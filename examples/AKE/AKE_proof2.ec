@@ -6,10 +6,6 @@ require import Int.
 require import AKE_defs.
 require import Real.
 
-(* { Hello *)
-(* dsfadfsdfdsf *)
-(* } *)
-
 module type AKE_Oracles2 = {
   fun eexpRev(i : Sidx, a : Sk) : Eexp option
   fun h2_a(sstring : Sstring) : Key option
@@ -221,8 +217,6 @@ module AKE_EexpRev(FA : Adv2) = {
   }
 }.
 
-(* first we enforce no collisions on Init1 and Resp *)
-
 pred collision_eexp_eexp(m : (Sidx, Eexp) map) =
   exists i j, in_dom i m /\ m.[i] = m.[j] /\ i <> j.
 
@@ -401,194 +395,41 @@ proof.
    by exists Z; rewrite mem_cons; right; assumption.
 save.
 
+lemma coll_or_not_fresh_mon : forall e s evs,
+ e <> Accept (cmatching s) =>
+ e <> Start (psid_of_sid (cmatching s)) =>
+(!fresh s evs \/ collision_eexp_rcvd evs ) =>
+(!fresh s (e::evs) \/ collision_eexp_rcvd(e::evs)).
+proof.
+ intros => e s evs hneq1 hneq2 [|] hor; last first.
+ by right; apply collision_eexp_rcvd_mon.
  
-module AKE_NoColl(FA : Adv2) = {
-  
-  var evs  : Event list               (* events for queries performed by adversary *)
-  var test : Sid option               (* session id of test session *)
+ left; generalize hor.
+ rewrite !fresh_eq_notfresh => hnfr.
+ apply notfresh_fresh => //.
+save.
 
-  var cSession, cH1, cH2 : int        (* counters for queries *)
+lemma coll_or_not_fresh_mon_ev : 
+forall e evs s,
+List.mem (Accept s) evs =>
+no_start_coll(e::evs) =>
+no_accept_coll(e::evs) =>
+valid_accepts (e::evs) =>
+(!fresh s evs \/ collision_eexp_rcvd evs ) =>
+(!fresh s (e::evs) \/ collision_eexp_rcvd(e::evs)).
+proof.
+ intros => e evs s hacc hnsc hnac hvalid hor.
+ case (collision_eexp_rcvd (e :: evs)) => // hncoll.
+ elim hor => {hor} hor.
+ left; apply coll_fresh => //.
+ cut: collision_eexp_rcvd (e :: evs); last by smt.
+ by apply collision_eexp_rcvd_mon.
+save.
 
-  var mH2 : (Sstring, Key) map        (* map for h2 *)
-  var sH2 : Sstring set               (* adversary queries for h2 *)
 
-  var mSk        : (Agent, Sk) map    (* map for static secret keys *)
-  var mEexp      : (Sidx, Eexp) map   (* map for ephemeral exponents of sessions *)
-  var mStarted   : (Sidx, Sdata2) map (* map of started sessions *)
-  var mCompleted : (Sidx, Epk)   map  (* additional data for completed sessions *)
-    
-  fun init() : unit = {
-    evs = [];
-    test = None;
-    cSession = 0;
-    cH1 = 0;
-    cH2 = 0;
-    mH2 = Map.empty;
-    sH2 = FSet.empty;
-    mSk = Map.empty;    
-    mEexp = Map.empty;
-    mStarted = Map.empty;
-    mCompleted = Map.empty;
-  }
-
-  module O : AKE_Oracles2 = {
-    
-    fun eexpRev(i : Sidx, a : Sk) : Eexp option = {
-      var r : Eexp option = None;
-      if (in_dom i mStarted) {
-        evs = EphemeralRev(compute_psid mStarted mEexp i)::evs;
-        if (sd2_actor(proj mStarted.[i]) = gen_pk(a)) {
-          r = mEexp.[i];
-        }
-      }
-      return r;
-    }
-    
-    fun h2(sstring : Sstring) : Key = {
-      var ke : Key;
-      ke = $sample_Key;
-      if (!in_dom sstring mH2) {
-        mH2.[sstring] = ke;
-      }
-      return proj mH2.[sstring];
-    }
- 
-    fun h2_a(sstring : Sstring) : Key option = {
-      var r : Key option = None;
-      var ks : Key;
-      if (cH2 < qH2) {
-        cH2 = cH2 + 1;
-        sH2 = add sstring sH2;
-        ks = h2(sstring);
-        r = Some(ks);
-      }
-      return r;
-    }
-
-    fun init1(i : Sidx, A : Agent, B : Agent) : Epk option = {
-      var pX : Epk;
-      var r : Epk option = None; 
-      if (in_dom A mSk && 
-         in_dom B mSk && !in_dom i mStarted &&
-         ! collision_eexp_rcvd_op(Start((A,B,gen_epk(proj mEexp.[i]),init))::evs)){
-        cSession = cSession + 1;
-        pX = gen_epk(proj mEexp.[i]);
-        mStarted.[i] = (A,B,init);
-        evs = Start((A,B,pX,init))::evs;
-        r = Some(pX);
-      }
-      return r;
-    }
-
-    fun resp(i : Sidx, B : Agent, A : Agent, X : Epk) : Epk option = {
-      var pY : Epk;
-      var r : Epk option = None;
-      if (in_dom A mSk && in_dom B mSk
-          && !in_dom i mStarted && !in_dom i mCompleted &&
-         ! collision_eexp_rcvd_op(Accept((B,A,gen_epk(proj mEexp.[i]),X,resp))::evs)) {
-        cSession = cSession + 1;
-        pY = gen_epk(proj mEexp.[i]);
-        mStarted.[i] = (B,A,resp);
-        mCompleted.[i] = X;
-        evs = Accept((B,A,pY,X,resp))::evs;
-        r = Some(pY);
-      }
-      return r;
-    }
-
-    fun init2(i : Sidx, Y : Epk) : unit = {
-      if (!in_dom i mCompleted && in_dom i mStarted &&
-      ! collision_eexp_rcvd_op(Accept(compute_sid mStarted mEexp mCompleted.[i <- Y] i)::evs)) {
-        mCompleted.[i] = Y;
-        evs = Accept(compute_sid mStarted mEexp mCompleted i)::evs;
-      }
-    }
-
-    fun staticRev(A : Agent) : Sk option = {
-      var r : Sk option = None;
-      if (in_dom A mSk) {
-        r = mSk.[A];
-        evs = StaticRev(A)::evs;
-      }
-      return r;
-    }
-
-    fun computeKey(i : Sidx) : Key option = {
-      var r : Key option = None;
-      var a : Agent;
-      var b : Agent;
-      var ro : Role;
-      var k : Key;
-      if (in_dom i mCompleted) {
-        (a,b,ro) = proj mStarted.[i];
-        k = h2(gen_sstring (proj mEexp.[i]) (proj mSk.[a]) b (proj mCompleted.[i]) ro);
-        r = Some k;
-      }
-      return r;
-    }
-
-    fun sessionRev(i : Sidx) : Key option = {
-      var r : Key option = None;
-      if (in_dom i mCompleted) {
-        evs = SessionRev(compute_sid mStarted mEexp mCompleted i)::evs;
-        r = computeKey(i);
-      }
-      return r;
-    }
-  }
-  
-  module A = FA(O)
-
-  fun main() : bool = {
-    var b : bool = def;
-    var pks : Pk list = [];
-    var t_idx : Sidx = def;
-    var key : Key = def;
-    var keyo : Key option = def;
-    var b' : bool = def;
-    var i : int = 0;
-    var ska : Sk = def;
-    var pka : Pk = def;
-    var xa' : Eexp = def;
-    var sidxs : Sidx set = univ_Sidx;
-    var sidx : Sidx;
-    
-    init();
-    while (i < qAgent) {
-      ska = $sample_Sk;
-      pka = gen_pk(ska);
-      pks = pka :: pks;
-      mSk.[pka] = ska;
-    }
-    while (sidxs <> FSet.empty) {
-      sidx = pick sidxs;
-      sidxs = rm sidx sidxs;
-      xa' = $sample_Eexp;
-      mEexp.[sidx] = xa';
-    } 
-    if (!collision_eexp_eexp_op mEexp) {
-     t_idx = A.choose(pks);
-     b = ${0,1};
-     if (mStarted.[t_idx] <> None && mCompleted.[t_idx] <> None) {
-      test = Some (compute_sid mStarted mEexp mCompleted t_idx);
-        (* the if-condition implies "mem (Accept (proj O.test)) O.evs" *)
-      if (b) {
-        keyo = O.computeKey(t_idx);
-      } else {
-        key  = $sample_Key;
-        keyo = Some key;
-      }
-      b' = A.guess(keyo);
-     }
-    }
-    return (b = b');
-  }
-}.
-
-(*{ proof: adding the collision check *)
 
 section.
-declare module A : Adv2{ AKE_EexpRev,AKE_NoColl}.
+declare module A : Adv2{ AKE_EexpRev}.
 
 axiom A_Lossless_guess : 
 forall (O <: AKE_Oracles2{A}),
@@ -608,366 +449,18 @@ forall (O <: AKE_Oracles2{A}),
   islossless O.resp =>
   islossless O.staticRev => islossless O.sessionRev => islossless A(O).choose.
 
-
 pred test_fresh(t : Sid option, evs : Event list) =
   t <> None /\ fresh (proj t) evs.
-
-equiv Eq_AKE_EexpRev_AKE_no_collision :
- AKE_NoColl(A).main ~ AKE_EexpRev(A).main  :
-={glob A} ==> 
-(res /\ test_fresh AKE_EexpRev.test AKE_EexpRev.evs
-                    /\ ! collision_eexp_eexp(AKE_EexpRev.mEexp) 
-                    /\ ! collision_eexp_rcvd(AKE_EexpRev.evs)){2}
-=>
-(res /\ test_fresh AKE_NoColl.test AKE_NoColl.evs
-                    /\ ! collision_eexp_eexp(AKE_NoColl.mEexp) 
-                    /\ ! collision_eexp_rcvd(AKE_NoColl.evs) ){1}.
-proof.
- fun.
- seq 14 14:
-(={glob A,b,pks,t_idx,key,keyo,b',i,pks} /\
-   AKE_EexpRev.evs{2} = AKE_NoColl.evs{1} /\
-   AKE_EexpRev.test{2} = AKE_NoColl.test{1} /\
-   AKE_EexpRev.cSession{2} = AKE_NoColl.cSession{1} /\
-   AKE_EexpRev.cH2{2} = AKE_NoColl.cH2{1} /\
-   AKE_EexpRev.mH2{2} = AKE_NoColl.mH2{1} /\
-   AKE_EexpRev.sH2{2} = AKE_NoColl.sH2{1} /\
-   AKE_EexpRev.mSk{2} = AKE_NoColl.mSk{1} /\
-   AKE_EexpRev.mEexp{2} = AKE_NoColl.mEexp{1} /\
-   AKE_EexpRev.mStarted{2} = AKE_NoColl.mStarted{1} /\
-   AKE_EexpRev.mCompleted{2} = AKE_NoColl.mCompleted{1}); first by eqobs_in.
-if{1}; last first.
-(* there is a collision: just show preservation on the right *)
-conseq ( _ : collision_eexp_eexp_op AKE_EexpRev.mEexp{2} ==>
-             collision_eexp_eexp_op AKE_EexpRev.mEexp{2})=> //.
- by smt.
- cut bhsh2: bd_hoare [ AKE_EexpRev(A).O.h2 : 
-     collision_eexp_eexp_op AKE_EexpRev.mEexp ==>
-     collision_eexp_eexp_op AKE_EexpRev.mEexp ] = 1%r;
- first by fun; wp; rnd => //; apply  TKey.Dword.lossless.
- cut bhsck2 : 
-bd_hoare [ AKE_EexpRev(A).O.computeKey : 
-     collision_eexp_eexp_op AKE_EexpRev.mEexp ==>
-     collision_eexp_eexp_op AKE_EexpRev.mEexp ] = 1%r;
- first by fun; sp; if => //; wp; call bhsh2; wp.
-
- seq 0 2: (collision_eexp_eexp_op AKE_EexpRev.mEexp{2}).
-  rnd{2}.
-  call{2} (_ : collision_eexp_eexp_op AKE_EexpRev.mEexp ==>
-               collision_eexp_eexp_op AKE_EexpRev.mEexp).
-   fun (collision_eexp_eexp_op AKE_EexpRev.mEexp) => //.
- by apply A_Lossless_choose.
- by fun; wp.
- by fun; sp; if => //; wp; call bhsh2; wp.
- by fun; sp; if => //; wp.
- by fun; if; wp.  
- by fun; sp; if => //; wp.
- by fun; wp.
- by fun; sp; if => //; call bhsck2; wp.
-  by skip; smt.
- 
- if{2} => //; sp.
-  call{2} (_ : collision_eexp_eexp_op AKE_EexpRev.mEexp ==>
-               collision_eexp_eexp_op AKE_EexpRev.mEexp).
-  fun (collision_eexp_eexp_op AKE_EexpRev.mEexp) => //.
- by apply A_Lossless_guess.
- by fun; wp.
- by fun; sp; if => //; wp; call bhsh2; wp.
- by fun; sp; if => //; wp.
- by fun; if; wp.  
- by fun; sp; if => //; wp.
- by fun; wp.
- by fun; sp; if => //; call bhsck2; wp.
- by if{2};[ call{2} bhsck2 => // | wp; rnd{2}; skip]; smt.
-
- seq 2 2:
-(!collision_eexp_rcvd AKE_EexpRev.evs{2} =>
- ={b,pks,t_idx,key,keyo,b',i,pks,glob A} /\
-  AKE_EexpRev.evs{2} = AKE_NoColl.evs{1} /\
-  AKE_EexpRev.test{2} = AKE_NoColl.test{1} /\
-  AKE_EexpRev.cSession{2} = AKE_NoColl.cSession{1} /\
-  AKE_EexpRev.cH2{2} = AKE_NoColl.cH2{1} /\
-  AKE_EexpRev.mH2{2} = AKE_NoColl.mH2{1} /\
-  AKE_EexpRev.sH2{2} = AKE_NoColl.sH2{1} /\
-  AKE_EexpRev.mSk{2} = AKE_NoColl.mSk{1} /\
-  AKE_EexpRev.mEexp{2} = AKE_NoColl.mEexp{1} /\
-  AKE_EexpRev.mStarted{2} = AKE_NoColl.mStarted{1} /\
-  AKE_EexpRev.mCompleted{2} = AKE_NoColl.mCompleted{1}).
-rnd.
-call 
-(_ :
-  (collision_eexp_rcvd AKE_EexpRev.evs),
-  (AKE_EexpRev.evs{2} = AKE_NoColl.evs{1} /\
-  AKE_EexpRev.test{2} = AKE_NoColl.test{1} /\
-  AKE_EexpRev.cSession{2} = AKE_NoColl.cSession{1} /\
-  AKE_EexpRev.cH2{2} = AKE_NoColl.cH2{1} /\
-  AKE_EexpRev.mH2{2} = AKE_NoColl.mH2{1} /\
-  AKE_EexpRev.sH2{2} = AKE_NoColl.sH2{1} /\
-  AKE_EexpRev.mSk{2} = AKE_NoColl.mSk{1} /\
-  AKE_EexpRev.mEexp{2} = AKE_NoColl.mEexp{1} /\
-  AKE_EexpRev.mStarted{2} = AKE_NoColl.mStarted{1} /\
-  AKE_EexpRev.mCompleted{2} = AKE_NoColl.mCompleted{1})) => //.
- by apply A_Lossless_choose.
- by fun; wp; skip; smt.
- by intros=> &2 hcoll; fun; wp; skip; smt.
- by intros=> &1; fun; wp; skip; smt.
- 
- by fun; sp; if => //;inline AKE_NoColl(A).O.h2 AKE_EexpRev(A).O.h2; wp; rnd;
-   wp; skip; smt.
- by intros => &2 hcoll; fun; sp; if => //; inline AKE_NoColl(A).O.h2; wp; rnd; 
-   try apply TKey.Dword.lossless; wp; skip; smt.
- by intros &1; fun; inline AKE_EexpRev(A).O.h2; sp; if => //; wp; rnd;
-   try apply TKey.Dword.lossless; wp; skip; smt.
-
- fun; sp; if{1} => //.
- rcondt{2} 1 => //.
- wp; skip; smt.
- if{2} => //; conseq (_ : collision_eexp_rcvd_op 
-                          (Start (A, B, gen_epk (proj AKE_EexpRev.mEexp.[i]), init){2} 
-                            ::AKE_EexpRev.evs{2}) ==> 
-                          collision_eexp_rcvd AKE_EexpRev.evs{2}) => //;
-   first 2 by smt.
-  wp; skip; progress.
-  by rewrite -collision_eexp_rcvd_op_def.
-  by intros => &2 hcoll; fun; wp.
-  by intros => &2; fun; wp; skip; progress => //; apply collision_eexp_rcvd_mon.
-
- fun.
- if{1}.
-  by rcondt{2} 1 => //; wp; skip => //.
-  if{2} => //.
-  conseq 
-(_ :  collision_eexp_rcvd_op (Accept
-  (compute_sid AKE_EexpRev.mStarted AKE_EexpRev.mEexp 
-   AKE_EexpRev.mCompleted.[i{2} <- Y{2}] i):: AKE_EexpRev.evs){2}  ==>  
-   collision_eexp_rcvd AKE_EexpRev.evs{2}) => //;first 2 by smt.
-  wp; skip; progress.
-  by rewrite -collision_eexp_rcvd_op_def.
- by intros => &2 hcoll; fun; wp; skip; smt.
- by intros => &1; fun; wp; skip; progress => //; apply collision_eexp_rcvd_mon.
- 
- fun; sp; if{1} => //.
- rcondt{2} 1 => //.
- wp; skip; smt.
- if{2} => //.
- conseq 
-(_ : collision_eexp_rcvd_op 
- (Accept (B, A, gen_epk (proj AKE_EexpRev.mEexp.[i]), X, resp)
-  :: AKE_EexpRev.evs){2} ==>
- collision_eexp_rcvd AKE_EexpRev.evs{2});first 2 by smt.
- by wp; skip; progress => //;rewrite -collision_eexp_rcvd_op_def.
-
- by intros => &2 hcoll; fun; wp; skip; smt.
- by intros => &1; fun; wp; skip; progress => //; apply collision_eexp_rcvd_mon.
-
- by fun; wp; skip; progress; smt.
- by intros => &2 hcoll; fun; wp; skip; smt.
- by intros => &1; fun; wp; skip; smt.
- 
- by fun; inline AKE_NoColl(A).O.computeKey AKE_NoColl(A).O.h2
-  AKE_EexpRev(A).O.computeKey AKE_EexpRev(A).O.h2;do 2!(sp; try if) => //;
-  wp; try rnd; wp; skip; progress => //; smt.
-
- by intros => _ _; fun; inline AKE_NoColl(A).O.computeKey AKE_NoColl(A).O.h2;
-  sp; if => //; sp; if; wp; try rnd; try apply TKey.Dword.lossless; wp; skip; progress.
- 
- by intros => _; fun; inline AKE_EexpRev(A).O.computeKey AKE_EexpRev(A).O.h2; 
-  sp; if => //; sp; if; wp; try rnd; try apply TKey.Dword.lossless; wp; skip; progress;
-  apply collision_eexp_rcvd_mon.
-  skip; smt.
- case (collision_eexp_rcvd AKE_EexpRev.evs{2}).
- conseq (_ :   collision_eexp_rcvd AKE_EexpRev.evs{2} ==> 
-  collision_eexp_rcvd AKE_EexpRev.evs{2}) => //.
- smt.
-if{1};if{2} => //.
-call{1} (_ : true ==> true).
-fun (true) => //; try (by fun; wp => //).
-  by apply A_Lossless_guess.
-  by fun; inline AKE_NoColl(A).O.h2; do 2!(sp; try if => //); wp; rnd;
-    try apply TKey.Dword.lossless; skip; smt.
-  by fun; inline  AKE_NoColl(A).O.computeKey AKE_NoColl(A).O.h2;
-    do 2!(sp; try if => //); wp; try rnd;
-    try apply TKey.Dword.lossless; wp; skip; smt.
-call{2} (_ : collision_eexp_rcvd AKE_EexpRev.evs ==>
-             collision_eexp_rcvd AKE_EexpRev.evs).
-fun (collision_eexp_rcvd AKE_EexpRev.evs) => //; try (by fun; wp => //; skip; smt).
-  by apply A_Lossless_guess.
-  by fun; inline AKE_EexpRev(A).O.h2; do 2!(sp; try if => //); wp; rnd;
-    try apply TKey.Dword.lossless; skip; smt.
-  by fun; inline  AKE_EexpRev(A).O.computeKey AKE_EexpRev(A).O.h2;
-    do 2!(sp; try if => //); wp; try rnd;
-    try apply TKey.Dword.lossless; wp; skip; smt.
- sp; if{1}; if{2} => //.
-  by inline AKE_NoColl(A).O.computeKey AKE_EexpRev(A).O.computeKey
-            AKE_NoColl(A).O.h2 AKE_EexpRev(A).O.h2;
-  sp; if{1}; if{2} => //; wp; try rnd; try rnd{1}; try rnd{2}; wp; skip; smt.
-  by inline AKE_NoColl(A).O.computeKey AKE_NoColl(A).O.h2;
-  sp; if{1} => //; wp; try rnd; try rnd{1}; try rnd{2}; wp; skip; smt.
-  by inline  AKE_EexpRev(A).O.computeKey AKE_EexpRev(A).O.h2;
-  sp; if{2} => //; wp; try rnd; try rnd{1}; try rnd{2}; wp; skip; smt.
-  by wp; rnd; skip; smt.
-call{1} (_ : true ==> true).
-fun (true) => //; try (by fun; wp => //).
-  by apply A_Lossless_guess.
-  by fun; inline AKE_NoColl(A).O.h2; do 2!(sp; try if => //); wp; rnd;
-    try apply TKey.Dword.lossless; skip; smt.
-  by fun; inline  AKE_NoColl(A).O.computeKey AKE_NoColl(A).O.h2;
-    do 2!(sp; try if => //); wp; try rnd;
-    try apply TKey.Dword.lossless; wp; skip; smt.
-sp; if{1} => //.
-  by inline AKE_NoColl(A).O.computeKey AKE_NoColl(A).O.h2;
-  sp; if{1} => //; wp; try rnd; try rnd{1}; try rnd{2}; wp; skip; smt.
-  by wp; rnd{1}; skip; smt.
-call{2} (_ : collision_eexp_rcvd AKE_EexpRev.evs ==>
-             collision_eexp_rcvd AKE_EexpRev.evs).
-fun (collision_eexp_rcvd AKE_EexpRev.evs) => //; try (by fun; wp => //; skip; smt).
-  by apply A_Lossless_guess.
-  by fun; inline AKE_EexpRev(A).O.h2; do 2!(sp; try if => //); wp; rnd;
-    try apply TKey.Dword.lossless; skip; smt.
-  by fun; inline  AKE_EexpRev(A).O.computeKey AKE_EexpRev(A).O.h2;
-    do 2!(sp; try if => //); wp; try rnd;
-    try apply TKey.Dword.lossless; wp; skip; smt.
-sp; if{2} => //.
-  by inline  AKE_EexpRev(A).O.computeKey AKE_EexpRev(A).O.h2;
-  sp; if{2} => //; wp; try rnd; try rnd{1}; try rnd{2}; wp; skip; smt.
-  by wp; rnd{2}; skip; smt.
- if => //;first by smt.
-call 
-(_ :
-  (collision_eexp_rcvd AKE_EexpRev.evs),
-  (AKE_EexpRev.evs{2} = AKE_NoColl.evs{1} /\
-  AKE_EexpRev.test{2} = AKE_NoColl.test{1} /\
-  AKE_EexpRev.cSession{2} = AKE_NoColl.cSession{1} /\
-  AKE_EexpRev.cH2{2} = AKE_NoColl.cH2{1} /\
-  AKE_EexpRev.mH2{2} = AKE_NoColl.mH2{1} /\
-  AKE_EexpRev.sH2{2} = AKE_NoColl.sH2{1} /\
-  AKE_EexpRev.mSk{2} = AKE_NoColl.mSk{1} /\
-  AKE_EexpRev.mEexp{2} = AKE_NoColl.mEexp{1} /\
-  AKE_EexpRev.mStarted{2} = AKE_NoColl.mStarted{1} /\
-  AKE_EexpRev.mCompleted{2} = AKE_NoColl.mCompleted{1})) => //.
- by apply A_Lossless_guess.
- by fun; wp; skip; smt.
- by intros=> &2 hcoll; fun; wp; skip; smt.
- by intros=> &1; fun; wp; skip; smt.
- 
- by fun; sp; if => //;inline AKE_NoColl(A).O.h2 AKE_EexpRev(A).O.h2; wp; rnd;
-   wp; skip; smt.
- by intros => &2 hcoll; fun; sp; if => //; inline AKE_NoColl(A).O.h2; wp; rnd; 
-   try apply TKey.Dword.lossless; wp; skip; smt.
- by intros &1; fun; inline AKE_EexpRev(A).O.h2; sp; if => //; wp; rnd;
-   try apply TKey.Dword.lossless; wp; skip; smt.
-
- fun; sp; if{1} => //.
- rcondt{2} 1 => //.
- wp; skip; smt.
- if{2} => //; conseq (_ : collision_eexp_rcvd_op 
-                          (Start (A, B, gen_epk (proj AKE_EexpRev.mEexp.[i]), init){2} 
-                            ::AKE_EexpRev.evs{2}) ==> 
-                          collision_eexp_rcvd AKE_EexpRev.evs{2}) => //;
-   first 2 by smt.
-  wp; skip; progress.
-  by rewrite -collision_eexp_rcvd_op_def.
-  by intros => &2 hcoll; fun; wp.
-  by intros => &2; fun; wp; skip; progress => //; apply collision_eexp_rcvd_mon.
-
- fun.
- if{1}.
-  by rcondt{2} 1 => //; wp; skip => //.
-  if{2} => //.
-  conseq 
-(_ :  collision_eexp_rcvd_op (Accept
-  (compute_sid AKE_EexpRev.mStarted AKE_EexpRev.mEexp 
-   AKE_EexpRev.mCompleted.[i{2} <- Y{2}] i):: AKE_EexpRev.evs){2}  ==>  
-   collision_eexp_rcvd AKE_EexpRev.evs{2}) => //;first 2 by smt.
-  wp; skip; progress.
-  by rewrite -collision_eexp_rcvd_op_def.
- by intros => &2 hcoll; fun; wp; skip; smt.
- by intros => &1; fun; wp; skip; progress => //; apply collision_eexp_rcvd_mon.
- 
- fun; sp; if{1} => //.
- rcondt{2} 1 => //.
- wp; skip; smt.
- if{2} => //.
- conseq 
-(_ : collision_eexp_rcvd_op 
- (Accept (B, A, gen_epk (proj AKE_EexpRev.mEexp.[i]), X, resp)
-  :: AKE_EexpRev.evs){2} ==>
- collision_eexp_rcvd AKE_EexpRev.evs{2});first 2 by smt.
- by wp; skip; progress => //;rewrite -collision_eexp_rcvd_op_def.
-
- by intros => &2 hcoll; fun; wp; skip; smt.
- by intros => &1; fun; wp; skip; progress => //; apply collision_eexp_rcvd_mon.
-
- by fun; wp; skip; progress; smt.
- by intros => &2 hcoll; fun; wp; skip; smt.
- by intros => &1; fun; wp; skip; smt.
- 
- by fun; inline AKE_NoColl(A).O.computeKey AKE_NoColl(A).O.h2
-  AKE_EexpRev(A).O.computeKey AKE_EexpRev(A).O.h2;do 2!(sp; try if) => //;
-  wp; try rnd; wp; skip; progress => //; smt.
-
- by intros => _ _; fun; inline AKE_NoColl(A).O.computeKey AKE_NoColl(A).O.h2;
-  sp; if => //; sp; if; wp; try rnd; try apply TKey.Dword.lossless; wp; skip; progress.
- 
- by intros => _; fun; inline AKE_EexpRev(A).O.computeKey AKE_EexpRev(A).O.h2; 
-  sp; if => //; sp; if; wp; try rnd; try apply TKey.Dword.lossless; wp; skip; progress;
-  apply collision_eexp_rcvd_mon.
- simplify.
-
- seq 2 2:
-( ={keyo, b} /\
-   ={glob A} /\
-   AKE_EexpRev.evs{2} = AKE_NoColl.evs{1} /\
-   AKE_EexpRev.test{2} = AKE_NoColl.test{1} /\
-   AKE_EexpRev.cSession{2} = AKE_NoColl.cSession{1} /\
-   AKE_EexpRev.cH2{2} = AKE_NoColl.cH2{1} /\
-   AKE_EexpRev.mH2{2} = AKE_NoColl.mH2{1} /\
-   AKE_EexpRev.sH2{2} = AKE_NoColl.sH2{1} /\
-   AKE_EexpRev.mSk{2} = AKE_NoColl.mSk{1} /\
-   AKE_EexpRev.mEexp{2} = AKE_NoColl.mEexp{1} /\
-   AKE_EexpRev.mStarted{2} = AKE_NoColl.mStarted{1} /\
-   AKE_EexpRev.mCompleted{2} = AKE_NoColl.mCompleted{1}).
- sp; if => //; first smt.
- inline AKE_NoColl(A).O.computeKey AKE_EexpRev(A).O.computeKey
-            AKE_NoColl(A).O.h2 AKE_EexpRev(A).O.h2; sp; if; first by smt.
-by wp; rnd; wp; skip => &1 &2 [[?][?][?][?][[testR][?][testL][?][[h]hnocoll]]];
-  elim (h _) => //;progress; smt.
-by wp; skip; progress; smt.
-by wp; rnd; wp; skip; progress; smt.
-by skip; progress => //;smt.
-by skip; progress => //;smt.
-save.
-
-
-
-lemma Eq_AKE_EexpRev_AKE_no_collision_Pr &m :
-Pr[AKE_EexpRev(A).main() @ &m : res /\ test_fresh AKE_EexpRev.test AKE_EexpRev.evs
-                    /\ ! collision_eexp_eexp(AKE_EexpRev.mEexp) 
-                    /\ ! collision_eexp_rcvd(AKE_EexpRev.evs)] <=
-Pr[AKE_NoColl(A).main() @ &m : res /\ test_fresh AKE_EexpRev.test AKE_EexpRev.evs
-                    /\ ! collision_eexp_eexp(AKE_EexpRev.mEexp) 
-                    /\ ! collision_eexp_rcvd(AKE_EexpRev.evs)].
-proof.
- admit.
-save.
-(* need symmetry rule for pRHL *)
-
-
-(*end proof: adding the collision check }*)
-
-(*{ enforcing freshness *)
-(* first, we introduce an operator that implements
- the predicate fresh *)
 
 op fresh_op : Sid -> Event list-> bool.
 
 axiom fresh_op_def : forall s evs,
 fresh s evs <=> fresh_op s evs = true.
 
+lemma fresh_op_def' : forall s evs,
+fresh s evs = (fresh_op s evs = true) by smt.
 
-
-local module AKE_Enforcement(FA : Adv2) = {
-  
+local module AKE_Fresh(FA : Adv2) = {
   var evs  : Event list               (* events for queries performed by adversary *)
   var test : Sid option               (* session id of test session *)
 
@@ -1000,8 +493,8 @@ local module AKE_Enforcement(FA : Adv2) = {
     fun eexpRev(i : Sidx, a : Sk) : Eexp option = {
       var r : Eexp option = None;
       if (in_dom i mStarted && 
-    (let evs' = EphemeralRev(compute_psid mStarted mEexp i)::evs
-     in test <> None => fresh_op (proj test) evs' )) {
+      ((test <> None) => 
+      fresh_op (proj test) (EphemeralRev(compute_psid mStarted mEexp i)::evs ))) {
         evs = EphemeralRev(compute_psid mStarted mEexp i)::evs;
         if (sd2_actor(proj mStarted.[i]) = gen_pk(a)) {
           r = mEexp.[i];
@@ -1034,9 +527,7 @@ local module AKE_Enforcement(FA : Adv2) = {
     fun init1(i : Sidx, A : Agent, B : Agent) : Epk option = {
       var pX : Epk;
       var r : Epk option = None; 
-      if ( in_dom A mSk && 
-         in_dom B mSk && !in_dom i mStarted &&
-         ! collision_eexp_rcvd_op(Start((A,B,gen_epk(proj mEexp.[i]),init))::evs)) {
+      if ( in_dom A mSk && in_dom B mSk && !in_dom i mStarted ) {
         cSession = cSession + 1;
         pX = gen_epk(proj mEexp.[i]);
         mStarted.[i] = (A,B,init);
@@ -1050,8 +541,7 @@ local module AKE_Enforcement(FA : Adv2) = {
       var pY : Epk;
       var r : Epk option = None;
       if (in_dom A mSk && in_dom B mSk
-          && !in_dom i mStarted && !in_dom i mCompleted &&
-         ! collision_eexp_rcvd_op(Accept((B,A,gen_epk(proj mEexp.[i]),X,resp))::evs)) {
+          && !in_dom i mStarted && !in_dom i mCompleted) {
         cSession = cSession + 1;
         pY = gen_epk(proj mEexp.[i]);
         mStarted.[i] = (B,A,resp);
@@ -1063,8 +553,7 @@ local module AKE_Enforcement(FA : Adv2) = {
     }
 
     fun init2(i : Sidx, Y : Epk) : unit = {
-      if (!in_dom i mCompleted && in_dom i mStarted &&
-      ! collision_eexp_rcvd_op(Accept(compute_sid mStarted mEexp mCompleted.[i <- Y] i)::evs)) {
+      if (!in_dom i mCompleted && in_dom i mStarted) {
         mCompleted.[i] = Y;
         evs = Accept(compute_sid mStarted mEexp mCompleted i)::evs;
       }
@@ -1073,8 +562,8 @@ local module AKE_Enforcement(FA : Adv2) = {
     fun staticRev(A : Agent) : Sk option = {
       var r : Sk option = None;
       if (in_dom A mSk &&
-      (let evs' = StaticRev A::evs
-       in test <> None => fresh_op (proj test) evs' )) {
+      ((test <> None => 
+       fresh_op (proj test) (StaticRev A::evs )))) {
         r = mSk.[A];
         evs = StaticRev(A)::evs;
       }
@@ -1098,9 +587,9 @@ local module AKE_Enforcement(FA : Adv2) = {
     fun sessionRev(i : Sidx) : Key option = {
       var r : Key option = None;
       if (in_dom i mCompleted &&
-     (let evs' = SessionRev
-          (compute_sid mStarted mEexp mCompleted i)::evs
-     in test <> None => fresh_op (proj test) evs' )) {
+     ((test <> None) =>
+      fresh_op (proj test) (SessionRev
+          (compute_sid mStarted mEexp mCompleted i)::evs) )) {
         evs = SessionRev(compute_sid mStarted mEexp mCompleted i)::evs;
         r = computeKey(i);
       }
@@ -1156,10 +645,7 @@ local module AKE_Enforcement(FA : Adv2) = {
   }
 }.
 
-(*{ Proof: enforcement doesn not make a difference
-    when we have fresh in the event *)
-
-
+(* useful lemmas for the invariants *)
 
 lemma no_start_coll_pres : 
 forall e evs, 
@@ -1524,9 +1010,11 @@ proof.
    intros => [heq|hmem].
    cut: ps = (A0, B, gen_epk (proj m2.[i]), init); first by apply Start_inj.
    intros => {heq} heq.
-   exists i; progress => //; last 4 by generalize H; rewrite get_setE proj_some.
+   exists i; progress => //.
     by rewrite in_dom_setE.
-
+    by generalize H; rewrite get_setE proj_some.
+    by generalize H; rewrite get_setE proj_some.
+ 
    elim (hinv ps) => h1 h2.
    elim (h1 _) => //= i' [hindom2][hindom3 heq].
    cut hneq: i <> i'.
@@ -1670,87 +1158,87 @@ proof.
 save.
 
 
-local equiv Eq_AKE_EexpRev_AKE_Enforcement :
- AKE_Enforcement(A).main ~ AKE_NoColl(A).main  :
-true ==> 
-(res /\ test_fresh AKE_Enforcement.test AKE_Enforcement.evs
-                    /\ ! collision_eexp_eexp(AKE_Enforcement.mEexp) 
-                    /\ ! collision_eexp_rcvd(AKE_Enforcement.evs) ){1} <=>
-(res /\ test_fresh AKE_NoColl.test AKE_NoColl.evs
-                    /\ ! collision_eexp_eexp(AKE_NoColl.mEexp) 
-                    /\ ! collision_eexp_rcvd(AKE_NoColl.evs)){2}.
+local equiv eq1_choose : 
+AKE_Fresh(A).A.choose ~ AKE_EexpRev(A).A.choose : 
+ ={s, glob A} /\
+ (AKE_EexpRev.evs{2} = AKE_Fresh.evs{1} /\
+  AKE_EexpRev.test{2} = AKE_Fresh.test{1} /\
+  AKE_EexpRev.cSession{2} = AKE_Fresh.cSession{1} /\
+  AKE_EexpRev.cH2{2} = AKE_Fresh.cH2{1} /\
+  AKE_EexpRev.mH2{2} = AKE_Fresh.mH2{1} /\
+  AKE_EexpRev.sH2{2} = AKE_Fresh.sH2{1} /\
+  AKE_EexpRev.mSk{2} = AKE_Fresh.mSk{1} /\
+  AKE_EexpRev.mEexp{2} = AKE_Fresh.mEexp{1} /\
+  AKE_EexpRev.mStarted{2} = AKE_Fresh.mStarted{1} /\
+  AKE_EexpRev.mCompleted{2} = AKE_Fresh.mCompleted{1} /\
+  AKE_Fresh.test{1} = None /\
+  accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+  start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+  no_start_coll(AKE_EexpRev.evs{2}) /\
+  no_accept_coll(AKE_EexpRev.evs{2}) /\
+  valid_accepts (AKE_EexpRev.evs{2}) /\
+  inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2} AKE_EexpRev.mEexp{2}  /\
+  inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2} 
+             AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+  (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\ 
+  (forall x, in_dom x AKE_EexpRev.mCompleted{2} => in_dom x AKE_EexpRev.mStarted{2}) /\
+  (forall x, in_dom x AKE_EexpRev.mStarted{2} => !in_dom x AKE_EexpRev.mCompleted{2} =>
+     sd2_role (proj (AKE_EexpRev.mStarted{2}.[x])) = init)) ==>
+ ={res, glob A} /\
+ (AKE_EexpRev.evs{2} = AKE_Fresh.evs{1} /\
+  AKE_EexpRev.test{2} = AKE_Fresh.test{1} /\
+  AKE_EexpRev.cSession{2} = AKE_Fresh.cSession{1} /\
+  AKE_EexpRev.cH2{2} = AKE_Fresh.cH2{1} /\
+  AKE_EexpRev.mH2{2} = AKE_Fresh.mH2{1} /\
+  AKE_EexpRev.sH2{2} = AKE_Fresh.sH2{1} /\
+  AKE_EexpRev.mSk{2} = AKE_Fresh.mSk{1} /\
+  AKE_EexpRev.mEexp{2} = AKE_Fresh.mEexp{1} /\
+  AKE_EexpRev.mStarted{2} = AKE_Fresh.mStarted{1} /\
+  AKE_EexpRev.mCompleted{2} = AKE_Fresh.mCompleted{1} /\
+  AKE_Fresh.test{1} = None /\
+  accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+  start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+  no_start_coll(AKE_EexpRev.evs{2}) /\
+  no_accept_coll(AKE_EexpRev.evs{2}) /\
+  valid_accepts (AKE_EexpRev.evs{2}) /\
+  inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2} AKE_EexpRev.mEexp{2}  /\
+  inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2} 
+             AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+  (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\ 
+  (forall x, in_dom x AKE_EexpRev.mCompleted{2} => in_dom x AKE_EexpRev.mStarted{2}) /\
+  (forall x, in_dom x AKE_EexpRev.mStarted{2} => !in_dom x AKE_EexpRev.mCompleted{2} =>
+     sd2_role (proj (AKE_EexpRev.mStarted{2}.[x])) = init)).
 proof.
- fun.
- seq 14 14:(={b,pks,t_idx,key,keyo,b',i,pks} /\
-  AKE_NoColl.evs{2} = AKE_Enforcement.evs{1} /\
-  AKE_NoColl.test{2} = AKE_Enforcement.test{1} /\
-  AKE_NoColl.cSession{2} = AKE_Enforcement.cSession{1} /\
-  AKE_NoColl.cH2{2} = AKE_Enforcement.cH2{1} /\
-  AKE_NoColl.mH2{2} = AKE_Enforcement.mH2{1} /\
-  AKE_NoColl.sH2{2} = AKE_Enforcement.sH2{1} /\
-  AKE_NoColl.mSk{2} = AKE_Enforcement.mSk{1} /\
-  AKE_NoColl.mEexp{2} = AKE_Enforcement.mEexp{1} /\
-  AKE_NoColl.mStarted{2} = AKE_Enforcement.mStarted{1} /\
-  AKE_NoColl.mCompleted{2} = AKE_Enforcement.mCompleted{1} /\
-  AKE_NoColl.evs{2} = [] /\ 
-  (forall (s : Sidx), in_dom s AKE_NoColl.mEexp{2})).
- inline AKE_Enforcement(A).init AKE_NoColl(A).init.
- while
-(  ={sidxs} /\
-AKE_Enforcement.mEexp{1} = AKE_NoColl.mEexp{2}  /\
-  (forall (s : Sidx), !mem s sidxs{2} => in_dom s AKE_NoColl.mEexp{2})). 
-wp; rnd; wp; skip; progress; try smt.
-case  (s = (pick sidxs{2})) => h.
- by rewrite h;apply in_dom_setE.
-generalize H5; rewrite mem_rm !not_and => [hl|]; last by smt.
- by cut:= H s _ => //;rewrite in_dom_setNE //.
-while (={pks} /\ AKE_Enforcement.mSk{1} = AKE_NoColl.mSk{2}).
-by wp; rnd.
-by wp; skip; progress => //; smt.
-  if=> //.
-   seq 2 2:(={b,pks,t_idx,key,keyo,b',i,pks} /\
-  AKE_NoColl.evs{2} = AKE_Enforcement.evs{1} /\
-  AKE_NoColl.test{2} = AKE_Enforcement.test{1} /\
-  AKE_NoColl.cSession{2} = AKE_Enforcement.cSession{1} /\
-  AKE_NoColl.cH2{2} = AKE_Enforcement.cH2{1} /\
-  AKE_NoColl.mH2{2} = AKE_Enforcement.mH2{1} /\
-  AKE_NoColl.sH2{2} = AKE_Enforcement.sH2{1} /\
-  AKE_NoColl.mSk{2} = AKE_Enforcement.mSk{1} /\
-  AKE_NoColl.mEexp{2} = AKE_Enforcement.mEexp{1} /\
-  AKE_NoColl.mStarted{2} = AKE_Enforcement.mStarted{1} /\
-  AKE_NoColl.mCompleted{2} = AKE_Enforcement.mCompleted{1} /\
-  AKE_NoColl.evs{2} = [] /\ 
-  (forall (s : Sidx), in_dom s AKE_NoColl.mEexp{2}) /\
-  ! collision_eexp_eexp_op AKE_NoColl.mEexp{2}).
-rnd.
-call (_ :
-   AKE_NoColl.evs{2} = AKE_Enforcement.evs{1} /\
-  AKE_NoColl.test{2} = AKE_Enforcement.test{1} /\
-  AKE_NoColl.cSession{2} = AKE_Enforcement.cSession{1} /\
-  AKE_NoColl.cH2{2} = AKE_Enforcement.cH2{1} /\
-  AKE_NoColl.mH2{2} = AKE_Enforcement.mH2{1} /\
-  AKE_NoColl.sH2{2} = AKE_Enforcement.sH2{1} /\
-  AKE_NoColl.mSk{2} = AKE_Enforcement.mSk{1} /\
-  AKE_NoColl.mEexp{2} = AKE_Enforcement.mEexp{1} /\
-  AKE_NoColl.mStarted{2} = AKE_Enforcement.mStarted{1} /\
-  AKE_NoColl.mCompleted{2} = AKE_Enforcement.mCompleted{1} /\
-  AKE_Enforcement.test{1} = None /\
-  !collision_eexp_rcvd(AKE_NoColl.evs{2}) /\
-  accept_evs_eexps AKE_NoColl.evs{2} AKE_NoColl.mEexp{2} /\
-  start_evs_eexps AKE_NoColl.evs{2} AKE_NoColl.mEexp{2} /\
-  no_start_coll(AKE_NoColl.evs{2}) /\
-  no_accept_coll(AKE_NoColl.evs{2}) /\
-  valid_accepts (AKE_NoColl.evs{2}) /\
-  inv_started AKE_NoColl.evs{2} AKE_NoColl.mStarted{2} AKE_NoColl.mEexp{2}  /\
-  inv_accepted AKE_NoColl.evs{2} AKE_NoColl.mStarted{2} 
-             AKE_NoColl.mEexp{2} AKE_NoColl.mCompleted{2} /\
-  (forall (s : Sidx), in_dom s AKE_NoColl.mEexp{2}) /\
-! collision_eexp_eexp_op AKE_NoColl.mEexp{2} /\ 
-  (forall x, in_dom x AKE_NoColl.mCompleted{2} => in_dom x AKE_NoColl.mStarted{2}) /\
-  (forall x, in_dom x AKE_NoColl.mStarted{2} => !in_dom x AKE_NoColl.mCompleted{2} =>
-     sd2_role (proj (AKE_NoColl.mStarted{2}.[x])) = init)).
-   fun; wp; skip; progress => //.
-    by apply n_exp_recvd_coll => //; smt.
+ fun (AKE_EexpRev.evs{2} = AKE_Fresh.evs{1} /\
+  AKE_EexpRev.test{2} = AKE_Fresh.test{1} /\
+  AKE_EexpRev.cSession{2} = AKE_Fresh.cSession{1} /\
+  AKE_EexpRev.cH2{2} = AKE_Fresh.cH2{1} /\
+  AKE_EexpRev.mH2{2} = AKE_Fresh.mH2{1} /\
+  AKE_EexpRev.sH2{2} = AKE_Fresh.sH2{1} /\
+  AKE_EexpRev.mSk{2} = AKE_Fresh.mSk{1} /\
+  AKE_EexpRev.mEexp{2} = AKE_Fresh.mEexp{1} /\
+  AKE_EexpRev.mStarted{2} = AKE_Fresh.mStarted{1} /\
+  AKE_EexpRev.mCompleted{2} = AKE_Fresh.mCompleted{1} /\
+  AKE_Fresh.test{1} = None /\
+  accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+  start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+  no_start_coll(AKE_EexpRev.evs{2}) /\
+  no_accept_coll(AKE_EexpRev.evs{2}) /\
+  valid_accepts (AKE_EexpRev.evs{2}) /\
+  inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2} AKE_EexpRev.mEexp{2}  /\
+  inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2} 
+             AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+  (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\ 
+  (forall x, in_dom x AKE_EexpRev.mCompleted{2} => in_dom x AKE_EexpRev.mStarted{2}) /\
+  (forall x, in_dom x AKE_EexpRev.mStarted{2} => !in_dom x AKE_EexpRev.mCompleted{2} =>
+     sd2_role (proj (AKE_EexpRev.mStarted{2}.[x])) = init)).
+progress => //; try apply H9; smt.
+progress => //; try apply H9; smt.
+
+fun; wp; skip; progress => //.
     by apply accept_evs_eexps_pres => //; smt.
     by apply start_evs_eexps_pres => //; smt.
     by apply no_start_coll_pres => //; smt. 
@@ -1758,10 +1246,9 @@ call (_ :
     by apply valid_accept_pres => //; smt. 
     by apply inv_started_pres => //; smt.  
     by apply inv_accepted_pres => //; smt.  
-    by smt.
-    by smt.
-    by apply H10.
-    by apply n_exp_recvd_coll => //; smt.
+    by apply H6.
+    by apply H8.
+    by apply H9.
     by apply accept_evs_eexps_pres => //; smt.
     by apply start_evs_eexps_pres => //; smt.
     by apply no_start_coll_pres => //; smt. 
@@ -1769,41 +1256,40 @@ call (_ :
     by apply valid_accept_pres => //; smt.
     by apply inv_started_pres => //; smt.
     by apply inv_accepted_pres => //; smt.  
-    by smt.
-    by smt.
-    by apply H10.
-    by smt.
-    by smt.
-    by apply H10.
+    by apply H6.
+    by apply H8.
+    by apply H9.
+    by apply H6.
+    by apply H8.
+    by apply H9.
 
     fun; sp; (if; first smt);
-    inline AKE_Enforcement(A).O.h2  AKE_NoColl(A).O.h2;
+    inline AKE_Fresh(A).O.h2  AKE_EexpRev(A).O.h2;
     wp; try rnd; wp; skip; [smt | 
     intros => &1 &2 H1; do!split; smt].
 
 
-   fun; sp; (if; first by smt); wp; skip; progress; last 12 by (try apply H10; smt).
-    smt. 
+   fun; sp; (if; first by smt); wp; skip; progress => //.
     by apply accept_evs_eexps_pres => //; smt.
-    by apply start_evs_eexps_pres_ev => //;exists i{2}; progress; apply H7.
+    by apply start_evs_eexps_pres_ev => //;exists i{2}; progress => //; smt.
 
     apply no_start_coll_pres_ev => //.
     intros s' hmem; apply not_def => h.
-    elim (H5 s') => [hl hr] {hr}.
+    elim (H4 s') => [hl hr] {hr}.
     elim (hl _) => // j [hstarted][hdom]heq {hl}.
     cut hneq:  j <> i{2}; first by apply not_def => heq'; 
       generalize H12 hstarted; rewrite heq'.
     generalize heq; 
-    elim /tuple3_ind (proj AKE_Enforcement.mStarted{1}.[j]) => A B r /= heq1.
+    elim /tuple3_ind (proj AKE_Fresh.mStarted{1}.[j]) => A B r /= heq1.
     apply not_def => [[heq2 hrole']].
     generalize h; rewrite heq2 /psid_sent /=; apply not_def => {heq2}{heq1} heq1.
-    cut: collision_eexp_eexp_op AKE_Enforcement.mEexp{1}; last by smt.
+    cut: collision_eexp_eexp_op AKE_Fresh.mEexp{1}; last by smt.
     rewrite collision_eexp_eexp_op_def /collision_eexp_eexp.
     exists i{2}; exists j; do !split => //.
-    apply H7.
-    cut: (proj AKE_Enforcement.mEexp{1}.[i{2}]) =
-         (proj AKE_Enforcement.mEexp{1}.[j]); first by apply gen_epk_inj.
-    cut h':= H7 i{2} => h''.
+    by apply H6.
+    cut: (proj AKE_Fresh.mEexp{1}.[i{2}]) =
+         (proj AKE_Fresh.mEexp{1}.[j]); first by apply gen_epk_inj.
+    cut h':= H6 i{2} => h''.
     apply proj_inj_some.
      by generalize h'; rewrite /in_dom.
      by generalize hdom; rewrite /in_dom.
@@ -1812,81 +1298,83 @@ call (_ :
 
    by apply no_accept_coll_pres => //; smt. 
    by apply valid_accept_pres => //; smt.
-   by apply inv_started_pres_ev => //; apply H7 => //.
+   by apply inv_started_pres_ev => //; apply H6 => //.
    apply inv_accepted_pres_ev2 => //.
-    by apply not_def => h; cut: in_dom i{2} AKE_Enforcement.mStarted{1} by apply H9.
+    by apply not_def => h; cut: in_dom i{2} AKE_Fresh.mStarted{1} by apply H8.
     by smt.
 
-   by apply H7 => //.
-   by smt.
-   by rewrite in_dom_set; left; apply H9.
-   generalize H15; rewrite in_dom_set => [|] hor; last by rewrite hor  get_setE; smt.
+   by apply H6 => //.
+   by rewrite in_dom_set; left; apply H8.
+   generalize H13; rewrite in_dom_set => [|] hor; last by rewrite hor  get_setE; smt.
    rewrite get_setNE.
-    by apply not_def => heq; generalize heq hor H13 => ->.
-    by apply H10.
-   
+    by apply not_def => heq; generalize heq hor H12 => ->.
+    by apply H9.
+    by apply H6.
+    by apply H8.
+    by apply H9.
+
    fun; sp; if => //; wp; skip; progress => //.
-   by smt.
    apply accept_evs_eexps_pres_ev => //.
    exists i{2}; do !split => //.
-   apply H7 => //.
-   rewrite  /sid_sent /compute_sid /= get_setE proj_some /=.
-   by elim /tuple3_ind  (proj AKE_Enforcement.mStarted{1}.[i{2}]) => /=.
-   by apply start_evs_eexps_pres => //; smt.
-   by apply no_start_coll_pres => //; smt. 
+    by apply H6 => //.
+    
+    rewrite  /sid_sent /compute_sid /= get_setE proj_some /=.
+    by elim /tuple3_ind  (proj AKE_Fresh.mStarted{1}.[i{2}]) => /=.
+  
+    by apply start_evs_eexps_pres => //; smt.
+    by apply no_start_coll_pres => //; smt. 
 
    apply no_accept_coll_pres_ev => //.
    intros => s hmem.
    rewrite /compute_sid get_setE.
-   elim /tuple3_ind (proj AKE_Enforcement.mStarted{1}.[i{2}]) => /=;
+   elim /tuple3_ind (proj AKE_Fresh.mStarted{1}.[i{2}]) => /=;
     rewrite {1}/sid_sent /= => A B r heq;apply not_def => h.
-   cut [h1 h2]:= H6 s => {h2}.
+   cut [h1 h2]:= H5 s => {h2}.
    elim (h1 _) => //. 
    intros => {h1} j [hjstrt][hjcomp][heexp] heq'.
    generalize  heq' h => ->; rewrite /sid_sent /compute_sid /=.
-   elim /tuple3_ind (proj AKE_Enforcement.mStarted{1}.[j]) => /= A' B' r' heq'.
+   elim /tuple3_ind (proj AKE_Fresh.mStarted{1}.[j]) => /= A' B' r' heq'.
    case (i{2} = j) => hor.
      by generalize hjstrt H10; rewrite hor; smt.
 
      apply not_def => heq''; 
-     cut: collision_eexp_eexp_op AKE_Enforcement.mEexp{1}; last by smt.
+     cut: collision_eexp_eexp_op AKE_Fresh.mEexp{1}; last by smt.
      rewrite collision_eexp_eexp_op_def /collision_eexp_eexp.
      exists i{2}; exists j; do !split => //.
-      by apply H7.
+      by apply H6.
       apply proj_inj_some.
-       by cut:= H7 i{2}; rewrite /in_dom.
-       by cut:= H7 j; rewrite /in_dom.
+       by cut:= H6 i{2}; rewrite /in_dom.
+       by cut:= H6 j; rewrite /in_dom.
        by apply gen_epk_inj.
        
    apply valid_accept_pres_ev => //.   
    rewrite /psid_of_sid/compute_sid get_setE.
-   elim /tuple3_ind (proj AKE_Enforcement.mStarted{1}.[i{2}]) => /= A' B' r' heq.
+   elim /tuple3_ind (proj AKE_Fresh.mStarted{1}.[i{2}]) => /= A' B' r' heq.
    cut [h1 h2]:=
-    H5 (A', B', gen_epk (proj AKE_Enforcement.mEexp{1}.[i{2}]), r') => {h1}.
+    H4 (A', B', gen_epk (proj AKE_Fresh.mEexp{1}.[i{2}]), r') => {h1}.
    apply h2.
    exists i{2}; rewrite heq; progress => //.
-    by apply H7.
-    by cut:= H10 i{2} _ _ => //; rewrite heq /sd2_role /=.
+    by apply H6.
+    by cut:= H9 i{2} _ _ => //; rewrite heq /sd2_role /=.
 
   by apply inv_started_pres => //; smt.   
 
   apply inv_accepted_pres_ev1 => //.
-  by apply H7.
-  by apply H7.
+   by apply H6.
+   by apply H6.
   case (x = i{2}).
    by intros ->.
-   by intros neq; generalize H14; rewrite in_dom_setNE // => h; apply H9.
+   by intros neq; generalize H12; rewrite in_dom_setNE // => h; apply H8.
    case (x = i{2}).
-    by intros => ->; cut:= H10 i{2} _ _.
-    by intros => hneq; apply H10 => //; generalize H15; rewrite in_dom_set; smt.
+    by intros => ->; cut:= H9 i{2} _ _.
+    by intros => hneq; apply H9 => //; generalize H13; rewrite in_dom_set; smt.
 
-  by apply H7.
+  by apply H6.
+  by apply H8.
   by apply H9.
-  by apply H10.
 
    fun; sp; if => //; wp; skip; progress => //.
-   by smt.
- 
+
    apply accept_evs_eexps_pres_ev => //.
     by rewrite /sid_sent /=; exists i{2}; split; smt.
    
@@ -1896,21 +1384,2097 @@ call (_ :
    apply no_accept_coll_pres_ev => //.
    intros => s hmem; rewrite {1}/sid_sent /=.
    apply not_def => heq.
-   cut [h1 h2]:= H6 s => {h2}.
+   cut [h1 h2]:= H5 s => {h2}.
    elim (h1 _) => //. 
    intros => {h1} j [hjstrt][hjcomp][heexp] heq'.
    generalize  heq' heq => ->; rewrite /sid_sent /compute_sid /=.
-   elim /tuple3_ind (proj AKE_Enforcement.mStarted{1}.[j]) => /= A' B' r' heq'.
+   elim /tuple3_ind (proj AKE_Fresh.mStarted{1}.[j]) => /= A' B' r' heq'.
+   case (i{2} = j) => hor.
+     by generalize hjstrt H9; rewrite hor; smt.
+
+     apply not_def => heq''; 
+     cut: collision_eexp_eexp_op AKE_Fresh.mEexp{1}; last by smt.
+     rewrite collision_eexp_eexp_op_def /collision_eexp_eexp.
+     exists i{2}; exists j; do !split => //.
+      by apply H6.
+      apply proj_inj_some.
+       by cut:= H6 i{2}; rewrite /in_dom.
+       by cut:= H6 j; rewrite /in_dom.
+       by apply gen_epk_inj.
+   
+   by apply valid_accept_pres_ev2.
+  rewrite /inv_started.
+  intros => ps; rewrite mem_cons; split.
+   intros => [|] hor.
+   smt.
+   cut [h1 h2 ]:= H4 ps => {h2}.
+    elim (h1 _) => // j [hdom1'][hdom2'] heq.
+   case (j = i{2}) => heq'.
+     by generalize heq' H12 hdom1' => ->; smt.
+     exists j; progress => //.
+     rewrite in_dom_setNE //.
+     generalize H14 heq; (rewrite get_setNE; first by smt) => -> //.
+     generalize H14 heq; (rewrite get_setNE; first by smt) => -> //.
+
+   intros => [j][hdom1][hdom2] heq.
+   case (j = i{2}) => hor.
+    generalize hor heq => ->; rewrite get_setE proj_some /=; smt.
+   right.
+   cut [h1 h2] := H4 ps; apply h2.
+   exists j; progress.
+    by generalize hdom1; rewrite in_dom_setNE.
+    by apply H6.
+    by generalize heq; (rewrite get_setNE; first smt); rewrite H14 /=.
+    by generalize heq; (rewrite get_setNE; first smt); rewrite H14 /=.
+
+   rewrite /inv_accepted => ps; rewrite mem_cons; split.
+    intros => [|] hor.
+    cut: ps = (B{2}, A{2}, gen_epk (proj AKE_Fresh.mEexp{1}.[i{2}]), X{2}, resp).
+     by apply Accept_inj.
+    intros => ->.
+   exists i{2}; rewrite !in_dom_setE /compute_sid !get_setE !proj_some /=.
+    by apply H6.
+ 
+   cut [h1 h2] := H5 ps => {h2}.
+   cut:= h1 _ => //; intros => [j][hdom1][hdom2][hdom3] heq.
+    case (j = i{2}) => heq'.
+     by generalize heq' H12 hdom1 => ->; smt.
+     exists j; (rewrite !in_dom_setNE // /compute_sid heq !get_setNE; first 2 smt).
+     by do !split => //.
+   intros => [j][hdom1][hdom2][hdom3] heq.
+   case (i{2} = j) => hor.
+    generalize heq; rewrite hor.
+    by rewrite /compute_sid /= !get_setE !proj_some /= => ->; left.  
+   
+   right.
+   cut [h1 h2]:= H5 ps => {h1}.
+   apply h2.
+   exists j.
+   generalize hdom1 hdom2 hdom3 heq; 
+   rewrite !in_dom_setNE; first 2 smt. 
+   by rewrite /compute_sid /= !get_setNE /=; smt.
+   by apply H6.
+   generalize H14; rewrite !in_dom_set => [|] hor.
+    by left; apply H8.
+    by right.
+   case (x = i{2}) => hor.
+    by generalize hor H15 => ->; rewrite in_dom_setE.
+    rewrite get_setNE; first smt.
+    apply H9.
+    by generalize H14; rewrite !in_dom_setNE.
+    by generalize H15; rewrite !in_dom_setNE. 
+    by apply H6.
+    by apply H8.
+    by apply H9.
+       
+   fun; wp; skip; progress; try assumption.
+    by apply accept_evs_eexps_pres => //; smt.
+    by apply start_evs_eexps_pres => //; smt.
+    by apply no_start_coll_pres => //; smt. 
+    by apply no_accept_coll_pres => //; smt. 
+    by apply valid_accept_pres => //; smt. 
+    by apply inv_started_pres => //; smt.  
+    by apply inv_accepted_pres => //; smt.  
+    by smt.
+    by smt.
+    by apply H9.
+    by smt.
+    by smt.
+    by apply H9.
+
+    fun.
+    sp; if; first smt.
+    inline  AKE_Fresh(A).O.computeKey AKE_EexpRev(A).O.computeKey.
+    sp; if; first smt.
+    inline  AKE_Fresh(A).O.h2 AKE_EexpRev(A).O.h2.
+    wp; rnd; wp; skip; progress; try assumption.
+     by apply accept_evs_eexps_pres => //; smt.
+     by apply start_evs_eexps_pres => //; smt.
+     by apply no_start_coll_pres => //; smt. 
+     by apply no_accept_coll_pres => //; smt. 
+     by apply valid_accept_pres => //; smt. 
+     by apply inv_started_pres => //; smt.  
+     by apply inv_accepted_pres => //; smt.  
+     by smt.
+     by smt.
+     by apply H9.
+     by apply accept_evs_eexps_pres => //; smt.
+     by apply start_evs_eexps_pres => //; smt.
+     by apply no_start_coll_pres => //; smt. 
+     by apply no_accept_coll_pres => //; smt. 
+     by apply valid_accept_pres => //; smt. 
+     by apply inv_started_pres => //; smt.  
+     by apply inv_accepted_pres => //; smt.  
+     by smt.
+     by smt.
+     by apply H9.
+
+    wp; skip; smt.
+    wp; skip; progress; try assumption.    
+     by smt.
+     by smt.
+     by apply H9.
+save.
+
+
+local equiv eq1_eexpRev :
+AKE_Fresh(A).O.eexpRev ~ AKE_EexpRev(A).O.eexpRev :
+ ! (! test_fresh AKE_EexpRev.test{2} AKE_EexpRev.evs{2} \/
+     collision_eexp_rcvd AKE_EexpRev.evs{2}) /\
+  ={i, a} /\
+  AKE_EexpRev.evs{2} = AKE_Fresh.evs{1} /\
+  AKE_EexpRev.test{2} = AKE_Fresh.test{1} /\
+  AKE_EexpRev.cSession{2} = AKE_Fresh.cSession{1} /\
+  AKE_EexpRev.cH2{2} = AKE_Fresh.cH2{1} /\
+  AKE_EexpRev.mH2{2} = AKE_Fresh.mH2{1} /\
+  AKE_EexpRev.sH2{2} = AKE_Fresh.sH2{1} /\
+  AKE_EexpRev.mSk{2} = AKE_Fresh.mSk{1} /\
+  AKE_EexpRev.mEexp{2} = AKE_Fresh.mEexp{1} /\
+  AKE_EexpRev.mStarted{2} = AKE_Fresh.mStarted{1} /\
+  AKE_EexpRev.mCompleted{2} = AKE_Fresh.mCompleted{1} /\
+  ! AKE_Fresh.test{1} = None /\
+  mem (Accept (proj AKE_Fresh.test{1})) AKE_Fresh.evs{1} /\
+  accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+  start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+  no_start_coll AKE_EexpRev.evs{2} /\
+  no_accept_coll AKE_EexpRev.evs{2} /\
+  valid_accepts AKE_EexpRev.evs{2} /\
+  inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2} AKE_EexpRev.mEexp{2} /\
+  inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+    AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+  (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+  ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+  (forall (x : Sidx),
+     in_dom x AKE_EexpRev.mCompleted{2} => in_dom x AKE_EexpRev.mStarted{2}) /\
+  (forall (x : Sidx),
+     in_dom x AKE_EexpRev.mStarted{2} =>
+     ! in_dom x AKE_EexpRev.mCompleted{2} =>
+     sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
+  AKE_Fresh.test{1} = AKE_EexpRev.test{2} /\
+  mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}
+==>
+if ! test_fresh AKE_EexpRev.test{2} AKE_EexpRev.evs{2} \/
+     collision_eexp_rcvd AKE_EexpRev.evs{2} then
+    accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    no_start_coll AKE_EexpRev.evs{2} /\
+    no_accept_coll AKE_EexpRev.evs{2} /\
+    valid_accepts AKE_EexpRev.evs{2} /\
+    inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+      AKE_EexpRev.mEexp{2} /\
+    inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+      AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+    (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+    ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+    (forall (x : Sidx),
+       in_dom x AKE_EexpRev.mCompleted{2} => in_dom x AKE_EexpRev.mStarted{2}) /\
+    ! AKE_Fresh.test{1} = None /\
+    mem (Accept (proj AKE_Fresh.test{1})) AKE_Fresh.evs{1} /\
+    (forall (x : Sidx),
+       in_dom x AKE_EexpRev.mStarted{2} =>
+       ! in_dom x AKE_EexpRev.mCompleted{2} =>
+       sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
+    AKE_Fresh.test{1} = AKE_EexpRev.test{2} /\
+    mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}
+  else
+    ={res} /\
+    AKE_EexpRev.evs{2} = AKE_Fresh.evs{1} /\
+    AKE_EexpRev.test{2} = AKE_Fresh.test{1} /\
+    AKE_EexpRev.cSession{2} = AKE_Fresh.cSession{1} /\
+    AKE_EexpRev.cH2{2} = AKE_Fresh.cH2{1} /\
+    AKE_EexpRev.mH2{2} = AKE_Fresh.mH2{1} /\
+    AKE_EexpRev.sH2{2} = AKE_Fresh.sH2{1} /\
+    AKE_EexpRev.mSk{2} = AKE_Fresh.mSk{1} /\
+    AKE_EexpRev.mEexp{2} = AKE_Fresh.mEexp{1} /\
+    AKE_EexpRev.mStarted{2} = AKE_Fresh.mStarted{1} /\
+    AKE_EexpRev.mCompleted{2} = AKE_Fresh.mCompleted{1} /\
+    ! AKE_Fresh.test{1} = None /\
+    mem (Accept (proj AKE_Fresh.test{1})) AKE_Fresh.evs{1} /\
+    accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    no_start_coll AKE_EexpRev.evs{2} /\
+    no_accept_coll AKE_EexpRev.evs{2} /\
+    valid_accepts AKE_EexpRev.evs{2} /\
+    inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+      AKE_EexpRev.mEexp{2} /\
+    inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+      AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+    (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+    ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+    (forall (x : Sidx),
+       in_dom x AKE_EexpRev.mCompleted{2} => in_dom x AKE_EexpRev.mStarted{2}) /\
+    (forall (x : Sidx),
+       in_dom x AKE_EexpRev.mStarted{2} =>
+       ! in_dom x AKE_EexpRev.mCompleted{2} =>
+       sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
+    AKE_Fresh.test{1} = AKE_EexpRev.test{2} /\
+    mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}.
+proof.
+ fun.
+seq 1 1:
+( ! (! test_fresh AKE_EexpRev.test{2} AKE_EexpRev.evs{2} \/
+     collision_eexp_rcvd AKE_EexpRev.evs{2}) /\
+  ={i, a} /\
+  AKE_EexpRev.evs{2} = AKE_Fresh.evs{1} /\
+  AKE_EexpRev.test{2} = AKE_Fresh.test{1} /\
+  AKE_EexpRev.cSession{2} = AKE_Fresh.cSession{1} /\
+  AKE_EexpRev.cH2{2} = AKE_Fresh.cH2{1} /\
+  AKE_EexpRev.mH2{2} = AKE_Fresh.mH2{1} /\
+  AKE_EexpRev.sH2{2} = AKE_Fresh.sH2{1} /\
+  AKE_EexpRev.mSk{2} = AKE_Fresh.mSk{1} /\
+  AKE_EexpRev.mEexp{2} = AKE_Fresh.mEexp{1} /\
+  AKE_EexpRev.mStarted{2} = AKE_Fresh.mStarted{1} /\
+  AKE_EexpRev.mCompleted{2} = AKE_Fresh.mCompleted{1} /\
+  ! AKE_Fresh.test{1} = None /\
+  mem (Accept (proj AKE_Fresh.test{1})) AKE_Fresh.evs{1} /\
+  accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+  start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+  no_start_coll AKE_EexpRev.evs{2} /\
+  no_accept_coll AKE_EexpRev.evs{2} /\
+  valid_accepts AKE_EexpRev.evs{2} /\
+  inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2} AKE_EexpRev.mEexp{2} /\
+  inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+    AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+  (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+  ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+  (forall (x : Sidx),
+     in_dom x AKE_EexpRev.mCompleted{2} => in_dom x AKE_EexpRev.mStarted{2}) /\
+  (forall (x : Sidx),
+     in_dom x AKE_EexpRev.mStarted{2} =>
+     ! in_dom x AKE_EexpRev.mCompleted{2} =>
+     sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
+  AKE_Fresh.test{1} = AKE_EexpRev.test{2} /\
+  mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2} /\ 
+  ={r} /\ r{2} = None).
+wp; skip; progress => //.
+by apply H9.
+by apply H11.
+by apply H12.
+if{1}.
+rcondt{2} 1.
+intros &m; skip; smt.
+wp; skip; progress => //.
+    by apply accept_evs_eexps_pres => //; smt.
+    by apply start_evs_eexps_pres => //; smt.
+    by apply no_start_coll_pres => //; smt.
+    by apply no_accept_coll_pres => //; smt.
+    by apply valid_accept_pres => //; smt.
+    by apply inv_started_pres => //; smt.
+    by apply inv_accepted_pres => //; smt.
+    by apply H9.
+    by apply H11.
+    by rewrite mem_cons; right.
+    by apply H12.
+    by rewrite mem_cons; right.
+    by rewrite mem_cons; right.
+    by apply accept_evs_eexps_pres => //; smt.
+    by apply start_evs_eexps_pres => //; smt.
+    by apply no_start_coll_pres => //; smt.
+    by apply no_accept_coll_pres => //; smt.
+    by apply valid_accept_pres => //; smt.
+    by apply inv_started_pres => //; smt.
+    by apply inv_accepted_pres => //; smt.
+    by apply H9.
+    by apply H11.
+    by apply H12.
+    by rewrite mem_cons; right.
+    by apply accept_evs_eexps_pres => //; smt.
+    by apply start_evs_eexps_pres => //; smt.
+    by apply no_start_coll_pres => //; smt.
+    by apply no_accept_coll_pres => //; smt.
+    by apply valid_accept_pres => //; smt.
+    by apply inv_started_pres => //; smt.
+    by apply inv_accepted_pres => //; smt.
+    by apply H9.
+    by apply H11.
+    by rewrite mem_cons; right.
+    by apply H12.
+    by rewrite mem_cons; right.
+    by rewrite mem_cons; right.
+    by apply accept_evs_eexps_pres => //; smt.
+    by apply start_evs_eexps_pres => //; smt.
+    by apply no_start_coll_pres => //; smt.
+    by apply no_accept_coll_pres => //; smt.
+    by apply valid_accept_pres => //; smt.
+    by apply inv_started_pres => //; smt.
+    by apply inv_accepted_pres => //; smt.
+    by apply H9.
+    by apply H11.
+    by apply H12.
+    by rewrite mem_cons; right.
+    if{2}.
+    conseq (_ :_ ==>
+    AKE_Fresh.test{1} <> None /\
+    mem (Accept (proj AKE_Fresh.test{1})) AKE_Fresh.evs{1} /\
+    ! test_fresh AKE_EexpRev.test{2} AKE_EexpRev.evs{2} /\
+    accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    no_start_coll AKE_EexpRev.evs{2} /\
+    no_accept_coll AKE_EexpRev.evs{2} /\
+    valid_accepts AKE_EexpRev.evs{2} /\
+    inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+    AKE_EexpRev.mEexp{2} /\
+    inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+      AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+    (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+    ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+    (forall (x : Sidx),
+       in_dom x AKE_EexpRev.mCompleted{2} => in_dom x AKE_EexpRev.mStarted{2}) /\
+    (forall (x : Sidx),
+      in_dom x AKE_EexpRev.mStarted{2} =>
+      ! in_dom x AKE_EexpRev.mCompleted{2} =>
+      sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init ) /\
+     AKE_Fresh.test{1} = AKE_EexpRev.test{2} /\
+    mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}).
+     progress => //; try (apply H12); try smt.
+
+     wp; skip; progress => //.
+
+      by rewrite /test_fresh; smt.
+      by apply accept_evs_eexps_pres => //; smt.
+      by apply start_evs_eexps_pres => //; smt.
+      by apply no_start_coll_pres => //; smt.
+      by apply no_accept_coll_pres => //; smt.
+      by apply valid_accept_pres => //; smt.
+      by apply inv_started_pres => //; smt.
+      by apply inv_accepted_pres => //; smt.
+      by apply H9.
+      by apply H11.
+      by apply H12.
+      by rewrite mem_cons; right.
+     skip; smt.
+save.
+
+local lemma  bdh1_eexpRev1 :
+forall &2,
+  ! test_fresh AKE_EexpRev.test{2} AKE_EexpRev.evs{2} \/
+  collision_eexp_rcvd AKE_EexpRev.evs{2} =>
+  bd_hoare[ AKE_Fresh(A).O.eexpRev :
+             accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+             start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+             no_start_coll AKE_EexpRev.evs{2} /\
+             no_accept_coll AKE_EexpRev.evs{2} /\
+             valid_accepts AKE_EexpRev.evs{2} /\
+             inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+               AKE_EexpRev.mEexp{2} /\
+             inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+               AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+             (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+             ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mCompleted{2} =>
+                in_dom x AKE_EexpRev.mStarted{2}) /\
+             ! AKE_Fresh.test = None /\
+             mem (Accept (proj AKE_Fresh.test)) AKE_Fresh.evs /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mStarted{2} =>
+                ! in_dom x AKE_EexpRev.mCompleted{2} =>
+                sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
+             AKE_Fresh.test = AKE_EexpRev.test{2} /\
+             mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2} ==>
+             accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+             start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+             no_start_coll AKE_EexpRev.evs{2} /\
+             no_accept_coll AKE_EexpRev.evs{2} /\
+             valid_accepts AKE_EexpRev.evs{2} /\
+             inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+               AKE_EexpRev.mEexp{2} /\
+             inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+               AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+             (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+             ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mCompleted{2} =>
+                in_dom x AKE_EexpRev.mStarted{2}) /\
+             ! AKE_Fresh.test = None /\
+             mem (Accept (proj AKE_Fresh.test)) AKE_Fresh.evs /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mStarted{2} =>
+                ! in_dom x AKE_EexpRev.mCompleted{2} =>
+                sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
+             AKE_Fresh.test = AKE_EexpRev.test{2} /\
+             mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}] = 1%r.
+proof.
+ intros => &2 h; fun; wp; skip; progress; try apply H11; smt.
+save.
+
+
+local lemma bdh1_eexpRev2 :
+forall &1,
+  bd_hoare[ AKE_EexpRev(A).O.eexpRev :
+             (! test_fresh AKE_EexpRev.test AKE_EexpRev.evs \/
+              collision_eexp_rcvd AKE_EexpRev.evs) /\
+             accept_evs_eexps AKE_EexpRev.evs AKE_EexpRev.mEexp /\
+             start_evs_eexps AKE_EexpRev.evs AKE_EexpRev.mEexp /\
+             no_start_coll AKE_EexpRev.evs /\
+             no_accept_coll AKE_EexpRev.evs /\
+             valid_accepts AKE_EexpRev.evs /\
+             inv_started AKE_EexpRev.evs AKE_EexpRev.mStarted
+               AKE_EexpRev.mEexp /\
+             inv_accepted AKE_EexpRev.evs AKE_EexpRev.mStarted
+               AKE_EexpRev.mEexp AKE_EexpRev.mCompleted /\
+             (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp) /\
+             ! collision_eexp_eexp_op AKE_EexpRev.mEexp /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mCompleted =>
+                in_dom x AKE_EexpRev.mStarted) /\
+             ! AKE_Fresh.test{1} = None /\
+             mem (Accept (proj AKE_Fresh.test{1})) AKE_Fresh.evs{1} /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mStarted =>
+                ! in_dom x AKE_EexpRev.mCompleted =>
+                sd2_role (proj AKE_EexpRev.mStarted.[x]) = init) /\
+             AKE_Fresh.test{1} = AKE_EexpRev.test /\
+             mem (Accept (proj AKE_EexpRev.test)) AKE_EexpRev.evs ==>
+             (! test_fresh AKE_EexpRev.test AKE_EexpRev.evs \/
+              collision_eexp_rcvd AKE_EexpRev.evs) /\
+             accept_evs_eexps AKE_EexpRev.evs AKE_EexpRev.mEexp /\
+             start_evs_eexps AKE_EexpRev.evs AKE_EexpRev.mEexp /\
+             no_start_coll AKE_EexpRev.evs /\
+             no_accept_coll AKE_EexpRev.evs /\
+             valid_accepts AKE_EexpRev.evs /\
+             inv_started AKE_EexpRev.evs AKE_EexpRev.mStarted
+               AKE_EexpRev.mEexp /\
+             inv_accepted AKE_EexpRev.evs AKE_EexpRev.mStarted
+               AKE_EexpRev.mEexp AKE_EexpRev.mCompleted /\
+             (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp) /\
+             ! collision_eexp_eexp_op AKE_EexpRev.mEexp /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mCompleted =>
+                in_dom x AKE_EexpRev.mStarted) /\
+             ! AKE_Fresh.test{1} = None /\
+             mem (Accept (proj AKE_Fresh.test{1})) AKE_Fresh.evs{1} /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mStarted =>
+                ! in_dom x AKE_EexpRev.mCompleted =>
+                sd2_role (proj AKE_EexpRev.mStarted.[x]) = init) /\
+             AKE_Fresh.test{1} = AKE_EexpRev.test /\
+             mem (Accept (proj AKE_EexpRev.test)) AKE_EexpRev.evs] = 1%r.
+proof.
+ intros &1; fun; wp; skip; progress => //.
+  case (AKE_EexpRev.test{hr} = None); first smt.
+  intros => h.
+  generalize H.
+  cut heq :
+   forall t ev,  t <> None =>  test_fresh t ev = fresh (proj t) ev by smt.
+  rewrite !heq //.
+  by intros => h'; apply coll_or_not_fresh_mon => //; smt.
+
+  by apply accept_evs_eexps_pres; smt.
+  by apply start_evs_eexps_pres => //; smt.
+  by apply no_start_coll_pres => //; smt.
+  by apply no_accept_coll_pres => //; smt.
+  by apply valid_accept_pres => //; smt.
+  by apply inv_started_pres => //; smt.
+  by apply inv_accepted_pres => //; smt.
+  by apply H7.
+  by apply H9.
+  by apply H12.
+  by rewrite mem_cons; right.
+  by apply H7.
+  by apply H9.
+  by apply H12.
+save.
+
+
+local equiv eq1_h2 :
+    AKE_Fresh(A).O.h2 ~ AKE_EexpRev(A).O.h2 :
+! (! test_fresh AKE_EexpRev.test{2} AKE_EexpRev.evs{2} \/
+     collision_eexp_rcvd AKE_EexpRev.evs{2}) /\
+  ={sstring} /\
+  AKE_EexpRev.evs{2} = AKE_Fresh.evs{1} /\
+  AKE_EexpRev.test{2} = AKE_Fresh.test{1} /\
+  AKE_EexpRev.cSession{2} = AKE_Fresh.cSession{1} /\
+  AKE_EexpRev.cH2{2} = AKE_Fresh.cH2{1} /\
+  AKE_EexpRev.mH2{2} = AKE_Fresh.mH2{1} /\
+  AKE_EexpRev.sH2{2} = AKE_Fresh.sH2{1} /\
+  AKE_EexpRev.mSk{2} = AKE_Fresh.mSk{1} /\
+  AKE_EexpRev.mEexp{2} = AKE_Fresh.mEexp{1} /\
+  AKE_EexpRev.mStarted{2} = AKE_Fresh.mStarted{1} /\
+  AKE_EexpRev.mCompleted{2} = AKE_Fresh.mCompleted{1} /\
+  ! AKE_Fresh.test{1} = None /\
+  mem (Accept (proj AKE_Fresh.test{1})) AKE_Fresh.evs{1} /\
+  accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+  start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+  no_start_coll AKE_EexpRev.evs{2} /\
+  no_accept_coll AKE_EexpRev.evs{2} /\
+  valid_accepts AKE_EexpRev.evs{2} /\
+  inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2} AKE_EexpRev.mEexp{2} /\
+  inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+    AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+  (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+  ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+  (forall (x : Sidx),
+     in_dom x AKE_EexpRev.mCompleted{2} => in_dom x AKE_EexpRev.mStarted{2}) /\
+  (forall (x : Sidx),
+     in_dom x AKE_EexpRev.mStarted{2} =>
+     ! in_dom x AKE_EexpRev.mCompleted{2} =>
+     sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
+  AKE_Fresh.test{1} = AKE_EexpRev.test{2} /\
+  mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}
+==>
+
+ if ! test_fresh AKE_EexpRev.test{2} AKE_EexpRev.evs{2} \/
+     collision_eexp_rcvd AKE_EexpRev.evs{2} then
+    accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    no_start_coll AKE_EexpRev.evs{2} /\
+    no_accept_coll AKE_EexpRev.evs{2} /\
+    valid_accepts AKE_EexpRev.evs{2} /\
+    inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+      AKE_EexpRev.mEexp{2} /\
+    inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+      AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+    (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+    ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+    (forall (x : Sidx),
+       in_dom x AKE_EexpRev.mCompleted{2} => in_dom x AKE_EexpRev.mStarted{2}) /\
+    ! AKE_Fresh.test{1} = None /\
+    mem (Accept (proj AKE_Fresh.test{1})) AKE_Fresh.evs{1} /\
+    (forall (x : Sidx),
+       in_dom x AKE_EexpRev.mStarted{2} =>
+       ! in_dom x AKE_EexpRev.mCompleted{2} =>
+       sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
+    AKE_Fresh.test{1} = AKE_EexpRev.test{2} /\
+    mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}
+  else
+    ={res} /\
+    AKE_EexpRev.evs{2} = AKE_Fresh.evs{1} /\
+    AKE_EexpRev.test{2} = AKE_Fresh.test{1} /\
+    AKE_EexpRev.cSession{2} = AKE_Fresh.cSession{1} /\
+    AKE_EexpRev.cH2{2} = AKE_Fresh.cH2{1} /\
+    AKE_EexpRev.mH2{2} = AKE_Fresh.mH2{1} /\
+    AKE_EexpRev.sH2{2} = AKE_Fresh.sH2{1} /\
+    AKE_EexpRev.mSk{2} = AKE_Fresh.mSk{1} /\
+    AKE_EexpRev.mEexp{2} = AKE_Fresh.mEexp{1} /\
+    AKE_EexpRev.mStarted{2} = AKE_Fresh.mStarted{1} /\
+    AKE_EexpRev.mCompleted{2} = AKE_Fresh.mCompleted{1} /\
+    ! AKE_Fresh.test{1} = None /\
+    mem (Accept (proj AKE_Fresh.test{1})) AKE_Fresh.evs{1} /\
+    accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    no_start_coll AKE_EexpRev.evs{2} /\
+    no_accept_coll AKE_EexpRev.evs{2} /\
+    valid_accepts AKE_EexpRev.evs{2} /\
+    inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+      AKE_EexpRev.mEexp{2} /\
+    inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+      AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+    (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+    ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+    (forall (x : Sidx),
+       in_dom x AKE_EexpRev.mCompleted{2} => in_dom x AKE_EexpRev.mStarted{2}) /\
+    (forall (x : Sidx),
+       in_dom x AKE_EexpRev.mStarted{2} =>
+       ! in_dom x AKE_EexpRev.mCompleted{2} =>
+       sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
+    AKE_Fresh.test{1} = AKE_EexpRev.test{2} /\
+    mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}.
+proof.
+ fun; wp; rnd; skip; smt. 
+save.
+
+local equiv eq1_h2_a :
+    AKE_Fresh(A).O.h2_a ~ AKE_EexpRev(A).O.h2_a :
+! (! test_fresh AKE_EexpRev.test{2} AKE_EexpRev.evs{2} \/
+     collision_eexp_rcvd AKE_EexpRev.evs{2}) /\
+  ={sstring} /\
+  AKE_EexpRev.evs{2} = AKE_Fresh.evs{1} /\
+  AKE_EexpRev.test{2} = AKE_Fresh.test{1} /\
+  AKE_EexpRev.cSession{2} = AKE_Fresh.cSession{1} /\
+  AKE_EexpRev.cH2{2} = AKE_Fresh.cH2{1} /\
+  AKE_EexpRev.mH2{2} = AKE_Fresh.mH2{1} /\
+  AKE_EexpRev.sH2{2} = AKE_Fresh.sH2{1} /\
+  AKE_EexpRev.mSk{2} = AKE_Fresh.mSk{1} /\
+  AKE_EexpRev.mEexp{2} = AKE_Fresh.mEexp{1} /\
+  AKE_EexpRev.mStarted{2} = AKE_Fresh.mStarted{1} /\
+  AKE_EexpRev.mCompleted{2} = AKE_Fresh.mCompleted{1} /\
+  ! AKE_Fresh.test{1} = None /\
+  mem (Accept (proj AKE_Fresh.test{1})) AKE_Fresh.evs{1} /\
+  accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+  start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+  no_start_coll AKE_EexpRev.evs{2} /\
+  no_accept_coll AKE_EexpRev.evs{2} /\
+  valid_accepts AKE_EexpRev.evs{2} /\
+  inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2} AKE_EexpRev.mEexp{2} /\
+  inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+    AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+  (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+  ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+  (forall (x : Sidx),
+     in_dom x AKE_EexpRev.mCompleted{2} => in_dom x AKE_EexpRev.mStarted{2}) /\
+  (forall (x : Sidx),
+     in_dom x AKE_EexpRev.mStarted{2} =>
+     ! in_dom x AKE_EexpRev.mCompleted{2} =>
+     sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
+  AKE_Fresh.test{1} = AKE_EexpRev.test{2} /\
+  mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}
+==>
+
+ if ! test_fresh AKE_EexpRev.test{2} AKE_EexpRev.evs{2} \/
+     collision_eexp_rcvd AKE_EexpRev.evs{2} then
+    accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    no_start_coll AKE_EexpRev.evs{2} /\
+    no_accept_coll AKE_EexpRev.evs{2} /\
+    valid_accepts AKE_EexpRev.evs{2} /\
+    inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+      AKE_EexpRev.mEexp{2} /\
+    inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+      AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+    (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+    ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+    (forall (x : Sidx),
+       in_dom x AKE_EexpRev.mCompleted{2} => in_dom x AKE_EexpRev.mStarted{2}) /\
+    ! AKE_Fresh.test{1} = None /\
+    mem (Accept (proj AKE_Fresh.test{1})) AKE_Fresh.evs{1} /\
+    (forall (x : Sidx),
+       in_dom x AKE_EexpRev.mStarted{2} =>
+       ! in_dom x AKE_EexpRev.mCompleted{2} =>
+       sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
+    AKE_Fresh.test{1} = AKE_EexpRev.test{2} /\
+    mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}
+  else
+    ={res} /\
+    AKE_EexpRev.evs{2} = AKE_Fresh.evs{1} /\
+    AKE_EexpRev.test{2} = AKE_Fresh.test{1} /\
+    AKE_EexpRev.cSession{2} = AKE_Fresh.cSession{1} /\
+    AKE_EexpRev.cH2{2} = AKE_Fresh.cH2{1} /\
+    AKE_EexpRev.mH2{2} = AKE_Fresh.mH2{1} /\
+    AKE_EexpRev.sH2{2} = AKE_Fresh.sH2{1} /\
+    AKE_EexpRev.mSk{2} = AKE_Fresh.mSk{1} /\
+    AKE_EexpRev.mEexp{2} = AKE_Fresh.mEexp{1} /\
+    AKE_EexpRev.mStarted{2} = AKE_Fresh.mStarted{1} /\
+    AKE_EexpRev.mCompleted{2} = AKE_Fresh.mCompleted{1} /\
+    ! AKE_Fresh.test{1} = None /\
+    mem (Accept (proj AKE_Fresh.test{1})) AKE_Fresh.evs{1} /\
+    accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    no_start_coll AKE_EexpRev.evs{2} /\
+    no_accept_coll AKE_EexpRev.evs{2} /\
+    valid_accepts AKE_EexpRev.evs{2} /\
+    inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+      AKE_EexpRev.mEexp{2} /\
+    inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+      AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+    (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+    ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+    (forall (x : Sidx),
+       in_dom x AKE_EexpRev.mCompleted{2} => in_dom x AKE_EexpRev.mStarted{2}) /\
+    (forall (x : Sidx),
+       in_dom x AKE_EexpRev.mStarted{2} =>
+       ! in_dom x AKE_EexpRev.mCompleted{2} =>
+       sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
+    AKE_Fresh.test{1} = AKE_EexpRev.test{2} /\
+    mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}.
+proof.
+fun.
+sp; if; first smt.
+ wp; call eq1_h2; wp; skip; progress => //.
+  by apply H9.
+  by apply H11.
+  by apply H12.
+  by apply H9.
+  by apply H11.
+  by apply H12.
+  by elim H30; smt.
+  by elim H30; smt.
+  by elim H30; smt.
+  by elim H30; smt.
+  by apply H28.
+
+ skip; smt.
+save.
+
+local lemma  bdh1_h2_a_1 : 
+forall &2,
+  ! test_fresh AKE_EexpRev.test{2} AKE_EexpRev.evs{2} \/
+  collision_eexp_rcvd AKE_EexpRev.evs{2} =>
+  bd_hoare[ AKE_Fresh(A).O.h2_a :
+             accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+             start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+             no_start_coll AKE_EexpRev.evs{2} /\
+             no_accept_coll AKE_EexpRev.evs{2} /\
+             valid_accepts AKE_EexpRev.evs{2} /\
+             inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+               AKE_EexpRev.mEexp{2} /\
+             inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+               AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+             (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+             ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mCompleted{2} =>
+                in_dom x AKE_EexpRev.mStarted{2}) /\
+             ! AKE_Fresh.test = None /\
+             mem (Accept (proj AKE_Fresh.test)) AKE_Fresh.evs /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mStarted{2} =>
+                ! in_dom x AKE_EexpRev.mCompleted{2} =>
+                sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
+             AKE_Fresh.test = AKE_EexpRev.test{2} /\
+             mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2} ==>
+             accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+             start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+             no_start_coll AKE_EexpRev.evs{2} /\
+             no_accept_coll AKE_EexpRev.evs{2} /\
+             valid_accepts AKE_EexpRev.evs{2} /\
+             inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+               AKE_EexpRev.mEexp{2} /\
+             inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+               AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+             (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+             ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mCompleted{2} =>
+                in_dom x AKE_EexpRev.mStarted{2}) /\
+             ! AKE_Fresh.test = None /\
+             mem (Accept (proj AKE_Fresh.test)) AKE_Fresh.evs /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mStarted{2} =>
+                ! in_dom x AKE_EexpRev.mCompleted{2} =>
+                sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
+             AKE_Fresh.test = AKE_EexpRev.test{2} /\
+             mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}] = 1%r.
+proof.
+ intros &2 h.
+ fun.
+ sp; if.
+  inline AKE_Fresh(A).O.h2; wp; rnd; wp; skip; progress => //.
+   by apply H6.
+   by apply H8.
+   by apply H11.
+   by apply TKey.Dword.lossless.
+
+  skip; progress => //. 
+   by apply H6.
+   by apply H8.
+   by apply H11.
+save. 
+
+local lemma bdh1_h2_a_2 :
+forall &1,
+  bd_hoare[ AKE_EexpRev(A).O.h2_a :
+             (! test_fresh AKE_EexpRev.test AKE_EexpRev.evs \/
+              collision_eexp_rcvd AKE_EexpRev.evs) /\
+             accept_evs_eexps AKE_EexpRev.evs AKE_EexpRev.mEexp /\
+             start_evs_eexps AKE_EexpRev.evs AKE_EexpRev.mEexp /\
+             no_start_coll AKE_EexpRev.evs /\
+             no_accept_coll AKE_EexpRev.evs /\
+             valid_accepts AKE_EexpRev.evs /\
+             inv_started AKE_EexpRev.evs AKE_EexpRev.mStarted
+               AKE_EexpRev.mEexp /\
+             inv_accepted AKE_EexpRev.evs AKE_EexpRev.mStarted
+               AKE_EexpRev.mEexp AKE_EexpRev.mCompleted /\
+             (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp) /\
+             ! collision_eexp_eexp_op AKE_EexpRev.mEexp /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mCompleted =>
+                in_dom x AKE_EexpRev.mStarted) /\
+             ! AKE_Fresh.test{1} = None /\
+             mem (Accept (proj AKE_Fresh.test{1})) AKE_Fresh.evs{1} /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mStarted =>
+                ! in_dom x AKE_EexpRev.mCompleted =>
+                sd2_role (proj AKE_EexpRev.mStarted.[x]) = init) /\
+             AKE_Fresh.test{1} = AKE_EexpRev.test /\
+             mem (Accept (proj AKE_EexpRev.test)) AKE_EexpRev.evs ==>
+             (! test_fresh AKE_EexpRev.test AKE_EexpRev.evs \/
+              collision_eexp_rcvd AKE_EexpRev.evs) /\
+             accept_evs_eexps AKE_EexpRev.evs AKE_EexpRev.mEexp /\
+             start_evs_eexps AKE_EexpRev.evs AKE_EexpRev.mEexp /\
+             no_start_coll AKE_EexpRev.evs /\
+             no_accept_coll AKE_EexpRev.evs /\
+             valid_accepts AKE_EexpRev.evs /\
+             inv_started AKE_EexpRev.evs AKE_EexpRev.mStarted
+               AKE_EexpRev.mEexp /\
+             inv_accepted AKE_EexpRev.evs AKE_EexpRev.mStarted
+               AKE_EexpRev.mEexp AKE_EexpRev.mCompleted /\
+             (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp) /\
+             ! collision_eexp_eexp_op AKE_EexpRev.mEexp /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mCompleted =>
+                in_dom x AKE_EexpRev.mStarted) /\
+             ! AKE_Fresh.test{1} = None /\
+             mem (Accept (proj AKE_Fresh.test{1})) AKE_Fresh.evs{1} /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mStarted =>
+                ! in_dom x AKE_EexpRev.mCompleted =>
+                sd2_role (proj AKE_EexpRev.mStarted.[x]) = init) /\
+             AKE_Fresh.test{1} = AKE_EexpRev.test /\
+             mem (Accept (proj AKE_EexpRev.test)) AKE_EexpRev.evs] = 1%r.
+proof.
+ intros => &1.
+ fun.
+ sp; if.
+  inline AKE_EexpRev(A).O.h2;wp; rnd; wp; skip; progress => //.
+   by apply H7.
+   by apply H9.
+   by apply H12.
+   by apply TKey.Dword.lossless.
+
+  skip; progress => //. 
+   by apply H7.
+   by apply H9.
+   by apply H12.
+save.
+
+
+local equiv eq1_init1 :
+   AKE_Fresh(A).O.init1 ~ AKE_EexpRev(A).O.init1 : 
+! (! test_fresh AKE_EexpRev.test{2} AKE_EexpRev.evs{2} \/
+     collision_eexp_rcvd AKE_EexpRev.evs{2}) /\
+  ={i, A, B} /\
+  AKE_EexpRev.evs{2} = AKE_Fresh.evs{1} /\
+  AKE_EexpRev.test{2} = AKE_Fresh.test{1} /\
+  AKE_EexpRev.cSession{2} = AKE_Fresh.cSession{1} /\
+  AKE_EexpRev.cH2{2} = AKE_Fresh.cH2{1} /\
+  AKE_EexpRev.mH2{2} = AKE_Fresh.mH2{1} /\
+  AKE_EexpRev.sH2{2} = AKE_Fresh.sH2{1} /\
+  AKE_EexpRev.mSk{2} = AKE_Fresh.mSk{1} /\
+  AKE_EexpRev.mEexp{2} = AKE_Fresh.mEexp{1} /\
+  AKE_EexpRev.mStarted{2} = AKE_Fresh.mStarted{1} /\
+  AKE_EexpRev.mCompleted{2} = AKE_Fresh.mCompleted{1} /\
+  ! AKE_Fresh.test{1} = None /\
+  mem (Accept (proj AKE_Fresh.test{1})) AKE_Fresh.evs{1} /\
+  accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+  start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+  no_start_coll AKE_EexpRev.evs{2} /\
+  no_accept_coll AKE_EexpRev.evs{2} /\
+  valid_accepts AKE_EexpRev.evs{2} /\
+  inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2} AKE_EexpRev.mEexp{2} /\
+  inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+    AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+  (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+  ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+  (forall (x : Sidx),
+     in_dom x AKE_EexpRev.mCompleted{2} => in_dom x AKE_EexpRev.mStarted{2}) /\
+  (forall (x : Sidx),
+     in_dom x AKE_EexpRev.mStarted{2} =>
+     ! in_dom x AKE_EexpRev.mCompleted{2} =>
+     sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
+  AKE_Fresh.test{1} = AKE_EexpRev.test{2} /\
+  mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}
+==>
+if ! test_fresh AKE_EexpRev.test{2} AKE_EexpRev.evs{2} \/
+     collision_eexp_rcvd AKE_EexpRev.evs{2} then
+    accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    no_start_coll AKE_EexpRev.evs{2} /\
+    no_accept_coll AKE_EexpRev.evs{2} /\
+    valid_accepts AKE_EexpRev.evs{2} /\
+    inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+      AKE_EexpRev.mEexp{2} /\
+    inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+      AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+    (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+    ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+    (forall (x : Sidx),
+       in_dom x AKE_EexpRev.mCompleted{2} => in_dom x AKE_EexpRev.mStarted{2}) /\
+    ! AKE_Fresh.test{1} = None /\
+    mem (Accept (proj AKE_Fresh.test{1})) AKE_Fresh.evs{1} /\
+    (forall (x : Sidx),
+       in_dom x AKE_EexpRev.mStarted{2} =>
+       ! in_dom x AKE_EexpRev.mCompleted{2} =>
+       sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
+    AKE_Fresh.test{1} = AKE_EexpRev.test{2} /\
+    mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}
+  else
+    ={res} /\
+    AKE_EexpRev.evs{2} = AKE_Fresh.evs{1} /\
+    AKE_EexpRev.test{2} = AKE_Fresh.test{1} /\
+    AKE_EexpRev.cSession{2} = AKE_Fresh.cSession{1} /\
+    AKE_EexpRev.cH2{2} = AKE_Fresh.cH2{1} /\
+    AKE_EexpRev.mH2{2} = AKE_Fresh.mH2{1} /\
+    AKE_EexpRev.sH2{2} = AKE_Fresh.sH2{1} /\
+    AKE_EexpRev.mSk{2} = AKE_Fresh.mSk{1} /\
+    AKE_EexpRev.mEexp{2} = AKE_Fresh.mEexp{1} /\
+    AKE_EexpRev.mStarted{2} = AKE_Fresh.mStarted{1} /\
+    AKE_EexpRev.mCompleted{2} = AKE_Fresh.mCompleted{1} /\
+    ! AKE_Fresh.test{1} = None /\
+    mem (Accept (proj AKE_Fresh.test{1})) AKE_Fresh.evs{1} /\
+    accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    no_start_coll AKE_EexpRev.evs{2} /\
+    no_accept_coll AKE_EexpRev.evs{2} /\
+    valid_accepts AKE_EexpRev.evs{2} /\
+    inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+      AKE_EexpRev.mEexp{2} /\
+    inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+      AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+    (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+    ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+    (forall (x : Sidx),
+       in_dom x AKE_EexpRev.mCompleted{2} => in_dom x AKE_EexpRev.mStarted{2}) /\
+    (forall (x : Sidx),
+       in_dom x AKE_EexpRev.mStarted{2} =>
+       ! in_dom x AKE_EexpRev.mCompleted{2} =>
+       sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
+    AKE_Fresh.test{1} = AKE_EexpRev.test{2} /\
+    mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}.
+proof.
+ fun; wp; skip; progress => //.
+  by apply accept_evs_eexps_pres; smt.
+  by apply start_evs_eexps_pres_ev => //; smt.
+  apply no_start_coll_pres_ev => //.
+    intros s' hmem; apply not_def => h. 
+    elim (H7 s') => [hl hr] {hr}.
+    elim (hl _) => // j [hstarted][hdom]heq {hl}.
+    cut hneq:  j <> i{2}; first by apply not_def => heq'; 
+      generalize H12 hstarted; rewrite heq'.
+    generalize heq; 
+    elim /tuple3_ind (proj AKE_Fresh.mStarted{1}.[j]) => A B r /= heq1.
+    apply not_def => [[heq2 hrole']].
+    generalize h; rewrite heq2 /psid_sent /=; apply not_def => {heq2}{heq1} heq1.
+    cut: collision_eexp_eexp_op AKE_Fresh.mEexp{1}; last by smt.
+    rewrite collision_eexp_eexp_op_def /collision_eexp_eexp.
+    exists i{2}; exists j; do !split => //.
+    apply H9.
+    cut: (proj AKE_Fresh.mEexp{1}.[i{2}]) =
+         (proj AKE_Fresh.mEexp{1}.[j]); first by apply gen_epk_inj.
+    cut h':= H9 i{2} => h''.
+    apply proj_inj_some.
+     by generalize h'; rewrite /in_dom.
+     by generalize hdom; rewrite /in_dom.
+     by rewrite h''.
+     by smt.
+  by apply no_accept_coll_pres => //; smt.
+  by apply valid_accept_pres => //; smt.
+  by apply inv_started_pres_ev => //; apply H9 => //.
+  apply inv_accepted_pres_ev2 => //.
+   by apply not_def => h; cut: in_dom i{2} AKE_Fresh.mStarted{1} by apply H11.
+   by smt.
+   by apply H9.
+   by rewrite in_dom_set; left; apply H11.
+   by rewrite mem_cons; right; assumption.
+   generalize H18; rewrite in_dom_set => [|] hor; last by rewrite hor  get_setE; smt.
+   rewrite get_setNE.
+    by apply not_def => heq; generalize heq hor H16 => ->.
+    by apply H12.
+   by rewrite mem_cons; right; assumption.
+   by rewrite mem_cons; right; assumption.
+  by apply accept_evs_eexps_pres; smt. 
+  by apply start_evs_eexps_pres_ev => //; smt.
+  apply no_start_coll_pres_ev => //.
+    intros s' hmem; apply not_def => h.
+    elim (H7 s') => [hl hr] {hr}.
+    elim (hl _) => // j [hstarted][hdom]heq {hl}.
+    cut hneq:  j <> i{2}; first by apply not_def => heq'; 
+      generalize H12 hstarted; rewrite heq'.
+    generalize heq; 
+    elim /tuple3_ind (proj AKE_Fresh.mStarted{1}.[j]) => A B r /= heq1.
+    apply not_def => [[heq2 hrole']].
+    generalize h; rewrite heq2 /psid_sent /=; apply not_def => {heq2}{heq1} heq1.
+    cut: collision_eexp_eexp_op AKE_Fresh.mEexp{1}; last by smt.
+    rewrite collision_eexp_eexp_op_def /collision_eexp_eexp.
+    exists i{2}; exists j; do !split => //.
+    apply H9.
+    cut: (proj AKE_Fresh.mEexp{1}.[i{2}]) =
+         (proj AKE_Fresh.mEexp{1}.[j]); first by apply gen_epk_inj.
+    cut h':= H9 i{2} => h''.
+    apply proj_inj_some.
+     by generalize h'; rewrite /in_dom.
+     by generalize hdom; rewrite /in_dom.
+     by rewrite h''.
+     by smt.
+  by apply no_accept_coll_pres => //; smt. 
+  by apply valid_accept_pres => //; smt.
+  by apply inv_started_pres_ev => //; apply H9 => //.
+  apply inv_accepted_pres_ev2 => //.
+   by apply not_def => h; cut: in_dom i{2} AKE_Fresh.mStarted{1} by apply H11.
+   by smt.
+   by apply H9.
+   by rewrite in_dom_set; left; apply H11.
+   generalize H18; rewrite in_dom_set => [|] hor; last by rewrite hor  get_setE; smt.
+   rewrite get_setNE.
+    by apply not_def => heq; generalize heq hor H16 => ->.
+    by apply H12.
+by rewrite mem_cons; right.
+by apply H9.
+by apply H11.
+by apply H12.
+by apply H9.
+by apply H11.
+by apply H12.
+save.
+
+
+local lemma bdh1_init11 :
+forall &2,
+  ! test_fresh AKE_EexpRev.test{2} AKE_EexpRev.evs{2} \/
+  collision_eexp_rcvd AKE_EexpRev.evs{2} =>
+  bd_hoare[ AKE_Fresh(A).O.init1 :
+             accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+             start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+             no_start_coll AKE_EexpRev.evs{2} /\
+             no_accept_coll AKE_EexpRev.evs{2} /\
+             valid_accepts AKE_EexpRev.evs{2} /\
+             inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+               AKE_EexpRev.mEexp{2} /\
+             inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+               AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+             (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+             ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mCompleted{2} =>
+                in_dom x AKE_EexpRev.mStarted{2}) /\
+             ! AKE_Fresh.test = None /\
+             mem (Accept (proj AKE_Fresh.test)) AKE_Fresh.evs /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mStarted{2} =>
+                ! in_dom x AKE_EexpRev.mCompleted{2} =>
+                sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
+             AKE_Fresh.test = AKE_EexpRev.test{2} /\
+             mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2} ==>
+             accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+             start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+             no_start_coll AKE_EexpRev.evs{2} /\
+             no_accept_coll AKE_EexpRev.evs{2} /\
+             valid_accepts AKE_EexpRev.evs{2} /\
+             inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+               AKE_EexpRev.mEexp{2} /\
+             inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+               AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+             (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+             ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mCompleted{2} =>
+                in_dom x AKE_EexpRev.mStarted{2}) /\
+             ! AKE_Fresh.test = None /\
+             mem (Accept (proj AKE_Fresh.test)) AKE_Fresh.evs /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mStarted{2} =>
+                ! in_dom x AKE_EexpRev.mCompleted{2} =>
+                sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
+             AKE_Fresh.test = AKE_EexpRev.test{2} /\
+             mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}] = 1%r.
+proof.
+ intros => &2 h; fun; wp; skip; progress => //; rewrite ?mem_cons; try (apply H11 ); smt.
+save.
+
+local lemma bdh1_init1_2 :
+forall &1,
+  bd_hoare[ AKE_EexpRev(A).O.init1 :
+             (! test_fresh AKE_EexpRev.test AKE_EexpRev.evs \/
+              collision_eexp_rcvd AKE_EexpRev.evs) /\
+             accept_evs_eexps AKE_EexpRev.evs AKE_EexpRev.mEexp /\
+             start_evs_eexps AKE_EexpRev.evs AKE_EexpRev.mEexp /\
+             no_start_coll AKE_EexpRev.evs /\
+             no_accept_coll AKE_EexpRev.evs /\
+             valid_accepts AKE_EexpRev.evs /\
+             inv_started AKE_EexpRev.evs AKE_EexpRev.mStarted
+               AKE_EexpRev.mEexp /\
+             inv_accepted AKE_EexpRev.evs AKE_EexpRev.mStarted
+               AKE_EexpRev.mEexp AKE_EexpRev.mCompleted /\
+             (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp) /\
+             ! collision_eexp_eexp_op AKE_EexpRev.mEexp /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mCompleted =>
+                in_dom x AKE_EexpRev.mStarted) /\
+             ! AKE_Fresh.test{1} = None /\
+             mem (Accept (proj AKE_Fresh.test{1})) AKE_Fresh.evs{1} /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mStarted =>
+                ! in_dom x AKE_EexpRev.mCompleted =>
+                sd2_role (proj AKE_EexpRev.mStarted.[x]) = init) /\
+             AKE_Fresh.test{1} = AKE_EexpRev.test /\
+             mem (Accept (proj AKE_EexpRev.test)) AKE_EexpRev.evs ==>
+             (! test_fresh AKE_EexpRev.test AKE_EexpRev.evs \/
+              collision_eexp_rcvd AKE_EexpRev.evs) /\
+             accept_evs_eexps AKE_EexpRev.evs AKE_EexpRev.mEexp /\
+             start_evs_eexps AKE_EexpRev.evs AKE_EexpRev.mEexp /\
+             no_start_coll AKE_EexpRev.evs /\
+             no_accept_coll AKE_EexpRev.evs /\
+             valid_accepts AKE_EexpRev.evs /\
+             inv_started AKE_EexpRev.evs AKE_EexpRev.mStarted
+               AKE_EexpRev.mEexp /\
+             inv_accepted AKE_EexpRev.evs AKE_EexpRev.mStarted
+               AKE_EexpRev.mEexp AKE_EexpRev.mCompleted /\
+             (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp) /\
+             ! collision_eexp_eexp_op AKE_EexpRev.mEexp /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mCompleted =>
+                in_dom x AKE_EexpRev.mStarted) /\
+             ! AKE_Fresh.test{1} = None /\
+             mem (Accept (proj AKE_Fresh.test{1})) AKE_Fresh.evs{1} /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mStarted =>
+                ! in_dom x AKE_EexpRev.mCompleted =>
+                sd2_role (proj AKE_EexpRev.mStarted.[x]) = init) /\
+             AKE_Fresh.test{1} = AKE_EexpRev.test /\
+             mem (Accept (proj AKE_EexpRev.test)) AKE_EexpRev.evs] = 1%r.
+proof.
+intros &1; fun; wp; skip; progress => //.
+elim H => h; last first.
+by right; apply collision_eexp_rcvd_mon.
+  cut heq :
+   forall t ev,  t <> None =>  test_fresh t ev = fresh (proj t) ev by smt.
+  generalize h.
+  rewrite !heq //.
+  intros => h.
+  case (collision_eexp_rcvd
+  (Start (A{hr}, B{hr}, gen_epk (proj AKE_EexpRev.mEexp{hr}.[i{hr}]), init) :: AKE_EexpRev.evs{hr})) => hcoll; first by right.
+  left.
+  apply coll_fresh => //.
+  apply no_start_coll_pres_ev => //.
+    intros s' hmem; apply not_def => h'.
+    elim (H5 s') => [hl hr] {hr}.
+    elim (hl _) => // j [hstarted][hdom]heq' {hl}.
+    cut hneq:  j <> i{hr}; first by apply not_def => heq''; 
+      generalize H12 hstarted; rewrite heq''.
+    generalize heq'; 
+    elim /tuple3_ind (proj AKE_EexpRev.mStarted{hr}.[j]) => A B r /= heq1.
+    apply not_def => [[heq2 hrole']].
+    generalize h'; rewrite heq2 /psid_sent /=; apply not_def => {heq2}{heq1} heq1.
+    cut: collision_eexp_eexp_op AKE_EexpRev.mEexp{hr}; last by smt.
+    rewrite collision_eexp_eexp_op_def /collision_eexp_eexp.
+    exists i{hr}; exists j; do !split => //.
+    apply H7.
+    cut: (proj AKE_EexpRev.mEexp{hr}.[i{hr}]) =
+         (proj AKE_EexpRev.mEexp{hr}.[j]); first by apply gen_epk_inj.
+    cut h':= H7 i{hr} => h''.
+    apply proj_inj_some.
+     by generalize h''; rewrite /in_dom.
+     by generalize hdom; rewrite /in_dom.
+     by rewrite h''.
+     by smt.
+  by apply no_accept_coll_pres => //; smt.
+  by apply valid_accept_pres => //; smt.
+
+  by apply accept_evs_eexps_pres; smt. 
+  by apply start_evs_eexps_pres_ev => //; smt.
+
+  apply no_start_coll_pres_ev => //.
+    intros s' hmem; apply not_def => h'.
+    elim (H5 s') => [hl hr] {hr}.
+    elim (hl _) => // j [hstarted][hdom]heq' {hl}.
+    cut hneq:  j <> i{hr}; first by apply not_def => heq''; 
+      generalize H12 hstarted; rewrite heq''.
+    generalize heq'; 
+    elim /tuple3_ind (proj AKE_EexpRev.mStarted{hr}.[j]) => A B r /= heq1.
+    apply not_def => [[heq2 hrole']].
+    generalize h'; rewrite heq2 /psid_sent /=; apply not_def => {heq2}{heq1} heq1.
+    cut: collision_eexp_eexp_op AKE_EexpRev.mEexp{hr}; last by smt.
+    rewrite collision_eexp_eexp_op_def /collision_eexp_eexp.
+    exists i{hr}; exists j; do !split => //.
+    apply H7.
+    cut: (proj AKE_EexpRev.mEexp{hr}.[i{hr}]) =
+         (proj AKE_EexpRev.mEexp{hr}.[j]); first by apply gen_epk_inj.
+    cut h':= H7 i{hr} => h''.
+    apply proj_inj_some.
+     by generalize h''; rewrite /in_dom.
+     by generalize hdom; rewrite /in_dom.
+     by rewrite h''.
+     by smt.
+
+  by apply no_accept_coll_pres => //; smt.
+  by apply valid_accept_pres => //; smt.
+
+  by apply inv_started_pres_ev => //; apply H7 => //.
+  apply inv_accepted_pres_ev2 => //.
+  apply not_def => h; cut: in_dom i{hr} AKE_EexpRev.mStarted{hr}. 
+   by apply H9.
+   by smt.
+   by smt.
+   by apply H7.
+   by rewrite in_dom_set; left; apply H9.
+   generalize H17; rewrite in_dom_set => [|] hor; last by rewrite hor  get_setE; smt.
+   rewrite get_setNE.
+    by apply not_def => heq; generalize heq hor H16 => ->.
+    by apply H12.
+   by rewrite mem_cons; right; assumption.
+   by apply H7.
+   by apply H9.
+   by apply H12.
+save.
+
+local equiv eq1_init2 : 
+    AKE_Fresh(A).O.init2 ~ AKE_EexpRev(A).O.init2 :
+ ! (! test_fresh AKE_EexpRev.test{2} AKE_EexpRev.evs{2} \/
+     collision_eexp_rcvd AKE_EexpRev.evs{2}) /\
+  ={i, Y} /\
+  AKE_EexpRev.evs{2} = AKE_Fresh.evs{1} /\
+  AKE_EexpRev.test{2} = AKE_Fresh.test{1} /\
+  AKE_EexpRev.cSession{2} = AKE_Fresh.cSession{1} /\
+  AKE_EexpRev.cH2{2} = AKE_Fresh.cH2{1} /\
+  AKE_EexpRev.mH2{2} = AKE_Fresh.mH2{1} /\
+  AKE_EexpRev.sH2{2} = AKE_Fresh.sH2{1} /\
+  AKE_EexpRev.mSk{2} = AKE_Fresh.mSk{1} /\
+  AKE_EexpRev.mEexp{2} = AKE_Fresh.mEexp{1} /\
+  AKE_EexpRev.mStarted{2} = AKE_Fresh.mStarted{1} /\
+  AKE_EexpRev.mCompleted{2} = AKE_Fresh.mCompleted{1} /\
+  ! AKE_Fresh.test{1} = None /\
+  mem (Accept (proj AKE_Fresh.test{1})) AKE_Fresh.evs{1} /\
+  accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+  start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+  no_start_coll AKE_EexpRev.evs{2} /\
+  no_accept_coll AKE_EexpRev.evs{2} /\
+  valid_accepts AKE_EexpRev.evs{2} /\
+  inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2} AKE_EexpRev.mEexp{2} /\
+  inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+    AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+  (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+  ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+  (forall (x : Sidx),
+     in_dom x AKE_EexpRev.mCompleted{2} => in_dom x AKE_EexpRev.mStarted{2}) /\
+  (forall (x : Sidx),
+     in_dom x AKE_EexpRev.mStarted{2} =>
+     ! in_dom x AKE_EexpRev.mCompleted{2} =>
+     sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
+  AKE_Fresh.test{1} = AKE_EexpRev.test{2} /\
+  mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2} ==>
+if ! test_fresh AKE_EexpRev.test{2} AKE_EexpRev.evs{2} \/
+     collision_eexp_rcvd AKE_EexpRev.evs{2} then
+    accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    no_start_coll AKE_EexpRev.evs{2} /\
+    no_accept_coll AKE_EexpRev.evs{2} /\
+    valid_accepts AKE_EexpRev.evs{2} /\
+    inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+      AKE_EexpRev.mEexp{2} /\
+    inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+      AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+    (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+    ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+    (forall (x : Sidx),
+       in_dom x AKE_EexpRev.mCompleted{2} => in_dom x AKE_EexpRev.mStarted{2}) /\
+    ! AKE_Fresh.test{1} = None /\
+    mem (Accept (proj AKE_Fresh.test{1})) AKE_Fresh.evs{1} /\
+    (forall (x : Sidx),
+       in_dom x AKE_EexpRev.mStarted{2} =>
+       ! in_dom x AKE_EexpRev.mCompleted{2} =>
+       sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
+    AKE_Fresh.test{1} = AKE_EexpRev.test{2} /\
+    mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}
+  else
+    ={res} /\
+    AKE_EexpRev.evs{2} = AKE_Fresh.evs{1} /\
+    AKE_EexpRev.test{2} = AKE_Fresh.test{1} /\
+    AKE_EexpRev.cSession{2} = AKE_Fresh.cSession{1} /\
+    AKE_EexpRev.cH2{2} = AKE_Fresh.cH2{1} /\
+    AKE_EexpRev.mH2{2} = AKE_Fresh.mH2{1} /\
+    AKE_EexpRev.sH2{2} = AKE_Fresh.sH2{1} /\
+    AKE_EexpRev.mSk{2} = AKE_Fresh.mSk{1} /\
+    AKE_EexpRev.mEexp{2} = AKE_Fresh.mEexp{1} /\
+    AKE_EexpRev.mStarted{2} = AKE_Fresh.mStarted{1} /\
+    AKE_EexpRev.mCompleted{2} = AKE_Fresh.mCompleted{1} /\
+    ! AKE_Fresh.test{1} = None /\
+    mem (Accept (proj AKE_Fresh.test{1})) AKE_Fresh.evs{1} /\
+    accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    no_start_coll AKE_EexpRev.evs{2} /\
+    no_accept_coll AKE_EexpRev.evs{2} /\
+    valid_accepts AKE_EexpRev.evs{2} /\
+    inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+      AKE_EexpRev.mEexp{2} /\
+    inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+      AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+    (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+    ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+    (forall (x : Sidx),
+       in_dom x AKE_EexpRev.mCompleted{2} => in_dom x AKE_EexpRev.mStarted{2}) /\
+    (forall (x : Sidx),
+       in_dom x AKE_EexpRev.mStarted{2} =>
+       ! in_dom x AKE_EexpRev.mCompleted{2} =>
+       sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
+    AKE_Fresh.test{1} = AKE_EexpRev.test{2} /\
+    mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}.
+proof.
+ fun; if; [smt | | ]; wp; skip; progress => //.
+   apply accept_evs_eexps_pres_ev => //.
+   exists i{2}; do !split => //.
+   apply H9 => //.
+   rewrite  /sid_sent /compute_sid /= get_setE proj_some /=.
+   by elim /tuple3_ind  (proj AKE_Fresh.mStarted{1}.[i{2}]) => /=.
+   by apply start_evs_eexps_pres => //; smt.
+   by apply no_start_coll_pres => //; smt. 
+
+   apply no_accept_coll_pres_ev => //.
+   intros => s hmem.
+   rewrite /compute_sid get_setE.
+   elim /tuple3_ind (proj AKE_Fresh.mStarted{1}.[i{2}]) => /=;
+    rewrite {1}/sid_sent /= => A B r heq;apply not_def => h.
+   cut [h1 h2]:= H8 s => {h2}.
+   elim (h1 _) => //. 
+   intros => {h1} j [hjstrt][hjcomp][heexp] heq'.
+   generalize  heq' h => ->; rewrite /sid_sent /compute_sid /=.
+   elim /tuple3_ind (proj AKE_Fresh.mStarted{1}.[j]) => /= A' B' r' heq'.
    case (i{2} = j) => hor.
      by generalize hjstrt H10; rewrite hor; smt.
 
      apply not_def => heq''; 
-     cut: collision_eexp_eexp_op AKE_Enforcement.mEexp{1}; last by smt.
+     cut: collision_eexp_eexp_op AKE_Fresh.mEexp{1}; last by smt.
      rewrite collision_eexp_eexp_op_def /collision_eexp_eexp.
      exists i{2}; exists j; do !split => //.
+      by apply H9.
+      apply proj_inj_some.
+       by cut:= H9 i{2}; rewrite /in_dom.
+       by cut:= H9 j; rewrite /in_dom.
+       by apply gen_epk_inj.
+       
+   apply valid_accept_pres_ev => //.   
+   rewrite /psid_of_sid/compute_sid get_setE.
+   elim /tuple3_ind (proj AKE_Fresh.mStarted{1}.[i{2}]) => /= A' B' r' heq.
+   cut [h1 h2]:=
+    H7 (A', B', gen_epk (proj AKE_Fresh.mEexp{1}.[i{2}]), r') => {h1}.
+   apply h2.
+   exists i{2}; rewrite heq; progress => //.
+    by apply H9.
+    by cut:= H12 i{2} _ _ => //; rewrite heq /sd2_role /=.
+
+  by apply inv_started_pres => //; smt.   
+
+  apply inv_accepted_pres_ev1 => //.
+  by apply H9.
+  by apply H9.
+  case (x = i{2}).
+   by intros ->.
+   by intros neq; generalize H17; rewrite in_dom_setNE // => h; apply H11.
+  by rewrite mem_cons; right.
+   case (x = i{2}).
+    by intros => ->; cut:= H12 i{2} _ _.
+    by intros => hneq; apply H12 => //; generalize H18; rewrite in_dom_set; smt.
+
+  by rewrite mem_cons; right.
+  by rewrite mem_cons; right.
+   apply accept_evs_eexps_pres_ev => //.
+   exists i{2}; do !split => //.
+   apply H9 => //.
+   rewrite  /sid_sent /compute_sid /= get_setE proj_some /=.
+   by elim /tuple3_ind  (proj AKE_Fresh.mStarted{1}.[i{2}]) => /=.
+   by apply start_evs_eexps_pres => //; smt.
+   by apply no_start_coll_pres => //; smt. 
+
+   apply no_accept_coll_pres_ev => //.
+   intros => s hmem.
+   rewrite /compute_sid get_setE.
+   elim /tuple3_ind (proj AKE_Fresh.mStarted{1}.[i{2}]) => /=;
+    rewrite {1}/sid_sent /= => A B r heq;apply not_def => h.
+   cut [h1 h2]:= H8 s => {h2}.
+   elim (h1 _) => //. 
+   intros => {h1} j [hjstrt][hjcomp][heexp] heq'.
+   generalize  heq' h => ->; rewrite /sid_sent /compute_sid /=.
+   elim /tuple3_ind (proj AKE_Fresh.mStarted{1}.[j]) => /= A' B' r' heq'.
+   case (i{2} = j) => hor.
+     by generalize hjstrt H10; rewrite hor; smt.
+
+     apply not_def => heq''; 
+     cut: collision_eexp_eexp_op AKE_Fresh.mEexp{1}; last by smt.
+     rewrite collision_eexp_eexp_op_def /collision_eexp_eexp.
+     exists i{2}; exists j; do !split => //.
+      by apply H9.
+      apply proj_inj_some.
+       by cut:= H9 i{2}; rewrite /in_dom.
+       by cut:= H9 j; rewrite /in_dom.
+       by apply gen_epk_inj.
+       
+   apply valid_accept_pres_ev => //.   
+   rewrite /psid_of_sid/compute_sid get_setE.
+   elim /tuple3_ind (proj AKE_Fresh.mStarted{1}.[i{2}]) => /= A' B' r' heq.
+   cut [h1 h2]:=
+    H7 (A', B', gen_epk (proj AKE_Fresh.mEexp{1}.[i{2}]), r') => {h1}.
+   apply h2.
+   exists i{2}; rewrite heq; progress => //.
+    by apply H9.
+    by cut:= H12 i{2} _ _ => //; rewrite heq /sd2_role /=.
+
+  by apply inv_started_pres => //; smt.   
+
+  apply inv_accepted_pres_ev1 => //.
+  by apply H9.
+  by apply H9.
+  case (x = i{2}).
+   by intros ->.
+   by intros neq; generalize H17; rewrite in_dom_setNE // => h; apply H11.
+  case (x = i{2}).
+   by intros => ->; cut:= H12 i{2} _ _.
+    by intros => hneq; apply H12 => //; generalize H18; rewrite in_dom_set; smt.
+
+  by rewrite mem_cons; right.
+  smt.
+  smt.
+  smt.
+  smt.
+  smt.  
+  by apply H12.
+save.  
+
+
+local lemma bdh1_init2_1 :
+forall &2,
+  ! test_fresh AKE_EexpRev.test{2} AKE_EexpRev.evs{2} \/
+  collision_eexp_rcvd AKE_EexpRev.evs{2} =>
+  bd_hoare[ AKE_Fresh(A).O.init2 :
+             accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+             start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+             no_start_coll AKE_EexpRev.evs{2} /\
+             no_accept_coll AKE_EexpRev.evs{2} /\
+             valid_accepts AKE_EexpRev.evs{2} /\
+             inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+               AKE_EexpRev.mEexp{2} /\
+             inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+               AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+             (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+             ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mCompleted{2} =>
+                in_dom x AKE_EexpRev.mStarted{2}) /\
+             ! AKE_Fresh.test = None /\
+             mem (Accept (proj AKE_Fresh.test)) AKE_Fresh.evs /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mStarted{2} =>
+                ! in_dom x AKE_EexpRev.mCompleted{2} =>
+                sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
+             AKE_Fresh.test = AKE_EexpRev.test{2} /\
+             mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2} ==>
+             accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+             start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+             no_start_coll AKE_EexpRev.evs{2} /\
+             no_accept_coll AKE_EexpRev.evs{2} /\
+             valid_accepts AKE_EexpRev.evs{2} /\
+             inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+               AKE_EexpRev.mEexp{2} /\
+             inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+               AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+             (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+             ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mCompleted{2} =>
+                in_dom x AKE_EexpRev.mStarted{2}) /\
+             ! AKE_Fresh.test = None /\
+             mem (Accept (proj AKE_Fresh.test)) AKE_Fresh.evs /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mStarted{2} =>
+                ! in_dom x AKE_EexpRev.mCompleted{2} =>
+                sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
+             AKE_Fresh.test = AKE_EexpRev.test{2} /\
+             mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}] = 1%r.
+proof.
+ intros => &2 hbad; fun; wp; skip; progress => //.
+ by apply H6.
+ by apply H8.
+ by rewrite mem_cons; right.
+ by apply H11.
+ by apply H6.
+ by apply H8.
+ by apply H11.
+save.
+
+local lemma bdh1_init2_2 :
+forall &1,
+  bd_hoare[ AKE_EexpRev(A).O.init2 :
+             (! test_fresh AKE_EexpRev.test AKE_EexpRev.evs \/
+              collision_eexp_rcvd AKE_EexpRev.evs) /\
+             accept_evs_eexps AKE_EexpRev.evs AKE_EexpRev.mEexp /\
+             start_evs_eexps AKE_EexpRev.evs AKE_EexpRev.mEexp /\
+             no_start_coll AKE_EexpRev.evs /\
+             no_accept_coll AKE_EexpRev.evs /\
+             valid_accepts AKE_EexpRev.evs /\
+             inv_started AKE_EexpRev.evs AKE_EexpRev.mStarted
+               AKE_EexpRev.mEexp /\
+             inv_accepted AKE_EexpRev.evs AKE_EexpRev.mStarted
+               AKE_EexpRev.mEexp AKE_EexpRev.mCompleted /\
+             (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp) /\
+             ! collision_eexp_eexp_op AKE_EexpRev.mEexp /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mCompleted =>
+                in_dom x AKE_EexpRev.mStarted) /\
+             ! AKE_Fresh.test{1} = None /\
+             mem (Accept (proj AKE_Fresh.test{1})) AKE_Fresh.evs{1} /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mStarted =>
+                ! in_dom x AKE_EexpRev.mCompleted =>
+                sd2_role (proj AKE_EexpRev.mStarted.[x]) = init) /\
+             AKE_Fresh.test{1} = AKE_EexpRev.test /\
+             mem (Accept (proj AKE_EexpRev.test)) AKE_EexpRev.evs ==>
+             (! test_fresh AKE_EexpRev.test AKE_EexpRev.evs \/
+              collision_eexp_rcvd AKE_EexpRev.evs) /\
+             accept_evs_eexps AKE_EexpRev.evs AKE_EexpRev.mEexp /\
+             start_evs_eexps AKE_EexpRev.evs AKE_EexpRev.mEexp /\
+             no_start_coll AKE_EexpRev.evs /\
+             no_accept_coll AKE_EexpRev.evs /\
+             valid_accepts AKE_EexpRev.evs /\
+             inv_started AKE_EexpRev.evs AKE_EexpRev.mStarted
+               AKE_EexpRev.mEexp /\
+             inv_accepted AKE_EexpRev.evs AKE_EexpRev.mStarted
+               AKE_EexpRev.mEexp AKE_EexpRev.mCompleted /\
+             (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp) /\
+             ! collision_eexp_eexp_op AKE_EexpRev.mEexp /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mCompleted =>
+                in_dom x AKE_EexpRev.mStarted) /\
+             ! AKE_Fresh.test{1} = None /\
+             mem (Accept (proj AKE_Fresh.test{1})) AKE_Fresh.evs{1} /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mStarted =>
+                ! in_dom x AKE_EexpRev.mCompleted =>
+                sd2_role (proj AKE_EexpRev.mStarted.[x]) = init) /\
+             AKE_Fresh.test{1} = AKE_EexpRev.test /\
+             mem (Accept (proj AKE_EexpRev.test)) AKE_EexpRev.evs] = 1%r.
+proof.
+ intros => &1; fun; wp; skip; progress => //.
+ elim H => h; last first.
+ by right; apply collision_eexp_rcvd_mon.
+  cut heq :
+   forall t ev,  t <> None =>  test_fresh t ev = fresh (proj t) ev by smt.
+  generalize h.
+  rewrite !heq //.
+  intros => h.
+  case (collision_eexp_rcvd
+  (Accept (compute_sid AKE_EexpRev.mStarted{hr} AKE_EexpRev.mEexp{hr}
+        AKE_EexpRev.mCompleted{hr}.[i{hr} <- Y{hr}] i{hr}) :: AKE_EexpRev.evs{hr}))
+   => hcoll; first by right.
+  left.
+  apply coll_fresh => //.
+  by apply no_start_coll_pres => //; smt.
+  apply no_accept_coll_pres_ev => //.
+   intros => s hmem.
+   rewrite /compute_sid get_setE.
+   elim /tuple3_ind (proj AKE_EexpRev.mStarted{hr}.[i{hr}]) => /=;
+    rewrite {1}/sid_sent /= => A B r heq';apply not_def => h'.
+   cut [h1 h2]:= H6 s => {h2}.
+   elim (h1 _) => //. 
+   intros => {h1} j [hjstrt][hjcomp][heexp] heq''.
+   generalize  heq'' h' => ->; rewrite /sid_sent /compute_sid /=.
+   elim /tuple3_ind (proj AKE_EexpRev.mStarted{hr}.[j]) => /= A' B' r' heq''.
+   case (i{hr} = j) => hor.
+     by generalize hjstrt H10; rewrite hor; smt.
+
+     apply not_def => heq'''; 
+     cut: collision_eexp_eexp_op AKE_EexpRev.mEexp{hr}; last by smt.
+     rewrite collision_eexp_eexp_op_def /collision_eexp_eexp.
+     exists i{hr}; exists j; do !split => //.
       by apply H7.
       apply proj_inj_some.
-       by cut:= H7 i{2}; rewrite /in_dom.
+       by cut:= H7 i{hr}; rewrite /in_dom.
+       by cut:= H7 j; rewrite /in_dom.
+       by apply gen_epk_inj.
+       
+   apply valid_accept_pres_ev => //.   
+   rewrite /psid_of_sid/compute_sid get_setE.
+   elim /tuple3_ind (proj AKE_EexpRev.mStarted{hr}.[i{hr}]) => /= A' B' r' heq'.
+   cut [h1 h2]:=
+    H5 (A', B', gen_epk (proj AKE_EexpRev.mEexp{hr}.[i{hr}]), r') => {h1}.
+   apply h2.
+   exists i{hr}; rewrite heq'; progress => //.
+    by apply H7.
+    by cut:= H12 i{hr} _ _ => //; rewrite heq' /sd2_role /=.
+
+   apply accept_evs_eexps_pres_ev => //.
+   exists i{hr}; do !split => //.
+   apply H7 => //.
+   rewrite  /sid_sent /compute_sid /= get_setE proj_some /=.
+   by elim /tuple3_ind  (proj AKE_EexpRev.mStarted{hr}.[i{hr}]) => /=.
+   by apply start_evs_eexps_pres => //; smt.
+   by apply no_start_coll_pres => //; smt. 
+
+   apply no_accept_coll_pres_ev => //.
+   intros => s hmem.
+   rewrite /compute_sid get_setE.
+   elim /tuple3_ind (proj AKE_EexpRev.mStarted{hr}.[i{hr}]) => /=;
+    rewrite {1}/sid_sent /= => A B r heq;apply not_def => h.
+   cut [h1 h2]:= H6 s => {h2}.
+   elim (h1 _) => //. 
+   intros => {h1} j [hjstrt][hjcomp][heexp] heq'.
+   generalize  heq' h => ->; rewrite /sid_sent /compute_sid /=.
+   elim /tuple3_ind (proj AKE_EexpRev.mStarted{hr}.[j]) => /= A' B' r' heq'.
+   case (i{hr} = j) => hor.
+     by generalize hjstrt H10; rewrite hor; smt.
+
+     apply not_def => heq''; 
+     cut: collision_eexp_eexp_op AKE_EexpRev.mEexp{hr}; last by smt.
+     rewrite collision_eexp_eexp_op_def /collision_eexp_eexp.
+     exists i{hr}; exists j; do !split => //.
+      by apply H7.
+      apply proj_inj_some.
+       by cut:= H7 i{hr}; rewrite /in_dom.
+       by cut:= H7 j; rewrite /in_dom.
+       by apply gen_epk_inj.
+       
+   apply valid_accept_pres_ev => //.   
+   rewrite /psid_of_sid/compute_sid get_setE.
+   elim /tuple3_ind (proj AKE_EexpRev.mStarted{hr}.[i{hr}]) => /= A' B' r' heq.
+   cut [h1 h2]:=
+    H5 (A', B', gen_epk (proj AKE_EexpRev.mEexp{hr}.[i{hr}]), r') => {h1}.
+   apply h2.
+   exists i{hr}; rewrite heq; progress => //.
+    by apply H7.
+    by cut:= H12 i{hr} _ _ => //; rewrite heq /sd2_role /=.
+
+  by apply inv_started_pres => //; smt.   
+
+  apply inv_accepted_pres_ev1 => //.
+  by apply H7.
+  by apply H7.
+  case (x = i{hr}).
+   by intros ->.
+   by intros neq; generalize H16; rewrite in_dom_setNE // => h; apply H9.
+  case (x = i{hr}).
+   by intros => ->; cut:= H12 i{hr} _ _.
+    by intros => hneq; apply H12 => //; generalize H17; rewrite in_dom_set; smt.
+
+  by rewrite mem_cons; right.
+  smt.
+  smt.
+  by apply H12.
+save.
+
+
+local equiv eq1_resp :
+    AKE_Fresh(A).O.resp ~ AKE_EexpRev(A).O.resp :
+  ! (! test_fresh AKE_EexpRev.test{2} AKE_EexpRev.evs{2} \/
+     collision_eexp_rcvd AKE_EexpRev.evs{2}) /\
+  ={i, B, A, X} /\
+  AKE_EexpRev.evs{2} = AKE_Fresh.evs{1} /\
+  AKE_EexpRev.test{2} = AKE_Fresh.test{1} /\
+  AKE_EexpRev.cSession{2} = AKE_Fresh.cSession{1} /\
+  AKE_EexpRev.cH2{2} = AKE_Fresh.cH2{1} /\
+  AKE_EexpRev.mH2{2} = AKE_Fresh.mH2{1} /\
+  AKE_EexpRev.sH2{2} = AKE_Fresh.sH2{1} /\
+  AKE_EexpRev.mSk{2} = AKE_Fresh.mSk{1} /\
+  AKE_EexpRev.mEexp{2} = AKE_Fresh.mEexp{1} /\
+  AKE_EexpRev.mStarted{2} = AKE_Fresh.mStarted{1} /\
+  AKE_EexpRev.mCompleted{2} = AKE_Fresh.mCompleted{1} /\
+  ! AKE_Fresh.test{1} = None /\
+  mem (Accept (proj AKE_Fresh.test{1})) AKE_Fresh.evs{1} /\
+  accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+  start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+  no_start_coll AKE_EexpRev.evs{2} /\
+  no_accept_coll AKE_EexpRev.evs{2} /\
+  valid_accepts AKE_EexpRev.evs{2} /\
+  inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2} AKE_EexpRev.mEexp{2} /\
+  inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+    AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+  (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+  ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+  (forall (x : Sidx),
+     in_dom x AKE_EexpRev.mCompleted{2} => in_dom x AKE_EexpRev.mStarted{2}) /\
+  (forall (x : Sidx),
+     in_dom x AKE_EexpRev.mStarted{2} =>
+     ! in_dom x AKE_EexpRev.mCompleted{2} =>
+     sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
+  AKE_Fresh.test{1} = AKE_EexpRev.test{2} /\
+  mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2} ==> 
+
+ if ! test_fresh AKE_EexpRev.test{2} AKE_EexpRev.evs{2} \/
+     collision_eexp_rcvd AKE_EexpRev.evs{2} then
+    accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    no_start_coll AKE_EexpRev.evs{2} /\
+    no_accept_coll AKE_EexpRev.evs{2} /\
+    valid_accepts AKE_EexpRev.evs{2} /\
+    inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+      AKE_EexpRev.mEexp{2} /\
+    inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+      AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+    (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+    ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+    (forall (x : Sidx),
+       in_dom x AKE_EexpRev.mCompleted{2} => in_dom x AKE_EexpRev.mStarted{2}) /\
+    ! AKE_Fresh.test{1} = None /\
+    mem (Accept (proj AKE_Fresh.test{1})) AKE_Fresh.evs{1} /\
+    (forall (x : Sidx),
+       in_dom x AKE_EexpRev.mStarted{2} =>
+       ! in_dom x AKE_EexpRev.mCompleted{2} =>
+       sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
+    AKE_Fresh.test{1} = AKE_EexpRev.test{2} /\
+    mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}
+  else
+    ={res} /\
+    AKE_EexpRev.evs{2} = AKE_Fresh.evs{1} /\
+    AKE_EexpRev.test{2} = AKE_Fresh.test{1} /\
+    AKE_EexpRev.cSession{2} = AKE_Fresh.cSession{1} /\
+    AKE_EexpRev.cH2{2} = AKE_Fresh.cH2{1} /\
+    AKE_EexpRev.mH2{2} = AKE_Fresh.mH2{1} /\
+    AKE_EexpRev.sH2{2} = AKE_Fresh.sH2{1} /\
+    AKE_EexpRev.mSk{2} = AKE_Fresh.mSk{1} /\
+    AKE_EexpRev.mEexp{2} = AKE_Fresh.mEexp{1} /\
+    AKE_EexpRev.mStarted{2} = AKE_Fresh.mStarted{1} /\
+    AKE_EexpRev.mCompleted{2} = AKE_Fresh.mCompleted{1} /\
+    ! AKE_Fresh.test{1} = None /\
+    mem (Accept (proj AKE_Fresh.test{1})) AKE_Fresh.evs{1} /\
+    accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    no_start_coll AKE_EexpRev.evs{2} /\
+    no_accept_coll AKE_EexpRev.evs{2} /\
+    valid_accepts AKE_EexpRev.evs{2} /\
+    inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+      AKE_EexpRev.mEexp{2} /\
+    inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+      AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+    (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+    ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+    (forall (x : Sidx),
+       in_dom x AKE_EexpRev.mCompleted{2} => in_dom x AKE_EexpRev.mStarted{2}) /\
+    (forall (x : Sidx),
+       in_dom x AKE_EexpRev.mStarted{2} =>
+       ! in_dom x AKE_EexpRev.mCompleted{2} =>
+       sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
+    AKE_Fresh.test{1} = AKE_EexpRev.test{2} /\
+    mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}.
+proof.
+ fun; wp; skip; progress => //.
+   apply accept_evs_eexps_pres_ev => //.
+    by rewrite /sid_sent /=; exists i{2}; split; smt.
+   
+   by apply start_evs_eexps_pres => //; smt.
+   by apply no_start_coll_pres => //; smt.
+  
+   apply no_accept_coll_pres_ev => //.
+   intros => s hmem; rewrite {1}/sid_sent /=.
+   apply not_def => heq.
+   cut [h1 h2]:= H8 s => {h2}.
+   elim (h1 _) => //. 
+   intros => {h1} j [hjstrt][hjcomp][heexp] heq'.
+   generalize  heq' heq => ->; rewrite /sid_sent /compute_sid /=.
+   elim /tuple3_ind (proj AKE_Fresh.mStarted{1}.[j]) => /= A' B' r' heq'.
+   case (i{2} = j) => hor.
+     by generalize hjstrt H10; rewrite hor; smt.
+
+     apply not_def => heq''; 
+     cut: collision_eexp_eexp_op AKE_Fresh.mEexp{1}; last by smt.
+     rewrite collision_eexp_eexp_op_def /collision_eexp_eexp.
+     exists i{2}; exists j; do !split => //.
+      by apply H9.
+      apply proj_inj_some.
+       by cut:= H9 i{2}; rewrite /in_dom.
+       by cut:= H9 j; rewrite /in_dom.
+       by apply gen_epk_inj.
+   
+   by apply valid_accept_pres_ev2.
+  rewrite /inv_started.
+  intros => ps; rewrite mem_cons; split.
+   intros => [|] hor.
+   smt.
+   cut [h1 h2 ]:= H7 ps => {h2}.
+    elim (h1 _) => // j [hdom1'][hdom2'] heq.
+   case (j = i{2}) => heq'.
+     by generalize heq' H15 hdom1' => ->; smt.
+     exists j; progress => //.
+     rewrite in_dom_setNE //.
+     generalize H19 heq; (rewrite get_setNE; first by smt) => -> //.
+     generalize H19 heq; (rewrite get_setNE; first by smt) => -> //.
+
+   intros => [j][hdom1][hdom2] heq.
+   case (j = i{2}) => hor.
+    generalize hor heq => ->; rewrite get_setE proj_some /=; smt.
+   right.
+   cut [h1 h2] := H7 ps; apply h2.
+   exists j; progress.
+    by generalize hdom1; rewrite in_dom_setNE.
+    by apply H9.
+    by generalize heq; (rewrite get_setNE; first smt); rewrite H19 /=.
+    by generalize heq; (rewrite get_setNE; first smt); rewrite H19 /=.
+
+   rewrite /inv_accepted => ps; rewrite mem_cons; split.
+    intros => [|] hor.
+    cut: ps = (B{2}, A{2}, gen_epk (proj AKE_Fresh.mEexp{1}.[i{2}]), X{2}, resp).
+     by apply Accept_inj.
+    intros => ->.
+   exists i{2}; rewrite !in_dom_setE /compute_sid !get_setE !proj_some /=.
+    by apply H9.
+ 
+   cut [h1 h2] := H8 ps => {h2}.
+   cut:= h1 _ => //; intros => [j][hdom1][hdom2][hdom3] heq.
+    case (j = i{2}) => heq'.
+     by generalize heq' H15 hdom1 => ->; smt.
+     exists j; (rewrite !in_dom_setNE // /compute_sid heq !get_setNE; first 2 smt).
+     by do !split => //.
+   intros => [j][hdom1][hdom2][hdom3] heq.
+   case (i{2} = j) => hor.
+    generalize heq; rewrite hor.
+    by rewrite /compute_sid /= !get_setE !proj_some /= => ->; left.  
+   
+   right.
+   cut [h1 h2]:= H8 ps => {h1}.
+   apply h2.
+   exists j.
+   generalize hdom1 hdom2 hdom3 heq; 
+   rewrite !in_dom_setNE; first 2 smt. 
+   by rewrite /compute_sid /= !get_setNE /=; smt.
+   by apply H9.
+   generalize H19; rewrite !in_dom_set => [|] hor.
+    by left; apply H11.
+    by right.
+   by rewrite mem_cons; right.
+   case (x = i{2}) => hor.
+    by generalize hor H20 => ->; rewrite in_dom_setE.
+    rewrite get_setNE; first smt.
+    apply H12.
+    by generalize H19; rewrite !in_dom_setNE.
+    by generalize H20; rewrite !in_dom_setNE. 
+    by rewrite mem_cons; right.
+    by rewrite mem_cons; right.
+   apply accept_evs_eexps_pres_ev => //.
+    by rewrite /sid_sent /=; exists i{2}; split; smt.
+   
+   by apply start_evs_eexps_pres => //; smt.
+   by apply no_start_coll_pres => //; smt.
+  
+   apply no_accept_coll_pres_ev => //.
+   intros => s hmem; rewrite {1}/sid_sent /=.
+   apply not_def => heq.
+   cut [h1 h2]:= H8 s => {h2}.
+   elim (h1 _) => //. 
+   intros => {h1} j [hjstrt][hjcomp][heexp] heq'.
+   generalize  heq' heq => ->; rewrite /sid_sent /compute_sid /=.
+   elim /tuple3_ind (proj AKE_Fresh.mStarted{1}.[j]) => /= A' B' r' heq'.
+   case (i{2} = j) => hor.
+     by generalize hjstrt H10; rewrite hor; smt.
+
+     apply not_def => heq''; 
+     cut: collision_eexp_eexp_op AKE_Fresh.mEexp{1}; last by smt.
+     rewrite collision_eexp_eexp_op_def /collision_eexp_eexp.
+     exists i{2}; exists j; do !split => //.
+      by apply H9.
+      apply proj_inj_some.
+       by cut:= H9 i{2}; rewrite /in_dom.
+       by cut:= H9 j; rewrite /in_dom.
+       by apply gen_epk_inj.
+   
+   by apply valid_accept_pres_ev2.
+  rewrite /inv_started.
+  intros => ps; rewrite mem_cons; split.
+   intros => [|] hor.
+   smt.
+   cut [h1 h2 ]:= H7 ps => {h2}.
+    elim (h1 _) => // j [hdom1'][hdom2'] heq.
+   case (j = i{2}) => heq'.
+     by generalize heq' H15 hdom1' => ->; smt.
+     exists j; progress => //.
+     rewrite in_dom_setNE //.
+     generalize H19 heq; (rewrite get_setNE; first by smt) => -> //.
+     generalize H19 heq; (rewrite get_setNE; first by smt) => -> //.
+
+   intros => [j][hdom1][hdom2] heq.
+   case (j = i{2}) => hor.
+    generalize hor heq => ->; rewrite get_setE proj_some /=; smt.
+   right.
+   cut [h1 h2] := H7 ps; apply h2.
+   exists j; progress.
+    by generalize hdom1; rewrite in_dom_setNE.
+    by apply H9.
+    by generalize heq; (rewrite get_setNE; first smt); rewrite H19 /=.
+    by generalize heq; (rewrite get_setNE; first smt); rewrite H19 /=.
+
+   rewrite /inv_accepted => ps; rewrite mem_cons; split.
+    intros => [|] hor.
+    cut: ps = (B{2}, A{2}, gen_epk (proj AKE_Fresh.mEexp{1}.[i{2}]), X{2}, resp).
+     by apply Accept_inj.
+    intros => ->.
+   exists i{2}; rewrite !in_dom_setE /compute_sid !get_setE !proj_some /=.
+    by apply H9.
+ 
+   cut [h1 h2] := H8 ps => {h2}.
+   cut:= h1 _ => //; intros => [j][hdom1][hdom2][hdom3] heq.
+    case (j = i{2}) => heq'.
+     by generalize heq' H15 hdom1 => ->; smt.
+     exists j; (rewrite !in_dom_setNE // /compute_sid heq !get_setNE; first 2 smt).
+     by do !split => //.
+   intros => [j][hdom1][hdom2][hdom3] heq.
+   case (i{2} = j) => hor.
+    generalize heq; rewrite hor.
+    by rewrite /compute_sid /= !get_setE !proj_some /= => ->; left.  
+   
+   right.
+   cut [h1 h2]:= H8 ps => {h1}.
+   apply h2.
+   exists j.
+   generalize hdom1 hdom2 hdom3 heq; 
+   rewrite !in_dom_setNE; first 2 smt. 
+   by rewrite /compute_sid /= !get_setNE /=; smt.
+   by apply H9.
+   generalize H19; rewrite !in_dom_set => [|] hor.
+    by left; apply H11.
+    by right.
+   case (x = i{2}) => hor.
+    by generalize hor H20 => ->; rewrite in_dom_setE.
+    rewrite get_setNE; first smt.
+    apply H12.
+    by generalize H19; rewrite !in_dom_setNE.
+    by generalize H20; rewrite !in_dom_setNE. 
+    by rewrite mem_cons; right.
+   by apply H9.
+   by apply H11.
+   by apply H12.
+   by apply H9.
+   by apply H11.
+   by apply H12.
+save.
+
+local lemma bdh1_resp_1 :
+forall &2,
+  ! test_fresh AKE_EexpRev.test{2} AKE_EexpRev.evs{2} \/
+  collision_eexp_rcvd AKE_EexpRev.evs{2} =>
+  bd_hoare[ AKE_Fresh(A).O.resp :
+             accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+             start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+             no_start_coll AKE_EexpRev.evs{2} /\
+             no_accept_coll AKE_EexpRev.evs{2} /\
+             valid_accepts AKE_EexpRev.evs{2} /\
+             inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+               AKE_EexpRev.mEexp{2} /\
+             inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+               AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+             (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+             ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mCompleted{2} =>
+                in_dom x AKE_EexpRev.mStarted{2}) /\
+             ! AKE_Fresh.test = None /\
+             mem (Accept (proj AKE_Fresh.test)) AKE_Fresh.evs /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mStarted{2} =>
+                ! in_dom x AKE_EexpRev.mCompleted{2} =>
+                sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
+             AKE_Fresh.test = AKE_EexpRev.test{2} /\
+             mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2} ==>
+             accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+             start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+             no_start_coll AKE_EexpRev.evs{2} /\
+             no_accept_coll AKE_EexpRev.evs{2} /\
+             valid_accepts AKE_EexpRev.evs{2} /\
+             inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+               AKE_EexpRev.mEexp{2} /\
+             inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+               AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+             (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+             ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mCompleted{2} =>
+                in_dom x AKE_EexpRev.mStarted{2}) /\
+             ! AKE_Fresh.test = None /\
+             mem (Accept (proj AKE_Fresh.test)) AKE_Fresh.evs /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mStarted{2} =>
+                ! in_dom x AKE_EexpRev.mCompleted{2} =>
+                sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
+             AKE_Fresh.test = AKE_EexpRev.test{2} /\
+             mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}] = 1%r.
+proof.
+ intros => &2 h; fun; wp; skip; progress => //.
+ by apply H6.
+ by apply H8.
+ by rewrite mem_cons; right.
+ by apply H11.
+ by apply H6.
+ by apply H8.
+ by apply H11.
+save.
+
+
+local lemma bdh1_resp_2 :
+forall &1,
+  bd_hoare[ AKE_EexpRev(A).O.resp :
+             (! test_fresh AKE_EexpRev.test AKE_EexpRev.evs \/
+              collision_eexp_rcvd AKE_EexpRev.evs) /\
+             accept_evs_eexps AKE_EexpRev.evs AKE_EexpRev.mEexp /\
+             start_evs_eexps AKE_EexpRev.evs AKE_EexpRev.mEexp /\
+             no_start_coll AKE_EexpRev.evs /\
+             no_accept_coll AKE_EexpRev.evs /\
+             valid_accepts AKE_EexpRev.evs /\
+             inv_started AKE_EexpRev.evs AKE_EexpRev.mStarted
+               AKE_EexpRev.mEexp /\
+             inv_accepted AKE_EexpRev.evs AKE_EexpRev.mStarted
+               AKE_EexpRev.mEexp AKE_EexpRev.mCompleted /\
+             (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp) /\
+             ! collision_eexp_eexp_op AKE_EexpRev.mEexp /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mCompleted =>
+                in_dom x AKE_EexpRev.mStarted) /\
+             ! AKE_Fresh.test{1} = None /\
+             mem (Accept (proj AKE_Fresh.test{1})) AKE_Fresh.evs{1} /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mStarted =>
+                ! in_dom x AKE_EexpRev.mCompleted =>
+                sd2_role (proj AKE_EexpRev.mStarted.[x]) = init) /\
+             AKE_Fresh.test{1} = AKE_EexpRev.test /\
+             mem (Accept (proj AKE_EexpRev.test)) AKE_EexpRev.evs ==>
+             (! test_fresh AKE_EexpRev.test AKE_EexpRev.evs \/
+              collision_eexp_rcvd AKE_EexpRev.evs) /\
+             accept_evs_eexps AKE_EexpRev.evs AKE_EexpRev.mEexp /\
+             start_evs_eexps AKE_EexpRev.evs AKE_EexpRev.mEexp /\
+             no_start_coll AKE_EexpRev.evs /\
+             no_accept_coll AKE_EexpRev.evs /\
+             valid_accepts AKE_EexpRev.evs /\
+             inv_started AKE_EexpRev.evs AKE_EexpRev.mStarted
+               AKE_EexpRev.mEexp /\
+             inv_accepted AKE_EexpRev.evs AKE_EexpRev.mStarted
+               AKE_EexpRev.mEexp AKE_EexpRev.mCompleted /\
+             (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp) /\
+             ! collision_eexp_eexp_op AKE_EexpRev.mEexp /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mCompleted =>
+                in_dom x AKE_EexpRev.mStarted) /\
+             ! AKE_Fresh.test{1} = None /\
+             mem (Accept (proj AKE_Fresh.test{1})) AKE_Fresh.evs{1} /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mStarted =>
+                ! in_dom x AKE_EexpRev.mCompleted =>
+                sd2_role (proj AKE_EexpRev.mStarted.[x]) = init) /\
+             AKE_Fresh.test{1} = AKE_EexpRev.test /\
+             mem (Accept (proj AKE_EexpRev.test)) AKE_EexpRev.evs] = 1%r.
+proof.
+ intros => &1; fun; wp; skip; progress => //.
+ elim H => h; last first.
+ by right; apply collision_eexp_rcvd_mon.
+  cut heq_tf :
+   forall t ev,  t <> None =>  test_fresh t ev = fresh (proj t) ev by smt.
+  generalize h.
+  rewrite !heq_tf //.
+  intros => h.
+  case (collision_eexp_rcvd
+  (Accept(B{hr}, A{hr}, gen_epk (proj AKE_EexpRev.mEexp{hr}.[i{hr}]), X{hr}, resp) 
+    :: AKE_EexpRev.evs{hr})) => hcoll; first by right.
+  left.
+  apply coll_fresh => //.
+  by apply no_start_coll_pres => //; smt.
+  apply no_accept_coll_pres_ev => //.
+   intros => s hmem; rewrite {1}/sid_sent /=.
+   apply not_def => heq.
+   cut [h1 h2]:= H6 s => {h2}.
+   elim (h1 _) => //. 
+   intros => {h1} j [hjstrt][hjcomp][heexp] heq'.
+   generalize  heq' heq => ->; rewrite /sid_sent /compute_sid /=.
+   elim /tuple3_ind (proj AKE_EexpRev.mStarted{hr}.[j]) => /= A' B' r' heq'.
+   case (i{hr} = j) => hor.
+     by generalize hjstrt H10; rewrite hor; smt.
+
+     apply not_def => heq''; 
+     cut: collision_eexp_eexp_op AKE_EexpRev.mEexp{hr}; last by smt.
+     rewrite collision_eexp_eexp_op_def /collision_eexp_eexp.
+     exists i{hr}; exists j; do !split => //.
+      by apply H7.
+      apply proj_inj_some.
+       by cut:= H7 i{hr}; rewrite /in_dom.
+       by cut:= H7 j; rewrite /in_dom.
+       by apply gen_epk_inj.
+   
+   by apply valid_accept_pres_ev2.
+
+   apply accept_evs_eexps_pres_ev => //.
+    by rewrite /sid_sent /=; exists i{hr}; split; smt.
+
+   by apply start_evs_eexps_pres => //; smt.
+   by apply no_start_coll_pres => //; smt.
+
+   apply no_accept_coll_pres_ev => //.
+   intros => s hmem; rewrite {1}/sid_sent /=.
+   apply not_def => heq.
+   cut [h1 h2]:= H6 s => {h2}.
+   elim (h1 _) => //. 
+   intros => {h1} j [hjstrt][hjcomp][heexp] heq'.
+   generalize  heq' heq => ->; rewrite /sid_sent /compute_sid /=.
+   elim /tuple3_ind (proj AKE_EexpRev.mStarted{hr}.[j]) => /= A' B' r' heq'.
+   case (i{hr} = j) => hor.
+     by generalize hjstrt H10; rewrite hor; smt.
+
+     apply not_def => heq''; 
+     cut: collision_eexp_eexp_op AKE_EexpRev.mEexp{hr}; last by smt.
+     rewrite collision_eexp_eexp_op_def /collision_eexp_eexp.
+     exists i{hr}; exists j; do !split => //.
+      by apply H7.
+      apply proj_inj_some.
+       by cut:= H7 i{hr}; rewrite /in_dom.
        by cut:= H7 j; rewrite /in_dom.
        by apply gen_epk_inj.
    
@@ -1921,95 +3485,1416 @@ call (_ :
    smt.
    cut [h1 h2 ]:= H5 ps => {h2}.
     elim (h1 _) => // j [hdom1'][hdom2'] heq.
-   case (j = i{2}) => heq'.
-     by generalize heq' H13 hdom1' => ->; smt.
+   case (j = i{hr}) => heq'.
+     by generalize heq' H15 hdom1' => ->; smt.
      exists j; progress => //.
      rewrite in_dom_setNE //.
-     generalize H16 heq; (rewrite get_setNE; first by smt) => -> //.
-     generalize H16 heq; (rewrite get_setNE; first by smt) => -> //.
+     generalize H18 heq; (rewrite get_setNE; first by smt) => -> //.
+     generalize H18 heq; (rewrite get_setNE; first by smt) => -> //.
 
    intros => [j][hdom1][hdom2] heq.
-   case (j = i{2}) => hor.
+   case (j = i{hr}) => hor.
     generalize hor heq => ->; rewrite get_setE proj_some /=; smt.
    right.
    cut [h1 h2] := H5 ps; apply h2.
    exists j; progress.
     by generalize hdom1; rewrite in_dom_setNE.
     by apply H7.
-    by generalize heq; (rewrite get_setNE; first smt); rewrite H16 /=.
-    by generalize heq; (rewrite get_setNE; first smt); rewrite H16 /=.
+    by generalize heq; (rewrite get_setNE; first smt); rewrite H18 /=.
+    by generalize heq; (rewrite get_setNE; first smt); rewrite H18 /=.
+   rewrite /inv_accepted => ps; rewrite mem_cons; split.
+    intros => [|] hor.
+    cut: ps = (B{hr}, A{hr}, gen_epk (proj AKE_EexpRev.mEexp{hr}.[i{hr}]), X{hr},resp).
+     by apply Accept_inj.
+    intros => ->.
+   exists i{hr}; rewrite !in_dom_setE /compute_sid !get_setE !proj_some /=.
+    by apply H7.
+ 
+   cut [h1 h2] := H6 ps => {h2}.
+   cut:= h1 _ => //; intros => [j][hdom1][hdom2][hdom3] heq.
+    case (j = i{hr}) => heq'.
+     by generalize heq' H15 hdom1 => ->; smt.
+     exists j; (rewrite !in_dom_setNE // /compute_sid heq !get_setNE; first 2 smt).
+     by do !split => //.
+   intros => [j][hdom1][hdom2][hdom3] heq.
+   case (i{hr} = j) => hor.
+    generalize heq; rewrite hor.
+    by rewrite /compute_sid /= !get_setE !proj_some /= => ->; left.  
 
-   apply inv_accepted_pres_ev2.
-   
+   right.
+   cut [h1 h2]:= H6 ps => {h1}.
+   apply h2.
+   exists j.
+   generalize hdom1 hdom2 hdom3 heq; 
+   rewrite !in_dom_setNE; first 2 smt. 
+   by rewrite /compute_sid /= !get_setNE /=; smt.
 
-call 
-(_ :
-  (!fresh (proj AKE_NoColl.test) AKE_NoColl.evs),
-  (AKE_NoColl.evs{2} = AKE_Enforcement.evs{1} /\
-  AKE_NoColl.test{2} = AKE_Enforcement.test{1} /\
-  AKE_NoColl.cSession{2} = AKE_Enforcement.cSession{1} /\
-  AKE_NoColl.cH2{2} = AKE_Enforcement.cH2{1} /\
-  AKE_NoColl.mH2{2} = AKE_Enforcement.mH2{1} /\
-  AKE_NoColl.sH2{2} = AKE_Enforcement.sH2{1} /\
-  AKE_NoColl.mSk{2} = AKE_Enforcement.mSk{1} /\
-  AKE_NoColl.mEexp{2} = AKE_Enforcement.mEexp{1} /\
-  AKE_NoColl.mStarted{2} = AKE_Enforcement.mStarted{1} /\
-  AKE_NoColl.mCompleted{2} = AKE_Enforcement.mCompleted{1} /\
+   smt.
+   generalize H18; rewrite !in_dom_set => [|] hor.
+    by left; apply H9.
+    by right.
+   case (x = i{hr}) => hor.
+    by generalize hor H19 => ->; rewrite in_dom_setE.
+    rewrite get_setNE; first smt.
+    apply H12.
+    by generalize H18; rewrite !in_dom_setNE.
+    by generalize H19; rewrite !in_dom_setNE. 
+    by rewrite mem_cons; right.
+    by apply H7.
+    by apply H9.
+    by apply H12.
+save.   
 
-  AKE_Enforcement.test{1} <> None),
-  AKE_Enforcement.test{1} <> None) => //.
+local equiv eq1_staticRev : 
+    AKE_Fresh(A).O.staticRev ~ AKE_EexpRev(A).O.staticRev :
+  ! (! test_fresh AKE_EexpRev.test{2} AKE_EexpRev.evs{2} \/
+     collision_eexp_rcvd AKE_EexpRev.evs{2}) /\
+  ={A} /\
+  AKE_EexpRev.evs{2} = AKE_Fresh.evs{1} /\
+  AKE_EexpRev.test{2} = AKE_Fresh.test{1} /\
+  AKE_EexpRev.cSession{2} = AKE_Fresh.cSession{1} /\
+  AKE_EexpRev.cH2{2} = AKE_Fresh.cH2{1} /\
+  AKE_EexpRev.mH2{2} = AKE_Fresh.mH2{1} /\
+  AKE_EexpRev.sH2{2} = AKE_Fresh.sH2{1} /\
+  AKE_EexpRev.mSk{2} = AKE_Fresh.mSk{1} /\
+  AKE_EexpRev.mEexp{2} = AKE_Fresh.mEexp{1} /\
+  AKE_EexpRev.mStarted{2} = AKE_Fresh.mStarted{1} /\
+  AKE_EexpRev.mCompleted{2} = AKE_Fresh.mCompleted{1} /\
+  ! AKE_Fresh.test{1} = None /\
+  mem (Accept (proj AKE_Fresh.test{1})) AKE_Fresh.evs{1} /\
+  accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+  start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+  no_start_coll AKE_EexpRev.evs{2} /\
+  no_accept_coll AKE_EexpRev.evs{2} /\
+  valid_accepts AKE_EexpRev.evs{2} /\
+  inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2} AKE_EexpRev.mEexp{2} /\
+  inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+    AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+  (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+  ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+  (forall (x : Sidx),
+     in_dom x AKE_EexpRev.mCompleted{2} => in_dom x AKE_EexpRev.mStarted{2}) /\
+  (forall (x : Sidx),
+     in_dom x AKE_EexpRev.mStarted{2} =>
+     ! in_dom x AKE_EexpRev.mCompleted{2} =>
+     sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
+  AKE_Fresh.test{1} = AKE_EexpRev.test{2} /\
+  mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2} ==>
+if ! test_fresh AKE_EexpRev.test{2} AKE_EexpRev.evs{2} \/
+     collision_eexp_rcvd AKE_EexpRev.evs{2} then
+    accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    no_start_coll AKE_EexpRev.evs{2} /\
+    no_accept_coll AKE_EexpRev.evs{2} /\
+    valid_accepts AKE_EexpRev.evs{2} /\
+    inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+      AKE_EexpRev.mEexp{2} /\
+    inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+      AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+    (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+    ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+    (forall (x : Sidx),
+       in_dom x AKE_EexpRev.mCompleted{2} => in_dom x AKE_EexpRev.mStarted{2}) /\
+    ! AKE_Fresh.test{1} = None /\
+    mem (Accept (proj AKE_Fresh.test{1})) AKE_Fresh.evs{1} /\
+    (forall (x : Sidx),
+       in_dom x AKE_EexpRev.mStarted{2} =>
+       ! in_dom x AKE_EexpRev.mCompleted{2} =>
+       sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
+    AKE_Fresh.test{1} = AKE_EexpRev.test{2} /\
+    mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}
+  else
+    ={res} /\
+    AKE_EexpRev.evs{2} = AKE_Fresh.evs{1} /\
+    AKE_EexpRev.test{2} = AKE_Fresh.test{1} /\
+    AKE_EexpRev.cSession{2} = AKE_Fresh.cSession{1} /\
+    AKE_EexpRev.cH2{2} = AKE_Fresh.cH2{1} /\
+    AKE_EexpRev.mH2{2} = AKE_Fresh.mH2{1} /\
+    AKE_EexpRev.sH2{2} = AKE_Fresh.sH2{1} /\
+    AKE_EexpRev.mSk{2} = AKE_Fresh.mSk{1} /\
+    AKE_EexpRev.mEexp{2} = AKE_Fresh.mEexp{1} /\
+    AKE_EexpRev.mStarted{2} = AKE_Fresh.mStarted{1} /\
+    AKE_EexpRev.mCompleted{2} = AKE_Fresh.mCompleted{1} /\
+    ! AKE_Fresh.test{1} = None /\
+    mem (Accept (proj AKE_Fresh.test{1})) AKE_Fresh.evs{1} /\
+    accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    no_start_coll AKE_EexpRev.evs{2} /\
+    no_accept_coll AKE_EexpRev.evs{2} /\
+    valid_accepts AKE_EexpRev.evs{2} /\
+    inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+      AKE_EexpRev.mEexp{2} /\
+    inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+      AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+    (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+    ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+    (forall (x : Sidx),
+       in_dom x AKE_EexpRev.mCompleted{2} => in_dom x AKE_EexpRev.mStarted{2}) /\
+    (forall (x : Sidx),
+       in_dom x AKE_EexpRev.mStarted{2} =>
+       ! in_dom x AKE_EexpRev.mCompleted{2} =>
+       sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
+    AKE_Fresh.test{1} = AKE_EexpRev.test{2} /\
+    mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}.
+proof.
+fun.
+seq 1 1:
+( ! (! test_fresh AKE_EexpRev.test{2} AKE_EexpRev.evs{2} \/
+     collision_eexp_rcvd AKE_EexpRev.evs{2}) /\
+  ={A} /\
+  AKE_EexpRev.evs{2} = AKE_Fresh.evs{1} /\
+  AKE_EexpRev.test{2} = AKE_Fresh.test{1} /\
+  AKE_EexpRev.cSession{2} = AKE_Fresh.cSession{1} /\
+  AKE_EexpRev.cH2{2} = AKE_Fresh.cH2{1} /\
+  AKE_EexpRev.mH2{2} = AKE_Fresh.mH2{1} /\
+  AKE_EexpRev.sH2{2} = AKE_Fresh.sH2{1} /\
+  AKE_EexpRev.mSk{2} = AKE_Fresh.mSk{1} /\
+  AKE_EexpRev.mEexp{2} = AKE_Fresh.mEexp{1} /\
+  AKE_EexpRev.mStarted{2} = AKE_Fresh.mStarted{1} /\
+  AKE_EexpRev.mCompleted{2} = AKE_Fresh.mCompleted{1} /\
+  ! AKE_Fresh.test{1} = None /\
+  mem (Accept (proj AKE_Fresh.test{1})) AKE_Fresh.evs{1} /\
+  accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+  start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+  no_start_coll AKE_EexpRev.evs{2} /\
+  no_accept_coll AKE_EexpRev.evs{2} /\
+  valid_accepts AKE_EexpRev.evs{2} /\
+  inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2} AKE_EexpRev.mEexp{2} /\
+  inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+    AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+  (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+  ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+  (forall (x : Sidx),
+     in_dom x AKE_EexpRev.mCompleted{2} => in_dom x AKE_EexpRev.mStarted{2}) /\
+  (forall (x : Sidx),
+     in_dom x AKE_EexpRev.mStarted{2} =>
+     ! in_dom x AKE_EexpRev.mCompleted{2} =>
+     sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
+  AKE_Fresh.test{1} = AKE_EexpRev.test{2} /\
+  mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2} /\ 
+ ={r} /\ r{2} = None).
+wp; skip; progress => //.
+by apply H9.
+by apply H11.
+by apply H12.
+if{1}.
+rcondt{2} 1.
+intros => ?; wp; progress => //.
+wp; skip; progress => //.
+    by apply accept_evs_eexps_pres => //; smt.
+    by apply start_evs_eexps_pres => //; smt.
+    by apply no_start_coll_pres => //; smt. 
+    by apply no_accept_coll_pres => //; smt. 
+    by apply valid_accept_pres => //; smt. 
+    by apply inv_started_pres => //; smt.  
+    by apply inv_accepted_pres => //; smt.  
+    by smt.
+    by smt.
+    by rewrite mem_cons; right.
+    by apply H12.
+    by rewrite mem_cons; right.
+    by rewrite mem_cons; right.
+    by apply accept_evs_eexps_pres => //; smt.
+    by apply start_evs_eexps_pres => //; smt.
+    by apply no_start_coll_pres => //; smt. 
+    by apply no_accept_coll_pres => //; smt. 
+    by apply valid_accept_pres => //; smt. 
+    by apply inv_started_pres => //; smt.  
+    by apply inv_accepted_pres => //; smt.  
+    by smt.
+    by smt.
+    by apply H12.
+    by rewrite mem_cons; right.
 
-  by apply A_Lossless.
-  (* relational spec for eexpRev *)
-  fun.
-  seq 1 1: 
-( ! ! fresh (proj AKE_EexpRev.test{2}) AKE_EexpRev.evs{2} /\
-  ={i, a, r} /\
-  AKE_EexpRev.evs{2} = AKE_Enforcement.evs{1} /\
-  AKE_EexpRev.test{2} = AKE_Enforcement.test{1} /\
-  AKE_EexpRev.cSession{2} = AKE_Enforcement.cSession{1} /\
-  AKE_EexpRev.cH2{2} = AKE_Enforcement.cH2{1} /\
-  AKE_EexpRev.mH2{2} = AKE_Enforcement.mH2{1} /\
-  AKE_EexpRev.sH2{2} = AKE_Enforcement.sH2{1} /\
-  AKE_EexpRev.mSk{2} = AKE_Enforcement.mSk{1} /\
-  AKE_EexpRev.mEexp{2} = AKE_Enforcement.mEexp{1} /\
-  AKE_EexpRev.mStarted{2} = AKE_Enforcement.mStarted{1} /\
-  AKE_EexpRev.mCompleted{2} = AKE_Enforcement.mCompleted{1} /\
-  ! AKE_Enforcement.test{1} = None);first by wp.
-  if{1}.
-  by rcondt{2} 1 => //; wp; skip; progress; smt.
-  if{2} => //.
-  conseq (_ : _ ==>  ! AKE_Enforcement.test{1} = None /\ 
-                     ! fresh (proj AKE_EexpRev.test{2}) AKE_EexpRev.evs{2});first smt.
-  by wp; skip; progress => //;smt.
+   if{2}.
+   conseq (_ : _ ==>
+ (! test_fresh AKE_EexpRev.test{2} AKE_EexpRev.evs{2} \/
+     collision_eexp_rcvd AKE_EexpRev.evs{2}) /\ 
+ accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    no_start_coll AKE_EexpRev.evs{2} /\
+    no_accept_coll AKE_EexpRev.evs{2} /\
+    valid_accepts AKE_EexpRev.evs{2} /\
+    inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+      AKE_EexpRev.mEexp{2} /\
+    inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+      AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+    (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+    ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+    (forall (x : Sidx),
+       in_dom x AKE_EexpRev.mCompleted{2} => in_dom x AKE_EexpRev.mStarted{2}) /\
+    ! AKE_Fresh.test{1} = None /\
+    mem (Accept (proj AKE_Fresh.test{1})) AKE_Fresh.evs{1} /\
+    (forall (x : Sidx),
+       in_dom x AKE_EexpRev.mStarted{2} =>
+       ! in_dom x AKE_EexpRev.mCompleted{2} =>
+       sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
+    AKE_Fresh.test{1} = AKE_EexpRev.test{2} /\
+    mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}).
+progress => //; try (apply H12); smt.
+wp; skip; progress => //.    
+    cut heq' : forall p q, (p && q) = (p /\ (p => q)) by smt.
+    cut heq'' : forall p q, (p => q) = (!p \/ q) by smt.
+    generalize H14; rewrite heq' not_and => [|]; first by smt.
+     rewrite (heq'' (in_dom A{2} AKE_Fresh.mSk{1})) not_or => [hv].
+     rewrite (heq'' (! AKE_Fresh.test{1} = None)) not_or => [hv'].
+   cut heq :
+   forall t ev,  t <> None =>  test_fresh t ev = fresh (proj t) ev by smt.
+   cut nnp : forall p, (! ! p) = p by smt.
+   by rewrite heq // fresh_op_def'; smt.
+    by apply accept_evs_eexps_pres => //; smt.
+    by apply start_evs_eexps_pres => //; smt.
+    by apply no_start_coll_pres => //; smt. 
+    by apply no_accept_coll_pres => //; smt. 
+    by apply valid_accept_pres => //; smt. 
+    by apply inv_started_pres => //; smt.  
+    by apply inv_accepted_pres => //; smt.  
+    by smt.
+    by smt.
+    by apply H12.
+    by rewrite mem_cons; right.
 
-  (* valid test preservation for eeexpreveal *)
-  by intros &2 hunfresh; fun; wp; skip; progress.
-  (* not fresh preservation for eeexpreveal *)
-  intros &1; fun; wp; skip; progress try smt.
-  generalize H.
-  rewrite !fresh_eq_notfresh.
-  cut h := 
-   notfresh_fresh (proj AKE_EexpRev.test{hr}) AKE_EexpRev.evs{hr} (EphemeralRev
-     (compute_psid AKE_EexpRev.mStarted{hr} AKE_EexpRev.mEexp{hr} i{hr})); smt. 
-  (* relational spec for h2 *)
-  fun;sp; if => //;inline AKE_Enforcement(A).O.h2  AKE_EexpRev(A).O.h2; wp; rnd; wp.
-  by skip; progress => //; smt.
-  (* valid test preservation for h2 *)
-  intros &2 hunfresh; fun.
-  inline AKE_Enforcement(A).O.h2; sp; if => //;wp; rnd => //;
-      first (by apply TKey.Dword.lossless).
-  by wp; skip; progress.
-  (* not fresh preservation for h2 *)
-  intros &1; fun.
-  inline AKE_EexpRev(A).O.h2; sp; if => //;wp; rnd => //;
-      first (by apply TKey.Dword.lossless).
-  by wp; skip; progress => //.
-  (* relational spec for Init1 *)
-  by fun; wp; skip; smt.
-  (* valid test preservation for Init1 *)
-  intros => &2 hfresh; fun; wp; skip; smt.
+   skip; progress => //.
+   by apply H9.
+   by apply H11.
+   by apply H12.  
+   by apply H9.
+   by apply H11.
+   by apply H12.  
+qed.
+
+local lemma bdh1_staticRev_1 :
+forall &2,
+  ! test_fresh AKE_EexpRev.test{2} AKE_EexpRev.evs{2} \/
+  collision_eexp_rcvd AKE_EexpRev.evs{2} =>
+  bd_hoare[ AKE_Fresh(A).O.staticRev :
+             accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+             start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+             no_start_coll AKE_EexpRev.evs{2} /\
+             no_accept_coll AKE_EexpRev.evs{2} /\
+             valid_accepts AKE_EexpRev.evs{2} /\
+             inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+               AKE_EexpRev.mEexp{2} /\
+             inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+               AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+             (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+             ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mCompleted{2} =>
+                in_dom x AKE_EexpRev.mStarted{2}) /\
+             ! AKE_Fresh.test = None /\
+             mem (Accept (proj AKE_Fresh.test)) AKE_Fresh.evs /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mStarted{2} =>
+                ! in_dom x AKE_EexpRev.mCompleted{2} =>
+                sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
+             AKE_Fresh.test = AKE_EexpRev.test{2} /\
+             mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2} ==>
+             accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+             start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+             no_start_coll AKE_EexpRev.evs{2} /\
+             no_accept_coll AKE_EexpRev.evs{2} /\
+             valid_accepts AKE_EexpRev.evs{2} /\
+             inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+               AKE_EexpRev.mEexp{2} /\
+             inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+               AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+             (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+             ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mCompleted{2} =>
+                in_dom x AKE_EexpRev.mStarted{2}) /\
+             ! AKE_Fresh.test = None /\
+             mem (Accept (proj AKE_Fresh.test)) AKE_Fresh.evs /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mStarted{2} =>
+                ! in_dom x AKE_EexpRev.mCompleted{2} =>
+                sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
+             AKE_Fresh.test = AKE_EexpRev.test{2} /\
+             mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}] = 1%r.
+proof.
+ intros => &2 h; fun; wp; skip; progress => //.
+  by apply H6.
+  by apply H8.
+  by rewrite mem_cons; right.
+  by apply H11.
+  by apply H6.
+  by apply H8.
+  by apply H11.
+save.
+
+
+local lemma bdh1_staticRev_2 :
+forall &1,
+  bd_hoare[ AKE_EexpRev(A).O.staticRev :
+             (! test_fresh AKE_EexpRev.test AKE_EexpRev.evs \/
+              collision_eexp_rcvd AKE_EexpRev.evs) /\
+             accept_evs_eexps AKE_EexpRev.evs AKE_EexpRev.mEexp /\
+             start_evs_eexps AKE_EexpRev.evs AKE_EexpRev.mEexp /\
+             no_start_coll AKE_EexpRev.evs /\
+             no_accept_coll AKE_EexpRev.evs /\
+             valid_accepts AKE_EexpRev.evs /\
+             inv_started AKE_EexpRev.evs AKE_EexpRev.mStarted
+               AKE_EexpRev.mEexp /\
+             inv_accepted AKE_EexpRev.evs AKE_EexpRev.mStarted
+               AKE_EexpRev.mEexp AKE_EexpRev.mCompleted /\
+             (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp) /\
+             ! collision_eexp_eexp_op AKE_EexpRev.mEexp /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mCompleted =>
+                in_dom x AKE_EexpRev.mStarted) /\
+             ! AKE_Fresh.test{1} = None /\
+             mem (Accept (proj AKE_Fresh.test{1})) AKE_Fresh.evs{1} /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mStarted =>
+                ! in_dom x AKE_EexpRev.mCompleted =>
+                sd2_role (proj AKE_EexpRev.mStarted.[x]) = init) /\
+             AKE_Fresh.test{1} = AKE_EexpRev.test /\
+             mem (Accept (proj AKE_EexpRev.test)) AKE_EexpRev.evs ==>
+             (! test_fresh AKE_EexpRev.test AKE_EexpRev.evs \/
+              collision_eexp_rcvd AKE_EexpRev.evs) /\
+             accept_evs_eexps AKE_EexpRev.evs AKE_EexpRev.mEexp /\
+             start_evs_eexps AKE_EexpRev.evs AKE_EexpRev.mEexp /\
+             no_start_coll AKE_EexpRev.evs /\
+             no_accept_coll AKE_EexpRev.evs /\
+             valid_accepts AKE_EexpRev.evs /\
+             inv_started AKE_EexpRev.evs AKE_EexpRev.mStarted
+               AKE_EexpRev.mEexp /\
+             inv_accepted AKE_EexpRev.evs AKE_EexpRev.mStarted
+               AKE_EexpRev.mEexp AKE_EexpRev.mCompleted /\
+             (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp) /\
+             ! collision_eexp_eexp_op AKE_EexpRev.mEexp /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mCompleted =>
+                in_dom x AKE_EexpRev.mStarted) /\
+             ! AKE_Fresh.test{1} = None /\
+             mem (Accept (proj AKE_Fresh.test{1})) AKE_Fresh.evs{1} /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mStarted =>
+                ! in_dom x AKE_EexpRev.mCompleted =>
+                sd2_role (proj AKE_EexpRev.mStarted.[x]) = init) /\
+             AKE_Fresh.test{1} = AKE_EexpRev.test /\
+             mem (Accept (proj AKE_EexpRev.test)) AKE_EexpRev.evs] = 1%r.
+proof.
+ intros => &1; fun; wp; skip; progress => //.
+ elim H => h; last first.
+ by right; apply collision_eexp_rcvd_mon.
+  cut heq_tf :
+   forall t ev,  t <> None =>  test_fresh t ev = fresh (proj t) ev by smt.
+  generalize h.
+  rewrite !heq_tf //.
+  intros => h.
+  case (collision_eexp_rcvd (StaticRev A{hr} :: AKE_EexpRev.evs{hr})) => hcoll; 
+   first by right.
+  left.
+  apply coll_fresh => //.
+  by apply no_start_coll_pres => //; smt.
+  by apply no_accept_coll_pres => //; smt.
+  by apply valid_accept_pres => //; smt.
+  by apply accept_evs_eexps_pres => //; smt.  
+  by apply start_evs_eexps_pres => //; smt.
+  by apply no_start_coll_pres => //; smt.
+  by apply no_accept_coll_pres => //; smt.
+  by apply valid_accept_pres => //; smt.
+  by apply inv_started_pres => //; smt.  
+  by apply inv_accepted_pres => //; smt.  
+  by apply H7.
+  by apply H9.
+  by apply H12.
+  by rewrite mem_cons; right.
+  by apply H7.
+  by apply H9.
+  by apply H12.
+qed.  
+
+
+local equiv eq1_computeKey :
+    AKE_Fresh(A).O.computeKey ~ AKE_EexpRev(A).O.computeKey :
+  ! (! test_fresh AKE_EexpRev.test{2} AKE_EexpRev.evs{2} \/
+     collision_eexp_rcvd AKE_EexpRev.evs{2}) /\
+  ={i} /\
+  AKE_EexpRev.evs{2} = AKE_Fresh.evs{1} /\
+  AKE_EexpRev.test{2} = AKE_Fresh.test{1} /\
+  AKE_EexpRev.cSession{2} = AKE_Fresh.cSession{1} /\
+  AKE_EexpRev.cH2{2} = AKE_Fresh.cH2{1} /\
+  AKE_EexpRev.mH2{2} = AKE_Fresh.mH2{1} /\
+  AKE_EexpRev.sH2{2} = AKE_Fresh.sH2{1} /\
+  AKE_EexpRev.mSk{2} = AKE_Fresh.mSk{1} /\
+  AKE_EexpRev.mEexp{2} = AKE_Fresh.mEexp{1} /\
+  AKE_EexpRev.mStarted{2} = AKE_Fresh.mStarted{1} /\
+  AKE_EexpRev.mCompleted{2} = AKE_Fresh.mCompleted{1} /\
+  ! AKE_Fresh.test{1} = None /\
+  mem (Accept (proj AKE_Fresh.test{1})) AKE_Fresh.evs{1} /\
+  accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+  start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+  no_start_coll AKE_EexpRev.evs{2} /\
+  no_accept_coll AKE_EexpRev.evs{2} /\
+  valid_accepts AKE_EexpRev.evs{2} /\
+  inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2} AKE_EexpRev.mEexp{2} /\
+  inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+    AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+  (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+  ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+  (forall (x : Sidx),
+     in_dom x AKE_EexpRev.mCompleted{2} => in_dom x AKE_EexpRev.mStarted{2}) /\
+  (forall (x : Sidx),
+     in_dom x AKE_EexpRev.mStarted{2} =>
+     ! in_dom x AKE_EexpRev.mCompleted{2} =>
+     sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
+  AKE_Fresh.test{1} = AKE_EexpRev.test{2} /\
+  mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}
+==>
+  if ! test_fresh AKE_EexpRev.test{2} AKE_EexpRev.evs{2} \/
+     collision_eexp_rcvd AKE_EexpRev.evs{2} then
+    accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    no_start_coll AKE_EexpRev.evs{2} /\
+    no_accept_coll AKE_EexpRev.evs{2} /\
+    valid_accepts AKE_EexpRev.evs{2} /\
+    inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+      AKE_EexpRev.mEexp{2} /\
+    inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+      AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+    (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+    ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+    (forall (x : Sidx),
+       in_dom x AKE_EexpRev.mCompleted{2} => in_dom x AKE_EexpRev.mStarted{2}) /\
+    ! AKE_Fresh.test{1} = None /\
+    mem (Accept (proj AKE_Fresh.test{1})) AKE_Fresh.evs{1} /\
+    (forall (x : Sidx),
+       in_dom x AKE_EexpRev.mStarted{2} =>
+       ! in_dom x AKE_EexpRev.mCompleted{2} =>
+       sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
+    AKE_Fresh.test{1} = AKE_EexpRev.test{2} /\
+    mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}
+  else
+    ={res} /\
+    AKE_EexpRev.evs{2} = AKE_Fresh.evs{1} /\
+    AKE_EexpRev.test{2} = AKE_Fresh.test{1} /\
+    AKE_EexpRev.cSession{2} = AKE_Fresh.cSession{1} /\
+    AKE_EexpRev.cH2{2} = AKE_Fresh.cH2{1} /\
+    AKE_EexpRev.mH2{2} = AKE_Fresh.mH2{1} /\
+    AKE_EexpRev.sH2{2} = AKE_Fresh.sH2{1} /\
+    AKE_EexpRev.mSk{2} = AKE_Fresh.mSk{1} /\
+    AKE_EexpRev.mEexp{2} = AKE_Fresh.mEexp{1} /\
+    AKE_EexpRev.mStarted{2} = AKE_Fresh.mStarted{1} /\
+    AKE_EexpRev.mCompleted{2} = AKE_Fresh.mCompleted{1} /\
+    ! AKE_Fresh.test{1} = None /\
+    mem (Accept (proj AKE_Fresh.test{1})) AKE_Fresh.evs{1} /\
+    accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    no_start_coll AKE_EexpRev.evs{2} /\
+    no_accept_coll AKE_EexpRev.evs{2} /\
+    valid_accepts AKE_EexpRev.evs{2} /\
+    inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+      AKE_EexpRev.mEexp{2} /\
+    inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+      AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+    (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+    ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+    (forall (x : Sidx),
+       in_dom x AKE_EexpRev.mCompleted{2} => in_dom x AKE_EexpRev.mStarted{2}) /\
+    (forall (x : Sidx),
+       in_dom x AKE_EexpRev.mStarted{2} =>
+       ! in_dom x AKE_EexpRev.mCompleted{2} =>
+       sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
+    AKE_Fresh.test{1} = AKE_EexpRev.test{2} /\
+    mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}.
+proof.
+ fun; sp; if; first by smt.
+  wp.
+  call eq1_h2.
+  wp; skip; progress => //.
+   by apply H9.
+   by apply H11.
+   by apply H12.
+   by apply H9.
+   by apply H11.
+   by apply H12.
+   smt.   
+   smt.
+   smt.
+   by apply H11.
+   by apply H12.
+  wp; skip; progress => //.
+   by apply H9.
+   by apply H11.
+   by apply H12.
+   by apply H9.
+   by apply H11.
+   by apply H12.
+save. 
   
 
+local equiv eq1_sessionRev :
+    AKE_Fresh(A).O.sessionRev ~ AKE_EexpRev(A).O.sessionRev :
+  ! (! test_fresh AKE_EexpRev.test{2} AKE_EexpRev.evs{2} \/
+     collision_eexp_rcvd AKE_EexpRev.evs{2}) /\
+  ={i} /\
+  AKE_EexpRev.evs{2} = AKE_Fresh.evs{1} /\
+  AKE_EexpRev.test{2} = AKE_Fresh.test{1} /\
+  AKE_EexpRev.cSession{2} = AKE_Fresh.cSession{1} /\
+  AKE_EexpRev.cH2{2} = AKE_Fresh.cH2{1} /\
+  AKE_EexpRev.mH2{2} = AKE_Fresh.mH2{1} /\
+  AKE_EexpRev.sH2{2} = AKE_Fresh.sH2{1} /\
+  AKE_EexpRev.mSk{2} = AKE_Fresh.mSk{1} /\
+  AKE_EexpRev.mEexp{2} = AKE_Fresh.mEexp{1} /\
+  AKE_EexpRev.mStarted{2} = AKE_Fresh.mStarted{1} /\
+  AKE_EexpRev.mCompleted{2} = AKE_Fresh.mCompleted{1} /\
+  ! AKE_Fresh.test{1} = None /\
+  mem (Accept (proj AKE_Fresh.test{1})) AKE_Fresh.evs{1} /\
+  accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+  start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+  no_start_coll AKE_EexpRev.evs{2} /\
+  no_accept_coll AKE_EexpRev.evs{2} /\
+  valid_accepts AKE_EexpRev.evs{2} /\
+  inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2} AKE_EexpRev.mEexp{2} /\
+  inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+    AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+  (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+  ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+  (forall (x : Sidx),
+     in_dom x AKE_EexpRev.mCompleted{2} => in_dom x AKE_EexpRev.mStarted{2}) /\
+  (forall (x : Sidx),
+     in_dom x AKE_EexpRev.mStarted{2} =>
+     ! in_dom x AKE_EexpRev.mCompleted{2} =>
+     sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
+  AKE_Fresh.test{1} = AKE_EexpRev.test{2} /\
+  mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}
+==>
+  if ! test_fresh AKE_EexpRev.test{2} AKE_EexpRev.evs{2} \/
+     collision_eexp_rcvd AKE_EexpRev.evs{2} then
+    accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    no_start_coll AKE_EexpRev.evs{2} /\
+    no_accept_coll AKE_EexpRev.evs{2} /\
+    valid_accepts AKE_EexpRev.evs{2} /\
+    inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+      AKE_EexpRev.mEexp{2} /\
+    inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+      AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+    (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+    ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+    (forall (x : Sidx),
+       in_dom x AKE_EexpRev.mCompleted{2} => in_dom x AKE_EexpRev.mStarted{2}) /\
+    ! AKE_Fresh.test{1} = None /\
+    mem (Accept (proj AKE_Fresh.test{1})) AKE_Fresh.evs{1} /\
+    (forall (x : Sidx),
+       in_dom x AKE_EexpRev.mStarted{2} =>
+       ! in_dom x AKE_EexpRev.mCompleted{2} =>
+       sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
+    AKE_Fresh.test{1} = AKE_EexpRev.test{2} /\
+    mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}
+  else
+    ={res} /\
+    AKE_EexpRev.evs{2} = AKE_Fresh.evs{1} /\
+    AKE_EexpRev.test{2} = AKE_Fresh.test{1} /\
+    AKE_EexpRev.cSession{2} = AKE_Fresh.cSession{1} /\
+    AKE_EexpRev.cH2{2} = AKE_Fresh.cH2{1} /\
+    AKE_EexpRev.mH2{2} = AKE_Fresh.mH2{1} /\
+    AKE_EexpRev.sH2{2} = AKE_Fresh.sH2{1} /\
+    AKE_EexpRev.mSk{2} = AKE_Fresh.mSk{1} /\
+    AKE_EexpRev.mEexp{2} = AKE_Fresh.mEexp{1} /\
+    AKE_EexpRev.mStarted{2} = AKE_Fresh.mStarted{1} /\
+    AKE_EexpRev.mCompleted{2} = AKE_Fresh.mCompleted{1} /\
+    ! AKE_Fresh.test{1} = None /\
+    mem (Accept (proj AKE_Fresh.test{1})) AKE_Fresh.evs{1} /\
+    accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    no_start_coll AKE_EexpRev.evs{2} /\
+    no_accept_coll AKE_EexpRev.evs{2} /\
+    valid_accepts AKE_EexpRev.evs{2} /\
+    inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+      AKE_EexpRev.mEexp{2} /\
+    inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+      AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+    (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+    ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+    (forall (x : Sidx),
+       in_dom x AKE_EexpRev.mCompleted{2} => in_dom x AKE_EexpRev.mStarted{2}) /\
+    (forall (x : Sidx),
+       in_dom x AKE_EexpRev.mStarted{2} =>
+       ! in_dom x AKE_EexpRev.mCompleted{2} =>
+       sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
+    AKE_Fresh.test{1} = AKE_EexpRev.test{2} /\
+    mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}.
+proof.
+ fun; sp.
+ if{1}.
+ rcondt{2} 1.
+ intros => ?; wp; skip; progress; smt. 
+ call eq1_computeKey.
+ wp; skip; progress => //.
+ generalize H; rewrite !not_or => [h1 h2]; split => //.
+   cut heq :
+   forall t ev,  t <> None =>  test_fresh t ev = fresh (proj t) ev by smt.
+  by rewrite heq // fresh_op_def'; smt.
+  by apply n_exp_recvd_coll => //; smt.
+  by rewrite mem_cons; right.
+  by apply accept_evs_eexps_pres => //; smt.  
+  by apply start_evs_eexps_pres => //; smt.
+  by apply no_start_coll_pres => //; smt.
+  by apply no_accept_coll_pres => //; smt.
+  by apply valid_accept_pres => //; smt.
+  by apply inv_started_pres => //; smt.  
+  by apply inv_accepted_pres => //; smt.  
+  by apply H9.
+  by apply H11.
+  by apply H12.
+  by rewrite mem_cons; right.
+  by apply H9.
+  by apply H11.
+  by apply H12.
+  smt.
+  smt.
+  by apply H9.
+  by apply H11.
+  by apply H12.
+if{2}.
+   conseq (_ : _ ==>
+ (! test_fresh AKE_EexpRev.test{2} AKE_EexpRev.evs{2} \/
+     collision_eexp_rcvd AKE_EexpRev.evs{2}) /\ 
+ accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    no_start_coll AKE_EexpRev.evs{2} /\
+    no_accept_coll AKE_EexpRev.evs{2} /\
+    valid_accepts AKE_EexpRev.evs{2} /\
+    inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+      AKE_EexpRev.mEexp{2} /\
+    inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+      AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+    (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+    ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+    (forall (x : Sidx),
+       in_dom x AKE_EexpRev.mCompleted{2} => in_dom x AKE_EexpRev.mStarted{2}) /\
+    ! AKE_Fresh.test{1} = None /\
+    mem (Accept (proj AKE_Fresh.test{1})) AKE_Fresh.evs{1} /\
+    (forall (x : Sidx),
+       in_dom x AKE_EexpRev.mStarted{2} =>
+       ! in_dom x AKE_EexpRev.mCompleted{2} =>
+       sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
+    AKE_Fresh.test{1} = AKE_EexpRev.test{2} /\
+    mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}).
+progress => //; try (apply H12); smt.
+wp.
+inline AKE_EexpRev(A).O.computeKey.
+inline AKE_EexpRev(A).O.h2.
+sp.
+if{2}.
+wp; rnd{2}; wp; skip; progress => //.
+   by apply TKey.Dword.lossless.
+    cut heq' : forall p q, (p && q) = (p /\ (p => q)) by smt.
+    cut heq'' : forall p q, (p => q) = (!p \/ q) by smt.
+    generalize H14; rewrite heq' not_and => [|]; first by smt.
+     rewrite (heq'' (in_dom i{2} AKE_Fresh.mCompleted{1})) not_or => [hv].
+     rewrite (heq'' (! AKE_Fresh.test{1} = None)) not_or => [hv'].
+   cut heq :
+   forall t ev,  t <> None =>  test_fresh t ev = fresh (proj t) ev by smt.
+   cut nnp : forall p, (! ! p) = p by smt.
+   by rewrite heq // fresh_op_def'; smt.
+  by apply accept_evs_eexps_pres => //; smt.  
+  by apply start_evs_eexps_pres => //; smt.
+  by apply no_start_coll_pres => //; smt.
+  by apply no_accept_coll_pres => //; smt.
+  by apply valid_accept_pres => //; smt.
+  by apply inv_started_pres => //; smt.  
+  by apply inv_accepted_pres => //; smt.  
+  by apply H9.
+  by apply H11.
+  by apply H12.
+  by rewrite mem_cons; right.
+ wp; skip; progress => //.
+    cut heq' : forall p q, (p && q) = (p /\ (p => q)) by smt.
+    cut heq'' : forall p q, (p => q) = (!p \/ q) by smt.
+    generalize H14; rewrite heq' not_and => [|]; first by smt.
+     rewrite (heq'' (in_dom i{2} AKE_Fresh.mCompleted{1})) not_or => [hv].
+     rewrite (heq'' (! AKE_Fresh.test{1} = None)) not_or => [hv'].
+   cut heq :
+   forall t ev,  t <> None =>  test_fresh t ev = fresh (proj t) ev by smt.
+   cut nnp : forall p, (! ! p) = p by smt.
+   by rewrite heq // fresh_op_def'; smt.
+  by apply accept_evs_eexps_pres => //; smt.  
+  by apply start_evs_eexps_pres => //; smt.
+  by apply no_start_coll_pres => //; smt.
+  by apply no_accept_coll_pres => //; smt.
+  by apply valid_accept_pres => //; smt.
+  by apply inv_started_pres => //; smt.  
+  by apply inv_accepted_pres => //; smt.  
+  by apply H9.
+  by apply H11.
+  by apply H12.
+  by rewrite mem_cons; right.
+skip; progress => //.
+  by apply H9.
+  by apply H11.
+  by apply H12.
+  by apply H9.
+  by apply H11.
+  by apply H12.
+save.
 
-(* end proof: }*) 
+local lemma bdh1_sessionRev_1 :
+forall &2,
+  ! test_fresh AKE_EexpRev.test{2} AKE_EexpRev.evs{2} \/
+  collision_eexp_rcvd AKE_EexpRev.evs{2} =>
+  bd_hoare[ AKE_Fresh(A).O.sessionRev :
+             accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+             start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+             no_start_coll AKE_EexpRev.evs{2} /\
+             no_accept_coll AKE_EexpRev.evs{2} /\
+             valid_accepts AKE_EexpRev.evs{2} /\
+             inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+               AKE_EexpRev.mEexp{2} /\
+             inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+               AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+             (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+             ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mCompleted{2} =>
+                in_dom x AKE_EexpRev.mStarted{2}) /\
+             ! AKE_Fresh.test = None /\
+             mem (Accept (proj AKE_Fresh.test)) AKE_Fresh.evs /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mStarted{2} =>
+                ! in_dom x AKE_EexpRev.mCompleted{2} =>
+                sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
+             AKE_Fresh.test = AKE_EexpRev.test{2} /\
+             mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2} ==>
+             accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+             start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+             no_start_coll AKE_EexpRev.evs{2} /\
+             no_accept_coll AKE_EexpRev.evs{2} /\
+             valid_accepts AKE_EexpRev.evs{2} /\
+             inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+               AKE_EexpRev.mEexp{2} /\
+             inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+               AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+             (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+             ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mCompleted{2} =>
+                in_dom x AKE_EexpRev.mStarted{2}) /\
+             ! AKE_Fresh.test = None /\
+             mem (Accept (proj AKE_Fresh.test)) AKE_Fresh.evs /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mStarted{2} =>
+                ! in_dom x AKE_EexpRev.mCompleted{2} =>
+                sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
+             AKE_Fresh.test = AKE_EexpRev.test{2} /\
+             mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}] = 1%r.
+proof.
+ intros => &2 h; fun.
+ inline AKE_Fresh(A).O.computeKey AKE_Fresh(A).O.h2.
+ sp; if; last first.
+  skip; progress => //.
+   by apply H6.
+   by apply H8.
+   by apply H11.
+ 
+  sp; if; last first.
+   wp; skip; progress => //.
+    by apply H6.
+    by apply H8.
+    by rewrite mem_cons; right.
+    by apply H11.
+  
+   wp; rnd; wp; skip; progress => //.
+    by apply H6.
+    by apply H8.
+    by rewrite mem_cons; right.
+    by apply H11.
+  
+   by apply TKey.Dword.lossless.
+qed.
+
+
+local lemma bdh1_sessionRev_2 :
+forall &1,
+  bd_hoare[ AKE_EexpRev(A).O.sessionRev :
+             (! test_fresh AKE_EexpRev.test AKE_EexpRev.evs \/
+              collision_eexp_rcvd AKE_EexpRev.evs) /\
+             accept_evs_eexps AKE_EexpRev.evs AKE_EexpRev.mEexp /\
+             start_evs_eexps AKE_EexpRev.evs AKE_EexpRev.mEexp /\
+             no_start_coll AKE_EexpRev.evs /\
+             no_accept_coll AKE_EexpRev.evs /\
+             valid_accepts AKE_EexpRev.evs /\
+             inv_started AKE_EexpRev.evs AKE_EexpRev.mStarted
+               AKE_EexpRev.mEexp /\
+             inv_accepted AKE_EexpRev.evs AKE_EexpRev.mStarted
+               AKE_EexpRev.mEexp AKE_EexpRev.mCompleted /\
+             (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp) /\
+             ! collision_eexp_eexp_op AKE_EexpRev.mEexp /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mCompleted =>
+                in_dom x AKE_EexpRev.mStarted) /\
+             ! AKE_Fresh.test{1} = None /\
+             mem (Accept (proj AKE_Fresh.test{1})) AKE_Fresh.evs{1} /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mStarted =>
+                ! in_dom x AKE_EexpRev.mCompleted =>
+                sd2_role (proj AKE_EexpRev.mStarted.[x]) = init) /\
+             AKE_Fresh.test{1} = AKE_EexpRev.test /\
+             mem (Accept (proj AKE_EexpRev.test)) AKE_EexpRev.evs ==>
+             (! test_fresh AKE_EexpRev.test AKE_EexpRev.evs \/
+              collision_eexp_rcvd AKE_EexpRev.evs) /\
+             accept_evs_eexps AKE_EexpRev.evs AKE_EexpRev.mEexp /\
+             start_evs_eexps AKE_EexpRev.evs AKE_EexpRev.mEexp /\
+             no_start_coll AKE_EexpRev.evs /\
+             no_accept_coll AKE_EexpRev.evs /\
+             valid_accepts AKE_EexpRev.evs /\
+             inv_started AKE_EexpRev.evs AKE_EexpRev.mStarted
+               AKE_EexpRev.mEexp /\
+             inv_accepted AKE_EexpRev.evs AKE_EexpRev.mStarted
+               AKE_EexpRev.mEexp AKE_EexpRev.mCompleted /\
+             (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp) /\
+             ! collision_eexp_eexp_op AKE_EexpRev.mEexp /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mCompleted =>
+                in_dom x AKE_EexpRev.mStarted) /\
+             ! AKE_Fresh.test{1} = None /\
+             mem (Accept (proj AKE_Fresh.test{1})) AKE_Fresh.evs{1} /\
+             (forall (x : Sidx),
+                in_dom x AKE_EexpRev.mStarted =>
+                ! in_dom x AKE_EexpRev.mCompleted =>
+                sd2_role (proj AKE_EexpRev.mStarted.[x]) = init) /\
+             AKE_Fresh.test{1} = AKE_EexpRev.test /\
+             mem (Accept (proj AKE_EexpRev.test)) AKE_EexpRev.evs] = 1%r.
+proof.
+ intros => &1; fun.
+ inline AKE_EexpRev(A).O.computeKey AKE_EexpRev(A).O.h2.
+ sp; if; last first.
+  skip; progress => //.
+   by apply H7.
+   by apply H9.
+   by apply H12.
+ 
+  sp; if; last first.
+   wp; skip; progress => //.
+
+  elim H => h; last first.
+   by right; apply collision_eexp_rcvd_mon.
+  cut heq_tf :
+   forall t ev,  t <> None =>  test_fresh t ev = fresh (proj t) ev by smt.
+  generalize h.
+  rewrite !heq_tf //.
+  intros => h.
+  case (collision_eexp_rcvd (SessionRev
+     (compute_sid AKE_EexpRev.mStarted{hr} AKE_EexpRev.mEexp{hr}
+        AKE_EexpRev.mCompleted{hr} i{hr}) :: evsR)) => hcoll; 
+   first by right.
+  left.
+  apply coll_fresh => //.
+  by apply no_start_coll_pres => //; smt.
+  by apply no_accept_coll_pres => //; smt.
+  by apply valid_accept_pres => //; smt.
+  by apply accept_evs_eexps_pres => //; smt.  
+  by apply start_evs_eexps_pres => //; smt.
+  by apply no_start_coll_pres => //; smt.
+  by apply no_accept_coll_pres => //; smt.
+  by apply valid_accept_pres => //; smt.
+  by apply inv_started_pres => //; smt.  
+  by apply inv_accepted_pres => //; smt.  
+  by apply H7.
+  by apply H9.
+  by apply H12.
+  by rewrite mem_cons; right.
+
+  wp; rnd; wp; skip; progress => //.
+  elim H => h; last first.
+   by right; apply collision_eexp_rcvd_mon.
+  cut heq_tf :
+   forall t ev,  t <> None =>  test_fresh t ev = fresh (proj t) ev by smt.
+  generalize h.
+  rewrite !heq_tf //.
+  intros => h.
+  case (collision_eexp_rcvd (SessionRev
+     (compute_sid AKE_EexpRev.mStarted{hr} AKE_EexpRev.mEexp{hr}
+        AKE_EexpRev.mCompleted{hr} i{hr}) :: evsR)) => hcoll; 
+   first by right.
+  left.
+  apply coll_fresh => //.
+  by apply no_start_coll_pres => //; smt.
+  by apply no_accept_coll_pres => //; smt.
+  by apply valid_accept_pres => //; smt.
+  by apply accept_evs_eexps_pres => //; smt.  
+  by apply start_evs_eexps_pres => //; smt.
+  by apply no_start_coll_pres => //; smt.
+  by apply no_accept_coll_pres => //; smt.
+  by apply valid_accept_pres => //; smt.
+  by apply inv_started_pres => //; smt.  
+  by apply inv_accepted_pres => //; smt.  
+  by apply H7.
+  by apply H9.
+  by apply H12.
+  by rewrite mem_cons; right.
+  by apply TKey.Dword.lossless.
+save.
+ 
+local equiv eq1_guess :
+    AKE_Fresh(A).A.guess ~ AKE_EexpRev(A).A.guess :
+if ! (! test_fresh AKE_EexpRev.test{2} AKE_EexpRev.evs{2} \/
+     collision_eexp_rcvd AKE_EexpRev.evs{2}) then 
+(  ={k, glob A} /\
+  AKE_EexpRev.evs{2} = AKE_Fresh.evs{1} /\
+  AKE_EexpRev.test{2} = AKE_Fresh.test{1} /\
+  AKE_EexpRev.cSession{2} = AKE_Fresh.cSession{1} /\
+  AKE_EexpRev.cH2{2} = AKE_Fresh.cH2{1} /\
+  AKE_EexpRev.mH2{2} = AKE_Fresh.mH2{1} /\
+  AKE_EexpRev.sH2{2} = AKE_Fresh.sH2{1} /\
+  AKE_EexpRev.mSk{2} = AKE_Fresh.mSk{1} /\
+  AKE_EexpRev.mEexp{2} = AKE_Fresh.mEexp{1} /\
+  AKE_EexpRev.mStarted{2} = AKE_Fresh.mStarted{1} /\
+  AKE_EexpRev.mCompleted{2} = AKE_Fresh.mCompleted{1} /\
+  ! AKE_Fresh.test{1} = None /\
+  mem (Accept (proj AKE_Fresh.test{1})) AKE_Fresh.evs{1} /\
+  accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+  start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+  no_start_coll AKE_EexpRev.evs{2} /\
+  no_accept_coll AKE_EexpRev.evs{2} /\
+  valid_accepts AKE_EexpRev.evs{2} /\
+  inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2} AKE_EexpRev.mEexp{2} /\
+  inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+    AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+  (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+  ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+  (forall (x : Sidx),
+     in_dom x AKE_EexpRev.mCompleted{2} => in_dom x AKE_EexpRev.mStarted{2}) /\
+  (forall (x : Sidx),
+    in_dom x AKE_EexpRev.mStarted{2} =>
+    ! in_dom x AKE_EexpRev.mCompleted{2} =>
+    sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
+    AKE_Fresh.test{1} = AKE_EexpRev.test{2} /\
+   mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}) else
+(   AKE_EexpRev.evs{2} = AKE_Fresh.evs{1} /\
+    AKE_EexpRev.test{2} = AKE_Fresh.test{1} /\
+    AKE_EexpRev.cSession{2} = AKE_Fresh.cSession{1} /\
+    AKE_EexpRev.cH2{2} = AKE_Fresh.cH2{1} /\
+    AKE_EexpRev.mH2{2} = AKE_Fresh.mH2{1} /\
+    AKE_EexpRev.sH2{2} = AKE_Fresh.sH2{1} /\
+    AKE_EexpRev.mSk{2} = AKE_Fresh.mSk{1} /\
+    AKE_EexpRev.mEexp{2} = AKE_Fresh.mEexp{1} /\
+    AKE_EexpRev.mStarted{2} = AKE_Fresh.mStarted{1} /\
+    AKE_EexpRev.mCompleted{2} = AKE_Fresh.mCompleted{1} /\  
+    AKE_Fresh.test{1} <> None /\
+    mem (Accept (proj AKE_Fresh.test{1})) AKE_Fresh.evs{1} /\
+    accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    no_start_coll AKE_EexpRev.evs{2} /\
+    no_accept_coll AKE_EexpRev.evs{2} /\
+    valid_accepts AKE_EexpRev.evs{2} /\
+    inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+      AKE_EexpRev.mEexp{2} /\
+    inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+      AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+    (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+    ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+    (forall (x : Sidx),
+       in_dom x AKE_EexpRev.mCompleted{2} => in_dom x AKE_EexpRev.mStarted{2}) /\
+    (forall (x : Sidx),
+      in_dom x AKE_EexpRev.mStarted{2} =>
+      ! in_dom x AKE_EexpRev.mCompleted{2} =>
+      sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
+    AKE_Fresh.test{1} = AKE_EexpRev.test{2} /\
+   mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2})
+==>
+  if ! (! test_fresh AKE_EexpRev.test{2} AKE_EexpRev.evs{2} \/
+     collision_eexp_rcvd AKE_EexpRev.evs{2}) then
+    ={res} /\
+    AKE_EexpRev.evs{2} = AKE_Fresh.evs{1} /\
+    AKE_EexpRev.test{2} = AKE_Fresh.test{1} /\
+    AKE_EexpRev.cSession{2} = AKE_Fresh.cSession{1} /\
+    AKE_EexpRev.cH2{2} = AKE_Fresh.cH2{1} /\
+    AKE_EexpRev.mH2{2} = AKE_Fresh.mH2{1} /\
+    AKE_EexpRev.sH2{2} = AKE_Fresh.sH2{1} /\
+    AKE_EexpRev.mSk{2} = AKE_Fresh.mSk{1} /\
+    AKE_EexpRev.mEexp{2} = AKE_Fresh.mEexp{1} /\
+    AKE_EexpRev.mStarted{2} = AKE_Fresh.mStarted{1} /\
+    AKE_EexpRev.mCompleted{2} = AKE_Fresh.mCompleted{1} /\
+    AKE_Fresh.test{1} <> None /\
+    mem (Accept (proj AKE_Fresh.test{1})) AKE_Fresh.evs{1} /\
+    accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    no_start_coll AKE_EexpRev.evs{2} /\
+    no_accept_coll AKE_EexpRev.evs{2} /\
+    valid_accepts AKE_EexpRev.evs{2} /\
+    inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+      AKE_EexpRev.mEexp{2} /\
+    inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+      AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+    (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+    ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+    (forall (x : Sidx),
+       in_dom x AKE_EexpRev.mCompleted{2} => in_dom x AKE_EexpRev.mStarted{2}) /\
+    (forall (x : Sidx),
+      in_dom x AKE_EexpRev.mStarted{2} =>
+      ! in_dom x AKE_EexpRev.mCompleted{2} =>
+      sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
+    AKE_Fresh.test{1} = AKE_EexpRev.test{2} /\
+   mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2} else 
+    AKE_Fresh.test{1} <> None /\
+    mem (Accept (proj AKE_Fresh.test{1})) AKE_Fresh.evs{1} /\
+    accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    no_start_coll AKE_EexpRev.evs{2} /\
+    no_accept_coll AKE_EexpRev.evs{2} /\
+    valid_accepts AKE_EexpRev.evs{2} /\
+    inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+      AKE_EexpRev.mEexp{2} /\
+    inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+      AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+    (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+    ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+    (forall (x : Sidx),
+       in_dom x AKE_EexpRev.mCompleted{2} => in_dom x AKE_EexpRev.mStarted{2}) /\
+    (forall (x : Sidx),
+      in_dom x AKE_EexpRev.mStarted{2} =>
+      ! in_dom x AKE_EexpRev.mCompleted{2} =>
+      sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
+    AKE_Fresh.test{1} = AKE_EexpRev.test{2} /\
+   mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}.
+proof.
+ fun (! test_fresh AKE_EexpRev.test AKE_EexpRev.evs \/
+     collision_eexp_rcvd AKE_EexpRev.evs)
+    (AKE_EexpRev.evs{2} = AKE_Fresh.evs{1} /\
+    AKE_EexpRev.test{2} = AKE_Fresh.test{1} /\
+    AKE_EexpRev.cSession{2} = AKE_Fresh.cSession{1} /\
+    AKE_EexpRev.cH2{2} = AKE_Fresh.cH2{1} /\
+    AKE_EexpRev.mH2{2} = AKE_Fresh.mH2{1} /\
+    AKE_EexpRev.sH2{2} = AKE_Fresh.sH2{1} /\
+    AKE_EexpRev.mSk{2} = AKE_Fresh.mSk{1} /\
+    AKE_EexpRev.mEexp{2} = AKE_Fresh.mEexp{1} /\
+    AKE_EexpRev.mStarted{2} = AKE_Fresh.mStarted{1} /\
+    AKE_EexpRev.mCompleted{2} = AKE_Fresh.mCompleted{1} /\
+    AKE_Fresh.test{1} <> None /\
+    mem (Accept (proj AKE_Fresh.test{1})) AKE_Fresh.evs{1} /\
+    accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    no_start_coll AKE_EexpRev.evs{2} /\
+    no_accept_coll AKE_EexpRev.evs{2} /\
+    valid_accepts AKE_EexpRev.evs{2} /\
+    inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+      AKE_EexpRev.mEexp{2} /\
+    inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+      AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+    (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+    ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+    (forall (x : Sidx),
+       in_dom x AKE_EexpRev.mCompleted{2} => in_dom x AKE_EexpRev.mStarted{2}) /\
+    (forall (x : Sidx),
+      in_dom x AKE_EexpRev.mStarted{2} =>
+      ! in_dom x AKE_EexpRev.mCompleted{2} =>
+      sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
+    AKE_Fresh.test{1} = AKE_EexpRev.test{2} /\
+   mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2})
+   (accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    no_start_coll AKE_EexpRev.evs{2} /\
+    no_accept_coll AKE_EexpRev.evs{2} /\
+    valid_accepts AKE_EexpRev.evs{2} /\
+    inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+      AKE_EexpRev.mEexp{2} /\
+    inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+      AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+    (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+    ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+    (forall (x : Sidx),
+       in_dom x AKE_EexpRev.mCompleted{2} => in_dom x AKE_EexpRev.mStarted{2}) /\
+    AKE_Fresh.test{1} <> None /\
+    mem (Accept (proj AKE_Fresh.test{1})) AKE_Fresh.evs{1} /\
+    (forall (x : Sidx),
+      in_dom x AKE_EexpRev.mStarted{2} =>
+      ! in_dom x AKE_EexpRev.mCompleted{2} =>
+      sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
+    AKE_Fresh.test{1} = AKE_EexpRev.test{2} /\
+   mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}).
+smt.
+smt.
+by apply A_Lossless_guess.
+by apply eq1_eexpRev.
+by apply bdh1_eexpRev1.
+by apply bdh1_eexpRev2.
+by apply eq1_h2_a.
+by apply bdh1_h2_a_1.
+by apply bdh1_h2_a_2.
+by apply eq1_init1.
+by apply bdh1_init11.
+by apply bdh1_init1_2.
+by apply eq1_init2.
+by apply bdh1_init2_1.
+by apply bdh1_init2_2.
+by apply eq1_resp.
+by apply bdh1_resp_1.
+by apply bdh1_resp_2.
+by apply eq1_staticRev.
+by apply bdh1_staticRev_1.
+by apply bdh1_staticRev_2.
+by apply eq1_sessionRev.
+by apply bdh1_sessionRev_1.
+by apply bdh1_sessionRev_2.
+save.
+
+local equiv Eq_AKE_EexpRev_AKE_no_collision :
+ AKE_Fresh(A).main ~ AKE_EexpRev(A).main  :
+={glob A} ==> 
+(res /\ test_fresh AKE_EexpRev.test AKE_EexpRev.evs
+                    /\ ! collision_eexp_eexp(AKE_EexpRev.mEexp) 
+                    /\ ! collision_eexp_rcvd(AKE_EexpRev.evs)){2}
+=>
+(res /\ test_fresh AKE_Fresh.test AKE_Fresh.evs
+                    /\ ! collision_eexp_eexp(AKE_Fresh.mEexp) 
+                    /\ ! collision_eexp_rcvd(AKE_Fresh.evs) ){1}.
+fun.
+ seq 14 14:(={b,pks,t_idx,key,keyo,b',i,pks, glob A} /\
+  AKE_EexpRev.evs{2} = AKE_Fresh.evs{1} /\
+  AKE_EexpRev.test{2} = AKE_Fresh.test{1} /\
+  AKE_EexpRev.cSession{2} = AKE_Fresh.cSession{1} /\
+  AKE_EexpRev.cH2{2} = AKE_Fresh.cH2{1} /\
+  AKE_EexpRev.mH2{2} = AKE_Fresh.mH2{1} /\
+  AKE_EexpRev.sH2{2} = AKE_Fresh.sH2{1} /\
+  AKE_EexpRev.mSk{2} = AKE_Fresh.mSk{1} /\
+  AKE_EexpRev.mEexp{2} = AKE_Fresh.mEexp{1} /\
+  AKE_EexpRev.mStarted{2} = AKE_Fresh.mStarted{1} /\
+  AKE_EexpRev.mCompleted{2} = AKE_Fresh.mCompleted{1} /\
+  AKE_EexpRev.evs{2} = [] /\ 
+  (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+  AKE_Fresh.test{1} = None /\
+ AKE_Fresh.mStarted{1} = Map.empty /\
+ AKE_Fresh.mCompleted{1} = Map.empty).
+ inline AKE_Fresh(A).init AKE_EexpRev(A).init.
+ while
+(  ={sidxs} /\
+AKE_Fresh.mEexp{1} = AKE_EexpRev.mEexp{2}  /\
+  (forall (s : Sidx), !mem s sidxs{2} => in_dom s AKE_EexpRev.mEexp{2})). 
+wp; rnd; wp; skip; progress; try smt.
+case  (s = (pick sidxs{2})) => h.
+ by rewrite h;apply in_dom_setE.
+generalize H5; rewrite mem_rm !not_and => [hl|]; last by smt.
+ by cut:= H s _ => //;rewrite in_dom_setNE //.
+while (={pks} /\ AKE_Fresh.mSk{1} = AKE_EexpRev.mSk{2}).
+by wp; rnd.
+by wp; skip; progress => //; smt.
+  if{1}; last first.
+
+(* if we have a collision after sampling the eph secrets, it suffices to
+   show preservation of collisions *)
+  conseq (_ : collision_eexp_eexp_op AKE_EexpRev.mEexp{2} ==> 
+              collision_eexp_eexp_op AKE_EexpRev.mEexp{2}).
+  smt.
+  smt.
+cut hh2 : bd_hoare
+ [AKE_EexpRev(A).O.h2 : 
+  collision_eexp_eexp_op AKE_EexpRev.mEexp ==> 
+  collision_eexp_eexp_op AKE_EexpRev.mEexp] = 1%r.
+ by fun; wp; rnd; skip; progress => //; apply TKey.Dword.lossless.
+
+cut hck : bd_hoare
+ [AKE_EexpRev(A).O.computeKey : 
+  collision_eexp_eexp_op AKE_EexpRev.mEexp ==> 
+  collision_eexp_eexp_op AKE_EexpRev.mEexp] = 1%r.
+ by fun; sp; if; wp; try call hh2; wp.
+ seq 0 2: (collision_eexp_eexp_op AKE_EexpRev.mEexp{2}).
+ rnd{2}.
+ call{2}(_ : (collision_eexp_eexp_op AKE_EexpRev.mEexp) ==>
+            (collision_eexp_eexp_op AKE_EexpRev.mEexp)).
+
+ fun (collision_eexp_eexp_op AKE_EexpRev.mEexp).
+ smt.
+ smt.
+ by apply A_Lossless_choose.
+ by fun; wp.
+ by fun; sp; if; wp; try call hh2; wp => //.
+ by fun; wp. 
+ by fun; wp.
+ by fun; wp.
+ by fun; wp.
+ by fun; sp; if; try call hck; wp.
+ skip; progress; smt.
+ 
+ if{2}; last by trivial.
+ call{2}(_ : (collision_eexp_eexp_op AKE_EexpRev.mEexp) ==>
+            (collision_eexp_eexp_op AKE_EexpRev.mEexp)).
+ fun (collision_eexp_eexp_op AKE_EexpRev.mEexp).
+ smt.
+ smt.
+ by apply A_Lossless_guess.
+ by fun; wp.
+ by fun; sp; if; wp; try call hh2; wp => //.
+ by fun; wp. 
+ by fun; wp.
+ by fun; wp.
+ by fun; wp.
+ by fun; sp; if; try call hck; wp.
+ sp; if{2}; wp; [call{2} hck | rnd{2} ]; skip; smt.
+seq 2 2:
+( ={b, pks, t_idx, key, keyo, b', i, pks, glob A} /\
+AKE_EexpRev.evs{2} = AKE_Fresh.evs{1} /\
+  AKE_EexpRev.test{2} = AKE_Fresh.test{1} /\
+  AKE_EexpRev.cSession{2} = AKE_Fresh.cSession{1} /\
+  AKE_EexpRev.cH2{2} = AKE_Fresh.cH2{1} /\
+  AKE_EexpRev.mH2{2} = AKE_Fresh.mH2{1} /\
+  AKE_EexpRev.sH2{2} = AKE_Fresh.sH2{1} /\
+  AKE_EexpRev.mSk{2} = AKE_Fresh.mSk{1} /\
+  AKE_EexpRev.mEexp{2} = AKE_Fresh.mEexp{1} /\
+  AKE_EexpRev.mStarted{2} = AKE_Fresh.mStarted{1} /\
+  AKE_EexpRev.mCompleted{2} = AKE_Fresh.mCompleted{1} /\
+  AKE_Fresh.test{1} = None /\
+  accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+  start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+  no_start_coll(AKE_EexpRev.evs{2}) /\
+  no_accept_coll(AKE_EexpRev.evs{2}) /\
+  valid_accepts (AKE_EexpRev.evs{2}) /\
+  inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2} AKE_EexpRev.mEexp{2}  /\
+  inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2} 
+             AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+  (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\ 
+  (forall x, in_dom x AKE_EexpRev.mCompleted{2} => in_dom x AKE_EexpRev.mStarted{2}) /\
+  (forall x, in_dom x AKE_EexpRev.mStarted{2} => !in_dom x AKE_EexpRev.mCompleted{2} =>
+     sd2_role (proj (AKE_EexpRev.mStarted{2}.[x])) = init)).
+rnd.
+call eq1_choose.
+wp; skip; progress; try assumption.  
+   rewrite /accept_evs_eexps; smt.
+   smt.
+   rewrite /no_start_coll => X A1 A2 B1 B2 r1 r2 i j hpos1 hpos2.
+   rewrite nth_geq_len ?length_nil //; smt.
+   rewrite /no_accept_coll => X A1 A2 B1 B2 Y1 Y2 r1 r2 i j hpos1 hpos2.
+   rewrite nth_geq_len ?length_nil //; smt.
+   rewrite /valid_accepts => s i; rewrite length_nil; smt.
+   rewrite /inv_started => ps; split.
+    cut:= mem_nil (Start ps); smt.
+    smt.
+   rewrite /inv_accepted => ps; split.
+    cut:= mem_nil (Accept ps); smt.
+    smt.
+  apply H.
+  smt.
+  smt.
+  smt.   
+  by apply H21.
+  by apply H22.
+  if => //.
+seq 2 2:
+  ((={b, pks, t_idx, key, keyo, b', i, pks, glob A, keyo} /\
+   AKE_EexpRev.evs{2} = AKE_Fresh.evs{1} /\
+   AKE_EexpRev.test{2} = AKE_Fresh.test{1} /\
+   AKE_EexpRev.cSession{2} = AKE_Fresh.cSession{1} /\
+   AKE_EexpRev.cH2{2} = AKE_Fresh.cH2{1} /\
+   AKE_EexpRev.mH2{2} = AKE_Fresh.mH2{1} /\
+   AKE_EexpRev.sH2{2} = AKE_Fresh.sH2{1} /\
+   AKE_EexpRev.mSk{2} = AKE_Fresh.mSk{1} /\
+   AKE_EexpRev.mEexp{2} = AKE_Fresh.mEexp{1} /\
+   AKE_EexpRev.mStarted{2} = AKE_Fresh.mStarted{1} /\
+   AKE_EexpRev.mCompleted{2} = AKE_Fresh.mCompleted{1} /\
+   AKE_Fresh.test{1} = Some (compute_sid AKE_Fresh.mStarted{1} 
+     AKE_Fresh.mEexp{1} AKE_Fresh.mCompleted{1} t_idx{2}) /\
+   accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+   start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+   no_start_coll AKE_EexpRev.evs{2} /\
+   no_accept_coll AKE_EexpRev.evs{2} /\
+   valid_accepts AKE_EexpRev.evs{2} /\
+   inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+     AKE_EexpRev.mEexp{2} /\
+   inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+     AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+   (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+   ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+   (forall (x : Sidx),
+      in_dom x AKE_EexpRev.mCompleted{2} => in_dom x AKE_EexpRev.mStarted{2}) /\
+   (forall (x : Sidx),
+     in_dom x AKE_EexpRev.mStarted{2} =>
+     ! in_dom x AKE_EexpRev.mCompleted{2} =>
+     sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
+  ! AKE_Fresh.mStarted{1}.[t_idx{1}] = None &&
+  ! AKE_Fresh.mCompleted{1}.[t_idx{1}] = None)).
+  sp; (if; first smt); last first.
+  wp; rnd; skip; progress => //.
+  by apply H6.
+  by apply H8.
+  by apply H9.
+inline AKE_Fresh(A).O.computeKey AKE_EexpRev(A).O.computeKey
+       AKE_Fresh(A).O.h2 AKE_EexpRev(A).O.h2. 
+sp; if => //.
+
+wp; rnd; wp; skip; progress => //.
+  by apply H6.
+  by apply H8.
+  by apply H9.
+  by apply H6.
+  by apply H8.
+  by apply H9.
+wp; skip; progress => //.
+  by apply H6.
+  by apply H8.
+  by apply H9.
+call eq1_guess.
+skip; progress => //.
+smt.
+  rewrite proj_some.
+  cut [h1 h2] := H5 (compute_sid AKE_Fresh.mStarted{1} AKE_Fresh.mEexp{1}
+        AKE_Fresh.mCompleted{1} t_idx{2}).
+  apply h2.
+  exists t_idx{2}; progress => //.
+   by apply H6.
+   by apply H6.
+   by apply H8.
+   by apply H9. 
+  rewrite proj_some.
+  cut [h1 h2] := H5 (compute_sid AKE_Fresh.mStarted{1} AKE_Fresh.mEexp{1}
+          AKE_Fresh.mCompleted{1} t_idx{2}).
+  apply h2.
+  exists t_idx{2}; progress => //.
+   by apply H6.
+   smt.
+
+  rewrite proj_some.
+  cut [h1 h2] := H5 (compute_sid AKE_Fresh.mStarted{1} AKE_Fresh.mEexp{1}
+        AKE_Fresh.mCompleted{1} t_idx{2}).
+  apply h2.
+  exists t_idx{2}; progress => //.
+  by apply H6.
+  smt.
+  by apply H8.
+  by apply H9. 
+  cut [h1 h2] := H5 (compute_sid AKE_Fresh.mStarted{1} AKE_Fresh.mEexp{1}
+          AKE_Fresh.mCompleted{1} t_idx{2}).
+  rewrite proj_some;apply h2.
+  exists t_idx{2}; progress => //.
+   by apply H6.
+   smt.
+   smt.   
+   elim H13; progress => //.
+   smt.
+ elim H17.
+smt.
+smt.
+smt.
+save.
+
+local equiv Eq_AKE_EexpRev_AKE_no_collision' :
+ AKE_EexpRev(A).main ~ AKE_Fresh(A).main :
+={glob A} ==> 
+(res /\ test_fresh AKE_EexpRev.test AKE_EexpRev.evs
+                    /\ ! collision_eexp_eexp(AKE_EexpRev.mEexp) 
+                    /\ ! collision_eexp_rcvd(AKE_EexpRev.evs)){1}
+=>
+(res /\ test_fresh AKE_Fresh.test AKE_Fresh.evs
+                    /\ ! collision_eexp_eexp(AKE_Fresh.mEexp) 
+                    /\ ! collision_eexp_rcvd(AKE_Fresh.evs) ){2}.
+proof.
+ symmetry.
+ by conseq Eq_AKE_EexpRev_AKE_no_collision.
+save.
+
+local lemma Pr1 : 
+forall &m,
+Pr[AKE_EexpRev(A).main() @ &m : res /\ test_fresh AKE_EexpRev.test AKE_EexpRev.evs
+                    /\ ! collision_eexp_eexp(AKE_EexpRev.mEexp) 
+                    /\ ! collision_eexp_rcvd(AKE_EexpRev.evs)] <=
+Pr[AKE_Fresh(A).main() @ &m : res /\ test_fresh AKE_Fresh.test AKE_Fresh.evs
+                    /\ ! collision_eexp_eexp(AKE_Fresh.mEexp) 
+                    /\ ! collision_eexp_rcvd(AKE_Fresh.evs)].
+proof.
+ intros => &m.
+ by equiv_deno Eq_AKE_EexpRev_AKE_no_collision'.
+save.
