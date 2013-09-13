@@ -11,6 +11,13 @@ op weight (d:'a distr) : real = mu d cpTrue.
 
 op in_supp x (d:'a distr) : bool = 0%r < mu_x d x.
 
+op support (d:'a distr) x = in_supp x d.
+
+pred isuniform (d:'a distr) = forall (x y:'a),
+  in_supp x d =>
+  in_supp y d =>
+  mu_x d x = mu_x d y.
+
 (** Point-wise equality *)
 pred (==)(d d':'a distr) =
   (forall x, mu_x d x = mu_x d' x).
@@ -29,14 +36,14 @@ axiom mu_sub (d:'a distr) (p q:'a cpred):
 
 axiom mu_supp_in (d:'a distr) p:
   mu d p = mu d cpTrue <=>
-  (lambda x, in_supp x d) <= p.
+  support d <= p.
 
 axiom pw_eq (d d':'a distr):
   d == d' => d = d'.
 
 (** Lemmas *)
 lemma mu_supp (d:'a distr):
-  mu d (lambda x, in_supp x d) = mu d cpTrue.
+  mu d (support d) = mu d cpTrue.
 proof strict.
 by rewrite mu_supp_in.
 qed.
@@ -63,8 +70,8 @@ cut ->: (forall (x y z:real), x = y - z <=> x + z = y) by smt;
 by rewrite -mu_disjoint ?cpEM //; apply leq_refl; rewrite cpC.
 qed.
 
-lemma mu_in_supp (d:'a distr) (p:'a cpred):
-  mu d p = mu d (cpAnd p (lambda x, in_supp x d)).
+lemma mu_in_supp (p:'a cpred) (d:'a distr):
+  mu d p = mu d (cpAnd p (support d)).
 proof strict.
 apply Antisymm; last by apply mu_sub=> x; rewrite /cpAnd.
 by cut -> : (forall (p q:'a cpred), (cpAnd p q) = (cpNot (cpOr (cpNot p) (cpNot q))))
@@ -73,20 +80,20 @@ by cut -> : (forall (p q:'a cpred), (cpAnd p q) = (cpNot (cpOr (cpNot p) (cpNot 
 qed.
 
 lemma mu_in_supp_sub (d:'a distr) (p q:'a cpred):
-  (forall a, in_supp a d => p a => q a) =>
+  cpAnd p (support d) <= cpAnd q (support d) =>
   mu d p <= mu d q.
 proof strict.
-by intros=> ple_p_q; rewrite mu_in_supp;
-   apply mu_sub; rewrite /cpAnd=> x [mu_p mu_supp];
-   apply ple_p_q.
+by intros=> ple_p_q; rewrite (mu_in_supp p) (mu_in_supp q);
+   apply mu_sub.
 qed.
 
 lemma mu_in_supp_eq (d:'a distr) (p q:'a cpred):
-  (forall (a:'a), in_supp a d => (p a <=> q a)) =>
+  cpAnd p (support d) = cpAnd q (support d) =>
   mu d p = mu d q.
 proof strict.
-by intros=> eq_on_supp; rewrite mu_in_supp (mu_in_supp _ q);
-   apply mu_eq; rewrite /cpAnd=> x /=; smt.
+by intros=> eq_on_supp;
+   rewrite (mu_in_supp p) (mu_in_supp q);
+   apply mu_eq; rewrite eq_on_supp.
 qed.
 
 lemma mu_weight_0 (d:'a distr):
@@ -117,6 +124,8 @@ theory Dempty.
     split; last smt.
     intros weight_0; rewrite -(pw_eq<:'a> d dempty); smt.
   qed.
+
+  lemma demptyU: isuniform dempty<:'a> by [].
 end Dempty.
 
 (** Point distribution *)
@@ -144,6 +153,10 @@ theory Dunit.
 
   lemma lossless (x:'a):
     weight (dunit x) = 1%r
+  by [].
+
+  lemma dunitU (x:'a):
+    isuniform (dunit x)
   by [].
 end Dunit.
 
@@ -174,8 +187,15 @@ theory Dinter.
     i <= j => 
     mu (dinter i j) (lambda x, i <= x <= j) = 1%r.
   proof.
-  by intros=> H; rewrite -(mu_in_supp_eq (dinter i j) cpTrue); smt.
+  by intros=> H;
+     rewrite -(mu_in_supp_eq (dinter i j) cpTrue);
+       try apply fun_ext;
+     smt.
   qed.
+
+  lemma isuniform (i j:int):
+    isuniform (dinter i j)
+  by [].
 end Dinter.
 
 (** Normalization of a sub-distribution *)
@@ -202,6 +222,10 @@ theory Dscale.
   proof.
   by intros=> H; rewrite /weight mu_def_pos /weight=> //; smt.
   qed.  
+
+  lemma scaleU (d:'a distr):
+    isuniform d => isuniform (dscale d)
+  by [].
 end Dscale.
 
 (** Distribution resulting from applying a function to a distribution *)
@@ -217,11 +241,14 @@ theory Dapply.
   by rewrite /mu_x mu_def.
   qed.
 
-  lemma supp_def (d : 'a distr) (f : 'a -> 'b) x:
-    in_supp x (dapply f d) <=> exists y, in_supp y d /\ f y = x.
+  lemma supp_def (d : 'a distr) (f : 'a -> 'b) y:
+    in_supp y (dapply f d) <=> exists x, y = f x /\ in_supp x d.
   proof strict.
-  rewrite /in_supp /mu_x mu_def; split=> in_sup; first smt.
-  elim in_sup => w; rewrite /in_supp /mu_x=> in_sup_w; smt.
+  rewrite /in_supp /mu_x mu_def; split.
+    rewrite mu_in_supp /cpAnd /= => in_sup; smt.
+    by intros=> [x]; rewrite /in_supp /mu_x=> [y_def nempty];
+       cut : (=) x <= (lambda x, y = f x) by (by intros=> w);
+       smt.
   qed.
 
   lemma lossless (d : 'a distr) (f : 'a -> 'b):

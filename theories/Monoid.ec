@@ -255,7 +255,7 @@ cut pcan_pickp_eq : forall x, mem x s => pickp (eq x) = x.
 cut pcan_eq_pickp : forall x, mem x is => eq (pickp x) = x.
   by delta pickp eq; intros x h /=; apply fun_ext=> a /=; smt.
 cut p_is_or: mu d p = mu d (cpOrs is).
-  rewrite /cpOrs /is mu_in_supp /cpAnd /=;
+  rewrite /cpOrs /is mu_in_supp /cpAnd /support /=;
   congr=> //; apply fun_ext=> x /=; rewrite or_exists andC;
   case (in_supp x d /\ p x)=> h.
     rewrite rw_eq_sym rw_eqT; exists (eq x);

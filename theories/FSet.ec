@@ -721,9 +721,10 @@ theory Dinter_uni.
     i <= j => 
     mu (dinter i j) (lambda x, i <= x <= j) = 1%r.
   proof strict.
-    intros=> H;
-    rewrite -(mu_in_supp_eq (dinter i j) Fun.cpTrue);smt.
-  save.
+  by intros=> H;
+     rewrite -(mu_in_supp_eq (dinter i j) cpTrue);
+     try apply fun_ext; smt.
+  qed.
 end Dinter_uni.
 
 (** Restriction of a distribution (sub-distribution) *)
