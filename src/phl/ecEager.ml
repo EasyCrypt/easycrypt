@@ -222,7 +222,7 @@ let process_if = t_eager_if
 
 (* eager while:
    (a) ={I} => e{1} = e{2}
-   (b) S;c1 ~ c1';S' : ={I} /\ e{1} ==> ={I}
+   (b) S;c ~ c';S' : ={I} /\ e{1} ==> ={I}
    (c)  c' ~ c'    : ={I.2} ==> ={I.2}
    (d) forall b &2, S  : e = b ==> e = b
    (e) ={I} => ={Is}
@@ -384,7 +384,7 @@ let process_fun_abs info eqI g =
    S,f ~ f',S' : fpre ==> fpost 
    S do not write a 
    -----------------------------------
-   S;x = f(a) ~ x' = f'(a');S' : wp_call fpre fpost post ==> post{res <- x,x'}
+   S;x = f(a) ~ x' = f'(a');S' : wp_call fpre fpost post ==> post
 *)
 class rn_eager_call =
 object
@@ -448,4 +448,168 @@ let process_call info (_,n as g) =
     t_eager_call eg.eg_pr eg.eg_po g in
   t_seq_subgoal t_call [t_use an gs; t_id None] (juc, n)
 
+
+(***************************************************************************)
+(* This part of the code is for automatic application of eager rule as for *)
+(* eqobs_in                                                                *)
+(***************************************************************************)
+
+let eager env s s' inv eqIs eqXs c c' eqO =
+  let modi = s_write env s in
+  let modi' = s_write env s' in
+  let readi = s_read env s in
+
+  let check_args args =
+    let read = List.fold_left (e_read env) PV.empty args in
+    if not (PV.indep env modi read) then raise EqObsInError in
+    
+  let check_swap_s i =
+    let m = is_write env PV.empty [i] in
+    let r = is_read env PV.empty [i] in
+    let t = PV.indep env m modi && 
+      PV.indep env m readi && PV.indep env modi r in
+    if not t then raise EqObsInError in
+
+  let rev st = List.rev st.s_node in
+
+  let remove lvl lvr eqs =
+    let aux eqs (pvl,tyl) (pvr,tyr) = 
+      if (EcReduction.equal_type env tyl tyr) then
+        Mpv2.remove env pvl pvr eqs
+      else raise EqObsInError in
+
+    match lvl, lvr with
+    | LvVar xl, LvVar xr -> aux eqs xl xr 
+    | LvTuple ll, LvTuple lr when List.length ll = List.length lr->
+      List.fold_left2 aux eqs ll lr
+    | LvMap((pl,tysl), pvl, el, tyl),
+        LvMap((pr,tysr), pvr, er,tyr) when EcPath.p_equal pl pr &&
+      List.all2  (EcReduction.equal_type env) (tyl::tysl) (tyr::tysr) ->
+      add_eqs env (Mpv2.remove env pvl pvr eqs) el er
+    | _, _ -> raise EqObsInError in
+
+  let oremove lvl lvr eqs = 
+    match lvl, lvr with
+    | None, None -> eqs
+    | Some lvl, Some lvr -> remove lvl lvr eqs 
+    | _, _ -> raise EqObsInError in
+
+
+  let rec s_eager fhyps rsl rsr eqo =
+    match rsl, rsr with
+    | [], _ -> [], rsr, fhyps, eqo
+    | _, [] -> rsl, [], fhyps, eqo
+    | il::rsl', ir::rsr' ->
+      match (try Some (i_eager fhyps il ir eqo) with _ -> None) with
+      | None -> rsl, rsr, fhyps, eqo
+      | Some (fhyps, eqi) -> s_eager fhyps rsl' rsr' eqi
+  and i_eager fhyps il ir eqo = 
+    match il.i_node, ir.i_node with
+    | Sasgn(lvl,el), Sasgn(lvr,er) | Srnd(lvl,el), Srnd(lvr,er) ->
+      check_swap_s il;
+      let eqnm = Mpv2.split_nmod modi modi' eqo in
+      let eqm  = Mpv2.split_mod modi modi' eqo in
+      if not (Mpv2.subset eqm eqXs) then raise EqObsInError;
+      let eqi = Mpv2.union eqIs eqnm in
+      fhyps, add_eqs env (remove lvl lvr eqi) el er
+    | Scall(lvl,fl,argsl), Scall(lvr,fr,argsr) 
+      when List.length argsl = List.length argsr ->
+      check_args argsl;
+      let eqo = oremove lvl lvr eqo in
+      let modl = PV.union modi (f_write env fl) in
+      let modr = PV.union modi' (f_write env fr) in
+      let eqnm = Mpv2.split_nmod modl modr eqo in
+      let outf = Mpv2.split_mod  modl modr eqo in
+      Mpv2.check_glob outf;
+      let fhyps, inf = f_eager fhyps fl fr outf in
+      let eqi = 
+        List.fold_left2 (add_eqs env) (Mpv2.union eqnm inf) argsl argsr in
+      fhyps, eqi
+
+    | Sif(el,stl,sfl), Sif(er,str,sfr) ->
+      check_args [el];
+      let r1,r2,fhyps1, eqs1 = s_eager fhyps (rev stl) (rev str) eqo in
+      if r1 <> [] || r2 <> [] then raise EqObsInError;
+      let r1,r2, fhyps2, eqs2 = s_eager fhyps1 (rev sfl) (rev sfr) eqo in
+      if r1 <> [] || r2 <> [] then raise EqObsInError;
+      let eqi = Mpv2.union eqs1 eqs2 in
+      let eqe = add_eqs env eqi el er in
+      fhyps2, eqe 
+
+    | Swhile(el,sl), Swhile(er,sr2) ->
+      check_args [el]; (* ensure condition (d) *)
+      let sl, sr = rev sl, rev sr2 in
+      let rec aux eqo = 
+        let r1,r2,fhyps, eqi = s_eager fhyps sl sr eqo in
+        if r1 <> [] || r2 <> [] then raise EqObsInError;
+        if Mpv2.subset eqi eqo then fhyps, eqo
+        else aux (Mpv2.union eqi eqo) in
+      let fhyps, eqi = aux (Mpv2.union eqIs (add_eqs env eqo el er)) in
+      (* by construction condition (a), (b) and (c) are satisfied *)
+      compat env modi modi' eqi eqIs eqXs; (* ensure (e) and (f) *)
+      (* (h) is assumed *)
+      fhyps, eqi
+
+    | Sassert el, Sassert er -> 
+      check_args [el];
+      let eqnm = Mpv2.split_nmod modi modi' eqo in
+      let eqm  = Mpv2.split_mod modi modi' eqo in
+      if not (Mpv2.subset eqm eqXs) then raise EqObsInError;
+      let eqi = Mpv2.union eqIs eqnm in
+      fhyps, add_eqs env eqi el er
+    | _, _ -> raise EqObsInError 
+  and f_eager (fhyps:(EcPath.xpath * EcPath.xpath * EcPV.Mpv2.t) list) fl fr out = 
+    let fl, fr = NormMp.norm_xpath env fl, NormMp.norm_xpath env fr in
+    let rec aux fhyps = 
+      match fhyps with
+      | [] -> [fl,fr,out]
+      | (fl',fr',out') :: fhyps ->
+        if EcPath.x_equal fl fl' && EcPath.x_equal fr fr' then
+          (fl,fr, Mpv2.union out out')::fhyps
+        else (fl',fr',out')::aux fhyps in
+    aux fhyps, inv in
+ 
+  s_eager [] (rev c) (rev c') eqO
+
+class rn_eager_auto =
+object
+  inherit xrule "[eager] auto"
+end
+let rn_eager_auto = RN_xtd (new rn_eager_auto :> xrule)
+
+let t_eager h inv g =
+  let env, hyps, concl = get_goal_e g in
+  let _, (_, s, s', eqIs, eqXs) = get_hSS' hyps h in
+  check_only_global env s; check_only_global env s';
+  let eC, c, c' = destr_eagerS s s' concl in
+  let eqinv = Mpv2.of_form env mleft mright inv in
+  let eqO = Mpv2.of_form env mleft mright eC.es_po in
+  let c1,c1',fhyps,eqi = 
+    eager env s s' eqinv eqIs eqXs c c' eqO in
+  if c1 <> [] || c1' <> [] then tacuerror "not able to apply eager";
+  let dof (fl,fr,eqo) = 
+    let defl = Fun.by_xpath fl env in
+    let defr = Fun.by_xpath fr env in
+    let sigl, sigr = defl.f_sig, defr.f_sig in
+    let eq_res = f_eqres fl sigl.fs_ret mleft fr sigr.fs_ret mright in
+    let post = Mpv2.to_form mleft mright eqo eq_res in
+    let eq_params = 
+      f_eqparams fl sigl.fs_params mleft fr sigr.fs_params mright in
+    let pre = f_and_simpl eq_params inv in
+    f_eagerF pre s fl fr s' post in
+  let concl = 
+    f_equivS_r { eC with es_sl = stmt []; es_sr = stmt []; 
+      es_po = Mpv2.to_form mleft mright eqi f_true } in
+  let concls = List.map dof fhyps in
+  prove_goal_by (concl::concls) rn_eager_auto g
+
+let process_eager info inv g = 
+  let hyps = get_hyps g in
+  let penv = LDecl.inv_memenv hyps in
+  let inv  = EcCoreHiLogic.process_form penv inv tbool in
+  let gs, h = process_info info g in
+  t_on_last (t_eager h inv) gs
+
+
       
+
