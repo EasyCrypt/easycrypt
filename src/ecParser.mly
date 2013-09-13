@@ -1824,6 +1824,8 @@ eager_tac:
     { Peager_fun_def }
 | FUN i=eager_info f=sform 
     { Peager_fun_abs(i,f) }
+| CALL info=fpattern(call_info) 
+    { Peager_call info }
 ;
 (* END EAGER *)
 

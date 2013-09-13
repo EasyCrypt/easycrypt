@@ -114,31 +114,21 @@ let t_bdHoare_call fpre fpost opt_bd g =
   in
   prove_goal_by [f_concl;concl] (rn_hl_call None fpre fpost) g
 
-let t_equiv_call fpre fpost g =
-  (* FIXME : check the well formess of the pre and the post ? *)
-  let env,_,concl = get_goal_e g in
-  let es = t_as_equivS concl in
-  let (lpl,fl,argsl),(lpr,fr,argsr),sl,sr = 
-    s_last_calls "call" es.es_sl es.es_sr in
-  let ml = EcMemory.memory es.es_ml in
-  let mr = EcMemory.memory es.es_mr in
+let wp2_call env fpre fpost (lpl,fl,argsl) modil (lpr,fr,argsr) modir 
+ ml mr post hyps =
   let fsigl = (Fun.by_xpath fl env).f_sig in
   let fsigr = (Fun.by_xpath fr env).f_sig in
-  (* The functions satisfy their specification *)
-  let f_concl = f_equivF fpre fl fr fpost in
   (* The wp *)
   let pvresl = pv_res fl and pvresr = pv_res fr in
-  let vresl = LDecl.fresh_id (get_hyps g) "result_L" in
-  let vresr = LDecl.fresh_id (get_hyps g) "result_R" in
+  let vresl = LDecl.fresh_id hyps "result_L" in
+  let vresr = LDecl.fresh_id hyps "result_R" in
   let fresl = f_local vresl fsigl.fs_ret in
   let fresr = f_local vresr fsigr.fs_ret in
-  let post = wp_asgn_call env ml lpl fresl es.es_po in
+  let post = wp_asgn_call env ml lpl fresl post in
   let post = wp_asgn_call env mr lpr fresr post in
   let s    = 
     PVM.add env pvresl ml fresl (PVM.add env pvresr mr fresr PVM.empty) in   
   let fpost = PVM.subst env s fpost in 
-  let modil = f_write env fl in
-  let modir = f_write env fr in
   let post = generalize_mod env mr modir (f_imp_simpl fpost post) in
   let post = generalize_mod env ml modil post in
   let post = 
@@ -148,7 +138,23 @@ let t_equiv_call fpre fpost g =
       post in
   let spre = subst_args_call env ml fl fsigl.fs_params argsl PVM.empty in
   let spre = subst_args_call env mr fr fsigr.fs_params argsr spre in
-  let post = f_anda_simpl (PVM.subst env spre fpre) post in
+  f_anda_simpl (PVM.subst env spre fpre) post
+  
+let t_equiv_call fpre fpost g =
+  (* FIXME : check the well formess of the pre and the post ? *)
+  let env,hyps,concl = get_goal_e g in
+  let es = t_as_equivS concl in
+  let (lpl,fl,argsl),(lpr,fr,argsr),sl,sr = 
+    s_last_calls "call" es.es_sl es.es_sr in
+  let ml = EcMemory.memory es.es_ml in
+  let mr = EcMemory.memory es.es_mr in
+  (* The functions satisfy their specification *)
+  let f_concl = f_equivF fpre fl fr fpost in
+  let modil = f_write env fl in
+  let modir = f_write env fr in
+  (* The wp *)
+  let post = wp2_call env fpre fpost (lpl,fl,argsl) modil (lpr,fr,argsr) modir
+     ml mr es.es_po hyps in
   let concl = f_equivS_r { es with es_sl = sl; es_sr = sr; es_po=post} in
   prove_goal_by [f_concl;concl] (rn_hl_call None fpre fpost) g
 

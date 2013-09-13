@@ -380,8 +380,72 @@ let process_fun_abs info eqI g =
   let gs, h = process_info info g in
   t_on_last (t_eager_fun_abs eqI h) gs
   
+(* eager call :
+   S,f ~ f',S' : fpre ==> fpost 
+   S do not write a 
+   -----------------------------------
+   S;x = f(a) ~ x' = f'(a');S' : wp_call fpre fpost post ==> post{res <- x,x'}
+*)
+class rn_eager_call =
+object
+  inherit xrule "[eager] call"
+end
+let rn_eager_call = RN_xtd (new rn_eager_call :> xrule)
 
+let t_eager_call fpre fpost g =
+  let env, hyps, concl = get_goal_e g in
+  let es = t_as_equivS concl in
+  let (lvl,fl,argsl), s = s_last_call "eager call" es.es_sl in
+  let (lvr,fr,argsr), s' = s_first_call "eager call" es.es_sr in
+  let sw = s_write env s in
+  let sw' = s_write env s' in
+  let check_a e = 
+    let er = e_read env PV.empty e in
+    let diff = PV.interdep env sw er in 
+    if not (PV.is_empty diff) then 
+      tacuerror "eager call: the s statement write %a" (PV.pp env) diff in
+  List.iter check_a argsl;
+  let ml = EcMemory.memory es.es_ml in
+  let mr = EcMemory.memory es.es_mr in
+  let modil = PV.union (f_write env fl) sw in
+  let modir = PV.union (f_write env fr) sw' in 
+  let post = EcPhlCall.wp2_call env fpre fpost (lvl,fl,argsl) modil
+     (lvr,fr,argsr) modir ml mr es.es_po hyps in
+  let f_concl = f_eagerF fpre s fl fr s' fpost in
+  let concl   = f_equivS_r 
+    { es with es_sl = stmt []; es_sr = stmt []; es_po=post } in
+  prove_goal_by [f_concl;concl] rn_eager_call g
 
+let check_only_global env s = 
+  let sw = s_write env s in
+  let sr = s_read env s in
+  let check_glob v _ =
+    if is_loc v then
+      tacuerror "Swapping statement should use only global variables" in
+  let check_mp _ = () in
+  PV.iter check_glob check_mp sw;
+  PV.iter check_glob check_mp sr
+        
+let process_call info (_,n as g) =
+  let process_cut g info = 
+    match info with 
+    | EcParsetree.CI_spec (fpre,fpost) ->
+      let env,hyps,concl = get_goal_e g in
+      let es = t_as_equivS concl in
+      let (_,fl,_), s = s_last_call "eager call" es.es_sl in
+      let (_,fr,_), s' = s_first_call "eager call" es.es_sr in
+      check_only_global env s; check_only_global env s';
+      let penv, qenv = LDecl.equivF fl fr hyps in
+      let fpre  = EcCoreHiLogic.process_form penv fpre tbool in
+      let fpost = EcCoreHiLogic.process_form qenv fpost tbool in
+      f_eagerF fpre s fl fr s' fpost 
+    | _ -> tacuerror "do not known what to do with this kind of info" in
 
+  let (juc,an), gs = EcCoreHiLogic.process_mkn_apply (process_cut g) info g in
+  let t_call g =
+    let (_,f) = get_node (juc, an) in
+    let eg = t_as_eagerF f in
+    t_eager_call eg.eg_pr eg.eg_po g in
+  t_seq_subgoal t_call [t_use an gs; t_id None] (juc, n)
 
       

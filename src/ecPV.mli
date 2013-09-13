@@ -77,6 +77,9 @@ module PV : sig
   val fv : env -> EcIdent.t -> form -> t
 
   val pp : env -> Format.formatter -> t -> unit
+
+  val iter : (prog_var -> ty -> unit) -> (mpath -> unit) -> t -> unit
+
 end
 
 val s_write  : ?except_fs:EcPath.Sx.t -> env -> stmt -> PV.t

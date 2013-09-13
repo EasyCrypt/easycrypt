@@ -375,6 +375,10 @@ module PV = struct
 
   let indep env fv1 fv2 = 
     is_empty (interdep env fv1 fv2)
+
+  let iter fpv fm fv =
+    Mnpv.iter fpv fv.s_pv;
+    Sm.iter fm fv.s_gl
     
 end
 
