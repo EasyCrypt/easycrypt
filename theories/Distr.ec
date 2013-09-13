@@ -27,13 +27,20 @@ axiom mu_or (d:'a distr) (p q:'a cpred):
 axiom mu_sub (d:'a distr) (p q:'a cpred):
   p <= q => mu d p <= mu d q.
 
-axiom mu_supp (d:'a distr) :
-  mu d (lambda x, in_supp x d) = mu d cpTrue.
+axiom mu_supp_in (d:'a distr) p:
+  mu d p = mu d cpTrue <=>
+  (lambda x, in_supp x d) <= p.
 
 axiom pw_eq (d d':'a distr):
   d == d' => d = d'.
 
 (** Lemmas *)
+lemma mu_supp (d:'a distr):
+  mu d (lambda x, in_supp x d) = mu d cpTrue.
+proof strict.
+by rewrite mu_supp_in.
+qed.
+
 lemma mu_eq (d:'a distr) (p q:'a cpred):
   p == q => mu d p = mu d q.
 proof.
