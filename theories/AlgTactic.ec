@@ -21,7 +21,7 @@
  * - forall n, 0 <= n -> (n+1)%:R = n%:R + 1
  * - forall n, (-n)%:R = - n%:R
  *
- * If an explicit symbol (-) is given for the substraction:
+ * If an explicit symbol (-) is given for the subtraction:
  * - forall x y, x - y = x + (-y)
  *
  * Axioms on the field structure [0, 1, +, -, *, ^-1]
@@ -29,7 +29,7 @@
  * - forall x, x != 0 -> x * x^-1 = 1
  * - forall x n, 0 <= n -> x^(-n) = (x^n)^-1
  *
- * If an explicit symbol (/) is given the the division:
+ * If an explicit symbol (/) is given for the division:
  * - forall x y, x / y = x * y^-1
  *)
 

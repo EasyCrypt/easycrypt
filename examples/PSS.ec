@@ -800,7 +800,7 @@ section.
   by apply (G2_G3_abstract GAdv _); apply lossless_GAdv.
   qed.
 
-  (** TODO: Bound the probability of bad in G5 *)
+  (** TODO: Bound the probability of bad in G3 *)
 
   (** G4: compute z and u from the sampled values
         Note: z is uniform in "bitstrings of length k starting with a zero bit" (denoted '0 || 2^k-1'), and
@@ -867,7 +867,7 @@ section.
         by case (x{2} = x0); smt.
     by wp; skip; progress=> //; smt.
 
-    by if; [smt | | ]; wp; skip; progress=> //; smt.  
+    by if; [smt | | ]; wp; skip; progress=> //; smt.
   qed.
 
   local equiv G3_G4_abstract (Ga <: Gadv {H2,H3,G,Hmem}):
@@ -894,8 +894,50 @@ section.
   local equiv G3_G4: G3.main ~ G4.main: true ==> ={res}
   by apply (G3_G4_abstract GAdv).
 
-  (** G5: No longer using sk to simulate the oracles *)
+  (** G5: Sampling z in a (non-PTIME) loop *)
   local module H5: SplitOracle = {
+    fun init(ks:pkey * skey): unit = {
+      Hmap.init(ks);
+    }
+
+    fun o(c:bool,x:message * salt): htag = {
+      var b:bool;
+      var w:htag;
+      var st:gtag;
+      var z, u:signature;
+      var i:int;
+
+      i = 0;
+      b = true;
+      if (!in_dom x Hmap.m)
+      {
+        while (b)
+        {
+          z = $sample_plain Hmem.pk;
+          b = ((sub (to_bits z) 0 1) = ones 1);
+          w = HTag.from_bits (sub (to_bits z) 1 k1);
+          st = GTag.from_bits (sub (to_bits z) (k1 + 1) kg);
+          u = if c then ((inv Hmem.xstar Hmem.pk) * finv Hmem.sk  z) Hmem.pk else finv Hmem.sk z;
+          if (!b)
+          {
+            Hmap.m.[x] = (w,c,u);
+            G.m.[w] = st ^ (GTag.from_bits (to_bits (snd x) || zeros (kg - k0)));
+          }
+          i = i + 1;
+        }
+      }
+      else
+      {
+        if (!c /\ pi3_2 (proj Hmap.m.[x])) Hmap.m.[x] = (HTag.zeros,c,Signature.ones);
+      }
+      return pi3_1 (proj Hmap.m.[x]);
+    }
+  }.
+
+  local module G5 = Gen(GAdv,H5,G).
+
+  (** G6: upto "k2 executions of the loop didn't sample a bitstring starting with 0" *)
+  local module H6: SplitOracle = {
     var bad:bool
 
     fun init(ks:pkey * skey): unit = {
@@ -904,27 +946,29 @@ section.
     }
 
     fun o(c:bool,x:message * salt): htag = {
-      var b:bool = true;
-      var i:int = 0;
+      var b:bool;
       var w:htag;
       var st:gtag;
       var z, u:signature;
+      var i:int;
 
+      i = 0;
+      b = true;
       if (!in_dom x Hmap.m)
       {
-        while (i < kg2 && b)
+        while (b /\ i < kg2)
         {
-          u = $sample_plain Hmem.pk;
-          z = if c then (f Hmem.pk Hmem.xstar * f Hmem.pk u) Hmem.pk else f Hmem.pk u;
-          b = (sub (to_bits z) 0 1 = ones 1);
+          z = $sample_plain Hmem.pk;
+          b = ((sub (to_bits z) 0 1) = ones 1);
           w = HTag.from_bits (sub (to_bits z) 1 k1);
-          st = GTag.from_bits (sub (to_bits z) (k1 + 1) (kg));
-          i = i + 1;
+          st = GTag.from_bits (sub (to_bits z) (k1 + 1) kg);
+          u = if c then ((inv Hmem.xstar Hmem.pk) * finv Hmem.sk  z) Hmem.pk else finv Hmem.sk z;
           if (!b)
           {
             Hmap.m.[x] = (w,c,u);
             G.m.[w] = st ^ (GTag.from_bits (to_bits (snd x) || zeros (kg - k0)));
           }
+          i = i + 1;
         }
         bad = bad \/ b;
       }
@@ -936,7 +980,91 @@ section.
     }
   }.
 
-  local module G5 = Gen(GAdv,H5,G).
+  local module G6 = Gen(GAdv,H6,G).
+
+  local lemma G5_G6_abstract (Ga <: Gadv {H5,H6,G,Hmem}):
+    (forall (H <: SplitOracle{Ga}) (G <: Gt.Types.ARO{Ga}),
+       islossless H.o => islossless G.o => islossless Ga(H,G).main) => 
+    equiv [Gen(Ga,H5,G).main ~ Gen(Ga,H6,G).main: true ==> !H6.bad{2} => ={res}].
+  proof strict.
+  intros=> GaL; fun.
+  call (_: H6.bad, ={glob Hmap, glob G}).
+    (* H *)
+    fun; sp; if=> //.
+      splitwhile (i < kg2): {1} 1.
+      seq 1 1: (={b, i, c, x, w, st, z, u, glob Hmap, glob G} /\ !H6.bad{2}).
+        while (={b, i, c, x, glob Hmap, glob G} /\ 0 <= i{1} /\ (i{1} > 0 => ={z, w, st, u}) /\ (i{1} = 0 => b{1})).
+          seq 5 5: (={b, i, c, x, w, st, z, u, glob Hmap, glob G} /\ 0 <= i{1}).
+            by wp; rnd; skip; smt.
+            by if=> //; wp; skip; smt.
+        by skip; progress=> //; smt.
+      case (b{1}).
+        seq 0 1: H6.bad{2}; first by wp; skip; progress=> //; right.
+          conseq* (_: _ ==> true). progress=> //; smt.
+          while{1} (true) (1)=> //. admit. (* termination cannot currently be proven? *)
+        by rcondf{1} 1=> //; wp.
+      by if=> //; wp.
+    intros=> _ _; admit. (* same thing *)
+    intros=> _; fun; sp; if.
+      wp; while true (kg2 - i); first by intros=> _; wp; rnd cpTrue; skip; smt.
+            skip; smt.
+      by wp.
+    (* G *)
+    by conseq* (_: ={glob G, x} ==> ={glob G, res})=> //;
+      first by fun; eqobs_in.
+    by intros=> _ _; apply (Gt.Lazy.lossless_o _); apply gtagL.
+    by intros=> _; conseq* (Gt.Lazy.lossless_o _); apply gtagL.
+  call (_: ={ks} /\ valid_keys ks{1} ==> ={glob Hmap});
+    first by fun; eqobs_in.
+  call (_: true ==> ={glob G});
+    first by fun; eqobs_in.
+  by rnd; skip; progress=> //; smt.
+  qed.
+
+  local equiv G5_G6_equiv: G5.main ~ G6.main: true ==> !H6.bad{2} => ={res}
+  by (apply (G5_G6_abstract GAdv); apply lossless_GAdv).
+
+  (** G7: No longer using sk to simulate the oracles *)
+  local module H7: SplitOracle = {
+    fun init(ks:pkey * skey): unit = {
+      Hmap.init(ks);
+    }
+
+    fun o(c:bool,x:message * salt): htag = {
+      var b:bool;
+      var w:htag;
+      var st:gtag;
+      var z, u:signature;
+      var i:int;
+
+      i = 0;
+      b = true;
+      if (!in_dom x Hmap.m)
+      {
+        while (b /\ i < kg2)
+        {
+          u = $sample_plain Hmem.pk;
+          z = if c then (f Hmem.pk Hmem.xstar * f Hmem.pk u) Hmem.pk else f Hmem.pk u;
+          b = (sub (to_bits z) 0 1 = ones 1);
+          w = HTag.from_bits (sub (to_bits z) 1 k1);
+          st = GTag.from_bits (sub (to_bits z) (k1 + 1) (kg));
+          if (!b)
+          {
+            Hmap.m.[x] = (w,c,u);
+            G.m.[w] = st ^ (GTag.from_bits (to_bits (snd x) || zeros (kg - k0)));
+          }
+          i = i + 1;
+        }
+      }
+      else
+      {
+        if (!c /\ pi3_2 (proj Hmap.m.[x])) Hmap.m.[x] = (HTag.zeros,c,Signature.ones);
+      }
+      return pi3_1 (proj Hmap.m.[x]);
+    }
+  }.
+
+  local module G7 = Gen(GAdv,H7,G).
 
   (** Reduction to OW: no longer using xstar to simulate the oracles *)
   local module I: Inverter = {
@@ -957,19 +1085,19 @@ section.
 
         if (!in_dom x m)
         {
-          while (i < kg2 && b)
+          while (b /\ i < kg2)
           {
             u = $sample_plain I.pk;
             z = if c then (ystar * f pk u) pk else f pk u;
             b = (sub (to_bits z) 0 1 = ones 1);
             w = HTag.from_bits (sub (to_bits z) 1 k1);
             st = GTag.from_bits (sub (to_bits z) (k1 + 1) (kg));
-            i = i + 1;
             if (!b)
             {
               m.[x] = (w,c,u);
               G.m.[w] = st ^ (GTag.from_bits (to_bits (snd x) || zeros (kg - k0)));
             }
+            i = i + 1;
           }
         }
         else
@@ -1029,7 +1157,7 @@ section.
             G.m.[w] = Some (sub ((f pk xstar) * (f pk u) [pk]) (k1 = 1) kg) ^ (r || zeros)
        There may also still be an upto bad step missing, that deals with the case where
        the adversary gets lucky and gets a valid signature out of fresh queries to H and G. *)
-  local equiv G5_OW_H: H5.o ~ I.H.o:
+  local equiv G7_OW_H: H7.o ~ I.H.o:
     ={glob G, x, c} /\
     Hmap.m{1} = I.H.m{2} /\
     Hmem.pk{1} = I.pk{2} /\
@@ -1039,19 +1167,13 @@ section.
     Hmem.pk{1} = I.pk{2} /\
     (f Hmem.pk Hmem.xstar){1} = I.ystar{2}.
   proof strict.
-  fun; inline H5.o I.H.o; wp; sp; if=> //.
+  fun; inline H7.o I.H.o; wp; sp; if=> //.
     wp; while (={glob G, i, b, c, x} /\
                Hmap.m{1} = I.H.m{2} /\
                Hmem.pk{1} = I.pk{2} /\
                (f Hmem.pk Hmem.xstar){1} = I.ystar{2})=> //.
-      seq 6 6: (={glob G, u, w, st, i, b, c, x} /\
-                Hmap.m{1} = I.H.m{2} /\
-                Hmem.pk{1} = I.pk{2} /\
-                (f Hmem.pk Hmem.xstar){1} = I.ystar{2} /\
-                i{1} <= kg2).
-        by wp; rnd; skip; smt.
-        by if; try wp.
-    by sp; if=> //; wp.
+          by wp; rnd; skip; smt.
+    by if=> //; wp.
   qed.
 end section.
 

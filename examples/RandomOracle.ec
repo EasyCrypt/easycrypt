@@ -270,12 +270,11 @@ theory LazyEager.
     equiv [IND(Lazy.RO,D).main ~ IND(Eager.RO,D).main: true ==> ={res}].
   proof strict.
   intros=> dsampleL; bypr (res{1}) (res{2})=> //; intros=> a &1 &2 _.
-  cut eq_trans: forall (y x z:real), x = y => y = z => x = z by smt.
-  apply (eq_trans Pr[IND_Lazy.main() @ &1: a = res] _).
-    by equiv_deno (_: true ==> ={res}); first by apply IND_Lazy.
-  apply (eq_trans Pr[IND_Eager.main() @ &1: a = res] _).
-    by equiv_deno (_: true ==> ={res}); first by apply eager_aux.
-  by equiv_deno (_: true ==> ={res}); first by apply IND_Eager.
+  apply (eq_trans _ Pr[IND_Lazy.main() @ &1: a = res]);
+    first by equiv_deno (IND_Lazy _).
+  apply (eq_trans _ Pr[IND_Eager.main() @ &1: a = res]);
+    first by equiv_deno (eager_aux _).
+  by equiv_deno (IND_Eager _).
   qed.
   end section.
 end LazyEager.
