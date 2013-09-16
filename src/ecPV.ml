@@ -410,7 +410,13 @@ let rec f_write ?(except_fs=Sx.empty) env w f =
       else f_write ~except_fs env w o)
       (PV.add_glob env mp w) oi.oi_calls
   | FBdef fdef ->
-    s_write ~except_fs env w fdef.f_body
+    let add x w = 
+      let vb = Var.by_xpath x env in
+      PV.add env (pv_glob x) vb.vb_type w in
+    let w = EcPath.Sx.fold add fdef.f_uses.us_writes w in
+    let fwrite w f = 
+      if Sx.mem f except_fs then w else f_write ~except_fs env w f in
+    List.fold_left fwrite w fdef.f_uses.us_calls
 
 and is_write ?(except_fs=Sx.empty) env w s = 
   List.fold_left (i_write ~except_fs env) w s
