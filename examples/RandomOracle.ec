@@ -37,7 +37,7 @@ theory Lazy.
     }
   
     fun o(x:from):to = {
-      var y : to;
+      var y:to;
       y = $dsample;
       if (!in_dom x m) m.[x] = y;
       return proj (m.[x]);
@@ -49,17 +49,11 @@ theory Lazy.
   by fun; wp.
   qed.
 
-  lemma termination_o r:
-    mu dsample cpTrue = r =>
-    bd_hoare [RO.o: true ==> true] = r.
-  proof strict.
-  by intros=> r_def; fun; wp; rnd (cpTrue); wp.
-  qed.
-
   lemma lossless_o:
-    mu dsample cpTrue = 1%r => islossless RO.o.
+    mu dsample cpTrue = 1%r =>
+    islossless RO.o.
   proof strict.
-  by intros=> Hd; apply (termination_o 1%r).
+  by intros=> dsampleL; fun; wp; rnd.
   qed.
 
   equiv abstract_init:
@@ -90,17 +84,17 @@ theory Eager.
     var m:(from,to) map
 
     fun init(): unit = {
+      var y:to;
       var work:from set;
       var f:from;
-      var t:to;
 
       m = Map.empty;
       work = toFSet univ;
       while (work <> FSet.empty)
       {
         f = pick work;
-        t = $dsample;
-        m.[f] = t;
+        y = $dsample;
+        m.[f] = y;
         work = rm f work;
       }
     }
@@ -197,10 +191,25 @@ theory LazyEager.
       }
   
       fun o(x:from):to = {
-        var y : to;
+        var y:to;
         y = $dsample;
         if (!in_dom x m) m.[x] = y;
         return proj (m.[x]);
+      }
+    }
+
+    fun resample(): unit = {
+      var work:from set;
+      var f:from;
+      var y,y0:to;
+
+      work = toFSet univ;
+      while (work <> FSet.empty)
+      {
+        f = pick work;
+        y = $dsample;
+        if (!in_dom f H.m) H.m.[f] = y;
+        work = rm f work;
       }
     }
 
@@ -208,21 +217,10 @@ theory LazyEager.
 
     fun main(): bool = {
       var b:bool;
-      var work:from set;
-      var f:from;
-      var t:to;
 
       H.init();
       b = D.distinguish();
-
-      work = toFSet univ;
-      while (work <> FSet.empty)
-      {
-        f = pick work;
-        t = $dsample;
-        H.m.[f] = t;
-        work = rm f work;
-      }
+      resample();
 
       return b;
     }
@@ -235,6 +233,7 @@ theory LazyEager.
     call (_: Lazy.RO.m{1} = IND_Lazy.H.m{2}); first by fun; eqobs_in.
     by call (_: true ==> Lazy.RO.m{1} = IND_Lazy.H.m{2})=> //;
       first by fun; wp.
+    inline IND_Lazy.resample;
     while{2} (true) (card work{2}).
       intros=> &m z; wp; rnd; wp; skip; progress=> //.
         by rewrite card_rm_in ?mem_pick //; smt. (* This should definitely be a lemma in FSet. *)
@@ -246,10 +245,22 @@ theory LazyEager.
       var m:(from,to) map
 
       fun o(x:from): to = {
-        var y : to;
-        y = $dsample;
-        if (!in_dom x m) m.[x] = y;
         return proj (m.[x]);
+      }
+    }
+
+    fun resample(): unit = {
+      var work:from set;
+      var f:from;
+      var y,y0:to;
+
+      work = toFSet univ;
+      while (work <> FSet.empty)
+      {
+        f = pick work;
+        y = $dsample;
+        if (!in_dom f H.m) H.m.[f] = y;
+        work = rm f work;
       }
     }
 
@@ -257,31 +268,97 @@ theory LazyEager.
 
     fun main(): bool = {
       var b:bool;
-      var work:from set;
-      var f:from;
-      var t:to;
 
       H.m = Map.empty;
-      work = toFSet univ;
-      while (work <> FSet.empty)
-      {
-        f = pick work;
-        t = $dsample;
-        H.m.[f] = t;
-        work = rm f work;
-      }
-
+      resample();
       b = D.distinguish();
 
       return b;
     }
   }.
 
+  local lemma eager_query: mu dsample cpTrue = 1%r =>
+    eager [IND_Eager.resample(); ,
+               IND_Eager.H.o ~ IND_Lazy.H.o,
+           IND_Lazy.resample();:
+      ={x} /\ IND_Eager.H.m{1} = IND_Lazy.H.m{2} ==>
+      ={res} /\ IND_Eager.H.m{1} = IND_Lazy.H.m{2}].
+  proof strict.
+  intros=> dsampleL; eager fun.
+  inline IND_Eager.resample IND_Lazy.resample; swap{2} 4 -3.
+  seq 1 1: (={x,work} /\
+            IND_Eager.H.m{1} = IND_Lazy.H.m{2} /\
+            mem x{1} work{1});
+     first by wp; skip; smt.
+  case (!in_dom x IND_Lazy.H.m){2}; [rcondt{2} 2; first by intros=> &m; rnd |
+                                     rcondf{2} 2; first by intros=> &m; rnd].
+    transitivity{1} {y0 = $dsample; 
+                     while (work <> FSet.empty) {
+                       f = pick work;
+                       y = $dsample;
+                       if (!in_dom f IND_Eager.H.m)
+                         IND_Eager.H.m = IND_Eager.H.m.[f <- if f = x then y0 else y];
+                       work = rm f work;
+                     }
+                     result = proj IND_Eager.H.m.[x]; }
+                     (={x,work,IND_Eager.H.m} ==> ={result,IND_Eager.H.m})
+                     ((={x,work} /\
+                      IND_Eager.H.m{1} = IND_Lazy.H.m{2} /\
+                      mem x{1} work{1}) /\
+                      !in_dom x{2} IND_Lazy.H.m{2} ==>
+                      ={result} /\ IND_Eager.H.m{1} = IND_Lazy.H.m{2}) => //.
+      by intros=> &1 &2 H; exists IND_Lazy.H.m{2}, x{2}, work{2}; generalize H.
+    transitivity{1} {while (work <> FSet.empty) {
+                       f = pick work;
+                       y = $dsample;
+                       if (!in_dom f IND_Eager.H.m)
+                         IND_Eager.H.m.[f] = y;
+                       work = rm f work;
+                     }
+                     y0 = $dsample; 
+                     result = proj IND_Eager.H.m.[x]; }
+                     (={x,work,IND_Eager.H.m} ==> ={result,IND_Eager.H.m})
+                     (={x,work,IND_Eager.H.m} ==> ={result,IND_Eager.H.m})=> //.
+      by intros &1 &2 H; exists IND_Eager.H.m{2}, x{2}, work{2}; generalize H.
+    by eqobs_in; rnd{2}; eqobs_in true true: (={x,IND_Eager.H.m}).
+
+    wp; symmetry.
+    eager while (H:y0 = $dsample; ~ y0 = $dsample; : true ==> ={y0})=> //; first by rnd.
+      swap{2} 5 -4; swap 3 -1; case (x = pick work){1}.
+        by wp; rnd{1}; rnd; rnd{2}.
+        by wp; do 2!rnd; skip; smt.
+      by eqobs_in.
+
+    wp; while (={x, work} /\
+               (!mem x work => in_dom x IND_Eager.H.m){1} /\
+               IND_Lazy.H.m.[x]{2} = Some y0{1} /\
+               if (in_dom x IND_Eager.H.m){1}
+                 then IND_Eager.H.m{1} = IND_Lazy.H.m{2}
+                 else eq_except IND_Eager.H.m{1} IND_Lazy.H.m{2} x{1}).
+      by wp; rnd; wp; skip; progress=> //; try case (pick work = x){2}; smt.
+    by wp; rnd; skip; progress=> //; smt.
+
+  wp; while (={x,work} /\
+             IND_Eager.H.m{1} = IND_Lazy.H.m{2} /\
+             in_dom x{2} IND_Lazy.H.m{2} /\ 
+             proj IND_Eager.H.m.[x]{1} = result{2}).
+     by wp; rnd; wp; skip; smt.
+  by wp; rnd{2}.
+  qed.
+
   local lemma eager_aux: mu dsample cpTrue = 1%r =>
     equiv [IND_Lazy.main ~ IND_Eager.main: true ==> ={res}].
   proof strict.
-  (* by eager *)
-  admit.
+  intros=> dsampleL; fun; inline IND_Lazy.H.init.
+  seq 1 1: (IND_Lazy.H.m{1} = IND_Eager.H.m{2}); first by wp.
+  symmetry;
+  eager (H: IND_Eager.resample(); ~ IND_Lazy.resample();:
+              IND_Eager.H.m{1} = IND_Lazy.H.m{2} ==> IND_Eager.H.m{1} = IND_Lazy.H.m{2}): 
+        (IND_Eager.H.m{1} = IND_Lazy.H.m{2})=> //;
+    first by eqobs_in.
+  eager fun H (IND_Eager.H.m{1} = IND_Lazy.H.m{2})=> //;
+    first by apply eager_query=> //.
+  by fun; eqobs_in.
   qed.
 
   local lemma IND_Eager: mu dsample cpTrue = 1%r =>
@@ -289,15 +366,11 @@ theory LazyEager.
   proof strict.
   intros=> dsampleL; fun.
   call (_: (forall x, in_dom x IND_Eager.H.m{1}) /\ IND_Eager.H.m{1} = Eager.RO.m{2}).
-    fun; rcondf{1} 2; first by intros=> _; rnd; skip; smt.
-         by rnd{1}; skip; smt.
-  inline RO.init.
-    while (={work} /\ (forall x, !in_dom x IND_Eager.H.m{1} => mem x work{1}) /\ IND_Eager.H.m{1} = Eager.RO.m{2}).
-      wp; rnd; wp; skip; progress=> //.
-        rewrite mem_rm andC (_: forall a b, a /\ b <=> a && b) //; split.
-          by generalize H5; apply absurd=> //= ->; rewrite in_dom_set; right.
-          by intros=> x_neq_pick; apply H; generalize H5; apply absurd=> //= x_in_m; rewrite in_dom_set; left.
-    wp; skip; smt.
+    by fun; skip; smt.
+  inline RO.init IND_Eager.resample.
+    while (={work} /\ (forall x, !in_dom x IND_Eager.H.m{1} <=> mem x work{1}) /\ IND_Eager.H.m{1} = Eager.RO.m{2}).
+      wp; rnd; wp; skip; progress=> //; smt.
+    by wp; skip; smt.
   qed.
 
   lemma eagerRO: mu dsample cpTrue = 1%r =>
