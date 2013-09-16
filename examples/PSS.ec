@@ -54,7 +54,9 @@ require import ABitstring.
 
 type message = bitstring.
 
-(* Signatures *)
+(* Signatures.
+   We use a non-standard distribution instead
+   of the default Dword. *)
 type signature.
 clone import AWord as Signature with
   type word <- signature,
@@ -90,8 +92,6 @@ clone import AWord as G2Tag with
   type word <- g2tag,
   op length <- kg2.
 
-(* Domain of RSA *)
-
 (** Instantiating *)
 require PKS.
 require OW.
@@ -110,40 +110,27 @@ clone import OW as RSA with
   op keypairs <- keypairs,
   op challenge <- sample_plain.
 
-lemma plainL pk: weight (sample_plain pk) = 1%r.
-proof strict.
-rewrite /weight; apply Antisymm.
-  by cut [_ H]:= mu_bounded (sample_plain pk) cpTrue.
-  apply (Trans _ (mu (sample_plain pk) (f_dom pk))).
-    by rewrite f_dom_challenge.
-    by apply mu_sub=> x; rewrite /cpTrue.
-qed.
-
-axiom f_dom_rng pk: valid_pkey pk => f_dom pk = f_rng pk.
-axiom finv_dom_rng sk: valid_skey sk => finv_dom sk = finv_rng sk.
+(** Things we know on RSA in addition to the one-wayness *)
+axiom f_dom_rng: f_dom = f_rng.
 
 op modulus_p: pkey -> int.
 axiom modulus_size pk sk:
   valid_keys (pk,sk) => 2^(k-1) <= modulus_p pk < 2^k.
 
-op inv: signature -> pkey -> signature.
 op ( * ): signature -> signature -> pkey -> signature.
+
+axiom mulIn (x y:signature) pk:
+  f_dom pk x =>
+  f_dom pk y =>
+  f_dom pk ((x * y) pk).
 
 axiom mulC (x y:signature) pk:
   f_dom pk x =>
   f_dom pk y =>
   (x * y) pk = (y * x) pk.
 
-op one_sig: signature.
-
-axiom mul_one (x:signature) pk:
-  f_dom pk x =>
-  (x * one_sig) pk = x.
-
-axiom mul_inv (x:signature) pk:
-  x <> Signature.zeros =>
-  f_dom pk x =>
-  (x * (inv x pk)) pk = one_sig.
+axiom mulA (x y z:signature) pk:
+  (((x * y) pk) * z) pk = (x * ((y * z) pk)) pk.
 
 axiom homo_f_mul (x y:signature) pk:
   f_dom pk x =>
@@ -152,12 +139,34 @@ axiom homo_f_mul (x y:signature) pk:
 
 axiom homo_finv_mul (x y:signature) pk sk:
   valid_keys (pk,sk) =>
-  finv_dom sk x =>
-  finv_dom sk y =>
+  f_rng pk x =>
+  f_rng pk y =>
   finv sk ((x * y) pk) = (finv sk x * finv sk y) pk.
 
+op one_sig: signature.
+axiom mul_one (x:signature) pk:
+  f_dom pk x =>
+  (x * one_sig) pk = x.
+
+op inv: signature -> pkey -> signature.
+axiom invIn x pk:
+  f_dom pk x =>
+  f_dom pk (inv x pk).
+
+axiom mul_inv (x:signature) pk:
+  x <> Signature.zeros =>
+  f_dom pk x =>
+  (x * (inv x pk)) pk = one_sig.
+
+(* This would be a lemma if only we could prove
+   that there is an element in f_dom that is neither 0 nor 1 *)
+axiom f_dom_one pk: f_dom pk one_sig.
+
 axiom f_zero pk: valid_pkey pk => f pk Signature.zeros = Signature.zeros.
-axiom f_one sk: valid_skey sk => finv sk (one_sig) = one_sig.
+axiom finv_zero sk: valid_skey sk => finv sk Signature.zeros = Signature.zeros.
+
+axiom f_one pk: valid_pkey pk => f pk (one_sig) = one_sig.
+axiom finv_one sk: valid_skey sk => finv sk (one_sig) = one_sig.
 
 clone import RandomOracle.LazyEager as Gt with
   type from <- htag,
@@ -427,12 +436,16 @@ section.
 
   local equiv Hmem_init:
     Hmem.init ~ Hmem.init: ={ks} /\ valid_keys ks{2} ==>
-                           ={glob Hmem} /\ valid_keys (Hmem.pk,Hmem.sk){2}
-  by (fun; rnd; wp; skip; smt).
+                           ={glob Hmem} /\
+                           valid_keys (Hmem.pk,Hmem.sk){2} /\
+                           f_dom Hmem.pk{2} Hmem.xstar{2}
+  by (fun; rnd; wp).
 
   local equiv Hmap_init:
     Hmap.init ~ Hmap.init: ={ks} /\ valid_keys ks{2} ==>
-                           ={glob Hmap} /\ valid_keys (Hmem.pk,Hmem.sk){2}
+                           ={glob Hmap} /\
+                           valid_keys (Hmem.pk,Hmem.sk){2} /\
+                           f_dom Hmem.pk{2} Hmem.xstar{2}
   by (by fun; wp; call Hmem_init).
 
   pred (=<=) (m0:(message * salt,htag) map) (m1:(message * salt,htag * bool * signature) map) =
@@ -484,24 +497,30 @@ section.
                RO.init Gt.Lazy.RO.init PSS(Gt.Lazy.RO,RO).keygen
                H0.init H.init Mem.init.
     call (_: ={glob G} /\ H.m{1} =<= Hmap.m{2} /\ Wrap.qs{1} = Mem.qs{2} /\ Wrap.sk{1} = Mem.sk{2}).
-     by conseq* (_: ={glob G, x} ==> ={glob G, res})=> //; fun; eqobs_in.
-     fun*; inline GAdv(H0,Gt.Lazy.RO).Ha.o; sp; wp; call PSS_G0_H=> //.
+     (* G *)
+     by conseq* Gt.Lazy.abstract_o.
+     (* H *)
+     by fun*; inline GAdv(H0,Gt.Lazy.RO).Ha.o; sp; wp; call PSS_G0_H=> //.
+     (* sign *)
      fun; inline PSS(Gt.Lazy.RO, RO).sign.
        wp; inline PSS(Gt.Lazy.RO, RO).g1 PSS(Gt.Lazy.RO, RO).g2 Gt.Lazy.RO.o
                   GAdv(H0, Gt.Lazy.RO).Hs.o.
        rcondf{1} 16;
-         first intros=> &m; inline RO.o; do !(rnd; wp); skip; progress=> //; smt.
-       wp; rnd{1} (cpTrue).
+         first intros=> &m; inline RO.o; do !(rnd; wp); skip; smt.
+       wp; rnd{1} cpTrue.
        wp; rnd.
        wp; call PSS_G0_H.
        wp; rnd.
-       wp; skip; smt.
-    inline Hmap.init Hmem.init; wp; rnd{2} (cpTrue).
+       by wp; skip; smt.
+    (* Initialization code *)
+    inline Hmap.init Hmem.init; wp; rnd{2} cpTrue.
     by wp; rnd; wp; skip; progress=> //; smt.
 
+  (* Leftover from the main: two successive calls to G.o with
+     the same argument yield the same result. *)
   inline Gt.Lazy.RO.o; rcondf{1} 9.
-    by intros=> &m //=; do !(rnd; wp); skip; progress=> //; smt.
-    by wp; rnd{1} (cpTrue); wp; rnd; wp; skip; progress=> //; smt.
+    by intros=> &m //=; do !(rnd; wp); skip; smt.
+    by wp; rnd{1} cpTrue; wp; rnd; wp; skip; progress=> //; smt.
   qed.
 
   (** First Transition: Calling G inside H *)
@@ -606,14 +625,11 @@ section.
         rcondt{1} 2; first by intros=> &m; rnd.
         by rcondt{2} 1; last inline Eager.RO.o; wp; rnd; skip; smt.
       (* G *)
-      conseq* (_: ={glob G', x} ==> ={glob G', res}); first 2 smt.
-        fun; eqobs_in.
-    call (_: ={ks} ==> ={glob Hmap}); first by fun; inline H0.init; eqobs_in.
-    rnd; skip; smt.
-  inline Eager.RO.init;
-  while (={work, Eager.RO.m} /\ forall x, !mem x work{1} => in_dom x Eager.RO.m{1}).
-    by wp; rnd; wp; skip; progress=> //; smt.
-  by wp; skip; smt.
+      by conseq* Gt.Eager.abstract_o; first 2 smt.
+    call (_: ={ks} ==> ={glob Hmap}); first by fun; eqobs_in.
+    by rnd; skip; smt.
+  call (Gt.Eager.abstract_init _); first smt. (* Note: We are using the fact that AWord is a finite type without ever explicitly assuming/proving it. There is some dangerous thing going on with cloning. *)
+  by skip; smt.
   qed.
 
   local equiv D1e_D1 (Ga <: Gadv {G,G'}):
@@ -710,8 +726,7 @@ section.
       by if => //; wp; do !rnd cpTrue;
          skip; smt.
     (* G *)
-    by conseq* (_: ={glob G, x} ==> ={glob G, res})=> //;
-       fun; eqobs_in.
+    by conseq* Gt.Lazy.abstract_o.
     by intros=> _ _;
        conseq* (Gt.Lazy.lossless_o _);
        apply gtagL.
@@ -720,8 +735,7 @@ section.
        apply gtagL.
   call (_: ={ks} /\ valid_keys ks{1} ==> ={glob Hmap} /\ !H2.bad{2});
     first by fun; wp; call Hmap_init.
-  call (_: true ==> ={glob G});
-    first by fun; eqobs_in.
+  call Gt.Lazy.abstract_init.
   by rnd; skip; smt.
   qed.
 
@@ -785,7 +799,7 @@ section.
        fun; if=> //; wp; do !rnd cpTrue; skip; smt.
     by intros=> _; fun; if=> //; wp; try (do !rnd cpTrue); skip; smt.
     (* G *)
-    by conseq* (_: _ ==> ={glob G, res})=> //; fun; eqobs_in.
+    by conseq* Gt.Lazy.abstract_o.
     by intros _ _; conseq* (Gt.Lazy.lossless_o _); apply gtagL.
     by intros _; conseq* (Gt.Lazy.lossless_o _); apply  gtagL.
   call (_: ={ks} /\ valid_keys ks{2} ==> ={glob Hmap} /\ !H3.bad{2});
@@ -882,12 +896,10 @@ section.
     (* H *)
     by conseq* G3_G4_H; smt.
     (* G *)
-    conseq* (_: ={glob G, x} ==> ={glob G, res}); first 2 smt.
-      by fun; eqobs_in.
+    conseq* Gt.Lazy.abstract_o; first 2 smt.
   call (_: ={ks} /\ valid_keys ks{1} ==> ={glob Hmap});
     first by fun; wp; call Hmap_init.
-  call (_: true ==> ={glob G});
-    first by fun; eqobs_in.
+  call Gt.Lazy.abstract_init.
   by rnd.
   qed.
 
@@ -935,6 +947,17 @@ section.
   }.
 
   local module G5 = Gen(GAdv,H5,G).
+
+  local equiv G4_G5_H: H4.o ~ H5.o: ={glob Hmap, c, x} ==> ={glob Hmap, res}.
+  proof strict.
+  fun; sp; if=> //; last by wp.
+  (* Here, if we can prove that
+       1) the loop terminates (the probability that the condition is false is constant and non-zero); and
+       2) the only side-effects that are visible on loop exit are those produced during the last iteration,
+     then we can remove the while and focus on showing the equivalence of its last iteration and the other
+     game. *)
+  admit.
+  qed.
 
   (** G6: upto "k2 executions of the loop didn't sample a bitstring starting with 0" *)
   local module H6: SplitOracle = {
@@ -1010,15 +1033,13 @@ section.
             skip; smt.
       by wp.
     (* G *)
-    by conseq* (_: ={glob G, x} ==> ={glob G, res})=> //;
-      first by fun; eqobs_in.
+    by conseq* Gt.Lazy.abstract_o.
     by intros=> _ _; apply (Gt.Lazy.lossless_o _); apply gtagL.
     by intros=> _; conseq* (Gt.Lazy.lossless_o _); apply gtagL.
   call (_: ={ks} /\ valid_keys ks{1} ==> ={glob Hmap});
     first by fun; eqobs_in.
-  call (_: true ==> ={glob G});
-    first by fun; eqobs_in.
-  by rnd; skip; progress=> //; smt.
+  call Gt.Lazy.abstract_init.
+  by rnd; skip; smt.
   qed.
 
   local equiv G5_G6_equiv: G5.main ~ G6.main: true ==> !H6.bad{2} => ={res}
@@ -1065,6 +1086,50 @@ section.
   }.
 
   local module G7 = Gen(GAdv,H7,G).
+
+  local lemma G6_G7_abstract (Ga <: Gadv {H5,H6,G,Hmem}):
+    (forall (H <: SplitOracle{Ga}) (G <: Gt.Types.ARO{Ga}),
+       islossless H.o => islossless G.o => islossless Ga(H,G).main) => 
+    equiv [Gen(Ga,H6,G).main ~ Gen(Ga,H7,G).main: true ==> ={res}].
+  proof strict.
+  intros=> GaL; fun.
+  call (_: ={glob Hmap, glob G} /\ valid_keys (Hmem.pk,Hmem.sk){2} /\ f_dom Hmem.pk{2} Hmem.xstar{2}).
+    (* H *)
+    fun; sp; if=> //.
+      wp; while (={x, c, b, i, glob Hmap, glob G} /\
+                 valid_keys (Hmem.pk,Hmem.sk){2} /\ 
+                 f_dom Hmem.pk{2} Hmem.xstar{2}).
+        case c{2}.
+          wp; rnd (lambda z, ((inv Hmem.xstar Hmem.pk) * finv Hmem.sk z) Hmem.pk){2}
+                  (lambda u, ((f Hmem.pk Hmem.xstar) * f Hmem.pk u) Hmem.pk){2};
+          skip; progress => //; last 14 smt.
+            by apply (challengeU Hmem.pk{2} _ _ _ _)=> //; smt.
+            smt.
+            rewrite homo_f_mul; first 2 smt.
+            rewrite -mulA -homo_f_mul; first 2 smt.
+            rewrite mul_inv=> //. admit. (* TODO: xstar is non-zero! *)
+            smt.
+            rewrite homo_finv_mul; first 3 smt.
+            rewrite -mulA finvof // (mulC _ Hmem.xstar{2}); first 2 smt.
+            rewrite mul_inv=> //. admit. (* TODO: xstar is non-zero! *)
+            smt.
+
+          wp; rnd (lambda z, finv Hmem.sk z){2} (lambda u, f Hmem.pk u){2};
+          skip; progress=> //; last 17 smt.
+            by apply (challengeU Hmem.pk{2} _ _ _ _)=> //; smt.
+        by skip.
+      if=> //; by wp.
+    (* G *)
+    by conseq* (_: ={glob G, x} ==> ={glob G, res})=> //; first fun; eqobs_in.
+  call (_: ={ks} /\
+           valid_keys ks{1} ==>
+           ={glob Hmap} /\
+           valid_keys (Hmem.pk,Hmem.sk){2} /\
+           f_dom Hmem.pk{2} Hmem.xstar{2});
+    first by fun; wp; call Hmap_init.
+  call Gt.Lazy.abstract_init.
+  by rnd.
+  qed.
 
   (** Reduction to OW: no longer using xstar to simulate the oracles *)
   local module I: Inverter = {

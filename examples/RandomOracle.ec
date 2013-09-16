@@ -50,9 +50,9 @@ theory Lazy.
   qed.
 
   lemma termination_o r:
-  mu dsample cpTrue = r =>
-  bd_hoare [RO.o: true ==> true] = r.
-  proof.
+    mu dsample cpTrue = r =>
+    bd_hoare [RO.o: true ==> true] = r.
+  proof strict.
   by intros=> r_def; fun; wp; rnd (cpTrue); wp.
   qed.
 
@@ -61,6 +61,14 @@ theory Lazy.
   proof strict.
   by intros=> Hd; apply (termination_o 1%r).
   qed.
+
+  equiv abstract_init:
+    RO.init ~ RO.init: true ==> ={glob RO}
+  by (fun; wp).
+
+  equiv abstract_o:
+    RO.o ~ RO.o: ={glob RO, x} ==> ={glob RO, res}
+  by (fun; eqobs_in).
 end Lazy.
 
 theory Eager.
@@ -102,9 +110,35 @@ theory Eager.
     }
   }.
 
-(* We may want to restrict even this to finite types so we can prove losslessness.
-   Alternatively, we could condition losslessness by type finiteness,
-   since we can express it as a term (which is a bit scary in itself...). *)
+  lemma lossless_init:
+    finite univ<:from> =>
+    mu dsample cpTrue = 1%r =>
+    islossless RO.init.
+  proof strict.
+  intros=> fType dsampleL; fun.
+  while (true) (card work).
+    by intros=> z; wp; rnd cpTrue; wp;
+       skip; smt.
+  by wp; skip; smt.
+  qed.
+
+  lemma lossless_o: islossless RO.o.
+  proof strict.
+  by fun; wp.
+  qed.
+
+  lemma abstract_init:
+    finite univ<:from> =>
+    equiv [RO.init ~ RO.init: true ==> ={glob RO} /\ forall x, in_dom x RO.m{1}].
+  proof strict.
+  intros=> fType; fun;
+  while (={glob RO, work} /\ forall x, !mem x work{1} => in_dom x RO.m{1}).
+    by wp; rnd; wp; skip; progress=> //; smt.
+  by wp; skip; smt.
+  qed.
+
+  equiv abstract_o: RO.o ~ RO.o: ={glob RO, x} ==> ={glob RO, res}
+  by (fun; wp).
 end Eager.
 
 theory LazyEager.
@@ -204,7 +238,7 @@ theory LazyEager.
     while{2} (true) (card work{2}).
       intros=> &m z; wp; rnd; wp; skip; progress=> //.
         by rewrite card_rm_in ?mem_pick //; smt. (* This should definitely be a lemma in FSet. *)
-    wp; skip; progress=> //; smt. (* Weird obligation "card work <= 0 => work = empty" *)
+    by wp; skip; progress=> //; smt.
   qed.
 
   local module IND_Eager = {
