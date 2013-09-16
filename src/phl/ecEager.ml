@@ -229,7 +229,7 @@ let process_if = t_eager_if
    (f) compat S S' I Xs 
    (h) S ~ S' : ={Is} ==> ={Xs}
    --------------------------------------------------
-   S;while e do c ~ while e' do c';S' : ={I} ==> ={I} /\ !e{1}
+   S;while e do c ~ while e' do c';S' : ={I} ==> ={I,Xs} /\ !e{1}
 *)
 
 class rn_eager_while =
@@ -250,8 +250,8 @@ let t_eager_while h g =
   let seqI = Mpv2.of_form env (fst eC.es_ml) (fst eC.es_mr) eqI in
   let e1 = form_of_expr (fst eC.es_ml) e in
   let e2 = form_of_expr (fst eC.es_mr) e' in
-  if not (f_equal eC.es_po (f_and eqI (f_not e1))) then
-    tacuerror "can not apply eager while, unexpected post-condition";
+  let post = Mpv2.to_form (fst eC.es_ml) (fst eC.es_mr) 
+               (Mpv2.union seqI eqXs) (f_not e1) in
   (* check (e) and (f) *)
   compat env (s_write env s) (s_write env s') seqI eqIs eqXs;
   let to_form eq =  Mpv2.to_form (fst eC.es_ml) (fst eC.es_mr) eq f_true in
@@ -270,7 +270,11 @@ let t_eager_while h g =
     es_sl = c';
     es_sr = c';
     es_po = eqI2 } in
-  t_on_first (t_hyp h) (prove_goal_by [tH;a;b;c] rn_eager_while g)
+  t_seq_subgoal (EcPhlConseq.t_equivS_conseq eqI post)
+   [ t_logic_trivial;
+     t_logic_trivial;
+     fun g -> 
+      t_on_first (t_hyp h) (prove_goal_by [tH;a;b;c] rn_eager_while g) ] g
   
 let process_while info  g = 
   let gs, h = process_info info g in
@@ -421,7 +425,10 @@ let check_only_global env s =
   let sr = s_read env s in
   let check_glob v _ =
     if is_loc v then
-      tacuerror "Swapping statement should use only global variables" in
+      let ppe = EcPrinting.PPEnv.ofenv env in
+      tacuerror "Swapping statement should use only global variables : %a" 
+        (EcPrinting.pp_pv ppe) v
+  in
   let check_mp _ = () in
   PV.iter check_glob check_mp sw;
   PV.iter check_glob check_mp sr
