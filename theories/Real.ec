@@ -35,7 +35,7 @@ theory PowerInt.
      
 end PowerInt.
 export PowerInt.
-print theory Int.
+
 theory Square.
   import why3 "real" "Square"
     op "sqrt" as "sqrt".
