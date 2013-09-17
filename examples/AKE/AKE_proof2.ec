@@ -191,6 +191,7 @@ module AKE_EexpRev(FA : Adv2) = {
       pka = gen_pk(ska);
       pks = pka :: pks;
       mSk.[pka] = ska;
+      i = i + 1;
     }
     while (sidxs <> FSet.empty) {
       sidx = pick sidxs;
@@ -619,6 +620,7 @@ local module AKE_Fresh(FA : Adv2) = {
       pka = gen_pk(ska);
       pks = pka :: pks;
       mSk.[pka] = ska;
+      i = i + 1;
     }
     while (sidxs <> FSet.empty) {
       sidx = pick sidxs;
@@ -4898,3 +4900,985 @@ proof.
  intros => &m.
  by equiv_deno Eq_AKE_EexpRev_AKE_no_collision'.
 save.
+
+
+
+local module AKE_NoHashOnCompute(FA : Adv2) = {
+  var evs  : Event list               (* events for queries performed by adversary *)
+  var test : Sid option               (* session id of test session *)
+
+  var cSession, cH1, cH2 : int        (* counters for queries *)
+
+  var mH2 : (Sstring, Key) map        (* map for h2 *)
+  var sH2 : Sstring set               (* adversary queries for h2 *)
+
+  var mSk        : (Agent, Sk) map    (* map for static secret keys *)
+  var mEexp      : (Sidx, Eexp) map   (* map for ephemeral exponents of sessions *)
+  var mStarted   : (Sidx, Sdata2) map (* map of started sessions *)
+  var mCompleted : (Sidx, Epk)   map  (* additional data for completed sessions *)
+  var t_idx : Sidx    
+  fun init() : unit = {
+    evs = [];
+    test = None;
+    cSession = 0;
+    cH1 = 0;
+    cH2 = 0;
+    mH2 = Map.empty;
+    sH2 = FSet.empty;
+    mSk = Map.empty;    
+    mEexp = Map.empty;
+    mStarted = Map.empty;
+    mCompleted = Map.empty;
+  }
+
+  module O : AKE_Oracles2 = {
+    
+    fun eexpRev(i : Sidx, a : Sk) : Eexp option = {
+      var r : Eexp option = None;
+      if (in_dom i mStarted && 
+      ((test <> None) => 
+      fresh_op (proj test) (EphemeralRev(compute_psid mStarted mEexp i)::evs ))) {
+        evs = EphemeralRev(compute_psid mStarted mEexp i)::evs;
+        if (sd2_actor(proj mStarted.[i]) = gen_pk(a)) {
+          r = mEexp.[i];
+        }
+      }
+      return r;
+    }
+    
+    fun h2(sstring : Sstring) : Key = {
+      var ke : Key;
+      ke = $sample_Key;
+      if (!in_dom sstring mH2) {
+        mH2.[sstring] = ke;
+      }
+      return proj mH2.[sstring];
+    }
+ 
+    fun h2_a(sstring : Sstring) : Key option = {
+      var r : Key option = None;
+      var ks : Key;
+      if (cH2 < qH2) {
+        cH2 = cH2 + 1;
+        sH2 = add sstring sH2;
+        ks = h2(sstring);
+        r = Some(ks);
+      }
+      return r;
+    }
+
+    fun init1(i : Sidx, A : Agent, B : Agent) : Epk option = {
+      var pX : Epk;
+      var r : Epk option = None; 
+      if ( in_dom A mSk && in_dom B mSk && !in_dom i mStarted ) {
+        cSession = cSession + 1;
+        pX = gen_epk(proj mEexp.[i]);
+        mStarted.[i] = (A,B,init);
+        evs = Start((A,B,pX,init))::evs;
+        r = Some(pX);
+      }
+      return r;
+    }
+
+    fun resp(i : Sidx, B : Agent, A : Agent, X : Epk) : Epk option = {
+      var pY : Epk;
+      var r : Epk option = None;
+      if (in_dom A mSk && in_dom B mSk
+          && !in_dom i mStarted && !in_dom i mCompleted) {
+        cSession = cSession + 1;
+        pY = gen_epk(proj mEexp.[i]);
+        mStarted.[i] = (B,A,resp);
+        mCompleted.[i] = X;
+        evs = Accept((B,A,pY,X,resp))::evs;
+        r = Some(pY);
+      }
+      return r;
+    }
+
+    fun init2(i : Sidx, Y : Epk) : unit = {
+      if (!in_dom i mCompleted && in_dom i mStarted) {
+        mCompleted.[i] = Y;
+        evs = Accept(compute_sid mStarted mEexp mCompleted i)::evs;
+      }
+    }
+
+    fun staticRev(A : Agent) : Sk option = {
+      var r : Sk option = None;
+      if (in_dom A mSk &&
+      ((test <> None => 
+       fresh_op (proj test) (StaticRev A::evs )))) {
+        r = mSk.[A];
+        evs = StaticRev(A)::evs;
+      }
+      return r;
+    }
+
+    fun computeKey(i : Sidx) : Key option = {
+      var r : Key option = None;
+      var a : Agent;
+      var b : Agent;
+      var ro : Role;
+      var k : Key;
+      if (in_dom i mCompleted) {
+        (a,b,ro) = proj mStarted.[i];
+        k = h2(gen_sstring (proj mEexp.[i]) (proj mSk.[a]) b (proj mCompleted.[i]) ro);
+        r = Some k;
+      }
+      return r;
+    }
+    fun computeKey'(i : Sidx) : Key option = {
+      var r : Key option = None;
+      var a : Agent;
+      var b : Agent;
+      var ro : Role;
+      var k : Key;
+      if (in_dom i mCompleted) {
+        (a,b,ro) = proj mStarted.[i];
+        k = $sample_Key; 
+        r = Some k;
+      }
+      return r;
+    }
+
+    fun sessionRev(i : Sidx) : Key option = {
+      var r : Key option = None;
+      if (in_dom i mCompleted &&
+     ((test <> None) =>
+      fresh_op (proj test) (SessionRev
+          (compute_sid mStarted mEexp mCompleted i)::evs) )) {
+        evs = SessionRev(compute_sid mStarted mEexp mCompleted i)::evs;
+        r = computeKey(i);
+      }
+      return r;
+    }
+  }
+  
+  module A = FA(O)
+
+  fun main() : bool = {
+    var b : bool = def;
+    var pks : Pk list = [];
+    var key : Key = def;
+    var keyo : Key option = def;
+    var b' : bool = def;
+    var i : int = 0;
+    var ska : Sk = def;
+    var pka : Pk = def;
+    var xa' : Eexp = def;
+    var sidxs : Sidx set = univ_Sidx;
+    var sidx : Sidx;
+    t_idx = def;
+    init();
+    while (i < qAgent) {
+      ska = $sample_Sk;
+      pka = gen_pk(ska);
+      pks = pka :: pks;
+      mSk.[pka] = ska;
+      i = i + 1;
+    }
+    while (sidxs <> FSet.empty) {
+      sidx = pick sidxs;
+      sidxs = rm sidx sidxs;
+      xa' = $sample_Eexp;
+      mEexp.[sidx] = xa';
+    } 
+    if (!collision_eexp_eexp_op mEexp) {
+     t_idx = A.choose(pks);
+     b = ${0,1};
+      if (mStarted.[t_idx] <> None && mCompleted.[t_idx] <> None) {
+      test = Some (compute_sid mStarted mEexp mCompleted t_idx);
+      (* the if-condition implies "mem (Accept (proj O.test)) O.evs" *)
+      if (b) {
+       keyo = O.computeKey'(t_idx);
+      } else {
+       key  = $sample_Key;
+       keyo = Some key;
+      }
+      b' = A.guess(keyo);
+     }
+    }
+    return (b = b');
+  }
+}.
+
+op get_string_from_id (i : Sidx)(mStarted : (Sidx, Sdata2) map)(mCompleted : (Sidx, Epk)   map) mEexp mSk : Sstring =
+let (a,b,ro) = proj mStarted.[i] in
+gen_sstring (proj mEexp.[i]) (proj mSk.[a]) b (proj mCompleted.[i]) ro.
+
+lemma get_string_pres : 
+forall (i : Sidx)(mStarted : (Sidx, Sdata2) map)
+(mCompleted : (Sidx, Epk)   map) mEexp mSk j v,
+j <> i =>
+get_string_from_id i mStarted mCompleted mEexp mSk = 
+get_string_from_id i mStarted.[j <- v] mCompleted mEexp mSk.
+proof.
+ by progress; rewrite /get_string_from_id get_setNE.
+save.
+
+lemma get_string_pres2 : 
+forall (i : Sidx)(mStarted : (Sidx, Sdata2) map)
+(mCompleted : (Sidx, Epk)   map) mEexp mSk j v,
+j <> i =>
+get_string_from_id i mStarted mCompleted mEexp mSk = 
+get_string_from_id i mStarted mCompleted.[j <- v] mEexp mSk.
+proof.
+ by progress; rewrite /get_string_from_id get_setNE.
+save.
+
+local equiv Eq_AKE_Fresh_AKE_NoHashOnCompute :
+ AKE_Fresh(A).main ~ AKE_NoHashOnCompute(A).main  :
+={glob A} ==> 
+(res /\ test_fresh AKE_Fresh.test AKE_Fresh.evs
+                    /\ ! collision_eexp_eexp(AKE_Fresh.mEexp) 
+                    /\ ! collision_eexp_rcvd(AKE_Fresh.evs) ){1} =>
+((res /\ test_fresh AKE_NoHashOnCompute.test AKE_NoHashOnCompute.evs
+                    /\ ! collision_eexp_eexp(AKE_NoHashOnCompute.mEexp) 
+                    /\ ! collision_eexp_rcvd(AKE_NoHashOnCompute.evs)){2} \/
+(AKE_NoHashOnCompute.test <> None /\ 
+in_dom AKE_NoHashOnCompute.t_idx AKE_NoHashOnCompute.mCompleted /\ 
+in_dom AKE_NoHashOnCompute.t_idx AKE_NoHashOnCompute.mStarted /\ 
+in_dom AKE_NoHashOnCompute.t_idx AKE_NoHashOnCompute.mEexp /\
+in_dom 
+(get_string_from_id AKE_NoHashOnCompute.t_idx AKE_NoHashOnCompute.mStarted 
+  AKE_NoHashOnCompute.mCompleted AKE_NoHashOnCompute.mEexp AKE_NoHashOnCompute.mSk) 
+AKE_NoHashOnCompute.mH2)){2}.
+fun.
+ seq 14 14:(={b,pks,key,keyo,b',i,pks, glob A} /\
+  t_idx{1} = AKE_NoHashOnCompute.t_idx{2} /\
+  AKE_NoHashOnCompute.evs{2} = AKE_Fresh.evs{1} /\
+  AKE_NoHashOnCompute.test{2} = AKE_Fresh.test{1} /\
+  AKE_NoHashOnCompute.cSession{2} = AKE_Fresh.cSession{1} /\
+  AKE_NoHashOnCompute.cH2{2} = AKE_Fresh.cH2{1} /\
+  AKE_NoHashOnCompute.mH2{2} = AKE_Fresh.mH2{1} /\
+  AKE_NoHashOnCompute.sH2{2} = AKE_Fresh.sH2{1} /\
+  AKE_NoHashOnCompute.mSk{2} = AKE_Fresh.mSk{1} /\
+  AKE_NoHashOnCompute.mEexp{2} = AKE_Fresh.mEexp{1} /\
+  AKE_NoHashOnCompute.mStarted{2} = AKE_Fresh.mStarted{1} /\
+  AKE_NoHashOnCompute.mCompleted{2} = AKE_Fresh.mCompleted{1} /\ 
+  (forall x, in_dom x AKE_NoHashOnCompute.mEexp{2})).
+ while
+(  ={sidxs} /\
+AKE_NoHashOnCompute.mEexp{2} = AKE_Fresh.mEexp{1}  /\
+  (forall (s : Sidx), !mem s sidxs{2} => in_dom s AKE_NoHashOnCompute.mEexp{2})). 
+wp; rnd; wp; skip; progress => //.
+case  (s = (pick sidxs{2})) => h.
+ by rewrite h;apply in_dom_setE.
+generalize H5; rewrite mem_rm !not_and => [hl|]; last by smt.
+ by cut:= H s _ => //;rewrite in_dom_setNE //.
+while (={pks} /\ AKE_Fresh.mSk{1} = AKE_NoHashOnCompute.mSk{2}).
+by wp; rnd.
+by inline AKE_Fresh(A).init AKE_NoHashOnCompute(A).init;
+    wp; skip; progress => //; smt.
+  if => //; last first.
+ skip; progress; smt.
+ seq 2 2:(={b,pks,key,keyo,b',i,pks, glob A} /\
+  t_idx{1} = AKE_NoHashOnCompute.t_idx{2} /\
+  AKE_NoHashOnCompute.evs{2} = AKE_Fresh.evs{1} /\
+  AKE_NoHashOnCompute.test{2} = AKE_Fresh.test{1} /\
+  AKE_NoHashOnCompute.cSession{2} = AKE_Fresh.cSession{1} /\
+  AKE_NoHashOnCompute.cH2{2} = AKE_Fresh.cH2{1} /\
+  AKE_NoHashOnCompute.mH2{2} = AKE_Fresh.mH2{1} /\
+  AKE_NoHashOnCompute.sH2{2} = AKE_Fresh.sH2{1} /\
+  AKE_NoHashOnCompute.mSk{2} = AKE_Fresh.mSk{1} /\
+  AKE_NoHashOnCompute.mEexp{2} = AKE_Fresh.mEexp{1} /\
+  AKE_NoHashOnCompute.mStarted{2} = AKE_Fresh.mStarted{1} /\
+  AKE_NoHashOnCompute.mCompleted{2} = AKE_Fresh.mCompleted{1} /\ 
+  (forall x, in_dom x AKE_NoHashOnCompute.mEexp{2})).
+ rnd.
+ call (_ : 
+  AKE_NoHashOnCompute.evs{2} = AKE_Fresh.evs{1} /\
+  AKE_NoHashOnCompute.test{2} = AKE_Fresh.test{1} /\
+  AKE_NoHashOnCompute.cSession{2} = AKE_Fresh.cSession{1} /\
+  AKE_NoHashOnCompute.cH2{2} = AKE_Fresh.cH2{1} /\
+  AKE_NoHashOnCompute.mH2{2} = AKE_Fresh.mH2{1} /\
+  AKE_NoHashOnCompute.sH2{2} = AKE_Fresh.sH2{1} /\
+  AKE_NoHashOnCompute.mSk{2} = AKE_Fresh.mSk{1} /\
+  AKE_NoHashOnCompute.mEexp{2} = AKE_Fresh.mEexp{1} /\
+  AKE_NoHashOnCompute.mStarted{2} = AKE_Fresh.mStarted{1} /\
+  AKE_NoHashOnCompute.mCompleted{2} = AKE_Fresh.mCompleted{1}).
+ by fun; wp; skip; progress.
+ by fun; sp; if => //; wp; 
+ inline AKE_Fresh(A).O.h2 AKE_NoHashOnCompute(A).O.h2; wp; rnd;
+ wp; skip; progress; smt.
+ by fun; wp; skip; progress.
+ by fun; wp; skip; progress.
+ by fun; wp; skip; progress.
+ by fun; wp; skip; progress.
+ by fun;
+ inline AKE_Fresh(A).O.computeKey AKE_Fresh(A).O.h2 
+        AKE_NoHashOnCompute(A).O.computeKey  AKE_NoHashOnCompute(A).O.h2;
+ sp; if => //; sp; if => //; wp; try rnd; wp; skip; progress; smt.
+ by skip; progress; smt.
+ if => //; last first.
+ by skip; progress => //; left; smt.
+cut h: equiv [  AKE_Fresh(A).O.h2 ~ AKE_NoHashOnCompute(A).O.h2 :
+ ! in_dom
+      (get_string_from_id AKE_NoHashOnCompute.t_idx{2}
+         AKE_NoHashOnCompute.mStarted{2} AKE_NoHashOnCompute.mCompleted{2}
+         AKE_NoHashOnCompute.mEexp{2} AKE_NoHashOnCompute.mSk{2})
+      AKE_NoHashOnCompute.mH2{2} /\
+  ={sstring} /\
+  AKE_NoHashOnCompute.evs{2} = AKE_Fresh.evs{1} /\
+  AKE_NoHashOnCompute.test{2} = AKE_Fresh.test{1} /\
+  AKE_NoHashOnCompute.cSession{2} = AKE_Fresh.cSession{1} /\
+  AKE_NoHashOnCompute.cH2{2} = AKE_Fresh.cH2{1} /\
+  AKE_NoHashOnCompute.sH2{2} = AKE_Fresh.sH2{1} /\
+  AKE_NoHashOnCompute.mSk{2} = AKE_Fresh.mSk{1} /\
+  AKE_NoHashOnCompute.mEexp{2} = AKE_Fresh.mEexp{1} /\
+  AKE_NoHashOnCompute.mStarted{2} = AKE_Fresh.mStarted{1} /\
+  AKE_NoHashOnCompute.mCompleted{2} = AKE_Fresh.mCompleted{1} /\
+  eq_except AKE_NoHashOnCompute.mH2{2} AKE_Fresh.mH2{1}
+    (get_string_from_id AKE_NoHashOnCompute.t_idx{2}
+       AKE_NoHashOnCompute.mStarted{2} AKE_NoHashOnCompute.mCompleted{2}
+       AKE_NoHashOnCompute.mEexp{2} AKE_NoHashOnCompute.mSk{2}) ==>
+ ! in_dom
+      (get_string_from_id AKE_NoHashOnCompute.t_idx{2}
+         AKE_NoHashOnCompute.mStarted{2} AKE_NoHashOnCompute.mCompleted{2}
+         AKE_NoHashOnCompute.mEexp{2} AKE_NoHashOnCompute.mSk{2})
+      AKE_NoHashOnCompute.mH2{2} =>
+  ={res} /\
+  AKE_NoHashOnCompute.evs{2} = AKE_Fresh.evs{1} /\
+  AKE_NoHashOnCompute.test{2} = AKE_Fresh.test{1} /\
+  AKE_NoHashOnCompute.cSession{2} = AKE_Fresh.cSession{1} /\
+  AKE_NoHashOnCompute.cH2{2} = AKE_Fresh.cH2{1} /\
+  AKE_NoHashOnCompute.sH2{2} = AKE_Fresh.sH2{1} /\
+  AKE_NoHashOnCompute.mSk{2} = AKE_Fresh.mSk{1} /\
+  AKE_NoHashOnCompute.mEexp{2} = AKE_Fresh.mEexp{1} /\
+  AKE_NoHashOnCompute.mStarted{2} = AKE_Fresh.mStarted{1} /\
+  AKE_NoHashOnCompute.mCompleted{2} = AKE_Fresh.mCompleted{1} /\
+  eq_except AKE_NoHashOnCompute.mH2{2} AKE_Fresh.mH2{1}
+    (get_string_from_id AKE_NoHashOnCompute.t_idx{2}
+       AKE_NoHashOnCompute.mStarted{2} AKE_NoHashOnCompute.mCompleted{2}
+       AKE_NoHashOnCompute.mEexp{2} AKE_NoHashOnCompute.mSk{2}) ].
+ fun; wp; rnd; wp; skip; progress => //.
+  smt.
+  by apply eqe_set.
+  generalize H6; rewrite in_dom_set not_or => [h1] h2.
+  generalize H4 H5; rewrite /in_dom H0 => //; smt.
+  generalize H6; rewrite in_dom_set not_or => [h1] h2.
+  generalize H4 H5; rewrite /in_dom H0 => //; smt.
+  case (get_string_from_id AKE_NoHashOnCompute.t_idx{2}
+           AKE_Fresh.mStarted{1} AKE_Fresh.mCompleted{1} AKE_Fresh.mEexp{1}
+           AKE_Fresh.mSk{1} = sstring{2}) => h; first by smt.
+  generalize H4 H5; rewrite /in_dom H0 => //; smt.
+  case (get_string_from_id AKE_NoHashOnCompute.t_idx{2}
+           AKE_Fresh.mStarted{1} AKE_Fresh.mCompleted{1} AKE_Fresh.mEexp{1}
+           AKE_Fresh.mSk{1} = sstring{2}) => h; first by smt.
+  generalize H4 H5; rewrite /in_dom H0 => //; smt.
+  case (get_string_from_id AKE_NoHashOnCompute.t_idx{2}
+           AKE_Fresh.mStarted{1} AKE_Fresh.mCompleted{1} AKE_Fresh.mEexp{1}
+           AKE_Fresh.mSk{1} = sstring{2}) => h; first by smt.
+  by rewrite H0 => //. 
+cut h': equiv [  AKE_Fresh(A).O.computeKey ~ AKE_NoHashOnCompute(A).O.computeKey :
+ ! in_dom
+      (get_string_from_id AKE_NoHashOnCompute.t_idx{2}
+         AKE_NoHashOnCompute.mStarted{2} AKE_NoHashOnCompute.mCompleted{2}
+         AKE_NoHashOnCompute.mEexp{2} AKE_NoHashOnCompute.mSk{2})
+      AKE_NoHashOnCompute.mH2{2} /\
+  ={i} /\
+  AKE_NoHashOnCompute.evs{2} = AKE_Fresh.evs{1} /\
+  AKE_NoHashOnCompute.test{2} = AKE_Fresh.test{1} /\
+  AKE_NoHashOnCompute.cSession{2} = AKE_Fresh.cSession{1} /\
+  AKE_NoHashOnCompute.cH2{2} = AKE_Fresh.cH2{1} /\
+  AKE_NoHashOnCompute.sH2{2} = AKE_Fresh.sH2{1} /\
+  AKE_NoHashOnCompute.mSk{2} = AKE_Fresh.mSk{1} /\
+  AKE_NoHashOnCompute.mEexp{2} = AKE_Fresh.mEexp{1} /\
+  AKE_NoHashOnCompute.mStarted{2} = AKE_Fresh.mStarted{1} /\
+  AKE_NoHashOnCompute.mCompleted{2} = AKE_Fresh.mCompleted{1} /\
+  eq_except AKE_NoHashOnCompute.mH2{2} AKE_Fresh.mH2{1}
+    (get_string_from_id AKE_NoHashOnCompute.t_idx{2}
+       AKE_NoHashOnCompute.mStarted{2} AKE_NoHashOnCompute.mCompleted{2}
+       AKE_NoHashOnCompute.mEexp{2} AKE_NoHashOnCompute.mSk{2}) ==>
+ ! in_dom
+      (get_string_from_id AKE_NoHashOnCompute.t_idx{2}
+         AKE_NoHashOnCompute.mStarted{2} AKE_NoHashOnCompute.mCompleted{2}
+         AKE_NoHashOnCompute.mEexp{2} AKE_NoHashOnCompute.mSk{2})
+      AKE_NoHashOnCompute.mH2{2} =>
+  ={res} /\
+  AKE_NoHashOnCompute.evs{2} = AKE_Fresh.evs{1} /\
+  AKE_NoHashOnCompute.test{2} = AKE_Fresh.test{1} /\
+  AKE_NoHashOnCompute.cSession{2} = AKE_Fresh.cSession{1} /\
+  AKE_NoHashOnCompute.cH2{2} = AKE_Fresh.cH2{1} /\
+  AKE_NoHashOnCompute.sH2{2} = AKE_Fresh.sH2{1} /\
+  AKE_NoHashOnCompute.mSk{2} = AKE_Fresh.mSk{1} /\
+  AKE_NoHashOnCompute.mEexp{2} = AKE_Fresh.mEexp{1} /\
+  AKE_NoHashOnCompute.mStarted{2} = AKE_Fresh.mStarted{1} /\
+  AKE_NoHashOnCompute.mCompleted{2} = AKE_Fresh.mCompleted{1} /\
+  eq_except AKE_NoHashOnCompute.mH2{2} AKE_Fresh.mH2{1}
+    (get_string_from_id AKE_NoHashOnCompute.t_idx{2}
+       AKE_NoHashOnCompute.mStarted{2} AKE_NoHashOnCompute.mCompleted{2}
+       AKE_NoHashOnCompute.mEexp{2} AKE_NoHashOnCompute.mSk{2}) ].
+by fun; sp; if => //; wp; call h; wp; skip; progress => //; smt.
+ call ( _ : 
+  in_dom 
+    (get_string_from_id AKE_NoHashOnCompute.t_idx
+       AKE_NoHashOnCompute.mStarted AKE_NoHashOnCompute.mCompleted
+       AKE_NoHashOnCompute.mEexp AKE_NoHashOnCompute.mSk)
+  AKE_NoHashOnCompute.mH2,
+  AKE_NoHashOnCompute.evs{2} = AKE_Fresh.evs{1} /\
+  AKE_NoHashOnCompute.test{2} = AKE_Fresh.test{1} /\
+  AKE_NoHashOnCompute.cSession{2} = AKE_Fresh.cSession{1} /\
+  AKE_NoHashOnCompute.cH2{2} = AKE_Fresh.cH2{1} /\
+  AKE_NoHashOnCompute.sH2{2} = AKE_Fresh.sH2{1} /\
+  AKE_NoHashOnCompute.mSk{2} = AKE_Fresh.mSk{1} /\
+  AKE_NoHashOnCompute.mEexp{2} = AKE_Fresh.mEexp{1} /\
+  AKE_NoHashOnCompute.mStarted{2} = AKE_Fresh.mStarted{1} /\
+  AKE_NoHashOnCompute.mCompleted{2} = AKE_Fresh.mCompleted{1} /\
+Map.eq_except AKE_NoHashOnCompute.mH2{2} AKE_Fresh.mH2{1} 
+(get_string_from_id AKE_NoHashOnCompute.t_idx
+       AKE_NoHashOnCompute.mStarted AKE_NoHashOnCompute.mCompleted
+       AKE_NoHashOnCompute.mEexp AKE_NoHashOnCompute.mSk){2} /\ 
+in_dom AKE_NoHashOnCompute.t_idx{2} AKE_NoHashOnCompute.mStarted{2} /\
+in_dom AKE_NoHashOnCompute.t_idx{2} AKE_NoHashOnCompute.mCompleted{2},
+in_dom AKE_NoHashOnCompute.t_idx{2} AKE_NoHashOnCompute.mStarted{2} /\
+in_dom AKE_NoHashOnCompute.t_idx{2} AKE_NoHashOnCompute.mCompleted{2}
+).
+ by apply A_Lossless_guess. 
+
+ by fun; wp; skip; progress.
+ by intros => &2 hdom; fun; wp; skip.
+ by intros => &1; fun; wp; skip. 
+
+ by fun; sp; if => //; wp; call h; wp; skip; progress => //; smt.
+ by intros => &2 hdom; fun; sp; if; inline AKE_Fresh(A).O.h2; 
+ wp; try rnd; wp; skip; progress; try apply TKey.Dword.lossless.
+ intros => &1; fun; sp; if; inline AKE_NoHashOnCompute(A).O.h2; 
+ wp.
+ conseq (_ : _ ==> 
+ (if ! in_dom sstring0 AKE_NoHashOnCompute.mH2 then
+    in_dom
+      (get_string_from_id AKE_NoHashOnCompute.t_idx
+         AKE_NoHashOnCompute.mStarted AKE_NoHashOnCompute.mCompleted
+         AKE_NoHashOnCompute.mEexp AKE_NoHashOnCompute.mSk)
+      AKE_NoHashOnCompute.mH2 \/ (get_string_from_id AKE_NoHashOnCompute.t_idx
+         AKE_NoHashOnCompute.mStarted AKE_NoHashOnCompute.mCompleted
+         AKE_NoHashOnCompute.mEexp AKE_NoHashOnCompute.mSk) = sstring0
+  else
+    in_dom
+      (get_string_from_id AKE_NoHashOnCompute.t_idx
+         AKE_NoHashOnCompute.mStarted AKE_NoHashOnCompute.mCompleted
+         AKE_NoHashOnCompute.mEexp AKE_NoHashOnCompute.mSk)
+      AKE_NoHashOnCompute.mH2) /\
+    in_dom AKE_NoHashOnCompute.t_idx AKE_NoHashOnCompute.mStarted /\
+    in_dom AKE_NoHashOnCompute.t_idx AKE_NoHashOnCompute.mCompleted) => //.
+by intros &hr; rewrite in_dom_set; smt.
+rnd; wp; skip; progress => //; first by left.
+ by apply TKey.Dword.lossless.
+skip; smt.
+
+fun; wp; skip; progress => //.
+ case (AKE_NoHashOnCompute.t_idx{2} = i{2}) => heq.
+  by generalize H1 H5; rewrite heq; smt.
+  by rewrite in_dom_set; left.
+  by rewrite -get_string_pres => //; smt.
+  by rewrite in_dom_set; left.
+
+by intros => &2 hdom; fun; wp; skip; progress.
+intros => &1; fun; wp; skip; progress => //.
+case (i{hr} = AKE_NoHashOnCompute.t_idx{hr}) => heq.
+ by generalize H0 H4; rewrite -heq; smt.
+ by rewrite -get_string_pres.
+ by rewrite in_dom_set; left.
+
+fun; wp; skip; progress => //.
+by rewrite in_dom_set; left.
+case (i{2} = AKE_NoHashOnCompute.t_idx{2}) => heq.
+  by generalize H0 H4; rewrite -heq; smt.
+  by rewrite -get_string_pres2.
+  by rewrite in_dom_set; left.
+
+by intros => &2 hdom; fun; wp; progress.
+intros => &1; fun; wp; skip; progress => //.
+case (i{hr} = AKE_NoHashOnCompute.t_idx{hr}) => heq.
+ by generalize H1 H2; rewrite -heq; smt.
+ by rewrite -get_string_pres2.
+ by rewrite in_dom_set; left.
+
+fun; wp; skip; progress => //.
+  by rewrite in_dom_set; left.
+  by rewrite in_dom_set; left.
+ case (i{2} = AKE_NoHashOnCompute.t_idx{2}) => heq.
+  by generalize H0 H4; rewrite -heq; smt.
+  by rewrite -get_string_pres // -get_string_pres2 //.
+  by rewrite in_dom_set; left.
+  by rewrite in_dom_set; left.
+  
+by intros => &2 hdom; fun; wp; skip; progress => //.
+
+intros => &1; fun; wp; skip; progress => //.
+case (i{hr} = AKE_NoHashOnCompute.t_idx{hr}) => heq.
+ by generalize H1 H2; rewrite -heq; smt.
+ by rewrite -get_string_pres // -get_string_pres2.
+ by rewrite in_dom_set; left.
+ by rewrite in_dom_set; left.
+
+by fun; wp; skip; progress.
+by intros => &2 hdom; fun; wp; skip; progress => //.
+by intros => &1; fun; wp; skip; progress => //.
+
+by fun; sp; if => //; call h'; wp; skip; progress => //; smt.
+by intros => &2 hdom; fun; inline AKE_Fresh(A).O.computeKey AKE_Fresh(A).O.h2;
+   sp; if; sp; try if; wp; try rnd; wp; skip; progress => //; 
+   try apply TKey.Dword.lossless.
+
+intros => &2; fun; inline AKE_NoHashOnCompute(A).O.computeKey 
+   AKE_NoHashOnCompute(A).O.h2; sp; if; sp; try if; wp.
+conseq (_ : _ ==>
+if ! in_dom sstring AKE_NoHashOnCompute.mH2 then
+    (in_dom
+      (get_string_from_id AKE_NoHashOnCompute.t_idx
+         AKE_NoHashOnCompute.mStarted AKE_NoHashOnCompute.mCompleted
+         AKE_NoHashOnCompute.mEexp AKE_NoHashOnCompute.mSk)
+      AKE_NoHashOnCompute.mH2 \/ ((get_string_from_id AKE_NoHashOnCompute.t_idx
+         AKE_NoHashOnCompute.mStarted AKE_NoHashOnCompute.mCompleted
+         AKE_NoHashOnCompute.mEexp AKE_NoHashOnCompute.mSk) = sstring)) /\
+    in_dom AKE_NoHashOnCompute.t_idx AKE_NoHashOnCompute.mStarted /\
+    in_dom AKE_NoHashOnCompute.t_idx AKE_NoHashOnCompute.mCompleted
+  else
+    in_dom
+      (get_string_from_id AKE_NoHashOnCompute.t_idx
+         AKE_NoHashOnCompute.mStarted AKE_NoHashOnCompute.mCompleted
+         AKE_NoHashOnCompute.mEexp AKE_NoHashOnCompute.mSk)
+      AKE_NoHashOnCompute.mH2 /\
+    in_dom AKE_NoHashOnCompute.t_idx AKE_NoHashOnCompute.mStarted /\
+    in_dom AKE_NoHashOnCompute.t_idx AKE_NoHashOnCompute.mCompleted).
+by intros => &hr; rewrite in_dom_set; progress.
+
+by rnd; wp; skip; progress => //; try apply TKey.Dword.lossless; smt.
+by skip; progress => //.
+by wp; skip; progress => //.
+
+(* finished upto call *)
+intros => {h} {h'}.
+sp; if => //.
+inline AKE_Fresh(A).O.computeKey AKE_Fresh(A).O.h2
+       AKE_NoHashOnCompute(A).O.computeKey' AKE_NoHashOnCompute(A).O.h2.
+sp; if => //.
+wp; rnd; wp; skip; progress => //.
+by rewrite !get_setE proj_some.
+rewrite /eq_except => y heq; rewrite get_setNE.
+cut :
+ get_string_from_id AKE_NoHashOnCompute.t_idx{2} AKE_Fresh.mStarted{1}
+         AKE_Fresh.mCompleted{1} AKE_Fresh.mEexp{1} AKE_Fresh.mSk{1} =
+gen_sstring (proj AKE_Fresh.mEexp{1}.[AKE_NoHashOnCompute.t_idx{2}])
+    (proj AKE_Fresh.mSk{1}.[x1]) x2
+    (proj AKE_Fresh.mCompleted{1}.[AKE_NoHashOnCompute.t_idx{2}]) x3; last by smt.
+by rewrite /get_string_from_id; smt.
+smt.
+elim H10; smt.
+generalize H8 H9;rewrite /get_string_from_id; smt.
+elim H10; smt.
+wp; skip; progress.
+generalize H3 H1; rewrite /in_dom; smt.
+generalize H3 H1; rewrite /in_dom; smt.
+generalize H3 H1; rewrite /in_dom; smt.
+generalize H3 H1; rewrite /in_dom; smt.
+elim H5; smt.
+wp; rnd; skip; progress => //.
+elim H7; smt.
+save.
+
+local lemma Pr2 : forall &m,
+Pr[AKE_Fresh(A).main() @ &m : 
+(res /\ test_fresh AKE_Fresh.test AKE_Fresh.evs
+                    /\ ! collision_eexp_eexp(AKE_Fresh.mEexp) 
+                    /\ ! collision_eexp_rcvd(AKE_Fresh.evs) )] <=
+Pr[AKE_NoHashOnCompute(A).main() @ &m : 
+(res /\ test_fresh AKE_NoHashOnCompute.test AKE_NoHashOnCompute.evs
+                    /\ ! collision_eexp_eexp(AKE_NoHashOnCompute.mEexp) 
+                    /\ ! collision_eexp_rcvd(AKE_NoHashOnCompute.evs) )] +
+Pr[AKE_NoHashOnCompute(A).main() @ &m : 
+(AKE_NoHashOnCompute.test <> None /\ 
+in_dom AKE_NoHashOnCompute.t_idx AKE_NoHashOnCompute.mCompleted /\ 
+in_dom AKE_NoHashOnCompute.t_idx AKE_NoHashOnCompute.mStarted /\ 
+in_dom AKE_NoHashOnCompute.t_idx AKE_NoHashOnCompute.mEexp /\
+in_dom 
+(get_string_from_id AKE_NoHashOnCompute.t_idx AKE_NoHashOnCompute.mStarted 
+  AKE_NoHashOnCompute.mCompleted AKE_NoHashOnCompute.mEexp AKE_NoHashOnCompute.mSk) 
+AKE_NoHashOnCompute.mH2)].
+proof.  
+intros => &m.
+apply (Real.Trans _ 
+ (Pr[AKE_NoHashOnCompute(A).main() @ &m :
+   (res /\
+   test_fresh AKE_NoHashOnCompute.test AKE_NoHashOnCompute.evs /\
+   ! collision_eexp_eexp AKE_NoHashOnCompute.mEexp /\
+   ! collision_eexp_rcvd AKE_NoHashOnCompute.evs) \/
+   (! AKE_NoHashOnCompute.test = None /\
+   in_dom AKE_NoHashOnCompute.t_idx AKE_NoHashOnCompute.mCompleted /\
+   in_dom AKE_NoHashOnCompute.t_idx AKE_NoHashOnCompute.mStarted /\
+   in_dom AKE_NoHashOnCompute.t_idx AKE_NoHashOnCompute.mEexp /\
+   in_dom
+     (get_string_from_id AKE_NoHashOnCompute.t_idx
+        AKE_NoHashOnCompute.mStarted AKE_NoHashOnCompute.mCompleted
+        AKE_NoHashOnCompute.mEexp AKE_NoHashOnCompute.mSk)
+     AKE_NoHashOnCompute.mH2)]) _).
+equiv_deno Eq_AKE_Fresh_AKE_NoHashOnCompute; smt.
+rewrite Pr mu_or.
+cut h: forall (a b c : real), 0%r <= c => a + b - c <= a + b by smt.
+by apply h; smt.
+qed.
+
+local module AKE_ComputeRand(FA : Adv2) = {
+  var evs  : Event list               (* events for queries performed by adversary *)
+  var test : Sid option               (* session id of test session *)
+
+  var cSession, cH1, cH2 : int        (* counters for queries *)
+
+  var mH2 : (Sstring, Key) map        (* map for h2 *)
+  var sH2 : Sstring set               (* adversary queries for h2 *)
+
+  var mSk        : (Agent, Sk) map    (* map for static secret keys *)
+  var mEexp      : (Sidx, Eexp) map   (* map for ephemeral exponents of sessions *)
+  var mStarted   : (Sidx, Sdata2) map (* map of started sessions *)
+  var mCompleted : (Sidx, Epk)   map  (* additional data for completed sessions *)
+  var t_idx : Sidx    
+  fun init() : unit = {
+    evs = [];
+    test = None;
+    cSession = 0;
+    cH1 = 0;
+    cH2 = 0;
+    mH2 = Map.empty;
+    sH2 = FSet.empty;
+    mSk = Map.empty;    
+    mEexp = Map.empty;
+    mStarted = Map.empty;
+    mCompleted = Map.empty;
+  }
+
+  module O : AKE_Oracles2 = {
+    
+    fun eexpRev(i : Sidx, a : Sk) : Eexp option = {
+      var r : Eexp option = None;
+      if (in_dom i mStarted && 
+      ((test <> None) => 
+      fresh_op (proj test) (EphemeralRev(compute_psid mStarted mEexp i)::evs ))) {
+        evs = EphemeralRev(compute_psid mStarted mEexp i)::evs;
+        if (sd2_actor(proj mStarted.[i]) = gen_pk(a)) {
+          r = mEexp.[i];
+        }
+      }
+      return r;
+    }
+    
+    fun h2(sstring : Sstring) : Key = {
+      var ke : Key;
+      ke = $sample_Key;
+      if (!in_dom sstring mH2) {
+        mH2.[sstring] = ke;
+      }
+      return proj mH2.[sstring];
+    }
+ 
+    fun h2_a(sstring : Sstring) : Key option = {
+      var r : Key option = None;
+      var ks : Key;
+      if (cH2 < qH2) {
+        cH2 = cH2 + 1;
+        sH2 = add sstring sH2;
+        ks = h2(sstring);
+        r = Some(ks);
+      }
+      return r;
+    }
+
+    fun init1(i : Sidx, A : Agent, B : Agent) : Epk option = {
+      var pX : Epk;
+      var r : Epk option = None; 
+      if ( in_dom A mSk && in_dom B mSk && !in_dom i mStarted ) {
+        cSession = cSession + 1;
+        pX = gen_epk(proj mEexp.[i]);
+        mStarted.[i] = (A,B,init);
+        evs = Start((A,B,pX,init))::evs;
+        r = Some(pX);
+      }
+      return r;
+    }
+
+    fun resp(i : Sidx, B : Agent, A : Agent, X : Epk) : Epk option = {
+      var pY : Epk;
+      var r : Epk option = None;
+      if (in_dom A mSk && in_dom B mSk
+          && !in_dom i mStarted && !in_dom i mCompleted) {
+        cSession = cSession + 1;
+        pY = gen_epk(proj mEexp.[i]);
+        mStarted.[i] = (B,A,resp);
+        mCompleted.[i] = X;
+        evs = Accept((B,A,pY,X,resp))::evs;
+        r = Some(pY);
+      }
+      return r;
+    }
+
+    fun init2(i : Sidx, Y : Epk) : unit = {
+      if (!in_dom i mCompleted && in_dom i mStarted) {
+        mCompleted.[i] = Y;
+        evs = Accept(compute_sid mStarted mEexp mCompleted i)::evs;
+      }
+    }
+
+    fun staticRev(A : Agent) : Sk option = {
+      var r : Sk option = None;
+      if (in_dom A mSk &&
+      ((test <> None => 
+       fresh_op (proj test) (StaticRev A::evs )))) {
+        r = mSk.[A];
+        evs = StaticRev(A)::evs;
+      }
+      return r;
+    }
+
+    fun computeKey(i : Sidx) : Key option = {
+      var r : Key option = None;
+      var a : Agent;
+      var b : Agent;
+      var ro : Role;
+      var k : Key;
+      if (in_dom i mCompleted) {
+        (a,b,ro) = proj mStarted.[i];
+        k = h2(gen_sstring (proj mEexp.[i]) (proj mSk.[a]) b (proj mCompleted.[i]) ro);
+        r = Some k;
+      }
+      return r;
+    }
+    fun computeKey'(i : Sidx) : Key option = {
+      var r : Key option = None;
+      var a : Agent;
+      var b : Agent;
+      var ro : Role;
+      var k : Key;
+      if (in_dom i mCompleted) {
+        (a,b,ro) = proj mStarted.[i];
+        k = $sample_Key; 
+        r = Some k;
+      }
+      return r;
+    }
+
+    fun sessionRev(i : Sidx) : Key option = {
+      var r : Key option = None;
+      if (in_dom i mCompleted &&
+     ((test <> None) =>
+      fresh_op (proj test) (SessionRev
+          (compute_sid mStarted mEexp mCompleted i)::evs) )) {
+        evs = SessionRev(compute_sid mStarted mEexp mCompleted i)::evs;
+        r = computeKey(i);
+      }
+      return r;
+    }
+  }
+  
+  module A = FA(O)
+
+  fun main() : bool = {
+    var b : bool = def;
+    var pks : Pk list = [];
+    var key : Key = def;
+    var keyo : Key option = def;
+    var b' : bool = def;
+    var i : int = 0;
+    var ska : Sk = def;
+    var pka : Pk = def;
+    var xa' : Eexp = def;
+    var sidxs : Sidx set = univ_Sidx;
+    var sidx : Sidx;
+    t_idx = def;
+    init();
+    while (i < qAgent) {
+      ska = $sample_Sk;
+      pka = gen_pk(ska);
+      pks = pka :: pks;
+      mSk.[pka] = ska;
+      i = i + 1;
+    }
+    while (sidxs <> FSet.empty) {
+      sidx = pick sidxs;
+      sidxs = rm sidx sidxs;
+      xa' = $sample_Eexp;
+      mEexp.[sidx] = xa';
+    } 
+    if (!collision_eexp_eexp_op mEexp) {
+     t_idx = A.choose(pks);
+      if (mStarted.[t_idx] <> None && mCompleted.[t_idx] <> None) {
+      test = Some (compute_sid mStarted mEexp mCompleted t_idx);
+      (* the if-condition implies "mem (Accept (proj O.test)) O.evs" *)
+      key  = $sample_Key;
+       keyo = Some key;
+      b' = A.guess(keyo);
+     }
+    }
+    b = ${0,1};
+    return (b = b');
+  }
+}.
+
+local equiv AKE_NoHashCall_AKE_ComputeRand : 
+AKE_NoHashOnCompute(A).main ~ AKE_ComputeRand(A).main :
+={glob A} ==>
+(res /\ test_fresh AKE_NoHashOnCompute.test AKE_NoHashOnCompute.evs
+                    /\ ! collision_eexp_eexp(AKE_NoHashOnCompute.mEexp) 
+                    /\ ! collision_eexp_rcvd(AKE_NoHashOnCompute.evs) ){1} =>
+(res ){2}.
+proof.
+ fun.
+ seq 14 14:
+(={b,pks,key,keyo,b',i,pks, glob A} /\
+  AKE_ComputeRand.t_idx{2} = AKE_NoHashOnCompute.t_idx{1} /\
+  AKE_ComputeRand.evs{2} = AKE_NoHashOnCompute.evs{1} /\
+  AKE_ComputeRand.test{2} = AKE_NoHashOnCompute.test{1} /\
+  AKE_ComputeRand.cSession{2} = AKE_NoHashOnCompute.cSession{1} /\
+  AKE_ComputeRand.cH2{2} = AKE_NoHashOnCompute.cH2{1} /\
+  AKE_ComputeRand.mH2{2} = AKE_NoHashOnCompute.mH2{1} /\
+  AKE_ComputeRand.sH2{2} = AKE_NoHashOnCompute.sH2{1} /\
+  AKE_ComputeRand.mSk{2} = AKE_NoHashOnCompute.mSk{1} /\
+  AKE_ComputeRand.mEexp{2} = AKE_NoHashOnCompute.mEexp{1} /\
+  AKE_ComputeRand.mStarted{2} = AKE_NoHashOnCompute.mStarted{1} /\
+  AKE_ComputeRand.mCompleted{2} = AKE_NoHashOnCompute.mCompleted{1}).
+eqobs_in.
+if => //.
+swap{2} 3 -1.
+seq 2 2:
+ (={b,pks,key,keyo,b',i,pks, glob A} /\
+  AKE_ComputeRand.t_idx{2} = AKE_NoHashOnCompute.t_idx{1} /\
+  AKE_ComputeRand.evs{2} = AKE_NoHashOnCompute.evs{1} /\
+  AKE_ComputeRand.test{2} = AKE_NoHashOnCompute.test{1} /\
+  AKE_ComputeRand.cSession{2} = AKE_NoHashOnCompute.cSession{1} /\
+  AKE_ComputeRand.cH2{2} = AKE_NoHashOnCompute.cH2{1} /\
+  AKE_ComputeRand.mH2{2} = AKE_NoHashOnCompute.mH2{1} /\
+  AKE_ComputeRand.sH2{2} = AKE_NoHashOnCompute.sH2{1} /\
+  AKE_ComputeRand.mSk{2} = AKE_NoHashOnCompute.mSk{1} /\
+  AKE_ComputeRand.mEexp{2} = AKE_NoHashOnCompute.mEexp{1} /\
+  AKE_ComputeRand.mStarted{2} = AKE_NoHashOnCompute.mStarted{1} /\
+  AKE_ComputeRand.mCompleted{2} = AKE_NoHashOnCompute.mCompleted{1}).
+rnd.
+call
+(_ :
+  AKE_ComputeRand.t_idx{2} = AKE_NoHashOnCompute.t_idx{1} /\
+  AKE_ComputeRand.evs{2} = AKE_NoHashOnCompute.evs{1} /\
+  AKE_ComputeRand.test{2} = AKE_NoHashOnCompute.test{1} /\
+  AKE_ComputeRand.cSession{2} = AKE_NoHashOnCompute.cSession{1} /\
+  AKE_ComputeRand.cH2{2} = AKE_NoHashOnCompute.cH2{1} /\
+  AKE_ComputeRand.mH2{2} = AKE_NoHashOnCompute.mH2{1} /\
+  AKE_ComputeRand.sH2{2} = AKE_NoHashOnCompute.sH2{1} /\
+  AKE_ComputeRand.mSk{2} = AKE_NoHashOnCompute.mSk{1} /\
+  AKE_ComputeRand.mEexp{2} = AKE_NoHashOnCompute.mEexp{1} /\
+  AKE_ComputeRand.mStarted{2} = AKE_NoHashOnCompute.mStarted{1} /\
+  AKE_ComputeRand.mCompleted{2} = AKE_NoHashOnCompute.mCompleted{1}) => //; 
+   try (fun; wp; skip; progress => //).
+
+fun; inline AKE_NoHashOnCompute(A).O.h2 AKE_ComputeRand(A).O.h2; 
+ sp; if => //; wp; try rnd; wp; skip; progress => //; smt.
+
+fun; inline AKE_NoHashOnCompute(A).O.computeKey AKE_NoHashOnCompute(A).O.h2 
+            AKE_ComputeRand(A).O.computeKey AKE_ComputeRand(A).O.h2;
+ sp; if => //; sp; if => //; wp; try rnd; wp; skip; progress => //; smt.
+if => //.
+sp.
+call
+(_ :
+  AKE_ComputeRand.t_idx{2} = AKE_NoHashOnCompute.t_idx{1} /\
+  AKE_ComputeRand.evs{2} = AKE_NoHashOnCompute.evs{1} /\
+  AKE_ComputeRand.test{2} = AKE_NoHashOnCompute.test{1} /\
+  AKE_ComputeRand.cSession{2} = AKE_NoHashOnCompute.cSession{1} /\
+  AKE_ComputeRand.cH2{2} = AKE_NoHashOnCompute.cH2{1} /\
+  AKE_ComputeRand.mH2{2} = AKE_NoHashOnCompute.mH2{1} /\
+  AKE_ComputeRand.sH2{2} = AKE_NoHashOnCompute.sH2{1} /\
+  AKE_ComputeRand.mSk{2} = AKE_NoHashOnCompute.mSk{1} /\
+  AKE_ComputeRand.mEexp{2} = AKE_NoHashOnCompute.mEexp{1} /\
+  AKE_ComputeRand.mStarted{2} = AKE_NoHashOnCompute.mStarted{1} /\
+  AKE_ComputeRand.mCompleted{2} = AKE_NoHashOnCompute.mCompleted{1}) => //; 
+   try (fun; wp; skip; progress => //).
+
+fun; inline AKE_NoHashOnCompute(A).O.h2 AKE_ComputeRand(A).O.h2; 
+ sp; if => //; wp; try rnd; wp; skip; progress => //; smt.
+
+fun; inline AKE_NoHashOnCompute(A).O.computeKey AKE_NoHashOnCompute(A).O.h2 
+            AKE_ComputeRand(A).O.computeKey AKE_ComputeRand(A).O.h2;
+ sp; if => //; sp; if => //; wp; try rnd; wp; skip; progress => //; smt.
+if{1}; last by wp; rnd; skip; progress => //.
+inline AKE_NoHashOnCompute(A).O.computeKey'.
+rcondt{1} 3.
+by intros => &m; wp; skip; progress; generalize H0; rewrite /in_dom.
+by wp; rnd; wp; skip; progress => //.
+by rnd{2}; skip; progress; smt.
+qed.
+
+lemma card0_empty : forall (s : 'a FSet.set), card s = 0 => s = FSet.empty.
+proof.
+ intros => s.
+ rewrite empty_elems_nil card_def => h.
+ by apply length0_nil.
+save.
+
+
+
+local lemma Pr3_aux : forall &m,
+Pr[AKE_ComputeRand(A).main() @ &m : res] = 1%r / 2%r.
+proof.
+ intros => &m.
+ bdhoare_deno (_ : true ==> _) => //.
+ fun.
+ rnd ((=) b') => /=.
+ inline AKE_ComputeRand(A).init.
+ sp.
+ seq 3: (true) => //.
+ seq 2: (true) => //.
+ while (true) (card sidxs) => //=.
+ intros => z.
+ wp; rnd; wp; skip; progress => //.
+ by rewrite card_rm_in;[apply mem_pick | smt].
+ by cut:= lossless_sample_Eexp; rewrite /Distr.weight => <-; apply Distr.mu_eq.
+
+ while (i <= qAgent) (qAgent - i) => //=.
+ intros => z; wp; rnd; skip; progress => //; first 2 smt.
+ by cut:= lossless_sample_Sk; rewrite /Distr.weight => <-; apply Distr.mu_eq.
+ skip; progress; first 2 smt.
+ 
+ apply card0_empty.
+ (cut h : 0 <= card sidxs0 by (rewrite card_def; apply length_nneg)); smt.
+
+ if => //.
+ seq 1: true.
+ by call (_ : true) => //.
+  call (_ : true) => //.
+  by apply A_Lossless_choose.
+  by fun; wp.
+  by fun; sp; inline AKE_ComputeRand(A).O.h2; if; wp; try rnd; wp; skip; progress => //; apply TKey.Dword.lossless; smt.
+  by fun; wp.
+  by fun; wp.
+  by fun; wp.
+  by fun; wp.
+  by fun; sp; inline AKE_ComputeRand(A).O.computeKey AKE_ComputeRand(A).O.h2; 
+   if => //; sp; if => //; wp; try rnd; wp; skip; progress; apply TKey.Dword.lossless; smt.
+  (* this is just stupid *)
+  conseq (_ : 1 = 1 ==> _).
+  if => //.
+  call (_ : true).
+  by apply A_Lossless_guess.
+  by fun; wp.
+  by fun; sp; inline AKE_ComputeRand(A).O.h2; if; wp; try rnd; wp; skip; progress => //; apply TKey.Dword.lossless; smt.
+  by fun; wp.
+  by fun; wp.
+  by fun; wp.
+  by fun; wp.
+  by fun; sp; inline AKE_ComputeRand(A).O.computeKey AKE_ComputeRand(A).O.h2; 
+   if => //; sp; if => //; wp; try rnd; wp; skip; progress; apply TKey.Dword.lossless; smt.
+
+  wp; rnd; wp; skip; progress => //; by apply TKey.Dword.lossless; smt.
+  by hoare.
+  smt.
+  by skip; progress => //; apply (Bool.Dbool.mu_x_def b'{hr}).
+save.
+
+local lemma Pr3 : forall &m,
+Pr[AKE_NoHashOnCompute(A).main()@ &m :
+(res /\ test_fresh AKE_NoHashOnCompute.test AKE_NoHashOnCompute.evs
+                    /\ ! collision_eexp_eexp(AKE_NoHashOnCompute.mEexp) 
+                    /\ ! collision_eexp_rcvd(AKE_NoHashOnCompute.evs) )] <= 1%r / 2%r.
+proof.
+ intros => &m.
+ apply (Real.Trans _ Pr[AKE_ComputeRand(A).main()@ &m : res] _).
+  by equiv_deno AKE_NoHashCall_AKE_ComputeRand.
+  by rewrite -(Pr3_aux &m); smt.
+save. 
