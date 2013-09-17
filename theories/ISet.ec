@@ -300,6 +300,3 @@ proof strict.
 by apply set_ext=> x; rewrite mem_filter mem_univ /=;
    apply mem_create.
 qed.
-
-require Distr.
-op support (d:'a distr) = create (lambda x, Distr.in_supp x d).
