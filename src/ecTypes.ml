@@ -527,7 +527,7 @@ let e_app x args ty =
 (* -------------------------------------------------------------------- *)
 module ExprSmart = struct
   let l_symbol (lp, x) x' =
-    if x == x then lp else LSymbol x'
+    if x == x' then lp else LSymbol x'
 
   let l_tuple (lp, xs) xs' =
     if xs == xs' then lp else LTuple xs'
