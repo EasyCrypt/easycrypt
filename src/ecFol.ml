@@ -920,47 +920,47 @@ module FSmart = struct
   type a_app   = form * form list * ty
 
   let f_local (fp, (x, ty)) (x', ty') =
-    if   false && x == x' && ty == ty'
+    if   x == x' && ty == ty'
     then fp
     else f_local x' ty'
 
   let f_pvar (fp, (pv, ty, m)) (pv', ty', m') =
-    if   false && pv == pv' && ty == ty' && m == m'
+    if   pv == pv' && ty == ty' && m == m'
     then fp
     else f_pvar pv' ty' m'
 
   let f_quant (fp, (q, b, f)) (q', b', f') =
-    if   false && q == q' && b == b' && f == f'
+    if   q == q' && b == b' && f == f'
     then fp
     else f_quant q' b' f'
 
   let f_glob (fp, (mp, m)) (mp', m') =
-    if   false && mp == mp' && m == m'
+    if   mp == mp' && m == m'
     then fp
     else f_glob mp' m'
 
   let f_if (fp, (c, f1, f2)) (c', f1', f2') =
-    if   false && c == c' && f1 == f1' && f2 == f2'
+    if   c == c' && f1 == f1' && f2 == f2'
     then fp
     else f_if c' f1' f2'
 
   let f_let (fp, (lp, f1, f2)) (lp', f1', f2') =
-    if   false && lp == lp' && f1 == f1' && f2 == f2'
+    if   lp == lp' && f1 == f1' && f2 == f2'
     then fp
     else f_let lp' f1' f2'
 
   let f_op (fp, (op, tys, ty)) (op', tys', ty') =
-    if   false && op == op' && tys == tys' && ty == ty'
+    if   op == op' && tys == tys' && ty == ty'
     then fp
     else f_op op' tys' ty'
 
   let f_app (fp, (f, fs, ty)) (f', fs', ty') =
-    if   false && f == f' && fs == fs' && ty == ty'
+    if   f == f' && fs == fs' && ty == ty'
     then fp
     else f_app f' fs' ty'
 
   let f_tuple (fp, fs) fs' =
-    if false && fs == fs' then fp else f_tuple fs'
+    if fs == fs' then fp else f_tuple fs'
 
   let f_equivF (fp, ef) ef' =
     if eqf_equal ef ef' then fp else mk_form (FequivF ef') fp.f_ty
