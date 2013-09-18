@@ -52,7 +52,7 @@ let t_bdHoare_while inv vrnt g =
   let b_concl = f_bdHoareS_r 
     { bhs with
         bhs_pr  = b_pre; bhs_s  = c; bhs_po = b_post;
-        bhs_cmp = FHeq ; bhs_bd = f_r1} 
+        bhs_cmp = FHeq ; bhs_bd = f_r1}
   in
   let b_concl = f_forall_simpl [(k_id,GTty tint)] b_concl in
   (* the wp of the while *)
@@ -64,6 +64,40 @@ let t_bdHoare_while inv vrnt g =
   let post = f_and_simpl inv post in
   let concl = f_bdHoareS_r { bhs with bhs_s = s; bhs_po=post} in
   prove_goal_by [b_concl;concl] (rn_hl_while inv (Some vrnt) None) g
+
+
+let t_bdHoare_while_rev inv g =
+  let env, _, concl = get_goal_e g in
+  let bhs = t_as_bdHoareS concl in
+  if (bhs.bhs_cmp <> FHle) then 
+    tacuerror "only upper-bounded judgments are supported";
+  let b_pre  = bhs.bhs_pr in
+  let b_post = bhs.bhs_po in
+  let mem = bhs.bhs_m in
+  let ((loopGuardExp,loopBody),rem_s) = s_last_while "while" bhs.bhs_s in
+  let loopGuard = form_of_expr (EcMemory.memory mem) loopGuardExp in
+  let bound = bhs.bhs_bd in
+
+  let body_concl = 
+    let while_s = EcModules.stmt [EcModules.i_while (loopGuardExp,loopBody)] in
+    let unfolded_while_s = EcModules.s_seq loopBody while_s in
+    let while_jgmt = f_bdHoareS_r {bhs with bhs_pr=inv ; bhs_s=while_s } in
+    let unfolded_while_jgmt = f_bdHoareS_r 
+      {bhs with bhs_pr=f_and inv loopGuard; bhs_s=unfolded_while_s } in
+    f_imp while_jgmt unfolded_while_jgmt
+  in
+
+  let rem_post = 
+    let term_post = f_imp (f_and inv (f_and (f_not loopGuard) b_post)) 
+      (f_eq bound f_r1)
+    in
+    let modi = s_write env loopBody in
+    let term_post = generalize_mod env (EcMemory.memory mem) modi term_post in
+    f_and inv term_post
+  in
+  let rem_concl = f_hoareS mem b_pre rem_s rem_post in
+  prove_goal_by [body_concl;rem_concl] (rn_hl_while inv None None) g
+
 
 let t_equiv_while_disj side vrnt inv g =
   let env, _, concl = get_goal_e g in
@@ -125,6 +159,28 @@ let t_equiv_while inv g =
     prove_goal_by [b_concl; concl] (rn_hl_while inv None None) g 
 
 (* -------------------------------------------------------------------- *)
+
+(*
+
+CASE (1): (t_bdHoare_while)
+
+[c': P ==> Inv /\ forall Mod, ( (Inv/\!b -> Q) /\ (Inv/\vrnt<=0 -> !b) )  ] <> p
+[c : Inv /\ b /\ vrnt=k ==> Inv /\ vrnt<k ] = 1
+================================================================================
+[c';while b do c : P ==> Q ] <> p
+
+
+CASE (2): (t_bdHoare_while_rev)
+
+c': P ==> Inv /\ forall Mod', ( (Inv/\!b /\ Q)[Mod'/Mod] -> p=1)
+[while b do c : Inv ==> Q] <= p -> 
+  [c; while b do c : Inv /\ b ==> Q] <= p
+================================================================================
+[c';while b do c : P ==> Q ] <= p
+
+
+*)
+
 let process_while side_opt phi vrnt_opt g =
   match (get_concl g).f_node with
   | FhoareS _ -> begin
@@ -135,12 +191,15 @@ let process_while side_opt phi vrnt_opt g =
 
   | FbdHoareS _ -> begin
       match vrnt_opt with
-      | Some vrnt ->
+      | Some vrnt -> (* this pattern is reserved for case (1) *)
           t_bdHoare_while 
             (process_phl_formula g phi) 
             (process_phl_form tint g vrnt) 
             g
-      | _ -> cannot_apply "while" "wrong arguments"
+      | None -> (* this pattern corresponds to case (2) *)
+        t_bdHoare_while_rev 
+          (process_phl_formula g phi) 
+          g
   end
 
   | FequivS _ -> begin
