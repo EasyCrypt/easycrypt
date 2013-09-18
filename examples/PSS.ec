@@ -906,6 +906,67 @@ section.
   local equiv G3_G4: G3.main ~ G4.main: true ==> ={res}
   by apply (G3_G4_abstract GAdv).
 
+  (** G4': Sampling z in a loop *)
+  local module H4': SplitOracle = {
+    fun init(ks:pkey * skey): unit = {
+      Hmap.init(ks);
+    }
+
+    fun sample(): bool * htag * gtag = {
+      var z:signature;
+      var b:bool;
+      var w:htag;
+      var st:gtag;
+
+      z = $sample_plain Hmem.pk;
+      b = ((sub (to_bits z) 0 1) <> zeros 1);
+      w = HTag.from_bits (sub (to_bits z) 1 k1);
+      st = GTag.from_bits (sub (to_bits z) (k1 + 1) kg);
+      return (b,w,st);
+    }
+
+    fun o(c:bool,x:message * salt): htag = {
+      var b:bool;
+      var w:htag;
+      var st:gtag;
+      var z, u:signature;
+      var i:int;
+
+      i = 0;
+      b = true;
+      if (!in_dom x Hmap.m)
+      {
+        while (b)
+        {
+          (b,w,st) = sample();
+          i = i + 1;
+        }
+        z = Signature.from_bits (zeros 1 || to_bits w || to_bits st);
+        u = if c then ((inv Hmem.xstar Hmem.pk) * finv Hmem.sk z) Hmem.pk else finv Hmem.sk z;
+        Hmap.m.[x] = (w,c,u);
+        G.m.[w] = st ^ (GTag.from_bits (to_bits (snd x) || zeros (kg - k0)));
+      }
+      else
+      {
+        if (!c /\ pi3_2 (proj Hmap.m.[x])) Hmap.m.[x] = (HTag.zeros,c,Signature.ones);
+      }
+      return pi3_1 (proj Hmap.m.[x]);
+    }
+  }.
+
+  local module G4' = Gen(GAdv,H4',G).
+
+  local equiv G4_G4'_H: H4.o ~ H4'.o: ={glob Hmap, c, x} ==> ={glob Hmap, res}.
+  proof strict.
+  fun; sp; if=> //; last by wp.
+  (* Here, if we can prove that
+       1) the loop terminates (the probability that the condition is false is constant and non-zero); and
+       2) the only side-effects that are visible on loop exit are those produced during the last iteration,
+     then we can remove the while and focus on showing the equivalence of its last iteration and the other
+     game. *)
+  admit.
+  qed.
+
   (** G5: Sampling z in a (non-PTIME) loop *)
   local module H5: SplitOracle = {
     fun init(ks:pkey * skey): unit = {
@@ -926,7 +987,7 @@ section.
         while (b)
         {
           z = $sample_plain Hmem.pk;
-          b = ((sub (to_bits z) 0 1) = ones 1);
+          b = ((sub (to_bits z) 0 1) <> zeros 1);
           w = HTag.from_bits (sub (to_bits z) 1 k1);
           st = GTag.from_bits (sub (to_bits z) (k1 + 1) kg);
           u = if c then ((inv Hmem.xstar Hmem.pk) * finv Hmem.sk  z) Hmem.pk else finv Hmem.sk z;
@@ -948,16 +1009,51 @@ section.
 
   local module G5 = Gen(GAdv,H5,G).
 
-  local equiv G4_G5_H: H4.o ~ H5.o: ={glob Hmap, c, x} ==> ={glob Hmap, res}.
+  local equiv G4'_G5_H: H4'.o ~ H5.o: ={glob Hmap, glob G, c, x} ==> ={glob Hmap, glob G, res}.
   proof strict.
   fun; sp; if=> //; last by wp.
-  (* Here, if we can prove that
-       1) the loop terminates (the probability that the condition is false is constant and non-zero); and
-       2) the only side-effects that are visible on loop exit are those produced during the last iteration,
-     then we can remove the while and focus on showing the equivalence of its last iteration and the other
-     game. *)
-  admit.
+    inline H4'.sample; wp;
+    while (={glob Hmem, c, x, b} /\
+           (b{1} => ={glob Hmap, glob G, c, x}) /\
+           (!b{1} =>
+              ={w, st} /\
+              eq_except Hmap.m{1} Hmap.m{2} x{1} /\
+              Hmap.m.[x]{2} = Some (w,c,c ? ((inv Hmem.xstar Hmem.pk) * (finv Hmem.sk (Signature.from_bits (zeros 1 || to_bits w || to_bits st)))) Hmem.pk
+                                          : finv Hmem.sk (Signature.from_bits (zeros 1 || to_bits w || to_bits st))){2} /\
+              eq_except G.m{1} G.m{2} w{1} /\
+              G.m.[w]{2} = Some (st ^ (GTag.from_bits (to_bits (snd x) || zeros (kg - k0))))){2}).
+      seq 5 4: (={glob Hmap, glob G, c, x, b, w, st} /\ z0{1} = z{2} /\
+                z0{1} = Signature.from_bits (zeros 1 || to_bits w || to_bits st){2} /\
+                b{1} = (sub (to_bits z0) 0 1 <> zeros 1){1}).
+        wp; rnd; skip; progress=> //; cut := H _=> //; progress=> //.
+          rewrite -{1}(Signature.can_from_to z0L); congr.
+            rewrite HTag.pcan_to_from; first smt.
+            rewrite GTag.pcan_to_from; first smt.
+            admit. (* Missing axioms on append and sub *)
+        by wp; skip; progress=> //; smt.
+    skip; progress=> //; cut := H3 _=> //; last 2 smt.
+      by case c{2}; intros=> _ /=; progress=> //; smt.
   qed.
+
+  local lemma G4'_G5_abstract (Ga <: Gadv {H4',H5,G,Hmem}):
+    (forall (H <: SplitOracle{Ga}) (G <: Gt.Types.ARO{Ga}),
+       islossless H.o => islossless G.o => islossless Ga(H,G).main) => 
+    equiv [Gen(Ga,H4',G).main ~ Gen(Ga,H5,G).main: true ==> ={res}].
+  proof strict.
+  intros=> GaL; fun.
+  call (_: ={glob Hmap, glob G}).
+    (* H *)
+    by conseq* G4'_G5_H.
+    (* G *)
+    by conseq* Gt.Lazy.abstract_o.
+  call (_: ={ks} /\ valid_keys ks{1} ==> ={glob Hmap});
+    first by fun; call Hmap_init.
+  call Gt.Lazy.abstract_init.
+  by rnd.
+  qed.
+
+  local equiv G4'_G5_equiv: G4'.main ~ G5.main: true ==> ={res}
+  by (apply (G4'_G5_abstract GAdv); apply lossless_GAdv).
 
   (** G6: upto "k2 executions of the loop didn't sample a bitstring starting with 0" *)
   local module H6: SplitOracle = {
@@ -982,7 +1078,7 @@ section.
         while (b /\ i < kg2)
         {
           z = $sample_plain Hmem.pk;
-          b = ((sub (to_bits z) 0 1) = ones 1);
+          b = ((sub (to_bits z) 0 1) <> zeros 1);
           w = HTag.from_bits (sub (to_bits z) 1 k1);
           st = GTag.from_bits (sub (to_bits z) (k1 + 1) kg);
           u = if c then ((inv Hmem.xstar Hmem.pk) * finv Hmem.sk  z) Hmem.pk else finv Hmem.sk z;
@@ -1018,7 +1114,7 @@ section.
       seq 1 1: (={b, i, c, x, w, st, z, u, glob Hmap, glob G} /\ !H6.bad{2}).
         while (={b, i, c, x, glob Hmap, glob G} /\ 0 <= i{1} /\ (i{1} > 0 => ={z, w, st, u}) /\ (i{1} = 0 => b{1})).
           seq 5 5: (={b, i, c, x, w, st, z, u, glob Hmap, glob G} /\ 0 <= i{1}).
-            by wp; rnd; skip; smt.
+            by wp; rnd; skip; progress=> //; smt.
             by if=> //; wp; skip; smt.
         by skip; progress=> //; smt.
       case (b{1}).
@@ -1066,7 +1162,7 @@ section.
         {
           u = $sample_plain Hmem.pk;
           z = if c then (f Hmem.pk Hmem.xstar * f Hmem.pk u) Hmem.pk else f Hmem.pk u;
-          b = (sub (to_bits z) 0 1 = ones 1);
+          b = (sub (to_bits z) 0 1 <> zeros 1);
           w = HTag.from_bits (sub (to_bits z) 1 k1);
           st = GTag.from_bits (sub (to_bits z) (k1 + 1) (kg));
           if (!b)
@@ -1102,7 +1198,7 @@ section.
         case c{2}.
           wp; rnd (lambda z, ((inv Hmem.xstar Hmem.pk) * finv Hmem.sk z) Hmem.pk){2}
                   (lambda u, ((f Hmem.pk Hmem.xstar) * f Hmem.pk u) Hmem.pk){2};
-          skip; progress => //; last 14 smt.
+          skip; progress => //; last 4 smt.
             by apply (challengeU Hmem.pk{2} _ _ _ _)=> //; smt.
             smt.
             rewrite homo_f_mul; first 2 smt.
@@ -1115,7 +1211,7 @@ section.
             smt.
 
           wp; rnd (lambda z, finv Hmem.sk z){2} (lambda u, f Hmem.pk u){2};
-          skip; progress=> //; last 17 smt.
+          skip; progress=> //; last 7 smt.
             by apply (challengeU Hmem.pk{2} _ _ _ _)=> //; smt.
         by skip.
       if=> //; by wp.
@@ -1154,7 +1250,7 @@ section.
           {
             u = $sample_plain I.pk;
             z = if c then (ystar * f pk u) pk else f pk u;
-            b = (sub (to_bits z) 0 1 = ones 1);
+            b = (sub (to_bits z) 0 1 <> zeros 1);
             w = HTag.from_bits (sub (to_bits z) 1 k1);
             st = GTag.from_bits (sub (to_bits z) (k1 + 1) (kg));
             if (!b)
