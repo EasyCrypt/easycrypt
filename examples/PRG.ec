@@ -339,6 +339,66 @@ axiom add_finite : forall (X :'a ISet.set) x, finite X => finite (ISet.add x X).
 axiom qP_pos : 0 <= qP.
 axiom qF_pos : 0 <= qF.
 
+lemma mu_or_le (d:'a distr) (p q:'a cpred) r1 r2: 
+   mu d p <= r1 => mu d q <= r2 => 
+   mu d (cpOr p q) <= r1 + r2.
+proof.
+  rewrite mu_or;smt.
+qed.
+
+lemma mu_cpMem_le (s:'a FSet.set): forall (d:'a distr) (bd:real),
+  (forall (x : 'a), mem x s => mu_x d x <= bd) =>
+    mu d (cpMem s) <= (card s)%r * bd.
+proof strict.
+ elimT set_ind s.
+ intros d bd Hmu_x.
+ rewrite (mu_eq d _ Fun.cpFalse).
+  by simplify Fun.(==) cpMem cpFalse;smt.
+ rewrite mu_false card_empty //.
+ clear s;intros x s Hnmem IH d bd Hmu_x.
+ rewrite card_add_nin // FromInt.Add Mul_distr_r CommutativeGroup.Comm.Comm.
+ rewrite (mu_eq d _ (Fun.cpOr ((=) x) (cpMem s))).
+  intros y; rewrite /cpMem /cpOr;smt.
+ apply mu_or_le; [ | apply IH]; by smt.
+qed.
+
+op of_list (l:'a list) = List.fold_right FSet.add FSet.empty l.
+ 
+lemma mem_of_list (x:'a) l : List.mem x l = mem x (of_list l).
+proof.
+ rewrite /of_list;elimT list_ind l. 
+   rewrite fold_right_nil;smt.
+ intros {l} y xs;rewrite fold_right_cons;smt.
+save.
+
+lemma card_of_list (l:'a list) :
+   card (of_list l) <= List.length l.
+proof.
+  rewrite /of_list;elimT list_ind l.
+   by rewrite fold_right_nil card_empty length_nil => //.
+  intros => {l} x xs H; rewrite fold_right_cons length_cons.  
+  case (mem x (fold_right add FSet.empty xs))=> Hin; 
+     [rewrite card_add_in // | rewrite card_add_nin //];smt.
+save.
+  
+lemma mu_Lmem (l:'a list) : forall (d:'a distr) (bd:real),
+  0%r <= bd => 
+  (forall (x : 'a), List.mem x l => mu_x d x <= bd) =>
+    mu d (lambda x, List.mem x l) <= (length l)%r * bd. 
+proof.
+ intros d bd Hbd Hl.
+ rewrite (mu_eq _ _ (cpMem (of_list l))). 
+   by intros x;rewrite /cpMem => /=; apply mem_of_list.
+ apply (Real.Trans _ ((card (of_list l))%r * bd)).
+  apply mu_cpMem_le => x. rewrite -mem_of_list;apply Hl.
+ by smt.
+save.
+
+lemma nosmt real_eq_le : forall (r1 r2:real), r1 = r2 => r1 <= r2.
+proof. intros => //. save.
+
+require import AlgTactic.
+
 lemma Pr3 (A<:Adv{Prg,F,C}) : 
    (forall (O1 <: AOrclPrg{A}) (O2<:OrclRnd{A}), islossless O1.prg => islossless O2.f => 
        islossless A(O1,O2).a) =>
@@ -368,34 +428,39 @@ proof.
        1%r (if bad Prg.logP F.m then 1%r 
             else  bd1 * ((qP + qF) * (n - length Prg.logP))%r) 
        0%r 1%r 
-         (n <= qP /\ Prg.logP = [] /\ card (toFSet (dom F.m)) <= qF) => //.
+         (finite (dom F.m) /\ n <= qP /\ Prg.logP = [] /\ 
+          card (toFSet (dom F.m)) <= qF) => //.
        rnd;wp => //.
-    while{1} (n <= qP /\ card (toFSet (dom F.m)) <= qF).
+    while{1} (finite (dom F.m) /\ n <= qP /\ card (toFSet (dom F.m)) <= qF).
     intros Hw.
     exists * Prg.logP;elim * => logP.
     case (bad Prg.logP F.m).
      conseq * ( _ : _ : <= (1%r)) => //; smt.
     seq 2 : (bad Prg.logP F.m) 
-      (bd1 * (qP + qF)%r) 1%r
+      ((qP + qF)%r * bd1) 1%r
       1%r  (bd1 * ((qP + qF) * (n - (length logP + 1)))%r)
-      (r::logP = Prg.logP /\ n <= qP /\ card (toFSet (dom F.m)) <= qF) => //.
+      (finite (dom F.m) /\ r::logP = Prg.logP /\ n <= qP /\ card (toFSet (dom F.m)) <= qF) => //.
      wp;rnd => //.
      wp;rnd;skip;progress.
-       admit.
-    (* Bug in conseq * : 
-       we should apply first conseq_bd and then conseq_nm. *)
-    conseq ( _ : _ : <= (if bad Prg.logP F.m then 1%r
-      else bd1 * ((qP + qF) * (n - (length Prg.logP)))%r)).
+     generalize H3;rewrite !FromInt.Add Mul_distr_r /bad -rw_nor /= => [Hu He].
+     apply (Real.Trans _ (mu dsample1 (cpOr (lambda x, mem x Prg.logP{hr})
+                                            (lambda x, in_dom x F.m{hr})))).
+      apply mu_sub => x /=; rewrite /cpOr; smt.
+     cut Hbd1 : 0%r <= bd1 by smt.
+     apply mu_or_le.
+       apply (Real.Trans _ ((length Prg.logP{hr})%r * bd1)).
+         by apply mu_Lmem; smt.
+       apply CompatOrderMult => //;smt.
+     rewrite (mu_eq _ _ (cpMem (toFSet (dom F.m{hr})))).
+       intros x; rewrite /= /cpMem. smt.
+     apply (Real.Trans _ ((card (toFSet (dom F.m{hr})))%r * bd1));smt.
+    conseq Hw => //.
       progress => //.
       rewrite (neqF ( bad (r{hr} :: logP) F.m{hr})) => //=; smt.
-      (* apply Hw. marche, ca sent le bug ??? *) conseq Hw => //.
     progress => //.
     rewrite (neqF (bad Prg.logP{hr} F.m{hr}) _) => //=.
     rewrite !FromInt.Mul !FromInt.Add !FromInt.Sub !FromInt.Add.
-    rewrite (_:bd1 * (qP%r + qF%r) +
-               bd1 * ((qP%r + qF%r) * 
-               (n{hr1}%r - ((length Prg.logP{hr})%r + 1%r))) =
-               bd1 * ((qP%r + qF%r) * (n{hr}%r - (length Prg.logP{hr})%r))) => //.
+    apply real_eq_le.
       (* ringeq . *) admit.
     skip;progress => //. smt.
 save.
