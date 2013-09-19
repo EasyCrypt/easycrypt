@@ -306,23 +306,6 @@ module C(A:Adv,P:AOrclPrg,R:OrclRnd) = {
     }
   }.
 
-lemma Pr2 (A<:Adv{Prg,F,C}) :
-    (forall (O1 <: AOrclPrg{A}) (O2<:OrclRnd{A}), islossless O1.prg => islossless O2.f => 
-       islossless A(O1,O2).a) =>
-    forall &m, 
-      Pr[Exp(C(A),Prg).main() @ &m : res] <= 
-        Pr[Exp(C(A),Prg_r).main() @ &m : res] + 
-        Pr[Exp'(C(A)).main() @ &m : bad Prg.logP F.m].
-proof.
- intros HA.      
- apply (Pr1 (<:C(A)) _). 
- intros O1 O2 HO1 HO2;fun.
- call (HA (<:C(A,O1,O2).CP) (<:C(A,O1,O2).CF) _ _).
-  fun;if;[call HO1 | ];wp => //.
-  fun;if;[call HO2 | ];wp => //.
-  wp => //.
-save.
-
 op bd1 : real.
 
 axiom dsample1_uni : forall r, mu_x dsample1 r = bd1.
@@ -446,11 +429,9 @@ instance ring with real
   proof ofintN    by smt.
 
 lemma Pr3 (A<:Adv{Prg,F,C}) : 
-   (forall (O1 <: AOrclPrg{A}) (O2<:OrclRnd{A}), islossless O1.prg => islossless O2.f => 
-       islossless A(O1,O2).a) =>
    bd_hoare [ Exp'(C(A)).main : true ==> bad Prg.logP F.m] <= (bd1 * ((qP + qF) * qP)%r).
 proof.
-  intros HA;fun.
+  fun.
   seq 3 : true (1%r) (bd1 * ((qP + qF) * qP)%r) 0%r 1%r  
         (finite (dom F.m) /\ length Prg.logP <= qP /\ FSet.card (toFSet (dom F.m)) <= qF) => //.
     inline Exp'(C(A)).A.a;wp.
@@ -492,7 +473,8 @@ proof.
      apply (Real.Trans _ (mu dsample1 (cpOr (lambda x, mem x Prg.logP{hr})
                                             (lambda x, in_dom x F.m{hr})))).
       apply mu_sub => x /=; rewrite /cpOr; smt.
-     cut Hbd1 : 0%r <= bd1 by smt.
+     cut Hbd1 : 0%r <= bd1.
+       cut _ := dsample1_uni default1;by smt.
      apply mu_or_le.
        apply (Real.Trans _ ((length Prg.logP{hr})%r * bd1)).
          by apply mu_Lmem; smt.
@@ -510,3 +492,25 @@ proof.
        ringeq.
     skip;progress => //. smt.
 save.
+
+lemma conclusion (A<:Adv{Prg,F,C}) :
+    (forall (O1 <: AOrclPrg{A}) (O2<:OrclRnd{A}), islossless O1.prg => islossless O2.f => 
+       islossless A(O1,O2).a) =>
+    forall &m, 
+      Pr[Exp(C(A),Prg).main() @ &m : res] <= 
+        Pr[Exp(C(A),Prg_r).main() @ &m : res] +  bd1 * ((qP + qF) * qP)%r.
+proof.
+ intros HA &m.      
+ apply (Real.Trans _ (Pr[Exp(C(A),Prg_r).main() @ &m : res] + 
+        Pr[Exp'(C(A)).main() @ &m : bad Prg.logP F.m])).
+ apply (Pr1 (<:C(A)) _ &m). 
+ intros O1 O2 HO1 HO2;fun.
+ call (HA (<:C(A,O1,O2).CP) (<:C(A,O1,O2).CF) _ _).
+  fun;if;[call HO1 | ];wp => //.
+  fun;if;[call HO2 | ];wp => //.
+  wp => //.
+ cut _ : Pr[Exp'(C(A)).main() @ &m : bad Prg.logP F.m] <= bd1 * ((qP + qF) * qP)%r;
+   last smt.
+ bdhoare_deno (Pr3 A) => //.
+save.
+
