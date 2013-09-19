@@ -328,17 +328,34 @@ op bd1 : real.
 axiom dsample1_uni : forall r, mu_x dsample1 r = bd1.
 import FSet.
 import ISet.Finite.
+print theory Real.
+(* TODO : move the 3 following lemmas *)
+lemma finite_empty : finite (ISet.empty <:'a>).
+proof.
+  exists FSet.empty;intros x;smt.
+save.
 
-axiom finite_empty : finite (ISet.empty <:'a>).
+lemma add_finite : forall (X :'a ISet.set) x, finite X => finite (ISet.add x X).
+proof.
+ intros X x [Y HY].
+ exists (FSet.add x Y) => y.
+ by rewrite mem_add ISet.mem_add;smt.
+save.
 
-axiom finite_add : forall (X :'a ISet.set) x,
+lemma finite_add : forall (X :'a ISet.set) x,
     finite X => toFSet (ISet.add x X) = FSet.add x (toFSet X).
-
-axiom add_finite : forall (X :'a ISet.set) x, finite X => finite (ISet.add x X).
+proof.
+ intros X x H.
+ apply set_ext => y.
+ rewrite (mem_toFSet y (ISet.add x X)).
+  apply add_finite => //.
+ rewrite mem_add ISet.mem_add (mem_toFSet y X) => //.
+save.
 
 axiom qP_pos : 0 <= qP.
 axiom qF_pos : 0 <= qF.
 
+(* TODO : move *)
 lemma mu_or_le (d:'a distr) (p q:'a cpred) r1 r2: 
    mu d p <= r1 => mu d q <= r2 => 
    mu d (cpOr p q) <= r1 + r2.
@@ -393,11 +410,40 @@ proof.
   apply mu_cpMem_le => x. rewrite -mem_of_list;apply Hl.
  by smt.
 save.
+(* TODO : end move *)
 
 lemma nosmt real_eq_le : forall (r1 r2:real), r1 = r2 => r1 <= r2.
 proof. intros => //. save.
 
 require import AlgTactic.
+
+print theory Real.
+instance ring with real
+  op rzero = Real.zero
+  op rone  = Real.one
+  op add   = Real.( + )
+  op opp   = Real.([-])
+  op mul   = Real.( * )
+  op expr  = Real.PowerInt.( ^ )
+  op sub   = Real.(-)
+  op ofint = FromInt.from_int
+
+  proof oner_neq0 by smt
+  proof addr0     by smt
+  proof addrA     by smt
+  proof addrC     by smt
+  proof addrN     by smt
+  proof mulr1     by smt
+  proof mulrA     by smt
+  proof mulrC     by smt
+  proof mulrDl    by smt
+  proof expr0     by smt
+  proof exprS     by smt
+  proof subrE     by smt
+  proof ofint0    by smt
+  proof ofint1    by smt
+  proof ofintS    by smt
+  proof ofintN    by smt.
 
 lemma Pr3 (A<:Adv{Prg,F,C}) : 
    (forall (O1 <: AOrclPrg{A}) (O2<:OrclRnd{A}), islossless O1.prg => islossless O2.f => 
@@ -433,13 +479,13 @@ proof.
        rnd;wp => //.
     while{1} (finite (dom F.m) /\ n <= qP /\ card (toFSet (dom F.m)) <= qF).
     intros Hw.
-    exists * Prg.logP;elim * => logP.
+    exists * Prg.logP, F.m, n;elim * => logP fm n0.
     case (bad Prg.logP F.m).
      conseq * ( _ : _ : <= (1%r)) => //; smt.
     seq 2 : (bad Prg.logP F.m) 
       ((qP + qF)%r * bd1) 1%r
       1%r  (bd1 * ((qP + qF) * (n - (length logP + 1)))%r)
-      (finite (dom F.m) /\ r::logP = Prg.logP /\ n <= qP /\ card (toFSet (dom F.m)) <= qF) => //.
+      (n = n0 /\ F.m = fm /\ finite (dom F.m) /\ r::logP = Prg.logP /\ n <= qP /\ card (toFSet (dom F.m)) <= qF) => //.
      wp;rnd => //.
      wp;rnd;skip;progress.
      generalize H3;rewrite !FromInt.Add Mul_distr_r /bad -rw_nor /= => [Hu He].
@@ -461,6 +507,6 @@ proof.
     rewrite (neqF (bad Prg.logP{hr} F.m{hr}) _) => //=.
     rewrite !FromInt.Mul !FromInt.Add !FromInt.Sub !FromInt.Add.
     apply real_eq_le.
-      (* ringeq . *) admit.
+       ringeq.
     skip;progress => //. smt.
 save.
