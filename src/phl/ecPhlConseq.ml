@@ -343,14 +343,14 @@ let process_conseq notmod info (_, n as g) =
         else t_bdHoareF_conseq hf.bhf_pr hf.bhf_po in
       let t2 = t_bdHoareF_conseq_bd hf.bhf_cmp hf.bhf_bd in
       lt := t_trivial :: !lt;
-      t_seq_subgoal t1 [t_id None; t_id None; t2]
+      t_seq_subgoal t2 [t_id None; t1]
     | FbdHoareS hs ->
       let t1 =
         if notmod then t_bdHoareS_conseq_nm hs.bhs_pr hs.bhs_po
         else t_bdHoareS_conseq hs.bhs_pr hs.bhs_po in
       let t2 = t_bdHoareS_conseq_bd hs.bhs_cmp hs.bhs_bd in
       lt := t_trivial :: !lt;
-      t_seq_subgoal t1 [t_id None; t_id None; t2]
+      t_seq_subgoal t2 [t_id None; t1]
     | FequivF ef   ->
       if notmod then t_equivF_conseq_nm ef.ef_pr ef.ef_po
       else t_equivF_conseq ef.ef_pr ef.ef_po
