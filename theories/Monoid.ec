@@ -219,7 +219,6 @@ elim/set_ind X=> {X}.
   elim/set_ind X.
     by rewrite Mbor.sum_empty /Mbor.Base.Z /Bbor.Z /=.
     intros=> g X' g_nin_X' IH' f_nin_addgX' disj sum_addgX'.
-    print pred disj_or.
     cut f_ng := disj f g  _ _ _ x'.
       by generalize f_nin_addgX'; rewrite mem_add; apply absurd.
       by rewrite mem_add.
