@@ -28,20 +28,20 @@ proof.
   fun;rnd;skip;progress => //.
   rewrite (_:mu [1..4] (lambda (x : int), k = x) = mu_x [1..4] k).
    rewrite /mu_x;apply mu_eq => //.
-  case (1 <= k && k <= 4) => Hk; [rewrite Dinter.mu_x_def_in // | rewrite Dinter.mu_x_def_notin //];
-   rewrite Dinter.supp_def => //.
+   case (1 <= k && k <= 4) => Hk; [rewrite Dinter.mu_x_def_in // | rewrite Dinter.mu_x_def_notin //];
+   rewrite Dinter.supp_def => //. 
 save.
 
-lemma prD6 : forall k &m, (if 1 <= k && k <= 4 then 1%r/4%r else 0%r) <= Pr[D6.sample() @ &m : res = k].
+lemma prD6 : forall k &m, Pr[D6.sample() @ &m : res = k] = if 1 <= k && k <= 4 then 1%r/4%r else 0%r.
 proof.
   intros k &m. 
   bdhoare_deno (_: true ==> k = res) => //.
   fun; case (1 <= k && k <= 4).
     seq 1 : true 1%r (1%r/4%r) 0%r 1%r (1 <= k <= 4 /\ r = 5) => //;first 2 wp => //.
     while (1 <= k <= 4) (if r <= 4 then 0 else 1) 1 (4%r/6%r) => //.
-    intros r; case (r <= 4) => /=. admit. admit. (* Bug in <= *)
+    intros r; case (r <= 4) => //=; first smt. 
     intros Hw.
-      seq 1 : (r=k) (4%r/6%r) 1%r (2%r/6%r) (1%r/4%r) (1<=k <= 4) => //.
+      seq 1 : (r=k) (1%r/6%r) 1%r (2%r/6%r) (1%r/4%r) (1<=k <= 4) => //.
       rnd => //.
       rnd;skip;progress => //.
         admit.
@@ -49,7 +49,6 @@ proof.
       rnd;skip;progress.           
         admit.
      conseq Hw => //.
-     smt.         
     conseq * (_: _ ==> true) => //.
     rnd;skip;progress => //;smt.
     intros z;rnd;skip;progress.
@@ -68,6 +67,5 @@ proof.
    equiv_deno (_: true ==> ={res}) => //. fun;eqobs_in.
  rewrite (_ : Pr[D6.sample() @ &m2 : k = res] = Pr[D6.sample() @ &m2 : res = k]).
    equiv_deno (_: true ==> ={res}) => //. fun;eqobs_in.
- rewrite (prD4 k &m1) (* (prD6 k &m2) *).
-admit.
+ rewrite (prD4 k &m1) (prD6 k &m2) => //.
 save.
