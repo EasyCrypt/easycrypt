@@ -170,7 +170,7 @@ clone Comoid as Mrplus with
 require import FSet.
 require import Distr.
 
-pred cpOrs (X:('a->bool) set) (x:'a) = Mbor.sum (lambda (P:'a->bool), P x) X.
+pred cpOrs (X:('a cpred) set) (x:'a) = Mbor.sum (lambda (P:'a cpred), P x) X.
 
 pred disj_or (X:('a->bool) set) =
   forall x1 x2, x1 <> x2 => mem x1 X => mem x2 X =>
@@ -237,12 +237,12 @@ qed.
 require ISet.
 import Real.
 lemma mean (d:'a distr) (p:'a -> bool):
-  ISet.Finite.finite (ISet.support d) =>
+  ISet.Finite.finite (ISet.create (support d)) =>
   d <> Dempty.dempty =>
-  mu d p = Mrplus.sum (lambda x, (mu_x d x)*(mu (Dunit.dunit x) p)) (ISet.Finite.toFSet (ISet.support d)).
+  mu d p = Mrplus.sum (lambda x, (mu_x d x)*(mu (Dunit.dunit x) p)) (ISet.Finite.toFSet (ISet.create (support d))).
 proof strict.
 intros=> fin_supp_d d_nempty.
-pose s := FSet.filter p (ISet.Finite.toFSet (ISet.support d)).
+pose s := FSet.filter p (ISet.Finite.toFSet (ISet.create (support d))).
 pose eq := lambda (a b:'a), a = b.
 pose pickp := lambda (p:'a -> bool), pick (FSet.filter p s).
 pose is := img eq s.
@@ -259,7 +259,7 @@ cut p_is_or: mu d p = mu d (cpOrs is).
   case (in_supp x d /\ p x)=> h.
     rewrite rw_eq_sym rw_eqT; exists (eq x);
     split;last by delta eq=> //.
-    by rewrite /s mem_img // mem_filter ISet.Finite.mem_toFSet // /ISet.support ISet.mem_create.
+    by rewrite /s mem_img // mem_filter ISet.Finite.mem_toFSet // /support ISet.mem_create.
     by rewrite rw_eq_sym rw_neqF;
        pose q := (lambda x', mem x' (img eq s) /\ x' x);
        change (! exists x, q x); apply nexists=> a;
@@ -267,7 +267,7 @@ cut p_is_or: mu d p = mu d (cpOrs is).
        case (mem a is)=> // /= a_in_is;
        cut valA :eq (pickp a) = a by (apply pcan_eq_pickp);
        generalize a_in_is; rewrite /is /s img_def=> [y [<-]];
-       rewrite mem_filter ISet.Finite.mem_toFSet // /ISet.support ISet.mem_create /=;
+       rewrite mem_filter ISet.Finite.mem_toFSet // /support ISet.mem_create /=;
        delta eq=> /=; apply absurd=> /= ->.
 cut disj_or_is: disj_or is.
   by rewrite /disj_or /is=> x1 x2 h;

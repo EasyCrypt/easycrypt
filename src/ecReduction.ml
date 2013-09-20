@@ -442,7 +442,7 @@ let check_alpha_equal ri hyps f1 f2 =
       ensure (hs1.bhs_cmp = hs2.bhs_cmp);
       check_s env subst hs1.bhs_s hs2.bhs_s;
       (* FIXME should check the memenv *)
-      aux env subst hs1.bhs_pr hs1.bhs_pr;
+      aux env subst hs1.bhs_pr hs2.bhs_pr;
       aux env subst hs1.bhs_po hs2.bhs_po;
       aux env subst hs1.bhs_bd hs2.bhs_bd
 

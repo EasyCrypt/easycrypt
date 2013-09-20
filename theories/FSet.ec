@@ -141,7 +141,7 @@ elim/list_case_eq (elems X).
      rewrite hd_cons mem_cons //.
 qed.
 
-lemma pick_single (x:'a set):
+lemma pick_single (x:'a):
   pick (single x) = x.
 proof strict.
 by rewrite -mem_single mem_pick // single_nempty.
