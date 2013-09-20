@@ -18,7 +18,7 @@ let process_phl loc ptac g =
     | Psp k                     -> EcPhlSp.t_sp k
     | Prcond (side, b, i)       -> EcPhlRCond.t_rcond side b i
     | Pcond side                -> EcPhlCond.process_cond side
-    | Pwhile (side, (phi, vopt))-> EcPhlWhile.process_while side phi vopt
+    | Pwhile(side,(phi,vopt,info))->EcPhlWhile.process_while side phi vopt info
     | Pfission info             -> EcPhlLoopTx.process_fission info
     | Pfusion info              -> EcPhlLoopTx.process_fusion info
     | Punroll info              -> EcPhlLoopTx.process_unroll info

@@ -1653,9 +1653,11 @@ code_position:
 
 while_tac_info : 
 | inv=sform
-    { (inv, None) }
+    { (inv, None, None) }
 | inv=sform vrnt=sform 
-    { (inv, Some vrnt) }
+    { (inv, Some vrnt, None) }
+| inv=sform vrnt=sform k=sform eps=sform 
+    { (inv, Some vrnt, Some (k,eps)) }
 
 rnd_info:
 | empty {PNoRndParams (* None,None *) }
