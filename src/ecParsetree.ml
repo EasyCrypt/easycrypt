@@ -554,11 +554,13 @@ type claim = psymbol * (pexpr * hint)
 
 (* -------------------------------------------------------------------- *)
 type pprint = 
-  | Pr_ty of pqsymbol
-  | Pr_op of pqsymbol
-  | Pr_th of pqsymbol
-  | Pr_pr of pqsymbol
-  | Pr_ax of pqsymbol
+  | Pr_ty  of pqsymbol
+  | Pr_op  of pqsymbol
+  | Pr_th  of pqsymbol
+  | Pr_pr  of pqsymbol
+  | Pr_ax  of pqsymbol
+  | Pr_mod of pqsymbol
+  | Pr_mty of pqsymbol
 
 (* -------------------------------------------------------------------- *)
 type renaming_kind = 

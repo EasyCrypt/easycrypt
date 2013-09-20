@@ -1087,7 +1087,7 @@ mod_def:
         | `Alias m ->
              if p <> [] then
                error (EcLocation.make $startpos $endpos)
-                 (Some "cannot parameterized module alias");
+                 (Some "cannot parameterize module alias");
              if t <> None then
                error (EcLocation.make $startpos $endpos)
                  (Some "cannot bind module type to module alias"); 
@@ -2225,6 +2225,8 @@ print:
 | THEORY qs=qident { Pr_th qs }
 | PRED   qs=qident { Pr_pr qs } 
 | AXIOM  qs=qident { Pr_ax qs }
+| MODULE qs=qident { Pr_mod qs }
+| MODULE TYPE qs=qident { Pr_mty qs }
 ;
 
 prover_iconfig:
