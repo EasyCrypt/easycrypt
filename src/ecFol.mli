@@ -166,6 +166,8 @@ val f_false : form
 (* soft-constructors - numbers *)
 val f_int  : int -> form
 val f_rint : int -> form
+val f_i0   : form
+val f_i1   : form
 
 val f_real_of_int : form -> form
 

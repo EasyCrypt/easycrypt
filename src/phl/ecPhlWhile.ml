@@ -102,8 +102,12 @@ let t_bdHoare_while_rev inv g =
 let t_bdHoare_while_rev_geq inv vrnt k eps g =
   let env, _, concl = get_goal_e g in
   let bhs = t_as_bdHoareS concl in
-  if (bhs.bhs_cmp <> FHge) then 
-    tacuerror "only lower-bounded judgments are accepted for these parameters";
+  (* The test is not necessary : 
+     the rule is valid for <= (more hypothesis than the previous one),
+     So it is valid for = 
+  *)
+(*  if (bhs.bhs_cmp <> FHge) then 
+    tacuerror "only lower-bounded judgments are accepted for these parameters"; *)
   let b_pre  = bhs.bhs_pr in
   let b_post = bhs.bhs_po in
   let mem = bhs.bhs_m in
@@ -121,7 +125,7 @@ let t_bdHoare_while_rev_geq inv vrnt k eps g =
   in
   let inv_term_concl = 
     let concl= f_imp inv (
-      f_and (f_int_le vrnt k) (f_imp (f_int_le vrnt f_r0) (f_not loopGuard))) 
+      f_and (f_int_le vrnt k) (f_imp (f_int_le vrnt f_i0) (f_not loopGuard))) 
     in
     generalize_mod env (EcMemory.memory mem) modi concl
   in
