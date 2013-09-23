@@ -86,7 +86,7 @@ let process_pr fmt scope p =
       Format.fprintf fmt "%a@." (EcPrinting.pp_axiom ppe) (p, ax)
      
   | Pr_mod qs ->
-      let (p, me) = EcEnv.Mod.lookup qs.pl_desc env in
+      let (_p, me) = EcEnv.Mod.lookup qs.pl_desc env in
       Format.fprintf fmt "%a@." (EcPrinting.pp_modexp ppe) me
 
   | Pr_mty qs ->
