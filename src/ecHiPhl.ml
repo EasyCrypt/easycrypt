@@ -40,6 +40,7 @@ let process_phl loc ptac g =
     | Pfel (at_pos, info)       -> EcPhlFel.process_fel at_pos info
     | Pequivdeno info           -> EcPhlDeno.process_equiv_deno info
     | Phoare | Pbdhoare         -> EcPhlBdHoare.t_hoare_bd_hoare
+    | Pbdhoare_split i          -> EcPhlPrRw.process_bdhoare_split i
     | Pprbounded                -> EcPhlPr.t_prbounded true
     | Pprfalse                  -> EcPhlPr.t_prfalse
     | Ppr_rewrite s             -> EcPhlPrRw.t_pr_rewrite s 

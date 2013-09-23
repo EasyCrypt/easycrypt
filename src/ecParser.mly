@@ -1966,9 +1966,16 @@ phltactic:
 | BDHOARE {Pbdhoare}
 | PRBOUNDED {Pprbounded}
 | REWRITE PR s=LIDENT {Ppr_rewrite s}
+(* NEW TACTIC *)
+| BDHOARE SPLIT i=bdhoare_split { Pbdhoare_split i }
 (* TODO : remove this tactic *)
 | PRFALSE {Pprfalse}
 | BDEQ {Pbdeq}
+;
+
+bdhoare_split:
+| b1=sform b2=sform b3=sform? { BDH_split_bop (b1,b2,b3) }
+| NOT b1=sform b2=sform      { BDH_split_not (Some b1,b2) }
 ;
 
 trans_kind:

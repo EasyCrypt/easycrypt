@@ -180,6 +180,7 @@ val f_hoareS   : memenv -> form -> EcModules.stmt -> form -> form
 val f_hoareS_r : hoareS -> form
 
 (* soft-constructors - bd hoare *)
+val hoarecmp_opp : hoarecmp -> hoarecmp 
 val f_bdHoareF   : form -> EcPath.xpath -> form -> hoarecmp -> form -> form 
 val f_bdHoareS   : memenv -> form -> EcModules.stmt -> form -> hoarecmp -> form -> form 
 val f_bdHoareS_r : bdHoareS -> form

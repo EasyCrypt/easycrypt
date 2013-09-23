@@ -614,6 +614,12 @@ let f_hoareF pre f post =
     mk_form (FhoareF hf) ty_bool
 
 (* -------------------------------------------------------------------- *)
+let hoarecmp_opp cmp = 
+  match cmp with
+  | FHle -> FHge
+  | FHeq -> FHeq
+  | FHge -> FHle
+
 let f_bdHoareS_r bhs = mk_form (FbdHoareS bhs) ty_bool
 
 let f_bdHoareS mem pre s post hcmp bd = 
