@@ -104,11 +104,9 @@ let process_phl_bd_info dir g bd_info =
          match dir with
         | Backs -> hs.bhs_bd, f_r1
         | Fwds  -> f_r1, hs.bhs_bd
-  
       in
         (* The last argument will not be used *)
         (f_true, f1, f2, f_r0, f_r1)
-
   | PAppSingle f ->
       let f = process_phl_formula g f in
       let hs = t_as_bdHoareS (get_concl g) in
@@ -118,7 +116,6 @@ let process_phl_bd_info dir g bd_info =
         | Fwds   -> f, f_real_div hs.bhs_bd f
       in
         (f_true, f1, f2, f_r0, f_r1)
-
   | PAppMult (phi,f1,f2,g1,g2) ->
       let phi = phi |> omap_dfl (process_phl_formula g) f_true in
       let check_0 f =
@@ -129,26 +126,22 @@ let process_phl_bd_info dir g bd_info =
         | None, None ->
             (* Not accepted by the parser *)
             assert false
-
         | Some f, None ->
           let loc = f.pl_loc in
           let f = process_phl_form treal g f in
             set_loc loc check_0 f;
             (f, f_r1)
-
         | None, Some f ->
           let loc = f.pl_loc in
           let f = process_phl_form treal g f in
           set_loc loc check_0 f;
             (f_r1, f)
-
         | Some f1, Some f2 ->
             (process_phl_form treal g f1, process_phl_form treal g f2)
     in
-
     let f1, f2 = process_f (f1, f2) in
     let g1, g2 = process_f (g1, g2) in
-      (phi, f1, f2, g1, g2)
+    (phi, f1, f2, g1, g2)
 
 (* -------------------------------------------------------------------- *)
 let process_app dir k phi bd_info g =
@@ -160,9 +153,9 @@ let process_app dir k phi bd_info g =
         t_hoare_app i phi g
 
   | Single i, _ when is_bdHoareS concl ->
-      let pR = process_phl_formula g phi in
-      let (phi,f1,f2,f3,f4) = process_phl_bd_info dir g bd_info in
-        t_bdHoare_app i (phi, pR, f1, f2, f3, f4) g
+      let prob_interm_assertion = process_phl_formula g phi in
+      let (range_assertion,f1,f2,f3,f4) = process_phl_bd_info dir g bd_info in
+        t_bdHoare_app i (range_assertion, prob_interm_assertion, f1, f2, f3, f4) g
 
   | Double(i,j), PAppNone ->
     let phi = process_prhl_formula g phi in
