@@ -378,6 +378,7 @@ type phltactic =
   | Pkill       of (tac_side * codepos * int option)
   | Prnd        of tac_side * (pformula, pformula option, pformula) rnd_tac_info
   | Palias      of (tac_side * codepos * psymbol option)
+  | Pset        of (bool * tac_side * codepos * psymbol * pexpr)
   | Pconseq     of bool * ccfpattern 
   | Phr_exists_elim  
   | Phr_exists_intro of pformula list 

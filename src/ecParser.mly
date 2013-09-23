@@ -1902,6 +1902,10 @@ phltactic:
 
 | ALIAS s=side? o=codepos WITH x=lident
     { Palias (s, o, Some x) }
+(* NEW *)
+| ALIAS s=side? o=codepos x=lident EQ e=expr 
+    { Pset (false,s, o,x,e) }
+(* END NEW *)
 
 | FISSION s=side? o=codepos AT d1=NUM COMMA d2=NUM
     { Pfission (s, o, (1, (d1, d2))) }
