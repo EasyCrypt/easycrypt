@@ -448,7 +448,7 @@ proof.
          fun;wp;do !rnd;skip;progress => //; smt.
         wp;skip;progress => //;smt.
       wp => //.
-    inline F.init Prg_rB.init;wp;rnd;wp;skip;progress => //; smt.
+  inline F.init Prg_rB.init;wp;rnd;wp;skip;progress => //; smt.
  
   inline Resample.resample.
     seq 3 : true 
@@ -462,11 +462,12 @@ proof.
     intros Hw.
     exists * Prg.logP, F.m, n;elim * => logP fm n0.
     case (bad Prg.logP F.m).
-     conseq * ( _ : _ : <= (1%r)) => //; smt.
+     conseq * ( _ : _ : <= (1%r)) => //; smt. 
     seq 2 : (bad Prg.logP F.m) 
       ((qP + qF)%r * bd1) 1%r
       1%r  (bd1 * ((qP + qF) * (n - (length logP + 1)))%r)
-      (n = n0 /\ F.m = fm /\ finite (dom F.m) /\ r::logP = Prg.logP /\ n <= qP /\ card (toFSet (dom F.m)) <= qF) => //.
+      (n = n0 /\ F.m = fm /\ finite (dom F.m) /\ r::logP = Prg.logP /\ 
+       n <= qP /\ card (toFSet (dom F.m)) <= qF) => //.
      wp;rnd => //.
      wp;rnd;skip;progress.
      generalize H3;rewrite !FromInt.Add Mul_distr_r /bad -rw_nor /= => [Hu He].
