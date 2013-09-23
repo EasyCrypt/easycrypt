@@ -113,7 +113,8 @@ let t_bdHoare_while_rev_geq inv vrnt k eps g =
   let mem = bhs.bhs_m in
   let ((loopGuardExp,loopBody),rem_s) = s_last_while "while" bhs.bhs_s in
   if ( not (EcModules.s_equal rem_s (EcModules.stmt []) )) then 
-      tacuerror "only single loop statements are accepted with these parameters";
+      tacuerror 
+        "only single loop statements are accepted with these parameters";
   let loopGuard = form_of_expr (EcMemory.memory mem) loopGuardExp in
   let bound = bhs.bhs_bd in
   let modi = s_write env loopBody in
@@ -121,13 +122,14 @@ let t_bdHoare_while_rev_geq inv vrnt k eps g =
   let pre_bound_concl = 
     let term_post = f_imp (f_and b_pre (f_and (f_not loopGuard) b_post)) 
       (f_eq bound f_r0) in
-    generalize_mod env (EcMemory.memory mem) modi term_post
+    f_forall_mems [mem] 
+      (generalize_mod env (EcMemory.memory mem) modi term_post)
   in
   let inv_term_concl = 
     let concl= f_imp inv (
       f_and (f_int_le vrnt k) (f_imp (f_int_le vrnt f_i0) (f_not loopGuard))) 
     in
-    generalize_mod env (EcMemory.memory mem) modi concl
+    f_forall_mems [mem] (generalize_mod env (EcMemory.memory mem) modi concl)
   in
   let body_concl = 
     let while_s = EcModules.stmt [EcModules.i_while (loopGuardExp,loopBody)] in
