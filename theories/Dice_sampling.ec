@@ -5,7 +5,6 @@ require import FSet.
 
 require import AlgTactic.
 
-print theory Real.
 instance ring with real
   op rzero = Real.zero
   op rone  = Real.one
