@@ -70,6 +70,13 @@ cut ->: (forall (x y z:real), x = y - z <=> x + z = y) by smt;
 by rewrite -mu_disjoint ?cpEM //; apply leq_refl; rewrite cpC.
 qed.
 
+lemma mu_split (d:'a distr) (p q:'a cpred):
+  mu d p = mu d (cpAnd p q) + mu d (cpAnd p (cpNot q)).
+proof strict.
+rewrite -mu_disjoint; first smt.
+by apply mu_eq; smt.
+qed.
+
 lemma mu_in_supp (p:'a cpred) (d:'a distr):
   mu d p = mu d (cpAnd p (support d)).
 proof strict.
