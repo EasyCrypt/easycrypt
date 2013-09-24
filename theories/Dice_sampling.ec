@@ -3,67 +3,6 @@ require import Int.
 require import Real.
 require import FSet.
 
-require import AlgTactic.
-
-instance ring with real
-  op rzero = Real.zero
-  op rone  = Real.one
-  op add   = Real.( + )
-  op opp   = Real.([-])
-  op mul   = Real.( * )
-  op expr  = Real.PowerInt.( ^ )
-  op sub   = Real.(-)
-  op ofint = FromInt.from_int
-
-  proof oner_neq0 by smt
-  proof addr0     by smt
-  proof addrA     by smt
-  proof addrC     by smt
-  proof addrN     by smt
-  proof mulr1     by smt
-  proof mulrA     by smt
-  proof mulrC     by smt
-  proof mulrDl    by smt
-  proof expr0     by smt
-  proof exprS     by smt
-  proof subrE     by smt
-  proof ofint0    by smt
-  proof ofint1    by smt
-  proof ofintS    by smt
-  proof ofintN    by smt.
-
-instance field with real
-  op rzero = Real.zero
-  op rone  = Real.one
-  op add   = Real.( + )
-  op opp   = Real.([-])
-  op mul   = Real.( * )
-  op expr  = Real.PowerInt.( ^ )
-  op sub   = Real.(-)
-  op ofint = FromInt.from_int
-  op inv   = Real.inv
-  op div   = Real.(/)
-
-  proof oner_neq0 by smt
-  proof addr0     by smt
-  proof addrA     by smt
-  proof addrC     by smt
-  proof addrN     by smt
-  proof mulr1     by smt
-  proof mulrA     by smt
-  proof mulrC     by smt
-  proof mulrDl    by smt
-  proof mulrV     by smt
-  proof expr0     by smt
-  proof exprS     by smt
-  proof exprN     by admit
-  proof subrE     by smt
-  proof divrE     by smt
-  proof ofint0    by smt
-  proof ofint1    by smt
-  proof ofintS    by smt
-  proof ofintN    by smt.
-
   (* TODO : provide the good lemma in FSet *)
   axiom mu_cpMem (s:'a set): forall (d:'a distr) (bd:real),
     (forall (x : 'a), mem x s => mu_x d x = bd) => 

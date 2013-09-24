@@ -398,36 +398,6 @@ save.
 lemma nosmt real_eq_le : forall (r1 r2:real), r1 = r2 => r1 <= r2.
 proof. intros => //. save.
 
-require import AlgTactic.
-
-print theory Real.
-instance ring with real
-  op rzero = Real.zero
-  op rone  = Real.one
-  op add   = Real.( + )
-  op opp   = Real.([-])
-  op mul   = Real.( * )
-  op expr  = Real.PowerInt.( ^ )
-  op sub   = Real.(-)
-  op ofint = FromInt.from_int
-
-  proof oner_neq0 by smt
-  proof addr0     by smt
-  proof addrA     by smt
-  proof addrC     by smt
-  proof addrN     by smt
-  proof mulr1     by smt
-  proof mulrA     by smt
-  proof mulrC     by smt
-  proof mulrDl    by smt
-  proof expr0     by smt
-  proof exprS     by smt
-  proof subrE     by smt
-  proof ofint0    by smt
-  proof ofint1    by smt
-  proof ofintS    by smt
-  proof ofintN    by smt.
-
 lemma Pr3 (A<:Adv{Prg,F,C}) : 
    bd_hoare [ Exp'(C(A)).main : true ==> bad Prg.logP F.m] <= (bd1 * ((qP + qF) * qP)%r).
 proof.
