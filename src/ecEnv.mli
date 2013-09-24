@@ -233,7 +233,7 @@ module Theory : sig
   val add : path -> env -> env
 
   val bind  : symbol -> ctheory_w3 -> env -> env
-  val bindx : symbol -> ctheory -> env -> env
+(*  val bindx : symbol -> ctheory -> env -> env *)
 
   val require : symbol -> ctheory_w3 -> env -> env
   val import  : path -> env -> env

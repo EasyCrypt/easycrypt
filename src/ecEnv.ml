@@ -2095,17 +2095,23 @@ end
 module Algebra = struct
   open EcAlgebra
 
-  let add_ring p cr env =
-    { env with env_tci =
-        Mp.change
-          (function tci -> Some (`Ring cr :: odfl [] tci))
-          p env.env_tci }
+  let bind p cr tci = 
+    let change tci = 
+      let tci = odfl [] tci in
+      let eq cr1 cr2 = 
+        match cr1, cr2 with
+        | `Ring r1, `Ring r2 -> ring_equal r1 r2
+        | `Field f1, `Field f2 -> field_equal f1 f2
+        | _, _ -> false in
+      Some (if List.exists (eq cr) tci then tci else cr::tci) in
+     Mp.change change p tci
+ 
+  let add p cr env = 
+    { env with env_tci = bind p cr env.env_tci;
+      env_item = CTh_instance(p,cr)::env.env_item }
 
-  let add_field p cr env =
-    { env with env_tci =
-        Mp.change
-          (function tci -> Some (`Field cr :: odfl [] tci))
-          p env.env_tci }
+  let add_ring p cr env = add p (`Ring cr) env
+  let add_field p cr env = add p (`Field cr) env
 
   let get_instances ty env =
     match (Ty.hnorm ty env).ty_node with
@@ -2180,15 +2186,26 @@ module Theory = struct
     fst (lookup name env)
 
   (* ------------------------------------------------------------------ *)
+  let rec bind_instance_cth inst cth = 
+    List.fold_left bind_instance_cth_item inst cth.cth_struct 
+  and bind_instance_cth_item inst item = 
+    match item with
+    | CTh_instance (p,k) -> Algebra.bind p k inst
+    | CTh_theory(_,cth) -> bind_instance_cth inst cth 
+    | CTh_type _ | CTh_operator _ | CTh_axiom _ 
+    | CTh_modtype _ | CTh_module _ | CTh_export _ -> inst
+    
   let bind id cth env =
     let env = MC.bind_theory id cth.cth3_theory env in
-      { env with
-          env_w3   = EcWhy3.rebind env.env_w3 cth.cth3_rebind;
-          env_rb   = List.rev_append cth.cth3_rebind env.env_rb;
-          env_item = (CTh_theory (id, cth.cth3_theory)) :: env.env_item; }
+    { env with
+      env_w3   = EcWhy3.rebind env.env_w3 cth.cth3_rebind;
+      env_rb   = List.rev_append cth.cth3_rebind env.env_rb;
+      env_item = (CTh_theory (id, cth.cth3_theory)) :: env.env_item; 
+      env_tci  = bind_instance_cth env.env_tci cth.cth3_theory
+    }
 
    (* ------------------------------------------------------------------ *)
-  let bindx name th env =
+(*  let bindx name th env =
     let rec compile1 path w3env item =
       let xpath = fun x -> EcPath.pqname path x in
         match item with
@@ -2221,7 +2238,7 @@ module Theory = struct
       { env with
           env_w3   = w3env;
           env_rb   = rb @ env.env_rb;
-          env_item = (CTh_theory (name, th)) :: env.env_item; }
+          env_item = (CTh_theory (name, th)) :: env.env_item; } *)
 
   (* ------------------------------------------------------------------ *)
   let rebind name cth env =

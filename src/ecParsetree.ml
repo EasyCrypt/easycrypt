@@ -356,6 +356,10 @@ type eager_info =
   | LE_done of psymbol 
   | LE_todo of psymbol * pstmt * pstmt * pformula * pformula
 
+type bdh_split = 
+  | BDH_split_bop of pformula * pformula * pformula option
+  | BDH_split_not of pformula option * pformula
+
 type phltactic = 
   | Pfun_def  
   | Pfun_abs    of pformula
@@ -378,6 +382,7 @@ type phltactic =
   | Pkill       of (tac_side * codepos * int option)
   | Prnd        of tac_side * (pformula, pformula option, pformula) rnd_tac_info
   | Palias      of (tac_side * codepos * psymbol option)
+  | Pset        of (bool * tac_side * codepos * psymbol * pexpr)
   | Pconseq     of bool * ccfpattern 
   | Phr_exists_elim  
   | Phr_exists_intro of pformula list 
@@ -396,6 +401,7 @@ type phltactic =
   | Ptrans_stmt of trans_info
   | Psymmetry   
   | Psp        of (bool option)
+  | Pbdhoare_split of bdh_split 
   (* for eager *)
   | Peager_seq of eager_info * (int * int) * pformula 
   | Peager_if  

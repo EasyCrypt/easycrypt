@@ -95,7 +95,41 @@ let alias_stmt id _ me i =
 
 let t_alias side cpos id g =
   let tr = fun side -> rn_hl_alias side cpos in
-  t_code_transform side cpos tr (t_fold (alias_stmt id)) g
+  t_code_transform side ~bdhoare:true cpos tr (t_fold (alias_stmt id)) g
+
+(* -------------------------------------------------------------------- *)
+class rn_hl_set side pos =
+object
+  inherit xrule "[hl] set"
+
+  method side     : bool option = side
+  method position : codepos     = pos
+end
+
+let rn_hl_set side pos =
+  RN_xtd (new rn_hl_set side pos :> xrule)
+
+let set_stmt fresh id e = 
+  let get_i me = 
+    let id       = EcLocation.unloc id in
+    let  v       = { v_name = id; v_type = e.e_ty } in
+    let (me, id) = fresh_pv me v in
+    let pv       = pv_loc (EcMemory.xpath me) id in
+    me,i_asgn (LvVar(pv,e.e_ty), e) in
+  let get_i = 
+    if fresh then get_i 
+    else
+      let res = ref None in
+      fun me ->
+        if !res = None then res := Some (get_i me);
+        oget !res in
+  fun _ _ me z ->
+    let me,i = get_i me in
+    (me, {z with Zpr.z_tail = i::z.Zpr.z_tail},[])
+
+let t_set fresh side cpos id e g =
+  let tr = fun side -> rn_hl_set side cpos in
+  t_code_transform side ~bdhoare:true cpos tr (t_zip (set_stmt fresh id e)) g
 
 (* -------------------------------------------------------------------- *)
 let cfold_stmt env me olen zpr =
@@ -187,3 +221,8 @@ let process_kill (side, cpos, len) g =
 
 let process_alias (side, cpos, id) g =
   t_alias side cpos id g
+
+let process_set (fresh,side,cpos, id, e) g = 
+  let e = EcCoreHiPhl.process_phl_exp side e None g in
+  t_set fresh side cpos id e g 
+  

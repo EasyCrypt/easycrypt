@@ -616,6 +616,10 @@ require import Distr.
 
 
 (* General result regarding cpMem *)
+(* TODO : this is two strong it should be:
+      (forall (x : 'a), mem x s => mu_x d x = bd) =>
+       mu d (cpMem s) = (card s)%r * bd.
+*)
 lemma mu_cpMem (s:'a set): forall (d:'a distr) (bd:real),
   (forall (x : 'a), mu_x d x = bd) =>
     mu d (cpMem s) = (card s)%r * bd.

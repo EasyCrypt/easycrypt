@@ -258,7 +258,7 @@ let rec h_red ri env hyps f =
       | OK_real_lt, [f1;f2] -> f_real_lt_simpl f1 f2
       | OK_int_add, [f1;f2] -> f_int_add_simpl f1 f2
       | OK_int_sub, [f1;f2] -> f_int_sub_simpl f1 f2
-      | OK_int_prod, [f1;f2] -> f_int_prod_simpl f1 f2
+      | OK_int_mul, [f1;f2] -> f_int_prod_simpl f1 f2
       | OK_real_add, [f1;f2] -> f_real_add_simpl f1 f2
       | OK_real_sub, [f1;f2] -> f_real_sub_simpl f1 f2
       | OK_real_prod, [f1;f2] -> f_real_prod_simpl f1 f2

@@ -681,10 +681,14 @@ let transexp (env : EcEnv.env) (ue : EcUnify.unienv) e =
 
 let transexpcast (env : EcEnv.env) (ue : EcUnify.unienv) t e =
   let (e', t') = transexp env ue e in
-
   try  EcUnify.unify env ue t' t; e'
   with EcUnify.UnificationFailure (t1, t2) ->
     tyerror e.pl_loc env (TypeMismatch ((t', t), (t1, t2)))
+
+let transexpcast_opt (env : EcEnv.env) (ue : EcUnify.unienv) oty e =
+  match oty with
+  | None -> fst (transexp env ue e)
+  | Some t -> transexpcast env ue t e
 
 (* -------------------------------------------------------------------- *)
 exception DuplicatedSigItemName

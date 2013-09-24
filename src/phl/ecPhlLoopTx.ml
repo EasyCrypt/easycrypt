@@ -219,5 +219,5 @@ let t_splitwhile b side cpos g =
     t_code_transform side cpos tr (t_fold (splitwhile_stmt b)) g
 
 let process_splitwhile (b, side, cpos) g =
-  let b = process_phl_exp side b tbool g in
+  let b = process_phl_exp side b (Some tbool) g in
     t_splitwhile b side cpos g

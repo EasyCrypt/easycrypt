@@ -29,6 +29,7 @@ let process_phl loc ptac g =
     | Pcfold info               -> EcPhlCodeTx.process_cfold info
     | Pkill info                -> EcPhlCodeTx.process_kill info
     | Palias info               -> EcPhlCodeTx.process_alias info
+    | Pset info                 -> EcPhlCodeTx.process_set info
     | Prnd (side, info)         -> EcPhlRnd.process_rnd side info
     | Pconseq (nm,info)         -> EcPhlConseq.process_conseq nm info
     | Phr_exists_elim           -> EcPhlExists.t_hr_exists_elim
@@ -39,6 +40,7 @@ let process_phl loc ptac g =
     | Pfel (at_pos, info)       -> EcPhlFel.process_fel at_pos info
     | Pequivdeno info           -> EcPhlDeno.process_equiv_deno info
     | Phoare | Pbdhoare         -> EcPhlBdHoare.t_hoare_bd_hoare
+    | Pbdhoare_split i          -> EcPhlPrRw.process_bdhoare_split i
     | Pprbounded                -> EcPhlPr.t_prbounded true
     | Pprfalse                  -> EcPhlPr.t_prfalse
     | Ppr_rewrite s             -> EcPhlPrRw.t_pr_rewrite s 

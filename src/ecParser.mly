@@ -1902,6 +1902,10 @@ phltactic:
 
 | ALIAS s=side? o=codepos WITH x=lident
     { Palias (s, o, Some x) }
+(* NEW *)
+| ALIAS s=side? o=codepos x=lident EQ e=expr 
+    { Pset (false,s, o,x,e) }
+(* END NEW *)
 
 | FISSION s=side? o=codepos AT d1=NUM COMMA d2=NUM
     { Pfission (s, o, (1, (d1, d2))) }
@@ -1962,9 +1966,16 @@ phltactic:
 | BDHOARE {Pbdhoare}
 | PRBOUNDED {Pprbounded}
 | REWRITE PR s=LIDENT {Ppr_rewrite s}
+(* NEW TACTIC *)
+| BDHOARE SPLIT i=bdhoare_split { Pbdhoare_split i }
 (* TODO : remove this tactic *)
 | PRFALSE {Pprfalse}
 | BDEQ {Pbdeq}
+;
+
+bdhoare_split:
+| b1=sform b2=sform b3=sform? { BDH_split_bop (b1,b2,b3) }
+| NOT b1=sform b2=sform      { BDH_split_not (Some b1,b2) }
 ;
 
 trans_kind:
