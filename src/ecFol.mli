@@ -437,7 +437,9 @@ type op_kind =
   | OK_real_lt
   | OK_int_add
   | OK_int_sub
-  | OK_int_prod
+  | OK_int_mul
+  | OK_int_exp
+  | OK_int_opp
   | OK_real_add
   | OK_real_sub
   | OK_real_prod
