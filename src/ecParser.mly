@@ -1087,7 +1087,7 @@ mod_def:
         | `Alias m ->
              if p <> [] then
                error (EcLocation.make $startpos $endpos)
-                 (Some "cannot parameterized module alias");
+                 (Some "cannot parameterize module alias");
              if t <> None then
                error (EcLocation.make $startpos $endpos)
                  (Some "cannot bind module type to module alias"); 
@@ -1653,9 +1653,11 @@ code_position:
 
 while_tac_info : 
 | inv=sform
-    { (inv, None) }
+    { (inv, None, None) }
 | inv=sform vrnt=sform 
-    { (inv, Some vrnt) }
+    { (inv, Some vrnt, None) }
+| inv=sform vrnt=sform k=sform eps=sform 
+    { (inv, Some vrnt, Some (k,eps)) }
 
 rnd_info:
 | empty {PNoRndParams (* None,None *) }
@@ -1900,6 +1902,10 @@ phltactic:
 
 | ALIAS s=side? o=codepos WITH x=lident
     { Palias (s, o, Some x) }
+(* NEW *)
+| ALIAS s=side? o=codepos x=lident EQ e=expr 
+    { Pset (false,s, o,x,e) }
+(* END NEW *)
 
 | FISSION s=side? o=codepos AT d1=NUM COMMA d2=NUM
     { Pfission (s, o, (1, (d1, d2))) }
@@ -1960,9 +1966,16 @@ phltactic:
 | BDHOARE {Pbdhoare}
 | PRBOUNDED {Pprbounded}
 | REWRITE PR s=LIDENT {Ppr_rewrite s}
+(* NEW TACTIC *)
+| BDHOARE SPLIT i=bdhoare_split { Pbdhoare_split i }
 (* TODO : remove this tactic *)
 | PRFALSE {Pprfalse}
 | BDEQ {Pbdeq}
+;
+
+bdhoare_split:
+| b1=sform b2=sform b3=sform? { BDH_split_bop (b1,b2,b3) }
+| NOT b1=sform b2=sform      { BDH_split_not (Some b1,b2) }
 ;
 
 trans_kind:
@@ -2225,6 +2238,8 @@ print:
 | THEORY qs=qident { Pr_th qs }
 | PRED   qs=qident { Pr_pr qs } 
 | AXIOM  qs=qident { Pr_ax qs }
+| MODULE qs=qident { Pr_mod qs }
+| MODULE TYPE qs=qident { Pr_mty qs }
 ;
 
 prover_iconfig:

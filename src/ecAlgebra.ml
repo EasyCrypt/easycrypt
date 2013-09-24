@@ -53,11 +53,31 @@ type ring = {
   r_embed : [ `Direct | `Embed of EcPath.path ];
 }
 
+let ring_equal r1 r2 = 
+  EcTypes.ty_equal r1.r_type r2.r_type &&
+  EcPath.p_equal r1.r_zero r2.r_zero &&
+  EcPath.p_equal r1.r_one  r2.r_one  &&
+  EcPath.p_equal r1.r_add  r2.r_add  &&
+  EcPath.p_equal r1.r_opp  r2.r_opp  &&
+  EcPath.p_equal r1.r_mul  r2.r_mul  &&
+  EcPath.p_equal r1.r_exp  r2.r_exp  &&
+  EcUtils.oall2 EcPath.p_equal r1.r_sub r2.r_sub &&
+  match r1.r_embed, r2.r_embed with
+  | `Direct, `Direct -> true
+  | `Embed p1, `Embed p2 -> EcPath.p_equal p1 p2
+  | _, _ -> false
+
+  
 type field = {
   f_ring : ring;
   f_inv  : path;
   f_div  : path option;
 }
+
+let field_equal f1 f2 = 
+  ring_equal f1.f_ring f2.f_ring && 
+  EcPath.p_equal f1.f_inv f2.f_inv &&
+  EcUtils.oall2 EcPath.p_equal f1.f_div f2.f_div
 
 (* -------------------------------------------------------------------- *)
 type eq  = form * form
@@ -155,23 +175,42 @@ let toring ((r, cr) : cring) (rmap : RState.rstate) (form : form) =
         match Mp.find_opt op cr with
         | None -> abstract form
         | Some op -> begin
-            match op,args with
-            | `Zero, []           -> PEc c0
-            | `One , []           -> PEc c1
-            | `Add , [arg1; arg2] -> PEadd (doit arg1, doit arg2)
-            | `Opp , [arg1]       -> PEsub (PEc c0, doit arg1)
-            | `Sub , [arg1; arg2] -> PEsub (doit arg1, doit arg2)
-            | `Mul , [arg1; arg2] -> PEmul (doit arg1, doit arg2)
-            | `Exp , [arg1; arg2] -> begin
-                match arg2.f_node with
-                | Fint n when n >= 0 -> PEpow (doit arg1, n)
-                | _ -> abstract form
-            end
-            | `OfInt, [arg1] -> begin
-              match arg1.f_node with
+          match op,args with
+          | `Zero, []           -> PEc c0
+          | `One , []           -> PEc c1
+          | `Add , [arg1; arg2] -> PEadd (doit arg1, doit arg2)
+          | `Opp , [arg1]       -> PEsub (PEc c0, doit arg1)
+          | `Sub , [arg1; arg2] -> PEsub (doit arg1, doit arg2)
+          | `Mul , [arg1; arg2] -> PEmul (doit arg1, doit arg2)
+          | `Exp , [arg1; arg2] -> begin
+            match arg2.f_node with
+            | Fint n when n >= 0 -> PEpow (doit arg1, n)
+            | _ -> abstract form
+          end
+          | `OfInt, [arg1] -> 
+            let rec of_int f = 
+              match f.f_node with
               | Fint n -> PEc (Big_int.big_int_of_int n)
-              | _ -> abstract form
-            end
+              | Fapp({f_node = Fop (p,_)}, [a1;a2]) ->
+                begin match op_kind p with
+                | OK_int_add -> PEadd (of_int a1, of_int a2)
+                | OK_int_sub -> PEsub (of_int a1, of_int a2)
+                | OK_int_mul -> PEmul (of_int a1, of_int a2)
+                | OK_int_exp -> 
+                  begin match a2.f_node with
+                  | Fint n when 0 <= n -> PEpow (of_int a1, n)
+                  | _ -> abstract f
+                  end
+                | _ -> abstract f
+                end 
+              | Fapp({f_node = Fop (p,_)}, [a]) ->
+                begin match op_kind p with
+                | OK_int_opp -> PEsub (PEc c0, of_int a)
+                | _ -> abstract f
+                end
+              | _ -> abstract f in
+            of_int arg1
+
             | _, _ -> abstract form
         end
     end
@@ -194,26 +233,45 @@ let tofield ((r, cr) : cfield) (rmap : RState.rstate) (form : form) =
         match Mp.find_opt op cr with
         | None -> abstract form
         | Some op -> begin
-            match op,args with
-            | `Zero, []           -> FEc c0
-            | `One , []           -> FEc c1
-            | `Add , [arg1; arg2] -> FEadd (doit arg1, doit arg2)
-            | `Opp , [arg1]       -> FEsub (FEc c0, doit arg1)
-            | `Sub , [arg1; arg2] -> FEsub (doit arg1, doit arg2)
-            | `Mul , [arg1; arg2] -> FEmul (doit arg1, doit arg2)
-            | `Inv , [arg1]       -> FEdiv (FEc c1, doit arg1)
-            | `Div , [arg1; arg2] -> FEdiv (doit arg1, doit arg2)
-            | `Exp , [arg1; arg2] -> begin
-                match arg2.f_node with
-                | Fint n -> FEpow (doit arg1, n)
-                | _ -> abstract form
-            end
-            | `OfInt, [arg1] -> begin
-              match arg1.f_node with
+          match op,args with
+          | `Zero, []           -> FEc c0
+          | `One , []           -> FEc c1
+          | `Add , [arg1; arg2] -> FEadd (doit arg1, doit arg2)
+          | `Opp , [arg1]       -> FEsub (FEc c0, doit arg1)
+          | `Sub , [arg1; arg2] -> FEsub (doit arg1, doit arg2)
+          | `Mul , [arg1; arg2] -> FEmul (doit arg1, doit arg2)
+          | `Inv , [arg1]       -> FEdiv (FEc c1, doit arg1)
+          | `Div , [arg1; arg2] -> FEdiv (doit arg1, doit arg2)
+          | `Exp , [arg1; arg2] -> begin
+            match arg2.f_node with
+              (* TODO : il faut faire un truc pour < 0 *)
+            | Fint n -> FEpow (doit arg1, n)
+            | _ -> abstract form
+          end
+          | `OfInt, [arg1] -> 
+            let rec of_int f = 
+              match f.f_node with
               | Fint n -> FEc (Big_int.big_int_of_int n)
-              | _ -> abstract form
-            end
-            | _, _ -> abstract form
+              | Fapp({f_node = Fop (p,_)}, [a1;a2]) ->
+                begin match op_kind p with
+                | OK_int_add -> FEadd (of_int a1, of_int a2)
+                | OK_int_sub -> FEsub (of_int a1, of_int a2)
+                | OK_int_mul -> FEmul (of_int a1, of_int a2)
+                | OK_int_exp -> 
+                  begin match a2.f_node with
+                  | Fint n when 0 <= n -> FEpow (of_int a1, n)
+                  | _ -> abstract f
+                  end
+                | _ -> abstract f
+                end 
+              | Fapp({f_node = Fop (p,_)}, [a]) ->
+                begin match op_kind p with
+                | OK_int_opp -> FEsub (FEc c0, of_int a)
+                | _ -> abstract f
+                end
+              | _ -> abstract f in
+            of_int arg1
+          | _, _ -> abstract form
         end
     end
     | SFint i when r.f_ring.r_embed = `Direct -> FEc (Big_int.big_int_of_int i)

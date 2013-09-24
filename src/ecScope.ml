@@ -999,7 +999,7 @@ module Mod = struct
             let env = scope.sc_env in
             (* We keep only the internal part, i.e the inner global variables *)
             (* TODO : using mod_use here to compute the set of inner global 
-               variables is inefficiant, change this algo *)
+               variables is inefficient, change this algo *)
             let mp = EcPath.mpath_crt mpath [] None in
             let use = EcEnv.NormMp.mod_use env mp in
             let rx = 
@@ -1036,7 +1036,7 @@ module Mod = struct
 
   let declare (scope : scope) m =
     if not (CoreSection.in_section scope.sc_section) then
-      hierror "cannot declare an abstract module outside of a module";
+      hierror "cannot declare an abstract module outside of a section";
 
     let modty = m.ptmd_modty in
     let tysig = fst (TT.transmodtype scope.sc_env (fst modty)) in

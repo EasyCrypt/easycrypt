@@ -614,6 +614,12 @@ let f_hoareF pre f post =
     mk_form (FhoareF hf) ty_bool
 
 (* -------------------------------------------------------------------- *)
+let hoarecmp_opp cmp = 
+  match cmp with
+  | FHle -> FHge
+  | FHeq -> FHeq
+  | FHge -> FHle
+
 let f_bdHoareS_r bhs = mk_form (FbdHoareS bhs) ty_bool
 
 let f_bdHoareS mem pre s post hcmp bd = 
@@ -1723,7 +1729,9 @@ type op_kind =
   | OK_real_lt
   | OK_int_add
   | OK_int_sub
-  | OK_int_prod
+  | OK_int_mul
+  | OK_int_exp
+  | OK_int_opp
   | OK_real_add
   | OK_real_sub
   | OK_real_prod
@@ -1748,7 +1756,9 @@ let operators =
      EcCoreLib.p_real_lt, OK_real_lt;
      EcCoreLib.p_int_add, OK_int_add;
      EcCoreLib.p_int_sub, OK_int_sub;
-     EcCoreLib.p_int_prod, OK_int_prod;
+     EcCoreLib.p_int_prod, OK_int_mul;
+     EcCoreLib.p_int_opp, OK_int_opp;
+     EcCoreLib.p_int_pow, OK_int_exp;
      EcCoreLib.p_real_add, OK_real_add;
      EcCoreLib.p_real_sub, OK_real_sub;
      EcCoreLib.p_real_prod, OK_real_prod;
@@ -1767,7 +1777,7 @@ let is_logical_op op =
   match op_kind op with
   | OK_not | OK_and _ | OK_or _ | OK_imp | OK_iff | OK_eq 
   | OK_int_le| OK_int_lt | OK_real_le | OK_real_lt 
-  | OK_int_add | OK_int_sub | OK_int_prod 
+  | OK_int_add | OK_int_sub | OK_int_mul 
   | OK_real_add | OK_real_sub| OK_real_prod | OK_real_div -> true
   | _ -> false
 

@@ -43,25 +43,40 @@ end
 let rn_hl_hoare_bd_hoare =
   RN_xtd (new rn_hl_hoare_bd_hoare)
 
+
 (* -------------------------------------------------------------------- *)
+let hoare_of_bdhoare g =
+  let concl = get_concl g in
+  let bhs = t_as_bdHoareS concl in
+  let concl1 = f_hoareS bhs.bhs_m bhs.bhs_pr bhs.bhs_s (f_not bhs.bhs_po) in
+  let concl2 = 
+    let bd_cond = 
+      if bhs.bhs_cmp = FHle then f_real_le f_r0 bhs.bhs_bd 
+      else f_eq bhs.bhs_bd f_r0
+    in
+    f_forall_mems [bhs.bhs_m] (f_imp bhs.bhs_pr bd_cond ) in
+  prove_goal_by [concl2;concl1] rn_hl_hoare_bd_hoare g
+
+
+
+let bdhoare_of_hoare g =
+  let concl = get_concl g in
+  let hs = t_as_hoareS concl in
+  let concl1 = f_bdHoareS hs.hs_m hs.hs_pr hs.hs_s (f_not hs.hs_po) FHeq f_r0 in
+  prove_goal_by [concl1] rn_hl_hoare_bd_hoare g
+    
+
 let t_hoare_bd_hoare g =
   let concl = get_concl g in
   if is_bdHoareS concl then
-    let bhs = t_as_bdHoareS concl in
-    let concl1 = f_hoareS bhs.bhs_m bhs.bhs_pr bhs.bhs_s (f_not bhs.bhs_po) in
-    if f_equal bhs.bhs_bd f_r0 then
-      prove_goal_by [concl1] rn_hl_hoare_bd_hoare g
-    else 
-      (* Rewrite this : it is a consequence rule *)
-      let concl2 = 
-        f_forall_mems [bhs.bhs_m] (f_imp bhs.bhs_pr (f_eq bhs.bhs_bd f_r0)) in
-      prove_goal_by [concl1;concl2] rn_hl_hoare_bd_hoare g
+    let subgoals = hoare_of_bdhoare g in
+    t_on_first (t_try EcPhlTrivial.t_trivial) subgoals
   else if is_hoareS concl then
-    let hs = t_as_hoareS concl in
-    let concl1 = f_bdHoareS hs.hs_m hs.hs_pr hs.hs_s (f_not hs.hs_po) FHeq f_r0 in
-    prove_goal_by [concl1] rn_hl_hoare_bd_hoare g
+    bdhoare_of_hoare g
   else 
     cannot_apply "hoare/bd_hoare" "a hoare or bd_hoare judgment was expected" 
+
+
 
 let t_bdeq g = 
   let concl = get_concl g in
@@ -69,21 +84,3 @@ let t_bdeq g =
   let concl = f_bdHoareS_r {bhs with bhs_cmp=FHeq } in
     prove_goal_by [concl] (RN_xtd (new EcPhlPr.rn_hl_prbounded)) g
     
-(* -------------------------------------------------------------------- *)
-class rn_hoare_true =
-object
-  inherit xrule "[hl] hoare-true"
-end
-
-let rn_hoare_true =
-  RN_xtd (new rn_hoare_true :> xrule)
-
-(* -------------------------------------------------------------------- *)
-let t_hoare_true g = 
-  let concl = get_concl g in
-  match concl.f_node with
-  | FhoareF hf when f_equal hf.hf_po f_true ->
-    prove_goal_by [] rn_hoare_true g   
-  | FhoareS hs when f_equal hs.hs_po f_true ->
-    prove_goal_by [] rn_hoare_true g    
-  | _ -> tacuerror "the conclusion should have the form hoare[_ : _ ==> true]"

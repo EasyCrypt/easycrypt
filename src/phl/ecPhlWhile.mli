@@ -18,3 +18,5 @@ val t_equiv_while      : form -> tactic
 
 (* -------------------------------------------------------------------- *)
 val process_while : bool option -> pformula -> pformula option -> tactic
+val process_while : bool option -> pformula -> pformula option -> 
+  (pformula * pformula) option -> tactic

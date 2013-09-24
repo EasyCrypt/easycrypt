@@ -2001,6 +2001,3 @@ let rec pp_theory ppe (fmt:Format.formatter) (path, cth) =
       EcSymbols.pp_qsymbol (PPEnv.th_symb ppe p)
   | EcTheory.CTh_instance _ ->
     Format.fprintf fmt "instance <FIXME>."
-
-  
-

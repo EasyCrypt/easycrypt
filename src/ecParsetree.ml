@@ -356,6 +356,10 @@ type eager_info =
   | LE_done of psymbol 
   | LE_todo of psymbol * pstmt * pstmt * pformula * pformula
 
+type bdh_split = 
+  | BDH_split_bop of pformula * pformula * pformula option
+  | BDH_split_not of pformula option * pformula
+
 type phltactic = 
   | Pfun_def  
   | Pfun_abs    of pformula
@@ -364,7 +368,7 @@ type phltactic =
   | Pskip
   | Papp        of (tac_dir * int doption * pformula * p_app_bd_info)
   | Pwp         of int doption option 
-  | Pwhile      of tac_side * (pformula * pformula_o )
+  | Pwhile      of tac_side * (pformula * pformula_o * (pformula * pformula) option)
   | Pfission    of (tac_side * codepos * (int * (int * int)))
   | Pfusion     of (tac_side * codepos * (int * (int * int)))
   | Punroll     of (tac_side * codepos)
@@ -378,6 +382,7 @@ type phltactic =
   | Pkill       of (tac_side * codepos * int option)
   | Prnd        of tac_side * (pformula, pformula option, pformula) rnd_tac_info
   | Palias      of (tac_side * codepos * psymbol option)
+  | Pset        of (bool * tac_side * codepos * psymbol * pexpr)
   | Pconseq     of bool * ccfpattern 
   | Phr_exists_elim  
   | Phr_exists_intro of pformula list 
@@ -396,6 +401,7 @@ type phltactic =
   | Ptrans_stmt of trans_info
   | Psymmetry   
   | Psp        of (bool option)
+  | Pbdhoare_split of bdh_split 
   (* for eager *)
   | Peager_seq of eager_info * (int * int) * pformula 
   | Peager_if  
@@ -554,11 +560,13 @@ type claim = psymbol * (pexpr * hint)
 
 (* -------------------------------------------------------------------- *)
 type pprint = 
-  | Pr_ty of pqsymbol
-  | Pr_op of pqsymbol
-  | Pr_th of pqsymbol
-  | Pr_pr of pqsymbol
-  | Pr_ax of pqsymbol
+  | Pr_ty  of pqsymbol
+  | Pr_op  of pqsymbol
+  | Pr_th  of pqsymbol
+  | Pr_pr  of pqsymbol
+  | Pr_ax  of pqsymbol
+  | Pr_mod of pqsymbol
+  | Pr_mty of pqsymbol
 
 (* -------------------------------------------------------------------- *)
 type renaming_kind = 

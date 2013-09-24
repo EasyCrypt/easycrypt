@@ -84,6 +84,14 @@ let process_pr fmt scope p =
   | Pr_ax qs ->
       let (p, ax) = EcEnv.Ax.lookup qs.pl_desc env in
       Format.fprintf fmt "%a@." (EcPrinting.pp_axiom ppe) (p, ax)
+     
+  | Pr_mod qs ->
+      let (_p, me) = EcEnv.Mod.lookup qs.pl_desc env in
+      Format.fprintf fmt "%a@." (EcPrinting.pp_modexp ppe) me
+
+  | Pr_mty qs ->
+      let (p, ms) = EcEnv.ModTy.lookup qs.pl_desc env in
+      Format.fprintf fmt "%a@." (EcPrinting.pp_modsig ppe) (p, ms)
 
 let process_print scope p = 
   process_pr Format.std_formatter scope p
