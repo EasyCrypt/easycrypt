@@ -614,35 +614,25 @@ end Interval.
 require import Real.
 require import Distr.
 
-
-(* General result regarding cpMem *)
-(* TODO : this is two strong it should be:
-      (forall (x : 'a), mem x s => mu_x d x = bd) =>
-       mu d (cpMem s) = (card s)%r * bd.
-*)
 lemma mu_cpMem (s:'a set): forall (d:'a distr) (bd:real),
-  (forall (x : 'a), mu_x d x = bd) =>
+  (forall (x : 'a), mem x s => mu_x d x = bd) =>
     mu d (cpMem s) = (card s)%r * bd.
 proof strict.
- elimT set_ind s.
- intros d bd Hmu_x.
- rewrite (mu_eq d _ Fun.cpFalse).
-  simplify Fun.(==) cpMem cpFalse;smt.
- rewrite mu_false card_empty //; smt.
- clear s;intros x s Hnmem IH d bd Hmu_x.
- cut ->: (card (add x s))%r * bd = 
-          bd + (card s)%r * bd. 
-  rewrite card_add_nin //=;smt.
- rewrite (mu_eq d _ (Fun.cpOr ((=) x) (cpMem s))).
- simplify Fun.(==) cpMem cpOr;smt.
- rewrite mu_or.
- cut ->: (mu d (Fun.cpAnd ((=) x) (cpMem s)) =
-          mu d (Fun.cpFalse)).
-  apply mu_eq;simplify Fun.(==) cpMem cpFalse;smt.
- rewrite mu_false (IH d bd _);first assumption.
- cut ->: (mu d ((=) x) = mu_x d x).
-  simplify mu_x=> //.
- rewrite Hmu_x;smt.
+  elimT set_ind s.
+  intros d bd Hmu_x.
+  rewrite (mu_eq d _ Fun.cpFalse).
+    by intros x;rewrite /cpMem /cpFalse /= rw_neqF;apply mem_empty.
+  rewrite mu_false card_empty //.
+  intros {s} x s Hnmem IH d bd Hmu_x.
+  rewrite (_: (card (add x s))%r * bd = 
+          bd + (card s)%r * bd); first by rewrite card_add_nin //=;ringeq.
+  rewrite (mu_eq d _ (Fun.cpOr ((=) x) (cpMem s))).
+    by intros z;rewrite /cpMem /cpOr mem_add orC (rw_eq_sym z).
+  rewrite mu_disjoint.
+   by rewrite /cpAnd /cpOr /cpFalse /cpMem => z /=;smt.
+  (cut ->: (mu d ((=) x) = mu_x d x)) => //.
+  rewrite Hmu_x; first by rewrite mem_add.
+  by rewrite (IH _ bd) //;intros z Hz;apply Hmu_x;rewrite mem_add;left.
 qed.
 
 

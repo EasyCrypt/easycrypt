@@ -3,11 +3,6 @@ require import Int.
 require import Real.
 require import FSet.
 
-  (* TODO : provide the good lemma in FSet *)
-  axiom mu_cpMem (s:'a set): forall (d:'a distr) (bd:real),
-    (forall (x : 'a), mem x s => mu_x d x = bd) => 
-    mu d (cpMem s) = (card s)%r * bd.
-
 theory GenDice.
 
   type t.
