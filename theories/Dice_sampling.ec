@@ -49,50 +49,42 @@ theory GenDice.
       cut Hdiff : ! bdt = (Real.zero)%Real by smt.
       while (i0=i) (if test i r then 0 else 1) 1 (bdt * bd) => //; first 2 smt.
         intros Hw; alias 2 r0 = r.
-        conseq (_: _ ==> (k = r0 /\ k = r) \/ (k <> r0 /\ k = r)); first by smt.
         cut Htk' := Htk;generalize Htk';rewrite -test_sub_supp => Hmemk.
-        bd_hoare split bd ((1%r - bdt*bd) * (1%r/bdt)).
+        bd_hoare split bd ((1%r - bdt*bd) * (1%r/bdt)) : (k=r0).
           by intros _ _; fieldeq => //.
           (* bounding pr : k = r0 /\ k = r *)
           seq 2 : (k = r0) bd 1%r 1%r 0%r (r0 = r /\ i = i0) => //.
             by wp;rnd => //.
             wp;rnd;skip;progress => //. 
-            rewrite -(d_uni i{hr} k) /mu_x; first smt.
-            by apply mu_eq => //.
-            rcondf 1 => //.
-            conseq * (_: _ ==> false) => //.
+            by rewrite -(d_uni i{hr} k) /mu_x; [ smt | apply mu_eq].
+            by rcondf 1 => //.
+          by conseq * (_: _ ==> false) => //.
           (* bounding pr : ! k = r0 /\ k = r *)
-          conseq * (_: _ ==> (test i r0 /\ !k=r0 /\ k = r) \/ (!test i r0 /\ !k = r0 /\ k = r));
-            first by smt.
-          bd_hoare split 0%r ((1%r - bdt*bd) * (1%r/bdt)).
-            by intros &m1 [ _ H]; fieldeq => //.
-            (* bounding pr :  test i r0 /\ ! k = r0 /\ k = r *) 
-            seq 2 : (test i r0) 1%r 0%r 1%r 0%r (i0 = i /\ test i k /\ r0 = r) => //.
-              by wp;rnd => //.
-              by rcondf 1 => //;hoare;skip;smt.
-              by conseq * (_ : _ ==> false) => //.
-            (* bounding pr :  !test i r0 /\ ! k = r0 /\ k = r *) 
-            seq 2 : (test i r0) 1%r 0%r (1%r - bdt*bd) (1%r/bdt) 
+        bd_hoare split 0%r ((1%r - bdt*bd) * (1%r/bdt)) : (test i r0).
+          by intros &m1 [ _ H]; fieldeq => //.
+          (* bounding pr :  test i r0 /\ ! k = r0 /\ k = r *) 
+          seq 2 : (test i r0) 1%r 0%r 1%r 0%r (i0 = i /\ test i k /\ r0 = r) => //.
+            by wp;rnd => //.
+            by rcondf 1 => //;hoare;skip;smt.
+          by conseq * (_ : _ ==> false) => //.
+          (* bounding pr :  !test i r0 /\ ! k = r0 /\ k = r *) 
+        seq 2 : (test i r0) 1%r 0%r (1%r - bdt*bd) (1%r/bdt) 
                            (i0 = i /\ test i k /\ r0 = r) => //.
-              by wp;rnd => //.
-              by rcondf 1 => //;hoare;skip;smt.
-            bd_hoare split ! 1%r (bdt*bd);wp;rnd => //.
-            skip;progress => //.
-            rewrite -(mu_eq (d i{hr}) (cpMem (sub_supp i{hr}))).
-               by intros x ; rewrite /= -test_sub_supp.
-            apply (mu_cpMem (sub_supp i{hr}) (d i{hr}) bd _) => x Hx.
-            by apply d_uni; apply test_in_supp; rewrite -test_sub_supp.
-            conseq * Hw => //; by smt.
-          (* the events are disjoint *)        
-          by conseq * ( _ : _ ==> false) => //.
-        (* The events are disjoint *)
-        by conseq * (_ : _ ==> false) => //.
-        by conseq * (_ : _ ==> true) => //;rnd;skip;progress=> //; smt.
-        intros z;conseq * (_ : _ ==>  mem r (sub_supp i)); first smt.
-        rnd;skip;progress => //.
-        rewrite -(mu_eq (d i{hr}) (cpMem (sub_supp i{hr}))) => //.
-        rewrite (mu_cpMem (sub_supp i{hr}) (d i{hr}) bd) => // x Hx.
-        by apply d_uni; apply test_in_supp; rewrite -test_sub_supp.
+          by wp;rnd => //.
+          by rcondf 1 => //;hoare;skip;smt.
+          bd_hoare split ! 1%r (bdt*bd);wp;rnd => //.
+          skip;progress => //.
+          rewrite -(mu_eq (d i{hr}) (cpMem (sub_supp i{hr}))).
+            by intros x ; rewrite /= -test_sub_supp.
+          apply (mu_cpMem (sub_supp i{hr}) (d i{hr}) bd _) => x Hx.
+          by apply d_uni; apply test_in_supp; rewrite -test_sub_supp.
+        conseq * Hw => //; by smt.
+      by conseq * (_ : _ ==> true) => //;rnd;skip;progress=> //; smt.
+      intros z;conseq * (_ : _ ==>  mem r (sub_supp i)); first smt.
+      rnd;skip;progress => //.
+      rewrite -(mu_eq (d i{hr}) (cpMem (sub_supp i{hr}))) => //.
+      rewrite (mu_cpMem (sub_supp i{hr}) (d i{hr}) bd) => // x Hx.
+      by apply d_uni; apply test_in_supp; rewrite -test_sub_supp.
     (* case ! test i0 k *)
     hoare; while (!test i k); first rnd => //.
     by skip;smt.

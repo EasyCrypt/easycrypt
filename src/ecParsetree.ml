@@ -358,6 +358,7 @@ type eager_info =
 
 type bdh_split = 
   | BDH_split_bop of pformula * pformula * pformula option
+  | BDH_split_or_case of pformula * pformula * pformula 
   | BDH_split_not of pformula option * pformula
 
 type phltactic = 
