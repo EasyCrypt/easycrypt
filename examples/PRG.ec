@@ -311,12 +311,13 @@ op bd1 : real.
 axiom dsample1_uni : forall r, mu_x dsample1 r = bd1.
 import FSet.
 import ISet.Finite.
-print theory Real.
 (* TODO : move the 3 following lemmas *)
 lemma finite_empty : finite (ISet.empty <:'a>).
 proof.
   exists FSet.empty;intros x;smt.
 save.
+
+lemma toFSet_empty: toFSet (ISet.empty<:'a>) = FSet.empty by [].
 
 lemma add_finite : forall (X :'a ISet.set) x, finite X => finite (ISet.add x X).
 proof.
@@ -419,7 +420,6 @@ proof.
         wp;skip;progress => //;smt.
       wp => //.
   inline F.init Prg_rB.init;wp;rnd;wp;skip;progress => //; smt.
- 
   inline Resample.resample.
     seq 3 : true 
        1%r (if bad Prg.logP F.m then 1%r 
