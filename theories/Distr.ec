@@ -31,6 +31,10 @@ axiom mu_false (d:'a distr): mu d cpFalse = 0%r.
 axiom mu_or (d:'a distr) (p q:'a cpred):
   mu d (cpOr p q) = mu d p + mu d q - mu d (cpAnd p q).
 
+lemma nosmt mu_and  (d:'a distr) (p q:'a cpred):
+  mu d (cpAnd p q) = mu d p + mu d q - mu d (cpOr p q)
+by [].
+
 axiom mu_sub (d:'a distr) (p q:'a cpred):
   p <= q => mu d p <= mu d q.
 
