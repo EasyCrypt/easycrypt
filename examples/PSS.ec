@@ -475,7 +475,16 @@ section.
   local equiv PSS_G0_H:
     H.o ~ H0.o: ={x} /\ H.m{1} =<= Hmap.m{2} ==> ={res} /\ H.m{1} =<= Hmap.m{2}.
   proof strict.
-  by fun; inline H0.o; wp; rnd; wp; skip; rewrite /(=<=); progress=> //; smt.
+  fun; inline H0.o; wp; rnd; wp; skip;
+       rewrite /(=<=); progress=> //.
+         smt.
+         case (x0 = x){2}; smt.
+         smt.
+         case (x0 = x){2}; smt.
+         smt.
+         case (x0 = x){2}; smt.
+         smt.
+         case (x0 = x){2}; smt.
   qed.
 
   (* More informed use of conseq* might speed up some of the smt calls *)
