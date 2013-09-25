@@ -77,6 +77,8 @@ clone import AWord as HTag with
   op length <- k1.
 op sample_htag = HTag.Dword.dword.
 axiom htagL: mu sample_htag cpTrue = 1%r.
+op s_htag = lambda (x:message * salt), sample_htag.
+lemma s_htagL x: mu (s_htag x) cpTrue = 1%r by [].
 
 (* Output of G *)
 type gtag.
@@ -85,6 +87,8 @@ clone import AWord as GTag with
   op length <- kg.
 op sample_gtag = GTag.Dword.dword.
 axiom gtagL: mu sample_gtag cpTrue = 1%r.
+op s_gtag = lambda (x:htag), sample_gtag.
+lemma s_gtagL x: mu (s_gtag x) cpTrue = 1%r by [].
 
 (* Output of G2 [G1 produces an HTag] *)
 type g2tag.
@@ -171,14 +175,14 @@ axiom finv_one sk: valid_skey sk => finv sk (one_sig) = one_sig.
 clone import RandomOracle.LazyEager as Gt with
   type from <- htag,
   type to <- gtag,
-  op dsample <- sample_gtag.
+  op dsample <- s_gtag.
 module G = Gt.Lazy.RO.
 module G' = Gt.Eager.RO.
 
 clone import RandomOracle.Lazy as Ht with
   type from <- (message * salt),
   type to <- htag,
-  op dsample <- sample_htag.
+  op dsample <- s_htag.
 module H = Ht.RO.
 
 clone import PKS as PKSi with
@@ -471,7 +475,16 @@ section.
   local equiv PSS_G0_H:
     H.o ~ H0.o: ={x} /\ H.m{1} =<= Hmap.m{2} ==> ={res} /\ H.m{1} =<= Hmap.m{2}.
   proof strict.
-  by fun; inline H0.o; wp; rnd; wp; skip; rewrite /(=<=); progress=> //; smt.
+  fun; inline H0.o; wp; rnd; wp; skip;
+       rewrite /(=<=); progress=> //.
+         smt.
+         case (x0 = x){2}; smt.
+         smt.
+         case (x0 = x){2}; smt.
+         smt.
+         case (x0 = x){2}; smt.
+         smt.
+         case (x0 = x){2}; smt.
   qed.
 
   (* More informed use of conseq* might speed up some of the smt calls *)
@@ -601,19 +614,19 @@ section.
   }.
 
   local equiv G0_D0 (Ga <: Gadv {G,Hmap}):
-    Gen(Ga,H0,G).main ~ Gt.IND(G,D(Ga,H0')).main: true ==> ={res}.
+    Gen(Ga,H0,G).main ~ Gt.Types.IND(G,D(Ga,H0')).main: true ==> ={res}.
   proof strict.
   by fun;
-     inline IND(Lazy.RO,D(Ga,H0')).D.distinguish; swap{1} 1 1;
+     inline Gt.Types.IND(Lazy.RO,D(Ga,H0')).D.distinguish; swap{1} 1 1;
      eqobs_in.
   qed.
 
   local equiv D0_D0e (Ga <: Gadv {G,G'}):
-    Gt.IND(G,D(Ga,H0')).main ~ Gt.IND(G',D(Ga,H0')).main: true ==> ={res}
-  by (apply (eagerRO (D(Ga,H0')) _); apply gtagL).
+    Gt.Types.IND(G,D(Ga,H0')).main ~ Gt.Types.IND(G',D(Ga,H0')).main: true ==> ={res}
+  by (apply (eagerRO (D(Ga,H0')) _); apply s_gtagL).
 
   local equiv D0e_D1e (Ga <: Gadv {G',Hmap}):
-    Gt.IND(G',D(Ga,H0')).main ~ Gt.IND(G',D(Ga,H1')).main: true ==> ={res}.
+    Gt.Types.IND(G',D(Ga,H0')).main ~ Gt.Types.IND(G',D(Ga,H1')).main: true ==> ={res}.
   proof strict.
   fun.
   call (_: ={glob Eager.RO} /\ forall x, in_dom x G'.m{1}).
@@ -633,33 +646,33 @@ section.
   qed.
 
   local equiv D1e_D1 (Ga <: Gadv {G,G'}):
-    Gt.IND(G',D(Ga,H1')).main ~ Gt.IND(G,D(Ga,H1')).main: true ==> ={res}.
+    Gt.Types.IND(G',D(Ga,H1')).main ~ Gt.Types.IND(G,D(Ga,H1')).main: true ==> ={res}.
   proof strict.
   by symmetry;
      (* Note that we cannot apply the lemma directly because 'res{2} = res{1}' does not match '={res}' *)
      conseq* (eagerRO (D(Ga,H1')) _)=> //;
-     apply gtagL.
+     apply s_gtagL.
   qed.
 
   local equiv D1_G1 (Ga <: Gadv {G,Hmap}):
-    Gt.IND(G,D(Ga,H1')).main ~ Gen(Ga,H1,G).main: true ==> ={res}.
+    Gt.Types.IND(G,D(Ga,H1')).main ~ Gen(Ga,H1,G).main: true ==> ={res}.
   proof strict.
   by fun;
-     inline IND(Lazy.RO,D(Ga,H1')).D.distinguish; swap{1} 1 1;
+     inline Gt.Types.IND(Lazy.RO,D(Ga,H1')).D.distinguish; swap{1} 1 1;
      eqobs_in.
   qed.
 
   local equiv G0_G1_abstract (Ga <: Gadv {G,G',Hmap}):
     Gen(Ga,H0,G).main ~ Gen(Ga,H1,G).main: true ==> ={res}.
   proof strict.
-  bypr (res{1}) (res{2})=> // a &1 &2 h {h}.
-  apply (eq_trans _ Pr[Gt.IND(G,D(Ga,H0')).main() @ &1: a = res]);
+  bypr (res{1}) (res{2})=> // &1 &2 a.
+  apply (eq_trans _ Pr[Gt.Types.IND(G,D(Ga,H0')).main() @ &1: a = res]);
     first by equiv_deno (G0_D0 Ga).
-  apply (eq_trans _ Pr[Gt.IND(G',D(Ga,H0')).main() @ &1: a = res]);
+  apply (eq_trans _ Pr[Gt.Types.IND(G',D(Ga,H0')).main() @ &1: a = res]);
     first by equiv_deno (D0_D0e Ga).
-  apply (eq_trans _ Pr[Gt.IND(G',D(Ga,H1')).main() @ &1: a = res]);
+  apply (eq_trans _ Pr[Gt.Types.IND(G',D(Ga,H1')).main() @ &1: a = res]);
     first by equiv_deno (D0e_D1e Ga).
-  apply (eq_trans _ Pr[Gt.IND(G,D(Ga,H1')).main() @ &1: a = res]);
+  apply (eq_trans _ Pr[Gt.Types.IND(G,D(Ga,H1')).main() @ &1: a = res]);
     first by equiv_deno (D1e_D1 Ga).
   by equiv_deno (D1_G1 Ga).
   qed.
@@ -703,9 +716,9 @@ section.
       !H2.bad{2} /\ ={glob Hmap, glob G, c, x} ==>
       !H2.bad{2} => ={glob Hmap, glob G, res}.
   proof strict.
-  by fun; if=> //; inline G.o; swap{1} 4 -2; wp;
+  by fun; if=> //; inline G.o; swap{1} [3..4] -1; wp;
           rnd ((^) (GTag.from_bits (to_bits (snd x{2}) || zeros (kg - k0))));
-          rnd; skip; progress=> //; smt.
+          wp; rnd; skip; progress=> //; smt.
   qed.
 
   local lemma G1_G2_abstract (Ga <: Gadv {G, H1, H2}):
@@ -720,7 +733,7 @@ section.
     intros=> _ _; fun.
       if=> //;
       call (Gt.Lazy.lossless_o _);
-        first by apply gtagL.
+        first by apply s_gtagL.
       by wp; rnd; skip; progress=> //; apply htagL.
     intros=> _; fun.
       by if => //; wp; do !rnd cpTrue;
@@ -729,10 +742,10 @@ section.
     by conseq* Gt.Lazy.abstract_o.
     by intros=> _ _;
        conseq* (Gt.Lazy.lossless_o _);
-       apply gtagL.
+       apply s_gtagL.
     by intros=> _ /=;
        conseq* (Gt.Lazy.lossless_o _);
-       apply gtagL.
+       apply s_gtagL.
   call (_: ={ks} /\ valid_keys ks{1} ==> ={glob Hmap} /\ !H2.bad{2});
     first by fun; wp; call Hmap_init.
   call Gt.Lazy.abstract_init.
@@ -742,7 +755,40 @@ section.
   local equiv G1_G2_equiv: G1.main ~ G2.main: true ==> !H2.bad{2} => ={res}
   by (apply (G1_G2_abstract GAdv); apply lossless_GAdv).
 
-  (** TODO: bound the probability of bad in G2. *)
+(* TODO: finish this
+require import Sum.
+  local lemma GAdv1_GAdv2_BAD &m (qG qH qS:int) ks:
+    0 < qG => 0 < qH => 0 < qS =>
+    valid_keys ks =>
+    Hmap.m{m} = Map.empty =>
+    !H2.bad{m} =>
+    G.m{m} = Map.empty =>
+    Pr[ GAdv(H2,G).main(ks) @ &m:
+          H2.bad /\
+          card (ISet.Finite.toFSet (dom Hmap.m)) <= qH + qS /\
+          card (ISet.Finite.toFSet (dom G.m)) <= qG + qH ] <=
+      ((qG + qH) * (qH + qS))%r / (2^k1)%r.
+  proof strict.
+  intros=> lt0_qG lt0_qH lt0_qS valid_ks H_empty nbad G_empty.
+  fel 1 (card (ISet.Finite.toFSet (dom G.m))) (lambda x, (qH + qS)%r / (2^k1)%r) (qG + qH) H2.bad [H2.o: (card (ISet.Finite.toFSet (dom G.m)) < qG + qH /\ x = x)]=> //.
+    (* Inductive argument on the bound *)
+    rewrite /int_sum /intval (_: qG + qH = qG + qH - 1 + 1); first smt.
+    elim/Induction.induction (qG + qH - 1).
+      cut ->: 0 + 1 - 1 = 0 by smt.
+      cut minus_neg: 0 > 0 - 1 by smt.
+      by rewrite Interval.interval_pos // Interval.interval_neg //; smt.
+      intros=> i leq0_i IH.
+      cut ->: i + 1 + 1 - 1 = i + 1 by smt.
+      rewrite Interval.interval_pos; first smt.
+      rewrite Monoid.Mrplus.sum_add //=; first smt.
+      by admit. (* Scoping issues? *)
+      smt.
+    (* Establishing the invariant *)
+    inline Mem.init; wp; skip; progress=> //. admit. admit.
+    (* bounding the probability of bad **becoming** true during a single oracle query *)
+    fun. admit. (** PROOF NOTE: More invariant needed *)
+    (* I don't know *)
+*)
 
   (** G3: upto "H is called by the signature oracle on a message * salt pair that has
                 previously been queries directly by the adversary" *)
@@ -800,8 +846,8 @@ section.
     by intros=> _; fun; if=> //; wp; try (do !rnd cpTrue); skip; smt.
     (* G *)
     by conseq* Gt.Lazy.abstract_o.
-    by intros _ _; conseq* (Gt.Lazy.lossless_o _); apply gtagL.
-    by intros _; conseq* (Gt.Lazy.lossless_o _); apply  gtagL.
+    by intros _ _; conseq* (Gt.Lazy.lossless_o _); apply s_gtagL.
+    by intros _; conseq* (Gt.Lazy.lossless_o _); apply  s_gtagL.
   call (_: ={ks} /\ valid_keys ks{2} ==> ={glob Hmap} /\ !H3.bad{2});
     first by fun; wp; call Hmap_init.
   call (_: true ==> ={glob G});
@@ -1130,8 +1176,8 @@ section.
       by wp.
     (* G *)
     by conseq* Gt.Lazy.abstract_o.
-    by intros=> _ _; apply (Gt.Lazy.lossless_o _); apply gtagL.
-    by intros=> _; conseq* (Gt.Lazy.lossless_o _); apply gtagL.
+    by intros=> _ _; apply (Gt.Lazy.lossless_o _); apply s_gtagL.
+    by intros=> _; conseq* (Gt.Lazy.lossless_o _); apply s_gtagL.
   call (_: ={ks} /\ valid_keys ks{1} ==> ={glob Hmap});
     first by fun; eqobs_in.
   call Gt.Lazy.abstract_init.

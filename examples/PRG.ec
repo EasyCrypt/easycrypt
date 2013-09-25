@@ -336,7 +336,6 @@ proof.
         wp;skip;progress => //;smt.
       wp => //.
   inline F.init Prg_rB.init;wp;rnd;wp;skip;progress => //; smt.
- 
   inline Resample.resample.
     seq 3 : true 
        1%r (if bad Prg.logP F.m then 1%r 

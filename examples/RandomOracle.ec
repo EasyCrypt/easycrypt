@@ -5,7 +5,7 @@ theory Types.
   type from.
   type to.
 
-  op dsample: to distr. (* Distribution to use on the target type *)
+  op dsample: from -> to distr. (* Distribution to use on the target type; it can be parameterized by the input *)
 
   (* A signature for random oracles from "from" to "to". *)
   module type Oracle =
@@ -15,13 +15,29 @@ theory Types.
   }.
 
   module type ARO = { fun o(x:from):to }.
+
+  module type Dist (H:ARO) = {
+    fun distinguish(): bool {* H.o}
+  }.
+
+  module IND(H:Oracle,D:Dist) = {
+    module D = D(H)
+
+    fun main(): bool = {
+      var b:bool;
+
+      H.init();
+      b = D.distinguish();
+      return b;
+    }
+  }.
 end Types.
 
 theory Lazy.
   type from.
   type to.
 
-  op dsample: to distr.
+  op dsample: from -> to distr.
 
   clone import Types with
     type from <- from,
@@ -38,7 +54,7 @@ theory Lazy.
   
     fun o(x:from):to = {
       var y:to;
-      y = $dsample;
+      y = $dsample x;
       if (!in_dom x m) m.[x] = y;
       return proj (m.[x]);
     }
@@ -50,10 +66,10 @@ theory Lazy.
   qed.
 
   lemma lossless_o:
-    mu dsample cpTrue = 1%r =>
+    (forall x, mu (dsample x) cpTrue = 1%r) =>
     islossless RO.o.
   proof strict.
-  by intros=> dsampleL; fun; wp; rnd.
+  by intros=> dsampleL; fun; wp; rnd; skip; smt.
   qed.
 
   equiv abstract_init:
@@ -73,7 +89,7 @@ theory Eager.
   type from.
   type to.
 
-  op dsample: to distr.
+  op dsample: from -> to distr.
 
   clone import Types with
     type from <- from,
@@ -93,7 +109,7 @@ theory Eager.
       while (work <> FSet.empty)
       {
         f = pick work;
-        y = $dsample;
+        y = $dsample f;
         m.[f] = y;
         work = rm f work;
       }
@@ -106,7 +122,7 @@ theory Eager.
 
   lemma lossless_init:
     finite univ<:from> =>
-    mu dsample cpTrue = 1%r =>
+    (forall x, mu (dsample x) cpTrue = 1%r) =>
     islossless RO.init.
   proof strict.
   intros=> fType dsampleL; fun.
@@ -145,7 +161,7 @@ theory LazyEager.
 
   type to.
 
-  op dsample: to distr.
+  op dsample: from -> to distr.
 
   clone import Types with
     type from <- from,
@@ -162,22 +178,6 @@ theory LazyEager.
     type to <- to,
     op dsample <- dsample.
 
-  module type Dist (H:ARO) = {
-    fun distinguish(): bool {* H.o}
-  }.
-
-  module IND(H:Oracle,D:Dist) = {
-    module D = D(H)
-
-    fun main(): bool = {
-      var b:bool;
-
-      H.init();
-      b = D.distinguish();
-      return b;
-    }
-  }.
-
   section.
   (* Proof note: We may be missing losslessness assumptions on D *)
   declare module D:Dist {Lazy.RO,Eager.RO}.
@@ -192,7 +192,7 @@ theory LazyEager.
   
       fun o(x:from):to = {
         var y:to;
-        y = $dsample;
+        y = $dsample x;
         if (!in_dom x m) m.[x] = y;
         return proj (m.[x]);
       }
@@ -207,7 +207,7 @@ theory LazyEager.
       while (work <> FSet.empty)
       {
         f = pick work;
-        y = $dsample;
+        y = $dsample f;
         if (!in_dom f H.m) H.m.[f] = y;
         work = rm f work;
       }
@@ -226,7 +226,7 @@ theory LazyEager.
     }
   }.
 
-  local lemma IND_Lazy: mu dsample cpTrue = 1%r =>
+  local lemma IND_Lazy: (forall x, mu (dsample x) cpTrue = 1%r) =>
     equiv [IND(Lazy.RO,D).main ~ IND_Lazy.main: true ==> ={res}].
   proof strict.
   intros=> dsampleL; fun; seq 2 2: (={b}).
@@ -235,7 +235,7 @@ theory LazyEager.
       first by fun; wp.
     inline IND_Lazy.resample;
     while{2} (true) (card work{2}).
-      intros=> &m z; wp; rnd; wp; skip; progress=> //.
+      intros=> &m z; wp; rnd; wp; skip; progress=> //; last smt.
         by rewrite card_rm_in ?mem_pick //; smt. (* This should definitely be a lemma in FSet. *)
     by wp; skip; progress=> //; smt.
   qed.
@@ -258,7 +258,7 @@ theory LazyEager.
       while (work <> FSet.empty)
       {
         f = pick work;
-        y = $dsample;
+        y = $dsample f;
         if (!in_dom f H.m) H.m.[f] = y;
         work = rm f work;
       }
@@ -277,7 +277,7 @@ theory LazyEager.
     }
   }.
 
-  local lemma eager_query: mu dsample cpTrue = 1%r =>
+  local lemma eager_query: (forall x, mu (dsample x) cpTrue = 1%r) =>
     eager [IND_Eager.resample(); ,
                IND_Eager.H.o ~ IND_Lazy.H.o,
            IND_Lazy.resample();:
@@ -292,10 +292,10 @@ theory LazyEager.
      first by wp; skip; smt.
   case (!in_dom x IND_Lazy.H.m){2}; [rcondt{2} 2; first by intros=> &m; rnd |
                                      rcondf{2} 2; first by intros=> &m; rnd].
-    transitivity{1} {y0 = $dsample; 
+    transitivity{1} {y0 = $dsample x;
                      while (work <> FSet.empty) {
                        f = pick work;
-                       y = $dsample;
+                       y = $dsample f;
                        if (!in_dom f IND_Eager.H.m)
                          IND_Eager.H.m = IND_Eager.H.m.[f <- if f = x then y0 else y];
                        work = rm f work;
@@ -310,23 +310,23 @@ theory LazyEager.
       by intros=> &1 &2 H; exists IND_Lazy.H.m{2}, x{2}, work{2}; generalize H.
     transitivity{1} {while (work <> FSet.empty) {
                        f = pick work;
-                       y = $dsample;
+                       y = $dsample f;
                        if (!in_dom f IND_Eager.H.m)
                          IND_Eager.H.m.[f] = y;
                        work = rm f work;
                      }
-                     y0 = $dsample; 
+                     y0 = $dsample x;
                      result = proj IND_Eager.H.m.[x]; }
                      (={x,work,IND_Eager.H.m} ==> ={result,IND_Eager.H.m})
                      (={x,work,IND_Eager.H.m} ==> ={result,IND_Eager.H.m})=> //.
       by intros &1 &2 H; exists IND_Eager.H.m{2}, x{2}, work{2}; generalize H.
-    by eqobs_in; rnd{2}; eqobs_in true true: (={x,IND_Eager.H.m}).
+    by eqobs_in; rnd{2}; eqobs_in true true: (={x,IND_Eager.H.m}); smt.
 
     wp; symmetry.
-    eager while (H:y0 = $dsample; ~ y0 = $dsample; : true ==> ={y0})=> //; first by rnd.
-      swap{2} 5 -4; swap 3 -1; case (x = pick work){1}.
-        by wp; rnd{1}; rnd; rnd{2}.
-        by wp; do 2!rnd; skip; smt.
+    eager while (H:y0 = $dsample x; ~ y0 = $dsample x; : ={x} ==> ={y0})=> //; first by rnd.
+      swap{2} 5 -4; swap [2..3] -1; case (x = pick work){1}.
+        by wp; rnd{2}; rnd; rnd{1}; wp; skip; smt.
+        by wp; do 2!rnd; wp; skip; smt.
       by eqobs_in.
 
     wp; while (={x, work} /\
@@ -343,10 +343,10 @@ theory LazyEager.
              in_dom x{2} IND_Lazy.H.m{2} /\ 
              proj IND_Eager.H.m.[x]{1} = result{2}).
      by wp; rnd; wp; skip; smt.
-  by wp; rnd{2}.
+  by wp; rnd{2}; skip; smt.
   qed.
 
-  local lemma eager_aux: mu dsample cpTrue = 1%r =>
+  local lemma eager_aux: (forall x, mu (dsample x) cpTrue = 1%r) =>
     equiv [IND_Lazy.main ~ IND_Eager.main: true ==> ={res}].
   proof strict.
   intros=> dsampleL; fun; inline IND_Lazy.H.init.
@@ -361,7 +361,7 @@ theory LazyEager.
   by fun; eqobs_in.
   qed.
 
-  local lemma IND_Eager: mu dsample cpTrue = 1%r =>
+  local lemma IND_Eager: (forall x, mu (dsample x) cpTrue = 1%r) =>
     equiv [IND_Eager.main ~ IND(Eager.RO,D).main: true ==> ={res}].
   proof strict.
   intros=> dsampleL; fun.
@@ -373,10 +373,10 @@ theory LazyEager.
     by wp; skip; smt.
   qed.
 
-  lemma eagerRO: mu dsample cpTrue = 1%r =>
+  lemma eagerRO: (forall x, mu (dsample x) cpTrue = 1%r) =>
     equiv [IND(Lazy.RO,D).main ~ IND(Eager.RO,D).main: true ==> ={res}].
   proof strict.
-  intros=> dsampleL; bypr (res{1}) (res{2})=> //; intros=> a &1 &2 _.
+  intros=> dsampleL; bypr (res{1}) (res{2})=> //; intros=> &1 &2 a.
   apply (eq_trans _ Pr[IND_Lazy.main() @ &1: a = res]);
     first by equiv_deno (IND_Lazy _).
   apply (eq_trans _ Pr[IND_Eager.main() @ &1: a = res]);
@@ -387,28 +387,91 @@ theory LazyEager.
 end LazyEager.
 
 theory Wrappers.
-          import Types.
-  (** Budget-tracking wrapper *)
-  require import FSet.
-  module Count(H:Oracle) = {
-    var qs:from set
+  clone import Types.
+  clone Lazy with
+    type from = from,
+    type to = to,
+    op dsample = dsample.
 
-    fun init(): unit = {
+  module type WRO = {
+    fun init(qO:int): unit {*}
+    fun o(x:from): to
+  }.
+
+  module IND_b(H:WRO,D:Dist) = {
+    module D = D(H)
+
+    fun main(qO:int): bool = {
+      var b:bool;
+      H.init(qO);
+      b = D.distinguish();
+      return b;
+    }
+  }.
+
+  (** Budget-cutting wrapper *)
+  require import Int.
+  module Count(H:Oracle) = {
+    var qO:int
+    var qs:int
+
+    fun init(qO:int): unit = {
       H.init();
-      qs = FSet.empty;
+      Count.qO = qO;
+      qs = 0;
     }
 
     fun o(x:from): to = {
       var r:to;
-      qs = add x qs;
-      r = H.o(x);
+      if (qs < qO)
+      {
+        qs = qs + 1;
+        r = H.o(x);
+      }
       return r;
     }
-
-    fun queries(): int = {
-      return card qs;
-    }
   }.
+
+  import FSet.
+  import ISet.Finite.
+  lemma bound qO' (D <: Dist {Lazy.RO,Count}):
+    0 < qO' =>
+    (forall x, mu (dsample x) cpTrue = 1%r) =>
+    (forall (H <: ARO {D}), islossless H.o => islossless D(H).distinguish) =>
+    equiv [ IND(Lazy.RO,D).main ~ IND_b(Count(Lazy.RO),D).main:
+              qO{2} = qO' ==>
+              (Count.qs{2} < qO' =>
+                 ={res} /\
+                 finite (dom Lazy.RO.m){1} /\
+                 card (toFSet (dom Lazy.RO.m)){1} <= Count.qs{2}) ].
+  proof strict.
+  intros=> lt0_qO dsampleL DL; fun.
+  call (_: Count.qO <= Count.qs,
+           ={glob Lazy.RO} /\
+           Count.qO{2} = qO' /\
+           finite (dom Lazy.RO.m){1} /\
+           card (toFSet (dom Lazy.RO.m)){1} <= Count.qs{2}).
+    (* H *)
+    fun; rcondt{2} 1; first intros=> &m; skip; progress=> //; smt.
+      inline Lazy.RO.o; wp; rnd; wp; skip; progress=> //.
+        by rewrite dom_set; cut H7: forall (x:from) X, finite X => ISet.add x X == FSet.add x (toFSet X) by smt;
+           exists (add x{2} (toFSet (dom Lazy.RO.m{2}))); by apply H7.
+        rewrite dom_set; cut H7: forall (x:from) X, finite X => ISet.add x X == FSet.add x (toFSet X) by smt;
+        cut H8: forall X' (X:from ISet.set), X == X' => toFSet X = X' by (intros=> X X' ext_eq; apply set_ext; smt).
+          cut ->:= H8 (add x{2} (toFSet (dom Lazy.RO.m{2}))) (ISet.add x{2} (dom Lazy.RO.m{2})) _; first by apply H7.
+          rewrite card_add_nin ?mem_toFSet ?dom_def //; smt.
+          smt.
+    by intros=> _ _; apply Lazy.lossless_o.
+    by intros=> _; fun; if=> //; inline Lazy.RO.o; wp; rnd; wp; skip; smt.
+  inline Count(Lazy.RO).init; wp; call (_: true ==> ={glob Lazy.RO} /\ dom Lazy.RO.m{1} = ISet.empty)=> //;
+    first by fun; wp; skip; progress=> //; smt.
+  wp; skip; cut H1: ISet.empty<:from> == FSet.empty by smt; progress=> //.
+    by rewrite H; exists FSet.empty.
+    by rewrite H; cut ->: toFSet ISet.empty<:from> = FSet.empty by (apply set_ext; smt); rewrite card_empty.
+    by cut [eq_res _]:= H2 _; first smt.
+    by cut [_ [_ [_ [fdom _]]]]:= H2 _; first smt.
+    by cut [_ [_ [_ [_ card]]]]:= H2 _; first smt.
+  qed.
 
   (** Query-tracking wrapper *)
   require import Int.
