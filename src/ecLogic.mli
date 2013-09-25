@@ -138,6 +138,7 @@ val t_rewrite_node : ?fpat:dofpattern -> goal * int list -> rwside -> int -> goa
 val t_simplify : reduction_info -> tactic
 val t_simplify_nodelta : tactic
 
+val t_true  : tactic
 val t_split : tactic
 
 val t_left  : tactic
