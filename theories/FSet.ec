@@ -321,6 +321,35 @@ cut h: card (single x) - 1 = 0; last smt.
 by rewrite -(card_rm_in x) ?rm_single ?card_empty //; apply mem_single_eq.
 qed.
 
+(** of_list *)
+op of_list (l:'a list) = List.fold_right add empty l.
+
+lemma of_list_nil : of_list [] = empty <:'a>.
+proof.
+  by rewrite /of_list List.fold_right_nil.
+save.
+
+lemma of_list_cons (a:'a) l : of_list (a::l) = add a (of_list l).
+   by rewrite /of_list List.fold_right_cons.
+save.
+
+lemma mem_of_list (x:'a) l : List.mem x l = mem x (of_list l).
+proof.
+ rewrite /of_list;elimT list_ind l. 
+   rewrite fold_right_nil;smt.
+ intros {l} y xs;rewrite fold_right_cons;smt.
+save.
+
+lemma card_of_list (l:'a list) :
+   card (of_list l) <= List.length l.
+proof.
+  rewrite /of_list;elimT list_ind l.
+   by rewrite fold_right_nil card_empty length_nil => //.
+  intros => {l} x xs H; rewrite fold_right_cons length_cons.  
+  case (mem x (fold_right add empty xs))=> Hin; 
+     [rewrite card_add_in // | rewrite card_add_nin //];smt.
+save.
+
 (** union *)
 op union:'a set -> 'a set -> 'a set.
 axiom mem_union x (X1 X2:'a set):
@@ -614,15 +643,15 @@ end Interval.
 require import Real.
 require import Distr.
 
-lemma mu_cpMem (s:'a set): forall (d:'a distr) (bd:real),
-  (forall (x : 'a), mem x s => mu_x d x = bd) =>
-    mu d (cpMem s) = (card s)%r * bd.
+lemma mu_cpMem_le (s:'a set): forall (d:'a distr) (bd:real),
+  (forall (x : 'a), mem x s => mu_x d x <= bd) =>
+    mu d (cpMem s) <= (card s)%r * bd.
 proof strict.
   elimT set_ind s.
-  intros d bd Hmu_x.
-  rewrite (mu_eq d _ Fun.cpFalse).
-    by intros x;rewrite /cpMem /cpFalse /= rw_neqF;apply mem_empty.
-  rewrite mu_false card_empty //.
+    intros d bd Hmu_x.
+    rewrite (mu_eq d _ Fun.cpFalse).
+      by intros x;rewrite /cpMem /cpFalse /= rw_neqF;apply mem_empty.
+    by rewrite mu_false card_empty //.
   intros {s} x s Hnmem IH d bd Hmu_x.
   rewrite (_: (card (add x s))%r * bd = 
           bd + (card s)%r * bd); first by rewrite card_add_nin //=;ringeq.
@@ -631,10 +660,76 @@ proof strict.
   rewrite mu_disjoint.
    by rewrite /cpAnd /cpOr /cpFalse /cpMem => z /=;smt.
   (cut ->: (mu d ((=) x) = mu_x d x)) => //.
-  rewrite Hmu_x; first by rewrite mem_add.
-  by rewrite (IH _ bd) //;intros z Hz;apply Hmu_x;rewrite mem_add;left.
+  apply addleM.
+    by apply Hmu_x; first rewrite mem_add.   
+  by apply (IH _ bd) => //;intros z Hz;apply Hmu_x;rewrite mem_add;left.
 qed.
 
+lemma mu_cpMem_ge (s:'a set): forall (d:'a distr) (bd:real),
+  (forall (x : 'a), mem x s => mu_x d x >= bd) =>
+    mu d (cpMem s) >= (card s)%r * bd.
+proof strict.
+  elimT set_ind s.
+    intros d bd Hmu_x.
+    rewrite (mu_eq d _ Fun.cpFalse).
+      by intros x;rewrite /cpMem /cpFalse /= rw_neqF;apply mem_empty.
+    by rewrite -le_ge mu_false card_empty //.
+  intros {s} x s Hnmem IH d bd Hmu_x.
+  rewrite (_: (card (add x s))%r * bd = 
+          bd + (card s)%r * bd); first by rewrite card_add_nin //=;ringeq.
+  rewrite (mu_eq d _ (Fun.cpOr ((=) x) (cpMem s))).
+    by intros z;rewrite /cpMem /cpOr mem_add orC (rw_eq_sym z).
+  rewrite mu_disjoint.
+   by rewrite /cpAnd /cpOr /cpFalse /cpMem => z /=;smt.
+  (cut ->: (mu d ((=) x) = mu_x d x)) => //.
+  apply addgeM.
+    by apply Hmu_x; first rewrite mem_add.   
+  by apply (IH _ bd) => //;intros z Hz;apply Hmu_x;rewrite mem_add;left.
+qed.
+
+lemma mu_cpMem (s:'a set): forall (d:'a distr) (bd:real),
+  (forall (x : 'a), mem x s => mu_x d x = bd) =>
+    mu d (cpMem s) = (card s)%r * bd.
+proof strict.
+  intros d bd Hmu; rewrite eq_le_ge;split.
+    by apply mu_cpMem_le => x H;rewrite Hmu.
+  by apply mu_cpMem_ge => x H;rewrite Hmu // -le_ge.
+qed.
+
+lemma mu_Lmem_card (l:'a list) (d:'a distr) (bd:real):
+  (forall (x : 'a), List.mem x l => mu_x d x = bd) =>
+  mu d (lambda x, List.mem x l) = (card (of_list l))%r * bd. 
+proof.  
+  intros Hmu; rewrite (mu_eq _ _ (cpMem (of_list l))). 
+    by intros x;rewrite /cpMem => /=; apply mem_of_list.
+  apply mu_cpMem => x. rewrite -mem_of_list;apply Hmu.
+save.
+
+lemma mu_Lmem_le_card (l:'a list) (d:'a distr) (bd:real):
+  (forall (x : 'a), List.mem x l => mu_x d x <= bd) =>
+  mu d (lambda x, List.mem x l) <= (card (of_list l))%r * bd. 
+proof.  
+  intros Hmu; rewrite (mu_eq _ _ (cpMem (of_list l))). 
+    by intros x;rewrite /cpMem => /=; apply mem_of_list.
+  apply mu_cpMem_le => x. rewrite -mem_of_list;apply Hmu.
+save.
+
+lemma mu_Lmem_le_length (l:'a list) (d:'a distr) (bd:real):
+  (forall (x : 'a), List.mem x l => mu_x d x <= bd) =>
+  mu d (lambda x, List.mem x l) <= (length l)%r * bd. 
+proof.
+  elimT list_case l.
+    intros _; rewrite length_nil (mu_eq _ _ (cpFalse)).
+      by intros x; rewrite /cpFalse /= rw_neqF;apply mem_nil.
+    by rewrite mu_false.
+  intros x l0 Hmu.
+  cut Hbd : 0%r <= bd.
+    by cut H := Hmu x _; [ by rewrite mem_cons | smt].
+  generalize (x :: l0) Hmu => {l x l0} l Hmu. 
+  apply (Real.Trans _ ((card (of_list l))%r * bd)).
+    by apply mu_Lmem_le_card.
+  cut H := card_of_list l; smt.
+save.
 
 (* Uniform distribution on a (finite) set *)
 theory Duni.
