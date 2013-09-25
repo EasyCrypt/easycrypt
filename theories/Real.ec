@@ -62,6 +62,22 @@ lemma mulrM: forall (x y z:real),
   x * z < y * z
 by [].
 
+lemma nosmt addleM : forall (x1 x2 y1 y2:real),
+   x1 <= x2 => y1 <= y2 => x1 + y1 <= x2 + y2 
+by [].
+
+lemma nosmt addgeM : forall (x1 x2 y1 y2:real),
+   x1 >= x2 => y1 >= y2 => x1 + y1 >= x2 + y2 
+by [].
+
+lemma nosmt le_ge : forall (x y:real), (x <= y) <=> (y >= x)
+by [].
+
+lemma nosmt eq_le_ge : forall (x y:real), (x = y) <=> (x <= y /\ x >= y)
+by [].
+
+lemma nosmt eq_le: forall (x y:real), x = y => x <= y
+by [].
 
 op exp : real -> real.
 (* TODO : add axioms*)
