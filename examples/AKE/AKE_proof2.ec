@@ -427,8 +427,6 @@ proof.
  by apply collision_eexp_rcvd_mon.
 save.
 
-
-
 section.
 declare module A : Adv2{ AKE_EexpRev}.
 
@@ -461,6 +459,25 @@ fresh s evs <=> fresh_op s evs = true.
 lemma fresh_op_def' : forall s evs,
 fresh s evs = (fresh_op s evs = true) by smt.
 
+lemma coll_or_not_fresh_test_mon_ev :
+forall e evs s,
+List.mem (Accept (proj s)) evs =>
+no_start_coll(e::evs) =>
+no_accept_coll(e::evs) =>
+valid_accepts (e::evs) =>
+(!test_fresh s evs \/ collision_eexp_rcvd evs ) =>
+(!test_fresh s (e::evs) \/ collision_eexp_rcvd(e::evs)).
+proof.
+ intros => e evs s hmem hsc hnac hv.
+case (s = None).
+ rewrite /test_fresh => ->; by smt.
+ intros => hn.
+ cut heq: forall e, test_fresh s e = fresh (proj s) e.
+ rewrite /test_fresh; smt.
+ rewrite !heq => _.
+ by apply coll_or_not_fresh_mon_ev.
+save.
+ 
 local module AKE_Fresh(FA : Adv2) = {
   var evs  : Event list               (* events for queries performed by adversary *)
   var test : Sid option               (* session id of test session *)
@@ -554,7 +571,10 @@ local module AKE_Fresh(FA : Adv2) = {
     }
 
     fun init2(i : Sidx, Y : Epk) : unit = {
-      if (!in_dom i mCompleted && in_dom i mStarted) {
+      if (!in_dom i mCompleted && in_dom i mStarted &&
+       (test <> None => 
+       fresh_op (proj test) 
+        (Accept(compute_sid mStarted mEexp mCompleted.[i<- Y] i)::evs ))) {
         mCompleted.[i] = Y;
         evs = Accept(compute_sid mStarted mEexp mCompleted i)::evs;
       }
@@ -631,7 +651,8 @@ local module AKE_Fresh(FA : Adv2) = {
     if (!collision_eexp_eexp_op mEexp) {
      t_idx = A.choose(pks);
      b = ${0,1};
-      if (mStarted.[t_idx] <> None && mCompleted.[t_idx] <> None) {
+      if (mStarted.[t_idx] <> None && mCompleted.[t_idx] <> None &&
+          fresh_op (compute_sid mStarted mEexp mCompleted t_idx) evs) {
       test = Some (compute_sid mStarted mEexp mCompleted t_idx);
       (* the if-condition implies "mem (Accept (proj O.test)) O.evs" *)
       if (b) {
@@ -2681,7 +2702,10 @@ if ! test_fresh AKE_EexpRev.test{2} AKE_EexpRev.evs{2} \/
     AKE_Fresh.test{1} = AKE_EexpRev.test{2} /\
     mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}.
 proof.
- fun; if; [smt | | ]; wp; skip; progress => //.
+ fun.
+if{1}.
+   rcondt{2} 1;trivial.
+   wp; skip; progress => //.
    apply accept_evs_eexps_pres_ev => //.
    exists i{2}; do !split => //.
    apply H9 => //.
@@ -2730,11 +2754,11 @@ proof.
   by apply H9.
   case (x = i{2}).
    by intros ->.
-   by intros neq; generalize H17; rewrite in_dom_setNE // => h; apply H11.
+   by intros neq; generalize H18; rewrite in_dom_setNE // => h; apply H11.
   by rewrite mem_cons; right.
    case (x = i{2}).
     by intros => ->; cut:= H12 i{2} _ _.
-    by intros => hneq; apply H12 => //; generalize H18; rewrite in_dom_set; smt.
+    by intros => hneq; apply H12 => //; generalize H19; rewrite in_dom_set; smt.
 
   by rewrite mem_cons; right.
   by rewrite mem_cons; right.
@@ -2786,18 +2810,186 @@ proof.
   by apply H9.
   case (x = i{2}).
    by intros ->.
-   by intros neq; generalize H17; rewrite in_dom_setNE // => h; apply H11.
+   by intros neq; generalize H18; rewrite in_dom_setNE // => h; apply H11.
   case (x = i{2}).
    by intros => ->; cut:= H12 i{2} _ _.
-    by intros => hneq; apply H12 => //; generalize H18; rewrite in_dom_set; smt.
+    by intros => hneq; apply H12 => //; generalize H19; rewrite in_dom_set; smt.
 
   by rewrite mem_cons; right.
+if{2}; last first.
+ skip; progress => //.
   smt.
   smt.
   smt.
   smt.
   smt.  
   by apply H12.
+ conseq (_ : 
+((! (! test_fresh AKE_EexpRev.test{2} AKE_EexpRev.evs{2} \/
+       collision_eexp_rcvd AKE_EexpRev.evs{2}) /\
+    ={i, Y} /\
+    AKE_EexpRev.evs{2} = AKE_Fresh.evs{1} /\
+    AKE_EexpRev.test{2} = AKE_Fresh.test{1} /\
+    AKE_EexpRev.cSession{2} = AKE_Fresh.cSession{1} /\
+    AKE_EexpRev.cH2{2} = AKE_Fresh.cH2{1} /\
+    AKE_EexpRev.mH2{2} = AKE_Fresh.mH2{1} /\
+    AKE_EexpRev.sH2{2} = AKE_Fresh.sH2{1} /\
+    AKE_EexpRev.mSk{2} = AKE_Fresh.mSk{1} /\
+    AKE_EexpRev.mEexp{2} = AKE_Fresh.mEexp{1} /\
+    AKE_EexpRev.mStarted{2} = AKE_Fresh.mStarted{1} /\
+    AKE_EexpRev.mCompleted{2} = AKE_Fresh.mCompleted{1} /\
+    ! AKE_Fresh.test{1} = None /\
+    mem (Accept (proj AKE_Fresh.test{1})) AKE_Fresh.evs{1} /\
+    accept_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    start_evs_eexps AKE_EexpRev.evs{2} AKE_EexpRev.mEexp{2} /\
+    no_start_coll AKE_EexpRev.evs{2} /\
+    no_accept_coll AKE_EexpRev.evs{2} /\
+    valid_accepts AKE_EexpRev.evs{2} /\
+    inv_started AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+      AKE_EexpRev.mEexp{2} /\
+    inv_accepted AKE_EexpRev.evs{2} AKE_EexpRev.mStarted{2}
+      AKE_EexpRev.mEexp{2} AKE_EexpRev.mCompleted{2} /\
+    (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp{2}) /\
+    ! collision_eexp_eexp_op AKE_EexpRev.mEexp{2} /\
+    (forall (x : Sidx),
+       in_dom x AKE_EexpRev.mCompleted{2} => in_dom x AKE_EexpRev.mStarted{2}) /\
+    (forall (x : Sidx),
+       in_dom x AKE_EexpRev.mStarted{2} =>
+       ! in_dom x AKE_EexpRev.mCompleted{2} =>
+       sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
+    AKE_Fresh.test{1} = AKE_EexpRev.test{2} /\
+    mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}) /\
+   ! (! in_dom i{1} AKE_Fresh.mCompleted{1} &&
+      in_dom i{1} AKE_Fresh.mStarted{1} &&
+      (! AKE_Fresh.test{1} = None =>
+       fresh_op (proj AKE_Fresh.test{1})
+         (Accept
+            (compute_sid AKE_Fresh.mStarted{1} AKE_Fresh.mEexp{1}
+               AKE_Fresh.mCompleted{1}.[i{1} <- Y{1}] i{1}) :: AKE_Fresh.evs{1})))) /\
+  ! in_dom i{2} AKE_EexpRev.mCompleted{2} &&
+  in_dom i{2} AKE_EexpRev.mStarted{2} /\
+(! test_fresh AKE_EexpRev.test{2}
+         (Accept
+            (compute_sid AKE_EexpRev.mStarted{2} AKE_EexpRev.mEexp{2}
+               AKE_EexpRev.mCompleted{2}.[i{2} <- Y{2}] i{2}) :: AKE_EexpRev.evs{2})) ==> _).
+progress => //.
+smt.
+smt.
+by apply H12.
+rewrite /test_fresh; rewrite not_and; right; smt.
+ wp; skip; progress => //; try (by apply H12); try (by apply H9);
+try (by apply H11).
+   apply accept_evs_eexps_pres_ev => //.
+   exists i{2}; do !split => //.
+   apply H9 => //.
+   rewrite  /sid_sent /compute_sid /= get_setE proj_some /=.
+   by elim /tuple3_ind  (proj AKE_Fresh.mStarted{1}.[i{2}]) => /=.
+   by apply start_evs_eexps_pres => //; smt.
+   by apply no_start_coll_pres => //; smt. 
+
+  apply no_accept_coll_pres_ev => //.
+   intros => s hmem.
+   rewrite /compute_sid get_setE.
+   elim /tuple3_ind (proj AKE_Fresh.mStarted{1}.[i{2}]) => /=;
+    rewrite {1}/sid_sent /= => A B r heq';apply not_def => h'.
+   cut [h1 h2]:= H8 s => {h2}.
+   elim (h1 _) => //. 
+   intros => {h1} j [hjstrt][hjcomp][heexp] heq''.
+   generalize  heq'' h' => ->; rewrite /sid_sent /compute_sid /=.
+   elim /tuple3_ind (proj AKE_Fresh.mStarted{1}.[j]) => /= A' B' r' heq''.
+   case (i{2} = j) => hor.
+     by generalize hjstrt H15; rewrite hor; smt.
+
+     apply not_def => heq'''. 
+     cut: collision_eexp_eexp_op AKE_Fresh.mEexp{1}; last by smt.
+     rewrite collision_eexp_eexp_op_def /collision_eexp_eexp.
+     exists i{2}; exists j; do !split => //.
+      by apply H9.
+      apply proj_inj_some.
+       by cut:= H9 i{2}; rewrite /in_dom.
+       by cut:= H9 j; rewrite /in_dom.
+       by apply gen_epk_inj.
+
+
+   apply valid_accept_pres_ev => //.   
+   rewrite /psid_of_sid/compute_sid get_setE.
+   elim /tuple3_ind (proj AKE_Fresh.mStarted{1}.[i{2}]) => /= A' B' r' heq'.
+   cut [h1 h2]:=
+    H7 (A', B', gen_epk (proj AKE_Fresh.mEexp{1}.[i{2}]), r') => {h1}.
+   apply h2.
+   exists i{2}; rewrite heq'; progress => //.
+    by apply H9.
+    by cut:= H12 i{2} _ _ => //; rewrite heq' /sd2_role /=.
+
+  by apply inv_started_pres => //; smt.   
+
+  apply inv_accepted_pres_ev1 => //.
+  by apply H9.
+
+  case (x = i{2}).
+   by intros ->.
+   by intros neq; generalize H19; rewrite in_dom_setNE // => h; apply H11.
+  case (x = i{2}).
+   by intros => ->; cut:= H12 i{2} _ _.
+   by intros => hneq; apply H12 => //; generalize H20; rewrite in_dom_set; smt.
+
+  by rewrite mem_cons; right.
+  smt.
+  smt.
+       
+   apply accept_evs_eexps_pres_ev => //.
+   exists i{2}; do !split => //.
+   apply H9 => //.
+   rewrite  /sid_sent /compute_sid /= get_setE proj_some /=.
+   by elim /tuple3_ind  ( proj AKE_Fresh.mStarted{1}.[i{2}]) => /=.
+   by apply start_evs_eexps_pres => //; smt.
+   by apply no_start_coll_pres => //; smt. 
+   
+   apply no_accept_coll_pres_ev => //.
+   intros => s hmem.
+   rewrite /compute_sid get_setE.
+   elim /tuple3_ind ( proj AKE_Fresh.mStarted{1}.[i{2}]) => /=;
+    rewrite {1}/sid_sent /= => A B r heq;apply not_def => h.
+   cut [h1 h2]:= H8 s => {h2}.
+   elim (h1 _) => //. 
+   intros => {h1} j [hjstrt][hjcomp][heexp] heq'.
+   generalize  heq' h => ->; rewrite /sid_sent /compute_sid /=.
+   elim /tuple3_ind (proj AKE_Fresh.mStarted{1}.[j]) => /= A' B' r' heq'.
+   case (i{2} = j) => hor.
+     by generalize hjstrt H12; rewrite hor; smt.
+
+     apply not_def => heq''.
+     cut: collision_eexp_eexp_op AKE_Fresh.mEexp{1}; last by smt.
+     rewrite collision_eexp_eexp_op_def /collision_eexp_eexp.
+     exists i{2}; exists j; do !split => //.
+      by apply H9.
+      apply proj_inj_some.
+       by cut:= H9 i{2}; rewrite /in_dom.
+       by cut:= H9 j; rewrite /in_dom.
+       by apply gen_epk_inj.
+       
+   apply valid_accept_pres_ev => //.   
+   rewrite /psid_of_sid/compute_sid get_setE.
+   elim /tuple3_ind (proj AKE_Fresh.mStarted{1}.[i{2}]) => /= A' B' r' heq.
+   cut [h1 h2]:=
+    H7 (A', B', gen_epk (proj AKE_Fresh.mEexp{1}.[i{2}]), r') => {h1}.
+   apply h2.
+   exists i{2}; rewrite heq; progress => //.
+    by apply H9.
+    by cut:= H12 i{2} _ _ => //; rewrite heq /sd2_role /=.
+
+  by apply inv_started_pres => //; smt.   
+
+  apply inv_accepted_pres_ev1 => //.
+  by apply H9.
+  case (x = i{2}).
+   by intros ->.
+   by intros neq; generalize H19; rewrite in_dom_setNE // => h; apply H11.
+  case (x = i{2}).
+   by intros => ->; cut:= H12 i{2} _ _.
+    by intros => hneq; apply H12 => //; generalize H20; rewrite in_dom_set; smt.
+
+  by rewrite mem_cons; right.
 save.  
 
 
@@ -4635,6 +4827,8 @@ by apply bdh1_sessionRev_1.
 by apply bdh1_sessionRev_2.
 save.
 
+
+
 local equiv Eq_AKE_EexpRev_AKE_no_collision :
  AKE_Fresh(A).main ~ AKE_EexpRev(A).main  :
 ={glob A} ==> 
@@ -4672,7 +4866,7 @@ case  (s = (pick sidxs{2})) => h.
  by rewrite h;apply in_dom_setE.
 generalize H5; rewrite mem_rm !not_and => [hl|]; last by smt.
  by cut:= H s _ => //;rewrite in_dom_setNE //.
-while (={pks} /\ AKE_Fresh.mSk{1} = AKE_EexpRev.mSk{2}).
+while (={pks, i} /\ AKE_Fresh.mSk{1} = AKE_EexpRev.mSk{2}).
 by wp; rnd.
 by wp; skip; progress => //; smt.
   if{1}; last first.
@@ -4775,7 +4969,9 @@ wp; skip; progress; try assumption.
   smt.   
   by apply H21.
   by apply H22.
-  if => //.
+  if{1}.
+  rcondt{2} 1.
+  intros => &m; skip; progress => //.
 seq 2 2:
   ((={b, pks, t_idx, key, keyo, b', i, pks, glob A, keyo} /\
    AKE_EexpRev.evs{2} = AKE_Fresh.evs{1} /\
@@ -4871,6 +5067,411 @@ smt.
 smt.
 smt.
 smt.
+if{2} => //.
+sp.
+conseq (_ :   (! AKE_EexpRev.test = None /\
+    mem (Accept (proj AKE_EexpRev.test)) AKE_EexpRev.evs /\
+    accept_evs_eexps AKE_EexpRev.evs AKE_EexpRev.mEexp /\
+    start_evs_eexps AKE_EexpRev.evs AKE_EexpRev.mEexp /\
+    no_start_coll AKE_EexpRev.evs /\
+    no_accept_coll AKE_EexpRev.evs /\
+    valid_accepts AKE_EexpRev.evs /\
+    inv_started AKE_EexpRev.evs AKE_EexpRev.mStarted
+      AKE_EexpRev.mEexp /\
+    inv_accepted AKE_EexpRev.evs AKE_EexpRev.mStarted
+      AKE_EexpRev.mEexp AKE_EexpRev.mCompleted /\
+    (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp) /\
+    ! collision_eexp_eexp_op AKE_EexpRev.mEexp /\
+    (forall (x : Sidx),
+       in_dom x AKE_EexpRev.mCompleted => in_dom x AKE_EexpRev.mStarted) /\
+    (forall (x : Sidx),
+      in_dom x AKE_EexpRev.mStarted =>
+      ! in_dom x AKE_EexpRev.mCompleted =>
+      sd2_role (proj AKE_EexpRev.mStarted.[x]) = init) /\
+      (! test_fresh AKE_EexpRev.test AKE_EexpRev.evs \/ 
+        collision_eexp_rcvd AKE_EexpRev.evs)){2} ==>
+   (! test_fresh AKE_EexpRev.test AKE_EexpRev.evs \/ 
+        collision_eexp_rcvd AKE_EexpRev.evs){2}).
+progress => //.
+ by smt.
+ rewrite proj_some.
+   cut [h1 h2] := H5 (compute_sid AKE_Fresh.mStarted{1} AKE_Fresh.mEexp{1}
+        AKE_Fresh.mCompleted{1} t_idx{2}).
+   apply h2 => {h2}{h1}.
+   by exists t_idx{2}; progress => //; apply H6.
+ by apply H6.
+ by apply H8.
+ by apply H9.
+ by left; rewrite /test_fresh not_and;right; rewrite fresh_op_def'; smt.
+smt.
+call{2} 
+(_ : 
+    ! AKE_EexpRev.test = None /\
+    mem (Accept (proj AKE_EexpRev.test)) AKE_EexpRev.evs /\
+    accept_evs_eexps AKE_EexpRev.evs AKE_EexpRev.mEexp /\
+    start_evs_eexps AKE_EexpRev.evs AKE_EexpRev.mEexp /\
+    no_start_coll AKE_EexpRev.evs /\
+    no_accept_coll AKE_EexpRev.evs /\
+    valid_accepts AKE_EexpRev.evs /\
+    inv_started AKE_EexpRev.evs AKE_EexpRev.mStarted
+      AKE_EexpRev.mEexp /\
+    inv_accepted AKE_EexpRev.evs AKE_EexpRev.mStarted
+      AKE_EexpRev.mEexp AKE_EexpRev.mCompleted /\
+    (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp) /\
+    ! collision_eexp_eexp_op AKE_EexpRev.mEexp /\
+    (forall (x : Sidx),
+       in_dom x AKE_EexpRev.mCompleted => in_dom x AKE_EexpRev.mStarted) /\
+    (forall (x : Sidx),
+      in_dom x AKE_EexpRev.mStarted =>
+      ! in_dom x AKE_EexpRev.mCompleted =>
+      sd2_role (proj AKE_EexpRev.mStarted.[x]) = init) /\
+      (! test_fresh AKE_EexpRev.test AKE_EexpRev.evs \/ 
+        collision_eexp_rcvd AKE_EexpRev.evs)==>
+    ! AKE_EexpRev.test = None /\
+    mem (Accept (proj AKE_EexpRev.test)) AKE_EexpRev.evs /\
+    accept_evs_eexps AKE_EexpRev.evs AKE_EexpRev.mEexp /\
+    start_evs_eexps AKE_EexpRev.evs AKE_EexpRev.mEexp /\
+    no_start_coll AKE_EexpRev.evs /\
+    no_accept_coll AKE_EexpRev.evs /\
+    valid_accepts AKE_EexpRev.evs /\
+    inv_started AKE_EexpRev.evs AKE_EexpRev.mStarted
+      AKE_EexpRev.mEexp /\
+    inv_accepted AKE_EexpRev.evs AKE_EexpRev.mStarted
+      AKE_EexpRev.mEexp AKE_EexpRev.mCompleted /\
+    (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp) /\
+    ! collision_eexp_eexp_op AKE_EexpRev.mEexp /\
+    (forall (x : Sidx),
+       in_dom x AKE_EexpRev.mCompleted => in_dom x AKE_EexpRev.mStarted) /\
+    (forall (x : Sidx),
+      in_dom x AKE_EexpRev.mStarted =>
+      ! in_dom x AKE_EexpRev.mCompleted =>
+      sd2_role (proj AKE_EexpRev.mStarted.[x]) = init) /\
+      (! test_fresh AKE_EexpRev.test AKE_EexpRev.evs \/ 
+        collision_eexp_rcvd AKE_EexpRev.evs)).
+fun ((! AKE_EexpRev.test = None /\
+    mem (Accept (proj AKE_EexpRev.test)) AKE_EexpRev.evs /\
+    accept_evs_eexps AKE_EexpRev.evs AKE_EexpRev.mEexp /\
+    start_evs_eexps AKE_EexpRev.evs AKE_EexpRev.mEexp /\
+    no_start_coll AKE_EexpRev.evs /\
+    no_accept_coll AKE_EexpRev.evs /\
+    valid_accepts AKE_EexpRev.evs /\
+    inv_started AKE_EexpRev.evs AKE_EexpRev.mStarted
+      AKE_EexpRev.mEexp /\
+    inv_accepted AKE_EexpRev.evs AKE_EexpRev.mStarted
+      AKE_EexpRev.mEexp AKE_EexpRev.mCompleted /\
+    (forall (s : Sidx), in_dom s AKE_EexpRev.mEexp) /\
+    ! collision_eexp_eexp_op AKE_EexpRev.mEexp /\
+    (forall (x : Sidx),
+       in_dom x AKE_EexpRev.mCompleted => in_dom x AKE_EexpRev.mStarted) /\
+    (forall (x : Sidx),
+      in_dom x AKE_EexpRev.mStarted =>
+      ! in_dom x AKE_EexpRev.mCompleted =>
+      sd2_role (proj AKE_EexpRev.mStarted.[x]) = init)) &&
+     (! test_fresh AKE_EexpRev.test AKE_EexpRev.evs \/ 
+        collision_eexp_rcvd AKE_EexpRev.evs)) => //.
+progress => //; try apply H11; smt.
+progress => //; try apply H11; smt.
+apply A_Lossless_guess.
+
+fun; wp; skip; progress => //.
+  by rewrite mem_cons; right.
+  by apply accept_evs_eexps_pres; smt.
+  by apply start_evs_eexps_pres => //; smt.
+  by apply no_start_coll_pres => //; smt.
+  by apply no_accept_coll_pres => //; smt.
+  by apply valid_accept_pres => //; smt.
+  by apply inv_started_pres => //; smt.
+  by apply inv_accepted_pres => //; smt.
+  by apply H8.
+  by apply H10.
+  by apply H11.
+  apply coll_or_not_fresh_test_mon_ev => //.
+  by apply H8.
+  by apply H10.
+  by apply H11.
+
+fun; sp; if; inline AKE_EexpRev(A).O.h2; wp; try rnd; wp; skip; progress => //.
+  by apply H8.
+  by apply H10.
+  by apply H11.
+  by apply TKey.Dword.lossless.
+  by apply H8.
+  by apply H10.
+  by apply H11.
+
+fun; wp; skip; progress => //.
+  by rewrite mem_cons; right.
+  by apply accept_evs_eexps_pres; smt. 
+  by apply start_evs_eexps_pres_ev => //; smt.
+  apply no_start_coll_pres_ev => //.
+    intros s' hmem; apply not_def => h'.
+    elim (H6 s') => [hl hr] {hr}.
+    elim (hl _) => // j [hstarted][hdom]heq' {hl}.
+    cut hneq:  j <> i{hr}; first by apply not_def => heq''; 
+      generalize H12 hstarted; rewrite heq''.
+    generalize heq'; 
+    elim /tuple3_ind (proj AKE_EexpRev.mStarted{hr}.[j]) => A B r /= heq1.
+    apply not_def => [[heq2 hrole']].
+    generalize h'; rewrite heq2 /psid_sent /=; apply not_def => {heq2}{heq1} heq1.
+    cut: collision_eexp_eexp_op AKE_EexpRev.mEexp{hr}; last by smt.
+    rewrite collision_eexp_eexp_op_def /collision_eexp_eexp.
+    exists i{hr}; exists j; do !split => //.
+    apply H8.
+    cut: (proj AKE_EexpRev.mEexp{hr}.[i{hr}]) =
+         (proj AKE_EexpRev.mEexp{hr}.[j]); first by apply gen_epk_inj.
+    cut h':= H8 i{hr} => h''.
+    apply proj_inj_some.
+     by generalize h''; rewrite /in_dom.
+     by generalize hdom; rewrite /in_dom.
+     by rewrite h''.
+     by smt.
+
+  by apply no_accept_coll_pres => //; smt.
+  by apply valid_accept_pres => //; smt.
+  by apply inv_started_pres_ev => //; apply H8 => //.
+  apply inv_accepted_pres_ev2 => //.
+   by apply not_def => h; cut: in_dom i{hr} AKE_EexpRev.mStarted{hr}; try apply H10; smt.
+   by smt.
+
+  by apply H8.
+  by rewrite in_dom_set; left; apply H10.
+  generalize H16; rewrite in_dom_set => [ hdom | ->]; [rewrite get_setNE // | rewrite get_setE].
+   by apply not_def => abs; generalize hdom H15; rewrite abs; smt.
+   by apply H11.
+   by rewrite /sd2_role proj_some.
+
+  apply coll_or_not_fresh_test_mon_ev => //.
+    by apply H8.
+    by apply H10.
+    by apply H11.
+
+fun; wp; skip; progress => //.
+  by rewrite mem_cons; right.
+
+  apply accept_evs_eexps_pres_ev => //.
+   exists i{hr}; do !split => //.
+   apply H8 => //.
+   rewrite  /sid_sent /compute_sid /= get_setE proj_some /=.
+   by elim /tuple3_ind  (proj AKE_EexpRev.mStarted{hr}.[i{hr}]) => /=.
+  
+  by apply start_evs_eexps_pres => //; smt.
+  by apply no_start_coll_pres => //; smt. 
+  apply no_accept_coll_pres_ev => //.
+   intros => s hmem.
+   rewrite /compute_sid get_setE.
+   elim /tuple3_ind (proj AKE_EexpRev.mStarted{hr}.[i{hr}]) => /=;
+    rewrite {1}/sid_sent /= => A B r heq';apply not_def => h'.
+   cut [h1 h2]:= H7 s => {h2}.
+   elim (h1 _) => //. 
+   intros => {h1} j [hjstrt][hjcomp][heexp] heq''.
+   generalize  heq'' h' => ->; rewrite /sid_sent /compute_sid /=.
+   elim /tuple3_ind (proj AKE_EexpRev.mStarted{hr}.[j]) => /= A' B' r' heq''.
+   case (i{hr} = j) => hor.
+     by generalize hjstrt H10; rewrite hor; smt.
+
+     apply not_def => heq'''; 
+     cut: collision_eexp_eexp_op AKE_EexpRev.mEexp{hr}; last by smt.
+     rewrite collision_eexp_eexp_op_def /collision_eexp_eexp.
+     exists i{hr}; exists j; do !split => //.
+      by apply H8.
+      apply proj_inj_some.
+       by cut:= H8 i{hr}; rewrite /in_dom.
+       by cut:= H8 j; rewrite /in_dom.
+       by apply gen_epk_inj.
+ 
+  apply valid_accept_pres_ev => //.   
+    rewrite /psid_of_sid/compute_sid get_setE.
+    elim /tuple3_ind (proj AKE_EexpRev.mStarted{hr}.[i{hr}]) => /= A' B' r' heq'.
+    cut [h1 h2]:=
+    H6 (A', B', gen_epk (proj AKE_EexpRev.mEexp{hr}.[i{hr}]), r') => {h1}.
+    apply h2.
+    exists i{hr}; rewrite heq'; progress => //.
+     by apply H8.
+     by cut:= H11 i{hr} _ _ => //; rewrite heq' /sd2_role /=.
+
+  by apply inv_started_pres => //; smt.          
+  apply inv_accepted_pres_ev1 => //.
+    by apply H8.
+    by apply H8.
+    case (x = i{hr}).
+     by intros ->.
+     by intros neq; generalize H15; rewrite in_dom_setNE // => h; apply H10.
+    case (x = i{hr}).
+     by intros => ->; cut:= H11 i{hr} _ _.
+     by intros => hneq; apply H11 => //; generalize H16; rewrite in_dom_set; smt.
+
+  apply coll_or_not_fresh_test_mon_ev => //.
+    by apply H8.
+    by apply H10.
+    by apply H11.
+
+fun; wp; skip; progress => //.
+  by rewrite mem_cons; right.
+  apply accept_evs_eexps_pres_ev => //.
+    by rewrite /sid_sent /=; exists i{hr}; split; smt.
+
+  by apply start_evs_eexps_pres => //; smt.
+  by apply no_start_coll_pres => //; smt.
+  apply no_accept_coll_pres_ev => //.
+   intros => s hmem; rewrite {1}/sid_sent /=.
+   apply not_def => heq.
+   cut [h1 h2]:= H7 s => {h2}.
+   elim (h1 _) => //. 
+   intros => {h1} j [hjstrt][hjcomp][heexp] heq'.
+   generalize  heq' heq => ->; rewrite /sid_sent /compute_sid /=.
+   elim /tuple3_ind (proj AKE_EexpRev.mStarted{hr}.[j]) => /= A' B' r' heq'.
+   case (i{hr} = j) => hor.
+     by generalize hjstrt H10; rewrite hor; smt.
+
+     apply not_def => heq''; 
+     cut: collision_eexp_eexp_op AKE_EexpRev.mEexp{hr}; last by smt.
+     rewrite collision_eexp_eexp_op_def /collision_eexp_eexp.
+     exists i{hr}; exists j; do !split => //.
+      by apply H8.
+      apply proj_inj_some.
+       by cut:= H8 i{hr}; rewrite /in_dom.
+       by cut:= H8 j; rewrite /in_dom.
+       by apply gen_epk_inj. 
+  
+  by apply valid_accept_pres_ev2.
+
+  rewrite /inv_started.
+  intros => ps; rewrite mem_cons; split.
+   intros => [|] hor.
+   smt.
+   cut [h1 h2 ]:= H6 ps => {h2}.
+    elim (h1 _) => // j [hdom1'][hdom2'] heq.
+   case (j = i{hr}) => heq'.
+     by generalize heq' H15 hdom1' => ->; smt.
+     exists j; progress => //.
+     rewrite in_dom_setNE //.
+     generalize H17 heq; (rewrite get_setNE; first by smt) => -> //.
+     generalize H17 heq; (rewrite get_setNE; first by smt) => -> //.
+
+   intros => [j][hdom1][hdom2] heq.
+   case (j = i{hr}) => hor.
+    generalize hor heq => ->; rewrite get_setE proj_some /=; smt.
+   right.
+   cut [h1 h2] := H6 ps; apply h2.
+   exists j; progress.
+    by generalize hdom1; rewrite in_dom_setNE.
+    by apply H8.
+    by generalize heq; (rewrite get_setNE; first smt); rewrite H17 /=.
+    by generalize heq; (rewrite get_setNE; first smt); rewrite H17 /=.
+   rewrite /inv_accepted => ps; rewrite mem_cons; split.
+    intros => [|] hor.
+    cut: ps = (B{hr}, A{hr}, gen_epk (proj AKE_EexpRev.mEexp{hr}.[i{hr}]), X{hr},resp).
+     by apply Accept_inj.
+    intros => ->.
+   exists i{hr}; rewrite !in_dom_setE /compute_sid !get_setE !proj_some /=.
+    by apply H8.
+ 
+   cut [h1 h2] := H7 ps => {h2}.
+   cut:= h1 _ => //; intros => [j][hdom1][hdom2][hdom3] heq.
+    case (j = i{hr}) => heq'.
+     by generalize heq' H16 hdom1 => ->; smt.
+     exists j; (rewrite !in_dom_setNE // /compute_sid heq !get_setNE; first 2 smt).
+     by do !split => //.
+   intros => [j][hdom1][hdom2][hdom3] heq.
+   case (i{hr} = j) => hor.
+    generalize heq; rewrite hor.
+    by rewrite /compute_sid /= !get_setE !proj_some /= => ->; left.  
+
+   right.
+   cut [h1 h2]:= H7 ps => {h1}.
+   apply h2.
+   exists j.
+   generalize hdom1 hdom2 hdom3 heq; 
+   rewrite !in_dom_setNE; first 2 smt. 
+   by rewrite /compute_sid /= !get_setNE /=; smt.
+   by apply H8.
+
+   generalize H17; rewrite !in_dom_set => [|] hor.
+    by left; apply H10.
+    by right.
+   case (x = i{hr}) => hor.
+    by generalize hor H18 => ->; rewrite in_dom_setE.
+    rewrite get_setNE; first smt.
+    apply H11.
+    by generalize H17; rewrite !in_dom_setNE.
+    by generalize H18; rewrite !in_dom_setNE. 
+  
+  apply coll_or_not_fresh_test_mon_ev => //.
+    by apply H8.
+    by apply H10.
+    by apply H11.
+
+fun; wp; skip; progress => //.
+  by rewrite mem_cons; right.
+  by apply accept_evs_eexps_pres => //; smt.  
+  by apply start_evs_eexps_pres => //; smt.
+  by apply no_start_coll_pres => //; smt.
+  by apply no_accept_coll_pres => //; smt.
+  by apply valid_accept_pres => //; smt.
+  by apply inv_started_pres => //; smt.  
+  by apply inv_accepted_pres => //; smt.  
+  by apply H8.
+  by apply H10.
+  by apply H11.
+  apply coll_or_not_fresh_test_mon_ev => //.
+    by apply H8.
+    by apply H10.
+    by apply H11.
+
+fun; sp; if; last first.
+  skip; progress => //.
+    by apply H8.
+    by apply H10.
+    by apply H11.
+
+  inline AKE_EexpRev(A).O.computeKey AKE_EexpRev(A).O.h2.
+    sp; if; last first.
+      wp; skip; progress => //. 
+      by rewrite mem_cons; right.
+      by apply accept_evs_eexps_pres => //; smt.  
+      by apply start_evs_eexps_pres => //; smt.
+      by apply no_start_coll_pres => //; smt.
+      by apply no_accept_coll_pres => //; smt.
+      by apply valid_accept_pres => //; smt.
+      by apply inv_started_pres => //; smt.  
+      by apply inv_accepted_pres => //; smt.  
+      by apply H8.
+      by apply H10.
+      by apply H11.
+      apply coll_or_not_fresh_test_mon_ev => //.
+ 
+      wp; rnd; wp; skip; progress => //.
+      by rewrite mem_cons; right.
+      by apply accept_evs_eexps_pres => //; smt.  
+      by apply start_evs_eexps_pres => //; smt.
+      by apply no_start_coll_pres => //; smt.
+      by apply no_accept_coll_pres => //; smt.
+      by apply valid_accept_pres => //; smt.
+      by apply inv_started_pres => //; smt.  
+      by apply inv_accepted_pres => //; smt.  
+      by apply H8.
+      by apply H10.
+      by apply H11.
+      by apply coll_or_not_fresh_test_mon_ev => //.
+      by apply TKey.Dword.lossless.
+
+if{2}; last first.
+wp; rnd{2}; skip; progress => //.
+smt.
+by apply H8.
+by apply H10.
+by apply H11.
+inline AKE_EexpRev(A).O.computeKey AKE_EexpRev(A).O.h2.
+sp; if{2}.
+wp; rnd{2}; wp; skip; progress => //.
+smt.
+by apply H8.
+by apply H10.
+by apply H11.
+wp; skip; progress => //.
+by apply H8.
+by apply H10.
+by apply H11.
 save.
 
 local equiv Eq_AKE_EexpRev_AKE_no_collision' :
@@ -4996,7 +5597,10 @@ local module AKE_NoHashOnCompute(FA : Adv2) = {
     }
 
     fun init2(i : Sidx, Y : Epk) : unit = {
-      if (!in_dom i mCompleted && in_dom i mStarted) {
+      if (!in_dom i mCompleted && in_dom i mStarted &&
+       (test <> None => 
+       fresh_op (proj test) 
+        (Accept(compute_sid mStarted mEexp mCompleted.[i<- Y] i)::evs ))) {
         mCompleted.[i] = Y;
         evs = Accept(compute_sid mStarted mEexp mCompleted i)::evs;
       }
@@ -5085,7 +5689,8 @@ local module AKE_NoHashOnCompute(FA : Adv2) = {
     if (!collision_eexp_eexp_op mEexp) {
      t_idx = A.choose(pks);
      b = ${0,1};
-      if (mStarted.[t_idx] <> None && mCompleted.[t_idx] <> None) {
+      if (mStarted.[t_idx] <> None && mCompleted.[t_idx] <> None &&
+          fresh_op (compute_sid mStarted mEexp mCompleted t_idx) evs) {
       test = Some (compute_sid mStarted mEexp mCompleted t_idx);
       (* the if-condition implies "mem (Accept (proj O.test)) O.evs" *)
       if (b) {
@@ -5165,7 +5770,7 @@ case  (s = (pick sidxs{2})) => h.
  by rewrite h;apply in_dom_setE.
 generalize H5; rewrite mem_rm !not_and => [hl|]; last by smt.
  by cut:= H s _ => //;rewrite in_dom_setNE //.
-while (={pks} /\ AKE_Fresh.mSk{1} = AKE_NoHashOnCompute.mSk{2}).
+while (={pks, i} /\ AKE_Fresh.mSk{1} = AKE_NoHashOnCompute.mSk{2}).
 by wp; rnd.
 by inline AKE_Fresh(A).init AKE_NoHashOnCompute(A).init;
     wp; skip; progress => //; smt.
@@ -5466,7 +6071,7 @@ gen_sstring (proj AKE_Fresh.mEexp{1}.[AKE_NoHashOnCompute.t_idx{2}])
 by rewrite /get_string_from_id; smt.
 smt.
 elim H10; smt.
-generalize H8 H9;rewrite /get_string_from_id; smt.
+generalize H9 H10;rewrite /get_string_from_id; smt.
 elim H10; smt.
 wp; skip; progress.
 generalize H3 H1; rewrite /in_dom; smt.
@@ -5612,7 +6217,10 @@ local module AKE_ComputeRand(FA : Adv2) = {
     }
 
     fun init2(i : Sidx, Y : Epk) : unit = {
-      if (!in_dom i mCompleted && in_dom i mStarted) {
+      if (!in_dom i mCompleted && in_dom i mStarted &&
+       (test <> None => 
+       fresh_op (proj test) 
+        (Accept(compute_sid mStarted mEexp mCompleted.[i<- Y] i)::evs ))) {
         mCompleted.[i] = Y;
         evs = Accept(compute_sid mStarted mEexp mCompleted i)::evs;
       }
@@ -5700,7 +6308,8 @@ local module AKE_ComputeRand(FA : Adv2) = {
     } 
     if (!collision_eexp_eexp_op mEexp) {
      t_idx = A.choose(pks);
-      if (mStarted.[t_idx] <> None && mCompleted.[t_idx] <> None) {
+      if (mStarted.[t_idx] <> None && mCompleted.[t_idx] <> None &&
+          fresh_op (compute_sid mStarted mEexp mCompleted t_idx) evs) {
       test = Some (compute_sid mStarted mEexp mCompleted t_idx);
       (* the if-condition implies "mem (Accept (proj O.test)) O.evs" *)
       key  = $sample_Key;
@@ -5811,8 +6420,6 @@ proof.
  by apply length0_nil.
 save.
 
-
-
 local lemma Pr3_aux : forall &m,
 Pr[AKE_ComputeRand(A).main() @ &m : res] = 1%r / 2%r.
 proof.
@@ -5882,3 +6489,798 @@ proof.
   by equiv_deno AKE_NoHashCall_AKE_ComputeRand.
   by rewrite -(Pr3_aux &m); smt.
 save. 
+
+pred invh2 (mH2 : (Sstring, Key) map)  
+           (sH2 : Sstring set) evs mStrt mComp mEexp mSk =  
+forall x, in_dom x mH2 => 
+          (FSet.mem x sH2 \/
+           (exists i, in_dom i mComp /\ in_dom i mStrt /\ 
+             (List.mem (SessionRev (compute_sid mStrt mEexp mComp i)) evs) /\ 
+                      get_string_from_id i mStrt mComp mEexp mSk = x)).
+                     
+
+lemma invh2_mon_ev : forall mH2 sH2 evs mStrt mComp mEexp mSk e,
+invh2 mH2 sH2 evs mStrt mComp mEexp mSk =>
+invh2 mH2 sH2 (e::evs) mStrt mComp mEexp mSk.
+proof.
+ rewrite /invh2; progress => //.
+ elim (H x _) => // h.
+  by left.
+  elim h => i [_][_][_] _.
+  by right; exists i; rewrite mem_cons; progress => //; right.
+save.
+
+lemma invh2_mon_Strt : forall mH2 sH2 evs mStrt mComp mEexp mSk i v,
+! in_dom i mStrt => 
+(* ! in_dom i mComp =>  *)
+invh2 mH2 sH2 evs mStrt mComp mEexp mSk =>
+invh2 mH2 sH2 evs mStrt.[i <- v] mComp mEexp mSk.
+proof.
+ rewrite /invh2.
+ intros => mH2 sH2 evs mStrt mCmp mEexp mSk i v hnin_dom h x hd.
+ cut:= h x _.
+ assumption.
+ intros => [_ | [j][hj1][hj2][hj3]hj4] ;[left => // |].
+ right; exists j.
+ case (i = j) => heq.
+  by generalize hnin_dom hj2; rewrite heq; smt.
+  by rewrite  /compute_sid /get_string_from_id get_setNE // !in_dom_setNE //; smt.
+save.
+
+lemma invh2_mon_Cmp : forall mH2 sH2 evs mStrt mComp mEexp mSk i v,
+! in_dom i mComp => 
+invh2 mH2 sH2 evs mStrt mComp mEexp mSk =>
+invh2 mH2 sH2 evs mStrt mComp.[i <- v] mEexp mSk.
+proof.
+ intros => mH2 sH2 evs mStrt mCmp mEexp mSk i v hnin_dom  h x hd.
+ cut := h x _.
+ assumption.
+ intros => [_ | [j][hj1][hj2][hj3]hj4] ;[left => // |] .
+ right; exists j.
+ case (i = j) => heq.
+  by generalize hnin_dom hj2; rewrite heq; smt.
+  by rewrite  /compute_sid /get_string_from_id get_setNE // !in_dom_setNE //; smt.
+save.
+
+lemma invh2_mon_h2_1 : forall mH2 sH2 evs mStrt mComp mEexp mSk str v,
+!in_dom str mH2 =>
+invh2 mH2 sH2 evs mStrt mComp mEexp mSk =>
+invh2 mH2.[str <- v] (add str sH2) evs mStrt mComp mEexp mSk.
+proof.
+ rewrite /invh2; progress (rewrite in_dom_set).
+  elim H1 => h.
+   by elim (H0 x _) => // hmem; rewrite mem_add; [left; left | right].
+   by left; rewrite mem_add h; right.
+save.  
+
+lemma invh2_mon_h2_2 : forall mH2 sH2 evs mStrt mComp mEexp mSk str,
+in_dom str mH2 =>
+invh2 mH2 sH2 evs mStrt mComp mEexp mSk =>
+invh2 mH2 (add str sH2) evs mStrt mComp mEexp mSk.
+proof.
+ rewrite /invh2; progress. 
+  elim (H0 x _) => // h1.
+  by rewrite mem_add; left; left.
+  by right.
+save.
+
+lemma invh2_mon_Rev1 : forall mH2 sH2 evs mStrt mComp mEexp mSk str i A B X v sid,
+proj mStrt.[i] = (A, B, X) =>
+str = gen_sstring (proj mEexp.[i]) (proj mSk.[A]) B (proj mComp.[i]) X =>
+sid = compute_sid mStrt mEexp mComp i =>
+! in_dom str mH2 =>
+in_dom i mStrt =>
+in_dom i mComp =>
+invh2 mH2 sH2 evs mStrt mComp mEexp mSk =>
+invh2 mH2.[str <- v] sH2  (SessionRev sid :: evs) mStrt mComp mEexp mSk.
+proof.
+ rewrite /invh2; progress.
+ generalize H4; rewrite in_dom_set => [|] h.
+  cut := H3 x _; first assumption.
+  intros => [|] h'; first by left.
+  elim h' => j [hj1][hj2][hj3] hj4.
+  right; exists j; do! split; try assumption.
+  by rewrite mem_cons; right.
+  
+  right; exists i; do !split => //.
+   by rewrite mem_cons; left.
+   by rewrite h /get_string_from_id H.
+save.
+
+
+lemma compute_sid_pres_cmp : forall m1 m2 m3 i j v,
+j <> i =>
+compute_sid m1 m2 m3 i =
+compute_sid m1 m2 m3.[j <- v] i.
+proof.
+ intros => m1 m2 m3 i j v hneq.
+ by rewrite /compute_sid get_setNE.
+save.
+
+lemma compute_sid_pres_strt : forall m1 m2 m3 i j v,
+j <> i =>
+compute_sid m1 m2 m3 i =
+compute_sid m1.[j <- v] m2 m3 i.
+proof.
+ intros => m1 m2 m3 i j v hneq.
+ by rewrite /compute_sid get_setNE.
+save.
+
+
+lemma fresh_not_Rev_mem1 : forall s evs,
+fresh_op s evs = true =>
+! mem (SessionRev s) evs.
+proof.
+ intros => s evs.
+ rewrite -fresh_op_def'.
+ rewrite /fresh.
+ by elim /tuple5_ind s => /= A B X Y r heq; progress.
+save.
+
+lemma fresh_not_Rev_mem2 : forall s evs,
+fresh_op s evs = true =>
+! mem (SessionRev (cmatching s)) evs.
+proof.
+ intros => s evs.
+ rewrite -fresh_op_def'.
+ rewrite /fresh.
+ by elim /tuple5_ind s => /= A B X Y r heq; progress.
+save.
+
+lemma fresh_not_Rev1 : forall s t evs,
+fresh_op t (SessionRev s :: evs) = true =>
+s <> t.
+proof.
+ intros => s t evs.
+ rewrite -fresh_op_def'.
+ rewrite /fresh.
+ elim /tuple5_ind t => /= A B X Y r heq; progress.
+ generalize H; rewrite mem_cons not_or.
+ smt.
+save.
+
+lemma fresh_not_Rev2 : forall s t evs,
+fresh_op t (SessionRev s :: evs) = true =>
+s <> cmatching t.
+proof.
+ intros => s t evs.
+ rewrite -fresh_op_def'.
+ rewrite /fresh.
+ elim /tuple5_ind t => /= A B X Y r heq; progress.
+ generalize H1; rewrite mem_cons not_or.
+ smt.
+save.
+
+axiom gen_pk_inj : forall s1 s2, 
+gen_pk s1 = gen_pk s2 =>
+s1 = s2.
+
+lemma strong_partnering_id :
+forall i j mStrt mCmp mEexp mSk,
+(forall s, in_dom s mSk => gen_pk(proj mSk.[s]) =  s) =>
+in_dom (sid_actor (compute_sid mStrt mEexp mCmp i)) mSk =>
+in_dom (sid_actor (compute_sid mStrt mEexp mCmp j)) mSk =>
+get_string_from_id i mStrt mCmp mEexp mSk =
+get_string_from_id j mStrt mCmp mEexp mSk =>
+compute_sid mStrt mEexp mCmp i =
+compute_sid mStrt mEexp mCmp j \/
+compute_sid mStrt mEexp mCmp i =
+cmatching (compute_sid mStrt mEexp mCmp j).
+proof.
+ intros => i j mStrt mCmp mEexp mSk mSk_inv hdom1 hdom2.
+ rewrite /get_string_from_id /compute_sid.
+ elim /tuple3_ind (proj mStrt.[i]) => A1 B1 r1 /=.
+ elim /tuple3_ind (proj mStrt.[j]) => A2 B2 r2 /= heq1 heq2.
+ rewrite strong_partnering => [|]; progress.
+  rewrite H0 H1.
+  cut h: gen_pk (proj mSk.[A1]) = gen_pk (proj mSk.[A2]).
+  rewrite H => //.
+  generalize h; rewrite !mSk_inv.
+   by generalize hdom1; rewrite /sid_actor /compute_sid heq2 /=.
+   by generalize hdom2; rewrite /sid_actor /compute_sid heq1 /=.
+  by intros => ->; left. 
+
+  rewrite /cmatching /=.
+  rewrite H H0.
+  rewrite /cmatching /= !mSk_inv.
+   by generalize hdom2; rewrite /sid_actor /compute_sid heq1 /=.
+   by generalize hdom1; rewrite /sid_actor /compute_sid heq2 /=.
+  by right; rewrite (_: r1 = (! r2)); first by smt.
+save.
+
+pred valid_start evs = forall A B X r, 
+List.mem (Start (A,B,X,r)) evs => 
+r = init.
+
+lemma valid_start_pres1 : forall evs e,
+(forall ps, Start ps <> e) =>
+valid_start evs =>
+valid_start (e::evs).
+proof.
+ rewrite /valid_start => evs e h hvalid A B X r; rewrite mem_cons => [|] hs.
+ by cut: Start (A, B, X, r) <> e; [ apply h | smt ].
+ by apply (hvalid A B X).
+save.
+
+lemma valid_start_pres2 : forall evs A B X,
+valid_start evs =>
+valid_start (Start (A, B, X, init)::evs).
+proof.
+ rewrite /valid_start => evs A B X hvalid A' B' X' r'; rewrite mem_cons => [|] hs.
+ cut h:= Start_inj (A', B', X', r') (A, B, X, init) _ => // {hs}.
+ smt.
+ by apply (hvalid A' B' X' r').
+save.
+
+lemma fresh_pres_aux : forall t e evs,
+valid_start evs =>
+(forall s, SessionRev s <> e) =>
+(forall s, StaticRev s <> e) =>
+(forall s, EphemeralRev s <> e) =>
+(forall A B X Y r, e = Accept (A,B,X,Y,r) => r <> init) => 
+fresh_op t evs =>
+fresh_op t (e::evs).
+proof.
+ intros => t e evs hvstrt hnsr hnstr hner hneq.
+ cut _ : fresh_op t evs = true => fresh_op t (e :: evs) = true; last by smt.
+ rewrite -!fresh_op_def' /fresh.
+ elim /tuple5_ind t => /= A B X Y r heq.
+ progress => //.
+  by rewrite mem_cons not_or; split => //; apply hnsr.
+  
+  generalize H0.
+  rewrite !mem_cons !not_and  !not_or => [|] h; [left | right]; split => //.
+   by apply hner.
+   by apply hnstr.  
+
+  by rewrite mem_cons not_or; split => //; apply hnsr.
+  
+  generalize H3; rewrite mem_cons => [heqa | hdom].
+   by generalize hnstr; rewrite -heqa; smt.
+   
+   elim (H2 _) => //;intros => [hacc hnoeph|[hsrt hnoex] hnoeph]; [left| right].
+    by rewrite mem_cons; right.
+    split.
+     by rewrite mem_cons; right.
+     apply not_def => [[z]]; rewrite mem_cons => [|] h; last first.
+     cut: (exists (z : Epk), mem (Accept (B, A, Y, z, ! r)) evs); last by smt.
+      by exists z.
+     
+     generalize hsrt; rewrite /psid_of_sid /cmatching /=.
+     apply not_def => h'.
+     generalize hvstrt; rewrite /valid_start => hvstrt.
+     generalize h.
+     cut -> := hvstrt B A Y (!r) _ => //.
+     intros heq'.
+     by cut := hneq B A Y z init _; first rewrite heq'.
+
+generalize H3.   
+rewrite !mem_cons not_or => [ |].
+cut : (StaticRev B <> e).
+ apply hnstr.
+ smt.
+intros => _; elim (H2 _) => //.
+progress => //. 
+by apply hner.
+save.
+
+
+local equiv AKE_NoHashCall_AKE_ComputeRand_bad_ev : 
+AKE_NoHashOnCompute(A).main ~ AKE_ComputeRand(A).main :
+={glob A} ==>
+(AKE_NoHashOnCompute.test <> None /\ 
+in_dom AKE_NoHashOnCompute.t_idx AKE_NoHashOnCompute.mCompleted /\ 
+in_dom AKE_NoHashOnCompute.t_idx AKE_NoHashOnCompute.mStarted /\ 
+in_dom AKE_NoHashOnCompute.t_idx AKE_NoHashOnCompute.mEexp /\
+in_dom 
+(get_string_from_id AKE_NoHashOnCompute.t_idx AKE_NoHashOnCompute.mStarted 
+  AKE_NoHashOnCompute.mCompleted AKE_NoHashOnCompute.mEexp AKE_NoHashOnCompute.mSk) 
+AKE_NoHashOnCompute.mH2){1} =>
+(AKE_ComputeRand.test <> None /\ 
+in_dom AKE_ComputeRand.t_idx AKE_ComputeRand.mCompleted /\
+mem
+(get_string_from_id AKE_ComputeRand.t_idx AKE_ComputeRand.mStarted 
+  AKE_ComputeRand.mCompleted AKE_ComputeRand.mEexp AKE_ComputeRand.mSk) 
+AKE_ComputeRand.sH2 /\
+fresh_op (compute_sid AKE_ComputeRand.mStarted AKE_ComputeRand.mEexp AKE_ComputeRand.mCompleted AKE_ComputeRand.t_idx) AKE_ComputeRand.evs){2}.
+proof.
+ fun. 
+ seq 14 14:
+(={b,pks,key,keyo,b',i,pks, glob A} /\
+  AKE_ComputeRand.t_idx{2} = AKE_NoHashOnCompute.t_idx{1} /\
+  AKE_ComputeRand.evs{2} = AKE_NoHashOnCompute.evs{1} /\
+  AKE_ComputeRand.test{2} = AKE_NoHashOnCompute.test{1} /\
+  AKE_ComputeRand.cSession{2} = AKE_NoHashOnCompute.cSession{1} /\
+  AKE_ComputeRand.cH2{2} = AKE_NoHashOnCompute.cH2{1} /\
+  AKE_ComputeRand.mH2{2} = AKE_NoHashOnCompute.mH2{1} /\
+  AKE_ComputeRand.sH2{2} = AKE_NoHashOnCompute.sH2{1} /\
+  AKE_ComputeRand.mSk{2} = AKE_NoHashOnCompute.mSk{1} /\
+  AKE_ComputeRand.mEexp{2} = AKE_NoHashOnCompute.mEexp{1} /\
+  AKE_ComputeRand.mStarted{2} = AKE_NoHashOnCompute.mStarted{1} /\
+  AKE_ComputeRand.mCompleted{2} = AKE_NoHashOnCompute.mCompleted{1} /\
+  AKE_ComputeRand.mH2{2} = Map.empty /\
+  AKE_ComputeRand.sH2{2} = FSet.empty /\
+  AKE_ComputeRand.mCompleted{2} = Map.empty /\
+  AKE_ComputeRand.mStarted{2} = Map.empty /\
+  AKE_NoHashOnCompute.test{1} = None  /\ 
+  (forall i, in_dom i AKE_ComputeRand.mStarted{2} => 
+   in_dom (sd2_actor (proj AKE_ComputeRand.mStarted{2}.[i])) 
+          AKE_ComputeRand.mSk{2}) /\
+  (forall s, in_dom s AKE_ComputeRand.mSk{2} => 
+       gen_pk (proj AKE_ComputeRand.mSk{2}.[s]) = s) /\
+  valid_start AKE_ComputeRand.evs{2}). 
+ while (={sidxs} /\   AKE_ComputeRand.mEexp{2} = AKE_NoHashOnCompute.mEexp{1});
+  first by wp; rnd; wp.
+ while (={pks, i} /\   AKE_ComputeRand.mSk{2} = AKE_NoHashOnCompute.mSk{1} /\
+(forall s, in_dom s AKE_ComputeRand.mSk{2} => 
+       gen_pk (proj AKE_ComputeRand.mSk{2}.[s]) = s)).
+wp; rnd; skip; progress.
+smt.
+case (s = gen_pk skaL)=> heq.
+ by rewrite heq get_setE proj_some.
+ generalize H5; rewrite in_dom_setNE // get_setNE; first smt.
+ by intros _; apply H. 
+
+ inline AKE_NoHashOnCompute(A).init AKE_ComputeRand(A).init; wp; skip; progress => //.
+ smt.
+ smt.
+ by apply H1.
+ by rewrite /valid_start; smt.
+
+if => //; last by rnd{2} => //; skip; progress => //; smt.
+swap{2} 3 -1.
+seq 2 2: (={b,pks,key,keyo,b',i,pks, glob A} /\
+  AKE_ComputeRand.t_idx{2} = AKE_NoHashOnCompute.t_idx{1} /\
+  AKE_ComputeRand.evs{2} = AKE_NoHashOnCompute.evs{1} /\
+  AKE_ComputeRand.test{2} = AKE_NoHashOnCompute.test{1} /\
+  AKE_ComputeRand.cSession{2} = AKE_NoHashOnCompute.cSession{1} /\
+  AKE_ComputeRand.cH2{2} = AKE_NoHashOnCompute.cH2{1} /\
+  AKE_ComputeRand.mH2{2} = AKE_NoHashOnCompute.mH2{1} /\
+  AKE_ComputeRand.sH2{2} = AKE_NoHashOnCompute.sH2{1} /\
+  AKE_ComputeRand.mSk{2} = AKE_NoHashOnCompute.mSk{1} /\
+  AKE_ComputeRand.mEexp{2} = AKE_NoHashOnCompute.mEexp{1} /\
+  AKE_ComputeRand.mStarted{2} = AKE_NoHashOnCompute.mStarted{1} /\
+  AKE_ComputeRand.mCompleted{2} = AKE_NoHashOnCompute.mCompleted{1} /\
+  (invh2 AKE_ComputeRand.mH2 AKE_ComputeRand.sH2 AKE_ComputeRand.evs 
+         AKE_ComputeRand.mStarted AKE_ComputeRand.mCompleted AKE_ComputeRand.mEexp 
+         AKE_ComputeRand.mSk){2} /\
+(forall x, in_dom x AKE_ComputeRand.mCompleted{2} => 
+           in_dom x AKE_ComputeRand.mStarted{2} ) /\
+  AKE_NoHashOnCompute.test{1} = None  /\
+(forall i, in_dom i AKE_ComputeRand.mStarted{2} => 
+   in_dom (sd2_actor (proj AKE_ComputeRand.mStarted{2}.[i])) 
+          AKE_ComputeRand.mSk{2}) /\
+  (forall s, in_dom s AKE_ComputeRand.mSk{2} => 
+       gen_pk (proj AKE_ComputeRand.mSk{2}.[s]) = s) /\
+  valid_start AKE_ComputeRand.evs{2}).
+rnd.
+call (_ :
+ AKE_ComputeRand.t_idx{2} = AKE_NoHashOnCompute.t_idx{1} /\
+  AKE_ComputeRand.evs{2} = AKE_NoHashOnCompute.evs{1} /\
+  AKE_ComputeRand.test{2} = AKE_NoHashOnCompute.test{1} /\
+  AKE_ComputeRand.cSession{2} = AKE_NoHashOnCompute.cSession{1} /\
+  AKE_ComputeRand.cH2{2} = AKE_NoHashOnCompute.cH2{1} /\
+  AKE_ComputeRand.mH2{2} = AKE_NoHashOnCompute.mH2{1} /\
+  AKE_ComputeRand.sH2{2} = AKE_NoHashOnCompute.sH2{1} /\
+  AKE_ComputeRand.mSk{2} = AKE_NoHashOnCompute.mSk{1} /\
+  AKE_ComputeRand.mEexp{2} = AKE_NoHashOnCompute.mEexp{1} /\
+  AKE_ComputeRand.mStarted{2} = AKE_NoHashOnCompute.mStarted{1} /\
+  AKE_ComputeRand.mCompleted{2} = AKE_NoHashOnCompute.mCompleted{1} /\
+  (invh2 AKE_ComputeRand.mH2 AKE_ComputeRand.sH2 AKE_ComputeRand.evs 
+         AKE_ComputeRand.mStarted AKE_ComputeRand.mCompleted AKE_ComputeRand.mEexp 
+         AKE_ComputeRand.mSk){2} /\
+ (forall x, in_dom x AKE_ComputeRand.mCompleted{2} => 
+           in_dom x AKE_ComputeRand.mStarted{2} ) /\
+(forall i, in_dom i AKE_ComputeRand.mStarted{2} => 
+   in_dom (sd2_actor (proj AKE_ComputeRand.mStarted{2}.[i])) 
+          AKE_ComputeRand.mSk{2}) /\
+  (forall s, in_dom s AKE_ComputeRand.mSk{2} => 
+       gen_pk (proj AKE_ComputeRand.mSk{2}.[s]) = s) /\
+  valid_start AKE_ComputeRand.evs{2}).
+fun; wp; skip; progress; (try apply invh2_mon_ev => //); (try apply H0 => //);
+     (try apply H1 => //); (try apply H2 => //).
+     by apply valid_start_pres1; smt.
+     by apply valid_start_pres1; smt.
+
+fun; inline AKE_NoHashOnCompute(A).O.h2 AKE_ComputeRand(A).O.h2; sp; if => //; wp; try rnd; wp; skip; progress => //;(try apply H0 => //);
+ (try apply H1 => //); (try apply H2 => //).
+ by apply invh2_mon_h2_1.
+ by apply invh2_mon_h2_2.
+
+fun; wp; skip; progress.
+  apply invh2_mon_ev.
+  by apply invh2_mon_Strt => //. 
+  by rewrite in_dom_set; left; apply H0.
+  case (i{2} = i0) => heq.
+   by rewrite heq get_setE proj_some /sd2_actor /=.
+   generalize H7; rewrite get_setNE // in_dom_setNE; first smt.
+   by intros h; apply H1.
+   by apply H2.
+
+  by apply valid_start_pres2.
+  assumption. 
+  by apply H0.
+  by apply H1.
+  by apply H2.
+  assumption.
+
+fun; wp; skip; progress.
+  apply invh2_mon_ev.
+  by apply invh2_mon_Cmp.
+  by generalize H7; rewrite in_dom_set => [ h | -> ]; [apply H0 | ].
+  by apply H1.
+  by apply H2.
+  by apply valid_start_pres1; smt.
+  assumption.
+  by apply H0.
+  by apply H1.
+  by apply H2.
+  assumption.
+
+fun; wp; skip; progress.
+  apply invh2_mon_ev.
+  apply invh2_mon_Cmp.
+  assumption.  
+  by apply invh2_mon_Strt. 
+  by generalize H8; rewrite !in_dom_set => [h | ->]; [left; apply H0 | right].
+  case (i{2} = i0) => heq.
+   by rewrite heq get_setE proj_some /sd2_actor /=.
+   generalize H8; rewrite get_setNE // in_dom_setNE; first smt.
+   by intros h; apply H1.
+   by apply H2.
+  by apply valid_start_pres1; smt.
+  assumption.
+  by apply H0.
+  by apply H1.
+  by apply H2.
+  assumption.
+
+fun; wp; skip; progress; try apply H0; try assumption.
+  by apply invh2_mon_ev.
+  by apply H1.
+  by apply H2.
+  by apply valid_start_pres1; smt.
+  by apply H1.
+  by apply H2.
+  
+fun.
+inline AKE_NoHashOnCompute(A).O.computeKey AKE_NoHashOnCompute(A).O.h2 
+       AKE_ComputeRand(A).O.computeKey AKE_ComputeRand(A).O.h2.
+sp; if => //; sp; try if => //; wp; try rnd; wp; skip; progress.
+ assumption.
+ apply (invh2_mon_Rev1 _ _ _ _ _ _ _ _ i{2} x1 x2 x3 keL _) => //.
+  by apply H0.
+
+ by apply H0.
+ by apply H1.
+ by apply H2.
+ by apply valid_start_pres1; smt.
+ by apply invh2_mon_ev.
+ by apply H0.
+ by apply H1.
+ by apply H2.
+ by apply valid_start_pres1; smt.
+ by apply invh2_mon_ev.
+ by apply H0. 
+ by apply H1.
+ by apply H2.
+ by apply valid_start_pres1; smt.
+ assumption.
+ by apply H0.
+ by apply H1.
+ by apply H2.
+ assumption.
+
+skip; progress => //.
+ rewrite /invh2; progress; smt.
+ smt.
+ smt.
+ by apply H0.
+ smt.
+ by apply H10.
+ by apply H11.
+ if => //.
+ call (_ :
+ AKE_ComputeRand.t_idx{2} = AKE_NoHashOnCompute.t_idx{1} /\
+  AKE_ComputeRand.evs{2} = AKE_NoHashOnCompute.evs{1} /\
+  AKE_ComputeRand.test{2} = AKE_NoHashOnCompute.test{1} /\
+  AKE_ComputeRand.cSession{2} = AKE_NoHashOnCompute.cSession{1} /\
+  AKE_ComputeRand.cH2{2} = AKE_NoHashOnCompute.cH2{1} /\
+  AKE_ComputeRand.mH2{2} = AKE_NoHashOnCompute.mH2{1} /\
+  AKE_ComputeRand.sH2{2} = AKE_NoHashOnCompute.sH2{1} /\
+  AKE_ComputeRand.mSk{2} = AKE_NoHashOnCompute.mSk{1} /\
+  AKE_ComputeRand.mEexp{2} = AKE_NoHashOnCompute.mEexp{1} /\
+  AKE_ComputeRand.mStarted{2} = AKE_NoHashOnCompute.mStarted{1} /\
+  AKE_ComputeRand.mCompleted{2} = AKE_NoHashOnCompute.mCompleted{1} /\
+  (invh2 AKE_ComputeRand.mH2 AKE_ComputeRand.sH2 AKE_ComputeRand.evs 
+         AKE_ComputeRand.mStarted AKE_ComputeRand.mCompleted AKE_ComputeRand.mEexp 
+         AKE_ComputeRand.mSk){2} /\
+ (forall x, in_dom x AKE_ComputeRand.mCompleted{2} => 
+           in_dom x AKE_ComputeRand.mStarted{2} ) /\ 
+  fresh_op (proj AKE_ComputeRand.test{2}) AKE_ComputeRand.evs{2} /\ 
+  in_dom AKE_ComputeRand.t_idx{2} AKE_ComputeRand.mCompleted{2} /\ 
+  proj (AKE_NoHashOnCompute.test{1}) = (compute_sid AKE_ComputeRand.mStarted AKE_ComputeRand.mEexp AKE_ComputeRand.mCompleted AKE_ComputeRand.t_idx){2} /\ 
+! AKE_NoHashOnCompute.test{1} = None /\
+(forall i, in_dom i AKE_ComputeRand.mStarted{2} => 
+   in_dom (sd2_actor (proj AKE_ComputeRand.mStarted{2}.[i])) 
+          AKE_ComputeRand.mSk{2}) /\
+  (forall s, in_dom s AKE_ComputeRand.mSk{2} => 
+       gen_pk (proj AKE_ComputeRand.mSk{2}.[s]) = s) /\
+  valid_start AKE_ComputeRand.evs{2}).
+fun; wp; skip; progress; (try apply invh2_mon_ev => //); (try apply H0 => //);(try apply H5 => //);(try apply H6 => //);(try apply H9 => //).
+ by apply valid_start_pres1; smt.
+ by apply valid_start_pres1; smt.
+ 
+fun; inline AKE_NoHashOnCompute(A).O.h2 AKE_ComputeRand(A).O.h2; sp; if => //; wp; try rnd; wp; skip; progress => //;(try apply H0 => //);
+(try apply H5 => //);(try apply H6 => //).
+ by apply invh2_mon_h2_1.
+ by apply invh2_mon_h2_2.
+
+fun; wp; skip; progress; 
+ (try by apply H0); (try by apply H5);
+ (try by apply H6); try (by (rewrite mem_cons; smt)); try (by assumption).
+  apply invh2_mon_ev.
+  by apply invh2_mon_Strt => //. 
+  by rewrite in_dom_set; left; apply H0.
+  apply fresh_pres_aux; smt.
+ 
+ rewrite -compute_sid_pres_strt; last by assumption.
+ by apply not_def => habs; generalize habs H10 => ->; cut:= H0 AKE_NoHashOnCompute.t_idx{1} _.
+  case (i{2} = i0) => heq.
+   by rewrite heq get_setE proj_some /sd2_actor /=.
+   generalize H11; rewrite get_setNE // in_dom_setNE; first smt.
+   by intros h; apply H5.
+   
+   by apply valid_start_pres2.
+fun; wp; skip; progress; 
+  try (by apply H0);
+  try (by apply H5);
+  try (by apply H6);
+  try (by assumption).
+  apply invh2_mon_ev.
+  by apply invh2_mon_Cmp.
+ 
+  by  generalize H11; rewrite in_dom_set => [ h | -> ]; [apply H0 | ].
+  by apply H10.
+  by rewrite in_dom_set; left.
+  rewrite  -{1}compute_sid_pres_cmp; last by assumption.
+
+  by apply not_def => heq; generalize heq H8 H2 => ->.
+  by apply valid_start_pres1; smt.
+
+  fun; wp; skip; progress; 
+  try (by apply H0);
+  try (by apply H5);
+  try (by apply H6);
+  try (by assumption).
+
+  apply invh2_mon_ev.
+  apply invh2_mon_Strt; first by assumption.
+  by apply invh2_mon_Cmp.
+  by generalize H12; rewrite !in_dom_set => [h | ->]; [left; apply H0 | right].
+  apply fresh_pres_aux => //; first 3 by smt.
+
+   progress.
+   cut H12' := Accept_inj (B{2}, A{2}, gen_epk (proj AKE_NoHashOnCompute.mEexp{1}.[i{2}]), X{2}, resp) (A0, B0, X0, Y, r0) _ => // {H12}.
+  smt.
+  
+  by rewrite in_dom_set; left; assumption.
+
+  rewrite -compute_sid_pres_strt.
+  by apply not_def => heq; generalize heq H11 H2 => ->.
+  rewrite -compute_sid_pres_cmp; last assumption.
+  by apply not_def => heq; generalize heq H11 H2 => ->.
+
+  case (i{2} = i0) => heq.
+   by rewrite heq get_setE proj_some /sd2_actor /=.
+   generalize H12; rewrite get_setNE // in_dom_setNE; first smt.
+   by intros h; apply H5.
+
+  by apply valid_start_pres1; smt.
+  
+fun; wp; skip; progress; 
+  try (by apply H0);
+  try (by apply H5);
+  try (by apply H6);
+  try (by assumption).
+
+  by apply invh2_mon_ev.
+  by apply H9.
+  by apply valid_start_pres1; smt.
+
+fun;inline AKE_NoHashOnCompute(A).O.computeKey AKE_NoHashOnCompute(A).O.h2 
+           AKE_ComputeRand(A).O.computeKey AKE_ComputeRand(A).O.h2.
+sp; if => //; sp; try if => //; wp; try rnd; wp; skip; progress;  try (by apply H0);
+  try (by apply H5);
+  try (by apply H6);
+  try (by assumption).
+
+ apply (invh2_mon_Rev1 _ _ _ _ _ _ _ _ i{2} x1 x2 x3 keL _) => //. 
+  by apply H0.
+ by apply H9.
+ by apply valid_start_pres1; smt.
+ by apply invh2_mon_ev.
+ by apply H9.
+ by apply valid_start_pres1; smt.
+ by apply invh2_mon_ev.
+ by apply H9.
+ by apply valid_start_pres1; smt.
+
+sp.
+if{1}.
+inline AKE_NoHashOnCompute(A).O.computeKey' AKE_NoHashOnCompute(A).O.h2.
+sp.
+rcondt{1} 1.
+by intros => &m; skip; progress; rewrite /in_dom.
+wp; rnd; wp.
+skip; progress => //;
+  try (by apply H0);
+  try (by apply H1);
+  try (by apply H2);
+  try (by assumption).
+by rewrite proj_some.
+by rewrite proj_some.
+smt.
+elim (H20 (get_string_from_id AKE_NoHashOnCompute.t_idx{1} mStarted_L
+          mCompleted_L AKE_NoHashOnCompute.mEexp{1}
+          AKE_NoHashOnCompute.mSk{1}) _) => //.
+intros => [i][hi1][hi2][hi3] hi4.
+cut:= strong_partnering_id i AKE_NoHashOnCompute.t_idx{1} mStarted_L mCompleted_L
+     AKE_NoHashOnCompute.mEexp{1} AKE_NoHashOnCompute.mSk{1} _ _ _ _ => //.
+
+cut := H26 i _ => //.
+rewrite /compute_sid /sid_actor /sd2_actor.
+by elim /tuple3_ind (proj mStarted_L.[i]) => /= A B r heq.
+
+cut := H26 AKE_NoHashOnCompute.t_idx{1} _ => //.
+rewrite /compute_sid /sid_actor /sd2_actor.
+by elim /tuple3_ind (proj mStarted_L.[AKE_NoHashOnCompute.t_idx{1}]) => /= A B r heq.
+
+intros => [|] h1.
+cut: !mem
+       (SessionRev
+          (compute_sid mStarted_L AKE_NoHashOnCompute.mEexp{1} mCompleted_L i))
+       evs_L; last by smt.
+generalize H24 H22.
+rewrite proj_some => ->;rewrite -h1.
+smt.
+cut: !mem
+       (SessionRev
+          (compute_sid mStarted_L AKE_NoHashOnCompute.mEexp{1} mCompleted_L i))
+       evs_L; last by smt.
+generalize H24 H22.
+rewrite proj_some => ->; rewrite h1 => habs.
+cut : 
+fresh_op
+        (compute_sid mStarted_L AKE_NoHashOnCompute.mEexp{1} mCompleted_L
+           AKE_NoHashOnCompute.t_idx{1}) evs_L = true; first smt.
+rewrite -fresh_op_def' /fresh.
+elim /tuple5_ind  (compute_sid mStarted_L AKE_NoHashOnCompute.mEexp{1} mCompleted_L
+    AKE_NoHashOnCompute.t_idx{1}) => A B X Y r /=.
+
+by intros => heq; progress.
+smt.
+wp; rnd; skip; progress; rewrite ?proj_some => //.
+by apply H0.
+smt.
+by apply H1.
+by apply H2.
+
+elim (H20 (get_string_from_id AKE_NoHashOnCompute.t_idx{1} mStarted_L
+          mCompleted_L AKE_NoHashOnCompute.mEexp{1}
+          AKE_NoHashOnCompute.mSk{1}) _) => //.
+intros => [i][hi1][hi2][hi3] hi4.
+cut:= strong_partnering_id i AKE_NoHashOnCompute.t_idx{1} mStarted_L mCompleted_L
+     AKE_NoHashOnCompute.mEexp{1} AKE_NoHashOnCompute.mSk{1} _ _ _ _ => //.
+
+cut := H26 i _ => //.
+rewrite /compute_sid /sid_actor /sd2_actor.
+by elim /tuple3_ind (proj mStarted_L.[i]) => /= A B r heq.
+
+cut := H26 AKE_NoHashOnCompute.t_idx{1} _ => //.
+rewrite /compute_sid /sid_actor /sd2_actor.
+by elim /tuple3_ind (proj mStarted_L.[AKE_NoHashOnCompute.t_idx{1}]) => /= A B r heq.
+
+intros => [|] h1.
+cut: !mem
+       (SessionRev
+          (compute_sid mStarted_L AKE_NoHashOnCompute.mEexp{1} mCompleted_L i))
+       evs_L; last by smt.
+generalize H24 H22.
+rewrite proj_some => ->;rewrite -h1.
+smt.
+cut: !mem
+       (SessionRev
+          (compute_sid mStarted_L AKE_NoHashOnCompute.mEexp{1} mCompleted_L i))
+       evs_L; last by smt.
+generalize H24 H22.
+rewrite proj_some => ->; rewrite h1 => habs.
+cut : 
+fresh_op
+        (compute_sid mStarted_L AKE_NoHashOnCompute.mEexp{1} mCompleted_L
+           AKE_NoHashOnCompute.t_idx{1}) evs_L = true; first smt.
+rewrite -fresh_op_def' /fresh.
+elim /tuple5_ind  (compute_sid mStarted_L AKE_NoHashOnCompute.mEexp{1} mCompleted_L
+    AKE_NoHashOnCompute.t_idx{1}) => A B X Y r /=.
+
+by intros => heq; progress.
+generalize H24 H22.
+by rewrite proj_some => ->.
+save.
+
+local lemma Pr3_bad : forall &m, 
+Pr[AKE_NoHashOnCompute(A).main() @ &m : 
+AKE_NoHashOnCompute.test <> None /\ 
+in_dom AKE_NoHashOnCompute.t_idx AKE_NoHashOnCompute.mCompleted /\ 
+in_dom AKE_NoHashOnCompute.t_idx AKE_NoHashOnCompute.mStarted /\ 
+in_dom AKE_NoHashOnCompute.t_idx AKE_NoHashOnCompute.mEexp /\
+in_dom 
+(get_string_from_id AKE_NoHashOnCompute.t_idx AKE_NoHashOnCompute.mStarted 
+  AKE_NoHashOnCompute.mCompleted AKE_NoHashOnCompute.mEexp AKE_NoHashOnCompute.mSk) 
+AKE_NoHashOnCompute.mH2] <=
+Pr[AKE_ComputeRand(A).main() @ &m : 
+AKE_ComputeRand.test <> None /\ 
+in_dom AKE_ComputeRand.t_idx AKE_ComputeRand.mCompleted /\ 
+mem
+(get_string_from_id AKE_ComputeRand.t_idx AKE_ComputeRand.mStarted 
+  AKE_ComputeRand.mCompleted AKE_ComputeRand.mEexp AKE_ComputeRand.mSk) 
+AKE_ComputeRand.sH2 /\
+fresh_op (compute_sid AKE_ComputeRand.mStarted AKE_ComputeRand.mEexp AKE_ComputeRand.mCompleted AKE_ComputeRand.t_idx) AKE_ComputeRand.evs].
+proof.
+ intros => &m.
+ by equiv_deno AKE_NoHashCall_AKE_ComputeRand_bad_ev.
+save.
+
+
+lemma real_le_plus1 : forall (p q r : real),
+p <= q => p + r <= q + r by smt.
+
+lemma real_le_plus : 
+forall (p q r s : real), p <= r => q <= s => p + q <= r + s.
+proof.
+ intros => p q r s hle1 hle2.
+ apply (Real.Trans _ (r + q) _); first by apply real_le_plus1.
+ rewrite (_ : r + q = q + r); first smt.
+ rewrite (_ : r + s =  s + r); first smt.
+ by apply real_le_plus1.
+save.
+
+local lemma Pr_sofar1 : forall &m,
+Pr[AKE_EexpRev(A).main() @ &m : res /\ test_fresh AKE_EexpRev.test AKE_EexpRev.evs
+                    /\ ! collision_eexp_eexp(AKE_EexpRev.mEexp) 
+                    /\ ! collision_eexp_rcvd(AKE_EexpRev.evs)] <=
+1%r/2%r + 
+Pr[AKE_ComputeRand(A).main() @ &m : 
+AKE_ComputeRand.test <> None /\ 
+in_dom AKE_ComputeRand.t_idx AKE_ComputeRand.mCompleted /\ 
+mem
+(get_string_from_id AKE_ComputeRand.t_idx AKE_ComputeRand.mStarted 
+  AKE_ComputeRand.mCompleted AKE_ComputeRand.mEexp AKE_ComputeRand.mSk) 
+AKE_ComputeRand.sH2 /\
+fresh_op (compute_sid AKE_ComputeRand.mStarted AKE_ComputeRand.mEexp AKE_ComputeRand.mCompleted AKE_ComputeRand.t_idx) AKE_ComputeRand.evs].
+proof. 
+ intros => &m.
+ apply (Real.Trans _ 
+      (Pr[AKE_Fresh(A).main() @ &m : res /\ test_fresh AKE_Fresh.test AKE_Fresh.evs
+                    /\ ! collision_eexp_eexp(AKE_Fresh.mEexp) 
+                    /\ ! collision_eexp_rcvd(AKE_Fresh.evs)]) _).
+ apply (Pr1 &m).
+ apply (Real.Trans _ 
+(Pr[AKE_NoHashOnCompute(A).main() @ &m : 
+(res /\ test_fresh AKE_NoHashOnCompute.test AKE_NoHashOnCompute.evs
+                    /\ ! collision_eexp_eexp(AKE_NoHashOnCompute.mEexp) 
+                    /\ ! collision_eexp_rcvd(AKE_NoHashOnCompute.evs) )] +
+Pr[AKE_NoHashOnCompute(A).main() @ &m : 
+(AKE_NoHashOnCompute.test <> None /\ 
+in_dom AKE_NoHashOnCompute.t_idx AKE_NoHashOnCompute.mCompleted /\ 
+in_dom AKE_NoHashOnCompute.t_idx AKE_NoHashOnCompute.mStarted /\ 
+in_dom AKE_NoHashOnCompute.t_idx AKE_NoHashOnCompute.mEexp /\
+in_dom 
+(get_string_from_id AKE_NoHashOnCompute.t_idx AKE_NoHashOnCompute.mStarted 
+  AKE_NoHashOnCompute.mCompleted AKE_NoHashOnCompute.mEexp AKE_NoHashOnCompute.mSk) 
+AKE_NoHashOnCompute.mH2)]) _).
+ apply (Pr2 &m).
+ apply real_le_plus.
+ apply (Pr3 &m).
+ apply (Pr3_bad &m).
+save.

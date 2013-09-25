@@ -39,6 +39,12 @@ module LowInternal = struct
     in
       prove_goal_by gs rn_hl_skip g
 
+
+  let t_bdHoare_skip g =
+    let t_trivial = t_try (t_lseq [t_simplify_nodelta;t_split;t_fail]) in
+    t_subgoal [t_trivial;t_bdHoare_skip] (EcPhlConseq.t_bdHoareS_conseq_bd FHeq f_r1 g)
+    
+
   let t_equiv_skip g =
     let concl = get_concl g in
     let es = t_as_equivS concl in
