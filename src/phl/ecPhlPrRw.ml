@@ -211,15 +211,15 @@ let destr_and f =
   try destr_and f 
   with DestrError _ -> tacuerror "The postcondition should be a conjunction"
 
-let destr_or f = 
-  try destr_or f 
-  with DestrError _ -> tacuerror "The postcondition should be a disjunction"
-
 let t_bdhoareS_and = gen_S t_bdhoare_split_bop_conseq destr_and f_or 
 let t_bdhoareF_and = gen_F t_bdhoare_split_bop_conseq destr_and f_or 
 let t_bdhoare_and b1 b2 b3 g =
   if bdhoare_kind g then t_bdhoareS_and b1 b2 b3 g
   else t_bdhoareF_and b1 b2 b3 g
+
+let destr_or f = 
+  try destr_or f 
+  with DestrError _ -> tacuerror "The postcondition should be a disjunction"
 
 let t_bdhoareS_or = gen_S t_bdhoare_split_bop_conseq destr_or f_and 
 let t_bdhoareF_or = gen_F t_bdhoare_split_bop_conseq destr_or f_and 
@@ -253,16 +253,29 @@ let t_bdhoare_not b1 b2 g =
    if bdhoare_kind g then t_bdhoareS_not b1 b2 g 
    else t_bdhoareF_not b1 b2 g
 
+open EcParsetree
+
+let t_rewrite_glob s pqs = 
+  EcHiLogic.process_rewrite pqs.EcLocation.pl_loc
+    [(RWRw(s,None,None, { fp_kind = FPNamed(pqs,None);fp_args = [] }))]
+
+let t_rewrite_logic s x = 
+  let loc = EcLocation._dummy in
+  let p = EcLocation.mk_loc loc ([EcCoreLib.id_top; "Logic"],x) in
+  t_rewrite_glob s p 
+  
 let process_bdhoare_split info g =
   let hyps, concl = get_goal g in
-  let penv, po = 
+  let (penv, qenv), pr, po = 
     match concl.f_node with
-    | FbdHoareS bhs -> LDecl.push_active bhs.bhs_m hyps, bhs.bhs_po
-    | FbdHoareF bhf -> fst (LDecl.hoareF bhf.bhf_f hyps), bhf.bhf_po
+    | FbdHoareS bhs -> 
+      let hyps = LDecl.push_active bhs.bhs_m hyps in
+      (hyps, hyps), bhs.bhs_pr, bhs.bhs_po
+    | FbdHoareF bhf -> (LDecl.hoareF bhf.bhf_f hyps), bhf.bhf_pr, bhf.bhf_po
     | _ -> tacuerror "The conclusion should be a bdhoare judgment" in
   match info with
   | EcParsetree.BDH_split_bop(b1,b2,b3) ->
-    let t = 
+    let t =
       if is_and po then t_bdhoare_and
       else if is_or po then t_bdhoare_or
       else tacuerror 
@@ -273,6 +286,25 @@ let process_bdhoare_split info g =
       | None -> f_r0
       | Some b3 -> EcCoreHiLogic.process_form penv b3 treal in
     t b1 b2 b3 g
+  | EcParsetree.BDH_split_or_case(b1,b2,f) -> 
+    let b1 = EcCoreHiLogic.process_form penv b1 treal in
+    let b2 = EcCoreHiLogic.process_form penv b2 treal in
+    let f  = EcCoreHiLogic.process_form qenv f tbool in
+    let t_conseq po lemma tac =
+      t_seq_subgoal (EcPhlConseq.t_conseq pr po)
+        [EcLogic.t_true;
+         EcLogic.t_lseq [
+           EcLogic.t_intros_i [EcIdent.create "_"];
+           t_rewrite_logic `LtoR lemma;
+           t_true ];
+         tac] in
+    t_conseq (f_or (f_and f po) (f_and (f_not f) po)) "orDandN"
+      (EcLogic.t_seq_subgoal (t_bdhoare_or b1 b2 f_r0)
+         [t_id None;
+          t_id None;
+          t_id None;
+          t_conseq f_false "andDorN" EcPhlTrivial.t_trivial]) g
+    
   | EcParsetree.BDH_split_not (b1, b2) ->
     let b1 = match b1 with
       | None -> f_r1
