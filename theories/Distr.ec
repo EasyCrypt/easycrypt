@@ -28,13 +28,6 @@ axiom mu_bounded (d:'a distr) (p:'a cpred):
 
 axiom mu_false (d:'a distr): mu d cpFalse = 0%r.
 
-axiom mu_or (d:'a distr) (p q:'a cpred):
-  mu d (cpOr p q) = mu d p + mu d q - mu d (cpAnd p q).
-
-lemma nosmt mu_and  (d:'a distr) (p q:'a cpred):
-  mu d (cpAnd p q) = mu d p + mu d q - mu d (cpOr p q)
-by [].
-
 axiom mu_sub (d:'a distr) (p q:'a cpred):
   p <= q => mu d p <= mu d q.
 
@@ -44,6 +37,33 @@ axiom mu_supp_in (d:'a distr) p:
 
 axiom pw_eq (d d':'a distr):
   d == d' => d = d'.
+
+axiom mu_or (d:'a distr) (p q:'a cpred):
+  mu d (cpOr p q) = mu d p + mu d q - mu d (cpAnd p q).
+
+lemma nosmt mu_or_le (d:'a distr) (p q:'a cpred) r1 r2:
+  mu d p <= r1 => mu d q <= r2 =>
+  mu d (cpOr p q) <= r1 + r2 by [].
+
+lemma nosmt mu_and  (d:'a distr) (p q:'a cpred):
+  mu d (cpAnd p q) = mu d p + mu d q - mu d (cpOr p q)
+by [].
+
+lemma nosmt mu_and_le_l (d:'a distr) (p q:'a cpred) r:
+  mu d p <= r =>
+  mu d (cpAnd p q) <= r.
+proof.
+  apply (Real.Trans _ (mu d p)).
+  by (apply mu_sub;rewrite /cpAnd => x //).
+save.
+
+lemma nosmt mu_and_le_r (d:'a distr) (p q:'a cpred) r :
+  mu d q <= r => 
+  mu d (cpAnd p q) <= r.
+proof.
+  apply (Real.Trans _ (mu d q)).
+  by (apply mu_sub;rewrite /cpAnd => x //).
+save.
 
 (** Lemmas *)
 lemma mu_supp (d:'a distr):
