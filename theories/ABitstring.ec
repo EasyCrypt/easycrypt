@@ -64,6 +64,11 @@ axiom app_sub (b:bitstring) l1 l2:
   0 <= l1 => 0 <= l2 => l1 + l2 = `|b| =>
   ((sub b 0 l1) || (sub b l1 l2)) = b.
 
+axiom sub_sub (b:bitstring) s1 l1 s2 l2:
+  0 <= s1 => 0 <= l1 => s1 + l1 <= `|b| =>
+  0 <= s2 => 0 <= l2 => s2 + l2 <= l1 =>
+  sub (sub b s1 l1) s2 l2 = sub b (s1 + s2) l2.
+
 theory DBitstring.
   require import Distr.
 
