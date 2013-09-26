@@ -185,8 +185,9 @@ let t_seq_subgoal t lt g = t_subgoal lt (t g)
 
 let t_try_base t g =
   let rec is_user_error = function
-    | TacError (true, _) -> true
-    | LocError (_, e)    -> is_user_error e
+    | EcTyping.TyError  _ -> true
+    | TacError (true, _)  -> true
+    | LocError (_, e)     -> is_user_error e
     | _ -> false
   in
   try `Success (t g)
