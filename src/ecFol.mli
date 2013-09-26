@@ -393,6 +393,7 @@ type f_subst = private {
   fs_mem     : EcIdent.t Mid.t;
   fs_sty     : ty_subst;
   fs_ty      : ty -> ty;
+  fs_opdef   : (EcIdent.t list * expr) EcPath.Mp.t;
 }
 
 module Fsubst : sig

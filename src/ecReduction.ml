@@ -376,7 +376,7 @@ let check_alpha_equal ri hyps f1 f2 =
     ensure (EcPath.p_equal xp1.EcPath.x_sub xp2.EcPath.x_sub);
     check_mp env subst xp1.EcPath.x_top xp2.EcPath.x_top in
   let check_s env s s1 s2 = 
-    let es = e_subst_init s.fs_freshen s.fs_sty.ts_p s.fs_ty s.fs_mp in
+    let es = e_subst_init s.fs_freshen s.fs_sty.ts_p s.fs_ty Mp.empty s.fs_mp in
     let s2 = EcModules.s_subst es s2 in
     ensure (s_equal_norm env s1 s2) in
 

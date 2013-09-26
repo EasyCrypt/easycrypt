@@ -599,11 +599,7 @@ and theory_override =
 | PTHO_Theory of pqsymbol
 
 and ty_override = psymbol list * pty * [`Alias | `Inline]
-
-and op_override = [
-| `OpDef    of op_override_def
-| `OpInline of pqsymbol
-]
+and op_override = op_override_def * [`Alias | `Inline]
 
 and op_override_def = {
   opov_tyvars : psymbol list option;

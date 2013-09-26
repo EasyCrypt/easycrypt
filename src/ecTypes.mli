@@ -186,6 +186,7 @@ type e_subst = {
   es_freshen : bool; (* true means realloc local *)
   es_p       : EcPath.path -> EcPath.path;
   es_ty      : ty -> ty;
+  es_opdef   : (EcIdent.t list * expr) EcPath.Mp.t;
   es_mp      : EcPath.mpath -> EcPath.mpath; 
   es_xp      : EcPath.xpath -> EcPath.xpath;
   es_loc     : expr Mid.t;
@@ -194,8 +195,12 @@ type e_subst = {
 val e_subst_id : e_subst
 
 val e_subst_init : 
-    bool -> (EcPath.path -> EcPath.path) ->
-      (ty -> ty) -> EcPath.mpath EcIdent.Mid.t -> e_subst
+      bool
+  -> (EcPath.path -> EcPath.path)
+  -> (ty -> ty)
+  -> (EcIdent.t list * expr) EcPath.Mp.t
+  -> EcPath.mpath EcIdent.Mid.t
+  -> e_subst
 
 val add_locals : e_subst -> 
   (EcIdent.t * ty) list -> e_subst * (EcIdent.t * ty) list
