@@ -1975,6 +1975,7 @@ phltactic:
 
 bdhoare_split:
 | b1=sform b2=sform b3=sform? { BDH_split_bop (b1,b2,b3) }
+| b1=sform b2=sform COLON f=sform { BDH_split_or_case (b1,b2,f) }
 | NOT b1=sform b2=sform      { BDH_split_not (Some b1,b2) }
 ;
 

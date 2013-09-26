@@ -185,8 +185,9 @@ let t_seq_subgoal t lt g = t_subgoal lt (t g)
 
 let t_try_base t g =
   let rec is_user_error = function
-    | TacError (true, _) -> true
-    | LocError (_, e)    -> is_user_error e
+    | EcTyping.TyError  _ -> true
+    | TacError (true, _)  -> true
+    | LocError (_, e)     -> is_user_error e
     | _ -> false
   in
   try `Success (t g)
@@ -716,6 +717,8 @@ let t_transitivity f g =
        @ (List.create 2 AAnode))
       g
 
+let t_true g = t_apply_logic p_true_intro [] [] g
+  
 (* Use to create two set of vars of a list of types*)
 let parseType create types =
   let parse ty =
@@ -765,7 +768,7 @@ let gen_eq_tuple_elim_proof types =
       ((
         t_lseq [t_rewrite_hyp `RtoL h1 [];
         t_apply_hyp h2 [];
-        t_apply_logic p_true_intro [] []]
+        t_true]
       )::(List.map (fun _ -> t_reflex ~reduce:false) types))
   ]
   
@@ -1019,12 +1022,9 @@ let t_exists = gen_t_exists (fun _ _ a -> a)
 
 let t_split g =
   let hyps, concl = get_goal g in
-  let env0 = LDecl.toenv hyps in
   let rec aux f =
     match f.f_node with
-    | Fop(p,_) when EcPath.p_equal p p_true ->
-      check_logic env0 p_true_intro;
-      t_glob p_true_intro [] g
+    | Fop(p,_) when EcPath.p_equal p p_true -> t_true g 
     | Fapp({f_node = Fop(p,_)}, [f1;f2]) ->
       begin
         match op_kind p with
@@ -1230,23 +1230,29 @@ let t_subst1 fx g =
 let t_subst_all =
   t_repeat (t_subst1 None)
 
-let find_in_hyps f hyps =
-  let test k =
-    try
-      let _, f' = LDecl.get_hyp k in
-      check_conv hyps f f'; true
-    with _ -> false in
+let gen_find_in_hyps eq f hyps = 
+  let test (_,lk) = 
+    match lk with
+    | LD_hyp f' -> eq hyps f f'
+    | _ -> false in
   fst (List.find test (LDecl.tohyps hyps).h_local)
 
+let find_in_hyps f hyps = gen_find_in_hyps is_conv f hyps
+
+let t_gen_assumption eq g =
+  let (hyps,concl) = get_goal g in
+  let h = 
+    try gen_find_in_hyps eq concl hyps 
+    with Not_found -> tacuerror "no assumption" in
+  t_hyp h g
+      
+let t_alpha_assumption g = t_gen_assumption is_alpha_eq g
+
 let t_assumption g = 
-  let (hyps, concl) = get_goal g in
-  let myh =
-    try  find_in_hyps concl hyps
-    with Not_found -> tacuerror "no assumption"
-  in
-    t_hyp myh g
+  t_or t_alpha_assumption (t_gen_assumption is_conv) g
     
 let t_progress tac g =
+  let tac = t_or t_alpha_assumption tac in
   let rec aux g = t_seq t_simplify_nodelta aux0 g 
   and aux0 g =
     t_seq (t_try tac) aux1 g

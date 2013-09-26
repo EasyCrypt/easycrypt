@@ -100,6 +100,7 @@ theory Requires.
   axiom nosmt mulrV:
     forall (x : domain), x <> rzero => mul x (inv x) = rone.
 
+  (* Can be usefull to add x <> 0 *)
   axiom nosmt exprN:
     forall (x : domain) (n : int), 0 <= n => expr x (-n) = inv (expr x n).
 

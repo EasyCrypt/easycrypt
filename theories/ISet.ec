@@ -283,14 +283,39 @@ theory Finite.
     finite X =>
     fromFSet (toFSet X) = X.
   proof strict.
-  by intros=> X fX; apply set_ext=> x;
-     rewrite fromFSet_cor toFSet_cor //.
+  by intros=> X fX; apply set_ext=> x; rewrite fromFSet_cor toFSet_cor //.
   qed.
 
   (* We should then show that all set operations correspond as expected *)
+
+  lemma finite_empty :  finite (empty <:'a>).
+  proof.
+    exists FSet.empty => x. 
+    rewrite (neqF (mem x empty));first apply mem_empty.
+    by rewrite (neqF (FSet.mem x (FSet.empty))) //; apply FSet.mem_empty.
+  save.
+
+  lemma finite_add : forall (X :'a set) x, finite X => finite (add x X).
+  proof.
+    intros X x [Y HY].
+    exists (FSet.add x Y) => y.
+    by rewrite FSet.mem_add mem_add (HY y).
+  save.
+
+  lemma add_morph : forall (X :'a set) x,
+     finite X => toFSet (add x X) = FSet.add x (toFSet X).
+  proof.
+   intros X x H.
+   apply FSet.set_ext => y.
+   rewrite (mem_toFSet y (add x X)).
+   apply finite_add => //.
+   by rewrite FSet.mem_add mem_add (mem_toFSet y X) => //.
+  save.
+
 end Finite.
 
 op create: 'a cpred -> 'a set.
+
 axiom mem_create (x:'a) p:
   mem x (create p) <=> p x.
 

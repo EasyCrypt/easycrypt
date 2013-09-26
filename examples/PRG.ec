@@ -311,122 +311,9 @@ op bd1 : real.
 axiom dsample1_uni : forall r, mu_x dsample1 r = bd1.
 import FSet.
 import ISet.Finite.
-print theory Real.
-(* TODO : move the 3 following lemmas *)
-lemma finite_empty : finite (ISet.empty <:'a>).
-proof.
-  exists FSet.empty;intros x;smt.
-save.
-
-lemma add_finite : forall (X :'a ISet.set) x, finite X => finite (ISet.add x X).
-proof.
- intros X x [Y HY].
- exists (FSet.add x Y) => y.
- by rewrite mem_add ISet.mem_add;smt.
-save.
-
-lemma finite_add : forall (X :'a ISet.set) x,
-    finite X => toFSet (ISet.add x X) = FSet.add x (toFSet X).
-proof.
- intros X x H.
- apply set_ext => y.
- rewrite (mem_toFSet y (ISet.add x X)).
-  apply add_finite => //.
- rewrite mem_add ISet.mem_add (mem_toFSet y X) => //.
-save.
 
 axiom qP_pos : 0 <= qP.
 axiom qF_pos : 0 <= qF.
-
-(* TODO : move *)
-lemma mu_or_le (d:'a distr) (p q:'a cpred) r1 r2: 
-   mu d p <= r1 => mu d q <= r2 => 
-   mu d (cpOr p q) <= r1 + r2.
-proof.
-  rewrite mu_or;smt.
-qed.
-
-lemma mu_cpMem_le (s:'a FSet.set): forall (d:'a distr) (bd:real),
-  (forall (x : 'a), mem x s => mu_x d x <= bd) =>
-    mu d (cpMem s) <= (card s)%r * bd.
-proof strict.
- elimT set_ind s.
- intros d bd Hmu_x.
- rewrite (mu_eq d _ Fun.cpFalse).
-  by simplify Fun.(==) cpMem cpFalse;smt.
- rewrite mu_false card_empty //.
- clear s;intros x s Hnmem IH d bd Hmu_x.
- rewrite card_add_nin // FromInt.Add Mul_distr_r CommutativeGroup.Comm.Comm.
- rewrite (mu_eq d _ (Fun.cpOr ((=) x) (cpMem s))).
-  intros y; rewrite /cpMem /cpOr;smt.
- apply mu_or_le; [ | apply IH]; by smt.
-qed.
-
-op of_list (l:'a list) = List.fold_right FSet.add FSet.empty l.
- 
-lemma mem_of_list (x:'a) l : List.mem x l = mem x (of_list l).
-proof.
- rewrite /of_list;elimT list_ind l. 
-   rewrite fold_right_nil;smt.
- intros {l} y xs;rewrite fold_right_cons;smt.
-save.
-
-lemma card_of_list (l:'a list) :
-   card (of_list l) <= List.length l.
-proof.
-  rewrite /of_list;elimT list_ind l.
-   by rewrite fold_right_nil card_empty length_nil => //.
-  intros => {l} x xs H; rewrite fold_right_cons length_cons.  
-  case (mem x (fold_right add FSet.empty xs))=> Hin; 
-     [rewrite card_add_in // | rewrite card_add_nin //];smt.
-save.
-  
-lemma mu_Lmem (l:'a list) : forall (d:'a distr) (bd:real),
-  0%r <= bd => 
-  (forall (x : 'a), List.mem x l => mu_x d x <= bd) =>
-    mu d (lambda x, List.mem x l) <= (length l)%r * bd. 
-proof.
- intros d bd Hbd Hl.
- rewrite (mu_eq _ _ (cpMem (of_list l))). 
-   by intros x;rewrite /cpMem => /=; apply mem_of_list.
- apply (Real.Trans _ ((card (of_list l))%r * bd)).
-  apply mu_cpMem_le => x. rewrite -mem_of_list;apply Hl.
- by smt.
-save.
-(* TODO : end move *)
-
-lemma nosmt real_eq_le : forall (r1 r2:real), r1 = r2 => r1 <= r2.
-proof. intros => //. save.
-
-require import AlgTactic.
-
-print theory Real.
-instance ring with real
-  op rzero = Real.zero
-  op rone  = Real.one
-  op add   = Real.( + )
-  op opp   = Real.([-])
-  op mul   = Real.( * )
-  op expr  = Real.PowerInt.( ^ )
-  op sub   = Real.(-)
-  op ofint = FromInt.from_int
-
-  proof oner_neq0 by smt
-  proof addr0     by smt
-  proof addrA     by smt
-  proof addrC     by smt
-  proof addrN     by smt
-  proof mulr1     by smt
-  proof mulrA     by smt
-  proof mulrC     by smt
-  proof mulrDl    by smt
-  proof expr0     by smt
-  proof exprS     by smt
-  proof subrE     by smt
-  proof ofint0    by smt
-  proof ofint1    by smt
-  proof ofintS    by smt
-  proof ofintN    by smt.
 
 lemma Pr3 (A<:Adv{Prg,F,C}) : 
    bd_hoare [ Exp'(C(A)).main : true ==> bad Prg.logP F.m] <= (bd1 * ((qP + qF) * qP)%r).
@@ -449,7 +336,6 @@ proof.
         wp;skip;progress => //;smt.
       wp => //.
   inline F.init Prg_rB.init;wp;rnd;wp;skip;progress => //; smt.
- 
   inline Resample.resample.
     seq 3 : true 
        1%r (if bad Prg.logP F.m then 1%r 
@@ -478,7 +364,7 @@ proof.
        cut _ := dsample1_uni default1;by smt.
      apply mu_or_le.
        apply (Real.Trans _ ((length Prg.logP{hr})%r * bd1)).
-         by apply mu_Lmem; smt.
+         by apply mu_Lmem_le_length; smt.
        apply CompatOrderMult => //;smt.
      rewrite (mu_eq _ _ (cpMem (toFSet (dom F.m{hr})))).
        intros x; rewrite /= /cpMem. smt.
@@ -488,9 +374,7 @@ proof.
       rewrite (neqF ( bad (r{hr} :: logP) F.m{hr})) => //=; smt.
     progress => //.
     rewrite (neqF (bad Prg.logP{hr} F.m{hr}) _) => //=.
-    rewrite !FromInt.Mul !FromInt.Add !FromInt.Sub !FromInt.Add.
-    apply real_eq_le.
-       ringeq.
+    apply eq_le; ringeq.
     skip;progress => //. smt.
 save.
 
