@@ -1229,23 +1229,29 @@ let t_subst1 fx g =
 let t_subst_all =
   t_repeat (t_subst1 None)
 
-let find_in_hyps f hyps =
-  let test k =
-    try
-      let _, f' = LDecl.get_hyp k in
-      check_conv hyps f f'; true
-    with _ -> false in
+let gen_find_in_hyps eq f hyps = 
+  let test (_,lk) = 
+    match lk with
+    | LD_hyp f' -> eq hyps f f'
+    | _ -> false in
   fst (List.find test (LDecl.tohyps hyps).h_local)
 
+let find_in_hyps f hyps = gen_find_in_hyps is_conv f hyps
+
+let t_gen_assumption eq g =
+  let (hyps,concl) = get_goal g in
+  let h = 
+    try gen_find_in_hyps eq concl hyps 
+    with Not_found -> tacuerror "no assumption" in
+  t_hyp h g
+      
+let t_alpha_assumption g = t_gen_assumption is_alpha_eq g
+
 let t_assumption g = 
-  let (hyps, concl) = get_goal g in
-  let myh =
-    try  find_in_hyps concl hyps
-    with Not_found -> tacuerror "no assumption"
-  in
-    t_hyp myh g
+  t_or t_alpha_assumption (t_gen_assumption is_conv) g
     
 let t_progress tac g =
+  let tac = t_or t_alpha_assumption tac in
   let rec aux g = t_seq t_simplify_nodelta aux0 g 
   and aux0 g =
     t_seq (t_try tac) aux1 g

@@ -137,16 +137,12 @@ let process_global loc tvi g =
 
 (* -------------------------------------------------------------------- *)
 let process_assumption loc (pq, tvi) g =
-  let hyps,concl = get_goal g in
   match pq with
   | None ->
       if (tvi <> None) then error loc BadTyinstance;
-      let h  =
-        try  find_in_hyps concl hyps
-        with Not_found -> tacuerror "no assumptions"
-      in
-      t_hyp h g
+      t_assumption g
   | Some pq ->
+    let hyps = get_hyps g in
       match unloc pq with
       | ([],ps) when LDecl.has_hyp ps hyps ->
           if (tvi <> None) then error pq.pl_loc BadTyinstance;
