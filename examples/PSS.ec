@@ -476,15 +476,7 @@ section.
     H.o ~ H0.o: ={x} /\ H.m{1} =<= Hmap.m{2} ==> ={res} /\ H.m{1} =<= Hmap.m{2}.
   proof strict.
   fun; inline H0.o; wp; rnd; wp; skip;
-       rewrite /(=<=); progress=> //.
-         smt.
-         case (x0 = x){2}; smt.
-         smt.
-         case (x0 = x){2}; smt.
-         smt.
-         case (x0 = x){2}; smt.
-         smt.
-         case (x0 = x){2}; smt.
+       rewrite /(=<=); progress=> //; smt.
   qed.
 
   (* More informed use of conseq* might speed up some of the smt calls *)
