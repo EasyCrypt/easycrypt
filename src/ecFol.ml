@@ -1158,12 +1158,13 @@ module Fsubst = struct
     && Mid.is_empty s.fs_loc
     && Mid.is_empty s.fs_mem
 
-  let f_subst_init freshen smp sty =
+  let f_subst_init freshen smp sty ops =
     { f_subst_id
         with fs_freshen = freshen;
-             fs_mp  = smp;
-             fs_sty = sty;
-             fs_ty  = ty_subst sty }
+             fs_mp    = smp;
+             fs_sty   = sty;
+             fs_ty    = ty_subst sty;
+             fs_opdef = ops; }
 
   (* ------------------------------------------------------------------ *)
   let f_bind_local s x t = 
