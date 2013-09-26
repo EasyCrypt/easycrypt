@@ -29,14 +29,34 @@ and sp_inst side env mem (pre : form) (inst : instr_node) : form =
         else EcIdent.create (symbol_of_lv lvL ^ "R") in
       let x    = f_local x_id lty in
       let muL  = EcFol.form_of_expr (EcMemory.memory mem) muL in
-      let muL' = (subst_form_lv env (EcMemory.memory mem) lvL x muL) in
       let fvl  = EcPV.PV.fv env (EcMemory.memory mem) pre in (* FV(pre) *)
       let fvm  = EcPV.PV.fv env (EcMemory.memory mem) muL in (* FV(e) *)
       if (EcPV.PV.mem_pv env lf fvl) || (EcPV.PV.mem_pv env lf fvm) then
-        let pr = subst_form_lv env (EcMemory.memory mem) lvL x pre in
-          f_exists [(x_id, GTty lty)] (f_and_simpl (f_eq fl muL') pr)
+        let muL' = (subst_form_lv env (EcMemory.memory mem) lvL x muL) in
+        let pre' = subst_form_lv env (EcMemory.memory mem) lvL x pre in
+        f_exists [(x_id, GTty lty)] (f_and_simpl (f_eq fl muL') pre')
       else
         f_and_simpl (f_eq fl muL) pre
+
+
+  | Sasgn (LvTuple lvs, e) ->
+    let lvs_pvar = List.map (fun (lf,lty) -> f_pvar lf lty side) lvs in
+    let lvs_tuple = f_tuple lvs_pvar in
+    let e_f  = EcFol.form_of_expr (EcMemory.memory mem) e in
+    let fv_e  = EcPV.PV.fv env (EcMemory.memory mem) e_f in 
+    let fv_pre  = EcPV.PV.fv env (EcMemory.memory mem) pre in 
+    let process_pvar (aux_vars,e,f) (lf,lty) = 
+      if (EcPV.PV.mem_pv env lf fv_e) || (EcPV.PV.mem_pv env lf fv_pre) then
+        let x_id = EcIdent.create (EcTypes.symbol_of_pv lf) in
+        let x    = f_local x_id lty in
+        let e' = (subst_form_lv env (EcMemory.memory mem) (LvVar (lf,lty))  x e) in
+        let f' = subst_form_lv env (EcMemory.memory mem) (LvVar (lf,lty)) x f in
+        (x_id,GTty lty)::aux_vars,e',f'
+      else
+        aux_vars,e,f
+    in
+    let (aux_vars,e_f,pre) = List.fold_left process_pvar ([],e_f,pre) lvs in
+    List.fold_left (fun f (id,t) -> f_exists_simpl [id,t] f) (f_and (f_eq lvs_tuple e_f) pre) aux_vars 
 
   | Sif (e, st1, st2) ->
       let b   = EcFol.form_of_expr (EcMemory.memory mem) e in
