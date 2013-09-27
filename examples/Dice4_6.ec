@@ -40,7 +40,6 @@ clone GenDice as D4_6 with
   op d <- d6,
   op test <- test4,
   op sub_supp <- sub_supp,
-  op bd <- bd6,
   type t' <- int,
   op d' <- d4
   proof * by smt.
@@ -85,19 +84,19 @@ proof.
 save.
 
 lemma D4_D6 (f finv : int -> int) :
-    (forall i, 1 <= i <= 4 <=> 1 <= finv i <= 4) =>
+    (forall i, 1 <= i <= 4 <=> 1 <= f i <= 4) =>
     (forall i, 1 <= i <= 4 => f (finv i) = i /\ finv (f i) = i) =>
-    equiv [D4.sample ~ D6.sample : true ==> f res{1} = res{2}].
+    equiv [D4.sample ~ D6.sample : true ==> res{1} = finv res{2}].
 proof.
   intros Hbound Hbij.
-  transitivity D4_6.Sample.sample (true ==> ={res}) (true ==> f res{1} = res{2}) => //.
+  transitivity D4_6.Sample.sample (true ==> ={res}) (true ==> res{1} = finv res{2}) => //.
     by apply D4_Sample.
-  transitivity D4_6.RsampleW.sample (r{2} = 5 ==> f res{1} = res{2})
+  transitivity D4_6.RsampleW.sample (r{2} = 5 ==> res{1} = finv res{2})
       (r{1} = 5 ==> res{2} = res{1}) => //.
     by intros _ _ _;exists 5 => //.
     conseq (D4_6.Sample_RsampleW f finv) => //.
-    rewrite /d6 /test4 /d4 => &m1 &m2 -> /=;split; first by smt.
-    split; first by rewrite Dinter.weight_def.
+    rewrite /test4 /d4 => &m1 &m2 -> /=;split; first by smt.
+    split; first by rewrite /d6 Dinter.weight_def.
     split; first by intros x;rewrite Dinter.supp_def;apply Hbound.
     split; first by intros x Hx;elim (Hbij x _).
     by intros x; rewrite Dinter.supp_def => Hx;elim (Hbij x _).
