@@ -42,7 +42,7 @@ intros bs; apply Array.extensionality; smt.
 save.
 
 (* Xor *)
-op (^^)(bs0 bs1:bitstring): bitstring = map2 Bool.xorb bs0 bs1.
+op (^^)(bs0 bs1:bitstring): bitstring = map2 Bool.(^^) bs0 bs1.
 
 lemma xor_length: forall (bs0 bs1:bitstring),
   length bs0 = length bs1 =>
