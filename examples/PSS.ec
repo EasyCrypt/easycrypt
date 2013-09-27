@@ -1008,9 +1008,6 @@ require import Sum.
     }
   }.
 
-axiom appA (x1 x2 x3:bitstring):
-     ((x1 || x2) || x3) = (x1 || (x2 || x3)).
-
   local equiv S2_Sw : S2.sample ~ Sw.sample : ={i} ==> ={res}.
   proof.
     transitivity S.Sample.sample (={i} ==> ={res}) (={i} ==> ={res}) => //.

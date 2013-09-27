@@ -39,15 +39,26 @@ rewrite -xor0 -(xor0 b') -eql_b_b' -eql_a_b -xorN
 qed. *)
 
 op (||): bitstring -> bitstring -> bitstring.
+
 axiom length_app (a b:bitstring):
   `|(a || b)| = `|a| + `|b|.
+
 axiom app0 l l':
   0 <= l => 0 <= l' =>
   (zeros l || zeros l') = zeros (l + l').
+
+axiom app1 l l':
+  0 <= l => 0 <= l' =>
+  (ones l || ones l') = ones (l + l').
+
 axiom appI (a b b':bitstring):
   (a || b) = (a || b') =>
   b = b'.
 
+axiom appA (x1 x2 x3:bitstring):
+     ((x1 || x2) || x3) = (x1 || (x2 || x3)).
+
+(* TODO: remane it a a form of distributivity *)
 axiom app_xor_interchange (a b a' b':bitstring):
   `|a| = `|a'| => `|b| = `|b'| =>
   ((a ^ a') || (b ^ b')) = (a || b) ^ (a' || b').
@@ -100,11 +111,22 @@ lemma sub_sub (b:bitstring) s1 l1 s2 l2:
   sub (sub b s1 l1) s2 l2 = sub b (s1 + s2) l2.
 proof.
   intros Hs1 Hl1 Hb Hs2 Hl2 Hsll.
-  rewrite - {2}(app_sub b s1 (`|b| - s1)) //;first 2 smt.
-  rewrite sub_app_snd_le length_sub //;first 3 smt.
-  rewrite (_ : s1 + s2 - s1 = s2);first smt.
-  admit.
-save.
+  rewrite {1}(_: b = (sub b 0 s1 || sub b s1 s2 || 
+           sub b (s1+s2) l2 || sub b (s1+s2+l2) (l1-(l2+s2)) || 
+           sub b (s1+s2+l2+(l1-(l2+s2))) (`|b|-(s1+l1)))).
+    rewrite sub_app_sub //; first 4 smt.
+    by rewrite sub_app_sub //;smt.
+  rewrite sub_app_snd_le;first smt.
+  rewrite (_:s1 - `|sub b 0 s1| = 0);first smt.
+  rewrite - ?appA.
+  rewrite sub_app_fst_le //;first smt.
+  rewrite {2} (_:l1 = `|((sub b s1 s2 || sub b (s1 + s2) l2) ||
+      sub b (s1 + s2 + l2) (l1 - (l2 + s2)))|);first by smt.
+  rewrite sub_full ?appA.
+  rewrite sub_app_snd_le //; first smt.
+  rewrite (_:s2 - `|sub b s1 s2| = 0);first smt.
+  rewrite sub_app_fst_le //;smt.
+qed.
 
 theory DBitstring.
   require import Distr.
