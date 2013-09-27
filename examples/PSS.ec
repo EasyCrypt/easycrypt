@@ -271,18 +271,32 @@ import Dprod.
 op test_plain0 (pk:pkey) (z:signature) = (sub (to_bits z) 0 1) = zeros 1.
 op sample_hgtag (pk:pkey) = sample_htag * sample_gtag.
 
-  clone GenDice as S with 
-    type t = signature,
+clone GenDice as S with 
+  type t <- signature,
     type input = pkey,
-    type t' = htag * gtag,
+    type t' <- htag * gtag,
     op d <- sample_plain,
-    op test <- test_plain0,
-    op d' <- sample_hgtag
+    op test <- (lambda (pk:pkey, z:signature), (sub (to_bits z) 0 1) = zeros 1),
+    op d' (pk:pkey) <-  sample_htag * sample_gtag
     proof *.
-  realize dU. proof. by admit. qed. 
-  realize test_in_supp. proof. by admit. qed.
-  realize test_sub_supp. proof. by admit. qed. (* WARNING sub_supp need to be defined *)
-  realize d'_uni. proof. by admit. qed.
+  realize dU. 
+  proof. apply RSA.challengeU. qed.
+  realize test_in_supp. 
+  proof. 
+   intros pk x /=.
+   admit.
+  save.
+  realize test_sub_supp. 
+  proof.
+   (* TODO : sub_supp should be defined *)
+   admit.
+  save.
+  realize d'_uni. 
+  proof. 
+   intros pk x /=.
+   (* Ident *)
+   admit.
+  save.
 
 section. 
   declare module A:CMA_2RO {G,G',H,EF_CMA,Wrap,OW}.
@@ -994,6 +1008,9 @@ require import Sum.
     }
   }.
 
+axiom appA (x1 x2 x3:bitstring):
+     ((x1 || x2) || x3) = (x1 || (x2 || x3)).
+
   local equiv S2_Sw : S2.sample ~ Sw.sample : ={i} ==> ={res}.
   proof.
     transitivity S.Sample.sample (={i} ==> ={res}) (={i} ==> ={res}) => //.
@@ -1013,11 +1030,10 @@ require import Sum.
          by smt. (* PY: progress; fieldeq;smt. (* error *) *)
       rewrite rw_eq_sym.  bdhoare_deno (_: true ==> x = res) => //; fun.
       rnd;skip;progress => //.
-      rewrite (_ : mu (sample_hgtag i{hr}) (lambda (x0 : S.t'), x = x0) = 
-                   mu_x (sample_hgtag i{hr}) x).
+      rewrite (_ : mu (sample_htag * sample_gtag) (lambda (x0 : htag * gtag), x = x0) =
+                   mu_x (sample_htag * sample_gtag) x).
         by rewrite /mu_x;apply mu_eq.
-      rewrite /sample_hgtag Dprod.mu_x_def /sample_htag HTag.Dword.mu_x_def /sample_gtag
-        GTag.Dword.mu_x_def. 
+      rewrite Dprod.mu_x_def /sample_htag HTag.Dword.mu_x_def /sample_gtag GTag.Dword.mu_x_def. 
       by smt.
     fun *;inline{2} Sw.sample;wp.
     pose f := lambda (p:htag * gtag), 
@@ -1025,19 +1041,29 @@ require import Sum.
     pose finv := lambda (z:signature), (HTag.from_bits (sub (to_bits z) 1 k1),
                             GTag.from_bits (sub (to_bits z) (k1 + 1) kg)).
     call (S.Sample_RsampleW f finv);wp;skip;progress => //.
-      rewrite /test_plain0 Signature.pcan_to_from;first smt.
-      by admit.
+      rewrite Signature.pcan_to_from;first smt.
+      rewrite - {2} (length_ones 1); first smt.
+      by rewrite sub_app_fst; rewrite rw_eq_sym;apply zeros_ones;smt.
       by smt.
-      by rewrite /f /test_plain0 Signature.pcan_to_from;smt.
+      by rewrite /f Signature.pcan_to_from;smt.
       by rewrite /sample_hgtag Dprod.supp_def;smt.
-      generalize H;rewrite /test_plain0 /f /finv /fst /snd => <- /=.
+      rewrite /f /finv /fst /snd /= -H.
       rewrite HTag.pcan_to_from;first smt.
       rewrite GTag.pcan_to_from;first smt.
-      by admit.
+      rewrite {2} (_: 1 = 0 + 1) //;  pose x := to_bits rR.
+      rewrite - appA sub_app_sub //;first 2 smt.
+      rewrite (_:k1 + 1 = 0 + (1 + k1));first smt.
+      by rewrite sub_app_sub //;smt.
     rewrite /finv /f Signature.pcan_to_from;first smt.
     elimT tuple2_ind rL => l r _;simplify fst snd.
-    by admit.
- save.
+    rewrite sub_app_snd_le length_zeros //=.
+    cut Hl : `|to_bits l| = k1 by smt.
+    rewrite sub_app_fst_le - ?Hl //;first smt.
+    rewrite sub_full HTag.can_from_to.
+    rewrite -appA sub_app_snd_le;first smt.
+    rewrite (_:(`|to_bits l| + 1 - `|zeros 1 || to_bits l|) = 0);first smt.
+    by rewrite (_:kg = `|to_bits r|);smt.
+  save.
            
   local module H4' = GenH4 (Sw).
   local module G4' = Gen(GAdv,H4',G).  
@@ -1124,18 +1150,22 @@ require import Sum.
      rewrite (eqT b{2}) /test_plain0;progress => //.
      rewrite HTag.pcan_to_from;first smt.
      rewrite GTag.pcan_to_from;first smt.
-     rewrite -H6.
+     rewrite -H5.
      rewrite (_: 
        (sub (to_bits rL) 0 1 || sub (to_bits rL) 1 k1 || sub (to_bits rL) (k1 + 1) kg )=
         to_bits rL).
-      admit.
+      rewrite (_ : k1 + 1 = 1 + k1);first smt.
+      rewrite sub_app_sub //; first 3 smt.
+      rewrite {2}(_: 1 = 0 + 1) // sub_app_sub //;smt.
     rewrite Signature.can_from_to //.
   skip;progress => //.
   rewrite /test_plain0 Signature.pcan_to_from;first smt.
-  admit.
-  generalize H2;rewrite (eqT (test_plain0 Hmem.pk{2} r_L)) //.
-  generalize H2;rewrite (eqT (test_plain0 Hmem.pk{2} r_L)) //.
-  generalize H2;rewrite (eqT (test_plain0 Hmem.pk{2} r_L)) //.
+  rewrite sub_app_fst_le //;first smt.
+  rewrite rw_eq_sym;apply eqT.
+  by rewrite -{2} (length_ones 1) // sub_full // (rw_eq_sym (ones 1));apply zeros_ones.
+  by generalize H2;rewrite (eqT (test_plain0 Hmem.pk{2} r_L)).
+  by generalize H2;rewrite (eqT (test_plain0 Hmem.pk{2} r_L)).
+  by generalize H2;rewrite (eqT (test_plain0 Hmem.pk{2} r_L)).
   qed.
 
   local lemma G4'_G5_abstract (Ga <: Gadv {H4',H5,G,Hmem}):
