@@ -1022,7 +1022,8 @@ require import Sum.
       by wp; skip; progress=> //; try (case (x0 = x){2}); smt.
     by wp; skip; progress=> //; smt.
 
-    by if; [smt | | ]; wp; skip; progress=> //; smt. (* unstable *)
+    if; [smt | | ]; wp; skip; progress=> //;
+      try (apply ISet.set_ext); try (case (x0 = x){2}); smt.
   qed.
 
   local equiv G3_G4_abstract (Ga <: Gadv {H2,H3,G,Hmem}):
@@ -1078,14 +1079,16 @@ require import Sum.
           rnd;skip;progress => //.
           by rewrite (mu_eq _ _ ((=) (snd x))) => //;apply (GTag.Dword.mu_x_def (snd x)).
           by hoare;rnd;skip;smt.
-         by smt. (* PY: progress; fieldeq;smt. (* error *) *)
+         progress=> //;
+          cut <-: (2 ^ k1) * (2 ^ kg) = 2 ^ (k1 + kg); smt.
       rewrite rw_eq_sym.  bdhoare_deno (_: true ==> x = res) => //; fun.
       rnd;skip;progress => //.
       rewrite (_ : mu (sample_htag * sample_gtag) (lambda (x0 : htag * gtag), x = x0) =
                    mu_x (sample_htag * sample_gtag) x).
         by rewrite /mu_x;apply mu_eq.
       rewrite Dprod.mu_x_def /sample_htag HTag.Dword.mu_x_def /sample_gtag GTag.Dword.mu_x_def. 
-      by smt.
+         progress=> //;
+          cut <-: (2 ^ k1) * (2 ^ kg) = 2 ^ (k1 + kg); smt.
     fun *;inline{2} Sw.sample;wp.
     pose f := lambda (p:htag * gtag), 
        Signature.from_bits (zeros 1 || to_bits (fst p) || to_bits (snd p)).
@@ -1114,7 +1117,7 @@ require import Sum.
     rewrite -appA sub_app_snd_le;first smt.
     rewrite (_:(`|to_bits l| + 1 - `|zeros 1 || to_bits l|) = 0);first smt.
     by rewrite (_:kg = `|to_bits r|);smt.
-  save.
+  qed.
            
   local module H4' = GenH4 (Sw).
   local module G4' = Gen(GAdv,H4',G).  
@@ -1394,9 +1397,9 @@ require import Sum.
             by rewrite homo_finv_mul; try (rewrite -/(f_dom _ _) f_dom_rng); smt.
 
           wp; rnd (lambda z, finv Hmem.sk z){2} (lambda u, f Hmem.pk u){2};
-          skip; progress=> //.
+          skip; progress=> //; last 6 by try (case c{2}); smt.
             by apply (challengeU Hmem.pk{2} _ _ _ _)=> //; smt.
-            
+            by rewrite -/(support _ _) -/(f_dom _ _) f_dom_rng; smt.
         by skip.
       if=> //; by wp.
     by intros=> &2 xstar_n0; fun; sp; if;
@@ -1427,61 +1430,23 @@ require import Sum.
       Why is it not an issue in earlier steps? (In particular, the one immediately above,
       speaking of exactly the same games...) *)
   local module Ha = GAdv(H7,G).Ha.
-  local module S  = GAdv(H7,G).S.
-
-  local lemma G6_G7_mu_0 &m:
-    Pr[G7.main() @ &m: mu_x (sample_plain Hmem.pk) Signature.zeros <= 1%r / (2 ^ (k - 1))%r] = 1%r.
-  proof strict.
-  bdhoare_deno (_: true ==> mu_x (sample_plain Hmem.pk) Signature.zeros <= 1%r / (2 ^ (k - 1))%r)=> //; fun.
-  call (_: true ==> true).
-    fun; call (_: true ==> true)=> //; first by fun.
-    wp; call (_: true ==> true);
-     first by fun; call (_: true ==> true)=> //;
-       fun; sp; if;
-         [while true (kg2 - i); [intros=> z; wp; rnd | ] | wp ]; skip; smt.
-    wp; call (Lazy.lossless_o _); first smt.
-    wp; call (adversaryL G Ha S _ _ _).
-      by apply Lazy.lossless_o; smt.
-      by fun; call (_: true ==> true)=> //;
-           fun; sp; if;
-             [while true (kg2 - i); [intros=> z; wp; rnd | ] | wp ]; skip; smt.
-      fun;
-        wp; call (Lazy.lossless_o _); first smt.
-        call (_: true ==> true);
-          first by fun; call (_: true ==> true)=> //;
-                     fun; sp; if;
-                       [while true (kg2 - i); [intros=> z; wp; rnd | ] | wp ]; skip; smt.
-        by rnd; wp; skip; smt.
-    by call (_: true ==> true); first by fun; wp.
-  call (_: valid_keys ks ==> valid_pkey Hmem.pk /\ in_supp Hmem.xstar (sample_plain Hmem.pk));
-    first fun; call (_: valid_keys ks ==> valid_pkey Hmem.pk /\ in_supp Hmem.xstar (sample_plain Hmem.pk))=> //;
-      fun; wp; call (_: valid_keys ks ==> valid_pkey Hmem.pk /\ in_supp Hmem.xstar (sample_plain Hmem.pk))=> //;
-        fun; rnd (cpTrue); wp; skip; smt.
-  call Lazy.lossless_init.
-  by rnd; skip; smt.
-  qed.
-
-  lemma bound pk x:
-    valid_pkey pk /\ in_supp x (sample_plain pk) =>
-    mu_x (sample_plain pk) x <= 1%r / (2 ^ (k - 1))%r.
-  proof strict.
-  admit. 
-  qed.
-
-  lemma toto d (x:'a) r:
-    0%r <= r =>
-    mu d (lambda x', mu_x d x <= r) = mu d cpTrue => mu_x d x <= r.
-  proof strict.
-  rewrite /mu_x mu_supp_in /Fun.(<=).
-  intros=> /= H.
-  case (exists a, in_supp a d); smt.
-  qed.
+  local module Si  = GAdv(H7,G).S.
 
   local lemma G6_G7_bad &m:
-    Pr[G7.main() @ &m: Hmem.xstar = Signature.zeros] <= 1%r/(2^(k-1))%r.
+    Pr[G7.main() @ &m: Hmem.xstar = Signature.zeros] <= 1%r / (2 ^ (k - 1))%r.
   proof strict.
   bdhoare_deno (_: true ==> Hmem.xstar = Signature.zeros)=> //; fun.
-  seq 3: (Hmem.xstar = Signature.zeros). (* Not what we want *)
+  seq 3: (Hmem.xstar = Signature.zeros) (1%r / (2 ^ (k - 1))%r) 1%r _ 0%r=> //.
+    call (_: valid_keys ks ==> Hmem.xstar = Signature.zeros);
+      first fun; call (_: valid_keys ks ==> Hmem.xstar = Signature.zeros)=> //;
+              fun; wp; call (_: valid_keys ks ==> Hmem.xstar = Signature.zeros)=> //;
+                fun; rnd; wp; skip; progress=> //;
+                  cut := plain0_bnd x1 _; first smt.
+                  by rewrite /mu_x (_: (lambda x, x = Signature.zeros) = ((=) Signature.zeros))=> //; apply Fun.fun_ext; smt.
+      call (_: true ==> true); first by fun; wp.
+      by rnd; skip; smt.
+
+    by hoare; call (_: true ==> true).
   qed.
 
   (** Reduction to OW: no longer using xstar to simulate the oracles *)
