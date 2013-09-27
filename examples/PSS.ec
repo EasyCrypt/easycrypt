@@ -16,6 +16,12 @@ op pi3_2 (t:'a * 'b * 'c): 'b =
 op pi3_3 (t:'a * 'b * 'c): 'c =
   let (a,b,c) = t in c.
 
+axiom mu_x_FU (d:'a distr) x:
+  isuniform d =>
+  ISet.Finite.finite (ISet.create (support d)) =>
+  in_supp x d =>
+  mu_x d x = 1%r / (card (ISet.Finite.toFSet (ISet.create (support d))))%r.
+
 (*** General definitions *)
 (** Lengths *)
 op k:int.
@@ -77,6 +83,7 @@ clone import AWord as HTag with
   op length <- k1.
 op sample_htag = HTag.Dword.dword.
 axiom htagL: mu sample_htag cpTrue = 1%r.
+lemma htagU: isuniform sample_htag by [].
 op s_htag = lambda (x:message * salt), sample_htag.
 lemma s_htagL x: mu (s_htag x) cpTrue = 1%r by [].
 
@@ -87,6 +94,7 @@ clone import AWord as GTag with
   op length <- kg.
 op sample_gtag = GTag.Dword.dword.
 axiom gtagL: mu sample_gtag cpTrue = 1%r.
+lemma gtagU: isuniform sample_gtag by [].
 op s_gtag = lambda (x:htag), sample_gtag.
 lemma s_gtagL x: mu (s_gtag x) cpTrue = 1%r by [].
 
@@ -105,7 +113,14 @@ type pkey.
 type skey.
 op keypairs: (pkey * skey) distr.
 
+op modulus_p: pkey -> int.
+
 op sample_plain: pkey -> signature distr.
+axiom nosmt plainF pk: ISet.Finite.finite (ISet.create (support (sample_plain pk))).
+axiom nosmt plainU pk: isuniform (sample_plain pk).
+axiom nosmt card_plain pk:
+  card (ISet.Finite.toFSet (ISet.create (support (sample_plain pk)))) = modulus_p pk.
+
 
 clone import OW as RSA with
   type pkey <- pkey,
@@ -117,61 +132,93 @@ clone import OW as RSA with
 (** Things we know on RSA in addition to the one-wayness *)
 axiom f_dom_rng: f_dom = f_rng.
 
-op modulus_p: pkey -> int.
-axiom modulus_size pk sk:
-  valid_keys (pk,sk) => 2^(k-1) <= modulus_p pk < 2^k.
+axiom nosmt zeros_plain pk:
+  valid_pkey pk =>
+  in_supp Signature.zeros (sample_plain pk).
+
+axiom nosmt modulus_size pk:
+  valid_pkey pk => 2^(k-1) <= modulus_p pk < 2^k.
+
+lemma nosmt card_plain_valid pk:
+  valid_pkey pk =>
+  2^(k-1) <= card (ISet.Finite.toFSet (ISet.create (support (sample_plain pk)))) < 2^k.
+proof strict.
+by intros=> valid; rewrite card_plain modulus_size.
+qed.
+
+lemma nosmt plain0 pk:
+  valid_pkey pk =>
+  mu_x (sample_plain pk) Signature.zeros = 1%r / (modulus_p pk)%r.
+proof strict.
+intros=> valid; rewrite mu_x_FU.
+  by apply plainU.
+  by apply plainF.
+  by apply zeros_plain.
+by rewrite card_plain.
+qed.
+
+lemma nosmt plain0_bnd pk:
+  valid_pkey pk =>
+  mu_x (sample_plain pk) Signature.zeros <= 1%r / (2 ^ (k - 1))%r.
+proof strict.
+intros=> valid; rewrite plain0 //.
+cut H: forall x y, 1 <= x => x <= y => 1%r / y%r <= 1%r / x%r. admit. (* Why3 does not know this! It is probably something we will use A LOT! *)
+apply H.
+  smt.
+  by cut := card_plain_valid pk; rewrite card_plain; smt.
+qed.
 
 op ( * ): signature -> signature -> pkey -> signature.
 
 axiom mulIn (x y:signature) pk:
-  f_dom pk x =>
-  f_dom pk y =>
-  f_dom pk ((x * y) pk).
+  support (sample_plain pk) x =>
+  support (sample_plain pk) y =>
+  support (sample_plain pk) ((x * y) pk).
 
 axiom mulC (x y:signature) pk:
-  f_dom pk x =>
-  f_dom pk y =>
+  support (sample_plain pk) x =>
+  support (sample_plain pk) y =>
   (x * y) pk = (y * x) pk.
 
 axiom mulA (x y z:signature) pk:
   (((x * y) pk) * z) pk = (x * ((y * z) pk)) pk.
 
 axiom homo_f_mul (x y:signature) pk:
-  f_dom pk x =>
-  f_dom pk y =>
+  support (sample_plain pk) x =>
+  support (sample_plain pk) y =>
   f pk ((x * y) pk) = (f pk x * f pk y) pk.
 
 axiom homo_finv_mul (x y:signature) pk sk:
   valid_keys (pk,sk) =>
-  f_rng pk x =>
-  f_rng pk y =>
+  support (sample_plain pk) x =>
+  support (sample_plain pk) y =>
   finv sk ((x * y) pk) = (finv sk x * finv sk y) pk.
 
 op one_sig: signature.
-axiom mul_one (x:signature) pk:
-  f_dom pk x =>
+axiom one_plain pk:
+  support (sample_plain pk) one_sig.
+axiom mul1 (x:signature) pk:
+  support (sample_plain pk) x =>
   (x * one_sig) pk = x.
 
 op inv: signature -> pkey -> signature.
 axiom invIn x pk:
-  f_dom pk x =>
-  f_dom pk (inv x pk).
+  support (sample_plain pk) x =>
+  support (sample_plain pk) (inv x pk).
 
 axiom mul_inv (x:signature) pk:
   x <> Signature.zeros =>
-  f_dom pk x =>
+  support (sample_plain pk) x =>
   (x * (inv x pk)) pk = one_sig.
 
-(* This would be a lemma if only we could prove
-   that there is an element in f_dom that is neither 0 nor 1 *)
-axiom f_dom_one pk: f_dom pk one_sig.
-
+(* More facts on RSA for 0 and 1: not sure how useful they are *)
 axiom f_zero pk: valid_pkey pk => f pk Signature.zeros = Signature.zeros.
 axiom finv_zero sk: valid_skey sk => finv sk Signature.zeros = Signature.zeros.
 
 axiom f_one pk: valid_pkey pk => f pk (one_sig) = one_sig.
 axiom finv_one sk: valid_skey sk => finv sk (one_sig) = one_sig.
 
+(** Continuing on with instantiation *)
 clone import RandomOracle.LazyEager as Gt with
   type from <- htag,
   type to <- gtag,
@@ -476,7 +523,7 @@ section.
     H.o ~ H0.o: ={x} /\ H.m{1} =<= Hmap.m{2} ==> ={res} /\ H.m{1} =<= Hmap.m{2}.
   proof strict.
   fun; inline H0.o; wp; rnd; wp; skip;
-       rewrite /(=<=); progress=> //; smt.
+       rewrite /(=<=); progress=> //; try (case (x0 = x){2}); smt. (* Forgot to plug my laptop in... *)
   qed.
 
   (* More informed use of conseq* might speed up some of the smt calls *)
@@ -511,7 +558,7 @@ section.
        wp; inline PSS(Gt.Lazy.RO, RO).g1 PSS(Gt.Lazy.RO, RO).g2 Gt.Lazy.RO.o
                   GAdv(H0, Gt.Lazy.RO).Hs.o.
        rcondf{1} 16;
-         first intros=> &m; inline RO.o; do !(rnd; wp); skip; smt.
+         first intros=> &m; inline RO.o; do !(rnd; wp); skip; progress=> //; smt.
        wp; rnd{1} cpTrue.
        wp; rnd.
        wp; call PSS_G0_H.
@@ -708,9 +755,17 @@ section.
       !H2.bad{2} /\ ={glob Hmap, glob G, c, x} ==>
       !H2.bad{2} => ={glob Hmap, glob G, res}.
   proof strict.
-  by fun; if=> //; inline G.o; swap{1} [3..4] -1; wp;
+  fun; if=> //; inline G.o; swap{1} [3..4] -1; wp;
           rnd ((^) (GTag.from_bits (to_bits (snd x{2}) || zeros (kg - k0))));
-          wp; rnd; skip; progress=> //; smt.
+          wp; rnd; skip; progress=> //.
+    by generalize H4; rewrite /s_gtag=> H4;
+       rewrite /s_gtag; apply gtagU=> //;
+       rewrite /sample_gtag; apply GTag.Dword.in_supp_def.
+    by rewrite /s_gtag /sample_gtag; apply GTag.Dword.in_supp_def.
+    by rewrite GTag.xorwA GTag.xorwK GTag.xorwC GTag.xorw0.
+    by rewrite GTag.xorwA GTag.xorwK GTag.xorwC GTag.xorw0.
+    by rewrite GTag.xorwC GTag.xorwA GTag.xorwK GTag.xorwC GTag.xorw0.
+    by rewrite GTag.xorwC GTag.xorwA GTag.xorwK GTag.xorwC GTag.xorw0; smt.
   qed.
 
   local lemma G1_G2_abstract (Ga <: Gadv {G, H1, H2}):
@@ -915,8 +970,7 @@ require import Sum.
                 pi3_1 (proj Hmap.m.[x]{1}) = pi3_1 (proj Hmap.m.[x]{2})) /\
               (forall x, in_dom x Hmap.m{1} =>
                 pi3_2 (proj Hmap.m.[x]{1}) = pi3_2 (proj Hmap.m.[x]{2}))).
-      wp; skip; progress=> //; first 2 smt.
-        by case (x{2} = x0); smt.
+      by wp; skip; progress=> //; try (case (x0 = x){2}); smt.
     by wp; skip; progress=> //; smt.
 
     by if; [smt | | ]; wp; skip; progress=> //; smt. (* unstable *)
@@ -1228,29 +1282,29 @@ require import Sum.
   proof strict.
   intros=> GaL; fun.
   call (_: Hmem.xstar = Signature.zeros,
-             ={glob Hmap, glob G} /\ valid_keys (Hmem.pk,Hmem.sk){2} /\ f_dom Hmem.pk{2} Hmem.xstar{2}).
+             ={glob Hmap, glob G} /\
+             valid_keys (Hmem.pk,Hmem.sk){2} /\
+             in_supp Hmem.xstar{2} (sample_plain Hmem.pk{2})).
     (* H *)
     fun; sp; if=> //.
       wp; while (={x, c, b, i, glob Hmap, glob G} /\
                  valid_keys (Hmem.pk,Hmem.sk){2} /\ 
-                 f_dom Hmem.pk{2} Hmem.xstar{2} /\
+                 in_supp Hmem.xstar{2} (sample_plain Hmem.pk{2}) /\
                  Hmem.xstar{2} <> Signature.zeros).
         case c{2}.
           wp; rnd (lambda z, ((inv Hmem.xstar Hmem.pk) * finv Hmem.sk z) Hmem.pk){2}
                   (lambda u, ((f Hmem.pk Hmem.xstar) * f Hmem.pk u) Hmem.pk){2};
           skip; progress => //; last 4 smt.
-            by apply (challengeU Hmem.pk{2} _ _ _ _)=> //; smt.
-            smt.
-            rewrite homo_f_mul; first 2 smt.
-            rewrite -mulA -homo_f_mul; first 2 smt.
-            by rewrite mul_inv=> //; smt.
-            rewrite homo_finv_mul; first 3 smt.
-            rewrite -mulA finvof // (mulC _ Hmem.xstar{2}); first 2 smt.
-            by rewrite mul_inv=> //; smt.
+            by apply (challengeU Hmem.pk{2} _ _ _ _)=> //; rewrite -/(support _ _); apply mulIn; smt.
+            by rewrite -/(support _ _); apply mulIn; rewrite -/(f_dom _ _) f_dom_rng; smt.
+            rewrite homo_f_mul; first 2 smt. rewrite -mulA -homo_f_mul; first 2 smt.
+              by rewrite mul_inv ?fofinv 1?mulC ?mul1 //; smt.
+            by rewrite homo_finv_mul; try (rewrite -/(f_dom _ _) f_dom_rng); smt.
 
           wp; rnd (lambda z, finv Hmem.sk z){2} (lambda u, f Hmem.pk u){2};
-          skip; progress=> //; last 7 smt.
+          skip; progress=> //.
             by apply (challengeU Hmem.pk{2} _ _ _ _)=> //; smt.
+            
         by skip.
       if=> //; by wp.
     by intros=> &2 xstar_n0; fun; sp; if;
@@ -1272,7 +1326,71 @@ require import Sum.
   by rnd; skip; smt.
   qed.
 
-  (** TODO: bound the probability of drawing 0 as the OW challenge. Note that this makes the bound slightly weaker than Pointcheval (factor 1/N). *)
+  local equiv G6_G7_equiv: G6.main ~ G7.main: true ==> Hmem.xstar{2} <> Signature.zeros => ={res}
+  by (apply (G6_G7_abstract GAdv); apply lossless_GAdv).
+
+
+  (** TODO: Bounding the probability of xstar being 0 *)
+  (** Proof Note: no abstraction possile here because of a problem with H7 not initializing G's state.
+      Why is it not an issue in earlier steps? (In particular, the one immediately above,
+      speaking of exactly the same games...) *)
+  local module Ha = GAdv(H7,G).Ha.
+  local module S  = GAdv(H7,G).S.
+
+  local lemma G6_G7_mu_0 &m:
+    Pr[G7.main() @ &m: mu_x (sample_plain Hmem.pk) Signature.zeros <= 1%r / (2 ^ (k - 1))%r] = 1%r.
+  proof strict.
+  bdhoare_deno (_: true ==> mu_x (sample_plain Hmem.pk) Signature.zeros <= 1%r / (2 ^ (k - 1))%r)=> //; fun.
+  call (_: true ==> true).
+    fun; call (_: true ==> true)=> //; first by fun.
+    wp; call (_: true ==> true);
+     first by fun; call (_: true ==> true)=> //;
+       fun; sp; if;
+         [while true (kg2 - i); [intros=> z; wp; rnd | ] | wp ]; skip; smt.
+    wp; call (Lazy.lossless_o _); first smt.
+    wp; call (adversaryL G Ha S _ _ _).
+      by apply Lazy.lossless_o; smt.
+      by fun; call (_: true ==> true)=> //;
+           fun; sp; if;
+             [while true (kg2 - i); [intros=> z; wp; rnd | ] | wp ]; skip; smt.
+      fun;
+        wp; call (Lazy.lossless_o _); first smt.
+        call (_: true ==> true);
+          first by fun; call (_: true ==> true)=> //;
+                     fun; sp; if;
+                       [while true (kg2 - i); [intros=> z; wp; rnd | ] | wp ]; skip; smt.
+        by rnd; wp; skip; smt.
+    by call (_: true ==> true); first by fun; wp.
+  call (_: valid_keys ks ==> valid_pkey Hmem.pk /\ in_supp Hmem.xstar (sample_plain Hmem.pk));
+    first fun; call (_: valid_keys ks ==> valid_pkey Hmem.pk /\ in_supp Hmem.xstar (sample_plain Hmem.pk))=> //;
+      fun; wp; call (_: valid_keys ks ==> valid_pkey Hmem.pk /\ in_supp Hmem.xstar (sample_plain Hmem.pk))=> //;
+        fun; rnd (cpTrue); wp; skip; smt.
+  call Lazy.lossless_init.
+  by rnd; skip; smt.
+  qed.
+
+  lemma bound pk x:
+    valid_pkey pk /\ in_supp x (sample_plain pk) =>
+    mu_x (sample_plain pk) x <= 1%r / (2 ^ (k - 1))%r.
+  proof strict.
+  admit. 
+  qed.
+
+  lemma toto d (x:'a) r:
+    0%r <= r =>
+    mu d (lambda x', mu_x d x <= r) = mu d cpTrue => mu_x d x <= r.
+  proof strict.
+  rewrite /mu_x mu_supp_in /Fun.(<=).
+  intros=> /= H.
+  case (exists a, in_supp a d); smt.
+  qed.
+
+  local lemma G6_G7_bad &m:
+    Pr[G7.main() @ &m: Hmem.xstar = Signature.zeros] <= 1%r/(2^(k-1))%r.
+  proof strict.
+  bdhoare_deno (_: true ==> Hmem.xstar = Signature.zeros)=> //; fun.
+  seq 3: (Hmem.xstar = Signature.zeros). (* Not what we want *)
+  qed.
 
   (** Reduction to OW: no longer using xstar to simulate the oracles *)
   local module I: Inverter = {
