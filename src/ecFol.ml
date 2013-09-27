@@ -1267,21 +1267,23 @@ module Fsubst = struct
             FSmart.f_local (fp, (id, fp.f_ty)) (id, ty')
     end
 
-    | Fop (p, tys) -> begin
-        match Mp.find_opt p s.fs_opdef with
-        | None ->
-            let ty'  = s.fs_ty fp.f_ty in
-            let tys' = List.Smart.map s.fs_ty tys in
-            let p'   = s.fs_sty.ts_p p in
-              FSmart.f_op (fp, (p, tys, fp.f_ty)) (p', tys', ty')
+    | Fop (p, tys) when Mp.mem p s.fs_opdef ->
+        let ty   = s.fs_ty fp.f_ty in
+        let tys  = List.Smart.map s.fs_ty tys in
+        let body = oget (Mp.find_opt p s.fs_opdef) in
+          f_subst_op ty tys [] body
 
-        | Some (tyids, e) ->
-            let sty = Tvar.init tyids tys in
-            let sty = ty_subst { ty_subst_id with ts_v = sty; } in
-            let sty = { e_subst_id with es_freshen = s.fs_freshen; es_ty = sty; } in
-              (* FIXME: is [mhr] good as a default? *)
-              form_of_expr mhr (e_subst sty e)
-    end
+    | Fapp ({ f_node = Fop (p, tys) }, args) when Mp.mem p s.fs_opdef ->
+        let ty   = s.fs_ty fp.f_ty in
+        let tys  = List.Smart.map s.fs_ty tys in
+        let body = oget (Mp.find_opt p s.fs_opdef) in
+          f_subst_op ty tys (List.map (f_subst s) args) body
+
+    | Fop (p, tys) ->
+        let ty'  = s.fs_ty fp.f_ty in
+        let tys' = List.Smart.map s.fs_ty tys in
+        let p'   = s.fs_sty.ts_p p in
+          FSmart.f_op (fp, (p, tys, fp.f_ty)) (p', tys', ty')
 
     | Fpvar (pv, m) ->
         let pv' = pv_subst (EcPath.x_substm s.fs_sty.ts_p s.fs_mp) pv in
@@ -1392,6 +1394,34 @@ module Fsubst = struct
       FSmart.f_pr (fp, (m, mp, args, e)) (m', mp', args', e')
   
     | _ -> f_map s.fs_ty (f_subst s) fp
+
+  and f_subst_op fty tys args (tyids, e) =
+    (* FIXME: factor this out *)
+    (* FIXME: is es_freshen value correct? *)
+    (* FIXME: is [mhr] good as a default? *)
+  
+    let e =
+      let sty = Tvar.init tyids tys in
+      let sty = ty_subst { ty_subst_id with ts_v = sty; } in
+      let sty = { e_subst_id with
+                    es_freshen = true;
+                    es_ty      = sty ; } in
+        e_subst sty e
+    in
+
+    let (sag, args, e) =
+      match e.e_node with
+      | Elam (largs, lbody) when args <> [] ->
+          let largs1, largs2 = List.take_n (List.length args  ) largs in
+          let  args1,  args2 = List.take_n (List.length largs1)  args in
+            (Mid.of_list (List.combine (List.map fst largs1) args1),
+             args2, e_lam largs2 lbody)
+  
+      | _ -> (Mid.of_list [], args, e)
+    in
+  
+    let sag = { f_subst_id with fs_loc = sag } in
+      f_app (f_subst sag (form_of_expr mhr e)) args fty
 
   (* ------------------------------------------------------------------ *)  
   let f_subst_local x t =
