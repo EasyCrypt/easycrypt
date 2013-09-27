@@ -699,20 +699,23 @@ let rec e_subst (s: e_subst) e =
       let ty' = s.es_ty e.e_ty in
         ExprSmart.e_var (e, (pv, e.e_ty)) (pv', ty')
 
-  | Eop (p, tys) -> begin
-      match Mp.find_opt p s.es_opdef with
-      | None ->
-          let p'   = s.es_p p in
-          let tys' = List.Smart.map s.es_ty tys in
-          let ty'  = s.es_ty e.e_ty in
-            ExprSmart.e_op (e, (p, tys, e.e_ty)) (p', tys', ty')
+  | Eapp ({ e_node = Eop (p, tys) }, args) when Mp.mem p s.es_opdef ->
+      let tys  = List.Smart.map s.es_ty tys in
+      let ty   = s.es_ty e.e_ty in
+      let body = oget (Mp.find_opt p s.es_opdef) in
+        e_subst_op ty tys (List.map (e_subst s) args) body
 
-      | Some (tyids, e) ->
-          let sty = Tvar.init tyids tys in
-          let sty = ty_subst { ty_subst_id with ts_v = sty; } in
-          let sty = { e_subst_id with es_freshen = s.es_freshen; es_ty = sty; } in
-            e_subst sty e
-    end
+  | Eop (p, tys) when Mp.mem p s.es_opdef ->
+      let tys  = List.Smart.map s.es_ty tys in
+      let ty   = s.es_ty e.e_ty in
+      let body = oget (Mp.find_opt p s.es_opdef) in
+        e_subst_op ty tys [] body
+
+  | Eop (p, tys) ->
+      let p'   = s.es_p p in
+      let tys' = List.Smart.map s.es_ty tys in
+      let ty'  = s.es_ty e.e_ty in
+        ExprSmart.e_op (e, (p, tys, e.e_ty)) (p', tys', ty')
 
   | Elet (lp, e1, e2) -> 
       let e1' = e_subst s e1 in
@@ -726,6 +729,33 @@ let rec e_subst (s: e_subst) e =
       ExprSmart.e_lam (e, (b, e1)) (b', e1')
 
   | _ -> e_map s.es_ty (e_subst s) e
+
+and e_subst_op ety tys args (tyids, e) =
+  (* FIXME: factor this out *)
+  (* FIXME: is es_freshen value correct? *)
+
+  let e =
+    let sty = Tvar.init tyids tys in
+    let sty = ty_subst { ty_subst_id with ts_v = sty; } in
+    let sty = { e_subst_id with
+                  es_freshen = true;
+                  es_ty      = sty } in
+      e_subst sty e
+  in
+
+  let (sag, args, e) =
+    match e.e_node with
+    | Elam (largs, lbody) when args <> [] ->
+        let largs1, largs2 = List.take_n (List.length args  ) largs in
+        let  args1,  args2 = List.take_n (List.length largs1)  args in
+          (Mid.of_list (List.combine (List.map fst largs1) args1),
+           args2, e_lam largs2 lbody)
+
+    | _ -> (Mid.of_list [], args, e)
+  in
+
+  let sag = { e_subst_id with es_loc = sag } in
+    e_app (e_subst sag e) args ety
 
 let is_subst_id s = 
   not s.es_freshen && s.es_p == identity && 

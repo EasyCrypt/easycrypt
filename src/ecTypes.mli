@@ -138,7 +138,7 @@ type expr = private {
 }
 
 and expr_node =
-  | Elam   of (EcIdent.t * ty) list * expr (* lambda expression *)
+  | Elam   of (EcIdent.t * ty) list * expr (* lambda expression     *)
   | Eint   of int                          (* int. literal          *)
   | Elocal of EcIdent.t                    (* let-variables         *)
   | Evar   of prog_var                     (* module variable       *)
