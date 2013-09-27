@@ -493,14 +493,8 @@ section.
   local equiv PSS_G0_H:
     H.o ~ H0.o: ={x} /\ H.m{1} =<= Hmap.m{2} ==> ={res} /\ H.m{1} =<= Hmap.m{2}.
   proof strict.
-  fun; inline H0.o; wp; rnd; wp; skip;rewrite /(=<=);progress=> //.
-    smt.
-    case (x0 = x){2}; smt.
-    smt.
-    case (x0 = x){2}; smt.
-    smt.
-    case (x0 = x){2}; smt.
-    smt.
+  fun; inline H0.o; wp; rnd; wp; skip;
+       rewrite /(=<=); progress=> //; smt.
   qed.
 
   (* More informed use of conseq* might speed up some of the smt calls *)
@@ -1295,15 +1289,17 @@ require import Sum.
   local lemma G6_G7_abstract (Ga <: Gadv {H5,H6,G,Hmem}):
     (forall (H <: SplitOracle{Ga}) (G <: Gt.Types.ARO{Ga}),
        islossless H.o => islossless G.o => islossless Ga(H,G).main) => 
-    equiv [Gen(Ga,H6,G).main ~ Gen(Ga,H7,G).main: true ==> ={res}].
+    equiv [Gen(Ga,H6,G).main ~ Gen(Ga,H7,G).main: true ==> Hmem.xstar{2} <> Signature.zeros => ={res}].
   proof strict.
   intros=> GaL; fun.
-  call (_: ={glob Hmap, glob G} /\ valid_keys (Hmem.pk,Hmem.sk){2} /\ f_dom Hmem.pk{2} Hmem.xstar{2}).
+  call (_: Hmem.xstar = Signature.zeros,
+             ={glob Hmap, glob G} /\ valid_keys (Hmem.pk,Hmem.sk){2} /\ f_dom Hmem.pk{2} Hmem.xstar{2}).
     (* H *)
     fun; sp; if=> //.
       wp; while (={x, c, b, i, glob Hmap, glob G} /\
                  valid_keys (Hmem.pk,Hmem.sk){2} /\ 
-                 f_dom Hmem.pk{2} Hmem.xstar{2}).
+                 f_dom Hmem.pk{2} Hmem.xstar{2} /\
+                 Hmem.xstar{2} <> Signature.zeros).
         case c{2}.
           wp; rnd (lambda z, ((inv Hmem.xstar Hmem.pk) * finv Hmem.sk z) Hmem.pk){2}
                   (lambda u, ((f Hmem.pk Hmem.xstar) * f Hmem.pk u) Hmem.pk){2};
@@ -1312,20 +1308,25 @@ require import Sum.
             smt.
             rewrite homo_f_mul; first 2 smt.
             rewrite -mulA -homo_f_mul; first 2 smt.
-            rewrite mul_inv=> //. admit. (* TODO: xstar is non-zero! *)
-            smt.
+            by rewrite mul_inv=> //; smt.
             rewrite homo_finv_mul; first 3 smt.
             rewrite -mulA finvof // (mulC _ Hmem.xstar{2}); first 2 smt.
-            rewrite mul_inv=> //. admit. (* TODO: xstar is non-zero! *)
-            smt.
+            by rewrite mul_inv=> //; smt.
 
           wp; rnd (lambda z, finv Hmem.sk z){2} (lambda u, f Hmem.pk u){2};
           skip; progress=> //; last 7 smt.
             by apply (challengeU Hmem.pk{2} _ _ _ _)=> //; smt.
         by skip.
       if=> //; by wp.
+    by intros=> &2 xstar_n0; fun; sp; if;
+         [wp; while true (kg2 - i); [intros=> z; wp; rnd | ]; skip; smt | wp].
+    by intros=> &1; fun; sp; if;
+         [wp; while true (kg2 - i); [intros=> z; wp; rnd | ]; skip; smt | wp].
+
     (* G *)
     by conseq* (_: ={glob G, x} ==> ={glob G, res})=> //; first fun; eqobs_in.
+    by intros=> _ _; apply (Gt.Lazy.lossless_o); smt.
+    by intros=> _; conseq* (Gt.Lazy.lossless_o _); smt.
   call (_: ={ks} /\
            valid_keys ks{1} ==>
            ={glob Hmap} /\
@@ -1333,8 +1334,10 @@ require import Sum.
            f_dom Hmem.pk{2} Hmem.xstar{2});
     first by fun; wp; call Hmap_init.
   call Gt.Lazy.abstract_init.
-  by rnd.
+  by rnd; skip; smt.
   qed.
+
+  (** TODO: bound the probability of drawing 0 as the OW challenge. Note that this makes the bound slightly weaker than Pointcheval (factor 1/N). *)
 
   (** Reduction to OW: no longer using xstar to simulate the oracles *)
   local module I: Inverter = {

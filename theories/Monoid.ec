@@ -250,7 +250,7 @@ cut pcan_pickp_eq : forall x, mem x s => pickp (eq x) = x.
   delta pickp eq; intros x x_in_s /=.
   apply (_:forall a, mem a (filter (lambda b, x = b) s) => a = x);
     first by (intros=> a; rewrite mem_filter //).
-  by rewrite mem_pick //; smt.
+  rewrite mem_pick //; smt.
 cut pcan_eq_pickp : forall x, mem x is => eq (pickp x) = x.
   by delta pickp eq; intros x h /=; apply fun_ext=> a /=; smt.
 cut p_is_or: mu d p = mu d (cpOrs is).

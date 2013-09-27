@@ -8,8 +8,9 @@ open EcModules
 
 type memory = EcMemory.memory
 
-(* -------------------------------------------------------------------- *)
+module Mp = EcPath.Mp
 
+(* -------------------------------------------------------------------- *)
 type gty =
   | GTty    of EcTypes.ty
   | GTmodty of module_type * mod_restr 
@@ -1114,6 +1115,21 @@ let f_iter g f =
   | Fpr(_,_,args,ev) -> List.iter g args; g ev
 
 (* -------------------------------------------------------------------- *)
+let rec form_of_expr mem (e: expr) = 
+  match e.e_node with
+  | Eint n -> f_int n
+  | Elocal id -> f_local id e.e_ty
+  | Evar pv -> f_pvar pv e.e_ty mem
+  | Eop (op,tys) -> f_op op tys e.e_ty
+  | Eapp (ef,es) -> f_app (form_of_expr mem ef) (List.map (form_of_expr mem) es) e.e_ty
+  | Elet (lpt,e1,e2) -> f_let lpt (form_of_expr mem e1) (form_of_expr mem e2)
+  | Etuple es -> f_tuple (List.map (form_of_expr mem) es)
+  | Eif (e1,e2,e3) -> 
+      f_if (form_of_expr mem e1) (form_of_expr mem e2) (form_of_expr mem e3)
+  | Elam(b,e) ->
+    f_lambda (List.map (fun (x,ty) -> (x,GTty ty)) b) (form_of_expr mem e)
+
+(* -------------------------------------------------------------------- *)
 type f_subst = { 
   fs_freshen : bool; (* true means freshen locals *)
   fs_mp      : EcPath.mpath Mid.t;
@@ -1121,6 +1137,7 @@ type f_subst = {
   fs_mem     : EcIdent.t Mid.t;
   fs_sty     : ty_subst;
   fs_ty      : ty -> ty;
+  fs_opdef   : (EcIdent.t list * expr) Mp.t;
 }
 
 module Fsubst = struct
@@ -1132,6 +1149,7 @@ module Fsubst = struct
     fs_mem     = Mid.empty;
     fs_sty     = ty_subst_id;
     fs_ty      = ty_subst ty_subst_id;
+    fs_opdef   = Mp.empty;
   }
 
   let is_subst_id s = 
@@ -1140,12 +1158,13 @@ module Fsubst = struct
     && Mid.is_empty s.fs_loc
     && Mid.is_empty s.fs_mem
 
-  let f_subst_init freshen smp sty =
+  let f_subst_init freshen smp sty ops =
     { f_subst_id
         with fs_freshen = freshen;
-             fs_mp  = smp;
-             fs_sty = sty;
-             fs_ty  = ty_subst sty }
+             fs_mp    = smp;
+             fs_sty   = sty;
+             fs_ty    = ty_subst sty;
+             fs_opdef = ops; }
 
   (* ------------------------------------------------------------------ *)
   let f_bind_local s x t = 
@@ -1248,11 +1267,21 @@ module Fsubst = struct
             FSmart.f_local (fp, (id, fp.f_ty)) (id, ty')
     end
 
-    | Fop (p, tys) ->
-        let ty'  = s.fs_ty fp.f_ty in
-        let tys' = List.Smart.map s.fs_ty tys in
-        let p'   = s.fs_sty.ts_p p in
-          FSmart.f_op (fp, (p, tys, fp.f_ty)) (p', tys', ty')
+    | Fop (p, tys) -> begin
+        match Mp.find_opt p s.fs_opdef with
+        | None ->
+            let ty'  = s.fs_ty fp.f_ty in
+            let tys' = List.Smart.map s.fs_ty tys in
+            let p'   = s.fs_sty.ts_p p in
+              FSmart.f_op (fp, (p, tys, fp.f_ty)) (p', tys', ty')
+
+        | Some (tyids, e) ->
+            let sty = Tvar.init tyids tys in
+            let sty = ty_subst { ty_subst_id with ts_v = sty; } in
+            let sty = { e_subst_id with es_freshen = s.fs_freshen; es_ty = sty; } in
+              (* FIXME: is [mhr] good as a default? *)
+              form_of_expr mhr (e_subst sty e)
+    end
 
     | Fpvar (pv, m) ->
         let pv' = pv_subst (EcPath.x_substm s.fs_sty.ts_p s.fs_mp) pv in
@@ -1275,7 +1304,7 @@ module Fsubst = struct
 
     | FhoareS hs ->
         assert (not (Mid.mem (fst hs.hs_m) s.fs_mem));
-        let es  = e_subst_init s.fs_freshen s.fs_sty.ts_p s.fs_ty s.fs_mp in
+        let es  = e_subst_init s.fs_freshen s.fs_sty.ts_p s.fs_ty s.fs_opdef s.fs_mp in
         let pr' = f_subst s hs.hs_pr in
         let po' = f_subst s hs.hs_po in
         let st' = EcModules.s_subst es hs.hs_s in
@@ -1295,7 +1324,7 @@ module Fsubst = struct
 
     | FbdHoareS bhs ->
       assert (not (Mid.mem (fst bhs.bhs_m) s.fs_mem));
-      let es  = e_subst_init s.fs_freshen s.fs_sty.ts_p s.fs_ty s.fs_mp in
+      let es  = e_subst_init s.fs_freshen s.fs_sty.ts_p s.fs_ty s.fs_opdef s.fs_mp in
       let pr' = f_subst s bhs.bhs_pr in
       let po' = f_subst s bhs.bhs_po in
       let st' = EcModules.s_subst es bhs.bhs_s in
@@ -1319,7 +1348,7 @@ module Fsubst = struct
     | FequivS eqs -> 
       assert (not (Mid.mem (fst eqs.es_ml) s.fs_mem) && 
                 not (Mid.mem (fst eqs.es_mr) s.fs_mem));
-      let es = e_subst_init s.fs_freshen s.fs_sty.ts_p s.fs_ty s.fs_mp in
+      let es = e_subst_init s.fs_freshen s.fs_sty.ts_p s.fs_ty s.fs_opdef s.fs_mp in
       let s_subst = EcModules.s_subst es in
 
       let pr' = f_subst s eqs.es_pr in
@@ -1344,7 +1373,7 @@ module Fsubst = struct
       let fl' = m_subst eg.eg_fl in
       let fr' = m_subst eg.eg_fr in
 
-      let es = e_subst_init s.fs_freshen s.fs_sty.ts_p s.fs_ty s.fs_mp in
+      let es = e_subst_init s.fs_freshen s.fs_sty.ts_p s.fs_ty s.fs_opdef s.fs_mp in
       let s_subst = EcModules.s_subst es in
       let sl' = s_subst eg.eg_sl in
       let sr' = s_subst eg.eg_sr in
@@ -1693,25 +1722,6 @@ let f_real_lt_simpl f1 f2 =
     when f_equal op1 f_op_real_of_int && f_equal op2 f_op_real_of_int -> 
     f_bool (x1 < x2)
   | _, _ -> f_real_lt f1 f2  
-
-  
-
-
-(* -------------------------------------------------------------------- *)
-let rec form_of_expr mem (e: expr) = 
-  match e.e_node with
-  | Eint n -> f_int n
-  | Elocal id -> f_local id e.e_ty
-  | Evar pv -> f_pvar pv e.e_ty mem
-  | Eop (op,tys) -> f_op op tys e.e_ty
-  | Eapp (ef,es) -> 
-      f_app (form_of_expr mem ef) (List.map (form_of_expr mem) es) e.e_ty
-  | Elet (lpt,e1,e2) -> f_let lpt (form_of_expr mem e1) (form_of_expr mem e2)
-  | Etuple es -> f_tuple (List.map (form_of_expr mem) es)
-  | Eif (e1,e2,e3) -> 
-      f_if (form_of_expr mem e1) (form_of_expr mem e2) (form_of_expr mem e3)
-  | Elam(b,e) ->
-    f_lambda (List.map (fun (x,ty) -> (x,GTty ty)) b) (form_of_expr mem e)
 
 (* -------------------------------------------------------------------- *)
 type op_kind = 

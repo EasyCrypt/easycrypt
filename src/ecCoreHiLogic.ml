@@ -288,7 +288,7 @@ let concretize_pterm_arguments (tue, ev) ids =
 
 (* -------------------------------------------------------------------- *)
 let concretize_form (tue, ev) f =
-  let s = Fsubst.f_subst_init false Mid.empty { ty_subst_id with ts_u = tue } in
+  let s = Fsubst.f_subst_init false Mid.empty { ty_subst_id with ts_u = tue } Mp.empty in
   let s = EV.fold (fun x f s -> Fsubst.f_bind_local s x f) ev s in
     Fsubst.f_subst s f
 

@@ -2170,6 +2170,11 @@ clone_proof:
 | PROOF x=clone_lemma { List.rev x }
 ;
 
+opclmode:
+| EQ { `Alias }
+| LEFTARROW { `Inline }
+;
+
 clone_override:
 | TYPE ps=typarams x=qident EQ t=loc(type_exp)
    { (x, PTHO_Type (ps, t, `Alias)) }
@@ -2177,35 +2182,32 @@ clone_override:
 | TYPE ps=typarams x=qident LEFTARROW t=loc(type_exp)
    { (x, PTHO_Type (ps, t, `Inline)) }
 
-| OP x=qoident LEFTARROW y=qoident
-   { (x, PTHO_Op (`OpInline y)) }
-
-| OP x=qoident tyvars=tyvars_decl COLON sty=loc(type_exp) EQ e=expr
+| OP x=qoident tyvars=tyvars_decl COLON sty=loc(type_exp) mode=opclmode e=expr
    { let ov = {
        opov_tyvars = tyvars;
        opov_args   = [];
        opov_retty  = sty;
        opov_body   = e;
      } in
-       (x, PTHO_Op (`OpDef ov)) }
+       (x, PTHO_Op (ov, mode)) }
 
-| OP x=qoident tyvars=tyvars_decl eq=loc(EQ) e=expr
+| OP x=qoident tyvars=tyvars_decl mode=loc(opclmode) e=expr
    { let ov = {
        opov_tyvars = tyvars;
        opov_args   = [];
-       opov_retty  = mk_loc eq.pl_loc PTunivar;
+       opov_retty  = mk_loc mode.pl_loc PTunivar;
        opov_body   = e;
      } in
-       (x, PTHO_Op (`OpDef ov)) }
+       (x, PTHO_Op (ov, unloc mode)) }
 
-| OP x=qoident tyvars=tyvars_decl p=ptybindings eq=loc(EQ) e=expr
+| OP x=qoident tyvars=tyvars_decl p=ptybindings mode=loc(opclmode) e=expr
    { let ov = {
        opov_tyvars = tyvars;
        opov_args   = p;
-       opov_retty  = mk_loc eq.pl_loc PTunivar;
+       opov_retty  = mk_loc mode.pl_loc PTunivar;
        opov_body   = e;
      } in
-       (x, PTHO_Op (`OpDef ov)) }
+       (x, PTHO_Op (ov, unloc mode)) }
 
 | PRED x=qoident tyvars=tyvars_decl p=ptybindings EQ f=form
    { let ov = {

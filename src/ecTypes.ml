@@ -631,6 +631,7 @@ type e_subst = {
     es_freshen : bool; (* true means realloc local *)
     es_p       : EcPath.path -> EcPath.path;
     es_ty      : ty -> ty;
+    es_opdef   : (EcIdent.t list * expr) EcPath.Mp.t;
     es_mp      : EcPath.mpath -> EcPath.mpath; 
     es_xp      : EcPath.xpath -> EcPath.xpath;
     es_loc     : expr Mid.t;
@@ -640,12 +641,13 @@ let e_subst_id = {
     es_freshen = false;
     es_p       = identity;
     es_ty      = identity;
+    es_opdef   = Mp.empty;
     es_mp      = identity;
     es_xp      = identity;
     es_loc     = Mid.empty;
  }
 
-let e_subst_init freshen on_path on_ty on_mpath = 
+let e_subst_init freshen on_path on_ty opdef on_mpath = 
   let on_mp = 
     let f = EcPath.m_subst on_path on_mpath in
     if f == identity then f else EcPath.Hm.memo 107 f in
@@ -656,6 +658,7 @@ let e_subst_init freshen on_path on_ty on_mpath =
     es_freshen = freshen;
     es_p       = on_path;
     es_ty      = on_ty;
+    es_opdef   = opdef;
     es_mp      = on_mp;
     es_xp      = on_xp;
     es_loc     = Mid.empty;
@@ -696,11 +699,20 @@ let rec e_subst (s: e_subst) e =
       let ty' = s.es_ty e.e_ty in
         ExprSmart.e_var (e, (pv, e.e_ty)) (pv', ty')
 
-  | Eop(p, tys) ->
-      let p'   = s.es_p p in
-      let tys' = List.Smart.map s.es_ty tys in
-      let ty'  = s.es_ty e.e_ty in
-        ExprSmart.e_op (e, (p, tys, e.e_ty)) (p', tys', ty')
+  | Eop (p, tys) -> begin
+      match Mp.find_opt p s.es_opdef with
+      | None ->
+          let p'   = s.es_p p in
+          let tys' = List.Smart.map s.es_ty tys in
+          let ty'  = s.es_ty e.e_ty in
+            ExprSmart.e_op (e, (p, tys, e.e_ty)) (p', tys', ty')
+
+      | Some (tyids, e) ->
+          let sty = Tvar.init tyids tys in
+          let sty = ty_subst { ty_subst_id with ts_v = sty; } in
+          let sty = { e_subst_id with es_freshen = s.es_freshen; es_ty = sty; } in
+            e_subst sty e
+    end
 
   | Elet (lp, e1, e2) -> 
       let e1' = e_subst s e1 in

@@ -27,6 +27,7 @@ type subst = {
   sb_modules : EcPath.mpath Mid.t;
   sb_path    : EcPath.path Mp.t;
   sb_tydef   : (EcIdent.t list * ty) Mp.t;
+  sb_opdef   : (EcIdent.t list * expr) Mp.t;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -34,6 +35,7 @@ let empty : subst = {
   sb_modules = Mid.empty;
   sb_path    = Mp.empty;
   sb_tydef   = Mp.empty;
+  sb_opdef   = Mp.empty;
 }
 
 let is_empty s = 
@@ -54,6 +56,10 @@ let add_tydef (s : subst) p (ids, ty) =
   assert (Mp.find_opt p s.sb_tydef = None);
   { s with sb_tydef = Mp.add p (ids, ty) s.sb_tydef }
 
+let add_opdef (s : subst) p (ids, e) =
+  assert (Mp.find_opt p s.sb_opdef = None);
+  { s with sb_opdef = Mp.add p (ids, e) s.sb_opdef }
+
 (* -------------------------------------------------------------------- *)
 type _subst = {
   s_s   : subst;
@@ -61,6 +67,7 @@ type _subst = {
   s_fmp : (EcPath.mpath -> EcPath.mpath);
   s_sty : ty_subst;
   s_ty  : (ty -> ty);
+  s_op  : (EcIdent.t list * expr) Mp.t;
 }
 
 let _subst_of_subst s = 
@@ -72,18 +79,20 @@ let _subst_of_subst s =
       s_p   = sp;
       s_fmp = sm;
       s_sty = sty;
-      s_ty  = st; }
+      s_ty  = st;
+      s_op  = s.sb_opdef; }
 
 let e_subst_of_subst (s:_subst) = 
   { es_freshen = true;
     es_p       = s.s_p;
     es_ty      = s.s_ty;
+    es_opdef   = s.s_op;
     es_mp      = s.s_fmp;
     es_xp      = EcPath.x_subst s.s_fmp;
     es_loc     = Mid.empty; }
 
 let f_subst_of_subst (s:_subst) = 
-  Fsubst.f_subst_init true s.s_s.sb_modules s.s_sty
+  Fsubst.f_subst_init true s.s_s.sb_modules s.s_sty s.s_op
 
 (* -------------------------------------------------------------------- *)
 let subst_variable (s : _subst) (x : variable) =
