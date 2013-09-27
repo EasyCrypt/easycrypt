@@ -313,6 +313,38 @@ module type CMA_2RO(G:Gt.Types.ARO,H:Ht.Types.ARO,S:AdvOracles) = {
   fun forge(pk:pkey): message * signature {* G.o H.o S.sign}
 }.
 
+require import Dice_sampling.  
+import Dprod.
+op test_plain0 (pk:pkey) (z:signature) = (sub (to_bits z) 0 1) = zeros 1.
+op sample_hgtag (pk:pkey) = sample_htag * sample_gtag.
+
+clone GenDice as S with 
+  type t <- signature,
+    type input = pkey,
+    type t' <- htag * gtag,
+    op d <- sample_plain,
+    op test <- (lambda (pk:pkey, z:signature), (sub (to_bits z) 0 1) = zeros 1),
+    op d' (pk:pkey) <-  sample_htag * sample_gtag
+    proof *.
+  realize dU. 
+  proof. apply RSA.challengeU. qed.
+  realize test_in_supp. 
+  proof. 
+   intros pk x /=.
+   admit.
+  save.
+  realize test_sub_supp. 
+  proof.
+   (* TODO : sub_supp should be defined *)
+   admit.
+  save.
+  realize d'_uni. 
+  proof. 
+   intros pk x /=.
+   (* Ident *)
+   admit.
+  save.
+
 section. 
   declare module A:CMA_2RO {G,G',H,EF_CMA,Wrap,OW}.
   axiom adversaryL (G <: Gt.Types.ARO {A}) (H <: Ht.Types.ARO {A}) (S <: AdvOracles {A}):
@@ -912,8 +944,14 @@ require import Sum.
   (** G4: compute z and u from the sampled values
         Note: z is uniform in "bitstrings of length k starting with a zero bit" (denoted '0 || 2^k-1'), and
               u is uniform in f^-1(0 || 2^k-1) *)
-  local module H4: SplitOracle = {
-    fun init(ks:pkey * skey): unit = {
+
+
+  module type Sample_w_st = {
+    fun sample(i:pkey) : htag * gtag {*}
+  }.
+
+  local module GenH4 (S:Sample_w_st) : SplitOracle = {
+     fun init(ks:pkey * skey): unit = {
       Hmap.init(ks);
     }
 
@@ -924,8 +962,7 @@ require import Sum.
 
       if (!in_dom x Hmap.m)
       {
-        w = $sample_htag;
-        st = $sample_gtag;
+        (w,st) = S.sample(Hmem.pk);
         z = Signature.from_bits (zeros 1 || to_bits w || to_bits st);
         u = if c then ((inv Hmem.xstar Hmem.pk) * finv Hmem.sk  z) Hmem.pk else finv Hmem.sk z;
         Hmap.m.[x] = (w,c,u);
@@ -937,7 +974,19 @@ require import Sum.
       }
       return pi3_1 (proj Hmap.m.[x]);
     }
+  }.  
+
+  local module S2 = { 
+    fun sample (i:pkey) : htag * gtag = {
+      var w:htag;
+      var st:gtag;
+      w = $sample_htag;
+      st = $sample_gtag;
+      return (w,st);
+    }
   }.
+ 
+  local module H4 = GenH4(S2).
 
   local module G4 = Gen(GAdv,H4,G).
 
@@ -957,13 +1006,13 @@ require import Sum.
   proof strict.
   fun;
   if; first smt.
-    seq 2 4: (={glob Hmem, glob G, c, x, w, st} /\
+    seq 2 3: (={glob Hmem, glob G, c, x, w, st} /\
               dom Hmap.m{1} = dom Hmap.m{2} /\
               (forall x, in_dom x Hmap.m{1} =>
                 pi3_1 (proj Hmap.m.[x]{1}) = pi3_1 (proj Hmap.m.[x]{2})) /\
               (forall x, in_dom x Hmap.m{1} =>
                 pi3_2 (proj Hmap.m.[x]{1}) = pi3_2 (proj Hmap.m.[x]{2}))).
-      by wp; do !rnd; skip; progress=> //; smt.
+      by inline S2.sample;wp; do !rnd;wp.
     seq 1 1: (={glob Hmem, glob G, c, x, w, st} /\
               dom Hmap.m{1} = dom Hmap.m{2} /\
               (forall x, in_dom x Hmap.m{1} =>
@@ -986,9 +1035,9 @@ require import Sum.
                 (forall x, in_dom x Hmap.m{1} =>
                   pi3_2 (proj Hmap.m.[x]{1}) = pi3_2 (proj Hmap.m.[x]{2}))).
     (* H *)
-    by conseq* G3_G4_H; smt.
+    by conseq* G3_G4_H. 
     (* G *)
-    conseq* Gt.Lazy.abstract_o; first 2 smt.
+    by conseq* Gt.Lazy.abstract_o.
   call (_: ={ks} /\ valid_keys ks{1} ==> ={glob Hmap});
     first by fun; wp; call Hmap_init.
   call Gt.Lazy.abstract_init.
@@ -999,64 +1048,80 @@ require import Sum.
   by apply (G3_G4_abstract GAdv).
 
   (** G4': Sampling z in a loop *)
-  local module H4': SplitOracle = {
-    fun init(ks:pkey * skey): unit = {
-      Hmap.init(ks);
-    }
 
-    fun sample(): bool * htag * gtag = {
+  local module Sw = {
+    fun sample(i:pkey):htag * gtag = {
       var z:signature;
-      var b:bool;
       var w:htag;
       var st:gtag;
-
-      z = $sample_plain Hmem.pk;
-      b = ((sub (to_bits z) 0 1) <> zeros 1);
+      z = Signature.from_bits(ones 1 || to_bits HTag.zeros || to_bits GTag.zeros);
+      z = S.RsampleW.sample(i,z);
       w = HTag.from_bits (sub (to_bits z) 1 k1);
-      st = GTag.from_bits (sub (to_bits z) (k1 + 1) kg);
-      return (b,w,st);
-    }
-
-    fun o(c:bool,x:message * salt): htag = {
-      var b:bool;
-      var w:htag;
-      var st:gtag;
-      var z, u:signature;
-      var i:int;
-
-      i = 0;
-      b = true;
-      if (!in_dom x Hmap.m)
-      {
-        while (b)
-        {
-          (b,w,st) = sample();
-          i = i + 1;
-        }
-        z = Signature.from_bits (zeros 1 || to_bits w || to_bits st);
-        u = if c then ((inv Hmem.xstar Hmem.pk) * finv Hmem.sk z) Hmem.pk else finv Hmem.sk z;
-        Hmap.m.[x] = (w,c,u);
-        G.m.[w] = st ^ (GTag.from_bits (to_bits (snd x) || zeros (kg - k0)));
-      }
-      else
-      {
-        if (!c /\ pi3_2 (proj Hmap.m.[x])) Hmap.m.[x] = (HTag.zeros,c,Signature.ones);
-      }
-      return pi3_1 (proj Hmap.m.[x]);
+      st = GTag.from_bits (sub (to_bits z) (k1 + 1) kg); 
+      return (w,st);
     }
   }.
 
-  local module G4' = Gen(GAdv,H4',G).
+  local equiv S2_Sw : S2.sample ~ Sw.sample : ={i} ==> ={res}.
+  proof.
+    transitivity S.Sample.sample (={i} ==> ={res}) (={i} ==> ={res}) => //.
+      by intros &m1 &m2 ->;exists i{m2}.
+      bypr (res{1}) (res{2}) => //.
+      intros &1 &2 x Heqi.
+      rewrite (_:Pr[S2.sample(i{1}) @ &1 : x = res] = 1%r/(2^(k1+kg))%r).
+        bdhoare_deno (_: true ==> x = res) => //; fun.
+        seq 1 : ( (fst x) = w) (1%r/(2^k1)%r) (1%r/(2^kg)%r) _ 0%r => //.
+          rnd;skip;progress => //.
+          by rewrite (mu_eq _ _ ((=) (fst x))) => //;apply (HTag.Dword.mu_x_def (fst x)).
+          conseq * (_ : _ ==> snd x = st).
+            by progress;elimT tuple2_ind x.
+          rnd;skip;progress => //.
+          by rewrite (mu_eq _ _ ((=) (snd x))) => //;apply (GTag.Dword.mu_x_def (snd x)).
+          by hoare;rnd;skip;smt.
+         by smt. (* PY: progress; fieldeq;smt. (* error *) *)
+      rewrite rw_eq_sym.  bdhoare_deno (_: true ==> x = res) => //; fun.
+      rnd;skip;progress => //.
+      rewrite (_ : mu (sample_htag * sample_gtag) (lambda (x0 : htag * gtag), x = x0) =
+                   mu_x (sample_htag * sample_gtag) x).
+        by rewrite /mu_x;apply mu_eq.
+      rewrite Dprod.mu_x_def /sample_htag HTag.Dword.mu_x_def /sample_gtag GTag.Dword.mu_x_def. 
+      by smt.
+    fun *;inline{2} Sw.sample;wp.
+    pose f := lambda (p:htag * gtag), 
+       Signature.from_bits (zeros 1 || to_bits (fst p) || to_bits (snd p)).
+    pose finv := lambda (z:signature), (HTag.from_bits (sub (to_bits z) 1 k1),
+                            GTag.from_bits (sub (to_bits z) (k1 + 1) kg)).
+    call (S.Sample_RsampleW f finv);wp;skip;progress => //.
+      rewrite Signature.pcan_to_from;first smt.
+      rewrite - {2} (length_ones 1); first smt.
+      by rewrite sub_app_fst; rewrite rw_eq_sym;apply zeros_ones;smt.
+      by smt.
+      by rewrite /f Signature.pcan_to_from;smt.
+      by rewrite /sample_hgtag Dprod.supp_def;smt.
+      rewrite /f /finv /fst /snd /= -H.
+      rewrite HTag.pcan_to_from;first smt.
+      rewrite GTag.pcan_to_from;first smt.
+      rewrite {2} (_: 1 = 0 + 1) //;  pose x := to_bits rR.
+      rewrite - appA sub_app_sub //;first 2 smt.
+      rewrite (_:k1 + 1 = 0 + (1 + k1));first smt.
+      by rewrite sub_app_sub //;smt.
+    rewrite /finv /f Signature.pcan_to_from;first smt.
+    elimT tuple2_ind rL => l r _;simplify fst snd.
+    rewrite sub_app_snd_le length_zeros //=.
+    cut Hl : `|to_bits l| = k1 by smt.
+    rewrite sub_app_fst_le - ?Hl //;first smt.
+    rewrite sub_full HTag.can_from_to.
+    rewrite -appA sub_app_snd_le;first smt.
+    rewrite (_:(`|to_bits l| + 1 - `|zeros 1 || to_bits l|) = 0);first smt.
+    by rewrite (_:kg = `|to_bits r|);smt.
+  save.
+           
+  local module H4' = GenH4 (Sw).
+  local module G4' = Gen(GAdv,H4',G).  
 
   local equiv G4_G4'_H: H4.o ~ H4'.o: ={glob Hmap, c, x} ==> ={glob Hmap, res}.
   proof strict.
-  fun; sp; if=> //; last by wp.
-  (* Here, if we can prove that
-       1) the loop terminates (the probability that the condition is false is constant and non-zero); and
-       2) the only side-effects that are visible on loop exit are those produced during the last iteration,
-     then we can remove the while and focus on showing the equivalence of its last iteration and the other
-     game. *)
-  admit.
+    by fun; eqobs_in; conseq S2_Sw.
   qed.
 
   (** G5: Sampling z in a (non-PTIME) loop *)
@@ -1104,27 +1169,54 @@ require import Sum.
   local equiv G4'_G5_H: H4'.o ~ H5.o: ={glob Hmap, glob G, c, x} ==> ={glob Hmap, glob G, res}.
   proof strict.
   fun; sp; if=> //; last by wp.
-    inline H4'.sample; wp;
-    while (={glob Hmem, c, x, b} /\
-           (b{1} => ={glob Hmap, glob G, c, x}) /\
-           (!b{1} =>
-              ={w, st} /\
-              eq_except Hmap.m{1} Hmap.m{2} x{1} /\
-              Hmap.m.[x]{2} = Some (w,c,c ? ((inv Hmem.xstar Hmem.pk) * (finv Hmem.sk (Signature.from_bits (zeros 1 || to_bits w || to_bits st)))) Hmem.pk
-                                          : finv Hmem.sk (Signature.from_bits (zeros 1 || to_bits w || to_bits st))){2} /\
-              eq_except G.m{1} G.m{2} w{1} /\
-              G.m.[w]{2} = Some (st ^ (GTag.from_bits (to_bits (snd x) || zeros (kg - k0))))){2}).
-      seq 5 4: (={glob Hmap, glob G, c, x, b, w, st} /\ z0{1} = z{2} /\
-                z0{1} = Signature.from_bits (zeros 1 || to_bits w || to_bits st){2} /\
-                b{1} = (sub (to_bits z0) 0 1 <> zeros 1){1}).
-        wp; rnd; skip; progress=> //; cut := H _=> //; progress=> //.
-          rewrite -{1}(Signature.can_from_to z0L); congr.
-            rewrite HTag.pcan_to_from; first smt.
-            rewrite GTag.pcan_to_from; first smt.
-            admit. (* Missing axioms on append and sub *)
-        by wp; skip; progress=> //; smt.
-    skip; progress=> //; cut := H3 _=> //; last 2 smt.
-      by case c{2}; intros=> _ /=; progress=> //; smt.
+    inline{1} Sw.sample S.RsampleW.sample;sp;wp; intros => /=.
+    while (={glob Hmem,x,c} /\ i0{1} = Hmem.pk{2} /\
+           b{2} = !(test_plain0 i0 r){1} /\
+           if b{2} then ={Hmap.m, G.m} 
+           else 
+            Hmap.m{2} = 
+              Hmap.m{1}.[x{1} <-
+              ((HTag.from_bits (sub (to_bits r{1}) 1 k1))%HTag, c{1},
+               if c{1} then ( * ) (inv Hmem.xstar{1} Hmem.pk{1})
+                             (finv Hmem.sk{1}
+                             ((Signature.from_bits
+                 (zeros 1 ||
+                  to_bits ((HTag.from_bits (sub (to_bits r{1}) 1 k1)))%HTag ||
+                  to_bits
+                    ((GTag.from_bits (sub (to_bits r{1}) (k1 + 1) kg)))%GTag)))%Signature)
+          Hmem.pk{1}
+      else
+        finv Hmem.sk{1}
+          ((Signature.from_bits
+              (zeros 1 ||
+               to_bits ((HTag.from_bits (sub (to_bits r{1}) 1 k1)))%HTag ||
+               to_bits
+                 ((GTag.from_bits (sub (to_bits r{1}) (k1 + 1) kg)))%GTag)))%Signature)] /\
+      Lazy.RO.m{2} =
+       Lazy.RO.m{1}.[(HTag.from_bits (sub (to_bits r{1}) 1 k1))%HTag <-
+        (GTag.from_bits (sub (to_bits r{1}) (k1 + 1) kg))%GTag ^
+        (GTag.from_bits (to_bits (snd x{1}) || zeros (kg - k0)))%GTag]).
+     wp;rnd;skip.
+     intros &1 &2 [H1 [H2 H3]];generalize H2 H1 => /=.
+     rewrite (eqT b{2}) /test_plain0;progress => //.
+     rewrite HTag.pcan_to_from;first smt.
+     rewrite GTag.pcan_to_from;first smt.
+     rewrite -H5.
+     rewrite (_: 
+       (sub (to_bits rL) 0 1 || sub (to_bits rL) 1 k1 || sub (to_bits rL) (k1 + 1) kg )=
+        to_bits rL).
+      rewrite (_ : k1 + 1 = 1 + k1);first smt.
+      rewrite sub_app_sub //; first 3 smt.
+      rewrite {2}(_: 1 = 0 + 1) // sub_app_sub //;smt.
+    rewrite Signature.can_from_to //.
+  skip;progress => //.
+  rewrite /test_plain0 Signature.pcan_to_from;first smt.
+  rewrite sub_app_fst_le //;first smt.
+  rewrite rw_eq_sym;apply eqT.
+  by rewrite -{2} (length_ones 1) // sub_full // (rw_eq_sym (ones 1));apply zeros_ones.
+  by generalize H2;rewrite (eqT (test_plain0 Hmem.pk{2} r_L)).
+  by generalize H2;rewrite (eqT (test_plain0 Hmem.pk{2} r_L)).
+  by generalize H2;rewrite (eqT (test_plain0 Hmem.pk{2} r_L)).
   qed.
 
   local lemma G4'_G5_abstract (Ga <: Gadv {H4',H5,G,Hmem}):
@@ -1143,7 +1235,7 @@ require import Sum.
   call Gt.Lazy.abstract_init.
   by rnd.
   qed.
-
+ 
   local equiv G4'_G5_equiv: G4'.main ~ G5.main: true ==> ={res}
   by (apply (G4'_G5_abstract GAdv); apply lossless_GAdv).
 
