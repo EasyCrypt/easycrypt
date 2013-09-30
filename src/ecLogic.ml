@@ -1,4 +1,3 @@
-(* -------------------------------------------------------------------- *)
 open EcLocation
 open EcUtils
 open EcMaps
@@ -11,11 +10,10 @@ open EcFol
 open EcBaseLogic
 open EcEnv
 open EcReduction
-open EcEctoField
 
 type pre_judgment = {
   pj_decl : LDecl.hyps * form;
-  pj_rule : (bool * int rule) option;
+  pj_rule : (bool * int rnode) option;
 }
 
 type judgment_uc = {
@@ -187,8 +185,9 @@ let t_seq_subgoal t lt g = t_subgoal lt (t g)
 
 let t_try_base t g =
   let rec is_user_error = function
-    | TacError (true, _) -> true
-    | LocError (_, e)    -> is_user_error e
+    | EcTyping.TyError  _ -> true
+    | TacError (true, _)  -> true
+    | LocError (_, e)     -> is_user_error e
     | _ -> false
   in
   try `Success (t g)
@@ -259,6 +258,16 @@ let get_hyps  g = fst (get_goal g)
 let get_concl g = snd (get_goal g)
 
 (* -------------------------------------------------------------------- *)
+let prove_goal_by sub_gs rule (juc,n as g) =
+  let hyps,_ = get_goal g in
+  let add_sgoal (juc,ns) sg = 
+    let juc,n = new_goal juc (hyps,sg) in juc, RA_node n::ns
+  in
+  let juc,ns = List.fold_left add_sgoal (juc,[]) sub_gs in
+  let rule = { pr_name = rule ; pr_hyps = List.rev ns} in
+  upd_rule rule (juc,n)
+
+(* -------------------------------------------------------------------- *)
 let tacerror = EcBaseLogic.tacerror 
 
 let tacuerror = EcBaseLogic.tacuerror
@@ -275,7 +284,7 @@ let t_subgoal lt gs =
       tacerror (InvalNumOfTactic (i1, i2))
 
 let t_admit g =
-  let rule = { pr_name = RN_admit; pr_hyps = [] } in
+  let rule = { pr_name = RN_admit; pr_hyps = []; } in
   upd_rule_done rule g
 
 let check_hyps hyps1 hyps2 =
@@ -322,7 +331,7 @@ let t_simplify_nodelta g =
 let mkn_hyp juc hyps id =
   let f = LDecl.lookup_hyp_by_id id hyps in
   let juc,n = new_goal juc (hyps,f) in
-  let rule = { pr_name = RN_hyp id; pr_hyps = [] } in
+  let rule = { pr_name = RN_hypothesis id; pr_hyps = [] } in
   let juc, _ = upd_rule_done rule (juc,n) in
   juc, n
 
@@ -334,7 +343,7 @@ let t_hyp id (juc,n as g) =
 let mkn_glob juc hyps p tys =
   let f = Ax.instanciate p tys (LDecl.toenv hyps) in
   let juc, n = new_goal juc (hyps,f) in
-  let rule = { pr_name = RN_glob(p,tys); pr_hyps = [] } in
+  let rule = { pr_name = RN_lemma (p, tys); pr_hyps = [] } in
   let juc, _ = upd_rule_done rule (juc, n) in
   juc, n
 
@@ -356,7 +365,7 @@ let t_smt ~strict ~usehyps pi g =
     | _ ->
         try
           if EcEnv.check_goal ~usehyps pi goal then
-            let rule = { pr_name = RN_prover (); pr_hyps = [] } in
+            let rule = { pr_name = RN_smt; pr_hyps = [] } in
             upd_rule_done rule g
           else error "cannot prove goal"
         with EcWhy3.CanNotTranslate _ ->
@@ -378,13 +387,14 @@ let t_clear ids (juc,n as g) =
       tacuerror "Cannot clear %a it is used in %a"
         pp_id id1 pp_id id2 in
   let juc,n1 = new_goal juc (hyps,concl) in
-  let rule = { pr_name = RN_clear ids; pr_hyps = [RA_node n1] } in
+  let rule = { pr_name = RN_weak ids; pr_hyps = [RA_node n1] } in
   upd_rule rule (juc,n)
 
 let gen_check_restr env pp_a a use restr =
   let restr = NormMp.norm_restr env restr in 
   let ppe = EcPrinting.PPEnv.ofenv env in
   let pp_mp = EcPrinting.pp_topmod ppe in
+
   let check_xp xp _ = 
     (* We check that the variable is not a variable in restr *)
     if NormMp.use_mem_xp xp restr then
@@ -407,18 +417,25 @@ let gen_check_restr env pp_a a use restr =
         (pp_a ppe) a pp_mp mp1
     else 
       let r1 = NormMp.get_restr env mp1 in
-      let check id2 = 
+      let check_v xp2 _ = 
+        if not (NormMp.use_mem_xp xp2 r1) then
+          tacuerror "%a should not be able to use %a (add restriction %a to %a)"
+           (pp_a ppe) a 
+           (EcPrinting.pp_pv ppe) (pv_glob xp2)
+           pp_mp xp2.x_top pp_mp mp1  in
+      Mx.iter check_v restr.NormMp.us_pv;
+                    
+      let check_g id2 = 
         let mp2 = EcPath.mident id2 in
         if not (NormMp.use_mem_gl mp2 r1) then
           let r2 = NormMp.get_restr env mp2 in
           if not (NormMp.use_mem_gl mp1 r2) then
             tacuerror 
-              "%a, using %a, should not use %a; add restriction %a to %a or %a to %a"
+              "%a should not use %a; add restriction %a to %a or %a to %a"
             (pp_a ppe) a pp_mp mp1 pp_mp mp2 
             pp_mp mp1 pp_mp mp2 pp_mp mp2 pp_mp mp1 in
-      EcIdent.Sid.iter check restr.NormMp.us_gl in
+      EcIdent.Sid.iter check_g restr.NormMp.us_gl in
   EcIdent.Sid.iter check_gl use.NormMp.us_gl
-
 
 let check_restr env mp restr = 
   let use = NormMp.mod_use env mp in
@@ -654,7 +671,7 @@ let t_intros ids (juc,n as g) =
   let hyps, concl = check_intros hyps ids Fsubst.f_subst_id concl in
   let (juc,n1) = new_goal juc (hyps,concl) in
   let ids = List.map unloc ids in
-  let rule = { pr_name = RN_intros ids; pr_hyps = [RA_node n1]} in
+  let rule = { pr_name = RN_intro (`Raw ids); pr_hyps = [RA_node n1]} in
   upd_rule rule (juc,n)
 
 (* internal use *)
@@ -700,6 +717,8 @@ let t_transitivity f g =
        @ (List.create 2 AAnode))
       g
 
+let t_true g = t_apply_logic p_true_intro [] [] g
+  
 (* Use to create two set of vars of a list of types*)
 let parseType create types =
   let parse ty =
@@ -749,7 +768,7 @@ let gen_eq_tuple_elim_proof types =
       ((
         t_lseq [t_rewrite_hyp `RtoL h1 [];
         t_apply_hyp h2 [];
-        t_apply_logic p_true_intro [] []]
+        t_true]
       )::(List.map (fun _ -> t_reflex ~reduce:false) types))
   ]
   
@@ -806,7 +825,7 @@ let t_elim f (juc,n) =
     | Fquant(Lexists,bd,f') ->
       let juc,n1 = new_goal juc (hyps, f) in
       let juc,n2 = new_goal juc (hyps,f_forall bd (f_imp f' concl)) in
-      let rule = { pr_name = RN_exists_elim; pr_hyps = [RA_node n1; RA_node n2] } in
+      let rule = { pr_name = RN_elim `Exist; pr_hyps = [RA_node n1; RA_node n2] } in
       upd_rule rule (juc, n)
     | _ -> aux_red f
 
@@ -887,7 +906,9 @@ let t_generalize_hyps ids g =
         f_forall [x,GTmodty(mt,r)] ff, AAmp(mp,sig_) :: args, lt 
       | LD_hyp f ->
         let ff, args, lt = aux s ids in
-        f_imp f ff, AAnode :: args, t_hyp id :: lt in
+        f_imp f ff, AAnode :: args, t_hyp id :: lt
+      | LD_abs_st _ -> 
+        tacuerror "can not generalize abstract statement" in
   let ff, args, lt = aux Fsubst.f_subst_id ids in
   t_seq_subgoal (t_apply_form ff args) (t_id None :: lt) g
 
@@ -975,26 +996,6 @@ let t_case f g =
   check_logic (LDecl.toenv (get_hyps g)) p_case_eq_bool;
   t_elimT [] p_case_eq_bool f 0 g
 
-let prove_goal_by sub_gs rule (juc,n as g) =
-  let hyps,_ = get_goal g in
-  let add_sgoal (juc,ns) sg = 
-    let juc,n = new_goal juc (hyps,sg) in juc, RA_node n::ns
-  in
-  let juc,ns = List.fold_left add_sgoal (juc,[]) sub_gs in
-  let rule = { pr_name = rule ; pr_hyps = List.rev ns} in
-  upd_rule rule (juc,n)
-
-let t_field (plus,times,inv,minus,z,o,eq) (t1,t2) g =
-	let (pzs,pbs) = appfield (t1, t2) plus minus times inv z o in
-	let pzs' = List.fold_left (fun is i -> (f_not (mk_form (Fapp (eq, [i;z])) tbool)) :: is) [] pzs in
-	let pbs' = List.fold_left (fun is (l,r) -> (mk_form (Fapp(eq, l :: r :: [])) tbool) :: is) [] pbs in
-	prove_goal_by (pzs' @ pbs') RN_field g
-
-let t_field_simp (plus,times,inv,minus,z,o,eq) t1 g =
-	let (pzs,res) = appfield_simp t1 plus minus times inv z o in
-	let pzs' = List.fold_left (fun is i -> (f_not (mk_form (Fapp (eq, [i;z])) tbool)) :: is) [] pzs in
-	prove_goal_by (res :: pzs') RN_field g
-
 let gen_t_exists do_arg fs (juc,n as g) =
   let hyps,concl = get_goal g in
   let rec aux s ras fs concl =
@@ -1016,19 +1017,16 @@ let gen_t_exists do_arg fs (juc,n as g) =
   let args,concl = aux Fsubst.f_subst_id [] fs concl in
   let (juc,n1) = new_goal juc (hyps,concl) in
   let rule =
-    {pr_name = RN_exists_intro; pr_hyps = List.rev_append args [RA_node n1] } in
+    {pr_name = RN_intro `Exist; pr_hyps = List.rev_append args [RA_node n1] } in
   upd_rule rule (juc,n)
 
 let t_exists = gen_t_exists (fun _ _ a -> a)
 
 let t_split g =
   let hyps, concl = get_goal g in
-  let env0 = LDecl.toenv hyps in
   let rec aux f =
     match f.f_node with
-    | Fop(p,_) when EcPath.p_equal p p_true ->
-      check_logic env0 p_true_intro;
-      t_glob p_true_intro [] g
+    | Fop(p,_) when EcPath.p_equal p p_true -> t_true g 
     | Fapp({f_node = Fop(p,_)}, [f1;f2]) ->
       begin
         match op_kind p with
@@ -1209,6 +1207,19 @@ let t_subst1_pv fx g =
       | _ -> aux l in
   aux (LDecl.tohyps hyps).h_local 
 
+let t_subst1_id h g =
+  let hyps = get_hyps g in
+  let k = LDecl.lookup_by_id h hyps in
+  let error () = tacuerror "cannot find something to subst" in
+  match is_subst_eq hyps None (h,k) with
+  | Some(h,x,side) -> t_subst_gen x h side g
+  | _ ->
+    match is_subst_pv_eq hyps None (h,k) with
+    | Some(h, _x, side) ->
+      (try t_subst_pv_gen h side g with 
+        EcPV.MemoryClash -> error ())
+    | _ -> error() 
+
 let t_subst1 fx g = 
   match fx with
   | None -> t_or (t_subst1_loc None) (t_subst1_pv None) g
@@ -1221,23 +1232,29 @@ let t_subst1 fx g =
 let t_subst_all =
   t_repeat (t_subst1 None)
 
-let find_in_hyps f hyps =
-  let test k =
-    try
-      let _, f' = LDecl.get_hyp k in
-      check_conv hyps f f'; true
-    with _ -> false in
+let gen_find_in_hyps eq f hyps = 
+  let test (_,lk) = 
+    match lk with
+    | LD_hyp f' -> eq hyps f f'
+    | _ -> false in
   fst (List.find test (LDecl.tohyps hyps).h_local)
 
+let find_in_hyps f hyps = gen_find_in_hyps is_conv f hyps
+
+let t_gen_assumption eq g =
+  let (hyps,concl) = get_goal g in
+  let h = 
+    try gen_find_in_hyps eq concl hyps 
+    with Not_found -> tacuerror "no assumption" in
+  t_hyp h g
+      
+let t_alpha_assumption g = t_gen_assumption is_alpha_eq g
+
 let t_assumption g = 
-  let (hyps, concl) = get_goal g in
-  let myh =
-    try  find_in_hyps concl hyps
-    with Not_found -> tacuerror "no assumption"
-  in
-    t_hyp myh g
+  t_or t_alpha_assumption (t_gen_assumption is_conv) g
     
 let t_progress tac g =
+  let tac = t_or t_alpha_assumption tac in
   let rec aux g = t_seq t_simplify_nodelta aux0 g 
   and aux0 g =
     t_seq (t_try tac) aux1 g
@@ -1247,29 +1264,31 @@ let t_progress tac g =
     | Fquant(Lforall,bd,_) ->
       let ids = 
         LDecl.fresh_ids hyps (List.map (fun (id,_) -> EcIdent.name id) bd) in
-      t_seq (t_intros_i ids) aux g
+      t_seq (t_intros_i ids) aux0 g
     | Flet (LTuple fs,f1,_) ->
       let p = p_tuple_ind (List.length fs) in
-      t_seq (t_elimT (List.map snd fs) p f1 0) aux g
+      t_seq (t_elimT (List.map snd fs) p f1 0) aux0 g
     | Fapp({f_node = Fop(p,_)}, [f1;_]) when EcPath.p_equal p EcCoreLib.p_imp ->
       let id = LDecl.fresh_id hyps "H" in
       t_seq (t_intros_i [id]) (aux2 id f1) g
-    | _ -> t_try (t_seq t_split aux) g
+    | _ -> t_try (t_seq t_split aux0) g
   and aux2 id f g = 
-    let t1 = 
+    let t1,aux = 
       match f.f_node with
-      | Fop(p,_) when EcPath.p_equal p p_false -> t_elim_hyp id
+      | Fop(p,_) when EcPath.p_equal p p_false -> t_elim_hyp id, aux
       | Fapp({f_node = Fop(p,_)}, [_;_] ) when is_op_and p -> 
-        t_seq (t_elim_hyp id) (t_clear (Sid.singleton id)) 
+        t_seq (t_elim_hyp id) (t_clear (Sid.singleton id)),
+        aux0
       | Fquant(Lexists,_,_) -> 
-        t_seq (t_elim_hyp id) (t_clear (Sid.singleton id))
+        t_seq (t_elim_hyp id) (t_clear (Sid.singleton id)),
+        aux0
       | _ when is_eq f -> 
         let f1, f2 = destr_eq f in
         if is_tuple f1 && is_tuple f2 then 
-          t_seq (t_elim_hyp id) (t_clear (Sid.singleton id))
-        else t_subst_all 
+          t_seq (t_elim_hyp id) (t_clear (Sid.singleton id)), aux0
+        else t_try (t_subst1_id id), aux 
           
-      | _ -> t_subst_all (* FIXME should allows to subst a given hyps *) in
+      | _ -> t_try (t_subst1_id id), aux in
     t_seq t1 aux g in
   aux g
 
@@ -1306,7 +1325,9 @@ let t_congr f (args, ty) g =
 
 
 (* -------------------------------------------------------------------- *)
-let t_trivial =
-  t_or
-    (t_lseq [t_try t_assumption; t_progress (t_id None); t_assumption; t_fail])
-    (t_id None)
+let t_logic_trivial =
+  t_try
+    (t_lseq [t_try t_assumption;
+             t_progress (t_id None);
+             t_assumption;
+             t_fail])

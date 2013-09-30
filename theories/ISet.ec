@@ -226,6 +226,19 @@ by apply set_ext=> a;
    rewrite mem_filter mem_rm mem_filter mem_rm.
 qed.
 
+(** create *)
+op create: 'a cpred -> 'a set.
+
+axiom mem_create (x:'a) p:
+  mem x (create p) <=> p x.
+
+lemma create_def (p:'a cpred):
+  create p = filter p univ.
+proof strict.
+by apply set_ext=> x;
+   rewrite mem_filter mem_univ /= mem_create.
+qed.
+
 theory Finite.
   require        FSet.
 
@@ -235,22 +248,19 @@ theory Finite.
   pred finite (X:'a set) = exists (X':'a FSet.set), X == X'.
 
   op toFSet: 'a set -> 'a FSet.set.
-  axiom toFSet_cor: forall (X:'a set),
+  axiom toFSet_cor (X:'a set):
     finite X => X == toFSet X.
 
   op fromFSet: 'a FSet.set -> 'a set.
-  axiom fromFSet_cor: forall (X:'a FSet.set),
+  axiom fromFSet_cor (X:'a FSet.set):
     fromFSet X == X.
 
-  lemma mem_toFSet : forall (x:'a) X, finite X =>
+  lemma mem_toFSet (x:'a) X: finite X =>
     FSet.mem x (toFSet X) <=> mem x X.
   proof strict.
-  intros x X h.
-  rewrite -rw_eq_iff rw_eq_sym rw_eq_iff.
-  generalize x.
-  change (X == (toFSet X)).
-  apply toFSet_cor.
-  assumption.
+  intros=> fX; rewrite -rw_eq_iff rw_eq_sym rw_eq_iff.
+  generalize x; rewrite -/(Finite.(==) X _).
+  by apply toFSet_cor.
   qed.
 
   lemma finite_fromFSet: forall (X:'a FSet.set),
@@ -262,44 +272,55 @@ theory Finite.
     toFSet X = toFSet Y => X = Y.
   proof strict.
   by intros=> X Y fX fY eq_toFSet; apply set_ext=> x;
-     rewrite 2?toFSet_cor // eq_toFSet //.
+     rewrite 2?toFSet_cor ?eq_toFSet.
   qed.
 
   lemma fromFSetI: forall (X Y:'a FSet.set),
     fromFSet X = fromFSet Y => X = Y.
   proof strict.
   by intros=> X Y eq_fromFSet; apply FSet.set_ext=> x;
-     rewrite -2!fromFSet_cor eq_fromFSet //.
+     rewrite -2!fromFSet_cor eq_fromFSet.
   qed.
 
   lemma toFSet_fromFSet: forall (X:'a FSet.set),
     toFSet (fromFSet X) = X.
   proof strict.
   by intros=> X; apply FSet.set_ext=> x;
-     rewrite -toFSet_cor ?fromFSet_cor //; apply finite_fromFSet.
+     rewrite -toFSet_cor ?fromFSet_cor ?finite_fromFSet.
   qed.
 
   lemma fromFSet_toFSet: forall (X:'a set),
     finite X =>
     fromFSet (toFSet X) = X.
   proof strict.
-  by intros=> X fX; apply set_ext=> x;
-     rewrite fromFSet_cor toFSet_cor //.
+  by intros=> X fX; apply set_ext=> x; rewrite fromFSet_cor toFSet_cor.
   qed.
 
   (* We should then show that all set operations correspond as expected *)
+  lemma finite_empty: finite empty<:'a>.
+  proof strict.
+  exists FSet.empty=> x. 
+  rewrite (neqF (mem x empty)); first by rewrite mem_empty.
+  by rewrite (neqF (FSet.mem x (FSet.empty))) ?FSet.mem_empty.
+  qed.
+
+  lemma toFSet_empty: toFSet empty<:'a> = FSet.empty.
+  proof strict.
+  by apply FSet.set_ext; smt.
+  qed.
+
+  lemma finite_add (X :'a set) x: finite X => finite (add x X).
+  proof strict.
+  intros=> [Y X_Y].
+  exists (FSet.add x Y)=> y.
+  by rewrite FSet.mem_add mem_add  X_Y.
+  qed.
+
+  lemma add_morph (X :'a set) x:
+    finite X => toFSet (add x X) = FSet.add x (toFSet X).
+  proof strict.
+  intros=> fX; apply FSet.set_ext=> y.
+  rewrite (mem_toFSet y (add x X)) ?finite_add //.
+  by rewrite FSet.mem_add mem_add (mem_toFSet y X).
+  qed.
 end Finite.
-
-op create: 'a cpred -> 'a set.
-axiom mem_create (x:'a) p:
-  mem x (create p) <=> p x.
-
-lemma create_def (p:'a cpred):
-  create p = filter p univ.
-proof strict.
-by apply set_ext=> x; rewrite mem_filter mem_univ /=;
-   apply mem_create.
-qed.
-
-require Distr.
-op support (d:'a distr) = create (lambda x, Distr.in_supp x d).

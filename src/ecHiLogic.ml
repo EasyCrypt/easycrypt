@@ -13,7 +13,7 @@ open EcMetaProg
 open EcBaseLogic
 open EcEnv
 open EcLogic
-open EcPhl
+open EcCoreHiLogic
 
 module Sp = EcPath.Sp
 
@@ -79,7 +79,7 @@ let _ = EcPException.register (fun fmt exn ->
 let error loc e = EcLocation.locate_error loc (TacError e)
 
 (* -------------------------------------------------------------------- *)
-let process_trivial = EcPhl.t_trivial
+let process_trivial = EcPhlTrivial.t_trivial
 
 (* -------------------------------------------------------------------- *)
 let process_done g =
@@ -106,15 +106,6 @@ let process_congr g =
     t_congr f1 ([], f1.f_ty) g
 
   | _, _ -> tacuerror "congr: no congruence"
-
-(* -------------------------------------------------------------------- *)
-let unienv_of_hyps hyps =
-  EcUnify.UniEnv.create (Some (LDecl.tohyps hyps).h_tvar)
-
-(* -------------------------------------------------------------------- *)
-let process_tyargs hyps tvi =
-  let ue = unienv_of_hyps hyps in
-    omap (TT.transtvi (LDecl.toenv hyps) ue) tvi
 
 (* -------------------------------------------------------------------- *)
 let process_instanciate hyps ({pl_desc = pq; pl_loc = loc} ,tvi) =
@@ -146,16 +137,12 @@ let process_global loc tvi g =
 
 (* -------------------------------------------------------------------- *)
 let process_assumption loc (pq, tvi) g =
-  let hyps,concl = get_goal g in
   match pq with
   | None ->
       if (tvi <> None) then error loc BadTyinstance;
-      let h  =
-        try  find_in_hyps concl hyps
-        with Not_found -> tacuerror "no assumptions"
-      in
-      t_hyp h g
+      t_assumption g
   | Some pq ->
+    let hyps = get_hyps g in
       match unloc pq with
       | ([],ps) when LDecl.has_hyp ps hyps ->
           if (tvi <> None) then error pq.pl_loc BadTyinstance;
@@ -165,20 +152,6 @@ let process_assumption loc (pq, tvi) g =
 (* -------------------------------------------------------------------- *)
 let process_reflexivity loc g =
   set_loc loc EcLogic.t_reflex g
-
-(* -------------------------------------------------------------------- *)
-let process_form_opt hyps pf oty =
-  let ue  = unienv_of_hyps hyps in
-  let ff  = TT.trans_form_opt (LDecl.toenv hyps) ue pf oty in
-  EcFol.Fsubst.uni (EcUnify.UniEnv.close ue) ff
-
-(* -------------------------------------------------------------------- *)
-let process_form hyps pf ty =
-  process_form_opt hyps pf (Some ty)
-
-(* -------------------------------------------------------------------- *)
-let process_formula hyps pf =
-  process_form hyps pf tbool
 
 (* -------------------------------------------------------------------- *)
 let process_smt hitenv (db, pi) g =
@@ -250,101 +223,6 @@ let process_subst loc ri g =
     set_loc loc (t_lseq tacs) g
 
 (* -------------------------------------------------------------------- *)
-let process_field (p,t,i,m,z,o,e) g =
-  let (hyps,concl) = get_goal g in
-    (match concl.f_node with
-      | Fapp(eq',[arg1;arg2]) ->
-        let ty = f_ty arg1 in
-        let eq = process_form hyps e (tfun ty (tfun ty tbool)) in
-        if (f_equal eq eq' ) then
-          let p' = process_form hyps p (tfun ty (tfun ty ty)) in 
-          let t' = process_form hyps t (tfun ty (tfun ty ty)) in 
-          let i' = process_form hyps i (tfun ty ty) in 
-          let m' = process_form hyps m (tfun ty ty) in 
-          let z' = process_form hyps z ty in 
-          let o' = process_form hyps o ty in 
-          t_field (p',t',i',m',z',o',eq) (arg1,arg2) g
-        else
-          cannot_apply "field" "the eq doesn't coincide"
-      | _ -> cannot_apply "field" "Think more about the goal")
-
-let process_field_simp (p,t,i,m,z,o,e) g =
-  let (hyps,concl) = get_goal g in
-    (match concl.f_node with
-      | Fapp(_,arg1 :: _) ->
-        let ty = f_ty arg1 in
-        let e' = process_form hyps e (tfun ty (tfun ty tbool)) in 
-        let p' = process_form hyps p (tfun ty (tfun ty ty)) in 
-        let t' = process_form hyps t (tfun ty (tfun ty ty)) in 
-        let i' = process_form hyps i (tfun ty ty) in 
-        let m' = process_form hyps m (tfun ty ty) in 
-        let z' = process_form hyps z ty in 
-        let o' = process_form hyps o ty in 
-        t_field_simp (p',t',i',m',z',o',e') concl g
-      | _ -> cannot_apply "field_simplify" "Think more about the goal")
-
-(* -------------------------------------------------------------------- *)
-let rec pmsymbol_of_pform fp : pmsymbol option =
-  match unloc fp with
-  | PFident ({ pl_desc = (nm, x); pl_loc = loc }, _) when EcIo.is_mod_ident x ->
-      Some (List.map (fun nm1 -> (mk_loc loc nm1, None)) (nm @ [x]))
-
-  | PFapp ({ pl_desc = PFident ({ pl_desc = (nm, x); pl_loc = loc }, _) },
-           [{ pl_desc = PFtuple args; }]) -> begin
-
-    let mod_ = List.map (fun nm1 -> (mk_loc loc nm1, None)) nm in
-    let args =
-      List.map
-        (fun a -> pmsymbol_of_pform a |> omap (mk_loc a.pl_loc))
-        args
-    in
-
-      match List.exists (fun x -> x = None) args with
-      | true  -> None
-      | false ->
-          let args = List.map (fun a -> oget a) args in
-            Some (mod_ @ [mk_loc loc x, Some args])
-  end
-
-  | PFtuple [fp] -> pmsymbol_of_pform fp
-
-  | _ -> None
-
-let trans_pterm_argument hyps ue arg =
-  let env = LDecl.toenv hyps in
-
-  match unloc arg with
-  | EA_form fp -> begin
-      let ff =
-        try  `Form (TT.trans_form_opt env ue fp None)
-        with TT.TyError _ as e -> `Error e
-      in
-
-      let mm =
-        match pmsymbol_of_pform fp with
-        | None    -> `Error None
-        | Some mp ->
-            try
-              let (mp, mt) = TT.trans_msymbol env (mk_loc arg.pl_loc mp) in
-                `Mod (mp, mt)
-            with TT.TyError _ as e -> `Error (Some e)
-      in
-
-      match ff, mm with
-      | `Error e, `Error _ -> raise e
-      | `Form  f, `Mod   m -> Some (`FormOrMod (Some f, Some m))
-      | `Form  f, `Error _ -> Some (`FormOrMod (Some f, None  ))
-      | `Error _, `Mod   m -> Some (`FormOrMod (None  , Some m))
-  end
-      
-  | EA_mem mem ->
-      let mem = TT.transmem env mem in
-        Some (`Memory mem)
-
-  | EA_none ->
-      None
-
-(* -------------------------------------------------------------------- *)
 exception RwMatchFound of EcUnify.unienv * ty EcUidgen.Muid.t * form evmap
 
 let try_match hyps (ue, ev) p form =
@@ -361,217 +239,6 @@ let try_match hyps (ue, ev) p form =
   try
     ignore (FPosition.select trymatch form); None
   with RwMatchFound (ue, tue, ev) -> Some (ue, tue, ev)
-
-(* -------------------------------------------------------------------- *)
-let process_named_pterm _loc hyps (fp, tvi) =
-  let env = LDecl.toenv hyps in
-
-  let (p, typ, ax) =
-    match unloc fp with
-    | ([], x) when LDecl.has_hyp x hyps ->
-        let (x, fp) = LDecl.lookup_hyp x hyps in
-          (`Local x, [], fp)
-
-    | _ -> begin
-      match EcEnv.Ax.lookup_opt (unloc fp) env with
-      | Some (p, ({ EcDecl.ax_spec = Some fp } as ax)) ->
-          (`Global p, ax.EcDecl.ax_tparams, fp)
-
-      | _ -> tacuerror "cannot find lemma %s" (string_of_qsymbol (unloc fp))
-    end
-  in
-
-  let ue  = unienv_of_hyps hyps in
-  let tvi = omap (TT.transtvi env ue) tvi in
-
-  begin
-    match tvi with
-    | None -> ()
-
-    | Some (EcUnify.UniEnv.TVIunamed tyargs) ->
-        if List.length tyargs <> List.length typ then
-          tacuerror
-            "wrong number of type parameters (%d, expecting %d)"
-            (List.length tyargs) (List.length typ)
-
-    | Some (EcUnify.UniEnv.TVInamed tyargs) ->
-        let typnames = List.map EcIdent.name typ in
-
-        List.iter
-          (fun (x, _) ->
-             if not (List.mem x typnames) then
-               tacuerror "unknown type variable: %s" x)
-          tyargs
-  end;
-
-  let fs  = EcUnify.UniEnv.freshen_ue ue typ tvi in
-  let ax  = Fsubst.subst_tvar fs ax in
-  let typ = List.map (fun a -> EcIdent.Mid.find a fs) typ in
-
-    (p, typ, ue, ax)
-
-(* -------------------------------------------------------------------- *)
-let process_pterm loc prcut hyps pe =
-  match pe.fp_kind with
-  | FPNamed (fp, tyargs) ->
-      process_named_pterm loc hyps (fp, tyargs)
-
-  | FPCut fp ->
-      let fp = prcut fp in
-      let ue = unienv_of_hyps hyps in
-        (`Cut fp, [], ue, fp)
-
-(* -------------------------------------------------------------------- *)
-let check_pterm_arg_for_ty hyps ty arg =
-  let ue  = unienv_of_hyps hyps in
-  let env = LDecl.toenv hyps in
-
-  let error () = 
-    tacuerror ~loc:arg.pl_loc "invalid argument type"
-  in
-
-  match arg.pl_desc, ty with
-  | EA_form pf, Some (GTty ty) ->
-      let ff = TT.trans_form env ue pf ty in
-        AAform (EcFol.Fsubst.uni (EcUnify.UniEnv.close ue) ff)
-
-  | EA_mem mem, Some (GTmem _) ->
-      AAmem (TT.transmem env mem)
-
-  | EA_none, None ->
-      AAnode
-
-  | EA_form fp, Some (GTmodty _) -> begin
-    match pmsymbol_of_pform fp with
-    | None    -> error ()
-    | Some mp ->
-        let (mp, mt) = TT.trans_msymbol env (mk_loc arg.pl_loc mp) in
-          AAmp (mp, mt)
-  end
-
-  | _, _ -> error ()
-
-(* -------------------------------------------------------------------- *)
-let check_pterm_argument hyps ue f arg =
-  let env = LDecl.toenv hyps in
-
-  let invalid_arg () = tacuerror "wrongly applied lemma" in
-
-  match arg, destruct_product hyps f with
-  | None, Some (`Imp (f1, f2)) ->
-      (f2, `SideCond f1)
-
-  | None, Some (`Forall (x, gty, f)) -> begin
-      match gty with
-      | GTmodty _  -> tacuerror "cannot infer module"
-      | GTmem   _  -> tacuerror "cannot infer memory"
-      | GTty    ty -> (f, `UnknownVar (x, ty))
-  end
-
-  | Some (`FormOrMod (Some tp, _)),
-    Some (`Forall (x, GTty ty, f)) -> begin
-      try
-        EcUnify.unify env ue tp.f_ty ty;
-        (Fsubst.f_subst_local x tp f, `KnownVar (x, tp))
-      with EcUnify.UnificationFailure _ ->
-        invalid_arg ()
-  end
-
-  | Some (`Memory m),
-    Some (`Forall (x, GTmem _, f)) ->
-      (Fsubst.f_subst_mem x m f, `KnownMem (x, m))
-
-  | Some (`FormOrMod (_, Some (mp, mt))),
-    Some (`Forall (x, GTmodty (emt, restr), f)) ->
-      check_modtype_restr env mp mt emt restr;
-      (Fsubst.f_subst_mod x mp f, `KnownMod (x, (mp, mt)))
-
-  | _, _ -> invalid_arg ()
-
-(* -------------------------------------------------------------------- *)
-let check_pterm_arguments hyps ue ax args =
-  let (ax, ids) = List.map_fold (check_pterm_argument hyps ue) ax args in
-    (ax, List.rev ids)
-
-(* -------------------------------------------------------------------- *)
-let can_concretize_pterm_arguments (tue, ev) ids =
-  let is_known_id = function
-    | `UnknownVar (x, _) -> begin
-      match EV.get x ev with Some (`Set _) -> true | _ -> false
-    end
-    | _ -> true
-  in
-     EcUnify.UniEnv.closed tue && List.for_all is_known_id ids
-
-(* -------------------------------------------------------------------- *)
-let evmap_of_pterm_arguments ids =
-  let forid id ev =
-    match id with
-    | `UnknownVar (x, _) -> EV.add x ev
-    | _ -> ev
-  in
-    List.fold_right forid ids EV.empty
-
-(* -------------------------------------------------------------------- *)
-let concretize_pterm_arguments (tue, ev) ids =
-  let do1 = function
-    | `KnownMod   (_, (mp, mt)) -> EcLogic.AAmp   (mp, mt)
-    | `KnownMem   (_, mem)      -> EcLogic.AAmem  mem
-    | `KnownVar   (_, tp)       -> EcLogic.AAform (Fsubst.uni tue tp)
-    | `SideCond   _             -> EcLogic.AAnode
-    | `UnknownVar (x, _)        -> EcLogic.AAform (Fsubst.uni tue (EV.doget x ev))
-  in
-    List.rev (List.map do1 ids)
-
-(* -------------------------------------------------------------------- *)
-let concretize_form (tue, ev) f =
-  let s = { ty_subst_id with ts_u = EcUidgen.Muid.find_opt^~ tue } in
-  let s = Fsubst.f_subst_init false Mid.empty s in
-  let s = EV.fold (fun x f s -> Fsubst.f_bind_local s x f) ev s in
-    Fsubst.f_subst s f
-
-(* -------------------------------------------------------------------- *)
-let concretize_pterm (tue, ev) ids fp =
-  let subst =
-    List.fold_left
-      (fun subst id ->
-        match id with
-        | `KnownMod (x, (mp, _)) -> Fsubst.f_bind_mod   subst x mp
-        | `KnownMem (x, mem)     -> Fsubst.f_bind_mem   subst x mem
-        | `KnownVar (x, tp)      -> Fsubst.f_bind_local subst x (Fsubst.uni tue tp)
-        | `UnknownVar (x, _)     -> Fsubst.f_bind_local subst x (Fsubst.uni tue (EV.doget x ev))
-        | `SideCond _            -> subst)
-      Fsubst.f_subst_id ids
-  in
-    Fsubst.f_subst subst (Fsubst.uni tue fp)
-
-(* -------------------------------------------------------------------- *)
-let process_mkn_apply prcut pe ((juc, _) as g) = 
-  let hyps = get_hyps g in
-
-  let (p, typs, ue, ax) = process_pterm _dummy prcut hyps pe in
-  let args = List.map (trans_pterm_argument hyps ue) pe.fp_args in
-  let (_ax, ids) = check_pterm_arguments hyps ue ax args in
-
-  let (tue, ev) =
-    if not (can_concretize_pterm_arguments (ue, EV.empty) ids) then
-      tacuerror "cannot find instance";
-    (EcUnify.UniEnv.close ue, EV.empty)
-  in
-
-  let args = concretize_pterm_arguments (tue, ev) ids in
-  let typs = List.map (Tuni.subst tue) typs in
-
-  let ((juc, fn), fgs) =
-    match p with
-    | `Local  x -> (mkn_hyp  juc hyps x, [])
-    | `Global x -> (mkn_glob juc hyps x typs, [])
-    | `Cut    x -> let (juc, fn) = new_goal juc (hyps, x) in ((juc, fn), [fn])
-  in
-
-  let (juc, an), ags = mkn_apply (fun _ _ a -> a) (juc, fn) args in
-
-    ((juc, an), fgs @ ags)
 
 (* -------------------------------------------------------------------- *)
 let process_apply loc pe g =
@@ -996,7 +663,6 @@ let process_cutdef loc ip cd g =
       match p with
       | `Global p -> gen_t_apply_glob (fun _ _ x -> x) p typs args g
       | `Local  x -> gen_t_apply_hyp  (fun _ _ x -> x) x args g
-      | `Cut    _ -> assert false
     in
       t_on_first tt g
   in
@@ -1151,6 +817,57 @@ let process_elimT loc (pf, qs) g =
     (t_simplify EcReduction.beta_red) g
 
 (* -------------------------------------------------------------------- *)
+let process_algebra mode kind eqs g =
+  let (env, hyps, concl) = get_goal_e g in
+
+  if not (EcAlgTactic.is_module_loaded env) then
+    tacuerror "ring/field cannot be used when AlgTactic is not loaded";
+
+  let (ty, f1, f2) =
+    match sform_of_form concl with
+    | SFeq (f1, f2) -> (f1.f_ty, f1, f2)
+    | _ -> tacuerror "conclusion must be an equation"
+  in
+
+  let eqs =
+    let eq1 { pl_desc = x } =
+      match LDecl.has_hyp x hyps with
+      | false -> tacuerror "cannot find equation referenced by `%s'" x
+      | true  -> begin
+        match sform_of_form (snd (LDecl.lookup_hyp x hyps)) with
+        | SFeq (f1, f2) ->
+            if not (EcReduction.equal_type env ty f1.f_ty) then
+              tacuerror "assumption `%s' is not an equation over the right type" x;
+            (f1, f2)
+        | _ -> tacuerror "assumption `%s' is not an equation" x
+      end
+    in List.map eq1 eqs
+  in
+
+  let tactic =
+    match
+      match mode, kind with
+      | `Simpl, `Ring  -> `Ring  EcAlgTactic.t_ring_simplify
+      | `Simpl, `Field -> `Field EcAlgTactic.t_field_simplify
+      | `Solve, `Ring  -> `Ring  EcAlgTactic.t_ring
+      | `Solve, `Field -> `Field EcAlgTactic.t_field
+    with
+    | `Ring t ->
+        let r =
+          match EcEnv.Algebra.get_ring ty env with
+          | None   -> tacuerror "cannot find a ring structure"
+          | Some r -> r
+        in t r eqs (f1, f2)
+    | `Field t ->
+        let r =
+          match EcEnv.Algebra.get_field ty env with
+          | None   -> tacuerror "cannot find a field structure"
+          | Some r -> r
+        in t r eqs (f1, f2)
+  in
+    tactic g
+
+(* -------------------------------------------------------------------- *)
 let process_logic (engine, hitenv) loc t =
   match t with
   | Preflexivity   -> process_reflexivity loc
@@ -1158,8 +875,8 @@ let process_logic (engine, hitenv) loc t =
   | Psmt pi        -> process_smt hitenv pi
   | Pintro pi      -> process_intros pi
   | Psplit         -> t_split
-  | Pfield st      -> process_field st
-  | Pfieldsimp st  -> process_field_simp st
+  | Pfield st      -> process_algebra `Solve `Field st
+  | Pring st       -> process_algebra `Solve `Ring  st
   | Pexists fs     -> process_exists fs
   | Pleft          -> t_left
   | Pright         -> t_right

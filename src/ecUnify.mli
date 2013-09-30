@@ -23,7 +23,6 @@ module UniEnv : sig
   val get_var    : unienv -> string -> EcIdent.t 
   val bind       : unienv -> uid -> ty -> unit
   val repr       : unienv -> ty -> ty
-  val dump       : EcDebug.ppdebug -> unienv -> unit
   val freshen_ue : unienv -> EcIdent.t list -> tvi -> ty EcIdent.Mid.t
   val freshen    : unienv -> EcIdent.t list -> tvi -> ty -> unienv * ty * ty list
   val close      : unienv -> ty Muid.t

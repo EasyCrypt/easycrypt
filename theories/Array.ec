@@ -28,7 +28,7 @@ op "_.[_]": 'x array -> int -> 'x.
 
 (* Equality is extensional *)
 pred (==) (xs0:'x array, xs1:'x array) =
-  length xs0 = length xs1 /\
+  length xs0 = length xs1 && 
   forall (i:int), 0 <= i => i < length xs0 => xs0.[i] = xs1.[i].
 
 axiom extensionality: forall (xs0:'x array, xs1:'x array),
@@ -68,27 +68,20 @@ by [].
 
 lemma cons_inj: forall (x y:'x, xs ys:'x array),
   x::xs = y::ys <=> x = y /\ xs = ys.
-intros=> x y xs ys.
-split;last by intros=>[? ?];subst=> //.
-rewrite - !rw_ext.
-delta (==)=> /=.
-intros=> [len val].
-split.
-cut h := val 0.
-generalize h.
-by rewrite ! cons_get;smt.
-split.
-cut -> : forall i j, i = j <=> 1 + i = 1 + j;first smt.
-by rewrite -(cons_length x) -(cons_length y) //.
-intros=> ? ? ?.
-cut h := val (i+1).
-generalize h.
-rewrite ! cons_get;first 4 smt.
-cut -> : ((0 = i + 1) = false);first smt.
-simplify.
-cut -> : i + 1 - 1 = i;first smt.
-intros=> h.
-by apply h;smt.
+proof.
+  intros=> x y xs ys.
+  split;last by intros=>[-> ->].
+  rewrite - !rw_ext;simplify (==).
+  rewrite anda_and => [len val].
+  split.
+    cut h := val 0;generalize h.
+    by rewrite ! cons_get => //;smt.
+  split.
+    cut -> : forall i j, i = j <=> 1 + i = 1 + j;first smt.
+    by rewrite -(cons_length x) -(cons_length y) //.
+  intros=> Heq i Hle Hlt.
+  cut h := val (i+1);generalize h.
+  rewrite ! cons_get //; smt.
 qed.
 
 (* snoc *)
@@ -182,7 +175,7 @@ proof.
 intros xs;  apply extensionality; smt.
 save.
 
-lemma sub_append_full : forall (xs:'x array),
+lemma sub_full : forall (xs:'x array),
   sub xs 0 (length xs) = xs.
 proof.  
 intros xs; apply extensionality; smt.
@@ -194,18 +187,18 @@ proof.
 intros xs0 xs1; apply extensionality; smt.
 save.
 
+lemma sub_append_snd: forall (xs0 xs1:'x array),
+  sub (xs0 || xs1) (length xs0) (length xs1) = xs1.
+proof.
+intros xs0 xs1; apply extensionality; smt.
+save.
+
 lemma sub_append_sub: forall (xs:'x array, i l1 l2:int),
   0 <= i => 0 <= l1 => 0 <= l2 => i+l1+l2 <= length xs =>
   (sub xs i l1 || sub xs (i+l1) l2) = sub xs i (l1+l2).
 proof.
 intros xs i l1 l2 i_pos l1_pos l2_pos i_l1_l2_bounded.
 apply extensionality; smt.
-save.
-
-lemma sub_append_snd: forall (xs0 xs1:'x array),
-  sub (xs0 || xs1) (length xs0) (length xs1) = xs1.
-proof.
-intros xs0 xs1; apply extensionality; smt.
 save.
 
 (* Induction Principle *)
@@ -256,8 +249,8 @@ axiom set_get: forall (xs:'x array) (i j:int) (x:'x),
 lemma set_setE: forall a (b c:'a) x,
   x.[a <- b].[a <- c] = x.[a <- c].
 proof strict.
-intros=> a b c x; apply extensionality; split; first by rewrite !set_length //.
-  intros=> i i_pos; rewrite 2!set_length=> i_bnd; rewrite set_get ?set_length //.
+  intros=> a b c x; apply extensionality; split; first by rewrite !set_length //.
+  intros=> Heq i i_pos; rewrite 2!set_length=> i_bnd; rewrite set_get ?set_length //.
   case (a = i)=> a_i.
     by subst a; rewrite set_get //.
     by do 2! rewrite set_get // (neqF (a = i)) // /=.
@@ -296,17 +289,15 @@ op create(n:int, k:'x) : 'x array = init n (lambda x, k).
 lemma create_length: forall (x:'x) l,
   0 <= l =>
   length (create l x) = l.
-intros=> ? ? ?.
-delta create=> /=.
-apply init_length=> //.
+proof. 
+  by intros=> ? ? ?;simplify create;apply init_length.
 qed.
 
 lemma create_get: forall l (x:'x) i,
   0 <= l => 0 <= i => i < l =>
   (create l x).[i] = x.
-intros=> ? ? ? ? ? ?.
-delta create=> /=.
-rewrite (init_get _ (lambda (x0 : int), x))=> //.
+proof. 
+ by intros=> ? ? ? ? ? ?;simplify create;rewrite init_get.
 qed.
 
 (*********************************)
@@ -316,7 +307,6 @@ lemma write_append: forall (dst src:'x array),
   length src <= length dst =>
   write dst 0 src 0 (length src) = (src || (sub dst (length src) (length dst - length src))).
 proof.
-intros dst src H; apply extensionality.
-delta beta;split;smt.
+  intros dst src H; apply extensionality;split;smt.
 save.
 

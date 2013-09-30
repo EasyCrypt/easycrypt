@@ -327,13 +327,14 @@ qed.
 
 lemma mem_nth: forall (x:'a) (xs:'a list),
   mem x xs =>
-  exists (i : int), 0 <= i <= length xs /\  nth xs i = Some x.
+  exists (i : int), 0 <= i < length xs /\  nth xs i = Some x.
 proof strict.
 intros=> x xs; elim/list_ind xs; first smt.
 intros=> {xs} x' xs IH x_in_x'xs; case (x' = x)=> x_x'.
-  by subst x'; exists 0; rewrite nth_cons0; progress; apply length_nneg.
+  by subst x'; exists 0; rewrite nth_cons0; progress; rewrite length_cons; smt.
+
   generalize x_in_x'xs; rewrite mem_consNE // => x_in_xs;
-  cut H : exists i, 0 <= i <= length xs /\ nth xs i = Some x; first by apply IH.
+  cut H : exists i, 0 <= i < length xs /\ nth xs i = Some x; first by apply IH.
   elim H=> i [[le_0_i le_i_lxs] nth_xs_i]; exists (i + 1); progress; first smt.
     by rewrite length_cons; smt.
     by (rewrite nth_consN; first smt); cut ->: i + 1 - 1 = i; first smt.
@@ -412,7 +413,10 @@ intros=> xs; split.
       by rewrite count_consNE //; apply IH=> //.
   elim/list_ind xs=> {xs}.
     by intros=> h {h}; apply unique_nil.
-    by intros=> x xs IH count_xs; rewrite unique_cons; split; smt.
+    intros=> x xs IH count_xs; rewrite unique_cons; split.
+     apply IH => x'. 
+     by cut _ : count x' xs <= count x' (x :: xs); smt.
+     by cut _ : count x (x :: xs) <= 1; smt.
 qed.
 
 (** rm *)

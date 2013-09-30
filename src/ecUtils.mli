@@ -23,6 +23,9 @@ val (<|) : ('a -> 'b) -> 'a -> 'b
 val copy : 'a -> 'a
 
 (* -------------------------------------------------------------------- *)
+val reffold : ('a -> 'b * 'a) -> 'a ref -> 'b
+
+(* -------------------------------------------------------------------- *)
 type 'a tuple0 = unit
 type 'a tuple1 = 'a
 type 'a tuple2 = 'a * 'a
@@ -31,12 +34,16 @@ type 'a tuple4 = 'a * 'a * 'a * 'a
 type 'a tuple5 = 'a * 'a * 'a * 'a * 'a
 type 'a tuple6 = 'a * 'a * 'a * 'a * 'a * 'a
 type 'a tuple7 = 'a * 'a * 'a * 'a * 'a * 'a * 'a
+type 'a tuple8 = 'a * 'a * 'a * 'a * 'a * 'a * 'a * 'a
+type 'a tuple9 = 'a * 'a * 'a * 'a * 'a * 'a * 'a * 'a * 'a
 
 (* -------------------------------------------------------------------- *)
 val as_seq0 : 'a list -> 'a tuple0
 val as_seq1 : 'a list -> 'a tuple1
 val as_seq2 : 'a list -> 'a tuple2
 val as_seq3 : 'a list -> 'a tuple3
+val as_seq4 : 'a list -> 'a tuple4
+val as_seq5 : 'a list -> 'a tuple5
 
 (* -------------------------------------------------------------------- *)
 val proj3_1 : 'a * 'b * 'c -> 'a
@@ -94,7 +101,6 @@ end
 
 (* -------------------------------------------------------------------- *)
 module List : sig
-
   include module type of List
 
   val ocons : 'a option -> 'a list -> 'a list
@@ -163,15 +169,17 @@ module List : sig
 
   val prmap : ('a -> 'b option) -> 'a list -> 'b list
 
-  val smart_map : ('a -> 'a) -> 'a list -> 'a list
-
-  val smart_map_fold : ('a -> 'b -> 'a * 'b) -> 'a -> 'b list -> 'a * 'b list
-
   val sum : int list -> int
 
   val min : 'a -> 'a list -> 'a
 
   val max : 'a -> 'a list -> 'a
+
+  module Smart : sig
+    val map : ('a -> 'a) -> 'a list -> 'a list
+
+    val map_fold : ('a -> 'b -> 'a * 'b) -> 'a -> 'b list -> 'a * 'b list
+  end
 end
 
 (* -------------------------------------------------------------------- *)
@@ -186,6 +194,10 @@ module String : sig
   include module type of String
 
   val map : (char -> char) -> string -> string
+
+  val startswith : string -> string -> bool
+
+  val endswith : string -> string -> bool
 
   val slice : ?first:int -> ?last:int -> string -> string
 

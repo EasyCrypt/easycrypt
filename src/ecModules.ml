@@ -61,12 +61,13 @@ type instr = {
 }
 
 and instr_node =
-  | Sasgn   of lvalue * EcTypes.expr
-  | Srnd    of lvalue * EcTypes.expr
-  | Scall   of lvalue option * EcPath.xpath * EcTypes.expr list
-  | Sif     of EcTypes.expr * stmt * stmt
-  | Swhile  of EcTypes.expr * stmt
-  | Sassert of EcTypes.expr
+  | Sasgn     of lvalue * EcTypes.expr
+  | Srnd      of lvalue * EcTypes.expr
+  | Scall     of lvalue option * EcPath.xpath * EcTypes.expr list
+  | Sif       of EcTypes.expr * stmt * stmt
+  | Swhile    of EcTypes.expr * stmt
+  | Sassert   of EcTypes.expr
+  | Sabstract of EcIdent.t 
 
 and stmt = {
   s_node : instr list;
@@ -114,6 +115,8 @@ module Hinstr = Why3.Hashcons.Make (struct
     | Sassert e1, Sassert e2 ->
         (EcTypes.e_equal e1 e2)
 
+    | Sabstract id1, Sabstract id2 -> EcIdent.id_equal id1 id2
+
     | _, _ -> false
 
   let equal i1 i2 = equal_node i1.i_node i2.i_node
@@ -143,6 +146,8 @@ module Hinstr = Why3.Hashcons.Make (struct
 
     | Sassert e -> EcTypes.e_hash e
 
+    | Sabstract id -> EcIdent.id_hash id
+
   let i_fv   = function
     | Sasgn(lv,e) -> 
         EcIdent.fv_union (lv_fv lv) (EcTypes.e_fv e)
@@ -160,6 +165,7 @@ module Hinstr = Why3.Hashcons.Make (struct
         EcIdent.fv_union (EcTypes.e_fv e) (s_fv s)
     | Sassert e    -> 
         EcTypes.e_fv e 
+    | Sabstract id -> EcIdent.fv_singleton id
           
   let tag n p = { p with i_tag = n; i_fv = i_fv p.i_node }
 end)
@@ -193,9 +199,12 @@ let i_call   (lv, m, tys) = mk_instr (Scall (lv, m, tys))
 let i_if     (c, s1, s2)  = mk_instr (Sif (c, s1, s2))
 let i_while  (c, s)       = mk_instr (Swhile (c, s))
 let i_assert e            = mk_instr (Sassert e)
+let i_abstract id         = mk_instr (Sabstract id)
 
 let stmt s = 
   Hstmt.hashcons { s_node = s; s_tag = -1; s_fv = EcIdent.Mid.empty}
+
+let s_seq s1 s2 = stmt (s1.s_node @ s2.s_node)
 
 let rstmt s = stmt (List.rev s)
 
@@ -254,11 +263,11 @@ let s_subst (s: EcTypes.e_subst) =
         if pvt == pvt' then lv else
           LvVar pvt'
       | LvTuple pvs ->
-        let pvs' = List.smart_map pvt_subst pvs in
+        let pvs' = List.Smart.map pvt_subst pvs in
         if pvs == pvs' then lv else LvTuple pvs'
       | LvMap((p,tys), pv, e, ty) ->
         let p'   = s.EcTypes.es_p p in
-        let tys' = List.smart_map s.EcTypes.es_ty tys in
+        let tys' = List.Smart.map s.EcTypes.es_ty tys in
         let pv'  = EcTypes.pv_subst s.EcTypes.es_xp pv in
         let e'   = e_subst e in
         let ty'  = s.EcTypes.es_ty ty in
@@ -280,7 +289,7 @@ let s_subst (s: EcTypes.e_subst) =
       | Scall(olv,mp,args) ->
         let olv' = olv |> osmart_map lv_subst in
         let mp'  = s.EcTypes.es_xp mp in
-        let args' = List.smart_map e_subst args in
+        let args' = List.Smart.map e_subst args in
         if olv == olv' && mp == mp' && args == args' then i else 
           i_call(olv',mp',args')
       | Sif(e,s1,s2) ->
@@ -298,10 +307,12 @@ let s_subst (s: EcTypes.e_subst) =
         let e' = e_subst e in
         if e == e' then i else
           i_assert e'
+      | Sabstract _ -> 
+        i
             
     and s_subst s = 
       let is = s.s_node in
-      let is' = List.smart_map i_subst is in
+      let is' = List.Smart.map i_subst is in
       if is == is' then s else stmt is' in
 
     s_subst 

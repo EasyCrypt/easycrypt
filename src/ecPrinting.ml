@@ -945,6 +945,8 @@ let pp_instr_for_form (ppe : PPEnv.t) fmt i =
   | Sif (e, _, _) ->
       Format.fprintf fmt "if (%a) {...}"
         (pp_expr ppe) e
+  | Sabstract id -> (* FIXME *)
+      Format.fprintf fmt "%s" (EcIdent.name id)
 
 (* -------------------------------------------------------------------- *)
 let pp_stmt_for_form (ppe : PPEnv.t) fmt (s : stmt) =
@@ -1229,6 +1231,20 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
         (pp_form ppe) es.es_pr
         (pp_form ppe) es.es_po
 
+  | FeagerF eg ->
+      let ppe =
+        PPEnv.create_and_push_mems
+          ppe [(EcFol.mleft , eg.eg_fl); (EcFol.mright, eg.eg_fr)]
+      in
+      Format.fprintf fmt "eager[@[<hov 2>@ %a,@ %a ~@ %a,@ %a :@ @[%a ==>@ %a@]@]]"
+        (pp_stmt_for_form ppe) eg.eg_sl
+        (pp_funname ppe) eg.eg_fl
+        (pp_funname ppe) eg.eg_fr
+        (pp_stmt_for_form ppe) eg.eg_sr
+
+        (pp_form ppe) eg.eg_pr
+        (pp_form ppe) eg.eg_po
+
   | FbdHoareF hf ->
       let ppe = PPEnv.create_and_push_mem ppe ~active:true (EcFol.mhr, hf.bhf_f) in
       Format.fprintf fmt "bd_hoare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]] %s %a"
@@ -1394,6 +1410,7 @@ type ppnode1 = [
   | `Assert of (EcTypes.expr)
   | `Call   of (EcModules.lvalue option * P.xpath * EcTypes.expr list)
   | `Rnd    of (EcModules.lvalue * EcTypes.expr)
+  | `Abstract of EcIdent.t 
   | `If     of (EcTypes.expr)
   | `Else
   | `While  of (EcTypes.expr)
@@ -1412,7 +1429,7 @@ let at n i =
   | Srnd  (lv, e)    , 0 -> Some (`Rnd  (lv, e)    , `P, [])
   | Scall (lv, f, es), 0 -> Some (`Call (lv, f, es), `P, [])
   | Sassert e        , 0 -> Some (`Assert e        , `P, [])
-
+  | Sabstract id     , 0 -> Some (`Abstract id     , `P, [])
   | Swhile (e, s), 0 -> Some (`While e, `P, s.s_node)
   | Swhile _     , 1 -> Some (`EBlk   , `B, [])
 
@@ -1516,6 +1533,8 @@ let pp_i_while (ppe : PPEnv.t) fmt e =
 let pp_i_blk (_ppe : PPEnv.t) fmt _ =
   Format.fprintf fmt "}"
 
+let pp_i_abstract (_ppe : PPEnv.t) fmt id = 
+  Format.fprintf fmt "%s" (EcIdent.name id)
 (* -------------------------------------------------------------------- *)
 let c_ppnode1 ~width ppe (pp1 : ppnode1) =
   match pp1 with
@@ -1523,6 +1542,7 @@ let c_ppnode1 ~width ppe (pp1 : ppnode1) =
   | `Assert x -> c_split ~width (pp_i_assert ppe) x
   | `Call   x -> c_split ~width (pp_i_call   ppe) x
   | `Rnd    x -> c_split ~width (pp_i_rnd    ppe) x
+  | `Abstract x -> c_split ~width (pp_i_abstract ppe) x
   | `If     x -> c_split ~width (pp_i_if     ppe) x
   | `Else     -> c_split ~width (pp_i_else   ppe) ()
   | `While  x -> c_split ~width (pp_i_while  ppe) x
@@ -1777,6 +1797,9 @@ let pp_goal (ppe : PPEnv.t) fmt (n, (hyps, concl)) =
 
         | EcBaseLogic.LD_hyp f ->
             pp_form ppe fmt f
+
+        | EcBaseLogic.LD_abs_st _ ->
+          Format.fprintf fmt "statement" (* FIXME *)
     in
     let pp fmt =
       Format.fprintf fmt "%-.2s: @[<hov 2>%t@]@\n%!" (EcIdent.name id) dk
@@ -1905,6 +1928,8 @@ let rec pp_instr (ppe : PPEnv.t) fmt i =
       (pp_expr ppe) e
       (pp_block ppe) s1
       (pp_else ppe) s2
+  | Sabstract id ->
+    Format.fprintf fmt "%s" (EcIdent.name id)
 
 and pp_block ppe fmt s =
   match s.s_node with
@@ -1985,6 +2010,5 @@ let rec pp_theory ppe (fmt:Format.formatter) (path, cth) =
     (* Fixme should not use a pp_list, it should be a fold *)
     Format.fprintf fmt "export %a."  
       EcSymbols.pp_qsymbol (PPEnv.th_symb ppe p)
-
-  
-
+  | EcTheory.CTh_instance _ ->
+    Format.fprintf fmt "instance <FIXME>."

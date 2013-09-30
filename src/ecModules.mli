@@ -28,12 +28,13 @@ type instr = private {
 }
 
 and instr_node =
-  | Sasgn   of lvalue * EcTypes.expr
-  | Srnd    of lvalue * EcTypes.expr
-  | Scall   of lvalue option * EcPath.xpath * EcTypes.expr list
-  | Sif     of EcTypes.expr * stmt * stmt
-  | Swhile  of EcTypes.expr * stmt
-  | Sassert of EcTypes.expr
+  | Sasgn     of lvalue * EcTypes.expr
+  | Srnd      of lvalue * EcTypes.expr
+  | Scall     of lvalue option * EcPath.xpath * EcTypes.expr list
+  | Sif       of EcTypes.expr * stmt * stmt
+  | Swhile    of EcTypes.expr * stmt
+  | Sassert   of EcTypes.expr
+  | Sabstract of EcIdent.t 
 
 and stmt = private {
   s_node : instr list;
@@ -60,6 +61,9 @@ val i_call    : lvalue option * xpath * expr list -> instr
 val i_if      : expr * stmt * stmt -> instr
 val i_while   : expr * stmt -> instr
 val i_assert  : expr -> instr
+val i_abstract : EcIdent.t -> instr
+
+val s_seq     : stmt -> stmt -> stmt
 
 val stmt : instr list -> stmt
 (* [rstmt l] is stmt (List.rev l) *)

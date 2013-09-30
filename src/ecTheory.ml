@@ -1,8 +1,8 @@
 (* -------------------------------------------------------------------- *)
-open EcDebug
 open EcUtils
 open EcSymbols
 open EcDecl
+open EcAlgebra
 
 open EcModules
 
@@ -20,6 +20,7 @@ and theory_item =
   | Th_module    of module_expr
   | Th_theory    of (symbol * theory)
   | Th_export    of EcPath.path
+  | Th_instance  of EcPath.path * [`Ring of ring | `Field of field]
 
 (* -------------------------------------------------------------------- *)
 type ctheory = {
@@ -41,6 +42,7 @@ and ctheory_item =
   | CTh_module    of module_expr
   | CTh_theory    of (symbol * ctheory)
   | CTh_export    of EcPath.path
+  | CTh_instance  of EcPath.path * [`Ring of ring | `Field of field]
 
 and ctheory_clone = {
   cthc_base : EcPath.path;
@@ -51,70 +53,8 @@ and ctheory_override =
 | CTHO_Type   of EcTypes.ty
 
 (* -------------------------------------------------------------------- *)
-let rec cth_dump (cth : ctheory) =
-  dnode "ctheory"
-    [dnode "description" [cth_desc_dump cth.cth_desc];
-     dnode "structure"   (List.map cthi_dump cth.cth_struct)]
-
-and cth_desc_dump (d : ctheory_desc) =
-  match d with
-  | CTh_struct cth ->
-      dnode "CTh_struct" (List.map cthi_dump cth)
-
-  | CTh_clone cl ->
-      dnode "CTh_clone" [cth_clone_dump cl]
-
-and cth_clone_dump (cl : ctheory_clone) =
-  dnode "theory-clone"
-    ((dleaf "base (%s)" (EcPath.tostring cl.cthc_base)) ::
-     (List.map
-        (fun (x, ovrd) ->
-           dnode (Printf.sprintf "override (%s)" (EcIdent.tostring x))
-             [cth_ovrd_dump ovrd])
-        cl.cthc_ext))
-
-and cth_ovrd_dump (ovrd : ctheory_override) =
-  match ovrd with
-  | CTHO_Type ty ->
-      dnode "CTHO_Type" [EcTypes.ty_dump ty]
-
-and cthi_dump (item : ctheory_item) =
-  match item with
-  | CTh_type (x, tyd) ->
-      dnode
-        (Printf.sprintf "CTh_type (%s)" x)
-        [tydecl_dump tyd]
-
-  | CTh_operator (x, op) ->
-      dnode
-        (Printf.sprintf "CTh_operator (%s)" x)
-        [op_dump op]
-
-  | CTh_axiom (x, ax) ->
-      dnode
-        (Printf.sprintf "CTh_axiom (%s)" x)
-        [ax_dump ax]
-
-  | CTh_modtype (x, _modty) ->
-      dleaf "CTh_modtype (%s)" x
-
-  | CTh_module me ->
-      dleaf "CTh_module (%s)" me.me_name
-
-  | CTh_theory (x, th) ->
-      dnode
-        (Printf.sprintf "CTh_theory (%s)" x)
-        [cth_dump th]
-
-  | CTh_export p ->
-      dleaf "CTh_export (%s)" (EcPath.tostring p)
-
-(* -------------------------------------------------------------------- *)
 let module_comps_of_module_sig_comps (comps : module_sig_body) =
   let onitem = function
-(*    | Tys_variable vd ->
-        MI_Variable vd *)
-
     | Tys_function(funsig, oi) ->
         MI_Function { 
           f_name = funsig.fs_name;

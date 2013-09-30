@@ -159,6 +159,7 @@ and i_equal_norm env i1 i2 =
       e_equal_norm env a1 a2 && s_equal_norm env b1 b2 
   | Sassert a1, Sassert a2 ->
       e_equal_norm env a1 a2 
+  | Sabstract id1, Sabstract id2 -> EcIdent.id_equal id1 id2
   | _, _ -> false
 
 type reduction_info = {
@@ -258,7 +259,7 @@ let rec h_red ri env hyps f =
       | OK_real_lt, [f1;f2] -> f_real_lt_simpl f1 f2
       | OK_int_add, [f1;f2] -> f_int_add_simpl f1 f2
       | OK_int_sub, [f1;f2] -> f_int_sub_simpl f1 f2
-      | OK_int_prod, [f1;f2] -> f_int_prod_simpl f1 f2
+      | OK_int_mul, [f1;f2] -> f_int_prod_simpl f1 f2
       | OK_real_add, [f1;f2] -> f_real_add_simpl f1 f2
       | OK_real_sub, [f1;f2] -> f_real_sub_simpl f1 f2
       | OK_real_prod, [f1;f2] -> f_real_prod_simpl f1 f2
@@ -376,7 +377,7 @@ let check_alpha_equal ri hyps f1 f2 =
     ensure (EcPath.p_equal xp1.EcPath.x_sub xp2.EcPath.x_sub);
     check_mp env subst xp1.EcPath.x_top xp2.EcPath.x_top in
   let check_s env s s1 s2 = 
-    let es = e_subst_init s.fs_freshen s.fs_sty.ts_p s.fs_ty s.fs_mp in
+    let es = e_subst_init s.fs_freshen s.fs_sty.ts_p s.fs_ty Mp.empty s.fs_mp in
     let s2 = EcModules.s_subst es s2 in
     ensure (s_equal_norm env s1 s2) in
 
@@ -442,7 +443,7 @@ let check_alpha_equal ri hyps f1 f2 =
       ensure (hs1.bhs_cmp = hs2.bhs_cmp);
       check_s env subst hs1.bhs_s hs2.bhs_s;
       (* FIXME should check the memenv *)
-      aux env subst hs1.bhs_pr hs1.bhs_pr;
+      aux env subst hs1.bhs_pr hs2.bhs_pr;
       aux env subst hs1.bhs_po hs2.bhs_po;
       aux env subst hs1.bhs_bd hs2.bhs_bd
 
@@ -458,6 +459,14 @@ let check_alpha_equal ri hyps f1 f2 =
       (* FIXME should check the memenv *)
       aux env subst es1.es_pr es2.es_pr;
       aux env subst es1.es_po es2.es_po
+
+    | FeagerF eg1, FeagerF eg2 -> 
+      check_xp env subst eg1.eg_fl eg2.eg_fl;
+      check_xp env subst eg1.eg_fr eg2.eg_fr;
+      aux env subst eg1.eg_pr eg2.eg_pr;
+      aux env subst eg1.eg_po eg2.eg_po;
+      check_s env subst eg1.eg_sl eg2.eg_sl;
+      check_s env subst eg1.eg_sr eg2.eg_sr
 
     | Fpr(m1,p1,args1,f1'), Fpr(m2,p2,args2,f2') ->
       check_mem subst m1 m2;
@@ -497,6 +506,14 @@ let h_red_opt ri hyps f = h_red_opt ri (LDecl.toenv hyps) hyps f
 
 let rec simplify ri hyps f = 
   let f' = try h_red ri hyps f with NotReducible -> f in
-  if f == f' then f_map (fun ty -> ty) (simplify ri hyps) f
+  if f == f' then simplify_rec ri hyps f 
+       (*f_map (fun ty -> ty) (simplify ri hyps) f*)
   else simplify ri hyps f'
+
+and simplify_rec ri hyps f = 
+  match f.f_node with
+  | Fapp({f_node = Fop(p,_)} as fo, args)
+      when ri.logic && is_logical_op p ->
+    f_app fo (List.map (simplify_rec ri hyps) args) f.f_ty    
+  | _ -> f_map (fun ty -> ty) (simplify ri hyps) f
 

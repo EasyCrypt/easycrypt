@@ -3,8 +3,8 @@ MANIFEST
 README
 
 # ocamlbuild configuration
-config/_tags
-config/myocamlbuild.ml
+_tags
+myocamlbuild.ml
 config/tests.config
 
 # documentation
@@ -23,15 +23,21 @@ proofgeneral/config/emacs.rc.in
 proofgeneral/scripts/find-emacs
 
 # EasyCrypt sources
-src/*.ml
-src/*.mli
-src/*.mly
-src/*.mll
+find:src:*.ml
+find:src:*.mli
+find:src:*.mly
+find:src:*.mll
 
 # EasyCrypt theories
 theories/*.ec
 theories/prelude/*.ec
 theories/realizations/*.ec
+
+# system
+system/Makefile
+system/*.c
+system/win32/*.c
+system/unix/*.c
 
 # EasyCrypt examples
 examples/*.ec

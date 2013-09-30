@@ -249,7 +249,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
                       let tya = List.map (fun a -> mk_loc l (PTvar a)) params in
                         mk_loc l (PEident (sym, Some (mk_loc l (TVIunamed tya))));
                   } in
-                    do1 (proofs, evc) (mk_loc l (xdth @ prefix, x), PTHO_Op (`OpDef ovrd))
+                    do1 (proofs, evc) (mk_loc l (xdth @ prefix, x), PTHO_Op (ovrd, `Alias))
 
               | CTh_operator (x, ({ op_kind = OB_pred None } as oprd)) ->
                   let params = List.map EcIdent.name oprd.op_tparams in
@@ -381,29 +381,26 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
           | None ->
               (subst, proofs, EcEnv.Op.bind x (EcSubst.subst_op subst oopd) scenv)
 
-          | Some { pl_desc = opov; pl_loc = loc; } ->
-            let (newop, subst, dobind) =
-              match opov with
-              | `OpDef opov ->
-                  let ue = EcTyping.ue_for_decl scenv (loc, opov.opov_tyvars) in
-                  let tp = EcTyping.tp_relax in
-                  let (ty, body) =
-                    let env     = scenv in
-                    let codom   = EcTyping.transty tp env ue opov.opov_retty in 
-                    let env, xs = EcTyping.transbinding env ue opov.opov_args in
-                    let body    = EcTyping.transexpcast env ue codom opov.opov_body in
-                    let lam     = EcTypes.e_lam xs body in
-                      (lam.EcTypes.e_ty, Some lam)
-                  in
-                  let uni     = EcTypes.Tuni.subst (EcUnify.UniEnv.close ue) in
-                  let body    = body |> omap (EcTypes.e_mapty uni) in
-                  let ty      = uni ty in
-                  let tparams = EcUnify.UniEnv.tparams ue in
-                    (mk_op tparams ty body, subst, true)
-
-              | `OpInline newop ->
-                  let (newpath, newop) = EcEnv.Op.lookup (unloc newop) scenv in
-                    (newop, EcSubst.add_path subst (xpath x) newpath, false)
+          | Some { pl_desc = (opov, opmode); pl_loc = loc; } ->
+              let (newop, subst, dobind) =
+                let ue = EcTyping.ue_for_decl scenv (loc, opov.opov_tyvars) in
+                let tp = EcTyping.tp_relax in
+                let (ty, body) =
+                  let env     = scenv in
+                  let codom   = EcTyping.transty tp env ue opov.opov_retty in 
+                  let env, xs = EcTyping.transbinding env ue opov.opov_args in
+                  let body    = EcTyping.transexpcast env ue codom opov.opov_body in
+                  let lam     = EcTypes.e_lam xs body in
+                    (lam.EcTypes.e_ty, lam)
+                in
+                let uni     = EcTypes.Tuni.subst (EcUnify.UniEnv.close ue) in
+                let body    = body |> EcTypes.e_mapty uni in
+                let ty      = uni ty in
+                let tparams = EcUnify.UniEnv.tparams ue in
+                let newop   = mk_op tparams ty (Some body) in
+                  match opmode with
+                  | `Alias  -> (newop, subst, true)
+                  | `Inline -> (newop, EcSubst.add_opdef subst (xpath x) (tparams, body), false)
             in
 
             let (reftyvars, refty) =
@@ -511,6 +508,10 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
 
       | CTh_export p ->
           (subst, proofs, EcEnv.Theory.export (EcSubst.subst_path subst p) scenv)
+
+      | CTh_instance _ ->
+          (* Currently, instances don't survive cloning *)
+          ( subst, proofs, scenv)
     in
       let scenv = EcEnv.Theory.enter name scenv in
       let _, proofs, scenv =

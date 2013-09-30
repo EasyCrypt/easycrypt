@@ -68,6 +68,7 @@ end
 module Ty : sig
   val add : scope -> (psymbol list * psymbol) located -> scope
   val addclass : scope -> ptypeclass located -> scope
+  val addinstance : scope -> Ax.mode -> ptycinstance located -> scope
   val define : scope -> (psymbol list * psymbol) located -> pty -> scope
 end
 
@@ -129,6 +130,7 @@ end
 
 module Prover : sig 
   val process     : scope -> pprover_infos -> scope
+  val set_wrapper : scope -> string option -> scope
   val set_all     : scope -> scope 
   val set_default : scope -> int -> string list option -> scope
   val full_check  : scope -> scope

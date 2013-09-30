@@ -81,9 +81,8 @@
     "modpath"     , MODPATH    ;        (* KW: tactic *)
     "using"       , USING      ;        (* KW: tactic *)
     "compute"     , COMPUTE    ;        (* KW: tactic *)
-    "field"       , FIELD      ;        (* KW: tactic *)
-    "field_simplify", FIELDSIMP;        (* KW: tactic *)
-
+    "fieldeq"     , FIELD      ;        (* KW: tactic *)
+    "ringeq"      , RING       ;        (* KW: tactic *)
 
     "assumption"  , ASSUMPTION ;        (* KW: bytac *)
     "smt"         , SMT        ;        (* KW: bytac *)
@@ -92,6 +91,7 @@
 
     (* PHL: tactics *)
     "transitivity", TRANSITIVITY;       (* KW: tactic *)
+    "symmetry"    , SYMMETRY   ;        (* KW: tactic *)
     "seq"         , SEQ        ;        (* KW: tactic *)
     "wp"          , WP         ;        (* KW: tactic *)
     "sp"          , SP         ;        (* KW: tactic *)
@@ -120,6 +120,7 @@
     "unroll"      , UNROLL     ;        (* KW: tactic *)
     "splitwhile"  , SPLITWHILE ;        (* KW: tactic *)
     "kill"        , KILL       ;        (* KW: tactic *)
+    "eager"       , EAGER      ;        (* KW: tactic *)
 
     "axiom"       , AXIOM      ;        (* KW: global *)
     "lemma"       , LEMMA      ;        (* KW: global *)
@@ -146,6 +147,7 @@
     "type"        , TYPE       ;        (* KW: global *)
     "self"        , SELF       ;        (* KW: global *)
     "class"       , CLASS      ;        (* KW: global *)
+    "instance"    , INSTANCE   ;        (* KW: global *)
     "datatype"    , DATATYPE   ;        (* KW: global *)
     "print"       , PRINT      ;        (* KW: global *)
     "why3"        , WHY3       ;        (* KW: global *)  

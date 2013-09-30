@@ -250,10 +250,10 @@ let mk_w3_opp2 s mk =
   let decl_spec = Decl.create_prop_decl Decl.Paxiom pr form in
   ls, decl, decl_spec
 
-let w3_ls_and, decl_and, spec_and = mk_w3_opp2 "AND" Term.t_and
+let w3_ls_and, decl_and, spec_and = mk_w3_opp2 "ANDS" Term.t_and
 let w3_ls_anda, decl_anda, spec_anda = mk_w3_opp2 "ANDA" Term.t_and_asym
-let w3_ls_or, decl_or, spec_or = mk_w3_opp2 "OR" Term.t_or
-let w3_ls_ora, decl_ora, spec_ora = mk_w3_opp2 "OR" Term.t_or_asym
+let w3_ls_or, decl_or, spec_or = mk_w3_opp2 "ORS" Term.t_or
+let w3_ls_ora, decl_ora, spec_ora = mk_w3_opp2 "ORA" Term.t_or_asym
 let w3_ls_imp, decl_imp, spec_imp = mk_w3_opp2 "IMP" Term.t_implies
 let w3_ls_iff, decl_iff, spec_iff = mk_w3_opp2 "IFF" Term.t_iff
 
@@ -1342,6 +1342,7 @@ let trans_form env f =
     | FbdHoareF _ -> raise (CanNotTranslate "FbdHoareF")
     | FbdHoareS _ -> raise (CanNotTranslate "FbdHoareS")
     | FequivF _   -> raise (CanNotTranslate "FequivF")
+    | FeagerF _   -> raise (CanNotTranslate "FeagerF")
     | FequivS _   -> raise (CanNotTranslate "FequivS")
 
     | Fpvar(pv,m) ->
@@ -1545,7 +1546,7 @@ let check_w3_formula pi task f =
   let pr   = Decl.create_prsymbol (Ident.id_fresh "goal") in
   let decl = Decl.create_prop_decl Decl.Pgoal pr f in
   let task = add_decl_with_tuples task decl in
-  EcProvers.call_prover_task pi task
+  EcProvers.call_prover_task pi task = Some true
 
 exception CanNotProve of axiom
 
@@ -1609,6 +1610,9 @@ let check_goal me_of_mt env pi (hyps, concl) =
           
       | LD_modty (mt,restr) ->
         env := add_abs_mod me_of_mt !env id mt restr
+
+      | LD_abs_st _ -> ()
+
     with CanNotTranslate _ -> ()
   in
   List.iter trans_tv hyps.h_tvar;

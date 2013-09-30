@@ -1,7 +1,5 @@
 *~
 _build
-/_tags
-/myocamlbuild.ml
 *.native
 *.byte
 /local
@@ -11,6 +9,10 @@ _build
 setup.data
 setup.log
 /attic
+
+/system/*.o
+/system/callprover
+/system/callprover.exe
 
 /doc/*.aux
 /doc/*.bbl

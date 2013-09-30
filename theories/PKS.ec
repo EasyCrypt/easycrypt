@@ -8,7 +8,7 @@ type message.
 type signature.
 
 module type Scheme = {
-  fun init(): unit
+  fun init(): unit {*}
   fun keygen(): (pkey * skey)
   fun sign(sk:skey, m:message): signature
   fun verify(pk:pkey, m:message, s:signature): bool
@@ -22,15 +22,16 @@ module type AdvCMA(O:AdvOracles) = {
 
 theory EF_CMA.
   module type Oracles = {
-    fun init(): pkey
+    fun init(): pkey {*}
     fun sign(m:message): signature
     fun verify(m:message,s:signature): bool
     fun fresh(m:message): bool
+    fun queries(): int
   }.
 
   (* A wrapper providing oracles for existential
      unforgeability from a PKS scheme. *)
-  module WrapEF(S:Scheme): Oracles = {
+  module Wrap(S:Scheme): Oracles = {
     var qs: message set
     var pk: pkey
     var sk: skey
@@ -58,6 +59,10 @@ theory EF_CMA.
     fun fresh(m:message): bool = {
       return !mem m qs;
     }
+
+    fun queries(): int = {
+      return card qs;
+    }
   }.
 
   module EF_CMA(O:Oracles, A:AdvCMA) = {
@@ -78,17 +83,18 @@ theory EF_CMA.
   }.
 end EF_CMA.
 
-theory UF_CMA.
+theory NM_CMA.
   module type Oracles = {
-    fun init(): pkey
+    fun init(): pkey {*}
     fun sign(m:message): signature
     fun verify(m:message,s:signature): bool
     fun fresh(m:message,s:signature): bool
+    fun queries(): int
   }.
 
-  (* A wrapper providing oracles for universal
-     unforgeability from a PKS scheme. *)
-  module WrapUF(S:Scheme): Oracles = {
+  (* A wrapper providing oracles for
+     non-malleability from a PKS scheme. *)
+  module Wrap(S:Scheme): Oracles = {
     var qs: (message * signature) set
     var pk: pkey
     var sk: skey
@@ -116,9 +122,13 @@ theory UF_CMA.
     fun fresh(m:message,s:signature): bool = {
       return !mem (m,s) qs;
     }
+
+    fun queries(): int = {
+      return card qs;
+    }
   }.
 
-  module UF_CMA(O:Oracles, A:AdvCMA) = {
+  module NM_CMA(O:Oracles, A:AdvCMA) = {
     module A = A(O)
 
     fun main(): bool = {
@@ -134,4 +144,4 @@ theory UF_CMA.
       return forged /\ fresh;
     }
   }.
-end UF_CMA.
+end NM_CMA.

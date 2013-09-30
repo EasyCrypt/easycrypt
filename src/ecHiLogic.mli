@@ -31,20 +31,10 @@ type hitenv = {
 }
 
 (* -------------------------------------------------------------------- *)
-val process_form_opt : EcEnv.LDecl.hyps -> pformula -> ty option -> form
-val process_form    : EcEnv.LDecl.hyps -> pformula -> ty -> form
-val process_formula : EcEnv.LDecl.hyps -> pformula -> form
-
-val process_mkn_apply :
-     ('a -> form)
-  -> 'a fpattern
-  -> goal
-  -> goal * int list
-
-(* -------------------------------------------------------------------- *)
 type engine = ptactic_core -> tactic
 
 val process_logic   : engine * hitenv -> EcLocation.t -> logtactic -> tactic
 val process_intros  : ?cf:bool -> intropattern -> goal -> goals
 val process_trivial : tactic
+val process_rewrite : EcLocation.t -> rwarg list -> tactic
 val process_done    : tactic

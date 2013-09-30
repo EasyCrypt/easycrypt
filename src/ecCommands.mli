@@ -19,7 +19,8 @@ val get_notifier : unit -> notifier
 val notify : EcScope.scope -> ('a, unit, string, unit) format4 -> 'a
 
 (* -------------------------------------------------------------------- *)
-val current : unit -> EcScope.scope
+val initialize : boot:bool -> wrapper:(string option) -> unit
+val current    : unit -> EcScope.scope
 
 (* -------------------------------------------------------------------- *)
 val full_check : bool -> int -> string list option -> unit

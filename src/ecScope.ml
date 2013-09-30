@@ -327,10 +327,12 @@ end = struct
     | Sasgn   _ -> ()
     | Srnd    _ -> ()
     | Sassert _ -> ()
+    | Sabstract _ -> ()
 
     | Scall (_, f, _) -> cb f.x_top
     | Sif (_, s1, s2) -> List.iter (on_mpath_stmt cb) [s1; s2]
     | Swhile (_, s)   -> on_mpath_stmt cb s
+
 
   and on_mpath_stmt cb (s : stmt) =
     List.iter (on_mpath_instr cb) s.s_node
@@ -380,6 +382,7 @@ end = struct
       | EcFol.FhoareS   hs           -> on_mpath_hs  cb hs
       | EcFol.FequivF   ef           -> on_mpath_ef  cb ef
       | EcFol.FequivS   es           -> on_mpath_es  cb es
+      | EcFol.FeagerF   eg           -> on_mpath_eg  cb eg
       | EcFol.FbdHoareS bhs          -> on_mpath_bhs cb bhs
       | EcFol.FbdHoareF bhf          -> on_mpath_bhf cb bhf
       | EcFol.Fpr       pr           -> on_mpath_pr  cb pr
@@ -408,6 +411,14 @@ end = struct
       on_mpath_stmt cb es.EcFol.es_sr;
       on_mpath_memenv cb es.EcFol.es_ml;
       on_mpath_memenv cb es.EcFol.es_mr
+
+    and on_mpath_eg cb eg =
+      on_mpath_form cb eg.EcFol.eg_pr;
+      on_mpath_form cb eg.EcFol.eg_po;
+      cb eg.EcFol.eg_fl.x_top;
+      cb eg.EcFol.eg_fr.x_top;
+      on_mpath_stmt cb eg.EcFol.eg_sl;
+      on_mpath_stmt cb eg.EcFol.eg_sr;
 
     and on_mpath_bhf cb bhf =
       on_mpath_form cb bhf.EcFol.bhf_pr;
@@ -728,56 +739,62 @@ module Prover = struct
 
   let _ = EcPException.register pp_error
 
-  let check_prover_name name =
-    let s = unloc name in
-    if not (EcProvers.check_prover_name s) then
-      EcLocation.locate_error name.pl_loc (Unknown_prover s);
-    s
+  let check_prover_name { pl_desc = name; pl_loc = loc } =
+    if not (EcProvers.check_prover_name name) then
+      EcLocation.locate_error loc (Unknown_prover name);
+    name
 
-  let mk_prover_info scope max time ns =
-    let dft = Prover_info.get scope.sc_options in
-    let time = odfl dft.EcProvers.prover_timelimit time in
-    let time = if time < 1 then 1 else time in
-    let provers = odfl dft.EcProvers.prover_names ns in
-    let provers = Array.to_list provers in
-    let max     = odfl dft.EcProvers.prover_max_run max in
-    { EcProvers.prover_max_run   = max;
-      EcProvers.prover_names     = Array.of_list provers;
-      EcProvers.prover_timelimit = time }
+  let set_wrapper scope wrapper =
+    let pi = Prover_info.get scope.sc_options in
+    let pi = { pi with EcProvers.pr_wrapper = wrapper } in
+      { scope with sc_options = Prover_info.set scope.sc_options pi; }
+
+  let mk_prover_info scope maxprocs time ns =
+    let dft      = Prover_info.get scope.sc_options in
+    let time     = max 1 (odfl dft.EcProvers.pr_timelimit time) in
+    let provers  = odfl dft.EcProvers.pr_provers ns in
+    let maxprocs = odfl dft.EcProvers.pr_maxprocs maxprocs in
+      { EcProvers.pr_maxprocs  = maxprocs;
+        EcProvers.pr_provers   = provers;
+        EcProvers.pr_timelimit = time;
+        EcProvers.pr_wrapper   = dft.EcProvers.pr_wrapper; }
 
   let set_prover_info scope max time ns =
     let pi = mk_prover_info scope max time ns in
       { scope with sc_options = Prover_info.set scope.sc_options pi }
 
   let set_all scope =
-    let provers = Array.of_list (EcProvers.known_provers ()) in
-    set_prover_info scope None None (Some provers)
+    let provers = EcProvers.known_provers () in
+      set_prover_info scope None None (Some provers)
 
   let set_default scope max provers =
     let provers =
       match provers with
-      | None -> List.filter EcProvers.check_prover_name ["Alt-Ergo";"Z3";"Vampire";"Eprover";"Yices"]
-      | Some ps -> List.iter (fun s -> if not (EcProvers.check_prover_name s) then raise (Unknown_prover s)) ps;ps
+      | None ->
+         let provers = EcProvers.dft_prover_names in
+           List.filter EcProvers.check_prover_name provers
+      | Some provers ->
+          List.iter
+            (fun name ->
+              if not (EcProvers.check_prover_name name) then
+                raise (Unknown_prover name)) provers;
+          provers
     in
-    let provers = Array.of_list provers in
-    let time = 3 in
-      set_prover_info scope (Some max) (Some time) (Some provers)
+      set_prover_info scope (Some max) (Some 3) (Some provers)
 
   let process scope pi =
     let max  = pi.pprov_max in
     let time = pi.pprov_time in
     let ns   = pi.pprov_names in
     let ns   = ns |> omap (List.map check_prover_name) in
-    let ns   = ns |> omap Array.of_list in
-    set_prover_info scope max time ns
+      set_prover_info scope max time ns
 
   let mk_prover_info scope pi =
     let max  = pi.pprov_max in
     let time = pi.pprov_time in
     let ns   = pi.pprov_names in
     let ns   = ns |> omap (List.map check_prover_name) in
-    let ns   = ns |> omap Array.of_list in
-    mk_prover_info scope max time ns
+      mk_prover_info scope max time ns
 
   let full_check scope =
     { scope with sc_options = Check_mode.full_check scope.sc_options }
@@ -962,44 +979,6 @@ module Pred = struct
 end
 
 (* -------------------------------------------------------------------- *)
-module Ty = struct
-  open EcDecl
-  open EcTyping
-
-  let bind (scope : scope) ((x, tydecl) : (_ * tydecl)) =
-    assert (scope.sc_pr_uc = None);
-    let scope = { scope with sc_env = EcEnv.Ty.bind x tydecl scope.sc_env; } in
-    let scope = maybe_add_to_section scope (EcTheory.CTh_type (x, tydecl)) in
-      scope
-
-  let add (scope : scope) info =
-    assert (scope.sc_pr_uc = None);
-    let (args, name) = info.pl_desc and loc = info.pl_loc in
-    let ue     = ue_for_decl scope.sc_env (loc, Some args) in
-    let tydecl = {
-      tyd_params = EcUnify.UniEnv.tparams ue;
-      tyd_type   = None;
-    } in
-      bind scope (unloc name, tydecl)
-
-  let addclass (scope : scope) tcd =
-    assert (scope.sc_pr_uc = None);
-    let tclass = EcTyping.trans_tclass scope.sc_env tcd in
-      scope
-
-  let define (scope : scope) info body =
-    assert (scope.sc_pr_uc = None);
-    let (args, name) = info.pl_desc and loc = info.pl_loc in
-    let ue     = ue_for_decl scope.sc_env (loc, Some args) in
-    let body   = transty tp_tydecl scope.sc_env ue body in
-    let tydecl = {
-      tyd_params = EcUnify.UniEnv.tparams ue;
-      tyd_type   = Some body;
-    } in
-      bind scope (unloc name, tydecl)
-end
-
-(* -------------------------------------------------------------------- *)
 module Mod = struct
   module TT = EcTyping
 
@@ -1022,7 +1001,7 @@ module Mod = struct
             let env = scope.sc_env in
             (* We keep only the internal part, i.e the inner global variables *)
             (* TODO : using mod_use here to compute the set of inner global 
-               variables is inefficiant, change this algo *)
+               variables is inefficient, change this algo *)
             let mp = EcPath.mpath_crt mpath [] None in
             let use = EcEnv.NormMp.mod_use env mp in
             let rx = 
@@ -1059,7 +1038,7 @@ module Mod = struct
 
   let declare (scope : scope) m =
     if not (CoreSection.in_section scope.sc_section) then
-      hierror "cannot declare an abstract module outside of a module";
+      hierror "cannot declare an abstract module outside of a section";
 
     let modty = m.ptmd_modty in
     let tysig = fst (TT.transmodtype scope.sc_env (fst modty)) in
@@ -1213,15 +1192,18 @@ module Ax = struct
 
         let tc =
           match tc with
-          | Some tc -> [tc]
+          | Some tc -> tc
           | None    ->
               let dtc = Plogic (Psmt (None, empty_pprover)) in
-              let dtc = [{ pl_loc = loc; pl_desc = dtc }] in
-              let dtc = List.map (fun t -> { pt_core = t; pt_intros = []; }) dtc in
+              let dtc = { pl_loc = loc; pl_desc = dtc } in
+              let dtc = { pt_core = dtc; pt_intros = []; } in
                 dtc
         in
 
-        let scope = Tactics.process_r false mode scope tc in
+        let tc = { pl_loc = loc; pl_desc = Pby [tc] } in
+        let tc = { pt_core = tc; pt_intros = []; } in
+
+        let scope = Tactics.process_r false mode scope [tc] in
           save scope loc
 
     | PAxiom ->
@@ -1310,6 +1292,193 @@ module Ax = struct
 end
 
 (* -------------------------------------------------------------------- *)
+module Ty = struct
+  open EcDecl
+  open EcTyping
+  open EcAlgebra
+
+  (* ------------------------------------------------------------------ *)
+  let bind (scope : scope) ((x, tydecl) : (_ * tydecl)) =
+    assert (scope.sc_pr_uc = None);
+    let scope = { scope with sc_env = EcEnv.Ty.bind x tydecl scope.sc_env; } in
+    let scope = maybe_add_to_section scope (EcTheory.CTh_type (x, tydecl)) in
+      scope
+
+  (* ------------------------------------------------------------------ *)
+  let add (scope : scope) info =
+    assert (scope.sc_pr_uc = None);
+    let (args, name) = info.pl_desc and loc = info.pl_loc in
+    let ue = ue_for_decl scope.sc_env (loc, Some args) in
+    let tydecl = {
+      tyd_params = EcUnify.UniEnv.tparams ue;
+      tyd_type   = None;
+    } in
+      bind scope (unloc name, tydecl)
+
+  (* ------------------------------------------------------------------ *)
+  let define (scope : scope) info body =
+    assert (scope.sc_pr_uc = None);
+    let (args, name) = info.pl_desc and loc = info.pl_loc in
+    let ue     = ue_for_decl scope.sc_env (loc, Some args) in
+    let body   = transty tp_tydecl scope.sc_env ue body in
+    let tydecl = {
+      tyd_params = EcUnify.UniEnv.tparams ue;
+      tyd_type   = Some body;
+    } in
+      bind scope (unloc name, tydecl)
+
+  (* ------------------------------------------------------------------ *)
+  let addclass (scope : scope) tcd =
+    assert (scope.sc_pr_uc = None);
+    let _tclass = EcTyping.trans_tclass scope.sc_env tcd in
+      scope
+
+  (* ------------------------------------------------------------------ *)
+  let check_tci_operators env ops reqs =
+    let rmap = Mstr.of_list reqs in
+    let ops =
+      List.fold_left
+        (fun m (x, op) ->
+          if not (Mstr.mem (unloc x) rmap) then
+            hierror ~loc:x.pl_loc "invalid operator name: `%s'" (unloc x);
+          let op =
+            let filter op = match op.op_kind with OB_oper _ -> true | _ -> false in
+            match EcEnv.Op.all filter (unloc op) env with
+            | []      -> hierror ~loc:op.pl_loc "unknown operator"
+            | _::_::_ -> hierror ~loc:op.pl_loc "ambiguous operator"
+            | [op]    -> op
+          in
+            Mstr.change
+              (function
+               | None   -> Some (x.pl_loc, op)
+               | Some _ -> hierror ~loc:(x.pl_loc)
+                             "duplicated operator name: `%s'" (unloc x))
+              (unloc x) m)
+        Mstr.empty ops
+    in
+      List.iter
+        (fun (x, (req, _)) ->
+           if req && not (Mstr.mem x ops) then
+             hierror "no definition for operator `%s'" x)
+        reqs;
+      List.fold_left
+        (fun m (x, (_, ty)) ->
+           match Mstr.find_opt x ops with
+           | None -> m
+           | Some (loc, (p, op)) ->
+               if not (EcReduction.equal_type env ty (op_ty op)) then
+                 hierror ~loc "invalid type for operator `%s'" x;
+               Mstr.add x p m)
+        Mstr.empty reqs
+
+  (* ------------------------------------------------------------------ *)
+  let check_tci_axioms scope mode axs reqs =
+    let rmap = Mstr.of_list reqs in
+    let symbs, axs =
+      List.map_fold
+        (fun m (x, t) ->
+          if not (Mstr.mem (unloc x) rmap) then
+            hierror ~loc:x.pl_loc "invalid axiom name: `%s'" (unloc x);
+          if Sstr.mem (unloc x) m then
+            hierror ~loc:(x.pl_loc) "duplicated axiom name: `%s'" (unloc x);
+          (Sstr.add (unloc x) m, (unloc x, t, Mstr.find (unloc x) rmap)))
+        Sstr.empty axs
+    in
+      List.iter
+        (fun (x, _) ->
+           if not (Mstr.mem x symbs) then
+             hierror "no proof for axiom `%s'" x)
+        reqs;
+      List.iter
+        (fun (x, pt, f) ->
+          let t  = { pt_core = pt; pt_intros = []; } in
+          let t  = { pl_loc = pt.pl_loc; pl_desc = Pby [t] } in
+          let t  = { pt_core = t; pt_intros = []; } in
+          let ax = { ax_tparams = [];
+                     ax_spec    = Some f;
+                     ax_kind    = `Axiom;
+                     ax_nosmt   = true; } in
+
+          let pucflags = { puc_nosmt = false; puc_local = false; } in
+          let pucflags = (([], None), pucflags) in
+          let check    = Check_mode.check scope.sc_options in
+
+          let escope = scope in
+          let escope = Ax.start_lemma escope pucflags check x ax in
+          let escope = Tactics.proof escope mode true in
+          let escope = Tactics.process_r false mode escope [t] in
+            ignore (Ax.save escope pt.pl_loc))
+        axs
+
+  (* ------------------------------------------------------------------ *)
+  let ring_of_symmap ty symbols =
+    { r_type  = ty;
+      r_zero  = oget (Mstr.find_opt "rzero" symbols);
+      r_one   = oget (Mstr.find_opt "rone"  symbols);
+      r_add   = oget (Mstr.find_opt "add"   symbols);
+      r_opp   = oget (Mstr.find_opt "opp"   symbols);
+      r_mul   = oget (Mstr.find_opt "mul"   symbols);
+      r_exp   = oget (Mstr.find_opt "expr"  symbols);
+      r_sub   = Mstr.find_opt "sub" symbols;
+      r_embed =
+        match Mstr.find_opt "ofint" symbols with
+        | None   -> `Direct
+        | Some p -> `Embed p }
+
+  let addring (scope : scope) mode { pl_desc = tci; pl_loc = loc } =
+    if not (EcAlgTactic.is_module_loaded scope.sc_env) then
+      hierror "load AlgTactic first";
+
+    let (ty, p) =
+      let ue = ue_for_decl scope.sc_env (loc, Some []) in
+      let ty = mk_loc tci.pti_type.pl_loc (PTnamed tci.pti_type) in
+      let ty = transty tp_tydecl scope.sc_env ue ty in
+        match (EcEnv.Ty.hnorm ty scope.sc_env).ty_node with
+        | Tconstr (p, []) -> (ty,  p)
+        | _ -> assert false
+    in
+    let symbols = EcAlgTactic.ring_symbols scope.sc_env ty in
+    let symbols = check_tci_operators scope.sc_env tci.pti_ops symbols in
+    let cr      = ring_of_symmap ty symbols in
+    let axioms  = EcAlgTactic.ring_axioms scope.sc_env cr in
+      check_tci_axioms scope mode tci.pti_axs axioms;
+      { scope with sc_env = EcEnv.Algebra.add_ring p cr scope.sc_env }
+
+  (* ------------------------------------------------------------------ *)
+  let field_of_symmap ty symbols =
+    { f_ring = ring_of_symmap ty symbols;
+      f_inv  = oget (Mstr.find_opt "inv" symbols);
+      f_div  = Mstr.find_opt "div" symbols; }
+
+  let addfield (scope : scope) mode { pl_desc = tci; pl_loc = loc } =
+    if not (EcAlgTactic.is_module_loaded scope.sc_env) then
+      hierror "load AlgTactic first";
+
+    let (ty, p) =
+      let ue = ue_for_decl scope.sc_env (loc, Some []) in
+      let ty = mk_loc tci.pti_type.pl_loc (PTnamed tci.pti_type) in
+      let ty = transty tp_tydecl scope.sc_env ue ty in
+        match (EcEnv.Ty.hnorm ty scope.sc_env).ty_node with
+        | Tconstr (p, []) -> (ty, p)
+        | _ -> assert false
+    in
+    let symbols = EcAlgTactic.field_symbols scope.sc_env ty in
+    let symbols = check_tci_operators scope.sc_env tci.pti_ops symbols in
+    let cr      = field_of_symmap ty symbols in
+    let axioms  = EcAlgTactic.field_axioms scope.sc_env cr in
+      check_tci_axioms scope mode tci.pti_axs axioms;
+      { scope with sc_env = EcEnv.Algebra.add_field p cr scope.sc_env }
+
+  (* ------------------------------------------------------------------ *)
+  (* We currently only deal with [ring] and [field] *)
+  let addinstance (scope : scope) mode ({ pl_desc = tci } as toptci) =
+    match unloc tci.pti_name with
+    | ([], "ring" ) -> addring  scope  mode toptci
+    | ([], "field") -> addfield scope  mode toptci
+    | _ -> hierror "unknown type class"
+end
+
+(* -------------------------------------------------------------------- *)
 module Theory = struct
   open EcTheory
 
@@ -1360,7 +1529,7 @@ module Theory = struct
           | None -> ()
           | Some sp ->
               if p_equal sp (EcEnv.root scope.sc_env) then
-                hierror "cannot close a theory with active sessions";
+                hierror "cannot close a theory with active sections";
         end;
         let cth      = EcEnv.Theory.close scope.sc_env in
         let loaded   = scope.sc_loaded in
@@ -1445,6 +1614,8 @@ module Theory = struct
       | None -> Some (axc.C.axc_axiom, axc.C.axc_path, axc.C.axc_env)
       | Some pt ->
           let t = { pt_core = pt; pt_intros = []; } in
+          let t = { pl_loc = pt.pl_loc; pl_desc = Pby [t]; } in
+          let t = { pt_core = t; pt_intros = []; } in
           let (x, ax) = axc.C.axc_axiom in
 
           let pucflags = { puc_nosmt = false; puc_local = false; } in
@@ -1541,6 +1712,12 @@ module Section = struct
               let scope = List.fold_left bind1 scope th.EcTheory.cth_struct in
               let _, scope = Theory.exit scope in
                 scope
+
+          | T.CTh_instance (p, cr) -> begin
+              match cr with
+              | `Ring  cr -> { scope with sc_env = EcEnv.Algebra.add_ring  p cr scope.sc_env }
+              | `Field cr -> { scope with sc_env = EcEnv.Algebra.add_field p cr scope.sc_env }
+          end
         in
 
         List.fold_left bind1 scope oitems

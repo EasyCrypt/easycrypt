@@ -37,6 +37,10 @@ let copy (x : 'a) : 'a =
   Obj.obj (Obj.dup (Obj.repr x))
 
 (* -------------------------------------------------------------------- *)
+let reffold (f : 'a -> 'b * 'a) (r : 'a ref) : 'b =
+  let (x, v) = f !r in r := v; x
+
+(* -------------------------------------------------------------------- *)
 type 'a tuple0 = unit
 type 'a tuple1 = 'a
 type 'a tuple2 = 'a * 'a
@@ -45,12 +49,22 @@ type 'a tuple4 = 'a * 'a * 'a * 'a
 type 'a tuple5 = 'a * 'a * 'a * 'a * 'a
 type 'a tuple6 = 'a * 'a * 'a * 'a * 'a * 'a
 type 'a tuple7 = 'a * 'a * 'a * 'a * 'a * 'a * 'a
+type 'a tuple8 = 'a * 'a * 'a * 'a * 'a * 'a * 'a * 'a
+type 'a tuple9 = 'a * 'a * 'a * 'a * 'a * 'a * 'a * 'a * 'a
 
 (* -------------------------------------------------------------------- *)
 let as_seq0 = function [] -> () | _ -> assert false
 let as_seq1 = function [x] -> x | _ -> assert false
 let as_seq2 = function [x1; x2] -> (x1, x2) | _ -> assert false
 let as_seq3 = function [x1; x2; x3] -> (x1, x2, x3) | _ -> assert false
+
+let as_seq4 = function
+  | [x1; x2; x3; x4] -> (x1, x2, x3, x4)
+  | _ -> assert false
+
+let as_seq5 = function
+  | [x1; x2; x3; x4; x5] -> (x1, x2, x3, x4, x5)
+  | _ -> assert false
 
 (* -------------------------------------------------------------------- *)
 let proj3_1 (x, _, _) = x
@@ -383,24 +397,23 @@ module List = struct
         else r
     | _, _ -> invalid_arg "List.filter2"
 
-  let rec smart_map f l = 
-    match l with
-    | [] -> l
-    | h::tl ->
-        let h' = f h in
-        let tl' = smart_map f tl in
-	if h'==h && tl'==tl then l else 
-        h'::tl'
-
-  let smart_map_fold (f : 'a -> 'b -> 'a * 'c) (a : 'a) (xs : 'b list) =
-    let r = ref a in
-    let f b = 
-      let (a,c) = f !r b in
-      r := a; c in
-    let l = smart_map f xs in
-    !r, l
-
   let sum xs = List.fold_left (+) 0 xs
+
+  module Smart = struct
+    let rec map f l = 
+      match l with
+      | []    -> []
+      | x::xs ->
+        let x'  = f x in
+        let xs' = map f xs in
+          if x == x' && xs == xs' then l else x'::xs'
+
+    let map_fold f a xs =
+      let r = ref a in
+      let f x = let (a, x) = f !r x in r := a; x in
+      let xs = map f xs in
+        (!r, xs)
+  end
 end
 
 (* -------------------------------------------------------------------- *)
@@ -456,6 +469,26 @@ module String = struct
         r.[i] <- f s.[i]
       done;
       r
+
+  let startswith ptn subject =
+    let rec doit i =
+      if   i = String.length ptn
+      then true
+      else ptn.[i] = subject.[i] && doit (i+1)
+    in
+      if   String.length ptn > String.length subject
+      then false
+      else doit 0
+
+  let endswith ptn subject =
+    let rec doit off i =
+      if   i = String.length ptn
+      then true
+      else ptn.[i] = subject.[i+off] && doit off (i+1)
+    in
+      if   String.length ptn > String.length subject
+      then false
+      else doit (String.length subject - String.length ptn) 0
 
   let slice ?first ?last (s : string) =
     let first = odfl 0 first in

@@ -42,7 +42,7 @@ intros bs; apply Array.extensionality; smt.
 save.
 
 (* Xor *)
-op (^^)(bs0 bs1:bitstring): bitstring = map2 Bool.xorb bs0 bs1.
+op (^^)(bs0 bs1:bitstring): bitstring = map2 Bool.(^^) bs0 bs1.
 
 lemma xor_length: forall (bs0 bs1:bitstring),
   length bs0 = length bs1 =>
@@ -52,65 +52,79 @@ by [].
 lemma xor_get: forall (bs0 bs1:bitstring) (i:int),
   length bs0 = length bs1 =>
   0 <= i => i < length bs0 =>
-  (bs0 ^^ bs1).[i] = Bool.xorb bs0.[i] bs1.[i]
+  (bs0 ^^ bs1).[i] = Bool.(^^) bs0.[i] bs1.[i]
 by [].
 
-(* Zero for bitstrings *)
+(* Zero and one for bitstrings *)
+
 op zeros: int -> bitstring.
+op ones : int -> bitstring.
 
-axiom zeros_length: forall (l:int),
-  0 <= l =>
-  length (zeros l) = l.
+axiom zeros_spec (l:int) : zeros l = create l false.
+axiom ones_spec (l:int) : ones l = create l true.
 
-axiom zeros_get: forall (l i:int),
+lemma zeros_length (l:int): 0 <= l => length (zeros l) = l.
+proof.
+ rewrite zeros_spec; apply create_length.
+qed.
+
+lemma zeros_get (l i:int):
   0 <= l => 0 <= i => i < l =>
   (zeros l).[i] = false.
+proof.
+ rewrite zeros_spec;apply create_get.
+qed.
+
+lemma ones_length (l:int): 0 <= l => length (ones l) = l.
+proof.
+ rewrite ones_spec; apply create_length.
+qed.
+
+lemma ones_get (l i:int):
+  0 <= l => 0 <= i => i < l =>
+  (ones l).[i] = true.
+proof.
+ rewrite ones_spec;apply create_get.
+qed.
+
+lemma zeros_ones (l:int): 0 < l =>
+  ! ((zeros l) = (ones l)).
+proof.
+ intros Hl;rewrite - not_def.
+ intros Heq;cut H : true = false; last smt.
+ rewrite - (zeros_get l 0) //;first smt.
+ by rewrite - (ones_get l 0) //;smt.
+save.
 
 (* Lemmas *)
 lemma xor_nilpotent: forall (bs:bitstring),
   bs ^^ bs = zeros (length bs).
 proof.
-  intros bs; apply extensionality.
-  delta (==); simplify; split; first smt.
-  intros i i_pos i_upbd.
-  delta (^^); simplify.
-  rewrite (zeros_get (length bs) i _ _ _);
-    [smt | smt | smt | ].
-  rewrite (map2_get<:bool,bool,bool> bs bs Bool.xorb i _ _ _);
-    smt.
+  intros bs;apply extensionality;smt.
 save.
 
 lemma xor_assoc : forall (x y z : bitstring), 
 length(x) = length(y) => length(y) = length(z) =>
  (x ^^ y) ^^ z = x ^^ (y ^^ z).
 proof.
- intros x y z Hleq1 Hleq2.
- apply extensionality.
- delta (==);simplify.
- split;try smt.
- delta (^^);simplify.
- intros i H H0.
- rewrite (map2_get<:bool,bool,bool> (map2 Bool.xorb x y) z Bool.xorb i _ _ _);
-  [smt | smt | smt | ].
- rewrite (map2_get<:bool,bool,bool> x y Bool.xorb i _ _ _);
-  [smt | smt | smt | ].
- rewrite (map2_get<:bool,bool,bool> x (map2 Bool.xorb y z)  Bool.xorb i _ _ _);
-  [smt | smt | smt | ].
- rewrite (map2_get<:bool,bool,bool> y z Bool.xorb i _ _ _);
- smt.
+ intros x y z Hleq1 Hleq2; apply extensionality.
+ cut Hxz : length x = length z by by rewrite Hleq1.
+ cut Hxxy : length x = length (x ^^ y) by by rewrite xor_length.
+ cut Hxyz : length x = length (y ^^ z) by by rewrite xor_length.
+ split; first by rewrite ?xor_length // Hleq1.
+ intros _ i Hle Hlt;rewrite ?xor_get //; first 5 smt.
+ apply Bool.xor_associative.
 save.
 
-lemma xor_zeroes_neutral : forall (x : bitstring),
-x ^^ zeros(length(x)) = x.
+lemma xor_zeros_neutral : forall (x : bitstring),
+  x ^^ zeros(length(x)) = x.
 proof.
- intros x; apply extensionality.
- delta (==); simplify; split; first smt.
- intros i i_pos i_upbd; delta (^^); simplify.
- rewrite (map2_get<:bool,bool,bool> x (zeros (length x)) Bool.xorb i _ _ _);
-  [smt | smt | smt | ].
- rewrite (zeros_get (length x) i _ _ _);
- smt.
-save.
+ intros x; apply extensionality;split;first by smt.
+ intros Heq;rewrite Heq => i Hle Hlt;rewrite xor_get //.
+   by rewrite zeros_length //;smt.
+ rewrite zeros_get //; first smt.
+ apply Bool.xor_false.
+qed.
 
 require import Real.
 require import Distr.

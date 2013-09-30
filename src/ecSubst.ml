@@ -5,6 +5,7 @@ open EcDecl
 open EcFol
 open EcModules
 open EcTheory
+open EcAlgebra
 
 module Sp    = EcPath.Sp
 module Sm    = EcPath.Sm
@@ -26,6 +27,7 @@ type subst = {
   sb_modules : EcPath.mpath Mid.t;
   sb_path    : EcPath.path Mp.t;
   sb_tydef   : (EcIdent.t list * ty) Mp.t;
+  sb_opdef   : (EcIdent.t list * expr) Mp.t;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -33,6 +35,7 @@ let empty : subst = {
   sb_modules = Mid.empty;
   sb_path    = Mp.empty;
   sb_tydef   = Mp.empty;
+  sb_opdef   = Mp.empty;
 }
 
 let is_empty s = 
@@ -53,6 +56,10 @@ let add_tydef (s : subst) p (ids, ty) =
   assert (Mp.find_opt p s.sb_tydef = None);
   { s with sb_tydef = Mp.add p (ids, ty) s.sb_tydef }
 
+let add_opdef (s : subst) p (ids, e) =
+  assert (Mp.find_opt p s.sb_opdef = None);
+  { s with sb_opdef = Mp.add p (ids, e) s.sb_opdef }
+
 (* -------------------------------------------------------------------- *)
 type _subst = {
   s_s   : subst;
@@ -60,6 +67,7 @@ type _subst = {
   s_fmp : (EcPath.mpath -> EcPath.mpath);
   s_sty : ty_subst;
   s_ty  : (ty -> ty);
+  s_op  : (EcIdent.t list * expr) Mp.t;
 }
 
 let _subst_of_subst s = 
@@ -71,18 +79,20 @@ let _subst_of_subst s =
       s_p   = sp;
       s_fmp = sm;
       s_sty = sty;
-      s_ty  = st; }
+      s_ty  = st;
+      s_op  = s.sb_opdef; }
 
 let e_subst_of_subst (s:_subst) = 
   { es_freshen = true;
     es_p       = s.s_p;
     es_ty      = s.s_ty;
+    es_opdef   = s.s_op;
     es_mp      = s.s_fmp;
     es_xp      = EcPath.x_subst s.s_fmp;
     es_loc     = Mid.empty; }
 
 let f_subst_of_subst (s:_subst) = 
-  Fsubst.f_subst_init true s.s_s.sb_modules s.s_sty
+  Fsubst.f_subst_init true s.s_s.sb_modules s.s_sty s.s_op
 
 (* -------------------------------------------------------------------- *)
 let subst_variable (s : _subst) (x : variable) =
@@ -295,12 +305,38 @@ let subst_ax (s : _subst) (ax : axiom) =
     | None -> None
     | Some f -> 
         let s = f_subst_of_subst s in
-        Some (Fsubst.f_subst s f)
+          Some (Fsubst.f_subst s f)
   in
      { ax_tparams = params;
        ax_spec    = spec;
        ax_kind    = ax.ax_kind;
        ax_nosmt   = ax.ax_nosmt; }
+
+(* -------------------------------------------------------------------- *)
+let subst_ring (s : _subst) cr =
+  { r_type  = s.s_ty cr.r_type;
+    r_zero  = s.s_p cr.r_zero;
+    r_one   = s.s_p cr.r_one;
+    r_add   = s.s_p cr.r_add;
+    r_opp   = s.s_p cr.r_opp;
+    r_mul   = s.s_p cr.r_mul;
+    r_exp   = s.s_p cr.r_exp;
+    r_sub   = cr.r_sub |> omap s.s_p;
+    r_embed =
+      match cr.r_embed with
+      | `Direct  -> `Direct
+      | `Embed p -> `Embed (s.s_p p); }
+
+let subst_field (s : _subst) cr =
+  { f_ring = subst_ring s cr.f_ring;
+    f_inv  = s.s_p cr.f_inv;
+    f_div  = cr.f_div |> omap s.s_p; }
+
+(* -------------------------------------------------------------------- *)
+let subst_instance (s : _subst) tci =
+  match tci with
+  | `Ring  cr -> `Ring  (subst_ring  s cr)
+  | `Field cr -> `Field (subst_field s cr)
 
 (* -------------------------------------------------------------------- *)
 (* SUBSTITUTION OVER THEORIES *)
@@ -326,6 +362,9 @@ let rec subst_theory_item (s : _subst) (item : theory_item) =
 
   | Th_export p -> 
       Th_export (s.s_p p)
+
+  | Th_instance (p, tci) ->
+      Th_instance (s.s_p p, subst_instance s tci)
 
 (* -------------------------------------------------------------------- *)
 and subst_theory (s : _subst) (items : theory) =
@@ -354,6 +393,9 @@ and subst_ctheory_item (s : _subst) (item : ctheory_item) =
 
   | CTh_export p ->
       CTh_export (s.s_p p)
+
+  | CTh_instance (p, cr) ->
+      CTh_instance (s.s_p p, subst_instance s cr)
 
 (* -------------------------------------------------------------------- *)
 and subst_ctheory_struct (s : _subst) (th : ctheory_struct) =
@@ -405,3 +447,5 @@ let subst_modsig_body  s = subst_modsig_body (_subst_of_subst s)
 
 let subst_mpath        s = (_subst_of_subst s).s_fmp
 let subst_path         s = (_subst_of_subst s).s_p
+
+let subst_form         s = fun f -> (Fsubst.f_subst (f_subst_of_subst (_subst_of_subst s)) f)

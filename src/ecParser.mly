@@ -197,7 +197,7 @@
 %token EXPORT
 %token FEL
 %token FIELD
-%token FIELDSIMP
+%token RING
 %token FINAL
 %token FIRST
 %token FISSION
@@ -217,6 +217,7 @@
 %token IMPOSSIBLE
 %token IN
 %token INLINE
+%token INSTANCE
 %token INTROS
 %token IOTA
 %token KILL
@@ -311,7 +312,9 @@
 %token WP
 %token EQOBSIN
 %token TRANSITIVITY
+%token SYMMETRY
 %token ZETA 
+%token EAGER
 
 %token <string> OP1 OP2 OP3 OP4
 %token LTCOLON GT LT GE LE
@@ -393,6 +396,7 @@ genqident(X):
 | x=LIDENT { x }
 | x=UIDENT { x }
 | x=PUNIOP { x }
+| x=paren(PUNIOP) { x }
 | x=PBINOP { x }
 
 | paren(DCOLON) { EcCoreLib.s_cons }
@@ -720,6 +724,9 @@ sform_u(P):
 
 | EQUIV LBRACKET eb=equiv_body(P) RBRACKET { eb }
 
+(* ADDED FOR EAGER *)
+| EAGER LBRACKET eb=eager_body(P) RBRACKET { eb }
+
 | HOARE LBRACKET
     s=loc(fun_def_body)
     COLON pre=form_r(P) LONGARROW post=form_r(P)
@@ -870,6 +877,11 @@ equiv_body(P):
   COLON pre=form_r(P) LONGARROW post=form_r(P)
 
     { PFequivF (pre, (mp1, mp2), post) }
+
+eager_body(P):
+| s1=stmt COMMA  mp1=loc(fident) TILD mp2=loc(fident) COMMA s2=stmt
+    COLON pre=form_r(P) LONGARROW post=form_r(P)
+    { PFeagerF (pre, (s1, mp1, mp2,s2), post) }
 
 pgtybinding1:
 | x=ptybinding1 { List.map (fun (xs,ty) -> xs, PGTY_Type ty) x }
@@ -1075,7 +1087,7 @@ mod_def:
         | `Alias m ->
              if p <> [] then
                error (EcLocation.make $startpos $endpos)
-                 (Some "cannot parameterized module alias");
+                 (Some "cannot parameterize module alias");
              if t <> None then
                error (EcLocation.make $startpos $endpos)
                  (Some "cannot bind module type to module alias"); 
@@ -1227,6 +1239,25 @@ tc_body: ops=tc_op* axs=tc_ax* { (ops, axs) };
 tc_op: OP x=lident COLON ty=loc(type_exp) { (x, ty) };
 
 tc_ax: AXIOM ax=form { ax };
+
+(* -------------------------------------------------------------------- *)
+(* Type classes (instances)                                             *)
+tycinstance:
+| INSTANCE x=qident WITH ty=qident ops=tyci_op* axs=tyci_ax* {
+    { pti_name = x;
+      pti_type = ty;
+      pti_ops  = ops;
+      pti_axs  = axs; }
+  }
+;
+
+tyci_op:
+| OP x=ident EQ tg=qoident { (x, tg) }
+;
+
+tyci_ax:
+| PROOF x=ident BY tg=tactic_core { (x, tg) }
+;
 
 (* -------------------------------------------------------------------- *)
 (* Operator definitions                                                 *)
@@ -1509,6 +1540,7 @@ fpattern_head(F):
 
 fpattern_arg:
 | UNDERSCORE   { EA_none }
+| LPAREN LTCOLON m=loc(mod_qident) RPAREN  { EA_mod m }
 | f=sform      { EA_form f }
 | s=mident     { EA_mem s }
 ;
@@ -1621,9 +1653,11 @@ code_position:
 
 while_tac_info : 
 | inv=sform
-    { (inv, None) }
+    { (inv, None, None) }
 | inv=sform vrnt=sform 
-    { (inv, Some vrnt) }
+    { (inv, Some vrnt, None) }
+| inv=sform vrnt=sform k=sform eps=sform 
+    { (inv, Some vrnt, Some (k,eps)) }
 
 rnd_info:
 | empty {PNoRndParams (* None,None *) }
@@ -1722,11 +1756,11 @@ logtactic:
 | SPLIT
     { Psplit }
 
-| FIELD plus=sform times=sform inv=sform minus=sform z=sform o=sform eq=sform
-    { Pfield (plus,times,inv,minus,z,o,eq)}
+| FIELD eqs=ident*
+    { Pfield eqs }
 
-| FIELDSIMP plus=sform times=sform inv=sform minus=sform z=sform o=sform  eq=sform
-    { Pfieldsimp (plus,times,inv,minus,z,o,eq)}
+| RING eqs=ident*
+    { Pring eqs }
 
 | EXIST a=iplist1(loc(fpattern_arg), COMMA) %prec prec_below_comma
    { Pexists a }
@@ -1773,6 +1807,31 @@ logtactic:
 | POSE o=rwocc? x=lident CEQ p=form_h %prec prec_below_IMPL
    { Ppose (x, o |> omap EcMaps.Sint.of_list, p) }
 ;
+
+(* NEW : ADDED FOR EAGER *)
+eager_info:
+| h=ident 
+    { LE_done h }
+| LPAREN h=ident COLON s1=stmt TILD s2=stmt COLON pr=form LONGARROW po=form RPAREN
+    { LE_todo(h,s1,s2,pr,po) }
+;
+eager_tac:
+| SEQ n1=number n2=number i=eager_info COLON p=sform
+    { Peager_seq (i,(n1,n2),p) }
+| IF 
+    { Peager_if }
+| WHILE i=eager_info 
+    { Peager_while i }
+| FUN 
+    { Peager_fun_def }
+| FUN i=eager_info f=sform 
+    { Peager_fun_abs(i,f) }
+| CALL info=fpattern(call_info) 
+    { Peager_call info }
+| info=eager_info COLON p=sform 
+    { Peager(info,p) }
+;
+(* END EAGER *)
 
 phltactic:
 | FUN
@@ -1843,6 +1902,10 @@ phltactic:
 
 | ALIAS s=side? o=codepos WITH x=lident
     { Palias (s, o, Some x) }
+(* NEW *)
+| ALIAS s=side? o=codepos x=lident EQ e=expr 
+    { Pset (false,s, o,x,e) }
+(* END NEW *)
 
 | FISSION s=side? o=codepos AT d1=NUM COMMA d2=NUM
     { Pfission (s, o, (1, (d1, d2))) }
@@ -1889,18 +1952,33 @@ phltactic:
     { Peqobs_in info }
 | TRANSITIVITY tk=trans_kind h1=trans_hyp h2=trans_hyp
     { Ptrans_stmt (tk, fst h1, snd h1, fst h2, snd h2) }
+(* ADDED *)
+| SYMMETRY 
+    { Psymmetry }    
 
 | SP s=side?
    {Psp s}
+(* NEW : ADDED FOR EAGER *)
+| EAGER t=eager_tac { t }
 
 (* basic pr based tacs *)
 | HOARE {Phoare}
 | BDHOARE {Pbdhoare}
 | PRBOUNDED {Pprbounded}
 | REWRITE PR s=LIDENT {Ppr_rewrite s}
+(* NEW TACTIC *)
+| BDHOARE SPLIT i=bdhoare_split { Pbdhoare_split i }
+(* NEW TACTIC *)
+| BDHOARE EQUIV s=side pr=sform po=sform { Pbd_equiv(s,pr,po) } 
 (* TODO : remove this tactic *)
 | PRFALSE {Pprfalse}
 | BDEQ {Pbdeq}
+;
+
+bdhoare_split:
+| b1=sform b2=sform b3=sform? { BDH_split_bop (b1,b2,b3) }
+| b1=sform b2=sform COLON f=sform { BDH_split_or_case (b1,b2,f) }
+| NOT b1=sform b2=sform      { BDH_split_not (Some b1,b2) }
 ;
 
 trans_kind:
@@ -2094,6 +2172,11 @@ clone_proof:
 | PROOF x=clone_lemma { List.rev x }
 ;
 
+opclmode:
+| EQ { `Alias }
+| LEFTARROW { `Inline }
+;
+
 clone_override:
 | TYPE ps=typarams x=qident EQ t=loc(type_exp)
    { (x, PTHO_Type (ps, t, `Alias)) }
@@ -2101,35 +2184,32 @@ clone_override:
 | TYPE ps=typarams x=qident LEFTARROW t=loc(type_exp)
    { (x, PTHO_Type (ps, t, `Inline)) }
 
-| OP x=qoident LEFTARROW y=qoident
-   { (x, PTHO_Op (`OpInline y)) }
-
-| OP x=qoident tyvars=tyvars_decl COLON sty=loc(type_exp) EQ e=expr
+| OP x=qoident tyvars=tyvars_decl COLON sty=loc(type_exp) mode=opclmode e=expr
    { let ov = {
        opov_tyvars = tyvars;
        opov_args   = [];
        opov_retty  = sty;
        opov_body   = e;
      } in
-       (x, PTHO_Op (`OpDef ov)) }
+       (x, PTHO_Op (ov, mode)) }
 
-| OP x=qoident tyvars=tyvars_decl eq=loc(EQ) e=expr
+| OP x=qoident tyvars=tyvars_decl mode=loc(opclmode) e=expr
    { let ov = {
        opov_tyvars = tyvars;
        opov_args   = [];
-       opov_retty  = mk_loc eq.pl_loc PTunivar;
+       opov_retty  = mk_loc mode.pl_loc PTunivar;
        opov_body   = e;
      } in
-       (x, PTHO_Op (`OpDef ov)) }
+       (x, PTHO_Op (ov, unloc mode)) }
 
-| OP x=qoident tyvars=tyvars_decl p=ptybindings eq=loc(EQ) e=expr
+| OP x=qoident tyvars=tyvars_decl p=ptybindings mode=loc(opclmode) e=expr
    { let ov = {
        opov_tyvars = tyvars;
        opov_args   = p;
-       opov_retty  = mk_loc eq.pl_loc PTunivar;
+       opov_retty  = mk_loc mode.pl_loc PTunivar;
        opov_body   = e;
      } in
-       (x, PTHO_Op (`OpDef ov)) }
+       (x, PTHO_Op (ov, unloc mode)) }
 
 | PRED x=qoident tyvars=tyvars_decl p=ptybindings EQ f=form
    { let ov = {
@@ -2163,6 +2243,8 @@ print:
 | THEORY qs=qident { Pr_th qs }
 | PRED   qs=qident { Pr_pr qs } 
 | AXIOM  qs=qident { Pr_ax qs }
+| MODULE qs=qident { Pr_mod qs }
+| MODULE TYPE qs=qident { Pr_mty qs }
 ;
 
 prover_iconfig:
@@ -2208,6 +2290,7 @@ global_:
 | sig_def          { Ginterface   $1 }
 | type_decl_or_def { Gtype        $1 }
 | typeclass        { Gtypeclass   $1 }
+| tycinstance      { Gtycinstance $1 }
 | datatype_def     { Gdatatype    $1 }
 | operator         { Goperator    $1 }
 | predicate        { Gpredicate   $1 }

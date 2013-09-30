@@ -7,6 +7,7 @@ const length:int.
 axiom leq0_length: 0 <= length.
 
 op zeros: word.
+op ones: word.
 
 op ( ^ ): word -> word -> word.
 

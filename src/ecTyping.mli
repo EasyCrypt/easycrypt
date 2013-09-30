@@ -99,6 +99,7 @@ val transbinding : EcEnv.env -> EcUnify.unienv -> ptybindings ->
 (* -------------------------------------------------------------------- *)
 val transexp     : EcEnv.env -> EcUnify.unienv -> pexpr -> expr * ty
 val transexpcast : EcEnv.env -> EcUnify.unienv -> ty -> pexpr -> expr
+val transexpcast_opt : EcEnv.env -> EcUnify.unienv -> ty option -> pexpr -> expr
 
 (* -------------------------------------------------------------------- *)
 val transstmt    : EcEnv.env -> EcUnify.unienv -> pstmt -> stmt

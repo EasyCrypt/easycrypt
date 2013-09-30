@@ -84,6 +84,14 @@ let process_pr fmt scope p =
   | Pr_ax qs ->
       let (p, ax) = EcEnv.Ax.lookup qs.pl_desc env in
       Format.fprintf fmt "%a@." (EcPrinting.pp_axiom ppe) (p, ax)
+     
+  | Pr_mod qs ->
+      let (_p, me) = EcEnv.Mod.lookup qs.pl_desc env in
+      Format.fprintf fmt "%a@." (EcPrinting.pp_modexp ppe) me
+
+  | Pr_mty qs ->
+      let (p, ms) = EcEnv.ModTy.lookup qs.pl_desc env in
+      Format.fprintf fmt "%a@." (EcPrinting.pp_modsig ppe) (p, ms)
 
 let process_print scope p = 
   process_pr Format.std_formatter scope p
@@ -123,6 +131,13 @@ and process_typeclass (scope : EcScope.scope) (tcd : ptypeclass located) =
   EcScope.check_state `InTop "type class" scope;
   let scope = EcScope.Ty.addclass scope tcd in
     notify scope "added type class: `%s'" (unloc tcd.pl_desc.ptc_name);
+    scope
+
+(* -------------------------------------------------------------------- *)
+and process_tycinst (scope : EcScope.scope) (tci : ptycinstance located) =
+  EcScope.check_state `InTop "type class instance" scope;
+  let mode = if (!pragma).pm_check then `Check else `WeakCheck in
+  let scope = EcScope.Ty.addinstance scope mode tci in
     scope
 
 (* -------------------------------------------------------------------- *)
@@ -307,44 +322,37 @@ and process (ld : EcLoader.ecloader) (scope : EcScope.scope) g =
   let scope =
     match
       match g.pl_desc with
-      | Gtype      t    -> `Fct   (fun scope -> process_type       scope  (mk_loc loc t))
-      | Gtypeclass t    -> `Fct   (fun scope -> process_typeclass  scope  (mk_loc loc t))
-      | Gdatatype  t    -> `Fct   (fun scope -> process_datatype   scope  (mk_loc loc t))
-      | Gmodule    m    -> `Fct   (fun scope -> process_module     scope  m)
-      | Gdeclare   m    -> `Fct   (fun scope -> process_declare    scope  m)
-      | Ginterface i    -> `Fct   (fun scope -> process_interface  scope  i)
-      | Goperator  o    -> `Fct   (fun scope -> process_operator   scope  (mk_loc loc o))
-      | Gpredicate p    -> `Fct   (fun scope -> process_predicate  scope  (mk_loc loc p))
-      | Gaxiom     a    -> `Fct   (fun scope -> process_axiom      scope  (mk_loc loc a))
-      | Gclaim     c    -> `Fct   (fun scope -> process_claim      scope  c)
-      | GthOpen    name -> `Fct   (fun scope -> process_th_open    scope  name.pl_desc)
-      | GthClose   name -> `Fct   (fun scope -> process_th_close   scope  name.pl_desc)
-      | GthRequire name -> `Fct   (fun scope -> process_th_require ld scope name)
-      | GthImport  name -> `Fct   (fun scope -> process_th_import  scope  name.pl_desc)
-      | GthExport  name -> `Fct   (fun scope -> process_th_export  scope  name.pl_desc)
-      | GthClone   thcl -> `Fct   (fun scope -> process_th_clone   scope  thcl)
-      | GsctOpen        -> `Fct   (fun scope -> process_sct_open   scope)
-      | GsctClose       -> `Fct   (fun scope -> process_sct_close  scope)
-      | GthW3      a    -> `Fct   (fun scope -> process_w3_import  scope  a)
-      | Gprint     p    -> `Fct   (fun scope -> process_print      scope  p; scope)
-      | Gtactics   t    -> `Fct   (fun scope -> process_tactics    scope  t)
-      | Grealize   p    -> `Fct   (fun scope -> process_realize    scope  p)
-      | Gprover_info pi -> `Fct   (fun scope -> process_proverinfo scope  pi)
-      | Gcheckproof b   -> `Fct   (fun scope -> process_checkproof scope  b)
-      | Gsave      loc  -> `Fct   (fun scope -> process_save       scope  loc)
-      | Gpragma    opt  -> `State (fun scope -> process_pragma     scope  opt)
+      | Gtype        t    -> `Fct   (fun scope -> process_type       scope  (mk_loc loc t))
+      | Gtypeclass   t    -> `Fct   (fun scope -> process_typeclass  scope  (mk_loc loc t))
+      | Gtycinstance t    -> `Fct   (fun scope -> process_tycinst    scope  (mk_loc loc t))
+      | Gdatatype    t    -> `Fct   (fun scope -> process_datatype   scope  (mk_loc loc t))
+      | Gmodule      m    -> `Fct   (fun scope -> process_module     scope  m)
+      | Gdeclare     m    -> `Fct   (fun scope -> process_declare    scope  m)
+      | Ginterface   i    -> `Fct   (fun scope -> process_interface  scope  i)
+      | Goperator    o    -> `Fct   (fun scope -> process_operator   scope  (mk_loc loc o))
+      | Gpredicate   p    -> `Fct   (fun scope -> process_predicate  scope  (mk_loc loc p))
+      | Gaxiom       a    -> `Fct   (fun scope -> process_axiom      scope  (mk_loc loc a))
+      | Gclaim       c    -> `Fct   (fun scope -> process_claim      scope  c)
+      | GthOpen      name -> `Fct   (fun scope -> process_th_open    scope  name.pl_desc)
+      | GthClose     name -> `Fct   (fun scope -> process_th_close   scope  name.pl_desc)
+      | GthRequire   name -> `Fct   (fun scope -> process_th_require ld scope name)
+      | GthImport    name -> `Fct   (fun scope -> process_th_import  scope  name.pl_desc)
+      | GthExport    name -> `Fct   (fun scope -> process_th_export  scope  name.pl_desc)
+      | GthClone     thcl -> `Fct   (fun scope -> process_th_clone   scope  thcl)
+      | GsctOpen          -> `Fct   (fun scope -> process_sct_open   scope)
+      | GsctClose         -> `Fct   (fun scope -> process_sct_close  scope)
+      | GthW3        a    -> `Fct   (fun scope -> process_w3_import  scope  a)
+      | Gprint       p    -> `Fct   (fun scope -> process_print      scope  p; scope)
+      | Gtactics     t    -> `Fct   (fun scope -> process_tactics    scope  t)
+      | Grealize     p    -> `Fct   (fun scope -> process_realize    scope  p)
+      | Gprover_info pi   -> `Fct   (fun scope -> process_proverinfo scope  pi)
+      | Gcheckproof  b    -> `Fct   (fun scope -> process_checkproof scope  b)
+      | Gsave        loc  -> `Fct   (fun scope -> process_save       scope  loc)
+      | Gpragma      opt  -> `State (fun scope -> process_pragma     scope  opt)
     with
     | `Fct   f -> Some (f scope)
     | `State f -> f scope; None
   in
-    begin
-      scope |> oiter
-        (fun scope ->
-          try
-            ignore (Sys.getenv "ECDEBUG");
-            EcEnv.dump EcDebug.initial (EcScope.env scope)
-          with Not_found -> ())
-    end;
     scope
 
 (* -------------------------------------------------------------------- *)
@@ -361,33 +369,39 @@ let loadpath () =
   EcLoader.aslist loader
 
 (* -------------------------------------------------------------------- *)
-let initial () =
+let initial ~boot ~wrapper =
   let prelude = (mk_loc _dummy "prelude", Some `Export) in
   let loader  = EcLoader.forsys loader in
   let scope   = EcScope.empty in
-  let scope   = if   !options.o_boot
+  let scope   = if   boot
                 then scope
                 else process_th_require loader scope prelude in
+  let scope   = EcScope.Prover.set_wrapper scope wrapper in
     scope
 
 (* -------------------------------------------------------------------- *)
-let context = ref (0, lazy (initial ()), [])
+let context = ref None
+
+(* -------------------------------------------------------------------- *)
+let initialize ~boot ~wrapper =
+  assert (!context = None);
+  context := Some (0, initial ~boot ~wrapper, [])
 
 (* -------------------------------------------------------------------- *)
 let current () =
-  let (_, lazy scope, _) = !context in scope
+  let (_, scope, _) = oget !context in scope
 
 (* -------------------------------------------------------------------- *)
 let full_check b max_provers provers =
-  let (idx, lazy scope, l) = !context in
+  let (idx, scope, l) = oget !context in
   assert (idx = 0 && l = []);  
   let scope = EcScope.Prover.set_default scope max_provers provers in
   let scope = if b then EcScope.Prover.full_check scope else scope in
-    context := (idx, lazy scope, l)
+    context := Some (idx, scope, l)
 
 (* -------------------------------------------------------------------- *)
 let uuid () : int =
-  let (idx, _, _) = !context in idx
+  let (idx, _, _) = oget !context in idx
 
 (* -------------------------------------------------------------------- *)
 let mode () : string =
@@ -400,24 +414,24 @@ let undo (olduuid : int) =
   if olduuid < (uuid ()) then
     begin
       for i = (uuid ()) - 1 downto olduuid do
-        let (_, _scope, stack) = !context in
-        context := (i, lazy (List.hd stack), List.tl stack)
+        let (_, _scope, stack) = oget !context in
+        context := Some (i, List.hd stack, List.tl stack)
       done
     end
 
 (* -------------------------------------------------------------------- *)
 let process (g : global located) =
-  let (idx, lazy scope, stack) = !context in
+  let (idx, scope, stack) = oget !context in
     match process loader scope g with
     | None -> ()
-    | Some newscope -> context := (idx+1, lazy newscope, scope :: stack)
+    | Some newscope -> context := Some (idx+1, newscope, scope :: stack)
 
 (* -------------------------------------------------------------------- *)
 module S = EcScope
 module L = EcBaseLogic
 
 let pp_current_goal stream =
-  let (_, lazy scope, _) = !context in
+  let (_, scope, _) = oget !context in
 
   match S.xgoal scope with
   | None -> ()

@@ -170,6 +170,11 @@ cut ext_eq: (Array.length (row M i) = fst (size M) /\
                Array."_.[_]" (row M i) j = M.[(j,i)] /\
                Array."_.[_]" (column (transpose M) i) j = (transpose M).[(i,j)] /\
                (transpose M).[(i,j)] = M.[(j,i)]);[ | smt ];
-progress; smt.
-save.
+progress=> //.
+  by apply row_length.
+  by rewrite column_length=> //; smt.
+  by apply row_get.
+  by apply column_get=> //; smt.
+  by apply transpose_get.
+qed.
 

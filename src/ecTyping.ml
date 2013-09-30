@@ -334,6 +334,7 @@ let (i_inuse, s_inuse, se_inuse) =
 
     | Sassert e ->
       se_inuse map e
+    | Sabstract _ -> assert false (* FIXME *)
 
   and s_inuse (map : uses) (s : stmt) =
     List.fold_left i_inuse map s.s_node
@@ -681,10 +682,14 @@ let transexp (env : EcEnv.env) (ue : EcUnify.unienv) e =
 
 let transexpcast (env : EcEnv.env) (ue : EcUnify.unienv) t e =
   let (e', t') = transexp env ue e in
-
   try  EcUnify.unify env ue t' t; e'
   with EcUnify.UnificationFailure (t1, t2) ->
     tyerror e.pl_loc env (TypeMismatch ((t', t), (t1, t2)))
+
+let transexpcast_opt (env : EcEnv.env) (ue : EcUnify.unienv) oty e =
+  match oty with
+  | None -> fst (transexp env ue e)
+  | Some t -> transexpcast env ue t e
 
 (* -------------------------------------------------------------------- *)
 exception DuplicatedSigItemName
@@ -1493,8 +1498,8 @@ let transmem env m =
       tyerror m.pl_loc env (UnknownMemName (0, unloc m))
       
   | Some me -> 
-      if (EcMemory.memtype me) <> None then
-        tyerror m.pl_loc env (InvalidMem (unloc m, MAE_IsConcrete));
+(*      if (EcMemory.memtype me) <> None then
+        tyerror m.pl_loc env (InvalidMem (unloc m, MAE_IsConcrete)); *)
       (fst me)
 
 (* -------------------------------------------------------------------- *)
@@ -1525,7 +1530,7 @@ let trans_form_or_pattern env tc (ps, ue) pf tt =
           transf_r (Some opsc) env f
 
     | PFglob gp ->
-        let mp = trans_topmsymbol env gp in
+        let (mp,_) = trans_msymbol env gp in
         let me =  
           match EcEnv.Memory.current env with
           | None -> tyerror f.pl_loc env NoActiveMemory
@@ -1585,7 +1590,7 @@ let trans_form_or_pattern env tc (ps, ue) pf tt =
             let x2 = lookup EcFol.mright x in
             f_eq x1 x2
           | GVglob gp ->
-            let mp = trans_topmsymbol env gp in
+            let (mp,_) = trans_msymbol env gp in
             check_mem gp.pl_loc EcFol.mleft;
             check_mem gp.pl_loc EcFol.mright;
             let x1 = f_glob mp EcFol.mleft in
@@ -1756,6 +1761,19 @@ let trans_form_or_pattern env tc (ps, ue) pf tt =
           unify_or_fail qenv ue post.pl_loc ~expct:tbool post'.f_ty;
           f_equivF pre' fpath1 fpath2 post'
 
+    | PFeagerF (pre, (s1,gp1,gp2,s2), post) ->
+        let fpath1 = trans_gamepath env gp1 in
+        let fpath2 = trans_gamepath env gp2 in
+        let penv, qenv = EcEnv.Fun.equivF fpath1 fpath2 env in
+        let pre'  = transf penv pre in
+        let post' = transf qenv post in
+        let s1    = transstmt env ue s1 in
+        let s2    = transstmt env ue s2 in
+        unify_or_fail penv ue pre .pl_loc ~expct:tbool pre' .f_ty;
+        unify_or_fail qenv ue post.pl_loc ~expct:tbool post'.f_ty;
+        f_eagerF pre' s1 fpath1 fpath2 s2 post'
+        
+
   and trans_fbind env ue decl = 
     let trans1 env (xs, pgty) =
         match pgty with
@@ -1768,6 +1786,8 @@ let trans_form_or_pattern env tc (ps, ue) pf tt =
   
         | PGTY_ModTy(mi,restr) ->
           let (mi, _) = transmodtype env mi in
+          (* FIXME ? why do we use trans_topmsymbol 
+             and not trans_msymbol here *)
           let restr = Sx.empty, Sm.of_list (List.map (trans_topmsymbol env) restr) in
           let ty = GTmodty (mi, restr) in
           let add1 env x = 

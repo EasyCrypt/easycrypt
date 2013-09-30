@@ -32,7 +32,7 @@ axiom zeros_get: forall i,
 op (^^): word -> word -> word.
 axiom xor_get: forall w0 w1 i,
   0 <= i => i < length =>
-  (w0 ^^ w1).[i] = Bool.xorb w0.[i] w1.[i].
+  (w0 ^^ w1).[i] = Bool.(^^) w0.[i] w1.[i].
 
 lemma xor_nilpotent: forall w,
   w ^^ w = zeros.

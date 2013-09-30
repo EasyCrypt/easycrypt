@@ -131,6 +131,7 @@ module Mpv = struct
     | Sif    (c, s1, s2) -> i_if     (esubst c, ssubst s1, ssubst s2)
     | Swhile (e, stmt)   -> i_while  (esubst e, ssubst stmt)
     | Sassert e          -> i_assert (esubst e)
+    | Sabstract _        -> i
 
   and issubst env (s : esubst) (is : instr list) =
     List.map (isubst env s) is
@@ -257,6 +258,10 @@ module PV = struct
       
   let remove env pv fv = 
     { fv with s_pv = Mnpv.remove (pvm env pv) fv.s_pv }
+
+  (* Works only for abstract module *)
+  let remove_glob mp fv = 
+    { fv with s_gl = Sm.remove mp fv.s_gl } 
       
   let mem_pv env pv fv = Mnpv.mem (pvm env pv) fv.s_pv 
     
@@ -301,7 +306,7 @@ module PV = struct
       | Fapp(e, es) -> List.fold_left (aux env) (aux env fv e) es
       | Ftuple es   -> List.fold_left (aux env) fv es
       | FhoareF _  | FhoareS _ | FbdHoareF _  | FbdHoareS _ 
-      | FequivF _ | FequivS _ | Fpr _ -> assert false 
+      | FequivF _ | FequivS _ | FeagerF _ | Fpr _ -> assert false 
     in
     aux env empty f
 
@@ -371,6 +376,10 @@ module PV = struct
 
   let indep env fv1 fv2 = 
     is_empty (interdep env fv1 fv2)
+
+  let iter fpv fm fv =
+    Mnpv.iter fpv fv.s_pv;
+    Sm.iter fm fv.s_gl
     
 end
 
@@ -402,7 +411,13 @@ let rec f_write ?(except_fs=Sx.empty) env w f =
       else f_write ~except_fs env w o)
       (PV.add_glob env mp w) oi.oi_calls
   | FBdef fdef ->
-    s_write ~except_fs env w fdef.f_body
+    let add x w = 
+      let vb = Var.by_xpath x env in
+      PV.add env (pv_glob x) vb.vb_type w in
+    let w = EcPath.Sx.fold add fdef.f_uses.us_writes w in
+    let fwrite w f = 
+      if Sx.mem f except_fs then w else f_write ~except_fs env w f in
+    List.fold_left fwrite w fdef.f_uses.us_calls
 
 and is_write ?(except_fs=Sx.empty) env w s = 
   List.fold_left (i_write ~except_fs env) w s
@@ -421,6 +436,11 @@ and i_write ?(except_fs=Sx.empty) env w i =
   | Sif (_,s1,s2) -> s_write ~except_fs env (s_write ~except_fs env w s1) s2
   | Swhile (_,s) -> s_write ~except_fs env w s
   | Sassert _ -> w 
+  | Sabstract id -> 
+    let us = AbsStmt.byid id env in 
+    let add_pv w (pv,ty) = PV.add env pv ty w in
+    let w = List.fold_left add_pv w us.EcBaseLogic.aus_writes in
+    List.fold_left (f_write ~except_fs env) w us.EcBaseLogic.aus_calls
     
 let rec f_read env r f = 
   let f = NormMp.norm_xpath env f in
@@ -463,11 +483,55 @@ and i_read env r i =
   | Sif (e,s1,s2) -> s_read env (s_read env (e_read env r e) s1) s2
   | Swhile (e,s) -> s_read env (e_read env r e) s
   | Sassert e -> e_read env r e
+  | Sabstract id -> 
+    let us = AbsStmt.byid id env in 
+    let add_pv r (pv,ty) = PV.add env pv ty r in
+    let r = List.fold_left add_pv r us.EcBaseLogic.aus_reads in
+    List.fold_left (f_read env) r us.EcBaseLogic.aus_calls
 
 let f_write ?(except_fs=Sx.empty) env f = f_write ~except_fs env PV.empty f
 let f_read  env f = f_read env PV.empty f
 let s_write ?(except_fs=Sx.empty) env s = s_write ~except_fs env PV.empty s
 let s_read  env s = s_read  env PV.empty s
+
+let while_info env e s = 
+  let w = PV.empty in
+  let r = e_read env PV.empty e in
+  let c = Sx.empty in
+  let rec i_info (w,r,c) i = 
+    match i.i_node with
+    | Sasgn(lp,e) | Srnd(lp,e) ->
+      let r = e_read env (lp_read env r lp) e in
+      let w = lp_write env w lp in
+      (w,r,c)
+    | Sif(e,s1,s2) ->
+      let r = e_read env r e in
+      s_info (s_info (w,r,c) s1) s2
+    | Swhile(e,s) ->
+      let r = e_read env r e in
+      s_info (w,r,c) s
+    | Scall(lp,f,es) ->
+      let r = List.fold_left (e_read env) r es in
+      let r = match lp with None -> r | Some lp -> lp_read env r lp in
+      let w = match lp with None -> w | Some lp -> lp_write env w lp in
+      let f = NormMp.norm_xpath env f in
+      (w,r,Sx.add f c)
+    | Sassert e ->
+      (w,e_read env r e, c)
+    | Sabstract id ->
+      let us = AbsStmt.byid id env in
+      let add_pv x (pv,ty) = PV.add env pv ty x in 
+      let w = List.fold_left add_pv w us.EcBaseLogic.aus_writes in
+      let r = List.fold_left add_pv r us.EcBaseLogic.aus_reads in
+      let c = 
+        List.fold_left (fun c f -> Sx.add f c) c us.EcBaseLogic.aus_calls in
+      (w,r,c)
+  and s_info info s = List.fold_left i_info info s.s_node in
+  let (w,r,c) = s_info (w,r,c) s in
+  { EcBaseLogic.aus_reads = fst (PV.elements r);
+    EcBaseLogic.aus_writes = fst (PV.elements w);
+    EcBaseLogic.aus_calls = Sx.elements c; }
+
 
 exception EqObsInError
 
@@ -576,6 +640,9 @@ module Mpv2 = struct
             | None -> Some (s,ty)
             | Some(s',_) -> Some (Snpv.union s s', ty))
             x (Mnpv.remove xl eqs.s_pv) }
+        
+  let substs_l env xls xs eqs = 
+    List.fold_left2 (fun eqs (xl,_) x -> subst_l env xl x eqs) eqs xls xs 
 
   let subst_r env xl x eqs = 
     let xl = pvm env xl in
@@ -587,6 +654,9 @@ module Mpv2 = struct
           Snpv.fold (fun x' s ->
             let x' = if pv_equal xl x' then x else x' in
             Snpv.add x' s) s Snpv.empty, ty) eqs.s_pv }
+
+  let substs_r env xrs xs eqs = 
+    List.fold_left2 (fun eqs (xr,_) x -> subst_r env xr x eqs) eqs xrs xs 
 
   let mem_pv_l env x eqs = 
     let x = pvm env x in
@@ -719,6 +789,42 @@ module Mpv2 = struct
       if is_loc pv || Snpv.exists is_loc s then raise EqObsInError)
       eqs.s_pv
 
+  let mem x1 x2 t =
+    try Snpv.mem x2 (fst (Mnpv.find x1 t.s_pv))
+    with Not_found -> false
+
+  let mem_glob m t = Sm.mem m t.s_gl
+
+  let iter fv fg t =
+    Mnpv.iter (fun x1 (s,ty) -> Snpv.iter (fun x2 -> fv x1 x2 ty) s) t.s_pv;
+    Sm.iter fg t.s_gl
+
+  let eq_fv2 t = 
+    let pv = ref Mnpv.empty in
+    let fv _ x2 ty = pv := Mnpv.add x2 (Snpv.singleton x2, ty) !pv in
+    let gl = ref Sm.empty in
+    let fg m = gl := Sm.add m !gl in
+    iter fv fg t;
+    { s_pv = !pv; s_gl = !gl }
+
+  let fv2 t =
+    let pv = ref Mnpv.empty in
+    let fv _ x2 ty = pv := Mnpv.add x2 ty !pv in
+    let gl = ref Sm.empty in
+    let fg m = gl := Sm.add m !gl in
+    iter fv fg t;
+    { PV.s_pv = !pv; PV.s_gl = !gl }
+
+  let eq_refl (fv:PV.t) = 
+    let pv = ref Mnpv.empty in
+    let fx x ty = pv := Mnpv.add x (Snpv.singleton x, ty) !pv in
+    Mnpv.iter fx fv.PV.s_pv;
+    let gl = ref Sm.empty in
+    let fg m = gl := Sm.add m !gl in
+    Sm.iter fg fv.PV.s_gl;
+    { s_pv = !pv; s_gl = !gl }
+    
+
 end
 
 (*add_eqs env local eqs e1 e2 : collect a set of equalities with ensure the
@@ -775,6 +881,8 @@ let eqobs_in env
         true
       with _ -> false in
 
+  let checks pvs fv = List.for_all (fun (pv,_) -> check pv fv) pvs in
+
   let check_not_l lvl eqo =
     let aux (pv,_) =
       check pv ifvl &&
@@ -794,7 +902,6 @@ let eqobs_in env
     | LvMap(_, pvr, _, _) -> aux (pvr,tint) in
 
   let remove lvl lvr eqs = 
-    (* TODO : ensure that the invariant is not modified *)
     let aux eqs (pvl,tyl) (pvr,tyr) = 
       if EcReduction.equal_type env tyl tyr then begin
         if not (check pvl ifvl && check pvr ifvr) then
@@ -809,6 +916,8 @@ let eqobs_in env
     | LvMap((pl,tysl), pvl, el, tyl),
         LvMap((pr,tysr), pvr, er,tyr) when EcPath.p_equal pl pr &&
       List.all2  (EcReduction.equal_type env) (tyl::tysl) (tyr::tysr) ->
+      if not (check pvl ifvl && check pvr ifvr) then
+        raise EqObsInError;
       add_eqs (Mpv2.remove env pvl pvr eqs) el er
     | _, _ -> raise EqObsInError in
 
@@ -829,6 +938,16 @@ let eqobs_in env
       if check xr ifvr then 
         let x = destr_var er in
         s_eqobs_in rsl rsr fhyps (Mpv2.subst_r env xr x eqo)
+      else rsl, rsr, fhyps, eqo
+    | { i_node = Sasgn(LvTuple xls, el)}::rsl, _ when is_tuple_var el ->
+      if checks xls ifvl then
+        let xs = destr_tuple_var el in
+        s_eqobs_in rsl rsr fhyps (Mpv2.substs_l env xls xs eqo)
+      else rsl, rsr, fhyps, eqo
+    | _, { i_node = Sasgn(LvTuple xrs, er)} :: rsr when is_tuple_var er ->
+      if checks xrs ifvr then 
+        let xs = destr_tuple_var er in
+        s_eqobs_in rsl rsr fhyps (Mpv2.substs_r env xrs xs eqo)
       else rsl, rsr, fhyps, eqo
     | {i_node = Sasgn(lvl,_)} ::rsl, _ when check_not_l lvl eqo ->
       s_eqobs_in rsl rsr fhyps eqo 
@@ -951,6 +1070,7 @@ and i_eqobs_in_refl env i eqo =
     aux (add_eqs_refl env eqo e)
 
   | Sassert e -> add_eqs_refl env eqo e
+  | Sabstract _ -> assert false 
 
 and eqobs_inF_refl env f' eqo = 
   let f = NormMp.norm_xpath env f' in
@@ -976,14 +1096,20 @@ and eqobs_inF_refl env f' eqo =
   | FBabs oi -> 
     let do1 eqo o = PV.union (eqobs_inF_refl env o eqo) eqo in
     let top = EcPath.m_functor f.x_top in
-    let add_in eqo = 
-      if oi.oi_in then PV.add_glob env top eqo else eqo in
     let rec aux eqo = 
       let eqi = List.fold_left do1 eqo oi.oi_calls in
-      let eqi = add_in eqi in
       if PV.subset eqi eqo then eqo 
       else aux eqi in
-    aux eqo
+    if oi.oi_in then aux (PV.add_glob env top eqo)
+    else 
+      let eqi = aux (PV.remove_glob top eqo) in
+      if PV.mem_glob env top eqi then begin
+        let ppe = EcPrinting.PPEnv.ofenv env in
+        EcBaseLogic.tacuerror "Function %a may use oracles that need equality on glob %a."
+        (EcPrinting.pp_funname ppe) f' (EcPrinting.pp_topmod ppe) top 
+      end;
+      eqi
+
 
 
 let check_module_in env mp mt =
@@ -991,14 +1117,18 @@ let check_module_in env mp mt =
   let params = sig_.mis_params in
   let global = PV.fv env mhr (NormMp.norm_glob env mhr mp) in
   let env = List.fold_left 
-    (fun env (id,mt) -> Mod.bind_local id mt (Sx.empty,Sm.empty) env) env params in
+    (fun env (id,mt) -> 
+      Mod.bind_local id mt (Sx.empty,Sm.empty) env) env params in
   let extra = List.map (fun (id,_) -> EcPath.mident id) params in
   let mp = EcPath.mpath mp.m_top (mp.m_args @ extra) in
   let check = function
     | Tys_function(fs,oi) ->
       let f = EcPath.xpath_fun mp fs.fs_name in
-      let eqi = eqobs_inF_refl env f global in      
-      if not (oi.oi_in) && not (Mnpv.is_empty eqi.PV.s_pv) then
+      let eqi = eqobs_inF_refl env f global in 
+      (* We remove the paramater not take into account *)
+      let eqi = 
+        List.fold_left (fun eqi mp -> PV.remove_glob mp eqi) eqi extra in 
+      if not (oi.oi_in) && not (PV.is_empty eqi) then
         let ppe = EcPrinting.PPEnv.ofenv env in
         EcBaseLogic.tacuerror "The function %a should initialize %a"
           (EcPrinting.pp_funname ppe) f (PV.pp env) eqi in
