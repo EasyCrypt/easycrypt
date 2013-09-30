@@ -1366,12 +1366,12 @@ section.
     while true (if b then 1 else 0) 1 (1%r/2%r) => //;first smt.
       intros Hw.
       seq 7 : true => //.
-        by wp => /=;rnd;skip;smt.
-        by wp => /=;rnd;skip;smt.
-        intros z0. conseq * (_: true ==> !b) => //;first by smt.
-        wp => /=. 
-        rnd;skip;progress => //.
-        admit.
+      by wp => /=;rnd;skip;smt.
+      by wp => /=;rnd;skip;smt.
+    intros z0. conseq * (_: true ==> !b) => //;first by smt.
+    wp => /=. 
+    rnd;skip;progress => //.
+    by admit.
     intros=> _; fun; sp; if.
       wp; while true (kg2 - i); first by intros=> _; wp; rnd cpTrue; skip; smt.
             skip; smt.
