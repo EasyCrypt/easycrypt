@@ -1968,6 +1968,8 @@ phltactic:
 | REWRITE PR s=LIDENT {Ppr_rewrite s}
 (* NEW TACTIC *)
 | BDHOARE SPLIT i=bdhoare_split { Pbdhoare_split i }
+(* NEW TACTIC *)
+| BDHOARE EQUIV s=side pr=sform po=sform { Pbd_equiv(s,pr,po) } 
 (* TODO : remove this tactic *)
 | PRFALSE {Pprfalse}
 | BDEQ {Pbdeq}
