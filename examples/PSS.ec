@@ -834,8 +834,7 @@ section.
   local equiv G1_G2_equiv: G1.main ~ G2.main: true ==> !H2.bad{2} => ={res}
   by (apply (G1_G2_abstract GAdv); apply lossless_GAdv).
 
-(* TODO: finish this
-require import Sum.
+  (* TODO (note that qG, qH and qS also have global versions if needed for the proof) *)
   local lemma GAdv1_GAdv2_BAD &m (qG qH qS:int) ks:
     0 < qG => 0 < qH => 0 < qS =>
     valid_keys ks =>
@@ -848,6 +847,9 @@ require import Sum.
           card (ISet.Finite.toFSet (dom G.m)) <= qG + qH ] <=
       ((qG + qH) * (qH + qS))%r / (2^k1)%r.
   proof strict.
+  admit.
+(* This proof goes by the failure event lemma and may require dynamic tests for bounding the random oracle sizes *)
+(*
   intros=> lt0_qG lt0_qH lt0_qS valid_ks H_empty nbad G_empty.
   fel 1 (card (ISet.Finite.toFSet (dom G.m))) (lambda x, (qH + qS)%r / (2^k1)%r) (qG + qH) H2.bad [H2.o: (card (ISet.Finite.toFSet (dom G.m)) < qG + qH /\ x = x)]=> //.
     (* Inductive argument on the bound *)
@@ -863,14 +865,44 @@ require import Sum.
       by admit. (* Scoping issues? *)
       smt.
     (* Establishing the invariant *)
-    inline Mem.init; wp; skip; progress=> //. admit. admit.
+    inline Mem.init; wp; skip; progress=> //. admit. admit. (* Completeness of FEL tactic: bug #16416 *)
     (* bounding the probability of bad **becoming** true during a single oracle query *)
-    fun. admit. (** PROOF NOTE: More invariant needed *)
-    (* I don't know *)
+    fun. admit. (** more invariant needed or completeness issue with FEL: the postcondition should be taken
+                    as a "conditional probability" style condition *)
 *)
+  qed.
+
+  local lemma G1_G2_BAD &m (qG qH qS:int):
+    0 < qG => 0 < qH => 0 < qS =>
+    Pr[ G2.main() @ &m:
+          H2.bad /\
+          card (ISet.Finite.toFSet (dom Hmap.m)) <= qH + qS /\
+          card (ISet.Finite.toFSet (dom G.m)) <= qG + qH ] <=
+      ((qG + qH) * (qH + qS))%r / (2^k1)%r.
+  proof strict.
+  intros=> lt0_qG lt0_qH lt0_qS;
+  bdhoare_deno (_: true ==>
+                   H2.bad /\
+                   card (ISet.Finite.toFSet (dom Hmap.m)) <= qH + qS /\
+                   card (ISet.Finite.toFSet (dom G.m)) <= qG + qH)=> //; fun.
+  call (_: valid_keys ks /\
+           Hmap.m{hr} = Map.empty /\
+           !H2.bad{hr} /\
+           G.m{hr} = Map.empty ==>
+           H2.bad /\
+           card (ISet.Finite.toFSet (dom Hmap.m)) <= qH + qS /\
+           card (ISet.Finite.toFSet (dom G.m)) <= qG + qH).
+    (* Here we want to interpret GAdv1_GAdv2_BAD as a bd_hoare statement (the exact one we want to prove) *)
+    admit.
+  call (_: true ==> Hmap.m = Map.empty /\ !H2.bad);
+    first by fun; wp; call (_: true ==> Hmap.m = Map.empty)=> //; fun; wp.
+  call (_: true ==> G.m = Map.empty);
+    first by fun; wp.
+  by rnd.
+  qed.
 
   (** G3: upto "H is called by the signature oracle on a message * salt pair that has
-                previously been queries directly by the adversary" *)
+                previously been queried directly by the adversary" *)
   local module H3: SplitOracle = {
     var bad:bool
 
@@ -940,12 +972,20 @@ require import Sum.
   qed.
 
   (** TODO: Bound the probability of bad in G3 *)
+  local lemma G2_G3_BAD &m (qH qS:int):
+    0 < qH => 0 < qS =>
+    Pr[ G3.main() @ &m:
+          H3.bad /\
+          card (ISet.Finite.toFSet (dom Hmap.m)) <= qH + qS ] <=
+      (qH * (qH + qS))%r / (2^k0)%r. (* Number of direct adversary queries times number of queries
+                                        over size of the input space (randomness only) *)
+  proof strict.
+  admit.
+  qed.
 
   (** G4: compute z and u from the sampled values
         Note: z is uniform in "bitstrings of length k starting with a zero bit" (denoted '0 || 2^k-1'), and
               u is uniform in f^-1(0 || 2^k-1) *)
-
-
   module type Sample_w_st = {
     fun sample(i:pkey) : htag * gtag {*}
   }.
@@ -1049,7 +1089,6 @@ require import Sum.
   by apply (G3_G4_abstract GAdv).
 
   (** G4': Sampling z in a loop *)
-
   local module Sw = {
     fun sample(i:pkey):htag * gtag = {
       var z:signature;
@@ -1328,6 +1367,14 @@ require import Sum.
   local equiv G5_G6_equiv: G5.main ~ G6.main: true ==> !H6.bad{2} => ={res}
   by (apply (G5_G6_abstract GAdv); apply lossless_GAdv).
 
+  (* TODO: bound the probability of bad in G6 *)
+  local lemma G5_G6_BAD &m qH:
+    0 < qH =>
+    Pr[ G6.main() @ &m: H6.bad ] <= qH%r / (2^kg2)%r.
+  proof strict.
+  admit. (* I bleieve we are still missing a tactic for this? *)
+  qed.
+
   (** G7: No longer using sk to simulate the oracles *)
   local module H7: SplitOracle = {
     fun init(ks:pkey * skey): unit = {
@@ -1425,10 +1472,12 @@ require import Sum.
   by (apply (G6_G7_abstract GAdv); apply lossless_GAdv).
 
 
-  (** TODO: Bounding the probability of xstar being 0 *)
   (** Proof Note: no abstraction possile here because of a problem with H7 not initializing G's state.
       Why is it not an issue in earlier steps? (In particular, the one immediately above,
       speaking of exactly the same games...) *)
+  (* TODO: Benjamin: check soundness of the application of the termination result
+           for GAdv in previous games where Hn (with n between 0 and 7) uses G directly
+           but does not initialize it. *)
   local module Ha = GAdv(H7,G).Ha.
   local module Si  = GAdv(H7,G).S.
 
