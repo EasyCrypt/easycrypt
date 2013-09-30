@@ -334,6 +334,7 @@ let (i_inuse, s_inuse, se_inuse) =
 
     | Sassert e ->
       se_inuse map e
+    | Sabstract _ -> assert false (* FIXME *)
 
   and s_inuse (map : uses) (s : stmt) =
     List.fold_left i_inuse map s.s_node

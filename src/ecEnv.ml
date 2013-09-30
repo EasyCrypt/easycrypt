@@ -129,6 +129,7 @@ type preenv = {
   env_locals   : (EcIdent.t * EcTypes.ty) MMsym.t;
   env_memories : EcMemory.memenv MMsym.t;
   env_actmem   : EcMemory.memory option;
+  env_abs_st   : EcBaseLogic.abs_uses Mid.t;
   env_tci      : (tcinstance list) Mp.t;
   env_modlcs   : Sid.t;                 (* declared modules *)
   env_w3       : EcWhy3.env;
@@ -192,6 +193,7 @@ let empty () =
       env_locals   = MMsym.empty;
       env_memories = MMsym.empty;
       env_actmem   = None;
+      env_abs_st   = Mid.empty;
       env_tci      = Mp.empty;
       env_modlcs   = Sid.empty;
       env_w3       = EcWhy3.empty;
@@ -211,6 +213,7 @@ type lookup_error = [
   | `MPath   of mpath
   | `Path    of path
   | `QSymbol of qsymbol
+  | `AbsStmt of EcIdent.t
 ]
 
 exception LookupFailure of lookup_error
@@ -222,6 +225,7 @@ let pp_lookup_failure fmt e =
     | `MPath   p -> EcPath.m_tostring p
     | `Path    p -> EcPath.tostring p
     | `QSymbol p -> string_of_qsymbol p
+    | `AbsStmt p -> EcIdent.tostring p
   in
     Format.fprintf fmt "unknown symbol: %s" p
 
@@ -1276,6 +1280,19 @@ module Var = struct
        env bindings
 
 end
+
+module AbsStmt = struct
+  type t = EcBaseLogic.abs_uses
+    
+  let byid id env = 
+    try Mid.find id env.env_abs_st 
+    with Not_found -> raise (LookupFailure (`AbsStmt id))
+
+  let bind id us env = 
+    { env with env_abs_st = Mid.add id us env.env_abs_st }
+
+end
+    
 
 (* -------------------------------------------------------------------- *)
 module Mod = struct
@@ -2557,6 +2574,7 @@ module LDecl = struct
       | _ -> assert false 
       end 
     | LD_hyp f -> LD_hyp (Fsubst.f_subst s f)
+    | LD_abs_st _ -> assert false (* FIXME *)
 
   type hyps = {
     le_initial_env : env;
@@ -2579,6 +2597,7 @@ module LDecl = struct
     | LD_mem mt      -> Memory.push (x,mt)   env
     | LD_modty (i,r) -> Mod.bind_local x i r env
     | LD_hyp   _     -> env
+    | LD_abs_st us    -> AbsStmt.bind x us env 
 
    let add_local x k h = 
     let nhyps = add_local x k (tohyps h) in
@@ -2595,7 +2614,14 @@ module LDecl = struct
       | LD_var (ty,Some f) -> fv_union ty.ty_fv f.f_fv
       | LD_mem mt -> EcMemory.mt_fv mt 
       | LD_hyp f -> f.f_fv
-      | LD_modty(p,r) -> gty_fv (GTmodty(p,r)) in
+      | LD_modty(p,r) -> gty_fv (GTmodty(p,r)) 
+      | LD_abs_st us -> 
+        let fv = Mid.empty in
+        let add fv (x,_) =  EcPath.x_fv fv x.pv_name in
+        let fv = List.fold_left add fv us.aus_reads in
+        let fv = List.fold_left add fv us.aus_writes in
+        List.fold_left EcPath.x_fv fv us.aus_calls in
+
     let check (id,lk) = 
       if EcIdent.Sid.mem id ids then false
       else
@@ -2666,7 +2692,8 @@ let norm_l_decl env (hyps,concl) =
     | LD_var (ty,o) -> x, LD_var (ty, o |> omap norm)
     | LD_mem _ -> x, lk
     | LD_modty _ -> x, lk
-    | LD_hyp f -> x, LD_hyp (norm f) in
+    | LD_hyp f -> x, LD_hyp (norm f) 
+    | LD_abs_st _ -> x, lk in
   let concl = norm concl in
   let lhyps = List.map onh hyps.h_local in
   ({ hyps with h_local = lhyps}, concl)

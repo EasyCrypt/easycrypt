@@ -36,6 +36,7 @@ type lookup_error = [
   | `MPath   of mpath
   | `Path    of path
   | `QSymbol of qsymbol
+  | `AbsStmt of EcIdent.t
 ]
 
 exception LookupFailure of lookup_error
@@ -278,6 +279,11 @@ module Ty : sig
   val defined : path -> env -> bool
   val unfold  : path -> EcTypes.ty list -> env -> EcTypes.ty
   val hnorm   : EcTypes.ty -> env -> EcTypes.ty
+end
+
+module AbsStmt : sig
+  type t = EcBaseLogic.abs_uses
+  val byid : EcIdent.t -> env -> t
 end
 
 (* -------------------------------------------------------------------- *)

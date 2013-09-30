@@ -71,6 +71,7 @@ and callable_oracles_i env modv os i =
     | Sif (_,s1,s2) -> callable_oracles_s env modv (callable_oracles_s env modv os s1) s2
     | Swhile (_,s) -> callable_oracles_s env modv os s
     | Sasgn _ | Srnd _ | Sassert _ -> os 
+    | Sabstract _ -> assert false (* FIXME *)
 
 let callable_oracles_stmt env (modv:PV.t) = callable_oracles_s env modv EcPath.Sx.empty
 

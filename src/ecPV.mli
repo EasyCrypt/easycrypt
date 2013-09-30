@@ -92,6 +92,8 @@ val s_read   : env -> stmt -> PV.t
 val is_read  : env -> PV.t -> instr list -> PV.t 
 val f_read   : env -> EcPath.xpath -> PV.t
 
+val while_info : env -> expr -> stmt -> EcBaseLogic.abs_uses
+
 exception EqObsInError
 
 module Mpv2 : sig

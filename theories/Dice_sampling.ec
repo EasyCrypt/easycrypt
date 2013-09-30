@@ -43,17 +43,19 @@ theory GenDice.
       cut d_uni : forall x, in_supp x (d i0) => mu_x (d i0) x = bd.
          by intros x Hx;rewrite /bd; apply dU => //; apply test_in_supp.
       cut Hdiff : ! bdt = (Real.zero)%Real by smt.
+      conseq (_:_: = (if test i r then Distr.charfun ((=) k) r{hr} else 1%r / bdt)).
+        intros &hr [H1 H2];rewrite (neqF (test i{hr} r{hr}) _) //.
       while (i0=i) (if test i r then 0 else 1) 1 (bdt * bd) => //; first 2 smt.
         intros Hw; alias 2 r0 = r.
         cut Htk' := Htk;generalize Htk';rewrite -test_sub_supp => Hmemk.
         bd_hoare split bd ((1%r - bdt*bd) * (1%r/bdt)) : (k=r0).
-          by intros _ _; fieldeq => //.
+          by intros &hr [H1 H2];rewrite  (neqF (test i{hr} r{hr}) _) //=; fieldeq.
           (* bounding pr : k = r0 /\ k = r *)
           seq 2 : (k = r0) bd 1%r 1%r 0%r (r0 = r /\ i = i0) => //.
             by wp;rnd => //.
             wp;rnd;skip;progress => //. 
-            rewrite /bd /mu_x;apply mu_eq => w //.
-            by rcondf 1 => //.
+            rewrite /bd /mu_x;apply mu_eq => w' //.
+            rcondf 1 => //.
           by conseq * (_: _ ==> false) => //.
           (* bounding pr : ! k = r0 /\ k = r *)
         bd_hoare split 0%r ((1%r - bdt*bd) * (1%r/bdt)) : (test i r0).
@@ -61,20 +63,20 @@ theory GenDice.
           (* bounding pr :  test i r0 /\ ! k = r0 /\ k = r *) 
           seq 2 : (test i r0) 1%r 0%r 1%r 0%r (i0 = i /\ test i k /\ r0 = r) => //.
             by wp;rnd => //.
-            by rcondf 1 => //;hoare;skip;smt.
+            by rcondf 1 => //; hoare;skip;smt.
           by conseq * (_ : _ ==> false) => //.
           (* bounding pr :  !test i r0 /\ ! k = r0 /\ k = r *) 
         seq 2 : (test i r0) 1%r 0%r (1%r - bdt*bd) (1%r/bdt) 
                            (i0 = i /\ test i k /\ r0 = r) => //.
           by wp;rnd => //.
-          by rcondf 1 => //;hoare;skip;smt.
+          conseq * (_:_ ==> false) => //.
           bd_hoare split ! 1%r (bdt*bd);wp;rnd => //.
           skip;progress => //.
           rewrite -(mu_eq (d i{hr}) (cpMem (sub_supp i{hr}))).
             by intros x ; rewrite /= -test_sub_supp.
           apply (mu_cpMem (sub_supp i{hr}) (d i{hr}) bd _) => x Hx.
           by apply d_uni; apply test_in_supp; rewrite -test_sub_supp.
-        conseq * Hw => //; by smt.
+        by conseq * Hw => //; smt.
       by conseq * (_ : _ ==> true) => //;rnd;skip;progress=> //; smt.
       intros z;conseq * (_ : _ ==>  mem r (sub_supp i)); first smt.
       rnd;skip;progress => //.

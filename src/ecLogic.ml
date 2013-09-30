@@ -906,7 +906,9 @@ let t_generalize_hyps ids g =
         f_forall [x,GTmodty(mt,r)] ff, AAmp(mp,sig_) :: args, lt 
       | LD_hyp f ->
         let ff, args, lt = aux s ids in
-        f_imp f ff, AAnode :: args, t_hyp id :: lt in
+        f_imp f ff, AAnode :: args, t_hyp id :: lt
+      | LD_abs_st _ -> 
+        tacuerror "can not generalize abstract statement" in
   let ff, args, lt = aux Fsubst.f_subst_id ids in
   t_seq_subgoal (t_apply_form ff args) (t_id None :: lt) g
 

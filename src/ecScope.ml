@@ -327,10 +327,12 @@ end = struct
     | Sasgn   _ -> ()
     | Srnd    _ -> ()
     | Sassert _ -> ()
+    | Sabstract _ -> ()
 
     | Scall (_, f, _) -> cb f.x_top
     | Sif (_, s1, s2) -> List.iter (on_mpath_stmt cb) [s1; s2]
     | Swhile (_, s)   -> on_mpath_stmt cb s
+
 
   and on_mpath_stmt cb (s : stmt) =
     List.iter (on_mpath_instr cb) s.s_node

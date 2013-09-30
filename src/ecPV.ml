@@ -131,6 +131,7 @@ module Mpv = struct
     | Sif    (c, s1, s2) -> i_if     (esubst c, ssubst s1, ssubst s2)
     | Swhile (e, stmt)   -> i_while  (esubst e, ssubst stmt)
     | Sassert e          -> i_assert (esubst e)
+    | Sabstract _        -> i
 
   and issubst env (s : esubst) (is : instr list) =
     List.map (isubst env s) is
@@ -435,6 +436,11 @@ and i_write ?(except_fs=Sx.empty) env w i =
   | Sif (_,s1,s2) -> s_write ~except_fs env (s_write ~except_fs env w s1) s2
   | Swhile (_,s) -> s_write ~except_fs env w s
   | Sassert _ -> w 
+  | Sabstract id -> 
+    let us = AbsStmt.byid id env in 
+    let add_pv w (pv,ty) = PV.add env pv ty w in
+    let w = List.fold_left add_pv w us.EcBaseLogic.aus_writes in
+    List.fold_left (f_write ~except_fs env) w us.EcBaseLogic.aus_calls
     
 let rec f_read env r f = 
   let f = NormMp.norm_xpath env f in
@@ -477,11 +483,55 @@ and i_read env r i =
   | Sif (e,s1,s2) -> s_read env (s_read env (e_read env r e) s1) s2
   | Swhile (e,s) -> s_read env (e_read env r e) s
   | Sassert e -> e_read env r e
+  | Sabstract id -> 
+    let us = AbsStmt.byid id env in 
+    let add_pv r (pv,ty) = PV.add env pv ty r in
+    let r = List.fold_left add_pv r us.EcBaseLogic.aus_reads in
+    List.fold_left (f_read env) r us.EcBaseLogic.aus_calls
 
 let f_write ?(except_fs=Sx.empty) env f = f_write ~except_fs env PV.empty f
 let f_read  env f = f_read env PV.empty f
 let s_write ?(except_fs=Sx.empty) env s = s_write ~except_fs env PV.empty s
 let s_read  env s = s_read  env PV.empty s
+
+let while_info env e s = 
+  let w = PV.empty in
+  let r = e_read env PV.empty e in
+  let c = Sx.empty in
+  let rec i_info (w,r,c) i = 
+    match i.i_node with
+    | Sasgn(lp,e) | Srnd(lp,e) ->
+      let r = e_read env (lp_read env r lp) e in
+      let w = lp_write env w lp in
+      (w,r,c)
+    | Sif(e,s1,s2) ->
+      let r = e_read env r e in
+      s_info (s_info (w,r,c) s1) s2
+    | Swhile(e,s) ->
+      let r = e_read env r e in
+      s_info (w,r,c) s
+    | Scall(lp,f,es) ->
+      let r = List.fold_left (e_read env) r es in
+      let r = match lp with None -> r | Some lp -> lp_read env r lp in
+      let w = match lp with None -> w | Some lp -> lp_write env w lp in
+      let f = NormMp.norm_xpath env f in
+      (w,r,Sx.add f c)
+    | Sassert e ->
+      (w,e_read env r e, c)
+    | Sabstract id ->
+      let us = AbsStmt.byid id env in
+      let add_pv x (pv,ty) = PV.add env pv ty x in 
+      let w = List.fold_left add_pv w us.EcBaseLogic.aus_writes in
+      let r = List.fold_left add_pv r us.EcBaseLogic.aus_reads in
+      let c = 
+        List.fold_left (fun c f -> Sx.add f c) c us.EcBaseLogic.aus_calls in
+      (w,r,c)
+  and s_info info s = List.fold_left i_info info s.s_node in
+  let (w,r,c) = s_info (w,r,c) s in
+  { EcBaseLogic.aus_reads = fst (PV.elements r);
+    EcBaseLogic.aus_writes = fst (PV.elements w);
+    EcBaseLogic.aus_calls = Sx.elements c; }
+
 
 exception EqObsInError
 
@@ -1020,6 +1070,7 @@ and i_eqobs_in_refl env i eqo =
     aux (add_eqs_refl env eqo e)
 
   | Sassert e -> add_eqs_refl env eqo e
+  | Sabstract _ -> assert false 
 
 and eqobs_inF_refl env f' eqo = 
   let f = NormMp.norm_xpath env f' in

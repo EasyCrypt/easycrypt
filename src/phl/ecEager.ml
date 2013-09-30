@@ -569,6 +569,7 @@ let eager env s s' inv eqIs eqXs c c' eqO =
       if not (Mpv2.subset eqm eqXs) then raise EqObsInError;
       let eqi = Mpv2.union eqIs eqnm in
       fhyps, add_eqs env eqi el er
+    | Sabstract _, Sabstract _ -> assert false (* FIXME *)
     | _, _ -> raise EqObsInError 
   and f_eager (fhyps:(EcPath.xpath * EcPath.xpath * EcPV.Mpv2.t) list) fl fr out = 
     let fl, fr = NormMp.norm_xpath env fl, NormMp.norm_xpath env fr in

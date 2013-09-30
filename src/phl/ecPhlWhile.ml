@@ -66,8 +66,8 @@ let t_bdHoare_while inv vrnt g =
   prove_goal_by [b_concl;concl] (rn_hl_while inv (Some vrnt) None) g
 
 
-let t_bdHoare_while_rev inv g =
-  let env, _, concl = get_goal_e g in
+let t_bdHoare_while_rev inv (juc,n as g) =
+  let env, hyps, concl = get_goal_e g in
   let bhs = t_as_bdHoareS concl in
   if (bhs.bhs_cmp <> FHle) then 
     tacuerror "only upper-bounded judgments are supported";
@@ -78,10 +78,17 @@ let t_bdHoare_while_rev inv g =
   let loopGuard = form_of_expr (EcMemory.memory mem) loopGuardExp in
   let bound = bhs.bhs_bd in
 
+  let w_u = EcPV.while_info env loopGuardExp loopBody in
+  let w   = EcEnv.LDecl.fresh_id hyps "w" in
+  let hyps' = EcEnv.LDecl.add_local w (EcBaseLogic.LD_abs_st w_u) hyps in
+
   let body_concl = 
-    let while_s = EcModules.stmt [EcModules.i_while (loopGuardExp,loopBody)] in
-    let unfolded_while_s = EcModules.s_seq loopBody while_s in
-    let while_jgmt = f_bdHoareS_r {bhs with bhs_pr=inv ; bhs_s=while_s } in
+    let while_s = EcModules.stmt [EcModules.i_abstract w] in
+    let while_s' = 
+      EcModules.stmt 
+        [EcModules.i_if (loopGuardExp, while_s, EcModules.stmt [])] in
+    let unfolded_while_s = EcModules.s_seq loopBody while_s' in
+    let while_jgmt = f_bdHoareS_r {bhs with bhs_pr=inv ; bhs_s=while_s' } in
     let unfolded_while_jgmt = f_bdHoareS_r 
       {bhs with bhs_pr=f_and inv loopGuard; bhs_s=unfolded_while_s } in
     f_imp while_jgmt unfolded_while_jgmt
@@ -96,11 +103,15 @@ let t_bdHoare_while_rev inv g =
     f_and inv term_post
   in
   let rem_concl = f_hoareS mem b_pre rem_s rem_post in
-  prove_goal_by [body_concl;rem_concl] (rn_hl_while inv None None) g
+  let juc,n1 = new_goal juc (hyps',body_concl) in
+  let juc,n2 = new_goal juc (hyps, rem_concl) in
+  let rule = { pr_name =  (rn_hl_while inv None None);
+               pr_hyps = [RA_node n1; RA_node n2] } in
+  upd_rule rule (juc, n)
 
 
-let t_bdHoare_while_rev_geq inv vrnt k eps g =
-  let env, _, concl = get_goal_e g in
+let t_bdHoare_while_rev_geq inv vrnt k eps (juc,n as g) =
+  let env, hyps, concl = get_goal_e g in
   let bhs = t_as_bdHoareS concl in
   (* The test is not necessary : 
      the rule is valid for <= (more hypothesis than the previous one),
@@ -131,17 +142,6 @@ let t_bdHoare_while_rev_geq inv vrnt k eps g =
     in
     f_forall_mems [mem] (generalize_mod env (EcMemory.memory mem) modi concl)
   in
-  let body_concl = 
-    let while_s = EcModules.stmt [EcModules.i_while (loopGuardExp,loopBody)] in
-    let unfolded_while_s = EcModules.s_seq loopBody while_s in
-    let while_jgmt = f_bdHoareS_r {bhs with bhs_pr=inv ; bhs_s=while_s } in
-    let unfolded_while_jgmt = f_bdHoareS_r 
-      {bhs with bhs_pr=f_and inv loopGuard; bhs_s=unfolded_while_s } in
-    f_imp while_jgmt unfolded_while_jgmt
-  in
-  let inv_concl = f_bdHoareS_r {bhs with bhs_pr=f_and inv loopGuard; bhs_po=inv; 
-    bhs_s=loopBody; bhs_cmp=FHeq; bhs_bd=f_r1 }
-  in
   let vrnt_concl = 
     let k_id = EcIdent.create "z" in
     let k = f_local k_id tint in
@@ -150,9 +150,39 @@ let t_bdHoare_while_rev_geq inv vrnt k eps g =
     f_forall_simpl [(k_id,GTty tint)] (f_bdHoareS_r {bhs with bhs_pr=f_ands [inv;loopGuard;vrnt_eq_k];
       bhs_po=vrnt_lt_k;  bhs_s=loopBody; bhs_cmp=FHge; bhs_bd=eps } )
   in
-  prove_goal_by [pre_inv_concl;pre_bound_concl; inv_term_concl;
-                 body_concl;inv_concl;vrnt_concl] (rn_hl_while inv None None) g
 
+  let inv_concl = 
+    f_bdHoareS_r {bhs with bhs_pr=f_and inv loopGuard; bhs_po=inv; 
+      bhs_s=loopBody; bhs_cmp=FHeq; bhs_bd=f_r1 }
+  in
+
+  let w_u = EcPV.while_info env loopGuardExp loopBody in
+  let w   = EcEnv.LDecl.fresh_id hyps "w" in
+  let hyps' = EcEnv.LDecl.add_local w (EcBaseLogic.LD_abs_st w_u) hyps in
+  
+  let body_concl = 
+    let while_s = EcModules.stmt [EcModules.i_abstract w] in
+    let while_s' = 
+      EcModules.stmt 
+        [EcModules.i_if (loopGuardExp, while_s, EcModules.stmt [])] in
+    let unfolded_while_s = EcModules.s_seq loopBody while_s' in
+    let while_jgmt = f_bdHoareS_r {bhs with bhs_pr=inv ; bhs_s=while_s' } in
+    let unfolded_while_jgmt = f_bdHoareS_r 
+      {bhs with bhs_pr=f_and inv loopGuard; bhs_s=unfolded_while_s } in
+    f_imp while_jgmt unfolded_while_jgmt
+  in
+
+  let juc,n1 = new_goal juc (hyps,  pre_inv_concl) in
+  let juc,n2 = new_goal juc (hyps,  pre_bound_concl) in
+  let juc,n3 = new_goal juc (hyps,  inv_term_concl) in
+  let juc,n4 = new_goal juc (hyps', body_concl) in
+  let juc,n5 = new_goal juc (hyps,  inv_concl) in
+  let juc,n6 = new_goal juc (hyps,  vrnt_concl) in
+  let rule = { pr_name =  (rn_hl_while inv None None);
+               pr_hyps = [RA_node n1; RA_node n2;RA_node n3;RA_node n4;
+                          RA_node n5;RA_node n6] } in
+  upd_rule rule (juc, n)
+ 
 
 let t_equiv_while_disj side vrnt inv g =
   let env, _, concl = get_goal_e g in

@@ -159,6 +159,7 @@ and i_equal_norm env i1 i2 =
       e_equal_norm env a1 a2 && s_equal_norm env b1 b2 
   | Sassert a1, Sassert a2 ->
       e_equal_norm env a1 a2 
+  | Sabstract id1, Sabstract id2 -> EcIdent.id_equal id1 id2
   | _, _ -> false
 
 type reduction_info = {

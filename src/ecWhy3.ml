@@ -1610,6 +1610,9 @@ let check_goal me_of_mt env pi (hyps, concl) =
           
       | LD_modty (mt,restr) ->
         env := add_abs_mod me_of_mt !env id mt restr
+
+      | LD_abs_st _ -> ()
+
     with CanNotTranslate _ -> ()
   in
   List.iter trans_tv hyps.h_tvar;
