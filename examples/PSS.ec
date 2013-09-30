@@ -980,6 +980,7 @@ section.
       (qH * (qH + qS))%r / (2^k0)%r. (* Number of direct adversary queries times number of queries
                                         over size of the input space (randomness only) *)
   proof strict.
+    
   admit.
   qed.
 
@@ -1346,10 +1347,31 @@ section.
       case (b{1}).
         seq 0 1: H6.bad{2}; first by wp; skip; progress=> //; right.
           conseq* (_: _ ==> true). progress=> //; smt.
-          while{1} (true) (1)=> //. admit. (* termination cannot currently be proven? *)
+          bd_hoare equiv {1} true true.
+          while true (if b then 1 else 0) 1 (1%r/2%r) => //;first smt.
+            intros Hw.
+            seq 7 : true 1%r 1%r 0%r _ => //.
+              by wp => /=;rnd;skip;smt.
+              by wp => /=;rnd;skip;smt.
+              intros z0. conseq * (_: true ==> !b) => //;first by smt.
+              wp => /=. 
+              rnd;skip;progress => //.
+              admit.
         by rcondf{1} 1=> //; wp.
       by if=> //; wp.
-    intros=> _ _; admit. (* same thing *)
+    intros=> _ _;fun. 
+    seq 2 : true => //.
+      by wp => //.
+    if;[ | wp => //].
+    while true (if b then 1 else 0) 1 (1%r/2%r) => //;first smt.
+      intros Hw.
+      seq 7 : true => //.
+        by wp => /=;rnd;skip;smt.
+        by wp => /=;rnd;skip;smt.
+        intros z0. conseq * (_: true ==> !b) => //;first by smt.
+        wp => /=. 
+        rnd;skip;progress => //.
+        admit.
     intros=> _; fun; sp; if.
       wp; while true (kg2 - i); first by intros=> _; wp; rnd cpTrue; skip; smt.
             skip; smt.
