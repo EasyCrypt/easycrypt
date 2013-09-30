@@ -131,8 +131,8 @@ let t_bdHoare_while_rev_geq inv vrnt k eps (juc,n as g) =
   let modi = s_write env loopBody in
   let pre_inv_concl = f_imp b_pre inv in
   let pre_bound_concl = 
-    let term_post = f_imp (f_and b_pre (f_and (f_not loopGuard) b_post)) 
-      (f_eq bound f_r0) in
+    let term_post = 
+      f_imps [b_pre; f_not loopGuard; f_not b_post] (f_eq bound f_r0) in
     f_forall_mems [mem] 
       (generalize_mod env (EcMemory.memory mem) modi term_post)
   in
