@@ -201,7 +201,7 @@ let rec ty_subst s =
       | Tglob m       -> TySmart.tglob (ty, m) (s.ts_mp m)
       | Tunivar id    -> odfl ty (s.ts_u id)
       | Tvar id       -> odfl ty (s.ts_v id)
-      | Ttuple lty    -> TySmart.ttuple (ty, lty) (List.smart_map aux lty)
+      | Ttuple lty    -> TySmart.ttuple (ty, lty) (List.Smart.map aux lty)
       | Tfun (t1, t2) -> TySmart.tfun (ty, (t1, t2)) (aux t1, aux t2)
 
       | Tconstr(p, lty) -> begin
@@ -731,7 +731,7 @@ and e_subst_op ety tys args (tyids, e) =
 
   let e =
     let sty = Tvar.init tyids tys in
-    let sty = ty_subst { ty_subst_id with ts_v = sty; } in
+    let sty = ty_subst { ty_subst_id with ts_v = Mid.find_opt^~ sty; } in
     let sty = { e_subst_id with
                   es_freshen = true;
                   es_ty      = sty } in
