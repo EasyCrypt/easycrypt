@@ -382,6 +382,12 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
               (subst, proofs, EcEnv.Op.bind x (EcSubst.subst_op subst oopd) scenv)
 
           | Some { pl_desc = (opov, opmode); pl_loc = loc; } ->
+              let (reftyvars, refty) =
+                let refop = EcEnv.Op.by_path (xpath x) scenv in
+                let refop = EcSubst.subst_op subst refop in
+                  (refop.op_tparams, refop.op_ty)
+              in
+
               let (newop, subst, dobind) =
                 let ue = EcTyping.ue_for_decl scenv (loc, opov.opov_tyvars) in
                 let tp = EcTyping.tp_relax in
@@ -393,6 +399,13 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
                   let lam     = EcTypes.e_lam xs body in
                     (lam.EcTypes.e_ty, lam)
                 in
+
+                if reftyvars = [] then begin
+                   try  EcUnify.unify scenv ue refty ty
+                   with EcUnify.UnificationFailure _ ->
+                     clone_error scenv (CE_OpIncompatible (prefix, x))
+                end;
+
                 let uni     = EcTypes.Tuni.subst (EcUnify.UniEnv.close ue) in
                 let body    = body |> EcTypes.e_mapty uni in
                 let ty      = uni ty in
@@ -403,13 +416,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
                   | `Inline -> (newop, EcSubst.add_opdef subst (xpath x) (tparams, body), false)
             in
 
-            let (reftyvars, refty) =
-              let refop = EcEnv.Op.by_path (xpath x) scenv in
-              let refop = EcSubst.subst_op subst refop in
-                (refop.op_tparams, refop.op_ty)
-            and (newtyvars, newty) =
-              (newop.op_tparams, newop.op_ty)
-            in
+            let (newtyvars, newty) = (newop.op_tparams, newop.op_ty) in
               if not (ty_compatible scenv (reftyvars, refty) (newtyvars, newty)) then
                 clone_error scenv (CE_OpIncompatible (prefix, x));
               (subst, proofs, if dobind then EcEnv.Op.bind x newop scenv else scenv)
@@ -421,32 +428,38 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
               (subst, proofs, EcEnv.Op.bind x (EcSubst.subst_op subst oopr) scenv)
 
           | Some { pl_desc = prov; pl_loc = loc; } ->
-              let newpr =
-                let ue = EcTyping.ue_for_decl scenv (loc, prov.prov_tyvars) in
-                let body =
-                  let env     = scenv in
-                  let env, xs = EcTyping.transbinding env ue prov.prov_args in
-                  let body    = EcTyping.trans_form_opt env ue prov.prov_body None in
-                  let xs      = List.map (fun (x,ty) -> x, EcFol.GTty ty) xs in
-                  let lam     = EcFol.f_lambda xs body in
-                    lam
-                in
-
-                let uni     = EcUnify.UniEnv.close ue in
-                let body    = EcFol.Fsubst.uni uni body in
-                let tparams = EcUnify.UniEnv.tparams ue in
-                  { op_tparams = tparams;
-                    op_ty      = body.EcFol.f_ty;
-                    op_kind    = OB_pred (Some body); }
-              in
-
               let (reftyvars, refty) =
                 let refpr = EcEnv.Op.by_path (xpath x) scenv in
                 let refpr = EcSubst.subst_op subst refpr in
                   (refpr.op_tparams, refpr.op_ty)
-              and (newtyvars, newty) =
-                (newpr.op_tparams, newpr.op_ty)
               in
+
+              let newpr =
+                 let ue = EcTyping.ue_for_decl scenv (loc, prov.prov_tyvars) in
+                 let body =
+                   let env     = scenv in
+                   let env, xs = EcTyping.transbinding env ue prov.prov_args in
+                   let body    = EcTyping.trans_form_opt env ue prov.prov_body None in
+                   let xs      = List.map (fun (x, ty) -> x, EcFol.GTty ty) xs in
+                   let lam     = EcFol.f_lambda xs body in
+                     lam
+                 in
+
+                 if reftyvars = [] then begin
+                   try  EcUnify.unify scenv ue refty body.EcFol.f_ty
+                   with EcUnify.UnificationFailure _ ->
+                     clone_error scenv (CE_OpIncompatible (prefix, x))
+                 end;
+
+                 let uni     = EcUnify.UniEnv.close ue in
+                 let body    = EcFol.Fsubst.uni uni body in
+                 let tparams = EcUnify.UniEnv.tparams ue in
+                   { op_tparams = tparams;
+                     op_ty      = body.EcFol.f_ty;
+                     op_kind    = OB_pred (Some body); }
+              in
+
+              let (newtyvars, newty) = (newpr.op_tparams, newpr.op_ty) in
                 if not (ty_compatible scenv (reftyvars, refty) (newtyvars, newty)) then
                   clone_error scenv (CE_OpIncompatible (prefix, x));
                 (subst, proofs, EcEnv.Op.bind x newpr scenv)

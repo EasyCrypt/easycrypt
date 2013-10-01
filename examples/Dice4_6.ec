@@ -7,11 +7,11 @@ import Real.
 clone GenDice as D4_6 with 
   type t <- int,
   type input <- unit,
-  op d (i:unit) <- [1..6], (* BUG : PY : op d i <- [1..6] *)
-  op test (i:unit) x <- 1 <= x <= 4,
-  op sub_supp (i:unit) <- Interval.interval 1 4,
+  op d i <- [1..6], (* BUG : PY : op d i <- [1..6] *)
+  op test i x <- 1 <= x <= 4,
+  op sub_supp i <- Interval.interval 1 4,
   type t' <- int,
-  op d' (i:unit) <- [1..4]
+  op d' i <- [1..4]
   proof * by smt.
 
 module D4 = {
