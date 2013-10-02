@@ -154,6 +154,36 @@ theory Core.
      rewrite card_add_nin.
   qed.
 
+  (* This is nosmt because of the commutativity part... *)
+  lemma nosmt set_set (m:('a,'b) map) x x' y y':
+    m.[x <- y].[x' <- y'] = if x = x' then m.[x' <- y']
+                                      else m.[x' <- y'].[x <- y].
+  proof strict.
+  apply map_ext=> x0; case (x = x').
+    intros=> ->; case (x' = x0).
+      by intros=> ->; rewrite 2!get_setE.
+      by intros=> x'_x0; rewrite 3?get_setN.
+    intros=> x_x'; case (x = x0).
+      by intros=> <-; rewrite get_setN -rw_eq_sym // 2!(get_setE _ x).
+      intros=> x_x0; rewrite (get_setN (m.[x' <- y'])) //; case (x' = x0).
+        by intros=> <-; rewrite 2!get_setE.
+        by intros=> x'_x0; rewrite 3?get_setN.
+  qed.
+
+  lemma set_setE (m:('a,'b) map) x y y':
+    m.[x <- y].[x <- y'] = m.[x <- y'].
+  proof strict.
+  by rewrite set_set.
+  qed.
+
+  (* Again, we don't send commutation lemmas to smt until we can figure things out *)
+  lemma nosmt set_setN (m:('a,'b) map) x x' y y':
+    x <> x' =>
+    m.[x <- y].[x' <- y'] = m.[x' <- y'].[x <- y].
+  proof strict.
+  by rewrite -rw_neqF set_set; intros=> ->.
+  qed.
+
   (* rm *)
   op rm: 'a -> ('a,'b) map -> ('a,'b) map.
   axiom get_rm x (m:('a,'b) map) x':
