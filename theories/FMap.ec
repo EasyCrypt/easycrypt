@@ -262,4 +262,3 @@ theory DefaultGet.
 
   op "_.[_]" (m:('a,'b) map) x = proj (get m x). (* We can use "proj None<:t>" as default element for type t *)
 end DefaultGet.
-
