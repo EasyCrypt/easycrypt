@@ -83,7 +83,18 @@ theory EuclDiv.
     0 <= r < `|d| =>
     m = q * d + r =>
     q = m /% d /\ r = m %% d.
+
+  axiom ediv_Mle : forall (m1 m2 d:int), 0 < d => m1 <= m2 => m1/%d <= m2/%d.
+
+  lemma ediv_pos : forall m d, 0 < d => 0 <= m => 0 <= m /%d.
+  proof. 
+    intros m d Hd Hm.
+    apply (Trans _ (0/%d));last apply ediv_Mle;smt.
+    elim (ediv_unique 0 d 0 0 _ _ _) => //;smt.
+  qed.
+
 end EuclDiv.
+
 export EuclDiv.
 
 theory Induction.
@@ -113,3 +124,11 @@ theory Power.
 end Power.
 export Power.
 
+lemma mulMle : forall (x1 x2 y1 y2:int),
+   0 <= x1 <= x2 => 0 <= y1 <= y2 => x1 * y1 <= x2 * y2.
+proof.
+ intros x1 x2 y1 y2 Hx Hy.
+ apply (Trans _ (x1 * y2)).
+ rewrite ?(Comm.Comm x1) CompatOrderMult; smt.
+ apply CompatOrderMult;smt.
+qed.

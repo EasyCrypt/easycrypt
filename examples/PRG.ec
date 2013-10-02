@@ -3,6 +3,11 @@ require import Map.
 require import Distr.
 require import Int.
 require import Real.
+require Monoid.
+import Monoid.Miplus.
+require AdvAbsVal.
+
+
 type t1.
 type t2. 
 
@@ -308,7 +313,8 @@ module C(A:Adv,P:AOrclPrg,R:OrclRnd) = {
 
 op bd1 : real.
 
-axiom dsample1_uni : forall r, mu_x dsample1 r = bd1.
+axiom dsample1_uni : forall r, in_supp r dsample1 => mu_x dsample1 r = bd1.
+axiom bd1_pos : 0%r <= bd1.
 import FSet.
 import ISet.Finite.
 
@@ -316,10 +322,10 @@ axiom qP_pos : 0 <= qP.
 axiom qF_pos : 0 <= qF.
 
 lemma Pr3 (A<:Adv{Prg,F,C}) : 
-   bd_hoare [ Exp'(C(A)).main : true ==> bad Prg.logP F.m] <= (bd1 * ((qP + qF) * qP)%r).
+   bd_hoare [ Exp'(C(A)).main : true ==> bad Prg.logP F.m] <= ((qP*qF + (qP - 1)*qP/%2)%r*bd1).
 proof.
   fun.
-  seq 3 : true (1%r) (bd1 * ((qP + qF) * qP)%r) 0%r 1%r  
+  seq 3 : true (1%r)  ((qP*qF + (qP - 1)*qP/%2)%r*bd1) 0%r 1%r  
         (finite (dom F.m) /\ length Prg.logP <= qP /\ FSet.card (toFSet (dom F.m)) <= qF) => //.
     inline Exp'(C(A)).A.a;wp.
     call (_: finite (dom F.m) /\ length Prg.logP = C.CP.c /\ C.CP.c <= qP /\ 
@@ -332,58 +338,70 @@ proof.
       fun;if.
         call (_: finite (dom F.m) /\ card (toFSet (dom F.m)) <= C.CF.c - 1 ==> 
                  finite (dom F.m) /\ card (toFSet (dom F.m)) <= C.CF.c).
-         fun;wp;do !rnd;skip;progress => //; smt.
+         fun;wp;do !rnd;skip;progress => //. smt.
+         rewrite dom_set;smt. smt.
         wp;skip;progress => //;smt.
       wp => //.
   inline F.init Prg_rB.init;wp;rnd;wp;skip;progress => //; smt.
   inline Resample.resample.
-    seq 3 : true 
-       1%r (if bad Prg.logP F.m then 1%r 
-            else  bd1 * ((qP + qF) * (n - length Prg.logP))%r) 
-       0%r 1%r 
-         (finite (dom F.m) /\ n <= qP /\ Prg.logP = [] /\ 
+  exists * Prg.logP;elim * => logP0.
+  seq 3 : true 
+     1%r  ((qP*qF + (qP - 1)*qP/%2)%r*bd1)
+     0%r 1%r 
+         (finite (dom F.m) /\ n = length logP0 /\ n <= qP /\ Prg.logP = [] /\ 
           card (toFSet (dom F.m)) <= qF) => //.
-       rnd;wp => //.
+    by rnd;wp.
+    conseq (_:_: <= (if bad Prg.logP F.m then 1%r else 
+                    ((sum_n (qF + length Prg.logP) (qF + n - 1))%r*bd1))).
+      progress.
+       rewrite (_:bad [] F.m{hr} = false); first rewrite /bad;smt.
+      progress;apply CompatOrderMult => //;last smt.
+      rewrite length_nil /=.
+      generalize H0;elimT list_case logP0.
+        rewrite length_nil /sum_n sum_ij_gt. smt.
+        intros _. cut HqP : 0 <= (qP-1) * qP by smt.
+        cut Hmod : 0 <= ( (qP - 1) * qP /% 2) by smt.
+        by rewrite from_intMle;smt.
+      intros x l H0;rewrite sumn_ij;first smt.
+      rewrite ?FromInt.Add.
+      apply addleM;first smt.
+      rewrite from_intMle;apply ediv_Mle => //. 
+      apply mulMle;smt.
     while{1} (finite (dom F.m) /\ n <= qP /\ card (toFSet (dom F.m)) <= qF).
-    intros Hw.
-    exists * Prg.logP, F.m, n;elim * => logP fm n0.
-    case (bad Prg.logP F.m).
-     conseq * ( _ : _ : <= (1%r)) => //; smt. 
-    seq 2 : (bad Prg.logP F.m) 
-      ((qP + qF)%r * bd1) 1%r
-      1%r  (bd1 * ((qP + qF) * (n - (length logP + 1)))%r)
-      (n = n0 /\ F.m = fm /\ finite (dom F.m) /\ r::logP = Prg.logP /\ 
-       n <= qP /\ card (toFSet (dom F.m)) <= qF) => //.
-     wp;rnd => //.
-     wp;rnd;skip;progress.
-     generalize H3;rewrite !FromInt.Add Mul_distr_r /bad -rw_nor /= => [Hu He].
-     apply (Real.Trans _ (mu dsample1 (cpOr (lambda x, mem x Prg.logP{hr})
-                                            (lambda x, in_dom x F.m{hr})))).
-      apply mu_sub => x /=; rewrite /cpOr; smt.
-     cut Hbd1 : 0%r <= bd1.
-       cut _ := dsample1_uni default1;by smt.
-     apply mu_or_le.
-       apply (Real.Trans _ ((length Prg.logP{hr})%r * bd1)).
-         by apply mu_Lmem_le_length; smt.
-       apply CompatOrderMult => //;smt.
-     rewrite (mu_eq _ _ (cpMem (toFSet (dom F.m{hr})))).
-       intros x; rewrite /= /cpMem. smt.
-     apply (Real.Trans _ ((card (toFSet (dom F.m{hr})))%r * bd1));smt.
-    conseq Hw => //.
+      intros Hw.
+      exists * Prg.logP, F.m, n;elim * => logP fm n0.
+      case (bad Prg.logP F.m).
+       conseq * ( _ : _ : <= (1%r)) => //. smt.
+      seq 2 : (bad Prg.logP F.m) 
+          ((qF + length logP)%r * bd1) 1%r
+          1%r ((sum_n (qF + (length logP + 1)) (qF + n - 1))%r * bd1)
+          (n = n0 /\ F.m = fm /\ finite (dom F.m) /\ r::logP = Prg.logP /\ 
+          n <= qP /\ card (toFSet (dom F.m)) <= qF) => //.
+        by wp;rnd => //.
+        wp;rnd;skip;progress.
+        generalize H3;rewrite !FromInt.Add Mul_distr_r /bad -rw_nor /= => [Hu He].
+        apply (Real.Trans _ (mu dsample1 (cpOr (lambda x, in_dom x F.m{hr})
+                                            (lambda x, mem x Prg.logP{hr})))).
+          by apply mu_sub => x /=; rewrite /cpOr; smt.
+        apply mu_or_le.
+          rewrite (mu_eq _ _ (cpMem (toFSet (dom F.m{hr})))).
+            by intros x; rewrite /= /cpMem;smt.
+          by apply (Real.Trans _ ((card (toFSet (dom F.m{hr})))%r * bd1));smt.
+        by apply mu_Lmem_le_length; smt.
+        conseq Hw; progress => //.
+        by rewrite (neqF ( bad (r{hr} :: logP) F.m{hr})) => //=; smt.
       progress => //.
-      rewrite (neqF ( bad (r{hr} :: logP) F.m{hr})) => //=; smt.
-    progress => //.
-    rewrite (neqF (bad Prg.logP{hr} F.m{hr}) _) => //=.
-    apply eq_le; ringeq.
-    skip;progress => //. smt.
+      rewrite (neqF (bad Prg.logP{hr} F.m{hr}) _) => //=.
+      rewrite -Mul_distr_r -Int.CommutativeGroup.Assoc -FromInt.Add sum_n_i1j //; smt.
+    by skip;progress => //;smt.
 save.
 
-lemma conclusion (A<:Adv{Prg,F,C}) :
+lemma conclusion_aux (A<:Adv{Prg,F,C}) :
     (forall (O1 <: AOrclPrg{A}) (O2<:OrclRnd{A}), islossless O1.prg => islossless O2.f => 
        islossless A(O1,O2).a) =>
     forall &m, 
       Pr[Exp(C(A),Prg).main() @ &m : res] <= 
-        Pr[Exp(C(A),Prg_r).main() @ &m : res] +  bd1 * ((qP + qF) * qP)%r.
+        Pr[Exp(C(A),Prg_r).main() @ &m : res] +  (qP*qF + (qP - 1)*qP/%2)%r*bd1.
 proof.
  intros HA &m.      
  apply (Real.Trans _ (Pr[Exp(C(A),Prg_r).main() @ &m : res] + 
@@ -394,8 +412,80 @@ proof.
   fun;if;[call HO1 | ];wp => //.
   fun;if;[call HO2 | ];wp => //.
   wp => //.
- cut _ : Pr[Exp'(C(A)).main() @ &m : bad Prg.logP F.m] <= bd1 * ((qP + qF) * qP)%r;
+ cut _ : Pr[Exp'(C(A)).main() @ &m : bad Prg.logP F.m] <= (qP*qF + (qP - 1)*qP/%2)%r*bd1;
    last smt.
  bdhoare_deno (Pr3 A) => //.
+save.
+
+module NegA (A:Adv, P:AOrclPrg, R:OrclRnd) = {
+  module A = A(P,R)
+  fun a() : bool = { 
+    var ba:bool;
+    ba = A.a();
+    return !ba;
+  }
+}.
+
+lemma lossNegA (A<:Adv) :
+  (forall (O1 <: AOrclPrg{A}) (O2 <: OrclRnd{A}),
+     islossless O1.prg => islossless O2.f => islossless A(O1, O2).a) =>
+  forall (O1 <: AOrclPrg{NegA(A)}) (O2 <: OrclRnd{NegA(A)}),
+    islossless O1.prg => islossless O2.f => islossless NegA(A, O1, O2).a.
+proof.
+ intros Hloss O1 O2 HO1 HO2;fun.
+ call (_:true) => //.
+qed.
+
+lemma NegA_Neg_main (P<:OrclPrg) (A<:Adv{P,F,C}) &m: 
+    Pr[AdvAbsVal.Neg_main(Exp(C(A),P)).main() @ &m : res] =
+    Pr[Exp(C(NegA(A)),P).main() @ &m : res].
+proof.
+  equiv_deno (_ : ={glob A, glob P, glob F} ==> ={res}) => //.
+  fun.
+  inline Exp(C(A), P).main Exp(C(NegA(A)), P).A.a C(NegA(A), P, F).A.a
+     Exp(C(A), P).A.a;wp; eqobs_in.
+qed.
+
+lemma lossExp (P<:OrclPrg) (A<:Adv{P,F,C}):  
+  (forall (O1 <: AOrclPrg{A}) (O2 <: OrclRnd{A}),
+         islossless O1.prg => islossless O2.f => islossless A(O1, O2).a) =>
+   islossless P.prg => islossless P.init =>
+   islossless Exp(C(A),P).main.
+proof.
+ intros HA Hp Hi;fun.
+ call (_: true).
+   call (_: true) => //.
+     fun.
+     if;last by wp.
+     by call Hp;wp.
+     fun.
+     if; last by wp.
+     by call lossless_Ff;wp.
+   by wp.
+ call Hi.
+ by call (_:true);first wp.
+qed.
+
+lemma conclusion (A<:Adv{Prg,F,C}) :
+    (forall (O1 <: AOrclPrg{A}) (O2<:OrclRnd{A}), islossless O1.prg => islossless O2.f => 
+       islossless A(O1,O2).a) =>
+    forall &m, 
+      `| Pr[Exp(C(A),Prg).main() @ &m : res] - Pr[Exp(C(A),Prg_r).main() @ &m : res] | <=  
+       (qP*qF + (qP - 1)*qP/%2)%r*bd1.
+proof.
+ intros Hloss &m.
+ case (Pr[Exp(C(A), Prg).main() @ &m : res] <= Pr[Exp(C(A), Prg_r).main() @ &m : res]) => Hle.
+   cut H := conclusion_aux (NegA(A)) _ &m.
+     by apply (lossNegA A).
+   generalize H;rewrite -(NegA_Neg_main Prg A &m) -(NegA_Neg_main Prg_r A &m).
+   rewrite (AdvAbsVal.Neg_A_Pr_minus (Exp(C(A), Prg)) &m).
+     apply (lossExp Prg A) => //. 
+       by fun;call lossless_Ff.
+     fun;rnd;skip;smt.
+   rewrite (AdvAbsVal.Neg_A_Pr_minus (Exp(C(A), Prg_r)) &m);last smt.
+      apply (lossExp Prg_r A) => //. 
+        by fun;rnd;skip;smt.
+      by fun.
+ by cut H := conclusion_aux A _ &m => //;smt.
 save.
 

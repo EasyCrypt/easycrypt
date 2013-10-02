@@ -26,6 +26,10 @@ theory FromInt.
   lemma from_intM: forall (a b:int),
     (from_int a < from_int b) <=> (a < b)%Int
   by [].
+
+  lemma from_intMle : forall (a b : int), from_int a <= from_int b <=> a <= b
+  by [].
+
 end FromInt.
 export FromInt.
 

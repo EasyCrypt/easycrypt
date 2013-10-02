@@ -175,6 +175,18 @@ rewrite -count_nmem=> x_nin_X x'; rewrite count_cons; case (x = x')=> /=.
     by intros=> x'_nin_X; rewrite x'_nin_X; generalize x'_nin_X; rewrite 2!count_nmem mem_add=> x'_in_X; smt.
 qed.
 
+lemma add_add_comm (a b:'a) s:
+  add a (add b s) = add b (add a s).
+proof.
+  apply set_ext => x.
+  by rewrite !mem_add !orA (orC (x = b)).
+qed.
+
+(** disjoint *)
+op disjoint : 'a set -> 'a set -> bool.
+axiom disjoint_spec (s1 s2:'a set) : 
+   disjoint s1 s2 <=> forall x, !(mem x s1 /\ mem x s2).
+
 (** rm *)
 op rm:'a -> 'a set -> 'a set.
 axiom mem_rm_eq (x:'a) (X:'a set):
@@ -382,6 +394,11 @@ qed.
 lemma unionK (X:'a set): union X X = X.
 proof strict.
 by apply set_ext=> x; rewrite mem_union orK.
+qed.
+
+lemma union_add (x:'a) s1 s2: union (add x s1) s2 = add x (union s1 s2).
+proof. 
+  apply set_ext => y;rewrite mem_add mem_union mem_add mem_union;smt.
 qed.
 
 (** inter *)
@@ -605,6 +622,26 @@ proof strict.
   rewrite (_:j + 1 - 1 + x - 1 = j - 1 + x);first smt.
   rewrite IH.
   smt.
+qed.
+
+lemma interval_single (i:int) :
+   interval i i = add i empty.
+proof.
+  rewrite interval_pos // interval_neg //; smt.
+qed.
+
+lemma interval_addl (i j : int) : 
+    i <= j =>
+    interval i j = add i (interval (i+1) j).  
+proof.
+ intros Hle;cut -> : j = (j - i) + i;first smt.
+ elim /Int.Induction.induction (j-i) => /=;last smt.
+   by rewrite interval_single interval_neg //;first smt.
+ clear j Hle => j Hle Heq.
+ rewrite (interval_pos i (j + 1 + i));first smt.
+ rewrite (interval_pos (i+1));first smt.
+ cut -> : j+1+i-1 = j+i;first smt.
+ by rewrite Heq;apply add_add_comm.
 qed.
 
 lemma card_interval_max x y: card (interval x y) = max (y - x + 1) 0.
