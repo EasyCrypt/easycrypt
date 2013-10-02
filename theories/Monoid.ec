@@ -79,7 +79,7 @@ elim/set_comp s'.
   rewrite (sum_rm _ _ (pick s')); first by rewrite mem_pick.
   rewrite (sum_rm _ s' (pick s')); first by rewrite mem_pick.
   rewrite IH /=.
-    by apply (leq_tran _ s')=> //; apply rm_leq.
+    by apply (leq_tran s')=> //; apply rm_leq.
     by rewrite (_: mem (pick s') s) // leq_s'_s // mem_pick.
 qed.
 
@@ -107,7 +107,7 @@ elim/set_comp s'.
   rewrite (sum_rm _ (img g s') (g (pick s'))) /=;
     first by rewrite mem_img // mem_pick.
   rewrite pcan_g'_g; first by apply leq_s'_s; apply mem_pick.
-  rewrite IH; first apply (leq_tran _ s')=> //; apply rm_leq.
+  rewrite IH; first apply (leq_tran s')=> //; apply rm_leq.
   rewrite img_rm;
   (cut ->: (forall x, mem x s' => g (pick s') = g x => pick s' = x) = true)=> //;
   apply eqT=> x x_in_s g_pick;
@@ -124,7 +124,7 @@ elim/set_comp s'.
   by rewrite FSet.filter_empty.
   intros=> {s'} s' s'_nempty IH leq_s'_s;
   rewrite (sum_rm _ s' (pick s')); first by apply mem_pick.
-  rewrite -IH;first apply (leq_tran _ s')=> //; apply rm_leq.
+  rewrite -IH;first apply (leq_tran s')=> //; apply rm_leq.
   case (p (pick s'))=> p_pick.
     by rewrite (sum_rm _ (filter p s') (pick s')) ?rm_filter // mem_filter;
        split=> //; apply mem_pick.
@@ -183,7 +183,7 @@ theory NatMul.
     by rewrite sum_empty card_empty MulZ.
     intros=> {s'} s' s'_nempty IH leq_s'_s.
     rewrite (sum_rm _ _ (pick s'));first by rewrite mem_pick.
-    rewrite IH; first by apply (leq_tran _ s')=> //; apply rm_leq.
+    rewrite IH; first by apply (leq_tran s')=> //; apply rm_leq.
     rewrite f_x; first by apply leq_s'_s; apply mem_pick.
     rewrite card_rm_in; first by apply mem_pick.
     rewrite -MulS; smt.
@@ -310,7 +310,7 @@ cut := FSet.leq_refl s; pose {1 3} s' := s;
 elim/set_ind s'.
   by rewrite Mbor.sum_empty.
   intros=> {s'} x s' nmem IH leq_adds'_s;
-  cut leq_s'_s : s' <= s by (apply (FSet.leq_tran _ (add x s'))=> //; apply leq_add);
+  cut leq_s'_s : s' <= s by (apply (FSet.leq_tran (add x s'))=> //; apply leq_add);
   rewrite Mbor.sum_add // /Mbor.Base.(+) /Bbor.(+) -rw_nor IH // /=;
   cut := h x; rewrite -rw_nand;
   case (mem x s)=> //=;

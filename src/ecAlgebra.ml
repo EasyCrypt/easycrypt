@@ -187,35 +187,40 @@ let toring ((r, cr) : cring) (rmap : RState.rstate) (form : form) =
             | Fint n when n >= 0 -> PEpow (doit arg1, n)
             | _ -> abstract form
           end
-          | `OfInt, [arg1] -> 
-            let rec of_int f = 
-              match f.f_node with
-              | Fint n -> PEc (Big_int.big_int_of_int n)
-              | Fapp({f_node = Fop (p,_)}, [a1;a2]) ->
-                begin match op_kind p with
-                | OK_int_add -> PEadd (of_int a1, of_int a2)
-                | OK_int_sub -> PEsub (of_int a1, of_int a2)
-                | OK_int_mul -> PEmul (of_int a1, of_int a2)
-                | OK_int_exp -> 
-                  begin match a2.f_node with
-                  | Fint n when 0 <= n -> PEpow (of_int a1, n)
-                  | _ -> abstract f
-                  end
-                | _ -> abstract f
-                end 
-              | Fapp({f_node = Fop (p,_)}, [a]) ->
-                begin match op_kind p with
-                | OK_int_opp -> PEsub (PEc c0, of_int a)
-                | _ -> abstract f
-                end
-              | _ -> abstract f in
-            of_int arg1
+          | `OfInt, [arg1] -> of_int arg1
 
-            | _, _ -> abstract form
+          | _, _ -> abstract form
         end
     end
     | SFint i when r.r_embed = `Direct -> PEc (Big_int.big_int_of_int i)
     | _ -> abstract form
+
+  and of_int f =
+    let abstract () =
+      match r.r_embed with
+      | `Direct  -> abstract f
+      | `Embed p -> abstract (rapp r p [f])
+    in
+      match f.f_node with
+      | Fint n -> PEc (Big_int.big_int_of_int n)
+      | Fapp ({f_node = Fop (p,_)}, [a1; a2]) -> begin
+          match op_kind p with
+          | OK_int_add -> PEadd (of_int a1, of_int a2)
+          | OK_int_sub -> PEsub (of_int a1, of_int a2)
+          | OK_int_mul -> PEmul (of_int a1, of_int a2)
+          | OK_int_exp -> begin
+              match a2.f_node with
+              | Fint n when 0 <= n -> PEpow (of_int a1, n)
+              | _ -> abstract ()
+          end
+          | _ -> abstract ()
+        end
+      | Fapp ({f_node = Fop (p,_)}, [a]) -> begin
+          match op_kind p with
+          | OK_int_opp -> PEsub (PEc c0, of_int a)
+          | _ -> abstract ()
+        end
+      | _ -> abstract ()
 
   and abstract form = PEX (int_of_form form) in
 
@@ -244,38 +249,44 @@ let tofield ((r, cr) : cfield) (rmap : RState.rstate) (form : form) =
           | `Div , [arg1; arg2] -> FEdiv (doit arg1, doit arg2)
           | `Exp , [arg1; arg2] -> begin
             match arg2.f_node with
-              (* TODO : il faut faire un truc pour < 0 *)
+              (* TODO: missing case for n < 0 *)
             | Fint n -> FEpow (doit arg1, n)
             | _ -> abstract form
           end
-          | `OfInt, [arg1] -> 
-            let rec of_int f = 
-              match f.f_node with
-              | Fint n -> FEc (Big_int.big_int_of_int n)
-              | Fapp({f_node = Fop (p,_)}, [a1;a2]) ->
-                begin match op_kind p with
-                | OK_int_add -> FEadd (of_int a1, of_int a2)
-                | OK_int_sub -> FEsub (of_int a1, of_int a2)
-                | OK_int_mul -> FEmul (of_int a1, of_int a2)
-                | OK_int_exp -> 
-                  begin match a2.f_node with
-                  | Fint n when 0 <= n -> FEpow (of_int a1, n)
-                  | _ -> abstract f
-                  end
-                | _ -> abstract f
-                end 
-              | Fapp({f_node = Fop (p,_)}, [a]) ->
-                begin match op_kind p with
-                | OK_int_opp -> FEsub (FEc c0, of_int a)
-                | _ -> abstract f
-                end
-              | _ -> abstract f in
-            of_int arg1
+          | `OfInt, [arg1] -> of_int arg1
           | _, _ -> abstract form
         end
     end
     | SFint i when r.f_ring.r_embed = `Direct -> FEc (Big_int.big_int_of_int i)
     | _ -> abstract form
+
+  and of_int f =
+    let abstract () =
+      match r.f_ring.r_embed with
+      | `Direct  -> abstract f
+      | `Embed p -> abstract (rapp r.f_ring p [f])
+    in
+
+    match f.f_node with
+    | Fint n -> FEc (Big_int.big_int_of_int n)
+    | Fapp ({f_node = Fop (p,_)}, [a1; a2]) -> begin
+        match op_kind p with
+        | OK_int_add -> FEadd (of_int a1, of_int a2)
+        | OK_int_sub -> FEsub (of_int a1, of_int a2)
+        | OK_int_mul -> FEmul (of_int a1, of_int a2)
+        | OK_int_exp -> begin
+          match a2.f_node with
+          | Fint n when 0 <= n -> FEpow (of_int a1, n)
+          | _ -> abstract ()
+          end
+        | _ -> abstract ()
+      end 
+    | Fapp({f_node = Fop (p,_)}, [a]) -> begin
+        match op_kind p with
+        | OK_int_opp -> FEsub (FEc c0, of_int a)
+        | _ -> abstract ()
+      end
+    | _ -> abstract ()
 
   and abstract form = FEX (int_of_form form) in
 
