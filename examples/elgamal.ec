@@ -1,5 +1,6 @@
 require import Int.
 require import Bool.
+
 type group. 
 type skey       = int.
 type pkey       = group.
@@ -97,7 +98,7 @@ module CPA (S:Scheme, A:Adv) = {
 
 module ElGamal : Scheme = {
   fun kg() : skey * pkey = {
-    var x : int; (* FIXME notation = $[0..q-1] *)
+    var x : int;
     x = $[0..q-1];
     return (x, g^x);
   }
