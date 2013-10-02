@@ -66,7 +66,7 @@ by intros=> X_leq_Y Y_leq_X; apply set_ext=> x;
    split; [apply X_leq_Y | apply Y_leq_X].
 qed.
 
-lemma nosmt leq_tran (X Y Z:'a set):
+lemma nosmt leq_tran (Y X Z:'a set):
   X <= Y => Y <= Z => X <= Z.
 proof strict.
 by intros=> X_leq_Y Y_leq_Z x x_in_X;
@@ -327,18 +327,18 @@ op of_list (l:'a list) = List.fold_right add empty l.
 lemma of_list_nil : of_list [] = empty <:'a>.
 proof.
   by rewrite /of_list List.fold_right_nil.
-save.
+qed.
 
 lemma of_list_cons (a:'a) l : of_list (a::l) = add a (of_list l).
    by rewrite /of_list List.fold_right_cons.
-save.
+qed.
 
 lemma mem_of_list (x:'a) l : List.mem x l = mem x (of_list l).
 proof.
  rewrite /of_list;elimT list_ind l. 
    rewrite fold_right_nil;smt.
  intros {l} y xs;rewrite fold_right_cons;smt.
-save.
+qed.
 
 lemma card_of_list (l:'a list) :
    card (of_list l) <= List.length l.
@@ -348,7 +348,7 @@ proof.
   intros => {l} x xs H; rewrite fold_right_cons length_cons.  
   case (mem x (fold_right add empty xs))=> Hin; 
      [rewrite card_add_in // | rewrite card_add_nin //];smt.
-save.
+qed.
 
 (** union *)
 op union:'a set -> 'a set -> 'a set.

@@ -17,10 +17,30 @@ theory Core.
   pred (==) (m1 m2:('a,'b) map) = forall x,
     get m1 x = get m2 x.
 
+  lemma nosmt eq_refl (m:('a,'b) map):
+    m == m.
+  proof strict.
+  by intros.
+  qed.
+
+  lemma nosmt eq_tran (m2 m1 m3:('a,'b) map):
+    m1 == m2 => m2 == m3 => m1 == m3.
+  proof strict.
+  by rewrite /Core.(==)=> m1_m2 m2_m3 x;
+     rewrite m1_m2 m2_m3.
+  qed.
+
+  lemma nosmt eq_symm (m1 m2:('a,'b) map):
+    m1 == m2 => m2 == m1.
+  proof strict.
+  by rewrite /Core.(==)=> m1_m2 x;
+     rewrite rw_eq_sym m1_m2.
+  qed.
+
   axiom map_ext (m1 m2:('a,'b) map):
     m1 == m2 => m1 = m2.
 
-  (** Domain definition *)
+  (** Domain *)
   op dom: ('a,'b) map -> 'a set.
   op in_dom (x:'a) (m:('a,'b) map) = mem x (dom m).
 
@@ -40,6 +60,30 @@ theory Core.
      rewrite -rw_neqF mem_dom get_empty; intros=> ->.
   qed.
 
+  (** Less defined than *)
+  pred (<=) (m1 m2:('a,'b) map) =
+    forall x, mem x (dom m1) => get m1 x = get m2 x.
+
+  lemma leq_dom (m1 m2:('a,'b) map): m1 <= m2 => dom m1 <= dom m2.
+  proof strict.
+  by intros=> H x; rewrite (mem_dom m2)=> x_m1;
+     rewrite -H // -mem_dom.
+  qed.
+
+  lemma nosmt leq_refl (m:('a,'b) map):
+    m <= m.
+  proof strict.
+  by intros.
+  qed.
+
+  lemma nosmt leq_tran (m2 m1 m3:('a,'b) map):
+    m1 <= m2 => m2 <= m3 => m1 <= m3
+  by [].
+
+  lemma nosmt leq_asym (m1 m2:('a,'b) map):
+    m1 <= m2 => m2 <= m1 => m1 == m2
+  by [].
+
   (** Size definition *)
   op size (m:('a,'b) map) = card (dom m).
 
@@ -52,6 +96,11 @@ theory Core.
   proof strict.
   by rewrite /size dom_empty card_empty.
   qed.
+
+  (* TODO: make sure we can prove
+      lemma size_leq m1 m2: m1 <= m2 => size m1 <= size m2.
+     This requires the (currently missing) card_leq lemma,
+     which might be provable by a stronger form of induction. *)
 
   (** We can now define writing operators *)
   (* set *)
@@ -82,26 +131,26 @@ theory Core.
   qed.
 
   lemma size_set (m:('a,'b) map) x y:
-    size m.[x <- y] = if in_dom x m then size m else size m + 1.
+    size m.[x <- y] = if mem x (dom m) then size m else size m + 1.
   proof strict.
-  rewrite /size dom_set /in_dom; case (mem x (dom m))=> x_m.
+  rewrite /size dom_set; case (mem x (dom m))=> x_m.
     by rewrite card_add_in.
     by rewrite card_add_nin.
   qed.
 
   lemma nosmt size_setI (m:('a,'b) map) x y:
-    in_dom x m =>
+    mem x (dom m) =>
     size m.[x <- y] = size m.
   proof strict.
-  by rewrite /in_dom /size dom_set=> x_m;
+  by rewrite /size dom_set=> x_m;
      rewrite card_add_in.
   qed.
 
   lemma nosmt size_setN (m:('a,'b) map) x y:
-    !in_dom x m =>
+    !mem x (dom m) =>
     size m.[x <- y] = size m + 1.
   proof strict.
-  by rewrite /in_dom /size dom_set=> x_m;
+  by rewrite /size dom_set=> x_m;
      rewrite card_add_nin.
   qed.
 
@@ -131,6 +180,75 @@ theory Core.
     by intros=> <-.
     by rewrite rw_eq_sym mem_dom=> ->.
   qed.
+
+  lemma size_rm (m:('a,'b) map) x:
+    size (rm x m) = if in_dom x m then size m - 1 else size m.
+  proof strict.
+  rewrite /size dom_rm /in_dom; case (mem x (dom m))=> x_m.
+    by rewrite card_rm_in.
+    by rewrite card_rm_nin.
+  qed.
+
+  lemma nosmt size_rmI (m:('a,'b) map) x:
+    in_dom x m =>
+    size (rm x m) = size m - 1.
+  proof strict.
+  by rewrite /in_dom /size dom_rm=> x_m;
+     rewrite card_rm_in.
+  qed.
+
+  lemma nosmt size_rmN (m:('a,'b) map) x:
+    !in_dom x m =>
+    size (rm x m) = size m.
+  proof strict.
+  by rewrite /in_dom /size dom_rm=> x_m;
+     rewrite card_rm_nin.
+  qed.
+
+  (* filter *)
+  op filter: ('a -> 'b -> bool) -> ('a,'b) map -> ('a,'b) map.
+
+  axiom get_filter f (m:('a,'b) map) x:
+    get (filter f m) x = if f x (proj (get m x)) then get m x else None.
+
+  lemma get_filterN f (m:('a,'b) map) x:
+    !in_dom x m =>
+    get (filter f m) x = get m x.
+  proof strict.
+  by rewrite get_filter /in_dom mem_dom /= => ->.
+  qed.
+
+  lemma dom_filter f (m:('a,'b) map):
+    dom (filter f m) = filter (lambda x, f x (proj (get m x))) (dom m).
+  proof strict.
+  by apply set_ext=> x; rewrite mem_dom get_filter mem_filter mem_dom /=;
+     case (f x (proj (get m x))).
+  qed.
+
+  lemma dom_filter1 f (m:('a,'b) map):
+    dom (filter (lambda x y, f x) m) = filter f (dom m).
+  proof strict.
+  by cut:= dom_filter (lambda x (y:'b), f x) m; beta=> ->;
+     congr=> //; apply Fun.fun_ext.
+  qed.
+
+  lemma filter_dom f (m:('a,'b) map) x:
+    in_dom x (filter f m) =>
+    in_dom x m /\ f x (proj (get m x)).
+  proof strict.
+  by rewrite /in_dom dom_filter mem_filter.
+  qed.
+
+  lemma leq_filter f (m:('a,'b) map):
+    filter f m <= m.
+  proof strict.
+  by rewrite /Core.(<=)=> x x_in_f; rewrite get_filter;
+     cut:= filter_dom f m x _; last intros=> [_ ->].
+  qed.
+
+  (* TODO: Prove
+       lemma size_filter f m: size (filter f m) <= size m.
+     This is simple once we have size_leq. *)
 end Core.
 
 theory OptionGet.
