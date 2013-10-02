@@ -57,23 +57,21 @@ let t_bdHoare_app i (phi,pR,f1,f2,g1,g2) g =
     { bhs with bhs_s = s2; bhs_pr = f_and_simpl phi pR;bhs_bd=f2} in
   let condg2 = f_bdHoareS_r
     { bhs with bhs_s = s2; bhs_pr = f_and_simpl phi nR;bhs_bd=g2} in
-  let (m0,m0ty) = bhs.bhs_m in
-  let mt = EcIdent.fresh m0 in
-  let mf = EcIdent.fresh m0 in
-  let m0mt = Fsubst.f_subst_mem m0 mt in
-  let m0mf = Fsubst.f_subst_mem m0 mf in
   let bd =
-    let f2 = m0mt f2 in
-    let g2 = m0mf g2 in
     (f_real_add_simpl (f_real_prod_simpl f1 f2) (f_real_prod_simpl g1 g2)) in
   let condbd =
     match bhs.bhs_cmp with
     | FHle -> f_real_le bd bhs.bhs_bd
     | FHeq -> f_eq bd bhs.bhs_bd
-    | FHge -> f_real_le bhs.bhs_bd bd in
-  let condbd =
-    f_imps [bhs.bhs_pr; m0mt pR; m0mt phi; m0mf nR; m0mf phi] condbd in
-  let conds = [ f_forall_mems [bhs.bhs_m; (mt,m0ty); (mf,m0ty)] condbd ] in
+    | FHge -> f_real_le bhs.bhs_bd bd in 
+  let condbd = f_imp bhs.bhs_pr condbd in
+  let ir1, ir2 = EcIdent.create "r", EcIdent.create "r" in
+  let r1, r2 = f_local ir1 treal, f_local ir2 treal in
+  let condnm = 
+    let eqs = f_and (f_eq f2 r1) (f_eq g2 r2) in
+    f_forall [ir1,GTty treal; ir2, GTty treal]
+       (f_hoareS bhs.bhs_m (f_and bhs.bhs_pr eqs) s1 eqs) in 
+  let conds = [ f_forall_mems [bhs.bhs_m] condbd; condnm ] in
   let conds =
     if f_equal g1 f_r0 then condg1 :: conds
     else if f_equal g2 f_r0 then condg2 :: conds
@@ -83,9 +81,21 @@ let t_bdHoare_app i (phi,pR,f1,f2,g1,g2) g =
     else if f_equal f2 f_r0 then condf2 :: conds
     else condf1 :: condf2 :: conds in
   let conds = cond_phi :: conds in
-    (* FIXME: the attached information is meaningless *)
-    prove_goal_by conds (rn_hl_append Backs (Single i) pR AppNone) g
+  (* FIXME: the attached information is meaningless *)
+  prove_goal_by conds (rn_hl_append Backs (Single i) pR AppNone) g
 
+let t_bdHoare_app i info g = 
+  let tac g = 
+    let concl = get_concl g in
+    let hs = t_as_hoareS concl in
+    t_lseq 
+       [EcPhlConseq.t_hoareS_conseq_nm hs.hs_pr f_true;
+        EcPhlTrivial.t_trivial;
+        t_fail] g in
+  let tac g = 
+    t_try (t_seq (t_intros_i [EcIdent.create "_"; EcIdent.create "_"]) tac) g in
+  t_on_last tac (t_bdHoare_app i info g) 
+ 
 let t_equiv_app (i,j) phi g =
   let concl = get_concl g in
   let es = t_as_equivS concl in
@@ -153,9 +163,9 @@ let process_app dir k phi bd_info g =
         t_hoare_app i phi g
 
   | Single i, _ when is_bdHoareS concl ->
-      let prob_interm_assertion = process_phl_formula g phi in
-      let (range_assertion,f1,f2,f3,f4) = process_phl_bd_info dir g bd_info in
-        t_bdHoare_app i (range_assertion, prob_interm_assertion, f1, f2, f3, f4) g
+    let prob_interm_assertion = process_phl_formula g phi in
+    let (range_assertion,f1,f2,f3,f4) = process_phl_bd_info dir g bd_info in
+    t_bdHoare_app i (range_assertion, prob_interm_assertion, f1, f2, f3, f4) g
 
   | Double(i,j), PAppNone ->
     let phi = process_prhl_formula g phi in
