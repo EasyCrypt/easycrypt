@@ -78,6 +78,7 @@ theory GenDice.
           by apply d_uni; apply test_in_supp; rewrite -test_sub_supp.
         by conseq * Hw => //; smt.
       by conseq * (_ : _ ==> true) => //;rnd;skip;progress=> //; smt.
+      split;first smt.
       intros z;conseq * (_ : _ ==>  mem r (sub_supp i)); first smt.
       rnd;skip;progress => //.
       rewrite -(mu_eq (d i{hr}) (cpMem (sub_supp i{hr}))) => //.
