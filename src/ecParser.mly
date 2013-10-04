@@ -139,6 +139,7 @@
 
 %token <EcParsetree.codepos> CPOS
 
+%token EXTRACTION
 %token ADD
 %token ADMIT
 %token ALIAS
@@ -2305,7 +2306,27 @@ global_:
 | x=loc(QED)       { Gsave x.pl_loc }
 | PRINT p=print    { Gprint     p   }
 | PRAGMA x=lident  { Gpragma    x   }
+| EXTRACTION i=extract_info { Gextract i }
 ;
+
+extract_info:
+|  s=STRING? qs=plist1(toextract,COMMA) w=withextract { (s,qs,w) }
+;
+
+toextract:
+| OP q=qoident     {ExOp q}
+| TYPE q=qoident   {ExTy q}
+| THEORY q=qoident {ExTh q}
+;
+
+withextract:
+| empty { [] }
+| WITH w=plist1(withextract1,COMMA) { w }
+;
+withextract1:
+| p=toextract EQ s=STRING { p,s }
+;
+
 
 stop:
 | EOF { }

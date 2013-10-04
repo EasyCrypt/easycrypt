@@ -144,6 +144,7 @@
     "require"     , REQUIRE    ;        (* KW: global *)
     "theory"      , THEORY     ;        (* KW: global *)
     "section"     , SECTION    ;        (* KW: global *)
+    "extraction"  , EXTRACTION ;        (* KW: global *)
     "type"        , TYPE       ;        (* KW: global *)
     "self"        , SELF       ;        (* KW: global *)
     "class"       , CLASS      ;        (* KW: global *)

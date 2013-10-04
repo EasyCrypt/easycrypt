@@ -316,6 +316,11 @@ and process_pragma (scope : EcScope.scope) opt =
   end
 
 (* -------------------------------------------------------------------- *)
+and process_extract scope todo = 
+  EcExtraction.process_extraction (EcScope.env scope) todo;
+  scope
+
+(* -------------------------------------------------------------------- *)
 and process (ld : EcLoader.ecloader) (scope : EcScope.scope) g =
   let loc = g.pl_loc in
 
@@ -349,6 +354,7 @@ and process (ld : EcLoader.ecloader) (scope : EcScope.scope) g =
       | Gcheckproof  b    -> `Fct   (fun scope -> process_checkproof scope  b)
       | Gsave        loc  -> `Fct   (fun scope -> process_save       scope  loc)
       | Gpragma      opt  -> `State (fun scope -> process_pragma     scope  opt)
+      | Gextract     todo -> `Fct   (fun scope -> process_extract    scope todo)
     with
     | `Fct   f -> Some (f scope)
     | `State f -> f scope; None
