@@ -81,19 +81,31 @@ let rec out_oty fmt oty =
   | OTvar s -> Format.fprintf fmt "%s" s
   | OTtuple tys -> out_tytuple fmt tys
   | OTconstr(s,otys) ->
-    Format.fprintf fmt "%a %a" out_tyargs otys out_name s
+    Format.fprintf fmt "%a%a" out_tyargs otys out_name s
   | OTfun(ot1,ot2) ->
-    Format.fprintf fmt "@[<hov 2>(%a ->@ %a)@]" out_oty ot1 out_oty ot2
+    Format.fprintf fmt "@[<hov 2>%a ->@ %a@]" out_oty_bf ot1 out_oty ot2
+
+and out_oty_bf fmt oty = 
+  match oty with
+  | OTfun _ -> pp_paren out_oty fmt oty
+  | _ -> out_oty fmt oty
+
+and out_oty_bfp fmt oty = 
+  match oty with
+  | OTfun _ | OTtuple _ -> pp_paren out_oty fmt oty
+  | _ -> out_oty fmt oty
 
 and out_tytuple fmt tys = 
   match tys with
   | [] -> Format.fprintf fmt "unit"
-  | _ -> pp_paren (EcPrinting.pp_list " *@ " out_oty) fmt tys
+  | _ -> 
+    Format.fprintf fmt "@[<hov 0>%a@]"
+      (EcPrinting.pp_list " *@ " out_oty) tys
 
 and out_tyargs fmt tys = 
   match tys with
   | [] -> ()
-  | [ty] -> out_oty fmt ty
+  | [ty] -> Format.fprintf fmt "%a " out_oty_bfp ty
   | _ -> pp_paren (EcPrinting.pp_list ",@ " out_oty) fmt tys
 
 let out_opat fmt = function
@@ -144,10 +156,18 @@ let out_op_decl fmt p s od =
   out_header fmt p;
   match od with
   | OOabs ty ->
-    Format.fprintf fmt "let %s : %a = assert false (* TO FILL *)"
+    Format.fprintf fmt "@[<hov 2>let %s : %a =@\nassert false (* TO FILL *)@]"
       s out_oty ty
   | OOdef e ->
-    Format.fprintf fmt "@[<hov 2>let %s =@ %a@]" s out_expr e
+    let bd,e = 
+      match e with 
+      | Olam(bd,e) -> bd, e 
+      | _ -> [], e in
+    Format.fprintf fmt "@[<hov 2>let %s @[<hov 0>%a@] =@\n%a@]" 
+      s
+      (EcPrinting.pp_list "@ " 
+         (fun fmt (s,ty) -> Format.fprintf fmt "(%s : %a)" s out_oty ty)) bd
+      out_expr e
 
 let out_ty_decl fmt p s ids oty =
   out_header fmt p;
@@ -163,7 +183,7 @@ let out_ty_decl fmt p s ids oty =
   | None -> 
     Format.fprintf fmt "type %a%s (* TO FILL *)" pp_typarams ids s
   | Some ty ->
-    Format.fprintf fmt "@[<hov 2>type %a%s =@ %a@]" pp_typarams ids 
+    Format.fprintf fmt "@[<hov 2>type %a%s =@ @[%a@]@]" pp_typarams ids 
       s out_oty ty
   
 let find_odef tbl p = 
