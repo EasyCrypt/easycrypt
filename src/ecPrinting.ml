@@ -491,6 +491,7 @@ let priority_of_binop name =
 let priority_of_unop name =
   match EcIo.lex_single_token name with
   | Some EP.NOT      -> Some e_uni_prio_not
+  | Some EP.PUNIOP s when s = EcCoreLib.id_not -> Some e_uni_prio_not
   | Some EP.PUNIOP _ -> Some e_uni_prio_uminus
 
   | _  -> None

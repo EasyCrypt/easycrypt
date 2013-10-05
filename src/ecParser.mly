@@ -551,7 +551,7 @@ expr_u:
     { PEapp (e, args) }
 
 | op=loc(NOT) ti=tvars_app? e=expr
-    { peapp_symb op.pl_loc "!" ti [e] }
+    { peapp_symb op.pl_loc "[!]" ti [e] }
 
 | op=loc(uniop) ti=tvars_app? e=expr
     { peapp_symb op.pl_loc op.pl_desc ti [e] } 
@@ -566,7 +566,7 @@ expr_u:
     { peapp_symb op.pl_loc "=" ti [e1; e2] }
 
 | e1=expr op=loc(NE) ti=tvars_app? e2=expr
-    { peapp_symb op.pl_loc "!" None 
+    { peapp_symb op.pl_loc "[!]" None 
       [ mk_loc op.pl_loc (peapp_symb op.pl_loc "=" ti [e1; e2])] }
 
 | e1=expr op=loc(ADD) ti=tvars_app? e2=expr 
@@ -756,7 +756,7 @@ form_u(P):
 | e=sform_r(P) args=sform_r(P)+ { PFapp (e, args) } 
 
 | op=loc(NOT) ti=tvars_app? e=form_r(P) 
-    { pfapp_symb  op.pl_loc "!" ti [e] }
+    { pfapp_symb  op.pl_loc "[!]" ti [e] }
 
 | op=loc(uniop) ti=tvars_app? e=form_r(P)
    { pfapp_symb op.pl_loc op.pl_desc ti [e] } 
@@ -771,7 +771,7 @@ form_u(P):
     { pfapp_symb op.pl_loc "=" ti [e1; e2] }
 
 | e1=form_r(P) op=loc(NE) ti=tvars_app? e2=form_r(P)
-    { pfapp_symb op.pl_loc "!" None 
+    { pfapp_symb op.pl_loc "[!]" None 
       [ mk_loc op.pl_loc (pfapp_symb op.pl_loc "=" ti [e1; e2])] }
 
 | e1=form_r(P) op=loc(MINUS) ti=tvars_app? e2=form_r(P)

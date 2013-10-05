@@ -24,6 +24,7 @@ val s_from_int   : qsymbol
 (* ----------------------------------------------------------------------*)
 val id_top       : symbol
 val id_Pervasive : symbol
+val id_not       : symbol
 
 val p_top       : path
 val p_Pervasive : path

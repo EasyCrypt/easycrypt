@@ -32,7 +32,7 @@ let id_from_int  = "from_int"
 
 let id_true      = "true"
 let id_false     = "false"
-let id_not       = "!"
+let id_not       = "[!]"
 let id_and       = "/\\"
 let id_anda      = "&&"
 let id_ora       = "||"
