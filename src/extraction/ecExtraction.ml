@@ -62,7 +62,7 @@ type extract_env = {
   mp_th     : ocaml_mod     ocaml_def Hp.t;
 }
 
-let eempty = {
+let eempty _ = {
   mp_ty = Hp.create 17;
   mp_op = Hp.create 17;
   mp_th = Hp.create 17;
@@ -203,7 +203,12 @@ and out_mod eenv fmt decls =
 (* Compiler *) 
 
 let sanitizer = 
-  Why3.Ident.sanitizer Why3.Ident.char_to_alnumus Why3.Ident.char_to_alnumus
+  let char_to c = 
+    if c = '*' then "aas" else Why3.Ident.char_to_alnumus c in
+  fun s ->
+    if s = "false" then "_false"
+    else if s = "true" then "_true"
+    else Why3.Ident.sanitizer char_to char_to s
 
 let dot_name mo s =
   mo.odef_name@[s]
@@ -246,7 +251,6 @@ let rec compile_tyd env eenv cname p =
   let res = 
     try (Hp.find eenv.mp_ty p).odef_name 
     with Not_found ->
-      Format.printf "start extraction of type %s@." (EcPath.tostring p);
       let pth, s = destr_path p in 
       let cname = EcPath.tolist pth in
       let tyd = Ty.by_path p env in
@@ -283,7 +287,6 @@ let rec compile_op env eenv cname p =
   let res = 
     try (Hp.find eenv.mp_op p).odef_name 
     with Not_found ->
-      Format.printf "start extraction of op %s@." (EcPath.tostring p);
       let pth, s = destr_path p in 
       let op = Op.by_path p env in
       let cname = EcPath.tolist pth in
@@ -428,31 +431,39 @@ and sort_expr eenv = function
 
   
 
-let rec add_withs env eenv withextract = 
-  List.iter (add_with env eenv) withextract 
+let rec add_withs check env eenv withextract = 
+  List.iter (add_with check env eenv) withextract 
 
-and add_with env eenv (toex, s) = 
+and add_with check env eenv (toex, s) = 
   let oname = Str.split (Str.regexp "\ .") s in
   match toex with
-  | ExOp qs -> add_withop env eenv qs oname 
-  | ExTy qs -> add_withty env eenv qs oname
-  | ExTh qs -> add_withth env eenv qs oname
+  | ExOp qs -> add_withop check env eenv qs oname 
+  | ExTy qs -> add_withty check env eenv qs oname
+  | ExTh qs -> add_withth check env eenv qs oname
 
-and add_withop env eenv qs oname = 
-  add_withop_p eenv (Op.lookup_path (EcLocation.unloc qs) env) oname
+and add_withop check env eenv qs oname =
+  try 
+    add_withop_p eenv (Op.lookup_path (EcLocation.unloc qs) env) oname
+  with LookupFailure _ when not check -> ()
+    
 and add_withop_p eenv p oname =
   Hp.add eenv.mp_op p 
     { odef_name = oname; odef_def = None; odef_done = true }
 
-and add_withty env eenv qs oname = 
-  add_withty_p eenv (Ty.lookup_path (EcLocation.unloc qs) env) oname 
+and add_withty check env eenv qs oname = 
+  try 
+    add_withty_p eenv (Ty.lookup_path (EcLocation.unloc qs) env) oname 
+  with LookupFailure _ when not check -> ()
+
 and add_withty_p eenv p oname =
   Hp.add eenv.mp_ty p 
     { odef_name = oname; odef_def = None; odef_done = true }
 
-and add_withth env eenv qs oname = 
-  let (p,cth) = Theory.lookup (EcLocation.unloc qs) env  in
-  List.iter (add_citem eenv p (List.rev oname)) cth.cth_struct 
+and add_withth check env eenv qs oname = 
+  try 
+    let (p,cth) = Theory.lookup (EcLocation.unloc qs) env  in
+    List.iter (add_citem eenv p (List.rev oname)) cth.cth_struct 
+  with LookupFailure _ when not check -> ()
 
 and add_citem eenv p oname = function 
   | CTh_type(s,_) ->
@@ -464,15 +475,60 @@ and add_citem eenv p oname = function
   | CTh_axiom _ | CTh_modtype _ | CTh_module _
   | CTh_export _ | CTh_instance _ -> ()
 
+let init_withextract =
+  let dummy x = EcLocation.mk_loc EcLocation._dummy x in
+  let perv x = dummy ([EcCoreLib.id_top; EcCoreLib.id_Pervasive], x) in
+  let operv x = "Pervasives." ^ x in
+  let tint x = dummy ([EcCoreLib.id_top; "Int"], x) in
+  [
+   (* Pervasive *)
+    ExTh (dummy ([EcCoreLib.id_top], EcCoreLib.id_Pervasive)), "EcPervasive";
+    ExOp (perv "true") , "true"       ;
+    ExOp (perv "false"), "false"      ;
+    ExOp (perv "<=>")  , operv "(==)" ;
+    ExOp (perv "||")   , operv "(||)" ;
+    ExOp (perv "\\/")  , operv "(||)" ;
+    ExOp (perv "&&")   , operv "(&&)" ;
+    ExOp (perv "/\\")  , operv "(&&)" ;
+    ExOp (perv "[!]")  , operv "not"  ;
+    ExOp (perv "=")    , operv "(=)"  ;
+    ExOp (perv "tt")   , operv "()"   ;
+   (* Int *) 
+   (* TODO : this is dangerous : we should use big_int *)
+    ExTh (dummy ([EcCoreLib.id_top], "Int")), "EcInt";
+    ExOp (tint "[-]")  , operv "(~-)" ;
+    ExOp (tint "-")    , operv "(-)"  ;
+    ExOp (tint "+")    , operv "(+)"  ;
+    ExOp (tint "*")    , operv "( * )";
+    ExOp (tint "<=")   , operv "(<=)" ;
+    ExOp (tint "<")    , operv "(<)"  ;
+    ExOp (tint ">=")   , operv "(>=)" ;
+    ExOp (tint ">")    , operv "(>)"  ;
+    ExOp (tint "one")  , "1"          ;
+    ExOp (tint "zero") , "0"          ;
+    ExOp (dummy ([EcCoreLib.id_top; "Int"; "EuclDiv"], "%%")) , operv "(mod)"  ;
+    ExOp (dummy ([EcCoreLib.id_top; "Int"; "EuclDiv"], "/%")) , operv "(/)"    ;
+    ExOp (dummy ([EcCoreLib.id_top; "Int"; "Extrema"], "max")), operv "max";
+    ExOp (dummy ([EcCoreLib.id_top; "Int"; "Extrema"], "min")), operv "min";
+    ExOp (dummy ([EcCoreLib.id_top; "Int"; "Abs"], "`|_|"))   , operv "abs";
+   (* Bool *)
+    ExTh (dummy ([EcCoreLib.id_top], "Bool")), "EcBool";
+   (* Pair *)
+    ExTh (dummy ([EcCoreLib.id_top], "Pair")), "EcPair";
+    ExOp (dummy ([EcCoreLib.id_top; "Pair"], "fst")), operv "fst";
+    ExOp (dummy ([EcCoreLib.id_top; "Pair"], "snd")), operv "snd";
+   ] 
+
 let process_extraction env (file, toextract, withextract) = 
-  let eenv = eempty in
+  let eenv = eempty () in
   let top = EcCoreLib.p_top in
   let topmod = { mod_path = top; mod_decl = []; mod_decl2 = [] } in
   let topdef = { odef_name = [EcPath.basename top];
                  odef_def  = Some (EcCoreLib.id_top, topmod);
                  odef_done = false } in
   Hp.add eenv.mp_th top topdef;
-  add_withs env eenv withextract;
+  add_withs false env eenv init_withextract;
+  add_withs true env eenv withextract;
   List.iter (compile_kind env eenv) toextract;
   topdef.odef_done <- true;
   List.iter (sort_decl eenv) topmod.mod_decl;
@@ -480,7 +536,6 @@ let process_extraction env (file, toextract, withextract) =
     match file with
     | None ->
       let fmt = Format.std_formatter in
-      Format.printf "(* Extraction *)@.@.";
       fmt, fun _ -> Format.fprintf fmt "@\n@."
     | Some filename ->
       let outc = open_out filename in
