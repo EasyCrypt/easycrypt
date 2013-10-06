@@ -10,11 +10,8 @@ let init = Array.init
 let create = Array.make 
 
 (* Array.empty *)
-(* TODO : how to implement this ? *)
-(*
-let empty : 'a array = ( (Obj.magic (Array.make 0 ())) : 'a array)
-*)
-  
+let empty : 'a array = [||]
+
 (* Array._.[_] *)
 let _dtlb_rb = Array.get 
 

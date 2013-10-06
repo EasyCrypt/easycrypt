@@ -11,6 +11,8 @@
    the reroot function.
 *)
 
+type 'a tarray = 'a array
+
 type 'a t = 'a data ref
 and 'a data =
   | Array of 'a array 
@@ -64,7 +66,8 @@ let reroot t =
 type 'x array = 'x t
 
 (* Array.empty *)
-(*  let empty : 'x array = assert false (* TO FILL *) *)
+(* TODO HOW to implement this *)
+(* let empty : 'x array = ref (Array ([||] : 'a tarray)) *)
 
 (* Array.create *)
 let create n v = ref (Array (Array.create n v))
