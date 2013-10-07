@@ -66,8 +66,7 @@ let reroot t =
 type 'x array = 'x t
 
 (* Array.empty *)
-(* TODO HOW to implement this *)
-(* let empty : 'x array = ref (Array ([||] : 'a tarray)) *)
+let empty  = Obj.magic (ref (Array [||]))
 
 (* Array.create *)
 let create n v = ref (Array (Array.create n v))
