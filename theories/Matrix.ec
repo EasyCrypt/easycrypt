@@ -163,7 +163,7 @@ lemma column_transpose_row: forall (M:'a matrix) i,
   0 <= i => i < snd (size M) =>
   row M i = column (transpose M) i.
 proof.
-intros M i i_0 i_bound; apply Array.extensionality.
+intros M i i_0 i_bound; apply Array.array_ext.
 cut ext_eq: (Array.length (row M i) = fst (size M) /\
              Array.length (column (transpose M) i) = fst (size M) /\
              forall j, 0 <= j => j < fst (size M) =>
@@ -177,4 +177,3 @@ progress=> //.
   by apply column_get=> //; smt.
   by apply transpose_get.
 qed.
-
