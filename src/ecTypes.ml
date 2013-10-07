@@ -220,14 +220,20 @@ let rec ty_subst s =
       end)
 
 module Tuni = struct
+  let offun uidmap =
+    ty_subst { ty_subst_id with ts_u = uidmap }
+
+  let offun_dom uidmap dom =
+    List.map (offun uidmap) dom
+
   let subst (uidmap : ty Muid.t) =
     ty_subst { ty_subst_id with ts_u = Muid.find_opt^~ uidmap } 
 
   let subst1 ((id, t) : uid * ty) =
     subst (Muid.singleton id t)
 
-  let subst_dom uidmap =
-    List.map (subst uidmap) 
+  let subst_dom uidmap dom =
+    List.map (subst uidmap) dom 
 
   let occurs u = 
     let rec aux t = 
@@ -766,7 +772,8 @@ let e_subst s =
 let e_mapty onty = 
   e_subst { e_subst_id with es_ty = onty; }
 
-let e_uni (uidmap : ty Muid.t) = e_mapty (Tuni.subst uidmap)
+let e_uni uidmap =
+  e_mapty (Tuni.offun uidmap)
 
 let is_var e = 
   match e.e_node with

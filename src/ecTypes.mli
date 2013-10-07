@@ -67,6 +67,9 @@ val is_ty_subst_id : ty_subst -> bool
 val ty_subst : ty_subst -> ty -> ty
 
 module Tuni : sig
+  val offun     : (uid -> ty option) -> ty  -> ty
+  val offun_dom : (uid -> ty option) -> dom -> dom
+
   val subst1    : (uid * ty) -> ty -> ty
   val subst     : ty Muid.t -> ty -> ty
   val subst_dom : ty Muid.t -> dom -> dom
@@ -207,7 +210,7 @@ val add_locals : e_subst ->
 
 val e_subst : e_subst -> expr -> expr
 val e_mapty : (ty -> ty) -> expr -> expr 
-val e_uni   : ty Muid.t -> expr -> expr
+val e_uni   : (uid -> ty option) -> expr -> expr
 
 (* -------------------------------------------------------------------- *)
 (* projects 'a Distr type into 'a *)

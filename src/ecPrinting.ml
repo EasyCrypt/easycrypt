@@ -123,7 +123,7 @@ module PPEnv = struct
       match info with
       | None -> fun sm -> EcEnv.Op.lookup_path sm ppe.ppe_env
       | Some (pred,typ,dom) ->
-        let tvi = Some (EcUnify.UniEnv.TVIunamed typ) in
+        let tvi = Some (EcUnify.TVIunamed typ) in
         fun sm ->
           let ue = EcUnify.UniEnv.create None in
           match  EcUnify.select_op pred tvi ppe.ppe_env sm ue dom with

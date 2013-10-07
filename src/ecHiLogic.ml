@@ -1,4 +1,5 @@
 (* -------------------------------------------------------------------- *)
+open EcUidgen
 open EcUtils
 open EcMaps
 open EcIdent
@@ -118,10 +119,10 @@ let process_instanciate hyps ({pl_desc = pq; pl_loc = loc} ,tvi) =
     match ax.EcDecl.ax_tparams, args with
     | [], None -> []
     | [], Some _ -> error loc BadTyinstance
-    | ltv, Some (UE.TVIunamed l) ->
+    | ltv, Some (EcUnify.TVIunamed l) ->
         if not (List.length ltv = List.length l) then error loc BadTyinstance;
         l
-    | ltv, Some (UE.TVInamed l) ->
+    | ltv, Some (EcUnify.TVInamed l) ->
         let get id =
           try List.assoc (EcIdent.name id) l
           with _ -> error loc BadTyinstance in
@@ -223,7 +224,7 @@ let process_subst loc ri g =
     set_loc loc (t_lseq tacs) g
 
 (* -------------------------------------------------------------------- *)
-exception RwMatchFound of EcUnify.unienv * ty EcUidgen.Muid.t * form evmap
+exception RwMatchFound of EcUnify.unienv * (uid -> ty option) * form evmap
 
 let try_match hyps (ue, ev) p form =
   let trymatch bds tp =
@@ -276,7 +277,7 @@ let process_apply loc pe g =
   in
 
   let args = concretize_pterm_arguments (tue, ev) ids in
-  let typs = List.map (Tuni.subst tue) typs in
+  let typs = List.map (Tuni.offun tue) typs in
 
     match p with
     | `Global p ->
@@ -328,7 +329,7 @@ let process_rewrite1_core (s, o) (p, typs, ue, ax) args g =
   in
 
   let args = concretize_pterm_arguments (tue, ev) ids in
-  let typs = List.map (Tuni.subst tue) typs in
+  let typs = List.map (Tuni.offun tue) typs in
   let fp   = concretize_pterm (tue, ev) ids fp in
 
   let cpos =
@@ -656,7 +657,7 @@ let process_cutdef loc ip cd g =
   let tue = EcUnify.UniEnv.close ue in
   let args = concretize_pterm_arguments (tue, ev) ids in
   let ax   = concretize_pterm (tue, ev) ids ax in
-  let typs = List.map (Tuni.subst tue) typs in
+  let typs = List.map (Tuni.offun tue) typs in
   let g    = t_cut ax g in
   let g    =
     let tt g =
@@ -781,7 +782,7 @@ let process_elimT loc (pf, qs) g =
 
   let tue =
     try  EcUnify.UniEnv.close ue
-    with EcUnify.UninstanciateUni _ -> noelim ()
+    with EcUnify.UninstanciateUni -> noelim ()
   in
 
   let ax = Fsubst.uni tue ax in
@@ -813,7 +814,7 @@ let process_elimT loc (pf, qs) g =
   let sk = skipmatch ax body 0 in
 
   t_seq
-    (set_loc loc (t_elimT (List.map (Tuni.subst tue) typs) p pf sk))
+    (set_loc loc (t_elimT (List.map (Tuni.offun tue) typs) p pf sk))
     (t_simplify EcReduction.beta_red) g
 
 (* -------------------------------------------------------------------- *)

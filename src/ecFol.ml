@@ -1445,7 +1445,7 @@ module Fsubst = struct
     f_subst { f_subst_id with fs_sty = sty; fs_ty = ty_subst sty }
  
   let uni uidmap = 
-    mapty { ty_subst_id with ts_u = EcUidgen.Muid.find_opt^~ uidmap }
+    mapty { ty_subst_id with ts_u = uidmap }
 
   (* ------------------------------------------------------------------ *)  
   let subst_locals s = 

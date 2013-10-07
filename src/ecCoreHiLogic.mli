@@ -14,12 +14,12 @@ open EcLogic
 val unienv_of_hyps : LDecl.hyps -> unienv
 
 val process_tyargs :
-  LDecl.hyps -> ptyannot option -> UniEnv.tvar_inst_kind option
+  LDecl.hyps -> ptyannot option -> EcUnify.tvar_inst option
 
 val process_named_pterm :
   'a -> LDecl.hyps -> pqsymbol * ptyannot option
   ->   [ `Global of EcPath.path
-       | `Local of EcIdent.t ]
+       | `Local  of EcIdent.t ]
      * ty list * unienv * form
 
 val process_pterm :
@@ -65,13 +65,13 @@ val can_concretize_pterm_arguments :
   unienv * form EcMetaProg.evmap -> ('a pterm_arg) list -> bool
 
 val concretize_pterm_arguments :
-  ty Muid.t * form EcMetaProg.evmap -> ('a pterm_arg) list -> app_arg list
+  (uid -> ty option) * form EcMetaProg.evmap -> ('a pterm_arg) list -> app_arg list
 
 val concretize_form :
-  ty Muid.t * form EcMetaProg.evmap -> form -> form
+  (uid -> ty option) * form EcMetaProg.evmap -> form -> form
 
 val concretize_pterm :
-  ty Muid.t * form EcMetaProg.evmap -> ('a pterm_arg) list -> form -> form
+  (uid -> ty option) * form EcMetaProg.evmap -> ('a pterm_arg) list -> form -> form
 
 (* -------------------------------------------------------------------- *)
 val process_form_opt : LDecl.hyps -> pformula -> ty option -> form

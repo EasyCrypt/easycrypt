@@ -922,7 +922,7 @@ module Op = struct
     if not (EcUnify.UniEnv.closed ue) then
       hierror "this operator type contains free type variables";
 
-    let uni     = Tuni.subst (EcUnify.UniEnv.close ue) in
+    let uni     = Tuni.offun (EcUnify.UniEnv.close ue) in
     let body    = body |> omap (e_mapty uni) in
     let ty      = uni ty in
     let tparams = EcUnify.UniEnv.tparams ue in
@@ -930,8 +930,8 @@ module Op = struct
 
     if op.po_kind = `Const then begin
       let tue, ty, _ = EcUnify.UniEnv.freshen ue tparams None ty in
-      let tdom = EcUnify.UniEnv.fresh_uid tue in
-      let tcom = EcUnify.UniEnv.fresh_uid tue in
+      let tdom = EcUnify.UniEnv.fresh tue in
+      let tcom = EcUnify.UniEnv.fresh tue in
       let tfun = EcTypes.tfun tdom tcom in
 
         try
@@ -971,7 +971,7 @@ module Pred = struct
 
     let uni     = EcUnify.UniEnv.close ue in
     let body    = body |> omap (EcFol.Fsubst.uni uni) in
-    let dom     = List.map (Tuni.subst uni) dom in
+    let dom     = List.map (Tuni.offun uni) dom in
     let tparams = EcUnify.UniEnv.tparams ue in
     let tyop    = EcDecl.mk_pred tparams dom body in
 
