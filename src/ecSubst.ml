@@ -248,11 +248,11 @@ and subst_module (s : _subst) (m : module_expr) =
     { m with me_body; me_comps; me_sig; }
 
 (* -------------------------------------------------------------------- *)
-let init_tparams (s : _subst) params params' = 
+let init_tparams (s : _subst) (params : ty_params) (params' : ty_params) =
   if params = [] then s
   else
     let styv =  
-      List.fold_left2 (fun m p p' -> Mid.add p (tvar p') m) 
+      List.fold_left2 (fun m (p, _) (p', _) -> Mid.add p (tvar p') m) 
         Mid.empty params params' in
     let sty = 
       { ty_subst_id with 
@@ -263,15 +263,20 @@ let init_tparams (s : _subst) params params' =
     in
       { s with s_sty = sty; s_ty = EcTypes.ty_subst sty } 
 
+let subst_typaram (s : _subst) ((id, tc) : ty_param) =
+  (EcIdent.fresh id,
+   Sp.fold (fun p tc -> Sp.add (s.s_p p) tc) tc Sp.empty)
+
 let subst_tydecl (s : _subst) (tyd : tydecl) =
-  let params' = List.map EcIdent.fresh tyd.tyd_params in
+  let params' = List.map (subst_typaram s) tyd.tyd_params in
   let body = 
     match tyd.tyd_type with
     | None    -> None 
     | Some ty ->
         let s = init_tparams s tyd.tyd_params params' in
-        Some (s.s_ty ty) in
-  { tyd_params = params'; tyd_type = body }
+          Some (s.s_ty ty)
+  in
+    { tyd_params = params'; tyd_type = body }
 
 (* -------------------------------------------------------------------- *)
 let subst_op_kind (s : _subst) (kind : operator_kind) =
@@ -279,26 +284,28 @@ let subst_op_kind (s : _subst) (kind : operator_kind) =
   | OB_oper (Some body) ->
       let s = e_subst_of_subst s in
       let body  = EcTypes.e_subst s body in
-      OB_oper (Some body)
+        OB_oper (Some body)
+
   | OB_pred (Some body) ->   
       let s = f_subst_of_subst s in
       let body  = Fsubst.f_subst s body in
-      OB_pred (Some body) 
-  | _ -> kind
+        OB_pred (Some body) 
+
+  | OB_oper None | OB_pred None -> kind
 
 (* -------------------------------------------------------------------- *)
 let subst_op (s : _subst) (op : operator) =
-  let tparams = List.map EcIdent.fresh op.op_tparams in
+  let tparams = List.map (subst_typaram s) op.op_tparams in
   let sty     = init_tparams s op.op_tparams tparams in
   let ty      = sty.s_ty op.op_ty in
   let kind    = subst_op_kind sty op.op_kind in
-  { op_tparams = tparams;
-    op_ty      = ty   ;
-    op_kind   = kind  ; }
+    { op_tparams = tparams;
+      op_ty      = ty     ;
+      op_kind    = kind   ; }
 
 (* -------------------------------------------------------------------- *)
 let subst_ax (s : _subst) (ax : axiom) =
-  let params = List.map EcIdent.fresh ax.ax_tparams in
+  let params = List.map (subst_typaram s) ax.ax_tparams in
   let s      = init_tparams s ax.ax_tparams params in
   let spec   = 
     match ax.ax_spec with

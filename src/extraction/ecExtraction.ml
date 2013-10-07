@@ -278,7 +278,14 @@ let rec compile_tyd env eenv cname p =
         match tyd.tyd_type with
         | None -> None
         | Some ty -> Some (compile_ty env eenv cname ty) in
-      let params = List.map EcIdent.name tyd.tyd_params in
+      let params =
+        let do1 (x, tc) =
+          if not (Sp.is_empty tc) then
+            error "cannot translate constrained type declaration";
+          EcIdent.name x
+        in
+          List.map do1 tyd.tyd_params
+      in
       let mo = compile_mod eenv pth in
       let res = mk_odef mo s (params,decl) in
       let modd = snd (EcUtils.oget mo.odef_def) in

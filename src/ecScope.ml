@@ -1110,7 +1110,8 @@ module Ax = struct
       match check with
       | false -> PSNoCheck
       | true  ->
-          let hyps = EcEnv.LDecl.init scope.sc_env axd.ax_tparams in
+          (* FIXME: TC HOOK *)
+          let hyps = EcEnv.LDecl.init scope.sc_env (List.map fst axd.ax_tparams) in
             PSCheck (EcLogic.open_juc (hyps, oget axd.ax_spec), [0])
     in 
     let puc = { puc_active = Some {

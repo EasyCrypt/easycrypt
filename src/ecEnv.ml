@@ -1559,7 +1559,9 @@ module Ty = struct
   let unfold (name : EcPath.path) (args : EcTypes.ty list) (env : env) =
     match by_path_opt name env with
     | Some ({ tyd_type = Some body } as tyd) ->
-        EcTypes.Tvar.subst (EcTypes.Tvar.init tyd.tyd_params args) body
+        EcTypes.Tvar.subst
+          (EcTypes.Tvar.init (List.map fst tyd.tyd_params) args)
+          body
     | _ -> raise (LookupFailure (`Path name))
 
   let rec hnorm (ty : ty) (env : env) =
@@ -2055,7 +2057,8 @@ module Op = struct
       | OB_pred(Some idsf) -> idsf
       | _ -> raise NotReducible
     in
-    EcFol.Fsubst.subst_tvar (EcTypes.Tvar.init op.op_tparams tys) f
+      EcFol.Fsubst.subst_tvar
+        (EcTypes.Tvar.init (List.map fst op.op_tparams) tys) f
 end
 
 (* -------------------------------------------------------------------- *)
@@ -2104,7 +2107,8 @@ module Ax = struct
   let instanciate p tys env =
     match by_path_opt p env with
     | Some ({ ax_spec = Some f } as ax) ->
-        Fsubst.subst_tvar (EcTypes.Tvar.init ax.ax_tparams tys) f
+        Fsubst.subst_tvar
+          (EcTypes.Tvar.init (List.map fst ax.ax_tparams) tys) f
     | _ -> raise (LookupFailure (`Path p))
 end
 

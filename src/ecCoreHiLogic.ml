@@ -160,7 +160,8 @@ let process_named_pterm _loc hyps (fp, tvi) =
             (List.length tyargs) (List.length typ)
 
     | Some (EcUnify.TVInamed tyargs) ->
-        let typnames = List.map EcIdent.name typ in
+        (* FIXME: TC HOOK *)
+        let typnames = List.map (EcIdent.name |- fst) typ in
 
         List.iter
           (fun (x, _) ->
@@ -171,7 +172,8 @@ let process_named_pterm _loc hyps (fp, tvi) =
 
   let fs  = EcUnify.UniEnv.freshen_ue ue typ tvi in
   let ax  = Fsubst.subst_tvar fs ax in
-  let typ = List.map (fun a -> EcIdent.Mid.find a fs) typ in
+  (* FIXME: TC HOOK *)
+  let typ = List.map (fun (a, _) -> EcIdent.Mid.find a fs) typ in
 
     (p, typ, ue, ax)
 

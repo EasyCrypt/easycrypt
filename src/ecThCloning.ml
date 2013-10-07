@@ -226,7 +226,8 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
             let rec doit prefix (proofs, evc) dth =
               match dth with
               | CTh_type (x, ({ tyd_type = None } as otyd)) ->
-                  let params = List.map EcIdent.name otyd.tyd_params in
+                  (* FIXME: TC HOOK *)
+                  let params = List.map (EcIdent.name |- fst) otyd.tyd_params in
                   let params = List.map (mk_loc l) params in
                   let tyd    =
                     match List.map (fun a -> mk_loc l (PTvar a)) params with
@@ -238,7 +239,8 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
                     do1 (proofs, evc) (mk_loc l (xdth @ prefix, x), ovrd)
 
               | CTh_operator (x, ({ op_kind = OB_oper None } as oopd)) ->
-                  let params = List.map EcIdent.name oopd.op_tparams in
+                  (* FIXME: TC HOOK *)
+                  let params = List.map (EcIdent.name |- fst) oopd.op_tparams in
                   let params = List.map (mk_loc l) params in
                   let ovrd   = {
                     opov_tyvars = Some params;
@@ -252,7 +254,8 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
                     do1 (proofs, evc) (mk_loc l (xdth @ prefix, x), PTHO_Op (ovrd, `Alias))
 
               | CTh_operator (x, ({ op_kind = OB_pred None } as oprd)) ->
-                  let params = List.map EcIdent.name oprd.op_tparams in
+                  (* FIXME: TC HOOK *)
+                  let params = List.map (EcIdent.name |- fst) oprd.op_tparams in
                   let params = List.map (mk_loc l) params in
                   let ovrd   = {
                     prov_tyvars = Some params;
@@ -265,7 +268,8 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
                     do1 (proofs, evc) (mk_loc l (xdth @ prefix, x), PTHO_Pred ovrd)
 
               | CTh_axiom (x, ({ ax_spec = Some _; ax_kind = `Axiom; } as ax)) ->
-                  let params = List.map EcIdent.name ax.ax_tparams in
+                  (* FIXME: TC HOOK *)
+                  let params = List.map (EcIdent.name |- fst) ax.ax_tparams in
                   let params = List.map (mk_loc l) params in
                   let params = List.map (fun a -> mk_loc l (PTvar a)) params in
 
@@ -356,8 +360,11 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
             (* Already checked:
              *   1. type is abstract
              *   2. type argument count are equal *)
-              let nargs = List.map (EcIdent.create -| unloc) nargs in
-              let ue    = EcUnify.UniEnv.create (Some nargs) in
+              (* FIXME: TC HOOK *)
+              let nargs = List.map2
+                            (fun (_, tc) x -> (EcIdent.create (unloc x), tc))
+                            otyd.tyd_params nargs in
+              let ue    = EcUnify.UniEnv.create (Some (List.map fst nargs)) in
               let ntyd  = EcTyping.transty EcTyping.tp_tydecl scenv ue ntyd in
 
               match mode with
@@ -369,8 +376,9 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
                     (subst, proofs, EcEnv.Ty.bind x binding scenv)
 
               | `Inline ->
-                  let subst = 
-                    EcSubst.add_tydef subst (xpath x) (nargs, ntyd)
+                  let subst =
+                    (* FIXME: TC HOOK *)
+                    EcSubst.add_tydef subst (xpath x) (List.map fst nargs, ntyd)
                   in
                     (subst, proofs, scenv)
           end
@@ -407,11 +415,15 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
                 let newop   = mk_op tparams ty (Some body) in
                   match opmode with
                   | `Alias  -> (newop, subst, true)
-                  | `Inline -> (newop, EcSubst.add_opdef subst (xpath x) (tparams, body), false)
+                  (* FIXME: TC HOOK *)
+                  | `Inline ->
+                      let subst = EcSubst.add_opdef subst (xpath x)  (List.map fst tparams, body) in
+                        (newop, subst, false)
             in
 
             let (newtyvars, newty) = (newop.op_tparams, newop.op_ty) in
-              if not (ty_compatible scenv (reftyvars, refty) (newtyvars, newty)) then
+              (* FIXME: TC HOOK *)
+              if not (ty_compatible scenv (List.map fst reftyvars, refty) (List.map fst newtyvars, newty)) then
                 clone_error scenv (CE_OpIncompatible (prefix, x));
               (subst, proofs, if dobind then EcEnv.Op.bind x newop scenv else scenv)
           end
@@ -454,7 +466,8 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
               in
 
               let (newtyvars, newty) = (newpr.op_tparams, newpr.op_ty) in
-                if not (ty_compatible scenv (reftyvars, refty) (newtyvars, newty)) then
+                (* FIXME: TC HOOK *)
+                if not (ty_compatible scenv (List.map fst reftyvars, refty) (List.map fst newtyvars, newty)) then
                   clone_error scenv (CE_OpIncompatible (prefix, x));
                 (subst, proofs, EcEnv.Op.bind x newpr scenv)
         end

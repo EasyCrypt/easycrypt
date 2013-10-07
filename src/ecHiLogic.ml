@@ -116,7 +116,8 @@ let process_instanciate hyps ({pl_desc = pq; pl_loc = loc} ,tvi) =
     with _ -> error loc (UnknownAxiom pq) in
   let args = process_tyargs hyps tvi in
   let args =
-    match ax.EcDecl.ax_tparams, args with
+    (* FIXME: TC HOOK *)
+    match List.map fst ax.EcDecl.ax_tparams, args with
     | [], None -> []
     | [], Some _ -> error loc BadTyinstance
     | ltv, Some (EcUnify.TVIunamed l) ->
@@ -125,8 +126,9 @@ let process_instanciate hyps ({pl_desc = pq; pl_loc = loc} ,tvi) =
     | ltv, Some (EcUnify.TVInamed l) ->
         let get id =
           try List.assoc (EcIdent.name id) l
-          with _ -> error loc BadTyinstance in
-        List.map get ltv
+          with _ -> error loc BadTyinstance
+        in
+          List.map get ltv
     | _, None -> error loc BadTyinstance in
   p,args
 
@@ -421,7 +423,8 @@ let process_rewrite1 loc ri g =
 
                   match sform_of_form fp with
                   | SFop ((_, tvi), []) -> begin
-                    let subst = EcTypes.Tvar.init tparams tvi in
+                    (* FIXME: TC HOOK *)
+                    let subst = EcTypes.Tvar.init (List.map fst tparams) tvi in
                     let body  = EcFol.Fsubst.subst_tvar subst body in
                     let body  = f_app body args topfp.f_ty in
                       try  EcReduction.h_red EcReduction.beta_red (get_hyps g) body
@@ -444,7 +447,8 @@ let process_rewrite1 loc ri g =
 
       | `RtoL ->
         let fp =
-          let subst = EcTypes.Tvar.init tparams tvi in
+          (* FIXME: TC HOOK *)
+          let subst = EcTypes.Tvar.init (List.map fst tparams) tvi in
           let body  = EcFol.Fsubst.subst_tvar subst body in
           let fp    = f_app body args p.f_ty in
             try  EcReduction.h_red EcReduction.beta_red (get_hyps g) fp

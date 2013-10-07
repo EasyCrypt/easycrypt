@@ -1288,11 +1288,12 @@ and pp_form ppe fmt f =
 
 (* -------------------------------------------------------------------- *)
 let pp_typedecl (ppe : PPEnv.t) fmt (x, tyd) =
-  let ppe = PPEnv.add_locals ppe tyd.tyd_params in
+  let ppe = PPEnv.add_locals ppe (List.map fst tyd.tyd_params) in
   let name = P.basename x in
 
   let pp_prelude fmt =
-    match tyd.tyd_params with
+    (* FIXME: TC HOOK *)
+    match List.map fst tyd.tyd_params with
     | [] ->
         Format.fprintf fmt "type %s" name
 
@@ -1314,13 +1315,14 @@ let pp_typedecl (ppe : PPEnv.t) fmt (x, tyd) =
 
 (* -------------------------------------------------------------------- *)
 let pp_tyvarannot (ppe : PPEnv.t) fmt ids =
-  match ids with
-  | [] -> ()
-  | _  -> Format.fprintf fmt "[%a]" (pp_list ",@ " (pp_tyvar ppe)) ids
+  (* FIXME: TC HOOK *)
+  match List.map fst ids with
+  | []  -> ()
+  | ids -> Format.fprintf fmt "[%a]" (pp_list ",@ " (pp_tyvar ppe)) ids
 
 (* -------------------------------------------------------------------- *)
 let pp_opdecl_pr (ppe : PPEnv.t) fmt (x, ts, ty, op) =
-  let ppe = PPEnv.add_locals ppe ts in
+  let ppe = PPEnv.add_locals ppe (List.map fst ts) in
   let basename = P.basename x in
 
   let pp_body fmt =
@@ -1349,7 +1351,7 @@ let pp_opdecl_pr (ppe : PPEnv.t) fmt (x, ts, ty, op) =
       pp_body
 
 let pp_opdecl_op (ppe : PPEnv.t) fmt (x, ts, ty, op) =
-  let ppe = PPEnv.add_locals ppe ts in
+  let ppe = PPEnv.add_locals ppe (List.map fst ts) in
   let basename = P.basename x in
   
   let pp_body fmt =
@@ -1387,7 +1389,7 @@ let string_of_axkind = function
   | `Lemma -> "lemma"
 
 let pp_axiom (ppe : PPEnv.t) fmt (x, ax) =
-  let ppe = PPEnv.add_locals ppe ax.ax_tparams in
+  let ppe = PPEnv.add_locals ppe (List.map fst ax.ax_tparams) in
   let basename = P.basename x in
 
   let pp_spec fmt =
@@ -1396,7 +1398,8 @@ let pp_axiom (ppe : PPEnv.t) fmt (x, ax) =
     | Some f -> pp_form ppe fmt f
 
   and pp_name fmt =
-    match ax.ax_tparams with
+    (* FIXME: TC HOOK *)
+    match List.map fst ax.ax_tparams with
     | [] -> pp_string fmt basename
     | ts ->
         Format.fprintf fmt "%s [%a]" basename

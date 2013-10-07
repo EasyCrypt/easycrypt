@@ -2,6 +2,7 @@
 open EcUidgen
 open EcSymbols
 open EcTypes
+open EcDecl
 
 (* -------------------------------------------------------------------- *)
 exception UnificationFailure of ty * ty
@@ -22,12 +23,12 @@ module UniEnv : sig
   val fresh      : unienv -> ty
   val getnamed   : unienv -> symbol -> EcIdent.t 
   val repr       : unienv -> ty -> ty
-  val freshen_ue : unienv -> EcIdent.t list -> tvi -> ty EcIdent.Mid.t
-  val freshen    : unienv -> EcIdent.t list -> tvi -> ty -> unienv * ty * ty list
+  val freshen_ue : unienv -> ty_params -> tvi -> ty EcIdent.Mid.t
+  val freshen    : unienv -> ty_params -> tvi -> ty -> unienv * ty * ty list
   val closed     : unienv -> bool
   val close      : unienv -> (uid -> ty option)
   val assubst    : unienv -> (uid -> ty option)
-  val tparams    : unienv -> EcIdent.t list
+  val tparams    : unienv -> ty_params
 end
 
 val unify : EcEnv.env -> unienv -> ty -> ty -> unit

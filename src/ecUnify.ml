@@ -4,6 +4,7 @@ open EcUtils
 open EcUidgen
 open EcIdent
 open EcTypes
+open EcDecl
 
 (* -------------------------------------------------------------------- *)
 exception UnificationFailure of ty * ty
@@ -216,19 +217,23 @@ module UniEnv = struct
       ue := { !ue with ue_tuni = Suid.add uid (!ue).ue_tuni; };
       tuni uid
 
-  let freshen_ue ue params tvi = 
+  let freshen_ue ue (params : ty_params) tvi = 
     match tvi with
     | None -> 
         List.fold_left
-          (fun s v -> Mid.add v (fresh ue) s) 
+          (* FIXME: TC HOOK *)
+          (fun s (v, _) -> Mid.add v (fresh ue) s) 
           Mid.empty params 
 
     | Some (TVIunamed lt) ->
         List.fold_left2
-          (fun s v t -> Mid.add v t s) Mid.empty params lt
+          (* FIXME: TC HOOK *)
+          (fun s (v, _) t -> Mid.add v t s) Mid.empty
+          params lt
 
     | Some (TVInamed l) ->
-        let for1 s v =
+        (* FIXME: TC HOOK *)
+        let for1 s (v, _) =
           let t =
             try  List.assoc (EcIdent.name v) l
             with Not_found -> fresh ue
@@ -238,7 +243,8 @@ module UniEnv = struct
           List.fold_left for1 Mid.empty params
 
   let subst_tv subst params = 
-    List.map (fun tv -> subst (tvar tv)) params
+    (* FIXME: TC HOOK *)
+    List.map (fun (tv, _) -> subst (tvar tv)) params
 
   let freshen ue params tvi ty = 
     let ue = copy ue in
@@ -269,7 +275,9 @@ module UniEnv = struct
 
   let assubst ue = subst_of_uf (!ue).ue_uf
 
-  let tparams ue = List.rev (!ue).ue_decl
+  let tparams ue =
+    (* FIXME: TC HOOK *)
+    List.map (fun x -> (x, EcPath.Sp.empty)) (List.rev (!ue).ue_decl)
 end
 
 (* -------------------------------------------------------------------- *)
@@ -280,13 +288,18 @@ let unify env ue t1 t2 =
 (* -------------------------------------------------------------------- *)
 let filter_tvi = function 
   | None -> fun _ -> true
+
   | Some (TVIunamed l) -> 
       let len = List.length l in
-      fun op -> List.length op.EcDecl.op_tparams = len
+        fun op -> List.length op.EcDecl.op_tparams = len
+
   | Some (TVInamed ls) -> fun op ->
       List.for_all
         (fun (s,_) -> 
-          List.exists (fun id -> EcIdent.name id = s) op.EcDecl.op_tparams) ls
+          (* FIXME: TC HOOK *)
+          List.exists (fun (id, _) -> EcIdent.name id = s)
+            op.EcDecl.op_tparams)
+        ls
 
 let tfun_expected ue psig = 
   let tres = UniEnv.fresh ue in
