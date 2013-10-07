@@ -1,45 +1,43 @@
 (* -------------------------------------------------------------------- *)
 open EcUidgen
+open EcSymbols
 open EcTypes
 
 (* -------------------------------------------------------------------- *)
-exception TypeVarCycle of uid * ty
 exception UnificationFailure of ty * ty
-exception DuplicateTvar of EcSymbols.symbol
-exception UninstanciateUni of uid
+exception UninstanciateUni
 
 type unienv
 
+type tvar_inst =
+| TVIunamed of ty list
+| TVInamed  of (EcSymbols.symbol * ty) list
+
+type tvi = tvar_inst option
+
 module UniEnv : sig
-  type tvar_inst_kind = 
-    | TVIunamed of ty list
-    | TVInamed  of (EcSymbols.symbol * ty) list
-
-  type tvi = tvar_inst_kind option
-
   val create     : EcIdent.t list option -> unienv
   val copy       : unienv -> unienv                 (* constant time *)
   val restore    : dst:unienv -> src:unienv -> unit (* constant time *)
-  val fresh_uid  : unienv -> ty
-  val get_var    : unienv -> string -> EcIdent.t 
-  val bind       : unienv -> uid -> ty -> unit
+  val fresh      : unienv -> ty
+  val getnamed   : unienv -> symbol -> EcIdent.t 
   val repr       : unienv -> ty -> ty
   val freshen_ue : unienv -> EcIdent.t list -> tvi -> ty EcIdent.Mid.t
   val freshen    : unienv -> EcIdent.t list -> tvi -> ty -> unienv * ty * ty list
-  val close      : unienv -> ty Muid.t
   val closed     : unienv -> bool
-  val asmap      : unienv -> ty Muid.t
+  val close      : unienv -> (uid -> ty option)
+  val assubst    : unienv -> (uid -> ty option)
   val tparams    : unienv -> EcIdent.t list
 end
 
 val unify : EcEnv.env -> unienv -> ty -> ty -> unit
 
-val filter_tvi : UniEnv.tvi -> EcDecl.operator -> bool
+val filter_tvi : tvi -> EcDecl.operator -> bool
 
 val tfun_expected : unienv -> EcTypes.ty list -> EcTypes.ty
 
 val select_op : 
   (* pred allowed *) bool ->
-  UniEnv.tvi -> EcEnv.env ->
+  tvi -> EcEnv.env ->
   EcSymbols.qsymbol -> unienv -> dom ->
   ((EcPath.path * ty list) * ty * unienv) list

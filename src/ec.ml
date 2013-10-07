@@ -5,6 +5,8 @@ open EcPrinting
 
 module T = EcTerminal
 
+open EcTypeClass                        (* FIXME *)
+
 (* -------------------------------------------------------------------- *)
 let _ =
   let myname  = Filename.basename Sys.executable_name

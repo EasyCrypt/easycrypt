@@ -46,6 +46,9 @@ val as_seq4 : 'a list -> 'a tuple4
 val as_seq5 : 'a list -> 'a tuple5
 
 (* -------------------------------------------------------------------- *)
+val int_of_bool : bool -> int
+
+(* -------------------------------------------------------------------- *)
 val proj3_1 : 'a * 'b * 'c -> 'a
 val proj3_2 : 'a * 'b * 'c -> 'b
 val proj3_3 : 'a * 'b * 'c -> 'c
@@ -63,6 +66,8 @@ val opt_equal  : 'a eq -> 'a option eq
 (* -------------------------------------------------------------------- *)
 val none : 'a option
 val some : 'a -> 'a option
+
+val funnone : 'a -> 'b option
 
 (* -------------------------------------------------------------------- *)
 val oiter      : ('a -> unit) -> 'a option -> unit

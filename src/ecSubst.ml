@@ -259,7 +259,7 @@ let init_tparams (s : _subst) params params' =
           ts_def = s.s_sty.ts_def;
           ts_p   = s.s_p;
           ts_mp  = s.s_fmp;
-          ts_v   = styv; }
+          ts_v   = Mid.find_opt^~ styv; }
     in
       { s with s_sty = sty; s_ty = EcTypes.ty_subst sty } 
 

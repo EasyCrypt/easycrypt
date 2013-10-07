@@ -400,13 +400,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
                     (lam.EcTypes.e_ty, lam)
                 in
 
-                if reftyvars = [] then begin
-                   try  EcUnify.unify scenv ue refty ty
-                   with EcUnify.UnificationFailure _ ->
-                     clone_error scenv (CE_OpIncompatible (prefix, x))
-                end;
-
-                let uni     = EcTypes.Tuni.subst (EcUnify.UniEnv.close ue) in
+                let uni     = EcTypes.Tuni.offun (EcUnify.UniEnv.close ue) in
                 let body    = body |> EcTypes.e_mapty uni in
                 let ty      = uni ty in
                 let tparams = EcUnify.UniEnv.tparams ue in
