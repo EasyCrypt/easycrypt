@@ -279,6 +279,11 @@ theory Core.
   (* TODO: Prove
        lemma size_filter f m: size (filter f m) <= size m.
      This is simple once we have size_leq. *)
+
+  (** Miscellaneous *)
+  (* lam: turning maps into lambdas *)
+  op lam (m:('a,'b) map) = lambda x, proj (get m x).
+  op lamo (m:('a,'b) map) = lambda x, get m x.
 end Core.
 
 theory OptionGet.
