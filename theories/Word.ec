@@ -64,28 +64,28 @@ qed.
 
 (* TODO: Finish writing the conversions *)
 require        Array.
-op to_array: word -> bool Array.array.
+op to_bits: word -> bool Array.array.
 axiom length_to_array w:
-  Array.length (to_array w) = length.
+  Array.length (to_bits w) = length.
 axiom get_to_array w i:
   0 <= i < length =>
-  Array."_.[_]" (to_array w) i = w.[i].
+  Array."_.[_]" (to_bits w) i = w.[i].
 
-op from_array: bool Array.array -> word.
-axiom get_from_array a i:
+op from_bits: bool Array.array -> word.
+axiom get_from_bits a i:
   Array.length a = length =>
   0 <= i < length =>
-  (from_array a).[i] = Array."_.[_]" a i.
+  (from_bits a).[i] = Array."_.[_]" a i.
 
 lemma to_from_array a:
   Array.length a = length =>
-  to_array (from_array a) = a.
+  to_bits (from_bits a) = a.
 proof strict.
 by intros Hlen; apply Array.array_ext; smt.
 qed.
 
-lemma from_to_array w:
-  from_array (to_array w) = w.
+lemma from_to_bits w:
+  from_bits (to_bits w) = w.
 proof strict.
 by apply word_ext; smt.
 qed.

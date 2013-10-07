@@ -26,6 +26,8 @@ type 'x array.
 op length: 'x array -> int.
 axiom length_pos: forall (xs:'x array), 0 <= length xs.
 
+op "`|_|" (xs:'x array) = length xs.
+
 (* And a bunch of elements *)
 op "_.[_]": 'x array -> int -> 'x.
 
@@ -320,6 +322,23 @@ lemma sub_append_sub (xs:'x array) (i l1 l2:int):
 proof strict.
 by intros=> i_pos l1_pos l2_pos i_l1_l2_bnd;
    apply array_ext; split; smt.
+qed.
+
+lemma mapi_mapi (f:int -> 'x -> 'y) (g:int -> 'y -> 'z) xs:
+ mapi g (mapi f xs) = mapi (lambda k x, g k (f k x)) xs.
+proof strict.
+apply array_ext; split.
+  by rewrite !length_mapi.
+  by intros=> i; rewrite !length_mapi=> i_bnd; rewrite ?get_mapi ?length_mapi.
+qed.
+
+lemma mapi_id (f:int -> 'x -> 'x) (xs:'x array):
+ (forall k x, 0 <= k < length xs => f k x = x) =>
+ mapi f xs = xs.
+proof strict.
+intros=> f_id; apply array_ext; split.
+  by rewrite length_mapi.
+  by intros=> i; rewrite !length_mapi=> i_bnd; rewrite ?get_mapi ?length_mapi ?f_id.
 qed.
 
 (* Useless? *)

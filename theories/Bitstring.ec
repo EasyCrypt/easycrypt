@@ -1,45 +1,9 @@
 require        Distr.
 require        Bool.
 require import Int.
-require        Array.
-
-(* We make a clone of the array theory so we
-   can further restrict to fixed size arrays. *)
-clone Array as Bits.
-export Bits.
+require import Array.
 
 type bitstring = bool array.
-
-(* Conversions for interaction with other array types *)
-op to_array: bitstring -> bool Array.array.
-
-axiom length_to_array bs:
-  Array.length (to_array bs) = length bs.
-
-axiom get_to_array bs i:
-  0 <= i => i < length bs =>
-  Array."_.[_]" (to_array bs) i = bs.[i].
-
-op from_array: bool Array.array -> bitstring.
-
-axiom length_from_array bs:
-  length (from_array bs) = Array.length bs.
-
-axiom get_from_array bs i:
-  0 <= i => i < Array.length bs =>
-  (from_array bs).[i] = Array."_.[_]" bs i.
-
-lemma from_to_array bs:
-  from_array (to_array bs) = bs.
-proof strict.
-by apply array_ext; split; smt.
-qed.
-
-lemma to_from_array bs:
-  to_array (from_array bs) = bs.
-proof strict.
-by apply Array.array_ext; split; smt.
-qed.
 
 (* Xor *)
 op (^^)(bs0 bs1:bitstring): bitstring = map2 Bool.(^^) bs0 bs1.
