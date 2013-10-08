@@ -1999,20 +1999,30 @@ let rec pp_theory ppe (fmt:Format.formatter) (path, cth) =
     
  and pp_th_item ppe (p:EcPath.path) fmt = function
   | EcTheory.CTh_type(id,ty) ->
-    pp_typedecl ppe fmt (EcPath.pqname p id,ty)
+      pp_typedecl ppe fmt (EcPath.pqname p id,ty)
+
   | EcTheory.CTh_operator(id,op) ->
-    pp_opdecl ppe fmt (EcPath.pqname p id, op)
+      pp_opdecl ppe fmt (EcPath.pqname p id, op)
+
   | EcTheory.CTh_axiom(id,ax) ->
-    pp_axiom ppe fmt (EcPath.pqname p id, ax)
+      pp_axiom ppe fmt (EcPath.pqname p id, ax)
+
   | EcTheory.CTh_modtype(id,ms) ->
-    pp_modsig ppe fmt (EcPath.pqname p id, ms)
+      pp_modsig ppe fmt (EcPath.pqname p id, ms)
+
   | EcTheory.CTh_module me -> 
-    pp_modexp ppe fmt me
+      pp_modexp ppe fmt me
+
   | EcTheory.CTh_theory(id,cth) -> 
-    pp_theory ppe fmt (EcPath.pqname p id, cth)
+      pp_theory ppe fmt (EcPath.pqname p id, cth)
+
   | EcTheory.CTh_export p ->
-    (* Fixme should not use a pp_list, it should be a fold *)
-    Format.fprintf fmt "export %a."  
-      EcSymbols.pp_qsymbol (PPEnv.th_symb ppe p)
+      (* Fixme should not use a pp_list, it should be a fold *)
+      Format.fprintf fmt "export %a."  
+        EcSymbols.pp_qsymbol (PPEnv.th_symb ppe p)
+
+  | EcTheory.CTh_typeclass _ ->
+      Format.fprintf fmt "typeclass <FIXME>."
+
   | EcTheory.CTh_instance _ ->
-    Format.fprintf fmt "instance <FIXME>."
+      Format.fprintf fmt "instance <FIXME>."

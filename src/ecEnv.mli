@@ -281,6 +281,24 @@ module Ty : sig
   val hnorm   : EcTypes.ty -> env -> EcTypes.ty
 end
 
+(* -------------------------------------------------------------------- *)
+module Algebra : sig
+  val add_ring  : path -> EcAlgebra.ring  -> env -> env
+  val add_field : path -> EcAlgebra.field -> env -> env
+
+  val get_ring  : ty -> env -> EcAlgebra.ring  option
+  val get_field : ty -> env -> EcAlgebra.field option
+end
+
+(* -------------------------------------------------------------------- *)
+module TypeClass : sig
+  type t = unit
+
+  val add  : path -> env -> env
+  val bind : symbol -> t -> env -> env
+end
+
+(* -------------------------------------------------------------------- *)
 module AbsStmt : sig
   type t = EcBaseLogic.abs_uses
   val byid : EcIdent.t -> env -> t
@@ -301,15 +319,6 @@ val import_w3_dir :
      env -> string list -> string
   -> EcWhy3.renaming_decl
   -> env * ctheory_item list
-
-(* -------------------------------------------------------------------- *)
-module Algebra : sig
-  val add_ring  : path -> EcAlgebra.ring  -> env -> env
-  val add_field : path -> EcAlgebra.field -> env -> env
-
-  val get_ring  : ty -> env -> EcAlgebra.ring  option
-  val get_field : ty -> env -> EcAlgebra.field option
-end
 
 (* -------------------------------------------------------------------- *)
 open EcBaseLogic

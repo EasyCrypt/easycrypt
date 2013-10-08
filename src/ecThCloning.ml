@@ -397,7 +397,8 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
               in
 
               let (newop, subst, dobind) =
-                let ue = EcTyping.ue_for_decl scenv (loc, opov.opov_tyvars) in
+                let tp = opov.opov_tyvars |> omap (List.map (fun tv -> (tv, []))) in
+                let ue = EcTyping.ue_for_decl scenv (loc, tp) in
                 let tp = EcTyping.tp_relax in
                 let (ty, body) =
                   let env     = scenv in
@@ -441,7 +442,8 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
               in
 
               let newpr =
-                 let ue = EcTyping.ue_for_decl scenv (loc, prov.prov_tyvars) in
+                 let tp = prov.prov_tyvars |> omap (List.map (fun tv -> (tv, []))) in
+                 let ue = EcTyping.ue_for_decl scenv (loc, tp) in
                  let body =
                    let env     = scenv in
                    let env, xs = EcTyping.transbinding env ue prov.prov_args in
@@ -531,7 +533,12 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
 
       | CTh_instance _ ->
           (* Currently, instances don't survive cloning *)
-          ( subst, proofs, scenv)
+          (subst, proofs, scenv)
+
+      | CTh_typeclass _ ->
+          (* Currently, type classes don't survive cloning *)
+          (subst, proofs, scenv)
+
     in
       let scenv = EcEnv.Theory.enter name scenv in
       let _, proofs, scenv =

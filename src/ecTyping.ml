@@ -434,7 +434,8 @@ let selfname   = EcIdent.create "$self"
 let ue_for_decl (env : EcEnv.env) (loc, tparams) =
   let tparams = tparams |> omap
     (fun tparams ->
-      let tparams = List.map unloc tparams in
+      (* FIXME: TC HOOK *)
+      let tparams = List.map (unloc |- fst) tparams in
         if not (List.uniq tparams) then
           tyerror loc env DuplicatedTyVar;
         List.map EcIdent.create tparams)

@@ -82,7 +82,7 @@ val selfname :  EcIdent.t
 (* -------------------------------------------------------------------- *)
 val ue_for_decl :
      EcEnv.env
-  -> (EcLocation.t * psymbol list option)
+  -> (EcLocation.t * (psymbol * pqsymbol list) list option)
   -> EcUnify.unienv
 
 (* -------------------------------------------------------------------- *)

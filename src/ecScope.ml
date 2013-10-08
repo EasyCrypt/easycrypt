@@ -1714,10 +1714,15 @@ module Section = struct
               let _, scope = Theory.exit scope in
                 scope
 
+          | T.CTh_typeclass _x ->
+              (* FIXME: TC HOOK *)
+              scope
+
           | T.CTh_instance (p, cr) -> begin
               match cr with
-              | `Ring  cr -> { scope with sc_env = EcEnv.Algebra.add_ring  p cr scope.sc_env }
-              | `Field cr -> { scope with sc_env = EcEnv.Algebra.add_field p cr scope.sc_env }
+              | `Ring    cr -> { scope with sc_env = EcEnv.Algebra.add_ring  p cr scope.sc_env }
+              | `Field   cr -> { scope with sc_env = EcEnv.Algebra.add_field p cr scope.sc_env }
+              | `General _  -> scope    (* FIXME: TC HOOK *)
           end
         in
 

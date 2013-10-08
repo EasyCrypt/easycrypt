@@ -371,13 +371,12 @@ let rec compile_theory env eenv p =
 
 and compile_thitem env eenv p = function
   | CTh_type(s,_) -> ignore (compile_tyd env eenv [] (EcPath.pqname p s))
-  | CTh_operator(s,op) -> 
-    if not (is_pred op) then 
-      ignore (compile_op env eenv [] (EcPath.pqname p s))
+  | CTh_operator(s,op) ->
+      if not (is_pred op) then 
+        ignore (compile_op env eenv [] (EcPath.pqname p s))
   | CTh_theory (s,_) -> compile_theory env eenv (EcPath.pqname p s)
   | CTh_export _ | CTh_modtype _ | CTh_module _ 
-  | CTh_axiom _ | CTh_instance _ -> ()
-
+  | CTh_axiom _ | CTh_instance _ | CTh_typeclass _ -> ()
 
 open EcParsetree
 
@@ -500,7 +499,7 @@ and add_citem eenv p oname = function
   | CTh_theory(s,cth) ->
     List.iter (add_citem eenv (EcPath.pqname p s) (s::oname)) cth.cth_struct
   | CTh_axiom _ | CTh_modtype _ | CTh_module _
-  | CTh_export _ | CTh_instance _ -> ()
+  | CTh_export _ | CTh_instance _ | CTh_typeclass _ -> ()
 
 let init_withextract =
   let dummy x = EcLocation.mk_loc EcLocation._dummy x in

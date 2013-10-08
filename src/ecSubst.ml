@@ -342,8 +342,9 @@ let subst_field (s : _subst) cr =
 (* -------------------------------------------------------------------- *)
 let subst_instance (s : _subst) tci =
   match tci with
-  | `Ring  cr -> `Ring  (subst_ring  s cr)
-  | `Field cr -> `Field (subst_field s cr)
+  | `Ring    cr -> `Ring  (subst_ring  s cr)
+  | `Field   cr -> `Field (subst_field s cr)
+  | `General p  -> `General (s.s_p p)
 
 (* -------------------------------------------------------------------- *)
 (* SUBSTITUTION OVER THEORIES *)
@@ -372,6 +373,9 @@ let rec subst_theory_item (s : _subst) (item : theory_item) =
 
   | Th_instance (p, tci) ->
       Th_instance (s.s_p p, subst_instance s tci)
+
+  | Th_typeclass (x : EcSymbols.symbol) ->
+      Th_typeclass x
 
 (* -------------------------------------------------------------------- *)
 and subst_theory (s : _subst) (items : theory) =
@@ -403,6 +407,9 @@ and subst_ctheory_item (s : _subst) (item : ctheory_item) =
 
   | CTh_instance (p, cr) ->
       CTh_instance (s.s_p p, subst_instance s cr)
+
+  | CTh_typeclass x ->
+      CTh_typeclass x
 
 (* -------------------------------------------------------------------- *)
 and subst_ctheory_struct (s : _subst) (th : ctheory_struct) =
