@@ -89,7 +89,7 @@ end
 
 module Mint = Map.Make(Int)
 module Sint = Set.MakeOfMap(Mint)
-module Hint = Map.Make(Int)
+module Hint = EHashtbl.Make(Int)
 
 (* --------------------------------------------------------------------*)
 module Mstr = Map.Make(String)

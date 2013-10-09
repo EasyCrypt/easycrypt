@@ -54,11 +54,11 @@ val ty_check_uni : ty -> unit
 
 (* -------------------------------------------------------------------- *)
 type ty_subst = {
-  ts_p   : EcPath.path  -> EcPath.path;
+  ts_p   : EcPath.path -> EcPath.path;
   ts_mp  : EcPath.mpath -> EcPath.mpath;
   ts_def : (EcIdent.t list * ty) EcPath.Mp.t;
-  ts_u   : ty Muid.t;
-  ts_v   : ty Mid.t;
+  ts_u   : EcUidgen.uid -> ty option;
+  ts_v   : EcIdent.t -> ty option;
 }
 
 val ty_subst_id    : ty_subst
@@ -67,10 +67,13 @@ val is_ty_subst_id : ty_subst -> bool
 val ty_subst : ty_subst -> ty -> ty
 
 module Tuni : sig
+  val offun     : (uid -> ty option) -> ty  -> ty
+  val offun_dom : (uid -> ty option) -> dom -> dom
+
   val subst1    : (uid * ty) -> ty -> ty
   val subst     : ty Muid.t -> ty -> ty
   val subst_dom : ty Muid.t -> dom -> dom
-  val occur     : uid -> ty -> bool
+  val occurs    : uid -> ty -> bool
   val fv        : ty -> Suid.t
 end
 
@@ -207,7 +210,7 @@ val add_locals : e_subst ->
 
 val e_subst : e_subst -> expr -> expr
 val e_mapty : (ty -> ty) -> expr -> expr 
-val e_uni   : ty Muid.t -> expr -> expr
+val e_uni   : (uid -> ty option) -> expr -> expr
 
 (* -------------------------------------------------------------------- *)
 (* projects 'a Distr type into 'a *)

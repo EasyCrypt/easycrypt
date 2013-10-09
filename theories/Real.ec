@@ -74,6 +74,14 @@ lemma nosmt addgeM : forall (x1 x2 y1 y2:real),
    x1 >= x2 => y1 >= y2 => x1 + y1 >= x2 + y2 
 by [].
 
+lemma real_abs_sum : forall (a b c:real),
+ a = b + c => `|a| <= `|b| + `|c|
+by smt.
+
+lemma real_le_trans: forall (a b c:real), 
+ a <= b => b <= c => a <= c
+by [].
+
 lemma nosmt le_ge : forall (x y:real), (x <= y) <=> (y >= x)
 by [].
 

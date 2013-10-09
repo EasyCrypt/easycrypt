@@ -113,6 +113,7 @@ type mc = {
   mc_operators  : (ipath * EcDecl.operator) MMsym.t;
   mc_axioms     : (ipath * EcDecl.axiom) MMsym.t;
   mc_theories   : (ipath * ctheory) MMsym.t;
+  mc_typeclasses: (ipath * unit) MMsym.t;
   mc_components : ipath MMsym.t;
 }
 
@@ -145,7 +146,11 @@ and escope = {
              | `Fun    of EcPath.xpath ];
 }
 
-and tcinstance = [ `Ring of EcAlgebra.ring | `Field of EcAlgebra.field ]
+and tcinstance = [
+  | `Ring    of EcAlgebra.ring
+  | `Field   of EcAlgebra.field
+  | `General of EcPath.path
+]
 
 (* -------------------------------------------------------------------- *)
 type env = preenv
@@ -176,6 +181,7 @@ let empty_mc params = {
   mc_theories   = MMsym.empty;
   mc_variables  = MMsym.empty;
   mc_functions  = MMsym.empty;
+  mc_typeclasses= MMsym.empty;
   mc_components = MMsym.empty;
 }
 
@@ -402,10 +408,11 @@ module MC = struct
     | IPIdent _ -> assert false
     | IPPath  p -> p
 
-  let _downpath_for_tydecl   = _downpath_for_th
-  let _downpath_for_modsig   = _downpath_for_th
-  let _downpath_for_operator = _downpath_for_th
-  let _downpath_for_axiom    = _downpath_for_th
+  let _downpath_for_tydecl    = _downpath_for_th
+  let _downpath_for_modsig    = _downpath_for_th
+  let _downpath_for_operator  = _downpath_for_th
+  let _downpath_for_axiom     = _downpath_for_th
+  let _downpath_for_typeclass = _downpath_for_th
 
   (* ------------------------------------------------------------------ *)
   let _params_of_path p env =
@@ -635,6 +642,20 @@ module MC = struct
     import (_up_axiom true) (IPPath p) ax env
 
   (* -------------------------------------------------------------------- *)
+  let lookup_typeclass qnx env =
+    match lookup (fun mc -> mc.mc_typeclasses) qnx env with
+    | None -> lookup_error (`QSymbol qnx)
+    | Some (p, (args, obj)) -> (_downpath_for_typeclass env p args, obj)
+
+  let _up_typeclass candup mc x obj =
+    if not candup && MMsym.last x mc.mc_typeclasses <> None then
+      raise (DuplicatedBinding x);
+    { mc with mc_typeclasses = MMsym.add x obj mc.mc_typeclasses }
+
+  let import_typeclass p ax env =
+    import (_up_typeclass true) (IPPath p) ax env
+
+  (* -------------------------------------------------------------------- *)
   let _up_theory candup mc x obj =
     if not candup && MMsym.last x mc.mc_theories <> None then
       raise (DuplicatedBinding x);
@@ -772,6 +793,9 @@ module MC = struct
           let mc = _up_mc false mc (IPPath (expath xsubth)) in
             (add2mc _up_theory xsubth subth mc, Some submcs)
 
+      | CTh_typeclass x ->
+          (add2mc _up_typeclass x () mc, None)
+
       | CTh_export _ -> (mc, None)
 
       | CTh_instance _ -> (mc, None)
@@ -849,6 +873,9 @@ module MC = struct
 
   and bind_tydecl x tyd env =
     bind _up_tydecl x tyd env
+
+  and bind_typeclass x ax env =
+    bind _up_typeclass x ax env
 end
 
 (* -------------------------------------------------------------------- *)
@@ -1559,7 +1586,9 @@ module Ty = struct
   let unfold (name : EcPath.path) (args : EcTypes.ty list) (env : env) =
     match by_path_opt name env with
     | Some ({ tyd_type = Some body } as tyd) ->
-        EcTypes.Tvar.subst (EcTypes.Tvar.init tyd.tyd_params args) body
+        EcTypes.Tvar.subst
+          (EcTypes.Tvar.init (List.map fst tyd.tyd_params) args)
+          body
     | _ -> raise (LookupFailure (`Path name))
 
   let rec hnorm (ty : ty) (env : env) =
@@ -2055,7 +2084,8 @@ module Op = struct
       | OB_pred(Some idsf) -> idsf
       | _ -> raise NotReducible
     in
-    EcFol.Fsubst.subst_tvar (EcTypes.Tvar.init op.op_tparams tys) f
+      EcFol.Fsubst.subst_tvar
+        (EcTypes.Tvar.init (List.map fst op.op_tparams) tys) f
 end
 
 (* -------------------------------------------------------------------- *)
@@ -2104,8 +2134,35 @@ module Ax = struct
   let instanciate p tys env =
     match by_path_opt p env with
     | Some ({ ax_spec = Some f } as ax) ->
-        Fsubst.subst_tvar (EcTypes.Tvar.init ax.ax_tparams tys) f
+        Fsubst.subst_tvar
+          (EcTypes.Tvar.init (List.map fst ax.ax_tparams) tys) f
     | _ -> raise (LookupFailure (`Path p))
+end
+
+(* -------------------------------------------------------------------- *)
+module TypeClass = struct
+  type t = unit
+
+
+  let by_path_opt (p : EcPath.path) (env : env) =
+    omap 
+      check_not_suspended
+      (MC.by_path (fun mc -> mc.mc_typeclasses) (IPPath p) env)
+
+  let by_path (p : EcPath.path) (env : env) =
+    match by_path_opt p env with
+    | None -> lookup_error (`Path p)
+    | Some obj -> obj
+
+  let add (p : EcPath.path) (env : env) =
+    let obj = by_path p env in
+      MC.import_typeclass p obj env
+
+  let bind name ax env =
+    let env = MC.bind_typeclass name ax env in
+    let env = { env with env_item = CTh_typeclass name :: env.env_item } in
+      (* FIXME: TC HOOK *)
+      env
 end
 
 (* -------------------------------------------------------------------- *)
@@ -2117,17 +2174,21 @@ module Algebra = struct
       let tci = odfl [] tci in
       let eq cr1 cr2 = 
         match cr1, cr2 with
-        | `Ring r1, `Ring r2 -> ring_equal r1 r2
-        | `Field f1, `Field f2 -> field_equal f1 f2
-        | _, _ -> false in
-      Some (if List.exists (eq cr) tci then tci else cr::tci) in
-     Mp.change change p tci
+        | `Ring    r1, `Ring    r2 -> ring_equal  r1 r2
+        | `Field   f1, `Field   f2 -> field_equal f1 f2
+        | `General p1, `General p2 -> p_equal     p1 p2
+        | _, _ -> false
+      in
+        Some (if List.exists (eq cr) tci then tci else cr::tci)
+    in
+      Mp.change change p tci
  
   let add p cr env = 
-    { env with env_tci = bind p cr env.env_tci;
-      env_item = CTh_instance(p,cr)::env.env_item }
+    { env with
+        env_tci = bind p cr env.env_tci;
+        env_item = CTh_instance (p, cr) :: env.env_item; }
 
-  let add_ring p cr env = add p (`Ring cr) env
+  let add_ring  p cr env = add p (`Ring  cr) env
   let add_field p cr env = add p (`Field cr) env
 
   let get_instances ty env =
@@ -2165,14 +2226,15 @@ module Theory = struct
           { cth_desc = CTh_struct items; cth_struct = items; }
 
   and ctheory_item_of_theory_item = function
-    | Th_type      (x, ty) -> CTh_type     (x, ty)
-    | Th_operator  (x, op) -> CTh_operator (x, op)
-    | Th_axiom     (x, ax) -> CTh_axiom    (x, ax)
-    | Th_modtype   (x, mt) -> CTh_modtype  (x, mt)
-    | Th_module    m       -> CTh_module   m
-    | Th_theory    (x, th) -> CTh_theory   (x, ctheory_of_theory th)
-    | Th_export    name    -> CTh_export   name
-    | Th_instance  (p, cr) -> CTh_instance (p, cr)
+    | Th_type      (x, ty) -> CTh_type      (x, ty)
+    | Th_operator  (x, op) -> CTh_operator  (x, op)
+    | Th_axiom     (x, ax) -> CTh_axiom     (x, ax)
+    | Th_modtype   (x, mt) -> CTh_modtype   (x, mt)
+    | Th_module    m       -> CTh_module    m
+    | Th_theory    (x, th) -> CTh_theory    (x, ctheory_of_theory th)
+    | Th_export    name    -> CTh_export    name
+    | Th_typeclass name    -> CTh_typeclass name
+    | Th_instance  (p, cr) -> CTh_instance  (p, cr)
 
   (* ------------------------------------------------------------------ *)
   let enter name env =
@@ -2205,12 +2267,14 @@ module Theory = struct
   (* ------------------------------------------------------------------ *)
   let rec bind_instance_cth inst cth = 
     List.fold_left bind_instance_cth_item inst cth.cth_struct 
+
   and bind_instance_cth_item inst item = 
     match item with
-    | CTh_instance (p,k) -> Algebra.bind p k inst
-    | CTh_theory(_,cth) -> bind_instance_cth inst cth 
+    | CTh_instance (p,k)  -> Algebra.bind p k inst
+    | CTh_theory (_, cth) -> bind_instance_cth inst cth 
     | CTh_type _ | CTh_operator _ | CTh_axiom _ 
-    | CTh_modtype _ | CTh_module _ | CTh_export _ -> inst
+    | CTh_modtype _ | CTh_module _ | CTh_export _
+    | CTh_typeclass _ -> inst           (* FIXME: TC HOOK *)
     
   let bind id cth env =
     let env = MC.bind_theory id cth.cth3_theory env in
@@ -2220,42 +2284,6 @@ module Theory = struct
       env_item = (CTh_theory (id, cth.cth3_theory)) :: env.env_item; 
       env_tci  = bind_instance_cth env.env_tci cth.cth3_theory
     }
-
-   (* ------------------------------------------------------------------ *)
-(*  let bindx name th env =
-    let rec compile1 path w3env item =
-      let xpath = fun x -> EcPath.pqname path x in
-        match item with
-        | CTh_type     (x, ty) -> EcWhy3.add_ty w3env (xpath x) ty
-        | CTh_operator (x, op) -> EcWhy3.add_op w3env (xpath x) op
-        | CTh_modtype  (_, _)  -> (w3env, [])
-        | CTh_module   me      -> EcWhy3.add_mod_exp w3env (xpath me.me_name) me
-        | CTh_export   _       -> (w3env, [])
-        | CTh_theory (x, th)   -> compile (xpath x) w3env th
-        | CTh_instance _       -> (w3env, [])
-
-        | CTh_axiom (x, ax) -> begin
-          match ax.ax_nosmt with
-          | true  -> (w3env, [])
-          | false -> EcWhy3.add_ax w3env (xpath x) ax
-        end
-
-    and compile path w3env cth =
-      let (w3env, rb) =
-        List.map_fold (compile1 path) w3env cth.cth_struct
-      in
-        (w3env, List.rev (List.flatten rb))
-    in
-
-    let (w3env, rb) =
-      compile (EcPath.pqname (root env) name) env.env_w3 th
-    in
-
-    let env = MC.bind_theory name th env in
-      { env with
-          env_w3   = w3env;
-          env_rb   = rb @ env.env_rb;
-          env_item = (CTh_theory (name, th)) :: env.env_item; } *)
 
   (* ------------------------------------------------------------------ *)
   let rebind name cth env =
@@ -2291,10 +2319,14 @@ module Theory = struct
             let env = MC.import_mc (IPPath (xpath x)) env in
               env
 
+        | CTh_typeclass x ->
+            MC.import_typeclass (xpath x) () env
+
         | CTh_instance (p, cr) -> begin
             match cr with
-            | `Ring  cr -> Algebra.add_ring  p cr env
-            | `Field cr -> Algebra.add_field p cr env
+            | `Ring    cr -> Algebra.add_ring  p cr env
+            | `Field   cr -> Algebra.add_field p cr env
+            | `General _  -> env        (* FIXME: TC HOOK *)
         end
       in
         List.fold_left import_cth_item env cth.cth_struct

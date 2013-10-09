@@ -112,7 +112,7 @@ val f_match :
   -> unienv * form evmap
   -> ptn:form
   -> form
-  -> unienv * ty Muid.t * form evmap
+  -> unienv * (uid -> ty option) * form evmap
 
 (* -------------------------------------------------------------------- *)
 type ptnpos = private [`Select | `Sub of ptnpos] Mint.t

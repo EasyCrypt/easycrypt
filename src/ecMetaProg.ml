@@ -457,7 +457,7 @@ let f_match hyps (ue, ev) ~ptn subject =
       raise MatchFailure;
     let clue =
       try  EcUnify.UniEnv.close ue
-      with EcUnify.UninstanciateUni _ -> raise MatchFailure
+      with EcUnify.UninstanciateUni -> raise MatchFailure
     in
       (ue, clue, Ev ev)
 

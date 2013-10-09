@@ -14,6 +14,8 @@ open EcMetaProg
 
 module TT = EcTyping
 
+module Muid = EcUidgen.Muid
+
 module Sid = EcIdent.Sid
 module Mid = EcIdent.Mid
 
@@ -151,14 +153,15 @@ let process_named_pterm _loc hyps (fp, tvi) =
     match tvi with
     | None -> ()
 
-    | Some (EcUnify.UniEnv.TVIunamed tyargs) ->
+    | Some (EcUnify.TVIunamed tyargs) ->
         if List.length tyargs <> List.length typ then
           tacuerror
             "wrong number of type parameters (%d, expecting %d)"
             (List.length tyargs) (List.length typ)
 
-    | Some (EcUnify.UniEnv.TVInamed tyargs) ->
-        let typnames = List.map EcIdent.name typ in
+    | Some (EcUnify.TVInamed tyargs) ->
+        (* FIXME: TC HOOK *)
+        let typnames = List.map (EcIdent.name |- fst) typ in
 
         List.iter
           (fun (x, _) ->
@@ -169,7 +172,8 @@ let process_named_pterm _loc hyps (fp, tvi) =
 
   let fs  = EcUnify.UniEnv.freshen_ue ue typ tvi in
   let ax  = Fsubst.subst_tvar fs ax in
-  let typ = List.map (fun a -> EcIdent.Mid.find a fs) typ in
+  (* FIXME: TC HOOK *)
+  let typ = List.map (fun (a, _) -> EcIdent.Mid.find a fs) typ in
 
     (p, typ, ue, ax)
 
@@ -288,7 +292,8 @@ let concretize_pterm_arguments (tue, ev) ids =
 
 (* -------------------------------------------------------------------- *)
 let concretize_form (tue, ev) f =
-  let s = Fsubst.f_subst_init false Mid.empty { ty_subst_id with ts_u = tue } Mp.empty in
+  let s = { ty_subst_id with ts_u = tue } in
+  let s = Fsubst.f_subst_init false Mid.empty s Mp.empty in
   let s = EV.fold (fun x f s -> Fsubst.f_bind_local s x f) ev s in
     Fsubst.f_subst s f
 
@@ -322,7 +327,7 @@ let process_mkn_apply prcut pe ((juc, _) as g) =
   in
 
   let args = concretize_pterm_arguments (tue, ev) ids in
-  let typs = List.map (Tuni.subst tue) typs in
+  let typs = List.map (Tuni.offun tue) typs in
 
   let ((juc, fn), fgs) =
     match p with

@@ -82,7 +82,7 @@ val selfname :  EcIdent.t
 (* -------------------------------------------------------------------- *)
 val ue_for_decl :
      EcEnv.env
-  -> (EcLocation.t * psymbol list option)
+  -> (EcLocation.t * (psymbol * pqsymbol list) list option)
   -> EcUnify.unienv
 
 (* -------------------------------------------------------------------- *)
@@ -91,7 +91,7 @@ val transty : typolicy -> EcEnv.env -> EcUnify.unienv -> pty -> ty
 val transtys :  
     typolicy -> EcEnv.env -> EcUnify.unienv -> pty list -> ty list
 
-val transtvi : EcEnv.env -> EcUnify.unienv -> ptyannot -> EcUnify.UniEnv.tvar_inst_kind
+val transtvi : EcEnv.env -> EcUnify.unienv -> ptyannot -> EcUnify.tvar_inst
 
 val transbinding : EcEnv.env -> EcUnify.unienv -> ptybindings ->
   EcEnv.env * (EcIdent.t * EcTypes.ty) list

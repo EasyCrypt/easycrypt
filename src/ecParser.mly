@@ -1187,15 +1187,19 @@ oracle_info:
 (* -------------------------------------------------------------------- *)
 (* EcTypes declarations / definitions                                   *)
 
+tcand:
+| x=loc(OP4) { if unloc x <> "&" then error x.pl_loc None }
+;
+
+typaram:
+| x=tident { (x, []) }
+| x=tident LTCOLON tc=plist1(lqident, tcand) { (x, tc) }
+;
+
 typarams:
-| empty
-    { []  }
-
-| x=tident
-   { [x] }
-
-| LPAREN xs=plist1(tident, COMMA) RPAREN
-    { xs }
+| empty { []  }
+| x=tident { [(x, [])] }
+| xs=paren(plist1(typaram, COMMA)) { xs }
 ;
 
 type_decl:
@@ -1275,8 +1279,7 @@ op_tydom:
 ;
 
 tyvars_decl:
-| LBRACKET tyvars=tident* RBRACKET { Some tyvars }
-| empty { None }
+| LBRACKET tyvars=typaram* RBRACKET { tyvars }
 ;
 
 %inline op_or_const:
@@ -1285,35 +1288,35 @@ tyvars_decl:
 ;
 
 operator:
-| k=op_or_const x=oident tyvars=tyvars_decl COLON sty=loc(type_exp) {
+| k=op_or_const x=oident tyvars=tyvars_decl? COLON sty=loc(type_exp) {
     { po_kind   = k;
       po_name   = x;
       po_tyvars = tyvars;
       po_def    = POabstr sty; }
   }
 
-| k=op_or_const x=oident tyvars=tyvars_decl COLON sty=loc(type_exp) EQ b=expr {
+| k=op_or_const x=oident tyvars=tyvars_decl? COLON sty=loc(type_exp) EQ b=expr {
     { po_kind   = k;
       po_name   = x;
       po_tyvars = tyvars;
       po_def    = POconcr ([], sty, b); }
   }
 
-| k=op_or_const x=oident tyvars=tyvars_decl eq=loc(EQ) b=expr {
+| k=op_or_const x=oident tyvars=tyvars_decl? eq=loc(EQ) b=expr {
     { po_kind   = k;
       po_name   = x;
       po_tyvars = tyvars;
       po_def    = POconcr([], mk_loc eq.pl_loc PTunivar, b); }
   }
 
-| k=op_or_const x=oident tyvars=tyvars_decl p=ptybindings eq=loc(EQ) b=expr {
+| k=op_or_const x=oident tyvars=tyvars_decl? p=ptybindings eq=loc(EQ) b=expr {
     { po_kind   = k;
       po_name   = x;
       po_tyvars = tyvars;
       po_def    = POconcr(p, mk_loc eq.pl_loc PTunivar, b); }
   }
 
-| k=op_or_const x=oident tyvars=tyvars_decl p=ptybindings COLON codom=loc(type_exp)
+| k=op_or_const x=oident tyvars=tyvars_decl? p=ptybindings COLON codom=loc(type_exp)
     EQ b=expr {
     { po_kind   = k;
       po_name   = x;
@@ -1324,19 +1327,19 @@ operator:
 
 predicate:
 | PRED x = oident
-   { { pp_name = x;
+   { { pp_name   = x;
        pp_tyvars = None;
-       pp_def = PPabstr []; } }
+       pp_def    = PPabstr []; } }
 
-| PRED x = oident tyvars=tyvars_decl COLON sty = op_tydom
-   { { pp_name = x;
+| PRED x = oident tyvars=tyvars_decl? COLON sty = op_tydom
+   { { pp_name   = x;
        pp_tyvars = tyvars;
-       pp_def = PPabstr sty; } }
+       pp_def    = PPabstr sty; } }
 
-| PRED x = oident tyvars=tyvars_decl p=ptybindings EQ f=form
-   { { pp_name = x;
+| PRED x = oident tyvars=tyvars_decl? p=ptybindings EQ f=form
+   { { pp_name   = x;
        pp_tyvars = tyvars;
-       pp_def = PPconcr(p,f); } } 
+       pp_def    = PPconcr(p,f); } } 
 ;
 
 (* -------------------------------------------------------------------- *)
@@ -1367,7 +1370,7 @@ claim:
 ;
 
 lemma_decl :
-| x=ident tyvars=tyvars_decl pd=pgtybindings? COLON f=form { x,tyvars,pd,f }
+| x=ident tyvars=tyvars_decl? pd=pgtybindings? COLON f=form { x,tyvars,pd,f }
 ;
 
 nosmt:
@@ -2178,14 +2181,20 @@ opclmode:
 | LEFTARROW { `Inline }
 ;
 
+cltyparams:
+| empty { [] }
+| x=tident { [x] }
+| xs=paren(plist1(tident, COMMA)) { xs }
+;
+
 clone_override:
-| TYPE ps=typarams x=qident EQ t=loc(type_exp)
+| TYPE ps=cltyparams x=qident EQ t=loc(type_exp)
    { (x, PTHO_Type (ps, t, `Alias)) }
 
-| TYPE ps=typarams x=qident LEFTARROW t=loc(type_exp)
+| TYPE ps=cltyparams x=qident LEFTARROW t=loc(type_exp)
    { (x, PTHO_Type (ps, t, `Inline)) }
 
-| OP x=qoident tyvars=tyvars_decl COLON sty=loc(type_exp) mode=opclmode e=expr
+| OP x=qoident tyvars=bracket(tident*)? COLON sty=loc(type_exp) mode=opclmode e=expr
    { let ov = {
        opov_tyvars = tyvars;
        opov_args   = [];
@@ -2194,7 +2203,7 @@ clone_override:
      } in
        (x, PTHO_Op (ov, mode)) }
 
-| OP x=qoident tyvars=tyvars_decl mode=loc(opclmode) e=expr
+| OP x=qoident tyvars=bracket(tident*)? mode=loc(opclmode) e=expr
    { let ov = {
        opov_tyvars = tyvars;
        opov_args   = [];
@@ -2203,7 +2212,7 @@ clone_override:
      } in
        (x, PTHO_Op (ov, unloc mode)) }
 
-| OP x=qoident tyvars=tyvars_decl p=ptybindings mode=loc(opclmode) e=expr
+| OP x=qoident tyvars=bracket(tident*)? p=ptybindings mode=loc(opclmode) e=expr
    { let ov = {
        opov_tyvars = tyvars;
        opov_args   = p;
@@ -2212,7 +2221,7 @@ clone_override:
      } in
        (x, PTHO_Op (ov, unloc mode)) }
 
-| PRED x=qoident tyvars=tyvars_decl p=ptybindings EQ f=form
+| PRED x=qoident tyvars=bracket(tident*)? p=ptybindings EQ f=form
    { let ov = {
        prov_tyvars = tyvars;
        prov_args   = p;
@@ -2220,7 +2229,7 @@ clone_override:
      } in
        (x, PTHO_Pred ov) }
 
-| PRED x=qoident tyvars=tyvars_decl EQ f=form
+| PRED x=qoident tyvars=bracket(tident*)? EQ f=form
    { let ov = {
        prov_tyvars = tyvars;
        prov_args   = [];
@@ -2404,6 +2413,10 @@ __rlist1(X, S):                         (* left-recursive *)
 
 %inline brace(X):
 | LBRACE x=X RBRACE { x }
+;
+
+%inline bracket(X):
+| LBRACKET x=X RBRACKET { x }
 ;
 
 (* -------------------------------------------------------------------- *)

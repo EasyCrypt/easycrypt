@@ -922,7 +922,7 @@ module Op = struct
     if not (EcUnify.UniEnv.closed ue) then
       hierror "this operator type contains free type variables";
 
-    let uni     = Tuni.subst (EcUnify.UniEnv.close ue) in
+    let uni     = Tuni.offun (EcUnify.UniEnv.close ue) in
     let body    = body |> omap (e_mapty uni) in
     let ty      = uni ty in
     let tparams = EcUnify.UniEnv.tparams ue in
@@ -930,8 +930,8 @@ module Op = struct
 
     if op.po_kind = `Const then begin
       let tue, ty, _ = EcUnify.UniEnv.freshen ue tparams None ty in
-      let tdom = EcUnify.UniEnv.fresh_uid tue in
-      let tcom = EcUnify.UniEnv.fresh_uid tue in
+      let tdom = EcUnify.UniEnv.fresh tue in
+      let tcom = EcUnify.UniEnv.fresh tue in
       let tfun = EcTypes.tfun tdom tcom in
 
         try
@@ -971,7 +971,7 @@ module Pred = struct
 
     let uni     = EcUnify.UniEnv.close ue in
     let body    = body |> omap (EcFol.Fsubst.uni uni) in
-    let dom     = List.map (Tuni.subst uni) dom in
+    let dom     = List.map (Tuni.offun uni) dom in
     let tparams = EcUnify.UniEnv.tparams ue in
     let tyop    = EcDecl.mk_pred tparams dom body in
 
@@ -1110,7 +1110,8 @@ module Ax = struct
       match check with
       | false -> PSNoCheck
       | true  ->
-          let hyps = EcEnv.LDecl.init scope.sc_env axd.ax_tparams in
+          (* FIXME: TC HOOK *)
+          let hyps = EcEnv.LDecl.init scope.sc_env (List.map fst axd.ax_tparams) in
             PSCheck (EcLogic.open_juc (hyps, oget axd.ax_spec), [0])
     in 
     let puc = { puc_active = Some {
@@ -1713,10 +1714,15 @@ module Section = struct
               let _, scope = Theory.exit scope in
                 scope
 
+          | T.CTh_typeclass _x ->
+              (* FIXME: TC HOOK *)
+              scope
+
           | T.CTh_instance (p, cr) -> begin
               match cr with
-              | `Ring  cr -> { scope with sc_env = EcEnv.Algebra.add_ring  p cr scope.sc_env }
-              | `Field cr -> { scope with sc_env = EcEnv.Algebra.add_field p cr scope.sc_env }
+              | `Ring    cr -> { scope with sc_env = EcEnv.Algebra.add_ring  p cr scope.sc_env }
+              | `Field   cr -> { scope with sc_env = EcEnv.Algebra.add_field p cr scope.sc_env }
+              | `General _  -> scope    (* FIXME: TC HOOK *)
           end
         in
 

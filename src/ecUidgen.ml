@@ -33,6 +33,7 @@ let forsym (um : uidmap) (x : symbol) =
 
 (* -------------------------------------------------------------------- *)
 let uid_equal x y = x == y
+let uid_compare x y = x - y
 
 module Muid = Mint
 module Suid = Set.MakeOfMap(Muid)

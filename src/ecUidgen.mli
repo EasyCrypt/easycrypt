@@ -14,10 +14,11 @@ val lookup : uidmap -> symbol -> uid option
 val forsym : uidmap -> symbol -> uid
 
 (* -------------------------------------------------------------------- *)
-val uid_equal : uid -> uid -> bool
+val uid_equal   : uid -> uid -> bool
+val uid_compare : uid -> uid -> int
 
-module Muid : Map.S with type key = uid
-module Suid : Set.S with module M = Map.MakeBase(Muid)
+module Muid : Map.S  with type key = uid
+module Suid : Set.S  with module M = Map.MakeBase(Muid)
 
 (* -------------------------------------------------------------------- *)
 module NameGen : sig

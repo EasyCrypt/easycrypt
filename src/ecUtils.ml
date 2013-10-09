@@ -67,6 +67,9 @@ let as_seq5 = function
   | _ -> assert false
 
 (* -------------------------------------------------------------------- *)
+let int_of_bool (b : bool) = if b then 1 else 0
+
+(* -------------------------------------------------------------------- *)
 let proj3_1 (x, _, _) = x
 let proj3_2 (_, x, _) = x
 let proj3_3 (_, _, x) = x
@@ -90,6 +93,8 @@ let opt_equal (f : 'a -> 'a -> bool) o1 o2 =
 (* -------------------------------------------------------------------- *)
 let none = None
 let some = fun x -> Some x
+
+let funnone (_ : 'a) : 'b option = None
 
 let oiter (f : 'a -> unit) (x : 'a option) =
   match x with None -> () | Some x -> f x

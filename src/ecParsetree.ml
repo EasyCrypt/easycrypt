@@ -157,16 +157,18 @@ and pdeclmodule = {
 }
 
 (* -------------------------------------------------------------------- *)
+type ptyparams = (psymbol * pqsymbol list) list
+
 type ptydecl = {
   pty_name   : psymbol;
-  pty_tyvars : psymbol list;
+  pty_tyvars : ptyparams;
   pty_body   : pty option;
 }
 
 (* -------------------------------------------------------------------- *)
 type pdatatype = {
   ptd_name   : psymbol;
-  ptd_tyvars : psymbol list;
+  ptd_tyvars : (psymbol * pqsymbol list) list;
   ptd_ctors  : (psymbol * pty option) list;
 }
 
@@ -230,7 +232,7 @@ type pop_def =
 type poperator = {
   po_kind   : [`Op | `Const];
   po_name   : psymbol;
-  po_tyvars : psymbol list option;
+  po_tyvars : (psymbol * pqsymbol list) list option;
   po_def    : pop_def
 }
 
@@ -240,7 +242,7 @@ type ppred_def =
 
 type ppredicate = {
   pp_name   : psymbol;
-  pp_tyvars : psymbol list option;
+  pp_tyvars : (psymbol * pqsymbol list) list option;
   pp_def    : ppred_def;
 }
 
@@ -502,7 +504,7 @@ type paxiom_kind = PAxiom | PLemma of ptactic option | PILemma
 
 type paxiom = {
   pa_name    : psymbol;
-  pa_tyvars  : psymbol list option;
+  pa_tyvars  : (psymbol * pqsymbol list) list option;
   pa_vars    : pgtybindings option;  
   pa_formula : pformula;
   pa_kind    : paxiom_kind;

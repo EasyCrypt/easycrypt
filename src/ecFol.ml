@@ -1402,7 +1402,7 @@ module Fsubst = struct
   
     let e =
       let sty = Tvar.init tyids tys in
-      let sty = ty_subst { ty_subst_id with ts_v = sty; } in
+      let sty = ty_subst { ty_subst_id with ts_v = Mid.find_opt^~ sty; } in
       let sty = { e_subst_id with
                     es_freshen = true;
                     es_ty      = sty ; } in
@@ -1460,12 +1460,11 @@ module Fsubst = struct
 
   (* ------------------------------------------------------------------ *)  
   let init_subst_tvar s = 
-    let sty = { ty_subst_id with ts_v = s } in
+    let sty = { ty_subst_id with ts_v = Mid.find_opt^~ s } in
     { f_subst_id with fs_freshen = true; fs_sty = sty; fs_ty = ty_subst sty }
 
   let subst_tvar s = 
-    let sf  = init_subst_tvar s in
-    f_subst sf
+    f_subst (init_subst_tvar s)
 end
 
 let can_subst f = 

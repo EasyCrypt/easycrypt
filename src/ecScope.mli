@@ -66,10 +66,10 @@ module Ax : sig
 end
 
 module Ty : sig
-  val add : scope -> (psymbol list * psymbol) located -> scope
+  val add : scope -> (ptyparams * psymbol) located -> scope
   val addclass : scope -> ptypeclass located -> scope
   val addinstance : scope -> Ax.mode -> ptycinstance located -> scope
-  val define : scope -> (psymbol list * psymbol) located -> pty -> scope
+  val define : scope -> (ptyparams * psymbol) located -> pty -> scope
 end
 
 module Mod : sig
