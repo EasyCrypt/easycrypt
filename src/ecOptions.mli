@@ -26,6 +26,7 @@ and prv_options = {
   prvo_maxjobs  : int;
   prvo_provers  : string list option;
   pvro_checkall : bool;
+  pvro_weakchk  : bool;
 }
 
 and ldr_options = {
