@@ -1,3 +1,0 @@
-[submodule "webui/frontend/twbs"]
-	path = webui/frontend/twbs
-	url = https://github.com/twbs/bootstrap.git
