@@ -13,6 +13,7 @@ open EcLogic
 open EcMetaProg
 
 module TT = EcTyping
+module TC = EcTypeClass
 
 module Muid = EcUidgen.Muid
 
@@ -47,7 +48,7 @@ let process_exp hyps e oty =
   let env = LDecl.toenv hyps in
   let ue  = EcUnify.UniEnv.create (Some (LDecl.tohyps hyps).h_tvar) in
   let e   =  TT.transexpcast_opt env ue oty e in
-  EcTypes.e_uni (EcUnify.UniEnv.close ue) e
+    EcTypes.e_uni (EcUnify.UniEnv.close ue) e
 
 (* -------------------------------------------------------------------- *)
 type pterm_parg =
@@ -170,7 +171,7 @@ let process_named_pterm _loc hyps (fp, tvi) =
           tyargs
   end;
 
-  let fs  = EcUnify.UniEnv.freshen_ue ue typ tvi in
+  let fs  = EcUnify.UniEnv.opentvi ue typ tvi in
   let ax  = Fsubst.subst_tvar fs ax in
   (* FIXME: TC HOOK *)
   let typ = List.map (fun (a, _) -> EcIdent.Mid.find a fs) typ in

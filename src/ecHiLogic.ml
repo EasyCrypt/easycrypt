@@ -764,7 +764,7 @@ let process_generalize l =
 let process_elimT loc (pf, qs) g =
   let noelim () = tacuerror "cannot recognize elimination principle" in
 
-  let (env, hyps, concl) = get_goal_e g in
+  let (hyps, concl) = get_goal g in
 
   let pf = process_form_opt hyps pf None in
   let (p, typs, ue, ax) =
@@ -780,7 +780,7 @@ let process_elimT loc (pf, qs) g =
   in
 
   begin
-    try  EcUnify.unify env ue (tfun pf.f_ty tbool) xpty
+    try  EcUnify.unify (LDecl.toenv hyps) ue (tfun pf.f_ty tbool) xpty
     with EcUnify.UnificationFailure _ -> noelim ()
   end;
 
