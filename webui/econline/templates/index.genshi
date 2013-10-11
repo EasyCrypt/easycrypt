@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html xmlns:xi="http://www.w3.org/2001/XInclude" lang="en">
+<xi:include href="econline:templates/layout/general.genshi" />
+<head />
+<body>
+  <div class="container">
+    <div class="row">
+      <div class="offset1 span10" style="text-align:justify;">
+      <p>EasyCrypt is a toolset for reasoning about relational properties
+      of probabilistic computations with adversarial code. Its main
+      application is the construction and verification of game-based
+      cryptographic proofs. EasyCrypt can also be used for reasoning
+      about (vanilla, approximate, and computational) differential
+      privacy.</p>
+    
+      <p>EasyCrypt has been used to prove the security of emblematic
+      cryptographic constructions, including the Cramer-Shoup
+      cryptosystem, the OAEP padding scheme, the Full Domain Hash
+      signature scheme, the Merkle-Damgård hash function design, and the
+      CBC block cipher mode of operation.</p>
+    
+      <p>For more information about, documentation about or downloading
+      EasyCrypt, please visite our
+      <a href="http://ci.easycrypt.info/">website</a>.</p>
+    
+      <p class="lead" style="margin-top:40px;">
+        <a href="${url('tryme')}">Try me online!</a>
+      </p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

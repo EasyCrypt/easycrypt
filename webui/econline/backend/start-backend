@@ -15,7 +15,6 @@ logger = logging.getLogger(__file__)
 
 # --------------------------------------------------------------------
 from pyramid.view import view_config
-#from pyramid.response import Response
 
 # --------------------------------------------------------------------
 class EasyCryptClient(object):
@@ -92,7 +91,7 @@ class EasyCryptClient(object):
         assert (self.easycrypt == None)
 
         self.easycrypt = \
-            sp.Popen(['../../ec.native', '-emacs'],
+            sp.Popen(['ec.native', '-emacs'],
                      stdin  = sp.PIPE,
                      stdout = sp.PIPE,
                      stderr = sp.STDOUT)
@@ -128,20 +127,18 @@ def _routing(config):
 
 # --------------------------------------------------------------------
 def _main():
-    from pyramid.config  import Configurator
-    from pyramid.session import UnencryptedCookieSessionFactoryConfig
-
+    from pyramid.config        import Configurator
     from wsgiref.simple_server import make_server
 
     settings = {}
     settings['reload_all'] = True
     settings['debug_all' ] = True
 
-    session_factory = UnencryptedCookieSessionFactoryConfig('itsaseekreet')
-    config = Configurator(settings=settings, session_factory=session_factory)
+    config = Configurator(settings=settings, session_factory=None)
     _routing(config); config.scan()
 
     application = config.make_wsgi_app()
+    application.app_protocol = lambda _ : 'easycrypt'
 
     server = gwsgi.WSGIServer(('0.0.0.0', 8080), application,
                               handler_class=WebSocketHandler)

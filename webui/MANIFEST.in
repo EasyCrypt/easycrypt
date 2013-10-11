@@ -1,0 +1,3 @@
+include *.txt *.ini *.cfg
+include econline/backend/start-backend
+recursive-include econline *.css *.js *.png *.txt *.html *.xml

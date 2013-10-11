@@ -2,6 +2,8 @@
 _build
 *.native
 *.byte
+*.pyc
+*.pyo
 /local
 /why3
 /_tools
@@ -28,3 +30,6 @@ setup.log
 /doc/*.toc
 
 /doc/easycrypt.pdf
+
+/webui/webui-env/
+/webui/econline.egg-info/
