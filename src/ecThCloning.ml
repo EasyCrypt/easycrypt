@@ -285,6 +285,9 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
               | CTh_theory (x, dth) ->
                   List.fold_left (doit (prefix @ [x])) (proofs, evc) dth.cth_struct
 
+              | CTh_export _ ->
+                  (proofs, evc)
+
               | _ -> clone_error scenv (CE_CrtOverride (OVK_Theory, name))
             in
               List.fold_left (doit []) (proofs, evc) dth.cth_struct

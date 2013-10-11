@@ -8,6 +8,7 @@ true : warn_Z, warn_Y, warn_+28, warn_-23
 <src/phl> : include
 <src/extraction> : include
 
+<webui>  : -traverse
 <why3>   : -traverse
 <_tools> : -traverse
 <system> : -traverse
