@@ -15,6 +15,12 @@ type pragma = {
 
 let pragma = ref { pm_verbose = true; pm_check = true; }
 
+let pragma_verbose (b : bool) =
+  pragma := { !pragma with pm_verbose = b; }
+
+let pragma_check (b : bool) =
+  pragma := { !pragma with pm_check = b; }
+
 (* -------------------------------------------------------------------- *)
 exception TopError of EcLocation.t * exn
 
@@ -302,16 +308,15 @@ and process_pragma (scope : EcScope.scope) opt =
     match EcScope.goal scope with
     | Some { EcScope.puc_mode = Some false } ->
         EcScope.hierror "pragma [check|nocheck] in non-strict proof script";
-    | _ -> pragma := { !pragma with pm_check = mode }
+    | _ -> pragma_check mode
   in
 
   begin
     match unloc opt with
-    | "silent"   -> pragma := { !pragma with pm_verbose = false }
-    | "verbose"  -> pragma := { !pragma with pm_verbose = true  }
-    | "check"    -> check true
+    | "silent"   -> pragma_verbose false
+    | "verbose"  -> pragma_verbose true
     | "nocheck"  -> check false
-
+    | "check"    -> check true
     | _          -> ()
   end
 

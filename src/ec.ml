@@ -128,6 +128,9 @@ let _ =
     prvopts.prvo_maxjobs
     prvopts.prvo_provers;
 
+  if prvopts.pvro_weakchk then
+    EcCommands.pragma_check false;
+
   (* Instantiate terminal *)
   let lazy terminal = terminal in
 

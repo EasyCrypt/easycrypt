@@ -196,14 +196,15 @@ end
 
 (* -------------------------------------------------------------------- *)
 module NormMp : sig
+  type use = {
+    us_pv : ty EcPath.Mx.t; 
+    us_gl : EcIdent.Sid.t;  
+  }  
+
   val norm_mpath : env -> mpath -> mpath
   val norm_xpath : env -> xpath -> xpath
   val norm_pvar  : env -> EcTypes.prog_var -> EcTypes.prog_var
   val norm_form  : env -> form -> form
-  type use =
-    { us_pv : ty EcPath.Mx.t; 
-      us_gl : EcIdent.Sid.t;  
-    }  
   val mod_use    : env -> mpath -> use
   val fun_use    : env -> xpath -> use
   val norm_restr : env -> mod_restr  -> use 
@@ -294,8 +295,11 @@ end
 module TypeClass : sig
   type t = unit
 
-  val add  : path -> env -> env
-  val bind : symbol -> t -> env -> env
+  val add   : path -> env -> env
+  val bind  : symbol -> t -> env -> env
+  val graph : env -> EcTypeClass.graph
+
+  val tc_of_typename : path -> env -> Sp.t
 end
 
 (* -------------------------------------------------------------------- *)
@@ -337,7 +341,7 @@ module LDecl : sig
 
   type hyps
 
-  val init : env -> EcIdent.t list -> hyps
+  val init   : env -> EcIdent.t list -> hyps
   val tohyps : hyps -> EcBaseLogic.hyps
   val toenv  : hyps -> env
 

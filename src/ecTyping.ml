@@ -500,9 +500,9 @@ let rec transty (tp : typolicy) (env : EcEnv.env) ue ty =
 and transtys tp (env : EcEnv.env) ue tys = 
   List.map (transty tp env ue) tys
 
-let transty_for_decl =
+let transty_for_decl env ty =
   let ue = UE.create (Some []) in
-  fun env ty -> transty tp_nothing env ue ty
+    transty tp_nothing env ue ty
 
 (* -------------------------------------------------------------------- *)
 let transpattern1 env ue (p : EcParsetree.plpattern) = 

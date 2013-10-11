@@ -17,6 +17,7 @@ module Msym = EcSymbols.Msym
 module Mp   = EcPath.Mp
 module Sid  = EcIdent.Sid
 module Mid  = EcIdent.Mid
+module TC   = EcTypeClass
 
 (* -------------------------------------------------------------------- *)
 type 'a suspension = {
@@ -1599,7 +1600,6 @@ end
 
 (* -------------------------------------------------------------------- *)
 module NormMp = struct
-
   let rec norm_mpath_for_typing env p =
     let (ip, (i, args)) = ipath_of_mpath p in
     match Mod.by_ipath_r true ip env with
@@ -2143,7 +2143,6 @@ end
 module TypeClass = struct
   type t = unit
 
-
   let by_path_opt (p : EcPath.path) (env : env) =
     omap 
       check_not_suspended
@@ -2163,6 +2162,14 @@ module TypeClass = struct
     let env = { env with env_item = CTh_typeclass name :: env.env_item } in
       (* FIXME: TC HOOK *)
       env
+
+  let graph (_env : env) =
+    (* FIXME: TC HOOK *)
+    TC.Graph.empty
+
+  let tc_of_typename (_p : EcPath.path) (_env : env) =
+    (* FIXME: TC HOOK *)
+    Sp.empty
 end
 
 (* -------------------------------------------------------------------- *)
@@ -2631,7 +2638,7 @@ module LDecl = struct
     | LD_hyp   _     -> env
     | LD_abs_st us    -> AbsStmt.bind x us env 
 
-   let add_local x k h = 
+   let add_local x k h =
     let nhyps = add_local x k (tohyps h) in
     let env = h.le_env in
     let nenv = add_local_env x k env in

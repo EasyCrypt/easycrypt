@@ -50,9 +50,10 @@ let process_phl_formula  = process_phl_form tbool
 let process_prhl_formula = process_prhl_form tbool
 
 let process_prhl_stmt side g c = 
-  let hyps,concl = get_goal g in
-  let es = EcCorePhl.t_as_equivS concl in
-  let mt = snd (if side then es.es_ml else es.es_mr) in
+  let (hyps, concl) = get_goal g in
+
+  let es   = EcCorePhl.t_as_equivS concl in
+  let mt   = snd (if side then es.es_ml else es.es_mr) in
   let hyps = LDecl.push_active (mhr,mt) hyps in
   let env  = LDecl.toenv hyps in
   let ue   = EcUnify.UniEnv.create (Some (LDecl.tohyps hyps).EcBaseLogic.h_tvar) in

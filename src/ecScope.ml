@@ -929,14 +929,15 @@ module Op = struct
     let tyop    = EcDecl.mk_op tparams ty body in
 
     if op.po_kind = `Const then begin
-      let tue, ty, _ = EcUnify.UniEnv.freshen ue tparams None ty in
-      let tdom = EcUnify.UniEnv.fresh tue in
-      let tcom = EcUnify.UniEnv.fresh tue in
-      let tfun = EcTypes.tfun tdom tcom in
+      let tue   = EcUnify.UniEnv.copy ue in
+      let ty, _ = EcUnify.UniEnv.openty tue tparams None ty in
+      let tdom  = EcUnify.UniEnv.fresh tue in
+      let tcom  = EcUnify.UniEnv.fresh tue in
+      let tfun  = EcTypes.tfun tdom tcom in
 
         try
           EcUnify.unify (env scope) tue ty tfun;
-          let msg = "this operator type is (unifiable) to an function type" in
+          let msg = "this operator type is (unifiable) to a function type" in
             hierror ~loc "%s" msg
         with EcUnify.UnificationFailure _ -> ()
     end;

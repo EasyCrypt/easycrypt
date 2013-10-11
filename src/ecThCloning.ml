@@ -364,6 +364,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
               let nargs = List.map2
                             (fun (_, tc) x -> (EcIdent.create (unloc x), tc))
                             otyd.tyd_params nargs in
+              (* FIXME: TC HOOK *)
               let ue    = EcUnify.UniEnv.create (Some (List.map fst nargs)) in
               let ntyd  = EcTyping.transty EcTyping.tp_tydecl scenv ue ntyd in
 

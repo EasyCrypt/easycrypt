@@ -56,6 +56,8 @@ val proj3_3 : 'a * 'b * 'c -> 'c
 val fst_map : ('a -> 'c) -> 'a * 'b -> 'c * 'b
 val snd_map : ('b -> 'c) -> 'a * 'b -> 'a * 'c
 
+val swap: 'a * 'b -> 'b * 'a
+
 (* -------------------------------------------------------------------- *)
 type 'a eq  = 'a -> 'a -> bool
 type 'a cmp = 'a -> 'a -> int
