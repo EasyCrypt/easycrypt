@@ -230,6 +230,8 @@ let sanitizer =
     else if s = "true" then "_true"
     else Why3.Ident.sanitizer char_to char_to s
 
+let sanitizer_local s = "x" ^ s
+
 let dot_name mo s =
   mo.odef_name@[s]
 
@@ -315,6 +317,7 @@ let rec compile_op env eenv cname p =
     try (Hp.find eenv.mp_op p).odef_name 
     with Not_found ->
       let pth, s = destr_path p in 
+      let s = sanitizer_local s in
       let op = Op.by_path p env in
       let cname = EcPath.tolist pth in
       let def = 
@@ -337,12 +340,12 @@ and compile_expr env eenv cname e =
   | Elam(bd,e) ->
     let compile_bd (id,ty) =
       let ty = compile_ty env eenv cname ty in
-      EcIdent.name id, ty in
+      compile_id id, ty in
     let bd = List.map compile_bd bd in
     let body = compile_expr env eenv cname e in
     Olam(bd, body) 
   | Eint n -> Oint n
-  | Elocal id -> Olocal (EcIdent.name id)
+  | Elocal id -> Olocal (compile_id id)
   | Evar _ -> error "can not extract program variable"
   | Eop(p,_) -> Oop (compile_op env eenv cname p,p)
   | Eapp(e,es) -> 
@@ -352,8 +355,8 @@ and compile_expr env eenv cname e =
   | Elet(p,e1,e2) ->
     let p = 
       match p with
-      | LSymbol (id, _) -> Oploc (EcIdent.name id)
-      | LTuple ids -> Optuple (List.map (fun (id, _) -> EcIdent.name id) ids) in
+      | LSymbol (id, _) -> Oploc (compile_id id)
+      | LTuple ids -> Optuple (List.map (fun (id, _) -> compile_id id) ids) in
     let e1 = compile_expr env eenv cname e1 in
     let e2 = compile_expr env eenv cname e2 in
     Olet(p,e1,e2)
@@ -364,6 +367,8 @@ and compile_expr env eenv cname e =
     let e2 = compile_expr env eenv cname e2 in
     let e3 = compile_expr env eenv cname e3 in
     Oif(e1,e2,e3)
+and compile_id id = sanitizer_local (EcIdent.name id)
+  
 
 let rec compile_theory env eenv p = 
   let cth = Theory.by_path p env in
@@ -518,7 +523,7 @@ let init_withextract =
     ExOp (perv "/\\")  , operv "(&&)" ;
     ExOp (perv "[!]")  , operv "not"  ;
     ExOp (perv "=")    , operv "(=)"  ;
-    ExOp (perv "tt")   , operv "()"   ;
+    ExOp (perv "tt")   ,       "()"   ;
    (* Int *) 
    (* TODO : this is dangerous : we should use big_int *)
     ExTh (dummy ([EcCoreLib.id_top], "Int")), "EcInt";
