@@ -381,51 +381,74 @@ axiom alli_def p (xs:'x array):
   (forall i, 0 <= i < length xs => p i xs.[i]).
 
 (** Distribution on 'a array of length k from distribution on 'a *)
+(* We return the empty array when the length is negative *)
 theory Darray.
   require import Distr.
   require import Real.
 
   op darray: int -> 'a distr -> 'a array distr.
 
-  axiom mu_x0 (len:int) (d:'a distr) (x:'a array):
-    len < 0 => mu_x (darray len d) x = 0%r.
+  (* Negative length case... This appears to be a necessary evil for now *)
+  (* At least it's only one axiom *)
+  axiom mu_neg (len:int) (d:'a distr) (p:'a array -> bool):
+    len < 0 =>
+    mu (darray len d) p = charfun p empty.
 
+  lemma mu_x (len:int) (d:'a distr) (x:'a array):
+    len < 0 =>
+    mu_x (darray len d) x = if x = empty then 1%r else 0%r
+  by [].
+
+  lemma supp_neg (len:int) (d:'a distr) (x:'a array):
+    len < 0 =>
+    in_supp x (darray len d) <=> x = empty
+  by [].
+
+  lemma weight_neg (len:int) (d:'a distr):
+    len < 0 =>
+    weight (darray len d) = 1%r
+  by [].
+
+  (* Non-negative length case *)
   axiom mu_x_def (len: int) (d:'a distr) (x:'a array):
-    0 <= len =>
+    len = length x =>
     mu_x (darray len d) x = fold_right (lambda p x, p * mu_x d x) 1%r x.
 
   axiom supp_def (len:int) (x:'a array) (d:'a distr):
+    0 <= len =>
     in_supp x (darray len d) <=>
-    (0 <= len /\ length x = len /\ all (support d) x).
+    (length x = len /\ all (support d) x).
 
   lemma supp_full (len:int) (d:'a distr) (x:'a array):
+    0 <= len =>
     (forall y, in_supp y d) =>
-    length x = len =>
-    in_supp x (darray len d).
+    length x = len <=> in_supp x (darray len d).
   proof strict.
-  intros dF Hlen; rewrite Darray.supp_def; do !split=> //; first smt.
-  by rewrite all_def=> i Hi; rewrite /support dF.
+  intros leq0_len dF; split.
+    by intros=> Hlen; rewrite Darray.supp_def=> //; split=> //;
+       rewrite all_def=> i Hi; rewrite /support dF.
+    by rewrite Darray.supp_def.
   qed.
 
   lemma supp_len (len:int) (x: 'a array) (d:'a distr):
-    in_supp x (darray len d) =>
-    length x = len.
-  proof strict. by rewrite supp_def. qed.
+    0 <= len =>
+    in_supp x (darray len d) => length x = len.
+  proof strict. by intros=> leq0_len; rewrite supp_def. qed.
 
   lemma supp_k (len:int) (x: 'a array) (d:'a distr) (k:int):
     0 <= k < len =>
     in_supp x (darray len d) =>
     in_supp x.[k] d.
   proof strict.
-  rewrite supp_def -/(support d x.[k])=> Hk [H1 [H2 H3]]; subst len.
-  by generalize H3; rewrite all_def=> H3; apply H3.
+  intros=> k_bnd; rewrite supp_def -/(support d x.[k]); first smt.
+  by intros=> [len_def all_in_supp]; subst;
+     generalize all_in_supp; rewrite all_def=> H; apply H.
   qed.
 
   (* This would be a lemma by definition of ^
-     if we had it in the correct form *)
+     if we had it in the correct form (if we know that Real is a field) *)
   axiom weight_d (d:'a distr) len:
-    0 <= len =>
-    weight (darray len d) = (weight d) ^ len.
+    0 <= len => weight (darray len d) = (weight d) ^ len.
 
   lemma darrayL (d:'a distr) len:
     0 <= len =>
@@ -436,8 +459,11 @@ theory Darray.
   smt "Alt-Ergo".
   qed.
 
+  (* if len is negative, then uniformity is easy to prove.
+     otherwise, the folded function can be replaced with the same constant for x and y
+     (but we need to know that it is only applied to elements of d's support,
+      which justifies leaving it as an axiom for now) *)
   axiom uniform (d:'a distr) len:
-    0 <= len =>
     isuniform d =>
     isuniform (darray len d).
 end Darray.
