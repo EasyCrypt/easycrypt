@@ -32,7 +32,7 @@ EasyCryptEditor.prototype.createWidget = function() {
     if (this.editor)
         return ;
     
-    var url = "ws://localhost:8080/engine";
+    var url = "ws://ci.easycrypt.info:8080/engine";
     this.socket = new WebSocket(url, "easycrypt");
     this.socket.onopen    = this.onopen.bind(this);
     this.socket.onclose   = this.onclose.bind(this);
@@ -119,6 +119,7 @@ EasyCryptEditor.prototype.onmessage = function(event){
     if (json.status == 'undo') {
         this.endofsent.pop();
         this.setROMark(this.endofsent.peek());
+        this.widgets.feedback.text($.format("{0}\n", json.message));
     }
 }
 

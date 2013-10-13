@@ -9,9 +9,9 @@ body {
 }
 
 #ec-feedback {
-       width: 100%;
-  background: #f7f7f7;
-   max-width: 100%;
+        width: 100%;
+   background: #f7f7f7;
+    max-width: 100%;
 }
 
 /* CodeMirror */

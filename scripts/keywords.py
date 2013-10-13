@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
 # --------------------------------------------------------------------
-import sys, os, re, time
+import sys, os, re, time, itertools as it
 
 # --------------------------------------------------------------------
 def _options():
@@ -12,14 +12,14 @@ def _options():
     parser.add_option(
         '-m', '--mode',
         default = 'raw',
-        help    = 'output mode (raw|emacs)')
+        help    = 'output mode (raw|emacs|javascript)')
 
     (options, args) = parser.parse_args()
 
     if len(args) != 0:
         parser.error('this program does not take any argument')
 
-    if options.mode not in ('raw', 'emacs'):
+    if options.mode not in ('raw', 'emacs', 'javascript'):
         parser.error("invalid mode: `%s'" % (options.mode,))
 
     return options
@@ -50,6 +50,12 @@ def process():
             print "))"
             print
         print "(provide 'easycrypt-keywords)"
+
+    if options.mode == 'javascript':
+        print "// Generated on %s" % (time.ctime(),)
+        print 'var cKeywords = "%s"' % \
+                (' '.join(sorted(set(it.chain(*keywords.values())))))
+        print "// END"
 
 # --------------------------------------------------------------------
 if __name__ == '__main__':

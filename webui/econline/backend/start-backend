@@ -5,7 +5,8 @@ import sys, os, re, json, logging, gevent.subprocess as sp
 import cStringIO as sio
 import gevent, gevent.monkey, gevent.pywsgi as gwsgi
 
-from geventwebsocket.handler import WebSocketHandler
+from geventwebsocket.handler    import WebSocketHandler
+from geventwebsocket.exceptions import WebSocketError
 
 gevent.monkey.patch_all()
 
@@ -42,8 +43,9 @@ class EasyCryptClient(object):
 
         prompt  = self.__read_prompt()
         message = dict(
-            status = 'undo',
-            pundo  = self.prompt,
+            status  = 'undo'     ,
+            pundo   = self.prompt,
+            message = prompt     ,
         )
 
         self.websocket.send(json.dumps(message))
@@ -78,7 +80,10 @@ class EasyCryptClient(object):
 
     def __run(self):
         while True:
-            message = self.websocket.receive()
+            try:
+                message = self.websocket.receive()
+            except WebSocketError:
+                return
             if message is None:
                 return
             message = json.loads(message)
@@ -141,7 +146,7 @@ def _main():
     application = config.make_wsgi_app()
     application.app_protocol = lambda _ : 'easycrypt'
 
-    server = gwsgi.WSGIServer(('0.0.0.0', 8080), application,
+    server = gwsgi.WSGIServer(('127.0.0.1', 8080), application,
                               handler_class=WebSocketHandler)
     server.serve_forever()
 

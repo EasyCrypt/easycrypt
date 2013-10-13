@@ -6,6 +6,11 @@ ECCODE = '''\
 require import Int.
 
 op myop(x y z : int) : int = x * y + z.
+
+lemma L x y z: myop x y z = x * y + z.
+proof.
+  smt.
+qed.
 '''
 
 # --------------------------------------------------------------------

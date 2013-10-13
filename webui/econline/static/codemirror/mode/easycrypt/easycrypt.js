@@ -164,11 +164,10 @@ CodeMirror.defineMode("easycrypt", function(config, parserConfig) {
     for (var i = 0; i < words.length; ++i) obj[words[i]] = true;
     return obj;
   }
-  var cKeywords = "forall exists let in var fun if then else while assert return using"
-	  			+ " compute same idtac assumption intros split left right elim apply trivial"
-	  			+ " admit axiom lemma proof save claim cnst drop end import export module"
-	  			+ " op pred require theory type print why3 as Pr clone with prover checkproof timeout undo";        
 
+  // Generated on Sun Oct 13 21:54:15 2013
+  var cKeywords = "Pr admit alias apply as assert assumption axiom bd_eq bd_hoare bdhoare_deno beta by bypr call case cfold change checkproof claim class clear clone compute congr conseq const cut datatype debug declare delta do drop eager elim elimT else end eqobs_in equiv equiv_deno exfalso exists export fel fieldeq first fission forall fun fusion generalize glob hoare idtac if import in inline instance intros iota islossless kill lambda last left lemma let local logic modpath module nosmt of off on op pose pr_bounded pr_false pragma pred print progress proof prover qed rcondf rcondt realize reflexivity require res return rewrite right ringeq rnd same save section self seq simplify skip smt sp split splitwhile strict subst swap symmetry then theory timeout transitivity trivial try type undo unroll using var while why3 with wp zeta"
+  // END
 
 /*  function cppHook(stream, state) {
     if (!state.startOfLine) return false;

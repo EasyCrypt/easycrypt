@@ -18,8 +18,9 @@
 <body>
   <div class="container">
     <div class="row" style="text-align:justify; margin-bottom:20px;">
-    <p><strong>Ctrl-Down</strong> processes next sentence, and
-       <strong>Ctrl-Up</strong> restracts lext sentence.</p>
+    <p>When the editor has the focus,
+      <strong>Ctrl-Down</strong> processes next sentence, and
+      <strong>Ctrl-Up</strong> restracts last sentence.</p>
     </div>
 
     <div class="row"><div class="span12" id="ec-log">
@@ -37,7 +38,8 @@
     <div class="row" style="margin-top:10px;"><div class="span12">
       <p>EasyCrypt engine status: <span id="ec-status" />
          (<span class="icon icon-question-sign" /> unknown -
-          <span class="icon icon-fire" /> ready -
+          <span class="icon icon-ok-sign" /> ready -
+          <span class="icon icon-fire" /> working -
           <span class="icon icon-remove" /> error)</p>
     </div></div>
   </div>
