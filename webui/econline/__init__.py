@@ -11,16 +11,9 @@ def _routing(config):
 
 # --------------------------------------------------------------------
 def main(global_config, **settings):
-    from pkg_resources  import resource_filename, Requirement
     from pyramid.config import Configurator
 
-    if main.process is None:
-        backend = resource_filename(Requirement.parse('econline'),
-                                    'econline/backend/start-backend')
-        main.process = sp.Popen(
-            [backend], preexec_fn = lambda : signal.signal(signal.SIGINT,
-                                                           signal.SIG_IGN))
-
+    start_backend()
     config = Configurator(settings=settings)
     config.include('.renderer.pyramid_genshi')
     config.add_static_view('static', 'static', cache_max_age=3600)
@@ -30,6 +23,22 @@ def main(global_config, **settings):
     return config.make_wsgi_app()
 
 main.process = None
+
+# --------------------------------------------------------------------
+def start_backend():
+    if main.process is not None:
+        return
+
+    from pkg_resources import resource_filename, Requirement
+
+    backend = Requirement.parse('econline')
+    backend = resource_filename(backend, 'econline/backend/start-backend')
+
+    def preexec():
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
+        os.chdir(os.path.dirname(backend))
+
+    main.process = sp.Popen([backend], preexec_fn = preexec)
 
 # --------------------------------------------------------------------
 def kill_backend():

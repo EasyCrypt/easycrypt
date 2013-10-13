@@ -31,5 +31,9 @@ body {
 }
 
 .ec-read-only {
-  background-color: #ccc;
+  background: #ccc;
+}
+
+.ec-error {
+  background: #f00;
 }

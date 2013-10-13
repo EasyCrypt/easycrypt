@@ -28,7 +28,7 @@ class EasyCryptClient(object):
 
         while True:
             content = self.easycrypt.stdout.readline().rstrip('\r\n')
-            match   = re.search(r'^\[(\d+)\]>$', content)
+            match   = re.search(r'^\[(\d+)|.*?\]>$', content)
 
             if match is None:
                 prompt.write('%s\r\n' % (content,))
@@ -42,7 +42,8 @@ class EasyCryptClient(object):
 
         prompt  = self.__read_prompt()
         message = dict(
-            pundo = self.prompt
+            status = 'undo',
+            pundo  = self.prompt,
         )
 
         self.websocket.send(json.dumps(message))

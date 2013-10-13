@@ -18,9 +18,8 @@
 <body>
   <div class="container">
     <div class="row" style="text-align:justify; margin-bottom:20px;">
-    <p><strong>Ctrl-Down</strong> processes next sentence,
-       <strong>Ctrl-Up</strong> restracts lext sentence,
-       <strong>Ctrl-Space</strong> processes (or retracts) everything up to the cursor position.</p>
+    <p><strong>Ctrl-Down</strong> processes next sentence, and
+       <strong>Ctrl-Up</strong> restracts lext sentence.</p>
     </div>
 
     <div class="row"><div class="span12" id="ec-log">

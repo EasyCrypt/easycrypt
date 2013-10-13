@@ -21,6 +21,7 @@ function EasyCryptEditor(name) {
     this.errmark   = null;  
     this.editor    = null;
     this.socket    = null;
+    this.job       = null;
     
     this.createWidget();
 }
@@ -38,14 +39,12 @@ EasyCryptEditor.prototype.createWidget = function() {
     this.socket.onerror   = this.onerror.bind(this);
     this.socket.onmessage = this.onmessage.bind(this);
 
-    var onnext   = this._on_next.bind(this);
-    var onprev   = this._on_prev.bind(this);
-    var oncursor = this._on_cursor.bind(this);
+    var onnext = this._on_next.bind(this);
+    var onprev = this._on_prev.bind(this);
 
     var km = {
         "Ctrl-Down" : function (cm) { onnext(); },
         "Ctrl-Up"   : function (cm) { onprev(); },
-        "Ctrl-Space": function (cm) { oncursor(); },
     };
 
     var options = {
@@ -77,59 +76,61 @@ EasyCryptEditor.prototype.onopen = function(event){
 
 EasyCryptEditor.prototype.onclose = function(event){
     this.socket = null;
+    this.job    = null;
     this.log('The connection to the EasyCrypt engine has been closed', 'error', false)
     this.setStatus('error');
 }
 
 EasyCryptEditor.prototype.onerror = function(event){
     this.socket = null;
+    this.job    = null;
     this.log('The connection to the EasyCrypt engine failed', 'error', false);
     this.setStatus('error');
 }
 
 EasyCryptEditor.prototype.onmessage = function(event){
-    try {
-        var json = JSON.parse(event.data);
-    } catch (e) {
-        return;
-    }
+    var job  = this.job;
+    var json = JSON.parse(event.data);
 
-    if (json.status == "error") {
-        var end = this.endofsent.pop();
+    this.job = null;
+    this.setStatus('ready');
+    this.widgets.feedback.text('')
 
-        this.widgets.feedback.text($.format("> error: {0}\n", json.message));
-
-/*
+    if (json.status == 'error') {
+        /*
         var pos = { line : json.end.line-1,
                    start : json.start_err,
                      end : json.end_err };
-        this.setROMark_error(pos);
-*/
+        this.setErrorMask(pos);
+        */
+
+        this.endofsent.pop()
+        this.setROMark(this.endofsent.peek());
+        this.widgets.feedback.text($.format("error: {0}\n", json.message));
     }
 
-    else if (json.status == 'ok') {
-        var end = this.endofsent.peek();
-
+    if (json.status == 'ok') {
+        end = this.endofsent.peek();
         end.pundo = json.pundo;
         this.setROMark(end);
-        this.widgets.feedback.text($.format("> {0}\n", json.message));
+        this.widgets.feedback.text($.format("{0}\n", json.message));
     }
 
-    else if (json.status == "undo"){
-        this.widgets.feedback.text('')
+    if (json.status == 'undo') {
+        this.endofsent.pop();
+        this.setROMark(this.endofsent.peek());
     }
 }
 
 // --------------------------------------------------------------------
 // Read-only marker management
-
 EasyCryptEditor.prototype.clearROMark = function() {
     if (this.romark)
       this.romark.clear();
     this.romark = null;
 }
 
-EasyCryptEditor.prototype.clearERRMark = function() {
+EasyCryptEditor.prototype.clearErrorMark = function() {
     if (this.errmark)
       this.errmark.clear();
     this.errmark = null;
@@ -143,21 +144,29 @@ EasyCryptEditor.prototype.setROMark = function(end) {
     };
 
     this.clearROMark();
-    if (end)
+    if (end) {
+        if (end.line == this.editor.lineCount()-1 &&
+            end.ch-1 == this.editor.getLine(end.line).length)
+        {
+            this.editor.replaceRange('\n', end, end);
+        }
         this.romark = this.editor.markText({ line: 0, ch: 0 }, end, opts);
+    }
 }
 
-EasyCryptEditor.prototype.setROMark_error = function(pos) {
+EasyCryptEditor.prototype.setErrorMark = function(pos) {
     var opts = {
-           className: this.name + '-read-only-error',
+           className: this.name + '-error',
       inclusiveRight: false, 
        clearOnEnter : true,
     };
 
-    if (pos)
-        this.errmark = this.editor.markText({ line: pos.line, ch: pos.start }, 
-                                            { line: pos.line, ch: pos.end },
-                                            opts);
+    if (pos) {
+        this.errmark = this.editor.markText(
+            { line: pos.line, ch: pos.start }, 
+            { line: pos.line, ch: pos.end },
+            opts);
+    }
 }
 
 // --------------------------------------------------------------------
@@ -174,8 +183,11 @@ EasyCryptEditor.prototype.log = function(msg, level, autoclear) {
                 .append(msg);
 
     this.widgets.log.append(tag);
-    if (autoclear)
-        setTimeout(function () { tag.remove(); }, 3000);
+    if (autoclear) {
+        setTimeout(function () {
+            tag.fadeOut('fast', function() { tag.remove(); });
+        }, 3000);
+    }
 }
 
 EasyCryptEditor.prototype.setStatus = function(status) {
@@ -192,59 +204,37 @@ EasyCryptEditor.prototype.setStatus = function(status) {
 
 // --------------------------------------------------------------------
 // Callbacks
-
 EasyCryptEditor.prototype._on_next = function() {
-    if (this.socket == null) return ;
+    if (this.socket == null || this.job != null) return ;
 
     var prev = this.endofsent.peek() || {line: 0, ch: 1};
     var end  = this.findStatement(prev);
 
     if (end) {
-        this.endofsent.push(end);
-        this.clearERRMark();
         var json = JSON.stringify({ mode     : "forward",
                                     contents : end.contents });
+
+        this.endofsent.push(end);
+        this.clearErrorMark();
         this.socket.send(json);
+        this.job = json;
+        this.setStatus('working');
     }
 }
 
 EasyCryptEditor.prototype._on_prev = function() {
-    if (this.socket == null) return ;
+    if (this.socket == null || this.job != null) return ;
 
     if (this.endofsent.length == 0)
         return ;
 
-    var posend   = this.endofsent.pop();
-    var posstart = this.endofsent.peek();
+    var posend = this.endofsent.peek();
+    var json   = JSON.stringify({ mode : 'undo', data : posend.pundo });
 
-    this.clearERRMark();
-    this.setROMark(posstart);
-
-    var json = JSON.stringify({ mode : "undo", data : posend.pundo });
+    this.clearErrorMark();
     this.socket.send(json);
-}
-
-EasyCryptEditor.prototype._on_cursor = function() {
-    if (this.socket == null) return ;
-
-    var cursor = this.editor.getCursor();
-    var history = this.endofsent.peek();
-
-    this.clearERRMark();
-    
-    while (cursor.line < history.line) 
-            history = this.endofsent.pop();
-    // for different statement on the same line
-    while (cursor.line == this.endofsent.peek().line && cursor.ch < this.endofsent.peek().ch)
-        this.endofsent.pop();
-        
-    this.clearROMark();
-    if (cursor.line == history.line)
-        this.setROMark(this.endofsent.peek());
-    else {
-        this.setROMark(history);
-        this.endofsent.push(history);
-    }
+    this.job = json;
+    this.setStatus('working');
 }
 
 // --------------------------------------------------------------------
