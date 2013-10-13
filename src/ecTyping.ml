@@ -11,16 +11,15 @@ open EcFol
 
 module MMsym = EcSymbols.MMsym
 
-module Sp = EcPath.Sp
-module Mp = EcPath.Mp
-
-module Sm = EcPath.Sm
-module Mm = EcPath.Mm
-
-module Sx = EcPath.Sx
-module Mx = EcPath.Mx
-
+module Sp  = EcPath.Sp
+module Mp  = EcPath.Mp
+module Sm  = EcPath.Sm
+module Mm  = EcPath.Mm
+module Sx  = EcPath.Sx
+module Mx  = EcPath.Mx
 module Mid = EcIdent.Mid
+
+module TC = EcTypeClass
 
 (* -------------------------------------------------------------------- *)
 type tymod_cnv_failure =
@@ -51,6 +50,7 @@ type tyerror =
 | OnlyMonoTypeAllowed
 | UnboundTypeParameter of symbol
 | UnknownTypeName      of qsymbol
+| UnknownTypeClass     of qsymbol
 | InvalidTypeAppl      of qsymbol * int * int
 | DuplicatedTyVar
 | DuplicatedLocal      of symbol
@@ -141,6 +141,9 @@ let pp_tyerror fmt env error =
 
   | UnknownTypeName qs ->
       msg "unknown type name: %a" pp_qsymbol qs
+
+  | UnknownTypeClass qs ->
+      msg "unknown type class: %a" pp_qsymbol qs
 
   | InvalidTypeAppl (name, _, _) ->
       msg "invalid type application: %a" pp_qsymbol name
@@ -431,14 +434,22 @@ let tp_uni     = { tp_uni = true ; tp_tvar = false; tp_self = false; } (* params
 let selfname   = EcIdent.create "$self"
 
 (* -------------------------------------------------------------------- *)
-let ue_for_decl (env : EcEnv.env) (loc, tparams) =
+let transtcs (env : EcEnv.env) tcs =
+  let for1 tc =
+    match EcEnv.TypeClass.lookup_opt (unloc tc) env with
+    | None -> tyerror tc.pl_loc env (UnknownTypeClass (unloc tc))
+    | Some (p, ()) -> p
+  in
+    Sp.of_list (List.map for1 tcs)
+
+(* -------------------------------------------------------------------- *)
+let transtyvars (env : EcEnv.env) (loc, tparams) =
   let tparams = tparams |> omap
     (fun tparams ->
-      (* FIXME: TC HOOK *)
-      let tparams = List.map (unloc |- fst) tparams in
-        if not (List.uniq tparams) then
-          tyerror loc env DuplicatedTyVar;
-        List.map EcIdent.create tparams)
+        let for1 ({ pl_desc = x }, tc) = (EcIdent.create x, transtcs env tc) in
+          if not (List.uniq (List.map (unloc |- fst) tparams)) then
+            tyerror loc env DuplicatedTyVar;
+          List.map for1 tparams)
   in
     EcUnify.UniEnv.create tparams
 

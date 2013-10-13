@@ -2163,6 +2163,15 @@ module TypeClass = struct
       (* FIXME: TC HOOK *)
       env
 
+  let lookup qname (env : env) =
+    MC.lookup_typeclass qname env
+
+  let lookup_opt name env =
+    try_lf (fun () -> lookup name env)
+
+  let lookup_path name env =
+    fst (lookup name env)
+
   let graph (_env : env) =
     (* FIXME: TC HOOK *)
     TC.Graph.empty

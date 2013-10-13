@@ -36,6 +36,7 @@ type tyerror =
 | OnlyMonoTypeAllowed
 | UnboundTypeParameter of symbol
 | UnknownTypeName      of qsymbol
+| UnknownTypeClass     of qsymbol
 | InvalidTypeAppl      of qsymbol * int * int
 | DuplicatedTyVar
 | DuplicatedLocal      of symbol
@@ -80,10 +81,8 @@ val tp_tclass : typolicy
 val selfname :  EcIdent.t
 
 (* -------------------------------------------------------------------- *)
-val ue_for_decl :
-     EcEnv.env
-  -> (EcLocation.t * (psymbol * pqsymbol list) list option)
-  -> EcUnify.unienv
+val transtyvars:
+  EcEnv.env -> (EcLocation.t * ptyparams option) -> EcUnify.unienv
 
 (* -------------------------------------------------------------------- *)
 val transty : typolicy -> EcEnv.env -> EcUnify.unienv -> pty -> ty 

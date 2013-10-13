@@ -1,6 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcUidgen
 open EcSymbols
+open EcPath
 open EcTypes
 open EcDecl
 
@@ -17,7 +18,7 @@ type tvar_inst =
 type tvi = tvar_inst option
 
 module UniEnv : sig
-  val create     : EcIdent.t list option -> unienv
+  val create     : (EcIdent.t * Sp.t) list option -> unienv
   val copy       : unienv -> unienv                 (* constant time *)
   val restore    : dst:unienv -> src:unienv -> unit (* constant time *)
   val fresh      : ?tc:EcPath.Sp.t -> ?ty:ty -> unienv -> ty

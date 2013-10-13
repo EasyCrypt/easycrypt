@@ -299,6 +299,10 @@ module TypeClass : sig
   val bind  : symbol -> t -> env -> env
   val graph : env -> EcTypeClass.graph
 
+  val lookup      : qsymbol -> env -> path * t
+  val lookup_opt  : qsymbol -> env -> (path * t) option
+  val lookup_path : qsymbol -> env -> path
+
   val tc_of_typename : path -> env -> Sp.t
 end
 

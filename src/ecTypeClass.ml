@@ -25,9 +25,12 @@ module Graph = struct
   }
 
   let has_path ~src ~dst g =
-    match Mp.find_opt src g.tcg_closure with
-    | None -> false
-    | Some m -> Mp.mem dst m
+    if EcPath.p_equal src dst then
+      true
+    else
+      match Mp.find_opt src g.tcg_closure with
+      | None -> false
+      | Some m -> Mp.mem dst m
 
   let add ~src ~dst g =
     if has_path dst src g then

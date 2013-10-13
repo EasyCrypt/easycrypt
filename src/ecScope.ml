@@ -902,7 +902,7 @@ module Op = struct
   let add (scope : scope) (op : poperator located) =
     assert (scope.sc_pr_uc = None);
     let op = op.pl_desc and loc = op.pl_loc in
-    let ue = TT.ue_for_decl scope.sc_env (loc, op.po_tyvars) in
+    let ue = TT.transtyvars scope.sc_env (loc, op.po_tyvars) in
     let tp = TT.tp_relax in
 
     let (ty, body) =
@@ -952,7 +952,7 @@ module Pred = struct
   let add (scope : scope) (op : ppredicate located) =
     assert (scope.sc_pr_uc = None);
     let op = op.pl_desc and loc = op.pl_loc in
-    let ue     = TT.ue_for_decl scope.sc_env (loc, op.pp_tyvars) in
+    let ue     = TT.transtyvars scope.sc_env (loc, op.pp_tyvars) in
     let tp     = TT.tp_relax in
     let dom, body = 
       match op.pp_def with
@@ -1131,7 +1131,7 @@ module Ax = struct
     assert (scope.sc_pr_uc = None);
 
     let loc = ax.pl_loc and ax = ax.pl_desc in
-    let ue  = TT.ue_for_decl scope.sc_env (loc, ax.pa_tyvars) in
+    let ue  = TT.transtyvars scope.sc_env (loc, ax.pa_tyvars) in
 
     if ax.pa_local && not (CoreSection.in_section scope.sc_section) then
       hierror "cannot declare a local lemma outside of a section";
@@ -1299,6 +1299,8 @@ module Ty = struct
   open EcTyping
   open EcAlgebra
 
+  module TT = EcTyping
+
   (* ------------------------------------------------------------------ *)
   let bind (scope : scope) ((x, tydecl) : (_ * tydecl)) =
     assert (scope.sc_pr_uc = None);
@@ -1310,7 +1312,7 @@ module Ty = struct
   let add (scope : scope) info =
     assert (scope.sc_pr_uc = None);
     let (args, name) = info.pl_desc and loc = info.pl_loc in
-    let ue = ue_for_decl scope.sc_env (loc, Some args) in
+    let ue = TT.transtyvars scope.sc_env (loc, Some args) in
     let tydecl = {
       tyd_params = EcUnify.UniEnv.tparams ue;
       tyd_type   = None;
@@ -1321,7 +1323,7 @@ module Ty = struct
   let define (scope : scope) info body =
     assert (scope.sc_pr_uc = None);
     let (args, name) = info.pl_desc and loc = info.pl_loc in
-    let ue     = ue_for_decl scope.sc_env (loc, Some args) in
+    let ue     = TT.transtyvars scope.sc_env (loc, Some args) in
     let body   = transty tp_tydecl scope.sc_env ue body in
     let tydecl = {
       tyd_params = EcUnify.UniEnv.tparams ue;
@@ -1330,10 +1332,17 @@ module Ty = struct
       bind scope (unloc name, tydecl)
 
   (* ------------------------------------------------------------------ *)
+  let bindclass (scope : scope) (x, (tc : unit)) =
+    assert (scope.sc_pr_uc = None);
+    let scope = { scope with sc_env = EcEnv.TypeClass.bind x tc scope.sc_env; } in
+    let scope = maybe_add_to_section scope (EcTheory.CTh_typeclass x) in
+      scope
+
+  (* ------------------------------------------------------------------ *)
   let addclass (scope : scope) tcd =
     assert (scope.sc_pr_uc = None);
     let _tclass = EcTyping.trans_tclass scope.sc_env tcd in
-      scope
+      bindclass scope (unloc (unloc tcd).ptc_name, ())
 
   (* ------------------------------------------------------------------ *)
   let check_tci_operators env ops reqs =
@@ -1432,7 +1441,7 @@ module Ty = struct
       hierror "load AlgTactic first";
 
     let (ty, p) =
-      let ue = ue_for_decl scope.sc_env (loc, Some []) in
+      let ue = TT.transtyvars scope.sc_env (loc, Some []) in
       let ty = mk_loc tci.pti_type.pl_loc (PTnamed tci.pti_type) in
       let ty = transty tp_tydecl scope.sc_env ue ty in
         match (EcEnv.Ty.hnorm ty scope.sc_env).ty_node with
@@ -1457,7 +1466,7 @@ module Ty = struct
       hierror "load AlgTactic first";
 
     let (ty, p) =
-      let ue = ue_for_decl scope.sc_env (loc, Some []) in
+      let ue = TT.transtyvars scope.sc_env (loc, Some []) in
       let ty = mk_loc tci.pti_type.pl_loc (PTnamed tci.pti_type) in
       let ty = transty tp_tydecl scope.sc_env ue ty in
         match (EcEnv.Ty.hnorm ty scope.sc_env).ty_node with
@@ -1715,9 +1724,7 @@ module Section = struct
               let _, scope = Theory.exit scope in
                 scope
 
-          | T.CTh_typeclass _x ->
-              (* FIXME: TC HOOK *)
-              scope
+          | T.CTh_typeclass x -> Ty.bindclass scope (x, ())
 
           | T.CTh_instance (p, cr) -> begin
               match cr with

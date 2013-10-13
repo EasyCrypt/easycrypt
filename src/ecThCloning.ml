@@ -367,8 +367,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
               let nargs = List.map2
                             (fun (_, tc) x -> (EcIdent.create (unloc x), tc))
                             otyd.tyd_params nargs in
-              (* FIXME: TC HOOK *)
-              let ue    = EcUnify.UniEnv.create (Some (List.map fst nargs)) in
+              let ue    = EcUnify.UniEnv.create (Some nargs) in
               let ntyd  = EcTyping.transty EcTyping.tp_tydecl scenv ue ntyd in
 
               match mode with
@@ -402,7 +401,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
 
               let (newop, subst, dobind) =
                 let tp = opov.opov_tyvars |> omap (List.map (fun tv -> (tv, []))) in
-                let ue = EcTyping.ue_for_decl scenv (loc, tp) in
+                let ue = EcTyping.transtyvars scenv (loc, tp) in
                 let tp = EcTyping.tp_relax in
                 let (ty, body) =
                   let env     = scenv in
@@ -447,7 +446,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
 
               let newpr =
                  let tp = prov.prov_tyvars |> omap (List.map (fun tv -> (tv, []))) in
-                 let ue = EcTyping.ue_for_decl scenv (loc, tp) in
+                 let ue = EcTyping.transtyvars scenv (loc, tp) in
                  let body =
                    let env     = scenv in
                    let env, xs = EcTyping.transbinding env ue prov.prov_args in

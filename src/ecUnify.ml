@@ -227,7 +227,7 @@ module UniEnv = struct
             }; id
     end
 
-  let create (vd : EcIdent.t list option) =
+  let create (vd : (EcIdent.t * Sp.t) list option) =
     let ue = {
       ue_uf     = UF.initial;
       ue_named  = Mstr.empty;
@@ -240,10 +240,11 @@ module UniEnv = struct
       match vd with
       | None    -> ue
       | Some vd ->
-          let vdmap = List.map (fun x -> (EcIdent.name x, x)) vd in
+          let vdmap = List.map (fun (x, _) -> (EcIdent.name x, x)) vd in
             { ue with
                 ue_named  = Mstr.of_list vdmap;
-                ue_decl   = List.rev vd;
+                ue_tvtc   = Mid.of_list vd;
+                ue_decl   = List.rev_map fst vd;
                 ue_closed = true; }
     in
       ref ue

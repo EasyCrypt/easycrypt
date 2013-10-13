@@ -22,7 +22,10 @@ module Mid = EcIdent.Mid
 
 (* -------------------------------------------------------------------- *)
 let unienv_of_hyps hyps =
-  EcUnify.UniEnv.create (Some (LDecl.tohyps hyps).h_tvar)
+  (* FIXME: TC HOOK *)
+  let tv = (LDecl.tohyps hyps).h_tvar in
+  let tv = List.map (fun x -> (x, Sp.empty)) tv in
+    EcUnify.UniEnv.create (Some tv)
 
 (* -------------------------------------------------------------------- *)
 let process_tyargs hyps tvi =
@@ -45,8 +48,8 @@ let process_formula hyps pf =
 
 (* -------------------------------------------------------------------- *)
 let process_exp hyps e oty =
-  let env = LDecl.toenv hyps in
-  let ue  = EcUnify.UniEnv.create (Some (LDecl.tohyps hyps).h_tvar) in
+  let env  = LDecl.toenv hyps in
+  let ue  = unienv_of_hyps hyps in
   let e   =  TT.transexpcast_opt env ue oty e in
     EcTypes.e_uni (EcUnify.UniEnv.close ue) e
 

@@ -56,7 +56,7 @@ let process_prhl_stmt side g c =
   let mt   = snd (if side then es.es_ml else es.es_mr) in
   let hyps = LDecl.push_active (mhr,mt) hyps in
   let env  = LDecl.toenv hyps in
-  let ue   = EcUnify.UniEnv.create (Some (LDecl.tohyps hyps).EcBaseLogic.h_tvar) in
+  let ue   = EcCoreHiLogic.unienv_of_hyps hyps in
   let c    = EcTyping.transstmt env ue c in
   let esub = Tuni.offun (EcUnify.UniEnv.close ue) in
   let esub = { e_subst_id with es_ty = esub; } in
