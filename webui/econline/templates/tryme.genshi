@@ -19,8 +19,8 @@
   <div class="container">
     <div class="row" style="text-align:justify; margin-bottom:20px;">
     <p>When the editor has the focus,
-      <strong>Ctrl-Down</strong> processes next sentence, and
-      <strong>Ctrl-Up</strong> restracts last sentence.</p>
+      <strong>Ctrl-Down</strong> processes one sentence, and
+      <strong>Ctrl-Up</strong> retracts one sentence.</p>
     </div>
 
     <div class="row"><div class="span12" id="ec-log">
