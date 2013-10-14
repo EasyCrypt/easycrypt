@@ -145,10 +145,11 @@ let unify_core (env : EcEnv.env) (tvtc : Sp.t Mid.t) (uf : UF.t) t1 t2 =
             | _, Tconstr (p, lt) when EcEnv.Ty.defined p env ->
                 Queue.push (`TyUni (t1, EcEnv.Ty.unfold p lt env)) pb
       
-            | Tglob mp1, Tglob mp2 ->
-                let mp1 = EcEnv.NormMp.norm_tglob env mp1 in
-                let mp2 = EcEnv.NormMp.norm_tglob env mp2 in
-                  if not (ty_equal mp1 mp2) then failure ()
+            | Tglob mp, _ when EcEnv.NormMp.tglob_reducible env mp ->
+                Queue.push (`TyUni (EcEnv.NormMp.norm_tglob env mp, t2)) pb
+
+            | _, Tglob mp when EcEnv.NormMp.tglob_reducible env mp ->
+                Queue.push (`TyUni (t1, EcEnv.NormMp.norm_tglob env mp)) pb
 
             | _, _ -> failure ()
         end
