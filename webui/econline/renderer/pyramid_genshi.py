@@ -82,8 +82,8 @@ class GenshiTemplateRenderer(object):
         template = self.loader.load(rn)
 
         # Mix the *system* and *value* dictionaries
-        system['url']    = system['request'].route_url
-        system['chrome'] = system['request'].static_url
+        system['url']    = system['request'].route_path
+        system['chrome'] = system['request'].static_path
         try:
             system.update(value)
         except (TypeError, ValueError):

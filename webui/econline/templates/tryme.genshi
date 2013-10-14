@@ -10,7 +10,7 @@
 
   <script type="text/javascript">
     $(document).ready(function () {
-      window.ec = new EasyCryptEditor("ec");
+      window.ec = new EasyCryptEditor("ec", "ws://${engine}/engine");
     });
   </script>
 </head>

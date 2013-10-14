@@ -6,7 +6,7 @@ Array.prototype.peek = function() {
 }
 
 // --------------------------------------------------------------------
-function EasyCryptEditor(name) {
+function EasyCryptEditor(name, url) {
     this.widgets = {
         code    : $('#' + name + "-code"),
         feedback: $('#' + name + "-feedback"),
@@ -15,6 +15,7 @@ function EasyCryptEditor(name) {
     };
 
     this.name      = name;
+    this.url       = url;
     this.endofsent = [];
     this.init      = 0;
     this.romark    = null;
@@ -32,8 +33,7 @@ EasyCryptEditor.prototype.createWidget = function() {
     if (this.editor)
         return ;
     
-    var url = "ws://ci.easycrypt.info:8080/engine";
-    this.socket = new WebSocket(url, "easycrypt");
+    this.socket = new WebSocket(this.url, "easycrypt");
     this.socket.onopen    = this.onopen.bind(this);
     this.socket.onclose   = this.onclose.bind(this);
     this.socket.onerror   = this.onerror.bind(this);

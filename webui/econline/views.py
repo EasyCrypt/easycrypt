@@ -1,5 +1,6 @@
 # --------------------------------------------------------------------
 from pyramid.view import view_config
+import pyramid.httpexceptions as exc
 
 # --------------------------------------------------------------------
 ECCODE = '''\
@@ -21,8 +22,14 @@ class View(object):
 
     @view_config(route_name='home', renderer='econline:templates/index.genshi')
     def home(self):
-        return dict()
+        return {}
 
     @view_config(route_name='tryme', renderer='econline:templates/tryme.genshi')
     def tryme(self):
-        return dict(eccode = ECCODE)
+        settings = self.request.registry.settings
+        engine   = settings.get('econline.engine')
+
+        if engine is None:
+            raise exc.HTTPInternalServerError()
+
+        return dict(eccode = ECCODE, engine = engine)

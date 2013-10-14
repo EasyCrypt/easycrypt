@@ -17,6 +17,8 @@ logger = logging.getLogger(__file__)
 # --------------------------------------------------------------------
 from pyramid.view import view_config
 
+PORT = 8090
+
 # --------------------------------------------------------------------
 class EasyCryptClient(object):
     def __init__(self, websocket):
@@ -146,8 +148,17 @@ def _main():
     application = config.make_wsgi_app()
     application.app_protocol = lambda _ : 'easycrypt'
 
-    server = gwsgi.WSGIServer(('127.0.0.1', 8080), application,
-                              handler_class=WebSocketHandler)
+    if len(sys.argv)-1 == 0:
+        bind = ('127.0.0.1', PORT)
+    else:
+        bind = sys.argv[1]
+        if re.search(r'^.+:\d+$', bind):
+            bind = bind.rsplit(':', 1)
+            bind = (bind[0], int(bind[1]))
+        else:
+            bind = (bind, PORT)
+
+    server = gwsgi.WSGIServer(bind, application, handler_class=WebSocketHandler)
     server.serve_forever()
 
 # --------------------------------------------------------------------
