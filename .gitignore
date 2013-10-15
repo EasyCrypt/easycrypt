@@ -33,3 +33,7 @@ setup.log
 
 /webui/webui-env/
 /webui/econline.egg-info/
+/webui/build/
+/webui/dist/
+/webui/pyramid.log
+/webui/pyramid.pid
