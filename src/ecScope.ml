@@ -1736,3 +1736,18 @@ module Section = struct
 
         List.fold_left bind1 scope oitems
 end
+
+module Extraction = struct
+    
+  let check_top scope = 
+    if not (scope.sc_top = None) then 
+      hierror "Extraction can not be done inside a theory";
+    if CoreSection.in_section scope.sc_section then
+      hierror "Extraction can not be done inside a section"
+    
+  let process scope todo =
+    check_top scope;
+    EcExtraction.process_extraction (env scope) scope.sc_required todo;
+    scope 
+    
+end
