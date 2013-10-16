@@ -33,6 +33,7 @@ CHECK     = scripts/runtest.py --bin-args="$(ECARGS)" config/tests.config
 .PHONY: all build byte native tests check check-xunit examples
 .PHONY: clean install uninstall uninstall-purge dist distcheck
 .PHONY: callprover pg toolchain update-toolchain provers update
+.PHONY: webui webui-env
 .PHONY: %.ml %.mli %.inferred.mli
 
 all: build
@@ -158,6 +159,10 @@ pg:
 	  $(MAKE) -C proofgeneral run-local
 
 # --------------------------------------------------------------------
+webui: native
+	bash ./scripts/ec-run-webui
+
+# --------------------------------------------------------------------
 TOOLCHAIN_URL := http://ci.easycrypt.info/scripts/ec-build-toolchain
 
 toolchain:
@@ -176,6 +181,9 @@ provers:
 	  && opam install -y ec-provers \
 	  && rm -f _tools/why3.local.conf \
 	  && why3config --detect -C _tools/why3.local.conf
+
+webui-env:
+	bash ./scripts/ec-build-webui-env
 
 update:
 	git pull

@@ -13,6 +13,7 @@ def _routing(config):
 def main(global_config, **settings):
     from pyramid.config import Configurator
 
+    signal.signal(signal.SIGTERM, lambda : sys.exit())
     config = Configurator(settings=settings)
     start_backend(settings.get('econline.engine', None))
     config.include('.renderer.pyramid_genshi')
