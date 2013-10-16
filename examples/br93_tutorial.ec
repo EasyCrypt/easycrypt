@@ -323,7 +323,6 @@ fun (={RO.m,RO.s} /\ (forall x, in_dom x RO.m{2} = mem x RO.s{2}));[smt | smt | 
 fun;inline RO.o;if;[smt | wp;rnd | ];wp;skip;progress=> //=.
   by rewrite mem_add in_dom_set H.
   by rewrite mem_add -H; case (x1 = x{2})=> // -> /=; rewrite rw_eqT.
-  by apply H.
 inline CPA(BR,A).SO.kg RO.init CPA(BR2,A).SO.kg;wp;rnd;wp;skip;progress;smt.
 qed.
 (** end eq1 *)
@@ -531,7 +530,6 @@ proof.
  fun;if;[smt|inline RO.o;wp;rnd|];wp;skip;progress=> //=.
    by rewrite mem_add in_dom_set H.
    by rewrite mem_add -H; case (x1 = x{2})=> //= -> //=; rewrite rw_eqT.
-   by apply H.
  inline CPA2(BR3,A).SO.enc;wp;rnd;swap{1} -5.
  wp.
  call (_:  ={RO.s,RO.m} /\ 
@@ -539,9 +537,8 @@ proof.
  fun;if;[smt|inline RO.o;wp;rnd|];wp;skip;progress=> //=.
    by rewrite mem_add in_dom_set H.
    by rewrite mem_add -H; case (x1 = x{2})=> //= -> //=; rewrite rw_eqT.
-   by apply H.
  inline RO.init CPA2(BR3,A).SO.kg OW(BR_OW(A)).kg;swap {2} 3 -2;
- do 2!(wp;rnd);skip;progress=> //;first 3 smt.
+ do 2!(wp;rnd);skip;progress=> //; first 2 smt.
 
  rewrite (find_in_p_unique 
       (lambda (p0:randomness) (p1:plaintext), f x1 p0 = f x1 rL) m_R0 rL _) => //=.

@@ -2,11 +2,14 @@
 
 (*
  * All operators are only partially specified, as we may choose to match
- * them with different programming language construct.
+ * them with various programming language constructs.
  * 
  * The user wanting to instantiate it with particular implementation
  * choices should clone it and add axioms to further refine the
  * operators.
+ *
+ * The operator names for imperative operators correspond to the OCaml Array library.
+ *
  *)
 
 require import Logic.
@@ -23,300 +26,475 @@ type 'x array.
 op length: 'x array -> int.
 axiom length_pos: forall (xs:'x array), 0 <= length xs.
 
+op "`|_|" (xs:'x array) = length xs.
+
 (* And a bunch of elements *)
 op "_.[_]": 'x array -> int -> 'x.
 
 (* Equality is extensional *)
-pred (==) (xs0:'x array, xs1:'x array) =
+pred (==) (xs0 xs1:'x array) =
   length xs0 = length xs1 /\
-  forall (i:int), 0 <= i => i < length xs0 => xs0.[i] = xs1.[i].
+  forall (i:int), 0 <= i < length xs0 => xs0.[i] = xs1.[i].
 
-axiom extensionality: forall (xs0:'x array, xs1:'x array),
+axiom array_ext (xs0 xs1:'x array):
   xs0 == xs1 => xs0 = xs1.
 
-lemma rw_ext: forall (xs0:'x array, xs1:'x array),
-  xs0 == xs1 <=> xs0 = xs1
-by [].
+lemma rw_array_ext (xs0 xs1:'x array):
+  xs0 == xs1 <=> xs0 = xs1.
+proof strict.
+by split; first apply array_ext.
+qed.
 
 (*********************************)
-(*      Functional Operators     *)
+(*    "Functional" Operators     *)
 (*********************************)
 (* empty *)
 op empty: 'x array.
 
-axiom empty_length: length (empty<:'x>) = 0.
+axiom length_empty: length (empty<:'x>) = 0.
 
-lemma empty_unique: forall (xs:'x array),
+lemma empty_unique (xs:'x array):
   length(xs) = 0 => xs = empty.
-proof.
-intros xs H; apply extensionality; smt.
-save.
+proof strict.
+by intros=> xs_0; apply array_ext; split;
+     [rewrite length_empty | smt].
+qed.
 
 (* cons *)
 op "_::_" : 'x -> 'x array -> 'x array.
 
-axiom cons_length: forall (x:'x, xs:'x array),
+axiom length_cons (x:'x) (xs:'x array):
   length (x::xs) = 1 + length xs.
 
-axiom cons_get: forall (x:'x, xs:'x array, i:int),
-  0 <= i => i <= length xs =>
+axiom get_cons (x:'x) (xs:'x array) (i:int):
+  0 <= i <= length xs =>
   (x::xs).[i] = (0 = i) ? x : xs.[i - 1].
 
-lemma cons_nonempty: forall (x:'x, xs:'x array),
-  x::xs <> empty
-by [].
+lemma cons_nonempty (x:'x) (xs:'x array):
+  x::xs <> empty.
+proof strict.
+by rewrite -not_def=> cons_empty;
+   cut:= fcongr length (x::xs) empty _=> //;
+   rewrite length_empty length_cons; smt.
+qed.
 
-lemma cons_inj: forall (x y:'x, xs ys:'x array),
+lemma consI (x y:'x) (xs ys:'x array):
   x::xs = y::ys <=> x = y /\ xs = ys.
-intros=> x y xs ys.
-split;last by intros=>[? ?];subst=> //.
-rewrite - !rw_ext.
-delta (==)=> /=.
-intros=> [len val].
-split.
-cut h := val 0.
-generalize h.
-by rewrite ! cons_get;smt.
-split.
-cut -> : forall i j, i = j <=> 1 + i = 1 + j;first smt.
-by rewrite -(cons_length x) -(cons_length y) //.
-intros=> ? ? ?.
-cut h := val (i+1).
-generalize h.
-rewrite ! cons_get;first 4 smt.
-cut -> : ((0 = i + 1) = false);first smt.
-simplify.
-cut -> : i + 1 - 1 = i;first smt.
-intros=> h.
-by apply h;smt.
+proof strict.
+split; last by intros=> [-> ->].
+rewrite - !rw_array_ext /(==)=> [len val].
+do !split.
+  cut:= val 0 _; first smt.
+  by rewrite 2?get_cons /=; first 2 smt.
+  by generalize len; rewrite 2!length_cons; smt.
+  intros=> i i_bnd; cut := val (i + 1) _; first smt.
+  rewrite 2?get_cons; first 2 smt.
+  by cut ->: (0 = i + 1) = false by smt; cut ->: i + 1 - 1 = i by smt.
 qed.
 
 (* snoc *)
 op (:::): 'x array -> 'x -> 'x array.
 
-axiom snoc_length: forall (xs:'x array, x:'x),
+axiom length_snoc (x:'x) (xs:'x array):
   length (xs:::x) = length xs + 1.
 
-axiom snoc_get: forall (xs:'x array, x:'x, i:int),
-  0 <= i => i <= length xs =>
+axiom get_snoc (xs:'x array) (x:'x) (i:int):
+  0 <= i <= length xs =>
   (xs:::x).[i] = (i < length xs) ? xs.[i] : x.
 
-lemma snoc_nonempty: forall (xs:'x array, x:'x),
-  xs:::x <> empty
-by [].
+lemma snoc_nonempty (xs:'x array, x:'x):
+  xs:::x <> empty.
+proof strict.
+by rewrite -not_def=> snoc_empty;
+   cut:= fcongr length (xs:::x) empty _=> //;
+   rewrite length_empty length_snoc; smt.
+qed.
+
+(* Induction Principle *)
+axiom array_ind (p:'x array -> bool):
+  p empty =>
+  (forall x xs, p xs => p (x::xs)) =>
+  (forall xs, p xs).
+
+(***************************)
+(*      OCaml Arrays       *)
+(***************************)
+(* set *)
+op "_.[_<-_]": 'x array -> int -> 'x -> 'x array.
+
+axiom length_set (i:int) (x:'x) (xs:'x array):
+  length (xs.[i <- x]) = length xs.
+
+axiom get_set (xs:'x array) (i j:int) (x:'x):
+  0 <= j < length xs =>
+  xs.[i <- x].[j] = (i = j) ? x : xs.[j].
+
+lemma set_set i j (x y:'x) xs:
+  xs.[i <- x].[j <- y] =
+    (i = j) ? xs.[j <- y] :
+              xs.[j <- y].[i <- x].
+proof strict.
+by apply array_ext; split; smt.
+qed.
+
+lemma nosmt set_setE x i (y:'a) xs:
+  xs.[i <- x].[i <- y] = xs.[i <- y].
+proof strict.
+by rewrite set_set.
+qed.
+
+lemma nosmt set_setN x i j (y:'a) xs:
+  i <> j =>
+  xs.[i <- x].[j <- y] = xs.[j <- y].[i <- x].
+proof strict.
+by rewrite set_set -rw_neqF=> ->.
+qed.
+
+(* make *)
+op make: int -> 'x -> 'x array.
+
+axiom length_make (x:'x) l:
+  0 <= l =>
+  length (make l x) = l.
+
+axiom get_make l (x:'x) i:
+  0 <= i < l =>
+  (make l x).[i] = x.
+
+(* init *)
+op init: int -> (int -> 'x) -> 'x array.
+
+axiom length_init (f:int -> 'x) l:
+  0 <= l =>
+  length (init l f) = l.
+
+axiom get_init l (f:int -> 'x) i:
+  0 <= i < l =>
+  (init l f).[i] = f i.
 
 (* append *)
 op (||): 'x array -> 'x array -> 'x array.
 
-axiom append_length: forall (xs0 xs1:'x array),
-  length (xs0 || xs1) = length xs0  + length xs1.
+axiom length_append (xs0 xs1:'x array):
+  length (xs0 || xs1) = length xs0 + length xs1.
 
-axiom append_get: forall (xs0 xs1:'x array) (i:int),
-  (0 <= i => i < length xs0 => (xs0 || xs1).[i] = xs0.[i]) /\
-  (length xs0 <= i => i < length (xs0 || xs1) => (xs0 || xs1).[i] = xs1.[i - length xs0]).
+axiom get_append (xs0 xs1:'x array) (i:int):
+  0 <= i < length (xs0 || xs1) =>
+  (xs0 || xs1).[i] = (0 <= i < length xs0) ? xs0.[i] : xs1.[i - length xs0].
 
 (* sub *)
 op sub: 'x array -> int -> int -> 'x array.
 
-axiom sub_length: forall (xs:'x array) (s l:int),
+axiom length_sub (xs:'x array) (s l:int):
   0 <= s => 0 <= l => s + l <= length xs =>
   length (sub xs s l) = l.
 
-axiom sub_get: forall (xs:'x array) (s l i:int),
+axiom get_sub (xs:'x array) (s l i:int):
   0 <= s => 0 <= l => s + l <= length xs =>
-  0 <= i => i < l =>
+  0 <= i < l =>
   (sub xs s l).[i] = xs.[i + s].
 
-(* fold_left *)
-op fold_right: ('state -> 'x -> 'state) -> 'state -> 'x array -> 'state.
+(* fill *)
+op fill: 'x array -> int -> int -> 'x -> 'x array.
 
-axiom fold_right_base: forall (f:'state -> 'x -> 'state) s,
-  (fold_right f s empty) = s.
+axiom length_fill (s l:int) x (xs:'x array):
+  0 <= s => 0 <= l => s + l <= length xs =>
+  length (fill xs s l x) = length xs.
 
-axiom fold_right_ind: forall (f:'state -> 'x -> 'state) s xs,
-  0 < length xs =>
-  (fold_right f s xs) = fold_right f (f s xs.[0]) (sub xs 1 (length xs - 1)).
+axiom get_fill (xs:'x array) (s l:int) x i:
+  0 <= s => 0 <= l => s + l <= length xs =>
+  0 <= i < length xs =>
+  (fill xs s l x).[i] = (s <= i < s + l) ? x : xs.[i].
 
-(* fold_left *)
-op fold_left: ('x -> 'state -> 'state) -> 'x array -> 'state -> 'state.
+(* blit (previously write) *)
+op blit: 'x array -> int -> 'x array -> int -> int -> 'x array.
 
-axiom fold_left_base: forall (f:'x -> 'state -> 'state) s,
-  (fold_left f empty s) = s.
+axiom length_blit (dst src:'x array) (dOff sOff l:int):
+  0 <= dOff => 0 <= sOff => 0 <= l =>
+  dOff + l <= length dst =>
+  sOff + l <= length src =>
+  length (blit dst dOff src sOff l) = length dst.
 
-axiom fold_left_ind: forall (f:'x -> 'state -> 'state) s xs,
-  0 < length xs =>
-  (fold_left f xs s) = f xs.[0] (fold_left f (sub xs 1 (length xs - 1)) s).
+axiom get_blit (dst src:'x array) (dOff sOff l i:int):
+  0 <= dOff => 0 <= sOff => 0 <= l =>
+  dOff + l <= length dst =>
+  sOff + l <= length src =>
+  0 <= i < length dst =>
+  (blit dst dOff src sOff l).[i] =
+    (dOff <= i < dOff + l) ? src.[i - dOff + sOff]
+                           : dst.[i].
 
 (* map *)
 op map: ('x -> 'y) -> 'x array -> 'y array.
 
-axiom map_length: forall (xs:'x array, f:'x -> 'y),
+axiom length_map (xs:'x array) (f:'x -> 'y):
   length (map f xs) = length xs.
 
-axiom map_get: forall (xs:'x array, f:'x -> 'y, i:int),
-  0 <= i => i < length(xs) =>
+axiom get_map (xs:'x array) (f:'x -> 'y, i:int):
+  0 <= i < length(xs) =>
   (map f xs).[i] = f (xs.[i]).
 
 (* map2 *) (* Useful for bitwise operations *)
 op map2: ('x -> 'y -> 'z) -> 'x array -> 'y array -> 'z array.
 
-axiom map2_length: forall (xs:'x array, ys:'y array, f:'x -> 'y -> 'z),
+axiom length_map2 (xs:'x array) (ys:'y array) (f:'x -> 'y -> 'z):
   length xs = length ys =>
   length (map2 f xs ys) = length xs.
 
-axiom map2_get: forall (xs:'x array, ys:'y array, f:'x -> 'y -> 'z, i:int),
+axiom get_map2 (xs:'x array) (ys:'y array) (f:'x -> 'y -> 'z, i:int):
   length xs = length ys =>
-  0 <= i => i < length xs =>
+  0 <= i < length xs =>
   (map2 f xs ys).[i] = f (xs.[i]) (ys.[i]).
 
+(* mapi *)
+op mapi: (int -> 'x -> 'y) -> 'x array -> 'y array.
+
+axiom length_mapi (f:int -> 'x -> 'y) (xs:'x array):
+  length (mapi f xs) = length xs.
+
+axiom get_mapi (f:int -> 'x -> 'y) (xs:'x array) (i:int):
+  0 <= i < length xs =>
+  (mapi f xs).[i] = f i (xs.[i]).
+
+(* fold_left *)
+op fold_left: ('state -> 'x -> 'state) -> 'state -> 'x array -> 'state.
+
+axiom fold_left_empty (f:'state -> 'x -> 'state) s:
+  (fold_left f s empty) = s.
+
+axiom fold_left_cons (f:'state -> 'x -> 'state) s xs:
+  0 < length xs =>
+  (fold_left f s xs) = f (fold_left f s (sub xs 1 (length xs - 1))) xs.[0].
+
+(* fold_right *)
+op fold_right: ('state -> 'x -> 'state) -> 'state -> 'x array -> 'state.
+
+axiom fold_right_empty xs (f:'state -> 'x -> 'state) s:
+  length xs = 0 =>
+  (fold_right f s xs) = s.
+
+axiom fold_right_cons (f:'state -> 'x -> 'state) s xs:
+  0 < length xs =>
+  (fold_right f s xs) = fold_right f (f s xs.[0]) (sub xs 1 (length xs - 1)).
+
 (* lemmas *)
-lemma empty_append_fst: forall (xs:'x array),
+lemma empty_append_l (xs:'x array):
   (xs || empty) = xs.
-proof.
-intros xs;  apply extensionality; smt.
-save.
+proof strict.
+apply array_ext; split.
+  by rewrite length_append length_empty.
+  by intros=> i; rewrite length_append length_empty /= => i_bnd;
+     rewrite get_append ?length_append ?length_empty /= // i_bnd.
+qed.
 
-lemma empty_append_snd: forall (xs:'x array),
+lemma empty_append_r (xs:'x array):
   (empty || xs) = xs.
-proof.
-intros xs;  apply extensionality; smt.
-save.
+proof strict.
+apply array_ext; split.
+  by rewrite length_append length_empty.
+  by intros=> i; rewrite length_append length_empty /= => i_bnd;
+     rewrite get_append ?length_append ?length_empty /= //;
+     cut ->: (0 <= i < 0) = false by smt.
+qed.
 
-lemma sub_append_full : forall (xs:'x array),
+lemma sub_cons x (xs:'x array):
+  sub (x::xs) 1 (length (x::xs) - 1) = xs.
+proof strict.
+apply array_ext; smt.
+qed.
+
+lemma sub_full (xs:'x array):
   sub xs 0 (length xs) = xs.
-proof.  
-intros xs; apply extensionality; smt.
-save.
+proof strict.
+apply array_ext; split.
+  by rewrite length_sub; first 2 smt.
+  by intros=> i; rewrite length_sub //=; first 2 smt.
+qed.
 
-lemma sub_append_fst: forall (xs0 xs1:'x array),
+lemma sub_append_l (xs0 xs1:'x array):
   sub (xs0 || xs1) 0 (length xs0) = xs0.
-proof.
-intros xs0 xs1; apply extensionality; smt.
-save.
+proof strict.
+by apply array_ext; split; smt.
+qed.
 
-lemma sub_append_sub: forall (xs:'x array, i l1 l2:int),
-  0 <= i => 0 <= l1 => 0 <= l2 => i+l1+l2 <= length xs =>
-  (sub xs i l1 || sub xs (i+l1) l2) = sub xs i (l1+l2).
-proof.
-intros xs i l1 l2 i_pos l1_pos l2_pos i_l1_l2_bounded.
-apply extensionality; smt.
-save.
-
-lemma sub_append_snd: forall (xs0 xs1:'x array),
+lemma sub_append_r (xs0 xs1:'x array):
   sub (xs0 || xs1) (length xs0) (length xs1) = xs1.
-proof.
-intros xs0 xs1; apply extensionality; smt.
-save.
+proof strict.
+by apply array_ext; split; smt.
+qed.
 
-(* Induction Principle *)
-axiom induction: forall (p:'x array -> bool),
-  p empty =>
-  (forall x xs, p xs => p (x::xs)) =>
-  (forall xs, p xs).
+lemma sub_append_sub (xs:'x array) (i l1 l2:int):
+  0 <= i => 0 <= l1 => 0 <= l2 => i + l1 + l2 <= length xs =>
+  (sub xs i l1 || sub xs (i + l1) l2) = sub xs i (l1 + l2).
+proof strict.
+by intros=> i_pos l1_pos l2_pos i_l1_l2_bnd;
+   apply array_ext; split; smt.
+qed.
 
-lemma fold_left_deterministic: forall (f1 f2:'x -> 'state -> 'state) s1 s2 xs1 xs2,
+lemma map_map (f:'x -> 'y) (g:'y -> 'z) xs:
+ map g (map f xs) = map (lambda x, g (f x)) xs.
+proof strict.
+apply array_ext; split.
+  by rewrite !length_map.
+  by intros=> i; rewrite !length_map=> i_bnd;
+     rewrite !get_map ?length_map.
+qed.
+
+lemma map_cons (f:'x -> 'y) x xs:
+  map f (x::xs) = (f x)::(map f xs).
+proof strict.
+apply array_ext; split; smt.
+qed.
+
+lemma mapi_mapi (f:int -> 'x -> 'y) (g:int -> 'y -> 'z) xs:
+ mapi g (mapi f xs) = mapi (lambda k x, g k (f k x)) xs.
+proof strict.
+apply array_ext; split.
+  by rewrite !length_mapi.
+  by intros=> i; rewrite !length_mapi=> i_bnd; rewrite ?get_mapi ?length_mapi.
+qed.
+
+lemma mapi_id (f:int -> 'x -> 'x) (xs:'x array):
+ (forall k x, 0 <= k < length xs => f k x = x) =>
+ mapi f xs = xs.
+proof strict.
+intros=> f_id; apply array_ext; split.
+  by rewrite length_mapi.
+  by intros=> i; rewrite !length_mapi=> i_bnd; rewrite ?get_mapi ?length_mapi ?f_id.
+qed.
+
+(* Useless? *)
+lemma fold_left_deterministic: forall (f1 f2:'state -> 'x -> 'state) s1 s2 xs1 xs2,
   f1 = f2 => s1 = s2 => xs1 = xs2 =>
-  fold_left f1 xs1 s1 = fold_left f2 xs2 s2
+  fold_left f1 s1 xs1 = fold_left f2 s2 xs2
 by [].
 
-(* This proof needs cleaned up, and the lemma library completed. *)
-lemma fold_length: forall (xs:'x array),
-  fold_left (lambda x n, n + 1) xs 0 = length xs.
-proof.
-intros xs.
-apply (induction<:'x> (lambda xs', fold_left (lambda x n, n + 1) xs' 0 = length xs') _ _ xs).
-smt.
-simplify.
-intros x xs' IH.
-cut length_def:(length (x::xs') = length xs' + 1); [ smt | rewrite length_def;rewrite -IH ].
-cut sub_eq:(sub (x::xs') 1 (length (x::xs') - 1) = xs');[ apply extensionality; smt | ].
-cut fold_def:(fold_left (lambda x n, n + 1) xs' 0 = fold_left (lambda x n, n + 1) (sub (x::xs') 1 (length (x::xs') - 1)) 0);[ rewrite sub_eq | ].
-apply (fold_left_deterministic<:int,'x> (lambda x n, n + 1) (lambda x n, n + 1) 0 0 xs' xs' _ _).
-  apply (Fun.fun_ext<:int -> int,'x> (lambda x n, n + 1) (lambda x n, n + 1) _).
-  delta beta.
-  intros x'. apply Fun.fun_ext.
-  delta beta. smt.
-smt.
-rewrite fold_def;clear fold_def.
-apply (fold_left_ind<:int,'x> (lambda x n, n + 1) 0 (x::xs') _);smt.
-save.
-
-(*********************************)
-(*      Imperative Operators     *)
-(*********************************)
-op "_.[_<-_]": 'x array -> int -> 'x -> 'x array.
-
-axiom set_length: forall (xs:'x array, i:int, x:'x),
-  length (xs.[i <- x]) = length xs.
-
-axiom set_get: forall (xs:'x array) (i j:int) (x:'x),
-  0 <= j => j < length xs =>
-  xs.[i <- x].[j] = (i = j) ? x : xs.[j].
-
-lemma set_setE: forall a (b c:'a) x,
-  x.[a <- b].[a <- c] = x.[a <- c].
+lemma fold_right_map (f:'x -> 'y -> 'x) (x:'x) (g:'z -> 'y) (zs:'z array):
+ fold_right f x (map g zs) = fold_right (lambda x y, f x (g y)) x zs.
 proof strict.
-intros=> a b c x; apply extensionality; split; first by rewrite !set_length //.
-  intros=> i i_pos; rewrite 2!set_length=> i_bnd; rewrite set_get ?set_length //.
-  case (a = i)=> a_i.
-    by subst a; rewrite set_get //.
-    by do 2! rewrite set_get // (neqF (a = i)) // /=.
+generalize x; elim/array_ind zs.
+  by intros=> x; rewrite !fold_right_empty ?length_map ?length_empty.
+  intros=> {zs} z zs IH x; rewrite !(fold_right_cons _ x); first 2 smt.
+  by rewrite map_cons !sub_cons IH 2?get_cons; first 2 smt.
 qed.
 
-(* write: array -> offset -> array -> offset -> length -> array *)
-op write: 'x array -> int -> 'x array -> int -> int -> 'x array.
-
-axiom write_length: forall (dst src:'x array) (dOff sOff l:int),
-  0 <= dOff => 0 <= sOff => 0 <= l =>
-  dOff + l <= length dst =>
-  sOff + l <= length src =>
-  length (write dst dOff src sOff l) = length dst.
-
-axiom write_get: forall (dst src:'x array) (dOff sOff l i:int),
-  0 <= dOff => 0 <= sOff => 0 <= l =>
-  dOff + l <= length dst =>
-  sOff + l <= length src =>
-  (0 <= i => i < dOff => (write dst dOff src sOff l).[i] = dst.[i]) /\
-  (dOff <= i => i < dOff + l => (write dst dOff src sOff l).[i] = src.[i - dOff + sOff]) /\
-  (dOff + l <= i => i < length dst => (write dst dOff src sOff l).[i] = dst.[i]).
-
-(* init *)
-op init: int -> (int -> 'a) -> 'a array.
-
-axiom init_length: forall (n:int, f:int -> 'a), 0 <= n =>
-  length (init n f) = n.
-
-axiom init_get: forall (n:int, f:int -> 'a, i:int),
-  0 <= i => i < n =>
-  (init n f).[i] = f i
-
-(* create *).
-op create(n:int, k:'x) : 'x array = init n (lambda x, k).
-
-lemma create_length: forall (x:'x) l,
-  0 <= l =>
-  length (create l x) = l.
-intros=> ? ? ?.
-delta create=> /=.
-apply init_length=> //.
+(* This proof needs cleaned up, and the lemma library completed. *)
+lemma fold_length (xs:'x array):
+  fold_left (lambda n x, n + 1) 0 xs = length xs.
+proof strict.
+elim/array_ind xs.
+  by rewrite fold_left_empty length_empty.
+  by intros=> {xs} x xs IH; rewrite fold_left_cons;
+       [ | cut ->: sub (x::xs) 1 (length (x::xs) - 1) = xs by (apply array_ext; smt)];
+     smt.
 qed.
 
-lemma create_get: forall l (x:'x) i,
-  0 <= l => 0 <= i => i < l =>
-  (create l x).[i] = x.
-intros=> ? ? ? ? ? ?.
-delta create=> /=.
-rewrite (init_get _ (lambda (x0 : int), x))=> //.
-qed.
-
-(*********************************)
-(*       Some Mixed Lemmas       *)
-(*********************************)
-lemma write_append: forall (dst src:'x array),
+lemma blit_append (dst src:'x array):
   length src <= length dst =>
-  write dst 0 src 0 (length src) = (src || (sub dst (length src) (length dst - length src))).
-proof.
-intros dst src H; apply extensionality.
-delta beta;split;smt.
-save.
+  blit dst 0 src 0 (length src) = (src || (sub dst (length src) (length dst - length src))).
+proof strict.
+intros=> src_dst; apply array_ext; split; smt.
+qed.
 
+(** Logical Stuff *)
+(* all: this is computable because all arrays are finite *)
+op all: ('x -> bool) -> 'x array -> bool.
+
+axiom all_def p (xs:'x array):
+  all p xs <=>
+  (forall i, 0 <= i < length xs => p xs.[i]).
+
+(* alli *)
+op alli: (int -> 'x -> bool) -> 'x array -> bool.
+
+axiom alli_def p (xs:'x array):
+  alli p xs <=>
+  (forall i, 0 <= i < length xs => p i xs.[i]).
+
+(** Distribution on 'a array of length k from distribution on 'a *)
+(* We return the empty array when the length is negative *)
+theory Darray.
+  require import Distr.
+  require import Real.
+
+  op darray: int -> 'a distr -> 'a array distr.
+
+  (* Negative length case... This appears to be a necessary evil for now *)
+  (* At least it's only one axiom *)
+  axiom mu_neg (len:int) (d:'a distr) (p:'a array -> bool):
+    len < 0 =>
+    mu (darray len d) p = charfun p empty.
+
+  lemma mu_x (len:int) (d:'a distr) (x:'a array):
+    len < 0 =>
+    mu_x (darray len d) x = if x = empty then 1%r else 0%r
+  by [].
+
+  lemma supp_neg (len:int) (d:'a distr) (x:'a array):
+    len < 0 =>
+    in_supp x (darray len d) <=> x = empty
+  by [].
+
+  lemma weight_neg (len:int) (d:'a distr):
+    len < 0 =>
+    weight (darray len d) = 1%r
+  by [].
+
+  (* Non-negative length case *)
+  axiom mu_x_def (len: int) (d:'a distr) (x:'a array):
+    len = length x =>
+    mu_x (darray len d) x = fold_right (lambda p x, p * mu_x d x) 1%r x.
+
+  axiom supp_def (len:int) (x:'a array) (d:'a distr):
+    0 <= len =>
+    in_supp x (darray len d) <=>
+    (length x = len /\ all (support d) x).
+
+  lemma supp_full (len:int) (d:'a distr) (x:'a array):
+    0 <= len =>
+    (forall y, in_supp y d) =>
+    length x = len <=> in_supp x (darray len d).
+  proof strict.
+  intros leq0_len dF; split.
+    by intros=> Hlen; rewrite Darray.supp_def=> //; split=> //;
+       rewrite all_def=> i Hi; rewrite /support dF.
+    by rewrite Darray.supp_def.
+  qed.
+
+  lemma supp_len (len:int) (x: 'a array) (d:'a distr):
+    0 <= len =>
+    in_supp x (darray len d) => length x = len.
+  proof strict. by intros=> leq0_len; rewrite supp_def. qed.
+
+  lemma supp_k (len:int) (x: 'a array) (d:'a distr) (k:int):
+    0 <= k < len =>
+    in_supp x (darray len d) =>
+    in_supp x.[k] d.
+  proof strict.
+  intros=> k_bnd; rewrite supp_def -/(support d x.[k]); first smt.
+  by intros=> [len_def all_in_supp]; subst;
+     generalize all_in_supp; rewrite all_def=> H; apply H.
+  qed.
+
+  (* This would be a lemma by definition of ^
+     if we had it in the correct form (if we know that Real is a field) *)
+  axiom weight_d (d:'a distr) len:
+    0 <= len => weight (darray len d) = (weight d) ^ len.
+
+  lemma darrayL (d:'a distr) len:
+    0 <= len =>
+    weight d = 1%r =>
+    weight (darray len d) = 1%r.
+  proof strict.
+  intros leq0_len H; rewrite (weight_d d len) // H.
+  smt "Alt-Ergo".
+  qed.
+
+  (* if len is negative, then uniformity is easy to prove.
+     otherwise, the folded function can be replaced with the same constant for x and y
+     (but we need to know that it is only applied to elements of d's support,
+      which justifies leaving it as an axiom for now) *)
+  axiom uniform (d:'a distr) len:
+    isuniform d =>
+    isuniform (darray len d).
+end Darray.

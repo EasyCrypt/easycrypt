@@ -457,7 +457,7 @@ let f_match hyps (ue, ev) ~ptn subject =
       raise MatchFailure;
     let clue =
       try  EcUnify.UniEnv.close ue
-      with EcUnify.UninstanciateUni _ -> raise MatchFailure
+      with EcUnify.UninstanciateUni -> raise MatchFailure
     in
       (ue, clue, Ev ev)
 
@@ -629,6 +629,7 @@ module FPosition = struct
           | FbdHoareS _ -> raise InvalidPosition
           | FequivF   _ -> raise InvalidPosition
           | FequivS   _ -> raise InvalidPosition
+          | FeagerF   _ -> raise InvalidPosition
           | Fpr       _ -> raise InvalidPosition
       end
   

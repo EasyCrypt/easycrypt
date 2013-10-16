@@ -1,5 +1,4 @@
 (* -------------------------------------------------------------------- *)
-open EcDebug
 open EcUtils
 open EcMaps
 open EcIdent
@@ -9,8 +8,9 @@ open EcModules
 
 type memory = EcMemory.memory
 
-(* -------------------------------------------------------------------- *)
+module Mp = EcPath.Mp
 
+(* -------------------------------------------------------------------- *)
 type gty =
   | GTty    of EcTypes.ty
   | GTmodty of module_type * mod_restr 
@@ -57,7 +57,18 @@ and f_node =
   | FequivF of equivF (* $left,$right / $left,$right *)
   | FequivS of equivS 
 
+  | FeagerF of eagerF
+    
   | Fpr of pr (* hr *)
+
+and eagerF = { 
+  eg_pr : form;
+  eg_sl : stmt;  (* No local program variables *)
+  eg_fl : EcPath.xpath;
+  eg_fr : EcPath.xpath;
+  eg_sr : stmt;  (* No local program variables *)
+  eg_po : form
+}
 
 and equivF = { 
   ef_pr : form;
@@ -211,6 +222,14 @@ let eqs_equal es1 es2 =
   && EcMemory.me_equal es1.es_ml es2.es_ml
   && EcMemory.me_equal es1.es_mr es2.es_mr 
 
+let egf_equal eg1 eg2 = 
+     f_equal eg1.eg_pr eg2.eg_pr
+  && f_equal eg1.eg_po eg2.eg_po
+  && EcModules.s_equal eg1.eg_sl eg2.eg_sl
+  && EcPath.x_equal eg1.eg_fl eg2.eg_fl 
+  && EcPath.x_equal eg1.eg_fr eg2.eg_fr
+  && EcModules.s_equal eg1.eg_sr eg2.eg_sr
+
 (* -------------------------------------------------------------------- *)
 let hf_hash hf =
   Why3.Hashcons.combine2
@@ -239,6 +258,12 @@ let es_hash es =
   Why3.Hashcons.combine3
     (f_hash es.es_pr) (f_hash es.es_po)
     (EcModules.s_hash es.es_sl) (EcModules.s_hash es.es_sr)
+
+let eg_hash eg = 
+  Why3.Hashcons.combine3
+    (f_hash eg.eg_pr) (f_hash eg.eg_po)
+    (Why3.Hashcons.combine (EcModules.s_hash eg.eg_sl) (EcPath.x_hash eg.eg_fl))
+    (Why3.Hashcons.combine (EcModules.s_hash eg.eg_sr) (EcPath.x_hash eg.eg_fr))
 
 (* -------------------------------------------------------------------- *)
 module Hsform = Why3.Hashcons.Make (struct
@@ -284,6 +309,8 @@ module Hsform = Why3.Hashcons.Make (struct
         
     | FequivF eqf1, FequivF eqf2 -> eqf_equal eqf1 eqf2
     | FequivS eqs1, FequivS eqs2 -> eqs_equal eqs1 eqs2
+
+    | FeagerF eg1, FeagerF eg2   -> egf_equal eg1 eg2
 
     | Fpr (m1, mp1, args1, ev1), Fpr (m2, mp2, args2, ev2) ->
            EcIdent.id_equal m1  m2
@@ -335,6 +362,8 @@ module Hsform = Why3.Hashcons.Make (struct
 
     | FequivF ef -> ef_hash ef
     | FequivS es -> es_hash es
+
+    | FeagerF eg  -> eg_hash eg
 
     | Fpr (m, mp, args, ev) ->
         let id =
@@ -401,6 +430,13 @@ module Hsform = Why3.Hashcons.Make (struct
         let fv = fv_diff fv (Sid.add ml (Sid.singleton mr)) in
         fv_union fv 
           (fv_union (EcModules.s_fv es.es_sl) (EcModules.s_fv es.es_sr))
+
+    | FeagerF eg ->
+        let fv = fv_union (f_fv eg.eg_pr) (f_fv eg.eg_po) in
+        let fv = fv_diff fv fv_mlr in
+        let fv = EcPath.x_fv (EcPath.x_fv fv eg.eg_fl) eg.eg_fr in
+        fv_union fv 
+          (fv_union (EcModules.s_fv eg.eg_sl) (EcModules.s_fv eg.eg_sr))
 
     | Fpr (m,mp,args,event) ->
         let fve = Mid.remove mhr (f_fv event) in
@@ -482,6 +518,10 @@ let f_exists b f = f_quant Lexists b f
 let f_forall b f = f_quant Lforall b f
 let f_lambda b f = f_quant Llambda b f
 
+let f_forall_mems bds f = 
+  let bds = List.map (fun (m, mt) -> (m, GTmem mt)) bds in
+    f_forall bds f
+
 (* -------------------------------------------------------------------- *)
 let f_tt     = f_op EcCoreLib.p_tt [] ty_unit
 let f_true   = f_op EcCoreLib.p_true [] ty_bool
@@ -529,10 +569,20 @@ let f_ands fs =
   | [] -> f_true
   | f::fs -> List.fold_left ((^~) f_and) f fs
 
+let f_andas fs =
+  match fs with
+  | [] -> f_true
+  | f::fs -> List.fold_left f_anda f fs
+
 let f_ors fs =
   match List.rev fs with
-  | [] -> f_true
+  | [] -> f_false
   | f::fs -> List.fold_left ((^~) f_or) f fs
+
+let f_oras fs =
+  match fs with
+  | [] -> f_false
+  | f::fs -> List.fold_left f_ora f fs
 
 let f_imps = List.fold_right f_imp
 
@@ -565,6 +615,12 @@ let f_hoareF pre f post =
     mk_form (FhoareF hf) ty_bool
 
 (* -------------------------------------------------------------------- *)
+let hoarecmp_opp cmp = 
+  match cmp with
+  | FHle -> FHge
+  | FHeq -> FHeq
+  | FHge -> FHle
+
 let f_bdHoareS_r bhs = mk_form (FbdHoareS bhs) ty_bool
 
 let f_bdHoareS mem pre s post hcmp bd = 
@@ -589,15 +645,22 @@ let f_equivF pre fl fr post =
     mk_form (FequivF ef) ty_bool
 
 (* -------------------------------------------------------------------- *)
+let f_eagerF pre sl fl fr sr post = 
+  let eg = { eg_pr = pre; eg_sl = sl;eg_fl = fl; 
+             eg_fr = fr; eg_sr = sr; eg_po = post; } in
+  mk_form (FeagerF eg) ty_bool
+
+
+(* -------------------------------------------------------------------- *)
 let f_pr m f args e = mk_form (Fpr (m, f, args, e)) ty_real
 
 (* -------------------------------------------------------------------- *)
 let fop_int_le    = f_op EcCoreLib.p_int_le    [] (tfun tint  (tfun tint ty_bool))
 let fop_int_lt    = f_op EcCoreLib.p_int_lt    [] (tfun tint  (tfun tint ty_bool))
-let fop_int_prod = f_op EcCoreLib.p_int_prod [] (tfun tint  (tfun tint ty_int))
-let fop_int_add  = f_op EcCoreLib.p_int_add  [] (tfun tint  (tfun tint ty_int))
-let fop_int_sub  = f_op EcCoreLib.p_int_sub  [] (tfun tint  (tfun tint ty_int))
-let fop_int_pow  = f_op EcCoreLib.p_int_pow  [] (tfun tint  (tfun tint ty_int))
+let fop_int_prod  = f_op EcCoreLib.p_int_prod  [] (tfun tint  (tfun tint ty_int))
+let fop_int_add   = f_op EcCoreLib.p_int_add   [] (tfun tint  (tfun tint ty_int))
+let fop_int_sub   = f_op EcCoreLib.p_int_sub   [] (tfun tint  (tfun tint ty_int))
+let fop_int_pow   = f_op EcCoreLib.p_int_pow   [] (tfun tint  (tfun tint ty_int))
 let fop_real_le   = f_op EcCoreLib.p_real_le   [] (tfun treal (tfun treal ty_bool))
 let fop_real_lt   = f_op EcCoreLib.p_real_lt   [] (tfun treal (tfun treal ty_bool))
 let fop_real_add  = f_op EcCoreLib.p_real_add  [] (tfun treal (tfun treal treal))
@@ -744,8 +807,6 @@ let decompose_forall f =
   | Fquant(Lforall,bd,p) -> bd, p 
   | _ -> [], f
 
-  
-
 let destr_exists1 f = 
   match f.f_node with
   | Fquant(Lexists,(x,t)::bd,p) -> x,t,f_exists bd p 
@@ -770,6 +831,11 @@ let destr_equivF f =
   match f.f_node with
   | FequivF es -> es 
   | _ -> destr_error "equivF"
+
+let destr_eagerF f = 
+  match f.f_node with
+  | FeagerF eg -> eg 
+  | _ -> destr_error "eagerF"
 
 let destr_hoareS f = 
   match f.f_node with
@@ -840,6 +906,7 @@ let is_exists   f = is_from_destr destr_exists1   f
 let is_let      f = is_from_destr destr_let1      f
 let is_equivF   f = is_from_destr destr_equivF    f
 let is_equivS   f = is_from_destr destr_equivS    f
+let is_eagerF   f = is_from_destr destr_eagerF    f
 let is_hoareS   f = is_from_destr destr_hoareS    f
 let is_hoareF   f = is_from_destr destr_hoareF    f
 let is_bdHoareS f = is_from_destr destr_bdHoareS  f
@@ -860,53 +927,56 @@ module FSmart = struct
   type a_app   = form * form list * ty
 
   let f_local (fp, (x, ty)) (x', ty') =
-    if   false && x == x' && ty == ty'
+    if   x == x' && ty == ty'
     then fp
     else f_local x' ty'
 
   let f_pvar (fp, (pv, ty, m)) (pv', ty', m') =
-    if   false && pv == pv' && ty == ty' && m == m'
+    if   pv == pv' && ty == ty' && m == m'
     then fp
     else f_pvar pv' ty' m'
 
   let f_quant (fp, (q, b, f)) (q', b', f') =
-    if   false && q == q' && b == b' && f == f'
+    if   q == q' && b == b' && f == f'
     then fp
     else f_quant q' b' f'
 
   let f_glob (fp, (mp, m)) (mp', m') =
-    if   false && mp == mp' && m == m'
+    if   mp == mp' && m == m'
     then fp
     else f_glob mp' m'
 
   let f_if (fp, (c, f1, f2)) (c', f1', f2') =
-    if   false && c == c' && f1 == f1' && f2 == f2'
+    if   c == c' && f1 == f1' && f2 == f2'
     then fp
     else f_if c' f1' f2'
 
   let f_let (fp, (lp, f1, f2)) (lp', f1', f2') =
-    if   false && lp == lp' && f1 == f1' && f2 == f2'
+    if   lp == lp' && f1 == f1' && f2 == f2'
     then fp
     else f_let lp' f1' f2'
 
   let f_op (fp, (op, tys, ty)) (op', tys', ty') =
-    if   false && op == op' && tys == tys' && ty == ty'
+    if   op == op' && tys == tys' && ty == ty'
     then fp
     else f_op op' tys' ty'
 
   let f_app (fp, (f, fs, ty)) (f', fs', ty') =
-    if   false && f == f' && fs == fs' && ty == ty'
+    if   f == f' && fs == fs' && ty == ty'
     then fp
     else f_app f' fs' ty'
 
   let f_tuple (fp, fs) fs' =
-    if false && fs == fs' then fp else f_tuple fs'
+    if fs == fs' then fp else f_tuple fs'
 
   let f_equivF (fp, ef) ef' =
     if eqf_equal ef ef' then fp else mk_form (FequivF ef') fp.f_ty
 
   let f_equivS (fp, es) es' =
     if eqs_equal es es' then fp else f_equivS_r es'
+
+  let f_eagerF (fp, eg) eg' =
+    if egf_equal eg eg' then fp else mk_form (FeagerF eg') fp.f_ty
 
   let f_hoareF (fp, hf) hf' =
     if hf_equal hf hf' then fp else mk_form (FhoareF hf') fp.f_ty
@@ -941,7 +1011,7 @@ let f_map gt g fp =
           if gty == gty' then b1 else (x, gty')
       in
 
-      let b' = List.smart_map map_gty b in
+      let b' = List.Smart.map map_gty b in
       let f' = g f in
         FSmart.f_quant (fp, (q, b, f)) (q, b', f')
 
@@ -963,18 +1033,18 @@ let f_map gt g fp =
         FSmart.f_pvar (fp, (id, fp.f_ty, s)) (id, ty', s)
 
   | Fop (p, tys) -> 
-      let tys' = List.smart_map gt tys in
+      let tys' = List.Smart.map gt tys in
       let ty'  = gt fp.f_ty in
         FSmart.f_op (fp, (p, tys, fp.f_ty)) (p, tys', ty')
 
   | Fapp (f, fs) ->
       let f'  = g f in
-      let fs' = List.smart_map g fs in
+      let fs' = List.Smart.map g fs in
       let ty' = gt fp.f_ty in
         FSmart.f_app (fp, (f, fs, fp.f_ty)) (f', fs', ty')
 
   | Ftuple fs -> 
-      let fs' = List.smart_map g fs in
+      let fs' = List.Smart.map g fs in
         FSmart.f_tuple (fp, fs) fs'
 
   | FhoareF hf ->
@@ -1015,8 +1085,14 @@ let f_map gt g fp =
         FSmart.f_equivS (fp, es)
           { es with es_pr = pr'; es_po = po'; }
 
+  | FeagerF eg ->
+      let pr' = g eg.eg_pr in
+      let po' = g eg.eg_po in
+        FSmart.f_eagerF (fp, eg)
+          { eg with eg_pr = pr'; eg_po = po'; }
+
   | Fpr (m, mp, args, ev) -> 
-      let args' = List.smart_map g args in
+      let args' = List.Smart.map g args in
       let ev'   = g ev in
         FSmart.f_pr (fp, (m, mp, args, ev)) (m, mp, args', ev')
 
@@ -1035,7 +1111,23 @@ let f_iter g f =
   | FbdHoareS bhs -> g bhs.bhs_pr; g bhs.bhs_po
   | FequivF ef -> g ef.ef_pr; g ef.ef_po
   | FequivS es -> g es.es_pr; g es.es_po
+  | FeagerF eg -> g eg.eg_pr; g eg.eg_po
   | Fpr(_,_,args,ev) -> List.iter g args; g ev
+
+(* -------------------------------------------------------------------- *)
+let rec form_of_expr mem (e: expr) = 
+  match e.e_node with
+  | Eint n -> f_int n
+  | Elocal id -> f_local id e.e_ty
+  | Evar pv -> f_pvar pv e.e_ty mem
+  | Eop (op,tys) -> f_op op tys e.e_ty
+  | Eapp (ef,es) -> f_app (form_of_expr mem ef) (List.map (form_of_expr mem) es) e.e_ty
+  | Elet (lpt,e1,e2) -> f_let lpt (form_of_expr mem e1) (form_of_expr mem e2)
+  | Etuple es -> f_tuple (List.map (form_of_expr mem) es)
+  | Eif (e1,e2,e3) -> 
+      f_if (form_of_expr mem e1) (form_of_expr mem e2) (form_of_expr mem e3)
+  | Elam(b,e) ->
+    f_lambda (List.map (fun (x,ty) -> (x,GTty ty)) b) (form_of_expr mem e)
 
 (* -------------------------------------------------------------------- *)
 type f_subst = { 
@@ -1045,6 +1137,7 @@ type f_subst = {
   fs_mem     : EcIdent.t Mid.t;
   fs_sty     : ty_subst;
   fs_ty      : ty -> ty;
+  fs_opdef   : (EcIdent.t list * expr) Mp.t;
 }
 
 module Fsubst = struct
@@ -1056,6 +1149,7 @@ module Fsubst = struct
     fs_mem     = Mid.empty;
     fs_sty     = ty_subst_id;
     fs_ty      = ty_subst ty_subst_id;
+    fs_opdef   = Mp.empty;
   }
 
   let is_subst_id s = 
@@ -1064,12 +1158,13 @@ module Fsubst = struct
     && Mid.is_empty s.fs_loc
     && Mid.is_empty s.fs_mem
 
-  let f_subst_init freshen smp sty =
+  let f_subst_init freshen smp sty ops =
     { f_subst_id
         with fs_freshen = freshen;
-             fs_mp  = smp;
-             fs_sty = sty;
-             fs_ty  = ty_subst sty }
+             fs_mp    = smp;
+             fs_sty   = sty;
+             fs_ty    = ty_subst sty;
+             fs_opdef = ops; }
 
   (* ------------------------------------------------------------------ *)
   let f_bind_local s x t = 
@@ -1095,7 +1190,7 @@ module Fsubst = struct
       then (s, xt)
       else f_bind_local s x (f_local x' t'), (x',t')
 
-  let add_locals = List.smart_map_fold add_local
+  let add_locals = List.Smart.map_fold add_local
 
   let subst_lpattern (s: f_subst) (lp:lpattern) = 
     match lp with
@@ -1172,9 +1267,21 @@ module Fsubst = struct
             FSmart.f_local (fp, (id, fp.f_ty)) (id, ty')
     end
 
+    | Fop (p, tys) when Mp.mem p s.fs_opdef ->
+        let ty   = s.fs_ty fp.f_ty in
+        let tys  = List.Smart.map s.fs_ty tys in
+        let body = oget (Mp.find_opt p s.fs_opdef) in
+          f_subst_op ty tys [] body
+
+    | Fapp ({ f_node = Fop (p, tys) }, args) when Mp.mem p s.fs_opdef ->
+        let ty   = s.fs_ty fp.f_ty in
+        let tys  = List.Smart.map s.fs_ty tys in
+        let body = oget (Mp.find_opt p s.fs_opdef) in
+          f_subst_op ty tys (List.map (f_subst s) args) body
+
     | Fop (p, tys) ->
         let ty'  = s.fs_ty fp.f_ty in
-        let tys' = List.smart_map s.fs_ty tys in
+        let tys' = List.Smart.map s.fs_ty tys in
         let p'   = s.fs_sty.ts_p p in
           FSmart.f_op (fp, (p, tys, fp.f_ty)) (p', tys', ty')
 
@@ -1199,7 +1306,7 @@ module Fsubst = struct
 
     | FhoareS hs ->
         assert (not (Mid.mem (fst hs.hs_m) s.fs_mem));
-        let es  = e_subst_init s.fs_freshen s.fs_sty.ts_p s.fs_ty s.fs_mp in
+        let es  = e_subst_init s.fs_freshen s.fs_sty.ts_p s.fs_ty s.fs_opdef s.fs_mp in
         let pr' = f_subst s hs.hs_pr in
         let po' = f_subst s hs.hs_po in
         let st' = EcModules.s_subst es hs.hs_s in
@@ -1219,7 +1326,7 @@ module Fsubst = struct
 
     | FbdHoareS bhs ->
       assert (not (Mid.mem (fst bhs.bhs_m) s.fs_mem));
-      let es  = e_subst_init s.fs_freshen s.fs_sty.ts_p s.fs_ty s.fs_mp in
+      let es  = e_subst_init s.fs_freshen s.fs_sty.ts_p s.fs_ty s.fs_opdef s.fs_mp in
       let pr' = f_subst s bhs.bhs_pr in
       let po' = f_subst s bhs.bhs_po in
       let st' = EcModules.s_subst es bhs.bhs_s in
@@ -1243,7 +1350,7 @@ module Fsubst = struct
     | FequivS eqs -> 
       assert (not (Mid.mem (fst eqs.es_ml) s.fs_mem) && 
                 not (Mid.mem (fst eqs.es_mr) s.fs_mem));
-      let es = e_subst_init s.fs_freshen s.fs_sty.ts_p s.fs_ty s.fs_mp in
+      let es = e_subst_init s.fs_freshen s.fs_sty.ts_p s.fs_ty s.fs_opdef s.fs_mp in
       let s_subst = EcModules.s_subst es in
 
       let pr' = f_subst s eqs.es_pr in
@@ -1260,16 +1367,61 @@ module Fsubst = struct
           es_pr = pr'; es_po = po';
           es_sl = sl'; es_sr = sr'; }
 
+    | FeagerF eg ->
+      assert (not (Mid.mem mleft s.fs_mem) && not (Mid.mem mright s.fs_mem));
+      let m_subst = EcPath.x_substm s.fs_sty.ts_p s.fs_mp in 
+      let pr' = f_subst s eg.eg_pr in
+      let po' = f_subst s eg.eg_po in
+      let fl' = m_subst eg.eg_fl in
+      let fr' = m_subst eg.eg_fr in
+
+      let es = e_subst_init s.fs_freshen s.fs_sty.ts_p s.fs_ty s.fs_opdef s.fs_mp in
+      let s_subst = EcModules.s_subst es in
+      let sl' = s_subst eg.eg_sl in
+      let sr' = s_subst eg.eg_sr in
+
+      FSmart.f_eagerF (fp, eg)
+        { eg_pr = pr'; eg_sl = sl';eg_fl = fl'; 
+          eg_fr = fr'; eg_sr = sr'; eg_po = po'; }
+
     | Fpr (m, mp, args, e) ->
       assert (not (Mid.mem mhr s.fs_mem));
       let m'    = Mid.find_def m m s.fs_mem in
       let mp'   = EcPath.x_substm s.fs_sty.ts_p s.fs_mp mp in
-      let args' = List.smart_map (f_subst s) args in
+      let args' = List.Smart.map (f_subst s) args in
       let e'    = (f_subst s) e in
 
       FSmart.f_pr (fp, (m, mp, args, e)) (m', mp', args', e')
   
     | _ -> f_map s.fs_ty (f_subst s) fp
+
+  and f_subst_op fty tys args (tyids, e) =
+    (* FIXME: factor this out *)
+    (* FIXME: is es_freshen value correct? *)
+    (* FIXME: is [mhr] good as a default? *)
+  
+    let e =
+      let sty = Tvar.init tyids tys in
+      let sty = ty_subst { ty_subst_id with ts_v = Mid.find_opt^~ sty; } in
+      let sty = { e_subst_id with
+                    es_freshen = true;
+                    es_ty      = sty ; } in
+        e_subst sty e
+    in
+
+    let (sag, args, e) =
+      match e.e_node with
+      | Elam (largs, lbody) when args <> [] ->
+          let largs1, largs2 = List.take_n (List.length args  ) largs in
+          let  args1,  args2 = List.take_n (List.length largs1)  args in
+            (Mid.of_list (List.combine (List.map fst largs1) args1),
+             args2, e_lam largs2 lbody)
+  
+      | _ -> (Mid.of_list [], args, e)
+    in
+  
+    let sag = { f_subst_id with fs_loc = sag } in
+      f_app (f_subst sag (form_of_expr mhr e)) args fty
 
   (* ------------------------------------------------------------------ *)  
   let f_subst_local x t =
@@ -1308,12 +1460,11 @@ module Fsubst = struct
 
   (* ------------------------------------------------------------------ *)  
   let init_subst_tvar s = 
-    let sty = { ty_subst_id with ts_v = s } in
+    let sty = { ty_subst_id with ts_v = Mid.find_opt^~ s } in
     { f_subst_id with fs_freshen = true; fs_sty = sty; fs_ty = ty_subst sty }
 
   let subst_tvar s = 
-    let sf  = init_subst_tvar s in
-    f_subst sf
+    f_subst (init_subst_tvar s)
 end
 
 let can_subst f = 
@@ -1601,25 +1752,6 @@ let f_real_lt_simpl f1 f2 =
     f_bool (x1 < x2)
   | _, _ -> f_real_lt f1 f2  
 
-  
-
-
-(* -------------------------------------------------------------------- *)
-let rec form_of_expr mem (e: expr) = 
-  match e.e_node with
-  | Eint n -> f_int n
-  | Elocal id -> f_local id e.e_ty
-  | Evar pv -> f_pvar pv e.e_ty mem
-  | Eop (op,tys) -> f_op op tys e.e_ty
-  | Eapp (ef,es) -> 
-      f_app (form_of_expr mem ef) (List.map (form_of_expr mem) es) e.e_ty
-  | Elet (lpt,e1,e2) -> f_let lpt (form_of_expr mem e1) (form_of_expr mem e2)
-  | Etuple es -> f_tuple (List.map (form_of_expr mem) es)
-  | Eif (e1,e2,e3) -> 
-      f_if (form_of_expr mem e1) (form_of_expr mem e2) (form_of_expr mem e3)
-  | Elam(b,e) ->
-    f_lambda (List.map (fun (x,ty) -> (x,GTty ty)) b) (form_of_expr mem e)
-
 (* -------------------------------------------------------------------- *)
 type op_kind = 
   | OK_true
@@ -1636,7 +1768,9 @@ type op_kind =
   | OK_real_lt
   | OK_int_add
   | OK_int_sub
-  | OK_int_prod
+  | OK_int_mul
+  | OK_int_exp
+  | OK_int_opp
   | OK_real_add
   | OK_real_sub
   | OK_real_prod
@@ -1661,7 +1795,9 @@ let operators =
      EcCoreLib.p_real_lt, OK_real_lt;
      EcCoreLib.p_int_add, OK_int_add;
      EcCoreLib.p_int_sub, OK_int_sub;
-     EcCoreLib.p_int_prod, OK_int_prod;
+     EcCoreLib.p_int_prod, OK_int_mul;
+     EcCoreLib.p_int_opp, OK_int_opp;
+     EcCoreLib.p_int_pow, OK_int_exp;
      EcCoreLib.p_real_add, OK_real_add;
      EcCoreLib.p_real_sub, OK_real_sub;
      EcCoreLib.p_real_prod, OK_real_prod;
@@ -1680,7 +1816,7 @@ let is_logical_op op =
   match op_kind op with
   | OK_not | OK_and _ | OK_or _ | OK_imp | OK_iff | OK_eq 
   | OK_int_le| OK_int_lt | OK_real_le | OK_real_lt 
-  | OK_int_add | OK_int_sub | OK_int_prod 
+  | OK_int_add | OK_int_sub | OK_int_mul 
   | OK_real_add | OK_real_sub| OK_real_prod | OK_real_div -> true
   | _ -> false
 
@@ -1773,74 +1909,3 @@ let f_check_uni f =
     | Fop(_,tys) -> List.iter ty_check_uni tys
     | _ -> f_iter aux f in
   try aux f;true with EcTypes.FoundUnivar -> false
-
-(* -------------------------------------------------------------------- *)
-let rec lp_dump (lp : lpattern) =
-  match lp with
-  | LSymbol (x,_) ->
-      dleaf "LSymbol (%s)" (EcIdent.tostring x)
-
-  | LTuple xs ->
-      let xs = List.map (fun (x,_) -> EcIdent.tostring x) xs in
-        dleaf "LTuple (%s)" (String.concat ", " xs)
-
-let string_of_quantif = function
-  | Lforall -> "Lforall"
-  | Lexists -> "Lexists"
-  | Llambda -> "Llambda"
-
-let gty_dump (gty : gty) =
-  match gty with
-  | GTty    t -> dnode "GTty" [ty_dump t]
-  | GTmodty _ -> dleaf "GTmodty"
-  | GTmem   _ -> dleaf "GTmem"
-
-let bd_dump (x, gty) =
-  dnode
-    (Printf.sprintf "binding (%s)" (EcIdent.tostring x))
-    [gty_dump gty]
-
-let rec f_dump (f : form) : dnode =
-  let node =
-    match f.f_node with
-    | Fquant (q, b, f) ->
-        dnode
-          (Printf.sprintf "Fquant (%s)" (string_of_quantif q))
-          (List.flatten [List.map bd_dump b; [f_dump f]])
-  
-    | Flocal x ->
-        dleaf "Flocal (%s)" (EcIdent.tostring x)
-  
-    | Fint i ->
-        dleaf "Fint (%d)"  i
-  
-    | Fpvar (x, m) ->
-        dleaf "Fpvar (%s, %s)" (string_of_pvar x) (EcIdent.tostring m)
-  
-    | Fif (c, f1, f2) ->
-        dnode "Fif" (List.map f_dump [c; f1; f2])
-  
-    | Flet (p, f1, f2) ->
-        dnode "Flet" [lp_dump p; f_dump f1; f_dump f2]
-  
-    | Fapp (f, fs) ->
-        dnode "Fapp" [f_dump f; dnode "arguments" (List.map f_dump fs)]
-  
-    | Fop (p, tys) ->
-        dnode
-          (Printf.sprintf "Fop (%s)" (EcPath.tostring p))
-          [dnode "type-arguments" (List.map ty_dump tys)]
-  
-    | Ftuple fs ->
-        dnode "Ftuple" (List.map f_dump fs)
-  
-    | Fglob _ -> dleaf "Fglob"
-    | FhoareF _ -> dleaf "FhoareF"
-    | FhoareS _ -> dleaf "FhoareS"
-    | FbdHoareF _ -> dleaf "FbdHoareF"
-    | FbdHoareS _ -> dleaf "FbdHoareS"
-    | FequivF _ -> dleaf "FequivF"
-    | FequivS _ -> dleaf "FequivS"
-    | Fpr     _ -> dleaf "Fpr"
-  in
-     dnode "Form" [ty_dump f.f_ty; node]

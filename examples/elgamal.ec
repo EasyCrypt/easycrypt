@@ -1,5 +1,6 @@
 require import Int.
 require import Bool.
+
 type group. 
 type skey       = int.
 type pkey       = group.
@@ -15,7 +16,6 @@ op g : group.
    So we declare an operator (%%) which stand for the modulo ...
 *)
 
-op ( %% ) :int -> int -> int.
 op ( * ) : group -> group -> group.
 op ( ^ ) : group -> int -> group.
 op log   : group -> int.
@@ -35,7 +35,7 @@ axiom log_pow :
  forall (g':group), g ^ log(g') = g'.
 
 axiom pow_mod : 
- forall (z:int), g ^ (z%%q) = g ^ z.
+ forall (z:int), g ^ (z %% q) = g ^ z.
 
 axiom mod_add : 
  forall (x,y:int), (x%%q + y)%%q = (x + y)%%q.
@@ -43,11 +43,13 @@ axiom mod_add :
 axiom mod_small : 
  forall (x:int), 0 <= x => x < q => x%%q = x.
 
-axiom mod_sub : 
- forall (x, y:int), (x%%q - y)%%q = (x - y)%%q. 
+lemma nosmt mod_sub : 
+ forall (x, y:int), (x%%q - y)%%q = (x - y)%%q
+by [].
 
-axiom mod_bound : 
- forall (x:int), 0 <= x%%q && x%%q < q. 
+lemma nosmt mod_bound : 
+ forall (x:int), 0 <= x%%q && x%%q < q
+by [].
 
 axiom mul_div : forall (g1 g2:group), (g1 * g2) / g1 = g2.
 
@@ -96,7 +98,7 @@ module CPA (S:Scheme, A:Adv) = {
 
 module ElGamal : Scheme = {
   fun kg() : skey * pkey = {
-    var x : int; (* FIXME notation = $[0..q-1] *)
+    var x : int;
     x = $[0..q-1];
     return (x, g^x);
   }
@@ -230,63 +232,49 @@ equiv equiv1 (A<:Adv) :
    CPA(ElGamal,A).main ~ DDH0(Inv(A)).main : 
       true ==> res{1} = res{2}.
 proof.
- fun.
- inline ElGamal.kg ElGamal.enc Inv(A).inv.
- wp.
-(* call (_: ={c, glob A} ==> ={res, glob A}). *)
- call (equiv1_A2 A).
- swap{1} 7 -5. 
- wp;rnd.
- call (_ : true).
- wp; do rnd; skip. simplify; smt. 
-
-(* Just to test tactic *)
-(* intros &m1 &m2 Heq.
- subst;simplify.
- intros x Hx y Hy rL rR A0 A1 H;elim H;clear H; intros H1 H2.
- subst.
- elimT tuple2_ind rR.
- intros a b _;simplify.
- intros b1 _;split.
- smt.
- intros _ r1L r2L A0 A2 H;elim H;clear H;intros H1 H2.
- subst;simplify.
- split. *)
+  fun.
+  inline ElGamal.kg ElGamal.enc Inv(A).inv.
+  wp.
+  call (equiv1_A2 A).
+  swap{1} 7 -5. 
+  wp;rnd.
+  call (_ : true).
+  wp; do rnd; skip. 
+  by smt. 
 save.
 
 lemma Pr1 (A<:Adv) &m : 
    Pr[CPA(ElGamal,A).main() @ &m : res] = 
    Pr[DDH0(Inv(A)).main() @ &m : res].
 proof.
- equiv_deno (equiv1 (A)); by trivial.
+  by equiv_deno (equiv1 (A)); trivial.
 save.
 
 lemma Pr2 (A<:Adv) &m : 
    Pr[G1(A).main() @ &m : res] = 
    Pr[DDH1(Inv(A)).main() @ &m : res].
 proof.
- equiv_deno (_: true ==> ={res});trivial.
+  equiv_deno (_: true ==> ={res});trivial.
   fun. inline{2} Inv(A).inv.
   swap{1} 7 -4;wp.
   call (equiv1_A2 A).
   wp;rnd.
   call (_ : true).
-  wp;do rnd;skip;by trivial. 
+  by wp;do rnd.
 save.
 
 lemma Fact3 (A<:Adv) &m : 
   Pr[G1(A).main() @ &m : res] = Pr[G2(A).main() @ &m : res].
 proof.
- equiv_deno (_: true ==> ={res});try trivial.
- fun. 
- swap{2} 10 -4;wp.
- call (equiv1_A2 A).
- wp; rnd (lambda (z:int), (z + log(if b then m1 else m0){2}) %% q)
+  equiv_deno (_: true ==> ={res});try trivial.
+  fun. 
+  swap{2} 10 -4;wp.
+  call (equiv1_A2 A).
+  wp; rnd (lambda (z:int), (z + log(if b then m1 else m0){2}) %% q)
      (lambda (z:int), (z - log(if b then m1 else m0){2}) %% q).
- wp;rnd;simplify.
- call ( _ : ={pk} ==> ={res,glob A}).
-   fun true;try (simplify;split).
- wp;do rnd;skip; progress; smt.
+  wp;rnd => /=.
+  call ( _ : true).
+  by wp;do rnd;skip;progress => //; smt.
 save.
 
 require import Real.
@@ -295,22 +283,16 @@ lemma Pr4_aux (A<:Adv) :
    (islossless A.a1) => (islossless A.a2) =>
    bd_hoare [G2(A).main : true ==> res] = (1%r / 2%r).
 proof.
- intros Ha1 Ha2.
- fun.
- rnd ((=) b').
- conseq  (_ : ==> true) .
- intros &m;progress.
- apply (Dbool.mu_x_def (b'{m})).
- call ( _ : true ==> true);try assumption.
- cut H1 : mu [0..Int.(-) q 1] Fun.cpTrue = 1%r by smt.
- wp; rnd Fun.cpTrue.
- conseq (_ : _ ==> true);[assumption | ].
- call (_ : true ==> true);[assumption | ].
- wp; rnd Fun.cpTrue.
- conseq (_ : _ ==> true);[trivial | ].
- rnd Fun.cpTrue.
- conseq (_ : _ ==> true);[trivial | ].
- skip;trivial.
+  intros Ha1 Ha2;fun.
+  rnd ((=) b'); conseq  (_ : ==> true) .
+    intros &m;progress.
+    by apply (Dbool.mu_x_def (b'{m})).
+  call Ha2.
+  cut H1 : mu [0..Int.(-) q 1] Fun.cpTrue = 1%r by smt.
+  wp; rnd Fun.cpTrue; conseq (_ : _ ==> true) => //.
+  call Ha1.
+  wp; rnd Fun.cpTrue; conseq (_ : _ ==> true) => //.
+  by rnd Fun.cpTrue; conseq (_ : _ ==> true).
 save.
 
 lemma Pr4 (A<:Adv) &m : 
@@ -318,7 +300,7 @@ lemma Pr4 (A<:Adv) &m :
    Pr[G2(A).main() @ &m : res] = 1%r / 2%r.
 proof.
  intros Ha1 Ha2.
- bdhoare_deno (Pr4_aux A _ _);trivial.
+ by bdhoare_deno (Pr4_aux A _ _).
 save.
 
 lemma Conclusion1 (A<:Adv) &m : 
@@ -327,10 +309,7 @@ lemma Conclusion1 (A<:Adv) &m :
  `| Pr[DDH0(Inv(A)).main() @ &m :res] - Pr[DDH1(Inv(A)).main() @ &m :res] |.
 proof. 
   intros Ha1 Ha2.
-  rewrite (Pr1 A &m).
-  rewrite -(Pr4 A &m _ _);try assumption.
-  rewrite -(Fact3 A &m).
-  rewrite (Pr2 A &m);smt.
+  by rewrite (Pr1 A &m) -(Pr4 A &m _ _) // -(Fact3 A &m) (Pr2 A &m).
 save.
 
 lemma Conclusion (A<:Adv) &m :
@@ -339,7 +318,6 @@ lemma Conclusion (A<:Adv) &m :
    `| Pr[CPA(ElGamal, A).main() @ &m : res] - 1%r / 2%r | = 
    `| Pr[DDH0(I).main() @ &m :res] - Pr[DDH1(I).main() @ &m :res] |.
 proof.
-  intros Ha1 Ha2.
-  exists (Inv(A)).
-  apply (Conclusion1 A &m _ _);assumption.
+  intros Ha1 Ha2; exists (Inv(A)).
+  by apply (Conclusion1 A &m).
 save.

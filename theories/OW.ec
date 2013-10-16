@@ -1,68 +1,72 @@
 (* Trapdoor one-way permutations *)
 require import Distr.
 
+(** Abstract declarations to be refined when instantiating *)
+(* Support *)
 type t.
 
+(* Keys *)
 type pkey.
 type skey.
 op keypairs: (pkey * skey) distr.
-axiom keypairsL: mu keypairs cpTrue = 1%r.
+axiom keypairsL: weight keypairs = 1%r.
+
+(* The distribution from which the challenge is sampled *)
+(* Note: We use its support as the permutation's domain! *)
+op challenge: pkey -> t distr.
+axiom challengeL pk: weight (challenge pk) = 1%r.
+axiom challengeU pk: isuniform (challenge pk).
+
+(** Concrete definitions *)
+pred valid_keys (ks:pkey * skey) = in_supp ks keypairs.
+pred valid_pkey (pk:pkey) = exists sk, valid_keys (pk,sk).
+pred valid_skey (sk:skey) = exists pk, valid_keys (pk,sk).
 
 op f: pkey -> t -> t.
-op f_dom: pkey -> t -> bool.
-op f_rng: pkey -> t -> bool.
+pred f_dom (pk:pkey) (x:t) =
+  support (challenge pk) x.
+pred f_rng (pk:pkey) (y:t) =
+  exists x, f_dom pk x /\ y = f pk x.
 
 op finv: skey -> t -> t.
-op finv_dom: skey -> t -> bool.
-op finv_rng: skey -> t -> bool.
-
-axiom f_rng_sub_finv_dom pk sk:
-  in_supp (pk,sk) keypairs =>
-  f_rng pk <= finv_dom sk.
-
-axiom finv_rng_sub_f_dom pk sk:
-  in_supp (pk,sk) keypairs =>
-  finv_rng sk <= f_dom pk.
+axiom finv_correct (pk:pkey) (sk:skey) y:
+  valid_keys (pk,sk) =>
+  f_rng pk y =>
+  f_dom pk (finv sk y).
 
 axiom finvof (pk:pkey) (sk:skey) (x:t):
-  in_supp (pk,sk) keypairs =>
+  valid_keys (pk,sk) =>
   f_dom pk x =>
   finv sk (f pk x) = x.
 
 axiom fofinv (pk:pkey) (sk:skey) (x:t):
-  in_supp (pk,sk) keypairs =>
-  finv_dom sk x =>
+  valid_keys (pk,sk) =>
+  f_rng pk x =>
   f pk (finv sk x) = x.
 
 (* This is often useful to extract plaintexts *)
 lemma f_pk_inj (x, y:t) (pk:pkey) (sk:skey):
-  in_supp (pk,sk) keypairs  =>
+  valid_keys (pk,sk) =>
   f_dom pk x => f_dom pk y =>
   f pk x = f pk y => x = y.
-proof.
+proof strict.
 by intros=> Hsupp Hdom_x Hdom_y Heqf;
-   rewrite -(finvof pk sk _ _) // -(finvof pk sk y _) // Heqf.
+   rewrite -(finvof pk sk) // -(finvof pk sk y) // Heqf.
 qed.
 
-(* This is bad. *)
-op sample_t: t distr. 
-
-axiom f_dom_sample_t pk:
-  mu sample_t (f_dom pk) = mu sample_t cpTrue.
-
 module type Inverter = {
-  fun inverter(pk : pkey, y : t) : t
+  fun invert(pk : pkey, y : t) : t
 }.
 
 module OW(I :Inverter) ={
-  var pk:pkey
-  fun main() : bool ={
-    var x,x',y : t;
-    var sk : skey;
+  fun main(): bool ={
+    var x,x':t;
+    var pk:pkey;
+    var sk:skey;
 
-    x       = $sample_t;
     (pk,sk) = $keypairs;
-    x'      = I.inverter(pk,(f pk x));
+    x       = $challenge pk;
+    x'      = I.invert(pk,f pk x);
     return (x = x');
   }
 }.

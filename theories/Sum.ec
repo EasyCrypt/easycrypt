@@ -30,3 +30,5 @@ by intros=> is_cnst;
    rewrite /int_sum (Mrplus.NatMul.sum_const (f 0)) // => x hh;
    apply is_cnst.
 qed.
+
+

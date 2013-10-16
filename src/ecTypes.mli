@@ -1,5 +1,4 @@
 (* -------------------------------------------------------------------- *)
-open EcDebug
 open EcMaps
 open EcUtils
 open EcSymbols
@@ -49,20 +48,17 @@ val tcpred  : ty -> ty
 val toarrow : ty list -> ty -> ty
 
 (* -------------------------------------------------------------------- *)
-val ty_dump  : ty -> EcDebug.dnode
-
-(* -------------------------------------------------------------------- *)
 exception FoundUnivar
 
 val ty_check_uni : ty -> unit
 
 (* -------------------------------------------------------------------- *)
 type ty_subst = {
-  ts_p   : EcPath.path  -> EcPath.path;
+  ts_p   : EcPath.path -> EcPath.path;
   ts_mp  : EcPath.mpath -> EcPath.mpath;
   ts_def : (EcIdent.t list * ty) EcPath.Mp.t;
-  ts_u   : ty Muid.t;
-  ts_v   : ty Mid.t;
+  ts_u   : EcUidgen.uid -> ty option;
+  ts_v   : EcIdent.t -> ty option;
 }
 
 val ty_subst_id    : ty_subst
@@ -71,10 +67,13 @@ val is_ty_subst_id : ty_subst -> bool
 val ty_subst : ty_subst -> ty -> ty
 
 module Tuni : sig
+  val offun     : (uid -> ty option) -> ty  -> ty
+  val offun_dom : (uid -> ty option) -> dom -> dom
+
   val subst1    : (uid * ty) -> ty -> ty
   val subst     : ty Muid.t -> ty -> ty
   val subst_dom : ty Muid.t -> dom -> dom
-  val occur     : uid -> ty -> bool
+  val occurs    : uid -> ty -> bool
   val fv        : ty -> Suid.t
 end
 
@@ -142,7 +141,7 @@ type expr = private {
 }
 
 and expr_node =
-  | Elam   of (EcIdent.t * ty) list * expr (* lambda expression *)
+  | Elam   of (EcIdent.t * ty) list * expr (* lambda expression     *)
   | Eint   of int                          (* int. literal          *)
   | Elocal of EcIdent.t                    (* let-variables         *)
   | Evar   of prog_var                     (* module variable       *)
@@ -151,8 +150,6 @@ and expr_node =
   | Elet   of lpattern * expr * expr       (* let binding           *)
   | Etuple of expr list                    (* tuple constructor     *)
   | Eif    of expr * expr * expr           (* _ ? _ : _             *)
-
-val expr_dump   : expr -> dnode
 
 (* -------------------------------------------------------------------- *)
 val e_equal   : expr -> expr -> bool
@@ -175,7 +172,8 @@ val e_lam      : (EcIdent.t * ty) list -> expr -> expr
 
 val is_var     : expr -> bool
 val destr_var  : expr -> prog_var 
-
+val is_tuple_var : expr -> bool
+val destr_tuple_var : expr -> prog_var list
 (* -------------------------------------------------------------------- *)
 val e_map :
      (ty   -> ty  ) (* 1-subtype op. *)
@@ -191,6 +189,7 @@ type e_subst = {
   es_freshen : bool; (* true means realloc local *)
   es_p       : EcPath.path -> EcPath.path;
   es_ty      : ty -> ty;
+  es_opdef   : (EcIdent.t list * expr) EcPath.Mp.t;
   es_mp      : EcPath.mpath -> EcPath.mpath; 
   es_xp      : EcPath.xpath -> EcPath.xpath;
   es_loc     : expr Mid.t;
@@ -199,22 +198,21 @@ type e_subst = {
 val e_subst_id : e_subst
 
 val e_subst_init : 
-    bool -> (EcPath.path -> EcPath.path) ->
-      (ty -> ty) -> EcPath.mpath EcIdent.Mid.t -> e_subst
+      bool
+  -> (EcPath.path -> EcPath.path)
+  -> (ty -> ty)
+  -> (EcIdent.t list * expr) EcPath.Mp.t
+  -> EcPath.mpath EcIdent.Mid.t
+  -> e_subst
 
 val add_locals : e_subst -> 
   (EcIdent.t * ty) list -> e_subst * (EcIdent.t * ty) list
 
 val e_subst : e_subst -> expr -> expr
 val e_mapty : (ty -> ty) -> expr -> expr 
-val e_uni   : ty Muid.t -> expr -> expr
+val e_uni   : (uid -> ty option) -> expr -> expr
 
 (* -------------------------------------------------------------------- *)
-module Dump : sig
-  val ty_dump : EcDebug.ppdebug -> ty -> unit
-  val ex_dump : EcDebug.ppdebug -> expr -> unit
-end
-
 (* projects 'a Distr type into 'a *)
 val proj_distr_ty : ty -> ty
 

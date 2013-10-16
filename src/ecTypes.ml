@@ -1,5 +1,4 @@
 (* -------------------------------------------------------------------- *)
-open EcDebug
 open EcUtils
 open EcSymbols
 open EcIdent
@@ -114,29 +113,6 @@ let toarrow dom ty =
   List.fold_right tfun dom ty
 
 (* -------------------------------------------------------------------- *)
-let rec ty_dump (ty : ty) =
-  match ty.ty_node with
-  | Tglob m ->
-      dleaf "Tglob(%s)" (EcPath.m_tostring m)
-
-  | Tunivar i ->
-      dleaf "Tunivar (%d)" i
-
-  | Tvar x ->
-      dleaf "Tvar (%s)" (EcIdent.tostring x)
-
-  | Ttuple ts ->
-      dnode "Ttuple" (List.map ty_dump ts)
-
-  | Tconstr (p, ts) ->
-      dnode
-        (Printf.sprintf "Tconstr (%s)" (EcPath.tostring p))
-        (List.map ty_dump ts)
-
-  | Tfun (ty1, ty2) ->
-      dnode "Tfun" [ty_dump ty1; ty_dump ty2]
-
-(* -------------------------------------------------------------------- *)
 module TySmart = struct
   let tglob (ty, mp) (mp') =
     if mp == mp' then ty else tglob mp'
@@ -157,10 +133,10 @@ let ty_map f t =
   | Tglob _ | Tunivar _ | Tvar _ -> t
 
   | Ttuple lty -> 
-      TySmart.ttuple (t, lty) (List.smart_map f lty)
+      TySmart.ttuple (t, lty) (List.Smart.map f lty)
 
   | Tconstr (p, lty) -> 
-      let lty' = List.smart_map f lty in
+      let lty' = List.Smart.map f lty in
         TySmart.tconstr (t, (p, lty)) (p, lty')
 
   | Tfun (t1, t2) -> 
@@ -199,23 +175,23 @@ type ty_subst = {
   ts_p   : EcPath.path -> EcPath.path;
   ts_mp  : EcPath.mpath -> EcPath.mpath;
   ts_def : (EcIdent.t list * ty) EcPath.Mp.t;
-  ts_u   : ty Muid.t;
-  ts_v   : ty Mid.t;
+  ts_u   : EcUidgen.uid -> ty option;
+  ts_v   : EcIdent.t -> ty option;
 }
 
 let ty_subst_id = 
   { ts_p   = identity;
     ts_mp  = identity;
     ts_def = Mp.empty;
-    ts_u   = Muid.empty;
-    ts_v   = Mid.empty; }
+    ts_u   = funnone ;
+    ts_v   = funnone ; }
 
 let is_ty_subst_id s = 
-     s.ts_p == identity
+     s.ts_p  == identity
   && s.ts_mp == identity
+  && s.ts_u  == funnone
+  && s.ts_v  == funnone
   && Mp.is_empty s.ts_def
-  && Muid.is_empty s.ts_u
-  && Mid.is_empty s.ts_v
 
 let rec ty_subst s =
   if is_ty_subst_id s then identity
@@ -223,16 +199,16 @@ let rec ty_subst s =
     Hty.memo_rec 107 (fun aux ty ->
       match ty.ty_node with 
       | Tglob m       -> TySmart.tglob (ty, m) (s.ts_mp m)
-      | Tunivar id    -> odfl ty (Muid.find_opt id s.ts_u) 
-      | Tvar id       -> odfl ty (Mid.find_opt  id s.ts_v)
-      | Ttuple lty    -> TySmart.ttuple (ty, lty) (List.smart_map aux lty)
+      | Tunivar id    -> odfl ty (s.ts_u id)
+      | Tvar id       -> odfl ty (s.ts_v id)
+      | Ttuple lty    -> TySmart.ttuple (ty, lty) (List.Smart.map aux lty)
       | Tfun (t1, t2) -> TySmart.tfun (ty, (t1, t2)) (aux t1, aux t2)
 
       | Tconstr(p, lty) -> begin
         match Mp.find_opt p s.ts_def with
         | None -> 
             let p'   = s.ts_p p in
-            let lty' = List.smart_map aux lty in
+            let lty' = List.Smart.map aux lty in
               TySmart.tconstr (ty, (p, lty)) (p', lty')
 
         | Some (args, body) ->
@@ -240,20 +216,26 @@ let rec ty_subst s =
               try  Mid.of_list (List.combine args (List.map aux lty))
               with Failure _ -> assert false
             in
-              ty_subst { ty_subst_id with ts_v = s; } body
+              ty_subst { ty_subst_id with ts_v = Mid.find_opt^~ s; } body
       end)
 
 module Tuni = struct
-  let subst1 ((id, t) : uid * ty) =
-    ty_subst { ty_subst_id with ts_u = Muid.singleton id t }
-        
+  let offun uidmap =
+    ty_subst { ty_subst_id with ts_u = uidmap }
+
+  let offun_dom uidmap dom =
+    List.map (offun uidmap) dom
+
   let subst (uidmap : ty Muid.t) =
-    ty_subst { ty_subst_id with ts_u = uidmap } 
+    ty_subst { ty_subst_id with ts_u = Muid.find_opt^~ uidmap } 
 
-  let subst_dom uidmap =
-    List.map (subst uidmap) 
+  let subst1 ((id, t) : uid * ty) =
+    subst (Muid.singleton id t)
 
-  let occur u = 
+  let subst_dom uidmap dom =
+    List.map (subst uidmap) dom 
+
+  let occurs u = 
     let rec aux t = 
       match t.ty_node with
       | Tunivar u' -> uid_equal u u'
@@ -270,11 +252,11 @@ module Tuni = struct
 end
 
 module Tvar = struct 
-  let subst1 (id,t) = 
-    ty_subst { ty_subst_id with ts_v = Mid.singleton id t }
-
   let subst (s : ty Mid.t) =
-    ty_subst { ty_subst_id with ts_v = s }
+    ty_subst { ty_subst_id with ts_v = Mid.find_opt^~ s }
+
+  let subst1 (id,t) = 
+    subst (Mid.singleton id t)
 
   let init lv lt = 
     assert (List.length lv = List.length lt);
@@ -293,11 +275,6 @@ end
 type pvar_kind = 
   | PVglob
   | PVloc 
-
-(* TODO : 
-   make the type private
-   ensure that the m_path does not contain arguments *)
-   
 
 type prog_var = {
   pv_name : EcPath.xpath;
@@ -353,8 +330,10 @@ let pv_glob x =
   let top = x.EcPath.x_top in
   let x = 
     if top.EcPath.m_args = [] then x
-    else EcPath.xpath (EcPath.m_functor top) x.EcPath.x_sub in
-    { pv_name = x; pv_kind = PVglob }
+    else 
+      let ntop = EcPath.mpath top.m_top [] in (* remove the functor argument *)
+      EcPath.xpath ntop x.EcPath.x_sub in
+  { pv_name = x; pv_kind = PVglob }
 
 let pv x k = 
   if k = PVglob then pv_glob x 
@@ -547,45 +526,89 @@ let e_app x args ty =
     | _ -> mk_expr (Eapp (x, args)) ty
 
 (* -------------------------------------------------------------------- *)
+module ExprSmart = struct
+  let l_symbol (lp, x) x' =
+    if x == x' then lp else LSymbol x'
+
+  let l_tuple (lp, xs) xs' =
+    if xs == xs' then lp else LTuple xs'
+
+  let e_local (e, (x, ty)) (x', ty') =
+    if   x == x' && ty == ty'
+    then e
+    else e_local x' ty'
+
+  let e_var (e, (pv, ty)) (pv', ty') =
+    if   pv == pv' && ty == ty'
+    then e
+    else e_var pv' ty'
+
+  let e_op (e, (p, tys, ty)) (p', tys', ty') =
+    if   p == p' && tys == tys' && ty == ty'
+    then e
+    else e_op p' tys' ty'
+
+  let e_app (e, (x, args, ty)) (x', args', ty') =
+    if   x == x' && args == args' && ty == ty'
+    then e
+    else e_app x' args' ty'
+
+  let e_let (e, (lp, e1, e2)) (lp', e1', e2') =
+    if   lp == lp' && e1 == e1' && e2 == e2'
+    then e
+    else e_let lp' e1' e2'
+
+  let e_tuple (e, es) es' =
+    if es == es' then e else e_tuple es'
+
+  let e_if (e, (e1, e2, e3)) (e1', e2', e3') =
+    if   e1 == e1' && e2 == e2' && e3 == e3'
+    then e
+    else e_if e1' e2' e3'
+
+  let e_lam (e, (b, body)) (b', body') =
+    if   b == b' && body == body'
+    then e
+    else e_lam b' body'
+end
+
 let e_map fty fe e =
   match e.e_node with 
-  | Eint _
-  | Elocal _
-  | Evar _                -> e
-  | Eop (p, tys)          -> 
-      let tys' = List.smart_map fty tys in
+  | Eint _ | Elocal _ | Evar _ -> e
+
+  | Eop (p, tys) -> 
+      let tys' = List.Smart.map fty tys in
       let ty'  = fty e.e_ty in
-      if tys == tys' && e.e_ty == ty' then e else
-      e_op p tys' ty'
-  | Eapp (e1, args)       -> 
+        ExprSmart.e_op (e, (p, tys, e.e_ty)) (p, tys', ty')
+
+  | Eapp (e1, args) -> 
+      let e1'   = fe e1 in
+      let args' = List.Smart.map fe args in
+      let ty'   = fty e.e_ty in
+        ExprSmart.e_app (e, (e1, args, e.e_ty)) (e1', args', ty')
+
+  | Elet (lp, e1, e2) -> 
       let e1' = fe e1 in
-      let args' = List.smart_map fe args in
-      let ty'  = fty e.e_ty in
-      if e1 == e1' && args == args' && e.e_ty = ty' then e else 
-      e_app e1' args' ty'
-  | Elet (lp, e1, e2)     -> 
-      let e1' = fe e1 in
-      let e2' = fe e2 in 
-      if e1 == e1' && e2 == e2' then e else
-      e_let lp e1' e2'
-  | Etuple le             -> 
-      let le' = List.smart_map fe le in
-      if le == le' then e else
-      e_tuple le'
+      let e2' = fe e2 in
+        ExprSmart.e_let (e, (lp, e1, e2)) (lp, e1', e2')
+
+  | Etuple le -> 
+      let le' = List.Smart.map fe le in
+        ExprSmart.e_tuple (e, le) le'
+
   | Eif (e1, e2, e3)      -> 
       let e1' = fe e1 in
       let e2' = fe e2 in 
-      let e3' = fe e3 in 
-      if e1 == e1' && e2 == e2' && e3 = e3' then e else
-      e_if e1' e2' e3' 
-  | Elam(b,e1) ->
-    let dop (x,ty as xty) =
-      let ty' = fty ty in
-      if ty == ty' then xty else (x,ty') in
-    let b' = List.smart_map dop b in
-    let e1' = fe e1 in
-    if b == b' && e1 == e1' then e else
-    e_lam b' e1'
+      let e3' = fe e3 in
+        ExprSmart.e_if (e, (e1, e2, e3)) (e1', e2', e3')
+
+  | Elam(b, bd) ->
+      let dop (x, ty as xty) =
+        let ty' = fty ty in
+          if ty == ty' then xty else (x, ty') in
+      let b'  = List.Smart.map dop b in
+      let bd' = fe bd in
+        ExprSmart.e_lam (e, (b, bd)) (b', bd')
 
 let rec e_fold fe state e =
   match e.e_node with
@@ -605,15 +628,11 @@ module Se = MSHe.S
 module He = MSHe.H  
 
 (* -------------------------------------------------------------------- *)
-let rec expr_dump (e : expr) =
-  match e.e_node with
-  | _ -> dleaf "expression"
-
-(* -------------------------------------------------------------------- *)
 type e_subst = { 
     es_freshen : bool; (* true means realloc local *)
     es_p       : EcPath.path -> EcPath.path;
     es_ty      : ty -> ty;
+    es_opdef   : (EcIdent.t list * expr) EcPath.Mp.t;
     es_mp      : EcPath.mpath -> EcPath.mpath; 
     es_xp      : EcPath.xpath -> EcPath.xpath;
     es_loc     : expr Mid.t;
@@ -623,12 +642,13 @@ let e_subst_id = {
     es_freshen = false;
     es_p       = identity;
     es_ty      = identity;
+    es_opdef   = Mp.empty;
     es_mp      = identity;
     es_xp      = identity;
     es_loc     = Mid.empty;
  }
 
-let e_subst_init freshen on_path on_ty on_mpath = 
+let e_subst_init freshen on_path on_ty opdef on_mpath = 
   let on_mp = 
     let f = EcPath.m_subst on_path on_mpath in
     if f == identity then f else EcPath.Hm.memo 107 f in
@@ -639,6 +659,7 @@ let e_subst_init freshen on_path on_ty on_mpath =
     es_freshen = freshen;
     es_p       = on_path;
     es_ty      = on_ty;
+    es_opdef   = opdef;
     es_mp      = on_mp;
     es_xp      = on_xp;
     es_loc     = Mid.empty;
@@ -652,49 +673,90 @@ let add_local s (x,t as xt) =
     let merger o = assert (o = None); Some (e_local x' t') in
     { s with es_loc = Mid.change merger x s.es_loc }, (x',t')
       
-let add_locals = List.smart_map_fold add_local
+let add_locals = List.Smart.map_fold add_local
 
 let subst_lpattern (s: e_subst) (lp:lpattern) = 
   match lp with
   | LSymbol x ->
-      let s, x' = add_local s x in
-      if x == x' then s,lp else
-      s , LSymbol x'
+      let (s, x') = add_local s x in
+        (s, ExprSmart.l_symbol (lp, x) x')
+
   | LTuple xs ->
-      let s',xs'  = add_locals s xs in
-      if xs == xs' then s, lp else
-      s', LTuple xs'
+      let (s, xs') = add_locals s xs in
+        (s, ExprSmart.l_tuple (lp, xs) xs')
 
 let rec e_subst (s: e_subst) e =
   match e.e_node with
-  | Elocal id -> 
-      (try Mid.find id s.es_loc with _ -> 
+  | Elocal id -> begin
+      match Mid.find_opt id s.es_loc with
+      | Some e' -> e'
+      | None    ->
         assert (not s.es_freshen);
-        let ty' = s.es_ty e.e_ty in
-        if e.e_ty == ty' then e else e_local id ty')
+        ExprSmart.e_local (e, (id, e.e_ty)) (id, s.es_ty e.e_ty)
+  end
+
   | Evar pv -> 
       let pv' = pv_subst s.es_xp pv in
       let ty' = s.es_ty e.e_ty in
-      if pv == pv' && e.e_ty == ty' then e 
-      else e_var pv' ty'
-  | Eop(p,tys) ->
+        ExprSmart.e_var (e, (pv, e.e_ty)) (pv', ty')
+
+  | Eapp ({ e_node = Eop (p, tys) }, args) when Mp.mem p s.es_opdef ->
+      let tys  = List.Smart.map s.es_ty tys in
+      let ty   = s.es_ty e.e_ty in
+      let body = oget (Mp.find_opt p s.es_opdef) in
+        e_subst_op ty tys (List.map (e_subst s) args) body
+
+  | Eop (p, tys) when Mp.mem p s.es_opdef ->
+      let tys  = List.Smart.map s.es_ty tys in
+      let ty   = s.es_ty e.e_ty in
+      let body = oget (Mp.find_opt p s.es_opdef) in
+        e_subst_op ty tys [] body
+
+  | Eop (p, tys) ->
       let p'   = s.es_p p in
-      let tys' = List.smart_map s.es_ty tys in
+      let tys' = List.Smart.map s.es_ty tys in
       let ty'  = s.es_ty e.e_ty in
-      if p == p' && tys == tys' && e.e_ty == ty' then e else
-      e_op p' tys' ty'
-  | Elet(lp,e1,e2) -> 
+        ExprSmart.e_op (e, (p, tys, e.e_ty)) (p', tys', ty')
+
+  | Elet (lp, e1, e2) -> 
       let e1' = e_subst s e1 in
-      let s,lp' = subst_lpattern s lp in
+      let s, lp' = subst_lpattern s lp in
       let e2' = e_subst s e2 in
-      if lp == lp' && e1 == e1' && e2 == e2' then e else 
-      e_let lp' e1' e2'
-  | Elam(b,e1) ->
+        ExprSmart.e_let (e, (lp, e1, e2)) (lp', e1', e2')
+
+  | Elam (b, e1) ->
     let s, b' = add_locals s b in
     let e1' = e_subst s e1 in
-    if b == b' && e1 == e1' then e else
-    e_lam b' e1'  
+      ExprSmart.e_lam (e, (b, e1)) (b', e1')
+
   | _ -> e_map s.es_ty (e_subst s) e
+
+and e_subst_op ety tys args (tyids, e) =
+  (* FIXME: factor this out *)
+  (* FIXME: is es_freshen value correct? *)
+
+  let e =
+    let sty = Tvar.init tyids tys in
+    let sty = ty_subst { ty_subst_id with ts_v = Mid.find_opt^~ sty; } in
+    let sty = { e_subst_id with
+                  es_freshen = true;
+                  es_ty      = sty } in
+      e_subst sty e
+  in
+
+  let (sag, args, e) =
+    match e.e_node with
+    | Elam (largs, lbody) when args <> [] ->
+        let largs1, largs2 = List.take_n (List.length args  ) largs in
+        let  args1,  args2 = List.take_n (List.length largs1)  args in
+          (Mid.of_list (List.combine (List.map fst largs1) args1),
+           args2, e_lam largs2 lbody)
+
+    | _ -> (Mid.of_list [], args, e)
+  in
+
+  let sag = { e_subst_id with es_loc = sag } in
+    e_app (e_subst sag e) args ety
 
 let is_subst_id s = 
   not s.es_freshen && s.es_p == identity && 
@@ -710,7 +772,8 @@ let e_subst s =
 let e_mapty onty = 
   e_subst { e_subst_id with es_ty = onty; }
 
-let e_uni (uidmap : ty Muid.t) = e_mapty (Tuni.subst uidmap)
+let e_uni uidmap =
+  e_mapty (Tuni.offun uidmap)
 
 let is_var e = 
   match e.e_node with
@@ -722,70 +785,15 @@ let destr_var e =
   | Evar pv -> pv
   | _ -> assert false
 
-(* -------------------------------------------------------------------- *)
-module Dump = struct
-  let ty_dump pp =
-    let rec ty_dump pp ty = 
-      match ty.ty_node with 
-      | Tglob m ->
-        EcDebug.single pp ~extra:(EcPath.m_tostring m) "Tglob"
+let is_tuple_var e = 
+  match e.e_node with
+  | Etuple es -> List.for_all is_var es
+  | _ -> false
 
-      | Tunivar i ->
-          EcDebug.single pp ~extra:(string_of_int i) "Tunivar"
-  
-      | Tvar a ->
-          EcDebug.single pp ~extra:(EcIdent.tostring a) "Tvar"
-  
-      | Ttuple tys ->
-          EcDebug.onhlist pp "Ttuple" ty_dump tys
-  
-      | Tconstr (p, tys) ->
-          let strp = EcPath.tostring p in
-            EcDebug.onhlist pp ~extra:strp "Tconstr" ty_dump tys
-      | Tfun (t1, t2) ->
-          EcDebug.onhlist pp "Tfun" ty_dump [t1;t2]
-    in
-      fun ty -> ty_dump pp ty
-
-  let ex_dump pp =
-    let rec ex_dump pp e =
-      match e.e_node with
-      | Eint i ->
-          EcDebug.single pp ~extra:(string_of_int i) "Eint"
-
-      | Elocal x ->
-          EcDebug.onhlist pp
-            "Elocal" ~extra:(EcIdent.tostring x)
-            ty_dump []
-        
-      | Evar x ->
-          EcDebug.onhlist pp
-            "Evar" ~extra:(EcPath.x_tostring x.pv_name)
-            ty_dump []
-
-      | Eop (x, tys) ->
-          EcDebug.onhlist pp "Eop" ~extra:(EcPath.tostring x)
-            ty_dump tys
-          
-      | Eapp (e, args) -> 
-          EcDebug.onhlist pp "Eapp" ex_dump (e::args)
-
-      | Elet (_p, e1, e2) ->            (* FIXME *)
-          let printers = [ex_dump^~ e1; ex_dump^~ e2] in
-            EcDebug.onseq pp "Elet" (Stream.of_list printers)
-        
-      | Etuple es ->
-          EcDebug.onhlist pp ~enum:true "Etuple" ex_dump es
-        
-      | Eif (c, e1, e2) ->
-          EcDebug.onhlist pp "Eif" ex_dump [c; e1; e2]
-
-      | Elam(_b,e) ->                   (* FIXME *)
-        EcDebug.onhlist pp "Elam" ex_dump [e]
-    in
-      fun e -> ex_dump pp e
-end
-
+let destr_tuple_var e = 
+   match e.e_node with
+  | Etuple es -> List.map destr_var es
+  | _ -> assert false
 
 let proj_distr_ty ty = match ty.ty_node with
   | Tconstr(_,lty) when List.length lty = 1  -> 

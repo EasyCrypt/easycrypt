@@ -250,10 +250,10 @@ let mk_w3_opp2 s mk =
   let decl_spec = Decl.create_prop_decl Decl.Paxiom pr form in
   ls, decl, decl_spec
 
-let w3_ls_and, decl_and, spec_and = mk_w3_opp2 "AND" Term.t_and
+let w3_ls_and, decl_and, spec_and = mk_w3_opp2 "ANDS" Term.t_and
 let w3_ls_anda, decl_anda, spec_anda = mk_w3_opp2 "ANDA" Term.t_and_asym
-let w3_ls_or, decl_or, spec_or = mk_w3_opp2 "OR" Term.t_or
-let w3_ls_ora, decl_ora, spec_ora = mk_w3_opp2 "OR" Term.t_or_asym
+let w3_ls_or, decl_or, spec_or = mk_w3_opp2 "ORS" Term.t_or
+let w3_ls_ora, decl_ora, spec_ora = mk_w3_opp2 "ORA" Term.t_or_asym
 let w3_ls_imp, decl_imp, spec_imp = mk_w3_opp2 "IMP" Term.t_implies
 let w3_ls_iff, decl_iff, spec_iff = mk_w3_opp2 "IFF" Term.t_iff
 
@@ -648,26 +648,24 @@ module Renaming = struct
         w3_id_string id
 end
 
-module Wtvm =
-  struct
+module Wtvm = struct
+  type t = EcIdent.t Ty.Mtv.t ref
 
-    type t = EcIdent.t Ty.Mtv.t ref
+  let create () = ref Ty.Mtv.empty
 
-    let create () = ref Ty.Mtv.empty
+  let get tvm tv =
+    try Ty.Mtv.find tv !tvm
+    with _ ->
+      let s = w3_id_string tv.Ty.tv_name in
+      assert (String.length s <> 0);
+      let s = if s.[0] = '\'' then s else String.concat "" ["\'"; s] in
+      let id = EcIdent.create s in
+      tvm := Ty.Mtv.add tv id !tvm;
+      id
 
-    let get tvm tv =
-      try Ty.Mtv.find tv !tvm
-      with _ ->
-        let s = w3_id_string tv.Ty.tv_name in
-        assert (String.length s <> 0);
-        let s = if s.[0] = '\'' then s else String.concat "" ["\'"; s] in
-        let id = EcIdent.create s in
-        tvm := Ty.Mtv.add tv id !tvm;
-        id
-
-    let tparams tvm = Ty.Mtv.values !tvm
-
-  end
+  let tparams tvm =
+    List.map (fun x -> (x, Sp.empty)) (Ty.Mtv.values !tvm)
+end
 
 exception UnknownWhy3Ident of Ident.ident
 
@@ -714,7 +712,7 @@ and zipper = zipper_elem list
 
 let import_w3_tydef rn path (env,rb,z) ty =
   let tvm = Wtvm.create () in
-  let params = List.map (Wtvm.get tvm) ty.Ty.ts_args in
+  let params = List.map (fun x -> Wtvm.get tvm x, Sp.empty) ty.Ty.ts_args in
   let def = ty.Ty.ts_def |> omap (import_w3_ty env tvm) in
   let eid = Renaming.get_ts rn ty in
   let td = { tyd_params = params; tyd_type = def } in
@@ -837,7 +835,7 @@ let import_w3_ls rn path (env,rb,z) ls =
   let dom = List.map (import_w3_ty env tvm) ls.Term.ls_args in
   let codom =  ls.Term.ls_value |> omap (import_w3_ty env tvm) in
   let wparams = Ty.Stv.elements (Term.ls_ty_freevars ls) in
-  let params = List.map (Wtvm.get tvm) wparams in
+  let params = List.map (fun x -> Wtvm.get tvm x, Sp.empty) wparams in
   let eid = Renaming.get_ls rn ls in
   let op = mk_op params (toarrow dom (force_bool codom)) None in
   let p = EcPath.pqname path eid in
@@ -875,8 +873,9 @@ let import_w3_pr rn path (env,rb,z as envld) k pr t =
       let spec =
         try Some (import Term.Mvs.empty t);
         with CannotTranslateW3Ec -> None in
+      (* FIXME: assert unicity of string in [ax_tparams] *)
       let ax = {
-        ax_tparams = Wtvm.tparams tvm; (* FIXME assert unicity of string *)
+        ax_tparams = Wtvm.tparams tvm;
         ax_spec = spec;
         ax_kind = if k = Decl.Plemma then `Lemma else `Axiom;
         ax_nosmt = false; } in
@@ -1021,11 +1020,12 @@ let trans_oty env oty =
   | Some t -> Some (trans_ty env t)
 
 let trans_typarams =
-  let trans_tv env id =
+  let trans_tv env ((id, _) : ty_param) = (* FIXME: TC HOOK *)
     let tv = create_tvsymbol id in
     let add o = assert (o = None); Some (Ty.ty_var tv) in
-    {env with env_tv = Mid.change add id env.env_tv }, tv in
-  List.map_fold trans_tv
+    ({ env with env_tv = Mid.change add id env.env_tv }, tv)
+  in
+    List.map_fold trans_tv
 
 let trans_tydecl env path td =
   let pid = preid_p path in
@@ -1342,6 +1342,7 @@ let trans_form env f =
     | FbdHoareF _ -> raise (CannotTranslate "FbdHoareF")
     | FbdHoareS _ -> raise (CannotTranslate "FbdHoareS")
     | FequivF _   -> raise (CannotTranslate "FequivF")
+    | FeagerF _   -> raise (CanNotTranslate "FeagerF")
     | FequivS _   -> raise (CannotTranslate "FequivS")
 
     | Fpvar(pv,m) ->
@@ -1611,6 +1612,9 @@ let check_goal me_of_mt env pi hints (hyps, concl) =
           
       | LD_modty (mt,restr) ->
         env := add_abs_mod me_of_mt !env id mt restr
+
+      | LD_abs_st _ -> ()
+
     with CannotTranslate _ -> ()
   in
   List.iter trans_tv hyps.h_tvar;

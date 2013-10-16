@@ -30,6 +30,7 @@ type signature.
 clone import AWord as Signature with
   type word <- signature,
   op length <- k.
+op s_signature (x:message) = Signature.Dword.dword.
 
 (* Domain of RSA *)
 op sample_plain: signature distr. (* Whereby we sample only with the first byte/bit set to 0 *)
@@ -39,22 +40,20 @@ require PKS.
 require OW.
 require RandomOracle.
 
+type pkey.
+op challenge (pk:pkey) = sample_plain.
+
 clone import OW as RSA with
   type t <- signature,
-  op sample_t <- sample_plain,
-  op f_dom = (lambda (pk:pkey) (x:signature), cpTrue x),
-  op f_rng = (lambda (pk:pkey) (x:signature), cpTrue x),
-  op finv_dom = (lambda (sk:skey) (x:signature), cpTrue x),
-  op finv_rng = (lambda (sk:skey) (x:signature), cpTrue x)
-  proof f_rng_sub_finv_dom by smt,
-        finv_rng_sub_f_dom by smt,
-        f_dom_sample_t by smt.
+  type pkey <- pkey,
+  op challenge <- challenge.
 
-clone import RandomOracle as Ht with
+clone import RandomOracle.Lazy as Ht with
   type from <- message,
   type to <- signature,
-  op dsample <- Signature.Dword.dword.
-  module H = Ht.ROM.RO.
+  op dsample <- s_signature.
+  import Types.
+  module H = RO.
 
 clone import PKS as PKSi with
   type pkey <- pkey,

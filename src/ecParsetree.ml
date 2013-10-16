@@ -157,16 +157,18 @@ and pdeclmodule = {
 }
 
 (* -------------------------------------------------------------------- *)
+type ptyparams = (psymbol * pqsymbol list) list
+
 type ptydecl = {
   pty_name   : psymbol;
-  pty_tyvars : psymbol list;
+  pty_tyvars : ptyparams;
   pty_body   : pty option;
 }
 
 (* -------------------------------------------------------------------- *)
 type pdatatype = {
   ptd_name   : psymbol;
-  ptd_tyvars : psymbol list;
+  ptd_tyvars : (psymbol * pqsymbol list) list;
   ptd_ctors  : (psymbol * pty option) list;
 }
 
@@ -203,6 +205,7 @@ and pformula_r =
   | PFhoareS   of pformula * pfunction_body located * pformula
   | PFhoareF   of pformula * pgamepath * pformula
   | PFequivF   of pformula * (pgamepath * pgamepath) * pformula
+  | PFeagerF    of pformula * (pstmt * pgamepath * pgamepath * pstmt) * pformula
   | PFprob     of pgamepath * (pformula list) * pmemory * pformula
   | PFBDhoareS of pformula * pfunction_body located * pformula * phoarecmp * pformula
   | PFBDhoareF of pformula * pgamepath * pformula * phoarecmp * pformula
@@ -229,7 +232,7 @@ type pop_def =
 type poperator = {
   po_kind   : [`Op | `Const];
   po_name   : psymbol;
-  po_tyvars : psymbol list option;
+  po_tyvars : (psymbol * pqsymbol list) list option;
   po_def    : pop_def
 }
 
@@ -239,7 +242,7 @@ type ppred_def =
 
 type ppredicate = {
   pp_name   : psymbol;
-  pp_tyvars : psymbol list option;
+  pp_tyvars : (psymbol * pqsymbol list) list option;
   pp_def    : ppred_def;
 }
 
@@ -264,6 +267,7 @@ type fpattern_arg =
   | EA_form of pformula
   | EA_mem  of pmemory
   | EA_none 
+  | EA_mod  of pmsymbol located
 
 type 'a fpattern = { 
   fp_kind : 'a fpattern_kind;
@@ -331,13 +335,13 @@ type call_info =
 type p_app_bd_info = 
   | PAppNone 
   | PAppSingle of pformula 
-  | PAppMult of (pformula_o * pformula_o * pformula_o * pformula_o * pformula_o)
+  | PAppMult   of pformula_o tuple5
 
 type ('a, 'b, 'c) rnd_tac_info = 
   | PNoRndParams 
   | PSingleRndParam of 'c 
-  | PTwoRndParams of 'a * 'a 
-  | PMultRndParams of (('a tuple5) * 'b)
+  | PTwoRndParams   of 'a * 'a 
+  | PMultRndParams  of ('a tuple5) * 'b
 
 type tac_dir = Backs | Fwds
 
@@ -350,6 +354,15 @@ type trans_kind =
 type trans_info = 
   trans_kind * pformula * pformula * pformula * pformula
 
+type eager_info = 
+  | LE_done of psymbol 
+  | LE_todo of psymbol * pstmt * pstmt * pformula * pformula
+
+type bdh_split = 
+  | BDH_split_bop of pformula * pformula * pformula option
+  | BDH_split_or_case of pformula * pformula * pformula 
+  | BDH_split_not of pformula option * pformula
+
 type phltactic = 
   | Pfun_def  
   | Pfun_abs    of pformula
@@ -358,7 +371,7 @@ type phltactic =
   | Pskip
   | Papp        of (tac_dir * int doption * pformula * p_app_bd_info)
   | Pwp         of int doption option 
-  | Pwhile      of tac_side * (pformula * pformula_o )
+  | Pwhile      of tac_side * (pformula * pformula_o * (pformula * pformula) option)
   | Pfission    of (tac_side * codepos * (int * (int * int)))
   | Pfusion     of (tac_side * codepos * (int * (int * int)))
   | Punroll     of (tac_side * codepos)
@@ -372,6 +385,7 @@ type phltactic =
   | Pkill       of (tac_side * codepos * int option)
   | Prnd        of tac_side * (pformula, pformula option, pformula) rnd_tac_info
   | Palias      of (tac_side * codepos * psymbol option)
+  | Pset        of (bool * tac_side * codepos * psymbol * pexpr)
   | Pconseq     of bool * ccfpattern 
   | Phr_exists_elim  
   | Phr_exists_intro of pformula list 
@@ -388,7 +402,20 @@ type phltactic =
   | Pbdeq 
   | Peqobs_in   of (pformula_o * pformula_o * pformula_o)
   | Ptrans_stmt of trans_info
+  | Psymmetry   
   | Psp        of (bool option)
+  | Pbdhoare_split of bdh_split 
+  (* for eager *)
+  | Peager_seq of eager_info * (int * int) * pformula 
+  | Peager_if  
+  | Peager_while of eager_info
+  | Peager_fun_def 
+  | Peager_fun_abs   of eager_info * pformula
+  | Peager_call of call_info fpattern
+  | Peager of eager_info * pformula
+  (* Relation between logic *)
+  | Pbd_equiv of (bool * pformula * pformula)
+
 
 and pinline_arg =
   [ `ByName    of tac_side * (pgamepath list * int list option)
@@ -488,7 +515,7 @@ type paxiom_kind = PAxiom | PLemma of ptactic option | PILemma
 
 type paxiom = {
   pa_name    : psymbol;
-  pa_tyvars  : psymbol list option;
+  pa_tyvars  : (psymbol * pqsymbol list) list option;
   pa_vars    : pgtybindings option;  
   pa_formula : pformula;
   pa_kind    : paxiom_kind;
@@ -550,11 +577,13 @@ type claim = psymbol * (pexpr * hint)
 
 (* -------------------------------------------------------------------- *)
 type pprint = 
-  | Pr_ty of pqsymbol
-  | Pr_op of pqsymbol
-  | Pr_th of pqsymbol
-  | Pr_pr of pqsymbol
-  | Pr_ax of pqsymbol
+  | Pr_ty  of pqsymbol
+  | Pr_op  of pqsymbol
+  | Pr_th  of pqsymbol
+  | Pr_pr  of pqsymbol
+  | Pr_ax  of pqsymbol
+  | Pr_mod of pqsymbol
+  | Pr_mty of pqsymbol
 
 (* -------------------------------------------------------------------- *)
 type renaming_kind = 
@@ -586,11 +615,7 @@ and theory_override =
 | PTHO_Theory of pqsymbol
 
 and ty_override = psymbol list * pty * [`Alias | `Inline]
-
-and op_override = [
-| `OpDef    of op_override_def
-| `OpInline of pqsymbol
-]
+and op_override = op_override_def * [`Alias | `Inline]
 
 and op_override_def = {
   opov_tyvars : psymbol list option;
@@ -604,6 +629,14 @@ and pr_override = {
   prov_args   : ptybinding list;
   prov_body   : pformula;
 }
+
+(* -------------------------------------------------------------------- *)
+type toextract = 
+ | ExOp of pqsymbol
+ | ExTy of pqsymbol
+ | ExTh of pqsymbol
+
+type withextract = toextract * string 
 
 (* -------------------------------------------------------------------- *)
 type global =
@@ -634,6 +667,7 @@ type global =
   | Gcheckproof  of bool
   | Gsave        of EcLocation.t
   | Gpragma      of psymbol
+  | Gextract     of (string option * toextract list * withextract list)
 
 type prog =
   | P_Prog of (global located) list * bool

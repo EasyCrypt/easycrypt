@@ -1,0 +1,29 @@
+#! /bin/bash
+
+# --------------------------------------------------------------------
+set -e
+
+# --------------------------------------------------------------------
+: ${DEST="${PWD}/_tools/webui"} # MUST BE ABSOLUTE
+
+# --------------------------------------------------------------------
+if [ ! -d "${DEST}" ]; then
+    echo "Install webui first (make webui-env)" >&2
+    exit 1
+fi
+
+# --------------------------------------------------------------------
+MYDIR="$(cd $(dirname $0) && pwd)"
+
+source "${DEST}/webui-env/bin/activate"
+export PATH="${MYDIR}/..:${PATH}"; hash -r
+
+( cd "${MYDIR}/../webui";
+    pserve --stop   development.ini || true;
+    pserve --daemon development.ini )
+
+echo "Waiting server to start..."; sleep 3
+
+python -mwebbrowser 'http://localhost:6543' &!
+
+exit 0

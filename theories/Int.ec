@@ -14,25 +14,25 @@ end Abs.
 export Abs.
 
 theory Triangle.
-  lemma triangle_inequality : forall (x:int,y:_,z:_),
+  lemma nosmt triangle_inequality (x y z:int):
      `| x - y | <= `| x - z | + `| y - z |
   by [].
 end Triangle.
 
 theory Extrema.
-  op min(a:int, b:int) = if (a < b) then a else b.
+  op min (a b:int) = if (a < b) then a else b.
 
-  lemma min_is_lb: forall a b,
+  lemma nosmt min_is_lb a b:
     min a b <= a /\
     min a b <= b
   by [].
 
-  lemma min_is_glb: forall x a b,
+  lemma nosmt min_is_glb x a b:
     x <= a => x <= b =>
     x <= min a b
   by [].
 
-  lemma min_is_extremum: forall a b,
+  lemma nosmt min_is_extremum a b:
     min a b = a \/ min a b = b
   by [].
 
@@ -51,42 +51,63 @@ theory Extrema.
   lemma min_def: forall a b,
     min a b = if (a < b) then a else b. *)
 
-  op max(a:int, b:int) = if (a < b) then b else a.
+  op max (a b:int) = if (a < b) then b else a.
 
-  lemma max_is_ub: forall a b,
+  lemma nosmt max_is_ub a b:
     a <= max a b /\
     b <= max a b
   by [].
 
-  lemma max_is_lub: forall x a b,
+  lemma nosmt max_is_lub x a b:
     a <= x => b <= x =>
     max a b <= x
   by [].
 
-  lemma max_is_extremum: forall a b,
+  lemma nosmt max_is_extremum a b:
     max a b = a \/ max a b = b
   by [].
 end Extrema.
 export Extrema.
 
 theory EuclDiv.
-  import why3 "int" "EuclideanDivision"
-    op "div" as "/";
-    op "mod" as "%".
+  op (/%): int -> int -> int.
+  op (%%): int -> int -> int.
+
+  axiom ediv_spec m d:
+    d <> 0 =>
+    0 <= m %% d < `|d| /\
+    m = (m /% d) * d + (m %% d).
+
+  axiom ediv_unique m d q r:
+    d <> 0 =>
+    0 <= r < `|d| =>
+    m = q * d + r =>
+    q = m /% d /\ r = m %% d.
+
+  axiom ediv_Mle : forall (m1 m2 d:int), 0 < d => m1 <= m2 => m1/%d <= m2/%d.
+
+  lemma ediv_pos : forall m d, 0 < d => 0 <= m => 0 <= m /%d.
+  proof. 
+    intros m d Hd Hm.
+    apply (Trans _ (0/%d));last apply ediv_Mle;smt.
+    elim (ediv_unique 0 d 0 0 _ _ _) => //;smt.
+  qed.
+
 end EuclDiv.
+
 export EuclDiv.
 
 theory Induction.
-  axiom nosmt induction: forall (p:int -> bool),
+  axiom nosmt induction (p:int -> bool):
     (p 0) =>
     (forall i, 0 <= i => p i => p (i + 1)) =>
     (forall i, 0 <= i => p i).
 
-  lemma nosmt strongInduction: forall (p:int -> bool),
-    (forall j, 0 <= j => (forall k, 0 <= k => k < j => p k) => p j) =>
+  lemma nosmt strongInduction (p:int -> bool):
+    (forall j, 0 <= j => (forall k, 0 <= k < j => p k) => p j) =>
     (forall i, 0 <= i => p i).
   proof strict.
-  by intros p hyp i iVal;
+  by intros hyp i iVal;
      apply (induction (lambda i, forall k, 0 <= k <= i => p k) _ _ i); smt.
   qed.
 end Induction.
@@ -96,11 +117,18 @@ theory Power.
   import why3 "int" "Power"
     op "power" as "^".
 
-  lemma Power_pos : forall (x n:int), 0 <= n => 0 < x => 0 < x ^ n.
+  lemma Power_pos (x n:int): 0 <= n => 0 < x => 0 < x ^ n.
   proof.
-  by intros x n n_pos x_pos; elim/Induction.induction n=> //; smt.
+  by intros n_pos x_pos; elim/Induction.induction n=> //; smt.
   qed.
 end Power.
-
 export Power.
 
+lemma mulMle : forall (x1 x2 y1 y2:int),
+   0 <= x1 <= x2 => 0 <= y1 <= y2 => x1 * y1 <= x2 * y2.
+proof.
+ intros x1 x2 y1 y2 Hx Hy.
+ apply (Trans _ (x1 * y2)).
+ rewrite ?(Comm.Comm x1) CompatOrderMult; smt.
+ apply CompatOrderMult;smt.
+qed.

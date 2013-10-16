@@ -316,14 +316,12 @@ proof.
    by rewrite mem_add in_dom_set; rewrite -H.
    by rewrite mem_add; rewrite -H; case (x1 = x{2})=> //=;
       intros=> ->; rewrite rw_eqT.
-   by apply H.
  wp;rnd;swap{1} -7;wp.
  call (_: ={RO.m,ARO.log}  /\ (forall x, in_dom x RO.m{1} = mem x ARO.log{1})).
  fun;if;[smt|inline RO.o;wp;rnd |];wp;skip;progress=> //.
    by rewrite mem_add in_dom_set; rewrite -H.
    by rewrite mem_add; rewrite -H; case (x1 = x{2})=> //=;
       intros=> ->; rewrite rw_eqT.
-   by apply H.
  do 2! (wp;rnd);skip;progress;smt.
  wp;skip;progress;first smt.
  elim (find_in

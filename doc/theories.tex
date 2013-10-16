@@ -555,12 +555,13 @@ This section informally describes their syntax and semantic interpretations.
 \warningbox{In the following, note the distinct implication symbols.
 $\Rightarrow$ is implication in the ambient logic (corresponding to the
 \rawec{=>} predicate), whereas $\Longrightarrow$ is used to express contracts on
-functions.\footnote{From Francois: it may be worth considering the use of
+functions (corresponding to \rawec{==>} in raw \EasyCrypt code).
+\footnote{From Francois: it may be worth considering the use of
 another arrow symbol (for example $\Rrightarrow$) for contracts.}}
 
 \subsection{(Possibilistic) Hoare Judgements}
 Given a statement $\mathsf{c}$ and two predicates $\pre$ and $\post$ on
-memories, judgement $\Hoare{c}{\pre}{\post}$ means that for any memory
+memories, judgement \[\Hoare{c}{\pre}{\post}\] means that for any memory
 $\mathsf{m}$ such that $\pre\ \mathsf{m}$ and any memory $\mathsf{m'}$ that may
 be obtained by executing $\mathsf{c}$ in $\mathsf{m}$, $\post\ \mathsf{m'}$.
 
@@ -576,8 +577,8 @@ be obtained by executing $\mathsf{c}$ in $\mathsf{m}$, $\post\ \mathsf{m'}$.
 
 \subsection{Probabilistic Hoare Judgements}
 Given a statement $\mathsf{c}$, two predicates $\pre$ and $\post$ on
-memories, a relation $\mathfrak{R}$ over the reals and a real bound $\delta$,
-judgement $\Hoare{c}{\pre}{\post} \mathrel{\mathfrak{R}} \delta$ means that for
+memories, a relation $\mathfrak{R} \in \left\{=,\leq,\geq\right\}$ and a real bound $\delta$,
+judgement \[\Hoare{c}{\pre}{\post} \mathrel{\mathfrak{R}} \delta\] means that for
 any memory $\mathsf{m}$ such that $\pre\ \mathsf{m}$ the probability that
 $\post$ holds after executing $\mathsf{c}$ in $\mathsf{m}$ is related to
 $\delta$ by $\mathfrak{R}$.
@@ -619,7 +620,11 @@ from the environment once the section is closed.
 
 \section{Working with Theories\label{sec:cloning}}
 
-\subsection{\rawec{print}}
+Theories can be cloned and refined using the \ec{clone} keyword, which creates
+a new theory containing exactly the same declarations and definitions as the
+original. It is possible to refine abstract definitions when cloning a theory.
+
+%\subsection{\rawec{print}}
 
 
 

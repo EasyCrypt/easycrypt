@@ -56,6 +56,19 @@ rewrite (sum_rm _ _ x); first by rewrite mem_add.
 by rewrite rm_add_eq -rm_nin_id.
 save.
 
+lemma sum_disj (f:'a -> t) (s1 s2:'a set) :
+  disjoint s1 s2 =>
+  sum f (union s1 s2) = sum f s1 + sum f s2.
+proof.
+ elim /set_ind s1.
+   by intros Hd;rewrite union0s sum_empty addmC addmZ.
+ intros x s Hx Hrec Hd;rewrite union_add sum_add.
+   by generalize Hd;rewrite disjoint_spec mem_union;smt.
+ rewrite sum_add.
+   by generalize Hd;rewrite disjoint_spec;smt.
+ rewrite Hrec;smt.
+qed.
+
 lemma sum_in (f:'a -> t) (s:'a set):
   sum f s = sum (lambda x, if mem x s then f x else Z) s.
 proof strict.
@@ -66,7 +79,7 @@ elim/set_comp s'.
   rewrite (sum_rm _ _ (pick s')); first by rewrite mem_pick.
   rewrite (sum_rm _ s' (pick s')); first by rewrite mem_pick.
   rewrite IH /=.
-    by apply (leq_tran _ s')=> //; apply rm_leq.
+    by apply (leq_tran s')=> //; apply rm_leq.
     by rewrite (_: mem (pick s') s) // leq_s'_s // mem_pick.
 qed.
 
@@ -94,7 +107,7 @@ elim/set_comp s'.
   rewrite (sum_rm _ (img g s') (g (pick s'))) /=;
     first by rewrite mem_img // mem_pick.
   rewrite pcan_g'_g; first by apply leq_s'_s; apply mem_pick.
-  rewrite IH; first apply (leq_tran _ s')=> //; apply rm_leq.
+  rewrite IH; first apply (leq_tran s')=> //; apply rm_leq.
   rewrite img_rm;
   (cut ->: (forall x, mem x s' => g (pick s') = g x => pick s' = x) = true)=> //;
   apply eqT=> x x_in_s g_pick;
@@ -111,7 +124,7 @@ elim/set_comp s'.
   by rewrite FSet.filter_empty.
   intros=> {s'} s' s'_nempty IH leq_s'_s;
   rewrite (sum_rm _ s' (pick s')); first by apply mem_pick.
-  rewrite -IH;first apply (leq_tran _ s')=> //; apply rm_leq.
+  rewrite -IH;first apply (leq_tran s')=> //; apply rm_leq.
   case (p (pick s'))=> p_pick.
     by rewrite (sum_rm _ (filter p s') (pick s')) ?rm_filter // mem_filter;
        split=> //; apply mem_pick.
@@ -119,8 +132,40 @@ elim/set_comp s'.
        right=> //.
 qed.
 
+require import Int.
+import Interval.
+
+op sum_ij (i j : int) (f:int -> t)  = 
+  sum f (interval i j).
+
+lemma sum_ij_gt (i j:int) f : 
+  i > j => sum_ij i j f = Z.
+proof.
+ by intros Hlt;rewrite /sum_ij interval_neg // sum_empty.
+qed.
+  
+lemma sum_ij_le_r (i j:int) f : 
+   i <= j =>
+   sum_ij i j f = sum_ij i (j-1) f + f j.
+proof.
+  intros Hle;rewrite /sum_ij interval_pos // sum_add //.
+    rewrite mem_interval => //;smt.
+  apply addmC.
+qed.
+
+lemma sum_ij_le_l (i j:int) f : 
+   i <= j =>
+   sum_ij i j f = f i + sum_ij (i+1) j f.
+proof.
+ intros Hle;rewrite /sum_ij interval_addl // sum_add // mem_interval;smt.
+qed.
+
+lemma sum_ij_eq i f: sum_ij i i f = f i.
+proof.
+ rewrite sum_ij_le_l // sum_ij_gt;[smt | apply addmZ].
+qed.
+
 theory NatMul.
-  require import Int.
 
   op ( * ) : int -> t -> t.
 
@@ -138,7 +183,7 @@ theory NatMul.
     by rewrite sum_empty card_empty MulZ.
     intros=> {s'} s' s'_nempty IH leq_s'_s.
     rewrite (sum_rm _ _ (pick s'));first by rewrite mem_pick.
-    rewrite IH; first by apply (leq_tran _ s')=> //; apply rm_leq.
+    rewrite IH; first by apply (leq_tran s')=> //; apply rm_leq.
     rewrite f_x; first by apply leq_s'_s; apply mem_pick.
     rewrite card_rm_in; first by apply mem_pick.
     rewrite -MulS; smt.
@@ -147,13 +192,92 @@ end NatMul.
 
 end Comoid.
 
+(* For bool *)
 require Bool.
 clone Comoid.Base as Bbor with
    type t = bool,
    op (+) = (\/),
    op Z = false
    proof * by smt.
+clone Comoid as Mbor with theory Base = Bbor.
 
+(* For int *)
+
+theory Miplus.
+  clone export Comoid as Miplus with
+    type Base.t <- int,
+    op Base.(+) <- Int.(+),
+    op Base.Z <- 0,
+    op NatMul.( * ) = Int.( * )
+    proof Base.* by smt, NatMul.* by smt.
+
+  import Int. import EuclDiv. 
+  op sum_n i j = sum_ij i j (lambda (n:int), n).
+
+  lemma sum_n_0k (k:int) : 0 <= k => sum_n 0 k = (k*(k + 1))/%2.
+  proof.
+    rewrite /sum_n;elim /Int.Induction.induction k.
+      rewrite sum_ij_eq => /=.
+      by elim (ediv_unique 0 2 0 0 _ _ _) => //; smt.
+    intros {k} k Hk Hrec;rewrite sum_ij_le_r;first smt.
+    cut -> : k + 1 - 1 = k;first smt.
+    rewrite Hrec /=.
+    elim (ediv_unique ((k + 1) * (k + 1 + 1)) 2 (k * (k + 1) /% 2 + (k + 1)) 0 _ _ _) => //.
+    smt.
+    cut -> : (k + 1) * (k + 1 + 1) = k * (k+1) + 2*(k+1) by smt.
+    elim (ediv_spec (k*(k+1)) 2 _) => //.
+    intros _ {1}->.
+    cut -> : k * (k + 1) %% 2 = 0;last smt.
+    elim (ediv_spec k 2 _) => //;smt.
+  qed.
+
+ lemma sum_n_ii (k:int): sum_n k k = k
+ by [].
+ 
+ lemma sum_n_ij1 (i j:int) : i <= j => sum_n i (j+1) = sum_n i j + (j+1)
+ by [].
+
+ lemma sum_n_i1j (i j : int) : i <= j => i + sum_n (i+1) j = sum_n i j
+ by [].
+
+ lemma sumn_ij_aux (i j:int) : i <= j =>
+   sum_n i j = i*((j - i)+1) + sum_n 0 ((j - i)).
+ proof.
+   intros Hle;rewrite {1} (_: j=i+(j-i));first smt.
+   elim /Int.Induction.induction (j-i) => /=;last smt.
+    rewrite !sum_n_ii //.
+   intros {j Hle} j Hj; rewrite -CommutativeGroup.Assoc sum_n_ij1;smt.
+ qed.
+
+ lemma sumn_ij (i j:int) : i <= j =>
+   sum_n i j = i*((j - i)+1) + (j-i)*(j-i+1)/%2.
+ proof.
+   intros Hle; rewrite sumn_ij_aux //;smt.
+ qed.
+
+import FSet.Interval.
+
+ lemma sumn_pos (i j:int) : 0 <= i => 0 <= sum_n i j.
+ proof.
+   case (i <= j) => Hle Hp.
+     rewrite sumn_ij => //;smt.
+   by rewrite /sum_n sum_ij_gt; first smt.
+ qed.
+
+ lemma sumn_le (i j k:int) : i <= j =>  0 <= j => j <= k =>
+   sum_n i j <= sum_n i k.    
+ proof.
+   intros Hij H0j Hjk;rewrite /sum_n /sum_ij.
+   cut -> :interval i k = FSet.union (interval i j) (interval (j+1) k).
+     by apply FSet.set_ext => x;rewrite FSet.mem_union ?mem_interval;smt.
+   rewrite sum_disj.
+     by rewrite FSet.disjoint_spec => x;rewrite ?mem_interval;smt.
+   smt.
+ qed.
+   
+end Miplus.
+  
+(* For real *)
 require Real.
 clone Comoid.Base as Brplus with
    type t = real,
@@ -161,7 +285,7 @@ clone Comoid.Base as Brplus with
    op Z = 0%r
    proof * by smt.
 
-clone Comoid as Mbor with theory Base = Bbor.
+
 clone Comoid as Mrplus with
   theory Base = Brplus,
   op NatMul.( * ) = lambda n, (Real.( * ) (n%r))
@@ -170,7 +294,7 @@ clone Comoid as Mrplus with
 require import FSet.
 require import Distr.
 
-pred cpOrs (X:('a->bool) set) (x:'a) = Mbor.sum (lambda (P:'a->bool), P x) X.
+pred cpOrs (X:('a cpred) set) (x:'a) = Mbor.sum (lambda (P:'a cpred), P x) X.
 
 pred disj_or (X:('a->bool) set) =
   forall x1 x2, x1 <> x2 => mem x1 X => mem x2 X =>
@@ -186,7 +310,7 @@ cut := FSet.leq_refl s; pose {1 3} s' := s;
 elim/set_ind s'.
   by rewrite Mbor.sum_empty.
   intros=> {s'} x s' nmem IH leq_adds'_s;
-  cut leq_s'_s : s' <= s by (apply (FSet.leq_tran _ (add x s'))=> //; apply leq_add);
+  cut leq_s'_s : s' <= s by (apply (FSet.leq_tran (add x s'))=> //; apply leq_add);
   rewrite Mbor.sum_add // /Mbor.Base.(+) /Bbor.(+) -rw_nor IH // /=;
   cut := h x; rewrite -rw_nand;
   case (mem x s)=> //=;
@@ -219,7 +343,6 @@ elim/set_ind X=> {X}.
   elim/set_ind X.
     by rewrite Mbor.sum_empty /Mbor.Base.Z /Bbor.Z /=.
     intros=> g X' g_nin_X' IH' f_nin_addgX' disj sum_addgX'.
-    print pred disj_or.
     cut f_ng := disj f g  _ _ _ x'.
       by generalize f_nin_addgX'; rewrite mem_add; apply absurd.
       by rewrite mem_add.
@@ -238,12 +361,12 @@ qed.
 require ISet.
 import Real.
 lemma mean (d:'a distr) (p:'a -> bool):
-  ISet.Finite.finite (ISet.support d) =>
+  ISet.Finite.finite (ISet.create (support d)) =>
   d <> Dempty.dempty =>
-  mu d p = Mrplus.sum (lambda x, (mu_x d x)*(mu (Dunit.dunit x) p)) (ISet.Finite.toFSet (ISet.support d)).
+  mu d p = Mrplus.sum (lambda x, (mu_x d x)*(mu (Dunit.dunit x) p)) (ISet.Finite.toFSet (ISet.create (support d))).
 proof strict.
 intros=> fin_supp_d d_nempty.
-pose s := FSet.filter p (ISet.Finite.toFSet (ISet.support d)).
+pose s := FSet.filter p (ISet.Finite.toFSet (ISet.create (support d))).
 pose eq := lambda (a b:'a), a = b.
 pose pickp := lambda (p:'a -> bool), pick (FSet.filter p s).
 pose is := img eq s.
@@ -251,16 +374,16 @@ cut pcan_pickp_eq : forall x, mem x s => pickp (eq x) = x.
   delta pickp eq; intros x x_in_s /=.
   apply (_:forall a, mem a (filter (lambda b, x = b) s) => a = x);
     first by (intros=> a; rewrite mem_filter //).
-  by rewrite mem_pick //; smt.
+  rewrite mem_pick //; smt.
 cut pcan_eq_pickp : forall x, mem x is => eq (pickp x) = x.
   by delta pickp eq; intros x h /=; apply fun_ext=> a /=; smt.
 cut p_is_or: mu d p = mu d (cpOrs is).
-  rewrite /cpOrs /is mu_in_supp /cpAnd /=;
+  rewrite /cpOrs /is mu_in_supp /cpAnd /support /=;
   congr=> //; apply fun_ext=> x /=; rewrite or_exists andC;
   case (in_supp x d /\ p x)=> h.
     rewrite rw_eq_sym rw_eqT; exists (eq x);
     split;last by delta eq=> //.
-    by rewrite /s mem_img // mem_filter ISet.Finite.mem_toFSet // /ISet.support ISet.mem_create.
+    by rewrite /s mem_img // mem_filter ISet.Finite.mem_toFSet // /support ISet.mem_create.
     by rewrite rw_eq_sym rw_neqF;
        pose q := (lambda x', mem x' (img eq s) /\ x' x);
        change (! exists x, q x); apply nexists=> a;
@@ -268,7 +391,7 @@ cut p_is_or: mu d p = mu d (cpOrs is).
        case (mem a is)=> // /= a_in_is;
        cut valA :eq (pickp a) = a by (apply pcan_eq_pickp);
        generalize a_in_is; rewrite /is /s img_def=> [y [<-]];
-       rewrite mem_filter ISet.Finite.mem_toFSet // /ISet.support ISet.mem_create /=;
+       rewrite mem_filter ISet.Finite.mem_toFSet // /support ISet.mem_create /=;
        delta eq=> /=; apply absurd=> /= ->.
 cut disj_or_is: disj_or is.
   by rewrite /disj_or /is=> x1 x2 h;

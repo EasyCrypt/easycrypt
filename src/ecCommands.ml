@@ -15,6 +15,12 @@ type pragma = {
 
 let pragma = ref { pm_verbose = true; pm_check = true; }
 
+let pragma_verbose (b : bool) =
+  pragma := { !pragma with pm_verbose = b; }
+
+let pragma_check (b : bool) =
+  pragma := { !pragma with pm_check = b; }
+
 (* -------------------------------------------------------------------- *)
 exception TopError of EcLocation.t * exn
 
@@ -84,6 +90,14 @@ let process_pr fmt scope p =
   | Pr_ax qs ->
       let (p, ax) = EcEnv.Ax.lookup qs.pl_desc env in
       Format.fprintf fmt "%a@." (EcPrinting.pp_axiom ppe) (p, ax)
+     
+  | Pr_mod qs ->
+      let (_p, me) = EcEnv.Mod.lookup qs.pl_desc env in
+      Format.fprintf fmt "%a@." (EcPrinting.pp_modexp ppe) me
+
+  | Pr_mty qs ->
+      let (p, ms) = EcEnv.ModTy.lookup qs.pl_desc env in
+      Format.fprintf fmt "%a@." (EcPrinting.pp_modsig ppe) (p, ms)
 
 let process_print scope p = 
   process_pr Format.std_formatter scope p
@@ -294,18 +308,22 @@ and process_pragma (scope : EcScope.scope) opt =
     match EcScope.goal scope with
     | Some { EcScope.puc_mode = Some false } ->
         EcScope.hierror "pragma [check|nocheck] in non-strict proof script";
-    | _ -> pragma := { !pragma with pm_check = mode }
+    | _ -> pragma_check mode
   in
 
   begin
     match unloc opt with
-    | "silent"   -> pragma := { !pragma with pm_verbose = false }
-    | "verbose"  -> pragma := { !pragma with pm_verbose = true  }
-    | "check"    -> check true
+    | "silent"   -> pragma_verbose false
+    | "verbose"  -> pragma_verbose true
     | "nocheck"  -> check false
-
+    | "check"    -> check true
     | _          -> ()
   end
+
+(* -------------------------------------------------------------------- *)
+and process_extract scope todo = 
+  EcExtraction.process_extraction (EcScope.env scope) todo;
+  scope
 
 (* -------------------------------------------------------------------- *)
 and process (ld : EcLoader.ecloader) (scope : EcScope.scope) g =
@@ -341,18 +359,11 @@ and process (ld : EcLoader.ecloader) (scope : EcScope.scope) g =
       | Gcheckproof  b    -> `Fct   (fun scope -> process_checkproof scope  b)
       | Gsave        loc  -> `Fct   (fun scope -> process_save       scope  loc)
       | Gpragma      opt  -> `State (fun scope -> process_pragma     scope  opt)
+      | Gextract     todo -> `Fct   (fun scope -> process_extract    scope todo)
     with
     | `Fct   f -> Some (f scope)
     | `State f -> f scope; None
   in
-    begin
-      scope |> oiter
-        (fun scope ->
-          try
-            ignore (Sys.getenv "ECDEBUG");
-            EcEnv.dump EcDebug.initial (EcScope.env scope)
-          with Not_found -> ())
-    end;
     scope
 
 (* -------------------------------------------------------------------- *)

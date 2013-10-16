@@ -14,7 +14,7 @@ open EcProvers
 (* -------------------------------------------------------------------- *)
 type pre_judgment = {
   pj_decl : LDecl.hyps * form;
-  pj_rule : (bool * int rule) option;
+  pj_rule : (bool * int rnode) option;
 }
 
 type judgment_uc = {
@@ -48,8 +48,8 @@ val get_hyps   : goal -> LDecl.hyps
 val get_node   : goal -> LDecl.hyps * form
 val new_goal   : judgment_uc -> LDecl.hyps * form -> goal
 
-val upd_rule : int rule -> goal -> goals
-val upd_rule_done : int rule -> goal -> goals
+val upd_rule : int rnode -> goal -> goals
+val upd_rule_done : int rnode -> goal -> goals
 
 val upd_done : judgment_uc -> judgment_uc
 
@@ -60,7 +60,7 @@ val find_all_goals : judgment_uc -> goals
 
 val find_in_hyps : form -> LDecl.hyps -> EcIdent.t
 
-val prove_goal_by : form list -> rule_name -> tactic
+val prove_goal_by : form list -> rule -> tactic
 
 (* -------------------------------------------------------------------- *)
 val t_id : string option -> tactic
@@ -86,7 +86,7 @@ val t_repeat : tactic -> tactic
 val t_do     : [`All | `Maybe] -> int option -> tactic -> tactic
 val t_try    : tactic -> tactic
 val t_or     : tactic -> tactic -> tactic
-val t_lor     : tactic list -> tactic
+val t_lor    : tactic list -> tactic
 
 val t_close : tactic -> tactic
 
@@ -139,6 +139,7 @@ val t_rewrite_node : ?fpat:dofpattern -> goal * int list -> rwside -> int -> goa
 val t_simplify : reduction_info -> tactic
 val t_simplify_nodelta : tactic
 
+val t_true  : tactic
 val t_split : tactic
 
 val t_left  : tactic
@@ -162,9 +163,10 @@ val t_subst_all : tactic
 val t_subst1    : form option -> tactic
 
 val t_assumption : tactic
+
 val t_progress : tactic -> tactic
 
-val t_trivial : tactic
+val t_logic_trivial : tactic
 
 val t_admit : tactic
 

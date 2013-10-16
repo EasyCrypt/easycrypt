@@ -1,12 +1,22 @@
 import why3 "bool" "Bool"
   op "xorb" as "^^".
 
-lemma xorb_spec : forall b1 b2, b1 ^^ b2 <=> b1 = !b2
+lemma nosmt xor_spec : forall b1 b2, b1 ^^ b2 <=> b1 = !b2
 by [].
 
-op xorb : bool -> bool -> bool = (^^).
+lemma nosmt xor_false : forall b, b ^^ false = b
+by [].
 
-lemma xorb_associative : forall b1 b2 b3, (b1 ^^ b2) ^^ b3 = b1 ^^ (b2 ^^ b3)
+lemma nosmt xor_true : forall b, b ^^ true = !b
+by [].
+
+lemma nosmt xor_comm : forall b1 b2, b1 ^^ b2 = b2 ^^ b1
+by [].
+
+lemma xor_nilpotent : forall b, b ^^ b = false
+by [].
+
+lemma xor_associative : forall b1 b2 b3, (b1 ^^ b2) ^^ b3 = b1 ^^ (b2 ^^ b3)
 by [].
 
 require import Real. 

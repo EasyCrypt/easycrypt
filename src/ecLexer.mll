@@ -91,6 +91,7 @@
 
     (* PHL: tactics *)
     "transitivity", TRANSITIVITY;       (* KW: tactic *)
+    "symmetry"    , SYMMETRY   ;        (* KW: tactic *)
     "seq"         , SEQ        ;        (* KW: tactic *)
     "wp"          , WP         ;        (* KW: tactic *)
     "sp"          , SP         ;        (* KW: tactic *)
@@ -119,6 +120,7 @@
     "unroll"      , UNROLL     ;        (* KW: tactic *)
     "splitwhile"  , SPLITWHILE ;        (* KW: tactic *)
     "kill"        , KILL       ;        (* KW: tactic *)
+    "eager"       , EAGER      ;        (* KW: tactic *)
 
     "axiom"       , AXIOM      ;        (* KW: global *)
     "lemma"       , LEMMA      ;        (* KW: global *)
@@ -142,6 +144,7 @@
     "require"     , REQUIRE    ;        (* KW: global *)
     "theory"      , THEORY     ;        (* KW: global *)
     "section"     , SECTION    ;        (* KW: global *)
+    "extraction"  , EXTRACTION ; 
     "type"        , TYPE       ;        (* KW: global *)
     "self"        , SELF       ;        (* KW: global *)
     "class"       , CLASS      ;        (* KW: global *)

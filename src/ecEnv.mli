@@ -32,14 +32,12 @@ val mroot : env -> EcPath.mpath
 val xroot : env -> EcPath.xpath option
 
 (* -------------------------------------------------------------------- *)
-val dump : ?name:string -> EcDebug.ppdebug -> env -> unit
-
-(* -------------------------------------------------------------------- *)
 type lookup_error = [
   | `XPath   of xpath
   | `MPath   of mpath
   | `Path    of path
   | `QSymbol of qsymbol
+  | `AbsStmt of EcIdent.t
 ]
 
 exception LookupFailure of lookup_error
@@ -199,14 +197,15 @@ end
 
 (* -------------------------------------------------------------------- *)
 module NormMp : sig
+  type use = {
+    us_pv : ty EcPath.Mx.t; 
+    us_gl : EcIdent.Sid.t;  
+  }  
+
   val norm_mpath : env -> mpath -> mpath
   val norm_xpath : env -> xpath -> xpath
   val norm_pvar  : env -> EcTypes.prog_var -> EcTypes.prog_var
   val norm_form  : env -> form -> form
-  type use =
-    { us_pv : ty EcPath.Mx.t; 
-      us_gl : EcIdent.Sid.t;  
-    }  
   val mod_use    : env -> mpath -> use
   val fun_use    : env -> xpath -> use
   val norm_restr : env -> mod_restr  -> use 
@@ -237,7 +236,7 @@ module Theory : sig
   val add : path -> env -> env
 
   val bind  : symbol -> ctheory_w3 -> env -> env
-  val bindx : symbol -> ctheory -> env -> env
+(*  val bindx : symbol -> ctheory -> env -> env *)
 
   val require : symbol -> ctheory_w3 -> env -> env
   val import  : path -> env -> env
@@ -285,6 +284,36 @@ module Ty : sig
 end
 
 (* -------------------------------------------------------------------- *)
+module Algebra : sig
+  val add_ring  : path -> EcAlgebra.ring  -> env -> env
+  val add_field : path -> EcAlgebra.field -> env -> env
+
+  val get_ring  : ty -> env -> EcAlgebra.ring  option
+  val get_field : ty -> env -> EcAlgebra.field option
+end
+
+(* -------------------------------------------------------------------- *)
+module TypeClass : sig
+  type t = unit
+
+  val add   : path -> env -> env
+  val bind  : symbol -> t -> env -> env
+  val graph : env -> EcTypeClass.graph
+
+  val lookup      : qsymbol -> env -> path * t
+  val lookup_opt  : qsymbol -> env -> (path * t) option
+  val lookup_path : qsymbol -> env -> path
+
+  val tc_of_typename : path -> env -> Sp.t
+end
+
+(* -------------------------------------------------------------------- *)
+module AbsStmt : sig
+  type t = EcBaseLogic.abs_uses
+  val byid : EcIdent.t -> env -> t
+end
+
+(* -------------------------------------------------------------------- *)
 type ebinding = [
   | `Variable  of EcTypes.pvar_kind * EcTypes.ty
   | `Function  of function_
@@ -299,15 +328,6 @@ val import_w3_dir :
      env -> string list -> string
   -> EcWhy3.renaming_decl
   -> env * ctheory_item list
-
-(* -------------------------------------------------------------------- *)
-module Algebra : sig
-  val add_ring  : path -> EcAlgebra.ring  -> env -> env
-  val add_field : path -> EcAlgebra.field -> env -> env
-
-  val get_ring  : ty -> env -> EcAlgebra.ring  option
-  val get_field : ty -> env -> EcAlgebra.field option
-end
 
 (* -------------------------------------------------------------------- *)
 open EcBaseLogic
@@ -326,7 +346,7 @@ module LDecl : sig
 
   type hyps
 
-  val init : env -> EcIdent.t list -> hyps
+  val init   : env -> EcIdent.t list -> hyps
   val tohyps : hyps -> EcBaseLogic.hyps
   val toenv  : hyps -> env
 

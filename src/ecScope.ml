@@ -327,10 +327,12 @@ end = struct
     | Sasgn   _ -> ()
     | Srnd    _ -> ()
     | Sassert _ -> ()
+    | Sabstract _ -> ()
 
     | Scall (_, f, _) -> cb f.x_top
     | Sif (_, s1, s2) -> List.iter (on_mpath_stmt cb) [s1; s2]
     | Swhile (_, s)   -> on_mpath_stmt cb s
+
 
   and on_mpath_stmt cb (s : stmt) =
     List.iter (on_mpath_instr cb) s.s_node
@@ -380,6 +382,7 @@ end = struct
       | EcFol.FhoareS   hs           -> on_mpath_hs  cb hs
       | EcFol.FequivF   ef           -> on_mpath_ef  cb ef
       | EcFol.FequivS   es           -> on_mpath_es  cb es
+      | EcFol.FeagerF   eg           -> on_mpath_eg  cb eg
       | EcFol.FbdHoareS bhs          -> on_mpath_bhs cb bhs
       | EcFol.FbdHoareF bhf          -> on_mpath_bhf cb bhf
       | EcFol.Fpr       pr           -> on_mpath_pr  cb pr
@@ -408,6 +411,14 @@ end = struct
       on_mpath_stmt cb es.EcFol.es_sr;
       on_mpath_memenv cb es.EcFol.es_ml;
       on_mpath_memenv cb es.EcFol.es_mr
+
+    and on_mpath_eg cb eg =
+      on_mpath_form cb eg.EcFol.eg_pr;
+      on_mpath_form cb eg.EcFol.eg_po;
+      cb eg.EcFol.eg_fl.x_top;
+      cb eg.EcFol.eg_fr.x_top;
+      on_mpath_stmt cb eg.EcFol.eg_sl;
+      on_mpath_stmt cb eg.EcFol.eg_sr;
 
     and on_mpath_bhf cb bhf =
       on_mpath_form cb bhf.EcFol.bhf_pr;
@@ -891,7 +902,7 @@ module Op = struct
   let add (scope : scope) (op : poperator located) =
     assert (scope.sc_pr_uc = None);
     let op = op.pl_desc and loc = op.pl_loc in
-    let ue = TT.ue_for_decl scope.sc_env (loc, op.po_tyvars) in
+    let ue = TT.transtyvars scope.sc_env (loc, op.po_tyvars) in
     let tp = TT.tp_relax in
 
     let (ty, body) =
@@ -911,21 +922,22 @@ module Op = struct
     if not (EcUnify.UniEnv.closed ue) then
       hierror "this operator type contains free type variables";
 
-    let uni     = Tuni.subst (EcUnify.UniEnv.close ue) in
+    let uni     = Tuni.offun (EcUnify.UniEnv.close ue) in
     let body    = body |> omap (e_mapty uni) in
     let ty      = uni ty in
     let tparams = EcUnify.UniEnv.tparams ue in
     let tyop    = EcDecl.mk_op tparams ty body in
 
     if op.po_kind = `Const then begin
-      let tue, ty, _ = EcUnify.UniEnv.freshen ue tparams None ty in
-      let tdom = EcUnify.UniEnv.fresh_uid tue in
-      let tcom = EcUnify.UniEnv.fresh_uid tue in
-      let tfun = EcTypes.tfun tdom tcom in
+      let tue   = EcUnify.UniEnv.copy ue in
+      let ty, _ = EcUnify.UniEnv.openty tue tparams None ty in
+      let tdom  = EcUnify.UniEnv.fresh tue in
+      let tcom  = EcUnify.UniEnv.fresh tue in
+      let tfun  = EcTypes.tfun tdom tcom in
 
         try
           EcUnify.unify (env scope) tue ty tfun;
-          let msg = "this operator type is (unifiable) to an function type" in
+          let msg = "this operator type is (unifiable) to a function type" in
             hierror ~loc "%s" msg
         with EcUnify.UnificationFailure _ -> ()
     end;
@@ -940,7 +952,7 @@ module Pred = struct
   let add (scope : scope) (op : ppredicate located) =
     assert (scope.sc_pr_uc = None);
     let op = op.pl_desc and loc = op.pl_loc in
-    let ue     = TT.ue_for_decl scope.sc_env (loc, op.pp_tyvars) in
+    let ue     = TT.transtyvars scope.sc_env (loc, op.pp_tyvars) in
     let tp     = TT.tp_relax in
     let dom, body = 
       match op.pp_def with
@@ -960,7 +972,7 @@ module Pred = struct
 
     let uni     = EcUnify.UniEnv.close ue in
     let body    = body |> omap (EcFol.Fsubst.uni uni) in
-    let dom     = List.map (Tuni.subst uni) dom in
+    let dom     = List.map (Tuni.offun uni) dom in
     let tparams = EcUnify.UniEnv.tparams ue in
     let tyop    = EcDecl.mk_pred tparams dom body in
 
@@ -990,7 +1002,7 @@ module Mod = struct
             let env = scope.sc_env in
             (* We keep only the internal part, i.e the inner global variables *)
             (* TODO : using mod_use here to compute the set of inner global 
-               variables is inefficiant, change this algo *)
+               variables is inefficient, change this algo *)
             let mp = EcPath.mpath_crt mpath [] None in
             let use = EcEnv.NormMp.mod_use env mp in
             let rx = 
@@ -1027,7 +1039,7 @@ module Mod = struct
 
   let declare (scope : scope) m =
     if not (CoreSection.in_section scope.sc_section) then
-      hierror "cannot declare an abstract module outside of a module";
+      hierror "cannot declare an abstract module outside of a section";
 
     let modty = m.ptmd_modty in
     let tysig = fst (TT.transmodtype scope.sc_env (fst modty)) in
@@ -1099,7 +1111,8 @@ module Ax = struct
       match check with
       | false -> PSNoCheck
       | true  ->
-          let hyps = EcEnv.LDecl.init scope.sc_env axd.ax_tparams in
+          (* FIXME: TC HOOK *)
+          let hyps = EcEnv.LDecl.init scope.sc_env (List.map fst axd.ax_tparams) in
             PSCheck (EcLogic.open_juc (hyps, oget axd.ax_spec), [0])
     in 
     let puc = { puc_active = Some {
@@ -1118,7 +1131,7 @@ module Ax = struct
     assert (scope.sc_pr_uc = None);
 
     let loc = ax.pl_loc and ax = ax.pl_desc in
-    let ue  = TT.ue_for_decl scope.sc_env (loc, ax.pa_tyvars) in
+    let ue  = TT.transtyvars scope.sc_env (loc, ax.pa_tyvars) in
 
     if ax.pa_local && not (CoreSection.in_section scope.sc_section) then
       hierror "cannot declare a local lemma outside of a section";
@@ -1286,6 +1299,8 @@ module Ty = struct
   open EcTyping
   open EcAlgebra
 
+  module TT = EcTyping
+
   (* ------------------------------------------------------------------ *)
   let bind (scope : scope) ((x, tydecl) : (_ * tydecl)) =
     assert (scope.sc_pr_uc = None);
@@ -1297,7 +1312,7 @@ module Ty = struct
   let add (scope : scope) info =
     assert (scope.sc_pr_uc = None);
     let (args, name) = info.pl_desc and loc = info.pl_loc in
-    let ue = ue_for_decl scope.sc_env (loc, Some args) in
+    let ue = TT.transtyvars scope.sc_env (loc, Some args) in
     let tydecl = {
       tyd_params = EcUnify.UniEnv.tparams ue;
       tyd_type   = None;
@@ -1308,7 +1323,7 @@ module Ty = struct
   let define (scope : scope) info body =
     assert (scope.sc_pr_uc = None);
     let (args, name) = info.pl_desc and loc = info.pl_loc in
-    let ue     = ue_for_decl scope.sc_env (loc, Some args) in
+    let ue     = TT.transtyvars scope.sc_env (loc, Some args) in
     let body   = transty tp_tydecl scope.sc_env ue body in
     let tydecl = {
       tyd_params = EcUnify.UniEnv.tparams ue;
@@ -1317,10 +1332,17 @@ module Ty = struct
       bind scope (unloc name, tydecl)
 
   (* ------------------------------------------------------------------ *)
+  let bindclass (scope : scope) (x, (tc : unit)) =
+    assert (scope.sc_pr_uc = None);
+    let scope = { scope with sc_env = EcEnv.TypeClass.bind x tc scope.sc_env; } in
+    let scope = maybe_add_to_section scope (EcTheory.CTh_typeclass x) in
+      scope
+
+  (* ------------------------------------------------------------------ *)
   let addclass (scope : scope) tcd =
     assert (scope.sc_pr_uc = None);
     let _tclass = EcTyping.trans_tclass scope.sc_env tcd in
-      scope
+      bindclass scope (unloc (unloc tcd).ptc_name, ())
 
   (* ------------------------------------------------------------------ *)
   let check_tci_operators env ops reqs =
@@ -1419,7 +1441,7 @@ module Ty = struct
       hierror "load AlgTactic first";
 
     let (ty, p) =
-      let ue = ue_for_decl scope.sc_env (loc, Some []) in
+      let ue = TT.transtyvars scope.sc_env (loc, Some []) in
       let ty = mk_loc tci.pti_type.pl_loc (PTnamed tci.pti_type) in
       let ty = transty tp_tydecl scope.sc_env ue ty in
         match (EcEnv.Ty.hnorm ty scope.sc_env).ty_node with
@@ -1444,7 +1466,7 @@ module Ty = struct
       hierror "load AlgTactic first";
 
     let (ty, p) =
-      let ue = ue_for_decl scope.sc_env (loc, Some []) in
+      let ue = TT.transtyvars scope.sc_env (loc, Some []) in
       let ty = mk_loc tci.pti_type.pl_loc (PTnamed tci.pti_type) in
       let ty = transty tp_tydecl scope.sc_env ue ty in
         match (EcEnv.Ty.hnorm ty scope.sc_env).ty_node with
@@ -1518,7 +1540,7 @@ module Theory = struct
           | None -> ()
           | Some sp ->
               if p_equal sp (EcEnv.root scope.sc_env) then
-                hierror "cannot close a theory with active sessions";
+                hierror "cannot close a theory with active sections";
         end;
         let cth      = EcEnv.Theory.close scope.sc_env in
         let loaded   = scope.sc_loaded in
@@ -1702,10 +1724,13 @@ module Section = struct
               let _, scope = Theory.exit scope in
                 scope
 
+          | T.CTh_typeclass x -> Ty.bindclass scope (x, ())
+
           | T.CTh_instance (p, cr) -> begin
               match cr with
-              | `Ring  cr -> { scope with sc_env = EcEnv.Algebra.add_ring  p cr scope.sc_env }
-              | `Field cr -> { scope with sc_env = EcEnv.Algebra.add_field p cr scope.sc_env }
+              | `Ring    cr -> { scope with sc_env = EcEnv.Algebra.add_ring  p cr scope.sc_env }
+              | `Field   cr -> { scope with sc_env = EcEnv.Algebra.add_field p cr scope.sc_env }
+              | `General _  -> scope    (* FIXME: TC HOOK *)
           end
         in
 

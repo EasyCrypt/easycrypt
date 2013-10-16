@@ -5,6 +5,8 @@ open EcPrinting
 
 module T = EcTerminal
 
+open EcTypeClass                        (* FIXME *)
+
 (* -------------------------------------------------------------------- *)
 let _ =
   let myname  = Filename.basename Sys.executable_name
@@ -125,6 +127,9 @@ let _ =
     prvopts.pvro_checkall
     prvopts.prvo_maxjobs
     prvopts.prvo_provers;
+
+  if prvopts.pvro_weakchk then
+    EcCommands.pragma_check false;
 
   (* Instantiate terminal *)
   let lazy terminal = terminal in

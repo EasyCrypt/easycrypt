@@ -11,12 +11,6 @@ module Map = struct
     val odup : ('a -> key) -> 'a list -> ('a * 'a) option
 
     val to_stream : 'a t -> (key * 'a) Stream.t
-
-    val dump :
-         name:string
-      -> (key -> 'a -> string)                   (* key printer *)
-      -> (EcDebug.ppdebug -> (key * 'a) -> unit) (* value printer *)
-      -> EcDebug.ppdebug -> 'a t -> unit
   end
 
   module Make(O : OrderedType) : S with type key = O.t = struct
@@ -44,12 +38,6 @@ module Map = struct
               aout
       in
         Stream.from next
-
-    let dump ~name keyprinter valuepp pp (m : 'a t) =
-      let ppkv pp (k, v) =
-        EcDebug.onhlist pp (keyprinter k v) valuepp [(k, v)]
-      in
-        EcDebug.onhseq pp name ppkv (to_stream m)
   end
 
   module MakeBase(M : S) : Why3.Extmap.S
@@ -101,7 +89,7 @@ end
 
 module Mint = Map.Make(Int)
 module Sint = Set.MakeOfMap(Mint)
-module Hint = Map.Make(Int)
+module Hint = EHashtbl.Make(Int)
 
 (* --------------------------------------------------------------------*)
 module Mstr = Map.Make(String)

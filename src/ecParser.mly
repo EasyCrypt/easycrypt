@@ -139,6 +139,7 @@
 
 %token <EcParsetree.codepos> CPOS
 
+%token EXTRACTION
 %token ADD
 %token ADMIT
 %token ALIAS
@@ -313,7 +314,9 @@
 %token WP
 %token EQOBSIN
 %token TRANSITIVITY
+%token SYMMETRY
 %token ZETA 
+%token EAGER
 
 %token <string> OP1 OP2 OP3 OP4
 %token LTCOLON GT LT GE LE
@@ -549,7 +552,7 @@ expr_u:
     { PEapp (e, args) }
 
 | op=loc(NOT) ti=tvars_app? e=expr
-    { peapp_symb op.pl_loc "!" ti [e] }
+    { peapp_symb op.pl_loc "[!]" ti [e] }
 
 | op=loc(uniop) ti=tvars_app? e=expr
     { peapp_symb op.pl_loc op.pl_desc ti [e] } 
@@ -564,7 +567,7 @@ expr_u:
     { peapp_symb op.pl_loc "=" ti [e1; e2] }
 
 | e1=expr op=loc(NE) ti=tvars_app? e2=expr
-    { peapp_symb op.pl_loc "!" None 
+    { peapp_symb op.pl_loc "[!]" None 
       [ mk_loc op.pl_loc (peapp_symb op.pl_loc "=" ti [e1; e2])] }
 
 | e1=expr op=loc(ADD) ti=tvars_app? e2=expr 
@@ -723,6 +726,9 @@ sform_u(P):
 
 | EQUIV LBRACKET eb=equiv_body(P) RBRACKET { eb }
 
+(* ADDED FOR EAGER *)
+| EAGER LBRACKET eb=eager_body(P) RBRACKET { eb }
+
 | HOARE LBRACKET
     s=loc(fun_def_body)
     COLON pre=form_r(P) LONGARROW post=form_r(P)
@@ -751,7 +757,7 @@ form_u(P):
 | e=sform_r(P) args=sform_r(P)+ { PFapp (e, args) } 
 
 | op=loc(NOT) ti=tvars_app? e=form_r(P) 
-    { pfapp_symb  op.pl_loc "!" ti [e] }
+    { pfapp_symb  op.pl_loc "[!]" ti [e] }
 
 | op=loc(uniop) ti=tvars_app? e=form_r(P)
    { pfapp_symb op.pl_loc op.pl_desc ti [e] } 
@@ -766,7 +772,7 @@ form_u(P):
     { pfapp_symb op.pl_loc "=" ti [e1; e2] }
 
 | e1=form_r(P) op=loc(NE) ti=tvars_app? e2=form_r(P)
-    { pfapp_symb op.pl_loc "!" None 
+    { pfapp_symb op.pl_loc "[!]" None 
       [ mk_loc op.pl_loc (pfapp_symb op.pl_loc "=" ti [e1; e2])] }
 
 | e1=form_r(P) op=loc(MINUS) ti=tvars_app? e2=form_r(P)
@@ -873,6 +879,11 @@ equiv_body(P):
   COLON pre=form_r(P) LONGARROW post=form_r(P)
 
     { PFequivF (pre, (mp1, mp2), post) }
+
+eager_body(P):
+| s1=stmt COMMA  mp1=loc(fident) TILD mp2=loc(fident) COMMA s2=stmt
+    COLON pre=form_r(P) LONGARROW post=form_r(P)
+    { PFeagerF (pre, (s1, mp1, mp2,s2), post) }
 
 pgtybinding1:
 | x=ptybinding1 { List.map (fun (xs,ty) -> xs, PGTY_Type ty) x }
@@ -1078,7 +1089,7 @@ mod_def:
         | `Alias m ->
              if p <> [] then
                error (EcLocation.make $startpos $endpos)
-                 (Some "cannot parameterized module alias");
+                 (Some "cannot parameterize module alias");
              if t <> None then
                error (EcLocation.make $startpos $endpos)
                  (Some "cannot bind module type to module alias"); 
@@ -1177,15 +1188,19 @@ oracle_info:
 (* -------------------------------------------------------------------- *)
 (* EcTypes declarations / definitions                                   *)
 
+tcand:
+| x=loc(OP4) { if unloc x <> "&" then error x.pl_loc None }
+;
+
+typaram:
+| x=tident { (x, []) }
+| x=tident LTCOLON tc=plist1(lqident, tcand) { (x, tc) }
+;
+
 typarams:
-| empty
-    { []  }
-
-| x=tident
-   { [x] }
-
-| LPAREN xs=plist1(tident, COMMA) RPAREN
-    { xs }
+| empty { []  }
+| x=tident { [(x, [])] }
+| xs=paren(plist1(typaram, COMMA)) { xs }
 ;
 
 type_decl:
@@ -1265,8 +1280,7 @@ op_tydom:
 ;
 
 tyvars_decl:
-| LBRACKET tyvars=tident* RBRACKET { Some tyvars }
-| empty { None }
+| LBRACKET tyvars=typaram* RBRACKET { tyvars }
 ;
 
 %inline op_or_const:
@@ -1275,35 +1289,35 @@ tyvars_decl:
 ;
 
 operator:
-| k=op_or_const x=oident tyvars=tyvars_decl COLON sty=loc(type_exp) {
+| k=op_or_const x=oident tyvars=tyvars_decl? COLON sty=loc(type_exp) {
     { po_kind   = k;
       po_name   = x;
       po_tyvars = tyvars;
       po_def    = POabstr sty; }
   }
 
-| k=op_or_const x=oident tyvars=tyvars_decl COLON sty=loc(type_exp) EQ b=expr {
+| k=op_or_const x=oident tyvars=tyvars_decl? COLON sty=loc(type_exp) EQ b=expr {
     { po_kind   = k;
       po_name   = x;
       po_tyvars = tyvars;
       po_def    = POconcr ([], sty, b); }
   }
 
-| k=op_or_const x=oident tyvars=tyvars_decl eq=loc(EQ) b=expr {
+| k=op_or_const x=oident tyvars=tyvars_decl? eq=loc(EQ) b=expr {
     { po_kind   = k;
       po_name   = x;
       po_tyvars = tyvars;
       po_def    = POconcr([], mk_loc eq.pl_loc PTunivar, b); }
   }
 
-| k=op_or_const x=oident tyvars=tyvars_decl p=ptybindings eq=loc(EQ) b=expr {
+| k=op_or_const x=oident tyvars=tyvars_decl? p=ptybindings eq=loc(EQ) b=expr {
     { po_kind   = k;
       po_name   = x;
       po_tyvars = tyvars;
       po_def    = POconcr(p, mk_loc eq.pl_loc PTunivar, b); }
   }
 
-| k=op_or_const x=oident tyvars=tyvars_decl p=ptybindings COLON codom=loc(type_exp)
+| k=op_or_const x=oident tyvars=tyvars_decl? p=ptybindings COLON codom=loc(type_exp)
     EQ b=expr {
     { po_kind   = k;
       po_name   = x;
@@ -1314,19 +1328,19 @@ operator:
 
 predicate:
 | PRED x = oident
-   { { pp_name = x;
+   { { pp_name   = x;
        pp_tyvars = None;
-       pp_def = PPabstr []; } }
+       pp_def    = PPabstr []; } }
 
-| PRED x = oident tyvars=tyvars_decl COLON sty = op_tydom
-   { { pp_name = x;
+| PRED x = oident tyvars=tyvars_decl? COLON sty = op_tydom
+   { { pp_name   = x;
        pp_tyvars = tyvars;
-       pp_def = PPabstr sty; } }
+       pp_def    = PPabstr sty; } }
 
-| PRED x = oident tyvars=tyvars_decl p=ptybindings EQ f=form
-   { { pp_name = x;
+| PRED x = oident tyvars=tyvars_decl? p=ptybindings EQ f=form
+   { { pp_name   = x;
        pp_tyvars = tyvars;
-       pp_def = PPconcr(p,f); } } 
+       pp_def    = PPconcr(p,f); } } 
 ;
 
 (* -------------------------------------------------------------------- *)
@@ -1357,7 +1371,7 @@ claim:
 ;
 
 lemma_decl :
-| x=ident tyvars=tyvars_decl pd=pgtybindings? COLON f=form { x,tyvars,pd,f }
+| x=ident tyvars=tyvars_decl? pd=pgtybindings? COLON f=form { x,tyvars,pd,f }
 ;
 
 nosmt:
@@ -1531,6 +1545,7 @@ fpattern_head(F):
 
 fpattern_arg:
 | UNDERSCORE   { EA_none }
+| LPAREN LTCOLON m=loc(mod_qident) RPAREN  { EA_mod m }
 | f=sform      { EA_form f }
 | s=mident     { EA_mem s }
 ;
@@ -1643,9 +1658,11 @@ code_position:
 
 while_tac_info : 
 | inv=sform
-    { (inv, None) }
+    { (inv, None, None) }
 | inv=sform vrnt=sform 
-    { (inv, Some vrnt) }
+    { (inv, Some vrnt, None) }
+| inv=sform vrnt=sform k=sform eps=sform 
+    { (inv, Some vrnt, Some (k,eps)) }
 
 rnd_info:
 | empty {PNoRndParams (* None,None *) }
@@ -1819,6 +1836,31 @@ logtactic:
    { Ppose (x, o |> omap EcMaps.Sint.of_list, p) }
 ;
 
+(* NEW : ADDED FOR EAGER *)
+eager_info:
+| h=ident 
+    { LE_done h }
+| LPAREN h=ident COLON s1=stmt TILD s2=stmt COLON pr=form LONGARROW po=form RPAREN
+    { LE_todo(h,s1,s2,pr,po) }
+;
+eager_tac:
+| SEQ n1=number n2=number i=eager_info COLON p=sform
+    { Peager_seq (i,(n1,n2),p) }
+| IF 
+    { Peager_if }
+| WHILE i=eager_info 
+    { Peager_while i }
+| FUN 
+    { Peager_fun_def }
+| FUN i=eager_info f=sform 
+    { Peager_fun_abs(i,f) }
+| CALL info=fpattern(call_info) 
+    { Peager_call info }
+| info=eager_info COLON p=sform 
+    { Peager(info,p) }
+;
+(* END EAGER *)
+
 phltactic:
 | FUN
     { Pfun_def }
@@ -1888,6 +1930,10 @@ phltactic:
 
 | ALIAS s=side? o=codepos WITH x=lident
     { Palias (s, o, Some x) }
+(* NEW *)
+| ALIAS s=side? o=codepos x=lident EQ e=expr 
+    { Pset (false,s, o,x,e) }
+(* END NEW *)
 
 | FISSION s=side? o=codepos AT d1=NUM COMMA d2=NUM
     { Pfission (s, o, (1, (d1, d2))) }
@@ -1934,18 +1980,33 @@ phltactic:
     { Peqobs_in info }
 | TRANSITIVITY tk=trans_kind h1=trans_hyp h2=trans_hyp
     { Ptrans_stmt (tk, fst h1, snd h1, fst h2, snd h2) }
+(* ADDED *)
+| SYMMETRY 
+    { Psymmetry }    
 
 | SP s=side?
    {Psp s}
+(* NEW : ADDED FOR EAGER *)
+| EAGER t=eager_tac { t }
 
 (* basic pr based tacs *)
 | HOARE {Phoare}
 | BDHOARE {Pbdhoare}
 | PRBOUNDED {Pprbounded}
 | REWRITE PR s=LIDENT {Ppr_rewrite s}
+(* NEW TACTIC *)
+| BDHOARE SPLIT i=bdhoare_split { Pbdhoare_split i }
+(* NEW TACTIC *)
+| BDHOARE EQUIV s=side pr=sform po=sform { Pbd_equiv(s,pr,po) } 
 (* TODO : remove this tactic *)
 | PRFALSE {Pprfalse}
 | BDEQ {Pbdeq}
+;
+
+bdhoare_split:
+| b1=sform b2=sform b3=sform? { BDH_split_bop (b1,b2,b3) }
+| b1=sform b2=sform COLON f=sform { BDH_split_or_case (b1,b2,f) }
+| NOT b1=sform b2=sform      { BDH_split_not (Some b1,b2) }
 ;
 
 trans_kind:
@@ -2139,44 +2200,52 @@ clone_proof:
 | PROOF x=clone_lemma { List.rev x }
 ;
 
+opclmode:
+| EQ { `Alias }
+| LEFTARROW { `Inline }
+;
+
+cltyparams:
+| empty { [] }
+| x=tident { [x] }
+| xs=paren(plist1(tident, COMMA)) { xs }
+;
+
 clone_override:
-| TYPE ps=typarams x=qident EQ t=loc(type_exp)
+| TYPE ps=cltyparams x=qident EQ t=loc(type_exp)
    { (x, PTHO_Type (ps, t, `Alias)) }
 
-| TYPE ps=typarams x=qident LEFTARROW t=loc(type_exp)
+| TYPE ps=cltyparams x=qident LEFTARROW t=loc(type_exp)
    { (x, PTHO_Type (ps, t, `Inline)) }
 
-| OP x=qoident LEFTARROW y=qoident
-   { (x, PTHO_Op (`OpInline y)) }
-
-| OP x=qoident tyvars=tyvars_decl COLON sty=loc(type_exp) EQ e=expr
+| OP x=qoident tyvars=bracket(tident*)? COLON sty=loc(type_exp) mode=opclmode e=expr
    { let ov = {
        opov_tyvars = tyvars;
        opov_args   = [];
        opov_retty  = sty;
        opov_body   = e;
      } in
-       (x, PTHO_Op (`OpDef ov)) }
+       (x, PTHO_Op (ov, mode)) }
 
-| OP x=qoident tyvars=tyvars_decl eq=loc(EQ) e=expr
+| OP x=qoident tyvars=bracket(tident*)? mode=loc(opclmode) e=expr
    { let ov = {
        opov_tyvars = tyvars;
        opov_args   = [];
-       opov_retty  = mk_loc eq.pl_loc PTunivar;
+       opov_retty  = mk_loc mode.pl_loc PTunivar;
        opov_body   = e;
      } in
-       (x, PTHO_Op (`OpDef ov)) }
+       (x, PTHO_Op (ov, unloc mode)) }
 
-| OP x=qoident tyvars=tyvars_decl p=ptybindings eq=loc(EQ) e=expr
+| OP x=qoident tyvars=bracket(tident*)? p=ptybindings mode=loc(opclmode) e=expr
    { let ov = {
        opov_tyvars = tyvars;
        opov_args   = p;
-       opov_retty  = mk_loc eq.pl_loc PTunivar;
+       opov_retty  = mk_loc mode.pl_loc PTunivar;
        opov_body   = e;
      } in
-       (x, PTHO_Op (`OpDef ov)) }
+       (x, PTHO_Op (ov, unloc mode)) }
 
-| PRED x=qoident tyvars=tyvars_decl p=ptybindings EQ f=form
+| PRED x=qoident tyvars=bracket(tident*)? p=ptybindings EQ f=form
    { let ov = {
        prov_tyvars = tyvars;
        prov_args   = p;
@@ -2184,7 +2253,7 @@ clone_override:
      } in
        (x, PTHO_Pred ov) }
 
-| PRED x=qoident tyvars=tyvars_decl EQ f=form
+| PRED x=qoident tyvars=bracket(tident*)? EQ f=form
    { let ov = {
        prov_tyvars = tyvars;
        prov_args   = [];
@@ -2208,6 +2277,8 @@ print:
 | THEORY qs=qident { Pr_th qs }
 | PRED   qs=qident { Pr_pr qs } 
 | AXIOM  qs=qident { Pr_ax qs }
+| MODULE qs=qident { Pr_mod qs }
+| MODULE TYPE qs=qident { Pr_mty qs }
 ;
 
 prover_iconfig:
@@ -2268,7 +2339,27 @@ global_:
 | x=loc(QED)       { Gsave x.pl_loc }
 | PRINT p=print    { Gprint     p   }
 | PRAGMA x=lident  { Gpragma    x   }
+| EXTRACTION i=extract_info { Gextract i }
 ;
+
+extract_info:
+|  s=STRING? qs=plist1(toextract,COMMA) w=withextract { (s,qs,w) }
+;
+
+toextract:
+| OP q=qoident     {ExOp q}
+| TYPE q=qoident   {ExTy q}
+| THEORY q=qoident {ExTh q}
+;
+
+withextract:
+| empty { [] }
+| WITH w=plist1(withextract1,COMMA) { w }
+;
+withextract1:
+| p=toextract EQ s=STRING { p,s }
+;
+
 
 stop:
 | EOF { }
@@ -2346,6 +2437,10 @@ __rlist1(X, S):                         (* left-recursive *)
 
 %inline brace(X):
 | LBRACE x=X RBRACE { x }
+;
+
+%inline bracket(X):
+| LBRACKET x=X RBRACKET { x }
 ;
 
 (* -------------------------------------------------------------------- *)

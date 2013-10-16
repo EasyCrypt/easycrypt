@@ -14,7 +14,7 @@ export Abs.
 
 theory Triangle.
 
-  lemma triangular_inequality : forall (x:_,y:_,z:_),
+  lemma triangular_inequality x y z:
      `| x-y | <= `| x-z |  + `| y-z |
   by [].
 
@@ -26,13 +26,19 @@ theory FromInt.
   lemma from_intM: forall (a b:int),
     (from_int a < from_int b) <=> (a < b)%Int
   by [].
+
+  lemma from_intMle : forall (a b : int), from_int a <= from_int b <=> a <= b
+  by [].
+
 end FromInt.
 export FromInt.
 
 theory PowerInt.
   import why3 "real" "PowerInt"
      op "power" as "^".
-     
+  axiom pow_inv_pos :
+    forall (x : real) (n : int), Int.(<=) 0 n => x ^ (Int.([-]) n) = inv (x ^ n).
+   
 end PowerInt.
 export PowerInt.
 
@@ -60,5 +66,91 @@ lemma mulrM: forall (x y z:real),
   x * z < y * z
 by [].
 
+lemma nosmt addleM : forall (x1 x2 y1 y2:real),
+   x1 <= x2 => y1 <= y2 => x1 + y1 <= x2 + y2 
+by [].
+
+lemma nosmt addgeM : forall (x1 x2 y1 y2:real),
+   x1 >= x2 => y1 >= y2 => x1 + y1 >= x2 + y2 
+by [].
+
+lemma real_abs_sum : forall (a b c:real),
+ a = b + c => `|a| <= `|b| + `|c|
+by smt.
+
+lemma real_le_trans: forall (a b c:real), 
+ a <= b => b <= c => a <= c
+by [].
+
+lemma nosmt le_ge : forall (x y:real), (x <= y) <=> (y >= x)
+by [].
+
+lemma nosmt eq_le_ge : forall (x y:real), (x = y) <=> (x <= y /\ x >= y)
+by [].
+
+lemma nosmt eq_le: forall (x y:real), x = y => x <= y
+by [].
+
 op exp : real -> real.
 (* TODO : add axioms*)
+
+require import AlgTactic.
+
+instance ring with real
+  op rzero = zero
+  op rone  = one
+  op add   = ( + )
+  op opp   = ([-])
+  op mul   = ( * )
+  op expr  = PowerInt.( ^ )
+  op sub   = (-)
+  op ofint = FromInt.from_int
+
+  proof oner_neq0 by smt
+  proof addr0     by smt
+  proof addrA     by smt
+  proof addrC     by smt
+  proof addrN     by smt
+  proof mulr1     by smt
+  proof mulrA     by smt
+  proof mulrC     by smt
+  proof mulrDl    by smt
+  proof expr0     by smt
+  proof exprS     by smt
+  proof subrE     by smt
+  proof ofint0    by smt
+  proof ofint1    by smt
+  proof ofintS    by smt
+  proof ofintN    by smt.
+
+instance field with real
+  op rzero = zero
+  op rone  = one
+  op add   = ( + )
+  op opp   = ([-])
+  op mul   = ( * )
+  op expr  = PowerInt.( ^ )
+  op sub   = (-)
+  op ofint = FromInt.from_int
+  op inv   = inv
+  op div   = (/)
+
+  proof oner_neq0 by smt
+  proof addr0     by smt
+  proof addrA     by smt
+  proof addrC     by smt
+  proof addrN     by smt
+  proof mulr1     by smt
+  proof mulrA     by smt
+  proof mulrC     by smt
+  proof mulrDl    by smt
+  proof mulrV     by smt
+  proof expr0     by smt
+  proof exprS     by smt
+  proof exprN     by smt
+  proof subrE     by smt
+  proof divrE     by smt
+  proof ofint0    by smt
+  proof ofint1    by smt
+  proof ofintS    by smt
+  proof ofintN    by smt.

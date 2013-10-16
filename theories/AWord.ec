@@ -7,6 +7,7 @@ const length:int.
 axiom leq0_length: 0 <= length.
 
 op zeros: word.
+op ones: word.
 
 op ( ^ ): word -> word -> word.
 
@@ -30,6 +31,23 @@ axiom can_from_to w:
 axiom pcan_to_from (b:bitstring):
   `|b| = length =>
   to_bits (from_bits b) = b.
+
+(** Conversion with int *)
+op to_int   : word -> int.
+op from_int : int -> word.
+
+axiom to_from w: from_int (to_int w) = w.
+axiom from_to i: to_int (from_int i) = i %% 2^length.
+
+lemma from_to_bound i:
+   0 <= i < 2^length =>
+   to_int (from_int i) = i.
+proof.
+ rewrite from_to.
+ intros H.
+ elim (EuclDiv.ediv_unique i (2^length) 0 i _ _ _) => //;first 2 smt.
+ by intros _ <-.
+qed.
 
 theory Dword.
   require import Distr.

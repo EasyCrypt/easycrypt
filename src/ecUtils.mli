@@ -42,6 +42,11 @@ val as_seq0 : 'a list -> 'a tuple0
 val as_seq1 : 'a list -> 'a tuple1
 val as_seq2 : 'a list -> 'a tuple2
 val as_seq3 : 'a list -> 'a tuple3
+val as_seq4 : 'a list -> 'a tuple4
+val as_seq5 : 'a list -> 'a tuple5
+
+(* -------------------------------------------------------------------- *)
+val int_of_bool : bool -> int
 
 (* -------------------------------------------------------------------- *)
 val proj3_1 : 'a * 'b * 'c -> 'a
@@ -50,6 +55,8 @@ val proj3_3 : 'a * 'b * 'c -> 'c
 
 val fst_map : ('a -> 'c) -> 'a * 'b -> 'c * 'b
 val snd_map : ('b -> 'c) -> 'a * 'b -> 'a * 'c
+
+val swap: 'a * 'b -> 'b * 'a
 
 (* -------------------------------------------------------------------- *)
 type 'a eq  = 'a -> 'a -> bool
@@ -61,6 +68,8 @@ val opt_equal  : 'a eq -> 'a option eq
 (* -------------------------------------------------------------------- *)
 val none : 'a option
 val some : 'a -> 'a option
+
+val funnone : 'a -> 'b option
 
 (* -------------------------------------------------------------------- *)
 val oiter      : ('a -> unit) -> 'a option -> unit
@@ -165,15 +174,17 @@ module List : sig
 
   val prmap : ('a -> 'b option) -> 'a list -> 'b list
 
-  val smart_map : ('a -> 'a) -> 'a list -> 'a list
-
-  val smart_map_fold : ('a -> 'b -> 'a * 'b) -> 'a -> 'b list -> 'a * 'b list
-
   val sum : int list -> int
 
   val min : 'a -> 'a list -> 'a
 
   val max : 'a -> 'a list -> 'a
+
+  module Smart : sig
+    val map : ('a -> 'a) -> 'a list -> 'a list
+
+    val map_fold : ('a -> 'b -> 'a * 'b) -> 'a -> 'b list -> 'a * 'b list
+  end
 end
 
 (* -------------------------------------------------------------------- *)

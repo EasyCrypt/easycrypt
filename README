@@ -1,7 +1,7 @@
 * REQUIREMENTS
 ====================================================================
 
- * OCaml (>= 3.12)
+ * OCaml (>= 4.00)
 
    Available at http://caml.inria.fr/
 

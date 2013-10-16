@@ -36,6 +36,7 @@ type tyerror =
 | OnlyMonoTypeAllowed
 | UnboundTypeParameter of symbol
 | UnknownTypeName      of qsymbol
+| UnknownTypeClass     of qsymbol
 | InvalidTypeAppl      of qsymbol * int * int
 | DuplicatedTyVar
 | DuplicatedLocal      of symbol
@@ -80,10 +81,8 @@ val tp_tclass : typolicy
 val selfname :  EcIdent.t
 
 (* -------------------------------------------------------------------- *)
-val ue_for_decl :
-     EcEnv.env
-  -> (EcLocation.t * psymbol list option)
-  -> EcUnify.unienv
+val transtyvars:
+  EcEnv.env -> (EcLocation.t * ptyparams option) -> EcUnify.unienv
 
 (* -------------------------------------------------------------------- *)
 val transty : typolicy -> EcEnv.env -> EcUnify.unienv -> pty -> ty 
@@ -91,7 +90,7 @@ val transty : typolicy -> EcEnv.env -> EcUnify.unienv -> pty -> ty
 val transtys :  
     typolicy -> EcEnv.env -> EcUnify.unienv -> pty list -> ty list
 
-val transtvi : EcEnv.env -> EcUnify.unienv -> ptyannot -> EcUnify.UniEnv.tvar_inst_kind
+val transtvi : EcEnv.env -> EcUnify.unienv -> ptyannot -> EcUnify.tvar_inst
 
 val transbinding : EcEnv.env -> EcUnify.unienv -> ptybindings ->
   EcEnv.env * (EcIdent.t * EcTypes.ty) list
@@ -99,6 +98,7 @@ val transbinding : EcEnv.env -> EcUnify.unienv -> ptybindings ->
 (* -------------------------------------------------------------------- *)
 val transexp     : EcEnv.env -> EcUnify.unienv -> pexpr -> expr * ty
 val transexpcast : EcEnv.env -> EcUnify.unienv -> ty -> pexpr -> expr
+val transexpcast_opt : EcEnv.env -> EcUnify.unienv -> ty option -> pexpr -> expr
 
 (* -------------------------------------------------------------------- *)
 val transstmt    : EcEnv.env -> EcUnify.unienv -> pstmt -> stmt

@@ -1,116 +1,96 @@
 require        Distr.
 require        Bool.
 require import Int.
-require        Array.
-
-(* We make a clone of the array theory so we
-   can further restrict to fixed size arrays. *)
-clone Array as Bits.
-export Bits.
+require import Array.
 
 type bitstring = bool array.
 
-(* Conversions for interaction with other array types *)
-op to_array: bitstring -> bool Array.array.
-
-axiom to_array_length: forall bs,
-  Array.length (to_array bs) = length bs.
-
-axiom to_array_get: forall bs i,
-  0 <= i => i < length bs =>
-  Array."_.[_]" (to_array bs) i = bs.[i].
-
-op from_array: bool Array.array -> bitstring.
-
-axiom from_array_length: forall bs,
-  length (from_array bs) = Array.length bs.
-
-axiom from_array_get: forall bs i,
-  0 <= i => i < Array.length bs =>
-  (from_array bs).[i] = Array."_.[_]" bs i.
-
-lemma to_array_from_array: forall bs,
-  from_array (to_array bs) = bs.
-proof.
-intros bs; apply extensionality; smt.
-save.
-
-lemma from_array_to_array: forall bs,
-  to_array (from_array bs) = bs.
-proof.
-intros bs; apply Array.extensionality; smt.
-save.
-
 (* Xor *)
-op (^^)(bs0 bs1:bitstring): bitstring = map2 Bool.xorb bs0 bs1.
+op (^^)(bs0 bs1:bitstring): bitstring = map2 Bool.(^^) bs0 bs1.
 
-lemma xor_length: forall (bs0 bs1:bitstring),
+lemma length_xor (bs0 bs1:bitstring):
   length bs0 = length bs1 =>
   length (bs0 ^^ bs1) = length bs0
 by [].
 
-lemma xor_get: forall (bs0 bs1:bitstring) (i:int),
+lemma get_xor (bs0 bs1:bitstring) (i:int):
   length bs0 = length bs1 =>
   0 <= i => i < length bs0 =>
-  (bs0 ^^ bs1).[i] = Bool.xorb bs0.[i] bs1.[i]
+  (bs0 ^^ bs1).[i] = Bool.(^^) bs0.[i] bs1.[i]
 by [].
 
-(* Zero for bitstrings *)
+(* Zero and one for bitstrings *)
 op zeros: int -> bitstring.
+op ones : int -> bitstring.
 
-axiom zeros_length: forall (l:int),
-  0 <= l =>
-  length (zeros l) = l.
+axiom zeros_spec (l:int): zeros l = make l false.
+axiom ones_spec (l:int): ones l = make l true.
 
-axiom zeros_get: forall (l i:int),
-  0 <= l => 0 <= i => i < l =>
+lemma length_zeros (l:int): 0 <= l => length (zeros l) = l.
+proof strict.
+by rewrite zeros_spec; apply length_make.
+qed.
+
+lemma get_zeros (l i:int):
+  0 <= i < l =>
   (zeros l).[i] = false.
+proof strict.
+by rewrite zeros_spec; apply get_make.
+qed.
+
+lemma length_ones (l:int): 0 <= l => length (ones l) = l.
+proof strict.
+by rewrite ones_spec; apply length_make.
+qed.
+
+lemma get_ones (l i:int):
+  0 <= i < l =>
+  (ones l).[i] = true.
+proof strict.
+by rewrite ones_spec; apply get_make.
+qed.
+
+lemma zeros_ones (l:int):
+  0 < l =>
+  zeros l <> ones l.
+proof strict.
+rewrite -not_def=> lt0_l eq_z_o.
+by (cut: false = true)=> //;
+   rewrite -(get_zeros l 0) // -(get_ones l 0) //;
+   congr.
+qed.
 
 (* Lemmas *)
-lemma xor_nilpotent: forall (bs:bitstring),
+lemma xorN (bs:bitstring):
   bs ^^ bs = zeros (length bs).
-proof.
-  intros bs; apply extensionality.
-  delta (==); simplify; split; first smt.
-  intros i i_pos i_upbd.
-  delta (^^); simplify.
-  rewrite (zeros_get (length bs) i _ _ _);
-    [smt | smt | smt | ].
-  rewrite (map2_get<:bool,bool,bool> bs bs Bool.xorb i _ _ _);
-    smt.
-save.
+proof strict.
+by apply array_ext; split; smt.
+qed.
 
-lemma xor_assoc : forall (x y z : bitstring), 
-length(x) = length(y) => length(y) = length(z) =>
- (x ^^ y) ^^ z = x ^^ (y ^^ z).
-proof.
- intros x y z Hleq1 Hleq2.
- apply extensionality.
- delta (==);simplify.
- split;try smt.
- delta (^^);simplify.
- intros i H H0.
- rewrite (map2_get<:bool,bool,bool> (map2 Bool.xorb x y) z Bool.xorb i _ _ _);
-  [smt | smt | smt | ].
- rewrite (map2_get<:bool,bool,bool> x y Bool.xorb i _ _ _);
-  [smt | smt | smt | ].
- rewrite (map2_get<:bool,bool,bool> x (map2 Bool.xorb y z)  Bool.xorb i _ _ _);
-  [smt | smt | smt | ].
- rewrite (map2_get<:bool,bool,bool> y z Bool.xorb i _ _ _);
- smt.
-save.
+lemma xorA (x y z : bitstring):
+  length x = length y =>
+  length y = length z =>
+  x ^^ (y ^^ z) = (x ^^ y) ^^ z.
+proof strict.
+intros=> x_y y_z;
+  cut x_z: length x = length z by (by rewrite x_y);
+  cut x_xy: length x = length (x ^^ y) by (by rewrite length_xor);
+  cut x_yz: length x = length (y ^^ z) by (by rewrite length_xor);
+  apply array_ext; split.
+    by rewrite ?length_xor.
+    intros=> i [leq0_i lti_l]; rewrite ?get_xor //; first 5 smt.
+    by rewrite Bool.xor_associative.
+qed.
 
-lemma xor_zeroes_neutral : forall (x : bitstring),
-x ^^ zeros(length(x)) = x.
-proof.
- intros x; apply extensionality.
- delta (==); simplify; split; first smt.
- intros i i_pos i_upbd; delta (^^); simplify.
- rewrite (map2_get<:bool,bool,bool> x (zeros (length x)) Bool.xorb i _ _ _);
-  [smt | smt | smt | ].
- rewrite (zeros_get (length x) i _ _ _);
- smt.
-save.
+lemma xor0 (x : bitstring):
+  x ^^ zeros (length x) = x.
+proof strict.
+apply array_ext; split; first smt.
+by cut lx_x0: length (zeros (length x)) = length x
+     by (by rewrite length_zeros ?length_pos);
+   intros=> i; rewrite length_xor ?lx_x0 // => [leq0_i lti_lx];
+   rewrite get_xor 1?rw_eq_sym // get_zeros // Bool.xor_false.
+qed.
 
 require import Real.
 require import Distr.
@@ -119,28 +99,26 @@ require import Distr.
 theory Dbitstring.
   op dbitstring: int -> bitstring distr.
 
-  axiom mu_x_def_in: forall (k:int, s:bitstring),
-    length s = k => mu_x (dbitstring k) s = 1%r/(2^k)%r.
+  axiom mu_x_def_in (k:int) (s:bitstring):
+    length s = k =>
+    mu_x (dbitstring k) s = 1%r/(2^k)%r.
 
-  axiom mu_x_def_other: forall (k:int, s:bitstring),
-    length s <> k => mu_x (dbitstring k) s = 0%r.
+  axiom mu_x_def_other (k:int) (s:bitstring):
+    length s <> k =>
+    mu_x (dbitstring k) s = 0%r.
 
-  lemma supp_def: forall (k:int, s:bitstring),
+  lemma supp_def (k:int) (s:bitstring):
     in_supp s (dbitstring k) <=> length s = k.
-  proof.
-    intros k s; delta in_supp mu; simplify; split; intros H.
-    smt.
-    rewrite (mu_x_def_in k s _).
-    smt.
-    cut H1: (0%r < (2 ^ k)%r); [smt | ].
-    cut H2: (0%r < Real.one * inv (2 ^ k)%r).
-    rewrite -(Real.Inverse (2 ^ k)%r _); smt.
-    smt.  
+  proof strict.
+  rewrite /in_supp; split=> H; first smt.
+  by rewrite mu_x_def_in; last smt.
   qed.     
 
-  axiom weight_pos: forall (k:int), 0 <= k => weight (dbitstring k) = 1%r.
+  axiom weight_pos (k:int):
+    0 <= k =>
+    weight (dbitstring k) = 1%r.
 
-  (* TODO Santi: write a proof if you really think this is a lemma *) 
-  axiom mu_weight_neg: forall (k:int), k < 0 => weight (dbitstring k) = 0%r.
-
+  axiom mu_weight_neg (k:int):
+    k < 0 =>
+    weight (dbitstring k) = 0%r.
 end Dbitstring.

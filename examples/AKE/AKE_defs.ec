@@ -12,23 +12,31 @@ require ISet.
 
 op def : 'a. (* types are inhabited, we define a polymorphic default value *)
 
-(* Zero based intervals {0, .., k} of natural numbers *)
-theory ZInter.
-  const bound : int.
-  axiom bound_geq_zero: bound >= 0.
-  type t.
-  op bounded(i : int) = 0 <= i /\ i <= bound.
-  op abs : int -> t.
-  op rep : t -> int.
-  axiom rep_abs(i : int): bounded i => rep (abs i) = i.
-  axiom abs_rep(x : t): abs (rep x) = x.
-end ZInter.
-
 op fdom(m : ('a,'b) map) : 'a set =
   ISet.Finite.toFSet (dom m).
 
 op frng (m : ('a,'b) map) : 'b set =
   ISet.Finite.toFSet (rng m).
+
+lemma fdom_empty:
+  fdom Map.empty<:'a,'b> = FSet.empty<:'a>.
+proof strict.
+  rewrite /fdom dom_empty.
+  apply eq_sym.
+  apply set_ext.
+  cut G:= ISet.Finite.toFSet_cor<:'a> ISet.empty _;
+    first by rewrite /ISet.Finite.finite; exists FSet.empty;
+             rewrite /ISet.Finite.(==); smt.
+  by smt.
+qed.
+
+lemma set_ext_eq (X1 X2 : 'a set): (X1 = X2) = (X1 == X2) by smt.
+
+axiom card_subset(X1 X2 : 'a FSet.set):
+  X1 < X2 => card X1 < card X2.
+
+lemma dom_add(m : ('a,'b) map) (x : 'a) (y : 'b):
+  ! ISet.mem x (dom m) => dom (m.[x <- y]) = ISet.add x (dom m) by [].
 
 (*} *)
 
@@ -53,15 +61,24 @@ type Key = TKey.word.
 
 op univ_Sk : Sk set.
 axiom nosmt univ_Sk_all_mem : forall (x : Sk), mem x univ_Sk.
+axiom univ_Sk_non_empty : univ_Sk <> FSet.empty.
 op sample_Sk = Duni.duni univ_Sk.
+lemma lossless_sample_Sk: weight sample_Sk = 1%r
+  by (rewrite /sample_Sk Duni.weight_def; smt).
 
 op univ_Esk : Esk set.
 axiom nosmt univ_Esk_all_mem : forall (x : Esk), mem x univ_Esk.
+axiom univ_Esk_non_empty : univ_Esk <> FSet.empty.
 op sample_Esk = Duni.duni univ_Esk.
+lemma lossless_sample_Esk: weight sample_Esk = 1%r
+  by (rewrite /sample_Esk Duni.weight_def; smt).
 
 op univ_Eexp : Eexp set.
 axiom nosmt univ_Eexp_all_mem : forall (x : Eexp), mem x univ_Eexp.
+axiom univ_Eexp_non_empty : univ_Eexp <> FSet.empty.
 op sample_Eexp = Duni.duni univ_Eexp.
+lemma lossless_sample_Eexp: weight sample_Eexp = 1%r
+  by (rewrite /sample_Eexp Duni.weight_def; smt).
 
 op univ_Key : Key set.
 axiom nosmt univ_Key_all_mem : forall (x : Key), mem x univ_Key.
@@ -347,22 +364,62 @@ save.
 
 (*{ * Basic types and definitions for initial AKE game *)
 
-const qSession :     int.
-const qSessionRev :   int.
-const qEphemeralRev : int.
-const qAgent :       int.
-const qH1 :           int.
-const qH2 :           int.
+const qSession : int.
+const qAgent :   int.
+const qH1 :      int.
+const qH2 :      int.
 
-axiom qSession_pos:      0 < qSession.
-axiom qSesssionRev_pos:  0 < qSessionRev.
-axiom qEphemeralRev_pos: 0 < qEphemeralRev.
-axiom qAgent_pos:        0 < qAgent.
-axiom qH1_pos:           0 < qH1.
-axiom qH2_pos:           0 < qH2.
+axiom qSession_pos: 0 < qSession.
+axiom qAgent_pos:   0 < qAgent.
+axiom qH1_pos:      0 < qH1.
+axiom qH2_pos:      0 < qH2.
 
 (* Session index: uniquely identifies sessions even in the presence of collisions *)
-type Sidx = int.
+type Sidx. (* we use an abstract, finite type with qSession elements *)
+
+op univ_Sidx : Sidx set.
+axiom univ_Sidx_all_mem : forall (x : Sidx), mem x univ_Sidx.
+op sample_Sidx = Duni.duni univ_Sidx.
+axiom card_univ_Sidx: card univ_Sidx = qSession.
+
+lemma card_Sidx(s : Sidx FSet.set): card s <= qSession.
+proof strict.
+  case (s = univ_Sidx); first by progress; smt.
+  intros=> Hneq.
+  cut Less: (s < univ_Sidx).
+    rewrite /FSet.(<). split; smt.
+  by cut Cless: card s < card univ_Sidx;  smt.
+qed.
+
+(* These can be generalized to finite types *)
+lemma Sidx_iset_finite(s : Sidx ISet.set):
+  ISet.Finite.finite s.
+proof strict.
+  rewrite /ISet.Finite.finite.
+  exists (filter (lambda x, ISet.mem x s) univ_Sidx).
+  rewrite /ISet.Finite.(==).
+  intros x.
+  rewrite mem_filter.
+  smt.
+qed.
+
+lemma mem_fdom(x : Sidx) (m : (Sidx,'b) map):
+   mem x (fdom m) = ISet.mem x (dom m).
+proof strict.
+  by rewrite /fdom; smt.
+qed.
+
+lemma fdom_eq_fdom(m1 m2 : (Sidx,'b) map): 
+  (fdom m1 = fdom m2) = (dom m1 = dom m2).
+proof strict.
+  by rewrite /fdom /fdom; smt.
+qed.
+
+lemma fdom_less_fdom(m1 m2 : (Sidx,'b) map): 
+  (fdom m1 < fdom m2) = (ISet.(<) (dom m1) (dom m2)).
+proof strict.
+  by rewrite /fdom /fdom; smt.
+qed.
 
 module type AKE_Oracles = {
   fun h1_a(a : Sk, x : Esk) : Eexp option

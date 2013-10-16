@@ -300,7 +300,7 @@ let p_subst (s : path Mp.t) =
 
 (* -------------------------------------------------------------------- *)
 let rec m_subst (sp : path -> path) (sm : mpath EcIdent.Mid.t) m =
-  let args = List.smart_map (m_subst sp sm) m.m_args in
+  let args = List.Smart.map (m_subst sp sm) m.m_args in
   match m.m_top with
   | `Concrete(p,sub) -> 
     let p' = sp p in

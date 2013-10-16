@@ -15,12 +15,14 @@ type ring = {
   r_embed : [ `Direct | `Embed of EcPath.path ];
 }
 
+val ring_equal : ring -> ring -> bool
 (* -------------------------------------------------------------------- *)
 type field = {
   f_ring : ring;
   f_inv  : EcPath.path;
   f_div  : EcPath.path option;
 }
+val field_equal : field -> field -> bool
 
 (* -------------------------------------------------------------------- *)
 val rapp   : ring -> EcPath.path -> form list -> form

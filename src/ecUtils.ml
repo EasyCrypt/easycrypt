@@ -58,6 +58,17 @@ let as_seq1 = function [x] -> x | _ -> assert false
 let as_seq2 = function [x1; x2] -> (x1, x2) | _ -> assert false
 let as_seq3 = function [x1; x2; x3] -> (x1, x2, x3) | _ -> assert false
 
+let as_seq4 = function
+  | [x1; x2; x3; x4] -> (x1, x2, x3, x4)
+  | _ -> assert false
+
+let as_seq5 = function
+  | [x1; x2; x3; x4; x5] -> (x1, x2, x3, x4, x5)
+  | _ -> assert false
+
+(* -------------------------------------------------------------------- *)
+let int_of_bool (b : bool) = if b then 1 else 0
+
 (* -------------------------------------------------------------------- *)
 let proj3_1 (x, _, _) = x
 let proj3_2 (_, x, _) = x
@@ -72,6 +83,8 @@ let snd_map (f : 'b -> 'c) ((x, y) : 'a * 'b) =
 let pair_equal tx ty (x1, y1) (x2, y2) =
   (tx x1 x2) && (ty y1 y2)
 
+let swap (x, y) = (y, x)
+
 (* -------------------------------------------------------------------- *)
 let opt_equal (f : 'a -> 'a -> bool) o1 o2 =
   match o1, o2 with
@@ -82,6 +95,8 @@ let opt_equal (f : 'a -> 'a -> bool) o1 o2 =
 (* -------------------------------------------------------------------- *)
 let none = None
 let some = fun x -> Some x
+
+let funnone (_ : 'a) : 'b option = None
 
 let oiter (f : 'a -> unit) (x : 'a option) =
   match x with None -> () | Some x -> f x
@@ -387,24 +402,23 @@ module List = struct
         else r
     | _, _ -> invalid_arg "List.filter2"
 
-  let rec smart_map f l = 
-    match l with
-    | [] -> l
-    | h::tl ->
-        let h' = f h in
-        let tl' = smart_map f tl in
-	if h'==h && tl'==tl then l else 
-        h'::tl'
-
-  let smart_map_fold (f : 'a -> 'b -> 'a * 'c) (a : 'a) (xs : 'b list) =
-    let r = ref a in
-    let f b = 
-      let (a,c) = f !r b in
-      r := a; c in
-    let l = smart_map f xs in
-    !r, l
-
   let sum xs = List.fold_left (+) 0 xs
+
+  module Smart = struct
+    let rec map f l = 
+      match l with
+      | []    -> []
+      | x::xs ->
+        let x'  = f x in
+        let xs' = map f xs in
+          if x == x' && xs == xs' then l else x'::xs'
+
+    let map_fold f a xs =
+      let r = ref a in
+      let f x = let (a, x) = f !r x in r := a; x in
+      let xs = map f xs in
+        (!r, xs)
+  end
 end
 
 (* -------------------------------------------------------------------- *)

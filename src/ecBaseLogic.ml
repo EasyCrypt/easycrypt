@@ -28,11 +28,18 @@ let pp_error fmt = function
 
 let _ = EcPException.register pp_error
 
+type abs_uses = {
+  aus_calls  : EcPath.xpath list;
+  aus_reads  : (prog_var * ty) list;
+  aus_writes  : (prog_var * ty) list;
+}
+
 type local_kind =
-  | LD_var   of ty * form option
-  | LD_mem   of EcMemory.memtype
-  | LD_modty of EcModules.module_type * EcModules.mod_restr
-  | LD_hyp   of form  (* of type bool *)
+  | LD_var    of ty * form option
+  | LD_mem    of EcMemory.memtype
+  | LD_modty  of EcModules.module_type * EcModules.mod_restr
+  | LD_hyp    of form  (* of type bool *)
+  | LD_abs_st of abs_uses
 
 type l_local = EcIdent.t * local_kind
 
@@ -45,8 +52,6 @@ type hyps = {
 (*    Basic construction for building the logic                         *)
 (* -------------------------------------------------------------------- *)
 
-type prover_info = unit (* FIXME *)
-
 type tac_pos = int EcParsetree.doption
 
 type i_pat =
@@ -55,84 +60,39 @@ type i_pat =
   | IPwhile of s_pat 
 and s_pat = (int (* index of targetted instr. *) * i_pat) list
 
+class virtual xrule (name : string) =
+object
+  method name = name
+end
 
-type rule_name = 
-   (* Logical rules *)
-  | RN_admit
-  | RN_clear        of EcIdent.Sid.t 
-  | RN_prover       of prover_info
-  | RN_hyp          of EcIdent.t 
-  | RN_glob         of EcPath.path * EcTypes.ty list
-  | RN_apply        
-  | RN_cut          
-  | RN_intros       of EcIdent.t list 
-  | RN_exists_elim  
-  | RN_exists_intro 
-  | RN_conv    
-  | RN_sp 
-	(* Field & Ring*)
-  | RN_field 
-  | RN_field_simp 
-  | RN_ring
-
-    (* Phl rules *)    
-  | RN_hl_fun_def 
-  | RN_hl_fun_abs   of EcFol.form
-  | RN_hl_fun_upto  of EcFol.form * EcFol.form * EcFol.form
-  | RN_hl_skip
-  | RN_hl_wp        of tac_pos
-  (* append: bool indicates direction: true backwards *)
-  | RN_hl_append    of tac_dir * tac_pos * EcFol.form * EcFol.app_bd_info
-  | RN_hl_rcond     of bool option * bool * int
-  | RN_hl_case      of form
-  | RN_hl_while     of EcFol.form * EcFol.form option * (EcFol.form * EcFol.form) option
-  | RN_hl_fission   of bool option * codepos * (int * (int * int))
-  | RN_hl_fusion    of bool option * codepos * (int * (int * int))
-  | RN_hl_unroll    of bool option * codepos
-  | RN_hl_splitwhile of EcTypes.expr *  bool option * codepos
-  | RN_hl_call      of bool option * EcFol.form * EcFol.form
-  | RN_hl_swap      of bool option * int * int * int
-  | RN_hl_cfold     of bool option * codepos * int option
-  | RN_hl_inline    of bool option * s_pat 
-  | RN_hl_kill      of bool option * codepos * int option
-  | RN_hl_alias     of bool option * codepos
-  | RN_hl_hoare_rnd
-  | RN_hl_equiv_rnd of (form,form,form) EcParsetree.rnd_tac_info
-  | RN_hl_conseq 
-  | RN_hl_conseq_bd
-  | RN_hl_exfalso 
-  | RN_hl_hoare_equiv 
-  | RN_hl_deno      
-  | RN_hl_hoare_bd_hoare      
-  | RN_hl_prbounded      
-  | RN_hl_prfalse      
-  | RN_hl_pr_lemma
-  | RN_hl_bdeq      
-  | RN_hl_fel       of (form * form * form * form * (EcPath.xpath*form) list)
-
-  | RN_bhl_rnd of (form,ty->form option,ty->form) EcParsetree.rnd_tac_info
-  | RN_eqobs_in
-  | RN_notmod
-  | RN_hl_exists_elim 
-  | RN_hoare_true
-  | RN_equiv_trans 
+type rule =
+| RN_admit
+| RN_conv
+| RN_intro      of [`Raw of EcIdent.t list | `Exist]
+| RN_elim       of [`Exist]
+| RN_weak       of Sid.t
+| RN_apply
+| RN_smt
+| RN_hypothesis of EcIdent.t
+| RN_lemma      of EcPath.path * ty list
+| RN_xtd        of xrule
 
 type 'a rule_arg = 
-  | RA_form of EcFol.form             (* formula             *)
-  | RA_id   of EcIdent.t              (* local ident         *)
-  | RA_mp   of EcPath.mpath           (* module              *)
-  | RA_node of 'a                    (* sub-derivation      *)
+| RA_form of EcFol.form             (* formula             *)
+| RA_id   of EcIdent.t              (* local ident         *)
+| RA_mp   of EcPath.mpath           (* module              *)
+| RA_node of 'a                     (* sub-derivation      *)
 
-type 'a rule = {
-  pr_name : rule_name;
-  pr_hyps : 'a rule_arg list;
+type 'a rnode = {
+  pr_name : rule;
+  pr_hyps : 'a rule_arg list
 }
 
 type l_decl = hyps * form
 
 type judgment = {
   j_decl : l_decl;
-  j_rule : judgment rule
+  j_rule : judgment rnode;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -195,17 +155,3 @@ let tacuerror ?(catchable = true) fmt =
          Format.pp_print_flush fbuf ();
          raise (TacError (catchable, User (Buffer.contents buf))))
       fbuf fmt
-
-(* -------------------------------------------------------------------- *)
-let rec jucdepends sp juc =
-  let sp =
-    match juc.j_rule.pr_name with
-    | RN_glob (p, _) -> Sp.add p sp
-    | _ -> sp
-  in
-    List.fold_left jucdepends sp
-      (List.pmap
-         (function RA_node x -> Some x | _ -> None)
-         juc.j_rule.pr_hyps)
-
-let jucdepends juc = jucdepends Sp.empty juc
