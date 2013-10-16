@@ -226,7 +226,7 @@ let op_char_234_r = op_char_2   | op_char_34_r
 let op1 = op_char_1234* op_char_1 op_char_1234*
 let op2 = op_char_2 | op_char_2 op_char_234_r op_char_234*
 let op3 = op_char_34* op_char_3 op_char_34*
-let op4 = (op_char_4 op_char_4_r) | ("::" ':'+)
+let op4 = (op_char_4 op_char_4_r*) | ("::" ':'+)
 
 let uniop = '!' | op2
 

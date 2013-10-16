@@ -140,6 +140,28 @@ module Hints = struct
         (fun m ->
            { m with ht_sub = Msym.add x (create (h :> xflag)) m.ht_sub })
         p m
+
+  let mem (p : path) m =
+    let rec find p m =
+      match p with
+      | None   -> m
+      | Some p ->
+          let x = EcPath.basename p in
+          let p = EcPath.prefix p in
+          let m = find p m in
+            match Msym.find_opt x m.ht_sub with
+            | Some m' when m'.ht_this = `Inherit -> { m' with ht_this = m.ht_this }
+            | Some m' -> m'
+            | None    -> create m.ht_this
+    in
+
+    let m = find (EcPath.prefix p) m in
+      match Msym.find_opt (EcPath.basename p) m.ht_axs with
+      | None when m.ht_this = `Include -> true
+      | None when m.ht_this = `Exclude -> false
+      | None -> assert false
+      | Some `Include -> true
+      | Some `Exclude -> false
 end
 
 (* -------------------------------------------------------------------- *)
@@ -152,7 +174,7 @@ let restartable_syscall (call : unit -> 'a) : 'a =
     done;
     EcUtils.oget !output
 
-let execute_task (pi : prover_infos) (_ : hints) task =
+let execute_task (pi : prover_infos) task =
   let module CP = Call_provers in
 
   let pcs = Array.create pi.pr_maxprocs None in

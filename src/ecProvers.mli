@@ -28,9 +28,11 @@ module Hints : sig
 
   val add1 : path -> hflag -> hints -> hints
   val addm : path -> hflag -> hints -> hints
+
+  val mem : path -> hints -> bool
 end
 
 (* -------------------------------------------------------------------- *)
-val execute_task : prover_infos -> hints -> Why3.Task.task -> bool option
+val execute_task : prover_infos -> Why3.Task.task -> bool option
 
 val get_w3_th : string list -> string -> Why3.Theory.theory

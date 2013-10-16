@@ -207,6 +207,7 @@ type env = {
     env_id  : Term.term Mid.t;
     env_w3  : (EcPath.path * Ty.tvsymbol list) Ident.Mid.t;
     env_lam : Term.term Mta.t;
+    env_rax : EcPath.path Decl.Mpr.t;
   }
 
 let w3_ls_true = Term.fs_bool_true
@@ -410,7 +411,7 @@ let empty = {
     env_id      = Mid.empty;
     env_w3      = Ident.Mid.empty;
     env_lam     = Mta.empty;
-  }
+    env_rax     = Decl.Mpr.empty;  }
 
 (* ---------------------------------------------------------------------- *)
 
@@ -553,6 +554,7 @@ let add_pr env path pr decl =
   else
     { env with
       env_ax = Mp.add path pr env.env_ax;
+      env_rax = Decl.Mpr.add pr path env.env_rax;
       logic_task = add_decl_with_tuples env.logic_task decl }
 
 let rebind_item env = function
@@ -1342,7 +1344,7 @@ let trans_form env f =
     | FbdHoareF _ -> raise (CannotTranslate "FbdHoareF")
     | FbdHoareS _ -> raise (CannotTranslate "FbdHoareS")
     | FequivF _   -> raise (CannotTranslate "FequivF")
-    | FeagerF _   -> raise (CanNotTranslate "FeagerF")
+    | FeagerF _   -> raise (CannotTranslate "FeagerF")
     | FequivS _   -> raise (CannotTranslate "FequivS")
 
     | Fpvar(pv,m) ->
@@ -1542,11 +1544,11 @@ let add_mod_exp_mp env mp me =
 
 let add_mod_exp env p me = add_mod_exp_mp env (mpath_crt p [] None) me
   
-let check_w3_formula pi hints task f =
+let check_w3_formula pi task f =
   let pr   = Decl.create_prsymbol (Ident.id_fresh "goal") in
   let decl = Decl.create_prop_decl Decl.Pgoal pr f in
   let task = add_decl_with_tuples task decl in
-    EcProvers.execute_task pi hints task = Some true
+    EcProvers.execute_task pi task = Some true
 
 exception CannotProve of axiom
 
@@ -1573,6 +1575,32 @@ let add_abs_mod me_of_mt env id mt restr =
   let nenv,_ = add_mod_exp_mp env (EcPath.mident id) me in
   nenv
 
+(* -------------------------------------------------------------------- *)
+open EcProvers
+
+let rec filter_task_r w3env (hints : hints) task = (* FIXME: not tail-rec *)
+  match task with
+  | None -> None
+  | Some task ->
+      let aout = filter_task_r w3env hints task.Task.task_prev in
+        match task.Task.task_decl.Theory.td_node with
+        | Theory.Decl { Decl.d_node = Decl.Dprop (_, x, _) } -> begin
+            match Decl.Mpr.find_opt x w3env.env_rax with
+            | None   -> Task.add_tdecl aout task.Task.task_decl
+            | Some p -> begin
+                match Hints.mem p hints with
+                | true  -> Task.add_tdecl aout task.Task.task_decl
+                | false -> aout
+            end
+        end
+        | _ -> Task.add_tdecl aout task.Task.task_decl
+
+let filter_task w3env hints task =
+  if   hints = Hints.full
+  then task
+  else filter_task_r w3env hints task
+
+(* -------------------------------------------------------------------- *)
 let check_goal me_of_mt env pi hints (hyps, concl) =
   let env = ref env in
   let trans_tv id = env := trans_tv !env id in
@@ -1620,4 +1648,5 @@ let check_goal me_of_mt env pi hints (hyps, concl) =
   List.iter trans_tv hyps.h_tvar;
   List.iter trans_hyp (List.rev hyps.h_local);
   let env, _, concl = trans_form !env concl in
-  check_w3_formula pi hints env.logic_task (force_prop concl)
+  let task = filter_task env hints env.logic_task in
+    check_w3_formula pi task (force_prop concl)
