@@ -1,15 +1,17 @@
 (* Pair.fst *)
-let fst = Pervasives.fst 
-
+let fst (p : 'a * 'b) =
+  let (a, b) = p in a
+  
 (* Pair.snd *)
-let snd = Pervasives.snd 
-
+let snd (p : 'a * 'b) =
+  let (a, b) = p in b
+  
 (* Pair.Dprod *)
 module Dprod = struct
-
-  (* Pair.Dprod.* *)
-  let aas (d1 : 'a EcPervasive.distr) (d2: 'a EcPervasive.distr) : 
-                ('a * 'b) EcPervasive.distr = 
-    fun _ -> (d1 (), d2 ())
   
+    (* Pair.Dprod.* *)
+  let as0 (d1 : 'a EcPervasive.distr) (d2 : 'b EcPervasive.distr) :
+      ('a * 'b) EcPervasive.distr =
+    fun _ -> (d1 (), d2 ())
+
 end

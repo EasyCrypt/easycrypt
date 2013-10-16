@@ -63,7 +63,7 @@ let ocaml_keyword =
       "type"; "as";
       "module"; "struct"; "sig"; "begin"; "end"; 
       "match"; "with"; "|"; "->"; "try"; "raise"; "when"; "where"; 
-      "unit";
+      "unit"; "int"; "bool"; 
       "()"; "=" ]  
 
 (**********************************************************************)
@@ -259,7 +259,7 @@ let out_ty_decl mname fmt s (ids, oty) =
   let pp_typarams fmt ids = 
     match ids with
     | [] -> ()
-    | [s] -> out_tvar fmt s 
+    | [s] -> Format.fprintf fmt "%a " out_tvar s 
     | _ -> 
       Format.fprintf fmt "@[<hov 1>(%a) @]"
         (EcPrinting.pp_list ",@ " out_tvar)
@@ -623,7 +623,7 @@ let init_withextract =
   let operv x = "Pervasives." ^ x in
   let tint x = dummy ([EcCoreLib.id_top; "Int"], x) in
   [
-   (* Pervasive *)
+    (* Pervasive *)
     ExTh (dummy ([EcCoreLib.id_top], EcCoreLib.id_Pervasive)), "EcPervasive";
     ExOp (perv "true") , "true"       ;
     ExOp (perv "false"), "false"      ;
@@ -635,8 +635,8 @@ let init_withextract =
     ExOp (perv "[!]")  , operv "not"  ;
     ExOp (perv "=")    , operv "(=)"  ;
     ExOp (perv "tt")   ,       "()"   ;
-   (* Int *) 
-   (* TODO : this is dangerous : we should use big_int *)
+    (* Int *) 
+    (* TODO : this is dangerous : we should use big_int *)
     ExTh (dummy ([EcCoreLib.id_top], "Int")), "EcInt";
     ExOp (tint "[-]")  , operv "(~-)" ;
     ExOp (tint "-")    , operv "(-)"  ;
@@ -653,12 +653,12 @@ let init_withextract =
     ExOp (dummy ([EcCoreLib.id_top; "Int"; "Extrema"], "max")), operv "max";
     ExOp (dummy ([EcCoreLib.id_top; "Int"; "Extrema"], "min")), operv "min";
     ExOp (dummy ([EcCoreLib.id_top; "Int"; "Abs"], "`|_|"))   , operv "abs";
-   (* Bool *)
+    (* Bool *)
     ExTh (dummy ([EcCoreLib.id_top], "Bool")), "EcBool";
-   (* Pair *)
+    (* Pair *)
     ExTh (dummy ([EcCoreLib.id_top], "Pair")), "EcPair";
     ExOp (dummy ([EcCoreLib.id_top; "Pair"], "fst")), operv "fst";
-    ExOp (dummy ([EcCoreLib.id_top; "Pair"], "snd")), operv "snd";
+    ExOp (dummy ([EcCoreLib.id_top; "Pair"], "snd")), operv "snd"; 
    ] 
 
 let compile_kind env eenv = function
@@ -695,258 +695,4 @@ let process_extraction env required (file, toextract, withextract) =
   close (); 
   EcUtils.oiter (fun e -> raise e) !err
  
-  
-
-
-
-
-
-
-(*
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-let find_odef tbl p = 
-  try Hp.find tbl p with Not_found -> assert false 
-
-let find_def tbl p =
-  let odef = find_odef tbl p in
-  assert odef.odef_done;
-  odef.odef_def
-
-let rec out_decl eenv fmt (p, k) = 
-  match k with 
-  | OCty ->
-    begin match find_def eenv.mp_ty p with
-    | None -> ()
-    | Some (s,(ids,tyd)) -> out_ty_decl fmt p s ids tyd 
-    end
-  | OClet -> 
-    begin match find_def eenv.mp_op p with
-    | None -> ()
-    | Some (s,opd) -> out_op_decl fmt p s opd
-    end
-  | OCmod -> 
-    begin match find_def eenv.mp_th p with
-    | None -> ()
-    | Some (s,mo) ->
-      out_header fmt p;
-      Format.fprintf fmt "@[module %s = struct@\n  %a@\n@\nend@]"
-        s (out_mod eenv) mo.mod_decl2
-    end
-
-and out_mod eenv fmt decls = 
-  Format.fprintf fmt "@[%a@]"
-    (EcPrinting.pp_list "@\n@\n" (out_decl eenv)) (List.rev decls)  
-  
-
-
-
-(* Compiler *) 
-
-let sanitizer = 
-  let char_to c = 
-    if c = '*' then "aas" else Why3.Ident.char_to_alnumus c in
-  fun s ->
-    if s = "false" then "_false"
-    else if s = "true" then "_true"
-    else Why3.Ident.sanitizer char_to char_to s
-
-let sanitizer_local s = "x" ^ s
-
-let dot_name mo s =
-  mo.odef_name@[s]
-
-let eq_string s1 s2 = 
-  s1 == s2 || s1 = s2
-
-let rec chop_name ls' ls = 
-  match ls', ls with
-  | _, [] -> assert false 
-  | [], ls -> ls
-  | s1::ls', s2::ls2 ->
-    if eq_string s1 s2 then chop_name ls' ls2
-    else ls
-
-let destr_path p = 
-  EcUtils.oget (EcPath.prefix p), sanitizer (EcPath.basename p)
-
-let mk_odef mo s def = 
-  { odef_name = dot_name mo s; odef_def = Some(s,def); odef_done = false }
-
-let rec compile_mod eenv p = 
-  try Hp.find eenv.mp_th p
-  with Not_found ->
-    let pp = 
-      match EcPath.prefix p with
-      | None -> assert false 
-      | Some pp -> pp in
-    let mo = compile_mod eenv pp in
-    let s = EcPath.basename p in
-    let res = mk_odef mo s {
-      mod_path = p; 
-      mod_decl = []; mod_decl2 = [] } in
-    let modd = snd (EcUtils.oget mo.odef_def) in
-    modd.mod_decl <- (p, OCmod) :: modd.mod_decl;
-    Hp.add eenv.mp_th p res;
-    res
-  
  
-
-
-
-let rec sort_modp eenv p = 
-  let odef = find_odef eenv.mp_th p in
-  if not odef.odef_done then begin
-    odef.odef_done <- true;
-    let _, def = EcUtils.oget odef.odef_def in
-    List.iter (sort_decl eenv) def.mod_decl;
-    upd_parent eenv p OCmod
-  end
-
-and upd_parent eenv p k = 
-  let pp = EcUtils.oget (EcPath.prefix p) in
-  let ppdef = find_odef eenv.mp_th pp in
-  let modu = snd (EcUtils.oget ppdef.odef_def) in
-  modu.mod_decl2 <- (p,k) :: modu.mod_decl2;
-  sort_modp eenv pp
-
-and sort_decl eenv (p,k) =
-  match k with 
-  | OCty -> sort_typ eenv p 
-  | OClet -> sort_opp eenv p
-  | OCmod -> sort_modp eenv p
-
-and sort_typ eenv p = 
-  let odef = find_odef eenv.mp_ty p in
-  if not odef.odef_done then begin 
-    odef.odef_done <- true;
-    let (_n,(_p,def)) = EcUtils.oget odef.odef_def in
-    EcUtils.oiter (sort_ty eenv) def;
-    upd_parent eenv p OCty
-  end
-
-and sort_opp eenv p = 
-  let odef = find_odef eenv.mp_op p in
-  if not odef.odef_done then begin
-    odef.odef_done <- true;
-    let (_,def) = EcUtils.oget odef.odef_def in
-    sort_op eenv def;
-    upd_parent eenv p OClet 
-  end
-
-and sort_op eenv = function
-  | OOabs ty -> sort_ty eenv ty
-  | OOdef e  -> sort_expr eenv e
-
-and sort_ty eenv = function
-  | OTvar _ -> ()
-  | OTtuple tys -> List.iter (sort_ty eenv) tys
-  | OTconstr ((_,p),tys) ->
-    sort_typ eenv p; List.iter (sort_ty eenv) tys
-  | OTfun(ty1,ty2) ->
-    sort_ty eenv ty1; sort_ty eenv ty2
-
-and sort_expr eenv = function
-  | Olam (bd,e) ->
-    List.iter (fun (_,ty) -> sort_ty eenv ty) bd;
-    sort_expr eenv e 
-  | Oint _ | Olocal _ -> ()
-  | Oop (_,p) -> sort_opp eenv p
-  | Oapp(e,es) -> List.iter (sort_expr eenv) (e::es)
-  | Olet(_,e1,e2) -> sort_expr eenv e1; sort_expr eenv e2
-  | Otuple es -> List.iter (sort_expr eenv) es 
-  | Oif(e1,e2,e3) -> sort_expr eenv e1; sort_expr eenv e2; sort_expr eenv e3
-
-
-
-let process_extraction env (file, toextract, withextract) = 
-  let eenv = eempty () in
-  let top = EcCoreLib.p_top in
-  let topmod = { mod_path = top; mod_decl = []; mod_decl2 = [] } in
-  let topdef = { odef_name = [EcPath.basename top];
-                 odef_def  = Some (EcCoreLib.id_top, topmod);
-                 odef_done = false } in
-  Hp.add eenv.mp_th top topdef;
-  add_withs false env eenv init_withextract;
-  add_withs true env eenv withextract;
-  List.iter (compile_kind env eenv) toextract;
-  topdef.odef_done <- true;
-  List.iter (sort_decl eenv) topmod.mod_decl;
-  let fmt, close = 
-    match file with
-    | None ->
-      let fmt = Format.std_formatter in
-      fmt, fun _ -> Format.fprintf fmt "@\n@."
-    | Some filename ->
-      let outc = open_out filename in
-      Format.formatter_of_out_channel outc, fun _ -> close_out outc in
-  let err = ref None in
-  begin try out_mod eenv fmt topmod.mod_decl2; with e -> err := Some e end;
-  close (); 
-  EcUtils.oiter (fun e -> raise e) !err
-
-
-  
-  
-  
-  
-*)

@@ -10,7 +10,6 @@
    the Array node to the position we are accessing; this is achieved with
    the reroot function.
 *)
-
 type 'a tarray = 'a array
 
 type 'a t = 'a data ref
@@ -62,29 +61,49 @@ let reroot t =
   | Array _ -> ()
   | _ -> rerootk t []
       
+(* wrappers to apply an impure function from Array to a persistent array *)
+let impure f t =
+  match !t with 
+  | Array a -> f a 
+  | _ -> 
+    rerootk t []; 
+    match !t with 
+    | Array a -> f a 
+    | _ -> assert false 
+
 (* Array.array *)
 type 'x array = 'x t
 
-(* Array.empty *)
-let empty  = Obj.magic (ref (Array [||]))
 
-(* Array.create *)
-let create n v = ref (Array (Array.create n v))
-
-(* Array.init *)
-let init n f = ref (Array (Array.init n f))
-
+(* Array.length *)
+let length t = impure Array.length t
+  
+(* Array.`|_| *)
+let bqbr_br (xs : 'x array) =
+  length xs
+  
 (* Array._.[_] *)
 let get t i = 
   match !t with
   | Array a -> a.(i)
-  | _ -> 
+  | _ ->  
     reroot t; 
     match !t with 
     | Array a -> a.(i) 
     | _ -> assert false 
 
-let _dtlb_rb = get 
+let _dtlb_rb : 'x array -> EcPervasive.int0 -> 'x = get
+  
+(* Array.empty *)
+let empty  = Obj.magic (ref (Array ([||]:int tarray)))
+  
+(* Array._::_ *)
+let _clcl_ x t = 
+  ref (Array (impure (fun a -> Array.append [|x|] a) t))
+
+(* Array.::: *)
+let clclcl t x =
+  ref (Array (impure (fun a -> Array.append a [|x|]) t))
 
 (* Array._.[_<-_] *)
 let rec set t i v = 
@@ -103,8 +122,36 @@ let rec set t i v =
 
 let _dtlb_lsmn_rb = set
 
-(* Array.write *)
-let write dst dOff src sOff len = 
+(* Array.make *)
+let make n v = ref (Array (Array.create n v))
+  
+(* Array.init *)
+let init n f = ref (Array (Array.init n f))
+  
+(* Array.|| *)
+let brbr t1 t2 = 
+ ref (Array (impure (fun a1 -> impure (Array.append a1) t2) t1))
+  
+(* Array.sub *)
+let sub t x y = 
+  ref (Array (impure (fun a -> Array.sub a x y) t))
+
+(* Array.fill *)
+let fill dst dOff len x = 
+  reroot dst; 
+  match !dst with
+  | Array a as n ->
+    begin
+      let s = Array.sub a dOff len in
+      Array.fill a dOff len x;
+      let res = ref n in
+      dst := DiffO (dOff, len, s, res);
+      res
+    end
+  | _ -> assert false
+  
+(* Array.blit *)
+let blit dst dOff src sOff len = 
   reroot dst; 
   reroot src;
   match !dst, !src with
@@ -118,34 +165,11 @@ let write dst dOff src sOff len =
     end
   | _, _ -> assert false
 
-(* wrappers to apply an impure function from Array to a persistent array *)
-let impure f t =
-  match !t with 
-  | Array a -> f a 
-  | _ -> 
-    rerootk t []; 
-    match !t with 
-    | Array a -> f a 
-    | _ -> assert false 
-
- (* Array.length *)
-let length t = impure Array.length t
-
-(* Array.fold_left *)
-let fold_left f t s = impure (Array.fold_left (fun s x -> f x s) s) t
-
-(* Array.fold_right *)
-let fold_right f s t = 
-  impure (fun a -> Array.fold_right (fun x s -> f s x) a s) t
-
-(* Array.sub *)
-let sub t x y = 
- ref (Array (impure (fun a -> Array.sub a x y) t))
   
-(* Array.|| *)
-let brbr t1 t2 = 
- ref (Array (impure (fun a1 -> impure (Array.append a1) t2) t1))
-
+(* Array.map *)
+let map f t = 
+  ref (Array (impure (Array.map f) t))
+  
 (* Array.map2 *)
 let map2 f t1 t2 = 
   let map2 f a1 a2 = 
@@ -153,21 +177,33 @@ let map2 f t1 t2 =
     Array.init len (fun i -> f a1.(i) a2.(i)) in
   ref (Array (impure (fun a1 -> impure (map2 f a1) t2) t1))
   
-(* Array.map *)
-let map f t = 
-  ref (Array (impure (Array.map f) t))
+(* Array.mapi *)
+let mapi f t =
+  ref (Array (impure (Array.mapi f) t))
   
-(* Array.::: *)
-let clclcl t x =
-  ref (Array (impure (fun a -> Array.append a [|x|]) t))
+(* Array.fold_left *)
+let fold_left f s t =
+  impure (Array.fold_left f s) t
   
-(* Array._::_ *)
-let _clcl_ x t = 
-  ref (Array (impure (fun a -> Array.append [|x|] a) t))
+(* Array.fold_right *)
+let fold_right f s t = 
+  impure (fun a -> Array.fold_right (fun x s -> f s x) a s) t
+  
+(* Array.all *)
+let all f t =
+  impure (fun t ->
+     let rec aux i = i >= Array.length t || (not (f t.(i)) && aux (i+1)) in
+     aux 0) t
+  
+(* Array.alli *)
+let alli f t = 
+  impure (fun t ->
+    let rec aux i = i >= Array.length t || (not (f i t.(i)) && aux (i+1)) in
+    aux 0) t
 
+(* Array.Darray *)
+module Darray = struct
   
+  let darray len d () = init len (fun _ -> d ())
   
- 
-  
- 
-
+end
