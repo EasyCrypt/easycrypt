@@ -33,6 +33,19 @@ theories/*.ec
 theories/prelude/*.ec
 theories/realizations/*.ec
 
+# EasyCrypt extraction support library
+find:extraction:*.ml
+find:extraction:*.mli
+find:extraction:*.ec
+
+# EasyCrypt webui
+webui/setup.py
+webui/MANIFEST.in
+webui/*.ini
+find:webui/econline/static:*
+find:webui/econline:*.py
+find:webui/econline/templates:*.genshi
+
 # system
 system/Makefile
 system/*.c
@@ -61,3 +74,5 @@ scripts/distribution.py
 scripts/keywords.py
 scripts/ec-build-toolchain
 scripts/activate-toolchain.sh
+scripts/ec-build-webui-env
+scripts/ec-run-webui
