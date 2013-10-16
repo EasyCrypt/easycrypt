@@ -33,7 +33,7 @@ CHECK     = scripts/runtest.py --bin-args="$(ECARGS)" config/tests.config
 .PHONY: all build byte native tests check check-xunit examples
 .PHONY: clean install uninstall uninstall-purge dist distcheck
 .PHONY: callprover pg toolchain update-toolchain provers update
-.PHONY: webui webui-env
+.PHONY: webui webui-stop webui-env
 .PHONY: %.ml %.mli %.inferred.mli
 
 all: build
@@ -160,7 +160,10 @@ pg:
 
 # --------------------------------------------------------------------
 webui: native
-	bash ./scripts/ec-run-webui
+	bash ./scripts/ec-run-webui start
+
+webui-stop:
+	bash ./scripts/ec-run-webui stop
 
 # --------------------------------------------------------------------
 TOOLCHAIN_URL := http://ci.easycrypt.info/scripts/ec-build-toolchain

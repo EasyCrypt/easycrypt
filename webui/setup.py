@@ -1,3 +1,5 @@
+#! /usr/bin/env python
+
 # --------------------------------------------------------------------
 from setuptools import setup, find_packages
 
@@ -20,7 +22,11 @@ classifiers = [
 
 ENTRY_POINTS = """\
 [paste.app_factory]
-main = econline:main
+main    = econline:main
+backend = econline.backend:main
+
+[paste.server_factory]
+wsserver = econline.backend:wsserver
 """
 
 XDEPS = [
