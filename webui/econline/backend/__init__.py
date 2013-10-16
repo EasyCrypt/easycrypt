@@ -1,14 +1,17 @@
-#! /usr/bin/env python
-
 # --------------------------------------------------------------------l
-import sys, os, re, json, logging, gevent.subprocess as sp
-import cStringIO as sio
-import gevent, gevent.monkey, gevent.pywsgi as gwsgi
+import sys, gevent.monkey
+
+if 'threading' in sys.modules:
+    # That's a bit brutal
+    del sys.modules['threading']
+gevent.monkey.patch_all()
+
+import os, re, json, logging, cStringIO as sio, socket
+
+import gevent, gevent.subprocess as sp, gevent.pywsgi as gwsgi
 
 from geventwebsocket.handler    import WebSocketHandler
 from geventwebsocket.exceptions import WebSocketError
-
-gevent.monkey.patch_all()
 
 # --------------------------------------------------------------------
 logging.basicConfig()
@@ -16,8 +19,6 @@ logger = logging.getLogger(__file__)
 
 # --------------------------------------------------------------------
 from pyramid.view import view_config
-
-PORT = 8090
 
 # --------------------------------------------------------------------
 class EasyCryptClient(object):
@@ -134,33 +135,23 @@ def _routing(config):
     config.add_route('easycrypt', '/engine')
 
 # --------------------------------------------------------------------
-def _main():
-    from pyramid.config        import Configurator
-    from wsgiref.simple_server import make_server
+def main(global_config, **settings):
+    from pyramid.config import Configurator
 
-    settings = {}
-    settings['reload_all'] = True
-    settings['debug_all' ] = True
-
-    config = Configurator(settings=settings, session_factory=None)
-    _routing(config); config.scan()
+    config = Configurator(settings=settings)
+    config.include(_routing); config.scan()
 
     application = config.make_wsgi_app()
     application.app_protocol = lambda _ : 'easycrypt'
 
-    if len(sys.argv)-1 == 0:
-        bind = ('127.0.0.1', PORT)
-    else:
-        bind = sys.argv[1]
-        if re.search(r'^.+:\d+$', bind):
-            bind = bind.rsplit(':', 1)
-            bind = (bind[0], int(bind[1]))
-        else:
-            bind = (bind, PORT)
-
-    server = gwsgi.WSGIServer(bind, application, handler_class=WebSocketHandler)
-    server.serve_forever()
+    return application
 
 # --------------------------------------------------------------------
-if __name__ == '__main__':
-    _main()
+def wsserver(global_conf, **kw):
+    bind = socket.getaddrinfo(kw.pop('host', 'localhost'),
+                              kw.pop('port', '8090'),
+                              socket.AF_INET, socket.SOCK_STREAM)[0][4]
+    def serve(app):
+        server = gwsgi.WSGIServer(bind, app, handler_class=WebSocketHandler)
+        server.serve_forever()
+    return serve

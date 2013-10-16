@@ -322,8 +322,7 @@ and process_pragma (scope : EcScope.scope) opt =
 
 (* -------------------------------------------------------------------- *)
 and process_extract scope todo = 
-  EcExtraction.process_extraction (EcScope.env scope) todo;
-  scope
+  EcScope.Extraction.process scope todo
 
 (* -------------------------------------------------------------------- *)
 and process (ld : EcLoader.ecloader) (scope : EcScope.scope) g =

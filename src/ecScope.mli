@@ -136,3 +136,8 @@ module Prover : sig
   val full_check  : scope -> scope
   val check_proof : scope -> bool -> scope
 end
+
+module Extraction : sig 
+  val process : 
+    scope -> (string option * toextract list * withextract list) -> scope
+end

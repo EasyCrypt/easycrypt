@@ -62,4 +62,4 @@ set +x; source "${DEST}/webui-env/bin/activate"; set -x
 # --------------------------------------------------------------------
 pip install cython; hash -r
 
-( cd "${MYDIR}"/../webui && pip install . )
+( cd "${MYDIR}"/../webui && pip install -e . )

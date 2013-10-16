@@ -18,12 +18,32 @@ MYDIR="$(cd $(dirname $0) && pwd)"
 source "${DEST}/webui-env/bin/activate"
 export PATH="${MYDIR}/..:${PATH}"; hash -r
 
-( cd "${MYDIR}/../webui";
-    pserve --stop   development.ini || true;
-    pserve --daemon development.ini )
+function psstop {
+  ( cd "${MYDIR}/../webui";
+      pserve --stop   --pid-file="$1.pid" --log-file="$1.log" "$2".ini || true )
+}
 
-echo "Waiting server to start..."; sleep 3
+function psstart {
+  ( cd "${MYDIR}/../webui";
+      pserve --stop   --pid-file="$1.pid" --log-file="$1.log" "$2".ini || true;
+      pserve --daemon --pid-file="$1.pid" --log-file="$1.log" "$2".ini )
+}
 
-python -mwebbrowser 'http://localhost:6543' &!
+case "$1" in
+  "start")
+    psstart backend  backend
+    psstart econline development
+    # echo "Waiting server to start..."; sleep 3
+    # python -mwebbrowser 'http://localhost:6543' &!
+    ;;
+  "stop")
+    psstop backend  backend
+    psstop econline development
+    ;;
+  *)
+    echo "unknown command: $1"
+    ;;
+esac
+
 
 exit 0
