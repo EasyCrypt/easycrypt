@@ -33,8 +33,6 @@ case "$1" in
   "start")
     psstart backend  backend
     psstart econline development
-    # echo "Waiting server to start..."; sleep 3
-    # python -mwebbrowser 'http://localhost:6543' &!
     ;;
   "stop")
     psstop backend  backend

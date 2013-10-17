@@ -68,11 +68,15 @@ function build_opam {
 
     "${DEST}"/ocaml-${OVERSION}/bin/opam init ${OPAMFLAGS}
 
-    cat >>"${OCONFIG}" <<EOF
-export OPAMROOT="${OPAMROOT}"
-export OCAMLFIND_CONF="${DEST}/ocaml-${OVERSION}/opam/system/lib/findlib.conf"
+    cat >>"${OCONFIG}" <<-EOF
+    export OPAMROOT="${OPAMROOT}"
+    export OCAMLFIND_CONF="${DEST}/ocaml-${OVERSION}/opam/system/lib/findlib.conf"
 EOF
     echo 'eval `opam config env`' >>"${OCONFIG}"
+
+    cat >>"${OCONFIG}" <<-EOF
+    export PS1="(ec-tool) \${PS1}"
+EOF
 }
 
 ( set -e; cd "${DEST}"/ocaml-${OVERSION}/build && build_opam )

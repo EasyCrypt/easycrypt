@@ -33,7 +33,7 @@ CHECK     = scripts/runtest.py --bin-args="$(ECARGS)" config/tests.config
 .PHONY: all build byte native tests check check-xunit examples
 .PHONY: clean install uninstall uninstall-purge dist distcheck
 .PHONY: callprover pg toolchain update-toolchain provers update
-.PHONY: webui webui-stop webui-env
+.PHONY: webui webui-start webui-stop webui-env
 .PHONY: %.ml %.mli %.inferred.mli
 
 all: build
@@ -159,7 +159,10 @@ pg:
 	  $(MAKE) -C proofgeneral run-local
 
 # --------------------------------------------------------------------
-webui: native
+webui:
+	@python -mwebbrowser 'http://localhost:6543'
+
+webui-start: native
 	bash ./scripts/ec-run-webui start
 
 webui-stop:
