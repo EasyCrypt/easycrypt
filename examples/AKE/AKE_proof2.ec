@@ -18,7 +18,8 @@ module type AKE_Oracles2 = {
 
 
 module type Adv2 (O : AKE_Oracles2) = {
-  fun choose(s : Pk list) : Sidx 
+  fun choose(s : Pk list) : Sidx {* O.eexpRev O.init1 O.init2 O.resp O.staticRev
+                                    O.h2_a O.sessionRev }
   fun guess(k : Key option) : bool
 }.
 
@@ -218,6 +219,19 @@ module AKE_EexpRev(FA : Adv2) = {
   }
 }.
 
+module type AKE_Oracles3 = {
+  fun eexpRev(i : Sidx, a : Sk) : Eexp option
+  fun init1(i : Sidx, A : Agent, B : Agent) : Epk option
+  fun init2(i : Sidx, Y : Epk) : unit
+  fun resp(i : Sidx, B : Agent, A : Agent, X : Epk) : Epk option
+  fun staticRev(A : Agent) : Sk option
+  fun eqS(i : Sidx, ss: Sstring) : bool option
+}.
+
+module type Adv3 (O : AKE_Oracles3) = {
+  fun guess(s : Pk list) : (Sstring list * Sidx) {* O.eexpRev O.init1 O.init2 O.resp O.staticRev O.eqS}
+}.
+
 pred collision_eexp_eexp(m : (Sidx, Eexp) map) =
   exists i j, in_dom i m /\ m.[i] = m.[j] /\ i <> j.
 
@@ -227,6 +241,153 @@ pred collision_eexp_rcvd(evs : Event list) =
      i > j /\  nth evs i = Some (Accept s1) /\
      (   (nth evs j  = Some (Start s2)  /\ psid_sent s2 = sid_rcvd s1)
       \/ (nth evs j  = Some (Accept s3) /\ sid_sent s3 = sid_rcvd s1 /\ sid_role s3 = resp)).
+
+op collision_eexp_rcvd_op : Event list -> bool.
+
+axiom collision_eexp_rcvd_op_def :
+forall evs, 
+(collision_eexp_rcvd_op evs) = 
+(collision_eexp_rcvd evs). 
+
+op collision_eexp_eexp_op : (Sidx, Eexp) map -> bool.
+
+axiom collision_eexp_eexp_op_def :
+forall eexps, 
+(collision_eexp_eexp_op eexps) = 
+(collision_eexp_eexp eexps). 
+
+
+module AKE_eqS(FA : Adv3) = {
+  
+  var evs  : Event list               (* events for queries performed by adversary *)
+  var test : Sid option               (* session id of test session *)
+
+  var mSk        : (Agent, Sk) map    (* map for static secret keys *)
+  var mEexp      : (Sidx, Eexp) map   (* map for ephemeral exponents of sessions *)
+  var mStarted   : (Sidx, Sdata2) map (* map of started sessions *)
+  var mCompleted : (Sidx, Epk)   map  (* additional data for completed sessions *)
+
+  var h2_queries : Sstring list
+  var test_sidx  : Sidx
+    
+  fun init() : unit = {
+    evs = [];
+    test = None;
+    mSk = Map.empty;    
+    mEexp = Map.empty;
+    mStarted = Map.empty;
+    mCompleted = Map.empty;
+  }
+
+  module O : AKE_Oracles3 = {
+    
+    fun eexpRev(i : Sidx, a : Sk) : Eexp option = {
+      var r : Eexp option = None;
+      if (in_dom i mStarted) {
+        evs = EphemeralRev(compute_psid mStarted mEexp i)::evs;
+        if (sd2_actor(proj mStarted.[i]) = gen_pk(a)) {
+          r = mEexp.[i];
+        }
+      }
+      return r;
+    }
+
+    fun init1(i : Sidx, A : Agent, B : Agent) : Epk option = {
+      var pX : Epk;
+      var r : Epk option = None; 
+      if (in_dom A mSk && in_dom B mSk && !in_dom i mStarted) {
+        pX = gen_epk(proj mEexp.[i]);
+        mStarted.[i] = (A,B,init);
+        evs = Start((A,B,pX,init))::evs;
+        r = Some(pX);
+      }
+      return r;
+    }
+
+    fun resp(i : Sidx, B : Agent, A : Agent, X : Epk) : Epk option = {
+      var pY : Epk;
+      var r : Epk option = None;
+      if (in_dom A mSk && in_dom B mSk && !in_dom i mStarted && !in_dom i mCompleted) {
+        pY = gen_epk(proj mEexp.[i]);
+        mStarted.[i] = (B,A,resp);
+        mCompleted.[i] = X;
+        evs = Accept((B,A,pY,X,resp))::evs;
+        r = Some(pY);
+      }
+      return r;
+    }
+
+    fun init2(i : Sidx, Y : Epk) : unit = {
+      if (!in_dom i mCompleted && in_dom i mStarted) {
+        mCompleted.[i] = Y;
+        evs = Accept(compute_sid mStarted mEexp mCompleted i)::evs;
+      }
+    }
+
+    fun staticRev(A : Agent) : Sk option = {
+      var r : Sk option = None;
+      if (in_dom A mSk) {
+        r = mSk.[A];
+        evs = StaticRev(A)::evs;
+      }
+      return r;
+    }
+
+    fun eqS(i: Sidx, ss : Sstring) : bool option = {
+      var r : bool option = None;
+      var ss_i : Sstring;
+      var sd : Sdata2;
+      var ev : Event;
+      if (in_dom i mCompleted && in_dom i mStarted && in_dom i mEexp) {
+        ev = SessionRev(compute_sid mStarted mEexp mCompleted i);
+        if (! mem ev evs) { evs = ev::evs; }
+        sd = proj mStarted.[i];
+        ss_i = gen_sstring (proj mEexp.[i]) (proj mSk.[sd2_actor sd])
+                           (sd2_peer sd) (proj mCompleted.[i])
+                           (sd2_role sd);
+        r = Some (ss_i = ss);
+      }
+      return r;
+    }
+  }
+  
+  module A = FA(O)
+
+  fun main() : unit = {
+    var b : bool = def;
+    var pks : Pk list = [];
+    var t_idx : Sidx = def;
+    var key : Key = def;
+    var keyo : Key option = def;
+    var b' : bool = def;
+    var i : int = 0;
+    var ska : Sk = def;
+    var pka : Pk = def;
+    var sidxs : Sidx set = univ_Sidx;
+    var sidx : Sidx;
+    var xa' : Eexp = def;
+    
+    init();
+    while (i < qAgent) {
+      i = i + 1;
+      ska = $sample_Sk;
+      pka = gen_pk(ska);
+      pks = pka :: pks;
+      mSk.[pka] = ska;
+    }
+
+    while (sidxs <> FSet.empty) {
+      sidx = pick sidxs;
+      sidxs = rm sidx sidxs;
+      xa' = $sample_Eexp;
+      mEexp.[sidx] = xa';
+    } 
+    if (!collision_eexp_eexp_op mEexp) {
+     (h2_queries, test_sidx) = A.guess(pks);
+    }
+  }
+}.
+
 
 lemma collision_eexp_rcvd_mon :
 forall e evs,
@@ -285,23 +446,6 @@ pred valid_accepts evs =
   nth evs i = Some (Accept s) =>
   sid_role s = init => 
   exists j, i < j /\ j < length evs /\ nth evs j = Some (Start (psid_of_sid s)).
-
-
-
-op collision_eexp_rcvd_op : Event list -> bool.
-
-axiom collision_eexp_rcvd_op_def :
-forall evs, 
-(collision_eexp_rcvd_op evs) = 
-(collision_eexp_rcvd evs). 
-
-op collision_eexp_eexp_op : (Sidx, Eexp) map -> bool.
-
-axiom collision_eexp_eexp_op_def :
-forall eexps, 
-(collision_eexp_eexp_op eexps) = 
-(collision_eexp_eexp eexps). 
-
 
 lemma nosmt fresh_eq_notfresh(t : Sid) (evs : Event list) :
   (! fresh t evs) =
@@ -427,27 +571,6 @@ proof.
  by apply collision_eexp_rcvd_mon.
 save.
 
-section.
-declare module A : Adv2{ AKE_EexpRev}.
-
-axiom A_Lossless_guess : 
-forall (O <: AKE_Oracles2{A}),
-  islossless O.eexpRev =>
-  islossless O.h2_a =>
-  islossless O.init1 =>
-  islossless O.init2 =>
-  islossless O.resp =>
-  islossless O.staticRev => islossless O.sessionRev => islossless A(O).guess.
-
-axiom A_Lossless_choose : 
-forall (O <: AKE_Oracles2{A}),
-  islossless O.eexpRev =>
-  islossless O.h2_a =>
-  islossless O.init1 =>
-  islossless O.init2 =>
-  islossless O.resp =>
-  islossless O.staticRev => islossless O.sessionRev => islossless A(O).choose.
-
 pred test_fresh(t : Sid option, evs : Event list) =
   t <> None /\ fresh (proj t) evs.
 
@@ -477,7 +600,131 @@ case (s = None).
  rewrite !heq => _.
  by apply coll_or_not_fresh_mon_ev.
 save.
- 
+
+axiom gen_epk_inj : forall e1 e2,
+gen_epk e1 = gen_epk e2 =>
+e1 = e2.
+
+axiom gen_pk_inj : forall s1 s2, 
+gen_pk s1 = gen_pk s2 =>
+s1 = s2.
+
+(* simulation between traces used in last step *)
+op tr_sim  : Event list -> Event list -> bool.
+
+axiom tr_sim_empty : tr_sim [] [].
+axiom tr_sim_eq_ev : forall (e : Event)(tr1 tr2 : Event list), tr_sim tr1 tr2 => tr_sim (e::tr1) (e::tr2).
+axiom tr_sim_skip_sRev : forall (s : Sid)(tr1 tr2 : Event list), tr_sim tr1 tr2 => 
+                                                                 tr_sim ((SessionRev s)::tr1) tr2.
+axiom tr_sim_dup_sRev :  forall s tr1 tr2, tr_sim tr1 tr2 =>
+                                           mem (SessionRev s) tr1 => 
+                                           tr_sim tr1 ((SessionRev s)::tr2).
+
+
+axiom tr_sim_inversion :
+forall tr1 tr2, tr_sim tr1 tr2 => 
+  ((tr1 = [] /\ tr2 = []) \/
+   (exists tr1', exists tr2', exists e, tr1 = e :: tr1' /\ tr2 = e :: tr2' /\ tr_sim tr1' tr2') \/
+   (exists tr1', exists s, tr1 = (SessionRev s) :: tr1' /\ tr_sim tr1' tr2) \/
+   (exists tr2', exists s, tr2 = (SessionRev s) :: tr2' /\ tr_sim tr1 tr2' /\ mem (SessionRev s) tr1)).
+
+require import Fun.
+
+axiom tr_sim_ind (P : (Event list * Event list) cpred) :
+P ([], []) =>
+(forall e tr1 tr2, P (tr1, tr2) => P (e::tr1, e::tr2)) =>
+(forall s tr1 tr2, P (tr1, tr2) => P ((SessionRev s) :: tr1, tr2)) =>
+(forall s tr1 tr2, P (tr1, tr2) => mem (SessionRev s) tr1 => P (tr1, (SessionRev s) :: tr2)) => 
+forall tr1 tr2, tr_sim tr1 tr2 => P (tr1, tr2).
+
+
+(* membership preservation properties *)
+lemma tr_sim_mem : forall tr1 tr2,
+tr_sim tr1 tr2 => forall e, (forall s, e <> SessionRev s) => mem e tr1 = mem e tr2.
+proof.
+ intros => tr1 tr2 h.
+ pose p := lambda p, let (tr1, tr2) = p in
+           forall (e : Event),  (forall (s : Sid), ! e = SessionRev s) => List.mem e tr1 = List.mem e tr2.
+ cut : p (tr1, tr2); last first.
+ by rewrite /p /=.
+ apply tr_sim_ind; rewrite /p //=.
+  by progress; rewrite !mem_cons H //.
+  by progress; rewrite mem_cons; (case (e = SessionRev s) => //=; first smt); rewrite H.
+  by progress; rewrite mem_cons; (case (e = SessionRev s) => //=; first smt); rewrite H.
+save.
+
+
+lemma tr_sim_mem_sRev : forall tr1 tr2,
+tr_sim tr1 tr2 => forall s, mem (SessionRev s) tr2 => mem (SessionRev s) tr1.
+proof.
+ intros => tr1 tr2 h.
+ pose p := lambda p, let (tr1, tr2) = p in
+         forall (s : Sid),  List.mem (SessionRev s) tr2 => List.mem (SessionRev s) tr1.
+ cut : p (tr1, tr2); last first.
+ by rewrite /p /=.
+ apply tr_sim_ind; rewrite /p //=.
+  by progress; generalize H0; rewrite !mem_cons =>[ -> |h'];[left| rewrite H].
+  by progress; rewrite mem_cons H //; right.
+  by progress => //; generalize H1; rewrite !mem_cons => [ -> // | h']; apply H.
+save.
+
+(* preservation of freshness *)
+lemma tr_sim_fresh : forall tr1 tr2,
+tr_sim tr1 tr2 => forall ts, fresh ts tr1 => fresh ts tr2.
+proof.
+ intros => tr1 tr2 hsim ts.
+ elim /tuple5_ind ts => A B X Y r ?.
+ rewrite /fresh /=.
+ progress.
+  by apply not_def => hmem; generalize H0 => /=; apply (tr_sim_mem_sRev _ tr2).
+  by generalize H1; rewrite !not_and => [|] h; [left | right];rewrite -(tr_sim_mem tr1) //; smt.
+  by apply not_def => hmem; generalize H2 => /=; apply (tr_sim_mem_sRev _ tr2).
+  cut h := H3 _.
+  by rewrite (tr_sim_mem tr1 tr2) //; first smt.
+  elim h => {h} [h1 h2].
+  elim h1 => {h1} h1.
+   by left; rewrite -(tr_sim_mem tr1 tr2) //; first smt.
+   elim h1 => {h1} h11 h12; right.
+   split; first by rewrite -(tr_sim_mem tr1 tr2) //; first smt.
+   apply not_def => [[z]] hz; generalize h12 => /=.
+    exists z; rewrite (tr_sim_mem tr1 tr2) => //; first smt.
+  cut h := H3 _.
+  by rewrite (tr_sim_mem tr1 tr2) //; first smt.
+  elim h => ?.
+  rewrite (tr_sim_mem tr1 tr2) //; first smt.
+save.
+
+lemma tr_sim_fresh_op : forall tr1 tr2,
+tr_sim tr1 tr2 => forall ts, fresh_op ts tr1 => fresh_op ts tr2.
+proof.
+intros => tr1 tr2 hsim ts.
+cut: fresh_op ts tr1 = true => fresh_op ts tr2 = true; last by smt.
+rewrite -!fresh_op_def'.
+by apply tr_sim_fresh.
+save.
+
+
+section.
+declare module A : Adv2{ AKE_EexpRev, AKE_eqS}.
+
+axiom A_Lossless_guess : 
+forall (O <: AKE_Oracles2{A}),
+  islossless O.eexpRev =>
+  islossless O.h2_a =>
+  islossless O.init1 =>
+  islossless O.init2 =>
+  islossless O.resp =>
+  islossless O.staticRev => islossless O.sessionRev => islossless A(O).guess.
+
+axiom A_Lossless_choose : 
+forall (O <: AKE_Oracles2{A}),
+  islossless O.eexpRev =>
+  islossless O.h2_a =>
+  islossless O.init1 =>
+  islossless O.init2 =>
+  islossless O.resp =>
+  islossless O.staticRev => islossless O.sessionRev => islossless A(O).choose.
+
 local module AKE_Fresh(FA : Adv2) = {
   var evs  : Event list               (* events for queries performed by adversary *)
   var test : Sid option               (* session id of test session *)
@@ -1010,8 +1257,6 @@ proof.
    intros => [i][hdom1][hdom2] heq.
    cut [h1 hcl]:= htl ps => {h1}; right; apply hcl.
    exists i; progress => //.
-   by generalize H heq => -> /=.
-   by generalize H heq => -> /=.
 save.
 
 (*  intros => evs e m1 m2; rewrite /inv_started => htl hnstsrt ps;  *)
@@ -1164,11 +1409,6 @@ proof.
    by rewrite /compute_sid get_setNE; smt.
 save.
 
-axiom gen_epk_inj : forall e1 e2,
-gen_epk e1 = gen_epk e2 =>
-e1 = e2.
-
-
 lemma proj_inj_some : 
 forall (x y : 'a option),
 x <> None => 
@@ -1269,9 +1509,6 @@ fun; wp; skip; progress => //.
     by apply valid_accept_pres => //; smt. 
     by apply inv_started_pres => //; smt.  
     by apply inv_accepted_pres => //; smt.  
-    by apply H6.
-    by apply H8.
-    by apply H9.
     by apply accept_evs_eexps_pres => //; smt.
     by apply start_evs_eexps_pres => //; smt.
     by apply no_start_coll_pres => //; smt. 
@@ -1279,20 +1516,10 @@ fun; wp; skip; progress => //.
     by apply valid_accept_pres => //; smt.
     by apply inv_started_pres => //; smt.
     by apply inv_accepted_pres => //; smt.  
-    by apply H6.
-    by apply H8.
-    by apply H9.
-    by apply H6.
-    by apply H8.
-    by apply H9.
 
     fun; sp; (if; first smt);
     inline AKE_Fresh(A).O.h2  AKE_EexpRev(A).O.h2;
-    wp; try rnd; wp; skip; [smt | 
-    intros => &1 &2 H1; do!split; smt].
-
-
-   fun; sp; (if; first by smt); wp; skip; progress => //.
+    wp; try rnd; wp; skip; progress.
     by apply accept_evs_eexps_pres => //; smt.
     by apply start_evs_eexps_pres_ev => //;exists i{2}; progress => //; smt.
 
@@ -1326,14 +1553,10 @@ fun; wp; skip; progress => //.
     by apply not_def => h; cut: in_dom i{2} AKE_Fresh.mStarted{1} by apply H8.
     by smt.
 
-   by apply H6 => //.
    by rewrite in_dom_set; left; apply H8.
    generalize H13; rewrite in_dom_set => [|] hor; last by rewrite hor  get_setE; smt.
    rewrite get_setNE.
     by apply not_def => heq; generalize heq hor H12 => ->.
-    by apply H9.
-    by apply H6.
-    by apply H8.
     by apply H9.
 
    fun; sp; if => //; wp; skip; progress => //.
@@ -1384,17 +1607,12 @@ fun; wp; skip; progress => //.
 
   apply inv_accepted_pres_ev1 => //.
    by apply H6.
-   by apply H6.
   case (x = i{2}).
    by intros ->.
    by intros neq; generalize H12; rewrite in_dom_setNE // => h; apply H8.
    case (x = i{2}).
     by intros => ->; cut:= H9 i{2} _ _.
     by intros => hneq; apply H9 => //; generalize H13; rewrite in_dom_set; smt.
-
-  by apply H6.
-  by apply H8.
-  by apply H9.
 
    fun; sp; if => //; wp; skip; progress => //.
 
@@ -1446,7 +1664,6 @@ fun; wp; skip; progress => //.
    cut [h1 h2] := H4 ps; apply h2.
    exists j; progress.
     by generalize hdom1; rewrite in_dom_setNE.
-    by apply H6.
     by generalize heq; (rewrite get_setNE; first smt); rewrite H14 /=.
     by generalize heq; (rewrite get_setNE; first smt); rewrite H14 /=.
 
@@ -1476,7 +1693,6 @@ fun; wp; skip; progress => //.
    generalize hdom1 hdom2 hdom3 heq; 
    rewrite !in_dom_setNE; first 2 smt. 
    by rewrite /compute_sid /= !get_setNE /=; smt.
-   by apply H6.
    generalize H14; rewrite !in_dom_set => [|] hor.
     by left; apply H8.
     by right.
@@ -1486,9 +1702,6 @@ fun; wp; skip; progress => //.
     apply H9.
     by generalize H14; rewrite !in_dom_setNE.
     by generalize H15; rewrite !in_dom_setNE. 
-    by apply H6.
-    by apply H8.
-    by apply H9.
        
    fun; wp; skip; progress; try assumption.
     by apply accept_evs_eexps_pres => //; smt.
@@ -1498,12 +1711,9 @@ fun; wp; skip; progress => //.
     by apply valid_accept_pres => //; smt. 
     by apply inv_started_pres => //; smt.  
     by apply inv_accepted_pres => //; smt.  
-    by smt.
-    by smt.
-    by apply H9.
-    by smt.
-    by smt.
-    by apply H9.
+
+   fun; sp; if => //.
+    inline  AKE_Fresh(A).O.h2 AKE_EexpRev(A).O.h2; wp; rnd; wp; skip; progress.
 
     fun.
     sp; if; first smt.
@@ -1518,9 +1728,6 @@ fun; wp; skip; progress => //.
      by apply valid_accept_pres => //; smt. 
      by apply inv_started_pres => //; smt.  
      by apply inv_accepted_pres => //; smt.  
-     by smt.
-     by smt.
-     by apply H9.
      by apply accept_evs_eexps_pres => //; smt.
      by apply start_evs_eexps_pres => //; smt.
      by apply no_start_coll_pres => //; smt. 
@@ -1528,15 +1735,9 @@ fun; wp; skip; progress => //.
      by apply valid_accept_pres => //; smt. 
      by apply inv_started_pres => //; smt.  
      by apply inv_accepted_pres => //; smt.  
-     by smt.
-     by smt.
-     by apply H9.
 
     wp; skip; smt.
-    wp; skip; progress; try assumption.    
-     by smt.
-     by smt.
-     by apply H9.
+    wp; skip; progress.
 save.
 
 
@@ -1670,9 +1871,6 @@ seq 1 1:
   mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2} /\ 
   ={r} /\ r{2} = None).
 wp; skip; progress => //.
-by apply H9.
-by apply H11.
-by apply H12.
 if{1}.
 rcondt{2} 1.
 intros &m; skip; smt.
@@ -1684,10 +1882,7 @@ wp; skip; progress => //.
     by apply valid_accept_pres => //; smt.
     by apply inv_started_pres => //; smt.
     by apply inv_accepted_pres => //; smt.
-    by apply H9.
-    by apply H11.
     by rewrite mem_cons; right.
-    by apply H12.
     by rewrite mem_cons; right.
     by rewrite mem_cons; right.
     by apply accept_evs_eexps_pres => //; smt.
@@ -1697,9 +1892,6 @@ wp; skip; progress => //.
     by apply valid_accept_pres => //; smt.
     by apply inv_started_pres => //; smt.
     by apply inv_accepted_pres => //; smt.
-    by apply H9.
-    by apply H11.
-    by apply H12.
     by rewrite mem_cons; right.
     by apply accept_evs_eexps_pres => //; smt.
     by apply start_evs_eexps_pres => //; smt.
@@ -1708,10 +1900,7 @@ wp; skip; progress => //.
     by apply valid_accept_pres => //; smt.
     by apply inv_started_pres => //; smt.
     by apply inv_accepted_pres => //; smt.
-    by apply H9.
-    by apply H11.
     by rewrite mem_cons; right.
-    by apply H12.
     by rewrite mem_cons; right.
     by rewrite mem_cons; right.
     by apply accept_evs_eexps_pres => //; smt.
@@ -1721,9 +1910,6 @@ wp; skip; progress => //.
     by apply valid_accept_pres => //; smt.
     by apply inv_started_pres => //; smt.
     by apply inv_accepted_pres => //; smt.
-    by apply H9.
-    by apply H11.
-    by apply H12.
     by rewrite mem_cons; right.
     if{2}.
     conseq (_ :_ ==>
@@ -1761,9 +1947,6 @@ wp; skip; progress => //.
       by apply valid_accept_pres => //; smt.
       by apply inv_started_pres => //; smt.
       by apply inv_accepted_pres => //; smt.
-      by apply H9.
-      by apply H11.
-      by apply H12.
       by rewrite mem_cons; right.
      skip; smt.
 save.
@@ -1818,7 +2001,7 @@ forall &2,
              AKE_Fresh.test = AKE_EexpRev.test{2} /\
              mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}] = 1%r.
 proof.
- intros => &2 h; fun; wp; skip; progress; try apply H11; smt.
+ by intros => &2 h; fun; wp; skip; progress; rewrite mem_cons; right.
 save.
 
 
@@ -1890,13 +2073,7 @@ proof.
   by apply valid_accept_pres => //; smt.
   by apply inv_started_pres => //; smt.
   by apply inv_accepted_pres => //; smt.
-  by apply H7.
-  by apply H9.
-  by apply H12.
   by rewrite mem_cons; right.
-  by apply H7.
-  by apply H9.
-  by apply H12.
 save.
 
 
@@ -2094,19 +2271,9 @@ proof.
 fun.
 sp; if; first smt.
  wp; call eq1_h2; wp; skip; progress => //.
-  by apply H9.
-  by apply H11.
-  by apply H12.
-  by apply H9.
-  by apply H11.
-  by apply H12.
   by elim H30; smt.
   by elim H30; smt.
-  by elim H30; smt.
-  by elim H30; smt.
-  by apply H28.
-
- skip; smt.
+  by skip; progress => //.
 save.
 
 local lemma  bdh1_h2_a_1 : 
@@ -2163,15 +2330,9 @@ proof.
  fun.
  sp; if.
   inline AKE_Fresh(A).O.h2; wp; rnd; wp; skip; progress => //.
-   by apply H6.
-   by apply H8.
-   by apply H11.
    by apply TKey.Dword.lossless.
 
   skip; progress => //. 
-   by apply H6.
-   by apply H8.
-   by apply H11.
 save. 
 
 local lemma bdh1_h2_a_2 :
@@ -2230,15 +2391,9 @@ proof.
  fun.
  sp; if.
   inline AKE_EexpRev(A).O.h2;wp; rnd; wp; skip; progress => //.
-   by apply H7.
-   by apply H9.
-   by apply H12.
    by apply TKey.Dword.lossless.
 
   skip; progress => //. 
-   by apply H7.
-   by apply H9.
-   by apply H12.
 save.
 
 
@@ -2366,7 +2521,6 @@ proof.
   apply inv_accepted_pres_ev2 => //.
    by apply not_def => h; cut: in_dom i{2} AKE_Fresh.mStarted{1} by apply H11.
    by smt.
-   by apply H9.
    by rewrite in_dom_set; left; apply H11.
    by rewrite mem_cons; right; assumption.
    generalize H18; rewrite in_dom_set => [|] hor; last by rewrite hor  get_setE; smt.
@@ -2405,19 +2559,12 @@ proof.
   apply inv_accepted_pres_ev2 => //.
    by apply not_def => h; cut: in_dom i{2} AKE_Fresh.mStarted{1} by apply H11.
    by smt.
-   by apply H9.
    by rewrite in_dom_set; left; apply H11.
    generalize H18; rewrite in_dom_set => [|] hor; last by rewrite hor  get_setE; smt.
    rewrite get_setNE.
     by apply not_def => heq; generalize heq hor H16 => ->.
     by apply H12.
 by rewrite mem_cons; right.
-by apply H9.
-by apply H11.
-by apply H12.
-by apply H9.
-by apply H11.
-by apply H12.
 save.
 
 
@@ -2564,7 +2711,7 @@ by right; apply collision_eexp_rcvd_mon.
   by apply valid_accept_pres => //; smt.
 
   by apply accept_evs_eexps_pres; smt. 
-  by apply start_evs_eexps_pres_ev => //; smt.
+  apply start_evs_eexps_pres_ev => //; exists i{hr}; progress; smt.
 
   apply no_start_coll_pres_ev => //.
     intros s' hmem; apply not_def => h'.
@@ -2598,16 +2745,12 @@ by right; apply collision_eexp_rcvd_mon.
    by apply H9.
    by smt.
    by smt.
-   by apply H7.
    by rewrite in_dom_set; left; apply H9.
    generalize H17; rewrite in_dom_set => [|] hor; last by rewrite hor  get_setE; smt.
    rewrite get_setNE.
     by apply not_def => heq; generalize heq hor H16 => ->.
     by apply H12.
    by rewrite mem_cons; right; assumption.
-   by apply H7.
-   by apply H9.
-   by apply H12.
 save.
 
 local equiv eq1_init2 : 
@@ -2751,7 +2894,6 @@ if{1}.
 
   apply inv_accepted_pres_ev1 => //.
   by apply H9.
-  by apply H9.
   case (x = i{2}).
    by intros ->.
    by intros neq; generalize H18; rewrite in_dom_setNE // => h; apply H11.
@@ -2807,7 +2949,6 @@ if{1}.
 
   apply inv_accepted_pres_ev1 => //.
   by apply H9.
-  by apply H9.
   case (x = i{2}).
    by intros ->.
    by intros neq; generalize H18; rewrite in_dom_setNE // => h; apply H11.
@@ -2818,12 +2959,6 @@ if{1}.
   by rewrite mem_cons; right.
 if{2}; last first.
  skip; progress => //.
-  smt.
-  smt.
-  smt.
-  smt.
-  smt.  
-  by apply H12.
  conseq (_ : 
 ((! (! test_fresh AKE_EexpRev.test{2} AKE_EexpRev.evs{2} \/
        collision_eexp_rcvd AKE_EexpRev.evs{2}) /\
@@ -2873,9 +3008,6 @@ if{2}; last first.
             (compute_sid AKE_EexpRev.mStarted{2} AKE_EexpRev.mEexp{2}
                AKE_EexpRev.mCompleted{2}.[i{2} <- Y{2}] i{2}) :: AKE_EexpRev.evs{2})) ==> _).
 progress => //.
-smt.
-smt.
-by apply H12.
 rewrite /test_fresh; rewrite not_and; right; smt.
  wp; skip; progress => //; try (by apply H12); try (by apply H9);
 try (by apply H11).
@@ -3044,13 +3176,7 @@ forall &2,
              mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}] = 1%r.
 proof.
  intros => &2 hbad; fun; wp; skip; progress => //.
- by apply H6.
- by apply H8.
  by rewrite mem_cons; right.
- by apply H11.
- by apply H6.
- by apply H8.
- by apply H11.
 save.
 
 local lemma bdh1_init2_2 :
@@ -3198,7 +3324,6 @@ proof.
 
   apply inv_accepted_pres_ev1 => //.
   by apply H7.
-  by apply H7.
   case (x = i{hr}).
    by intros ->.
    by intros neq; generalize H16; rewrite in_dom_setNE // => h; apply H9.
@@ -3207,9 +3332,6 @@ proof.
     by intros => hneq; apply H12 => //; generalize H17; rewrite in_dom_set; smt.
 
   by rewrite mem_cons; right.
-  smt.
-  smt.
-  by apply H12.
 save.
 
 
@@ -3355,7 +3477,6 @@ proof.
    cut [h1 h2] := H7 ps; apply h2.
    exists j; progress.
     by generalize hdom1; rewrite in_dom_setNE.
-    by apply H9.
     by generalize heq; (rewrite get_setNE; first smt); rewrite H19 /=.
     by generalize heq; (rewrite get_setNE; first smt); rewrite H19 /=.
 
@@ -3385,7 +3506,6 @@ proof.
    generalize hdom1 hdom2 hdom3 heq; 
    rewrite !in_dom_setNE; first 2 smt. 
    by rewrite /compute_sid /= !get_setNE /=; smt.
-   by apply H9.
    generalize H19; rewrite !in_dom_set => [|] hor.
     by left; apply H11.
     by right.
@@ -3398,6 +3518,7 @@ proof.
     by generalize H20; rewrite !in_dom_setNE. 
     by rewrite mem_cons; right.
     by rewrite mem_cons; right.
+
    apply accept_evs_eexps_pres_ev => //.
     by rewrite /sid_sent /=; exists i{2}; split; smt.
    
@@ -3446,7 +3567,6 @@ proof.
    cut [h1 h2] := H7 ps; apply h2.
    exists j; progress.
     by generalize hdom1; rewrite in_dom_setNE.
-    by apply H9.
     by generalize heq; (rewrite get_setNE; first smt); rewrite H19 /=.
     by generalize heq; (rewrite get_setNE; first smt); rewrite H19 /=.
 
@@ -3476,7 +3596,6 @@ proof.
    generalize hdom1 hdom2 hdom3 heq; 
    rewrite !in_dom_setNE; first 2 smt. 
    by rewrite /compute_sid /= !get_setNE /=; smt.
-   by apply H9.
    generalize H19; rewrite !in_dom_set => [|] hor.
     by left; apply H11.
     by right.
@@ -3487,12 +3606,6 @@ proof.
     by generalize H19; rewrite !in_dom_setNE.
     by generalize H20; rewrite !in_dom_setNE. 
     by rewrite mem_cons; right.
-   by apply H9.
-   by apply H11.
-   by apply H12.
-   by apply H9.
-   by apply H11.
-   by apply H12.
 save.
 
 local lemma bdh1_resp_1 :
@@ -3546,13 +3659,7 @@ forall &2,
              mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}] = 1%r.
 proof.
  intros => &2 h; fun; wp; skip; progress => //.
- by apply H6.
- by apply H8.
  by rewrite mem_cons; right.
- by apply H11.
- by apply H6.
- by apply H8.
- by apply H11.
 save.
 
 
@@ -3693,7 +3800,6 @@ proof.
    cut [h1 h2] := H5 ps; apply h2.
    exists j; progress.
     by generalize hdom1; rewrite in_dom_setNE.
-    by apply H7.
     by generalize heq; (rewrite get_setNE; first smt); rewrite H18 /=.
     by generalize heq; (rewrite get_setNE; first smt); rewrite H18 /=.
    rewrite /inv_accepted => ps; rewrite mem_cons; split.
@@ -3723,7 +3829,6 @@ proof.
    rewrite !in_dom_setNE; first 2 smt. 
    by rewrite /compute_sid /= !get_setNE /=; smt.
 
-   smt.
    generalize H18; rewrite !in_dom_set => [|] hor.
     by left; apply H9.
     by right.
@@ -3734,9 +3839,6 @@ proof.
     by generalize H18; rewrite !in_dom_setNE.
     by generalize H19; rewrite !in_dom_setNE. 
     by rewrite mem_cons; right.
-    by apply H7.
-    by apply H9.
-    by apply H12.
 save.   
 
 local equiv eq1_staticRev : 
@@ -3868,9 +3970,6 @@ seq 1 1:
   mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2} /\ 
  ={r} /\ r{2} = None).
 wp; skip; progress => //.
-by apply H9.
-by apply H11.
-by apply H12.
 if{1}.
 rcondt{2} 1.
 intros => ?; wp; progress => //.
@@ -3882,10 +3981,7 @@ wp; skip; progress => //.
     by apply valid_accept_pres => //; smt. 
     by apply inv_started_pres => //; smt.  
     by apply inv_accepted_pres => //; smt.  
-    by smt.
-    by smt.
     by rewrite mem_cons; right.
-    by apply H12.
     by rewrite mem_cons; right.
     by rewrite mem_cons; right.
     by apply accept_evs_eexps_pres => //; smt.
@@ -3895,9 +3991,6 @@ wp; skip; progress => //.
     by apply valid_accept_pres => //; smt. 
     by apply inv_started_pres => //; smt.  
     by apply inv_accepted_pres => //; smt.  
-    by smt.
-    by smt.
-    by apply H12.
     by rewrite mem_cons; right.
 
    if{2}.
@@ -3943,18 +4036,9 @@ wp; skip; progress => //.
     by apply valid_accept_pres => //; smt. 
     by apply inv_started_pres => //; smt.  
     by apply inv_accepted_pres => //; smt.  
-    by smt.
-    by smt.
-    by apply H12.
     by rewrite mem_cons; right.
 
    skip; progress => //.
-   by apply H9.
-   by apply H11.
-   by apply H12.  
-   by apply H9.
-   by apply H11.
-   by apply H12.  
 qed.
 
 local lemma bdh1_staticRev_1 :
@@ -4008,13 +4092,7 @@ forall &2,
              mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}] = 1%r.
 proof.
  intros => &2 h; fun; wp; skip; progress => //.
-  by apply H6.
-  by apply H8.
   by rewrite mem_cons; right.
-  by apply H11.
-  by apply H6.
-  by apply H8.
-  by apply H11.
 save.
 
 
@@ -4092,13 +4170,7 @@ proof.
   by apply valid_accept_pres => //; smt.
   by apply inv_started_pres => //; smt.  
   by apply inv_accepted_pres => //; smt.  
-  by apply H7.
-  by apply H9.
-  by apply H12.
   by rewrite mem_cons; right.
-  by apply H7.
-  by apply H9.
-  by apply H12.
 qed.  
 
 
@@ -4199,24 +4271,9 @@ proof.
   wp.
   call eq1_h2.
   wp; skip; progress => //.
-   by apply H9.
-   by apply H11.
-   by apply H12.
-   by apply H9.
-   by apply H11.
-   by apply H12.
    smt.   
    smt.
-   smt.
-   by apply H11.
-   by apply H12.
   wp; skip; progress => //.
-   by apply H9.
-   by apply H11.
-   by apply H12.
-   by apply H9.
-   by apply H11.
-   by apply H12.
 save. 
   
 
@@ -4332,18 +4389,7 @@ proof.
   by apply valid_accept_pres => //; smt.
   by apply inv_started_pres => //; smt.  
   by apply inv_accepted_pres => //; smt.  
-  by apply H9.
-  by apply H11.
-  by apply H12.
   by rewrite mem_cons; right.
-  by apply H9.
-  by apply H11.
-  by apply H12.
-  smt.
-  smt.
-  by apply H9.
-  by apply H11.
-  by apply H12.
 if{2}.
    conseq (_ : _ ==>
  (! test_fresh AKE_EexpRev.test{2} AKE_EexpRev.evs{2} \/
@@ -4393,9 +4439,6 @@ wp; rnd{2}; wp; skip; progress => //.
   by apply valid_accept_pres => //; smt.
   by apply inv_started_pres => //; smt.  
   by apply inv_accepted_pres => //; smt.  
-  by apply H9.
-  by apply H11.
-  by apply H12.
   by rewrite mem_cons; right.
  wp; skip; progress => //.
     cut heq' : forall p q, (p && q) = (p /\ (p => q)) by smt.
@@ -4413,18 +4456,9 @@ wp; rnd{2}; wp; skip; progress => //.
   by apply no_accept_coll_pres => //; smt.
   by apply valid_accept_pres => //; smt.
   by apply inv_started_pres => //; smt.  
-  by apply inv_accepted_pres => //; smt.  
-  by apply H9.
-  by apply H11.
-  by apply H12.
+  by apply inv_accepted_pres => //; smt. 
   by rewrite mem_cons; right.
 skip; progress => //.
-  by apply H9.
-  by apply H11.
-  by apply H12.
-  by apply H9.
-  by apply H11.
-  by apply H12.
 save.
 
 local lemma bdh1_sessionRev_1 :
@@ -4481,22 +4515,13 @@ proof.
  inline AKE_Fresh(A).O.computeKey AKE_Fresh(A).O.h2.
  sp; if; last first.
   skip; progress => //.
-   by apply H6.
-   by apply H8.
-   by apply H11.
  
   sp; if; last first.
    wp; skip; progress => //.
-    by apply H6.
-    by apply H8.
     by rewrite mem_cons; right.
-    by apply H11.
   
    wp; rnd; wp; skip; progress => //.
-    by apply H6.
-    by apply H8.
     by rewrite mem_cons; right.
-    by apply H11.
   
    by apply TKey.Dword.lossless.
 qed.
@@ -4558,9 +4583,6 @@ proof.
  inline AKE_EexpRev(A).O.computeKey AKE_EexpRev(A).O.h2.
  sp; if; last first.
   skip; progress => //.
-   by apply H7.
-   by apply H9.
-   by apply H12.
  
   sp; if; last first.
    wp; skip; progress => //.
@@ -4588,9 +4610,6 @@ proof.
   by apply valid_accept_pres => //; smt.
   by apply inv_started_pres => //; smt.  
   by apply inv_accepted_pres => //; smt.  
-  by apply H7.
-  by apply H9.
-  by apply H12.
   by rewrite mem_cons; right.
 
   wp; rnd; wp; skip; progress => //.
@@ -4617,9 +4636,6 @@ proof.
   by apply valid_accept_pres => //; smt.
   by apply inv_started_pres => //; smt.  
   by apply inv_accepted_pres => //; smt.  
-  by apply H7.
-  by apply H9.
-  by apply H12.
   by rewrite mem_cons; right.
   by apply TKey.Dword.lossless.
 save.
@@ -4896,16 +4912,17 @@ cut hck : bd_hoare
  fun (collision_eexp_eexp_op AKE_EexpRev.mEexp).
  smt.
  smt.
- by apply A_Lossless_choose.
+ progress; apply (A_Lossless_choose O) => //.
  by fun; wp.
- by fun; sp; if; wp; try call hh2; wp => //.
  by fun; wp. 
  by fun; wp.
  by fun; wp.
- by fun; wp.
+ by fun; wp. 
+ by fun; sp; if; wp; try call hh2; wp => //.
  by fun; sp; if; try call hck; wp.
  skip; progress; smt.
  
+
  if{2}; last by trivial.
  call{2}(_ : (collision_eexp_eexp_op AKE_EexpRev.mEexp) ==>
             (collision_eexp_eexp_op AKE_EexpRev.mEexp)).
@@ -4963,12 +4980,8 @@ wp; skip; progress; try assumption.
    rewrite /inv_accepted => ps; split.
     cut:= mem_nil (Accept ps); smt.
     smt.
-  apply H.
   smt.
   smt.
-  smt.   
-  by apply H21.
-  by apply H22.
   if{1}.
   rcondt{2} 1.
   intros => &m; skip; progress => //.
@@ -5007,24 +5020,13 @@ seq 2 2:
   ! AKE_Fresh.mCompleted{1}.[t_idx{1}] = None)).
   sp; (if; first smt); last first.
   wp; rnd; skip; progress => //.
-  by apply H6.
-  by apply H8.
-  by apply H9.
 inline AKE_Fresh(A).O.computeKey AKE_EexpRev(A).O.computeKey
        AKE_Fresh(A).O.h2 AKE_EexpRev(A).O.h2. 
 sp; if => //.
 
 wp; rnd; wp; skip; progress => //.
-  by apply H6.
-  by apply H8.
-  by apply H9.
-  by apply H6.
-  by apply H8.
-  by apply H9.
+
 wp; skip; progress => //.
-  by apply H6.
-  by apply H8.
-  by apply H9.
 call eq1_guess.
 skip; progress => //.
 smt.
@@ -5034,9 +5036,6 @@ smt.
   apply h2.
   exists t_idx{2}; progress => //.
    by apply H6.
-   by apply H6.
-   by apply H8.
-   by apply H9. 
   rewrite proj_some.
   cut [h1 h2] := H5 (compute_sid AKE_Fresh.mStarted{1} AKE_Fresh.mEexp{1}
           AKE_Fresh.mCompleted{1} t_idx{2}).
@@ -5051,9 +5050,6 @@ smt.
   apply h2.
   exists t_idx{2}; progress => //.
   by apply H6.
-  smt.
-  by apply H8.
-  by apply H9. 
   cut [h1 h2] := H5 (compute_sid AKE_Fresh.mStarted{1} AKE_Fresh.mEexp{1}
           AKE_Fresh.mCompleted{1} t_idx{2}).
   rewrite proj_some;apply h2.
@@ -5099,9 +5095,6 @@ progress => //.
         AKE_Fresh.mCompleted{1} t_idx{2}).
    apply h2 => {h2}{h1}.
    by exists t_idx{2}; progress => //; apply H6.
- by apply H6.
- by apply H8.
- by apply H9.
  by left; rewrite /test_fresh not_and;right; rewrite fresh_op_def'; smt.
 smt.
 call{2} 
@@ -5169,8 +5162,6 @@ fun ((! AKE_EexpRev.test = None /\
       sd2_role (proj AKE_EexpRev.mStarted.[x]) = init)) &&
      (! test_fresh AKE_EexpRev.test AKE_EexpRev.evs \/ 
         collision_eexp_rcvd AKE_EexpRev.evs)) => //.
-progress => //; try apply H11; smt.
-progress => //; try apply H11; smt.
 apply A_Lossless_guess.
 
 fun; wp; skip; progress => //.
@@ -5182,22 +5173,10 @@ fun; wp; skip; progress => //.
   by apply valid_accept_pres => //; smt.
   by apply inv_started_pres => //; smt.
   by apply inv_accepted_pres => //; smt.
-  by apply H8.
-  by apply H10.
-  by apply H11.
   apply coll_or_not_fresh_test_mon_ev => //.
-  by apply H8.
-  by apply H10.
-  by apply H11.
 
 fun; sp; if; inline AKE_EexpRev(A).O.h2; wp; try rnd; wp; skip; progress => //.
-  by apply H8.
-  by apply H10.
-  by apply H11.
   by apply TKey.Dword.lossless.
-  by apply H8.
-  by apply H10.
-  by apply H11.
 
 fun; wp; skip; progress => //.
   by rewrite mem_cons; right.
@@ -5233,7 +5212,6 @@ fun; wp; skip; progress => //.
    by apply not_def => h; cut: in_dom i{hr} AKE_EexpRev.mStarted{hr}; try apply H10; smt.
    by smt.
 
-  by apply H8.
   by rewrite in_dom_set; left; apply H10.
   generalize H16; rewrite in_dom_set => [ hdom | ->]; [rewrite get_setNE // | rewrite get_setE].
    by apply not_def => abs; generalize hdom H15; rewrite abs; smt.
@@ -5241,9 +5219,6 @@ fun; wp; skip; progress => //.
    by rewrite /sd2_role proj_some.
 
   apply coll_or_not_fresh_test_mon_ev => //.
-    by apply H8.
-    by apply H10.
-    by apply H11.
 
 fun; wp; skip; progress => //.
   by rewrite mem_cons; right.
@@ -5292,7 +5267,6 @@ fun; wp; skip; progress => //.
   by apply inv_started_pres => //; smt.          
   apply inv_accepted_pres_ev1 => //.
     by apply H8.
-    by apply H8.
     case (x = i{hr}).
      by intros ->.
      by intros neq; generalize H15; rewrite in_dom_setNE // => h; apply H10.
@@ -5301,9 +5275,6 @@ fun; wp; skip; progress => //.
      by intros => hneq; apply H11 => //; generalize H16; rewrite in_dom_set; smt.
 
   apply coll_or_not_fresh_test_mon_ev => //.
-    by apply H8.
-    by apply H10.
-    by apply H11.
 
 fun; wp; skip; progress => //.
   by rewrite mem_cons; right.
@@ -5355,7 +5326,6 @@ fun; wp; skip; progress => //.
    cut [h1 h2] := H6 ps; apply h2.
    exists j; progress.
     by generalize hdom1; rewrite in_dom_setNE.
-    by apply H8.
     by generalize heq; (rewrite get_setNE; first smt); rewrite H17 /=.
     by generalize heq; (rewrite get_setNE; first smt); rewrite H17 /=.
    rewrite /inv_accepted => ps; rewrite mem_cons; split.
@@ -5384,7 +5354,6 @@ fun; wp; skip; progress => //.
    generalize hdom1 hdom2 hdom3 heq; 
    rewrite !in_dom_setNE; first 2 smt. 
    by rewrite /compute_sid /= !get_setNE /=; smt.
-   by apply H8.
 
    generalize H17; rewrite !in_dom_set => [|] hor.
     by left; apply H10.
@@ -5397,9 +5366,6 @@ fun; wp; skip; progress => //.
     by generalize H18; rewrite !in_dom_setNE. 
   
   apply coll_or_not_fresh_test_mon_ev => //.
-    by apply H8.
-    by apply H10.
-    by apply H11.
 
 fun; wp; skip; progress => //.
   by rewrite mem_cons; right.
@@ -5410,19 +5376,10 @@ fun; wp; skip; progress => //.
   by apply valid_accept_pres => //; smt.
   by apply inv_started_pres => //; smt.  
   by apply inv_accepted_pres => //; smt.  
-  by apply H8.
-  by apply H10.
-  by apply H11.
   apply coll_or_not_fresh_test_mon_ev => //.
-    by apply H8.
-    by apply H10.
-    by apply H11.
 
 fun; sp; if; last first.
   skip; progress => //.
-    by apply H8.
-    by apply H10.
-    by apply H11.
 
   inline AKE_EexpRev(A).O.computeKey AKE_EexpRev(A).O.h2.
     sp; if; last first.
@@ -5435,9 +5392,7 @@ fun; sp; if; last first.
       by apply valid_accept_pres => //; smt.
       by apply inv_started_pres => //; smt.  
       by apply inv_accepted_pres => //; smt.  
-      by apply H8.
-      by apply H10.
-      by apply H11.
+
       apply coll_or_not_fresh_test_mon_ev => //.
  
       wp; rnd; wp; skip; progress => //.
@@ -5449,29 +5404,17 @@ fun; sp; if; last first.
       by apply valid_accept_pres => //; smt.
       by apply inv_started_pres => //; smt.  
       by apply inv_accepted_pres => //; smt.  
-      by apply H8.
-      by apply H10.
-      by apply H11.
       by apply coll_or_not_fresh_test_mon_ev => //.
       by apply TKey.Dword.lossless.
 
 if{2}; last first.
 wp; rnd{2}; skip; progress => //.
 smt.
-by apply H8.
-by apply H10.
-by apply H11.
 inline AKE_EexpRev(A).O.computeKey AKE_EexpRev(A).O.h2.
 sp; if{2}.
 wp; rnd{2}; wp; skip; progress => //.
 smt.
-by apply H8.
-by apply H10.
-by apply H11.
 wp; skip; progress => //.
-by apply H8.
-by apply H10.
-by apply H11.
 save.
 
 local equiv Eq_AKE_EexpRev_AKE_no_collision' :
@@ -5802,13 +5745,14 @@ by inline AKE_Fresh(A).init AKE_NoHashOnCompute(A).init;
   AKE_NoHashOnCompute.mStarted{2} = AKE_Fresh.mStarted{1} /\
   AKE_NoHashOnCompute.mCompleted{2} = AKE_Fresh.mCompleted{1}).
  by fun; wp; skip; progress.
+ by fun; wp; skip; progress.
+ by fun; wp; skip; progress.
+ by fun; wp; skip; progress.
+ by fun; wp; skip; progress.
  by fun; sp; if => //; wp; 
  inline AKE_Fresh(A).O.h2 AKE_NoHashOnCompute(A).O.h2; wp; rnd;
  wp; skip; progress; smt.
- by fun; wp; skip; progress.
- by fun; wp; skip; progress.
- by fun; wp; skip; progress.
- by fun; wp; skip; progress.
+
  by fun;
  inline AKE_Fresh(A).O.computeKey AKE_Fresh(A).O.h2 
         AKE_NoHashOnCompute(A).O.computeKey  AKE_NoHashOnCompute(A).O.h2;
@@ -6467,13 +6411,14 @@ proof.
  seq 1: true.
  by call (_ : true) => //.
   call (_ : true) => //.
-  by apply A_Lossless_choose.
+  by progress; apply (A_Lossless_choose O) => //.
   by fun; wp.
   by fun; sp; inline AKE_ComputeRand(A).O.h2; if; wp; try rnd; wp; skip; progress => //; apply TKey.Dword.lossless; smt.
   by fun; wp.
   by fun; wp.
   by fun; wp.
-  by fun; wp.
+  by fun; sp; inline AKE_ComputeRand(A).O.h2; if; wp; try rnd; wp; skip; progress => //; apply TKey.Dword.lossless; smt.
+
   by fun; sp; inline AKE_ComputeRand(A).O.computeKey AKE_ComputeRand(A).O.h2; 
    if => //; sp; if => //; wp; try rnd; wp; skip; progress; apply TKey.Dword.lossless; smt.
   (* this is just stupid *)
@@ -6489,9 +6434,9 @@ proof.
   by fun; wp.
   by fun; sp; inline AKE_ComputeRand(A).O.computeKey AKE_ComputeRand(A).O.h2; 
    if => //; sp; if => //; wp; try rnd; wp; skip; progress; apply TKey.Dword.lossless; smt.
-
-  wp; rnd; wp; skip; progress => //; by apply TKey.Dword.lossless; smt.
-  by hoare.
+  wp; rnd; wp; skip; progress => //.
+  apply TKey.Dword.lossless => //.
+  trivial.
   smt.
   by skip; progress => //; apply (Bool.Dbool.mu_x_def b'{hr}).
 save.
@@ -6669,9 +6614,6 @@ proof.
  smt.
 save.
 
-axiom gen_pk_inj : forall s1 s2, 
-gen_pk s1 = gen_pk s2 =>
-s1 = s2.
 
 lemma strong_partnering_id :
 forall i j mStrt mCmp mEexp mSk,
@@ -6833,7 +6775,7 @@ proof.
 (forall s, in_dom s AKE_ComputeRand.mSk{2} => 
        gen_pk (proj AKE_ComputeRand.mSk{2}.[s]) = s)).
 wp; rnd; skip; progress.
-smt.
+
 case (s = gen_pk skaL)=> heq.
  by rewrite heq get_setE proj_some.
  generalize H5; rewrite in_dom_setNE // get_setNE; first smt.
@@ -6842,7 +6784,6 @@ case (s = gen_pk skaL)=> heq.
  inline AKE_NoHashOnCompute(A).init AKE_ComputeRand(A).init; wp; skip; progress => //.
  smt.
  smt.
- by apply H1.
  by rewrite /valid_start; smt.
 
 if => //; last by rnd{2} => //; skip; progress => //; smt.
@@ -6900,11 +6841,6 @@ fun; wp; skip; progress; (try apply invh2_mon_ev => //); (try apply H0 => //);
      by apply valid_start_pres1; smt.
      by apply valid_start_pres1; smt.
 
-fun; inline AKE_NoHashOnCompute(A).O.h2 AKE_ComputeRand(A).O.h2; sp; if => //; wp; try rnd; wp; skip; progress => //;(try apply H0 => //);
- (try apply H1 => //); (try apply H2 => //).
- by apply invh2_mon_h2_1.
- by apply invh2_mon_h2_2.
-
 fun; wp; skip; progress.
   apply invh2_mon_ev.
   by apply invh2_mon_Strt => //. 
@@ -6913,27 +6849,14 @@ fun; wp; skip; progress.
    by rewrite heq get_setE proj_some /sd2_actor /=.
    generalize H7; rewrite get_setNE // in_dom_setNE; first smt.
    by intros h; apply H1.
-   by apply H2.
 
   by apply valid_start_pres2.
-  assumption. 
-  by apply H0.
-  by apply H1.
-  by apply H2.
-  assumption.
 
 fun; wp; skip; progress.
   apply invh2_mon_ev.
   by apply invh2_mon_Cmp.
   by generalize H7; rewrite in_dom_set => [ h | -> ]; [apply H0 | ].
-  by apply H1.
-  by apply H2.
   by apply valid_start_pres1; smt.
-  assumption.
-  by apply H0.
-  by apply H1.
-  by apply H2.
-  assumption.
 
 fun; wp; skip; progress.
   apply invh2_mon_ev.
@@ -6945,58 +6868,33 @@ fun; wp; skip; progress.
    by rewrite heq get_setE proj_some /sd2_actor /=.
    generalize H8; rewrite get_setNE // in_dom_setNE; first smt.
    by intros h; apply H1.
-   by apply H2.
   by apply valid_start_pres1; smt.
-  assumption.
-  by apply H0.
-  by apply H1.
-  by apply H2.
-  assumption.
 
 fun; wp; skip; progress; try apply H0; try assumption.
   by apply invh2_mon_ev.
-  by apply H1.
-  by apply H2.
   by apply valid_start_pres1; smt.
-  by apply H1.
-  by apply H2.
+
+fun; inline AKE_NoHashOnCompute(A).O.h2 AKE_ComputeRand(A).O.h2; sp; if => //; wp; try rnd; wp; skip; progress => //;(try apply H0 => //);
+ (try apply H1 => //); (try apply H2 => //).
+ by apply invh2_mon_h2_1.
+ by apply invh2_mon_h2_2.
   
 fun.
 inline AKE_NoHashOnCompute(A).O.computeKey AKE_NoHashOnCompute(A).O.h2 
        AKE_ComputeRand(A).O.computeKey AKE_ComputeRand(A).O.h2.
 sp; if => //; sp; try if => //; wp; try rnd; wp; skip; progress.
- assumption.
  apply (invh2_mon_Rev1 _ _ _ _ _ _ _ _ i{2} x1 x2 x3 keL _) => //.
   by apply H0.
 
- by apply H0.
- by apply H1.
- by apply H2.
  by apply valid_start_pres1; smt.
  by apply invh2_mon_ev.
- by apply H0.
- by apply H1.
- by apply H2.
  by apply valid_start_pres1; smt.
  by apply invh2_mon_ev.
- by apply H0. 
- by apply H1.
- by apply H2.
  by apply valid_start_pres1; smt.
- assumption.
- by apply H0.
- by apply H1.
- by apply H2.
- assumption.
 
 skip; progress => //.
  rewrite /invh2; progress; smt.
  smt.
- smt.
- by apply H0.
- smt.
- by apply H10.
- by apply H11.
  if => //.
  call (_ :
  AKE_ComputeRand.t_idx{2} = AKE_NoHashOnCompute.t_idx{1} /\
@@ -7179,10 +7077,7 @@ elim /tuple5_ind  (compute_sid mStarted_L AKE_NoHashOnCompute.mEexp{1} mComplete
 by intros => heq; progress.
 smt.
 wp; rnd; skip; progress; rewrite ?proj_some => //.
-by apply H0.
 smt.
-by apply H1.
-by apply H2.
 
 elim (H20 (get_string_from_id AKE_NoHashOnCompute.t_idx{1} mStarted_L
           mCompleted_L AKE_NoHashOnCompute.mEexp{1}
@@ -7304,11 +7199,7 @@ AKE_NoHashOnCompute.mH2)]) _).
 save.
 
 
-
-
-
-
-local module AKE_Eqs(FA : Adv2) = {
+local module AKE_find(FA : Adv2) = {
   var evs  : Event list               (* events for queries performed by adversary *)
   var test : Sid option               (* session id of test session *)
 
@@ -7338,9 +7229,9 @@ local module AKE_Eqs(FA : Adv2) = {
     mEexp = Map.empty;
     mStarted = Map.empty;
     mCompleted = Map.empty;
-    AKE_Eqs.sH2' = FSet.empty;
-    AKE_Eqs.sKeyRev = FSet.empty;
-    AKE_Eqs.mKeyRev = Map.empty;
+    (* AKE_find.sH2' = FSet.empty; *)
+    (* AKE_find.sKeyRev = FSet.empty; *)
+    (* AKE_find.mKeyRev = Map.empty; *)
   }
 
   module O : AKE_Oracles2 = {
@@ -7555,9 +7446,9 @@ local module AKE_Eqs(FA : Adv2) = {
     var sidxs : Sidx set = univ_Sidx;
     var sidx : Sidx;
     t_idx = def;
-    AKE_Eqs.sH2' = FSet.empty;
-    AKE_Eqs.sKeyRev = FSet.empty;
-    AKE_Eqs.mKeyRev = Map.empty;
+    AKE_find.sH2' = FSet.empty;
+    AKE_find.sKeyRev = FSet.empty;
+    AKE_find.mKeyRev = Map.empty;
     init();
     while (i < qAgent) {
       ska = $sample_Sk;
@@ -7600,43 +7491,43 @@ save.
 
 local lemma find_matching_spec_ll :
 forall id' id_set',
-bd_hoare [AKE_Eqs(A).O.find_matching : 
+bd_hoare [AKE_find(A).O.find_matching : 
 id' = id /\ id_set' = id_set /\
-in_dom id AKE_Eqs.mCompleted /\
-in_dom id AKE_Eqs.mStarted /\
-in_dom id AKE_Eqs.mEexp /\ 
+in_dom id AKE_find.mCompleted /\
+in_dom id AKE_find.mStarted /\
+in_dom id AKE_find.mEexp /\ 
 (forall j, mem j id_set => 
-     in_dom id AKE_Eqs.mCompleted /\
-    in_dom id AKE_Eqs.mStarted /\
-    in_dom id AKE_Eqs.mEexp ) ==>
+     in_dom id AKE_find.mCompleted /\
+    in_dom id AKE_find.mStarted /\
+    in_dom id AKE_find.mEexp ) ==>
 (res = None => 
 (forall j, mem j id_set' =>
-( cmatching (compute_sid AKE_Eqs.mStarted AKE_Eqs.mEexp AKE_Eqs.mCompleted j) <>
- compute_sid AKE_Eqs.mStarted AKE_Eqs.mEexp AKE_Eqs.mCompleted id') /\
- (compute_sid AKE_Eqs.mStarted AKE_Eqs.mEexp AKE_Eqs.mCompleted j <>
- (compute_sid AKE_Eqs.mStarted AKE_Eqs.mEexp AKE_Eqs.mCompleted id')))) /\
+( cmatching (compute_sid AKE_find.mStarted AKE_find.mEexp AKE_find.mCompleted j) <>
+ compute_sid AKE_find.mStarted AKE_find.mEexp AKE_find.mCompleted id') /\
+ (compute_sid AKE_find.mStarted AKE_find.mEexp AKE_find.mCompleted j <>
+ (compute_sid AKE_find.mStarted AKE_find.mEexp AKE_find.mCompleted id')))) /\
 (res <> None => mem (proj res) id_set' /\
  (((cmatching  
-  (compute_sid AKE_Eqs.mStarted AKE_Eqs.mEexp AKE_Eqs.mCompleted (proj res))) =
- compute_sid AKE_Eqs.mStarted AKE_Eqs.mEexp AKE_Eqs.mCompleted id') \/
-(compute_sid AKE_Eqs.mStarted AKE_Eqs.mEexp AKE_Eqs.mCompleted (proj res) =
- (compute_sid AKE_Eqs.mStarted AKE_Eqs.mEexp AKE_Eqs.mCompleted id'))))] = 1%r.
+  (compute_sid AKE_find.mStarted AKE_find.mEexp AKE_find.mCompleted (proj res))) =
+ compute_sid AKE_find.mStarted AKE_find.mEexp AKE_find.mCompleted id') \/
+(compute_sid AKE_find.mStarted AKE_find.mEexp AKE_find.mCompleted (proj res) =
+ (compute_sid AKE_find.mStarted AKE_find.mEexp AKE_find.mCompleted id'))))] = 1%r.
 proof.
  intros => id' id_set'; fun.
  sp.
  while 
-(sid = compute_sid AKE_Eqs.mStarted AKE_Eqs.mEexp AKE_Eqs.mCompleted id /\
+(sid = compute_sid AKE_find.mStarted AKE_find.mEexp AKE_find.mCompleted id /\
  (ret = None => (forall j, mem j id_set /\ ! mem j aux => 
-(compute_sid AKE_Eqs.mStarted AKE_Eqs.mEexp AKE_Eqs.mCompleted j <>
- compute_sid AKE_Eqs.mStarted AKE_Eqs.mEexp AKE_Eqs.mCompleted id) /\
-(cmatching (compute_sid AKE_Eqs.mStarted AKE_Eqs.mEexp AKE_Eqs.mCompleted j)) <>
- (compute_sid AKE_Eqs.mStarted AKE_Eqs.mEexp AKE_Eqs.mCompleted id))) /\
+(compute_sid AKE_find.mStarted AKE_find.mEexp AKE_find.mCompleted j <>
+ compute_sid AKE_find.mStarted AKE_find.mEexp AKE_find.mCompleted id) /\
+(cmatching (compute_sid AKE_find.mStarted AKE_find.mEexp AKE_find.mCompleted j)) <>
+ (compute_sid AKE_find.mStarted AKE_find.mEexp AKE_find.mCompleted id))) /\
  (forall j, mem j aux => mem j id_set) /\
  (ret <> None =>  mem (proj ret) id_set /\
- ((compute_sid AKE_Eqs.mStarted AKE_Eqs.mEexp AKE_Eqs.mCompleted (proj ret) =
- cmatching (compute_sid AKE_Eqs.mStarted AKE_Eqs.mEexp AKE_Eqs.mCompleted id)) \/
-(compute_sid AKE_Eqs.mStarted AKE_Eqs.mEexp AKE_Eqs.mCompleted (proj ret) =
- (compute_sid AKE_Eqs.mStarted AKE_Eqs.mEexp AKE_Eqs.mCompleted id))))) 
+ ((compute_sid AKE_find.mStarted AKE_find.mEexp AKE_find.mCompleted (proj ret) =
+ cmatching (compute_sid AKE_find.mStarted AKE_find.mEexp AKE_find.mCompleted id)) \/
+(compute_sid AKE_find.mStarted AKE_find.mEexp AKE_find.mCompleted (proj ret) =
+ (compute_sid AKE_find.mStarted AKE_find.mEexp AKE_find.mCompleted id))))) 
 (card aux).
 intros =>z; wp; skip; progress => //.
  smt.
@@ -7677,43 +7568,43 @@ save.
 
 local lemma find_matching_spec :
 forall id' id_set',
-hoare [AKE_Eqs(A).O.find_matching : 
+hoare [AKE_find(A).O.find_matching : 
 id' = id /\ id_set' = id_set /\
-in_dom id AKE_Eqs.mCompleted /\
-in_dom id AKE_Eqs.mStarted /\
-in_dom id AKE_Eqs.mEexp /\ 
+in_dom id AKE_find.mCompleted /\
+in_dom id AKE_find.mStarted /\
+in_dom id AKE_find.mEexp /\ 
 (forall j, mem j id_set => 
-     in_dom id AKE_Eqs.mCompleted /\
-    in_dom id AKE_Eqs.mStarted /\
-    in_dom id AKE_Eqs.mEexp ) ==>
+     in_dom id AKE_find.mCompleted /\
+    in_dom id AKE_find.mStarted /\
+    in_dom id AKE_find.mEexp ) ==>
 (res = None => 
 (forall j, mem j id_set' =>
-( cmatching (compute_sid AKE_Eqs.mStarted AKE_Eqs.mEexp AKE_Eqs.mCompleted j) <>
- compute_sid AKE_Eqs.mStarted AKE_Eqs.mEexp AKE_Eqs.mCompleted id') /\
- (compute_sid AKE_Eqs.mStarted AKE_Eqs.mEexp AKE_Eqs.mCompleted j <>
- (compute_sid AKE_Eqs.mStarted AKE_Eqs.mEexp AKE_Eqs.mCompleted id')))) /\
+( cmatching (compute_sid AKE_find.mStarted AKE_find.mEexp AKE_find.mCompleted j) <>
+ compute_sid AKE_find.mStarted AKE_find.mEexp AKE_find.mCompleted id') /\
+ (compute_sid AKE_find.mStarted AKE_find.mEexp AKE_find.mCompleted j <>
+ (compute_sid AKE_find.mStarted AKE_find.mEexp AKE_find.mCompleted id')))) /\
 (res <> None => mem (proj res) id_set' /\
  (((cmatching  
-  (compute_sid AKE_Eqs.mStarted AKE_Eqs.mEexp AKE_Eqs.mCompleted (proj res))) =
- compute_sid AKE_Eqs.mStarted AKE_Eqs.mEexp AKE_Eqs.mCompleted id') \/
-(compute_sid AKE_Eqs.mStarted AKE_Eqs.mEexp AKE_Eqs.mCompleted (proj res) =
- (compute_sid AKE_Eqs.mStarted AKE_Eqs.mEexp AKE_Eqs.mCompleted id'))))].
+  (compute_sid AKE_find.mStarted AKE_find.mEexp AKE_find.mCompleted (proj res))) =
+ compute_sid AKE_find.mStarted AKE_find.mEexp AKE_find.mCompleted id') \/
+(compute_sid AKE_find.mStarted AKE_find.mEexp AKE_find.mCompleted (proj res) =
+ (compute_sid AKE_find.mStarted AKE_find.mEexp AKE_find.mCompleted id'))))].
 proof.
  intros => id' id_set'; fun.
  sp.
  while 
-(sid = compute_sid AKE_Eqs.mStarted AKE_Eqs.mEexp AKE_Eqs.mCompleted id /\
+(sid = compute_sid AKE_find.mStarted AKE_find.mEexp AKE_find.mCompleted id /\
  (ret = None => (forall j, mem j id_set /\ ! mem j aux => 
-(compute_sid AKE_Eqs.mStarted AKE_Eqs.mEexp AKE_Eqs.mCompleted j <>
- compute_sid AKE_Eqs.mStarted AKE_Eqs.mEexp AKE_Eqs.mCompleted id) /\
-(cmatching (compute_sid AKE_Eqs.mStarted AKE_Eqs.mEexp AKE_Eqs.mCompleted j)) <>
- (compute_sid AKE_Eqs.mStarted AKE_Eqs.mEexp AKE_Eqs.mCompleted id))) /\
+(compute_sid AKE_find.mStarted AKE_find.mEexp AKE_find.mCompleted j <>
+ compute_sid AKE_find.mStarted AKE_find.mEexp AKE_find.mCompleted id) /\
+(cmatching (compute_sid AKE_find.mStarted AKE_find.mEexp AKE_find.mCompleted j)) <>
+ (compute_sid AKE_find.mStarted AKE_find.mEexp AKE_find.mCompleted id))) /\
  (forall j, mem j aux => mem j id_set) /\
  (ret <> None =>  mem (proj ret) id_set /\
- ((compute_sid AKE_Eqs.mStarted AKE_Eqs.mEexp AKE_Eqs.mCompleted (proj ret) =
- cmatching (compute_sid AKE_Eqs.mStarted AKE_Eqs.mEexp AKE_Eqs.mCompleted id)) \/
-(compute_sid AKE_Eqs.mStarted AKE_Eqs.mEexp AKE_Eqs.mCompleted (proj ret) =
- (compute_sid AKE_Eqs.mStarted AKE_Eqs.mEexp AKE_Eqs.mCompleted id))))).
+ ((compute_sid AKE_find.mStarted AKE_find.mEexp AKE_find.mCompleted (proj ret) =
+ cmatching (compute_sid AKE_find.mStarted AKE_find.mEexp AKE_find.mCompleted id)) \/
+(compute_sid AKE_find.mStarted AKE_find.mEexp AKE_find.mCompleted (proj ret) =
+ (compute_sid AKE_find.mStarted AKE_find.mEexp AKE_find.mCompleted id))))).
  wp; skip; progress => //.
  smt.
  smt.
@@ -7748,65 +7639,65 @@ save.
 
 local lemma eqS_spec_ll : 
 forall str sid, 
-bd_hoare [AKE_Eqs(A).O.eqS : 
+bd_hoare [AKE_find(A).O.eqS : 
 i = sid /\ str =ss  /\ 
-in_dom i AKE_Eqs.mCompleted /\  
-in_dom i AKE_Eqs.mStarted /\ 
-in_dom i AKE_Eqs.mEexp ==>
+in_dom i AKE_find.mCompleted /\  
+in_dom i AKE_find.mStarted /\ 
+in_dom i AKE_find.mEexp ==>
 res <> None /\
 proj (res) =
-(get_string_from_id sid AKE_Eqs.mStarted AKE_Eqs.mCompleted AKE_Eqs.mEexp AKE_Eqs.mSk = str)] = 1%r.
+(get_string_from_id sid AKE_find.mStarted AKE_find.mCompleted AKE_find.mEexp AKE_find.mSk = str)] = 1%r.
 proof.
   intros => str sid; fun.  
    wp; skip; progress => //.
  smt.
  rewrite proj_some /get_string_from_id.
- elim /tuple3_ind (proj AKE_Eqs.mStarted{hr}.[i{hr}]) => /= A B r heq.
+ elim /tuple3_ind (proj AKE_find.mStarted{hr}.[i{hr}]) => /= A B r heq.
  by rewrite /sd2_role/sd2_actor/sd2_peer /=.
 save.
 
 local lemma eqS_spec : 
 forall str sid, 
-hoare [AKE_Eqs(A).O.eqS : 
+hoare [AKE_find(A).O.eqS : 
 i = sid /\ str =ss  /\ 
-in_dom i AKE_Eqs.mCompleted /\  
-in_dom i AKE_Eqs.mStarted /\ 
-in_dom i AKE_Eqs.mEexp ==>
+in_dom i AKE_find.mCompleted /\  
+in_dom i AKE_find.mStarted /\ 
+in_dom i AKE_find.mEexp ==>
 res <> None /\
 proj (res) =
-(get_string_from_id sid AKE_Eqs.mStarted AKE_Eqs.mCompleted AKE_Eqs.mEexp AKE_Eqs.mSk = str)].
+(get_string_from_id sid AKE_find.mStarted AKE_find.mCompleted AKE_find.mEexp AKE_find.mSk = str)].
 proof.
   intros => str sid; fun.
    wp; skip; progress => //.
  smt.
  rewrite proj_some /get_string_from_id.
- elim /tuple3_ind (proj AKE_Eqs.mStarted{hr}.[i{hr}]) => /= A B r heq.
+ elim /tuple3_ind (proj AKE_find.mStarted{hr}.[i{hr}]) => /= A B r heq.
  by rewrite /sd2_role/sd2_actor/sd2_peer /=.
 save.
 
 
 local lemma  find_id_spec :  
 forall v sid, 
-hoare [AKE_Eqs(A).O.find_id : 
+hoare [AKE_find(A).O.find_id : 
 v = sstr /\ sid = s  /\
-(forall i, mem i s => in_dom i AKE_Eqs.mCompleted /\ 
-                      in_dom i AKE_Eqs.mStarted /\ 
-                      in_dom i AKE_Eqs.mEexp) ==> 
+(forall i, mem i s => in_dom i AKE_find.mCompleted /\ 
+                      in_dom i AKE_find.mStarted /\ 
+                      in_dom i AKE_find.mEexp) ==> 
 (res <> None => 
-get_string_from_id (proj res) AKE_Eqs.mStarted AKE_Eqs.mCompleted AKE_Eqs.mEexp AKE_Eqs.mSk = v /\ mem (proj res) sid) /\
+get_string_from_id (proj res) AKE_find.mStarted AKE_find.mCompleted AKE_find.mEexp AKE_find.mSk = v /\ mem (proj res) sid) /\
 (res = None => 
  (forall id, mem id sid => 
-get_string_from_id id AKE_Eqs.mStarted AKE_Eqs.mCompleted AKE_Eqs.mEexp AKE_Eqs.mSk <> v))].
+get_string_from_id id AKE_find.mStarted AKE_find.mCompleted AKE_find.mEexp AKE_find.mSk <> v))].
 proof.
  intros => v sid; fun.
  while ((ret = None => 
- (forall id, mem id sid  => !mem id aux => get_string_from_id id AKE_Eqs.mStarted AKE_Eqs.mCompleted AKE_Eqs.mEexp AKE_Eqs.mSk <> v)) /\
+ (forall id, mem id sid  => !mem id aux => get_string_from_id id AKE_find.mStarted AKE_find.mCompleted AKE_find.mEexp AKE_find.mSk <> v)) /\
 (forall i, mem i aux => mem i s) /\
-(forall i, mem i aux => in_dom i AKE_Eqs.mCompleted /\ 
-                      in_dom i AKE_Eqs.mStarted /\ 
-                      in_dom i AKE_Eqs.mEexp) /\ v = sstr /\
+(forall i, mem i aux => in_dom i AKE_find.mCompleted /\ 
+                      in_dom i AKE_find.mStarted /\ 
+                      in_dom i AKE_find.mEexp) /\ v = sstr /\
 (ret <> None => 
-get_string_from_id (proj ret) AKE_Eqs.mStarted AKE_Eqs.mCompleted AKE_Eqs.mEexp AKE_Eqs.mSk = v /\ mem (proj ret) s)).
+get_string_from_id (proj ret) AKE_find.mStarted AKE_find.mCompleted AKE_find.mEexp AKE_find.mSk = v /\ mem (proj ret) s)).
  wp.
  sp.
  exists* i;elim* => i'.
@@ -7837,39 +7728,32 @@ get_string_from_id (proj ret) AKE_Eqs.mStarted AKE_Eqs.mCompleted AKE_Eqs.mEexp 
 
  wp; skip; progress => //.
  smt.
- by cut := H i0 _.
- by cut := H i0 _.
- by cut := H i0 _.
- by cut:= H4 _.
- by cut:= H4 _.
- generalize H0; rewrite not_and => [|] h;[|smt].
- cut: aux0 = FSet.empty by smt => {h} h.
- by apply H1 => //; rewrite h; smt.
+ by cut := H1 _ id _ _; smt.
 save.
 
 
 local lemma  find_id_spec_ll :  
 forall v sid, 
-bd_hoare [AKE_Eqs(A).O.find_id : 
+bd_hoare [AKE_find(A).O.find_id : 
 v = sstr /\ sid = s  /\
-(forall i, mem i s => in_dom i AKE_Eqs.mCompleted /\ 
-                      in_dom i AKE_Eqs.mStarted /\ 
-                      in_dom i AKE_Eqs.mEexp) ==> 
+(forall i, mem i s => in_dom i AKE_find.mCompleted /\ 
+                      in_dom i AKE_find.mStarted /\ 
+                      in_dom i AKE_find.mEexp) ==> 
 (res <> None => 
-get_string_from_id (proj res) AKE_Eqs.mStarted AKE_Eqs.mCompleted AKE_Eqs.mEexp AKE_Eqs.mSk = v /\ mem (proj res) sid) /\
+get_string_from_id (proj res) AKE_find.mStarted AKE_find.mCompleted AKE_find.mEexp AKE_find.mSk = v /\ mem (proj res) sid) /\
 (res = None => 
  (forall id, mem id sid => 
-get_string_from_id id AKE_Eqs.mStarted AKE_Eqs.mCompleted AKE_Eqs.mEexp AKE_Eqs.mSk <> v))] = 1%r.
+get_string_from_id id AKE_find.mStarted AKE_find.mCompleted AKE_find.mEexp AKE_find.mSk <> v))] = 1%r.
 proof.
  intros => v sid; fun.
  while ((ret = None => 
- (forall id, mem id sid  => !mem id aux => get_string_from_id id AKE_Eqs.mStarted AKE_Eqs.mCompleted AKE_Eqs.mEexp AKE_Eqs.mSk <> v)) /\
+ (forall id, mem id sid  => !mem id aux => get_string_from_id id AKE_find.mStarted AKE_find.mCompleted AKE_find.mEexp AKE_find.mSk <> v)) /\
 (forall i, mem i aux => mem i s) /\
-(forall i, mem i aux => in_dom i AKE_Eqs.mCompleted /\ 
-                      in_dom i AKE_Eqs.mStarted /\ 
-                      in_dom i AKE_Eqs.mEexp) /\ v = sstr /\
+(forall i, mem i aux => in_dom i AKE_find.mCompleted /\ 
+                      in_dom i AKE_find.mStarted /\ 
+                      in_dom i AKE_find.mEexp) /\ v = sstr /\
 (ret <> None => 
-get_string_from_id (proj ret) AKE_Eqs.mStarted AKE_Eqs.mCompleted AKE_Eqs.mEexp AKE_Eqs.mSk = v /\ mem (proj ret) s)) (card aux).
+get_string_from_id (proj ret) AKE_find.mStarted AKE_find.mCompleted AKE_find.mEexp AKE_find.mSk = v /\ mem (proj ret) s)) (card aux).
  intros => z; wp; sp.
  exists* i;elim* => i'.
  exists* sstr; elim* => sstr'.
@@ -7901,44 +7785,36 @@ get_string_from_id (proj ret) AKE_Eqs.mStarted AKE_Eqs.mCompleted AKE_Eqs.mEexp 
 
  wp; skip; progress => //.
  smt.
- by cut := H i0 _.
- by cut := H i0 _.
- by cut := H i0 _.
- rewrite not_and; left.
- by rewrite card_le_0.
- by cut:= H4 _.
- by cut:= H4 _.
- generalize H0; rewrite not_and => [|] h;[|smt].
- cut: aux0 = FSet.empty by smt => {h} h.
- by apply H1 => //; rewrite h; smt.
+ smt.
+ by cut := H1 _ id _; smt.
 save.
 
 
 local lemma  find_string_spec :  
 forall i set_str, 
-hoare [AKE_Eqs(A).O.find_string : 
+hoare [AKE_find(A).O.find_string : 
 id = i /\ set_str = sstr  /\
-in_dom id AKE_Eqs.mCompleted /\ 
-in_dom id AKE_Eqs.mStarted /\ 
-in_dom id AKE_Eqs.mEexp ==> 
+in_dom id AKE_find.mCompleted /\ 
+in_dom id AKE_find.mStarted /\ 
+in_dom id AKE_find.mEexp ==> 
 (res <> None => 
-get_string_from_id i  AKE_Eqs.mStarted AKE_Eqs.mCompleted AKE_Eqs.mEexp AKE_Eqs.mSk = 
+get_string_from_id i  AKE_find.mStarted AKE_find.mCompleted AKE_find.mEexp AKE_find.mSk = 
 (proj res) /\ mem (proj res) set_str) /\
 (res = None => 
- ! mem (get_string_from_id i AKE_Eqs.mStarted AKE_Eqs.mCompleted AKE_Eqs.mEexp AKE_Eqs.mSk) set_str )].
+ ! mem (get_string_from_id i AKE_find.mStarted AKE_find.mCompleted AKE_find.mEexp AKE_find.mSk) set_str )].
 proof.
  intros => i set_str; fun.
  while 
 ((ret = None => 
  (forall s, mem s set_str => !mem s aux => 
- get_string_from_id id AKE_Eqs.mStarted 
-    AKE_Eqs.mCompleted AKE_Eqs.mEexp AKE_Eqs.mSk <> s)) /\
-in_dom id AKE_Eqs.mCompleted /\ 
-in_dom id AKE_Eqs.mStarted /\ 
-in_dom id AKE_Eqs.mEexp /\
+ get_string_from_id id AKE_find.mStarted 
+    AKE_find.mCompleted AKE_find.mEexp AKE_find.mSk <> s)) /\
+in_dom id AKE_find.mCompleted /\ 
+in_dom id AKE_find.mStarted /\ 
+in_dom id AKE_find.mEexp /\
 (ret <> None => 
- get_string_from_id id AKE_Eqs.mStarted 
-    AKE_Eqs.mCompleted AKE_Eqs.mEexp AKE_Eqs.mSk = proj ret /\ mem (proj ret) set_str) /\
+ get_string_from_id id AKE_find.mStarted 
+    AKE_find.mCompleted AKE_find.mEexp AKE_find.mSk = proj ret /\ mem (proj ret) set_str) /\
  (forall s, mem s aux => mem s set_str)).
  sp.
  wp.
@@ -7967,41 +7843,36 @@ in_dom id AKE_Eqs.mEexp /\
   by generalize H11; rewrite mem_rm => [h] h'; apply H4.
  wp; skip; progress => //.
   smt.
-  cut [h1 h2] := H7 _ => //.
-  cut [h1 h2] := H7 _ => //.
-  generalize H2; rewrite not_and => [heq|];[|smt].
-  cut : aux0 = FSet.empty by smt => {heq} heq.
   apply not_def => h.
-  cut := H3 _ (get_string_from_id id{hr} AKE_Eqs.mStarted{hr} AKE_Eqs.mCompleted{hr}
-         AKE_Eqs.mEexp{hr} AKE_Eqs.mSk{hr})  _ => //=.
-  by rewrite heq; smt.
+  cut := H3 _ (get_string_from_id id{hr} AKE_find.mStarted{hr} AKE_find.mCompleted{hr}
+       AKE_find.mEexp{hr} AKE_find.mSk{hr}) _  _ => //; smt.
 save.
 
 local lemma  find_string_spec_ll :  
 forall i set_str, 
-bd_hoare [AKE_Eqs(A).O.find_string : 
+bd_hoare [AKE_find(A).O.find_string : 
 id = i /\ set_str = sstr  /\
-in_dom id AKE_Eqs.mCompleted /\ 
-in_dom id AKE_Eqs.mStarted /\ 
-in_dom id AKE_Eqs.mEexp ==> 
+in_dom id AKE_find.mCompleted /\ 
+in_dom id AKE_find.mStarted /\ 
+in_dom id AKE_find.mEexp ==> 
 (res <> None => 
-get_string_from_id i  AKE_Eqs.mStarted AKE_Eqs.mCompleted AKE_Eqs.mEexp AKE_Eqs.mSk = 
+get_string_from_id i  AKE_find.mStarted AKE_find.mCompleted AKE_find.mEexp AKE_find.mSk = 
 (proj res) /\ mem (proj res) set_str) /\
 (res = None => 
- ! mem (get_string_from_id i AKE_Eqs.mStarted AKE_Eqs.mCompleted AKE_Eqs.mEexp AKE_Eqs.mSk) set_str )] = 1%r.
+ ! mem (get_string_from_id i AKE_find.mStarted AKE_find.mCompleted AKE_find.mEexp AKE_find.mSk) set_str )] = 1%r.
 proof.
  intros => i set_str; fun.
  while 
 ((ret = None => 
  (forall s, mem s set_str => !mem s aux => 
- get_string_from_id id AKE_Eqs.mStarted 
-    AKE_Eqs.mCompleted AKE_Eqs.mEexp AKE_Eqs.mSk <> s)) /\
-in_dom id AKE_Eqs.mCompleted /\ 
-in_dom id AKE_Eqs.mStarted /\ 
-in_dom id AKE_Eqs.mEexp /\
+ get_string_from_id id AKE_find.mStarted 
+    AKE_find.mCompleted AKE_find.mEexp AKE_find.mSk <> s)) /\
+in_dom id AKE_find.mCompleted /\ 
+in_dom id AKE_find.mStarted /\ 
+in_dom id AKE_find.mEexp /\
 (ret <> None => 
- get_string_from_id id AKE_Eqs.mStarted 
-    AKE_Eqs.mCompleted AKE_Eqs.mEexp AKE_Eqs.mSk = proj ret /\ mem (proj ret) set_str) /\
+ get_string_from_id id AKE_find.mStarted 
+    AKE_find.mCompleted AKE_find.mEexp AKE_find.mSk = proj ret /\ mem (proj ret) set_str) /\
  (forall s, mem s aux => mem s set_str))(card aux).
  intros => z.
  sp.
@@ -8036,14 +7907,9 @@ in_dom id AKE_Eqs.mEexp /\
   smt.
   rewrite not_and; left.
   by rewrite card_le_0.
-  cut [h1 h2] := H7 _ => //.
-  cut [h1 h2] := H7 _ => //.
-  generalize H2; rewrite not_and => [heq|];[|smt].
-  cut : aux0 = FSet.empty by smt => {heq} heq.
   apply not_def => h.
-  cut := H3 _ (get_string_from_id id{hr} AKE_Eqs.mStarted{hr} AKE_Eqs.mCompleted{hr}
-         AKE_Eqs.mEexp{hr} AKE_Eqs.mSk{hr})  _ => //=.
-  by rewrite heq; smt.
+  cut := H3 _ (get_string_from_id id{hr} AKE_find.mStarted{hr} AKE_find.mCompleted{hr}
+         AKE_find.mEexp{hr} AKE_find.mSk{hr})  _ _ => //; smt.
 save.
 
 pred is_dom (s : 'a set) (m : ('a,'b) map) = 
@@ -8333,91 +8199,91 @@ pred univ_map  (m : ('a, 'b) map) =
  forall x, in_dom x m.
 
 local equiv AKE_RandCompute_Eqs_h2 : 
-AKE_ComputeRand(A).O.h2 ~ AKE_Eqs(A).O.h2 :
+AKE_ComputeRand(A).O.h2 ~ AKE_find(A).O.h2 :
   ={sstring} /\
-  AKE_Eqs.t_idx{2} = AKE_ComputeRand.t_idx{1} /\
-  AKE_Eqs.evs{2} = AKE_ComputeRand.evs{1} /\
-  AKE_Eqs.test{2} = AKE_ComputeRand.test{1} /\
-  AKE_Eqs.cSession{2} = AKE_ComputeRand.cSession{1} /\
-  AKE_Eqs.cH2{2} = AKE_ComputeRand.cH2{1} /\
-  AKE_Eqs.sH2{2} = AKE_ComputeRand.sH2{1} /\
-  AKE_Eqs.mSk{2} = AKE_ComputeRand.mSk{1} /\
-  AKE_Eqs.mEexp{2} = AKE_ComputeRand.mEexp{1} /\
-  AKE_Eqs.mStarted{2} = AKE_ComputeRand.mStarted{1} /\
-  AKE_Eqs.mCompleted{2} = AKE_ComputeRand.mCompleted{1} /\
-  (is_dom AKE_Eqs.sH2' AKE_Eqs.mH2){2} /\
-  (is_dom AKE_Eqs.sKeyRev AKE_Eqs.mKeyRev){2} /\
-  inv_split_dom AKE_ComputeRand.mH2{1} AKE_Eqs.mH2{2} AKE_Eqs.mKeyRev{2} 
-                AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} AKE_Eqs.mEexp{2}
-                AKE_Eqs.mSk{2} /\
-  inv_split_val1 AKE_ComputeRand.mH2{1} AKE_Eqs.mH2{2} /\
-  inv_split_val2 AKE_ComputeRand.mH2{1} AKE_Eqs.mKeyRev{2} 
-                 AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} AKE_Eqs.mEexp{2}
-                 AKE_Eqs.mSk{2} /\
-  is_sub_map AKE_Eqs.mCompleted{2} AKE_Eqs.mStarted{2} /\
-  is_sub_map AKE_Eqs.mKeyRev{2} AKE_Eqs.mCompleted{2} /\ 
-  univ_map AKE_Eqs.mEexp{2} /\
-  actor_valid AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} 
-              AKE_Eqs.mEexp{2} AKE_Eqs.mSk{2} /\
-  mSk_inv AKE_Eqs.mSk{2}
+  AKE_find.t_idx{2} = AKE_ComputeRand.t_idx{1} /\
+  AKE_find.evs{2} = AKE_ComputeRand.evs{1} /\
+  AKE_find.test{2} = AKE_ComputeRand.test{1} /\
+  AKE_find.cSession{2} = AKE_ComputeRand.cSession{1} /\
+  AKE_find.cH2{2} = AKE_ComputeRand.cH2{1} /\
+  AKE_find.sH2{2} = AKE_ComputeRand.sH2{1} /\
+  AKE_find.mSk{2} = AKE_ComputeRand.mSk{1} /\
+  AKE_find.mEexp{2} = AKE_ComputeRand.mEexp{1} /\
+  AKE_find.mStarted{2} = AKE_ComputeRand.mStarted{1} /\
+  AKE_find.mCompleted{2} = AKE_ComputeRand.mCompleted{1} /\
+  (is_dom AKE_find.sH2' AKE_find.mH2){2} /\
+  (is_dom AKE_find.sKeyRev AKE_find.mKeyRev){2} /\
+  inv_split_dom AKE_ComputeRand.mH2{1} AKE_find.mH2{2} AKE_find.mKeyRev{2} 
+                AKE_find.mStarted{2} AKE_find.mCompleted{2} AKE_find.mEexp{2}
+                AKE_find.mSk{2} /\
+  inv_split_val1 AKE_ComputeRand.mH2{1} AKE_find.mH2{2} /\
+  inv_split_val2 AKE_ComputeRand.mH2{1} AKE_find.mKeyRev{2} 
+                 AKE_find.mStarted{2} AKE_find.mCompleted{2} AKE_find.mEexp{2}
+                 AKE_find.mSk{2} /\
+  is_sub_map AKE_find.mCompleted{2} AKE_find.mStarted{2} /\
+  is_sub_map AKE_find.mKeyRev{2} AKE_find.mCompleted{2} /\ 
+  univ_map AKE_find.mEexp{2} /\
+  actor_valid AKE_find.mStarted{2} AKE_find.mCompleted{2} 
+              AKE_find.mEexp{2} AKE_find.mSk{2} /\
+  mSk_inv AKE_find.mSk{2}
  ==>
   ={res} /\
-  AKE_Eqs.t_idx{2} = AKE_ComputeRand.t_idx{1} /\
-  AKE_Eqs.evs{2} = AKE_ComputeRand.evs{1} /\
-  AKE_Eqs.test{2} = AKE_ComputeRand.test{1} /\
-  AKE_Eqs.cSession{2} = AKE_ComputeRand.cSession{1} /\
-  AKE_Eqs.cH2{2} = AKE_ComputeRand.cH2{1} /\
-  AKE_Eqs.sH2{2} = AKE_ComputeRand.sH2{1} /\
-  AKE_Eqs.mSk{2} = AKE_ComputeRand.mSk{1} /\
-  AKE_Eqs.mEexp{2} = AKE_ComputeRand.mEexp{1} /\
-  AKE_Eqs.mStarted{2} = AKE_ComputeRand.mStarted{1} /\
-  AKE_Eqs.mCompleted{2} = AKE_ComputeRand.mCompleted{1} /\
-  (is_dom AKE_Eqs.sH2' AKE_Eqs.mH2){2} /\
-  (is_dom AKE_Eqs.sKeyRev AKE_Eqs.mKeyRev){2} /\
-  inv_split_dom AKE_ComputeRand.mH2{1} AKE_Eqs.mH2{2} AKE_Eqs.mKeyRev{2} 
-                AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} AKE_Eqs.mEexp{2}
-                AKE_Eqs.mSk{2} /\
-  inv_split_val1 AKE_ComputeRand.mH2{1} AKE_Eqs.mH2{2} /\
-  inv_split_val2 AKE_ComputeRand.mH2{1} AKE_Eqs.mKeyRev{2} 
-                 AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} AKE_Eqs.mEexp{2}
-                 AKE_Eqs.mSk{2} /\
-  is_sub_map AKE_Eqs.mCompleted{2} AKE_Eqs.mStarted{2} /\
-  is_sub_map AKE_Eqs.mKeyRev{2} AKE_Eqs.mCompleted{2} /\ 
-  univ_map AKE_Eqs.mEexp{2} /\
-  actor_valid AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} 
-              AKE_Eqs.mEexp{2} AKE_Eqs.mSk{2} /\
-  mSk_inv AKE_Eqs.mSk{2}.
+  AKE_find.t_idx{2} = AKE_ComputeRand.t_idx{1} /\
+  AKE_find.evs{2} = AKE_ComputeRand.evs{1} /\
+  AKE_find.test{2} = AKE_ComputeRand.test{1} /\
+  AKE_find.cSession{2} = AKE_ComputeRand.cSession{1} /\
+  AKE_find.cH2{2} = AKE_ComputeRand.cH2{1} /\
+  AKE_find.sH2{2} = AKE_ComputeRand.sH2{1} /\
+  AKE_find.mSk{2} = AKE_ComputeRand.mSk{1} /\
+  AKE_find.mEexp{2} = AKE_ComputeRand.mEexp{1} /\
+  AKE_find.mStarted{2} = AKE_ComputeRand.mStarted{1} /\
+  AKE_find.mCompleted{2} = AKE_ComputeRand.mCompleted{1} /\
+  (is_dom AKE_find.sH2' AKE_find.mH2){2} /\
+  (is_dom AKE_find.sKeyRev AKE_find.mKeyRev){2} /\
+  inv_split_dom AKE_ComputeRand.mH2{1} AKE_find.mH2{2} AKE_find.mKeyRev{2} 
+                AKE_find.mStarted{2} AKE_find.mCompleted{2} AKE_find.mEexp{2}
+                AKE_find.mSk{2} /\
+  inv_split_val1 AKE_ComputeRand.mH2{1} AKE_find.mH2{2} /\
+  inv_split_val2 AKE_ComputeRand.mH2{1} AKE_find.mKeyRev{2} 
+                 AKE_find.mStarted{2} AKE_find.mCompleted{2} AKE_find.mEexp{2}
+                 AKE_find.mSk{2} /\
+  is_sub_map AKE_find.mCompleted{2} AKE_find.mStarted{2} /\
+  is_sub_map AKE_find.mKeyRev{2} AKE_find.mCompleted{2} /\ 
+  univ_map AKE_find.mEexp{2} /\
+  actor_valid AKE_find.mStarted{2} AKE_find.mCompleted{2} 
+              AKE_find.mEexp{2} AKE_find.mSk{2} /\
+  mSk_inv AKE_find.mSk{2}.
 proof.
  fun.
  sp.
  seq 1 1:
   (  s{2} = None /\
   ={sstring,ke}  /\
-  AKE_Eqs.t_idx{2} = AKE_ComputeRand.t_idx{1} /\
-  AKE_Eqs.evs{2} = AKE_ComputeRand.evs{1} /\
-  AKE_Eqs.test{2} = AKE_ComputeRand.test{1} /\
-  AKE_Eqs.cSession{2} = AKE_ComputeRand.cSession{1} /\
-  AKE_Eqs.cH2{2} = AKE_ComputeRand.cH2{1} /\
-  AKE_Eqs.sH2{2} = AKE_ComputeRand.sH2{1} /\
-  AKE_Eqs.mSk{2} = AKE_ComputeRand.mSk{1} /\
-  AKE_Eqs.mEexp{2} = AKE_ComputeRand.mEexp{1} /\
-  AKE_Eqs.mStarted{2} = AKE_ComputeRand.mStarted{1} /\
-  AKE_Eqs.mCompleted{2} = AKE_ComputeRand.mCompleted{1} /\
-  (is_dom AKE_Eqs.sH2' AKE_Eqs.mH2){2} /\
-  (is_dom AKE_Eqs.sKeyRev AKE_Eqs.mKeyRev){2} /\
-  inv_split_dom AKE_ComputeRand.mH2{1} AKE_Eqs.mH2{2} AKE_Eqs.mKeyRev{2} 
-                AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} AKE_Eqs.mEexp{2}
-                AKE_Eqs.mSk{2} /\
-  inv_split_val1 AKE_ComputeRand.mH2{1} AKE_Eqs.mH2{2} /\
-  inv_split_val2 AKE_ComputeRand.mH2{1} AKE_Eqs.mKeyRev{2} 
-                 AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} AKE_Eqs.mEexp{2}
-                 AKE_Eqs.mSk{2} /\
-  is_sub_map AKE_Eqs.mCompleted{2} AKE_Eqs.mStarted{2} /\
-  is_sub_map AKE_Eqs.mKeyRev{2} AKE_Eqs.mCompleted{2} /\ 
-  univ_map AKE_Eqs.mEexp{2} /\
-  actor_valid AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} 
-              AKE_Eqs.mEexp{2} AKE_Eqs.mSk{2} /\
-  mSk_inv AKE_Eqs.mSk{2}).
+  AKE_find.t_idx{2} = AKE_ComputeRand.t_idx{1} /\
+  AKE_find.evs{2} = AKE_ComputeRand.evs{1} /\
+  AKE_find.test{2} = AKE_ComputeRand.test{1} /\
+  AKE_find.cSession{2} = AKE_ComputeRand.cSession{1} /\
+  AKE_find.cH2{2} = AKE_ComputeRand.cH2{1} /\
+  AKE_find.sH2{2} = AKE_ComputeRand.sH2{1} /\
+  AKE_find.mSk{2} = AKE_ComputeRand.mSk{1} /\
+  AKE_find.mEexp{2} = AKE_ComputeRand.mEexp{1} /\
+  AKE_find.mStarted{2} = AKE_ComputeRand.mStarted{1} /\
+  AKE_find.mCompleted{2} = AKE_ComputeRand.mCompleted{1} /\
+  (is_dom AKE_find.sH2' AKE_find.mH2){2} /\
+  (is_dom AKE_find.sKeyRev AKE_find.mKeyRev){2} /\
+  inv_split_dom AKE_ComputeRand.mH2{1} AKE_find.mH2{2} AKE_find.mKeyRev{2} 
+                AKE_find.mStarted{2} AKE_find.mCompleted{2} AKE_find.mEexp{2}
+                AKE_find.mSk{2} /\
+  inv_split_val1 AKE_ComputeRand.mH2{1} AKE_find.mH2{2} /\
+  inv_split_val2 AKE_ComputeRand.mH2{1} AKE_find.mKeyRev{2} 
+                 AKE_find.mStarted{2} AKE_find.mCompleted{2} AKE_find.mEexp{2}
+                 AKE_find.mSk{2} /\
+  is_sub_map AKE_find.mCompleted{2} AKE_find.mStarted{2} /\
+  is_sub_map AKE_find.mKeyRev{2} AKE_find.mCompleted{2} /\ 
+  univ_map AKE_find.mEexp{2} /\
+  actor_valid AKE_find.mStarted{2} AKE_find.mCompleted{2} 
+              AKE_find.mEexp{2} AKE_find.mSk{2} /\
+  mSk_inv AKE_find.mSk{2}).
  by rnd.
  if{1}.
  rcondf{2} 1.
@@ -8426,7 +8292,7 @@ proof.
   rcondf{2} 2.
   intros => &m.
   exists* sstring; elim* => str.
-  exists* AKE_Eqs.sKeyRev; elim* => id_set. 
+  exists* AKE_find.sKeyRev; elim* => id_set. 
   call (find_id_spec str id_set).
    wp; skip; progress => //.
    by apply H5; rewrite H0.
@@ -8441,7 +8307,7 @@ proof.
 
  wp.
  exists* sstring{2}; elim* => str.
- exists* AKE_Eqs.sKeyRev{2}; elim* => id_set. 
+ exists* AKE_find.sKeyRev{2}; elim* => id_set. 
  call{2} (find_id_spec_ll str id_set).
  skip; progress => //.
    by apply H5; rewrite H0.
@@ -8451,7 +8317,7 @@ proof.
    by apply is_dom_add.
    by apply inv_split_dom_updmH22.
    by apply inv_split_val1_updmH22.
-   by apply (inv_split_val2_updmH22 _ AKE_Eqs.mH2{2}).
+   by apply (inv_split_val2_updmH22 _ AKE_find.mH2{2}).
   
  if{2}.
  wp; skip; progress => //.
@@ -8459,7 +8325,7 @@ proof.
  rcondt{2} 2.
  intros => &m.
  exists* sstring; elim* => str.
- exists* AKE_Eqs.sKeyRev; elim* => id_set. 
+ exists* AKE_find.sKeyRev; elim* => id_set. 
  call{2} (find_id_spec str id_set).
  wp; skip; progress => //.
    by apply H5; rewrite H0.
@@ -8471,7 +8337,7 @@ proof.
   
  wp.
  exists* sstring{2}; elim* => str.
- exists* AKE_Eqs.sKeyRev{2}; elim* => id_set. 
+ exists* AKE_find.sKeyRev{2}; elim* => id_set. 
  call{2} (find_id_spec_ll str id_set).
  skip; progress => //.  
    by apply H5; rewrite H0.
@@ -8488,60 +8354,60 @@ proof.
 save.
 
 local equiv AKE_RandCompute_Eqs_h2a : 
-AKE_ComputeRand(A).O.h2_a ~ AKE_Eqs(A).O.h2_a :
+AKE_ComputeRand(A).O.h2_a ~ AKE_find(A).O.h2_a :
   ={sstring} /\
-  AKE_Eqs.t_idx{2} = AKE_ComputeRand.t_idx{1} /\
-  AKE_Eqs.evs{2} = AKE_ComputeRand.evs{1} /\
-  AKE_Eqs.test{2} = AKE_ComputeRand.test{1} /\
-  AKE_Eqs.cSession{2} = AKE_ComputeRand.cSession{1} /\
-  AKE_Eqs.cH2{2} = AKE_ComputeRand.cH2{1} /\
-  AKE_Eqs.sH2{2} = AKE_ComputeRand.sH2{1} /\
-  AKE_Eqs.mSk{2} = AKE_ComputeRand.mSk{1} /\
-  AKE_Eqs.mEexp{2} = AKE_ComputeRand.mEexp{1} /\
-  AKE_Eqs.mStarted{2} = AKE_ComputeRand.mStarted{1} /\
-  AKE_Eqs.mCompleted{2} = AKE_ComputeRand.mCompleted{1} /\
-  (is_dom AKE_Eqs.sH2' AKE_Eqs.mH2){2} /\
-  (is_dom AKE_Eqs.sKeyRev AKE_Eqs.mKeyRev){2} /\
-  inv_split_dom AKE_ComputeRand.mH2{1} AKE_Eqs.mH2{2} AKE_Eqs.mKeyRev{2} 
-                AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} AKE_Eqs.mEexp{2}
-                AKE_Eqs.mSk{2} /\
-  inv_split_val1 AKE_ComputeRand.mH2{1} AKE_Eqs.mH2{2} /\
-  inv_split_val2 AKE_ComputeRand.mH2{1} AKE_Eqs.mKeyRev{2} 
-                 AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} AKE_Eqs.mEexp{2}
-                 AKE_Eqs.mSk{2} /\
-  is_sub_map AKE_Eqs.mCompleted{2} AKE_Eqs.mStarted{2} /\
-  is_sub_map AKE_Eqs.mKeyRev{2} AKE_Eqs.mCompleted{2} /\ 
-  univ_map AKE_Eqs.mEexp{2} /\
-  actor_valid AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} 
-              AKE_Eqs.mEexp{2} AKE_Eqs.mSk{2} /\
-  mSk_inv AKE_Eqs.mSk{2} 
+  AKE_find.t_idx{2} = AKE_ComputeRand.t_idx{1} /\
+  AKE_find.evs{2} = AKE_ComputeRand.evs{1} /\
+  AKE_find.test{2} = AKE_ComputeRand.test{1} /\
+  AKE_find.cSession{2} = AKE_ComputeRand.cSession{1} /\
+  AKE_find.cH2{2} = AKE_ComputeRand.cH2{1} /\
+  AKE_find.sH2{2} = AKE_ComputeRand.sH2{1} /\
+  AKE_find.mSk{2} = AKE_ComputeRand.mSk{1} /\
+  AKE_find.mEexp{2} = AKE_ComputeRand.mEexp{1} /\
+  AKE_find.mStarted{2} = AKE_ComputeRand.mStarted{1} /\
+  AKE_find.mCompleted{2} = AKE_ComputeRand.mCompleted{1} /\
+  (is_dom AKE_find.sH2' AKE_find.mH2){2} /\
+  (is_dom AKE_find.sKeyRev AKE_find.mKeyRev){2} /\
+  inv_split_dom AKE_ComputeRand.mH2{1} AKE_find.mH2{2} AKE_find.mKeyRev{2} 
+                AKE_find.mStarted{2} AKE_find.mCompleted{2} AKE_find.mEexp{2}
+                AKE_find.mSk{2} /\
+  inv_split_val1 AKE_ComputeRand.mH2{1} AKE_find.mH2{2} /\
+  inv_split_val2 AKE_ComputeRand.mH2{1} AKE_find.mKeyRev{2} 
+                 AKE_find.mStarted{2} AKE_find.mCompleted{2} AKE_find.mEexp{2}
+                 AKE_find.mSk{2} /\
+  is_sub_map AKE_find.mCompleted{2} AKE_find.mStarted{2} /\
+  is_sub_map AKE_find.mKeyRev{2} AKE_find.mCompleted{2} /\ 
+  univ_map AKE_find.mEexp{2} /\
+  actor_valid AKE_find.mStarted{2} AKE_find.mCompleted{2} 
+              AKE_find.mEexp{2} AKE_find.mSk{2} /\
+  mSk_inv AKE_find.mSk{2} 
  ==>
   ={res} /\
-  AKE_Eqs.t_idx{2} = AKE_ComputeRand.t_idx{1} /\
-  AKE_Eqs.evs{2} = AKE_ComputeRand.evs{1} /\
-  AKE_Eqs.test{2} = AKE_ComputeRand.test{1} /\
-  AKE_Eqs.cSession{2} = AKE_ComputeRand.cSession{1} /\
-  AKE_Eqs.cH2{2} = AKE_ComputeRand.cH2{1} /\
-  AKE_Eqs.sH2{2} = AKE_ComputeRand.sH2{1} /\
-  AKE_Eqs.mSk{2} = AKE_ComputeRand.mSk{1} /\
-  AKE_Eqs.mEexp{2} = AKE_ComputeRand.mEexp{1} /\
-  AKE_Eqs.mStarted{2} = AKE_ComputeRand.mStarted{1} /\
-  AKE_Eqs.mCompleted{2} = AKE_ComputeRand.mCompleted{1} /\
-  (is_dom AKE_Eqs.sH2' AKE_Eqs.mH2){2} /\
-  (is_dom AKE_Eqs.sKeyRev AKE_Eqs.mKeyRev){2} /\
-  inv_split_dom AKE_ComputeRand.mH2{1} AKE_Eqs.mH2{2} AKE_Eqs.mKeyRev{2} 
-                AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} AKE_Eqs.mEexp{2}
-                AKE_Eqs.mSk{2} /\
-  inv_split_val1 AKE_ComputeRand.mH2{1} AKE_Eqs.mH2{2} /\
-  inv_split_val2 AKE_ComputeRand.mH2{1} AKE_Eqs.mKeyRev{2} 
-                 AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} AKE_Eqs.mEexp{2}
-                 AKE_Eqs.mSk{2} /\
-  is_sub_map AKE_Eqs.mCompleted{2} AKE_Eqs.mStarted{2} /\
-  is_sub_map AKE_Eqs.mKeyRev{2} AKE_Eqs.mCompleted{2} /\ 
-  univ_map AKE_Eqs.mEexp{2} /\
-  actor_valid AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} 
-              AKE_Eqs.mEexp{2} AKE_Eqs.mSk{2} /\
-  mSk_inv AKE_Eqs.mSk{2}.
+  AKE_find.t_idx{2} = AKE_ComputeRand.t_idx{1} /\
+  AKE_find.evs{2} = AKE_ComputeRand.evs{1} /\
+  AKE_find.test{2} = AKE_ComputeRand.test{1} /\
+  AKE_find.cSession{2} = AKE_ComputeRand.cSession{1} /\
+  AKE_find.cH2{2} = AKE_ComputeRand.cH2{1} /\
+  AKE_find.sH2{2} = AKE_ComputeRand.sH2{1} /\
+  AKE_find.mSk{2} = AKE_ComputeRand.mSk{1} /\
+  AKE_find.mEexp{2} = AKE_ComputeRand.mEexp{1} /\
+  AKE_find.mStarted{2} = AKE_ComputeRand.mStarted{1} /\
+  AKE_find.mCompleted{2} = AKE_ComputeRand.mCompleted{1} /\
+  (is_dom AKE_find.sH2' AKE_find.mH2){2} /\
+  (is_dom AKE_find.sKeyRev AKE_find.mKeyRev){2} /\
+  inv_split_dom AKE_ComputeRand.mH2{1} AKE_find.mH2{2} AKE_find.mKeyRev{2} 
+                AKE_find.mStarted{2} AKE_find.mCompleted{2} AKE_find.mEexp{2}
+                AKE_find.mSk{2} /\
+  inv_split_val1 AKE_ComputeRand.mH2{1} AKE_find.mH2{2} /\
+  inv_split_val2 AKE_ComputeRand.mH2{1} AKE_find.mKeyRev{2} 
+                 AKE_find.mStarted{2} AKE_find.mCompleted{2} AKE_find.mEexp{2}
+                 AKE_find.mSk{2} /\
+  is_sub_map AKE_find.mCompleted{2} AKE_find.mStarted{2} /\
+  is_sub_map AKE_find.mKeyRev{2} AKE_find.mCompleted{2} /\ 
+  univ_map AKE_find.mEexp{2} /\
+  actor_valid AKE_find.mStarted{2} AKE_find.mCompleted{2} 
+              AKE_find.mEexp{2} AKE_find.mSk{2} /\
+  mSk_inv AKE_find.mSk{2}.
 proof.
  by fun; sp; if => //; wp; call AKE_RandCompute_Eqs_h2; wp.
 qed.
@@ -8603,93 +8469,92 @@ rewrite strong_partnering.
  rewrite tuple_eq; progress; right; progress.
  by rewrite H.
  by rewrite H.
- by rewrite H0.
- by rewrite H1.
+ by rewrite -H1.
  smt.
 save.
  
 local equiv AKE_RandCompute_Eqs_computeKey : 
-AKE_ComputeRand(A).O.computeKey ~ AKE_Eqs(A).O.computeKey :
+AKE_ComputeRand(A).O.computeKey ~ AKE_find(A).O.computeKey :
   ={i} /\
-  AKE_Eqs.t_idx{2} = AKE_ComputeRand.t_idx{1} /\
-  AKE_Eqs.evs{2} = AKE_ComputeRand.evs{1} /\
-  AKE_Eqs.test{2} = AKE_ComputeRand.test{1} /\
-  AKE_Eqs.cSession{2} = AKE_ComputeRand.cSession{1} /\
-  AKE_Eqs.cH2{2} = AKE_ComputeRand.cH2{1} /\
-  AKE_Eqs.sH2{2} = AKE_ComputeRand.sH2{1} /\
-  AKE_Eqs.mSk{2} = AKE_ComputeRand.mSk{1} /\
-  AKE_Eqs.mEexp{2} = AKE_ComputeRand.mEexp{1} /\
-  AKE_Eqs.mStarted{2} = AKE_ComputeRand.mStarted{1} /\
-  AKE_Eqs.mCompleted{2} = AKE_ComputeRand.mCompleted{1} /\
-  (is_dom AKE_Eqs.sH2' AKE_Eqs.mH2){2} /\
-  (is_dom AKE_Eqs.sKeyRev AKE_Eqs.mKeyRev){2} /\
-  inv_split_dom AKE_ComputeRand.mH2{1} AKE_Eqs.mH2{2} AKE_Eqs.mKeyRev{2} 
-                AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} AKE_Eqs.mEexp{2}
-                AKE_Eqs.mSk{2} /\
-  inv_split_val1 AKE_ComputeRand.mH2{1} AKE_Eqs.mH2{2} /\
-  inv_split_val2 AKE_ComputeRand.mH2{1} AKE_Eqs.mKeyRev{2} 
-                 AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} AKE_Eqs.mEexp{2}
-                 AKE_Eqs.mSk{2} /\
-  is_sub_map AKE_Eqs.mCompleted{2} AKE_Eqs.mStarted{2} /\
-  is_sub_map AKE_Eqs.mKeyRev{2} AKE_Eqs.mCompleted{2} /\ 
-  univ_map AKE_Eqs.mEexp{2} /\
-  actor_valid AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} 
-              AKE_Eqs.mEexp{2} AKE_Eqs.mSk{2} /\
-  mSk_inv AKE_Eqs.mSk{2}  
+  AKE_find.t_idx{2} = AKE_ComputeRand.t_idx{1} /\
+  AKE_find.evs{2} = AKE_ComputeRand.evs{1} /\
+  AKE_find.test{2} = AKE_ComputeRand.test{1} /\
+  AKE_find.cSession{2} = AKE_ComputeRand.cSession{1} /\
+  AKE_find.cH2{2} = AKE_ComputeRand.cH2{1} /\
+  AKE_find.sH2{2} = AKE_ComputeRand.sH2{1} /\
+  AKE_find.mSk{2} = AKE_ComputeRand.mSk{1} /\
+  AKE_find.mEexp{2} = AKE_ComputeRand.mEexp{1} /\
+  AKE_find.mStarted{2} = AKE_ComputeRand.mStarted{1} /\
+  AKE_find.mCompleted{2} = AKE_ComputeRand.mCompleted{1} /\
+  (is_dom AKE_find.sH2' AKE_find.mH2){2} /\
+  (is_dom AKE_find.sKeyRev AKE_find.mKeyRev){2} /\
+  inv_split_dom AKE_ComputeRand.mH2{1} AKE_find.mH2{2} AKE_find.mKeyRev{2} 
+                AKE_find.mStarted{2} AKE_find.mCompleted{2} AKE_find.mEexp{2}
+                AKE_find.mSk{2} /\
+  inv_split_val1 AKE_ComputeRand.mH2{1} AKE_find.mH2{2} /\
+  inv_split_val2 AKE_ComputeRand.mH2{1} AKE_find.mKeyRev{2} 
+                 AKE_find.mStarted{2} AKE_find.mCompleted{2} AKE_find.mEexp{2}
+                 AKE_find.mSk{2} /\
+  is_sub_map AKE_find.mCompleted{2} AKE_find.mStarted{2} /\
+  is_sub_map AKE_find.mKeyRev{2} AKE_find.mCompleted{2} /\ 
+  univ_map AKE_find.mEexp{2} /\
+  actor_valid AKE_find.mStarted{2} AKE_find.mCompleted{2} 
+              AKE_find.mEexp{2} AKE_find.mSk{2} /\
+  mSk_inv AKE_find.mSk{2}  
  ==>
   ={res} /\
-  AKE_Eqs.t_idx{2} = AKE_ComputeRand.t_idx{1} /\
-  AKE_Eqs.evs{2} = AKE_ComputeRand.evs{1} /\
-  AKE_Eqs.test{2} = AKE_ComputeRand.test{1} /\
-  AKE_Eqs.cSession{2} = AKE_ComputeRand.cSession{1} /\
-  AKE_Eqs.cH2{2} = AKE_ComputeRand.cH2{1} /\
-  AKE_Eqs.sH2{2} = AKE_ComputeRand.sH2{1} /\
-  AKE_Eqs.mSk{2} = AKE_ComputeRand.mSk{1} /\
-  AKE_Eqs.mEexp{2} = AKE_ComputeRand.mEexp{1} /\
-  AKE_Eqs.mStarted{2} = AKE_ComputeRand.mStarted{1} /\
-  AKE_Eqs.mCompleted{2} = AKE_ComputeRand.mCompleted{1} /\
-  (is_dom AKE_Eqs.sH2' AKE_Eqs.mH2){2} /\
-  (is_dom AKE_Eqs.sKeyRev AKE_Eqs.mKeyRev){2} /\
-  inv_split_dom AKE_ComputeRand.mH2{1} AKE_Eqs.mH2{2} AKE_Eqs.mKeyRev{2} 
-                AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} AKE_Eqs.mEexp{2}
-                AKE_Eqs.mSk{2} /\
-  inv_split_val1 AKE_ComputeRand.mH2{1} AKE_Eqs.mH2{2} /\
-  inv_split_val2 AKE_ComputeRand.mH2{1} AKE_Eqs.mKeyRev{2} 
-                 AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} AKE_Eqs.mEexp{2}
-                 AKE_Eqs.mSk{2} /\
-  is_sub_map AKE_Eqs.mCompleted{2} AKE_Eqs.mStarted{2} /\
-  is_sub_map AKE_Eqs.mKeyRev{2} AKE_Eqs.mCompleted{2} /\ 
-  univ_map AKE_Eqs.mEexp{2} /\
-  actor_valid AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} 
-              AKE_Eqs.mEexp{2} AKE_Eqs.mSk{2} /\
-  mSk_inv AKE_Eqs.mSk{2}.
+  AKE_find.t_idx{2} = AKE_ComputeRand.t_idx{1} /\
+  AKE_find.evs{2} = AKE_ComputeRand.evs{1} /\
+  AKE_find.test{2} = AKE_ComputeRand.test{1} /\
+  AKE_find.cSession{2} = AKE_ComputeRand.cSession{1} /\
+  AKE_find.cH2{2} = AKE_ComputeRand.cH2{1} /\
+  AKE_find.sH2{2} = AKE_ComputeRand.sH2{1} /\
+  AKE_find.mSk{2} = AKE_ComputeRand.mSk{1} /\
+  AKE_find.mEexp{2} = AKE_ComputeRand.mEexp{1} /\
+  AKE_find.mStarted{2} = AKE_ComputeRand.mStarted{1} /\
+  AKE_find.mCompleted{2} = AKE_ComputeRand.mCompleted{1} /\
+  (is_dom AKE_find.sH2' AKE_find.mH2){2} /\
+  (is_dom AKE_find.sKeyRev AKE_find.mKeyRev){2} /\
+  inv_split_dom AKE_ComputeRand.mH2{1} AKE_find.mH2{2} AKE_find.mKeyRev{2} 
+                AKE_find.mStarted{2} AKE_find.mCompleted{2} AKE_find.mEexp{2}
+                AKE_find.mSk{2} /\
+  inv_split_val1 AKE_ComputeRand.mH2{1} AKE_find.mH2{2} /\
+  inv_split_val2 AKE_ComputeRand.mH2{1} AKE_find.mKeyRev{2} 
+                 AKE_find.mStarted{2} AKE_find.mCompleted{2} AKE_find.mEexp{2}
+                 AKE_find.mSk{2} /\
+  is_sub_map AKE_find.mCompleted{2} AKE_find.mStarted{2} /\
+  is_sub_map AKE_find.mKeyRev{2} AKE_find.mCompleted{2} /\ 
+  univ_map AKE_find.mEexp{2} /\
+  actor_valid AKE_find.mStarted{2} AKE_find.mCompleted{2} 
+              AKE_find.mEexp{2} AKE_find.mSk{2} /\
+  mSk_inv AKE_find.mSk{2}.
 proof.
  conseq (_ : _ ==> 
- (AKE_Eqs.t_idx{2} = AKE_ComputeRand.t_idx{1} /\
-  AKE_Eqs.evs{2} = AKE_ComputeRand.evs{1} /\
-  AKE_Eqs.test{2} = AKE_ComputeRand.test{1} /\
-  AKE_Eqs.cSession{2} = AKE_ComputeRand.cSession{1} /\
-  AKE_Eqs.cH2{2} = AKE_ComputeRand.cH2{1} /\
-  AKE_Eqs.sH2{2} = AKE_ComputeRand.sH2{1} /\
-  AKE_Eqs.mSk{2} = AKE_ComputeRand.mSk{1} /\
-  AKE_Eqs.mEexp{2} = AKE_ComputeRand.mEexp{1} /\
-  AKE_Eqs.mStarted{2} = AKE_ComputeRand.mStarted{1} /\
-  AKE_Eqs.mCompleted{2} = AKE_ComputeRand.mCompleted{1} /\
-  (is_dom AKE_Eqs.sH2' AKE_Eqs.mH2){2} /\
-  (is_dom AKE_Eqs.sKeyRev AKE_Eqs.mKeyRev){2} /\
-  inv_split_dom AKE_ComputeRand.mH2{1} AKE_Eqs.mH2{2} AKE_Eqs.mKeyRev{2} 
-                AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} AKE_Eqs.mEexp{2}
-                AKE_Eqs.mSk{2} /\
-  inv_split_val1 AKE_ComputeRand.mH2{1} AKE_Eqs.mH2{2} /\
-  inv_split_val2 AKE_ComputeRand.mH2{1} AKE_Eqs.mKeyRev{2} 
-                 AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} AKE_Eqs.mEexp{2}
-                 AKE_Eqs.mSk{2} /\
-  is_sub_map AKE_Eqs.mCompleted{2} AKE_Eqs.mStarted{2} /\
-  is_sub_map AKE_Eqs.mKeyRev{2} AKE_Eqs.mCompleted{2} /\ 
-  univ_map AKE_Eqs.mEexp{2} /\
-  actor_valid AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} 
-              AKE_Eqs.mEexp{2} AKE_Eqs.mSk{2} /\
-  mSk_inv AKE_Eqs.mSk{2}) && ={res}).
+ (AKE_find.t_idx{2} = AKE_ComputeRand.t_idx{1} /\
+  AKE_find.evs{2} = AKE_ComputeRand.evs{1} /\
+  AKE_find.test{2} = AKE_ComputeRand.test{1} /\
+  AKE_find.cSession{2} = AKE_ComputeRand.cSession{1} /\
+  AKE_find.cH2{2} = AKE_ComputeRand.cH2{1} /\
+  AKE_find.sH2{2} = AKE_ComputeRand.sH2{1} /\
+  AKE_find.mSk{2} = AKE_ComputeRand.mSk{1} /\
+  AKE_find.mEexp{2} = AKE_ComputeRand.mEexp{1} /\
+  AKE_find.mStarted{2} = AKE_ComputeRand.mStarted{1} /\
+  AKE_find.mCompleted{2} = AKE_ComputeRand.mCompleted{1} /\
+  (is_dom AKE_find.sH2' AKE_find.mH2){2} /\
+  (is_dom AKE_find.sKeyRev AKE_find.mKeyRev){2} /\
+  inv_split_dom AKE_ComputeRand.mH2{1} AKE_find.mH2{2} AKE_find.mKeyRev{2} 
+                AKE_find.mStarted{2} AKE_find.mCompleted{2} AKE_find.mEexp{2}
+                AKE_find.mSk{2} /\
+  inv_split_val1 AKE_ComputeRand.mH2{1} AKE_find.mH2{2} /\
+  inv_split_val2 AKE_ComputeRand.mH2{1} AKE_find.mKeyRev{2} 
+                 AKE_find.mStarted{2} AKE_find.mCompleted{2} AKE_find.mEexp{2}
+                 AKE_find.mSk{2} /\
+  is_sub_map AKE_find.mCompleted{2} AKE_find.mStarted{2} /\
+  is_sub_map AKE_find.mKeyRev{2} AKE_find.mCompleted{2} /\ 
+  univ_map AKE_find.mEexp{2} /\
+  actor_valid AKE_find.mStarted{2} AKE_find.mCompleted{2} 
+              AKE_find.mEexp{2} AKE_find.mSk{2} /\
+  mSk_inv AKE_find.mSk{2}) && ={res}).
   by progress => //.
  fun; sp; if => //.
  inline AKE_ComputeRand(A).O.h2.
@@ -8705,32 +8570,32 @@ seq 3 1:
    r{1} = None /\
    ke{1} = k{2} /\
    ={i} /\
-   AKE_Eqs.t_idx{2} = AKE_ComputeRand.t_idx{1} /\
-   AKE_Eqs.evs{2} = AKE_ComputeRand.evs{1} /\
-   AKE_Eqs.test{2} = AKE_ComputeRand.test{1} /\
-   AKE_Eqs.cSession{2} = AKE_ComputeRand.cSession{1} /\
-   AKE_Eqs.cH2{2} = AKE_ComputeRand.cH2{1} /\
-   AKE_Eqs.sH2{2} = AKE_ComputeRand.sH2{1} /\
-   AKE_Eqs.mSk{2} = AKE_ComputeRand.mSk{1} /\
-   AKE_Eqs.mEexp{2} = AKE_ComputeRand.mEexp{1} /\
-   AKE_Eqs.mStarted{2} = AKE_ComputeRand.mStarted{1} /\
-   AKE_Eqs.mCompleted{2} = AKE_ComputeRand.mCompleted{1} /\
-   is_dom AKE_Eqs.sH2'{2} AKE_Eqs.mH2{2} /\
-   is_dom AKE_Eqs.sKeyRev{2} AKE_Eqs.mKeyRev{2} /\
-   inv_split_dom AKE_ComputeRand.mH2{1} AKE_Eqs.mH2{2} AKE_Eqs.mKeyRev{2}
-     AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} AKE_Eqs.mEexp{2}
-     AKE_Eqs.mSk{2} /\
-   inv_split_val1 AKE_ComputeRand.mH2{1} AKE_Eqs.mH2{2} /\
-   inv_split_val2 AKE_ComputeRand.mH2{1} AKE_Eqs.mKeyRev{2}
-     AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} AKE_Eqs.mEexp{2}
-     AKE_Eqs.mSk{2} /\
-   is_sub_map AKE_Eqs.mCompleted{2} AKE_Eqs.mStarted{2} /\
-   is_sub_map AKE_Eqs.mKeyRev{2} AKE_Eqs.mCompleted{2} /\
-   univ_map AKE_Eqs.mEexp{2}) /\
+   AKE_find.t_idx{2} = AKE_ComputeRand.t_idx{1} /\
+   AKE_find.evs{2} = AKE_ComputeRand.evs{1} /\
+   AKE_find.test{2} = AKE_ComputeRand.test{1} /\
+   AKE_find.cSession{2} = AKE_ComputeRand.cSession{1} /\
+   AKE_find.cH2{2} = AKE_ComputeRand.cH2{1} /\
+   AKE_find.sH2{2} = AKE_ComputeRand.sH2{1} /\
+   AKE_find.mSk{2} = AKE_ComputeRand.mSk{1} /\
+   AKE_find.mEexp{2} = AKE_ComputeRand.mEexp{1} /\
+   AKE_find.mStarted{2} = AKE_ComputeRand.mStarted{1} /\
+   AKE_find.mCompleted{2} = AKE_ComputeRand.mCompleted{1} /\
+   is_dom AKE_find.sH2'{2} AKE_find.mH2{2} /\
+   is_dom AKE_find.sKeyRev{2} AKE_find.mKeyRev{2} /\
+   inv_split_dom AKE_ComputeRand.mH2{1} AKE_find.mH2{2} AKE_find.mKeyRev{2}
+     AKE_find.mStarted{2} AKE_find.mCompleted{2} AKE_find.mEexp{2}
+     AKE_find.mSk{2} /\
+   inv_split_val1 AKE_ComputeRand.mH2{1} AKE_find.mH2{2} /\
+   inv_split_val2 AKE_ComputeRand.mH2{1} AKE_find.mKeyRev{2}
+     AKE_find.mStarted{2} AKE_find.mCompleted{2} AKE_find.mEexp{2}
+     AKE_find.mSk{2} /\
+   is_sub_map AKE_find.mCompleted{2} AKE_find.mStarted{2} /\
+   is_sub_map AKE_find.mKeyRev{2} AKE_find.mCompleted{2} /\
+   univ_map AKE_find.mEexp{2}) /\
   in_dom i{1} AKE_ComputeRand.mCompleted{1} /\
-  actor_valid AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} 
-              AKE_Eqs.mEexp{2} AKE_Eqs.mSk{2} /\
-  mSk_inv AKE_Eqs.mSk{2}).
+  actor_valid AKE_find.mStarted{2} AKE_find.mCompleted{2} 
+              AKE_find.mEexp{2} AKE_find.mSk{2} /\
+  mSk_inv AKE_find.mSk{2}).
   by wp; rnd; wp.
   if{1}.
   rcondf{2} 1.
@@ -8744,7 +8609,7 @@ seq 3 1:
   rcondf{2} 2.
    intros => &m.
    exists* i; elim* => i'.
-   exists* AKE_Eqs.sKeyRev; elim* => sid_set'.
+   exists* AKE_find.sKeyRev; elim* => sid_set'.
    call (find_matching_spec i' sid_set'); skip; progress => //.
     by apply H5. 
     by apply H7.
@@ -8777,8 +8642,8 @@ seq 3 1:
    rcondf{2} 3.
  intros => &m.
  exists* i; elim* => i'.
- exists* AKE_Eqs.sH2'; elim* => str_set'.
- exists* AKE_Eqs.sKeyRev; elim* => sid_set'.
+ exists* AKE_find.sH2'; elim* => str_set'.
+ exists* AKE_find.sKeyRev; elim* => sid_set'.
  call (find_string_spec i' str_set').
  call (find_matching_spec i' sid_set').
  skip; progress => //.
@@ -8798,8 +8663,8 @@ seq 3 1:
   
   wp.
   exists* i{2}; elim* => i'.
-  exists* AKE_Eqs.sH2'{2}; elim* => str_set.
-  exists* AKE_Eqs.sKeyRev{2}; elim* => sid_set'.
+  exists* AKE_find.sH2'{2}; elim* => str_set.
+  exists* AKE_find.sKeyRev{2}; elim* => sid_set'.
   call{2} (find_string_spec_ll i' str_set);
   call{2} (find_matching_spec_ll i' sid_set'); wp; skip; progress => //.
    by apply H5. 
@@ -8829,7 +8694,7 @@ seq 3 1:
                          AKE_ComputeRand.mCompleted{1} AKE_ComputeRand.mEexp{1}
                          AKE_ComputeRand.mSk{1}).
     by rewrite /get_string_from_id -H.
-   apply (inv_split_val2_updmKeyRev _ AKE_Eqs.mH2{2}) => //.
+   apply (inv_split_val2_updmKeyRev _ AKE_find.mH2{2}) => //.
     generalize H11; apply (_ : forall p q, (p => q) => (!q => !p)); first smt.
     by rewrite /get_string_from_id -H.    
       
@@ -8853,37 +8718,37 @@ seq 0 1:
      r{1} = None /\
      ke{1} = k{2} /\
      ={i} /\
-     AKE_Eqs.t_idx{2} = AKE_ComputeRand.t_idx{1} /\
-     AKE_Eqs.evs{2} = AKE_ComputeRand.evs{1} /\
-     AKE_Eqs.test{2} = AKE_ComputeRand.test{1} /\
-     AKE_Eqs.cSession{2} = AKE_ComputeRand.cSession{1} /\
-     AKE_Eqs.cH2{2} = AKE_ComputeRand.cH2{1} /\
-     AKE_Eqs.sH2{2} = AKE_ComputeRand.sH2{1} /\
-     AKE_Eqs.mSk{2} = AKE_ComputeRand.mSk{1} /\
-     AKE_Eqs.mEexp{2} = AKE_ComputeRand.mEexp{1} /\
-     AKE_Eqs.mStarted{2} = AKE_ComputeRand.mStarted{1} /\
-     AKE_Eqs.mCompleted{2} = AKE_ComputeRand.mCompleted{1} /\
-     is_dom AKE_Eqs.sH2'{2} AKE_Eqs.mH2{2} /\
-     is_dom AKE_Eqs.sKeyRev{2} AKE_Eqs.mKeyRev{2} /\
-     inv_split_dom AKE_ComputeRand.mH2{1} AKE_Eqs.mH2{2} AKE_Eqs.mKeyRev{2}
-       AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} AKE_Eqs.mEexp{2}
-       AKE_Eqs.mSk{2} /\
-     inv_split_val1 AKE_ComputeRand.mH2{1} AKE_Eqs.mH2{2} /\
-     inv_split_val2 AKE_ComputeRand.mH2{1} AKE_Eqs.mKeyRev{2}
-       AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} AKE_Eqs.mEexp{2}
-       AKE_Eqs.mSk{2} /\
-     is_sub_map AKE_Eqs.mCompleted{2} AKE_Eqs.mStarted{2} /\
-     is_sub_map AKE_Eqs.mKeyRev{2} AKE_Eqs.mCompleted{2} /\
-     univ_map AKE_Eqs.mEexp{2}) /\
+     AKE_find.t_idx{2} = AKE_ComputeRand.t_idx{1} /\
+     AKE_find.evs{2} = AKE_ComputeRand.evs{1} /\
+     AKE_find.test{2} = AKE_ComputeRand.test{1} /\
+     AKE_find.cSession{2} = AKE_ComputeRand.cSession{1} /\
+     AKE_find.cH2{2} = AKE_ComputeRand.cH2{1} /\
+     AKE_find.sH2{2} = AKE_ComputeRand.sH2{1} /\
+     AKE_find.mSk{2} = AKE_ComputeRand.mSk{1} /\
+     AKE_find.mEexp{2} = AKE_ComputeRand.mEexp{1} /\
+     AKE_find.mStarted{2} = AKE_ComputeRand.mStarted{1} /\
+     AKE_find.mCompleted{2} = AKE_ComputeRand.mCompleted{1} /\
+     is_dom AKE_find.sH2'{2} AKE_find.mH2{2} /\
+     is_dom AKE_find.sKeyRev{2} AKE_find.mKeyRev{2} /\
+     inv_split_dom AKE_ComputeRand.mH2{1} AKE_find.mH2{2} AKE_find.mKeyRev{2}
+       AKE_find.mStarted{2} AKE_find.mCompleted{2} AKE_find.mEexp{2}
+       AKE_find.mSk{2} /\
+     inv_split_val1 AKE_ComputeRand.mH2{1} AKE_find.mH2{2} /\
+     inv_split_val2 AKE_ComputeRand.mH2{1} AKE_find.mKeyRev{2}
+       AKE_find.mStarted{2} AKE_find.mCompleted{2} AKE_find.mEexp{2}
+       AKE_find.mSk{2} /\
+     is_sub_map AKE_find.mCompleted{2} AKE_find.mStarted{2} /\
+     is_sub_map AKE_find.mKeyRev{2} AKE_find.mCompleted{2} /\
+     univ_map AKE_find.mEexp{2}) /\
     in_dom i{1} AKE_ComputeRand.mCompleted{1} /\
-    actor_valid AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} AKE_Eqs.mEexp{2}
-      AKE_Eqs.mSk{2} /\
-    mSk_inv AKE_Eqs.mSk{2}) /\
+    actor_valid AKE_find.mStarted{2} AKE_find.mCompleted{2} AKE_find.mEexp{2}
+      AKE_find.mSk{2} /\
+    mSk_inv AKE_find.mSk{2}) /\
    ! ! in_dom sstring{1} AKE_ComputeRand.mH2{1}) /\
-  ! in_dom i{2} AKE_Eqs.mKeyRev{2} /\
+  ! in_dom i{2} AKE_find.mKeyRev{2} /\
 (j{2} = None => 
  forall (j : Sidx),
-       mem j AKE_Eqs.sKeyRev{2} =>
+       mem j AKE_find.sKeyRev{2} =>
        ! cmatching
            (compute_sid AKE_ComputeRand.mStarted{1} AKE_ComputeRand.mEexp{1}
               AKE_ComputeRand.mCompleted{1} j) =
@@ -8894,7 +8759,7 @@ seq 0 1:
          compute_sid AKE_ComputeRand.mStarted{1} AKE_ComputeRand.mEexp{1}
            AKE_ComputeRand.mCompleted{1} i{2} ) /\
 (j{2}  <> None =>
-     mem (proj  j{2}) AKE_Eqs.sKeyRev{2} /\
+     mem (proj  j{2}) AKE_find.sKeyRev{2} /\
      (cmatching
         (compute_sid AKE_ComputeRand.mStarted{1} AKE_ComputeRand.mEexp{1}
            AKE_ComputeRand.mCompleted{1} (proj j{2})) =
@@ -8905,16 +8770,12 @@ seq 0 1:
       compute_sid AKE_ComputeRand.mStarted{1} AKE_ComputeRand.mEexp{1}
         AKE_ComputeRand.mCompleted{1} i{2}))).
    exists* i{2}; elim* => i'.
-   exists* AKE_Eqs.sKeyRev{2}; elim* => sid_set.
+   exists* AKE_find.sKeyRev{2}; elim* => sid_set.
    call{2} (find_matching_spec_ll i' sid_set); skip; progress => //.
     by apply H5. 
     by apply H7.
     by apply H5. 
     by apply H7.
-    cut:= H17 _ j0 _ => //.
-    cut:= H17 _ j0 _ => //.
-    cut:= H18 _ => //.
-    cut:= H18 _ => //.
     if{2}.
  wp; skip; progress => //.
  rewrite some_get => //.    
@@ -8943,7 +8804,7 @@ seq 0 1:
   rcondt{2} 2.
    intros => &m; wp.     
    exists* i; elim* => i'.
-   exists* AKE_Eqs.sH2'; elim* => str_set.
+   exists* AKE_find.sH2'; elim* => str_set.
    call (find_string_spec i' str_set); skip; progress => //.
     by apply H5. 
     by apply H7.
@@ -8975,7 +8836,7 @@ cmatching
  by rewrite cmatching_id.
  wp.
  exists* i{2}; elim* => i'.
- exists* AKE_Eqs.sH2'{2}; elim* => str_set.
+ exists* AKE_find.sH2'{2}; elim* => str_set.
  call{2} (find_string_spec_ll i' str_set); skip; progress => //.
   by apply H5.
   by apply H7.
@@ -9015,148 +8876,147 @@ apply (strong_partnering_id _ _ _ _ _  AKE_ComputeRand.mSk{1}).
 save.
 
 local equiv AKE_RandCompute_Eqs_sessionRev : 
-AKE_ComputeRand(A).O.sessionRev ~ AKE_Eqs(A).O.sessionRev :
+AKE_ComputeRand(A).O.sessionRev ~ AKE_find(A).O.sessionRev :
   ={i} /\
-  AKE_Eqs.t_idx{2} = AKE_ComputeRand.t_idx{1} /\
-  AKE_Eqs.evs{2} = AKE_ComputeRand.evs{1} /\
-  AKE_Eqs.test{2} = AKE_ComputeRand.test{1} /\
-  AKE_Eqs.cSession{2} = AKE_ComputeRand.cSession{1} /\
-  AKE_Eqs.cH2{2} = AKE_ComputeRand.cH2{1} /\
-  AKE_Eqs.sH2{2} = AKE_ComputeRand.sH2{1} /\
-  AKE_Eqs.mSk{2} = AKE_ComputeRand.mSk{1} /\
-  AKE_Eqs.mEexp{2} = AKE_ComputeRand.mEexp{1} /\
-  AKE_Eqs.mStarted{2} = AKE_ComputeRand.mStarted{1} /\
-  AKE_Eqs.mCompleted{2} = AKE_ComputeRand.mCompleted{1} /\
-  (is_dom AKE_Eqs.sH2' AKE_Eqs.mH2){2} /\
-  (is_dom AKE_Eqs.sKeyRev AKE_Eqs.mKeyRev){2} /\
-  inv_split_dom AKE_ComputeRand.mH2{1} AKE_Eqs.mH2{2} AKE_Eqs.mKeyRev{2} 
-                AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} AKE_Eqs.mEexp{2}
-                AKE_Eqs.mSk{2} /\
-  inv_split_val1 AKE_ComputeRand.mH2{1} AKE_Eqs.mH2{2} /\
-  inv_split_val2 AKE_ComputeRand.mH2{1} AKE_Eqs.mKeyRev{2} 
-                 AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} AKE_Eqs.mEexp{2}
-                 AKE_Eqs.mSk{2} /\
-  is_sub_map AKE_Eqs.mCompleted{2} AKE_Eqs.mStarted{2} /\
-  is_sub_map AKE_Eqs.mKeyRev{2} AKE_Eqs.mCompleted{2} /\ 
-  univ_map AKE_Eqs.mEexp{2} /\
-  actor_valid AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} 
-              AKE_Eqs.mEexp{2} AKE_Eqs.mSk{2} /\
-  mSk_inv AKE_Eqs.mSk{2}  
+  AKE_find.t_idx{2} = AKE_ComputeRand.t_idx{1} /\
+  AKE_find.evs{2} = AKE_ComputeRand.evs{1} /\
+  AKE_find.test{2} = AKE_ComputeRand.test{1} /\
+  AKE_find.cSession{2} = AKE_ComputeRand.cSession{1} /\
+  AKE_find.cH2{2} = AKE_ComputeRand.cH2{1} /\
+  AKE_find.sH2{2} = AKE_ComputeRand.sH2{1} /\
+  AKE_find.mSk{2} = AKE_ComputeRand.mSk{1} /\
+  AKE_find.mEexp{2} = AKE_ComputeRand.mEexp{1} /\
+  AKE_find.mStarted{2} = AKE_ComputeRand.mStarted{1} /\
+  AKE_find.mCompleted{2} = AKE_ComputeRand.mCompleted{1} /\
+  (is_dom AKE_find.sH2' AKE_find.mH2){2} /\
+  (is_dom AKE_find.sKeyRev AKE_find.mKeyRev){2} /\
+  inv_split_dom AKE_ComputeRand.mH2{1} AKE_find.mH2{2} AKE_find.mKeyRev{2} 
+                AKE_find.mStarted{2} AKE_find.mCompleted{2} AKE_find.mEexp{2}
+                AKE_find.mSk{2} /\
+  inv_split_val1 AKE_ComputeRand.mH2{1} AKE_find.mH2{2} /\
+  inv_split_val2 AKE_ComputeRand.mH2{1} AKE_find.mKeyRev{2} 
+                 AKE_find.mStarted{2} AKE_find.mCompleted{2} AKE_find.mEexp{2}
+                 AKE_find.mSk{2} /\
+  is_sub_map AKE_find.mCompleted{2} AKE_find.mStarted{2} /\
+  is_sub_map AKE_find.mKeyRev{2} AKE_find.mCompleted{2} /\ 
+  univ_map AKE_find.mEexp{2} /\
+  actor_valid AKE_find.mStarted{2} AKE_find.mCompleted{2} 
+              AKE_find.mEexp{2} AKE_find.mSk{2} /\
+  mSk_inv AKE_find.mSk{2}  
  ==>
   ={res} /\
-  AKE_Eqs.t_idx{2} = AKE_ComputeRand.t_idx{1} /\
-  AKE_Eqs.evs{2} = AKE_ComputeRand.evs{1} /\
-  AKE_Eqs.test{2} = AKE_ComputeRand.test{1} /\
-  AKE_Eqs.cSession{2} = AKE_ComputeRand.cSession{1} /\
-  AKE_Eqs.cH2{2} = AKE_ComputeRand.cH2{1} /\
-  AKE_Eqs.sH2{2} = AKE_ComputeRand.sH2{1} /\
-  AKE_Eqs.mSk{2} = AKE_ComputeRand.mSk{1} /\
-  AKE_Eqs.mEexp{2} = AKE_ComputeRand.mEexp{1} /\
-  AKE_Eqs.mStarted{2} = AKE_ComputeRand.mStarted{1} /\
-  AKE_Eqs.mCompleted{2} = AKE_ComputeRand.mCompleted{1} /\
-  (is_dom AKE_Eqs.sH2' AKE_Eqs.mH2){2} /\
-  (is_dom AKE_Eqs.sKeyRev AKE_Eqs.mKeyRev){2} /\
-  inv_split_dom AKE_ComputeRand.mH2{1} AKE_Eqs.mH2{2} AKE_Eqs.mKeyRev{2} 
-                AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} AKE_Eqs.mEexp{2}
-                AKE_Eqs.mSk{2} /\
-  inv_split_val1 AKE_ComputeRand.mH2{1} AKE_Eqs.mH2{2} /\
-  inv_split_val2 AKE_ComputeRand.mH2{1} AKE_Eqs.mKeyRev{2} 
-                 AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} AKE_Eqs.mEexp{2}
-                 AKE_Eqs.mSk{2} /\
-  is_sub_map AKE_Eqs.mCompleted{2} AKE_Eqs.mStarted{2} /\
-  is_sub_map AKE_Eqs.mKeyRev{2} AKE_Eqs.mCompleted{2} /\ 
-  univ_map AKE_Eqs.mEexp{2} /\
-  actor_valid AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} 
-              AKE_Eqs.mEexp{2} AKE_Eqs.mSk{2} /\
-  mSk_inv AKE_Eqs.mSk{2}.
+  AKE_find.t_idx{2} = AKE_ComputeRand.t_idx{1} /\
+  AKE_find.evs{2} = AKE_ComputeRand.evs{1} /\
+  AKE_find.test{2} = AKE_ComputeRand.test{1} /\
+  AKE_find.cSession{2} = AKE_ComputeRand.cSession{1} /\
+  AKE_find.cH2{2} = AKE_ComputeRand.cH2{1} /\
+  AKE_find.sH2{2} = AKE_ComputeRand.sH2{1} /\
+  AKE_find.mSk{2} = AKE_ComputeRand.mSk{1} /\
+  AKE_find.mEexp{2} = AKE_ComputeRand.mEexp{1} /\
+  AKE_find.mStarted{2} = AKE_ComputeRand.mStarted{1} /\
+  AKE_find.mCompleted{2} = AKE_ComputeRand.mCompleted{1} /\
+  (is_dom AKE_find.sH2' AKE_find.mH2){2} /\
+  (is_dom AKE_find.sKeyRev AKE_find.mKeyRev){2} /\
+  inv_split_dom AKE_ComputeRand.mH2{1} AKE_find.mH2{2} AKE_find.mKeyRev{2} 
+                AKE_find.mStarted{2} AKE_find.mCompleted{2} AKE_find.mEexp{2}
+                AKE_find.mSk{2} /\
+  inv_split_val1 AKE_ComputeRand.mH2{1} AKE_find.mH2{2} /\
+  inv_split_val2 AKE_ComputeRand.mH2{1} AKE_find.mKeyRev{2} 
+                 AKE_find.mStarted{2} AKE_find.mCompleted{2} AKE_find.mEexp{2}
+                 AKE_find.mSk{2} /\
+  is_sub_map AKE_find.mCompleted{2} AKE_find.mStarted{2} /\
+  is_sub_map AKE_find.mKeyRev{2} AKE_find.mCompleted{2} /\ 
+  univ_map AKE_find.mEexp{2} /\
+  actor_valid AKE_find.mStarted{2} AKE_find.mCompleted{2} 
+              AKE_find.mEexp{2} AKE_find.mSk{2} /\
+  mSk_inv AKE_find.mSk{2}.
 proof.
  by fun; sp; if => //; call AKE_RandCompute_Eqs_computeKey; wp; skip; progress.
 save.
  
 
 local equiv AKE_RandCompute_Eqs_choose : 
-AKE_ComputeRand(A).A.choose ~ AKE_Eqs(A).A.choose :
+AKE_ComputeRand(A).A.choose ~ AKE_find(A).A.choose :
   ={s, glob A} /\
-  AKE_Eqs.t_idx{2} = AKE_ComputeRand.t_idx{1} /\
-  AKE_Eqs.evs{2} = AKE_ComputeRand.evs{1} /\
-  AKE_Eqs.test{2} = AKE_ComputeRand.test{1} /\
-  AKE_Eqs.cSession{2} = AKE_ComputeRand.cSession{1} /\
-  AKE_Eqs.cH2{2} = AKE_ComputeRand.cH2{1} /\
-  AKE_Eqs.sH2{2} = AKE_ComputeRand.sH2{1} /\
-  AKE_Eqs.mSk{2} = AKE_ComputeRand.mSk{1} /\
-  AKE_Eqs.mEexp{2} = AKE_ComputeRand.mEexp{1} /\
-  AKE_Eqs.mStarted{2} = AKE_ComputeRand.mStarted{1} /\
-  AKE_Eqs.mCompleted{2} = AKE_ComputeRand.mCompleted{1} /\
-  (is_dom AKE_Eqs.sH2' AKE_Eqs.mH2){2} /\
-  (is_dom AKE_Eqs.sKeyRev AKE_Eqs.mKeyRev){2} /\
-  inv_split_dom AKE_ComputeRand.mH2{1} AKE_Eqs.mH2{2} AKE_Eqs.mKeyRev{2} 
-                AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} AKE_Eqs.mEexp{2}
-                AKE_Eqs.mSk{2} /\
-  inv_split_val1 AKE_ComputeRand.mH2{1} AKE_Eqs.mH2{2} /\
-  inv_split_val2 AKE_ComputeRand.mH2{1} AKE_Eqs.mKeyRev{2} 
-                 AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} AKE_Eqs.mEexp{2}
-                 AKE_Eqs.mSk{2} /\
-  is_sub_map AKE_Eqs.mCompleted{2} AKE_Eqs.mStarted{2} /\
-  is_sub_map AKE_Eqs.mKeyRev{2} AKE_Eqs.mCompleted{2} /\ 
-  univ_map AKE_Eqs.mEexp{2} /\
-  actor_valid AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} 
-              AKE_Eqs.mEexp{2} AKE_Eqs.mSk{2} /\
-  mSk_inv AKE_Eqs.mSk{2}  
+  AKE_find.t_idx{2} = AKE_ComputeRand.t_idx{1} /\
+  AKE_find.evs{2} = AKE_ComputeRand.evs{1} /\
+  AKE_find.test{2} = AKE_ComputeRand.test{1} /\
+  AKE_find.cSession{2} = AKE_ComputeRand.cSession{1} /\
+  AKE_find.cH2{2} = AKE_ComputeRand.cH2{1} /\
+  AKE_find.sH2{2} = AKE_ComputeRand.sH2{1} /\
+  AKE_find.mSk{2} = AKE_ComputeRand.mSk{1} /\
+  AKE_find.mEexp{2} = AKE_ComputeRand.mEexp{1} /\
+  AKE_find.mStarted{2} = AKE_ComputeRand.mStarted{1} /\
+  AKE_find.mCompleted{2} = AKE_ComputeRand.mCompleted{1} /\
+  (is_dom AKE_find.sH2' AKE_find.mH2){2} /\
+  (is_dom AKE_find.sKeyRev AKE_find.mKeyRev){2} /\
+  inv_split_dom AKE_ComputeRand.mH2{1} AKE_find.mH2{2} AKE_find.mKeyRev{2} 
+                AKE_find.mStarted{2} AKE_find.mCompleted{2} AKE_find.mEexp{2}
+                AKE_find.mSk{2} /\
+  inv_split_val1 AKE_ComputeRand.mH2{1} AKE_find.mH2{2} /\
+  inv_split_val2 AKE_ComputeRand.mH2{1} AKE_find.mKeyRev{2} 
+                 AKE_find.mStarted{2} AKE_find.mCompleted{2} AKE_find.mEexp{2}
+                 AKE_find.mSk{2} /\
+  is_sub_map AKE_find.mCompleted{2} AKE_find.mStarted{2} /\
+  is_sub_map AKE_find.mKeyRev{2} AKE_find.mCompleted{2} /\ 
+  univ_map AKE_find.mEexp{2} /\
+  actor_valid AKE_find.mStarted{2} AKE_find.mCompleted{2} 
+              AKE_find.mEexp{2} AKE_find.mSk{2} /\
+  mSk_inv AKE_find.mSk{2}  
  ==>
   ={res, glob A} /\
-  AKE_Eqs.t_idx{2} = AKE_ComputeRand.t_idx{1} /\
-  AKE_Eqs.evs{2} = AKE_ComputeRand.evs{1} /\
-  AKE_Eqs.test{2} = AKE_ComputeRand.test{1} /\
-  AKE_Eqs.cSession{2} = AKE_ComputeRand.cSession{1} /\
-  AKE_Eqs.cH2{2} = AKE_ComputeRand.cH2{1} /\
-  AKE_Eqs.sH2{2} = AKE_ComputeRand.sH2{1} /\
-  AKE_Eqs.mSk{2} = AKE_ComputeRand.mSk{1} /\
-  AKE_Eqs.mEexp{2} = AKE_ComputeRand.mEexp{1} /\
-  AKE_Eqs.mStarted{2} = AKE_ComputeRand.mStarted{1} /\
-  AKE_Eqs.mCompleted{2} = AKE_ComputeRand.mCompleted{1} /\
-  (is_dom AKE_Eqs.sH2' AKE_Eqs.mH2){2} /\
-  (is_dom AKE_Eqs.sKeyRev AKE_Eqs.mKeyRev){2} /\
-  inv_split_dom AKE_ComputeRand.mH2{1} AKE_Eqs.mH2{2} AKE_Eqs.mKeyRev{2} 
-                AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} AKE_Eqs.mEexp{2}
-                AKE_Eqs.mSk{2} /\
-  inv_split_val1 AKE_ComputeRand.mH2{1} AKE_Eqs.mH2{2} /\
-  inv_split_val2 AKE_ComputeRand.mH2{1} AKE_Eqs.mKeyRev{2} 
-                 AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} AKE_Eqs.mEexp{2}
-                 AKE_Eqs.mSk{2} /\
-  is_sub_map AKE_Eqs.mCompleted{2} AKE_Eqs.mStarted{2} /\
-  is_sub_map AKE_Eqs.mKeyRev{2} AKE_Eqs.mCompleted{2} /\ 
-  univ_map AKE_Eqs.mEexp{2} /\
-  actor_valid AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} 
-              AKE_Eqs.mEexp{2} AKE_Eqs.mSk{2} /\
-  mSk_inv AKE_Eqs.mSk{2}.
+  AKE_find.t_idx{2} = AKE_ComputeRand.t_idx{1} /\
+  AKE_find.evs{2} = AKE_ComputeRand.evs{1} /\
+  AKE_find.test{2} = AKE_ComputeRand.test{1} /\
+  AKE_find.cSession{2} = AKE_ComputeRand.cSession{1} /\
+  AKE_find.cH2{2} = AKE_ComputeRand.cH2{1} /\
+  AKE_find.sH2{2} = AKE_ComputeRand.sH2{1} /\
+  AKE_find.mSk{2} = AKE_ComputeRand.mSk{1} /\
+  AKE_find.mEexp{2} = AKE_ComputeRand.mEexp{1} /\
+  AKE_find.mStarted{2} = AKE_ComputeRand.mStarted{1} /\
+  AKE_find.mCompleted{2} = AKE_ComputeRand.mCompleted{1} /\
+  (is_dom AKE_find.sH2' AKE_find.mH2){2} /\
+  (is_dom AKE_find.sKeyRev AKE_find.mKeyRev){2} /\
+  inv_split_dom AKE_ComputeRand.mH2{1} AKE_find.mH2{2} AKE_find.mKeyRev{2} 
+                AKE_find.mStarted{2} AKE_find.mCompleted{2} AKE_find.mEexp{2}
+                AKE_find.mSk{2} /\
+  inv_split_val1 AKE_ComputeRand.mH2{1} AKE_find.mH2{2} /\
+  inv_split_val2 AKE_ComputeRand.mH2{1} AKE_find.mKeyRev{2} 
+                 AKE_find.mStarted{2} AKE_find.mCompleted{2} AKE_find.mEexp{2}
+                 AKE_find.mSk{2} /\
+  is_sub_map AKE_find.mCompleted{2} AKE_find.mStarted{2} /\
+  is_sub_map AKE_find.mKeyRev{2} AKE_find.mCompleted{2} /\ 
+  univ_map AKE_find.mEexp{2} /\
+  actor_valid AKE_find.mStarted{2} AKE_find.mCompleted{2} 
+              AKE_find.mEexp{2} AKE_find.mSk{2} /\
+  mSk_inv AKE_find.mSk{2}.
 proof.
- fun (AKE_Eqs.t_idx{2} = AKE_ComputeRand.t_idx{1} /\
-  AKE_Eqs.evs{2} = AKE_ComputeRand.evs{1} /\
-  AKE_Eqs.test{2} = AKE_ComputeRand.test{1} /\
-  AKE_Eqs.cSession{2} = AKE_ComputeRand.cSession{1} /\
-  AKE_Eqs.cH2{2} = AKE_ComputeRand.cH2{1} /\
-  AKE_Eqs.sH2{2} = AKE_ComputeRand.sH2{1} /\
-  AKE_Eqs.mSk{2} = AKE_ComputeRand.mSk{1} /\
-  AKE_Eqs.mEexp{2} = AKE_ComputeRand.mEexp{1} /\
-  AKE_Eqs.mStarted{2} = AKE_ComputeRand.mStarted{1} /\
-  AKE_Eqs.mCompleted{2} = AKE_ComputeRand.mCompleted{1} /\
-  (is_dom AKE_Eqs.sH2' AKE_Eqs.mH2){2} /\
-  (is_dom AKE_Eqs.sKeyRev AKE_Eqs.mKeyRev){2} /\
-  inv_split_dom AKE_ComputeRand.mH2{1} AKE_Eqs.mH2{2} AKE_Eqs.mKeyRev{2} 
-                AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} AKE_Eqs.mEexp{2}
-                AKE_Eqs.mSk{2} /\
-  inv_split_val1 AKE_ComputeRand.mH2{1} AKE_Eqs.mH2{2} /\
-  inv_split_val2 AKE_ComputeRand.mH2{1} AKE_Eqs.mKeyRev{2} 
-                 AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} AKE_Eqs.mEexp{2}
-                 AKE_Eqs.mSk{2} /\
-  is_sub_map AKE_Eqs.mCompleted{2} AKE_Eqs.mStarted{2} /\
-  is_sub_map AKE_Eqs.mKeyRev{2} AKE_Eqs.mCompleted{2} /\ 
-  univ_map AKE_Eqs.mEexp{2} /\
-  actor_valid AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} 
-              AKE_Eqs.mEexp{2} AKE_Eqs.mSk{2} /\
-  mSk_inv AKE_Eqs.mSk{2}) => //.
+ fun (AKE_find.t_idx{2} = AKE_ComputeRand.t_idx{1} /\
+  AKE_find.evs{2} = AKE_ComputeRand.evs{1} /\
+  AKE_find.test{2} = AKE_ComputeRand.test{1} /\
+  AKE_find.cSession{2} = AKE_ComputeRand.cSession{1} /\
+  AKE_find.cH2{2} = AKE_ComputeRand.cH2{1} /\
+  AKE_find.sH2{2} = AKE_ComputeRand.sH2{1} /\
+  AKE_find.mSk{2} = AKE_ComputeRand.mSk{1} /\
+  AKE_find.mEexp{2} = AKE_ComputeRand.mEexp{1} /\
+  AKE_find.mStarted{2} = AKE_ComputeRand.mStarted{1} /\
+  AKE_find.mCompleted{2} = AKE_ComputeRand.mCompleted{1} /\
+  (is_dom AKE_find.sH2' AKE_find.mH2){2} /\
+  (is_dom AKE_find.sKeyRev AKE_find.mKeyRev){2} /\
+  inv_split_dom AKE_ComputeRand.mH2{1} AKE_find.mH2{2} AKE_find.mKeyRev{2} 
+                AKE_find.mStarted{2} AKE_find.mCompleted{2} AKE_find.mEexp{2}
+                AKE_find.mSk{2} /\
+  inv_split_val1 AKE_ComputeRand.mH2{1} AKE_find.mH2{2} /\
+  inv_split_val2 AKE_ComputeRand.mH2{1} AKE_find.mKeyRev{2} 
+                 AKE_find.mStarted{2} AKE_find.mCompleted{2} AKE_find.mEexp{2}
+                 AKE_find.mSk{2} /\
+  is_sub_map AKE_find.mCompleted{2} AKE_find.mStarted{2} /\
+  is_sub_map AKE_find.mKeyRev{2} AKE_find.mCompleted{2} /\ 
+  univ_map AKE_find.mEexp{2} /\
+  actor_valid AKE_find.mStarted{2} AKE_find.mCompleted{2} 
+              AKE_find.mEexp{2} AKE_find.mSk{2} /\
+  mSk_inv AKE_find.mSk{2}) => //.
   by fun; wp.
-  apply AKE_RandCompute_Eqs_h2a.
   fun; wp; skip; progress; try assumption.
    apply inv_split_dom_updmStarted => //.
     apply not_def => h; generalize H11 => /=.
@@ -9216,91 +9076,92 @@ proof.
     intros => h''.
     by cut:= H7 j _.
   fun; wp; skip; progress; try assumption.
+  by apply AKE_RandCompute_Eqs_h2a.
   by apply AKE_RandCompute_Eqs_sessionRev.
 save.
 
 
 local equiv AKE_RandCompute_Eqs_guess : 
-AKE_ComputeRand(A).A.guess ~ AKE_Eqs(A).A.guess :
+AKE_ComputeRand(A).A.guess ~ AKE_find(A).A.guess :
   ={k, glob A} /\
-  AKE_Eqs.t_idx{2} = AKE_ComputeRand.t_idx{1} /\
-  AKE_Eqs.evs{2} = AKE_ComputeRand.evs{1} /\
-  AKE_Eqs.test{2} = AKE_ComputeRand.test{1} /\
-  AKE_Eqs.cSession{2} = AKE_ComputeRand.cSession{1} /\
-  AKE_Eqs.cH2{2} = AKE_ComputeRand.cH2{1} /\
-  AKE_Eqs.sH2{2} = AKE_ComputeRand.sH2{1} /\
-  AKE_Eqs.mSk{2} = AKE_ComputeRand.mSk{1} /\
-  AKE_Eqs.mEexp{2} = AKE_ComputeRand.mEexp{1} /\
-  AKE_Eqs.mStarted{2} = AKE_ComputeRand.mStarted{1} /\
-  AKE_Eqs.mCompleted{2} = AKE_ComputeRand.mCompleted{1} /\
-  (is_dom AKE_Eqs.sH2' AKE_Eqs.mH2){2} /\
-  (is_dom AKE_Eqs.sKeyRev AKE_Eqs.mKeyRev){2} /\
-  inv_split_dom AKE_ComputeRand.mH2{1} AKE_Eqs.mH2{2} AKE_Eqs.mKeyRev{2} 
-                AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} AKE_Eqs.mEexp{2}
-                AKE_Eqs.mSk{2} /\
-  inv_split_val1 AKE_ComputeRand.mH2{1} AKE_Eqs.mH2{2} /\
-  inv_split_val2 AKE_ComputeRand.mH2{1} AKE_Eqs.mKeyRev{2} 
-                 AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} AKE_Eqs.mEexp{2}
-                 AKE_Eqs.mSk{2} /\
-  is_sub_map AKE_Eqs.mCompleted{2} AKE_Eqs.mStarted{2} /\
-  is_sub_map AKE_Eqs.mKeyRev{2} AKE_Eqs.mCompleted{2} /\ 
-  univ_map AKE_Eqs.mEexp{2} /\
-  actor_valid AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} 
-              AKE_Eqs.mEexp{2} AKE_Eqs.mSk{2} /\
-  mSk_inv AKE_Eqs.mSk{2}  
+  AKE_find.t_idx{2} = AKE_ComputeRand.t_idx{1} /\
+  AKE_find.evs{2} = AKE_ComputeRand.evs{1} /\
+  AKE_find.test{2} = AKE_ComputeRand.test{1} /\
+  AKE_find.cSession{2} = AKE_ComputeRand.cSession{1} /\
+  AKE_find.cH2{2} = AKE_ComputeRand.cH2{1} /\
+  AKE_find.sH2{2} = AKE_ComputeRand.sH2{1} /\
+  AKE_find.mSk{2} = AKE_ComputeRand.mSk{1} /\
+  AKE_find.mEexp{2} = AKE_ComputeRand.mEexp{1} /\
+  AKE_find.mStarted{2} = AKE_ComputeRand.mStarted{1} /\
+  AKE_find.mCompleted{2} = AKE_ComputeRand.mCompleted{1} /\
+  (is_dom AKE_find.sH2' AKE_find.mH2){2} /\
+  (is_dom AKE_find.sKeyRev AKE_find.mKeyRev){2} /\
+  inv_split_dom AKE_ComputeRand.mH2{1} AKE_find.mH2{2} AKE_find.mKeyRev{2} 
+                AKE_find.mStarted{2} AKE_find.mCompleted{2} AKE_find.mEexp{2}
+                AKE_find.mSk{2} /\
+  inv_split_val1 AKE_ComputeRand.mH2{1} AKE_find.mH2{2} /\
+  inv_split_val2 AKE_ComputeRand.mH2{1} AKE_find.mKeyRev{2} 
+                 AKE_find.mStarted{2} AKE_find.mCompleted{2} AKE_find.mEexp{2}
+                 AKE_find.mSk{2} /\
+  is_sub_map AKE_find.mCompleted{2} AKE_find.mStarted{2} /\
+  is_sub_map AKE_find.mKeyRev{2} AKE_find.mCompleted{2} /\ 
+  univ_map AKE_find.mEexp{2} /\
+  actor_valid AKE_find.mStarted{2} AKE_find.mCompleted{2} 
+              AKE_find.mEexp{2} AKE_find.mSk{2} /\
+  mSk_inv AKE_find.mSk{2}  
  ==>
   ={res, glob A} /\
-  AKE_Eqs.t_idx{2} = AKE_ComputeRand.t_idx{1} /\
-  AKE_Eqs.evs{2} = AKE_ComputeRand.evs{1} /\
-  AKE_Eqs.test{2} = AKE_ComputeRand.test{1} /\
-  AKE_Eqs.cSession{2} = AKE_ComputeRand.cSession{1} /\
-  AKE_Eqs.cH2{2} = AKE_ComputeRand.cH2{1} /\
-  AKE_Eqs.sH2{2} = AKE_ComputeRand.sH2{1} /\
-  AKE_Eqs.mSk{2} = AKE_ComputeRand.mSk{1} /\
-  AKE_Eqs.mEexp{2} = AKE_ComputeRand.mEexp{1} /\
-  AKE_Eqs.mStarted{2} = AKE_ComputeRand.mStarted{1} /\
-  AKE_Eqs.mCompleted{2} = AKE_ComputeRand.mCompleted{1} /\
-  (is_dom AKE_Eqs.sH2' AKE_Eqs.mH2){2} /\
-  (is_dom AKE_Eqs.sKeyRev AKE_Eqs.mKeyRev){2} /\
-  inv_split_dom AKE_ComputeRand.mH2{1} AKE_Eqs.mH2{2} AKE_Eqs.mKeyRev{2} 
-                AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} AKE_Eqs.mEexp{2}
-                AKE_Eqs.mSk{2} /\
-  inv_split_val1 AKE_ComputeRand.mH2{1} AKE_Eqs.mH2{2} /\
-  inv_split_val2 AKE_ComputeRand.mH2{1} AKE_Eqs.mKeyRev{2} 
-                 AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} AKE_Eqs.mEexp{2}
-                 AKE_Eqs.mSk{2} /\
-  is_sub_map AKE_Eqs.mCompleted{2} AKE_Eqs.mStarted{2} /\
-  is_sub_map AKE_Eqs.mKeyRev{2} AKE_Eqs.mCompleted{2} /\ 
-  univ_map AKE_Eqs.mEexp{2} /\
-  actor_valid AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} 
-              AKE_Eqs.mEexp{2} AKE_Eqs.mSk{2} /\
-  mSk_inv AKE_Eqs.mSk{2}.
+  AKE_find.t_idx{2} = AKE_ComputeRand.t_idx{1} /\
+  AKE_find.evs{2} = AKE_ComputeRand.evs{1} /\
+  AKE_find.test{2} = AKE_ComputeRand.test{1} /\
+  AKE_find.cSession{2} = AKE_ComputeRand.cSession{1} /\
+  AKE_find.cH2{2} = AKE_ComputeRand.cH2{1} /\
+  AKE_find.sH2{2} = AKE_ComputeRand.sH2{1} /\
+  AKE_find.mSk{2} = AKE_ComputeRand.mSk{1} /\
+  AKE_find.mEexp{2} = AKE_ComputeRand.mEexp{1} /\
+  AKE_find.mStarted{2} = AKE_ComputeRand.mStarted{1} /\
+  AKE_find.mCompleted{2} = AKE_ComputeRand.mCompleted{1} /\
+  (is_dom AKE_find.sH2' AKE_find.mH2){2} /\
+  (is_dom AKE_find.sKeyRev AKE_find.mKeyRev){2} /\
+  inv_split_dom AKE_ComputeRand.mH2{1} AKE_find.mH2{2} AKE_find.mKeyRev{2} 
+                AKE_find.mStarted{2} AKE_find.mCompleted{2} AKE_find.mEexp{2}
+                AKE_find.mSk{2} /\
+  inv_split_val1 AKE_ComputeRand.mH2{1} AKE_find.mH2{2} /\
+  inv_split_val2 AKE_ComputeRand.mH2{1} AKE_find.mKeyRev{2} 
+                 AKE_find.mStarted{2} AKE_find.mCompleted{2} AKE_find.mEexp{2}
+                 AKE_find.mSk{2} /\
+  is_sub_map AKE_find.mCompleted{2} AKE_find.mStarted{2} /\
+  is_sub_map AKE_find.mKeyRev{2} AKE_find.mCompleted{2} /\ 
+  univ_map AKE_find.mEexp{2} /\
+  actor_valid AKE_find.mStarted{2} AKE_find.mCompleted{2} 
+              AKE_find.mEexp{2} AKE_find.mSk{2} /\
+  mSk_inv AKE_find.mSk{2}.
 proof.
- fun (AKE_Eqs.t_idx{2} = AKE_ComputeRand.t_idx{1} /\
-  AKE_Eqs.evs{2} = AKE_ComputeRand.evs{1} /\
-  AKE_Eqs.test{2} = AKE_ComputeRand.test{1} /\
-  AKE_Eqs.cSession{2} = AKE_ComputeRand.cSession{1} /\
-  AKE_Eqs.cH2{2} = AKE_ComputeRand.cH2{1} /\
-  AKE_Eqs.sH2{2} = AKE_ComputeRand.sH2{1} /\
-  AKE_Eqs.mSk{2} = AKE_ComputeRand.mSk{1} /\
-  AKE_Eqs.mEexp{2} = AKE_ComputeRand.mEexp{1} /\
-  AKE_Eqs.mStarted{2} = AKE_ComputeRand.mStarted{1} /\
-  AKE_Eqs.mCompleted{2} = AKE_ComputeRand.mCompleted{1} /\
-  (is_dom AKE_Eqs.sH2' AKE_Eqs.mH2){2} /\
-  (is_dom AKE_Eqs.sKeyRev AKE_Eqs.mKeyRev){2} /\
-  inv_split_dom AKE_ComputeRand.mH2{1} AKE_Eqs.mH2{2} AKE_Eqs.mKeyRev{2} 
-                AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} AKE_Eqs.mEexp{2}
-                AKE_Eqs.mSk{2} /\
-  inv_split_val1 AKE_ComputeRand.mH2{1} AKE_Eqs.mH2{2} /\
-  inv_split_val2 AKE_ComputeRand.mH2{1} AKE_Eqs.mKeyRev{2} 
-                 AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} AKE_Eqs.mEexp{2}
-                 AKE_Eqs.mSk{2} /\
-  is_sub_map AKE_Eqs.mCompleted{2} AKE_Eqs.mStarted{2} /\
-  is_sub_map AKE_Eqs.mKeyRev{2} AKE_Eqs.mCompleted{2} /\ 
-  univ_map AKE_Eqs.mEexp{2} /\
-  actor_valid AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} 
-              AKE_Eqs.mEexp{2} AKE_Eqs.mSk{2} /\
-  mSk_inv AKE_Eqs.mSk{2}) => //.
+ fun (AKE_find.t_idx{2} = AKE_ComputeRand.t_idx{1} /\
+  AKE_find.evs{2} = AKE_ComputeRand.evs{1} /\
+  AKE_find.test{2} = AKE_ComputeRand.test{1} /\
+  AKE_find.cSession{2} = AKE_ComputeRand.cSession{1} /\
+  AKE_find.cH2{2} = AKE_ComputeRand.cH2{1} /\
+  AKE_find.sH2{2} = AKE_ComputeRand.sH2{1} /\
+  AKE_find.mSk{2} = AKE_ComputeRand.mSk{1} /\
+  AKE_find.mEexp{2} = AKE_ComputeRand.mEexp{1} /\
+  AKE_find.mStarted{2} = AKE_ComputeRand.mStarted{1} /\
+  AKE_find.mCompleted{2} = AKE_ComputeRand.mCompleted{1} /\
+  (is_dom AKE_find.sH2' AKE_find.mH2){2} /\
+  (is_dom AKE_find.sKeyRev AKE_find.mKeyRev){2} /\
+  inv_split_dom AKE_ComputeRand.mH2{1} AKE_find.mH2{2} AKE_find.mKeyRev{2} 
+                AKE_find.mStarted{2} AKE_find.mCompleted{2} AKE_find.mEexp{2}
+                AKE_find.mSk{2} /\
+  inv_split_val1 AKE_ComputeRand.mH2{1} AKE_find.mH2{2} /\
+  inv_split_val2 AKE_ComputeRand.mH2{1} AKE_find.mKeyRev{2} 
+                 AKE_find.mStarted{2} AKE_find.mCompleted{2} AKE_find.mEexp{2}
+                 AKE_find.mSk{2} /\
+  is_sub_map AKE_find.mCompleted{2} AKE_find.mStarted{2} /\
+  is_sub_map AKE_find.mKeyRev{2} AKE_find.mCompleted{2} /\ 
+  univ_map AKE_find.mEexp{2} /\
+  actor_valid AKE_find.mStarted{2} AKE_find.mCompleted{2} 
+              AKE_find.mEexp{2} AKE_find.mSk{2} /\
+  mSk_inv AKE_find.mSk{2}) => //.
   by fun; wp.
   apply AKE_RandCompute_Eqs_h2a.
   fun; wp; skip; progress; try assumption.
@@ -9367,7 +9228,7 @@ save.
 
 
 local equiv AKE_RandCompute_Eqs : 
-AKE_ComputeRand(A).main ~ AKE_Eqs(A).main :
+AKE_ComputeRand(A).main ~ AKE_find(A).main :
 ={glob A} ==>
 (AKE_ComputeRand.test <> None /\ 
 in_dom AKE_ComputeRand.t_idx AKE_ComputeRand.mCompleted /\
@@ -9376,84 +9237,84 @@ mem
   AKE_ComputeRand.mCompleted AKE_ComputeRand.mEexp AKE_ComputeRand.mSk) 
 AKE_ComputeRand.sH2 /\
 fresh_op (compute_sid AKE_ComputeRand.mStarted AKE_ComputeRand.mEexp AKE_ComputeRand.mCompleted AKE_ComputeRand.t_idx) AKE_ComputeRand.evs){1} <=>
-(AKE_Eqs.test <> None /\ 
-in_dom AKE_Eqs.t_idx AKE_Eqs.mCompleted /\
+(AKE_find.test <> None /\ 
+in_dom AKE_find.t_idx AKE_find.mCompleted /\
 mem
-(get_string_from_id AKE_Eqs.t_idx AKE_Eqs.mStarted 
-  AKE_Eqs.mCompleted AKE_Eqs.mEexp AKE_Eqs.mSk) 
-AKE_Eqs.sH2 /\
-fresh_op (compute_sid AKE_Eqs.mStarted AKE_Eqs.mEexp AKE_Eqs.mCompleted AKE_Eqs.t_idx) AKE_Eqs.evs){2}.
+(get_string_from_id AKE_find.t_idx AKE_find.mStarted 
+  AKE_find.mCompleted AKE_find.mEexp AKE_find.mSk) 
+AKE_find.sH2 /\
+fresh_op (compute_sid AKE_find.mStarted AKE_find.mEexp AKE_find.mCompleted AKE_find.t_idx) AKE_find.evs){2}.
 proof.
  fun.
   seq 14 17:
 (={b,pks,key,keyo,b',i,pks, glob A} /\
-  AKE_Eqs.t_idx{2} = AKE_ComputeRand.t_idx{1} /\
-  AKE_Eqs.evs{2} = AKE_ComputeRand.evs{1} /\
-  AKE_Eqs.test{2} = AKE_ComputeRand.test{1} /\
-  AKE_Eqs.cSession{2} = AKE_ComputeRand.cSession{1} /\
-  AKE_Eqs.cH2{2} = AKE_ComputeRand.cH2{1} /\
-  AKE_Eqs.mH2{2} = AKE_ComputeRand.mH2{1} /\
-  AKE_Eqs.sH2{2} = AKE_ComputeRand.sH2{1} /\
-  AKE_Eqs.mSk{2} = AKE_ComputeRand.mSk{1} /\
-  AKE_Eqs.mEexp{2} = AKE_ComputeRand.mEexp{1} /\
-  AKE_Eqs.mStarted{2} = AKE_ComputeRand.mStarted{1} /\
-  AKE_Eqs.mCompleted{2} = AKE_ComputeRand.mCompleted{1} /\
-  AKE_Eqs.mH2{2} = Map.empty /\
-  AKE_Eqs.sH2{2} = FSet.empty /\
-  AKE_Eqs.mCompleted{2} = Map.empty /\
-  AKE_Eqs.mStarted{2} = Map.empty /\
+  AKE_find.t_idx{2} = AKE_ComputeRand.t_idx{1} /\
+  AKE_find.evs{2} = AKE_ComputeRand.evs{1} /\
+  AKE_find.test{2} = AKE_ComputeRand.test{1} /\
+  AKE_find.cSession{2} = AKE_ComputeRand.cSession{1} /\
+  AKE_find.cH2{2} = AKE_ComputeRand.cH2{1} /\
+  AKE_find.mH2{2} = AKE_ComputeRand.mH2{1} /\
+  AKE_find.sH2{2} = AKE_ComputeRand.sH2{1} /\
+  AKE_find.mSk{2} = AKE_ComputeRand.mSk{1} /\
+  AKE_find.mEexp{2} = AKE_ComputeRand.mEexp{1} /\
+  AKE_find.mStarted{2} = AKE_ComputeRand.mStarted{1} /\
+  AKE_find.mCompleted{2} = AKE_ComputeRand.mCompleted{1} /\
+  AKE_find.mH2{2} = Map.empty /\
+  AKE_find.sH2{2} = FSet.empty /\
+  AKE_find.mCompleted{2} = Map.empty /\
+  AKE_find.mStarted{2} = Map.empty /\
   AKE_ComputeRand.test{1} = None /\
-  mSk_inv AKE_Eqs.mSk{2} /\
-  AKE_Eqs.sH2'{2} = FSet.empty /\
-  AKE_Eqs.sKeyRev{2} = FSet.empty /\
-  AKE_Eqs.mKeyRev{2} = Map.empty /\
-  univ_map AKE_Eqs.mEexp{2}).
+  mSk_inv AKE_find.mSk{2} /\
+  AKE_find.sH2'{2} = FSet.empty /\
+  AKE_find.sKeyRev{2} = FSet.empty /\
+  AKE_find.mKeyRev{2} = Map.empty /\
+  univ_map AKE_find.mEexp{2}).
 while (  ={sidxs} /\
-AKE_ComputeRand.mEexp{1} = AKE_Eqs.mEexp{2}  /\
-  (forall (s : Sidx), !mem s sidxs{2} => in_dom s AKE_Eqs.mEexp{2})).
+AKE_ComputeRand.mEexp{1} = AKE_find.mEexp{2}  /\
+  (forall (s : Sidx), !mem s sidxs{2} => in_dom s AKE_find.mEexp{2})).
  wp; rnd; wp; skip; progress => //.
  generalize H5; rewrite mem_rm not_and => [|] h.
  by rewrite in_dom_set; left; apply H.
  rewrite in_dom_set; right; smt.
- while (={pks, i} /\   AKE_ComputeRand.mSk{1} = AKE_Eqs.mSk{2} /\ 
-         mSk_inv AKE_Eqs.mSk{2} ).
+ while (={pks, i} /\   AKE_ComputeRand.mSk{1} = AKE_find.mSk{2} /\ 
+         mSk_inv AKE_find.mSk{2} ).
  wp; rnd; skip; progress => //.
  rewrite /mSk_inv => s; rewrite in_dom_set.
   case (gen_pk skaL = s).
   by intros => <- _; rewrite get_setE proj_some.
   intros => h [|] h'; last smt.
   by rewrite get_setNE //; apply H.
- inline AKE_ComputeRand(A).init AKE_Eqs(A).init.
+ inline AKE_ComputeRand(A).init AKE_find(A).init.
  by wp; skip; progress; smt.
  if => //; last by rnd; skip; progress => //.
 seq 1 1:
   ( ={glob A} /\
-  AKE_Eqs.t_idx{2} = AKE_ComputeRand.t_idx{1} /\
-  AKE_Eqs.evs{2} = AKE_ComputeRand.evs{1} /\
-  AKE_Eqs.test{2} = AKE_ComputeRand.test{1} /\
-  AKE_Eqs.cSession{2} = AKE_ComputeRand.cSession{1} /\
-  AKE_Eqs.cH2{2} = AKE_ComputeRand.cH2{1} /\
-  AKE_Eqs.sH2{2} = AKE_ComputeRand.sH2{1} /\
-  AKE_Eqs.mSk{2} = AKE_ComputeRand.mSk{1} /\
-  AKE_Eqs.mEexp{2} = AKE_ComputeRand.mEexp{1} /\
-  AKE_Eqs.mStarted{2} = AKE_ComputeRand.mStarted{1} /\
-  AKE_Eqs.mCompleted{2} = AKE_ComputeRand.mCompleted{1} /\
-  (is_dom AKE_Eqs.sH2' AKE_Eqs.mH2){2} /\
-  (is_dom AKE_Eqs.sKeyRev AKE_Eqs.mKeyRev){2} /\
-  inv_split_dom AKE_ComputeRand.mH2{1} AKE_Eqs.mH2{2} AKE_Eqs.mKeyRev{2} 
-                AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} AKE_Eqs.mEexp{2}
-                AKE_Eqs.mSk{2} /\
-  inv_split_val1 AKE_ComputeRand.mH2{1} AKE_Eqs.mH2{2} /\
-  inv_split_val2 AKE_ComputeRand.mH2{1} AKE_Eqs.mKeyRev{2} 
-                 AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} AKE_Eqs.mEexp{2}
-                 AKE_Eqs.mSk{2} /\
-  is_sub_map AKE_Eqs.mCompleted{2} AKE_Eqs.mStarted{2} /\
-  is_sub_map AKE_Eqs.mKeyRev{2} AKE_Eqs.mCompleted{2} /\ 
-  univ_map AKE_Eqs.mEexp{2} /\
-  actor_valid AKE_Eqs.mStarted{2} AKE_Eqs.mCompleted{2} 
-              AKE_Eqs.mEexp{2} AKE_Eqs.mSk{2} /\
-  mSk_inv AKE_Eqs.mSk{2} /\
-  univ_map AKE_Eqs.mEexp{2}).
+  AKE_find.t_idx{2} = AKE_ComputeRand.t_idx{1} /\
+  AKE_find.evs{2} = AKE_ComputeRand.evs{1} /\
+  AKE_find.test{2} = AKE_ComputeRand.test{1} /\
+  AKE_find.cSession{2} = AKE_ComputeRand.cSession{1} /\
+  AKE_find.cH2{2} = AKE_ComputeRand.cH2{1} /\
+  AKE_find.sH2{2} = AKE_ComputeRand.sH2{1} /\
+  AKE_find.mSk{2} = AKE_ComputeRand.mSk{1} /\
+  AKE_find.mEexp{2} = AKE_ComputeRand.mEexp{1} /\
+  AKE_find.mStarted{2} = AKE_ComputeRand.mStarted{1} /\
+  AKE_find.mCompleted{2} = AKE_ComputeRand.mCompleted{1} /\
+  (is_dom AKE_find.sH2' AKE_find.mH2){2} /\
+  (is_dom AKE_find.sKeyRev AKE_find.mKeyRev){2} /\
+  inv_split_dom AKE_ComputeRand.mH2{1} AKE_find.mH2{2} AKE_find.mKeyRev{2} 
+                AKE_find.mStarted{2} AKE_find.mCompleted{2} AKE_find.mEexp{2}
+                AKE_find.mSk{2} /\
+  inv_split_val1 AKE_ComputeRand.mH2{1} AKE_find.mH2{2} /\
+  inv_split_val2 AKE_ComputeRand.mH2{1} AKE_find.mKeyRev{2} 
+                 AKE_find.mStarted{2} AKE_find.mCompleted{2} AKE_find.mEexp{2}
+                 AKE_find.mSk{2} /\
+  is_sub_map AKE_find.mCompleted{2} AKE_find.mStarted{2} /\
+  is_sub_map AKE_find.mKeyRev{2} AKE_find.mCompleted{2} /\ 
+  univ_map AKE_find.mEexp{2} /\
+  actor_valid AKE_find.mStarted{2} AKE_find.mCompleted{2} 
+              AKE_find.mEexp{2} AKE_find.mSk{2} /\
+  mSk_inv AKE_find.mSk{2} /\
+  univ_map AKE_find.mEexp{2}).
 call AKE_RandCompute_Eqs_choose; skip; progress => //.
  rewrite /is_dom; smt. 
  rewrite /is_dom; smt.
@@ -9478,12 +9339,12 @@ AKE_ComputeRand.sH2 /\
 fresh_op (compute_sid AKE_ComputeRand.mStarted AKE_ComputeRand.mEexp 
                       AKE_ComputeRand.mCompleted AKE_ComputeRand.t_idx)  
         AKE_ComputeRand.evs] =
-Pr[AKE_Eqs(A).main() @ &m : 
-AKE_Eqs.test <> None /\ 
-in_dom AKE_Eqs.t_idx AKE_Eqs.mCompleted /\ 
-mem (get_string_from_id AKE_Eqs.t_idx AKE_Eqs.mStarted AKE_Eqs.mCompleted 
-                        AKE_Eqs.mEexp AKE_Eqs.mSk) AKE_Eqs.sH2 /\ 
-fresh_op (compute_sid AKE_Eqs.mStarted AKE_Eqs.mEexp AKE_Eqs.mCompleted AKE_Eqs.t_idx) AKE_Eqs.evs].
+Pr[AKE_find(A).main() @ &m : 
+AKE_find.test <> None /\ 
+in_dom AKE_find.t_idx AKE_find.mCompleted /\ 
+mem (get_string_from_id AKE_find.t_idx AKE_find.mStarted AKE_find.mCompleted 
+                        AKE_find.mEexp AKE_find.mSk) AKE_find.sH2 /\ 
+fresh_op (compute_sid AKE_find.mStarted AKE_find.mEexp AKE_find.mCompleted AKE_find.t_idx) AKE_find.evs].
 proof.
  intros => &m.
  by equiv_deno AKE_RandCompute_Eqs.
@@ -9494,17 +9355,1879 @@ Pr[AKE_EexpRev(A).main() @ &m : res /\ test_fresh AKE_EexpRev.test AKE_EexpRev.e
                     /\ ! collision_eexp_eexp(AKE_EexpRev.mEexp) 
                     /\ ! collision_eexp_rcvd(AKE_EexpRev.evs)] <=
 1%r/2%r + 
-Pr[AKE_Eqs(A).main() @ &m : 
-AKE_Eqs.test <> None /\ 
-in_dom AKE_Eqs.t_idx AKE_Eqs.mCompleted /\ 
+Pr[AKE_find(A).main() @ &m : 
+AKE_find.test <> None /\ 
+in_dom AKE_find.t_idx AKE_find.mCompleted /\ 
 mem
-(get_string_from_id AKE_Eqs.t_idx AKE_Eqs.mStarted 
-  AKE_Eqs.mCompleted AKE_Eqs.mEexp AKE_Eqs.mSk) 
-AKE_Eqs.sH2 /\
-fresh_op (compute_sid AKE_Eqs.mStarted AKE_Eqs.mEexp AKE_Eqs.mCompleted AKE_Eqs.t_idx) AKE_Eqs.evs].
+(get_string_from_id AKE_find.t_idx AKE_find.mStarted 
+  AKE_find.mCompleted AKE_find.mEexp AKE_find.mSk) 
+AKE_find.sH2 /\
+fresh_op (compute_sid AKE_find.mStarted AKE_find.mEexp AKE_find.mCompleted AKE_find.t_idx) AKE_find.evs].
 proof. 
  intros => &m.
  rewrite -(Pr4 &m).
  apply (Pr_sofar1 &m).
 save.
 
+
+local module AKE2toAKE3(O3 : AKE_Oracles3) : Adv3(O3) = {
+  var evs  : Event list               (* events for queries performed by adversary *)
+  var test : Sid option               (* session id of test session *)
+
+  var cH2 : int        (* counters for queries *)
+
+  var mH2 : (Sstring, Key) map        (* map for h2 *)
+  var sH2 : Sstring set               (* adversary queries for h2 *)
+
+  var mStarted   : (Sidx, Sdata2) map (* map of started sessions *)
+  var mEPK       : (Sidx, Epk) map (* in_dom i mEPK => 
+                                         mEPK.[i] =gen_exp (mEexp.[i]) *)
+  var mCompleted : (Sidx, Epk)   map  (* additional data for completed sessions *)
+  var mKeyRev    : (Sidx, Key) map    (* maps id's to revealed keys *)
+  var sKeyRev    : Sidx set           (* set of id's revealed (dom of mKeyrev) *)
+  var sH2'       : Sstring set        (* exactly dom(mH2) *)
+  var t_idx : Sidx  
+
+
+  module O2 : AKE_Oracles2 = {
+    fun eexpRev(i : Sidx, a : Sk) : Eexp option = {
+      var r : Eexp option = None;
+      var p1 : Agent = def;
+      var p2 : Agent;
+      var pr : Role;
+      var msgX : Epk;
+      if (in_dom i mStarted) {
+       (p1, p2, pr) = proj (mStarted.[i]);
+       msgX = proj mEPK.[i];
+       if (test <> None => fresh_op (proj test) 
+               (EphemeralRev(p1, p2, msgX, pr)::evs )) {
+        r = O3.eexpRev(i,a);
+        evs =EphemeralRev(p1, p2, msgX, pr)::evs;
+     }
+    }
+      return r;
+   }
+
+    fun find_id (sstr : Sstring, s : Sidx set) : Sidx option = {
+      var aux : Sidx set = s;
+      var ret = None;
+      var i : Sidx = def;
+      var b : bool option = None;
+      while (aux <> FSet.empty /\ ret = None) {
+       i = pick aux;
+       aux = rm i aux;
+       b = O3.eqS(i, sstr);
+       ret = (b <> None && (proj b)) ? Some i : None;
+     }
+     return ret;
+    }
+    
+    fun h2(sstring : Sstring) : Key = {
+      var ke : Key;
+      var s : Sidx option = None;
+      var ret : Key;
+      ke = $sample_Key;
+      if (in_dom sstring mH2) {
+        ret = proj mH2.[sstring];
+      } else {
+       s = find_id(sstring, sKeyRev);
+       if (s <> None) { ret = proj mKeyRev.[proj s];}
+       else {
+        ret = ke;
+        mH2.[sstring] = ke;
+        sH2' = add sstring sH2';
+       }
+      }
+      return ret;
+    }
+ 
+    fun h2_a(sstring : Sstring) : Key option = {
+      var r : Key option = None;
+      var ks : Key;
+      if (cH2 < qH2) {
+        cH2 = cH2 + 1;
+        sH2 = add sstring sH2;
+        ks = h2(sstring);
+        r = Some(ks);
+      }
+      return r;
+    }
+
+    fun init1(i : Sidx, A : Agent, B : Agent) : Epk option = {
+      var pX : Epk;
+      var r : Epk option = None; 
+      r = O3.init1(i, A, B);
+      if (r <> None) {
+        pX = proj r;
+        evs = Start((A,B,pX,init))::evs;
+        mStarted.[i] = (A,B,init);
+        mEPK.[i] = pX;
+      }
+      return r;
+    }
+
+    fun resp(i : Sidx, B : Agent, A : Agent, X : Epk) : Epk option = {
+      var pY : Epk;
+      var r : Epk option = None;
+      r = O3.resp(i, B, A, X);
+      if (r <> None) {
+        pY = proj r;
+        mStarted.[i] = (B,A,resp);
+        mCompleted.[i] = X;
+        mEPK.[i] = pY;
+        evs = Accept((B,A,pY,X,resp))::evs;
+      }
+      return r;
+    }
+
+    fun init2(i : Sidx, Y : Epk) : unit = {
+      var p1, p2 : Agent;
+      var r : Role;
+      var msgX : Epk;
+      if (!in_dom i mCompleted /\ in_dom i mStarted) {
+      (p1, p2, r) = proj mStarted.[i];
+      msgX = proj mEPK.[i];
+       if (test <> None => fresh_op (proj test) 
+               (Accept(p1, p2, msgX, Y, r)::evs )) {
+          mCompleted.[i] = Y;
+          evs = Accept(p1, p2, msgX, Y, r)::evs;
+          O3.init2(i, Y);
+      }
+     }
+    }
+
+    fun staticRev(A : Agent) : Sk option = {
+      var r : Sk option = None;
+      if (((test <> None => 
+        fresh_op (proj test) (StaticRev A::evs )))) {
+        r = O3.staticRev(A);
+        if (r <> None) evs = StaticRev(A)::evs;
+      }
+      return r;
+    }
+
+    fun find_string (id : Sidx, sstr : Sstring set) : Sstring option = {
+      var aux : Sstring set = sstr;
+      var ret = None;
+      var str : Sstring = def;
+      var b : bool option = None;
+      while (aux <> FSet.empty /\ ret = None) {
+       str = pick aux;
+       aux = rm str aux;
+       b = O3.eqS(id, str);
+       ret = (b <> None && (proj b)) ? Some str : None;
+     }
+     return ret;
+    }
+    
+    fun find_matching (id : Sidx, id_set : Sidx set) : Sidx option = {
+     var p1, p2 : Agent;
+     var mX, mY : Epk;
+     var r : Role;
+     var sid, sid' : Sid;
+     var aux = id_set;
+     var ret = None;
+     var j : Sidx;
+     (p1, p2, r) = proj mStarted.[id];
+     mX = proj mEPK.[id];
+     mY = proj mCompleted.[id];
+     sid = (p1, p2, mX, mY, r);
+     while (aux <> FSet.empty /\ ret = None) {
+      j = pick aux;
+      aux = rm j aux;
+      (p1, p2, r) = proj mStarted.[j];
+      mX = proj mEPK.[j];
+      mY = proj mCompleted.[j];
+      sid' = (p1, p2, mX, mY, r);
+      if (sid' = sid \/ cmatching sid' = sid ) ret = Some j;
+     }
+     return ret;
+    }
+
+    fun computeKey(i : Sidx) : Key option = {
+      var r : Key option = None;
+      var k : Key;
+      var ret = None;
+      var str = None; 
+      var j : Sidx option;
+      if (in_dom i mCompleted) {
+        k = $sample_Key;
+        if (in_dom i mKeyRev) {
+         ret = mKeyRev.[i];
+        } else {
+         j = find_matching (i, sKeyRev);
+         if (j <> None) {
+          ret = mKeyRev.[proj j];
+         } else {
+          str = find_string (i, sH2');
+          if (str <> None) {
+           ret = mH2.[proj str];
+          } else {
+           ret = Some k;
+           mKeyRev.[i] = k;
+           sKeyRev = add i sKeyRev;
+          }
+         }
+        }
+       }
+    return ret;
+   }
+
+    fun sessionRev(i : Sidx) : Key option = {
+     var r : Key option = None;
+     var p1, p2 : Agent;
+     var mX, mY : Epk;
+     var r' : Role;
+     var sid : Sid;
+     if (in_dom i mCompleted) {
+      (p1, p2, r') = proj mStarted.[i];
+      mX = proj mEPK.[i];
+      mY = proj mCompleted.[i];
+      sid = (p1, p2, mX, mY, r');
+      if ((test <> None) => fresh_op (proj test) ((SessionRev sid)::evs) ) {
+        r = computeKey(i);
+        evs = SessionRev(sid)::evs;
+      }
+     }
+       return r;
+   }
+ }
+ fun init() : unit ={
+  evs = [];
+  test = None;
+  mH2 = Map.empty;
+  sH2 = FSet.empty;
+  mStarted = Map.empty;
+  mEPK = Map.empty;
+  mCompleted = Map.empty;
+  mKeyRev = Map.empty;
+  sKeyRev = FSet.empty;
+  sH2' = FSet.empty;
+  t_idx = def;
+  cH2 = 0;
+ }
+ module FA = A(O2)
+ fun guess(s : Pk list) : (Sstring list * Sidx) = {
+  var p1, p2 : Agent;
+  var mX, mY : Epk;
+  var r' : Role;
+  var sid : Sid;
+  var b : bool;
+  var key : Key;
+  init();
+  t_idx = FA.choose(s);
+  if (mStarted.[t_idx] <> None && mCompleted.[t_idx] <> None) {
+      (p1, p2, r') = proj mStarted.[t_idx];
+      mX = proj mEPK.[t_idx];
+      mY = proj mCompleted.[t_idx];
+      sid = (p1, p2, mX, mY, r'); 
+      if (fresh_op sid evs) {
+       test = Some sid;
+       key  = $sample_Key;
+       b = FA.guess(Some key);
+      }
+   }
+   return (FSet.elems sH2, t_idx);
+  }
+}.
+
+require import Pair.
+
+pred inv_EPK (mEexp : (Sidx, Eexp)  map) mEPK = 
+forall (i : Sidx), in_dom i mEPK => proj mEPK.[i] = gen_epk (proj mEexp.[i]).
+
+pred inv_KeyRev (mKeyRev: (Sidx, Key) map) (evs : Event list) (mStarted :  (Sidx, Sdata2) map)
+                 (mCompleted : (Sidx, Epk) map) mEexp =
+forall i, in_dom i mKeyRev => mem (SessionRev (compute_sid mStarted mEexp mCompleted i)) evs.
+
+
+local equiv AKE_find_eqS_find_id : 
+AKE_find(A).O.find_id ~ AKE2toAKE3(AKE_eqS(AKE2toAKE3).O).O2.find_id :
+   ={sstr, s} /\
+   is_dom s{1} AKE_find.mKeyRev{1} /\
+   AKE_find.sH2'{1} =  AKE2toAKE3.sH2'{2} /\
+   AKE_find.sKeyRev{1} = AKE2toAKE3.sKeyRev{2} /\
+   AKE_find.mKeyRev{1} = AKE2toAKE3.mKeyRev{2} /\
+    AKE_find.evs{1} = AKE2toAKE3.evs{2} /\
+   tr_sim AKE2toAKE3.evs{2} AKE_eqS.evs{2} /\
+   AKE_find.test{1} = AKE2toAKE3.test{2} /\
+   AKE_find.cH2{1} = AKE2toAKE3.cH2{2} /\
+   AKE_find.mH2{1} = AKE2toAKE3.mH2{2} /\
+   AKE_find.sH2{1} = AKE2toAKE3.sH2{2} /\
+   AKE_find.mSk{1} = AKE_eqS.mSk{2} /\
+   AKE_find.mEexp{1} = AKE_eqS.mEexp{2} /\
+   AKE_find.mStarted{1} = AKE_eqS.mStarted{2} /\
+   AKE_find.mStarted{1} = AKE2toAKE3.mStarted{2} /\
+   AKE_find.mCompleted{1} = AKE_eqS.mCompleted{2} /\
+   AKE_find.mCompleted{1} = AKE2toAKE3.mCompleted{2} /\
+   univ_map AKE_eqS.mEexp{2} /\ mSk_inv AKE_eqS.mSk{2} /\ 
+  inv_EPK AKE_eqS.mEexp{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mCompleted{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mEPK{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mStarted{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mKeyRev{2} AKE2toAKE3.mCompleted{2}  /\
+  is_dom AKE2toAKE3.sKeyRev{2} AKE2toAKE3.mKeyRev{2} /\
+  inv_KeyRev AKE_find.mKeyRev{1} AKE_find.evs{1} AKE_find.mStarted{1} AKE_find.mCompleted{1} AKE_find.mEexp{1} ==>
+   ={res} /\
+   AKE_find.sH2'{1} =  AKE2toAKE3.sH2'{2} /\
+   AKE_find.sKeyRev{1} = AKE2toAKE3.sKeyRev{2} /\
+   AKE_find.mKeyRev{1} = AKE2toAKE3.mKeyRev{2} /\
+    AKE_find.evs{1} = AKE2toAKE3.evs{2} /\
+   tr_sim AKE2toAKE3.evs{2} AKE_eqS.evs{2} /\
+   AKE_find.test{1} = AKE2toAKE3.test{2} /\
+
+   AKE_find.cH2{1} = AKE2toAKE3.cH2{2} /\
+   AKE_find.mH2{1} = AKE2toAKE3.mH2{2} /\
+   AKE_find.sH2{1} = AKE2toAKE3.sH2{2} /\
+   AKE_find.mSk{1} = AKE_eqS.mSk{2} /\
+   AKE_find.mEexp{1} = AKE_eqS.mEexp{2} /\
+   AKE_find.mStarted{1} = AKE_eqS.mStarted{2} /\
+   AKE_find.mStarted{1} = AKE2toAKE3.mStarted{2} /\
+   AKE_find.mCompleted{1} = AKE_eqS.mCompleted{2} /\
+   AKE_find.mCompleted{1} = AKE2toAKE3.mCompleted{2} /\
+   univ_map AKE_eqS.mEexp{2} /\ mSk_inv AKE_eqS.mSk{2} /\ 
+  inv_EPK AKE_eqS.mEexp{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mCompleted{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mEPK{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mStarted{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mKeyRev{2} AKE2toAKE3.mCompleted{2}  /\
+  is_dom AKE2toAKE3.sKeyRev{2} AKE2toAKE3.mKeyRev{2} /\
+  inv_KeyRev AKE_find.mKeyRev{1} AKE_find.evs{1} AKE_find.mStarted{1} AKE_find.mCompleted{1} AKE_find.mEexp{1}.
+proof.
+ fun.
+ sp; wp.
+ inline AKE_eqS(AKE2toAKE3).O.eqS AKE_find(A).O.eqS.
+ while ( ={i, b, ret, aux, sstr} /\
+   AKE_find.sH2'{1} =  AKE2toAKE3.sH2'{2} /\
+   AKE_find.sKeyRev{1} = AKE2toAKE3.sKeyRev{2} /\
+   AKE_find.mKeyRev{1} = AKE2toAKE3.mKeyRev{2} /\
+   AKE_find.evs{1} = AKE2toAKE3.evs{2} /\
+   tr_sim AKE2toAKE3.evs{2} AKE_eqS.evs{2} /\
+   AKE_find.test{1} = AKE2toAKE3.test{2} /\
+
+   AKE_find.cH2{1} = AKE2toAKE3.cH2{2} /\
+   AKE_find.mH2{1} = AKE2toAKE3.mH2{2} /\
+   AKE_find.sH2{1} = AKE2toAKE3.sH2{2} /\
+   AKE_find.mSk{1} = AKE_eqS.mSk{2} /\
+   AKE_find.mEexp{1} = AKE_eqS.mEexp{2} /\
+   AKE_find.mStarted{1} = AKE_eqS.mStarted{2} /\
+   AKE_find.mStarted{1} = AKE2toAKE3.mStarted{2} /\
+   AKE_find.mCompleted{1} = AKE_eqS.mCompleted{2} /\
+   AKE_find.mCompleted{1} = AKE2toAKE3.mCompleted{2} /\
+   univ_map AKE_eqS.mEexp{2} /\ mSk_inv AKE_eqS.mSk{2} /\ 
+  inv_EPK AKE_eqS.mEexp{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mCompleted{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mEPK{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mStarted{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mKeyRev{2} AKE2toAKE3.mCompleted{2}  /\
+   (forall x, mem x aux{1} => mem x s{1}) /\
+  is_dom AKE2toAKE3.sKeyRev{2} AKE2toAKE3.mKeyRev{2} /\
+   is_dom s{1} AKE_find.mKeyRev{1} /\
+  inv_KeyRev AKE_find.mKeyRev{1} AKE_find.evs{1} AKE_find.mStarted{1} AKE_find.mCompleted{1} AKE_find.mEexp{1}) => //.
+  wp; skip; progress => //.
+   by apply tr_sim_dup_sRev => //; apply H10; rewrite H9 H7 //; apply mem_pick . 
+   by apply H7; generalize H17; rewrite mem_rm.
+   by apply H7; generalize H17; rewrite mem_rm.
+   by apply H7; generalize H14; rewrite mem_rm.
+save.
+
+local equiv AKE_find_eqS_find_string : 
+AKE_find(A).O.find_string ~ AKE2toAKE3(AKE_eqS(AKE2toAKE3).O).O2.find_string :
+   ={id, sstr} /\
+  (mem (SessionRev (compute_sid AKE_find.mStarted AKE_find.mEexp AKE_find.mCompleted id)) AKE_find.evs){1} /\
+   AKE_find.sH2'{1} =  AKE2toAKE3.sH2'{2} /\
+   AKE_find.sKeyRev{1} = AKE2toAKE3.sKeyRev{2} /\
+   AKE_find.mKeyRev{1} = AKE2toAKE3.mKeyRev{2} /\
+    AKE_find.evs{1} = AKE2toAKE3.evs{2} /\
+   tr_sim AKE2toAKE3.evs{2} AKE_eqS.evs{2} /\
+   AKE_find.test{1} = AKE2toAKE3.test{2} /\
+
+   AKE_find.cH2{1} = AKE2toAKE3.cH2{2} /\
+   AKE_find.mH2{1} = AKE2toAKE3.mH2{2} /\
+   AKE_find.sH2{1} = AKE2toAKE3.sH2{2} /\
+   AKE_find.mSk{1} = AKE_eqS.mSk{2} /\
+   AKE_find.mEexp{1} = AKE_eqS.mEexp{2} /\
+   AKE_find.mStarted{1} = AKE_eqS.mStarted{2} /\
+   AKE_find.mStarted{1} = AKE2toAKE3.mStarted{2} /\
+   AKE_find.mCompleted{1} = AKE_eqS.mCompleted{2} /\
+   AKE_find.mCompleted{1} = AKE2toAKE3.mCompleted{2} /\
+   univ_map AKE_eqS.mEexp{2} /\ mSk_inv AKE_eqS.mSk{2} /\ 
+  inv_EPK AKE_eqS.mEexp{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mCompleted{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mEPK{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mStarted{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mKeyRev{2} AKE2toAKE3.mCompleted{2}  /\
+  is_dom AKE2toAKE3.sKeyRev{2} AKE2toAKE3.mKeyRev{2} /\
+  inv_KeyRev AKE_find.mKeyRev{1} AKE_find.evs{1} AKE_find.mStarted{1} AKE_find.mCompleted{1} AKE_find.mEexp{1} ==>
+   ={res} /\
+   AKE_find.sH2'{1} =  AKE2toAKE3.sH2'{2} /\
+   AKE_find.sKeyRev{1} = AKE2toAKE3.sKeyRev{2} /\
+   AKE_find.mKeyRev{1} = AKE2toAKE3.mKeyRev{2} /\
+    AKE_find.evs{1} = AKE2toAKE3.evs{2} /\
+   tr_sim AKE2toAKE3.evs{2} AKE_eqS.evs{2} /\
+   AKE_find.test{1} = AKE2toAKE3.test{2} /\
+
+   AKE_find.cH2{1} = AKE2toAKE3.cH2{2} /\
+   AKE_find.mH2{1} = AKE2toAKE3.mH2{2} /\
+   AKE_find.sH2{1} = AKE2toAKE3.sH2{2} /\
+   AKE_find.mSk{1} = AKE_eqS.mSk{2} /\
+   AKE_find.mEexp{1} = AKE_eqS.mEexp{2} /\
+   AKE_find.mStarted{1} = AKE_eqS.mStarted{2} /\
+   AKE_find.mStarted{1} = AKE2toAKE3.mStarted{2} /\
+   AKE_find.mCompleted{1} = AKE_eqS.mCompleted{2} /\
+   AKE_find.mCompleted{1} = AKE2toAKE3.mCompleted{2} /\
+   univ_map AKE_eqS.mEexp{2} /\ mSk_inv AKE_eqS.mSk{2} /\ 
+  inv_EPK AKE_eqS.mEexp{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mCompleted{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mEPK{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mStarted{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mKeyRev{2} AKE2toAKE3.mCompleted{2}  /\
+  is_dom AKE2toAKE3.sKeyRev{2} AKE2toAKE3.mKeyRev{2} /\
+  inv_KeyRev AKE_find.mKeyRev{1} AKE_find.evs{1} AKE_find.mStarted{1} AKE_find.mCompleted{1} AKE_find.mEexp{1}.
+proof.
+ fun; sp; wp. 
+ while (   ={id, sstr, str, b, ret, aux} /\
+   (mem (SessionRev (compute_sid AKE_find.mStarted AKE_find.mEexp AKE_find.mCompleted id)) AKE_find.evs){1} /\
+   AKE_find.sH2'{1} =  AKE2toAKE3.sH2'{2} /\
+   AKE_find.sKeyRev{1} = AKE2toAKE3.sKeyRev{2} /\
+   AKE_find.mKeyRev{1} = AKE2toAKE3.mKeyRev{2} /\
+    AKE_find.evs{1} = AKE2toAKE3.evs{2} /\
+   tr_sim AKE2toAKE3.evs{2} AKE_eqS.evs{2} /\
+   AKE_find.test{1} = AKE2toAKE3.test{2} /\
+
+   AKE_find.cH2{1} = AKE2toAKE3.cH2{2} /\
+   AKE_find.mH2{1} = AKE2toAKE3.mH2{2} /\
+   AKE_find.sH2{1} = AKE2toAKE3.sH2{2} /\
+   AKE_find.mSk{1} = AKE_eqS.mSk{2} /\
+   AKE_find.mEexp{1} = AKE_eqS.mEexp{2} /\
+   AKE_find.mStarted{1} = AKE_eqS.mStarted{2} /\
+   AKE_find.mStarted{1} = AKE2toAKE3.mStarted{2} /\
+   AKE_find.mCompleted{1} = AKE_eqS.mCompleted{2} /\
+   AKE_find.mCompleted{1} = AKE2toAKE3.mCompleted{2} /\
+   univ_map AKE_eqS.mEexp{2} /\ mSk_inv AKE_eqS.mSk{2} /\ 
+  inv_EPK AKE_eqS.mEexp{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mCompleted{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mEPK{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mStarted{2} AKE2toAKE3.mEPK{2} /\
+  is_dom AKE2toAKE3.sKeyRev{2} AKE2toAKE3.mKeyRev{2} /\
+  is_sub_map AKE2toAKE3.mKeyRev{2} AKE2toAKE3.mCompleted{2}  /\
+  inv_KeyRev AKE_find.mKeyRev{1} AKE_find.evs{1} AKE_find.mStarted{1} AKE_find.mCompleted{1} AKE_find.mEexp{1}) => //.
+  inline AKE_find(A).O.eqS AKE_eqS(AKE2toAKE3).O.eqS.
+  wp; skip; progress => //.
+   apply tr_sim_dup_sRev => //.
+save.
+
+local equiv AKE_find_eqS_find_matching : 
+AKE_find(A).O.find_matching ~ AKE2toAKE3(AKE_eqS(AKE2toAKE3).O).O2.find_matching :
+   ={id, id_set} /\
+  in_dom id{1} AKE_find.mCompleted{1} /\
+   id_set{1} = AKE_find.sKeyRev{1} /\
+   AKE_find.sH2'{1} =  AKE2toAKE3.sH2'{2} /\
+   AKE_find.sKeyRev{1} = AKE2toAKE3.sKeyRev{2} /\
+   AKE_find.mKeyRev{1} = AKE2toAKE3.mKeyRev{2} /\
+    AKE_find.evs{1} = AKE2toAKE3.evs{2} /\
+   tr_sim AKE2toAKE3.evs{2} AKE_eqS.evs{2} /\
+   AKE_find.test{1} = AKE2toAKE3.test{2} /\
+
+   AKE_find.cH2{1} = AKE2toAKE3.cH2{2} /\
+   AKE_find.mH2{1} = AKE2toAKE3.mH2{2} /\
+   AKE_find.sH2{1} = AKE2toAKE3.sH2{2} /\
+   AKE_find.mSk{1} = AKE_eqS.mSk{2} /\
+   AKE_find.mEexp{1} = AKE_eqS.mEexp{2} /\
+   AKE_find.mStarted{1} = AKE_eqS.mStarted{2} /\
+   AKE_find.mStarted{1} = AKE2toAKE3.mStarted{2} /\
+   AKE_find.mCompleted{1} = AKE_eqS.mCompleted{2} /\
+   AKE_find.mCompleted{1} = AKE2toAKE3.mCompleted{2} /\
+   univ_map AKE_eqS.mEexp{2} /\ mSk_inv AKE_eqS.mSk{2} /\ 
+  inv_EPK AKE_eqS.mEexp{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mCompleted{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mEPK{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mStarted{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mKeyRev{2} AKE2toAKE3.mCompleted{2}  /\
+  is_dom AKE2toAKE3.sKeyRev{2} AKE2toAKE3.mKeyRev{2} /\
+  inv_KeyRev AKE_find.mKeyRev{1} AKE_find.evs{1} AKE_find.mStarted{1} AKE_find.mCompleted{1} AKE_find.mEexp{1} ==>
+   ={res} /\
+   AKE_find.sH2'{1} =  AKE2toAKE3.sH2'{2} /\
+   AKE_find.sKeyRev{1} = AKE2toAKE3.sKeyRev{2} /\
+   AKE_find.mKeyRev{1} = AKE2toAKE3.mKeyRev{2} /\
+    AKE_find.evs{1} = AKE2toAKE3.evs{2} /\
+   tr_sim AKE2toAKE3.evs{2} AKE_eqS.evs{2} /\
+   AKE_find.test{1} = AKE2toAKE3.test{2} /\
+
+   AKE_find.cH2{1} = AKE2toAKE3.cH2{2} /\
+   AKE_find.mH2{1} = AKE2toAKE3.mH2{2} /\
+   AKE_find.sH2{1} = AKE2toAKE3.sH2{2} /\
+   AKE_find.mSk{1} = AKE_eqS.mSk{2} /\
+   AKE_find.mEexp{1} = AKE_eqS.mEexp{2} /\
+   AKE_find.mStarted{1} = AKE_eqS.mStarted{2} /\
+   AKE_find.mStarted{1} = AKE2toAKE3.mStarted{2} /\
+   AKE_find.mCompleted{1} = AKE_eqS.mCompleted{2} /\
+   AKE_find.mCompleted{1} = AKE2toAKE3.mCompleted{2} /\
+   univ_map AKE_eqS.mEexp{2} /\ mSk_inv AKE_eqS.mSk{2} /\ 
+  inv_EPK AKE_eqS.mEexp{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mCompleted{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mEPK{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mStarted{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mKeyRev{2} AKE2toAKE3.mCompleted{2}  /\
+  is_dom AKE2toAKE3.sKeyRev{2} AKE2toAKE3.mKeyRev{2} /\
+  inv_KeyRev AKE_find.mKeyRev{1} AKE_find.evs{1} AKE_find.mStarted{1} AKE_find.mCompleted{1} AKE_find.mEexp{1}.
+proof.
+ fun; wp; sp.
+ while 
+  (={id, id_set, ret, aux, sid} /\
+  (forall x,  mem x aux{1} => mem x AKE_find.sKeyRev{1}) /\
+  in_dom id{1} AKE_find.mCompleted{1} /\
+  id_set{1} = AKE_find.sKeyRev{1} /\
+  AKE_find.sH2'{1} = AKE2toAKE3.sH2'{2} /\
+  AKE_find.sKeyRev{1} = AKE2toAKE3.sKeyRev{2} /\
+  AKE_find.mKeyRev{1} = AKE2toAKE3.mKeyRev{2} /\
+    AKE_find.evs{1} = AKE2toAKE3.evs{2} /\
+   tr_sim AKE2toAKE3.evs{2} AKE_eqS.evs{2} /\
+  AKE_find.test{1} = AKE2toAKE3.test{2} /\
+  AKE_find.cH2{1} = AKE2toAKE3.cH2{2} /\
+  AKE_find.mH2{1} = AKE2toAKE3.mH2{2} /\
+  AKE_find.sH2{1} = AKE2toAKE3.sH2{2} /\
+  AKE_find.mSk{1} = AKE_eqS.mSk{2} /\
+  AKE_find.mEexp{1} = AKE_eqS.mEexp{2} /\
+  AKE_find.mStarted{1} = AKE_eqS.mStarted{2} /\
+  AKE_find.mStarted{1} = AKE2toAKE3.mStarted{2} /\
+  AKE_find.mCompleted{1} = AKE_eqS.mCompleted{2} /\
+  AKE_find.mCompleted{1} = AKE2toAKE3.mCompleted{2} /\
+  univ_map AKE_eqS.mEexp{2} /\
+  mSk_inv AKE_eqS.mSk{2} /\
+  inv_EPK AKE_eqS.mEexp{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mCompleted{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mEPK{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mStarted{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mKeyRev{2} AKE2toAKE3.mCompleted{2}  /\
+  is_dom AKE2toAKE3.sKeyRev{2} AKE2toAKE3.mKeyRev{2} /\
+  inv_KeyRev AKE_find.mKeyRev{1} AKE_find.evs{1} AKE_find.mStarted{1}
+    AKE_find.mCompleted{1} AKE_find.mEexp{1}).
+  wp; skip; progress => //.
+   by apply H; generalize H16; rewrite mem_rm.
+   (cut : false; last smt); generalize H15 => /=.
+   elim H14 => h {H14}; [left | right].
+   rewrite /compute_sid H13 /= -h.
+   rewrite H4 => //. 
+   by apply H7; apply H5; apply H8; rewrite H9; apply H; apply mem_pick.
+   rewrite /compute_sid H13 -h  /cmatching /=.
+   rewrite H4 => //. 
+   by apply H7; apply H5; apply H8; rewrite H9; apply H; apply mem_pick.
+   by apply H; generalize H16; rewrite mem_rm.
+   (cut : false; last smt); generalize H15 => /=.
+   elim H14 => h {H14}; [left | right].
+   rewrite /compute_sid H13 /= -h.
+   rewrite H4 => //. 
+   by apply H7; apply H5; apply H8; rewrite H9; apply H; apply mem_pick.
+   rewrite /compute_sid H13 -h  /cmatching /=.
+   rewrite H4 => //. 
+   by apply H7; apply H5; apply H8; rewrite H9; apply H; apply mem_pick.
+   (cut : false; last smt); generalize H14 => /=.
+   elim H15 => h {H15}; [left | right].
+   rewrite -h /compute_sid H13 /= .
+   rewrite H4 => //. 
+   by apply H7; apply H5; apply H8; rewrite H9; apply H; apply mem_pick.
+   rewrite  -h /compute_sid H13  /cmatching /=.
+   rewrite H4 => //. 
+   by apply H7; apply H5; apply H8; rewrite H9; apply H; apply mem_pick.
+   (cut : false; last smt); generalize H14 => /=.
+   elim H15 => h {H15}; [left | right].
+   rewrite -h /compute_sid H13 /= .
+   rewrite H4 => //. 
+   by apply H7; apply H5; apply H8; rewrite H9; apply H; apply mem_pick.
+   rewrite  -h /compute_sid H13  /cmatching /=.
+   rewrite H4 => //. 
+   by apply H7; apply H5; apply H8; rewrite H9; apply H; apply mem_pick.
+   (cut : false; last smt); generalize H14 => /=.
+   elim H15 => h {H15}; [left | right].
+   rewrite -h /compute_sid H13 /= .
+   rewrite H4 => //. 
+   by apply H7; apply H5; apply H8; rewrite H9; apply H; apply mem_pick.
+   rewrite  -h /compute_sid H13  /cmatching /=.
+   rewrite H4 => //. 
+   by apply H7; apply H5; apply H8; rewrite H9; apply H; apply mem_pick.
+   by apply H; generalize H16; rewrite mem_rm.
+   skip; progress.
+   rewrite /compute_sid -H /= H4 //.
+   by apply H7; apply H5.
+save.
+
+local equiv AKE_find_eqS_h2 : 
+AKE_find(A).O.h2 ~ AKE2toAKE3(AKE_eqS(AKE2toAKE3).O).O2.h2 :
+   ={sstring} /\
+   AKE_find.sH2'{1} =  AKE2toAKE3.sH2'{2} /\
+   AKE_find.sKeyRev{1} = AKE2toAKE3.sKeyRev{2} /\
+   AKE_find.mKeyRev{1} = AKE2toAKE3.mKeyRev{2} /\
+    AKE_find.evs{1} = AKE2toAKE3.evs{2} /\
+   tr_sim AKE2toAKE3.evs{2} AKE_eqS.evs{2} /\
+   AKE_find.test{1} = AKE2toAKE3.test{2} /\
+
+   AKE_find.cH2{1} = AKE2toAKE3.cH2{2} /\
+   AKE_find.mH2{1} = AKE2toAKE3.mH2{2} /\
+   AKE_find.sH2{1} = AKE2toAKE3.sH2{2} /\
+   AKE_find.mSk{1} = AKE_eqS.mSk{2} /\
+   AKE_find.mEexp{1} = AKE_eqS.mEexp{2} /\
+   AKE_find.mStarted{1} = AKE_eqS.mStarted{2} /\
+   AKE_find.mStarted{1} = AKE2toAKE3.mStarted{2} /\
+   AKE_find.mCompleted{1} = AKE_eqS.mCompleted{2} /\
+   AKE_find.mCompleted{1} = AKE2toAKE3.mCompleted{2} /\
+   univ_map AKE_eqS.mEexp{2} /\ mSk_inv AKE_eqS.mSk{2} /\ 
+  inv_EPK AKE_eqS.mEexp{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mCompleted{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mEPK{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mStarted{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mKeyRev{2} AKE2toAKE3.mCompleted{2}  /\
+  is_dom AKE2toAKE3.sKeyRev{2} AKE2toAKE3.mKeyRev{2} /\
+  inv_KeyRev AKE_find.mKeyRev{1} AKE_find.evs{1} AKE_find.mStarted{1} AKE_find.mCompleted{1} AKE_find.mEexp{1} ==>
+   ={res} /\
+   AKE_find.sH2'{1} =  AKE2toAKE3.sH2'{2} /\
+   AKE_find.sKeyRev{1} = AKE2toAKE3.sKeyRev{2} /\
+   AKE_find.mKeyRev{1} = AKE2toAKE3.mKeyRev{2} /\
+    AKE_find.evs{1} = AKE2toAKE3.evs{2} /\
+   tr_sim AKE2toAKE3.evs{2} AKE_eqS.evs{2} /\
+   AKE_find.test{1} = AKE2toAKE3.test{2} /\
+
+   AKE_find.cH2{1} = AKE2toAKE3.cH2{2} /\
+   AKE_find.mH2{1} = AKE2toAKE3.mH2{2} /\
+   AKE_find.sH2{1} = AKE2toAKE3.sH2{2} /\
+   AKE_find.mSk{1} = AKE_eqS.mSk{2} /\
+   AKE_find.mEexp{1} = AKE_eqS.mEexp{2} /\
+   AKE_find.mStarted{1} = AKE_eqS.mStarted{2} /\
+   AKE_find.mStarted{1} = AKE2toAKE3.mStarted{2} /\
+   AKE_find.mCompleted{1} = AKE_eqS.mCompleted{2} /\
+   AKE_find.mCompleted{1} = AKE2toAKE3.mCompleted{2} /\
+   univ_map AKE_eqS.mEexp{2} /\ mSk_inv AKE_eqS.mSk{2} /\ 
+  inv_EPK AKE_eqS.mEexp{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mCompleted{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mEPK{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mStarted{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mKeyRev{2} AKE2toAKE3.mCompleted{2}  /\
+  is_dom AKE2toAKE3.sKeyRev{2} AKE2toAKE3.mKeyRev{2} /\
+  inv_KeyRev AKE_find.mKeyRev{1} AKE_find.evs{1} AKE_find.mStarted{1} AKE_find.mCompleted{1} AKE_find.mEexp{1}.
+proof.
+ fun.
+ sp.
+ seq 1 1: (s{2} = None /\
+  s{1} = None /\
+  ={sstring, ke} /\
+  AKE_find.sH2'{1} = AKE2toAKE3.sH2'{2} /\
+  AKE_find.sKeyRev{1} = AKE2toAKE3.sKeyRev{2} /\
+  AKE_find.mKeyRev{1} = AKE2toAKE3.mKeyRev{2} /\
+    AKE_find.evs{1} = AKE2toAKE3.evs{2} /\
+   tr_sim AKE2toAKE3.evs{2} AKE_eqS.evs{2} /\
+  AKE_find.test{1} = AKE2toAKE3.test{2} /\
+
+  AKE_find.cH2{1} = AKE2toAKE3.cH2{2} /\
+  AKE_find.mH2{1} = AKE2toAKE3.mH2{2} /\
+  AKE_find.sH2{1} = AKE2toAKE3.sH2{2} /\
+  AKE_find.mSk{1} = AKE_eqS.mSk{2} /\
+  AKE_find.mEexp{1} = AKE_eqS.mEexp{2} /\
+  AKE_find.mStarted{1} = AKE_eqS.mStarted{2} /\
+  AKE_find.mStarted{1} = AKE2toAKE3.mStarted{2} /\
+  AKE_find.mCompleted{1} = AKE_eqS.mCompleted{2} /\
+  AKE_find.mCompleted{1} = AKE2toAKE3.mCompleted{2} /\
+  univ_map AKE_eqS.mEexp{2} /\
+  mSk_inv AKE_eqS.mSk{2} /\
+  inv_EPK AKE_eqS.mEexp{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mCompleted{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mEPK{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mStarted{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mKeyRev{2} AKE2toAKE3.mCompleted{2}  /\
+  is_dom AKE2toAKE3.sKeyRev{2} AKE2toAKE3.mKeyRev{2} /\
+  inv_KeyRev AKE_find.mKeyRev{1} AKE_find.evs{1} AKE_find.mStarted{1}
+    AKE_find.mCompleted{1} AKE_find.mEexp{1}).
+ by rnd.
+ if => //.
+  by wp; skip; progress.
+  seq 1 1:
+(  ={s,sstring, ke} /\
+   AKE_find.sH2'{1} = AKE2toAKE3.sH2'{2} /\
+   AKE_find.sKeyRev{1} = AKE2toAKE3.sKeyRev{2} /\
+   AKE_find.mKeyRev{1} = AKE2toAKE3.mKeyRev{2} /\
+    AKE_find.evs{1} = AKE2toAKE3.evs{2} /\
+   tr_sim AKE2toAKE3.evs{2} AKE_eqS.evs{2} /\
+   AKE_find.test{1} = AKE2toAKE3.test{2} /\
+
+   AKE_find.cH2{1} = AKE2toAKE3.cH2{2} /\
+   AKE_find.mH2{1} = AKE2toAKE3.mH2{2} /\
+   AKE_find.sH2{1} = AKE2toAKE3.sH2{2} /\
+   AKE_find.mSk{1} = AKE_eqS.mSk{2} /\
+   AKE_find.mEexp{1} = AKE_eqS.mEexp{2} /\
+   AKE_find.mStarted{1} = AKE_eqS.mStarted{2} /\
+   AKE_find.mStarted{1} = AKE2toAKE3.mStarted{2} /\
+   AKE_find.mCompleted{1} = AKE_eqS.mCompleted{2} /\
+   AKE_find.mCompleted{1} = AKE2toAKE3.mCompleted{2} /\
+   univ_map AKE_eqS.mEexp{2} /\
+   mSk_inv AKE_eqS.mSk{2} /\
+   inv_EPK AKE_eqS.mEexp{2} AKE2toAKE3.mEPK{2} /\
+   is_sub_map AKE2toAKE3.mCompleted{2} AKE2toAKE3.mStarted{2} /\
+   is_sub_map AKE2toAKE3.mEPK{2} AKE2toAKE3.mStarted{2} /\
+   is_sub_map AKE2toAKE3.mStarted{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mKeyRev{2} AKE2toAKE3.mCompleted{2}  /\
+  is_dom AKE2toAKE3.sKeyRev{2} AKE2toAKE3.mKeyRev{2} /\
+   inv_KeyRev AKE_find.mKeyRev{1} AKE_find.evs{1} AKE_find.mStarted{1}
+     AKE_find.mCompleted{1} AKE_find.mEexp{1} /\
+  ! in_dom sstring{1} AKE_find.mH2{1}).
+  call AKE_find_eqS_find_id; skip; progress.
+  by wp; skip; progress.
+save.
+
+local equiv AKE_find_eqS_h2_a : 
+AKE_find(A).O.h2_a ~ AKE2toAKE3(AKE_eqS(AKE2toAKE3).O).O2.h2_a :
+   ={sstring} /\
+   AKE_find.sH2'{1} =  AKE2toAKE3.sH2'{2} /\
+   AKE_find.sKeyRev{1} = AKE2toAKE3.sKeyRev{2} /\
+   AKE_find.mKeyRev{1} = AKE2toAKE3.mKeyRev{2} /\
+    AKE_find.evs{1} = AKE2toAKE3.evs{2} /\
+   tr_sim AKE2toAKE3.evs{2} AKE_eqS.evs{2} /\
+   AKE_find.test{1} = AKE2toAKE3.test{2} /\
+
+   AKE_find.cH2{1} = AKE2toAKE3.cH2{2} /\
+   AKE_find.mH2{1} = AKE2toAKE3.mH2{2} /\
+   AKE_find.sH2{1} = AKE2toAKE3.sH2{2} /\
+   AKE_find.mSk{1} = AKE_eqS.mSk{2} /\
+   AKE_find.mEexp{1} = AKE_eqS.mEexp{2} /\
+   AKE_find.mStarted{1} = AKE_eqS.mStarted{2} /\
+   AKE_find.mStarted{1} = AKE2toAKE3.mStarted{2} /\
+   AKE_find.mCompleted{1} = AKE_eqS.mCompleted{2} /\
+   AKE_find.mCompleted{1} = AKE2toAKE3.mCompleted{2} /\
+   univ_map AKE_eqS.mEexp{2} /\ mSk_inv AKE_eqS.mSk{2} /\ 
+  inv_EPK AKE_eqS.mEexp{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mCompleted{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mEPK{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mStarted{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mKeyRev{2} AKE2toAKE3.mCompleted{2}  /\
+  is_dom AKE2toAKE3.sKeyRev{2} AKE2toAKE3.mKeyRev{2} /\
+  inv_KeyRev AKE_find.mKeyRev{1} AKE_find.evs{1} AKE_find.mStarted{1} AKE_find.mCompleted{1} AKE_find.mEexp{1} ==>
+   ={res} /\
+   AKE_find.sH2'{1} =  AKE2toAKE3.sH2'{2} /\
+   AKE_find.sKeyRev{1} = AKE2toAKE3.sKeyRev{2} /\
+   AKE_find.mKeyRev{1} = AKE2toAKE3.mKeyRev{2} /\
+    AKE_find.evs{1} = AKE2toAKE3.evs{2} /\
+   tr_sim AKE2toAKE3.evs{2} AKE_eqS.evs{2} /\
+   AKE_find.test{1} = AKE2toAKE3.test{2} /\
+
+   AKE_find.cH2{1} = AKE2toAKE3.cH2{2} /\
+   AKE_find.mH2{1} = AKE2toAKE3.mH2{2} /\
+   AKE_find.sH2{1} = AKE2toAKE3.sH2{2} /\
+   AKE_find.mSk{1} = AKE_eqS.mSk{2} /\
+   AKE_find.mEexp{1} = AKE_eqS.mEexp{2} /\
+   AKE_find.mStarted{1} = AKE_eqS.mStarted{2} /\
+   AKE_find.mStarted{1} = AKE2toAKE3.mStarted{2} /\
+   AKE_find.mCompleted{1} = AKE_eqS.mCompleted{2} /\
+   AKE_find.mCompleted{1} = AKE2toAKE3.mCompleted{2} /\
+   univ_map AKE_eqS.mEexp{2} /\ mSk_inv AKE_eqS.mSk{2} /\ 
+  inv_EPK AKE_eqS.mEexp{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mCompleted{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mEPK{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mStarted{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mKeyRev{2} AKE2toAKE3.mCompleted{2}  /\
+  is_dom AKE2toAKE3.sKeyRev{2} AKE2toAKE3.mKeyRev{2} /\
+  inv_KeyRev AKE_find.mKeyRev{1} AKE_find.evs{1} AKE_find.mStarted{1} AKE_find.mCompleted{1} AKE_find.mEexp{1}.
+proof.
+ by fun; sp; if => //; wp; call AKE_find_eqS_h2; wp; skip; progress.
+save.
+
+local equiv AKE_find_eqS_computeKey : 
+AKE_find(A).O.computeKey ~ AKE2toAKE3(AKE_eqS(AKE2toAKE3).O).O2.computeKey :
+   ={i} /\
+   (mem (SessionRev (compute_sid AKE_find.mStarted AKE_find.mEexp AKE_find.mCompleted i)) AKE_find.evs){1} /\
+   AKE_find.sH2'{1} =  AKE2toAKE3.sH2'{2} /\
+   AKE_find.sKeyRev{1} = AKE2toAKE3.sKeyRev{2} /\
+   AKE_find.mKeyRev{1} = AKE2toAKE3.mKeyRev{2} /\
+    AKE_find.evs{1} = AKE2toAKE3.evs{2} /\
+   tr_sim AKE2toAKE3.evs{2} AKE_eqS.evs{2} /\
+   AKE_find.test{1} = AKE2toAKE3.test{2} /\
+
+   AKE_find.cH2{1} = AKE2toAKE3.cH2{2} /\
+   AKE_find.mH2{1} = AKE2toAKE3.mH2{2} /\
+   AKE_find.sH2{1} = AKE2toAKE3.sH2{2} /\
+   AKE_find.mSk{1} = AKE_eqS.mSk{2} /\
+   AKE_find.mEexp{1} = AKE_eqS.mEexp{2} /\
+   AKE_find.mStarted{1} = AKE_eqS.mStarted{2} /\
+   AKE_find.mStarted{1} = AKE2toAKE3.mStarted{2} /\
+   AKE_find.mCompleted{1} = AKE_eqS.mCompleted{2} /\
+   AKE_find.mCompleted{1} = AKE2toAKE3.mCompleted{2} /\
+   univ_map AKE_eqS.mEexp{2} /\ mSk_inv AKE_eqS.mSk{2} /\ 
+  inv_EPK AKE_eqS.mEexp{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mCompleted{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mEPK{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mStarted{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mKeyRev{2} AKE2toAKE3.mCompleted{2}  /\
+  is_dom AKE2toAKE3.sKeyRev{2} AKE2toAKE3.mKeyRev{2} /\
+  inv_KeyRev AKE_find.mKeyRev{1} AKE_find.evs{1} AKE_find.mStarted{1} AKE_find.mCompleted{1} AKE_find.mEexp{1} ==>
+   ={res} /\
+   AKE_find.sH2'{1} =  AKE2toAKE3.sH2'{2} /\
+   AKE_find.sKeyRev{1} = AKE2toAKE3.sKeyRev{2} /\
+   AKE_find.mKeyRev{1} = AKE2toAKE3.mKeyRev{2} /\
+    AKE_find.evs{1} = AKE2toAKE3.evs{2} /\
+   tr_sim AKE2toAKE3.evs{2} AKE_eqS.evs{2} /\
+   AKE_find.test{1} = AKE2toAKE3.test{2} /\
+
+   AKE_find.cH2{1} = AKE2toAKE3.cH2{2} /\
+   AKE_find.mH2{1} = AKE2toAKE3.mH2{2} /\
+   AKE_find.sH2{1} = AKE2toAKE3.sH2{2} /\
+   AKE_find.mSk{1} = AKE_eqS.mSk{2} /\
+   AKE_find.mEexp{1} = AKE_eqS.mEexp{2} /\
+   AKE_find.mStarted{1} = AKE_eqS.mStarted{2} /\
+   AKE_find.mStarted{1} = AKE2toAKE3.mStarted{2} /\
+   AKE_find.mCompleted{1} = AKE_eqS.mCompleted{2} /\
+   AKE_find.mCompleted{1} = AKE2toAKE3.mCompleted{2} /\
+   univ_map AKE_eqS.mEexp{2} /\ mSk_inv AKE_eqS.mSk{2} /\ 
+  inv_EPK AKE_eqS.mEexp{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mCompleted{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mEPK{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mStarted{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mKeyRev{2} AKE2toAKE3.mCompleted{2}  /\
+  is_dom AKE2toAKE3.sKeyRev{2} AKE2toAKE3.mKeyRev{2} /\
+  inv_KeyRev AKE_find.mKeyRev{1} AKE_find.evs{1} AKE_find.mStarted{1} AKE_find.mCompleted{1} AKE_find.mEexp{1}.
+proof.
+fun.
+sp.
+if => //.
+seq 1 1:
+(
+  (str{2} = None /\
+   ret{2} = None /\
+   r{2} = None /\
+   str{1} = None /\
+   ret{1} = None /\
+   r{1} = None /\
+   ={i, k} /\
+   mem
+     (SessionRev
+        (compute_sid AKE_find.mStarted{1} AKE_find.mEexp{1}
+           AKE_find.mCompleted{1} i{1})) AKE_find.evs{1} /\
+   AKE_find.sH2'{1} = AKE2toAKE3.sH2'{2} /\
+   AKE_find.sKeyRev{1} = AKE2toAKE3.sKeyRev{2} /\
+   AKE_find.mKeyRev{1} = AKE2toAKE3.mKeyRev{2} /\
+   AKE_find.evs{1} = AKE2toAKE3.evs{2} /\
+   tr_sim AKE2toAKE3.evs{2} AKE_eqS.evs{2} /\
+   AKE_find.test{1} = AKE2toAKE3.test{2} /\
+
+   AKE_find.cH2{1} = AKE2toAKE3.cH2{2} /\
+   AKE_find.mH2{1} = AKE2toAKE3.mH2{2} /\
+   AKE_find.sH2{1} = AKE2toAKE3.sH2{2} /\
+   AKE_find.mSk{1} = AKE_eqS.mSk{2} /\
+   AKE_find.mEexp{1} = AKE_eqS.mEexp{2} /\
+   AKE_find.mStarted{1} = AKE_eqS.mStarted{2} /\
+   AKE_find.mStarted{1} = AKE2toAKE3.mStarted{2} /\
+   AKE_find.mCompleted{1} = AKE_eqS.mCompleted{2} /\
+   AKE_find.mCompleted{1} = AKE2toAKE3.mCompleted{2} /\
+   univ_map AKE_eqS.mEexp{2} /\
+   mSk_inv AKE_eqS.mSk{2} /\
+   inv_EPK AKE_eqS.mEexp{2} AKE2toAKE3.mEPK{2} /\
+   is_sub_map AKE2toAKE3.mCompleted{2} AKE2toAKE3.mStarted{2} /\
+   is_sub_map AKE2toAKE3.mEPK{2} AKE2toAKE3.mStarted{2} /\
+   is_sub_map AKE2toAKE3.mStarted{2} AKE2toAKE3.mEPK{2} /\
+   is_sub_map AKE2toAKE3.mKeyRev{2} AKE2toAKE3.mCompleted{2} /\
+   is_dom AKE2toAKE3.sKeyRev{2} AKE2toAKE3.mKeyRev{2} /\
+   inv_KeyRev AKE_find.mKeyRev{1} AKE_find.evs{1} AKE_find.mStarted{1}
+     AKE_find.mCompleted{1} AKE_find.mEexp{1}) /\
+  in_dom i{1} AKE_find.mCompleted{1}).
+by rnd.
+if => //.
+by wp.
+seq 1 1:
+(
+  ((ret{2} = None /\
+    r{2} = None /\
+    ret{1} = None /\
+    r{1} = None /\
+    ={k, i, str, j} /\ 
+    mem
+      (SessionRev
+         (compute_sid AKE_find.mStarted{1} AKE_find.mEexp{1}
+            AKE_find.mCompleted{1} i{1})) AKE_find.evs{1} /\
+    AKE_find.sH2'{1} = AKE2toAKE3.sH2'{2} /\
+    AKE_find.sKeyRev{1} = AKE2toAKE3.sKeyRev{2} /\
+    AKE_find.mKeyRev{1} = AKE2toAKE3.mKeyRev{2} /\
+    AKE_find.evs{1} = AKE2toAKE3.evs{2} /\
+    tr_sim AKE2toAKE3.evs{2} AKE_eqS.evs{2} /\
+    AKE_find.test{1} = AKE2toAKE3.test{2} /\
+ 
+    AKE_find.cH2{1} = AKE2toAKE3.cH2{2} /\
+    AKE_find.mH2{1} = AKE2toAKE3.mH2{2} /\
+    AKE_find.sH2{1} = AKE2toAKE3.sH2{2} /\
+    AKE_find.mSk{1} = AKE_eqS.mSk{2} /\
+    AKE_find.mEexp{1} = AKE_eqS.mEexp{2} /\
+    AKE_find.mStarted{1} = AKE_eqS.mStarted{2} /\
+    AKE_find.mStarted{1} = AKE2toAKE3.mStarted{2} /\
+    AKE_find.mCompleted{1} = AKE_eqS.mCompleted{2} /\
+    AKE_find.mCompleted{1} = AKE2toAKE3.mCompleted{2} /\
+    univ_map AKE_eqS.mEexp{2} /\
+    mSk_inv AKE_eqS.mSk{2} /\
+    inv_EPK AKE_eqS.mEexp{2} AKE2toAKE3.mEPK{2} /\
+    is_sub_map AKE2toAKE3.mCompleted{2} AKE2toAKE3.mStarted{2} /\
+    is_sub_map AKE2toAKE3.mEPK{2} AKE2toAKE3.mStarted{2} /\
+    is_sub_map AKE2toAKE3.mStarted{2} AKE2toAKE3.mEPK{2} /\
+    is_sub_map AKE2toAKE3.mKeyRev{2} AKE2toAKE3.mCompleted{2} /\
+    is_dom AKE2toAKE3.sKeyRev{2} AKE2toAKE3.mKeyRev{2} /\
+    inv_KeyRev AKE_find.mKeyRev{1} AKE_find.evs{1} AKE_find.mStarted{1}
+      AKE_find.mCompleted{1} AKE_find.mEexp{1}) /\
+   in_dom i{1} AKE_find.mCompleted{1}) /\
+  ! in_dom i{1} AKE_find.mKeyRev{1}).
+call AKE_find_eqS_find_matching.
+skip; progress => //.
+if => //.
+wp; skip; progress.
+seq 1 1:
+ (((ret{2} = None /\
+     r{2} = None /\
+     ret{1} = None /\
+     r{1} = None /\
+     ={k, i, str, j} /\
+     mem
+       (SessionRev
+          (compute_sid AKE_find.mStarted{1} AKE_find.mEexp{1}
+             AKE_find.mCompleted{1} i{1})) AKE_find.evs{1} /\
+     AKE_find.sH2'{1} = AKE2toAKE3.sH2'{2} /\
+     AKE_find.sKeyRev{1} = AKE2toAKE3.sKeyRev{2} /\
+     AKE_find.mKeyRev{1} = AKE2toAKE3.mKeyRev{2} /\
+     AKE_find.evs{1} = AKE2toAKE3.evs{2} /\
+     tr_sim AKE2toAKE3.evs{2} AKE_eqS.evs{2} /\
+     AKE_find.test{1} = AKE2toAKE3.test{2} /\
+  
+     AKE_find.cH2{1} = AKE2toAKE3.cH2{2} /\
+     AKE_find.mH2{1} = AKE2toAKE3.mH2{2} /\
+     AKE_find.sH2{1} = AKE2toAKE3.sH2{2} /\
+     AKE_find.mSk{1} = AKE_eqS.mSk{2} /\
+     AKE_find.mEexp{1} = AKE_eqS.mEexp{2} /\
+     AKE_find.mStarted{1} = AKE_eqS.mStarted{2} /\
+     AKE_find.mStarted{1} = AKE2toAKE3.mStarted{2} /\
+     AKE_find.mCompleted{1} = AKE_eqS.mCompleted{2} /\
+     AKE_find.mCompleted{1} = AKE2toAKE3.mCompleted{2} /\
+     univ_map AKE_eqS.mEexp{2} /\
+     mSk_inv AKE_eqS.mSk{2} /\
+     inv_EPK AKE_eqS.mEexp{2} AKE2toAKE3.mEPK{2} /\
+     is_sub_map AKE2toAKE3.mCompleted{2} AKE2toAKE3.mStarted{2} /\
+     is_sub_map AKE2toAKE3.mEPK{2} AKE2toAKE3.mStarted{2} /\
+     is_sub_map AKE2toAKE3.mStarted{2} AKE2toAKE3.mEPK{2} /\
+     is_sub_map AKE2toAKE3.mKeyRev{2} AKE2toAKE3.mCompleted{2} /\
+     is_dom AKE2toAKE3.sKeyRev{2} AKE2toAKE3.mKeyRev{2} /\
+     inv_KeyRev AKE_find.mKeyRev{1} AKE_find.evs{1} AKE_find.mStarted{1}
+       AKE_find.mCompleted{1} AKE_find.mEexp{1}) /\
+    in_dom i{1} AKE_find.mCompleted{1}) /\
+   ! in_dom i{1} AKE_find.mKeyRev{1} /\
+  ! ! j{1} = None).
+call AKE_find_eqS_find_string.
+skip; progress => //.
+if => //.
+wp; skip; progress => //.
+wp; skip; progress => //.
+by apply is_sub_map_upd3.
+by apply is_dom_add.
+intros => j.
+rewrite  in_dom_set => [|] // hj.
+cut := H9 j _ => //.
+save.
+
+local equiv AKE_find_eqS_sessionRev : 
+AKE_find(A).O.sessionRev ~ AKE2toAKE3(AKE_eqS(AKE2toAKE3).O).O2.sessionRev :
+   ={i} /\
+   AKE_find.sH2'{1} =  AKE2toAKE3.sH2'{2} /\
+   AKE_find.sKeyRev{1} = AKE2toAKE3.sKeyRev{2} /\
+   AKE_find.mKeyRev{1} = AKE2toAKE3.mKeyRev{2} /\
+    AKE_find.evs{1} = AKE2toAKE3.evs{2} /\
+   tr_sim AKE2toAKE3.evs{2} AKE_eqS.evs{2} /\
+   AKE_find.test{1} = AKE2toAKE3.test{2} /\
+
+   AKE_find.cH2{1} = AKE2toAKE3.cH2{2} /\
+   AKE_find.mH2{1} = AKE2toAKE3.mH2{2} /\
+   AKE_find.sH2{1} = AKE2toAKE3.sH2{2} /\
+   AKE_find.mSk{1} = AKE_eqS.mSk{2} /\
+   AKE_find.mEexp{1} = AKE_eqS.mEexp{2} /\
+   AKE_find.mStarted{1} = AKE_eqS.mStarted{2} /\
+   AKE_find.mStarted{1} = AKE2toAKE3.mStarted{2} /\
+   AKE_find.mCompleted{1} = AKE_eqS.mCompleted{2} /\
+   AKE_find.mCompleted{1} = AKE2toAKE3.mCompleted{2} /\
+   univ_map AKE_eqS.mEexp{2} /\ mSk_inv AKE_eqS.mSk{2} /\ 
+  inv_EPK AKE_eqS.mEexp{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mCompleted{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mEPK{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mStarted{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mKeyRev{2} AKE2toAKE3.mCompleted{2}  /\
+  is_dom AKE2toAKE3.sKeyRev{2} AKE2toAKE3.mKeyRev{2} /\
+  inv_KeyRev AKE_find.mKeyRev{1} AKE_find.evs{1} AKE_find.mStarted{1} AKE_find.mCompleted{1} AKE_find.mEexp{1} ==>
+   ={res} /\
+   AKE_find.sH2'{1} =  AKE2toAKE3.sH2'{2} /\
+   AKE_find.sKeyRev{1} = AKE2toAKE3.sKeyRev{2} /\
+   AKE_find.mKeyRev{1} = AKE2toAKE3.mKeyRev{2} /\
+    AKE_find.evs{1} = AKE2toAKE3.evs{2} /\
+   tr_sim AKE2toAKE3.evs{2} AKE_eqS.evs{2} /\
+   AKE_find.test{1} = AKE2toAKE3.test{2} /\
+
+   AKE_find.cH2{1} = AKE2toAKE3.cH2{2} /\
+   AKE_find.mH2{1} = AKE2toAKE3.mH2{2} /\
+   AKE_find.sH2{1} = AKE2toAKE3.sH2{2} /\
+   AKE_find.mSk{1} = AKE_eqS.mSk{2} /\
+   AKE_find.mEexp{1} = AKE_eqS.mEexp{2} /\
+   AKE_find.mStarted{1} = AKE_eqS.mStarted{2} /\
+   AKE_find.mStarted{1} = AKE2toAKE3.mStarted{2} /\
+   AKE_find.mCompleted{1} = AKE_eqS.mCompleted{2} /\
+   AKE_find.mCompleted{1} = AKE2toAKE3.mCompleted{2} /\
+   univ_map AKE_eqS.mEexp{2} /\ mSk_inv AKE_eqS.mSk{2} /\ 
+  inv_EPK AKE_eqS.mEexp{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mCompleted{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mEPK{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mStarted{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mKeyRev{2} AKE2toAKE3.mCompleted{2}  /\
+  is_dom AKE2toAKE3.sKeyRev{2} AKE2toAKE3.mKeyRev{2} /\
+  inv_KeyRev AKE_find.mKeyRev{1} AKE_find.evs{1} AKE_find.mStarted{1} AKE_find.mCompleted{1} AKE_find.mEexp{1}.
+proof.
+fun.
+ sp.
+ if{1}.
+ rcondt{2} 1 => //.
+ rcondt{2} 5.
+  intros => ?; wp; skip; progress.
+  rewrite (_ : (x1, x2, proj AKE2toAKE3.mEPK{hr}.[i{hr}],
+      proj AKE2toAKE3.mCompleted{hr}.[i{hr}], x3) =  (compute_sid AKE2toAKE3.mStarted{hr} AKE_eqS.mEexp{hr}
+             AKE2toAKE3.mCompleted{hr} i{hr})) //.
+ rewrite /compute_sid H11 /= H2 //.
+ by apply H5; apply H3.
+ by apply H10.
+ swap{2} 6 -1.
+ call AKE_find_eqS_computeKey.
+ wp; skip; progress => //.
+  by rewrite mem_cons; left.
+  by rewrite /compute_sid H11 /= H2 //; apply H5; apply H3.
+  by apply tr_sim_skip_sRev.
+  intros => j hj.
+  by cut := H8 j _ => //; rewrite mem_cons => h; right.
+  if{2}.
+  rcondf{2} 5 => //.
+   intros => &m; wp; skip; progress.
+rewrite (_ : (x1, x2, proj AKE2toAKE3.mEPK{hr}.[i{hr}],
+         proj AKE2toAKE3.mCompleted{hr}.[i{hr}], x3) = 
+(compute_sid AKE2toAKE3.mStarted{hr} AKE_eqS.mEexp{hr}
+                AKE2toAKE3.mCompleted{hr} i{hr})) .
+rewrite /compute_sid H11 /= H2 //.
+by apply H5; apply H3.
+smt.
+wp; skip; progress.
+wp; skip; progress.
+save.
+
+local equiv AKE_find_eqS_guess : 
+AKE_find(A).A.guess ~ AKE2toAKE3(AKE_eqS(AKE2toAKE3).O).FA.guess :
+={k, glob A} /\
+AKE_find.sH2'{1} =  AKE2toAKE3.sH2'{2} /\
+   AKE_find.sKeyRev{1} = AKE2toAKE3.sKeyRev{2} /\
+   AKE_find.mKeyRev{1} = AKE2toAKE3.mKeyRev{2} /\
+    AKE_find.evs{1} = AKE2toAKE3.evs{2} /\
+   tr_sim AKE2toAKE3.evs{2} AKE_eqS.evs{2} /\
+   AKE_find.test{1} = AKE2toAKE3.test{2} /\
+
+   AKE_find.cH2{1} = AKE2toAKE3.cH2{2} /\
+   AKE_find.mH2{1} = AKE2toAKE3.mH2{2} /\
+   AKE_find.sH2{1} = AKE2toAKE3.sH2{2} /\
+   AKE_find.mSk{1} = AKE_eqS.mSk{2} /\
+   AKE_find.mEexp{1} = AKE_eqS.mEexp{2} /\
+   AKE_find.mStarted{1} = AKE_eqS.mStarted{2} /\
+   AKE_find.mStarted{1} = AKE2toAKE3.mStarted{2} /\
+   AKE_find.mCompleted{1} = AKE_eqS.mCompleted{2} /\
+   AKE_find.mCompleted{1} = AKE2toAKE3.mCompleted{2} /\
+   univ_map AKE_eqS.mEexp{2} /\ mSk_inv AKE_eqS.mSk{2} /\ 
+  inv_EPK AKE_eqS.mEexp{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mCompleted{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mEPK{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mStarted{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mKeyRev{2} AKE2toAKE3.mCompleted{2}  /\
+  is_dom AKE2toAKE3.sKeyRev{2} AKE2toAKE3.mKeyRev{2} /\
+  inv_KeyRev AKE_find.mKeyRev{1} AKE_find.evs{1} AKE_find.mStarted{1} AKE_find.mCompleted{1} AKE_find.mEexp{1} ==>
+={res, glob A} /\
+AKE_find.sH2'{1} =  AKE2toAKE3.sH2'{2} /\
+   AKE_find.sKeyRev{1} = AKE2toAKE3.sKeyRev{2} /\
+   AKE_find.mKeyRev{1} = AKE2toAKE3.mKeyRev{2} /\
+    AKE_find.evs{1} = AKE2toAKE3.evs{2} /\
+   tr_sim AKE2toAKE3.evs{2} AKE_eqS.evs{2} /\
+   AKE_find.test{1} = AKE2toAKE3.test{2} /\
+
+   AKE_find.cH2{1} = AKE2toAKE3.cH2{2} /\
+   AKE_find.mH2{1} = AKE2toAKE3.mH2{2} /\
+   AKE_find.sH2{1} = AKE2toAKE3.sH2{2} /\
+   AKE_find.mSk{1} = AKE_eqS.mSk{2} /\
+   AKE_find.mEexp{1} = AKE_eqS.mEexp{2} /\
+   AKE_find.mStarted{1} = AKE_eqS.mStarted{2} /\
+   AKE_find.mStarted{1} = AKE2toAKE3.mStarted{2} /\
+   AKE_find.mCompleted{1} = AKE_eqS.mCompleted{2} /\
+   AKE_find.mCompleted{1} = AKE2toAKE3.mCompleted{2} /\
+   univ_map AKE_eqS.mEexp{2} /\ mSk_inv AKE_eqS.mSk{2} /\ 
+  inv_EPK AKE_eqS.mEexp{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mCompleted{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mEPK{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mStarted{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mKeyRev{2} AKE2toAKE3.mCompleted{2}  /\
+  is_dom AKE2toAKE3.sKeyRev{2} AKE2toAKE3.mKeyRev{2} /\
+  inv_KeyRev AKE_find.mKeyRev{1} AKE_find.evs{1} AKE_find.mStarted{1} AKE_find.mCompleted{1} AKE_find.mEexp{1}.
+proof.
+ fun (AKE_find.sH2'{1} =  AKE2toAKE3.sH2'{2} /\
+   AKE_find.sKeyRev{1} = AKE2toAKE3.sKeyRev{2} /\
+   AKE_find.mKeyRev{1} = AKE2toAKE3.mKeyRev{2} /\
+    AKE_find.evs{1} = AKE2toAKE3.evs{2} /\
+   tr_sim AKE2toAKE3.evs{2} AKE_eqS.evs{2} /\
+   AKE_find.test{1} = AKE2toAKE3.test{2} /\
+
+   AKE_find.cH2{1} = AKE2toAKE3.cH2{2} /\
+   AKE_find.mH2{1} = AKE2toAKE3.mH2{2} /\
+   AKE_find.sH2{1} = AKE2toAKE3.sH2{2} /\
+   AKE_find.mSk{1} = AKE_eqS.mSk{2} /\
+   AKE_find.mEexp{1} = AKE_eqS.mEexp{2} /\
+   AKE_find.mStarted{1} = AKE_eqS.mStarted{2} /\
+   AKE_find.mStarted{1} = AKE2toAKE3.mStarted{2} /\
+   AKE_find.mCompleted{1} = AKE_eqS.mCompleted{2} /\
+   AKE_find.mCompleted{1} = AKE2toAKE3.mCompleted{2} /\
+   univ_map AKE_eqS.mEexp{2} /\ mSk_inv AKE_eqS.mSk{2} /\ 
+  inv_EPK AKE_eqS.mEexp{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mCompleted{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mEPK{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mStarted{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mKeyRev{2} AKE2toAKE3.mCompleted{2}  /\
+  is_dom AKE2toAKE3.sKeyRev{2} AKE2toAKE3.mKeyRev{2} /\
+  inv_KeyRev AKE_find.mKeyRev{1} AKE_find.evs{1} AKE_find.mStarted{1} AKE_find.mCompleted{1} AKE_find.mEexp{1}) => //.
+fun.
+inline AKE_eqS(AKE2toAKE3).O.eexpRev.
+seq 1 2: (={i, a, r} /\
+  r{2} = None /\
+  AKE_find.sH2'{1} = AKE2toAKE3.sH2'{2} /\
+  AKE_find.sKeyRev{1} = AKE2toAKE3.sKeyRev{2} /\
+  AKE_find.mKeyRev{1} = AKE2toAKE3.mKeyRev{2} /\
+  AKE_find.evs{1} = AKE2toAKE3.evs{2} /\
+  tr_sim AKE2toAKE3.evs{2} AKE_eqS.evs{2} /\
+  AKE_find.test{1} = AKE2toAKE3.test{2} /\
+
+  AKE_find.cH2{1} = AKE2toAKE3.cH2{2} /\
+  AKE_find.mH2{1} = AKE2toAKE3.mH2{2} /\
+  AKE_find.sH2{1} = AKE2toAKE3.sH2{2} /\
+  AKE_find.mSk{1} = AKE_eqS.mSk{2} /\
+  AKE_find.mEexp{1} = AKE_eqS.mEexp{2} /\
+  AKE_find.mStarted{1} = AKE_eqS.mStarted{2} /\
+  AKE_find.mStarted{1} = AKE2toAKE3.mStarted{2} /\
+  AKE_find.mCompleted{1} = AKE_eqS.mCompleted{2} /\
+  AKE_find.mCompleted{1} = AKE2toAKE3.mCompleted{2} /\
+  univ_map AKE_eqS.mEexp{2} /\
+  mSk_inv AKE_eqS.mSk{2} /\
+  inv_EPK AKE_eqS.mEexp{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mCompleted{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mEPK{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mStarted{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mKeyRev{2} AKE2toAKE3.mCompleted{2} /\
+  is_dom AKE2toAKE3.sKeyRev{2} AKE2toAKE3.mKeyRev{2} /\
+  inv_KeyRev AKE_find.mKeyRev{1} AKE_find.evs{1} AKE_find.mStarted{1}
+    AKE_find.mCompleted{1} AKE_find.mEexp{1}).
+wp; skip; progress => //.
+if{1}; last first.
+if{2}.
+rcondf{2} 3 => //.
+intros => ?; wp; skip; progress.
+cut : (x1, x2, proj AKE2toAKE3.mEPK{hr}.[i{hr}], x3) = 
+(compute_psid AKE2toAKE3.mStarted{hr} AKE_eqS.mEexp{hr} i{hr}).
+rewrite /compute_psid  H11 H2 /= //; first by apply H5.
+smt.
+wp; skip; progress => //.
+skip; progress => //.
+rcondt{2} 1.
+intros => ?; skip; progress => //.
+rcondt{2} 3.
+intros => ?; wp; skip; progress => //.
+cut : (x1, x2, proj AKE2toAKE3.mEPK{hr}.[i{hr}], x3) = 
+(compute_psid AKE2toAKE3.mStarted{hr} AKE_eqS.mEexp{hr} i{hr}).
+rewrite /compute_psid  H11 H2 //; first by apply H5.
+smt.
+rcondt{2} 6.
+intros => ?; wp; skip; progress => //.
+wp; skip; progress => //.
+
+cut : (x1, x2, proj AKE2toAKE3.mEPK{2}.[i{2}], x3) = 
+(compute_psid AKE2toAKE3.mStarted{2} AKE_eqS.mEexp{2} i{2}).
+rewrite /compute_psid  H11 H2 //; first by apply H5.
+smt.
+cut <- : (x1, x2, proj AKE2toAKE3.mEPK{2}.[i{2}], x3) = 
+(compute_psid AKE2toAKE3.mStarted{2} AKE_eqS.mEexp{2} i{2}).
+rewrite /compute_psid  H11 H2 //; first by apply H5.
+by apply tr_sim_eq_ev.
+intros => j hj; rewrite mem_cons; right; by apply H8.
+by rewrite /compute_psid /= H11 /= H2 //; apply H5. 
+rewrite /compute_psid /= H11 /= H2 //; first by apply H5.
+by apply tr_sim_eq_ev.
+intros => j hj; rewrite mem_cons; right; by apply H8.
+
+apply AKE_find_eqS_h2_a.
+
+fun.
+inline  AKE_eqS(AKE2toAKE3).O.init1.
+sp.
+if => //; last first.
+sp.
+rcondf{2} 1.
+by intros => ?; skip.
+skip; progress.
+rcondt{2} 6.
+by intros => ?; wp; skip; progress => //; smt.
+wp; skip; progress => //.
+by rewrite proj_some.
+by rewrite proj_some; apply tr_sim_eq_ev.
+rewrite proj_some /inv_EPK => j.
+case (j = i{2}) => heq.
+ by rewrite heq get_setE proj_some.
+ rewrite in_dom_setNE // get_setNE; first smt.
+ by intros => h; apply H2.
+ by apply is_sub_map_upd1. 
+ by apply is_sub_map_upd2. 
+ by apply is_sub_map_upd2. 
+intros => j hj; rewrite mem_cons; right.
+cut ->: ((compute_sid AKE2toAKE3.mStarted{2}.[i{2} <- (A{2}, B{2}, init)]
+        AKE_eqS.mEexp{2} AKE2toAKE3.mCompleted{2} j) = 
+        (compute_sid AKE2toAKE3.mStarted{2}
+        AKE_eqS.mEexp{2} AKE2toAKE3.mCompleted{2} j)).
+case (i{2} = j) => h .
+cut: false; last by smt.
+generalize H11 => /=.
+rewrite h.
+by apply H3; apply H6.
+rewrite /compute_sid.
+rewrite  get_setNE //.
+by  apply H8.
+
+fun.
+inline AKE_eqS(AKE2toAKE3).O.init2.
+if{1}; last first.
+if{2}=> //.
+rcondf{2} 3.
+intros => ?; wp; skip; progress => //.
+cut: ((x1, x2, proj AKE2toAKE3.mEPK{hr}.[i{hr}], Y{hr}, x3) = 
+      (compute_sid AKE2toAKE3.mStarted{hr} AKE_eqS.mEexp{hr}
+                AKE2toAKE3.mCompleted{hr}.[i{hr} <- Y{hr}] i{hr})).
+rewrite /compute_sid H12 /= get_setE proj_some H2 //; by apply H5.
+smt.
+wp; progress => //.
+rcondt{2} 1.
+intros => ?; skip; progress => //.
+rcondt{2} 3.
+intros => ?; wp; skip; progress => //.
+cut: ((x1, x2, proj AKE2toAKE3.mEPK{hr}.[i{hr}], Y{hr}, x3) = 
+      (compute_sid AKE2toAKE3.mStarted{hr} AKE_eqS.mEexp{hr}
+                AKE2toAKE3.mCompleted{hr}.[i{hr} <- Y{hr}] i{hr})).
+rewrite /compute_sid H12 /= get_setE proj_some H2 //; by apply H5.
+smt.
+rcondt{2} 7.
+intros => ?; wp; skip; progress => //.
+ wp; skip; progress => //. 
+cut: ((x1, x2, proj AKE2toAKE3.mEPK{2}.[i{2}], Y{2}, x3) = 
+      (compute_sid AKE2toAKE3.mStarted{2} AKE_eqS.mEexp{2}
+                AKE2toAKE3.mCompleted{2}.[i{2} <- Y{2}] i{2})).
+rewrite /compute_sid H12 /= get_setE proj_some H2 //; by apply H5.
+smt.
+ rewrite /compute_sid H12 /= get_setE proj_some H2 //; first apply H5 => //.
+ by apply tr_sim_eq_ev.
+ by apply is_sub_map_upd3. 
+ by apply is_sub_map_upd1. 
+intros => j hj; rewrite mem_cons; right.
+cut ->: (compute_sid AKE2toAKE3.mStarted{2} AKE_eqS.mEexp{2}
+        AKE2toAKE3.mCompleted{2}.[i{2} <- Y{2}] j) =
+       (compute_sid AKE2toAKE3.mStarted{2} AKE_eqS.mEexp{2}
+        AKE2toAKE3.mCompleted{2} j).
+case (i{2} = j) => h .
+cut: false; last by smt.
+generalize H9 => /=.
+rewrite h.
+by  apply H6.
+rewrite /compute_sid.
+rewrite  get_setNE //.
+by  apply H8.
+
+fun.
+inline AKE_eqS(AKE2toAKE3).O.resp.
+sp.
+if => //; last first.
+sp.
+rcondf{2} 1.
+intros => ?; wp; skip; progress => //.
+skip; progress => //.
+rcondt{2} 7.
+intros => ?; wp; skip; progress => //; smt.
+wp; skip; progress => //.
+by rewrite proj_some.
+by rewrite proj_some; apply tr_sim_eq_ev.
+rewrite /inv_EPK => j.
+case (j = i{2}) => heq.
+ by rewrite heq get_setE !proj_some.
+ rewrite in_dom_setNE // get_setNE; first smt.
+ by intros => h; apply H2.
+ by apply is_sub_map_upd2. 
+ by apply is_sub_map_upd2. 
+ by apply is_sub_map_upd2. 
+ by apply is_sub_map_upd1. 
+intros => j hj; rewrite mem_cons; right.
+cut ->: (compute_sid AKE2toAKE3.mStarted{2}.[i{2} <- (B{2}, A{2}, resp)]
+        AKE_eqS.mEexp{2} AKE2toAKE3.mCompleted{2}.[i{2} <- X{2}] j) =
+       (compute_sid AKE2toAKE3.mStarted{2} AKE_eqS.mEexp{2} AKE2toAKE3.mCompleted{2} j).
+case (i{2} = j) => h .
+cut: false; last by smt.
+generalize H12 => /=.
+rewrite h.
+by  apply H6.
+rewrite /compute_sid.
+rewrite  !get_setNE //.
+by  apply H8.
+
+ fun; inline AKE_eqS(AKE2toAKE3).O.staticRev.
+ wp; skip; progress.
+ by apply tr_sim_eq_ev.
+intros => j hj; rewrite mem_cons; right.
+by apply H8.
+
+ generalize H10 H11; rewrite /in_dom; smt.
+ generalize H10 H11; rewrite /in_dom; smt.
+ generalize H10 H11; rewrite /in_dom; smt.
+ apply AKE_find_eqS_sessionRev.
+save.
+
+local equiv AKE_find_eqS_choose : 
+AKE_find(A).A.choose ~ AKE2toAKE3(AKE_eqS(AKE2toAKE3).O).FA.choose :
+={s, glob A} /\
+AKE_find.sH2'{1} =  AKE2toAKE3.sH2'{2} /\
+   AKE_find.sKeyRev{1} = AKE2toAKE3.sKeyRev{2} /\
+   AKE_find.mKeyRev{1} = AKE2toAKE3.mKeyRev{2} /\
+    AKE_find.evs{1} = AKE2toAKE3.evs{2} /\
+   tr_sim AKE2toAKE3.evs{2} AKE_eqS.evs{2} /\
+   AKE_find.test{1} = AKE2toAKE3.test{2} /\
+
+   AKE_find.cH2{1} = AKE2toAKE3.cH2{2} /\
+   AKE_find.mH2{1} = AKE2toAKE3.mH2{2} /\
+   AKE_find.sH2{1} = AKE2toAKE3.sH2{2} /\
+   AKE_find.mSk{1} = AKE_eqS.mSk{2} /\
+   AKE_find.mEexp{1} = AKE_eqS.mEexp{2} /\
+   AKE_find.mStarted{1} = AKE_eqS.mStarted{2} /\
+   AKE_find.mStarted{1} = AKE2toAKE3.mStarted{2} /\
+   AKE_find.mCompleted{1} = AKE_eqS.mCompleted{2} /\
+   AKE_find.mCompleted{1} = AKE2toAKE3.mCompleted{2} /\
+   univ_map AKE_eqS.mEexp{2} /\ mSk_inv AKE_eqS.mSk{2} /\ 
+  inv_EPK AKE_eqS.mEexp{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mCompleted{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mEPK{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mStarted{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mKeyRev{2} AKE2toAKE3.mCompleted{2}  /\
+  is_dom AKE2toAKE3.sKeyRev{2} AKE2toAKE3.mKeyRev{2} /\
+  inv_KeyRev AKE_find.mKeyRev{1} AKE_find.evs{1} AKE_find.mStarted{1} AKE_find.mCompleted{1} AKE_find.mEexp{1} ==>
+={res, glob A} /\
+AKE_find.sH2'{1} =  AKE2toAKE3.sH2'{2} /\
+   AKE_find.sKeyRev{1} = AKE2toAKE3.sKeyRev{2} /\
+   AKE_find.mKeyRev{1} = AKE2toAKE3.mKeyRev{2} /\
+    AKE_find.evs{1} = AKE2toAKE3.evs{2} /\
+   tr_sim AKE2toAKE3.evs{2} AKE_eqS.evs{2} /\
+   AKE_find.test{1} = AKE2toAKE3.test{2} /\
+
+   AKE_find.cH2{1} = AKE2toAKE3.cH2{2} /\
+   AKE_find.mH2{1} = AKE2toAKE3.mH2{2} /\
+   AKE_find.sH2{1} = AKE2toAKE3.sH2{2} /\
+   AKE_find.mSk{1} = AKE_eqS.mSk{2} /\
+   AKE_find.mEexp{1} = AKE_eqS.mEexp{2} /\
+   AKE_find.mStarted{1} = AKE_eqS.mStarted{2} /\
+   AKE_find.mStarted{1} = AKE2toAKE3.mStarted{2} /\
+   AKE_find.mCompleted{1} = AKE_eqS.mCompleted{2} /\
+   AKE_find.mCompleted{1} = AKE2toAKE3.mCompleted{2} /\
+   univ_map AKE_eqS.mEexp{2} /\ mSk_inv AKE_eqS.mSk{2} /\ 
+  inv_EPK AKE_eqS.mEexp{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mCompleted{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mEPK{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mStarted{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mKeyRev{2} AKE2toAKE3.mCompleted{2}  /\
+  is_dom AKE2toAKE3.sKeyRev{2} AKE2toAKE3.mKeyRev{2} /\
+  inv_KeyRev AKE_find.mKeyRev{1} AKE_find.evs{1} AKE_find.mStarted{1} AKE_find.mCompleted{1} AKE_find.mEexp{1}.
+proof.
+ fun (AKE_find.sH2'{1} =  AKE2toAKE3.sH2'{2} /\
+   AKE_find.sKeyRev{1} = AKE2toAKE3.sKeyRev{2} /\
+   AKE_find.mKeyRev{1} = AKE2toAKE3.mKeyRev{2} /\
+    AKE_find.evs{1} = AKE2toAKE3.evs{2} /\
+   tr_sim AKE2toAKE3.evs{2} AKE_eqS.evs{2} /\
+   AKE_find.test{1} = AKE2toAKE3.test{2} /\
+
+   AKE_find.cH2{1} = AKE2toAKE3.cH2{2} /\
+   AKE_find.mH2{1} = AKE2toAKE3.mH2{2} /\
+   AKE_find.sH2{1} = AKE2toAKE3.sH2{2} /\
+   AKE_find.mSk{1} = AKE_eqS.mSk{2} /\
+   AKE_find.mEexp{1} = AKE_eqS.mEexp{2} /\
+   AKE_find.mStarted{1} = AKE_eqS.mStarted{2} /\
+   AKE_find.mStarted{1} = AKE2toAKE3.mStarted{2} /\
+   AKE_find.mCompleted{1} = AKE_eqS.mCompleted{2} /\
+   AKE_find.mCompleted{1} = AKE2toAKE3.mCompleted{2} /\
+   univ_map AKE_eqS.mEexp{2} /\ mSk_inv AKE_eqS.mSk{2} /\ 
+  inv_EPK AKE_eqS.mEexp{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mCompleted{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mEPK{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mStarted{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mKeyRev{2} AKE2toAKE3.mCompleted{2}  /\
+  is_dom AKE2toAKE3.sKeyRev{2} AKE2toAKE3.mKeyRev{2} /\
+  inv_KeyRev AKE_find.mKeyRev{1} AKE_find.evs{1} AKE_find.mStarted{1} AKE_find.mCompleted{1} AKE_find.mEexp{1}) => //.
+fun.
+inline AKE_eqS(AKE2toAKE3).O.eexpRev.
+seq 1 2: (={i, a, r} /\
+  r{2} = None /\
+  AKE_find.sH2'{1} = AKE2toAKE3.sH2'{2} /\
+  AKE_find.sKeyRev{1} = AKE2toAKE3.sKeyRev{2} /\
+  AKE_find.mKeyRev{1} = AKE2toAKE3.mKeyRev{2} /\
+  AKE_find.evs{1} = AKE2toAKE3.evs{2} /\
+  tr_sim AKE2toAKE3.evs{2} AKE_eqS.evs{2} /\
+  AKE_find.test{1} = AKE2toAKE3.test{2} /\
+
+  AKE_find.cH2{1} = AKE2toAKE3.cH2{2} /\
+  AKE_find.mH2{1} = AKE2toAKE3.mH2{2} /\
+  AKE_find.sH2{1} = AKE2toAKE3.sH2{2} /\
+  AKE_find.mSk{1} = AKE_eqS.mSk{2} /\
+  AKE_find.mEexp{1} = AKE_eqS.mEexp{2} /\
+  AKE_find.mStarted{1} = AKE_eqS.mStarted{2} /\
+  AKE_find.mStarted{1} = AKE2toAKE3.mStarted{2} /\
+  AKE_find.mCompleted{1} = AKE_eqS.mCompleted{2} /\
+  AKE_find.mCompleted{1} = AKE2toAKE3.mCompleted{2} /\
+  univ_map AKE_eqS.mEexp{2} /\
+  mSk_inv AKE_eqS.mSk{2} /\
+  inv_EPK AKE_eqS.mEexp{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mCompleted{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mEPK{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mStarted{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mKeyRev{2} AKE2toAKE3.mCompleted{2} /\
+  is_dom AKE2toAKE3.sKeyRev{2} AKE2toAKE3.mKeyRev{2} /\
+  inv_KeyRev AKE_find.mKeyRev{1} AKE_find.evs{1} AKE_find.mStarted{1}
+    AKE_find.mCompleted{1} AKE_find.mEexp{1}).
+wp; skip; progress => //.
+if{1}; last first.
+if{2}.
+rcondf{2} 3 => //.
+intros => ?; wp; skip; progress.
+cut : (x1, x2, proj AKE2toAKE3.mEPK{hr}.[i{hr}], x3) = 
+(compute_psid AKE2toAKE3.mStarted{hr} AKE_eqS.mEexp{hr} i{hr}).
+rewrite /compute_psid  H11 H2 /= //; first by apply H5.
+smt.
+wp; skip; progress => //.
+skip; progress => //.
+rcondt{2} 1.
+intros => ?; skip; progress => //.
+rcondt{2} 3.
+intros => ?; wp; skip; progress => //.
+cut : (x1, x2, proj AKE2toAKE3.mEPK{hr}.[i{hr}], x3) = 
+(compute_psid AKE2toAKE3.mStarted{hr} AKE_eqS.mEexp{hr} i{hr}).
+rewrite /compute_psid  H11 H2 //; first by apply H5.
+smt.
+rcondt{2} 6.
+intros => ?; wp; skip; progress => //.
+wp; skip; progress => //.
+
+cut : (x1, x2, proj AKE2toAKE3.mEPK{2}.[i{2}], x3) = 
+(compute_psid AKE2toAKE3.mStarted{2} AKE_eqS.mEexp{2} i{2}).
+rewrite /compute_psid  H11 H2 //; first by apply H5.
+smt.
+cut <- : (x1, x2, proj AKE2toAKE3.mEPK{2}.[i{2}], x3) = 
+(compute_psid AKE2toAKE3.mStarted{2} AKE_eqS.mEexp{2} i{2}).
+rewrite /compute_psid  H11 H2 //; first by apply H5.
+by apply tr_sim_eq_ev.
+intros => j hj; rewrite mem_cons; right; by apply H8.
+by rewrite /compute_psid /= H11 /= H2 //; apply H5. 
+rewrite /compute_psid /= H11 /= H2 //; first by apply H5.
+by apply tr_sim_eq_ev.
+intros => j hj; rewrite mem_cons; right; by apply H8.
+
+
+fun.
+inline  AKE_eqS(AKE2toAKE3).O.init1.
+sp.
+if => //; last first.
+sp.
+rcondf{2} 1.
+by intros => ?; skip.
+skip; progress.
+rcondt{2} 6.
+by intros => ?; wp; skip; progress => //; smt.
+wp; skip; progress => //.
+by rewrite proj_some.
+by rewrite proj_some; apply tr_sim_eq_ev.
+rewrite proj_some /inv_EPK => j.
+case (j = i{2}) => heq.
+ by rewrite heq get_setE proj_some.
+ rewrite in_dom_setNE // get_setNE; first smt.
+ by intros => h; apply H2.
+ by apply is_sub_map_upd1. 
+ by apply is_sub_map_upd2. 
+ by apply is_sub_map_upd2. 
+intros => j hj; rewrite mem_cons; right.
+cut ->: ((compute_sid AKE2toAKE3.mStarted{2}.[i{2} <- (A{2}, B{2}, init)]
+        AKE_eqS.mEexp{2} AKE2toAKE3.mCompleted{2} j) = 
+        (compute_sid AKE2toAKE3.mStarted{2}
+        AKE_eqS.mEexp{2} AKE2toAKE3.mCompleted{2} j)).
+case (i{2} = j) => h .
+cut: false; last by smt.
+generalize H11 => /=.
+rewrite h.
+by apply H3; apply H6.
+rewrite /compute_sid.
+rewrite  get_setNE //.
+by  apply H8.
+
+fun.
+inline AKE_eqS(AKE2toAKE3).O.init2.
+if{1}; last first.
+if{2}=> //.
+rcondf{2} 3.
+intros => ?; wp; skip; progress => //.
+cut: ((x1, x2, proj AKE2toAKE3.mEPK{hr}.[i{hr}], Y{hr}, x3) = 
+      (compute_sid AKE2toAKE3.mStarted{hr} AKE_eqS.mEexp{hr}
+                AKE2toAKE3.mCompleted{hr}.[i{hr} <- Y{hr}] i{hr})).
+rewrite /compute_sid H12 /= get_setE proj_some H2 //; by apply H5.
+smt.
+wp; progress => //.
+rcondt{2} 1.
+intros => ?; skip; progress => //.
+rcondt{2} 3.
+intros => ?; wp; skip; progress => //.
+cut: ((x1, x2, proj AKE2toAKE3.mEPK{hr}.[i{hr}], Y{hr}, x3) = 
+      (compute_sid AKE2toAKE3.mStarted{hr} AKE_eqS.mEexp{hr}
+                AKE2toAKE3.mCompleted{hr}.[i{hr} <- Y{hr}] i{hr})).
+rewrite /compute_sid H12 /= get_setE proj_some H2 //; by apply H5.
+smt.
+rcondt{2} 7.
+intros => ?; wp; skip; progress => //.
+ wp; skip; progress => //. 
+cut: ((x1, x2, proj AKE2toAKE3.mEPK{2}.[i{2}], Y{2}, x3) = 
+      (compute_sid AKE2toAKE3.mStarted{2} AKE_eqS.mEexp{2}
+                AKE2toAKE3.mCompleted{2}.[i{2} <- Y{2}] i{2})).
+rewrite /compute_sid H12 /= get_setE proj_some H2 //; by apply H5.
+smt.
+ rewrite /compute_sid H12 /= get_setE proj_some H2 //; first apply H5 => //.
+ by apply tr_sim_eq_ev.
+ by apply is_sub_map_upd3. 
+ by apply is_sub_map_upd1. 
+intros => j hj; rewrite mem_cons; right.
+cut ->: (compute_sid AKE2toAKE3.mStarted{2} AKE_eqS.mEexp{2}
+        AKE2toAKE3.mCompleted{2}.[i{2} <- Y{2}] j) =
+       (compute_sid AKE2toAKE3.mStarted{2} AKE_eqS.mEexp{2}
+        AKE2toAKE3.mCompleted{2} j).
+case (i{2} = j) => h .
+cut: false; last by smt.
+generalize H9 => /=.
+rewrite h.
+by  apply H6.
+rewrite /compute_sid.
+rewrite  get_setNE //.
+by  apply H8.
+
+fun.
+inline AKE_eqS(AKE2toAKE3).O.resp.
+sp.
+if => //; last first.
+sp.
+rcondf{2} 1.
+intros => ?; wp; skip; progress => //.
+skip; progress => //.
+rcondt{2} 7.
+intros => ?; wp; skip; progress => //; smt.
+wp; skip; progress => //.
+by rewrite proj_some.
+by rewrite proj_some; apply tr_sim_eq_ev.
+rewrite /inv_EPK => j.
+case (j = i{2}) => heq.
+ by rewrite heq get_setE !proj_some.
+ rewrite in_dom_setNE // get_setNE; first smt.
+ by intros => h; apply H2.
+ by apply is_sub_map_upd2. 
+ by apply is_sub_map_upd2. 
+ by apply is_sub_map_upd2. 
+ by apply is_sub_map_upd1. 
+intros => j hj; rewrite mem_cons; right.
+cut ->: (compute_sid AKE2toAKE3.mStarted{2}.[i{2} <- (B{2}, A{2}, resp)]
+        AKE_eqS.mEexp{2} AKE2toAKE3.mCompleted{2}.[i{2} <- X{2}] j) =
+       (compute_sid AKE2toAKE3.mStarted{2} AKE_eqS.mEexp{2} AKE2toAKE3.mCompleted{2} j).
+case (i{2} = j) => h .
+cut: false; last by smt.
+generalize H12 => /=.
+rewrite h.
+by  apply H6.
+rewrite /compute_sid.
+rewrite  !get_setNE //.
+by  apply H8.
+
+ fun; inline AKE_eqS(AKE2toAKE3).O.staticRev.
+ wp; skip; progress.
+ by apply tr_sim_eq_ev.
+intros => j hj; rewrite mem_cons; right.
+by apply H8.
+
+ generalize H10 H11; rewrite /in_dom; smt.
+ generalize H10 H11; rewrite /in_dom; smt.
+ generalize H10 H11; rewrite /in_dom; smt.
+ apply AKE_find_eqS_h2_a.
+ apply AKE_find_eqS_sessionRev.
+save.
+
+local equiv AKE_find_eqS : 
+AKE_find(A).main ~ AKE_eqS(AKE2toAKE3).main :
+={glob A} ==>
+(AKE_find.test <> None /\ 
+in_dom AKE_find.t_idx AKE_find.mCompleted /\
+mem
+(get_string_from_id AKE_find.t_idx AKE_find.mStarted 
+  AKE_find.mCompleted AKE_find.mEexp AKE_find.mSk) 
+AKE_find.sH2 /\
+fresh_op (compute_sid AKE_find.mStarted AKE_find.mEexp AKE_find.mCompleted AKE_find.t_idx) AKE_find.evs){1} =>
+(
+in_dom AKE_eqS.test_sidx AKE_eqS.mCompleted /\
+List.mem
+(get_string_from_id AKE_eqS.test_sidx AKE_eqS.mStarted 
+  AKE_eqS.mCompleted AKE_eqS.mEexp AKE_eqS.mSk) 
+(AKE_eqS.h2_queries) /\
+fresh_op (compute_sid AKE_eqS.mStarted AKE_eqS.mEexp AKE_eqS.mCompleted AKE_eqS.test_sidx) AKE_eqS.evs){2}.
+ fun.
+ inline AKE_eqS(AKE2toAKE3).init AKE_find(A).init AKE_eqS(AKE2toAKE3).A.guess.
+seq 27 19 : 
+ (={b, pks, key, keyo, b', i, glob A} /\
+  AKE_find.sH2'{1} = FSet.empty /\
+  AKE_find.sKeyRev{1} = FSet.empty /\
+  AKE_find.mKeyRev{1} = Map.empty /\
+  AKE_find.evs{1} = AKE_eqS.evs{2} /\
+  AKE_find.evs{1} = [] /\
+  AKE_find.test{1} = None /\
+
+  AKE_find.cSession{1} = 0 /\
+  AKE_find.cH1{1} = 0 /\
+  AKE_find.cH2{1} = 0 /\
+  AKE_find.mH2{1} = Map.empty /\
+  AKE_find.sH2{1} = FSet.empty /\
+  AKE_find.mSk{1} = AKE_eqS.mSk{2} /\
+  AKE_find.mEexp{1} = AKE_eqS.mEexp{2} /\
+  AKE_find.mStarted{1} = AKE_eqS.mStarted{2} /\ 
+  AKE_find.mStarted{1} = Map.empty /\
+  AKE_find.mCompleted{1} = AKE_eqS.mCompleted{2} /\ 
+  AKE_find.mCompleted{1} = Map.empty /\
+  univ_map AKE_eqS.mEexp{2} /\
+  mSk_inv AKE_eqS.mSk{2} ). 
+while (  ={sidxs} /\
+AKE_find.mEexp{1} = AKE_eqS.mEexp{2}  /\
+  (forall (s : Sidx), !mem s sidxs{2} => in_dom s AKE_eqS.mEexp{2})).
+ wp; rnd; wp; skip; progress => //.
+ generalize H5; rewrite mem_rm not_and => [|] h.
+ by rewrite in_dom_set; left; apply H.
+ rewrite in_dom_set; right; smt.
+ while (={pks, i} /\   AKE_find.mSk{1} = AKE_eqS.mSk{2} /\ 
+         mSk_inv AKE_eqS.mSk{2} ).
+ wp; rnd; wp; skip; progress.
+ rewrite /mSk_inv => s; rewrite in_dom_set.
+  case (gen_pk skaL = s).
+  by intros => <- _; rewrite get_setE proj_some.
+  intros => h [|] h'; last smt.
+  by rewrite get_setNE //; apply H.
+wp; skip; progress.
+ rewrite /mSk_inv; smt.
+ smt.
+ rewrite /univ_map => x; apply H2; smt.
+ if => //; last first.
+ rnd{1}; skip; progress => //; smt.
+
+ inline AKE2toAKE3(AKE_eqS(AKE2toAKE3).O).init.
+ seq 0 13:
+ (={b, pks, key, keyo, b', i, glob A} /\
+   AKE_find.sH2'{1} =  AKE2toAKE3.sH2'{2} /\
+   AKE_find.sKeyRev{1} = AKE2toAKE3.sKeyRev{2} /\
+   AKE_find.mKeyRev{1} = AKE2toAKE3.mKeyRev{2} /\
+   AKE_find.evs{1} = AKE_eqS.evs{2} /\
+   AKE_find.evs{1} = [] /\
+   AKE_find.evs{1} = AKE2toAKE3.evs{2} /\
+   AKE_find.test{1} = AKE2toAKE3.test{2} /\
+
+   AKE_find.cSession{1} = 0 /\
+   AKE_find.cH1{1} = 0 /\
+   AKE_find.cH2{1} = AKE2toAKE3.cH2{2} /\
+   AKE_find.mH2{1} = AKE2toAKE3.mH2{2} /\
+   AKE_find.sH2{1} = AKE2toAKE3.sH2{2} /\
+   AKE_find.mSk{1} = AKE_eqS.mSk{2} /\
+   AKE_find.mEexp{1} = AKE_eqS.mEexp{2} /\
+   AKE_find.mStarted{1} = AKE_eqS.mStarted{2} /\
+   AKE_find.mStarted{1} = AKE2toAKE3.mStarted{2} /\
+   AKE_find.mCompleted{1} = AKE_eqS.mCompleted{2} /\
+   AKE_find.mCompleted{1} = AKE2toAKE3.mCompleted{2} /\
+   univ_map AKE_eqS.mEexp{2} /\ mSk_inv AKE_eqS.mSk{2} /\
+  ! collision_eexp_eexp_op AKE_find.mEexp{1} /\
+   s{2} = pks{2}  /\ 
+  inv_EPK AKE_eqS.mEexp{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mCompleted{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mEPK{2} AKE2toAKE3.mStarted{2} /\
+  is_sub_map AKE2toAKE3.mStarted{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mKeyRev{2} AKE2toAKE3.mCompleted{2} /\
+  is_dom AKE2toAKE3.sKeyRev{2} AKE2toAKE3.mKeyRev{2} /\
+  AKE2toAKE3.mKeyRev{2} = Map.empty).
+  wp; skip; progress => //.
+ rewrite /inv_EPK; smt.
+ rewrite /is_sub_map; smt.
+ rewrite /is_sub_map; smt.
+ rewrite /is_sub_map; smt.
+ rewrite /is_sub_map; smt.
+ rewrite /is_dom; smt.
+seq 1 1:
+(={b, pks, key, keyo, b', i, glob A} /\
+   AKE_find.sH2'{1} =  AKE2toAKE3.sH2'{2} /\
+   AKE_find.sKeyRev{1} = AKE2toAKE3.sKeyRev{2} /\
+   AKE_find.mKeyRev{1} = AKE2toAKE3.mKeyRev{2} /\
+    AKE_find.evs{1} = AKE2toAKE3.evs{2} /\
+   tr_sim AKE2toAKE3.evs{2} AKE_eqS.evs{2} /\
+   AKE_find.test{1} = AKE2toAKE3.test{2} /\
+
+   AKE_find.cH2{1} = AKE2toAKE3.cH2{2} /\
+   AKE_find.mH2{1} = AKE2toAKE3.mH2{2} /\
+   AKE_find.sH2{1} = AKE2toAKE3.sH2{2} /\
+   AKE_find.mSk{1} = AKE_eqS.mSk{2} /\
+   AKE_find.mEexp{1} = AKE_eqS.mEexp{2} /\
+   AKE_find.mStarted{1} = AKE_eqS.mStarted{2} /\
+   AKE_find.mStarted{1} = AKE2toAKE3.mStarted{2} /\
+   AKE_find.mCompleted{1} = AKE_eqS.mCompleted{2} /\
+   AKE_find.mCompleted{1} = AKE2toAKE3.mCompleted{2} /\
+   univ_map AKE_eqS.mEexp{2} /\ mSk_inv AKE_eqS.mSk{2} /\
+  ! collision_eexp_eexp_op AKE_find.mEexp{1} /\ 
+   AKE_find.t_idx{1} =  AKE2toAKE3.t_idx{2} /\ 
+   inv_EPK AKE_eqS.mEexp{2} AKE2toAKE3.mEPK{2}  /\
+  is_sub_map AKE2toAKE3.mCompleted{2} AKE2toAKE3.mStarted{2}  /\
+  is_sub_map AKE2toAKE3.mEPK{2} AKE2toAKE3.mStarted{2}  /\
+  is_sub_map AKE2toAKE3.mStarted{2} AKE2toAKE3.mEPK{2} /\
+  is_sub_map AKE2toAKE3.mKeyRev{2} AKE2toAKE3.mCompleted{2} /\
+  is_dom AKE2toAKE3.sKeyRev{2} AKE2toAKE3.mKeyRev{2} /\
+inv_KeyRev AKE2toAKE3.mKeyRev{2} AKE2toAKE3.evs{2} AKE2toAKE3.mStarted{2}
+  AKE2toAKE3.mCompleted{2} AKE_eqS.mEexp{2}
+).
+call AKE_find_eqS_choose; skip; progress.
+apply tr_sim_empty.
+rewrite /inv_KeyRev; smt.
+ if{1}.
+ rcondt{2} 1 => //.
+ rcondt{2} 5 => //.
+ progress; wp; skip => //; progress.
+ generalize H12; rewrite /compute_sid H13 /= H3 //.
+ by apply H6; generalize H9; rewrite /in_dom.
+ rnd{1}; wp.
+
+call AKE_find_eqS_guess; wp; rnd; wp; skip; progress.
+  by rewrite /compute_sid H13 H3 //=; apply H6; generalize H9; rewrite /in_dom.
+  smt.
+  by rewrite mem_def.
+  by generalize H44; apply tr_sim_fresh_op.
+  if{2}.
+  rcondf{2} 5 => //.
+  intros => ?; wp; skip; progress => //.
+  generalize H10; rewrite /compute_sid H13 /= H3 //.
+    by apply H6; generalize H11; rewrite /in_dom.
+    smt.
+  wp; progress; rnd{1}; skip; progress; smt.
+  wp; progress; rnd{1}; skip; progress.
+  smt.
+  generalize H10 H15 H17.
+  rewrite /in_dom.
+  case (AKE2toAKE3.mCompleted{2}.[AKE2toAKE3.t_idx{2}] = None) => //= h.
+  cut: ! AKE2toAKE3.mStarted{2}.[AKE2toAKE3.t_idx{2}] = None.
+  cut: in_dom AKE2toAKE3.t_idx{2} AKE2toAKE3.mStarted{2}.
+   by apply H4; rewrite /in_dom.
+   by rewrite /in_dom.
+  case (AKE2toAKE3.mStarted{2}.[AKE2toAKE3.t_idx{2}] = None) => //=.
+  smt.
+  generalize H17.
+  by apply tr_sim_fresh_op => //.
+qed.
+
+local lemma  Pr5_aux &m :
+Pr[AKE_find(A).main()@ &m :
+(AKE_find.test <> None /\ 
+in_dom AKE_find.t_idx AKE_find.mCompleted /\
+mem
+(get_string_from_id AKE_find.t_idx AKE_find.mStarted 
+  AKE_find.mCompleted AKE_find.mEexp AKE_find.mSk) 
+AKE_find.sH2 /\
+fresh_op (compute_sid AKE_find.mStarted AKE_find.mEexp AKE_find.mCompleted AKE_find.t_idx) AKE_find.evs) ] <=
+Pr[AKE_eqS(AKE2toAKE3).main() @ &m :
+(in_dom AKE_eqS.test_sidx AKE_eqS.mCompleted /\
+List.mem
+(get_string_from_id AKE_eqS.test_sidx AKE_eqS.mStarted 
+  AKE_eqS.mCompleted AKE_eqS.mEexp AKE_eqS.mSk) 
+(AKE_eqS.h2_queries) /\
+fresh_op (compute_sid AKE_eqS.mStarted AKE_eqS.mEexp AKE_eqS.mCompleted AKE_eqS.test_sidx) AKE_eqS.evs)].
+proof.
+ equiv_deno AKE_find_eqS => //.
+save.
+
+local lemma Pr_sofar3 : forall &m,
+Pr[AKE_EexpRev(A).main() @ &m : res /\ test_fresh AKE_EexpRev.test AKE_EexpRev.evs
+                    /\ ! collision_eexp_eexp(AKE_EexpRev.mEexp) 
+                    /\ ! collision_eexp_rcvd(AKE_EexpRev.evs)] <=
+1%r/2%r + 
+Pr[AKE_eqS(AKE2toAKE3).main() @ &m :
+(in_dom AKE_eqS.test_sidx AKE_eqS.mCompleted /\
+List.mem
+(get_string_from_id AKE_eqS.test_sidx AKE_eqS.mStarted 
+  AKE_eqS.mCompleted AKE_eqS.mEexp AKE_eqS.mSk) 
+(AKE_eqS.h2_queries) /\
+fresh_op (compute_sid AKE_eqS.mStarted AKE_eqS.mEexp AKE_eqS.mCompleted AKE_eqS.test_sidx) AKE_eqS.evs)].
+proof. 
+ intros => &m.
+ apply (Real.Trans _
+(1%r/2%r + 
+Pr[AKE_find(A).main() @ &m : 
+AKE_find.test <> None /\ 
+in_dom AKE_find.t_idx AKE_find.mCompleted /\ 
+mem
+(get_string_from_id AKE_find.t_idx AKE_find.mStarted 
+  AKE_find.mCompleted AKE_find.mEexp AKE_find.mSk) 
+AKE_find.sH2 /\
+fresh_op (compute_sid AKE_find.mStarted AKE_find.mEexp AKE_find.mCompleted AKE_find.t_idx) AKE_find.evs]) _).
+apply (Pr_sofar2 &m).
+apply real_le_plus.
+smt.
+apply (Pr5_aux &m).
+save.
+
+lemma Pr_sofar3' : exists (B <: Adv3), forall &m,
+Pr[AKE_EexpRev(A).main() @ &m : res /\ test_fresh AKE_EexpRev.test AKE_EexpRev.evs
+                    /\ ! collision_eexp_eexp(AKE_EexpRev.mEexp) 
+                    /\ ! collision_eexp_rcvd(AKE_EexpRev.evs)] <=
+1%r/2%r + 
+Pr[AKE_eqS(B).main() @ &m :
+(in_dom AKE_eqS.test_sidx AKE_eqS.mCompleted /\
+List.mem
+(get_string_from_id AKE_eqS.test_sidx AKE_eqS.mStarted 
+  AKE_eqS.mCompleted AKE_eqS.mEexp AKE_eqS.mSk) 
+(AKE_eqS.h2_queries) /\
+fresh_op (compute_sid AKE_eqS.mStarted AKE_eqS.mEexp AKE_eqS.mCompleted AKE_eqS.test_sidx) AKE_eqS.evs)].
+proof. 
+ exists AKE2toAKE3.
+ apply Pr_sofar3.
+save.
+
+end section.
+
+lemma Pr5 : 
+forall (A <: Adv2{AKE_EexpRev, AKE_eqS}),
+(forall (O <: AKE_Oracles2{A}),
+  islossless O.eexpRev =>
+  islossless O.h2_a =>
+  islossless O.init1 =>
+  islossless O.init2 =>
+  islossless O.resp =>
+  islossless O.staticRev => islossless O.sessionRev => islossless A(O).choose) =>
+(forall (O <: AKE_Oracles2{A}),
+  islossless O.eexpRev =>
+  islossless O.h2_a =>
+  islossless O.init1 =>
+  islossless O.init2 =>
+  islossless O.resp =>
+  islossless O.staticRev => islossless O.sessionRev => islossless A(O).guess)
+=> exists (B <: Adv3), 
+forall &m,
+Pr[AKE_EexpRev(A).main() @ &m : res /\ test_fresh AKE_EexpRev.test AKE_EexpRev.evs
+                    /\ ! collision_eexp_eexp(AKE_EexpRev.mEexp) 
+                    /\ ! collision_eexp_rcvd(AKE_EexpRev.evs)] <=
+1%r/2%r + 
+Pr[AKE_eqS(B).main() @ &m :
+(in_dom AKE_eqS.test_sidx AKE_eqS.mCompleted /\
+List.mem
+(get_string_from_id AKE_eqS.test_sidx AKE_eqS.mStarted 
+  AKE_eqS.mCompleted AKE_eqS.mEexp AKE_eqS.mSk) 
+(AKE_eqS.h2_queries) /\
+fresh_op (compute_sid AKE_eqS.mStarted AKE_eqS.mEexp AKE_eqS.mCompleted AKE_eqS.test_sidx) AKE_eqS.evs)].
+proof.
+ intros => A hllc hllcg.
+ by apply (Pr_sofar3' A _ _ ) => //.
+save.
