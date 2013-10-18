@@ -146,7 +146,6 @@
     "section"     , SECTION    ;        (* KW: global *)
     "extraction"  , EXTRACTION ; 
     "type"        , TYPE       ;        (* KW: global *)
-    "self"        , SELF       ;        (* KW: global *)
     "class"       , CLASS      ;        (* KW: global *)
     "instance"    , INSTANCE   ;        (* KW: global *)
     "datatype"    , DATATYPE   ;        (* KW: global *)

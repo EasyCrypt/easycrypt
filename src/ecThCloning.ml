@@ -153,7 +153,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
             match EcEnv.Ty.by_path_opt xpath scenv with
             | None ->
                 clone_error scenv (CE_UnkOverride (OVK_Type, name));
-            | Some { EcDecl.tyd_type = Some _ } ->
+            | Some { EcDecl.tyd_type = `Concrete _ } ->
                 clone_error scenv (CE_CrtOverride (OVK_Type, name));
             | Some refty ->
                 if List.length refty.tyd_params <> List.length tyargs then
@@ -225,7 +225,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
 
             let rec doit prefix (proofs, evc) dth =
               match dth with
-              | CTh_type (x, ({ tyd_type = None } as otyd)) ->
+              | CTh_type (x, ({ tyd_type = `Abstract _ } as otyd)) ->
                   (* FIXME: TC HOOK *)
                   let params = List.map (EcIdent.name |- fst) otyd.tyd_params in
                   let params = List.map (mk_loc l) params in
@@ -374,7 +374,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
               | `Alias ->
                   let binding =
                     { tyd_params = nargs;
-                      tyd_type   = Some ntyd; }
+                      tyd_type   = `Concrete ntyd; }
                   in
                     (subst, proofs, EcEnv.Ty.bind x binding scenv)
 

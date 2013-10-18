@@ -715,7 +715,11 @@ and zipper = zipper_elem list
 let import_w3_tydef rn path (env,rb,z) ty =
   let tvm = Wtvm.create () in
   let params = List.map (fun x -> Wtvm.get tvm x, Sp.empty) ty.Ty.ts_args in
-  let def = ty.Ty.ts_def |> omap (import_w3_ty env tvm) in
+  let def =
+    match ty.Ty.ts_def |> omap (import_w3_ty env tvm) with
+    | None    -> `Abstract Sp.empty
+    | Some ty -> `Concrete ty
+  in
   let eid = Renaming.get_ts rn ty in
   let td = { tyd_params = params; tyd_type = def } in
   let p = EcPath.pqname path eid in
@@ -1032,8 +1036,12 @@ let trans_typarams =
 let trans_tydecl env path td =
   let pid = preid_p path in
   let env, tparams = trans_typarams env td.tyd_params in
-  let body = td.tyd_type |> omap (trans_ty env) in
-  Ty.create_tysymbol pid tparams body
+  let body =
+    match td.tyd_type with
+    | `Concrete ty -> Some (trans_ty env ty)
+    | `Abstract _  -> None
+  in
+    Ty.create_tysymbol pid tparams body
 
 (* --------------------------- Formulas ------------------------------- *)
 

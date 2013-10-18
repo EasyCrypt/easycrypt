@@ -271,10 +271,11 @@ let subst_tydecl (s : _subst) (tyd : tydecl) =
   let params' = List.map (subst_typaram s) tyd.tyd_params in
   let body = 
     match tyd.tyd_type with
-    | None    -> None 
-    | Some ty ->
+    | `Abstract tc ->
+        `Abstract (Sp.fold (fun p tc -> Sp.add (s.s_p p) tc) tc Sp.empty)
+    | `Concrete ty ->
         let s = init_tparams s tyd.tyd_params params' in
-          Some (s.s_ty ty)
+          `Concrete (s.s_ty ty)
   in
     { tyd_params = params'; tyd_type = body }
 

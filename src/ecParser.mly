@@ -3,7 +3,7 @@
   open EcLocation
   open EcParsetree
 
-  let error loc msg = raise (ParseError (loc, msg))
+  let parse_error loc msg = raise (ParseError (loc, msg))
 
   let pqsymb_of_psymb (x : psymbol) : pqsymbol =
     mk_loc x.pl_loc ([], x.pl_desc)
@@ -278,7 +278,6 @@
 %token SAMPLE
 %token SAVE
 %token SECTION
-%token SELF
 %token SEMICOLON
 %token SEQ
 %token SIMPLIFY
@@ -405,7 +404,7 @@ genqident(X):
 
 | x=loc(STRING) {
     if not (EcCoreLib.is_mixfix_op (unloc x)) then
-      error x.pl_loc (Some "invalid mixfix operator");
+      parse_error x.pl_loc (Some "invalid mixfix operator");
     unloc x
   }
 ;
@@ -505,7 +504,7 @@ sexpr_u:
 
 | e=sexpr PCENT p=lident
    { if unloc p <> "top" then
-       error p.pl_loc (Some "invalid scope name");
+       parse_error p.pl_loc (Some "invalid scope name");
      PEscope (pqsymb_of_symb p.pl_loc "<top>", e) }
 
 | n=number
@@ -904,7 +903,6 @@ pgtybindings:
 
 simpl_type_exp:
 | UNDERSCORE                  { PTunivar       }
-| SELF                        { PTself         }
 | x=qident                    { PTnamed x      }
 | x=tident                    { PTvar x        }
 | tya=type_args x=qident      { PTapp (x, tya) }
@@ -1088,10 +1086,10 @@ mod_def:
         match body.pl_desc with
         | `Alias m ->
              if p <> [] then
-               error (EcLocation.make $startpos $endpos)
+               parse_error (EcLocation.make $startpos $endpos)
                  (Some "cannot parameterize module alias");
              if t <> None then
-               error (EcLocation.make $startpos $endpos)
+               parse_error (EcLocation.make $startpos $endpos)
                  (Some "cannot bind module type to module alias"); 
              (x, mk_loc body.pl_loc (Pm_ident m))
 
@@ -1189,7 +1187,7 @@ oracle_info:
 (* EcTypes declarations / definitions                                   *)
 
 tcand:
-| x=loc(OP4) { if unloc x <> "&" then error x.pl_loc None }
+| x=loc(OP4) { if unloc x <> "&" then parse_error x.pl_loc None }
 ;
 
 typaram:
@@ -1595,7 +1593,7 @@ rwarg:
 | s=rwside r=rwrepeat? o=rwocc? SLASH x=sform_h
     { let loc = EcLocation.make $startpos $endpos in
         if r <> None then
-          error loc (Some "delta-repeat not supported");
+          parse_error loc (Some "delta-repeat not supported");
         RWDelta (s, o |> omap EcMaps.Sint.of_list, x); }
 ;
 
@@ -1700,7 +1698,7 @@ side:
    match n with
    | 1 -> true
    | 2 -> false
-   | _ -> error
+   | _ -> parse_error
               (EcLocation.make $startpos $endpos)
               (Some "variable side must be 1 or 2")
  }
@@ -1709,7 +1707,7 @@ side:
 occurences:
 | p=paren(NUM+) {
     if List.mem 0 p then
-      error
+      parse_error
         (EcLocation.make $startpos $endpos)
         (Some "`0' is not a valid occurence");
     p
@@ -2378,7 +2376,7 @@ prog_r:
    { P_Undo d }
 
 | error
-   { error (EcLocation.make $startpos $endpos) None }
+   { parse_error (EcLocation.make $startpos $endpos) None }
 ;
 
 prog:

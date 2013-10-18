@@ -133,6 +133,7 @@ type preenv = {
   env_actmem   : EcMemory.memory option;
   env_abs_st   : EcBaseLogic.abs_uses Mid.t;
   env_tci      : (tcinstance list) Mp.t;
+  env_tc       : TC.graph;
   env_modlcs   : Sid.t;                 (* declared modules *)
   env_w3       : EcWhy3.env;
   env_rb       : EcWhy3.rebinding;      (* in reverse order *)
@@ -202,6 +203,7 @@ let empty () =
       env_actmem   = None;
       env_abs_st   = Mid.empty;
       env_tci      = Mp.empty;
+      env_tc       = TC.Graph.empty;
       env_modlcs   = Sid.empty;
       env_w3       = EcWhy3.empty;
       env_rb       = [];
@@ -875,8 +877,8 @@ module MC = struct
   and bind_tydecl x tyd env =
     bind _up_tydecl x tyd env
 
-  and bind_typeclass x ax env =
-    bind _up_typeclass x ax env
+  and bind_typeclass x tc env =
+    bind _up_typeclass x tc env
 end
 
 (* -------------------------------------------------------------------- *)
@@ -1539,6 +1541,50 @@ module Mod = struct
 end
 
 (* -------------------------------------------------------------------- *)
+module TypeClass = struct
+  type t = unit
+
+  let by_path_opt (p : EcPath.path) (env : env) =
+    omap 
+      check_not_suspended
+      (MC.by_path (fun mc -> mc.mc_typeclasses) (IPPath p) env)
+
+  let by_path (p : EcPath.path) (env : env) =
+    match by_path_opt p env with
+    | None -> lookup_error (`Path p)
+    | Some obj -> obj
+
+  let add (p : EcPath.path) (env : env) =
+    let obj = by_path p env in
+      MC.import_typeclass p obj env
+
+  let bind name tc env =
+    let env = MC.bind_typeclass name tc env in
+    let env = { env with env_item = CTh_typeclass name :: env.env_item } in
+      (* FIXME: TC HOOK *)
+      env
+
+  let lookup qname (env : env) =
+    MC.lookup_typeclass qname env
+
+  let lookup_opt name env =
+    try_lf (fun () -> lookup name env)
+
+  let lookup_path name env =
+    fst (lookup name env)
+
+  let graph (env : env) =
+    env.env_tc
+
+  let tc_of_typename (_p : EcPath.path) (_env : env) =
+    (* FIXME: TC HOOK *)
+    Sp.empty
+
+  let add_abstract_instance ~src ~dst env =
+    { env with env_tc = TC.Graph.add ~src ~dst env.env_tc; }
+end
+
+(* -------------------------------------------------------------------- *)
 module Ty = struct
   type t = EcDecl.tydecl
 
@@ -1566,7 +1612,16 @@ module Ty = struct
     fst (lookup name env)
 
   let bind name ty env =
-    let env = MC.bind_tydecl name ty env in
+    let mypath = root env in
+    let env    = MC.bind_tydecl name ty env in
+    let env    =
+      match ty.tyd_type with
+      | `Concrete _  -> env
+      | `Abstract tc -> Sp.fold
+          (fun dst env -> TypeClass.add_abstract_instance ~src:mypath ~dst env)
+          tc env
+    in
+
     let (w3, rb) =
         EcWhy3.add_ty env.env_w3
           (EcPath.pqname (root env) name) ty
@@ -1577,16 +1632,17 @@ module Ty = struct
           env_item = CTh_type (name, ty) :: env.env_item; }
 
   let rebind name ty env =
+    (* FIXME: TC HOOK *)
     MC.bind_tydecl name ty env
 
   let defined (name : EcPath.path) (env : env) =
     match by_path_opt name env with
-    | Some { tyd_type = Some _ } -> true
+    | Some { tyd_type = `Concrete _ } -> true
     | _ -> false
 
   let unfold (name : EcPath.path) (args : EcTypes.ty list) (env : env) =
     match by_path_opt name env with
-    | Some ({ tyd_type = Some body } as tyd) ->
+    | Some ({ tyd_type = `Concrete body } as tyd) ->
         EcTypes.Tvar.subst
           (EcTypes.Tvar.init (List.map fst tyd.tyd_params) args)
           body
@@ -1888,16 +1944,12 @@ module NormMp = struct
           if hf.hf_pr == pre' && hf.hf_f == p' && hf.hf_po == post' then f else
           f_hoareF pre' p' post'
 
-(*        | FhoareS _ -> assert false (* FIXME ? Not implemented *) *)
-
         | FequivF ef ->
           let pre' = aux ef.ef_pr and l' = norm_xp ef.ef_fl
           and r' = norm_xp ef.ef_fr and post' = aux ef.ef_po in
           if ef.ef_pr == pre' && ef.ef_fl == l' &&
             ef.ef_fr == r' && ef.ef_po == post' then f else
           f_equivF pre' l' r' post'
-
-(*        | FequivS _ -> assert false (* FIXME ? Not implemented *) *)
 
         | Fpr(m,p,args,e) ->
           let p' = norm_xp p in
@@ -2140,48 +2192,6 @@ module Ax = struct
 end
 
 (* -------------------------------------------------------------------- *)
-module TypeClass = struct
-  type t = unit
-
-  let by_path_opt (p : EcPath.path) (env : env) =
-    omap 
-      check_not_suspended
-      (MC.by_path (fun mc -> mc.mc_typeclasses) (IPPath p) env)
-
-  let by_path (p : EcPath.path) (env : env) =
-    match by_path_opt p env with
-    | None -> lookup_error (`Path p)
-    | Some obj -> obj
-
-  let add (p : EcPath.path) (env : env) =
-    let obj = by_path p env in
-      MC.import_typeclass p obj env
-
-  let bind name ax env =
-    let env = MC.bind_typeclass name ax env in
-    let env = { env with env_item = CTh_typeclass name :: env.env_item } in
-      (* FIXME: TC HOOK *)
-      env
-
-  let lookup qname (env : env) =
-    MC.lookup_typeclass qname env
-
-  let lookup_opt name env =
-    try_lf (fun () -> lookup name env)
-
-  let lookup_path name env =
-    fst (lookup name env)
-
-  let graph (_env : env) =
-    (* FIXME: TC HOOK *)
-    TC.Graph.empty
-
-  let tc_of_typename (_p : EcPath.path) (_env : env) =
-    (* FIXME: TC HOOK *)
-    Sp.empty
-end
-
-(* -------------------------------------------------------------------- *)
 module Algebra = struct
   open EcAlgebra
 
@@ -2201,7 +2211,7 @@ module Algebra = struct
  
   let add p cr env = 
     { env with
-        env_tci = bind p cr env.env_tci;
+        env_tci  = bind p cr env.env_tci;
         env_item = CTh_instance (p, cr) :: env.env_item; }
 
   let add_ring  p cr env = add p (`Ring  cr) env
@@ -2295,10 +2305,11 @@ module Theory = struct
   let bind id cth env =
     let env = MC.bind_theory id cth.cth3_theory env in
     { env with
-      env_w3   = EcWhy3.rebind env.env_w3 cth.cth3_rebind;
-      env_rb   = List.rev_append cth.cth3_rebind env.env_rb;
-      env_item = (CTh_theory (id, cth.cth3_theory)) :: env.env_item; 
-      env_tci  = bind_instance_cth env.env_tci cth.cth3_theory
+        env_w3   = EcWhy3.rebind env.env_w3 cth.cth3_rebind;
+        env_rb   = List.rev_append cth.cth3_rebind env.env_rb;
+        env_item = (CTh_theory (id, cth.cth3_theory)) :: env.env_item; 
+        env_tci  = bind_instance_cth env.env_tci cth.cth3_theory;
+       (* FIXME: TC HOOK *)
     }
 
   (* ------------------------------------------------------------------ *)

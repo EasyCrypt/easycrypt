@@ -1,5 +1,6 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
+open EcPath
 open EcTypes
 open EcFol
 
@@ -9,7 +10,7 @@ type ty_params = ty_param list
 
 type tydecl = {
   tyd_params : ty_params;
-  tyd_type   : EcTypes.ty option;
+  tyd_type   : [`Concrete of EcTypes.ty | `Abstract of Sp.t];
 }
 
 (* -------------------------------------------------------------------- *)

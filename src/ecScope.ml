@@ -1315,7 +1315,7 @@ module Ty = struct
     let ue = TT.transtyvars scope.sc_env (loc, Some args) in
     let tydecl = {
       tyd_params = EcUnify.UniEnv.tparams ue;
-      tyd_type   = None;
+      tyd_type   = `Abstract Sp.empty;
     } in
       bind scope (unloc name, tydecl)
 
@@ -1327,7 +1327,7 @@ module Ty = struct
     let body   = transty tp_tydecl scope.sc_env ue body in
     let tydecl = {
       tyd_params = EcUnify.UniEnv.tparams ue;
-      tyd_type   = Some body;
+      tyd_type   = `Concrete body;
     } in
       bind scope (unloc name, tydecl)
 
@@ -1339,10 +1339,61 @@ module Ty = struct
       scope
 
   (* ------------------------------------------------------------------ *)
-  let addclass (scope : scope) tcd =
+  let addclass (scope : scope) { pl_desc = tcd } =
     assert (scope.sc_pr_uc = None);
-    let _tclass = EcTyping.trans_tclass scope.sc_env tcd in
-      bindclass scope (unloc (unloc tcd).ptc_name, ())
+
+    let name  = unloc tcd.ptc_name in
+    let pname = EcPath.pqname (EcEnv.root (env scope)) name in
+
+    (* FIXME: factor out this check *)
+    if    EcEnv.Ty       .by_path_opt pname (env scope) <> None 
+       || EcEnv.TypeClass.by_path_opt pname (env scope) <> None then
+      hierror "duplicated type/type-class name `%s'" name;
+
+    let scenv = (env scope) in
+
+    let _tclass =
+
+      let uptc =
+        tcd.ptc_inth |> omap
+          (fun { pl_loc = uploc; pl_desc = uptc } ->
+            match EcEnv.TypeClass.lookup_opt uptc scenv with
+            | None -> hierror ~loc:uploc "unknown type-class: `%s'"
+                        (string_of_qsymbol uptc)
+            | Some (p, _) -> p)
+      in
+
+      let asty  =
+        let body = ofold (fun p tc -> Sp.add p tc) Sp.empty uptc in
+          { tyd_params = []; tyd_type = `Abstract body; } in
+      let scenv = EcEnv.Ty.bind name asty scenv in
+
+      (* Check for duplicated field names *)
+      Msym.odup unloc (List.map fst tcd.ptc_ops)
+        |> oiter (fun (x, y) -> hierror ~loc:y.pl_loc
+                    "duplicated field name: `%s" x.pl_desc);
+    
+      (* Check operators types *)
+      let operators =
+        let check1 (x, ty) =
+          let ue = EcUnify.UniEnv.create (Some []) in
+            (EcIdent.create (unloc x), transty tp_tydecl scenv ue ty)
+        in
+          tcd.ptc_ops |> List.map check1 in
+    
+      (* Check axioms *)
+      let axioms =
+        let scenv = EcEnv.Var.bind_locals operators scenv in
+        let check1 ax =
+          let ue = EcUnify.UniEnv.create (Some []) in
+            trans_prop scenv ue ax
+        in
+          tcd.ptc_axs |> List.map check1 in
+    
+      (* Construct actual type-class *)
+      { tc_ops = operators; tc_axs = axioms; }
+    in
+      bindclass scope (name, ())
 
   (* ------------------------------------------------------------------ *)
   let check_tci_operators env ops reqs =

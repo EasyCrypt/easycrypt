@@ -353,8 +353,8 @@ let rec compile_tyd env eenv p =
     let vtymap, params = compile_typarams tyd.tyd_params in
     let decl = 
       match tyd.tyd_type with
-      | None -> None
-      | Some ty -> Some (compile_ty env eenv vtymap ty) in
+      | `Abstract _  -> None
+      | `Concrete ty -> Some (compile_ty env eenv vtymap ty) in
     let res = mk_odef pth s (params,decl) in
     Hp.add eenv.mp_ty p res;
     res.odef_name

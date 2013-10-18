@@ -1307,8 +1307,8 @@ let pp_typedecl (ppe : PPEnv.t) fmt (x, tyd) =
 
   and pp_body fmt =
     match tyd.tyd_type with
-    | None    -> ()
-    | Some ty -> Format.fprintf fmt " =@ %a" (pp_type ppe) ty
+    | `Abstract _  -> ()                (* FIXME: TC HOOK *)
+    | `Concrete ty -> Format.fprintf fmt " =@ %a" (pp_type ppe) ty
 
   in
     Format.fprintf fmt "@[%t%t.@]" pp_prelude pp_body

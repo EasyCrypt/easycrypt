@@ -23,9 +23,10 @@ let _ = dispatch begin function
            done
        end;
 
-       (* menhir & --explain/--trace *)
+       (* menhir & --explain/--trace/--table *)
        flag ["ocaml"; "parser"; "menhir"; "menhir_explain"] & A"--explain";
        flag ["ocaml"; "parser"; "menhir"; "menhir_trace"  ] & A"--trace";
+       flag ["ocaml"; "parser"; "menhir"; "menhir_table"  ] & A"--table";
 
        (* Threads switches *)
        flag ["ocaml"; "pkg_threads"; "compile"] (S[A "-thread"]);

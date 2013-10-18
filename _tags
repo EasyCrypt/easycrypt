@@ -1,5 +1,5 @@
 # --------------------------------------------------------------------
-true : use_menhir, menhir_explain
+true : use_menhir, menhir_explain, menhir_table
 true : debug
 true : warn_Z, warn_Y, warn_+28, warn_-23
 

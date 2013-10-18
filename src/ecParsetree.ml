@@ -30,7 +30,6 @@ type pmsymbol = (psymbol * ((pmsymbol located) list) option) list
 
 (* -------------------------------------------------------------------- *)
 type pty_r =
-  | PTself
   | PTunivar
   | PTtuple  of pty list
   | PTnamed  of pqsymbol
