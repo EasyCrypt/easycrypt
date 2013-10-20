@@ -67,8 +67,11 @@ end
 
 module Ty : sig
   val add : scope -> (ptyparams * psymbol) located -> scope
-  val addclass : scope -> ptypeclass located -> scope
-  val addinstance : scope -> Ax.mode -> ptycinstance located -> scope
+
+  val add_class    : scope -> ptypeclass located -> scope
+  val add_datatype : scope -> pdatatype located -> scope
+  val add_instance : scope -> Ax.mode -> ptycinstance located -> scope
+
   val define : scope -> (ptyparams * psymbol) located -> pty -> scope
 end
 

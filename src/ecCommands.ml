@@ -135,7 +135,7 @@ let rec process_type (scope : EcScope.scope) (tyd : ptydecl located) =
 (* -------------------------------------------------------------------- *)
 and process_typeclass (scope : EcScope.scope) (tcd : ptypeclass located) =
   EcScope.check_state `InTop "type class" scope;
-  let scope = EcScope.Ty.addclass scope tcd in
+  let scope = EcScope.Ty.add_class scope tcd in
     notify scope "added type class: `%s'" (unloc tcd.pl_desc.ptc_name);
     scope
 
@@ -143,12 +143,14 @@ and process_typeclass (scope : EcScope.scope) (tcd : ptypeclass located) =
 and process_tycinst (scope : EcScope.scope) (tci : ptycinstance located) =
   EcScope.check_state `InTop "type class instance" scope;
   let mode = if (!pragma).pm_check then `Check else `WeakCheck in
-  let scope = EcScope.Ty.addinstance scope mode tci in
+  let scope = EcScope.Ty.add_instance scope mode tci in
     scope
 
 (* -------------------------------------------------------------------- *)
-and process_datatype (_scope : EcScope.scope) _ =
-  failwith "not-implemented-yet"
+and process_datatype (scope : EcScope.scope) (dt : pdatatype located) =
+  EcScope.check_state `InTop "datatype" scope;
+  let scope = EcScope.Ty.add_datatype scope dt in
+    scope
 
 (* -------------------------------------------------------------------- *)
 and process_module (scope : EcScope.scope) m =

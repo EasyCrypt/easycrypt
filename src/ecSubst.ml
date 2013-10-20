@@ -276,6 +276,9 @@ let subst_tydecl (s : _subst) (tyd : tydecl) =
     | `Concrete ty ->
         let s = init_tparams s tyd.tyd_params params' in
           `Concrete (s.s_ty ty)
+    | `Datatype cs ->
+        let s = init_tparams s tyd.tyd_params params' in
+          `Datatype (List.map (fun (x, ty) -> (x, ty |> omap s.s_ty)) cs)
   in
     { tyd_params = params'; tyd_type = body }
 

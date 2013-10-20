@@ -354,6 +354,7 @@ let rec compile_tyd env eenv p =
     let decl = 
       match tyd.tyd_type with
       | `Abstract _  -> None
+      | `Datatype _  -> None            (* FIXME: IND HOOK *)
       | `Concrete ty -> Some (compile_ty env eenv vtymap ty) in
     let res = mk_odef pth s (params,decl) in
     Hp.add eenv.mp_ty p res;

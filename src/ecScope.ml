@@ -1302,6 +1302,14 @@ module Ty = struct
   module TT = EcTyping
 
   (* ------------------------------------------------------------------ *)
+  let check_name_available scope x =
+    let pname = EcPath.pqname (EcEnv.root (env scope)) x.pl_desc in
+
+    if    EcEnv.Ty       .by_path_opt pname (env scope) <> None 
+       || EcEnv.TypeClass.by_path_opt pname (env scope) <> None then
+      hierror ~loc:x.pl_loc "duplicated type/type-class name `%s'" x.pl_desc
+
+  (* ------------------------------------------------------------------ *)
   let bind (scope : scope) ((x, tydecl) : (_ * tydecl)) =
     assert (scope.sc_pr_uc = None);
     let scope = { scope with sc_env = EcEnv.Ty.bind x tydecl scope.sc_env; } in
@@ -1339,18 +1347,13 @@ module Ty = struct
       scope
 
   (* ------------------------------------------------------------------ *)
-  let addclass (scope : scope) { pl_desc = tcd } =
+  let add_class (scope : scope) { pl_desc = tcd } =
     assert (scope.sc_pr_uc = None);
 
     let name  = unloc tcd.ptc_name in
-    let pname = EcPath.pqname (EcEnv.root (env scope)) name in
-
-    (* FIXME: factor out this check *)
-    if    EcEnv.Ty       .by_path_opt pname (env scope) <> None 
-       || EcEnv.TypeClass.by_path_opt pname (env scope) <> None then
-      hierror "duplicated type/type-class name `%s'" name;
-
     let scenv = (env scope) in
+
+    check_name_available scope tcd.ptc_name;
 
     let _tclass =
 
@@ -1371,7 +1374,7 @@ module Ty = struct
       (* Check for duplicated field names *)
       Msym.odup unloc (List.map fst tcd.ptc_ops)
         |> oiter (fun (x, y) -> hierror ~loc:y.pl_loc
-                    "duplicated field name: `%s" x.pl_desc);
+                    "duplicated field name: `%s'" x.pl_desc);
     
       (* Check operators types *)
       let operators =
@@ -1533,11 +1536,51 @@ module Ty = struct
 
   (* ------------------------------------------------------------------ *)
   (* We currently only deal with [ring] and [field] *)
-  let addinstance (scope : scope) mode ({ pl_desc = tci } as toptci) =
+  let add_instance (scope : scope) mode ({ pl_desc = tci } as toptci) =
     match unloc tci.pti_name with
     | ([], "ring" ) -> addring  scope  mode toptci
     | ([], "field") -> addfield scope  mode toptci
     | _ -> hierror "unknown type class"
+
+  (* ------------------------------------------------------------------ *)
+  (* FIXME: Check for positivity *)
+  let add_datatype (scope : scope) { pl_loc = loc; pl_desc = dt; } =
+    check_name_available scope dt.ptd_name;
+
+    (* Check type-parameters / env0 is the env. augmented with an
+     * abstract type representing the currently processed datatype. *)
+    let ue   = TT.transtyvars scope.sc_env (loc, Some dt.ptd_tyvars) in
+    let env0 =
+      let myself = {
+        tyd_params = EcUnify.UniEnv.tparams ue;
+        tyd_type   = `Abstract Sp.empty;
+      } in
+        EcEnv.Ty.bind (unloc dt.ptd_name) myself scope.sc_env
+    in
+
+    (* Check for duplicated constructor names *)
+    Msym.odup unloc (List.map fst dt.ptd_ctors)
+      |> oiter (fun (x, y) -> hierror ~loc:y.pl_loc
+                  "duplicated constructor name: `%s'" x.pl_desc);
+
+
+    (* Type-check constructor types *)
+    let ctors =
+      let for1 (cname, cty) =
+        let ue  = EcUnify.UniEnv.copy ue in
+        let cty = cty |> omap (TT.transty TT.tp_tydecl env0 ue) in
+          (unloc cname, cty)
+      in
+        dt.ptd_ctors |> List.map for1
+    in
+
+
+    (* Add final datatype to environment *)
+    let tydecl = {
+      tyd_params = EcUnify.UniEnv.tparams ue;
+      tyd_type   = `Datatype ctors;
+    } in
+      bind scope (unloc dt.ptd_name, tydecl)
 end
 
 (* -------------------------------------------------------------------- *)

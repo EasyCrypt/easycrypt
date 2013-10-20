@@ -18,7 +18,6 @@ module Msym = EcSymbols.Msym
 
 (* ----------------------------------------------------------------------*)
 module Talpha = struct 
-
   type t = Term.vsymbol list * Term.term
 
   let vs_rename_alpha c h vs = incr c; Term.Mvs.add vs !c h
@@ -196,21 +195,23 @@ module Mta = EcMaps.Map.Make(Talpha)
 
 (* ----------------------------------------------------------------------*)
 type env = {
-    logic_task : Task.task;
-    env_ty  : Ty.tysymbol Mp.t;
-    env_op  : (Term.lsymbol * Term.lsymbol * Ty.tvsymbol list) Mp.t;
-    env_ax  : Decl.prsymbol Mp.t;
-    env_mp  : Term.lsymbol Mm.t;
-    env_xpv : Term.lsymbol Mx.t;
-    env_xpf : Term.lsymbol Mx.t;
-    env_tv  : Ty.ty Mid.t;
-    env_id  : Term.term Mid.t;
-    env_w3  : (EcPath.path * Ty.tvsymbol list) Ident.Mid.t;
-    env_lam : Term.term Mta.t;
-    env_rax : EcPath.path Decl.Mpr.t;
-  }
+  logic_task : Task.task;
+  env_ty     : ty_body Mp.t;
+  env_op     : (Term.lsymbol * Term.lsymbol * Ty.tvsymbol list) Mp.t;
+  env_ax     : Decl.prsymbol Mp.t;
+  env_mp     : Term.lsymbol Mm.t;
+  env_xpv    : Term.lsymbol Mx.t;
+  env_xpf    : Term.lsymbol Mx.t;
+  env_tv     : Ty.ty Mid.t;
+  env_id     : Term.term Mid.t;
+  env_w3     : (EcPath.path * Ty.tvsymbol list) Ident.Mid.t;
+  env_lam    : Term.term Mta.t;
+  env_rax    : EcPath.path Decl.Mpr.t;
+}
 
-let w3_ls_true = Term.fs_bool_true
+and ty_body = Ty.tysymbol * [ `Plain | `Datatype of unit ]
+
+let w3_ls_true  = Term.fs_bool_true
 let w3_ls_false = Term.fs_bool_false
 
 let w3_ls_not, decl_not, spec_not =
@@ -418,7 +419,7 @@ let empty = {
 type rebinding_w3 = {
     rb_th   : Theory.theory;
     rb_decl : Decl.decl list;
-    rb_ty   : Ty.tysymbol Mp.t;
+    rb_ty   : ty_body Mp.t;
     rb_op   : (Term.lsymbol * Term.lsymbol * Ty.tvsymbol list) Mp.t;
     rb_ax   : Decl.prsymbol Mp.t;
     rb_w3   : (EcPath.path * Ty.tvsymbol list) Ident.Mid.t;
@@ -436,17 +437,23 @@ let rb_empty th = {
 type highorder_decl = (Term.lsymbol * Decl.decl * Decl.decl) option
 
 type rebinding_item =
-  | RBuse of rebinding_w3
-  | RBty  of EcPath.path * Ty.tysymbol * Decl.decl
-  | RBop  of EcPath.path * (Term.lsymbol * Ty.tvsymbol list) * Decl.decl *
-                highorder_decl
-  | RBax  of EcPath.path * Decl.prsymbol * Decl.decl
-  | RBmp  of EcPath.mpath * Term.lsymbol
+  | RBuse  of rebinding_w3
+  | RBty   of EcPath.path * ty_body * Decl.decl
+  | RBop   of EcPath.path * (Term.lsymbol * Ty.tvsymbol list) * Decl.decl * highorder_decl
+  | RBax   of EcPath.path * Decl.prsymbol * Decl.decl
+  | RBmp   of EcPath.mpath * Term.lsymbol
   | RBxpf  of EcPath.xpath * Term.lsymbol
   | RBxpv  of EcPath.xpath * Term.lsymbol
-  | RBfun of Decl.decl * Decl.decl * Talpha.t * Term.term 
+  | RBfun  of Decl.decl * Decl.decl * Talpha.t * Term.term 
 
 type rebinding = rebinding_item list
+
+let ty_body_equal ((ts1, tb1) : ty_body) ((ts2, tb2) : ty_body) =
+  Ty.ts_equal ts1 ts2
+    && (match tb1, tb2 with
+        | `Plain       , `Plain       -> true
+        | `Datatype () , `Datatype () -> true
+        | _            , _            -> false)
 
 let merge check k o1 o2 =
   match o1, o2 with
@@ -454,14 +461,14 @@ let merge check k o1 o2 =
   | _, None -> o1
   | None, _ -> o2
 
-exception MergeW3Ty of EcPath.path * Ty.tysymbol * Ty.tysymbol
-exception MergeW3Op of EcPath.path * Term.lsymbol * Term.lsymbol
+exception MergeW3Ty of EcPath.path * ty_body       * ty_body
+exception MergeW3Op of EcPath.path * Term.lsymbol  * Term.lsymbol
 exception MergeW3Ax of EcPath.path * Decl.prsymbol * Decl.prsymbol
-exception MergeW3Id of Ident.ident * EcPath.path * EcPath.path
+exception MergeW3Id of Ident.ident * EcPath.path   * EcPath.path
 
 let merge_ty =
   let check p t1 t2 =
-    if not (Ty.ts_equal t1 t2) then raise (MergeW3Ty(p,t1,t2)) in
+    if not (ty_body_equal t1 t2) then raise (MergeW3Ty(p,t1,t2)) in
   Mp.merge (merge check)
 
 let merge_op =
@@ -480,12 +487,13 @@ let merge_id =
   Ident.Mid.merge (merge check)
 
 let add_ts env path ts decl =
-  if Mp.mem path env.env_ty then
-    (assert (Ty.ts_equal ts (Mp.find path env.env_ty)); env)
-  else
+  if Mp.mem path env.env_ty then begin
+    assert (ty_body_equal ts (Mp.find path env.env_ty));
+    env
+  end else
     { env with
-      env_ty = Mp.add path ts env.env_ty;
-      logic_task = add_decl_with_tuples env.logic_task decl }
+        env_ty     = Mp.add path ts env.env_ty;
+        logic_task = add_decl_with_tuples env.logic_task decl; }
 
 let add_ls env path ls tparams decl odecl =
   let ls', add' =
@@ -562,12 +570,11 @@ let rebind_item env = function
       let task = Task.use_export env.logic_task w3.rb_th in
       let task = List.fold_left Task.add_decl task w3.rb_decl in
       { env with
-        logic_task = task;
-        env_ty = merge_ty env.env_ty w3.rb_ty;
-        env_op = merge_op env.env_op w3.rb_op;
-        env_ax = merge_ax env.env_ax w3.rb_ax;
-        env_w3 = merge_id env.env_w3 w3.rb_w3;
-      }
+          logic_task = task;
+          env_ty     = merge_ty env.env_ty w3.rb_ty;
+          env_op     = merge_op env.env_op w3.rb_op;
+          env_ax     = merge_ax env.env_ax w3.rb_ax;
+          env_w3     = merge_id env.env_w3 w3.rb_w3; }
   | RBty(p,ts,decl) -> add_ts env p ts decl
   | RBop(p,(ls,tvs),decl,odecl) -> add_ls env p ls tvs decl odecl
   | RBax(p,pr,decl) -> add_pr env p pr decl
@@ -698,13 +705,13 @@ let exists_w3 env id =
 
 let add_w3_ty env p ty =
   { env with
-    env_ty = Mp.add p ty env.env_ty;
-    env_w3 = Ident.Mid.add (ty.Ty.ts_name) (p,[]) env.env_w3 }
+      env_ty = Mp.add p (ty, `Plain) env.env_ty;
+      env_w3 = Ident.Mid.add (ty.Ty.ts_name) (p, []) env.env_w3 }
 
 let rbadd_w3_ty rb p ty =
   { rb with
-    rb_ty = Mp.add p ty rb.rb_ty;
-    rb_w3 = Ident.Mid.add (ty.Ty.ts_name) (p,[]) rb.rb_w3 }
+      rb_ty = Mp.add p (ty, `Plain) rb.rb_ty;
+      rb_w3 = Ident.Mid.add (ty.Ty.ts_name) (p,[]) rb.rb_w3 }
 
 type zipper_elem =
   | Zenter of EcSymbols.symbol
@@ -982,7 +989,7 @@ let create_tvsymbol id =
 exception UnboundTypeVariable of EcIdent.t
 
 let trans_pty env p =
-  try Mp.find p env.env_ty
+  try fst (Mp.find p env.env_ty)
   with _ -> assert false
 
 let trans_tv env id =
@@ -1006,7 +1013,6 @@ let trans_glob env mp =
     Format.printf "trans_glob %s@." (EcPath.m_tostring mp);
     assert false (* tglob should have been normalized *)
   
-
 let rec trans_ty env ty =
   match ty.ty_node with
   | Tglob mp -> trans_tglob env mp
@@ -1015,7 +1021,7 @@ let rec trans_ty env ty =
   | Ttuple tys -> Ty.ty_tuple (trans_tys env tys)
   | Tconstr(p,tys) ->
       let id = trans_pty env p in
-      Ty.ty_app id (trans_tys env tys)
+        Ty.ty_app id (trans_tys env tys)
   | Tfun(t1,t2) -> Ty.ty_func (trans_ty env t1) (trans_ty env t2)
 
 and trans_tys env tys = List.map (trans_ty env) tys
@@ -1035,13 +1041,14 @@ let trans_typarams =
 
 let trans_tydecl env path td =
   let pid = preid_p path in
-  let env, tparams = trans_typarams env td.tyd_params in
-  let body =
+  let (env, tparams) = trans_typarams env td.tyd_params in
+  let (body, xinfo) =
     match td.tyd_type with
-    | `Concrete ty -> Some (trans_ty env ty)
-    | `Abstract _  -> None
+    | `Concrete ty  -> (Some (trans_ty env ty), `Plain)
+    | `Abstract _   -> (None, `Plain)       (* FIXME: TC HOOK *)
+    | `Datatype cs  -> (None, `Datatype ()) (* FIXME: IND HOOK *)
   in
-    Ty.create_tysymbol pid tparams body
+    (Ty.create_tysymbol pid tparams body, xinfo)
 
 (* --------------------------- Formulas ------------------------------- *)
 
@@ -1474,16 +1481,20 @@ let trans_oper env path op =
   {env with env_tv = mty; env_id = mid}, rb, ls, wparams, decl
 
 let add_ty env path td =
-  let ts = trans_tydecl env path td in
-  let decl = Decl.create_ty_decl ts in
-  add_ts env path ts decl, [RBty(path,ts,decl)]
+  let ts   = trans_tydecl env path td in
+  let decl =
+    match snd ts with
+    | `Plain       -> Decl.create_ty_decl (fst ts)
+    | `Datatype () -> Decl.create_data_decl []
+  in
+    (add_ts env path ts decl, [RBty (path, ts, decl)])
 
 let add_op env path op =
   let env, rb, ls, wparams, decl = trans_oper env path op in
   let odecl = mk_highorder_func ls in
   let env = add_ls env path ls wparams decl odecl in
   let rb = RBop(path,(ls,wparams),decl,odecl)::rb in
-  env, rb
+    (env, rb)
 
 let add_ax env path ax =
   let pr = Decl.create_prsymbol (preid_p path) in

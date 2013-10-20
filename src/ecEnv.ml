@@ -1618,8 +1618,10 @@ module Ty = struct
       match ty.tyd_type with
       | `Concrete _  -> env
       | `Abstract tc -> Sp.fold
-          (fun dst env -> TypeClass.add_abstract_instance ~src:mypath ~dst env)
+          (fun dst env ->
+             TypeClass.add_abstract_instance ~src:mypath ~dst env)
           tc env
+      | `Datatype _cs -> env            (* FIXME: IND HOOK *)
     in
 
     let (w3, rb) =

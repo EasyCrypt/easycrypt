@@ -10,8 +10,14 @@ type ty_params = ty_param list
 
 type tydecl = {
   tyd_params : ty_params;
-  tyd_type   : [`Concrete of EcTypes.ty | `Abstract of Sp.t];
+  tyd_type   : ty_body;
 }
+
+and ty_body = [
+  | `Concrete of EcTypes.ty
+  | `Abstract of Sp.t
+  | `Datatype of (EcSymbols.symbol * EcTypes.ty option) list
+]
 
 (* -------------------------------------------------------------------- *)
 type locals = EcIdent.t list 
