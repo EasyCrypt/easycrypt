@@ -1,5 +1,5 @@
 require import Int.
-require import Option.
+require export Option.
 require import FSet.
 
 theory Core.
@@ -279,6 +279,42 @@ theory Core.
   (* TODO: Prove
        lemma size_filter f m: size (filter f m) <= size m.
      This is simple once we have size_leq. *)
+
+  (* eq_except *)
+  op eq_except: ('a,'b) map ->  ('a,'b) map -> 'a -> bool.
+
+  axiom eq_except_def (m1 m2:('a,'b) map) x:
+    eq_except m1 m2 x <=>
+    forall x', x <> x' => get m1 x' = get m2 x'.
+
+  lemma eq_except_eq (m:('a,'b) map) x:
+    eq_except m m x
+  by [].
+
+  lemma eq_except_setE (m1 m2:('a,'b) map) x y:
+    eq_except m1 m2 x =>
+    !in_dom x m1 =>
+    get m2 x = Some y =>
+    m1.[x <- y] = m2.
+  proof strict.
+  rewrite eq_except_def=> eqe x_ndom_m1 m2x.
+  apply map_ext=> x'; rewrite get_set; case (x = x').
+    by intros=> <-; rewrite m2x.
+    by apply eqe.
+  qed.
+
+(*
+  lemma eq_except_ROM (m1 m2:('a,'b) map) x0 x y0 y:
+    let m1' = if !in_dom x0 m1 then m1.[x0 <- (x0 = x) ? y0 : y] else m1 in
+    let m2' = if !in_dom x0 m2 then m2.[x0 <- y0] else m2 in
+    (if in_dom x m1 then m1 = m2 else eq_except m1 m2 x) =>
+    get m2 x = Some y0 =>
+    (if in_dom x m1 then m1' = m2' else eq_except m1' m2' x).
+  proof strict.
+  intros=> m1' m2' m1_m2 m2x; split=> dom_x_m1 //=.
+    rewrite /m1' /m2'; generalize m1_m2; rewrite dom_x_m1 //= => m1_m2; subst; case (x0 = x)=> //.
+    case (in_dom x0 m2)=> dom_x0_m1 //=; generalize m1'; rewrite dom_x0_m1 //=.
+*)
 
   (** Miscellaneous *)
   (* lam: turning maps into lambdas *)

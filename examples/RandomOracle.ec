@@ -1,4 +1,4 @@
-require import Map.
+require import FMap. import OptionGet.
 require import Distr.
 
 theory Types.
@@ -49,7 +49,7 @@ theory Lazy.
     var m:(from, to) map
 
     fun init():unit = {
-      m = Map.empty;
+      m = FMap.Core.empty;
     }
   
     fun o(x:from):to = {
@@ -104,7 +104,7 @@ theory Eager.
       var work:from set;
       var f:from;
 
-      m = Map.empty;
+      m = FMap.Core.empty;
       work = toFSet univ;
       while (work <> FSet.empty)
       {
@@ -187,7 +187,7 @@ theory LazyEager.
       var m:(from, to) map
 
       fun init():unit = {
-        m = Map.empty;
+        m = FMap.Core.empty;
       }
   
       fun o(x:from):to = {
@@ -269,7 +269,7 @@ theory LazyEager.
     fun main(): bool = {
       var b:bool;
 
-      H.m = Map.empty;
+      H.m = FMap.Core.empty;
       resample();
       b = D.distinguish();
 
@@ -297,7 +297,7 @@ theory LazyEager.
                        f = pick work;
                        y = $dsample f;
                        if (!in_dom f IND_Eager.H.m)
-                         IND_Eager.H.m = IND_Eager.H.m.[f <- if f = x then y0 else y];
+                         IND_Eager.H.m.[f] = if f = x then y0 else y;
                        work = rm f work;
                      }
                      result = proj IND_Eager.H.m.[x]; }
@@ -442,37 +442,28 @@ theory Wrappers.
               qO{2} = qO' ==>
               (Count.qs{2} < qO' =>
                  ={res} /\
-                 finite (dom Lazy.RO.m){1} /\
-                 card (toFSet (dom Lazy.RO.m)){1} <= Count.qs{2}) ].
+                 size Lazy.RO.m{1} <= Count.qs{2}) ].
   proof strict.
   intros=> lt0_qO dsampleL DL; fun.
   call (_: Count.qO <= Count.qs,
            ={glob Lazy.RO} /\
            Count.qO{2} = qO' /\
-           finite (dom Lazy.RO.m){1} /\
-           card (toFSet (dom Lazy.RO.m)){1} <= Count.qs{2}).
+           size Lazy.RO.m{1} <= Count.qs{2}).
     (* H *)
     fun; rcondt{2} 1; first intros=> &m; skip; progress=> //; smt.
-      inline Lazy.RO.o; wp; rnd; wp; skip; progress=> //.
-        by rewrite dom_set; cut H7: forall (x:from) X, finite X => ISet.add x X == FSet.add x (toFSet X) by smt;
-           exists (add x{2} (toFSet (dom Lazy.RO.m{2}))); by apply H7.
-        rewrite dom_set; cut H7: forall (x:from) X, finite X => ISet.add x X == FSet.add x (toFSet X) by smt;
-        cut H8: forall X' (X:from ISet.set), X == X' => toFSet X = X' by (intros=> X X' ext_eq; apply set_ext; smt).
-          cut ->:= H8 (add x{2} (toFSet (dom Lazy.RO.m{2}))) (ISet.add x{2} (dom Lazy.RO.m{2})) _; first by apply H7.
-          rewrite card_add_nin ?mem_toFSet ?dom_def //; smt.
-          smt.
+      inline Lazy.RO.o; wp; rnd; wp; skip; progress=> //; last smt.
+        by rewrite /size dom_set card_add_nin -/(in_dom _ _); last smt.
     by intros=> _ _; apply Lazy.lossless_o.
     by intros=> _; fun; if=> //; inline Lazy.RO.o; wp; rnd; wp; skip; smt.
-  inline Count(Lazy.RO).init; wp; call (_: true ==> ={glob Lazy.RO} /\ dom Lazy.RO.m{1} = ISet.empty)=> //;
+  inline Count(Lazy.RO).init; wp; call (_: true ==> ={glob Lazy.RO} /\ dom Lazy.RO.m{1} = FSet.empty)=> //;
     first by fun; wp; skip; progress=> //; smt.
   wp; skip; cut H1: ISet.empty<:from> == FSet.empty by smt; progress=> //.
-    by rewrite H; exists FSet.empty.
-    by rewrite H; cut ->: toFSet ISet.empty<:from> = FSet.empty by (apply set_ext; smt); rewrite card_empty.
+    by rewrite /size H card_empty.
     by cut [eq_res _]:= H2 _; first smt.
-    by cut [_ [_ [_ [fdom _]]]]:= H2 _; first smt.
-    by cut [_ [_ [_ [_ card]]]]:= H2 _; first smt.
+    by cut [_ [_ [fdom _]]]:= H2 _; first smt.
   qed.
 
+(*
   (** Query-tracking wrapper *)
   require import Int.
   module Index(H:Oracle) = {
@@ -481,7 +472,7 @@ theory Wrappers.
 
     fun init(): unit = {
       H.init();
-      qs = Map.empty;
+      qs = FMap.Core.empty;
       qc = 0;
     }
 
@@ -496,7 +487,7 @@ theory Wrappers.
       return r;
     }
   }.
-
+*)
   (** Query-numbering wrapper *)
   module Number(H:Oracle) = {
     var qs:(from,int) map
@@ -504,7 +495,7 @@ theory Wrappers.
 
     fun init(): unit = {
       H.init();
-      qs = Map.empty;
+      qs = FMap.Core.empty;
       qc = 0;
     }
 
