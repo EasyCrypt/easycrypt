@@ -907,16 +907,20 @@ module Op = struct
 
     let (ty, body) =
       match op.po_def with
-      | POabstr pty ->
+      | PO_abstr pty ->
           TT.transty tp scope.sc_env ue pty, None
 
-      | POconcr (bd, pty, pe) ->
+      | PO_concr (bd, pty, pe) ->
           let env     = scope.sc_env in
           let codom   = TT.transty tp env ue pty in 
           let env, xs = TT.transbinding env ue bd in
           let body    = TT.transexpcast env ue codom pe in
           let lam     = EcTypes.e_lam xs body in
             lam.EcTypes.e_ty, Some lam
+
+      | PO_case _ ->
+          (* FIXME: IND HOOK *)
+          failwith "not-implemented-yet"
     in
 
     if not (EcUnify.UniEnv.closed ue) then
