@@ -930,7 +930,7 @@ module Op = struct
     let body    = body |> omap (e_mapty uni) in
     let ty      = uni ty in
     let tparams = EcUnify.UniEnv.tparams ue in
-    let tyop    = EcDecl.mk_op tparams ty body in
+    let tyop    = EcDecl.mk_op tparams ty (body |> omap (fun x -> OP_Plain x)) in
 
     if op.po_kind = `Const then begin
       let tue   = EcUnify.UniEnv.copy ue in

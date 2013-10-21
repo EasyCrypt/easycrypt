@@ -283,12 +283,10 @@ let subst_tydecl (s : _subst) (tyd : tydecl) =
     { tyd_params = params'; tyd_type = body }
 
 (* -------------------------------------------------------------------- *)
-let subst_op_kind (s : _subst) (kind : operator_kind) =
+let rec subst_op_kind (s : _subst) (kind : operator_kind) =
   match kind with 
   | OB_oper (Some body) ->
-      let s = e_subst_of_subst s in
-      let body  = EcTypes.e_subst s body in
-        OB_oper (Some body)
+      OB_oper (Some (subst_op_body s body))
 
   | OB_pred (Some body) ->   
       let s = f_subst_of_subst s in
@@ -296,6 +294,12 @@ let subst_op_kind (s : _subst) (kind : operator_kind) =
         OB_pred (Some body) 
 
   | OB_oper None | OB_pred None -> kind
+
+and subst_op_body (s : _subst) (bd : opbody) =
+  match bd with
+  | OP_Plain body ->
+      let s = e_subst_of_subst s in
+        OP_Plain (EcTypes.e_subst s body)
 
 (* -------------------------------------------------------------------- *)
 let subst_op (s : _subst) (op : operator) =

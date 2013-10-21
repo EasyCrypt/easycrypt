@@ -23,8 +23,11 @@ and ty_body = [
 type locals = EcIdent.t list 
 
 type operator_kind = 
-  | OB_oper of EcTypes.expr option
+  | OB_oper of opbody option
   | OB_pred of EcFol.form option
+
+and opbody =
+  | OP_Plain of EcTypes.expr
 
 type operator = {
   op_tparams : ty_params;
@@ -35,7 +38,7 @@ type operator = {
 val op_ty   : operator -> ty
 val is_pred : operator -> bool
 
-val mk_op   : ty_params -> ty -> expr option -> operator
+val mk_op   : ty_params -> ty -> opbody option -> operator
 val mk_pred : ty_params -> ty list -> form option -> operator
 
 (* -------------------------------------------------------------------- *)

@@ -2125,17 +2125,20 @@ module Op = struct
   let reducible env p =
     try
       let op = by_path p env in
-      match op.op_kind with
-      | OB_oper(Some _) | OB_pred(Some _) -> true
-      | _ -> false
-    with _ -> false
+        match op.op_kind with
+        | OB_oper (Some (OP_Plain _))
+        | OB_pred (Some _) -> true
+        | OB_oper None
+        | OB_pred None -> false
+
+    with LookupFailure _ -> false
 
   let reduce env p tys =
     let op = try by_path p env with _ -> assert false in
     let f =
       match op.op_kind with
-      | OB_oper(Some e) -> EcFol.form_of_expr EcFol.mhr e
-      | OB_pred(Some idsf) -> idsf
+      | OB_oper (Some (OP_Plain e)) -> EcFol.form_of_expr EcFol.mhr e
+      | OB_pred (Some idsf) -> idsf
       | _ -> raise NotReducible
     in
       EcFol.Fsubst.subst_tvar

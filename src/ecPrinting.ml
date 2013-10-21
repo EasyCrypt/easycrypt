@@ -1360,7 +1360,7 @@ let pp_opdecl_op (ppe : PPEnv.t) fmt (x, ts, ty, op) =
     | None ->
         Format.fprintf fmt ": %a" (pp_type ppe) ty
 
-    | Some e ->
+    | Some (OP_Plain e) ->
         let ((subppe, pp_vds), e) =
           let (vds, e) =
             match e.e_node with

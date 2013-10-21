@@ -23,8 +23,11 @@ and ty_body = [
 type locals = EcIdent.t list 
 
 type operator_kind =
-  | OB_oper of EcTypes.expr option 
+  | OB_oper of opbody option
   | OB_pred of EcFol.form option
+
+and opbody =
+  | OP_Plain of EcTypes.expr
 
 type operator = {
   op_tparams : ty_params;
@@ -71,7 +74,7 @@ let mk_pred tparams dom body =
 
 let mk_op tparams ty body = 
   let kind = OB_oper body in
-  gen_op tparams ty kind
+    gen_op tparams ty kind
 
 (* -------------------------------------------------------------------- *)
 type typeclass = {

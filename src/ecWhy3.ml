@@ -1442,8 +1442,10 @@ let destr_ty_fun ty =
 let trans_oper_body env ty body = 
   let body = 
     match body with
-    | OB_oper o -> o |> omap (EcFol.form_of_expr EcFol.mhr)
-    | OB_pred o -> o in
+    | OB_oper None -> None
+    | OB_oper (Some (OP_Plain o)) -> Some (EcFol.form_of_expr EcFol.mhr o)
+    | OB_pred o -> o
+  in
   match body with
   | None ->
     let ty = trans_ty env ty in    

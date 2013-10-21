@@ -416,7 +416,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
                 let body    = body |> EcTypes.e_mapty uni in
                 let ty      = uni ty in
                 let tparams = EcUnify.UniEnv.tparams ue in
-                let newop   = mk_op tparams ty (Some body) in
+                let newop   = mk_op tparams ty (Some (OP_Plain body)) in
                   match opmode with
                   | `Alias  -> (newop, subst, true)
                   (* FIXME: TC HOOK *)
