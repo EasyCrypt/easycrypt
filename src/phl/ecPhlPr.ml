@@ -42,7 +42,7 @@ let t_ppr ty phi_l phi_r g =
   prove_goal_by [concl_po;concl_pr] (RN_xtd (new EcPhlDeno.rn_hl_deno)) g
 
 (* -------------------------------------------------------------------- *)
-let process_ppr (phi1,phi2) g =
+let process_equiv_ppr (phi1,phi2) g =
   let hyps,concl = get_goal g in
   let ef = t_as_equivF concl in
   let _penv,qenv = LDecl.equivF ef.ef_fl ef.ef_fr hyps in
@@ -51,6 +51,35 @@ let process_ppr (phi1,phi2) g =
   (* TODO: check for type unification *)
   let ty = f_ty phi1 in
     t_ppr ty phi1 phi2 g
+
+let process_bdhoare_ppr g =
+  let env,_,concl = get_goal_e g in
+  let bhf = 
+    try t_as_bdHoareF concl 
+    with _ -> 
+      tacuerror "Only bounded-hoare over functions are supported."
+  in
+  let f_xpath = bhf.bhf_f in
+  let fun_ = EcEnv.Fun.by_xpath f_xpath env in
+  let params = fun_.f_sig.fs_params in
+  let penv,_qenv = EcEnv.Fun.hoareF_memenv f_xpath env in
+  let args = List.map (fun v -> f_pvloc f_xpath v (fst penv)) params in
+  (* Warning: currently no substitution on pre,post since penv is always mhr *)
+  let pre,post = bhf.bhf_pr, bhf.bhf_po in
+  let fop = match bhf.bhf_cmp with
+    | FHle -> f_real_le 
+    | FHge -> fun x y -> f_real_le y x 
+    | FHeq -> f_eq 
+  in
+  let concl = f_imp pre (fop (f_pr mhr f_xpath args post) bhf.bhf_bd) in
+  let concl = f_forall_mems [penv] concl in
+  prove_goal_by [concl] (RN_xtd (new EcPhlDeno.rn_hl_deno)) g
+
+let process_ppr info g =
+  match info with
+    | Some (phi1,phi2) -> process_equiv_ppr (phi1,phi2) g
+    | None -> process_bdhoare_ppr g
+
 
 
 (* -------------------------------------------------------------------- *)

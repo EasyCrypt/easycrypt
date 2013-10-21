@@ -16,4 +16,4 @@ val t_prbounded : bool -> tactic
 val t_prfalse   : tactic
 
 (* -------------------------------------------------------------------- *)
-val process_ppr : pformula tuple2 -> tactic
+val process_ppr : (pformula tuple2) option -> tactic

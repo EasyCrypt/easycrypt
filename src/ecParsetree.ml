@@ -391,7 +391,7 @@ type phltactic =
   | Pexfalso
   | Pbdhoaredeno  of cfpattern
   | Pequivdeno    of cfpattern
-  | PPr           of pformula * pformula
+  | PPr           of (pformula * pformula) option 
   | Pfel          of int * (pformula * pformula * pformula * pformula * pfel_spec_preds * pformula option)
   | Phoare
   | Pbdhoare
