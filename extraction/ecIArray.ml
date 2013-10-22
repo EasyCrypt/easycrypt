@@ -9,7 +9,7 @@ let length = Array.length
 let bqbr_br (xs : 'x array) = length xs
   
 (* Array._.[_] *)
-let _dtlb_rb = Array.set 
+let _dtlb_rb = Array.get
   
 (* Array.empty *)
 let empty : 'x array = [||]
@@ -18,19 +18,20 @@ let empty : 'x array = [||]
 let _clcl_ x t = 
   let len = Array.length t in
   let res = Array.make (len + 1) x in
-  Array.blit t 0 res 1 len 
+  Array.blit t 0 res 1 len;
+  res
 
 (* Array.::: *)
 let clclcl t x = 
   let len = Array.length t in
   let res = Array.make (len + 1) x in
-  Array.blit t 0 res 0 len
+  Array.blit t 0 res 0 len;
+  res
 
 (* Array._.[_<-_] *)
 let _dtlb_lsmn_rb : 'x array -> EcPervasive.int0 -> 'x -> 'x array =
   fun t i x ->
   Array.set t i x; t
-    
   
 (* Array.make *)
 let make : EcPervasive.int0 -> 'x -> 'x array = 
@@ -56,7 +57,7 @@ let fill : 'x array ->
     t
   
 (* Array.blit *)
-let blit dst dOff src sOff len = Array.blit src sOff dst dOff len
+let blit dst dOff src sOff len = Array.blit src sOff dst dOff len; dst
   
 (* Array.map *)
 let map : ('x -> 'y) -> 'x array -> 'y array =
