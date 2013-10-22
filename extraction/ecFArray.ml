@@ -10,13 +10,15 @@
    the Array node to the position we are accessing; this is achieved with
    the reroot function.
 *)
-type 'a tarray = 'a array
-
-type 'a t = 'a data ref
+type 'a tarray = 'a data ref
 and 'a data =
   | Array of 'a array 
-  | Diff of int * 'a * 'a t
-  | DiffO of int * int * 'a array * 'a t
+  | Diff of int * 'a * 'a tarray
+  | DiffO of int * int * 'a array * 'a tarray
+
+let array x = ref (Array x)
+
+type 'a t = 'a tarray
 
 type 'a zip1 = 
   | Zdiff of int * 'a * 'a t
@@ -71,15 +73,11 @@ let impure f t =
     | Array a -> f a 
     | _ -> assert false 
 
-(* Array.array *)
-type 'x array = 'x t
-
-
 (* Array.length *)
 let length t = impure Array.length t
   
 (* Array.`|_| *)
-let bqbr_br (xs : 'x array) =
+let bqbr_br (xs : 'x tarray) =
   length xs
   
 (* Array._.[_] *)
@@ -92,10 +90,10 @@ let get t i =
     | Array a -> a.(i) 
     | _ -> assert false 
 
-let _dtlb_rb : 'x array -> EcPervasive.int0 -> 'x = get
+let _dtlb_rb : 'x tarray -> EcPervasive.int0 -> 'x = get
   
 (* Array.empty *)
-let empty  = Obj.magic (ref (Array ([||]:int tarray)))
+let empty  = Obj.magic (ref (Array ([||]:int array)))
   
 (* Array._::_ *)
 let _clcl_ x t = 
@@ -205,5 +203,4 @@ let alli f t =
 module Darray = struct
   
   let darray len d () = init len (fun _ -> d ())
-  
 end
