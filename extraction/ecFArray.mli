@@ -1,7 +1,7 @@
 (* Array.array *)
 type 'x array
 
-val array: 'x array -> 'x array
+(*val array: 'x array -> 'x array *)
   
 (* Array.length *)
 val length : 'x array -> EcPervasive.int0 

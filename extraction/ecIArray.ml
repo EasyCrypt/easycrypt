@@ -1,7 +1,7 @@
 (* Array.array *)
 type 'x tarray = 'x array
 
-let array x = x
+(* let array x = x *)
   
 (* Array.length *)
 let length = Array.length 
