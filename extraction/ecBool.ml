@@ -19,7 +19,7 @@ let implb = EcPervasive.eqgt
 module Dbool = struct
   
   (* Bool.Dbool.dbool *)
-  let dbool : EcPervasive.bool0 EcPervasive.distr =
+  let dbool : bool EcPervasive.distr =
      fun _ -> Random.bool ()
 
 end

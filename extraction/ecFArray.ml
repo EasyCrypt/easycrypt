@@ -10,19 +10,17 @@
    the Array node to the position we are accessing; this is achieved with
    the reroot function.
 *)
-type 'a tarray = 'a data ref
+type 'a array0 = 'a data ref
 and 'a data =
-  | Array of 'a array 
-  | Diff of int * 'a * 'a tarray
-  | DiffO of int * int * 'a array * 'a tarray
+  | Array of 'a array
+  | Diff of int * 'a * 'a array0
+  | DiffO of int * int * 'a array * 'a array0
 
 let array x = ref (Array x)
 
-type 'a t = 'a tarray
-
 type 'a zip1 = 
-  | Zdiff of int * 'a * 'a t
-  | ZdiffO of int * int * 'a array * 'a t 
+  | Zdiff of int * 'a * 'a array0
+  | ZdiffO of int * int * 'a array * 'a array0 
 
 let rec unzip t' z = 
   match z with
@@ -77,7 +75,7 @@ let impure f t =
 let length t = impure Array.length t
   
 (* Array.`|_| *)
-let bqbr_br (xs : 'x tarray) =
+let bqbr_br (xs : 'x array0) =
   length xs
   
 (* Array._.[_] *)
@@ -90,7 +88,7 @@ let get t i =
     | Array a -> a.(i) 
     | _ -> assert false 
 
-let _dtlb_rb : 'x tarray -> EcPervasive.int0 -> 'x = get
+let _dtlb_rb : 'x array0 -> int -> 'x = get
   
 (* Array.empty *)
 let empty  = Obj.magic (ref (Array ([||]:int array)))

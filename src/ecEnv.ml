@@ -2469,17 +2469,17 @@ let initial =
       [ntt], EcWhy3.RDls, EcPath.basename EcCoreLib.p_tt
     ]  in
   let env, _ = import_w3 env (Why3.Theory.tuple_theory 0) unit_rn in
+  let bool_rn = [
+    ["bool"] , EcWhy3.RDts, EcPath.basename EcCoreLib.p_bool;
+    ["True"] , EcWhy3.RDls, EcPath.basename EcCoreLib.p_true;
+    ["False"], EcWhy3.RDls, EcPath.basename EcCoreLib.p_false ] in
+  let env, _ = import_w3 env Why3.Theory.bool_theory bool_rn in
   let builtin_rn = [
     ["int"]    , EcWhy3.RDts, EcPath.basename EcCoreLib.p_int;
     ["real"]   , EcWhy3.RDts, EcPath.basename EcCoreLib.p_real;
     ["infix ="], EcWhy3.RDls, EcPath.basename EcCoreLib.p_eq
   ] in
   let env, _ = import_w3 env Why3.Theory.builtin_theory builtin_rn in
-  let bool_rn = [
-    ["bool"] , EcWhy3.RDts, EcPath.basename EcCoreLib.p_bool;
-    ["True"] , EcWhy3.RDls, EcPath.basename EcCoreLib.p_true;
-    ["False"], EcWhy3.RDls, EcPath.basename EcCoreLib.p_false ] in
-  let env, _ = import_w3 env Why3.Theory.bool_theory bool_rn in
   let add_bool sign env path = 
     let ty = EcTypes.toarrow sign EcTypes.tbool in
     Op.bind_logical (EcPath.basename path) 

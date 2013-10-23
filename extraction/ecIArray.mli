@@ -1,77 +1,73 @@
 (* Array.array *)
-type 'x array
+type 'x array0
 
-(* val array: 'x array -> 'x array *)
+val array: 'x array -> 'x array0 
   
 (* Array.length *)
-val length : 'x array -> EcPervasive.int0 
+val length : 'x array0 -> int 
   
 (* Array.`|_| *)
-val bqbr_br : 'x array -> EcPervasive.int0 
+val bqbr_br : 'x array0 -> int 
   
 (* Array._.[_] *)
-val _dtlb_rb : 'x array -> EcPervasive.int0 -> 'x 
+val _dtlb_rb : 'x array0 -> int -> 'x 
   
 (* Array.empty *)
-val empty : 'x array 
+val empty : 'x array0 
   
 (* Array._::_ *)
-val _clcl_ : 'x -> 'x array -> 'x array
+val _clcl_ : 'x -> 'x array0 -> 'x array0
   
 (* Array.::: *)
-val clclcl : 'x array -> 'x -> 'x array 
+val clclcl : 'x array0 -> 'x -> 'x array0 
   
 (* Array._.[_<-_] *)
-val _dtlb_lsmn_rb : 'x array -> EcPervasive.int0 -> 'x -> 'x array 
+val _dtlb_lsmn_rb : 'x array0 -> int -> 'x -> 'x array0 
   
 (* Array.make *)
-val make : EcPervasive.int0 -> 'x -> 'x array 
+val make : int -> 'x -> 'x array0 
   
 (* Array.init *)
-val init : EcPervasive.int0 -> (EcPervasive.int0 -> 'x) -> 'x array 
+val init : int -> (int -> 'x) -> 'x array0 
   
 (* Array.|| *)
-val brbr : 'x array -> 'x array -> 'x array 
+val brbr : 'x array0 -> 'x array0 -> 'x array0 
   
 (* Array.sub *)
-val sub : 'x array -> EcPervasive.int0 -> EcPervasive.int0 -> 'x array 
+val sub : 'x array0 -> int -> int -> 'x array0 
   
 (* Array.fill *)
-val fill : 'x array ->
-               EcPervasive.int0 -> EcPervasive.int0 -> 'x -> 'x array 
+val fill : 'x array0 -> int -> int -> 'x -> 'x array0 
   
 (* Array.blit *)
-val blit : 'x array ->
-               EcPervasive.int0 ->
-                 'x array -> EcPervasive.int0 -> EcPervasive.int0 -> 'x array 
+val blit : 'x array0 -> int -> 'x array0 -> int -> int -> 'x array0 
   
 (* Array.map *)
-val map : ('x -> 'y) -> 'x array -> 'y array 
+val map : ('x -> 'y) -> 'x array0 -> 'y array0 
   
 (* Array.map2 *)
-val map2 : ('x -> 'y -> 'z) -> 'x array -> 'y array -> 'z array 
+val map2 : ('x -> 'y -> 'z) -> 'x array0 -> 'y array0 -> 'z array0 
   
 (* Array.mapi *)
-val mapi : (EcPervasive.int0 -> 'x -> 'y) -> 'x array -> 'y array 
+val mapi : (int -> 'x -> 'y) -> 'x array0 -> 'y array0 
   
 (* Array.fold_left *)
-val fold_left : ('state -> 'x -> 'state) -> 'state -> 'x array -> 'state 
+val fold_left : ('state -> 'x -> 'state) -> 'state -> 'x array0 -> 'state 
   
 (* Array.fold_right *)
-val fold_right : ('state -> 'x -> 'state) -> 'state -> 'x array -> 'state 
+val fold_right : ('state -> 'x -> 'state) -> 'state -> 'x array0 -> 'state 
   
 (* Array.all *)
-val all : ('x -> EcPervasive.bool0) -> 'x array -> EcPervasive.bool0 
+val all : ('x -> bool) -> 'x array0 -> bool 
   
 (* Array.alli *)
-val alli : (EcPervasive.int0 -> 'x -> EcPervasive.bool0) ->
-               'x array -> EcPervasive.bool0 
+val alli : (int -> 'x -> bool) ->
+               'x array0 -> bool 
   
 (* Array.Darray *)
 module Darray : sig
   
   (* Array.Darray.darray *)
-  val darray : EcPervasive.int0 ->
-                   'a EcPervasive.distr -> 'a array EcPervasive.distr 
+  val darray : int -> 'a EcPervasive.distr -> 'a array0 EcPervasive.distr 
 
 end

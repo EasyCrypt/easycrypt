@@ -623,9 +623,12 @@ let init_withextract =
   let tint x = dummy ([EcCoreLib.id_top; "Int"], x) in
   [
     (* Pervasive *)
-    ExTh (dummy ([EcCoreLib.id_top], EcCoreLib.id_Pervasive)), "EcPervasive";
+    ExTh (dummy ([EcCoreLib.id_top], EcCoreLib.id_Pervasive)), "EcPervasive"; 
+    ExTy (perv "unit") , "unit"       ;
+    ExTy (perv "bool") , "bool"       ; 
     ExOp (perv "true") , "true"       ;
     ExOp (perv "false"), "false"      ;
+    ExTy (perv "int")  , "int"        ;
     ExOp (perv "<=>")  , operv "(==)" ;
     ExOp (perv "||")   , operv "(||)" ;
     ExOp (perv "\\/")  , operv "(||)" ;
