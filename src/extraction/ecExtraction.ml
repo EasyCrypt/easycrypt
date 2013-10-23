@@ -588,7 +588,7 @@ let rec add_withs check env eenv withextract =
   List.iter (add_with check env eenv) withextract 
 
 and add_with check env eenv (toex, s) = 
-  let oname = List.rev (Str.split (Str.regexp "\ .") s) in
+  let oname = List.rev (Str.split (Str.regexp "\.") s) in
   match toex with
   | ExOp qs -> add_withop check env eenv qs oname 
   | ExTy qs -> add_withty check env eenv qs oname
