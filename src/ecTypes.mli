@@ -47,6 +47,8 @@ val tfset   : ty -> ty
 val tcpred  : ty -> ty
 val toarrow : ty list -> ty -> ty
 
+val flatten_ty : ty -> ty list
+
 (* -------------------------------------------------------------------- *)
 exception FoundUnivar
 

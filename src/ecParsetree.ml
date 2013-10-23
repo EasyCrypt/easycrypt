@@ -168,7 +168,7 @@ type ptydecl = {
 type pdatatype = {
   ptd_name   : psymbol;
   ptd_tyvars : (psymbol * pqsymbol list) list;
-  ptd_ctors  : (psymbol * pty option) list;
+  ptd_ctors  : (psymbol * pty list) list;
 }
 
 (* -------------------------------------------------------------------- *)

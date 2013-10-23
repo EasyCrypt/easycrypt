@@ -23,7 +23,7 @@ exception HiScopeError of EcLocation.t option * string
 
 let pp_hi_scope_error fmt exn =
   match exn with
-  | HiScopeError (None  , s) ->
+  | HiScopeError (None, s) ->
       Format.fprintf fmt "%s" s
 
   | HiScopeError (Some loc, s) ->
@@ -1572,7 +1572,7 @@ module Ty = struct
     let ctors =
       let for1 (cname, cty) =
         let ue  = EcUnify.UniEnv.copy ue in
-        let cty = cty |> omap (TT.transty TT.tp_tydecl env0 ue) in
+        let cty = cty |> List.map (TT.transty TT.tp_tydecl env0 ue) in
           (unloc cname, cty)
       in
         dt.ptd_ctors |> List.map for1
