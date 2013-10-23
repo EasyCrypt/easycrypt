@@ -264,8 +264,7 @@ let init_tparams (s : _subst) (params : ty_params) (params' : ty_params) =
       { s with s_sty = sty; s_ty = EcTypes.ty_subst sty } 
 
 let subst_typaram (s : _subst) ((id, tc) : ty_param) =
-  (EcIdent.fresh id,
-   Sp.fold (fun p tc -> Sp.add (s.s_p p) tc) tc Sp.empty)
+  (EcIdent.fresh id, Sp.fold (fun p tc -> Sp.add (s.s_p p) tc) tc Sp.empty)
 
 let subst_tydecl (s : _subst) (tyd : tydecl) =
   let params' = List.map (subst_typaram s) tyd.tyd_params in
@@ -278,17 +277,15 @@ let subst_tydecl (s : _subst) (tyd : tydecl) =
           `Concrete (s.s_ty ty)
     | `Datatype cs ->
         let s = init_tparams s tyd.tyd_params params' in
-          `Datatype (List.map (fun (x, ty) -> (x, ty |> omap s.s_ty)) cs)
+          `Datatype (List.map (fun (x, ty) -> (x, List.map s.s_ty ty)) cs)
   in
     { tyd_params = params'; tyd_type = body }
 
 (* -------------------------------------------------------------------- *)
-let subst_op_kind (s : _subst) (kind : operator_kind) =
+let rec subst_op_kind (s : _subst) (kind : operator_kind) =
   match kind with 
   | OB_oper (Some body) ->
-      let s = e_subst_of_subst s in
-      let body  = EcTypes.e_subst s body in
-        OB_oper (Some body)
+      OB_oper (Some (subst_op_body s body))
 
   | OB_pred (Some body) ->   
       let s = f_subst_of_subst s in
@@ -296,6 +293,14 @@ let subst_op_kind (s : _subst) (kind : operator_kind) =
         OB_pred (Some body) 
 
   | OB_oper None | OB_pred None -> kind
+
+and subst_op_body (s : _subst) (bd : opbody) =
+  match bd with
+  | OP_Plain body ->
+      let s = e_subst_of_subst s in
+        OP_Plain (EcTypes.e_subst s body)
+
+  | OP_Constr _ -> bd
 
 (* -------------------------------------------------------------------- *)
 let subst_op (s : _subst) (op : operator) =
@@ -447,9 +452,6 @@ and subst_ctheory (s : _subst) (cth : ctheory) =
     cth_struct = subst_ctheory_struct s cth.cth_struct; }
 
 (* -------------------------------------------------------------------- *)
-(* -------------------------  Wrapper --------------------------------- *)
-(* -------------------------------------------------------------------- *)
-
 let subst_ax           s = subst_ax (_subst_of_subst s)
 let subst_op           s = subst_op (_subst_of_subst s)
 let subst_tydecl       s = subst_tydecl (_subst_of_subst s)
@@ -467,3 +469,10 @@ let subst_mpath        s = (_subst_of_subst s).s_fmp
 let subst_path         s = (_subst_of_subst s).s_p
 
 let subst_form         s = fun f -> (Fsubst.f_subst (f_subst_of_subst (_subst_of_subst s)) f)
+
+(* -------------------------------------------------------------------- *)
+let freshen_type (typ, ty) =
+  let empty = _subst_of_subst empty in
+  let typ' = List.map (subst_typaram empty) typ in
+  let s = init_tparams empty typ typ' in
+    (typ', s.s_ty ty)

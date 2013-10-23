@@ -16,15 +16,19 @@ type tydecl = {
 and ty_body = [
   | `Concrete of EcTypes.ty
   | `Abstract of Sp.t
-  | `Datatype of (EcSymbols.symbol * EcTypes.ty option) list
+  | `Datatype of (EcSymbols.symbol * EcTypes.ty list) list
 ]
 
 (* -------------------------------------------------------------------- *)
 type locals = EcIdent.t list 
 
 type operator_kind = 
-  | OB_oper of EcTypes.expr option
+  | OB_oper of opbody option
   | OB_pred of EcFol.form option
+
+and opbody =
+  | OP_Plain  of EcTypes.expr
+  | OP_Constr of EcPath.path * int
 
 type operator = {
   op_tparams : ty_params;
@@ -35,7 +39,7 @@ type operator = {
 val op_ty   : operator -> ty
 val is_pred : operator -> bool
 
-val mk_op   : ty_params -> ty -> expr option -> operator
+val mk_op   : ty_params -> ty -> opbody option -> operator
 val mk_pred : ty_params -> ty list -> form option -> operator
 
 (* -------------------------------------------------------------------- *)

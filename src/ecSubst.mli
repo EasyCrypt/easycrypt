@@ -29,6 +29,9 @@ val add_tydef  : subst -> path -> (EcIdent.t list * ty) -> subst
 val add_opdef  : subst -> path -> (EcIdent.t list * expr) -> subst
 
 (* -------------------------------------------------------------------- *)
+val freshen_type : (ty_params * ty) -> (ty_params * ty)
+
+(* -------------------------------------------------------------------- *)
 val subst_theory  : subst -> theory -> theory
 val subst_ax      : subst -> axiom -> axiom
 val subst_op      : subst -> operator -> operator

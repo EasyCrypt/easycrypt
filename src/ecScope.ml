@@ -23,7 +23,7 @@ exception HiScopeError of EcLocation.t option * string
 
 let pp_hi_scope_error fmt exn =
   match exn with
-  | HiScopeError (None  , s) ->
+  | HiScopeError (None, s) ->
       Format.fprintf fmt "%s" s
 
   | HiScopeError (Some loc, s) ->
@@ -907,16 +907,20 @@ module Op = struct
 
     let (ty, body) =
       match op.po_def with
-      | POabstr pty ->
+      | PO_abstr pty ->
           TT.transty tp scope.sc_env ue pty, None
 
-      | POconcr (bd, pty, pe) ->
+      | PO_concr (bd, pty, pe) ->
           let env     = scope.sc_env in
           let codom   = TT.transty tp env ue pty in 
           let env, xs = TT.transbinding env ue bd in
           let body    = TT.transexpcast env ue codom pe in
           let lam     = EcTypes.e_lam xs body in
             lam.EcTypes.e_ty, Some lam
+
+      | PO_case _ ->
+          (* FIXME: IND HOOK *)
+          failwith "not-implemented-yet"
     in
 
     if not (EcUnify.UniEnv.closed ue) then
@@ -926,7 +930,7 @@ module Op = struct
     let body    = body |> omap (e_mapty uni) in
     let ty      = uni ty in
     let tparams = EcUnify.UniEnv.tparams ue in
-    let tyop    = EcDecl.mk_op tparams ty body in
+    let tyop    = EcDecl.mk_op tparams ty (body |> omap (fun x -> OP_Plain x)) in
 
     if op.po_kind = `Const then begin
       let tue   = EcUnify.UniEnv.copy ue in
@@ -1568,7 +1572,7 @@ module Ty = struct
     let ctors =
       let for1 (cname, cty) =
         let ue  = EcUnify.UniEnv.copy ue in
-        let cty = cty |> omap (TT.transty TT.tp_tydecl env0 ue) in
+        let cty = cty |> List.map (TT.transty TT.tp_tydecl env0 ue) in
           (unloc cname, cty)
       in
         dt.ptd_ctors |> List.map for1

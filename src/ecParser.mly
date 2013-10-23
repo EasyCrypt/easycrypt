@@ -34,6 +34,12 @@
     ptd_ctors  = ctors;
   }
 
+  let opdef_of_opbody ty b =
+    match b with
+    | None                  -> PO_abstr ty
+    | Some (args, `Expr e ) -> PO_concr (args, ty, e)
+    | Some (args, `Case bs) -> PO_case  (args, ty, bs)
+
   let mk_peid_symb loc s ti = 
     mk_loc loc (PEident (pqsymb_of_symb loc s, ti))
 
@@ -1219,8 +1225,8 @@ datatype_def:
 ;
 
 dt_ctor_def:
-| x=uident { (x, None) }
-| x=uident OF ty=loc(simpl_type_exp) { (x, (Some ty)) }
+| x=uident { (x, []) }
+| x=uident OF ty=plist1(loc(simpl_type_exp), STAR) { (x, ty) }
 ;
 
 (* -------------------------------------------------------------------- *)
@@ -1291,37 +1297,48 @@ operator:
     { po_kind   = k;
       po_name   = x;
       po_tyvars = tyvars;
-      po_def    = POabstr sty; }
+      po_def    = opdef_of_opbody sty None; }
   }
 
-| k=op_or_const x=oident tyvars=tyvars_decl? COLON sty=loc(type_exp) EQ b=expr {
+| k=op_or_const x=oident tyvars=tyvars_decl? COLON sty=loc(type_exp) EQ b=opbody {
     { po_kind   = k;
       po_name   = x;
       po_tyvars = tyvars;
-      po_def    = POconcr ([], sty, b); }
+      po_def    = opdef_of_opbody sty (Some ([], b)); }
   }
 
-| k=op_or_const x=oident tyvars=tyvars_decl? eq=loc(EQ) b=expr {
+| k=op_or_const x=oident tyvars=tyvars_decl? eq=loc(EQ) b=opbody {
     { po_kind   = k;
       po_name   = x;
       po_tyvars = tyvars;
-      po_def    = POconcr([], mk_loc eq.pl_loc PTunivar, b); }
+      po_def    = opdef_of_opbody (mk_loc eq.pl_loc PTunivar) (Some ([], b)); }
   }
 
-| k=op_or_const x=oident tyvars=tyvars_decl? p=ptybindings eq=loc(EQ) b=expr {
+| k=op_or_const x=oident tyvars=tyvars_decl? p=ptybindings eq=loc(EQ) b=opbody {
     { po_kind   = k;
       po_name   = x;
       po_tyvars = tyvars;
-      po_def    = POconcr(p, mk_loc eq.pl_loc PTunivar, b); }
+      po_def    = opdef_of_opbody (mk_loc eq.pl_loc PTunivar) (Some (p, b)); }
   }
 
-| k=op_or_const x=oident tyvars=tyvars_decl? p=ptybindings COLON codom=loc(type_exp)
-    EQ b=expr {
+| k=op_or_const x=oident tyvars=tyvars_decl? p=ptybindings COLON codom=loc(type_exp) EQ b=opbody {
     { po_kind   = k;
       po_name   = x;
       po_tyvars = tyvars;
-      po_def    = POconcr(p, codom, b); }
-  } 
+      po_def    = opdef_of_opbody codom (Some (p, b)); }
+  }
+;
+
+opbody:
+| e=expr     { `Expr e  }
+| bs=opcase+ { `Case bs }
+;
+
+opcase:
+| WITH x=ident EQ c=qoident ps=ident* IMPL e=expr
+   { { pop_name    = x;
+       pop_pattern = (c, ps);
+       pop_body    = e; } }
 ;
 
 predicate:

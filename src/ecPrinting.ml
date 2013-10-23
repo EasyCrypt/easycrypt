@@ -1291,25 +1291,36 @@ let pp_typedecl (ppe : PPEnv.t) fmt (x, tyd) =
   let ppe = PPEnv.add_locals ppe (List.map fst tyd.tyd_params) in
   let name = P.basename x in
 
+  let pp_kw fmt =
+    match tyd.tyd_type with
+    | `Abstract _ | `Concrete _ -> Format.fprintf fmt "type"
+    | `Datatype _ -> Format.fprintf fmt "datatype"
+  in
+
   let pp_prelude fmt =
-    (* FIXME: TC HOOK *)
     match List.map fst tyd.tyd_params with
     | [] ->
-        Format.fprintf fmt "type %s" name
+        Format.fprintf fmt "%t %s" pp_kw name
 
     | [tx] ->
-        Format.fprintf fmt "type %a %s"
-          (pp_tyvar ppe) tx name
+        Format.fprintf fmt "%t %a %s" pp_kw (pp_tyvar ppe) tx name
 
     | txs ->
-        Format.fprintf fmt "type (%a) %s"
-          (pp_paren (pp_list ",@ " (pp_tyvar ppe))) txs name
+        Format.fprintf fmt "%t (%a) %s"
+          pp_kw (pp_paren (pp_list ",@ " (pp_tyvar ppe))) txs name
 
   and pp_body fmt =
     match tyd.tyd_type with
     | `Abstract _  -> ()                (* FIXME: TC HOOK *)
-    | `Datatype _  -> ()                (* FIXME: IND HOOK *)
     | `Concrete ty -> Format.fprintf fmt " =@ %a" (pp_type ppe) ty
+    | `Datatype cs ->
+        let pp_ctor fmt (c, cty) =
+          match cty with
+          | [] -> Format.fprintf fmt "%s" c
+          | _  -> Format.fprintf fmt "%s of @[<hov 2>%a@]"
+                    c (pp_list " *@ " (pp_type ppe)) cty
+        in
+          Format.fprintf fmt " =@ @[<hov 2>%a@]" (pp_list " |@ " pp_ctor) cs
 
   in
     Format.fprintf fmt "@[%t%t.@]" pp_prelude pp_body
@@ -1360,7 +1371,7 @@ let pp_opdecl_op (ppe : PPEnv.t) fmt (x, ts, ty, op) =
     | None ->
         Format.fprintf fmt ": %a" (pp_type ppe) ty
 
-    | Some e ->
+    | Some (OP_Plain e) ->
         let ((subppe, pp_vds), e) =
           let (vds, e) =
             match e.e_node with
@@ -1370,6 +1381,10 @@ let pp_opdecl_op (ppe : PPEnv.t) fmt (x, ts, ty, op) =
           (pp_locbinds ppe vds, e)
         in
           Format.fprintf fmt "%t =@ %a" pp_vds (pp_expr subppe) e
+
+    | Some (OP_Constr (indp, i)) ->
+        Format.fprintf fmt
+          " =@ %d-th constructor of %a" (i+1) (pp_tyname ppe) indp
   in
 
   match ts with

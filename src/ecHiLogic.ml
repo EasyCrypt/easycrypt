@@ -404,7 +404,9 @@ let process_rewrite1 loc ri g =
             match op.EcDecl.op_kind with
             | EcDecl.OB_oper None | EcDecl.OB_pred None ->
                 tacuerror "this operator/predicate is abstract"
-            | EcDecl.OB_oper (Some e) ->
+            | EcDecl.OB_oper (Some (EcDecl.OP_Constr _)) ->
+                tacuerror "this operator is a constructor"
+            | EcDecl.OB_oper (Some (EcDecl.OP_Plain e)) ->
                 (snd p, op.EcDecl.op_tparams, form_of_expr EcFol.mhr e, args)
             | EcDecl.OB_pred (Some f) ->
                 (snd p, op.EcDecl.op_tparams, f, args)

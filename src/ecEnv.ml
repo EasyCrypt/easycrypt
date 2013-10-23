@@ -1611,19 +1611,37 @@ module Ty = struct
   let lookup_path name env =
     fst (lookup name env)
 
-  let bind name ty env =
-    let mypath = root env in
+  let rebind name ty env =
+    let mypath = EcPath.pqname (root env) name in
     let env    = MC.bind_tydecl name ty env in
     let env    =
       match ty.tyd_type with
-      | `Concrete _  -> env
+      | `Concrete _ -> env
+
       | `Abstract tc -> Sp.fold
           (fun dst env ->
              TypeClass.add_abstract_instance ~src:mypath ~dst env)
           tc env
-      | `Datatype _cs -> env            (* FIXME: IND HOOK *)
-    in
 
+      | `Datatype cs ->
+          let params = List.map (fun (x, _) -> tvar x) ty.tyd_params in
+
+          let for1 i (c, aty) =
+            let aty = EcTypes.toarrow aty (tconstr mypath params) in
+            let aty = EcSubst.freshen_type (ty.tyd_params, aty) in
+            let cop = (c, mk_op (fst aty) (snd aty) (Some (OP_Constr (mypath, i)))) in
+              cop
+          in
+
+          let cs = List.mapi for1 cs in
+            List.fold_left
+              (fun env (c, cop) -> MC.bind_operator c cop env)
+              env cs
+    in
+      env
+
+  let bind name ty env =
+    let env = rebind name ty env in
     let (w3, rb) =
         EcWhy3.add_ty env.env_w3
           (EcPath.pqname (root env) name) ty
@@ -1632,10 +1650,6 @@ module Ty = struct
           env_w3   = w3;
           env_rb   = rb @ env.env_rb;
           env_item = CTh_type (name, ty) :: env.env_item; }
-
-  let rebind name ty env =
-    (* FIXME: TC HOOK *)
-    MC.bind_tydecl name ty env
 
   let defined (name : EcPath.path) (env : env) =
     match by_path_opt name env with
@@ -2125,17 +2139,21 @@ module Op = struct
   let reducible env p =
     try
       let op = by_path p env in
-      match op.op_kind with
-      | OB_oper(Some _) | OB_pred(Some _) -> true
-      | _ -> false
-    with _ -> false
+        match op.op_kind with
+        | OB_oper (Some (OP_Plain _))
+        | OB_pred (Some _) -> true
+        | OB_oper None
+        | OB_oper (Some (OP_Constr _))
+        | OB_pred None -> false
+
+    with LookupFailure _ -> false
 
   let reduce env p tys =
     let op = try by_path p env with _ -> assert false in
     let f =
       match op.op_kind with
-      | OB_oper(Some e) -> EcFol.form_of_expr EcFol.mhr e
-      | OB_pred(Some idsf) -> idsf
+      | OB_oper (Some (OP_Plain e)) -> EcFol.form_of_expr EcFol.mhr e
+      | OB_pred (Some idsf) -> idsf
       | _ -> raise NotReducible
     in
       EcFol.Fsubst.subst_tvar

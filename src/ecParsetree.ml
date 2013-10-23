@@ -168,7 +168,7 @@ type ptydecl = {
 type pdatatype = {
   ptd_name   : psymbol;
   ptd_tyvars : (psymbol * pqsymbol list) list;
-  ptd_ctors  : (psymbol * pty option) list;
+  ptd_ctors  : (psymbol * pty list) list;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -225,8 +225,15 @@ let rec pf_ident f =
 
 (* -------------------------------------------------------------------- *)
 type pop_def =
-  | POabstr of pty
-  | POconcr of ptybindings * pty * pexpr
+  | PO_abstr of pty
+  | PO_concr of ptybindings * pty * pexpr
+  | PO_case  of ptybindings * pty * pop_branch list
+
+and pop_branch = {
+  pop_name    : psymbol;
+  pop_pattern : pqsymbol * psymbol list;
+  pop_body    : pexpr;
+}
 
 type poperator = {
   po_kind   : [`Op | `Const];

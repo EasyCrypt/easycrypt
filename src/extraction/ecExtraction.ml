@@ -395,8 +395,10 @@ let rec compile_op env eenv p =
     let vtymap, typarams = compile_typarams op.op_tparams in
     let def = 
       match op.op_kind with
-      | OB_oper (Some body) ->
+      | OB_oper (Some (OP_Plain body)) ->
         OOdef (compile_expr env eenv vtymap Mid.empty body)
+      | OB_oper (Some (OP_Constr _)) ->
+        assert false                    (* FIXME: IND HOOK *)
       | OB_oper None ->
         OOabs (compile_ty env eenv vtymap op.op_ty) 
       | OB_pred _ -> error "can not extract predicate" in

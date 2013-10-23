@@ -112,6 +112,11 @@ let treal      = tconstr EcCoreLib.p_real  []
 let toarrow dom ty = 
   List.fold_right tfun dom ty
 
+let flatten_ty (ty : ty) =
+  match ty with
+  | { ty_node = Ttuple tys } -> tys
+  | _ -> [ty]
+
 (* -------------------------------------------------------------------- *)
 module TySmart = struct
   let tglob (ty, mp) (mp') =
