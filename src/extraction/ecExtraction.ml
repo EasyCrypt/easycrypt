@@ -111,8 +111,15 @@ let rec uniq_expr restr = function
   | Oif(e1,e2,e3) -> 
     uniq_expr restr e1; uniq_expr restr e2; uniq_expr restr e3 
 
+let is_mod odecl = 
+  match odecl.odecl_kind with
+  | ODKmod _ -> true
+  | _ -> false 
+
 let rec uniq_decl restr odecl =
-  let restr = uniq_add_local restr odecl.odecl_name in
+  let restr = 
+    if is_mod odecl then restr 
+    else uniq_add_local restr odecl.odecl_name in
   uniq_decl_kind restr odecl.odecl_kind;
   restr
 
