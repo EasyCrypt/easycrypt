@@ -491,6 +491,32 @@ let merge_id =
     if not (EcPath.p_equal t1 t2) then raise (MergeW3Id(p,t1,t2)) in
   Ident.Mid.merge (merge check)
 
+let mk_highorder_func ls =
+  let targs = ls.Term.ls_args in
+  let tres = ls.Term.ls_value in
+  if targs = [] then None
+  else
+    let pid = Ident.id_fresh (ls.Term.ls_name.Ident.id_string ^ "_ho") in
+    let codom = (odfl Ty.ty_bool tres) in
+    let ty = List.fold_right Ty.ty_func ls.Term.ls_args codom in
+    let ls' = Term.create_fsymbol pid [] ty in
+    let decl' = Decl.create_param_decl ls' in
+    let pid_spec = Ident.id_fresh (ls.Term.ls_name.Ident.id_string ^ "_ho_spec") in
+    let pr = Decl.create_prsymbol pid_spec in
+    let preid = Ident.id_fresh "x" in
+    let params = List.map (Term.create_vsymbol preid) targs in
+    let args = List.map Term.t_var params in
+    let f_app' =
+      List.fold_left Term.t_func_app (Term.fs_app ls' [] ty) args in
+    let f_app = Term.t_app ls args tres in
+    let spec =
+      match tres with
+      | None -> Term.t_iff (Term.t_equ f_app' Term.t_bool_true) f_app
+      | Some _ -> Term.t_equ f_app' f_app in
+    let spec = Term.t_forall_close params [] spec in
+    let decl_s = Decl.create_prop_decl Decl.Paxiom pr spec in
+    Some(ls',decl',decl_s)
+
 let add_ts env path ts decl =
   if Mp.mem path env.env_ty then begin
     assert (ty_body_equal ts (Mp.find path env.env_ty));
@@ -507,7 +533,17 @@ let add_ts env path ts decl =
           let tvs = (fst ts).Ty.ts_args in
           let for1 env (c, ls) =
             let cpath = EcPath.pqoname (EcPath.prefix path) c in
-              { env with env_op = Mp.add cpath (ls, ls, tvs) env.env_op }
+            let odecl = mk_highorder_func ls in
+              match odecl with
+              | None ->
+                  { env with env_op = Mp.add cpath (ls, ls, tvs) env.env_op }
+
+              | Some (ls', dcl1, dcl2) ->
+                  List.fold_left
+                    (fun env dcl ->
+                      { env with logic_task = add_decl_with_tuples env.logic_task dcl })
+                    { env with env_op = Mp.add cpath (ls, ls', tvs) env.env_op }
+                    [dcl1; dcl2]
           in
             List.fold_left for1 env ls
   end
@@ -545,34 +581,6 @@ let add_xpf env xp ls =
   { env with
     env_xpf = Mx.change add xp env.env_xpf;
     logic_task = add_decl_with_tuples env.logic_task decl}
-
-
-
-let mk_highorder_func ls =
-  let targs = ls.Term.ls_args in
-  let tres = ls.Term.ls_value in
-  if targs = [] then None
-  else
-    let pid = Ident.id_fresh (ls.Term.ls_name.Ident.id_string ^ "_ho") in
-    let codom = (odfl Ty.ty_bool tres) in
-    let ty = List.fold_right Ty.ty_func ls.Term.ls_args codom in
-    let ls' = Term.create_fsymbol pid [] ty in
-    let decl' = Decl.create_param_decl ls' in
-    let pid_spec = Ident.id_fresh (ls.Term.ls_name.Ident.id_string ^ "_ho_spec") in
-    let pr = Decl.create_prsymbol pid_spec in
-    let preid = Ident.id_fresh "x" in
-    let params = List.map (Term.create_vsymbol preid) targs in
-    let args = List.map Term.t_var params in
-    let f_app' =
-      List.fold_left Term.t_func_app (Term.fs_app ls' [] ty) args in
-    let f_app = Term.t_app ls args tres in
-    let spec =
-      match tres with
-      | None -> Term.t_iff (Term.t_equ f_app' Term.t_bool_true) f_app
-      | Some _ -> Term.t_equ f_app' f_app in
-    let spec = Term.t_forall_close params [] spec in
-    let decl_s = Decl.create_prop_decl Decl.Paxiom pr spec in
-    Some(ls',decl',decl_s)
 
 let add_pr env path pr decl =
   if Mp.mem path env.env_ax then
