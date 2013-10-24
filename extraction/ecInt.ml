@@ -1,8 +1,8 @@
 (* Int.zero *)
-let zero : EcPervasive.int0 = 0
+let zero : int = 0
   
 (* Int.one *)
-let one : EcPervasive.int0 = 1
+let one : int = 1
   
 (* Int.< *)
 let ls (x:int) (y:int) = x < y

@@ -63,25 +63,26 @@ let ocaml_keyword =
       "type"; "as";
       "module"; "struct"; "sig"; "begin"; "end"; 
       "match"; "with"; "|"; "->"; "try"; "raise"; "when"; "where"; 
-      "unit"; "int"; "bool"; 
+      "unit"; "int"; "bool"; "array"; 
       "()"; "=" ]  
 
 (**********************************************************************)
 (* Make names uniques and compatibles with ocaml keyword              *)
 
 let uniq_name restr s =
-  if Sstr.mem s restr then
-    let rec aux i = 
-      let s' = s^(string_of_int i) in
-      if Sstr.mem s' restr then aux (i+1) 
-      else s' in
-    let s' = aux 0 in
-    Sstr.add s' restr, s'
-  else restr, s
+  let s' = 
+    if Sstr.mem s restr then
+      let rec aux i = 
+        let s' = s^(string_of_int i) in
+        if Sstr.mem s' restr then aux (i+1) 
+        else s' in
+      aux 0
+    else s in
+  Sstr.add s' restr, s'
 
 let uniq_add_local restr oname =
   let restr, s = uniq_name restr oname.oname_base in
-  oname.oname_base <- s;
+  if not (oname.oname_base == s) then oname.oname_base <- s;
   restr
   
 let uniq_add_locals restr onames = 
@@ -110,8 +111,15 @@ let rec uniq_expr restr = function
   | Oif(e1,e2,e3) -> 
     uniq_expr restr e1; uniq_expr restr e2; uniq_expr restr e3 
 
+let is_mod odecl = 
+  match odecl.odecl_kind with
+  | ODKmod _ -> true
+  | _ -> false 
+
 let rec uniq_decl restr odecl =
-  let restr = uniq_add_local restr odecl.odecl_name in
+  let restr = 
+    if is_mod odecl then restr 
+    else uniq_add_local restr odecl.odecl_name in
   uniq_decl_kind restr odecl.odecl_kind;
   restr
 
@@ -533,12 +541,6 @@ let oname_of_rlist ls =
   { oname_path = List.rev (List.tl ls);
     oname_base = List.hd ls } 
 
-let to_oname s = 
-  let ls = Str.split (Str.regexp "\ .") s in
-  let r = List.rev ls in
-  oname_of_rlist r 
- 
-
 let rec compile_dummy_th p ls cth =
   let modd = compile_dummy_items p ls cth.cth_struct in
   { odecl_path = p;
@@ -584,11 +586,12 @@ let rec add_dummy_decl eenv decl =
   | ODKmod modd ->
     List.iter (add_dummy_decl eenv) modd
 
+ 
 let rec add_withs check env eenv withextract = 
   List.iter (add_with check env eenv) withextract 
 
 and add_with check env eenv (toex, s) = 
-  let oname = List.rev (Str.split (Str.regexp "\ .") s) in
+  let oname = List.rev (Str.split (Str.regexp "\\.") s) in
   match toex with
   | ExOp qs -> add_withop check env eenv qs oname 
   | ExTy qs -> add_withty check env eenv qs oname
@@ -627,9 +630,12 @@ let init_withextract =
   let tint x = dummy ([EcCoreLib.id_top; "Int"], x) in
   [
     (* Pervasive *)
-    ExTh (dummy ([EcCoreLib.id_top], EcCoreLib.id_Pervasive)), "EcPervasive";
+    ExTh (dummy ([EcCoreLib.id_top], EcCoreLib.id_Pervasive)), "EcPervasive"; 
+    ExTy (perv "unit") , "unit"       ;
+    ExTy (perv "bool") , "bool"       ; 
     ExOp (perv "true") , "true"       ;
     ExOp (perv "false"), "false"      ;
+    ExTy (perv "int")  , "int"        ;
     ExOp (perv "<=>")  , operv "(==)" ;
     ExOp (perv "||")   , operv "(||)" ;
     ExOp (perv "\\/")  , operv "(||)" ;

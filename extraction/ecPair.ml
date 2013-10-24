@@ -1,10 +1,10 @@
 (* Pair.fst *)
 let fst (p : 'a * 'b) =
-  let (a, b) = p in a
+  let (a0, b0) = p in a0
   
 (* Pair.snd *)
 let snd (p : 'a * 'b) =
-  let (a, b) = p in b
+  let (a0, b0) = p in b0
   
 (* Pair.Dprod *)
 module Dprod = struct
