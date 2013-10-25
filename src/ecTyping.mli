@@ -71,6 +71,9 @@ val tyerror : EcLocation.t -> EcEnv.env -> tyerror -> 'a
 val pp_cnv_failure :  Format.formatter -> EcEnv.env -> tymod_cnv_failure -> unit
 
 (* -------------------------------------------------------------------- *)
+val unify_or_fail : EcEnv.env -> EcUnify.unienv -> EcLocation.t -> expct:ty -> ty -> unit
+
+(* -------------------------------------------------------------------- *)
 type typolicy
 
 val tp_tydecl : typolicy

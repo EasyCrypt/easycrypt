@@ -122,11 +122,17 @@ module PPEnv = struct
     let lookup = 
       match info with
       | None -> fun sm -> EcEnv.Op.lookup_path sm ppe.ppe_env
-      | Some (pred,typ,dom) ->
-        let tvi = Some (EcUnify.TVIunamed typ) in
+      | Some (mode, typ, dom) ->
+          let filter = 
+            match mode with
+            | `Expr -> fun op -> not (EcDecl.is_pred op)
+            | `Form -> fun _  -> true
+          in
+          let tvi    = Some (EcUnify.TVIunamed typ) in
+
         fun sm ->
           let ue = EcUnify.UniEnv.create None in
-          match  EcUnify.select_op pred tvi ppe.ppe_env sm ue dom with
+          match  EcUnify.select_op ~filter tvi ppe.ppe_env sm ue dom with
           | [(p1,_), _, _] -> p1
           | _ -> raise (EcEnv.LookupFailure (`QSymbol sm)) in
         
@@ -771,7 +777,7 @@ let pp_chained_orderings (ppe : PPEnv.t) t_ty pp_sub outer fmt (f, fs) =
         ignore (List.fold_left
           (fun fe (op, tvi, f) ->
             let (nm, opname) =
-              PPEnv.op_symb ppe op (Some (true, tvi, [t_ty fe; t_ty f]))
+              PPEnv.op_symb ppe op (Some (`Form, tvi, [t_ty fe; t_ty f]))
             in
               Format.fprintf fmt " %t@ %a"
                 (fun fmt ->
@@ -871,7 +877,7 @@ and pp_expr_core_r (ppe : PPEnv.t) outer fmt (e : expr) =
       pp_local ppe fmt x
 
   | Eop (op, tys) ->
-      pp_opapp ppe e_ty pp_expr_r outer fmt (false, op, tys, [])
+      pp_opapp ppe e_ty pp_expr_r outer fmt (`Expr, op, tys, [])
 
   | Eif (c, e1, e2) ->
       pp_if3 ppe pp_expr_r outer fmt (c, e1, e2)
@@ -880,7 +886,7 @@ and pp_expr_core_r (ppe : PPEnv.t) outer fmt (e : expr) =
       pp_tuple `ForTuple ppe pp_expr_r (fst outer) fmt es
 
   | Eapp ({e_node = Eop (op, tys) }, args) ->
-      pp_opapp ppe e_ty pp_expr_r outer fmt (false, op, tys, args)
+      pp_opapp ppe e_ty pp_expr_r outer fmt (`Expr, op, tys, args)
 
   | Eapp (e, args) ->
       pp_app ppe (pp_expr_r, pp_expr_r) outer fmt (e, args)
@@ -1185,10 +1191,10 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
       pp_let ppe pp_form_r outer fmt (lp, f1, f2)
       
   | Fop (op, tvi) ->
-      pp_opapp ppe f_ty pp_form_r outer fmt (true, op, tvi, [])
+      pp_opapp ppe f_ty pp_form_r outer fmt (`Form, op, tvi, [])
 
   | Fapp ({f_node = Fop (p, tys)}, args) ->
-      pp_opapp ppe f_ty pp_form_r outer fmt (true, p, tys, args)
+      pp_opapp ppe f_ty pp_form_r outer fmt (`Form, p, tys, args)
 
   | Fapp (e, args) ->
       pp_app ppe (pp_form_r, pp_form_r) outer fmt (e, args)
@@ -1385,6 +1391,9 @@ let pp_opdecl_op (ppe : PPEnv.t) fmt (x, ts, ty, op) =
     | Some (OP_Constr (indp, i)) ->
         Format.fprintf fmt
           " =@ %d-th constructor of %a" (i+1) (pp_tyname ppe) indp
+
+    | Some (OP_Fix _) ->
+        Format.fprintf fmt " = <match-fix>"
   in
 
   match ts with

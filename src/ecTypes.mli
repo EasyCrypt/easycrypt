@@ -153,6 +153,8 @@ and expr_node =
   | Etuple of expr list                    (* tuple constructor     *)
   | Eif    of expr * expr * expr           (* _ ? _ : _             *)
 
+type closure = (EcIdent.t * ty) list * expr
+
 (* -------------------------------------------------------------------- *)
 val e_equal   : expr -> expr -> bool
 val e_compare : expr -> expr -> int
@@ -174,8 +176,10 @@ val e_lam      : (EcIdent.t * ty) list -> expr -> expr
 
 val is_var     : expr -> bool
 val destr_var  : expr -> prog_var 
-val is_tuple_var : expr -> bool
+
+val is_tuple_var    : expr -> bool
 val destr_tuple_var : expr -> prog_var list
+
 (* -------------------------------------------------------------------- *)
 val e_map :
      (ty   -> ty  ) (* 1-subtype op. *)
@@ -207,10 +211,12 @@ val e_subst_init :
   -> EcPath.mpath EcIdent.Mid.t
   -> e_subst
 
-val add_locals : e_subst -> 
-  (EcIdent.t * ty) list -> e_subst * (EcIdent.t * ty) list
+val add_local  : e_subst -> EcIdent.t * ty -> e_subst * (EcIdent.t * ty)
+val add_locals : e_subst -> (EcIdent.t * ty) list -> e_subst * (EcIdent.t * ty) list
 
+val e_subst_closure : e_subst -> closure -> closure
 val e_subst : e_subst -> expr -> expr
+
 val e_mapty : (ty -> ty) -> expr -> expr 
 val e_uni   : (uid -> ty option) -> expr -> expr
 

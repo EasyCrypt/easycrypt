@@ -908,7 +908,7 @@ module Op = struct
     let (ty, body) =
       match op.po_def with
       | PO_abstr pty ->
-          TT.transty tp scope.sc_env ue pty, None
+          (TT.transty tp scope.sc_env ue pty, `Abstract)
 
       | PO_concr (bd, pty, pe) ->
           let env     = scope.sc_env in
@@ -916,21 +916,135 @@ module Op = struct
           let env, xs = TT.transbinding env ue bd in
           let body    = TT.transexpcast env ue codom pe in
           let lam     = EcTypes.e_lam xs body in
-            lam.EcTypes.e_ty, Some lam
+            (lam.EcTypes.e_ty, `Plain lam)
 
-      | PO_case _ ->
-          (* FIXME: IND HOOK *)
-          failwith "not-implemented-yet"
+      | PO_case (bd, pty, pbs) ->
+          let env       = scope.sc_env in
+          let codom     = TT.transty tp env ue pty in
+          let env, args = TT.transbinding env ue bd in
+          let ty        = EcTypes.toarrow (List.map snd args) codom in
+          let opname    = EcIdent.create (unloc op.po_name) in
+          let env       = EcEnv.Var.bind_local opname ty env in
+          let mpname, mpty =
+              let names = Ssym.of_list (List.map (fun pop -> unloc pop.pop_name) pbs) in
+              let name1 =
+                try  Ssym.choose names
+                with Not_found ->
+                  hierror ~loc "this pattern matching has no branches"
+              in
+                if not (Ssym.is_empty (Ssym.remove name1 names)) then
+                  hierror ~loc "this pattern matching matches on different parameters";
+                match List.findopt (fun (x, _) -> EcIdent.name x = name1) (List.rev args) with
+                | None   -> hierror ~loc "this pattern matching matches an unbound parameter";
+                | Some x -> x
+          in
+
+          let branches =
+            let pbs =
+              let trans1 pb =
+                let filter = fun op -> EcDecl.is_ctor op in
+                let cname  = fst pb.pop_pattern in
+                let tvi    = pb.pop_tvi |> omap (TT.transtvi env ue) in
+                let cts    = EcUnify.select_op ~filter tvi env (unloc cname) ue [] in
+  
+                match cts with
+                | [] -> hierror ~loc:cname.pl_loc "unknown constructor name"
+                | _ :: _ :: _ -> hierror ~loc:cname.pl_loc "ambiguous constructor name"
+  
+                | [(cp, tvi), opty, subue] ->
+                    let ctor = oget (EcEnv.Op.by_path_opt cp env) in
+                    let (indp, ctor) = EcDecl.operator_as_ctor ctor in
+                    let indty = oget (EcEnv.Ty.by_path_opt indp env) in
+                    let ind = EcDecl.tydecl_as_datatype indty in
+                    let ctorsym, ctorty = List.nth ind ctor in
+
+                    let args_exp = List.length ctorty in
+                    let args_got = List.length (snd pb.pop_pattern) in
+
+                    if args_exp <> args_got then
+                      hierror ~loc:cname.pl_loc
+                        "this constructor takes %d argument(s), got %d" args_exp args_got;
+
+                    if not (List.uniq (List.map unloc (snd pb.pop_pattern))) then
+                      hierror ~loc:cname.pl_loc "this pattern is non-linear";
+
+                    EcUnify.UniEnv.restore ~src:subue ~dst:ue;
+
+                    let pty = EcUnify.UniEnv.fresh ue in
+
+                    (try  EcUnify.unify env ue (toarrow ctorty pty) opty
+                     with EcUnify.UnificationFailure _ -> assert false);
+                    TT.unify_or_fail env ue pb.pop_name.pl_loc mpty pty;
+
+                    let ctorty =
+                      let tvi = Some (EcUnify.TVIunamed tvi) in
+                        fst (EcUnify.UniEnv.opentys ue indty.tyd_params tvi ctorty)
+                    and pvars = List.map (EcIdent.create |- unloc) (snd pb.pop_pattern) in
+                    let pvars = List.combine pvars ctorty in
+
+                    let be =
+                      let env = EcEnv.Var.bind_locals pvars env in
+                        TT.transexpcast env ue codom pb.pop_body
+                    in
+                      (pb, (indp, ind, (ctorsym, ctor)), (pvars, be))
+
+              in
+                List.map trans1 pbs
+            in
+
+            let (_, (_, ind, _), _) = oget (List.ohead pbs) in
+            let bmap = Array.create (List.length ind) None in
+
+            List.iter
+              (fun ((_, (_, _, (cname, ctor)), _) as ct) ->
+                if bmap.(ctor) <> None then
+                  hierror ~loc "duplicated branch for constructor `%s'" cname;
+                bmap.(ctor) <- Some ct)
+              pbs;
+
+            Parray.of_array (Array.mapi
+              (fun i v ->
+                 match v with
+                 | None ->
+                     let cname = fst (List.nth ind i) in
+                       hierror ~loc "missing branch for constructor `%s'" cname
+                 | Some (_, _, branch) -> branch)
+              bmap)
+          in
+
+            (ty, (`Fix ((opname, ty), (args, mpname), branches)))
     in
 
     if not (EcUnify.UniEnv.closed ue) then
-      hierror "this operator type contains free type variables";
+      hierror ~loc "this operator type contains free type variables";
 
     let uni     = Tuni.offun (EcUnify.UniEnv.close ue) in
-    let body    = body |> omap (e_mapty uni) in
+    let body    =
+      match body with
+      | `Abstract -> None
+      | `Plain e  -> Some (OP_Plain (e_mapty uni e))
+      | `Fix ((opname, opty), (args, mpname), bs) ->
+          let opty = uni opty in
+          let args = List.map (fun (x, xty) -> (x, uni xty)) args in
+          let structi =
+            oget (List.findex
+                    (fun (x, _) -> EcIdent.id_equal x mpname) args) in
+          let bs =
+            Parray.map
+              (fun (pvars, be) ->
+                { opf1_locals = List.map (fun (x, xty) -> (x, uni xty)) pvars;
+                  opf1_body   = e_mapty uni be; })
+              bs
+          in
+            Some (OP_Fix { opf_self     = (opname, opty);
+                           opf_args     = args;
+                           opf_struct   = (structi, List.length args);
+                           opf_branches = bs; })
+    in
+
     let ty      = uni ty in
     let tparams = EcUnify.UniEnv.tparams ue in
-    let tyop    = EcDecl.mk_op tparams ty (body |> omap (fun x -> OP_Plain x)) in
+    let tyop    = EcDecl.mk_op tparams ty body in
 
     if op.po_kind = `Const then begin
       let tue   = EcUnify.UniEnv.copy ue in

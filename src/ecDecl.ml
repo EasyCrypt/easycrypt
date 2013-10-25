@@ -19,6 +19,16 @@ and ty_body = [
   | `Datatype of (EcSymbols.symbol * EcTypes.ty list) list
 ]
 
+
+let tydecl_as_concrete (td : tydecl) =
+  match td.tyd_type with `Concrete x -> x | _ -> assert false
+
+let tydecl_as_abstract (td : tydecl) =
+  match td.tyd_type with `Abstract x -> x | _ -> assert false
+
+let tydecl_as_datatype (td : tydecl) =
+  match td.tyd_type with `Datatype x -> x | _ -> assert false
+
 (* -------------------------------------------------------------------- *)
 type locals = EcIdent.t list 
 
@@ -29,10 +39,23 @@ type operator_kind =
 and opbody =
   | OP_Plain  of EcTypes.expr
   | OP_Constr of EcPath.path * int
+  | OP_Fix    of opfix
+
+and opfix = {
+  opf_self     : (EcIdent.t * EcTypes.ty);
+  opf_args     : (EcIdent.t * EcTypes.ty) list;
+  opf_struct   : int * int;
+  opf_branches : opfix1 Parray.t;
+}
+
+and opfix1 = {
+  opf1_locals : (EcIdent.t * EcTypes.ty) list;
+  opf1_body   : EcTypes.expr;
+}
 
 type operator = {
   op_tparams : ty_params;
-  op_ty      : EcTypes.ty;
+  op_ty      : EcTypes.ty;        
   op_kind    : operator_kind;
 }
 
@@ -62,12 +85,17 @@ let is_pred op =
   match op.op_kind with
   | OB_pred _ -> true
   | _ -> false
+
+let is_ctor op =
+  match op.op_kind with
+  | OB_oper (Some (OP_Constr _)) -> true
+  | _ -> false
  
-let gen_op tparams ty kind = 
-  { op_tparams = tparams;
-    op_ty      = ty;
-    op_kind    = kind;
-  }
+let gen_op tparams ty kind = {
+  op_tparams = tparams;
+  op_ty      = ty;
+  op_kind    = kind;
+}
 
 let mk_pred tparams dom body =
   let kind = OB_pred body in
@@ -76,6 +104,11 @@ let mk_pred tparams dom body =
 let mk_op tparams ty body = 
   let kind = OB_oper body in
     gen_op tparams ty kind
+
+let operator_as_ctor (op : operator) =
+  match op.op_kind with
+  | OB_oper (Some (OP_Constr (indp, ctor))) -> (indp, ctor)
+  | _ -> assert false
 
 (* -------------------------------------------------------------------- *)
 type typeclass = {

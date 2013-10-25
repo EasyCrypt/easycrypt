@@ -2144,6 +2144,7 @@ module Op = struct
         | OB_pred (Some _) -> true
         | OB_oper None
         | OB_oper (Some (OP_Constr _))
+        | OB_oper (Some (OP_Fix _))
         | OB_pred None -> false
 
     with LookupFailure _ -> false

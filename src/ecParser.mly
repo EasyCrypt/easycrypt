@@ -1335,8 +1335,9 @@ opbody:
 ;
 
 opcase:
-| WITH x=ident EQ c=qoident ps=ident* IMPL e=expr
+| WITH x=ident EQ c=qoident tvi=tvars_app? ps=ident* IMPL e=expr
    { { pop_name    = x;
+       pop_tvi     = tvi;
        pop_pattern = (c, ps);
        pop_body    = e; } }
 ;

@@ -19,8 +19,12 @@ and ty_body = [
   | `Datatype of (EcSymbols.symbol * EcTypes.ty list) list
 ]
 
+val tydecl_as_concrete : tydecl -> EcTypes.ty
+val tydecl_as_abstract : tydecl -> Sp.t
+val tydecl_as_datatype : tydecl -> (EcSymbols.symbol * EcTypes.ty list) list
+
 (* -------------------------------------------------------------------- *)
-type locals = EcIdent.t list 
+type locals = EcIdent.t list
 
 type operator_kind = 
   | OB_oper of opbody option
@@ -29,6 +33,19 @@ type operator_kind =
 and opbody =
   | OP_Plain  of EcTypes.expr
   | OP_Constr of EcPath.path * int
+  | OP_Fix    of opfix
+
+and opfix = {
+  opf_self     : (EcIdent.t * EcTypes.ty);
+  opf_args     : (EcIdent.t * EcTypes.ty) list;
+  opf_struct   : int * int;
+  opf_branches : opfix1 Parray.t;
+}
+
+and opfix1 = {
+  opf1_locals : (EcIdent.t * EcTypes.ty) list;
+  opf1_body   : EcTypes.expr;
+}
 
 type operator = {
   op_tparams : ty_params;
@@ -38,9 +55,12 @@ type operator = {
 
 val op_ty   : operator -> ty
 val is_pred : operator -> bool
+val is_ctor : operator -> bool
 
 val mk_op   : ty_params -> ty -> opbody option -> operator
 val mk_pred : ty_params -> ty list -> form option -> operator
+
+val operator_as_ctor : operator -> EcPath.path * int
 
 (* -------------------------------------------------------------------- *)
 type axiom_kind = [`Axiom | `Lemma]

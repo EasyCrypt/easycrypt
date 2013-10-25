@@ -302,6 +302,22 @@ and subst_op_body (s : _subst) (bd : opbody) =
 
   | OP_Constr _ -> bd
 
+  | OP_Fix opfix ->
+      let s = e_subst_of_subst s in
+      let (s, (self, selfty)) = EcTypes.add_local s opfix.opf_self in
+      let (s, args) = EcTypes.add_locals s opfix.opf_args in
+
+      let for1 br =
+        let (locals, body) = EcTypes.e_subst_closure s (br.opf1_locals, br.opf1_body) in
+          { opf1_locals = locals; opf1_body = body; }
+      in
+
+      let branches = Parray.map for1 opfix.opf_branches in
+        OP_Fix { opf_self     = (self, selfty);
+                 opf_args     = args;
+                 opf_struct   = opfix.opf_struct;
+                 opf_branches = branches; }
+
 (* -------------------------------------------------------------------- *)
 let subst_op (s : _subst) (op : operator) =
   let tparams = List.map (subst_typaram s) op.op_tparams in

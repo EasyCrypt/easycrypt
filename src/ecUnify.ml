@@ -284,6 +284,10 @@ module UniEnv = struct
     let subst = Tvar.subst (opentvi ue params tvi) in
       (subst, subst_tv subst params)
 
+  let opentys ue params tvi tys =
+    let (subst, tvs) = openty_r ue params tvi in
+      (List.map subst tys, tvs)
+
   let openty ue params tvi ty =
     let (subst, tvs) = openty_r ue params tvi in
       (subst ty, tvs)
@@ -317,7 +321,7 @@ let tfun_expected ue psig =
   let tres = UniEnv.fresh ue in
     EcTypes.toarrow psig tres
 
-let select_op ~preds tvi env name ue psig = 
+let select_op ?(filter = fun _ -> true) tvi env name ue psig = 
   (* Filter operator based on given type variables instanciation *)
   let filter_on_tvi =
     let tvtc = (!ue).ue_tvtc in
@@ -347,7 +351,7 @@ let select_op ~preds tvi env name ue psig =
           List.for_all for1 ls
   in
 
-  let fop op = (preds || not (EcDecl.is_pred op)) && filter_on_tvi op in
+  let fop op = (filter op || not (EcDecl.is_pred op)) && filter_on_tvi op in
   let ops = EcEnv.Op.all fop name env in
   let select (path, op) =
     let subue = UniEnv.copy ue in
