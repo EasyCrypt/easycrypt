@@ -22,6 +22,7 @@ module Wrap(S:Scheme) = {
 
   fun init(): unit = {
     qs = empty;
+    S.init();
     k = S.keygen();
   }
 
