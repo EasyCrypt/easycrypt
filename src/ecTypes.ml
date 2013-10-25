@@ -391,6 +391,8 @@ and expr_node =
   | Etuple of expr list                    (* tuple constructor     *)
   | Eif    of expr * expr * expr           (* _ ? _ : _             *)
 
+type closure = (EcIdent.t * ty) list * expr
+
 (* -------------------------------------------------------------------- *)
 let e_equal   = ((==) : expr -> expr -> bool)
 let e_hash    = fun e -> e.e_tag
@@ -762,6 +764,10 @@ and e_subst_op ety tys args (tyids, e) =
 
   let sag = { e_subst_id with es_loc = sag } in
     e_app (e_subst sag e) args ety
+
+let e_subst_closure s (args, e) =
+  let (s, args) = add_locals s args in
+    (args, e_subst s e)
 
 let is_subst_id s = 
   not s.es_freshen && s.es_p == identity && 

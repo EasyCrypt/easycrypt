@@ -368,13 +368,18 @@ let select_pv env side name ue tvi psig =
     with EcEnv.LookupFailure _ -> []
 
 
-let gen_select_op ~actonly ~pred (fpv, fop, flc) opsc tvi env name ue psig =
+let gen_select_op ~actonly ~mode (fpv, fop, flc) opsc tvi env name ue psig =
+  let filter =
+    match mode with
+    | `Expr -> fun op -> not (EcDecl.is_pred op)
+    | `Form -> fun _  -> true
+  in
   match (if tvi = None then select_local env name else None) with
   | Some (id, ty) ->
       [ flc (id, ty, ue) ]
 
   | None ->
-      let ops = EcUnify.select_op pred tvi env name ue psig in
+      let ops = EcUnify.select_op ~filter tvi env name ue psig in
       let ops =
         match ops, opsc with
         | _ :: _ :: _, Some opsc ->
@@ -395,14 +400,14 @@ let select_exp_op env opsc name ue tvi psig =
   let ppv = (fun _ (pv, ty, ue) -> (e_var pv ty, ty, ue))
   and pop = (fun ((op, tys), ty, ue) -> (e_op op tys ty, ty, ue))
   and flc = (fun (id, ty, ue) -> (e_local id ty, ty, ue)) in
-    gen_select_op ~actonly:false ~pred:false (ppv, pop, flc)
+    gen_select_op ~actonly:false ~mode:`Expr (ppv, pop, flc)
       opsc tvi env name ue psig 
 
 let select_form_op env opsc name ue tvi psig =
   let ppv = (fun me (pv, ty, ue) -> (f_pvar pv ty (oget me), ue))
   and pop = (fun ((op, tys), ty, ue) -> (f_op op tys ty, ue))
   and flc = (fun (id, ty, ue) -> (f_local id ty, ue)) in
-    gen_select_op ~actonly:true ~pred:true (ppv, pop, flc)
+    gen_select_op ~actonly:true ~mode:`Form (ppv, pop, flc)
       opsc tvi env name ue psig 
 
 (* -------------------------------------------------------------------- *)
@@ -684,7 +689,7 @@ let transexpcast (env : EcEnv.env) (ue : EcUnify.unienv) t e =
   let (e', t') = transexp env ue e in
   try  EcUnify.unify env ue t' t; e'
   with EcUnify.UnificationFailure (t1, t2) ->
-    tyerror e.pl_loc env (TypeMismatch ((t', t), (t1, t2)))
+    tyerror e.pl_loc env (TypeMismatch ((t, t'), (t1, t2)))
 
 let transexpcast_opt (env : EcEnv.env) (ue : EcUnify.unienv) oty e =
   match oty with

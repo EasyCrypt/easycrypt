@@ -231,6 +231,7 @@ type pop_def =
 
 and pop_branch = {
   pop_name    : psymbol;
+  pop_tvi     : ptyannot option;
   pop_pattern : pqsymbol * psymbol list;
   pop_body    : pexpr;
 }

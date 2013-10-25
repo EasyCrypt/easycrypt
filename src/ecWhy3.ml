@@ -1492,8 +1492,9 @@ let trans_oper_body env ty body =
   let body = 
     match body with
     | OB_oper None -> None
-    | OB_oper (Some (OP_Plain o)) -> Some (EcFol.form_of_expr EcFol.mhr o)
-    | OB_oper (Some (OP_Constr _)) -> assert false (* FIXME: IND HOOK *)
+    | OB_oper (Some (OP_Plain  o)) -> Some (EcFol.form_of_expr EcFol.mhr o)
+    | OB_oper (Some (OP_Fix    _)) -> assert false (* FIXME: IND HOOK *)
+    | OB_oper (Some (OP_Constr _)) -> assert false
     | OB_pred o -> o
   in
   match body with
