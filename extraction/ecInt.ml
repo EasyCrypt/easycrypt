@@ -69,3 +69,15 @@ module Power = struct
       if p land 1 = 0 then pow else pow * x
         
 end
+
+(* Int.ForLoop *)
+module ForLoop = struct
+
+  (* Int.ForLoop.range *)
+  let range i j st f =
+    let st = ref st in
+    for k = i to j do
+      st := f k !st;
+    done;
+    !st
+end

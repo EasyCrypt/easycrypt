@@ -132,3 +132,13 @@ proof.
  rewrite ?(Comm.Comm x1) CompatOrderMult; smt.
  apply CompatOrderMult;smt.
 qed.
+
+theory ForLoop.
+  op range: int -> int -> 'a -> (int -> 'a -> 'a) -> 'a.
+  axiom range_base i j (st:'a) f:
+    j <= i =>
+    range i j st f = st.
+  axiom range_ind i j (st:'a) f:
+    i < j =>
+    range i j st f = range (i + 1) j (f i st) f.
+end ForLoop.
