@@ -1231,24 +1231,11 @@ let trans_op env p tys =
       let ty = trans_ty env (List.hd tys) in
       ([Some ty;Some ty],None), w3_ls_eq, mk_eq
   | _ ->
-      let ls,ls', tvs =
-        try Mp.find p env.env_op
-        with _ ->
-          (
-            Format.printf "cannot find %s@." (EcPath.tostring p);
-            assert false) in (* FIXME error message *)
+      let ls,ls', tvs = oget (Mp.find_opt p env.env_op) in
       let mtv = 
-(*        try  *)
-          List.fold_left2 (fun mtv tv ty ->
-            Ty.Mtv.add tv (trans_ty env ty) mtv) Ty.Mtv.empty
-            tvs tys
-       (* with Invalid_argument "List.fold_left2" as e->
-          Format.printf "p = %s@." (EcPath.tostring p);
-          Format.printf "tvs = %i; tys = %i@." 
-            (List.length tvs) (List.length tys);
-          Format.printf "ICI1@.";raise e
-        | e -> raise e *)
-      in
+        List.fold_left2 (fun mtv tv ty ->
+          Ty.Mtv.add tv (trans_ty env ty) mtv) Ty.Mtv.empty
+          tvs tys in
       let targs = List.map (fun t -> Some (Ty.ty_inst mtv t)) ls.Term.ls_args in
       let tres  =  ls.Term.ls_value |> omap (Ty.ty_inst mtv) in
       let mk args = Term.t_app ls args tres in
@@ -1487,7 +1474,9 @@ let destr_ty_fun ty =
     | _ -> List.rev tys, codom in
   aux [] ty
 
-let trans_oper_body env ty body = 
+let trans_oper_body env path wparams ty body =
+  let pid = preid_p path in
+
   let body = 
     match body with
     | OB_oper None -> None
@@ -1498,10 +1487,10 @@ let trans_oper_body env ty body =
   in
     match body with
     | None ->
-        let ty = trans_ty env ty in    
-        let (dom, codom) = destr_ty_fun ty in
+        let ty = trans_ty env ty in
+        let dom, codom = destr_ty_fun ty in
         let codom = if Ty.ty_equal codom Ty.ty_bool then None else Some codom in
-          (env, [], dom, codom, None)
+          (env, [], Term.create_lsymbol pid dom codom, None)
 
     | Some (`Plain body) ->
         let bd, body =
@@ -1517,7 +1506,7 @@ let trans_oper_body env ty body =
           then force_prop f 
           else f
         in
-          (env, rb, dom, f.Term.t_ty, Some (vs, f))
+          (env, rb, Term.create_lsymbol pid dom f.Term.t_ty, Some (vs, f))
 
     | Some (`Fix o) ->
         let (env, dom, vs) =
@@ -1527,7 +1516,10 @@ let trans_oper_body env ty body =
             (env, dom, vs)
         in
 
+        let ls    = Term.create_lsymbol pid dom (Some (trans_ty env o.opf_resty)) in
         let pterm = List.nth vs (fst o.opf_struct) in
+        let ops   = env.env_op in
+        let env   = { env with env_op = Mp.add path (ls, ls, wparams) env.env_op; } in
 
         let ((env, rb), bs) =
           List.map_fold
@@ -1538,7 +1530,7 @@ let trans_oper_body env ty body =
               let env, rb1, e =
                 trans_form env (EcFol.form_of_expr EcFol.mhr b.opf1_body) in
               let cl  = proj3_1 (oget (Mp.find_opt (fst b.opf1_ctor) env.env_op)) in
-              let ptn = List.map Term.pat_var vs  in
+              let ptn = List.map Term.pat_var vs in
               let ptn = Term.pat_app cl ptn pterm.Term.vs_ty in
                 ((env, rb1@rb), (ptn, e)))
             (env, []) (Parray.to_list o.opf_branches) in
@@ -1548,23 +1540,21 @@ let trans_oper_body env ty body =
           then List.map (fun (p, e) -> (p, force_prop e)) bs
           else bs in
 
-        let bs = List.map (fun (p, e) -> Term.t_close_branch p e) bs in
-
+        let bs   = List.map (fun (p, e) -> Term.t_close_branch p e) bs in
         let body = Term.t_case (Term.t_var pterm) bs in
-          (env, rb, dom, body.Term.t_ty, Some (vs, body))
+        let env  = { env with env_op = ops; } in
 
-let trans_oper env path op = 
+          (env, rb, ls, Some (vs, body))
+
+let trans_oper env path op =
   let mty = env.env_tv in
   let mid = env.env_id in
   let env, wparams = trans_typarams env op.op_tparams in
-  let pid = preid_p path in
-  let env, rb, dom, codom, body = trans_oper_body env op.op_ty op.op_kind in
-  let ls = Term.create_lsymbol pid dom codom in
+  let env, rb, ls, body = trans_oper_body env path wparams op.op_ty op.op_kind in
   let decl = 
     match body with
     | None -> Decl.create_param_decl ls
-    | Some(ids,f) ->
-      Decl.create_logic_decl [Decl.make_ls_defn ls ids f]
+    | Some(ids,f) -> Decl.create_logic_decl [Decl.make_ls_defn ls ids f]
   in
     ({ env with env_tv = mty; env_id = mid; }, rb, ls, wparams, decl)
 

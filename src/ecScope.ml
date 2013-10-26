@@ -1011,19 +1011,26 @@ module Op = struct
               bmap)
           in
 
-            (ty, (`Fix ((args, mpname), branches)))
+            (ty, (`Fix ((opname, codom), (args, mpname), branches)))
     in
 
     if not (EcUnify.UniEnv.closed ue) then
       hierror ~loc "this operator type contains free type variables";
 
     let uni     = Tuni.offun (EcUnify.UniEnv.close ue) in
+    let ty      = uni ty in
+    let tparams = EcUnify.UniEnv.tparams ue in
     let body    =
       match body with
       | `Abstract -> None
       | `Plain e  -> Some (OP_Plain (e_mapty uni e))
-      | `Fix ((args, mpname), bs) ->
-          let args = List.map (fun (x, xty) -> (x, uni xty)) args in
+      | `Fix ((opname, codom), (args, mpname), bs) ->
+          let codom   = uni codom in
+          let opexpr  = EcPath.pqname (path scope) (unloc op.po_name) in
+          let opexpr  = e_op opexpr (List.map (tvar |- fst) tparams) codom in
+          let ebsubst = { e_subst_id with es_freshen = false; es_ty = uni; } in
+          let ebsubst = { e_subst_id with es_loc = Mid.add opname opexpr ebsubst.es_loc; } in
+          let args    = List.map (fun (x, xty) -> (x, uni xty)) args in
           let structi =
             oget (List.findex
                     (fun (x, _) -> EcIdent.id_equal x mpname) args) in
@@ -1032,17 +1039,16 @@ module Op = struct
               (fun ((cname, i), (pvars, be)) ->
                 { opf1_ctor   = (EcPath.pqname (path scope) cname, i);
                   opf1_locals = List.map (fun (x, xty) -> (x, uni xty)) pvars;
-                  opf1_body   = e_mapty uni be; })
+                  opf1_body   = e_subst ebsubst be; })
               bs
           in
             Some (OP_Fix { opf_args     = args;
+                           opf_resty    = codom;
                            opf_struct   = (structi, List.length args);
                            opf_branches = bs; })
     in
 
-    let ty      = uni ty in
-    let tparams = EcUnify.UniEnv.tparams ue in
-    let tyop    = EcDecl.mk_op tparams ty body in
+    let tyop = EcDecl.mk_op tparams ty body in
 
     if op.po_kind = `Const then begin
       let tue   = EcUnify.UniEnv.copy ue in

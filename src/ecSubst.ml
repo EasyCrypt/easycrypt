@@ -317,6 +317,7 @@ and subst_op_body (s : _subst) (bd : opbody) =
 
       let branches = Parray.map for1 opfix.opf_branches in
         OP_Fix { opf_args     = args;
+                 opf_resty    = s.s_ty opfix.opf_resty;
                  opf_struct   = opfix.opf_struct;
                  opf_branches = branches; }
 

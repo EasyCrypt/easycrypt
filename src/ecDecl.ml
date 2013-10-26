@@ -43,6 +43,7 @@ and opbody =
 
 and opfix = {
   opf_args     : (EcIdent.t * EcTypes.ty) list;
+  opf_resty    : EcTypes.ty;
   opf_struct   : int * int;
   opf_branches : opfix1 Parray.t;
 }
