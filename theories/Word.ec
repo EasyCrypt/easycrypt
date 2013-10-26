@@ -63,6 +63,7 @@ by rewrite -xorA xorK xor0.
 qed.
 
 (* TODO: Finish writing the conversions *)
+(** Array conversions *)
 require        Array.
 op to_bits: word -> bool Array.array.
 axiom length_to_array w:
@@ -89,6 +90,17 @@ lemma from_to_bits w:
 proof strict.
 by apply word_ext; smt.
 qed.
+
+(** Integer conversion *)
+op to_int: word -> int.
+op from_int: int -> word.
+
+axiom to_from_int i:
+  0 <= i < 2^length =>
+  to_int (from_int i) = i.
+
+axiom from_to_int w:
+  from_int (to_int w) = w.
 
 require import Real.
 require import Distr.
