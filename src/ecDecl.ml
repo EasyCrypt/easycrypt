@@ -42,13 +42,13 @@ and opbody =
   | OP_Fix    of opfix
 
 and opfix = {
-  opf_self     : (EcIdent.t * EcTypes.ty);
   opf_args     : (EcIdent.t * EcTypes.ty) list;
   opf_struct   : int * int;
   opf_branches : opfix1 Parray.t;
 }
 
 and opfix1 = {
+  opf1_ctor   : EcPath.path * int;
   opf1_locals : (EcIdent.t * EcTypes.ty) list;
   opf1_body   : EcTypes.expr;
 }

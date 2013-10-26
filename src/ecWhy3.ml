@@ -427,7 +427,6 @@ let empty = {
     env_rax     = Decl.Mpr.empty;  }
 
 (* ---------------------------------------------------------------------- *)
-
 type rebinding_w3 = {
     rb_th   : Theory.theory;
     rb_decl : Decl.decl list;
@@ -1492,32 +1491,67 @@ let trans_oper_body env ty body =
   let body = 
     match body with
     | OB_oper None -> None
-    | OB_oper (Some (OP_Plain  o)) -> Some (EcFol.form_of_expr EcFol.mhr o)
-    | OB_oper (Some (OP_Fix    _)) -> assert false (* FIXME: IND HOOK *)
-    | OB_oper (Some (OP_Constr _)) -> assert false
-    | OB_pred o -> o
+    | OB_oper (Some (OP_Plain  o))  -> Some (`Plain (EcFol.form_of_expr EcFol.mhr o))
+    | OB_oper (Some (OP_Fix    o))  -> Some (`Fix o)
+    | OB_oper (Some (OP_Constr _))  -> assert false
+    | OB_pred o -> o |> omap (fun x -> `Plain x)
   in
-  match body with
-  | None ->
-    let ty = trans_ty env ty in    
-    let dom, codom = destr_ty_fun ty in
-    let codom = if Ty.ty_equal codom Ty.ty_bool then None else Some codom in
-    env, [], dom, codom, None
-  | Some body ->
-    let bd, body =
-      match body.f_node with
-      | Fquant(Llambda,bd,f) -> bd, f
-      | _ -> [], body in
-    let ids, dom = List.split bd in
-    
-    let env, dom = trans_gtys env dom in
-    let env, vs = add_ids env ids dom in
-    let env,rb,f = trans_form env body in
-    let f = 
-      if Ty.oty_equal f.Term.t_ty (Some Ty.ty_bool) then
-        force_prop f 
-      else f in
-    env, rb, dom, f.Term.t_ty, Some(vs,f)
+    match body with
+    | None ->
+        let ty = trans_ty env ty in    
+        let (dom, codom) = destr_ty_fun ty in
+        let codom = if Ty.ty_equal codom Ty.ty_bool then None else Some codom in
+          (env, [], dom, codom, None)
+
+    | Some (`Plain body) ->
+        let bd, body =
+          match body.f_node with
+          | Fquant (Llambda, bd, f) -> (bd, f)
+          | _ -> ([], body) in
+        let ids, dom   = List.split bd in    
+        let env, dom   = trans_gtys env dom in
+        let env, vs    = add_ids env ids dom in
+        let env, rb, f = trans_form env body in
+        let f = 
+          if   Ty.oty_equal f.Term.t_ty (Some Ty.ty_bool)
+          then force_prop f 
+          else f
+        in
+          (env, rb, dom, f.Term.t_ty, Some (vs, f))
+
+    | Some (`Fix o) ->
+        let (env, dom, vs) =
+          let ids, dom = List.split o.opf_args in
+          let dom      = List.map (trans_ty env) dom in
+          let env, vs  = add_ids env ids dom in
+            (env, dom, vs)
+        in
+
+        let pterm = List.nth vs (fst o.opf_struct) in
+
+        let ((env, rb), bs) =
+          List.map_fold
+            (fun (env, rb) b ->
+              let ids, sig_   = List.split b.opf1_locals in
+              let sig_        = List.map (trans_ty env) sig_ in
+              let env, vs     = add_ids env ids sig_ in
+              let env, rb1, e =
+                trans_form env (EcFol.form_of_expr EcFol.mhr b.opf1_body) in
+              let cl  = proj3_1 (oget (Mp.find_opt (fst b.opf1_ctor) env.env_op)) in
+              let ptn = List.map Term.pat_var vs  in
+              let ptn = Term.pat_app cl ptn pterm.Term.vs_ty in
+                ((env, rb1@rb), (ptn, e)))
+            (env, []) (Parray.to_list o.opf_branches) in
+
+        let bs =
+          if   List.exists (fun (_, e) -> e.Term.t_ty = None) bs
+          then List.map (fun (p, e) -> (p, force_prop e)) bs
+          else bs in
+
+        let bs = List.map (fun (p, e) -> Term.t_close_branch p e) bs in
+
+        let body = Term.t_case (Term.t_var pterm) bs in
+          (env, rb, dom, body.Term.t_ty, Some (vs, body))
 
 let trans_oper env path op = 
   let mty = env.env_tv in
@@ -1530,8 +1564,9 @@ let trans_oper env path op =
     match body with
     | None -> Decl.create_param_decl ls
     | Some(ids,f) ->
-      Decl.create_logic_decl [Decl.make_ls_defn ls ids f] in
-  {env with env_tv = mty; env_id = mid}, rb, ls, wparams, decl
+      Decl.create_logic_decl [Decl.make_ls_defn ls ids f]
+  in
+    ({ env with env_tv = mty; env_id = mid; }, rb, ls, wparams, decl)
 
 let add_ty env path td =
   let (ts, decl) = trans_tydecl env path td in

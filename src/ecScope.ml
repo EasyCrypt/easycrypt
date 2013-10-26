@@ -1004,15 +1004,14 @@ module Op = struct
 
             Parray.of_array (Array.mapi
               (fun i v ->
-                 match v with
-                 | None ->
-                     let cname = fst (List.nth ind i) in
-                       hierror ~loc "missing branch for constructor `%s'" cname
-                 | Some (_, _, branch) -> branch)
+                let cname = fst (List.nth ind i) in
+                  match v with
+                  | None -> hierror ~loc "missing branch for constructor `%s'" cname
+                  | Some (_, _, branch) -> ((cname, i), branch))
               bmap)
           in
 
-            (ty, (`Fix ((opname, ty), (args, mpname), branches)))
+            (ty, (`Fix ((args, mpname), branches)))
     in
 
     if not (EcUnify.UniEnv.closed ue) then
@@ -1023,21 +1022,20 @@ module Op = struct
       match body with
       | `Abstract -> None
       | `Plain e  -> Some (OP_Plain (e_mapty uni e))
-      | `Fix ((opname, opty), (args, mpname), bs) ->
-          let opty = uni opty in
+      | `Fix ((args, mpname), bs) ->
           let args = List.map (fun (x, xty) -> (x, uni xty)) args in
           let structi =
             oget (List.findex
                     (fun (x, _) -> EcIdent.id_equal x mpname) args) in
           let bs =
             Parray.map
-              (fun (pvars, be) ->
-                { opf1_locals = List.map (fun (x, xty) -> (x, uni xty)) pvars;
+              (fun ((cname, i), (pvars, be)) ->
+                { opf1_ctor   = (EcPath.pqname (path scope) cname, i);
+                  opf1_locals = List.map (fun (x, xty) -> (x, uni xty)) pvars;
                   opf1_body   = e_mapty uni be; })
               bs
           in
-            Some (OP_Fix { opf_self     = (opname, opty);
-                           opf_args     = args;
+            Some (OP_Fix { opf_args     = args;
                            opf_struct   = (structi, List.length args);
                            opf_branches = bs; })
     in
