@@ -159,8 +159,8 @@ let ty_sub_exists f t =
   | Tglob _ | Tunivar _ | Tvar _ -> false
   | Ttuple lty -> List.exists f lty
   | Tconstr (_, lty) -> List.exists f lty
-  | Tfun (t1,t2) -> f t1 || f t2
-  
+  | Tfun (t1, t2) -> f t1 || f t2
+
 let ty_iter f t = 
   match t.ty_node with
   | Tglob _ | Tunivar _ | Tvar _ -> ()

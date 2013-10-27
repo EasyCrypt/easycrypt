@@ -919,6 +919,8 @@ module Op = struct
             (lam.EcTypes.e_ty, `Plain lam)
 
       | PO_case (bd, pty, pbs) ->
+          (* FIXME: move this to a dedicated module *)
+
           let env       = scope.sc_env in
           let codom     = TT.transty tp env ue pty in
           let env, args = TT.transbinding env ue bd in
@@ -1671,8 +1673,9 @@ module Ty = struct
 
     (* Check type-parameters / env0 is the env. augmented with an
      * abstract type representing the currently processed datatype. *)
-    let ue   = TT.transtyvars scope.sc_env (loc, Some dt.ptd_tyvars) in
-    let env0 =
+    let ue    = TT.transtyvars scope.sc_env (loc, Some dt.ptd_tyvars) in
+    let tpath = EcPath.pqname (path scope) (unloc dt.ptd_name) in
+    let env0  =
       let myself = {
         tyd_params = EcUnify.UniEnv.tparams ue;
         tyd_type   = `Abstract Sp.empty;
@@ -1685,7 +1688,6 @@ module Ty = struct
       |> oiter (fun (x, y) -> hierror ~loc:y.pl_loc
                   "duplicated constructor name: `%s'" x.pl_desc);
 
-
     (* Type-check constructor types *)
     let ctors =
       let for1 (cname, cty) =
@@ -1696,6 +1698,34 @@ module Ty = struct
         dt.ptd_ctors |> List.map for1
     in
 
+    (* Check for the positivity condition / emptyness *)
+    begin
+      let rec positive p t =
+        let t = EcEnv.Ty.hnorm t env0 in
+        match t.ty_node with
+        | Tglob   _        -> assert false
+        | Tunivar _        -> assert false
+        | Tvar    _        -> true
+        | Ttuple  ts       -> List.for_all (positive p) ts
+        | Tconstr (_, ts)  -> not (List.exists (occurs p) ts)
+        | Tfun    (t1, t2) -> (not (occurs p t1)) && (positive p t2)
+
+      and occurs p t =
+        let t = EcEnv.Ty.hnorm t env0 in
+          match t.ty_node with
+          | Tconstr (p', _) when EcPath.p_equal p p' -> true
+          | _ -> EcTypes.ty_sub_exists (occurs p) t
+
+      in
+        List.iter (fun (cname, cty) ->
+          if not (List.for_all (positive tpath) cty) then
+            hierror ~loc
+              "the constructor `%s' does not respect the positivity condition"
+              cname)
+          ctors;
+        if List.for_all (fun (_, cty) -> List.exists (occurs tpath) cty) ctors then
+          hierror ~loc "this datatype is empty";
+    end;
 
     (* Add final datatype to environment *)
     let tydecl = {
