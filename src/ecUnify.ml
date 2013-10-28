@@ -51,7 +51,6 @@ module UFArgs = struct
             if   Sp.is_empty tc
             then ((Sp.union tc1 tc2, Some ty), [])
             else ((Sp.union tc1 tc2, Some ty), [`TcCtt (ty, tc)])
-
   end
 end
 
@@ -104,8 +103,8 @@ let unify_core (env : EcEnv.env) (tvtc : Sp.t Mid.t) (uf : UF.t) t1 t2 =
   in
 
   let setvar i t =
-    if ocheck i t then failure ();
     let (ti, effects) = UFArgs.D.union (UF.data i !uf) (Sp.empty, Some t) in
+      if odfl false (snd ti |> omap (ocheck i)) then failure ();
       List.iter (Queue.push^~ pb) effects;
       uf := UF.set i ti !uf
   in
@@ -252,8 +251,14 @@ module UniEnv = struct
 
   let fresh ?(tc = Sp.empty) ?ty ue = 
     let uid = EcUidgen.unique () in
-      ue := { !ue with ue_uf = UF.set uid (tc, ty) (!ue).ue_uf; };
-      tuni uid
+    let uf  =
+      match ty with
+      | Some { ty_node = Tunivar id } ->
+          let uf = UF.set uid (tc, None) (!ue).ue_uf in
+            fst (UF.union uid id uf)
+      | None | Some _ -> UF.set uid (tc, ty) (!ue).ue_uf
+    in
+      ue := { !ue with ue_uf = uf }; tuni uid
 
   let opentvi ue (params : ty_params) tvi =
     match tvi with
@@ -322,46 +327,47 @@ let tfun_expected ue psig =
     EcTypes.toarrow psig tres
 
 let select_op ?(filter = fun _ -> true) tvi env name ue psig = 
-  (* Filter operator based on given type variables instanciation *)
-  let filter_on_tvi =
-    let tvtc = (!ue).ue_tvtc in
+  let module D = EcDecl in
 
-    match tvi with
-    | None -> fun _ -> true
-
-    | Some (TVIunamed lt) ->
-        let len = List.length lt in
-          fun op ->
-            let tparams = op.EcDecl.op_tparams in
-               (List.length tparams = len)
-            && (List.for_all2
-                  (fun (_, tc) ty -> hastc env tvtc ty tc)
-                  tparams lt)
-
-    | Some (TVInamed ls) -> fun op ->
-        let tparams = op.EcDecl.op_tparams in
-        let for1 (s, ty) =
-          match
-            try  Some (List.find (fun (id, _) -> EcIdent.name id = s) tparams)
-            with Not_found -> None
-          with
-          | None -> false
-          | Some (_, tc) -> hastc env tvtc ty tc
-        in
-          List.for_all for1 ls
+  let filter op =
+    (* Filter operator based on given type variables instanciation *)
+    let filter_on_tvi =
+      let tvtc = (!ue).ue_tvtc in
+  
+      match tvi with
+      | None -> fun _ -> true
+  
+      | Some (TVIunamed lt) ->
+          let len = List.length lt in
+            fun op ->
+              let tparams = op.D.op_tparams in
+                 (List.length tparams = len)
+              && (List.for_all2
+                    (fun (_, tc) ty -> hastc env tvtc ty tc)
+                    tparams lt)
+  
+      | Some (TVInamed ls) -> fun op ->
+          let tparams = op.D.op_tparams in
+          let for1 (s, ty) =
+            match
+              try  Some (List.find (fun (id, _) -> EcIdent.name id = s) tparams)
+              with Not_found -> None
+            with
+            | None -> false
+            | Some (_, tc) -> hastc env tvtc ty tc
+          in
+            List.for_all for1 ls
+    in
+      filter op && filter_on_tvi op
   in
 
-  let fop op = (filter op || not (EcDecl.is_pred op)) && filter_on_tvi op in
-  let ops = EcEnv.Op.all fop name env in
   let select (path, op) =
     let subue = UniEnv.copy ue in
-    let (top, tys) =
-      UniEnv.openty subue op.EcDecl.op_tparams tvi (EcDecl.op_ty op)
-    in
+    let (top, tys) = UniEnv.openty subue op.D.op_tparams tvi (D.op_ty op) in
       try 
         let texpected = tfun_expected subue psig in
           unify env subue top texpected; 
           Some ((path, tys), top, subue) 
       with UnificationFailure _ -> None
   in
-    List.pmap select ops
+    List.pmap select (EcEnv.Op.all filter name env)
