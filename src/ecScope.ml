@@ -1710,7 +1710,7 @@ module Ty = struct
           | Tvar    _ -> None
 
           | Ttuple tys -> begin
-              let xs  = List.map (fun xty -> (fresh xty, xty)) tys in
+              let xs  = List.map (fun xty -> (fresh_id_of_ty xty, xty)) tys in
               let sc1 = fun (x, xty) -> scheme1 p (pred, EcFol.f_local x xty) xty in
                 match List.pmap sc1 xs with
                 | []  -> None
@@ -1724,7 +1724,7 @@ module Ty = struct
 
           | Tfun (ty1, ty2) ->
               if occurs p ty1 then raise E.Fail;
-              let x = fresh ty1 in
+              let x = fresh_id_of_ty ty1 in
                 scheme1 p (pred, EcFol.f_app fac [EcFol.f_local x ty1] ty2) ty2
                   |> omap (EcFol.f_forall [x, EcFol.GTty ty1])
 
@@ -1732,7 +1732,7 @@ module Ty = struct
         let indty = tconstr p (List.map tvar targs) in
         let ctor  = EcPath.pqname (path scope) ctor in
         let ctor  = EcFol.f_op ctor (List.map tvar targs) indty in
-        let xs    = List.map (fun xty -> (fresh xty, xty)) tys in
+        let xs    = List.map (fun xty -> (fresh_id_of_ty xty, xty)) tys in
         let cargs = List.map (fun (x, xty) -> EcFol.f_local x xty) xs in
         let sc1   = fun (x, xty) -> scheme1 p (pred, EcFol.f_local x xty) xty in
         let scs   = List.pmap sc1 xs in
@@ -1746,7 +1746,7 @@ module Ty = struct
 
       and scheme (targs, p) ctors =
         let indty  = tconstr p (List.map tvar targs) in
-        let indx   = fresh indty in
+        let indx   = fresh_id_of_ty indty in
         let indfm  = EcFol.f_local indx indty in
         let predty = tfun indty tbool in
         let predx  = EcIdent.create "P" in
@@ -1757,8 +1757,6 @@ module Ty = struct
         let form   = EcFol.f_imps scs form in
         let form   = EcFol.f_forall [predx, EcFol.GTty predty] form in
           form
-
-      and fresh (_t : ty) = EcIdent.create "x"
 
       and occurs p t =
         let t = EcEnv.Ty.hnorm t env0 in
