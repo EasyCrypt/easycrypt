@@ -48,6 +48,8 @@ qed.
 (*********************************)
 (*    "Functional" Operators     *)
 (*********************************)
+(* Using these should be avoided when extracting,
+   for performance reasons. *)
 (* empty *)
 op empty: 'x array.
 
@@ -396,7 +398,19 @@ proof strict.
 intros=> src_dst; apply array_ext; split; smt.
 qed.
 
-(** Logical Stuff *)
+(** Things that are not in the OCaml array library:
+      - complex initialization,
+      - logical predicates *)
+(* init_dep: init, but using a function that may depend
+   on the rest of the array! *)
+op init_dep: 'x array -> int -> (int -> 'x array -> 'x) -> 'x array.
+
+axiom init_dep_def (xs:'x array) (size:int) (f:int -> 'x array -> 'x):
+  init_dep xs size f =
+    let r = make (length xs + size) xs.[0] in (* creates the space *)
+    let r = blit r 0 xs 0 (length xs) in      (* copies the initial value in *)
+    ForLoop.range 0 (size - 1) r (lambda i r, r.[i + length xs <- f i r]). (* extends using f *)
+
 (* all: this is computable because all arrays are finite *)
 op all: ('x -> bool) -> 'x array -> bool.
 
@@ -410,6 +424,58 @@ op alli: (int -> 'x -> bool) -> 'x array -> bool.
 axiom alli_def p (xs:'x array):
   alli p xs <=>
   (forall i, 0 <= i < length xs => p i xs.[i]).
+
+lemma alli_base p: alli p empty<:'x>.
+proof strict.
+by rewrite alli_def length_empty; smt.
+qed.
+
+lemma alli_ind p (x:'x) xs:
+  alli p (x::xs) =
+    (p 0 x /\ alli (lambda i x, p (i + 1) x) xs).
+proof strict.
+rewrite (alli_def _ xs).
+cut ->: (p 0 x /\ forall (i:int), 0 <= i < length xs => (lambda i x, p (i + 1) x) i xs.[i]) <=>
+         forall (i:int), 0 <= i < length (x::xs) => p i (x::xs).[i].
+  split; first smt.
+  intros=> alli; split.
+    by cut ->: x = (x::xs).[0]
+         by (rewrite get_cons //=; smt);
+       apply alli; first smt.
+    by intros=> i i_bnd //=;
+       cut ->: xs.[i] = (x::xs).[i + 1]
+         by (rewrite get_cons //=; smt);
+       apply alli; first smt.
+by rewrite -alli_def.
+qed.
+
+lemma alli_true p (xs:'x array):
+  (forall i x, p i x) =>
+  alli p xs.
+proof strict.
+by rewrite alli_def=> p_true i i_bnd;
+   apply p_true.
+qed.
+
+(* Inductive <-> Iterative... the proof is more complex than I thought
+   because we need to drop all the inductive calls before the ith *)
+(*
+lemma range_alli i j p (xs:'x array):
+  0 <= i < length xs =>
+  0 <= j < length xs =>
+  ForLoop.range i j true (lambda k b, b /\ p k xs.[k]) =
+    alli (lambda k x, i <= k < j => p k x) xs.
+proof strict.
+intros=> i_bnd j_bnd.
+case (i < j)=> i_j.
+  cut [x' xs' ->]: exists x' xs', xs = x'::xs'
+    by (exists xs.[0]; exists (sub xs 1 (length xs - 1)); apply array_ext; smt).
+  rewrite alli_ind.
+  rewrite ForLoop.range_ind //=.
+  admit. (* by induction on j - i. This looks more complicated than it should be *)
+  by rewrite ForLoop.range_base ?alli_true //=; smt.
+qed.
+*)
 
 (** Distribution on 'a array of length k from distribution on 'a *)
 (* We return the empty array when the length is negative *)

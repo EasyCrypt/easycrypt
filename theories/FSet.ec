@@ -497,7 +497,8 @@ axiom fold_empty (f:'a -> 'b -> 'b) (e:'b):
   fold f e empty = e.
 
 axiom fold_rm_pick (f:'a -> 'b -> 'b) (e:'b) xs:
-    fold f e xs = f (pick xs) (fold f e (rm (pick xs) xs)).
+  xs <> empty =>
+  fold f e xs = f (pick xs) (fold f e (rm (pick xs) xs)).
 
 lemma fold_set_list (f:'a -> 'b -> 'b) (e:'b) xs:
   (forall a b X, f a (f b X) = f b (f a X)) =>
@@ -510,7 +511,7 @@ intros s nempty Hind; elim/list_case_eq (elems s);
 intros=> x l' h.
 cut xval : pick s = x;first rewrite pick_def h hd_cons //.
 subst x.
-rewrite h fold_rm_pick fold_right_cons Hind //.
+rewrite h fold_rm_pick // fold_right_cons Hind //.
 congr => //.
 apply fold_permC; first assumption.
 rewrite (_:l' = rm (pick s) (elems s)).
