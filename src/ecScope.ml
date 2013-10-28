@@ -955,10 +955,10 @@ module Op = struct
   
                 | [(cp, tvi), opty, subue] ->
                     let ctor = oget (EcEnv.Op.by_path_opt cp env) in
-                    let (indp, ctor) = EcDecl.operator_as_ctor ctor in
+                    let (indp, ctoridx) = EcDecl.operator_as_ctor ctor in
                     let indty = oget (EcEnv.Ty.by_path_opt indp env) in
                     let ind = snd (EcDecl.tydecl_as_datatype indty) in
-                    let ctorsym, ctorty = List.nth ind ctor in
+                    let ctorsym, ctorty = List.nth ind ctoridx in
 
                     let args_exp = List.length ctorty in
                     let args_got = List.length (snd pb.pop_pattern) in
@@ -972,23 +972,23 @@ module Op = struct
 
                     EcUnify.UniEnv.restore ~src:subue ~dst:ue;
 
+                    let ctorty =
+                      let tvi = Some (EcUnify.TVIunamed tvi) in
+                        fst (EcUnify.UniEnv.opentys ue indty.tyd_params tvi ctorty) in
                     let pty = EcUnify.UniEnv.fresh ue in
 
                     (try  EcUnify.unify env ue (toarrow ctorty pty) opty
                      with EcUnify.UnificationFailure _ -> assert false);
-                    TT.unify_or_fail env ue pb.pop_name.pl_loc mpty pty;
+                    TT.unify_or_fail env ue pb.pop_name.pl_loc pty mpty;
 
-                    let ctorty =
-                      let tvi = Some (EcUnify.TVIunamed tvi) in
-                        fst (EcUnify.UniEnv.opentys ue indty.tyd_params tvi ctorty)
-                    and pvars = List.map (EcIdent.create |- unloc) (snd pb.pop_pattern) in
+                    let pvars = List.map (EcIdent.create |- unloc) (snd pb.pop_pattern) in
                     let pvars = List.combine pvars ctorty in
 
                     let be =
                       let env = EcEnv.Var.bind_locals pvars env in
                         TT.transexpcast env ue codom pb.pop_body
                     in
-                      (pb, (indp, ind, (ctorsym, ctor)), (pvars, be))
+                      (pb, (indp, ind, (ctorsym, ctoridx)), (pvars, be))
 
               in
                 List.map trans1 pbs
@@ -1031,11 +1031,10 @@ module Op = struct
           let opexpr  = EcPath.pqname (path scope) (unloc op.po_name) in
           let opexpr  = e_op opexpr (List.map (tvar |- fst) tparams) codom in
           let ebsubst = { e_subst_id with es_freshen = false; es_ty = uni; } in
-          let ebsubst = { e_subst_id with es_loc = Mid.add opname opexpr ebsubst.es_loc; } in
+          let ebsubst = { ebsubst with es_loc = Mid.add opname opexpr ebsubst.es_loc; } in
           let args    = List.map (fun (x, xty) -> (x, uni xty)) args in
           let structi =
-            oget (List.findex
-                    (fun (x, _) -> EcIdent.id_equal x mpname) args) in
+            oget (List.findex (fun (x, _) -> EcIdent.id_equal x mpname) args) in
           let bs =
             Parray.map
               (fun ((cname, i), (pvars, be)) ->
