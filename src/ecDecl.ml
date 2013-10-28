@@ -16,7 +16,7 @@ type tydecl = {
 and ty_body = [
   | `Concrete of EcTypes.ty
   | `Abstract of Sp.t
-  | `Datatype of (EcSymbols.symbol * EcTypes.ty list) list
+  | `Datatype of EcFol.form * (EcSymbols.symbol * EcTypes.ty list) list
 ]
 
 

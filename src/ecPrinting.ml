@@ -1317,9 +1317,9 @@ let pp_typedecl (ppe : PPEnv.t) fmt (x, tyd) =
 
   and pp_body fmt =
     match tyd.tyd_type with
-    | `Abstract _  -> ()                (* FIXME: TC HOOK *)
+    | `Abstract _ -> ()                (* FIXME: TC HOOK *)
     | `Concrete ty -> Format.fprintf fmt " =@ %a" (pp_type ppe) ty
-    | `Datatype cs ->
+    | `Datatype (_, cs) ->
         let pp_ctor fmt (c, cty) =
           match cty with
           | [] -> Format.fprintf fmt "%s" c

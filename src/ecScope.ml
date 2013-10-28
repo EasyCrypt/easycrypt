@@ -957,7 +957,7 @@ module Op = struct
                     let ctor = oget (EcEnv.Op.by_path_opt cp env) in
                     let (indp, ctor) = EcDecl.operator_as_ctor ctor in
                     let indty = oget (EcEnv.Ty.by_path_opt indp env) in
-                    let ind = EcDecl.tydecl_as_datatype indty in
+                    let ind = snd (EcDecl.tydecl_as_datatype indty) in
                     let ctorsym, ctorty = List.nth ind ctor in
 
                     let args_exp = List.length ctorty in
@@ -1699,16 +1699,66 @@ module Ty = struct
     in
 
     (* Check for the positivity condition / emptyness *)
-    begin
-      let rec positive p t =
-        let t = EcEnv.Ty.hnorm t env0 in
-        match t.ty_node with
-        | Tglob   _        -> assert false
-        | Tunivar _        -> assert false
-        | Tvar    _        -> true
-        | Ttuple  ts       -> List.for_all (positive p) ts
-        | Tconstr (_, ts)  -> not (List.exists (occurs p) ts)
-        | Tfun    (t1, t2) -> (not (occurs p t1)) && (positive p t2)
+    let scheme =
+      let module E = struct exception Fail end in
+
+      let rec scheme1 p (pred, fac) ty =
+        let ty = EcEnv.Ty.hnorm ty env0 in
+          match ty.ty_node with
+          | Tglob   _ -> assert false
+          | Tunivar _ -> assert false
+          | Tvar    _ -> None
+
+          | Ttuple tys -> begin
+              let xs  = List.map (fun xty -> (fresh xty, xty)) tys in
+              let sc1 = fun (x, xty) -> scheme1 p (pred, EcFol.f_local x xty) xty in
+                match List.pmap sc1 xs with
+                | []  -> None
+                | scs -> Some (EcFol.f_let (LTuple xs) fac (EcFol.f_ands scs))
+          end
+
+          | Tconstr (p', ts)  ->
+              if List.exists (occurs p) ts then raise E.Fail;
+              if not (EcPath.p_equal p p') then None else
+                Some (EcFol.f_app pred [fac] tbool)
+
+          | Tfun (ty1, ty2) ->
+              if occurs p ty1 then raise E.Fail;
+              let x = fresh ty1 in
+                scheme1 p (pred, EcFol.f_app fac [EcFol.f_local x ty1] ty2) ty2
+                  |> omap (EcFol.f_forall [x, EcFol.GTty ty1])
+
+      and schemec (targs, p) pred (ctor, tys) =
+        let indty = tconstr p (List.map tvar targs) in
+        let ctor  = EcPath.pqname (path scope) ctor in
+        let ctor  = EcFol.f_op ctor (List.map tvar targs) indty in
+        let xs    = List.map (fun xty -> (fresh xty, xty)) tys in
+        let cargs = List.map (fun (x, xty) -> EcFol.f_local x xty) xs in
+        let sc1   = fun (x, xty) -> scheme1 p (pred, EcFol.f_local x xty) xty in
+        let scs   = List.pmap sc1 xs in
+        let form  = EcFol.f_app pred [EcFol.f_app ctor cargs indty] tbool in
+        let form  = EcFol.f_imps scs form in
+        let form  =
+          let bds = List.map (fun (x, xty) -> (x, EcFol.GTty xty)) xs in
+            EcFol.f_forall bds form
+        in
+          form
+
+      and scheme (targs, p) ctors =
+        let indty  = tconstr p (List.map tvar targs) in
+        let indx   = fresh indty in
+        let indfm  = EcFol.f_local indx indty in
+        let predty = tfun indty tbool in
+        let predx  = EcIdent.create "P" in
+        let pred   = EcFol.f_local predx predty in
+        let scs    = List.map (schemec (targs, p) pred) ctors in
+        let form   = EcFol.f_app pred [indfm] tbool in
+        let form   = EcFol.f_forall [indx, EcFol.GTty indty] form in
+        let form   = EcFol.f_imps scs form in
+        let form   = EcFol.f_forall [predx, EcFol.GTty predty] form in
+          form
+
+      and fresh (_t : ty) = EcIdent.create "x"
 
       and occurs p t =
         let t = EcEnv.Ty.hnorm t env0 in
@@ -1717,20 +1767,20 @@ module Ty = struct
           | _ -> EcTypes.ty_sub_exists (occurs p) t
 
       in
-        List.iter (fun (cname, cty) ->
-          if not (List.for_all (positive tpath) cty) then
-            hierror ~loc
-              "the constructor `%s' does not respect the positivity condition"
-              cname)
-          ctors;
-        if List.for_all (fun (_, cty) -> List.exists (occurs tpath) cty) ctors then
-          hierror ~loc "this datatype is empty";
-    end;
+        let scheme =
+          try  scheme ([], tpath) ctors
+          with E.Fail ->
+            hierror ~loc "the datatype does not respect the positivity condition"
+        in
+          if List.for_all (fun (_, cty) -> List.exists (occurs tpath) cty) ctors then
+            hierror ~loc "this datatype is empty";
+          scheme
+    in
 
     (* Add final datatype to environment *)
     let tydecl = {
       tyd_params = EcUnify.UniEnv.tparams ue;
-      tyd_type   = `Datatype ctors;
+      tyd_type   = `Datatype (scheme, ctors);
     } in
       bind scope (unloc dt.ptd_name, tydecl)
 end
