@@ -1226,7 +1226,7 @@ datatype_def:
 
 dt_ctor_def:
 | x=uident { (x, []) }
-| x=uident OF ty=plist1(loc(simpl_type_exp), STAR) { (x, ty) }
+| x=uident OF ty=plist1(loc(simpl_type_exp), tcand) { (x, ty) }
 ;
 
 (* -------------------------------------------------------------------- *)

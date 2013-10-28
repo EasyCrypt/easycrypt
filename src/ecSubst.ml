@@ -275,11 +275,12 @@ let subst_tydecl (s : _subst) (tyd : tydecl) =
     | `Concrete ty ->
         let s = init_tparams s tyd.tyd_params params' in
           `Concrete (s.s_ty ty)
-    | `Datatype cs ->
-        let s = init_tparams s tyd.tyd_params params' in
-          `Datatype (List.map (fun (x, ty) -> (x, List.map s.s_ty ty)) cs)
+    | `Datatype (scheme, cs) ->
+        let sty = init_tparams s tyd.tyd_params params' in
+          `Datatype (Fsubst.f_subst (f_subst_of_subst s) scheme,
+                     List.map (fun (x, ty) -> (x, List.map sty.s_ty ty)) cs)
   in
-    { tyd_params = params'; tyd_type = body }
+    { tyd_params = params'; tyd_type = body; }
 
 (* -------------------------------------------------------------------- *)
 let rec subst_op_kind (s : _subst) (kind : operator_kind) =

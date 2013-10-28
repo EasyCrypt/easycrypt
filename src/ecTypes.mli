@@ -87,12 +87,15 @@ module Tvar : sig
 end
 
 (* -------------------------------------------------------------------- *)
-
 (* [map f t] applies [f] on strict subterms of [t] (not recursive) *)
 val ty_map : (ty -> ty) -> ty -> ty
 
 (* [sub_exists f t] true if one of the strict-subterm of [t] valid [f] *)
 val ty_sub_exists : (ty -> bool) -> ty -> bool
+
+(* -------------------------------------------------------------------- *)
+val symbol_of_ty   : ty -> string
+val fresh_id_of_ty : ty -> EcIdent.t
 
 (* -------------------------------------------------------------------- *)
 type lpattern =

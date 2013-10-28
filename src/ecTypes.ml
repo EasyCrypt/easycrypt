@@ -176,6 +176,28 @@ let rec ty_check_uni t =
   | _ -> ty_iter ty_check_uni t
 
 (* -------------------------------------------------------------------- *)
+let symbol_of_ty (ty : ty) =
+  match ty.ty_node with
+  | Tglob   _      -> "g"
+  | Tunivar _      -> "u"
+  | Tvar    _      -> "x"
+  | Ttuple  _      -> "x"
+  | Tfun    _      -> "f"
+  | Tconstr (p, _) ->
+      let x = EcPath.basename p in
+      let rec doit i =
+        if   i >= String.length x
+        then "x"
+        else match Char.lowercase x.[i] with
+             | 'a' .. 'z' -> String.make 1 x.[i]
+             | _ -> doit (i+1)
+      in
+        doit 0
+
+let fresh_id_of_ty (ty : ty) =
+  EcIdent.create (symbol_of_ty ty)
+
+(* -------------------------------------------------------------------- *)
 type ty_subst = {
   ts_p   : EcPath.path -> EcPath.path;
   ts_mp  : EcPath.mpath -> EcPath.mpath;

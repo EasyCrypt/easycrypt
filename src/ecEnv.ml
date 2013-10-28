@@ -1623,7 +1623,7 @@ module Ty = struct
              TypeClass.add_abstract_instance ~src:mypath ~dst env)
           tc env
 
-      | `Datatype cs ->
+      | `Datatype (scheme, cs) ->
           let params = List.map (fun (x, _) -> tvar x) ty.tyd_params in
 
           let for1 i (c, aty) =
@@ -1633,10 +1633,21 @@ module Ty = struct
               cop
           in
 
-          let cs = List.mapi for1 cs in
+          let scheme =
+            let scname = Printf.sprintf "%s_ind" name in
+              (scname, { ax_tparams = ty.tyd_params;
+                         ax_spec    = Some scheme;
+                         ax_kind    = `Axiom;
+                         ax_nosmt   = true; })
+          in
+
+          let cs  = List.mapi for1 cs in
+          let env =
             List.fold_left
               (fun env (c, cop) -> MC.bind_operator c cop env)
-              env cs
+              env cs in
+
+            MC.bind_axiom (fst scheme) (snd scheme) env
     in
       env
 
