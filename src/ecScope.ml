@@ -1698,6 +1698,8 @@ module Ty = struct
         dt.ptd_ctors |> List.map for1
     in
 
+    let tparams = EcUnify.UniEnv.tparams ue in
+
     (* Check for the positivity condition / emptyness *)
     let scheme =
       let module E = struct exception Fail end in
@@ -1766,7 +1768,7 @@ module Ty = struct
 
       in
         let scheme =
-          try  scheme ([], tpath) ctors
+          try  scheme (List.map fst tparams, tpath) ctors
           with E.Fail ->
             hierror ~loc "the datatype does not respect the positivity condition"
         in
@@ -1777,7 +1779,7 @@ module Ty = struct
 
     (* Add final datatype to environment *)
     let tydecl = {
-      tyd_params = EcUnify.UniEnv.tparams ue;
+      tyd_params = tparams;
       tyd_type   = `Datatype (scheme, ctors);
     } in
       bind scope (unloc dt.ptd_name, tydecl)
