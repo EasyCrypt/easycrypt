@@ -1,11 +1,13 @@
 require Array.
 require Bitstring.
+require ABitstring.
 require Bool.
 require Cyclic_group_prime.
 require Distr.
 require Fun.
 require Int.
 require List.
+require FMap.
 require Map.
 require Matrix.
 require Option.
@@ -16,5 +18,18 @@ require Real.
 require ISet.
 require FSet.
 require Word.
+require AWord.
+require AdvAbsVal.
+require Dice_sampling.
+require AlgTactic.
+require MAC.
+require PKS.
+require Monoid.
+require Ring.
+require Multiset.
+require OW.
+require PKE.
+require SecureChannels.
+require Sum.
 
 lemma unsound: false by [].
