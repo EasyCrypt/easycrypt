@@ -493,8 +493,12 @@ theory Darray.
 
   lemma mu_x (len:int) (d:'a distr) (x:'a array):
     len < 0 =>
-    mu_x (darray len d) x = if x = empty then 1%r else 0%r
-  by [].
+    mu_x (darray len d) x = if x = empty then 1%r else 0%r.
+  proof strict.
+  rewrite /mu_x=> len_neg; case (x = empty).
+    by intros=> ->; rewrite mu_neg.
+    by rewrite mu_neg // /charfun -rw_neqF=> ->.
+  qed.
 
   lemma supp_neg (len:int) (d:'a distr) (x:'a array):
     len < 0 =>
