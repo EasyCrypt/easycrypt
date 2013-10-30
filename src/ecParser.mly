@@ -1335,11 +1335,13 @@ opbody:
 ;
 
 opcase:
-| WITH x=ident EQ c=qoident tvi=tvars_app? ps=ident* IMPL e=expr
-   { { pop_name    = x;
-       pop_tvi     = tvi;
-       pop_pattern = (c, ps);
-       pop_body    = e; } }
+| WITH ptn=plist1(opptn, COMMA) IMPL e=expr
+   { { pop_patterns = ptn; pop_body = e; } }
+;
+
+opptn:
+| x=ident EQ c=qoident tvi=tvars_app? ps=ident*
+    { { pop_name = x; pop_tvi = tvi; pop_pattern = (c, ps); } }
 ;
 
 predicate:

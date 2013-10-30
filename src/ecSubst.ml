@@ -307,20 +307,27 @@ and subst_op_body (s : _subst) (bd : opbody) =
       let (es, args) =
         EcTypes.add_locals (e_subst_of_subst s) opfix.opf_args in
 
-      let for1 br =
-        let (locals, body) =
-          EcTypes.e_subst_closure es (br.opf1_locals, br.opf1_body)
-        in
-          { opf1_ctor   = (s.s_p (fst br.opf1_ctor), snd br.opf1_ctor);
-            opf1_locals = locals;
-            opf1_body   = body; }
-      in
-
-      let branches = Parray.map for1 opfix.opf_branches in
         OP_Fix { opf_args     = args;
                  opf_resty    = s.s_ty opfix.opf_resty;
                  opf_struct   = opfix.opf_struct;
-                 opf_branches = branches; }
+                 opf_branches = subst_branches es opfix.opf_branches; }
+
+and subst_branches es = function
+  | OPB_Leaf (locals, e) ->
+      let (es, locals) =
+        List.map_fold
+          (fun es locals -> EcTypes.add_locals es locals)
+          es locals
+      in
+        OPB_Leaf (locals, EcTypes.e_subst es e)
+
+  | OPB_Branch bs ->
+      let for1 b =
+        let (ctorp, ctori) = b.opb_ctor in
+          { opb_ctor = (es.es_p ctorp, ctori);
+            opb_sub  = subst_branches es b.opb_sub; }
+      in
+        OPB_Branch (Parray.map for1 bs)
 
 (* -------------------------------------------------------------------- *)
 let subst_op (s : _subst) (op : operator) =

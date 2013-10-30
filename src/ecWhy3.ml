@@ -1508,7 +1508,8 @@ let trans_oper_body env path wparams ty body =
         in
           (env, rb, Term.create_lsymbol pid dom f.Term.t_ty, Some (vs, f))
 
-    | Some (`Fix o) ->
+    | Some (`Fix _o) -> assert false
+(*
         let (env, dom, vs) =
           let ids, dom = List.split o.opf_args in
           let dom      = List.map (trans_ty env) dom in
@@ -1544,7 +1545,7 @@ let trans_oper_body env path wparams ty body =
         let body = Term.t_case (Term.t_var pterm) bs in
         let env  = { env with env_op = ops; } in
 
-          (env, rb, ls, Some (vs, body))
+          (env, rb, ls, Some (vs, body)) *)
 
 let trans_oper env path op =
   let mty = env.env_tv in
