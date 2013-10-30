@@ -927,93 +927,190 @@ module Op = struct
           let ty        = EcTypes.toarrow (List.map snd args) codom in
           let opname    = EcIdent.create (unloc op.po_name) in
           let env       = EcEnv.Var.bind_local opname ty env in
-          let mpname, mpty =
-              let names = Ssym.of_list (List.map (fun pop -> unloc pop.pop_name) pbs) in
-              let name1 =
-                try  Ssym.choose names
-                with Not_found ->
-                  hierror ~loc "this pattern matching has no branches"
-              in
-                if not (Ssym.is_empty (Ssym.remove name1 names)) then
-                  hierror ~loc "this pattern matching matches on different parameters";
-                match List.findopt (fun (x, _) -> EcIdent.name x = name1) (List.rev args) with
-                | None   -> hierror ~loc "this pattern matching matches an unbound parameter";
-                | Some x -> x
+
+          let mpty, pbsmap =
+            let pbsmap =
+              List.map (fun x ->
+                let nms = (fun pop -> (unloc pop.pop_name, pop)) in
+                let nms = List.map nms x.pop_patterns in
+                  (x.pop_body, Msym.of_list nms))
+                pbs
+            in
+              match List.map snd pbsmap with
+              | [] -> hierror ~loc "this pattern matching has no branches"
+              | nm :: nms ->
+                  if not (List.for_all (Msym.set_equal nm) nms) then
+                    hierror ~loc "this pattern matching matches on different parameters";
+                  let argsmap =
+                    List.fold_lefti
+                      (fun i m (x, xty) -> Msym.add (EcIdent.name x) (i, x, xty) m)
+                      Msym.empty args
+                  in
+
+                  let _, mpty =
+                    Msym.fold_left
+                      (fun (seen, mpty) px _ ->
+                         if Msym.mem px seen then
+                            hierror ~loc "this pattern matching matches a parameter twice";
+                         match Msym.find_opt px argsmap with
+                         | None ->
+                            hierror ~loc "this pattern matching matches an unbound parameter";
+                         | Some (i, x, xty) -> (Ssym.add px seen, (i, x, xty) :: mpty))
+                      (Ssym.empty, []) nm
+                  in
+                    (mpty, pbsmap)
           in
 
           let branches =
             let pbs =
-              let trans1 pb =
-                let filter = fun op -> EcDecl.is_ctor op in
-                let cname  = fst pb.pop_pattern in
-                let tvi    = pb.pop_tvi |> omap (TT.transtvi env ue) in
-                let cts    = EcUnify.select_op ~filter tvi env (unloc cname) ue [] in
+              let trans_b ((body, pbmap) : _ * pop_pattern Msym.t) =
+                let trans1 ((_, x, xty) : _ * EcIdent.t * ty) =
+                  let pb     = oget (Msym.find_opt (EcIdent.name x) pbmap) in
+                  let filter = fun op -> EcDecl.is_ctor op in
+                  let cname  = fst pb.pop_pattern in
+                  let tvi    = pb.pop_tvi |> omap (TT.transtvi env ue) in
+                  let cts    = EcUnify.select_op ~filter tvi env (unloc cname) ue [] in
+    
+                  match cts with
+                  | [] -> hierror ~loc:cname.pl_loc "unknown constructor name"
+                  | _ :: _ :: _ -> hierror ~loc:cname.pl_loc "ambiguous constructor name"
+    
+                  | [(cp, tvi), opty, subue] ->
+                      let ctor = oget (EcEnv.Op.by_path_opt cp env) in
+                      let (indp, ctoridx) = EcDecl.operator_as_ctor ctor in
+                      let indty = oget (EcEnv.Ty.by_path_opt indp env) in
+                      let ind = snd (EcDecl.tydecl_as_datatype indty) in
+                      let ctorsym, ctorty = List.nth ind ctoridx in
   
-                match cts with
-                | [] -> hierror ~loc:cname.pl_loc "unknown constructor name"
-                | _ :: _ :: _ -> hierror ~loc:cname.pl_loc "ambiguous constructor name"
+                      let args_exp = List.length ctorty in
+                      let args_got = List.length (snd pb.pop_pattern) in
   
-                | [(cp, tvi), opty, subue] ->
-                    let ctor = oget (EcEnv.Op.by_path_opt cp env) in
-                    let (indp, ctoridx) = EcDecl.operator_as_ctor ctor in
-                    let indty = oget (EcEnv.Ty.by_path_opt indp env) in
-                    let ind = snd (EcDecl.tydecl_as_datatype indty) in
-                    let ctorsym, ctorty = List.nth ind ctoridx in
+                      if args_exp <> args_got then
+                        hierror ~loc:cname.pl_loc
+                          "this constructor takes %d argument(s), got %d" args_exp args_got;
+  
+                      if not (List.uniq (List.map unloc (snd pb.pop_pattern))) then
+                        hierror ~loc:cname.pl_loc "this pattern is non-linear";
+  
+                      EcUnify.UniEnv.restore ~src:subue ~dst:ue;
+  
+                      let ctorty =
+                        let tvi = Some (EcUnify.TVIunamed tvi) in
+                          fst (EcUnify.UniEnv.opentys ue indty.tyd_params tvi ctorty) in
+                      let pty = EcUnify.UniEnv.fresh ue in
+  
+                      (try  EcUnify.unify env ue (toarrow ctorty pty) opty
+                       with EcUnify.UnificationFailure _ -> assert false);
+                      TT.unify_or_fail env ue pb.pop_name.pl_loc pty xty;
+  
+                      let pvars = List.map (EcIdent.create |- unloc) (snd pb.pop_pattern) in
+                      let pvars = List.combine pvars ctorty in
 
-                    let args_exp = List.length ctorty in
-                    let args_got = List.length (snd pb.pop_pattern) in
+                        (pb, (indp, ind, (ctorsym, ctoridx)), pvars)
+                in  
 
-                    if args_exp <> args_got then
-                      hierror ~loc:cname.pl_loc
-                        "this constructor takes %d argument(s), got %d" args_exp args_got;
-
-                    if not (List.uniq (List.map unloc (snd pb.pop_pattern))) then
-                      hierror ~loc:cname.pl_loc "this pattern is non-linear";
-
-                    EcUnify.UniEnv.restore ~src:subue ~dst:ue;
-
-                    let ctorty =
-                      let tvi = Some (EcUnify.TVIunamed tvi) in
-                        fst (EcUnify.UniEnv.opentys ue indty.tyd_params tvi ctorty) in
-                    let pty = EcUnify.UniEnv.fresh ue in
-
-                    (try  EcUnify.unify env ue (toarrow ctorty pty) opty
-                     with EcUnify.UnificationFailure _ -> assert false);
-                    TT.unify_or_fail env ue pb.pop_name.pl_loc pty mpty;
-
-                    let pvars = List.map (EcIdent.create |- unloc) (snd pb.pop_pattern) in
-                    let pvars = List.combine pvars ctorty in
-
-                    let be =
-                      let env = EcEnv.Var.bind_locals pvars env in
-                        TT.transexpcast env ue codom pb.pop_body
-                    in
-                      (pb, (indp, ind, (ctorsym, ctoridx)), (pvars, be))
-
+                let ptns = List.map trans1 mpty in
+                let env  =
+                  List.fold_left (fun env (_, _, pvars) ->
+                    EcEnv.Var.bind_locals pvars env)
+                    env ptns
+                in
+                    (ptns, TT.transexpcast env ue codom body)
               in
-                List.map trans1 pbs
+                List.map trans_b pbsmap
             in
 
-            let (_, (_, ind, _), _) = oget (List.ohead pbs) in
-            let bmap = Array.create (List.length ind) None in
+            let module CaseMap : sig
+              type t
+
+              type locals = (EcIdent.t * ty) list
+
+              val create  : EcPath.path list list -> t
+              val add     : (int * locals) list -> expr -> t -> bool
+              val resolve : t -> opbranches option
+            end = struct
+              type locals = (EcIdent.t * ty) list
+
+              type t = [
+                | `Case of (EcPath.path * t) array
+                | `Leaf of (locals list * expr) option ref
+              ]
+
+              let rec create (inds : path list list) =
+                match inds with
+                | [] -> `Leaf (ref None)
+                | ind :: inds ->
+                    let ind = Array.of_list ind in
+                      `Case (Array.map (fun x -> (x, create inds)) ind)
+
+              let add bs e (m : t) =
+                let r =
+                  List.fold_left
+                    (fun m (i, _) ->
+                       match m with
+                       | `Leaf _ -> assert false
+                       | `Case t ->
+                           assert (i >= 0 && i < Array.length t);
+                           snd t.(i))
+                    m bs
+                in
+                  match r with
+                  | `Case _ -> assert false
+                  | `Leaf r -> begin
+                      match !r with
+                      | None   -> r := Some (List.map snd bs, e); true
+                      | Some _ -> false
+                  end
+
+              let resolve =
+                let module E = struct exception NotFull end in
+
+                let rec resolve_r m =
+                  match m with
+                  | `Case t ->
+                      let for1 i =
+                        let (cp, bs) = snd_map resolve_r t.(i) in
+                          { opb_ctor = (cp, i); opb_sub = bs; }
+                      in
+                        OPB_Branch (Parray.init (Array.length t) for1)
+
+                  | `Leaf r -> begin
+                      match !r with
+                      | None -> raise E.NotFull
+                      | Some (x1, x2) -> OPB_Leaf (x1, x2)
+                  end
+              in
+                fun m ->
+                  try  Some (resolve_r m)
+                  with E.NotFull -> None
+            end in
+
+            let inds = (fun (_, (indp, ind, _), _) -> (indp, ind)) in
+            let inds = List.map inds (fst (oget (List.ohead pbs))) in
+            let inds =
+              List.map (fun (indp, ctors) ->
+                List.map
+                  (fun (ctor, _) -> EcPath.pqoname (EcPath.prefix indp) ctor)
+                  ctors)
+                inds
+            in
+
+            let casemap = CaseMap.create inds in
 
             List.iter
-              (fun ((_, (_, _, (cname, ctor)), _) as ct) ->
-                if bmap.(ctor) <> None then
-                  hierror ~loc "duplicated branch for constructor `%s'" cname;
-                bmap.(ctor) <- Some ct)
+              (fun (ptns, be) ->
+                 let ptns = List.map (fun (_, (_, _, (_, ctor)), pvars) ->
+                   (ctor, pvars)) ptns
+                 in
+                   if not (CaseMap.add ptns be casemap) then
+                     hierror ~loc "this pattern matching contains duplicated branch")
               pbs;
 
-            Parray.of_array (Array.mapi
-              (fun i v ->
-                let cname = fst (List.nth ind i) in
-                  match v with
-                  | None -> hierror ~loc "missing branch for constructor `%s'" cname
-                  | Some (_, _, branch) -> ((cname, i), branch))
-              bmap)
+            match CaseMap.resolve casemap with
+            | None   -> hierror ~loc "this pattern matching is non-exhaustive"
+            | Some x -> x
           in
-
-            (ty, (`Fix ((opname, codom), (args, mpname), branches)))
+            (ty, (`Fix ((opname, codom), (args, List.map proj3_1 mpty), branches)))
     in
 
     if not (EcUnify.UniEnv.closed ue) then
@@ -1026,27 +1123,31 @@ module Op = struct
       match body with
       | `Abstract -> None
       | `Plain e  -> Some (OP_Plain (e_mapty uni e))
-      | `Fix ((opname, codom), (args, mpname), bs) ->
-          let codom   = uni codom in
-          let opexpr  = EcPath.pqname (path scope) (unloc op.po_name) in
-          let opexpr  = e_op opexpr (List.map (tvar |- fst) tparams) codom in
-          let ebsubst = { e_subst_id with es_freshen = false; es_ty = uni; } in
-          let ebsubst = { ebsubst with es_loc = Mid.add opname opexpr ebsubst.es_loc; } in
-          let args    = List.map (fun (x, xty) -> (x, uni xty)) args in
-          let structi =
-            oget (List.findex (fun (x, _) -> EcIdent.id_equal x mpname) args) in
-          let bs =
-            Parray.map
-              (fun ((cname, i), (pvars, be)) ->
-                { opf1_ctor   = (EcPath.pqname (path scope) cname, i);
-                  opf1_locals = List.map (fun (x, xty) -> (x, uni xty)) pvars;
-                  opf1_body   = e_subst ebsubst be; })
-              bs
+      | `Fix ((opname, codom), (args, istruct), branches) ->
+          let codom    = uni codom in
+          let opexpr   = EcPath.pqname (path scope) (unloc op.po_name) in
+          let opexpr   = e_op opexpr (List.map (tvar |- fst) tparams) codom in
+          let ebsubst  = { e_subst_id with es_freshen = false; es_ty = uni; } in
+          let ebsubst  = { ebsubst with es_loc = Mid.add opname opexpr ebsubst.es_loc; } in
+          let args     = List.map (fun (x, xty) -> (x, uni xty)) args in
+          let branches =
+            let rec uni_branches = function
+              | OPB_Leaf (locals, e) ->
+                  OPB_Leaf (List.map (List.map (snd_map uni)) locals,
+                             e_subst ebsubst e)
+              | OPB_Branch bs ->
+                  let for1 b =
+                    { opb_ctor = b.opb_ctor;
+                      opb_sub  = uni_branches b.opb_sub; }
+                  in
+                    OPB_Branch (Parray.map for1 bs)
+            in
+              uni_branches branches
           in
             Some (OP_Fix { opf_args     = args;
                            opf_resty    = codom;
-                           opf_struct   = (structi, List.length args);
-                           opf_branches = bs; })
+                           opf_struct   = (istruct, List.length args);
+                           opf_branches = branches; })
     in
 
     let tyop = EcDecl.mk_op tparams ty body in

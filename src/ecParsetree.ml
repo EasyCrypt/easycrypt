@@ -230,10 +230,14 @@ type pop_def =
   | PO_case  of ptybindings * pty * pop_branch list
 
 and pop_branch = {
+  pop_patterns : pop_pattern list;
+  pop_body     : pexpr;
+}
+
+and pop_pattern = {
   pop_name    : psymbol;
   pop_tvi     : ptyannot option;
   pop_pattern : pqsymbol * psymbol list;
-  pop_body    : pexpr;
 }
 
 type poperator = {
