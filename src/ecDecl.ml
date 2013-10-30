@@ -19,7 +19,6 @@ and ty_body = [
   | `Datatype of EcFol.form * (EcSymbols.symbol * EcTypes.ty list) list
 ]
 
-
 let tydecl_as_concrete (td : tydecl) =
   match td.tyd_type with `Concrete x -> x | _ -> assert false
 
@@ -44,14 +43,17 @@ and opbody =
 and opfix = {
   opf_args     : (EcIdent.t * EcTypes.ty) list;
   opf_resty    : EcTypes.ty;
-  opf_struct   : int * int;
-  opf_branches : opfix1 Parray.t;
+  opf_struct   : int list * int;
+  opf_branches : opbranches;
 }
 
-and opfix1 = {
-  opf1_ctor   : EcPath.path * int;
-  opf1_locals : (EcIdent.t * EcTypes.ty) list;
-  opf1_body   : EcTypes.expr;
+and opbranches =
+| OPB_Leaf   of ((EcIdent.t * EcTypes.ty) list) list * EcTypes.expr
+| OPB_Branch of opbranch Parray.t
+
+and opbranch = {
+  opb_ctor : EcPath.path * int;
+  opb_sub  : opbranches;
 }
 
 type operator = {

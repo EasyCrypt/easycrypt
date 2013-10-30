@@ -30,34 +30,34 @@ module Hsty = Why3.Hashcons.Make (struct
 
   let equal ty1 ty2 =
     match ty1.ty_node, ty2.ty_node with
-    | Tglob m1, Tglob m2                 ->
-      EcPath.m_equal m1 m2 
-    | Tunivar u1      , Tunivar u2       -> 
-      uid_equal u1 u2
-    | Tvar v1         , Tvar v2          -> 
-      id_equal v1 v2
-    | Ttuple lt1      , Ttuple lt2       -> 
-      List.all2 ty_equal lt1 lt2
-    | Tconstr (p1,lt1), Tconstr (p2,lt2) -> 
-      EcPath.p_equal p1 p2 && List.all2 ty_equal lt1 lt2
-    | Tfun(d1,c1)     , Tfun(d2,c2)      -> 
-      ty_equal d1 d2 && ty_equal c1 c2
-    | _               , _                -> false
+    | Tglob m1, Tglob m2 ->
+        EcPath.m_equal m1 m2 
+
+    | Tunivar u1, Tunivar u2 -> 
+        uid_equal u1 u2
+
+    | Tvar v1, Tvar v2 -> 
+        id_equal v1 v2
+
+    | Ttuple lt1, Ttuple lt2 -> 
+        List.all2 ty_equal lt1 lt2
+
+    | Tconstr (p1, lt1), Tconstr (p2, lt2) -> 
+        EcPath.p_equal p1 p2 && List.all2 ty_equal lt1 lt2
+
+    | Tfun (d1, c1), Tfun (d2, c2)-> 
+        ty_equal d1 d2 && ty_equal c1 c2
+
+    | _, _ -> false
       
   let hash ty = 
     match ty.ty_node with 
-    | Tglob m        ->
-      EcPath.m_hash m
-    | Tunivar u      -> 
-      u
-    | Tvar    id     -> 
-      EcIdent.tag id
-    | Ttuple  tl     -> 
-      Why3.Hashcons.combine_list ty_hash 0 tl
-    | Tconstr (p,tl) -> 
-      Why3.Hashcons.combine_list ty_hash p.p_tag tl
-    | Tfun    (t1,t2) ->
-      Why3.Hashcons.combine (ty_hash t1) (ty_hash t2)
+    | Tglob m          -> EcPath.m_hash m
+    | Tunivar u        -> u
+    | Tvar    id       -> EcIdent.tag id
+    | Ttuple  tl       -> Why3.Hashcons.combine_list ty_hash 0 tl
+    | Tconstr (p, tl)  -> Why3.Hashcons.combine_list ty_hash p.p_tag tl
+    | Tfun    (t1, t2) -> Why3.Hashcons.combine (ty_hash t1) (ty_hash t2)
         
   let fv ty =
     let union ex =
