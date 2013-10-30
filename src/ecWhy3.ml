@@ -1099,13 +1099,12 @@ let trans_tydecl env path td =
            ((ts, `Datatype (List.map (fun (x1, (x2, _)) -> (x1, x2)) cs)), decl)
 
 (* --------------------------- Formulas ------------------------------- *)
-
 let trans_lv env lv =
-  try Mid.find lv env.env_id with _ ->             
-    (
-      Format.printf "cannot find %s@." (EcIdent.tostring lv);
+  match Mid.find_opt lv env.env_id with
+  | None ->
+      Printf.eprintf "cannot find %s\n%!" (EcIdent.tostring lv);
       assert false
-    ) 
+  | Some x -> x
 
 let trans_mp env p = try Mm.find p env.env_mp with _ -> assert false
 
@@ -1508,8 +1507,7 @@ let trans_oper_body env path wparams ty body =
         in
           (env, rb, Term.create_lsymbol pid dom f.Term.t_ty, Some (vs, f))
 
-    | Some (`Fix _o) -> assert false
-(*
+    | Some (`Fix o) ->
         let (env, dom, vs) =
           let ids, dom = List.split o.opf_args in
           let dom      = List.map (trans_ty env) dom in
@@ -1517,35 +1515,69 @@ let trans_oper_body env path wparams ty body =
             (env, dom, vs)
         in
 
-        let ls    = Term.create_lsymbol pid dom (Some (trans_ty env o.opf_resty)) in
-        let pterm = List.nth vs (fst o.opf_struct) in
-        let ops   = env.env_op in
-        let env   = { env with env_op = Mp.add path (ls, ls, wparams) env.env_op; } in
+        let ls      = Term.create_lsymbol pid dom (Some (trans_ty env o.opf_resty)) in
+        let pterm   = List.map (List.nth vs) (fst o.opf_struct) in
+        let ptermty = List.map (fun x -> x.Term.vs_ty) pterm in
+        let ptermc  = List.length ptermty in
+        let ops = env.env_op in
+        let env = { env with env_op = Mp.add path (ls, ls, wparams) env.env_op; } in
 
-        let ((env, rb), bs) =
-          List.map_fold
-            (fun (env, rb) b ->
-              let ids, sig_   = List.split b.opf1_locals in
-              let sig_        = List.map (trans_ty env) sig_ in
-              let env, vs     = add_ids env ids sig_ in
-              let env, rb1, e =
-                trans_form env (EcFol.form_of_expr EcFol.mhr b.opf1_body) in
-              let cl  = proj3_1 (oget (Mp.find_opt (fst b.opf1_ctor) env.env_op)) in
-              let ptn = List.map Term.pat_var vs in
-              let ptn = Term.pat_app cl ptn pterm.Term.vs_ty in
-                ((env, rb1@rb), (ptn, e)))
-            (env, []) (Parray.to_list o.opf_branches) in
+        let ((env, rb), ptns) =
+          let rec compile ((env, rb), ptns) (ctors, m) =
+            match m with
+            | OPB_Branch bs ->
+                Parray.fold_left
+                  (fun ((env, rb), ptns) b ->
+                    let cl = proj3_1 (oget (Mp.find_opt (fst b.opb_ctor) env.env_op)) in
+                      compile ((env, rb), ptns) (cl :: ctors, b.opb_sub))
+                  ((env, rb), ptns) bs
 
-        let bs =
-          if   List.exists (fun (_, e) -> e.Term.t_ty = None) bs
-          then List.map (fun (p, e) -> (p, force_prop e)) bs
-          else bs in
+            | OPB_Leaf (locals, e) ->
+                let ctors = List.rev ctors in
+                let env, vs =
+                  List.map_fold
+                    (fun env locals ->
+                       let ids, sig_   = List.split locals in
+                       let sig_        = List.map (trans_ty env) sig_ in
+                         add_ids env ids sig_)
+                    env locals
+                in
 
-        let bs   = List.map (fun (p, e) -> Term.t_close_branch p e) bs in
-        let body = Term.t_case (Term.t_var pterm) bs in
-        let env  = { env with env_op = ops; } in
+                let env, rb1, e = trans_form env (EcFol.form_of_expr EcFol.mhr e) in
 
-          (env, rb, ls, Some (vs, body)) *)
+                let ptn =
+                  let for1 (cl, vs) pty =
+                    let ptn = List.map Term.pat_var vs in
+                    let ptn = Term.pat_app cl ptn pty in
+                      ptn
+                  in
+                    try  List.map2 for1 (List.combine ctors vs) ptermty
+                    with Failure _ -> assert false
+                in
+
+                let ptn =
+                  if   ptermc > 1
+                  then Term.pat_app (Term.fs_tuple ptermc) ptn (Ty.ty_tuple ptermty)
+                  else oget (List.ohead ptn)
+                in
+                  ((env, rb1@rb), (ptn, e)::ptns)
+          in
+            compile ((env, []), []) ([], o.opf_branches)
+        in
+
+        let ptns = List.rev ptns in
+        let ptns =
+          if   List.exists (fun (_, e) -> e.Term.t_ty = None) ptns
+          then List.map (fun (p, e) -> (p, force_prop e)) ptns
+          else ptns in
+        let ptns = List.map (fun (p, e) -> Term.t_close_branch p e) ptns in
+        let body =
+          if   ptermc > 1
+          then Term.t_tuple (List.map Term.t_var pterm)
+          else Term.t_var (oget (List.ohead pterm)) in
+        let body = Term.t_case body ptns in
+
+          ({ env with env_op = ops; }, rb, ls, Some (vs, body))
 
 let trans_oper env path op =
   let mty = env.env_tv in
