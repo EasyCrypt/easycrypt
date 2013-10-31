@@ -92,7 +92,6 @@ theory EuclDiv.
     apply (Trans _ (0/%d));last apply ediv_Mle;smt.
     elim (ediv_unique 0 d 0 0 _ _ _) => //;smt.
   qed.
-
 end EuclDiv.
 
 export EuclDiv.
@@ -135,10 +134,30 @@ qed.
 
 theory ForLoop.
   op range: int -> int -> 'a -> (int -> 'a -> 'a) -> 'a.
+
   axiom range_base i j (st:'a) f:
     j <= i =>
     range i j st f = st.
+
   axiom range_ind i j (st:'a) f:
     i < j =>
     range i j st f = range (i + 1) j (f i st) f.
+
+  lemma range_ind_lazy i j (st:'a) f:
+    i < j =>
+    range i j st f = f (j - 1) (range i (j - 1) st f).
+  proof strict.
+  intros=> h; cut {h}: 0 < j-i by smt.    (* missing gt0_subr *)
+  cut: (j-i) = (j-i) by trivial.          (* missing move: on pseudo proof-terms *)
+  generalize {2 3}(j-i) => n.             (* missing negative pattern selector *)
+  intros=> eq_iBj_n gt0_n; generalize i j eq_iBj_n.
+  cut ge0_n: 0 <= n by smt; generalize ge0_n gt0_n st.
+  elim/Induction.induction n; first smt.
+  intros=> {n} n ge0_n IH _ st i j.
+  case (n = 0); first intros=> -> h.
+    by (cut ->: j = i+1 by smt); rewrite range_ind ?range_base; smt.
+  intros=> nz_n eq_iBj_Sn; rewrite range_ind; first by smt.
+  (rewrite IH; first 2 smt); congr => //.
+  by rewrite -range_ind; first smt.
+  qed.
 end ForLoop.
