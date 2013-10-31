@@ -19,19 +19,22 @@
   <div class="container">
     <div class="row" style="text-align:justify; margin-bottom:20px;">
     <p>When the editor has the focus,
-      <strong>Ctrl-Down</strong> processes one sentence, and
-      <strong>Ctrl-Up</strong> retracts one sentence.</p>
+      <strong>Ctrl-N</strong> processes one sentence, and
+      <strong>Ctrl-P</strong> retracts one sentence.</p>
     </div>
 
     <div class="row"><div class="span12" id="ec-log">
     </div></div>
 
     <div class="row">
-      <div class="span6">
+      <div class="span5">
         <textarea id="ec-code" rows="30">${eccode}</textarea>
       </div>
-      <div class="span6">
+      <div class="span4">
         <textarea id="ec-feedback" readonly="readonly" rows="30"></textarea>
+      </div>
+      <div class="span2">
+        <textarea id="ec-operators" readonly="readonly" rows="10"></textarea>
       </div>
     </div>
 

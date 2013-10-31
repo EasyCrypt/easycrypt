@@ -8,10 +8,11 @@ Array.prototype.peek = function() {
 // --------------------------------------------------------------------
 function EasyCryptEditor(name, url) {
     this.widgets = {
-        code    : $('#' + name + "-code"),
-        feedback: $('#' + name + "-feedback"),
-        status  : $('#' + name + "-status"),
-        log     : $('#' + name + "-log"),
+        code     : $('#' + name + "-code"),
+        feedback : $('#' + name + "-feedback"),
+        status   : $('#' + name + "-status"),
+        log      : $('#' + name + "-log"),
+        operators: $('#' + name + "-operators"),
     };
 
     this.name      = name;
@@ -43,8 +44,8 @@ EasyCryptEditor.prototype.createWidget = function() {
     var onprev = this._on_prev.bind(this);
 
     var km = {
-        "Ctrl-Down" : function (cm) { onnext(); },
-        "Ctrl-Up"   : function (cm) { onprev(); },
+        'Ctrl-N' : function (cm) { onnext(); },
+        'Ctrl-P'   : function (cm) { onprev(); },
     };
 
     var options = {
@@ -114,6 +115,11 @@ EasyCryptEditor.prototype.onmessage = function(event){
         end.pundo = json.pundo;
         this.setROMark(end);
         this.widgets.feedback.text($.format("{0}\n", json.message));
+        var match = json.message.match(/added operator:/g);
+        var length = json.message.length;
+        if(match != null) {
+	        this.widgets.operators.append($.format("> {0}{1}\n", json.message.substring(17, length-3)));
+	        }
     }
 
     if (json.status == 'undo') {
