@@ -23,7 +23,8 @@ val (<|) : ('a -> 'b) -> 'a -> 'b
 val copy : 'a -> 'a
 
 (* -------------------------------------------------------------------- *)
-val reffold : ('a -> 'b * 'a) -> 'a ref -> 'b
+val reffold  : ('a -> 'b * 'a) -> 'a ref -> 'b
+val postincr : int ref -> int
 
 (* -------------------------------------------------------------------- *)
 type 'a tuple0 = unit
@@ -64,6 +65,11 @@ type 'a cmp = 'a -> 'a -> int
 
 val pair_equal : 'a eq -> 'b eq -> ('a * 'b) eq
 val opt_equal  : 'a eq -> 'a option eq
+
+(* -------------------------------------------------------------------- *)
+val compare_tag : 'a cmp
+val compare2: int lazy_t -> int lazy_t -> int
+val compare3: int lazy_t -> int lazy_t -> int lazy_t -> int
  
 (* -------------------------------------------------------------------- *)
 val none : 'a option
@@ -107,6 +113,8 @@ end
 (* -------------------------------------------------------------------- *)
 module List : sig
   include module type of List
+
+  val compare : 'a cmp -> 'a list cmp
 
   val ocons : 'a option -> 'a list -> 'a list
 
