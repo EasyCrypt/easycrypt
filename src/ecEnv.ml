@@ -1654,7 +1654,7 @@ module Ty = struct
           let nfields = List.length fields in
           let fields  =
             let for1 i (f, aty) =
-              let aty = EcTypes.tfun aty (tconstr mypath params) in
+              let aty = EcTypes.tfun (tconstr mypath params) aty in
               let aty = EcSubst.freshen_type (ty.tyd_params, aty) in
               let fop = (f, mk_op (fst aty) (snd aty) (Some (OP_Proj (mypath, i, nfields)))) in
                 fop
