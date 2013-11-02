@@ -1767,7 +1767,6 @@ module Ty = struct
     | _ -> hierror "unknown type class"
 
   (* ------------------------------------------------------------------ *)
-  (* FIXME: Check for positivity *)
   let add_datatype (scope : scope) { pl_loc = loc; pl_desc = dt; } =
     check_name_available scope dt.ptd_name;
 
@@ -1883,6 +1882,35 @@ module Ty = struct
       tyd_type   = `Datatype (scheme, ctors);
     } in
       bind scope (unloc dt.ptd_name, tydecl)
+
+  (* ------------------------------------------------------------------ *)
+  let add_record (scope : scope) { pl_loc = loc; pl_desc = rt; } =
+    check_name_available scope rt.ptr_name;
+
+    (* Check type-parameters *)
+    let ue = TT.transtyvars scope.sc_env (loc, Some rt.ptr_tyvars) in
+
+    (* Check for duplicated field names *)
+    Msym.odup unloc (List.map fst rt.ptr_fields)
+      |> oiter (fun (x, y) -> hierror ~loc:y.pl_loc
+                  "duplicated field name: `%s'" x.pl_desc);
+
+    (* Type-check field types *)
+    let fields =
+      let for1 (fname, fty) =
+        let fty = TT.transty TT.tp_tydecl (env scope) ue fty in
+          (unloc fname, fty)
+      in
+        rt.ptr_fields |> List.map for1
+    in
+
+    (* Add final record to environment *)
+    let tparams = EcUnify.UniEnv.tparams ue in
+    let tydecl  = {
+      tyd_params = tparams;
+      tyd_type   = `Record fields;
+    } in
+      bind scope (unloc rt.ptr_name, tydecl)
 end
 
 (* -------------------------------------------------------------------- *)
@@ -2133,8 +2161,8 @@ module Section = struct
         List.fold_left bind1 scope oitems
 end
 
+(* -------------------------------------------------------------------- *)
 module Extraction = struct
-    
   let check_top scope = 
     if not (scope.sc_top = None) then 
       hierror "Extraction can not be done inside a theory";
@@ -2145,5 +2173,4 @@ module Extraction = struct
     check_top scope;
     EcExtraction.process_extraction (env scope) scope.sc_required todo;
     scope 
-    
 end

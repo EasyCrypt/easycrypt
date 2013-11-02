@@ -149,6 +149,7 @@
     "class"       , CLASS      ;        (* KW: global *)
     "instance"    , INSTANCE   ;        (* KW: global *)
     "datatype"    , DATATYPE   ;        (* KW: global *)
+    "record"      , RECORD     ;        (* KW: global *)
     "print"       , PRINT      ;        (* KW: global *)
     "why3"        , WHY3       ;        (* KW: global *)  
     "as"          , AS         ;        (* KW: global *)  

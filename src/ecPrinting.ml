@@ -1301,6 +1301,7 @@ let pp_typedecl (ppe : PPEnv.t) fmt (x, tyd) =
     match tyd.tyd_type with
     | `Abstract _ | `Concrete _ -> Format.fprintf fmt "type"
     | `Datatype _ -> Format.fprintf fmt "datatype"
+    | `Record   _ -> Format.fprintf fmt "record"
   in
 
   let pp_prelude fmt =
@@ -1327,7 +1328,12 @@ let pp_typedecl (ppe : PPEnv.t) fmt (x, tyd) =
                     c (pp_list " *@ " (pp_type ppe)) cty
         in
           Format.fprintf fmt " =@ @[<hov 2>%a@]" (pp_list " |@ " pp_ctor) cs
-
+    | `Record fields ->
+        let pp_field fmt (f, fty) =
+          Format.fprintf fmt "%s: @[<hov 2>%a@]" f (pp_type ppe) fty
+        in
+          Format.fprintf fmt " = {@ @[<hov 2>%a;@]@ }"
+            (pp_list ";@ " pp_field) fields
   in
     Format.fprintf fmt "@[%t%t.@]" pp_prelude pp_body
 
@@ -1391,6 +1397,10 @@ let pp_opdecl_op (ppe : PPEnv.t) fmt (x, ts, ty, op) =
     | Some (OP_Constr (indp, i)) ->
         Format.fprintf fmt
           " =@ %d-th constructor of %a" (i+1) (pp_tyname ppe) indp
+
+    | Some (OP_Proj (rp, i, _)) ->
+        Format.fprintf fmt
+          " =@ %d-th projection of %a" (i+1) (pp_tyname ppe) rp
 
     | Some (OP_Fix _) ->
         Format.fprintf fmt " = <match-fix>"

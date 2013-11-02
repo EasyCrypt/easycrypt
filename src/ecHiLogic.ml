@@ -406,6 +406,8 @@ let process_rewrite1 loc ri g =
                 tacuerror "this operator/predicate is abstract"
             | EcDecl.OB_oper (Some (EcDecl.OP_Constr _)) ->
                 tacuerror "this operator is a constructor"
+            | EcDecl.OB_oper (Some (EcDecl.OP_Proj _)) ->
+                tacuerror "this operator is a projection"
             | EcDecl.OB_oper (Some (EcDecl.OP_Fix _)) ->
                 tacuerror "this operator is a match-fix"
             | EcDecl.OB_oper (Some (EcDecl.OP_Plain e)) ->

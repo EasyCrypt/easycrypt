@@ -199,7 +199,9 @@ type env = {
 
 and ty_body =
   Ty.tysymbol *
-    [ `Plain | `Datatype of (symbol * Term.lsymbol) list]
+    [ `Plain
+    | `Datatype of (symbol * Term.lsymbol) list
+    | `Record   of (symbol * Ty.ty * Term.lsymbol) list ]
 
 let ty_body_equal ((ty1, xi1) : ty_body) ((ty2, xi2) : ty_body) =
   let c_equal (c1, ls1) (c2, ls2) =
@@ -509,6 +511,22 @@ let add_ts env path ts decl =
     assert (ty_body_equal ts (Mp.find path env.env_ty));
     env
   end else begin
+    let add_extra_op env c ls =
+      let tvs   = (fst ts).Ty.ts_args in
+      let cpath = EcPath.pqoname (EcPath.prefix path) c in
+      let odecl = mk_highorder_func ls in
+        match odecl with
+        | None ->
+            { env with env_op = Mp.add cpath (ls, ls, tvs) env.env_op }
+            
+        | Some (ls', dcl1, dcl2) ->
+            List.fold_left
+              (fun env dcl ->
+                { env with logic_task = add_decl_with_tuples env.logic_task dcl })
+              { env with env_op = Mp.add cpath (ls, ls', tvs) env.env_op }
+              [dcl1; dcl2]
+    in
+
     let env =
       { env with
           env_ty = Mp.add path ts env.env_ty;
@@ -516,23 +534,14 @@ let add_ts env path ts decl =
     in
       match snd ts with
       | `Plain -> env
-      | `Datatype ls ->
-          let tvs = (fst ts).Ty.ts_args in
-          let for1 env (c, ls) =
-            let cpath = EcPath.pqoname (EcPath.prefix path) c in
-            let odecl = mk_highorder_func ls in
-              match odecl with
-              | None ->
-                  { env with env_op = Mp.add cpath (ls, ls, tvs) env.env_op }
-
-              | Some (ls', dcl1, dcl2) ->
-                  List.fold_left
-                    (fun env dcl ->
-                      { env with logic_task = add_decl_with_tuples env.logic_task dcl })
-                    { env with env_op = Mp.add cpath (ls, ls', tvs) env.env_op }
-                    [dcl1; dcl2]
-          in
+      | `Datatype ls -> begin
+          let for1 env (c, ls) = add_extra_op env c ls in
             List.fold_left for1 env ls
+        end
+      | `Record fields -> begin
+          let for1 env (f, _, ls) = add_extra_op env f ls in
+            List.fold_left for1 env fields
+        end
   end
 
 let add_ls env path ls tparams decl odecl =
@@ -1086,6 +1095,27 @@ let trans_tydecl env path td =
          let decl = Decl.create_data_decl [(ts, List.map snd cs)] in
            ((ts, `Datatype (List.map (fun (x1, (x2, _)) -> (x1, x2)) cs)), decl)
 
+    | `Record fields ->
+        let ts     = Ty.create_tysymbol pid tparams None in
+        let decl   = Decl.create_ty_decl ts in
+        let env    = add_ts env path (ts, `Plain) decl in
+        let myself = tconstr path (List.map (tvar |- fst) td.tyd_params) in
+        let myself = myself |> trans_ty env in
+        let ps     =
+          let for1 (f, aty) =
+            let fid = preid_p (EcPath.pqname path f) in
+            let aty = trans_ty env aty in
+            let pls = Term.create_lsymbol fid [myself] (Some aty) in
+              (f, aty, pls)
+          in
+            List.map for1 fields in
+
+        let cid  = preid_p (EcPath.pqname path "$record") in
+        let cls  = Term.create_lsymbol ~constr:1 cid (List.map proj3_2 ps) (Some myself) in
+        let decl = Decl.create_data_decl [ts, [cls, List.map (some |- proj3_3) ps]] in
+
+          ((ts, `Record ps), decl)
+
 (* --------------------------- Formulas ------------------------------- *)
 let trans_lv env lv =
   match Mid.find_opt lv env.env_id with
@@ -1470,6 +1500,7 @@ let trans_oper_body env path wparams ty body =
     | OB_oper (Some (OP_Plain  o))  -> Some (`Plain (EcFol.form_of_expr EcFol.mhr o))
     | OB_oper (Some (OP_Fix    o))  -> Some (`Fix o)
     | OB_oper (Some (OP_Constr _))  -> assert false
+    | OB_oper (Some (OP_Proj   _))  -> assert false
     | OB_pred o -> o |> omap (fun x -> `Plain x)
   in
     match body with

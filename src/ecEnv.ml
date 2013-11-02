@@ -1648,6 +1648,22 @@ module Ty = struct
               env cs in
 
             MC.bind_axiom (fst scheme) (snd scheme) env
+
+      | `Record fields ->
+          let params  = List.map (fun (x, _) -> tvar x) ty.tyd_params in
+          let nfields = List.length fields in
+          let fields  =
+            let for1 i (f, aty) =
+              let aty = EcTypes.tfun aty (tconstr mypath params) in
+              let aty = EcSubst.freshen_type (ty.tyd_params, aty) in
+              let fop = (f, mk_op (fst aty) (snd aty) (Some (OP_Proj (mypath, i, nfields)))) in
+                fop
+            in
+              List.mapi for1 fields
+          in
+            List.fold_left
+              (fun env (f, fop) -> MC.bind_operator f fop env)
+              env fields
     in
       env
 
@@ -2155,6 +2171,7 @@ module Op = struct
         | OB_pred (Some _) -> true
         | OB_oper None
         | OB_oper (Some (OP_Constr _))
+        | OB_oper (Some (OP_Proj _))
         | OB_oper (Some (OP_Fix _))
         | OB_pred None -> false
 

@@ -70,6 +70,7 @@ module Ty : sig
 
   val add_class    : scope -> ptypeclass located -> scope
   val add_datatype : scope -> pdatatype located -> scope
+  val add_record   : scope -> precord located -> scope
   val add_instance : scope -> Ax.mode -> ptycinstance located -> scope
 
   val define : scope -> (ptyparams * psymbol) located -> pty -> scope

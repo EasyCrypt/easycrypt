@@ -34,6 +34,12 @@
     ptd_ctors  = ctors;
   }
 
+  let mk_record (tyvars, name) fields = {
+    ptr_name   = name;
+    ptr_tyvars = tyvars;
+    ptr_fields = fields;
+  }
+
   let opdef_of_opbody ty b =
     match b with
     | None                  -> PO_abstr ty
@@ -272,6 +278,7 @@
 %token RCONDF
 %token RCONDT
 %token REALIZE
+%token RECORD
 %token REFLEX
 %token REQUIRE
 %token RES
@@ -1227,6 +1234,19 @@ datatype_def:
 dt_ctor_def:
 | x=ident { (x, []) }
 | x=ident OF ty=plist1(loc(simpl_type_exp), tcand) { (x, ty) }
+;
+
+(* -------------------------------------------------------------------- *)
+(* Records                                                              *)
+record_def:
+| RECORD tya=typarams x=ident EQ LBRACE
+    fields=rlist1(rec_field_def, SEMICOLON) SEMICOLON?
+  RBRACE
+    { mk_record (tya, x) fields }
+;
+
+rec_field_def:
+| x=ident COLON ty=loc(type_exp) { (x, ty); }
 ;
 
 (* -------------------------------------------------------------------- *)
@@ -2345,6 +2365,7 @@ global_:
 | typeclass        { Gtypeclass   $1 }
 | tycinstance      { Gtycinstance $1 }
 | datatype_def     { Gdatatype    $1 }
+| record_def       { Grecord      $1 }
 | operator         { Goperator    $1 }
 | predicate        { Gpredicate   $1 }
 | axiom            { Gaxiom       $1 }

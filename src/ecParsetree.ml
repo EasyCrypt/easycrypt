@@ -172,6 +172,13 @@ type pdatatype = {
 }
 
 (* -------------------------------------------------------------------- *)
+type precord = {
+  ptr_name   : psymbol;
+  ptr_tyvars : (psymbol * pqsymbol list) list;
+  ptr_fields : (psymbol * pty) list;
+}
+
+(* -------------------------------------------------------------------- *)
 type pgamepath = (pmsymbol * psymbol) located
 type pmemory   = psymbol
 
@@ -662,6 +669,7 @@ type global =
   | Gtypeclass   of ptypeclass
   | Gtycinstance of ptycinstance
   | Gdatatype    of pdatatype
+  | Grecord      of precord
   | Gprint       of pprint
   | GthOpen      of psymbol
   | GthClose     of psymbol

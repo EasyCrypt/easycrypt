@@ -279,6 +279,9 @@ let subst_tydecl (s : _subst) (tyd : tydecl) =
         let sty = init_tparams s tyd.tyd_params params' in
           `Datatype (Fsubst.f_subst (f_subst_of_subst s) scheme,
                      List.map (fun (x, ty) -> (x, List.map sty.s_ty ty)) cs)
+    | `Record fields ->
+      let sty = init_tparams s tyd.tyd_params params' in
+        `Record (List.map (snd_map sty.s_ty) fields)
   in
     { tyd_params = params'; tyd_type = body; }
 
@@ -301,7 +304,9 @@ and subst_op_body (s : _subst) (bd : opbody) =
       let s = e_subst_of_subst s in
         OP_Plain (EcTypes.e_subst s body)
 
-  | OP_Constr _ -> bd
+  | OP_Constr (p, i) -> OP_Constr (s.s_p p, i)
+
+  | OP_Proj (p, i, j) -> OP_Proj (s.s_p p, i, j)
 
   | OP_Fix opfix ->
       let (es, args) =

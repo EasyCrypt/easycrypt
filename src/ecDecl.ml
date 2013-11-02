@@ -17,6 +17,7 @@ and ty_body = [
   | `Concrete of EcTypes.ty
   | `Abstract of Sp.t
   | `Datatype of EcFol.form * (EcSymbols.symbol * EcTypes.ty list) list
+  | `Record   of (EcSymbols.symbol * EcTypes.ty) list
 ]
 
 let tydecl_as_concrete (td : tydecl) =
@@ -28,6 +29,9 @@ let tydecl_as_abstract (td : tydecl) =
 let tydecl_as_datatype (td : tydecl) =
   match td.tyd_type with `Datatype x -> x | _ -> assert false
 
+let tydecl_as_record (td : tydecl) =
+  match td.tyd_type with `Record x -> x | _ -> assert false
+
 (* -------------------------------------------------------------------- *)
 type locals = EcIdent.t list 
 
@@ -38,6 +42,7 @@ type operator_kind =
 and opbody =
   | OP_Plain  of EcTypes.expr
   | OP_Constr of EcPath.path * int
+  | OP_Proj   of EcPath.path * int * int
   | OP_Fix    of opfix
 
 and opfix = {
