@@ -54,6 +54,8 @@ type tyerror =
 | DuplicatedRecFieldName of symbol
 | MissingRecField        of symbol
 | MixingRecFields        of EcPath.path tuple2
+| UnknownProj            of qsymbol
+| AmbiguousProj          of qsymbol
 | InvalidTypeAppl        of qsymbol * int * int
 | DuplicatedTyVar
 | DuplicatedLocal        of symbol
@@ -154,6 +156,12 @@ let pp_tyerror fmt env error =
   | MixingRecFields (p1, p2) ->
       msg "mixing (record) fields from different record types: %a / %a"
         EcPrinting.pp_path p1 EcPrinting.pp_path p2
+
+  | UnknownProj qs ->
+      msg "unknown record projection: %a" pp_qsymbol qs
+
+  | AmbiguousProj qs ->
+      msg "ambiguous record projection: %a" pp_qsymbol qs
 
   | InvalidTypeAppl (name, _, _) ->
       msg "invalid type application: %a" pp_qsymbol name
@@ -423,6 +431,20 @@ let select_form_op env opsc name ue tvi psig =
   and flc = (fun (id, ty, ue) -> (f_local id ty, ue)) in
     gen_select_op ~actonly:true ~mode:`Form (ppv, pop, flc)
       opsc tvi env name ue psig 
+
+let select_proj env opsc name ue tvi recty =
+  let filter = (fun op -> EcDecl.is_proj op) in
+  let ops = EcUnify.select_op ~filter tvi env name ue [recty] in
+  let ops =
+    match ops, opsc with
+    | _ :: _ :: _, Some opsc ->
+        List.filter
+          (fun ((p, _), _, _) ->
+            EcPath.p_equal opsc (oget (EcPath.prefix p)))
+          ops
+    | _, _ -> ops
+  in
+    ops
 
 (* -------------------------------------------------------------------- *)
 let lookup_scope env popsc =
@@ -773,6 +795,19 @@ let transexp (env : EcEnv.env) (ue : EcUnify.unienv) e =
         let ctor = e_op ctor rtvi (toarrow (List.map snd fields) reccty) in
         let ctor = e_app ctor (List.map fst fields) reccty in
           ctor, reccty
+
+    | PEproj (sube, x) -> begin
+        let sube, ety = transexp env sube in
+          match select_proj env osc (unloc x) ue None ety with
+          | [] -> tyerror x.pl_loc env (UnknownProj (unloc x))
+          | _::_::_ -> tyerror x.pl_loc env (AmbiguousProj (unloc x))
+          | [(op, tvi), pty, subue] ->
+              EcUnify.UniEnv.restore ~src:subue ~dst:ue;
+              let rty = EcUnify.UniEnv.fresh ue in
+              (try  EcUnify.unify env ue (tfun ety rty) pty
+               with EcUnify.UnificationFailure _ -> assert false);
+              (e_app (e_op op tvi pty) [sube] rty, rty)
+      end
         
   in
     transexp_r None env e
@@ -1762,6 +1797,19 @@ let trans_form_or_pattern env (ps, ue) pf tt =
         let ctor = f_op ctor rtvi (toarrow (List.map snd fields) reccty) in
         let ctor = f_app ctor (List.map fst fields) reccty in
           ctor
+
+    | PFproj (subf, x) -> begin
+        let subf = transf env subf in
+          match select_proj env opsc (unloc x) ue None subf.f_ty with
+          | [] -> tyerror x.pl_loc env (UnknownProj (unloc x))
+          | _::_::_ -> tyerror x.pl_loc env (AmbiguousProj (unloc x))
+          | [(op, tvi), pty, subue] ->
+              EcUnify.UniEnv.restore ~src:subue ~dst:ue;
+              let rty = EcUnify.UniEnv.fresh ue in
+              (try  EcUnify.unify env ue (tfun subf.f_ty rty) pty
+               with EcUnify.UnificationFailure _ -> assert false);
+              f_app (f_op op tvi pty) [subf] rty
+      end
 
     | PFprob (gp, args, m, event) ->
         let fpath = trans_gamepath env gp in

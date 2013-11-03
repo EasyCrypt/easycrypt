@@ -60,6 +60,7 @@ and pexpr_r =
   | PEif     of pexpr * pexpr * pexpr             (* _ ? _ : _          *)
   | PElambda of ptybindings * pexpr               (* lambda abstraction *)
   | PErecord of pexpr rfield list                 (* record             *)
+  | PEproj   of pexpr * pqsymbol                  (* projection         *)
   | PEscope  of pqsymbol * pexpr                  (* scope selection    *)
 
 and pexpr = pexpr_r located
@@ -210,6 +211,7 @@ and pformula_r =
   | PFexists of pgtybindings * pformula
   | PFlambda of ptybindings * pformula
   | PFrecord of pformula rfield list
+  | PFproj   of pformula * pqsymbol
   | PFglob   of pmsymbol located 
   | PFeqveq  of glob_or_var list
   | PFlsless of pgamepath

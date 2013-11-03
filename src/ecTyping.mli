@@ -41,6 +41,8 @@ type tyerror =
 | DuplicatedRecFieldName of symbol
 | MissingRecField        of symbol
 | MixingRecFields        of EcPath.path tuple2
+| UnknownProj            of qsymbol
+| AmbiguousProj          of qsymbol
 | InvalidTypeAppl        of qsymbol * int * int
 | DuplicatedTyVar
 | DuplicatedLocal        of symbol

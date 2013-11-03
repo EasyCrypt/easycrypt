@@ -194,6 +194,7 @@
 %token DECLARE
 %token DELTA
 %token DLBRACKET
+%token DLPAREN
 %token DO
 %token DOT
 %token DOTDOT
@@ -632,6 +633,9 @@ expr_u:
 | LET p=lpattern EQ e1=expr IN e2=expr
    { PElet (p, e1, e2) }
 
+| e=sexpr DLPAREN x=qident RPAREN
+   { PEproj (e, x) }
+
 | r=loc(RBOOL) TILD e=sexpr
     { let id  = PEident(mk_loc r.pl_loc EcCoreLib.s_dbitstring, None) in
       let loc = EcLocation.make $startpos $endpos in
@@ -844,7 +848,11 @@ form_u(P):
 | IF c=form_r(P) THEN e1=form_r(P) ELSE e2=form_r(P)
     { PFif (c, e1, e2) }
 
-| LET p=lpattern EQ e1=form_r(P) IN e2=form_r(P) { PFlet (p, e1, e2) }
+| LET p=lpattern EQ e1=form_r(P) IN e2=form_r(P)
+    { PFlet (p, e1, e2) }
+
+| f=sform_r(P) DLPAREN x=qident RPAREN
+    { PFproj (f, x) }
 
 | FORALL pd=pgtybindings COMMA e=form_r(P) { PFforall (pd, e) }
 | EXIST  pd=pgtybindings COMMA e=form_r(P) { PFexists (pd, e) }
