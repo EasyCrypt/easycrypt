@@ -35,6 +35,7 @@ type operator_kind =
 and opbody =
   | OP_Plain  of EcTypes.expr
   | OP_Constr of EcPath.path * int
+  | OP_Record of EcPath.path
   | OP_Proj   of EcPath.path * int * int
   | OP_Fix    of opfix
 
@@ -63,11 +64,13 @@ type operator = {
 val op_ty   : operator -> ty
 val is_pred : operator -> bool
 val is_ctor : operator -> bool
+val is_proj : operator -> bool
 
 val mk_op   : ty_params -> ty -> opbody option -> operator
 val mk_pred : ty_params -> ty list -> form option -> operator
 
 val operator_as_ctor : operator -> EcPath.path * int
+val operator_as_proj : operator -> EcPath.path * int * int
 
 (* -------------------------------------------------------------------- *)
 type axiom_kind = [`Axiom | `Lemma]

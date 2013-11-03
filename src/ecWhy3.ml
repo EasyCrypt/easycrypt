@@ -201,7 +201,7 @@ and ty_body =
   Ty.tysymbol *
     [ `Plain
     | `Datatype of (symbol * Term.lsymbol) list
-    | `Record   of (symbol * Ty.ty * Term.lsymbol) list ]
+    | `Record   of (symbol * Term.lsymbol) * (symbol * Ty.ty * Term.lsymbol) list ]
 
 let ty_body_equal ((ty1, xi1) : ty_body) ((ty2, xi2) : ty_body) =
   let c_equal (c1, ls1) (c2, ls2) =
@@ -538,9 +538,10 @@ let add_ts env path ts decl =
           let for1 env (c, ls) = add_extra_op env c ls in
             List.fold_left for1 env ls
         end
-      | `Record fields -> begin
+      | `Record (ctor, fields) -> begin
           let for1 env (f, _, ls) = add_extra_op env f ls in
-            List.fold_left for1 env fields
+          let env = List.fold_left for1 env fields in
+            curry (add_extra_op env) ctor
         end
   end
 
@@ -1111,16 +1112,17 @@ let trans_tydecl env path td =
             List.map for1 fields in
 
         let cid  = preid_p (EcPath.pqname path "$record") in
+        let csym = Printf.sprintf "mk_%s" (EcPath.basename path) in
         let cls  = Term.create_lsymbol ~constr:1 cid (List.map proj3_2 ps) (Some myself) in
         let decl = Decl.create_data_decl [ts, [cls, List.map (some |- proj3_3) ps]] in
 
-          ((ts, `Record ps), decl)
+          ((ts, `Record ((csym, cls), ps)), decl)
 
 (* --------------------------- Formulas ------------------------------- *)
 let trans_lv env lv =
   match Mid.find_opt lv env.env_id with
   | None ->
-      Printf.eprintf "cannot find %s\n%!" (EcIdent.tostring lv);
+      Printf.printf "cannot find %s\n%!" (EcIdent.tostring lv);
       assert false
   | Some x -> x
 
@@ -1248,7 +1250,12 @@ let trans_op env p tys =
       let ty = trans_ty env (List.hd tys) in
       ([Some ty;Some ty],None), w3_ls_eq, mk_eq
   | _ ->
-      let ls,ls', tvs = oget (Mp.find_opt p env.env_op) in
+      let ls,ls', tvs =
+        match Mp.find_opt p env.env_op with
+        | None ->
+            Printf.printf "<lv>: %s\n%!" (EcPath.tostring p);
+            assert false
+        | Some x -> x in
       let mtv = 
         List.fold_left2 (fun mtv tv ty ->
           Ty.Mtv.add tv (trans_ty env ty) mtv) Ty.Mtv.empty
@@ -1500,6 +1507,7 @@ let trans_oper_body env path wparams ty body =
     | OB_oper (Some (OP_Plain  o))  -> Some (`Plain (EcFol.form_of_expr EcFol.mhr o))
     | OB_oper (Some (OP_Fix    o))  -> Some (`Fix o)
     | OB_oper (Some (OP_Constr _))  -> assert false
+    | OB_oper (Some (OP_Record _))  -> assert false
     | OB_oper (Some (OP_Proj   _))  -> assert false
     | OB_pred o -> o |> omap (fun x -> `Plain x)
   in

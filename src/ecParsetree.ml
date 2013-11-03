@@ -59,9 +59,16 @@ and pexpr_r =
   | PEtuple  of pexpr list                        (* tuple constructor  *)
   | PEif     of pexpr * pexpr * pexpr             (* _ ? _ : _          *)
   | PElambda of ptybindings * pexpr               (* lambda abstraction *)
+  | PErecord of pexpr rfield list                 (* record             *)
   | PEscope  of pqsymbol * pexpr                  (* scope selection    *)
 
 and pexpr = pexpr_r located
+
+and 'a rfield = {
+  rf_name  : pqsymbol;
+  rf_tvi   : ptyannot option;
+  rf_value : 'a;
+}
 
 (* -------------------------------------------------------------------- *)
 type plvalue_r =
@@ -202,6 +209,7 @@ and pformula_r =
   | PFforall of pgtybindings * pformula
   | PFexists of pgtybindings * pformula
   | PFlambda of ptybindings * pformula
+  | PFrecord of pformula rfield list
   | PFglob   of pmsymbol located 
   | PFeqveq  of glob_or_var list
   | PFlsless of pgamepath

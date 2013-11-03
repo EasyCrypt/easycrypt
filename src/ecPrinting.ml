@@ -1398,6 +1398,10 @@ let pp_opdecl_op (ppe : PPEnv.t) fmt (x, ts, ty, op) =
         Format.fprintf fmt
           " =@ %d-th constructor of %a" (i+1) (pp_tyname ppe) indp
 
+    | Some (OP_Record recp) ->
+        Format.fprintf fmt
+          " =@ record constructor of %a" (pp_tyname ppe) recp
+
     | Some (OP_Proj (rp, i, _)) ->
         Format.fprintf fmt
           " =@ %d-th projection of %a" (i+1) (pp_tyname ppe) rp

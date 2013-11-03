@@ -304,8 +304,8 @@ and subst_op_body (s : _subst) (bd : opbody) =
       let s = e_subst_of_subst s in
         OP_Plain (EcTypes.e_subst s body)
 
-  | OP_Constr (p, i) -> OP_Constr (s.s_p p, i)
-
+  | OP_Constr (p, i)  -> OP_Constr (s.s_p p, i)
+  | OP_Record p       -> OP_Record (s.s_p p)
   | OP_Proj (p, i, j) -> OP_Proj (s.s_p p, i, j)
 
   | OP_Fix opfix ->

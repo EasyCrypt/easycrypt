@@ -299,6 +299,8 @@ rule main = parse
   | "`|" { TICKPIPE }
   | "@"  { AT }
   | "~"  { TILD }
+  | "{|" { LPBRACE }
+  | "|}" { RPBRACE }
 
   | "==>" { LONGARROW }
 

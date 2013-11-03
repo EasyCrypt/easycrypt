@@ -1652,7 +1652,7 @@ module Ty = struct
       | `Record fields ->
           let params  = List.map (fun (x, _) -> tvar x) ty.tyd_params in
           let nfields = List.length fields in
-          let fields  =
+          let cfields =
             let for1 i (f, aty) =
               let aty = EcTypes.tfun (tconstr mypath params) aty in
               let aty = EcSubst.freshen_type (ty.tyd_params, aty) in
@@ -1661,9 +1661,17 @@ module Ty = struct
             in
               List.mapi for1 fields
           in
+
+          let stname = Printf.sprintf "mk_%s" name in
+          let stop   =
+            let stty = toarrow (List.map snd fields) (tconstr mypath params) in
+            let stty = EcSubst.freshen_type (ty.tyd_params, stty) in
+              mk_op (fst stty) (snd stty) (Some (OP_Record mypath))
+          in
+
             List.fold_left
               (fun env (f, fop) -> MC.bind_operator f fop env)
-              env fields
+              env ((stname, stop) :: cfields)
     in
       env
 
@@ -2171,6 +2179,7 @@ module Op = struct
         | OB_pred (Some _) -> true
         | OB_oper None
         | OB_oper (Some (OP_Constr _))
+        | OB_oper (Some (OP_Record _))
         | OB_oper (Some (OP_Proj _))
         | OB_oper (Some (OP_Fix _))
         | OB_pred None -> false

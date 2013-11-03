@@ -1,4 +1,5 @@
 (* -------------------------------------------------------------------- *)
+open EcUtils
 open EcSymbols
 open EcPath
 open EcLocation
@@ -33,35 +34,39 @@ type tyerror =
 | UniVarNotAllowed
 | TypeVarNotAllowed
 | OnlyMonoTypeAllowed
-| UnboundTypeParameter of symbol
-| UnknownTypeName      of qsymbol
-| UnknownTypeClass     of qsymbol
-| InvalidTypeAppl      of qsymbol * int * int
+| UnboundTypeParameter   of symbol
+| UnknownTypeName        of qsymbol
+| UnknownTypeClass       of qsymbol
+| UnknownRecFieldName    of qsymbol
+| DuplicatedRecFieldName of symbol
+| MissingRecField        of symbol
+| MixingRecFields        of EcPath.path tuple2
+| InvalidTypeAppl        of qsymbol * int * int
 | DuplicatedTyVar
-| DuplicatedLocal      of symbol
-| DuplicatedField      of symbol
+| DuplicatedLocal        of symbol
+| DuplicatedField        of symbol
 | NonLinearPattern
 | LvNonLinear
 | NonUnitFunWithoutReturn
 | UnitFunWithReturn
-| TypeMismatch         of (ty * ty) * (ty * ty)
-| TypeModMismatch      of tymod_cnv_failure
+| TypeMismatch           of (ty * ty) * (ty * ty)
+| TypeModMismatch        of tymod_cnv_failure
 | NotAFunction
-| UnknownVarOrOp       of qsymbol * ty list
-| MultipleOpMatch      of qsymbol * ty list
-| UnknownModName       of qsymbol
-| UnknownTyModName     of qsymbol
-| UnknownFunName       of qsymbol
-| UnknownModVar        of qsymbol
-| UnknownMemName       of int * symbol
-| InvalidFunAppl       of funapp_error
-| InvalidModAppl       of modapp_error
-| InvalidModType       of modtyp_error
-| InvalidMem           of symbol * mem_error
-| FunNotInModParam     of qsymbol
+| UnknownVarOrOp         of qsymbol * ty list
+| MultipleOpMatch        of qsymbol * ty list
+| UnknownModName         of qsymbol
+| UnknownTyModName       of qsymbol
+| UnknownFunName         of qsymbol
+| UnknownModVar          of qsymbol
+| UnknownMemName         of int * symbol
+| InvalidFunAppl         of funapp_error
+| InvalidModAppl         of modapp_error
+| InvalidModType         of modtyp_error
+| InvalidMem             of symbol * mem_error
+| FunNotInModParam       of qsymbol
 | NoActiveMemory
 | PatternNotAllowed
-| UnknownScope         of qsymbol
+| UnknownScope           of qsymbol
 
 exception TymodCnvFailure of tymod_cnv_failure
 exception TyError of EcLocation.t * EcEnv.env * tyerror

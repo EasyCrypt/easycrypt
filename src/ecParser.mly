@@ -247,6 +247,7 @@
 %token LONGARROW
 %token LOSSLESS
 %token LPAREN
+%token LPBRACE
 %token MINUS
 %token MODPATH
 %token MODULE
@@ -287,6 +288,7 @@
 %token RIGHT
 %token RND
 %token RPAREN
+%token RPBRACE
 %token SAME
 %token SAMPLE
 %token SAVE
@@ -555,6 +557,9 @@ sexpr_u:
 
 | r=loc(RBOOL)
    { PEident (mk_loc r.pl_loc EcCoreLib.s_dbool, None) }
+
+| LPBRACE fields=rlist1(expr_field, SEMICOLON) SEMICOLON? RPBRACE
+   { PErecord fields }
 ;
 
 expr_u:
@@ -633,6 +638,11 @@ expr_u:
         PEapp (mk_loc loc id, [e]) }
 
 | LAMBDA pd=ptybindings COMMA e=expr { PElambda (pd, e) } 
+;
+
+expr_field:
+| x=qident EQ e=expr
+    { { rf_name = x ; rf_tvi = None; rf_value = e; } }
 ;
 
 expr_ordering:
@@ -728,6 +738,9 @@ sform_u(P):
 | LPAREN fs=plist0(form_r(P), COMMA) RPAREN
    { PFtuple fs }
 
+| LPBRACE fields=rlist1(form_field, SEMICOLON) SEMICOLON? RPBRACE
+   { PFrecord fields }
+
 | LBRACKET ti=tvars_app? es=loc(plist0(form_r(P), SEMICOLON)) RBRACKET
    { (pflist es.pl_loc ti es.pl_desc).pl_desc }
 
@@ -738,7 +751,6 @@ sform_u(P):
 
 | EQUIV LBRACKET eb=equiv_body(P) RBRACKET { eb }
 
-(* ADDED FOR EAGER *)
 | EAGER LBRACKET eb=eager_body(P) RBRACKET { eb }
 
 | HOARE LBRACKET
@@ -859,6 +871,11 @@ form_u(P):
 
 | LOSSLESS mp=loc(fident)
     { PFlsless mp }
+;
+
+form_field:
+| x=qident EQ f=form
+    { { rf_name = x; rf_tvi = None; rf_value = f; } }
 ;
 
 form_ordering(P):

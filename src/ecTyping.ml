@@ -47,35 +47,39 @@ type tyerror =
 | UniVarNotAllowed
 | TypeVarNotAllowed
 | OnlyMonoTypeAllowed
-| UnboundTypeParameter of symbol
-| UnknownTypeName      of qsymbol
-| UnknownTypeClass     of qsymbol
-| InvalidTypeAppl      of qsymbol * int * int
+| UnboundTypeParameter   of symbol
+| UnknownTypeName        of qsymbol
+| UnknownTypeClass       of qsymbol
+| UnknownRecFieldName    of qsymbol
+| DuplicatedRecFieldName of symbol
+| MissingRecField        of symbol
+| MixingRecFields        of EcPath.path tuple2
+| InvalidTypeAppl        of qsymbol * int * int
 | DuplicatedTyVar
-| DuplicatedLocal      of symbol
-| DuplicatedField      of symbol
+| DuplicatedLocal        of symbol
+| DuplicatedField        of symbol
 | NonLinearPattern
 | LvNonLinear
 | NonUnitFunWithoutReturn
 | UnitFunWithReturn
-| TypeMismatch         of (ty * ty) * (ty * ty)
-| TypeModMismatch      of tymod_cnv_failure
+| TypeMismatch           of (ty * ty) * (ty * ty)
+| TypeModMismatch        of tymod_cnv_failure
 | NotAFunction
-| UnknownVarOrOp       of qsymbol * ty list
-| MultipleOpMatch      of qsymbol * ty list
-| UnknownModName       of qsymbol
-| UnknownTyModName     of qsymbol
-| UnknownFunName       of qsymbol
-| UnknownModVar        of qsymbol
-| UnknownMemName       of int * symbol
-| InvalidFunAppl       of funapp_error
-| InvalidModAppl       of modapp_error
-| InvalidModType       of modtyp_error
-| InvalidMem           of symbol * mem_error
-| FunNotInModParam     of qsymbol
+| UnknownVarOrOp         of qsymbol * ty list
+| MultipleOpMatch        of qsymbol * ty list
+| UnknownModName         of qsymbol
+| UnknownTyModName       of qsymbol
+| UnknownFunName         of qsymbol
+| UnknownModVar          of qsymbol
+| UnknownMemName         of int * symbol
+| InvalidFunAppl         of funapp_error
+| InvalidModAppl         of modapp_error
+| InvalidModType         of modtyp_error
+| InvalidMem             of symbol * mem_error
+| FunNotInModParam       of qsymbol
 | NoActiveMemory
 | PatternNotAllowed
-| UnknownScope         of qsymbol
+| UnknownScope           of qsymbol
 
 exception TyError of EcLocation.t * EcEnv.env * tyerror
 
@@ -117,10 +121,7 @@ let pp_modappl_error fmt error =
 
 let pp_tyerror fmt env error =
   let msg x = Format.fprintf fmt x in
-
-  let pp_type fmt ty =
-    EcPrinting.pp_type env fmt ty
-  in
+  let pp_type fmt ty = EcPrinting.pp_type env fmt ty in
 
   match error with
   | UniVarNotAllowed ->
@@ -140,6 +141,19 @@ let pp_tyerror fmt env error =
 
   | UnknownTypeClass qs ->
       msg "unknown type class: %a" pp_qsymbol qs
+
+  | UnknownRecFieldName qs ->
+      msg "unknown (record) field name: %a" pp_qsymbol qs
+
+  | DuplicatedRecFieldName qs ->
+      msg "duplicated (record) field name: %s" qs
+
+  | MissingRecField qs ->
+      msg "missing (record) field: %s" qs
+
+  | MixingRecFields (p1, p2) ->
+      msg "mixing (record) fields from different record types: %a / %a"
+        EcPrinting.pp_path p1 EcPrinting.pp_path p2
 
   | InvalidTypeAppl (name, _, _) ->
       msg "invalid type application: %a" pp_qsymbol name
@@ -371,8 +385,8 @@ let select_pv env side name ue tvi psig =
 let gen_select_op ~actonly ~mode (fpv, fop, flc) opsc tvi env name ue psig =
   let filter =
     match mode with
-    | `Expr -> fun op -> not (EcDecl.is_pred op)
-    | `Form -> fun _  -> true
+    | `Expr -> fun op -> not (EcDecl.is_pred op || EcDecl.is_proj op)
+    | `Form -> fun op -> not (EcDecl.is_proj op)
   in
   match (if tvi = None then select_local env name else None) with
   | Some (id, ty) ->
@@ -590,6 +604,77 @@ let transbinding env ue bd =
   let bd = List.flatten bd in
   env, bd
 
+(* -------------------------------------------------------------------- *)
+let trans_record env ue subtt (loc, fields) =                                                                    
+  let fields =
+    let for1 rf =
+      let filter = fun op -> EcDecl.is_proj op in
+      let tvi    = rf.rf_tvi |> omap (transtvi env ue) in
+      let fds    = EcUnify.select_op ~filter tvi env (unloc rf.rf_name) ue [] in
+        match List.ohead fds with
+        | None ->
+            let exn = UnknownRecFieldName (unloc rf.rf_name) in
+              tyerror rf.rf_name.pl_loc env exn
+
+        | Some ((fp, _tvi), opty, subue) ->
+            let field = oget (EcEnv.Op.by_path_opt fp env) in
+            let (recp, fieldidx, _) = EcDecl.operator_as_proj field in
+              EcUnify.UniEnv.restore ~src:subue ~dst:ue;
+              ((recp, fieldidx), opty, rf)
+    in
+      List.map for1 fields in
+
+  let recp = Sp.of_list (List.map (fst |- proj3_1) fields) in
+  let recp =
+    match Sp.elements recp with
+    | []        -> assert false
+    | [recp]    -> recp
+    | p1::p2::_ -> tyerror loc env (MixingRecFields (p1, p2))
+  in
+
+  let recty  = oget (EcEnv.Ty.by_path_opt recp env) in
+  let rec_   = EcDecl.tydecl_as_record recty in
+  let reccty = tconstr recp (List.map (tvar |- fst) recty.tyd_params) in
+  let reccty, rtvi = EcUnify.UniEnv.openty ue recty.tyd_params None reccty in
+  let fields =
+    List.fold_left
+      (fun map (((_, idx), _, _) as field) ->
+         if Mint.mem idx map then
+           let name = fst (List.nth rec_ idx) in
+           let exn  = DuplicatedRecFieldName name in
+             tyerror loc env exn
+         else
+           Mint.add idx field map)
+      Mint.empty fields in
+
+  List.iteri
+    (fun i (name, _) ->
+       if not (Mint.mem i fields) then
+         let exn = MissingRecField name in
+           tyerror loc env exn)
+    rec_;
+
+  let fields = Mint.values fields in (* sorted by field idx *)
+  let fields =
+    let for1 (_, opty, rf) =
+      let pty = EcUnify.UniEnv.fresh ue in
+      (try  EcUnify.unify env ue (tfun reccty pty) opty
+       with EcUnify.UnificationFailure _ -> assert false);
+      let e, ety = subtt rf.rf_value in
+      unify_or_fail env ue rf.rf_value.pl_loc ~expct:pty ety;
+      (e, ety)
+    in
+      List.map for1 fields
+  in
+
+  let ctor =
+    EcPath.pqoname
+      (EcPath.prefix recp)
+      (Printf.sprintf "mk_%s" (EcPath.basename recp))
+  in
+    (ctor, fields, (rtvi, reccty))
+
+(* -------------------------------------------------------------------- *)
 let transexp (env : EcEnv.env) (ue : EcUnify.unienv) e =
   let rec transexp_r (osc : EcPath.path option) (env : EcEnv.env) (e : pexpr) =
     let loc = e.pl_loc in
@@ -672,7 +757,7 @@ let transexp (env : EcEnv.env) (ue : EcUnify.unienv) e =
         unify_or_fail env ue pe2.pl_loc ~expct:ty1   ty2;
         (e_if c e1 e2, ty1)
 
-    | PElambda(bd, pe) ->
+    | PElambda (bd, pe) ->
         let env, xs = transbinding env ue bd in
         let e, ty = transexp env pe in
         let ty =
@@ -682,6 +767,13 @@ let transexp (env : EcEnv.env) (ue : EcUnify.unienv) e =
         in
           (e_lam xs e, ty)
 
+    | PErecord fields ->
+        let (ctor, fields, (rtvi, reccty)) =
+          trans_record env ue (transexp env) (loc, fields) in
+        let ctor = e_op ctor rtvi (toarrow (List.map snd fields) reccty) in
+        let ctor = e_app ctor (List.map fst fields) reccty in
+          ctor, reccty
+        
   in
     transexp_r None env e
 
@@ -1661,6 +1753,15 @@ let trans_form_or_pattern env (ps, ue) pf tt =
         let env, xs = transbinding env ue xs in
         let f = transf env f1 in
           f_lambda (List.map (fun (x,ty) -> (x,GTty ty)) xs) f
+
+    | PFrecord fields ->
+        let (ctor, fields, (rtvi, reccty)) =
+          trans_record env ue
+            (fun f -> let f = transf env f in (f, f.f_ty))
+            (f.pl_loc, fields) in
+        let ctor = f_op ctor rtvi (toarrow (List.map snd fields) reccty) in
+        let ctor = f_app ctor (List.map fst fields) reccty in
+          ctor
 
     | PFprob (gp, args, m, event) ->
         let fpath = trans_gamepath env gp in
