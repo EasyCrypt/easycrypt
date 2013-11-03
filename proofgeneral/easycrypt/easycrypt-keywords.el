@@ -1,4 +1,4 @@
-; Generated on Wed Aug 14 12:58:22 2013
+; Generated on Sun Nov  3 19:08:22 2013
 
 (defvar easycrypt-bytac-keywords '(
   "assumption"
@@ -35,10 +35,10 @@
   "theory"
   "section"
   "type"
-  "self"
   "class"
   "instance"
   "datatype"
+  "record"
   "print"
   "why3"
   "as"
@@ -50,6 +50,7 @@
   "timeout"
   "on"
   "off"
+  "nolocals"
 ))
 
 (defvar easycrypt-internal-keywords '(
@@ -113,6 +114,7 @@
   "fieldeq"
   "ringeq"
   "transitivity"
+  "symmetry"
   "seq"
   "wp"
   "sp"
@@ -140,6 +142,7 @@
   "unroll"
   "splitwhile"
   "kill"
+  "eager"
 ))
 
 (defvar easycrypt-tactical-keywords '(
