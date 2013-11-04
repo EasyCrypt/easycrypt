@@ -759,12 +759,35 @@ let pp_opapp (ppe : PPEnv.t) t_ty pp_sub outer fmt (pred, op, tvi, es) =
 
     | _ -> None
 
+  and try_pp_record () =
+    let env = ppe.PPEnv.ppe_env in
+      match EcEnv.Op.by_path_opt op env with
+      | Some op when EcDecl.is_rcrd op -> begin
+          let recp = EcDecl.operator_as_rcrd op in
+            match EcEnv.Ty.by_path_opt recp env with
+            | Some { tyd_type = `Record (_, fields) } -> begin
+                if List.length fields = List.length es then
+                  let pp fmt () =
+                    let pp_field fmt ((name, _), e) =
+                      Format.fprintf fmt "%s =@ %a" name
+                        (pp_sub ppe (fst outer, (min_op_prec, `NonAssoc))) e
+                    in
+                      Format.fprintf fmt "{|@[<hov 2> %a;@ @]|}"
+                        (pp_list ";@ " pp_field) (List.combine fields es)
+                  in
+                    Some pp
+                else None
+              end
+            | _ -> None
+        end
+      | _ -> None
   in
     (odfl
        pp_as_std_op
        (List.fpick [try_pp_special ;
                     try_pp_as_uniop;
-                    try_pp_as_binop])) fmt ()
+                    try_pp_as_binop;
+                    try_pp_record  ;])) fmt ()
 
 (* -------------------------------------------------------------------- *)
 let pp_chained_orderings (ppe : PPEnv.t) t_ty pp_sub outer fmt (f, fs) =

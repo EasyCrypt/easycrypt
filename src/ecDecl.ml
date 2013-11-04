@@ -134,6 +134,11 @@ let operator_as_proj (op : operator) =
   | OB_oper (Some (OP_Proj (recp, i1, i2))) -> (recp, i1, i2)
   | _ -> assert false
 
+let operator_as_rcrd (op : operator) =
+  match op.op_kind with
+  | OB_oper (Some (OP_Record recp)) -> recp
+  | _ -> assert false
+
 (* -------------------------------------------------------------------- *)
 type typeclass = {
   tc_ops : (EcIdent.t * EcTypes.ty) list;
