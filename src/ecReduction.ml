@@ -266,7 +266,21 @@ let rec h_red ri env hyps f =
       | OK_real_div, [f1;f2] ->f_real_div_simpl f1 f2
       | _                 -> f in
     if f_equal f f' then f_app fo (h_red_args ri env hyps args) f.f_ty
-    else f' 
+    else f'
+  | Fapp({f_node = Fop(p,_)} as f1, args)
+        when ri.iota && EcEnv.Op.is_projection env p -> begin
+      let fallback = lazy (f_app (h_red ri env hyps f1) args f.f_ty) in
+        match args with
+        | [mk] -> begin
+            match (odfl mk (h_red_opt ri env hyps mk)).f_node with
+            | Fapp ({ f_node = Fop (mkp, _) }, mkargs) when EcEnv.Op.is_record_ctor env mkp ->
+              let (_, i, _) = EcDecl.operator_as_proj (oget (EcEnv.Op.by_path_opt p env)) in
+              let v = List.nth mkargs i in
+                odfl v (h_red_opt ri env hyps v)
+            | _ -> Lazy.force fallback
+        end
+        | _ -> Lazy.force fallback
+    end
   | Fapp(f1,args) ->
     f_app (h_red ri env hyps f1) args f.f_ty
   | Fop(p,tys) -> reduce_op ri env p tys
@@ -302,7 +316,7 @@ and h_red_args ri env hyps args =
     try h_red ri env hyps a :: args 
     with NotReducible -> a :: h_red_args ri env hyps args 
 
-let h_red_opt ri env hyps f =
+and h_red_opt ri env hyps f =
   try Some (h_red ri env hyps f)
   with NotReducible -> None
 

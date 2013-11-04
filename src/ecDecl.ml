@@ -105,6 +105,11 @@ let is_proj op =
   | OB_oper (Some (OP_Proj _)) -> true
   | _ -> false
  
+let is_rcrd op =
+  match op.op_kind with
+  | OB_oper (Some (OP_Record _)) -> true
+  | _ -> false
+
 let gen_op tparams ty kind = {
   op_tparams = tparams;
   op_ty      = ty;

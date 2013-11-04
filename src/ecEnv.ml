@@ -2198,8 +2198,8 @@ module Op = struct
     with LookupFailure _ -> false
 
   let reduce env p tys =
-    let op = try by_path p env with _ -> assert false in
-    let f =
+    let op = oget (by_path_opt p env) in
+    let f  =
       match op.op_kind with
       | OB_oper (Some (OP_Plain e)) -> EcFol.form_of_expr EcFol.mhr e
       | OB_pred (Some idsf) -> idsf
@@ -2207,6 +2207,14 @@ module Op = struct
     in
       EcFol.Fsubst.subst_tvar
         (EcTypes.Tvar.init (List.map fst op.op_tparams) tys) f
+
+  let is_projection env p =
+    try  EcDecl.is_proj (by_path p env)
+    with LookupFailure _ -> false
+
+  let is_record_ctor env p =
+    try  EcDecl.is_rcrd (by_path p env)
+    with LookupFailure _ -> false
 end
 
 (* -------------------------------------------------------------------- *)
