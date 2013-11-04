@@ -781,13 +781,27 @@ let pp_opapp (ppe : PPEnv.t) t_ty pp_sub outer fmt (pred, op, tvi, es) =
             | _ -> None
         end
       | _ -> None
+
+  and try_pp_proj () =
+    let env = ppe.PPEnv.ppe_env in
+      match es, EcEnv.Op.by_path_opt op env with
+      | [arg], Some op when EcDecl.is_proj op ->
+          let pp fmt () =
+            Format.fprintf fmt "%a.(%a)"
+              (pp_sub ppe (fst outer, (max_op_prec, `NonAssoc))) arg
+              pp_opname (nm, opname)
+          in
+            Some pp
+      | _ -> None
+
   in
     (odfl
        pp_as_std_op
        (List.fpick [try_pp_special ;
                     try_pp_as_uniop;
                     try_pp_as_binop;
-                    try_pp_record  ;])) fmt ()
+                    try_pp_record  ;
+                    try_pp_proj    ;])) fmt ()
 
 (* -------------------------------------------------------------------- *)
 let pp_chained_orderings (ppe : PPEnv.t) t_ty pp_sub outer fmt (f, fs) =
