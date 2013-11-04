@@ -393,8 +393,8 @@ let select_pv env side name ue tvi psig =
 let gen_select_op ~actonly ~mode (fpv, fop, flc) opsc tvi env name ue psig =
   let filter =
     match mode with
-    | `Expr -> fun op -> not (EcDecl.is_pred op || EcDecl.is_proj op)
-    | `Form -> fun op -> not (EcDecl.is_proj op)
+    | `Expr -> fun op -> not (EcDecl.is_pred op)
+    | `Form -> fun _  -> true
   in
   match (if tvi = None then select_local env name else None) with
   | Some (id, ty) ->
