@@ -655,7 +655,7 @@ let trans_record env ue subtt (loc, fields) =
   in
 
   let recty  = oget (EcEnv.Ty.by_path_opt recp env) in
-  let rec_   = EcDecl.tydecl_as_record recty in
+  let rec_   = snd (EcDecl.tydecl_as_record recty) in
   let reccty = tconstr recp (List.map (tvar |- fst) recty.tyd_params) in
   let reccty, rtvi = EcUnify.UniEnv.openty ue recty.tyd_params None reccty in
   let fields =

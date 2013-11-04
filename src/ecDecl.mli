@@ -17,13 +17,13 @@ and ty_body = [
   | `Concrete of EcTypes.ty
   | `Abstract of Sp.t
   | `Datatype of form * (EcSymbols.symbol * EcTypes.ty list) list
-  | `Record   of (EcSymbols.symbol * EcTypes.ty) list
+  | `Record   of form * (EcSymbols.symbol * EcTypes.ty) list
 ]
 
 val tydecl_as_concrete : tydecl -> EcTypes.ty
 val tydecl_as_abstract : tydecl -> Sp.t
 val tydecl_as_datatype : tydecl -> form * (EcSymbols.symbol * EcTypes.ty list) list
-val tydecl_as_record   : tydecl -> (EcSymbols.symbol * EcTypes.ty) list
+val tydecl_as_record   : tydecl -> form * (EcSymbols.symbol * EcTypes.ty) list
 
 (* -------------------------------------------------------------------- *)
 type locals = EcIdent.t list

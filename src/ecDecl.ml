@@ -17,7 +17,7 @@ and ty_body = [
   | `Concrete of EcTypes.ty
   | `Abstract of Sp.t
   | `Datatype of EcFol.form * (EcSymbols.symbol * EcTypes.ty list) list
-  | `Record   of (EcSymbols.symbol * EcTypes.ty) list
+  | `Record   of EcFol.form * (EcSymbols.symbol * EcTypes.ty) list
 ]
 
 let tydecl_as_concrete (td : tydecl) =

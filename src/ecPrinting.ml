@@ -1328,7 +1328,7 @@ let pp_typedecl (ppe : PPEnv.t) fmt (x, tyd) =
                     c (pp_list " *@ " (pp_type ppe)) cty
         in
           Format.fprintf fmt " =@ @[<hov 2>%a@]" (pp_list " |@ " pp_ctor) cs
-    | `Record fields ->
+    | `Record (_, fields) ->
         let pp_field fmt (f, fty) =
           Format.fprintf fmt "%s: @[<hov 2>%a@]" f (pp_type ppe) fty
         in

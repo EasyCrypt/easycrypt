@@ -1649,7 +1649,7 @@ module Ty = struct
 
             MC.bind_axiom (fst scheme) (snd scheme) env
 
-      | `Record fields ->
+      | `Record (scheme, fields) ->
           let params  = List.map (fun (x, _) -> tvar x) ty.tyd_params in
           let nfields = List.length fields in
           let cfields =
@@ -1662,6 +1662,14 @@ module Ty = struct
               List.mapi for1 fields
           in
 
+          let scheme =
+            let scname = Printf.sprintf "%s_ind" name in
+              (scname, { ax_tparams = ty.tyd_params;
+                         ax_spec    = Some scheme;
+                         ax_kind    = `Axiom;
+                         ax_nosmt   = true; })
+          in
+
           let stname = Printf.sprintf "mk_%s" name in
           let stop   =
             let stty = toarrow (List.map snd fields) (tconstr mypath params) in
@@ -1669,9 +1677,12 @@ module Ty = struct
               mk_op (fst stty) (snd stty) (Some (OP_Record mypath))
           in
 
+          let env =
             List.fold_left
               (fun env (f, fop) -> MC.bind_operator f fop env)
               env ((stname, stop) :: cfields)
+          in
+            MC.bind_axiom (fst scheme) (snd scheme) env
     in
       env
 
