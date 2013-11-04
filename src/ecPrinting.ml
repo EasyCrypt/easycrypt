@@ -787,7 +787,7 @@ let pp_opapp (ppe : PPEnv.t) t_ty pp_sub outer fmt (pred, op, tvi, es) =
       match es, EcEnv.Op.by_path_opt op env with
       | [arg], Some op when EcDecl.is_proj op ->
           let pp fmt () =
-            Format.fprintf fmt "%a.(%a)"
+            Format.fprintf fmt "%a.(|%a|)"
               (pp_sub ppe (fst outer, (max_op_prec, `NonAssoc))) arg
               pp_opname (nm, opname)
           in
