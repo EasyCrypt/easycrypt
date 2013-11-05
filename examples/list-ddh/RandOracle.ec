@@ -3,6 +3,7 @@
    oracle that logs the queries and limits the number of queries
    since it is not required in our example.
 *)
+
 require import List.
 require import Map.
 require import FSet.
@@ -16,7 +17,9 @@ theory RandOracle.
 
   (* finite type of oracle inputs *)
   type from.
-  axiom from_univ_finite : finite ISet.univ<:from>.
+
+  axiom from_univ_finite : finite univ<:from>.
+
   op univ_from = toFSet (univ<:from>).
 
   type to.
@@ -106,23 +109,11 @@ theory RandOracle.
   lemma FRO_lossless_init:
     mu dsample Fun.cpTrue = 1%r => islossless FRO.init.
   proof strict.
-    intros=> dsamp.
-    fun.
-admit.
-(*    while true (card (univ_from) - card (toFSet (dom FRO.m))).
-    intros=> z.
-    wp; rnd; wp.
-    skip; progress.
-    admit. (* lambda is equal to cpTrue *)
-    wp; skip; progress.
-    cut H1: card univ_from <= card (toFSet (dom m)); first smt.
-    cut H2: toFSet (dom m) <= univ_from; first smt.
-    case (toFSet (dom m) = univ_from); first smt.
-    intros => Hneq.
-    cut H3: toFSet (dom m) < univ_from; first by smt.
-    cut H4: card (toFSet (dom m)) < card (univ_from).
-      admit. (* there are some facts about card missing *)
-    smt. *)
+    intros H; fun.
+    inline FRO.resample.
+    while true (length (xs)).
+     by intros z; wp; rnd; wp; skip; smt.
+     wp; skip; smt.
   qed.
 
   (** Switching between lazy and fixed random oracle *)
