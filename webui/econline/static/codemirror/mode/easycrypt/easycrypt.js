@@ -15,10 +15,17 @@ CodeMirror.defineMode("easycrypt", function(config, parserConfig) {
 
   function tokenBase(stream, state) {
     var ch = stream.next();
+    //var newLine = '\\n';
+
     if (hooks[ch]) {
       var result = hooks[ch](stream, state);
       if (result !== false) return result;
     }
+    
+    //if (ch == '\\') {
+    //	var match = stream.match(new RegExp(newLine.charAt(1)));
+   // 	alert(match);
+    //}
     if (ch == '"') {
       state.tokenize = tokenString(ch);
       return state.tokenize(stream, state);
@@ -50,6 +57,9 @@ CodeMirror.defineMode("easycrypt", function(config, parserConfig) {
         var cur = stream.current();
         if (keywords.propertyIsEnumerable(cur)) {
             if (blockKeywords.propertyIsEnumerable(cur)) curPunc = "newstatement";
+            if (cur == 'op') {
+            	tokenOperatorName(stream, state);	
+            }
             return "keyword";
        }
        if (builtin.propertyIsEnumerable(cur)) {
@@ -67,6 +77,20 @@ CodeMirror.defineMode("easycrypt", function(config, parserConfig) {
     stream.next();
     return "unknown";
   }
+
+  function tokenOperatorName(stream, state) {
+  	stream.eatSpace();
+  	var lenghtOpAndSpaces = stream.current().length;
+    stream.eatWhile(/\w/);
+    var lengthOpAndName = stream.current().length;
+    var operatorName =  stream.current().substring(lengthOpAndName-lenghtOpAndSpaces-1, lengthOpAndName);
+    state.operatorsList[state.operators] = operatorName;
+    state.operators = state.operators + 1;
+    stream.backUp(lengthOpAndName-lenghtOpAndSpaces);
+    for (var i=0; i<state.operators; i++) {
+    	alert(state.operatorsList[i] + ' ' + i);
+    	}
+  }	
 
   function tokenString(quote) {
     return function(stream, state) {
@@ -121,7 +145,10 @@ CodeMirror.defineMode("easycrypt", function(config, parserConfig) {
         tokenize: null,
         context: new Context((basecolumn || 0) - indentUnit, 0, "top", false),
         indented: 0,
-        startOfLine: true
+        startOfLine: true,
+        operators: 0,
+        operatorsList: new Array(),
+        lines: 0
       };
     },
 
@@ -131,6 +158,7 @@ CodeMirror.defineMode("easycrypt", function(config, parserConfig) {
         if (ctx.align == null) ctx.align = false;
         state.indented = stream.indentation();
         state.startOfLine = true;
+        state.lines = state.lines + 1;
       }
       if (stream.eatSpace()) return null;
       curPunc = null;
