@@ -63,7 +63,8 @@ let process_bdhoare_ppr g =
   let fun_ = EcEnv.Fun.by_xpath f_xpath env in
   let params = fun_.f_sig.fs_params in
   let penv,_qenv = EcEnv.Fun.hoareF_memenv f_xpath env in
-  let args = List.map (fun v -> f_pvloc f_xpath v (fst penv)) params in
+  let m = EcIdent.create "&m" in
+  let args = List.map (fun v -> f_pvloc f_xpath v m) params in
   (* Warning: currently no substitution on pre,post since penv is always mhr *)
   let pre,post = bhf.bhf_pr, bhf.bhf_po in
   let fop = match bhf.bhf_cmp with
@@ -71,9 +72,9 @@ let process_bdhoare_ppr g =
     | FHge -> fun x y -> f_real_le y x 
     | FHeq -> f_eq 
   in
-  let m = EcIdent.create "&m" in
+
   let concl = f_imp (Fsubst.f_subst_mem (fst penv) m pre) (fop (f_pr m f_xpath args post) bhf.bhf_bd) in
-  let concl = f_forall_mems [m,None] concl in
+  let concl = f_forall_mems [m,snd penv] concl in
   prove_goal_by [concl] (RN_xtd (new EcPhlDeno.rn_hl_deno)) g
 
 let process_ppr info g =
