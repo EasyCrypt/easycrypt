@@ -71,8 +71,9 @@ let process_bdhoare_ppr g =
     | FHge -> fun x y -> f_real_le y x 
     | FHeq -> f_eq 
   in
-  let concl = f_imp pre (fop (f_pr mhr f_xpath args post) bhf.bhf_bd) in
-  let concl = f_forall_mems [penv] concl in
+  let m = EcIdent.create "&m" in
+  let concl = f_imp (Fsubst.f_subst_mem (fst penv) m pre) (fop (f_pr m f_xpath args post) bhf.bhf_bd) in
+  let concl = f_forall_mems [m,None] concl in
   prove_goal_by [concl] (RN_xtd (new EcPhlDeno.rn_hl_deno)) g
 
 let process_ppr info g =
