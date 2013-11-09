@@ -269,6 +269,7 @@ rule main = parse
   | ".."    { DOTDOT }
   | ".["    { DLBRACKET }
   | ".(|"   { DLPAREN }
+  | "|)"    { DRPAREN }
   | ":="    { CEQ }
   | "::"    { DCOLON }
   | "%r"    { FROM_INT }

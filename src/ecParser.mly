@@ -199,6 +199,7 @@
 %token DOT
 %token DOTDOT
 %token DROP
+%token DRPAREN
 %token ELIM
 %token ELIMT
 %token ELSE
@@ -633,7 +634,7 @@ expr_u:
 | LET p=lpattern EQ e1=expr IN e2=expr
    { PElet (p, e1, e2) }
 
-| e=sexpr DLPAREN x=qident RPAREN
+| e=sexpr DLPAREN x=qident DRPAREN
    { PEproj (e, x) }
 
 | r=loc(RBOOL) TILD e=sexpr
@@ -851,7 +852,7 @@ form_u(P):
 | LET p=lpattern EQ e1=form_r(P) IN e2=form_r(P)
     { PFlet (p, e1, e2) }
 
-| f=sform_r(P) DLPAREN x=qident RPAREN
+| f=sform_r(P) DLPAREN x=qident DRPAREN
     { PFproj (f, x) }
 
 | FORALL pd=pgtybindings COMMA e=form_r(P) { PFforall (pd, e) }
