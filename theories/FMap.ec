@@ -316,10 +316,34 @@ theory Core.
     case (in_dom x0 m2)=> dom_x0_m1 //=; generalize m1'; rewrite dom_x0_m1 //=.
 *)
 
-  (** Miscellaneous *)
-  (* lam: turning maps into lambdas *)
+  op map: ('b -> 'c) -> ('a,'b) map -> ('a,'c) map.
+  axiom get_map (f:'b -> 'c) (m:('a,'b) map) (x:'a):
+    get (map f m) x =
+      if get m x = None
+      then None
+      else Some (f (proj (get m x))).
+
+  op mapi: ('a -> 'b -> 'c) -> ('a,'b) map -> ('a,'c) map.
+  axiom get_mapi (f:'a -> 'b -> 'c) (m:('a,'b) map) (x:'a):
+    get (mapi f m) x =
+      if get m x = None
+      then None
+      else  Some (f x (proj (get m x))).
+
+  (** Miscellaneous higher-order stuff *)
+  (* lam and lamo: turning maps into lambdas *)
   op lam (m:('a,'b) map) = lambda x, proj (get m x).
   op lamo (m:('a,'b) map) = lambda x, get m x.
+
+  lemma lamo_map (f:'b -> 'c) (m:('a,'b) map):
+    lamo (map f m) = lambda x, (lift f) ((lamo m) x).
+  proof strict.
+  apply Fun.fun_ext=> x //=.
+  rewrite /lamo /lamo get_map; elim/option_case (get m x)=> //=.
+    by rewrite lift_None.
+    by intros=> x'; cut ->: (Some x' = None) = false by smt;
+       rewrite //= proj_some lift_Some.
+  qed.
 end Core.
 
 theory OptionGet.
