@@ -184,6 +184,16 @@ axiom get_append (xs0 xs1:'x array) (i:int):
   0 <= i < length (xs0 || xs1) =>
   (xs0 || xs1).[i] = (0 <= i < length xs0) ? xs0.[i] : xs1.[i - length xs0].
 
+lemma nosmt get_append_left (xs0 xs1:'x array) (i:int):
+ 0 <= i < length xs0 =>
+ (xs0 || xs1).[i] = xs0.[i]
+by smt.
+
+lemma nosmt get_append_right (xs0 xs1:'x array) (i:int):
+ length xs0 <= i < length xs0 + length xs1 =>
+ (xs0 || xs1).[i] = xs1.[i - length xs0]
+by smt.
+
 (* sub *)
 op sub: 'x array -> int -> int -> 'x array.
 
@@ -399,8 +409,40 @@ intros=> src_dst; apply array_ext; split; smt.
 qed.
 
 (** Things that are not in the OCaml array library:
+      - take and drop (prefix and suffix),
       - complex initialization,
       - logical predicates *)
+(* take *)
+op take (len:int) (xs:'a array) = sub xs 0 len.
+
+lemma length_take (xs:'a array) (l:int):
+  0 <= l <= length xs =>
+  length (take l xs) = l
+by smt.
+
+lemma get_take (xs:'a array) (l k:int):
+  0 <= k < l <= length xs =>
+  (take l xs).[k] = xs.[k]
+by smt.
+
+(* drop *)
+op drop (len:int) (xs:'a array) = sub xs len (length xs-len).
+
+lemma length_drop (xs:'a array) (l:int):
+  0 <= l <= length xs =>
+  length (drop l xs) = length xs - l
+by smt.
+
+lemma get_drop  (xs:'a array) (l k:int):
+  0 <= l => 0 <= k < length xs-l =>
+  (drop l xs).[k] = xs.[l + k]
+by smt.
+
+lemma take_drop (xs:'a array) (l:int):
+  0 <= l <= length xs =>
+  (take l xs || drop l xs) = xs
+by smt.
+
 (* init_dep: init, but using a function that may depend
    on the rest of the array! *)
 op init_dep: 'x array -> int -> (int -> 'x array -> 'x) -> 'x array.
@@ -476,6 +518,8 @@ case (i < j)=> i_j.
   by rewrite ForLoop.range_base ?alli_true //=; smt.
 qed.
 *)
+
+(* TODO *)
 
 (** Distribution on 'a array of length k from distribution on 'a *)
 (* We return the empty array when the length is negative *)
