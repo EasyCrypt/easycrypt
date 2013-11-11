@@ -84,12 +84,12 @@ CodeMirror.defineMode("easycrypt", function(config, parserConfig) {
     stream.eatWhile(/\w/);
     var lengthOpAndName = stream.current().length;
     var operatorName =  stream.current().substring(lengthOpAndName-lenghtOpAndSpaces-1, lengthOpAndName);
-    state.operatorsList[state.operators] = operatorName;
-    state.operators = state.operators + 1;
+    
+    state.operatorsList.name = operatorName;
+    state.operatorsList.line = state.lines;
+    
     stream.backUp(lengthOpAndName-lenghtOpAndSpaces);
-    for (var i=0; i<state.operators; i++) {
-    	alert(state.operatorsList[i] + ' ' + i);
-    	}
+    //alert(state.operatorsList.line + ' ' + state.operatorsList.name);
   }	
 
   function tokenString(quote) {
@@ -139,6 +139,11 @@ CodeMirror.defineMode("easycrypt", function(config, parserConfig) {
 
   // Interface
 
+  function operatorsList(name, line) {
+  	this.name = name;
+  	this.line = line;
+  }
+
   return {
     startState: function(basecolumn) {
       return {
@@ -146,9 +151,8 @@ CodeMirror.defineMode("easycrypt", function(config, parserConfig) {
         context: new Context((basecolumn || 0) - indentUnit, 0, "top", false),
         indented: 0,
         startOfLine: true,
-        operators: 0,
-        operatorsList: new Array(),
-        lines: 0
+        operatorsList: new operatorsList(null, null),
+        lines: 1
       };
     },
 
@@ -158,6 +162,7 @@ CodeMirror.defineMode("easycrypt", function(config, parserConfig) {
         if (ctx.align == null) ctx.align = false;
         state.indented = stream.indentation();
         state.startOfLine = true;
+        // counting number of lines
         state.lines = state.lines + 1;
       }
       if (stream.eatSpace()) return null;
