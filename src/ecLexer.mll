@@ -129,7 +129,7 @@
     "save"        , SAVE       ;        (* KW: global *)
     "qed"         , QED        ;        (* KW: global *)
     "claim"       , CLAIM      ;        (* KW: global *)
-    "drop"        , DROP       ;        (* KW: global *)
+(*    "drop"        , DROP       ;        (* KW: global *)*)
     "end"         , END        ;        (* KW: global *)
     "import"      , IMPORT     ;        (* KW: global *)
     "export"      , EXPORT     ;        (* KW: global *)

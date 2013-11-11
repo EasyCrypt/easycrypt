@@ -19,7 +19,7 @@
   "save"
   "qed"
   "claim"
-  "drop"
+;  "drop"
   "end"
   "import"
   "export"
