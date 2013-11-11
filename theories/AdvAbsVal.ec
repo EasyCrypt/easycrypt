@@ -37,7 +37,7 @@ lemma abs_val :
     forall (P:real -> bool), 
     (forall &m (A<:Adv), P (Pr[A.main() @ &m : res] - 1%r/2%r)) =>
     forall &m (A<:Adv), islossless A.main => 
-      P (`|Pr[A.main() @ &m : res] - 1%r/2%r|).
+      P (`|Pr[A.main() @ &m : res] - 1%r/2%r| ).
 proof.
  intros P HP &m A Hl.
  case (Pr[A.main() @ &m : res] <= 1%r / 2%r) => Hle.
