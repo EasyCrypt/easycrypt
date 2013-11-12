@@ -85,11 +85,11 @@ CodeMirror.defineMode("easycrypt", function(config, parserConfig) {
     var lengthOpAndName = stream.current().length;
     var operatorName =  stream.current().substring(lengthOpAndName-lenghtOpAndSpaces-1, lengthOpAndName);
     
-    state.operatorsList.name = operatorName;
-    state.operatorsList.line = state.lines;
-    
+    state.operatorsList[state.operatorsCounter] = new Operator(operatorName, state.lines);
+    alert(state.operatorsList[state.operatorsCounter].line + ' ' + state.operatorsList[state.operatorsCounter].name);
+    state.operatorsCounter = state.operatorsCounter + 1;
+	
     stream.backUp(lengthOpAndName-lenghtOpAndSpaces);
-    //alert(state.operatorsList.line + ' ' + state.operatorsList.name);
   }	
 
   function tokenString(quote) {
@@ -139,7 +139,7 @@ CodeMirror.defineMode("easycrypt", function(config, parserConfig) {
 
   // Interface
 
-  function operatorsList(name, line) {
+  function Operator(name, line) {
   	this.name = name;
   	this.line = line;
   }
@@ -151,7 +151,8 @@ CodeMirror.defineMode("easycrypt", function(config, parserConfig) {
         context: new Context((basecolumn || 0) - indentUnit, 0, "top", false),
         indented: 0,
         startOfLine: true,
-        operatorsList: new operatorsList(null, null),
+        operatorsList: new Array(),
+        operatorsCounter : 0,
         lines: 1
       };
     },
