@@ -6,6 +6,10 @@ axiom nosmt option_rect_none (v:'a) (f:'b -> 'a):
 axiom nosmt option_rect_some (v:'a) (f:'b -> 'a) (x:'b):
   option_rect v f (Some x) = f x.
 
+lemma nosmt option_free (x:'a option):
+  Some x <> None
+by [].
+
 lemma nosmt option_lfp (x:'a option):
   x = None \/ (exists y, x = Some y)
 by [].
@@ -52,3 +56,13 @@ lemma nosmt some_proj (x:'a option):
   x <> None =>
   Some (proj x) = x
 by [].
+
+(* lift: lift functions to the option type *)
+op lift: ('a -> 'b) -> ('a option -> 'b option).
+
+axiom lift_None (f:'a -> 'b):
+  (lift f) None = None.
+
+axiom lift_Some (f:'a -> 'b) (x:'a):
+  (lift f) (Some x) = Some (f x).
+
