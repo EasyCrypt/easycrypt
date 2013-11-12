@@ -553,6 +553,21 @@ elim (img_def y f empty).
 intros ? ?;assumption.
 qed.
 
+lemma img_add (x:'a) s (f:'a -> 'b): 
+   img f (add x s) = add (f x) (img f s).
+proof.
+  apply set_ext => z.
+  rewrite !img_def mem_add.
+  split; [intros [w ] | intros [H | H]].
+    rewrite mem_add => [<- [H | H]].
+      by left;apply mem_img.
+    by subst.
+    generalize H;rewrite img_def => [x' [H1 H2]];exists x'.
+    by rewrite mem_add;smt.
+  by exists x;subst => /=;smt.
+qed.
+
+
 lemma img_rm (f:'a -> 'b) (xs:'a set) (x:'a):
   img f (rm x xs) = (if (forall x', mem x' xs => f x = f x' => x = x') then rm (f x) (img f xs) else img f xs).
 apply set_ext=> y.
