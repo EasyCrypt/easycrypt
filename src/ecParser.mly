@@ -944,7 +944,9 @@ simpl_type_exp:
 | x=qident                    { PTnamed x      }
 | x=tident                    { PTvar x        }
 | tya=type_args x=qident      { PTapp (x, tya) }
+| GLOB m=loc(mod_qident)      { PTglob m       }
 | LPAREN ty=type_exp RPAREN   { ty             }
+
 ;
 
 type_args:

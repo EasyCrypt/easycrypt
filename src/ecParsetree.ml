@@ -36,6 +36,7 @@ type pty_r =
   | PTvar    of psymbol
   | PTapp    of pqsymbol * pty list
   | PTfun    of pty * pty
+  | PTglob   of pmsymbol located
 and pty = pty_r located
 
 type ptyannot_r = 
