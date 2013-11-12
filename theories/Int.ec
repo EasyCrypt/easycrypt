@@ -160,4 +160,17 @@ theory ForLoop.
   (rewrite IH; first 2 smt); congr => //.
   by rewrite -range_ind; first smt.
   qed.
+
+  (* General result on boolean accumulation *)
+  lemma rangeb_forall i j p (x:'a) b:
+    ForLoop.range i j b (lambda k b, b /\ p k x) =
+     (b /\ forall k, i <= k < j => p k x).
+  proof strict.
+  case (i < j)=> i_j; last smt.
+  pose n:= j - i; cut ->: j = n + i by smt.
+  elim/Induction.induction n; first last; last 2 smt.
+  intros=> k leq0_k IH.
+  rewrite ForLoop.range_ind_lazy //= 1?(_: k + 1 + i - 1 = k + i); first 2 smt.
+  by rewrite IH; smt.
+  qed.
 end ForLoop.
