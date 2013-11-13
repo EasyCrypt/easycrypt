@@ -78,18 +78,30 @@ proof.
  rewrite Hrec;smt.
 qed.
 
+lemma sum_eq (f1 f2:'a -> t) (s: 'a set) :  
+   (forall x, mem x s => f1 x = f2 x) =>
+   sum f1 s = sum f2 s.
+proof strict.
+  elimT set_ind s.
+    by rewrite !sum_empty.
+  intros {s} x s Hx Hr Hf;rewrite sum_add // sum_add // Hf;first smt.
+  by rewrite Hr // => y Hin;apply Hf;smt.
+qed.
+
 lemma sum_in (f:'a -> t) (s:'a set):
   sum f s = sum (lambda x, if mem x s then f x else Z) s.
 proof strict.
-cut := leq_refl s; pose {1 3 5} s' := s;
-elim/set_comp s'.
-  by rewrite 2!sum_empty.
-  intros=> {s'} s' s'_nempty IH leq_s'_s;
-  rewrite (sum_rm _ _ (pick s')); first by rewrite mem_pick.
-  rewrite (sum_rm _ s' (pick s')); first by rewrite mem_pick.
-  rewrite IH /=.
-    by apply (leq_tran s')=> //; apply rm_leq.
-    by rewrite (_: mem (pick s') s) // leq_s'_s // mem_pick.
+  by apply sum_eq => x /= ->.
+qed.
+
+lemma sum_comp (f: t -> t) (g:'a -> t) (s: 'a set):
+  (f Z = Z) =>
+  (forall x y, f (x + y) = f x + f y) =>
+  sum (lambda a, f (g a)) s = f (sum g s).
+proof.
+  intros Hz Ha;elimT set_ind s.
+    by rewrite !sum_empty Hz.
+  by intros {s} x s Hx Hr;rewrite sum_add // sum_add //= Hr Ha. 
 qed.
 
 lemma sum_add2 (f:'a -> t) (g:'a -> t) (s:'a set):
@@ -101,7 +113,7 @@ rewrite (sum_rm f _ (pick s)); first by rewrite mem_pick.
 rewrite (sum_rm g _ (pick s)); first by rewrite mem_pick.
 rewrite (sum_rm _ s (pick s)); first by rewrite mem_pick.
 by rewrite -IH /= addmACA.
-save.
+qed.
 
 lemma sum_chind (f:'a -> t) (g:'a -> 'b) (g':'b -> 'a) (s:'a set):
   (forall x, mem x s => g' (g x) = x) =>

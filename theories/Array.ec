@@ -451,7 +451,7 @@ axiom init_dep_def (xs:'x array) (size:int) (f:int -> 'x array -> 'x):
   init_dep xs size f =
     let r = make (length xs + size) xs.[0] in (* creates the space *)
     let r = blit r 0 xs 0 (length xs) in      (* copies the initial value in *)
-    ForLoop.range 0 (size - 1) r (lambda i r, r.[i + length xs <- f i r]). (* extends using f *)
+    ForLoop.range 0 size r (lambda i r, r.[i + length xs <- f i r]). (* extends using f *)
 
 (* all: this is computable because all arrays are finite *)
 op all: ('x -> bool) -> 'x array -> bool.
