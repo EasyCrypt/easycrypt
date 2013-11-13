@@ -16,7 +16,7 @@ theory Mean.
     fun work(x:input) : output
   }.
 
-  module Rand(W:Worker) = {
+  module Rand (W:Worker) = {
     fun randAndWork() : input * output = {
       var x : input;
       var r : output;
@@ -27,7 +27,7 @@ theory Mean.
     }
   }.
 
-  lemma prCond (A <: Worker {Rand}) &m (v:input)
+  lemma prCond (A <: Worker) &m (v:input)
                (ev:input -> glob A -> output -> bool):
       Pr[Rand(A).randAndWork() @ &m: ev v (glob A) (snd res) /\ v = fst res] =
         (mu_x d v) * Pr[A.work(v) @ &m : ev v (glob A) res].
@@ -46,7 +46,7 @@ theory Mean.
     by conseq* (_: _ ==> false)=> //.
   qed.
 
-  lemma introOrs (A <: Worker {Rand}) &m (ev:input -> glob A -> output -> bool):
+  lemma introOrs (A <: Worker) &m (ev:input -> glob A -> output -> bool):
     Finite.finite (create (support d)) =>
     let sup = Finite.toFSet (create (support d)) in
     Pr[Rand(A).randAndWork() @ &m: ev (fst res) (glob A) (snd res)] =
@@ -66,7 +66,7 @@ theory Mean.
     by intros=> [x]; rewrite img_def => /= [[v [<- /= Hm] [H1 <- ]]].
   qed.
 
-  lemma Mean (A <: Worker {Rand}) &m (ev:input -> glob A -> output -> bool): 
+  lemma Mean (A <: Worker) &m (ev:input -> glob A -> output -> bool): 
     Finite.finite (create (support d)) =>
     let sup = Finite.toFSet (create (support d)) in
     Pr[Rand(A).randAndWork()@ &m: ev (fst res) (glob A) (snd res)] =
