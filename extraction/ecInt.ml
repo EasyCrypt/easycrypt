@@ -76,7 +76,7 @@ module ForLoop = struct
   (* Int.ForLoop.range *)
   let range i j st f =
     let st = ref st in
-    for k = i to j do
+    for k = i to (j - 1) do
       st := f k !st;
     done;
     !st
