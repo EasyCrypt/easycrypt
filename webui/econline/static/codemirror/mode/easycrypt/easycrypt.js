@@ -86,7 +86,6 @@ CodeMirror.defineMode("easycrypt", function(config, parserConfig) {
     var operatorName =  stream.current().substring(lengthOpAndName-lenghtOpAndSpaces-1, lengthOpAndName);
     
     state.operatorsList[state.operatorsCounter] = new Operator(operatorName, state.lines);
-    alert(state.operatorsList[state.operatorsCounter].line + ' ' + state.operatorsList[state.operatorsCounter].name);
     state.operatorsCounter = state.operatorsCounter + 1;
 	
     stream.backUp(lengthOpAndName-lenghtOpAndSpaces);

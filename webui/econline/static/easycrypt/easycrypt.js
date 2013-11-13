@@ -73,6 +73,12 @@ EasyCryptEditor.prototype.createWidget = function() {
 EasyCryptEditor.prototype.onopen = function(event){
     this.log('You are now connected to the EasyCrypt engine', 'success', true);
     this.setStatus('ready');
+    this.widgets.operators.append('Operators List: \n');
+    var editorState = this.editor.getStateAfter(this.widgets.feedback.height() + 10, true);
+    var numberOfOperators = editorState.operatorsList.length;
+    for (var i=0; i<numberOfOperators; i++) {
+	    this.widgets.operators.append('> ' + editorState.operatorsList[i].name + ' at line: ' + editorState.operatorsList[i].line + '\n');
+	    }
 }
 
 EasyCryptEditor.prototype.onclose = function(event){
@@ -115,10 +121,11 @@ EasyCryptEditor.prototype.onmessage = function(event){
         end.pundo = json.pundo;
         this.setROMark(end);
         this.widgets.feedback.text($.format("{0}\n", json.message));
+        
         var match = json.message.match(/added operator:/g);
         var length = json.message.length;
         if(match != null) {
-	        this.widgets.operators.append($.format("> {0}{1}\n", json.message.substring(17, length-3)));
+	        this.widgets.operators.append($.format("> {0}\n", json.message.substring(17, length-3)));
 	        }
     }
 
