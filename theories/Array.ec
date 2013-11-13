@@ -451,7 +451,7 @@ axiom init_dep_def (xs:'x array) (size:int) (f:int -> 'x array -> 'x):
   init_dep xs size f =
     let r = make (length xs + size) xs.[0] in (* creates the space *)
     let r = blit r 0 xs 0 (length xs) in      (* copies the initial value in *)
-    ForLoop.range 0 (size - 1) r (lambda i r, r.[i + length xs <- f i r]). (* extends using f *)
+    ForLoop.range 0 size r (lambda i r, r.[i + length xs <- f i r]). (* extends using f *)
 
 (* all: this is computable because all arrays are finite *)
 op all: ('x -> bool) -> 'x array -> bool.
@@ -499,25 +499,26 @@ by rewrite alli_def=> p_true i i_bnd;
    apply p_true.
 qed.
 
-(* Inductive <-> Iterative... the proof is more complex than I thought
-   because we need to drop all the inductive calls before the ith *)
-(*
+(* note: I'm not sure this is the most useful formulation of this lemma. Check use cases. *)
+(* overall, I feel that the general rangeb_forall is more useful *)
 lemma range_alli i j p (xs:'x array):
-  0 <= i < length xs =>
-  0 <= j < length xs =>
-  ForLoop.range i j true (lambda k b, b /\ p k xs.[k]) =
-    alli (lambda k x, i <= k < j => p k x) xs.
+  0 <= i < j < length xs =>
+  ForLoop.range i j true (lambda k b, b /\ p k xs.[k]) <=>
+   alli (lambda k, p (k + i)) (sub xs i (j - i)).
 proof strict.
-intros=> i_bnd j_bnd.
-case (i < j)=> i_j.
-  cut [x' xs' ->]: exists x' xs', xs = x'::xs'
-    by (exists xs.[0]; exists (sub xs 1 (length xs - 1)); apply array_ext; smt).
-  rewrite alli_ind.
-  rewrite ForLoop.range_ind //=.
-  admit. (* by induction on j - i. This looks more complicated than it should be *)
-  by rewrite ForLoop.range_base ?alli_true //=; smt.
+intros=> i_j_bnd.
+cut ->: (lambda k b, b /\ p k xs.[k]) =
+         (lambda k b, b /\ (lambda k x, p k x.[k]) k xs) by smt.
+rewrite ForLoop.rangeb_forall //=.
+rewrite alli_def length_sub; first 3 smt.
+split.
+  intros=> all_ij k k_bnd; rewrite get_sub=> //=; first 3 smt.
+  by apply all_ij; smt.
+  intros=> //= all_ij k k_bnd; rewrite {2}(_: k = k - i + i); first smt.
+  rewrite -(get_sub xs i (j - i) (k - i)); first 4 smt.
+  pose k':= k - i; cut ->: k = k' + i by smt.
+  by apply all_ij; smt.
 qed.
-*)
 
 (* TODO *)
 

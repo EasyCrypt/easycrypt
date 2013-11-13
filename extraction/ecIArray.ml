@@ -88,8 +88,28 @@ let all f t =
 (* Array.alli *)
 let alli f t = 
   let rec aux i = i >= Array.length t || (not (f i t.(i)) && aux (i+1)) in
-  aux 0 
-  
+  aux 0
+
+(* Array.init_dep *)
+let init_dep ar size extract =
+  let r =
+    make (Pervasives.(+) (length ar) size)
+      (_dtlb_rb ar 0) in
+  let r0 = blit r 0 ar 0 (length ar) in
+  EcInt.ForLoop.range 0 size r0
+    (fun i r1 ->
+       _dtlb_lsmn_rb r1 (Pervasives.(+) i (length ar))
+         (extract i r1))
+
+
+(* Array.take *)
+let take l xs =
+  sub xs 0 l
+
+(* Array.drop *)
+let drop l xs =
+  sub xs l (length xs - l)
+
 (* Array.Darray *)
 module Darray = struct
   
