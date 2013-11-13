@@ -115,7 +115,7 @@ val f_match :
   -> unienv * (uid -> ty option) * form evmap
 
 (* -------------------------------------------------------------------- *)
-type ptnpos = private [`Select | `Sub of ptnpos] Mint.t
+type ptnpos = private [`Select of int | `Sub of ptnpos] Mint.t
 
 exception InvalidPosition
 exception InvalidOccurence
@@ -127,7 +127,7 @@ module FPosition : sig
 
   val tostring : ptnpos -> string
 
-  val select : ?o:Sint.t -> (Sid.t -> form -> bool) -> form -> ptnpos
+  val select : ?o:Sint.t -> (Sid.t -> form -> int option) -> form -> ptnpos
 
   val select_form : LDecl.hyps -> Sint.t option -> form -> form -> ptnpos
 

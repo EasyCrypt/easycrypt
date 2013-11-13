@@ -255,14 +255,24 @@ let process_subst loc ri g =
 exception RwMatchFound of EcUnify.unienv * (uid -> ty option) * form evmap
 
 let try_match hyps (ue, ev) p form =
+  let na = List.length (snd (EcFol.destr_app p)) in
+
   let trymatch bds tp =
+    let tp =
+      match tp.f_node with
+      | Fapp (h, hargs) when List.length hargs > na ->
+          let (a1, a2) = List.take_n na hargs in
+            f_app h a1 (toarrow (List.map f_ty a2) tp.f_ty)
+      | _ -> tp
+    in
+
     try
       if not (Mid.set_disjoint bds tp.f_fv) then
-        false
+        None
       else
         let (ue, tue, ev) = f_match hyps (ue, ev) ~ptn:p tp in
           raise (RwMatchFound (ue, tue, ev))
-    with MatchFailure -> false
+    with MatchFailure -> None
   in
 
   try
@@ -443,7 +453,7 @@ let process_rewrite1 loc ri g =
                         f_app h a1 (toarrow (List.map f_ty a2) fp.f_ty)
                   | _ -> fp
                 in
-                  EcReduction.is_alpha_eq hyps p fp
+                  if EcReduction.is_alpha_eq hyps p fp then Some (-1) else None
               in
                 try  FPosition.select ?o test concl
                 with InvalidOccurence ->
