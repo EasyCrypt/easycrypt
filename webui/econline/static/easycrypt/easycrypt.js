@@ -74,10 +74,19 @@ EasyCryptEditor.prototype.onopen = function(event){
     this.log('You are now connected to the EasyCrypt engine', 'success', true);
     this.setStatus('ready');
     this.widgets.operators.append('Operators List: \n');
+    
     var editorState = this.editor.getStateAfter(this.widgets.feedback.height() + 10, true);
+    
     var numberOfOperators = editorState.operatorsList.length;
     for (var i=0; i<numberOfOperators; i++) {
 	    this.widgets.operators.append('> ' + editorState.operatorsList[i].name + ' at line: ' + editorState.operatorsList[i].line + '\n');
+	    }
+	    
+	var numberOfTheories = editorState.theoriesList.length;
+    for (var j=0; j<numberOfTheories; j++) {
+	    this.widgets.operators.append('> ' + editorState.theoriesList[j].name + '\n' 
+	    				+ ' starting at line: ' + editorState.theoriesList[j].startLine 
+	    				+ ' and ending at line: ' + editorState.theoriesList[j].endLine + '\n');
 	    }
 }
 

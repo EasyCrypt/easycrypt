@@ -58,7 +58,13 @@ CodeMirror.defineMode("easycrypt", function(config, parserConfig) {
         if (keywords.propertyIsEnumerable(cur)) {
             if (blockKeywords.propertyIsEnumerable(cur)) curPunc = "newstatement";
             if (cur == 'op') {
-            	tokenOperatorName(stream, state);	
+            	tokenOperator(stream, state);	
+            }
+            if (cur == 'theory') {
+            	tokenTheory(stream, state);
+            }
+            if (cur == 'end') {
+            	findTheoryEnd(stream, state);
             }
             return "keyword";
        }
@@ -78,17 +84,48 @@ CodeMirror.defineMode("easycrypt", function(config, parserConfig) {
     return "unknown";
   }
 
-  function tokenOperatorName(stream, state) {
+  function findTheoryEnd(stream, state) { 
   	stream.eatSpace();
-  	var lenghtOpAndSpaces = stream.current().length;
+  	var lengthEndAndSpaces = stream.current().length;
+    stream.eatWhile(/\w/);
+    var lengthEndAndName = stream.current().length;
+    var theoryEndingName = stream.current().substring(lengthEndAndSpaces, lengthEndAndName);
+    
+    for (var i=0; i<state.theoriesList.length; i++) {
+  		if (state.theoriesList[i].name == theoryEndingName)
+  			state.theoriesList[i].endLine = state.lines;
+  	}
+    
+  	
+  }	
+
+  function tokenTheory(stream, state) {
+  	// obtain the theory's name
+  	stream.eatSpace();
+  	var lengthTheoryAndSpaces = stream.current().length;
+    stream.eatWhile(/\w/);
+    var lengthTheoryAndName = stream.current().length;
+    var theoryName = stream.current().substring(lengthTheoryAndSpaces, lengthTheoryAndName);
+    
+    state.theoriesList[state.theoriesCounter] = new Theory(theoryName, state.lines, null);
+    //alert(state.theoriesList[state.theoriesCounter].name + state.theoriesList[state.theoriesCounter].startLine);
+    state.theoriesCounter = state.theoriesCounter + 1;
+    
+    stream.backUp(lengthTheoryAndName-lengthTheoryAndSpaces);
+  } 	
+
+  function tokenOperator(stream, state) {
+  	// obtain the operator's name
+  	stream.eatSpace();
+  	var lengthOpAndSpaces = stream.current().length;
     stream.eatWhile(/\w/);
     var lengthOpAndName = stream.current().length;
-    var operatorName =  stream.current().substring(lengthOpAndName-lenghtOpAndSpaces-1, lengthOpAndName);
+    var operatorName =  stream.current().substring(lengthOpAndSpaces, lengthOpAndName);
     
     state.operatorsList[state.operatorsCounter] = new Operator(operatorName, state.lines);
     state.operatorsCounter = state.operatorsCounter + 1;
 	
-    stream.backUp(lengthOpAndName-lenghtOpAndSpaces);
+    stream.backUp(lengthOpAndName-lengthOpAndSpaces);
   }	
 
   function tokenString(quote) {
@@ -142,6 +179,12 @@ CodeMirror.defineMode("easycrypt", function(config, parserConfig) {
   	this.name = name;
   	this.line = line;
   }
+  
+  function Theory(name, startLine, endLine) {
+  	this.name = name;
+  	this.startLine = startLine;
+  	this.endLine = endLine;
+  }
 
   return {
     startState: function(basecolumn) {
@@ -152,6 +195,8 @@ CodeMirror.defineMode("easycrypt", function(config, parserConfig) {
         startOfLine: true,
         operatorsList: new Array(),
         operatorsCounter : 0,
+        theoriesList: new Array(),
+        theoriesCounter : 0,
         lines: 1
       };
     },
