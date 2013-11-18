@@ -235,6 +235,21 @@ theory Core.
      rewrite card_rm_nin.
   qed.
 
+  (* find *)
+  op find: ('a -> 'b -> bool) -> ('a,'b) map -> 'a option.
+
+  axiom find_nin: forall (p:'a -> 'b -> bool) m,
+    (forall x, in_dom x m => !(p x (proj (get m x)))) =>
+    find p m = None.
+
+  axiom find_in: forall (p:'a -> 'b -> bool) (m:('a,'b) map),
+    (exists x, in_dom x m /\ p x (proj (get m x))) =>
+    (exists x, find p m = Some x).
+
+  axiom find_cor: forall (p:'a -> 'b -> bool) m x,
+    find p m = Some x =>
+    in_dom x m /\ p x (proj (get m x)).
+
   (* filter *)
   op filter: ('a -> 'b -> bool) -> ('a,'b) map -> ('a,'b) map.
 
