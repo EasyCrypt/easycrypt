@@ -67,11 +67,24 @@ theory Prime_field.
   lemma add0f (x:t): zero + x = x
   by [].
 
+  lemma addIf (x y y':t):
+    x + y = x + y' => y = y'
+  by [].
+
+  lemma mulfDr (x y z:t):
+    x * z + y * z = (x + y) * z
+  by [].
+
   lemma mulf0 (x:t): x * zero = zero
   by [].
 
-  lemma mulNf (x y:t): (-x) * y = - (x * y)
+  lemma mul0f (x:t): zero * x = zero
   by [].
+
+  lemma mulNf (x y:t): (-x) * y = - (x * y).
+  proof strict.
+  by apply (addIf (x * y)); rewrite mulfDr -!sub_def !subff mul0f.
+  qed.
 
   lemma mulfN (x y:t): y * (-x)= - (y * x)
   by [].  
