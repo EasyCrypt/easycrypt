@@ -584,34 +584,6 @@ module MC = struct
     import (_up_mod true) p mod_ env
 
   (* -------------------------------------------------------------------- *)
-  let lookup_tydecl qnx env =
-    match lookup (fun mc -> mc.mc_tydecls) qnx env with
-    | None -> lookup_error (`QSymbol qnx)
-    | Some (p, (args, obj)) -> (_downpath_for_tydecl env p args, obj)
-
-  let _up_tydecl candup mc x obj =
-    if not candup && MMsym.last x mc.mc_tydecls <> None then
-      raise (DuplicatedBinding x);
-    { mc with mc_tydecls = MMsym.add x obj mc.mc_tydecls }
-
-  let import_tydecl p tyd env =
-    import (_up_tydecl true) (IPPath p) tyd env
-
-  (* -------------------------------------------------------------------- *)
-  let lookup_modty qnx env =
-    match lookup (fun mc -> mc.mc_modsigs) qnx env with
-    | None -> lookup_error (`QSymbol qnx)
-    | Some (p, (args, obj)) -> (_downpath_for_modsig env p args, obj)
-
-  let _up_modty candup mc x obj =
-    if not candup && MMsym.last x mc.mc_modsigs <> None then
-      raise (DuplicatedBinding x);
-    { mc with mc_modsigs = MMsym.add x obj mc.mc_modsigs }
-
-  let import_modty p msig env =
-    import (_up_modty true) (IPPath p) msig env
-
-  (* -------------------------------------------------------------------- *)
   let lookup_operator qnx env =
     match lookup (fun mc -> mc.mc_operators) qnx env with
     | None -> lookup_error (`QSymbol qnx)
@@ -643,6 +615,108 @@ module MC = struct
 
   let import_axiom p ax env =
     import (_up_axiom true) (IPPath p) ax env
+
+  (* -------------------------------------------------------------------- *)
+  let lookup_tydecl qnx env =
+    match lookup (fun mc -> mc.mc_tydecls) qnx env with
+    | None -> lookup_error (`QSymbol qnx)
+    | Some (p, (args, obj)) -> (_downpath_for_tydecl env p args, obj)
+
+  let _up_tydecl candup mc x obj =
+    if not candup && MMsym.last x mc.mc_tydecls <> None then
+      raise (DuplicatedBinding x);
+    let mc = { mc with mc_tydecls = MMsym.add x obj mc.mc_tydecls } in
+    let mc =
+      let mypath, tyd =
+        match obj with IPPath p, x -> (p, x) | _, _ -> assert false in
+      let ipath name = IPPath (EcPath.pqoname (EcPath.prefix mypath) name) in
+
+      match tyd.tyd_type with
+      | `Abstract _ -> mc
+      | `Concrete _ -> mc
+
+      | `Datatype (scheme, cs) ->
+          let params = List.map (fun (x, _) -> tvar x) tyd.tyd_params in
+
+          let for1 i (c, aty) =
+            let aty = EcTypes.toarrow aty (tconstr mypath params) in
+            let aty = EcSubst.freshen_type (tyd.tyd_params, aty) in
+            let cop = mk_op (fst aty) (snd aty) (Some (OP_Constr (mypath, i))) in
+            let cop = (ipath c, cop) in
+              (c, cop)
+          in
+
+          let scheme =
+            let scname = Printf.sprintf "%s_ind" x in
+              (scname, { ax_tparams = tyd.tyd_params;
+                         ax_spec    = Some scheme;
+                         ax_kind    = `Axiom;
+                         ax_nosmt   = true; })
+          in
+
+          let cs = List.mapi for1 cs in
+          let mc =
+            List.fold_left
+              (fun mc (c, cop) -> _up_operator candup mc c cop)
+              mc cs
+          in
+            _up_axiom candup mc (fst scheme) (fst_map ipath scheme)
+
+      | `Record (scheme, fields) ->
+          let params  = List.map (fun (x, _) -> tvar x) tyd.tyd_params in
+          let nfields = List.length fields in
+          let cfields =
+            let for1 i (f, aty) =
+              let aty = EcTypes.tfun (tconstr mypath params) aty in
+              let aty = EcSubst.freshen_type (tyd.tyd_params, aty) in
+              let fop = mk_op (fst aty) (snd aty) (Some (OP_Proj (mypath, i, nfields))) in
+              let fop = (ipath f, fop) in
+                (f, fop)
+            in
+              List.mapi for1 fields
+          in
+
+          let scheme =
+            let scname = Printf.sprintf "%s_ind" x in
+              (scname, { ax_tparams = tyd.tyd_params;
+                         ax_spec    = Some scheme;
+                         ax_kind    = `Axiom;
+                         ax_nosmt   = true; })
+          in
+
+          let stname = Printf.sprintf "mk_%s" x in
+          let stop   =
+            let stty = toarrow (List.map snd fields) (tconstr mypath params) in
+            let stty = EcSubst.freshen_type (tyd.tyd_params, stty) in
+              mk_op (fst stty) (snd stty) (Some (OP_Record mypath))
+          in
+
+          let mc =
+            List.fold_left
+              (fun mc (f, fop) -> _up_operator candup mc f fop)
+              mc ((stname, (ipath stname, stop)) :: cfields)
+          in
+            _up_axiom candup mc (fst scheme) (fst_map ipath scheme)
+
+    in
+      mc
+
+  let import_tydecl p tyd env =
+    import (_up_tydecl true) (IPPath p) tyd env
+
+  (* -------------------------------------------------------------------- *)
+  let lookup_modty qnx env =
+    match lookup (fun mc -> mc.mc_modsigs) qnx env with
+    | None -> lookup_error (`QSymbol qnx)
+    | Some (p, (args, obj)) -> (_downpath_for_modsig env p args, obj)
+
+  let _up_modty candup mc x obj =
+    if not candup && MMsym.last x mc.mc_modsigs <> None then
+      raise (DuplicatedBinding x);
+    { mc with mc_modsigs = MMsym.add x obj mc.mc_modsigs }
+
+  let import_modty p msig env =
+    import (_up_modty true) (IPPath p) msig env
 
   (* -------------------------------------------------------------------- *)
   let lookup_typeclass qnx env =
@@ -1616,73 +1690,12 @@ module Ty = struct
     let env    = MC.bind_tydecl name ty env in
     let env    =
       match ty.tyd_type with
-      | `Concrete _ -> env
-
       | `Abstract tc -> Sp.fold
           (fun dst env ->
              TypeClass.add_abstract_instance ~src:mypath ~dst env)
           tc env
 
-      | `Datatype (scheme, cs) ->
-          let params = List.map (fun (x, _) -> tvar x) ty.tyd_params in
-
-          let for1 i (c, aty) =
-            let aty = EcTypes.toarrow aty (tconstr mypath params) in
-            let aty = EcSubst.freshen_type (ty.tyd_params, aty) in
-            let cop = (c, mk_op (fst aty) (snd aty) (Some (OP_Constr (mypath, i)))) in
-              cop
-          in
-
-          let scheme =
-            let scname = Printf.sprintf "%s_ind" name in
-              (scname, { ax_tparams = ty.tyd_params;
-                         ax_spec    = Some scheme;
-                         ax_kind    = `Axiom;
-                         ax_nosmt   = true; })
-          in
-
-          let cs  = List.mapi for1 cs in
-          let env =
-            List.fold_left
-              (fun env (c, cop) -> MC.bind_operator c cop env)
-              env cs in
-
-            MC.bind_axiom (fst scheme) (snd scheme) env
-
-      | `Record (scheme, fields) ->
-          let params  = List.map (fun (x, _) -> tvar x) ty.tyd_params in
-          let nfields = List.length fields in
-          let cfields =
-            let for1 i (f, aty) =
-              let aty = EcTypes.tfun (tconstr mypath params) aty in
-              let aty = EcSubst.freshen_type (ty.tyd_params, aty) in
-              let fop = (f, mk_op (fst aty) (snd aty) (Some (OP_Proj (mypath, i, nfields)))) in
-                fop
-            in
-              List.mapi for1 fields
-          in
-
-          let scheme =
-            let scname = Printf.sprintf "%s_ind" name in
-              (scname, { ax_tparams = ty.tyd_params;
-                         ax_spec    = Some scheme;
-                         ax_kind    = `Axiom;
-                         ax_nosmt   = true; })
-          in
-
-          let stname = Printf.sprintf "mk_%s" name in
-          let stop   =
-            let stty = toarrow (List.map snd fields) (tconstr mypath params) in
-            let stty = EcSubst.freshen_type (ty.tyd_params, stty) in
-              mk_op (fst stty) (snd stty) (Some (OP_Record mypath))
-          in
-
-          let env =
-            List.fold_left
-              (fun env (f, fop) -> MC.bind_operator f fop env)
-              env ((stname, stop) :: cfields)
-          in
-            MC.bind_axiom (fst scheme) (snd scheme) env
+      | _ -> env
     in
       env
 
