@@ -6,7 +6,7 @@ axiom nosmt option_rect_none (v:'a) (f:'b -> 'a):
 axiom nosmt option_rect_some (v:'a) (f:'b -> 'a) (x:'b):
   option_rect v f (Some x) = f x.
 
-lemma nosmt option_free (x:'a option):
+lemma nosmt option_free (x:'a):
   Some x <> None
 by [].
 
