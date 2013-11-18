@@ -1,8 +1,9 @@
 require import Fun.
 require import Int.
 require import Real.
+require import ISet.
 require import FSet.
-require import Map.
+require import FMap. import OptionGet.
 require import Pair.
 require import Distr.
 
@@ -513,7 +514,7 @@ section.
 
     fun init(ks:pkey*skey) : unit = {
       Hmem.init(ks);
-      m = Map.empty;
+      m = FMap.Core.empty;
     }
   }.
 
@@ -554,8 +555,13 @@ section.
   local equiv PSS_G0_H:
     H.o ~ H0.o: ={x} /\ H.m{1} =<= Hmap.m{2} ==> ={res} /\ H.m{1} =<= Hmap.m{2}.
   proof strict.
-  fun; inline H0.o; wp; rnd; wp; skip;
-       rewrite /(=<=); progress=> //; try (case (x0 = x){2}); smt. (* Forgot to plug my laptop in... *)
+  fun; inline H0.o; wp; rnd; wp; skip.
+  rewrite /(=<=); progress=> //; [smt| |smt| |smt|smt|smt];
+  case (x = x0){2}; [smt| |smt|];
+  by intros=> x_x0;
+     do 3!rewrite /FMap.OptionGet."_.[_]" ?get_setN //;
+     do 3!rewrite -/(FMap.OptionGet."_.[_]" _ _);
+     apply H.
   qed.
 
   (* More informed use of conseq* might speed up some of the smt calls *)
@@ -838,13 +844,13 @@ section.
   local lemma GAdv1_GAdv2_BAD &m (qG qH qS:int) ks:
     0 < qG => 0 < qH => 0 < qS =>
     valid_keys ks =>
-    Hmap.m{m} = Map.empty =>
+    Hmap.m{m} = FMap.Core.empty =>
     !H2.bad{m} =>
-    G.m{m} = Map.empty =>
+    G.m{m} = FMap.Core.empty =>
     Pr[ GAdv(H2,G).main(ks) @ &m:
           H2.bad /\
-          card (ISet.Finite.toFSet (dom Hmap.m)) <= qH + qS /\
-          card (ISet.Finite.toFSet (dom G.m)) <= qG + qH ] <=
+          size Hmap.m <= qH + qS /\
+          size G.m <= qG + qH ] <=
       ((qG + qH) * (qH + qS))%r / (2^k1)%r.
   proof strict.
   admit.
@@ -876,27 +882,27 @@ section.
     0 < qG => 0 < qH => 0 < qS =>
     Pr[ G2.main() @ &m:
           H2.bad /\
-          card (ISet.Finite.toFSet (dom Hmap.m)) <= qH + qS /\
-          card (ISet.Finite.toFSet (dom G.m)) <= qG + qH ] <=
+          size Hmap.m <= qH + qS /\
+          size G.m <= qG + qH ] <=
       ((qG + qH) * (qH + qS))%r / (2^k1)%r.
   proof strict.
   intros=> lt0_qG lt0_qH lt0_qS;
   bdhoare_deno (_: true ==>
                    H2.bad /\
-                   card (ISet.Finite.toFSet (dom Hmap.m)) <= qH + qS /\
-                   card (ISet.Finite.toFSet (dom G.m)) <= qG + qH)=> //; fun.
+                   size Hmap.m <= qH + qS /\
+                   size G.m <= qG + qH)=> //; fun.
   call (_: valid_keys ks /\
-           Hmap.m{hr} = Map.empty /\
+           Hmap.m{hr} = FMap.Core.empty /\
            !H2.bad{hr} /\
-           G.m{hr} = Map.empty ==>
+           G.m{hr} = FMap.Core.empty ==>
            H2.bad /\
-           card (ISet.Finite.toFSet (dom Hmap.m)) <= qH + qS /\
-           card (ISet.Finite.toFSet (dom G.m)) <= qG + qH).
+           size Hmap.m <= qH + qS /\
+           size G.m <= qG + qH).
     (* Here we want to interpret GAdv1_GAdv2_BAD as a bd_hoare statement (the exact one we want to prove) *)
     admit.
-  call (_: true ==> Hmap.m = Map.empty /\ !H2.bad);
-    first by fun; wp; call (_: true ==> Hmap.m = Map.empty)=> //; fun; wp.
-  call (_: true ==> G.m = Map.empty);
+  call (_: true ==> Hmap.m = FMap.Core.empty /\ !H2.bad);
+    first by fun; wp; call (_: true ==> Hmap.m = FMap.Core.empty)=> //; fun; wp.
+  call (_: true ==> G.m = FMap.Core.empty);
     first by fun; wp.
   by rnd.
   qed.
@@ -976,7 +982,7 @@ section.
     0 < qH => 0 < qS =>
     Pr[ G3.main() @ &m:
           H3.bad /\
-          card (ISet.Finite.toFSet (dom Hmap.m)) <= qH + qS ] <=
+          size Hmap.m <= qH + qS ] <=
       (qH * (qH + qS))%r / (2^k0)%r. (* Number of direct adversary queries times number of queries
                                         over size of the input space (randomness only) *)
   proof strict.
@@ -1060,11 +1066,13 @@ section.
                 pi3_1 (proj Hmap.m.[x]{1}) = pi3_1 (proj Hmap.m.[x]{2})) /\
               (forall x, in_dom x Hmap.m{1} =>
                 pi3_2 (proj Hmap.m.[x]{1}) = pi3_2 (proj Hmap.m.[x]{2}))).
-      by wp; skip; progress=> //; try (case (x0 = x){2}); smt.
+      by wp; skip; progress=> //; [smt| |];
+         (case (x = x0){2}; [| intros=> x_x0; do 2!rewrite /"_.[_]" ?get_setN //]; smt).
     by wp; skip; progress=> //; smt.
 
-    if; [smt | | ]; wp; skip; progress=> //;
-      try (apply ISet.set_ext); try (case (x0 = x){2}); smt.
+    if; [smt | | ]; wp; skip; progress=> //; first 2 last; last 3 smt.
+      by case (x = x0){2}; [| intros=> x_x0; do 2!rewrite /"_.[_]" ?get_setN //]; smt.
+      by case (x = x0){2}; [| intros=> x_x0; do 2!rewrite /"_.[_]" ?get_setN //]; smt.
   qed.
 
   local equiv G3_G4_abstract (Ga <: Gadv {H2,H3,G,Hmem}):
@@ -1155,8 +1163,8 @@ section.
     rewrite sub_app_fst_le - ?Hl //;first smt.
     rewrite sub_full HTag.can_from_to.
     rewrite -appA sub_app_snd_le;first smt.
-    rewrite (_:(`|to_bits l| + 1 - `|zeros 1 || to_bits l|) = 0);first smt.
-    by rewrite (_:kg = `|to_bits r|);smt.
+    rewrite (_:(`|to_bits l| + 1 - `|zeros 1 || to_bits l| ) = 0);first smt.
+    by rewrite (_:kg = `|to_bits r| );smt.
   qed.
            
   local module H4' = GenH4 (Sw).
@@ -1353,10 +1361,9 @@ section.
             seq 7 : true 1%r 1%r 0%r _ => //.
               by wp => /=;rnd;skip;smt.
               by wp => /=;rnd;skip;smt.
-              intros z0. conseq * (_: true ==> !b) => //;first by smt.
-              wp => /=. 
-              rnd;skip;progress => //.
-              admit.
+              split; first smt.
+              intros z0; conseq * (_: true ==> !b) => //;first smt.
+              wp=> /=; rnd; skip; progress=> //. admit. (* We need some concrete facts about words of length 1 *)
         by rcondf{1} 1=> //; wp.
       by if=> //; wp.
     intros=> _ _;fun. 
@@ -1368,10 +1375,11 @@ section.
       seq 7 : true => //.
       by wp => /=;rnd;skip;smt.
       by wp => /=;rnd;skip;smt.
-    intros z0. conseq * (_: true ==> !b) => //;first by smt.
-    wp => /=. 
-    rnd;skip;progress => //.
-    by admit.
+      split; first smt.
+      intros z0; conseq * (_: true ==> !b) => //;first by smt.
+      wp=> /=. 
+      rnd;skip;progress => //.
+      by admit. (* same as above. *)
     intros=> _; fun; sp; if.
       wp; while true (kg2 - i); first by intros=> _; wp; rnd cpTrue; skip; smt.
             skip; smt.
@@ -1494,7 +1502,7 @@ section.
   by (apply (G6_G7_abstract GAdv); apply lossless_GAdv).
 
 
-  (** Proof Note: no abstraction possile here because of a problem with H7 not initializing G's state.
+  (** Proof Note: no abstraction possible here because of a problem with H7 not initializing G's state.
       Why is it not an issue in earlier steps? (In particular, the one immediately above,
       speaking of exactly the same games...) *)
   (* TODO: Benjamin: check soundness of the application of the termination result
@@ -1528,7 +1536,7 @@ section.
     module H = {
       var m:(message * salt,htag * bool * signature) map
 
-      fun init(): unit = { m = Map.empty; }
+      fun init(): unit = { m = FMap.Core.empty; }
 
       fun o(c:bool,x:message * salt): htag = {
         var b:bool = true;

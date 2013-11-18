@@ -1,5 +1,5 @@
 require import Int.
-require import Map.
+require import FMap. import OptionGet.
 require import Distr.
 
 type from.
@@ -104,7 +104,7 @@ theory WRO_Int.
     islossless RO.o =>
     bd_hoare[ ARO(RO).o : x = ARO.log ==> x <= ARO.log] = 1%r.
   proof strict.
-  intros=> Ho; fun; if; [call Ho | ];
+  by intros=> Ho; fun; if; [call Ho | ];
      wp; skip=> //; progress; smt.
   qed.
 
@@ -191,8 +191,10 @@ theory WRO_Set.
   fun; if.
     by intros=> &1 &2 [r_nin_log] [[x_eq log_eq]] m_eq_exc;
        rewrite (fcongr card ARO.log{1} ARO.log{2}) //.
-    by inline ROM.RO.o; wp; rnd; wp; skip; progress=> //; smt.
-    by wp; skip; progress.
+    inline ROM.RO.o; wp; rnd; wp; skip; progress=> //; first 5 last; last 6 smt.
+      by cut em: forall a, a => !a => false by smt;
+         cut := em (in_dom x ROM.RO.m){2} _ _=> //; smt. (* This is going to come up all the time. *)
+    by wp.
   qed.
 end WRO_Set.
 
@@ -273,8 +275,10 @@ theory WRO_List.
   intros=> r; fun; if.
     by intros=> &1 &2 [r_nin_log] [[x_eq log_eq]] m_eq_exc;
        rewrite (fcongr length ARO.log{1} ARO.log{2}) //.
-    by inline ROM.RO.o; wp; rnd; wp; skip; progress=> //; smt.
-    by wp; skip; progress.
+    inline ROM.RO.o; wp; rnd; wp; skip; progress=> //; first 5 last; last 6 smt.
+      by cut em: forall a, a => !a => false by smt;
+         cut := em (in_dom x ROM.RO.m){2} _ _=> //; smt. (* This is going to come up all the time. *)
+    by wp.
   qed.
 end WRO_List.
 

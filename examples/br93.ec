@@ -1,6 +1,6 @@
 require import RandOrcl.
 require import Array.
-require import Map.
+require import FMap. import OptionGet.
 require import FSet.
 require import Int.
 require import Distr.
@@ -188,7 +188,10 @@ proof.
  call (_ : (mem M.r ARO.log), 
            (={ARO.log} /\ eq_except RO.m{1} RO.m{2} M.r{2})).
  intros => O Hll;apply (lossless2 O) => //.
- fun;if;[smt|inline RO.o;wp;rnd|];wp;skip;progress => //;smt.
+ fun;if;[smt|inline RO.o;wp;rnd|];wp;skip;progress => //; first 5 last; last 6 smt.
+  case (x = M.r){2}; first smt.
+  by cut em: forall a, a => !a => false by smt; (* again, this (the whole reasoning) should be lemma-ized *)
+     cut:= em (in_dom x RO.m){2} _ _=> //; smt.
  intros _ _;apply lossless_ARO_o.
  intros &m;fun;if;[inline RO.o;wp;rnd cpTrue|];wp;skip;progress;smt.
  call eq1_enc.
@@ -279,11 +282,10 @@ module BR_OW(A_ : Adv) : Inverter = {
   (m0,m1)  = A.a1(pk);
   h = $uniform; 
   b  = A.a2(y || h);
-  x = Option.proj (Map.find (lambda p0 p1,f pk p0 = y) RO.m);
+  x = Option.proj (FMap.Core.find (lambda p0 p1,f pk p0 = y) RO.m);
    return (x);
  }
 }.
-
 
 lemma f_iny :
 forall (x, y : randomness, pk: pkey, sk : skey), 
@@ -313,13 +315,13 @@ proof.
 
  call (_ : ={RO.m,ARO.log} /\ (forall x, in_dom x RO.m{1} = mem x ARO.log{1})).
  fun;if;[smt|inline RO.o;wp;rnd |];wp;skip;progress=> //.
-   by rewrite mem_add in_dom_set; rewrite -H.
+   by rewrite /in_dom dom_set !mem_add -/(in_dom _ _) H.
    by rewrite mem_add; rewrite -H; case (x1 = x{2})=> //=;
       intros=> ->; rewrite rw_eqT.
  wp;rnd;swap{1} -7;wp.
  call (_: ={RO.m,ARO.log}  /\ (forall x, in_dom x RO.m{1} = mem x ARO.log{1})).
  fun;if;[smt|inline RO.o;wp;rnd |];wp;skip;progress=> //.
-   by rewrite mem_add in_dom_set; rewrite -H.
+   by rewrite /in_dom dom_set !mem_add -/(in_dom _ _) H.
    by rewrite mem_add; rewrite -H; case (x1 = x{2})=> //=;
       intros=> ->; rewrite rw_eqT.
  do 2! (wp;rnd);skip;progress;smt.

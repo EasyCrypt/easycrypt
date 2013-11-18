@@ -1,4 +1,4 @@
-require import Map.
+require import FMap. import OptionGet.
 require import Distr.
 require import RandOrcl.
 
