@@ -342,7 +342,7 @@ theory LazyEager.
              IND_Eager.H.m{1} = IND_Lazy.H.m{2} /\
              in_dom x{2} IND_Lazy.H.m{2} /\ 
              proj IND_Eager.H.m.[x]{1} = result{2}).
-     by wp; rnd; wp; skip; smt.
+     by wp; rnd; wp; skip; progress=> //; smt.
   by wp; rnd{2}; skip; smt.
   qed.
 
