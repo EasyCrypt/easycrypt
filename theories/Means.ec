@@ -93,10 +93,7 @@ theory Mean.
       rewrite Pr mu_eq => // &m1.
       pose f:= (lambda (v : input) (r : input * output),
                   ev v (glob A){m1} (snd r) /\ v = fst r).
-      rewrite img_add.
-      (* bug rewrite cpOrs_add: we are trying to rewrite a partially applied function *)
-      cut ->: cpOrs (add (f x) (img f s)) == (cpOr (f x) (cpOrs (img f s))); last by smt.
-      by rewrite cpOrs_add.       
+      by rewrite img_add cpOrs_add; smt.
     rewrite Pr mu_disjoint; first by smt.
     by rewrite Hrec (prCond A &m x ev).
   qed.
@@ -136,7 +133,8 @@ theory LR.
              Pr[Rand(A).randAndWork() @ &m : ev (fst res) (glob A) (snd res)] by trivial.
     cut Hcr: forall x, 
                mem x (create (support {0,1})) <=>
-               mem x (add true (add false (FSet.empty)%FSet)) by smt.
+               mem x (add true (add false (FSet.empty)%FSet)).
+      by intros=> x; rewrite !FSet.mem_add; case x=> //=; smt.
     cut Hf : Finite.finite (create (support {0,1})).
       by exists (FSet.add true (FSet.add false FSet.empty)) => x;apply Hcr.
     cut := Mean A &m ev => /= -> //.
