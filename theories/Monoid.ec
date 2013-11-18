@@ -131,10 +131,10 @@ elim/set_comp s'.
   rewrite IH; first apply (leq_tran s')=> //; apply rm_leq.
   rewrite img_rm;
   (cut ->: (forall x, mem x s' => g (pick s') = g x => pick s' = x) = true)=> //;
-  apply eqT=> x x_in_s g_pick;
-  rewrite -pcan_g'_g; first by apply leq_s'_s; apply mem_pick.
-  by rewrite g_pick pcan_g'_g //; apply leq_s'_s.
-save.
+  apply eqT=> x x_in_s g_pick.
+  rewrite -pcan_g'_g; first by apply leq_s'_s.
+  by rewrite -g_pick pcan_g'_g //; apply leq_s'_s; apply mem_pick.
+qed.
 
 lemma sum_filter (f:'a -> t) (p:'a -> bool) (s:'a set):
   (forall x, (!p x) => f x = Z) =>
@@ -398,4 +398,3 @@ proof strict.
     by apply mu_eq.       
   by rewrite -(mu_false d);apply mu_eq.
 save.
-
