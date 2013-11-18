@@ -765,7 +765,7 @@ sform_u(P):
 	{ PFhoareS (pre, s, post) }
 
 | PR LBRACKET
-    mp=loc(fident) args=paren(plist0(sform_r(P), COMMA)) AT pn=mident
+    mp=loc(fident) args=paren(plist0(form_r(P), COMMA)) AT pn=mident
     COLON event=form_r(P)
   RBRACKET
     { PFprob (mp, args, pn, event) }
