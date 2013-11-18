@@ -36,6 +36,7 @@ type modapp_error =
 
 type modtyp_error =
 | MTE_FunSigDoesNotRepeatArgNames
+| MTE_InternalFunctor
 
 type funapp_error =
 | FAE_WrongArgCount
@@ -233,6 +234,9 @@ let pp_tyerror fmt env error =
 
   | InvalidModType MTE_FunSigDoesNotRepeatArgNames ->
       msg "applied argument names must repeat functor argument names"
+
+  | InvalidModType MTE_InternalFunctor ->
+      msg "functors must be top-level modules"
 
   | InvalidMem (name, MAE_IsConcrete) ->
       msg "the memory %s must be abstract" name
@@ -1174,22 +1178,27 @@ and transmodsig_body (env : EcEnv.env) (sa : Sm.t)
       items
 
 (* -------------------------------------------------------------------- *)
-let rec transmod (env : EcEnv.env) ~internal (x : symbol) (me : pmodule_expr) =
+let rec transmod ~attop (env : EcEnv.env) (x : symbol) (me : pmodule_expr) =
   match me.pl_desc with
   | Pm_ident m -> 
       let (mp, sig_) = trans_msymbol env {pl_desc = m; pl_loc = me.pl_loc} in
       let params = sig_.mis_params in
 
-      if params <> [] && internal then
+      if params <> [] && not attop then
         tyerror me.pl_loc env (InvalidModAppl MAE_WrongArgCount);
 
       let me = EcEnv.Mod.by_mpath mp env in
         { me with me_name  = x; me_body  = ME_Alias mp; }
 
-  | Pm_struct st -> transstruct env x st
+  | Pm_struct st -> transstruct ~attop env x (mk_loc me.pl_loc st)
 
 (* -------------------------------------------------------------------- *)
-and transstruct (env : EcEnv.env) (x : symbol) (st : pstructure) =
+and transstruct ~attop (env : EcEnv.env) (x : symbol) (st : pstructure located) =
+  let { pl_loc = loc; pl_desc = st; } = st in
+
+  if not attop && st.ps_params <> [] then
+    tyerror loc env (InvalidModType MTE_InternalFunctor);
+
   (* Check parameters types *) (* FIXME: dup names *)
   let stparams =
     List.map                          (* FIXME: exn *)
@@ -1290,7 +1299,7 @@ and transstruct (env : EcEnv.env) (x : symbol) (st : pstructure) =
 and transstruct1 (env : EcEnv.env) (st : pstructure_item located) =
   match unloc st with
   | Pst_mod ({ pl_desc = m }, me) ->
-      let me = transmod env ~internal:true m me in
+      let me = transmod ~attop:false env m me in
         [(m, MI_Module me)]
 
   | Pst_var (xs, ty) ->
