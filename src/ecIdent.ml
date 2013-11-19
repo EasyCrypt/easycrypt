@@ -40,7 +40,7 @@ type t = ident
 
 let create (x : symbol) = 
   { id_symb = x;
-    id_tag  = EcUidgen.unique () }
+    id_tag  = EcUid.unique () }
 
 let fresh (id : t) = create (name id)
 

@@ -34,7 +34,7 @@ let _ = EcPException.register (fun fmt exn ->
 let rec equal_type env t1 t2 = 
   ty_equal t1 t2 || 
   match t1.ty_node, t2.ty_node with
-  | Tunivar uid1, Tunivar uid2 -> EcUidgen.uid_equal uid1 uid2
+  | Tunivar uid1, Tunivar uid2 -> EcUid.uid_equal uid1 uid2
   | Tvar i1, Tvar i2 -> i1 = i2
   | Ttuple lt1, Ttuple lt2 ->
         List.length lt1 = List.length lt2

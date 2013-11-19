@@ -1465,7 +1465,7 @@ and fundef_add_symbol env symbols x =  (* for locals dup check *)
 
 and fundef_check_type subst_uni env (ty, loc) = 
   let ty = subst_uni ty in
-    if not (EcUidgen.Suid.is_empty (Tuni.fv ty)) then
+    if not (EcUid.Suid.is_empty (Tuni.fv ty)) then
       tyerror loc env OnlyMonoTypeAllowed;
     ty
 

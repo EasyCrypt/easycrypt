@@ -57,7 +57,7 @@ module NameGen = struct
         else acc
     in
       if i < 0 then
-        invalid_arg "EcUidgen.ofint [i < 0]";
+        invalid_arg "EcUid.ofint [i < 0]";
       ofint i ""
 
   let create () = {

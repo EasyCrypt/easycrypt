@@ -1,5 +1,5 @@
 (* -------------------------------------------------------------------- *)
-open EcUidgen
+open EcUid
 open EcSymbols
 open EcPath
 open EcTypes

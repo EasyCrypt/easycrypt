@@ -1,7 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcMaps
 open EcUtils
-open EcUidgen
+open EcUid
 open EcSymbols
 open EcIdent
 open EcTypes
@@ -250,7 +250,7 @@ module UniEnv = struct
       ref ue
 
   let fresh ?(tc = Sp.empty) ?ty ue = 
-    let uid = EcUidgen.unique () in
+    let uid = EcUid.unique () in
     let uf  =
       match ty with
       | Some { ty_node = Tunivar id } ->

@@ -1,5 +1,5 @@
 (* -------------------------------------------------------------------- *)
-open EcUidgen
+open EcUid
 open EcUtils
 open EcMaps
 open EcIdent
