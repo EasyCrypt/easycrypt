@@ -11,6 +11,8 @@ op myop(x y z : int) : int = x * y + z.
 theory T.
 end T
 
+op mysecondop(x y z : int) : int = x * y + z.
+
 lemma L x y z: myop x y z = x * y + z.
 proof.
   smt.

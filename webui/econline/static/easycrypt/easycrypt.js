@@ -78,17 +78,44 @@ EasyCryptEditor.prototype.onopen = function(event){
     var editorState = this.editor.getStateAfter(this.widgets.feedback.height() + 10, true);
     
     var numberOfOperators = editorState.operatorsList.length;
-    for (var i=0; i<numberOfOperators; i++) {
-	    this.widgets.operators.append('> ' + editorState.operatorsList[i].name + ' at line: ' + editorState.operatorsList[i].line + '\n');
-	    }
-	    
 	var numberOfTheories = editorState.theoriesList.length;
-    for (var j=0; j<numberOfTheories; j++) {
-	    this.widgets.operators.append('> ' + editorState.theoriesList[j].name + '\n' 
+	
+	var j=0;
+	var i=0;
+    //while(j<numberOfTheories) {
+    while(i<numberOfOperators) {
+    	if(editorState.operatorsList[i].line < editorState.theoriesList[j].startLine) {
+			this.widgets.operators.append('> ' + editorState.operatorsList[i].name + ' at line: ' 
+	    								+ editorState.operatorsList[i].line + '\n');
+	    		i++;
+	    		if(i>=numberOfOperators) {
+	    			for(j; j<numberOfTheories; j++)
+	    				this.widgets.operators.append('> ' + editorState.theoriesList[j].name 
 	    				+ ' starting at line: ' + editorState.theoriesList[j].startLine 
-	    				+ ' and ending at line: ' + editorState.theoriesList[j].endLine + '\n');
+	    				+ ' and ending at line: ' + editorState.theoriesList[j].endLine + '\n');	
+	    		}
 	    }
+	    else {
+	    	this.widgets.operators.append('> ' + editorState.theoriesList[j].name + '\n' 
+	    				+ ' starting at line: ' + editorState.theoriesList[j].startLine 
+	    				+ ' and ending at line: ' + editorState.theoriesList[j].endLine + '\n');	
+	    	j++;
+	    	if(j>=numberOfTheories) {
+	    		for(i; i<numberOfOperators; i++)
+	    			this.widgets.operators.append('> ' + editorState.operatorsList[i].name + ' at line: ' 
+	    								+ editorState.operatorsList[i].line + '\n');
+	    	}
+	    }
+	}
 }
+	    		//editorState.opertorsList.splice(i, 1);					
+	    		/*else {
+	    		if(editorState.operatorsList[i].line > editorState.theoriesList[j].startLine && 
+	    	   	   editorState.operatorsList[i].line < editorState.theoriesList[j].endLine) {
+	    			this.widgets.operators.append('------> ' + editorState.operatorsList[i].name 
+	    							+ ' at line: ' + editorState.operatorsList[i].line + '\n');		
+	    			i++;
+	    		}*/
 
 EasyCryptEditor.prototype.onclose = function(event){
     this.socket = null;
