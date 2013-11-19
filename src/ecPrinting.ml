@@ -494,13 +494,14 @@ let priority_of_binop name =
   | _ -> None
 
 (* -------------------------------------------------------------------- *)
-let priority_of_unop name =
-  match EcIo.lex_single_token name with
-  | Some EP.NOT      -> Some e_uni_prio_not
-  | Some EP.PUNIOP s when s = EcCoreLib.id_not -> Some e_uni_prio_not
-  | Some EP.PUNIOP _ -> Some e_uni_prio_uminus
-
-  | _  -> None
+let priority_of_unop =
+  let id_not = EcPath.basename EcCoreLib.p_not in
+    fun name ->
+      match EcIo.lex_single_token name with
+      | Some EP.NOT      -> Some e_uni_prio_not
+      | Some EP.PUNIOP s when s = id_not -> Some e_uni_prio_not
+      | Some EP.PUNIOP _ -> Some e_uni_prio_uminus
+      | _  -> None
 
 (* -------------------------------------------------------------------- *)
 let is_unop name = 
@@ -742,7 +743,7 @@ let pp_opapp (ppe : PPEnv.t) t_ty pp_sub outer fmt (pred, op, tvi, es) =
         in
           Some pp
 
-    | [e] when qs = EcCoreLib.s_from_int ->
+    | [e] when qs = EcCoreLib.s_real_of_int ->
         let pp fmt () =
           Format.fprintf fmt "%a%%r"
             (pp_sub ppe (fst outer, (max_op_prec, `NonAssoc))) e

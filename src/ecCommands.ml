@@ -387,12 +387,18 @@ let loadpath () =
 
 (* -------------------------------------------------------------------- *)
 let initial ~boot ~wrapper =
-  let prelude = (mk_loc _dummy "prelude", Some `Export) in
+  let prelude = (mk_loc _dummy "Prelude", Some `Export) in
   let loader  = EcLoader.forsys loader in
   let scope   = EcScope.empty in
-  let scope   = if   boot
-                then scope
-                else process_th_require loader scope prelude in
+  let scope   =
+    if   boot
+    then scope
+    else
+      List.fold_left
+        (fun scope th -> process_th_require loader scope th)
+        scope [prelude]
+  in
+
   let scope   = EcScope.Prover.set_wrapper scope wrapper in
     scope
 

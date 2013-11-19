@@ -11,15 +11,13 @@ and options = {
 }
 
 and cmp_option = {
-  cmpo_input    : string;
-  cmpo_provers  : prv_options;
-  cmpo_loader   : ldr_options;
+  cmpo_input   : string;
+  cmpo_provers : prv_options;
 }
 
 and cli_option = {
   clio_emacs   : bool;
   clio_provers : prv_options;
-  clio_loader  : ldr_options;
 }
 
 and prv_options = {
@@ -35,7 +33,8 @@ and ldr_options = {
 }
 
 and glb_options = {
-  o_why3 : string option;
+  o_why3   : string option;
+  o_loader : ldr_options;
 }
 
 (* -------------------------------------------------------------------- *)

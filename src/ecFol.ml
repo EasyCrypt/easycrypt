@@ -538,7 +538,7 @@ let rec f_int n  =
 let f_i0     = f_int 0
 let f_i1     = f_int 1
 
-let f_op_real_of_int = f_op EcCoreLib.p_from_int [] (tfun ty_int ty_real)
+let f_op_real_of_int = f_op EcCoreLib.p_real_of_int [] (tfun ty_int ty_real)
 let f_real_of_int f  = f_app f_op_real_of_int [f] ty_real
 let f_rint n         = f_real_of_int (f_int n)
 let f_r0             = f_rint 0
@@ -650,14 +650,13 @@ let f_eagerF pre sl fl fr sr post =
              eg_fr = fr; eg_sr = sr; eg_po = post; } in
   mk_form (FeagerF eg) ty_bool
 
-
 (* -------------------------------------------------------------------- *)
 let f_pr m f args e = mk_form (Fpr (m, f, args, e)) ty_real
 
 (* -------------------------------------------------------------------- *)
 let fop_int_le    = f_op EcCoreLib.p_int_le    [] (tfun tint  (tfun tint ty_bool))
 let fop_int_lt    = f_op EcCoreLib.p_int_lt    [] (tfun tint  (tfun tint ty_bool))
-let fop_int_prod  = f_op EcCoreLib.p_int_prod  [] (tfun tint  (tfun tint ty_int))
+let fop_int_mul   = f_op EcCoreLib.p_int_mul   [] (tfun tint  (tfun tint ty_int))
 let fop_int_add   = f_op EcCoreLib.p_int_add   [] (tfun tint  (tfun tint ty_int))
 let fop_int_sub   = f_op EcCoreLib.p_int_sub   [] (tfun tint  (tfun tint ty_int))
 let fop_int_pow   = f_op EcCoreLib.p_int_pow   [] (tfun tint  (tfun tint ty_int))
@@ -665,7 +664,7 @@ let fop_real_le   = f_op EcCoreLib.p_real_le   [] (tfun treal (tfun treal ty_boo
 let fop_real_lt   = f_op EcCoreLib.p_real_lt   [] (tfun treal (tfun treal ty_bool))
 let fop_real_add  = f_op EcCoreLib.p_real_add  [] (tfun treal (tfun treal treal))
 let fop_real_sub  = f_op EcCoreLib.p_real_sub  [] (tfun treal (tfun treal treal))
-let fop_real_prod = f_op EcCoreLib.p_real_prod [] (tfun treal (tfun treal treal))
+let fop_real_mul  = f_op EcCoreLib.p_real_mul  [] (tfun treal (tfun treal treal))
 let fop_real_div  = f_op EcCoreLib.p_real_div  [] (tfun treal (tfun treal treal))
 
 let f_int_binop op f1 f2 =
@@ -677,10 +676,10 @@ let f_int_lt = f_int_binop fop_int_lt
 let f_int_binop op f1 f2 =
   f_app op [f1; f2] ty_int
 
-let f_int_prod = f_int_binop fop_int_prod
-let f_int_add  = f_int_binop fop_int_add
-let f_int_sub  = f_int_binop fop_int_sub
-let f_int_pow  = f_int_binop fop_int_pow
+let f_int_add = f_int_binop fop_int_add
+let f_int_sub = f_int_binop fop_int_sub
+let f_int_mul = f_int_binop fop_int_mul
+let f_int_pow = f_int_binop fop_int_pow
 
 let fop_int_intval = f_op EcCoreLib.p_int_intval [] (tfun tint (tfun tint (tfset tint)))
 
@@ -702,10 +701,10 @@ let f_real_lt = f_real_cmp fop_real_lt
 let f_real_binop op f1 f2 =
   f_app op [f1; f2] ty_real
 
-let f_real_add  = f_real_binop fop_real_add
-let f_real_sub  = f_real_binop fop_real_sub
-let f_real_prod = f_real_binop fop_real_prod
-let f_real_div  = f_real_binop fop_real_div
+let f_real_add = f_real_binop fop_real_add
+let f_real_sub = f_real_binop fop_real_sub
+let f_real_mul = f_real_binop fop_real_mul
+let f_real_div = f_real_binop fop_real_div
 
 (* -------------------------------------------------------------------- *)
 let fop_in_supp ty = f_op EcCoreLib.p_in_supp [ty] (toarrow [ty; tdistr ty] tbool)
@@ -1497,13 +1496,13 @@ let f_int_sub_simpl f1 f2 =
       else if f_equal f_i0 f2 then f1
       else f_int_sub f1 f2
 
-let f_int_prod_simpl f1 f2 =
+let f_int_mul_simpl f1 f2 =
   try f_int (destr_int f1 * destr_int f2)
   with DestrError _ -> 
     if f_equal f_i0 f1 || f_equal f_i0 f2 then f_i0
     else if f_equal f_i1 f1 then f2
     else if f_equal f_i1 f2 then f1
-    else f_int_prod f1 f2
+    else f_int_mul f1 f2
 
 let destr_rdivint f =
   match f.f_node with
@@ -1547,34 +1546,34 @@ let f_real_sub_simpl f1 f2 =
       if f_equal f_r0 f2 then f1
       else f_real_sub f1 f2
 
-let rec f_real_prod_simpl f1 f2 =
+let rec f_real_mul_simpl f1 f2 =
   match f1.f_node, f2.f_node with
   | Fapp (op1,[f1_1;f1_2]), Fapp (op2,[f2_1;f2_2]) 
     when f_equal op1 fop_real_div && f_equal op2 fop_real_div ->
-    f_real_div_simpl (f_real_prod_simpl f1_1 f2_1) (f_real_prod_simpl f1_2 f2_2)
+    f_real_div_simpl (f_real_mul_simpl f1_1 f2_1) (f_real_mul_simpl f1_2 f2_2)
   | _, Fapp (op2,[f2_1;f2_2]) when f_equal op2 fop_real_div ->
-    f_real_div_simpl (f_real_prod_simpl f1 f2_1) f2_2
+    f_real_div_simpl (f_real_mul_simpl f1 f2_1) f2_2
   | Fapp (op1,[f1_1;f1_2]), _ when f_equal op1 fop_real_div ->
-    f_real_div_simpl (f_real_prod_simpl f1_1 f2) f1_2
+    f_real_div_simpl (f_real_mul_simpl f1_1 f2) f1_2
   | _ ->
     try f_rint (destr_rint f1 * destr_rint f2)
     with DestrError _ ->   
       if f_equal f_r0 f1 || f_equal f_r0 f2 then f_r0
       else if f_equal f_r1 f1 then f2
       else if f_equal f_r1 f2 then f1
-      else f_real_prod f1 f2
+      else f_real_mul f1 f2
 
 and f_real_div_simpl f1 f2 =
   match f1.f_node, f2.f_node with
   | Fapp (op1,[f1_1;f1_2]), Fapp (op2,[f2_1;f2_2]) 
     when f_equal op1 fop_real_div && f_equal op2 fop_real_div ->
-    f_real_div_simpl (f_real_prod_simpl f1_1 f2_2) (f_real_prod_simpl f1_2 f2_1)
+    f_real_div_simpl (f_real_mul_simpl f1_1 f2_2) (f_real_mul_simpl f1_2 f2_1)
   | _, Fapp (op2,[f2_1;f2_2]) 
     when f_equal op2 fop_real_div ->
-    f_real_div_simpl (f_real_prod_simpl f1 f2_2) f2_1
+    f_real_div_simpl (f_real_mul_simpl f1 f2_2) f2_1
   | Fapp (op,[f1_1;f1_2]), _ 
     when f_equal op fop_real_div ->
-    f_real_div_simpl f1_1 (f_real_prod_simpl f1_2 f2)
+    f_real_div_simpl f1_1 (f_real_mul_simpl f1_2 f2)
   | _ -> 
     try norm_real_int_div (destr_rint f1) (destr_rint f2)
     with DestrError _ ->
@@ -1773,7 +1772,7 @@ type op_kind =
   | OK_int_opp
   | OK_real_add
   | OK_real_sub
-  | OK_real_prod
+  | OK_real_mul
   | OK_real_div
   | OK_other 
 
@@ -1795,12 +1794,12 @@ let operators =
      EcCoreLib.p_real_lt, OK_real_lt;
      EcCoreLib.p_int_add, OK_int_add;
      EcCoreLib.p_int_sub, OK_int_sub;
-     EcCoreLib.p_int_prod, OK_int_mul;
+     EcCoreLib.p_int_mul, OK_int_mul;
      EcCoreLib.p_int_opp, OK_int_opp;
      EcCoreLib.p_int_pow, OK_int_exp;
      EcCoreLib.p_real_add, OK_real_add;
      EcCoreLib.p_real_sub, OK_real_sub;
-     EcCoreLib.p_real_prod, OK_real_prod;
+     EcCoreLib.p_real_mul, OK_real_mul;
      EcCoreLib.p_real_div, OK_real_div
     ]
   in
@@ -1817,7 +1816,7 @@ let is_logical_op op =
   | OK_not | OK_and _ | OK_or _ | OK_imp | OK_iff | OK_eq 
   | OK_int_le| OK_int_lt | OK_real_le | OK_real_lt 
   | OK_int_add | OK_int_sub | OK_int_mul 
-  | OK_real_add | OK_real_sub| OK_real_prod | OK_real_div -> true
+  | OK_real_add | OK_real_sub| OK_real_mul | OK_real_div -> true
   | _ -> false
 
 (* -------------------------------------------------------------------- *)

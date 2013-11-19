@@ -532,7 +532,7 @@ sexpr_u:
 
 | se=sexpr op=loc(FROM_INT)
    { let id =
-       PEident (mk_loc op.pl_loc EcCoreLib.s_from_int, None)
+       PEident (mk_loc op.pl_loc EcCoreLib.s_real_of_int, None)
      in
        PEapp (mk_loc op.pl_loc id, [se]) }
 
@@ -725,7 +725,7 @@ sform_u(P):
    { PFident (x, ti) }
 
 | se=sform_r(P) op=loc(FROM_INT)
-   { let id = PFident(mk_loc op.pl_loc EcCoreLib.s_from_int, None) in
+   { let id = PFident(mk_loc op.pl_loc EcCoreLib.s_real_of_int, None) in
      PFapp (mk_loc op.pl_loc id, [se]) }
 
 | se=sform_r(P) DLBRACKET ti=tvars_app? e=form_r(P) RBRACKET
