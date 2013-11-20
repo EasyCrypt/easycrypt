@@ -487,8 +487,18 @@ pside:
 (* Patterns                                                             *)
 
 lpattern_u:
-| x=ident { LPSymbol x }
-| LPAREN p=plist2(ident, COMMA) RPAREN { LPTuple p }
+| x=ident
+    { LPSymbol x }
+
+| LPAREN p=plist2(ident, COMMA) RPAREN
+    { LPTuple p }
+
+| LPBRACE fs=rlist1(lp_field, SEMICOLON) SEMICOLON? RPBRACE
+    { LPRecord fs }
+;
+
+lp_field:
+| f=qident EQ x=ident { (f, x) }
 ;
 
 %inline lpattern:

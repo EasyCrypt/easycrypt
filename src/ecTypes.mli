@@ -101,6 +101,7 @@ val fresh_id_of_ty : ty -> EcIdent.t
 type lpattern =
   | LSymbol of (EcIdent.t * ty)
   | LTuple  of (EcIdent.t * ty) list
+  | LRecord of EcPath.path * (EcIdent.t option * ty) list
 
 val lp_equal : lpattern -> lpattern -> bool
 val lp_hash  : lpattern -> int 

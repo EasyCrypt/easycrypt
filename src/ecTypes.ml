@@ -370,6 +370,7 @@ let pv x k =
 type lpattern =
   | LSymbol of (EcIdent.t * ty)
   | LTuple  of (EcIdent.t * ty) list
+  | LRecord of EcPath.path * (EcIdent.t option * ty) list
 
 let idty_equal (x1,t1) (x2,t2) = 
   EcIdent.id_equal x1 x2 && ty_equal t1 t2
@@ -383,16 +384,26 @@ let lp_equal p1 p2 =
 let idty_hash (x,t) = Why3.Hashcons.combine (EcIdent.id_hash x) (ty_hash t) 
 
 let lp_hash = function
-  | LSymbol x -> idty_hash x
-  | LTuple lx -> Why3.Hashcons.combine_list idty_hash 0 lx
+  | LSymbol  x -> idty_hash x
+  | LTuple  lx -> Why3.Hashcons.combine_list idty_hash 0 lx
+
+  | LRecord (p, lx) ->
+      let for1 (x, ty) =
+        Why3.Hashcons.combine (ty_hash ty)
+          (Why3.Hashcons.combine_option EcIdent.id_hash x)
+      in
+        Why3.Hashcons.combine_list for1 (p_hash p) lx
 
 let lp_ids = function
-  | LSymbol (id,_) -> [id] 
-  | LTuple ids -> List.map fst ids
+  | LSymbol (id,_)  -> [id] 
+  | LTuple  ids     -> List.map fst ids
+  | LRecord (_,ids) -> List.pmap fst ids
 
 let lp_bind = function
-  | LSymbol b -> [b] 
-  | LTuple b -> b
+  | LSymbol b     -> [b] 
+  | LTuple  b     -> b
+  | LRecord (_,b) ->
+      List.pmap (fun (x, ty) -> omap (fun x -> (x, ty)) x) b
 
 (* -------------------------------------------------------------------- *)
 type expr = {
@@ -424,9 +435,16 @@ let e_ty e    = e.e_ty
 
 (* -------------------------------------------------------------------- *)
 let lp_fv = function
-  | LSymbol (id,_) -> Sid.singleton id
+  | LSymbol (id,_) ->
+      Sid.singleton id
+
   | LTuple ids -> 
-      List.fold_left (fun s (id,_) -> Sid.add id s) Sid.empty ids
+      List.fold_left (fun s (id, _) -> Sid.add id s) Sid.empty ids
+
+  | LRecord (_,ids) ->
+      List.fold_left
+        (fun s (id, _) -> ofold Sid.add s id)
+        Sid.empty ids
 
 let pv_fv pv = EcPath.x_fv Mid.empty pv.pv_name
 
@@ -562,6 +580,9 @@ module ExprSmart = struct
   let l_tuple (lp, xs) xs' =
     if xs == xs' then lp else LTuple xs'
 
+  let l_record (lp, (p, xs)) (p', xs') =
+    if p == p' && xs == xs' then lp else LRecord (p', xs')
+
   let e_local (e, (x, ty)) (x', ty') =
     if   x == x' && ty == ty'
     then e
@@ -684,23 +705,24 @@ let e_subst_init freshen on_path on_ty opdef on_mpath =
   let on_xp = 
     let f = EcPath.x_subst on_mp in
     if f == identity then f else EcPath.Hx.memo 107 f in
-  {
-    es_freshen = freshen;
+
+  { es_freshen = freshen;
     es_p       = on_path;
     es_ty      = on_ty;
     es_opdef   = opdef;
     es_mp      = on_mp;
     es_xp      = on_xp;
-    es_loc     = Mid.empty;
-  }
+    es_loc     = Mid.empty; }
   
-let add_local s (x,t as xt) = 
+let add_local s ((x, t) as xt) = 
   let x' = if s.es_freshen then EcIdent.fresh x else x in
   let t' = s.es_ty t in
-  if x == x' && t == t' then s, xt
-  else 
-    let merger o = assert (o = None); Some (e_local x' t') in
-    { s with es_loc = Mid.change merger x s.es_loc }, (x',t')
+
+    if   x == x' && t == t'
+    then (s, xt)
+    else 
+      let merger o = assert (o = None); Some (e_local x' t') in
+        ({ s with es_loc = Mid.change merger x s.es_loc }, (x', t'))
       
 let add_locals = List.Smart.map_fold add_local
 
@@ -713,6 +735,23 @@ let subst_lpattern (s: e_subst) (lp:lpattern) =
   | LTuple xs ->
       let (s, xs') = add_locals s xs in
         (s, ExprSmart.l_tuple (lp, xs) xs')
+
+  | LRecord (p, xs) ->
+      let (s, xs') =
+        List.Smart.map_fold
+          (fun s ((x, t) as xt) ->
+            match x with
+            | None ->
+                let t' = s.es_ty t in
+                  if t == t' then (s, xt) else (s, (x, t'))
+            | Some x ->
+                let (s, (x', t')) = add_local s (x, t) in
+                  if   x == x' && t == t'
+                  then (s, xt)
+                  else (s, (Some x', t')))
+          s xs
+      in
+        (s, ExprSmart.l_record (lp, (p, xs)) (s.es_p p, xs'))
 
 let rec e_subst (s: e_subst) e =
   match e.e_node with

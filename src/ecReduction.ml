@@ -250,6 +250,11 @@ let reduce_op ri env p tys =
   | Some s when Sp.mem p s -> Op.reduce env p tys 
   | _ -> raise NotReducible
 
+let is_record env f =
+  match EcFol.destr_app f with
+  | { f_node = Fop (p, _) }, _ -> EcEnv.Op.is_record_ctor env p
+  | _ -> false
+
 (* -------------------------------------------------------------------- *)
 let rec h_red ri env hyps f = 
   match f.f_node with
@@ -262,6 +267,16 @@ let rec h_red ri env hyps f =
       List.fold_left2 (fun s (x,_) e1 -> Fsubst.f_bind_local s x e1) 
         Fsubst.f_subst_id ids es in
     Fsubst.f_subst s e2
+  | Flet(LRecord (_, ids), f1, f2) when ri.iota && is_record env f1 ->
+      let args  = snd (EcFol.destr_app f1) in
+      let subst =
+        List.fold_left2 (fun subst (x, _) e ->
+          match x with
+          | None   -> subst
+          | Some x -> Fsubst.f_bind_local subst x e)
+          Fsubst.f_subst_id ids args
+      in
+        Fsubst.f_subst subst f2
   | Fglob(mp,m) when ri.modpath ->
     let f' = EcEnv.NormMp.norm_glob env m mp in
     if f_equal f f' then raise NotReducible

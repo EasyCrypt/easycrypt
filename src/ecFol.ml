@@ -1194,12 +1194,29 @@ module Fsubst = struct
   let subst_lpattern (s: f_subst) (lp:lpattern) = 
     match lp with
     | LSymbol x ->
-        let s, x' = add_local s x in
+        let (s, x') = add_local s x in
           if x == x' then (s, lp) else (s, LSymbol x')
 
     | LTuple xs ->
         let (s, xs') = add_locals s xs in
           if xs == xs' then (s, lp) else (s, LTuple xs')
+
+    | LRecord (p, xs) ->
+        let (s, xs') =
+          List.Smart.map_fold
+            (fun s ((x, t) as xt) ->
+              match x with
+              | None ->
+                  let t' = s.fs_ty t in
+                    if t == t' then (s, xt) else (s, (x, t'))
+              | Some x ->
+                  let (s, (x', t')) = add_local s (x, t) in
+                    if   x == x' && t == t'
+                    then (s, xt)
+                    else (s, (Some x', t')))
+            s xs
+        in
+          if xs == xs' then (s, lp) else (s, LRecord (p, xs'))
 
   let gty_subst s gty = 
     if is_subst_id s then gty 
@@ -1580,27 +1597,46 @@ and f_real_div_simpl f1 f2 =
       if f_equal f2 f_r1 then f1 
       else f_real_div f1 f2
 
-
 (* -------------------------------------------------------------------- *)
 let f_let_simpl lp f1 f2 =
-  match lp, f1.f_node with
-  | LSymbol (id,_), _ ->
-      let n = Mid.find_def 0 id (f_fv f2) in
-      if n = 0 then f2 
-      else if n = 1 || can_subst f1 then Fsubst.subst_local id f1 f2
-      else f_let lp f1 f2 
-  | LTuple ids, Ftuple fs ->
-      let d, s = 
-        List.fold_left2 (fun (d,s) (id,ty) f1 ->
-          let n = Mid.find_def 0 id (f_fv f2) in
-          if n = 0 then (d,s) 
-          else if n = 1 || can_subst f1 then (d,Mid.add id f1 s)
-          else (((id,ty),f1)::d,s)) ([],Mid.empty) ids fs in
-      List.fold_left (fun f2 (id,f1) -> f_let (LSymbol id) f1 f2)
-        (Fsubst.subst_locals s f2) d
-  | LTuple ids, _ ->
-    if List.for_all (fun (id,_) -> Mid.find_def 0 id (f_fv f2) = 0) ids then f2
-    else f_let lp f1 f2 
+  match lp with
+  | LSymbol (id, _) -> begin
+      match Mid.find_opt id (f_fv f2) with
+      | None   -> f2
+      | Some i ->
+          if   i = 1 || can_subst f1
+          then Fsubst.subst_local id f1 f2
+          else f_let lp f1 f2 
+    end
+
+  | LTuple ids -> begin
+      match f1.f_node with
+      | Ftuple fs ->
+          let (d, s) =
+            List.fold_left2 (fun (d, s) (id, ty) f1 ->
+              match Mid.find_opt id (f_fv f2) with
+              | None   -> (d, s)
+              | Some i ->
+                  if   i = 1 || can_subst f1
+                  then (d, Mid.add id f1 s)
+                  else (((id, ty), f1) :: d, s))
+              ([], Mid.empty) ids fs
+          in
+            List.fold_left
+              (fun f2 (id, f1) -> f_let (LSymbol id) f1 f2)
+              (Fsubst.subst_locals s f2) d
+      | _ ->
+        let check (id, _) = Mid.find_opt id (f_fv f2) = None in
+          if List.for_all check ids then f2 else f_let lp f1 f2
+    end
+
+  | LRecord (_, ids) ->
+      let check (id, _) =
+        match id with
+        | None -> true
+        | Some id -> Mid.find_opt id (f_fv f2) = None
+      in
+        if List.for_all check ids then f2 else f_let lp f1 f2
 
 let f_lets_simpl =
   (* FIXME : optimize this *)

@@ -1389,9 +1389,34 @@ let trans_form env f =
                 (List.map Term.pat_var ids) t1 in
             let f2 = trans_form f2 in
             let br = Term.t_close_branch pat f2 in
-            Term.t_case f1 [br] in
-      restore mid;
-      res
+            Term.t_case f1 [br]
+        | LRecord (recp, fields) ->
+            let ctor =
+              match Mp.find_opt recp (!env).env_ty with
+              | Some (_, `Record ((_, ctor), _)) -> ctor
+              | _ -> assert false in
+            let pat =
+              let pat =
+                List.map (fun (x, ty) ->
+                  let ty = trans_ty !env ty in
+                  let v  =
+                    match x with
+                    | None   -> None
+                    | Some x ->
+                        let env0, v = add_id !env (x, ty) in
+                          env := env0; Some v
+                  in
+                    match v with
+                    | None   -> Term.pat_wild ty
+                    | Some v -> Term.pat_var v)
+                  fields
+              in
+                Term.pat_app ctor pat (Term.t_type f1) in
+            let f2 = trans_form f2 in
+            let br = Term.t_close_branch pat f2 in
+            Term.t_case f1 [br]
+      in
+        restore mid; res
 
     | Fint n ->
         let n = Number.ConstInt(Number.int_const_dec (string_of_int n)) in

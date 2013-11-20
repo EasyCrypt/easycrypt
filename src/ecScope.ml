@@ -289,6 +289,7 @@ end = struct
     match lp with
     | LSymbol (_, ty) -> on_mpath_ty cb ty
     | LTuple  xs      -> List.iter (fun (_, ty) -> on_mpath_ty cb ty) xs
+    | LRecord (_, xs) -> List.iter (on_mpath_ty cb |- snd) xs
 
   let rec on_mpath_expr cb (e : expr) =
     let cbrec = on_mpath_expr cb in
