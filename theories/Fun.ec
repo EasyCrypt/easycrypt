@@ -7,6 +7,13 @@ lemma nosmt eq_tran: forall (X Y Z:'a -> 'b), X == Y => Y == Z => X == Z by [].
 
 axiom fun_ext: forall (f g:'a -> 'b), f == g => f = g.
 
+(* We need to have these two explicit, since = is not an operator *)
+lemma eqL (x:'a): (lambda y, x = y) = (=) x
+by apply fun_ext.
+
+lemma eqR (y:'a): (lambda x, x = y) = (=) y
+by (apply fun_ext=> x //=; rewrite (rw_eq_sym x)).
+
 (** Computable predicates *)
 type 'a cpred = 'a -> bool.
 pred (<=) (p q:'a cpred) = forall (a:'a), p a => q a.
@@ -31,7 +38,16 @@ op cpOr(p q:'a cpred, x:'a) : bool = p x \/ q x.
 
 (** Lemmas *)
 lemma cpTrue_true : forall (x:'a), cpTrue x by [].
+
+lemma cpTrue_def (p:'a cpred): (forall x, p x) => p = cpTrue.
+proof strict.
+by intros=> px; apply fun_ext=> x; rewrite px.
+qed.
+
 lemma cpFalse_false : forall (x:'a), !cpFalse x by [].
+
+lemma cpFalse_def (p:'a cpred): (forall x, !p x) => p = cpFalse
+by [].
 
 lemma cpNot_not : forall (p:'a cpred) x, cpNot p x <=> !p x by [].
 lemma cpAnd_and :
