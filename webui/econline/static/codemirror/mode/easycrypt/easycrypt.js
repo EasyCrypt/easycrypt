@@ -15,7 +15,7 @@ CodeMirror.defineMode("easycrypt", function(config, parserConfig) {
 
   function tokenBase(stream, state) {
     var ch = stream.next();
-    //var newLine = '\\n';
+	//var newLine = '\\n';
 
     if (hooks[ch]) {
       var result = hooks[ch](stream, state);
@@ -96,6 +96,7 @@ CodeMirror.defineMode("easycrypt", function(config, parserConfig) {
   			state.theoriesList[i].endLine = state.lines;
   	}
     
+    stream.backUp(lengthEndAndName-lengthEndAndSpaces);
   	
   }	
 
@@ -123,6 +124,7 @@ CodeMirror.defineMode("easycrypt", function(config, parserConfig) {
     var operatorName =  stream.current().substring(lengthOpAndSpaces, lengthOpAndName);
     
     state.operatorsList[state.operatorsCounter] = new Operator(operatorName, state.lines);
+    //alert(state.operatorsList[state.operatorsCounter].line);
     state.operatorsCounter = state.operatorsCounter + 1;
 	
     stream.backUp(lengthOpAndName-lengthOpAndSpaces);
@@ -197,7 +199,7 @@ CodeMirror.defineMode("easycrypt", function(config, parserConfig) {
         operatorsCounter : 0,
         theoriesList: new Array(),
         theoriesCounter : 0,
-        lines: 1
+        lines: 0
       };
     },
 
@@ -231,9 +233,15 @@ CodeMirror.defineMode("easycrypt", function(config, parserConfig) {
       state.startOfLine = false;
       return style;
     },
+    
+    blankLine: function blankLine(state) {
+  	// increment lines counter whenever a blank line is passed over 
+  	state.lines = state.lines + 1;
+  },
 
     electricChars: "{}"
-  };
+  };	
+  
 });
 
 (function() {

@@ -73,9 +73,9 @@ EasyCryptEditor.prototype.createWidget = function() {
 EasyCryptEditor.prototype.onopen = function(event){
     this.log('You are now connected to the EasyCrypt engine', 'success', true);
     this.setStatus('ready');
-    this.widgets.operators.append('Operators List: \n');
     
     var editorState = this.editor.getStateAfter(this.widgets.feedback.height() + 10, true);
+    this.widgets.operators.append('Operators List: \n');
     
     var numberOfOperators = editorState.operatorsList.length;
 	var numberOfTheories = editorState.theoriesList.length;
