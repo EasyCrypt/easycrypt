@@ -738,7 +738,7 @@ sform_u(P):
    { PFside (x, s) }
 
 | TICKPIPE ti=tvars_app? e =form_r(P) PIPE 
-    { pfapp_symb e.pl_loc EcCoreLib.s_abs ti [e] }
+   { pfapp_symb e.pl_loc EcCoreLib.s_abs ti [e] }
 
 | LPAREN fs=plist0(form_r(P), COMMA) RPAREN
    { PFtuple fs }
@@ -1658,7 +1658,7 @@ rwarg:
 | s=rwside r=rwrepeat? o=rwocc? fp=fpattern(form)
     { RWRw (s, r, o |> omap EcMaps.Sint.of_list, fp) }
 
-| s=rwside r=rwrepeat? o=rwocc? SLASH x=sform_h
+| s=rwside r=rwrepeat? o=rwocc? SLASH x=sform_h %prec prec_tactic
     { let loc = EcLocation.make $startpos $endpos in
         if r <> None then
           parse_error loc (Some "delta-repeat not supported");
