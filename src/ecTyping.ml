@@ -19,6 +19,8 @@ module Sx  = EcPath.Sx
 module Mx  = EcPath.Mx
 module Mid = EcIdent.Mid
 
+module EqTest = EcReduction.EqTest
+
 module TC = EcTypeClass
 
 (* -------------------------------------------------------------------- *)
@@ -535,7 +537,8 @@ let rec check_sig_cnv mode (env:EcEnv.env) (sin:module_sig) (sout:module_sig) =
        * instantiating an abstract module with an implementation. *)
 
       let arg_compatible vd1 vd2 = 
-        vd1.v_name = vd2.v_name && EcReduction.equal_type env vd1.v_type vd2.v_type 
+           vd1.v_name = vd2.v_name
+        && EqTest.for_type env vd1.v_type vd2.v_type 
       in
 
       let (iargs, oargs) = (fin.fs_params, fout.fs_params) in
@@ -545,7 +548,7 @@ let rec check_sig_cnv mode (env:EcEnv.env) (sin:module_sig) (sout:module_sig) =
           tymod_cnv_failure (E_TyModCnv_MismatchFunSig fin.fs_name);
         if not (List.for_all2 arg_compatible iargs oargs) then
           tymod_cnv_failure (E_TyModCnv_MismatchFunSig fin.fs_name);
-        if not (EcReduction.equal_type env ires ores) then
+        if not (EqTest.for_type env ires ores) then
           tymod_cnv_failure (E_TyModCnv_MismatchFunSig fin.fs_name);
 
         let flcmp () =
@@ -1579,7 +1582,7 @@ and translvalue ue (env : EcEnv.env) lvalue =
 
   | PLvTuple xs -> 
       let xs = List.map (trans_pv env) xs in
-      if not (List.uniqf (EcReduction.pv_equal_norm env) (List.map fst xs)) then
+      if not (List.uniqf (EqTest.for_pv_norm env) (List.map fst xs)) then
         tyerror lvalue.pl_loc env LvNonLinear;
       let ty = ttuple (List.map snd xs) in
       (LvTuple xs, ty)

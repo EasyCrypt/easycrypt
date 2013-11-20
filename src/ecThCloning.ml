@@ -128,7 +128,7 @@ let ty_compatible env (rtyvars, rty) (ntyvars, nty) =
   in
 
   let nty = EcTypes.Tvar.subst s nty in
-    if not (EcReduction.equal_type env rty nty) then
+    if not (EcReduction.EqTest.for_type env rty nty) then
       raise Incompatible
 
 let ty_compatible env t1 t2 =

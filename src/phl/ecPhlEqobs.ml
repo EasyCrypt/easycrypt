@@ -104,9 +104,9 @@ let rec eqobs_inF env eqg (inv,ifvl,ifvr as inve) log fl fr eqO =
           let sigl, sigr = defl.f_sig, defr.f_sig in
           let testty = 
             List.all2 (fun v1 v2 -> 
-              EcReduction.equal_type env v1.v_type v2.v_type)
+              EcReduction.EqTest.for_type env v1.v_type v2.v_type)
               sigl.fs_params sigr.fs_params && 
-              EcReduction.equal_type env sigl.fs_ret sigr.fs_ret 
+              EcReduction.EqTest.for_type env sigl.fs_ret sigr.fs_ret 
           in
           if not testty then raise EqObsInError;
           let eqo' = 

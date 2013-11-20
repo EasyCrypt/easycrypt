@@ -481,7 +481,7 @@ let eager env s s' inv eqIs eqXs c c' eqO =
 
   let remove lvl lvr eqs =
     let aux eqs (pvl,tyl) (pvr,tyr) = 
-      if (EcReduction.equal_type env tyl tyr) then
+      if (EcReduction.EqTest.for_type env tyl tyr) then
         Mpv2.remove env pvl pvr eqs
       else raise EqObsInError in
 
@@ -491,7 +491,7 @@ let eager env s s' inv eqIs eqXs c c' eqO =
       List.fold_left2 aux eqs ll lr
     | LvMap((pl,tysl), pvl, el, tyl),
         LvMap((pr,tysr), pvr, er,tyr) when EcPath.p_equal pl pr &&
-      List.all2  (EcReduction.equal_type env) (tyl::tysl) (tyr::tysr) ->
+      List.all2  (EcReduction.EqTest.for_type env) (tyl::tysl) (tyr::tysr) ->
       add_eqs env (Mpv2.remove env pvl pvr eqs) el er
     | _, _ -> raise EqObsInError in
 

@@ -1655,7 +1655,7 @@ module Ty = struct
            match Mstr.find_opt x ops with
            | None -> m
            | Some (loc, (p, op)) ->
-               if not (EcReduction.equal_type env ty (op_ty op)) then
+               if not (EcReduction.EqTest.for_type env ty (op_ty op)) then
                  hierror ~loc "invalid type for operator `%s'" x;
                Mstr.add x p m)
         Mstr.empty reqs
