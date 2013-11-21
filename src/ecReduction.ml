@@ -256,18 +256,31 @@ let is_record env f =
   | _ -> false
 
 (* -------------------------------------------------------------------- *)
-let rec h_red ri env hyps f = 
+let rec h_red ri env hyps f =
   match f.f_node with
-  | Flocal x -> reduce_local ri hyps x 
-  | Flet(LSymbol(x,_), e1, e2) when ri.zeta ->
-    let s = Fsubst.f_bind_local Fsubst.f_subst_id x e1 in
-    Fsubst.f_subst s e2
-  | Flet(LTuple ids, { f_node = Ftuple es }, e2) when ri.iota ->
-    let s = 
-      List.fold_left2 (fun s (x,_) e1 -> Fsubst.f_bind_local s x e1) 
-        Fsubst.f_subst_id ids es in
-    Fsubst.f_subst s e2
-  | Flet(LRecord (_, ids), f1, f2) when ri.iota && is_record env f1 ->
+    (* β-reduction *)
+  | Fapp({f_node = Fquant(Llambda,bds,body)}, args) when ri.beta -> 
+      f_betared_simpl bds body args f.f_ty
+
+    (* ζ-reduction *)
+  | Flocal x -> reduce_local ri hyps x
+
+    (* ζ-reduction *)
+  | Flet (LSymbol(x,_), e1, e2) when ri.zeta ->
+      let s = Fsubst.f_bind_local Fsubst.f_subst_id x e1 in
+        Fsubst.f_subst s e2
+
+    (* ι-reduction (let-tuple) *)
+  | Flet (LTuple ids, { f_node = Ftuple es }, e2) when ri.iota ->
+      let s = 
+        List.fold_left2
+          (fun s (x,_) e1 -> Fsubst.f_bind_local s x e1) 
+          Fsubst.f_subst_id ids es
+      in
+        Fsubst.f_subst s e2
+
+    (* ι-reduction (let-records) *)
+  | Flet (LRecord (_, ids), f1, f2) when ri.iota && is_record env f1 ->
       let args  = snd (EcFol.destr_app f1) in
       let subst =
         List.fold_left2 (fun subst (x, _) e ->
@@ -277,85 +290,95 @@ let rec h_red ri env hyps f =
           Fsubst.f_subst_id ids args
       in
         Fsubst.f_subst subst f2
-  | Fglob(mp,m) when ri.modpath ->
-    let f' = EcEnv.NormMp.norm_glob env m mp in
-    if f_equal f f' then raise NotReducible
-    else f' 
-  | Fpvar (pv,m) when ri.modpath ->
-    let pv' = EcEnv.NormMp.norm_pvar env pv in
-    if pv_equal pv pv' then raise NotReducible 
-    else f_pvar pv' f.f_ty m
-  | Flet(lp,f1,f2) -> f_let lp (h_red ri env hyps f1) f2 
-  | Fapp({f_node = Fquant(Llambda,bds,body)}, args) when ri.beta -> 
-    f_betared_simpl bds body args f.f_ty
-  | Fapp({f_node = Fop(p,_)} as fo, args)
-      when ri.logic && is_logical_op p ->
-    let f' = 
-      match op_kind p, args with
-      | OK_not  , [f1] -> f_not_simpl f1 
-      | OK_and b, [f1;f2] ->
-        if b then f_anda_simpl f1 f2 else f_and_simpl f1 f2 
-      | OK_or b , [f1;f2] ->
-        if b then f_ora_simpl f1 f2 else f_or_simpl f1 f2 
-      | OK_imp  , [f1;f2] -> f_imp_simpl f1 f2 
-      | OK_iff  , [f1;f2] -> f_iff_simpl f1 f2 
-      | OK_eq   , [f1;f2] -> f_eq_simpl f1 f2 
-      | OK_int_le, [f1;f2] -> f_int_le_simpl f1 f2
-      | OK_int_lt, [f1;f2] -> f_int_lt_simpl f1 f2
-      | OK_real_le, [f1;f2] -> f_real_le_simpl f1 f2
-      | OK_real_lt, [f1;f2] -> f_real_lt_simpl f1 f2
-      | OK_int_add, [f1;f2] -> f_int_add_simpl f1 f2
-      | OK_int_sub, [f1;f2] -> f_int_sub_simpl f1 f2
-      | OK_int_mul, [f1;f2] -> f_int_mul_simpl f1 f2
-      | OK_real_add, [f1;f2] -> f_real_add_simpl f1 f2
-      | OK_real_sub, [f1;f2] -> f_real_sub_simpl f1 f2
-      | OK_real_mul, [f1;f2] -> f_real_mul_simpl f1 f2
-      | OK_real_div, [f1;f2] ->f_real_div_simpl f1 f2
-      | _                 -> f in
-    if f_equal f f' then f_app fo (h_red_args ri env hyps args) f.f_ty
-    else f'
-  | Fapp({f_node = Fop(p,_)} as f1, args)
-        when ri.iota && EcEnv.Op.is_projection env p -> begin
-      let fallback = lazy (f_app (h_red ri env hyps f1) args f.f_ty) in
-        match args with
-        | [mk] -> begin
-            match (odfl mk (h_red_opt ri env hyps mk)).f_node with
-            | Fapp ({ f_node = Fop (mkp, _) }, mkargs) when EcEnv.Op.is_record_ctor env mkp ->
+
+    (* ι-reduction (records projection) *)
+  | Fapp ({ f_node = Fop (p, _); } as f1, args)
+      when ri.iota && EcEnv.Op.is_projection env p -> begin
+
+      match args with
+      | [mk] -> begin
+          match (odfl mk (h_red_opt ri env hyps mk)).f_node with
+          | Fapp ({ f_node = Fop (mkp, _) }, mkargs) when EcEnv.Op.is_record_ctor env mkp ->
               let (_, i, _) = EcDecl.operator_as_proj (oget (EcEnv.Op.by_path_opt p env)) in
               let v = List.nth mkargs i in
                 odfl v (h_red_opt ri env hyps v)
-            | _ -> Lazy.force fallback
-        end
-        | _ -> Lazy.force fallback
+          | _ -> f_app (h_red ri env hyps f1) args f.f_ty
+      end
+      | _ -> f_app (h_red ri env hyps f1) args f.f_ty
     end
-  | Fapp(f1,args) ->
-    f_app (h_red ri env hyps f1) args f.f_ty
-  | Fop(p,tys) -> reduce_op ri env p tys
-  | Fif(f1,f2,f3) when ri.iota ->
-    let f' = f_if_simpl f1 f2 f3 in
-    if f_equal f f' then f_if (h_red ri env hyps f1) f2 f3
-    else f' 
-  | Fquant(Lforall,b,f1) ->
-    begin 
-      try 
-        let env = Mod.add_mod_binding b env in
-        f_forall_simpl b (h_red ri env hyps f1)
-      with NotReducible ->
-        let f' = f_forall_simpl b f1 in
-        if f_equal f f' then raise NotReducible
+
+    (* ι-reduction (if-then-else) *)
+  | Fif (f1, f2, f3) when ri.iota ->
+      let f' = f_if_simpl f1 f2 f3 in
+        if f_equal f f' then f_if (h_red ri env hyps f1) f2 f3 else f' 
+
+    (* μ-reduction *)
+  | Fglob (mp, m) when ri.modpath ->
+      let f' = EcEnv.NormMp.norm_glob env m mp in
+        if f_equal f f' then raise NotReducible else f' 
+
+    (* μ-reduction *)
+  | Fpvar (pv, m) when ri.modpath ->
+      let pv' = EcEnv.NormMp.norm_pvar env pv in
+        if pv_equal pv pv' then raise NotReducible else f_pvar pv' f.f_ty m
+
+    (* δ-reduction *)
+  | Fop (p, tys) -> reduce_op ri env p tys
+
+    (* logical reduction *)
+  | Fapp ({f_node = Fop (p, _); } as fo, args) when ri.logic && is_logical_op p ->
+      let f' = 
+        match op_kind p, args with
+        | OK_not      , [f1]    -> f_not_simpl f1 
+        | OK_and true , [f1;f2] -> f_anda_simpl f1 f2
+        | OK_or  true , [f1;f2] -> f_ora_simpl f1 f2
+        | OK_and false, [f1;f2] -> f_and_simpl f1 f2 
+        | OK_or  false, [f1;f2] -> f_or_simpl f1 f2 
+        | OK_imp      , [f1;f2] -> f_imp_simpl f1 f2 
+        | OK_iff      , [f1;f2] -> f_iff_simpl f1 f2 
+        | OK_eq       , [f1;f2] -> f_eq_simpl f1 f2 
+        | OK_int_le   , [f1;f2] -> f_int_le_simpl f1 f2
+        | OK_int_lt   , [f1;f2] -> f_int_lt_simpl f1 f2
+        | OK_real_le  , [f1;f2] -> f_real_le_simpl f1 f2
+        | OK_real_lt  , [f1;f2] -> f_real_lt_simpl f1 f2
+        | OK_int_add  , [f1;f2] -> f_int_add_simpl f1 f2
+        | OK_int_sub  , [f1;f2] -> f_int_sub_simpl f1 f2
+        | OK_int_mul  , [f1;f2] -> f_int_mul_simpl f1 f2
+        | OK_real_add , [f1;f2] -> f_real_add_simpl f1 f2
+        | OK_real_sub , [f1;f2] -> f_real_sub_simpl f1 f2
+        | OK_real_mul , [f1;f2] -> f_real_mul_simpl f1 f2
+        | OK_real_div , [f1;f2] -> f_real_div_simpl f1 f2
+        | _                     -> f
+      in
+        if   f_equal f f'
+        then f_app fo (h_red_args ri env hyps args) f.f_ty
         else f'
-    end
-  | Fquant(Lexists,b,f1) ->
-    begin 
-      try 
+
+    (* contextual rule - let *)
+  | Flet (lp, f1, f2) -> f_let lp (h_red ri env hyps f1) f2 
+
+    (* Contextual rule - application args. *)
+  | Fapp (f1, args) ->
+      f_app (h_red ri env hyps f1) args f.f_ty
+
+    (* Contextual rule - bindings *)
+  | Fquant (Lforall as t, b, f1)
+  | Fquant (Lexists as t, b, f1) -> begin
+      let ctor = match t with
+        | Lforall -> f_forall_simpl
+        | Lexists -> f_exists_simpl
+        | _       -> assert false in
+
+      try
         let env = Mod.add_mod_binding b env in
-        f_exists_simpl b (h_red ri env hyps f1)
+          ctor b (h_red ri env hyps f1)
       with NotReducible ->
-        let f' = f_exists_simpl b f1 in
-        if f_equal f f' then raise NotReducible
-        else f'
+        let f' = ctor b f1 in
+          if f_equal f f' then raise NotReducible else f'
     end
-  | _ -> raise NotReducible 
+
+  | _ -> raise NotReducible
+
 and h_red_args ri env hyps args =
   match args with
   | [] -> raise NotReducible
