@@ -110,6 +110,11 @@ let is_rcrd op =
   | OB_oper (Some (OP_Record _)) -> true
   | _ -> false
 
+let is_fix op =
+  match op.op_kind with
+  | OB_oper (Some (OP_Fix _)) -> true
+  | _ -> false
+
 let gen_op tparams ty kind = {
   op_tparams = tparams;
   op_ty      = ty;
@@ -137,6 +142,11 @@ let operator_as_proj (op : operator) =
 let operator_as_rcrd (op : operator) =
   match op.op_kind with
   | OB_oper (Some (OP_Record recp)) -> recp
+  | _ -> assert false
+
+let operator_as_fix (op : operator) =
+  match op.op_kind with
+  | OB_oper (Some (OP_Fix fix)) -> fix
   | _ -> assert false
 
 (* -------------------------------------------------------------------- *)

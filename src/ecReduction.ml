@@ -294,23 +294,88 @@ let rec h_red ri env hyps f =
     (* ι-reduction (records projection) *)
   | Fapp ({ f_node = Fop (p, _); } as f1, args)
       when ri.iota && EcEnv.Op.is_projection env p -> begin
+        try
+          match args with
+          | [mk] -> begin
+              match (odfl mk (h_red_opt ri env hyps mk)).f_node with
+              | Fapp ({ f_node = Fop (mkp, _) }, mkargs) ->
+                  if not (EcEnv.Op.is_record_ctor env mkp) then
+                    raise NotReducible;
+                  let v = oget (EcEnv.Op.by_path_opt p env) in
+                  let v = proj3_2 (EcDecl.operator_as_proj v) in
+                  let v = List.nth mkargs v in
+                    odfl v (h_red_opt ri env hyps v)
+              | _ -> raise NotReducible
+            end
+          | _ -> raise NotReducible
 
-      match args with
-      | [mk] -> begin
-          match (odfl mk (h_red_opt ri env hyps mk)).f_node with
-          | Fapp ({ f_node = Fop (mkp, _) }, mkargs) when EcEnv.Op.is_record_ctor env mkp ->
-              let (_, i, _) = EcDecl.operator_as_proj (oget (EcEnv.Op.by_path_opt p env)) in
-              let v = List.nth mkargs i in
-                odfl v (h_red_opt ri env hyps v)
-          | _ -> f_app (h_red ri env hyps f1) args f.f_ty
+        with NotReducible ->
+          f_app (h_red ri env hyps f1) args f.f_ty
       end
-      | _ -> f_app (h_red ri env hyps f1) args f.f_ty
-    end
 
     (* ι-reduction (if-then-else) *)
   | Fif (f1, f2, f3) when ri.iota ->
       let f' = f_if_simpl f1 f2 f3 in
         if f_equal f f' then f_if (h_red ri env hyps f1) f2 f3 else f' 
+
+    (* ι-reduction (match-fix) *)
+  | Fapp ({ f_node = Fop (p, tys); } as f1, fargs)
+      when ri.iota && EcEnv.Op.is_fix_def env p -> begin
+
+        try
+          let op  = oget (EcEnv.Op.by_path_opt p env) in
+          let fix = EcDecl.operator_as_fix op in
+
+            if List.length fargs <> snd (fix.EcDecl.opf_struct) then
+              raise NotReducible;
+
+          let args  = Array.of_list fargs in
+          let pargs = List.fold_left (fun (opb, acc) v ->
+              let v = args.(v) in
+              let v = odfl v (h_red_opt ri env hyps v) in
+
+                match fst_map (fun x -> x.f_node) (EcFol.destr_app v) with
+                | (Fop (p, _), cargs) when EcEnv.Op.is_dtype_ctor env p -> begin
+                    let idx = EcEnv.Op.by_path p env in
+                    let idx = snd (EcDecl.operator_as_ctor idx) in
+                      match opb with
+                      | EcDecl.OPB_Leaf   _  -> assert false
+                      | EcDecl.OPB_Branch bs ->
+                         ((Parray.get bs idx).EcDecl.opb_sub, cargs :: acc)
+                  end
+                | _ -> raise NotReducible)
+            (fix.EcDecl.opf_branches, []) (fst fix.EcDecl.opf_struct)
+          in
+
+          let pargs, (bds, body) =
+            match pargs with
+            | EcDecl.OPB_Leaf (bds, body), cargs -> (List.rev cargs, (bds, body))
+            | _ -> assert false
+          in
+
+          let subst =
+            List.fold_left2
+              (fun subst (x, _) fa -> Fsubst.f_bind_local subst x fa)
+              Fsubst.f_subst_id fix.EcDecl.opf_args fargs in
+
+          let subst =
+            List.fold_left2
+              (fun subst bds cargs ->
+                List.fold_left2
+                  (fun subst (x, _) fa -> Fsubst.f_bind_local subst x fa)
+                  subst bds cargs)
+              subst bds pargs in
+
+          let body = EcFol.form_of_expr EcFol.mhr body in
+          let body =
+            EcFol.Fsubst.subst_tvar
+              (EcTypes.Tvar.init (List.map fst op.EcDecl.op_tparams) tys) body in
+
+            Fsubst.f_subst subst body
+
+        with NotReducible ->
+          f_app (h_red ri env hyps f1) fargs f.f_ty
+    end
 
     (* μ-reduction *)
   | Fglob (mp, m) when ri.modpath ->

@@ -2228,6 +2228,14 @@ module Op = struct
   let is_record_ctor env p =
     try  EcDecl.is_rcrd (by_path p env)
     with LookupFailure _ -> false
+
+  let is_dtype_ctor env p =
+    try  EcDecl.is_ctor (by_path p env)
+    with LookupFailure _ -> false
+
+  let is_fix_def env p =
+    try  EcDecl.is_fix (by_path p env)
+    with LookupFailure _ -> false
 end
 
 (* -------------------------------------------------------------------- *)

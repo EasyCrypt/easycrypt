@@ -266,6 +266,8 @@ module Op : sig
 
   val is_projection  : env -> path -> bool
   val is_record_ctor : env -> path -> bool
+  val is_dtype_ctor  : env -> path -> bool
+  val is_fix_def     : env -> path -> bool
 end
 
 (* -------------------------------------------------------------------- *)

@@ -5,22 +5,20 @@ op add (x y : nat) =
   with x = O   => y
   with x = S x => S (add x y).
 
-lemma add0n y: add O y = y.
-proof. by smt. qed.
+lemma add0n y: add O y = y by reflexivity.
 
-lemma addSn x y: add (S x) y = S (add x y).
-proof. by smt. qed.
+lemma addSn x y: add (S x) y = S (add x y) by reflexivity.
 
 lemma addn0 x: add x O = x.
 proof.
-  elim/nat_ind x => {x}; first by rewrite add0n.
-  by intros=> n IH; rewrite addSn IH.
+  elim/nat_ind x => {x} //=.
+  by intros=> n IH; rewrite IH.
 qed.
 
 lemma addnS x y: add x (S y) = S (add x y).
 proof.
-  elim/nat_ind x => {x}; first by rewrite !add0n.
-  by intros=> n IH; rewrite !addSn IH.
+  elim/nat_ind x => {x} //=.
+  by intros=> n IH; rewrite IH.
 qed.
 
 lemma addnC x y: add x y = add y x.
@@ -44,15 +42,15 @@ op size ['a] (xs : 'a list) =
   with xs = Nil       => O
   with xs = Cons y ys => S (size ys).
 
-lemma size_nil ['a]: size Nil<:'a> = O by [].
-lemma size_cons ['a] x xs: size (Cons<:'a> x xs) = S (size xs) by [].
+lemma size_nil ['a]: size Nil<:'a> = O by reflexivity.
+lemma size_cons ['a] x xs: size (Cons<:'a> x xs) = S (size xs) by reflexivity.
 
 op cat ['a] (xs1 xs2 : 'a list) : 'a list =
   with xs1 = Nil       => xs2
   with xs1 = Cons y ys => Cons y (cat ys xs2).
 
-lemma cat_nil ['a] xs: cat Nil<:'a> xs = xs by [].
-lemma cat_cons ['a] x xs xs': cat (Cons<:'a> x xs) xs' = Cons x (cat xs xs') by [].
+lemma cat_nil ['a] xs: cat Nil<:'a> xs = xs by reflexivity.
+lemma cat_cons ['a] x xs xs': cat (Cons<:'a> x xs) xs' = Cons x (cat xs xs') by reflexivity.
 
 lemma size_cat ['a] (xs1 xs2 : 'a list):
   size (cat xs1 xs2) = add (size xs1) (size xs2).
@@ -66,8 +64,8 @@ op nseq ['a] (n : nat) (x : 'a) =
   with n = O   => Nil
   with n = S p => Cons x (nseq p x).
 
-lemma nseqO ['a] (x : 'a): nseq O x = Nil by [].
-lemma nseqS ['a] n (x : 'a): nseq (S n) x = Cons x (nseq n x) by [].
+lemma nseqO ['a] (x : 'a): nseq O x = Nil by reflexivity.
+lemma nseqS ['a] n (x : 'a): nseq (S n) x = Cons x (nseq n x) by reflexivity.
 
 lemma size_nseq ['a] n (x : 'a) : size (nseq n x) = n.
 proof.
@@ -81,10 +79,10 @@ op nth ['a] (x : 'a) (n : nat) (xs : 'a list) =
   with n = S p, xs = Nil       => x
   with n = S p, xs = Cons y ys => nth x p ys.
 
-lemma nth_O_Nil  (x : 'a)       : nth x O Nil = x by [].
-lemma nth_O_Cons (x : 'a) y ys  : nth x O (Cons y ys) = y by [].
-lemma nth_S_Nil  (x : 'a) n     : nth x (S n) Nil = x by [].
-lemma nth_S_Cons (x : 'a) n y ys: nth x (S n) (Cons y ys) = nth x n ys by [].
+lemma nth_O_Nil  (x : 'a)       : nth x O Nil = x by reflexivity.
+lemma nth_O_Cons (x : 'a) y ys  : nth x O (Cons y ys) = y by reflexivity.
+lemma nth_S_Nil  (x : 'a) n     : nth x (S n) Nil = x by reflexivity.
+lemma nth_S_Cons (x : 'a) n y ys: nth x (S n) (Cons y ys) = nth x n ys by reflexivity.
 
 lemma nth_nil (x : 'a) n: nth x n Nil = x.
 proof.
@@ -98,10 +96,10 @@ op subn n p =
   with n = S n', p = O    => n
   with n = S n', p = S p' => subn n' p'.
 
-lemma subOO: subn O O = O by [].
-lemma subSO: forall n, subn (S n) O = S n by [].
-lemma subOS: forall n, subn O (S n) = O by [].
-lemma subSS: forall n p, subn (S n) (S p) = subn n p by [].
+lemma subOO: subn O O = O by reflexivity.
+lemma subSO: forall n, subn (S n) O = S n by (intros=> n; reflexivity).
+lemma subOS: forall n, subn O (S n) = O by (intros=> n; reflexivity).
+lemma subSS: forall n p, subn (S n) (S p) = subn n p by (intros=> n p; reflexivity).
 
 lemma subn0 n: subn n O = n.
 proof.
