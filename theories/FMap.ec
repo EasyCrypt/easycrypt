@@ -354,10 +354,9 @@ theory Core.
     lamo (map f m) = lambda x, (lift f) ((lamo m) x).
   proof strict.
   apply Fun.fun_ext=> x //=.
-  rewrite /lamo /lamo get_map; elim/option_case (get m x)=> //=.
-    by rewrite lift_None.
-    by intros=> x'; cut ->: (Some x' = None) = false by smt;
-       rewrite //= proj_some lift_Some.
+  rewrite /lamo /lamo get_map; elim/option_ind (get m x)=> //= {x}.
+    by intros=> x'; cut ->: (Some x' = None) = false by smt; (* This will fail once non-confusion is part of // *)
+       rewrite //= proj_some.
   qed.
 end Core.
 
