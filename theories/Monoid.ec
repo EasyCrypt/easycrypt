@@ -164,26 +164,50 @@ lemma sum_ij_gt (i j:int) f :
 proof.
  by intros Hlt;rewrite /sum_ij interval_neg // sum_empty.
 qed.
-  
+
+lemma sum_ij_split (k i j:int) f:
+  i <= k <= j + 1 => sum_ij i j f = sum_ij i (k-1) f + sum_ij k j f.
+proof. 
+  intros Hbound;rewrite /sum_ij -sum_disj.
+    rewrite disjoint_spec=> x;rewrite !Interval.mem_interval;smt.
+  congr => //;apply set_ext => x;smt.
+qed.
+
+lemma sum_ij_eq i f: sum_ij i i f = f i.
+proof.
+ rewrite /sum_ij Interval.interval_single sum_add;first apply mem_empty.
+ rewrite sum_empty;apply addmZ.
+qed.
+
 lemma sum_ij_le_r (i j:int) f : 
    i <= j =>
    sum_ij i j f = sum_ij i (j-1) f + f j.
 proof.
-  intros Hle;rewrite /sum_ij interval_pos // sum_add //.
-    rewrite mem_interval => //;smt.
-  apply addmC.
+  intros Hle;rewrite (sum_ij_split j); first by smt.
+  by rewrite sum_ij_eq.
 qed.
 
 lemma sum_ij_le_l (i j:int) f : 
    i <= j =>
    sum_ij i j f = f i + sum_ij (i+1) j f.
 proof.
- intros Hle;rewrite /sum_ij interval_addl // sum_add // mem_interval;smt.
+ intros Hle; rewrite (sum_ij_split (i+1));smt.
 qed.
 
-lemma sum_ij_eq i f: sum_ij i i f = f i.
-proof.
- rewrite sum_ij_le_l // sum_ij_gt;[smt | apply addmZ].
+lemma sum_ij_shf (k i j:int) f:
+   sum_ij i j f = sum_ij (i-k) (j-k) (lambda n, f (k+n)).
+proof strict.
+  rewrite /sum_ij.
+  rewrite (sum_chind f (lambda n, n - k) (lambda n, k + n)) /=;first smt.
+  congr => //;apply set_ext => x;rewrite Interval.mem_interval img_def /=;split.
+  intros [x0 [Heq ]];rewrite Interval.mem_interval;subst;smt.
+  intros _;exists (x + k);smt.
+qed.
+
+lemma sum_ij_shf0 (i j :int) f:
+   sum_ij i j f = sum_ij 0 (j-i) (lambda n, f (i+n)).
+proof strict.
+  rewrite (sum_ij_shf i);smt.
 qed.
 
 theory NatMul.
