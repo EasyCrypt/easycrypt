@@ -66,6 +66,7 @@ val is_pred : operator -> bool
 val is_ctor : operator -> bool
 val is_proj : operator -> bool
 val is_rcrd : operator -> bool
+val is_fix  : operator -> bool
 
 val mk_op   : ty_params -> ty -> opbody option -> operator
 val mk_pred : ty_params -> ty list -> form option -> operator
@@ -73,6 +74,7 @@ val mk_pred : ty_params -> ty list -> form option -> operator
 val operator_as_ctor : operator -> EcPath.path * int
 val operator_as_rcrd : operator -> EcPath.path
 val operator_as_proj : operator -> EcPath.path * int * int
+val operator_as_fix  : operator -> opfix
 
 (* -------------------------------------------------------------------- *)
 type axiom_kind = [`Axiom | `Lemma]

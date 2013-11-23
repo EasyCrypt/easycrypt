@@ -40,4 +40,4 @@ setup.log
 /webui/backend.log
 /webui/backend.pid
 
-/sendbox
+/sandbox

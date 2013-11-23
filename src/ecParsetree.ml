@@ -47,6 +47,8 @@ and ptyannot  = ptyannot_r  located
 type plpattern_r =
   | LPSymbol of psymbol
   | LPTuple  of psymbol list
+  | LPRecord of (pqsymbol * psymbol) list
+
 and plpattern = plpattern_r located
 
 type ptybinding  = psymbol list * pty

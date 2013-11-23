@@ -1,6 +1,6 @@
 (* -------------------------------------------------------------------- *)
 open EcParsetree
-open EcUidgen
+open EcUid
 open EcLocation
 open EcPath
 open EcTypes

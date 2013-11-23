@@ -28,19 +28,17 @@ module Mid = Map.Make(IdComparable)
 module Sid = Set.MakeOfMap(Mid)
 
 (* -------------------------------------------------------------------- *)
-
 let fv_singleton x = Mid.singleton x 1
 let fv_union m1 m2 = Mid.union (fun _ m n -> Some(m+n)) m1 m2
-let fv_diff m1 (m2:'a Mid.t) = Mid.diff (fun _ _ _ -> None) m1 m2
-let fv_add x m  = Mid.change (function None -> Some 1 | Some n -> Some(n+1)) x m
-
+let fv_diff m1 m2  = Mid.diff (fun _ _ _ -> None) m1 m2
+let fv_add x m     = Mid.change (fun x -> Some ((odfl 0 x) + 1)) x m
 
 (* -------------------------------------------------------------------- *)
 type t = ident
 
 let create (x : symbol) = 
   { id_symb = x;
-    id_tag  = EcUidgen.unique () }
+    id_tag  = EcUid.unique () }
 
 let fresh (id : t) = create (name id)
 

@@ -1,6 +1,6 @@
 (* -------------------------------------------------------------------- *)
 open EcMaps
-open EcUidgen
+open EcUid
 open EcParsetree
 open EcIdent
 open EcTypes

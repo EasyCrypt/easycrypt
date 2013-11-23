@@ -173,4 +173,20 @@ theory ForLoop.
   rewrite ForLoop.range_ind_lazy //= 1?(_: k + 1 + i - 1 = k + i); first 2 smt.
   by rewrite IH; smt.
   qed.
+
+  (* General result on restricting the range *)
+  lemma range_restr (i j:int) (base:'a) f:
+    0 <= j - i =>
+    ForLoop.range i j base (lambda k a, if i <= k < j then f k a else a) = ForLoop.range i j base f.
+  proof strict.
+  intros=> h.
+  case (0 = j - i)=> h2; first smt.
+  pose k:= j - i - 1.
+  cut {1 3}->: j = k + i + 1 by smt.
+  cut: k < j - i by smt.
+  elim /Induction.induction k; first last; last 2 smt.
+  progress; rewrite !(ForLoop.range_ind_lazy _ (i0 + 1 + i + 1)); first 2 smt.
+  cut ->: i0 + 1 + i + 1 - 1 = i0 + i + 1 by smt.
+  by rewrite H0; smt.
+  qed.
 end ForLoop.

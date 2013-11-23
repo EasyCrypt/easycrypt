@@ -25,11 +25,12 @@ val pp_paren : 'a pp -> 'a pp
 
 val pp_list : ('a, 'b, 'c, 'd, 'd, 'a) format6 -> 'a pp -> 'a list pp
 
-val pp_pv     : PPEnv.t -> EcTypes.prog_var pp
+val pp_pv      : PPEnv.t -> EcTypes.prog_var pp
 val pp_funname : PPEnv.t -> EcPath.xpath pp
-val pp_topmod : PPEnv.t -> EcPath.mpath pp
-val pp_form : PPEnv.t -> EcFol.form pp
-val pp_type : PPEnv.t -> EcTypes.ty pp
+val pp_topmod  : PPEnv.t -> EcPath.mpath pp
+val pp_form    : PPEnv.t -> EcFol.form pp
+val pp_type    : PPEnv.t -> EcTypes.ty pp
+val pp_tyname  : PPEnv.t -> EcPath.path pp
 
 val pp_typedecl : PPEnv.t -> (EcPath.path * EcDecl.tydecl                ) pp
 val pp_opdecl   : PPEnv.t -> (EcPath.path * EcDecl.operator              ) pp

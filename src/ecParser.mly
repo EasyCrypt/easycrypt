@@ -487,8 +487,18 @@ pside:
 (* Patterns                                                             *)
 
 lpattern_u:
-| x=ident { LPSymbol x }
-| LPAREN p=plist2(ident, COMMA) RPAREN { LPTuple p }
+| x=ident
+    { LPSymbol x }
+
+| LPAREN p=plist2(ident, COMMA) RPAREN
+    { LPTuple p }
+
+| LPBRACE fs=rlist1(lp_field, SEMICOLON) SEMICOLON? RPBRACE
+    { LPRecord fs }
+;
+
+lp_field:
+| f=qident EQ x=ident { (f, x) }
 ;
 
 %inline lpattern:
@@ -532,7 +542,7 @@ sexpr_u:
 
 | se=sexpr op=loc(FROM_INT)
    { let id =
-       PEident (mk_loc op.pl_loc EcCoreLib.s_from_int, None)
+       PEident (mk_loc op.pl_loc EcCoreLib.s_real_of_int, None)
      in
        PEapp (mk_loc op.pl_loc id, [se]) }
 
@@ -725,7 +735,7 @@ sform_u(P):
    { PFident (x, ti) }
 
 | se=sform_r(P) op=loc(FROM_INT)
-   { let id = PFident(mk_loc op.pl_loc EcCoreLib.s_from_int, None) in
+   { let id = PFident(mk_loc op.pl_loc EcCoreLib.s_real_of_int, None) in
      PFapp (mk_loc op.pl_loc id, [se]) }
 
 | se=sform_r(P) DLBRACKET ti=tvars_app? e=form_r(P) RBRACKET
@@ -738,7 +748,7 @@ sform_u(P):
    { PFside (x, s) }
 
 | TICKPIPE ti=tvars_app? e =form_r(P) PIPE 
-    { pfapp_symb e.pl_loc EcCoreLib.s_abs ti [e] }
+   { pfapp_symb e.pl_loc EcCoreLib.s_abs ti [e] }
 
 | LPAREN fs=plist0(form_r(P), COMMA) RPAREN
    { PFtuple fs }
@@ -765,7 +775,7 @@ sform_u(P):
 	{ PFhoareS (pre, s, post) }
 
 | PR LBRACKET
-    mp=loc(fident) args=paren(plist0(sform_r(P), COMMA)) AT pn=mident
+    mp=loc(fident) args=paren(plist0(form_r(P), COMMA)) AT pn=mident
     COLON event=form_r(P)
   RBRACKET
     { PFprob (mp, args, pn, event) }
@@ -1658,7 +1668,7 @@ rwarg:
 | s=rwside r=rwrepeat? o=rwocc? fp=fpattern(form)
     { RWRw (s, r, o |> omap EcMaps.Sint.of_list, fp) }
 
-| s=rwside r=rwrepeat? o=rwocc? SLASH x=sform_h
+| s=rwside r=rwrepeat? o=rwocc? SLASH x=sform_h %prec prec_tactic
     { let loc = EcLocation.make $startpos $endpos in
         if r <> None then
           parse_error loc (Some "delta-repeat not supported");

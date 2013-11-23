@@ -207,6 +207,59 @@ module AKE_eqS(FA : Adv3) = {
   }
 }.
 
+op inv_gen_epk : Epk -> Eexp.
+
+axiom inv_gen_epk_def : forall x, x = inv_gen_epk (gen_epk x).
+
+lemma gen_epk_inj : forall e1 e2,
+gen_epk e1 = gen_epk e2 =>
+e1 = e2.
+proof.
+ intros => e1 e2 heq.
+ by rewrite (inv_gen_epk_def e1) (inv_gen_epk_def e2) heq.
+save.
+
+module type AKE_Leaf1_Oracle = {
+  fun eqS(A : Pk, b : Sk, X Y : Epk, r : Role, ss: Sstring) : bool option
+}.
+
+module type Adv_Leaf1 (O : AKE_Leaf1_Oracle) = {
+ fun guess(A : Pk, lepk : Epk list ) : Sk  {* O.eqS}
+}.
+
+
+
+module Leaf1 (A :  Adv_Leaf1) = {
+ var sk : Sk
+ var lepk : Epk list
+ module O : AKE_Leaf1_Oracle = {
+
+  fun eqS(A : Pk, b : Sk, X Y : Epk, r : Role, ss: Sstring) : bool option = {
+   var ret : bool option = None;
+   if (gen_pk sk = A /\ mem X lepk)
+    ret = Some (ss = gen_sstring (inv_gen_epk X) sk (gen_pk b) Y r);
+   return ret;
+  }
+ }
+ module Adv = A(O)
+ fun main() : bool = {
+  var sk' : Sk;
+  var sidxs : Sidx set = univ_Sidx;
+  var sidx : Sidx;
+  var xa' : Eexp;
+  sk = $sample_Sk;
+  lepk = [];
+  while (sidxs <> FSet.empty) {
+   sidx = pick sidxs;
+   sidxs = rm sidx sidxs;
+   xa' = $sample_Eexp;
+   lepk = (gen_epk xa') :: lepk;
+  }
+  sk' = Adv.guess(gen_pk (sk) , lepk);
+  return (sk = sk');
+ }
+}.
+
 section.
 
 declare module A : Adv3{ AKE_eqS}.

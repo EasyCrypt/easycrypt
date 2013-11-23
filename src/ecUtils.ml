@@ -153,13 +153,6 @@ let omap (f : 'a -> 'b) (x : 'a option) =
 let omap_dfl (f : 'a -> 'b) (d : 'b) (x : 'a option) =
   match x with None -> d  | Some x -> f x
 
-let osmart_map (f : 'a -> 'b) (x : 'a option) =
-  match x with 
-  | None -> x 
-  | Some y -> 
-      let y' = f y in 
-      if y == y' then x else Some y'
-
 let odfl (d : 'a) (x : 'a option) =
   match x with None -> d | Some x -> x
 
@@ -181,6 +174,22 @@ let ocompare f o1 o2 =
   | None   , Some _  -> -1
   | Some _ , None    -> 1
   | Some x1, Some x2 -> f x1 x2
+
+module OSmart = struct
+  let omap (f : 'a -> 'b) (x : 'a option) =
+    match x with 
+    | None   -> x 
+    | Some y -> 
+        let y' = f y in 
+          if y == y' then x else Some y'
+
+  let omap_fold (f : 'a -> 'b -> 'a * 'c) (v : 'a) (x : 'b option) =
+    match x with
+    | None   -> (v, x)
+    | Some y ->
+        let (v, y') = f v y in
+          (v, if y == y' then x else Some y')
+end
 
 (* -------------------------------------------------------------------- *)
 module Counter : sig
@@ -281,6 +290,14 @@ module List = struct
       if n <= 0 then xs else aux (n-1) (x::xs)
     in
       aux n []
+
+  let init n f =
+    let rec aux i =
+      if i = n then [] else
+        let v = f i in v :: aux (i+1)
+    in
+      if n < 0 then invalid_arg "List.init";
+      aux 0
 
   let iteri f xs =
     let rec doit i = function

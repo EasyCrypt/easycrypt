@@ -5,8 +5,6 @@ open EcPrinting
 
 module T = EcTerminal
 
-open EcTypeClass                        (* FIXME *)
-
 (* -------------------------------------------------------------------- *)
 let _ =
   let myname  = Filename.basename Sys.executable_name
@@ -67,14 +65,18 @@ let _ =
   end;
 
   (* Initialize load path *)
+  let ldropts = options.o_options.o_loader in
+
   begin
     let theories = resource ["theories"] in
       EcCommands.addidir ~system:true (Filename.concat theories "prelude");
-      EcCommands.addidir ~system:true theories
+      EcCommands.addidir ~system:true (Filename.concat theories "core");
+      if not ldropts.ldro_boot then
+        EcCommands.addidir ~system:true theories
   end;
 
   (* Initialize I/O + interaction module *)
-  let (ldropts, prvopts, input, terminal) =
+  let (prvopts, input, terminal) =
     match options.o_command with
     | `Config -> begin
         Format.eprintf "load-path:@\n%!";
@@ -101,13 +103,13 @@ let _ =
           | true  -> lazy (EcTerminal.from_emacs ())
           | false -> lazy (EcTerminal.from_tty ())
         in
-          (cliopts.clio_loader, cliopts.clio_provers, None, terminal)
+          (cliopts.clio_provers, None, terminal)
     end
 
     | `Compile cmpopts -> begin
         let input = cmpopts.cmpo_input in
         let terminal = lazy (EcTerminal.from_channel ~name:input (open_in input)) in
-          (cmpopts.cmpo_loader, cmpopts.cmpo_provers, Some input, terminal)
+          (cmpopts.cmpo_provers, Some input, terminal)
     end
   in
 

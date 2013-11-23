@@ -92,7 +92,11 @@ val oall2      : ('a -> 'b -> bool) -> 'a option -> 'b option -> bool
 val otolist    : 'a option -> 'a list
 val ocompare   : 'a cmp -> 'a option cmp
 val omap_dfl   : ('a -> 'b) -> 'b -> 'a option -> 'b
-val osmart_map : ('a -> 'a) -> 'a option -> 'a option
+
+module OSmart : sig
+  val omap : ('a -> 'a) -> 'a option -> 'a option
+  val omap_fold : ('a -> 'b -> 'a * 'b) -> 'a -> 'b option -> 'a * 'b option
+end
 
 (* -------------------------------------------------------------------- *)
 module Counter : sig
@@ -158,6 +162,8 @@ module List : sig
   val filter2 : ('a -> 'b -> bool) -> 'a list -> 'b list -> 'a list * 'b list
 
   val create : int -> 'a -> 'a list
+
+  val init : int -> (int -> 'a) -> 'a list
 
   val find_split : ('a -> bool) -> 'a list -> 'a list * 'a * 'a list
 

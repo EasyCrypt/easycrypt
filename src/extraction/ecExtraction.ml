@@ -450,7 +450,9 @@ and compile_expr env eenv vtymap lmap e =
         let lmap, names = 
           List.map_fold (fun lmap (id,_) ->
             compile_add_local lmap id) lmap ids in
-        lmap, Optuple names in
+        lmap, Optuple names
+      | LRecord _ -> assert false       (* FIXME: IND HOOK *)
+    in
     let e2 = compile_expr env eenv vtymap lmap e2 in
     Olet(p,e1,e2)
   | Etuple es ->

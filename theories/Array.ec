@@ -390,6 +390,24 @@ generalize x; elim/array_ind zs.
   by rewrite map_cons !sub_cons IH 2?get_cons; first 2 smt.
 qed.
 
+(* Alternative induction principle: building arrays from the back *)
+lemma array_ind_snoc (p:'x array -> bool):
+  p empty =>
+  (forall x xs, p xs => p (xs:::x)) =>
+  (forall xs, p xs).
+proof strict.
+intros=> p0 prec xs.
+cut h : (forall n, 0 <= n => forall xs, length xs = n => p xs).
+  intros=> n hn.
+  elim/Induction.induction n=> //; first smt.
+  intros=> i ipos hrec xs' hlen.
+  cut ->: xs' = (sub xs' 0 i):::xs'.[i] by (apply array_ext; smt).
+  apply prec.
+  apply hrec.  
+  by rewrite length_sub; smt.
+by apply (h (length xs) _);smt.
+qed.
+
 (* This proof needs cleaned up, and the lemma library completed. *)
 lemma fold_length (xs:'x array):
   fold_left (lambda n x, n + 1) 0 xs = length xs.

@@ -245,7 +245,7 @@ let t_bd_hoare_rnd tac_info g =
       let event = match event ty_distr with
         | None -> mk_event ~simpl:false ty_distr | Some event -> event
       in
-      let bd_sgoal = f_cmp (f_real_add (f_real_prod d1 d2) (f_real_prod d3 d4)) bhs.bhs_bd in
+      let bd_sgoal = f_cmp (f_real_add (f_real_mul d1 d2) (f_real_mul d3 d4)) bhs.bhs_bd in
       let sgoal1 = f_bdHoareS_r {bhs with bhs_s=s; bhs_po=phi; bhs_bd=d1} in
       let sgoal2 =
         let bounded_distr = f_cmp (f_mu distr event) d2 in

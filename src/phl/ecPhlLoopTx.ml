@@ -142,11 +142,11 @@ let fusion_stmt (il, (d1, d2)) env me zpr =
   let (sw2, fini2) = List.take_n d2 sw2.s_node in
 
   (* FIXME: costly *)
-  if not (EcReduction.s_equal_norm env (stmt init1) (stmt init2)) then
+  if not (EcReduction.EqTest.for_stmt_norm env (stmt init1) (stmt init2)) then
     tacuerror "in loop-fusion, preludes do not match";
-  if not (EcReduction.s_equal_norm env (stmt fini1) (stmt fini2)) then
+  if not (EcReduction.EqTest.for_stmt_norm env (stmt fini1) (stmt fini2)) then
     tacuerror "in loop-fusion, finalizers do not match";
-  if not (EcReduction.e_equal_norm env b1 b2) then
+  if not (EcReduction.EqTest.for_expr_norm env b1 b2) then
     tacuerror "in loop-fusion, while conditions do not match";
 
   check_fission_independence env b1 init1 sw1 sw2 fini1;

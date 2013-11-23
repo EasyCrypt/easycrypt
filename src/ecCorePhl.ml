@@ -342,9 +342,10 @@ let mk_inv_spec env inv fl fr =
     let defr = EcEnv.Fun.by_xpath fr env in
     let sigl, sigr = defl.f_sig, defr.f_sig in
     let testty = 
-      List.all2 (fun v1 v2 -> EcReduction.equal_type env v1.v_type v2.v_type)
-        sigl.fs_params sigr.fs_params && 
-        EcReduction.equal_type env sigl.fs_ret sigr.fs_ret 
+      List.all2
+        (fun v1 v2 -> EcReduction.EqTest.for_type env v1.v_type v2.v_type)
+        sigl.fs_params sigr.fs_params
+      && EcReduction.EqTest.for_type env sigl.fs_ret sigr.fs_ret 
     in
       if not testty then 
         cannot_apply "call" 

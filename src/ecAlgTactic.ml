@@ -46,7 +46,7 @@ module Axioms = struct
        (mul , (true , ty2 ty));
        (expr, (true , toarrow [ty; tint] ty))]
     in
-      if   EcReduction.equal_type env ty tint
+      if   EcReduction.EqTest.for_type env ty tint
       then symbols
       else symbols @ [(embed, (true, tfun tint ty))]
 

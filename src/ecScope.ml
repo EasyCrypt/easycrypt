@@ -289,6 +289,7 @@ end = struct
     match lp with
     | LSymbol (_, ty) -> on_mpath_ty cb ty
     | LTuple  xs      -> List.iter (fun (_, ty) -> on_mpath_ty cb ty) xs
+    | LRecord (_, xs) -> List.iter (on_mpath_ty cb |- snd) xs
 
   let rec on_mpath_expr cb (e : expr) =
     let cbrec = on_mpath_expr cb in
@@ -1248,7 +1249,7 @@ module Mod = struct
       hierror "cannot declare a local module outside of a section";
 
     let (name, m) = ptm.ptm_def in
-    let m = TT.transmod scope.sc_env ~internal:false (unloc name) m in
+    let m = TT.transmod scope.sc_env ~attop:true (unloc name) m in
 
     if not ptm.ptm_local then begin
       match CoreSection.olocals scope.sc_section with
@@ -1655,7 +1656,7 @@ module Ty = struct
            match Mstr.find_opt x ops with
            | None -> m
            | Some (loc, (p, op)) ->
-               if not (EcReduction.equal_type env ty (op_ty op)) then
+               if not (EcReduction.EqTest.for_type env ty (op_ty op)) then
                  hierror ~loc "invalid type for operator `%s'" x;
                Mstr.add x p m)
         Mstr.empty reqs

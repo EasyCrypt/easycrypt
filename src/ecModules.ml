@@ -245,7 +245,6 @@ module MSHi = EcMaps.MakeMSH(struct type t = instr let tag i = i.i_tag end)
 module Hi = MSHi.H
 
 let s_subst (s: EcTypes.e_subst) = 
-
   let e_subst = EcTypes.e_subst s in
   if e_subst == identity then identity 
   else
@@ -287,7 +286,7 @@ let s_subst (s: EcTypes.e_subst) =
         if lv == lv' && e == e' then i else 
           i_rnd(lv',e')
       | Scall(olv,mp,args) ->
-        let olv' = olv |> osmart_map lv_subst in
+        let olv' = olv |> OSmart.omap lv_subst in
         let mp'  = s.EcTypes.es_xp mp in
         let args' = List.Smart.map e_subst args in
         if olv == olv' && mp == mp' && args == args' then i else 

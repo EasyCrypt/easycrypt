@@ -1,5 +1,5 @@
 (* -------------------------------------------------------------------- *)
-open EcUidgen
+open EcUid
 open EcUtils
 open EcMaps
 open EcIdent
@@ -343,7 +343,7 @@ let process_rewrite1_core (s, o) (p, typs, ue, ax) args g =
       | _ -> begin
         match destruct_product hyps ax with
         | None ->
-            if s = `LtoR && EcReduction.equal_type env ax.f_ty tbool then
+            if s = `LtoR && EcReduction.EqTest.for_type env ax.f_ty tbool then
               ((ax, ids), (`Bool, (ax, f_true)))
             else
               tacuerror "not an equation to rewrite"
@@ -453,7 +453,9 @@ let process_rewrite1 loc ri g =
                         f_app h a1 (toarrow (List.map f_ty a2) fp.f_ty)
                   | _ -> fp
                 in
-                  if EcReduction.is_alpha_eq hyps p fp then Some (-1) else None
+                  if   EcReduction.is_alpha_eq hyps p fp
+                  then Some (-1)
+                  else None
               in
                 try  FPosition.select ?o test concl
                 with InvalidOccurence ->
@@ -885,7 +887,7 @@ let process_algebra mode kind eqs g =
       | true  -> begin
         match sform_of_form (snd (LDecl.lookup_hyp x hyps)) with
         | SFeq (f1, f2) ->
-            if not (EcReduction.equal_type env ty f1.f_ty) then
+            if not (EcReduction.EqTest.for_type env ty f1.f_ty) then
               tacuerror "assumption `%s' is not an equation over the right type" x;
             (f1, f2)
         | _ -> tacuerror "assumption `%s' is not an equation" x

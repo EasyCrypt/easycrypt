@@ -306,7 +306,7 @@ let t_use n gs (juc,n1) =
 
 let t_change f (juc,n1) =
   let hyps = get_hyps (juc,n1) in
-  check_type (LDecl.toenv hyps) f.f_ty tbool;
+  EqTest.for_type_exn (LDecl.toenv hyps) f.f_ty tbool;
   let (juc,n) = new_goal juc (hyps,f) in
   t_use n [n] (juc,n1)
 
@@ -467,7 +467,7 @@ let check_arg do_arg hyps s x gty a =
   let a = do_arg hyps (Some gty) a in
   match gty, a with
   | GTty ty  , AAform f ->
-      check_type (LDecl.toenv hyps) ty f.f_ty; (* FIXME error message *)
+      EqTest.for_type_exn (LDecl.toenv hyps) ty f.f_ty; (* FIXME error message *)
       Fsubst.f_bind_local s x f, RA_form f
   | GTmem _   , AAmem m ->
       Fsubst.f_bind_mem s x m, RA_id m
@@ -567,7 +567,7 @@ let t_rewrite_gen fpat side f g =
       match h_red_opt full_red hyps f with
       | Some f -> find_rewrite f
       | None   -> begin
-        if side && (EcReduction.equal_type env f.f_ty EcTypes.tbool)
+        if side && (EqTest.for_type env f.f_ty EcTypes.tbool)
         then ((f, f_true), `Bool)
         else
           let ppe = EcPrinting.PPEnv.ofenv (LDecl.toenv hyps) in
@@ -947,7 +947,7 @@ let t_elimT tys p f sk g =
         | _ -> noelim ()
       in
 
-      if not (EcReduction.equal_type env prty (tfun f.f_ty tbool)) then
+      if not (EqTest.for_type env prty (tfun f.f_ty tbool)) then
         noelim();
 
       let (aa1, ax) = skip None [] ax in
@@ -1248,7 +1248,7 @@ let t_gen_assumption eq g =
     with Not_found -> tacuerror "no assumption" in
   t_hyp h g
       
-let t_alpha_assumption g = t_gen_assumption is_alpha_eq g
+let t_alpha_assumption g = t_gen_assumption EcReduction.is_alpha_eq g
 
 let t_assumption g = 
   t_or t_alpha_assumption (t_gen_assumption is_conv) g
