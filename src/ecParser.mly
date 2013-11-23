@@ -316,6 +316,7 @@
 %token TICKPIPE
 %token TILD
 %token TIMEOUT
+%token TOP
 %token TRIVIAL
 %token TRY
 %token TYPE
@@ -391,7 +392,14 @@
 
 (* -------------------------------------------------------------------- *)
 %inline namespace:
-| nm=rlist1(UIDENT, DOT) { nm }
+| nm=rlist1(UIDENT, DOT)
+    { nm }
+
+| TOP
+    { [EcCoreLib.id_top] }
+
+| TOP DOT nm=rlist1(UIDENT, DOT)
+    { EcCoreLib.id_top :: nm }
 ;
 
 _genqident(X):

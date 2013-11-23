@@ -1,4 +1,4 @@
-; Generated on Sun Nov  3 19:08:22 2013
+; Generated on Sat Nov 23 09:59:47 2013
 
 (defvar easycrypt-bytac-keywords '(
   "assumption"
@@ -19,7 +19,6 @@
   "save"
   "qed"
   "claim"
-;  "drop"
   "end"
   "import"
   "export"
@@ -51,6 +50,7 @@
   "on"
   "off"
   "nolocals"
+  "Top"
 ))
 
 (defvar easycrypt-internal-keywords '(
