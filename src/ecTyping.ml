@@ -2046,7 +2046,8 @@ let trans_form_or_pattern env (ps, ue) pf tt =
   in
 
   let f = transf_r None env pf in
-    tt |> oiter (unify_or_fail env ue pf.pl_loc ~expct:f.f_ty); f
+  tt |> oiter (fun tt -> unify_or_fail env ue pf.pl_loc ~expct:tt f.f_ty);
+  f
 
 (* -------------------------------------------------------------------- *)
 let trans_form_opt env ue pf oty =
