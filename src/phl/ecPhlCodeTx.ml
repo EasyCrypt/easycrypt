@@ -83,7 +83,7 @@ let alias_stmt id _ me i =
   match i.i_node with
   | Srnd (lv, e) ->
       let id       = odfl "x" (omap EcLocation.unloc id) in
-      let ty       = ty_of_lv lv in
+      let ty       = e.e_ty in
       let id       = { v_name = id; v_type = ty; } in
       let (me, id) = fresh_pv me id in
       let pv       = pv_loc (EcMemory.xpath me) id in
