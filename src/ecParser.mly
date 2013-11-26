@@ -1644,7 +1644,7 @@ fpattern(F):
 
 fpattern_list(F):
 | f=fpattern(F) { [f] }
-| LBRACKET fs=plist1(fpattern(F), SEMICOLON) RBRACKET { fs }
+| LPAREN fs=rlist2(fpattern(F), COLON) LPAREN { fs }
 ;
 
 pterm:
@@ -2519,6 +2519,10 @@ __rlist1(X, S):                         (* left-recursive *)
 
 %inline rlist1(X, S):
 | xs=__rlist1(X, S) { List.rev xs }
+;
+
+%inline rlist2(X, S):
+| xs=__rlist1(X, S) S x=X { List.rev (x :: xs) }
 ;
 
 (* -------------------------------------------------------------------- *)
