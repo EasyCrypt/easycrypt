@@ -519,19 +519,22 @@ let process_rewrite1 loc ri g =
         end
   end
 
-  | RWRw (s, r, o, pe) ->
-      let do1 g =
-        let hyps = get_hyps g in
-
-        let (p, typs, ue, ax) = process_pterm loc (process_formula hyps) hyps pe in
-        let args = List.map (trans_pterm_argument hyps ue) pe.fp_args in
-
-          process_rewrite1_core (s, o) (p, typs, ue, ax) args g
-
-      in
-        match r with
-        | None -> do1 g
-        | Some (b, n) -> t_do b n do1 g
+  | RWRw (s, r, o, l) ->
+    let do1 pe g =
+      let hyps = get_hyps g in
+      let (p, typs, ue, ax) =
+        process_pterm loc (process_formula hyps) hyps pe in
+      let args = List.map (trans_pterm_argument hyps ue) pe.fp_args in
+      process_rewrite1_core (s, o) (p, typs, ue, ax) args g in
+    let ordo = 
+      match o, l with
+      | _, [pe] -> do1 pe
+      | None, l -> t_lor (List.map do1 l)
+      | Some _, _ -> 
+        tacuerror "occurences selector not allowed for multiple rewrite" in
+    match r with
+    | None -> ordo g
+    | Some (b, n) -> t_do b n ordo g
 
 (* -------------------------------------------------------------------- *)
 let process_rewrite loc ri g =

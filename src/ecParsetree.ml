@@ -456,7 +456,7 @@ type trepeat = [`All | `Maybe] * int option
 
 type rwarg =
   | RWDelta of (rwside * rwocc * pformula)
-  | RWRw    of (rwside * trepeat option * rwocc * ffpattern)
+  | RWRw    of (rwside * trepeat option * rwocc * ffpattern list)
   | RWDone  of bool
   | RWSimpl
 

@@ -259,7 +259,7 @@ open EcParsetree
 
 let t_rewrite_glob s pqs = 
   EcHiLogic.process_rewrite pqs.EcLocation.pl_loc
-    [(RWRw(s,None,None, { fp_kind = FPNamed(pqs,None);fp_args = [] }))]
+    [(RWRw(s,None,None, [{ fp_kind = FPNamed(pqs,None);fp_args = [] }]))]
 
 let t_rewrite_logic s x = 
   let loc = EcLocation._dummy in
