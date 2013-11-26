@@ -75,47 +75,70 @@ EasyCryptEditor.prototype.onopen = function(event){
     this.setStatus('ready');
     
     var editorState = this.editor.getStateAfter(this.widgets.feedback.height() + 10, true);
-    this.widgets.operators.append('Operators List: \n');
     
     var numberOfOperators = editorState.operatorsList.length;
 	var numberOfTheories = editorState.theoriesList.length;
 	
+		
 	var j=0;
 	var i=0;
     //while(j<numberOfTheories) {
     while(i<numberOfOperators) {
-    	if(editorState.operatorsList[i].line < editorState.theoriesList[j].startLine) {
-			this.widgets.operators.append('> ' + editorState.operatorsList[i].name + ' at line: ' 
-	    								+ editorState.operatorsList[i].line + '\n');
-	    		i++;
-	    		if(i>=numberOfOperators) {
-	    			for(j; j<numberOfTheories; j++)
-	    				this.widgets.operators.append('> ' + editorState.theoriesList[j].name 
-	    				+ ' starting at line: ' + editorState.theoriesList[j].startLine 
-	    				+ ' and ending at line: ' + editorState.theoriesList[j].endLine + '\n');	
-	    		}
+    try {
+    	if(editorState.theoriesList[j].startLine < editorState.operatorsList[i].line) {
+			    this.printTheory(editorState, j);
+	    		j++;
 	    }
 	    else {
-	    	this.widgets.operators.append('> ' + editorState.theoriesList[j].name + '\n' 
-	    				+ ' starting at line: ' + editorState.theoriesList[j].startLine 
-	    				+ ' and ending at line: ' + editorState.theoriesList[j].endLine + '\n');	
-	    	j++;
-	    	if(j>=numberOfTheories) {
-	    		for(i; i<numberOfOperators; i++)
-	    			this.widgets.operators.append('> ' + editorState.operatorsList[i].name + ' at line: ' 
-	    								+ editorState.operatorsList[i].line + '\n');
+	    	if(editorState.operatorsList[i].line > editorState.theoriesList[j].startLine && 
+	    	  editorState.operatorsList[i].line < editorState.theoriesList[j].endLine) {
+	    	  	this.printOperatorIndented(editorState, i);
+	    		i++;
+	    		if(i>=numberOfOperators) 
+	    			for(j; j<numberOfTheories; j++)
+	    				this.printTheory(editorState, j); 		
 	    	}
-	    }
+	        else {	    	
+	        	this.printOperator(editorState, i);
+	    		i++; 
+	    		if(i>=numberOfOperators) 
+	    			for(j; j<numberOfTheories; j++)
+	    				this.printTheory(editorState, j); 
+	    	}
+		} 
+	}catch(TypeError) {
+		j--;
+		for(i; i<numberOfOperators; i++)
+			if(editorState.operatorsList[i].line > editorState.theoriesList[j].startLine && 
+	    	  	editorState.operatorsList[i].line < editorState.theoriesList[j].endLine)
+	    	  	this.printOperatorIndented(editorState, i);
+	    	else			
+				this.printOperator(editorState, i);
+	 }
 	}
 }
-	    		//editorState.opertorsList.splice(i, 1);					
-	    		/*else {
-	    		if(editorState.operatorsList[i].line > editorState.theoriesList[j].startLine && 
-	    	   	   editorState.operatorsList[i].line < editorState.theoriesList[j].endLine) {
-	    			this.widgets.operators.append('------> ' + editorState.operatorsList[i].name 
-	    							+ ' at line: ' + editorState.operatorsList[i].line + '\n');		
-	    			i++;
-	    		}*/
+
+EasyCryptEditor.prototype.printOperator = function(editorState, i){
+	this.widgets.operators.append("... <span class='icon icon-plus-sign'/> "
+	    			+ editorState.operatorsList[i].name 
+	    			+ " {line: " + editorState.operatorsList[i].line + "}"  
+	    			+ "<div />");
+}
+
+EasyCryptEditor.prototype.printOperatorIndented = function(editorState, i){
+	this.widgets.operators.append("........ <span class='icon icon-plus-sign'/> "
+	    			+ editorState.operatorsList[i].name 
+	    			+ " {line: " + editorState.operatorsList[i].line + "}"  
+	    			+ "<div />");
+}
+
+EasyCryptEditor.prototype.printTheory = function(editorState, j){
+	this.widgets.operators.append("... <span class='icon icon-text-width'/> "
+				    		+ editorState.theoriesList[j].name 
+	    					+ " {start: " + editorState.theoriesList[j].startLine 
+				    		+ " , end: " + editorState.theoriesList[j].endLine + "}"  
+	    					+ "<div />");	
+}
 
 EasyCryptEditor.prototype.onclose = function(event){
     this.socket = null;

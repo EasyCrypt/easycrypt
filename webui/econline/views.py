@@ -9,6 +9,9 @@ require import Int.
 op myop(x y z : int) : int = x * y + z.
 
 theory T.
+
+op inside(x y z : int) : int = x * y + z.
+
 end T
 
 op mysecondop(x y z : int) : int = x * y + z.

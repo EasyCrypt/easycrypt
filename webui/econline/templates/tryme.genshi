@@ -33,8 +33,12 @@
       <div class="span4">
         <textarea id="ec-feedback" readonly="readonly" rows="30"></textarea>
       </div>
-      <div class="span2">
-        <textarea id="ec-operators" readonly="readonly" rows="10"></textarea>
+      <div class="span3">
+      	<span class="icon icon-text-width" /> Theory 
+      	<div />	
+      	<span class="icon icon-plus-sign" /> Operator
+      	<div> --------------------------------- </div>
+		<span id="ec-operators" />				
       </div>
     </div>
 
