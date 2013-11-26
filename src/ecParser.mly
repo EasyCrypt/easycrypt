@@ -1628,10 +1628,17 @@ fpattern_head(F):
 ;
 
 fpattern_arg:
-| UNDERSCORE   { EA_none }
-| LPAREN LTCOLON m=loc(mod_qident) RPAREN  { EA_mod m }
-| f=sform      { EA_form f }
-| s=mident     { EA_mem s }
+| UNDERSCORE
+    { EA_none }
+
+| LPAREN LTCOLON m=loc(mod_qident) RPAREN
+    { EA_mod m }
+
+| f=sform
+    { EA_form f }
+
+| s=mident
+    { EA_mem s }
 ;
 
 fpattern(F):
@@ -1643,8 +1650,11 @@ fpattern(F):
 ;
 
 fpattern_list(F):
-| f=fpattern(F) { [f] }
-| LPAREN fs=rlist2(fpattern(F), COLON) LPAREN { fs }
+| f=fpattern(F)
+    { [f] }
+
+| LPAREN fs=rlist2(fpattern(F), COMMA) RPAREN
+    { fs }
 ;
 
 pterm:
