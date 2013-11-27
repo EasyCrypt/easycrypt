@@ -129,7 +129,6 @@
     "save"        , SAVE       ;        (* KW: global *)
     "qed"         , QED        ;        (* KW: global *)
     "claim"       , CLAIM      ;        (* KW: global *)
-    "drop"        , DROP       ;        (* KW: global *)
     "end"         , END        ;        (* KW: global *)
     "import"      , IMPORT     ;        (* KW: global *)
     "export"      , EXPORT     ;        (* KW: global *)
@@ -149,6 +148,7 @@
     "class"       , CLASS      ;        (* KW: global *)
     "instance"    , INSTANCE   ;        (* KW: global *)
     "datatype"    , DATATYPE   ;        (* KW: global *)
+    "record"      , RECORD     ;        (* KW: global *)
     "print"       , PRINT      ;        (* KW: global *)
     "why3"        , WHY3       ;        (* KW: global *)  
     "as"          , AS         ;        (* KW: global *)  
@@ -165,6 +165,8 @@
     "undo"        , UNDO       ;        (* KW: internal *)
     "debug"       , DEBUG      ;        (* KW: internal *)
     "pragma"      , PRAGMA     ;        (* KW: internal *)
+
+    "Top"         , TOP        ;        (* KW: global *)
   ]
 
   let keywords = Hashtbl.create 97
@@ -267,6 +269,8 @@ rule main = parse
   | "->"    { ARROW  }
   | ".."    { DOTDOT }
   | ".["    { DLBRACKET }
+  | ".(|"   { DLPAREN }
+  | "|)"    { DRPAREN }
   | ":="    { CEQ }
   | "::"    { DCOLON }
   | "%r"    { FROM_INT }
@@ -298,6 +302,8 @@ rule main = parse
   | "`|" { TICKPIPE }
   | "@"  { AT }
   | "~"  { TILD }
+  | "{|" { LPBRACE }
+  | "|}" { RPBRACE }
 
   | "==>" { LONGARROW }
 

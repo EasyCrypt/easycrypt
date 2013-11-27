@@ -149,8 +149,12 @@ and process_tycinst (scope : EcScope.scope) (tci : ptycinstance located) =
 (* -------------------------------------------------------------------- *)
 and process_datatype (scope : EcScope.scope) (dt : pdatatype located) =
   EcScope.check_state `InTop "datatype" scope;
-  let scope = EcScope.Ty.add_datatype scope dt in
-    scope
+  EcScope.Ty.add_datatype scope dt
+
+(* -------------------------------------------------------------------- *)
+and process_record (scope : EcScope.scope) (rt : precord located) =
+  EcScope.check_state `InTop "record" scope;
+  EcScope.Ty.add_record scope rt
 
 (* -------------------------------------------------------------------- *)
 and process_module (scope : EcScope.scope) m =
@@ -337,6 +341,7 @@ and process (ld : EcLoader.ecloader) (scope : EcScope.scope) g =
       | Gtypeclass   t    -> `Fct   (fun scope -> process_typeclass  scope  (mk_loc loc t))
       | Gtycinstance t    -> `Fct   (fun scope -> process_tycinst    scope  (mk_loc loc t))
       | Gdatatype    t    -> `Fct   (fun scope -> process_datatype   scope  (mk_loc loc t))
+      | Grecord      t    -> `Fct   (fun scope -> process_record     scope  (mk_loc loc t))
       | Gmodule      m    -> `Fct   (fun scope -> process_module     scope  m)
       | Gdeclare     m    -> `Fct   (fun scope -> process_declare    scope  m)
       | Ginterface   i    -> `Fct   (fun scope -> process_interface  scope  i)
@@ -382,12 +387,18 @@ let loadpath () =
 
 (* -------------------------------------------------------------------- *)
 let initial ~boot ~wrapper =
-  let prelude = (mk_loc _dummy "prelude", Some `Export) in
+  let prelude = (mk_loc _dummy "Prelude", Some `Export) in
   let loader  = EcLoader.forsys loader in
   let scope   = EcScope.empty in
-  let scope   = if   boot
-                then scope
-                else process_th_require loader scope prelude in
+  let scope   =
+    if   boot
+    then scope
+    else
+      List.fold_left
+        (fun scope th -> process_th_require loader scope th)
+        scope [prelude]
+  in
+
   let scope   = EcScope.Prover.set_wrapper scope wrapper in
     scope
 

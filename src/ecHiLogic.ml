@@ -1,5 +1,5 @@
 (* -------------------------------------------------------------------- *)
-open EcUidgen
+open EcUid
 open EcUtils
 open EcMaps
 open EcIdent
@@ -255,14 +255,24 @@ let process_subst loc ri g =
 exception RwMatchFound of EcUnify.unienv * (uid -> ty option) * form evmap
 
 let try_match hyps (ue, ev) p form =
+  let na = List.length (snd (EcFol.destr_app p)) in
+
   let trymatch bds tp =
+    let tp =
+      match tp.f_node with
+      | Fapp (h, hargs) when List.length hargs > na ->
+          let (a1, a2) = List.take_n na hargs in
+            f_app h a1 (toarrow (List.map f_ty a2) tp.f_ty)
+      | _ -> tp
+    in
+
     try
       if not (Mid.set_disjoint bds tp.f_fv) then
-        false
+        None
       else
         let (ue, tue, ev) = f_match hyps (ue, ev) ~ptn:p tp in
           raise (RwMatchFound (ue, tue, ev))
-    with MatchFailure -> false
+    with MatchFailure -> None
   in
 
   try
@@ -333,7 +343,7 @@ let process_rewrite1_core (s, o) (p, typs, ue, ax) args g =
       | _ -> begin
         match destruct_product hyps ax with
         | None ->
-            if s = `LtoR && EcReduction.equal_type env ax.f_ty tbool then
+            if s = `LtoR && EcReduction.EqTest.for_type env ax.f_ty tbool then
               ((ax, ids), (`Bool, (ax, f_true)))
             else
               tacuerror "not an equation to rewrite"
@@ -406,6 +416,10 @@ let process_rewrite1 loc ri g =
                 tacuerror "this operator/predicate is abstract"
             | EcDecl.OB_oper (Some (EcDecl.OP_Constr _)) ->
                 tacuerror "this operator is a constructor"
+            | EcDecl.OB_oper (Some (EcDecl.OP_Record _)) ->
+                tacuerror "this operator is a record constructor"
+            | EcDecl.OB_oper (Some (EcDecl.OP_Proj _)) ->
+                tacuerror "this operator is a projection"
             | EcDecl.OB_oper (Some (EcDecl.OP_Fix _)) ->
                 tacuerror "this operator is a match-fix"
             | EcDecl.OB_oper (Some (EcDecl.OP_Plain e)) ->
@@ -439,7 +453,9 @@ let process_rewrite1 loc ri g =
                         f_app h a1 (toarrow (List.map f_ty a2) fp.f_ty)
                   | _ -> fp
                 in
-                  EcReduction.is_alpha_eq hyps p fp
+                  if   EcReduction.is_alpha_eq hyps p fp
+                  then Some (-1)
+                  else None
               in
                 try  FPosition.select ?o test concl
                 with InvalidOccurence ->
@@ -503,19 +519,22 @@ let process_rewrite1 loc ri g =
         end
   end
 
-  | RWRw (s, r, o, pe) ->
-      let do1 g =
-        let hyps = get_hyps g in
-
-        let (p, typs, ue, ax) = process_pterm loc (process_formula hyps) hyps pe in
-        let args = List.map (trans_pterm_argument hyps ue) pe.fp_args in
-
-          process_rewrite1_core (s, o) (p, typs, ue, ax) args g
-
-      in
-        match r with
-        | None -> do1 g
-        | Some (b, n) -> t_do b n do1 g
+  | RWRw (s, r, o, l) ->
+    let do1 pe g =
+      let hyps = get_hyps g in
+      let (p, typs, ue, ax) =
+        process_pterm loc (process_formula hyps) hyps pe in
+      let args = List.map (trans_pterm_argument hyps ue) pe.fp_args in
+      process_rewrite1_core (s, o) (p, typs, ue, ax) args g in
+    let ordo = 
+      match o, l with
+      | _, [pe] -> do1 pe
+      | None, l -> t_lor (List.map do1 l)
+      | Some _, _ -> 
+        tacuerror "occurences selector not allowed for multiple rewrite" in
+    match r with
+    | None -> ordo g
+    | Some (b, n) -> t_do b n ordo g
 
 (* -------------------------------------------------------------------- *)
 let process_rewrite loc ri g =
@@ -871,7 +890,7 @@ let process_algebra mode kind eqs g =
       | true  -> begin
         match sform_of_form (snd (LDecl.lookup_hyp x hyps)) with
         | SFeq (f1, f2) ->
-            if not (EcReduction.equal_type env ty f1.f_ty) then
+            if not (EcReduction.EqTest.for_type env ty f1.f_ty) then
               tacuerror "assumption `%s' is not an equation over the right type" x;
             (f1, f2)
         | _ -> tacuerror "assumption `%s' is not an equation" x

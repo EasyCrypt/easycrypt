@@ -58,7 +58,7 @@ let t_bdHoare_app i (phi,pR,f1,f2,g1,g2) g =
   let condg2 = f_bdHoareS_r
     { bhs with bhs_s = s2; bhs_pr = f_and_simpl phi nR;bhs_bd=g2} in
   let bd =
-    (f_real_add_simpl (f_real_prod_simpl f1 f2) (f_real_prod_simpl g1 g2)) in
+    (f_real_add_simpl (f_real_mul_simpl f1 f2) (f_real_mul_simpl g1 g2)) in
   let condbd =
     match bhs.bhs_cmp with
     | FHle -> f_real_le bd bhs.bhs_bd

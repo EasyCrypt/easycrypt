@@ -107,6 +107,8 @@ let t_pr_rewrite s g =
     | `MuNot   -> select_pr is_not
     | `MuOr
     | `MuDisj  -> select_pr is_or in
+
+  let select xs fp = if select xs fp then Some (-1) else None in
   let env, _, concl = get_goal_e g in
   let torw =
     try
@@ -257,7 +259,7 @@ open EcParsetree
 
 let t_rewrite_glob s pqs = 
   EcHiLogic.process_rewrite pqs.EcLocation.pl_loc
-    [(RWRw(s,None,None, { fp_kind = FPNamed(pqs,None);fp_args = [] }))]
+    [(RWRw(s,None,None, [{ fp_kind = FPNamed(pqs,None);fp_args = [] }]))]
 
 let t_rewrite_logic s x = 
   let loc = EcLocation._dummy in

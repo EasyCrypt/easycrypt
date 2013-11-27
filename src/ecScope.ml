@@ -289,6 +289,7 @@ end = struct
     match lp with
     | LSymbol (_, ty) -> on_mpath_ty cb ty
     | LTuple  xs      -> List.iter (fun (_, ty) -> on_mpath_ty cb ty) xs
+    | LRecord (_, xs) -> List.iter (on_mpath_ty cb |- snd) xs
 
   let rec on_mpath_expr cb (e : expr) =
     let cbrec = on_mpath_expr cb in
@@ -927,93 +928,190 @@ module Op = struct
           let ty        = EcTypes.toarrow (List.map snd args) codom in
           let opname    = EcIdent.create (unloc op.po_name) in
           let env       = EcEnv.Var.bind_local opname ty env in
-          let mpname, mpty =
-              let names = Ssym.of_list (List.map (fun pop -> unloc pop.pop_name) pbs) in
-              let name1 =
-                try  Ssym.choose names
-                with Not_found ->
-                  hierror ~loc "this pattern matching has no branches"
-              in
-                if not (Ssym.is_empty (Ssym.remove name1 names)) then
-                  hierror ~loc "this pattern matching matches on different parameters";
-                match List.findopt (fun (x, _) -> EcIdent.name x = name1) (List.rev args) with
-                | None   -> hierror ~loc "this pattern matching matches an unbound parameter";
-                | Some x -> x
+
+          let mpty, pbsmap =
+            let pbsmap =
+              List.map (fun x ->
+                let nms = (fun pop -> (unloc pop.pop_name, pop)) in
+                let nms = List.map nms x.pop_patterns in
+                  (x.pop_body, Msym.of_list nms))
+                pbs
+            in
+              match List.map snd pbsmap with
+              | [] -> hierror ~loc "this pattern matching has no branches"
+              | nm :: nms ->
+                  if not (List.for_all (Msym.set_equal nm) nms) then
+                    hierror ~loc "this pattern matching matches on different parameters";
+                  let argsmap =
+                    List.fold_lefti
+                      (fun i m (x, xty) -> Msym.add (EcIdent.name x) (i, x, xty) m)
+                      Msym.empty args
+                  in
+
+                  let _, mpty =
+                    Msym.fold_left
+                      (fun (seen, mpty) px _ ->
+                         if Msym.mem px seen then
+                            hierror ~loc "this pattern matching matches a parameter twice";
+                         match Msym.find_opt px argsmap with
+                         | None ->
+                            hierror ~loc "this pattern matching matches an unbound parameter";
+                         | Some (i, x, xty) -> (Ssym.add px seen, (i, x, xty) :: mpty))
+                      (Ssym.empty, []) nm
+                  in
+                    (mpty, pbsmap)
           in
 
           let branches =
             let pbs =
-              let trans1 pb =
-                let filter = fun op -> EcDecl.is_ctor op in
-                let cname  = fst pb.pop_pattern in
-                let tvi    = pb.pop_tvi |> omap (TT.transtvi env ue) in
-                let cts    = EcUnify.select_op ~filter tvi env (unloc cname) ue [] in
+              let trans_b ((body, pbmap) : _ * pop_pattern Msym.t) =
+                let trans1 ((_, x, xty) : _ * EcIdent.t * ty) =
+                  let pb     = oget (Msym.find_opt (EcIdent.name x) pbmap) in
+                  let filter = fun op -> EcDecl.is_ctor op in
+                  let cname  = fst pb.pop_pattern in
+                  let tvi    = pb.pop_tvi |> omap (TT.transtvi env ue) in
+                  let cts    = EcUnify.select_op ~filter tvi env (unloc cname) ue [] in
+    
+                  match cts with
+                  | [] -> hierror ~loc:cname.pl_loc "unknown constructor name"
+                  | _ :: _ :: _ -> hierror ~loc:cname.pl_loc "ambiguous constructor name"
+    
+                  | [(cp, tvi), opty, subue] ->
+                      let ctor = oget (EcEnv.Op.by_path_opt cp env) in
+                      let (indp, ctoridx) = EcDecl.operator_as_ctor ctor in
+                      let indty = oget (EcEnv.Ty.by_path_opt indp env) in
+                      let ind = snd (EcDecl.tydecl_as_datatype indty) in
+                      let ctorsym, ctorty = List.nth ind ctoridx in
   
-                match cts with
-                | [] -> hierror ~loc:cname.pl_loc "unknown constructor name"
-                | _ :: _ :: _ -> hierror ~loc:cname.pl_loc "ambiguous constructor name"
+                      let args_exp = List.length ctorty in
+                      let args_got = List.length (snd pb.pop_pattern) in
   
-                | [(cp, tvi), opty, subue] ->
-                    let ctor = oget (EcEnv.Op.by_path_opt cp env) in
-                    let (indp, ctor) = EcDecl.operator_as_ctor ctor in
-                    let indty = oget (EcEnv.Ty.by_path_opt indp env) in
-                    let ind = EcDecl.tydecl_as_datatype indty in
-                    let ctorsym, ctorty = List.nth ind ctor in
+                      if args_exp <> args_got then
+                        hierror ~loc:cname.pl_loc
+                          "this constructor takes %d argument(s), got %d" args_exp args_got;
+  
+                      if not (List.uniq (List.map unloc (snd pb.pop_pattern))) then
+                        hierror ~loc:cname.pl_loc "this pattern is non-linear";
+  
+                      EcUnify.UniEnv.restore ~src:subue ~dst:ue;
+  
+                      let ctorty =
+                        let tvi = Some (EcUnify.TVIunamed tvi) in
+                          fst (EcUnify.UniEnv.opentys ue indty.tyd_params tvi ctorty) in
+                      let pty = EcUnify.UniEnv.fresh ue in
+  
+                      (try  EcUnify.unify env ue (toarrow ctorty pty) opty
+                       with EcUnify.UnificationFailure _ -> assert false);
+                      TT.unify_or_fail env ue pb.pop_name.pl_loc pty xty;
+  
+                      let pvars = List.map (EcIdent.create |- unloc) (snd pb.pop_pattern) in
+                      let pvars = List.combine pvars ctorty in
 
-                    let args_exp = List.length ctorty in
-                    let args_got = List.length (snd pb.pop_pattern) in
+                        (pb, (indp, ind, (ctorsym, ctoridx)), pvars)
+                in  
 
-                    if args_exp <> args_got then
-                      hierror ~loc:cname.pl_loc
-                        "this constructor takes %d argument(s), got %d" args_exp args_got;
-
-                    if not (List.uniq (List.map unloc (snd pb.pop_pattern))) then
-                      hierror ~loc:cname.pl_loc "this pattern is non-linear";
-
-                    EcUnify.UniEnv.restore ~src:subue ~dst:ue;
-
-                    let pty = EcUnify.UniEnv.fresh ue in
-
-                    (try  EcUnify.unify env ue (toarrow ctorty pty) opty
-                     with EcUnify.UnificationFailure _ -> assert false);
-                    TT.unify_or_fail env ue pb.pop_name.pl_loc mpty pty;
-
-                    let ctorty =
-                      let tvi = Some (EcUnify.TVIunamed tvi) in
-                        fst (EcUnify.UniEnv.opentys ue indty.tyd_params tvi ctorty)
-                    and pvars = List.map (EcIdent.create |- unloc) (snd pb.pop_pattern) in
-                    let pvars = List.combine pvars ctorty in
-
-                    let be =
-                      let env = EcEnv.Var.bind_locals pvars env in
-                        TT.transexpcast env ue codom pb.pop_body
-                    in
-                      (pb, (indp, ind, (ctorsym, ctor)), (pvars, be))
-
+                let ptns = List.map trans1 mpty in
+                let env  =
+                  List.fold_left (fun env (_, _, pvars) ->
+                    EcEnv.Var.bind_locals pvars env)
+                    env ptns
+                in
+                    (ptns, TT.transexpcast env ue codom body)
               in
-                List.map trans1 pbs
+                List.map trans_b pbsmap
             in
 
-            let (_, (_, ind, _), _) = oget (List.ohead pbs) in
-            let bmap = Array.create (List.length ind) None in
+            let module CaseMap : sig
+              type t
+
+              type locals = (EcIdent.t * ty) list
+
+              val create  : EcPath.path list list -> t
+              val add     : (int * locals) list -> expr -> t -> bool
+              val resolve : t -> opbranches option
+            end = struct
+              type locals = (EcIdent.t * ty) list
+
+              type t = [
+                | `Case of (EcPath.path * t) array
+                | `Leaf of (locals list * expr) option ref
+              ]
+
+              let rec create (inds : path list list) =
+                match inds with
+                | [] -> `Leaf (ref None)
+                | ind :: inds ->
+                    let ind = Array.of_list ind in
+                      `Case (Array.map (fun x -> (x, create inds)) ind)
+
+              let add bs e (m : t) =
+                let r =
+                  List.fold_left
+                    (fun m (i, _) ->
+                       match m with
+                       | `Leaf _ -> assert false
+                       | `Case t ->
+                           assert (i >= 0 && i < Array.length t);
+                           snd t.(i))
+                    m bs
+                in
+                  match r with
+                  | `Case _ -> assert false
+                  | `Leaf r -> begin
+                      match !r with
+                      | None   -> r := Some (List.map snd bs, e); true
+                      | Some _ -> false
+                  end
+
+              let resolve =
+                let module E = struct exception NotFull end in
+
+                let rec resolve_r m =
+                  match m with
+                  | `Case t ->
+                      let for1 i =
+                        let (cp, bs) = snd_map resolve_r t.(i) in
+                          { opb_ctor = (cp, i); opb_sub = bs; }
+                      in
+                        OPB_Branch (Parray.init (Array.length t) for1)
+
+                  | `Leaf r -> begin
+                      match !r with
+                      | None -> raise E.NotFull
+                      | Some (x1, x2) -> OPB_Leaf (x1, x2)
+                  end
+              in
+                fun m ->
+                  try  Some (resolve_r m)
+                  with E.NotFull -> None
+            end in
+
+            let inds = (fun (_, (indp, ind, _), _) -> (indp, ind)) in
+            let inds = List.map inds (fst (oget (List.ohead pbs))) in
+            let inds =
+              List.map (fun (indp, ctors) ->
+                List.map
+                  (fun (ctor, _) -> EcPath.pqoname (EcPath.prefix indp) ctor)
+                  ctors)
+                inds
+            in
+
+            let casemap = CaseMap.create inds in
 
             List.iter
-              (fun ((_, (_, _, (cname, ctor)), _) as ct) ->
-                if bmap.(ctor) <> None then
-                  hierror ~loc "duplicated branch for constructor `%s'" cname;
-                bmap.(ctor) <- Some ct)
+              (fun (ptns, be) ->
+                 let ptns = List.map (fun (_, (_, _, (_, ctor)), pvars) ->
+                   (ctor, pvars)) ptns
+                 in
+                   if not (CaseMap.add ptns be casemap) then
+                     hierror ~loc "this pattern matching contains duplicated branch")
               pbs;
 
-            Parray.of_array (Array.mapi
-              (fun i v ->
-                let cname = fst (List.nth ind i) in
-                  match v with
-                  | None -> hierror ~loc "missing branch for constructor `%s'" cname
-                  | Some (_, _, branch) -> ((cname, i), branch))
-              bmap)
+            match CaseMap.resolve casemap with
+            | None   -> hierror ~loc "this pattern matching is non-exhaustive"
+            | Some x -> x
           in
-
-            (ty, (`Fix ((opname, codom), (args, mpname), branches)))
+            (ty, (`Fix ((opname, codom), (args, List.map proj3_1 mpty), branches)))
     in
 
     if not (EcUnify.UniEnv.closed ue) then
@@ -1026,28 +1124,31 @@ module Op = struct
       match body with
       | `Abstract -> None
       | `Plain e  -> Some (OP_Plain (e_mapty uni e))
-      | `Fix ((opname, codom), (args, mpname), bs) ->
-          let codom   = uni codom in
-          let opexpr  = EcPath.pqname (path scope) (unloc op.po_name) in
-          let opexpr  = e_op opexpr (List.map (tvar |- fst) tparams) codom in
-          let ebsubst = { e_subst_id with es_freshen = false; es_ty = uni; } in
-          let ebsubst = { e_subst_id with es_loc = Mid.add opname opexpr ebsubst.es_loc; } in
-          let args    = List.map (fun (x, xty) -> (x, uni xty)) args in
-          let structi =
-            oget (List.findex
-                    (fun (x, _) -> EcIdent.id_equal x mpname) args) in
-          let bs =
-            Parray.map
-              (fun ((cname, i), (pvars, be)) ->
-                { opf1_ctor   = (EcPath.pqname (path scope) cname, i);
-                  opf1_locals = List.map (fun (x, xty) -> (x, uni xty)) pvars;
-                  opf1_body   = e_subst ebsubst be; })
-              bs
+      | `Fix ((opname, codom), (args, istruct), branches) ->
+          let codom    = uni codom in
+          let opexpr   = EcPath.pqname (path scope) (unloc op.po_name) in
+          let opexpr   = e_op opexpr (List.map (tvar |- fst) tparams) codom in
+          let ebsubst  = { e_subst_id with es_freshen = false; es_ty = uni; } in
+          let ebsubst  = { ebsubst with es_loc = Mid.add opname opexpr ebsubst.es_loc; } in
+          let args     = List.map (fun (x, xty) -> (x, uni xty)) args in
+          let branches =
+            let rec uni_branches = function
+              | OPB_Leaf (locals, e) ->
+                  OPB_Leaf (List.map (List.map (snd_map uni)) locals,
+                             e_subst ebsubst e)
+              | OPB_Branch bs ->
+                  let for1 b =
+                    { opb_ctor = b.opb_ctor;
+                      opb_sub  = uni_branches b.opb_sub; }
+                  in
+                    OPB_Branch (Parray.map for1 bs)
+            in
+              uni_branches branches
           in
             Some (OP_Fix { opf_args     = args;
                            opf_resty    = codom;
-                           opf_struct   = (structi, List.length args);
-                           opf_branches = bs; })
+                           opf_struct   = (istruct, List.length args);
+                           opf_branches = branches; })
     in
 
     let tyop = EcDecl.mk_op tparams ty body in
@@ -1148,7 +1249,7 @@ module Mod = struct
       hierror "cannot declare a local module outside of a section";
 
     let (name, m) = ptm.ptm_def in
-    let m = TT.transmod scope.sc_env ~internal:false (unloc name) m in
+    let m = TT.transmod scope.sc_env ~attop:true (unloc name) m in
 
     if not ptm.ptm_local then begin
       match CoreSection.olocals scope.sc_section with
@@ -1555,7 +1656,7 @@ module Ty = struct
            match Mstr.find_opt x ops with
            | None -> m
            | Some (loc, (p, op)) ->
-               if not (EcReduction.equal_type env ty (op_ty op)) then
+               if not (EcReduction.EqTest.for_type env ty (op_ty op)) then
                  hierror ~loc "invalid type for operator `%s'" x;
                Mstr.add x p m)
         Mstr.empty reqs
@@ -1667,7 +1768,6 @@ module Ty = struct
     | _ -> hierror "unknown type class"
 
   (* ------------------------------------------------------------------ *)
-  (* FIXME: Check for positivity *)
   let add_datatype (scope : scope) { pl_loc = loc; pl_desc = dt; } =
     check_name_available scope dt.ptd_name;
 
@@ -1698,17 +1798,67 @@ module Ty = struct
         dt.ptd_ctors |> List.map for1
     in
 
+    let tparams = EcUnify.UniEnv.tparams ue in
+
     (* Check for the positivity condition / emptyness *)
-    begin
-      let rec positive p t =
-        let t = EcEnv.Ty.hnorm t env0 in
-        match t.ty_node with
-        | Tglob   _        -> assert false
-        | Tunivar _        -> assert false
-        | Tvar    _        -> true
-        | Ttuple  ts       -> List.for_all (positive p) ts
-        | Tconstr (_, ts)  -> not (List.exists (occurs p) ts)
-        | Tfun    (t1, t2) -> (not (occurs p t1)) && (positive p t2)
+    let scheme =
+      let module E = struct exception Fail end in
+
+      let rec scheme1 p (pred, fac) ty =
+        let ty = EcEnv.Ty.hnorm ty env0 in
+          match ty.ty_node with
+          | Tglob   _ -> assert false
+          | Tunivar _ -> assert false
+          | Tvar    _ -> None
+
+          | Ttuple tys -> begin
+              let xs  = List.map (fun xty -> (fresh_id_of_ty xty, xty)) tys in
+              let sc1 = fun (x, xty) -> scheme1 p (pred, EcFol.f_local x xty) xty in
+                match List.pmap sc1 xs with
+                | []  -> None
+                | scs -> Some (EcFol.f_let (LTuple xs) fac (EcFol.f_ands scs))
+          end
+
+          | Tconstr (p', ts)  ->
+              if List.exists (occurs p) ts then raise E.Fail;
+              if not (EcPath.p_equal p p') then None else
+                Some (EcFol.f_app pred [fac] tbool)
+
+          | Tfun (ty1, ty2) ->
+              if occurs p ty1 then raise E.Fail;
+              let x = fresh_id_of_ty ty1 in
+                scheme1 p (pred, EcFol.f_app fac [EcFol.f_local x ty1] ty2) ty2
+                  |> omap (EcFol.f_forall [x, EcFol.GTty ty1])
+
+      and schemec (targs, p) pred (ctor, tys) =
+        let indty = tconstr p (List.map tvar targs) in
+        let ctor  = EcPath.pqname (path scope) ctor in
+        let ctor  = EcFol.f_op ctor (List.map tvar targs) indty in
+        let xs    = List.map (fun xty -> (fresh_id_of_ty xty, xty)) tys in
+        let cargs = List.map (fun (x, xty) -> EcFol.f_local x xty) xs in
+        let sc1   = fun (x, xty) -> scheme1 p (pred, EcFol.f_local x xty) xty in
+        let scs   = List.pmap sc1 xs in
+        let form  = EcFol.f_app pred [EcFol.f_app ctor cargs indty] tbool in
+        let form  = EcFol.f_imps scs form in
+        let form  =
+          let bds = List.map (fun (x, xty) -> (x, EcFol.GTty xty)) xs in
+            EcFol.f_forall bds form
+        in
+          form
+
+      and scheme (targs, p) ctors =
+        let indty  = tconstr p (List.map tvar targs) in
+        let indx   = fresh_id_of_ty indty in
+        let indfm  = EcFol.f_local indx indty in
+        let predty = tfun indty tbool in
+        let predx  = EcIdent.create "P" in
+        let pred   = EcFol.f_local predx predty in
+        let scs    = List.map (schemec (targs, p) pred) ctors in
+        let form   = EcFol.f_app pred [indfm] tbool in
+        let form   = EcFol.f_forall [indx, EcFol.GTty indty] form in
+        let form   = EcFol.f_imps scs form in
+        let form   = EcFol.f_forall [predx, EcFol.GTty predty] form in
+          form
 
       and occurs p t =
         let t = EcEnv.Ty.hnorm t env0 in
@@ -1717,22 +1867,80 @@ module Ty = struct
           | _ -> EcTypes.ty_sub_exists (occurs p) t
 
       in
-        List.iter (fun (cname, cty) ->
-          if not (List.for_all (positive tpath) cty) then
-            hierror ~loc
-              "the constructor `%s' does not respect the positivity condition"
-              cname)
-          ctors;
-        if List.for_all (fun (_, cty) -> List.exists (occurs tpath) cty) ctors then
-          hierror ~loc "this datatype is empty";
-    end;
+        let scheme =
+          try  scheme (List.map fst tparams, tpath) ctors
+          with E.Fail ->
+            hierror ~loc "the datatype does not respect the positivity condition"
+        in
+          if List.for_all (fun (_, cty) -> List.exists (occurs tpath) cty) ctors then
+            hierror ~loc "this datatype is empty";
+          scheme
+    in
 
     (* Add final datatype to environment *)
     let tydecl = {
-      tyd_params = EcUnify.UniEnv.tparams ue;
-      tyd_type   = `Datatype ctors;
+      tyd_params = tparams;
+      tyd_type   = `Datatype (scheme, ctors);
     } in
       bind scope (unloc dt.ptd_name, tydecl)
+
+  (* ------------------------------------------------------------------ *)
+  let add_record (scope : scope) { pl_loc = loc; pl_desc = rt; } =
+    check_name_available scope rt.ptr_name;
+
+    (* Check type-parameters *)
+    let ue    = TT.transtyvars scope.sc_env (loc, Some rt.ptr_tyvars) in
+    let tpath = EcPath.pqname (path scope) (unloc rt.ptr_name) in
+
+    (* Check for duplicated field names *)
+    Msym.odup unloc (List.map fst rt.ptr_fields)
+      |> oiter (fun (x, y) -> hierror ~loc:y.pl_loc
+                  "duplicated field name: `%s'" x.pl_desc);
+
+    (* Type-check field types *)
+    let fields =
+      let for1 (fname, fty) =
+        let fty = TT.transty TT.tp_tydecl (env scope) ue fty in
+          (unloc fname, fty)
+      in
+        rt.ptr_fields |> List.map for1
+    in
+
+    let tparams = EcUnify.UniEnv.tparams ue in
+
+    (* Generate induction scheme *)
+    let scheme = 
+      let targs  = List.map (tvar |- fst) tparams in
+      let recty  = tconstr tpath targs in
+      let recx   = fresh_id_of_ty recty in
+      let recfm  = EcFol.f_local recx recty in
+      let predty = tfun recty tbool in
+      let predx  = EcIdent.create "P" in
+      let pred   = EcFol.f_local predx predty in
+      let ctor   = EcPath.pqoname
+                     (EcPath.prefix tpath)
+                     (Printf.sprintf "mk_%s" (unloc rt.ptr_name)) in
+      let ctor   = EcFol.f_op ctor targs (toarrow (List.map snd fields) recty) in
+      let prem   =
+        let ids  = List.map (fun (_, fty) -> (fresh_id_of_ty fty, fty)) fields in
+        let vars = List.map (fun (x, xty) -> EcFol.f_local x xty) ids in
+        let bds  = List.map (fun (x, xty) -> (x, EcFol.GTty xty)) ids in
+        let recv = EcFol.f_app ctor vars recty in
+          EcFol.f_forall bds (EcFol.f_app pred [recv] tbool) in
+      let form   = EcFol.f_app pred [recfm] tbool in
+      let form   = EcFol.f_forall [recx, EcFol.GTty recty] form in
+      let form   = EcFol.f_imp prem form in
+      let form   = EcFol.f_forall [predx, EcFol.GTty predty] form in
+        form
+    in
+
+    (* Add final record to environment *)
+    let tparams = EcUnify.UniEnv.tparams ue in
+    let tydecl  = {
+      tyd_params = tparams;
+      tyd_type   = `Record (scheme, fields);
+    } in
+      bind scope (unloc rt.ptr_name, tydecl)
 end
 
 (* -------------------------------------------------------------------- *)
@@ -1983,8 +2191,8 @@ module Section = struct
         List.fold_left bind1 scope oitems
 end
 
+(* -------------------------------------------------------------------- *)
 module Extraction = struct
-    
   let check_top scope = 
     if not (scope.sc_top = None) then 
       hierror "Extraction can not be done inside a theory";
@@ -1995,5 +2203,4 @@ module Extraction = struct
     check_top scope;
     EcExtraction.process_extraction (env scope) scope.sc_required todo;
     scope 
-    
 end

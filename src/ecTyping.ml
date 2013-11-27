@@ -19,6 +19,8 @@ module Sx  = EcPath.Sx
 module Mx  = EcPath.Mx
 module Mid = EcIdent.Mid
 
+module EqTest = EcReduction.EqTest
+
 module TC = EcTypeClass
 
 (* -------------------------------------------------------------------- *)
@@ -36,6 +38,7 @@ type modapp_error =
 
 type modtyp_error =
 | MTE_FunSigDoesNotRepeatArgNames
+| MTE_InternalFunctor
 
 type funapp_error =
 | FAE_WrongArgCount
@@ -47,35 +50,41 @@ type tyerror =
 | UniVarNotAllowed
 | TypeVarNotAllowed
 | OnlyMonoTypeAllowed
-| UnboundTypeParameter of symbol
-| UnknownTypeName      of qsymbol
-| UnknownTypeClass     of qsymbol
-| InvalidTypeAppl      of qsymbol * int * int
+| UnboundTypeParameter   of symbol
+| UnknownTypeName        of qsymbol
+| UnknownTypeClass       of qsymbol
+| UnknownRecFieldName    of qsymbol
+| DuplicatedRecFieldName of symbol
+| MissingRecField        of symbol
+| MixingRecFields        of EcPath.path tuple2
+| UnknownProj            of qsymbol
+| AmbiguousProj          of qsymbol
+| InvalidTypeAppl        of qsymbol * int * int
 | DuplicatedTyVar
-| DuplicatedLocal      of symbol
-| DuplicatedField      of symbol
+| DuplicatedLocal        of symbol
+| DuplicatedField        of symbol
 | NonLinearPattern
 | LvNonLinear
 | NonUnitFunWithoutReturn
 | UnitFunWithReturn
-| TypeMismatch         of (ty * ty) * (ty * ty)
-| TypeModMismatch      of tymod_cnv_failure
+| TypeMismatch           of (ty * ty) * (ty * ty)
+| TypeModMismatch        of tymod_cnv_failure
 | NotAFunction
-| UnknownVarOrOp       of qsymbol * ty list
-| MultipleOpMatch      of qsymbol * ty list
-| UnknownModName       of qsymbol
-| UnknownTyModName     of qsymbol
-| UnknownFunName       of qsymbol
-| UnknownModVar        of qsymbol
-| UnknownMemName       of int * symbol
-| InvalidFunAppl       of funapp_error
-| InvalidModAppl       of modapp_error
-| InvalidModType       of modtyp_error
-| InvalidMem           of symbol * mem_error
-| FunNotInModParam     of qsymbol
+| UnknownVarOrOp         of qsymbol * ty list
+| MultipleOpMatch        of qsymbol * ty list
+| UnknownModName         of qsymbol
+| UnknownTyModName       of qsymbol
+| UnknownFunName         of qsymbol
+| UnknownModVar          of qsymbol
+| UnknownMemName         of int * symbol
+| InvalidFunAppl         of funapp_error
+| InvalidModAppl         of modapp_error
+| InvalidModType         of modtyp_error
+| InvalidMem             of symbol * mem_error
+| FunNotInModParam       of qsymbol
 | NoActiveMemory
 | PatternNotAllowed
-| UnknownScope         of qsymbol
+| UnknownScope           of qsymbol
 
 exception TyError of EcLocation.t * EcEnv.env * tyerror
 
@@ -117,10 +126,7 @@ let pp_modappl_error fmt error =
 
 let pp_tyerror fmt env error =
   let msg x = Format.fprintf fmt x in
-
-  let pp_type fmt ty =
-    EcPrinting.pp_type env fmt ty
-  in
+  let pp_type fmt ty = EcPrinting.pp_type env fmt ty in
 
   match error with
   | UniVarNotAllowed ->
@@ -140,6 +146,26 @@ let pp_tyerror fmt env error =
 
   | UnknownTypeClass qs ->
       msg "unknown type class: %a" pp_qsymbol qs
+
+  | UnknownRecFieldName qs ->
+      msg "unknown (record) field name: %a" pp_qsymbol qs
+
+  | DuplicatedRecFieldName qs ->
+      msg "duplicated (record) field name: %s" qs
+
+  | MissingRecField qs ->
+      msg "missing (record) field: %s" qs
+
+  | MixingRecFields (p1, p2) ->
+      msg "mixing (record) fields from different record types: %a / %a"
+        (EcPrinting.pp_tyname env) p1
+        (EcPrinting.pp_tyname env) p2
+
+  | UnknownProj qs ->
+      msg "unknown record projection: %a" pp_qsymbol qs
+
+  | AmbiguousProj qs ->
+      msg "ambiguous record projection: %a" pp_qsymbol qs
 
   | InvalidTypeAppl (name, _, _) ->
       msg "invalid type application: %a" pp_qsymbol name
@@ -211,6 +237,9 @@ let pp_tyerror fmt env error =
 
   | InvalidModType MTE_FunSigDoesNotRepeatArgNames ->
       msg "applied argument names must repeat functor argument names"
+
+  | InvalidModType MTE_InternalFunctor ->
+      msg "functors must be top-level modules"
 
   | InvalidMem (name, MAE_IsConcrete) ->
       msg "the memory %s must be abstract" name
@@ -410,6 +439,20 @@ let select_form_op env opsc name ue tvi psig =
     gen_select_op ~actonly:true ~mode:`Form (ppv, pop, flc)
       opsc tvi env name ue psig 
 
+let select_proj env opsc name ue tvi recty =
+  let filter = (fun op -> EcDecl.is_proj op) in
+  let ops = EcUnify.select_op ~filter tvi env name ue [recty] in
+  let ops =
+    match ops, opsc with
+    | _ :: _ :: _, Some opsc ->
+        List.filter
+          (fun ((p, _), _, _) ->
+            EcPath.p_equal opsc (oget (EcPath.prefix p)))
+          ops
+    | _, _ -> ops
+  in
+    ops
+
 (* -------------------------------------------------------------------- *)
 let lookup_scope env popsc =
   match unloc popsc with
@@ -452,6 +495,243 @@ let transtyvars (env : EcEnv.env) (loc, tparams) =
     EcUnify.UniEnv.create tparams
 
 (* -------------------------------------------------------------------- *)
+exception TymodCnvFailure of tymod_cnv_failure
+
+let tymod_cnv_failure e =
+  raise (TymodCnvFailure e)
+
+let tysig_item_name = function
+  | Tys_function (f, _) -> f.fs_name
+
+let tysig_item_kind = function
+  | Tys_function _ -> `Function
+
+let rec check_sig_cnv mode (env:EcEnv.env) (sin:module_sig) (sout:module_sig) = 
+  (* Check parameters for compatibility. Parameters names may be
+   * different, hence, substitute in [tin.tym_params] types the names
+   * of [tout.tym_params] *)
+  
+  if List.length sin.mis_params <> List.length sout.mis_params then
+    tymod_cnv_failure E_TyModCnv_ParamCountMismatch;
+
+  let bsubst =
+    List.fold_left2
+      (fun subst (xin, tyin) (xout, tyout) ->
+        let tyout = EcSubst.subst_modtype subst tyout in
+        check_modtype_cnv env tyin tyout;
+        EcSubst.add_module subst xout (EcPath.mident xin))
+      EcSubst.empty sin.mis_params sout.mis_params
+  in
+  (* Check for body inclusion (w.r.t the parameters names substitution).
+   * This includes:
+   * - functions inclusion with equal signatures + included use modifiers.
+   *)
+  let tin  = sin.mis_body 
+  and tout = EcSubst.subst_modsig_body bsubst sout.mis_body in
+
+  let check_item_compatible =
+    let check_fun_compatible (fin,oin) (fout,oout) =
+      assert (fin.fs_name = fout.fs_name);
+      (* We currently reject function with compatible signatures but
+       * for the arguments names. We plan to leviate this restriction
+       * later on, but note that this may require to alpha-convert when
+       * instantiating an abstract module with an implementation. *)
+
+      let arg_compatible vd1 vd2 = 
+           vd1.v_name = vd2.v_name
+        && EqTest.for_type env vd1.v_type vd2.v_type 
+      in
+
+      let (iargs, oargs) = (fin.fs_params, fout.fs_params) in
+      let (ires , ores ) = ( fin.fs_ret, fout.fs_ret) in
+
+        if List.length iargs <> List.length oargs then
+          tymod_cnv_failure (E_TyModCnv_MismatchFunSig fin.fs_name);
+        if not (List.for_all2 arg_compatible iargs oargs) then
+          tymod_cnv_failure (E_TyModCnv_MismatchFunSig fin.fs_name);
+        if not (EqTest.for_type env ires ores) then
+          tymod_cnv_failure (E_TyModCnv_MismatchFunSig fin.fs_name);
+
+        let flcmp () =
+          let norm oi = 
+            List.fold_left (fun s f -> 
+              EcPath.Sx.add (EcEnv.NormMp.norm_xpath env f) s)
+              EcPath.Sx.empty oi.oi_calls
+          in
+          let icalls = norm oin in
+          let ocalls = norm oout in
+          match mode with
+          | `Sub -> Sx.subset icalls ocalls
+          | `Eq  -> Sx.equal  icalls ocalls
+        in
+        if not (flcmp ()) then
+          tymod_cnv_failure (E_TyModCnv_MismatchFunSig fin.fs_name);
+        
+    in
+      fun i_item o_item ->
+        match i_item, o_item with
+        | Tys_function (fin,oin), Tys_function (fout,oout) -> 
+          check_fun_compatible (fin,oin) (fout,oout)
+  in
+
+  let check_for_item (o_item : module_sig_body_item) =
+    let o_name = tysig_item_name o_item
+    and o_kind = tysig_item_kind o_item in
+
+    let i_item =
+      List.findopt
+        (fun i_item ->
+             (tysig_item_name i_item) = o_name
+          && (tysig_item_kind i_item) = o_kind)
+        tin
+    in
+      match i_item with
+      | None -> tymod_cnv_failure (E_TyModCnv_MissingComp o_name)
+      | Some i_item -> check_item_compatible i_item o_item
+  in
+    List.iter check_for_item tout;
+
+    if mode = `Eq then begin
+      List.iter
+        (fun i_item ->
+          let i_name = tysig_item_name i_item
+          and i_kind = tysig_item_kind i_item in
+          let b =
+            List.exists
+              (fun o_item ->
+                   (tysig_item_name o_item) = i_name
+                && (tysig_item_kind o_item) = i_kind)
+              tout
+          in
+            if not b then
+              tymod_cnv_failure (E_TyModCnv_MissingComp i_name))
+        tin
+    end
+
+and check_modtype_cnv env (tyin:module_type) (tyout:module_type) = 
+  let sin = EcEnv.ModTy.sig_of_mt env tyin in
+  let sout = EcEnv.ModTy.sig_of_mt env tyout in
+  check_sig_cnv `Eq env sin sout
+
+let check_sig_mt_cnv env sin tyout = 
+  let sout = EcEnv.ModTy.sig_of_mt env tyout in
+  check_sig_cnv `Sub env sin sout
+
+
+(* -------------------------------------------------------------------- *)
+let split_msymb (env : EcEnv.env) (msymb : pmsymbol located) =
+  let (top, args, sm) = 
+    try
+      let (r, (x, args), sm) =
+        List.find_split (fun (_,args) -> args <> None) msymb.pl_desc
+      in
+        (List.rev_append r [x, None], args, sm)
+    with Not_found ->
+      (msymb.pl_desc, None, [])
+  in
+
+  let (top, sm) =
+    let ca (x, args) =
+      if args <> None then
+        tyerror msymb.pl_loc env (InvalidModAppl MAE_WrongArgPosition);
+      x
+    in
+      (List.map ca top, List.map ca sm)
+  in
+    (top, args, sm)
+
+(* -------------------------------------------------------------------- *)
+let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol located) =
+  let loc = msymb.pl_loc in
+  let (top, args, sm) = split_msymb env msymb in
+
+  let to_qsymbol l = 
+    match List.rev l with
+    | [] -> assert false
+    | x::qn ->
+        { pl_desc = (List.rev_map unloc qn, unloc x);
+          pl_loc  = x.pl_loc; }
+  in
+
+  let top_qname = to_qsymbol (top@sm) in
+
+  let (top_path, {EcEnv.sp_target = mod_expr; EcEnv.sp_params = (spi, params)}) =
+    match EcEnv.Mod.sp_lookup_opt top_qname.pl_desc env with
+    | None ->
+        tyerror top_qname.pl_loc env (UnknownModName top_qname.pl_desc)
+    | Some me -> me
+  in
+
+  let (params, istop) =
+    match top_path.EcPath.m_top with
+    | `Concrete (_, Some sub) ->
+        if mod_expr.me_sig.mis_params <> [] then
+          assert false;
+        if args <> None then
+          if not (EcPath.p_size sub = List.length sm) then
+            tyerror loc env (InvalidModAppl MAE_WrongArgPosition);
+        (params, false)
+
+    | `Concrete (p, None) ->
+        if (params <> []) || ((spi+1) <> EcPath.p_size p) then
+          assert false;
+        (mod_expr.me_sig.mis_params, true)
+
+    | `Local _m ->
+        if (params <> []) || spi <> 0 then
+          assert false;
+        (mod_expr.me_sig.mis_params, true)
+  in
+
+  let args = args |> omap (List.map (trans_msymbol env)) in
+
+  match args with
+  | None ->
+    if not istop && params <> [] then
+      tyerror loc env (InvalidModAppl MAE_AccesSubModFunctor); 
+
+    (top_path, mod_expr.me_sig)
+
+  | Some args ->
+      if List.length args > List.length params then
+        tyerror loc env (InvalidModAppl MAE_WrongArgCount);
+
+      let params, remn = List.take_n (List.length args) params in
+
+      List.iter2
+        (fun (_, p) (_, a) ->
+          try check_sig_mt_cnv env a p
+          with TymodCnvFailure _ ->
+            tyerror loc env (InvalidModAppl MAE_InvalidArgType))
+        params args;
+
+      let args  = List.map fst args in
+      let subst = 
+          List.fold_left2
+            (fun s (x,_) a -> EcSubst.add_module s x a) 
+            EcSubst.empty params args
+      in
+
+      let keepcall =
+        let used = EcIdent.Sid.of_list (List.map fst params) in
+          fun xp ->
+            match xp.EcPath.x_top.EcPath.m_top with
+            | `Local id -> not (EcIdent.Sid.mem id used)
+            | _ -> true
+      in
+
+      let body =
+        List.map 
+          (fun (Tys_function (s, oi)) ->
+            Tys_function(s, { oi_calls = List.filter keepcall oi.oi_calls;
+                              oi_in    = oi.oi_in; }))
+          mod_expr.me_sig.mis_body
+      in
+      let body = EcSubst.subst_modsig_body subst body in
+
+        (EcPath.mpath top_path.EcPath.m_top args, {mis_params = remn; mis_body = body})
+
+(* -------------------------------------------------------------------- *)
 let rec transty (tp : typolicy) (env : EcEnv.env) ue ty =
   match ty.pl_desc with
   | PTunivar ->
@@ -485,21 +765,26 @@ let rec transty (tp : typolicy) (env : EcEnv.env) ue ty =
   | PTfun(ty1,ty2) ->
       tfun (transty tp env ue ty1) (transty tp env ue ty2) 
         
-  | PTapp ({ pl_desc = name }, tyargs) -> begin
-      match EcEnv.Ty.lookup_opt name env with
-      | None ->
-          tyerror ty.pl_loc env (UnknownTypeName name)
-  
-      | Some (p, tydecl) ->
-          let nargs    = List.length tyargs in
-          let expected = List.length tydecl.tyd_params in
+  | PTapp ({ pl_desc = name }, tyargs) -> 
+    begin match EcEnv.Ty.lookup_opt name env with
+    | None ->
+      tyerror ty.pl_loc env (UnknownTypeName name)
+        
+    | Some (p, tydecl) ->
+      let nargs    = List.length tyargs in
+      let expected = List.length tydecl.tyd_params in
+      
+      if nargs <> expected then
+        tyerror ty.pl_loc env (InvalidTypeAppl (name, expected, nargs));
+      
+      let tyargs = transtys tp env ue tyargs in 
+      tconstr p tyargs
+    end
+  | PTglob gp ->
+    let m,_ = trans_msymbol env gp in
+    tglob m
+    
 
-          if nargs <> expected then
-            tyerror ty.pl_loc env (InvalidTypeAppl (name, expected, nargs));
-
-          let tyargs = transtys tp env ue tyargs in 
-            tconstr p tyargs
-      end
 
 and transtys tp (env : EcEnv.env) ue tys = 
   List.map (transty tp env ue) tys
@@ -525,13 +810,88 @@ let transpattern1 env ue (p : EcParsetree.plpattern) =
         let subtys = List.map (fun _ -> UE.fresh ue) xs in
         (LTuple (List.combine xs subtys), ttuple subtys)
 
+  | LPRecord fields ->
+      let xs = List.map (unloc |- snd) fields in
+      if not (List.uniq xs) then
+        tyerror p.pl_loc env NonLinearPattern;
+
+      let fields =
+        let for1 (name, v) =
+          let filter = fun op -> EcDecl.is_proj op in
+          let fds    = EcUnify.select_op ~filter None env (unloc name) ue [] in
+            match List.ohead fds with
+            | None ->
+              let exn = UnknownRecFieldName (unloc name) in
+                tyerror name.pl_loc env exn
+
+            | Some ((fp, _tvi), opty, subue) ->
+              let field = oget (EcEnv.Op.by_path_opt fp env) in
+              let (recp, fieldidx, _) = EcDecl.operator_as_proj field in
+                EcUnify.UniEnv.restore ~src:subue ~dst:ue;
+                ((recp, fieldidx), opty, (name, v))
+        in
+          List.map for1 fields in
+
+      let recp = Sp.of_list (List.map (fst |- proj3_1) fields) in
+      let recp =
+        match Sp.elements recp with
+        | []        -> assert false
+        | [recp]    -> recp
+        | p1::p2::_ -> tyerror p.pl_loc env (MixingRecFields (p1, p2))
+      in
+
+      let recty  = oget (EcEnv.Ty.by_path_opt recp env) in
+      let rec_   = snd (EcDecl.tydecl_as_record recty) in
+      let reccty = tconstr recp (List.map (tvar |- fst) recty.tyd_params) in
+      let reccty, rectvi = EcUnify.UniEnv.openty ue recty.tyd_params None reccty in
+      let fields =
+        List.fold_left
+          (fun map (((_, idx), _, _) as field) ->
+             if Mint.mem idx map then
+               let name = fst (List.nth rec_ idx) in
+               let exn  = DuplicatedRecFieldName name in
+                 tyerror p.pl_loc env exn
+             else
+               Mint.add idx field map)
+          Mint.empty fields in
+
+      let fields =
+        List.init (List.length rec_)
+          (fun i ->
+            match Mint.find_opt i fields with
+            | None ->
+                let pty = EcUnify.UniEnv.fresh ue in
+                let fty = snd (List.nth rec_ i) in
+                let fty, _ =
+                  EcUnify.UniEnv.openty ue recty.tyd_params
+                    (Some (EcUnify.TVIunamed rectvi)) fty
+                in
+                  (try  EcUnify.unify env ue pty fty
+                   with EcUnify.UnificationFailure _ -> assert false);
+                  (None, pty)
+
+            | Some (_, opty, (_, v)) ->
+                let pty = EcUnify.UniEnv.fresh ue in
+                (try  EcUnify.unify env ue (tfun reccty pty) opty
+                 with EcUnify.UnificationFailure _ -> assert false);
+                (Some (EcIdent.create (unloc v)), pty))
+      in
+        (LRecord (recp, fields), reccty)
+
 let transpattern env ue (p : EcParsetree.plpattern) =
   match transpattern1 env ue p with
-  | (LSymbol (x,ty)) as p, _ ->
-      EcEnv.Var.bind_local x ty env, p, ty
+  | (LSymbol (x, ty)) as p, _ ->
+      (EcEnv.Var.bind_local x ty env, p, ty)
 
   | LTuple xs as p, ty ->
-      EcEnv.Var.bind_locals xs env, p, ty
+      (EcEnv.Var.bind_locals xs env, p, ty)
+
+  | LRecord (_, xs) as p, ty ->
+      let xs = List.pmap (function
+        | (None, _)    -> None
+        | (Some x, ty) -> Some (x, ty)) xs
+      in
+        (EcEnv.Var.bind_locals xs env, p, ty)
 
 (* -------------------------------------------------------------------- *)
 let transtvi env ue tvi = 
@@ -590,6 +950,77 @@ let transbinding env ue bd =
   let bd = List.flatten bd in
   env, bd
 
+(* -------------------------------------------------------------------- *)
+let trans_record env ue subtt (loc, fields) =                                                                    
+  let fields =
+    let for1 rf =
+      let filter = fun op -> EcDecl.is_proj op in
+      let tvi    = rf.rf_tvi |> omap (transtvi env ue) in
+      let fds    = EcUnify.select_op ~filter tvi env (unloc rf.rf_name) ue [] in
+        match List.ohead fds with
+        | None ->
+            let exn = UnknownRecFieldName (unloc rf.rf_name) in
+              tyerror rf.rf_name.pl_loc env exn
+
+        | Some ((fp, _tvi), opty, subue) ->
+            let field = oget (EcEnv.Op.by_path_opt fp env) in
+            let (recp, fieldidx, _) = EcDecl.operator_as_proj field in
+              EcUnify.UniEnv.restore ~src:subue ~dst:ue;
+              ((recp, fieldidx), opty, rf)
+    in
+      List.map for1 fields in
+
+  let recp = Sp.of_list (List.map (fst |- proj3_1) fields) in
+  let recp =
+    match Sp.elements recp with
+    | []        -> assert false
+    | [recp]    -> recp
+    | p1::p2::_ -> tyerror loc env (MixingRecFields (p1, p2))
+  in
+
+  let recty  = oget (EcEnv.Ty.by_path_opt recp env) in
+  let rec_   = snd (EcDecl.tydecl_as_record recty) in
+  let reccty = tconstr recp (List.map (tvar |- fst) recty.tyd_params) in
+  let reccty, rtvi = EcUnify.UniEnv.openty ue recty.tyd_params None reccty in
+  let fields =
+    List.fold_left
+      (fun map (((_, idx), _, _) as field) ->
+         if Mint.mem idx map then
+           let name = fst (List.nth rec_ idx) in
+           let exn  = DuplicatedRecFieldName name in
+             tyerror loc env exn
+         else
+           Mint.add idx field map)
+      Mint.empty fields in
+
+  List.iteri
+    (fun i (name, _) ->
+       if not (Mint.mem i fields) then
+         let exn = MissingRecField name in
+           tyerror loc env exn)
+    rec_;
+
+  let fields = Mint.values fields in (* sorted by field idx *)
+  let fields =
+    let for1 (_, opty, rf) =
+      let pty = EcUnify.UniEnv.fresh ue in
+      (try  EcUnify.unify env ue (tfun reccty pty) opty
+       with EcUnify.UnificationFailure _ -> assert false);
+      let e, ety = subtt rf.rf_value in
+      unify_or_fail env ue rf.rf_value.pl_loc ~expct:pty ety;
+      (e, ety)
+    in
+      List.map for1 fields
+  in
+
+  let ctor =
+    EcPath.pqoname
+      (EcPath.prefix recp)
+      (Printf.sprintf "mk_%s" (EcPath.basename recp))
+  in
+    (ctor, fields, (rtvi, reccty))
+
+(* -------------------------------------------------------------------- *)
 let transexp (env : EcEnv.env) (ue : EcUnify.unienv) e =
   let rec transexp_r (osc : EcPath.path option) (env : EcEnv.env) (e : pexpr) =
     let loc = e.pl_loc in
@@ -648,7 +1079,7 @@ let transexp (env : EcEnv.env) (ue : EcUnify.unienv) e =
         let (penv, pt, pty) = transpattern env ue p in
   
         let e1, ty1 = transexp env pe1 in
-          unify_or_fail env ue p.pl_loc ~expct:ty1 pty;
+          unify_or_fail env ue pe1.pl_loc ~expct:pty ty1;
   
         let e2, ty2 = transexp penv pe2 in
         (e_let pt e1 e2, ty2)
@@ -672,7 +1103,7 @@ let transexp (env : EcEnv.env) (ue : EcUnify.unienv) e =
         unify_or_fail env ue pe2.pl_loc ~expct:ty1   ty2;
         (e_if c e1 e2, ty1)
 
-    | PElambda(bd, pe) ->
+    | PElambda (bd, pe) ->
         let env, xs = transbinding env ue bd in
         let e, ty = transexp env pe in
         let ty =
@@ -682,14 +1113,32 @@ let transexp (env : EcEnv.env) (ue : EcUnify.unienv) e =
         in
           (e_lam xs e, ty)
 
+    | PErecord fields ->
+        let (ctor, fields, (rtvi, reccty)) =
+          trans_record env ue (transexp env) (loc, fields) in
+        let ctor = e_op ctor rtvi (toarrow (List.map snd fields) reccty) in
+        let ctor = e_app ctor (List.map fst fields) reccty in
+          ctor, reccty
+
+    | PEproj (sube, x) -> begin
+        let sube, ety = transexp env sube in
+          match select_proj env osc (unloc x) ue None ety with
+          | [] -> tyerror x.pl_loc env (UnknownProj (unloc x))
+          | _::_::_ -> tyerror x.pl_loc env (AmbiguousProj (unloc x))
+          | [(op, tvi), pty, subue] ->
+              EcUnify.UniEnv.restore ~src:subue ~dst:ue;
+              let rty = EcUnify.UniEnv.fresh ue in
+              (try  EcUnify.unify env ue (tfun ety rty) pty
+               with EcUnify.UnificationFailure _ -> assert false);
+              (e_app (e_op op tvi pty) [sube] rty, rty)
+      end
+        
   in
     transexp_r None env e
 
 let transexpcast (env : EcEnv.env) (ue : EcUnify.unienv) t e =
   let (e', t') = transexp env ue e in
-  try  EcUnify.unify env ue t' t; e'
-  with EcUnify.UnificationFailure (t1, t2) ->
-    tyerror e.pl_loc env (TypeMismatch ((t, t'), (t1, t2)))
+    unify_or_fail env ue e.pl_loc ~expct:t t'; e'
 
 let transexpcast_opt (env : EcEnv.env) (ue : EcUnify.unienv) oty e =
   match oty with
@@ -808,257 +1257,27 @@ and transmodsig_body (env : EcEnv.env) (sa : Sm.t)
       items
 
 (* -------------------------------------------------------------------- *)
-exception TymodCnvFailure of tymod_cnv_failure
-
-let tymod_cnv_failure e =
-  raise (TymodCnvFailure e)
-
-let tysig_item_name = function
-  | Tys_function (f, _) -> f.fs_name
-
-let tysig_item_kind = function
-  | Tys_function _ -> `Function
-
-let rec check_sig_cnv mode (env:EcEnv.env) (sin:module_sig) (sout:module_sig) = 
-  (* Check parameters for compatibility. Parameters names may be
-   * different, hence, substitute in [tin.tym_params] types the names
-   * of [tout.tym_params] *)
-  
-  if List.length sin.mis_params <> List.length sout.mis_params then
-    tymod_cnv_failure E_TyModCnv_ParamCountMismatch;
-
-  let bsubst =
-    List.fold_left2
-      (fun subst (xin, tyin) (xout, tyout) ->
-        let tyout = EcSubst.subst_modtype subst tyout in
-        check_modtype_cnv env tyin tyout;
-        EcSubst.add_module subst xout (EcPath.mident xin))
-      EcSubst.empty sin.mis_params sout.mis_params
-  in
-  (* Check for body inclusion (w.r.t the parameters names substitution).
-   * This includes:
-   * - functions inclusion with equal signatures + included use modifiers.
-   *)
-  let tin  = sin.mis_body 
-  and tout = EcSubst.subst_modsig_body bsubst sout.mis_body in
-
-  let check_item_compatible =
-    let check_fun_compatible (fin,oin) (fout,oout) =
-      assert (fin.fs_name = fout.fs_name);
-      (* We currently reject function with compatible signatures but
-       * for the arguments names. We plan to leviate this restriction
-       * later on, but note that this may require to alpha-convert when
-       * instantiating an abstract module with an implementation. *)
-
-      let arg_compatible vd1 vd2 = 
-        vd1.v_name = vd2.v_name && EcReduction.equal_type env vd1.v_type vd2.v_type 
-      in
-
-      let (iargs, oargs) = (fin.fs_params, fout.fs_params) in
-      let (ires , ores ) = ( fin.fs_ret, fout.fs_ret) in
-
-        if List.length iargs <> List.length oargs then
-          tymod_cnv_failure (E_TyModCnv_MismatchFunSig fin.fs_name);
-        if not (List.for_all2 arg_compatible iargs oargs) then
-          tymod_cnv_failure (E_TyModCnv_MismatchFunSig fin.fs_name);
-        if not (EcReduction.equal_type env ires ores) then
-          tymod_cnv_failure (E_TyModCnv_MismatchFunSig fin.fs_name);
-
-        let flcmp () =
-          let norm oi = 
-            List.fold_left (fun s f -> 
-              EcPath.Sx.add (EcEnv.NormMp.norm_xpath env f) s)
-              EcPath.Sx.empty oi.oi_calls
-          in
-          let icalls = norm oin in
-          let ocalls = norm oout in
-          match mode with
-          | `Sub -> Sx.subset icalls ocalls
-          | `Eq  -> Sx.equal  icalls ocalls
-        in
-        if not (flcmp ()) then
-          tymod_cnv_failure (E_TyModCnv_MismatchFunSig fin.fs_name);
-        
-    in
-      fun i_item o_item ->
-        match i_item, o_item with
-        | Tys_function (fin,oin), Tys_function (fout,oout) -> 
-          check_fun_compatible (fin,oin) (fout,oout)
-  in
-
-  let check_for_item (o_item : module_sig_body_item) =
-    let o_name = tysig_item_name o_item
-    and o_kind = tysig_item_kind o_item in
-
-    let i_item =
-      List.findopt
-        (fun i_item ->
-             (tysig_item_name i_item) = o_name
-          && (tysig_item_kind i_item) = o_kind)
-        tin
-    in
-      match i_item with
-      | None -> tymod_cnv_failure (E_TyModCnv_MissingComp o_name)
-      | Some i_item -> check_item_compatible i_item o_item
-  in
-    List.iter check_for_item tout;
-
-    if mode = `Eq then begin
-      List.iter
-        (fun i_item ->
-          let i_name = tysig_item_name i_item
-          and i_kind = tysig_item_kind i_item in
-          let b =
-            List.exists
-              (fun o_item ->
-                   (tysig_item_name o_item) = i_name
-                && (tysig_item_kind o_item) = i_kind)
-              tout
-          in
-            if not b then
-              tymod_cnv_failure (E_TyModCnv_MissingComp i_name))
-        tin
-    end
-
-and check_modtype_cnv env (tyin:module_type) (tyout:module_type) = 
-  let sin = EcEnv.ModTy.sig_of_mt env tyin in
-  let sout = EcEnv.ModTy.sig_of_mt env tyout in
-  check_sig_cnv `Eq env sin sout
-
-let check_sig_mt_cnv env sin tyout = 
-  let sout = EcEnv.ModTy.sig_of_mt env tyout in
-  check_sig_cnv `Sub env sin sout
-
-(* -------------------------------------------------------------------- *)
-let split_msymb (env : EcEnv.env) (msymb : pmsymbol located) =
-  let (top, args, sm) = 
-    try
-      let (r, (x, args), sm) =
-        List.find_split (fun (_,args) -> args <> None) msymb.pl_desc
-      in
-        (List.rev_append r [x, None], args, sm)
-    with Not_found ->
-      (msymb.pl_desc, None, [])
-  in
-
-  let (top, sm) =
-    let ca (x, args) =
-      if args <> None then
-        tyerror msymb.pl_loc env (InvalidModAppl MAE_WrongArgPosition);
-      x
-    in
-      (List.map ca top, List.map ca sm)
-  in
-    (top, args, sm)
-
-(* -------------------------------------------------------------------- *)
-let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol located) =
-  let loc = msymb.pl_loc in
-  let (top, args, sm) = split_msymb env msymb in
-
-  let to_qsymbol l = 
-    match List.rev l with
-    | [] -> assert false
-    | x::qn ->
-        { pl_desc = (List.rev_map unloc qn, unloc x);
-          pl_loc  = x.pl_loc; }
-  in
-
-  let top_qname = to_qsymbol (top@sm) in
-
-  let (top_path, {EcEnv.sp_target = mod_expr; EcEnv.sp_params = (spi, params)}) =
-    match EcEnv.Mod.sp_lookup_opt top_qname.pl_desc env with
-    | None ->
-        tyerror top_qname.pl_loc env (UnknownModName top_qname.pl_desc)
-    | Some me -> me
-  in
-
-  let (params, istop) =
-    match top_path.EcPath.m_top with
-    | `Concrete (_, Some sub) ->
-        if mod_expr.me_sig.mis_params <> [] then
-          assert false;
-        if args <> None then
-          if not (EcPath.p_size sub = List.length sm) then
-            tyerror loc env (InvalidModAppl MAE_WrongArgPosition);
-        (params, false)
-
-    | `Concrete (p, None) ->
-        if (params <> []) || ((spi+1) <> EcPath.p_size p) then
-          assert false;
-        (mod_expr.me_sig.mis_params, true)
-
-    | `Local _m ->
-        if (params <> []) || spi <> 0 then
-          assert false;
-        (mod_expr.me_sig.mis_params, true)
-  in
-
-  let args = args |> omap (List.map (trans_msymbol env)) in
-
-  match args with
-  | None ->
-    if not istop && params <> [] then
-      tyerror loc env (InvalidModAppl MAE_AccesSubModFunctor); 
-
-    (top_path, mod_expr.me_sig)
-
-  | Some args ->
-      if List.length args > List.length params then
-        tyerror loc env (InvalidModAppl MAE_WrongArgCount);
-
-      let params, remn = List.take_n (List.length args) params in
-
-      List.iter2
-        (fun (_, p) (_, a) ->
-          try check_sig_mt_cnv env a p
-          with TymodCnvFailure _ ->
-            tyerror loc env (InvalidModAppl MAE_InvalidArgType))
-        params args;
-
-      let args  = List.map fst args in
-      let subst = 
-          List.fold_left2
-            (fun s (x,_) a -> EcSubst.add_module s x a) 
-            EcSubst.empty params args
-      in
-
-      let keepcall =
-        let used = EcIdent.Sid.of_list (List.map fst params) in
-          fun xp ->
-            match xp.EcPath.x_top.EcPath.m_top with
-            | `Local id -> not (EcIdent.Sid.mem id used)
-            | _ -> true
-      in
-
-      let body =
-        List.map 
-          (fun (Tys_function (s, oi)) ->
-            Tys_function(s, { oi_calls = List.filter keepcall oi.oi_calls;
-                              oi_in    = oi.oi_in; }))
-          mod_expr.me_sig.mis_body
-      in
-      let body = EcSubst.subst_modsig_body subst body in
-
-        (EcPath.mpath top_path.EcPath.m_top args, {mis_params = remn; mis_body = body})
-
-(* -------------------------------------------------------------------- *)
-let rec transmod (env : EcEnv.env) ~internal (x : symbol) (me : pmodule_expr) =
+let rec transmod ~attop (env : EcEnv.env) (x : symbol) (me : pmodule_expr) =
   match me.pl_desc with
   | Pm_ident m -> 
       let (mp, sig_) = trans_msymbol env {pl_desc = m; pl_loc = me.pl_loc} in
       let params = sig_.mis_params in
 
-      if params <> [] && internal then
+      if params <> [] && not attop then
         tyerror me.pl_loc env (InvalidModAppl MAE_WrongArgCount);
 
       let me = EcEnv.Mod.by_mpath mp env in
         { me with me_name  = x; me_body  = ME_Alias mp; }
 
-  | Pm_struct st -> transstruct env x st
+  | Pm_struct st -> transstruct ~attop env x (mk_loc me.pl_loc st)
 
 (* -------------------------------------------------------------------- *)
-and transstruct (env : EcEnv.env) (x : symbol) (st : pstructure) =
+and transstruct ~attop (env : EcEnv.env) (x : symbol) (st : pstructure located) =
+  let { pl_loc = loc; pl_desc = st; } = st in
+
+  if not attop && st.ps_params <> [] then
+    tyerror loc env (InvalidModType MTE_InternalFunctor);
+
   (* Check parameters types *) (* FIXME: dup names *)
   let stparams =
     List.map                          (* FIXME: exn *)
@@ -1159,7 +1378,7 @@ and transstruct (env : EcEnv.env) (x : symbol) (st : pstructure) =
 and transstruct1 (env : EcEnv.env) (st : pstructure_item located) =
   match unloc st with
   | Pst_mod ({ pl_desc = m }, me) ->
-      let me = transmod env ~internal:true m me in
+      let me = transmod ~attop:false env m me in
         [(m, MI_Module me)]
 
   | Pst_var (xs, ty) ->
@@ -1325,7 +1544,7 @@ and fundef_add_symbol env symbols x =  (* for locals dup check *)
 
 and fundef_check_type subst_uni env (ty, loc) = 
   let ty = subst_uni ty in
-    if not (EcUidgen.Suid.is_empty (Tuni.fv ty)) then
+    if not (EcUid.Suid.is_empty (Tuni.fv ty)) then
       tyerror loc env OnlyMonoTypeAllowed;
     ty
 
@@ -1439,7 +1658,7 @@ and translvalue ue (env : EcEnv.env) lvalue =
 
   | PLvTuple xs -> 
       let xs = List.map (trans_pv env) xs in
-      if not (List.uniqf (EcReduction.pv_equal_norm env) (List.map fst xs)) then
+      if not (List.uniqf (EqTest.for_pv_norm env) (List.map fst xs)) then
         tyerror lvalue.pl_loc env LvNonLinear;
       let ty = ttuple (List.map snd xs) in
       (LvTuple xs, ty)
@@ -1487,14 +1706,6 @@ let trans_gamepath (env : EcEnv.env) gp =
   if _sig.mis_params <> [] then
     tyerror gp.pl_loc env (UnknownFunName (modsymb, funsymb));
   EcPath.xpath_fun mpath funsymb
-
-(* -------------------------------------------------------------------- *)
-let transfpattern env ue (p : EcParsetree.plpattern) =
-  match transpattern1 env ue p with
-  | LSymbol (x,ty) as p, _ ->
-      (EcEnv.Var.bind_local x ty env, p, ty)
-  | LTuple xs as p, ty ->
-      (EcEnv.Var.bind_locals xs env, p , ty)
 
 (* -------------------------------------------------------------------- *)
 let transmem env m =
@@ -1641,10 +1852,10 @@ let trans_form_or_pattern env (ps, ue) pf tt =
           f_if f1 f2 f3
 
     | PFlet (lp, pf1, f2) ->
-        let (penv, p, pty) = transfpattern env ue lp in
+        let (penv, p, pty) = transpattern env ue lp in
         let f1 = transf env pf1 in
         let f2 = transf penv f2 in
-          unify_or_fail env ue lp.pl_loc ~expct:f1.f_ty pty;
+          unify_or_fail env ue pf1.pl_loc ~expct:pty f1.f_ty;
           f_let p f1 f2 
 
     | PFforall (xs, pf) ->
@@ -1663,6 +1874,28 @@ let trans_form_or_pattern env (ps, ue) pf tt =
         let env, xs = transbinding env ue xs in
         let f = transf env f1 in
           f_lambda (List.map (fun (x,ty) -> (x,GTty ty)) xs) f
+
+    | PFrecord fields ->
+        let (ctor, fields, (rtvi, reccty)) =
+          trans_record env ue
+            (fun f -> let f = transf env f in (f, f.f_ty))
+            (f.pl_loc, fields) in
+        let ctor = f_op ctor rtvi (toarrow (List.map snd fields) reccty) in
+        let ctor = f_app ctor (List.map fst fields) reccty in
+          ctor
+
+    | PFproj (subf, x) -> begin
+        let subf = transf env subf in
+          match select_proj env opsc (unloc x) ue None subf.f_ty with
+          | [] -> tyerror x.pl_loc env (UnknownProj (unloc x))
+          | _::_::_ -> tyerror x.pl_loc env (AmbiguousProj (unloc x))
+          | [(op, tvi), pty, subue] ->
+              EcUnify.UniEnv.restore ~src:subue ~dst:ue;
+              let rty = EcUnify.UniEnv.fresh ue in
+              (try  EcUnify.unify env ue (tfun subf.f_ty rty) pty
+               with EcUnify.UnificationFailure _ -> assert false);
+              f_app (f_op op tvi pty) [subf] rty
+      end
 
     | PFprob (gp, args, m, event) ->
         let fpath = trans_gamepath env gp in
@@ -1813,7 +2046,8 @@ let trans_form_or_pattern env (ps, ue) pf tt =
   in
 
   let f = transf_r None env pf in
-    tt |> oiter (unify_or_fail env ue pf.pl_loc ~expct:f.f_ty); f
+  tt |> oiter (fun tt -> unify_or_fail env ue pf.pl_loc ~expct:tt f.f_ty);
+  f
 
 (* -------------------------------------------------------------------- *)
 let trans_form_opt env ue pf oty =

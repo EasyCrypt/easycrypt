@@ -39,3 +39,5 @@ setup.log
 /webui/econline.pid
 /webui/backend.log
 /webui/backend.pid
+
+/sandbox

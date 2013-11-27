@@ -497,7 +497,8 @@ axiom fold_empty (f:'a -> 'b -> 'b) (e:'b):
   fold f e empty = e.
 
 axiom fold_rm_pick (f:'a -> 'b -> 'b) (e:'b) xs:
-    fold f e xs = f (pick xs) (fold f e (rm (pick xs) xs)).
+  xs <> empty =>
+  fold f e xs = f (pick xs) (fold f e (rm (pick xs) xs)).
 
 lemma fold_set_list (f:'a -> 'b -> 'b) (e:'b) xs:
   (forall a b X, f a (f b X) = f b (f a X)) =>
@@ -510,7 +511,7 @@ intros s nempty Hind; elim/list_case_eq (elems s);
 intros=> x l' h.
 cut xval : pick s = x;first rewrite pick_def h hd_cons //.
 subst x.
-rewrite h fold_rm_pick fold_right_cons Hind //.
+rewrite h fold_rm_pick // fold_right_cons Hind //.
 congr => //.
 apply fold_permC; first assumption.
 rewrite (_:l' = rm (pick s) (elems s)).
@@ -551,6 +552,21 @@ simplify.
 elim (img_def y f empty).
 intros ? ?;assumption.
 qed.
+
+lemma img_add (x:'a) s (f:'a -> 'b): 
+   img f (add x s) = add (f x) (img f s).
+proof.
+  apply set_ext => z.
+  rewrite !img_def mem_add.
+  split; [intros [w ] | intros [H | H]].
+    rewrite mem_add => [<- [H | H]].
+      by left;apply mem_img.
+    by subst.
+    generalize H;rewrite img_def => [x' [H1 H2]];exists x'.
+    by rewrite mem_add;smt.
+  by exists x;subst => /=;smt.
+qed.
+
 
 lemma img_rm (f:'a -> 'b) (xs:'a set) (x:'a):
   img f (rm x xs) = (if (forall x', mem x' xs => f x = f x' => x = x') then rm (f x) (img f xs) else img f xs).

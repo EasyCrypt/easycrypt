@@ -3,7 +3,7 @@ open EcUtils
 open EcSymbols
 open EcIdent
 open EcPath
-open EcUidgen
+open EcUid
 
 (* -------------------------------------------------------------------- *)
 type ty = {
@@ -14,7 +14,7 @@ type ty = {
 
 and ty_node =
   | Tglob   of EcPath.mpath (* The tuple of global variable of the module *)
-  | Tunivar of EcUidgen.uid
+  | Tunivar of EcUid.uid
   | Tvar    of EcIdent.t 
   | Ttuple  of ty list
   | Tconstr of EcPath.path * ty list
@@ -30,34 +30,34 @@ module Hsty = Why3.Hashcons.Make (struct
 
   let equal ty1 ty2 =
     match ty1.ty_node, ty2.ty_node with
-    | Tglob m1, Tglob m2                 ->
-      EcPath.m_equal m1 m2 
-    | Tunivar u1      , Tunivar u2       -> 
-      uid_equal u1 u2
-    | Tvar v1         , Tvar v2          -> 
-      id_equal v1 v2
-    | Ttuple lt1      , Ttuple lt2       -> 
-      List.all2 ty_equal lt1 lt2
-    | Tconstr (p1,lt1), Tconstr (p2,lt2) -> 
-      EcPath.p_equal p1 p2 && List.all2 ty_equal lt1 lt2
-    | Tfun(d1,c1)     , Tfun(d2,c2)      -> 
-      ty_equal d1 d2 && ty_equal c1 c2
-    | _               , _                -> false
+    | Tglob m1, Tglob m2 ->
+        EcPath.m_equal m1 m2 
+
+    | Tunivar u1, Tunivar u2 -> 
+        uid_equal u1 u2
+
+    | Tvar v1, Tvar v2 -> 
+        id_equal v1 v2
+
+    | Ttuple lt1, Ttuple lt2 -> 
+        List.all2 ty_equal lt1 lt2
+
+    | Tconstr (p1, lt1), Tconstr (p2, lt2) -> 
+        EcPath.p_equal p1 p2 && List.all2 ty_equal lt1 lt2
+
+    | Tfun (d1, c1), Tfun (d2, c2)-> 
+        ty_equal d1 d2 && ty_equal c1 c2
+
+    | _, _ -> false
       
   let hash ty = 
     match ty.ty_node with 
-    | Tglob m        ->
-      EcPath.m_hash m
-    | Tunivar u      -> 
-      u
-    | Tvar    id     -> 
-      EcIdent.tag id
-    | Ttuple  tl     -> 
-      Why3.Hashcons.combine_list ty_hash 0 tl
-    | Tconstr (p,tl) -> 
-      Why3.Hashcons.combine_list ty_hash p.p_tag tl
-    | Tfun    (t1,t2) ->
-      Why3.Hashcons.combine (ty_hash t1) (ty_hash t2)
+    | Tglob m          -> EcPath.m_hash m
+    | Tunivar u        -> u
+    | Tvar    id       -> EcIdent.tag id
+    | Ttuple  tl       -> Why3.Hashcons.combine_list ty_hash 0 tl
+    | Tconstr (p, tl)  -> Why3.Hashcons.combine_list ty_hash p.p_tag tl
+    | Tfun    (t1, t2) -> Why3.Hashcons.combine (ty_hash t1) (ty_hash t2)
         
   let fv ty =
     let union ex =
@@ -176,11 +176,33 @@ let rec ty_check_uni t =
   | _ -> ty_iter ty_check_uni t
 
 (* -------------------------------------------------------------------- *)
+let symbol_of_ty (ty : ty) =
+  match ty.ty_node with
+  | Tglob   _      -> "g"
+  | Tunivar _      -> "u"
+  | Tvar    _      -> "x"
+  | Ttuple  _      -> "x"
+  | Tfun    _      -> "f"
+  | Tconstr (p, _) ->
+      let x = EcPath.basename p in
+      let rec doit i =
+        if   i >= String.length x
+        then "x"
+        else match Char.lowercase x.[i] with
+             | 'a' .. 'z' -> String.make 1 x.[i]
+             | _ -> doit (i+1)
+      in
+        doit 0
+
+let fresh_id_of_ty (ty : ty) =
+  EcIdent.create (symbol_of_ty ty)
+
+(* -------------------------------------------------------------------- *)
 type ty_subst = {
   ts_p   : EcPath.path -> EcPath.path;
   ts_mp  : EcPath.mpath -> EcPath.mpath;
   ts_def : (EcIdent.t list * ty) EcPath.Mp.t;
-  ts_u   : EcUidgen.uid -> ty option;
+  ts_u   : EcUid.uid -> ty option;
   ts_v   : EcIdent.t -> ty option;
 }
 
@@ -348,6 +370,7 @@ let pv x k =
 type lpattern =
   | LSymbol of (EcIdent.t * ty)
   | LTuple  of (EcIdent.t * ty) list
+  | LRecord of EcPath.path * (EcIdent.t option * ty) list
 
 let idty_equal (x1,t1) (x2,t2) = 
   EcIdent.id_equal x1 x2 && ty_equal t1 t2
@@ -361,16 +384,26 @@ let lp_equal p1 p2 =
 let idty_hash (x,t) = Why3.Hashcons.combine (EcIdent.id_hash x) (ty_hash t) 
 
 let lp_hash = function
-  | LSymbol x -> idty_hash x
-  | LTuple lx -> Why3.Hashcons.combine_list idty_hash 0 lx
+  | LSymbol  x -> idty_hash x
+  | LTuple  lx -> Why3.Hashcons.combine_list idty_hash 0 lx
+
+  | LRecord (p, lx) ->
+      let for1 (x, ty) =
+        Why3.Hashcons.combine (ty_hash ty)
+          (Why3.Hashcons.combine_option EcIdent.id_hash x)
+      in
+        Why3.Hashcons.combine_list for1 (p_hash p) lx
 
 let lp_ids = function
-  | LSymbol (id,_) -> [id] 
-  | LTuple ids -> List.map fst ids
+  | LSymbol (id,_)  -> [id] 
+  | LTuple  ids     -> List.map fst ids
+  | LRecord (_,ids) -> List.pmap fst ids
 
 let lp_bind = function
-  | LSymbol b -> [b] 
-  | LTuple b -> b
+  | LSymbol b     -> [b] 
+  | LTuple  b     -> b
+  | LRecord (_,b) ->
+      List.pmap (fun (x, ty) -> omap (fun x -> (x, ty)) x) b
 
 (* -------------------------------------------------------------------- *)
 type expr = {
@@ -402,9 +435,16 @@ let e_ty e    = e.e_ty
 
 (* -------------------------------------------------------------------- *)
 let lp_fv = function
-  | LSymbol (id,_) -> Sid.singleton id
+  | LSymbol (id,_) ->
+      Sid.singleton id
+
   | LTuple ids -> 
-      List.fold_left (fun s (id,_) -> Sid.add id s) Sid.empty ids
+      List.fold_left (fun s (id, _) -> Sid.add id s) Sid.empty ids
+
+  | LRecord (_,ids) ->
+      List.fold_left
+        (fun s (id, _) -> ofold Sid.add s id)
+        Sid.empty ids
 
 let pv_fv pv = EcPath.x_fv Mid.empty pv.pv_name
 
@@ -540,6 +580,9 @@ module ExprSmart = struct
   let l_tuple (lp, xs) xs' =
     if xs == xs' then lp else LTuple xs'
 
+  let l_record (lp, (p, xs)) (p', xs') =
+    if p == p' && xs == xs' then lp else LRecord (p', xs')
+
   let e_local (e, (x, ty)) (x', ty') =
     if   x == x' && ty == ty'
     then e
@@ -662,23 +705,24 @@ let e_subst_init freshen on_path on_ty opdef on_mpath =
   let on_xp = 
     let f = EcPath.x_subst on_mp in
     if f == identity then f else EcPath.Hx.memo 107 f in
-  {
-    es_freshen = freshen;
+
+  { es_freshen = freshen;
     es_p       = on_path;
     es_ty      = on_ty;
     es_opdef   = opdef;
     es_mp      = on_mp;
     es_xp      = on_xp;
-    es_loc     = Mid.empty;
-  }
+    es_loc     = Mid.empty; }
   
-let add_local s (x,t as xt) = 
+let add_local s ((x, t) as xt) = 
   let x' = if s.es_freshen then EcIdent.fresh x else x in
   let t' = s.es_ty t in
-  if x == x' && t == t' then s, xt
-  else 
-    let merger o = assert (o = None); Some (e_local x' t') in
-    { s with es_loc = Mid.change merger x s.es_loc }, (x',t')
+
+    if   x == x' && t == t'
+    then (s, xt)
+    else 
+      let merger o = assert (o = None); Some (e_local x' t') in
+        ({ s with es_loc = Mid.change merger x s.es_loc }, (x', t'))
       
 let add_locals = List.Smart.map_fold add_local
 
@@ -691,6 +735,23 @@ let subst_lpattern (s: e_subst) (lp:lpattern) =
   | LTuple xs ->
       let (s, xs') = add_locals s xs in
         (s, ExprSmart.l_tuple (lp, xs) xs')
+
+  | LRecord (p, xs) ->
+      let (s, xs') =
+        List.Smart.map_fold
+          (fun s ((x, t) as xt) ->
+            match x with
+            | None ->
+                let t' = s.es_ty t in
+                  if t == t' then (s, xt) else (s, (x, t'))
+            | Some x ->
+                let (s, (x', t')) = add_local s (x, t) in
+                  if   x == x' && t == t'
+                  then (s, xt)
+                  else (s, (Some x', t')))
+          s xs
+      in
+        (s, ExprSmart.l_record (lp, (p, xs)) (s.es_p p, xs'))
 
 let rec e_subst (s: e_subst) e =
   match e.e_node with

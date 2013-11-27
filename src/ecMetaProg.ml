@@ -462,7 +462,7 @@ let f_match hyps (ue, ev) ~ptn subject =
       (ue, clue, Ev ev)
 
 (* -------------------------------------------------------------------- *)
-type ptnpos = [`Select | `Sub of ptnpos] Mint.t
+type ptnpos = [`Select of int | `Sub of ptnpos] Mint.t
 
 exception InvalidPosition
 exception InvalidOccurence
@@ -486,15 +486,16 @@ module FPosition = struct
 
   (* ------------------------------------------------------------------ *)
   and tostring1 = function
-    | `Select -> "-"
+    | `Select i when i < 0 -> "-"
+    | `Select i -> Printf.sprintf "-(%d)" i
     | `Sub p -> tostring p
 
   (* ------------------------------------------------------------------ *)
   let occurences =
     let rec doit1 n p =
       match p with
-      | `Select -> n+1
-      | `Sub p  -> doit n p
+      | `Select _ -> n+1
+      | `Sub p    -> doit n p
 
     and doit n (ps : ptnpos) =
       Mint.fold (fun _ p n -> doit1 n p) ps n
@@ -505,7 +506,7 @@ module FPosition = struct
   let filter (s : Sint.t) =
     let rec doit1 n p =
       match p with
-      | `Select -> (n+1, if Sint.mem n s then Some `Select else None)
+      | `Select _ -> (n+1, if Sint.mem n s then Some p else None)
       | `Sub p  -> begin
           match doit n p with
           | (n, sub) when Mint.is_empty sub -> (n, None)
@@ -526,9 +527,9 @@ module FPosition = struct
   (* ------------------------------------------------------------------ *)
   let select ?o test =
     let rec doit1 ctxt fp =
-      if   test ctxt fp
-      then Some `Select
-      else begin
+      match test ctxt fp with
+      | Some i -> Some (`Select i)
+      | None   -> begin
         let subp =
           match fp.f_node with
           | Fif    (c, f1, f2) -> doit (`WithCtxt (ctxt, [c; f1; f2]))
@@ -584,15 +585,34 @@ module FPosition = struct
 
   (* ------------------------------------------------------------------ *)
   let select_form hyps o p target =
-    let test _ tp = EcReduction.is_alpha_eq hyps p tp in
+    let na = List.length (snd (EcFol.destr_app p)) in
+    let test _ tp =
+      let (tp, ti) =
+        match tp.f_node with
+        | Fapp (h, hargs) when List.length hargs > na ->
+            let (a1, a2) = List.take_n na hargs in
+              (f_app h a1 (toarrow (List.map f_ty a2) tp.f_ty), na)
+        | _ -> (tp, -1)
+      in
+        if EcReduction.is_alpha_eq hyps p tp then Some ti else None
+    in
       select ?o test target
 
   (* ------------------------------------------------------------------ *)
   let map (p : ptnpos) (tx : form -> form) (f : form) =
     let rec doit1 p fp =
       match p with
-      | `Select -> tx fp
-      | `Sub p  -> begin
+      | `Select i when i < 0 -> tx fp
+
+      | `Select i -> begin
+          let (f, fs) = EcFol.destr_app fp in
+            if List.length fs < i then raise InvalidPosition;
+            let (fs1, fs2) = List.take_n i fs in
+            let f' = f_app f fs1 (toarrow (List.map f_ty fs2) fp.f_ty) in
+              f_app (tx f') fs2 fp.f_ty
+        end
+
+      | `Sub p    -> begin
           match fp.f_node with
           | Flocal _ -> raise InvalidPosition
           | Fpvar  _ -> raise InvalidPosition

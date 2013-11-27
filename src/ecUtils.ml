@@ -32,6 +32,9 @@ let (|-) g f = fun x -> g (f x)
 let (|>) x f = f x
 let (<|) f x = f x
 
+let curry   f (x, y) = f x y
+let uncurry f x y = f (x, y)
+
 (* -------------------------------------------------------------------- *)
 let copy (x : 'a) : 'a =
   Obj.obj (Obj.dup (Obj.repr x))
@@ -39,6 +42,31 @@ let copy (x : 'a) : 'a =
 (* -------------------------------------------------------------------- *)
 let reffold (f : 'a -> 'b * 'a) (r : 'a ref) : 'b =
   let (x, v) = f !r in r := v; x
+
+let postincr (i : int ref) = incr i; !i
+
+(* -------------------------------------------------------------------- *)
+let compare_tag (x1 : 'a) (x2 : 'a) =
+  match Obj.tag (Obj.repr x1), Obj.tag (Obj.repr x2) with
+  | n1, n2 when (n1, n2) = (Obj.int_tag, Obj.int_tag) ->
+      Pervasives.compare (Obj.magic x1 : int) (Obj.magic x2 : int)
+
+  | n1, _ when n1 = Obj.int_tag ->  1
+  | _, n2 when n2 = Obj.int_tag -> -1
+
+  | n1, n2 -> Pervasives.compare n1 n2
+
+type lzcmp = int lazy_t
+
+let compare2 (c1 : lzcmp) (c2 : lzcmp) =
+  match c1 with
+  | lazy 0 -> Lazy.force c2
+  | lazy n -> n
+
+let compare3 (c1 : lzcmp) (c2 : lzcmp) (c3 : lzcmp) =
+  match c1 with
+  | lazy 0 -> compare2 c2 c3
+  | lazy n -> n
 
 (* -------------------------------------------------------------------- *)
 type 'a tuple0 = unit
@@ -125,13 +153,6 @@ let omap (f : 'a -> 'b) (x : 'a option) =
 let omap_dfl (f : 'a -> 'b) (d : 'b) (x : 'a option) =
   match x with None -> d  | Some x -> f x
 
-let osmart_map (f : 'a -> 'b) (x : 'a option) =
-  match x with 
-  | None -> x 
-  | Some y -> 
-      let y' = f y in 
-      if y == y' then x else Some y'
-
 let odfl (d : 'a) (x : 'a option) =
   match x with None -> d | Some x -> x
 
@@ -146,6 +167,29 @@ let oall2 f x y =
   | Some x, Some y -> f x y
   | None  , None   -> true
   | _     , _      -> false 
+
+let ocompare f o1 o2 =
+  match o1, o2 with
+  | None   , None    -> 0
+  | None   , Some _  -> -1
+  | Some _ , None    -> 1
+  | Some x1, Some x2 -> f x1 x2
+
+module OSmart = struct
+  let omap (f : 'a -> 'b) (x : 'a option) =
+    match x with 
+    | None   -> x 
+    | Some y -> 
+        let y' = f y in 
+          if y == y' then x else Some y'
+
+  let omap_fold (f : 'a -> 'b -> 'a * 'c) (v : 'a) (x : 'b option) =
+    match x with
+    | None   -> (v, x)
+    | Some y ->
+        let (v, y') = f v y in
+          (v, if y == y' then x else Some y')
+end
 
 (* -------------------------------------------------------------------- *)
 module Counter : sig
@@ -204,6 +248,17 @@ end
 module List = struct
   include List
 
+  let rec compare f s1 s2 =
+    match s1, s2 with
+    | [], [] -> 0
+    | [], _  -> -1
+    | _ , [] -> 1
+
+    | x1::s1, x2::s2 ->
+        match f x1 x2 with
+        | 0 -> compare f s1 s2
+        | c -> c
+
   let hd2 l = 
     match l with
     | a::b::_ -> a,b
@@ -235,6 +290,14 @@ module List = struct
       if n <= 0 then xs else aux (n-1) (x::xs)
     in
       aux n []
+
+  let init n f =
+    let rec aux i =
+      if i = n then [] else
+        let v = f i in v :: aux (i+1)
+    in
+      if n < 0 then invalid_arg "List.init";
+      aux 0
 
   let iteri f xs =
     let rec doit i = function

@@ -393,7 +393,7 @@ lemma collision_eexp_rcvd_mon :
 forall e evs,
  collision_eexp_rcvd evs =>
  collision_eexp_rcvd (e::evs).
-proof.
+proof strict.
  intros => e evs [i] j s1 ps1 s2 [hposi][hposj][hlen][hlt][hevi] hor.
  exists (i+1); exists (j+1); exists s1;exists ps1;
   exists s2;elim hor;intros => [hevj heq];do !split => //;first 2 by smt.
@@ -421,7 +421,7 @@ lemma start_coll_mon :
 forall e evs,
 ! no_start_coll (evs) =>
 ! no_start_coll (e::evs).
-proof.
+proof strict.
  intros => e evs.
  cut h : no_start_coll (e::evs) => no_start_coll (evs); last by smt.
  rewrite /no_start_coll => hnocoll X A1 A2 B1 B2 r1 r2 i j hposi hposj hith hjth.
@@ -450,7 +450,7 @@ pred valid_accepts evs =
 lemma nosmt fresh_eq_notfresh(t : Sid) (evs : Event list) :
   (! fresh t evs) =
   (notfresh t evs).
-proof.
+proof strict.
 by elim /tuple5_ind t => ? ? ? ? ? heq;clear t heq;rewrite /fresh/notfresh /=; smt.
 save.
 
@@ -465,7 +465,7 @@ no_accept_coll(e::evs) =>
 valid_accepts (e::evs) =>
 !fresh s evs =>
 !fresh s (e::evs).
-proof.
+proof strict.
  intros => e evs s hmem hcoll hnostartcoll hnacceptcoll hvalid.
  rewrite !fresh_eq_notfresh => hnfresh.
  elim (mem_nth (Accept s) evs _) => // i [hleq] hnth.
@@ -545,7 +545,7 @@ lemma coll_or_not_fresh_mon : forall e s evs,
  e <> Start (psid_of_sid (cmatching s)) =>
 (!fresh s evs \/ collision_eexp_rcvd evs ) =>
 (!fresh s (e::evs) \/ collision_eexp_rcvd(e::evs)).
-proof.
+proof strict.
  intros => e s evs hneq1 hneq2 [|] hor; last first.
  by right; apply collision_eexp_rcvd_mon.
  
@@ -562,7 +562,7 @@ no_accept_coll(e::evs) =>
 valid_accepts (e::evs) =>
 (!fresh s evs \/ collision_eexp_rcvd evs ) =>
 (!fresh s (e::evs) \/ collision_eexp_rcvd(e::evs)).
-proof.
+proof strict.
  intros => e evs s hacc hnsc hnac hvalid hor.
  case (collision_eexp_rcvd (e :: evs)) => // hncoll.
  elim hor => {hor} hor.
@@ -590,7 +590,7 @@ no_accept_coll(e::evs) =>
 valid_accepts (e::evs) =>
 (!test_fresh s evs \/ collision_eexp_rcvd evs ) =>
 (!test_fresh s (e::evs) \/ collision_eexp_rcvd(e::evs)).
-proof.
+proof strict.
  intros => e evs s hmem hsc hnac hv.
 case (s = None).
  rewrite /test_fresh => ->; by smt.
@@ -641,7 +641,7 @@ forall tr1 tr2, tr_sim tr1 tr2 => P (tr1, tr2).
 (* membership preservation properties *)
 lemma tr_sim_mem : forall tr1 tr2,
 tr_sim tr1 tr2 => forall e, (forall s, e <> SessionRev s) => mem e tr1 = mem e tr2.
-proof.
+proof strict.
  intros => tr1 tr2 h.
  pose p := lambda p, let (tr1, tr2) = p in
            forall (e : Event),  (forall (s : Sid), ! e = SessionRev s) => List.mem e tr1 = List.mem e tr2.
@@ -656,7 +656,7 @@ save.
 
 lemma tr_sim_mem_sRev : forall tr1 tr2,
 tr_sim tr1 tr2 => forall s, mem (SessionRev s) tr2 => mem (SessionRev s) tr1.
-proof.
+proof strict.
  intros => tr1 tr2 h.
  pose p := lambda p, let (tr1, tr2) = p in
          forall (s : Sid),  List.mem (SessionRev s) tr2 => List.mem (SessionRev s) tr1.
@@ -671,7 +671,7 @@ save.
 (* preservation of freshness *)
 lemma tr_sim_fresh : forall tr1 tr2,
 tr_sim tr1 tr2 => forall ts, fresh ts tr1 => fresh ts tr2.
-proof.
+proof strict.
  intros => tr1 tr2 hsim ts.
  elim /tuple5_ind ts => A B X Y r ?.
  rewrite /fresh /=.
@@ -696,7 +696,7 @@ save.
 
 lemma tr_sim_fresh_op : forall tr1 tr2,
 tr_sim tr1 tr2 => forall ts, fresh_op ts tr1 => fresh_op ts tr2.
-proof.
+proof strict.
 intros => tr1 tr2 hsim ts.
 cut: fresh_op ts tr1 = true => fresh_op ts tr2 = true; last by smt.
 rewrite -!fresh_op_def'.
@@ -922,7 +922,7 @@ forall e evs,
  (forall s, e <> Start s) =>
  no_start_coll evs =>
  no_start_coll (e :: evs).
-proof.
+proof strict.
  rewrite /no_start_coll; progress.
  cut _ :  0 <> i.
  apply not_def => heq.
@@ -944,7 +944,7 @@ save.
 lemma mem_nth_simple x (xs : 'a list) j: 
 nth xs j = Some x =>
 List.mem x xs.
-proof.
+proof strict.
  intros => hjth.
  rewrite -(proj_some x) -hjth.
  apply nth_mem.
@@ -962,7 +962,7 @@ forall s evs,
  no_start_coll evs =>
  (forall s', mem (Start s') evs => psid_sent s <> psid_sent s') => 
  no_start_coll (Start s :: evs).
-proof.
+proof strict.
  intros => s evs; rewrite /no_start_coll; progress.
  case (0 = i); case (0 = j) => // hj hi.
 
@@ -992,7 +992,7 @@ forall e evs,
  (forall s, e <> Accept s) =>
  no_accept_coll evs =>
  no_accept_coll (e :: evs).
-proof.
+proof strict.
  rewrite /no_accept_coll; progress.
  cut _ :  0 <> i.
  apply not_def => heq.
@@ -1017,7 +1017,7 @@ forall s evs,
  no_accept_coll evs =>
  (forall s', mem (Accept s') evs => sid_sent s <> sid_sent s') => 
  no_accept_coll (Accept s :: evs).
-proof.
+proof strict.
  intros => s evs; rewrite /no_accept_coll; progress.
  case (0 = i); case (0 = j) => // hj hi.
  
@@ -1050,7 +1050,7 @@ lemma n_exp_recvd_coll :
 (forall s, e <> Accept s) =>
 ! collision_eexp_rcvd evs => 
 ! collision_eexp_rcvd (e :: evs). 
-proof.
+proof strict.
  intros => e evs hnstrt hnacc hcoll.
  rewrite /collision_eexp_rcvd /=. 
  apply not_def => [[i]] j s1 s2 s3 [hposi][hposj][hlength][hlt][hith] hor.
@@ -1082,7 +1082,7 @@ psid_sent s = gen_epk (proj (mEexps.[e])).
 lemma start_evs_eexps_emp : 
 forall m,
 start_evs_eexps [] m.
-proof.
+proof strict.
  intros => m; rewrite /start_evs_eexps; smt.
 save.
 
@@ -1091,7 +1091,7 @@ forall e evs m,
 start_evs_eexps evs m =>
 (forall s, e <> Start s) =>
 start_evs_eexps (e::evs) m.
-proof.
+proof strict.
  intros e evs m; rewrite /start_evs_eexps  => htl hneq s; rewrite mem_cons => [|] hor.
  by cut _ := hneq s; smt.
  by apply htl.
@@ -1102,7 +1102,7 @@ forall evs m s,
 start_evs_eexps evs m =>
 (exists e, in_dom e m /\ psid_sent s = gen_epk (proj (m.[e]))) =>
 start_evs_eexps (Start s::evs) m.
-proof.
+proof strict.
  intros => evs m s; rewrite /start_evs_eexps => htl hex s'; 
   rewrite mem_cons => [|] hor.
  by cut ->: s' = s by apply Start_inj => //.
@@ -1120,7 +1120,7 @@ sid_sent s = gen_epk (proj (mEexps.[e])).
 lemma accept_evs_eexps_emp : 
 forall m,
 accept_evs_eexps [] m.
-proof.
+proof strict.
  intros => m; rewrite /accept_evs_eexps; smt.
 save.
 
@@ -1130,7 +1130,7 @@ forall e evs m,
 accept_evs_eexps evs m =>
 (forall s, e <> Accept s) =>
 accept_evs_eexps (e::evs) m.
-proof.
+proof strict.
  intros e evs m; rewrite /accept_evs_eexps  => htl hneq s; rewrite mem_cons => [|] hor.
  by cut _ := hneq s; smt.
  by apply htl.
@@ -1141,7 +1141,7 @@ forall evs m s,
 accept_evs_eexps evs m =>
 (exists e, in_dom e m /\ sid_sent s = gen_epk (proj (m.[e]))) =>
 accept_evs_eexps (Accept s::evs) m.
-proof.
+proof strict.
  intros => evs m s; rewrite /accept_evs_eexps => htl hex s'; 
   rewrite mem_cons => [|] hor.
  by cut ->: s' = s by apply Accept_inj => //.
@@ -1154,7 +1154,7 @@ forall e evs,
 valid_accepts evs =>
 (forall s, e <> Accept s) => 
 valid_accepts (e::evs).
-proof.
+proof strict.
  intros => e evs; rewrite /valid_accepts => htl hnotacc s i hbnds hith hrole.
  case (0 = i) => hZ.
    generalize hZ hith => <-; rewrite nth_cons0 => heq.
@@ -1180,7 +1180,7 @@ forall evs s,
 valid_accepts evs =>
 mem (Start (psid_of_sid s)) evs =>
 valid_accepts (Accept s::evs).
-proof.
+proof strict.
   intros => evs s; rewrite /valid_accepts => htl hmem s' i hbnds hith hrole.
   case (0 = i) => hZ.
 
@@ -1214,7 +1214,7 @@ forall evs s,
 valid_accepts evs =>
 sid_role s = resp =>
 valid_accepts (Accept s::evs).
-proof.
+proof strict.
  intros => evs s hvalid hrole.
  rewrite /valid_accepts => s' i.
  case (0 = i).
@@ -1247,7 +1247,7 @@ forall evs e m1 m2,
 inv_started evs m1 m2 =>
 (forall s, e <> Start s) =>
 inv_started (e::evs) m1 m2.
-proof.
+proof strict.
  intros => evs e m1 m2; rewrite /inv_started => htl hnstsrt ps; 
   rewrite mem_cons; split.
    intros => [|] h.
@@ -1272,7 +1272,7 @@ inv_started evs m1 m2 =>
 in_dom i m2 =>
 ! in_dom i m1 =>
 inv_started (Start (A0,B, gen_epk (proj m2.[i]), init)::evs) m1.[i <- (A0,B,init)] m2.
-proof.
+proof strict.
   intros => evs A0 B m1 m2 i; rewrite /inv_started => hinv hindom hnindom ps;
    rewrite mem_cons; split.
    intros => [heq|hmem].
@@ -1306,7 +1306,7 @@ inv_started evs m1 m2 =>
 in_dom i m2 =>
 ! in_dom i m1 =>
 inv_started (Start (A0,B, gen_epk (proj m2.[i]), resp)::evs) m1.[i <- (A0,B,resp)] m2.
-proof.
+proof strict.
   intros => evs A0 B m1 m2 i; rewrite /inv_started => hinv hindom hnindom ps;
    rewrite mem_cons; split.
    intros => [heq|hmem].
@@ -1329,7 +1329,7 @@ forall evs e m1 m2 m3,
 inv_accepted evs m1 m2 m3 =>
 (forall s, e <> Accept s) =>
 inv_accepted (e::evs) m1 m2 m3.
-proof.
+proof strict.
  intros => evs e m1 m2 m3; rewrite /inv_accepted => htl hnstsrt ps.
   rewrite mem_cons; split.
    intros => [|] h.
@@ -1349,7 +1349,7 @@ inv_accepted evs m1 m2 m3 =>
 !in_dom i m3 =>
 (forall s, e <> Accept s) =>
 inv_accepted (e::evs) m1.[i <- v] m2 m3.
-proof.
+proof strict.
  intros => evs e m1 m2 m3 i v; rewrite /inv_accepted => htl hnindom hnindom' hnstsrt ps.
   rewrite mem_cons; split.
    intros => [|] h.
@@ -1380,7 +1380,7 @@ in_dom i m2 =>
 ! in_dom i m3 =>
 inv_accepted (Accept (compute_sid m1 m2 m3.[i <- Y] i)::evs) m1 m2 
     m3.[i <- Y].
-proof.
+proof strict.
  intros => evs m1 m2 m3 i Y;
  rewrite /inv_accepted => htl hindom1 hindom2 hnindom ps;
  rewrite mem_cons; split.
@@ -1415,7 +1415,7 @@ x <> None =>
 y <> None =>
 proj x = proj y =>
 x = y.
-proof.
+proof strict.
  intros => x y;elim /option_case_eq x => //;elim /option_case_eq y => //.
  by intros=> [x'] -> [y'] ->; rewrite !proj_some.
 save.
@@ -1473,7 +1473,7 @@ AKE_Fresh(A).A.choose ~ AKE_EexpRev(A).A.choose :
   (forall x, in_dom x AKE_EexpRev.mCompleted{2} => in_dom x AKE_EexpRev.mStarted{2}) /\
   (forall x, in_dom x AKE_EexpRev.mStarted{2} => !in_dom x AKE_EexpRev.mCompleted{2} =>
      sd2_role (proj (AKE_EexpRev.mStarted{2}.[x])) = init)).
-proof.
+proof strict.
  fun (AKE_EexpRev.evs{2} = AKE_Fresh.evs{1} /\
   AKE_EexpRev.test{2} = AKE_Fresh.test{1} /\
   AKE_EexpRev.cSession{2} = AKE_Fresh.cSession{1} /\
@@ -1833,7 +1833,7 @@ if ! test_fresh AKE_EexpRev.test{2} AKE_EexpRev.evs{2} \/
        sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
     AKE_Fresh.test{1} = AKE_EexpRev.test{2} /\
     mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}.
-proof.
+proof strict.
  fun.
 seq 1 1:
 ( ! (! test_fresh AKE_EexpRev.test{2} AKE_EexpRev.evs{2} \/
@@ -2000,7 +2000,7 @@ forall &2,
                 sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
              AKE_Fresh.test = AKE_EexpRev.test{2} /\
              mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}] = 1%r.
-proof.
+proof strict.
  by intros => &2 h; fun; wp; skip; progress; rewrite mem_cons; right.
 save.
 
@@ -2056,7 +2056,7 @@ forall &1,
                 sd2_role (proj AKE_EexpRev.mStarted.[x]) = init) /\
              AKE_Fresh.test{1} = AKE_EexpRev.test /\
              mem (Accept (proj AKE_EexpRev.test)) AKE_EexpRev.evs] = 1%r.
-proof.
+proof strict.
  intros &1; fun; wp; skip; progress => //.
   case (AKE_EexpRev.test{hr} = None); first smt.
   intros => h.
@@ -2170,7 +2170,7 @@ local equiv eq1_h2 :
        sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
     AKE_Fresh.test{1} = AKE_EexpRev.test{2} /\
     mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}.
-proof.
+proof strict.
  fun; wp; rnd; skip; smt. 
 save.
 
@@ -2267,7 +2267,7 @@ local equiv eq1_h2_a :
        sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
     AKE_Fresh.test{1} = AKE_EexpRev.test{2} /\
     mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}.
-proof.
+proof strict.
 fun.
 sp; if; first smt.
  wp; call eq1_h2; wp; skip; progress => //.
@@ -2325,7 +2325,7 @@ forall &2,
                 sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
              AKE_Fresh.test = AKE_EexpRev.test{2} /\
              mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}] = 1%r.
-proof.
+proof strict.
  intros &2 h.
  fun.
  sp; if.
@@ -2386,7 +2386,7 @@ forall &1,
                 sd2_role (proj AKE_EexpRev.mStarted.[x]) = init) /\
              AKE_Fresh.test{1} = AKE_EexpRev.test /\
              mem (Accept (proj AKE_EexpRev.test)) AKE_EexpRev.evs] = 1%r.
-proof.
+proof strict.
  intros => &1.
  fun.
  sp; if.
@@ -2489,7 +2489,7 @@ if ! test_fresh AKE_EexpRev.test{2} AKE_EexpRev.evs{2} \/
        sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
     AKE_Fresh.test{1} = AKE_EexpRev.test{2} /\
     mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}.
-proof.
+proof strict.
  fun; wp; skip; progress => //.
   by apply accept_evs_eexps_pres; smt.
   by apply start_evs_eexps_pres_ev => //; smt.
@@ -2617,7 +2617,7 @@ forall &2,
                 sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
              AKE_Fresh.test = AKE_EexpRev.test{2} /\
              mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}] = 1%r.
-proof.
+proof strict.
  intros => &2 h; fun; wp; skip; progress => //; rewrite ?mem_cons; try (apply H11 ); smt.
 save.
 
@@ -2672,7 +2672,7 @@ forall &1,
                 sd2_role (proj AKE_EexpRev.mStarted.[x]) = init) /\
              AKE_Fresh.test{1} = AKE_EexpRev.test /\
              mem (Accept (proj AKE_EexpRev.test)) AKE_EexpRev.evs] = 1%r.
-proof.
+proof strict.
 intros &1; fun; wp; skip; progress => //.
 elim H => h; last first.
 by right; apply collision_eexp_rcvd_mon.
@@ -2844,7 +2844,7 @@ if ! test_fresh AKE_EexpRev.test{2} AKE_EexpRev.evs{2} \/
        sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
     AKE_Fresh.test{1} = AKE_EexpRev.test{2} /\
     mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}.
-proof.
+proof strict.
  fun.
 if{1}.
    rcondt{2} 1;trivial.
@@ -3174,7 +3174,7 @@ forall &2,
                 sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
              AKE_Fresh.test = AKE_EexpRev.test{2} /\
              mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}] = 1%r.
-proof.
+proof strict.
  intros => &2 hbad; fun; wp; skip; progress => //.
  by rewrite mem_cons; right.
 save.
@@ -3230,7 +3230,7 @@ forall &1,
                 sd2_role (proj AKE_EexpRev.mStarted.[x]) = init) /\
              AKE_Fresh.test{1} = AKE_EexpRev.test /\
              mem (Accept (proj AKE_EexpRev.test)) AKE_EexpRev.evs] = 1%r.
-proof.
+proof strict.
  intros => &1; fun; wp; skip; progress => //.
  elim H => h; last first.
  by right; apply collision_eexp_rcvd_mon.
@@ -3427,7 +3427,7 @@ local equiv eq1_resp :
        sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
     AKE_Fresh.test{1} = AKE_EexpRev.test{2} /\
     mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}.
-proof.
+proof strict.
  fun; wp; skip; progress => //.
    apply accept_evs_eexps_pres_ev => //.
     by rewrite /sid_sent /=; exists i{2}; split; smt.
@@ -3657,7 +3657,7 @@ forall &2,
                 sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
              AKE_Fresh.test = AKE_EexpRev.test{2} /\
              mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}] = 1%r.
-proof.
+proof strict.
  intros => &2 h; fun; wp; skip; progress => //.
  by rewrite mem_cons; right.
 save.
@@ -3714,7 +3714,7 @@ forall &1,
                 sd2_role (proj AKE_EexpRev.mStarted.[x]) = init) /\
              AKE_Fresh.test{1} = AKE_EexpRev.test /\
              mem (Accept (proj AKE_EexpRev.test)) AKE_EexpRev.evs] = 1%r.
-proof.
+proof strict.
  intros => &1; fun; wp; skip; progress => //.
  elim H => h; last first.
  by right; apply collision_eexp_rcvd_mon.
@@ -3932,7 +3932,7 @@ if ! test_fresh AKE_EexpRev.test{2} AKE_EexpRev.evs{2} \/
        sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
     AKE_Fresh.test{1} = AKE_EexpRev.test{2} /\
     mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}.
-proof.
+proof strict.
 fun.
 seq 1 1:
 ( ! (! test_fresh AKE_EexpRev.test{2} AKE_EexpRev.evs{2} \/
@@ -4090,7 +4090,7 @@ forall &2,
                 sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
              AKE_Fresh.test = AKE_EexpRev.test{2} /\
              mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}] = 1%r.
-proof.
+proof strict.
  intros => &2 h; fun; wp; skip; progress => //.
   by rewrite mem_cons; right.
 save.
@@ -4147,7 +4147,7 @@ forall &1,
                 sd2_role (proj AKE_EexpRev.mStarted.[x]) = init) /\
              AKE_Fresh.test{1} = AKE_EexpRev.test /\
              mem (Accept (proj AKE_EexpRev.test)) AKE_EexpRev.evs] = 1%r.
-proof.
+proof strict.
  intros => &1; fun; wp; skip; progress => //.
  elim H => h; last first.
  by right; apply collision_eexp_rcvd_mon.
@@ -4266,7 +4266,7 @@ local equiv eq1_computeKey :
        sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
     AKE_Fresh.test{1} = AKE_EexpRev.test{2} /\
     mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}.
-proof.
+proof strict.
  fun; sp; if; first by smt.
   wp.
   call eq1_h2.
@@ -4369,7 +4369,7 @@ local equiv eq1_sessionRev :
        sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
     AKE_Fresh.test{1} = AKE_EexpRev.test{2} /\
     mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}.
-proof.
+proof strict.
  fun; sp.
  if{1}.
  rcondt{2} 1.
@@ -4510,7 +4510,7 @@ forall &2,
                 sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
              AKE_Fresh.test = AKE_EexpRev.test{2} /\
              mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}] = 1%r.
-proof.
+proof strict.
  intros => &2 h; fun.
  inline AKE_Fresh(A).O.computeKey AKE_Fresh(A).O.h2.
  sp; if; last first.
@@ -4578,7 +4578,7 @@ forall &1,
                 sd2_role (proj AKE_EexpRev.mStarted.[x]) = init) /\
              AKE_Fresh.test{1} = AKE_EexpRev.test /\
              mem (Accept (proj AKE_EexpRev.test)) AKE_EexpRev.evs] = 1%r.
-proof.
+proof strict.
  intros => &1; fun.
  inline AKE_EexpRev(A).O.computeKey AKE_EexpRev(A).O.h2.
  sp; if; last first.
@@ -4762,7 +4762,7 @@ if ! (! test_fresh AKE_EexpRev.test{2} AKE_EexpRev.evs{2} \/
       sd2_role (proj AKE_EexpRev.mStarted{2}.[x]) = init) /\
     AKE_Fresh.test{1} = AKE_EexpRev.test{2} /\
    mem (Accept (proj AKE_EexpRev.test{2})) AKE_EexpRev.evs{2}.
-proof.
+proof strict.
  fun (! test_fresh AKE_EexpRev.test AKE_EexpRev.evs \/
      collision_eexp_rcvd AKE_EexpRev.evs)
     (AKE_EexpRev.evs{2} = AKE_Fresh.evs{1} /\
@@ -5427,7 +5427,7 @@ local equiv Eq_AKE_EexpRev_AKE_no_collision' :
 (res /\ test_fresh AKE_Fresh.test AKE_Fresh.evs
                     /\ ! collision_eexp_eexp(AKE_Fresh.mEexp) 
                     /\ ! collision_eexp_rcvd(AKE_Fresh.evs) ){2}.
-proof.
+proof strict.
  symmetry.
  by conseq Eq_AKE_EexpRev_AKE_no_collision.
 save.
@@ -5440,7 +5440,7 @@ Pr[AKE_EexpRev(A).main() @ &m : res /\ test_fresh AKE_EexpRev.test AKE_EexpRev.e
 Pr[AKE_Fresh(A).main() @ &m : res /\ test_fresh AKE_Fresh.test AKE_Fresh.evs
                     /\ ! collision_eexp_eexp(AKE_Fresh.mEexp) 
                     /\ ! collision_eexp_rcvd(AKE_Fresh.evs)].
-proof.
+proof strict.
  intros => &m.
  by equiv_deno Eq_AKE_EexpRev_AKE_no_collision'.
 save.
@@ -5659,7 +5659,7 @@ forall (i : Sidx)(mStarted : (Sidx, Sdata2) map)
 j <> i =>
 get_string_from_id i mStarted mCompleted mEexp mSk = 
 get_string_from_id i mStarted.[j <- v] mCompleted mEexp mSk.
-proof.
+proof strict.
  by progress; rewrite /get_string_from_id get_setNE.
 save.
 
@@ -5669,7 +5669,7 @@ forall (i : Sidx)(mStarted : (Sidx, Sdata2) map)
 j <> i =>
 get_string_from_id i mStarted mCompleted mEexp mSk = 
 get_string_from_id i mStarted mCompleted.[j <- v] mEexp mSk.
-proof.
+proof strict.
  by progress; rewrite /get_string_from_id get_setNE.
 save.
 
@@ -6045,7 +6045,7 @@ in_dom
 (get_string_from_id AKE_NoHashOnCompute.t_idx AKE_NoHashOnCompute.mStarted 
   AKE_NoHashOnCompute.mCompleted AKE_NoHashOnCompute.mEexp AKE_NoHashOnCompute.mSk) 
 AKE_NoHashOnCompute.mH2)].
-proof.  
+proof strict.  
 intros => &m.
 apply (Real.Trans _ 
  (Pr[AKE_NoHashOnCompute(A).main() @ &m :
@@ -6273,7 +6273,7 @@ AKE_NoHashOnCompute(A).main ~ AKE_ComputeRand(A).main :
                     /\ ! collision_eexp_eexp(AKE_NoHashOnCompute.mEexp) 
                     /\ ! collision_eexp_rcvd(AKE_NoHashOnCompute.evs) ){1} =>
 (res ){2}.
-proof.
+proof strict.
  fun.
  seq 14 14:
 (={b,pks,key,keyo,b',i,pks, glob A} /\
@@ -6358,7 +6358,7 @@ by rnd{2}; skip; progress; smt.
 qed.
 
 lemma card0_empty : forall (s : 'a FSet.set), card s = 0 => s = FSet.empty.
-proof.
+proof strict.
  intros => s.
  rewrite empty_elems_nil card_def => h.
  by apply length0_nil.
@@ -6368,7 +6368,7 @@ lemma mem_rm_variant :
 forall (s : 'a set), 
 s <> FSet.empty =>
 card (rm (pick s) s) < card s.
-proof.
+proof strict.
  intros => s hne.
  rewrite card_rm_in;first by apply mem_pick.
  generalize (card s).
@@ -6376,7 +6376,7 @@ proof.
 save.
 
 lemma card_le_0 : forall (s : 'a FSet.set), card s <= 0 => s = FSet.empty.
-proof.
+proof strict.
  intros => s h.
  cut h' : 0 <= card s by (rewrite card_def; apply length_nneg).
  cut _: card s = 0 by smt.
@@ -6385,7 +6385,7 @@ save.
 
 local lemma Pr3_aux : forall &m,
 Pr[AKE_ComputeRand(A).main() @ &m : res] = 1%r / 2%r.
-proof.
+proof strict.
  intros => &m.
  bdhoare_deno (_ : true ==> _) => //.
  fun.
@@ -6446,7 +6446,7 @@ Pr[AKE_NoHashOnCompute(A).main()@ &m :
 (res /\ test_fresh AKE_NoHashOnCompute.test AKE_NoHashOnCompute.evs
                     /\ ! collision_eexp_eexp(AKE_NoHashOnCompute.mEexp) 
                     /\ ! collision_eexp_rcvd(AKE_NoHashOnCompute.evs) )] <= 1%r / 2%r.
-proof.
+proof strict.
  intros => &m.
  apply (Real.Trans _ Pr[AKE_ComputeRand(A).main()@ &m : res] _).
   by equiv_deno AKE_NoHashCall_AKE_ComputeRand.
@@ -6465,7 +6465,7 @@ forall x, in_dom x mH2 =>
 lemma invh2_mon_ev : forall mH2 sH2 evs mStrt mComp mEexp mSk e,
 invh2 mH2 sH2 evs mStrt mComp mEexp mSk =>
 invh2 mH2 sH2 (e::evs) mStrt mComp mEexp mSk.
-proof.
+proof strict.
  rewrite /invh2; progress => //.
  elim (H x _) => // h.
   by left.
@@ -6478,7 +6478,7 @@ lemma invh2_mon_Strt : forall mH2 sH2 evs mStrt mComp mEexp mSk i v,
 (* ! in_dom i mComp =>  *)
 invh2 mH2 sH2 evs mStrt mComp mEexp mSk =>
 invh2 mH2 sH2 evs mStrt.[i <- v] mComp mEexp mSk.
-proof.
+proof strict.
  rewrite /invh2.
  intros => mH2 sH2 evs mStrt mCmp mEexp mSk i v hnin_dom h x hd.
  cut:= h x _.
@@ -6494,7 +6494,7 @@ lemma invh2_mon_Cmp : forall mH2 sH2 evs mStrt mComp mEexp mSk i v,
 ! in_dom i mComp => 
 invh2 mH2 sH2 evs mStrt mComp mEexp mSk =>
 invh2 mH2 sH2 evs mStrt mComp.[i <- v] mEexp mSk.
-proof.
+proof strict.
  intros => mH2 sH2 evs mStrt mCmp mEexp mSk i v hnin_dom  h x hd.
  cut := h x _.
  assumption.
@@ -6509,7 +6509,7 @@ lemma invh2_mon_h2_1 : forall mH2 sH2 evs mStrt mComp mEexp mSk str v,
 !in_dom str mH2 =>
 invh2 mH2 sH2 evs mStrt mComp mEexp mSk =>
 invh2 mH2.[str <- v] (add str sH2) evs mStrt mComp mEexp mSk.
-proof.
+proof strict.
  rewrite /invh2; progress (rewrite in_dom_set).
   elim H1 => h.
    by elim (H0 x _) => // hmem; rewrite mem_add; [left; left | right].
@@ -6520,7 +6520,7 @@ lemma invh2_mon_h2_2 : forall mH2 sH2 evs mStrt mComp mEexp mSk str,
 in_dom str mH2 =>
 invh2 mH2 sH2 evs mStrt mComp mEexp mSk =>
 invh2 mH2 (add str sH2) evs mStrt mComp mEexp mSk.
-proof.
+proof strict.
  rewrite /invh2; progress. 
   elim (H0 x _) => // h1.
   by rewrite mem_add; left; left.
@@ -6536,7 +6536,7 @@ in_dom i mStrt =>
 in_dom i mComp =>
 invh2 mH2 sH2 evs mStrt mComp mEexp mSk =>
 invh2 mH2.[str <- v] sH2  (SessionRev sid :: evs) mStrt mComp mEexp mSk.
-proof.
+proof strict.
  rewrite /invh2; progress.
  generalize H4; rewrite in_dom_set => [|] h.
   cut := H3 x _; first assumption.
@@ -6555,7 +6555,7 @@ lemma compute_sid_pres_cmp : forall m1 m2 m3 i j v,
 j <> i =>
 compute_sid m1 m2 m3 i =
 compute_sid m1 m2 m3.[j <- v] i.
-proof.
+proof strict.
  intros => m1 m2 m3 i j v hneq.
  by rewrite /compute_sid get_setNE.
 save.
@@ -6564,7 +6564,7 @@ lemma compute_sid_pres_strt : forall m1 m2 m3 i j v,
 j <> i =>
 compute_sid m1 m2 m3 i =
 compute_sid m1.[j <- v] m2 m3 i.
-proof.
+proof strict.
  intros => m1 m2 m3 i j v hneq.
  by rewrite /compute_sid get_setNE.
 save.
@@ -6573,7 +6573,7 @@ save.
 lemma fresh_not_Rev_mem1 : forall s evs,
 fresh_op s evs = true =>
 ! mem (SessionRev s) evs.
-proof.
+proof strict.
  intros => s evs.
  rewrite -fresh_op_def'.
  rewrite /fresh.
@@ -6583,7 +6583,7 @@ save.
 lemma fresh_not_Rev_mem2 : forall s evs,
 fresh_op s evs = true =>
 ! mem (SessionRev (cmatching s)) evs.
-proof.
+proof strict.
  intros => s evs.
  rewrite -fresh_op_def'.
  rewrite /fresh.
@@ -6593,7 +6593,7 @@ save.
 lemma fresh_not_Rev1 : forall s t evs,
 fresh_op t (SessionRev s :: evs) = true =>
 s <> t.
-proof.
+proof strict.
  intros => s t evs.
  rewrite -fresh_op_def'.
  rewrite /fresh.
@@ -6605,7 +6605,7 @@ save.
 lemma fresh_not_Rev2 : forall s t evs,
 fresh_op t (SessionRev s :: evs) = true =>
 s <> cmatching t.
-proof.
+proof strict.
  intros => s t evs.
  rewrite -fresh_op_def'.
  rewrite /fresh.
@@ -6626,7 +6626,7 @@ compute_sid mStrt mEexp mCmp i =
 compute_sid mStrt mEexp mCmp j \/
 compute_sid mStrt mEexp mCmp i =
 cmatching (compute_sid mStrt mEexp mCmp j).
-proof.
+proof strict.
  intros => i j mStrt mCmp mEexp mSk mSk_inv hdom1 hdom2.
  rewrite /get_string_from_id /compute_sid.
  elim /tuple3_ind (proj mStrt.[i]) => A1 B1 r1 /=.
@@ -6656,7 +6656,7 @@ lemma valid_start_pres1 : forall evs e,
 (forall ps, Start ps <> e) =>
 valid_start evs =>
 valid_start (e::evs).
-proof.
+proof strict.
  rewrite /valid_start => evs e h hvalid A B X r; rewrite mem_cons => [|] hs.
  by cut: Start (A, B, X, r) <> e; [ apply h | smt ].
  by apply (hvalid A B X).
@@ -6665,7 +6665,7 @@ save.
 lemma valid_start_pres2 : forall evs A B X,
 valid_start evs =>
 valid_start (Start (A, B, X, init)::evs).
-proof.
+proof strict.
  rewrite /valid_start => evs A B X hvalid A' B' X' r'; rewrite mem_cons => [|] hs.
  cut h:= Start_inj (A', B', X', r') (A, B, X, init) _ => // {hs}.
  smt.
@@ -6680,7 +6680,7 @@ valid_start evs =>
 (forall A B X Y r, e = Accept (A,B,X,Y,r) => r <> init) => 
 fresh_op t evs =>
 fresh_op t (e::evs).
-proof.
+proof strict.
  intros => t e evs hvstrt hnsr hnstr hner hneq.
  cut _ : fresh_op t evs = true => fresh_op t (e :: evs) = true; last by smt.
  rewrite -!fresh_op_def' /fresh.
@@ -6743,7 +6743,7 @@ mem
   AKE_ComputeRand.mCompleted AKE_ComputeRand.mEexp AKE_ComputeRand.mSk) 
 AKE_ComputeRand.sH2 /\
 fresh_op (compute_sid AKE_ComputeRand.mStarted AKE_ComputeRand.mEexp AKE_ComputeRand.mCompleted AKE_ComputeRand.t_idx) AKE_ComputeRand.evs){2}.
-proof.
+proof strict.
  fun. 
  seq 14 14:
 (={b,pks,key,keyo,b',i,pks, glob A} /\
@@ -7139,7 +7139,7 @@ mem
   AKE_ComputeRand.mCompleted AKE_ComputeRand.mEexp AKE_ComputeRand.mSk) 
 AKE_ComputeRand.sH2 /\
 fresh_op (compute_sid AKE_ComputeRand.mStarted AKE_ComputeRand.mEexp AKE_ComputeRand.mCompleted AKE_ComputeRand.t_idx) AKE_ComputeRand.evs].
-proof.
+proof strict.
  intros => &m.
  by equiv_deno AKE_NoHashCall_AKE_ComputeRand_bad_ev.
 save.
@@ -7150,7 +7150,7 @@ p <= q => p + r <= q + r by smt.
 
 lemma real_le_plus : 
 forall (p q r s : real), p <= r => q <= s => p + q <= r + s.
-proof.
+proof strict.
  intros => p q r s hle1 hle2.
  apply (Real.Trans _ (r + q) _); first by apply real_le_plus1.
  rewrite (_ : r + q = q + r); first smt.
@@ -7171,7 +7171,7 @@ mem
   AKE_ComputeRand.mCompleted AKE_ComputeRand.mEexp AKE_ComputeRand.mSk) 
 AKE_ComputeRand.sH2 /\
 fresh_op (compute_sid AKE_ComputeRand.mStarted AKE_ComputeRand.mEexp AKE_ComputeRand.mCompleted AKE_ComputeRand.t_idx) AKE_ComputeRand.evs].
-proof. 
+proof strict. 
  intros => &m.
  apply (Real.Trans _ 
       (Pr[AKE_Fresh(A).main() @ &m : res /\ test_fresh AKE_Fresh.test AKE_Fresh.evs
@@ -7484,7 +7484,7 @@ local module AKE_find(FA : Adv2) = {
 
 lemma cmatching_id : forall s,
 cmatching (cmatching s) = s.
-proof.
+proof strict.
  intros => s.
  by rewrite /cmatching; elim /tuple5_ind s => A B X Y r; rewrite /cmatching /=.
 save.
@@ -7512,7 +7512,7 @@ in_dom id AKE_find.mEexp /\
  compute_sid AKE_find.mStarted AKE_find.mEexp AKE_find.mCompleted id') \/
 (compute_sid AKE_find.mStarted AKE_find.mEexp AKE_find.mCompleted (proj res) =
  (compute_sid AKE_find.mStarted AKE_find.mEexp AKE_find.mCompleted id'))))] = 1%r.
-proof.
+proof strict.
  intros => id' id_set'; fun.
  sp.
  while 
@@ -7589,7 +7589,7 @@ in_dom id AKE_find.mEexp /\
  compute_sid AKE_find.mStarted AKE_find.mEexp AKE_find.mCompleted id') \/
 (compute_sid AKE_find.mStarted AKE_find.mEexp AKE_find.mCompleted (proj res) =
  (compute_sid AKE_find.mStarted AKE_find.mEexp AKE_find.mCompleted id'))))].
-proof.
+proof strict.
  intros => id' id_set'; fun.
  sp.
  while 
@@ -7647,7 +7647,7 @@ in_dom i AKE_find.mEexp ==>
 res <> None /\
 proj (res) =
 (get_string_from_id sid AKE_find.mStarted AKE_find.mCompleted AKE_find.mEexp AKE_find.mSk = str)] = 1%r.
-proof.
+proof strict.
   intros => str sid; fun.  
    wp; skip; progress => //.
  smt.
@@ -7666,7 +7666,7 @@ in_dom i AKE_find.mEexp ==>
 res <> None /\
 proj (res) =
 (get_string_from_id sid AKE_find.mStarted AKE_find.mCompleted AKE_find.mEexp AKE_find.mSk = str)].
-proof.
+proof strict.
   intros => str sid; fun.
    wp; skip; progress => //.
  smt.
@@ -7688,7 +7688,7 @@ get_string_from_id (proj res) AKE_find.mStarted AKE_find.mCompleted AKE_find.mEe
 (res = None => 
  (forall id, mem id sid => 
 get_string_from_id id AKE_find.mStarted AKE_find.mCompleted AKE_find.mEexp AKE_find.mSk <> v))].
-proof.
+proof strict.
  intros => v sid; fun.
  while ((ret = None => 
  (forall id, mem id sid  => !mem id aux => get_string_from_id id AKE_find.mStarted AKE_find.mCompleted AKE_find.mEexp AKE_find.mSk <> v)) /\
@@ -7744,7 +7744,7 @@ get_string_from_id (proj res) AKE_find.mStarted AKE_find.mCompleted AKE_find.mEe
 (res = None => 
  (forall id, mem id sid => 
 get_string_from_id id AKE_find.mStarted AKE_find.mCompleted AKE_find.mEexp AKE_find.mSk <> v))] = 1%r.
-proof.
+proof strict.
  intros => v sid; fun.
  while ((ret = None => 
  (forall id, mem id sid  => !mem id aux => get_string_from_id id AKE_find.mStarted AKE_find.mCompleted AKE_find.mEexp AKE_find.mSk <> v)) /\
@@ -7802,7 +7802,7 @@ get_string_from_id i  AKE_find.mStarted AKE_find.mCompleted AKE_find.mEexp AKE_f
 (proj res) /\ mem (proj res) set_str) /\
 (res = None => 
  ! mem (get_string_from_id i AKE_find.mStarted AKE_find.mCompleted AKE_find.mEexp AKE_find.mSk) set_str )].
-proof.
+proof strict.
  intros => i set_str; fun.
  while 
 ((ret = None => 
@@ -7860,7 +7860,7 @@ get_string_from_id i  AKE_find.mStarted AKE_find.mCompleted AKE_find.mEexp AKE_f
 (proj res) /\ mem (proj res) set_str) /\
 (res = None => 
  ! mem (get_string_from_id i AKE_find.mStarted AKE_find.mCompleted AKE_find.mEexp AKE_find.mSk) set_str )] = 1%r.
-proof.
+proof strict.
  intros => i set_str; fun.
  while 
 ((ret = None => 
@@ -7918,7 +7918,7 @@ forall x, in_dom x m <=> FSet.mem x s.
 lemma is_dom_add : forall m s (x : 'a) (v : 'b),
 is_dom s m =>
 is_dom (add x s) m.[x<-v].
-proof.
+proof strict.
  intros => m s x v.
  rewrite /is_dom => hdom y.
  case (y = x) => h.
@@ -7954,7 +7954,7 @@ forall (mH21 mH22 : (Sstring, Key) map)
 in_dom x mH22 =>
 inv_split_dom mH21 mH22 mKeyRev2 mStarted2 mCompleted2 mEexp2 mSk2 =>
 in_dom x mH21.
-proof.
+proof strict.
  progress.
  cut [h1 h2] := H0 x => {h1}.
  by apply h2 => {h2}; left.
@@ -7966,7 +7966,7 @@ forall (mH21 mH22 : (Sstring, Key) map)
                  mStarted2 mCompleted2 mEexp2 mSk2 x v,
 inv_split_dom mH21 mH22 mKeyRev2 mStarted2 mCompleted2 mEexp2 mSk2 =>
 inv_split_dom mH21.[x <- v] mH22.[x <- v] mKeyRev2 mStarted2 mCompleted2 mEexp2 mSk2.
-proof.
+proof strict.
  progress => str.
  case (str = x)=> h.
   by rewrite h !in_dom_setE.
@@ -7981,7 +7981,7 @@ forall (mH21 mH22 : (Sstring, Key) map)
 inv_split_dom mH21 mH22 mKeyRev2 mStarted2 mCompleted2 mEexp2 mSk2 =>
 inv_split_dom mH21.[get_string_from_id x mStarted2 mCompleted2 mEexp2 mSk2 <- v]
      mH22 mKeyRev2.[x <- v] mStarted2 mCompleted2 mEexp2 mSk2.
-proof.
+proof strict.
  progress => str.
  case (str = get_string_from_id x mStarted2 mCompleted2 mEexp2 mSk2) => h.
   rewrite h !in_dom_setE; progress => //.
@@ -8005,7 +8005,7 @@ forall (mH21 mH22 : (Sstring, Key) map)
 ! in_dom x mKeyRev2 => 
 inv_split_dom mH21 mH22 mKeyRev2 mStarted2 mCompleted2 mEexp2 mSk2 =>
 inv_split_dom mH21 mH22 mKeyRev2 mStarted2.[x<-v] mCompleted2 mEexp2 mSk2.
-proof.
+proof strict.
  progress.
  generalize H0; rewrite  /inv_split_dom; progress. 
   generalize H1; rewrite H0 => [|] h.
@@ -8029,7 +8029,7 @@ forall (mH21 mH22 : (Sstring, Key) map)
 ! in_dom x mKeyRev2 => 
 inv_split_dom mH21 mH22 mKeyRev2 mStarted2 mCompleted2 mEexp2 mSk2 =>
 inv_split_dom mH21 mH22 mKeyRev2 mStarted2 mCompleted2.[x<-v] mEexp2 mSk2.
-proof.
+proof strict.
  progress.
  generalize H0; rewrite  /inv_split_dom; progress. 
   generalize H1; rewrite H0 => [|] h.
@@ -8050,7 +8050,7 @@ lemma inv_split_val1_updmH22 :
 forall (mH21 mH22 : (Sstring, Key) map) x v,
 inv_split_val1 mH21 mH22  =>
 inv_split_val1 mH21.[x <- v] mH22.[x <- v].
-proof.
+proof strict.
  progress => str.
  case (str = x)=> h.
   by rewrite h !get_setE.
@@ -8063,7 +8063,7 @@ forall (mH21 mH22 : (Sstring, Key) map) x v,
 !in_dom x mH22 => 
 inv_split_val1 mH21 mH22  =>
 inv_split_val1 mH21.[x <- v] mH22.
-proof.
+proof strict.
  progress => str.
  case (str = x)=> h.
   by generalize H; rewrite h; smt.
@@ -8080,7 +8080,7 @@ forall (mH21 mH22 : (Sstring, Key) map)
 inv_split_dom mH21 mH22 mKeyRev2 mStarted2 mCompleted2 mEexp2 mSk2 =>
 inv_split_val2 mH21 mKeyRev2 mStarted2 mCompleted2 mEexp2 mSk2 =>
 inv_split_val2 mH21.[x <- v] mKeyRev2 mStarted2 mCompleted2 mEexp2 mSk2.
-proof.
+proof strict.
  progress => id hdom.
  rewrite get_setNE; last first.
   by apply H1.
@@ -8101,7 +8101,7 @@ inv_split_dom mH21 mH22 mKeyRev2 mStarted2 mCompleted2 mEexp2 mSk2 =>
 inv_split_val2 mH21 mKeyRev2 mStarted2 mCompleted2 mEexp2 mSk2 =>
 inv_split_val2 mH21.[(get_string_from_id x mStarted2 mCompleted2 mEexp2 mSk2) <- v] 
 mKeyRev2.[x <- v] mStarted2 mCompleted2 mEexp2 mSk2.
-proof.
+proof strict.
  progress => i hdom.
  case (x = i) => heq.
   by rewrite heq !get_setE.
@@ -8129,7 +8129,7 @@ forall (mH21 : (Sstring, Key) map)
 ! in_dom x mKeyRev2 => 
 inv_split_val2 mH21 mKeyRev2 mStarted2 mCompleted2 mEexp2 mSk2 =>
 inv_split_val2 mH21 mKeyRev2 mStarted2.[x <- v] mCompleted2 mEexp2 mSk2.
-proof.
+proof strict.
  progress.
  generalize H0; rewrite /inv_split_val2.
  progress.
@@ -8145,7 +8145,7 @@ forall (mH21 : (Sstring, Key) map)
 ! in_dom x mKeyRev2 => 
 inv_split_val2 mH21 mKeyRev2 mStarted2 mCompleted2 mEexp2 mSk2 =>
 inv_split_val2 mH21 mKeyRev2 mStarted2 mCompleted2.[x <- v] mEexp2 mSk2.
-proof.
+proof strict.
  progress.
  generalize H0; rewrite /inv_split_val2.
  progress.
@@ -8161,7 +8161,7 @@ forall x, in_dom x m1 => in_dom x m2.
 lemma is_sub_map_upd1 : forall (m1 : ('a, 'b) map)(m2 : ('a, 'c) map) x v,
 is_sub_map m1 m2 =>
 is_sub_map m1 m2.[x<-v].
-proof.
+proof strict.
  intros => m1 m2 x v h s hdom.
  by rewrite in_dom_set; left; apply h.
 save.
@@ -8170,7 +8170,7 @@ save.
 lemma is_sub_map_upd2 : forall (m1 : ('a, 'b) map)(m2 : ('a, 'c) map) x v1 v2,
 is_sub_map m1 m2 =>
 is_sub_map m1.[x<-v1] m2.[x<-v2].
-proof.
+proof strict.
  intros => m1 m2 x v1 v2 h s.
  rewrite in_dom_set => [|] h'.
   by rewrite in_dom_set; left; apply h.
@@ -8181,7 +8181,7 @@ lemma is_sub_map_upd3 : forall (m1 : ('a, 'b) map)(m2 : ('a, 'c) map) x v,
 in_dom x m2 =>
 is_sub_map m1 m2 =>
 is_sub_map m1.[x<-v] m2.
-proof.
+proof strict.
  intros => m1 m2 x v1 h h' s.
  rewrite in_dom_set => [|] h''.
   by apply h'.
@@ -8253,7 +8253,7 @@ AKE_ComputeRand(A).O.h2 ~ AKE_find(A).O.h2 :
   actor_valid AKE_find.mStarted{2} AKE_find.mCompleted{2} 
               AKE_find.mEexp{2} AKE_find.mSk{2} /\
   mSk_inv AKE_find.mSk{2}.
-proof.
+proof strict.
  fun.
  sp.
  seq 1 1:
@@ -8408,7 +8408,7 @@ AKE_ComputeRand(A).O.h2_a ~ AKE_find(A).O.h2_a :
   actor_valid AKE_find.mStarted{2} AKE_find.mCompleted{2} 
               AKE_find.mEexp{2} AKE_find.mSk{2} /\
   mSk_inv AKE_find.mSk{2}.
-proof.
+proof strict.
  by fun; sp; if => //; wp; call AKE_RandCompute_Eqs_h2; wp.
 qed.
    
@@ -8416,7 +8416,7 @@ qed.
 lemma some_proj : forall (x : 'a option),
 x <> None =>
 Some (proj x) = x.
-proof.
+proof strict.
  intros => x hnn.
  elim /option_case_eq x; first smt.
   intros => [y] ->.
@@ -8427,7 +8427,7 @@ lemma some_get :
 forall (m : ('a, 'b) map) (x : 'a),
 in_dom x m =>
 Some (proj m.[x]) = m.[x].
-proof.
+proof strict.
  intros => m x hdom.
  apply some_proj.
  by generalize hdom; rewrite /in_dom.
@@ -8438,7 +8438,7 @@ forall (A1 A2 : 'a) (B1 B2 : 'b) (X1 X2 : 'c)(Y1 Y2 : 'd)(r1 r2 : 'e),
 ((A2, B2, X2, Y2, r2) =
  (A1, B1, X1, Y1, r1)) <=>
  A1 = A2 /\ B1 = B2 /\ X1 = X2 /\ Y1 = Y2 /\ r1 = r2.
-proof.
+proof strict.
  progress.
 save.
 
@@ -8453,7 +8453,7 @@ compute_sid mStrt mEexp mCmp i =
 cmatching (compute_sid mStrt mEexp mCmp j) =>
 get_string_from_id i mStrt mCmp mEexp mSk =
 get_string_from_id j mStrt mCmp mEexp mSk.
-proof.
+proof strict.
  progress => //.
  generalize H0 H1.
  elim H2 => {H2};
@@ -8528,7 +8528,7 @@ AKE_ComputeRand(A).O.computeKey ~ AKE_find(A).O.computeKey :
   actor_valid AKE_find.mStarted{2} AKE_find.mCompleted{2} 
               AKE_find.mEexp{2} AKE_find.mSk{2} /\
   mSk_inv AKE_find.mSk{2}.
-proof.
+proof strict.
  conseq (_ : _ ==> 
  (AKE_find.t_idx{2} = AKE_ComputeRand.t_idx{1} /\
   AKE_find.evs{2} = AKE_ComputeRand.evs{1} /\
@@ -8930,7 +8930,7 @@ AKE_ComputeRand(A).O.sessionRev ~ AKE_find(A).O.sessionRev :
   actor_valid AKE_find.mStarted{2} AKE_find.mCompleted{2} 
               AKE_find.mEexp{2} AKE_find.mSk{2} /\
   mSk_inv AKE_find.mSk{2}.
-proof.
+proof strict.
  by fun; sp; if => //; call AKE_RandCompute_Eqs_computeKey; wp; skip; progress.
 save.
  
@@ -8990,7 +8990,7 @@ AKE_ComputeRand(A).A.choose ~ AKE_find(A).A.choose :
   actor_valid AKE_find.mStarted{2} AKE_find.mCompleted{2} 
               AKE_find.mEexp{2} AKE_find.mSk{2} /\
   mSk_inv AKE_find.mSk{2}.
-proof.
+proof strict.
  fun (AKE_find.t_idx{2} = AKE_ComputeRand.t_idx{1} /\
   AKE_find.evs{2} = AKE_ComputeRand.evs{1} /\
   AKE_find.test{2} = AKE_ComputeRand.test{1} /\
@@ -9136,7 +9136,7 @@ AKE_ComputeRand(A).A.guess ~ AKE_find(A).A.guess :
   actor_valid AKE_find.mStarted{2} AKE_find.mCompleted{2} 
               AKE_find.mEexp{2} AKE_find.mSk{2} /\
   mSk_inv AKE_find.mSk{2}.
-proof.
+proof strict.
  fun (AKE_find.t_idx{2} = AKE_ComputeRand.t_idx{1} /\
   AKE_find.evs{2} = AKE_ComputeRand.evs{1} /\
   AKE_find.test{2} = AKE_ComputeRand.test{1} /\
@@ -9244,7 +9244,7 @@ mem
   AKE_find.mCompleted AKE_find.mEexp AKE_find.mSk) 
 AKE_find.sH2 /\
 fresh_op (compute_sid AKE_find.mStarted AKE_find.mEexp AKE_find.mCompleted AKE_find.t_idx) AKE_find.evs){2}.
-proof.
+proof strict.
  fun.
   seq 14 17:
 (={b,pks,key,keyo,b',i,pks, glob A} /\
@@ -9345,7 +9345,7 @@ in_dom AKE_find.t_idx AKE_find.mCompleted /\
 mem (get_string_from_id AKE_find.t_idx AKE_find.mStarted AKE_find.mCompleted 
                         AKE_find.mEexp AKE_find.mSk) AKE_find.sH2 /\ 
 fresh_op (compute_sid AKE_find.mStarted AKE_find.mEexp AKE_find.mCompleted AKE_find.t_idx) AKE_find.evs].
-proof.
+proof strict.
  intros => &m.
  by equiv_deno AKE_RandCompute_Eqs.
 save.
@@ -9363,7 +9363,7 @@ mem
   AKE_find.mCompleted AKE_find.mEexp AKE_find.mSk) 
 AKE_find.sH2 /\
 fresh_op (compute_sid AKE_find.mStarted AKE_find.mEexp AKE_find.mCompleted AKE_find.t_idx) AKE_find.evs].
-proof. 
+proof strict. 
  intros => &m.
  rewrite -(Pr4 &m).
  apply (Pr_sofar1 &m).
@@ -9693,7 +9693,7 @@ AKE_find(A).O.find_id ~ AKE2toAKE3(AKE_eqS(AKE2toAKE3).O).O2.find_id :
   is_sub_map AKE2toAKE3.mKeyRev{2} AKE2toAKE3.mCompleted{2}  /\
   is_dom AKE2toAKE3.sKeyRev{2} AKE2toAKE3.mKeyRev{2} /\
   inv_KeyRev AKE_find.mKeyRev{1} AKE_find.evs{1} AKE_find.mStarted{1} AKE_find.mCompleted{1} AKE_find.mEexp{1}.
-proof.
+proof strict.
  fun.
  sp; wp.
  inline AKE_eqS(AKE2toAKE3).O.eqS AKE_find(A).O.eqS.
@@ -9784,7 +9784,7 @@ AKE_find(A).O.find_string ~ AKE2toAKE3(AKE_eqS(AKE2toAKE3).O).O2.find_string :
   is_sub_map AKE2toAKE3.mKeyRev{2} AKE2toAKE3.mCompleted{2}  /\
   is_dom AKE2toAKE3.sKeyRev{2} AKE2toAKE3.mKeyRev{2} /\
   inv_KeyRev AKE_find.mKeyRev{1} AKE_find.evs{1} AKE_find.mStarted{1} AKE_find.mCompleted{1} AKE_find.mEexp{1}.
-proof.
+proof strict.
  fun; sp; wp. 
  while (   ={id, sstr, str, b, ret, aux} /\
    (mem (SessionRev (compute_sid AKE_find.mStarted AKE_find.mEexp AKE_find.mCompleted id)) AKE_find.evs){1} /\
@@ -9871,7 +9871,7 @@ AKE_find(A).O.find_matching ~ AKE2toAKE3(AKE_eqS(AKE2toAKE3).O).O2.find_matching
   is_sub_map AKE2toAKE3.mKeyRev{2} AKE2toAKE3.mCompleted{2}  /\
   is_dom AKE2toAKE3.sKeyRev{2} AKE2toAKE3.mKeyRev{2} /\
   inv_KeyRev AKE_find.mKeyRev{1} AKE_find.evs{1} AKE_find.mStarted{1} AKE_find.mCompleted{1} AKE_find.mEexp{1}.
-proof.
+proof strict.
  fun; wp; sp.
  while 
   (={id, id_set, ret, aux, sid} /\
@@ -10004,7 +10004,7 @@ AKE_find(A).O.h2 ~ AKE2toAKE3(AKE_eqS(AKE2toAKE3).O).O2.h2 :
   is_sub_map AKE2toAKE3.mKeyRev{2} AKE2toAKE3.mCompleted{2}  /\
   is_dom AKE2toAKE3.sKeyRev{2} AKE2toAKE3.mKeyRev{2} /\
   inv_KeyRev AKE_find.mKeyRev{1} AKE_find.evs{1} AKE_find.mStarted{1} AKE_find.mCompleted{1} AKE_find.mEexp{1}.
-proof.
+proof strict.
  fun.
  sp.
  seq 1 1: (s{2} = None /\
@@ -10124,7 +10124,7 @@ AKE_find(A).O.h2_a ~ AKE2toAKE3(AKE_eqS(AKE2toAKE3).O).O2.h2_a :
   is_sub_map AKE2toAKE3.mKeyRev{2} AKE2toAKE3.mCompleted{2}  /\
   is_dom AKE2toAKE3.sKeyRev{2} AKE2toAKE3.mKeyRev{2} /\
   inv_KeyRev AKE_find.mKeyRev{1} AKE_find.evs{1} AKE_find.mStarted{1} AKE_find.mCompleted{1} AKE_find.mEexp{1}.
-proof.
+proof strict.
  by fun; sp; if => //; wp; call AKE_find_eqS_h2; wp; skip; progress.
 save.
 
@@ -10181,7 +10181,7 @@ AKE_find(A).O.computeKey ~ AKE2toAKE3(AKE_eqS(AKE2toAKE3).O).O2.computeKey :
   is_sub_map AKE2toAKE3.mKeyRev{2} AKE2toAKE3.mCompleted{2}  /\
   is_dom AKE2toAKE3.sKeyRev{2} AKE2toAKE3.mKeyRev{2} /\
   inv_KeyRev AKE_find.mKeyRev{1} AKE_find.evs{1} AKE_find.mStarted{1} AKE_find.mCompleted{1} AKE_find.mEexp{1}.
-proof.
+proof strict.
 fun.
 sp.
 if => //.
@@ -10374,7 +10374,7 @@ AKE_find(A).O.sessionRev ~ AKE2toAKE3(AKE_eqS(AKE2toAKE3).O).O2.sessionRev :
   is_sub_map AKE2toAKE3.mKeyRev{2} AKE2toAKE3.mCompleted{2}  /\
   is_dom AKE2toAKE3.sKeyRev{2} AKE2toAKE3.mKeyRev{2} /\
   inv_KeyRev AKE_find.mKeyRev{1} AKE_find.evs{1} AKE_find.mStarted{1} AKE_find.mCompleted{1} AKE_find.mEexp{1}.
-proof.
+proof strict.
 fun.
  sp.
  if{1}.
@@ -10461,7 +10461,7 @@ AKE_find.sH2'{1} =  AKE2toAKE3.sH2'{2} /\
   is_sub_map AKE2toAKE3.mKeyRev{2} AKE2toAKE3.mCompleted{2}  /\
   is_dom AKE2toAKE3.sKeyRev{2} AKE2toAKE3.mKeyRev{2} /\
   inv_KeyRev AKE_find.mKeyRev{1} AKE_find.evs{1} AKE_find.mStarted{1} AKE_find.mCompleted{1} AKE_find.mEexp{1}.
-proof.
+proof strict.
  fun (AKE_find.sH2'{1} =  AKE2toAKE3.sH2'{2} /\
    AKE_find.sKeyRev{1} = AKE2toAKE3.sKeyRev{2} /\
    AKE_find.mKeyRev{1} = AKE2toAKE3.mKeyRev{2} /\
@@ -10736,7 +10736,7 @@ AKE_find.sH2'{1} =  AKE2toAKE3.sH2'{2} /\
   is_sub_map AKE2toAKE3.mKeyRev{2} AKE2toAKE3.mCompleted{2}  /\
   is_dom AKE2toAKE3.sKeyRev{2} AKE2toAKE3.mKeyRev{2} /\
   inv_KeyRev AKE_find.mKeyRev{1} AKE_find.evs{1} AKE_find.mStarted{1} AKE_find.mCompleted{1} AKE_find.mEexp{1}.
-proof.
+proof strict.
  fun (AKE_find.sH2'{1} =  AKE2toAKE3.sH2'{2} /\
    AKE_find.sKeyRev{1} = AKE2toAKE3.sKeyRev{2} /\
    AKE_find.mKeyRev{1} = AKE2toAKE3.mKeyRev{2} /\
@@ -11145,7 +11145,7 @@ List.mem
   AKE_eqS.mCompleted AKE_eqS.mEexp AKE_eqS.mSk) 
 (AKE_eqS.h2_queries) /\
 fresh_op (compute_sid AKE_eqS.mStarted AKE_eqS.mEexp AKE_eqS.mCompleted AKE_eqS.test_sidx) AKE_eqS.evs)].
-proof.
+proof strict.
  equiv_deno AKE_find_eqS => //.
 save.
 
@@ -11161,7 +11161,7 @@ List.mem
   AKE_eqS.mCompleted AKE_eqS.mEexp AKE_eqS.mSk) 
 (AKE_eqS.h2_queries) /\
 fresh_op (compute_sid AKE_eqS.mStarted AKE_eqS.mEexp AKE_eqS.mCompleted AKE_eqS.test_sidx) AKE_eqS.evs)].
-proof. 
+proof strict. 
  intros => &m.
  apply (Real.Trans _
 (1%r/2%r + 
@@ -11191,7 +11191,7 @@ List.mem
   AKE_eqS.mCompleted AKE_eqS.mEexp AKE_eqS.mSk) 
 (AKE_eqS.h2_queries) /\
 fresh_op (compute_sid AKE_eqS.mStarted AKE_eqS.mEexp AKE_eqS.mCompleted AKE_eqS.test_sidx) AKE_eqS.evs)].
-proof. 
+proof strict. 
  exists AKE2toAKE3.
  apply Pr_sofar3.
 save.
@@ -11227,7 +11227,7 @@ List.mem
   AKE_eqS.mCompleted AKE_eqS.mEexp AKE_eqS.mSk) 
 (AKE_eqS.h2_queries) /\
 fresh_op (compute_sid AKE_eqS.mStarted AKE_eqS.mEexp AKE_eqS.mCompleted AKE_eqS.test_sidx) AKE_eqS.evs)].
-proof.
+proof strict.
  intros => A hllc hllcg.
  by apply (Pr_sofar3' A _ _ ) => //.
 save.

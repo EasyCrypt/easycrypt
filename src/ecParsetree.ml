@@ -36,6 +36,7 @@ type pty_r =
   | PTvar    of psymbol
   | PTapp    of pqsymbol * pty list
   | PTfun    of pty * pty
+  | PTglob   of pmsymbol located
 and pty = pty_r located
 
 type ptyannot_r = 
@@ -46,6 +47,8 @@ and ptyannot  = ptyannot_r  located
 type plpattern_r =
   | LPSymbol of psymbol
   | LPTuple  of psymbol list
+  | LPRecord of (pqsymbol * psymbol) list
+
 and plpattern = plpattern_r located
 
 type ptybinding  = psymbol list * pty
@@ -59,9 +62,17 @@ and pexpr_r =
   | PEtuple  of pexpr list                        (* tuple constructor  *)
   | PEif     of pexpr * pexpr * pexpr             (* _ ? _ : _          *)
   | PElambda of ptybindings * pexpr               (* lambda abstraction *)
+  | PErecord of pexpr rfield list                 (* record             *)
+  | PEproj   of pexpr * pqsymbol                  (* projection         *)
   | PEscope  of pqsymbol * pexpr                  (* scope selection    *)
 
 and pexpr = pexpr_r located
+
+and 'a rfield = {
+  rf_name  : pqsymbol;
+  rf_tvi   : ptyannot option;
+  rf_value : 'a;
+}
 
 (* -------------------------------------------------------------------- *)
 type plvalue_r =
@@ -172,6 +183,13 @@ type pdatatype = {
 }
 
 (* -------------------------------------------------------------------- *)
+type precord = {
+  ptr_name   : psymbol;
+  ptr_tyvars : (psymbol * pqsymbol list) list;
+  ptr_fields : (psymbol * pty) list;
+}
+
+(* -------------------------------------------------------------------- *)
 type pgamepath = (pmsymbol * psymbol) located
 type pmemory   = psymbol
 
@@ -195,6 +213,8 @@ and pformula_r =
   | PFforall of pgtybindings * pformula
   | PFexists of pgtybindings * pformula
   | PFlambda of ptybindings * pformula
+  | PFrecord of pformula rfield list
+  | PFproj   of pformula * pqsymbol
   | PFglob   of pmsymbol located 
   | PFeqveq  of glob_or_var list
   | PFlsless of pgamepath
@@ -230,10 +250,14 @@ type pop_def =
   | PO_case  of ptybindings * pty * pop_branch list
 
 and pop_branch = {
+  pop_patterns : pop_pattern list;
+  pop_body     : pexpr;
+}
+
+and pop_pattern = {
   pop_name    : psymbol;
   pop_tvi     : ptyannot option;
   pop_pattern : pqsymbol * psymbol list;
-  pop_body    : pexpr;
 }
 
 type poperator = {
@@ -432,7 +456,7 @@ type trepeat = [`All | `Maybe] * int option
 
 type rwarg =
   | RWDelta of (rwside * rwocc * pformula)
-  | RWRw    of (rwside * trepeat option * rwocc * ffpattern)
+  | RWRw    of (rwside * trepeat option * rwocc * ffpattern list)
   | RWDone  of bool
   | RWSimpl
 
@@ -658,6 +682,7 @@ type global =
   | Gtypeclass   of ptypeclass
   | Gtycinstance of ptycinstance
   | Gdatatype    of pdatatype
+  | Grecord      of precord
   | Gprint       of pprint
   | GthOpen      of psymbol
   | GthClose     of psymbol

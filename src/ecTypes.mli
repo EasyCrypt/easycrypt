@@ -3,7 +3,7 @@ open EcMaps
 open EcUtils
 open EcSymbols
 open EcParsetree
-open EcUidgen
+open EcUid
 open EcIdent
 
 (* -------------------------------------------------------------------- *)
@@ -15,7 +15,7 @@ type ty = private {
 
 and ty_node =
   | Tglob   of EcPath.mpath (* The tuple of global variable of the module *)
-  | Tunivar of EcUidgen.uid
+  | Tunivar of EcUid.uid
   | Tvar    of EcIdent.t 
   | Ttuple  of ty list
   | Tconstr of EcPath.path * ty list
@@ -30,7 +30,7 @@ type dom = ty list
 val ty_equal : ty -> ty -> bool
 val ty_hash  : ty -> int 
 
-val tuni    : EcUidgen.uid -> ty
+val tuni    : EcUid.uid -> ty
 val tvar    : EcIdent.t -> ty
 val ttuple  : ty list -> ty
 val tconstr : EcPath.path -> ty list -> ty
@@ -59,7 +59,7 @@ type ty_subst = {
   ts_p   : EcPath.path -> EcPath.path;
   ts_mp  : EcPath.mpath -> EcPath.mpath;
   ts_def : (EcIdent.t list * ty) EcPath.Mp.t;
-  ts_u   : EcUidgen.uid -> ty option;
+  ts_u   : EcUid.uid -> ty option;
   ts_v   : EcIdent.t -> ty option;
 }
 
@@ -87,7 +87,6 @@ module Tvar : sig
 end
 
 (* -------------------------------------------------------------------- *)
-
 (* [map f t] applies [f] on strict subterms of [t] (not recursive) *)
 val ty_map : (ty -> ty) -> ty -> ty
 
@@ -95,9 +94,14 @@ val ty_map : (ty -> ty) -> ty -> ty
 val ty_sub_exists : (ty -> bool) -> ty -> bool
 
 (* -------------------------------------------------------------------- *)
+val symbol_of_ty   : ty -> string
+val fresh_id_of_ty : ty -> EcIdent.t
+
+(* -------------------------------------------------------------------- *)
 type lpattern =
   | LSymbol of (EcIdent.t * ty)
   | LTuple  of (EcIdent.t * ty) list
+  | LRecord of EcPath.path * (EcIdent.t option * ty) list
 
 val lp_equal : lpattern -> lpattern -> bool
 val lp_hash  : lpattern -> int 

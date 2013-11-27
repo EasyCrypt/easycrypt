@@ -107,5 +107,6 @@ theory MultiUser.
       return sec \/ auth;
     }
   }.
+end MultiUser.
 
 (* Reduce multi-user to single-user *)

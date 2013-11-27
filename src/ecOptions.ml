@@ -15,15 +15,13 @@ and options = {
 }
 
 and cmp_option = {
-  cmpo_input    : string;
-  cmpo_provers  : prv_options;
-  cmpo_loader   : ldr_options;
+  cmpo_input   : string;
+  cmpo_provers : prv_options;
 }
 
 and cli_option = {
   clio_emacs   : bool;
   clio_provers : prv_options;
-  clio_loader  : ldr_options;
 }
 
 and prv_options = {
@@ -39,7 +37,8 @@ and ldr_options = {
 }
 
 and glb_options = {
-  o_why3 : string option;
+  o_why3   : string option;
+  o_loader : ldr_options;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -194,7 +193,10 @@ let parse spec argv =
 
 (* -------------------------------------------------------------------- *)
 let specs = {
-  xp_globals  = [ `Spec ("why3", `String, "why3 configuration file") ];
+  xp_globals  = [
+    `Spec  ("why3", `String, "why3 configuration file");
+    `Group "loader";
+  ];
   xp_commands = [
 
     ("compile", "Check an EasyCrypt file", [
@@ -247,12 +249,13 @@ let get_strings name values =
     List.rev xs
 
 (* -------------------------------------------------------------------- *)
-let glb_options_of_values values =
-  { o_why3 = get_string "why3" values; }
-
 let ldr_options_of_values values =
   { ldro_idirs = get_strings "I"    values;
     ldro_boot  = get_flag    "boot" values; }
+
+let glb_options_of_values values =
+  { o_why3   = get_string "why3" values;
+    o_loader = ldr_options_of_values values; }
 
 let prv_options_of_values values =
   let provers =
@@ -266,13 +269,11 @@ let prv_options_of_values values =
 
 let cli_options_of_values values =
   { clio_emacs   = get_flag "emacs" values;
-    clio_provers = prv_options_of_values values;
-    clio_loader  = ldr_options_of_values values; }
+    clio_provers = prv_options_of_values values; }
 
 let cmp_options_of_values values input =
-  { cmpo_input    = input;
-    cmpo_provers  = prv_options_of_values values;
-    cmpo_loader   = ldr_options_of_values values; }
+  { cmpo_input   = input;
+    cmpo_provers = prv_options_of_values values; }
 
 (* -------------------------------------------------------------------- *)
 let parse argv =

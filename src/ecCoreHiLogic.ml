@@ -15,7 +15,7 @@ open EcMetaProg
 module TT = EcTyping
 module TC = EcTypeClass
 
-module Muid = EcUidgen.Muid
+module Muid = EcUid.Muid
 
 module Sid = EcIdent.Sid
 module Mid = EcIdent.Mid

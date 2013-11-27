@@ -710,7 +710,7 @@ module Mpv2 = struct
   let enter_local env local ids1 ids2 = 
     try 
       let do1 local (x1,t1) (x2,t2) = 
-        EcReduction.check_type env t1 t2;
+        EcReduction.EqTest.for_type_exn env t1 t2;
         Mid.add x2 x1 local in
       List.fold_left2 do1 local ids1 ids2
     with _ -> raise EqObsInError
@@ -748,7 +748,7 @@ module Mpv2 = struct
         if f_equal f1 f1' && f_equal f2 f2' then add_glob env mp1 mp2 eqs 
         else add_eq local eqs f1' f2'
       | Fop(op1,tys1), Fop(op2,tys2) when EcPath.p_equal op1 op2 &&
-          List.all2 (EcReduction.equal_type env) tys1 tys2 -> eqs
+          List.all2 (EcReduction.EqTest.for_type env) tys1 tys2 -> eqs
       | Fapp(f1,a1), Fapp(f2,a2) -> 
         List.fold_left2 (add_eq local) eqs (f1::a1) (f2::a2)
       | Ftuple es1, Ftuple es2 ->
@@ -837,12 +837,12 @@ let rec add_eqs env local eqs e1 e2 : Mpv2.t =
   | Eint i1, Eint i2 when i1 = i2 -> eqs 
   | Elocal x1, Elocal x2 when 
       opt_equal EcIdent.id_equal (Some x1) (Mid.find_opt x2 local) -> eqs 
-  | Evar pv1, Evar pv2 when EcReduction.equal_type env e1.e_ty e2.e_ty -> 
+  | Evar pv1, Evar pv2 when EcReduction.EqTest.for_type env e1.e_ty e2.e_ty -> 
     Mpv2.add env e1.e_ty pv1 pv2 eqs
   (* TODO it could be greate to work up to reduction,
      I postpone this for latter *)
   | Eop(op1,tys1), Eop(op2,tys2) when EcPath.p_equal op1 op2 &&
-      List.all2  (EcReduction.equal_type env) tys1 tys2 -> eqs
+      List.all2  (EcReduction.EqTest.for_type env) tys1 tys2 -> eqs
   | Eapp(f1,a1), Eapp(f2,a2) -> 
      List.fold_left2 (add_eqs env local) eqs (f1::a1) (f2::a2)
   | Elet(lp1,a1,b1), Elet(lp2,a2,b2) ->
@@ -903,7 +903,7 @@ let eqobs_in env
 
   let remove lvl lvr eqs = 
     let aux eqs (pvl,tyl) (pvr,tyr) = 
-      if EcReduction.equal_type env tyl tyr then begin
+      if EcReduction.EqTest.for_type env tyl tyr then begin
         if not (check pvl ifvl && check pvr ifvr) then
           raise EqObsInError;
         Mpv2.remove env pvl pvr eqs
@@ -915,7 +915,7 @@ let eqobs_in env
       List.fold_left2 aux eqs ll lr
     | LvMap((pl,tysl), pvl, el, tyl),
         LvMap((pr,tysr), pvr, er,tyr) when EcPath.p_equal pl pr &&
-      List.all2  (EcReduction.equal_type env) (tyl::tysl) (tyr::tysr) ->
+      List.all2  (EcReduction.EqTest.for_type env) (tyl::tysl) (tyr::tysr) ->
       if not (check pvl ifvl && check pvr ifvr) then
         raise EqObsInError;
       add_eqs (Mpv2.remove env pvl pvr eqs) el er

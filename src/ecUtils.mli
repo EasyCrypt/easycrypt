@@ -19,11 +19,15 @@ val (|-) : ('a -> 'b) -> ('c -> 'a) -> 'c -> 'b
 val (|>) : 'a -> ('a -> 'b) -> 'b
 val (<|) : ('a -> 'b) -> 'a -> 'b
 
+val curry   : ('a1 -> 'a2 -> 'b) -> 'a1 * 'a2 -> 'b
+val uncurry : ('a1 * 'a2 -> 'b) -> 'a1 -> 'a2 -> 'b
+
 (* -------------------------------------------------------------------- *)
 val copy : 'a -> 'a
 
 (* -------------------------------------------------------------------- *)
-val reffold : ('a -> 'b * 'a) -> 'a ref -> 'b
+val reffold  : ('a -> 'b * 'a) -> 'a ref -> 'b
+val postincr : int ref -> int
 
 (* -------------------------------------------------------------------- *)
 type 'a tuple0 = unit
@@ -64,6 +68,11 @@ type 'a cmp = 'a -> 'a -> int
 
 val pair_equal : 'a eq -> 'b eq -> ('a * 'b) eq
 val opt_equal  : 'a eq -> 'a option eq
+
+(* -------------------------------------------------------------------- *)
+val compare_tag : 'a cmp
+val compare2: int lazy_t -> int lazy_t -> int
+val compare3: int lazy_t -> int lazy_t -> int lazy_t -> int
  
 (* -------------------------------------------------------------------- *)
 val none : 'a option
@@ -83,7 +92,11 @@ val oall2      : ('a -> 'b -> bool) -> 'a option -> 'b option -> bool
 val otolist    : 'a option -> 'a list
 val ocompare   : 'a cmp -> 'a option cmp
 val omap_dfl   : ('a -> 'b) -> 'b -> 'a option -> 'b
-val osmart_map : ('a -> 'a) -> 'a option -> 'a option
+
+module OSmart : sig
+  val omap : ('a -> 'a) -> 'a option -> 'a option
+  val omap_fold : ('a -> 'b -> 'a * 'b) -> 'a -> 'b option -> 'a * 'b option
+end
 
 (* -------------------------------------------------------------------- *)
 module Counter : sig
@@ -107,6 +120,8 @@ end
 (* -------------------------------------------------------------------- *)
 module List : sig
   include module type of List
+
+  val compare : 'a cmp -> 'a list cmp
 
   val ocons : 'a option -> 'a list -> 'a list
 
@@ -147,6 +162,8 @@ module List : sig
   val filter2 : ('a -> 'b -> bool) -> 'a list -> 'b list -> 'a list * 'b list
 
   val create : int -> 'a -> 'a list
+
+  val init : int -> (int -> 'a) -> 'a list
 
   val find_split : ('a -> bool) -> 'a list -> 'a list * 'a * 'a list
 

@@ -152,13 +152,13 @@ proof.
  intros => X Y.
  cut := gen_def X => [[x]] ->.
  cut := gen_def Y => [[y]] ->.
- by rewrite /Cyclic_group_prime.(/) !group_pow_log.
+ by rewrite -Cyclic_group_prime.div_def !group_pow_log.
 save.
 
 lemma inv_inj : forall (X Y Z : group), X / Z = Y / Z => X = Y.
 proof.
  intros X Y Z.
- rewrite /Cyclic_group_prime.(/) => h.
+ rewrite -!Cyclic_group_prime.div_def => h.
  cut:= gen_exp_inj (log X - log Z) (log Y - log Z) _ => // {h} h.
  cut: (log X = log Y).
   by apply (substr_inj _ _ (log Z)).
@@ -173,12 +173,12 @@ lemma inv_rewr : forall (X Y Z : group), X / Z = Y / Z <=> X = Y
 lemma div_cancel : forall (Y : group), Y / Y = g ^ gf_q0.
 proof.
  intros => Y.
- by rewrite /Cyclic_group_prime.(/) /Prime_field.(-) gf_q_add_minus.
+ by rewrite -!Cyclic_group_prime.div_def /Prime_field.(-) gf_q_add_minus.
 save.
 
-lemma div_prod : forall (X Y : group), X / Y = X * (I / Y).
+lemma div_prod (X Y : group): X / Y = X * (I / Y).
 proof.
- rewrite /Cyclic_group_prime.(/) /I /Prime_field.(-) => X Y.
+ rewrite -!Cyclic_group_prime.div_def /I /Prime_field.(-).
  cut:= gen_def X => [[x]] ->.
  by rewrite !group_pow_log group_pow_add gf_q_add_unit.
 save.
@@ -224,7 +224,7 @@ save.
 lemma mult_div_I : forall (X : group), X / X = I.
  intros => X.
  cut := gen_def X => [[x]] ->.
- by rewrite /Cyclic_group_prime.(/) /Prime_field.(-) gf_q_add_minus /I.
+ by rewrite -!Cyclic_group_prime.div_def /Prime_field.(-) gf_q_add_minus /I.
 save. 
 
 lemma mult_div : forall (X Y : group), (X * Y) / Y = X.
@@ -247,7 +247,7 @@ proof.
  intros => X Y n.
  cut := gen_def X => [[x]] ->.
  cut := gen_def Y => [[y]] ->.
- rewrite /Cyclic_group_prime.(/) !group_pow_mult !group_pow_log.
+ rewrite -!Cyclic_group_prime.div_def !group_pow_mult !group_pow_log.
  rewrite /Prime_field.(-) gf_q_mult_comm gf_q_distr (gf_q_mult_comm x n). 
  by rewrite gf_q_mult_minus_right (gf_q_mult_comm y n).
 save.
@@ -265,15 +265,15 @@ proof.
  cut := gen_def X => [[x]] ->.
  cut := gen_def Y => [[y]] ->.
  cut := gen_def Z => [[z]] ->.
- rewrite /Cyclic_group_prime.(/).
- rewrite log_div_minus log_prod_plus /Prime_field.(-).
- by rewrite neg_distr gf_q_add_assoc /Prime_field.(-).
+ rewrite -!Cyclic_group_prime.div_def.
+ rewrite -log_div_minus log_prod_plus /Prime_field.(-).
+ by rewrite neg_distr gf_q_add_assoc /Prime_field.(-); smt.
 save.
 
 lemma pow_div_minus : forall (X : group) m n,  X ^ m / X ^ n = X ^ (m - n).
  intros => X m n.
  cut := gen_def X => [[x]] ->.
- rewrite /Cyclic_group_prime.(/).
+ rewrite -!Cyclic_group_prime.div_def.
  rewrite !group_pow_mult !group_pow_log.
  rewrite /Prime_field.(-) gf_q_distr gf_q_mult_comm (gf_q_mult_comm x n).
  by rewrite -gf_q_mult_minus (gf_q_mult_comm (-n) x).
@@ -308,8 +308,8 @@ save.
 lemma div_eq_I : forall (X Y : group), I = X / Y  <=> X = Y.
 proof.
  progress; last first.
- by rewrite /Cyclic_group_prime.(/) gf_q_minus /I.
- generalize H; rewrite /Cyclic_group_prime.(/) /I=> H.
+ by rewrite -!Cyclic_group_prime.div_def gf_q_minus /I.
+ generalize H; rewrite -!Cyclic_group_prime.div_def /I=> H.
  cut:= gen_exp_inj  gf_q0  (log X - log Y) _ => // {H} H.
  cut:= neg_zero (log X) (log Y) _ => // {H} H.
  by rewrite -(group_log_pow X) H group_log_pow.
@@ -456,7 +456,7 @@ proof.
 ((Z1{2} / Y{2} ^ log M.gx1{2}) ^ M.r{2} = Y{2} ^ log (g ^ M.s{2} / M.gx1{2} ^ M.r{2}) / Z2{2})); last by smt.
  split.
  intros => [heq1 heq2].
- rewrite heq1 heq2 /Cyclic_group_prime.(/) !gf_q_minus group_pow_mult.
+ rewrite heq1 heq2 -!Cyclic_group_prime.div_def !gf_q_minus group_pow_mult.
  by rewrite gf_q_mult_comm gf_q_mult_zero.
  intros heq.
  cut :( Z1{2} = Y{2} ^ log M.gx1{2} \/
@@ -547,8 +547,8 @@ proof.
             gf_q_add_comm gf_q_add_unit.
  by rewrite (gf_q_mult_comm rL) /Prime_field.(-) -gf_q_add_assoc gf_q_add_minus
              gf_q_add_comm gf_q_add_unit group_log_pow.
- by rewrite /Cyclic_group_prime.(/) group_pow_log log_pow_mult (gf_q_mult_comm rL).
- by rewrite /Cyclic_group_prime.(/) group_pow_log log_pow_mult (gf_q_mult_comm rL).
+ by rewrite -!Cyclic_group_prime.div_def group_pow_log log_pow_mult (gf_q_mult_comm rL).
+ by rewrite -!Cyclic_group_prime.div_def group_pow_log log_pow_mult (gf_q_mult_comm rL).
  smt.
 save. 
 
@@ -1084,7 +1084,7 @@ proof.
  skip; progress => //.
  by rewrite mu_x_def_in Dgroup.mu_x_def_in.
  by apply supp_def.
- rewrite  /Cyclic_group_prime.(/).
+ rewrite -!Cyclic_group_prime.div_def.
  rewrite log_pow_mult group_pow_log.
  rewrite /Prime_field.(/).
  rewrite -gf_q_mult_assoc.
@@ -1097,7 +1097,7 @@ proof.
  apply (_ : forall V W, log V = log W => V = W) => //.
   by intros => V W h; rewrite -group_log_pow -(group_log_pow W) h.
  by rewrite gf_q_mult_unit.
- rewrite  /Cyclic_group_prime.(/) group_pow_mult.
+ rewrite -!Cyclic_group_prime.div_def group_pow_mult.
  rewrite /Prime_field.(/).
  rewrite gf_q_mult_assoc. 
  rewrite gf_q_mult_comm. 

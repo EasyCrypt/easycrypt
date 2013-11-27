@@ -78,7 +78,7 @@ axiom sub_app_fst_le (b1 b2:bitstring) x l:
 
 axiom sub_app_snd_le (b1 b2:bitstring) x l:
   `|b1| <= x => 
-   sub (b1 || b2) x l = sub b2 (x - `|b1|) l.
+   sub (b1 || b2) x l = sub b2 (x - `|b1| ) l.
 
 axiom sub_app_sub: forall (xs:bitstring, i l1 l2:int),
   0 <= i => 0 <= l1 => 0 <= l2 => i+l1+l2 <= `|xs| =>
@@ -121,7 +121,7 @@ proof.
   rewrite - ?appA.
   rewrite sub_app_fst_le //;first smt.
   rewrite {2} (_:l1 = `|((sub b s1 s2 || sub b (s1 + s2) l2) ||
-      sub b (s1 + s2 + l2) (l1 - (l2 + s2)))|);first by smt.
+      sub b (s1 + s2 + l2) (l1 - (l2 + s2)))| );first by smt.
   rewrite sub_full ?appA.
   rewrite sub_app_snd_le //; first smt.
   rewrite (_:s2 - `|sub b s1 s2| = 0);first smt.

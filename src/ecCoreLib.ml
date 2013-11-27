@@ -12,115 +12,145 @@ let is_mixfix_op op =
   List.mem op mixfix_ops
 
 (* -------------------------------------------------------------------- *)
-let s_dbool      = (["<top>"; "Bool" ; "Dbool"     ], "dbool")
-let s_dbitstring = (["<top>"; "Distr"; "Dbitstring"], "dbitstring")
-let s_dinter     = (["<top>"; "Distr"; "Dinter"    ], "dinter")
-let s_from_int   = (["<top>"; "Real" ; "FromInt"   ], "from_int")
-let s_fset       = (["<top>"; "FSet" ], "set")
+(*                         Top-level theory                             *)
+(* -------------------------------------------------------------------- *)
+let id_top = "Top"
+let p_top  = EcPath.psymbol id_top
 
 (* -------------------------------------------------------------------- *)
-let id_top       = "<top>"
-let id_Pervasive = "Pervasive"
-let id_unit      = "unit"
-let id_tt        = "tt"
-let id_bool      = "bool"
-let id_int       = "int"
-let id_real      = "real"
-let id_distr     = "distr"
-let id_cpred     = "cpred"
-let id_from_int  = "from_int"
-
-let id_true      = "true"
-let id_false     = "false"
-let id_not       = "[!]"
-let id_and       = "/\\"
-let id_anda      = "&&"
-let id_ora       = "||"
-let id_or        = "\\/"
-let id_imp       = "=>"
-let id_iff       = "<=>"
-let id_eq        = "="
-
-let id_le        = "<="
-let id_lt        = "<"
-let id_ge        = ">="
-
-let id_add         = "+"
-let id_sub         = "-"
-let id_opp         = "[-]"
-let id_prod        = "*"
-let id_div         = "/"
-let id_pow         = "^"
-
-let id_in_supp   = "in_supp"
-let id_mu        = "mu"
-let id_mu_x      = "mu_x"
-let id_weight    = "weight"
-
-let p_top         = EcPath.psymbol id_top
+(*                            Core Types                                *)
+(* -------------------------------------------------------------------- *)
+let id_Pervasive  = "Pervasive"
 let p_Pervasive   = EcPath.pqname p_top id_Pervasive
-let _Pervasive id = EcPath.pqname p_Pervasive id
+let _Pervasive    = fun x -> EcPath.pqname p_Pervasive x
 
-let p_unit       = _Pervasive id_unit
-let p_tt         = _Pervasive id_tt
-let p_bool       = _Pervasive id_bool
-let p_int        = _Pervasive id_int
-let p_real       = _Pervasive id_real
-let p_distr      = _Pervasive id_distr
-let p_cpred      = _Pervasive id_cpred
-let p_fset       = EcPath.fromqsymbol s_fset
-let p_from_int   = EcPath.fromqsymbol s_from_int
+let p_unit  = _Pervasive "unit"
+let p_bool  = _Pervasive "bool"
+let p_int   = _Pervasive "int"
+let p_real  = _Pervasive "real"
+let p_distr = _Pervasive "distr"
+let p_cpred = _Pervasive "cpred"
 
-let p_true       = _Pervasive id_true
-let p_false      = _Pervasive id_false
-let p_not        = _Pervasive id_not
-let p_anda       = _Pervasive id_anda 
-let p_and        = _Pervasive id_and
-let p_ora        = _Pervasive id_ora
-let p_or         = _Pervasive id_or
-let p_imp        = _Pervasive id_imp
-let p_iff        = _Pervasive id_iff
-let p_eq         = _Pervasive id_eq
+(* -------------------------------------------------------------------- *)
+(*                         Numbers theories                             *)
+(* -------------------------------------------------------------------- *)
+let id_Int  = "Int"
+let id_Real = "Real"
 
-let id_Int       = "Int"
-let p_Int        = EcPath.pqname p_top id_Int 
-let _Int id      = EcPath.pqname p_Int id
+let p_Int  = EcPath.pqname p_top id_Int 
+let p_Real = EcPath.pqname p_top id_Real
 
-let p_int_le     = _Int  id_le
-let p_int_lt     = _Int  id_lt
+(* --------------------------------------------------------------------- *)
+(*                    Symbols for alg. operators                         *)
+(* --------------------------------------------------------------------  *)
+let id_add = "+"
+let id_sub = "-"
+let id_opp = "[-]"
+let id_mul = "*"
+let id_div = "/"
+let id_pow = "^"
 
-let p_int_opp    = _Int id_opp
-let p_int_add    = _Int id_add
-let p_int_sub    = _Int id_sub
-let p_int_prod   = _Int id_prod
-let p_int_pow    = _Int id_pow   
+let id_le  = "<="
+let id_lt  = "<"
+let id_ge  = ">="
 
-let p_int_intval = EcPath.fromqsymbol (["<top>"; "Sum"], "intval" )
-let p_int_sum    = EcPath.fromqsymbol (["<top>"; "Sum"], "int_sum")
+(* -------------------------------------------------------------------- *)
+(*                  Core constructors / operators                       *)
+(* -------------------------------------------------------------------- *)
+let p_tt    = _Pervasive "tt"
+let p_true  = _Pervasive "true"
+let p_false = _Pervasive "false"
 
-let id_Real      = "Real"
-let p_Real       = EcPath.pqname p_top id_Real
-let _Real id     = EcPath.pqname p_Real id
+(* -------------------------------------------------------------------- *)
+(*                        Logical operators                             *)
+(* -------------------------------------------------------------------- *)
+let p_not  = _Pervasive "[!]"
+let p_anda = _Pervasive "&&"
+let p_and  = _Pervasive "/\\"
+let p_ora  = _Pervasive "||"
+let p_or   = _Pervasive "\\/"
+let p_imp  = _Pervasive "=>"
+let p_iff  = _Pervasive "<=>"
+let p_eq   = _Pervasive "="
 
-let p_real_le    = _Real id_le
-let p_real_lt    = _Real id_lt
-let p_real_ge    = _Real id_ge
-let p_real_add    = _Real id_add
-let p_real_sub    = _Real id_sub
-let p_real_prod   = _Real id_prod
-let p_real_div    = _Real id_div   
+(* -------------------------------------------------------------------- *)
+(*                      Operations on integers                          *)
+(* -------------------------------------------------------------------- *)
+let _Int = fun x -> EcPath.pqname p_Int x
 
-let id_Distr     = "Distr"
-let p_Distr      = EcPath.pqname p_top id_Distr
-let _Distr id    = EcPath.pqname p_Distr id
+let p_int_opp = _Int id_opp
+let p_int_add = _Int id_add
+let p_int_sub = _Int id_sub
+let p_int_mul = _Int id_mul
+let p_int_pow = _Int id_pow   
+let p_int_le  = _Int id_le
+let p_int_lt  = _Int id_lt
 
-let p_in_supp    = _Distr id_in_supp
-let p_mu         = _Pervasive id_mu
-let p_mu_x       = _Distr id_mu_x
-let p_weight     = _Distr id_weight
+let p_real_of_int = List.fold_left EcPath.pqname p_Real ["FromInt"; "from_int"]
+let s_real_of_int = EcPath.toqsymbol p_real_of_int
 
-let p_Logic         = EcPath.pqname p_top "Logic" 
-let _Logic    id    = EcPath.pqname p_Logic id
+(* -------------------------------------------------------------------- *)
+(*                       Operations on reals                            *)
+(* -------------------------------------------------------------------- *)
+let _Real = fun x -> EcPath.pqname p_Real x
+
+let p_real_opp = _Real id_opp
+let p_real_add = _Real id_add
+let p_real_sub = _Real id_sub
+let p_real_mul = _Real id_mul
+let p_real_div = _Real id_div
+let p_real_pow = _Real id_pow   
+let p_real_le  = _Real id_le
+let p_real_lt  = _Real id_lt
+let p_real_ge  = _Real id_ge
+
+(* -------------------------------------------------------------------- *)
+(*                           Finite sets                                *)
+(* -------------------------------------------------------------------- *)
+let p_FSet = EcPath.pqname p_top "FSet"
+let p_fset = EcPath.pqname p_FSet "set"
+
+(* -------------------------------------------------------------------- *)
+(*                            Intervals                                 *)
+(* -------------------------------------------------------------------- *)
+let p_Sum = EcPath.pqname p_top "Sum"
+let _Sum  = fun x -> EcPath.pqname p_Sum x
+
+let p_int_intval = _Sum "intval"
+let p_int_sum    = _Sum "int_sum"
+
+(* -------------------------------------------------------------------- *)
+(*                          Distributions                               *)
+(* -------------------------------------------------------------------- *)
+let id_Distr = "Distr"
+let p_Distr  = EcPath.pqname p_top id_Distr
+let _Distr   = fun x -> EcPath.pqname p_Distr x
+
+let p_in_supp = _Distr "in_supp"
+let p_mu      = _Pervasive "mu"
+let p_mu_x    = _Distr "mu_x"
+let p_weight  = _Distr "weight"
+
+let p_dbitstring = List.fold_left EcPath.pqname p_Distr ["Dbitstring"; "dbitstring"]
+let p_dinter     = List.fold_left EcPath.pqname p_Distr ["Dinter"; "dinter"]
+
+let s_dbitstring = EcPath.toqsymbol p_dbitstring
+let s_dinter     = EcPath.toqsymbol p_dinter
+
+(* -------------------------------------------------------------------- *)
+(*                             Booleans                                 *)
+(* -------------------------------------------------------------------- *)
+let id_Bool = "Bool"
+let p_Bool  = EcPath.pqname p_top id_Bool
+
+let p_dbool = List.fold_left EcPath.pqname p_Bool ["Dbool"; "dbool"]
+let s_dbool = EcPath.toqsymbol p_dbool
+
+(* -------------------------------------------------------------------- *)
+(*                          Logical lemmas                              *)
+(* -------------------------------------------------------------------- *)
+let p_Logic = EcPath.pqname p_top "Logic" 
+let _Logic  = fun x -> EcPath.pqname p_Logic x
 
 let p_cut_lemma     = _Logic "cut_lemma"
 let p_false_elim    = _Logic "falseE"

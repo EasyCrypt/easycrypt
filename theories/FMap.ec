@@ -235,6 +235,21 @@ theory Core.
      rewrite card_rm_nin.
   qed.
 
+  (* find *)
+  op find: ('a -> 'b -> bool) -> ('a,'b) map -> 'a option.
+
+  axiom find_nin: forall (p:'a -> 'b -> bool) m,
+    (forall x, in_dom x m => !(p x (proj (get m x)))) =>
+    find p m = None.
+
+  axiom find_in: forall (p:'a -> 'b -> bool) (m:('a,'b) map),
+    (exists x, in_dom x m /\ p x (proj (get m x))) =>
+    (exists x, find p m = Some x).
+
+  axiom find_cor: forall (p:'a -> 'b -> bool) m x,
+    find p m = Some x =>
+    in_dom x m /\ p x (proj (get m x)).
+
   (* filter *)
   op filter: ('a -> 'b -> bool) -> ('a,'b) map -> ('a,'b) map.
 
@@ -316,10 +331,33 @@ theory Core.
     case (in_dom x0 m2)=> dom_x0_m1 //=; generalize m1'; rewrite dom_x0_m1 //=.
 *)
 
-  (** Miscellaneous *)
-  (* lam: turning maps into lambdas *)
+  op map: ('b -> 'c) -> ('a,'b) map -> ('a,'c) map.
+  axiom get_map (f:'b -> 'c) (m:('a,'b) map) (x:'a):
+    get (map f m) x =
+      if get m x = None
+      then None
+      else Some (f (proj (get m x))).
+
+  op mapi: ('a -> 'b -> 'c) -> ('a,'b) map -> ('a,'c) map.
+  axiom get_mapi (f:'a -> 'b -> 'c) (m:('a,'b) map) (x:'a):
+    get (mapi f m) x =
+      if get m x = None
+      then None
+      else  Some (f x (proj (get m x))).
+
+  (** Miscellaneous higher-order stuff *)
+  (* lam and lamo: turning maps into lambdas *)
   op lam (m:('a,'b) map) = lambda x, proj (get m x).
   op lamo (m:('a,'b) map) = lambda x, get m x.
+
+  lemma lamo_map (f:'b -> 'c) (m:('a,'b) map):
+    lamo (map f m) = lambda x, (lift f) ((lamo m) x).
+  proof strict.
+  apply Fun.fun_ext=> x //=.
+  rewrite /lamo /lamo get_map; elim/option_ind (get m x)=> //= {x}.
+    by intros=> x'; cut ->: (Some x' = None) = false by smt; (* This will fail once non-confusion is part of // *)
+       rewrite //= proj_some.
+  qed.
 end Core.
 
 theory OptionGet.

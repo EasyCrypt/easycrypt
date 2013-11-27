@@ -494,13 +494,14 @@ let priority_of_binop name =
   | _ -> None
 
 (* -------------------------------------------------------------------- *)
-let priority_of_unop name =
-  match EcIo.lex_single_token name with
-  | Some EP.NOT      -> Some e_uni_prio_not
-  | Some EP.PUNIOP s when s = EcCoreLib.id_not -> Some e_uni_prio_not
-  | Some EP.PUNIOP _ -> Some e_uni_prio_uminus
-
-  | _  -> None
+let priority_of_unop =
+  let id_not = EcPath.basename EcCoreLib.p_not in
+    fun name ->
+      match EcIo.lex_single_token name with
+      | Some EP.NOT      -> Some e_uni_prio_not
+      | Some EP.PUNIOP s when s = id_not -> Some e_uni_prio_not
+      | Some EP.PUNIOP _ -> Some e_uni_prio_uminus
+      | _  -> None
 
 (* -------------------------------------------------------------------- *)
 let is_unop name = 
@@ -742,7 +743,7 @@ let pp_opapp (ppe : PPEnv.t) t_ty pp_sub outer fmt (pred, op, tvi, es) =
         in
           Some pp
 
-    | [e] when qs = EcCoreLib.s_from_int ->
+    | [e] when qs = EcCoreLib.s_real_of_int ->
         let pp fmt () =
           Format.fprintf fmt "%a%%r"
             (pp_sub ppe (fst outer, (max_op_prec, `NonAssoc))) e
@@ -759,12 +760,49 @@ let pp_opapp (ppe : PPEnv.t) t_ty pp_sub outer fmt (pred, op, tvi, es) =
 
     | _ -> None
 
+  and try_pp_record () =
+    let env = ppe.PPEnv.ppe_env in
+      match EcEnv.Op.by_path_opt op env with
+      | Some op when EcDecl.is_rcrd op -> begin
+          let recp = EcDecl.operator_as_rcrd op in
+            match EcEnv.Ty.by_path_opt recp env with
+            | Some { tyd_type = `Record (_, fields) } -> begin
+                if List.length fields = List.length es then
+                  let pp fmt () =
+                    let pp_field fmt ((name, _), e) =
+                      Format.fprintf fmt "%s =@ %a" name
+                        (pp_sub ppe (fst outer, (min_op_prec, `NonAssoc))) e
+                    in
+                      Format.fprintf fmt "{|@[<hov 2> %a;@ @]|}"
+                        (pp_list ";@ " pp_field) (List.combine fields es)
+                  in
+                    Some pp
+                else None
+              end
+            | _ -> None
+        end
+      | _ -> None
+
+  and try_pp_proj () =
+    let env = ppe.PPEnv.ppe_env in
+      match es, EcEnv.Op.by_path_opt op env with
+      | [arg], Some op when EcDecl.is_proj op ->
+          let pp fmt () =
+            Format.fprintf fmt "%a.(|%a|)"
+              (pp_sub ppe (fst outer, (max_op_prec, `NonAssoc))) arg
+              pp_opname (nm, opname)
+          in
+            Some pp
+      | _ -> None
+
   in
     (odfl
        pp_as_std_op
        (List.fpick [try_pp_special ;
                     try_pp_as_uniop;
-                    try_pp_as_binop])) fmt ()
+                    try_pp_as_binop;
+                    try_pp_record  ;
+                    try_pp_proj    ;])) fmt ()
 
 (* -------------------------------------------------------------------- *)
 let pp_chained_orderings (ppe : PPEnv.t) t_ty pp_sub outer fmt (f, fs) =
@@ -1301,6 +1339,7 @@ let pp_typedecl (ppe : PPEnv.t) fmt (x, tyd) =
     match tyd.tyd_type with
     | `Abstract _ | `Concrete _ -> Format.fprintf fmt "type"
     | `Datatype _ -> Format.fprintf fmt "datatype"
+    | `Record   _ -> Format.fprintf fmt "record"
   in
 
   let pp_prelude fmt =
@@ -1317,9 +1356,9 @@ let pp_typedecl (ppe : PPEnv.t) fmt (x, tyd) =
 
   and pp_body fmt =
     match tyd.tyd_type with
-    | `Abstract _  -> ()                (* FIXME: TC HOOK *)
+    | `Abstract _ -> ()                (* FIXME: TC HOOK *)
     | `Concrete ty -> Format.fprintf fmt " =@ %a" (pp_type ppe) ty
-    | `Datatype cs ->
+    | `Datatype (_, cs) ->
         let pp_ctor fmt (c, cty) =
           match cty with
           | [] -> Format.fprintf fmt "%s" c
@@ -1327,7 +1366,12 @@ let pp_typedecl (ppe : PPEnv.t) fmt (x, tyd) =
                     c (pp_list " *@ " (pp_type ppe)) cty
         in
           Format.fprintf fmt " =@ @[<hov 2>%a@]" (pp_list " |@ " pp_ctor) cs
-
+    | `Record (_, fields) ->
+        let pp_field fmt (f, fty) =
+          Format.fprintf fmt "%s: @[<hov 2>%a@]" f (pp_type ppe) fty
+        in
+          Format.fprintf fmt " = {@ @[<hov 2>%a;@]@ }"
+            (pp_list ";@ " pp_field) fields
   in
     Format.fprintf fmt "@[%t%t.@]" pp_prelude pp_body
 
@@ -1391,6 +1435,14 @@ let pp_opdecl_op (ppe : PPEnv.t) fmt (x, ts, ty, op) =
     | Some (OP_Constr (indp, i)) ->
         Format.fprintf fmt
           " =@ %d-th constructor of %a" (i+1) (pp_tyname ppe) indp
+
+    | Some (OP_Record recp) ->
+        Format.fprintf fmt
+          " =@ record constructor of %a" (pp_tyname ppe) recp
+
+    | Some (OP_Proj (rp, i, _)) ->
+        Format.fprintf fmt
+          " =@ %d-th projection of %a" (i+1) (pp_tyname ppe) rp
 
     | Some (OP_Fix _) ->
         Format.fprintf fmt " = <match-fix>"

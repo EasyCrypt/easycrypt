@@ -275,11 +275,16 @@ let subst_tydecl (s : _subst) (tyd : tydecl) =
     | `Concrete ty ->
         let s = init_tparams s tyd.tyd_params params' in
           `Concrete (s.s_ty ty)
-    | `Datatype cs ->
-        let s = init_tparams s tyd.tyd_params params' in
-          `Datatype (List.map (fun (x, ty) -> (x, List.map s.s_ty ty)) cs)
+    | `Datatype (scheme, cs) ->
+        let sty = init_tparams s tyd.tyd_params params' in
+          `Datatype (Fsubst.f_subst (f_subst_of_subst s) scheme,
+                     List.map (fun (x, ty) -> (x, List.map sty.s_ty ty)) cs)
+    | `Record (scheme, fields) ->
+      let sty = init_tparams s tyd.tyd_params params' in
+        `Record (Fsubst.f_subst (f_subst_of_subst s) scheme,
+                 List.map (snd_map sty.s_ty) fields)
   in
-    { tyd_params = params'; tyd_type = body }
+    { tyd_params = params'; tyd_type = body; }
 
 (* -------------------------------------------------------------------- *)
 let rec subst_op_kind (s : _subst) (kind : operator_kind) =
@@ -300,26 +305,35 @@ and subst_op_body (s : _subst) (bd : opbody) =
       let s = e_subst_of_subst s in
         OP_Plain (EcTypes.e_subst s body)
 
-  | OP_Constr _ -> bd
+  | OP_Constr (p, i)  -> OP_Constr (s.s_p p, i)
+  | OP_Record p       -> OP_Record (s.s_p p)
+  | OP_Proj (p, i, j) -> OP_Proj (s.s_p p, i, j)
 
   | OP_Fix opfix ->
       let (es, args) =
         EcTypes.add_locals (e_subst_of_subst s) opfix.opf_args in
 
-      let for1 br =
-        let (locals, body) =
-          EcTypes.e_subst_closure es (br.opf1_locals, br.opf1_body)
-        in
-          { opf1_ctor   = (s.s_p (fst br.opf1_ctor), snd br.opf1_ctor);
-            opf1_locals = locals;
-            opf1_body   = body; }
-      in
-
-      let branches = Parray.map for1 opfix.opf_branches in
         OP_Fix { opf_args     = args;
                  opf_resty    = s.s_ty opfix.opf_resty;
                  opf_struct   = opfix.opf_struct;
-                 opf_branches = branches; }
+                 opf_branches = subst_branches es opfix.opf_branches; }
+
+and subst_branches es = function
+  | OPB_Leaf (locals, e) ->
+      let (es, locals) =
+        List.map_fold
+          (fun es locals -> EcTypes.add_locals es locals)
+          es locals
+      in
+        OPB_Leaf (locals, EcTypes.e_subst es e)
+
+  | OPB_Branch bs ->
+      let for1 b =
+        let (ctorp, ctori) = b.opb_ctor in
+          { opb_ctor = (es.es_p ctorp, ctori);
+            opb_sub  = subst_branches es b.opb_sub; }
+      in
+        OPB_Branch (Parray.map for1 bs)
 
 (* -------------------------------------------------------------------- *)
 let subst_op (s : _subst) (op : operator) =

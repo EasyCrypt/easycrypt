@@ -237,10 +237,10 @@ val f_int_le  : form -> form -> form
 val f_int_lt  : form -> form -> form
 val f_int_sub : form -> form -> form
 
-val f_int_prod : form -> form -> form
 val f_int_add  : form -> form -> form
 val f_int_sub  : form -> form -> form
 val f_int_opp  : form -> form
+val f_int_mul  : form -> form -> form
 val f_int_pow  : form -> form -> form
 
 val f_int_intval : form -> form -> form
@@ -253,10 +253,10 @@ val f_int_sum : form -> form -> EcTypes.ty -> form
 val f_real_le : form -> form -> form
 val f_real_lt : form -> form -> form
 
-val f_real_div  : form -> form -> form
-val f_real_add  : form -> form -> form
-val f_real_sub  : form -> form -> form
-val f_real_prod : form -> form -> form
+val f_real_div : form -> form -> form
+val f_real_add : form -> form -> form
+val f_real_sub : form -> form -> form
+val f_real_mul : form -> form -> form
 
 (* soft constructors - distributions *)
 val fop_in_supp : EcTypes.ty -> form
@@ -312,19 +312,20 @@ val f_imps       : form list -> form -> form
 val f_imps_simpl : form list -> form -> form
 val f_iff_simpl  : form -> form -> form
 val f_eq_simpl   : form -> form -> form
-val f_int_le_simpl : form -> form -> form
-val f_int_lt_simpl : form -> form -> form
+
+val f_int_le_simpl  : form -> form -> form
+val f_int_lt_simpl  : form -> form -> form
 val f_real_le_simpl : form -> form -> form
 val f_real_lt_simpl : form -> form -> form
 
-val f_int_add_simpl  : form -> form -> form
-val f_int_sub_simpl  : form -> form -> form
-val f_int_prod_simpl : form -> form -> form
+val f_int_add_simpl : form -> form -> form
+val f_int_sub_simpl : form -> form -> form
+val f_int_mul_simpl : form -> form -> form
 
-val f_real_add_simpl  : form -> form -> form
-val f_real_sub_simpl  : form -> form -> form
-val f_real_prod_simpl : form -> form -> form
-val f_real_div_simpl  : form -> form -> form
+val f_real_add_simpl : form -> form -> form
+val f_real_sub_simpl : form -> form -> form
+val f_real_mul_simpl : form -> form -> form
+val f_real_div_simpl : form -> form -> form
 
 val f_forall_mems : (EcIdent.t * memtype) list -> form -> form
 
@@ -414,7 +415,7 @@ module Fsubst : sig
   val f_subst_mem   : EcIdent.t -> EcIdent.t -> form -> form 
   val f_subst_mod   : EcIdent.t -> EcPath.mpath -> form -> form 
 
-  val uni : (EcUidgen.uid -> ty option) -> form -> form
+  val uni : (EcUid.uid -> ty option) -> form -> form
   val subst_tvar : EcTypes.ty EcIdent.Mid.t -> form -> form
 end
 
@@ -444,7 +445,7 @@ type op_kind =
   | OK_int_opp
   | OK_real_add
   | OK_real_sub
-  | OK_real_prod
+  | OK_real_mul
   | OK_real_div
   | OK_other 
 

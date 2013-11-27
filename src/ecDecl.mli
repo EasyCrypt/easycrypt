@@ -16,12 +16,14 @@ type tydecl = {
 and ty_body = [
   | `Concrete of EcTypes.ty
   | `Abstract of Sp.t
-  | `Datatype of (EcSymbols.symbol * EcTypes.ty list) list
+  | `Datatype of form * (EcSymbols.symbol * EcTypes.ty list) list
+  | `Record   of form * (EcSymbols.symbol * EcTypes.ty) list
 ]
 
 val tydecl_as_concrete : tydecl -> EcTypes.ty
 val tydecl_as_abstract : tydecl -> Sp.t
-val tydecl_as_datatype : tydecl -> (EcSymbols.symbol * EcTypes.ty list) list
+val tydecl_as_datatype : tydecl -> form * (EcSymbols.symbol * EcTypes.ty list) list
+val tydecl_as_record   : tydecl -> form * (EcSymbols.symbol * EcTypes.ty) list
 
 (* -------------------------------------------------------------------- *)
 type locals = EcIdent.t list
@@ -33,19 +35,24 @@ type operator_kind =
 and opbody =
   | OP_Plain  of EcTypes.expr
   | OP_Constr of EcPath.path * int
+  | OP_Record of EcPath.path
+  | OP_Proj   of EcPath.path * int * int
   | OP_Fix    of opfix
 
 and opfix = {
   opf_args     : (EcIdent.t * EcTypes.ty) list;
   opf_resty    : EcTypes.ty;
-  opf_struct   : int * int;
-  opf_branches : opfix1 Parray.t;
+  opf_struct   : int list * int;
+  opf_branches : opbranches;
 }
 
-and opfix1 = {
-  opf1_ctor   : EcPath.path * int;
-  opf1_locals : (EcIdent.t * EcTypes.ty) list;
-  opf1_body   : EcTypes.expr;
+and opbranches =
+| OPB_Leaf   of ((EcIdent.t * EcTypes.ty) list) list * EcTypes.expr
+| OPB_Branch of opbranch Parray.t
+
+and opbranch = {
+  opb_ctor : EcPath.path * int;
+  opb_sub  : opbranches;
 }
 
 type operator = {
@@ -57,11 +64,17 @@ type operator = {
 val op_ty   : operator -> ty
 val is_pred : operator -> bool
 val is_ctor : operator -> bool
+val is_proj : operator -> bool
+val is_rcrd : operator -> bool
+val is_fix  : operator -> bool
 
 val mk_op   : ty_params -> ty -> opbody option -> operator
 val mk_pred : ty_params -> ty list -> form option -> operator
 
 val operator_as_ctor : operator -> EcPath.path * int
+val operator_as_rcrd : operator -> EcPath.path
+val operator_as_proj : operator -> EcPath.path * int * int
+val operator_as_fix  : operator -> opfix
 
 (* -------------------------------------------------------------------- *)
 type axiom_kind = [`Axiom | `Lemma]

@@ -16,9 +16,9 @@ type tydecl = {
 and ty_body = [
   | `Concrete of EcTypes.ty
   | `Abstract of Sp.t
-  | `Datatype of (EcSymbols.symbol * EcTypes.ty list) list
+  | `Datatype of EcFol.form * (EcSymbols.symbol * EcTypes.ty list) list
+  | `Record   of EcFol.form * (EcSymbols.symbol * EcTypes.ty) list
 ]
-
 
 let tydecl_as_concrete (td : tydecl) =
   match td.tyd_type with `Concrete x -> x | _ -> assert false
@@ -28,6 +28,9 @@ let tydecl_as_abstract (td : tydecl) =
 
 let tydecl_as_datatype (td : tydecl) =
   match td.tyd_type with `Datatype x -> x | _ -> assert false
+
+let tydecl_as_record (td : tydecl) =
+  match td.tyd_type with `Record x -> x | _ -> assert false
 
 (* -------------------------------------------------------------------- *)
 type locals = EcIdent.t list 
@@ -39,19 +42,24 @@ type operator_kind =
 and opbody =
   | OP_Plain  of EcTypes.expr
   | OP_Constr of EcPath.path * int
+  | OP_Record of EcPath.path
+  | OP_Proj   of EcPath.path * int * int
   | OP_Fix    of opfix
 
 and opfix = {
   opf_args     : (EcIdent.t * EcTypes.ty) list;
   opf_resty    : EcTypes.ty;
-  opf_struct   : int * int;
-  opf_branches : opfix1 Parray.t;
+  opf_struct   : int list * int;
+  opf_branches : opbranches;
 }
 
-and opfix1 = {
-  opf1_ctor   : EcPath.path * int;
-  opf1_locals : (EcIdent.t * EcTypes.ty) list;
-  opf1_body   : EcTypes.expr;
+and opbranches =
+| OPB_Leaf   of ((EcIdent.t * EcTypes.ty) list) list * EcTypes.expr
+| OPB_Branch of opbranch Parray.t
+
+and opbranch = {
+  opb_ctor : EcPath.path * int;
+  opb_sub  : opbranches;
 }
 
 type operator = {
@@ -91,7 +99,22 @@ let is_ctor op =
   match op.op_kind with
   | OB_oper (Some (OP_Constr _)) -> true
   | _ -> false
+
+let is_proj op =
+  match op.op_kind with
+  | OB_oper (Some (OP_Proj _)) -> true
+  | _ -> false
  
+let is_rcrd op =
+  match op.op_kind with
+  | OB_oper (Some (OP_Record _)) -> true
+  | _ -> false
+
+let is_fix op =
+  match op.op_kind with
+  | OB_oper (Some (OP_Fix _)) -> true
+  | _ -> false
+
 let gen_op tparams ty kind = {
   op_tparams = tparams;
   op_ty      = ty;
@@ -109,6 +132,21 @@ let mk_op tparams ty body =
 let operator_as_ctor (op : operator) =
   match op.op_kind with
   | OB_oper (Some (OP_Constr (indp, ctor))) -> (indp, ctor)
+  | _ -> assert false
+
+let operator_as_proj (op : operator) =
+  match op.op_kind with
+  | OB_oper (Some (OP_Proj (recp, i1, i2))) -> (recp, i1, i2)
+  | _ -> assert false
+
+let operator_as_rcrd (op : operator) =
+  match op.op_kind with
+  | OB_oper (Some (OP_Record recp)) -> recp
+  | _ -> assert false
+
+let operator_as_fix (op : operator) =
+  match op.op_kind with
+  | OB_oper (Some (OP_Fix fix)) -> fix
   | _ -> assert false
 
 (* -------------------------------------------------------------------- *)

@@ -363,6 +363,7 @@ let rec compile_tyd env eenv p =
       match tyd.tyd_type with
       | `Abstract _  -> None
       | `Datatype _  -> None            (* FIXME: IND HOOK *)
+      | `Record   _  -> None            (* FIXME: IND HOOK *)
       | `Concrete ty -> Some (compile_ty env eenv vtymap ty) in
     let res = mk_odef pth s (params,decl) in
     Hp.add eenv.mp_ty p res;
@@ -407,8 +408,12 @@ let rec compile_op env eenv p =
         OOdef (compile_expr env eenv vtymap Mid.empty body)
       | OB_oper (Some (OP_Constr _)) ->
         assert false                    (* FIXME: IND HOOK *)
-      | OB_oper (Some (OP_Fix _)) ->    (* FIXME: IND HOOK *)
-        assert false
+      | OB_oper (Some (OP_Record _)) ->
+        assert false                    (* FIXME: IND HOOK *)
+      | OB_oper (Some (OP_Proj _)) ->
+        assert false                    (* FIXME: IND HOOK *)
+      | OB_oper (Some (OP_Fix _)) ->
+        assert false                    (* FIXME: IND HOOK *)
       | OB_oper None ->
         OOabs (compile_ty env eenv vtymap op.op_ty) 
       | OB_pred _ -> error "can not extract predicate" in
@@ -445,7 +450,9 @@ and compile_expr env eenv vtymap lmap e =
         let lmap, names = 
           List.map_fold (fun lmap (id,_) ->
             compile_add_local lmap id) lmap ids in
-        lmap, Optuple names in
+        lmap, Optuple names
+      | LRecord _ -> assert false       (* FIXME: IND HOOK *)
+    in
     let e2 = compile_expr env eenv vtymap lmap e2 in
     Olet(p,e1,e2)
   | Etuple es ->

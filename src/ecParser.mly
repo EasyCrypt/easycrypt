@@ -34,6 +34,12 @@
     ptd_ctors  = ctors;
   }
 
+  let mk_record (tyvars, name) fields = {
+    ptr_name   = name;
+    ptr_tyvars = tyvars;
+    ptr_fields = fields;
+  }
+
   let opdef_of_opbody ty b =
     match b with
     | None                  -> PO_abstr ty
@@ -188,10 +194,12 @@
 %token DECLARE
 %token DELTA
 %token DLBRACKET
+%token DLPAREN
 %token DO
 %token DOT
 %token DOTDOT
 %token DROP
+%token DRPAREN
 %token ELIM
 %token ELIMT
 %token ELSE
@@ -241,6 +249,7 @@
 %token LONGARROW
 %token LOSSLESS
 %token LPAREN
+%token LPBRACE
 %token MINUS
 %token MODPATH
 %token MODULE
@@ -272,6 +281,7 @@
 %token RCONDF
 %token RCONDT
 %token REALIZE
+%token RECORD
 %token REFLEX
 %token REQUIRE
 %token RES
@@ -280,6 +290,7 @@
 %token RIGHT
 %token RND
 %token RPAREN
+%token RPBRACE
 %token SAME
 %token SAMPLE
 %token SAVE
@@ -305,6 +316,7 @@
 %token TICKPIPE
 %token TILD
 %token TIMEOUT
+%token TOP
 %token TRIVIAL
 %token TRY
 %token TYPE
@@ -380,7 +392,14 @@
 
 (* -------------------------------------------------------------------- *)
 %inline namespace:
-| nm=rlist1(UIDENT, DOT) { nm }
+| nm=rlist1(UIDENT, DOT)
+    { nm }
+
+| TOP
+    { [EcCoreLib.id_top] }
+
+| TOP DOT nm=rlist1(UIDENT, DOT)
+    { EcCoreLib.id_top :: nm }
 ;
 
 _genqident(X):
@@ -476,8 +495,18 @@ pside:
 (* Patterns                                                             *)
 
 lpattern_u:
-| x=ident { LPSymbol x }
-| LPAREN p=plist2(ident, COMMA) RPAREN { LPTuple p }
+| x=ident
+    { LPSymbol x }
+
+| LPAREN p=plist2(ident, COMMA) RPAREN
+    { LPTuple p }
+
+| LPBRACE fs=rlist1(lp_field, SEMICOLON) SEMICOLON? RPBRACE
+    { LPRecord fs }
+;
+
+lp_field:
+| f=qident EQ x=ident { (f, x) }
 ;
 
 %inline lpattern:
@@ -521,7 +550,7 @@ sexpr_u:
 
 | se=sexpr op=loc(FROM_INT)
    { let id =
-       PEident (mk_loc op.pl_loc EcCoreLib.s_from_int, None)
+       PEident (mk_loc op.pl_loc EcCoreLib.s_real_of_int, None)
      in
        PEapp (mk_loc op.pl_loc id, [se]) }
 
@@ -548,6 +577,9 @@ sexpr_u:
 
 | r=loc(RBOOL)
    { PEident (mk_loc r.pl_loc EcCoreLib.s_dbool, None) }
+
+| LPBRACE fields=rlist1(expr_field, SEMICOLON) SEMICOLON? RPBRACE
+   { PErecord fields }
 ;
 
 expr_u:
@@ -620,12 +652,20 @@ expr_u:
 | LET p=lpattern EQ e1=expr IN e2=expr
    { PElet (p, e1, e2) }
 
+| e=sexpr DLPAREN x=qident DRPAREN
+   { PEproj (e, x) }
+
 | r=loc(RBOOL) TILD e=sexpr
     { let id  = PEident(mk_loc r.pl_loc EcCoreLib.s_dbitstring, None) in
       let loc = EcLocation.make $startpos $endpos in
         PEapp (mk_loc loc id, [e]) }
 
 | LAMBDA pd=ptybindings COMMA e=expr { PElambda (pd, e) } 
+;
+
+expr_field:
+| x=qident EQ e=expr
+    { { rf_name = x ; rf_tvi = None; rf_value = e; } }
 ;
 
 expr_ordering:
@@ -703,7 +743,7 @@ sform_u(P):
    { PFident (x, ti) }
 
 | se=sform_r(P) op=loc(FROM_INT)
-   { let id = PFident(mk_loc op.pl_loc EcCoreLib.s_from_int, None) in
+   { let id = PFident(mk_loc op.pl_loc EcCoreLib.s_real_of_int, None) in
      PFapp (mk_loc op.pl_loc id, [se]) }
 
 | se=sform_r(P) DLBRACKET ti=tvars_app? e=form_r(P) RBRACKET
@@ -716,10 +756,13 @@ sform_u(P):
    { PFside (x, s) }
 
 | TICKPIPE ti=tvars_app? e =form_r(P) PIPE 
-    { pfapp_symb e.pl_loc EcCoreLib.s_abs ti [e] }
+   { pfapp_symb e.pl_loc EcCoreLib.s_abs ti [e] }
 
 | LPAREN fs=plist0(form_r(P), COMMA) RPAREN
    { PFtuple fs }
+
+| LPBRACE fields=rlist1(form_field, SEMICOLON) SEMICOLON? RPBRACE
+   { PFrecord fields }
 
 | LBRACKET ti=tvars_app? es=loc(plist0(form_r(P), SEMICOLON)) RBRACKET
    { (pflist es.pl_loc ti es.pl_desc).pl_desc }
@@ -731,7 +774,6 @@ sform_u(P):
 
 | EQUIV LBRACKET eb=equiv_body(P) RBRACKET { eb }
 
-(* ADDED FOR EAGER *)
 | EAGER LBRACKET eb=eager_body(P) RBRACKET { eb }
 
 | HOARE LBRACKET
@@ -741,7 +783,7 @@ sform_u(P):
 	{ PFhoareS (pre, s, post) }
 
 | PR LBRACKET
-    mp=loc(fident) args=paren(plist0(sform_r(P), COMMA)) AT pn=mident
+    mp=loc(fident) args=paren(plist0(form_r(P), COMMA)) AT pn=mident
     COLON event=form_r(P)
   RBRACKET
     { PFprob (mp, args, pn, event) }
@@ -825,7 +867,11 @@ form_u(P):
 | IF c=form_r(P) THEN e1=form_r(P) ELSE e2=form_r(P)
     { PFif (c, e1, e2) }
 
-| LET p=lpattern EQ e1=form_r(P) IN e2=form_r(P) { PFlet (p, e1, e2) }
+| LET p=lpattern EQ e1=form_r(P) IN e2=form_r(P)
+    { PFlet (p, e1, e2) }
+
+| f=sform_r(P) DLPAREN x=qident DRPAREN
+    { PFproj (f, x) }
 
 | FORALL pd=pgtybindings COMMA e=form_r(P) { PFforall (pd, e) }
 | EXIST  pd=pgtybindings COMMA e=form_r(P) { PFexists (pd, e) }
@@ -852,6 +898,11 @@ form_u(P):
 
 | LOSSLESS mp=loc(fident)
     { PFlsless mp }
+;
+
+form_field:
+| x=qident EQ f=form
+    { { rf_name = x; rf_tvi = None; rf_value = f; } }
 ;
 
 form_ordering(P):
@@ -912,7 +963,9 @@ simpl_type_exp:
 | x=qident                    { PTnamed x      }
 | x=tident                    { PTvar x        }
 | tya=type_args x=qident      { PTapp (x, tya) }
+| GLOB m=loc(mod_qident)      { PTglob m       }
 | LPAREN ty=type_exp RPAREN   { ty             }
+
 ;
 
 type_args:
@@ -1225,8 +1278,21 @@ datatype_def:
 ;
 
 dt_ctor_def:
-| x=uident { (x, []) }
-| x=uident OF ty=plist1(loc(simpl_type_exp), STAR) { (x, ty) }
+| x=ident { (x, []) }
+| x=ident OF ty=plist1(loc(simpl_type_exp), tcand) { (x, ty) }
+;
+
+(* -------------------------------------------------------------------- *)
+(* Records                                                              *)
+record_def:
+| RECORD tya=typarams x=ident EQ LBRACE
+    fields=rlist1(rec_field_def, SEMICOLON) SEMICOLON?
+  RBRACE
+    { mk_record (tya, x) fields }
+;
+
+rec_field_def:
+| x=ident COLON ty=loc(type_exp) { (x, ty); }
 ;
 
 (* -------------------------------------------------------------------- *)
@@ -1335,11 +1401,13 @@ opbody:
 ;
 
 opcase:
-| WITH x=ident EQ c=qoident tvi=tvars_app? ps=ident* IMPL e=expr
-   { { pop_name    = x;
-       pop_tvi     = tvi;
-       pop_pattern = (c, ps);
-       pop_body    = e; } }
+| WITH ptn=plist1(opptn, COMMA) IMPL e=expr
+   { { pop_patterns = ptn; pop_body = e; } }
+;
+
+opptn:
+| x=ident EQ c=qoident tvi=tvars_app? ps=ident*
+    { { pop_name = x; pop_tvi = tvi; pop_pattern = (c, ps); } }
 ;
 
 predicate:
@@ -1560,10 +1628,17 @@ fpattern_head(F):
 ;
 
 fpattern_arg:
-| UNDERSCORE   { EA_none }
-| LPAREN LTCOLON m=loc(mod_qident) RPAREN  { EA_mod m }
-| f=sform      { EA_form f }
-| s=mident     { EA_mem s }
+| UNDERSCORE
+    { EA_none }
+
+| LPAREN LTCOLON m=loc(mod_qident) RPAREN
+    { EA_mod m }
+
+| f=sform
+    { EA_form f }
+
+| s=mident
+    { EA_mem s }
 ;
 
 fpattern(F):
@@ -1572,6 +1647,14 @@ fpattern(F):
 
 | LPAREN hd=fpattern_head(F) args=loc(fpattern_arg)* RPAREN
    { mk_fpattern hd args }
+;
+
+fpattern_list(F):
+| f=fpattern(F)
+    { [f] }
+
+| LPAREN fs=rlist2(fpattern(F), COMMA) RPAREN
+    { fs }
 ;
 
 pterm:
@@ -1605,10 +1688,10 @@ rwarg:
 | SLASHEQ
    { RWSimpl }
 
-| s=rwside r=rwrepeat? o=rwocc? fp=fpattern(form)
+| s=rwside r=rwrepeat? o=rwocc? fp=fpattern_list(form)
     { RWRw (s, r, o |> omap EcMaps.Sint.of_list, fp) }
 
-| s=rwside r=rwrepeat? o=rwocc? SLASH x=sform_h
+| s=rwside r=rwrepeat? o=rwocc? SLASH x=sform_h %prec prec_tactic
     { let loc = EcLocation.make $startpos $endpos in
         if r <> None then
           parse_error loc (Some "delta-repeat not supported");
@@ -2290,9 +2373,9 @@ realize:
 (* Printing                                                             *)
 print:
 | TYPE   qs=qident { Pr_ty qs }
-| OP     qs=qident { Pr_op qs }
+| OP     qs=qoident { Pr_op qs }
 | THEORY qs=qident { Pr_th qs }
-| PRED   qs=qident { Pr_pr qs } 
+| PRED   qs=qoident { Pr_pr qs } 
 | AXIOM  qs=qident { Pr_ax qs }
 | MODULE qs=qident { Pr_mod qs }
 | MODULE TYPE qs=qident { Pr_mty qs }
@@ -2343,6 +2426,7 @@ global_:
 | typeclass        { Gtypeclass   $1 }
 | tycinstance      { Gtycinstance $1 }
 | datatype_def     { Gdatatype    $1 }
+| record_def       { Grecord      $1 }
 | operator         { Goperator    $1 }
 | predicate        { Gpredicate   $1 }
 | axiom            { Gaxiom       $1 }
@@ -2445,6 +2529,10 @@ __rlist1(X, S):                         (* left-recursive *)
 
 %inline rlist1(X, S):
 | xs=__rlist1(X, S) { List.rev xs }
+;
+
+%inline rlist2(X, S):
+| xs=__rlist1(X, S) S x=X { List.rev (x :: xs) }
 ;
 
 (* -------------------------------------------------------------------- *)

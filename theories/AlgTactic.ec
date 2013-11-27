@@ -86,7 +86,7 @@ theory Requires.
       expr x (n+1) = mul x (expr x n).
 
   axiom nosmt ofint0: ofint 0 = rzero.
-  axiom nosmt ofint1: ofint 1 = rone.
+  axiom nosmt ofint1: ofint 1 = rone. (* This is e conseq of ofint0, ofintS *)
 
   axiom nosmt ofintS:
     forall (n : int), 0 <= n => ofint (n+1) = add (ofint n) rone.

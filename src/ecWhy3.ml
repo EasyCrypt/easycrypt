@@ -20,175 +20,163 @@ module Msym = EcSymbols.Msym
 module Talpha = struct 
   type t = Term.vsymbol list * Term.term
 
-  let vs_rename_alpha c h vs = incr c; Term.Mvs.add vs !c h
+  type talphaenv = {
+    tae_map : int Term.Mvs.t;
+    tae_ctn : int ref;
+  }
 
-  let vl_rename_alpha c h vl = List.fold_left (vs_rename_alpha c) h vl
+  let tae_create () =
+    { tae_map = Term.Mvs.empty; tae_ctn = ref 0; }
 
-  let rec pat_rename_alpha c h p = match p.Term.pat_node with
-    | Term.Pvar v -> vs_rename_alpha c h v
-    | Term.Pas (p, v) -> pat_rename_alpha c (vs_rename_alpha c h v) p
-    | Term.Por (p, _) -> pat_rename_alpha c h p
-    | _ -> Term.pat_fold (pat_rename_alpha c) h p
+  let vs_rename_alpha tae vs =
+    { tae with tae_map = Term.Mvs.add vs (postincr tae.tae_ctn) tae.tae_map; }
 
-  let w3_ty_compare t1 t2 = Ty.ty_hash t1 - Ty.ty_hash t2
+  let vl_rename_alpha tae vl =
+    List.fold_left vs_rename_alpha tae vl
+
+  let rec pat_rename_alpha m p =
+    match p.Term.pat_node with
+    | Term.Pvar v -> vs_rename_alpha m v
+    | Term.Pas (p, v) -> pat_rename_alpha (vs_rename_alpha m v) p
+    | Term.Por (p, _) -> pat_rename_alpha m p
+    | _ -> Term.pat_fold pat_rename_alpha m p
+
+  let w3_ty_compare t1 t2 = Ty.ty_hash   t1 - Ty.ty_hash   t2
   let w3_ls_compare l1 l2 = Term.ls_hash l1 - Term.ls_hash l2
-
-  let rec list_compare c l1 l2 =
-    match l1, l2 with
-    | [], [] -> 0
-    | [], _ -> -1
-    | _, [] -> 1
-    | x1::l1, x2::l2 ->
-      let cx = c x1 x2 in
-      if cx = 0 then list_compare c l1 l2
-      else cx
-
-  let option_compare c o1 o2 = 
-    match o1, o2 with
-    | None, None -> 0
-    | None, _ -> -1
-    | _, None -> 1
-    | Some x1, Some x2 -> c x1 x2
       
-  let rec pat_compare_alpha p1 p2 =
-    if Term.pat_equal p1 p2 then 0
-    else
+  let rec pat_compare_alpha m1 m2 p1 p2 =
+    if Term.pat_equal p1 p2 then 0 else
       let ct = w3_ty_compare p1.Term.pat_ty p2.Term.pat_ty in
-      if ct = 0 then
+      if ct <> 0 then ct else
         match p1.Term.pat_node, p2.Term.pat_node with
         | Term.Pwild, Term.Pwild -> 0
-        | Term.Pwild, _ -> -1
-        | _, Term.Pwild -> 1
-        | Term.Pvar _, Term.Pvar _ -> 0
-        | Term.Pvar _, _ -> -1
-        | _, Term.Pvar _ -> 1
+
+        | Term.Pvar v1, Term.Pvar v2 -> begin
+            match Term.Mvs.find_opt v1 m1.tae_map,
+                  Term.Mvs.find_opt v2 m2.tae_map
+            with
+            | Some _ , None    -> 1
+            | None   , Some _  -> -1
+            | None   , None    -> Term.vs_hash v1 - Term.vs_hash v2
+            | Some i1, Some i2 -> i1 - i2
+          end
+
         | Term.Papp (f1, l1), Term.Papp (f2, l2) ->
-          let cf = w3_ls_compare f1 f2 in
-          if cf = 0 then  list_compare pat_compare_alpha l1 l2
-          else cf
-        | Term.Papp _, _ -> -1
-        | _, Term.Papp _ -> 1
-        | Term.Pas (p1, _), Term.Pas (p2, _) -> pat_compare_alpha p1 p2
-        | Term.Pas _, _ -> -1
-        | _, Term.Pas _ -> 1
+            compare2
+              (lazy (w3_ls_compare f1 f2))
+              (lazy (List.compare (pat_compare_alpha m1 m2) l1 l2))
+
+        | Term.Pas (p1, _), Term.Pas (p2, _) ->
+            pat_compare_alpha m1 m2 p1 p2
+
         | Term.Por (p1, q1), Term.Por (p2, q2) ->
-          let cp = pat_compare_alpha p1 p2 in
-          if cp = 0 then pat_compare_alpha q1 q2
-          else cp
-      else ct
+            compare2
+              (lazy (pat_compare_alpha m1 m2 p1 p2))
+              (lazy (pat_compare_alpha m1 m2 q1 q2))
+
+        | _ -> compare_tag  p1.Term.pat_node p2.Term.pat_node
         
-  let rec t_compare_alpha c1 c2 m1 m2 t1 t2 =
-    if Term.t_equal t1 t2 then 0 
-    else 
-      let ct = option_compare w3_ty_compare t1.Term.t_ty t2.Term.t_ty in
-      if ct = 0 then
+  let rec t_compare_alpha m1 m2 t1 t2 =
+    if Term.t_equal t1 t2 then 0 else 
+      match ocompare w3_ty_compare t1.Term.t_ty t2.Term.t_ty with
+      | ct when ct <> 0 -> ct
+      | _ -> begin
         match t1.Term.t_node, t2.Term.t_node with
-        | Term.Tvar v1, Term.Tvar v2 ->
-          if Term.Mvs.mem v1 m1 then
-            if Term.Mvs.mem v2 m2 then Term.Mvs.find v1 m1 - Term.Mvs.find v2 m2
-            else 1
-          else if Term.Mvs.mem v2 m2 then -1
-          else Term.vs_hash v1 - Term.vs_hash v2
-        | Term.Tvar _, _ -> -1
-        | _, Term.Tvar _ -> 1
-        | Term.Tconst c1, Term.Tconst c2 -> Pervasives.compare c1 c2
-        | Term.Tconst _, _ -> -1
-        | _, Term.Tconst _ -> 1
-        | Term.Tapp (f1,l1), Term.Tapp (f2,l2) ->
-          let cf = w3_ls_compare f1 f2 in
-          if cf = 0 then  list_compare (t_compare_alpha c1 c2 m1 m2) l1 l2
-          else cf
-        | Term.Tapp _, _ -> -1
-        | _, Term.Tapp _ -> 1
-        | Term.Tif (f1,t1,e1), Term.Tif (f2,t2,e2) ->
-          let cf = t_compare_alpha c1 c2 m1 m2 f1 f2 in
-          if cf = 0 then
-            let ct = t_compare_alpha c1 c2 m1 m2 t1 t2 in
-            if ct = 0 then t_compare_alpha c1 c2 m1 m2 e1 e2
-            else ct
-          else cf 
-        | Term.Tif _, _ -> -1
-        | _, Term.Tif _ -> 1
-        | Term.Tlet (t1,b1), Term.Tlet (t2,b2) ->
-          let ct = t_compare_alpha c1 c2 m1 m2 t1 t2 in
-          if ct = 0 then
+        | Term.Tvar v1, Term.Tvar v2 -> begin
+            match Term.Mvs.find_opt v1 m1.tae_map,
+                  Term.Mvs.find_opt v2 m2.tae_map
+            with
+            | Some _ , None    -> 1
+            | None   , Some _  -> -1
+            | None   , None    -> Term.vs_hash v1 - Term.vs_hash v2
+            | Some i1, Some i2 -> i1 - i2
+          end
+
+        | Term.Tconst c1, Term.Tconst c2 ->
+            Pervasives.compare c1 c2
+
+        | Term.Tapp (f1, l1), Term.Tapp (f2, l2) ->
+            compare2
+              (lazy (w3_ls_compare f1 f2))
+              (lazy (List.compare (t_compare_alpha m1 m2) l1 l2))
+
+        | Term.Tif (f1, t1, e1), Term.Tif (f2, t2, e2) ->
+            compare3
+              (lazy (t_compare_alpha m1 m2 f1 f2))
+              (lazy (t_compare_alpha m1 m2 t1 t2))
+              (lazy (t_compare_alpha m1 m2 e1 e2))
+
+        | Term.Tlet (t1, b1), Term.Tlet (t2, b2) -> begin
+            match t_compare_alpha m1 m2 t1 t2 with
+            | ct when ct <> 0 -> ct
+            | _ ->
+                let u1,e1 = Term.t_open_bound b1 in
+                let u2,e2 = Term.t_open_bound b2 in
+                let m1 = vs_rename_alpha m1 u1 in
+                let m2 = vs_rename_alpha m2 u2 in
+                  t_compare_alpha m1 m2 e1 e2
+            end
+
+        | Term.Tcase (t1, bl1), Term.Tcase (t2, bl2) -> begin
+            match t_compare_alpha m1 m2 t1 t2 with
+            | ct when ct <> 0 -> ct
+            | _ ->
+                let br_compare b1 b2 =
+                  let p1,e1 = Term.t_open_branch b1 in
+                  let p2,e2 = Term.t_open_branch b2 in
+                    match pat_compare_alpha m1 m2 p1 p2 with
+                    | ct when ct <> 0 -> ct
+                    | _ ->
+                      let m1 = pat_rename_alpha m1 p1 in
+                      let m2 = pat_rename_alpha m2 p2 in
+                        t_compare_alpha m1 m2 e1 e2
+                in
+                  List.compare br_compare bl1 bl2
+          end
+
+        | Term.Teps b1, Term.Teps b2 ->
             let u1,e1 = Term.t_open_bound b1 in
             let u2,e2 = Term.t_open_bound b2 in
-            let m1 = vs_rename_alpha c1 m1 u1 in
-            let m2 = vs_rename_alpha c2 m2 u2 in
-            t_compare_alpha c1 c2 m1 m2 e1 e2
-          else ct 
-        | Term.Tlet _, _ -> -1
-        | _, Term.Tlet _ -> 1
-        | Term.Tcase (t1,bl1), Term.Tcase (t2,bl2) ->
-          let ct = t_compare_alpha c1 c2 m1 m2 t1 t2 in
-          if ct = 0 then
-            let br_compare b1 b2 =
-              let p1,e1 = Term.t_open_branch b1 in
-              let p2,e2 = Term.t_open_branch b2 in
-              let cp = pat_compare_alpha p1 p2 in
-              if cp = 0 then
-                let m1 = pat_rename_alpha c1 m1 p1 in
-                let m2 = pat_rename_alpha c2 m2 p2 in
-                t_compare_alpha c1 c2 m1 m2 e1 e2
-              else cp
+            let m1 = vs_rename_alpha m1 u1 in
+            let m2 = vs_rename_alpha m2 u2 in
+              t_compare_alpha m1 m2 e1 e2
+
+        | Term.Tquant (q1, b1), Term.Tquant (q2, b2) ->
+            let compare_body b1 b2 =
+              let cv v1 v2 = w3_ty_compare v1.Term.vs_ty v2.Term.vs_ty in 
+              let vl1,_,e1 = Term.t_open_quant b1 in
+              let vl2,_,e2 = Term.t_open_quant b2 in
+                compare2
+                  (lazy (List.compare cv vl1 vl2))
+                  (lazy (let m1 = vl_rename_alpha m1 vl1 in
+                         let m2 = vl_rename_alpha m2 vl2 in
+                           t_compare_alpha m1 m2 e1 e2))
             in
-            list_compare br_compare bl1 bl2
-          else ct
-        | Term.Tcase _, _ -> -1
-        | _, Term.Tcase _ -> 1
-        | Term.Teps b1, Term.Teps b2 ->
-          let u1,e1 = Term.t_open_bound b1 in
-          let u2,e2 = Term.t_open_bound b2 in
-          let m1 = vs_rename_alpha c1 m1 u1 in
-          let m2 = vs_rename_alpha c2 m2 u2 in
-          t_compare_alpha c1 c2 m1 m2 e1 e2
-        | Term.Teps _, _ -> -1
-        | _, Term.Teps _ -> 1
-        | Term.Tquant (q1, b1), Term.Tquant (q2,b2) ->
-          let cq = Pervasives.compare q1 q2 in
-          if cq = 0 then
-            let cv v1 v2 =  w3_ty_compare v1.Term.vs_ty v2.Term.vs_ty in 
-            let vl1,_,e1 = Term.t_open_quant b1 in
-            let vl2,_,e2 = Term.t_open_quant b2 in
-            let cty = list_compare cv vl1 vl2 in
-            if cty = 0 then 
-              let m1 = vl_rename_alpha c1 m1 vl1 in
-              let m2 = vl_rename_alpha c2 m2 vl2 in
-              t_compare_alpha c1 c2 m1 m2 e1 e2
-            else cty
-          else cq 
-        | Term.Tquant _, _ -> -1
-        | _, Term.Tquant _ -> 1
-        | Term.Tbinop (o1,f1,g1), Term.Tbinop (o2,f2,g2) ->
-          let co = Pervasives.compare o1 o2 in
-          if co = 0 then
-            let cf = t_compare_alpha c1 c2 m1 m2 f1 f2 in
-            if cf = 0 then t_compare_alpha c1 c2 m1 m2 g1 g2
-            else cf 
-          else co 
-        | Term.Tbinop _, _ -> -1
-        | _, Term.Tbinop _ -> 1
-        | Term.Tnot f1, Term.Tnot f2 -> t_compare_alpha c1 c2 m1 m2 f1 f2
-        | Term.Tnot _, _ -> -1
-        | _, Term.Tnot _ -> 1
-        | Term.Ttrue, Term.Ttrue -> 0
-        | Term.Ttrue, _ -> -1
-        | _, Term.Ttrue -> 1
-        | Term.Tfalse, Term.Tfalse -> 0
-      else ct
+              compare2
+                (lazy (Pervasives.compare q1 q2))
+                (lazy (compare_body b1 b2))
+
+        | Term.Tbinop (o1, f1, g1), Term.Tbinop (o2, f2, g2) ->
+            compare3
+              (lazy (Pervasives.compare o1 o2))
+              (lazy (t_compare_alpha m1 m2 f1 f2))
+              (lazy (t_compare_alpha m1 m2 g1 g2))
+
+        | Term.Tnot f1, Term.Tnot f2 ->
+            t_compare_alpha m1 m2 f1 f2
+
+        | _ -> compare_tag t1.Term.t_node t2.Term.t_node
+      end
 
   let compare (vl1,e1) (vl2,e2) =
-    let c1 = ref (-1) in
-    let c2 = ref (-1) in
+    let m1 = tae_create () in
+    let m2 = tae_create () in
     let cv v1 v2 =  w3_ty_compare v1.Term.vs_ty v2.Term.vs_ty in 
-    let cty = list_compare cv vl1 vl2 in
-    if cty = 0 then 
-      let m1 = vl_rename_alpha c1 Term.Mvs.empty vl1 in
-      let m2 = vl_rename_alpha c2 Term.Mvs.empty vl2 in
-      t_compare_alpha c1 c2 m1 m2 e1 e2
-    else cty 
-
+      compare2
+        (lazy (List.compare cv vl1 vl2))
+        (lazy (let m1 = vl_rename_alpha m1 vl1 in
+               let m2 = vl_rename_alpha m2 vl2 in
+                 t_compare_alpha m1 m2 e1 e2))
 end
 
 module Mta = EcMaps.Map.Make(Talpha)
@@ -211,7 +199,9 @@ type env = {
 
 and ty_body =
   Ty.tysymbol *
-    [ `Plain | `Datatype of (symbol * Term.lsymbol) list]
+    [ `Plain
+    | `Datatype of (symbol * Term.lsymbol) list
+    | `Record   of (symbol * Term.lsymbol) * (symbol * Ty.ty * Term.lsymbol) list ]
 
 let ty_body_equal ((ty1, xi1) : ty_body) ((ty2, xi2) : ty_body) =
   let c_equal (c1, ls1) (c2, ls2) =
@@ -521,6 +511,22 @@ let add_ts env path ts decl =
     assert (ty_body_equal ts (Mp.find path env.env_ty));
     env
   end else begin
+    let add_extra_op env c ls =
+      let tvs   = (fst ts).Ty.ts_args in
+      let cpath = EcPath.pqoname (EcPath.prefix path) c in
+      let odecl = mk_highorder_func ls in
+        match odecl with
+        | None ->
+            { env with env_op = Mp.add cpath (ls, ls, tvs) env.env_op }
+            
+        | Some (ls', dcl1, dcl2) ->
+            List.fold_left
+              (fun env dcl ->
+                { env with logic_task = add_decl_with_tuples env.logic_task dcl })
+              { env with env_op = Mp.add cpath (ls, ls', tvs) env.env_op }
+              [dcl1; dcl2]
+    in
+
     let env =
       { env with
           env_ty = Mp.add path ts env.env_ty;
@@ -528,23 +534,15 @@ let add_ts env path ts decl =
     in
       match snd ts with
       | `Plain -> env
-      | `Datatype ls ->
-          let tvs = (fst ts).Ty.ts_args in
-          let for1 env (c, ls) =
-            let cpath = EcPath.pqoname (EcPath.prefix path) c in
-            let odecl = mk_highorder_func ls in
-              match odecl with
-              | None ->
-                  { env with env_op = Mp.add cpath (ls, ls, tvs) env.env_op }
-
-              | Some (ls', dcl1, dcl2) ->
-                  List.fold_left
-                    (fun env dcl ->
-                      { env with logic_task = add_decl_with_tuples env.logic_task dcl })
-                    { env with env_op = Mp.add cpath (ls, ls', tvs) env.env_op }
-                    [dcl1; dcl2]
-          in
+      | `Datatype ls -> begin
+          let for1 env (c, ls) = add_extra_op env c ls in
             List.fold_left for1 env ls
+        end
+      | `Record (ctor, fields) -> begin
+          let for1 env (f, _, ls) = add_extra_op env f ls in
+          let env = List.fold_left for1 env fields in
+            curry (add_extra_op env) ctor
+        end
   end
 
 let add_ls env path ls tparams decl odecl =
@@ -1079,7 +1077,7 @@ let trans_tydecl env path td =
         let decl = Decl.create_ty_decl ts in
           ((ts, `Plain), decl)
 
-    | `Datatype cs ->
+    | `Datatype (_, cs) ->
          let ts   = Ty.create_tysymbol pid tparams None in
          let decl = Decl.create_ty_decl ts in
          let env  = add_ts env path (ts, `Plain) decl in
@@ -1098,14 +1096,35 @@ let trans_tydecl env path td =
          let decl = Decl.create_data_decl [(ts, List.map snd cs)] in
            ((ts, `Datatype (List.map (fun (x1, (x2, _)) -> (x1, x2)) cs)), decl)
 
-(* --------------------------- Formulas ------------------------------- *)
+    | `Record (_, fields) ->
+        let ts     = Ty.create_tysymbol pid tparams None in
+        let decl   = Decl.create_ty_decl ts in
+        let env    = add_ts env path (ts, `Plain) decl in
+        let myself = tconstr path (List.map (tvar |- fst) td.tyd_params) in
+        let myself = myself |> trans_ty env in
+        let ps     =
+          let for1 (f, aty) =
+            let fid = preid_p (EcPath.pqname path f) in
+            let aty = trans_ty env aty in
+            let pls = Term.create_lsymbol fid [myself] (Some aty) in
+              (f, aty, pls)
+          in
+            List.map for1 fields in
 
+        let cid  = preid_p (EcPath.pqname path "$record") in
+        let csym = Printf.sprintf "mk_%s" (EcPath.basename path) in
+        let cls  = Term.create_lsymbol ~constr:1 cid (List.map proj3_2 ps) (Some myself) in
+        let decl = Decl.create_data_decl [ts, [cls, List.map (some |- proj3_3) ps]] in
+
+          ((ts, `Record ((csym, cls), ps)), decl)
+
+(* --------------------------- Formulas ------------------------------- *)
 let trans_lv env lv =
-  try Mid.find lv env.env_id with _ ->             
-    (
-      Format.printf "cannot find %s@." (EcIdent.tostring lv);
+  match Mid.find_opt lv env.env_id with
+  | None ->
+      Printf.printf "cannot find %s\n%!" (EcIdent.tostring lv);
       assert false
-    ) 
+  | Some x -> x
 
 let trans_mp env p = try Mm.find p env.env_mp with _ -> assert false
 
@@ -1231,7 +1250,12 @@ let trans_op env p tys =
       let ty = trans_ty env (List.hd tys) in
       ([Some ty;Some ty],None), w3_ls_eq, mk_eq
   | _ ->
-      let ls,ls', tvs = oget (Mp.find_opt p env.env_op) in
+      let ls,ls', tvs =
+        match Mp.find_opt p env.env_op with
+        | None ->
+            Printf.printf "<lv>: %s\n%!" (EcPath.tostring p);
+            assert false
+        | Some x -> x in
       let mtv = 
         List.fold_left2 (fun mtv tv ty ->
           Ty.Mtv.add tv (trans_ty env ty) mtv) Ty.Mtv.empty
@@ -1365,9 +1389,34 @@ let trans_form env f =
                 (List.map Term.pat_var ids) t1 in
             let f2 = trans_form f2 in
             let br = Term.t_close_branch pat f2 in
-            Term.t_case f1 [br] in
-      restore mid;
-      res
+            Term.t_case f1 [br]
+        | LRecord (recp, fields) ->
+            let ctor =
+              match Mp.find_opt recp (!env).env_ty with
+              | Some (_, `Record ((_, ctor), _)) -> ctor
+              | _ -> assert false in
+            let pat =
+              let pat =
+                List.map (fun (x, ty) ->
+                  let ty = trans_ty !env ty in
+                  let v  =
+                    match x with
+                    | None   -> None
+                    | Some x ->
+                        let env0, v = add_id !env (x, ty) in
+                          env := env0; Some v
+                  in
+                    match v with
+                    | None   -> Term.pat_wild ty
+                    | Some v -> Term.pat_var v)
+                  fields
+              in
+                Term.pat_app ctor pat (Term.t_type f1) in
+            let f2 = trans_form f2 in
+            let br = Term.t_close_branch pat f2 in
+            Term.t_case f1 [br]
+      in
+        restore mid; res
 
     | Fint n ->
         let n = Number.ConstInt(Number.int_const_dec (string_of_int n)) in
@@ -1483,6 +1532,8 @@ let trans_oper_body env path wparams ty body =
     | OB_oper (Some (OP_Plain  o))  -> Some (`Plain (EcFol.form_of_expr EcFol.mhr o))
     | OB_oper (Some (OP_Fix    o))  -> Some (`Fix o)
     | OB_oper (Some (OP_Constr _))  -> assert false
+    | OB_oper (Some (OP_Record _))  -> assert false
+    | OB_oper (Some (OP_Proj   _))  -> assert false
     | OB_pred o -> o |> omap (fun x -> `Plain x)
   in
     match body with
@@ -1516,35 +1567,69 @@ let trans_oper_body env path wparams ty body =
             (env, dom, vs)
         in
 
-        let ls    = Term.create_lsymbol pid dom (Some (trans_ty env o.opf_resty)) in
-        let pterm = List.nth vs (fst o.opf_struct) in
-        let ops   = env.env_op in
-        let env   = { env with env_op = Mp.add path (ls, ls, wparams) env.env_op; } in
+        let ls      = Term.create_lsymbol pid dom (Some (trans_ty env o.opf_resty)) in
+        let pterm   = List.map (List.nth vs) (fst o.opf_struct) in
+        let ptermty = List.map (fun x -> x.Term.vs_ty) pterm in
+        let ptermc  = List.length ptermty in
+        let ops = env.env_op in
+        let env = { env with env_op = Mp.add path (ls, ls, wparams) env.env_op; } in
 
-        let ((env, rb), bs) =
-          List.map_fold
-            (fun (env, rb) b ->
-              let ids, sig_   = List.split b.opf1_locals in
-              let sig_        = List.map (trans_ty env) sig_ in
-              let env, vs     = add_ids env ids sig_ in
-              let env, rb1, e =
-                trans_form env (EcFol.form_of_expr EcFol.mhr b.opf1_body) in
-              let cl  = proj3_1 (oget (Mp.find_opt (fst b.opf1_ctor) env.env_op)) in
-              let ptn = List.map Term.pat_var vs in
-              let ptn = Term.pat_app cl ptn pterm.Term.vs_ty in
-                ((env, rb1@rb), (ptn, e)))
-            (env, []) (Parray.to_list o.opf_branches) in
+        let ((env, rb), ptns) =
+          let rec compile ((env, rb), ptns) (ctors, m) =
+            match m with
+            | OPB_Branch bs ->
+                Parray.fold_left
+                  (fun ((env, rb), ptns) b ->
+                    let cl = proj3_1 (oget (Mp.find_opt (fst b.opb_ctor) env.env_op)) in
+                      compile ((env, rb), ptns) (cl :: ctors, b.opb_sub))
+                  ((env, rb), ptns) bs
 
-        let bs =
-          if   List.exists (fun (_, e) -> e.Term.t_ty = None) bs
-          then List.map (fun (p, e) -> (p, force_prop e)) bs
-          else bs in
+            | OPB_Leaf (locals, e) ->
+                let ctors = List.rev ctors in
+                let env, vs =
+                  List.map_fold
+                    (fun env locals ->
+                       let ids, sig_   = List.split locals in
+                       let sig_        = List.map (trans_ty env) sig_ in
+                         add_ids env ids sig_)
+                    env locals
+                in
 
-        let bs   = List.map (fun (p, e) -> Term.t_close_branch p e) bs in
-        let body = Term.t_case (Term.t_var pterm) bs in
-        let env  = { env with env_op = ops; } in
+                let env, rb1, e = trans_form env (EcFol.form_of_expr EcFol.mhr e) in
 
-          (env, rb, ls, Some (vs, body))
+                let ptn =
+                  let for1 (cl, vs) pty =
+                    let ptn = List.map Term.pat_var vs in
+                    let ptn = Term.pat_app cl ptn pty in
+                      ptn
+                  in
+                    try  List.map2 for1 (List.combine ctors vs) ptermty
+                    with Failure _ -> assert false
+                in
+
+                let ptn =
+                  if   ptermc > 1
+                  then Term.pat_app (Term.fs_tuple ptermc) ptn (Ty.ty_tuple ptermty)
+                  else oget (List.ohead ptn)
+                in
+                  ((env, rb1@rb), (ptn, e)::ptns)
+          in
+            compile ((env, []), []) ([], o.opf_branches)
+        in
+
+        let ptns = List.rev ptns in
+        let ptns =
+          if   List.exists (fun (_, e) -> e.Term.t_ty = None) ptns
+          then List.map (fun (p, e) -> (p, force_prop e)) ptns
+          else ptns in
+        let ptns = List.map (fun (p, e) -> Term.t_close_branch p e) ptns in
+        let body =
+          if   ptermc > 1
+          then Term.t_tuple (List.map Term.t_var pterm)
+          else Term.t_var (oget (List.ohead pterm)) in
+        let body = Term.t_case body ptns in
+
+          ({ env with env_op = ops; }, rb, ls, Some (vs, body))
 
 let trans_oper env path op =
   let mty = env.env_tv in

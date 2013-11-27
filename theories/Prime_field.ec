@@ -90,10 +90,26 @@ proof strict.
   by rewrite (gf_q_mult_comm y) (gf_q_mult_comm y)  gf_q_mult_minus.
 qed.
 
+lemma nosmt gf_q_minus_minus (x:gf_q):
+  -(-x) = x
+by [].
+
 lemma gf_q_minus_distr (x y z:gf_q):
   x * (y - z) = x * y - x * z.
 proof strict.
   by rewrite /(-) gf_q_distr gf_q_mult_minus_right.
+qed.
+
+lemma gf_q_opp_mult (x:gf_q):
+  -x = (-gf_q1) * x.
+proof strict.
+by rewrite gf_q_mult_minus gf_q_mult_comm gf_q_mult_unit.
+qed.
+
+lemma gf_q_opp_distr (x y:gf_q):
+  -(x + y) = (-x) + (-y).
+proof strict.
+by rewrite gf_q_opp_mult gf_q_distr -2!gf_q_opp_mult.
 qed.
 
 theory Dgf_q.

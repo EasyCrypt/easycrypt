@@ -48,6 +48,8 @@ qed.
 (*********************************)
 (*    "Functional" Operators     *)
 (*********************************)
+(* Using these should be avoided when extracting,
+   for performance reasons. *)
 (* empty *)
 op empty: 'x array.
 
@@ -181,6 +183,16 @@ axiom length_append (xs0 xs1:'x array):
 axiom get_append (xs0 xs1:'x array) (i:int):
   0 <= i < length (xs0 || xs1) =>
   (xs0 || xs1).[i] = (0 <= i < length xs0) ? xs0.[i] : xs1.[i - length xs0].
+
+lemma nosmt get_append_left (xs0 xs1:'x array) (i:int):
+ 0 <= i < length xs0 =>
+ (xs0 || xs1).[i] = xs0.[i]
+by smt.
+
+lemma nosmt get_append_right (xs0 xs1:'x array) (i:int):
+ length xs0 <= i < length xs0 + length xs1 =>
+ (xs0 || xs1).[i] = xs1.[i - length xs0]
+by smt.
 
 (* sub *)
 op sub: 'x array -> int -> int -> 'x array.
@@ -378,6 +390,24 @@ generalize x; elim/array_ind zs.
   by rewrite map_cons !sub_cons IH 2?get_cons; first 2 smt.
 qed.
 
+(* Alternative induction principle: building arrays from the back *)
+lemma array_ind_snoc (p:'x array -> bool):
+  p empty =>
+  (forall x xs, p xs => p (xs:::x)) =>
+  (forall xs, p xs).
+proof strict.
+intros=> p0 prec xs.
+cut h : (forall n, 0 <= n => forall xs, length xs = n => p xs).
+  intros=> n hn.
+  elim/Induction.induction n=> //; first smt.
+  intros=> i ipos hrec xs' hlen.
+  cut ->: xs' = (sub xs' 0 i):::xs'.[i] by (apply array_ext; smt).
+  apply prec.
+  apply hrec.  
+  by rewrite length_sub; smt.
+by apply (h (length xs) _);smt.
+qed.
+
 (* This proof needs cleaned up, and the lemma library completed. *)
 lemma fold_length (xs:'x array):
   fold_left (lambda n x, n + 1) 0 xs = length xs.
@@ -396,7 +426,51 @@ proof strict.
 intros=> src_dst; apply array_ext; split; smt.
 qed.
 
-(** Logical Stuff *)
+(** Things that are not in the OCaml array library:
+      - take and drop (prefix and suffix),
+      - complex initialization,
+      - logical predicates *)
+(* take *)
+op take (len:int) (xs:'a array) = sub xs 0 len.
+
+lemma length_take (xs:'a array) (l:int):
+  0 <= l <= length xs =>
+  length (take l xs) = l
+by smt.
+
+lemma get_take (xs:'a array) (l k:int):
+  0 <= k < l <= length xs =>
+  (take l xs).[k] = xs.[k]
+by smt.
+
+(* drop *)
+op drop (len:int) (xs:'a array) = sub xs len (length xs-len).
+
+lemma length_drop (xs:'a array) (l:int):
+  0 <= l <= length xs =>
+  length (drop l xs) = length xs - l
+by smt.
+
+lemma get_drop  (xs:'a array) (l k:int):
+  0 <= l => 0 <= k < length xs-l =>
+  (drop l xs).[k] = xs.[l + k]
+by smt.
+
+lemma take_drop (xs:'a array) (l:int):
+  0 <= l <= length xs =>
+  (take l xs || drop l xs) = xs
+by smt.
+
+(* init_dep: init, but using a function that may depend
+   on the rest of the array! *)
+op init_dep: 'x array -> int -> (int -> 'x array -> 'x) -> 'x array.
+
+axiom init_dep_def (xs:'x array) (size:int) (f:int -> 'x array -> 'x):
+  init_dep xs size f =
+    let r = make (length xs + size) xs.[0] in (* creates the space *)
+    let r = blit r 0 xs 0 (length xs) in      (* copies the initial value in *)
+    ForLoop.range 0 size r (lambda i r, r.[i + length xs <- f i r]). (* extends using f *)
+
 (* all: this is computable because all arrays are finite *)
 op all: ('x -> bool) -> 'x array -> bool.
 
@@ -410,6 +484,61 @@ op alli: (int -> 'x -> bool) -> 'x array -> bool.
 axiom alli_def p (xs:'x array):
   alli p xs <=>
   (forall i, 0 <= i < length xs => p i xs.[i]).
+
+lemma alli_base p: alli p empty<:'x>.
+proof strict.
+by rewrite alli_def length_empty; smt.
+qed.
+
+lemma alli_ind p (x:'x) xs:
+  alli p (x::xs) =
+    (p 0 x /\ alli (lambda i x, p (i + 1) x) xs).
+proof strict.
+rewrite (alli_def _ xs).
+cut ->: (p 0 x /\ forall (i:int), 0 <= i < length xs => (lambda i x, p (i + 1) x) i xs.[i]) <=>
+         forall (i:int), 0 <= i < length (x::xs) => p i (x::xs).[i].
+  split; first smt.
+  intros=> alli; split.
+    by cut ->: x = (x::xs).[0]
+         by (rewrite get_cons //=; smt);
+       apply alli; first smt.
+    by intros=> i i_bnd //=;
+       cut ->: xs.[i] = (x::xs).[i + 1]
+         by (rewrite get_cons //=; smt);
+       apply alli; first smt.
+by rewrite -alli_def.
+qed.
+
+lemma alli_true p (xs:'x array):
+  (forall i x, p i x) =>
+  alli p xs.
+proof strict.
+by rewrite alli_def=> p_true i i_bnd;
+   apply p_true.
+qed.
+
+(* note: I'm not sure this is the most useful formulation of this lemma. Check use cases. *)
+(* overall, I feel that the general rangeb_forall is more useful *)
+lemma range_alli i j p (xs:'x array):
+  0 <= i < j < length xs =>
+  ForLoop.range i j true (lambda k b, b /\ p k xs.[k]) <=>
+   alli (lambda k, p (k + i)) (sub xs i (j - i)).
+proof strict.
+intros=> i_j_bnd.
+cut ->: (lambda k b, b /\ p k xs.[k]) =
+         (lambda k b, b /\ (lambda k x, p k x.[k]) k xs) by smt.
+rewrite ForLoop.rangeb_forall //=.
+rewrite alli_def length_sub; first 3 smt.
+split.
+  intros=> all_ij k k_bnd; rewrite get_sub=> //=; first 3 smt.
+  by apply all_ij; smt.
+  intros=> //= all_ij k k_bnd; rewrite {2}(_: k = k - i + i); first smt.
+  rewrite -(get_sub xs i (j - i) (k - i)); first 4 smt.
+  pose k':= k - i; cut ->: k = k' + i by smt.
+  by apply all_ij; smt.
+qed.
+
+(* TODO *)
 
 (** Distribution on 'a array of length k from distribution on 'a *)
 (* We return the empty array when the length is negative *)
@@ -427,8 +556,12 @@ theory Darray.
 
   lemma mu_x (len:int) (d:'a distr) (x:'a array):
     len < 0 =>
-    mu_x (darray len d) x = if x = empty then 1%r else 0%r
-  by [].
+    mu_x (darray len d) x = if x = empty then 1%r else 0%r.
+  proof strict.
+  rewrite /mu_x=> len_neg; case (x = empty).
+    by intros=> ->; rewrite mu_neg.
+    by rewrite mu_neg // /charfun -rw_neqF=> ->.
+  qed.
 
   lemma supp_neg (len:int) (d:'a distr) (x:'a array):
     len < 0 =>

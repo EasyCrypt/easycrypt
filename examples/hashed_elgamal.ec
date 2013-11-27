@@ -1,7 +1,7 @@
 require import Int.
 require import Real.
-require import Map.
-require import Set_Why.
+require import FMap. import OptionGet.
+require import FSet.
 require import CDH.
 require Logic.
 require AWord.
@@ -22,8 +22,6 @@ axiom qH_pos : 0 < qH.
 clone Set_CDH as SCDH with op n = qH.
 
 import Group.
-import Fset.
-import FsetNth.
 
 type pkey       = group.
 type skey       = int.
@@ -63,7 +61,7 @@ theory WRO_Fset.
 
     fun init() : unit = {
       R.init();
-      log = Fset.empty;
+      log = FSet.empty;
     }
 
     fun o(x:from) : to = {
@@ -161,7 +159,7 @@ proof.
   swap{1} 9 -5.
   seq 5 6 : 
     ((glob A){1} = (glob A){2} /\ ={ARO.log, RO.m, y} /\
-     RO.m{1} = Map.empty /\ ARO.log{2} = Fset.empty /\
+     RO.m{1} = FMap.Core.empty /\ ARO.log{2} = FSet.empty /\
      pk{1} = gx{2} /\ (G1.gxy = gx ^ y){2}).
   wp; do rnd; wp; skip; progress; try smt.
   seq 2 2 : 
@@ -180,7 +178,10 @@ proof.
        (={ARO.log} /\ eq_except RO.m{1} RO.m{2} G1.gxy{2})) => //.
   by intros O _; apply (Hll2 O) => //.
   fun; inline RO.o; wp; if; first smt.
-  by wp; rnd; wp; skip; smt.
+  wp; rnd; wp; skip; progress=> //; first 5 last; last 6 smt.
+  case (x = G1.gxy){2}; first smt.
+  cut em: forall a, a => !a => false by smt=> //.
+  by cut:= em (in_dom x{2} RO.m{2}) _ _=> //; smt.
   by wp; skip; smt.
 
   intros _ _; fun; if; inline RO.o; wp.
@@ -251,6 +252,7 @@ proof.
   by generalize (if bL then x2 else x1) => x; smt.
 qed.
 
+(** The following is no longer in synch because of the use of Set_why... We can no longer maintain this example. *)
 module SCDH_from_CPA (A_:Adv) : SCDH.Adversary = {
   module AO = ARO(RO)
   module A  = A_(AO)
