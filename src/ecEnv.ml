@@ -119,8 +119,9 @@ type mc = {
 }
 
 type env_norm = {
-  norm_mp : EcPath.mpath Mm.t;
-  norm_xp : EcPath.xpath Mx.t;
+  norm_mp  : EcPath.mpath Mm.t;
+  norm_xpv  : EcPath.xpath Mx.t;   (* for global program variable *)
+  norm_xfun : EcPath.xpath Mx.t;   (* for fun and local program variable *)
 }
 
 (* -------------------------------------------------------------------- *)
@@ -208,7 +209,9 @@ let empty () =
       env_w3       = EcWhy3.empty;
       env_rb       = [];
       env_item     = [];
-      env_norm     = ref { norm_mp = Mm.empty; norm_xp = Mx.empty };
+      env_norm     = ref { norm_mp = Mm.empty; 
+                           norm_xpv = Mx.empty; 
+                           norm_xfun = Mx.empty };
     }
   in
     env
@@ -1734,8 +1737,8 @@ module NormMp = struct
   let rec norm_mpath_for_typing env p =
     let (ip, (i, args)) = ipath_of_mpath p in
     match Mod.by_ipath_r true ip env with
-    | Some ((spi, params), ({ me_body = ME_Alias alias } as m)) ->
-      assert (m.me_sig.mis_params = []);
+    | Some ((spi, params), ({ me_body = ME_Alias (arity,alias) } as m)) ->
+      assert (m.me_sig.mis_params = [] && arity = 0);
       let p =
         Mod.unsuspend_r EcSubst.subst_mpath
           true (i, args) (spi, params) alias
@@ -1757,48 +1760,48 @@ module NormMp = struct
           EcPath.mpath_crt p1 pr.EcPath.m_args (Some (EcPath.pqoname p2 name))
       end
     end
-  (* 
-     module F : A -> B -> C
-     module M1 = F A
-     module M2 = M1 B
 
-     first we normalise the top functor.
-     second we apply top to args 
-     we check that top is fully apply 
-        if not we normalize the argument and we return 
-     if yes we do as usual 
-     
-  *)
-  let rec norm_mpath_def env p =
+  let rec norm_mpath_def env p = 
     let top = EcPath.m_functor p in
     let args = p.EcPath.m_args in
     let sub = 
       match p.EcPath.m_top with | `Local _ -> None | `Concrete(_,o) -> o in
     (* p is (top args).sub *)
-    
     match Mod.by_mpath_opt top env with
     | None -> norm_mpath_for_typing env p
     | Some me ->
       begin match me.me_body with
-      | ME_Alias mp -> 
-        let args' = mp.EcPath.m_args in
-        let args2 = if args = [] then args' else args' @ args in
-        let mp = 
-          match mp.EcPath.m_top with
-          | `Local _ as x -> assert (sub = None); EcPath.mpath x args2
-          | `Concrete(top',None) -> (* ((top' args') args).sub *)
-            EcPath.mpath_crt top' args2 sub
-          | `Concrete(top',(Some p' as sub')) -> (* ((top' args').sub').sub *)
-            assert (args = []); (* A submodule cannot by a functor *)
-            match sub with
-            | None   -> EcPath.mpath_crt top' args2 sub'
-            | Some p -> EcPath.mpath_crt top' args2 (Some (pappend p' p)) in
-        norm_mpath env mp 
+      | ME_Alias (arity,mp) ->
+        let nargs = List.length args in
+        if arity <= nargs then
+          let args, extra = List.take_n arity args in
+          let params = List.take arity me.me_sig.mis_params in
+          let s = 
+            List.fold_left2
+              (fun s (x, _) a -> EcSubst.add_module s x a)
+              EcSubst.empty params args in
+          let mp = EcSubst.subst_mpath s mp in
+          let args' = mp.EcPath.m_args in
+          let args2 = if extra = [] then args' else args' @ extra in
+          let mp = 
+            match mp.EcPath.m_top with
+            | `Local _ as x -> assert (sub = None); EcPath.mpath x args2
+            | `Concrete(top',None) -> (* ((top' args') args).sub *)
+              EcPath.mpath_crt top' args2 sub
+            | `Concrete(top',(Some p' as sub')) -> (* ((top' args').sub').sub *)
+              assert (args = []); (* A submodule cannot be a functor *)
+              match sub with
+              | None   -> EcPath.mpath_crt top' args2 sub'
+              | Some p -> EcPath.mpath_crt top' args2 (Some (pappend p' p)) in
+          norm_mpath env mp 
+        else 
+          EcPath.mpath p.EcPath.m_top (List.map (norm_mpath env) args)
+                    
       | ME_Structure _ when sub <> None ->
         begin
           let (ip, (i, args)) = ipath_of_mpath p in
           match Mod.by_ipath_r true ip env with
-          | Some ((spi, params), ({ me_body = ME_Alias alias } as m)) ->
+          | Some ((spi, params), ({ me_body = ME_Alias (_,alias) } as m)) ->
             assert (m.me_sig.mis_params = []); 
             let p =
               Mod.unsuspend_r EcSubst.subst_mpath
@@ -1821,13 +1824,38 @@ module NormMp = struct
       env.env_norm := { en with norm_mp = Mm.add p res en.norm_mp };
       res
  
-  let norm_xpath env p =
-    try Mx.find p !(env.env_norm).norm_xp with Not_found ->
+  let norm_xfun env p =
+    try Mx.find p !(env.env_norm).norm_xfun with Not_found ->
       let res = EcPath.xpath (norm_mpath env p.EcPath.x_top) p.EcPath.x_sub in
       let en = !(env.env_norm) in
-      env.env_norm := { en with norm_xp = Mx.add p res en.norm_xp };
+      env.env_norm := { en with norm_xfun = Mx.add p res en.norm_xfun };
       res
 
+  let norm_xpv env p =
+    try Mx.find p !(env.env_norm).norm_xpv with Not_found ->
+      let mp = p.x_top in
+      assert (mp.m_args = []);
+      let top = m_functor p.x_top in
+      match Mod.by_mpath_opt top env with
+      | None -> (* We are in typing mod .... *)
+        let mp = norm_mpath env mp in
+        let xp = EcPath.xpath mp p.x_sub in
+        let res = xp_glob xp in
+        res
+      | Some me ->
+        let params = me.me_sig.mis_params in
+        let env', mp = 
+          if params = [] then env, mp
+          else 
+            Mod.bind_locals params env,
+            EcPath.m_apply mp (List.map (fun (id,_)->EcPath.mident id) params)in
+        let mp = norm_mpath env' mp in
+        let xp = EcPath.xpath mp p.x_sub in
+        let res = (pv_glob xp).pv_name in
+        let en = !(env.env_norm) in
+        env.env_norm := { en with norm_xpv = Mx.add p res en.norm_xpv };
+        res
+   
   type use =
     { us_pv : ty Mx.t; 
       us_gl : Sid.t;  
@@ -1849,7 +1877,8 @@ module NormMp = struct
     | _ -> assert false
 
   let add_var env xp us = 
-    let xp = norm_xpath env xp in
+    let xp = xp_glob xp in 
+    let xp = norm_xpv env xp in
     let vb = Var.by_xpath xp env in
     let pv = EcTypes.pv_glob xp in
     { us with us_pv = Mx.add pv.pv_name vb.vb_type us.us_pv }
@@ -1862,7 +1891,7 @@ module NormMp = struct
 
   let gen_fun_use env fdone rm =
     let rec fun_use us f = 
-      let f = norm_xpath env f in
+      let f = norm_xfun env f in
       if Mx.mem f !fdone then us 
       else 
         let f1 = Fun.by_xpath f env in
@@ -1934,9 +1963,10 @@ module NormMp = struct
   let equal_restr env r1 r2 = use_equal (norm_restr env r1) (norm_restr env r2)
 
   let norm_pvar env pv = 
-    let p = norm_xpath env pv.pv_name in
-    if   x_equal p pv.pv_name
-    then pv
+    let p = 
+      if pv.pv_kind = PVglob then norm_xpv env pv.pv_name
+      else norm_xfun env pv.pv_name in
+    if   x_equal p pv.pv_name then pv
     else EcTypes.pv p pv.pv_kind 
 
   let globals env m mp =
@@ -1967,13 +1997,6 @@ module NormMp = struct
         | _ -> ty_map aux ty) 
     
   let rec norm_form env =
-    let norm_xp = EcPath.Hx.memo 107 (norm_xpath env) in
-    let norm_pv pv =
-      let p = norm_xp pv.pv_name in
-      if   x_equal p pv.pv_name
-      then pv
-      else EcTypes.pv p pv.pv_kind 
-    in
     let norm_ty1 : ty -> ty = norm_ty env in
 
     let norm_gty env (id,gty) = 
@@ -1984,7 +2007,7 @@ module NormMp = struct
         | GTmem None -> gty
         | GTmem (Some mt) -> 
           let me = 
-            EcMemory.empty_local id (norm_xpath env (EcMemory.lmt_xpath mt)) in
+            EcMemory.empty_local id (norm_xfun env (EcMemory.lmt_xpath mt)) in
           let me = Msym.fold (fun id ty me ->
             EcMemory.bind id (norm_ty env ty) me) (EcMemory.lmt_bindings mt) me  in
           GTmem (snd me) in
@@ -2007,27 +2030,27 @@ module NormMp = struct
           f_quant q bd (aux f)
 
         | Fpvar(p,m) ->
-          let p' = norm_pv p in
+          let p' = norm_pvar env p in
           if p == p' then f else
             f_pvar p' f.f_ty m
 
         | Fglob(p,m) -> norm_glob env m p
 
         | FhoareF hf ->
-          let pre' = aux hf.hf_pr and p' = norm_xp hf.hf_f
+          let pre' = aux hf.hf_pr and p' = norm_xfun env hf.hf_f
           and post' = aux hf.hf_po in
           if hf.hf_pr == pre' && hf.hf_f == p' && hf.hf_po == post' then f else
           f_hoareF pre' p' post'
 
         | FequivF ef ->
-          let pre' = aux ef.ef_pr and l' = norm_xp ef.ef_fl
-          and r' = norm_xp ef.ef_fr and post' = aux ef.ef_po in
+          let pre' = aux ef.ef_pr and l' = norm_xfun env ef.ef_fl
+          and r' = norm_xfun env ef.ef_fr and post' = aux ef.ef_po in
           if ef.ef_pr == pre' && ef.ef_fl == l' &&
             ef.ef_fr == r' && ef.ef_po == post' then f else
           f_equivF pre' l' r' post'
 
         | Fpr(m,p,args,e) ->
-          let p' = norm_xp p in
+          let p' = norm_xfun env p in
           let args' = List.Smart.map aux args in
           let e' = aux e in
           if p == p' && args == args' && e == e' then f else
@@ -2046,7 +2069,7 @@ module NormMp = struct
     { ax with ax_spec = ax.ax_spec |> omap (norm_form env) }
 
   let is_abstract_fun f env = 
-    let f = norm_xpath env f in
+    let f = norm_xfun env f in
     match (Fun.by_xpath f env).f_def with
     | FBabs _ -> true 
     | _ -> false 

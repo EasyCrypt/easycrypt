@@ -66,8 +66,8 @@ let rec eqobs_inF env eqg (inv,ifvl,ifvr as inve) log fl fr eqO =
   match find_eqobs_in_log log fl fr eqO with
   | Some(eqi,spec) -> log, eqi, spec
   | None -> 
-    let nfl = NormMp.norm_xpath env fl in
-    let nfr = NormMp.norm_xpath env fr in
+    let nfl = NormMp.norm_xfun env fl in
+    let nfr = NormMp.norm_xfun env fr in
     let defl = Fun.by_xpath nfl env in
     let defr = Fun.by_xpath nfr env in
     let mk_inv_spec inv fl fr = 

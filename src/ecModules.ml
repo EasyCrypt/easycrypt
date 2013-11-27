@@ -357,6 +357,11 @@ type uses = {
   us_writes : Sx.t;
 }
 
+let mk_uses c r w = 
+  let map s = Sx.fold (fun x s -> Sx.add (EcTypes.xp_glob x) s) s Sx.empty in
+  {us_calls = c; us_reads = map r; us_writes = map w }
+
+
 type function_def = {
   f_locals : variable list;
   f_body   : stmt;
@@ -388,7 +393,7 @@ type module_expr = {
 }
 
 and module_body =
-  | ME_Alias       of EcPath.mpath
+  | ME_Alias       of int * EcPath.mpath
   | ME_Structure   of module_structure
   | ME_Decl        of module_type * mod_restr
 

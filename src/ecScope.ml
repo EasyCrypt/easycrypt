@@ -443,7 +443,7 @@ end = struct
 
   let rec on_mpath_module cb (me : module_expr) =
     match me.me_body with
-    | ME_Alias     mp   -> cb mp
+    | ME_Alias (_, mp)  -> cb mp
     | ME_Structure st   -> on_mpath_mstruct cb st
     | ME_Decl (mty, sm) -> on_mpath_mdecl cb (mty, sm)
 

@@ -1144,13 +1144,13 @@ mod_def:
     { let p = EcUtils.odfl [] p in
         match body.pl_desc with
         | `Alias m ->
-             if p <> [] then
+            (* if p <> [] then
                parse_error (EcLocation.make $startpos $endpos)
-                 (Some "cannot parameterize module alias");
+                 (Some "cannot parameterize module alias"); *)
              if t <> None then
                parse_error (EcLocation.make $startpos $endpos)
                  (Some "cannot bind module type to module alias"); 
-             (x, mk_loc body.pl_loc (Pm_ident m))
+             (x, mk_loc body.pl_loc (Pm_ident(p, m)))
 
         | `Struct st ->
              (x, mk_loc body.pl_loc (mk_mod ?modtypes:t p st)) }

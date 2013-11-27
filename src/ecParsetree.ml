@@ -124,14 +124,16 @@ and pfunction_decl = {
 }
 
 (* -------------------------------------------------------------------- *)
+and pmodule_params = (psymbol * pmodule_type) list
+
 and pmodule_expr_r =
-  | Pm_ident  of pmsymbol
+  | Pm_ident  of pmodule_params * pmsymbol
   | Pm_struct of pstructure
 
 and pmodule_expr = pmodule_expr_r located
 
 and pstructure = {
-  ps_params    : (psymbol * pmodule_type) list;
+  ps_params    : pmodule_params;
   ps_body      : pstructure_item located list;
   ps_signature : ((pqsymbol * psymbol list) located) list;
 }

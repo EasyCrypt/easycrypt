@@ -2028,7 +2028,7 @@ let rec pp_modexp ppe fmt me =
     (pp_modbody ppe) me.me_body 
 
 and pp_modbody ppe fmt = function
-  | ME_Alias mp -> Format.fprintf fmt "@,%a" (pp_topmod ppe) mp
+  | ME_Alias (_,mp) -> Format.fprintf fmt "@,%a" (pp_topmod ppe) mp
   | ME_Structure ms -> 
     Format.fprintf fmt " {@,  @[<v>%a@]@,}"
       (pp_list "@,@," (pp_moditem ppe)) ms.ms_body 

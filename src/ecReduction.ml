@@ -83,13 +83,13 @@ module EqTest = struct
   let for_pv_norm env p1 p2 = 
     pv_equal p1 p2 || 
       (p1.pv_kind = p2.pv_kind &&
-          EcPath.x_equal_na (NormMp.norm_xpath env p1.pv_name) 
-            (NormMp.norm_xpath env p2.pv_name))
+          EcPath.x_equal 
+            (NormMp.norm_pvar env p1).pv_name (NormMp.norm_pvar env p2).pv_name)
 
   (* ------------------------------------------------------------------ *)
   let for_xp_norm env p1 p2 = 
        EcPath.x_equal p1 p2
-    || EcPath.x_equal (NormMp.norm_xpath env p1) (NormMp.norm_xpath env p2)
+    || EcPath.x_equal (NormMp.norm_xfun env p1) (NormMp.norm_xfun env p2)
   
   (* ------------------------------------------------------------------ *)
   let for_mp_norm env p1 p2 = 

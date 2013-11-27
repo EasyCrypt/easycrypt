@@ -28,7 +28,7 @@ module LowInternal = struct
     let module P = EcPath in
   
     let inline1 me lv p args = 
-      let p = EcEnv.NormMp.norm_xpath env p in
+      let p = EcEnv.NormMp.norm_xfun env p in
       let f = EcEnv.Fun.by_xpath p env in
       let fdef = 
         match f.f_def with
@@ -56,7 +56,7 @@ module LowInternal = struct
         let mx = List.fold_left2 for1 mx f.f_sig.fs_params anames in
         let mx = List.fold_left2 for1 mx fdef.f_locals lnames in
         let on_xp xp =
-          let xp' = EcEnv.NormMp.norm_xpath env xp in
+          let xp' = EcEnv.NormMp.norm_xfun env xp in
           P.Mx.find_def xp xp' mx 
         in
         { e_subst_id with es_xp = on_xp }

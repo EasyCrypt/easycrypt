@@ -104,8 +104,7 @@ let subst_fun_uses (s : _subst) (u : uses) =
   let calls  = List.map x_subst u.us_calls
   and reads  = Sx.fold (fun p m -> Sx.add (x_subst p) m) u.us_reads Sx.empty
   and writes = Sx.fold (fun p m -> Sx.add (x_subst p) m) u.us_writes Sx.empty in
-
-    { us_calls = calls; us_reads = reads; us_writes = writes; }
+  EcModules.mk_uses calls reads writes
 
 (* -------------------------------------------------------------------- *)
 let subst_oracle_info (s:_subst) (x:oracle_info) = 
@@ -220,8 +219,8 @@ and subst_module_struct (s : _subst) (bstruct : module_structure) =
 (* -------------------------------------------------------------------- *)
 and subst_module_body (s : _subst) (body : module_body) =
   match body with
-  | ME_Alias m ->
-      ME_Alias (s.s_fmp m)
+  | ME_Alias (arity,m) ->
+      ME_Alias (arity, s.s_fmp m)
 
   | ME_Structure bstruct ->
       ME_Structure (subst_module_struct s bstruct)

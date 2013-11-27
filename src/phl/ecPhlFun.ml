@@ -99,7 +99,7 @@ module FunDefLow = struct
   let t_hoareF_fun_def g =
     let env,_,concl = get_goal_e g in
     let hf = t_as_hoareF concl in
-    let f = NormMp.norm_xpath env hf.hf_f in
+    let f = NormMp.norm_xfun env hf.hf_f in
     check_concrete env f;
     let memenv, fdef, env = Fun.hoareS f env in
     let m = EcMemory.memory memenv in
@@ -114,7 +114,7 @@ module FunDefLow = struct
   let t_bdHoareF_fun_def g =
     let env,_,concl = get_goal_e g in
     let bhf = t_as_bdHoareF concl in
-    let f = NormMp.norm_xpath env bhf.bhf_f in
+    let f = NormMp.norm_xfun env bhf.bhf_f in
     check_concrete env f;
     let memenv, fdef, env = Fun.hoareS f env in
     let m = EcMemory.memory memenv in
@@ -130,7 +130,7 @@ module FunDefLow = struct
     let env,_,concl = get_goal_e g in
     let ef = t_as_equivF concl in
     let fl, fr =
-      NormMp.norm_xpath env ef.ef_fl,  NormMp.norm_xpath env ef.ef_fr in
+      NormMp.norm_xfun env ef.ef_fl,  NormMp.norm_xfun env ef.ef_fr in
     check_concrete env fl; check_concrete env fr;
     let memenvl,fdefl,memenvr,fdefr,env = Fun.equivS fl fr env in
     let ml, mr = EcMemory.memory memenvl, EcMemory.memory memenvr in

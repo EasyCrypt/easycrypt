@@ -30,7 +30,7 @@ let rn_hl_fel cntr ash q fevent preds =
 
 (* -------------------------------------------------------------------- *)
 let rec callable_oracles_f env modv os f =
-  let f' = NormMp.norm_xpath env f in
+  let f' = NormMp.norm_xfun env f in
   let func = Fun.by_xpath f' env in
 
   match func.f_def with

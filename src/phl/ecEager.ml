@@ -297,7 +297,7 @@ let t_eager_fun_def g =
   let env, _hyps, concl = get_goal_e g in
   let eg = destr_eagerF concl in
   let fl, fr = 
-    NormMp.norm_xpath env eg.eg_fl,  NormMp.norm_xpath env eg.eg_fr in
+    NormMp.norm_xfun env eg.eg_fl,  NormMp.norm_xfun env eg.eg_fr in
   EcPhlFun.check_concrete env fl; EcPhlFun.check_concrete env fr;
   let memenvl,fdefl,memenvr,fdefr,env = Fun.equivS fl fr env in
   let extend mem fdef = 
@@ -572,7 +572,7 @@ let eager env s s' inv eqIs eqXs c c' eqO =
     | Sabstract _, Sabstract _ -> assert false (* FIXME *)
     | _, _ -> raise EqObsInError 
   and f_eager (fhyps:(EcPath.xpath * EcPath.xpath * EcPV.Mpv2.t) list) fl fr out = 
-    let fl, fr = NormMp.norm_xpath env fl, NormMp.norm_xpath env fr in
+    let fl, fr = NormMp.norm_xfun env fl, NormMp.norm_xfun env fr in
     let rec aux fhyps = 
       match fhyps with
       | [] -> [fl,fr,out]
