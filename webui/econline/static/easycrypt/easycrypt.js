@@ -79,10 +79,9 @@ EasyCryptEditor.prototype.onopen = function(event){
     var numberOfOperators = editorState.operatorsList.length;
 	var numberOfTheories = editorState.theoriesList.length;
 	
-		
 	var j=0;
 	var i=0;
-    //while(j<numberOfTheories) {
+	
     while(i<numberOfOperators) {
     try {
     	if(editorState.theoriesList[j].startLine < editorState.operatorsList[i].line) {
@@ -126,7 +125,7 @@ EasyCryptEditor.prototype.printOperator = function(editorState, i){
 }
 
 EasyCryptEditor.prototype.printOperatorIndented = function(editorState, i){
-	this.widgets.operators.append("........ <span class='icon icon-plus-sign'/> "
+	this.widgets.operators.append("&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;... <span class='icon icon-plus-sign'/> "
 	    			+ editorState.operatorsList[i].name 
 	    			+ " {line: " + editorState.operatorsList[i].line + "}"  
 	    			+ "<div />");

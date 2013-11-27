@@ -86,9 +86,9 @@ CodeMirror.defineMode("easycrypt", function(config, parserConfig) {
 
   function findTheoryEnd(stream, state) { 
   	stream.eatSpace();
-  	var lengthEndAndSpaces = stream.current().length;
+  	var lengthEndAndSpaces = stream.current().length; 
     stream.eatWhile(/\w/);
-    var lengthEndAndName = stream.current().length;
+    var lengthEndAndName = stream.current().length; 
     var theoryEndingName = stream.current().substring(lengthEndAndSpaces, lengthEndAndName);
     
     for (var i=0; i<state.theoriesList.length; i++) {
@@ -109,7 +109,6 @@ CodeMirror.defineMode("easycrypt", function(config, parserConfig) {
     var theoryName = stream.current().substring(lengthTheoryAndSpaces, lengthTheoryAndName);
     
     state.theoriesList[state.theoriesCounter] = new Theory(theoryName, state.lines, null);
-    //alert(state.theoriesList[state.theoriesCounter].name + state.theoriesList[state.theoriesCounter].startLine);
     state.theoriesCounter = state.theoriesCounter + 1;
     
     stream.backUp(lengthTheoryAndName-lengthTheoryAndSpaces);
@@ -124,7 +123,6 @@ CodeMirror.defineMode("easycrypt", function(config, parserConfig) {
     var operatorName =  stream.current().substring(lengthOpAndSpaces, lengthOpAndName);
     
     state.operatorsList[state.operatorsCounter] = new Operator(operatorName, state.lines);
-    //alert(state.operatorsList[state.operatorsCounter].line);
     state.operatorsCounter = state.operatorsCounter + 1;
 	
     stream.backUp(lengthOpAndName-lengthOpAndSpaces);
