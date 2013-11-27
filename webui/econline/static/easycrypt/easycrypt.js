@@ -86,25 +86,19 @@ EasyCryptEditor.prototype.onopen = function(event){
     try {
     	if(editorState.theoriesList[j].startLine < editorState.operatorsList[i].line) {
 			    this.printTheory(editorState, j);
+			    while(editorState.operatorsList[i].line < editorState.theoriesList[j].endLine) {
+			    	this.printOperatorIndented(editorState, i);
+	    			i++;
+	    		}
 	    		j++;
 	    }
-	    else {
-	    	if(editorState.operatorsList[i].line > editorState.theoriesList[j].startLine && 
-	    	  editorState.operatorsList[i].line < editorState.theoriesList[j].endLine) {
-	    	  	this.printOperatorIndented(editorState, i);
-	    		i++;
-	    		if(i>=numberOfOperators) 
-	    			for(j; j<numberOfTheories; j++)
-	    				this.printTheory(editorState, j); 		
-	    	}
-	        else {	    	
-	        	this.printOperator(editorState, i);
-	    		i++; 
-	    		if(i>=numberOfOperators) 
-	    			for(j; j<numberOfTheories; j++)
-	    				this.printTheory(editorState, j); 
-	    	}
-		} 
+	    else {	    	
+	      	this.printOperator(editorState, i);
+			i++; 
+    		if(i>=numberOfOperators) 
+        		for(j; j<numberOfTheories; j++)
+	    			this.printTheory(editorState, j); 
+	    	} 
 	}catch(TypeError) {
 		j--;
 		for(i; i<numberOfOperators; i++)

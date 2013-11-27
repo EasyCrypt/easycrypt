@@ -7,14 +7,20 @@ ECCODE = '''\
 require import Int.
 
 op myop(x y z : int) : int = x * y + z.
+op mys(x y z : int) : int = x * y + z.
 
 theory Theory.
 
 op inside(x y z : int) : int = x * y + z.
+op fourth(x y z : int) : int = x * y + z.
 
 end Theory
 
 op mysecondop(x y z : int) : int = x * y + z.
+
+theory T.
+op third(x y z : int) : int = x * y + z.
+end T
 
 lemma L x y z: myop x y z = x * y + z.
 proof.
