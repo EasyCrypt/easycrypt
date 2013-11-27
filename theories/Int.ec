@@ -162,9 +162,9 @@ theory ForLoop.
   qed.
 
   (* General result on boolean accumulation *)
-  lemma rangeb_forall i j p (x:'a) b:
-    ForLoop.range i j b (lambda k b, b /\ p k x) =
-     (b /\ forall k, i <= k < j => p k x).
+  lemma rangeb_forall i j p b:
+    ForLoop.range i j b (lambda k b, b /\ p k) =
+     (b /\ forall k, i <= k < j => p k).
   proof strict.
   case (i < j)=> i_j; last smt.
   pose n:= j - i; cut ->: j = n + i by smt.
