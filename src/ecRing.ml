@@ -410,28 +410,26 @@ let rec norm_aux (e : pexpr) : pol =
     | PEopp e1 -> popp (norm_aux e1)
     | PEpow (e1,p) -> ppow_n (norm_aux e1) p 
 
-let norm_subst (n : int) (lmp : ((c * mon) * pol) list) (p : pexpr) : pol  =  pnsubstl (norm_aux p) lmp n n
+let norm_subst (n : int) (lmp : ((c * mon) * pol) list) (p : pexpr) : pol  = 
+  pnsubstl (norm_aux p) lmp n n
 
-let rec mon_of_pol (p : pol) : (c * mon) option =
+(* [mon_of_pol p = (c, m, r)] => p = c*m + r *)
+let rec mon_of_pol (p : pol) : (c * mon * pol) =
   match p with
-    | Pc c -> if (ceq c c0) then None else Some (c, Mon0)
-    | Pinj (j,p) ->
-      (match mon_of_pol p with
-        | None -> None
-        | Some (c,m) -> Some (c, mkZmon j m))
-    | PX (p,i,q) ->
-      if (peq q p0) then
-         match mon_of_pol p with
-          | None -> None
-          | Some (c,m) -> Some (c, mkVmon i m)
-      else None
+  | Pc c -> c, Mon0, p0
+  | Pinj(j,p) ->
+    let c,m,r = mon_of_pol p in
+    c, mkZmon j m, mkPinj j r
+  | PX(p,i,q) ->
+    let c,m,r = mon_of_pol p in
+    c, mkVmon i m, mkPX r i q 
 
 let rec mk_monpol_list (lpe : (pexpr * pexpr) list) : ((c * mon) * pol) list =
   match lpe with
     | [] -> []
     | (me,pe) :: lpe ->
-      match mon_of_pol (norm_subst 0 [] me) with
-        | None -> mk_monpol_list lpe
-        | Some m -> (m,norm_subst 0 [] pe) :: mk_monpol_list lpe
+      let c,m,r = mon_of_pol (norm_subst 0 [] me) in
+      if ceq c c0 then mk_monpol_list lpe
+      else ((c,m),psub (norm_subst 0 [] pe) r)::mk_monpol_list lpe
 
-let norm p lp = norm_subst (List.length lp) (mk_monpol_list lp) p
+let norm p lp = norm_subst 1000 (mk_monpol_list lp) p
