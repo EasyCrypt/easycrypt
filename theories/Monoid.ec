@@ -170,7 +170,7 @@ lemma sum_ij_split (k i j:int) f:
 proof. 
   intros Hbound;rewrite /sum_ij -sum_disj.
     rewrite disjoint_spec=> x;rewrite !Interval.mem_interval;smt.
-  congr => //;apply set_ext => x;smt.
+  congr=> //; apply set_ext=> x; rewrite mem_union; smt.
 qed.
 
 lemma sum_ij_eq i f: sum_ij i i f = f i.
