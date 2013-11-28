@@ -1077,7 +1077,7 @@ let trans_tydecl env path td =
         let decl = Decl.create_ty_decl ts in
           ((ts, `Plain), decl)
 
-    | `Datatype (_, cs) ->
+    | `Datatype { tydt_ctors = cs } ->
          let ts   = Ty.create_tysymbol pid tparams None in
          let decl = Decl.create_ty_decl ts in
          let env  = add_ts env path (ts, `Plain) decl in

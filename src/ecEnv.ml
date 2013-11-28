@@ -638,8 +638,11 @@ module MC = struct
       | `Abstract _ -> mc
       | `Concrete _ -> mc
 
-      | `Datatype (scheme, cs) ->
-          let params = List.map (fun (x, _) -> tvar x) tyd.tyd_params in
+      | `Datatype dtype ->
+          let cs      = dtype.tydt_ctors   in
+          let schelim = dtype.tydt_schelim in
+          let schcase = dtype.tydt_schcase in
+          let params  = List.map (fun (x, _) -> tvar x) tyd.tyd_params in
 
           let for1 i (c, aty) =
             let aty = EcTypes.toarrow aty (tconstr mypath params) in
@@ -649,12 +652,15 @@ module MC = struct
               (c, cop)
           in
 
-          let scheme =
-            let scname = Printf.sprintf "%s_ind" x in
-              (scname, { ax_tparams = tyd.tyd_params;
-                         ax_spec    = Some scheme;
-                         ax_kind    = `Axiom;
-                         ax_nosmt   = true; })
+          let (schelim, schcase) =
+            let do1 scheme name =
+              let scname = Printf.sprintf "%s_%s" x name in
+                (scname, { ax_tparams = tyd.tyd_params;
+                           ax_spec    = Some scheme;
+                           ax_kind    = `Axiom;
+                           ax_nosmt   = true; })
+            in
+              (do1 schelim "ind", do1 schcase "case")
           in
 
           let cs = List.mapi for1 cs in
@@ -663,7 +669,10 @@ module MC = struct
               (fun mc (c, cop) -> _up_operator candup mc c cop)
               mc cs
           in
-            _up_axiom candup mc (fst scheme) (fst_map ipath scheme)
+
+          let mc = _up_axiom candup mc (fst schcase) (fst_map ipath schcase) in
+          let mc = _up_axiom candup mc (fst schelim) (fst_map ipath schelim) in
+            mc
 
       | `Record (scheme, fields) ->
           let params  = List.map (fun (x, _) -> tvar x) tyd.tyd_params in
