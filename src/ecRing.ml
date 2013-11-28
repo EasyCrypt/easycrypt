@@ -301,6 +301,7 @@ let rec ppow_n (p : pol) (n : int) : pol =
 let mkZmon j m =
   match m with
     | Mon0 -> Mon0
+    | Zmon(j',m) -> Zmon(j + j', m)
     | _ -> Zmon (j,m)
 
 let zmon_pred j m =
@@ -327,18 +328,19 @@ let rec cfactor (p : pol) ( c : c) : (pol * pol) =
 
 let rec mfactor (p : pol) (c : c) (m : mon) : pol * pol =
   match (p,m) with
-    | (_, Mon0) ->
-      if (ceq c c1) then (Pc c0, p) else cfactor p c
+    | (_, Mon0) -> if (ceq c c1) then (Pc c0, p) else cfactor p c
     | (Pc _, _) -> (p, Pc c0)
     | (Pinj (j1,p1), Zmon (j2,m1)) ->
       if (j1 = j2) then
         let (r,s) = mfactor p1 c m1 in
-          (mkPinj j1 r, mkPinj j1 s)
+        (mkPinj j1 r, mkPinj j1 s)
       else if (j1 < j2) then
-            let (r,s) = mfactor p1 c (Zmon ((j2-j1),m1)) in
-              (mkPinj j1 r, mkPinj j1 s)
-           else (p, Pc c0)
-    | (Pinj _ , Vmon _) -> (p, Pc c0)
+        let (r,s) = mfactor p1 c (Zmon ((j2-j1),m1)) in
+        (mkPinj j1 r, mkPinj j1 s)
+      else 
+        (p, Pc c0)
+    | (Pinj _ , Vmon _) -> 
+      (p, Pc c0)
     | (PX (p1,i,q1), Zmon (j,m1)) ->
       let m2 = zmon_pred j m1 in
       let (r1,s1) = mfactor p1 c m in
@@ -347,24 +349,28 @@ let rec mfactor (p : pol) (c : c) (m : mon) : pol * pol =
     | (PX (p1,i,q1), Vmon (j,m1)) ->
       if (i = j) then
         let (r1,s1) = mfactor p1 c (mkZmon 1 m1) in
-          (mkPX r1 i q1, s1)
-      else if ( j > i) then
-            let (r1,s1) = mfactor p1 c (Vmon (j-i,m1)) in
-              (mkPX r1 i q1, s1)
-           else
-            let (r1,s1) = mfactor p1 c (mkZmon 1 m1) in
-              (mkPX r1 i q1, mkPX s1 (i-j) (Pc c0))
+        (mkPX r1 i q1, s1)
+      else if ( i < j) then
+        let (r1,s1) = mfactor p1 c (Vmon (j-i,m1)) in
+        (mkPX r1 i q1, s1)
+      else
+        let (r1,s1) = mfactor p1 c (mkZmon 1 m1) in
+        (mkPX r1 i q1, mkPX s1 (i-j) (Pc c0)) 
 
-let ponesubst (p1 : pol) ((c,m1) : c * mon) (p2 : pol) : pol option =
+
+let ponesubst (p1 : pol) ((c,m1) : c * mon) (p2 : pol) : pol option =    
   let (q1,r1) = mfactor p1 c m1 in
   match r1 with
-    | Pc c -> if (ceq c c0) then None
-                else Some (padd q1 (pmul p2 r1))
-    | _ -> Some (padd q1 (pmul p2 r1))
+    | Pc c -> 
+      if (ceq c c0) then None
+      else Some (padd q1 (pmul p2 r1))
+    | _ -> 
+      Some (padd q1 (pmul p2 r1))
 
 let rec pnsubstl (p1 : pol) (cm1 : c * mon) (p2 : pol) (n : int) : pol =
   match (ponesubst p1 cm1 p2) with
-    | Some p3 -> if (n = 0) then p3 else
+    | Some p3 -> 
+      if (n = 0) then p3 else
                   pnsubstl p3 cm1 p2 (n-1)
     | _ -> p1
  
