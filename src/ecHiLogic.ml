@@ -816,6 +816,16 @@ let process_elimT loc (pf, qs) g =
   let (hyps, concl) = get_goal g in
 
   let pf = process_form_opt hyps pf None in
+  let qs =
+    match qs with
+    | Some qs -> qs
+    | None    -> begin
+        match EcEnv.Ty.scheme_of_ty pf.f_ty (LDecl.toenv hyps) with
+        | None    -> noelim ()
+        | Some qs -> mk_loc loc (EcPath.toqsymbol qs)
+    end
+  in
+
   let (p, typs, ue, ax) =
     match process_named_pterm loc hyps (qs, None) with
     | (`Global p, typs, ue, ax) -> (p, typs, ue, ax)

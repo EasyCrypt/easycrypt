@@ -1739,7 +1739,20 @@ module Ty = struct
     match ty.ty_node with
     | Tconstr (p, tys) when defined p env -> hnorm (unfold p tys env) env
     | _ -> ty
-end
+
+  let scheme_of_ty (ty : ty) (env : env) =
+    let ty = hnorm ty env in
+      match ty.ty_node with
+      | Tconstr (p, _) -> begin
+          match by_path_opt p env with
+          | Some ({ tyd_type = (`Datatype _ | `Record _) }) ->
+              let prefix   = EcPath.prefix   p in
+              let basename = EcPath.basename p in
+                Some (EcPath.pqoname prefix (basename ^ "_ind"))
+          | _ -> None
+      end
+      | _ -> None
+ end
 
 (* -------------------------------------------------------------------- *)
 module NormMp = struct

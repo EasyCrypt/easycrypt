@@ -513,7 +513,7 @@ type logtactic =
   | Psubst      of pformula list
   | Psimplify   of preduction 
   | Pchange     of pformula
-  | PelimT      of (pformula * pqsymbol)
+  | PelimT      of (pformula * pqsymbol option)
   | Ppose       of (psymbol * rwocc * pformula)
 
 and ptactic_core_r =
