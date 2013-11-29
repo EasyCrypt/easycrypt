@@ -1900,11 +1900,14 @@ logtactic:
 | ELIM e=fpattern(form)
    { Pelim e }
 
+| ELIMT f=sform
+   { PelimT (f, None) }
+
 | ELIMT p=qident f=sform
-   { PelimT (f, p) }
+   { PelimT (f, Some p) }
 
 | ELIM SLASH p=qident f=sform
-   { PelimT (f, p) }
+   { PelimT (f, Some p) }
 
 | APPLY e=fpattern(form)
    { Papply e }

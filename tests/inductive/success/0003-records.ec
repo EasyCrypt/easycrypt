@@ -8,7 +8,7 @@ lemma L (x y : 'a) : (r x y).`x = x.
 proof. by rewrite /r. qed.
 
 lemma LE (v : 'a myrecord): v = {| x = v.`x; y = v.`y; |}.
-proof. by elim/myrecord_ind v. qed.
+proof. by elimT v. qed.
 
 op id (x : 'a) = x.
 
