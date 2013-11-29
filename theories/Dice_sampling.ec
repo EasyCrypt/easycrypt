@@ -36,13 +36,15 @@ theory GenDice.
   proof.
     intros i0 dfl0 k.
     pose bdt := (card(sub_supp i0))%r.
+    cut bdt_pos: 0 <= card (sub_supp i0) by smt.
+    cut bdt_posr: 0%r <= (card (sub_supp i0))%r by smt.
     case (test i0 k) => Htk &m Hdfl Hweight;
       bdhoare_deno (_: !test i r /\ i0 = i ==> k = res) => //;fun.
       (* case : test i k *)
       pose bd := mu_x (d i0) k.
       cut d_uni : forall x, in_supp x (d i0) => mu_x (d i0) x = bd.
          by intros x Hx;rewrite /bd; apply dU => //; apply test_in_supp.
-      cut Hdiff : ! bdt = (Real.zero)%Real by smt.
+      cut Hdiff: bdt <> (Real.zero)%Real by smt.
       conseq (_:i=i0 ==> k = r : = (if test i r then charfun ((=) k) r else 1%r / bdt)) => //;
         first by smt.
       while (i0=i) (if test i r then 0 else 1) 1 (bdt * bd) => //; first 2 smt.
@@ -72,7 +74,7 @@ theory GenDice.
           by apply d_uni; apply test_in_supp; rewrite -test_sub_supp.
         by conseq * Hw => //; smt.         
         by conseq * (_ : _ ==> true) => //;rnd;skip;progress=> //; smt.
-      split;first smt.
+      split; first smt.
       intros z;conseq * (_ : _ ==>  mem r (sub_supp i)); first smt.
       rnd;skip;progress => //.
       rewrite -(mu_eq (d i{hr}) (cpMem (sub_supp i{hr}))) => //.
