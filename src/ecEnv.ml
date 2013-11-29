@@ -2869,6 +2869,7 @@ let norm_l_decl env (hyps, concl) =
   let norm = NormMp.norm_form env in
   let onh (x,lk) =
     match lk with
+    (* TODO : we should also normalize type, they can contain (glob A) *)
     | LD_var (ty,o) -> x, LD_var (ty, o |> omap norm)
     | LD_mem _ -> x, lk
     | LD_modty _ -> x, lk
