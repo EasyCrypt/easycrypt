@@ -1206,14 +1206,23 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
   | Flocal id ->
       pp_local ppe fmt id
       
-  | Fpvar (x, i) -> begin
-        match EcEnv.Memory.get_active ppe.PPEnv.ppe_env with
-        | Some i' when EcMemory.mem_equal i i' ->
-            Format.fprintf fmt "%a" (pp_pv ppe) x
-        | _ ->
-          let ppe = PPEnv.enter_by_memid ppe i in
-            Format.fprintf fmt "%a{%a}" (pp_pv ppe) x (pp_mem ppe) i
-  end
+  | Fpvar (x, i) -> 
+    begin match EcEnv.Memory.get_active ppe.PPEnv.ppe_env with
+    | Some i' when EcMemory.mem_equal i i' ->
+      Format.fprintf fmt "%a" (pp_pv ppe) x
+    | _ ->
+      let ppe = PPEnv.enter_by_memid ppe i in
+      Format.fprintf fmt "%a{%a}" (pp_pv ppe) x (pp_mem ppe) i
+    end
+
+  | Fglob (mp, i) ->
+    begin match EcEnv.Memory.get_active ppe.PPEnv.ppe_env with
+    | Some i' when EcMemory.mem_equal i i' ->
+      Format.fprintf fmt "(glob %a)" (pp_topmod ppe) mp 
+    | _ ->
+      let ppe = PPEnv.enter_by_memid ppe i in
+      Format.fprintf fmt "(glob %a){%a}" (pp_topmod ppe) mp (pp_mem ppe) i
+    end
 
   | Fquant (q, bd, f) ->
       let (subppe, pp) = pp_bindings ppe bd in
@@ -1240,9 +1249,6 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
   | Ftuple args ->
       pp_tuple `ForTuple ppe pp_form_r (fst outer) fmt args
       
-  | Fglob (mp, me) ->
-      Format.fprintf fmt "(glob %a){%a}" (pp_topmod ppe) mp (pp_mem ppe) me
-
   | FhoareF hf ->
       let ppe = PPEnv.create_and_push_mem ppe ~active:true (EcFol.mhr, hf.hf_f) in
       Format.fprintf fmt "hoare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]]"
