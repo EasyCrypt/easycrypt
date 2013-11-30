@@ -1937,6 +1937,8 @@ module NormMp = struct
       match body with
       | ME_Alias _ -> assert false 
       | ME_Decl _ ->
+        let id = match mp.m_top with `Local id -> id | _ -> assert false in
+        let us = add_glob_except rm id us in
         List.fold_left (item_use mp) us comps
       | ME_Structure ms ->
         List.fold_left (item_use mp) us ms.ms_body  
