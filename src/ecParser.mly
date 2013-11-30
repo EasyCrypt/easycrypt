@@ -194,12 +194,11 @@
 %token DECLARE
 %token DELTA
 %token DLBRACKET
-%token DLPAREN
 %token DO
 %token DOT
 %token DOTDOT
+%token DOTTICK
 %token DROP
-%token DRPAREN
 %token ELIM
 %token ELIMT
 %token ELSE
@@ -580,6 +579,9 @@ sexpr_u:
 
 | LPBRACE fields=rlist1(expr_field, SEMICOLON) SEMICOLON? RPBRACE
    { PErecord fields }
+
+| e=sexpr DOTTICK x=qident
+   { PEproj (e, x) }
 ;
 
 expr_u:
@@ -651,9 +653,6 @@ expr_u:
 
 | LET p=lpattern EQ e1=expr IN e2=expr
    { PElet (p, e1, e2) }
-
-| e=sexpr DLPAREN x=qident DRPAREN
-   { PEproj (e, x) }
 
 | r=loc(RBOOL) TILD e=sexpr
     { let id  = PEident(mk_loc r.pl_loc EcCoreLib.s_dbitstring, None) in
@@ -767,6 +766,9 @@ sform_u(P):
 | LBRACKET ti=tvars_app? es=loc(plist0(form_r(P), SEMICOLON)) RBRACKET
    { (pflist es.pl_loc ti es.pl_desc).pl_desc }
 
+| f=sform_r(P) DOTTICK x=qident
+    { PFproj (f, x) }
+
 | HOARE LBRACKET
     mp=loc(fident) COLON pre=form_r(P) LONGARROW post=form_r(P)
   RBRACKET
@@ -869,9 +871,6 @@ form_u(P):
 
 | LET p=lpattern EQ e1=form_r(P) IN e2=form_r(P)
     { PFlet (p, e1, e2) }
-
-| f=sform_r(P) DLPAREN x=qident DRPAREN
-    { PFproj (f, x) }
 
 | FORALL pd=pgtybindings COMMA e=form_r(P) { PFforall (pd, e) }
 | EXIST  pd=pgtybindings COMMA e=form_r(P) { PFexists (pd, e) }
@@ -1901,11 +1900,14 @@ logtactic:
 | ELIM e=fpattern(form)
    { Pelim e }
 
+| ELIMT f=sform
+   { PelimT (f, None) }
+
 | ELIMT p=qident f=sform
-   { PelimT (f, p) }
+   { PelimT (f, Some p) }
 
 | ELIM SLASH p=qident f=sform
-   { PelimT (f, p) }
+   { PelimT (f, Some p) }
 
 | APPLY e=fpattern(form)
    { Papply e }

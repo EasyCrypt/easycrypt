@@ -274,10 +274,14 @@ let subst_tydecl (s : _subst) (tyd : tydecl) =
     | `Concrete ty ->
         let s = init_tparams s tyd.tyd_params params' in
           `Concrete (s.s_ty ty)
-    | `Datatype (scheme, cs) ->
-        let sty = init_tparams s tyd.tyd_params params' in
-          `Datatype (Fsubst.f_subst (f_subst_of_subst s) scheme,
-                     List.map (fun (x, ty) -> (x, List.map sty.s_ty ty)) cs)
+    | `Datatype dtype ->
+        let sty   = init_tparams s tyd.tyd_params params' in
+        let dtype =
+          { tydt_ctors   = List.map (snd_map (List.map sty.s_ty)) dtype.tydt_ctors;
+            tydt_schelim = Fsubst.f_subst (f_subst_of_subst s) dtype.tydt_schelim;
+            tydt_schcase = Fsubst.f_subst (f_subst_of_subst s) dtype.tydt_schcase; }
+        in
+          `Datatype dtype
     | `Record (scheme, fields) ->
       let sty = init_tparams s tyd.tyd_params params' in
         `Record (Fsubst.f_subst (f_subst_of_subst s) scheme,

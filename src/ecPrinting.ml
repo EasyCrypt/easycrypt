@@ -788,7 +788,7 @@ let pp_opapp (ppe : PPEnv.t) t_ty pp_sub outer fmt (pred, op, tvi, es) =
       match es, EcEnv.Op.by_path_opt op env with
       | [arg], Some op when EcDecl.is_proj op ->
           let pp fmt () =
-            Format.fprintf fmt "%a.(|%a|)"
+            Format.fprintf fmt "%a.`%a"
               (pp_sub ppe (fst outer, (max_op_prec, `NonAssoc))) arg
               pp_opname (nm, opname)
           in
@@ -1364,7 +1364,7 @@ let pp_typedecl (ppe : PPEnv.t) fmt (x, tyd) =
     match tyd.tyd_type with
     | `Abstract _ -> ()                (* FIXME: TC HOOK *)
     | `Concrete ty -> Format.fprintf fmt " =@ %a" (pp_type ppe) ty
-    | `Datatype (_, cs) ->
+    | `Datatype { tydt_ctors = cs } ->
         let pp_ctor fmt (c, cty) =
           match cty with
           | [] -> Format.fprintf fmt "%s" c

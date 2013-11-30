@@ -16,9 +16,15 @@ type tydecl = {
 and ty_body = [
   | `Concrete of EcTypes.ty
   | `Abstract of Sp.t
-  | `Datatype of EcFol.form * (EcSymbols.symbol * EcTypes.ty list) list
+  | `Datatype of ty_dtype
   | `Record   of EcFol.form * (EcSymbols.symbol * EcTypes.ty) list
 ]
+
+and ty_dtype = {
+  tydt_ctors   : (EcSymbols.symbol * EcTypes.ty list) list;
+  tydt_schelim : EcFol.form;
+  tydt_schcase : EcFol.form;
+}
 
 let tydecl_as_concrete (td : tydecl) =
   match td.tyd_type with `Concrete x -> x | _ -> assert false

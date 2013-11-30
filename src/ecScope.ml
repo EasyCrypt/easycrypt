@@ -980,7 +980,7 @@ module Op = struct
                       let ctor = oget (EcEnv.Op.by_path_opt cp env) in
                       let (indp, ctoridx) = EcDecl.operator_as_ctor ctor in
                       let indty = oget (EcEnv.Ty.by_path_opt indp env) in
-                      let ind = snd (EcDecl.tydecl_as_datatype indty) in
+                      let ind = (EcDecl.tydecl_as_datatype indty).tydt_ctors in
                       let ctorsym, ctorty = List.nth ind ctoridx in
   
                       let args_exp = List.length ctorty in
@@ -1801,7 +1801,7 @@ module Ty = struct
     let tparams = EcUnify.UniEnv.tparams ue in
 
     (* Check for the positivity condition / emptyness *)
-    let scheme =
+    let (schelim, schcase) =
       let module E = struct exception Fail end in
 
       let rec scheme1 p (pred, fac) ty =
@@ -1830,30 +1830,38 @@ module Ty = struct
                 scheme1 p (pred, EcFol.f_app fac [EcFol.f_local x ty1] ty2) ty2
                   |> omap (EcFol.f_forall [x, EcFol.GTty ty1])
 
-      and schemec (targs, p) pred (ctor, tys) =
+      and schemec mode (targs, p) pred (ctor, tys) =
         let indty = tconstr p (List.map tvar targs) in
         let ctor  = EcPath.pqname (path scope) ctor in
         let ctor  = EcFol.f_op ctor (List.map tvar targs) indty in
         let xs    = List.map (fun xty -> (fresh_id_of_ty xty, xty)) tys in
         let cargs = List.map (fun (x, xty) -> EcFol.f_local x xty) xs in
-        let sc1   = fun (x, xty) -> scheme1 p (pred, EcFol.f_local x xty) xty in
-        let scs   = List.pmap sc1 xs in
         let form  = EcFol.f_app pred [EcFol.f_app ctor cargs indty] tbool in
-        let form  = EcFol.f_imps scs form in
+        let form  =
+          match mode with
+          | `Case -> form
+
+          | `Elim ->
+              let sc1 = fun (x, xty) -> scheme1 p (pred, EcFol.f_local x xty) xty in
+              let scs = List.pmap sc1 xs in
+                (EcFol.f_imps scs form)
+        in
+
         let form  =
           let bds = List.map (fun (x, xty) -> (x, EcFol.GTty xty)) xs in
             EcFol.f_forall bds form
+              
         in
           form
 
-      and scheme (targs, p) ctors =
+      and scheme mode (targs, p) ctors =
         let indty  = tconstr p (List.map tvar targs) in
         let indx   = fresh_id_of_ty indty in
         let indfm  = EcFol.f_local indx indty in
         let predty = tfun indty tbool in
         let predx  = EcIdent.create "P" in
         let pred   = EcFol.f_local predx predty in
-        let scs    = List.map (schemec (targs, p) pred) ctors in
+        let scs    = List.map (schemec mode (targs, p) pred) ctors in
         let form   = EcFol.f_app pred [indfm] tbool in
         let form   = EcFol.f_forall [indx, EcFol.GTty indty] form in
         let form   = EcFol.f_imps scs form in
@@ -1867,20 +1875,26 @@ module Ty = struct
           | _ -> EcTypes.ty_sub_exists (occurs p) t
 
       in
-        let scheme =
-          try  scheme (List.map fst tparams, tpath) ctors
+        let (schelim, schcase) =
+          try
+            let schelim = scheme `Elim (List.map fst tparams, tpath) ctors in
+            let schcase = scheme `Case (List.map fst tparams, tpath) ctors in
+              (schelim, schcase)
+
           with E.Fail ->
             hierror ~loc "the datatype does not respect the positivity condition"
         in
           if List.for_all (fun (_, cty) -> List.exists (occurs tpath) cty) ctors then
             hierror ~loc "this datatype is empty";
-          scheme
+          (schelim, schcase)
     in
 
     (* Add final datatype to environment *)
     let tydecl = {
       tyd_params = tparams;
-      tyd_type   = `Datatype (scheme, ctors);
+      tyd_type   = `Datatype { tydt_ctors   = ctors;
+                               tydt_schcase = schcase;
+                               tydt_schelim = schelim; };
     } in
       bind scope (unloc dt.ptd_name, tydecl)
 
