@@ -336,7 +336,6 @@ type 'a doption =
   | Single of 'a
   | Double of 'a * 'a
 
-
 type tac_side = bool option
 
 type swap_kind = 
@@ -449,14 +448,16 @@ type phltactic =
   (* Relation between logic *)
   | Pbd_equiv of (bool * pformula * pformula)
 
-
 and pinline_arg =
   [ `ByName    of tac_side * (pgamepath list * int list option)
   | `ByPattern of pipattern ]
 
 type trepeat = [`All | `Maybe] * int option
+type tfocus  = (int option * int option) * [`Include | `Exclude]
 
-type rwarg =
+type rwarg = (tfocus located) option * rwarg1
+
+and rwarg1 =
   | RWDelta of (rwside * rwocc * pformula)
   | RWRw    of (rwside * trepeat option * rwocc * ffpattern list)
   | RWDone  of bool

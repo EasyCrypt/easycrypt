@@ -181,6 +181,26 @@ let t_on_lasts t i (juc, ln) =
 let t_on_first t g = t_on_firsts t 1 g
 let t_on_last  t g = t_on_lasts  t 1 g
 
+let t_focus ((from_, to_), mode) t gs =
+  let ngoals = List.length (snd gs) in
+
+  if ngoals > 0 then
+    let of_neg_idx i = if i < 0 then max 0 (ngoals + i) else i in
+    let from_ = clamp 1 ngoals (of_neg_idx (odfl 1      from_)) in
+    let to_   = clamp 1 ngoals (of_neg_idx (odfl ngoals to_  )) in
+    let tx    =
+      List.init ngoals
+        (fun i ->
+          let i = i + 1 in
+          match mode with
+          | `Include when i >= from_ && i <= to_ -> t
+          | `Exclude when i <  from_ || i >  to_ -> t
+          | _ -> t_id None)
+    in
+      t_subgoal tx gs
+  else
+    gs
+
 let t_seq_subgoal t lt g = t_subgoal lt (t g)
 
 let t_try_base t g =
@@ -207,8 +227,9 @@ let t_or t1 t2 g =
 
 let rec t_lor lt g = 
   match lt with
-  | [] -> t_fail g 
-  | t1::lt -> t_or t1 (t_lor lt) g
+  | []       -> t_fail g
+  | [t1]     -> t1 g
+  | t1 :: lt -> t_or t1 (t_lor lt) g
 
 let t_do b omax t g =
   let max = max (odfl max_int omax) 0 in

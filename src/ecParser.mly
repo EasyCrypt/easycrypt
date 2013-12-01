@@ -1661,9 +1661,30 @@ pterm:
     { { pt_name = p; pt_tys = tvi; pt_args = args; } }
 ;
 
-rwside:
+%inline rwside:
 | MINUS { `RtoL }
 | empty { `LtoR }
+;
+
+%inline rwrgint:
+| i=loc(int) {
+    if i.pl_desc = 0 then
+      parse_error i.pl_loc (Some "focus-index cannot be 0");
+    i.pl_desc
+  }
+;
+
+%inline rwrg:
+| i=rwrgint              { ((Some i, Some i), `Include) }
+| TILD i=rwrgint         { ((Some i, Some i), `Exclude) }
+| rg=rgrw_cp             { (rg, `Include) }
+| TILD rg=paren(rgrw_cp) { (rg, `Exclude) }
+;
+
+%inline rgrw_cp:
+| i1=rwrgint DOTDOT i2=rwrgint { (Some i1, Some i2) }
+| i1=rwrgint DOTDOT            { (Some i1, None   ) }
+|        DOTDOT i2=rwrgint     { (None   , Some i2) }
 ;
 
 rwrepeat:
@@ -1677,24 +1698,29 @@ rwocc:
 | LBRACE x=uint+ RBRACE { x }
 ;
 
-rwarg:
+rwarg1:
 | SLASHSLASH
     { RWDone false }
 
 | SLASHSLASHEQ
-    { RWDone true  }
+    { RWDone true }
 
 | SLASHEQ
    { RWSimpl }
 
 | s=rwside r=rwrepeat? o=rwocc? fp=fpattern_list(form)
-    { RWRw (s, r, o |> omap EcMaps.Sint.of_list, fp) }
+   { RWRw (s, r, o |> omap EcMaps.Sint.of_list, fp) }
 
 | s=rwside r=rwrepeat? o=rwocc? SLASH x=sform_h %prec prec_tactic
-    { let loc = EcLocation.make $startpos $endpos in
-        if r <> None then
-          parse_error loc (Some "delta-repeat not supported");
-        RWDelta (s, o |> omap EcMaps.Sint.of_list, x); }
+   { let loc = EcLocation.make $startpos $endpos in
+       if r <> None then
+         parse_error loc (Some "delta-repeat not supported");
+       RWDelta (s, o |> omap EcMaps.Sint.of_list, x); }
+;
+
+rwarg:
+| r=rwarg1 { (None, r) }
+| rg=loc(rwrg) COLON r=rwarg1 { (Some rg, r) }
 ;
 
 genpattern:

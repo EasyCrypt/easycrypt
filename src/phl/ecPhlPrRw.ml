@@ -258,8 +258,8 @@ let t_bdhoare_not b1 b2 g =
 open EcParsetree
 
 let t_rewrite_glob s pqs = 
-  EcHiLogic.process_rewrite pqs.EcLocation.pl_loc
-    [(RWRw(s,None,None, [{ fp_kind = FPNamed(pqs,None);fp_args = [] }]))]
+  let rwarg = (RWRw (s, None, None, [{ fp_kind = FPNamed(pqs,None); fp_args = []; }])) in
+    EcHiLogic.process_rewrite pqs.EcLocation.pl_loc [(None, rwarg)]
 
 let t_rewrite_logic s x = 
   let loc = EcLocation._dummy in
