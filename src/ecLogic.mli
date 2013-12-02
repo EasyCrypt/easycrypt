@@ -68,6 +68,8 @@ val t_fail : tactic
 
 val t_reflex : ?reduce:bool -> tactic
 
+val t_focus : tfocus -> tactic -> goals -> goals
+
 val t_on_first : tactic -> goals -> goals
 val t_on_last  : tactic -> goals -> goals
 
