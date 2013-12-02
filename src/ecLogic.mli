@@ -97,7 +97,7 @@ val t_rotate : [`Left | `Right] -> int -> goals -> goals
 val gen_check_restr : 
   env -> 
   (EcPrinting.PPEnv.t -> 'a EcPrinting.pp) -> 'a ->
-  NormMp.use -> mod_restr -> unit
+  use -> mod_restr -> unit
 
 val check_restr :  EcEnv.env -> EcPath.mpath -> mod_restr -> unit
 

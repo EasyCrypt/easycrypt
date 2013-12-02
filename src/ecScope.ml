@@ -1235,7 +1235,7 @@ module Mod = struct
                 if EcPath.m_equal (EcPath.m_functor x.EcPath.x_top) mp then
                   Sx.add x rx 
                 else rx in
-              Mx.fold add use.EcEnv.NormMp.us_pv EcPath.Sx.empty in
+              Mx.fold add use.EcEnv.us_pv EcPath.Sx.empty in
             EcEnv.Mod.add_restr_to_locals (rx,EcPath.Sm.empty) env in
         let ec = CoreSection.add_local_mod mpath scope.sc_section in
         { scope with sc_section = ec; sc_env = env }

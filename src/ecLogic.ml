@@ -408,8 +408,8 @@ let gen_check_restr env pp_a a use restr =
       if not (NormMp.use_mem_xp xp r2) then
         tacuerror "%a use the variable %a, but should not use the module %a (which can use %a)" (pp_a ppe) a (EcPrinting.pp_pv ppe) (pv_glob xp)
           pp_mp mp2 (EcPrinting.pp_pv ppe) (pv_glob xp) in
-    EcIdent.Sid.iter check restr.NormMp.us_gl in
-  EcPath.Mx.iter check_xp (use.NormMp.us_pv);
+    EcIdent.Sid.iter check restr.us_gl in
+  EcPath.Mx.iter check_xp (use.us_pv);
   let check_gl id = 
     let mp1 = EcPath.mident id in
     if NormMp.use_mem_gl mp1 restr then
@@ -423,7 +423,7 @@ let gen_check_restr env pp_a a use restr =
            (pp_a ppe) a 
            (EcPrinting.pp_pv ppe) (pv_glob xp2)
            pp_mp xp2.x_top pp_mp mp1  in
-      Mx.iter check_v restr.NormMp.us_pv;
+      Mx.iter check_v restr.us_pv;
                     
       let check_g id2 = 
         let mp2 = EcPath.mident id2 in
@@ -434,8 +434,8 @@ let gen_check_restr env pp_a a use restr =
               "%a should not use %a; add restriction %a to %a or %a to %a"
             (pp_a ppe) a pp_mp mp1 pp_mp mp2 
             pp_mp mp1 pp_mp mp2 pp_mp mp2 pp_mp mp1 in
-      EcIdent.Sid.iter check_g restr.NormMp.us_gl in
-  EcIdent.Sid.iter check_gl use.NormMp.us_gl
+      EcIdent.Sid.iter check_g restr.us_gl in
+  EcIdent.Sid.iter check_gl use.us_gl
 
 let check_restr env mp restr = 
   let use = NormMp.mod_use env mp in
