@@ -1603,20 +1603,23 @@ module Mod = struct
           { me with me_body = ME_Decl (mt, union_restr restr r) }
         | _ -> me
       in
-        MMsym.map_at
-          (List.map
-             (fun (ip, me) ->
-                 if   ip = IPIdent (id, None)
-                 then (ip, update me)
-                 else (ip, me)))
-          (EcIdent.name id) mods
+      MMsym.map_at
+        (List.map
+           (fun (ip, me) ->
+             if   ip = IPIdent (id, None)
+             then (ip, update me)
+             else (ip, me)))
+        (EcIdent.name id) mods
     in
-      { env with env_current =
-          { env.env_current
+    let envc =  { env.env_current
               with mc_modules =
-                Sid.fold update_id env.env_modlcs
-                  env.env_current.mc_modules; }
-      }
+        Sid.fold update_id env.env_modlcs
+          env.env_current.mc_modules; } in
+    let en = !(env.env_norm) in
+    let norm = { en with get_restr = Mm.empty } in
+    { env with env_current = envc;
+      env_norm = ref norm;
+    }
 
   let bind_locals bindings env =
     List.fold_left
