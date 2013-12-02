@@ -258,8 +258,8 @@ let t_bdhoare_not b1 b2 g =
 open EcParsetree
 
 let t_rewrite_glob s pqs = 
-  EcHiLogic.process_rewrite pqs.EcLocation.pl_loc
-    [(RWRw(s,None,None, [{ fp_kind = FPNamed(pqs,None);fp_args = [] }]))]
+  let rwarg = (RWRw (s, None, None, [{ fp_kind = FPNamed(pqs,None); fp_args = []; }])) in
+    EcHiLogic.process_rewrite pqs.EcLocation.pl_loc [(None, rwarg)]
 
 let t_rewrite_logic s x = 
   let loc = EcLocation._dummy in
@@ -281,7 +281,7 @@ let process_bdhoare_split info g =
       if is_and po then t_bdhoare_and
       else if is_or po then t_bdhoare_or
       else tacuerror 
-        "The postcondition should be a conjunction or a disjonction" in
+        "The postcondition should be a conjunction or a disjunction" in
     let b1 = EcCoreHiLogic.process_form penv b1 treal in
     let b2 = EcCoreHiLogic.process_form penv b2 treal in
     let b3 = match b3 with

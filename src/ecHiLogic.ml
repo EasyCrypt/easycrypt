@@ -390,7 +390,7 @@ let process_rewrite1_core (s, o) (p, typs, ue, ax) args g =
       t_rewrite_form ~fpat s fc args g
 
 (* -------------------------------------------------------------------- *)
-let process_rewrite1 loc ri g =
+let rec process_rewrite1 loc ri g =
   let (hyps, concl) = get_goal g in
 
   match ri with
@@ -533,8 +533,16 @@ let process_rewrite1 loc ri g =
         | Some (b, n) -> t_do b n doall g
 
 (* -------------------------------------------------------------------- *)
-let process_rewrite loc ri g =
-  set_loc loc (t_lseq (List.map (process_rewrite1 loc) ri)) g
+let process_rewrite loc ri (juc, n) =
+  let do1 gs (fc, ri) =
+    let tx =
+      match fc with
+      | None    -> t_on_goals
+      | Some fc -> t_focus fc.pl_desc
+    in
+      tx (process_rewrite1 loc ri) gs
+  in
+    set_loc loc (fun () -> List.fold_left do1 (juc, [n]) ri) ()
 
 (* -------------------------------------------------------------------- *)
 let process_elim loc pe ((_, n) as g) =

@@ -118,10 +118,17 @@ type mc = {
   mc_components : ipath MMsym.t;
 }
 
+type use =
+ { us_pv : ty Mx.t; 
+   us_gl : Sid.t;  
+ } 
+
 type env_norm = {
-  norm_mp  : EcPath.mpath Mm.t;
+  norm_mp   : EcPath.mpath Mm.t;
   norm_xpv  : EcPath.xpath Mx.t;   (* for global program variable *)
   norm_xfun : EcPath.xpath Mx.t;   (* for fun and local program variable *)
+  mod_use   : use Mm.t;
+  get_restr : use Mm.t;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -209,9 +216,12 @@ let empty () =
       env_w3       = EcWhy3.empty;
       env_rb       = [];
       env_item     = [];
-      env_norm     = ref { norm_mp = Mm.empty; 
-                           norm_xpv = Mx.empty; 
-                           norm_xfun = Mx.empty };
+      env_norm     = ref { norm_mp   = Mm.empty; 
+                           norm_xpv  = Mx.empty; 
+                           norm_xfun = Mx.empty;
+                           mod_use   = Mm.empty;
+                           get_restr = Mm.empty;
+                         };
     }
   in
     env
@@ -1878,11 +1888,6 @@ module NormMp = struct
         env.env_norm := { en with norm_xpv = Mx.add p res en.norm_xpv };
         res
    
-  type use =
-    { us_pv : ty Mx.t; 
-      us_gl : Sid.t;  
-    } 
-
   let use_empty = { us_pv = Mx.empty; us_gl = Sid.empty }
   let use_equal us1 us2 =
     Mx.equal (fun _ _ -> true) us1.us_pv us2.us_pv &&
@@ -1975,14 +1980,26 @@ module NormMp = struct
 
     mod_use use_empty mp'
 
+  let mod_use env mp = 
+    try Mm.find mp !(env.env_norm).mod_use with Not_found ->
+      let res = mod_use env mp in
+      let en = !(env.env_norm) in
+      env.env_norm := { en with mod_use = Mm.add mp res en.mod_use };
+      res
+
   let norm_restr env (rx,r) = 
     let restr = Sx.fold (fun xp r -> add_var env xp r) rx use_empty in
     Sm.fold (fun mp r -> use_union r (mod_use env mp)) r restr
 
   let get_restr env mp = 
-    match (Mod.by_mpath mp env).me_body with
-    | EcModules.ME_Decl(_,restr) -> norm_restr env restr
-    | _ -> assert false 
+    try Mm.find mp !(env.env_norm).get_restr with Not_found ->
+      let res = 
+        match (Mod.by_mpath mp env).me_body with
+        | EcModules.ME_Decl(_,restr) -> norm_restr env restr
+        | _ -> assert false in
+      let en = !(env.env_norm) in
+      env.env_norm := { en with get_restr = Mm.add mp res en.get_restr };
+      res
 
   let equal_restr env r1 r2 = use_equal (norm_restr env r1) (norm_restr env r2)
 

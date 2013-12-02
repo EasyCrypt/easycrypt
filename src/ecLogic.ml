@@ -181,6 +181,26 @@ let t_on_lasts t i (juc, ln) =
 let t_on_first t g = t_on_firsts t 1 g
 let t_on_last  t g = t_on_lasts  t 1 g
 
+let t_focus ((from_, to_), mode) t gs =
+  let ngoals = List.length (snd gs) in
+
+  if ngoals > 0 then
+    let of_neg_idx i = if i < 0 then max 0 (ngoals + i) else i in
+    let from_ = clamp 1 ngoals (of_neg_idx (odfl 1      from_)) in
+    let to_   = clamp 1 ngoals (of_neg_idx (odfl ngoals to_  )) in
+    let tx    =
+      List.init ngoals
+        (fun i ->
+          let i = i + 1 in
+          match mode with
+          | `Include when i >= from_ && i <= to_ -> t
+          | `Exclude when i <  from_ || i >  to_ -> t
+          | _ -> t_id None)
+    in
+      t_subgoal tx gs
+  else
+    gs
+
 let t_seq_subgoal t lt g = t_subgoal lt (t g)
 
 let t_try_base t g =
@@ -207,8 +227,9 @@ let t_or t1 t2 g =
 
 let rec t_lor lt g = 
   match lt with
-  | [] -> t_fail g 
-  | t1::lt -> t_or t1 (t_lor lt) g
+  | []       -> t_fail g
+  | [t1]     -> t1 g
+  | t1 :: lt -> t_or t1 (t_lor lt) g
 
 let t_do b omax t g =
   let max = max (odfl max_int omax) 0 in
@@ -406,10 +427,10 @@ let gen_check_restr env pp_a a use restr =
       let mp2 = EcPath.mident id2 in
       let r2  = NormMp.get_restr env mp2 in
       if not (NormMp.use_mem_xp xp r2) then
-        tacuerror "%a use the variable %a, but should not use the module %a (which can use %a)" (pp_a ppe) a (EcPrinting.pp_pv ppe) (pv_glob xp)
+        tacuerror "%a uses the variable %a, but should not use the module %a (which can use %a)" (pp_a ppe) a (EcPrinting.pp_pv ppe) (pv_glob xp)
           pp_mp mp2 (EcPrinting.pp_pv ppe) (pv_glob xp) in
-    EcIdent.Sid.iter check restr.NormMp.us_gl in
-  EcPath.Mx.iter check_xp (use.NormMp.us_pv);
+    EcIdent.Sid.iter check restr.us_gl in
+  EcPath.Mx.iter check_xp (use.us_pv);
   let check_gl id = 
     let mp1 = EcPath.mident id in
     if NormMp.use_mem_gl mp1 restr then
@@ -423,7 +444,7 @@ let gen_check_restr env pp_a a use restr =
            (pp_a ppe) a 
            (EcPrinting.pp_pv ppe) (pv_glob xp2)
            pp_mp xp2.x_top pp_mp mp1  in
-      Mx.iter check_v restr.NormMp.us_pv;
+      Mx.iter check_v restr.us_pv;
                     
       let check_g id2 = 
         let mp2 = EcPath.mident id2 in
@@ -434,8 +455,8 @@ let gen_check_restr env pp_a a use restr =
               "%a should not use %a; add restriction %a to %a or %a to %a"
             (pp_a ppe) a pp_mp mp1 pp_mp mp2 
             pp_mp mp1 pp_mp mp2 pp_mp mp2 pp_mp mp1 in
-      EcIdent.Sid.iter check_g restr.NormMp.us_gl in
-  EcIdent.Sid.iter check_gl use.NormMp.us_gl
+      EcIdent.Sid.iter check_g restr.us_gl in
+  EcIdent.Sid.iter check_gl use.us_gl
 
 let check_restr env mp restr = 
   let use = NormMp.mod_use env mp in
