@@ -142,7 +142,7 @@
 %token <EcSymbols.symbol> PUNIOP
 %token <EcSymbols.symbol> PBINOP
 
-%token <int> NUM
+%token <int> UINT
 %token <string> STRING
 
 (* Tokens *)
@@ -194,12 +194,11 @@
 %token DECLARE
 %token DELTA
 %token DLBRACKET
-%token DLPAREN
 %token DO
 %token DOT
 %token DOTDOT
+%token DOTTICK
 %token DROP
-%token DRPAREN
 %token ELIM
 %token ELIMT
 %token ELSE
@@ -388,7 +387,7 @@
 | x=loc(_ident) { x }
 ;
 
-%inline number: n=NUM { n };
+%inline uint: n=UINT { n };
 
 (* -------------------------------------------------------------------- *)
 %inline namespace:
@@ -483,7 +482,7 @@ fident:
 (* -------------------------------------------------------------------- *)
 pside_:
 | x=LIDENT     { (0, Printf.sprintf "&%s" x) }
-| x=NUM        { (0, Printf.sprintf "&%d" x) }
+| x=UINT       { (0, Printf.sprintf "&%d" x) }
 | ADD x=pside_ { (1 + fst x, snd x) }
 ;
 
@@ -542,7 +541,7 @@ sexpr_u:
        parse_error p.pl_loc (Some "invalid scope name");
      PEscope (pqsymb_of_symb p.pl_loc "<top>", e) }
 
-| n=number
+| n=uint
    { PEint n }
 
 | x=qoident ti=tvars_app?
@@ -580,6 +579,9 @@ sexpr_u:
 
 | LPBRACE fields=rlist1(expr_field, SEMICOLON) SEMICOLON? RPBRACE
    { PErecord fields }
+
+| e=sexpr DOTTICK x=qident
+   { PEproj (e, x) }
 ;
 
 expr_u:
@@ -651,9 +653,6 @@ expr_u:
 
 | LET p=lpattern EQ e1=expr IN e2=expr
    { PElet (p, e1, e2) }
-
-| e=sexpr DLPAREN x=qident DRPAREN
-   { PEproj (e, x) }
 
 | r=loc(RBOOL) TILD e=sexpr
     { let id  = PEident(mk_loc r.pl_loc EcCoreLib.s_dbitstring, None) in
@@ -733,7 +732,7 @@ sform_u(P):
 | f=sform_r(P) PCENT p=qident
    { PFscope (p, f) }
 
-| n=number
+| n=uint
    { PFint n }
 
 | x=loc(RES)
@@ -766,6 +765,9 @@ sform_u(P):
 
 | LBRACKET ti=tvars_app? es=loc(plist0(form_r(P), SEMICOLON)) RBRACKET
    { (pflist es.pl_loc ti es.pl_desc).pl_desc }
+
+| f=sform_r(P) DOTTICK x=qident
+    { PFproj (f, x) }
 
 | HOARE LBRACKET
     mp=loc(fident) COLON pre=form_r(P) LONGARROW post=form_r(P)
@@ -869,9 +871,6 @@ form_u(P):
 
 | LET p=lpattern EQ e1=form_r(P) IN e2=form_r(P)
     { PFlet (p, e1, e2) }
-
-| f=sform_r(P) DLPAREN x=qident DRPAREN
-    { PFproj (f, x) }
 
 | FORALL pd=pgtybindings COMMA e=form_r(P) { PFforall (pd, e) }
 | EXIST  pd=pgtybindings COMMA e=form_r(P) { PFexists (pd, e) }
@@ -1144,13 +1143,13 @@ mod_def:
     { let p = EcUtils.odfl [] p in
         match body.pl_desc with
         | `Alias m ->
-             if p <> [] then
+            (* if p <> [] then
                parse_error (EcLocation.make $startpos $endpos)
-                 (Some "cannot parameterize module alias");
+                 (Some "cannot parameterize module alias"); *)
              if t <> None then
                parse_error (EcLocation.make $startpos $endpos)
                  (Some "cannot bind module type to module alias"); 
-             (x, mk_loc body.pl_loc (Pm_ident m))
+             (x, mk_loc body.pl_loc (Pm_ident(p, m)))
 
         | `Struct st ->
              (x, mk_loc body.pl_loc (mk_mod ?modtypes:t p st)) }
@@ -1443,10 +1442,10 @@ real_hint:
 | AUTO          { Hauto }
 | empty         { Hnone }
 
-| COMPUTE n=NUM e1=expr COMMA e2=expr
+| COMPUTE n=uint e1=expr COMMA e2=expr
    { Hfailure (n, e1, e2, []) }
 
-| COMPUTE n=NUM e1=expr COMMA e2=expr COLON l=plist1(ident_exp, COLON)
+| COMPUTE n=uint e1=expr COMMA e2=expr COLON l=plist1(ident_exp, COLON)
    { Hfailure (n, e1, e2, l) }
 ;
 
@@ -1662,40 +1661,66 @@ pterm:
     { { pt_name = p; pt_tys = tvi; pt_args = args; } }
 ;
 
-rwside:
+%inline rwside:
 | MINUS { `RtoL }
 | empty { `LtoR }
 ;
 
+%inline rwrgint:
+| i=loc(int) {
+    if i.pl_desc = 0 then
+      parse_error i.pl_loc (Some "focus-index cannot be 0");
+    i.pl_desc
+  }
+;
+
+%inline rwrg:
+| i=rwrgint              { ((Some i, Some i), `Include) }
+| TILD i=rwrgint         { ((Some i, Some i), `Exclude) }
+| rg=rgrw_cp             { (rg, `Include) }
+| TILD rg=paren(rgrw_cp) { (rg, `Exclude) }
+;
+
+%inline rgrw_cp:
+| i1=rwrgint DOTDOT i2=rwrgint { (Some i1, Some i2) }
+| i1=rwrgint DOTDOT            { (Some i1, None   ) }
+|        DOTDOT i2=rwrgint     { (None   , Some i2) }
+;
+
 rwrepeat:
-| NOT            { (`All  , None  ) }
-| QUESTION       { (`Maybe, None  ) }
-| n=NUM NOT      { (`All  , Some n) }
-| n=NUM QUESTION { (`Maybe, Some n) }
+| NOT             { (`All  , None  ) }
+| QUESTION        { (`Maybe, None  ) }
+| n=uint NOT      { (`All  , Some n) }
+| n=uint QUESTION { (`Maybe, Some n) }
 ;
 
 rwocc:
-| LBRACE x=NUM+ RBRACE { x }
+| LBRACE x=uint+ RBRACE { x }
 ;
 
-rwarg:
+rwarg1:
 | SLASHSLASH
     { RWDone false }
 
 | SLASHSLASHEQ
-    { RWDone true  }
+    { RWDone true }
 
 | SLASHEQ
    { RWSimpl }
 
 | s=rwside r=rwrepeat? o=rwocc? fp=fpattern_list(form)
-    { RWRw (s, r, o |> omap EcMaps.Sint.of_list, fp) }
+   { RWRw (s, r, o |> omap EcMaps.Sint.of_list, fp) }
 
 | s=rwside r=rwrepeat? o=rwocc? SLASH x=sform_h %prec prec_tactic
-    { let loc = EcLocation.make $startpos $endpos in
-        if r <> None then
-          parse_error loc (Some "delta-repeat not supported");
-        RWDelta (s, o |> omap EcMaps.Sint.of_list, x); }
+   { let loc = EcLocation.make $startpos $endpos in
+       if r <> None then
+         parse_error loc (Some "delta-repeat not supported");
+       RWDelta (s, o |> omap EcMaps.Sint.of_list, x); }
+;
+
+rwarg:
+| r=rwarg1 { (None, r) }
+| rg=loc(rwrg) COLON r=rwarg1 { (Some rg, r) }
 ;
 
 genpattern:
@@ -1746,13 +1771,13 @@ tac_dir:
 ;
 
 codepos:
-| i=NUM  { (i, None) }
+| i=uint { (i, None) }
 | c=CPOS { c }
 ;
 
 code_position:
-| n=number { Single n }
-| n1=number n2=number { Double (n1, n2) } 
+| n=uint { Single n }
+| n1=uint n2=uint { Double (n1, n2) } 
 ;
 
 while_tac_info : 
@@ -1776,26 +1801,26 @@ swap_info:
 ;
 
 swap_pos:
-| i1=number i2=number i3=number
+| i1=uint i2=uint i3=uint
     { SKbase (i1, i2, i3) }
 
 | p=int
     { SKmove p }
 
-| i1=number p=int
+| i1=uint p=int
     { SKmovei (i1, p) }
 
-| LBRACKET i1=number DOTDOT i2=number RBRACKET p=int
+| LBRACKET i1=uint DOTDOT i2=uint RBRACKET p=int
     { SKmoveinter (i1, i2, p) }
 ;
 
 int:
-| n=number { n }
-| loc(MINUS) n=number { -n }
+| n=uint { n }
+| loc(MINUS) n=uint { -n }
 ;
 
 side:
-| LBRACE n=number RBRACE {
+| LBRACE n=uint RBRACE {
    match n with
    | 1 -> true
    | 2 -> false
@@ -1806,7 +1831,7 @@ side:
 ;
 
 occurences:
-| p=paren(NUM+) {
+| p=paren(uint+) {
     if List.mem 0 p then
       parse_error
         (EcLocation.make $startpos $endpos)
@@ -1901,11 +1926,14 @@ logtactic:
 | ELIM e=fpattern(form)
    { Pelim e }
 
+| ELIMT f=sform
+   { PelimT (f, None) }
+
 | ELIMT p=qident f=sform
-   { PelimT (f, p) }
+   { PelimT (f, Some p) }
 
 | ELIM SLASH p=qident f=sform
-   { PelimT (f, p) }
+   { PelimT (f, Some p) }
 
 | APPLY e=fpattern(form)
    { Papply e }
@@ -1943,7 +1971,7 @@ eager_info:
     { LE_todo(h,s1,s2,pr,po) }
 ;
 eager_tac:
-| SEQ n1=number n2=number i=eager_info COLON p=sform
+| SEQ n1=uint n2=uint i=eager_info COLON p=sform
     { Peager_seq (i,(n1,n2),p) }
 | IF 
     { Peager_if }
@@ -1988,10 +2016,10 @@ phltactic:
 | CALL s=side? info=fpattern(call_info) 
     { Pcall (s, info) }
 
-| RCONDT s=side? i=number
+| RCONDT s=side? i=uint
     { Prcond (s, true, i) }
 
-| RCONDF s=side? i=number 
+| RCONDF s=side? i=uint 
     { Prcond (s, false, i) }
 
 | IF s=side?
@@ -2000,7 +2028,7 @@ phltactic:
 | SWAP info=iplist1(loc(swap_info), COMMA) %prec prec_below_comma
     { Pswap info }
 
-| CFOLD s=side? c=codepos NOT n=NUM
+| CFOLD s=side? c=codepos NOT n=uint
     { Pcfold (s, c, Some n) }
 
 | CFOLD s=side? c=codepos
@@ -2015,7 +2043,7 @@ phltactic:
 | KILL s=side? o=codepos 
     { Pkill (s, o, Some 1) }
 
-| KILL s=side? o=codepos NOT n=NUM
+| KILL s=side? o=codepos NOT n=uint
     { Pkill (s, o, Some n) }
 
 | KILL s=side? o=codepos NOT STAR
@@ -2034,16 +2062,16 @@ phltactic:
     { Pset (false,s, o,x,e) }
 (* END NEW *)
 
-| FISSION s=side? o=codepos AT d1=NUM COMMA d2=NUM
+| FISSION s=side? o=codepos AT d1=uint COMMA d2=uint
     { Pfission (s, o, (1, (d1, d2))) }
 
-| FISSION s=side? o=codepos NOT i=NUM AT d1=NUM COMMA d2=NUM
+| FISSION s=side? o=codepos NOT i=uint AT d1=uint COMMA d2=uint
     { Pfission (s, o, (i, (d1, d2))) }
 
-| FUSION s=side? o=codepos AT d1=NUM COMMA d2=NUM
+| FUSION s=side? o=codepos AT d1=uint COMMA d2=uint
     { Pfusion (s, o, (1, (d1, d2))) }
 
-| FUSION s=side? o=codepos NOT i=NUM AT d1=NUM COMMA d2=NUM
+| FUSION s=side? o=codepos NOT i=uint AT d1=uint COMMA d2=uint
     { Pfusion (s, o, (i, (d1, d2))) }
 
 | UNROLL s=side? o=codepos
@@ -2073,7 +2101,7 @@ phltactic:
 | BYPR { PPr ( None ) }
 | BYPR f1=sform f2=sform { PPr( Some (f1,f2)) }
 
-| FEL at_pos=NUM cntr=sform delta=sform q=sform f_event=sform some_p=fel_pred_specs inv=sform?
+| FEL at_pos=uint cntr=sform delta=sform q=sform f_event=sform some_p=fel_pred_specs inv=sform?
    {Pfel (at_pos,(cntr,delta,q,f_event,some_p,inv))}
 
 | EQOBSIN info=eqobs_in
@@ -2149,10 +2177,10 @@ tactic_core_r:
 | DO t=tactic_core
    { Pdo ((`All, None), t) }
 
-| DO n=NUM? NOT t=tactic_core
+| DO n=uint? NOT t=tactic_core
    { Pdo ((`All, n), t) }
 
-| DO n=NUM? QUESTION t=tactic_core
+| DO n=uint? QUESTION t=tactic_core
    { Pdo ((`Maybe, n), t) }
 
 | LPAREN s=tactics RPAREN
@@ -2197,14 +2225,14 @@ tactic_chain:
 | FIRST t=loc(tactics) { Pfirst (mk_core_tactic (mk_loc t.pl_loc (Pseq (unloc t))), 1) }
 | LAST  t=loc(tactics) { Plast  (mk_core_tactic (mk_loc t.pl_loc (Pseq (unloc t))), 1) }
 
-| FIRST n=NUM t=loc(tactics) { Pfirst (mk_core_tactic (mk_loc t.pl_loc (Pseq (unloc t))), n) }
-| LAST  n=NUM t=loc(tactics) { Plast  (mk_core_tactic (mk_loc t.pl_loc (Pseq (unloc t))), n) }
+| FIRST n=uint t=loc(tactics) { Pfirst (mk_core_tactic (mk_loc t.pl_loc (Pseq (unloc t))), n) }
+| LAST  n=uint t=loc(tactics) { Plast  (mk_core_tactic (mk_loc t.pl_loc (Pseq (unloc t))), n) }
 
 | FIRST LAST  { Protate (`Left , 1) }
 | LAST  FIRST { Protate (`Right, 1) }
 
-| FIRST n=NUM LAST  { Protate (`Left , n) }
-| LAST  n=NUM FIRST { Protate (`Right, n) }
+| FIRST n=uint LAST  { Protate (`Left , n) }
+| LAST  n=uint FIRST { Protate (`Right, n) }
 
 ;
 
@@ -2382,9 +2410,9 @@ print:
 ;
 
 prover_iconfig:
-| /* empty */   { (None   , None   ) }
-| i=NUM         { (Some i , None   ) }
-| i1=NUM i2=NUM { (Some i1, Some i2) }
+| /* empty */     { (None   , None   ) }
+| i=uint          { (Some i , None   ) }
+| i1=uint i2=uint { (Some i1, Some i2) }
 ;
 
 prover_info:
@@ -2396,8 +2424,10 @@ prover_info:
 ;
 
 gprover_info: 
-| PROVER x=prover_info { x }
-| TIMEOUT t=NUM        
+| PROVER x=prover_info
+    { x }
+
+| TIMEOUT t=uint        
     { { pprov_max = None; pprov_time = Some t; pprov_names = None } }
 ;
 
@@ -2475,7 +2505,7 @@ prog_r:
 | g=global { P_Prog ([g], false) }
 | stop     { P_Prog ([ ], true ) }
 
-| UNDO d=number FINAL
+| UNDO d=uint FINAL
    { P_Undo d }
 
 | error

@@ -203,13 +203,13 @@ let upper   = ['A'-'Z']
 let lower   = ['a'-'z']
 let letter  = upper | lower
 let digit   = ['0'-'9']
-let number  = digit+
+let uint    = digit+
 
 let ichar  = (letter | digit | '_' | '\'')
 let lident = (lower ichar*) | ('_' ichar+)
 let uident = upper ichar*
 let tident = '\'' lident
-let mident = '&'  (lident | number)
+let mident = '&'  (lident | uint)
 
 let op_char_1    = ['=' '<' '>']
 let op_char_2    = ['+' '-']
@@ -244,7 +244,7 @@ rule main = parse
   | uident as id { try Hashtbl.find keywords id with Not_found -> UIDENT id }
   | tident       { TIDENT (Lexing.lexeme lexbuf) }
   | mident       { MIDENT (Lexing.lexeme lexbuf) }
-  | number       { NUM (int_of_string (Lexing.lexeme lexbuf)) }
+  | uint         { UINT (int_of_string (Lexing.lexeme lexbuf)) }
   | "<<"         { BACKS }
   | ">>"         { FWDS }
 
@@ -269,8 +269,7 @@ rule main = parse
   | "->"    { ARROW  }
   | ".."    { DOTDOT }
   | ".["    { DLBRACKET }
-  | ".(|"   { DLPAREN }
-  | "|)"    { DRPAREN }
+  | ".`"    { DOTTICK }
   | ":="    { CEQ }
   | "::"    { DCOLON }
   | "%r"    { FROM_INT }

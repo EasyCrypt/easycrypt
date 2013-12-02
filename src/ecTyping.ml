@@ -293,22 +293,19 @@ let e_inuse =
     fun e -> inuse Sx.empty e
 
 (* -------------------------------------------------------------------- *)
-let empty_uses : uses =
-  { us_calls  = [];
-    us_reads  = Sx.empty;
-    us_writes = Sx.empty; }
+let empty_uses : uses = mk_uses [] Sx.empty Sx.empty
 
 let add_call (u : uses) p : uses =
-  { u with us_calls = p :: u.us_calls }
+  mk_uses (p::u.us_calls) u.us_reads u.us_writes
 
 let add_read (u : uses) p : uses =
   if is_glob p then 
-    { u with us_reads = Sx.add p.pv_name u.us_reads }
+    mk_uses u.us_calls (Sx.add p.pv_name u.us_reads) u.us_writes
   else u 
 
 let add_write (u : uses) p : uses =
   if is_glob p then
-    { u with us_writes = Sx.add p.pv_name u.us_writes }
+    mk_uses u.us_calls u.us_reads (Sx.add p.pv_name u.us_writes)
   else u
 
 let (i_inuse, s_inuse, se_inuse) =
@@ -368,7 +365,7 @@ let (i_inuse, s_inuse, se_inuse) =
     List.fold_left i_inuse map s.s_node
 
   and se_inuse (u : uses) (e : expr) =
-    { u with us_reads = Sx.union u.us_reads (e_inuse e) }
+    mk_uses u.us_calls (Sx.union u.us_reads (e_inuse e)) u.us_writes
 
   in
     (i_inuse empty_uses, s_inuse empty_uses, se_inuse)
@@ -555,7 +552,7 @@ let rec check_sig_cnv mode (env:EcEnv.env) (sin:module_sig) (sout:module_sig) =
         let flcmp () =
           let norm oi = 
             List.fold_left (fun s f -> 
-              EcPath.Sx.add (EcEnv.NormMp.norm_xpath env f) s)
+              EcPath.Sx.add (EcEnv.NormMp.norm_xfun env f) s)
               EcPath.Sx.empty oi.oi_calls
           in
           let icalls = norm oin in
@@ -1259,36 +1256,46 @@ and transmodsig_body (env : EcEnv.env) (sa : Sm.t)
 (* -------------------------------------------------------------------- *)
 let rec transmod ~attop (env : EcEnv.env) (x : symbol) (me : pmodule_expr) =
   match me.pl_desc with
-  | Pm_ident m -> 
-      let (mp, sig_) = trans_msymbol env {pl_desc = m; pl_loc = me.pl_loc} in
-      let params = sig_.mis_params in
-
-      if params <> [] && not attop then
-        tyerror me.pl_loc env (InvalidModAppl MAE_WrongArgCount);
-
-      let me = EcEnv.Mod.by_mpath mp env in
-        { me with me_name  = x; me_body  = ME_Alias mp; }
+  | Pm_ident (params,m) -> 
+    let stparams, env0 = transmod_params env x params in
+    let (mp, sig_) = trans_msymbol env0 {pl_desc = m; pl_loc = me.pl_loc} in
+    let extraparams = sig_.mis_params in
+    let allparams = stparams @ extraparams in
+    if allparams <> [] && not attop then
+      tyerror me.pl_loc env (InvalidModAppl MAE_WrongArgCount);
+    let me = EcEnv.Mod.by_mpath mp env in
+    let arity = List.length stparams in
+    { me with 
+      me_name  = x; 
+      me_body  = ME_Alias (arity,mp);
+      me_sig   = { sig_ with mis_params = allparams }; 
+    }
 
   | Pm_struct st -> transstruct ~attop env x (mk_loc me.pl_loc st)
 
 (* -------------------------------------------------------------------- *)
+and transmod_params env x params = 
+    (* Check parameters types *) (* FIXME: dup names *)
+  let stparams =
+    List.map                          (* FIXME: exn *)
+      (fun (a, aty) ->
+         (EcIdent.create a.pl_desc, fst (transmodtype env aty)))
+      params
+  in
+
+  (* Check structure items, extending environment initially with
+   * structure arguments, and then with previously checked items. *)
+  let env = EcEnv.Mod.enter x stparams env in
+  stparams, env
+
 and transstruct ~attop (env : EcEnv.env) (x : symbol) (st : pstructure located) =
   let { pl_loc = loc; pl_desc = st; } = st in
 
   if not attop && st.ps_params <> [] then
     tyerror loc env (InvalidModType MTE_InternalFunctor);
 
-  (* Check parameters types *) (* FIXME: dup names *)
-  let stparams =
-    List.map                          (* FIXME: exn *)
-      (fun (a, aty) ->
-         (EcIdent.create a.pl_desc, fst (transmodtype env aty)))
-      st.ps_params
-  in
+  let stparams, env0 = transmod_params env x st.ps_params in
 
-  (* Check structure items, extending environment initially with
-   * structure arguments, and then with previously checked items. *)
-  let env0 = EcEnv.Mod.enter x stparams env in
   let (envi, items) =
     let tydecl1 (x, obj) =
       match obj with
@@ -1318,7 +1325,7 @@ and transstruct ~attop (env : EcEnv.env) (x : symbol) (st : pstructure located) 
           match f.f_def with
           | FBdef def ->
             let rec f_call c f =
-              let f = EcEnv.NormMp.norm_xpath envi f in
+              let f = EcEnv.NormMp.norm_xfun envi f in
               if EcPath.Sx.mem f c then c
               else 
                 let c = EcPath.Sx.add f c in
@@ -1414,7 +1421,6 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item located) =
       let (env, stmt, result, prelude, locals) =
         transbody ue symbols !env retty (mk_loc st.pl_loc body)
       in
-
       (* Close all types *)
       let su      = Tuni.offun (UE.close ue) in
       let retty   = fundef_check_type su env (retty, decl.pfd_tyresult.pl_loc) in

@@ -8,10 +8,11 @@ Array.prototype.peek = function() {
 // --------------------------------------------------------------------
 function EasyCryptEditor(name, url) {
     this.widgets = {
-        code    : $('#' + name + "-code"),
-        feedback: $('#' + name + "-feedback"),
-        status  : $('#' + name + "-status"),
-        log     : $('#' + name + "-log"),
+        code     : $('#' + name + "-code"),
+        feedback : $('#' + name + "-feedback"),
+        status   : $('#' + name + "-status"),
+        log      : $('#' + name + "-log"),
+        operators: $('#' + name + "-operators"),
     };
 
     this.name      = name;
@@ -43,8 +44,8 @@ EasyCryptEditor.prototype.createWidget = function() {
     var onprev = this._on_prev.bind(this);
 
     var km = {
-        "Ctrl-Down" : function (cm) { onnext(); },
-        "Ctrl-Up"   : function (cm) { onprev(); },
+        'Ctrl-N' : function (cm) { onnext(); },
+        'Ctrl-P'   : function (cm) { onprev(); },
     };
 
     var options = {
@@ -72,6 +73,64 @@ EasyCryptEditor.prototype.createWidget = function() {
 EasyCryptEditor.prototype.onopen = function(event){
     this.log('You are now connected to the EasyCrypt engine', 'success', true);
     this.setStatus('ready');
+    
+    var editorState = this.editor.getStateAfter(this.widgets.feedback.height() + 10, true);
+    
+    var numberOfOperators = editorState.operatorsList.length;
+	var numberOfTheories = editorState.theoriesList.length;
+	
+	var j=0;
+	var i=0;
+	
+    while(i<numberOfOperators) {
+    try {
+    	if(editorState.theoriesList[j].startLine < editorState.operatorsList[i].line) {
+			    this.printTheory(editorState, j);
+			    while(editorState.operatorsList[i].line < editorState.theoriesList[j].endLine) {
+			    	this.printOperatorIndented(editorState, i);
+	    			i++;
+	    		}
+	    		j++;
+	    }
+	    else {	    	
+	      	this.printOperator(editorState, i);
+			i++; 
+    		if(i>=numberOfOperators) 
+        		for(j; j<numberOfTheories; j++)
+	    			this.printTheory(editorState, j); 
+	    	} 
+	}catch(TypeError) {
+		j--;
+		for(i; i<numberOfOperators; i++)
+			if(editorState.operatorsList[i].line > editorState.theoriesList[j].startLine && 
+	    	  	editorState.operatorsList[i].line < editorState.theoriesList[j].endLine)
+	    	  	this.printOperatorIndented(editorState, i);
+	    	else			
+				this.printOperator(editorState, i);
+	 }
+	}
+}
+
+EasyCryptEditor.prototype.printOperator = function(editorState, i){
+	this.widgets.operators.append("... <span class='icon icon-plus-sign'/> "
+	    			+ editorState.operatorsList[i].name 
+	    			+ " {line: " + editorState.operatorsList[i].line + "}"  
+	    			+ "<div />");
+}
+
+EasyCryptEditor.prototype.printOperatorIndented = function(editorState, i){
+	this.widgets.operators.append("&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;... <span class='icon icon-plus-sign'/> "
+	    			+ editorState.operatorsList[i].name 
+	    			+ " {line: " + editorState.operatorsList[i].line + "}"  
+	    			+ "<div />");
+}
+
+EasyCryptEditor.prototype.printTheory = function(editorState, j){
+	this.widgets.operators.append("... <span class='icon icon-text-width'/> "
+				    		+ editorState.theoriesList[j].name 
+	    					+ " {start: " + editorState.theoriesList[j].startLine 
+				    		+ " , end: " + editorState.theoriesList[j].endLine + "}"  
+	    					+ "<div />");	
 }
 
 EasyCryptEditor.prototype.onclose = function(event){
@@ -114,6 +173,12 @@ EasyCryptEditor.prototype.onmessage = function(event){
         end.pundo = json.pundo;
         this.setROMark(end);
         this.widgets.feedback.text($.format("{0}\n", json.message));
+        
+        var match = json.message.match(/added operator:/g);
+        var length = json.message.length;
+        if(match != null) {
+	        this.widgets.operators.append($.format("> {0}\n", json.message.substring(17, length-3)));
+	        }
     }
 
     if (json.status == 'undo') {

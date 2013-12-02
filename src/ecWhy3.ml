@@ -1077,7 +1077,7 @@ let trans_tydecl env path td =
         let decl = Decl.create_ty_decl ts in
           ((ts, `Plain), decl)
 
-    | `Datatype (_, cs) ->
+    | `Datatype { tydt_ctors = cs } ->
          let ts   = Ty.create_tysymbol pid tparams None in
          let decl = Decl.create_ty_decl ts in
          let env  = add_ts env path (ts, `Plain) decl in
@@ -1678,8 +1678,13 @@ let add_mod_exp_mp env mp me =
   | _ -> false);
 
   let is_alias = function ME_Alias _ -> true | _ -> false in
-  if is_alias me.me_body then env, []
-  else
+  match me.me_body with
+  | ME_Alias (arity,_) ->
+    if arity = 0 then env, [] 
+    else
+      let ls = Term.create_fsymbol (preid_mp mp) [] ty_mod in
+      add_mp env mp ls, [RBmp(mp,ls)] 
+  | _ ->
     let ls = Term.create_fsymbol (preid_mp mp) [] ty_mod in
     let env = ref (add_mp env mp ls) in
     let rb  = ref [RBmp(mp,ls)] in
@@ -1701,11 +1706,13 @@ let add_mod_exp_mp env mp me =
     and add_comp mp comp =
       match comp with
       | MI_Module me  -> 
-        let mp = EcPath.mqname mp me.me_name in
-        let ls = Term.create_fsymbol (preid_mp mp) tparams ty_mod in
-        env := add_mp !env mp ls;
-        rb  := RBmp(mp,ls) :: !rb;
-        add_comps mp me.me_comps
+        if not (is_alias me.me_body) then begin 
+          let mp = EcPath.mqname mp me.me_name in
+          let ls = Term.create_fsymbol (preid_mp mp) tparams ty_mod in
+          env := add_mp !env mp ls;
+          rb  := RBmp(mp,ls) :: !rb;
+          add_comps mp me.me_comps
+        end
       | MI_Variable v -> 
         add_gpv (EcPath.xpath_fun mp v.v_name) v.v_type
       | MI_Function f -> 

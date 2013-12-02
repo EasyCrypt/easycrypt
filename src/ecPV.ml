@@ -58,19 +58,19 @@ module Snpv = EcMaps.Set.MakeOfMap(Mnpv)
 module Mpv = struct
   type ('a, 'b) t = 
     { s_pv : 'a Mnpv.t; 
-      s_gl : (NormMp.use * 'b) Mm.t;  (* only abstract module *)
+      s_gl : (EcEnv.use * 'b) Mm.t;  (* only abstract module *)
     } 
       
   let empty = { s_pv = Mnpv.empty; s_gl = Mm.empty }
 
   let check_npv_mp env npv mp restr = 
     if not (NormMp.use_mem_xp npv.pv_name restr) then
-      raise (AliasClash (env,AC_concrete_abstract(mp,npv)))
+      raise (AliasClash (env,AC_concrete_abstract(mp,npv))) 
     
   let check_npv env npv m = 
     if is_glob npv then 
       let check1 mp (restr,_) =  check_npv_mp env npv mp restr in
-      Mm.iter check1 m.s_gl
+      Mm.iter check1 m.s_gl 
 
   let add env pv f m = 
     let pv = pvm env pv in
@@ -401,7 +401,7 @@ let lp_write env w lp =
   | LvMap ((_p,_tys),pv,_,ty) -> add w (pv,ty) 
 
 let rec f_write ?(except_fs=Sx.empty) env w f =
-  let f = NormMp.norm_xpath env f in
+  let f = NormMp.norm_xfun env f in
   let func = Fun.by_xpath f env in
   match func.f_def with
   | FBabs oi ->
@@ -443,7 +443,7 @@ and i_write ?(except_fs=Sx.empty) env w i =
     List.fold_left (f_write ~except_fs env) w us.EcBaseLogic.aus_calls
     
 let rec f_read env r f = 
-  let f = NormMp.norm_xpath env f in
+  let f = NormMp.norm_xfun env f in
   let func = Fun.by_xpath f env in
   match func.f_def with
   | FBabs oi ->
@@ -514,7 +514,7 @@ let while_info env e s =
       let r = List.fold_left (e_read env) r es in
       let r = match lp with None -> r | Some lp -> lp_read env r lp in
       let w = match lp with None -> w | Some lp -> lp_write env w lp in
-      let f = NormMp.norm_xpath env f in
+      let f = NormMp.norm_xfun env f in
       (w,r,Sx.add f c)
     | Sassert e ->
       (w,e_read env r e, c)
@@ -1073,7 +1073,7 @@ and i_eqobs_in_refl env i eqo =
   | Sabstract _ -> assert false 
 
 and eqobs_inF_refl env f' eqo = 
-  let f = NormMp.norm_xpath env f' in
+  let f = NormMp.norm_xfun env f' in
   let ffun = Fun.by_xpath f env in
   match ffun.f_def with
   | FBdef fdef ->

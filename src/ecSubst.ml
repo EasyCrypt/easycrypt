@@ -104,8 +104,7 @@ let subst_fun_uses (s : _subst) (u : uses) =
   let calls  = List.map x_subst u.us_calls
   and reads  = Sx.fold (fun p m -> Sx.add (x_subst p) m) u.us_reads Sx.empty
   and writes = Sx.fold (fun p m -> Sx.add (x_subst p) m) u.us_writes Sx.empty in
-
-    { us_calls = calls; us_reads = reads; us_writes = writes; }
+  EcModules.mk_uses calls reads writes
 
 (* -------------------------------------------------------------------- *)
 let subst_oracle_info (s:_subst) (x:oracle_info) = 
@@ -220,8 +219,8 @@ and subst_module_struct (s : _subst) (bstruct : module_structure) =
 (* -------------------------------------------------------------------- *)
 and subst_module_body (s : _subst) (body : module_body) =
   match body with
-  | ME_Alias m ->
-      ME_Alias (s.s_fmp m)
+  | ME_Alias (arity,m) ->
+      ME_Alias (arity, s.s_fmp m)
 
   | ME_Structure bstruct ->
       ME_Structure (subst_module_struct s bstruct)
@@ -275,10 +274,14 @@ let subst_tydecl (s : _subst) (tyd : tydecl) =
     | `Concrete ty ->
         let s = init_tparams s tyd.tyd_params params' in
           `Concrete (s.s_ty ty)
-    | `Datatype (scheme, cs) ->
-        let sty = init_tparams s tyd.tyd_params params' in
-          `Datatype (Fsubst.f_subst (f_subst_of_subst s) scheme,
-                     List.map (fun (x, ty) -> (x, List.map sty.s_ty ty)) cs)
+    | `Datatype dtype ->
+        let sty   = init_tparams s tyd.tyd_params params' in
+        let dtype =
+          { tydt_ctors   = List.map (snd_map (List.map sty.s_ty)) dtype.tydt_ctors;
+            tydt_schelim = Fsubst.f_subst (f_subst_of_subst s) dtype.tydt_schelim;
+            tydt_schcase = Fsubst.f_subst (f_subst_of_subst s) dtype.tydt_schcase; }
+        in
+          `Datatype dtype
     | `Record (scheme, fields) ->
       let sty = init_tparams s tyd.tyd_params params' in
         `Record (Fsubst.f_subst (f_subst_of_subst s) scheme,

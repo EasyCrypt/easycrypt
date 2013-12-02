@@ -69,6 +69,8 @@ val m_functor : mpath -> mpath
 
 val mget_ident : mpath -> ident
 
+val pp_m : Format.formatter -> mpath -> unit
+
 (* -------------------------------------------------------------------- *)
 type xpath = private {
   x_top : mpath;

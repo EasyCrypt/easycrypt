@@ -283,7 +283,7 @@ type ai_t = EcPath.mpath * EcPath.xpath * oracle_info * funsig
 
 (* -------------------------------------------------------------------- *)
 let abstract_info env f1 = 
-  let f   = EcEnv.NormMp.norm_xpath env f1 in
+  let f   = EcEnv.NormMp.norm_xfun env f1 in
   let top = EcPath.m_functor f.EcPath.x_top in
   let def = EcEnv.Fun.by_xpath f env in
   let oi  = 

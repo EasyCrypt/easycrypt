@@ -121,11 +121,13 @@ type module_sig = {
 }
 
 (* -------------------------------------------------------------------- *)
-type uses = {
+type uses = private {
   us_calls  : xpath list;
   us_reads  : Sx.t;
   us_writes : Sx.t;
 }
+
+val mk_uses : xpath list -> Sx.t -> Sx.t -> uses
 
 type function_def = {
   f_locals : variable list;
@@ -158,7 +160,8 @@ type module_expr = {
 }
 
 and module_body =
-  | ME_Alias       of EcPath.mpath
+  | ME_Alias       of int * EcPath.mpath 
+                      (* The int represent the number of argument *)
   | ME_Structure   of module_structure
   | ME_Decl        of module_type * mod_restr 
 

@@ -390,7 +390,7 @@ let process_rewrite1_core (s, o) (p, typs, ue, ax) args g =
       t_rewrite_form ~fpat s fc args g
 
 (* -------------------------------------------------------------------- *)
-let process_rewrite1 loc ri g =
+let rec process_rewrite1 loc ri g =
   let (hyps, concl) = get_goal g in
 
   match ri with
@@ -520,25 +520,29 @@ let process_rewrite1 loc ri g =
   end
 
   | RWRw (s, r, o, l) ->
-    let do1 pe g =
-      let hyps = get_hyps g in
-      let (p, typs, ue, ax) =
-        process_pterm loc (process_formula hyps) hyps pe in
-      let args = List.map (trans_pterm_argument hyps ue) pe.fp_args in
-      process_rewrite1_core (s, o) (p, typs, ue, ax) args g in
-    let ordo = 
-      match o, l with
-      | _, [pe] -> do1 pe
-      | None, l -> t_lor (List.map do1 l)
-      | Some _, _ -> 
-        tacuerror "occurences selector not allowed for multiple rewrite" in
-    match r with
-    | None -> ordo g
-    | Some (b, n) -> t_do b n ordo g
+      let do1 pe g =
+        let hyps = get_hyps g in
+        let (p, typs, ue, ax) =
+          process_pterm loc (process_formula hyps) hyps pe in
+        let args = List.map (trans_pterm_argument hyps ue) pe.fp_args in
+          process_rewrite1_core (s, o) (p, typs, ue, ax) args g in
+      let doall = t_lor (List.map do1 l) in
+
+        match r with
+        | None -> doall g
+        | Some (b, n) -> t_do b n doall g
 
 (* -------------------------------------------------------------------- *)
-let process_rewrite loc ri g =
-  set_loc loc (t_lseq (List.map (process_rewrite1 loc) ri)) g
+let process_rewrite loc ri (juc, n) =
+  let do1 gs (fc, ri) =
+    let tx =
+      match fc with
+      | None    -> t_on_goals
+      | Some fc -> t_focus fc.pl_desc
+    in
+      tx (process_rewrite1 loc ri) gs
+  in
+    set_loc loc (fun () -> List.fold_left do1 (juc, [n]) ri) ()
 
 (* -------------------------------------------------------------------- *)
 let process_elim loc pe ((_, n) as g) =
@@ -816,6 +820,16 @@ let process_elimT loc (pf, qs) g =
   let (hyps, concl) = get_goal g in
 
   let pf = process_form_opt hyps pf None in
+  let qs =
+    match qs with
+    | Some qs -> qs
+    | None    -> begin
+        match EcEnv.Ty.scheme_of_ty pf.f_ty (LDecl.toenv hyps) with
+        | None    -> noelim ()
+        | Some qs -> mk_loc loc (EcPath.toqsymbol qs)
+    end
+  in
+
   let (p, typs, ue, ax) =
     match process_named_pterm loc hyps (qs, None) with
     | (`Global p, typs, ue, ax) -> (p, typs, ue, ax)

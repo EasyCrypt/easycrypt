@@ -49,7 +49,6 @@
 
 (defun easycrypt-init-output-syntax-table ()
   "Set appropriate values for syntax table for EasyCrypt output."
-  (modify-syntax-entry ?`   " ")
   (modify-syntax-entry ?,   " ")
   (modify-syntax-entry ?\'  "_")
   (modify-syntax-entry ?_   "_")

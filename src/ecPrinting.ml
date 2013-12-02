@@ -788,7 +788,7 @@ let pp_opapp (ppe : PPEnv.t) t_ty pp_sub outer fmt (pred, op, tvi, es) =
       match es, EcEnv.Op.by_path_opt op env with
       | [arg], Some op when EcDecl.is_proj op ->
           let pp fmt () =
-            Format.fprintf fmt "%a.(|%a|)"
+            Format.fprintf fmt "%a.`%a"
               (pp_sub ppe (fst outer, (max_op_prec, `NonAssoc))) arg
               pp_opname (nm, opname)
           in
@@ -1206,14 +1206,23 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
   | Flocal id ->
       pp_local ppe fmt id
       
-  | Fpvar (x, i) -> begin
-        match EcEnv.Memory.get_active ppe.PPEnv.ppe_env with
-        | Some i' when EcMemory.mem_equal i i' ->
-            Format.fprintf fmt "%a" (pp_pv ppe) x
-        | _ ->
-          let ppe = PPEnv.enter_by_memid ppe i in
-            Format.fprintf fmt "%a{%a}" (pp_pv ppe) x (pp_mem ppe) i
-  end
+  | Fpvar (x, i) -> 
+    begin match EcEnv.Memory.get_active ppe.PPEnv.ppe_env with
+    | Some i' when EcMemory.mem_equal i i' ->
+      Format.fprintf fmt "%a" (pp_pv ppe) x
+    | _ ->
+      let ppe = PPEnv.enter_by_memid ppe i in
+      Format.fprintf fmt "%a{%a}" (pp_pv ppe) x (pp_mem ppe) i
+    end
+
+  | Fglob (mp, i) ->
+    begin match EcEnv.Memory.get_active ppe.PPEnv.ppe_env with
+    | Some i' when EcMemory.mem_equal i i' ->
+      Format.fprintf fmt "(glob %a)" (pp_topmod ppe) mp 
+    | _ ->
+      let ppe = PPEnv.enter_by_memid ppe i in
+      Format.fprintf fmt "(glob %a){%a}" (pp_topmod ppe) mp (pp_mem ppe) i
+    end
 
   | Fquant (q, bd, f) ->
       let (subppe, pp) = pp_bindings ppe bd in
@@ -1240,9 +1249,6 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
   | Ftuple args ->
       pp_tuple `ForTuple ppe pp_form_r (fst outer) fmt args
       
-  | Fglob (mp, me) ->
-      Format.fprintf fmt "(glob %a){%a}" (pp_topmod ppe) mp (pp_mem ppe) me
-
   | FhoareF hf ->
       let ppe = PPEnv.create_and_push_mem ppe ~active:true (EcFol.mhr, hf.hf_f) in
       Format.fprintf fmt "hoare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]]"
@@ -1358,7 +1364,7 @@ let pp_typedecl (ppe : PPEnv.t) fmt (x, tyd) =
     match tyd.tyd_type with
     | `Abstract _ -> ()                (* FIXME: TC HOOK *)
     | `Concrete ty -> Format.fprintf fmt " =@ %a" (pp_type ppe) ty
-    | `Datatype (_, cs) ->
+    | `Datatype { tydt_ctors = cs } ->
         let pp_ctor fmt (c, cty) =
           match cty with
           | [] -> Format.fprintf fmt "%s" c
@@ -2028,7 +2034,7 @@ let rec pp_modexp ppe fmt me =
     (pp_modbody ppe) me.me_body 
 
 and pp_modbody ppe fmt = function
-  | ME_Alias mp -> Format.fprintf fmt "@,%a" (pp_topmod ppe) mp
+  | ME_Alias (_,mp) -> Format.fprintf fmt "@,%a" (pp_topmod ppe) mp
   | ME_Structure ms -> 
     Format.fprintf fmt " {@,  @[<v>%a@]@,}"
       (pp_list "@,@," (pp_moditem ppe)) ms.ms_body 

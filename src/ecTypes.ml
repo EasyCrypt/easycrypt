@@ -328,10 +328,6 @@ let pv_compare_p v1 v2 =
 let is_loc v = match v.pv_kind with PVloc -> true | _ -> false
 let is_glob v = match v.pv_kind with PVglob -> true | _ -> false
   
-let pv_subst m_subst pv = 
-  let mp' = m_subst pv.pv_name in
-  if pv.pv_name == mp' then pv else { pv with pv_name = mp'}
-
 let symbol_of_pv pv = 
   EcPath.basename pv.pv_name.EcPath.x_sub
 
@@ -353,18 +349,23 @@ let pv_loc f s =
 
 let pv_res (f:EcPath.xpath) = pv_loc f "res"
 
-let pv_glob x =
+let xp_glob x = 
   let top = x.EcPath.x_top in
-  let x = 
-    if top.EcPath.m_args = [] then x
-    else 
-      let ntop = EcPath.mpath top.m_top [] in (* remove the functor argument *)
-      EcPath.xpath ntop x.EcPath.x_sub in
-  { pv_name = x; pv_kind = PVglob }
+  if top.EcPath.m_args = [] then x
+  else 
+    let ntop = EcPath.mpath top.m_top [] in (* remove the functor argument *)
+    EcPath.xpath ntop x.EcPath.x_sub 
+
+let pv_glob x =
+  { pv_name = xp_glob x; pv_kind = PVglob }
 
 let pv x k = 
   if k = PVglob then pv_glob x 
   else { pv_name = x; pv_kind = k }
+
+let pv_subst m_subst px = 
+  let mp' = m_subst px.pv_name in
+  if px.pv_name == mp' then px else pv mp' px.pv_kind
 
 (* -------------------------------------------------------------------- *)
 type lpattern =

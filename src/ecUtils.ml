@@ -8,6 +8,10 @@ type 'a eq  = 'a -> 'a -> bool
 type 'a cmp = 'a -> 'a -> int
 
 (* -------------------------------------------------------------------- *)
+let clamp ~min ~max i =
+  Pervasives.min max (Pervasives.max min i)
+
+(* -------------------------------------------------------------------- *)
 let tryexn (ignoreexn : exn -> bool) (f : unit -> 'a) =
   try  Some (f ())
   with e -> if ignoreexn e then None else raise e

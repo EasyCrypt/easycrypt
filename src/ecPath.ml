@@ -210,6 +210,25 @@ let rec m_fv fv mp =
     | `Concrete _  -> fv in
   List.fold_left m_fv fv mp.m_args 
 
+let rec pp_list sep pp fmt xs =
+  let pp_list = pp_list sep pp in
+    match xs with
+    | []      -> ()
+    | [x]     -> Format.fprintf fmt "%a" pp x
+    | x :: xs -> Format.fprintf fmt "%a%(%)%a" pp x sep pp_list xs
+
+let rec pp_m fmt mp = 
+  let pp_args fmt args = 
+    if args <> [] then
+      Format.fprintf fmt "@[(%a)@]" (pp_list "," pp_m) args in
+  match mp.m_top with
+  | `Local id -> 
+    Format.fprintf fmt "%s%a" (EcIdent.tostring id) pp_args mp.m_args
+  | `Concrete(p,None) ->
+    Format.fprintf fmt "%s%a" (tostring p) pp_args mp.m_args
+  | `Concrete(p,Some sub) ->
+    Format.fprintf fmt "%s%a.%s" (tostring p) pp_args mp.m_args (tostring sub)
+
 (* -------------------------------------------------------------------- *)
 type xpath = {
   x_top : mpath;
