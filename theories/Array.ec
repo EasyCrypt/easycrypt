@@ -526,7 +526,7 @@ lemma range_alli i j p (xs:'x array):
 proof strict.
 intros=> i_j_bnd.
 cut ->: (lambda k b, b /\ p k xs.[k]) =
-         (lambda k b, b /\ (lambda k x, p k x.[k]) k xs) by smt.
+         (lambda k b, b /\ (lambda k, p k xs.[k]) k) by smt.
 rewrite ForLoop.rangeb_forall //=.
 rewrite alli_def length_sub; first 3 smt.
 split.
