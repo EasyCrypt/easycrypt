@@ -427,7 +427,7 @@ let gen_check_restr env pp_a a use restr =
       let mp2 = EcPath.mident id2 in
       let r2  = NormMp.get_restr env mp2 in
       if not (NormMp.use_mem_xp xp r2) then
-        tacuerror "%a use the variable %a, but should not use the module %a (which can use %a)" (pp_a ppe) a (EcPrinting.pp_pv ppe) (pv_glob xp)
+        tacuerror "%a uses the variable %a, but should not use the module %a (which can use %a)" (pp_a ppe) a (EcPrinting.pp_pv ppe) (pv_glob xp)
           pp_mp mp2 (EcPrinting.pp_pv ppe) (pv_glob xp) in
     EcIdent.Sid.iter check restr.us_gl in
   EcPath.Mx.iter check_xp (use.us_pv);

@@ -281,7 +281,7 @@ let process_bdhoare_split info g =
       if is_and po then t_bdhoare_and
       else if is_or po then t_bdhoare_or
       else tacuerror 
-        "The postcondition should be a conjunction or a disjonction" in
+        "The postcondition should be a conjunction or a disjunction" in
     let b1 = EcCoreHiLogic.process_form penv b1 treal in
     let b2 = EcCoreHiLogic.process_form penv b2 treal in
     let b3 = match b3 with
