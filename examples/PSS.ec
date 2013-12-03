@@ -163,10 +163,10 @@ lemma nosmt plain0_bnd pk:
   mu_x (sample_plain pk) Signature.zeros <= 1%r / (2 ^ (k - 1))%r.
 proof strict.
 intros=> valid; rewrite plain0 //.
-cut H: forall x y, 1 <= x => x <= y => 1%r / y%r <= 1%r / x%r. admit. (* Why3 does not know this! It is probably something we will use A LOT! *)
-apply H.
-  smt.
-  by cut := card_plain_valid pk; rewrite card_plain; smt.
+cut H: forall x y, 1 <= x <= y => 1%r / y%r <= 1%r / x%r.
+  admit. (* Why3 does not know this! It is probably something we will use A LOT! *)
+apply H; split; first smt.
+by cut:= card_plain_valid pk; rewrite card_plain; smt.
 qed.
 
 op ( * ): signature -> signature -> pkey -> signature.
@@ -324,27 +324,31 @@ clone GenDice as S with
     type input = pkey,
     type t' <- htag * gtag,
     op d <- sample_plain,
-    op test <- (lambda (pk:pkey, z:signature), (sub (to_bits z) 0 1) = zeros 1),
-    op d' (pk:pkey) <-  sample_htag * sample_gtag
+    op test <- (lambda (pk:pkey) (z:signature), (sub (to_bits z) 0 1) = zeros 1),
+    op d' (pk:pkey) <-  sample_htag * sample_gtag,
+    op sub_supp <- (lambda (pk:pkey),
+                      Finite.toFSet (filter (lambda (x:signature), sub (to_bits x) 0 1 = zeros 1) univ))
     proof *.
-  realize dU. 
-  proof. apply RSA.challengeU. qed.
+  realize dU. proof strict. apply RSA.challengeU. qed.
   realize test_in_supp. 
-  proof. 
-   intros pk x /=.
-   admit.
-  save.
-  realize test_sub_supp. 
-  proof.
-   (* TODO : sub_supp should be defined *)
-   admit.
-  save.
-  realize d'_uni. 
-  proof. 
-   intros pk x /=.
-   (* Ident *)
-   admit.
-  save.
+  proof strict. intros pk x /=. admit. qed. (* sub (to_bits x) 0 1 = zeros 1 => toInt x <= modulus_p pk *)
+  realize test_sub_supp.
+  proof strict.
+    cut fSig: Finite.finite univ<:signature>. admit. (* this should be known for finite words on finite alphabets *)
+    by intros=> i x; rewrite Finite.filterM 2:mem_filter 2:Finite.mem_toFSet 3:mem_univ.
+  qed.
+  realize d'_uni. proof strict. intros pk x /=.
+    cut fSig: Finite.finite univ<:signature>. admit. (* this should be known for finite words on finite alphabets *)
+    intros supp; rewrite Finite.filterM //.
+    cut ->: card (filter (lambda (x:signature), sub (to_bits x) 0 1 = zeros 1) (Finite.toFSet univ)) =
+              2^(k - 1). admit. (* | filter (lambda x, sub (to_bits x) 0 n = x') {words<k>}| = 2^(k - n) *)
+    rewrite Dprod.mu_x_def
+            /sample_htag HTag.Dword.mu_x_def
+            /sample_gtag GTag.Dword.mu_x_def.
+    cut ->: 1%r / (2^k1)%r * (1%r  /(2^kg)%r) = 1%r / ((2^k1) * (2^kg))%r by smt.
+    cut ->: forall m n, 0 <= m => 0 <= n => 2^m * 2^n = 2^(m + n); first 3 smt.
+    smt.
+  qed.
 
 section. 
   declare module A:CMA_2RO {G,G',H,EF_CMA,Wrap,OW}.
@@ -1066,8 +1070,11 @@ section.
                 pi3_1 (proj Hmap.m.[x]{1}) = pi3_1 (proj Hmap.m.[x]{2})) /\
               (forall x, in_dom x Hmap.m{1} =>
                 pi3_2 (proj Hmap.m.[x]{1}) = pi3_2 (proj Hmap.m.[x]{2}))).
-      by wp; skip; progress=> //; [smt| |];
-         (case (x = x0){2}; [| intros=> x_x0; do 2!rewrite /"_.[_]" ?get_setN //]; smt).
+      wp; skip; progress=> //; first smt.
+       case (x = x0){2}; first smt.
+       by intros=> x_x0; do 2!rewrite /"_.[_]" ?get_setN //; smt.
+       case (x = x0){2}; first smt.
+       by intros=> x_x0; do 2!rewrite /"_.[_]" ?get_setN //; smt.
     by wp; skip; progress=> //; smt.
 
     if; [smt | | ]; wp; skip; progress=> //; first 2 last; last 3 smt.
