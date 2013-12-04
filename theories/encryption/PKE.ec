@@ -168,29 +168,6 @@ section.
   axiom Lenc : islossless S.enc. 
   axiom La   : forall (LR<:LR{A}), islossless LR.orcl => islossless A(LR).main.
 
-  equiv CPAL_INDL (A0<:AdvCPA {K,H.C,S}) : 
-        CPAL(S,A0).main ~ INDL(ToOrcl(S),ToAdv(A0)).main : ={glob A0, glob S} ==>
-           ={res,glob A0, glob S, K.pk} /\ K.c{1} = H.C.c{2}.
-  proof.
-    fun. 
-    inline INDL(ToOrcl(S), ToAdv(A0)).A.main H.C.init  ToOrcl(S).leaks.
-    wp;call (_: ={glob S, K.pk} /\ K.c{1} = H.C.c{2}).
-      by fun;inline ToOrcl(S).orcl H.C.incr;wp;call (_:true);wp.
-    by wp;call (_:true);wp.
-  qed.
-
-  equiv CPAR_INDR (A0<:AdvCPA {K,H.C,S}) : 
-        CPAR(S,A0).main ~ INDR(ToOrcl(S),ToAdv(A0)).main : ={glob A0, glob S} ==>
-           ={res,glob A0, glob S, K.pk} /\ K.c{1} = H.C.c{2}.
-  proof.
-    fun. 
-    inline INDR(ToOrcl(S), ToAdv(A0)).A.main H.C.init  ToOrcl(S).leaks.
-    wp;call (_: ={glob S, K.pk} /\ K.c{1} = H.C.c{2}).
-      by fun;inline ToOrcl(S).orcl H.C.incr;wp;call (_:true);wp.
-    by wp;call (_:true);wp.
-  qed.
-
-
   lemma CPA1_CPAn &m : 0 < H.q => 
     Pr[CPAL(S,B(S,A)).main() @ &m : res /\ H.LRB.l <= H.q /\ K.c <= 1] - 
     Pr[CPAR(S,B(S,A)).main() @ &m : res /\ H.LRB.l <= H.q /\ K.c <= 1] =
@@ -200,10 +177,22 @@ section.
     intros Hq.
     cut -> : Pr[CPAL(S, A).main() @ &m : res /\ K.c <= H.q] =
              Pr[INDL(ToOrcl(S),ToAdv(A)).main() @ &m : res /\ H.C.c <= H.q].
-      by equiv_deno (CPAL_INDL A).
+      equiv_deno (_ : ={glob A, glob S} ==>
+                        ={res,glob A, glob S, K.pk} /\ K.c{1} = H.C.c{2}) => //.
+      fun. 
+      inline INDL(ToOrcl(S), ToAdv(A)).A.main H.C.init  ToOrcl(S).leaks.
+      wp;call (_: ={glob S, K.pk} /\ K.c{1} = H.C.c{2}).
+        by fun;inline ToOrcl(S).orcl H.C.incr;wp;call (_:true);wp.
+      by wp;call (_:true);wp.
     cut -> : Pr[CPAR(S, A).main() @ &m : res /\ K.c <= H.q] =
              Pr[INDR(ToOrcl(S),ToAdv(A)).main() @ &m : res /\ H.C.c <= H.q].          
-      by equiv_deno (CPAR_INDR A).
+      equiv_deno (_ : ={glob A, glob S} ==>
+                        ={res,glob A, glob S, K.pk} /\ K.c{1} = H.C.c{2}) => //.
+      fun. 
+      inline INDR(ToOrcl(S), ToAdv(A)).A.main H.C.init  ToOrcl(S).leaks.
+      wp;call (_: ={glob S, K.pk} /\ K.c{1} = H.C.c{2}).
+        by fun;inline ToOrcl(S).orcl H.C.incr;wp;call (_:true);wp.
+      by wp;call (_:true);wp.
     cut := IND1_INDn (ToOrcl(S)) (ToAdv(A)) _ _ _ _ &m (lambda ga go c, true) => //=.
       by fun;call Lkg.
       by fun;call Lenc.    
