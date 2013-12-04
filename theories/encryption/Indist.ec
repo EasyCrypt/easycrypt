@@ -34,8 +34,6 @@ module OrclL (O:Orcl) = {
 }.
 
 module OrclR (O:Orcl) = {
-  fun init () : unit = { C.init(); }
-
   fun orcl (m0 m1:input) : output = {
     var r : output;
     C.incr();
