@@ -15,200 +15,201 @@ op mem:'a -> 'a set -> bool.
 pred (==) (X1 X2:'a set) = forall x, mem x X1 <=> mem x X2.
 
 (* Extension is an equivalence relation *)
-lemma nosmt eq_refl: forall (X:'a set), X == X by [].
-lemma nosmt eq_symm: forall (X Y:'a set), X == Y => Y == X by [].
-lemma nosmt eq_tran: forall (X Y Z:'a set), X == Y => Y == Z => X == Z by [].
+lemma nosmt eq_refl (X:'a set): X == X by [].
+lemma nosmt eq_symm (X Y:'a set): X == Y => Y == X by [].
+lemma nosmt eq_tran (X Y Z:'a set): X == Y => Y == Z => X == Z by [].
 
 (* And we can use it as equality *)
-axiom set_ext: forall (X1 X2:'a set), X1 == X2 => X1 = X2.
+axiom set_ext (X1 X2:'a set): X1 == X2 => X1 = X2.
 
 (** Inclusion *)
 pred (<=) (X1 X2:'a set) = forall x, mem x X1 => mem x X2.
 
 (* Inclusion is a partial order *)
-lemma leq_refl: forall (X:'a set),
+lemma leq_refl (X:'a set):
   X <= X
 by trivial.
 
-lemma leq_asym: forall (X Y:'a set),
+lemma leq_asym (X Y:'a set):
   X <= Y => Y <= X => X = Y
-by (intros=> X Y X_leq_Y Y_leq_X; apply set_ext; smt).
+by (intros=> X_leq_Y Y_leq_X; apply set_ext; smt).
 
-lemma leq_tran: forall (X Y Z:'a set),
+lemma leq_tran (X Y Z:'a set):
   X <= Y => Y <= Z => X <= Z.
 proof strict.
-by delta (<=) beta; intros=> X Y Z X_leq_Y Y_leq_Z x x_in_X;
+by rewrite /Top.(<=); intros=> X_leq_Y Y_leq_Z x x_in_X;
    apply Y_leq_Z=> //; apply X_leq_Y=> //.
 qed.
 
 pred (>=) (X1 X2:'a set) = X2 <= X1.
-pred (<) (X1 X2:'a set) = X1 <= X2 /\ X1 <> X2.
-pred (>) (X1 X2:'a set) = X2 < X1.
+pred (<)  (X1 X2:'a set) = X1 <= X2 /\ X1 <> X2.
+pred (>)  (X1 X2:'a set) = X2 < X1.
 
 (** mem *)
 op empty:'a set.
-axiom mem_empty: forall (x:'a), !(mem x empty).
+axiom mem_empty (x:'a): !(mem x empty).
 
-lemma empty_leq: forall (X:'a set), empty <= X by [].
-lemma empty_unique: forall (X:'a set),
+lemma empty_leq (X:'a set): empty <= X by [].
+lemma empty_unique (X:'a set):
   (forall (x:'a), !(mem x X)) <=> X = empty
 by [].
 
 (** add *)
 op add:'a -> 'a set -> 'a set.
-axiom mem_add: forall (x y:'a) X,
+axiom mem_add (x y:'a) X:
   (mem x (add y X)) = (mem x X \/ x = y).
 
-lemma add_in_id: forall (x:'a) X,
+lemma add_in_id (x:'a) X:
   mem x X => X = add x X
-by (intros=> x X x_in_X; apply set_ext; smt).
+by (intros=> x_in_X; apply set_ext; smt).
 
-lemma leq_add: forall (x:'a) X, X <= add x X by [].
+lemma leq_add (x:'a) X: X <= add x X by [].
 
 (** rm *)
 op rm:'a -> 'a set -> 'a set.
-axiom mem_rm_eq: forall (x:'a) X,
+axiom mem_rm_eq (x:'a) X:
   !(mem x (rm x X)).
-axiom mem_rm_neq: forall (x x':'a) X,
+axiom mem_rm_neq (x x':'a) X:
   x <> x' => mem x (rm x' X) = mem x X.
 
-lemma mem_rm: forall (x x':'a) (X:'a set),
+lemma mem_rm (x x':'a) (X:'a set):
   mem x (rm x' X) = (mem x X /\ x <> x').
-intros x x' X; case (x = x')=> x_x'.
+proof strict.
+case (x = x')=> x_x'.
   by subst x'; logic; apply neqF; apply mem_rm_eq.
   by logic; apply mem_rm_neq.
-save.
+qed.
 
-lemma rm_add_eq: forall (x:'a) X,
+lemma rm_add_eq (x:'a) X:
   rm x (add x X) = rm x X
-by (intros=> x X; apply set_ext; smt).
+by (apply set_ext; smt).
 
-lemma rm_add_neq: forall (x x':'a) X,
+lemma rm_add_neq (x x':'a) X:
   x <> x' => rm x (add x' X) = add x' (rm x X).
 proof strict.
-intros=> x x' X x_x'; apply set_ext;
+intros=> x_x'; apply set_ext;
 delta (==); beta=> x0;
 case (x = x0)=> x_x0.
   by subst x0; smt.
   by rewrite mem_rm_neq; smt.
 qed.
 
-lemma add_rm_in: forall (x:'a) X,
+lemma add_rm_in (x:'a) X:
   mem x X => add x (rm x X) = X
-by (intros=> x X x_in_X; apply set_ext; smt).
+by (intros=> x_in_X; apply set_ext; smt).
 
-lemma add_destruct: forall (x:'a) X,
+lemma add_destruct (x:'a) X:
   (exists X', !mem x X' /\ X = add x X') <=> mem x X
 by [].
 
 (** single *)
 op single:'a -> 'a set.
-axiom mem_single_eq: forall (x:'a),
+axiom mem_single_eq (x:'a):
   mem x (single x).
-axiom mem_single_neq: forall (x x':'a),
+axiom mem_single_neq (x x':'a):
   x <> x' => !mem x (single x').
 
 (** compl *)
 op compl:'a set -> 'a set.
-axiom mem_compl: forall x (X:'a set),
+axiom mem_compl x (X:'a set):
   mem x (compl X) <=> !mem x X.
 
-lemma complK: forall (X:'a set),
+lemma complK (X:'a set):
   compl (compl X) = X
-by (intros=> X; apply set_ext; smt).
+by (apply set_ext; smt).
 
 (** univ *)
 const univ:'a set = compl empty.
-lemma mem_univ: forall (x:'a),
+lemma mem_univ (x:'a):
   mem x univ
 by [].
 
 (** union *)
 op union:'a set -> 'a set -> 'a set.
-axiom mem_union: forall x (X1 X2:'a set),
+axiom mem_union x (X1 X2:'a set):
   mem x (union X1 X2) <=> (mem x X1 \/ mem x X2).
 
-lemma unionC: forall (X1 X2:'a set),
+lemma unionC (X1 X2:'a set):
   union X1 X2 = union X2 X1
-by (intros=> X1 X2; apply set_ext; smt).
+by (apply set_ext; smt).
 
-lemma unionA: forall (X1 X2 X3:'a set),
+lemma unionA (X1 X2 X3:'a set):
   union (union X1 X2) X3 = union X1 (union X2 X3)
-by (intros=> X1 X2 X3; apply set_ext; smt).
+by (apply set_ext; smt).
 
-lemma union0s: forall (X:'a set),
+lemma union0s (X:'a set):
   union empty X = X
-by (intros=> X; apply set_ext; smt).
+by (apply set_ext; smt).
 
-lemma unionLs: forall (X1 X2:'a set),
+lemma unionLs (X1 X2:'a set):
   X1 <= union X1 X2
 by [].
 
-lemma unionK: forall (X:'a set),
+lemma unionK (X:'a set):
   union X X = X
-by (intros=> X; apply set_ext; smt).
+by (apply set_ext; smt).
 
-lemma unionNs: forall (X:'a set),
+lemma unionNs (X:'a set):
   union X (compl X) = univ
-by (intros=> X; apply set_ext; smt).
+by (apply set_ext; smt).
 
-lemma union1s: forall (X:'a set),
+lemma union1s (X:'a set):
   union univ X = univ
-by (intros=> X; apply set_ext; smt).
+by (apply set_ext; smt).
 
 (** inter *)
 op inter:'a set -> 'a set -> 'a set.
-axiom mem_inter: forall x (X1 X2:'a set),
+axiom mem_inter x (X1 X2:'a set):
   mem x (inter X1 X2) <=> (mem x X1 /\ mem x X2).
 
-lemma interC: forall (X1 X2:'a set),
+lemma interC (X1 X2:'a set):
   inter X1 X2 = inter X2 X1
-by (intros=> X1 X2; apply set_ext; smt).
+by (apply set_ext; smt).
 
-lemma interA: forall (X1 X2 X3:'a set),
+lemma interA (X1 X2 X3:'a set):
   inter (inter X1 X2) X3 = inter X1 (inter X2 X3)
-by (intros=> X1 X2 X3; apply set_ext; smt).
+by (apply set_ext; smt).
 
-lemma interGs: forall (X1 X2:'a set),
+lemma interGs (X1 X2:'a set):
   inter X1 X2 <= X1
 by [].
 
-lemma interK: forall (X:'a set),
+lemma interK (X:'a set):
   inter X X = X
-by (intros=> X; apply set_ext; smt).
+by (apply set_ext; smt).
 
-lemma inter0s: forall (X:'a set),
+lemma inter0s (X:'a set):
   inter empty X = empty
-by (intros=> X; apply set_ext; smt).
+by (apply set_ext; smt).
 
-lemma inter1s: forall (X:'a set),
+lemma inter1s (X:'a set):
   inter X univ = X
-by (intros=> X; apply set_ext; smt).
+by (apply set_ext; smt).
 
 (** all *)
 op all:'a cpred -> 'a set -> bool.
-axiom all_def: forall (p:'a cpred) X,
+axiom all_def (p:'a cpred) X:
   all p X <=> (forall x, mem x X => p x).
 
 (** any *)
 op any:'a cpred -> 'a set -> bool.
-axiom any_def: forall (p:'a cpred) X,
+axiom any_def (p:'a cpred) X:
   any p X <=> (exists x, mem x X /\ p x).
 
 (** filter *)
 op filter:'a cpred -> 'a set -> 'a set.
-axiom mem_filter: forall x (p:'a cpred) X,
+axiom mem_filter x (p:'a cpred) X:
   mem x (filter p X) <=> (mem x X /\ p x).
 
-lemma filter_cpTrue: forall (X:'a set),
+lemma filter_cpTrue (X:'a set):
   filter cpTrue X = X
-by (intros=> X; apply set_ext; smt).
+by (apply set_ext; smt).
 
-lemma filter_cpEq_in: forall (x:'a) X,
+lemma filter_cpEq_in (x:'a) X:
   mem x X => filter ((=) x) X = single x
-by (intros=> x X x_in_X; apply set_ext; smt).
+by (intros=> x_in_X; apply set_ext; smt).
 
-lemma leq_filter: forall (p:'a cpred) X,
+lemma leq_filter (p:'a cpred) X:
   filter p X <= X
 by [].
 
@@ -239,13 +240,23 @@ by apply set_ext=> x;
    rewrite mem_filter mem_univ /= mem_create.
 qed.
 
+(*** Cross-operator lemmas *)
+(** This is another scary one *)
+lemma inter_filter (X Y:'a set):
+  inter X Y = filter (lambda x, mem x X) Y.
+proof strict.
+by apply set_ext=> x; rewrite mem_inter mem_filter.
+qed.
+
+(*** Finite sets and isomorphism between finite ISets and FSet *)
 theory Finite.
   require        FSet.
 
   pred (==) (X:'a set) (Y:'a FSet.set) =
     forall (x:'a), mem x X <=> FSet.mem x Y.
 
-  pred finite (X:'a set) = exists (X':'a FSet.set), X == X'.
+  pred finite (X:'a set) =
+    exists (X':'a FSet.set), X == X'.
 
   op toFSet: 'a set -> 'a FSet.set.
   axiom toFSet_cor (X:'a set):
@@ -263,37 +274,37 @@ theory Finite.
   by apply toFSet_cor.
   qed.
 
-  lemma finite_fromFSet: forall (X:'a FSet.set),
+  lemma finite_fromFSet (X:'a FSet.set):
     finite (fromFSet X)
-  by (intros=> X; exists X; apply fromFSet_cor).
+  by (exists X; apply fromFSet_cor).
 
-  lemma toFSetI: forall (X Y:'a set),
+  lemma toFSetI (X Y:'a set):
     finite X => finite Y =>
     toFSet X = toFSet Y => X = Y.
   proof strict.
-  by intros=> X Y fX fY eq_toFSet; apply set_ext=> x;
+  by intros=> fX fY eq_toFSet; apply set_ext=> x;
      rewrite 2?toFSet_cor ?eq_toFSet.
   qed.
 
-  lemma fromFSetI: forall (X Y:'a FSet.set),
+  lemma fromFSetI (X Y:'a FSet.set):
     fromFSet X = fromFSet Y => X = Y.
   proof strict.
-  by intros=> X Y eq_fromFSet; apply FSet.set_ext=> x;
+  by intros=> eq_fromFSet; apply FSet.set_ext=> x;
      rewrite -2!fromFSet_cor eq_fromFSet.
   qed.
 
-  lemma toFSet_fromFSet: forall (X:'a FSet.set),
+  lemma toFSet_fromFSet (X:'a FSet.set):
     toFSet (fromFSet X) = X.
   proof strict.
-  by intros=> X; apply FSet.set_ext=> x;
+  by apply FSet.set_ext=> x;
      rewrite -toFSet_cor ?fromFSet_cor ?finite_fromFSet.
   qed.
 
-  lemma fromFSet_toFSet: forall (X:'a set),
+  lemma fromFSet_toFSet (X:'a set):
     finite X =>
     fromFSet (toFSet X) = X.
   proof strict.
-  by intros=> X fX; apply set_ext=> x; rewrite fromFSet_cor toFSet_cor.
+  by intros=> fX; apply set_ext=> x; rewrite fromFSet_cor toFSet_cor.
   qed.
 
   (* We should then show that all set operations correspond as expected *)
@@ -309,18 +320,75 @@ theory Finite.
   by apply FSet.set_ext; smt.
   qed.
 
-  lemma finite_add (X :'a set) x: finite X => finite (add x X).
+  lemma finite_add (X :'a set) x:
+    finite X => finite (add x X).
   proof strict.
   intros=> [Y X_Y].
   exists (FSet.add x Y)=> y.
   by rewrite FSet.mem_add mem_add  X_Y.
   qed.
 
-  lemma add_morph (X :'a set) x:
+  lemma addM (X :'a set) x:
     finite X => toFSet (add x X) = FSet.add x (toFSet X).
   proof strict.
   intros=> fX; apply FSet.set_ext=> y.
   rewrite (mem_toFSet y (add x X)) ?finite_add //.
   by rewrite FSet.mem_add mem_add (mem_toFSet y X).
+  qed.
+
+  lemma finite_filter p (X:'a set):
+    finite X =>
+    finite (filter p X).
+  proof strict.
+  intros=> [X' X_X'].
+  exists (FSet.filter p X')=> x.
+  by rewrite mem_filter FSet.mem_filter X_X'.
+  qed.
+
+  lemma filterM p (X:'a set):
+    finite X =>
+    toFSet (filter p X) = FSet.filter p (toFSet X).
+  proof strict.
+  intros=> fX; apply FSet.set_ext=> x.
+  rewrite mem_toFSet ?finite_filter //.
+  by rewrite mem_filter FSet.mem_filter mem_toFSet.
+  qed.
+
+  lemma finite_union (X Y:'a set):
+    finite X =>
+    finite Y =>
+    finite (union X Y).
+  proof strict.
+  intros=> [X' X_X'] [Y' Y_Y'].
+  exists (FSet.union X' Y')=> x.
+  by rewrite mem_union FSet.mem_union X_X' Y_Y'.
+  qed.
+
+  lemma unionM (X Y:'a set):
+    finite X =>
+    finite Y =>
+    toFSet (union X Y) = FSet.union (toFSet X) (toFSet Y).
+  proof strict.
+  intros=> fX fY; apply FSet.set_ext=> x.
+  rewrite mem_toFSet ?finite_union //.
+  by rewrite FSet.mem_union mem_union !mem_toFSet.
+  qed.
+
+  lemma finite_inter (X Y:'a set):
+    finite Y =>
+    finite (inter X Y).
+  proof strict.
+  intros=> fY.
+  by rewrite inter_filter finite_filter.
+  qed.
+
+  lemma interM (X Y:'a set):
+    finite X =>
+    finite Y =>
+    toFSet (inter X Y) = FSet.inter (toFSet X) (toFSet Y).
+  proof strict.
+  intros=> fX fY; apply FSet.set_ext=> x.
+  rewrite mem_toFSet ?finite_inter //.
+  by rewrite mem_inter FSet.mem_inter !mem_toFSet.
   qed.
 end Finite.
