@@ -424,6 +424,7 @@ and expr_node =
   | Elet   of lpattern * expr * expr       (* let binding           *)
   | Etuple of expr list                    (* tuple constructor     *)
   | Eif    of expr * expr * expr           (* _ ? _ : _             *)
+  | Eproj  of expr * int                   (* projection of a tuple *)
 
 type closure = (EcIdent.t * ty) list * expr
 
@@ -465,6 +466,7 @@ let fv_node e =
   | Elam (b, e)       -> List.fold_left
                            (fun s (id, _) -> Mid.remove id s)
                            (e_fv e) b
+  | Eproj(e,_)        -> e_fv e
 
 (* -------------------------------------------------------------------- *)
 module Hexpr = Why3.Hashcons.Make (struct 
@@ -499,6 +501,8 @@ module Hexpr = Why3.Hashcons.Make (struct
         (e_equal c1 c2) && (e_equal e1 e2) && (e_equal f1 f2)
     | Elam(b1,e1), Elam(b2,e2) ->
       e_equal e1 e2 && b_equal b1 b2
+    | Eproj(e1,i1), Eproj(e2,i2) ->
+      i1 = i2 && e_equal e1 e2
     | _, _ -> false
 
   let equal e1 e2 = 
@@ -537,6 +541,9 @@ module Hexpr = Why3.Hashcons.Make (struct
 
     | Elam(b,e) ->
         Why3.Hashcons.combine (e_hash e) (b_hash b) 
+
+    | Eproj(e,i) ->
+        Why3.Hashcons.combine (e_hash e) i
           
   let tag n e = 
     let fv = fv_union (fv_node e.e_node) e.e_ty.ty_fv in
@@ -555,6 +562,7 @@ let e_op    = fun x targs ty -> mk_expr (Eop (x, targs)) ty
 let e_let   = fun pt e1 e2 -> mk_expr (Elet (pt, e1, e2)) e2.e_ty
 let e_tuple = fun es -> mk_expr (Etuple es) (ttuple (List.map e_ty es))
 let e_if    = fun c e1 e2 -> mk_expr (Eif (c, e1, e2)) e2.e_ty
+let e_proj  = fun e i ty -> mk_expr (Eproj(e,i)) ty
 
 let e_lam b e =
   if b = [] then e

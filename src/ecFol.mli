@@ -47,6 +47,7 @@ and f_node =
   | Fop     of EcPath.path * ty list
   | Fapp    of form * form list
   | Ftuple  of form list
+  | Fproj   of form * int 
 
   | FhoareF of hoareF (* $hr / $hr *)
   | FhoareS of hoareS (* $hr  / $hr   *)
@@ -116,7 +117,7 @@ and bdHoareS = {
   bhs_bd  : form;
 }
 
-and pr = memory * EcPath.xpath * form list * form
+and pr = memory * EcPath.xpath * form * form
 
 type app_bd_info =
 | AppNone
@@ -147,6 +148,7 @@ val f_glob  : EcPath.mpath -> memory -> form
 val f_op     : EcPath.path -> EcTypes.ty list -> EcTypes.ty -> form
 val f_app    : form -> form list -> EcTypes.ty -> form
 val f_tuple  : form list -> form
+val f_proj   : form -> int -> EcTypes.ty -> form
 val f_if     : form -> form -> form -> form
 val f_let    : EcTypes.lpattern -> form -> form -> form
 val f_let1   : EcIdent.t -> form -> form -> form
@@ -197,7 +199,7 @@ val f_eagerF   : form -> EcModules.stmt -> EcPath.xpath ->
                  form 
 
 (* soft-constructors - PR *)
-val f_pr : memory -> EcPath.xpath -> form list -> form -> form
+val f_pr : memory -> EcPath.xpath -> form -> form -> form
 
 (* soft-constructors - boolean operators *)
 val fop_not  : form
@@ -356,7 +358,7 @@ val destr_hoareF    : form -> hoareF
 val destr_hoareS    : form -> hoareS
 val destr_bdHoareF  : form -> bdHoareF
 val destr_bdHoareS  : form -> bdHoareS
-val destr_pr        : form -> memory * EcPath.xpath * form list * form (* hr *) 
+val destr_pr        : form -> memory * EcPath.xpath * form * form (* hr *) 
 val destr_programS  : bool option -> form -> memenv * stmt
 
 val is_true     : form -> bool

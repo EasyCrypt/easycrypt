@@ -87,9 +87,26 @@ type variable = {
 
 type funsig = {
   fs_name   : symbol;
-  fs_params : variable list;
+  fs_arg    : EcTypes.ty;
+  fs_anames : symbol list option; 
   fs_ret    : EcTypes.ty;
 }
+(* fun f (x:int, y: bool) : real 
+   { fs_name   = f;
+     fs_arg    = int * bool;
+     fs_anames = Some [x;y];
+     fs_ret    = real;
+   }
+
+   fun f int * bool : real 
+   { fs_name   = f;
+     fs_arg    = int * bool;
+     fs_pnames = None;
+     fs_ret    = real;
+   }
+*)
+
+
 
 (* -------------------------------------------------------------------- *)
 (* An oracle in a function provided by a module parameter of a functor *)
@@ -137,8 +154,9 @@ type function_def = {
 }
 
 type function_body =
-  | FBdef of function_def
-  | FBabs of oracle_info
+  | FBdef   of function_def
+  | FBalias of xpath 
+  | FBabs   of oracle_info
 
 type function_ = {
   f_name   : symbol;

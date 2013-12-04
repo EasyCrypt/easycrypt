@@ -1,4 +1,5 @@
 (* ----------------------------------------------------------------------*)
+open EcMaps
 open Why3
 open EcUtils
 open EcSymbols
@@ -186,6 +187,7 @@ type env = {
   logic_task : Task.task;
   env_ty     : ty_body Mp.t;
   env_op     : (Term.lsymbol * Term.lsymbol * Ty.tvsymbol list) Mp.t;
+  env_proj   : Term.lsymbol Mint.t Mint.t; 
   env_ax     : Decl.prsymbol Mp.t;
   env_mp     : Term.lsymbol Mm.t;
   env_xpv    : Term.lsymbol Mx.t;
@@ -347,7 +349,7 @@ let ts_fun =
   let ta = Ty.create_tvsymbol (Ident.id_fresh "ta")
 (*  and tr = Ty.create_tvsymbol (Ident.id_fresh "tr") *) in
   Ty.create_tysymbol (Ident.id_fresh "fun") [ta(*;tr*)] None
-let ty_fun ta (* tr *) = Ty.ty_app ts_fun [Ty.ty_tuple ta (*; tr *)]
+let ty_fun ta (* tr *) = Ty.ty_app ts_fun [ta (*; tr *)]
 
 let fs_app_mod = 
   Term.create_fsymbol (Ident.id_fresh "app_mod") [ty_mod;ty_mod] ty_mod
@@ -369,7 +371,7 @@ let fs_sem =
   Term.create_fsymbol (Ident.id_fresh "sem") [tf;ty_mem;ta] (ty_distr ty_mem)
 
 let getpr f mem args ev =
-  let sem = Term.t_app_infer fs_sem [f;mem;Term.t_tuple args] in
+  let sem = Term.t_app_infer fs_sem [f;mem;args] in
   Term.t_app_infer fs_mu [sem;ev]
 
 let add_decl_with_tuples task d =
@@ -406,6 +408,7 @@ let empty = {
     logic_task  = initial_task;
     env_ty      = Mp.empty;
     env_op      = Mp.empty;
+    env_proj    = Mint.empty;
     env_ax      = Mp.empty;
     env_mp      = Mm.empty;
     env_xpv     = Mx.empty;
@@ -446,7 +449,7 @@ type rebinding_item =
   | RBxpf  of EcPath.xpath * Term.lsymbol
   | RBxpv  of EcPath.xpath * Term.lsymbol
   | RBfun  of Decl.decl * Decl.decl * Talpha.t * Term.term 
-
+  | RBproj of int * int * Term.lsymbol * Decl.decl
 type rebinding = rebinding_item list
 
 let merge check k o1 o2 =
@@ -611,6 +614,13 @@ let rebind_item env = function
       { env with 
         env_lam = Mta.add k t env.env_lam;
         logic_task = task }
+  | RBproj(n,p,ls,d) ->
+    let task = add_decl_with_tuples env.logic_task d in
+    let mn = try Mint.find n env.env_proj with Not_found -> Mint.empty in
+    let ep = Mint.add n (Mint.add p ls mn) env.env_proj in
+    { env with env_proj = ep; logic_task = task }
+      
+    
 
 let rebind = List.fold_left rebind_item
 
@@ -1337,11 +1347,42 @@ let trans_gty env gty =
 let trans_gtys env gtys =
   List.map_fold trans_gty env gtys
 
+
 let trans_form env f =
   let env = ref env in
   let save () = !env.env_id in
   let restore mid = env := { !env with env_id = mid} in
   let rb  = ref [] in
+  
+  let trans_proj n p = 
+    let mn = 
+      try Mint.find n !env.env_proj with Not_found -> Mint.empty in
+    try Mint.find p mn with Not_found ->
+      let tvs = 
+        Array.init n (fun _ -> Ty.create_tvsymbol (Ident.id_fresh "a")) in
+      let ts = Array.map Ty.ty_var tvs in
+      let t = Ty.ty_tuple (Array.to_list ts) in
+      let tp = ts.(p) in
+      let pat = Array.map (fun t -> Term.pat_wild t) ts in
+      let vp = Term.create_vsymbol (Ident.id_fresh "v") tp in
+      pat.(p) <- Term.pat_var vp;
+      let br =
+        Term.t_close_branch 
+          (Term.pat_app (Term.fs_tuple n) (Array.to_list pat) t) 
+          (Term.t_var vp) in
+      let va = Term.create_vsymbol (Ident.id_fresh "p") t in
+      let body = Term.t_case (Term.t_var va) [ br ] in
+      let s = Format.sprintf "proj%i_%i" n p in
+      let ls = Term.create_lsymbol (Ident.id_fresh s) [t] (Some tp) in
+      let decl = Decl.create_logic_decl [Decl.make_ls_defn ls [va] body ] in
+      let mn = Mint.add p ls mn in
+      env := {!env with
+        logic_task = add_decl_with_tuples !env.logic_task decl;
+        env_proj   = Mint.add n mn !env.env_proj
+      };
+      rb := RBproj(n,p,ls,decl)::!rb;
+      ls in
+        
 
   let rec trans_form f =
     match f.f_node with
@@ -1438,6 +1479,16 @@ let trans_form env f =
       let args = List.map trans_form_b args in
       Term.t_tuple args
 
+    | Fproj(f,i) ->
+      let a = trans_form f in
+      let ty = oget (a.Term.t_ty) in
+      let n = 
+        match ty.Ty.ty_node with
+        | Ty.Tyapp(_,targs) -> List.length targs
+        | _ -> assert false in
+      let ls = trans_proj n i in
+      Term.t_app_infer ls [a] 
+      
     | FhoareF _   -> raise (CannotTranslate "FhoareF")
     | FhoareS _   -> raise (CannotTranslate "FhoareS")
     | FbdHoareF _ -> raise (CannotTranslate "FbdHoareF")
@@ -1457,9 +1508,9 @@ let trans_form env f =
 
     | Fpr(mem,mp,args,ev) ->
         let mem   = trans_lv !env mem in
-        let args  = List.map trans_form_b args in
+        let args  = trans_form_b args in
         let f = 
-          trans_fun !env mp (List.map (fun t -> oget t.Term.t_ty) args) in
+          trans_fun !env mp (oget args.Term.t_ty) in
         let mid = save () in
         let env0, ty = trans_gty !env (GTmem None) in
         let env1, vs  = add_id env0 (EcFol.mhr, ty) in
@@ -1716,12 +1767,12 @@ let add_mod_exp_mp env mp me =
       | MI_Variable v -> 
         add_gpv (EcPath.xpath_fun mp v.v_name) v.v_type
       | MI_Function f -> 
-        let tys = List.map (fun v -> trans_ty !env v.v_type) f.f_sig.fs_params in
+        let tys =trans_ty !env f.f_sig.fs_arg in
         let xp = EcPath.xpath_fun mp f.f_name in
         let ls = Term.create_fsymbol (preid_xp xp) tparams (ty_fun tys) in
         env := add_xpf !env xp ls;
         rb  := RBxpf(xp,ls) :: !rb;
-        List.iter (fun v -> add_lpv (EcPath.xqname xp v.v_name) v.v_type) f.f_sig.fs_params;
+        add_lpv (EcPath.xqname xp "param") f.f_sig.fs_arg;
         add_lpv (EcPath.xqname xp "res") f.f_sig.fs_ret in
     add_comps mp me.me_comps;
     !env, !rb
