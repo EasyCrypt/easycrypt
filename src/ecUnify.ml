@@ -81,20 +81,23 @@ let unify_core (env : EcEnv.env) (tvtc : Sp.t Mid.t) (uf : UF.t) t1 t2 =
   let pb = let x = Queue.create () in Queue.push (`TyUni (t1, t2)) x; x in
 
   let ocheck i t =
+    let i   = UF.find i !uf in
     let map = Hint.create 0 in
 
     let rec doit t =
       match t.ty_node with
-      | Tunivar i' when uid_equal i i'  -> true
-      | Tunivar i' when Hint.mem map i' -> false
       | Tunivar i' -> begin
-          match snd (UF.data i' !uf) with
-          | None   -> Hint.add map i' (); false
-          | Some t -> begin
-            match doit t with
-            | true  -> true
-            | false -> Hint.add map i' (); false
-          end
+          let i' = UF.find i' !uf in
+            match i' with
+            | _ when i = i' -> true
+            | _ when Hint.mem map i' -> false
+            | _ ->
+                match snd (UF.data i' !uf) with
+                | None   -> Hint.add map i' (); false
+                | Some t ->
+                  match doit t with
+                  | true  -> true
+                  | false -> Hint.add map i' (); false
       end
 
       | _ -> EcTypes.ty_sub_exists doit t
