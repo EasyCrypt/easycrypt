@@ -94,9 +94,28 @@ module IND (O:Oracle, A:Adv) = {
   }
 }.
 
-(** This theory allows transitions between enforcement-style
-    and penalty-style bounds on the number of oracle queries *)
-theory Event.
+section.
+  declare module O:Oracle {Count}.
+  axiom O_fL: islossless O.f.
+
+  declare module A:Adv {Count(O)}.
+  axiom A_distinguishL (O <: Oracle {A}):
+    islossless O.f =>
+    islossless A(O).distinguish.
+
+  lemma IND_CountO_O &m (P: glob O -> glob A -> bool):
+    Pr[IND(Count(O),A).main() @ &m: res /\ P (glob O) (glob A)] =
+      Pr[IND(O,A).main() @ &m: res /\ P (glob O) (glob A)].
+  proof strict.
+  equiv_deno (_: ={glob A, glob O} ==> ={glob O, glob A, res})=> //; fun.
+  call (_: ={glob O});
+    first by fun*; inline Count(O).f Counter.incr; wp;
+             call (_: true); wp.
+  by inline Counter.init; wp.
+  qed.
+end section.
+
+theory EnfPen.
   const bound:int.
   axiom leq0_bound: 0 <= bound.
 
@@ -121,7 +140,7 @@ theory Event.
       islossless O.f =>
       islossless A(O).distinguish.
 
-    lemma event_wrap &m:
+    lemma enf_implies_pen &m:
       Pr[IND(Count(O),A).main() @ &m: res /\ Counter.c <= bound] <= Pr[IND(Enforce(Count(O)),A).main() @ &m: res].
     proof strict.
     equiv_deno (_: ={glob A, glob O} ==> Counter.c{1} <= bound => res{1} = res{2})=> //; last smt.
@@ -149,20 +168,45 @@ theory Event.
     by inline Counter.init; wp; skip; smt.
     qed.
   end section.
-end Event.
+end EnfPen.
 
-(** Ideally, this theory would allow transitions between penalty-style
-    bounds on the number of oracle queries and cryptographer-friendly
-    static restrictions on the adversary. These obviously need to be
-    checked when instantiating lemmas and should make for smooth-looking
-    lemmas if we can get things to line up properly. *)
-theory StaticWrap.
+theory PenBnd.
+  const bound:int.
+  axiom leq0_bound: 0 <= bound.
+
+  section.
+    declare module O:Oracle {Count}.
+    axiom O_fL: islossless O.f.
+
+    declare module A:Adv {Count(O)}.
+    axiom A_distinguishL (O <: Oracle {A}):
+      islossless O.f =>
+      islossless A(O).distinguish.
+    axiom A_distinguishC:
+      bd_hoare[A(Count(O)).distinguish: Counter.c = 0 ==> Counter.c <= bound] = 1%r.
+    axiom A_distinguishC_E:
+      equiv[A(Count(O)).distinguish ~ A(Count(O)).distinguish:
+              ={glob A, glob O, Counter.c} /\ Counter.c{1} = 0 ==>
+              ={glob A, glob O, res, Counter.c} /\ Counter.c{1} <= bound].
+
+    lemma pen_implies_bnd &m:
+      Pr[IND(Count(O),A).main() @ &m: res] =
+        Pr[IND(Count(O),A).main() @ &m: res /\ Counter.c <= bound].
+    proof strict.
+    by equiv_deno (_: ={glob O, glob A} ==> ={Counter.c, res} /\ Counter.c{1} <= bound)=> //;
+       fun; call A_distinguishC_E;
+       inline Counter.init; wp.
+    qed.
+  end section.
+end PenBnd.
+
+theory BndPen.
   const bound:int.
   axiom leq0_bound: 0 <= bound.
 
   const default:to.
 
-  module Wrap(O:Oracle) = {
+  module Enforce(O:Oracle) = {
     fun f(x:from): to = {
       var r:to = default;
 
@@ -172,7 +216,7 @@ theory StaticWrap.
     }
   }.
 
-  module WrapAdv (A:Adv, O:Oracle) = A(Wrap(O)). 
+  module EnforcedAdv (A:Adv, O:Oracle) = A(Enforce(O)). 
 
   section.
     declare module O:Oracle {Count}.
@@ -183,8 +227,9 @@ theory StaticWrap.
       islossless O.f =>
       islossless A(O).distinguish.
 
-    lemma wrapAdv_bnd:
-      bd_hoare[WrapAdv(A,Count(O)).distinguish: Counter.c = 0 ==> Counter.c <= bound] = 1%r.
+    (* The adversary we build is bounded in both senses used above (for sanity) *)
+    lemma enforcedAdv_bounded:
+      bd_hoare[EnforcedAdv(A,Count(O)).distinguish: Counter.c = 0 ==> Counter.c <= bound] = 1%r.
     proof strict.
       fun (Counter.c <= bound)=> //; first by smt.
         by apply A_distinguishL.
@@ -193,16 +238,27 @@ theory StaticWrap.
          skip; smt.
     qed.
 
-    lemma event_bndAdv &m:
-      Pr[IND(Count(O),A).main() @ &m: res /\ Counter.c <= bound] <= Pr[IND(Count(O),WrapAdv(A)).main() @ &m: res].
+    equiv enforcedAdv_bounded_E:
+      EnforcedAdv(A,Count(O)).distinguish ~ EnforcedAdv(A,Count(O)).distinguish:
+        ={glob A, glob O, Counter.c} /\ Counter.c{1} = 0 ==>
+        ={glob A, glob O, res, Counter.c} /\ Counter.c{1} <= bound.
+    proof strict.
+    fun (={glob O, Counter.c} /\ Counter.c{1} <= bound)=> //; first smt.
+    fun; sp; if=> //; inline Count(O).f Counter.incr; wp; call (_: true); wp; skip; smt.
+    qed.
+
+    (* Security against the bounded adversary implies penalty-style security  *)
+    lemma bnd_implied_pen &m:
+      Pr[IND(Count(O),A).main() @ &m: res /\ Counter.c <= bound] <=
+       Pr[IND(Count(O),EnforcedAdv(A)).main() @ &m: res].
     proof strict.
     equiv_deno (_: ={glob A, glob O} ==> Counter.c{1} <= bound => ={res, glob Count})=> //; last smt.
     symmetry; fun.
-    call (_: bound < Counter.c, ={glob Counter, glob Wrap, glob O}).
+    call (_: bound < Counter.c, ={glob Counter, glob Enforce, glob O}).
       (* A lossless *)
       by apply A_distinguishL.
       (* Wrap(O).f ~ O.f *)
-      fun*; inline Wrap(Count(O)).f; case (Counter.c{1} = bound).
+      fun*; inline Enforce(Count(O)).f; case (Counter.c{1} = bound).
         rcondf{1} 3; first by progress; wp.
         exists* Counter.c{2}; elim* => c; call{2} (CountO_fC O c _);
           first apply O_fL.
@@ -222,4 +278,4 @@ theory StaticWrap.
     by skip; smt.
     qed.
   end section.
-end StaticWrap.
+end BndPen.
