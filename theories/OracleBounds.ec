@@ -159,7 +159,6 @@ theory StaticWrap.
     }
   }.
 
-(*  module Fo(A:Adv) = A. *)
   module WrapAdv (A:Adv, O:Oracle) = A(Wrap(O)). 
 
   section.
@@ -178,9 +177,38 @@ theory StaticWrap.
     lemma wrapAdv_bnd:
       bd_hoare[WrapAdv(A,O).distinguish: Count.c = 0 ==> Count.c <= bound] = 1%r.
     proof strict.
-      fun (Count.c <= bound) => //; first by smt.
+      fun (Count.c <= bound)=> //; first by smt.
         by apply A_distinguishL.
       by fun; sp; if; [exists* Count.c; elim* => c; call (O_fC c) |].
+    qed.
+
+    lemma event_bndAdv &m:
+      Pr[IND(O,A).main() @ &m: res /\ Count.c <= bound] = Pr[IND(O,WrapAdv(A)).main() @ &m: res].
+    proof strict.
+    equiv_deno (_: ={glob A, glob O} ==> ={res, glob Count} /\ Count.c{1} <= bound)=> //.
+    symmetry; fun.
+    call (_: bound < Count.c, ={glob Count, glob Wrap, glob O}).
+      (* A lossless *)
+      by apply A_distinguishL.
+      (* Wrap(O).f ~ O.f *)
+      fun*; inline Wrap(O).f; case (Count.c{1} = bound).
+        rcondf{1} 3; first by progress; wp.
+        exists* Count.c{2}; elim* => c; call{2} (O_fC c).
+        by wp; skip; smt.
+        rcondt{1} 3; first by progress; wp; skip; smt.
+        wp; exists* Count.c{2}; elim* => c; call (O_fC_E c).
+        by wp.
+      (* Wrap(O).f lossless *)
+      by progress; fun; sp; if; [call (O_fL) |].
+      (* O.f preserves bad *)
+      progress; bypr; intros=> &m0 bad.
+      cut: 1%r <= Pr[O.f(x{m0}) @ &m0: bound < Count.c]; last smt.
+      cut lbnd: bd_hoare[O.f: Count.c = Count.c{m0} ==> Count.c = Count.c{m0} + 1] >= 1%r;
+        first by conseq (O_fC Count.c{m0}).
+      by bdhoare_deno lbnd; last smt.
+    call (_: true ==> ={glob Count} /\ Count.c{1} = 0);
+      first by fun; wp.
+    by skip; smt.
     qed.
   end section.
 end StaticWrap.
