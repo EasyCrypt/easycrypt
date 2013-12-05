@@ -1257,8 +1257,8 @@ and transmodsig_body (env : EcEnv.env) (sa : Sm.t)
 let rec transmod ~attop (env : EcEnv.env) (x : symbol) (me : pmodule_expr) =
   match me.pl_desc with
   | Pm_ident (params,m) -> 
-    let stparams, env0 = transmod_params env x params in
-    let (mp, sig_) = trans_msymbol env0 {pl_desc = m; pl_loc = me.pl_loc} in
+    let stparams, env = transmod_params env x params in
+    let (mp, sig_) = trans_msymbol env {pl_desc = m; pl_loc = me.pl_loc} in
     let extraparams = sig_.mis_params in
     let allparams = stparams @ extraparams in
     if allparams <> [] && not attop then

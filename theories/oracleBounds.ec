@@ -159,17 +159,8 @@ theory StaticWrap.
     }
   }.
 
-  (* module WrapAdv (A:Adv, O:Oracle) = A(Wrap(O)). *)
-  module WrapAdv (A:Adv, O:Oracle) = {
-    module A = A(Wrap(O))
-
-    fun distinguish(): bool = {
-      var r:bool;
-
-      r = A.distinguish();
-      return r;
-    }
-  }.
+(*  module Fo(A:Adv) = A. *)
+  module WrapAdv (A:Adv, O:Oracle) = A(Wrap(O)). 
 
   section.
     declare module O:Oracle {Count}.
@@ -187,10 +178,9 @@ theory StaticWrap.
     lemma wrapAdv_bnd:
       bd_hoare[WrapAdv(A,O).distinguish: Count.c = 0 ==> Count.c <= bound] = 1%r.
     proof strict.
-    fun; call (_: Count.c <= bound).
-      by apply A_distinguishL.
+      fun (Count.c <= bound) => //; first by smt.
+        by apply A_distinguishL.
       by fun; sp; if; [exists* Count.c; elim* => c; call (O_fC c) |].
-      by skip; smt.
     qed.
   end section.
 end StaticWrap.
