@@ -1639,7 +1639,7 @@ and f_real_div_simpl f1 f2 =
       else f_real_div f1 f2
 
 (* -------------------------------------------------------------------- *)
-let f_let_simpl lp f1 f2 =
+let rec f_let_simpl lp f1 f2 =
   match lp with
   | LSymbol (id, _) -> begin
       match Mid.find_opt id (f_fv f2) with
@@ -1667,11 +1667,19 @@ let f_let_simpl lp f1 f2 =
               (fun f2 (id, f1) -> f_let (LSymbol id) f1 f2)
               (Fsubst.subst_locals s f2) d
       | _ ->
+        let x = EcIdent.create "tpl" in
+        let ty = ttuple (List.map snd ids) in
+        let lpx = LSymbol(x,ty) in
+        let fx = f_local x ty in
+        let tu = f_tuple (List.mapi (fun i (_,ty') -> f_proj fx i ty') ids) in
+        f_let_simpl lpx f1 (f_let_simpl lp tu f2)
+(*
         let check (id, _) = Mid.find_opt id (f_fv f2) = None in
-          if List.for_all check ids then f2 else f_let lp f1 f2
+          if List.for_all check ids then f2 else f_let lp f1 f2 *)
     end
 
   | LRecord (_, ids) ->
+      (* TODO B : PY this should be simplified if possible *)
       let check (id, _) =
         match id with
         | None -> true
