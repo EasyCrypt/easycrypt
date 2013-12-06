@@ -326,6 +326,7 @@ let t_fun_to_code g =
       let arg = e_var (pv_arg f) fd.f_sig.fs_arg  in 
       match fd.f_sig.fs_anames with
       | None -> [arg]
+      | Some [_] -> [arg]
       | Some params -> List.mapi (fun i v -> e_proj arg i v.v_type) params in
     let m, res = fresh_pv m {v_name = "r"; v_type = fd.f_sig.fs_ret} in
     let r = pv_loc f res in
@@ -338,8 +339,9 @@ let t_fun_to_code g =
   let s = PVM.add env (pv_res fr) (fst mr) (f_pvar rr tyr (fst mr)) s in
   let post = PVM.subst env s ef.ef_po in
   let concl = f_equivS ml mr ef.ef_pr sl sr post in
-    (* TODO change the name of the rule *)
-    prove_goal_by [concl] rn_hl_fun_code g
+  (* TODO change the name of the rule *)
+  prove_goal_by [concl] rn_hl_fun_code g
+
 
 (* -------------------------------------------------------------------- *)
 let t_fun inv g =

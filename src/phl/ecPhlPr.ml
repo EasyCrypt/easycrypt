@@ -11,6 +11,13 @@ open EcCoreHiLogic
 open EcCoreHiPhl
 
 (* -------------------------------------------------------------------- *)
+let to_args fun_ arg = 
+  match fun_.f_sig.fs_anames with
+  | None -> arg
+  | Some [_] -> arg
+  | Some lv ->
+    f_tuple (List.mapi (fun i v -> f_proj arg i v.v_type) lv)
+
 let t_ppr ty phi_l phi_r g =
   let env,_,concl = get_goal_e g in
   let ef = t_as_equivF concl in
@@ -19,8 +26,8 @@ let t_ppr ty phi_l phi_r g =
   let funl = EcEnv.Fun.by_xpath fl env in
   let funr = EcEnv.Fun.by_xpath fr env in
   let (penvl,penvr), (qenvl,qenvr) = EcEnv.Fun.equivF_memenv fl fr env in
-  let argsl = f_pvarg fl funl.f_sig.fs_arg (fst penvl) in
-  let argsr = f_pvarg fr funr.f_sig.fs_arg (fst penvr) in
+  let argsl = to_args funl (f_pvarg fl funl.f_sig.fs_arg (fst penvl)) in
+  let argsr = to_args funr (f_pvarg fr funr.f_sig.fs_arg (fst penvr)) in
   let a_id = EcIdent.create "a" in
   let a_f = f_local a_id ty in
   let smem1 = Fsubst.f_bind_mem Fsubst.f_subst_id mleft mhr in
@@ -61,7 +68,7 @@ let process_bdhoare_ppr g =
   let fun_ = EcEnv.Fun.by_xpath f_xpath env in
   let penv,_qenv = EcEnv.Fun.hoareF_memenv f_xpath env in
   let m = EcIdent.create "&m" in
-  let args = f_pvarg f_xpath fun_.f_sig.fs_arg m in
+  let args = to_args fun_ (f_pvarg f_xpath fun_.f_sig.fs_arg m) in
   (* Warning: currently no substitution on pre,post since penv is always mhr *)
   let pre,post = bhf.bhf_pr, bhf.bhf_po in
   let fop = match bhf.bhf_cmp with
