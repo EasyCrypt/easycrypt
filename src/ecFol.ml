@@ -489,10 +489,12 @@ let f_pvlocs f vs m =
 let f_glob mp m = mk_form (Fglob(mp,m)) (tglob mp)
 
 (* -------------------------------------------------------------------- *)
+let f_tt    = f_op EcCoreLib.p_tt [] tunit
 let f_tuple args = 
   match args with
+  | []  -> f_tt
   | [x] -> x
-  | _ -> mk_form (Ftuple args) (ttuple (List.map f_ty args))
+  | _   -> mk_form (Ftuple args) (ttuple (List.map f_ty args))
 
 let f_proj f i ty = mk_form (Fproj(f, i)) ty
 

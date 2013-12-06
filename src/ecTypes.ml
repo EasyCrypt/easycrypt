@@ -564,6 +564,7 @@ let e_op    = fun x targs ty -> mk_expr (Eop (x, targs)) ty
 let e_let   = fun pt e1 e2 -> mk_expr (Elet (pt, e1, e2)) e2.e_ty
 let e_tuple = fun es -> 
   match es with
+  | []  -> e_tt
   | [x] -> x 
   | _   -> mk_expr (Etuple es) (ttuple (List.map e_ty es))
 

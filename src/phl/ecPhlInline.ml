@@ -23,8 +23,7 @@ let rn_hl_inline side pattern =
 
 (* --------------------------------------------------------------------- *)
 module LowInternal = struct
-  let inline hyps me sp s = assert false 
-(* TODO B
+  let inline hyps me sp s =
     let env = LDecl.toenv hyps in
     let module P = EcPath in
   
@@ -41,8 +40,12 @@ module LowInternal = struct
             (EcPrinting.pp_funname ppe) p
         end
       in
+      let params = 
+        match f.f_sig.fs_anames with
+        | None -> [{v_name = "arg"; v_type = f.f_sig.fs_arg}]
+        | Some lv -> lv in
       let me, anames = 
-        List.map_fold fresh_pv me f.f_sig.fs_params in
+        List.map_fold fresh_pv me params in
       let me, lnames = 
         List.map_fold fresh_pv me fdef.f_locals in
       let subst =
@@ -54,7 +57,7 @@ module LowInternal = struct
             mx
         in
         let mx = P.Mx.empty in
-        let mx = List.fold_left2 for1 mx f.f_sig.fs_params anames in
+        let mx = List.fold_left2 for1 mx params anames in
         let mx = List.fold_left2 for1 mx fdef.f_locals lnames in
         let on_xp xp =
           let xp' = EcEnv.NormMp.norm_xfun env xp in
@@ -64,12 +67,13 @@ module LowInternal = struct
       in
   
       let prelude =
-        List.map2
-          (fun (v, newx) e ->
-            let newpv = pv_loc (EcMemory.xpath me) newx in
-            i_asgn (LvVar (newpv, v.v_type), e))
-          (List.combine f.f_sig.fs_params anames)
-          args in
+        let newpv = 
+          List.map2 (fun v newx -> pv_loc (EcMemory.xpath me) newx, v.v_type)
+            params anames in
+        if List.length newpv = List.length args then
+          List.map2 (fun npv e -> i_asgn(LvVar npv, e)) newpv args
+        else
+          [i_asgn(LvTuple newpv, e_tuple args)] in
   
       let body  = s_subst subst fdef.f_body in
   
@@ -104,7 +108,7 @@ module LowInternal = struct
 
     in
     let me, s = inline_s me sp s.s_node in
-      (me, stmt s ) *)
+      (me, stmt s ) 
 end
 
 (* -------------------------------------------------------------------- *)
