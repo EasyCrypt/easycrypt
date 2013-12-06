@@ -1909,8 +1909,8 @@ module NormMp = struct
       let mp = norm_mpath env pf.x_top in
       let pf = EcPath.xpath mp pf.x_sub in
       let pf = 
-        match (Fun.by_xpath pf env).f_def with (* TODO use by_xpath_r *)
-        | FBalias xp -> norm_xfun env xp
+        match Fun.by_xpath_opt pf env with (* TODO B:use by_xpath_r *)
+        | Some {f_def = FBalias xp} -> norm_xfun env xp
         | _ -> pf in
       let res = 
         match v with
