@@ -91,11 +91,6 @@ let tuni uid = mk_ty (Tunivar uid)
 
 let tvar id = mk_ty (Tvar id)
 
-let ttuple lt    = 
-  match lt with
-  | [t] -> t
-  | _ -> mk_ty (Ttuple lt)
-
 let tconstr p lt = mk_ty (Tconstr(p,lt))
 let tfun t1 t2   = mk_ty (Tfun(t1,t2)) 
 let tglob m      = mk_ty (Tglob m)
@@ -108,6 +103,12 @@ let tdistr ty  = tconstr EcCoreLib.p_distr [ty]
 let tfset  ty  = tconstr EcCoreLib.p_fset  [ty]
 let tcpred ty  = tconstr EcCoreLib.p_cpred [ty]
 let treal      = tconstr EcCoreLib.p_real  []
+
+let ttuple lt    = 
+  match lt with
+  | []  -> tunit
+  | [t] -> t
+  | _ -> mk_ty (Ttuple lt)
  
 let toarrow dom ty = 
   List.fold_right tfun dom ty
@@ -347,6 +348,7 @@ let pv_loc f s =
   { pv_name = EcPath.xqname f s;
     pv_kind = PVloc }
 
+let pv_arg (f:EcPath.xpath) = pv_loc f "arg"
 let pv_res (f:EcPath.xpath) = pv_loc f "res"
 
 let xp_glob x = 
@@ -560,7 +562,11 @@ let e_local = fun x ty -> mk_expr (Elocal x) ty
 let e_var   = fun x ty -> mk_expr (Evar x) ty
 let e_op    = fun x targs ty -> mk_expr (Eop (x, targs)) ty
 let e_let   = fun pt e1 e2 -> mk_expr (Elet (pt, e1, e2)) e2.e_ty
-let e_tuple = fun es -> mk_expr (Etuple es) (ttuple (List.map e_ty es))
+let e_tuple = fun es -> 
+  match es with
+  | [x] -> x 
+  | _   -> mk_expr (Etuple es) (ttuple (List.map e_ty es))
+
 let e_if    = fun c e1 e2 -> mk_expr (Eif (c, e1, e2)) e2.e_ty
 let e_proj  = fun e i ty -> mk_expr (Eproj(e,i)) ty
 
@@ -620,6 +626,9 @@ module ExprSmart = struct
   let e_tuple (e, es) es' =
     if es == es' then e else e_tuple es'
 
+  let e_proj (e,e1,i) (e1',ty') =
+    if e1 == e1' && e.e_ty == ty' then e else e_proj e1' i ty'
+
   let e_if (e, (e1, e2, e3)) (e1', e2', e3') =
     if   e1 == e1' && e2 == e2' && e3 == e3'
     then e
@@ -655,6 +664,11 @@ let e_map fty fe e =
       let le' = List.Smart.map fe le in
         ExprSmart.e_tuple (e, le) le'
 
+  | Eproj(e1,i) ->
+    let e' = fe e1 in
+    let ty = fty e.e_ty in
+    ExprSmart.e_proj (e,e1,i) (e',ty)
+
   | Eif (e1, e2, e3)      -> 
       let e1' = fe e1 in
       let e2' = fe e2 in 
@@ -678,6 +692,7 @@ let rec e_fold fe state e =
   | Eapp (e, args)        -> List.fold_left fe (fe state e) args
   | Elet (_, e1, e2)      -> List.fold_left fe state [e1; e2]
   | Etuple es             -> List.fold_left fe state es
+  | Eproj(e,_)            -> fe state e
   | Eif (e1, e2, e3)      -> List.fold_left fe state [e1; e2; e3]
   | Elam(_,e1)            -> fe state e1
 

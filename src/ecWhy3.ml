@@ -936,6 +936,7 @@ let import_decl rn path envld d =
   match d.Decl.d_node with
   | Decl.Dtype ty -> import_w3_tydef rn path envld ty
   | Decl.Ddata ddl ->
+    Format.printf "ICI1@.";
       let lty, lc = List.split ddl in
       let envld = List.fold_left (import_w3_tydef rn path) envld lty in
       List.fold_left (import_w3_constructors rn path) envld lc
@@ -1327,20 +1328,23 @@ let trans_gty env gty =
       let xp = EcMemory.lmt_xpath lmt in 
       let tparams = List.map (fun _ -> ty_mod) xp.EcPath.x_top.EcPath.m_args in
       let xp = rm_xp_args xp in
-      let add id ty env =
-        let ty = trans_ty env ty in
-        let xp = EcPath.xqname xp id in
-        if Mx.mem xp env.env_xpv then
-          let ls = Mx.find xp env.env_xpv in
-          assert (List.all2 Ty.ty_equal ls.Term.ls_args tparams);
-          assert (Ty.oty_equal ls.Term.ls_value (Some (ty_var ty)));
-          env
-        else
-          let ls = Term.create_fsymbol (preid_xp xp) tparams (ty_var ty) in
-          let decl = Decl.create_param_decl ls in
-          { env with
-            env_xpv = Mx.add xp ls env.env_xpv;
-            logic_task = add_decl_with_tuples env.logic_task decl } in
+      let add id (p,ty) env =
+        match p with
+        | Some _ -> env
+        | None ->
+          let ty = trans_ty env ty in
+          let xp = EcPath.xqname xp id in
+          if Mx.mem xp env.env_xpv then
+            let ls = Mx.find xp env.env_xpv in
+            assert (List.all2 Ty.ty_equal ls.Term.ls_args tparams);
+            assert (Ty.oty_equal ls.Term.ls_value (Some (ty_var ty)));
+            env
+          else
+            let ls = Term.create_fsymbol (preid_xp xp) tparams (ty_var ty) in
+            let decl = Decl.create_param_decl ls in
+            { env with
+              env_xpv = Mx.add xp ls env.env_xpv;
+              logic_task = add_decl_with_tuples env.logic_task decl } in
       let env = Msym.fold add (EcMemory.lmt_bindings lmt) env in
       env, ty_mem
 

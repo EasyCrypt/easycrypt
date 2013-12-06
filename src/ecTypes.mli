@@ -137,6 +137,7 @@ val pv_loc  : EcPath.xpath -> symbol -> prog_var
 val pv_glob : EcPath.xpath -> prog_var 
 val xp_glob : EcPath.xpath -> EcPath.xpath
 val pv_res  : EcPath.xpath -> prog_var
+val pv_arg  : EcPath.xpath -> prog_var
 val pv      : EcPath.xpath -> pvar_kind -> prog_var
 
 (* -------------------------------------------------------------------- *)

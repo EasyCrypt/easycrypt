@@ -141,6 +141,7 @@ val mk_form : f_node -> EcTypes.ty -> form
 (* soft-constructors - common leaves *)
 val f_local : EcIdent.t -> EcTypes.ty -> form
 val f_pvar  : EcTypes.prog_var -> EcTypes.ty -> memory -> form
+val f_pvarg : EcPath.xpath -> EcTypes.ty -> memory -> form
 val f_pvloc : EcPath.xpath -> EcModules.variable -> memory -> form
 val f_glob  : EcPath.mpath -> memory -> form
 
@@ -227,8 +228,8 @@ val f_iff   : form -> form -> form
 val f_eq  : form -> form -> form
 val f_eqs : form list -> form list -> form
 
-val f_eqparams : EcPath.xpath -> variable list -> memory ->
-                 EcPath.xpath -> variable list -> memory -> form
+val f_eqparams : EcPath.xpath -> EcTypes.ty -> variable list option -> memory ->
+                 EcPath.xpath -> EcTypes.ty -> variable list option -> memory -> form
 val f_eqres    : EcPath.xpath -> EcTypes.ty -> memory ->
                  EcPath.xpath -> EcTypes.ty -> memory -> form
 val f_eqglob   : EcPath.mpath -> memory -> 
@@ -294,6 +295,7 @@ end
 (* WARNING : this function should be use only in a context ensuring
  * that the quantified variables can be instanciated *)
 
+val f_proj_simpl : form -> int -> EcTypes.ty -> form
 val f_if_simpl   : form -> form -> form -> form
 val f_let_simpl  : EcTypes.lpattern -> form -> form -> form
 val f_lets_simpl : (EcTypes.lpattern * form) list -> form -> form

@@ -88,13 +88,13 @@ type variable = {
 type funsig = {
   fs_name   : symbol;
   fs_arg    : EcTypes.ty;
-  fs_anames : symbol list option; 
+  fs_anames : variable list option; 
   fs_ret    : EcTypes.ty;
 }
 (* fun f (x:int, y: bool) : real 
    { fs_name   = f;
      fs_arg    = int * bool;
-     fs_anames = Some [x;y];
+     fs_anames = Some [(x,int);(y,bool)];
      fs_ret    = real;
    }
 

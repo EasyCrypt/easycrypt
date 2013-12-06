@@ -96,6 +96,14 @@ module PPEnv = struct
 
   let add_locals ppe xs = List.fold_left add_local ppe xs
 
+  let add_mods ppe xs mt = 
+    (* TODO B : this is costly *)
+    let ppe = add_locals ppe xs in
+    { ppe with ppe_env = 
+        List.fold_left (fun e x -> 
+          EcEnv.Mod.bind_local x mt (EcPath.Sx.empty, EcPath.Sm.empty) e)
+          ppe.ppe_env xs }
+
   let p_shorten cond p =
     let rec shorten prefix (nm, x) =
       match cond (nm, x) with
@@ -343,17 +351,24 @@ let msymbol_of_pv (ppe : PPEnv.t) p =
   let inscope =
     let mem =
       let env = ppe.PPEnv.ppe_env in
-        obind (EcEnv.Memory.byid^~ env) (EcEnv.Memory.get_active env)
-    in
+      obind (EcEnv.Memory.byid^~ env) (EcEnv.Memory.get_active env) in
     match mem  with
     | None | Some (_, None) -> false
     | Some (_, Some lcmem) ->
-        let xp = EcMemory.lmt_xpath lcmem in
-          P.x_equal p (P.xqname xp (P.basename p.P.x_sub))
+      let xp = EcMemory.lmt_xpath lcmem in
+      P.x_equal p (P.xqname xp (P.basename p.P.x_sub))
   in
 
   match k with
-  | PVloc when inscope -> [(P.basename p.P.x_sub, [])]
+  | PVloc when inscope -> 
+    if EcPath.basename p.EcPath.x_sub = "arg" then
+      let f = 
+        EcPath.xpath p.EcPath.x_top (oget (EcPath.prefix p.EcPath.x_sub)) in
+      let fd = EcEnv.Fun.by_xpath f ppe.PPEnv.ppe_env in
+      match fd.f_sig.fs_anames with
+      | Some [v] -> [(v.v_name, [])]
+      | _ -> [(P.basename p.P.x_sub, [])]
+    else [(P.basename p.P.x_sub, [])]
 
   | _ ->
       let (nm, x) = EcPath.toqsymbol p.P.x_sub in
@@ -362,7 +377,26 @@ let msymbol_of_pv (ppe : PPEnv.t) p =
         @ [(x, [])]
 
 let pp_pv ppe fmt p =
-  Format.fprintf fmt "%a" EcSymbols.pp_msymbol (msymbol_of_pv ppe p)
+  EcSymbols.pp_msymbol fmt (msymbol_of_pv ppe p)
+
+exception NoProjArg
+let get_projarg ppe e i =
+  match e.f_node with
+  | Fpvar(x,m) when is_loc x && 
+      EcPath.basename x.pv_name.EcPath.x_sub = "arg" ->
+    let x = x.pv_name in
+    let f = 
+      EcPath.xpath x.EcPath.x_top (oget (EcPath.prefix x.EcPath.x_sub)) in
+    let fd = EcEnv.Fun.by_xpath f ppe.PPEnv.ppe_env in
+    begin match fd.f_sig.fs_anames with
+    | Some vs when i < List.length vs -> 
+      let v = List.nth vs i in
+      (f_pvar (pv_loc f v.v_name) v.v_type m)
+    | _ -> raise NoProjArg
+    end
+  | _ -> raise NoProjArg
+
+
 
 (* -------------------------------------------------------------------- *)
 let pp_modtype (ppe : PPEnv.t) fmt ((mty, r) : module_type * _) =
@@ -589,6 +623,11 @@ let pp_tuple mode (ppe : PPEnv.t) pp_sub osc fmt es =
   let pp fmt = Format.fprintf fmt "@[<hov 0>%t@]" pp in
 
     pp_maybe_paren prth (fun fmt () -> pp fmt) fmt ()
+
+let pp_proji ppe pp_sub osc fmt (e,i) =
+  Format.fprintf fmt "%a.`%i"
+    (pp_sub ppe (osc, (max_op_prec, `NonAssoc))) e
+    i
 
 (* -------------------------------------------------------------------- *)
 let pp_let (ppe : PPEnv.t) pp_sub outer fmt (pt, e1, e2) =
@@ -922,6 +961,8 @@ and pp_expr_core_r (ppe : PPEnv.t) outer fmt (e : expr) =
 
   | Etuple es ->
       pp_tuple `ForTuple ppe pp_expr_r (fst outer) fmt es
+  | Eproj(e,i) ->
+      pp_proji ppe pp_expr_r (fst outer) fmt (e,i)
 
   | Eapp ({e_node = Eop (op, tys) }, args) ->
       pp_opapp ppe e_ty pp_expr_r outer fmt (`Expr, op, tys, args)
@@ -1048,7 +1089,7 @@ let pp_binding (ppe : PPEnv.t) (xs, ty) =
         (tenv1, pp)
 
   | GTmodty (p, sm) ->
-      let tenv1  = PPEnv.add_locals ppe xs in
+      let tenv1  = PPEnv.add_mods ppe xs p in
       let pp fmt =
         Format.fprintf fmt "(%a <: %a)"
           (pp_list "@ " (pp_local tenv1)) xs (pp_modtype ppe) (p, sm)
@@ -1111,8 +1152,14 @@ let rec try_pp_form_eqveq (ppe : PPEnv.t) _outer fmt f =
       let pv2 = (PPEnv.mod_symb ppe x2) in
   
       if pv1 = pv2 then Some (`Glob pv1) else None
+    | SFeq({f_node = Fproj(f1,i1)},{f_node = Fproj(f2,i2)}) ->
+      (try 
+         let x1 = get_projarg ppe f1 i1 in
+         let x2 = get_projarg ppe f2 i2 in
+         collect1 (f_eq x1 x2)
+       with NoProjArg -> None)
 
-  | _ -> None
+    | _ -> None
 
   and collect acc f =
     match collect1 f with
@@ -1248,9 +1295,19 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
       
   | Ftuple args ->
       pp_tuple `ForTuple ppe pp_form_r (fst outer) fmt args
-      
+
+  | Fproj(e,i) ->
+    begin 
+      try 
+        let v = get_projarg ppe e i in
+        pp_form_core_r ppe outer fmt v
+      with NoProjArg ->
+        pp_proji ppe pp_form_r (fst outer) fmt (e,i)
+    end
+
   | FhoareF hf ->
-      let ppe = PPEnv.create_and_push_mem ppe ~active:true (EcFol.mhr, hf.hf_f) in
+      let ppe = 
+        PPEnv.create_and_push_mem ppe ~active:true (EcFol.mhr, hf.hf_f) in
       Format.fprintf fmt "hoare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]]"
         (pp_funname ppe) hf.hf_f
         (pp_form ppe) hf.hf_pr
@@ -1318,7 +1375,8 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
       let ppe = PPEnv.create_and_push_mem ppe ~active:true (EcFol.mhr, f) in
       Format.fprintf fmt "Pr[@[%a(@[%a@]) @@ %a :@ %a@]]"
         (pp_funname ppe) f 
-        (pp_list ",@ " (pp_form ppe)) args
+        (*(pp_list ",@ " (pp_form ppe)) args *)
+        (pp_form ppe) args
         (pp_local ppe) m
         (pp_form ppe) ev
 
@@ -1857,11 +1915,13 @@ let pp_goal (ppe : PPEnv.t) fmt (n, (hyps, concl)) =
 
   let pp_hyp ppe (id, k) = 
     let ppe =
-      let ppe = PPEnv.add_local ppe id in
-        match k with
-        | EcBaseLogic.LD_mem (Some m) ->
-          PPEnv.create_and_push_mem ppe (id, EcMemory.lmt_xpath m)
-        | _ -> ppe
+      match k with
+      | EcBaseLogic.LD_mem (Some m) ->
+        let ppe = PPEnv.add_local ppe id in
+        PPEnv.create_and_push_mem ppe (id, EcMemory.lmt_xpath m)
+      | EcBaseLogic.LD_modty (p,_) ->
+        PPEnv.add_mods ppe [id] p
+      | _ -> PPEnv.add_local ppe id 
 
     and dk fmt =
         match k with
@@ -1954,10 +2014,15 @@ let pp_pvdecl ppe fmt v =
   Format.fprintf fmt "%s : %a" v.v_name (pp_type ppe) v.v_type
 
 let pp_funsig ppe fmt fs = 
-  Format.fprintf fmt "@[<hov 2>fun %s(%a) :@ %a@]"
-    fs.fs_name 
-    (pp_list ", " (pp_pvdecl ppe)) fs.fs_params
-    (pp_type ppe) fs.fs_ret
+  match fs.fs_anames with
+  | None ->
+    Format.fprintf fmt "@[<hov 2>fun %s %a :@ %a@]"
+      fs.fs_name (pp_type ppe) fs.fs_arg (pp_type ppe) fs.fs_ret
+  | Some params -> 
+    Format.fprintf fmt "@[<hov 2>fun %s(%a) :@ %a@]"
+      fs.fs_name 
+      (pp_list ", " (pp_pvdecl ppe)) params
+      (pp_type ppe) fs.fs_ret
 
 let pp_orclinfo ppe fmt oi =
   Format.fprintf fmt "{%s%a}"

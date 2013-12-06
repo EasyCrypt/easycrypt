@@ -478,6 +478,8 @@ let f_local x ty = mk_form (Flocal x) ty
 
 let f_pvar x ty m = mk_form (Fpvar(x, m)) ty
 
+let f_pvarg f ty m = f_pvar (pv_arg f) ty m 
+
 let f_pvloc f v m = 
   f_pvar (EcTypes.pv_loc f v.v_name) v.v_type m
 
@@ -601,8 +603,28 @@ let f_eqs fs1 fs2 =
   assert (List.length fs1 = List.length fs2);
   f_ands (List.map2 f_eq fs1 fs2)
 
-let f_eqparams f1 vs1 m1 f2 vs2 m2 =
-  f_eqs (f_pvlocs f1 vs1 m1) (f_pvlocs f2 vs2 m2)
+let f_eqparams f1 ty1 vs1 m1 f2 ty2 vs2 m2 =
+  let f_pvlocs f ty vs m = 
+    let arg = f_pvarg f ty m in
+    if List.length vs = 1 then [arg]
+    else
+      let t = Array.of_list vs in
+      let t = Array.mapi (fun i vd -> f_proj arg i vd.v_type) t in
+      Array.to_list t in
+  match vs1, vs2 with
+  | Some vs1, Some vs2 ->
+    if List.length vs1 = List.length vs1 then
+      f_eqs (f_pvlocs f1 ty1 vs1 m1) (f_pvlocs f2 ty2 vs2 m2)
+    else
+      f_eq (f_tuple (f_pvlocs f1 ty1 vs1 m1)) 
+        (f_tuple (f_pvlocs f2 ty2 vs2 m2))
+  | Some vs1, None ->
+    f_eq (f_tuple (f_pvlocs f1 ty1 vs1 m1)) (f_pvarg f2 ty2 m2)
+  | None, Some vs2 ->
+    f_eq (f_pvarg f1 ty1 m1) (f_tuple (f_pvlocs f2 ty2 vs2 m2))
+  | None, None ->
+    f_eq (f_pvarg f1 ty1 m1) (f_pvarg f2 ty2 m2)
+
 
 let f_eqres f1 ty1 m1 f2 ty2 m2 =
   f_eq (f_pvar (pv_res f1) ty1 m1)  (f_pvar (pv_res f2) ty2 m2)
@@ -1738,6 +1760,11 @@ let bool_val f =
   if is_true f then Some true
   else if is_false f then Some false
   else None 
+
+let f_proj_simpl f i ty =
+  match f.f_node with
+  | Ftuple args -> List.nth args i
+  | _ -> f_proj f i ty
 
 let f_if_simpl f1 f2 f3 =
   if f_equal f2 f3 then f2

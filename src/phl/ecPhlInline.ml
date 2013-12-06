@@ -23,7 +23,8 @@ let rn_hl_inline side pattern =
 
 (* --------------------------------------------------------------------- *)
 module LowInternal = struct
-  let inline hyps me sp s =
+  let inline hyps me sp s = assert false 
+(* TODO B
     let env = LDecl.toenv hyps in
     let module P = EcPath in
   
@@ -103,7 +104,7 @@ module LowInternal = struct
 
     in
     let me, s = inline_s me sp s.s_node in
-      (me, stmt s )
+      (me, stmt s ) *)
 end
 
 (* -------------------------------------------------------------------- *)

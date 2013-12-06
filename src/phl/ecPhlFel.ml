@@ -34,6 +34,7 @@ let rec callable_oracles_f env modv os f =
   let func = Fun.by_xpath f' env in
 
   match func.f_def with
+    | FBalias _ -> assert false (* normal form *)
     | FBabs oi ->
         let called_fs = 
           List.fold_left

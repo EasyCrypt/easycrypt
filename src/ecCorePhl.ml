@@ -332,7 +332,8 @@ let mk_inv_spec env inv fl fr =
     let eqglob = f_eqglob topl ml topr mr in
     let lpre = if oil.oi_in then [eqglob;inv] else [inv] in
     let eq_params = 
-      f_eqparams fl sigl.fs_params ml fr sigr.fs_params mr in
+      f_eqparams fl sigl.fs_arg sigl.fs_anames ml 
+        fr sigr.fs_arg sigr.fs_anames mr in
     let eq_res = f_eqres fl sigl.fs_ret ml fr sigr.fs_ret mr in
     let pre = f_ands (eq_params::lpre) in
     let post = f_ands [eq_res; eqglob; inv] in
@@ -342,9 +343,7 @@ let mk_inv_spec env inv fl fr =
     let defr = EcEnv.Fun.by_xpath fr env in
     let sigl, sigr = defl.f_sig, defr.f_sig in
     let testty = 
-      List.all2
-        (fun v1 v2 -> EcReduction.EqTest.for_type env v1.v_type v2.v_type)
-        sigl.fs_params sigr.fs_params
+      EcReduction.EqTest.for_type env sigl.fs_arg sigr.fs_arg 
       && EcReduction.EqTest.for_type env sigl.fs_ret sigr.fs_ret 
     in
       if not testty then 
@@ -352,7 +351,8 @@ let mk_inv_spec env inv fl fr =
           "the two functions should have the same signature";
       let ml, mr = EcFol.mleft, EcFol.mright in
       let eq_params = 
-        f_eqparams fl sigl.fs_params ml fr sigr.fs_params mr in
+        f_eqparams fl sigl.fs_arg sigl.fs_anames ml 
+          fr sigr.fs_arg sigr.fs_anames mr in
       let eq_res = f_eqres fl sigl.fs_ret ml fr sigr.fs_ret mr in
       let pre = f_and eq_params inv in
       let post = f_and eq_res inv in

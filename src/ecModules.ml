@@ -325,7 +325,7 @@ type variable = {
 type funsig = { 
   fs_name   : symbol;
   fs_arg    : EcTypes.ty;
-  fs_anames : symbol list option; 
+  fs_anames : variable list option; 
   fs_ret    : EcTypes.ty;
 }
 

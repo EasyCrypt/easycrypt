@@ -103,9 +103,7 @@ let rec eqobs_inF env eqg (inv,ifvl,ifvr as inve) log fl fr eqO =
         try
           let sigl, sigr = defl.f_sig, defr.f_sig in
           let testty = 
-            List.all2 (fun v1 v2 -> 
-              EcReduction.EqTest.for_type env v1.v_type v2.v_type)
-              sigl.fs_params sigr.fs_params && 
+              EcReduction.EqTest.for_type env sigl.fs_arg sigr.fs_arg && 
               EcReduction.EqTest.for_type env sigl.fs_ret sigr.fs_ret 
           in
           if not testty then raise EqObsInError;
@@ -119,13 +117,12 @@ let rec eqobs_inF env eqg (inv,ifvl,ifvr as inve) log fl fr eqO =
               log funl.f_body funr.f_body eqo' (ifvl,ifvr) in
           if sl.s_node <> [] || sr.s_node <> [] then raise EqObsInError;
           let geqi = 
-            List.fold_left2 (fun eqi vl vr ->
-              Mpv2.remove env (pv_loc nfl vl.v_name) (pv_loc nfr vr.v_name) eqi) 
-              eqi  sigl.fs_params sigr.fs_params in
+            Mpv2.remove env (pv_arg nfl) (pv_arg nfr) eqi in
           Mpv2.check_glob geqi;
           let ml, mr = EcFol.mleft, EcFol.mright in
           let eq_params = 
-            f_eqparams fl sigl.fs_params ml fr sigr.fs_params mr in
+            f_eqparams fl sigl.fs_arg sigl.fs_anames ml 
+              fr sigr.fs_arg sigr.fs_anames mr in
           let eq_res = f_eqres fl sigl.fs_ret ml fr sigr.fs_ret mr in
           let pre = f_and eq_params (Mpv2.to_form ml mr geqi inv) in
           let post = f_and eq_res (Mpv2.to_form ml mr eqO inv) in

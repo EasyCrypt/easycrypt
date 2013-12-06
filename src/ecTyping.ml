@@ -423,14 +423,22 @@ let gen_select_op ~actonly ~mode (fpv, fop, flc) opsc tvi env name ue psig =
         (List.map (fpv me) pvs) @ (List.map fop ops)
 
 let select_exp_op env opsc name ue tvi psig =
-  let ppv = (fun _ (pv, ty, ue) -> (e_var pv ty, ty, ue))
+  let ppv = (fun _ (pv, ty, ue) -> 
+    match pv with
+    | `Var pv -> (e_var pv ty, ty, ue)
+    | `Proj _ -> assert false)
   and pop = (fun ((op, tys), ty, ue) -> (e_op op tys ty, ty, ue))
   and flc = (fun (id, ty, ue) -> (e_local id ty, ty, ue)) in
     gen_select_op ~actonly:false ~mode:`Expr (ppv, pop, flc)
       opsc tvi env name ue psig 
 
 let select_form_op env opsc name ue tvi psig =
-  let ppv = (fun me (pv, ty, ue) -> (f_pvar pv ty (oget me), ue))
+  let ppv = (fun me (pv, ty, ue) -> 
+    match pv with 
+    | `Var pv -> f_pvar pv ty (oget me), ue
+    | `Proj(pv,ty',(i,n)) -> 
+      if i = 0 && n = 1 then f_pvar pv ty (oget me), ue
+      else f_proj (f_pvar pv ty' (oget me)) i ty, ue)
   and pop = (fun ((op, tys), ty, ue) -> (f_op op tys ty, ue))
   and flc = (fun (id, ty, ue) -> (f_local id ty, ue)) in
     gen_select_op ~actonly:true ~mode:`Form (ppv, pop, flc)
@@ -526,7 +534,7 @@ let rec check_sig_cnv mode (env:EcEnv.env) (sin:module_sig) (sout:module_sig) =
   let tin  = sin.mis_body 
   and tout = EcSubst.subst_modsig_body bsubst sout.mis_body in
 
-  let check_item_compatible =
+  let check_item_compatible = 
     let check_fun_compatible (fin,oin) (fout,oout) =
       assert (fin.fs_name = fout.fs_name);
       (* We currently reject function with compatible signatures but
@@ -534,19 +542,23 @@ let rec check_sig_cnv mode (env:EcEnv.env) (sin:module_sig) (sout:module_sig) =
        * later on, but note that this may require to alpha-convert when
        * instantiating an abstract module with an implementation. *)
 
-      let arg_compatible vd1 vd2 = 
+      let (iargs, oargs) = (fin.fs_arg, fout.fs_arg) in
+      let (ires , ores ) = (fin.fs_ret, fout.fs_ret) in
+
+      (*
+        let arg_compatible vd1 vd2 = 
            vd1.v_name = vd2.v_name
         && EqTest.for_type env vd1.v_type vd2.v_type 
-      in
-
-      let (iargs, oargs) = (fin.fs_params, fout.fs_params) in
-      let (ires , ores ) = ( fin.fs_ret, fout.fs_ret) in
+        in
 
         if List.length iargs <> List.length oargs then
           tymod_cnv_failure (E_TyModCnv_MismatchFunSig fin.fs_name);
         if not (List.for_all2 arg_compatible iargs oargs) then
-          tymod_cnv_failure (E_TyModCnv_MismatchFunSig fin.fs_name);
-        if not (EqTest.for_type env ires ores) then
+          tymod_cnv_failure (E_TyModCnv_MismatchFunSig fin.fs_name); *)
+      if not (EqTest.for_type env iargs oargs) then
+        tymod_cnv_failure (E_TyModCnv_MismatchFunSig fin.fs_name);
+
+      if not (EqTest.for_type env ires ores) then
           tymod_cnv_failure (E_TyModCnv_MismatchFunSig fin.fs_name);
 
         let flcmp () =
@@ -1179,6 +1191,31 @@ let transmodtype (env : EcEnv.env) (modty : pmodule_type) =
     (modty, sig_)
 
 
+let trans_call transexp env ue loc fdef  args =
+  let targ = fdef.f_sig.fs_arg in
+  let process_args tys =
+    if List.length args <> List.length tys then
+      tyerror loc env (InvalidFunAppl FAE_WrongArgCount);
+    List.map2
+      (fun a ty ->
+        let loc = a.pl_loc in
+        let a, aty = transexp a in
+        unify_or_fail env ue loc ~expct:ty aty; a) args tys in
+  let args = 
+    match List.length args with
+    | 0 -> 
+      if not (EcReduction.EqTest.for_type env targ tunit) then
+        tyerror loc env (InvalidFunAppl FAE_WrongArgCount);
+      []
+    | 1 -> process_args [targ]
+    | _ -> 
+      let lty =
+        match (EcEnv.Ty.hnorm targ env).ty_node with
+        | Ttuple lty -> lty
+        | _ -> [targ] in
+      process_args lty in
+  (args, fdef.f_sig.fs_ret)
+
 (* -------------------------------------------------------------------- *)
 let rec transmodsig (env : EcEnv.env) (name : symbol) (modty : pmodule_sig) =
   let Pmty_struct modty = modty in
@@ -1238,7 +1275,8 @@ and transmodsig_body (env : EcEnv.env) (sa : Sm.t)
     in
 
     let sig_ = { fs_name   = name.pl_desc;
-                 fs_params = tyargs;
+                 fs_arg    = ttuple (List.map (fun vd -> vd.v_type) tyargs);
+                 fs_anames = Some tyargs;
                  fs_ret    = resty; }
     and oi = { oi_calls = calls; oi_in = uin; } in
       Tys_function (sig_, oi)
@@ -1321,17 +1359,19 @@ and transstruct ~attop (env : EcEnv.env) (x : symbol) (st : pstructure located) 
       | MI_Module   _ -> None
       | MI_Variable _ -> None
       | MI_Function f -> 
+        let rec f_call c f =
+          let f = EcEnv.NormMp.norm_xfun envi f in
+          if EcPath.Sx.mem f c then c
+          else 
+            let c = EcPath.Sx.add f c in
+            match (EcEnv.Fun.by_xpath f envi).f_def with
+            | FBalias _ -> assert false
+            | FBdef def -> List.fold_left f_call c def.f_uses.us_calls 
+            | FBabs oi  -> List.fold_left f_call c oi.oi_calls in
         let all_calls = 
           match f.f_def with
-          | FBdef def ->
-            let rec f_call c f =
-              let f = EcEnv.NormMp.norm_xfun envi f in
-              if EcPath.Sx.mem f c then c
-              else 
-                let c = EcPath.Sx.add f c in
-                match (EcEnv.Fun.by_xpath f envi).f_def with
-                | FBdef def -> List.fold_left f_call c def.f_uses.us_calls 
-                | FBabs oi  -> List.fold_left f_call c oi.oi_calls in
+          | FBalias f -> f_call EcPath.Sx.empty f 
+          | FBdef def ->      
             List.fold_left f_call EcPath.Sx.empty def.f_uses.us_calls 
           | FBabs _ -> assert false in
         let filter f = 
@@ -1441,7 +1481,8 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item located) =
         { f_name   = decl.pfd_name.pl_desc;
           f_sig    = {
             fs_name   = decl.pfd_name.pl_desc;
-            fs_params = params;
+            fs_arg    = ttuple (List.map (fun vd -> vd.v_type) params);
+            fs_anames = Some params;
             fs_ret    = retty;
           };
           f_def = FBdef {
@@ -1582,21 +1623,10 @@ and transstmt (env : EcEnv.env) ue (stmt : pstmt) : stmt =
 
 (* -------------------------------------------------------------------- *)
 and transinstr (env : EcEnv.env) ue (i : pinstr) =
-  let transcall name args =
+  let transcall name args = 
     let fpath, fdef = lookup_fun env name in
-      if List.length args <> List.length fdef.f_sig.fs_params then
-        tyerror name.pl_loc env (InvalidFunAppl FAE_WrongArgCount);
-  
-      let args =
-        List.map2
-          (fun a {v_type = ty} ->
-            let loc = a.pl_loc in
-            let a, aty = transexp env ue a in
-            unify_or_fail env ue loc ~expct:ty aty; a)
-          args fdef.f_sig.fs_params
-      in
-        (fpath, args, fdef.f_sig.fs_ret)
-  in
+    let (args,ty) = trans_call (transexp env ue) env ue name.pl_loc fdef args in
+    fpath,args,ty in
 
   match i.pl_desc with
   | PSasgn (plvalue, prvalue) -> 
@@ -1654,7 +1684,10 @@ and trans_pv env { pl_desc = x; pl_loc = loc } =
   let side = EcEnv.Memory.get_active env in
   match EcEnv.Var.lookup_progvar_opt ?side x env with
   | None -> tyerror loc env (UnknownModVar x)
-  | Some(pv,xty) -> pv, xty 
+  | Some(pv,xty) -> 
+    match pv with 
+    | `Var pv -> pv, xty 
+    | `Proj _ -> assert false
 
 and translvalue ue (env : EcEnv.env) lvalue =
   match lvalue.pl_desc with
@@ -1800,7 +1833,12 @@ let trans_form_or_pattern env (ps, ue) pf tt =
         let lookup me x =
           match EcEnv.Var.lookup_progvar_opt ~side:me (unloc x) env with
           | None -> tyerror x.pl_loc env (UnknownVarOrOp (unloc x, []))
-          | Some (x, ty) -> f_pvar x ty me
+          | Some (x, ty) -> 
+            match x with
+            | `Var x -> f_pvar x ty me
+            | `Proj(x,ty',(i,n)) -> 
+              if i = 0 && n = 1 then f_pvar x ty me 
+              else f_proj (f_pvar x ty' me) i ty
         in
         let check_mem loc me = 
           match EcEnv.Memory.byid me env with
@@ -1906,22 +1944,14 @@ let trans_form_or_pattern env (ps, ue) pf tt =
     | PFprob (gp, args, m, event) ->
         let fpath = trans_gamepath env gp in
         let fun_  = EcEnv.Fun.by_xpath fpath env in
-        let fsig  = fun_.f_sig.fs_params, fun_.f_sig.fs_ret in
-        if List.length args <> List.length (fst fsig) then
-          tyerror f.pl_loc env (InvalidFunAppl FAE_WrongArgCount);
-        let args =
-          let doit1 arg { v_type = aty } =
-            let aout = transf env arg in
-              unify_or_fail env ue arg.pl_loc ~expct:aty aout.f_ty;
-              aout
-          in
-            List.map2 doit1 args (fst fsig)
-        in
+        let args,_ = 
+          trans_call (fun f -> let f = transf env f in f, f.f_ty)
+            env ue f.pl_loc fun_ args in
         let memid = transmem env m in
         let env = EcEnv.Fun.prF fpath env in
         let event' = transf env event in
-          unify_or_fail env ue event.pl_loc ~expct:tbool event'.f_ty;
-          f_pr memid fpath args event'
+        unify_or_fail env ue event.pl_loc ~expct:tbool event'.f_ty;
+        f_pr memid fpath (f_tuple args) event'
 
     | PFhoareF (pre, gp, post) ->
         let fpath = trans_gamepath env gp in

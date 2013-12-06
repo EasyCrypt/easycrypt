@@ -607,7 +607,8 @@ let t_eager h inv g =
     let eq_res = f_eqres fl sigl.fs_ret mleft fr sigr.fs_ret mright in
     let post = Mpv2.to_form mleft mright eqo eq_res in
     let eq_params = 
-      f_eqparams fl sigl.fs_params mleft fr sigr.fs_params mright in
+      f_eqparams fl sigl.fs_arg sigl.fs_anames mleft 
+        fr sigr.fs_arg sigr.fs_anames mright in
     let pre = f_and_simpl eq_params inv in
     f_eagerF pre s fl fr s' post in
   let concl = 

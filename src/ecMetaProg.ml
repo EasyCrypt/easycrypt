@@ -422,7 +422,9 @@ let f_match hyps ue ev ptn subject =
             if not (
               try
                 EcSymbols.Msym.equal
-                  (fun ty1 ty2 -> EcUnify.unify env ue ty1 ty2; true)
+                  (fun (p1,ty1) (p2,ty2) -> 
+                    if p1 <> p2 then raise MatchFailure;
+                    EcUnify.unify env ue ty1 ty2; true)
                   m1 m2
               with EcUnify.UnificationFailure _ -> raise MatchFailure)
             then
@@ -638,7 +640,7 @@ module FPosition = struct
           | Ftuple fs ->
               let fs' = doit p fs in
                 FSmart.f_tuple (fp, fs) fs'
-  
+          | Fproj(f,_) -> as_seq1 (doit p [f])
           | Flet (lv, f1, f2) ->
               let (f1', f2') = as_seq2 (doit p [f1; f2]) in
                 FSmart.f_let (fp, (lv, f1, f2)) (lv, f1', f2')

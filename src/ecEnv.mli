@@ -19,7 +19,7 @@ type 'a suspension = {
 (* -------------------------------------------------------------------- *)
 type varbind = {
   vb_type  : EcTypes.ty;
-  vb_kind  : EcTypes.pvar_kind;
+  vb_kind  :  [ `Proj of int | `Var of EcTypes.pvar_kind ];
 }
 
 (* -------------------------------------------------------------------- *)
@@ -119,8 +119,12 @@ module Var : sig
   val lookup_local     : symbol -> env -> (EcIdent.t * EcTypes.ty)
   val lookup_local_opt : symbol -> env -> (EcIdent.t * EcTypes.ty) option
 
-  val lookup_progvar     : ?side:memory -> qsymbol -> env -> (prog_var * EcTypes.ty)
-  val lookup_progvar_opt : ?side:memory -> qsymbol -> env -> (prog_var * EcTypes.ty) option
+  val lookup_progvar     : ?side:memory -> qsymbol -> env -> 
+    ([`Proj of EcTypes.prog_var * EcTypes.ty * (int*int) | `Var of EcTypes.prog_var ] *
+     EcTypes.ty)
+  val lookup_progvar_opt : ?side:memory -> qsymbol -> env -> 
+    ([`Proj of EcTypes.prog_var * EcTypes.ty * (int*int) | `Var of EcTypes.prog_var ] *
+     EcTypes.ty) option
 
   (* Locals binding *)
   val bind_local  : EcIdent.t -> EcTypes.ty -> env -> env

@@ -33,10 +33,12 @@ let wp_asgn_call env m lv res post =
     let lets = lv_subst m lv res in
       mk_let_of_lv_substs env ([lets],post)
 
-let subst_args_call env m f =
+let subst_args_call env m f e s =
+  PVM.add env (pv_arg f) m (form_of_expr m e) s
+(* TODO B
   List.fold_right2 (fun v e s ->
     PVM.add env (pv_loc f v.v_name) m (form_of_expr m e) s)
-
+*)
 let t_hoare_call fpre fpost g =
   (* FIXME : check the well formess of the pre and the post ? *)
   let env,_,concl = get_goal_e g in
@@ -55,7 +57,7 @@ let t_hoare_call fpre fpost g =
   let modi = f_write env f in
   let post = generalize_mod env m modi (f_imp_simpl fpost post) in
   let post = f_forall_simpl [(vres, GTty fsig.fs_ret)] post in
-  let spre = subst_args_call env m f fsig.fs_params args PVM.empty in
+  let spre = subst_args_call env m f (e_tuple args) PVM.empty in
   let post = f_anda_simpl (PVM.subst env spre fpre) post in
   let concl = f_hoareS_r { hs with hs_s = s; hs_po=post} in
   prove_goal_by [f_concl;concl] (rn_hl_call None fpre fpost) g
@@ -94,7 +96,7 @@ let t_bdHoare_call fpre fpost opt_bd g =
   let modi = f_write env f in
   let post = generalize_mod env m modi (f_imp_simpl fpost post) in
   let post = f_forall_simpl [(vres, GTty fsig.fs_ret)] post in
-  let spre = subst_args_call env m f fsig.fs_params args PVM.empty in
+  let spre = subst_args_call env m f (e_tuple args) PVM.empty in
   let post = f_anda_simpl (PVM.subst env spre fpre) post in
 
   (* most of the above code is duplicated from t_hoare_call *)
@@ -136,8 +138,8 @@ let wp2_call env fpre fpost (lpl,fl,argsl) modil (lpr,fr,argsr) modir
       [(vresl, GTty fsigl.fs_ret);
        (vresr, GTty fsigr.fs_ret)]
       post in
-  let spre = subst_args_call env ml fl fsigl.fs_params argsl PVM.empty in
-  let spre = subst_args_call env mr fr fsigr.fs_params argsr spre in
+  let spre = subst_args_call env ml fl (e_tuple argsl) PVM.empty in
+  let spre = subst_args_call env mr fr (e_tuple argsr) spre in
   f_anda_simpl (PVM.subst env spre fpre) post
   
 let t_equiv_call fpre fpost g =
@@ -188,7 +190,7 @@ let t_equiv_call1 side fpre fpost g =
   let post   = generalize_mod env me modi post in
   let post   = f_forall_simpl [(vres, GTty fsig.fs_ret)] post in
   let spre   = PVM.empty in
-  let spre   = subst_args_call env me f fsig.fs_params args spre in
+  let spre   = subst_args_call env me f (e_tuple args) spre in
   let post   = 
     f_anda_simpl (PVM.subst env spre (Fsubst.f_subst msubst fpre)) post in
   let concl  =
@@ -260,7 +262,8 @@ let process_call side info (_, n as g) =
       let eqglob = f_eqglob topl ml topr mr in
       let lpre = if oil.oi_in then [eqglob;invP] else [invP] in
       let eq_params = 
-        f_eqparams fl sigl.fs_params ml fr sigr.fs_params mr in
+        f_eqparams fl sigl.fs_arg sigl.fs_anames
+          ml fr sigr.fs_arg sigr.fs_anames mr in
       let eq_res = f_eqres fl sigl.fs_ret ml fr sigr.fs_ret mr in
       let pre = f_if_simpl bad2 invQ (f_ands (eq_params::lpre)) in
       let post = f_if_simpl bad2 invQ (f_ands [eq_res;eqglob;invP]) in

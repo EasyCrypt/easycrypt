@@ -78,7 +78,7 @@ let select_pr_cmp on_cmp sid f =
       if    on_cmp op
          && EcIdent.id_equal m1 m2
          && EcPath.x_equal f1 f2
-         && List.all2 f_equal arg1 arg2
+         && f_equal arg1 arg2
          && Mid.set_disjoint f.f_fv sid
       then raise (FoundPr f)
       else false

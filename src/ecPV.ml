@@ -305,6 +305,7 @@ module PV = struct
       | Fint _ | Flocal _ | Fop _ -> fv
       | Fapp(e, es) -> List.fold_left (aux env) (aux env fv e) es
       | Ftuple es   -> List.fold_left (aux env) fv es
+      | Fproj(e,_)  -> aux env fv e
       | FhoareF _  | FhoareS _ | FbdHoareF _  | FbdHoareS _ 
       | FequivF _ | FequivS _ | FeagerF _ | Fpr _ -> assert false 
     in
@@ -404,6 +405,7 @@ let rec f_write ?(except_fs=Sx.empty) env w f =
   let f = NormMp.norm_xfun env f in
   let func = Fun.by_xpath f env in
   match func.f_def with
+  | FBalias _ -> assert false (* Normal form *)
   | FBabs oi ->
     let mp = get_abs_functor f in
     List.fold_left (fun w o -> 
@@ -446,6 +448,7 @@ let rec f_read env r f =
   let f = NormMp.norm_xfun env f in
   let func = Fun.by_xpath f env in
   match func.f_def with
+  | FBalias _ -> assert false (* Normal form *)
   | FBabs oi ->
     let mp = get_abs_functor f in
     let r = if oi.oi_in then (PV.add_glob env mp r) else r in
@@ -1076,6 +1079,7 @@ and eqobs_inF_refl env f' eqo =
   let f = NormMp.norm_xfun env f' in
   let ffun = Fun.by_xpath f env in
   match ffun.f_def with
+  | FBalias _ -> assert false 
   | FBdef fdef ->
     let eqo = 
       match fdef.f_ret with
@@ -1083,9 +1087,12 @@ and eqobs_inF_refl env f' eqo =
       | Some r -> add_eqs_refl env eqo r in
     let eqi = s_eqobs_in_refl env fdef.f_body eqo in
     let local = PV.local eqi in
-    let params = 
-      List.fold_left (fun fv v -> PV.add env (pv_loc f v.v_name) v.v_type fv)
-        PV.empty ffun.f_sig.fs_params in
+    let params =
+      match ffun.f_sig.fs_anames with
+      | None -> PV.add env (pv_arg f) ffun.f_sig.fs_arg PV.empty
+      | Some lv -> 
+        List.fold_left (fun fv v -> PV.add env (pv_loc f v.v_name) v.v_type fv)
+          PV.empty lv in
     if PV.subset local params then PV.global eqi 
     else
       let diff = PV.diff local params in 
