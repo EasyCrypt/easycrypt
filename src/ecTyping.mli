@@ -44,6 +44,7 @@ type tyerror =
 | MixingRecFields        of EcPath.path tuple2
 | UnknownProj            of qsymbol
 | AmbiguousProj          of qsymbol
+| AmbiguousProji         of int
 | InvalidTypeAppl        of qsymbol * int * int
 | DuplicatedTyVar
 | DuplicatedLocal        of symbol

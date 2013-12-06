@@ -389,6 +389,7 @@ let get_projarg ppe e i =
       EcPath.xpath x.EcPath.x_top (oget (EcPath.prefix x.EcPath.x_sub)) in
     let fd = EcEnv.Fun.by_xpath f ppe.PPEnv.ppe_env in
     begin match fd.f_sig.fs_anames with
+    | Some [_] -> raise NoProjArg
     | Some vs when i < List.length vs -> 
       let v = List.nth vs i in
       (f_pvar (pv_loc f v.v_name) v.v_type m)

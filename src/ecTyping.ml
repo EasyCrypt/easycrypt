@@ -59,6 +59,7 @@ type tyerror =
 | MixingRecFields        of EcPath.path tuple2
 | UnknownProj            of qsymbol
 | AmbiguousProj          of qsymbol
+| AmbiguousProji         of int
 | InvalidTypeAppl        of qsymbol * int * int
 | DuplicatedTyVar
 | DuplicatedLocal        of symbol
@@ -166,6 +167,10 @@ let pp_tyerror fmt env error =
 
   | AmbiguousProj qs ->
       msg "ambiguous record projection: %a" pp_qsymbol qs
+
+  | AmbiguousProji i ->
+    let i = max (i + 1) 2 in
+    msg "should be a tuple of at least %i elements" i 
 
   | InvalidTypeAppl (name, _, _) ->
       msg "invalid type application: %a" pp_qsymbol name
@@ -1130,17 +1135,25 @@ let transexp (env : EcEnv.env) (ue : EcUnify.unienv) e =
           ctor, reccty
 
     | PEproj (sube, x) -> begin
-        let sube, ety = transexp env sube in
-          match select_proj env osc (unloc x) ue None ety with
-          | [] -> tyerror x.pl_loc env (UnknownProj (unloc x))
-          | _::_::_ -> tyerror x.pl_loc env (AmbiguousProj (unloc x))
-          | [(op, tvi), pty, subue] ->
-              EcUnify.UniEnv.restore ~src:subue ~dst:ue;
-              let rty = EcUnify.UniEnv.fresh ue in
-              (try  EcUnify.unify env ue (tfun ety rty) pty
-               with EcUnify.UnificationFailure _ -> assert false);
-              (e_app (e_op op tvi pty) [sube] rty, rty)
-      end
+      let sube, ety = transexp env sube in
+      match select_proj env osc (unloc x) ue None ety with
+      | [] -> tyerror x.pl_loc env (UnknownProj (unloc x))
+      | _::_::_ -> tyerror x.pl_loc env (AmbiguousProj (unloc x))
+      | [(op, tvi), pty, subue] ->
+        EcUnify.UniEnv.restore ~src:subue ~dst:ue;
+        let rty = EcUnify.UniEnv.fresh ue in
+        (try  EcUnify.unify env ue (tfun ety rty) pty
+         with EcUnify.UnificationFailure _ -> assert false);
+        (e_app (e_op op tvi pty) [sube] rty, rty)
+    end
+    | PEproji(sube, i) -> begin
+      let sube', ety = transexp env sube in
+      match (EcEnv.Ty.hnorm ety env).ty_node with
+      | Ttuple l when i < List.length l ->
+        let ty = List.nth l i in
+        e_proj sube' i ty, ty
+      | _ -> tyerror sube.pl_loc env (AmbiguousProji i)
+    end
         
   in
     transexp_r None env e
@@ -1929,17 +1942,26 @@ let trans_form_or_pattern env (ps, ue) pf tt =
           ctor
 
     | PFproj (subf, x) -> begin
-        let subf = transf env subf in
-          match select_proj env opsc (unloc x) ue None subf.f_ty with
-          | [] -> tyerror x.pl_loc env (UnknownProj (unloc x))
-          | _::_::_ -> tyerror x.pl_loc env (AmbiguousProj (unloc x))
-          | [(op, tvi), pty, subue] ->
-              EcUnify.UniEnv.restore ~src:subue ~dst:ue;
-              let rty = EcUnify.UniEnv.fresh ue in
-              (try  EcUnify.unify env ue (tfun subf.f_ty rty) pty
-               with EcUnify.UnificationFailure _ -> assert false);
-              f_app (f_op op tvi pty) [subf] rty
-      end
+      let subf = transf env subf in
+      match select_proj env opsc (unloc x) ue None subf.f_ty with
+      | [] -> tyerror x.pl_loc env (UnknownProj (unloc x))
+      | _::_::_ -> tyerror x.pl_loc env (AmbiguousProj (unloc x))
+      | [(op, tvi), pty, subue] ->
+        EcUnify.UniEnv.restore ~src:subue ~dst:ue;
+        let rty = EcUnify.UniEnv.fresh ue in
+        (try  EcUnify.unify env ue (tfun subf.f_ty rty) pty
+         with EcUnify.UnificationFailure _ -> assert false);
+        f_app (f_op op tvi pty) [subf] rty
+    end
+
+    | PFproji (subf, i) -> begin
+      let subf' = transf env subf in
+      match (EcEnv.Ty.hnorm subf'.f_ty env).ty_node with
+      | Ttuple l when i < List.length l ->
+        let ty = List.nth l i in
+        f_proj subf' i ty
+      | _ -> tyerror subf.pl_loc env (AmbiguousProji i)
+    end
 
     | PFprob (gp, args, m, event) ->
         let fpath = trans_gamepath env gp in
