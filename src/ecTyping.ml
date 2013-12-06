@@ -1230,6 +1230,23 @@ let trans_call transexp env ue loc fdef  args =
   (args, fdef.f_sig.fs_ret)
 
 (* -------------------------------------------------------------------- *)
+let trans_gamepath (env : EcEnv.env) gp =
+  let loc = gp.pl_loc in
+  
+  let modsymb = List.map (unloc -| fst) (fst (unloc gp))
+  and funsymb = unloc (snd (unloc gp)) in
+  let xp =
+    match EcEnv.Fun.sp_lookup_opt (modsymb, funsymb) env with
+    | None -> tyerror gp.pl_loc env (UnknownFunName (modsymb, funsymb))
+    | Some (xp,_) -> xp in
+  if modsymb = [] then xp
+  else
+    let (mpath, _sig) = trans_msymbol env (mk_loc loc (fst (unloc gp))) in
+    if _sig.mis_params <> [] then
+      tyerror gp.pl_loc env (UnknownFunName (modsymb, funsymb));
+    EcPath.xpath_fun mpath funsymb
+
+(* -------------------------------------------------------------------- *)
 let rec transmodsig (env : EcEnv.env) (name : symbol) (modty : pmodule_sig) =
   let Pmty_struct modty = modty in
 
@@ -1251,16 +1268,22 @@ and transmodsig_body (env : EcEnv.env) (sa : Sm.t)
     (is : pmodule_sig_struct_body) =
   let transsig1 (`FunctionDecl f) =
     let name   = f.pfd_name in
-    let tyargs =
-      List.map                          (* FIXME: continuation *)
-        (fun (x, ty) -> { v_name = x.pl_desc; 
-                          v_type = transty_for_decl env ty})
-        f.pfd_tyargs
-    in
-    let resty = transty_for_decl env f.pfd_tyresult in
+    let tyarg, tyargs =
+      match f.pfd_tyargs with
+      | Fparams_exp l ->
+        let tyargs = 
+          List.map                          (* FIXME: continuation *)
+            (fun (x, ty) -> { v_name = x.pl_desc; 
+                              v_type = transty_for_decl env ty}) l in
+        if not (List.uniq (List.map fst l)) then
+          raise (DuplicatedArgumentsName f);
+        let tyarg = ttuple (List.map (fun vd -> vd.v_type) tyargs) in
+        tyarg, Some tyargs
+      | Fparams_imp ty ->
+        let tyarg = transty_for_decl env ty in
+        tyarg, None in
 
-    if not (List.uniq (List.map fst f.pfd_tyargs)) then
-      raise (DuplicatedArgumentsName f);
+    let resty = transty_for_decl env f.pfd_tyresult in
 
     let (uin, calls) =
       match f.pfd_uses with
@@ -1288,8 +1311,8 @@ and transmodsig_body (env : EcEnv.env) (sa : Sm.t)
     in
 
     let sig_ = { fs_name   = name.pl_desc;
-                 fs_arg    = ttuple (List.map (fun vd -> vd.v_type) tyargs);
-                 fs_anames = Some tyargs;
+                 fs_arg    = tyarg;
+                 fs_anames = tyargs;
                  fs_ret    = resty; }
     and oi = { oi_calls = calls; oi_in = uin; } in
       Tys_function (sig_, oi)
@@ -1456,6 +1479,10 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item located) =
       and env     = ref env in
 
       (* Type-check function parameters / check for dups *)
+      let dtyargs = 
+        match decl.pfd_tyargs with
+        | Fparams_imp _ -> assert false
+        | Fparams_exp l -> l in
       let params =
         let params = ref [] in
         let add_param (x, pty) =
@@ -1465,7 +1492,7 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item located) =
             params  := ({ v_name = unloc x; v_type = ty }, pty.pl_loc) :: !params;
             env     := EcEnv.bindall [pr] !env
         in
-          List.iter add_param decl.pfd_tyargs;
+          List.iter add_param dtyargs;
           List.rev !params
       in
 
@@ -1509,7 +1536,17 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item located) =
         [(decl.pfd_name.pl_desc, MI_Function fun_)]
   end
 
-  | Pst_alias _ -> assert false
+  | Pst_alias ({pl_desc = name},f) ->
+    let f = trans_gamepath env f in
+    let sig_ = (EcEnv.Fun.by_xpath f env).f_sig in
+    let fun_ = { 
+      f_name = name;
+      f_sig = { sig_ with fs_name = name };
+      f_def = FBalias f;
+    } in
+    [(name, MI_Function fun_)]
+    
+
 
 (* -------------------------------------------------------------------- *)
 and transbody ue symbols (env : EcEnv.env) retty pbody =
@@ -1741,23 +1778,6 @@ and translvalue ue (env : EcEnv.env) lvalue =
           let esig = Tuni.offun_dom (EcUnify.UniEnv.assubst ue) esig in
             tyerror x.pl_loc env (UnknownVarOrOp (name, esig))
 
-(* -------------------------------------------------------------------- *)
-let trans_gamepath (env : EcEnv.env) gp =
-  let loc = gp.pl_loc in
-  
-  let modsymb = List.map (unloc -| fst) (fst (unloc gp))
-  and funsymb = unloc (snd (unloc gp)) in
-  
-  let _ =
-    match EcEnv.Fun.sp_lookup_opt (modsymb, funsymb) env with
-    | None -> tyerror gp.pl_loc env (UnknownFunName (modsymb, funsymb))
-    | Some _ -> ()
-  in
-
-  let (mpath, _sig) = trans_msymbol env (mk_loc loc (fst (unloc gp))) in
-  if _sig.mis_params <> [] then
-    tyerror gp.pl_loc env (UnknownFunName (modsymb, funsymb));
-  EcPath.xpath_fun mpath funsymb
 
 (* -------------------------------------------------------------------- *)
 let transmem env m =

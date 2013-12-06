@@ -27,7 +27,7 @@ let qsymb_of_symb (x : symbol) : qsymbol = ([], x)
 type psymbol  = symbol  located
 type pqsymbol = qsymbol located
 type pmsymbol = (psymbol * ((pmsymbol located) list) option) list
-
+type pgamepath = (pmsymbol * psymbol) located
 (* -------------------------------------------------------------------- *)
 type pty_r =
   | PTunivar
@@ -117,9 +117,13 @@ and pvariable_decl = {
   pvd_type : pty;
 }
 
+and fun_params = 
+ | Fparams_exp of (psymbol * pty) list
+ | Fparams_imp of pty
+
 and pfunction_decl = {
   pfd_name     : psymbol;
-  pfd_tyargs   : (psymbol * pty) list;
+  pfd_tyargs   : fun_params;
   pfd_tyresult : pty;
   pfd_uses     : (bool * pqsymbol list) option;
 }
@@ -140,10 +144,10 @@ and pstructure = {
 }
 
 and pstructure_item =
-  | Pst_mod   of pmodule
-  | Pst_var   of (psymbol list * pty)
-  | Pst_fun   of (pfunction_decl * pfunction_body)
-  | Pst_alias of (psymbol * pqsymbol)
+  | Pst_mod    of pmodule
+  | Pst_var    of (psymbol list * pty)
+  | Pst_fun    of (pfunction_decl * pfunction_body)
+  | Pst_alias  of (psymbol * pgamepath)
 
 and pfunction_body = {
   pfb_locals : pfunction_local list;
@@ -156,6 +160,8 @@ and pfunction_local = {
   pfl_type  : pty   option;
   pfl_init  : pexpr option;
 }
+
+
 
 and pmodule = (psymbol * pmodule_expr)
 
@@ -193,7 +199,7 @@ type precord = {
 }
 
 (* -------------------------------------------------------------------- *)
-type pgamepath = (pmsymbol * psymbol) located
+
 type pmemory   = psymbol
 
 type phoarecmp = PFHle | PFHeq | PFHge
