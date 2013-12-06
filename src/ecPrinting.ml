@@ -628,7 +628,7 @@ let pp_tuple mode (ppe : PPEnv.t) pp_sub osc fmt es =
 let pp_proji ppe pp_sub osc fmt (e,i) =
   Format.fprintf fmt "%a.`%i"
     (pp_sub ppe (osc, (max_op_prec, `NonAssoc))) e
-    i
+    (i+1)
 
 (* -------------------------------------------------------------------- *)
 let pp_let (ppe : PPEnv.t) pp_sub outer fmt (pt, e1, e2) =
@@ -962,8 +962,15 @@ and pp_expr_core_r (ppe : PPEnv.t) outer fmt (e : expr) =
 
   | Etuple es ->
       pp_tuple `ForTuple ppe pp_expr_r (fst outer) fmt es
-  | Eproj(e,i) ->
-      pp_proji ppe pp_expr_r (fst outer) fmt (e,i)
+
+  | Eproj(e1,i) ->
+    begin 
+      try 
+        let v = get_eprojarg ppe e1 i in
+        pp_expr_core_r ppe outer fmt v
+      with NoProjArg ->
+        pp_proji ppe pp_expr_r (fst outer) fmt (e,i) 
+    end
 
   | Eapp ({e_node = Eop (op, tys) }, args) ->
       pp_opapp ppe e_ty pp_expr_r outer fmt (`Expr, op, tys, args)
@@ -1297,13 +1304,13 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
   | Ftuple args ->
       pp_tuple `ForTuple ppe pp_form_r (fst outer) fmt args
 
-  | Fproj(e,i) ->
+  | Fproj(e1,i) ->
     begin 
       try 
-        let v = get_projarg ppe e i in
+        let v = get_projarg ppe e1 i in
         pp_form_core_r ppe outer fmt v
       with NoProjArg ->
-        pp_proji ppe pp_form_r (fst outer) fmt (e,i)
+        pp_proji ppe pp_form_r (fst outer) fmt (e1,i) 
     end
 
   | FhoareF hf ->
@@ -2113,7 +2120,7 @@ and pp_moditem ppe fmt = function
   | MI_Function f -> 
     let pp_fundef ppe fmt = function
       | FBdef def ->
-        Format.fprintf fmt "%a@,%a@,%a" 
+        Format.fprintf fmt "{@,  @[<v>%a@,%a@,%a@]@,}"
           (pp_list "@," (fun fmt->Format.fprintf fmt "@[<hov 2>var %a@]" (pp_pvdecl ppe)))
           def.f_locals
           (pp_stmt ppe) def.f_body (* FIXME ppe should add the memory *)
@@ -2121,10 +2128,12 @@ and pp_moditem ppe fmt = function
               Format.fprintf fmt "@[<hov 2>return@ @[%a@];@]"
                 (pp_expr ppe) (oget o))
           def.f_ret
+      | FBalias g -> 
+        Format.fprintf fmt "%a" (pp_funname ppe) g
           
       | _ -> Format.fprintf fmt "?ABSTRACT?" in
       
-    Format.fprintf fmt "@[<v>%a = {@,  @[<v>%a@]@,}@]"
+    Format.fprintf fmt "@[<v>%a = %a@]"
       (pp_funsig ppe) f.f_sig 
       (pp_fundef ppe) f.f_def 
 
