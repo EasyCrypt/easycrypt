@@ -539,27 +539,18 @@ let rec check_sig_cnv mode (env:EcEnv.env) (sin:module_sig) (sout:module_sig) =
   let tin  = sin.mis_body 
   and tout = EcSubst.subst_modsig_body bsubst sout.mis_body in
 
+  let env = 
+    List.fold_left (fun env (xin,tyin) ->
+      EcEnv.Mod.bind_local xin tyin (EcPath.Sx.empty, EcPath.Sm.empty) env)
+      env sin.mis_params in
+
   let check_item_compatible = 
     let check_fun_compatible (fin,oin) (fout,oout) =
       assert (fin.fs_name = fout.fs_name);
-      (* We currently reject function with compatible signatures but
-       * for the arguments names. We plan to leviate this restriction
-       * later on, but note that this may require to alpha-convert when
-       * instantiating an abstract module with an implementation. *)
-
+ 
       let (iargs, oargs) = (fin.fs_arg, fout.fs_arg) in
       let (ires , ores ) = (fin.fs_ret, fout.fs_ret) in
 
-      (*
-        let arg_compatible vd1 vd2 = 
-           vd1.v_name = vd2.v_name
-        && EqTest.for_type env vd1.v_type vd2.v_type 
-        in
-
-        if List.length iargs <> List.length oargs then
-          tymod_cnv_failure (E_TyModCnv_MismatchFunSig fin.fs_name);
-        if not (List.for_all2 arg_compatible iargs oargs) then
-          tymod_cnv_failure (E_TyModCnv_MismatchFunSig fin.fs_name); *)
       if not (EqTest.for_type env iargs oargs) then
         tymod_cnv_failure (E_TyModCnv_MismatchFunSig fin.fs_name);
 
