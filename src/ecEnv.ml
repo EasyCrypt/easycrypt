@@ -1357,7 +1357,7 @@ module Fun = struct
         match fun_.f_sig.fs_anames with
         | None -> mem
         | Some l -> adds_in_memenv mem l in
-      fd, adds_in_memenv mem fd.f_locals
+      (fun_.f_sig,fd), adds_in_memenv mem fd.f_locals
 
   let actmem_body_anonym _me _path _locals = assert false
     (*

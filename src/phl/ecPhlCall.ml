@@ -35,10 +35,7 @@ let wp_asgn_call env m lv res post =
 
 let subst_args_call env m f e s =
   PVM.add env (pv_arg f) m (form_of_expr m e) s
-(* TODO B
-  List.fold_right2 (fun v e s ->
-    PVM.add env (pv_loc f v.v_name) m (form_of_expr m e) s)
-*)
+
 let t_hoare_call fpre fpost g =
   (* FIXME : check the well formess of the pre and the post ? *)
   let env,_,concl = get_goal_e g in

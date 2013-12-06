@@ -299,7 +299,8 @@ let t_eager_fun_def g =
   let fl, fr = 
     NormMp.norm_xfun env eg.eg_fl,  NormMp.norm_xfun env eg.eg_fr in
   EcPhlFun.check_concrete env fl; EcPhlFun.check_concrete env fr;
-  let memenvl,fdefl,memenvr,fdefr,env = Fun.equivS fl fr env in
+  (* TODO B : check this, did we have to subst more ? *)
+  let memenvl,(_,fdefl),memenvr,(_,fdefr),env = Fun.equivS fl fr env in
   let extend mem fdef = 
     match fdef.f_ret with
     | None -> f_tt, mem, fdef.f_body 

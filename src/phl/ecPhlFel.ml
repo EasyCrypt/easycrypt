@@ -87,7 +87,8 @@ let t_failure_event at_pos cntr ash q f_event pred_specs inv g =
         | Some m -> m 
         | None -> cannot_apply "fel" "Cannot find memory (bug?)"
       in
-      let memenv, fdef, _env = 
+      (* TODO B : did we have to subst more *)
+      let memenv, (_,fdef), _env = 
         try Fun.hoareS f env
         with _ -> 
           cannot_apply "fel" "not applicable to abstract functions"
