@@ -1161,7 +1161,7 @@ let rec form_of_expr mem (e: expr) =
   | Eapp (ef,es) -> f_app (form_of_expr mem ef) (List.map (form_of_expr mem) es) e.e_ty
   | Elet (lpt,e1,e2) -> f_let lpt (form_of_expr mem e1) (form_of_expr mem e2)
   | Etuple es -> f_tuple (List.map (form_of_expr mem) es)
-  | Eproj(e,i) -> f_proj (form_of_expr mem e) i e.e_ty
+  | Eproj(e1,i) -> f_proj (form_of_expr mem e1) i e.e_ty
   | Eif (e1,e2,e3) -> 
       f_if (form_of_expr mem e1) (form_of_expr mem e2) (form_of_expr mem e3)
   | Elam(b,e) ->
