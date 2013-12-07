@@ -33,6 +33,9 @@ end
 val check_concrete : EcEnv.env -> EcPath.xpath -> unit
 (* -------------------------------------------------------------------- *)
 module FunDefLow : sig
+  val subst_pre : 
+    EcEnv.env -> EcPath.xpath -> EcModules.funsig ->
+    EcMemory.memory -> EcPV.PVM.subst -> EcPV.PVM.subst
   val t_hoareF_fun_def   : tactic
   val t_bdHoareF_fun_def : tactic
   val t_equivF_fun_def   : tactic

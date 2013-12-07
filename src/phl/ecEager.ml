@@ -299,8 +299,8 @@ let t_eager_fun_def g =
   let fl, fr = 
     NormMp.norm_xfun env eg.eg_fl,  NormMp.norm_xfun env eg.eg_fr in
   EcPhlFun.check_concrete env fl; EcPhlFun.check_concrete env fr;
-  (* TODO B : check this, did we have to subst more ? *)
-  let memenvl,(_,fdefl),memenvr,(_,fdefr),env = Fun.equivS fl fr env in
+
+  let memenvl,(fsigl,fdefl),memenvr,(fsigr,fdefr),env = Fun.equivS fl fr env in
   let extend mem fdef = 
     match fdef.f_ret with
     | None -> f_tt, mem, fdef.f_body 
@@ -313,16 +313,23 @@ let t_eager_fun_def g =
       s_seq fdef.f_body (stmt [i_asgn(LvVar(x,e.e_ty), e)]) in
   let el,meml, sfl = extend memenvl fdefl in
   let er,memr, sfr = extend memenvr fdefr in
+  let ml, mr = EcMemory.memory meml, EcMemory.memory memr in
   let s = 
-    PVM.add env (pv_res fl) (fst meml) el 
-    (PVM.add env (pv_res fr) (fst memr) er PVM.empty) in 
+    PVM.add env (pv_res fl) ml el 
+    (PVM.add env (pv_res fr) mr er PVM.empty) in 
+  let post = PVM.subst env s eg.eg_po in
+  let s = EcPhlFun.FunDefLow.subst_pre env fl fsigl ml PVM.empty in
+  let s = EcPhlFun.FunDefLow.subst_pre env fr fsigr mr s in
+  let pre = PVM.subst env s eg.eg_pr in
+
+  (* TODO B : the pre should be substitued *)
   let cond = f_equivS_r { 
     es_ml = meml;
     es_mr = memr;
     es_sl = s_seq eg.eg_sl sfl;
     es_sr = s_seq sfr eg.eg_sr;
-    es_pr = eg.eg_pr;
-    es_po = PVM.subst env s eg.eg_po;
+    es_pr = pre;
+    es_po = post;
   } in
   prove_goal_by [cond] rn_eager_fun_def g
  
