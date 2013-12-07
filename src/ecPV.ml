@@ -756,6 +756,8 @@ module Mpv2 = struct
         List.fold_left2 (add_eq local) eqs (f1::a1) (f2::a2)
       | Ftuple es1, Ftuple es2 ->
         List.fold_left2 (add_eq local) eqs es1 es2
+      | Fproj(f1,i1), Fproj(f2,i2) when i1 = i2 ->
+        add_eq local eqs f1 f2
       | _, _ -> raise Not_found in
 
     let rec aux local eqs f =
@@ -774,6 +776,8 @@ module Mpv2 = struct
           let lp = lp_bind lp1 in 
           enter_local env local lp lp in
         aux local eqs f1 
+      | Fop(op,_) when EcPath.p_equal op EcCoreLib.p_true -> eqs
+        
       | Fapp({f_node = Fop(op,_)},a) -> 
         begin match op_kind op with
         | OK_true -> eqs

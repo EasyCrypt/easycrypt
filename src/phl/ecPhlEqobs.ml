@@ -62,6 +62,20 @@ let t_eqobs_inS finfo eqo inv g =
     f_equivS es.es_ml es.es_mr es.es_pr sl sr pre in
   prove_goal_by (sg@[concl]) rn_eqobs_in g
 
+let extend_body f fsig body = 
+  let arg = pv_arg f in
+  let i = 
+    match fsig.fs_anames with
+    | None | Some [] -> []
+    | Some [v] -> 
+      [i_asgn(LvVar (pv_loc f v.v_name, v.v_type),  
+              e_var arg fsig.fs_arg)]
+    | Some lv ->
+      let lv = 
+        List.map (fun v -> pv_loc f v.v_name, v.v_type) lv in
+      [i_asgn(LvTuple lv, e_var arg fsig.fs_arg)] in
+  arg, s_seq (stmt i) body
+
 let rec eqobs_inF env eqg (inv,ifvl,ifvr as inve) log fl fr eqO =
   match find_eqobs_in_log log fl fr eqO with
   | Some(eqi,spec) -> log, eqi, spec
@@ -103,7 +117,7 @@ let rec eqobs_inF env eqg (inv,ifvl,ifvr as inve) log fl fr eqO =
         try
           let sigl, sigr = defl.f_sig, defr.f_sig in
           let testty = 
-              EcReduction.EqTest.for_type env sigl.fs_arg sigr.fs_arg && 
+            EcReduction.EqTest.for_type env sigl.fs_arg sigr.fs_arg && 
               EcReduction.EqTest.for_type env sigl.fs_ret sigr.fs_ret 
           in
           if not testty then raise EqObsInError;
@@ -112,12 +126,13 @@ let rec eqobs_inF env eqg (inv,ifvl,ifvr as inve) log fl fr eqO =
             | None, None -> eqO
             | Some el, Some er -> add_eqs env eqO el er 
             | _, _ -> raise EqObsInError in
+          let argl, bodyl = extend_body nfl sigl funl.f_body in
+          let argr, bodyr = extend_body nfr sigr funr.f_body in
           let sl, sr, (log,_), eqi =
             eqobs_in env (eqobs_inF env eqg inve) 
-              log funl.f_body funr.f_body eqo' (ifvl,ifvr) in
+              log bodyl bodyr eqo' (ifvl,ifvr) in
           if sl.s_node <> [] || sr.s_node <> [] then raise EqObsInError;
-          let geqi = 
-            Mpv2.remove env (pv_arg nfl) (pv_arg nfr) eqi in
+          let geqi = Mpv2.remove env argl argr eqi in
           Mpv2.check_glob geqi;
           let ml, mr = EcFol.mleft, EcFol.mright in
           let eq_params = 
