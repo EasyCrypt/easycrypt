@@ -1,0 +1,94 @@
+-*- outline -*-
+
+* Mots clés
+
+  - fun -> proc
+  - lambda -> fun
+
+* Type de retour optionnel pour les procédures + inférence pour les var. locales
+
+* Chainage pour les déclarations abstraites:
+
+  type t1, ..., tn.
+  var  x1, ..., xn.
+
+  Avec ou sans virgule ?
+
+* Permettre les accès directs aux fonctions dans les foncteurs
+
+* interface de module / proc.
+
+  proc id(arg...) : t * { restr } (* `*' est maintenant en dehors - 16082 *)
+  + `arg' peut maintenant être de la forme `_ : t1 * ... * tn'
+
+* if / while -> parenthèses sur la condition ? (interaction avec les accolades)
+
+* intro-pattern ->>, <<- pour substitution d'une variable par un terme (voir pour un rewrite in *)
+
+* rewrite in + apply in à la Coq
+
+* by < ; < first, last -> cas t; first by (t2; t3); t4
+
+* cut by t -> currently cut; first t. Should be cut; first by t.
+  idem for lemma ... by ...
+
+* by [] everywhere
+
+* apply -> gestion de <=>
+
+* t1 || t2 -> or-else
+
+* case pour PHL -> à lier à celui de la logique ambiente
+
+* bd_hoare / hoare à top-level
+
+* bd_hoare -> phoare / phl
+
+* détection du code mort
+
+* Syntaxe des tactiques
+
+    wp side? cpos?
+    sp side? cpos?
+
+    seq side? cpos : sform tacdir appbdinfo -> voir si `:' sert
+    while side : wtacinfo
+
+    rcondt / rcondf -> UINT => singlecpos
+
+    swap icpos -> unifier avec les code-positions + intervals à la rewrite
+      + enlever la 1ère règle (SKbase)
+
+    cfold -> voir si peut-être enlevé
+
+    rnd -> mettre ou enlever le `:' (rnd_info)
+
+    inline * -> inline tout le monde d'un niveau
+
+    kill -> utiliser la syntaxe des intervals pour rewrite
+
+    split_while expr : side? cpos => split_while side? cpos : expr
+
+    exfalso : si la pred. n'est pas False, devrait faire une coupure
+
+    transivity transkind transkind transheap
+      transkind : side stmt | id
+      transheap : ...
+
+    eager
+      eager_seq -> utiliser les cpos
+      à la fin : `:' entre eager_info && sform
+
+    pr_bounded -> à virer
+
+    hoare / bdhoare -> fusionner en hoare
+
+    rewrite Pr -> intégrer dans rewrite
+
+    pr_false -> à enlever
+
+    pr_eq -> à enlever
+
+X : tacdir : << | >> | ε
+
+* 
