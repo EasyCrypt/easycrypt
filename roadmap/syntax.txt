@@ -4,6 +4,10 @@
 
   - fun -> proc
   - lambda -> fun
+  - bd_hoare -> phoare
+  - bdhoare_* -> phoare_*
+  - eqobs_in -> sim
+  - *_deno -> bydeno
 
 * Type de retour optionnel pour les procédures + inférence pour les var. locales
 
@@ -54,6 +58,10 @@
     seq side? cpos : sform tacdir appbdinfo -> voir si `:' sert
     while side : wtacinfo
 
+    proc sform sform sform? -> proc LBRACKET form RBRACKET sform sform?
+    call side? fpattern(callinfo) -> call side? fpattern(callinfo')  et call LBRACKET form RBRACKET sform sform?
+    callinfo' = form LONGARROW form | form
+
     rcondt / rcondf -> UINT => singlecpos
 
     swap icpos -> unifier avec les code-positions + intervals à la rewrite
@@ -91,4 +99,9 @@
 
 X : tacdir : << | >> | ε
 
-* 
+* Semantique des tactiques:
+    eqobs_in, hoare devraient sur les procedures, pas seulement les statements
+
+    Pr[...] sur les statements et pas seulement sur les procedures?
+
+* equiv, phoare, hoare devraient pouvoir prendre des invariants plutot que des paires pre/post.
