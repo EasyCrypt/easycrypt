@@ -45,8 +45,8 @@ DONE   proc * id(arg...) : t { restr } (* `*' est maintenant en dehors - 16082 *
 
 * by < ; < first, last -> cas t; first by (t2; t3); t4
 
-* cut by t -> currently cut; first t. Should be cut; first by t.
-  idem for lemma ... by ...
+DONE * cut by t -> currently cut; first t. Should be cut; first by t.
+DONE   idem for lemma ... by ...
 
 * by [] everywhere
 

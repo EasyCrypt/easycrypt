@@ -695,7 +695,11 @@ let process_cut (engine : engine) ip phi t g =
   let g   =
     match t with
     | None   -> g
-    | Some t -> t_on_first (engine t) g
+    | Some t ->
+        let l = t.pl_loc in
+        let t = { pt_core = t; pt_intros = []; } in
+        let t = mk_loc l (Pby [t]) in
+          t_on_first (engine t) g
   in
 
   match ip with None -> g | Some ip -> t_on_last (process_intros [ip]) g
