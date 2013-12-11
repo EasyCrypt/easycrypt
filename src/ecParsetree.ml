@@ -24,10 +24,11 @@ let () =
 let qsymb_of_symb (x : symbol) : qsymbol = ([], x)
 
 (* -------------------------------------------------------------------- *)
-type psymbol  = symbol  located
-type pqsymbol = qsymbol located
-type pmsymbol = (psymbol * ((pmsymbol located) list) option) list
+type psymbol   = symbol  located
+type pqsymbol  = qsymbol located
+type pmsymbol  = (psymbol * ((pmsymbol located) list) option) list
 type pgamepath = (pmsymbol * psymbol) located
+
 (* -------------------------------------------------------------------- *)
 type pty_r =
   | PTunivar
@@ -125,7 +126,7 @@ and pfunction_decl = {
   pfd_name     : psymbol;
   pfd_tyargs   : fun_params;
   pfd_tyresult : pty;
-  pfd_uses     : (bool * pqsymbol list) option;
+  pfd_uses     : bool * pqsymbol list option;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -689,7 +690,7 @@ type global =
   | Gpredicate   of ppredicate
   | Gaxiom       of paxiom
   | Gclaim       of claim
-  | Gtype        of ptydecl
+  | Gtype        of ptydecl list
   | Gtypeclass   of ptypeclass
   | Gtycinstance of ptycinstance
   | Gdatatype    of pdatatype

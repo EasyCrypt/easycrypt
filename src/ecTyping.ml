@@ -313,7 +313,7 @@ let add_write (u : uses) p : uses =
     mk_uses u.us_calls u.us_reads (Sx.add p.pv_name u.us_writes)
   else u
 
-let (i_inuse, s_inuse, se_inuse) =
+let (_i_inuse, s_inuse, se_inuse) =
   let rec lv_inuse (map : uses) (lv : lvalue) =
     match lv with
     | LvVar (p,_) ->
@@ -1167,12 +1167,6 @@ let name_of_sigitem = function
   | `FunctionDecl f -> f.pfd_name
 
 (* -------------------------------------------------------------------- *)
-let lookup_module (env : EcEnv.env) (name : pqsymbol) =
-  match EcEnv.Mod.lookup_opt (unloc name) env with
-  | None   -> tyerror name.pl_loc env (UnknownModName (unloc name))
-  | Some x -> x
-
-(* -------------------------------------------------------------------- *)
 let lookup_module_type (env : EcEnv.env) (name : pqsymbol) =
   match EcEnv.ModTy.lookup_opt (unloc name) env with
   | None   -> tyerror name.pl_loc env (UnknownTyModName (unloc name))
@@ -1277,28 +1271,30 @@ and transmodsig_body (env : EcEnv.env) (sa : Sm.t)
     let resty = transty_for_decl env f.pfd_tyresult in
 
     let (uin, calls) =
-      match f.pfd_uses with
-      | None -> 
-        let do_one mp calls = 
-          let sig_ = (EcEnv.Mod.by_mpath mp env).me_sig in
-            if sig_.mis_params <> [] then calls
-            else
-              let fs = List.map (fun (Tys_function (fsig, _)) ->
-                EcPath.xpath_fun mp fsig.fs_name) sig_.mis_body
-              in
-                fs@calls
-        in
-          (true, Sm.fold do_one sa [])
-
-      | Some (uin, pfd_uses) ->
-        uin, List.map (fun name -> 
-          let f = fst (lookup_fun env name) in
-          let p = f.EcPath.x_top in
-          if not (Sm.mem p sa) then 
-            tyerror name.pl_loc env (FunNotInModParam name.pl_desc);
-          f
-        )
-          pfd_uses
+      let calls =
+        match snd f.pfd_uses with
+        | None -> 
+            let do_one mp calls = 
+              let sig_ = (EcEnv.Mod.by_mpath mp env).me_sig in
+                if sig_.mis_params <> [] then calls
+                else
+                  let fs = List.map (fun (Tys_function (fsig, _)) ->
+                    EcPath.xpath_fun mp fsig.fs_name) sig_.mis_body
+                  in
+                    fs@calls
+            in
+              Sm.fold do_one sa []
+  
+        | Some pfd_uses ->
+            List.map (fun name -> 
+              let f = fst (lookup_fun env name) in
+              let p = f.EcPath.x_top in
+                if not (Sm.mem p sa) then 
+                  tyerror name.pl_loc env (FunNotInModParam name.pl_desc);
+                f)
+              pfd_uses
+      in
+        (fst f.pfd_uses, calls)
     in
 
     let sig_ = { fs_name   = name.pl_desc;

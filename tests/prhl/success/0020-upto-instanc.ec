@@ -9,11 +9,11 @@ module Or : OR = {
 }.
 
 module type ADV1(Or : OR) = {
-  proc g() : int {* Or.f}
+  proc * g() : int { Or.f}
 }.
 
 module type ADV2(Or : OR) = {
-  proc h() : int {* Or.f}
+  proc * h() : int { Or.f}
 }.
 
 module G(Adv2 : ADV2) = {

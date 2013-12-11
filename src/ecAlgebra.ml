@@ -14,7 +14,6 @@ module RState : sig
   val empty   : rstate
   val add     : form -> rstate -> int * rstate
   val get     : int -> rstate -> form option
-  val current : rstate -> int
 end = struct
   type rstate = {
     rst_map : int Mf.t;
@@ -32,9 +31,6 @@ end = struct
        let m = Mf  .add form i rmap.rst_map in
        let v = Mint.add i form rmap.rst_inv in
          (i, { rst_map = m; rst_inv = v; rst_idx = i; })
-
-  let current (rmap : rstate) =
-    rmap.rst_idx
 
   let get (i : int) (rmap : rstate) =
     Mint.find_opt i rmap.rst_inv

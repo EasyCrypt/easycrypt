@@ -10,6 +10,8 @@
   - *_deno -> bydeno
   - fst -> .`1
   - snd -> .`2
+  - datatype -> type
+  - record -> type
 
 * Comportement par défaut devrait etre `proof strict' (ceci est une décision unilatérale de François)
 

@@ -11,11 +11,6 @@
   let pqsymb_of_symb loc x : pqsymbol =
     mk_loc loc ([], x)
 
-  let isordering (nm, x) =
-    match nm, x with
-    | ([], ("<" | ">" | "<=" | ">=")) -> true
-    | _ -> false
-
   let mk_mod ?(modtypes = []) params body = Pm_struct {
     ps_params    = params;
     ps_signature = modtypes;
@@ -1121,7 +1116,7 @@ fun_decl:
     { { pfd_name     = x   ;
         pfd_tyargs   = pd  ;
         pfd_tyresult = ty  ;
-        pfd_uses     = None; }
+        pfd_uses     = (true, None); }
     }
 ; 
 
@@ -1243,21 +1238,12 @@ sig_param:
 ;
 
 signature_item:
-| PROC decl=ifun_decl
-    { `FunctionDecl decl }
-;
-
-ifun_decl:
-| x=lident pd=param_decl COLON ty=loc(type_exp) us=brace(oracle_info)?
-    { { pfd_name     = x ;
-        pfd_tyargs   = pd;
-        pfd_tyresult = ty;
-        pfd_uses     = us; }
-    }
-;
-
-oracle_info:
-| i=STAR? qs=qident* { i=None, qs }
+| PROC i=boption(STAR) x=lident pd=param_decl COLON ty=loc(type_exp) qs=brace(qident*)?
+    { `FunctionDecl
+          { pfd_name     = x;
+            pfd_tyargs   = pd;
+            pfd_tyresult = ty;
+            pfd_uses     = (not i, qs); } }
 ;
 
 (* -------------------------------------------------------------------- *)
@@ -1279,12 +1265,12 @@ typarams:
 ;
 
 type_decl:
-| TYPE tya=typarams x=ident { (tya, x) }
+| tya=typarams x=ident { (tya, x) }
 ;
 
 type_decl_or_def:
-| td=type_decl { mk_tydecl td None }
-| td=type_decl EQ te=loc(type_exp) { mk_tydecl td (Some te) }
+| TYPE td=plist1(type_decl, COMMA) { List.map (mk_tydecl^~ None) td }
+| TYPE td=type_decl EQ te=loc(type_exp) { [mk_tydecl td (Some te)] }
 ;
 
 (* -------------------------------------------------------------------- *)

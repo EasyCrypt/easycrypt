@@ -2,7 +2,7 @@
 require import Int.
 
 module type ADV = {
-proc main() : unit {*}
+proc * main() : unit {}
 }.
 
 module type O = {

@@ -46,58 +46,12 @@ type pol =
   | Pinj of int * pol
   | PX of pol * int * pol
 
-type mon = Mon0 | Zmon of (int * mon) | Vmon of (int * mon)
-
-(*let rec pp_pol fmt = function
+let rec pp_pol fmt = function
   | Pc c -> Format.fprintf fmt "%s" (string_of_big_int c)
   | Pinj(i,p) -> Format.fprintf fmt "%i(%a)" i pp_pol p
   | PX(q,i,p) -> Format.fprintf fmt "(%a^%i + %a)" pp_pol q i pp_pol p
 
-let rec pp_mon c fmt = function
-  | Mon0 -> (*Format.fprintf fmt "%s" (string_of_big_int c)*) ()
-  | Zmon(i,p) -> Format.fprintf fmt "%i(%a)" i (pp_mon c) p
-  | Vmon(i,p) -> Format.fprintf fmt "(^%i)%a" i  (pp_mon c) p *)
-
-let ofpol (p:pol) = 
-  let mkxp i p mon = 
-    if p = 0 then mon 
-    else if p = 1 then (PEX i) :: mon
-    else PEpow(PEX i, p) :: mon in
-  let iszero pe = match pe with PEc c -> ceq c c0 | _ -> false in
-  let mkmul c mon = 
-    if ceq c c0 || mon = [] then PEc c 
-    else 
-      let hd,tl = 
-        if ceq c c1 then List.hd mon, List.tl mon
-        else PEc c, mon in
-      List.fold_left (fun p x -> PEmul(p, x)) hd tl in
-  let mkadd r neg p = 
-    if iszero p then r
-    else
-      if iszero r then if neg then PEopp p else p
-      else if neg then PEsub(r, p) else PEadd(r,p) in
-  let rec aux q i p mon r = (* q * x_i^p * mon + r *)
-    match q with
-    | Pc c ->
-      let mon = mkxp i p mon in (* x_i * mon *)
-      let neg, q = 
-        if sign_big_int c = -1 then true, mkmul (copp c) mon
-        else false, mkmul c mon in
-      mkadd r neg q 
-    | Pinj(j,q) -> aux q (i+j) 0 (mkxp i p mon) r
-    | PX(q1,p',q2) -> 
-      let r = aux q2 (i+1) 0 (mkxp i p mon) r in
-      aux q1 i (p+p') mon r in
-  aux p 0 0 [] (PEc c0)
-
-
-let ofmon c mon = 
-  let rec aux q i mon =
-    match mon with
-    | Mon0 -> q
-    | Zmon(j,mon) -> aux q (i+j) mon
-    | Vmon(p,mon) -> aux (PEmul(q,PEpow(PEX i,p))) (i+1) mon in
-  aux (PEc c) 0 mon
+type mon = Mon0 | Zmon of (int * mon) | Vmon of (int * mon)
 
 let rec pexpr_eq (e1 : pexpr) (e2 : pexpr) : bool =
   match (e1,e2) with
@@ -162,8 +116,6 @@ let rec popp ( p : pol) : pol =
     | Pc c -> Pc (copp c)
     | Pinj (j,q) -> Pinj (j, popp q)
     | PX (p,j,q) -> PX (popp p, j, popp q)
-
-let (--~) p = popp p
 
 (* Addition and Subs *)
 

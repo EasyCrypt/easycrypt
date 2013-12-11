@@ -1,0 +1,7 @@
+* separer les bibliotheques entre:
+  - datatypes
+  - algebraic structures (type classes)
+  - assumptions/security notions
+  - high-level transitions (transforms)
+
+* datatypes sont inclus dans le prelude, mais ne sont pas envoyes a smt tant qu'ils ne sont pas required
