@@ -7,7 +7,7 @@ type plaintext.
 type ciphertext.
 
 module type Scheme = {
-  proc init(): unit {*}
+  proc * init(): unit {}
   proc kg(): key
   proc enc(k:key,p:plaintext): ciphertext
   proc dec(k:key,c:ciphertext): plaintext option

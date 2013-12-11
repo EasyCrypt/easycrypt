@@ -5,7 +5,7 @@ type message.
 type tag.
 
 module type Scheme = {
-  proc init(): unit {*}
+  proc * init(): unit {}
   proc keygen(): key
   proc mac(k:key,m:message): tag
   proc verify(k:key,m:message,t:tag): bool

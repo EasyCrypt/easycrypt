@@ -12,7 +12,7 @@ require import Distr. (* We use core knowledge on probabilities *)
      3) refactoring to remove the use of Count.
    This is independent of any counting done inside the oracles. *)
 module type Counter = {
-  proc init(): unit {*}
+  proc * init(): unit {}
   proc incr(): unit
 }.
 

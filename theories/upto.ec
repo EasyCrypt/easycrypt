@@ -28,7 +28,7 @@ proc f (x : from) : to * bool
 }.
 
 module type A (O : Oracle) ={
- proc run () : ret_adv {* O.f}
+ proc * run () : ret_adv { O.f}
 }.
 
 module Experiment( O : Oracle, AdvF : A) = {

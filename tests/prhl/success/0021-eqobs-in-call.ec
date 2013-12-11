@@ -6,7 +6,7 @@ module type Orcl = {
 }.
 
 module type Adv (O:Orcl) = { 
-  proc a1 (x:int) : int {* O.o1}
+  proc * a1 (x:int) : int { O.o1}
   proc a2 (x:int) : int
 }.
 
