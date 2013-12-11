@@ -457,6 +457,7 @@ and compile_expr env eenv vtymap lmap e =
     Olet(p,e1,e2)
   | Etuple es ->
     Otuple (List.map (compile_expr env eenv vtymap lmap) es)
+  | Eproj _ -> assert false (* Not Implemented *)
   | Eif(e1,e2,e3) ->
     let e1 = compile_expr env eenv vtymap lmap e1 in
     let e2 = compile_expr env eenv vtymap lmap e2 in

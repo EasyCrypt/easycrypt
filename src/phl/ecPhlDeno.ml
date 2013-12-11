@@ -42,9 +42,7 @@ let t_bdHoare_deno pre post g =
   let concl_e = f_bdHoareF pre f post cmp bd in
   let fun_ = EcEnv.Fun.by_xpath f env in
   (* building the substitution for the pre *)
-  let sargs = 
-    List.fold_left2 (fun s v a -> PVM.add env (pv_loc f v.v_name) mhr a s)
-      PVM.empty fun_.f_sig.fs_params args in
+  let sargs = PVM.add env (pv_arg f) mhr args PVM.empty in
   let smem = Fsubst.f_bind_mem Fsubst.f_subst_id mhr m in
   let concl_pr  = Fsubst.f_subst smem (PVM.subst env sargs pre) in
   (* building the substitution for the post *)
@@ -76,12 +74,8 @@ let t_equiv_deno pre post g =
   let funr = EcEnv.Fun.by_xpath fr env in
   (* building the substitution for the pre *)
   (* we should substitute param by args and left by ml and right by mr *)
-  let sargs = 
-    List.fold_left2 (fun s v a -> PVM.add env (pv_loc fr v.v_name) mright a s)
-      PVM.empty funr.f_sig.fs_params argsr in
-  let sargs = 
-    List.fold_left2 (fun s v a -> PVM.add env (pv_loc fl v.v_name) mleft a s)
-      sargs funl.f_sig.fs_params argsl in
+  let sargs = PVM.add env (pv_arg fr) mright argsr PVM.empty in
+  let sargs = PVM.add env (pv_arg fl) mleft argsl sargs in
   let smem = 
     Fsubst.f_bind_mem (Fsubst.f_bind_mem Fsubst.f_subst_id mright mr) mleft ml in
   let concl_pr  = Fsubst.f_subst smem (PVM.subst env sargs pre) in

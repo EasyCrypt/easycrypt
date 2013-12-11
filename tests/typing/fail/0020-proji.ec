@@ -1,0 +1,1 @@
+op foo (x:int) = x.`1.

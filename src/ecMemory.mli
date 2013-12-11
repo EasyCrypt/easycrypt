@@ -14,11 +14,13 @@ type memtype = local_memtype option
 
 val lmt_equal    : local_memtype -> local_memtype -> bool
 val lmt_xpath    : local_memtype -> EcPath.xpath
-val lmt_bindings : local_memtype -> EcTypes.ty Msym.t
+val lmt_bindings : local_memtype -> ((int*int) option * EcTypes.ty) Msym.t
+(* the "int option" indicate if the variable is defined as the projection of
+   "arg" or as a variable *)                         
 
 val mt_equal    : memtype -> memtype -> bool
 val mt_xpath    : memtype -> EcPath.xpath
-val mt_bindings : memtype -> EcTypes.ty Msym.t
+val mt_bindings : memtype -> ((int*int) option * EcTypes.ty) Msym.t
 val mt_fv       : memtype -> int EcIdent.Mid.t
 
 (* -------------------------------------------------------------------- *)
@@ -32,14 +34,16 @@ exception DuplicatedMemoryBinding of symbol
 val memory   : memenv -> memory
 val memtype  : memenv -> memtype 
 val xpath    : memenv -> EcPath.xpath
-val bindings : memenv -> EcTypes.ty Msym.t
+val bindings : memenv -> ((int*int) option * EcTypes.ty) Msym.t
 
 (* -------------------------------------------------------------------- *)
 val empty_local : memory -> EcPath.xpath -> memenv
 val abstract    : memory -> memenv
 
+val bindp    : symbol -> (int*int) option -> EcTypes.ty -> memenv -> memenv
 val bind     : symbol -> EcTypes.ty -> memenv -> memenv
-val lookup   : symbol -> memenv -> EcTypes.ty option
+val bind_proj: int -> int -> symbol -> EcTypes.ty -> memenv -> memenv
+val lookup   : symbol -> memenv -> ((int*int) option * EcTypes.ty) option
 val is_bound : symbol -> memenv -> bool
 
 (* -------------------------------------------------------------------- *)

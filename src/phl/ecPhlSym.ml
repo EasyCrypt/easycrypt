@@ -1,5 +1,5 @@
 (* -------------------------------------------------------------------- *)
-(* Symmetry(commutativity) rule for equiv                               *)
+(* Symmetry rule for equiv                                              *)
 
 (*  
  *  c2 ~ c1 : fun m2 m1 -> P m1 m2 ==> fun m2 m1 -> Q m1 m2

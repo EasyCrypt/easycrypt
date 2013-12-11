@@ -47,7 +47,7 @@ and f_node =
   | Fop     of EcPath.path * ty list
   | Fapp    of form * form list
   | Ftuple  of form list
-
+  | Fproj   of form * int
   | FhoareF of hoareF (* $hr / $hr *)
   | FhoareS of hoareS 
 
@@ -112,7 +112,7 @@ and bdHoareS = {
   bhs_bd  : form;
 }
 
-and pr = memory * EcPath.xpath * form list * form
+and pr = memory * EcPath.xpath * form * form
 
 type app_bd_info =
 | AppNone
@@ -300,6 +300,9 @@ module Hsform = Why3.Hashcons.Make (struct
 
     | Ftuple args1, Ftuple args2 ->
         List.all2 f_equal args1 args2
+    
+    | Fproj(f1,i1), Fproj(f2,i2) ->
+      i1 = i2 && f_equal f1 f2
 
     | FhoareF hf1, FhoareF hf2 -> hf_equal hf1 hf2
     | FhoareS hs1, FhoareS hs2 -> hs_equal hs1 hs2
@@ -316,7 +319,7 @@ module Hsform = Why3.Hashcons.Make (struct
            EcIdent.id_equal m1  m2
         && EcPath.x_equal   mp1 mp2
         && f_equal          ev1 ev2
-        && (List.all2 f_equal args1 args2)
+        && f_equal args1 args2
 
     | _, _ -> false
 
@@ -353,6 +356,8 @@ module Hsform = Why3.Hashcons.Make (struct
 
     | Ftuple args ->
         Why3.Hashcons.combine_list f_hash 0 args
+    | Fproj(f,i) ->
+        Why3.Hashcons.combine (f_hash f) i
 
     | FhoareF hf -> hf_hash hf
     | FhoareS hs -> hs_hash hs
@@ -366,13 +371,11 @@ module Hsform = Why3.Hashcons.Make (struct
     | FeagerF eg  -> eg_hash eg
 
     | Fpr (m, mp, args, ev) ->
-        let id =
-          Why3.Hashcons.combine2
-            (EcIdent.id_hash m)
-            (EcPath.x_hash   mp)
-            (f_hash          ev)
-        in
-          Why3.Hashcons.combine_list f_hash id args
+      Why3.Hashcons.combine3
+        (EcIdent.id_hash m)
+        (EcPath.x_hash   mp)
+        (f_hash          args)
+        (f_hash          ev)
 
   let fv_mlr = Sid.add mleft (Sid.singleton mright)
 
@@ -389,6 +392,7 @@ module Hsform = Why3.Hashcons.Make (struct
     | Flocal id        -> fv_singleton id 
     | Fapp (f, args)   -> union f_fv (f :: args)
     | Ftuple args      -> union f_fv args
+    | Fproj(e,_)       -> f_fv e
     | Fif (f1, f2, f3) -> union f_fv [f1; f2; f3]
 
     | Fquant(_, b, f) -> 
@@ -441,7 +445,7 @@ module Hsform = Why3.Hashcons.Make (struct
     | Fpr (m,mp,args,event) ->
         let fve = Mid.remove mhr (f_fv event) in
         let fv  = EcPath.x_fv fve mp in
-        List.fold_left (fun s f -> fv_union s (f_fv f)) (fv_add m fv) args
+        fv_union (f_fv args) (fv_add m fv)
   
   let tag n f = 
     let fv = fv_union (fv_node f.f_node) f.f_ty.ty_fv in
@@ -474,6 +478,8 @@ let f_local x ty = mk_form (Flocal x) ty
 
 let f_pvar x ty m = mk_form (Fpvar(x, m)) ty
 
+let f_pvarg f ty m = f_pvar (pv_arg f) ty m 
+
 let f_pvloc f v m = 
   f_pvar (EcTypes.pv_loc f v.v_name) v.v_type m
 
@@ -483,10 +489,14 @@ let f_pvlocs f vs m =
 let f_glob mp m = mk_form (Fglob(mp,m)) (tglob mp)
 
 (* -------------------------------------------------------------------- *)
+let f_tt    = f_op EcCoreLib.p_tt [] tunit
 let f_tuple args = 
   match args with
+  | []  -> f_tt
   | [x] -> x
-  | _ -> mk_form (Ftuple args) (ttuple (List.map f_ty args))
+  | _   -> mk_form (Ftuple args) (ttuple (List.map f_ty args))
+
+let f_proj f i ty = mk_form (Fproj(f, i)) ty
 
 let f_if f1 f2 f3 =
   mk_form (Fif (f1, f2, f3)) f2.f_ty 
@@ -595,8 +605,28 @@ let f_eqs fs1 fs2 =
   assert (List.length fs1 = List.length fs2);
   f_ands (List.map2 f_eq fs1 fs2)
 
-let f_eqparams f1 vs1 m1 f2 vs2 m2 =
-  f_eqs (f_pvlocs f1 vs1 m1) (f_pvlocs f2 vs2 m2)
+let f_eqparams f1 ty1 vs1 m1 f2 ty2 vs2 m2 =
+  let f_pvlocs f ty vs m = 
+    let arg = f_pvarg f ty m in
+    if List.length vs = 1 then [arg]
+    else
+      let t = Array.of_list vs in
+      let t = Array.mapi (fun i vd -> f_proj arg i vd.v_type) t in
+      Array.to_list t in
+  match vs1, vs2 with
+  | Some vs1, Some vs2 ->
+    if List.length vs1 = List.length vs1 then
+      f_eqs (f_pvlocs f1 ty1 vs1 m1) (f_pvlocs f2 ty2 vs2 m2)
+    else
+      f_eq (f_tuple (f_pvlocs f1 ty1 vs1 m1)) 
+        (f_tuple (f_pvlocs f2 ty2 vs2 m2))
+  | Some vs1, None ->
+    f_eq (f_tuple (f_pvlocs f1 ty1 vs1 m1)) (f_pvarg f2 ty2 m2)
+  | None, Some vs2 ->
+    f_eq (f_pvarg f1 ty1 m1) (f_tuple (f_pvlocs f2 ty2 vs2 m2))
+  | None, None ->
+    f_eq (f_pvarg f1 ty1 m1) (f_pvarg f2 ty2 m2)
+
 
 let f_eqres f1 ty1 m1 f2 ty2 m2 =
   f_eq (f_pvar (pv_res f1) ty1 m1)  (f_pvar (pv_res f2) ty2 m2)
@@ -968,6 +998,10 @@ module FSmart = struct
   let f_tuple (fp, fs) fs' =
     if fs == fs' then fp else f_tuple fs'
 
+  let f_proj (fp,f,ty) (f',ty') i = 
+    if f == f' && ty == ty' then fp
+    else f_proj f' i ty'
+
   let f_equivF (fp, ef) ef' =
     if eqf_equal ef ef' then fp else mk_form (FequivF ef') fp.f_ty
 
@@ -1046,6 +1080,11 @@ let f_map gt g fp =
       let fs' = List.Smart.map g fs in
         FSmart.f_tuple (fp, fs) fs'
 
+  | Fproj(f,i) ->
+    let f' = g f in
+    let ty' = gt fp.f_ty in
+    FSmart.f_proj (fp, f, fp.f_ty) (f',ty') i
+
   | FhoareF hf ->
       let pr' = g hf.hf_pr in
       let po' = g hf.hf_po in
@@ -1091,7 +1130,7 @@ let f_map gt g fp =
           { eg with eg_pr = pr'; eg_po = po'; }
 
   | Fpr (m, mp, args, ev) -> 
-      let args' = List.Smart.map g args in
+      let args' = g args in
       let ev'   = g ev in
         FSmart.f_pr (fp, (m, mp, args, ev)) (m, mp, args', ev')
 
@@ -1104,6 +1143,7 @@ let f_iter g f =
   | Fint _  | Flocal _ | Fpvar _ | Fglob _ | Fop _ -> ()
   | Fapp(e, es) -> g e; List.iter g es
   | Ftuple es -> List.iter g es
+  | Fproj(e,_) -> g e
   | FhoareF hf -> g hf.hf_pr; g hf.hf_po
   | FhoareS hs -> g hs.hs_pr; g hs.hs_po
   | FbdHoareF bhf -> g bhf.bhf_pr; g bhf.bhf_po
@@ -1111,7 +1151,7 @@ let f_iter g f =
   | FequivF ef -> g ef.ef_pr; g ef.ef_po
   | FequivS es -> g es.es_pr; g es.es_po
   | FeagerF eg -> g eg.eg_pr; g eg.eg_po
-  | Fpr(_,_,args,ev) -> List.iter g args; g ev
+  | Fpr(_,_,args,ev) -> g args; g ev
 
 (* -------------------------------------------------------------------- *)
 let rec form_of_expr mem (e: expr) = 
@@ -1123,6 +1163,7 @@ let rec form_of_expr mem (e: expr) =
   | Eapp (ef,es) -> f_app (form_of_expr mem ef) (List.map (form_of_expr mem) es) e.e_ty
   | Elet (lpt,e1,e2) -> f_let lpt (form_of_expr mem e1) (form_of_expr mem e2)
   | Etuple es -> f_tuple (List.map (form_of_expr mem) es)
+  | Eproj(e1,i) -> f_proj (form_of_expr mem e1) i e.e_ty
   | Eif (e1,e2,e3) -> 
       f_if (form_of_expr mem e1) (form_of_expr mem e2) (form_of_expr mem e3)
   | Elam(b,e) ->
@@ -1404,8 +1445,8 @@ module Fsubst = struct
       assert (not (Mid.mem mhr s.fs_mem));
       let m'    = Mid.find_def m m s.fs_mem in
       let mp'   = EcPath.x_substm s.fs_sty.ts_p s.fs_mp mp in
-      let args' = List.Smart.map (f_subst s) args in
-      let e'    = (f_subst s) e in
+      let args' =f_subst s args in
+      let e'    = f_subst s e in
 
       FSmart.f_pr (fp, (m, mp, args, e)) (m', mp', args', e')
   
@@ -1598,7 +1639,7 @@ and f_real_div_simpl f1 f2 =
       else f_real_div f1 f2
 
 (* -------------------------------------------------------------------- *)
-let f_let_simpl lp f1 f2 =
+let rec f_let_simpl lp f1 f2 =
   match lp with
   | LSymbol (id, _) -> begin
       match Mid.find_opt id (f_fv f2) with
@@ -1626,11 +1667,19 @@ let f_let_simpl lp f1 f2 =
               (fun f2 (id, f1) -> f_let (LSymbol id) f1 f2)
               (Fsubst.subst_locals s f2) d
       | _ ->
+        let x = EcIdent.create "tpl" in
+        let ty = ttuple (List.map snd ids) in
+        let lpx = LSymbol(x,ty) in
+        let fx = f_local x ty in
+        let tu = f_tuple (List.mapi (fun i (_,ty') -> f_proj fx i ty') ids) in
+        f_let_simpl lpx f1 (f_let_simpl lp tu f2)
+(*
         let check (id, _) = Mid.find_opt id (f_fv f2) = None in
-          if List.for_all check ids then f2 else f_let lp f1 f2
+          if List.for_all check ids then f2 else f_let lp f1 f2 *)
     end
 
   | LRecord (_, ids) ->
+      (* TODO B : PY this should be simplified if possible *)
       let check (id, _) =
         match id with
         | None -> true
@@ -1721,6 +1770,11 @@ let bool_val f =
   if is_true f then Some true
   else if is_false f then Some false
   else None 
+
+let f_proj_simpl f i ty =
+  match f.f_node with
+  | Ftuple args -> List.nth args i
+  | _ -> f_proj f i ty
 
 let f_if_simpl f1 f2 f3 =
   if f_equal f2 f3 then f2

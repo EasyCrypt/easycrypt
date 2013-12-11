@@ -27,7 +27,7 @@ let qsymb_of_symb (x : symbol) : qsymbol = ([], x)
 type psymbol  = symbol  located
 type pqsymbol = qsymbol located
 type pmsymbol = (psymbol * ((pmsymbol located) list) option) list
-
+type pgamepath = (pmsymbol * psymbol) located
 (* -------------------------------------------------------------------- *)
 type pty_r =
   | PTunivar
@@ -64,6 +64,7 @@ and pexpr_r =
   | PElambda of ptybindings * pexpr               (* lambda abstraction *)
   | PErecord of pexpr rfield list                 (* record             *)
   | PEproj   of pexpr * pqsymbol                  (* projection         *)
+  | PEproji  of pexpr * int                       (* tuple projection   *)
   | PEscope  of pqsymbol * pexpr                  (* scope selection    *)
 
 and pexpr = pexpr_r located
@@ -116,9 +117,13 @@ and pvariable_decl = {
   pvd_type : pty;
 }
 
+and fun_params = 
+ | Fparams_exp of (psymbol * pty) list
+ | Fparams_imp of pty
+
 and pfunction_decl = {
   pfd_name     : psymbol;
-  pfd_tyargs   : (psymbol * pty) list;
+  pfd_tyargs   : fun_params;
   pfd_tyresult : pty;
   pfd_uses     : (bool * pqsymbol list) option;
 }
@@ -139,10 +144,10 @@ and pstructure = {
 }
 
 and pstructure_item =
-  | Pst_mod   of pmodule
-  | Pst_var   of (psymbol list * pty)
-  | Pst_fun   of (pfunction_decl * pfunction_body)
-  | Pst_alias of (psymbol * pqsymbol)
+  | Pst_mod    of pmodule
+  | Pst_var    of (psymbol list * pty)
+  | Pst_fun    of (pfunction_decl * pfunction_body)
+  | Pst_alias  of (psymbol * pgamepath)
 
 and pfunction_body = {
   pfb_locals : pfunction_local list;
@@ -155,6 +160,8 @@ and pfunction_local = {
   pfl_type  : pty   option;
   pfl_init  : pexpr option;
 }
+
+
 
 and pmodule = (psymbol * pmodule_expr)
 
@@ -192,7 +199,7 @@ type precord = {
 }
 
 (* -------------------------------------------------------------------- *)
-type pgamepath = (pmsymbol * psymbol) located
+
 type pmemory   = psymbol
 
 type phoarecmp = PFHle | PFHeq | PFHge
@@ -217,6 +224,7 @@ and pformula_r =
   | PFlambda of ptybindings * pformula
   | PFrecord of pformula rfield list
   | PFproj   of pformula * pqsymbol
+  | PFproji  of pformula * int 
   | PFglob   of pmsymbol located 
   | PFeqveq  of glob_or_var list
   | PFlsless of pgamepath

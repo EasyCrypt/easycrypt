@@ -24,6 +24,7 @@ val t_hoareS_conseq   : form -> form -> tactic
 val t_bdHoareF_conseq : form -> form -> tactic
 val t_bdHoareS_conseq : form -> form -> tactic
 val t_bdHoareS_conseq_bd : hoarecmp -> form -> tactic
+val t_bdHoareF_conseq_bd : hoarecmp -> form -> tactic
 
   
 val t_equivF_conseq_nm   : form -> form -> tactic
@@ -33,8 +34,6 @@ val t_hoareS_conseq_nm   : form -> form -> tactic
 val t_bdHoareF_conseq_nm : form -> form -> tactic
 val t_bdHoareS_conseq_nm : form -> form -> tactic
 
-val t_bdHoareF_conseq_bd : hoarecmp -> form -> tactic
-val t_bdHoareS_conseq_bd : hoarecmp -> form -> tactic
 
 val t_conseq : form -> form -> tactic
 

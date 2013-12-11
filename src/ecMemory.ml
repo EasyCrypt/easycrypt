@@ -13,7 +13,7 @@ let mem_equal = EcIdent.id_equal
 (* -------------------------------------------------------------------- *)
 type local_memtype = {
   mt_path : EcPath.xpath;
-  mt_vars : ty Msym.t
+  mt_vars : ((int*int) option * ty) Msym.t
 }
 
 type memtype = local_memtype option
@@ -22,12 +22,12 @@ let mt_fv = function
   | None -> EcIdent.Mid.empty
   | Some lmt ->
     let fv = EcPath.x_fv EcIdent.Mid.empty lmt.mt_path in
-    Msym.fold (fun _ ty fv -> EcIdent.fv_union fv ty.ty_fv) lmt.mt_vars fv 
-
+    Msym.fold (fun _ (_,ty) fv -> EcIdent.fv_union fv ty.ty_fv) lmt.mt_vars fv 
 
 let lmt_equal mt1 mt2 =   
   EcPath.x_equal mt1.mt_path mt2.mt_path &&
-    Msym.equal ty_equal mt1.mt_vars mt2.mt_vars
+    Msym.equal (fun (p1,ty1) (p2,ty2) -> p1 = p2 && ty_equal ty1 ty2) 
+      mt1.mt_vars mt2.mt_vars
 
 let lmt_xpath mt = mt.mt_path
 let lmt_bindings mt = mt.mt_vars
@@ -68,15 +68,18 @@ let empty_local (me : memory) mp =
 let abstract (me:memory) = (me,None)
 
 (* -------------------------------------------------------------------- *)
-let bind (x : symbol) (ty : EcTypes.ty) ((m,mt) : memenv) =
+let bindp (x : symbol) pr (ty : EcTypes.ty) ((m,mt) : memenv) =
   let mt = match mt with
     | None -> assert false
     | Some mt -> mt in
   let merger = function
     | Some _ -> raise (DuplicatedMemoryBinding x)
-    | None   -> Some ty
+    | None   -> Some (pr,ty)
   in
     (m, Some { mt with mt_vars = Msym.change merger x mt.mt_vars })
+
+let bind_proj i n x ty me = bindp x (Some (i,n)) ty me
+let bind x ty me = bindp x None ty me
 
 (* -------------------------------------------------------------------- *)
 let lookup (x : symbol) ((_,mt) : memenv) =
@@ -94,7 +97,8 @@ let mt_subst sx st o =
     let p' = sx mt.mt_path in
     let vars' = 
       if st == identity then mt.mt_vars else
-        Msym.map st mt.mt_vars in (* FIXME could be greate to use smart_map *)
+        Msym.map (fun (p,ty) -> p, st ty) mt.mt_vars in 
+           (* FIXME could be greate to use smart_map *)
     if p' == mt.mt_path && vars' == mt.mt_vars then o else
       Some { mt_path   = p'; mt_vars   = vars' }
 

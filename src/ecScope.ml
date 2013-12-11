@@ -303,6 +303,7 @@ end = struct
       | Eapp   (e, es)      -> List.iter cbrec (e :: es)
       | Elet   (lp, e1, e2) -> on_mpath_lp cb lp; List.iter cbrec [e1; e2]
       | Etuple es           -> List.iter cbrec es
+      | Eproj  (e,_)        -> cbrec e
       | Eif    (e1, e2, e3) -> List.iter cbrec [e1; e2; e3]
       | Elam   (xs, e)      ->
           List.iter (fun (_, ty) -> on_mpath_ty cb ty) xs;
@@ -340,7 +341,7 @@ end = struct
 
   let on_mpath_lcmem cb m =
       cb (EcMemory.lmt_xpath m).x_top;
-      Msym.iter (fun _ ty -> on_mpath_ty cb ty) (EcMemory.lmt_bindings m)
+      Msym.iter (fun _ (_,ty) -> on_mpath_ty cb ty) (EcMemory.lmt_bindings m)
 
   let on_mpath_memenv cb (m : EcMemory.memenv) =
     match snd m with
@@ -377,6 +378,7 @@ end = struct
       | EcFol.Fop       (_, ty)      -> List.iter (on_mpath_ty cb) ty
       | EcFol.Fapp      (f, fs)      -> List.iter cbrec (f :: fs)
       | EcFol.Ftuple    fs           -> List.iter cbrec fs
+      | EcFol.Fproj     (f,_)        -> cbrec f
       | EcFol.Fpvar     (pv, _)      -> on_mpath_pv  cb pv
       | EcFol.Fglob     (mp, _)      -> cb mp
       | EcFol.FhoareF   hf           -> on_mpath_hf  cb hf
@@ -436,7 +438,7 @@ end = struct
 
     and on_mpath_pr cb (_, xp, fs, f) =
       cb xp.x_top;
-      List.iter (on_mpath_form cb) (f :: fs)
+      List.iter (on_mpath_form cb) [f ; fs]
 
     in
       on_mpath_ty cb f.EcFol.f_ty; fornode ()
@@ -466,11 +468,12 @@ end = struct
     on_mpath_fun_body cb fun_.f_def
 
   and on_mpath_fun_sig cb fsig =
-    List.iter (fun v -> on_mpath_ty cb v.v_type) fsig.fs_params;
+    on_mpath_ty cb fsig.fs_arg;
     on_mpath_ty cb fsig.fs_ret
 
   and on_mpath_fun_body cb fbody =
     match fbody with
+    | FBalias xp -> cb xp.x_top
     | FBdef fdef -> on_mpath_fun_def cb fdef
     | FBabs oi   -> on_mpath_fun_oi  cb oi
 

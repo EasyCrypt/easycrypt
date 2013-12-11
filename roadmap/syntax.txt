@@ -4,6 +4,16 @@
 
   - fun -> proc
   - lambda -> fun
+  - bd_hoare -> phoare
+  - bdhoare_* -> phoare_*
+  - eqobs_in -> sim
+  - *_deno -> bydeno
+  - fst -> .`1
+  - snd -> .`2
+
+* Comportement par défaut devrait etre `proof strict' (ceci est une décision unilatérale de François)
+
+* Discuter la syntaxe des opérateurs
 
 * Type de retour optionnel pour les procédures + inférence pour les var. locales
 
@@ -20,6 +30,7 @@
 
   proc id(arg...) : t * { restr } (* `*' est maintenant en dehors - 16082 *)
   + `arg' peut maintenant être de la forme `_ : t1 * ... * tn'
+     actuellement, la syntaxe est ,t1 * ... * tn
 
 * if / while -> parenthèses sur la condition ? (interaction avec les accolades)
 
@@ -43,6 +54,7 @@
 * bd_hoare / hoare à top-level
 
 * bd_hoare -> phoare / phl
+	bd_hoare [fident ...] relation form // pas sform
 
 * détection du code mort
 
@@ -52,7 +64,12 @@
     sp side? cpos?
 
     seq side? cpos : sform tacdir appbdinfo -> voir si `:' sert
+	en fait, on veut: seq side? cpos : sform sform? tacdir? appbdinfo' (ou appbdinfo' est appbdinfo sans le dernier sform optionnel)
     while side : wtacinfo
+
+    proc sform sform sform? -> proc LBRACKET form RBRACKET sform sform?
+    call side? fpattern(callinfo) -> call side? fpattern(callinfo')  et call LBRACKET form RBRACKET sform sform?
+    callinfo' = form LONGARROW form | form
 
     rcondt / rcondf -> UINT => singlecpos
 
@@ -89,6 +106,18 @@
 
     pr_eq -> à enlever
 
+	
+	exists* -> utilise alias
+
+	alias ?side slist(alias_dec,COMMA)
+
+	alias_dec = codepos | codepos AS lident | codepos lident EQ expr | UNDERSCORE list(sform)
+	
 X : tacdir : << | >> | ε
 
-* 
+* Semantique des tactiques:
+    eqobs_in, hoare devraient sur les procedures, pas seulement les statements
+
+    Pr[...] sur les statements et pas seulement sur les procedures?
+
+* equiv, phoare, hoare devraient pouvoir prendre des invariants plutot que des paires pre/post.

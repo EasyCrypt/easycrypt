@@ -322,9 +322,10 @@ type variable = {
   v_type : EcTypes.ty;
 }
 
-type funsig = {
+type funsig = { 
   fs_name   : symbol;
-  fs_params : variable list;
+  fs_arg    : EcTypes.ty;
+  fs_anames : variable list option; 
   fs_ret    : EcTypes.ty;
 }
 
@@ -371,6 +372,7 @@ type function_def = {
 
 type function_body =
 | FBdef of function_def
+| FBalias of xpath 
 | FBabs of oracle_info
 
 type function_ = {

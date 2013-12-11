@@ -1,8 +1,6 @@
-op fst (p:'a * 'b): 'a = 
-  let (a,b) = p in a.
+op fst (p:'a * 'b): 'a = p.`1.
 
-op snd (p:'a * 'b): 'b = 
-  let (a,b) = p in b.
+op snd (p:'a * 'b): 'b = p.`2.
 
 lemma nosmt pw_eq (x x':'a) (y y':'b):
   x = x' => y = y' => (x,y) = (x',y')

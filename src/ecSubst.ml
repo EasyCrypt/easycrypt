@@ -115,11 +115,12 @@ let subst_oracle_info (s:_subst) (x:oracle_info) =
 
 (* -------------------------------------------------------------------- *)
 let subst_funsig (s : _subst) (funsig : funsig) =
-  let fs_params = List.map (subst_variable s) (funsig.fs_params) in
-  let fs_ret    = s.s_ty (funsig.fs_ret) in
+  let fs_arg = s.s_ty funsig.fs_arg in
+  let fs_ret = s.s_ty funsig.fs_ret in
 
   { fs_name   = funsig.fs_name;
-    fs_params = fs_params;
+    fs_arg    = fs_arg;
+    fs_anames = funsig.fs_anames;
     fs_ret    = fs_ret; }
 
 (* -------------------------------------------------------------------- *)
@@ -188,6 +189,7 @@ let subst_function (s : _subst) (f : function_) =
   let def' = 
     match f.f_def with 
     | FBdef def -> FBdef (subst_function_def s def)
+    | FBalias f -> FBalias (EcPath.x_subst s.s_fmp f)
     | FBabs oi  -> FBabs (subst_oracle_info s oi) in
   { f_name = f.f_name;
     f_sig  = sig';
