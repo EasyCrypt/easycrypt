@@ -133,5 +133,3 @@ theory GenDice.
  save.
 
 end GenDice.
-
-
