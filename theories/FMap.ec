@@ -355,8 +355,7 @@ theory Core.
   proof strict.
   apply Fun.fun_ext=> x //=.
   rewrite /lamo /lamo get_map; elim/option_ind (get m x)=> //= {x}.
-    by intros=> x'; cut ->: (Some x' = None) = false by smt; (* This will fail once non-confusion is part of // *)
-       rewrite //= proj_some.
+  by intros=> x'; rewrite proj_some.
   qed.
 end Core.
 
