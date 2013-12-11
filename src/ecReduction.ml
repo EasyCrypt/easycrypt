@@ -312,6 +312,9 @@ let rec h_red ri env hyps f =
         with NotReducible ->
           f_app (h_red ri env hyps f1) args f.f_ty
       end
+  | Fproj(f1,i) when ri.iota ->
+    let f' = f_proj_simpl f1 i f.f_ty in
+    if f_equal f f' then f_proj (h_red ri env hyps f1) i f.f_ty else f'
 
     (* ι-reduction (if-then-else) *)
   | Fif (f1, f2, f3) when ri.iota ->
@@ -484,7 +487,9 @@ let check_alpha_equal ri hyps f1 f2 =
       let xp1, xp2 = EcMemory.lmt_xpath lmt1, EcMemory.lmt_xpath lmt2 in
       ensure (EqTest.for_xp_norm env xp1 xp2);
       let m1, m2 = EcMemory.lmt_bindings lmt1, EcMemory.lmt_bindings lmt2 in
-      ensure (EcSymbols.Msym.equal (EqTest.for_type env) m1 m2)
+      ensure (EcSymbols.Msym.equal 
+                (fun (p1,ty1) (p2,ty2) -> 
+                  p1 = p2 && EqTest.for_type env ty1 ty2) m1 m2)
     | _, _ -> error () in
   (* TODO all declaration in env, do it also in add local *)
   let check_binding (env, subst) (x1,gty1) (x2,gty2) = 
@@ -570,6 +575,9 @@ let check_alpha_equal ri hyps f1 f2 =
     | Ftuple args1, Ftuple args2 when List.length args1 = List.length args2 ->
       List.iter2 (aux env subst) args1 args2
 
+    | Fproj(f1,i1), Fproj(f2,i2) when i1 = i2 ->
+      aux env subst f1 f2
+
     | FhoareF hf1, FhoareF hf2 -> 
       check_xp env subst hf1.hf_f hf2.hf_f;
       aux env subst hf1.hf_pr hf2.hf_pr;
@@ -620,8 +628,9 @@ let check_alpha_equal ri hyps f1 f2 =
     | Fpr(m1,p1,args1,f1'), Fpr(m2,p2,args2,f2') ->
       check_mem subst m1 m2;
       check_xp env subst p1 p2;
-      ensure (List.length args1 = List.length args2);
-      List.iter2 (aux env subst) args1 args2;
+     (* ensure (List.length args1 = List.length args2); 
+      List.iter2 (aux env subst) args1 args2; *)
+      aux env subst args1 args2;
       aux env subst f1' f2'
 
     | _, _ -> error ()

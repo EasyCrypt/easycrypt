@@ -582,6 +582,10 @@ sexpr_u:
 
 | e=sexpr DOTTICK x=qident
    { PEproj (e, x) }
+| e=sexpr DOTTICK n=loc(uint) 
+   { if n.pl_desc = 0 then 
+       parse_error n.pl_loc (Some "tuple projection start at 1");
+     PEproji(e,n.pl_desc - 1) }
 ;
 
 expr_u:
@@ -768,6 +772,11 @@ sform_u(P):
 
 | f=sform_r(P) DOTTICK x=qident
     { PFproj (f, x) }
+
+| f=sform_r(P) DOTTICK n=loc(uint) 
+   { if n.pl_desc = 0 then 
+       parse_error n.pl_loc (Some "tuple projection start at 1");
+     PFproji(f,n.pl_desc - 1) }
 
 | HOARE LBRACKET
     mp=loc(fident) COLON pre=form_r(P) LONGARROW post=form_r(P)
@@ -990,7 +999,10 @@ typed_vars:
 ;
 
 param_decl:
-| LPAREN aout=plist0(typed_vars, COMMA) RPAREN { List.flatten aout }
+| LPAREN aout=plist0(typed_vars, COMMA) RPAREN 
+    { Fparams_exp (List.flatten aout )}
+| COMMA ty=loc(type_exp)
+    { Fparams_imp ty } 
 ;
 
 (* -------------------------------------------------------------------- *)
@@ -1111,7 +1123,8 @@ fun_decl:
         pfd_tyresult = ty  ;
         pfd_uses     = None; }
     }
-;
+; 
+
 
 mod_item:
 | v=var_decl
@@ -1120,10 +1133,18 @@ mod_item:
 | m=mod_def
     { let (x, m) = m in Pst_mod (x, m) }
 
-| FUN decl=fun_decl EQ body=fun_def_body
-    { Pst_fun (decl, body) }
+| FUN decl=loc(fun_decl) EQ body=fun_def_body
+    { 
+      let loc = decl.pl_loc in
+      let decl = decl.pl_desc in
+      begin match decl.pfd_tyargs with
+      | Fparams_imp _ -> 
+        parse_error loc (Some "implicite declaration of parameters not allowed")
+      | _ -> ()
+      end;
+      Pst_fun (decl, body) }
 
-| FUN x=lident EQ f=qident
+| FUN x=lident EQ f=loc(fident)
     { Pst_alias (x, f) }
 ;
 

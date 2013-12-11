@@ -137,6 +137,7 @@ val pv_loc  : EcPath.xpath -> symbol -> prog_var
 val pv_glob : EcPath.xpath -> prog_var 
 val xp_glob : EcPath.xpath -> EcPath.xpath
 val pv_res  : EcPath.xpath -> prog_var
+val pv_arg  : EcPath.xpath -> prog_var
 val pv      : EcPath.xpath -> pvar_kind -> prog_var
 
 (* -------------------------------------------------------------------- *)
@@ -157,6 +158,7 @@ and expr_node =
   | Elet   of lpattern * expr * expr       (* let binding           *)
   | Etuple of expr list                    (* tuple constructor     *)
   | Eif    of expr * expr * expr           (* _ ? _ : _             *)
+  | Eproj  of expr * int                   (* projection of a tuple *)
 
 type closure = (EcIdent.t * ty) list * expr
 
@@ -178,6 +180,7 @@ val e_let      : lpattern -> expr -> expr -> expr
 val e_tuple    : expr list -> expr
 val e_if       : expr -> expr -> expr -> expr
 val e_lam      : (EcIdent.t * ty) list -> expr -> expr
+val e_proj     : expr -> int -> ty -> expr
 
 val is_var     : expr -> bool
 val destr_var  : expr -> prog_var 

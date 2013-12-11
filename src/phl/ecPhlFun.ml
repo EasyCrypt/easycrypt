@@ -96,19 +96,28 @@ let lossless_hyps env top sub =
 
 (* -------------------------------------------------------------------- *)
 module FunDefLow = struct
+
+  let subst_pre env f fs m s =
+    match fs.fs_anames with
+    | Some lv -> 
+      let v = f_tuple (List.map (fun v -> f_pvloc f v m) lv) in
+      PVM.add env (pv_arg f) m v s
+    | None -> s 
+
   let t_hoareF_fun_def g =
     let env,_,concl = get_goal_e g in
     let hf = t_as_hoareF concl in
     let f = NormMp.norm_xfun env hf.hf_f in
     check_concrete env f;
-    let memenv, fdef, env = Fun.hoareS f env in
+    let memenv, (fsig,fdef), env = Fun.hoareS f env in
     let m = EcMemory.memory memenv in
     let fres =
       match fdef.f_ret with
       | None -> f_tt
       | Some e -> form_of_expr m e in
     let post = PVM.subst1 env (pv_res f) m fres hf.hf_po in
-    let concl' = f_hoareS memenv hf.hf_pr fdef.f_body post in
+    let pre  = PVM.subst env (subst_pre env f fsig m PVM.empty) hf.hf_pr in
+    let concl' = f_hoareS memenv pre fdef.f_body post in
     prove_goal_by [concl'] rn_hl_fun_def g
 
   let t_bdHoareF_fun_def g =
@@ -116,14 +125,18 @@ module FunDefLow = struct
     let bhf = t_as_bdHoareF concl in
     let f = NormMp.norm_xfun env bhf.bhf_f in
     check_concrete env f;
-    let memenv, fdef, env = Fun.hoareS f env in
+    let memenv, (fsig,fdef), env = Fun.hoareS f env in
     let m = EcMemory.memory memenv in
     let fres =
       match fdef.f_ret with
       | None -> f_tt
       | Some e -> form_of_expr m e in
     let post = PVM.subst1 env (pv_res f) m fres bhf.bhf_po in
-    let concl' = f_bdHoareS memenv bhf.bhf_pr fdef.f_body post bhf.bhf_cmp bhf.bhf_bd  in
+    let spre = subst_pre env f fsig m PVM.empty in
+    let pre = PVM.subst env spre bhf.bhf_pr in
+    let bd  = PVM.subst env spre bhf.bhf_bd in
+    let concl' = 
+      f_bdHoareS memenv pre fdef.f_body post bhf.bhf_cmp bd in
     prove_goal_by [concl'] rn_hl_fun_def g
 
   let t_equivF_fun_def g =
@@ -132,7 +145,7 @@ module FunDefLow = struct
     let fl, fr =
       NormMp.norm_xfun env ef.ef_fl,  NormMp.norm_xfun env ef.ef_fr in
     check_concrete env fl; check_concrete env fr;
-    let memenvl,fdefl,memenvr,fdefr,env = Fun.equivS fl fr env in
+    let memenvl,(fsigl,fdefl),memenvr,(fsigr,fdefr),env= Fun.equivS fl fr env in
     let ml, mr = EcMemory.memory memenvl, EcMemory.memory memenvr in
     let fresl =
       match fdefl.f_ret with
@@ -145,8 +158,11 @@ module FunDefLow = struct
     let s = PVM.add env (pv_res fl) ml fresl PVM.empty in
     let s = PVM.add env (pv_res fr) mr fresr s in
     let post = PVM.subst env s ef.ef_po in
+    let s = subst_pre env fl fsigl ml PVM.empty in
+    let s = subst_pre env fr fsigr mr s in
+    let pre = PVM.subst env s ef.ef_pr in
     let concl' =
-      f_equivS memenvl memenvr ef.ef_pr fdefl.f_body fdefr.f_body post
+      f_equivS memenvl memenvr pre fdefl.f_body fdefr.f_body post
     in
       prove_goal_by [concl'] rn_hl_fun_def g
 end
@@ -195,7 +211,8 @@ module FunAbsLow = struct
       let fo_l = EcEnv.Fun.by_xpath o_l env in
       let fo_r = EcEnv.Fun.by_xpath o_r env in
       let eq_params =
-        f_eqparams o_l fo_l.f_sig.fs_params ml o_r fo_r.f_sig.fs_params mr in
+        f_eqparams o_l fo_l.f_sig.fs_arg fo_l.f_sig.fs_anames ml 
+          o_r fo_r.f_sig.fs_arg fo_r.f_sig.fs_anames mr in
       let eq_res = f_eqres o_l fo_l.f_sig.fs_ret ml o_r fo_r.f_sig.fs_ret mr in
       let invs = if use then [eqglob;inv] else [inv] in
       let pre = EcFol.f_ands (eq_params :: invs) in
@@ -203,7 +220,8 @@ module FunAbsLow = struct
       f_equivF pre o_l o_r post in
     let sg = List.map2 ospec oil.oi_calls oir.oi_calls in
     let eq_params =
-      f_eqparams fl sigl.fs_params ml fr sigr.fs_params mr in
+      f_eqparams fl sigl.fs_arg sigl.fs_anames ml 
+        fr sigr.fs_arg sigr.fs_anames mr in
     let eq_res = f_eqres fl sigl.fs_ret ml fr sigr.fs_ret mr in
     let lpre = if oil.oi_in then [eqglob;inv] else [inv] in
     let pre = f_ands (eq_params::lpre) in
@@ -260,7 +278,8 @@ module UpToLow = struct
       let fo_l = EcEnv.Fun.by_xpath o_l env in
       let fo_r = EcEnv.Fun.by_xpath o_r env in
       let eq_params =
-        f_eqparams o_l fo_l.f_sig.fs_params ml o_r fo_r.f_sig.fs_params mr in
+        f_eqparams o_l fo_l.f_sig.fs_arg fo_l.f_sig.fs_anames
+          ml o_r fo_r.f_sig.fs_arg fo_r.f_sig.fs_anames mr in
       let eq_res = f_eqres o_l fo_l.f_sig.fs_ret ml o_r fo_r.f_sig.fs_ret mr in
       let pre = EcFol.f_ands [EcFol.f_not bad2; eq_params; invP] in
       let post = EcFol.f_if_simpl bad2 invQ (f_and eq_res invP) in
@@ -278,7 +297,8 @@ module UpToLow = struct
     let lossless_a = lossless_hyps env topl fl.x_sub in
     let sg = lossless_a :: sg in
     let eq_params =
-      f_eqparams fl sigl.fs_params ml fr sigr.fs_params mr in
+      f_eqparams fl sigl.fs_arg sigl.fs_anames ml 
+        fr sigr.fs_arg sigr.fs_anames mr in
     let eq_res = f_eqres fl sigl.fs_ret ml fr sigr.fs_ret mr in
     let lpre = if oil.oi_in then [eqglob;invP] else [invP] in
     let pre = f_if_simpl bad2 invQ (f_ands (eq_params::lpre)) in
@@ -295,7 +315,7 @@ module UpToLow = struct
 end
 
 (* -------------------------------------------------------------------- *)
-let t_fun_to_code g =
+let t_fun_to_code g = 
   let env, _, concl = get_goal_e g in
   let ef = t_as_equivF concl in
   let (ml,mr), _ = Fun.equivF_memenv ef.ef_fl ef.ef_fr env in
@@ -303,8 +323,11 @@ let t_fun_to_code g =
   let do1 f m =
     let fd = Fun.by_xpath f env in
     let args =
-      List.map (fun v -> e_var (pv_loc f v.v_name) v.v_type)
-        fd.f_sig.fs_params in
+      let arg = e_var (pv_arg f) fd.f_sig.fs_arg  in 
+      match fd.f_sig.fs_anames with
+      | None -> [arg]
+      | Some [_] -> [arg]
+      | Some params -> List.mapi (fun i v -> e_proj arg i v.v_type) params in
     let m, res = fresh_pv m {v_name = "r"; v_type = fd.f_sig.fs_ret} in
     let r = pv_loc f res in
     let i = i_call (Some(LvVar(r,fd.f_sig.fs_ret)), f, args) in
@@ -316,8 +339,9 @@ let t_fun_to_code g =
   let s = PVM.add env (pv_res fr) (fst mr) (f_pvar rr tyr (fst mr)) s in
   let post = PVM.subst env s ef.ef_po in
   let concl = f_equivS ml mr ef.ef_pr sl sr post in
-    (* TODO change the name of the rule *)
-    prove_goal_by [concl] rn_hl_fun_code g
+  (* TODO change the name of the rule *)
+  prove_goal_by [concl] rn_hl_fun_code g
+
 
 (* -------------------------------------------------------------------- *)
 let t_fun inv g =
