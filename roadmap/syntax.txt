@@ -8,6 +8,8 @@
   - bdhoare_* -> phoare_*
   - eqobs_in -> sim
   - *_deno -> bydeno
+  - fst -> .`1
+  - snd -> .`2
 
 * Discuter la syntaxe des opérateurs
 
@@ -26,6 +28,7 @@
 
   proc id(arg...) : t * { restr } (* `*' est maintenant en dehors - 16082 *)
   + `arg' peut maintenant être de la forme `_ : t1 * ... * tn'
+     actuellement, la syntaxe est ,t1 * ... * tn
 
 * if / while -> parenthèses sur la condition ? (interaction avec les accolades)
 
