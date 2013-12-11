@@ -2,16 +2,18 @@
 
 * Mots clés
 
-  - fun -> proc
-  - lambda -> fun
+DONE  - fun -> proc
+DONE  - lambda -> fun
+DONE  - eqobs_in -> sim
+DONE  - datatype -> type
+DONE  - record -> type
+
   - bd_hoare -> phoare
   - bdhoare_* -> phoare_*
-  - eqobs_in -> sim
+
   - *_deno -> bydeno
   - fst -> .`1
   - snd -> .`2
-  - datatype -> type
-  - record -> type
 
 * Comportement par défaut devrait etre `proof strict' (ceci est une décision unilatérale de François)
 
@@ -21,7 +23,8 @@
 
 * Chainage pour les déclarations abstraites:
 
-  type t1, ..., tn.
+DONE   type t1, ..., tn.
+
   var  x1, ..., xn.
 
   Avec ou sans virgule ?
@@ -30,7 +33,8 @@
 
 * interface de module / proc.
 
-  proc id(arg...) : t * { restr } (* `*' est maintenant en dehors - 16082 *)
+DONE   proc * id(arg...) : t { restr } (* `*' est maintenant en dehors - 16082 *)
+
   + `arg' peut maintenant être de la forme `_ : t1 * ... * tn'
      actuellement, la syntaxe est ,t1 * ... * tn
 
@@ -58,7 +62,7 @@
 * bd_hoare -> phoare / phl
 	bd_hoare [fident ...] relation form // pas sform
 
-* détection du code mort
+HALF-DONE (only for non-exported functions) * détection du code mort
 
 * Syntaxe des tactiques
 
