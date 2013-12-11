@@ -6,7 +6,7 @@ require import Map.
 module M = {
   var m : (int, int) map
 
-  fun f1 (x:int) : unit = {
+  proc f1 (x:int) : unit = {
     var w:int;
     var b:bool;
     b = true;
@@ -17,7 +17,7 @@ module M = {
     }
   }
 
-  fun f2 (x:int) : unit = {
+  proc f2 (x:int) : unit = {
     var w:int;
     var b:bool;
     b = true;
@@ -32,7 +32,7 @@ module M = {
 
 equiv f1_f2 : M.f1 ~ M.f2 : ={M.m,x} ==> ={M.m}.
 proof.
- fun.
+ proc.
  sp.
  transitivity{1} 
    {if (b) w = $[0..10]; else w = 0;

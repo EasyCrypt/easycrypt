@@ -7,7 +7,7 @@ op e2 : t.
 
 module M = {
   var x : t
-  fun f (b:bool) : unit = {
+  proc f (b:bool) : unit = {
     if (b) {
       x = e1;
     } else {
@@ -19,7 +19,7 @@ module M = {
 lemma foo_side : 
   equiv [M.f ~ M.f : b{1} = b{2} ==> M.x{1}=M.x{2} ].
 proof.
- fun.
+ proc.
  if {1}.
  if {2}.
  wp;skip;simplify;split.
@@ -32,7 +32,7 @@ save.
 lemma foo : 
   equiv [M.f ~ M.f : b{1} = b{2} ==> M.x{1}=M.x{2} ].
 proof.
- fun.
+ proc.
  if.
  intros &m1 &m2 Heq;rewrite Heq;simplify;smt.
  wp;skip;smt.

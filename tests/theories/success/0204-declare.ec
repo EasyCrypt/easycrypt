@@ -1,7 +1,7 @@
 require import Real.
 
 module type I = {
-  fun f() : bool
+  proc f() : bool
 }.
 
 section.

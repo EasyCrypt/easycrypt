@@ -1,12 +1,12 @@
 require import Int.
 module type O = {
-  fun o (x:int) : int
+  proc o (x:int) : int
 }.
 
 
 module type IA (O1:O, O2:O) = {
-  fun a1 (x:int, y:int) : int { O1.o }
-  fun a2 (x:int) : int { O1.o O2.o }
+  proc a1 (x:int, y:int) : int { O1.o }
+  proc a2 (x:int) : int { O1.o O2.o }
 }.
 
 (*
@@ -20,15 +20,15 @@ module H = {
 }.
 
 module O1 : O = { 
-  fun o (x:int) : int = { return H.w; }
+  proc o (x:int) : int = { return H.w; }
 }.
 
 module O2 : O = { 
-  fun o (x:int) : int = { return H.w; }
+  proc o (x:int) : int = { return H.w; }
 }.
 
 module type FOO = {
-  fun f (x:int) : int { O1.o } (* Should not be accepted ? *)
+  proc f (x:int) : int { O1.o } (* Should not be accepted ? *)
 }.
 
 
@@ -37,7 +37,7 @@ module G(FA:IA, O1 : O, O2 : O) = {
 }.
 
 module H1 = {
- fun id (x:int) : int = { return x; }
+ proc id (x:int) : int = { return x; }
 }.
 
 axiom foo : equiv [ H1.id ~ H1.id : true ==> true] .

@@ -1,7 +1,7 @@
 require import Real.
 
 module M = { 
-  fun f () : bool = { return true;}
+  proc f () : bool = { return true;}
 }.
 
 lemma t1 &m : Pr[M.f() @ &m : !res] = Pr[M.f() @ &m : true] - Pr[M.f() @ &m : res].

@@ -10,7 +10,7 @@ op default:'a.
 (** Destructors (partially specified) *)
 (* Head *)
 op hd (xs:'a list) =
-  list_rect default (lambda x xs v, x) xs.
+  list_rect default (fun x xs v, x) xs.
 
 lemma hd_cons (x:'a) xs: hd (x::xs) = x.
 proof strict.
@@ -19,7 +19,7 @@ qed.
 
 (* Tail *)
 op tl (xs:'a list) =
-  list_rect (default::[]) (lambda x xs v, xs) xs.
+  list_rect (default::[]) (fun x xs v, xs) xs.
 lemma tl_cons (x:'a) xs: tl (x::xs) = xs.
 proof strict.
 by rewrite /tl list_rect_cons.
@@ -28,7 +28,7 @@ qed.
 (*** Derived Constructions *)
 (** fold_right *)
 op fold_right (f:'a -> 'b -> 'b) (v:'b): 'a list -> 'b =
-  list_rect v (lambda x xs, f x).
+  list_rect v (fun x xs, f x).
 
 (* Direct inductive definition *)
 lemma fold_right_nil (f:'a -> 'b -> 'b) (v:'b):
@@ -44,7 +44,7 @@ by rewrite /fold_right list_rect_cons.
 qed.
 
 (** mem *)
-op mem(x:'a) = fold_right (lambda y intl, (x = y) \/ intl) false.
+op mem(x:'a) = fold_right (fun y intl, (x = y) \/ intl) false.
 
 (* Direct inductive definition *)
 lemma mem_nil (x:'a): !(mem x []).
@@ -59,7 +59,7 @@ by rewrite /mem fold_right_cons.
 qed.
 
 (*** length *)
-op length = fold_right (lambda (x:'a) l, l + 1) 0.
+op length = fold_right (fun (x:'a) l, l + 1) 0.
 op __abs:'a list -> int  = length. (* notation *)
 
 (* Direct inductive definition *)
@@ -88,7 +88,7 @@ by rewrite /(++) fold_right_cons.
 qed.
 
 (** rev *)
-op rev = fold_right<:'a list,'a> (lambda x xs, xs ++ (x::[])) [].
+op rev = fold_right<:'a list,'a> (fun x xs, xs ++ (x::[])) [].
 
 (* Direct inductive definition *)
 lemma rev_nil: rev<:'a> [] = [].
@@ -121,7 +121,7 @@ rewrite /all rw_eq_iff; split.
 qed.
 
 (** forallb *)
-op forallb (p:'a cpred) = fold_right (lambda x r, (p x) /\ r) true.
+op forallb (p:'a cpred) = fold_right (fun x r, (p x) /\ r) true.
 
 (* Direct inductive definition *)
 lemma forallb_nil (p:'a cpred): forallb p [].
@@ -152,7 +152,7 @@ rewrite /any rw_eq_iff; split.
 qed.
 
 (** existsb *)
-op existsb (p:'a cpred) = fold_right (lambda x r, (p x) \/ r) false.
+op existsb (p:'a cpred) = fold_right (fun x r, (p x) \/ r) false.
 
 (* Direct inductive definition *)
 lemma existsb_nil (p:'a cpred): !(existsb p []).
@@ -167,7 +167,7 @@ qed.
 
 (** filter *)
 op filter (p:'a cpred) =
-  fold_right (lambda x r, if p x then x::r else r) [].
+  fold_right (fun x r, if p x then x::r else r) [].
 
 (* Direct inductive definition *)
 lemma filter_nil (p:'a cpred):
@@ -184,7 +184,7 @@ by rewrite /filter fold_right_cons.
 qed.
 
 (** map *)
-op map (f:'a -> 'b) = fold_right (lambda x xs, (f x)::xs) [].
+op map (f:'a -> 'b) = fold_right (fun x xs, (f x)::xs) [].
 
 (* Direct inductive definition *)
 lemma map_nil (f:'a -> 'b): map f [] = [].
@@ -202,9 +202,9 @@ qed.
 require import Option.
 require import Pair.
 op nth (xs:'a list) =
-  fold_right (lambda (x:'a) (r:'a option -> int -> 'a option) (y:'a option) (n:int),
+  fold_right (fun (x:'a) (r:'a option -> int -> 'a option) (y:'a option) (n:int),
                 if n = 0 then Some x else (r y (n - 1)))
-             (lambda y n, y) xs None.
+             (fun y n, y) xs None.
 
 
 (* Direct inductive definition *)
@@ -216,7 +216,7 @@ lemma nth_consN (x:'a) xs n:
 
 (** count *)
 op count (x:'a) =
-  list_rect 0 (lambda y xs n, n + ((x = y) ? 1 : 0)).
+  list_rect 0 (fun y xs n, n + ((x = y) ? 1 : 0)).
 
 (** Direct inductive definition *)
 lemma count_nil (x:'a): count x [] = 0 by [].
@@ -229,7 +229,7 @@ qed.
 
 (** unique *)
 op unique: 'a list cpred =
-  list_rect true (lambda x xs v, v /\ !mem x xs).
+  list_rect true (fun x xs v, v /\ !mem x xs).
 
 (* Direct inductive definition *)
 lemma unique_nil: unique<:'a> []
@@ -243,7 +243,7 @@ qed.
 
 (** rm *)
 op rm (x:'a) (xs:'a list) =
-  list_rect [] (lambda y ys v, if (x = y) then ys else y::v) xs.
+  list_rect [] (fun y ys v, if (x = y) then ys else y::v) xs.
 
 lemma rm_nil (x:'a): rm x [] = []
 by (rewrite /rm list_rect_nil //).

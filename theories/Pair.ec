@@ -26,7 +26,7 @@ theory Dprod.
  
   (* This can be generalized *)
   axiom mu_def : forall P1 P2 (d1:'a distr) (d2: 'b distr),
-     mu (d1 * d2) (lambda p, P1 (fst p) /\ P2 (snd p)) = 
+     mu (d1 * d2) (fun p, P1 (fst p) /\ P2 (snd p)) = 
      mu d1 P1 * mu d2 P2.
 
   lemma mu_x_def: forall (d1:'a distr) (d2:'b distr) p, 

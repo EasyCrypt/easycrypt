@@ -1,10 +1,10 @@
 module type I = {
-  fun init():unit 
+  proc init():unit 
 }.
 
 module M(I:I): I = {
   var x:bool
-  fun init():unit = {
+  proc init():unit = {
     I.init();
     x = true;
   }

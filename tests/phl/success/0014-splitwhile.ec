@@ -2,7 +2,7 @@ require Logic.
 require import Int.
 
 module M1 = { 
-  fun f () : int * int= {
+  proc f () : int * int= {
     var x : int;
     var y : int;
     x = 1;
@@ -16,7 +16,7 @@ module M1 = {
 
 lemma test1 : hoare [M1.f : true ==> true].
 proof.
-  fun.
+  proc.
   splitwhile (x<=5) : 3.
   while (x<=y).
   wp; skip; smt.
@@ -27,7 +27,7 @@ save.
 
 lemma test2 : equiv [M1.f ~ M1.f : true ==> true].
 proof.
-  fun.
+  proc.
   splitwhile (x<=5) : {2} 3.
   splitwhile (x<=5) : {2} 3.
   admit.

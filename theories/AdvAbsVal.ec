@@ -1,11 +1,11 @@
 require import Real.
 
 module type Adv = { 
-  fun main () : bool
+  proc main () : bool
 }.
 
 module Neg_main (A:Adv) = { 
-  fun main () : bool = {
+  proc main () : bool = {
     var b : bool;
     b = A.main ();
     return !b;
@@ -15,7 +15,7 @@ module Neg_main (A:Adv) = {
 equiv Neg_A (A<:Adv) : 
    Neg_main(A).main ~ A.main : ={glob A} ==> res{1} = !res{2}.
 proof. 
- fun *;inline{1} Neg_main(A).main.
+ proc *;inline{1} Neg_main(A).main.
  by wp;call (_:true).
 qed.
 

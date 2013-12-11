@@ -3,7 +3,7 @@ require import Int.
 
 module G3 = {
   var z : int
-  fun f() : int  = {
+  proc f() : int  = {
     z = $dinter 0 1;
     return z;
   } 
@@ -11,7 +11,7 @@ module G3 = {
 
 module G4 = {
   var z : int
-  fun f() : int  = {
+  proc f() : int  = {
     z = $dinter 1 2;
     return z;
   } 
@@ -20,7 +20,7 @@ module G4 = {
 (* Should not be provable *)
 equiv equality : G3.f ~ G4.f : true ==> true.
 proof.
- fun.
+ proc.
  rnd.
  skip.
  smt.

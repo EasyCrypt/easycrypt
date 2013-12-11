@@ -2,7 +2,7 @@ require import Int.
 require import Bool.
 
 module M = {
-  fun f() : unit = {
+  proc f() : unit = {
     var x : int;
     var y : int;
     var z : int;
@@ -17,7 +17,7 @@ module M = {
     }
   }
 
-  fun g() : unit = {
+  proc g() : unit = {
     var x : int;
     var y : int;
     var z : int;
@@ -40,7 +40,7 @@ module M = {
 
 lemma L : equiv[M.f ~ M.g : true ==> true].
 proof.
-  fun.
+  proc.
   fission {1} 1.3!2 @ 1, 2.
   fusion  {1} 1.3!2 @ 1, 1.
   fusion  {2} 1.3!2 @ 1, 1.

@@ -1,7 +1,7 @@
 require import Int.
 
 module M = {
-  fun f() : unit = {
+  proc f() : unit = {
     var x : int = 0;
 
     if (true) {
@@ -14,7 +14,7 @@ module M = {
 
 lemma L : equiv[M.f ~ M.f : true ==> true].
 proof.
-  fun; unroll {1} 2.1.
+  proc; unroll {1} 2.1.
   admit.
 save.
 

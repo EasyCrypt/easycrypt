@@ -264,16 +264,16 @@ theory Core.
   qed.
 
   lemma dom_filter f (m:('a,'b) map):
-    dom (filter f m) = filter (lambda x, f x (proj (get m x))) (dom m).
+    dom (filter f m) = filter (fun x, f x (proj (get m x))) (dom m).
   proof strict.
   by apply set_ext=> x; rewrite mem_dom get_filter mem_filter mem_dom /=;
      case (f x (proj (get m x))).
   qed.
 
   lemma dom_filter1 f (m:('a,'b) map):
-    dom (filter (lambda x y, f x) m) = filter f (dom m).
+    dom (filter (fun x y, f x) m) = filter f (dom m).
   proof strict.
-  by cut:= dom_filter (lambda x (y:'b), f x) m; beta=> ->;
+  by cut:= dom_filter (fun x (y:'b), f x) m; beta=> ->;
      congr=> //; apply Fun.fun_ext.
   qed.
 
@@ -347,11 +347,11 @@ theory Core.
 
   (** Miscellaneous higher-order stuff *)
   (* lam and lamo: turning maps into lambdas *)
-  op lam (m:('a,'b) map) = lambda x, proj (get m x).
-  op lamo (m:('a,'b) map) = lambda x, get m x.
+  op lam (m:('a,'b) map) = fun x, proj (get m x).
+  op lamo (m:('a,'b) map) = fun x, get m x.
 
   lemma lamo_map (f:'b -> 'c) (m:('a,'b) map):
-    lamo (map f m) = lambda x, (lift f) ((lamo m) x).
+    lamo (map f m) = fun x, (lift f) ((lamo m) x).
   proof strict.
   apply Fun.fun_ext=> x //=.
   rewrite /lamo /lamo get_map; elim/option_ind (get m x)=> //= {x}.

@@ -23,24 +23,24 @@ axiom qO_pos : 0 <= qO.
 op def : 'a.
 
 module type Oracle = {
-fun init () : unit
-fun f (x : from) : to * bool
+proc init () : unit
+proc f (x : from) : to * bool
 }.
 
 module type A (O : Oracle) ={
- fun run () : ret_adv {* O.f}
+ proc run () : ret_adv {* O.f}
 }.
 
 module Experiment( O : Oracle, AdvF : A) = {
  module WO : Oracle = {
   var cO : int
   var bad : bool
-  fun init() : unit = {
+  proc init() : unit = {
    bad = false;
    cO = 0;
    O.init();
   }
-  fun f (x : from) : to * bool = { 
+  proc f (x : from) : to * bool = { 
    var y : to = def;
    var b : bool = false;
    if (cO < qO /\ !bad) {
@@ -52,7 +52,7 @@ module Experiment( O : Oracle, AdvF : A) = {
   }
  }
  module Adv = AdvF(WO)
- fun main() : ret_adv = {
+ proc main() : ret_adv = {
   var b : ret_adv = def;
   WO.init();
   b = Adv.run();
@@ -98,7 +98,7 @@ equiv_deno (_ : true ==>
           (! Experiment.WO.bad{2} => ={res}) /\ 
              Experiment.WO.cO{2} <= qO /\
              Experiment.WO.cO{2} = m (glob O2){2})  => //.
-fun.
+proc.
 call (_ : Experiment.WO.bad,
           I  (glob O1){1} (glob O2){2} /\ 
           ={Experiment.WO.cO, Experiment.WO.bad} /\
@@ -106,14 +106,14 @@ call (_ : Experiment.WO.bad,
           Experiment.WO.cO{2} = m (glob O2){2},
           Experiment.WO.cO{2} <= qO /\ 
           Experiment.WO.cO{2} = m (glob O2){2}) => // {g hg hbnd hbound_bad}.
- fun.
+ proc.
  sp; if => //.
  swap 1 2; wp.
  exists *(  Experiment.WO.cO{2}).
  elim * => cO.
  call (hf cO); skip; progress => //; smt.
- by intros => &2 h; fun; sp; if => //; wp; call hll1; wp; skip; smt.
- by intros => &1; fun; sp; if => //; wp; call hll2; wp; skip; smt.
+ by intros => &2 h; proc; sp; if => //; wp; call hll1; wp; skip; smt.
+ by intros => &1; proc; sp; if => //; wp; call hll2; wp; skip; smt.
  inline Experiment(O1,Adv).WO.init Experiment(O2,Adv).WO.init; wp. 
  call hinint; wp; skip; progress; smt.
 smt.
@@ -132,7 +132,7 @@ fel 2 Experiment.WO.cO g  qO (Experiment.WO.bad)
   (!Experiment.WO.bad  /\ Experiment.WO.cO < qO)]
 (m (glob O2) = Experiment.WO.cO) => //. 
 by inline Experiment(O2, Adv).WO.init; call hinit2; wp.
- fun.
+ proc.
  sp; if => //; wp; last first.
   hoare; progress; first smt.
   by skip; progress.
@@ -146,7 +146,7 @@ exists* Experiment.WO.bad.
 elim* => b.
 call (hbound_bad cO); skip; progress; smt.
 intros => c.
-fun.
+proc.
 sp; if => //; wp.
 exists* Experiment.WO.cO.
 elim* => cO. 
@@ -155,7 +155,7 @@ intros => {g hg hbnd hbound_bad}; smt.
 intros => {g hg hbnd hbound_bad}; smt.
 
 intros => b c.
-fun; sp; if => //.
+proc; sp; if => //.
 swap 1 1; wp.
 exists* Experiment.WO.cO.
 elim* => cO. 

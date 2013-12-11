@@ -7,7 +7,7 @@ require import Real.
 module Test = {
   var x : bool
 
-  fun test() : unit = {
+  proc test() : unit = {
     x = !x;
     x = $Dbool.dbool;
   }
@@ -17,7 +17,7 @@ module Test = {
 
 
 lemma test : bd_hoare [Test.test : Test.x ==> Test.x] <=  (if Test.x then (1%r/2%r) else 0%r).
-fun.
+proc.
 rnd.
 intros bd.
 wp.

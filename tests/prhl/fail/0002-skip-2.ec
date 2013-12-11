@@ -1,9 +1,9 @@
 module M1 = {
-  fun f () : unit = { }
+  proc f () : unit = { }
 }.
 
 module M2 = { 
-  fun g () : unit = {
+  proc g () : unit = {
     var x : int;
     x = 2;
   }
@@ -11,5 +11,5 @@ module M2 = {
 
 lemma foo : equiv [M2.f ~ M1.g : true ==> true].
 proof.
-  fun.
+  proc.
   skip.

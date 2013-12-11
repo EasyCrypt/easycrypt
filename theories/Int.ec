@@ -107,7 +107,7 @@ theory Induction.
     (forall i, 0 <= i => p i).
   proof strict.
   by intros hyp i iVal;
-     apply (induction (lambda i, forall k, 0 <= k <= i => p k) _ _ i); smt.
+     apply (induction (fun i, forall k, 0 <= k <= i => p k) _ _ i); smt.
   qed.
 end Induction.
 
@@ -163,7 +163,7 @@ theory ForLoop.
 
   (* General result on boolean accumulation *)
   lemma rangeb_forall i j p b:
-    ForLoop.range i j b (lambda k b, b /\ p k) =
+    ForLoop.range i j b (fun k b, b /\ p k) =
      (b /\ forall k, i <= k < j => p k).
   proof strict.
   case (i < j)=> i_j; last smt.
@@ -177,7 +177,7 @@ theory ForLoop.
   (* General result on restricting the range *)
   lemma range_restr (i j:int) (base:'a) f:
     0 <= j - i =>
-    ForLoop.range i j base (lambda k a, if i <= k < j then f k a else a) = ForLoop.range i j base f.
+    ForLoop.range i j base (fun k a, if i <= k < j then f k a else a) = ForLoop.range i j base f.
   proof strict.
   intros=> h.
   case (0 = j - i)=> h2; first smt.

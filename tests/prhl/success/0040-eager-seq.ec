@@ -3,7 +3,7 @@ require import Distr.
 
 module M = {
   var w:int
-  fun f1():unit = {
+  proc f1():unit = {
     var x,y,z : int;
     w = $[0 .. 10];
     x = 1;
@@ -11,7 +11,7 @@ module M = {
     z = 3;
 
   }
-  fun f2():unit = {
+  proc f2():unit = {
     var x,y,z : int;
     x = 1;
     y = 2;
@@ -22,7 +22,7 @@ module M = {
 
 equiv foo : M.f1 ~ M.f2 : true ==> ={M.w}.  
 proof.
-  fun.
+  proc.
   eager seq 1 1 (H:M.w = $[0..10]; ~ M.w = $[0..10]; : true ==> ={M.w}) : (={M.w,x}).
    rnd => //.   
   swap{1} 1; seq 1 1 : (={x}).

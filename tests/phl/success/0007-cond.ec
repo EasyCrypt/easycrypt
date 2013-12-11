@@ -9,7 +9,7 @@ op e2 : t.
 
 module M = {
   var x, y : t
-  fun f () : unit = {
+  proc f () : unit = {
     if (b1) {
       x = e1;
     } else {
@@ -21,7 +21,7 @@ module M = {
 lemma foo : hoare [M.f : (b1 => M.y=e1) && (b2 => M.y=e2) && (b1||b2) ==> 
                          M.x=M.y ].
 proof.
- fun.
+ proc.
  if; wp; skip;  smt.
 save.
 

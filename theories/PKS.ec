@@ -8,25 +8,25 @@ type message.
 type signature.
 
 module type Scheme = {
-  fun init(): unit {*}
-  fun keygen(): (pkey * skey)
-  fun sign(sk:skey, m:message): signature
-  fun verify(pk:pkey, m:message, s:signature): bool
+  proc init(): unit {*}
+  proc keygen(): (pkey * skey)
+  proc sign(sk:skey, m:message): signature
+  proc verify(pk:pkey, m:message, s:signature): bool
 }.
 
-module type AdvOracles = { fun sign(m:message): signature }.
+module type AdvOracles = { proc sign(m:message): signature }.
 
 module type AdvCMA(O:AdvOracles) = {
-  fun forge(pk:pkey): (message * signature)
+  proc forge(pk:pkey): (message * signature)
 }.
 
 theory EF_CMA.
   module type Oracles = {
-    fun init(): pkey {*}
-    fun sign(m:message): signature
-    fun verify(m:message,s:signature): bool
-    fun fresh(m:message): bool
-    fun queries(): int
+    proc init(): pkey {*}
+    proc sign(m:message): signature
+    proc verify(m:message,s:signature): bool
+    proc fresh(m:message): bool
+    proc queries(): int
   }.
 
   (* A wrapper providing oracles for existential
@@ -36,31 +36,31 @@ theory EF_CMA.
     var pk: pkey
     var sk: skey
 
-    fun init(): pkey = {
+    proc init(): pkey = {
       S.init();
       qs = empty;
       (pk,sk) = S.keygen();
       return pk;
     }
 
-    fun sign(m:message): signature = {
+    proc sign(m:message): signature = {
       var s:signature;
       qs = add m qs;
       s = S.sign(sk,m);
       return s;
     }
 
-    fun verify(m:message,s:signature): bool = {
+    proc verify(m:message,s:signature): bool = {
       var b:bool;
       b = S.verify(pk,m,s);
       return b;
     }
 
-    fun fresh(m:message): bool = {
+    proc fresh(m:message): bool = {
       return !mem m qs;
     }
 
-    fun queries(): int = {
+    proc queries(): int = {
       return card qs;
     }
   }.
@@ -68,7 +68,7 @@ theory EF_CMA.
   module EF_CMA(O:Oracles, A:AdvCMA) = {
     module A = A(O)
 
-    fun main(): bool = {
+    proc main(): bool = {
       var pk:pkey;
       var m:message;
       var s:signature;
@@ -85,11 +85,11 @@ end EF_CMA.
 
 theory NM_CMA.
   module type Oracles = {
-    fun init(): pkey {*}
-    fun sign(m:message): signature
-    fun verify(m:message,s:signature): bool
-    fun fresh(m:message,s:signature): bool
-    fun queries(): int
+    proc init(): pkey {*}
+    proc sign(m:message): signature
+    proc verify(m:message,s:signature): bool
+    proc fresh(m:message,s:signature): bool
+    proc queries(): int
   }.
 
   (* A wrapper providing oracles for
@@ -99,31 +99,31 @@ theory NM_CMA.
     var pk: pkey
     var sk: skey
 
-    fun init(): pkey = {
+    proc init(): pkey = {
       S.init();
       qs = empty;
       (pk,sk) = S.keygen();
       return pk;
     }
 
-    fun sign(m:message): signature = {
+    proc sign(m:message): signature = {
       var s:signature;
       s = S.sign(sk,m);
       qs = add (m,s) qs;
       return s;
     }
 
-    fun verify(m:message,s:signature): bool = {
+    proc verify(m:message,s:signature): bool = {
       var b:bool;
       b = S.verify(pk,m,s);
       return b;
     }
 
-    fun fresh(m:message,s:signature): bool = {
+    proc fresh(m:message,s:signature): bool = {
       return !mem (m,s) qs;
     }
 
-    fun queries(): int = {
+    proc queries(): int = {
       return card qs;
     }
   }.
@@ -131,7 +131,7 @@ theory NM_CMA.
   module NM_CMA(O:Oracles, A:AdvCMA) = {
     module A = A(O)
 
-    fun main(): bool = {
+    proc main(): bool = {
       var pk:pkey;
       var m:message;
       var s:signature;

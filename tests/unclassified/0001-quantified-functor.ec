@@ -1,10 +1,10 @@
 module type I = {
-  fun init(b:bool): unit
-  fun get(): bool
+  proc init(b:bool): unit
+  proc get(): bool
 }.
 
 module G(X:I) = {
-  fun f(): bool = {
+  proc f(): bool = {
     var b:bool;
     X.init(true);
     b  = X.get();

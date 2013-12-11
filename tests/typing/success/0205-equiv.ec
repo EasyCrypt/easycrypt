@@ -1,7 +1,7 @@
 require import Int.
 
 module G = {
-  fun f(x : int, y : int) : int = {
+  proc f(x : int, y : int) : int = {
     return x + y;
   }
 }.

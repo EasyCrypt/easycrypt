@@ -14,11 +14,11 @@ theory Mean.
   op d : input distr.
   
   module type Worker = {
-    fun work(x:input) : output
+    proc work(x:input) : output
   }.
 
   module Rand (W:Worker) = {
-    fun randAndWork() : input * output = {
+    proc randAndWork() : input * output = {
       var x : input;
       var r : output;
 
@@ -37,13 +37,13 @@ theory Mean.
                    ev (fst res) (glob A) (snd res) /\ fst res = v) => //.
   pose pr := Pr[A.work(v) @ &m: ev v (glob A) res];
   conseq* (_: _: = (mu_x d v * pr)). (* WEIRD! *)
-  fun; seq 1 : (v = x) (mu_x d v) pr 1%r 0%r ((glob A)=(glob A){m})=> //.
+  proc; seq 1 : (v = x) (mu_x d v) pr 1%r 0%r ((glob A)=(glob A){m})=> //.
     by rnd.
     by rnd; skip; progress=> //; rewrite /mu_x; apply mu_eq.
     call (_: (glob A) = (glob A){m} /\ x = v ==> 
              ev v (glob A) res) => //.
     simplify pr; bypr => &m' eqGlob.
-    by equiv_deno (_: ={glob A, x} ==> ={res, glob A}) => //; fun true. 
+    by equiv_deno (_: ={glob A, x} ==> ={res, glob A}) => //; proc true. 
     by conseq* (_: _ ==> false)=> //.
   qed.
 
@@ -52,15 +52,15 @@ theory Mean.
     let sup = Finite.toFSet (create (support d)) in
     Pr[Rand(A).randAndWork() @ &m: ev (fst res) (glob A) (snd res)] =
      Pr[Rand(A).randAndWork() @ &m:
-          cpOrs (img (lambda v r, ev v (glob A) (snd r) /\ v = fst r) sup) res].
+          cpOrs (img (fun v r, ev v (glob A) (snd r) /\ v = fst r) sup) res].
   proof strict.
   intros=> Fsup sup.
   equiv_deno (_: ={glob A} ==> ={glob A, res} /\ in_supp (fst res{1}) d)=> //;
-    first by fun; call (_: true); rnd.
+    first by proc; call (_: true); rnd.
   intros=> &m1 &m2 [[<- <-] Hin].
   rewrite /cpOrs or_exists;split.
     intros=> H.
-    exists (lambda r, 
+    exists (fun r, 
               ev (fst res{m1}) (glob A){m1} (snd r) /\ (fst res{m1}) = fst r).
     split=> //. 
     by rewrite img_def; exists (fst (res{m1})); smt.
@@ -72,7 +72,7 @@ theory Mean.
     let sup = Finite.toFSet (create (support d)) in
     Pr[Rand(A).randAndWork()@ &m: ev (fst res) (glob A) (snd res)] =
      Mrplus.sum
-       (lambda (v:input), mu_x d v * Pr[A.work(v)@ &m:ev v (glob A) res]) 
+       (fun (v:input), mu_x d v * Pr[A.work(v)@ &m:ev v (glob A) res]) 
        sup.
   proof strict.
   intros=> Fsup /=.
@@ -84,14 +84,14 @@ theory Mean.
     intros=> x s Hx Hrec.
     rewrite Mrplus.sum_add //=.
     cut ->: Pr[Rand(A).randAndWork() @ &m:
-                 cpOrs (img (lambda (v : input) (r : input * output),
+                 cpOrs (img (fun (v : input) (r : input * output),
                                ev v (glob A) (snd r) /\ v = fst r) (add x s)) res] =
              Pr[Rand(A).randAndWork() @ &m:
                  (ev x (glob A) (snd res) /\ x = fst res) \/
-                 cpOrs (img (lambda (v : input) (r : input * output),
+                 cpOrs (img (fun (v : input) (r : input * output),
                                ev v (glob A){hr} (snd r) /\ v = fst r) s) res].
       rewrite Pr mu_eq => // &m1.
-      pose f:= (lambda (v : input) (r : input * output),
+      pose f:= (fun (v : input) (r : input * output),
                   ev v (glob A){m1} (snd r) /\ v = fst r).
       by rewrite img_add cpOrs_add; smt.
     rewrite Pr mu_disjoint; first by smt.
@@ -103,11 +103,11 @@ theory Mean.
      Finite.finite (create (support d)) =>
      let sup = Finite.toFSet (create (support d)) in
      Pr[Rand(A).randAndWork()@ &m: ev (fst res) (glob A) (snd res)] =
-       r * Mrplus.sum (lambda (v:input), Pr[A.work(v)@ &m:ev v (glob A) res]) sup.
+       r * Mrplus.sum (fun (v:input), Pr[A.work(v)@ &m:ev v (glob A) res]) sup.
   proof.
     intros Hd Hfin /=.
     cut := Mean A &m ev => /= -> //.
-    cut := Mrplus.sum_comp (( * ) r) (lambda (v:input), Pr[A.work(v)@ &m:ev v (glob A) res]) => /= <-.
+    cut := Mrplus.sum_comp (( * ) r) (fun (v:input), Pr[A.work(v)@ &m:ev v (glob A) res]) => /= <-.
       by intros x y;ringeq.
     apply Mrplus.sum_eq => /= x.
     by rewrite Finite.mem_toFSet // mem_create /support => Hin;rewrite Hd.
@@ -128,7 +128,7 @@ theory LR.
       1%r/2%r*(Pr[A.work(true) @ &m : res] - Pr[A.work(false) @ &m : res]).
   proof strict.
     intros Hloss.
-    pose ev := lambda (b:bool) (gA:glob A) (b':bool), b = b'.
+    pose ev := fun (b:bool) (gA:glob A) (b':bool), b = b'.
     cut -> : Pr[Rand(A).randAndWork() @ &m : fst res = snd res] =
              Pr[Rand(A).randAndWork() @ &m : ev (fst res) (glob A) (snd res)] by trivial.
     cut Hcr: forall x, 
@@ -163,32 +163,32 @@ theory Hybrid.
   type outputA.
 
   module type Enc = { 
-    fun init () : unit 
-    fun leaks () : leaks  
-    fun enc (m:input) : output
+    proc init () : unit 
+    proc leaks () : leaks  
+    proc enc (m:input) : output
   }.
 
   module type AEnc = {
-    fun enc (m:input) : output
+    proc enc (m:input) : output
   }.
 
   module type EAdv(E:Enc, AE: AEnc) = {
-    fun run () : outputA
+    proc run () : outputA
   }.
 
   module C = { 
     var c : int
-    fun init () : unit = {
+    proc init () : unit = {
       c = 0;
     }
-    fun incr () : unit = {
+    proc incr () : unit = {
       c = c + 1;
     }
   }.
 
   module GE (A:EAdv, E:Enc) = {
     module Em = {
-      fun enc(m:input) : output = {
+      proc enc(m:input) : output = {
         var r : output;
         r = E.enc(m);
         C.incr();
@@ -198,7 +198,7 @@ theory Hybrid.
       
     module A = A(E,Em)
 
-    fun main () : outputA = {
+    proc main () : outputA = {
       var r : outputA;
       C.init();
       r = A.run();
@@ -208,7 +208,7 @@ theory Hybrid.
 
   module GE0(A:EAdv, E:Enc) = {
     module E0 = {
-      fun enc(m:input) : output = {
+      proc enc(m:input) : output = {
         var r : output;
         r = E.enc(in0);
         C.incr();
@@ -217,7 +217,7 @@ theory Hybrid.
     }
     module A = A(E,E0)
 
-    fun main () : outputA = {
+    proc main () : outputA = {
       var r : outputA;
       C.init();
       r = A.run();
@@ -226,11 +226,11 @@ theory Hybrid.
   }.
 
   module type LR = { 
-    fun lr(m0 m1:input) : output
+    proc lr(m0 m1:input) : output
   }.
    
   module L(E:Enc) = {
-    fun lr(m0 m1:input) : output = {
+    proc lr(m0 m1:input) : output = {
       var r : output;
       r = E.enc(m0);
       return r;
@@ -238,7 +238,7 @@ theory Hybrid.
   }.
 
   module R(E:Enc) = {
-    fun lr(m0 m1:input) : output = {
+    proc lr(m0 m1:input) : output = {
       var r : output;
       r = E.enc(m1);
       return r;
@@ -246,12 +246,12 @@ theory Hybrid.
   }. 
 
   module type LRAdv(E:Enc, LR:LR) = {
-    fun run () : outputA
+    proc run () : outputA
   }.
 
   module GL(A:LRAdv, E:Enc) = {
     module L = { 
-      fun lr(m0 m1:input) : output = {
+      proc lr(m0 m1:input) : output = {
         var r : output;
         r = E.enc(m0);
         C.incr();
@@ -261,7 +261,7 @@ theory Hybrid.
 
     module A = A(E,L)
 
-    fun main () : outputA = {
+    proc main () : outputA = {
       var r : outputA;
       C.init();
       r = A.run();
@@ -271,7 +271,7 @@ theory Hybrid.
 
   module GR(A:LRAdv, E:Enc) = {
     module R = {
-      fun lr(m0 m1:input) : output = {
+      proc lr(m0 m1:input) : output = {
         var r : output;
         r = E.enc(m1);
         C.incr();
@@ -281,7 +281,7 @@ theory Hybrid.
 
     module A = A(E,R)
 
-    fun main () : outputA = {
+    proc main () : outputA = {
       var r : outputA;
       C.init();
       r = A.run();
@@ -291,14 +291,14 @@ theory Hybrid.
 
   module BLR(A:EAdv, E:Enc, LR:LR) = {
     module Elr = {
-      fun enc(m:input) : output = {
+      proc enc(m:input) : output = {
         var r : output;
         r = LR.lr(m, in0);
         return r;
       }
     }
     module A = A(E,Elr)
-    fun run () : outputA = {
+    proc run () : outputA = {
       var r : outputA;
       r = A.run();
       return r;
@@ -306,10 +306,10 @@ theory Hybrid.
   }.
 
   equiv Cinit : C.init ~ C.init : true ==> ={C.c}.
-  proof strict. by fun;wp. qed.
+  proof strict. by proc;wp. qed.
 
   equiv Cincr : C.incr ~ C.incr : ={C.c} ==> ={C.c}.
-  proof strict. by fun;wp. qed.
+  proof strict. by proc;wp. qed.
  
   section. (* E0_LR. *)
     declare module E : Enc{C}.
@@ -318,26 +318,26 @@ theory Hybrid.
     equiv GE_GL : GE(A,E).main ~ GL(BLR(A),E).main : 
                     ={glob A,glob E} ==> ={res,glob A,glob E,C.c}.
     proof strict.
-      fun;inline{2} GL(BLR(A), E).A.run;wp.
+      proc;inline{2} GL(BLR(A), E).A.run;wp.
       call (_: ={glob E, C.c}).
-        fun;inline{2} GL(BLR(A), E).L.lr;wp.
+        proc;inline{2} GL(BLR(A), E).L.lr;wp.
         by call Cincr; call(_: true);wp.
-        by fun (={C.c}).
-        by fun (={C.c}).
-        by fun (={C.c}).
+        by proc (={C.c}).
+        by proc (={C.c}).
+        by proc (={C.c}).
       by call Cinit.
     qed.
 
     equiv GE0_GR : GE0(A,E).main ~ GR(BLR(A),E).main : 
                      ={glob A,glob E} ==> ={res,glob A,glob E,C.c}.
     proof strict.
-      fun;inline{2} GR(BLR(A), E).A.run;wp.
+      proc;inline{2} GR(BLR(A), E).A.run;wp.
       call (_: ={glob E,C.c}).
-        fun;inline{2} GR(BLR(A), E).R.lr;wp.
+        proc;inline{2} GR(BLR(A), E).R.lr;wp.
         by call Cincr; call(_: true);wp.
-        by fun (={C.c}).
-        by fun (={C.c}).
-        by fun (={C.c}).
+        by proc (={C.c}).
+        by proc (={C.c}).
+        by proc (={C.c}).
       by call Cinit.
     qed.
 
@@ -355,7 +355,7 @@ theory Hybrid.
 
   module LRB (E:AEnc,LR:LR) = {
     var l, l0 : int  
-    fun lr(m0 m1:input):output = {
+    proc lr(m0 m1:input):output = {
       var r : output;
       if (l0 < l) r = E.enc(m0);
       else { 
@@ -372,7 +372,7 @@ theory Hybrid.
   module B(A:LRAdv, E:Enc, LR0:LR) = {
     module LR = LRB(E,LR0)
     module A = A(E,LR)
-    fun run():outputA = {
+    proc run():outputA = {
       var r:outputA;
       LRB.l0 = $[0..q-1];
       LRB.l  = 0;
@@ -394,7 +394,7 @@ theory Hybrid.
     local module W (LR0:LR) = {
       module LR = LRB(E,LR0)
       module A = A(E,LR)
-      fun work(x:int) : outputA = {
+      proc work(x:int) : outputA = {
         var r:outputA;
         LRB.l = 0; LRB.l0 = x;
         r = A.run();
@@ -403,13 +403,13 @@ theory Hybrid.
     }.
 
     local equiv Einit : E.init ~ E.init : ={glob E} ==> ={glob E}.
-    proof strict. by fun true. qed.
+    proof strict. by proc true. qed.
 
     local equiv Eleaks : E.leaks ~ E.leaks : ={glob E} ==> ={res,glob E}.
-    proof strict. by fun true. qed.
+    proof strict. by proc true. qed.
 
     local equiv Eenc : E.enc ~ E.enc : ={m,glob E} ==> ={res,glob E}.
-    proof strict. by fun true. qed.
+    proof strict. by proc true. qed.
 
     local lemma GLB_WL &m (p:glob A -> glob E -> int -> outputA -> bool):
       Pr[GL(B(A),E).main() @ &m : p (glob A) (glob E) LRB.l res /\ C.c <= 1] = 
@@ -417,9 +417,9 @@ theory Hybrid.
     proof strict.
       equiv_deno (_ : ={glob A, glob E} ==> 
                       ={glob A, glob E,glob LRB} /\ res{1} = snd res{2} /\ C.c{1} <= 1) => //.
-      fun; inline{1} GL(B(A), E).A.run;inline{2} W(L(E)).work;wp.
+      proc; inline{1} GL(B(A), E).A.run;inline{2} W(L(E)).work;wp.
       call (_: ={glob E, glob LRB} /\ C.c{1} = (LRB.l0{1} < LRB.l{1}) ? 1 : 0).
-        fun;wp.
+        proc;wp.
         if => //;first by call Eenc;skip;progress => //; smt.
         if => //.
           inline{1} GL(B(A), E).L.lr C.incr;inline{2} L(E).lr.
@@ -438,9 +438,9 @@ theory Hybrid.
     proof strict.
       equiv_deno (_ : ={glob A, glob E} ==> 
                       ={glob A, glob E, glob LRB} /\ res{1} = snd res{2} /\ C.c{1} <= 1) => //.
-      fun; inline{1} GR(B(A), E).A.run;inline{2} W(R(E)).work;wp.
+      proc; inline{1} GR(B(A), E).A.run;inline{2} W(R(E)).work;wp.
       call (_: ={glob E, glob LRB} /\ C.c{1} = (LRB.l0{1} < LRB.l{1}) ? 1 : 0).
-        fun;wp.
+        proc;wp.
         if => //;first by wp;call Eenc;skip;progress => //; smt.
         if => //.
           inline{1} GR(B(A), E).R.lr C.incr;inline{2} R(E).lr.
@@ -470,20 +470,20 @@ theory Hybrid.
                       (LRB.l{1} <= q) = (C.c{2} <= q) /\
                       (C.c{2} <= q =>
                         ={glob A, glob E,res} /\ LRB.l{1} = C.c{2})) => //;last smt.
-      fun.
+      proc.
       call (_: q < C.c,
                ={glob E} /\ LRB.l0{1} = 0 /\ LRB.l{1} = C.c{2} /\ 0 <= LRB.l{1},
                LRB.l0{1} = 0 /\ q < LRB.l{1}).
         by apply losslessA.
 
-        fun;inline{2} C.incr;wp.
+        proc;inline{2} C.incr;wp.
         if{1};first by call Eenc;skip;progress => //;smt.
         rcondt{1} 1; first by intros &m0;skip;smt.
         by inline{1} L(E).lr;wp;call Eenc;wp;skip;progress => //;smt.
-        intros &m2 _;fun.
+        intros &m2 _;proc.
         rcondt 1; first by skip;smt.
         by wp;call losslessE;skip;smt.
-        by intros &m1;fun;inline C.incr;wp;call losslessE;wp;skip;smt.
+        by intros &m1;proc;inline C.incr;wp;call losslessE;wp;skip;smt.
 
         by conseq * Einit; progress => //;smt.
         intros &m2 _;conseq * losslessI.
@@ -508,20 +508,20 @@ theory Hybrid.
                       (LRB.l{1} <= q) = (C.c{2} <= q) /\
                       (C.c{2} <= q =>
                         ={glob A, glob E, res} /\ LRB.l{1} = C.c{2})) => //;last smt.
-      fun.
+      proc.
       call (_: q < C.c,
                ={glob E} /\ LRB.l0{1} = q-1 /\ LRB.l{1} = C.c{2} /\ 0 <= LRB.l{1},
                LRB.l0{1} = q-1 /\ q < LRB.l{1}).
         by apply losslessA.
 
-        fun;inline{2} C.incr;wp.
+        proc;inline{2} C.incr;wp.
         if{1};first by call{1} losslessE;call{2} losslessE;skip; smt.
         inline{1} R(E).lr;if{1};first by wp;call Eenc;wp;skip;progress => //;smt.
         by call Eenc;skip;progress => //;smt.
-        intros &m2 _;fun.
+        intros &m2 _;proc.
         rcondt 1; first by skip;smt.
         by wp;call losslessE;skip; smt.
-        by intros &m1;fun;inline C.incr;wp;call losslessE;wp;skip;smt.
+        by intros &m1;proc;inline C.incr;wp;call losslessE;wp;skip;smt.
 
         by conseq * Einit; progress => //;smt.
         intros &m2 _;conseq * losslessI.
@@ -544,9 +544,9 @@ theory Hybrid.
     proof strict.
       intros Hv;equiv_deno (_: ={glob A,glob E} /\ x{1} = v /\ x{2} = v-1 ==> 
                                ={glob A,glob E, LRB.l, res}) => //.
-      fun.
+      proc.
       call (_: ={glob E, LRB.l} /\ LRB.l0{1} = v /\ LRB.l0{2} = v-1).
-        fun.
+        proc.
         if{1}; first by rcondt{2} 1;[intros &m0;skip;smt | wp;call Eenc].
         if{1};first by rcondt{2} 1;[intros &m0;skip;smt | inline{1} L(E).lr;wp;call Eenc;wp].
         rcondf{2} 1;first by intros &m0;skip;smt.
@@ -560,9 +560,9 @@ theory Hybrid.
     (* TODO : move this *)
     lemma Mrplus_inter_shift (i j k:int) f: 
         Mrplus.sum f (Interval.interval i j) = 
-        Mrplus.sum (lambda l, f (l + k)) (Interval.interval (i-k) (j-k)).
+        Mrplus.sum (fun l, f (l + k)) (Interval.interval (i-k) (j-k)).
     proof strict.
-      rewrite (Mrplus.sum_chind f (lambda l, l - k) (lambda l, l + k)) /=;first smt.
+      rewrite (Mrplus.sum_chind f (fun l, l - k) (fun l, l + k)) /=;first smt.
       congr => //.   
       apply FSet.set_ext => x.
       rewrite img_def Interval.mem_interval;split.
@@ -571,7 +571,7 @@ theory Hybrid.
     qed.
 
     lemma Hybrid &m (p:glob A -> glob E -> int -> outputA -> bool):
-       let p' = lambda ga ge l r, p ga ge l r /\ l <= q in
+       let p' = fun ga ge l r, p ga ge l r /\ l <= q in
        Pr[GL(B(A),E).main() @ &m : p' (glob A) (glob E) LRB.l res /\ C.c <= 1] - 
          Pr[GR(B(A),E).main() @ &m : p' (glob A) (glob E) LRB.l res /\ C.c <= 1] = 
        1%r/q%r * (
@@ -587,7 +587,7 @@ theory Hybrid.
       cut Huni : forall (x : int), in_supp x [0..q - 1] => mu_x [0..q - 1] x = 1%r / q%r.
         by intros x Hx;rewrite Dinter.mu_x_def_in //;smt.
       pose ev := 
-        lambda (_j:int) (g:glob W(L(E))) (r:outputA),
+        fun (_j:int) (g:glob W(L(E))) (r:outputA),
           let (l,l0,ge,ga) = g in p ga ge l r /\ l <= q.
       cut := M.Mean_uni (W(L(E))) &m ev (1%r/q%r) _ _ => //; simplify ev => ->.
       cut := M.Mean_uni (W(R(E))) &m ev (1%r/q%r) _ _ => //; simplify ev => ->.
@@ -619,7 +619,7 @@ theory Hybrid.
   end section.
 
   module LRB0 (E:AEnc,AE:AEnc) = {
-    fun enc(m:input):output = {
+    proc enc(m:input):output = {
       var r : output;
       if (LRB.l0 < LRB.l) r = E.enc(m);
       else { 
@@ -634,7 +634,7 @@ theory Hybrid.
   module B0(A:EAdv, E:Enc, AE:AEnc) = {
     module E0 = LRB0(E,AE)
     module A = A(E,E0)
-    fun run():outputA = {
+    proc run():outputA = {
       var r:outputA;
       LRB.l0 = $[0..q-1];
       LRB.l  = 0;
@@ -654,7 +654,7 @@ theory Hybrid.
     0 < q =>
     forall &m (p : (glob A) -> (glob E) -> int -> outputA -> bool),
       let p' =
-        lambda (ga : (glob A)) (ge : (glob E)) (l : int) (r : outputA),
+        fun (ga : (glob A)) (ge : (glob E)) (l : int) (r : outputA),
            p ga ge l r /\ l <= q in
       Pr[GE(B0(A), E).main() @ &m :
          p' (glob A){hr} (glob E){hr} LRB.l res /\ C.c <= 1] -
@@ -665,7 +665,7 @@ theory Hybrid.
        Pr[GE0(A, E).main() @ &m : p' (glob A){hr} (glob E){hr} C.c res]).
   proof strict. 
    intros Il Ll El Al Hq &m p p'.
-   pose p2 := lambda (g : (glob B0(A))) (ge : (glob E)) (c : int) (r : outputA),
+   pose p2 := fun (g : (glob B0(A))) (ge : (glob E)) (c : int) (r : outputA),
                let (l,l0,ga) = g in p' ga ge l r /\ c <= 1.
    cut := E0_LR E (B0(A)) &m p2;simplify p2 => ->.
    rewrite (E0_LR E A &m p').
@@ -674,42 +674,42 @@ theory Hybrid.
             Pr[GL(B(BLR(A)), E).main() @ &m :
               p' (glob A){hr} (glob E){hr} LRB.l res /\ C.c <= 1].
      equiv_deno (_: ={glob A, glob E} ==> ={glob A, glob E, LRB.l, C.c, res}) => //.
-     fun.
+     proc.
      inline{1} GL(BLR(B0(A)), E).A.run BLR(B0(A), E, GL(BLR(B0(A)), E).L).A.run.
      inline{2} GL(B(BLR(A)), E).A.run B(BLR(A), E, GL(B(BLR(A)), E).L).A.run;wp.
      call (_: ={glob E, glob LRB, C.c}).
-       fun;inline{2} LRB(E, GL(B(BLR(A)), E).L).lr;eqobs_in;sp.
+       proc;inline{2} LRB(E, GL(B(BLR(A)), E).L).lr;eqobs_in;sp.
        if => //;first by eqobs_in.
        if => //;last by call (_: true) => //;eqobs_in.
        inline{1} BLR(B0(A), E, GL(BLR(B0(A)), E).L).Elr.enc GL(BLR(B0(A)), E).L.lr.
        by inline{2} GL(B(BLR(A)), E).L.lr;eqobs_in.
-       by fun (={glob LRB,C.c}).
-       by fun (={glob LRB,C.c}).
-       by fun (={glob LRB,C.c}).
+       by proc (={glob LRB,C.c}).
+       by proc (={glob LRB,C.c}).
+       by proc (={glob LRB,C.c}).
      conseq (_ : _ ==> ={glob A, glob E, glob LRB, C.c}) => //;eqobs_in.
    cut -> : Pr[GR(BLR(B0(A)), E).main() @ &m :
               p' (glob A){hr} (glob E){hr} LRB.l res /\ C.c <= 1] = 
             Pr[GR(B(BLR(A)), E).main() @ &m :
               p' (glob A){hr} (glob E){hr} LRB.l res /\ C.c <= 1].
      equiv_deno (_: ={glob A, glob E} ==> ={glob A, glob E, LRB.l, C.c, res}) => //.
-     fun.
+     proc.
      inline{1} GR(BLR(B0(A)), E).A.run BLR(B0(A), E, GR(BLR(B0(A)), E).R).A.run.
      inline{2} GR(B(BLR(A)), E).A.run B(BLR(A), E, GR(B(BLR(A)), E).R).A.run;wp.
      call (_: ={glob E, glob LRB, C.c}).
-       fun;inline{2} LRB(E, GR(B(BLR(A)), E).R).lr;eqobs_in;sp.
+       proc;inline{2} LRB(E, GR(B(BLR(A)), E).R).lr;eqobs_in;sp.
        if => //;first by eqobs_in.
        if => //;last by call (_: true) => //;eqobs_in.
        inline{1} BLR(B0(A), E, GR(BLR(B0(A)), E).R).Elr.enc GR(BLR(B0(A)), E).R.lr.
        inline{2} GR(B(BLR(A)), E).R.lr.
        by inline C.incr;wp;call (_:true);wp.
-       by fun (={glob LRB,C.c}).
-       by fun (={glob LRB,C.c}).
-       by fun (={glob LRB,C.c}).
+       by proc (={glob LRB,C.c}).
+       by proc (={glob LRB,C.c}).
+       by proc (={glob LRB,C.c}).
      conseq (_ : _ ==> ={glob A, glob E, glob LRB, C.c}) => //;eqobs_in.
    clear p2;generalize p';apply (Hybrid E (<:BLR(A)) _ _ _ _ _ &m p) => //.
-   intros E0 LR Hlr HI HL HE;fun.
+   intros E0 LR Hlr HI HL HE;proc.
    call (_: true => true) => //.
-   by fun;call Hlr.
+   by proc;call Hlr.
   qed.
 
 end Hybrid.

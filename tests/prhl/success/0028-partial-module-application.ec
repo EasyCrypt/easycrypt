@@ -1,8 +1,8 @@
-module type T = { fun f() : unit}.
-module A = { fun f() : unit = { } }.
-module B = { fun f() : unit = { } }.
+module type T = { proc f() : unit}.
+module A = { proc f() : unit = { } }.
+module B = { proc f() : unit = { } }.
 module F (A:T, B:T) = { 
-  fun f () : unit = {
+  proc f () : unit = {
      A.f(); B.f();
   }
 }.
@@ -12,6 +12,6 @@ module FAB = FA(B).
 
 require import Real.
 lemma foo : bd_hoare [FAB.f : true ==> true] = 1%r.
-fun.
+proc.
 admit.
 save.

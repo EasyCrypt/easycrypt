@@ -7,7 +7,7 @@ theory T.
     }.
 
     module G = {
-      fun f() : t = { return M.x; }
+      proc f() : t = { return M.x; }
     }.
   end section.
 end T.

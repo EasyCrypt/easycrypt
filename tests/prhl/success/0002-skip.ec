@@ -1,10 +1,10 @@
 module M = { 
-  fun f () : unit = { }
+  proc f () : unit = { }
 }.
 
 equiv foo : M.f ~ M.f : true ==> true.
 proof.
-  fun.
+  proc.
   skip.
   intros _ _ h;assumption h.
 save.

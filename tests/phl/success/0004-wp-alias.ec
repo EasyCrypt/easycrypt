@@ -5,7 +5,7 @@ module M = {
 
 module N = {
   module P = M
-  fun f (z:int) : int = { 
+  proc f (z:int) : int = { 
     P.x = 2;
     return M.x;
   }
@@ -13,7 +13,7 @@ module N = {
 
 lemma foo : hoare [N.f : true ==> res = 2 && N.P.x = 2 && M.x = 2].
 proof.
- fun.
+ proc.
  wp.
  skip. 
  intros _ _.

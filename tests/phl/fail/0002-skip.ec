@@ -1,5 +1,5 @@
 module M = { 
-  fun f () : unit = { 
+  proc f () : unit = { 
     var x : int;
     x = 1;
   }
@@ -7,5 +7,5 @@ module M = {
 
 lemma foo : hoare [ M.f : true ==> true].
 proof.
- fun.
+ proc.
  skip.

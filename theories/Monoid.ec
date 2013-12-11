@@ -31,7 +31,7 @@ qed.
 require import FSet.
 
 op sum (f:'a -> t) (s:'a set) =
-  fold (lambda x s, s + (f x)) Z s.
+  fold (fun x s, s + (f x)) Z s.
 
 lemma sum_empty (f:'a -> t): sum f empty = Z.
 proof strict.
@@ -89,7 +89,7 @@ proof strict.
 qed.
 
 lemma sum_in (f:'a -> t) (s:'a set):
-  sum f s = sum (lambda x, if mem x s then f x else Z) s.
+  sum f s = sum (fun x, if mem x s then f x else Z) s.
 proof strict.
   by apply sum_eq => x /= ->.
 qed.
@@ -97,7 +97,7 @@ qed.
 lemma sum_comp (f: t -> t) (g:'a -> t) (s: 'a set):
   (f Z = Z) =>
   (forall x y, f (x + y) = f x + f y) =>
-  sum (lambda a, f (g a)) s = f (sum g s).
+  sum (fun a, f (g a)) s = f (sum g s).
 proof.
   intros Hz Ha;elimT set_ind s.
     by rewrite !sum_empty Hz.
@@ -105,7 +105,7 @@ proof.
 qed.
 
 lemma sum_add2 (f:'a -> t) (g:'a -> t) (s:'a set):
-  (sum f s) + (sum g s) = sum (lambda x, f x + g x) s.
+  (sum f s) + (sum g s) = sum (fun x, f x + g x) s.
 proof strict.
 elim/set_comp s;first by rewrite !sum_empty addmZ.
 intros {s} s s_nempty IH;
@@ -117,7 +117,7 @@ qed.
 
 lemma sum_chind (f:'a -> t) (g:'a -> 'b) (g':'b -> 'a) (s:'a set):
   (forall x, mem x s => g' (g x) = x) =>
-  (sum f s) = sum (lambda x, f (g' x)) (img g s).
+  (sum f s) = sum (fun x, f (g' x)) (img g s).
 proof strict.
 intros=> pcan_g'_g;
 cut := leq_refl s; pose {1 3 4} s' := s.
@@ -195,17 +195,17 @@ proof.
 qed.
 
 lemma sum_ij_shf (k i j:int) f:
-   sum_ij i j f = sum_ij (i-k) (j-k) (lambda n, f (k+n)).
+   sum_ij i j f = sum_ij (i-k) (j-k) (fun n, f (k+n)).
 proof strict.
   rewrite /sum_ij.
-  rewrite (sum_chind f (lambda n, n - k) (lambda n, k + n)) /=;first smt.
+  rewrite (sum_chind f (fun n, n - k) (fun n, k + n)) /=;first smt.
   congr => //;apply set_ext => x;rewrite Interval.mem_interval img_def /=;split.
   intros [x0 [Heq ]];rewrite Interval.mem_interval;subst;smt.
   intros _;exists (x + k);smt.
 qed.
 
 lemma sum_ij_shf0 (i j :int) f:
-   sum_ij i j f = sum_ij 0 (j-i) (lambda n, f (i+n)).
+   sum_ij i j f = sum_ij 0 (j-i) (fun n, f (i+n)).
 proof strict.
   rewrite (sum_ij_shf i);smt.
 qed.
@@ -244,7 +244,7 @@ clone Comoid as Mbor with
    type Base.t <- bool,
    op Base.(+) <- (\/),
    op Base.Z   <- false,
-   op NatMul.( * ) = lambda (n:int) (b:bool), n <> 0 /\ b
+   op NatMul.( * ) = fun (n:int) (b:bool), n <> 0 /\ b
    proof Base.* by smt, NatMul.* by smt.
 
 (* For int *)
@@ -258,7 +258,7 @@ theory Miplus.
     proof Base.* by smt, NatMul.* by smt.
 
   import Int. import EuclDiv. 
-  op sum_n i j = sum_ij i j (lambda (n:int), n).
+  op sum_n i j = sum_ij i j (fun (n:int), n).
 
   lemma sum_n_0k (k:int) : 0 <= k => sum_n 0 k = (k*(k + 1))/%2.
   proof.
@@ -330,7 +330,7 @@ clone Comoid as Mrplus with
    type Base.t <- real,
    op Base.(+) <- Real.(+),
    op Base.Z   <- 0%r,
-   op NatMul.( * ) = lambda n, (Real.( * ) (n%r))
+   op NatMul.( * ) = fun n, (Real.( * ) (n%r))
   proof Base.* by smt, NatMul.* by smt.
 
 require import FSet.
@@ -344,7 +344,7 @@ lemma or_exists (f:'a->bool) s:
   (Mbor.sum f s) <=> (exists x, (mem x s /\ f x)).
 proof.
   split;last by intros=> [x [x_in_s f_x]]; rewrite (Mbor.sum_rm _ _ x) // f_x.
-  intros=> sum_true; pose p := lambda x, mem x s /\ f x; change (exists x, p x);
+  intros=> sum_true; pose p := fun x, mem x s /\ f x; change (exists x, p x);
     apply ex_for; delta p=> {p}; generalize sum_true; apply absurd=> /= h.
   cut := FSet.leq_refl s; pose {1 3} s' := s;elim/set_ind s'.
     by rewrite Mbor.sum_empty.
@@ -357,7 +357,7 @@ proof.
   by cut := leq_adds'_s x; rewrite mem_add //= => ->.
 qed.
 
-pred cpOrs (X:('a cpred) set) (x:'a) = Mbor.sum (lambda (P:'a cpred), P x) X.
+pred cpOrs (X:('a cpred) set) (x:'a) = Mbor.sum (fun (P:'a cpred), P x) X.
 
 lemma cpOrs0 : cpOrs (empty <:'a cpred>) = cpFalse.
 proof.
@@ -377,7 +377,7 @@ qed.
 
 lemma mu_ors d (X:('a->bool) set):
   disj_or X =>
-  mu d (cpOrs X) = Mrplus.sum (lambda P, mu d P) X.
+  mu d (cpOrs X) = Mrplus.sum (fun P, mu d P) X.
 proof strict.
   elim/set_ind X=> {X}.
     by intros disj;rewrite Mrplus.sum_empty cpOrs0 mu_false.
@@ -396,15 +396,15 @@ import Real.
 lemma mean (d:'a distr) (p:'a -> bool):
   ISet.Finite.finite (ISet.create (support d)) =>
   mu d p = 
-    Mrplus.sum (lambda x, (mu_x d x)*(charfun p x))
+    Mrplus.sum (fun x, (mu_x d x)*(charfun p x))
         (ISet.Finite.toFSet (ISet.create (support d))).
 proof strict.
   intros=> fin_supp_d.
   pose sup := ISet.Finite.toFSet (ISet.create (support d)).
-  pose is  := img (lambda x y, p x /\ x = y) sup.
+  pose is  := img (fun x y, p x /\ x = y) sup.
   rewrite mu_in_supp (mu_eq d _ (cpOrs is)).
     intros y;rewrite /cpAnd /is /cpOrs /= or_exists rw_eq_iff;split.
-      intros [H1 H2];exists ((lambda x0 y0, p x0 /\ x0 = y0) y);split => //.
+      intros [H1 H2];exists ((fun x0 y0, p x0 /\ x0 = y0) y);split => //.
       by apply mem_img;rewrite /sup ISet.Finite.mem_toFSet // ISet.mem_create.
     intros [p' []].
     by rewrite img_def; progress => //;smt. 

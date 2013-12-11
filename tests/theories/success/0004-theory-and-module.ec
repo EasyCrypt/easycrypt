@@ -8,26 +8,26 @@ theory Th.
   }.
 
   module M2 = {
-    fun u () : int = {
+    proc u () : int = {
       return M1.x;
     }
   }.
 
   module M3 = {
-    fun u () : int = {
+    proc u () : int = {
       return M1.N1.y;
     }
   }.
 end Th.
 
 module M2' = {
-    fun u () : int = {
+    proc u () : int = {
       return Th.M1.x;
     }
 }.
 
 module M3' = {
-  fun u () : int = {
+  proc u () : int = {
      return Th.M1.N1.y;
   }
 }.

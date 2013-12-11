@@ -1,16 +1,16 @@
 (* FIXME: disabled - this test is a non-sense
 
 module type I = {
-  fun init(b:bool): unit
-  fun get(): bool
+  proc init(b:bool): unit
+  proc get(): bool
 }.
 
 module type J = {
-  fun f() : bool
+  proc f() : bool
 }.
 
 module G(X:I) : J = {
-  fun f(): bool = {
+  proc f(): bool = {
     var b:bool;
     X.init(true);
     b  = X.get();

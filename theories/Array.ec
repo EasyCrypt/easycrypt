@@ -344,7 +344,7 @@ by intros=> i_pos l1_pos l2_pos i_l1_l2_bnd;
 qed.
 
 lemma map_map (f:'x -> 'y) (g:'y -> 'z) xs:
- map g (map f xs) = map (lambda x, g (f x)) xs.
+ map g (map f xs) = map (fun x, g (f x)) xs.
 proof strict.
 apply array_ext; split.
   by rewrite !length_map.
@@ -359,7 +359,7 @@ apply array_ext; split; smt.
 qed.
 
 lemma mapi_mapi (f:int -> 'x -> 'y) (g:int -> 'y -> 'z) xs:
- mapi g (mapi f xs) = mapi (lambda k x, g k (f k x)) xs.
+ mapi g (mapi f xs) = mapi (fun k x, g k (f k x)) xs.
 proof strict.
 apply array_ext; split.
   by rewrite !length_mapi.
@@ -382,7 +382,7 @@ lemma fold_left_deterministic: forall (f1 f2:'state -> 'x -> 'state) s1 s2 xs1 x
 by [].
 
 lemma fold_right_map (f:'x -> 'y -> 'x) (x:'x) (g:'z -> 'y) (zs:'z array):
- fold_right f x (map g zs) = fold_right (lambda x y, f x (g y)) x zs.
+ fold_right f x (map g zs) = fold_right (fun x y, f x (g y)) x zs.
 proof strict.
 generalize x; elim/array_ind zs.
   by intros=> x; rewrite !fold_right_empty ?length_map ?length_empty.
@@ -410,7 +410,7 @@ qed.
 
 (* This proof needs cleaned up, and the lemma library completed. *)
 lemma fold_length (xs:'x array):
-  fold_left (lambda n x, n + 1) 0 xs = length xs.
+  fold_left (fun n x, n + 1) 0 xs = length xs.
 proof strict.
 elim/array_ind xs.
   by rewrite fold_left_empty length_empty.
@@ -469,7 +469,7 @@ axiom init_dep_def (xs:'x array) (size:int) (f:int -> 'x array -> 'x):
   init_dep xs size f =
     let r = make (length xs + size) xs.[0] in (* creates the space *)
     let r = blit r 0 xs 0 (length xs) in      (* copies the initial value in *)
-    ForLoop.range 0 size r (lambda i r, r.[i + length xs <- f i r]). (* extends using f *)
+    ForLoop.range 0 size r (fun i r, r.[i + length xs <- f i r]). (* extends using f *)
 
 (* all: this is computable because all arrays are finite *)
 op all: ('x -> bool) -> 'x array -> bool.
@@ -492,10 +492,10 @@ qed.
 
 lemma alli_ind p (x:'x) xs:
   alli p (x::xs) =
-    (p 0 x /\ alli (lambda i x, p (i + 1) x) xs).
+    (p 0 x /\ alli (fun i x, p (i + 1) x) xs).
 proof strict.
 rewrite (alli_def _ xs).
-cut ->: (p 0 x /\ forall (i:int), 0 <= i < length xs => (lambda i x, p (i + 1) x) i xs.[i]) <=>
+cut ->: (p 0 x /\ forall (i:int), 0 <= i < length xs => (fun i x, p (i + 1) x) i xs.[i]) <=>
          forall (i:int), 0 <= i < length (x::xs) => p i (x::xs).[i].
   split; first smt.
   intros=> alli; split.
@@ -521,12 +521,12 @@ qed.
 (* overall, I feel that the general rangeb_forall is more useful *)
 lemma range_alli i j p (xs:'x array):
   0 <= i < j < length xs =>
-  ForLoop.range i j true (lambda k b, b /\ p k xs.[k]) <=>
-   alli (lambda k, p (k + i)) (sub xs i (j - i)).
+  ForLoop.range i j true (fun k b, b /\ p k xs.[k]) <=>
+   alli (fun k, p (k + i)) (sub xs i (j - i)).
 proof strict.
 intros=> i_j_bnd.
-cut ->: (lambda k b, b /\ p k xs.[k]) =
-         (lambda k b, b /\ (lambda k, p k xs.[k]) k) by smt.
+cut ->: (fun k b, b /\ p k xs.[k]) =
+         (fun k b, b /\ (fun k, p k xs.[k]) k) by smt.
 rewrite ForLoop.rangeb_forall //=.
 rewrite alli_def length_sub; first 3 smt.
 split.
@@ -576,7 +576,7 @@ theory Darray.
   (* Non-negative length case *)
   axiom mu_x_def (len: int) (d:'a distr) (x:'a array):
     len = length x =>
-    mu_x (darray len d) x = fold_right (lambda p x, p * mu_x d x) 1%r x.
+    mu_x (darray len d) x = fold_right (fun p x, p * mu_x d x) 1%r x.
 
   axiom supp_def (len:int) (x:'a array) (d:'a distr):
     0 <= len =>

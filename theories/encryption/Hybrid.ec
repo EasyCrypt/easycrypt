@@ -15,20 +15,20 @@ type outputA.
 
 module C = { 
   var c : int
-  fun init () : unit = {
+  proc init () : unit = {
     c = 0;
   }
-  fun incr () : unit = {
+  proc incr () : unit = {
     c = c + 1;
   }
 }.
 
 module type Orcl = { 
-  fun orcl(m:input) : output
+  proc orcl(m:input) : output
 }.
 
 module Orclc(O:Orcl) = {
-  fun orcl(m:input) : output = {
+  proc orcl(m:input) : output = {
     var r : output;
     r = O.orcl(m);
     C.incr();
@@ -36,11 +36,11 @@ module Orclc(O:Orcl) = {
   }
 }.
 module type Adversary = {
-  fun main():outputA
+  proc main():outputA
 }.
 
 module Ac (A:Adversary) = {
-  fun main():outputA = {
+  proc main():outputA = {
     var r:outputA;
     C.init();
     r = A.main();
@@ -49,22 +49,22 @@ module Ac (A:Adversary) = {
 }.
 
 module type OrclAdv (O:Orcl) = {
-  fun main () : outputA 
+  proc main () : outputA 
 }.
 
 module type Orclb = {
-  fun leaks (il:inleaks) : outleaks  
-  fun orcl1 (m:input) : output
-  fun orcl2 (m:input) : output
+  proc leaks (il:inleaks) : outleaks  
+  proc orcl1 (m:input) : output
+  proc orcl2 (m:input) : output
 }.
 
 (* I would like to to 
 module L(Ob:Orclb) : Orcl = {
-  fun orcl = Ob.orcl1 (*No need to inline, direct application *)
+  proc orcl = Ob.orcl1 (*No need to inline, direct application *)
 }.
 or 
 module L(Ob:Orclb) : Orcl = {
-  fun orcl(z:xxx) = Ob.orcl1(z) 
+  proc orcl(z:xxx) = Ob.orcl1(z) 
            (* Allow to rename the argument but need to inline *)
 }
 Remark it could be good to refers to a function parameter in spec by it relative
@@ -74,7 +74,7 @@ Then the printing will be in charge to use the good name.
 *)
 
 module L (Ob:Orclb) : Orcl = {
-  fun orcl (m:input) : output = {
+  proc orcl (m:input) : output = {
     var r : output;
     r = Ob.orcl1(m);
     return r;
@@ -82,7 +82,7 @@ module L (Ob:Orclb) : Orcl = {
 }.
 
 module R (Ob:Orclb) : Orcl = {
-  fun orcl (m:input) : output = {
+  proc orcl (m:input) : output = {
     var r : output;
     r = Ob.orcl2(m);
     return r;
@@ -91,7 +91,7 @@ module R (Ob:Orclb) : Orcl = {
 
 module LoR (Ob:Orclb) : Orcl = {
   var b:bool
-  fun orcl (m:input) : output = {
+  proc orcl (m:input) : output = {
     var r : output;
     if (b) r = Ob.orcl1(m);
     else r = Ob.orcl2(m);
@@ -100,7 +100,7 @@ module LoR (Ob:Orclb) : Orcl = {
 }.
 
 module type OrclbAdv (Ob:Orclb, O:Orcl) = {
-  fun main () : outputA
+  proc main () : outputA
 }.
 
 module Orcln (A:OrclAdv, O:Orcl) = Ac(A(Orclc(O))). 
@@ -111,7 +111,7 @@ module Rn(Ob:Orclb,A:OrclbAdv) = Orcln(A(Ob), R(Ob)).
 
 module LRB (Ob:Orclb,O:Orcl) = {
   var l, l0 : int  
-  fun orcl(m:input):output = {
+  proc orcl(m:input):output = {
     var r : output;
     if (l0 < l) r = Ob.orcl1(m);
     else { 
@@ -128,7 +128,7 @@ op q : int.
 module B(A:OrclbAdv, Ob:Orclb, O:Orcl) = {
   module LR = LRB(Ob,O)
   module A = A(Ob,LR)
-  fun main():outputA = {
+  proc main():outputA = {
     var r:outputA;
     LRB.l0 = $[0..q-1];
     LRB.l  = 0;
@@ -151,7 +151,7 @@ section.
   local module W (O:Orcl) = {
     module LR = LRB(Ob,O)
     module A = A(Ob,LR)
-    fun work(x:int) : outputA = {
+    proc work(x:int) : outputA = {
       var r:outputA;
       LRB.l = 0; LRB.l0 = x;
       r = A.main();
@@ -160,13 +160,13 @@ section.
   }.
 
   local equiv Obleaks : Ob.leaks ~ Ob.leaks : ={il,glob Ob} ==> ={res,glob Ob}.
-  proof strict. by fun true. qed.
+  proof strict. by proc true. qed.
 
   local equiv Oborcl1 : Ob.orcl1 ~ Ob.orcl1 : ={m,glob Ob} ==> ={res,glob Ob}.
-  proof strict. by fun true. qed.
+  proof strict. by proc true. qed.
 
   local equiv Oborcl2 : Ob.orcl2 ~ Ob.orcl2 : ={m,glob Ob} ==> ={res,glob Ob}.
-  proof strict. by fun true. qed.
+  proof strict. by proc true. qed.
 
   local lemma GLB_WL &m (p:glob A -> glob Ob -> int -> outputA -> bool):
     Pr[Ln(Ob,B(A)).main() @ &m : p (glob A) (glob Ob) LRB.l res /\ C.c <= 1] = 
@@ -174,10 +174,10 @@ section.
   proof strict.
     equiv_deno (_ : ={glob A, glob Ob} ==> 
                     ={glob A, glob Ob,glob LRB} /\ res{1} = snd res{2} /\ 
-                     C.c{1} <= 1) => //;fun. 
+                     C.c{1} <= 1) => //;proc. 
     inline{1}B(A, Ob, Orclc(L(Ob))).main; inline{2}W(L(Ob)).work;wp.
     call (_: ={glob Ob, glob LRB} /\ C.c{1} = (LRB.l0{1} < LRB.l{1}) ? 1 : 0).
-      fun;wp.
+      proc;wp.
       if => //;first by call Oborcl1;skip;progress => //; smt.
       if => //.
         inline{1} Orclc(L(Ob)).orcl L(Ob).orcl C.incr;inline{2} L(Ob).orcl.
@@ -196,10 +196,10 @@ section.
   proof strict.
     equiv_deno (_ : ={glob A, glob Ob} ==> 
                     ={glob A, glob Ob, glob LRB} /\ res{1} = snd res{2} /\ 
-                    C.c{1} <= 1) => //;fun.
+                    C.c{1} <= 1) => //;proc.
     inline{1}B(A, Ob, Orclc(R(Ob))).main; inline{2}W(R(Ob)).work;wp.
     call (_: ={glob Ob, glob LRB} /\ C.c{1} = (LRB.l0{1} < LRB.l{1}) ? 1 : 0).
-      fun;wp.
+      proc;wp.
       if => //;first by call Oborcl1;skip;progress => //; smt.
       if => //.
         inline{1} Orclc(R(Ob)).orcl R(Ob).orcl C.incr;inline{2} R(Ob).orcl.
@@ -230,19 +230,19 @@ section.
                     (LRB.l{1} <= q) = (C.c{2} <= q) /\
                     (C.c{2} <= q =>
                       ={glob A, glob Ob,res} /\ LRB.l{1} = C.c{2})) => //;
-     [fun | smt].
+     [proc | smt].
     call (_: q < C.c,
              ={glob Ob} /\ LRB.l0{1} = 0 /\ LRB.l{1} = C.c{2} /\ 0 <= LRB.l{1},
              LRB.l0{1} = 0 /\ q < LRB.l{1}).
       by apply losslessA.
-      fun;inline{2} C.incr L(Ob).orcl;wp.
+      proc;inline{2} C.incr L(Ob).orcl;wp.
       if{1};first by call Oborcl1;wp;skip;progress => //;smt.
       rcondt{1} 1; first by intros &m0;skip;smt.
       by inline{1} L(Ob).orcl;wp;call Oborcl1;wp;skip;progress => //;smt.
-      intros &m2 _;fun.
+      intros &m2 _;proc.
       rcondt 1; first by skip;smt.
       by wp;call losslessOb1;skip;smt.
-      by intros &m1;fun;inline C.incr L(Ob).orcl;wp;call losslessOb1;wp;skip;smt.
+      by intros &m1;proc;inline C.incr L(Ob).orcl;wp;call losslessOb1;wp;skip;smt.
       by conseq * Obleaks.
       intros &m2 _;conseq * losslessL.
       intros &m1; conseq * losslessL.
@@ -266,21 +266,21 @@ section.
                     (LRB.l{1} <= q) = (C.c{2} <= q) /\
                     (C.c{2} <= q =>
                       ={glob A, glob Ob, res} /\ LRB.l{1} = C.c{2})) => //;
-    [fun | smt].
+    [proc | smt].
     call (_: q < C.c,
              ={glob Ob} /\ LRB.l0{1} = q-1 /\ LRB.l{1} = C.c{2} /\ 0 <= LRB.l{1},
              LRB.l0{1} = q-1 /\ q < LRB.l{1}).
       by apply losslessA.
 
-      fun;inline{2} C.incr R(Ob).orcl;wp.
+      proc;inline{2} C.incr R(Ob).orcl;wp.
       if{1};first by call{1} losslessOb1;call{2} losslessOb2;wp;skip; smt.
       inline{1} R(Ob).orcl;if{1};
         first by wp;call Oborcl2;wp;skip;progress => //;smt.
       by call Oborcl2;wp;skip;progress => //;smt.
-      intros &m2 _;fun.
+      intros &m2 _;proc.
       rcondt 1; first by skip;smt.
       by wp;call losslessOb1;skip; smt.
-      intros &m1;fun;inline C.incr R(Ob).orcl;wp;call losslessOb2;wp;skip;smt.
+      intros &m1;proc;inline C.incr R(Ob).orcl;wp;call losslessOb2;wp;skip;smt.
 
       by conseq * Obleaks.
       intros &m2 _;conseq * losslessL.
@@ -304,9 +304,9 @@ section.
   proof strict.
     intros Hv;equiv_deno (_: ={glob A,glob Ob} /\ x{1} = v /\ x{2} = v-1 ==> 
                              ={glob A,glob Ob, LRB.l, res}) => //.
-    fun.
+    proc.
     call (_: ={glob Ob, LRB.l} /\ LRB.l0{1} = v /\ LRB.l0{2} = v-1).
-      fun.
+      proc.
       if{1}; first by rcondt{2} 1;[intros &m0;skip;smt | wp;call Oborcl1].
       if{1};first by rcondt{2} 1;
        [intros &m0;skip;smt | inline{1} L(Ob).orcl;wp;call Oborcl1;wp].
@@ -321,9 +321,9 @@ section.
   (* TODO : move this *)
   lemma Mrplus_inter_shift (i j k:int) f: 
       Mrplus.sum f (Interval.interval i j) = 
-      Mrplus.sum (lambda l, f (l + k)) (Interval.interval (i-k) (j-k)).
+      Mrplus.sum (fun l, f (l + k)) (Interval.interval (i-k) (j-k)).
   proof strict.
-    rewrite (Mrplus.sum_chind f (lambda l, l - k) (lambda l, l + k)) /=;first smt.
+    rewrite (Mrplus.sum_chind f (fun l, l - k) (fun l, l + k)) /=;first smt.
     congr => //.   
     apply FSet.set_ext => x.
     rewrite img_def Interval.mem_interval;split.
@@ -332,7 +332,7 @@ section.
   qed.
 
   lemma Hybrid &m (p:glob A -> glob Ob -> int -> outputA -> bool):
-     let p' = lambda ga ge l r, p ga ge l r /\ l <= q in
+     let p' = fun ga ge l r, p ga ge l r /\ l <= q in
      Pr[Ln(Ob,B(A)).main() @ &m : p' (glob A) (glob Ob) LRB.l res /\ C.c <= 1] - 
        Pr[Rn(Ob,B(A)).main() @ &m : p' (glob A) (glob Ob) LRB.l res /\ C.c <= 1] =
      1%r/q%r * (
@@ -348,7 +348,7 @@ section.
     cut Huni : forall (x : int), in_supp x [0..q - 1] => mu_x [0..q - 1] x = 1%r / q%r.
       by intros x Hx;rewrite Dinter.mu_x_def_in //;smt.
     pose ev := 
-      lambda (_j:int) (g:glob W(L(Ob))) (r:outputA),
+      fun (_j:int) (g:glob W(L(Ob))) (r:outputA),
         let (l,l0,ge,ga) = g in p ga ge l r /\ l <= q.
     cut := M.Mean_uni (W(L(Ob))) &m ev (1%r/q%r) _ _ => //; simplify ev => ->.
     cut := M.Mean_uni (W(R(Ob))) &m ev (1%r/q%r) _ _ => //; simplify ev => ->.

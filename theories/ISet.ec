@@ -243,7 +243,7 @@ qed.
 (*** Cross-operator lemmas *)
 (** This is another scary one *)
 lemma inter_filter (X Y:'a set):
-  inter X Y = filter (lambda x, mem x X) Y.
+  inter X Y = filter (fun x, mem x X) Y.
 proof strict.
 by apply set_ext=> x; rewrite mem_inter mem_filter.
 qed.

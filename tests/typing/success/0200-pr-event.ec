@@ -4,7 +4,7 @@ require import Real.
 op c : real.
 
 module G = {
-  fun f(x y : int) : int = {
+  proc f(x y : int) : int = {
     return x + y;
   }
 }.

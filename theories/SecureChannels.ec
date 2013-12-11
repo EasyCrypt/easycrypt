@@ -8,10 +8,10 @@ type message.
 type container.
 
 module type Scheme = {
-  fun init(): unit
-  fun kg(): key
-  fun send(k:key,m:message): container
-  fun recv(k:key,c:container): message option
+  proc init(): unit
+  proc kg(): key
+  proc send(k:key,m:message): container
+  proc recv(k:key,c:container): message option
 }.
 
 theory MultiUser.
@@ -21,8 +21,8 @@ theory MultiUser.
   axiom users_pos: 0 < users.
 
   module type Oracles = {
-    fun send(i:int,m0:message,m1:message): container option
-    fun recv(i:int,c:container): message option
+    proc send(i:int,m0:message,m1:message): container option
+    proc recv(i:int,c:container): message option
   }.
 
   module Wrap(S:Scheme) = {
@@ -31,7 +31,7 @@ theory MultiUser.
     var b:bool
     var auth:bool
 
-    fun initKeys(): unit = {
+    proc initKeys(): unit = {
       var i:int;
 
       i = 0;
@@ -42,7 +42,7 @@ theory MultiUser.
       }
     }
 
-    fun init(): unit = {
+    proc init(): unit = {
       qs = FSet.empty;
       auth = false;
       S.init();
@@ -50,7 +50,7 @@ theory MultiUser.
       initKeys();
     }
 
-    fun send(i:int,m0:message,m1:message): container option = {
+    proc send(i:int,m0:message,m1:message): container option = {
       var r:container option;
       var c:container;
 
@@ -66,7 +66,7 @@ theory MultiUser.
       return r;      
     }
 
-    fun recv(i:int,c:container): message option = {
+    proc recv(i:int,c:container): message option = {
       var r:message option;
 
       if (0 <= i < users)
@@ -80,24 +80,24 @@ theory MultiUser.
       return r;
     }
 
-    fun guess(b':bool): bool = {
+    proc guess(b':bool): bool = {
       return b' = b;
     }
 
-    fun auth(): bool = {
+    proc auth(): bool = {
       return auth;
     }
   }.
 
   module type Adv_LOR(O:Oracles) = {
-    fun guess(): bool
+    proc guess(): bool
   }.
 
   module LOR(S:Scheme,A:Adv_LOR) = {
     module O = Wrap(S)
     module A = A(O)
 
-    fun main(): bool = {
+    proc main(): bool = {
       var b',sec,auth:bool;
 
       O.init();

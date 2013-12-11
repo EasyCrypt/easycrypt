@@ -15,11 +15,11 @@ op bd : real.
 axiom bdPos : bd >= 0%r.
 
 module type O = {
-  fun o(x:from) : to
+  proc o(x:from) : to
 }.
 
 module type Adv(Foo : O) = {
-  fun g() : unit
+  proc g() : unit
 }.
 
 require import List.
@@ -29,13 +29,13 @@ module O : O = {
   var m : (from, to) map
   var s : to list
 
-  fun init() : unit = {
+  proc init() : unit = {
     bad = false;
     m = Map.empty;
     s = [];
   }
 
-  fun o(x:from) : to = {
+  proc o(x:from) : to = {
     var y : to;
     var r : to;
 
@@ -54,7 +54,7 @@ module O : O = {
 module M(A:Adv)  = {
   module AO = A(O)
 
-  fun main () : unit = {
+  proc main () : unit = {
     O.init();
     AO.g();
   }
@@ -70,16 +70,16 @@ require import Distr.
 (* BUG: this returns a weird error message *) 
 (* axiom distr_ax : *)
 (*   forall (s: to set), *)
-(*   (mu dsample (lambda (z : to), FSet.mem z s)) ((card s)%r * bd). *)
+(*   (mu dsample (fun (z : to), FSet.mem z s)) ((card s)%r * bd). *)
 
 axiom distr_ax :
   forall (s: to list),
-  (mu dsample (lambda (z : to), mem z s)) = ((length s)%r * bd).
+  (mu dsample (fun (z : to), mem z s)) = ((length s)%r * bd).
 
 lemma test : forall (A<:Adv{O}), forall &m,
 Pr[M(A).main() @ &m : O.bad /\ (length O.s) <= qO] <= qO%r * (qO-1)%r * bd.
 intros A &m.
-fel 1 (length O.s) (lambda x, (x%r)*bd) qO O.bad [O.o : (length O.s < qO /\ x=x)].
+fel 1 (length O.s) (fun x, (x%r)*bd) qO O.bad [O.o : (length O.s < qO /\ x=x)].
 
   (* subgoal on sum *)
   rewrite /int_sum /intval (_:qO=qO-1+1);first smt.
@@ -101,11 +101,11 @@ fel 1 (length O.s) (lambda x, (x%r)*bd) qO O.bad [O.o : (length O.s < qO /\ x=x)
   (* sugoals for oracle o *)
 
   (** pr of setting bad *)
-  fun.
+  proc.
   if;[|conseq (_ : _ : = 0%r);[smt|hoare;wp; skip; smt]]. 
   wp.
   simplify.
-  rnd (lambda z, mem z O.s).
+  rnd (fun z, mem z O.s).
   skip; simplify.
   intros &hr H.
    rewrite distr_ax.
@@ -113,12 +113,12 @@ fel 1 (length O.s) (lambda x, (x%r)*bd) qO O.bad [O.o : (length O.s < qO /\ x=x)
 
    (** counter increases *)
    intros c.
-   fun.
+   proc.
    if;[wp;rnd;skip;smt|wp; skip; smt].
 
    (** last subgoal for oracle *)
    intros b c.   
-   fun.
+   proc.
    if; [wp;rnd;skip;smt|wp; skip; trivial].
 save.
 

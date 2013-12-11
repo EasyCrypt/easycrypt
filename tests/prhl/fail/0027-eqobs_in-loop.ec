@@ -2,7 +2,7 @@ require import Int.
 
 module M = { 
   var i, j : int
-  fun f (x:int) : int = {
+  proc f (x:int) : int = {
     i = 0;
     while (i < 10) {
       x = i + x;
@@ -14,7 +14,7 @@ module M = {
 
 module M' = { 
   var i, j : int
-  fun f (x:int) : int = {
+  proc f (x:int) : int = {
     i = 0; j = 0;
     while (j < 10) {
       x = i + x;
@@ -25,7 +25,7 @@ module M' = {
 }.
 
 equiv foo : M.f ~ M'.f : ={x} ==> ={res}.
-fun.
+proc.
 seq 1 2 : true.
  wp => //.
 eqobs_in.

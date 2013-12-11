@@ -1,10 +1,10 @@
 module M = { 
-  fun f (x:int) : int = { return x; }
+  proc f (x:int) : int = { return x; }
 }.
 
 lemma foo : hoare [M.f : x=1 ==> res=1].
 proof.
- fun.
+ proc.
  skip.
  intros &m h.
  assumption h.

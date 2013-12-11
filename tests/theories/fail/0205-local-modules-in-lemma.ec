@@ -5,7 +5,7 @@ theory T.
     local module M = {
       var x : t
 
-      fun f() : t = { return x; }
+      proc f() : t = { return x; }
     }.
 
     lemma L : equiv[M.f ~ M.f : true ==> true].

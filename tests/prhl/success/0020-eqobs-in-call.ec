@@ -1,18 +1,18 @@
 require import Int.
 
 module type Orcl = {
-  fun o (x:int) : int 
+  proc o (x:int) : int 
 }.
 
 module type Adv (O:Orcl) = { 
-  fun a1 (x:int) : int {* O.o}
-  fun a2 (x:int) : int
+  proc a1 (x:int) : int {* O.o}
+  proc a2 (x:int) : int
 }.
 
 module O = { 
   var m : int
   var l : int
-  fun o (x:int) : int = {
+  proc o (x:int) : int = {
     m = x + m;
     return m;
   }
@@ -20,7 +20,7 @@ module O = {
 
 module G (A:Adv) = {
   module AO = A(O)
-  fun main (x:int) : int = { 
+  proc main (x:int) : int = { 
     x = AO.a1(x);
     x = O.o(x);
     x = AO.a2(x);
@@ -29,21 +29,21 @@ module G (A:Adv) = {
 }.
 
 equiv foo_0 (A<:Adv {O} ) : G(A).main ~ G(A).main : ={x,O.m,O.l} ==> ={res,O.m,O.l}.
-fun.
+proc.
 eqobs_in true true : (={O.m,O.l,x}).
 save.
 
 equiv foo_1 (A<:Adv {O} ) : G(A).main ~ G(A).main : ={x,O.m,O.l} ==> ={res,O.m,O.l}.
-fun.
+proc.
 eqobs_in.
 save.
 
 equiv foo1_0 (A<:Adv {O} ) : G(A).main ~ G(A).main : ={x,O.m,O.l,glob A} ==> ={res,O.m,glob A}.
-fun.
+proc.
 eqobs_in true true : (={O.m,glob A,x,O.l}).
 save.
 
 equiv foo1_1 (A<:Adv {O} ) : G(A).main ~ G(A).main : ={x,O.m,O.l,glob A} ==> ={res,O.m,glob A}.
-fun.
+proc.
 eqobs_in.
 save.

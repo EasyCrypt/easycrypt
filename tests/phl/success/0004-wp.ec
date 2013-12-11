@@ -1,6 +1,6 @@
 require Logic.
 module M = {
-  fun f (w x:int) : int = {
+  proc f (w x:int) : int = {
     var y : int;
     var z : int;
     y = 1;
@@ -13,14 +13,14 @@ module M = {
 
 lemma foo : hoare [M.f : true ==> res = 1 ].
 proof.
- fun.
+ proc.
  wp.
  skip;intros _ _;split.
 save.
 
 lemma foo1 : hoare [M.f : true ==> res = 1 ].
 proof.
- fun.
+ proc.
  wp 1.
  wp 0.
  skip;intros _ _;split.

@@ -5,7 +5,7 @@ require import Real.
 
 
 module M = {
-  fun f (y:bool) : bool = {
+  proc f (y:bool) : bool = {
     var x : bool;
     x = $Dbool.dbool; 
     return x=y;
@@ -14,19 +14,19 @@ module M = {
 
 lemma test: bd_hoare [ M.f : true ==> res] = (1%r/2%r).
 proof.
-fun.
-rnd. (* (lambda (x:bool), x=y). *)
+proc.
+rnd. (* (fun (x:bool), x=y). *)
 skip.
 simplify.
 intros &hr.
-rewrite (Dbool.mu_def  (lambda (x : bool), x = y{hr})).
+rewrite (Dbool.mu_def  (fun (x : bool), x = y{hr})).
 smt.
 save.
 
 module F = {
   var b1 : bool
   var b2 : bool
-  fun f () : bool = {
+  proc f () : bool = {
     b1 = $Dbool.dbool;
     b2 = $Dbool.dbool;
     return b1;
@@ -34,7 +34,7 @@ module F = {
 }.
 
 lemma test2: bd_hoare [ F.f : true ==> res] = (1%r/2%r). proof.
-fun.
+proc.
 rnd;[smt|rnd; skip; smt].
 save.
 
@@ -45,7 +45,7 @@ op k1 : int.
 op k2 : int.
 
 module Test = {
-  fun test () : bitstring = {
+  proc test () : bitstring = {
     var z : bitstring;
     z = $Dbitstring.dbitstring (k1+k2);
     return z;
@@ -55,7 +55,7 @@ module Test = {
 .
 
 module Test' = {
-  fun test () : bitstring = {
+  proc test () : bitstring = {
     var z1 : bitstring;
     var z2 : bitstring;
     z1 = $Dbitstring.dbitstring (k1);
@@ -69,7 +69,7 @@ module Test' = {
 lemma test' : forall &m (a:bitstring), length a = k1+k2 => Pr[Test.test() @ &m : a=res]=1%r/(2^(k1+k2))%r.
 intros &m a length_a.
 bdhoare_deno (_ : (true) ==> (a=res)).
-fun.
+proc.
 rnd ((=)a).
 skip.
 trivial.
@@ -102,9 +102,9 @@ cut pow_distr :  ((2 ^ k2)%r * (2 ^ k1)%r = (2 ^ (k1+k2))%r).
 smt.
 intros &m a length_a.
 bdhoare_deno (_ : (true) ==> (a=res)).
-fun.
+proc.
 rnd (sub a 0 k1 =z1) (1%r/(2 ^ (k1))%r) (1%r/(2 ^ (k2))%r) (1%r - 1%r/(2 ^ (k1))%r) (0%r) 
-    (lambda z, sub a 0 k1 = z1 /\ z= (sub a k1 k2)).
+    (fun z, sub a 0 k1 = z1 /\ z= (sub a k1 k2)).
 simplify;rewrite -pow_distr; trivial. admit.
 rnd ((=) (sub a 0 k1)).
 simplify.
@@ -126,7 +126,7 @@ generalize H; delta mu_x; simplify; intros H.
 split.
 rewrite h.
 simplify.
-  cut Why : ((lambda (z : bool Bits.array), z = sub a k1 k2) = (=)(sub a k1 k2)) .
+  cut Why : ((fun (z : bool Bits.array), z = sub a k1 k2) = (=)(sub a k1 k2)) .
   delta (=).
   apply extensionality.
   simplify.
@@ -152,7 +152,7 @@ admit.
 (* *)
 intros &hr F.
 split.
-cut J :  (lambda z, false) = lambda z, (sub a 0 k1 = z1{hr} /\ z = sub a k1 k2).
+cut J :  (fun z, false) = fun z, (sub a 0 k1 = z1{hr} /\ z = sub a k1 k2).
 apply extensionality.
 smt.
 rewrite -J.

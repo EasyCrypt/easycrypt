@@ -3,7 +3,7 @@ require Logic.
 module M = {
   var y : int
   var z : int
-  fun f (x:int) : int = { 
+  proc f (x:int) : int = { 
     y = x;
     return 3;
   }
@@ -12,5 +12,5 @@ module M = {
 lemma foo : 
   hoare [M.f : true ==> true].
 proof.
- fun.
+ proc.
  call ( _ : true ==> true). 

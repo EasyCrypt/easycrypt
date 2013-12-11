@@ -23,18 +23,18 @@ theory PRP_PRF.
 (*  axiom q_pos : 0 < q.  *)
 
   module type I = {
-    fun F (x:from) : to 
+    proc F (x:from) : to 
   }.
 
   module type Adv (O:I) = {
-    fun A () : bool { D.F }
+    proc A () : bool { D.F }
   }.
 
   (* Better here to do a declare module *)
   module PRP (FA:Adv) = {
     var m : (from,to) map
 
-    fun F (x:from) : to = {
+    proc F (x:from) : to = {
       var t : to;
 
       if (not(in_dom(x,m)) && (length(dom(m)) < q)) {
@@ -45,11 +45,11 @@ theory PRP_PRF.
       return get(m, x); (* m[x]; *)
     }
 
-    module PA = { fun F = F }
+    module PA = { proc F = F }
 
     module A = FA(PA)
     
-    fun Main() : bool = {
+    proc Main() : bool = {
       var b : bool;
       m = empty_map;
       b = A();
@@ -61,7 +61,7 @@ theory PRP_PRF.
     var m : (from,to) map
     var bad : bool
 
-    fun F (x:from) : to = {
+    proc F (x:from) : to = {
       var t : to;
 
       if (!in_dom(x,m) && length(dom(m)) < q) {
@@ -72,11 +72,11 @@ theory PRP_PRF.
       return m[x];
     }
 
-    module PA = { fun F = F }
+    module PA = { proc F = F }
 
     module A = FA(PA)
     
-    fun Main() : bool = {
+    proc Main() : bool = {
       var b : bool;
       bad = true;
       m = empty_map;
@@ -89,7 +89,7 @@ theory PRP_PRF.
     var m : (from,to) map
     var bad : bool
 
-    fun F (x:from) : to = {
+    proc F (x:from) : to = {
       var t : to;
 
       if (!in_dom(x,m) && length(dom(m)) < q) {
@@ -100,11 +100,11 @@ theory PRP_PRF.
       return m[x];
     }
 
-    module PA = { fun F = F } 
+    module PA = { proc F = F } 
 
     module A = FA(PA)
     
-    fun Main() : bool = {
+    proc Main() : bool = {
       var b : bool;
       bad = true;
       m = empty_map;
@@ -117,7 +117,7 @@ theory PRP_PRF.
 
     var m : (from,to) map
 
-    fun G (x:from) : to = {
+    proc G (x:from) : to = {
       var t : to;
 
       if (!in_dom(x,m) && length(dom(m)) < q) {
@@ -128,12 +128,12 @@ theory PRP_PRF.
     }
     
     module FF = { 
-      fun F = G
+      proc F = G
     }
 
     module A = FA(FF)
     
-    fun Main() : bool = {
+    proc Main() : bool = {
       var b : bool;
       m = empty_map;
       b = A();

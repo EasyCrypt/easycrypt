@@ -16,14 +16,14 @@ theory T.
  cnst c' : t' = (c,0,c1). 
 
  module type IOrcl = {
-   fun o1 (x:int):int
-   fun o2 (x:int):bool
+   proc o1 (x:int):int
+   proc o2 (x:int):bool
  }
 
  module type IA (O:IOrcl) = {
     (* var x *)
-    fun A1(x:int) : int { O.o1 }
-    fun A2(y:int) : int { O.o1, O.o2 }
+    proc A1(x:int) : int { O.o1 }
+    proc A2(y:int) : int { O.o1, O.o2 }
  }
  
  op add (x,y:int) = x + y.
@@ -38,8 +38,8 @@ theory T.
 
  module test1 = {
    var y : t'
-   fun O1 (x:t) : t' = { return c'; }
-   fun O2 (x:t) : t' = {
+   proc O1 (x:t) : t' = { return c'; }
+   proc O2 (x:t) : t' = {
      var r : t';
      r = O1(x);
      return r;
@@ -49,14 +49,14 @@ theory T.
  module test (AF:IA) = {
    var w : int
    module O = { 
-      fun O1 (x:int) : int = { return x; }
-      fun O2 (x:int) : bool = { return true; }
+      proc O1 (x:int) : int = { return x; }
+      proc O2 (x:int) : bool = { return true; }
    }
 
    module A = AF(O)
    open A
 
-   fun Main () : bool = { 
+   proc Main () : bool = { 
      var x : int;
      x = A1(0);
      x = A2(0);
@@ -69,14 +69,14 @@ theory T.
  module test'  = {
    var w : int
    module O = { 
-      fun O1 (x:int) : int = { return x; }
-      fun O2 (x:int) : bool = { return true; }
+      proc O1 (x:int) : int = { return x; }
+      proc O2 (x:int) : bool = { return true; }
    }
 
    module A = AF(O)
    open A
 
-   fun Main () : bool = { 
+   proc Main () : bool = { 
      var x : int;
      x = A1(0);
      x = A2(0);
@@ -100,9 +100,9 @@ print T''.test.
 
 print T'.test1.
 
-module type B(O:{ fun o1: int -> int; o2 : fun o2:int -> bool } (* not the good syntaxe ? *) = {
-  fun B1(x:int) : int {O.o1}
-  fun B2 (y:int) : int {O.o1,O.o2}
+module type B(O:{ proc o1: int -> int; o2 : proc o2:int -> bool } (* not the good syntaxe ? *) = {
+  proc B1(x:int) : int {O.o1}
+  proc B2 (y:int) : int {O.o1,O.o2}
 }
 
 clone theory T with type t = int and cnst c = 0 and
@@ -111,13 +111,13 @@ clone theory T with type t = int and cnst c = 0 and
    var y : int
    var z : int
    module B = B (O)
-   fun F(x1:int) : int = { return 0; }
-   fun A1 (x1:int) : int = {
+   proc F(x1:int) : int = { return 0; }
+   proc A1 (x1:int) : int = {
      var r : int;
      r = o1(x1);
      return 0;
    }
-   fun A2 (x1:int) : int = {
+   proc A2 (x1:int) : int = {
      z = F(x1);
      return 0;
    }

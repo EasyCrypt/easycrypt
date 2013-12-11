@@ -4,17 +4,17 @@ require import Real.
 op c : real.
 
 module type I = {
-  fun f (x : int) : int
+  proc f (x : int) : int
 }.
 
 module M : I = {
-  fun f (x : int) : int = {
+  proc f (x : int) : int = {
     return x;
   }
 }.
 
 module G(X : I) = {
-  fun f(x : int, y : int) : int = {
+  proc f(x : int, y : int) : int = {
     return x + y;
   }
 }.

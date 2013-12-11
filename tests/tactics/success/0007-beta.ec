@@ -1,4 +1,4 @@
-lemma l: forall (x:int), (lambda y, y = y) x.
+lemma l: forall (x:int), (fun y, y = y) x.
 proof.
 beta.
 smt.
