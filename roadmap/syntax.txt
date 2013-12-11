@@ -100,7 +100,8 @@
 
     pr_false -> à enlever
 
-    pr_eq -> à enlever
+    pr_eq -> à enlever (* Ce fait avec conseq *)
+    
 
 	
 	exists* -> utilise alias
