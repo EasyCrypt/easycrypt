@@ -81,7 +81,7 @@ equiv [O1.f ~ O2.f : I (glob O1){1} (glob O2){2} /\
 hoare [O2.f : (m (glob O2)) = k ==> 
               (m (glob O2)) = k + 1]) =>
 (forall k,
- bd_hoare [O2.f : m (glob O2) = k ==> snd res] <= (g k )) =>
+ phoare [O2.f : m (glob O2) = k ==> snd res] <= (g k )) =>
 islossless O1.f =>
 islossless O2.f =>
 (forall (O <: Oracle{Adv}), islossless O.f => islossless Adv(O).run) =>

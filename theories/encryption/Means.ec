@@ -32,7 +32,7 @@ lemma prCond (A <: Worker) &m (v:input)
     Pr[Rand(A).main() @ &m: ev v (glob A) (snd res) /\ v = fst res] =
       (mu_x d v) * Pr[A.work(v) @ &m : ev v (glob A) res].
 proof strict.
-bdhoare_deno (_: (glob A) = (glob A){m} ==> 
+phoare_deno (_: (glob A) = (glob A){m} ==> 
                  ev (fst res) (glob A) (snd res) /\ fst res = v) => //.
 pose pr := Pr[A.work(v) @ &m: ev v (glob A) res];
 conseq* (_: _: = (mu_x d v * pr)). (* WEIRD! *)
@@ -78,7 +78,7 @@ intros=> Fsup /=.
 cut:= introOrs A &m ev _=> //= ->.
 elim/set_ind (Finite.toFSet (create (support d))).
   rewrite Mrplus.sum_empty.
-  bdhoare_deno (_ : true ==> false)=> //.
+  phoare_deno (_ : true ==> false)=> //.
   by rewrite /cpOrs img_empty Mbor.sum_empty.
   intros=> x s Hx Hrec.
   rewrite Mrplus.sum_add //=.

@@ -20,7 +20,7 @@ module OneSided = {
 lemma bar:
   (* "hoare [OneSided.init: true ==> OneSided.x =  0]" wouldn't work,
      Hoare judgments guarantee only partial correctness *)
-  bd_hoare [OneSided.init: true ==> OneSided.x =  0] = 1%r.
+  phoare [OneSided.init: true ==> OneSided.x =  0] = 1%r.
 proof.
 proc;wp;skip;smt.
 qed.

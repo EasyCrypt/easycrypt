@@ -102,7 +102,7 @@ theory WRO_Int.
 
   lemma log_stable x (RO <: Oracle{ARO}):
     islossless RO.o =>
-    bd_hoare[ ARO(RO).o : x = ARO.log ==> x <= ARO.log] = 1%r.
+    phoare[ ARO(RO).o : x = ARO.log ==> x <= ARO.log] = 1%r.
   proof strict.
   by intros=> Ho; proc; if; [call Ho | ];
      wp; skip=> //; progress; smt.
@@ -110,7 +110,7 @@ theory WRO_Int.
 
   lemma RO_log_stable x:
      mu dsample cpTrue = 1%r => 
-     bd_hoare[ ARO(ROM.RO).o: x = ARO.log ==> x <= ARO.log ] = 1%r.
+     phoare[ ARO(ROM.RO).o: x = ARO.log ==> x <= ARO.log ] = 1%r.
   proof strict.
   by intros=> Hs; apply (log_stable x ROM.RO); apply ROM.lossless_o.
   qed.
@@ -167,7 +167,7 @@ theory WRO_Set.
 
   lemma log_stable r (RO<:Oracle{ARO}):
     islossless RO.o =>
-    bd_hoare[ ARO(RO).o : mem r ARO.log ==> mem r ARO.log ] = 1%r.
+    phoare[ ARO(RO).o : mem r ARO.log ==> mem r ARO.log ] = 1%r.
   proof strict.
   by intros=> Ho; proc; if; [call Ho | ];
      wp; skip=> //; progress; rewrite mem_add; left.
@@ -175,7 +175,7 @@ theory WRO_Set.
 
   lemma RO_log_stable r:
      mu dsample cpTrue = 1%r => 
-     bd_hoare[ ARO(ROM.RO).o: mem r ARO.log ==> mem r ARO.log ] = 1%r.
+     phoare[ ARO(ROM.RO).o: mem r ARO.log ==> mem r ARO.log ] = 1%r.
   proof strict.
   by intros=> Hs; apply (log_stable r ROM.RO); apply ROM.lossless_o.
   qed.
@@ -250,7 +250,7 @@ theory WRO_List.
 
   lemma log_stable: forall r (RO<:Oracle{ARO}), 
     islossless RO.o =>
-    bd_hoare[ ARO(RO).o : mem r ARO.log ==> mem r ARO.log ] = 1%r.
+    phoare[ ARO(RO).o : mem r ARO.log ==> mem r ARO.log ] = 1%r.
   proof strict.
   intros=> r RO Ho; proc; if.
     by call Ho; wp; skip=> //; progress; rewrite mem_cons; right.
@@ -259,7 +259,7 @@ theory WRO_List.
 
   lemma RO_log_stable: forall r,
      mu dsample cpTrue = 1%r => 
-     bd_hoare[ ARO(ROM.RO).o: mem r ARO.log ==> mem r ARO.log ] = 1%r.
+     phoare[ ARO(ROM.RO).o: mem r ARO.log ==> mem r ARO.log ] = 1%r.
   proof strict.
   by intros=> r Hs; apply (log_stable r ROM.RO); apply ROM.lossless_o.
   qed.

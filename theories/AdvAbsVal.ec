@@ -30,7 +30,7 @@ lemma Neg_A_Pr_minus (A<:Adv) &m:
    Pr[Neg_main(A).main() @ &m : res] = 1%r - Pr[A.main() @ &m : res].
 proof.
   intros Hl; rewrite (Neg_A_Pr A &m); rewrite Pr mu_not; congr => //.
-  by bdhoare_deno Hl.
+  by phoare_deno Hl.
 qed.
   
 lemma abs_val : 

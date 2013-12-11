@@ -28,7 +28,7 @@ call ( _ : true ==> true).
 
 
 lemma foo : forall (A<:Adv),
-  bd_hoare [M(A).g : true ==> true] = 1%r.
+  phoare [M(A).g : true ==> true] = 1%r.
 intros A.
 proc.
 call ( _ : true ==> true).

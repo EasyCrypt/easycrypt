@@ -39,7 +39,7 @@ theory GenDice.
     cut bdt_pos: 0 <= card (sub_supp i0) by smt.
     cut bdt_posr: 0%r <= (card (sub_supp i0))%r by smt.
     case (test i0 k) => Htk &m Hdfl Hweight;
-      bdhoare_deno (_: !test i r /\ i0 = i ==> k = res) => //;proc.
+      phoare_deno (_: !test i r /\ i0 = i ==> k = res) => //;proc.
       (* case : test i k *)
       pose bd := mu_x (d i0) k.
       cut d_uni : forall x, in_supp x (d i0) => mu_x (d i0) x = bd.
@@ -50,7 +50,7 @@ theory GenDice.
       while (i0=i) (if test i r then 0 else 1) 1 (bdt * bd) => //; first 2 smt.
         intros Hw; alias 2 r0 = r.
         cut Htk' := Htk;generalize Htk';rewrite -test_sub_supp => Hmemk.
-        bd_hoare split bd ((1%r - bdt*bd) * (1%r/bdt)) : (k=r0).
+        phoare split bd ((1%r - bdt*bd) * (1%r/bdt)) : (k=r0).
           by intros &hr [H1 H2]; rewrite (neqF (test i{hr} r{hr})) //=;fieldeq.
           (* bounding pr : k = r0 /\ k = r *)
           seq 2 : (k = r0) bd 1%r 1%r 0%r (r0 = r /\ i = i0) => //.
@@ -66,7 +66,7 @@ theory GenDice.
          case (k = r0);first by conseq * (_ : _ ==> false) => //.
          conseq * Hw;progress => //.
          by rewrite (eqT (test i{hr} r{hr})) //= /charfun (neqF (k = r{hr})) //.
-         bd_hoare split ! 1%r (bdt*bd);wp;rnd => //.
+         phoare split ! 1%r (bdt*bd);wp;rnd => //.
           skip;progress => //.
           rewrite -(mu_eq (d i{hr}) (cpMem (sub_supp i{hr}))).
             by intros x ; rewrite /= -test_sub_supp.
@@ -100,7 +100,7 @@ theory GenDice.
   
   lemma prSample : forall i k &m, Pr[Sample.sample(i) @ &m : res = k] = mu_x (d' i) k.
   proof.
-    intros i0 k &m; bdhoare_deno (_: i0 = i ==> k = res) => //;proc.
+    intros i0 k &m; phoare_deno (_: i0 = i ==> k = res) => //;proc.
     rnd;skip;progress.
     by apply (mu_eq (d' i{hr}) (fun (x:t'), k = x) ((=) k)).
   qed.

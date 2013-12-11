@@ -35,39 +35,39 @@ proof.
  smt. 
 qed. 
 
-lemma bdhoareF_eq (A <: F {M}) : bd_hoare [P(A).main : P.y /\ !P.y ==> P.y] = 1%r.
+lemma bdhoareF_eq (A <: F {M}) : phoare [P(A).main : P.y /\ !P.y ==> P.y] = 1%r.
 proof.
  exfalso.
  smt. 
 qed. 
 
-lemma bdhoareF_le (A <: F {M}) : bd_hoare [P(A).main : P.y /\ !P.y ==> P.y] <= 1%r.
+lemma bdhoareF_le (A <: F {M}) : phoare [P(A).main : P.y /\ !P.y ==> P.y] <= 1%r.
 proof.
  exfalso.
  smt. 
 qed. 
 
-lemma bdhoareF_ge (A <: F {M}) : bd_hoare [P(A).main : P.y /\ !P.y ==> P.y] >= 1%r.
+lemma bdhoareF_ge (A <: F {M}) : phoare [P(A).main : P.y /\ !P.y ==> P.y] >= 1%r.
 proof.
  exfalso.
  smt. 
 qed. 
 
-lemma bdhoareS_eq (A <: F {M}) : bd_hoare [P(A).main : P.y /\ !P.y ==> P.y] = 1%r.
-proof.
- proc.
- exfalso.
- smt. 
-qed. 
-
-lemma bdhoareS_le (A <: F {M}) : bd_hoare [P(A).main : P.y /\ !P.y ==> P.y] <= 1%r.
+lemma bdhoareS_eq (A <: F {M}) : phoare [P(A).main : P.y /\ !P.y ==> P.y] = 1%r.
 proof.
  proc.
  exfalso.
  smt. 
 qed. 
 
-lemma bdhoareS_ge (A <: F {M}) : bd_hoare [P(A).main : P.y /\ !P.y ==> P.y] >= 1%r.
+lemma bdhoareS_le (A <: F {M}) : phoare [P(A).main : P.y /\ !P.y ==> P.y] <= 1%r.
+proof.
+ proc.
+ exfalso.
+ smt. 
+qed. 
+
+lemma bdhoareS_ge (A <: F {M}) : phoare [P(A).main : P.y /\ !P.y ==> P.y] >= 1%r.
 proof.
  proc.
  exfalso.

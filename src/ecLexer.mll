@@ -35,7 +35,7 @@
     "res"         , RES        ;        (* KW: prog *)
     "equiv"       , EQUIV      ;        (* KW: prog *)
     "hoare"       , HOARE      ;        (* KW: prog *)
-    "bd_hoare"    , BDHOARE    ;        (* KW: prog *)
+    "phoare"      , PHOARE     ;        (* KW: prog *)
     "islossless"  , LOSSLESS   ;        (* KW: prog *)
 
     "try"         , TRY        ;        (* KW: tactical *)
@@ -103,7 +103,7 @@
     "swap"        , SWAP       ;        (* KW: tactic *)
     "cfold"       , CFOLD      ;        (* KW: tactic *)
     "rnd"         , RND        ;        (* KW: tactic *)
-    "bdhoare_deno", BDHOAREDENO;        (* KW: tactic *)
+    "phoare_deno" , PHOAREDENO ;        (* KW: tactic *)
     "pr_bounded"  , PRBOUNDED  ;        (* KW: tactic *)
     "pr_false"    , PRFALSE    ;        (* KW: tactic *)
     "bd_eq"       , BDEQ       ;        (* KW: tactic *)

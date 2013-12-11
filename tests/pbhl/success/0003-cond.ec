@@ -21,7 +21,7 @@ module M = {
   }
 }.
 
-lemma foo : bd_hoare [M.f : (b1 => M.y=e1) && (b2 => M.y=e2) && (b1||b2) ==> 
+lemma foo : phoare [M.f : (b1 => M.y=e1) && (b2 => M.y=e2) && (b1||b2) ==> 
                          M.x=M.y ] = (1%r).
 proof.
  proc.
@@ -45,7 +45,7 @@ module M2 = {
 }.
 
 
-lemma test : bd_hoare [M2.f : true ==> M2.b \/ M2.b' ] = (1%r).
+lemma test : phoare [M2.f : true ==> M2.b \/ M2.b' ] = (1%r).
 proc.
 if.
 wp; skip; trivial.

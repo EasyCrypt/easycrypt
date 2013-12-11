@@ -16,7 +16,7 @@ module M = {
     return x;
   }
 }.
-lemma test : bd_hoare [M.f : true ==> res = 1 ] >= 1%r.
+lemma test : phoare [M.f : true ==> res = 1 ] >= 1%r.
  proc.
  wp.
  skip;intros _ _;split.
@@ -34,7 +34,7 @@ module M2 = {
   }
 }.
 
-lemma test2: bd_hoare [ M2.f : b ==> res] = (1%r/2%r). 
+lemma test2: phoare [ M2.f : b ==> res] = (1%r/2%r). 
 proc.
 wp.
 rnd ((=) y).
@@ -55,7 +55,7 @@ module M3 = {
   }
 }.
 
-lemma test3: bd_hoare [ M3.f : true ==> res=b] >= 1%r. 
+lemma test3: phoare [ M3.f : true ==> res=b] >= 1%r. 
 proof.
 proc.
 wp.
@@ -78,7 +78,7 @@ module M4 = {
 .
 
 require import Real.
-lemma test : bd_hoare[M4.foo : M4.x=(Real.(/) 1%r2%r) ==> M4.y=true] = M4.x.
+lemma test : phoare[M4.foo : M4.x=(Real.(/) 1%r2%r) ==> M4.y=true] = M4.x.
 proc.
 wp.
 rcondt 1; [trivial|].

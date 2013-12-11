@@ -147,8 +147,6 @@
 %token AXIOM
 %token BACKS
 %token BDEQ
-%token BDHOARE
-%token BDHOAREDENO
 %token BETA 
 %token BY
 %token BYPR
@@ -242,6 +240,8 @@
 %token ON
 %token OP
 %token PCENT
+%token PHOARE
+%token PHOAREDENO
 %token PIPE
 %token POSE
 %token PR
@@ -870,14 +870,14 @@ form_u(P):
       let loc = EcLocation.make $startpos $endpos in
         PFapp (mk_loc loc id, [e]) }
 
-| BDHOARE 
+| PHOARE 
     LBRACKET mp=loc(fident) COLON
       pre=form_r(P) LONGARROW post=form_r(P)
     RBRACKET
       cmp=hoare_bd_cmp bd=sform_r(P)
 	{ PFBDhoareF (pre, mp, post, cmp, bd) }
 
-| BDHOARE 
+| PHOARE 
     LBRACKET s=loc(fun_def_body) COLON
       pre=form_r(P) LONGARROW post=form_r(P)
     RBRACKET
@@ -2078,7 +2078,7 @@ phltactic:
 | EQUIVDENO info=fpattern(conseq)
     { Pequivdeno info }
 
-| BDHOAREDENO info=fpattern(conseq)
+| PHOAREDENO info=fpattern(conseq)
     { Pbdhoaredeno info }
 
 | CONSEQ nm=STAR? info=fpattern(conseq_bd)
@@ -2113,11 +2113,11 @@ phltactic:
 
 (* basic pr based tacs *)
 | HOARE {Phoare}
-| BDHOARE {Pbdhoare}
+| PHOARE {Pbdhoare}
 | PRBOUNDED {Pprbounded}
 | REWRITE PR s=LIDENT {Ppr_rewrite s}
-| BDHOARE SPLIT i=bdhoare_split { Pbdhoare_split i }
-| BDHOARE EQUIV s=side pr=sform po=sform { Pbd_equiv(s,pr,po) } 
+| PHOARE SPLIT i=bdhoare_split { Pbdhoare_split i }
+| PHOARE EQUIV s=side pr=sform po=sform { Pbd_equiv(s,pr,po) } 
 
 (* TODO : remove this tactic *)
 | PRFALSE {Pprfalse}

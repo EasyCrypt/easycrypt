@@ -7,9 +7,8 @@ DONE  - lambda -> fun
 DONE  - eqobs_in -> sim
 DONE  - datatype -> type
 DONE  - record -> type
-
-  - bd_hoare -> phoare
-  - bdhoare_* -> phoare_*
+DONE  - bd_hoare -> phoare
+DONE  - bdhoare_* -> phoare_*
 
   - *_deno -> bydeno
   - fst -> .`1
@@ -112,8 +111,6 @@ HALF-DONE (only for non-exported functions) * détection du code mort
     pr_false -> à enlever
 
     pr_eq -> à enlever (* Ce fait avec conseq *)
-    
-
 	
 	exists* -> utilise alias
 

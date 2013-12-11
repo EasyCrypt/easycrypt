@@ -54,7 +54,7 @@ section.
 
   lemma CountO_fC ci:
     islossless O.f =>
-    bd_hoare[Count(O).f: Counter.c = ci ==> Counter.c = ci + 1] = 1%r.
+    phoare[Count(O).f: Counter.c = ci ==> Counter.c = ci + 1] = 1%r.
   proof strict.
   by intros=> O_fL; proc;
      call O_fL;
@@ -162,9 +162,9 @@ theory EnfPen.
       (* Count(O).f preserves bad *)
       intros=> &m1 //=; bypr; intros=> &m0 bad.
         cut: 1%r <= Pr[Count(O).f(x{m0}) @ &m0: bound < Counter.c]; last smt.
-        cut lbnd: bd_hoare[Count(O).f: Counter.c = Counter.c{m0} ==> Counter.c = Counter.c{m0} + 1] >= 1%r;
+        cut lbnd: phoare[Count(O).f: Counter.c = Counter.c{m0} ==> Counter.c = Counter.c{m0} + 1] >= 1%r;
           first by conseq (CountO_fC O Counter.c{m0} _); apply O_fL.
-        by bdhoare_deno lbnd=> //; smt.
+        by phoare_deno lbnd=> //; smt.
     by inline Counter.init; wp; skip; smt.
     qed.
   end section.
@@ -183,7 +183,7 @@ theory PenBnd.
       islossless O.f =>
       islossless A(O).distinguish.
     axiom A_distinguishC:
-      bd_hoare[A(Count(O)).distinguish: Counter.c = 0 ==> Counter.c <= bound] = 1%r.
+      phoare[A(Count(O)).distinguish: Counter.c = 0 ==> Counter.c <= bound] = 1%r.
     axiom A_distinguishC_E:
       equiv[A(Count(O)).distinguish ~ A(Count(O)).distinguish:
               ={glob A, glob O, Counter.c} /\ Counter.c{1} = 0 ==>
@@ -229,7 +229,7 @@ theory BndPen.
 
     (* The adversary we build is bounded in both senses used above (for sanity) *)
     lemma enforcedAdv_bounded:
-      bd_hoare[EnforcedAdv(A,Count(O)).distinguish: Counter.c = 0 ==> Counter.c <= bound] = 1%r.
+      phoare[EnforcedAdv(A,Count(O)).distinguish: Counter.c = 0 ==> Counter.c <= bound] = 1%r.
     proof strict.
       proc (Counter.c <= bound)=> //; first by smt.
         by apply A_distinguishL.
@@ -271,9 +271,9 @@ theory BndPen.
       (* O.f preserves bad *)
       progress; bypr; intros=> &m0 bad.
       cut: 1%r <= Pr[Count(O).f(x{m0}) @ &m0: bound < Counter.c]; last smt.
-      cut lbnd: bd_hoare[Count(O).f: Counter.c = Counter.c{m0} ==> Counter.c = Counter.c{m0} + 1] >= 1%r;
+      cut lbnd: phoare[Count(O).f: Counter.c = Counter.c{m0} ==> Counter.c = Counter.c{m0} + 1] >= 1%r;
         first by conseq (CountO_fC O Counter.c{m0} _); first apply O_fL.
-      by bdhoare_deno lbnd; last smt.
+      by phoare_deno lbnd; last smt.
     inline Counter.init; wp.
     by skip; smt.
     qed.

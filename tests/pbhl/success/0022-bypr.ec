@@ -34,7 +34,7 @@ module Test' = {
 
 lemma test' : forall &m (a:bitstring), length a = k1+k2 => Pr[Test.test() @ &m : a=res]=1%r/(2^(k1+k2))%r.
 intros &m a length_a.
-bdhoare_deno (_ : (true) ==> (a=res)); [|trivial|trivial].
+phoare_deno (_ : (true) ==> (a=res)); [|trivial|trivial].
 proc.
 rnd ((=)a);skip;smt.
 qed.
@@ -52,7 +52,7 @@ axiom mu_neg : forall (d:'a distr, p:'a cpred),
 
 lemma test'' : forall &m (a:bitstring), length a = k1+k2 => Pr[Test'.test() @ &m : a=res]=1%r/(2^(k1+k2))%r.
 intros &m a length_a.
-bdhoare_deno (_ : (true) ==> (a=res));[|trivial|trivial].
+phoare_deno (_ : (true) ==> (a=res));[|trivial|trivial].
 proc.
 rnd (z1=sub a 0 k1) (1%r/(2 ^ (k1))%r) (1%r/(2 ^ (k2))%r) (1%r-1%r/(2 ^ (k1))%r) (0%r) (fun z, z1=sub a 0 k1 /\ z=sub a k1 k2).
 smt.
