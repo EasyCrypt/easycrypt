@@ -11,6 +11,8 @@
   - fst -> .`1
   - snd -> .`2
 
+* Comportement par défaut devrait etre `proof strict' (ceci est une décision unilatérale de François)
+
 * Discuter la syntaxe des opérateurs
 
 * Type de retour optionnel pour les procédures + inférence pour les var. locales
