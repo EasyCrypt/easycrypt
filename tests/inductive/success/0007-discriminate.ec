@@ -1,3 +1,3 @@
-datatype I = C1 | C2.
+type I = [C1 | C2].
 
 lemma L : C1 = C2 => false by [].
