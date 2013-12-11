@@ -936,14 +936,13 @@ let import_decl rn path envld d =
   match d.Decl.d_node with
   | Decl.Dtype ty -> import_w3_tydef rn path envld ty
   | Decl.Ddata ddl ->
-    Format.printf "ICI1@.";
-      let lty, lc = List.split ddl in
-      let envld = List.fold_left (import_w3_tydef rn path) envld lty in
-      List.fold_left (import_w3_constructors rn path) envld lc
+    let lty, lc = List.split ddl in
+    let envld = List.fold_left (import_w3_tydef rn path) envld lty in
+    List.fold_left (import_w3_constructors rn path) envld lc
   | Decl.Dparam ls -> import_w3_ls rn path envld ls
   | Decl.Dlogic lls ->
-      let lls = List.map fst lls in
-      List.fold_left (import_w3_ls rn path) envld lls
+    let lls = List.map fst lls in
+    List.fold_left (import_w3_ls rn path) envld lls
   | Decl.Dind _  -> envld  (* FIXME *)
   | Decl.Dprop (k,pr,t) -> import_w3_pr rn path envld k pr t
 

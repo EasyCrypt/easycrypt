@@ -64,7 +64,7 @@ let t_hoare_bd_hoare g =
 
   | FbdHoareS bhs -> 
     if bhs.bhs_cmp = FHeq && f_equal bhs.bhs_bd f_r0 then 
-       hoare_of_bdhoareF g
+       hoare_of_bdhoareS g
     else 
       t_seq_subgoal (t_bdHoareS_conseq_bd FHeq f_r0)
         [t_try EcPhlTrivial.t_trivial;
