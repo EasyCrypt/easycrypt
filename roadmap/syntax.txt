@@ -9,6 +9,8 @@
   - eqobs_in -> sim
   - *_deno -> bydeno
 
+* Discuter la syntaxe des opérateurs
+
 * Type de retour optionnel pour les procédures + inférence pour les var. locales
 
 * Chainage pour les déclarations abstraites:
@@ -97,6 +99,13 @@
 
     pr_eq -> à enlever
 
+	
+	exists* -> utilise alias
+
+	alias ?side slist(alias_dec,COMMA)
+
+	alias_dec = codepos | codepos AS lident | codepos lident EQ expr | UNDERSCORE list(sform)
+	
 X : tacdir : << | >> | ε
 
 * Semantique des tactiques:
