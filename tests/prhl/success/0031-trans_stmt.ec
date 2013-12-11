@@ -33,7 +33,7 @@ proof.
     trivial.
   wp;skip;smt.
     sim.                              
-save.     
+qed.     
 
 
 

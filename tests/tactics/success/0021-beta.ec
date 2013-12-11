@@ -36,6 +36,6 @@ split.
 intros=> [x'_in_X x_x'].
 admit.
 admit.
-save.
+qed.
 
 

@@ -23,5 +23,5 @@ lemma foo : hoare [M.f : (b1 => M.y=e1) && (b2 => M.y=e2) && (b1||b2) ==>
 proof.
  proc.
  if; wp; skip;  smt.
-save.
+qed.
 

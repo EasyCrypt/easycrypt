@@ -86,5 +86,5 @@ section.
     intros &m;conseq * (_ : _ ==> true) => //.
   sim;rnd{1} => //.
   proc;sim.
-save.
+qed.
 

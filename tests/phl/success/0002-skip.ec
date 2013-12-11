@@ -8,5 +8,5 @@ proof.
  skip.
  intros _ h.
  assumption h.
-save.
+qed.
 

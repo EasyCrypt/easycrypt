@@ -27,7 +27,7 @@ proof.
  rcondf {2} 1.
   intros &m;skip;smt.
  wp;skip;smt.
-save.
+qed.
 
 lemma foo : 
   equiv [M.f ~ M.f : b{1} = b{2} ==> M.x{1}=M.x{2} ].
@@ -37,7 +37,7 @@ proof.
  intros &m1 &m2 Heq;rewrite Heq;simplify;smt.
  wp;skip;smt.
  wp;skip;smt.
-save.
+qed.
 
 
 

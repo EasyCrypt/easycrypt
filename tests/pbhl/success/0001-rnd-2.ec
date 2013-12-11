@@ -24,6 +24,6 @@ wp.
 simplify.
 skip.
 smt.
-save.
+qed.
 
 

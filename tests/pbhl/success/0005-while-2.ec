@@ -49,6 +49,6 @@ admit. (* reasoning on distr *)
 conseq Hw => //.
 smt.
 smt.
-save.
+qed.
 
 

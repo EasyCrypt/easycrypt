@@ -20,7 +20,7 @@ lemma test : bd_hoare [M.f : true ==> res = 1 ] >= 1%r.
  proc.
  wp.
  skip;intros _ _;split.
-save.
+qed.
 
 op b : bool.
 
@@ -42,7 +42,7 @@ skip.
 simplify.
 intros &hr b.
 split;[smt|smt].
-save.
+qed.
 
 
 module M3 = {
@@ -61,7 +61,7 @@ proc.
 wp.
 rnd (fun x, true) .
 skip; smt.
-save.
+qed.
 
 
 

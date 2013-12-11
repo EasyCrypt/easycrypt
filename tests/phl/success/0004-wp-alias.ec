@@ -19,6 +19,6 @@ proof.
  intros _ _.
  simplify.
  split.
-save.
+qed.
 
 

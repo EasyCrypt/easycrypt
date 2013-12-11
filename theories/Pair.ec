@@ -32,7 +32,7 @@ theory Dprod.
   proof.
     intros d1 d2 p;beta delta mu_x;rewrite -mu_def.
     by apply mu_eq => x;smt.
-  save.
+  qed.
 
   lemma supp_def: forall (d1:'a distr) (d2:'b distr) p, 
     in_supp p (d1 * d2) <=>
@@ -59,7 +59,7 @@ theory Dprod.
   proof.
     intros Hd1 Hd2 x y; rewrite ?supp_def ?mu_x_def => [Hx1 Hx2] [Hy1 Hy2].
     by rewrite (Hd1 _ (fst y)) // (Hd2 _ (snd y)).
-  save.
+  qed.
 
 end Dprod.
 

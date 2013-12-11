@@ -31,6 +31,6 @@ proof.
   eager seq 1 1 H : (={M.w,y});first 2 (wp;rnd;wp => //).
     wp => //.
   sim.  
-save.
+qed.
 
 

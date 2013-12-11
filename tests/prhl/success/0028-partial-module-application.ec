@@ -14,4 +14,4 @@ require import Real.
 lemma foo : bd_hoare [FAB.f : true ==> true] = 1%r.
 proc.
 admit.
-save.
+qed.

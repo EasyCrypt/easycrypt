@@ -86,7 +86,7 @@ theory WRO_Int.
     islossless ARO(R).o.
   proof strict.
   by intros=> HR; proc; wp; if; [call HR | ]; wp; skip.
-  save.
+  qed.
 
   lemma RO_lossless_init: islossless ARO(ROM.RO).init.
   proof strict.

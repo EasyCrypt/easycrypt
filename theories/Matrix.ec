@@ -97,7 +97,7 @@ pose m := fst (size M'); pose n := snd (size M'); cut ->: size M' = (m,n); first
 split.
   rewrite sub_size //=; smt.
   intros=> i' j' i'_pos i'_bnd j'_pos j'_bnd; rewrite sub_get //=; smt.
-save.
+qed.
 
 (* transpose M *)
 op transpose: 'a matrix -> 'a matrix.
@@ -118,7 +118,7 @@ cut ext: (size (transpose (transpose M)) = size M /\
           forall i j, 0 <= i => i < fst (size M) => 0 <= j => j < snd (size M) =>
             (transpose (transpose M)).[(i,j)] = M.[(i,j)]);
 smt.
-save.
+qed.
 
 (* Interactions with arrays *)
 require Array.

@@ -28,7 +28,7 @@ equiv foo : M1.f ~ M1'.f : ={x} ==> ={res}.
 proc.
 sim.
 wp => //.
-save.
+qed.
 
 
 

@@ -7,4 +7,4 @@ delta.
 beta.
 logic.
 smt.
-save.
+qed.

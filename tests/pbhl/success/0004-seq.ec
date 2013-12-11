@@ -21,7 +21,7 @@ proof.
  skip.
  progress;try smt.
  hoare;rnd;skip;smt.
-save.
+qed.
 
 module M2 = {
   var y : bool
@@ -39,7 +39,7 @@ proof.
  rnd (fun (x:bool),x=true).
  skip;progress;smt.
  hoare;wp;trivial.
-save.
+qed.
 
 
 module M3 = {
@@ -57,7 +57,7 @@ proof.
  seq 1 : (M3.x) (1%r/2%r) (1%r) (1%r/2%r) (0%r)=> //.
  rnd (fun (x:bool),x=true);skip; smt.
  wp;hoare=> //.
-save.
+qed.
 
 
 

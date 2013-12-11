@@ -126,7 +126,6 @@
     "lemma"       , LEMMA      ;        (* KW: global *)
     "realize"     , REALIZE    ;        (* KW: global *)
     "proof"       , PROOF      ;        (* KW: global *)
-    "save"        , SAVE       ;        (* KW: global *)
     "qed"         , QED        ;        (* KW: global *)
     "claim"       , CLAIM      ;        (* KW: global *)
     "end"         , END        ;        (* KW: global *)

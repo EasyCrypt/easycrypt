@@ -9,4 +9,4 @@ proof.
   delta iff.
   beta.
   smt.
-save.
+qed.

@@ -19,7 +19,7 @@ proof.
  while (x=1).   
  wp;skip;simplify;split.
  wp;skip;simplify;split.
-save.
+qed.
 
 module M1 = { 
   proc f () : int * int= {
@@ -42,4 +42,4 @@ proof.
    intros _ h.
    elim h;intros h1 _; assumption h1.
  wp;skip => /= x -> //.
-save.
+qed.

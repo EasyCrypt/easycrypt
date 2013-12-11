@@ -25,7 +25,7 @@ section.
   local equiv foo : G1.f ~ G2.f : ={glob A} ==> true.
   proof.
     proc;swap{1} 1;wp;call (_:true) => //.
-  save.
+  qed.
 end section.
 
 module M = { var x : int }.
@@ -51,5 +51,5 @@ section.
   local equiv foo : G1.f ~ G2.f : ={glob A} ==> true.
   proof.
     proc;swap{1} 1;wp;call (_:true) => //.
-  save.
+  qed.
 end section.

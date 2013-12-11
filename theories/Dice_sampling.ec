@@ -83,7 +83,7 @@ theory GenDice.
     (* case ! test i0 k *)
     hoare; while (!test i k); first rnd => //.
     by skip;smt.
-  save.
+  qed.
 
   type t'.
   op d' : input -> t' distr.
@@ -103,7 +103,7 @@ theory GenDice.
     intros i0 k &m; bdhoare_deno (_: i0 = i ==> k = res) => //;proc.
     rnd;skip;progress.
     by apply (mu_eq (d' i{hr}) (fun (x:t'), k = x) ((=) k)).
-  save.
+  qed.
 
   equiv Sample_RsampleW (f : t' -> t) (finv : t -> t') : 
      Sample.sample ~ RsampleW.sample : 
@@ -130,6 +130,6 @@ theory GenDice.
     case (test i{m2} (f k)).
       by rewrite -Heqi -Htin; apply d'_uni.
     rewrite -Heqi -Htin /in_supp;smt.
- save.
+ qed.
 
 end GenDice.

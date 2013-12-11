@@ -55,7 +55,7 @@ lemma nosmt mu_and_le_l (d:'a distr) (p q:'a cpred) r:
 proof.
   apply (Real.Trans _ (mu d p)).
   by (apply mu_sub;rewrite /cpAnd => x //).
-save.
+qed.
 
 lemma nosmt mu_and_le_r (d:'a distr) (p q:'a cpred) r :
   mu d q <= r => 
@@ -63,7 +63,7 @@ lemma nosmt mu_and_le_r (d:'a distr) (p q:'a cpred) r :
 proof.
   apply (Real.Trans _ (mu d q)).
   by (apply mu_sub;rewrite /cpAnd => x //).
-save.
+qed.
 
 (** Lemmas *)
 lemma mu_supp (d:'a distr):

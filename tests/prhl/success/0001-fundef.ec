@@ -8,7 +8,7 @@ proof.
  skip.
  intros &m1 &m2 h.
  assumption h.
-save.
+qed.
 
 
 module type T = {
@@ -43,4 +43,4 @@ proof.
   smt.
   skip.
   smt.
-save.
+qed.

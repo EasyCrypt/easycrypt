@@ -48,4 +48,4 @@ proof.
     trivial.
   proc;wp;skip;smt.
     proc;sim.
-save.
+qed.

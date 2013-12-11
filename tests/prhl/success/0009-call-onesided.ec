@@ -23,7 +23,7 @@ lemma bar:
   bd_hoare [OneSided.init: true ==> OneSided.x =  0] = 1%r.
 proof.
 proc;wp;skip;smt.
-save.
+qed.
 
 lemma main:
   equiv [OneSided.main ~ OneSided.main2: true ==> OneSided.x{1} = OneSided.x{2}].
@@ -31,7 +31,7 @@ proof.
 proc;
 seq 1 0: (OneSided.x{1} = 0);[ | wp;skip;smt ].
 call {1} ( _ : true ==> OneSided.x = 0);[ apply bar | skip;smt ].
-save.
+qed.
 
 module Framing = {
   var x:int
@@ -56,4 +56,4 @@ proc.
   call{2} (_ : true ==> true).
     proc;wp;skip;smt.
   wp;skip;smt.
-save.
+qed.

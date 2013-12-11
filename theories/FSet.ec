@@ -200,7 +200,7 @@ proof strict.
 case (x = x')=> x_x'.
   by subst x'=> /=; apply neqF; apply mem_rm_eq.
   by intros=> /=; apply mem_rm_neq.
-save.
+qed.
 
 lemma nosmt mem_rm_left (x x':'a) (X:'a set):
   mem x (rm x' X) => mem x X by [].
@@ -756,7 +756,7 @@ proof.
   intros Hmu; rewrite (mu_eq _ _ (cpMem (of_list l))). 
     by intros x;rewrite /cpMem => /=; apply mem_of_list.
   apply mu_cpMem => x. rewrite -mem_of_list;apply Hmu.
-save.
+qed.
 
 lemma mu_Lmem_le_card (l:'a list) (d:'a distr) (bd:real):
   (forall (x : 'a), List.mem x l => mu_x d x <= bd) =>
@@ -765,7 +765,7 @@ proof.
   intros Hmu; rewrite (mu_eq _ _ (cpMem (of_list l))). 
     by intros x;rewrite /cpMem => /=; apply mem_of_list.
   apply mu_cpMem_le => x. rewrite -mem_of_list;apply Hmu.
-save.
+qed.
 
 lemma mu_Lmem_le_length (l:'a list) (d:'a distr) (bd:real):
   (forall (x : 'a), List.mem x l => mu_x d x <= bd) =>
@@ -782,7 +782,7 @@ proof.
   apply (Real.Trans _ ((card (of_list l))%r * bd)).
     by apply mu_Lmem_le_card.
   cut H := card_of_list l; smt.
-save.
+qed.
 
 (* Uniform distribution on a (finite) set *)
 theory Duni.

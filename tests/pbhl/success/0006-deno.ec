@@ -18,5 +18,5 @@ proof.
 intros &m.
 bdhoare_deno (_ : true ==> _ );
 [proc;rnd (1%r/2%r) (fun (x:bool), x);skip; smt|smt|smt].
-save.
+qed.
 

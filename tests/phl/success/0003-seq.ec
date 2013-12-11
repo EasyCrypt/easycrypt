@@ -13,4 +13,4 @@ proof.
  seq 1 : (M.y = x).
  admit.
  admit.
-save.
+qed.

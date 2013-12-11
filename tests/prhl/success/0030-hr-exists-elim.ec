@@ -37,5 +37,5 @@ proof.
  intros yy.
  call (X_f yy).
  trivial.
-save.
+qed.
 

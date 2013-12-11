@@ -46,4 +46,4 @@ proof.
   fusion  {2} 1.3!2 @ 1, 1.
   fission {2} 1.3!2 @ 1, 2.
   admit.
-save.
+qed.

@@ -30,4 +30,4 @@ intros A.
 proc.
 swap{1} 1 1.
 admit.
-save.
+qed.

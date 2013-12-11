@@ -37,7 +37,7 @@ intros &m a length_a.
 bdhoare_deno (_ : (true) ==> (a=res)); [|trivial|trivial].
 proc.
 rnd ((=)a);skip;smt.
-save.
+qed.
 
 
 (* not required in previous case?? *)
@@ -112,7 +112,7 @@ rewrite H.
 trivial.
 (*****)
 smt.
-save.
+qed.
 
 
 lemma test : forall (a:bitstring), length a = k1+k2 => equiv [ Test.test ~ Test'.test : true ==> ={res}]. 
@@ -123,7 +123,7 @@ intros a0 &m1 &m2 _.
 rewrite  (test' &m1 a0 _); [admit |].
 rewrite  (test'' &m2 a0 _); [admit |].
 trivial.
-save.
+qed.
 
 
 

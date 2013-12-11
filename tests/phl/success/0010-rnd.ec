@@ -13,4 +13,4 @@ lemma G_in_range:
   hoare [ G.f : true ==> 0 <= res /\ res <= 10 ].
 proof.
 proc;rnd;skip;smt.
-save.
+qed.

@@ -46,11 +46,11 @@ proof.
 intros xs p.
 apply (induction<:'a> xs (fun xs, 0 <= count xs p) _ _);
 smt.
-save.
+qed.
 
 lemma card_add: forall (x:'a) xs,
   count (add xs x) (fun x, true) = 1 + count xs (fun x, true).
-proof. by intros x xs; smt. save.
+proof. by intros x xs; smt. qed.
 
 lemma add_commutative: forall (x y:'a) xs,
   add (add xs x) y = add (add xs y) x.
@@ -58,4 +58,4 @@ proof.
 intros x y xs;
 apply (extensionality<:'a> (add (add xs x) y) (add (add xs y) x) _);
 smt.
-save.
+qed.

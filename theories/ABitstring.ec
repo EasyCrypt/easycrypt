@@ -88,13 +88,13 @@ lemma sub_app_fst (b1 b2:bitstring):
   sub (b1 || b2) 0 `|b1| = b1.
 proof.
   rewrite sub_app_fst_le //;[apply lengthP | apply sub_full].
-save.
+qed.
 
 lemma sub_app_snd(b1 b2:bitstring):
   sub (b1 || b2) `|b1| `|b2| = b2.
 proof.
   rewrite sub_app_snd_le //;smt.
-save.
+qed.
 
 lemma app_sub (b:bitstring) l1 l2:
   0 <= l1 => 0 <= l2 => l1 + l2 = `|b| =>

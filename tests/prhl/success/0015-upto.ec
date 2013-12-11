@@ -115,4 +115,4 @@ proof.
     smt.
 
   inline RO.hash;wp;rnd;wp;skip;simplify;smt.
-save.
+qed.

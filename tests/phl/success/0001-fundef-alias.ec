@@ -14,4 +14,4 @@ proof.
  proc.
  skip.
  intros _; simplify;split.
-save.
+qed.

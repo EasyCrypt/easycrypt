@@ -26,7 +26,7 @@ lemma foo : bd_hoare [M.f : (b1 => M.y=e1) && (b2 => M.y=e2) && (b1||b2) ==>
 proof.
  proc.
  if; wp; skip; smt.
-save.
+qed.
 
 
 require import Distr.
@@ -58,5 +58,5 @@ delta cpMem; simplify.
 cut -> : (fun x, mem x (single M2.b{hr})) = ( (=) M2.b{hr}); [apply fun_ext;smt|].
 smt.
 cut -> : M2.b{hr} = false;[ smt|simplify;smt]. 
-save.
+qed.
 

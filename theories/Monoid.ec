@@ -54,7 +54,7 @@ proof strict.
 intros=> x_nin_s;
 rewrite (sum_rm _ _ x); first by rewrite mem_add.
 by rewrite rm_add_eq -rm_nin_id.
-save.
+qed.
 
 lemma sum_add0 (f:'a -> t) (s:'a set) (x:'a):
   (mem x s => f x = Z) =>
@@ -63,7 +63,7 @@ proof strict.
 case (mem x s) => /= Hin.
   by rewrite -add_in_id // => ->;rewrite addmC addmZ.
 by apply sum_add.  
-save.
+qed.
 
 lemma sum_disj (f:'a -> t) (s1 s2:'a set) :
   disjoint s1 s2 =>
@@ -421,4 +421,4 @@ proof strict.
   rewrite /charfun /mu_x;case (p x) => //= Hp.
     by apply mu_eq.       
   by rewrite -(mu_false d);apply mu_eq.
-save.
+qed.

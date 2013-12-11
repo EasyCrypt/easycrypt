@@ -120,7 +120,7 @@ fel 1 (length O.s) (fun x, (x%r)*bd) qO O.bad [O.o : (length O.s < qO /\ x=x)].
    intros b c.   
    proc.
    if; [wp;rnd;skip;smt|wp; skip; trivial].
-save.
+qed.
 
 
 

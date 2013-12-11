@@ -7,4 +7,4 @@ proof.
   proc.
   skip.
   intros _ _ h;assumption h.
-save.
+qed.

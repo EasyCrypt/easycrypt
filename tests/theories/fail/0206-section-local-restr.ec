@@ -26,5 +26,5 @@ section.
   proof.
     proc;swap{1} 1.
     admit.
-  save.
+  qed.
 end section.

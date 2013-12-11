@@ -22,4 +22,4 @@ proc.
 sp 1.
 skip.
 smt.
-save.
+qed.

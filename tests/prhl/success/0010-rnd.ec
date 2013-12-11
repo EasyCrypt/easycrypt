@@ -20,7 +20,7 @@ proc.
 rnd.
 skip.
 smt.
-save.
+qed.
 
 
 
@@ -38,7 +38,7 @@ equiv test' : G'.f ~ G'.f : true ==> 0 <= res{1} /\ res{1} <= 10.
 proof.
 proc.
 rnd; skip; smt.
-save.
+qed.
 
 
 
@@ -65,7 +65,7 @@ proof.
  rnd (fun z, z + 1) (fun z, z - 1).
  skip.
  progress; smt.
-save.
+qed.
 
 
 
@@ -123,7 +123,7 @@ proof.
  skip.
  intros &1 &2 _ x y H1 H2.
  simplify; split;[ split;[ split;smt | smt ] | smt ].
-save.
+qed.
 
 
 equiv test_sp : G5.f ~ G6.f : Q(G5.z{1},G6.z{2}) ==>
@@ -135,7 +135,7 @@ proof.
  skip.
  intros &1 &2 _ x y H1 H2.
  simplify. split;[ split;[ split;smt | smt ] | smt ].
-save.
+qed.
 
 
 (* one-sided *)
@@ -154,6 +154,6 @@ proc.
  rnd{1}.
  rnd{2}.
  skip;smt.
-save.
+qed.
 
 

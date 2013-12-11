@@ -27,7 +27,7 @@ proof.
  clear h heq1 heq2.
  intros x1 i1 x2 i2 _ _ h1;elim h1;intros heq1 heq2;subst; simplify.
  split.
-save.
+qed.
 
 module type T = { proc f() : unit }.
 
@@ -51,4 +51,4 @@ proof.
    wp;skip;progress.
 
  wp; skip;progress.
-save.
+qed.

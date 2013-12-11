@@ -52,4 +52,4 @@ lemma foo1 : forall &m1 &m2,
   Pr[G(A).main() @ &m2 : res = 3]. 
 intros &m1 &m2.
 apply (foo &m1 &m2 A).
-save.
+qed.

@@ -13,4 +13,4 @@ proof.
  rcondt 2.
  wp; skip; smt.
  wp; skip; smt.
-save.
+qed.

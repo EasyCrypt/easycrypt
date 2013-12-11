@@ -70,7 +70,7 @@ apply (G (Adv2)).
 intros O LossF.
 proc.
  call (LossAdv1 O _);trivial.
-save.
+qed.
 
 axiom G' :
   forall (Adv2 <: ADV2{Or}),
@@ -86,7 +86,7 @@ apply (G' (Adv2)).
 intros O LossF.
 proc.
  call (LossAdv1 O _);trivial.
-save.
+qed.
 
 end section.
 

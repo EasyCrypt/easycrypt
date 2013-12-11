@@ -151,7 +151,7 @@ theory LR.
       by rewrite Pr mu_eq;smt.       
     rewrite Pr mu_not.
     by rewrite Hloss;fieldeq.
-  save.
+  qed.
 
 end LR.
 
@@ -451,7 +451,7 @@ theory Hybrid.
         by conseq * Eenc.
       swap{1} 1 2;inline{1} C.init.
       by wp;rnd;wp;skip;progress => //;smt.
-    save.
+    qed.
 
     axiom losslessI: islossless E.init.
     axiom losslessL: islossless E.leaks.

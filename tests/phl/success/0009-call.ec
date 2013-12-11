@@ -24,4 +24,4 @@ proof.
     intros &m _;subst;simplify;split.
   skip.
   intros &m h;elim h;clear h;intros _ _;subst;simplify;split.
-save.
+qed.

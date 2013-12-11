@@ -11,7 +11,7 @@ lemma foo1 : forall &m1 &m2,
 proof.
  intros &m1 &m2 H;simplify.
  smt.
-save.
+qed.
 
 module type Adv = { }.
 
@@ -28,4 +28,4 @@ lemma foo : forall z &hr,
 proof.
 prover "Alt-Ergo".
 smt.
-save.
+qed.

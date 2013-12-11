@@ -7,4 +7,4 @@ intros b.
 delta.
 beta.
 smt.
-save.
+qed.

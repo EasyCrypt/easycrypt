@@ -7,5 +7,5 @@ proc.
 skip.
 smt.
 trivial.
-save.
+qed.
 

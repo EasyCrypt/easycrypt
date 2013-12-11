@@ -45,5 +45,5 @@ proof.
 proc.
 sim (G1.u{1} = G2.u{2}) true : (={z} /\ G1.u{1} = G2.u{2}).
  proc; wp; skip; smt.
-save.
+qed.
 

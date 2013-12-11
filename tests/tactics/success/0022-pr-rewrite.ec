@@ -8,17 +8,17 @@ lemma t1 &m : Pr[M.f() @ &m : !res] = Pr[M.f() @ &m : true] - Pr[M.f() @ &m : re
 proof.
  rewrite Pr mu_not.
  trivial.
-save.
+qed.
 
 lemma t2 &m : Pr[M.f() @ &m : res \/ false] = Pr[M.f() @ &m : res].
   smt.
-save.
+qed.
 
 lemma t3 &m : Pr[M.f() @ &m : res \/ false] = Pr[M.f() @ &m : res].
   rewrite Pr mu_eq.
     trivial.
   trivial.
-save.
+qed.
 
 lemma t4 &m : Pr[M.f() @ &m : res \/ false] = Pr[M.f() @ &m : res].
   rewrite Pr mu_or.
@@ -28,24 +28,24 @@ lemma t4 &m : Pr[M.f() @ &m : res \/ false] = Pr[M.f() @ &m : res].
     trivial.
   rewrite Pr mu_false.
   smt.
-save.
+qed.
 
 lemma t5 &m : Pr[M.f() @ &m : res \/ false] = Pr[M.f() @ &m : res].
   rewrite Pr mu_disjoint.
     trivial.
   rewrite Pr mu_false.
   smt.
-save.
+qed.
 
 lemma t6 &m :  Pr[M.f() @ &m : res /\ false ] <= Pr[M.f() @ &m : res ].
   rewrite Pr mu_sub.
     trivial.
   trivial.
-save.
+qed.
 
 lemma t7 &m :  Pr[M.f() @ &m : res /\ false ] <= Pr[M.f() @ &m : res ] /\ true.
   rewrite Pr mu_sub.
     trivial.
   trivial.
-save.
+qed.
 

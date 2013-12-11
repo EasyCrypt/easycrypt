@@ -19,12 +19,12 @@ module M = {
 equiv test_0 : M.main ~ M.main : ={M.m,w} ==> ={M.m,res}.
 proc.
 sim : (={M.m, w}).
-save.
+qed.
 
 equiv test_1 : M.main ~ M.main : ={M.m,w} ==> ={M.m,res}.
 proc.
 sim.
-save.
+qed.
 
 
 module type Orcl = {
@@ -57,22 +57,22 @@ module G (A:Adv) = {
 equiv foo_0 (A<:Adv {O} ) : G(A).main ~ G(A).main : ={x,O.m,glob A} ==> ={res,O.m}.
 proc.
 sim : (={O.m, x}).
-save.
+qed.
 
 equiv foo_1 (A<:Adv {O} ) : G(A).main ~ G(A).main : ={x,O.m,glob A} ==> ={res,O.m}.
 proc.
 sim.
-save.
+qed.
 
 equiv foo1_0 (A<:Adv {O} ) : G(A).main ~ G(A).main : ={x,O.m,glob A} ==> ={res,O.m,glob A}.
 proc.
 sim : (={O.m,glob A, x}).
-save.
+qed.
 
 equiv foo1_1 (A<:Adv {O} ) : G(A).main ~ G(A).main : ={x,O.m,glob A} ==> ={res,O.m,glob A}.
 proc.
 sim.
-save.
+qed.
 
 
 

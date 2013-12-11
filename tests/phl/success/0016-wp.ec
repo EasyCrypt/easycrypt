@@ -39,4 +39,4 @@ lemma foo : hoare [M.f : true ==> B.x = 2 /\ C.x = 2].
  skip.
  simplify.
  trivial.
-save.
+qed.

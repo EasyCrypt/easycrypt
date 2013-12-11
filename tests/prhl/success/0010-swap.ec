@@ -29,5 +29,5 @@ proof.
   swap {1} [2..3] 1.
   swap {2} [2..3] -1.
   wp;skip;intros &m1 &m2 h;assumption h.
-save.
+qed.
 

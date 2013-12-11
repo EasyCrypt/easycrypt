@@ -21,7 +21,7 @@ simplify.
 intros &hr.
 rewrite (Dbool.mu_def  (fun (x : bool), x = y{hr})).
 smt.
-save.
+qed.
 
 module F = {
   var b1 : bool
@@ -36,7 +36,7 @@ module F = {
 lemma test2: bd_hoare [ F.f : true ==> res] = (1%r/2%r). proof.
 proc.
 rnd;[smt|rnd; skip; smt].
-save.
+qed.
 
 
 require import Bitstring. 
@@ -85,7 +85,7 @@ simplify.
 smt.
 trivial.
 trivial.
-save.
+qed.
 
 (* not required in previous case?? *)
 axiom k1_pos : 0<= k1.
@@ -95,7 +95,7 @@ require import Array.
 
 lemma extensionality : forall (f g : 'a -> 'b), (forall z, f z = g z) => f = g.  
 smt.
-save.
+qed.
 
 lemma test'' : forall &m (a:bitstring), length a = k1+k2 => Pr[Test'.test() @ &m : a=res]=1%r/(2^(k1+k2))%r.
 cut pow_distr :  ((2 ^ k2)%r * (2 ^ k1)%r = (2 ^ (k1+k2))%r).
@@ -164,4 +164,4 @@ smt.
 smt.
 trivial.
 trivial.
-save.
+qed.

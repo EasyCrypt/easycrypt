@@ -6,4 +6,4 @@ lemma foo : hoare [M.f : false ==> true].
 proof.
   conseq ( _: true ==> false).
   admit.
-save.
+qed.

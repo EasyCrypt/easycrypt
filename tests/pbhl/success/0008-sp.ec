@@ -24,14 +24,14 @@ proc.
 sp.
 skip.
 smt.
-save.
+qed.
 
 lemma test2 : hoare [M.test : M.y=0 ==> M.x=1 && res=0].
 proc.
 sp.
 skip.
 smt.
-save.
+qed.
 
 require import Real.
 

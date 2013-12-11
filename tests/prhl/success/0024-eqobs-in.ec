@@ -80,7 +80,7 @@ proof.
 proc.
 sim (G1.u{1} = G2.u{2}) true : (={z}).
 apply G1_G2_f.
-save.
+qed.
 
 
 

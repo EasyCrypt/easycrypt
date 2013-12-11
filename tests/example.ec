@@ -8,14 +8,14 @@ pred p : 'a.
 lemma l_admit : forall (x:'a), p x.
 proof.
   admit.
-save.
+qed.
 
 (* idtac *)
 lemma l_idtac : true.
 proof.
  idtac.
 admit.
-save.
+qed.
 
 (* intros *)
 lemma l_intros : forall (x1 : 'a), p x1 => forall (x2 x3:'a), p x2 => p x3.
@@ -23,7 +23,7 @@ proof.
   intros x1 hx1 x2.
   intros x3 hx2.
   admit.
-save.
+qed.
 
 lemma l_intros_let : forall (x1 : int), 
    let x2 = x1 + x1 in
@@ -32,7 +32,7 @@ lemma l_intros_let : forall (x1 : int),
 proof.
   intros x1 x2 x3. (* FIXME : printing of let hyp *)
   admit.
-save.
+qed.
 
 
 (* generalize *)
@@ -42,7 +42,7 @@ proof.
   generalize x1 hx1.
   generalize hx2 x2.
   admit.
-save. 
+qed. 
 
 
 (* clear *)
@@ -54,31 +54,31 @@ proof.
   clear hx1 x1. (* can be in any order x1 hx1 or hx1 x1 *)
   clear x2 x3 hx2.
   admit.
-save. 
+qed. 
 
 (* assumption *)
 lemma l_assumption : forall a, a => a. 
 proof.
   intros a h.
   assumption h.
-save.
+qed.
 
 lemma l_assumption_no : forall a, a => a. 
 proof.
  intros a h.
  assumption.
-save.
+qed.
 
 lemma l_assumption_ax : forall (x:'a), p x.
 proof.
  assumption l_admit <:'a>.
-save.
+qed.
 
 (* smt *)
 lemma l_smt : forall (x:'a), x = x.
 proof.
   smt.
-save.
+qed.
 
 (* Simplification
    beta                    beta reducition   (* beta redex *)
@@ -103,7 +103,7 @@ lemma l_simplify_beta : forall (x:int), (fun y , y = y) x
 proof.
   beta.
   smt.
-save.
+qed.
 
 lemma l_simplify_iota : forall (x y:int), 
    let (u,v) = (x, y) in
@@ -115,7 +115,7 @@ proof.
   beta.
   delta w.
 admit.
-save.
+qed.
 
 op iff (x y : bool) : bool = x <=> y.
 op and (x y : bool) : bool = x /\ y.
@@ -128,27 +128,27 @@ proof.
   beta delta iff. 
   logic.
 admit.
-save.
+qed.
 
 lemma l_simplify_logic : iff (and true true) false /\ (true = true).
 proof.
   logic.
   simplify and or iff.
 admit.
-save.
+qed.
 
 lemma l_normalize : iff (and true true) false /\ (true = true).
 proof.
   simplify delta.
 admit.
-save.
+qed.
 
 (* change *)
 lemma l_change : iff (and true true) false /\ (true = true).
 proof.
   change false.
 admit.
-save.
+qed.
 
 
 (* UNITIZED UP TO HERE *)
@@ -165,13 +165,13 @@ save.
 lemma l_split_true : true.
 proof.
   split.
-save.
+qed.
 
 lemma l_eq : forall (x:int), x = x.
 proof.
  intros x.
  split.
-save.
+qed.
 
 lemma l_split_and : forall x y, x /\ y.
 proof.
@@ -179,7 +179,7 @@ proof.
  split.
  admit.  
  admit.
-save.
+qed.
 
 lemma l_split_anda : forall x y, x && y.
 proof.
@@ -187,7 +187,7 @@ proof.
  split.
  admit.  
  admit.
-save.
+qed.
 
 lemma l_split_iff : forall x y, x <=> y.
 proof.
@@ -195,7 +195,7 @@ proof.
  split.
  admit.  
  admit.
-save.
+qed.
 
 lemma l_split_if : forall x y z, if x then y else z.
 proof.
@@ -203,7 +203,7 @@ proof.
  split.
  admit.  
  admit.
-save.
+qed.
 
 (* Remark : if the current goal do no start by a known constructor,
    the tactic try to perform head reduction to find a known constructor.
@@ -217,14 +217,14 @@ proof.
  split.
  admit.
  admit.
-save. 
+qed. 
 
 pred pintro (x:int)  = forall y, x = y.
 lemma l_intro_red : forall x, pintro x.
 proof.
  intros x y.
 admit.
-save.
+qed.
 
 (* exists *)
 lemma l_exists : exists (x y z: int), x = y.
@@ -232,7 +232,7 @@ proof.
  exists 0.
  exists 0, 1.
 admit.
-save.
+qed.
 
 (* left 
    try to apply one of the following lemmas proved in Logic :
@@ -245,14 +245,14 @@ proof.
  intros x y.
  left.
 admit.
-save. 
+qed. 
 
 lemma l_lefta : forall x y, x || y.
 proof.
  intros x y.
  left.
 admit.
-save.   
+qed.   
 
 (* right 
    try to apply one of the following lemmas proved in Logic :
@@ -266,14 +266,14 @@ proof.
  intros x y.
  right.
 admit.
-save. 
+qed. 
 
 lemma l_righta : forall x y, x || y.
 proof.
  intros x y.
  right.
 admit.
-save.  
+qed.  
 
 (* apply :
    apply (g<: > a b _)
@@ -289,14 +289,14 @@ intros x.
 apply (l_intros<:'a> x _ x x _).
 admit.
 admit.
-save.
+qed.
 
 lemma l_apply_hyp : forall a b, (a => b) => a => b.
 proof.
 intros a b h1 h2.
 apply (h1 _).
 apply h2.
-save.
+qed.
 
 lemma l_apply_form : forall a b, (a => a => b) => a => b.
 proof.
@@ -305,7 +305,7 @@ proof.
  apply (h1 _).
  apply h2.
  apply h2.
-save.
+qed.
 
 (* cut *)
 
@@ -315,7 +315,7 @@ proof.
  cut h : false.
 admit.
 admit.
-save.
+qed.
 
 (* elim : eliminate logical constructor 
    Try to apply on of the following lemma (defined in logic)
@@ -331,21 +331,21 @@ lemma l_elim_false : forall (p:bool), false => p /\ !p.
 proof.
   intros p h.
   elim h.  (* eliminate a hypothesis *)
-save.
+qed.
 
 lemma l_elim_and : true.
 proof.
  elim (l_split_and true false).  (* eliminate the application of a lemma *)
  elim (l_split_and false true).
  intros _ _ h _; apply h.
-save.
+qed.
 
 lemma l_elim_anda : true.
 proof.
   elim (_:true && false). (* eliminate a formula *)
   admit.
   admit.
-save.
+qed.
 
 lemma l_elim_or : true.
 proof.
@@ -353,7 +353,7 @@ proof.
   admit.
   admit.
   admit.
-save.
+qed.
 
 lemma l_elim_ora : true.
 proof.
@@ -361,14 +361,14 @@ proof.
   admit.
   admit.
   admit.
-save.
+qed.
 
 lemma l_elim_iff : true.
 proof.
   elim (_:false <=> true).
   admit.
   admit.
-save.
+qed.
 
 lemma l_elim_if :forall (a:bool), true.
 proof.
@@ -377,7 +377,7 @@ proof.
  admit.
  admit.
  admit.
-save.
+qed.
 
 (* case *)
 lemma l_case : forall (a b:bool), if a then a /\ true else a /\ false.
@@ -388,7 +388,7 @@ proof.
  case a.
    admit.
    admit.
-save.
+qed.
 
 (* rewrite *)
 lemma l_rewrite : forall (x y:'a), (false => x = y) => x = y => y = x.
@@ -400,7 +400,7 @@ admit.
  rewrite (_:x = y).  (* forumula *)
 admit.
  admit.
-save.
+qed.
 
 lemma l_rewrite_eq : forall a, a => a.
 proof.
@@ -408,7 +408,7 @@ intros a h.
 rewrite (eqT a _).
 apply h.
 split.
-save.
+qed.
 
 (* subst *)
 
@@ -418,7 +418,7 @@ proof.
  intros x y z h.
  subst x.
  split.
-save.
+qed.
 
 lemma l_subst_xz : forall (x y z : int),
    x = y + z => y = z => x + 1 = (z + z) + 1.
@@ -426,7 +426,7 @@ proof.
  intros x y z _ _.
  subst x z.
  split.
-save.
+qed.
 
 lemma l_subst : forall (x y z : int),
    x = y + z => y = z => x + 1 = (z + z) + 1.
@@ -434,7 +434,7 @@ proof.
  intros x y z _ _.
  subst.
  split.
-save.
+qed.
 
 (*
 lemma l_subst_fail : forall (x y z : int),
@@ -477,7 +477,7 @@ proof.
  intros x l' heq; right.   
  exists x, l'.
  smt.
-save.
+qed.
 
 op length : 'a mylist -> int.
 
@@ -487,5 +487,5 @@ proof.
  elimT mylist_ind xs.
 admit.
 admit.
-save.
+qed.
 

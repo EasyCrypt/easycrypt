@@ -22,7 +22,7 @@ proof.
   intros z.
   wp; skip; smt.
   wp; skip; smt.
-save.
+qed.
 
 
 

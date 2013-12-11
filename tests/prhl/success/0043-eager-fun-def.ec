@@ -23,4 +23,4 @@ proof.
  eager proc.
  rcondf{2} 4; first intros &m;wp => //.
  sim.
-save.
+qed.

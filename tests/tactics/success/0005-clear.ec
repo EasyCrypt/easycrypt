@@ -9,4 +9,4 @@ intros x1 hx1 x2 x3 hx2.
 generalize (x1) hx1 (x2) x3 hx2.
 clear x1 x2.
 admit.
-save.
+qed.

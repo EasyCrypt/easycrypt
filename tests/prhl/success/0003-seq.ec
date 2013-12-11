@@ -14,4 +14,4 @@ proof.
   seq 1 1 : (M.y{1} = x{1} /\ M.y{2} = x{2}).
   admit.
   admit.
-save.
+qed.

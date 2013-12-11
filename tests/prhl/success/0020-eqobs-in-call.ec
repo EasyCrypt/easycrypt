@@ -31,19 +31,19 @@ module G (A:Adv) = {
 equiv foo_0 (A<:Adv {O} ) : G(A).main ~ G(A).main : ={x,O.m,O.l} ==> ={res,O.m,O.l}.
 proc.
 sim true true : (={O.m,O.l,x}).
-save.
+qed.
 
 equiv foo_1 (A<:Adv {O} ) : G(A).main ~ G(A).main : ={x,O.m,O.l} ==> ={res,O.m,O.l}.
 proc.
 sim.
-save.
+qed.
 
 equiv foo1_0 (A<:Adv {O} ) : G(A).main ~ G(A).main : ={x,O.m,O.l,glob A} ==> ={res,O.m,glob A}.
 proc.
 sim true true : (={O.m,glob A,x,O.l}).
-save.
+qed.
 
 equiv foo1_1 (A<:Adv {O} ) : G(A).main ~ G(A).main : ={x,O.m,O.l,glob A} ==> ={res,O.m,glob A}.
 proc.
 sim.
-save.
+qed.

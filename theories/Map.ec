@@ -186,7 +186,7 @@ proof.
  elim (find_in p m _);first by exists x.
  intros x' Hfind.
  by exists x';split => //;apply find_cor => //.
-save. 
+qed. 
 
 lemma find_in_p_unique : forall (p:'a -> 'b cpred) (m:('a,'b) map),
   forall x, in_dom x m => p x (proj m.[x]) =>
@@ -196,7 +196,7 @@ proof.
  intros => p m x Hindom Hproj Hp.
  elim (find_in_p p m x _ _) => // x' [->][_] Hp'.
  by rewrite (Hp x' x) => //.
-save. 
+qed. 
 
 
 (** rm *)

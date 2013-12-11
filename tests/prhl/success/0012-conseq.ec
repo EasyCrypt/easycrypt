@@ -10,7 +10,7 @@ proof.
  conseq (_ : x{1} = x{1} ==> _).
  conseq (_ : true /\ x{1} = x{1}).
  proc;skip;intros &m1 &m2 h;apply h.
-save.
+qed.
 
 equiv foo2 : M.f ~ M.f : x{1} = x{1} ==> res{1} = res{1}.
 proof.
@@ -21,4 +21,4 @@ proof.
  conseq (_ : x{1} = x{1} ==> _).
  conseq (_ : true /\ x{1} = x{1}).
  skip;intros &m1 &m2 h;apply h.
-save.
+qed.

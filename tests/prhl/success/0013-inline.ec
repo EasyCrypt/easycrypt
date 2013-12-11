@@ -20,4 +20,4 @@ proof.
   inline {1} M.f.
   inline {2} M.f.
   wp; skip; smt.
-save.
+qed.

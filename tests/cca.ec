@@ -44,7 +44,7 @@ proof.
  skip;simplify. (* Il y a un bug : les variables sont des fois avec les
                    arguments des foncteurs d'autres fois non *)
  smt.
-save.
+qed.
 
 module type IO = { 
   proc h (x:int) : int {}
@@ -90,7 +90,7 @@ intros A.
  proc.
  skip;smt.
  skip;smt.
-save.
+qed.
 
 module A' (O:IO) : Adv'(O) = { 
   proc a (x:int) : int = {
@@ -106,7 +106,7 @@ lemma foo1 :
            res{1} = res{2} /\  (glob A'){1} = (glob A'){2} ].
 proof.
  apply (foo' (A')).
-save.
+qed.
 
 
 lemma foo2 : forall (x:int) &m1 &m2, 
@@ -118,7 +118,7 @@ proof.
  apply foo1.
  simplify;smt.
  smt.
-save.
+qed.
 
 (*
 

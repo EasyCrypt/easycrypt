@@ -72,7 +72,7 @@ proof.
           : (O1.m{1} = O2.m{2} /\ O1.l{1} = O2.l{2} /\ ={x}).
    proc;wp;skip;trivial.
  wp;skip;trivial.
-save.
+qed.
 
 equiv foo_1 (A<:Adv {O1,O2} ) : G1(A).main ~ G2(A).main : 
   ={x} /\ O1.m{1} = O2.m{2} /\ O1.l{1} = O2.l{2} ==> 
@@ -82,7 +82,7 @@ proof.
  sim (O1.m{1} = O2.m{2} /\ O1.l{1} = O2.l{2}) (O1.w{1} = 2) : .
    proc;wp;skip;trivial.
  wp;skip;trivial.
-save.
+qed.
 
 equiv foo1_0 (A<:Adv {O1,O2} ) : G1(A).main ~ G2(A).main : 
       ={x} /\ O1.m{1} = O2.m{2} /\ O1.l{1} = O2.l{2} ==> 
@@ -92,7 +92,7 @@ proc.
      (O1.m{1} = O2.m{2} /\ O1.l{1} = O2.l{2} /\ ={x,glob A}). 
    proc;wp;skip;trivial.
  wp;skip;trivial.
-save.
+qed.
 
 equiv foo1_1 (A<:Adv {O1,O2} ) : G1(A).main ~ G2(A).main : 
       ={x} /\ O1.m{1} = O2.m{2} /\ O1.l{1} = O2.l{2} ==> 
@@ -101,5 +101,5 @@ proc.
   sim (O1.m{1} = O2.m{2} /\ O1.l{1} = O2.l{2}) (O1.w{1} = 2) : .
    proc;wp;skip;trivial.
  wp;skip;trivial.
-save.
+qed.
 

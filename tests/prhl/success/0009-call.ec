@@ -42,7 +42,7 @@ proof.
   intros &m1 &m2 h;elim h;clear h;intros h1 h2.
   elim h2;clear h2;intros h2 h3.
   rewrite h1; rewrite h3;simplify;split.
-save.
+qed.
 
 
 module type Adv = {
@@ -65,5 +65,5 @@ proc.
 call (_ : true ==> true).
 proc true;progress.
 skip;progress.
-save.
+qed.
 

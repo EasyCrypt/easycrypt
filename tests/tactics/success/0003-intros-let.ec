@@ -7,4 +7,4 @@ lemma l: forall x1,
 proof.
 intros x1 x2 x3. (* FIXME: printing of let hyp *)
 smt.
-save.
+qed.

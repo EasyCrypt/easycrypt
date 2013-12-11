@@ -16,6 +16,6 @@ lemma L : equiv[M.f ~ M.f : true ==> true].
 proof.
   proc; unroll {1} 2.1.
   admit.
-save.
+qed.
 
   

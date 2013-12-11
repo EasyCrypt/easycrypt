@@ -14,4 +14,4 @@ module M = {
 lemma L : equiv[M.f ~ M.f : true ==> res{1} = 0].
 proof.
   proc; kill {1} 2; admit.
-save.
+qed.

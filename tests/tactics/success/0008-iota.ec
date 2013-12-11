@@ -9,4 +9,4 @@ iota.
 intros x w.
 beta.
 split.
-save.
+qed.

@@ -17,4 +17,4 @@ Works with proc ((glob A){1} = (glob A){2}).
 Do we want to add this automatically?
 *)
 proc true;progress.
-save.
+qed.

@@ -19,4 +19,4 @@ module G = {
 equiv foo_0 : G.main ~ G.main : ={x, glob O} ==> ={res, glob O}.
 proc.
 sim : (={x,glob O}).
-save.
+qed.

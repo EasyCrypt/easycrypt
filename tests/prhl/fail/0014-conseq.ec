@@ -8,4 +8,4 @@ proof.
   smt.
   smt.
   admit.
-save.
+qed.

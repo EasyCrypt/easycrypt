@@ -274,7 +274,6 @@
 %token RPBRACE
 %token SAME
 %token SAMPLE
-%token SAVE
 %token SECTION
 %token SEMICOLON
 %token SEQ
@@ -2458,7 +2457,6 @@ global_:
 | gprover_info     { Gprover_info $1 }
 | checkproof       { Gcheckproof  $1 }
 
-| x=loc(SAVE)      { Gsave x.pl_loc }
 | x=loc(QED)       { Gsave x.pl_loc }
 | PRINT p=print    { Gprint     p   }
 | PRAGMA x=lident  { Gpragma    x   }

@@ -14,14 +14,14 @@ lemma toto : forall (Or<:Orcl {F}),
 intros Or.
 proc.
  sim (={glob Or}) true : (={F.view, glob Or}).
-save.
+qed.
 
 lemma toto1 : forall (Or<:Orcl),
    equiv [F.f ~ F.f : ={glob Or} ==> (={F.view, glob Or})].
 intros Or.
 proc.
  sim (={glob Or}) true : (={F.view, glob Or}).
-save.
+qed.
 
 module Or = { 
   var x : int
@@ -31,4 +31,4 @@ lemma toto2 :
    equiv [F.f ~ F.f : ={glob Or} ==> (={F.view, glob Or})].
 proc.
  sim (={glob Or}) true : (={F.view, glob Or}).
-save.
+qed.

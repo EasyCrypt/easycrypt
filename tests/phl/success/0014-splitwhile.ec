@@ -23,7 +23,7 @@ proof.
   while (x<=y).
   wp; skip; smt.
   wp; skip; smt.
-save.
+qed.
 
 lemma test2 : equiv [M1.f ~ M1.f : true ==> true].
 proof.
@@ -31,4 +31,4 @@ proof.
   splitwhile (x<=5) : {2} 3.
   splitwhile (x<=5) : {2} 3.
   admit.
-save.
+qed.
