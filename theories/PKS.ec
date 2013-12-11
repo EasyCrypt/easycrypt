@@ -8,7 +8,7 @@ type message.
 type signature.
 
 module type Scheme = {
-  proc init(): unit {*}
+  proc * init(): unit {}
   proc keygen(): (pkey * skey)
   proc sign(sk:skey, m:message): signature
   proc verify(pk:pkey, m:message, s:signature): bool
@@ -22,7 +22,7 @@ module type AdvCMA(O:AdvOracles) = {
 
 theory EF_CMA.
   module type Oracles = {
-    proc init(): pkey {*}
+    proc * init(): pkey {}
     proc sign(m:message): signature
     proc verify(m:message,s:signature): bool
     proc fresh(m:message): bool
@@ -85,7 +85,7 @@ end EF_CMA.
 
 theory NM_CMA.
   module type Oracles = {
-    proc init(): pkey {*}
+    proc * init(): pkey {}
     proc sign(m:message): signature
     proc verify(m:message,s:signature): bool
     proc fresh(m:message,s:signature): bool

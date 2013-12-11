@@ -126,7 +126,7 @@ and pfunction_decl = {
   pfd_name     : psymbol;
   pfd_tyargs   : fun_params;
   pfd_tyresult : pty;
-  pfd_uses     : (bool * pqsymbol list) option;
+  pfd_uses     : bool * pqsymbol list option;
 }
 
 (* -------------------------------------------------------------------- *)

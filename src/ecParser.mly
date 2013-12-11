@@ -1116,7 +1116,7 @@ fun_decl:
     { { pfd_name     = x   ;
         pfd_tyargs   = pd  ;
         pfd_tyresult = ty  ;
-        pfd_uses     = None; }
+        pfd_uses     = (true, None); }
     }
 ; 
 
@@ -1238,21 +1238,12 @@ sig_param:
 ;
 
 signature_item:
-| PROC decl=ifun_decl
-    { `FunctionDecl decl }
-;
-
-ifun_decl:
-| x=lident pd=param_decl COLON ty=loc(type_exp) us=brace(oracle_info)?
-    { { pfd_name     = x ;
-        pfd_tyargs   = pd;
-        pfd_tyresult = ty;
-        pfd_uses     = us; }
-    }
-;
-
-oracle_info:
-| i=STAR? qs=qident* { i=None, qs }
+| PROC i=boption(STAR) x=lident pd=param_decl COLON ty=loc(type_exp) qs=brace(qident*)?
+    { `FunctionDecl
+          { pfd_name     = x;
+            pfd_tyargs   = pd;
+            pfd_tyresult = ty;
+            pfd_uses     = (not i, qs); } }
 ;
 
 (* -------------------------------------------------------------------- *)

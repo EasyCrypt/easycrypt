@@ -5,7 +5,7 @@ module type Or = {
 }.
 
 module type Adv (O:Or) = { 
-  proc a1 () : unit {*}
+  proc * a1 () : unit {}
   proc a2 (x:int) : int {O.o}
 }. 
 
