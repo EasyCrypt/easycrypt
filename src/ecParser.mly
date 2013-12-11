@@ -1279,12 +1279,12 @@ typarams:
 ;
 
 type_decl:
-| TYPE tya=typarams x=ident { (tya, x) }
+| tya=typarams x=ident { (tya, x) }
 ;
 
 type_decl_or_def:
-| td=type_decl { mk_tydecl td None }
-| td=type_decl EQ te=loc(type_exp) { mk_tydecl td (Some te) }
+| TYPE td=plist1(type_decl, COMMA) { List.map (mk_tydecl^~ None) td }
+| TYPE td=type_decl EQ te=loc(type_exp) { [mk_tydecl td (Some te)] }
 ;
 
 (* -------------------------------------------------------------------- *)

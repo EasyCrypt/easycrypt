@@ -133,6 +133,10 @@ let rec process_type (scope : EcScope.scope) (tyd : ptydecl located) =
     scope
   
 (* -------------------------------------------------------------------- *)
+and process_types (scope : EcScope.scope) tyds =
+  List.fold_left process_type scope tyds
+
+(* -------------------------------------------------------------------- *)
 and process_typeclass (scope : EcScope.scope) (tcd : ptypeclass located) =
   EcScope.check_state `InTop "type class" scope;
   let scope = EcScope.Ty.add_class scope tcd in
@@ -337,7 +341,7 @@ and process (ld : EcLoader.ecloader) (scope : EcScope.scope) g =
   let scope =
     match
       match g.pl_desc with
-      | Gtype        t    -> `Fct   (fun scope -> process_type       scope  (mk_loc loc t))
+      | Gtype        t    -> `Fct   (fun scope -> process_types      scope  (List.map (mk_loc loc) t))
       | Gtypeclass   t    -> `Fct   (fun scope -> process_typeclass  scope  (mk_loc loc t))
       | Gtycinstance t    -> `Fct   (fun scope -> process_tycinst    scope  (mk_loc loc t))
       | Gdatatype    t    -> `Fct   (fun scope -> process_datatype   scope  (mk_loc loc t))
