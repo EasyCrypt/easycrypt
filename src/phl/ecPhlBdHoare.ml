@@ -5,34 +5,6 @@ open EcBaseLogic
 open EcLogic
 open EcCorePhl
 open EcPhlConseq
-(* --------------------------------------------------------------------- *)
-class rn_hl_hoare_equiv =
-object
-  inherit xrule "[hl] hoare-equiv"
-end
-
-let rn_hl_hoare_equiv = RN_xtd (new rn_hl_hoare_equiv)
-
-(* -------------------------------------------------------------------- *)
-let t_hoare_equiv p q p1 q1 p2 q2 g =
-  let concl = get_concl g in
-  let es = t_as_equivS concl in
-  let s1 = Fsubst.f_bind_mem Fsubst.f_subst_id mhr (fst es.es_ml) in
-  let s2 = Fsubst.f_bind_mem Fsubst.f_subst_id mhr (fst es.es_mr) in
-  let concl1 = 
-    f_forall_mems [es.es_ml;es.es_mr] 
-      (f_imp es.es_pr (f_and p (f_and (Fsubst.f_subst s1 p1) (Fsubst.f_subst s2 p2)))) in
-  let concl2 = 
-    f_forall_mems [es.es_ml;es.es_mr]
-      (f_imps [q;Fsubst.f_subst s1 q1;Fsubst.f_subst s2 q2] es.es_po) in
-  let concl3 = 
-    f_hoareS (mhr,snd es.es_ml) p1 es.es_sl q1 in
-  let concl4 = 
-    f_hoareS (mhr,snd es.es_mr) p2 es.es_sr q2 in
-  let concl5 = 
-    f_equivS_r { es with es_pr = p; es_po = q } in
-  prove_goal_by [concl1; concl2; concl3; concl4; concl5] 
-    rn_hl_hoare_equiv g
 
 (* -------------------------------------------------------------------- *)
 class rn_hl_hoare_bd_hoare =
