@@ -70,19 +70,6 @@ let upd_done juc =
     | _ -> juc in
   upd juc 0
 
-let get_first_goal juc = 
-  let rec aux n = 
-    let pj = get_pj (juc, n) in
-    match pj.pj_rule with
-    | None -> juc, n 
-    | Some(d, r) -> if d then raise (NotAnOpenGoal None) else auxs r.pr_hyps
-  and auxs ns = 
-    match ns with
-    | [] -> raise (NotAnOpenGoal None) 
-    | RA_node n :: ns -> (try aux n with _ -> auxs ns)
-    | _ :: ns -> auxs ns in
-  aux 0
-
 let find_all_goals juc = 
   let juc = upd_done juc in
   let rec aux ns n = 
@@ -164,11 +151,6 @@ let t_subgoal lt (juc,ln) =
       let juc, ln' = t (juc, n) in
       juc, List.rev_append ln' ln) (juc,[]) lt ln in
   juc, List.rev ln
-
-let t_on_nth t n (juc,ln) = 
-  let r,n,l = try List.split_n n ln with _ -> assert false in
-  let juc,ln = t (juc,n) in
-  juc, List.rev_append r (List.append ln l)
 
 let t_on_firsts t i (juc, ln) =
   let (ln1, ln2) = List.take_n i ln in
@@ -1040,8 +1022,6 @@ let gen_t_exists do_arg fs (juc,n as g) =
   let rule =
     {pr_name = RN_intro `Exist; pr_hyps = List.rev_append args [RA_node n1] } in
   upd_rule rule (juc,n)
-
-let t_exists = gen_t_exists (fun _ _ a -> a)
 
 let t_split g =
   let hyps, concl = get_goal g in

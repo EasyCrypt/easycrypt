@@ -177,21 +177,6 @@ module EqTest = struct
     | _, _ -> false
 end
 
-let rec destr_tfun env tf = 
-  match tf.ty_node with
-  | Tfun(ty1,ty2) -> ty1, ty2
-  | Tconstr(p,tys) when Ty.defined p env ->
-      destr_tfun env (Ty.unfold p tys env) 
-  | _ -> assert false 
-
-let rec ty_fun_app env tf targs = 
-  match targs with
-  | [] -> tf
-  | t1 :: targs ->
-      let (dom, codom) = destr_tfun env tf in
-        EqTest.for_type_exn env dom t1;
-        ty_fun_app env codom targs
-
 (* -------------------------------------------------------------------- *)
 type reduction_info = {
   beta    : bool;
@@ -226,23 +211,11 @@ let no_red = {
 let beta_red = { no_red with beta = true }
 let betaiota_red = { no_red with beta = true; iota = true }
 
-let reducible_local ri hyps x =
-  match ri.delta_h with
-  | None -> LDecl.reducible_var x hyps 
-  | Some s when Sid.mem x s -> LDecl.reducible_var x hyps
-  | _ -> false
-
 let reduce_local ri hyps x  = 
   match ri.delta_h with
   | None -> LDecl.reduce_var x hyps 
   | Some s when Sid.mem x s -> LDecl.reduce_var x hyps 
   | _ -> raise NotReducible
-
-let reducible_op ri env p =
-  match ri.delta_p with
-  | None -> Op.reducible env p 
-  | Some s when Sp.mem p s -> Op.reducible env p 
-  | _ -> false
 
 let reduce_op ri env p tys =
   match ri.delta_p with

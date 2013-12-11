@@ -9,8 +9,6 @@ module Config : sig
     string * Why3.Whyconf.config_prover * Why3.Driver.driver
 
   val load    : string option -> unit
-  val config  : unit -> Whyconf.config
-  val main    : unit -> Whyconf.main
   val w3_env  : unit -> Env.env
   val provers : unit -> prover list
   val known_provers : unit -> string list
@@ -42,12 +40,6 @@ end = struct
         theprovers := provers
     end
 
-  let config () =
-    load None; EcUtils.oget !theconfig
-
-  let main () =
-    load None; EcUtils.oget !themain
-
   let w3_env () =
     load None; EcUtils.oget !thew3_env
 
@@ -56,7 +48,6 @@ end = struct
 
   let known_provers () =
     List.map (fun (p,_,_) -> p) (provers())
-
 end
 
 let initialize    = Config.load

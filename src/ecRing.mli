@@ -32,3 +32,7 @@ val peq : pol -> pol -> bool
 
 (* -------------------------------------------------------------------- *)
 val norm : pexpr -> (pexpr * pexpr) list -> pol
+
+(* -------------------------------------------------------------------- *)
+val pp_pe  : Format.formatter -> pexpr -> unit
+val pp_pol : Format.formatter -> pol   -> unit

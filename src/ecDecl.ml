@@ -84,10 +84,6 @@ type axiom = {
   ax_nosmt   : bool;
 }
 
-let string_of_ax_kind = function
-  | `Axiom -> "axiom"
-  | `Lemma -> "lemma"
-
 (* -------------------------------------------------------------------- *)
 let op_ty op = op.op_ty
 
