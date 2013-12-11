@@ -11,6 +11,8 @@
   - fst -> .`1
   - snd -> .`2
 
+* Comportement par défaut devrait etre `proof strict' (ceci est une décision unilatérale de François)
+
 * Discuter la syntaxe des opérateurs
 
 * Type de retour optionnel pour les procédures + inférence pour les var. locales
@@ -52,6 +54,7 @@
 * bd_hoare / hoare à top-level
 
 * bd_hoare -> phoare / phl
+	bd_hoare [fident ...] relation form // pas sform
 
 * détection du code mort
 
@@ -61,6 +64,7 @@
     sp side? cpos?
 
     seq side? cpos : sform tacdir appbdinfo -> voir si `:' sert
+	en fait, on veut: seq side? cpos : sform sform? tacdir? appbdinfo' (ou appbdinfo' est appbdinfo sans le dernier sform optionnel)
     while side : wtacinfo
 
     proc sform sform sform? -> proc LBRACKET form RBRACKET sform sform?
