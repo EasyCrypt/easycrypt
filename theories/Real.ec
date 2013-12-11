@@ -91,8 +91,18 @@ by [].
 lemma nosmt eq_le: forall (x y:real), x = y => x <= y
 by [].
 
-op exp : real -> real.
+theory Exp.
+
+  import why3 "real" "ExpLog"
+    op "exp" as "exp".
+  axiom exp_zero : exp (from_int 0) = from_int 1.
+  axiom exp_monotonous : forall x y , x<=y => exp x <= exp y.
+(* op exp : real -> real. *)
 (* TODO : add axioms*)
+
+end Exp.
+export Exp.
+
 
 require import AlgTactic.
 
