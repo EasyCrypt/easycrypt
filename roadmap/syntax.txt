@@ -61,6 +61,7 @@ DONE   proc * id(arg...) : t { restr } (* `*' est maintenant en dehors - 16082 *
 
 * bd_hoare -> phoare / phl
 	bd_hoare [fident ...] relation form // pas sform
+	conseq aussi
 
 HALF-DONE (only for non-exported functions) * détection du code mort
 
