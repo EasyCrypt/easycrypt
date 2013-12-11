@@ -1,3 +1,16 @@
+extention a fun:
+  eqobs_in
+  hoare
+
+fun * doit marcher en bd hoare 
+extention:
+  wp
+  sp
+
+
+
+
+
 rnd avec 6 arguments doit etre implemente en term de seq conseq et rnd...
 
 rnd avec 1 argument : <= 

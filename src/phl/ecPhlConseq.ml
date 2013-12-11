@@ -82,7 +82,7 @@ let bd_goal fcmp fbd cmp bd =
   | FHle, (FHle | FHeq) -> f_real_le bd fbd
   | FHle, FHge -> tacuerror "can not swap comparison"
   | FHeq, FHeq -> f_eq bd fbd
-  | FHeq, _ -> tacuerror "can only equality is accepted"
+  | FHeq, _ -> tacuerror "only equality is accepted"
   | FHge, (FHge | FHeq)  -> f_real_le fbd bd
   | FHge, FHle -> tacuerror "can not swap comparison"
 
