@@ -3,7 +3,7 @@ module M1 = {
 }.
 
 module M2 = {
-  fun update_M1_x (y:int) : unit = {
+  proc update_M1_x (y:int) : unit = {
     M1.x = y;
   }
 }.

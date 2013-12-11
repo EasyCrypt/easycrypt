@@ -1,13 +1,13 @@
 type t.
 
 module type I = {
-  fun f() : t 
+  proc f() : t 
 }.
 
 module M(X : I) = {
   var y : t
 
-  fun init() : unit = {
+  proc init() : unit = {
     y  = X.f();
   }
 }.

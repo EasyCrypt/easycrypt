@@ -1,5 +1,5 @@
 module M = { 
-  fun f() : unit = {}
+  proc f() : unit = {}
 }.
 
 lemma foo : hoare [M.f : true ==> false].

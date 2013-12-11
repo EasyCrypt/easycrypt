@@ -2,36 +2,36 @@
 require import Int.
 
 module type ADV = {
-fun main() : unit {*}
+proc main() : unit {*}
 }.
 
 module type O = {
-fun init() : unit
-fun get() : int
+proc init() : unit
+proc get() : int
 }.
 
 module O1 : O = {
 var x : int
-fun init() : unit = {
+proc init() : unit = {
 x = 0;
 }
-fun get() : int = {
+proc get() : int = {
 return x;
 }
 }.
 
 module O2 : O = {
 var x : int
-fun init() : unit = {
+proc init() : unit = {
 x = 0;
 }
-fun get() : int = {
+proc get() : int = {
 return x;
 }
 }.
 
 module G(Adv : ADV, O : O) = {
-fun main() : bool = {
+proc main() : bool = {
 var y : int;
 O.init();
 Adv.main();
@@ -45,7 +45,7 @@ forall (Adv <: ADV{O1, O2}),
 equiv[G(Adv, O1).main ~ G(Adv, O2).main : true ==> ={res}].
 proof.
 intros Adv.
-fun.
+proc.
 call (_ : O1.x{1} = O2.x{2}).
 call (_ : O1.x{1} = O2.x{2}).
 inline O1.init O2.init; wp; skip; trivial.

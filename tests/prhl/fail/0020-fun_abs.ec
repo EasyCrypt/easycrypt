@@ -1,34 +1,34 @@
 module type OR = {
-  fun f() : unit
+  proc f() : unit
 }.
 
 module type ADV(O : OR) = {
-  fun g() : int { O.f}
+  proc g() : int { O.f}
 }.
 
 module Adv(O : OR) : ADV(O) = {
   var x : int
-  fun g() : int = {
+  proc g() : int = {
     O.f();
     return x;
   }
 }.
 
 module Or1 : OR = {
-  fun f() : unit = {
+  proc f() : unit = {
     Adv.x = 0;
   }
 }.
 
 module Or2 : OR = {
-  fun f() : unit = {
+  proc f() : unit = {
   }
 }.
 
 module G1(Adv : ADV) = {
   module A = Adv(Or1)
 
-  fun main() : int = {
+  proc main() : int = {
     var y : int;
     y = A.g();
     return y;
@@ -38,7 +38,7 @@ module G1(Adv : ADV) = {
 module G2(Adv : ADV) = {
   module A = Adv(Or2)
 
-  fun main() : int = {
+  proc main() : int = {
     var y : int;
     y = A.g();
     return y;
@@ -48,10 +48,10 @@ module G2(Adv : ADV) = {
 lemma G1_G2 (Adv' <: ADV) :
   equiv[G1(Adv').main ~ G2(Adv').main : ={glob Adv'} ==> ={res}].
 proof.
-fun.
+proc.
 call (_ : ={glob Adv'} ==> ={res}).
-fun (true);trivial.
-fun.
+proc (true);trivial.
+proc.
 (* should fail here *)
 wp. 
 skip; trivial.

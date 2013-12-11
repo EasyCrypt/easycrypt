@@ -55,11 +55,11 @@ by intros=> Hsupp Hdom_x Hdom_y Heqf;
 qed.
 
 module type Inverter = {
-  fun invert(pk : pkey, y : t) : t
+  proc invert(pk : pkey, y : t) : t
 }.
 
 module OW(I :Inverter) ={
-  fun main(): bool ={
+  proc main(): bool ={
     var x,x':t;
     var pk:pkey;
     var sk:skey;

@@ -7,29 +7,29 @@ theory RO.
 
   module type ROA = {
     var lA : form list
-    fun HA (x:from) : to 
+    proc HA (x:from) : to 
   }
 
   module type RO extend ROA = { 
     var m : (from,to) map
       
-    fun H(x:from) : to 
+    proc H(x:from) : to 
     var lA : from list
-    fun HA(x:from) : to
-    fun init () : unit 
+    proc HA(x:from) : to
+    proc init () : unit 
   }
 
   module RO : RO = {
     var m : (from,to) map
       
-    fun H(x:from) : to = {
+    proc H(x:from) : to = {
       var r : to = sample();
       if (!in_dom(x,m)) m[x] = r;
       return m[x]
     }
 
     var lA : from list
-    fun HA(x:from) : to = {
+    proc HA(x:from) : to = {
       var r : to;
       if (length(lA < qHA)) {
         r = H(x);
@@ -37,7 +37,7 @@ theory RO.
       }
       return r
     }
-    fun init () : unit = {
+    proc init () : unit = {
       m = empty_map;
       lA = empty_map;
     }
@@ -52,13 +52,13 @@ theory PKE_ROM.
   type cipher.
 
   module type ePKE(O:RO.RO) = {
-    fun KG() : pkey * skey     (* { O.m, O.lA, O.H, O.HA } *)
-    fun Enc(pk:pkey, m:message) : cipher (* {  O.m, O.lA, O.H, O.HA } *)
+    proc KG() : pkey * skey     (* { O.m, O.lA, O.H, O.HA } *)
+    proc Enc(pk:pkey, m:message) : cipher (* {  O.m, O.lA, O.H, O.HA } *)
   }.
 
 (*  module type PKE(O:RO.RO) = {
     extend ePKE
-    fun Dec(sk:spkey, c:cipher) : message option { O.H }
+    proc Dec(sk:spkey, c:cipher) : message option { O.H }
   }  *)
   
 end.
@@ -69,8 +69,8 @@ theory CPA_ROM1.
   clone RO.
  
   module type IAdv (O:RO.ROA) = {
-    fun A1 (pk:pkey) : message * message {O.HA}
-    fun A2 (pk:pkey, c:cipher) : bool {O.HA}
+    proc A1 (pk:pkey) : message * message {O.HA}
+    proc A2 (pk:pkey, c:cipher) : bool {O.HA}
   }.
 
   declare module PKE:ePKE.
@@ -79,7 +79,7 @@ theory CPA_ROM1.
   module CPA = {
     module PKE = PKE(RO.RO)
     module A = Adv(RO.RO)
-    fun Main() : bool = {
+    proc Main() : bool = {
       var m0,m1, mb :message;
       var c : cipher;
       var b, b' : bool;
@@ -99,7 +99,7 @@ theory CPA_ROM1.
   module CPA'(PKE:ePKE, Adv:IAdv) = {
     module PKE = PKE(RO.RO)
     module A = Adv(RO.RO)
-    fun Main() : bool = {
+    proc Main() : bool = {
       var m0,m1, mb :message;
       var c : cipher;
       var b, b' : bool;

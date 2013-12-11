@@ -99,7 +99,7 @@ save.
                            (* ie compute the normal form *)
    
  *)
-lemma l_simplify_beta : forall (x:int), (lambda y , y = y) x
+lemma l_simplify_beta : forall (x:int), (fun y , y = y) x
 proof.
   beta.
   smt.
@@ -108,7 +108,7 @@ save.
 lemma l_simplify_iota : forall (x y:int), 
    let (u,v) = (x, y) in
    let w = u in
-   if true then (lambda z , z = z) w else false.
+   if true then (fun z , z = z) w else false.
 proof.
   iota.
   intros x y w.

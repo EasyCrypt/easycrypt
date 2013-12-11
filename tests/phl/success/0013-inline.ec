@@ -1,12 +1,12 @@
 require import Int.
 
 module M = {
-  fun f(x : int, y : int) : int = {
+  proc f(x : int, y : int) : int = {
     var r : int = x + y;
     return r;
   }
 
-  fun g(a : int) : int = {
+  proc g(a : int) : int = {
     var z : int;
 
     z  = f(a, a);
@@ -16,5 +16,5 @@ module M = {
 
 lemma h : hoare[M.g : a = a ==> res = res].
 proof.
-  fun; inline M.f. wp; skip; smt.
+  proc; inline M.f. wp; skip; smt.
 save.

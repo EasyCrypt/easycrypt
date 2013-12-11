@@ -1,5 +1,5 @@
 module M = { 
-  fun f () : unit = {
+  proc f () : unit = {
     var x : int;
     var y : int; 
     x = 0;
@@ -11,7 +11,7 @@ module M = {
 
 equiv foo : M.f ~ M.f : true ==> true.
 proof.
-  fun.   
+  proc.   
   swap {1} 2 3 3.
   swap {1} 3 4 4.
   swap {1} 1 2 3.

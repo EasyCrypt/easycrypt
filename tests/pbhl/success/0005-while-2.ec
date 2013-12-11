@@ -10,7 +10,7 @@ axiom K_def : 0 <= K.
 module Test = {
   var ls : int list
 
-  fun test () : int list = {
+  proc test () : int list = {
     var i : int;
     var l : int;
     i = 0;
@@ -27,7 +27,7 @@ module Test = {
 
 
 lemma test : bd_hoare [Test.test : true ==> mem 0 res] <= (if mem 0 Test.ls then 1%r else (K%r/10%r)).
-fun.
+proc.
 seq 1 : (true) (1%r) (if mem 0 Test.ls then 1%r else (K%r/10%r)) (0%r) (1%r) (i=0);
 [wp;trivial|trivial| |trivial|trivial]. 
 case (mem 0 Test.ls).

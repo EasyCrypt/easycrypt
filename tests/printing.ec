@@ -2,11 +2,11 @@ require import Int.
 require import List.
 theory T.
 module type I = {
-  fun g (x:int) : int
+  proc g (x:int) : int
 }.
 
 module M(U:I) = { 
-  fun f (x y : int) : int = { 
+  proc f (x y : int) : int = { 
     var b : bool;
     b = if x = 0 then true else false;
     b = if x + x + x + x + x + x + x = 0 + 0 + 0 + 0 + 0 then true else false;
@@ -46,7 +46,7 @@ print type T2.t.
 
 module M1 = {
 
-  fun f (x:int) : int = {
+  proc f (x:int) : int = {
     var b : bool;
     var y : int;
     y = let w = 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 + 0 +0 + 0 + 0  in x + w;
@@ -85,7 +85,7 @@ proof.
 
 lemma foo : hoare [M1.f : true ==> true /\ true  /\ true  /\ true  /\ true  /\ true  /\ true  /\ true].
 proof.
-  fun. 
+  proc. 
 
 type t1 = int * int.
 print type t1.
@@ -97,7 +97,7 @@ type t4 = int -> int -> (int * int, int -> int -> int -> int -> int -> int -> in
 print type t4.
 lemma foo : hoare [M.f : true ==> true].
 proof.
-  fun. 
+  proc. 
 print type int.
 
 theory T.
@@ -137,10 +137,10 @@ theory T.
     var x : int
     var y : int
 
-    fun g(x : int) : unit = {
+    proc g(x : int) : unit = {
     }
 
-    fun f(x : int) : int = {
+    proc f(x : int) : int = {
       var b  : bool;
       var l1 : int;
       var l2 : int;

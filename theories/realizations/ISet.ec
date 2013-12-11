@@ -39,13 +39,13 @@ op empty = cpFalse<:'a>.
 lemma mem_empty: forall (x:'a), !(mem x empty) by [].
 
 (** add *)
-op add (x:'a) (X:'a set) = lambda y, (x = y) || X y.
+op add (x:'a) (X:'a set) = fun y, (x = y) || X y.
 lemma mem_add: forall (x y:'a) X,
   (mem x (add y X)) = (mem x X \/ x = y)
 by [].
 
 (** rm *)
-op rm (x:'a) (X:'a set) = lambda y, (x <> y) && X y.
+op rm (x:'a) (X:'a set) = fun y, (x <> y) && X y.
 lemma mem_rm_eq: forall (x:'a) X,
   !(mem x (rm x X))
 by [].
@@ -103,7 +103,7 @@ lemma any_def: forall (p:'a cpred) X,
   any p X <=> (exists x, mem x X /\ p x).
 proof strict.
 intros=> p X; delta mem any inter cpAnd; beta; split=> h; last smt.
-  cut h1: exists x, (lambda x, p x /\ X x) x. (* This proof is disgusting *)
+  cut h1: exists x, (fun x, p x /\ X x) x. (* This proof is disgusting *)
     generalize h; apply absurd; simplify=> h; apply set_ext; smt.
     elim h1; beta=> {h1} x x_in_inter; exists x; smt.
 qed.

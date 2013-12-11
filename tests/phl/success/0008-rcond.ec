@@ -1,5 +1,5 @@
 module M = {
-  fun f () : int = {
+  proc f () : int = {
     var y : int;
     y = 1;
     if (y=1) { y = 2; }
@@ -9,7 +9,7 @@ module M = {
 
 lemma foo : hoare [M.f : true ==> res = 2 ].
 proof.
- fun.
+ proc.
  rcondt 2.
  wp; skip; smt.
  wp; skip; smt.

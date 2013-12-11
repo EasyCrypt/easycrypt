@@ -6,7 +6,7 @@ require import Real.
 
 require Logic.
 module M = {
-  fun f (w x:int) : int = {
+  proc f (w x:int) : int = {
     var y : int;
     var z : int;
     y = 1;
@@ -17,7 +17,7 @@ module M = {
   }
 }.
 lemma test : bd_hoare [M.f : true ==> res = 1 ] >= 1%r.
- fun.
+ proc.
  wp.
  skip;intros _ _;split.
 save.
@@ -26,7 +26,7 @@ op b : bool.
 
 module M2 = {
   var z : bool
-  fun f (y:bool) : bool = {
+  proc f (y:bool) : bool = {
     var x : bool;
     x = $Dbool.dbool;
     if (b)  z = x;
@@ -35,7 +35,7 @@ module M2 = {
 }.
 
 lemma test2: bd_hoare [ M2.f : b ==> res] = (1%r/2%r). 
-fun.
+proc.
 wp.
 rnd ((=) y).
 skip.
@@ -47,7 +47,7 @@ save.
 
 module M3 = {
   var z : bool
-  fun f (y:bool) : bool = {
+  proc f (y:bool) : bool = {
     var x : bool;
     x = $Dbool.dbool;
     if (x<>b)  x = !x;
@@ -57,9 +57,9 @@ module M3 = {
 
 lemma test3: bd_hoare [ M3.f : true ==> res=b] >= 1%r. 
 proof.
-fun.
+proc.
 wp.
-rnd (lambda x, true) .
+rnd (fun x, true) .
 skip; smt.
 save.
 
@@ -68,7 +68,7 @@ save.
 module M4 = {
   var x : real
   var y : bool
-  fun foo () : unit = {
+  proc foo () : unit = {
     if (true) {
       y = ${0,1};
     }
@@ -79,7 +79,7 @@ module M4 = {
 
 require import Real.
 lemma test : bd_hoare[M4.foo : M4.x=(Real.(/) 1%r2%r) ==> M4.y=true] = M4.x.
-fun.
+proc.
 wp.
 rcondt 1; [trivial|].
 rnd;skip; smt.

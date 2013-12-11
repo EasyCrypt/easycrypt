@@ -13,22 +13,22 @@ op default : to.       (* Default element to return on error by wrapper *)
 (* A signature for random oracles from "from" to "to". *)
 module type Oracle =
 {
-  fun init():unit {*}
-  fun o(x:from):to
+  proc init():unit {*}
+  proc o(x:from):to
 }.
 
-module type ARO = { fun o(x:from):to }.
+module type ARO = { proc o(x:from):to }.
 
 theory ROM.
   (* Bare random oracle for use in schemes *)
   module RO:Oracle = {
     var m : (from, to) map
 
-    fun init() : unit = {
+    proc init() : unit = {
       m = empty;
     }
   
-    fun o(x:from) : to = {
+    proc o(x:from) : to = {
       var y : to;
       y = $dsample;
       if (!in_dom x m) m.[x] = y;
@@ -38,13 +38,13 @@ theory ROM.
 
   lemma lossless_init : islossless RO.init.
   proof strict.
-  by fun; wp; skip.
+  by proc; wp; skip.
   qed.
 
   lemma lossless_o:
     mu dsample cpTrue = 1%r => islossless RO.o.
   proof strict.
-  by intros=> Hd; fun; wp; rnd.
+  by intros=> Hd; proc; wp; rnd.
   qed.
 end ROM.
 
@@ -56,12 +56,12 @@ theory WRO_Int.
   module ARO(R:Oracle):Oracle = {
     var log:int
 
-    fun init():unit = {
+    proc init():unit = {
       R.init();
       log = 0;
     }
 
-    fun o(x:from): to = {
+    proc o(x:from): to = {
       var r:to;
       if (log < qO)
       {
@@ -78,14 +78,14 @@ theory WRO_Int.
     islossless R.init =>
     islossless ARO(R).init.
   proof strict.
-  by intros=> HR; fun; wp; call HR; skip.
+  by intros=> HR; proc; wp; call HR; skip.
   qed.
 
   lemma lossless_o (R <: Oracle):
     islossless R.o =>
     islossless ARO(R).o.
   proof strict.
-  by intros=> HR; fun; wp; if; [call HR | ]; wp; skip.
+  by intros=> HR; proc; wp; if; [call HR | ]; wp; skip.
   save.
 
   lemma RO_lossless_init: islossless ARO(ROM.RO).init.
@@ -104,7 +104,7 @@ theory WRO_Int.
     islossless RO.o =>
     bd_hoare[ ARO(RO).o : x = ARO.log ==> x <= ARO.log] = 1%r.
   proof strict.
-  by intros=> Ho; fun; if; [call Ho | ];
+  by intros=> Ho; proc; if; [call Ho | ];
      wp; skip=> //; progress; smt.
   qed.
 
@@ -121,12 +121,12 @@ theory WRO_Set.
   module ARO(R:Oracle):Oracle = {
     var log:from set
 
-    fun init():unit = {
+    proc init():unit = {
       R.init();
       log = FSet.empty;
     }
 
-    fun o(x:from): to = {
+    proc o(x:from): to = {
       var r:to;
       if (card log < qO)
       {
@@ -143,14 +143,14 @@ theory WRO_Set.
     islossless R.init =>
     islossless ARO(R).init.
   proof strict.
-  by intros=> HR; fun; wp; call HR; skip.
+  by intros=> HR; proc; wp; call HR; skip.
   qed.
 
   lemma lossless_o (R <: Oracle):
     islossless R.o =>
     islossless ARO(R).o.
   proof strict.
-  by intros=> HR; fun; wp; if; [call HR | ]; wp; skip.
+  by intros=> HR; proc; wp; if; [call HR | ]; wp; skip.
   qed.
 
   lemma RO_lossless_init: islossless ARO(ROM.RO).init.
@@ -169,7 +169,7 @@ theory WRO_Set.
     islossless RO.o =>
     bd_hoare[ ARO(RO).o : mem r ARO.log ==> mem r ARO.log ] = 1%r.
   proof strict.
-  by intros=> Ho; fun; if; [call Ho | ];
+  by intros=> Ho; proc; if; [call Ho | ];
      wp; skip=> //; progress; rewrite mem_add; left.
   qed.
 
@@ -188,7 +188,7 @@ theory WRO_Set.
       !mem r ARO.log{2} =>
         ={res, ARO.log} /\ eq_except ROM.RO.m{1} ROM.RO.m{2} r].
   proof strict.
-  fun; if.
+  proc; if.
     by intros=> &1 &2 [r_nin_log] [[x_eq log_eq]] m_eq_exc;
        rewrite (fcongr card ARO.log{1} ARO.log{2}) //.
     inline ROM.RO.o; wp; rnd; wp; skip; progress=> //; first 5 last; last 6 smt.
@@ -204,12 +204,12 @@ theory WRO_List.
   module ARO(R:Oracle):Oracle = {
     var log:from list
 
-    fun init():unit = {
+    proc init():unit = {
       R.init();
       log = [];
     }
 
-    fun o(x:from): to = {
+    proc o(x:from): to = {
       var r:to;
       if (length log < qO)
       {
@@ -226,14 +226,14 @@ theory WRO_List.
     islossless R.init =>
     islossless ARO(R).init.
   proof strict.
-  by intros=> R HR; fun; wp; call HR; skip.
+  by intros=> R HR; proc; wp; call HR; skip.
   qed.
 
   lemma lossless_o: forall (R <: Oracle),
     islossless R.o =>
     islossless ARO(R).o.
   proof strict.
-  by intros=> R HR; fun; wp; (if; first call HR); wp; skip.
+  by intros=> R HR; proc; wp; (if; first call HR); wp; skip.
   qed.
 
   lemma RO_lossless_init: islossless ARO(ROM.RO).init.
@@ -252,7 +252,7 @@ theory WRO_List.
     islossless RO.o =>
     bd_hoare[ ARO(RO).o : mem r ARO.log ==> mem r ARO.log ] = 1%r.
   proof strict.
-  intros=> r RO Ho; fun; if.
+  intros=> r RO Ho; proc; if.
     by call Ho; wp; skip=> //; progress; rewrite mem_cons; right.
     by wp; skip=> //; progress.
   qed.
@@ -272,7 +272,7 @@ theory WRO_List.
       !mem r ARO.log{2} =>
         ={res, ARO.log} /\ eq_except ROM.RO.m{1} ROM.RO.m{2} r].
   proof strict.
-  intros=> r; fun; if.
+  intros=> r; proc; if.
     by intros=> &1 &2 [r_nin_log] [[x_eq log_eq]] m_eq_exc;
        rewrite (fcongr length ARO.log{1} ARO.log{2}) //.
     inline ROM.RO.o; wp; rnd; wp; skip; progress=> //; first 5 last; last 6 smt.
@@ -283,13 +283,13 @@ theory WRO_List.
 end WRO_List.
 
 theory IND_RO.
-  module type ARO = { fun o(x:from): to }.
-  module type RO_adv(X:ARO) = { fun a(): bool }.
+  module type ARO = { proc o(x:from): to }.
+  module type RO_adv(X:ARO) = { proc a(): bool }.
 
   module IND_RO(R:Oracle,A:RO_adv) = {
     module Adv = A(R)
 
-    fun main(): bool = {
+    proc main(): bool = {
       var b:bool;
       R.init();
       b = Adv.a();

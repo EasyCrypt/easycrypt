@@ -216,7 +216,7 @@ theory Dinter.
 
   lemma mu_in_supp (i j : int):
     i <= j => 
-    mu (dinter i j) (lambda x, i <= x <= j) = 1%r.
+    mu (dinter i j) (fun x, i <= x <= j) = 1%r.
   proof.
   by intros=> H;
      rewrite -(mu_in_supp_eq (dinter i j) cpTrue);
@@ -264,10 +264,10 @@ theory Dapply.
   op dapply : ('a -> 'b) -> 'a distr -> 'b distr.
 
   axiom mu_def (d : 'a distr) (f : 'a -> 'b) P:
-    mu (dapply f d) P = mu d (lambda x, P (f x)).
+    mu (dapply f d) P = mu d (fun x, P (f x)).
 
   lemma mu_x_def (d : 'a distr) (f : 'a -> 'b) x:
-    mu_x (dapply f d) x = mu d (lambda y, x = f y).
+    mu_x (dapply f d) x = mu d (fun y, x = f y).
   proof strict.
   by rewrite /mu_x mu_def.
   qed.
@@ -278,7 +278,7 @@ theory Dapply.
   rewrite /in_supp /mu_x mu_def; split.
     rewrite mu_in_supp /cpAnd /= => in_sup; smt.
     by intros=> [x]; rewrite /in_supp /mu_x=> [y_def nempty];
-       cut : (=) x <= (lambda x, y = f x) by (by intros=> w);
+       cut : (=) x <= (fun x, y = f x) by (by intros=> w);
        smt.
   qed.
 

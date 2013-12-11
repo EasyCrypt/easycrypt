@@ -8,10 +8,10 @@ lemma nosmt eq_tran: forall (X Y Z:'a -> 'b), X == Y => Y == Z => X == Z by [].
 axiom fun_ext: forall (f g:'a -> 'b), f == g => f = g.
 
 (* We need to have these two explicit, since = is not an operator *)
-lemma eqL (x:'a): (lambda y, x = y) = (=) x
+lemma eqL (x:'a): (fun y, x = y) = (=) x
 by apply fun_ext.
 
-lemma eqR (y:'a): (lambda x, x = y) = (=) y
+lemma eqR (y:'a): (fun x, x = y) = (=) y
 by (apply fun_ext=> x //=; rewrite (rw_eq_sym x)).
 
 (** Computable predicates *)

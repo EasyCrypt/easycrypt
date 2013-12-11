@@ -14,7 +14,7 @@ op mem:'a -> 'a set -> bool.
 axiom mem_def (x:'a) (X:'a set):
   mem x (elems X) <=> mem x X.
 
-op cpMem(X:'a set): 'a cpred = lambda x, mem x X.
+op cpMem(X:'a set): 'a cpred = fun x, mem x X.
 
 lemma nosmt count_mem (x:'a) (X:'a set):
   (count x (elems X) = 1) <=> mem x X
@@ -545,7 +545,7 @@ qed.
 lemma img_empty (f:'a -> 'b): (img f empty) = empty.
 proof strict.
 rewrite -empty_nmem => y.
-cut ? : !(exists x, (lambda x, f x = y /\ mem x empty) x);first apply (nexists (lambda x, f x = y /\ mem x empty) _)=> x;beta;apply nand;right;apply mem_empty.
+cut ? : !(exists x, (fun x, f x = y /\ mem x empty) x);first apply (nexists (fun x, f x = y /\ mem x empty) _)=> x;beta;apply nand;right;apply mem_empty.
 generalize H.
 apply absurd.
 simplify.
@@ -598,7 +598,7 @@ by intros=> [a];intros=> [h1 h2];exists a;(split;last apply (mem_rm_left _ x));t
 
 intros=> [a];intros=> [h1 h2].
 
-cut [b] : (exists (x' : 'a), !(mem x' xs => f x = f x' => x = x'));first (apply (ex_for (lambda x',
+cut [b] : (exists (x' : 'a), !(mem x' xs => f x = f x' => x = x'));first (apply (ex_for (fun x',
 !(mem x' xs => f x = f x' => x = x')) _));apply H.
 clear H.
 rewrite (rw_imp (mem b xs)).
@@ -673,7 +673,7 @@ qed.
 
 lemma dec_interval (x y:int):
     x <= y =>
-    (img (lambda (x : int), x-1) (rm x (interval x y)) =
+    (img (fun (x : int), x-1) (rm x (interval x y)) =
     (rm y (interval x y))
     ).
 proof strict.
@@ -751,7 +751,7 @@ qed.
 
 lemma mu_Lmem_card (l:'a list) (d:'a distr) (bd:real):
   (forall (x : 'a), List.mem x l => mu_x d x = bd) =>
-  mu d (lambda x, List.mem x l) = (card (of_list l))%r * bd. 
+  mu d (fun x, List.mem x l) = (card (of_list l))%r * bd. 
 proof.  
   intros Hmu; rewrite (mu_eq _ _ (cpMem (of_list l))). 
     by intros x;rewrite /cpMem => /=; apply mem_of_list.
@@ -760,7 +760,7 @@ save.
 
 lemma mu_Lmem_le_card (l:'a list) (d:'a distr) (bd:real):
   (forall (x : 'a), List.mem x l => mu_x d x <= bd) =>
-  mu d (lambda x, List.mem x l) <= (card (of_list l))%r * bd. 
+  mu d (fun x, List.mem x l) <= (card (of_list l))%r * bd. 
 proof.  
   intros Hmu; rewrite (mu_eq _ _ (cpMem (of_list l))). 
     by intros x;rewrite /cpMem => /=; apply mem_of_list.
@@ -769,7 +769,7 @@ save.
 
 lemma mu_Lmem_le_length (l:'a list) (d:'a distr) (bd:real):
   (forall (x : 'a), List.mem x l => mu_x d x <= bd) =>
-  mu d (lambda x, List.mem x l) <= (length l)%r * bd. 
+  mu d (fun x, List.mem x l) <= (length l)%r * bd. 
 proof.
   elimT list_case l.
     intros _; rewrite length_nil (mu_eq _ _ (cpFalse)).
@@ -861,7 +861,7 @@ theory Dinter_uni.
   
   lemma mu_in_supp (i j : int):
     i <= j => 
-    mu (dinter i j) (lambda x, i <= x <= j) = 1%r.
+    mu (dinter i j) (fun x, i <= x <= j) = 1%r.
   proof strict.
   by intros=> H;
      rewrite -(mu_in_supp_eq (dinter i j) cpTrue);

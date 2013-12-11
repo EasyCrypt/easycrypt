@@ -4,11 +4,11 @@ type u.
 op c : u.
 
 module type I = {
-  fun f() : t
+  proc f() : t
 }.
 
 module M : I = {
-  fun f() : u = {
+  proc f() : u = {
     return c;
   }
 }.

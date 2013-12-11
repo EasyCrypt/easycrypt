@@ -45,7 +45,7 @@ lemma Sample_bool (A<:Worker) &m (p:glob A -> bool):
       1%r/2%r*(Pr[A.work(true) @ &m : res /\ p (glob A)] - 
                Pr[A.work(false) @ &m : res /\ p (glob A)]).
 proof strict.
-  cut := Mean A &m (lambda b (gA:glob A) (b':bool), b = b' /\ p gA) => /= ->.
+  cut := Mean A &m (fun b (gA:glob A) (b':bool), b = b' /\ p gA) => /= ->.
   cut Hd: 2%r <> Real.zero by smt.
   cut -> : Pr[A.work(true) @ &m : true = res /\ p (glob A)] = 
            Pr[A.work(true) @ &m : res /\ p (glob A)].
@@ -66,7 +66,7 @@ lemma Sample_bool_lossless (A<:Worker) &m:
       1%r/2%r*(Pr[A.work(true) @ &m : res] - Pr[A.work(false) @ &m : res]).
 proof strict.
   intros Hloss.
-  cut := Sample_bool A &m (lambda x, true) => /= <-.
+  cut := Sample_bool A &m (fun x, true) => /= <-.
   by rewrite Hloss.
 qed.
 

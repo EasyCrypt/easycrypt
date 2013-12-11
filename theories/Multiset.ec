@@ -44,12 +44,12 @@ lemma count_pos: forall (xs:'a multiset) p,
   0 <= count xs p.
 proof.
 intros xs p.
-apply (induction<:'a> xs (lambda xs, 0 <= count xs p) _ _);
+apply (induction<:'a> xs (fun xs, 0 <= count xs p) _ _);
 smt.
 save.
 
 lemma card_add: forall (x:'a) xs,
-  count (add xs x) (lambda x, true) = 1 + count xs (lambda x, true).
+  count (add xs x) (fun x, true) = 1 + count xs (fun x, true).
 proof. by intros x xs; smt. save.
 
 lemma add_commutative: forall (x y:'a) xs,

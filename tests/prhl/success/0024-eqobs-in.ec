@@ -3,7 +3,7 @@ require import Int.
 module G1 = {
   var u : int
 
-  fun g(x : int) : int = {
+  proc g(x : int) : int = {
     if (u < 10) {
       x = x + 1;
       x = x + 2;
@@ -13,14 +13,14 @@ module G1 = {
     return x;
   }
 
-  fun f(x : int) : int = {
+  proc f(x : int) : int = {
     x = x + 3;
     x = x + 1 - 4;
     x = g(x);
     return x;
   }
 
-  fun main (x:int) : int = { 
+  proc main (x:int) : int = { 
     var y, z : int;
     u = 10;
     y = f(x);
@@ -32,7 +32,7 @@ module G1 = {
 module G2 = {
   var u : int
 
-  fun g(x : int) : int = {
+  proc g(x : int) : int = {
     if (u < 10) {
       x = x + 1;
       x = x + 1;
@@ -41,12 +41,12 @@ module G2 = {
     return x;
   }
 
-  fun f(x : int) : int = {
+  proc f(x : int) : int = {
     x = g(x);
     return x;
   }
 
-  fun main (x:int) : int = { 
+  proc main (x:int) : int = { 
     var y, z : int;
     u = 10;
     y = f(x);
@@ -60,7 +60,7 @@ lemma G1_G2_g :
         ={x} /\ G1.u{1} = G2.u{2} ==>
         ={res} /\ G1.u{1} = G2.u{2}].
 proof.
-fun; wp; skip; smt.
+proc; wp; skip; smt.
 qed.
 
 lemma G1_G2_f :
@@ -68,7 +68,7 @@ lemma G1_G2_f :
         ={x} /\ G1.u{1} = G2.u{2} ==>
         ={res} /\ G1.u{1} = G2.u{2}].
 proof.
-fun.
+proc.
 call (_ : ={x} /\ G1.u{1} = G2.u{2} ==> ={res} /\ G1.u{1} = G2.u{2}).
 apply G1_G2_g.
 wp; skip; smt.
@@ -77,7 +77,7 @@ qed.
 lemma G1_G2_main :
   equiv[G1.main ~ G2.main : ={x} ==> ={res}].
 proof.
-fun.
+proc.
 eqobs_in (G1.u{1} = G2.u{2}) true : (={z}).
 apply G1_G2_f.
 save.

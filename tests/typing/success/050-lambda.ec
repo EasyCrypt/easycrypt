@@ -1,2 +1,2 @@
 op id : bool =
-  (lambda (x:bool) (y:int), x) true 0.
+  (fun (x:bool) (y:int), x) true 0.

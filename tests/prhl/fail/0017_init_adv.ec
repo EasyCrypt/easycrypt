@@ -1,23 +1,23 @@
 require import Int.
 
 module type Or = { 
-  fun o (x:int) : int 
+  proc o (x:int) : int 
 }.
 
 module type Adv (O:Or) = { 
-  fun a1 () : unit {*}
-  fun a2 (x:int) : int {O.o}
+  proc a1 () : unit {*}
+  proc a2 (x:int) : int {O.o}
 }. 
 
 module O = { 
-  fun o (x:int) : int = { return x; }
+  proc o (x:int) : int = { return x; }
 }.
 
 module G (A:Adv) = { 
 
   module A1 = A(O)
 
-  fun main () : int = {
+  proc main () : int = {
     var x : int;
     A1.a1();
     x = A1.a2(3);
@@ -31,16 +31,16 @@ axiom foo : forall &m1 &m2(A<:Adv),
 
 module L = { 
   var x : int
-  fun f () : int = { return x; }
+  proc f () : int = { return x; }
 }.
 
 module A (O:Or) = {
   var s : int
-  fun a1 () : unit = { 
+  proc a1 () : unit = { 
     s = 1; 
 (*    L.x = 2; *)
   }
-  fun a2(x:int) : int = { 
+  proc a2(x:int) : int = { 
     x = O.o(x); 
     x = L.f();
     return s + x;

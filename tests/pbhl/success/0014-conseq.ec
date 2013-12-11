@@ -5,7 +5,7 @@ require import Bool.
 
 module M = { 
   
-  fun f() : bool = { 
+  proc f() : bool = { 
     var x : bool;
     x = $Dbool.dbool;
     return x;
@@ -16,14 +16,14 @@ lemma foo : bd_hoare [M.f : false ==> res] = (1%r/2%r).
   conseq ( _: true ==> res=true).
   smt.
   smt.
-  fun.
-  rnd (1%r/2%r) (lambda (x), x). 
+  proc.
+  rnd (1%r/2%r) (fun (x), x). 
   skip.
   smt.
 save.
 
 module M2 = { 
-  fun f() : int = { 
+  proc f() : int = { 
     return 2;
   }
 }.
@@ -32,7 +32,7 @@ lemma foo2 : bd_hoare [M2.f : true ==> false] <= 1%r.
   conseq ( _: true ==> res<=2).
   smt.
   smt.
-  fun.
+  proc.
   pr_bounded. 
   smt.
 save.
@@ -41,7 +41,7 @@ lemma foo3 : bd_hoare [M2.f : true ==> true] >= (1%r/2%r).
   conseq ( _: true ==> res=2).
   smt.
   smt.
-  fun.
+  proc.
   admit.
 (* 
   FIXME: either I extend the conseq tactic with an 
@@ -54,7 +54,7 @@ save.
 lemma bug_15920 : bd_hoare [M2.f : true ==> false] <= 1%r.
   conseq ( _: true ==> _).
   smt.
-  fun.
+  proc.
   pr_bounded. 
   smt.
 save.

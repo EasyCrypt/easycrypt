@@ -3,12 +3,12 @@ require import Int.
 require import Bool.
 
 module X = {
-  fun f(x : int) : int = {
+  proc f(x : int) : int = {
     return x - 1;
   }
 
 
-  fun main(y : int) : bool = {
+  proc main(y : int) : bool = {
     var x : int;
     var b : bool;
     x = f(y);
@@ -23,7 +23,7 @@ lemma X_f :
         res{1} < y /\ ={res}].
 proof.
 intros y.
-fun; skip; smt.
+proc; skip; smt.
 qed.
 
 lemma X_main :
@@ -31,7 +31,7 @@ lemma X_main :
         ={y} ==>
         ={res} /\ res{1}].
 proof.
- fun.
+ proc.
  exists * y{1}.
  elim *.
  intros yy.

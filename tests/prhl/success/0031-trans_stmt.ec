@@ -1,7 +1,7 @@
 require import Int.
 module M = {
   var w : int
-  fun f () : int = {
+  proc f () : int = {
     var x,y : int;
     x = 1;
     y = 2;
@@ -11,7 +11,7 @@ module M = {
 
 module M' = { 
   var w : int
-  fun f () : int = {
+  proc f () : int = {
     var x,y : int;
     x = 1;
     y = 2;
@@ -21,7 +21,7 @@ module M' = {
 
 equiv foo : M.f ~ M'.f : M.w{1} = M'.w{2} + 1 ==> ={res}.
 proof.
-  fun.
+  proc.
   transitivity {1} { x=1;} (={M.w} ==> ={M.w,x})
                           (M.w{1} = M'.w{2} + 1 ==> x{1} + M.w{1} = y{2} + M'.w{2}).
     intros &m1 &m2 H; exists M.w{m1} => //.

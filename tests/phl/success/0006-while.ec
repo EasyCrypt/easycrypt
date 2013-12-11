@@ -1,7 +1,7 @@
 require Logic.
 
 module M = { 
-  fun f () : int * int = {
+  proc f () : int * int = {
     var x : int;
     var y : int;
     x = 1;
@@ -15,14 +15,14 @@ module M = {
 
 lemma foo : hoare [M.f : true ==> res = (1,0)].
 proof.
- fun.
+ proc.
  while (x=1).   
  wp;skip;simplify;split.
  wp;skip;simplify;split.
 save.
 
 module M1 = { 
-  fun f () : int * int= {
+  proc f () : int * int= {
     var x : int;
     var y : int;
     x = 1;
@@ -36,7 +36,7 @@ module M1 = {
 
 lemma foo1 : hoare [M1.f : true ==> res = (10,10)].
 proof.
- fun.
+ proc.
  while (x=1).   
    wp;skip.
    intros _ h.

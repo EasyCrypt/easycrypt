@@ -7,7 +7,7 @@ module Test = {
   var y: int
   var z: int
 
-  fun test () : unit = {
+  proc test () : unit = {
     x = 0;
     y = 1;
     (x,y) = (y,x);
@@ -18,7 +18,7 @@ module Test = {
 
 
 lemma test : hoare [Test.test : Test.z=10 ==> Test.z=1 /\ Test.y=10 /\ Test.x=11].
-fun.
+proc.
 sp 1.
 skip.
 smt.

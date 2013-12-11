@@ -2,7 +2,7 @@ require import Distr. import Dinter.
 require import Int. 
 
 module G1 = {
-  fun f() : bool = {
+  proc f() : bool = {
     var z : int;
     z = $dinter 0 0;
     return true;
@@ -10,7 +10,7 @@ module G1 = {
 }.
 
 module G2 = {
-  fun f() : bool = {
+  proc f() : bool = {
     var z : int;
     var b : bool = false;
     z = $dinter 0 0;
@@ -22,9 +22,9 @@ module G2 = {
 (* Should not be provable *)
 equiv backward : G1.f ~ G2.f : true ==> true.
 proof. 
- fun.
+ proc.
  wp.
- rnd (lambda z, 1 - z), (lambda z, 1 - z).
+ rnd (fun z, 1 - z), (fun z, 1 - z).
  wp.
  skip.
  smt.

@@ -8,14 +8,14 @@ module ROe = {
   var hs : to
   var m : (from, to) map
 
-  fun init (x:from) : unit = {
+  proc init (x:from) : unit = {
     xs = x;
     m = empty;
     hs = $dsample;
 
   }
 
-  fun o(x:from) : to = {
+  proc o(x:from) : to = {
     var y : to;
     y = $dsample;
     if (!in_dom x m) 
@@ -26,8 +26,8 @@ module ROe = {
 }.
 
 module type Adv (O:ARO) = {
-  fun a0 () : from {}
-  fun a1 () : bool 
+  proc a0 () : from {}
+  proc a1 () : bool 
 }.
 
 section.
@@ -38,7 +38,7 @@ section.
  local module A2 = A(ROe). 
  
  local module G1 = {
-  fun main() : bool = {
+  proc main() : bool = {
     var x:from;
     var b:bool;
     x = A1.a0();
@@ -49,7 +49,7 @@ section.
  }.
 
  local module G2 = {
-  fun main() : bool = {
+  proc main() : bool = {
     var x:from;
     var b:bool;
     x = A2.a0();
@@ -64,14 +64,14 @@ section.
   equiv [G2.main ~ G1.main : ={glob A} ==>
                             ={glob A,res} /\ ROe.m{1} = ROM.RO.m{2} ].
  proof.
-  intros Hw;fun.
+  intros Hw;proc.
   inline ROM.RO.init ROe.init.
   seq 4 2 : (={glob A,x} /\ ROe.m{1} = ROM.RO.m{2} );first by eqobs_in. 
   eager (h : ROe.hs = $dsample;  ~  : true ==> true) : (={glob A} /\ ROe.m{1} = ROM.RO.m{2}).
   rnd{1} => //.
   trivial.
-  eager fun h (ROe.m{1} = ROM.RO.m{2}) => //.
-  eager fun.
+  eager proc h (ROe.m{1} = ROM.RO.m{2}) => //.
+  eager proc.
   case (!in_dom x ROe.m){1}.
    rcondt{1} 3.
      intros &m;conseq * (_ : _ ==> true) => //.
@@ -85,6 +85,6 @@ section.
   rcondf{2} 2.
     intros &m;conseq * (_ : _ ==> true) => //.
   eqobs_in;rnd{1} => //.
-  fun;eqobs_in.
+  proc;eqobs_in.
 save.
 

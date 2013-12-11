@@ -1,3 +1,3 @@
 lemma foo : true.
 proof.
- fun.
+ proc.

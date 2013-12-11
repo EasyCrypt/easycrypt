@@ -2,12 +2,12 @@ require Logic.
 module M1 = {
   var y : int
   var z : int
-  fun f (x:int) : int = { 
+  proc f (x:int) : int = { 
     y = x;
     return 3;
   }
 
-  fun g (x:int) : int = {
+  proc g (x:int) : int = {
     var r : int;
     r  = f(x);
     return r;
@@ -17,12 +17,12 @@ module M1 = {
 module M2 = {
   var y : int
   var z : int
-  fun f (w:int) : int = { 
+  proc f (w:int) : int = { 
     y = w;
     return 3;
   }
 
-  fun g (w:int) : int = {
+  proc g (w:int) : int = {
     var r : int;
     r  = f(w);
     return r;
@@ -34,9 +34,9 @@ lemma foo :
   equiv [M1.g ~ M2.g : M1.z{1}=M2.z{2} /\ M1.y{1} = M2.y{2} /\ x{1} = w{2} 
         ==> res{1} = res{2} /\ M1.z{1} = M2.z{2} /\ M1.y{1} = M2.y{2}].
 proof.
-  fun.
+  proc.
   call (_ : x{1}=w{2} ==> res{1} = res{2} /\ M1.y{1} = M2.y{2}).
-    fun;wp;skip.
+    proc;wp;skip.
     intros &m1 &m2 h;simplify;assumption.
   skip.
   intros &m1 &m2 h;elim h;clear h;intros h1 h2.
@@ -46,13 +46,13 @@ save.
 
 
 module type Adv = {
-  fun f() : unit
+  proc f() : unit
 }.
 
 
 module M(A:Adv) = {
 
-  fun g() : unit = {
+  proc g() : unit = {
     A.f();
   }
 
@@ -61,9 +61,9 @@ module M(A:Adv) = {
 lemma foo1 : forall (A<:Adv {M}), hoare [M(A).g : true ==> true].
 proof.
 intros A.
-fun.
+proc.
 call (_ : true ==> true).
-fun true;progress.
+proc true;progress.
 skip;progress.
 save.
 

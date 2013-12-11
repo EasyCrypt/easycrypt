@@ -3,7 +3,7 @@ require import Int.
 require import Real.
 
 module M1 = { 
-  fun f () : int * int= {
+  proc f () : int * int= {
     var x : int;
     var y : int;
     x = 1;
@@ -17,7 +17,7 @@ module M1 = {
 
 lemma test1 : bd_hoare [M1.f : true ==> true] = (1%r).
 proof.
-  fun.
+  proc.
   while (x<=y) (y-x).
   intros z.
   wp; skip; smt.

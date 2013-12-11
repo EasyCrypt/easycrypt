@@ -20,7 +20,7 @@ theory GenDice.
       mem x (sub_supp i) <=> test i x.
   
   module RsampleW = {
-    fun sample (i:input, r:t) : t = {
+    proc sample (i:input, r:t) : t = {
       while (!test i r) {
          r = $(d i);
       }
@@ -39,7 +39,7 @@ theory GenDice.
     cut bdt_pos: 0 <= card (sub_supp i0) by smt.
     cut bdt_posr: 0%r <= (card (sub_supp i0))%r by smt.
     case (test i0 k) => Htk &m Hdfl Hweight;
-      bdhoare_deno (_: !test i r /\ i0 = i ==> k = res) => //;fun.
+      bdhoare_deno (_: !test i r /\ i0 = i ==> k = res) => //;proc.
       (* case : test i k *)
       pose bd := mu_x (d i0) k.
       cut d_uni : forall x, in_supp x (d i0) => mu_x (d i0) x = bd.
@@ -89,7 +89,7 @@ theory GenDice.
   op d' : input -> t' distr.
 
   module Sample = {  
-    fun sample (i:input) : t' = {
+    proc sample (i:input) : t' = {
       var r : t';
       r = $(d' i);
       return r;
@@ -100,9 +100,9 @@ theory GenDice.
   
   lemma prSample : forall i k &m, Pr[Sample.sample(i) @ &m : res = k] = mu_x (d' i) k.
   proof.
-    intros i0 k &m; bdhoare_deno (_: i0 = i ==> k = res) => //;fun.
+    intros i0 k &m; bdhoare_deno (_: i0 = i ==> k = res) => //;proc.
     rnd;skip;progress.
-    by apply (mu_eq (d' i{hr}) (lambda (x:t'), k = x) ((=) k)).
+    by apply (mu_eq (d' i{hr}) (fun (x:t'), k = x) ((=) k)).
   save.
 
   equiv Sample_RsampleW (f : t' -> t) (finv : t -> t') : 
@@ -119,7 +119,7 @@ theory GenDice.
                Pr[RsampleW.sample(i{m2}, r{m2}) @ &m2 : res = f k]).
       equiv_deno (_: ={i,r} /\ i{2} = i{m2} ==> 
                         ={res} /\ test i{m2} res{2}) => //.
-        by fun;while (={i,r});[rnd | ];trivial.
+        by proc;while (={i,r});[rnd | ];trivial.
       progress => //. 
         by rewrite Hffi.
       by rewrite Hfif // Htin Heqi.

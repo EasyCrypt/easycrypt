@@ -1,5 +1,5 @@
 module type Adv = {
-  fun f () : unit
+  proc f () : unit
 }.
 
 section.
@@ -9,14 +9,14 @@ section.
   local module M = { var x : int }.
 
   local module G1 = {
-    fun f () : unit = {
+    proc f () : unit = {
       M.x = 1;
       A.f();
     }
   }.
 
   local module G2 = {
-    fun f () : unit = {
+    proc f () : unit = {
       A.f();
       M.x = 1;
     }
@@ -24,7 +24,7 @@ section.
 
   local equiv foo : G1.f ~ G2.f : ={glob A} ==> true.
   proof.
-    fun;swap{1} 1;wp;call (_:true) => //.
+    proc;swap{1} 1;wp;call (_:true) => //.
   save.
 end section.
 
@@ -35,14 +35,14 @@ section.
   declare module A : Adv {M}.
 
   local module G1 = {
-    fun f () : unit = {
+    proc f () : unit = {
       M.x = 1;
       A.f();
     }
   }.
 
   local module G2 = {
-    fun f () : unit = {
+    proc f () : unit = {
       A.f();
       M.x = 1;
     }
@@ -50,6 +50,6 @@ section.
 
   local equiv foo : G1.f ~ G2.f : ={glob A} ==> true.
   proof.
-    fun;swap{1} 1;wp;call (_:true) => //.
+    proc;swap{1} 1;wp;call (_:true) => //.
   save.
 end section.

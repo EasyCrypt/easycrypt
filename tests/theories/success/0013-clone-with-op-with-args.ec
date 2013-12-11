@@ -14,7 +14,7 @@ clone T as U with op myop(x, y, z) = x + y + 2*z.
 
 clone T as V with op myop(x, y, z) <- x + y + 2*z.
 
-clone T as W with op myop <- lambda (x, y, z), x + y + 2*z.
+clone T as W with op myop <- fun (x, y, z), x + y + 2*z.
 
 clone T as X with op myop <- o.
 

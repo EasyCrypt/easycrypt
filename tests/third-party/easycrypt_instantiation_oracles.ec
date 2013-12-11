@@ -23,7 +23,7 @@ import RO. (* Maybe we should let users "clone import X as Y"? *)
 
 (* An adversary with a function using two oracles *)
 module type Adversary(O1:Oracle, O2:Oracle) = {
-  fun main():bool
+  proc main():bool
 }.
 
 (* Experiment *)
@@ -32,7 +32,7 @@ require import Map.
 module Experiment(O1:Oracle, O2:Oracle, A:Adversary) = {
   module A_ = A(O1,O2)
 
-  fun main(): bool = {
+  proc main(): bool = {
     var b:bool;
     (* Setup Phase *)
     O1.init(); O2.init();
@@ -54,13 +54,13 @@ module R = RO2.RO.
 module F:Oracle = {
   var k:gf_q
 
-  fun init(): unit = {
+  proc init(): unit = {
     var k':int;
     k' = $dinter 0 (q - 1);
     k = i_to_gf_q k';
   }
 
-  fun o(x:t): group = {
+  proc o(x:t): group = {
     var y:group;
     y  = H.o(x);
     y = y ^ k;
@@ -86,7 +86,7 @@ adversary type B = {
 adversary A(B : B): A = {
   (* See the following comment for how to interpret {O : t -> group} *)
 
-  fun Process{O : t -> group}(xs : t list) : group list = {
+  proc Process{O : t -> group}(xs : t list) : group list = {
     var ys : group list;
     var y : group;
     var x : t;
@@ -106,7 +106,7 @@ adversary A(B : B): A = {
      used when declaring an adversary's type, as well as when calling
      an adversary *)
 
-  fun A{H : t -> group, O : t -> group}() : bool = {
+  proc A{H : t -> group, O : t -> group}() : bool = {
     var xs : t list;
     var gs : group list;
     var b : bool;
@@ -129,11 +129,11 @@ claim G0_G1_A : | G0_A.Main[res] - G0_A.Main[res] | <= epsilon.
 game G0_A(B : B) = {
   var hState : (t, group)map
 
-  fun InitH() : unit = {
+  proc InitH() : unit = {
     hState = empty_map;
   }
 
-  fun H(x : t) : group = {
+  proc H(x : t) : group = {
     var y : group;
     if (!in_dom(x, hState)) {
       y = rand();
@@ -144,14 +144,14 @@ game G0_A(B : B) = {
 
   var k : int
 
-  fun F(x : t) : group = {
+  proc F(x : t) : group = {
     var y : group;
     y = H(x);
     y = y ^ k;
     return y;
   }
 
-  fun Process{O : t -> group}(xs : t list) : group list = {
+  proc Process{O : t -> group}(xs : t list) : group list = {
     var ys : group list;
     var y : group;
     var x : t;
@@ -165,7 +165,7 @@ game G0_A(B : B) = {
     return ys;
   }
 
-  fun A{H : t -> group, O : t -> group}() : bool = {
+  proc A{H : t -> group, O : t -> group}() : bool = {
     var xs : t list;
     var gs : group list;
     var b : bool;
@@ -175,7 +175,7 @@ game G0_A(B : B) = {
     return b;
   }
 
-  fun Main() : bool = {
+  proc Main() : bool = {
     var b : bool;
     k = [0 .. ord - 1];  (* F depends on k *)
     InitH();
@@ -189,11 +189,11 @@ And, doing the second instantiation by hand, we get:
 game G1_A(B : B) = {
   var hState : (t, group)map
 
-  fun InitH() : unit = {
+  proc InitH() : unit = {
     hState = empty_map;
   }
 
-  fun H(x : t) : group = {
+  proc H(x : t) : group = {
     var y : group;
     if (!in_dom(x, hState)) {
       y = rand();
@@ -204,11 +204,11 @@ game G1_A(B : B) = {
 
   var rState : (t, group)map
 
-  fun InitR() : unit = {
+  proc InitR() : unit = {
     rState = empty_map;
   }
 
-  fun R(x : t) : group = {
+  proc R(x : t) : group = {
     var y : group;
     if (!in_dom(x, rState)) {
       y = rand();
@@ -217,7 +217,7 @@ game G1_A(B : B) = {
     return rState[x];
   }
 
-  fun Process{O : t -> group}(xs : t list) : group list = {
+  proc Process{O : t -> group}(xs : t list) : group list = {
     var ys : group list;
     var y : group;
     var x : t;
@@ -231,7 +231,7 @@ game G1_A(B : B) = {
     return ys;
   }
 
-  fun A{H : t -> group, O : t -> group}() : bool = {
+  proc A{H : t -> group, O : t -> group}() : bool = {
     var xs : t list;
     var gs : group list;
     var b : bool;
@@ -241,7 +241,7 @@ game G1_A(B : B) = {
     return b;
   }
 
-  fun Main() : bool = {
+  proc Main() : bool = {
     var b : bool;
     InitH(); InitR();
     b = A{H, R}();

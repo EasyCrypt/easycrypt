@@ -15,17 +15,17 @@ clone import Hybrid as H
        type outputA <- bool.
 
 module type Orcl = {
-  fun leaks (il:inleaks) : outleaks  
-  fun orcl (m:input) : output
+  proc leaks (il:inleaks) : outleaks  
+  proc orcl (m:input) : output
 }.
 
 module type LR = {
-  fun orcl (m0 m1:input) : output
+  proc orcl (m0 m1:input) : output
 }.
 
 module OrclL (O:Orcl) = {
 
-  fun orcl (m0 m1:input) : output = {
+  proc orcl (m0 m1:input) : output = {
     var r : output;
     r = O.orcl(m0);
     C.incr();
@@ -34,7 +34,7 @@ module OrclL (O:Orcl) = {
 }.
 
 module OrclR (O:Orcl) = {
-  fun orcl (m0 m1:input) : output = {
+  proc orcl (m0 m1:input) : output = {
     var r : output;
     C.incr();
     r = O.orcl(m1);
@@ -45,7 +45,7 @@ module OrclR (O:Orcl) = {
 module Orclb (O:Orcl) = {
 
   var b:bool
-  fun orcl (m0 m1:input) : output = {
+  proc orcl (m0 m1:input) : output = {
     var r : output;
     C.incr();
     r = O.orcl(b?m0:m1);
@@ -53,11 +53,11 @@ module Orclb (O:Orcl) = {
   }
 }.
 
-module type Adv (O:Orcl, LR:LR) = { fun main():bool { O.leaks O.orcl LR.orcl }}.
+module type Adv (O:Orcl, LR:LR) = { proc main():bool { O.leaks O.orcl LR.orcl }}.
 
 module INDL (O:Orcl, A:Adv) = {
   module A = A(O,OrclL(O))
-  fun main():bool = {
+  proc main():bool = {
     var b' : bool;
     C.init();
     b' = A.main();
@@ -67,7 +67,7 @@ module INDL (O:Orcl, A:Adv) = {
 
 module INDR (O:Orcl, A:Adv) = {
   module A = A(O,OrclR(O))
-  fun main():bool = {
+  proc main():bool = {
     var b' : bool;
     C.init();
     b' = A.main();
@@ -77,7 +77,7 @@ module INDR (O:Orcl, A:Adv) = {
 
 module INDb(O:Orcl,A:Adv) = {
   module A = A(O,Orclb(O))
-  fun main():bool = {
+  proc main():bool = {
     var b' : bool;
     C.init();
     Orclb.b = ${0,1};
@@ -95,7 +95,7 @@ section.
 
   local module WA = {
     module A=A(O,Orclb(O))  
-    fun work(x:bool) : bool = {
+    proc work(x:bool) : bool = {
       var b' : bool;
       C.init();
       Orclb.b = x;
@@ -111,20 +111,20 @@ section.
       Pr[INDR(O,A).main() @ &m : res /\ p (glob A) (glob O) C.c])/2%r.
   proof strict.
    cut := Sample_bool WA &m 
-     (lambda (g:glob WA), let (b,c,go,ga) = g in p ga go c) => /= H.
+     (fun (g:glob WA), let (b,c,go,ga) = g in p ga go c) => /= H.
    cut -> : Pr[INDb(O, A).main() @ &m : res /\ p (glob A) (glob O) C.c] =
     Pr[MB.M.Rand(WA).main() @ &m : fst res = snd res /\ p (glob A) (glob O) C.c].
      equiv_deno (_: ={glob A,glob O} ==> ={glob A,glob O, C.c} /\
-                   res{1} = (fst res = snd res){2}) => //;fun.
+                   res{1} = (fst res = snd res){2}) => //;proc.
      inline C.init WA.work;simplify fst snd. 
-     by swap{1} 2 -1; eqobs_in; fun (={Orclb.b, C.c}).
+     by swap{1} 2 -1; eqobs_in; proc (={Orclb.b, C.c}).
    cut He: equiv [INDR(O, A).main ~ WA.work: x{2}=false /\ 
                    ={glob A,glob O} ==> ={res,glob A,glob O, C.c}].
-    fun. 
+    proc. 
     call (_: ={glob O, C.c} /\ Orclb.b{2} = false).
-      by fun (={C.c} /\ Orclb.b{2} = false).      
-      by fun (={C.c} /\ Orclb.b{2} = false). 
-      by fun;inline C.incr;wp;call(_:true);wp;skip;progress.
+      by proc (={C.c} /\ Orclb.b{2} = false).      
+      by proc (={C.c} /\ Orclb.b{2} = false). 
+      by proc;inline C.incr;wp;call(_:true);wp;skip;progress.
     inline C.init;by wp.
    cut -> : Pr[INDR(O, A).main() @ &m : p (glob A) (glob O) C.c] =
             Pr[WA.work(false) @ &m : p (glob A) (glob O) C.c].
@@ -136,10 +136,10 @@ section.
             Pr[WA.work(true) @ &m : res /\ p (glob A) (glob O) C.c]) => //.
    equiv_deno 
       (_: x{2}=true /\ ={glob A,glob O} ==> ={res,glob A,glob O, C.c}) => //.
-   fun; call (_: ={glob O, C.c} /\ Orclb.b{2} = true).
-     by fun (={C.c} /\ Orclb.b{2} = true).      
-     by fun (={C.c} /\ Orclb.b{2} = true). 
-     by fun;inline C.incr;wp;call(_:true);wp;skip;progress.
+   proc; call (_: ={glob O, C.c} /\ Orclb.b{2} = true).
+     by proc (={C.c} /\ Orclb.b{2} = true).      
+     by proc (={C.c} /\ Orclb.b{2} = true). 
+     by proc;inline C.incr;wp;call(_:true);wp;skip;progress.
    inline C.init;by wp.
  qed.
 
@@ -148,19 +148,19 @@ end section.
 (* We prove that IND-n is equivalent to IND-1 *)
 
 module Orcl2(O:Orcl) = {
-  fun leaks (il:inleaks) : outleaks = {
+  proc leaks (il:inleaks) : outleaks = {
     var r : outleaks;
     r = O.leaks(il);
     return r;
   }
 
-  fun orcl1 (m:input * input) : output = {
+  proc orcl1 (m:input * input) : output = {
     var r : output;
     r = O.orcl(fst m);
     return r;
   }
 
-  fun orcl2 (m:input * input) : output = {
+  proc orcl2 (m:input * input) : output = {
     var r : output;
     r = O.orcl(snd m);
     return r;
@@ -168,7 +168,7 @@ module Orcl2(O:Orcl) = {
 }.
 
 module LRB2 (O:Orcl,LR:LR) = {
-  fun orcl(m0 m1:input):output = {
+  proc orcl(m0 m1:input):output = {
     var r : output;
     if (LRB.l0 < LRB.l) r = O.orcl(m0);
     else { 
@@ -182,7 +182,7 @@ module LRB2 (O:Orcl,LR:LR) = {
 
 module B(A:Adv, O:Orcl, LR:LR) = {
   module A = A(O,LRB2(O,LR))
-  fun main():bool = {
+  proc main():bool = {
     var b':bool;
     LRB.l0 = $[0..q-1];
     LRB.l  = 0;
@@ -198,26 +198,26 @@ section.
 
   local module A' (Ob:Orclb, LR:H.Orcl) = {
     module O = {
-      fun leaks(il:inleaks) : outleaks = {
+      proc leaks(il:inleaks) : outleaks = {
         var r : outleaks;
         r = Ob.leaks(il);
         return r;
       }
-      fun orcl(m:input) : output = {
+      proc orcl(m:input) : output = {
         var r:output;
         r = Ob.orcl1((m,m));
         return r;
       }
     }
     module LR' = {
-      fun orcl (m0 m1:input) : output = {
+      proc orcl (m0 m1:input) : output = {
         var r : output;
         r = LR.orcl((m0,m1));
         return r;
       }
     }
     module A = A(O,LR')
-    fun main():bool = {
+    proc main():bool = {
       var b':bool;
       b' = A.main();
       return b';
@@ -243,12 +243,12 @@ section.
          Pr[INDR(O,A).main() @ &m :  res /\ p (glob A) (glob O) C.c /\
                                   C.c <= q]).
   proof.
-    cut := Hybrid (Orcl2(O)) A' _ _ _ _ _ &m (lambda ga go c b, b /\ p ga go c).
-      by fun;call losslessL.
-      by fun;call losslessO.
-      by fun;call losslessO.
-      intros Ob LR Hlr Hl Ho1 Ho2;fun.
-      by call (losslessA (<:A'(Ob,LR).O) (<:A'(Ob,LR).LR') _ _ _) => //;fun;
+    cut := Hybrid (Orcl2(O)) A' _ _ _ _ _ &m (fun ga go c b, b /\ p ga go c).
+      by proc;call losslessL.
+      by proc;call losslessO.
+      by proc;call losslessO.
+      intros Ob LR Hlr Hl Ho1 Ho2;proc.
+      by call (losslessA (<:A'(Ob,LR).O) (<:A'(Ob,LR).LR') _ _ _) => //;proc;
         [call Hlr | call Hl | call Ho1].
       apply q_pos.
     zeta beta => H.
@@ -257,70 +257,70 @@ section.
              Pr[Ln(Orcl2(O), H.B(A')).main() @ &m :
                  ((res /\ p (glob A) (glob O) LRB.l) /\ LRB.l <= q) /\ C.c <= 1].
       equiv_deno (_: ={glob A,glob O} ==>
-                     ={res,glob A,glob O,glob LRB, C.c}) => //;fun.
+                     ={res,glob A,glob O,glob LRB, C.c}) => //;proc.
       call (_: ={glob A,glob O, C.c} ==> ={glob A,glob O,glob LRB,C.c,res}).
-        fun;inline H.B(A', Orcl2(O), Orclc(L(Orcl2(O)))).A.main;wp.
+        proc;inline H.B(A', Orcl2(O), Orclc(L(Orcl2(O)))).A.main;wp.
         call (_: ={glob O, C.c, glob LRB}).
-          fun *. inline A'(Orcl2(O), LRB(Orcl2(O), Orclc(L(Orcl2(O))))).O.leaks Orcl2(O).leaks;wp.
+          proc *. inline A'(Orcl2(O), LRB(Orcl2(O), Orclc(L(Orcl2(O))))).O.leaks Orcl2(O).leaks;wp.
           by call (_:true);wp.
-          fun *. inline A'(Orcl2(O), LRB(Orcl2(O), Orclc(L(Orcl2(O))))).O.orcl Orcl2(O).orcl1;wp.
+          proc *. inline A'(Orcl2(O), LRB(Orcl2(O), Orclc(L(Orcl2(O))))).O.orcl Orcl2(O).orcl1;wp.
           by call (_:true);wp.
-          fun. inline LRB(Orcl2(O), Orclc(L(Orcl2(O)))).orcl Orcl2(O).orcl1 Orcl2(O).orcl2;wp.
+          proc. inline LRB(Orcl2(O), Orclc(L(Orcl2(O)))).orcl Orcl2(O).orcl1 Orcl2(O).orcl2;wp.
           sp;if => //;first by wp;call (_:true);wp.
           if => //;last by wp;call (_:true);wp.
           inline OrclL(O).orcl Orclc(L(Orcl2(O))).orcl L(Orcl2(O)).orcl Orcl2(O).orcl1 C.incr.
           by wp;call (_: true);wp.
         by wp;rnd.
-      by call (_:true ==> ={C.c});first by fun;wp.
+      by call (_:true ==> ={C.c});first by proc;wp.
     cut -> : Pr[INDR(O, B(A)).main() @ &m :
                  res /\ p (glob A) (glob O) LRB.l /\ LRB.l <= q /\ C.c <= 1] =
              Pr[Rn(Orcl2(O), H.B(A')).main() @ &m :
                  ((res /\ p (glob A) (glob O) LRB.l) /\ LRB.l <= q) /\ C.c <= 1].
       equiv_deno (_: ={glob A,glob O} ==>
-                     ={res,glob A,glob O,glob LRB, C.c}) => //;fun.
+                     ={res,glob A,glob O,glob LRB, C.c}) => //;proc.
       call (_: ={glob A,glob O, C.c} ==> ={glob A,glob O,glob LRB,C.c,res}).
-        fun;inline H.B(A', Orcl2(O), Orclc(R(Orcl2(O)))).A.main;wp.
+        proc;inline H.B(A', Orcl2(O), Orclc(R(Orcl2(O)))).A.main;wp.
         call (_: ={glob O, C.c, glob LRB}).
-          fun *. inline A'(Orcl2(O), LRB(Orcl2(O), Orclc(R(Orcl2(O))))).O.leaks Orcl2(O).leaks;wp.
+          proc *. inline A'(Orcl2(O), LRB(Orcl2(O), Orclc(R(Orcl2(O))))).O.leaks Orcl2(O).leaks;wp.
           by call (_:true);wp.
-          fun *. inline A'(Orcl2(O), LRB(Orcl2(O), Orclc(R(Orcl2(O))))).O.orcl Orcl2(O).orcl1;wp.
+          proc *. inline A'(Orcl2(O), LRB(Orcl2(O), Orclc(R(Orcl2(O))))).O.orcl Orcl2(O).orcl1;wp.
           by call (_:true);wp.
-          fun. inline LRB(Orcl2(O), Orclc(R(Orcl2(O)))).orcl Orcl2(O).orcl1 Orcl2(O).orcl2;wp.
+          proc. inline LRB(Orcl2(O), Orclc(R(Orcl2(O)))).orcl Orcl2(O).orcl1 Orcl2(O).orcl2;wp.
           sp;if => //;first by wp;call (_:true);wp.
           if => //;last by wp;call (_:true);wp.
           inline OrclR(O).orcl Orclc(R(Orcl2(O))).orcl R(Orcl2(O)).orcl Orcl2(O).orcl2 C.incr.
           by wp;call (_: true);wp.
         by wp;rnd.
-      by call (_:true ==> ={C.c});first by fun;wp.
+      by call (_:true ==> ={C.c});first by proc;wp.
    (* BUG : rewrite H.  *)
    cut -> : Pr[INDL(O, A).main() @ &m : res /\ p (glob A) (glob O) C.c /\ C.c <= q] =
             Pr[Ln(Orcl2(O), A').main() @ &m : (res /\ p (glob A) (glob O) C.c) /\ C.c <= q].
      equiv_deno (_: ={glob A,glob O} ==>
-                    ={res,glob A,glob O, C.c}) => //;fun.
+                    ={res,glob A,glob O, C.c}) => //;proc.
       call (_: ={glob A,glob O, C.c} ==> ={glob A,glob O,C.c,res}).
-        fun *. inline A'(Orcl2(O), Orclc(L(Orcl2(O)))).main;eqobs_in.
+        proc *. inline A'(Orcl2(O), Orclc(L(Orcl2(O)))).main;eqobs_in.
         call (_: ={glob O, C.c}) => //.
-          fun *. inline A'(Orcl2(O), Orclc(L(Orcl2(O)))).O.leaks Orcl2(O).leaks;wp.
+          proc *. inline A'(Orcl2(O), Orclc(L(Orcl2(O)))).O.leaks Orcl2(O).leaks;wp.
           by call (_:true);wp.
-          fun *. inline A'(Orcl2(O), Orclc(L(Orcl2(O)))).O.orcl Orcl2(O).orcl1;wp.
+          proc *. inline A'(Orcl2(O), Orclc(L(Orcl2(O)))).O.orcl Orcl2(O).orcl1;wp.
           by call (_:true);wp.
-          fun;inline Orclc(L(Orcl2(O))).orcl L(Orcl2(O)).orcl Orcl2(O).orcl1 C.incr.
+          proc;inline Orclc(L(Orcl2(O))).orcl L(Orcl2(O)).orcl Orcl2(O).orcl1 C.incr.
         by wp;call(_:true);wp.
-      by call (_:true ==> ={C.c});first by fun;wp.
+      by call (_:true ==> ={C.c});first by proc;wp.
    cut -> : Pr[INDR(O, A).main() @ &m : res /\ p (glob A) (glob O) C.c /\ C.c <= q] =
             Pr[Rn(Orcl2(O), A').main() @ &m : (res /\ p (glob A) (glob O) C.c) /\ C.c <= q].
      equiv_deno (_: ={glob A,glob O} ==>
-                    ={res,glob A,glob O, C.c}) => //;fun.
+                    ={res,glob A,glob O, C.c}) => //;proc.
       call (_: ={glob A,glob O, C.c} ==> ={glob A,glob O,C.c,res}).
-        fun *. inline A'(Orcl2(O), Orclc(R(Orcl2(O)))).main;eqobs_in.
+        proc *. inline A'(Orcl2(O), Orclc(R(Orcl2(O)))).main;eqobs_in.
         call (_: ={glob O, C.c}) => //.
-          fun *. inline A'(Orcl2(O), Orclc(R(Orcl2(O)))).O.leaks Orcl2(O).leaks;wp.
+          proc *. inline A'(Orcl2(O), Orclc(R(Orcl2(O)))).O.leaks Orcl2(O).leaks;wp.
           by call (_:true);wp.
-          fun *. inline A'(Orcl2(O), Orclc(R(Orcl2(O)))).O.orcl Orcl2(O).orcl1;wp.
+          proc *. inline A'(Orcl2(O), Orclc(R(Orcl2(O)))).O.orcl Orcl2(O).orcl1;wp.
           by call (_:true);wp.
-          fun;inline Orclc(R(Orcl2(O))).orcl R(Orcl2(O)).orcl Orcl2(O).orcl2 C.incr.
+          proc;inline Orclc(R(Orcl2(O))).orcl R(Orcl2(O)).orcl Orcl2(O).orcl2 C.incr.
         by wp;call(_:true);wp.
-      by call (_:true ==> ={C.c});first by fun;wp.
+      by call (_:true ==> ={C.c});first by proc;wp.
     apply H.
   qed.
 

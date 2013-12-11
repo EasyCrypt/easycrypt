@@ -3,7 +3,7 @@ require import Int.
 module G1 = {
   var u : int
 
-  fun f(x : int) : int = {
+  proc f(x : int) : int = {
     x = x + 1;
     x = x + 2;
     x = x - 1;
@@ -11,7 +11,7 @@ module G1 = {
     return x;
   }
 
-  fun main (x:int) : int = { 
+  proc main (x:int) : int = { 
     var y, z : int;
     u = 10;
     y = f(x);
@@ -23,14 +23,14 @@ module G1 = {
 module G2 = {
   var u : int
 
-  fun f(x : int) : int = {
+  proc f(x : int) : int = {
     x = x + 1;
     x = x + 1;
     u = u + 1 + x;
     return x;
   }
 
-  fun main (x:int) : int = { 
+  proc main (x:int) : int = { 
     var y, z : int;
     u = 10;
     y = f(x);
@@ -42,8 +42,8 @@ module G2 = {
 lemma G1_G2_main :
   equiv[G1.main ~ G2.main : ={x} ==> ={res}].
 proof.
-fun.
+proc.
 eqobs_in (G1.u{1} = G2.u{2}) true : (={z} /\ G1.u{1} = G2.u{2}).
- fun; wp; skip; smt.
+ proc; wp; skip; smt.
 save.
 

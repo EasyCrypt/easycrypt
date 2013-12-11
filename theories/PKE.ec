@@ -9,18 +9,18 @@ type plaintext.
 type ciphertext.
 
 module type Scheme = {
-  fun kg() : pkey * skey 
-  fun enc(pk:pkey, m:plaintext)  : ciphertext 
-  fun dec(sk:skey, c:ciphertext) : plaintext option
+  proc kg() : pkey * skey 
+  proc enc(pk:pkey, m:plaintext)  : ciphertext 
+  proc dec(sk:skey, c:ciphertext) : plaintext option
 }.
 
 module type Adversary = {
-  fun choose(pk:pkey)     : plaintext * plaintext 
-  fun guess(c:ciphertext) : bool                  
+  proc choose(pk:pkey)     : plaintext * plaintext 
+  proc guess(c:ciphertext) : bool                  
 }.
 
 module CPA (S:Scheme, A:Adversary) = {
-  fun main() : bool = {
+  proc main() : bool = {
     var pk : pkey;
     var sk : skey;
     var m0, m1 : plaintext;
@@ -52,7 +52,7 @@ module CCA (S:Scheme, A:Adversary) = {
   var guess : bool
   var sk : skey
 
-  fun dec(c:ciphertext) : plaintext option = {
+  proc dec(c:ciphertext) : plaintext option = {
     var m : plaintext option;
 
     if (length log < qD && (guess => c <> cstar)) {
@@ -63,7 +63,7 @@ module CCA (S:Scheme, A:Adversary) = {
     return m;
   }
 
-  fun main() : bool = {
+  proc main() : bool = {
     var pk : pkey;
     var m0, m1 : plaintext;
     var c : ciphertext;
@@ -82,7 +82,7 @@ module CCA (S:Scheme, A:Adversary) = {
 }.
 
 module Correctness (S:Scheme) = {
-  fun main(m:plaintext) : bool = {
+  proc main(m:plaintext) : bool = {
     var pk : pkey;
     var sk : skey;
     var c  : ciphertext;

@@ -4,7 +4,7 @@ require import Pair.
 
 module M = {
   var w:int
-  fun f1():unit = {
+  proc f1():unit = {
     var x,y,z : int;
     var b : bool * bool;
     b = (true, true);
@@ -17,7 +17,7 @@ module M = {
 
   }
 
-  fun f2():unit = {
+  proc f2():unit = {
     var x,y,z : int;
     var b' : bool * bool;
     b' = (true, true);
@@ -33,7 +33,7 @@ module M = {
 
 equiv foo : M.f1 ~ M.f2 : true ==> ={M.w}.
 proof.
- fun.
+ proc.
  seq 1 1 : (b{1} = b'{2}).
   eqobs_in.
  conseq (_: _ ==> b{1} = b'{2} /\ ={M.w}) => //.

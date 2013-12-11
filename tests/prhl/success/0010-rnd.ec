@@ -3,7 +3,7 @@ require import Int.
 
 module G = {
 
-  fun f() : int = {
+  proc f() : int = {
     var k : int;
     k = $dinter 0 10;
     return k;
@@ -16,7 +16,7 @@ module G = {
 
 equiv test : G.f ~ G.f : true ==> res{1}=res{2}.
 proof.
-fun.
+proc.
 rnd.
 skip.
 smt.
@@ -26,7 +26,7 @@ save.
 
 module G' = {
 
-  fun f() : int = {
+  proc f() : int = {
     var k : int;
     k = $dinter 0 10;
     return k;
@@ -36,7 +36,7 @@ module G' = {
 (* /\ and && are not compatible??? *)
 equiv test' : G'.f ~ G'.f : true ==> 0 <= res{1} /\ res{1} <= 10.
 proof.
-fun.
+proc.
 rnd; skip; smt.
 save.
 
@@ -45,7 +45,7 @@ save.
 
 module G3 = {
   var z : int
-  fun f() : int  = {
+  proc f() : int  = {
     z = $dinter 0 1;
     return z;
   } 
@@ -53,7 +53,7 @@ module G3 = {
 
 module G4 = {
   var z : int
-  fun f() : int  = {
+  proc f() : int  = {
     z = $dinter 1 2;
     return z;
   } 
@@ -61,8 +61,8 @@ module G4 = {
 
 equiv different : G3.f ~ G4.f : true ==> G3.z{1} + 1 = G4.z{2}.
 proof.
- fun.
- rnd (lambda z, z + 1) (lambda z, z - 1).
+ proc.
+ rnd (fun z, z + 1) (fun z, z - 1).
  skip.
  progress; smt.
 save.
@@ -96,7 +96,7 @@ axiom finv_f :
 
 module G5 = {
   var z : int
-  fun f() : int  = {
+  proc f() : int  = {
     z = $dinter a b;
     return z;
   } 
@@ -105,7 +105,7 @@ module G5 = {
 
 module G6 = {
   var z : int
-  fun f() : int  = {
+  proc f() : int  = {
     z = $dinter c d;
     return z;
   } 
@@ -118,8 +118,8 @@ mu_x (dinter a b) x = mu_x (dinter c d) (f x).
 
 equiv test_wp : G5.f ~ G6.f : true ==> Q(G5.z{1},G6.z{2}).
 proof.
- fun.
- rnd (lambda x, f x) (lambda x, finv x).
+ proc.
+ rnd (fun x, f x) (fun x, finv x).
  skip.
  intros &1 &2 _ x y H1 H2.
  simplify; split;[ split;[ split;smt | smt ] | smt ].
@@ -130,8 +130,8 @@ equiv test_sp : G5.f ~ G6.f : Q(G5.z{1},G6.z{2}) ==>
  G6.z{2} = f(G5.z{1}) && a <= G5.z{1} && G5.z{1} <= b && c <= G6.z{2} && G6.z{2} <= d &&
  exists (u v:int), Q(u, v).
 proof.
- fun.
- rnd (lambda x, f x) (lambda x, finv x ).
+ proc.
+ rnd (fun x, f x) (fun x, finv x ).
  skip.
  intros &1 &2 _ x y H1 H2.
  simplify. split;[ split;[ split;smt | smt ] | smt ].
@@ -140,7 +140,7 @@ save.
 
 (* one-sided *)
 module M = {
-  fun f() : int = {
+  proc f() : int = {
     var k : int;
     k = $dinter 0 10;
     return k;
@@ -150,7 +150,7 @@ module M = {
 lemma M_in_range:
   equiv [ M.f ~ M.f : true ==> 0 <= res{1} /\ res{2} <= 10 ].
 proof.
-fun.
+proc.
  rnd{1}.
  rnd{2}.
  skip;smt.

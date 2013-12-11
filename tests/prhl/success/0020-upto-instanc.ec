@@ -1,25 +1,25 @@
 module type OR = {
-  fun f() : int
+  proc f() : int
 }.
 
 module Or : OR = {
-  fun f() : int = {
+  proc f() : int = {
     return 3;
   }
 }.
 
 module type ADV1(Or : OR) = {
-  fun g() : int {* Or.f}
+  proc g() : int {* Or.f}
 }.
 
 module type ADV2(Or : OR) = {
-  fun h() : int {* Or.f}
+  proc h() : int {* Or.f}
 }.
 
 module G(Adv2 : ADV2) = {
   module A = Adv2(Or)
 
-  fun g() : int = {
+  proc g() : int = {
     var n : int;
     n = A.h();
     return n;
@@ -34,14 +34,14 @@ lemma G :
   equiv[G(Adv2).g ~ G(Adv2).g : true ==> ={res}].
 proof.
 intros Adv2 LossAdv2.
-fun.
+proc.
 call (_ : true ==> ={res, glob Adv2}).
-(* I'm using three argument fun here just to test losslessness *)
-fun (false) (true) (true).
+(* I'm using three argument proc here just to test losslessness *)
+proc (false) (true) (true).
 trivial. trivial. assumption LossAdv2.
-fun; skip; trivial.
+proc; skip; trivial.
 trivial.
-intros &1; fun; skip; trivial.
+intros &1; proc; skip; trivial.
 skip; trivial.
 qed.
 
@@ -52,7 +52,7 @@ declare module Adv1 : ADV1{Or}.
 local module FAdv2(Adv1:ADV1, Or : OR) = {
   module A = Adv1(Or)
 
-  fun h() : int = {
+  proc h() : int = {
     var n : int;
     n = A.g();
     return n;
@@ -68,7 +68,7 @@ proof.
 intros LossAdv1.
 apply (G (Adv2)).
 intros O LossF.
-fun.
+proc.
  call (LossAdv1 O _);trivial.
 save.
 
@@ -84,7 +84,7 @@ proof.
 intros LossAdv1.
 apply (G' (Adv2)).
 intros O LossF.
-fun.
+proc.
  call (LossAdv1 O _);trivial.
 save.
 

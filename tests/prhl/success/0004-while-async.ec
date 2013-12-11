@@ -4,7 +4,7 @@ require import Int.
 
 module Test = {
   var x : int
-  fun test () : unit = {
+  proc test () : unit = {
         while ( x<10) {
       x = x + 1;
     }
@@ -17,7 +17,7 @@ save.
 
 lemma test : 
 equiv [Test.test ~ Test.test : ={Test.x} /\ Test.x{1}<= 10 /\ Test.x{2}<= 10 ==> Test.x{1}=10 /\ Test.x{2}=10].
-fun.
+proc.
 while{1} (Test.x{1}<=10) (10-Test.x{1}).
 intros &m z.
 wp;skip;smt.

@@ -15,13 +15,13 @@ type plaintext.
 type ciphertext.
 
 module type Scheme = {
-  fun kg() : pkey * skey 
-  fun enc(pk:pkey, m:plaintext)  : ciphertext 
-  fun dec(sk:skey, c:ciphertext) : plaintext option  
+  proc kg() : pkey * skey 
+  proc enc(pk:pkey, m:plaintext)  : ciphertext 
+  proc dec(sk:skey, c:ciphertext) : plaintext option  
 }.
 
 module Correctness (S:Scheme) = {
-  fun main(m:plaintext) : bool = {
+  proc main(m:plaintext) : bool = {
     var pk : pkey;
     var sk : skey;
     var c  : ciphertext;
@@ -35,11 +35,11 @@ module Correctness (S:Scheme) = {
 }.
 
 module type LR = {
-  fun orcl (m0 m1:plaintext) : ciphertext
+  proc orcl (m0 m1:plaintext) : ciphertext
 }.
 
 module type AdvCPA(LR:LR) = {
-  fun main(pk:pkey) : bool
+  proc main(pk:pkey) : bool
 }.
 
 module K = { 
@@ -51,7 +51,7 @@ module K = {
  
 module L (S:Scheme) = {
 
-  fun orcl (m0 m1:plaintext) : ciphertext = {
+  proc orcl (m0 m1:plaintext) : ciphertext = {
     var r : ciphertext;
     r = S.enc(K.pk,m0);
     K.c = K.c + 1;
@@ -61,7 +61,7 @@ module L (S:Scheme) = {
 
 module R (S:Scheme) = {
 
-  fun orcl (m0 m1:plaintext) : ciphertext = {
+  proc orcl (m0 m1:plaintext) : ciphertext = {
     var r : ciphertext;
     r = S.enc(K.pk,m1);
     K.c = K.c + 1;
@@ -71,7 +71,7 @@ module R (S:Scheme) = {
 
 module LRb (S:Scheme) = {
 
-  fun orcl (m0 m1:plaintext) : ciphertext = {
+  proc orcl (m0 m1:plaintext) : ciphertext = {
     var r : ciphertext;
     r = S.enc(K.pk,K.b?m0:m1);
     K.c = K.c + 1;
@@ -81,7 +81,7 @@ module LRb (S:Scheme) = {
 
 module CPAL (S:Scheme,A:AdvCPA) = {
   module A = A(L(S))
-  fun main():bool = {
+  proc main():bool = {
     var b':bool;
     K.c = 0;
     (K.pk,K.sk) = S.kg();
@@ -92,7 +92,7 @@ module CPAL (S:Scheme,A:AdvCPA) = {
 
 module CPAR (S:Scheme,A:AdvCPA) = {
   module A = A(R(S))
-  fun main():bool = {
+  proc main():bool = {
     var b':bool;
     K.c = 0;
     (K.pk,K.sk) = S.kg();
@@ -103,7 +103,7 @@ module CPAR (S:Scheme,A:AdvCPA) = {
 
 module CPA (S:Scheme,A:AdvCPA) = {
   module A = A(LRb(S))
-  fun main():bool = {
+  proc main():bool = {
     var b':bool;
     K.c = 0;
     K.b = ${0,1};
@@ -120,11 +120,11 @@ clone import Indist as Ind with
   type H.outleaks <- pkey.
 
 module ToOrcl (S:Scheme) = {
-  fun leaks (il:unit) : pkey = {
+  proc leaks (il:unit) : pkey = {
     (K.pk, K.sk) = S.kg();
     return K.pk;
   }
-  fun orcl (m:plaintext) : ciphertext = {
+  proc orcl (m:plaintext) : ciphertext = {
     var c : ciphertext;
     c = S.enc(K.pk, m);
     return c;
@@ -133,7 +133,7 @@ module ToOrcl (S:Scheme) = {
 
 module ToAdv(A:AdvCPA, O:Orcl,LR:LR) = {
   module A = A(LR)
-  fun main() : bool = {
+  proc main() : bool = {
     var pk:pkey;
     var b':bool;
     pk = O.leaks(());
@@ -144,7 +144,7 @@ module ToAdv(A:AdvCPA, O:Orcl,LR:LR) = {
 
 module B (S:Scheme, A:AdvCPA, LR:LR) = {
   module A = A(LRB2(ToOrcl(S),LR))
-  fun main(pk:pkey) : bool = {
+  proc main(pk:pkey) : bool = {
     var b':bool;
     H.LRB.l0 = $[0..H.q-1];
     H.LRB.l  = 0;
@@ -179,33 +179,33 @@ section.
              Pr[INDL(ToOrcl(S),ToAdv(A)).main() @ &m : res /\ H.C.c <= H.q].
       equiv_deno (_ : ={glob A, glob S} ==>
                         ={res,glob A, glob S, K.pk} /\ K.c{1} = H.C.c{2}) => //.
-      fun. 
+      proc. 
       inline INDL(ToOrcl(S), ToAdv(A)).A.main H.C.init  ToOrcl(S).leaks.
       wp;call (_: ={glob S, K.pk} /\ K.c{1} = H.C.c{2}).
-        by fun;inline ToOrcl(S).orcl H.C.incr;wp;call (_:true);wp.
+        by proc;inline ToOrcl(S).orcl H.C.incr;wp;call (_:true);wp.
       by wp;call (_:true);wp.
     cut -> : Pr[CPAR(S, A).main() @ &m : res /\ K.c <= H.q] =
              Pr[INDR(ToOrcl(S),ToAdv(A)).main() @ &m : res /\ H.C.c <= H.q].          
       equiv_deno (_ : ={glob A, glob S} ==>
                         ={res,glob A, glob S, K.pk} /\ K.c{1} = H.C.c{2}) => //.
-      fun. 
+      proc. 
       inline INDR(ToOrcl(S), ToAdv(A)).A.main H.C.init  ToOrcl(S).leaks.
       wp;call (_: ={glob S, K.pk} /\ K.c{1} = H.C.c{2}).
-        by fun;inline ToOrcl(S).orcl H.C.incr;wp;call (_:true);wp.
+        by proc;inline ToOrcl(S).orcl H.C.incr;wp;call (_:true);wp.
       by wp;call (_:true);wp.
-    cut := IND1_INDn (ToOrcl(S)) (ToAdv(A)) _ _ _ _ &m (lambda ga go c, true) => //=.
-      by fun;call Lkg.
-      by fun;call Lenc.    
-      intros O LR Llr Ll Lo;fun;call (La LR _) => //.
+    cut := IND1_INDn (ToOrcl(S)) (ToAdv(A)) _ _ _ _ &m (fun ga go c, true) => //=.
+      by proc;call Lkg.
+      by proc;call Lenc.    
+      intros O LR Llr Ll Lo;proc;call (La LR _) => //.
       by call Ll.
     intros <-;congr.
       equiv_deno (_: ={glob S,glob A} ==> ={res,glob H.LRB} /\ K.c{1} = H.C.c{2}) => //.
-      fun.
+      proc.
       inline INDR(ToOrcl(S), Ind.B(ToAdv(A))).A.main H.C.init CPAR(S, B(S,A)).A.main
         Ind.B(ToAdv(A), ToOrcl(S), OrclR(ToOrcl(S))).A.main.
       wp.
       call (_: ={glob S,glob H.LRB, K.pk} /\ K.c{1} = H.C.c{2}).
-        fun;wp.
+        proc;wp.
         if => //.
           by call (_: ={glob S, K.pk});first eqobs_in.
         if => //.
@@ -215,12 +215,12 @@ section.
       swap{1} [4..5] -2;inline ToOrcl(S).leaks;wp.
       by call (_:true);wp;rnd;wp.
     equiv_deno (_: ={glob S,glob A} ==> ={res,glob H.LRB} /\ K.c{1} = H.C.c{2}) => //.
-    fun.
+    proc.
     inline INDL(ToOrcl(S), Ind.B(ToAdv(A))).A.main H.C.init CPAL(S, B(S,A)).A.main
       Ind.B(ToAdv(A), ToOrcl(S), OrclL(ToOrcl(S))).A.main.
     wp.
     call (_: ={glob S,glob H.LRB, K.pk} /\ K.c{1} = H.C.c{2}).
-      fun;wp.
+      proc;wp.
       if => //.
         by call (_: ={glob S, K.pk});first eqobs_in.
       if => //.

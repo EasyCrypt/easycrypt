@@ -11,7 +11,7 @@ op k1 : int.
 op k2 : int.
 
 module Test = {
-  fun test () : bitstring = {
+  proc test () : bitstring = {
     var z : bitstring;
     z = $Dbitstring.dbitstring (k1+k2);
     return z;
@@ -21,7 +21,7 @@ module Test = {
 .
 
 module Test' = {
-  fun test () : bitstring = {
+  proc test () : bitstring = {
     var z1 : bitstring;
     var z2 : bitstring;
     z1 = $Dbitstring.dbitstring (k1);
@@ -35,7 +35,7 @@ module Test' = {
 lemma test' : forall &m (a:bitstring), length a = k1+k2 => Pr[Test.test() @ &m : a=res]=1%r/(2^(k1+k2))%r.
 intros &m a length_a.
 bdhoare_deno (_ : (true) ==> (a=res)); [|trivial|trivial].
-fun.
+proc.
 rnd ((=)a);skip;smt.
 save.
 
@@ -53,8 +53,8 @@ axiom mu_neg : forall (d:'a distr, p:'a cpred),
 lemma test'' : forall &m (a:bitstring), length a = k1+k2 => Pr[Test'.test() @ &m : a=res]=1%r/(2^(k1+k2))%r.
 intros &m a length_a.
 bdhoare_deno (_ : (true) ==> (a=res));[|trivial|trivial].
-fun.
-rnd (z1=sub a 0 k1) (1%r/(2 ^ (k1))%r) (1%r/(2 ^ (k2))%r) (1%r-1%r/(2 ^ (k1))%r) (0%r) (lambda z, z1=sub a 0 k1 /\ z=sub a k1 k2).
+proc.
+rnd (z1=sub a 0 k1) (1%r/(2 ^ (k1))%r) (1%r/(2 ^ (k2))%r) (1%r-1%r/(2 ^ (k1))%r) (0%r) (fun z, z1=sub a 0 k1 /\ z=sub a k1 k2).
 smt.
 rnd; skip; progress.
 cut H : (mu_x (Dbitstring.dbitstring k1) (sub a 0 k1) = 1%r/(2^k1)%r).
@@ -63,7 +63,7 @@ smt.
 rewrite - H.
 delta mu_x.
 simplify.
-cut -> : (lambda (x : bitstring), x = sub a 0 k1) = ((=) (sub a 0 k1));[apply Fun.fun_ext; smt|trivial].
+cut -> : (fun (x : bitstring), x = sub a 0 k1) = ((=) (sub a 0 k1));[apply Fun.fun_ext; smt|trivial].
 (* rnd (1%r/(2 ^ (k1))%r) (=sub a 0 k1). *)
 (* simplify. *)
 (* cut pow_distr :  ((2 ^ k2)%r * (2 ^ k1)%r = (2 ^ (k1+k2))%r). *)
@@ -76,10 +76,10 @@ intros &hr J.
 split.
 cut H: (mu_x (Dbitstring.dbitstring k2) (sub a k1 k2) = 1%r/(2^k2)%r);
     [apply (Dbitstring.mu_x_def_in k2 (sub a k1 k2) _);smt|].
-cut -> :  (lambda (z : bool array), z1{hr} = sub a 0 k1 /\ z = sub a k1 k2) =  (lambda (z : bool array), z = sub a k1 k2);
+cut -> :  (fun (z : bool array), z1{hr} = sub a 0 k1 /\ z = sub a k1 k2) =  (fun (z : bool array), z = sub a k1 k2);
     [apply Fun.fun_ext; smt|].
 generalize H; delta mu_x; beta; intros H.
-cut -> : (lambda (z : bool array), z = sub a k1 k2) = ((=) (sub a k1 k2)); [apply Fun.fun_ext;smt|].
+cut -> : (fun (z : bool array), z = sub a k1 k2) = ((=) (sub a k1 k2)); [apply Fun.fun_ext;smt|].
 rewrite - H. trivial.
 intros H.
 intros v _.
@@ -99,7 +99,7 @@ smt.
 (********)
 rnd; skip; progress; try smt.
 
-cut -> : (lambda (x : bitstring), ! x = sub a 0 k1) = (Fun.cpNot ( (=) (sub a 0 k1) )).
+cut -> : (fun (x : bitstring), ! x = sub a 0 k1) = (Fun.cpNot ( (=) (sub a 0 k1) )).
 apply fun_ext. smt.
 rewrite mu_neg.
 cut -> : (mu ((Dbitstring.dbitstring k1))%Dbitstring (Fun.cpTrue)) = 1%r.

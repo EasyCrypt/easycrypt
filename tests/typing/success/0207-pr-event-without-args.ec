@@ -1,7 +1,7 @@
 require import Real.
 
 module G = {
-  fun f(): bool = {
+  proc f(): bool = {
     return true;
   }
 }.

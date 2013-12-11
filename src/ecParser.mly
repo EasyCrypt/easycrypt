@@ -235,7 +235,6 @@
 %token INTROS
 %token IOTA
 %token KILL
-%token LAMBDA
 %token LAST
 %token LBRACE
 %token LBRACKET
@@ -269,6 +268,7 @@
 %token PRED
 %token PRFALSE
 %token PRINT
+%token PROC
 %token PROGRESS
 %token PROOF
 %token PROVER
@@ -663,7 +663,7 @@ expr_u:
       let loc = EcLocation.make $startpos $endpos in
         PEapp (mk_loc loc id, [e]) }
 
-| LAMBDA pd=ptybindings COMMA e=expr { PElambda (pd, e) } 
+| FUN pd=ptybindings COMMA e=expr { PElambda (pd, e) } 
 ;
 
 expr_field:
@@ -883,7 +883,7 @@ form_u(P):
 
 | FORALL pd=pgtybindings COMMA e=form_r(P) { PFforall (pd, e) }
 | EXIST  pd=pgtybindings COMMA e=form_r(P) { PFexists (pd, e) }
-| LAMBDA pd=ptybindings  COMMA e=form_r(P) { PFlambda (pd, e) }
+| FUN    pd=ptybindings  COMMA e=form_r(P) { PFlambda (pd, e) }
 
 | r=loc(RBOOL) TILD e=sform_r(P)
     { let id  = PFident (mk_loc r.pl_loc EcCoreLib.s_dbitstring, None) in
@@ -1133,18 +1133,16 @@ mod_item:
 | m=mod_def
     { let (x, m) = m in Pst_mod (x, m) }
 
-| FUN decl=loc(fun_decl) EQ body=fun_def_body
-    { 
-      let loc = decl.pl_loc in
-      let decl = decl.pl_desc in
-      begin match decl.pfd_tyargs with
-      | Fparams_imp _ -> 
-        parse_error loc (Some "implicite declaration of parameters not allowed")
-      | _ -> ()
-      end;
-      Pst_fun (decl, body) }
+| PROC decl=loc(fun_decl) EQ body=fun_def_body { 
+    let { pl_loc = loc; pl_desc = decl; } = decl in
+        match decl.pfd_tyargs with
+        | Fparams_imp _ ->
+            let msg = "implicite declaration of parameters not allowed" in
+              parse_error loc (Some msg)
+        | _ -> Pst_fun (decl, body)
+  }
 
-| FUN x=lident EQ f=loc(fident)
+| PROC x=lident EQ f=loc(fident)
     { Pst_alias (x, f) }
 ;
 
@@ -1245,7 +1243,7 @@ sig_param:
 ;
 
 signature_item:
-| FUN decl=ifun_decl
+| PROC decl=ifun_decl
     { `FunctionDecl decl }
 ;
 
@@ -1991,6 +1989,7 @@ eager_info:
 | LPAREN h=ident COLON s1=stmt TILD s2=stmt COLON pr=form LONGARROW po=form RPAREN
     { LE_todo(h,s1,s2,pr,po) }
 ;
+
 eager_tac:
 | SEQ n1=uint n2=uint i=eager_info COLON p=sform
     { Peager_seq (i,(n1,n2),p) }
@@ -1998,9 +1997,9 @@ eager_tac:
     { Peager_if }
 | WHILE i=eager_info 
     { Peager_while i }
-| FUN 
+| PROC 
     { Peager_fun_def }
-| FUN i=eager_info f=sform 
+| PROC i=eager_info f=sform 
     { Peager_fun_abs(i,f) }
 | CALL info=fpattern(call_info) 
     { Peager_call info }
@@ -2010,16 +2009,16 @@ eager_tac:
 (* END EAGER *)
 
 phltactic:
-| FUN
+| PROC
     { Pfun_def }
 
-| FUN f=sform
+| PROC f=sform
     { Pfun_abs f }
 
-| FUN bad=sform p=sform q=sform? 
+| PROC bad=sform p=sform q=sform? 
     { Pfun_upto(bad, p, q) }
 
-| FUN STAR 
+| PROC STAR 
     { Pfun_to_code }
 
 | SEQ d=tac_dir pos=code_position COLON p=sform f=app_bd_info

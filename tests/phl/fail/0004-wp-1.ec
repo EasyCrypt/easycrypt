@@ -1,6 +1,6 @@
 module M = { 
-  fun f () : unit = {}
-  fun g () : unit = {
+  proc f () : unit = {}
+  proc g () : unit = {
     var x : int;
     f();
     x = 1;
@@ -9,5 +9,5 @@ module M = {
 
 lemma foo : hoare [M.g : true ==> true].
 proof.
- fun.
+ proc.
  wp 0.

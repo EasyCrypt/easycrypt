@@ -1,6 +1,6 @@
 module M = {
   var y : int
-  fun f(x:int) : int = {
+  proc f(x:int) : int = {
     y = x;
     y = 1;
     return y;
@@ -9,5 +9,5 @@ module M = {
 
 lemma foo : hoare [M.f : true ==> res = 1 /\ M.y = 1 ].
 proof.
- fun.
+ proc.
  seq 10 : (M.y = x).

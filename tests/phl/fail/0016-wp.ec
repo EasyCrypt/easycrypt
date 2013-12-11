@@ -1,14 +1,14 @@
 module type Orcl = {
-  fun o (x:int) : int
+  proc o (x:int) : int
 }.
 
 module type Adv (O:Orcl) = {
-  fun a (x:int) : int { O.o }
+  proc a (x:int) : int { O.o }
 }.
 
 module A (O:Orcl) = {
   var x : int
-  fun a (w:int) : int = {
+  proc a (w:int) : int = {
     var r : int;
     r = O.o(w);
     return r;
@@ -16,25 +16,25 @@ module A (O:Orcl) = {
 }.
 
 module X : Orcl = {
-  fun o (x:int) : int = { return x; }
+  proc o (x:int) : int = { return x; }
 }.
 
 module Y : Orcl = {
-  fun o (x:int) : int = { return x; }
+  proc o (x:int) : int = { return x; }
 }.
 
 module B = A(X).
 module C = A(Y).
 
 module M =  { 
-  fun f (w:int) : unit = {
+  proc f (w:int) : unit = {
     B.x = 1;
     C.x = 2;
   }
 }.
 
 lemma foo : hoare [M.f : true ==> B.x = 1 /\ C.x = 2].
- fun.
+ proc.
  wp.
  skip.
  simplify.
