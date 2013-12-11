@@ -22,5 +22,5 @@ lemma foo : eager[if (!M.b) M.w = $[0..10]; , M.f1 ~
 proof.
  eager proc.
  rcondf{2} 4; first intros &m;wp => //.
- eqobs_in.
+ sim.
 save.

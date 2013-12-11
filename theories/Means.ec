@@ -678,15 +678,15 @@ theory Hybrid.
      inline{1} GL(BLR(B0(A)), E).A.run BLR(B0(A), E, GL(BLR(B0(A)), E).L).A.run.
      inline{2} GL(B(BLR(A)), E).A.run B(BLR(A), E, GL(B(BLR(A)), E).L).A.run;wp.
      call (_: ={glob E, glob LRB, C.c}).
-       proc;inline{2} LRB(E, GL(B(BLR(A)), E).L).lr;eqobs_in;sp.
-       if => //;first by eqobs_in.
-       if => //;last by call (_: true) => //;eqobs_in.
+       proc;inline{2} LRB(E, GL(B(BLR(A)), E).L).lr;sim;sp.
+       if => //;first by sim.
+       if => //;last by call (_: true) => //;sim.
        inline{1} BLR(B0(A), E, GL(BLR(B0(A)), E).L).Elr.enc GL(BLR(B0(A)), E).L.lr.
-       by inline{2} GL(B(BLR(A)), E).L.lr;eqobs_in.
+       by inline{2} GL(B(BLR(A)), E).L.lr;sim.
        by proc (={glob LRB,C.c}).
        by proc (={glob LRB,C.c}).
        by proc (={glob LRB,C.c}).
-     conseq (_ : _ ==> ={glob A, glob E, glob LRB, C.c}) => //;eqobs_in.
+     conseq (_ : _ ==> ={glob A, glob E, glob LRB, C.c}) => //;sim.
    cut -> : Pr[GR(BLR(B0(A)), E).main() @ &m :
               p' (glob A){hr} (glob E){hr} LRB.l res /\ C.c <= 1] = 
             Pr[GR(B(BLR(A)), E).main() @ &m :
@@ -696,16 +696,16 @@ theory Hybrid.
      inline{1} GR(BLR(B0(A)), E).A.run BLR(B0(A), E, GR(BLR(B0(A)), E).R).A.run.
      inline{2} GR(B(BLR(A)), E).A.run B(BLR(A), E, GR(B(BLR(A)), E).R).A.run;wp.
      call (_: ={glob E, glob LRB, C.c}).
-       proc;inline{2} LRB(E, GR(B(BLR(A)), E).R).lr;eqobs_in;sp.
-       if => //;first by eqobs_in.
-       if => //;last by call (_: true) => //;eqobs_in.
+       proc;inline{2} LRB(E, GR(B(BLR(A)), E).R).lr;sim;sp.
+       if => //;first by sim.
+       if => //;last by call (_: true) => //;sim.
        inline{1} BLR(B0(A), E, GR(BLR(B0(A)), E).R).Elr.enc GR(BLR(B0(A)), E).R.lr.
        inline{2} GR(B(BLR(A)), E).R.lr.
        by inline C.incr;wp;call (_:true);wp.
        by proc (={glob LRB,C.c}).
        by proc (={glob LRB,C.c}).
        by proc (={glob LRB,C.c}).
-     conseq (_ : _ ==> ={glob A, glob E, glob LRB, C.c}) => //;eqobs_in.
+     conseq (_ : _ ==> ={glob A, glob E, glob LRB, C.c}) => //;sim.
    clear p2;generalize p';apply (Hybrid E (<:BLR(A)) _ _ _ _ _ &m p) => //.
    intros E0 LR Hlr HI HL HE;proc.
    call (_: true => true) => //.

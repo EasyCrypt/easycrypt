@@ -117,5 +117,5 @@ wp; rnd.
 call (_: ={glob Wrap, glob S} /\ Wrap.qs{2} = []);
   first by proc; call (_: true).
 by call (_: true ==> ={glob Wrap, glob S} /\ Wrap.qs{2} = []);
-     first by proc; wp; eqobs_in.
+     first by proc; wp; sim.
 qed.

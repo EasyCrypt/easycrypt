@@ -26,13 +26,13 @@ proof.
                           (M.w{1} = M'.w{2} + 1 ==> x{1} + M.w{1} = y{2} + M'.w{2}).
     intros &m1 &m2 H; exists M.w{m1} => //.
     trivial.
-    eqobs_in.
+    sim.
   transitivity {2} { y=2;} (M.w{1} = M'.w{2} + 1 ==> x{1} + M.w{1} = y{2} + M'.w{2})
                            (={M'.w} ==> ={M'.w,y}).
     intros &m1 &m2 H; exists M'.w{m2} => //.
     trivial.
   wp;skip;smt.
-    eqobs_in.                              
+    sim.                              
 save.     
 
 

@@ -207,11 +207,11 @@ section.
       call (_: ={glob S,glob H.LRB, K.pk} /\ K.c{1} = H.C.c{2}).
         proc;wp.
         if => //.
-          by call (_: ={glob S, K.pk});first eqobs_in.
+          by call (_: ={glob S, K.pk});first sim.
         if => //.
           call (_: ={glob S, K.pk} /\ K.c{1} = H.C.c{2}) => //.
           by inline ToOrcl(S).orcl H.C.incr;wp;call (_: true);wp.
-        by call (_: ={glob S, K.pk});first eqobs_in.
+        by call (_: ={glob S, K.pk});first sim.
       swap{1} [4..5] -2;inline ToOrcl(S).leaks;wp.
       by call (_:true);wp;rnd;wp.
     equiv_deno (_: ={glob S,glob A} ==> ={res,glob H.LRB} /\ K.c{1} = H.C.c{2}) => //.
@@ -222,11 +222,11 @@ section.
     call (_: ={glob S,glob H.LRB, K.pk} /\ K.c{1} = H.C.c{2}).
       proc;wp.
       if => //.
-        by call (_: ={glob S, K.pk});first eqobs_in.
+        by call (_: ={glob S, K.pk});first sim.
       if => //.
         call (_: ={glob S, K.pk} /\ K.c{1} = H.C.c{2}) => //.
         by inline ToOrcl(S).orcl H.C.incr;wp;call (_: true);wp.
-      by call (_: ={glob S, K.pk});first eqobs_in.
+      by call (_: ={glob S, K.pk});first sim.
     swap{1} [4..5] -2;inline ToOrcl(S).leaks;wp.
     by call (_:true);wp;rnd;wp.
   qed.

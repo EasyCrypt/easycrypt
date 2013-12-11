@@ -41,11 +41,11 @@ proof.
                     (M.w{1} = M'.w{2} + 1 ==> ={res}).
     intros &m1 &m2 H; exists M.w{m1} => //.
     trivial.
-    proc;eqobs_in.
+    proc;sim.
   transitivity M1'.f (M.w{1} = M'.w{2} + 1 ==> ={res})
                      (={M'.w} ==> ={M'.w,res}).
     intros &m1 &m2 H; exists M'.w{m2} => //.
     trivial.
   proc;wp;skip;smt.
-    proc;eqobs_in.
+    proc;sim.
 save.

@@ -146,7 +146,6 @@
 
 %token <EcParsetree.codepos> CPOS
 
-%token EXTRACTION
 %token ADD
 %token ADMIT
 %token ALIAS
@@ -180,7 +179,6 @@
 %token COMPUTE
 %token CONGR
 %token CONSEQ
-%token EXFALSO
 %token CONST
 %token CUT
 %token DATATYPE
@@ -194,6 +192,7 @@
 %token DOTDOT
 %token DOTTICK
 %token DROP
+%token EAGER
 %token ELIM
 %token ELIMT
 %token ELSE
@@ -202,11 +201,12 @@
 %token EQ
 %token EQUIV
 %token EQUIVDENO
+%token EXFALSO
 %token EXIST
 %token EXPORT
+%token EXTRACTION
 %token FEL
 %token FIELD
-%token RING
 %token FINAL
 %token FIRST
 %token FISSION
@@ -282,6 +282,7 @@
 %token RETURN
 %token REWRITE
 %token RIGHT
+%token RING
 %token RND
 %token RPAREN
 %token RPBRACE
@@ -291,6 +292,7 @@
 %token SECTION
 %token SEMICOLON
 %token SEQ
+%token SIM
 %token SIMPLIFY
 %token SKIP
 %token SLASH
@@ -305,12 +307,14 @@
 %token STRICT
 %token SUBST
 %token SWAP
+%token SYMMETRY
 %token THEN
 %token THEORY
 %token TICKPIPE
 %token TILD
 %token TIMEOUT
 %token TOP
+%token TRANSITIVITY
 %token TRIVIAL
 %token TRY
 %token TYPE
@@ -323,11 +327,7 @@
 %token WHY3
 %token WITH
 %token WP
-%token EQOBSIN
-%token TRANSITIVITY
-%token SYMMETRY
 %token ZETA 
-%token EAGER
 
 %token <string> OP1 OP2 OP3 OP4
 %token LTCOLON GT LT GE LE
@@ -2013,6 +2013,9 @@ phltactic:
 | WP n=code_position?
    { Pwp n }
 
+| SP s=side?
+    { Psp s }
+
 | SKIP
     { Pskip }
 
@@ -2063,10 +2066,9 @@ phltactic:
 
 | ALIAS s=side? o=codepos WITH x=lident
     { Palias (s, o, Some x) }
-(* NEW *)
+
 | ALIAS s=side? o=codepos x=lident EQ e=expr 
     { Pset (false,s, o,x,e) }
-(* END NEW *)
 
 | FISSION s=side? o=codepos AT d1=uint COMMA d2=uint
     { Pfission (s, o, (1, (d1, d2))) }
@@ -2110,28 +2112,26 @@ phltactic:
 | FEL at_pos=uint cntr=sform delta=sform q=sform f_event=sform some_p=fel_pred_specs inv=sform?
    {Pfel (at_pos,(cntr,delta,q,f_event,some_p,inv))}
 
-| EQOBSIN info=eqobs_in
-    { Peqobs_in info }
+| SIM info=eqobs_in
+    { Psim info }
+
 | TRANSITIVITY tk=trans_kind h1=trans_hyp h2=trans_hyp
     { Ptrans_stmt (tk, fst h1, snd h1, fst h2, snd h2) }
-(* ADDED *)
+
 | SYMMETRY 
     { Psymmetry }    
 
-| SP s=side?
-   {Psp s}
-(* NEW : ADDED FOR EAGER *)
-| EAGER t=eager_tac { t }
+| EAGER t=eager_tac
+    { t }
 
 (* basic pr based tacs *)
 | HOARE {Phoare}
 | BDHOARE {Pbdhoare}
 | PRBOUNDED {Pprbounded}
 | REWRITE PR s=LIDENT {Ppr_rewrite s}
-(* NEW TACTIC *)
 | BDHOARE SPLIT i=bdhoare_split { Pbdhoare_split i }
-(* NEW TACTIC *)
 | BDHOARE EQUIV s=side pr=sform po=sform { Pbd_equiv(s,pr,po) } 
+
 (* TODO : remove this tactic *)
 | PRFALSE {Pprfalse}
 | BDEQ {Pbdeq}

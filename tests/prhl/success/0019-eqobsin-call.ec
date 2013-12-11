@@ -18,12 +18,12 @@ module M = {
 
 equiv test_0 : M.main ~ M.main : ={M.m,w} ==> ={M.m,res}.
 proc.
-eqobs_in : (={M.m, w}).
+sim : (={M.m, w}).
 save.
 
 equiv test_1 : M.main ~ M.main : ={M.m,w} ==> ={M.m,res}.
 proc.
-eqobs_in.
+sim.
 save.
 
 
@@ -56,22 +56,22 @@ module G (A:Adv) = {
 
 equiv foo_0 (A<:Adv {O} ) : G(A).main ~ G(A).main : ={x,O.m,glob A} ==> ={res,O.m}.
 proc.
-eqobs_in : (={O.m, x}).
+sim : (={O.m, x}).
 save.
 
 equiv foo_1 (A<:Adv {O} ) : G(A).main ~ G(A).main : ={x,O.m,glob A} ==> ={res,O.m}.
 proc.
-eqobs_in.
+sim.
 save.
 
 equiv foo1_0 (A<:Adv {O} ) : G(A).main ~ G(A).main : ={x,O.m,glob A} ==> ={res,O.m,glob A}.
 proc.
-eqobs_in : (={O.m,glob A, x}).
+sim : (={O.m,glob A, x}).
 save.
 
 equiv foo1_1 (A<:Adv {O} ) : G(A).main ~ G(A).main : ={x,O.m,glob A} ==> ={res,O.m,glob A}.
 proc.
-eqobs_in.
+sim.
 save.
 
 

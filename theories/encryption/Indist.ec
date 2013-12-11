@@ -117,7 +117,7 @@ section.
      equiv_deno (_: ={glob A,glob O} ==> ={glob A,glob O, C.c} /\
                    res{1} = (fst res = snd res){2}) => //;proc.
      inline C.init WA.work;simplify fst snd. 
-     by swap{1} 2 -1; eqobs_in; proc (={Orclb.b, C.c}).
+     by swap{1} 2 -1; sim; proc (={Orclb.b, C.c}).
    cut He: equiv [INDR(O, A).main ~ WA.work: x{2}=false /\ 
                    ={glob A,glob O} ==> ={res,glob A,glob O, C.c}].
     proc. 
@@ -298,7 +298,7 @@ section.
      equiv_deno (_: ={glob A,glob O} ==>
                     ={res,glob A,glob O, C.c}) => //;proc.
       call (_: ={glob A,glob O, C.c} ==> ={glob A,glob O,C.c,res}).
-        proc *. inline A'(Orcl2(O), Orclc(L(Orcl2(O)))).main;eqobs_in.
+        proc *. inline A'(Orcl2(O), Orclc(L(Orcl2(O)))).main;sim.
         call (_: ={glob O, C.c}) => //.
           proc *. inline A'(Orcl2(O), Orclc(L(Orcl2(O)))).O.leaks Orcl2(O).leaks;wp.
           by call (_:true);wp.
@@ -312,7 +312,7 @@ section.
      equiv_deno (_: ={glob A,glob O} ==>
                     ={res,glob A,glob O, C.c}) => //;proc.
       call (_: ={glob A,glob O, C.c} ==> ={glob A,glob O,C.c,res}).
-        proc *. inline A'(Orcl2(O), Orclc(R(Orcl2(O)))).main;eqobs_in.
+        proc *. inline A'(Orcl2(O), Orclc(R(Orcl2(O)))).main;sim.
         call (_: ={glob O, C.c}) => //.
           proc *. inline A'(Orcl2(O), Orclc(R(Orcl2(O)))).O.leaks Orcl2(O).leaks;wp.
           by call (_:true);wp.

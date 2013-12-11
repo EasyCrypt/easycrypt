@@ -439,22 +439,24 @@ type phltactic =
   | Pbdhoare
   | Pprbounded
   | Pprfalse
-  | Ppr_rewrite   of symbol
+  | Ppr_rewrite    of symbol
   | Pbdeq 
-  | Peqobs_in   of (pformula_o * pformula_o * pformula_o)
-  | Ptrans_stmt of trans_info
-  | Psymmetry   
-  | Psp        of (bool option)
+  | Psim           of (pformula_o * pformula_o * pformula_o)
+  | Ptrans_stmt    of trans_info
+  | Psymmetry
+  | Psp            of (bool option)
   | Pbdhoare_split of bdh_split 
-  (* for eager *)
-  | Peager_seq of eager_info * (int * int) * pformula 
+
+    (* Eager *)
+  | Peager_seq       of eager_info * (int * int) * pformula 
   | Peager_if  
-  | Peager_while of eager_info
+  | Peager_while     of eager_info
   | Peager_fun_def 
   | Peager_fun_abs   of eager_info * pformula
-  | Peager_call of call_info fpattern
-  | Peager of eager_info * pformula
-  (* Relation between logic *)
+  | Peager_call      of call_info fpattern
+  | Peager           of eager_info * pformula
+
+    (* Relation between logic *)
   | Pbd_equiv of (bool * pformula * pformula)
 
 and pinline_arg =

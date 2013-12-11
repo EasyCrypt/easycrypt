@@ -45,7 +45,7 @@ let process_phl loc ptac g =
     | Pprfalse                  -> EcPhlPr.t_prfalse
     | Ppr_rewrite s             -> EcPhlPrRw.t_pr_rewrite s 
     | Pbdeq                     -> EcPhlBdHoare.t_bdeq
-    | Peqobs_in info            -> EcPhlEqobs.process_eqobs_in info
+    | Psim info                 -> EcPhlEqobs.process_eqobs_in info
     | Ptrans_stmt info          -> EcPhlTrans.process_equiv_trans info
     | Psymmetry                 -> EcPhlSym.process_equiv_sym
     | Peager_seq (info,pos,eqR) -> EcEager.process_seq info pos eqR

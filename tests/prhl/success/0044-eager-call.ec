@@ -37,7 +37,7 @@ proof.
  eager call (_:  ={M.b,M.w,x} ==> ={M.b,M.w,res}).
  eager proc.
    rcondf{2} 4; first intros &m;wp => //.
-   eqobs_in.
+   sim.
  skip => //.
 save.
 
@@ -47,7 +47,7 @@ lemma foo : eager[if (!M.b) M.w = $[0..10]; , M.f1 ~
 proof.
  eager proc.
  rcondf{2} 4; first intros &m;wp => //.
- eqobs_in.
+ sim.
 save.
 
 lemma foo2 : equiv [M.g1 ~ M.g2 : ={M.b,M.w,y} ==> ={M.b,M.w,res}].
