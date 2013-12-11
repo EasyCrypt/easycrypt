@@ -262,7 +262,7 @@ module Leaf1 (A :  Adv_Leaf1) = {
 
 section.
 
-declare module A : Adv3{ AKE_eqS}.
+declare module A : Adv3{ AKE_eqS, Leaf1}.
 
 axiom A_ll :
 forall (O <: AKE_Oracles3{A}),
@@ -284,7 +284,7 @@ local module G1(FA : Adv3) = {
 
   var h2_queries : Sstring list
   var test_sidx  : Sidx
-    
+  var bad : bool
   fun init() : unit = {
     evs = [];
     test = None;
@@ -298,12 +298,13 @@ local module G1(FA : Adv3) = {
     
     fun eexpRev(i : Sidx, a : Sk) : Eexp option = {
       var r : Eexp option = None;
-      if (in_dom i mStarted) {
+      if (in_dom i mStarted /\ !bad) {
         evs = EphemeralRev(compute_psid mStarted mEexp i)::evs;
-       if (mem (StaticRev (psid_actor (compute_psid mStarted mEexp i))) evs) {
-        if (sd2_actor(proj mStarted.[i]) = gen_pk(a)) {
+   if (sd2_actor(proj mStarted.[i]) = gen_pk(a)) {
+      if (mem (StaticRev (psid_actor (compute_psid mStarted mEexp i))) evs) {
           r = mEexp.[i];
-        }
+        } else bad = true;
+   
       }
      }
       return r;
@@ -343,7 +344,7 @@ local module G1(FA : Adv3) = {
 
     fun staticRev(A : Agent) : Sk option = {
       var r : Sk option = None;
-      if (in_dom A mSk) {
+      if (in_dom A mSk /\ ! bad) {
         r = mSk.[A];
         evs = StaticRev(A)::evs;
       }
@@ -400,11 +401,605 @@ local module G1(FA : Adv3) = {
       xa' = $sample_Eexp;
       mEexp.[sidx] = xa';
     } 
+    bad = false;
     if (!collision_eexp_eexp_op mEexp) {
      (h2_queries, test_sidx) = A.guess(pks);
     }
   }
 }.
+
+local equiv Eq1 : AKE_eqS(A).main ~ G1(A).main : true ==> 
+(AKE_eqS.h2_queries{1} = G1.h2_queries{2} /\
+ AKE_eqS.test_sidx{1} = G1.test_sidx{2} /\ 
+ AKE_eqS.evs{1} = G1.evs{2} /\
+ AKE_eqS.mSk{1} = G1.mSk{2} /\
+ AKE_eqS.mEexp{1} = G1.mEexp{2} /\
+ AKE_eqS.mStarted{1} = G1.mStarted{2} /\ 
+ AKE_eqS.mCompleted{1} = G1.mCompleted{2}) \/ G1.bad{2}.
+proof.
+ fun.
+ seq 16 17:
+(AKE_eqS.evs{1} = G1.evs{2} /\
+ AKE_eqS.test{1} = G1.test{2} /\
+ AKE_eqS.mSk{1} = G1.mSk{2} /\
+ AKE_eqS.mEexp{1} = G1.mEexp{2} /\
+ AKE_eqS.mStarted{1} = G1.mStarted{2} /\ 
+ AKE_eqS.mCompleted{1} = G1.mCompleted{2} /\
+ AKE_eqS.h2_queries{1} = G1.h2_queries{2} /\
+ AKE_eqS.test_sidx{1} = G1.test_sidx{2} /\
+ ={pks} /\ 
+ ! G1.bad{2}).
+wp.
+simplify.
+eqobs_in.
+if => //.
+call (_ : G1.bad, 
+ AKE_eqS.evs{1} = G1.evs{2} /\
+ AKE_eqS.test{1} = G1.test{2} /\
+ AKE_eqS.mSk{1} = G1.mSk{2} /\
+ AKE_eqS.mEexp{1} = G1.mEexp{2} /\
+ AKE_eqS.mStarted{1} = G1.mStarted{2} /\ 
+ AKE_eqS.mCompleted{1} = G1.mCompleted{2}).
+ by apply A_ll.
+ by fun; wp; skip; progress; smt.
+ by intros => ? ?; fun; wp; trivial. 
+ by intros => ?; fun; wp; skip; progress.
+ by fun; wp.
+ by intros => ? ?; fun; wp; trivial.
+ by intros => ?; fun; wp; skip; progress.
+ by fun; wp.
+ by intros => ? ?; fun; wp; trivial. 
+ by intros => ?; fun; wp; skip; progress.
+ by fun; wp.
+ by intros => ? ?; fun; wp; trivial. 
+ by intros => ?; fun; wp; skip; progress.
+ fun.
+ wp; skip; progress; smt.
+
+ by intros => ? ?; fun; wp; trivial. 
+ by intros => ?; fun; wp; skip; progress.
+ fun.
+ wp; trivial; skip; progress; smt.
+ by intros => ? ?; fun; wp; trivial. 
+ by intros => ?; fun; wp; skip; progress.
+ skip; progress => //; smt.
+save.
+
+op guess_session(test_sidx : Sidx,
+                  mCompleted : (Sidx, Epk) map,
+                  mStarted   : (Sidx, Sdata2) map, 
+                  mEexp : (Sidx, Eexp) map, 
+                  mSk : (Pk, Sk) map,
+                  h2_queries : Sstring list,
+                  evs : Event list) =
+in_dom test_sidx mCompleted /\
+List.mem
+(get_string_from_id test_sidx mStarted 
+  mCompleted mEexp mSk) 
+(h2_queries) /\
+fresh_op (compute_sid mStarted mEexp mCompleted test_sidx) evs.
+
+local lemma Pr1 &m :
+Pr[AKE_eqS(A).main() @ &m : guess_session AKE_eqS.test_sidx AKE_eqS.mCompleted 
+                              AKE_eqS.mStarted AKE_eqS.mEexp AKE_eqS.mSk 
+                              AKE_eqS.h2_queries AKE_eqS.evs] <=
+Pr[G1(A).main() @ &m : guess_session G1.test_sidx G1.mCompleted G1.mStarted 
+                                     G1.mEexp G1.mSk G1.h2_queries G1.evs] +
+Pr[G1(A).main() @ &m : G1.bad].
+proof.
+apply (Real.Trans _ 
+Pr[G1(A).main() @ &m :
+   guess_session G1.test_sidx G1.mCompleted G1.mStarted G1.mEexp G1.mSk
+     G1.h2_queries G1.evs \/ G1.bad]
+ _ ).
+equiv_deno Eq1 => //; smt.
+rewrite Pr mu_or.
+cut h: forall (a b c : real), 0%r <= c => a + b - c <= a + b by smt.
+apply h; smt.
+save.
+
+local module G2(FA : Adv3) = {
+  
+  var evs  : Event list               (* events for queries performed by adversary *)
+  var test : Sid option               (* session id of test session *)
+
+  var mSk        : (Agent, Sk) map    (* map for static secret keys *)
+  var mEexp      : (Sidx, Eexp) map   (* map for ephemeral exponents of sessions *)
+  var mStarted   : (Sidx, Sdata2) map (* map of started sessions *)
+  var mCompleted : (Sidx, Epk)   map  (* additional data for completed sessions *)
+  var mPkPos     : (Agent, int) map
+  var h2_queries : Sstring list
+  var test_sidx  : Sidx
+  var bad : bool
+  var bad_pk : Agent option
+  var pk_guess : int
+  fun init() : unit = {
+    evs = [];
+    test = None;
+    mSk = Map.empty;    
+    mEexp = Map.empty;
+    mStarted = Map.empty;
+    mCompleted = Map.empty;
+    bad_pk = None;
+  }
+
+  module O : AKE_Oracles3 = {
+    
+    fun eexpRev(i : Sidx, a : Sk) : Eexp option = {
+      var r : Eexp option = None;
+      if (in_dom i mStarted /\ !bad) {
+        evs = EphemeralRev(compute_psid mStarted mEexp i)::evs;
+   if (sd2_actor(proj mStarted.[i]) = gen_pk(a)) {
+      if (mem (StaticRev (psid_actor (compute_psid mStarted mEexp i))) evs) {
+          r = mEexp.[i];
+        } else
+        {
+         bad = true;
+         bad_pk = Some (gen_pk a);
+        }
+      }
+     }
+      return r;
+    }
+
+    fun init1(i : Sidx, A : Agent, B : Agent) : Epk option = {
+      var pX : Epk;
+      var r : Epk option = None; 
+      if (in_dom A mSk && in_dom B mSk && !in_dom i mStarted) {
+        pX = gen_epk(proj mEexp.[i]);
+        mStarted.[i] = (A,B,init);
+        evs = Start((A,B,pX,init))::evs;
+        r = Some(pX);
+      }
+      return r;
+    }
+
+    fun resp(i : Sidx, B : Agent, A : Agent, X : Epk) : Epk option = {
+      var pY : Epk;
+      var r : Epk option = None;
+      if (in_dom A mSk && in_dom B mSk && !in_dom i mStarted && !in_dom i mCompleted) {
+        pY = gen_epk(proj mEexp.[i]);
+        mStarted.[i] = (B,A,resp);
+        mCompleted.[i] = X;
+        evs = Accept((B,A,pY,X,resp))::evs;
+        r = Some(pY);
+      }
+      return r;
+    }
+
+    fun init2(i : Sidx, Y : Epk) : unit = {
+      if (!in_dom i mCompleted && in_dom i mStarted) {
+        mCompleted.[i] = Y;
+        evs = Accept(compute_sid mStarted mEexp mCompleted i)::evs;
+      }
+    }
+
+    fun staticRev(A : Agent) : Sk option = {
+      var r : Sk option = None;
+      if (in_dom A mSk /\ ! bad) {
+        r = mSk.[A];
+        evs = StaticRev(A)::evs;
+      }
+      return r;
+    }
+
+    fun eqS(i: Sidx, ss : Sstring) : bool option = {
+      var r : bool option = None;
+      var ss_i : Sstring;
+      var sd : Sdata2;
+      var ev : Event;
+      if (in_dom i mCompleted && in_dom i mStarted && in_dom i mEexp) {
+        ev = SessionRev(compute_sid mStarted mEexp mCompleted i);
+        if (! mem ev evs) { evs = ev::evs; }
+        sd = proj mStarted.[i];
+        ss_i = gen_sstring (proj mEexp.[i]) (proj mSk.[sd2_actor sd])
+                           (sd2_peer sd) (proj mCompleted.[i])
+                           (sd2_role sd);
+        r = Some (ss_i = ss);
+      }
+      return r;
+    }
+  }
+  
+  module A = FA(O)
+
+  fun main() : unit = {
+    var b : bool = def;
+    var pks : Pk list = [];
+    var t_idx : Sidx = def;
+    var key : Key = def;
+    var keyo : Key option = def;
+    var b' : bool = def;
+    var i : int = 0;
+    var ska : Sk = def;
+    var pka : Pk = def;
+    var sidxs : Sidx set = univ_Sidx;
+    var sidx : Sidx;
+    var xa' : Eexp = def;
+    test_sidx = def;
+    h2_queries = def;
+    mPkPos = Map.empty;
+    init();
+    while (i < qAgent) {
+      i = i + 1;
+      ska = $sample_Sk;
+      pka = gen_pk(ska);
+      pks = pka :: pks;
+      mSk.[pka] = ska;
+      mPkPos.[pka] = i;
+    }
+
+    while (sidxs <> FSet.empty) {
+      sidx = pick sidxs;
+      sidxs = rm sidx sidxs;
+      xa' = $sample_Eexp;
+      mEexp.[sidx] = xa';
+    } 
+    bad = false;
+    if (!collision_eexp_eexp_op mEexp) {
+     (h2_queries, test_sidx) = A.guess(pks);
+    }
+    pk_guess = $[1..qAgent];
+  }
+}.
+pred is_sub_map (m1 : ('a, 'b) map)(m2 : ('a, 'c) map) =
+forall x, in_dom x m1 => in_dom x m2.
+
+lemma is_sub_map_upd1 : forall (m1 : ('a, 'b) map)(m2 : ('a, 'c) map) x v,
+is_sub_map m1 m2 =>
+is_sub_map m1 m2.[x<-v].
+proof strict.
+ intros => m1 m2 x v h s hdom.
+ by rewrite in_dom_set; left; apply h.
+save.
+
+
+lemma is_sub_map_upd2 : forall (m1 : ('a, 'b) map)(m2 : ('a, 'c) map) x v1 v2,
+is_sub_map m1 m2 =>
+is_sub_map m1.[x<-v1] m2.[x<-v2].
+proof strict.
+ intros => m1 m2 x v1 v2 h s.
+ rewrite in_dom_set => [|] h'.
+  by rewrite in_dom_set; left; apply h.
+  by rewrite h' in_dom_setE.
+save.
+
+lemma is_sub_map_upd3 : forall (m1 : ('a, 'b) map)(m2 : ('a, 'c) map) x v,
+in_dom x m2 =>
+is_sub_map m1 m2 =>
+is_sub_map m1.[x<-v] m2.
+proof strict.
+ intros => m1 m2 x v1 h h' s.
+ rewrite in_dom_set => [|] h''.
+  by apply h'.
+  by rewrite h''.
+save.
+
+
+
+local equiv Eq2 : G1(A).main ~ G2(A).main : true ==> 
+G1.bad{1} => G2.bad{2} /\ (0 < (proj G2.mPkPos.[(proj G2.bad_pk)]) <= qAgent){2}.
+proof.
+ fun.
+ seq 17 18: 
+(={pks} /\
+ G1.evs{1} = G2.evs{2} /\
+ G1.test{1} = G2.test{2} /\
+ G1.mSk{1} = G2.mSk{2} /\
+ G1.mEexp{1} = G2.mEexp{2} /\
+ G1.mStarted{1} = G2.mStarted{2} /\ 
+ G1.mCompleted{1} = G2.mCompleted{2} /\
+ G1.h2_queries{1} = G2.h2_queries{2} /\
+ G1.test_sidx{1} = G2.test_sidx{2} /\
+ (forall x, in_dom x G2.mSk => 0 < (proj G2.mPkPos.[x]) <= qAgent){2} /\
+ G1.bad{1} = G2.bad{2} /\ ! G2.bad{2} /\
+ G1.mStarted{1} = Map.empty /\
+ G1.mCompleted{1} = Map.empty).
+  wp; simplify.
+ while (={sidxs} /\ G1.mEexp{1} = G2.mEexp{2}).
+ wp; rnd; wp; skip; progress.
+ while (G1.mSk{1} = G2.mSk{2} /\ ={i, pks} /\ 0 <= i{2} <= qAgent /\
+(forall x, in_dom x G2.mSk => 0 < (proj G2.mPkPos.[x]) <= qAgent){2}).
+wp; rnd; wp; skip; progress.
+ smt.
+ smt.
+ case (x = gen_pk skaL).
+  intros => ->; rewrite get_setE proj_some; smt.
+
+  intros => h; generalize H7; rewrite in_dom_setNE ?get_setNE; first 2 smt.
+   intros => h'; cut := H1 x _; smt.
+
+ case (x = gen_pk skaL).
+  intros => ->; rewrite get_setE proj_some; smt.
+  intros => h; generalize H7; rewrite in_dom_setNE ?get_setNE; first 2 smt.
+   intros => h'; cut := H1 x _; smt.
+
+inline G1(A).init G2(A).init.
+wp; skip; progress => //.
+smt.
+smt.
+smt.
+if => //.
+rnd{2}.
+call (_ :
+ G1.evs{1} = G2.evs{2} /\
+ G1.test{1} = G2.test{2} /\
+ G1.mSk{1} = G2.mSk{2} /\
+ G1.mEexp{1} = G2.mEexp{2} /\
+ G1.mStarted{1} = G2.mStarted{2} /\ 
+ G1.mCompleted{1} = G2.mCompleted{2} /\
+ G1.bad{1} = G2.bad{2} /\ 
+ (G2.bad{2} => 
+  G2.bad_pk{2} <> None /\ in_dom (proj G2.bad_pk{2}) G2.mSk{2}) /\
+ is_sub_map G2.mCompleted{2} G2.mStarted{2} /\
+ (forall i, in_dom i G2.mStarted{2} => 
+ in_dom (sd2_actor(proj G2.mStarted.[i])){2} G2.mSk{2} )).
+fun; wp; skip; progress => //; first smt.
+ by rewrite proj_some -H4; apply H1.
+fun; wp; skip; progress => //.
+by apply is_sub_map_upd1.
+case (i{2} = i0).
+ by intros => ->; rewrite get_setE proj_some /sd2_actor.
+ intros => _; rewrite get_setNE //; apply H1; generalize H5;
+  rewrite in_dom_setNE; smt.
+
+by fun; wp; skip; progress => //; apply is_sub_map_upd3.
+fun; wp; skip; progress => //.
+ apply is_sub_map_upd2 => //.
+case (i{2} = i0).
+ by intros => ->; rewrite get_setE proj_some /sd2_actor.
+ intros => _; rewrite get_setNE //; apply H1; generalize H6;
+  rewrite in_dom_setNE; smt.
+by fun; wp; skip; progress => //.
+by fun; wp; skip; progress => //.
+skip; progress => //.
+smt.
+smt.
+rewrite /is_sub_map; smt.
+smt.
+rewrite -FSet.Dinter_uni.dinter_is_dinter FSet.Dinter_uni.weight_def; smt.
+cut := H5 _ => //.
+intros => [_ _].
+cut := H (proj bad_pk_R) _ => //.
+cut := H5 _ => //.
+intros => [_ _].
+cut := H (proj bad_pk_R) _ => //.
+rnd{2};skip; progress.
+rewrite -FSet.Dinter_uni.dinter_is_dinter FSet.Dinter_uni.weight_def; smt.
+smt.
+smt.
+save.
+
+local lemma Pr2 : forall &m,
+Pr[G1(A).main() @ &m : G1.bad] <=
+Pr[G2(A).main() @ &m : G2.bad /\ 
+              0 < (proj G2.mPkPos.[(proj G2.bad_pk)]) <= qAgent].
+proof.
+ by intros => &m; equiv_deno Eq2.
+save.
+
+local lemma Pr3 : forall &m,
+Pr[G1(A).main() @ &m : G1.bad] <=
+qAgent%r * Pr[G2(A).main() @ &m : G2.bad /\ 
+              (proj G2.mPkPos.[(proj G2.bad_pk)]) = G2.pk_guess].
+proof.
+ admit.
+save.
+
+
+local module G3(FA : Adv3) = {
+  
+  var evs  : Event list               (* events for queries performed by adversary *)
+  var test : Sid option               (* session id of test session *)
+
+  var mSk        : (Agent, Sk) map    (* map for static secret keys *)
+  var mEexp      : (Sidx, Eexp) map   (* map for ephemeral exponents of sessions *)
+  var mStarted   : (Sidx, Sdata2) map (* map of started sessions *)
+  var mCompleted : (Sidx, Epk)   map  (* additional data for completed sessions *)
+  var mPkPos     : (Agent, int) map
+  var h2_queries : Sstring list
+  var test_sidx  : Sidx
+  var bad : bool
+  var bad_pk : Agent option
+  var pk_guess : int
+  fun init() : unit = {
+    evs = [];
+    test = None;
+    mSk = Map.empty;    
+    mEexp = Map.empty;
+    mStarted = Map.empty;
+    mCompleted = Map.empty;
+    bad_pk = None;
+  }
+
+  module O : AKE_Oracles3 = {
+    
+    fun eexpRev(i : Sidx, a : Sk) : Eexp option = {
+      var r : Eexp option = None;
+      if (in_dom i mStarted /\ !bad) {
+        evs = EphemeralRev(compute_psid mStarted mEexp i)::evs;
+   if (sd2_actor(proj mStarted.[i]) = gen_pk(a)) {
+      if (mem (StaticRev (psid_actor (compute_psid mStarted mEexp i))) evs) {
+          r = mEexp.[i];
+        } else
+        {
+         bad = true;
+         bad_pk = Some (gen_pk a);
+        }
+      }
+     }
+      return r;
+    }
+
+    fun init1(i : Sidx, A : Agent, B : Agent) : Epk option = {
+      var pX : Epk;
+      var r : Epk option = None; 
+      if (in_dom A mSk && in_dom B mSk && !in_dom i mStarted) {
+        pX = gen_epk(proj mEexp.[i]);
+        mStarted.[i] = (A,B,init);
+        evs = Start((A,B,pX,init))::evs;
+        r = Some(pX);
+      }
+      return r;
+    }
+
+    fun resp(i : Sidx, B : Agent, A : Agent, X : Epk) : Epk option = {
+      var pY : Epk;
+      var r : Epk option = None;
+      if (in_dom A mSk && in_dom B mSk && !in_dom i mStarted && !in_dom i mCompleted) {
+        pY = gen_epk(proj mEexp.[i]);
+        mStarted.[i] = (B,A,resp);
+        mCompleted.[i] = X;
+        evs = Accept((B,A,pY,X,resp))::evs;
+        r = Some(pY);
+      }
+      return r;
+    }
+
+    fun init2(i : Sidx, Y : Epk) : unit = {
+      if (!in_dom i mCompleted && in_dom i mStarted) {
+        mCompleted.[i] = Y;
+        evs = Accept(compute_sid mStarted mEexp mCompleted i)::evs;
+      }
+    }
+
+    fun staticRev(A : Agent) : Sk option = {
+      var r : Sk option = None;
+      if (in_dom A mSk /\ ! bad) {
+        r = mSk.[A];
+        evs = StaticRev(A)::evs;
+      }
+      return r;
+    }
+
+    fun eqS(i: Sidx, ss : Sstring) : bool option = {
+      var r : bool option = None;
+      var ss_i : Sstring;
+      var sd : Sdata2;
+      var ev : Event;
+      if (in_dom i mCompleted && in_dom i mStarted && in_dom i mEexp) {
+        ev = SessionRev(compute_sid mStarted mEexp mCompleted i);
+        if (! mem ev evs) { evs = ev::evs; }
+        sd = proj mStarted.[i];
+        ss_i = gen_sstring (proj mEexp.[i]) (proj mSk.[sd2_actor sd])
+                           (sd2_peer sd) (proj mCompleted.[i])
+                           (sd2_role sd);
+        r = Some (ss_i = ss);
+      }
+      return r;
+    }
+  }
+  
+  module A = FA(O)
+
+  fun main() : unit = {
+    var b : bool = def;
+    var pks : Pk list = [];
+    var t_idx : Sidx = def;
+    var key : Key = def;
+    var keyo : Key option = def;
+    var b' : bool = def;
+    var i : int = 0;
+    var ska : Sk = def;
+    var pka : Pk = def;
+    var sidxs : Sidx set = univ_Sidx;
+    var sidx : Sidx;
+    var xa' : Eexp = def;
+    test_sidx = def;
+    h2_queries = def;
+    mPkPos = Map.empty;
+    init();
+    pk_guess = $[1..qAgent];
+    while (i < pk_guess - 1) {
+      i = i + 1;
+      ska = $sample_Sk;
+      pka = gen_pk(ska);
+      pks = pka :: pks;
+      mSk.[pka] = ska;
+      mPkPos.[pka] = i;
+    }
+      i = i + 1;
+      ska = $sample_Sk;
+      pka = gen_pk(ska);
+      pks = pka :: pks;
+      mSk.[pka] = ska;
+      mPkPos.[pka] = i;
+    while (i < qAgent) {
+      i = i + 1;
+      ska = $sample_Sk;
+      pka = gen_pk(ska);
+      pks = pka :: pks;
+      mSk.[pka] = ska;
+      mPkPos.[pka] = i;
+    }
+
+    while (sidxs <> FSet.empty) {
+      sidx = pick sidxs;
+      sidxs = rm sidx sidxs;
+      xa' = $sample_Eexp;
+      mEexp.[sidx] = xa';
+    } 
+    bad = false;
+    if (!collision_eexp_eexp_op mEexp) {
+     (h2_queries, test_sidx) = A.guess(pks);
+    }
+  }
+}.
+
+
+local equiv Eq3 : G2(A).main ~ G3(A).main : true ==> 
+(G2.bad /\ (proj G2.mPkPos.[(proj G2.bad_pk)]) = G2.pk_guess){1} <=>
+(G3.bad /\ (proj G3.mPkPos.[(proj G3.bad_pk)]) = G3.pk_guess){2}.
+proof.
+ fun.
+ swap{1} 20 -4.
+ seq 17 24:
+( ={sidxs, i} /\
+  ={pks} /\
+  G2.pk_guess{1} = G3.pk_guess{2} /\
+  G2.mPkPos{1} = G3.mPkPos{2} /\
+  G2.bad_pk{1} = G3.bad_pk{2} /\
+  G2.mCompleted{1} = G3.mCompleted{2} /\
+  G2.mStarted{1} = G3.mStarted{2} /\
+  G2.mEexp{1} = G3.mEexp{2} /\ 
+  G2.mSk{1} = G3.mSk{2} /\ G2.evs{1} = G3.evs{2});
+  last by eqobs_in.
+   
+  inline G2(A).init G3(A).init; sp.
+  splitwhile (i < G2.pk_guess - 1) : {1} 2.
+  splitwhile (i = G2.pk_guess - 1) : {1} 3.
+  eqobs_in.
+  rcondt{1} 3.
+  intros &m; wp.
+  while (i <= G2.pk_guess - 1 /\ G2.pk_guess <= qAgent).
+  wp; rnd; wp; skip; smt.
+  rnd; wp; skip; progress; last 3 by smt.
+   cut: 1 <= pk_guess; smt.
+  rcondf{1} 9.
+  intros &m; wp; rnd; wp.
+  while (i <= G2.pk_guess - 1 /\ G2.pk_guess <= qAgent).
+  wp; rnd; wp; skip; smt.
+  rnd; wp; skip; progress; last 2 smt.
+  cut: 1 <= pk_guess; smt.
+  wp; rnd; wp.     
+  while (={i, ska, pka, pks} /\ G2.mSk{1} = G3.mSk{2} /\ 
+   G2.mPkPos{1} = G3.mPkPos{2} /\ G2.mPkPos{1} = G3.mPkPos{2} /\
+   G2.pk_guess{1} = G3.pk_guess{2} /\
+   G2.pk_guess{1} <= qAgent ).
+  wp; rnd; wp; skip; progress; smt.
+  rnd; skip; progress.
+  smt.
+save.
+
+local lemma Pr4 &m :
+Pr[G2(A).main() @ &m : G2.bad /\ 
+              (proj G2.mPkPos.[(proj G2.bad_pk)]) = G2.pk_guess] =
+Pr[G3(A).main() @ &m : G3.bad /\ 
+              (proj G3.mPkPos.[(proj G3.bad_pk)]) = G3.pk_guess].
+proof.
+ by equiv_deno Eq3.
+save.
+
 
 pred bad_eph_query (evs : Event list) =
 exists j, exists A, exists B, exists X, exists r, 
@@ -427,128 +1022,3 @@ proof.
   by apply hnot; generalize H0; rewrite length_cons; smt.
 save.
 
-
-
-local equiv Eq1 : AKE_eqS(A).main ~ G1(A).main : true ==> 
-(AKE_eqS.h2_queries{1} = G1.h2_queries{2} /\
- AKE_eqS.test_sidx{1} = G1.test_sidx{2} /\ 
- AKE_eqS.evs{1} = G1.evs{2} /\
- AKE_eqS.mSk{1} = G1.mSk{2} /\
- AKE_eqS.mEexp{1} = G1.mEexp{2} /\
- AKE_eqS.mStarted{1} = G1.mStarted{2} /\ 
- AKE_eqS.mCompleted{1} = G1.mCompleted{2}) \/ bad_eph_query G1.evs{2}.
-proof.
- fun.
- seq 16 16:
-(AKE_eqS.evs{1} = G1.evs{2} /\
- AKE_eqS.test{1} = G1.test{2} /\
- AKE_eqS.mSk{1} = G1.mSk{2} /\
- AKE_eqS.mEexp{1} = G1.mEexp{2} /\
- AKE_eqS.mStarted{1} = G1.mStarted{2} /\ 
- AKE_eqS.mCompleted{1} = G1.mCompleted{2} /\
- AKE_eqS.h2_queries{1} = G1.h2_queries{2} /\
- AKE_eqS.test_sidx{1} = G1.test_sidx{2} /\
- ={pks}).
-eqobs_in.
-if => //.
-call (_ : bad_eph_query G1.evs, 
- AKE_eqS.evs{1} = G1.evs{2} /\
- AKE_eqS.test{1} = G1.test{2} /\
- AKE_eqS.mSk{1} = G1.mSk{2} /\
- AKE_eqS.mEexp{1} = G1.mEexp{2} /\
- AKE_eqS.mStarted{1} = G1.mStarted{2} /\ 
- AKE_eqS.mCompleted{1} = G1.mCompleted{2}).
-apply A_ll.
-fun.
-seq 1 1:
-(! bad_eph_query G1.evs{2} /\
-  ={i, a, r} /\
-  AKE_eqS.evs{1} = G1.evs{2} /\
-  AKE_eqS.test{1} = G1.test{2} /\
-  AKE_eqS.mSk{1} = G1.mSk{2} /\
-  AKE_eqS.mEexp{1} = G1.mEexp{2} /\
-  AKE_eqS.mStarted{1} = G1.mStarted{2} /\
-  AKE_eqS.mCompleted{1} = G1.mCompleted{2} /\
-  r{2} = None).
-by wp.
-if => //.
-seq 1 1:
-((! bad_eph_query (tl G1.evs{2}) /\
-   ={i, a, r} /\
-   AKE_eqS.evs{1} = G1.evs{2} /\
-   AKE_eqS.test{1} = G1.test{2} /\
-   AKE_eqS.mSk{1} = G1.mSk{2} /\
-   AKE_eqS.mEexp{1} = G1.mEexp{2} /\
-   AKE_eqS.mStarted{1} = G1.mStarted{2} /\
-   AKE_eqS.mCompleted{1} = G1.mCompleted{2} /\ r{2} = None) /\
-  in_dom i{1} AKE_eqS.mStarted{1} /\ 
- (exists evs', G1.evs{2} = 
-  EphemeralRev (compute_psid G1.mStarted G1.mEexp i){2} :: evs' )).
-by wp; skip; progress; rewrite ?tl_cons //; exists G1.evs{2}.
-if{2}.
-wp; skip; progress => //.
-conseq (_ : _ ==> bad_eph_query G1.evs{2}).
- smt.
- wp.
- wp; progress; skip; progress => //.
- generalize H1.
- elim /tuple4_ind (compute_psid G1.mStarted{2} G1.mEexp{2} i{2}) => A B X r htuple h.
- exists 0; exists A; exists B; exists X; exists r.
- rewrite nth_cons0; progress.
-  rewrite nth_consN; first smt.
- apply not_def => h0; generalize h;rewrite /psid_actor /=.
- rewrite mem_cons; right.
- rewrite -(proj_some (StaticRev A)) -h0; apply nth_mem.
- smt.
- generalize H2; rewrite length_cons; smt.
- by intros => ? ?; fun; wp; trivial. 
- by intros => ?; fun; wp; skip; progress; apply bad_eph_query_mon.
- by fun; wp.
- by intros => ? ?; fun; wp; trivial.
- by intros => ?; fun; wp; skip; progress; apply bad_eph_query_mon.
- by fun; wp.
- by intros => ? ?; fun; wp; trivial. 
- by intros => ?; fun; wp; skip; progress; apply bad_eph_query_mon.
- by fun; wp.
- by intros => ? ?; fun; wp; trivial. 
- by intros => ?; fun; wp; skip; progress; apply bad_eph_query_mon.
- by fun; wp.
- by intros => ? ?; fun; wp; trivial. 
- by intros => ?; fun; wp; skip; progress; apply bad_eph_query_mon.
- fun.
- wp; trivial; skip; progress; smt.
- by intros => ? ?; fun; wp; trivial. 
- by intros => ?; fun; wp; skip; progress; apply bad_eph_query_mon.
- skip; progress => //; smt.
-save.
-
-local lemma Pr1 &m :
-Pr[AKE_eqS(A).main() @ &m :
-(in_dom AKE_eqS.test_sidx AKE_eqS.mCompleted /\
-List.mem
-(get_string_from_id AKE_eqS.test_sidx AKE_eqS.mStarted 
-  AKE_eqS.mCompleted AKE_eqS.mEexp AKE_eqS.mSk) 
-(AKE_eqS.h2_queries) /\
-fresh_op (compute_sid AKE_eqS.mStarted AKE_eqS.mEexp AKE_eqS.mCompleted AKE_eqS.test_sidx) AKE_eqS.evs)] <=
-Pr[G1(A).main() @ &m :
-(in_dom G1.test_sidx G1.mCompleted /\
-List.mem
-(get_string_from_id G1.test_sidx G1.mStarted 
-  G1.mCompleted G1.mEexp G1.mSk) 
-(G1.h2_queries) /\
-fresh_op (compute_sid G1.mStarted G1.mEexp G1.mCompleted G1.test_sidx) G1.evs)] +
-Pr[G1(A).main() @ &m : bad_eph_query G1.evs].
-proof.
-apply (Real.Trans _ 
-Pr[G1(A).main() @ &m :
-   in_dom G1.test_sidx G1.mCompleted /\
-   mem
-     (get_string_from_id G1.test_sidx G1.mStarted G1.mCompleted G1.mEexp
-        G1.mSk) G1.h2_queries /\
-   fresh_op (compute_sid G1.mStarted G1.mEexp G1.mCompleted G1.test_sidx)
-     G1.evs \/ bad_eph_query G1.evs] _ ).
-equiv_deno Eq1 => //; smt.
-rewrite Pr mu_or.
-cut h: forall (a b c : real), 0%r <= c => a + b - c <= a + b by smt.
-apply h; smt.
-save.
