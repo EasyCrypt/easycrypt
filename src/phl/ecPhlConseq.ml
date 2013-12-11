@@ -21,9 +21,14 @@ class rn_hl_notmod = object
   inherit xrule "[hl] notmod"
 end
 
+class rn_hl_conseq_bd = object
+  inherit xrule "[hl] conseq bd"
+end
+
 (* -------------------------------------------------------------------- *)
 let rn_hl_notmod = RN_xtd (new rn_hl_notmod :> xrule)
 let rn_hl_conseq = RN_xtd (new rn_hl_conseq :> xrule)
+let rn_hl_conseq_bd = RN_xtd (new rn_hl_conseq_bd :> xrule)
 
 (* -------------------------------------------------------------------- *)
 let conseq_cond pre post spre spost =
@@ -144,6 +149,18 @@ let t_conseq pre post g =
   | FequivS _   -> t_equivS_conseq pre post g
   | FeagerF _   -> t_eagerF_conseq pre post g
   | _           -> tacerror (NotPhl None)
+
+let t_hoareS_conseq_bdhoare g = 
+  let concl = get_concl g in
+  let hs = t_as_hoareS concl in
+  let concl1 = f_bdHoareS hs.hs_m hs.hs_pr hs.hs_s hs.hs_po FHeq f_r1 in
+  prove_goal_by [concl1] rn_hl_conseq_bd g
+
+let t_hoareF_conseq_bdhoare g = 
+  let concl = get_concl g in
+  let hf = t_as_hoareF concl in
+  let concl1 = f_bdHoareF hf.hf_pr hf.hf_f hf.hf_po FHeq f_r1 in
+  prove_goal_by [concl1] rn_hl_conseq_bd g
 
 (* -------------------------------------------------------------------- *)
 let t_equivF_notmod post g =
@@ -281,11 +298,17 @@ let process_conseq notmod info (_, n as g) =
       | FhoareF hf ->
         let penv, qenv = LDecl.hoareF hf.hf_f hyps in
         penv, qenv, hf.hf_pr, hf.hf_po,
-        (fun pre post bd -> ensure_none bd;f_hoareF pre hf.hf_f post)
+        (fun pre post bd -> 
+          match bd with
+          | None -> f_hoareF pre hf.hf_f post
+          | Some(cmp,bd) -> f_bdHoareF pre hf.hf_f post (oget cmp) bd)
       | FhoareS hs ->
         let env = LDecl.push_active hs.hs_m hyps in
         env, env, hs.hs_pr, hs.hs_po,
-        (fun pre post bd -> ensure_none bd;f_hoareS_r { hs with hs_pr = pre; hs_po = post })
+        (fun pre post bd -> 
+          match bd with
+          | None ->f_hoareS_r { hs with hs_pr = pre; hs_po = post }
+          | Some(cmp,bd) -> f_bdHoareS hs.hs_m pre hs.hs_s post (oget cmp) bd)
       | FbdHoareF bhf ->
         let penv, qenv = LDecl.hoareF bhf.bhf_f hyps in
         penv, qenv, bhf.bhf_pr, bhf.bhf_po,
@@ -338,19 +361,28 @@ let process_conseq notmod info (_, n as g) =
       if notmod then t_hoareS_conseq_nm hs.hs_pr hs.hs_po
       else t_hoareS_conseq hs.hs_pr hs.hs_po
     | FbdHoareF hf ->
-      let t1 =
-        if notmod then t_bdHoareF_conseq_nm hf.bhf_pr hf.bhf_po
-        else t_bdHoareF_conseq hf.bhf_pr hf.bhf_po in
-      let t2 = t_bdHoareF_conseq_bd hf.bhf_cmp hf.bhf_bd in
-      lt := t_trivial :: !lt;
-      t_seq_subgoal t2 [t_id None; t1]
+      let concl = get_concl g in
+      let tac = 
+        let t1 =
+          if notmod then t_bdHoareF_conseq_nm hf.bhf_pr hf.bhf_po
+          else t_bdHoareF_conseq hf.bhf_pr hf.bhf_po in
+        let t2 = t_bdHoareF_conseq_bd hf.bhf_cmp hf.bhf_bd in
+        lt := t_trivial :: !lt;
+        t_seq_subgoal t2 [t_id None; t1] in
+      if is_hoareF concl then t_seq t_hoareF_conseq_bdhoare tac
+      else tac        
     | FbdHoareS hs ->
-      let t1 =
-        if notmod then t_bdHoareS_conseq_nm hs.bhs_pr hs.bhs_po
-        else t_bdHoareS_conseq hs.bhs_pr hs.bhs_po in
-      let t2 = t_bdHoareS_conseq_bd hs.bhs_cmp hs.bhs_bd in
-      lt := t_trivial :: !lt;
-      t_seq_subgoal t2 [t_id None; t1]
+      let concl = get_concl g in
+      let tac =
+        let t1 =
+          if notmod then t_bdHoareS_conseq_nm hs.bhs_pr hs.bhs_po
+          else t_bdHoareS_conseq hs.bhs_pr hs.bhs_po in
+        let t2 = t_bdHoareS_conseq_bd hs.bhs_cmp hs.bhs_bd in
+        lt := t_trivial :: !lt;
+        t_seq_subgoal t2 [t_id None; t1] in
+      if is_hoareS concl then
+        t_seq t_hoareS_conseq_bdhoare tac
+      else tac  
     | FequivF ef   ->
       if notmod then t_equivF_conseq_nm ef.ef_pr ef.ef_po
       else t_equivF_conseq ef.ef_pr ef.ef_po
