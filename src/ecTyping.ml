@@ -313,7 +313,7 @@ let add_write (u : uses) p : uses =
     mk_uses u.us_calls u.us_reads (Sx.add p.pv_name u.us_writes)
   else u
 
-let (i_inuse, s_inuse, se_inuse) =
+let (_i_inuse, s_inuse, se_inuse) =
   let rec lv_inuse (map : uses) (lv : lvalue) =
     match lv with
     | LvVar (p,_) ->
@@ -1165,12 +1165,6 @@ exception DuplicatedArgumentsName of pfunction_decl
 (* -------------------------------------------------------------------- *)
 let name_of_sigitem = function
   | `FunctionDecl f -> f.pfd_name
-
-(* -------------------------------------------------------------------- *)
-let lookup_module (env : EcEnv.env) (name : pqsymbol) =
-  match EcEnv.Mod.lookup_opt (unloc name) env with
-  | None   -> tyerror name.pl_loc env (UnknownModName (unloc name))
-  | Some x -> x
 
 (* -------------------------------------------------------------------- *)
 let lookup_module_type (env : EcEnv.env) (name : pqsymbol) =

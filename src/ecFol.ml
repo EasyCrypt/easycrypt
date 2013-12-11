@@ -483,9 +483,6 @@ let f_pvarg f ty m = f_pvar (pv_arg f) ty m
 let f_pvloc f v m = 
   f_pvar (EcTypes.pv_loc f v.v_name) v.v_type m
 
-let f_pvlocs f vs m =
-  List.map (fun v -> f_pvloc f v m) vs
-
 let f_glob mp m = mk_form (Fglob(mp,m)) (tglob mp)
 
 (* -------------------------------------------------------------------- *)
@@ -1788,7 +1785,6 @@ let f_if_simpl f1 f2 f3 =
   | _, _, _          -> f_if f1 f2 f3
 
 let f_imps_simpl = List.fold_right f_imp_simpl 
-let f_imps = List.fold_right f_imp 
 
 let f_iff_simpl f1 f2 = 
   if f_equal f1 f2 then f_true

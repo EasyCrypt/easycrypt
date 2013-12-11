@@ -733,9 +733,6 @@ let rec import_w3_ty env tvm ty =
           tfun t1 t2
         else raise e
 
-let exists_w3 env id =
-  Ident.Mid.mem id env.env_w3
-
 let add_w3_ty env p ty =
   { env with
       env_ty = Mp.add p (ty, `Plain) env.env_ty;
@@ -1057,11 +1054,6 @@ let rec trans_ty env ty =
   | Tfun(t1,t2) -> Ty.ty_func (trans_ty env t1) (trans_ty env t2)
 
 and trans_tys env tys = List.map (trans_ty env) tys
-
-let trans_oty env oty =
-  match oty with
-  | None -> None
-  | Some t -> Some (trans_ty env t)
 
 let trans_typarams =
   let trans_tv env ((id, _) : ty_param) = (* FIXME: TC HOOK *)

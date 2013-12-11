@@ -134,6 +134,8 @@ module List : sig
 
   val otail : 'a list -> 'a list option
 
+  val last : 'a list -> 'a
+
   val iteri : (int -> 'a -> 'b) -> 'a list -> unit
 
   val iter2i : (int -> 'a -> 'b -> 'c) -> 'a list -> 'b list -> unit

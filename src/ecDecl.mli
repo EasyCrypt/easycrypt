@@ -69,6 +69,7 @@ type operator = {
 
 val op_ty   : operator -> ty
 val is_pred : operator -> bool
+val is_oper : operator -> bool
 val is_ctor : operator -> bool
 val is_proj : operator -> bool
 val is_rcrd : operator -> bool

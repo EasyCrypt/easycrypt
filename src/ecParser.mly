@@ -11,11 +11,6 @@
   let pqsymb_of_symb loc x : pqsymbol =
     mk_loc loc ([], x)
 
-  let isordering (nm, x) =
-    match nm, x with
-    | ([], ("<" | ">" | "<=" | ">=")) -> true
-    | _ -> false
-
   let mk_mod ?(modtypes = []) params body = Pm_struct {
     ps_params    = params;
     ps_signature = modtypes;

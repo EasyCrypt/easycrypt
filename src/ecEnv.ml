@@ -59,12 +59,12 @@ let ibasename p =
   | IPIdent (m, None) -> EcIdent.name m
   | IPIdent (_, Some p) -> EcPath.basename p
 
-let itostring = function
-  | IPPath p -> EcPath.tostring p
-  | IPIdent (m, None) -> EcIdent.tostring m
-  | IPIdent (m, Some p) ->
-      Printf.sprintf "%s.%s"
-        (EcIdent.tostring m) (EcPath.tostring p)
+(* let itostring = function *)
+(*   | IPPath p -> EcPath.tostring p *)
+(*   | IPIdent (m, None) -> EcIdent.tostring m *)
+(*   | IPIdent (m, Some p) -> *)
+(*       Printf.sprintf "%s.%s" *)
+(*         (EcIdent.tostring m) (EcPath.tostring p) *)
 
 module IPathC = struct
   type t = ipath
@@ -227,9 +227,6 @@ let empty () =
     env
 
 (* -------------------------------------------------------------------- *)
-let preenv (env : preenv) : env = env
-
-(* -------------------------------------------------------------------- *)
 type lookup_error = [
   | `XPath   of xpath
   | `MPath   of mpath
@@ -270,9 +267,6 @@ let _ = EcPException.register (fun fmt exn ->
   | DuplicatedBinding s ->
     Format.fprintf fmt "the symbol %s already exists" s
   | _ -> raise exn)
-
-(* -------------------------------------------------------------------- *)
-let unsuspend _ (_, o) _ = o
 
 (* -------------------------------------------------------------------- *)
 module MC = struct
@@ -1086,15 +1080,6 @@ module Memory = struct
 end
 
 (* -------------------------------------------------------------------- *)
-let ipath_of_mpath_opt (p : mpath_top) =
-  match p with
-  | `Local i ->
-      IPIdent (i, None)
-
-  | `Concrete (p1, p2) ->
-      let pr = odfl p1 (p2 |> omap (MC.pcat p1)) in
-        IPPath pr
-
 let ipath_of_mpath (p : mpath) =
   match p.EcPath.m_top with
   | `Local i ->
@@ -1359,12 +1344,6 @@ module Fun = struct
         | Some l -> adds_in_memenv mem l in
       (fun_.f_sig,fd), adds_in_memenv mem fd.f_locals
 
-  let actmem_body_anonym _me _path _locals = assert false
-    (*
-    let mem = EcMemory.empty_local me path in
-    adds_in_memenv mem locals
-    *)
-      
   let inv_memenv env = 
     let path  = mroot env in
     let xpath = EcPath.xpath_fun path "" in (* dummy value *)
@@ -1575,6 +1554,7 @@ module Var = struct
 
 end
 
+(* -------------------------------------------------------------------- *)
 module AbsStmt = struct
   type t = EcBaseLogic.abs_uses
     
@@ -1584,9 +1564,7 @@ module AbsStmt = struct
 
   let bind id us env = 
     { env with env_abs_st = Mid.add id us env.env_abs_st }
-
 end
-    
 
 (* -------------------------------------------------------------------- *)
 module Mod = struct
@@ -1639,15 +1617,6 @@ module Mod = struct
       obj |> omap
                (fun (args, obj) ->
                  (fst (MC._downpath_for_mod spsc env p args), obj))
-
-  let by_ipath (p : ipath) (env : env) =
-    by_ipath_r true p env
-
-  let by_path (p : mpath_top) (env : env) =
-    by_ipath (ipath_of_mpath_opt p) env
-
-  let by_path_opt (p : mpath_top) (env : env) =
-    try_lf (fun () -> by_path p env)
 
   let by_mpath (p : mpath) (env : env) =
     let (ip, (i, args)) = ipath_of_mpath p in
@@ -2785,8 +2754,6 @@ module LDecl = struct
   let lookup_hyp_by_id id hyps = snd (get_hyp (id, lookup_by_id id hyps))
 
   let lookup_var s hyps = get_var (lookup s hyps) 
-
-  let lookup_var_by_id id hyps = snd (get_var (id, lookup_by_id id hyps))
 
   let reducible_var id hyps = 
     try 
