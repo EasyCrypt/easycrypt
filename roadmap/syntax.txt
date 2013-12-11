@@ -57,6 +57,7 @@
 
 * bd_hoare -> phoare / phl
 	bd_hoare [fident ...] relation form // pas sform
+	conseq aussi
 
 * détection du code mort
 
