@@ -66,14 +66,16 @@ module Ax : sig
 end
 
 module Ty : sig
-  val add : scope -> (ptyparams * psymbol) located -> scope
+  type tydname = (ptyparams * psymbol) located
+
+  val add : scope -> tydname -> scope
 
   val add_class    : scope -> ptypeclass located -> scope
-  val add_datatype : scope -> pdatatype located -> scope
-  val add_record   : scope -> precord located -> scope
   val add_instance : scope -> Ax.mode -> ptycinstance located -> scope
+  val add_datatype : scope -> tydname -> pdatatype -> scope
+  val add_record   : scope -> tydname -> precord -> scope
 
-  val define : scope -> (ptyparams * psymbol) located -> pty -> scope
+  val define : scope -> tydname -> pty -> scope
 end
 
 module Mod : sig

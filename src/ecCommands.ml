@@ -126,12 +126,14 @@ let rec process_type (scope : EcScope.scope) (tyd : ptydecl located) =
   let tyname = (tyd.pl_desc.pty_tyvars, tyd.pl_desc.pty_name) in
   let scope = 
     match tyd.pl_desc.pty_body with
-    | None    -> EcScope.Ty.add    scope (mk_loc tyd.pl_loc tyname)
-    | Some bd -> EcScope.Ty.define scope (mk_loc tyd.pl_loc tyname) bd
+    | PTYD_Abstract    -> EcScope.Ty.add          scope (mk_loc tyd.pl_loc tyname)
+    | PTYD_Alias    bd -> EcScope.Ty.define       scope (mk_loc tyd.pl_loc tyname) bd
+    | PTYD_Datatype bd -> EcScope.Ty.add_datatype scope (mk_loc tyd.pl_loc tyname) bd
+    | PTYD_Record   bd -> EcScope.Ty.add_record   scope (mk_loc tyd.pl_loc tyname) bd
   in
     notify scope "added type: `%s'" (unloc tyd.pl_desc.pty_name);
     scope
-  
+
 (* -------------------------------------------------------------------- *)
 and process_types (scope : EcScope.scope) tyds =
   List.fold_left process_type scope tyds
@@ -149,16 +151,6 @@ and process_tycinst (scope : EcScope.scope) (tci : ptycinstance located) =
   let mode = if (!pragma).pm_check then `Check else `WeakCheck in
   let scope = EcScope.Ty.add_instance scope mode tci in
     scope
-
-(* -------------------------------------------------------------------- *)
-and process_datatype (scope : EcScope.scope) (dt : pdatatype located) =
-  EcScope.check_state `InTop "datatype" scope;
-  EcScope.Ty.add_datatype scope dt
-
-(* -------------------------------------------------------------------- *)
-and process_record (scope : EcScope.scope) (rt : precord located) =
-  EcScope.check_state `InTop "record" scope;
-  EcScope.Ty.add_record scope rt
 
 (* -------------------------------------------------------------------- *)
 and process_module (scope : EcScope.scope) m =
@@ -344,8 +336,6 @@ and process (ld : EcLoader.ecloader) (scope : EcScope.scope) g =
       | Gtype        t    -> `Fct   (fun scope -> process_types      scope  (List.map (mk_loc loc) t))
       | Gtypeclass   t    -> `Fct   (fun scope -> process_typeclass  scope  (mk_loc loc t))
       | Gtycinstance t    -> `Fct   (fun scope -> process_tycinst    scope  (mk_loc loc t))
-      | Gdatatype    t    -> `Fct   (fun scope -> process_datatype   scope  (mk_loc loc t))
-      | Grecord      t    -> `Fct   (fun scope -> process_record     scope  (mk_loc loc t))
       | Gmodule      m    -> `Fct   (fun scope -> process_module     scope  m)
       | Gdeclare     m    -> `Fct   (fun scope -> process_declare    scope  m)
       | Ginterface   i    -> `Fct   (fun scope -> process_interface  scope  i)

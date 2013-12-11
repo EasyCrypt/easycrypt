@@ -23,18 +23,6 @@
     pty_body   = body;
   }
 
-  let mk_datatype (tyvars, name) ctors = {
-    ptd_name   = name;
-    ptd_tyvars = tyvars;
-    ptd_ctors  = ctors;
-  }
-
-  let mk_record (tyvars, name) fields = {
-    ptr_name   = name;
-    ptr_tyvars = tyvars;
-    ptr_fields = fields;
-  }
-
   let opdef_of_opbody ty b =
     match b with
     | None                  -> PO_abstr ty
@@ -181,7 +169,6 @@
 %token CONSEQ
 %token CONST
 %token CUT
-%token DATATYPE
 %token DCOLON
 %token DEBUG
 %token DECLARE
@@ -275,7 +262,6 @@
 %token RCONDF
 %token RCONDT
 %token REALIZE
-%token RECORD
 %token REFLEX
 %token REQUIRE
 %token RES
@@ -1249,10 +1235,6 @@ signature_item:
 (* -------------------------------------------------------------------- *)
 (* EcTypes declarations / definitions                                   *)
 
-tcand:
-| x=loc(OP4) { if unloc x <> "&" then parse_error x.pl_loc None }
-;
-
 typaram:
 | x=tident { (x, []) }
 | x=tident LTCOLON tc=plist1(lqident, tcand) { (x, tc) }
@@ -1264,21 +1246,12 @@ typarams:
 | xs=paren(plist1(typaram, COMMA)) { xs }
 ;
 
-type_decl:
+%inline tyd_name:
 | tya=typarams x=ident { (tya, x) }
 ;
 
-type_decl_or_def:
-| TYPE td=plist1(type_decl, COMMA) { List.map (mk_tydecl^~ None) td }
-| TYPE td=type_decl EQ te=loc(type_exp) { [mk_tydecl td (Some te)] }
-;
-
-(* -------------------------------------------------------------------- *)
-(* Datatypes                                                            *)
-
-datatype_def:
-| DATATYPE tya=typarams x=ident EQ PIPE? ctors=plist1(dt_ctor_def, PIPE)
-    { mk_datatype (tya, x) ctors }
+tcand:
+| x=loc(OP4) { if unloc x <> "&" then parse_error x.pl_loc None }
 ;
 
 dt_ctor_def:
@@ -1286,18 +1259,33 @@ dt_ctor_def:
 | x=ident OF ty=plist1(loc(simpl_type_exp), tcand) { (x, ty) }
 ;
 
-(* -------------------------------------------------------------------- *)
-(* Records                                                              *)
-record_def:
-| RECORD tya=typarams x=ident EQ LBRACE
-    fields=rlist1(rec_field_def, SEMICOLON) SEMICOLON?
-  RBRACE
-    { mk_record (tya, x) fields }
+%inline datatype_def:
+| LBRACKET PIPE? ctors=plist1(dt_ctor_def, PIPE) RBRACKET { ctors }
 ;
 
 rec_field_def:
 | x=ident COLON ty=loc(type_exp) { (x, ty); }
 ;
+
+%inline record_def:
+| LBRACE fields=rlist1(rec_field_def, SEMICOLON) SEMICOLON? RBRACE
+    { fields }
+;
+
+typedecl:
+| TYPE td=rlist1(tyd_name, COMMA)
+    { List.map (mk_tydecl^~ PTYD_Abstract) td }
+
+| TYPE td=tyd_name EQ te=loc(type_exp)
+    { [mk_tydecl td (PTYD_Alias te)] }
+
+| TYPE td=tyd_name EQ te=record_def
+    { [mk_tydecl td (PTYD_Record te)] }
+
+| TYPE td=tyd_name EQ te=datatype_def
+    { [mk_tydecl td (PTYD_Datatype te)] }
+;
+
 
 (* -------------------------------------------------------------------- *)
 (* Type classes                                                         *)
@@ -2458,11 +2446,9 @@ global_:
 | top_mod_def      { Gmodule      $1 }
 | top_mod_decl     { Gdeclare     $1 }
 | sig_def          { Ginterface   $1 }
-| type_decl_or_def { Gtype        $1 }
+| typedecl         { Gtype        $1 }
 | typeclass        { Gtypeclass   $1 }
 | tycinstance      { Gtycinstance $1 }
-| datatype_def     { Gdatatype    $1 }
-| record_def       { Grecord      $1 }
 | operator         { Goperator    $1 }
 | predicate        { Gpredicate   $1 }
 | axiom            { Gaxiom       $1 }

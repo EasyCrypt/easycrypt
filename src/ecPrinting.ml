@@ -1403,24 +1403,17 @@ let pp_typedecl (ppe : PPEnv.t) fmt (x, tyd) =
   let ppe = PPEnv.add_locals ppe (List.map fst tyd.tyd_params) in
   let name = P.basename x in
 
-  let pp_kw fmt =
-    match tyd.tyd_type with
-    | `Abstract _ | `Concrete _ -> Format.fprintf fmt "type"
-    | `Datatype _ -> Format.fprintf fmt "datatype"
-    | `Record   _ -> Format.fprintf fmt "record"
-  in
-
   let pp_prelude fmt =
     match List.map fst tyd.tyd_params with
     | [] ->
-        Format.fprintf fmt "%t %s" pp_kw name
+        Format.fprintf fmt "type %s" name
 
     | [tx] ->
-        Format.fprintf fmt "%t %a %s" pp_kw (pp_tyvar ppe) tx name
+        Format.fprintf fmt "type %a %s" (pp_tyvar ppe) tx name
 
     | txs ->
-        Format.fprintf fmt "%t (%a) %s"
-          pp_kw (pp_paren (pp_list ",@ " (pp_tyvar ppe))) txs name
+        Format.fprintf fmt "type (%a) %s"
+          (pp_paren (pp_list ",@ " (pp_tyvar ppe))) txs name
 
   and pp_body fmt =
     match tyd.tyd_type with
@@ -1433,7 +1426,7 @@ let pp_typedecl (ppe : PPEnv.t) fmt (x, tyd) =
           | _  -> Format.fprintf fmt "%s of @[<hov 2>%a@]"
                     c (pp_list " *@ " (pp_type ppe)) cty
         in
-          Format.fprintf fmt " =@ @[<hov 2>%a@]" (pp_list " |@ " pp_ctor) cs
+          Format.fprintf fmt " =@ [@[<hov 2>%a@]]" (pp_list " |@ " pp_ctor) cs
     | `Record (_, fields) ->
         let pp_field fmt (f, fty) =
           Format.fprintf fmt "%s: @[<hov 2>%a@]" f (pp_type ppe) fty

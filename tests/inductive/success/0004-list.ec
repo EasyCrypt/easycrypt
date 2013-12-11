@@ -2,9 +2,9 @@
 require import Int.
 
 (* -------------------------------------------------------------------- *)
-datatype 'a list =
+type 'a list = [
   | Nil
-  | Cons of 'a & 'a list.
+  | Cons of 'a & 'a list].
 
 op cat (l1 l2 : 'a list) : 'a list =
   with l1 = Nil => l2

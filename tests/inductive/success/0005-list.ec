@@ -1,5 +1,5 @@
 (* -------------------------------------------------------------------- *)
-datatype nat = O | S of nat.
+type nat = [ O | S of nat].
 
 op add (x y : nat) =
   with x = O   => y
@@ -34,9 +34,9 @@ proof.
 qed.  
 
 (* -------------------------------------------------------------------- *)
-datatype 'a list =
+type 'a list = [
   | Nil
-  | Cons of 'a & 'a list.
+  | Cons of 'a & 'a list].
 
 op size ['a] (xs : 'a list) =
   with xs = Nil       => O

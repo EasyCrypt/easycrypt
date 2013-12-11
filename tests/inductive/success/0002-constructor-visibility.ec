@@ -1,7 +1,7 @@
 theory Option.
-  datatype 'a option =
+  type 'a option = [
   | None
-  | Some of 'a.
+  | Some of 'a].
 end Option.
 import Option.
 

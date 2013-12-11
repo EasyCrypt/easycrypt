@@ -182,25 +182,20 @@ type ptyparams = (psymbol * pqsymbol list) list
 type ptydecl = {
   pty_name   : psymbol;
   pty_tyvars : ptyparams;
-  pty_body   : pty option;
+  pty_body   : ptydbody;
 }
 
-(* -------------------------------------------------------------------- *)
-type pdatatype = {
-  ptd_name   : psymbol;
-  ptd_tyvars : (psymbol * pqsymbol list) list;
-  ptd_ctors  : (psymbol * pty list) list;
-}
+and ptydbody =
+| PTYD_Abstract
+| PTYD_Alias    of pty
+| PTYD_Record   of precord
+| PTYD_Datatype of pdatatype
+
+and pdatatype = (psymbol * pty list) list
+
+and precord = (psymbol * pty) list
 
 (* -------------------------------------------------------------------- *)
-type precord = {
-  ptr_name   : psymbol;
-  ptr_tyvars : (psymbol * pqsymbol list) list;
-  ptr_fields : (psymbol * pty) list;
-}
-
-(* -------------------------------------------------------------------- *)
-
 type pmemory   = psymbol
 
 type phoarecmp = PFHle | PFHeq | PFHge
@@ -695,8 +690,6 @@ type global =
   | Gtype        of ptydecl list
   | Gtypeclass   of ptypeclass
   | Gtycinstance of ptycinstance
-  | Gdatatype    of pdatatype
-  | Grecord      of precord
   | Gprint       of pprint
   | GthOpen      of psymbol
   | GthClose     of psymbol
