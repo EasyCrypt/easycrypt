@@ -73,6 +73,8 @@ ALLTX = [
     WordRename({'phoare_deno': 'byphoare', 'equiv_deno': 'byequiv'}),
     WordRename({'pr_false': 'trivial'}),
     PrRw(),
+    WordRename({'xor_comm': 'xorC', 'xor_associative': 'xorA',
+                'xor_nilpotent': 'xorK'}),
 ]
 
 ALLTX = [ALLTX[-1]]
