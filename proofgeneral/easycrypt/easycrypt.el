@@ -157,22 +157,14 @@
                (point) (+ (point) lgth)
                'face 'proof-script-highlight-error-face))))))
 
-(defun easycrypt-redisplay ()
-   (proof-shell-invisible-command "pragma verbose." t)
-   (proof-shell-invisible-command "pragma noop." t))
-
 (defun easycrypt-highlight-error-hook ()
   (easycrypt-highlight-error))
 
 (defun easycrypt-redisplay-hook ()
   (easycrypt-redisplay))
 
-
 (add-hook 'proof-shell-handle-error-or-interrupt-hook
           'easycrypt-highlight-error-hook t)
-
-(add-hook 'proof-shell-handle-error-or-interrupt-hook
-          'easycrypt-redisplay-hook t)
 
 ;; --------------------------------------------------------------------
 ;; Check mode related commands
