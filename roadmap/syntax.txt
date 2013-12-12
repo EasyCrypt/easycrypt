@@ -30,12 +30,12 @@ DONE   type t1, ..., tn.
 
 * Permettre les accès directs aux fonctions dans les foncteurs
 
-* interface de module / proc.
-
+DONE * interface de module / proc.
+DONE
 DONE   proc * id(arg...) : t { restr } (* `*' est maintenant en dehors - 16082 *)
-
-  + `arg' peut maintenant être de la forme `_ : t1 * ... * tn'
-     actuellement, la syntaxe est ,t1 * ... * tn
+DONE 
+DONE   + `arg' peut maintenant être de la forme `_ : t1 * ... * tn'
+DONE      actuellement, la syntaxe est ,t1 * ... * tn
 
 * if / while -> parenthèses sur la condition ? (interaction avec les accolades)
 
@@ -104,13 +104,13 @@ HALF-DONE (only for non-exported functions) * détection du code mort
 
     pr_bounded -> à virer
 
-    hoare / bdhoare -> fusionner en hoare
+    DONE hoare / bdhoare -> fusionner en hoare
 
-    rewrite Pr -> intégrer dans rewrite
+    DONE rewrite Pr -> intégrer dans rewrite
 
-    pr_false -> à enlever
+    DONE pr_false -> à enlever
 
-    pr_eq -> à enlever (* Ce fait avec conseq *)
+    DONE pr_eq -> à enlever (* Ce fait avec conseq *)
 	
 	exists* -> utilise alias
 
