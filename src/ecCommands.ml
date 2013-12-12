@@ -319,11 +319,12 @@ and process_pragma (scope : EcScope.scope) opt =
 
   begin
     match unloc opt with
-    | "silent"   -> pragma_verbose false
-    | "verbose"  -> pragma_verbose true
-    | "nocheck"  -> check false
-    | "check"    -> check true
-    | _          -> ()
+    | "silent"  -> pragma_verbose false
+    | "verbose" -> pragma_verbose true
+    | "nocheck" -> check false
+    | "check"   -> check true
+    | "noop"    -> ()
+    | _         -> ()
   end
 
 (* -------------------------------------------------------------------- *)
