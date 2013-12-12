@@ -300,11 +300,6 @@ and process_proverinfo scope pi =
     scope
 
 (* -------------------------------------------------------------------- *)
-and process_checkproof scope b = 
-  let scope = EcScope.Prover.check_proof scope b in
-    scope
-
-(* -------------------------------------------------------------------- *)
 and process_pragma (scope : EcScope.scope) opt =
   let check mode =
     match EcScope.goal scope with
@@ -356,7 +351,6 @@ and process (ld : EcLoader.ecloader) (scope : EcScope.scope) g =
       | Gtactics     t    -> `Fct   (fun scope -> process_tactics    scope  t)
       | Grealize     p    -> `Fct   (fun scope -> process_realize    scope  p)
       | Gprover_info pi   -> `Fct   (fun scope -> process_proverinfo scope  pi)
-      | Gcheckproof  b    -> `Fct   (fun scope -> process_checkproof scope  b)
       | Gsave        loc  -> `Fct   (fun scope -> process_save       scope  loc)
       | Gpragma      opt  -> `State (fun scope -> process_pragma     scope  opt)
       | Gextract     todo -> `Fct   (fun scope -> process_extract    scope todo)

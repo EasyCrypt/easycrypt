@@ -703,7 +703,6 @@ type global =
   | Grealize     of pqsymbol
   | Gtactics     of [`Proof of bool | `Actual of ptactic list]
   | Gprover_info of pprover_infos
-  | Gcheckproof  of bool
   | Gsave        of EcLocation.t
   | Gpragma      of psymbol
   | Gextract     of (string option * toextract list * withextract list)

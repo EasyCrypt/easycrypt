@@ -155,7 +155,6 @@
 %token CEQ
 %token CFOLD
 %token CHANGE
-%token CHECKPROOF
 %token CLAIM
 %token CLASS
 %token CLEAR
@@ -236,8 +235,6 @@
 %token NOSMT
 %token NOT
 %token OF
-%token OFF
-%token ON
 %token OP
 %token PCENT
 %token PHOARE
@@ -2424,11 +2421,6 @@ gprover_info:
     { { pprov_max = None; pprov_time = Some t; pprov_names = None } }
 ;
 
-checkproof:
-| CHECKPROOF ON  { true }
-| CHECKPROOF OFF { false }
-;
-
 (* -------------------------------------------------------------------- *)
 (* Global entries                                                       *)
 
@@ -2455,11 +2447,11 @@ global_:
 | tactics_or_prf   { Gtactics     $1 }
 | realize          { Grealize     $1 }
 | gprover_info     { Gprover_info $1 }
-| checkproof       { Gcheckproof  $1 }
 
 | x=loc(QED)       { Gsave x.pl_loc }
 | PRINT p=print    { Gprint     p   }
 | PRAGMA x=lident  { Gpragma    x   }
+
 | EXTRACTION i=extract_info { Gextract i }
 ;
 

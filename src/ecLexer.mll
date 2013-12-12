@@ -153,10 +153,7 @@
     "clone"       , CLONE      ;        (* KW: global *)
     "with"        , WITH       ;        (* KW: global *)
     "prover"      , PROVER     ;        (* KW: global *)
-    "checkproof"  , CHECKPROOF ;        (* KW: global *)
     "timeout"     , TIMEOUT    ;        (* KW: global *)
-    "on"          , ON         ;        (* KW: global *)
-    "off"         , OFF        ;        (* KW: global *)
     "nolocals"    , NOLOCALS   ;        (* KW: global *)
 
     "undo"        , UNDO       ;        (* KW: internal *)
