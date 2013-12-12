@@ -976,7 +976,8 @@ typed_vars:
 param_decl:
 | LPAREN aout=plist0(typed_vars, COMMA) RPAREN 
     { Fparams_exp (List.flatten aout )}
-| COMMA ty=loc(type_exp)
+
+| LPAREN UNDERSCORE COLON ty=loc(type_exp) RPAREN
     { Fparams_imp ty } 
 ;
 
