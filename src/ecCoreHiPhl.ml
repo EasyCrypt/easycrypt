@@ -43,7 +43,7 @@ let process_phl_exp side e ty g =
   in
 
   let hyps = LDecl.push_active m hyps in
-    EcCoreHiLogic.process_exp hyps e ty
+    EcCoreHiLogic.process_exp hyps `InProc e ty
 
 (* -------------------------------------------------------------------- *)
 let process_phl_formula  = process_phl_form tbool
