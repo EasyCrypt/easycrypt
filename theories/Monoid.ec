@@ -357,14 +357,14 @@ proof -strict.
   by cut := leq_adds'_s x; rewrite mem_add //= => ->.
 qed.
 
-pred cpOrs (X:('a cpred) set) (x:'a) = Mbor.sum (fun (P:'a cpred), P x) X.
+pred cpOrs (X:(('a -> bool)) set) (x:'a) = Mbor.sum (fun (P:('a -> bool)), P x) X.
 
-lemma cpOrs0 : cpOrs (empty <:'a cpred>) = cpFalse.
+lemma cpOrs0 : cpOrs (empty <:('a -> bool)>) = cpFalse.
 proof -strict.
   by apply fun_ext => y;rewrite /cpOrs Mbor.sum_empty.
 qed.
 
-lemma cpOrs_add s (p:'a cpred) : 
+lemma cpOrs_add s (p:('a -> bool)) : 
   cpOrs (FSet.add p s) = cpOr p (cpOrs s).
 proof -strict.
   apply fun_ext => y.
