@@ -61,6 +61,14 @@ class PrRw(codetx):
                    code)
 
 # --------------------------------------------------------------------
+class CPred(codetx):
+    def __init__(self):
+        pass
+
+    def __call__(self, code):
+        return re.sub(r'(\w+)\s+cpred\b', '(\\1 -> bool)', code)
+
+# --------------------------------------------------------------------
 ALLTX = [
     WordRename({'fun': 'proc', 'lambda' : 'fun'}),
     OracleInfo(),
@@ -73,8 +81,10 @@ ALLTX = [
     WordRename({'phoare_deno': 'byphoare', 'equiv_deno': 'byequiv'}),
     WordRename({'pr_false': 'trivial'}),
     PrRw(),
-    WordRename({'xor_comm': 'xorC', 'xor_associative': 'xorA',
+    WordRename({'xor_comm': 'xorC',
+                'xor_associative': 'xorA',
                 'xor_nilpotent': 'xorK'}),
+    CPred(),
 ]
 
 ALLTX = [ALLTX[-1]]
