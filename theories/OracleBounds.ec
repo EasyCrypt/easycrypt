@@ -54,7 +54,7 @@ section.
 
   lemma CountO_fC ci:
     islossless O.f =>
-    bd_hoare[Count(O).f: Counter.c = ci ==> Counter.c = ci + 1] = 1%r.
+    phoare[Count(O).f: Counter.c = ci ==> Counter.c = ci + 1] = 1%r.
   proof strict.
   by intros=> O_fL; proc;
      call O_fL;
@@ -107,7 +107,7 @@ section.
     Pr[IND(Count(O),A).main() @ &m: res /\ P (glob O) (glob A)] =
       Pr[IND(O,A).main() @ &m: res /\ P (glob O) (glob A)].
   proof strict.
-  equiv_deno (_: ={glob A, glob O} ==> ={glob O, glob A, res})=> //; proc.
+  byequiv (_: ={glob A, glob O} ==> ={glob O, glob A, res})=> //; proc.
   call (_: ={glob O});
     first by proc*; inline Count(O).f Counter.incr; wp;
              call (_: true); wp.
@@ -143,7 +143,7 @@ theory EnfPen.
     lemma enf_implies_pen &m:
       Pr[IND(Count(O),A).main() @ &m: res /\ Counter.c <= bound] <= Pr[IND(Enforce(Count(O)),A).main() @ &m: res].
     proof strict.
-    equiv_deno (_: ={glob A, glob O} ==> Counter.c{1} <= bound => res{1} = res{2})=> //; last smt.
+    byequiv (_: ={glob A, glob O} ==> Counter.c{1} <= bound => res{1} = res{2})=> //; last smt.
     symmetry; proc.
     call (_: !Counter.c <= bound, ={glob Counter, glob O}, Counter.c{1} <= bound).
       (* A lossless *)
@@ -162,9 +162,9 @@ theory EnfPen.
       (* Count(O).f preserves bad *)
       intros=> &m1 //=; bypr; intros=> &m0 bad.
         cut: 1%r <= Pr[Count(O).f(x{m0}) @ &m0: bound < Counter.c]; last smt.
-        cut lbnd: bd_hoare[Count(O).f: Counter.c = Counter.c{m0} ==> Counter.c = Counter.c{m0} + 1] >= 1%r;
+        cut lbnd: phoare[Count(O).f: Counter.c = Counter.c{m0} ==> Counter.c = Counter.c{m0} + 1] >= 1%r;
           first by conseq (CountO_fC O Counter.c{m0} _); apply O_fL.
-        by bdhoare_deno lbnd=> //; smt.
+        by byphoare lbnd=> //; smt.
     by inline Counter.init; wp; skip; smt.
     qed.
   end section.
@@ -183,7 +183,7 @@ theory PenBnd.
       islossless O.f =>
       islossless A(O).distinguish.
     axiom A_distinguishC:
-      bd_hoare[A(Count(O)).distinguish: Counter.c = 0 ==> Counter.c <= bound] = 1%r.
+      phoare[A(Count(O)).distinguish: Counter.c = 0 ==> Counter.c <= bound] = 1%r.
     axiom A_distinguishC_E:
       equiv[A(Count(O)).distinguish ~ A(Count(O)).distinguish:
               ={glob A, glob O, Counter.c} /\ Counter.c{1} = 0 ==>
@@ -193,7 +193,7 @@ theory PenBnd.
       Pr[IND(Count(O),A).main() @ &m: res] =
         Pr[IND(Count(O),A).main() @ &m: res /\ Counter.c <= bound].
     proof strict.
-    by equiv_deno (_: ={glob O, glob A} ==> ={Counter.c, res} /\ Counter.c{1} <= bound)=> //;
+    by byequiv (_: ={glob O, glob A} ==> ={Counter.c, res} /\ Counter.c{1} <= bound)=> //;
        proc; call A_distinguishC_E;
        inline Counter.init; wp.
     qed.
@@ -229,7 +229,7 @@ theory BndPen.
 
     (* The adversary we build is bounded in both senses used above (for sanity) *)
     lemma enforcedAdv_bounded:
-      bd_hoare[EnforcedAdv(A,Count(O)).distinguish: Counter.c = 0 ==> Counter.c <= bound] = 1%r.
+      phoare[EnforcedAdv(A,Count(O)).distinguish: Counter.c = 0 ==> Counter.c <= bound] = 1%r.
     proof strict.
       proc (Counter.c <= bound)=> //; first by smt.
         by apply A_distinguishL.
@@ -252,7 +252,7 @@ theory BndPen.
       Pr[IND(Count(O),A).main() @ &m: res /\ Counter.c <= bound] <=
        Pr[IND(Count(O),EnforcedAdv(A)).main() @ &m: res].
     proof strict.
-    equiv_deno (_: ={glob A, glob O} ==> Counter.c{1} <= bound => ={res, glob Count})=> //; last smt.
+    byequiv (_: ={glob A, glob O} ==> Counter.c{1} <= bound => ={res, glob Count})=> //; last smt.
     symmetry; proc.
     call (_: bound < Counter.c, ={glob Counter, glob Enforce, glob O}).
       (* A lossless *)
@@ -271,9 +271,9 @@ theory BndPen.
       (* O.f preserves bad *)
       progress; bypr; intros=> &m0 bad.
       cut: 1%r <= Pr[Count(O).f(x{m0}) @ &m0: bound < Counter.c]; last smt.
-      cut lbnd: bd_hoare[Count(O).f: Counter.c = Counter.c{m0} ==> Counter.c = Counter.c{m0} + 1] >= 1%r;
+      cut lbnd: phoare[Count(O).f: Counter.c = Counter.c{m0} ==> Counter.c = Counter.c{m0} + 1] >= 1%r;
         first by conseq (CountO_fC O Counter.c{m0} _); first apply O_fL.
-      by bdhoare_deno lbnd; last smt.
+      by byphoare lbnd; last smt.
     inline Counter.init; wp.
     by skip; smt.
     qed.

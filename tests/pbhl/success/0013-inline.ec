@@ -15,7 +15,7 @@ module M = {
   }
 }.
 
-lemma h : bd_hoare[M.g : a = a ==> res = res] = 1%r.
-proof.
+lemma h : phoare[M.g : a = a ==> res = res] = 1%r.
+proof -strict.
   proc; inline M.f. wp; skip; smt.
-save.
+qed.

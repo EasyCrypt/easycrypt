@@ -112,7 +112,7 @@ theory Prime_field.
   by [].
 
   lemma toofint (x:int): 0 <= x => x < q => toint (ofint x) = x.
-  proof.
+  proof -strict.
     intros Hp Hlt;rewrite toofint_mod.
     by cut H:= ediv_unique x q 0 x _; smt.
   qed.
@@ -228,17 +228,17 @@ theory Cyclic.
     log (g ^ x) = x.
 
   lemma mulC (x y: group) : x * y = y * x.
-  proof. 
+  proof -strict. 
     by rewrite -(pow_log x) -(pow_log y) mul_pow;smt. 
   qed.
 
   lemma mulA (x y z: group) : x * (y * z) = x * y * z.
-  proof. 
+  proof -strict. 
     by rewrite -(pow_log x) -(pow_log y) -(pow_log z) !mul_pow;smt. 
   qed.
 
   lemma mul1 x : g1 * x = x.
-  proof.
+  proof -strict.
     by rewrite /g1 -(pow_log x) mul_pow;smt.
   qed.
 
@@ -312,7 +312,7 @@ theory Bilinear.
   axiom e_pow2 (f:G2.group) x g: e g (f^x) = (e g f)^x.
 
   lemma e_pow (g:G1.group) (f:G2.group) (x y:t) : e (g^x) (f^y) =  (e g f)^(x*y).
-  proof.
+  proof -strict.
     by rewrite e_pow2 e_pow1 pow_pow.
   qed.
 
@@ -321,7 +321,7 @@ theory Bilinear.
   lemma log_ge : log ge <> zero
   by smt.
 (*
-  proof.
+  proof -strict.
     case (log ge = zero) => //.
     rewrite /ge => H /=; cut := eND; by rewrite - GT.pow_log /GT.g1 H.
   qed.
@@ -330,17 +330,17 @@ theory Bilinear.
   op loge (h:GT.group) = GT.log h / log ge.
 
   lemma pow_loge (a:GT.group): ge ^ (loge a) = a.
-  proof. 
+  proof -strict. 
     by rewrite /loge -{1}(GT.pow_log ge) pow_pow; smt.
   qed.
 
   lemma loge_pow (x:t): loge (ge ^ x) = x.    
-  proof.
+  proof -strict.
     by rewrite /loge -{1}(pow_log ge) pow_pow log_pow; smt.
   qed.  
 
   lemma loge_log g f : e g f = ge ^ (log g * log f).
-  proof.
+  proof -strict.
     by rewrite -{1}G1.pow_log -{1}G2.pow_log e_pow.
   qed.
 (*
@@ -377,7 +377,7 @@ instance field with t
     proof ofintN    by smt.
 *)
   lemma test g f : e g f = ge ^ (log f * log g).
-  proof.
+  proof -strict.
     rewrite loge_log;congr; last by trivial.
     by fieldeq .
   qed.

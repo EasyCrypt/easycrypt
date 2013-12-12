@@ -31,7 +31,7 @@ module M = {
 }.
 
 equiv f1_f2 : M.f1 ~ M.f2 : ={M.m,x} ==> ={M.m}.
-proof.
+proof -strict.
  proc.
  sp.
  transitivity{1} 
@@ -43,7 +43,7 @@ proof.
         (={M.m,x,b} /\ b{1} ==> ={M.m}) => //.
     intros &m1 &m2 [H1 [H2 [H3 H4]]];subst.
     exists true, M.m{m2},  x{m2} => //.
-    rcondt{2} 1 => //;eqobs_in.
+    rcondt{2} 1 => //;sim.
   transitivity{2} {
     while (b) { 
       b = ${0,1};
@@ -60,7 +60,7 @@ proof.
     eager while 
       (h: if (b) w = $[0..10]; else w = 0; ~ if (b) w = $[0..10]; else w = 0; :
         ={b} ==> ={w}).
-    eqobs_in.
+    sim.
     trivial.
     rcondt{1} 1 => //.
     swap{1} 1.
@@ -71,8 +71,8 @@ proof.
       wp;rnd => //. 
     rcondt{2} 1 => //.
     wp;rnd;skip;smt.
-    eqobs_in.
-  seq 1 1 : (={M.m});[eqobs_in | if{1};[rnd{1};skip;progress => // | wp => //] ].
+    sim.
+  seq 1 1 : (={M.m});[sim | if{1};[rnd{1};skip;progress => // | wp => //] ].
     smt.
 qed.
 

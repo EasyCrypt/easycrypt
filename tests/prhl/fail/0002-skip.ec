@@ -10,6 +10,6 @@ module M2 = {
 }.
 
 lemma foo : equiv [M1.f ~ M2.g : true ==> true].
-proof.
+proof -strict.
   proc.
   skip.

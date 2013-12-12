@@ -20,5 +20,5 @@ class rn_hl_wp : int doption -> object
   method doption : int doption
 end
 
-val wp : env -> memory -> stmt -> form -> instr list * form
+val wp : ?onesided:bool -> env -> memory -> stmt -> form -> instr list * form
 val t_wp : (int doption) option -> tactic

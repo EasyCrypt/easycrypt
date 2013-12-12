@@ -8,7 +8,6 @@ open EcMemory
 open EcDecl
 open EcModules
 open EcTheory
-open EcWhy3
 open EcBaseLogic
 
 (* -------------------------------------------------------------------- *)

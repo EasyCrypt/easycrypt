@@ -23,18 +23,6 @@
     pty_body   = body;
   }
 
-  let mk_datatype (tyvars, name) ctors = {
-    ptd_name   = name;
-    ptd_tyvars = tyvars;
-    ptd_ctors  = ctors;
-  }
-
-  let mk_record (tyvars, name) fields = {
-    ptr_name   = name;
-    ptr_tyvars = tyvars;
-    ptr_fields = fields;
-  }
-
   let opdef_of_opbody ty b =
     match b with
     | None                  -> PO_abstr ty
@@ -146,7 +134,6 @@
 
 %token <EcParsetree.codepos> CPOS
 
-%token EXTRACTION
 %token ADD
 %token ADMIT
 %token ALIAS
@@ -159,18 +146,16 @@
 %token AUTO
 %token AXIOM
 %token BACKS
-%token BDEQ
-%token BDHOARE
-%token BDHOAREDENO
 %token BETA 
 %token BY
+%token BYEQUIV
+%token BYPHOARE
 %token BYPR
 %token CALL
 %token CASE
 %token CEQ
 %token CFOLD
 %token CHANGE
-%token CHECKPROOF
 %token CLAIM
 %token CLASS
 %token CLEAR
@@ -180,10 +165,8 @@
 %token COMPUTE
 %token CONGR
 %token CONSEQ
-%token EXFALSO
 %token CONST
 %token CUT
-%token DATATYPE
 %token DCOLON
 %token DEBUG
 %token DECLARE
@@ -194,6 +177,7 @@
 %token DOTDOT
 %token DOTTICK
 %token DROP
+%token EAGER
 %token ELIM
 %token ELIMT
 %token ELSE
@@ -201,12 +185,12 @@
 %token EOF
 %token EQ
 %token EQUIV
-%token EQUIVDENO
+%token EXFALSO
 %token EXIST
 %token EXPORT
+%token EXTRACTION
 %token FEL
 %token FIELD
-%token RING
 %token FINAL
 %token FIRST
 %token FISSION
@@ -251,17 +235,15 @@
 %token NOSMT
 %token NOT
 %token OF
-%token OFF
-%token ON
 %token OP
 %token PCENT
+%token PHOARE
 %token PIPE
 %token POSE
 %token PR
 %token PRAGMA
 %token PRBOUNDED
 %token PRED
-%token PRFALSE
 %token PRINT
 %token PROC
 %token PROGRESS
@@ -275,22 +257,22 @@
 %token RCONDF
 %token RCONDT
 %token REALIZE
-%token RECORD
 %token REFLEX
 %token REQUIRE
 %token RES
 %token RETURN
 %token REWRITE
 %token RIGHT
+%token RING
 %token RND
 %token RPAREN
 %token RPBRACE
 %token SAME
 %token SAMPLE
-%token SAVE
 %token SECTION
 %token SEMICOLON
 %token SEQ
+%token SIM
 %token SIMPLIFY
 %token SKIP
 %token SLASH
@@ -305,12 +287,14 @@
 %token STRICT
 %token SUBST
 %token SWAP
+%token SYMMETRY
 %token THEN
 %token THEORY
 %token TICKPIPE
 %token TILD
 %token TIMEOUT
 %token TOP
+%token TRANSITIVITY
 %token TRIVIAL
 %token TRY
 %token TYPE
@@ -323,11 +307,7 @@
 %token WHY3
 %token WITH
 %token WP
-%token EQOBSIN
-%token TRANSITIVITY
-%token SYMMETRY
 %token ZETA 
-%token EAGER
 
 %token <string> OP1 OP2 OP3 OP4
 %token LTCOLON GT LT GE LE
@@ -885,14 +865,14 @@ form_u(P):
       let loc = EcLocation.make $startpos $endpos in
         PFapp (mk_loc loc id, [e]) }
 
-| BDHOARE 
+| PHOARE 
     LBRACKET mp=loc(fident) COLON
       pre=form_r(P) LONGARROW post=form_r(P)
     RBRACKET
       cmp=hoare_bd_cmp bd=sform_r(P)
 	{ PFBDhoareF (pre, mp, post, cmp, bd) }
 
-| BDHOARE 
+| PHOARE 
     LBRACKET s=loc(fun_def_body) COLON
       pre=form_r(P) LONGARROW post=form_r(P)
     RBRACKET
@@ -996,7 +976,8 @@ typed_vars:
 param_decl:
 | LPAREN aout=plist0(typed_vars, COMMA) RPAREN 
     { Fparams_exp (List.flatten aout )}
-| COMMA ty=loc(type_exp)
+
+| LPAREN UNDERSCORE COLON ty=loc(type_exp) RPAREN
     { Fparams_imp ty } 
 ;
 
@@ -1249,10 +1230,6 @@ signature_item:
 (* -------------------------------------------------------------------- *)
 (* EcTypes declarations / definitions                                   *)
 
-tcand:
-| x=loc(OP4) { if unloc x <> "&" then parse_error x.pl_loc None }
-;
-
 typaram:
 | x=tident { (x, []) }
 | x=tident LTCOLON tc=plist1(lqident, tcand) { (x, tc) }
@@ -1264,21 +1241,12 @@ typarams:
 | xs=paren(plist1(typaram, COMMA)) { xs }
 ;
 
-type_decl:
+%inline tyd_name:
 | tya=typarams x=ident { (tya, x) }
 ;
 
-type_decl_or_def:
-| TYPE td=plist1(type_decl, COMMA) { List.map (mk_tydecl^~ None) td }
-| TYPE td=type_decl EQ te=loc(type_exp) { [mk_tydecl td (Some te)] }
-;
-
-(* -------------------------------------------------------------------- *)
-(* Datatypes                                                            *)
-
-datatype_def:
-| DATATYPE tya=typarams x=ident EQ PIPE? ctors=plist1(dt_ctor_def, PIPE)
-    { mk_datatype (tya, x) ctors }
+tcand:
+| x=loc(OP4) { if unloc x <> "&" then parse_error x.pl_loc None }
 ;
 
 dt_ctor_def:
@@ -1286,18 +1254,33 @@ dt_ctor_def:
 | x=ident OF ty=plist1(loc(simpl_type_exp), tcand) { (x, ty) }
 ;
 
-(* -------------------------------------------------------------------- *)
-(* Records                                                              *)
-record_def:
-| RECORD tya=typarams x=ident EQ LBRACE
-    fields=rlist1(rec_field_def, SEMICOLON) SEMICOLON?
-  RBRACE
-    { mk_record (tya, x) fields }
+%inline datatype_def:
+| LBRACKET PIPE? ctors=plist1(dt_ctor_def, PIPE) RBRACKET { ctors }
 ;
 
 rec_field_def:
 | x=ident COLON ty=loc(type_exp) { (x, ty); }
 ;
+
+%inline record_def:
+| LBRACE fields=rlist1(rec_field_def, SEMICOLON) SEMICOLON? RBRACE
+    { fields }
+;
+
+typedecl:
+| TYPE td=rlist1(tyd_name, COMMA)
+    { List.map (mk_tydecl^~ PTYD_Abstract) td }
+
+| TYPE td=tyd_name EQ te=loc(type_exp)
+    { [mk_tydecl td (PTYD_Alias te)] }
+
+| TYPE td=tyd_name EQ te=record_def
+    { [mk_tydecl td (PTYD_Record te)] }
+
+| TYPE td=tyd_name EQ te=datatype_def
+    { [mk_tydecl td (PTYD_Datatype te)] }
+;
+
 
 (* -------------------------------------------------------------------- *)
 (* Type classes                                                         *)
@@ -1721,6 +1704,9 @@ rwarg1:
        if r <> None then
          parse_error loc (Some "delta-repeat not supported");
        RWDelta (s, o |> omap EcMaps.Sint.of_list, x); }
+
+| PR s=bracket(ident)
+   { RWPr s }
 ;
 
 rwarg:
@@ -2013,6 +1999,9 @@ phltactic:
 | WP n=code_position?
    { Pwp n }
 
+| SP s=side?
+    { Psp s }
+
 | SKIP
     { Pskip }
 
@@ -2063,10 +2052,9 @@ phltactic:
 
 | ALIAS s=side? o=codepos WITH x=lident
     { Palias (s, o, Some x) }
-(* NEW *)
+
 | ALIAS s=side? o=codepos x=lident EQ e=expr 
     { Pset (false,s, o,x,e) }
-(* END NEW *)
 
 | FISSION s=side? o=codepos AT d1=uint COMMA d2=uint
     { Pfission (s, o, (1, (d1, d2))) }
@@ -2086,11 +2074,11 @@ phltactic:
 | SPLITWHILE c=expr COLON s=side? o=codepos
     { Psplitwhile (c, s, o) }
 
-| EQUIVDENO info=fpattern(conseq)
-    { Pequivdeno info }
+| BYPHOARE info=fpattern(conseq)
+    { Pbydeno (`PHoare, info) }
 
-| BDHOAREDENO info=fpattern(conseq)
-    { Pbdhoaredeno info }
+| BYEQUIV info=fpattern(conseq)
+    { Pbydeno (`Equiv, info) }
 
 | CONSEQ nm=STAR? info=fpattern(conseq_bd)
     { Pconseq (nm<>None, info) }
@@ -2110,31 +2098,23 @@ phltactic:
 | FEL at_pos=uint cntr=sform delta=sform q=sform f_event=sform some_p=fel_pred_specs inv=sform?
    {Pfel (at_pos,(cntr,delta,q,f_event,some_p,inv))}
 
-| EQOBSIN info=eqobs_in
-    { Peqobs_in info }
+| SIM info=eqobs_in
+    { Psim info }
+
 | TRANSITIVITY tk=trans_kind h1=trans_hyp h2=trans_hyp
     { Ptrans_stmt (tk, fst h1, snd h1, fst h2, snd h2) }
-(* ADDED *)
+
 | SYMMETRY 
     { Psymmetry }    
 
-| SP s=side?
-   {Psp s}
-(* NEW : ADDED FOR EAGER *)
-| EAGER t=eager_tac { t }
+| EAGER t=eager_tac
+    { t }
 
 (* basic pr based tacs *)
 | HOARE {Phoare}
-| BDHOARE {Pbdhoare}
 | PRBOUNDED {Pprbounded}
-| REWRITE PR s=LIDENT {Ppr_rewrite s}
-(* NEW TACTIC *)
-| BDHOARE SPLIT i=bdhoare_split { Pbdhoare_split i }
-(* NEW TACTIC *)
-| BDHOARE EQUIV s=side pr=sform po=sform { Pbd_equiv(s,pr,po) } 
-(* TODO : remove this tactic *)
-| PRFALSE {Pprfalse}
-| BDEQ {Pbdeq}
+| PHOARE SPLIT i=bdhoare_split { Pbdhoare_split i }
+| PHOARE EQUIV s=side pr=sform po=sform { Pbd_equiv(s,pr,po) } 
 ;
 
 bdhoare_split:
@@ -2266,8 +2246,29 @@ tactics0:
 
 tactics_or_prf:
 | t=tactics    { `Actual t    }
-| PROOF        { `Proof false }
-| PROOF STRICT { `Proof true  }
+| p=proof      { `Proof  p    }
+;
+
+proof:
+| PROOF modes=proofmode1* {
+    let seen = Hashtbl.create 0 in
+      List.fold_left
+        (fun pmodes (mode, flag) ->
+           if Hashtbl.mem seen mode then
+             parse_error mode.pl_loc (Some "duplicated flag");
+           Hashtbl.add seen mode ();
+           match unloc mode with
+           | `Strict -> { pmodes with pm_strict = flag; })
+        { pm_strict = true; } modes
+  }
+;
+
+proofmode1:
+| b=boption(MINUS) pm=loc(proofmodename) { (pm, not b) }
+;
+
+proofmodename:
+| STRICT { `Strict }
 ;
 
 (* -------------------------------------------------------------------- *)
@@ -2437,11 +2438,6 @@ gprover_info:
     { { pprov_max = None; pprov_time = Some t; pprov_names = None } }
 ;
 
-checkproof:
-| CHECKPROOF ON  { true }
-| CHECKPROOF OFF { false }
-;
-
 (* -------------------------------------------------------------------- *)
 (* Global entries                                                       *)
 
@@ -2458,11 +2454,9 @@ global_:
 | top_mod_def      { Gmodule      $1 }
 | top_mod_decl     { Gdeclare     $1 }
 | sig_def          { Ginterface   $1 }
-| type_decl_or_def { Gtype        $1 }
+| typedecl         { Gtype        $1 }
 | typeclass        { Gtypeclass   $1 }
 | tycinstance      { Gtycinstance $1 }
-| datatype_def     { Gdatatype    $1 }
-| record_def       { Grecord      $1 }
 | operator         { Goperator    $1 }
 | predicate        { Gpredicate   $1 }
 | axiom            { Gaxiom       $1 }
@@ -2470,12 +2464,11 @@ global_:
 | tactics_or_prf   { Gtactics     $1 }
 | realize          { Grealize     $1 }
 | gprover_info     { Gprover_info $1 }
-| checkproof       { Gcheckproof  $1 }
 
-| x=loc(SAVE)      { Gsave x.pl_loc }
 | x=loc(QED)       { Gsave x.pl_loc }
 | PRINT p=print    { Gprint     p   }
 | PRAGMA x=lident  { Gpragma    x   }
+
 | EXTRACTION i=extract_info { Gextract i }
 ;
 

@@ -10,8 +10,8 @@ module N = {
 }.
 
 lemma foo : hoare [N.P.f : true ==> res].
-proof.
+proof -strict.
  proc.
  skip.
  intros _; simplify;split.
-save.
+qed.

@@ -15,14 +15,14 @@ module M1 = {
   }
 }.
 
-lemma test1 : bd_hoare [M1.f : true ==> true] = (1%r).
-proof.
+lemma test1 : phoare [M1.f : true ==> true] = (1%r).
+proof -strict.
   proc.
   while (x<=y) (y-x).
   intros z.
   wp; skip; smt.
   wp; skip; smt.
-save.
+qed.
 
 
 

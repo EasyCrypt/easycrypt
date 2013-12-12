@@ -14,5 +14,5 @@ end T.
 
 clone T as U proof U.* by admit, *.
 
-realize L1. proof. admit. qed.
-realize L2. proof. admit. qed.
+realize L1. proof -strict. admit. qed.
+realize L2. proof -strict. admit. qed.

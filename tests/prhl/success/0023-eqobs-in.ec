@@ -41,9 +41,9 @@ module G2 = {
 
 lemma G1_G2_main :
   equiv[G1.main ~ G2.main : ={x} ==> ={res}].
-proof.
+proof -strict.
 proc.
-eqobs_in (G1.u{1} = G2.u{2}) true : (={z} /\ G1.u{1} = G2.u{2}).
+sim (G1.u{1} = G2.u{2}) true : (={z} /\ G1.u{1} = G2.u{2}).
  proc; wp; skip; smt.
-save.
+qed.
 

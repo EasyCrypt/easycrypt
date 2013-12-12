@@ -17,11 +17,11 @@ module M = {
 lemma foo : 
   forall (xi zi:int),
   hoare [M.g : M.z=zi /\ x = xi ==> res = 3 /\ M.z = zi /\ M.y = xi].
-proof.
+proof -strict.
   intros xi zi;proc.
   call ( _ : x = xi ==> res = 3 /\ M.y = xi).
     proc;wp;skip.
     intros &m _;subst;simplify;split.
   skip.
   intros &m h;elim h;clear h;intros _ _;subst;simplify;split.
-save.
+qed.

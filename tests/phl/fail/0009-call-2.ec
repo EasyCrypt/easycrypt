@@ -17,7 +17,7 @@ module M = {
 lemma foo : 
   forall (xi zi:int),
   hoare [M.g : M.z=zi /\ w = xi ==> res = 3 /\ M.z = zi /\ M.y = xi].
-proof.
+proof -strict.
   intros xi zi;proc.
   call (x=xi) (res = 3 /\ M.y = w).
 

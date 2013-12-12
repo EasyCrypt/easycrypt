@@ -25,7 +25,7 @@ op p (x x:int) : int = x + x.
 print op p.
 
 lemma foo : let x = 1 + 1 in x = x.
-proof.
+proof -strict.
  intros x.
 
 op p1 : (int, int) -> int.
@@ -60,10 +60,10 @@ op p20 : int -> int -> int -> int -> int -> int -> int -> int -> int -> int -> i
 lemma toto1 : 
   p (p20 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1) 
     (p20 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1) = 1.
-proof.
+proof -strict.
 
 lemma toto : forall x, p (x + x + x + x + x + x + x + x + x + x + x + x ) (x + x + x + x+ x) = x.
-proof.
+proof -strict.
 (*
 Require Import ZArith.
 Open Scope Z_scope.
@@ -78,13 +78,13 @@ Lemma foo : forall (b:bool) x,
 *)
 
 lemma foo1 : forall x, (x+x) + x = x + (x + x).
-proof.
+proof -strict.
 
 lemma foo2 : (true => true => true) => true => true => true => true=> true => true => true => true => true => true.
-proof.
+proof -strict.
 
 lemma foo : hoare [M1.f : true ==> true /\ true  /\ true  /\ true  /\ true  /\ true  /\ true  /\ true].
-proof.
+proof -strict.
   proc. 
 
 type t1 = int * int.
@@ -96,7 +96,7 @@ print type t3.
 type t4 = int -> int -> (int * int, int -> int -> int -> int -> int -> int -> int -> int -> int -> int -> int,int * int, int * int ) t2.
 print type t4.
 lemma foo : hoare [M.f : true ==> true].
-proof.
+proof -strict.
   proc. 
 print type int.
 

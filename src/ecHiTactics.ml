@@ -1,19 +1,13 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
-open EcMaps
 open EcLocation
-open EcSymbols
 open EcParsetree
-open EcTypes
-open EcModules
 open EcFol
 
-open EcBaseLogic
 open EcLogic
 open EcCoreHiLogic
 open EcHiLogic
 open EcCoreHiPhl
-open EcHiPhl
 
 (* -------------------------------------------------------------------- *)
 let process_case loc pf g =

@@ -7,5 +7,5 @@ theory T.
   axiom A : q.
 
   lemma L : p.
-  proof. by apply Top.A. qed.
+  proof -strict. by apply Top.A. qed.
 end T.

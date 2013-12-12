@@ -5,47 +5,47 @@ module M = {
 }.
 
 lemma t1 &m : Pr[M.f() @ &m : !res] = Pr[M.f() @ &m : true] - Pr[M.f() @ &m : res].
-proof.
- rewrite Pr mu_not.
+proof -strict.
+ rewrite Pr[mu_not].
  trivial.
-save.
+qed.
 
 lemma t2 &m : Pr[M.f() @ &m : res \/ false] = Pr[M.f() @ &m : res].
   smt.
-save.
+qed.
 
 lemma t3 &m : Pr[M.f() @ &m : res \/ false] = Pr[M.f() @ &m : res].
-  rewrite Pr mu_eq.
+  rewrite Pr[mu_eq].
     trivial.
   trivial.
-save.
+qed.
 
 lemma t4 &m : Pr[M.f() @ &m : res \/ false] = Pr[M.f() @ &m : res].
-  rewrite Pr mu_or.
+  rewrite Pr[mu_or].
   rewrite (_ : Pr[M.f() @ &m : res /\ false] = Pr[M.f() @ &m : false]).
-    rewrite Pr mu_eq.
+    rewrite Pr[mu_eq].
       trivial.
     trivial.
-  rewrite Pr mu_false.
+  rewrite Pr[mu_false].
   smt.
-save.
+qed.
 
 lemma t5 &m : Pr[M.f() @ &m : res \/ false] = Pr[M.f() @ &m : res].
-  rewrite Pr mu_disjoint.
+  rewrite Pr[mu_disjoint].
     trivial.
-  rewrite Pr mu_false.
+  rewrite Pr[mu_false].
   smt.
-save.
+qed.
 
 lemma t6 &m :  Pr[M.f() @ &m : res /\ false ] <= Pr[M.f() @ &m : res ].
-  rewrite Pr mu_sub.
+  rewrite Pr[mu_sub].
     trivial.
   trivial.
-save.
+qed.
 
 lemma t7 &m :  Pr[M.f() @ &m : res /\ false ] <= Pr[M.f() @ &m : res ] /\ true.
-  rewrite Pr mu_sub.
+  rewrite Pr[mu_sub].
     trivial.
   trivial.
-save.
+qed.
 

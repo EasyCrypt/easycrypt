@@ -21,7 +21,7 @@ module G2 = {
 
 (* Should not be provable *)
 equiv backward : G1.f ~ G2.f : true ==> true.
-proof. 
+proof -strict. 
  proc.
  wp.
  rnd (fun z, 1 - z), (fun z, 1 - z).

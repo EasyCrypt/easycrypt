@@ -2,7 +2,6 @@
 open EcUtils
 open EcParsetree
 open EcTypes
-open EcModules
 open EcFol
 open EcEnv
 open EcBaseLogic

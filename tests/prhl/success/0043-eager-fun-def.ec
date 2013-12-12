@@ -19,8 +19,8 @@ module M = {
 lemma foo : eager[if (!M.b) M.w = $[0..10]; , M.f1 ~ 
                   M.f2, if (!M.b) M.w = $[0..10]; :
                   ={M.b,M.w} ==> ={M.b,M.w,res}].
-proof.
+proof -strict.
  eager proc.
  rcondf{2} 4; first intros &m;wp => //.
- eqobs_in.
-save.
+ sim.
+qed.

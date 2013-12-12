@@ -1,7 +1,6 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcOptions
-open EcPrinting
 
 module T = EcTerminal
 

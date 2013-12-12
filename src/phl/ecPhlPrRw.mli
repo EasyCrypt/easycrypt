@@ -12,6 +12,3 @@ end
 (* -------------------------------------------------------------------- *)
 val t_pr_rewrite : symbol -> tactic
 
-(* -------------------------------------------------------------------- *)
-val process_bdhoare_split : EcParsetree.bdh_split -> tactic
-

@@ -5,7 +5,6 @@ open EcPath
 open EcLocation
 open EcParsetree
 open EcTypes
-open EcDecl
 open EcModules
 
 (* -------------------------------------------------------------------- *)
@@ -104,9 +103,9 @@ val transbinding : EcEnv.env -> EcUnify.unienv -> ptybindings ->
   EcEnv.env * (EcIdent.t * EcTypes.ty) list
 
 (* -------------------------------------------------------------------- *)
-val transexp     : EcEnv.env -> EcUnify.unienv -> pexpr -> expr * ty
-val transexpcast : EcEnv.env -> EcUnify.unienv -> ty -> pexpr -> expr
-val transexpcast_opt : EcEnv.env -> EcUnify.unienv -> ty option -> pexpr -> expr
+val transexp         : EcEnv.env -> [`InProc|`InOp] -> EcUnify.unienv -> pexpr -> expr * ty
+val transexpcast     : EcEnv.env -> [`InProc|`InOp] -> EcUnify.unienv -> ty -> pexpr -> expr
+val transexpcast_opt : EcEnv.env -> [`InProc|`InOp] -> EcUnify.unienv -> ty option -> pexpr -> expr
 
 (* -------------------------------------------------------------------- *)
 val transstmt    : EcEnv.env -> EcUnify.unienv -> pstmt -> stmt

@@ -182,25 +182,20 @@ type ptyparams = (psymbol * pqsymbol list) list
 type ptydecl = {
   pty_name   : psymbol;
   pty_tyvars : ptyparams;
-  pty_body   : pty option;
+  pty_body   : ptydbody;
 }
 
-(* -------------------------------------------------------------------- *)
-type pdatatype = {
-  ptd_name   : psymbol;
-  ptd_tyvars : (psymbol * pqsymbol list) list;
-  ptd_ctors  : (psymbol * pty list) list;
-}
+and ptydbody =
+| PTYD_Abstract
+| PTYD_Alias    of pty
+| PTYD_Record   of precord
+| PTYD_Datatype of pdatatype
+
+and pdatatype = (psymbol * pty list) list
+
+and precord = (psymbol * pty) list
 
 (* -------------------------------------------------------------------- *)
-type precord = {
-  ptr_name   : psymbol;
-  ptr_tyvars : (psymbol * pqsymbol list) list;
-  ptr_fields : (psymbol * pty) list;
-}
-
-(* -------------------------------------------------------------------- *)
-
 type pmemory   = psymbol
 
 type phoarecmp = PFHle | PFHeq | PFHge
@@ -431,30 +426,27 @@ type phltactic =
   | Phr_exists_elim  
   | Phr_exists_intro of pformula list 
   | Pexfalso
-  | Pbdhoaredeno  of cfpattern
-  | Pequivdeno    of cfpattern
+  | Pbydeno       of ([`PHoare | `Equiv ] * cfpattern)
   | PPr           of (pformula * pformula) option 
   | Pfel          of int * (pformula * pformula * pformula * pformula * pfel_spec_preds * pformula option)
   | Phoare
-  | Pbdhoare
   | Pprbounded
-  | Pprfalse
-  | Ppr_rewrite   of symbol
-  | Pbdeq 
-  | Peqobs_in   of (pformula_o * pformula_o * pformula_o)
-  | Ptrans_stmt of trans_info
-  | Psymmetry   
-  | Psp        of (bool option)
+  | Psim           of (pformula_o * pformula_o * pformula_o)
+  | Ptrans_stmt    of trans_info
+  | Psymmetry
+  | Psp            of (bool option)
   | Pbdhoare_split of bdh_split 
-  (* for eager *)
-  | Peager_seq of eager_info * (int * int) * pformula 
+
+    (* Eager *)
+  | Peager_seq       of eager_info * (int * int) * pformula 
   | Peager_if  
-  | Peager_while of eager_info
+  | Peager_while     of eager_info
   | Peager_fun_def 
   | Peager_fun_abs   of eager_info * pformula
-  | Peager_call of call_info fpattern
-  | Peager of eager_info * pformula
-  (* Relation between logic *)
+  | Peager_call      of call_info fpattern
+  | Peager           of eager_info * pformula
+
+    (* Relation between logic *)
   | Pbd_equiv of (bool * pformula * pformula)
 
 and pinline_arg =
@@ -469,6 +461,7 @@ type rwarg = (tfocus located) option * rwarg1
 and rwarg1 =
   | RWDelta of (rwside * rwocc * pformula)
   | RWRw    of (rwside * trepeat option * rwocc * ffpattern list)
+  | RWPr    of psymbol
   | RWDone  of bool
   | RWSimpl
 
@@ -682,6 +675,11 @@ type toextract =
 type withextract = toextract * string 
 
 (* -------------------------------------------------------------------- *)
+type proofmode = {
+  pm_strict : bool;
+}
+
+(* -------------------------------------------------------------------- *)
 type global =
   | Gmodule      of ptopmodule
   | Gdeclare     of pdeclmodule
@@ -693,8 +691,6 @@ type global =
   | Gtype        of ptydecl list
   | Gtypeclass   of ptypeclass
   | Gtycinstance of ptycinstance
-  | Gdatatype    of pdatatype
-  | Grecord      of precord
   | Gprint       of pprint
   | GthOpen      of psymbol
   | GthClose     of psymbol
@@ -706,9 +702,8 @@ type global =
   | GsctOpen
   | GsctClose
   | Grealize     of pqsymbol
-  | Gtactics     of [`Proof of bool | `Actual of ptactic list]
+  | Gtactics     of [`Proof of proofmode | `Actual of ptactic list]
   | Gprover_info of pprover_infos
-  | Gcheckproof  of bool
   | Gsave        of EcLocation.t
   | Gpragma      of psymbol
   | Gextract     of (string option * toextract list * withextract list)

@@ -28,7 +28,7 @@ equiv foo : M.f ~ M'.f : ={x} ==> ={res}.
 proc.
 seq 1 2 : true.
  wp => //.
-eqobs_in.
+sim.
 skip.
 
 

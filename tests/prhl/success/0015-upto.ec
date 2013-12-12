@@ -73,12 +73,12 @@ axiom d_inter_lossless : mu [0..10] (fun (x1 : int), 0 <= x1 /\ x1 <= 10) = 1%r.
 
 lemma foo : forall (A<:Adv{RO,F1,F2}), 
   (forall (O<:O {A}),  
-      bd_hoare [O.hashA : true ==> true] = 1%r => 
-      bd_hoare [A(O).a : true ==> true] = 1%r) =>  
+      phoare [O.hashA : true ==> true] = 1%r => 
+      phoare [A(O).a : true ==> true] = 1%r) =>  
   equiv [F1(A).main ~ F2(A).main : 
      (glob A){1} = (glob A){2} /\ F1.xs{1} = F2.xs{2} ==> 
      (!mem F2.xs RO.logA){2} => res{1} = res{2}].
-proof.
+proof -strict.
   intros A Hlossless;proc.
   call ( _ : (!mem F2.xs RO.logA){2} /\ h{1} = h{2} /\ (glob A){1} = (glob A){2} /\
          F1.xs{1} = F2.xs{2} /\
@@ -115,4 +115,4 @@ proof.
     smt.
 
   inline RO.hash;wp;rnd;wp;skip;simplify;smt.
-save.
+qed.

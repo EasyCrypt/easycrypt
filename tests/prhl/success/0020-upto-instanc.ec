@@ -32,7 +32,7 @@ lemma G :
   forall (Adv2 <: ADV2{Or}),
   (forall (O <: OR{Adv2}), islossless O.f => islossless Adv2(O).h) =>
   equiv[G(Adv2).g ~ G(Adv2).g : true ==> ={res}].
-proof.
+proof -strict.
 intros Adv2 LossAdv2.
 proc.
 call (_ : true ==> ={res, glob Adv2}).
@@ -64,13 +64,13 @@ local module Adv2 = FAdv2(Adv1).
 local lemma G_Inst :
   (forall (O <: OR{Adv2}), islossless O.f => islossless Adv1(O).g) =>
   equiv[G(Adv2).g ~ G(Adv2).g : true ==> ={res}].
-proof.
+proof -strict.
 intros LossAdv1.
 apply (G (Adv2)).
 intros O LossF.
 proc.
  call (LossAdv1 O _);trivial.
-save.
+qed.
 
 axiom G' :
   forall (Adv2 <: ADV2{Or}),
@@ -80,13 +80,13 @@ axiom G' :
 local lemma G_Inst' :
   (forall (O <: OR), islossless O.f => islossless Adv1(O).g) =>
   equiv[G(Adv2).g ~ G(Adv2).g : true ==> ={res}].
-proof.
+proof -strict.
 intros LossAdv1.
 apply (G' (Adv2)).
 intros O LossF.
 proc.
  call (LossAdv1 O _);trivial.
-save.
+qed.
 
 end section.
 

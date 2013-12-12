@@ -8,6 +8,6 @@ module M = {
 }.
 
 equiv foo : M.f ~ M.f : true ==> true.
-proof.
+proof -strict.
  proc.
  swap {1} 1 2 4.

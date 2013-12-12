@@ -52,18 +52,18 @@ by [].
 lemma nosmt mu_and_le_l (d:'a distr) (p q:'a cpred) r:
   mu d p <= r =>
   mu d (cpAnd p q) <= r.
-proof.
+proof -strict.
   apply (Real.Trans _ (mu d p)).
   by (apply mu_sub;rewrite /cpAnd => x //).
-save.
+qed.
 
 lemma nosmt mu_and_le_r (d:'a distr) (p q:'a cpred) r :
   mu d q <= r => 
   mu d (cpAnd p q) <= r.
-proof.
+proof -strict.
   apply (Real.Trans _ (mu d q)).
   by (apply mu_sub;rewrite /cpAnd => x //).
-save.
+qed.
 
 (** Lemmas *)
 lemma mu_supp (d:'a distr):
@@ -74,7 +74,7 @@ qed.
 
 lemma mu_eq (d:'a distr) (p q:'a cpred):
   p == q => mu d p = mu d q.
-proof.
+proof -strict.
 by intros=> ext_p_q; congr=> //; apply fun_ext=> //.
 qed.
 
@@ -135,7 +135,7 @@ lemma mu_one : forall (P : 'a Fun.cpred)(d : 'a distr),
   P == Fun.cpTrue => 
   weight d = 1%r =>
   mu d P = 1%r.
-proof.
+proof -strict.
   intros => P d heq <-.
   rewrite /weight.
   congr => //.
@@ -151,7 +151,7 @@ theory Dempty.
 
   lemma unique (d:'a distr):
     weight d = 0%r <=> d = dempty.
-  proof.
+  proof -strict.
     split; last smt.
     intros weight_0; rewrite -(pw_eq<:'a> d dempty); smt.
   qed.
@@ -217,7 +217,7 @@ theory Dinter.
   lemma mu_in_supp (i j : int):
     i <= j => 
     mu (dinter i j) (fun x, i <= x <= j) = 1%r.
-  proof.
+  proof -strict.
   by intros=> H;
      rewrite -(mu_in_supp_eq (dinter i j) cpTrue);
        try apply fun_ext;
@@ -250,7 +250,7 @@ theory Dscale.
 
   lemma weight_pos (d:'a distr):
     0%r < weight d => weight (dscale d) = 1%r.
-  proof.
+  proof -strict.
   by intros=> H; rewrite /weight mu_def_pos /weight=> //; smt.
   qed.  
 

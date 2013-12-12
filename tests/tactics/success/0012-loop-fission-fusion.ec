@@ -39,11 +39,11 @@ module M = {
 }.
 
 lemma L : equiv[M.f ~ M.g : true ==> true].
-proof.
+proof -strict.
   proc.
   fission {1} 1.3!2 @ 1, 2.
   fusion  {1} 1.3!2 @ 1, 1.
   fusion  {2} 1.3!2 @ 1, 1.
   fission {2} 1.3!2 @ 1, 2.
   admit.
-save.
+qed.

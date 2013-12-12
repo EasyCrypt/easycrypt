@@ -3,9 +3,9 @@ module M = {
 }.
 
 lemma foo : hoare [M.f : true ==> false].
-proof.
+proof -strict.
   conseq ( _: true ==> true).
   smt.
   smt.
   admit.
-save.
+qed.

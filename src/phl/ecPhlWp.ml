@@ -3,7 +3,6 @@ open EcUtils
 open EcParsetree
 open EcModules
 open EcFol
-open EcPV
 open EcBaseLogic
 open EcLogic
 open EcCorePhl
@@ -16,23 +15,23 @@ module LowInternal = struct
     let let1 = lv_subst m lv (form_of_expr m e) in
       (let1::lets, f)
 
-  let rec wp_stmt env m (stmt: EcModules.instr list) letsf =
+  let rec wp_stmt onesided env m (stmt: EcModules.instr list) letsf =
     match stmt with
     | [] -> stmt, letsf
     | i :: stmt' ->
         try
-          let letsf = wp_instr env m i letsf in
-            wp_stmt env m stmt' letsf
+          let letsf = wp_instr onesided env m i letsf in
+            wp_stmt onesided env m stmt' letsf
         with No_wp -> (stmt, letsf)
 
-  and wp_instr env m i letsf =
+  and wp_instr onesided env m i letsf =
     match i.i_node with
     | Sasgn (lv,e) ->
         wp_asgn_aux m lv e letsf
 
     | Sif (e,s1,s2) ->
-        let r1,letsf1 = wp_stmt env m (List.rev s1.s_node) letsf in
-        let r2,letsf2 = wp_stmt env m (List.rev s2.s_node) letsf in
+        let r1,letsf1 = wp_stmt onesided env m (List.rev s1.s_node) letsf in
+        let r2,letsf2 = wp_stmt onesided env m (List.rev s2.s_node) letsf in
         if r1=[] && r2=[] then
           let post1 = mk_let_of_lv_substs env letsf1 in
           let post2 = mk_let_of_lv_substs env letsf2 in
@@ -40,11 +39,16 @@ module LowInternal = struct
             ([], post)
         else raise No_wp
 
+    | Sassert e when onesided ->
+      let phi = form_of_expr m e in
+      let (lets,f) = letsf in
+      (lets,EcFol.f_and_simpl phi f)
+
     | _ -> raise No_wp
 end
 
-let wp env m s post =
-  let r,letsf = LowInternal.wp_stmt env m (List.rev s.s_node) ([],post) in
+let wp ?(onesided=true) env m s post =
+  let r,letsf = LowInternal.wp_stmt onesided env m (List.rev s.s_node) ([],post) in
     (List.rev r, mk_let_of_lv_substs env letsf)
 
 (* -------------------------------------------------------------------- *)
@@ -73,7 +77,7 @@ module TacInternal = struct
     let hs = t_as_hoareS concl in
     let s_hd,s_wp = s_split_o "wp" i hs.hs_s in
     let s_wp,post =
-      wp env (EcMemory.memory hs.hs_m) (EcModules.stmt s_wp) hs.hs_po in
+      wp ~onesided:true env (EcMemory.memory hs.hs_m) (EcModules.stmt s_wp) hs.hs_po in
     let i = check_wp_progress "wp" i hs.hs_s s_wp in
     let s = EcModules.stmt (s_hd @ s_wp) in
     let concl = f_hoareS_r { hs with hs_s = s; hs_po = post} in

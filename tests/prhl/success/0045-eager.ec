@@ -63,10 +63,10 @@ section.
   weight dsample = 1%r => 
   equiv [G2.main ~ G1.main : ={glob A} ==>
                             ={glob A,res} /\ ROe.m{1} = ROM.RO.m{2} ].
- proof.
+ proof -strict.
   intros Hw;proc.
   inline ROM.RO.init ROe.init.
-  seq 4 2 : (={glob A,x} /\ ROe.m{1} = ROM.RO.m{2} );first by eqobs_in. 
+  seq 4 2 : (={glob A,x} /\ ROe.m{1} = ROM.RO.m{2} );first by sim. 
   eager (h : ROe.hs = $dsample;  ~  : true ==> true) : (={glob A} /\ ROe.m{1} = ROM.RO.m{2}).
   rnd{1} => //.
   trivial.
@@ -84,7 +84,7 @@ section.
     intros &m;conseq * (_ : _ ==> true) => //.
   rcondf{2} 2.
     intros &m;conseq * (_ : _ ==> true) => //.
-  eqobs_in;rnd{1} => //.
-  proc;eqobs_in.
-save.
+  sim;rnd{1} => //.
+  proc;sim.
+qed.
 

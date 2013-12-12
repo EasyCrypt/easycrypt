@@ -377,7 +377,6 @@ let rec h_red ri env hyps f =
         | OK_or  false, [f1;f2] -> f_or_simpl f1 f2 
         | OK_imp      , [f1;f2] -> f_imp_simpl f1 f2 
         | OK_iff      , [f1;f2] -> f_iff_simpl f1 f2 
-        | OK_eq       , [f1;f2] -> f_eq_simpl f1 f2 
         | OK_int_le   , [f1;f2] -> f_int_le_simpl f1 f2
         | OK_int_lt   , [f1;f2] -> f_int_lt_simpl f1 f2
         | OK_real_le  , [f1;f2] -> f_real_le_simpl f1 f2
@@ -389,7 +388,21 @@ let rec h_red ri env hyps f =
         | OK_real_sub , [f1;f2] -> f_real_sub_simpl f1 f2
         | OK_real_mul , [f1;f2] -> f_real_mul_simpl f1 f2
         | OK_real_div , [f1;f2] -> f_real_div_simpl f1 f2
-        | _                     -> f
+        | OK_eq       , [f1;f2] -> begin
+            let fallback () = f_eq_simpl f1 f2 in
+            match (fst (destr_app f1)).f_node, (fst (destr_app f2)).f_node with
+            | Fop (p1, _), Fop (p2, _)
+                when EcEnv.Op.is_dtype_ctor env p1
+                  && EcEnv.Op.is_dtype_ctor env p2 ->
+
+                let idx p =
+                  let idx = EcEnv.Op.by_path p env in
+                    snd (EcDecl.operator_as_ctor idx)
+                in
+                  if idx p1 <> idx p2 then f_false else fallback ()
+            | _ -> fallback ()
+        end
+        | _  -> f
       in
         if   f_equal f f'
         then f_app fo (h_red_args ri env hyps args) f.f_ty

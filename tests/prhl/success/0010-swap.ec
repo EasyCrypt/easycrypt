@@ -10,7 +10,7 @@ module M = {
 }.
 
 equiv foo : M.f ~ M.f : true ==> true.
-proof.
+proof -strict.
   proc.   
   swap {1} 2 3 3.
   swap {1} 3 4 4.
@@ -29,5 +29,5 @@ proof.
   swap {1} [2..3] 1.
   swap {2} [2..3] -1.
   wp;skip;intros &m1 &m2 h;assumption h.
-save.
+qed.
 

@@ -6,7 +6,7 @@ theory Foo.
   end section.
 
   lemma bar : true.
-  proof.
+  proof -strict.
     apply U.foo; admit.
   qed.
 end Foo.

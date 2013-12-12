@@ -12,7 +12,7 @@ module M = {
   }
 }.
 
-lemma foo : bd_hoare [M.f : false ==> res] = (1%r/2%r).
+lemma foo : phoare [M.f : false ==> res] = (1%r/2%r).
   conseq ( _: true ==> res=true).
   smt.
   smt.
@@ -20,7 +20,7 @@ lemma foo : bd_hoare [M.f : false ==> res] = (1%r/2%r).
   rnd (1%r/2%r) (fun (x), x). 
   skip.
   smt.
-save.
+qed.
 
 module M2 = { 
   proc f() : int = { 
@@ -28,16 +28,16 @@ module M2 = {
   }
 }.
 
-lemma foo2 : bd_hoare [M2.f : true ==> false] <= 1%r.
+lemma foo2 : phoare [M2.f : true ==> false] <= 1%r.
   conseq ( _: true ==> res<=2).
   smt.
   smt.
   proc.
   pr_bounded. 
   smt.
-save.
+qed.
 
-lemma foo3 : bd_hoare [M2.f : true ==> true] >= (1%r/2%r).
+lemma foo3 : phoare [M2.f : true ==> true] >= (1%r/2%r).
   conseq ( _: true ==> res=2).
   smt.
   smt.
@@ -49,12 +49,12 @@ lemma foo3 : bd_hoare [M2.f : true ==> true] >= (1%r/2%r).
   or the skip tactics accepts lower-bounded judgments 
   and requires bhs_bd <= 1 as subgoal.
 *)
-save.
+qed.
 
-lemma bug_15920 : bd_hoare [M2.f : true ==> false] <= 1%r.
+lemma bug_15920 : phoare [M2.f : true ==> false] <= 1%r.
   conseq ( _: true ==> _).
   smt.
   proc.
   pr_bounded. 
   smt.
-save.
+qed.

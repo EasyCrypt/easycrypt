@@ -2,7 +2,7 @@ lemma foo2 : forall (x1 y1:'a1) (x2 y2:'a2),
    (x1,x2) = (y1, y2) => x2 = y2.
  intros a b c d h.
  elim h;split.
-save.
+qed.
 
 lemma foo20 :
   forall
@@ -15,4 +15,4 @@ lemma foo20 :
          x20 = y20.
  intros _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ h.
  elim h;split.
-save.
+qed.

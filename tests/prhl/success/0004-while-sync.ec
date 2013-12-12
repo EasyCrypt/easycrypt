@@ -12,7 +12,7 @@ module M = {
 
 equiv foo : M.f ~ M.f : 
   M.y{1} = M.y{2} /\ x{1}=x{2} ==> res{1} = res{2} /\ M.y{1} = M.y{2}.
-proof.
+proof -strict.
  proc.
  while (x{1} = x{2} /\ i{1} = i{2}).
    wp;skip.
@@ -27,7 +27,7 @@ proof.
  clear h heq1 heq2.
  intros x1 i1 x2 i2 _ _ h1;elim h1;intros heq1 heq2;subst; simplify.
  split.
-save.
+qed.
 
 module type T = { proc f() : unit }.
 
@@ -43,7 +43,7 @@ module MM(A:T) = {
 equiv foo1 (A<:T{MM}) : MM(A).f ~ MM(A).f : 
   (glob A){1} = (glob A){2} /\ MM.y{1} = MM.y{2} /\ x{1} = x{2} ==> 
   res{1} = res{2} /\ MM.y{1} = MM.y{2}.
-proof.
+proof -strict.
  proc.
  while (x{1} = x{2} /\ i{1} = i{2} /\ (glob A){1} = (glob A){2} ).
    call (_ : (glob A){1} = (glob A){2} ==> (glob A){1} = (glob A){2}).
@@ -51,4 +51,4 @@ proof.
    wp;skip;progress.
 
  wp; skip;progress.
-save.
+qed.

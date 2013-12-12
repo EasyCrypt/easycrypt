@@ -2,18 +2,19 @@
 
 * Mots clés
 
-  - fun -> proc
-  - lambda -> fun
-  - bd_hoare -> phoare
-  - bdhoare_* -> phoare_*
-  - eqobs_in -> sim
-  - *_deno -> bydeno
+DONE  - fun -> proc
+DONE  - lambda -> fun
+DONE  - eqobs_in -> sim
+DONE  - datatype -> type
+DONE  - record -> type
+DONE  - bd_hoare -> phoare
+DONE  - bdhoare_* -> phoare_*
+DONE  - *_deno -> bydeno (byphoare | byequiv)
+
   - fst -> .`1
   - snd -> .`2
-  - datatype -> type
-  - record -> type
 
-* Comportement par défaut devrait etre `proof strict' (ceci est une décision unilatérale de François)
+DONE * Comportement par défaut devrait etre `proof strict' (ceci est une décision unilatérale de François)
 
 * Discuter la syntaxe des opérateurs
 
@@ -21,18 +22,20 @@
 
 * Chainage pour les déclarations abstraites:
 
-  type t1, ..., tn.
+DONE   type t1, ..., tn.
+
   var  x1, ..., xn.
 
   Avec ou sans virgule ?
 
 * Permettre les accès directs aux fonctions dans les foncteurs
 
-* interface de module / proc.
-
-  proc id(arg...) : t * { restr } (* `*' est maintenant en dehors - 16082 *)
-  + `arg' peut maintenant être de la forme `_ : t1 * ... * tn'
-     actuellement, la syntaxe est ,t1 * ... * tn
+DONE * interface de module / proc.
+DONE
+DONE   proc * id(arg...) : t { restr } (* `*' est maintenant en dehors - 16082 *)
+DONE 
+DONE   + `arg' peut maintenant être de la forme `_ : t1 * ... * tn'
+DONE      actuellement, la syntaxe est ,t1 * ... * tn
 
 * if / while -> parenthèses sur la condition ? (interaction avec les accolades)
 
@@ -42,8 +45,8 @@
 
 * by < ; < first, last -> cas t; first by (t2; t3); t4
 
-* cut by t -> currently cut; first t. Should be cut; first by t.
-  idem for lemma ... by ...
+DONE * cut by t -> currently cut; first t. Should be cut; first by t.
+DONE   idem for lemma ... by ...
 
 * by [] everywhere
 
@@ -59,7 +62,7 @@
 	bd_hoare [fident ...] relation form // pas sform
 	conseq aussi
 
-* détection du code mort
+HALF-DONE (only for non-exported functions) * détection du code mort
 
 * Syntaxe des tactiques
 
@@ -101,15 +104,13 @@
 
     pr_bounded -> à virer
 
-    hoare / bdhoare -> fusionner en hoare
+    DONE hoare / bdhoare -> fusionner en hoare
 
-    rewrite Pr -> intégrer dans rewrite
+    DONE rewrite Pr -> intégrer dans rewrite
 
-    pr_false -> à enlever
+    DONE pr_false -> à enlever
 
-    pr_eq -> à enlever (* Ce fait avec conseq *)
-    
-
+    DONE pr_eq -> à enlever (* Ce fait avec conseq *)
 	
 	exists* -> utilise alias
 

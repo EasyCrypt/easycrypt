@@ -1,6 +1,7 @@
-datatype 'a option =
+type 'a option = [
   | None
-  | Some of 'a.
+  | Some of 'a
+].
 
 lemma option_ind_eq (P:'a option -> bool) (xo:'a option):
   (xo = None => P xo) =>

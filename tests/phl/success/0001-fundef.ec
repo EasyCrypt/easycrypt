@@ -3,9 +3,9 @@ module M = {
 }.
 
 lemma foo : hoare [M.f : x=1 ==> res=1].
-proof.
+proof -strict.
  proc.
  skip.
  intros &m h.
  assumption h.
-save.
+qed.

@@ -1,5 +1,4 @@
 (* -------------------------------------------------------------------- *)
-open EcSymbols
 open EcParsetree
 open EcBaseLogic
 open EcLogic

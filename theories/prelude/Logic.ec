@@ -127,7 +127,7 @@ lemma nosmt andDor : forall (a b c : bool),
   ((a /\ b) \/ c) = ((a \/ c) /\ (b \/ c))
 by [].
 
-(* variation usefull for bd_hoare split tactic *)
+(* variation usefull for phoare split tactic *)
 lemma nosmt orDandN : forall a b, (b /\ a \/ !b /\ a) = a
 by [].
 

@@ -33,13 +33,13 @@ theory GenDice.
       weight (d i) = 1%r =>
       Pr[RsampleW.sample(i,dfl) @ &m : res = k] = 
          if test i k then 1%r/(card(sub_supp i))%r else 0%r.
-  proof.
+  proof -strict.
     intros i0 dfl0 k.
     pose bdt := (card(sub_supp i0))%r.
     cut bdt_pos: 0 <= card (sub_supp i0) by smt.
     cut bdt_posr: 0%r <= (card (sub_supp i0))%r by smt.
     case (test i0 k) => Htk &m Hdfl Hweight;
-      bdhoare_deno (_: !test i r /\ i0 = i ==> k = res) => //;proc.
+      byphoare (_: !test i r /\ i0 = i ==> k = res) => //;proc.
       (* case : test i k *)
       pose bd := mu_x (d i0) k.
       cut d_uni : forall x, in_supp x (d i0) => mu_x (d i0) x = bd.
@@ -50,7 +50,7 @@ theory GenDice.
       while (i0=i) (if test i r then 0 else 1) 1 (bdt * bd) => //; first 2 smt.
         intros Hw; alias 2 r0 = r.
         cut Htk' := Htk;generalize Htk';rewrite -test_sub_supp => Hmemk.
-        bd_hoare split bd ((1%r - bdt*bd) * (1%r/bdt)) : (k=r0).
+        phoare split bd ((1%r - bdt*bd) * (1%r/bdt)) : (k=r0).
           by intros &hr [H1 H2]; rewrite (neqF (test i{hr} r{hr})) //=;fieldeq.
           (* bounding pr : k = r0 /\ k = r *)
           seq 2 : (k = r0) bd 1%r 1%r 0%r (r0 = r /\ i = i0) => //.
@@ -66,7 +66,7 @@ theory GenDice.
          case (k = r0);first by conseq * (_ : _ ==> false) => //.
          conseq * Hw;progress => //.
          by rewrite (eqT (test i{hr} r{hr})) //= /charfun (neqF (k = r{hr})) //.
-         bd_hoare split ! 1%r (bdt*bd);wp;rnd => //.
+         phoare split ! 1%r (bdt*bd);wp;rnd => //.
           skip;progress => //.
           rewrite -(mu_eq (d i{hr}) (cpMem (sub_supp i{hr}))).
             by intros x ; rewrite /= -test_sub_supp.
@@ -83,7 +83,7 @@ theory GenDice.
     (* case ! test i0 k *)
     hoare; while (!test i k); first rnd => //.
     by skip;smt.
-  save.
+  qed.
 
   type t'.
   op d' : input -> t' distr.
@@ -99,11 +99,11 @@ theory GenDice.
   axiom d'_uni : forall i x, in_supp x (d' i) => mu_x (d' i) x = 1%r/(card(sub_supp i))%r.
   
   lemma prSample : forall i k &m, Pr[Sample.sample(i) @ &m : res = k] = mu_x (d' i) k.
-  proof.
-    intros i0 k &m; bdhoare_deno (_: i0 = i ==> k = res) => //;proc.
+  proof -strict.
+    intros i0 k &m; byphoare (_: i0 = i ==> k = res) => //;proc.
     rnd;skip;progress.
     by apply (mu_eq (d' i{hr}) (fun (x:t'), k = x) ((=) k)).
-  save.
+  qed.
 
   equiv Sample_RsampleW (f : t' -> t) (finv : t -> t') : 
      Sample.sample ~ RsampleW.sample : 
@@ -112,12 +112,12 @@ theory GenDice.
        (forall rR, test i{2} rR => f (finv rR) = rR) /\
        (forall rL, in_supp rL (d' i{1}) => finv (f rL) = rL) ==>
        res{1} = finv res{2}.
-  proof.
+  proof -strict.
     bypr (res{1}) (finv res{2}) => //.      
     intros &m1 &m2 k [Heqi [Ht [Hw [Htin [Hffi Hfif]]]]].
     rewrite (_:Pr[RsampleW.sample(i{m2}, r{m2}) @ &m2 : k = finv res] = 
                Pr[RsampleW.sample(i{m2}, r{m2}) @ &m2 : res = f k]).
-      equiv_deno (_: ={i,r} /\ i{2} = i{m2} ==> 
+      byequiv (_: ={i,r} /\ i{2} = i{m2} ==> 
                         ={res} /\ test i{m2} res{2}) => //.
         by proc;while (={i,r});[rnd | ];trivial.
       progress => //. 
@@ -125,11 +125,11 @@ theory GenDice.
       by rewrite Hfif // Htin Heqi.
     rewrite (_:Pr[Sample.sample(i{m1}) @ &m1 : k = res] = 
                Pr[Sample.sample(i{m1}) @ &m1 : res = k]). 
-      by rewrite Pr mu_eq.
+      by rewrite Pr[mu_eq].
     rewrite (prSample i{m1} k &m1) (prRsampleW i{m2} r{m2} (f k) &m2) => //.   
     case (test i{m2} (f k)).
       by rewrite -Heqi -Htin; apply d'_uni.
     rewrite -Heqi -Htin /in_supp;smt.
- save.
+ qed.
 
 end GenDice.

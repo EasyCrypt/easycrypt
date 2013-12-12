@@ -2,7 +2,6 @@
 open EcUtils
 open EcFol
 open EcEnv
-open EcBaseLogic
 open EcLogic
 open EcCorePhl
 

@@ -29,37 +29,37 @@ theory Dprod.
 
   lemma mu_x_def: forall (d1:'a distr) (d2:'b distr) p, 
      mu_x (d1 * d2) p = mu_x d1 (fst p) * mu_x d2 (snd p).
-  proof.
+  proof -strict.
     intros d1 d2 p;beta delta mu_x;rewrite -mu_def.
     by apply mu_eq => x;smt.
-  save.
+  qed.
 
   lemma supp_def: forall (d1:'a distr) (d2:'b distr) p, 
     in_supp p (d1 * d2) <=>
     in_supp (fst p) d1 /\ in_supp (snd p) d2.
-  proof.
+  proof -strict.
     by intros d1 d2 p;beta delta in_supp;rewrite mu_x_def; smt.
   qed.
  
   lemma weight_def: forall (d1:'a distr) (d2:'b distr), 
      weight (d1 * d2) = weight d1 * weight d2.
-  proof.
+  proof -strict.
     intros d1 d2;beta delta weight cpTrue;rewrite -mu_def;apply mu_eq => x //.
   qed.
 
   lemma lossless (d1:'a distr) (d2:'b distr): 
      weight d1 = 1%r => weight d2 = 1%r =>
      weight (d1 * d2) = 1%r.
-  proof.
+  proof -strict.
     by rewrite weight_def => -> ->.
   qed.
 
   lemma dprodU (d1:'a distr) (d2:'b distr): 
      isuniform d1 => isuniform d2 => isuniform (d1 * d2).
-  proof.
+  proof -strict.
     intros Hd1 Hd2 x y; rewrite ?supp_def ?mu_x_def => [Hx1 Hx2] [Hy1 Hy2].
     by rewrite (Hd1 _ (fst y)) // (Hd2 _ (snd y)).
-  save.
+  qed.
 
 end Dprod.
 

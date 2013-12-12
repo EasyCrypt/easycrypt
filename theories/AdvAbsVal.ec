@@ -14,23 +14,23 @@ module Neg_main (A:Adv) = {
 
 equiv Neg_A (A<:Adv) : 
    Neg_main(A).main ~ A.main : ={glob A} ==> res{1} = !res{2}.
-proof. 
+proof -strict. 
  proc *;inline{1} Neg_main(A).main.
  by wp;call (_:true).
 qed.
 
 lemma Neg_A_Pr (A<:Adv) &m: 
    Pr[Neg_main(A).main() @ &m : res] = Pr[A.main() @ &m : !res].
-proof.
-  equiv_deno (Neg_A A) => //.
+proof -strict.
+  byequiv (Neg_A A) => //.
 qed.
 
 lemma Neg_A_Pr_minus (A<:Adv) &m: 
    islossless A.main => 
    Pr[Neg_main(A).main() @ &m : res] = 1%r - Pr[A.main() @ &m : res].
-proof.
-  intros Hl; rewrite (Neg_A_Pr A &m); rewrite Pr mu_not; congr => //.
-  by bdhoare_deno Hl.
+proof -strict.
+  intros Hl; rewrite (Neg_A_Pr A &m); rewrite Pr[mu_not]; congr => //.
+  by byphoare Hl.
 qed.
   
 lemma abs_val : 
@@ -38,19 +38,10 @@ lemma abs_val :
     (forall &m (A<:Adv), P (Pr[A.main() @ &m : res] - 1%r/2%r)) =>
     forall &m (A<:Adv), islossless A.main => 
       P (`|Pr[A.main() @ &m : res] - 1%r/2%r| ).
-proof.
+proof -strict.
  intros P HP &m A Hl.
  case (Pr[A.main() @ &m : res] <= 1%r / 2%r) => Hle.
    cut H  := HP &m (Neg_main(A)).
    cut H1 := Neg_A_Pr_minus A &m _; [trivial | smt].
  cut H := HP &m A;smt.
 qed.
-
-
-
-
-
-
-    
-
-

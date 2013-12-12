@@ -21,7 +21,7 @@ module M = {
 }.
 
 equiv foo : M.f1 ~ M.f2 : true ==> ={M.w}.  
-proof.
+proof -strict.
   proc.
   eager seq 1 1 (H:M.w = $[0..10]; ~ M.w = $[0..10]; : true ==> ={M.w}) : (={M.w,x}).
    rnd => //.   
@@ -30,7 +30,7 @@ proof.
     conseq * H => //.
   eager seq 1 1 H : (={M.w,y});first 2 (wp;rnd;wp => //).
     wp => //.
-  eqobs_in.  
-save.
+  sim.  
+qed.
 
 

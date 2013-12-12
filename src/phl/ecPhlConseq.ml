@@ -8,7 +8,6 @@ open EcEnv
 open EcBaseLogic
 open EcLogic
 open EcCorePhl
-open EcCoreHiPhl
 open EcCoreHiLogic
 open EcPV
 

@@ -1,6 +1,5 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
-open EcSymbols
 open EcIdent
 open EcPath
 open EcUid

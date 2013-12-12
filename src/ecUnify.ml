@@ -2,7 +2,6 @@
 open EcMaps
 open EcUtils
 open EcUid
-open EcSymbols
 open EcIdent
 open EcTypes
 open EcDecl

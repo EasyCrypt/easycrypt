@@ -1,7 +1,4 @@
-open EcUtils
-open EcParsetree
-open EcUtils
-open EcMaps
+(* -------------------------------------------------------------------- *)
 open EcIdent
 open EcTypes
 open EcFol

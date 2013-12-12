@@ -1,7 +1,5 @@
 (* -------------------------------------------------------------------- *)
 open EcParsetree
-open EcLocation
-open EcBaseLogic
 open EcLogic
 
 (* -------------------------------------------------------------------- *)
@@ -35,17 +33,13 @@ let process_phl loc ptac g =
     | Phr_exists_elim           -> EcPhlExists.t_hr_exists_elim
     | Phr_exists_intro fs       -> EcPhlExists.process_exists_intro fs
     | Pexfalso                  -> EcPhlExfalso.t_exfalso
-    | Pbdhoaredeno info         -> EcPhlDeno.process_bdHoare_deno info
+    | Pbydeno (mode, info)      -> EcPhlDeno.process_deno mode info
     | PPr info                  -> EcPhlPr.process_ppr info
     | Pfel (at_pos, info)       -> EcPhlFel.process_fel at_pos info
-    | Pequivdeno info           -> EcPhlDeno.process_equiv_deno info
-    | Phoare | Pbdhoare         -> EcPhlBdHoare.t_hoare_bd_hoare
-    | Pbdhoare_split i          -> EcPhlPrRw.process_bdhoare_split i
+    | Phoare                    -> EcPhlBdHoare.t_hoare_bd_hoare
+    | Pbdhoare_split i          -> EcPhlBdHoare.process_bdhoare_split i
     | Pprbounded                -> EcPhlPr.t_prbounded true
-    | Pprfalse                  -> EcPhlPr.t_prfalse
-    | Ppr_rewrite s             -> EcPhlPrRw.t_pr_rewrite s 
-    | Pbdeq                     -> EcPhlBdHoare.t_bdeq
-    | Peqobs_in info            -> EcPhlEqobs.process_eqobs_in info
+    | Psim info                 -> EcPhlEqobs.process_eqobs_in info
     | Ptrans_stmt info          -> EcPhlTrans.process_equiv_trans info
     | Psymmetry                 -> EcPhlSym.process_equiv_sym
     | Peager_seq (info,pos,eqR) -> EcEager.process_seq info pos eqR

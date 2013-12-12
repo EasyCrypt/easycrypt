@@ -3,7 +3,6 @@ open EcIdent
 open EcPath
 open EcTypes
 open EcFol
-open EcDecl
 open EcModules
 open EcEnv
 

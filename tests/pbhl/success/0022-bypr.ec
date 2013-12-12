@@ -34,10 +34,10 @@ module Test' = {
 
 lemma test' : forall &m (a:bitstring), length a = k1+k2 => Pr[Test.test() @ &m : a=res]=1%r/(2^(k1+k2))%r.
 intros &m a length_a.
-bdhoare_deno (_ : (true) ==> (a=res)); [|trivial|trivial].
+byphoare (_ : (true) ==> (a=res)); [|trivial|trivial].
 proc.
 rnd ((=)a);skip;smt.
-save.
+qed.
 
 
 (* not required in previous case?? *)
@@ -52,7 +52,7 @@ axiom mu_neg : forall (d:'a distr, p:'a cpred),
 
 lemma test'' : forall &m (a:bitstring), length a = k1+k2 => Pr[Test'.test() @ &m : a=res]=1%r/(2^(k1+k2))%r.
 intros &m a length_a.
-bdhoare_deno (_ : (true) ==> (a=res));[|trivial|trivial].
+byphoare (_ : (true) ==> (a=res));[|trivial|trivial].
 proc.
 rnd (z1=sub a 0 k1) (1%r/(2 ^ (k1))%r) (1%r/(2 ^ (k2))%r) (1%r-1%r/(2 ^ (k1))%r) (0%r) (fun z, z1=sub a 0 k1 /\ z=sub a k1 k2).
 smt.
@@ -112,7 +112,7 @@ rewrite H.
 trivial.
 (*****)
 smt.
-save.
+qed.
 
 
 lemma test : forall (a:bitstring), length a = k1+k2 => equiv [ Test.test ~ Test'.test : true ==> ={res}]. 
@@ -123,7 +123,7 @@ intros a0 &m1 &m2 _.
 rewrite  (test' &m1 a0 _); [admit |].
 rewrite  (test'' &m2 a0 _); [admit |].
 trivial.
-save.
+qed.
 
 
 

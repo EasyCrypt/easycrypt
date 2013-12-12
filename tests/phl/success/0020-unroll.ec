@@ -13,9 +13,9 @@ module M = {
 }.
 
 lemma L : equiv[M.f ~ M.f : true ==> true].
-proof.
+proof -strict.
   proc; unroll {1} 2.1.
   admit.
-save.
+qed.
 
   

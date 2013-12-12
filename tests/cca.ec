@@ -35,7 +35,7 @@ lemma foo :
     equiv [ Test(A).main ~ Test(A).main : 
          x{1} = x{2} /\ (glob A){1} = (glob A){2} ==> 
          res{1} = res{2} /\  (glob A){1} = (glob A){2} ].
-proof.
+proof -strict.
  intros A.
  proc.
  call (x{1} = x{2} /\ (glob A){1} = (glob A){2}) 
@@ -44,7 +44,7 @@ proof.
  skip;simplify. (* Il y a un bug : les variables sont des fois avec les
                    arguments des foncteurs d'autres fois non *)
  smt.
-save.
+qed.
 
 module type IO = { 
   proc h (x:int) : int {}
@@ -81,7 +81,7 @@ lemma foo' :
     equiv [ G(A).main ~ G(A).main : 
          x{1} = x{2} /\ (glob A){1} = (glob A){2} ==> 
          res{1} = res{2} /\  (glob A){1} = (glob A){2} ].
-proof.
+proof -strict.
 intros A. 
  proc.
  call (x{1} = x{2} /\ (glob A){1} = (glob A){2} /\ true) 
@@ -90,7 +90,7 @@ intros A.
  proc.
  skip;smt.
  skip;smt.
-save.
+qed.
 
 module A' (O:IO) : Adv'(O) = { 
   proc a (x:int) : int = {
@@ -104,21 +104,21 @@ lemma foo1 :
    equiv [ G(A').main ~ G(A').main : 
            x{1} = x{2} /\ (glob A'){1} = (glob A'){2} ==> 
            res{1} = res{2} /\  (glob A'){1} = (glob A'){2} ].
-proof.
+proof -strict.
  apply (foo' (A')).
-save.
+qed.
 
 
 lemma foo2 : forall (x:int) &m1 &m2, 
      Pr[G(A').main(x) @ &m1 : res = 0] = Pr[G(A').main(x) @ &m1 : res = 0].
-proof.
+proof -strict.
  intros xv &m1 &m2.
- equiv_deno (_ : x{1} = x{2} /\ (glob A'){1} = (glob A'){2} ==> 
+ byequiv (_ : x{1} = x{2} /\ (glob A'){1} = (glob A'){2} ==> 
                  res{1} = res{2} /\  (glob A'){1} = (glob A'){2}).
  apply foo1.
  simplify;smt.
  smt.
-save.
+qed.
 
 (*
 

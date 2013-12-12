@@ -172,7 +172,7 @@ section.
     Pr[Ln(Ob,B(A)).main() @ &m : p (glob A) (glob Ob) LRB.l res /\ C.c <= 1] = 
     Pr[Rand(W(L(Ob))).main() @ &m : p (glob A) (glob Ob) LRB.l (snd res)].
   proof strict.
-    equiv_deno (_ : ={glob A, glob Ob} ==> 
+    byequiv (_ : ={glob A, glob Ob} ==> 
                     ={glob A, glob Ob,glob LRB} /\ res{1} = snd res{2} /\ 
                      C.c{1} <= 1) => //;proc. 
     inline{1}B(A, Ob, Orclc(L(Ob))).main; inline{2}W(L(Ob)).work;wp.
@@ -194,7 +194,7 @@ section.
     Pr[Rn(Ob,B(A)).main() @ &m : p (glob A) (glob Ob) LRB.l res /\ C.c <= 1] = 
     Pr[Rand(W(R(Ob))).main() @ &m : p (glob A) (glob Ob) LRB.l (snd res)].
   proof strict.
-    equiv_deno (_ : ={glob A, glob Ob} ==> 
+    byequiv (_ : ={glob A, glob Ob} ==> 
                     ={glob A, glob Ob, glob LRB} /\ res{1} = snd res{2} /\ 
                     C.c{1} <= 1) => //;proc.
     inline{1}B(A, Ob, Orclc(R(Ob))).main; inline{2}W(R(Ob)).work;wp.
@@ -226,7 +226,7 @@ section.
      Pr[W(L(Ob)).work(0) @ &m : p (glob A) (glob Ob) LRB.l res /\ LRB.l <= q] = 
      Pr[Ln(Ob,A).main() @ &m : p (glob A) (glob Ob) C.c res /\ C.c <= q ].
   proof strict.
-    equiv_deno (_ : ={glob A, glob Ob} /\ x{1}=0 ==> 
+    byequiv (_ : ={glob A, glob Ob} /\ x{1}=0 ==> 
                     (LRB.l{1} <= q) = (C.c{2} <= q) /\
                     (C.c{2} <= q =>
                       ={glob A, glob Ob,res} /\ LRB.l{1} = C.c{2})) => //;
@@ -262,7 +262,7 @@ section.
      Pr[W(R(Ob)).work((q-1)) @ &m :  p (glob A) (glob Ob) LRB.l res /\ LRB.l <= q] = 
      Pr[Rn(Ob,A).main() @ &m :  p (glob A) (glob Ob) C.c res /\ C.c <= q ].
   proof strict.
-    equiv_deno (_ : ={glob A, glob Ob} /\ x{1}=q-1 ==> 
+    byequiv (_ : ={glob A, glob Ob} /\ x{1}=q-1 ==> 
                     (LRB.l{1} <= q) = (C.c{2} <= q) /\
                     (C.c{2} <= q =>
                       ={glob A, glob Ob, res} /\ LRB.l{1} = C.c{2})) => //;
@@ -302,7 +302,7 @@ section.
     Pr[W(L(Ob)).work(v) @ &m: p (glob A) (glob Ob) LRB.l res] = 
     Pr[W(R(Ob)).work((v-1)) @ &m : p (glob A) (glob Ob) LRB.l res].
   proof strict.
-    intros Hv;equiv_deno (_: ={glob A,glob Ob} /\ x{1} = v /\ x{2} = v-1 ==> 
+    intros Hv;byequiv (_: ={glob A,glob Ob} /\ x{1} = v /\ x{2} = v-1 ==> 
                              ={glob A,glob Ob, LRB.l, res}) => //.
     proc.
     call (_: ={glob Ob, LRB.l} /\ LRB.l0{1} = v /\ LRB.l0{2} = v-1).

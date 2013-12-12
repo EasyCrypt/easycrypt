@@ -8,6 +8,6 @@ module M = {
 }.
 
 lemma foo : hoare [M.g : true ==> true].
-proof.
+proof -strict.
  proc.
  wp 0.

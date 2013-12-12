@@ -24,18 +24,18 @@ proc.
 sp.
 skip.
 smt.
-save.
+qed.
 
 lemma test2 : hoare [M.test : M.y=0 ==> M.x=1 && res=0].
 proc.
 sp.
 skip.
 smt.
-save.
+qed.
 
 require import Real.
 
-lemma test : bd_hoare [M.test : M.y=0 ==> M.x=1 && res=0] = (1%r).
+lemma test : phoare [M.test : M.y=0 ==> M.x=1 && res=0] = (1%r).
 proc.
 sp.
 skip.

@@ -14,12 +14,12 @@ module M = {
 }.
 
 lemma foo : hoare [M.f : true ==> res = (1,0)].
-proof.
+proof -strict.
  proc.
  while (x=1).   
  wp;skip;simplify;split.
  wp;skip;simplify;split.
-save.
+qed.
 
 module M1 = { 
   proc f () : int * int= {
@@ -35,11 +35,11 @@ module M1 = {
 }.
 
 lemma foo1 : hoare [M1.f : true ==> res = (10,10)].
-proof.
+proof -strict.
  proc.
  while (x=1).   
    wp;skip.
    intros _ h.
    elim h;intros h1 _; assumption h1.
  wp;skip => /= x -> //.
-save.
+qed.

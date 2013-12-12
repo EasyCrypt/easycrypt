@@ -3,10 +3,10 @@ module M = {
 }.
 
 lemma foo : hoare [M.f : true ==> true].
-proof.
+proof -strict.
  proc.
  skip.
  intros _ h.
  assumption h.
-save.
+qed.
 

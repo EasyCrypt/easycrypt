@@ -26,7 +26,7 @@ module Test = {
 }.
 
 
-lemma test : bd_hoare [Test.test : true ==> mem 0 res] <= (if mem 0 Test.ls then 1%r else (K%r/10%r)).
+lemma test : phoare [Test.test : true ==> mem 0 res] <= (if mem 0 Test.ls then 1%r else (K%r/10%r)).
 proc.
 seq 1 : (true) (1%r) (if mem 0 Test.ls then 1%r else (K%r/10%r)) (0%r) (1%r) (i=0);
 [wp;trivial|trivial| |trivial|trivial]. 
@@ -49,6 +49,6 @@ admit. (* reasoning on distr *)
 conseq Hw => //.
 smt.
 smt.
-save.
+qed.
 
 

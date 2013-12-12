@@ -12,18 +12,18 @@ module M = {
 }.
 
 lemma foo : hoare [M.f : true ==> res = 1 ].
-proof.
+proof -strict.
  proc.
  wp.
  skip;intros _ _;split.
-save.
+qed.
 
 lemma foo1 : hoare [M.f : true ==> res = 1 ].
-proof.
+proof -strict.
  proc.
  wp 1.
  wp 0.
  skip;intros _ _;split.
-save.
+qed.
 
     

@@ -20,18 +20,18 @@ module OneSided = {
 lemma bar:
   (* "hoare [OneSided.init: true ==> OneSided.x =  0]" wouldn't work,
      Hoare judgments guarantee only partial correctness *)
-  bd_hoare [OneSided.init: true ==> OneSided.x =  0] = 1%r.
-proof.
+  phoare [OneSided.init: true ==> OneSided.x =  0] = 1%r.
+proof -strict.
 proc;wp;skip;smt.
-save.
+qed.
 
 lemma main:
   equiv [OneSided.main ~ OneSided.main2: true ==> OneSided.x{1} = OneSided.x{2}].
-proof.
+proof -strict.
 proc;
 seq 1 0: (OneSided.x{1} = 0);[ | wp;skip;smt ].
 call {1} ( _ : true ==> OneSided.x = 0);[ apply bar | skip;smt ].
-save.
+qed.
 
 module Framing = {
   var x:int
@@ -49,11 +49,11 @@ module Framing = {
 
 lemma frame:
   equiv [Framing.main ~ Framing.main: true ==> Framing.y{1} = Framing.y{2} /\ Framing.y{1} = 0].
-proof.
+proof -strict.
 proc.
   call{1} (_ : true ==> true).
     proc;wp;skip;smt.
   call{2} (_ : true ==> true).
     proc;wp;skip;smt.
   wp;skip;smt.
-save.
+qed.

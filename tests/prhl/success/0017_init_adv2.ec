@@ -38,14 +38,14 @@ proc;skip;trivial.
 call (_ : true ==> ={res} /\ (glob A){1} = (glob A){2}).
 proc true;try skip;trivial.
 skip;trivial.
-save.
+qed.
 
 lemma foo : forall &m1 &m2(A<:Adv), 
   Pr[G(A).main() @ &m1 : res = 3] = 
   Pr[G(A).main() @ &m2 : res = 3].
 intros &m1 &m2 A.
-equiv_deno (foo3 A);trivial.
-save.
+byequiv (foo3 A);trivial.
+qed.
 
 
 module L = { 
@@ -71,4 +71,4 @@ lemma foo1 : forall &m1 &m2,
   Pr[G(A).main() @ &m2 : res = 3]. 
 intros &m1 &m2.
 apply (foo &m1 &m2 A).
-save.
+qed.

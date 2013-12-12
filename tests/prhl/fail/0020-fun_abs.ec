@@ -47,7 +47,7 @@ module G2(Adv : ADV) = {
 
 lemma G1_G2 (Adv' <: ADV) :
   equiv[G1(Adv').main ~ G2(Adv').main : ={glob Adv'} ==> ={res}].
-proof.
+proof -strict.
 proc.
 call (_ : ={glob Adv'} ==> ={res}).
 proc (true);trivial.

@@ -1,5 +1,5 @@
 lemma toto : forall (p:bool), p => p.
-proof.
+proof -strict.
   intros p H.
   assumption H.
-save.
+qed.

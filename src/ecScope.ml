@@ -893,7 +893,6 @@ end
 module Op = struct
   open EcTypes
   open EcDecl
-  open EcEnv
 
   module TT = EcTyping
 
@@ -918,7 +917,7 @@ module Op = struct
           let env     = scope.sc_env in
           let codom   = TT.transty tp env ue pty in 
           let env, xs = TT.transbinding env ue bd in
-          let body    = TT.transexpcast env ue codom pe in
+          let body    = TT.transexpcast env `InOp ue codom pe in
           let lam     = EcTypes.e_lam xs body in
             (lam.EcTypes.e_ty, `Plain lam)
 
@@ -1019,7 +1018,7 @@ module Op = struct
                     EcEnv.Var.bind_locals pvars env)
                     env ptns
                 in
-                    (ptns, TT.transexpcast env ue codom body)
+                    (ptns, TT.transexpcast env `InOp ue codom body)
               in
                 List.map trans_b pbsmap
             in
@@ -1305,7 +1304,6 @@ end
 (* -------------------------------------------------------------------- *)
 module Ax = struct
   open EcParsetree
-  open EcTypes
   open EcDecl
 
   module TT = EcTyping
@@ -1528,6 +1526,8 @@ module Ty = struct
   open EcAlgebra
 
   module TT = EcTyping
+
+  type tydname = (ptyparams * psymbol) located
 
   (* ------------------------------------------------------------------ *)
   let check_name_available scope x =
@@ -1771,23 +1771,25 @@ module Ty = struct
     | _ -> hierror "unknown type class"
 
   (* ------------------------------------------------------------------ *)
-  let add_datatype (scope : scope) { pl_loc = loc; pl_desc = dt; } =
-    check_name_available scope dt.ptd_name;
+  let add_datatype (scope : scope) (tydname : tydname) dt =
+    let { pl_loc = loc; pl_desc = (tyvars, name); } = tydname in
+
+    check_name_available scope name;
 
     (* Check type-parameters / env0 is the env. augmented with an
      * abstract type representing the currently processed datatype. *)
-    let ue    = TT.transtyvars scope.sc_env (loc, Some dt.ptd_tyvars) in
-    let tpath = EcPath.pqname (path scope) (unloc dt.ptd_name) in
+    let ue    = TT.transtyvars scope.sc_env (loc, Some tyvars) in
+    let tpath = EcPath.pqname (path scope) (unloc name) in
     let env0  =
       let myself = {
         tyd_params = EcUnify.UniEnv.tparams ue;
         tyd_type   = `Abstract Sp.empty;
       } in
-        EcEnv.Ty.bind (unloc dt.ptd_name) myself scope.sc_env
+        EcEnv.Ty.bind (unloc name) myself scope.sc_env
     in
 
     (* Check for duplicated constructor names *)
-    Msym.odup unloc (List.map fst dt.ptd_ctors)
+    Msym.odup unloc (List.map fst dt)
       |> oiter (fun (x, y) -> hierror ~loc:y.pl_loc
                   "duplicated constructor name: `%s'" x.pl_desc);
 
@@ -1798,7 +1800,7 @@ module Ty = struct
         let cty = cty |> List.map (TT.transty TT.tp_tydecl env0 ue) in
           (unloc cname, cty)
       in
-        dt.ptd_ctors |> List.map for1
+        dt |> List.map for1
     in
 
     let tparams = EcUnify.UniEnv.tparams ue in
@@ -1899,18 +1901,20 @@ module Ty = struct
                                tydt_schcase = schcase;
                                tydt_schelim = schelim; };
     } in
-      bind scope (unloc dt.ptd_name, tydecl)
+      bind scope (unloc name, tydecl)
 
   (* ------------------------------------------------------------------ *)
-  let add_record (scope : scope) { pl_loc = loc; pl_desc = rt; } =
-    check_name_available scope rt.ptr_name;
+  let add_record (scope : scope) (tydname : tydname) rt =
+    let { pl_loc = loc; pl_desc = (tyvars, name); } = tydname in
+
+    check_name_available scope name;
 
     (* Check type-parameters *)
-    let ue    = TT.transtyvars scope.sc_env (loc, Some rt.ptr_tyvars) in
-    let tpath = EcPath.pqname (path scope) (unloc rt.ptr_name) in
+    let ue    = TT.transtyvars scope.sc_env (loc, Some tyvars) in
+    let tpath = EcPath.pqname (path scope) (unloc name) in
 
     (* Check for duplicated field names *)
-    Msym.odup unloc (List.map fst rt.ptr_fields)
+    Msym.odup unloc (List.map fst rt)
       |> oiter (fun (x, y) -> hierror ~loc:y.pl_loc
                   "duplicated field name: `%s'" x.pl_desc);
 
@@ -1920,7 +1924,7 @@ module Ty = struct
         let fty = TT.transty TT.tp_tydecl (env scope) ue fty in
           (unloc fname, fty)
       in
-        rt.ptr_fields |> List.map for1
+        rt |> List.map for1
     in
 
     let tparams = EcUnify.UniEnv.tparams ue in
@@ -1936,7 +1940,7 @@ module Ty = struct
       let pred   = EcFol.f_local predx predty in
       let ctor   = EcPath.pqoname
                      (EcPath.prefix tpath)
-                     (Printf.sprintf "mk_%s" (unloc rt.ptr_name)) in
+                     (Printf.sprintf "mk_%s" (unloc name)) in
       let ctor   = EcFol.f_op ctor targs (toarrow (List.map snd fields) recty) in
       let prem   =
         let ids  = List.map (fun (_, fty) -> (fresh_id_of_ty fty, fty)) fields in
@@ -1957,13 +1961,11 @@ module Ty = struct
       tyd_params = tparams;
       tyd_type   = `Record (scheme, fields);
     } in
-      bind scope (unloc rt.ptr_name, tydecl)
+      bind scope (unloc name, tydecl)
 end
 
 (* -------------------------------------------------------------------- *)
 module Theory = struct
-  open EcTheory
-
   exception TopScope
 
   (* ------------------------------------------------------------------ *)

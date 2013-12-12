@@ -59,7 +59,7 @@ lemma G1_G2_g :
   equiv[G1.g ~ G2.g :
         ={x} /\ G1.u{1} = G2.u{2} ==>
         ={res} /\ G1.u{1} = G2.u{2}].
-proof.
+proof -strict.
 proc; wp; skip; smt.
 qed.
 
@@ -67,7 +67,7 @@ lemma G1_G2_f :
   equiv[G1.f ~ G2.f :
         ={x} /\ G1.u{1} = G2.u{2} ==>
         ={res} /\ G1.u{1} = G2.u{2}].
-proof.
+proof -strict.
 proc.
 call (_ : ={x} /\ G1.u{1} = G2.u{2} ==> ={res} /\ G1.u{1} = G2.u{2}).
 apply G1_G2_g.
@@ -76,11 +76,11 @@ qed.
 
 lemma G1_G2_main :
   equiv[G1.main ~ G2.main : ={x} ==> ={res}].
-proof.
+proof -strict.
 proc.
-eqobs_in (G1.u{1} = G2.u{2}) true : (={z}).
+sim (G1.u{1} = G2.u{2}) true : (={z}).
 apply G1_G2_f.
-save.
+qed.
 
 
 

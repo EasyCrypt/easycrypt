@@ -1,7 +1,6 @@
 (* -------------------------------------------------------------------- *)
 open EcPath
 open EcTypes
-open EcDecl
 open EcModules
 open EcMemory
 open EcEnv

@@ -20,8 +20,8 @@ module M = {
 
 lemma foo : hoare [M.f : (b1 => M.y=e1) && (b2 => M.y=e2) && (b1||b2) ==> 
                          M.x=M.y ].
-proof.
+proof -strict.
  proc.
  if; wp; skip;  smt.
-save.
+qed.
 

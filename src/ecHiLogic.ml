@@ -1,13 +1,11 @@
 (* -------------------------------------------------------------------- *)
 open EcUid
 open EcUtils
-open EcMaps
 open EcIdent
 open EcLocation
 open EcSymbols
 open EcParsetree
 open EcTypes
-open EcModules
 open EcFol
 
 open EcMetaProg
@@ -519,7 +517,7 @@ let rec process_rewrite1 loc ri g =
         end
   end
 
-  | RWRw (s, r, o, l) ->
+  | RWRw (s, r, o, l) -> begin
       let do1 pe g =
         let hyps = get_hyps g in
         let (p, typs, ue, ax) =
@@ -531,6 +529,9 @@ let rec process_rewrite1 loc ri g =
         match r with
         | None -> doall g
         | Some (b, n) -> t_do b n doall g
+    end
+
+  | RWPr x -> EcPhlPrRw.t_pr_rewrite (unloc x) g
 
 (* -------------------------------------------------------------------- *)
 let process_rewrite loc ri (juc, n) =
@@ -695,7 +696,11 @@ let process_cut (engine : engine) ip phi t g =
   let g   =
     match t with
     | None   -> g
-    | Some t -> t_on_first (engine t) g
+    | Some t ->
+        let l = t.pl_loc in
+        let t = { pt_core = t; pt_intros = []; } in
+        let t = mk_loc l (Pby [t]) in
+          t_on_first (engine t) g
   in
 
   match ip with None -> g | Some ip -> t_on_last (process_intros [ip]) g

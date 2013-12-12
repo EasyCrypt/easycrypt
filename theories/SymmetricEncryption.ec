@@ -106,7 +106,7 @@ module ToCCA (A:Adv_INDCPA, O:CCA_Oracles) = A(O).
 lemma CCA_implies_CPA (S <: Scheme {INDCPA}) (A <: Adv_INDCPA {S, INDCPA}) &m:
   Pr[INDCPA(S,A).main() @ &m: res] = Pr[INDCCA(S,ToCCA(A)).main() @ &m: res].
 proof strict.
-equiv_deno (_: ={glob A} ==> ={res})=> //; proc.
+byequiv (_: ={glob A} ==> ={res})=> //; proc.
 call{2} (_: Wrap.qs = [] ==> !res); first by proc; skip; smt.
 conseq (_: _ ==> Wrap.qs{2} = [] /\ (b = b'){1} = (b = b'){2}); first smt.
 call (_: ={glob Wrap, glob S} /\ Wrap.qs{2} = []);
@@ -117,5 +117,5 @@ wp; rnd.
 call (_: ={glob Wrap, glob S} /\ Wrap.qs{2} = []);
   first by proc; call (_: true).
 by call (_: true ==> ={glob Wrap, glob S} /\ Wrap.qs{2} = []);
-     first by proc; wp; eqobs_in.
+     first by proc; wp; sim.
 qed.

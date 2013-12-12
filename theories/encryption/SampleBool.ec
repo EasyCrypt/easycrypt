@@ -17,7 +17,7 @@ theory MeansBool.
      Pr[Rand(A).main() @ &m : p (fst res) (glob A) (snd res)] = 
      1%r/2%r*(Pr[A.work(true) @ &m : p true (glob A) res] + 
                 Pr[A.work(false) @ &m : p false (glob A) res]).
-  proof.
+  proof -strict.
     cut Hcr: forall x, 
              mem x (create (support {0,1})) <=>
              mem x (add true (add false (FSet.empty)%FSet)).
@@ -49,14 +49,14 @@ proof strict.
   cut Hd: 2%r <> Real.zero by smt.
   cut -> : Pr[A.work(true) @ &m : true = res /\ p (glob A)] = 
            Pr[A.work(true) @ &m : res /\ p (glob A)].
-    by rewrite Pr mu_eq;smt.
+    by rewrite Pr[mu_eq];smt.
   cut -> : Pr[A.work(false) @ &m : false = res /\ p (glob A)] = 
            Pr[A.work(false) @ &m : !res /\ p (glob A)].
-    by rewrite Pr mu_eq;smt.       
+    by rewrite Pr[mu_eq];smt.       
   cut -> : Pr[A.work(false) @ &m : p (glob A)] = 
            Pr[A.work(false) @ &m : (!res /\ p (glob A)) \/ (res /\ p (glob A))].
-    by rewrite Pr mu_eq;smt.
-  rewrite Pr mu_disjoint;first smt.
+    by rewrite Pr[mu_eq];smt.
+  rewrite Pr[mu_disjoint];first smt.
   by fieldeq.
 qed.
 

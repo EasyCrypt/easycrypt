@@ -81,20 +81,20 @@ equiv [O1.f ~ O2.f : I (glob O1){1} (glob O2){2} /\
 hoare [O2.f : (m (glob O2)) = k ==> 
               (m (glob O2)) = k + 1]) =>
 (forall k,
- bd_hoare [O2.f : m (glob O2) = k ==> snd res] <= (g k )) =>
+ phoare [O2.f : m (glob O2) = k ==> snd res] <= (g k )) =>
 islossless O1.f =>
 islossless O2.f =>
 (forall (O <: Oracle{Adv}), islossless O.f => islossless Adv(O).run) =>
 I (glob O1){m} (glob O2){m} =>
 Pr [Experiment(O1, Adv).main() @ &m : P res] <=
 Pr [Experiment(O2, Adv).main() @ &m : P res]  + qO%r * p.
-proof.
+proof -strict.
 intros => O1 O2 Adv I P m g hg hbnd hinint hinit2 hf hf2 hbound_bad hll1 hll2 hlladv hIm.
 apply (Real.Trans _ 
 (Pr [Experiment(O2, Adv).main() @ &m : P res \/ (Experiment.WO.bad /\
                           Experiment.WO.cO <= qO /\ 
 Experiment.WO.cO = m (glob O2))]) _).
-equiv_deno (_ : true ==> 
+byequiv (_ : true ==> 
           (! Experiment.WO.bad{2} => ={res}) /\ 
              Experiment.WO.cO{2} <= qO /\
              Experiment.WO.cO{2} = m (glob O2){2})  => //.
@@ -122,7 +122,7 @@ apply (Real.Trans _
 Pr [Experiment(O2, Adv).main() @ &m : 
              Experiment.WO.bad /\ Experiment.WO.cO <= qO /\ 
              Experiment.WO.cO = m (glob O2){hr}]) _).
-rewrite Pr mu_or.
+rewrite Pr[mu_or].
 apply (_ : forall (p q r : real), 0%r <= r => p + q - r <= p + q); 
  intros {g hg hbnd hbound_bad}; smt.
 apply (_ : forall (a b c : real), b <= c => a + b <= a + c); 
@@ -160,4 +160,4 @@ swap 1 1; wp.
 exists* Experiment.WO.cO.
 elim* => cO. 
 call (hf2 cO); wp; skip ; progress; smt.
-save.
+qed.

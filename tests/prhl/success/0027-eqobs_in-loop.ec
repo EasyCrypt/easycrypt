@@ -26,9 +26,9 @@ module M1' = {
 
 equiv foo : M1.f ~ M1'.f : ={x} ==> ={res}.
 proc.
-eqobs_in.
+sim.
 wp => //.
-save.
+qed.
 
 
 

@@ -11,7 +11,7 @@ module FA = F(A).
 module FAB = FA(B).
 
 require import Real.
-lemma foo : bd_hoare [FAB.f : true ==> true] = 1%r.
+lemma foo : phoare [FAB.f : true ==> true] = 1%r.
 proc.
 admit.
-save.
+qed.

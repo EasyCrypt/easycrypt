@@ -202,18 +202,33 @@ type env = {
 and ty_body =
   Ty.tysymbol *
     [ `Plain
-    | `Datatype of (symbol * Term.lsymbol) list
-    | `Record   of (symbol * Term.lsymbol) * (symbol * Ty.ty * Term.lsymbol) list ]
+    | `Datatype of   (symbol * Term.lsymbol) list
+    | `Record   of   (symbol * Term.lsymbol)
+                   * (symbol * Term.lsymbol * Ty.ty) list ]
 
 let ty_body_equal ((ty1, xi1) : ty_body) ((ty2, xi2) : ty_body) =
-  let c_equal (c1, ls1) (c2, ls2) =
-    EcSymbols.equal c1 c2 && Term.ls_equal ls1 ls2
+  let c_equal (c1, l1) (c2, l2) =
+    EcSymbols.equal c1 c2 && Term.ls_equal l1  l2
+
+  and r_equal (c1, l1, ty1) (c2, l2, ty2) =
+       EcSymbols.equal c1 c2
+    && Term.ls_equal l1 l2
+    && Ty.ty_equal ty1 ty2
   in
     (Ty.ts_equal ty1 ty2)
       && match xi1, xi2 with
-         | `Plain       , `Plain        -> true
-         | `Datatype ls1, `Datatype ls2 -> List.all2 c_equal ls1 ls2
-         | _            , _             -> false
+         | `Plain , `Plain ->
+             true
+
+         | `Datatype ls1, `Datatype ls2 ->
+             List.all2 c_equal ls1 ls2
+
+         | `Record ((c1, l1), fs1), `Record ((c2, l2), fs2) ->
+                EcSymbols.equal c1 c2
+             && Term.ls_equal l1  l2
+             && List.all2 r_equal fs1 fs2
+
+         | _, _ -> false
 
 let w3_ls_true  = Term.fs_bool_true
 let w3_ls_false = Term.fs_bool_false
@@ -421,13 +436,13 @@ let empty = {
 
 (* ---------------------------------------------------------------------- *)
 type rebinding_w3 = {
-    rb_th   : Theory.theory;
-    rb_decl : Decl.decl list;
-    rb_ty   : ty_body Mp.t;
-    rb_op   : (Term.lsymbol * Term.lsymbol * Ty.tvsymbol list) Mp.t;
-    rb_ax   : Decl.prsymbol Mp.t;
-    rb_w3   : (EcPath.path * Ty.tvsymbol list) Ident.Mid.t;
-  }
+  rb_th   : Theory.theory;
+  rb_decl : Decl.decl list;
+  rb_ty   : ty_body Mp.t;
+  rb_op   : (Term.lsymbol * Term.lsymbol * Ty.tvsymbol list) Mp.t;
+  rb_ax   : Decl.prsymbol Mp.t;
+  rb_w3   : (EcPath.path * Ty.tvsymbol list) Ident.Mid.t;
+}
 
 let rb_empty th = {
     rb_th     = th;
@@ -442,7 +457,7 @@ type highorder_decl = (Term.lsymbol * Decl.decl * Decl.decl) option
 
 type rebinding_item =
   | RBuse  of rebinding_w3
-  | RBty   of EcPath.path * ty_body * Decl.decl
+  | RBty   of EcPath.path * rbty_body * Decl.decl
   | RBop   of EcPath.path * (Term.lsymbol * Ty.tvsymbol list) * Decl.decl * highorder_decl
   | RBax   of EcPath.path * Decl.prsymbol * Decl.decl
   | RBmp   of EcPath.mpath * Term.lsymbol
@@ -450,8 +465,33 @@ type rebinding_item =
   | RBxpv  of EcPath.xpath * Term.lsymbol
   | RBfun  of Decl.decl * Decl.decl * Talpha.t * Term.term 
   | RBproj of int * int * Term.lsymbol * Decl.decl
+
+and rbty_body =
+  Ty.tysymbol *
+    [ `Plain
+    | `Datatype of   (symbol * Term.lsymbol * highorder_decl) list
+    | `Record   of   (symbol * Term.lsymbol * highorder_decl)
+                   * (symbol * Term.lsymbol * highorder_decl * Ty.ty) list ]
+
 type rebinding = rebinding_item list
 
+(* -------------------------------------------------------------------- *)
+let ty_of_rbty ((ty, body) : rbty_body) : ty_body=
+  let body =
+    match body with
+    | `Plain ->
+        `Plain
+
+    | `Datatype cs ->
+        `Datatype (List.map (fun (c, ls, _) -> (c, ls)) cs)
+
+    | `Record ((c, cls, _), fields) ->
+        let fields = List.map (fun (f, ls, _, fty) -> (f, ls, fty)) fields in
+          `Record ((c, cls), fields)
+  in
+    (ty, body)
+
+(* -------------------------------------------------------------------- *)
 let merge check k o1 o2 =
   match o1, o2 with
   | Some e1, Some e2 -> check k e1 e2; o1
@@ -509,15 +549,16 @@ let mk_highorder_func ls =
     let decl_s = Decl.create_prop_decl Decl.Paxiom pr spec in
     Some(ls',decl',decl_s)
 
-let add_ts env path ts decl =
+let add_ts env path rbts decl =
+  let ts = ty_of_rbty rbts in
+
   if Mp.mem path env.env_ty then begin
     assert (ty_body_equal ts (Mp.find path env.env_ty));
     env
   end else begin
-    let add_extra_op env c ls =
+    let add_extra_op env c ls odecl =
       let tvs   = (fst ts).Ty.ts_args in
       let cpath = EcPath.pqoname (EcPath.prefix path) c in
-      let odecl = mk_highorder_func ls in
         match odecl with
         | None ->
             { env with env_op = Mp.add cpath (ls, ls, tvs) env.env_op }
@@ -535,16 +576,16 @@ let add_ts env path ts decl =
           env_ty = Mp.add path ts env.env_ty;
           logic_task = add_decl_with_tuples env.logic_task decl; }
     in
-      match snd ts with
+      match snd rbts with
       | `Plain -> env
       | `Datatype ls -> begin
-          let for1 env (c, ls) = add_extra_op env c ls in
+          let for1 env (c, ls, odecl) = add_extra_op env c ls odecl in
             List.fold_left for1 env ls
         end
       | `Record (ctor, fields) -> begin
-          let for1 env (f, _, ls) = add_extra_op env f ls in
+          let for1 env (f, ls, odecl, _) = add_extra_op env f ls odecl in
           let env = List.fold_left for1 env fields in
-            curry (add_extra_op env) ctor
+            curry3 (add_extra_op env) ctor
         end
   end
 
@@ -1084,19 +1125,21 @@ let trans_tydecl env path td =
          let decl = Decl.create_ty_decl ts in
          let env  = add_ts env path (ts, `Plain) decl in
          let ncs  = List.length cs in
-         let cs   =
+
+         let (cs, wcs) =
            let for1 (c, aty) =
-             let cid = preid_p (EcPath.pqname path c) in
-             let aty = aty |> List.map (trans_ty env) in
-             let dom = tconstr path (List.map (tvar |- fst) td.tyd_params) in
-             let dom = dom |> trans_ty env in
-             let cls = Term.create_lsymbol ~constr:ncs cid aty (Some dom) in
-               (c, (cls, List.create (List.length aty) None))
+             let cid  = preid_p (EcPath.pqname path c) in
+             let aty  = aty |> List.map (trans_ty env) in
+             let dom  = tconstr path (List.map (tvar |- fst) td.tyd_params) in
+             let dom  = dom |> trans_ty env in
+             let cls  = Term.create_lsymbol ~constr:ncs cid aty (Some dom) in
+             let ocls = mk_highorder_func cls in
+               ((c, cls, ocls), (cls, List.create (List.length aty) None))
            in
-             List.map for1 cs
+             List.split (List.map for1 cs)
          in
-         let decl = Decl.create_data_decl [(ts, List.map snd cs)] in
-           ((ts, `Datatype (List.map (fun (x1, (x2, _)) -> (x1, x2)) cs)), decl)
+         let decl = Decl.create_data_decl [(ts, wcs)] in
+           ((ts, `Datatype cs), decl)
 
     | `Record (_, fields) ->
         let ts     = Ty.create_tysymbol pid tparams None in
@@ -1106,19 +1149,21 @@ let trans_tydecl env path td =
         let myself = myself |> trans_ty env in
         let ps     =
           let for1 (f, aty) =
-            let fid = preid_p (EcPath.pqname path f) in
-            let aty = trans_ty env aty in
-            let pls = Term.create_lsymbol fid [myself] (Some aty) in
-              (f, aty, pls)
+            let fid  = preid_p (EcPath.pqname path f) in
+            let aty  = trans_ty env aty in
+            let pls  = Term.create_lsymbol fid [myself] (Some aty) in
+            let opls = mk_highorder_func pls in
+              (f, pls, opls, aty)
           in
             List.map for1 fields in
 
         let cid  = preid_p (EcPath.pqname path "$record") in
         let csym = Printf.sprintf "mk_%s" (EcPath.basename path) in
-        let cls  = Term.create_lsymbol ~constr:1 cid (List.map proj3_2 ps) (Some myself) in
-        let decl = Decl.create_data_decl [ts, [cls, List.map (some |- proj3_3) ps]] in
+        let cls  = Term.create_lsymbol ~constr:1 cid (List.map proj4_4 ps) (Some myself) in
+        let ocls = mk_highorder_func cls in
+        let decl = Decl.create_data_decl [ts, [cls, List.map (some |- proj4_2) ps]] in
 
-          ((ts, `Record ((csym, cls), ps)), decl)
+          ((ts, `Record ((csym, cls, ocls), ps)), decl)
 
 (* --------------------------- Formulas ------------------------------- *)
 let trans_lv env lv =
@@ -1213,11 +1258,7 @@ let bool_of_prop t =
   | _ ->
       Term.t_if t Term.t_bool_true Term.t_bool_false
 
-let force_bool t =
-  if t.Term.t_ty = None then bool_of_prop t
-  else t
-
-
+let force_bool t = if t.Term.t_ty = None then bool_of_prop t else t
 
 let mk_not args  =
   match args with
@@ -1664,17 +1705,13 @@ let trans_oper_body env path wparams ty body =
         in
 
         let ptns = List.rev ptns in
-        let ptns =
-          if   List.exists (fun (_, e) -> e.Term.t_ty = None) ptns
-          then List.map (fun (p, e) -> (p, force_prop e)) ptns
-          else ptns in
         let ptns = List.map (fun (p, e) -> Term.t_close_branch p e) ptns in
-        let body =
+        let mtch =
           if   ptermc > 1
           then Term.t_tuple (List.map Term.t_var pterm)
           else Term.t_var (oget (List.ohead pterm)) in
-        let body = Term.t_case body ptns in
-
+        let body = Term.t_case mtch ptns in
+        let body = if body.Term.t_ty = None then force_bool body else body in
           ({ env with env_op = ops; }, rb, ls, Some (vs, body))
 
 let trans_oper env path op =
