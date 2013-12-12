@@ -11,7 +11,6 @@ open EcLogic
 open EcPV
 open EcCorePhl
 open EcCoreHiLogic
-open EcCoreHiPhl
 
 (* -------------------------------------------------------------------- *)
 class rn_hl_fel cntr ash q fevent preds =

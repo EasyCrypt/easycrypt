@@ -893,7 +893,6 @@ end
 module Op = struct
   open EcTypes
   open EcDecl
-  open EcEnv
 
   module TT = EcTyping
 
@@ -1305,7 +1304,6 @@ end
 (* -------------------------------------------------------------------- *)
 module Ax = struct
   open EcParsetree
-  open EcTypes
   open EcDecl
 
   module TT = EcTyping
@@ -1968,8 +1966,6 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Theory = struct
-  open EcTheory
-
   exception TopScope
 
   (* ------------------------------------------------------------------ *)

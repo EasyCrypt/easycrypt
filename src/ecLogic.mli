@@ -1,6 +1,5 @@
 (* -------------------------------------------------------------------- *)
 open EcMaps
-open EcUtils
 open EcSymbols
 open EcParsetree
 open EcModules

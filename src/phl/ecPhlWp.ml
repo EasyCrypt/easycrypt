@@ -3,7 +3,6 @@ open EcUtils
 open EcParsetree
 open EcModules
 open EcFol
-open EcPV
 open EcBaseLogic
 open EcLogic
 open EcCorePhl

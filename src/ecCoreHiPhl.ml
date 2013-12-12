@@ -1,6 +1,4 @@
 (* -------------------------------------------------------------------- *)
-open EcUtils
-open EcLocation
 open EcTypes
 open EcFol
 open EcEnv

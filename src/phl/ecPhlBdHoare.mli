@@ -1,6 +1,4 @@
 (* -------------------------------------------------------------------- *)
-open EcTypes
-open EcFol
 open EcBaseLogic
 open EcLogic
 

@@ -11,7 +11,6 @@ open EcEnv
 open EcTypes
 open EcModules
 open EcFol
-open EcBaseLogic
 
 (* -------------------------------------------------------------------- *)
 module Zipper = struct

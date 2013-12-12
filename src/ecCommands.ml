@@ -1,10 +1,8 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
-open EcSymbols
 open EcLocation
 open EcParsetree
 open EcTyping
-open EcOptions
 open EcLogic
 
 (* -------------------------------------------------------------------- *)

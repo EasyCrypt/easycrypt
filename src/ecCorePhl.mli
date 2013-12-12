@@ -8,7 +8,6 @@ open EcModules
 open EcFol
 open EcMetaProg.Zipper
 open EcEnv
-open EcBaseLogic
 open EcLogic
 
 (* -------------------------------------------------------------------- *)

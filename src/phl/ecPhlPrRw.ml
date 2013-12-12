@@ -1,6 +1,5 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
-open EcTypes
 open EcFol
 open EcEnv
 open EcBaseLogic

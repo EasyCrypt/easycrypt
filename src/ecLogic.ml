@@ -1,7 +1,7 @@
+(* -------------------------------------------------------------------- *)
 open EcLocation
 open EcUtils
 open EcMaps
-open EcSymbols
 open EcIdent
 open EcPath
 open EcCoreLib

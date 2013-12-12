@@ -1,8 +1,6 @@
 (* -------------------------------------------------------------------- *)
 open EcMaps
-open EcUtils
 open EcSymbols
-open EcParsetree
 open EcUid
 open EcIdent
 

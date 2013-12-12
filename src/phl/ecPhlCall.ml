@@ -1,5 +1,4 @@
 (* -------------------------------------------------------------------- *)
-open EcUtils
 open EcParsetree
 open EcTypes
 open EcModules
@@ -10,7 +9,6 @@ open EcLogic
 open EcCorePhl
 open EcPV
 open EcCoreHiLogic
-open EcCoreHiPhl
 
 (* -------------------------------------------------------------------- *)
 class rn_hl_call side pr po =

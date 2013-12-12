@@ -5,7 +5,6 @@ open EcPath
 open EcLocation
 open EcParsetree
 open EcTypes
-open EcDecl
 open EcModules
 
 (* -------------------------------------------------------------------- *)

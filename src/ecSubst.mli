@@ -1,5 +1,4 @@
 (* -------------------------------------------------------------------- *)
-open EcSymbols
 open EcIdent
 open EcPath
 open EcModules

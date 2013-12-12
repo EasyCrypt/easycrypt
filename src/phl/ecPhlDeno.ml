@@ -1,8 +1,6 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
-open EcLocation
 open EcTypes
-open EcModules
 open EcFol
 open EcEnv
 open EcBaseLogic
@@ -10,7 +8,6 @@ open EcLogic
 open EcPV
 open EcCorePhl
 open EcCoreHiLogic
-open EcCoreHiPhl
 
 (* -------------------------------------------------------------------- *)
 class rn_hl_deno = object

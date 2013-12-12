@@ -1,13 +1,11 @@
 (* -------------------------------------------------------------------- *)
 open EcUid
 open EcUtils
-open EcMaps
 open EcIdent
 open EcLocation
 open EcSymbols
 open EcParsetree
 open EcTypes
-open EcModules
 open EcFol
 
 open EcMetaProg

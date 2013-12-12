@@ -1,7 +1,5 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
-open EcMaps
-open EcPath
 open EcTypes
 open EcFol
 open EcAlgebra
