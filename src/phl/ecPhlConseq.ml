@@ -21,14 +21,10 @@ class rn_hl_notmod = object
   inherit xrule "[hl] notmod"
 end
 
-class rn_hl_conseq_bd = object
-  inherit xrule "[hl] conseq bd"
-end
 
 (* -------------------------------------------------------------------- *)
 let rn_hl_notmod = RN_xtd (new rn_hl_notmod :> xrule)
 let rn_hl_conseq = RN_xtd (new rn_hl_conseq :> xrule)
-let rn_hl_conseq_bd = RN_xtd (new rn_hl_conseq_bd :> xrule)
 
 (* -------------------------------------------------------------------- *)
 let conseq_cond pre post spre spost =
@@ -149,18 +145,6 @@ let t_conseq pre post g =
   | FequivS _   -> t_equivS_conseq pre post g
   | FeagerF _   -> t_eagerF_conseq pre post g
   | _           -> tacerror (NotPhl None)
-
-let t_hoareS_conseq_bdhoare g = 
-  let concl = get_concl g in
-  let hs = t_as_hoareS concl in
-  let concl1 = f_bdHoareS hs.hs_m hs.hs_pr hs.hs_s hs.hs_po FHeq f_r1 in
-  prove_goal_by [concl1] rn_hl_conseq_bd g
-
-let t_hoareF_conseq_bdhoare g = 
-  let concl = get_concl g in
-  let hf = t_as_hoareF concl in
-  let concl1 = f_bdHoareF hf.hf_pr hf.hf_f hf.hf_po FHeq f_r1 in
-  prove_goal_by [concl1] rn_hl_conseq_bd g
 
 (* -------------------------------------------------------------------- *)
 let t_equivF_notmod post g =
@@ -288,6 +272,339 @@ let t_bdHoareF_conseq_nm = gen_conseq_nm t_bdHoareF_notmod t_bdHoareF_conseq
 let t_bdHoareS_conseq_nm = gen_conseq_nm t_bdHoareS_notmod t_bdHoareS_conseq
 
 (* -------------------------------------------------------------------- *)
+(*                   Relation between logics                            *)
+(* phoare [c : P ==> Q] = 1 
+   -------------------------
+     hoare [c:P ==> Q] *)
+
+(* Remark the rule 
+   hoare [c:P ==> Q] <=> phoare[c:P ==> !Q] = 0 
+   is defined else where tactic hoare *)
+
+(*     phoare[c:P ==> Q] = 1 
+  ----------------------------------
+      equiv[c ~ [] : P{1} ==> Q{1}] 
+    implemented elsewhere
+*)
+
+class rn_hl_conseq_bd = object
+  inherit xrule "[hl] conseq bd"
+end
+
+let rn_hl_conseq_bd = RN_xtd (new rn_hl_conseq_bd :> xrule)
+
+let t_hoareS_conseq_bdhoare g = 
+  let concl = get_concl g in
+  let hs = t_as_hoareS concl in
+  let concl1 = f_bdHoareS hs.hs_m hs.hs_pr hs.hs_s hs.hs_po FHeq f_r1 in
+  prove_goal_by [concl1] rn_hl_conseq_bd g
+
+let t_hoareF_conseq_bdhoare g = 
+  let concl = get_concl g in
+  let hf = t_as_hoareF concl in
+  let concl1 = f_bdHoareF hf.hf_pr hf.hf_f hf.hf_po FHeq f_r1 in
+  prove_goal_by [concl1] rn_hl_conseq_bd g
+
+
+class rn_hl_conseq_conj = object
+  inherit xrule "[hl] conseq bd"
+end
+
+let rn_hl_conseq_conj = RN_xtd (new rn_hl_conseq_conj :> xrule)
+
+(* hoare[c:P => Q]    hoare[c:P' => Q']
+   -----------------------------------------
+      hoare[c:P /\ P' ==> Q /\ Q' ] *)
+
+(* hoare[c:P => Q]    phoare[c:P' => Q'] ? d
+   -----------------------------------------
+      phoare[c:P /\ P' ==> Q /\ Q' ] ? d *)
+
+(* hoare[c1:P1 => Q1] hoare[c2:P2 ==> Q2]    equiv[c1 ~ c2 :P => Q] 
+   -----------------------------------------------------------------
+    equiv[c1 ~ c2 : P /\ P1{1} /\ P2{2} ==> Q /\ Q1{1} /\ Q2{2} ] *)
+
+let t_hoareS_conseq_conj pre post pre' post' g = 
+  let concl = get_concl g in
+  let hs = t_as_hoareS concl in
+  if not (f_equal hs.hs_pr (f_and pre' pre) ) then
+    tacuerror "bad pre condition";
+  if not (f_equal hs.hs_po (f_and post' post)) then
+    tacuerror "bad post condition";
+  let concl1 = f_hoareS_r {hs with hs_pr = pre; hs_po = post} in
+  let concl2 = f_hoareS_r {hs with hs_pr = pre'; hs_po = post'} in
+  prove_goal_by [concl1;concl2] rn_hl_conseq_conj g
+
+let t_hoareF_conseq_conj pre post pre' post' g = 
+  let concl = get_concl g in
+  let hf = t_as_hoareF concl in
+  if not (f_equal hf.hf_pr (f_and pre' pre) ) then
+    tacuerror "bad pre condition";
+  if not (f_equal hf.hf_po (f_and post' post)) then
+    tacuerror "bad post condition";
+  let concl1 = f_hoareF pre hf.hf_f post in
+  let concl2 = f_hoareF pre' hf.hf_f post' in
+  prove_goal_by [concl1;concl2] rn_hl_conseq_conj g
+
+let t_bdHoareS_conseq_conj pre post pre' post' g = 
+  let concl = get_concl g in
+  let hs = t_as_bdHoareS concl in
+  if not (f_equal hs.bhs_pr (f_and pre' pre) ) then
+    tacuerror "bad pre condition";
+  if not (f_equal hs.bhs_po (f_and post' post)) then
+    tacuerror "bad post condition";
+  let concl1 = f_hoareS hs.bhs_m pre hs.bhs_s post in
+  let concl2 = f_bdHoareS_r {hs with bhs_pr = pre'; bhs_po = post'} in
+  prove_goal_by [concl1;concl2] rn_hl_conseq_conj g
+
+let t_bdHoareF_conseq_conj pre post pre' post' g = 
+  let concl = get_concl g in
+  let hf = t_as_bdHoareF concl in
+  if not (f_equal hf.bhf_pr (f_and pre' pre) ) then
+    tacuerror "bad pre condition";
+  if not (f_equal hf.bhf_po (f_and post' post)) then
+    tacuerror "bad post condition";
+  let concl1 = f_hoareF   pre  hf.bhf_f post in
+  let concl2 = f_bdHoareF pre' hf.bhf_f post' hf.bhf_cmp hf.bhf_bd in
+  prove_goal_by [concl1;concl2] rn_hl_conseq_conj g
+ 
+let t_equivS_conseq_conj pre1 post1 pre2 post2 pre' post' g = 
+  let concl = get_concl g in
+  let es = t_as_equivS concl in
+  let subst1 = Fsubst.f_subst_mem mhr mleft in
+  let subst2 = Fsubst.f_subst_mem mhr mright in
+  let pre1'  = subst1 pre1 in
+  let post1' = subst1 post1 in
+  let pre2'  = subst2 pre2 in
+  let post2' = subst2 post2 in
+  if not (f_equal es.es_pr (f_ands [pre';pre1';pre2']) ) then
+    tacuerror "bad pre condition";
+  if not (f_equal es.es_po (f_ands [post';post1';post2'])) then
+    tacuerror "bad post condition";
+  let concl1 = f_hoareS (mhr,snd es.es_ml) pre1 es.es_sl post1 in
+  let concl2 = f_hoareS (mhr,snd es.es_mr) pre2 es.es_sr post2 in
+  let concl3 = f_equivS_r {es with es_pr = pre'; es_po = post'} in
+  prove_goal_by [concl1;concl2;concl3] rn_hl_conseq_conj g
+
+let t_equivF_conseq_conj pre1 post1 pre2 post2 pre' post' g = 
+  let concl = get_concl g in
+  let ef = t_as_equivF concl in
+  let subst1 = Fsubst.f_subst_mem mhr mleft in
+  let subst2 = Fsubst.f_subst_mem mhr mright in
+  let pre1'  = subst1 pre1 in
+  let post1' = subst1 post1 in
+  let pre2'  = subst2 pre2 in
+  let post2' = subst2 post2 in
+  if not (f_equal ef.ef_pr (f_ands [pre';pre1';pre2']) ) then
+    tacuerror "bad pre condition";
+  if not (f_equal ef.ef_po (f_ands [post';post1';post2'])) then
+    tacuerror "bad post condition";
+  let concl1 = f_hoareF pre1 ef.ef_fl post1 in
+  let concl2 = f_hoareF pre2 ef.ef_fr post2 in
+  let concl3 = f_equivF pre' ef.ef_fl ef.ef_fr post' in
+  prove_goal_by [concl1;concl2;concl3] rn_hl_conseq_conj g
+
+(* deduce equiv from phoare *)
+class rn_hl_bd_equiv = object
+  inherit xrule "[hl] bd equiv"
+end
+let rn_hl_bd_equiv = RN_xtd (new rn_hl_bd_equiv :> xrule)
+
+let t_equivS_conseq_bd side pr po g = 
+  let concl = get_concl g in
+  let es = destr_equivS concl in
+  let m,s,s' = 
+    if side then es.es_ml, es.es_sl,es.es_sr 
+    else es.es_mr, es.es_sr, es.es_sl in
+  if s'.s_node <> [] then 
+    tacuerror "the other statement should be empty";
+  let subst = Fsubst.f_subst_mem mhr (fst m) in
+  let prs, pos = subst pr, subst po in
+  if not (f_equal prs es.es_pr && f_equal pos es.es_po) then
+    tacuerror "invalid pre or post condition";
+  let g1 = f_bdHoareS m pr s po FHeq f_r1 in
+  prove_goal_by [g1] rn_hl_bd_equiv g
+
+
+
+let rec t_hi_conseq notmod f1 f2 f3 g =
+  let t_use (n,gs)= t_use n gs in
+  let hyps,concl = get_goal g in
+  let t_trivial = t_try (t_lseq [t_simplify_nodelta;t_split;t_fail]) in
+  match concl.f_node, f1, f2, f3 with
+  | FhoareS _, Some(nf1,{f_node = FhoareS hs}), None, None ->
+    let tac = if notmod then t_hoareS_conseq_nm else t_hoareS_conseq in
+    t_seq_subgoal (tac hs.hs_pr hs.hs_po) 
+      [t_trivial; t_trivial; t_use nf1] g
+  | FhoareS _, Some(nf1,{f_node = FhoareS hs}), Some(nf2,f2), None ->
+    let hs2 = t_as_hoareS f2 in
+    let tac = if notmod then t_hoareS_conseq_nm else t_hoareS_conseq in
+    t_seq_subgoal (tac (f_and hs.hs_pr hs2.hs_pr) (f_and hs.hs_po hs2.hs_po))
+      [t_trivial; t_trivial; 
+       t_seq_subgoal 
+         (t_hoareS_conseq_conj hs2.hs_pr hs2.hs_po hs.hs_pr hs.hs_po)
+         [t_use nf2; t_use nf1]] g
+  | FhoareS _, Some(nf1,{f_node = FbdHoareS hs}), None, None ->
+    let tac = if notmod then t_bdHoareS_conseq_nm else t_bdHoareS_conseq in
+    t_seq t_hoareS_conseq_bdhoare
+      (t_seq_subgoal (t_bdHoareS_conseq_bd hs.bhs_cmp hs.bhs_bd)
+         [t_trivial;
+          t_seq_subgoal (tac hs.bhs_pr hs.bhs_po)
+            [t_trivial; t_trivial; t_use nf1]]) g
+
+  | FhoareF _, Some(nf1,{f_node = FhoareF hs}), None, None ->
+    let tac = if notmod then t_hoareF_conseq_nm else t_hoareF_conseq in
+    t_seq_subgoal (tac hs.hf_pr hs.hf_po) 
+      [t_trivial; t_trivial; t_use nf1] g
+  | FhoareF _, Some(nf1,{f_node = FhoareF hs}), Some(nf2,f2), None ->
+    let hs2 = t_as_hoareF f2 in
+    let tac = if notmod then t_hoareF_conseq_nm else t_hoareF_conseq in
+    t_seq_subgoal (tac (f_and hs.hf_pr hs2.hf_pr) (f_and hs.hf_po hs2.hf_po))
+      [t_trivial; t_trivial; 
+       t_seq_subgoal 
+         (t_hoareS_conseq_conj hs2.hf_pr hs2.hf_po hs.hf_pr hs.hf_po)
+         [t_use nf2; t_use nf1]] g
+  | FhoareF _, Some(nf1,{f_node = FbdHoareF hs}), None, None ->
+    let tac = if notmod then t_bdHoareF_conseq_nm else t_bdHoareF_conseq in
+    t_seq t_hoareF_conseq_bdhoare 
+      (t_seq_subgoal (t_bdHoareF_conseq_bd hs.bhf_cmp hs.bhf_bd)
+         [t_trivial;
+          t_seq_subgoal (tac hs.bhf_pr hs.bhf_po)
+            [t_trivial; t_trivial; t_use nf1]]) g
+
+
+  | FbdHoareS _, Some(nf1,{f_node = FbdHoareS hs}), None, None ->
+    let tac = if notmod then t_bdHoareS_conseq_nm else t_bdHoareS_conseq in
+    t_seq_subgoal (t_bdHoareS_conseq_bd hs.bhs_cmp hs.bhs_bd)
+      [t_trivial;
+       t_seq_subgoal (tac hs.bhs_pr hs.bhs_po)
+         [t_trivial; t_trivial; t_use nf1]] g
+
+  | FbdHoareS _, Some(nf1,{f_node = FbdHoareS hs}), Some(nf2,f2), None -> 
+    let hs2 = t_as_hoareS f2 in
+    let tac = if notmod then t_bdHoareS_conseq_nm else t_bdHoareS_conseq in
+    t_seq_subgoal (t_bdHoareS_conseq_bd hs.bhs_cmp hs.bhs_bd)
+      [t_trivial;
+       t_seq_subgoal (tac (f_and hs.bhs_pr hs2.hs_pr) 
+                          (f_and hs.bhs_po hs2.hs_po))
+         [t_trivial; t_trivial; 
+          t_seq_subgoal (t_bdHoareS_conseq_conj hs2.hs_pr hs2.hs_po 
+                           hs.bhs_pr hs.bhs_po)
+            [t_use nf2; t_use nf1]]] g
+
+  | FbdHoareF _, Some(nf1,{f_node = FbdHoareF hs}), None, None ->
+    let tac = if notmod then t_bdHoareF_conseq_nm else t_bdHoareF_conseq in
+    t_seq_subgoal (t_bdHoareF_conseq_bd hs.bhf_cmp hs.bhf_bd)
+      [t_trivial;
+       t_seq_subgoal (tac hs.bhf_pr hs.bhf_po)
+         [t_trivial; t_trivial; t_use nf1]] g
+
+  | FbdHoareF _, Some(nf1,{f_node = FbdHoareF hs}), Some(nf2,f2), None -> 
+    let hs2 = t_as_hoareF f2 in
+    let tac = if notmod then t_bdHoareF_conseq_nm else t_bdHoareF_conseq in
+    t_seq_subgoal (t_bdHoareF_conseq_bd hs.bhf_cmp hs.bhf_bd)
+      [t_trivial;
+       t_seq_subgoal (tac (f_and hs.bhf_pr hs2.hf_pr) 
+                          (f_and hs.bhf_po hs2.hf_po))
+         [t_trivial; t_trivial; 
+          t_seq_subgoal (t_bdHoareF_conseq_conj hs2.hf_pr hs2.hf_po 
+                           hs.bhf_pr hs.bhf_po)
+            [t_use nf2; t_use nf1]]] g
+
+  | FequivS _, Some (nf1, {f_node = FequivS es}), None, None ->
+    let tac = if notmod then t_equivS_conseq_nm else t_equivS_conseq in
+    t_seq_subgoal (tac es.es_pr es.es_po) 
+      [t_trivial; t_trivial; t_use nf1] g
+  | FequivS _, Some(nf1,{f_node = FequivS es}), Some (nf2,f2), Some (nf3,f3) ->
+    let subst1 = Fsubst.f_subst_mem mhr mleft in
+    let subst2 = Fsubst.f_subst_mem mhr mright in
+    let hs2, hs3 = t_as_hoareS f2, t_as_hoareS f3 in
+    let pre = f_ands [es.es_pr; subst1 hs2.hs_pr; subst2 hs3.hs_pr] in
+    let post = f_ands [es.es_po; subst1 hs2.hs_po; subst2 hs3.hs_po] in
+    let tac = if notmod then t_equivS_conseq_nm else t_equivS_conseq in
+    t_seq_subgoal (tac pre post) 
+      [ t_trivial;
+        t_trivial;
+        t_seq_subgoal
+          (t_equivS_conseq_conj hs2.hs_pr hs2.hs_po hs3.hs_pr hs3.hs_po
+             es.es_pr es.es_po)
+          [t_use nf2; t_use nf3; t_use nf1]
+      ] g
+  | FequivS es, Some _, Some _, None ->
+    let (juc,n) = g in
+    let f3 = f_hoareS (mhr, snd es.es_mr) f_true es.es_sr f_true in
+    let (juc,n3) = EcLogic.new_goal juc (hyps, f3) in
+    let (juc,gs) = EcPhlTauto.t_hoare_true (juc,n3) in
+    t_hi_conseq notmod f1 f2 (Some((n3,gs),f3)) (juc,n)
+  | FequivS es, Some _, None, Some _ ->
+    let (juc,n) = g in
+    let f2 = f_hoareS (mhr, snd es.es_ml) f_true es.es_sl f_true in
+    let (juc,n2) = EcLogic.new_goal juc (hyps, f2) in
+    let (juc,gs) = EcPhlTauto.t_hoare_true (juc,n2) in
+    t_hi_conseq notmod f1 (Some((n2,gs),f2)) f3 (juc,n)
+
+  | FequivS _, None, Some(n2,f2), None ->
+    let subst1 = Fsubst.f_subst_mem mhr mleft in
+    let hs = t_as_bdHoareS f2 in
+    let pre, post = subst1 hs.bhs_pr, subst1 hs.bhs_po in
+    let tac = if notmod then t_equivS_conseq_nm else t_equivS_conseq in
+    t_seq_subgoal (tac pre post)
+      [t_trivial;
+       t_trivial;
+       t_seq (t_equivS_conseq_bd true hs.bhs_pr hs.bhs_po) (t_use n2)] g
+  | FequivS _, None, None, Some (n3,f3) ->
+    let subst2 = Fsubst.f_subst_mem mhr mright in
+    let hs = t_as_bdHoareS f3 in
+    let pre, post = subst2 hs.bhs_pr, subst2 hs.bhs_po in
+    let tac = if notmod then t_equivS_conseq_nm else t_equivS_conseq in
+    t_seq_subgoal (tac pre post)
+      [t_trivial;
+       t_trivial;
+       t_seq (t_equivS_conseq_bd false hs.bhs_pr hs.bhs_po) (t_use n3)] g
+
+  | FequivF _, Some(nf1,{f_node = FequivF ef}), None, None ->
+    let tac = if notmod then t_equivF_conseq_nm else t_equivF_conseq in
+    t_seq_subgoal (tac ef.ef_pr ef.ef_po)
+      [t_trivial; t_trivial; t_use nf1] g
+
+  | FequivF _, Some(nf1,{f_node = FequivF ef}), Some (nf2,f2), Some (nf3,f3) ->
+    let subst1 = Fsubst.f_subst_mem mhr mleft in
+    let subst2 = Fsubst.f_subst_mem mhr mright in
+    let hs2, hs3 = t_as_hoareF f2, t_as_hoareF f3 in
+    let pre = f_ands [ef.ef_pr; subst1 hs2.hf_pr; subst2 hs3.hf_pr] in
+    let post = f_ands [ef.ef_po; subst1 hs2.hf_po; subst2 hs3.hf_po] in
+    let tac = if notmod then t_equivF_conseq_nm else t_equivF_conseq in
+    t_seq_subgoal (tac pre post) 
+      [ t_trivial;
+        t_trivial;
+        t_seq_subgoal
+          (t_equivF_conseq_conj hs2.hf_pr hs2.hf_po hs3.hf_pr hs3.hf_po
+             ef.ef_pr ef.ef_po)
+          [t_use nf2; t_use nf3; t_use nf1]
+      ] g
+  | FequivF ef, Some _, Some _, None ->
+    let (juc,n) = g in
+    let f3 = f_hoareF f_true ef.ef_fr f_true in
+    let (juc,n3) = EcLogic.new_goal juc (hyps, f3) in
+    let (juc,gs) = EcPhlTauto.t_hoare_true (juc,n3) in
+    t_hi_conseq notmod f1 f2 (Some((n3,gs),f3)) (juc,n)
+  | FequivF ef, Some _, None, Some _ ->
+    let (juc,n) = g in
+    let f2 = f_hoareF f_true ef.ef_fl f_true in
+    let (juc,n2) = EcLogic.new_goal juc (hyps, f2) in
+    let (juc,gs) = EcPhlTauto.t_hoare_true (juc,n2) in
+    t_hi_conseq notmod f1 (Some((n2,gs),f2)) f3 (juc,n)
+  | _ -> 
+    tacuerror "do not known what to do"
+
+
+
+     
+
+
+
+
+(* -------------------------------------------------------------------- *)
 let process_conseq notmod info (_, n as g) =
   let process_cut g ((pre,post),bd) =
     let hyps,concl = get_goal g in
@@ -348,6 +665,7 @@ let process_conseq notmod info (_, n as g) =
         Some (cmp,bd) in
     fmake pre post bd
   in
+
   let (juc,an), gs = process_mkn_apply (process_cut g) info g in
   let lt = ref [t_use an gs] in
   let t_trivial = t_try (t_lseq [t_simplify_nodelta;t_split;t_fail]) in
@@ -392,3 +710,5 @@ let process_conseq notmod info (_, n as g) =
     | _ -> tacuerror "cannot apply conseq rule, not a phl/prhl judgement"
   in
     t_subgoal (t_trivial :: t_trivial :: !lt) (t_conseq (juc, n))
+
+
