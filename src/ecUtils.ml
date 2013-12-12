@@ -39,6 +39,9 @@ let (<|) f x = f x
 let curry   f (x, y) = f x y
 let uncurry f x y = f (x, y)
 
+let curry3   f (x, y, z) = f x y z
+let uncurry3 f x y z = f (x, y, z)
+
 (* -------------------------------------------------------------------- *)
 let copy (x : 'a) : 'a =
   Obj.obj (Obj.dup (Obj.repr x))
@@ -83,6 +86,7 @@ type 'a tuple6 = 'a * 'a * 'a * 'a * 'a * 'a
 type 'a tuple7 = 'a * 'a * 'a * 'a * 'a * 'a * 'a
 type 'a tuple8 = 'a * 'a * 'a * 'a * 'a * 'a * 'a * 'a
 type 'a tuple9 = 'a * 'a * 'a * 'a * 'a * 'a * 'a * 'a * 'a
+type 'a pair   = 'a * 'a
 
 (* -------------------------------------------------------------------- *)
 let as_seq0 = function [] -> () | _ -> assert false
@@ -105,6 +109,11 @@ let int_of_bool (b : bool) = if b then 1 else 0
 let proj3_1 (x, _, _) = x
 let proj3_2 (_, x, _) = x
 let proj3_3 (_, _, x) = x
+
+let proj4_1 (x, _, _, _) = x
+let proj4_2 (_, x, _, _) = x
+let proj4_3 (_, _, x, _) = x
+let proj4_4 (_, _, _, x) = x
 
 let fst_map (f : 'a -> 'c) ((x, y) : 'a * 'b) =
   (f x, y)
