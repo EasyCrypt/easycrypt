@@ -22,7 +22,7 @@ require import Distr.
 theory Dbool.
   op dbool: bool distr.
 
-  axiom mu_def (p:bool cpred):
+  axiom mu_def (p:bool -> bool):
     mu dbool p = (1%r / 2%r) * charfun p true + (1%r / 2%r) * charfun p false.
  
   lemma supp_def (b:bool): in_supp b dbool.
