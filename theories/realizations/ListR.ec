@@ -102,15 +102,15 @@ by rewrite /rev fold_right_cons.
 qed.
 
 (** all *)
-pred all(p:'a cpred) xs = forall x, mem x xs => p x.
+pred all(p:('a -> bool)) xs = forall x, mem x xs => p x.
 
 (* Direct inductive definition *)
-lemma all_nil (p:'a cpred): all p [].
+lemma all_nil (p:('a -> bool)): all p [].
 proof strict.
 rewrite /all=> x; apply absurd=> _; apply mem_nil.
 qed.
 
-lemma all_cons (p:'a cpred) x xs:
+lemma all_cons (p:('a -> bool)) x xs:
   all p (x::xs) = ((p x) /\ all p xs).
 proof strict.
 rewrite /all rw_eq_iff; split.
@@ -121,25 +121,25 @@ rewrite /all rw_eq_iff; split.
 qed.
 
 (** forallb *)
-op forallb (p:'a cpred) = fold_right (fun x r, (p x) /\ r) true.
+op forallb (p:('a -> bool)) = fold_right (fun x r, (p x) /\ r) true.
 
 (* Direct inductive definition *)
-lemma forallb_nil (p:'a cpred): forallb p [].
+lemma forallb_nil (p:('a -> bool)): forallb p [].
 proof strict.
 by rewrite /forallb fold_right_nil.
 qed.
 
-lemma forallb_cons (p:'a cpred) x xs: forallb p (x::xs) = ((p x) /\ forallb p xs).
+lemma forallb_cons (p:('a -> bool)) x xs: forallb p (x::xs) = ((p x) /\ forallb p xs).
 proof strict.
 by rewrite /forallb fold_right_cons.
 qed.
 
 (** any *)
-pred any (p:'a cpred) xs = exists x, mem x xs /\ p x.
+pred any (p:('a -> bool)) xs = exists x, mem x xs /\ p x.
 
 (* Direct inductive definition *)
-lemma any_nil (p:'a cpred): !(any p []) by [].
-lemma any_cons (p:'a cpred) x xs:
+lemma any_nil (p:('a -> bool)): !(any p []) by [].
+lemma any_cons (p:('a -> bool)) x xs:
   any p (x::xs) = ((p x) \/ any p xs).
 proof strict.
 rewrite /any rw_eq_iff; split.
@@ -152,31 +152,31 @@ rewrite /any rw_eq_iff; split.
 qed.
 
 (** existsb *)
-op existsb (p:'a cpred) = fold_right (fun x r, (p x) \/ r) false.
+op existsb (p:('a -> bool)) = fold_right (fun x r, (p x) \/ r) false.
 
 (* Direct inductive definition *)
-lemma existsb_nil (p:'a cpred): !(existsb p []).
+lemma existsb_nil (p:('a -> bool)): !(existsb p []).
 by rewrite /existsb fold_right_nil.
 qed.
 
-lemma existsb_cons (p:'a cpred) x xs:
+lemma existsb_cons (p:('a -> bool)) x xs:
   existsb p (x::xs) = ((p x) \/ existsb p xs).
 proof strict.
 by rewrite /existsb fold_right_cons.
 qed.
 
 (** filter *)
-op filter (p:'a cpred) =
+op filter (p:('a -> bool)) =
   fold_right (fun x r, if p x then x::r else r) [].
 
 (* Direct inductive definition *)
-lemma filter_nil (p:'a cpred):
+lemma filter_nil (p:('a -> bool)):
   filter p [] = [].
 proof strict.
 by rewrite /filter fold_right_nil.
 qed.
 
-lemma filter_cons (p:'a cpred) x xs:
+lemma filter_cons (p:('a -> bool)) x xs:
   filter p (x::xs) = let rest = filter p xs in
                      if p x then x::rest else rest.
 proof strict.
@@ -228,7 +228,7 @@ by rewrite /count list_rect_cons /= (rw_eq_sym x y).
 qed.
 
 (** unique *)
-op unique: 'a list cpred =
+op unique: 'a list -> bool =
   list_rect true (fun x xs v, v /\ !mem x xs).
 
 (* Direct inductive definition *)
@@ -256,4 +256,4 @@ qed.
 
 (** Equality up to permutation *)
 pred (<->) (xs xs':'a list) =
-  forall (x:'a), count x xs = count x xs'.  
+  forall (x:'a), count x xs = count x xs'.

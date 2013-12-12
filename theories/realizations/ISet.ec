@@ -3,7 +3,7 @@ require import Fun.
 
 (** We realize potentially infinite sets as boolean functions *)
 (* We avoid using maps as they depend on infinite sets *)
-type 'a set = 'a cpred.
+type 'a set = ('a -> bool).
 
 (** We use membership as core specification *)
 op mem (x:'a) (X:'a set) = X x.
@@ -86,8 +86,8 @@ lemma mem_inter: forall x (X1 X2:'a set),
 by [].
 
 (** all *)
-op all (p:'a cpred) (X:'a set) = (inter p X) = X.
-lemma all_def: forall (p:'a cpred) X,
+op all (p:('a -> bool)) (X:'a set) = (inter p X) = X.
+lemma all_def: forall (p:('a -> bool)) X,
   all p X <=> (forall x, mem x X => p x).
 proof strict.
 intros=> p X; delta mem all inter cpAnd; beta; split=> h.
@@ -98,8 +98,8 @@ intros=> p X; delta mem all inter cpAnd; beta; split=> h.
 qed.
 
 (** any *)
-op any (p:'a cpred) (X:'a set) = (inter p X) <> empty.
-lemma any_def: forall (p:'a cpred) X,
+op any (p:('a -> bool)) (X:'a set) = (inter p X) <> empty.
+lemma any_def: forall (p:('a -> bool)) X,
   any p X <=> (exists x, mem x X /\ p x).
 proof strict.
 intros=> p X; delta mem any inter cpAnd; beta; split=> h; last smt.
@@ -109,12 +109,12 @@ intros=> p X; delta mem any inter cpAnd; beta; split=> h; last smt.
 qed.
 
 (** filter *)
-op filter (p:'a cpred) (X:'a set) = inter p X.
-lemma mem_filter: forall x (p:'a cpred) X,
+op filter (p:('a -> bool)) (X:'a set) = inter p X.
+lemma mem_filter: forall x (p:('a -> bool)) X,
   mem x (filter p X) <=> (mem x X /\ p x)
 by [].
 
-op create (p:'a cpred): 'a set = p.
+op create (p:('a -> bool)): 'a set = p.
 lemma mem_create (x:'a) p:
   mem x (create p) = p x
 by trivial.

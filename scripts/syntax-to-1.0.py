@@ -66,7 +66,7 @@ class CPred(codetx):
         pass
 
     def __call__(self, code):
-        return re.sub(r'(\w+)\s+cpred\b', '(\\1 -> bool)', code)
+        return re.sub(r"('?\w+)\s+(\w+\.)*cpred\b", '(\\1 -> bool)', code)
 
 # --------------------------------------------------------------------
 ALLTX = [

@@ -1,6 +1,5 @@
 (* Removing library dependencies *)
-type 'a cpred = 'a -> bool.
-op cpEq (x:'a): 'a cpred = (=) x.
+op cpEq (x:'a): ('a -> bool) = (=) x.
 
 (* Minimal case follows *)
 type 'a set.
@@ -19,8 +18,8 @@ axiom mem_single_eq: forall (x:'a),
 axiom mem_single_neq: forall (x x':'a),
   x <> x' => !mem x (single x'). *)
 
-op filter:'a cpred -> 'a set -> 'a set.
-axiom mem_filter: forall x (p:'a cpred) (X:'a set),
+op filter:('a -> bool) -> 'a set -> 'a set.
+axiom mem_filter: forall x (p:('a -> bool)) (X:'a set),
   mem x (filter p X) <=> (mem x X /\ p x).
 
 lemma filter_cpEq_in: forall (x:'a) (X:'a set),

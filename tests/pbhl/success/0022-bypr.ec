@@ -47,7 +47,7 @@ axiom k2_pos : 0<= k2.
 
 require import Fun.
 
-axiom mu_neg : forall (d:'a distr, p:'a cpred), 
+axiom mu_neg : forall (d:'a distr, p:('a -> bool)), 
   mu d (Fun.cpNot p) = mu d (Fun.cpTrue) - mu d p .
 
 lemma test'' : forall &m (a:bitstring), length a = k1+k2 => Pr[Test'.test() @ &m : a=res]=1%r/(2^(k1+k2))%r.

@@ -149,36 +149,36 @@ intros=> m x x_in_m; exists (proj m.[x]); split; last smt.
 qed.
 
 (** find *)
-op find: ('a -> 'b cpred) -> ('a,'b) map -> 'a option.
+op find: ('a -> ('b -> bool)) -> ('a,'b) map -> 'a option.
 
-axiom find_nin: forall (p:'a -> 'b cpred) m,
+axiom find_nin: forall (p:'a -> ('b -> bool)) m,
   (forall x, in_dom x m => !(p x (proj m.[x]))) =>
   find p m = None.
 
-axiom find_in: forall (p:'a -> 'b cpred) (m:('a,'b) map),
+axiom find_in: forall (p:'a -> ('b -> bool)) (m:('a,'b) map),
   (exists x, in_dom x m /\ p x (proj m.[x])) =>
   (exists x, find p m = Some x).
 
-axiom find_cor: forall (p:'a -> 'b cpred) m x,
+axiom find_cor: forall (p:'a -> ('b -> bool)) m x,
   find p m = Some x =>
   in_dom x m /\ p x (proj m.[x]).
 
 (* Lemmas *)
-lemma find_none: forall (p:'a -> 'b cpred) m,
+lemma find_none: forall (p:'a -> ('b -> bool)) m,
   find p m = None <=>
   (forall x, in_dom x m => !(p x (proj m.[x])))
 by [].
 
-lemma find_some: forall (p:'a -> 'b cpred) m,
+lemma find_some: forall (p:'a -> ('b -> bool)) m,
   (exists x, find p m = Some x) <=>
   (exists x, in_dom x m /\ p x (proj m.[x]))
 by [].
 
-lemma find_empty: forall (p:'a -> 'b cpred),
+lemma find_empty: forall (p:'a -> ('b -> bool)),
   find p empty = None
 by [].
 
-lemma find_in_p : forall (p:'a -> 'b cpred) (m:('a,'b) map),
+lemma find_in_p : forall (p:'a -> ('b -> bool)) (m:('a,'b) map),
   forall x, in_dom x m => p x (proj m.[x]) =>
   (exists x, find p m = Some x /\ in_dom x m /\ p x (proj m.[x])).
 proof -strict.
@@ -188,7 +188,7 @@ proof -strict.
  by exists x';split => //;apply find_cor => //.
 qed. 
 
-lemma find_in_p_unique : forall (p:'a -> 'b cpred) (m:('a,'b) map),
+lemma find_in_p_unique : forall (p:'a -> ('b -> bool)) (m:('a,'b) map),
   forall x, in_dom x m => p x (proj m.[x]) =>
   (forall x y, (p x (proj m.[x])) => (p y (proj m.[y])) => x = y) =>
   find p m = Some x.

@@ -14,7 +14,7 @@ op mem:'a -> 'a set -> bool.
 axiom mem_def (x:'a) (X:'a set):
   mem x (elems X) <=> mem x X.
 
-op cpMem(X:'a set): 'a cpred = fun x, mem x X.
+op cpMem(X:'a set): ('a -> bool) = fun x, mem x X.
 
 lemma nosmt count_mem (x:'a) (X:'a set):
   (count x (elems X) = 1) <=> mem x X
@@ -277,12 +277,12 @@ apply set_ext=> x'; case (x' = x)=> x_x'.
 qed.
 
 (** induction *)
-axiom set_comp (p:('a set) cpred):
+axiom set_comp (p:'a set-> bool):
   p empty =>
   (forall (s:'a set), s <> empty => p (rm (pick s) s) => p s) =>
   forall s, p s.
 
-lemma set_ind (p:('a set) cpred):
+lemma set_ind (p:'a set -> bool):
   p empty =>
   (forall x (s:'a set), !mem x s => p s => p (add x s)) =>
   forall s, p s.
@@ -435,18 +435,18 @@ by apply set_ext=> x; rewrite mem_inter; split=> //;
 qed.
 
 (** all *)
-op all:'a cpred -> 'a set -> bool.
-axiom all_def (p:'a cpred) (X:'a set):
+op all:('a -> bool) -> 'a set -> bool.
+axiom all_def (p:('a -> bool)) (X:'a set):
   all p X <=> (forall x, mem x X => p x).
 
 (** any *)
-op any:'a cpred -> 'a set -> bool.
-axiom any_def (p:'a cpred) (X:'a set):
+op any:('a -> bool) -> 'a set -> bool.
+axiom any_def (p:('a -> bool)) (X:'a set):
   any p X <=> (exists x, mem x X /\ p x).
 
 (** filter *)
-op filter:'a cpred -> 'a set -> 'a set.
-axiom mem_filter x (p:'a cpred) (X:'a set):
+op filter:('a -> bool) -> 'a set -> 'a set.
+axiom mem_filter x (p:('a -> bool)) (X:'a set):
   mem x (filter p X) <=> (mem x X /\ p x).
 
 lemma filter_cpTrue (X:'a set):
@@ -470,7 +470,7 @@ proof strict.
 by intros=> x_in_X; rewrite filter_cpEq_in ?card_single.
 qed.
 
-lemma leq_filter (p:'a cpred) (X:'a set):
+lemma leq_filter (p:('a -> bool)) (X:'a set):
   filter p X <= X.
 proof strict.
 by intros=> x; rewrite mem_filter=> [x_in_X _].
@@ -793,7 +793,7 @@ theory Duni.
   axiom mu_def (X:'a set) P:
     !X = empty => mu (duni X) P = (card (filter P X))%r / (card X)%r. 
 
-  axiom mu_def_empty (P:'a cpred): mu (duni empty) P = 0%r.
+  axiom mu_def_empty (P:('a -> bool)): mu (duni empty) P = 0%r.
 
   axiom mu_x_def_in (x:'a) (X:'a set):
     mem x X => mu_x (duni X) x = 1%r / (card X)%r. 
@@ -819,12 +819,12 @@ theory Dinter_uni.
     in_supp x (dinter i j) <=> i <= x <= j
   by [].
 
-  lemma nosmt mu_def_z (i j:int) (p:int cpred):
+  lemma nosmt mu_def_z (i j:int) (p:(int -> bool)):
     j < i =>
     mu (dinter i j) p = 0%r
   by [].
 
-  lemma nosmt mu_def_nz (i j:int) (p:int cpred):
+  lemma nosmt mu_def_nz (i j:int) (p:(int -> bool)):
     i <= j =>
     mu (dinter i j) p =
       (card (filter p (interval i j)))%r / (card (interval i j))%r.
