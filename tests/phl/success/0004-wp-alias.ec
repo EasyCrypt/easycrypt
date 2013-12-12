@@ -12,7 +12,7 @@ module N = {
 }.
 
 lemma foo : hoare [N.f : true ==> res = 2 && N.P.x = 2 && M.x = 2].
-proof.
+proof -strict.
  proc.
  wp.
  skip. 

@@ -3,7 +3,7 @@ module M = {
 }.
 
 lemma foo : equiv [M.f ~ M.f : x{1}=x{2} ==> res{1}=res{2}].
-proof.
+proof -strict.
  proc.
  skip.
  intros &m1 &m2 h.
@@ -34,7 +34,7 @@ module M2(A:T) = {
 lemma test :
   forall (A<:T),
     equiv [M1(A).f ~ M2(A).f : ((glob A){1} = (glob A){2}) ==> res{1} = res{2}].
-proof.
+proof -strict.
   intros A.
   proc.
   call (_ : (glob A){1} = (glob A){2} ==> res{1}=res{2}).

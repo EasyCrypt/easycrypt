@@ -27,7 +27,7 @@ module M(AF : AF) = {
 lemma triv:
     forall (A <: AF {M}),
   equiv[ M(A).main ~ M(A).main : ={glob A} ==> ={res} ].
-proof.
+proof -strict.
   intros=> A.
   proc.
   call (_ : true) => //.

@@ -1,5 +1,5 @@
 lemma l: forall (x:int), (fun y, y = y) x.
-proof.
+proof -strict.
 beta.
 smt.
 qed.

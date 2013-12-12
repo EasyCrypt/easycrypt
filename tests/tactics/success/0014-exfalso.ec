@@ -23,65 +23,65 @@ module P (A:F) = {
 }.
 
 lemma hoareF (A <: F {M}) : hoare [P(A).main : P.y /\ !P.y ==> false].
-proof.
+proof -strict.
  exfalso.
  smt. 
 qed. 
 
 lemma hoareS (A <: F {M}) : hoare [P(A).main : P.y /\ !P.y ==> false].
-proof.
+proof -strict.
  proc.
  exfalso.
  smt. 
 qed. 
 
 lemma bdhoareF_eq (A <: F {M}) : phoare [P(A).main : P.y /\ !P.y ==> P.y] = 1%r.
-proof.
+proof -strict.
  exfalso.
  smt. 
 qed. 
 
 lemma bdhoareF_le (A <: F {M}) : phoare [P(A).main : P.y /\ !P.y ==> P.y] <= 1%r.
-proof.
+proof -strict.
  exfalso.
  smt. 
 qed. 
 
 lemma bdhoareF_ge (A <: F {M}) : phoare [P(A).main : P.y /\ !P.y ==> P.y] >= 1%r.
-proof.
+proof -strict.
  exfalso.
  smt. 
 qed. 
 
 lemma bdhoareS_eq (A <: F {M}) : phoare [P(A).main : P.y /\ !P.y ==> P.y] = 1%r.
-proof.
+proof -strict.
  proc.
  exfalso.
  smt. 
 qed. 
 
 lemma bdhoareS_le (A <: F {M}) : phoare [P(A).main : P.y /\ !P.y ==> P.y] <= 1%r.
-proof.
+proof -strict.
  proc.
  exfalso.
  smt. 
 qed. 
 
 lemma bdhoareS_ge (A <: F {M}) : phoare [P(A).main : P.y /\ !P.y ==> P.y] >= 1%r.
-proof.
+proof -strict.
  proc.
  exfalso.
  smt. 
 qed. 
 
 lemma equivF (A <: F {M}) : equiv [P(A).main ~ P(A).main : P.y{1} /\ !P.y{1} ==> P.y{1}].
-proof.
+proof -strict.
  exfalso.
  smt. 
 qed. 
 
 lemma equivS (A <: F {M}) : equiv [P(A).main ~ P(A).main : P.y{1} /\ !P.y{1} ==> P.y{1}].
-proof.
+proof -strict.
  proc.
  exfalso.
  smt. 

@@ -23,7 +23,7 @@ section.
   }.
 
   local equiv foo : G1.f ~ G2.f : ={glob A} ==> true.
-  proof.
+  proof -strict.
     proc;swap{1} 1.
     admit.
   qed.

@@ -17,7 +17,7 @@ theory MeansBool.
      Pr[Rand(A).main() @ &m : p (fst res) (glob A) (snd res)] = 
      1%r/2%r*(Pr[A.work(true) @ &m : p true (glob A) res] + 
                 Pr[A.work(false) @ &m : p false (glob A) res]).
-  proof.
+  proof -strict.
     cut Hcr: forall x, 
              mem x (create (support {0,1})) <=>
              mem x (add true (add false (FSet.empty)%FSet)).

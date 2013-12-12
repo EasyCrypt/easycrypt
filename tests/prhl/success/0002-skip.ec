@@ -3,7 +3,7 @@ module M = {
 }.
 
 equiv foo : M.f ~ M.f : true ==> true.
-proof.
+proof -strict.
   proc.
   skip.
   intros _ _ h;assumption h.

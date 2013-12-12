@@ -32,7 +32,7 @@ module M = {
 }.
 
 equiv foo : M.f1 ~ M.f2 : true ==> ={M.w}.
-proof.
+proof -strict.
  proc.
  seq 1 1 : (b{1} = b'{2}).
   sim.

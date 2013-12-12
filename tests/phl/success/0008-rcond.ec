@@ -8,7 +8,7 @@ module M = {
 }.
 
 lemma foo : hoare [M.f : true ==> res = 2 ].
-proof.
+proof -strict.
  proc.
  rcondt 2.
  wp; skip; smt.

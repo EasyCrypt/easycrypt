@@ -20,7 +20,7 @@ module M' = {
 }.
 
 equiv foo : M.f ~ M'.f : M.w{1} = M'.w{2} + 1 ==> ={res}.
-proof.
+proof -strict.
   proc.
   transitivity {1} { x=1;} (={M.w} ==> ={M.w,x})
                           (M.w{1} = M'.w{2} + 1 ==> x{1} + M.w{1} = y{2} + M'.w{2}).

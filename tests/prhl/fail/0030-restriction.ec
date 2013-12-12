@@ -43,7 +43,7 @@ return y = 0;
 lemma G_main :
 forall (Adv <: ADV{O1, O2}),
 equiv[G(Adv, O1).main ~ G(Adv, O2).main : true ==> ={res}].
-proof.
+proof -strict.
 intros Adv.
 proc.
 call (_ : O1.x{1} = O2.x{2}).
@@ -56,7 +56,7 @@ qed.
 lemma G :
 forall (Adv <: ADV) &m,
 Pr[G(Adv, O1).main() @ &m : res] = Pr[G(Adv, O2).main() @ &m : res].
-proof.
+proof -strict.
 intros Adv &m.
 (* the following shouldn't succeed, as Adv <: ADV, whereas
 G_main needs Adv <: ADV{O1, O2} *)

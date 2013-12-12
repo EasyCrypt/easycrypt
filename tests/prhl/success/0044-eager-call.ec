@@ -32,7 +32,7 @@ module M = {
 }.
 
 lemma foo1 : equiv [M.g1 ~ M.g2 : ={M.b,M.w,y} ==> ={M.b,M.w,res}].
-proof.
+proof -strict.
  proc.
  eager call (_:  ={M.b,M.w,x} ==> ={M.b,M.w,res}).
  eager proc.
@@ -44,14 +44,14 @@ qed.
 lemma foo : eager[if (!M.b) M.w = $[0..10]; , M.f1 ~ 
                   M.f2, if (!M.b) M.w = $[0..10]; :
                   ={M.b,M.w,x} ==> ={M.b,M.w,res}].
-proof.
+proof -strict.
  eager proc.
  rcondf{2} 4; first intros &m;wp => //.
  sim.
 qed.
 
 lemma foo2 : equiv [M.g1 ~ M.g2 : ={M.b,M.w,y} ==> ={M.b,M.w,res}].
-proof.
+proof -strict.
  proc.
  eager call foo.
  skip => //.

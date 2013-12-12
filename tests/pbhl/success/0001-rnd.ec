@@ -13,7 +13,7 @@ module M = {
 }.
 
 lemma test: phoare [ M.f : true ==> res] = (1%r/2%r).
-proof.
+proof -strict.
 proc.
 rnd. (* (fun (x:bool), x=y). *)
 skip.
@@ -33,7 +33,7 @@ module F = {
   }
 }.
 
-lemma test2: phoare [ F.f : true ==> res] = (1%r/2%r). proof.
+lemma test2: phoare [ F.f : true ==> res] = (1%r/2%r). proof -strict.
 proc.
 rnd;[smt|rnd; skip; smt].
 qed.

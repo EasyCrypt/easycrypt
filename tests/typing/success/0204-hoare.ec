@@ -7,4 +7,4 @@ module G = {
 }.
 
 lemma L : forall u v, hoare[G.f : (x = u /\ y = v) ==> (res = u + v)].
-proof. admit. qed.
+proof -strict. admit. qed.

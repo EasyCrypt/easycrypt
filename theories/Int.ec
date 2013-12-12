@@ -87,7 +87,7 @@ theory EuclDiv.
   axiom ediv_Mle : forall (m1 m2 d:int), 0 < d => m1 <= m2 => m1/%d <= m2/%d.
 
   lemma ediv_pos : forall m d, 0 < d => 0 <= m => 0 <= m /%d.
-  proof. 
+  proof -strict. 
     intros m d Hd Hm.
     apply (Trans _ (0/%d));last apply ediv_Mle;smt.
     elim (ediv_unique 0 d 0 0 _ _ _) => //;smt.
@@ -117,7 +117,7 @@ theory Power.
     op "power" as "^".
 
   lemma Power_pos (x n:int): 0 <= n => 0 < x => 0 < x ^ n.
-  proof.
+  proof -strict.
   by intros n_pos x_pos; elim/Induction.induction n=> //; smt.
   qed.
 end Power.
@@ -125,7 +125,7 @@ export Power.
 
 lemma mulMle : forall (x1 x2 y1 y2:int),
    0 <= x1 <= x2 => 0 <= y1 <= y2 => x1 * y1 <= x2 * y2.
-proof.
+proof -strict.
  intros x1 x2 y1 y2 Hx Hy.
  apply (Trans _ (x1 * y2)).
  rewrite ?(Comm.Comm x1) CompatOrderMult; smt.

@@ -9,7 +9,7 @@ module type Adv (O1:O) = {
 lemma test : forall (O2<:O) (A<:Adv{O2}),
   equiv [A(O2).g ~ A(O2).g : (glob O2){1} = (glob O2){2} /\  (glob A){1} = (glob A){2} ==> 
                         (glob O2){1} = (glob O2){2} /\  (glob A){1} = (glob A){2}].
-proof.
+proof -strict.
 intros O2 A.
 proc ((glob O2){1} = (glob O2){2});try progress.
 (*

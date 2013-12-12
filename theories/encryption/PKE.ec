@@ -173,7 +173,7 @@ section.
     Pr[CPAR(S,B(S,A)).main() @ &m : res /\ H.LRB.l <= H.q /\ K.c <= 1] =
     1%r/H.q%r * (Pr[CPAL(S,A).main() @ &m : res /\ K.c <= H.q] -
                  Pr[CPAR(S,A).main() @ &m : res /\ K.c <= H.q]).
-  proof.
+  proof -strict.
     intros Hq.
     cut -> : Pr[CPAL(S, A).main() @ &m : res /\ K.c <= H.q] =
              Pr[INDL(ToOrcl(S),ToAdv(A)).main() @ &m : res /\ H.C.c <= H.q].

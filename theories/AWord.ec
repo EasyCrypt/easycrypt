@@ -42,7 +42,7 @@ axiom from_to i: to_int (from_int i) = i %% 2^length.
 lemma from_to_bound i:
    0 <= i < 2^length =>
    to_int (from_int i) = i.
-proof.
+proof -strict.
  rewrite from_to.
  intros H.
  elim (EuclDiv.ediv_unique i (2^length) 0 i _ _ _) => //;first 2 smt.
@@ -58,13 +58,13 @@ theory Dword.
   axiom lossless: weight dword = 1%r.
 
   lemma in_supp_def w: in_supp w dword.
-  proof.
+  proof -strict.
   by rewrite /in_supp mu_x_def; smt.
   qed.
 
   lemma mu_cpMemw X:
     mu dword (cpMem X) = (card X)%r / (2^length)%r.
-  proof.
+  proof -strict.
   by rewrite (mu_cpMem _ _ (1%r/(2^length)%r))=> // x;
      rewrite mu_x_def.
   qed.
@@ -73,7 +73,7 @@ theory Dword.
   lemma lossless_restrw X:
     card X < 2^length =>
     weight (dword \ X) = 1%r.
-  proof.
+  proof -strict.
   intros=> card_X; rewrite lossless_restr ?lossless // ?mu_cpMemw;
   cut <-: (forall x y, x * (1%r / y) = x / y) by smt;
   apply (real_lt_trans _ ((2^length)%r* (1%r/(2^length)%r)) _); last smt.

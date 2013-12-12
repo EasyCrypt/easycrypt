@@ -33,7 +33,7 @@ module M2 = {
 lemma foo : 
   equiv [M1.g ~ M2.g : M1.z{1}=M2.z{2} /\ M1.y{1} = M2.y{2} /\ x{1} = w{2} 
         ==> res{1} = res{2} /\ M1.z{1} = M2.z{2} /\ M1.y{1} = M2.y{2}].
-proof.
+proof -strict.
   proc.
   call (_ : x{1}=w{2} ==> res{1} = res{2} /\ M1.y{1} = M2.y{2}).
     proc;wp;skip.
@@ -59,7 +59,7 @@ module M(A:Adv) = {
 }.
 
 lemma foo1 : forall (A<:Adv {M}), hoare [M(A).g : true ==> true].
-proof.
+proof -strict.
 intros A.
 proc.
 call (_ : true ==> true).

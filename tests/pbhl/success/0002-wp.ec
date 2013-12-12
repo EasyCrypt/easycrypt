@@ -56,7 +56,7 @@ module M3 = {
 }.
 
 lemma test3: phoare [ M3.f : true ==> res=b] >= 1%r. 
-proof.
+proof -strict.
 proc.
 wp.
 rnd (fun x, true) .

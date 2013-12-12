@@ -12,7 +12,7 @@ axiom set_ext: forall (X1 X2:'a set), X1 == X2 => X1 = X2.
 
 op single:'a -> 'a set.
 (* These definitions do not matter for the bug,
-   but are good for finishing the proof. *)
+   but are good for finishing the proof -strict. *)
 (*
 axiom mem_single_eq: forall (x:'a),
   mem x (single x).

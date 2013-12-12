@@ -31,7 +31,7 @@ module M = {
 }.
 
 equiv f1_f2 : M.f1 ~ M.f2 : ={M.m,x} ==> ={M.m}.
-proof.
+proof -strict.
  proc.
  sp.
  transitivity{1} 

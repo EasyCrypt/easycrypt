@@ -12,6 +12,6 @@ module M = {
 }.
 
 lemma L : equiv[M.f ~ M.f : true ==> res{1} = 0].
-proof.
+proof -strict.
   proc; kill {1} 2; admit.
 qed.

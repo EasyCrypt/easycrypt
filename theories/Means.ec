@@ -104,7 +104,7 @@ theory Mean.
      let sup = Finite.toFSet (create (support d)) in
      Pr[Rand(A).randAndWork()@ &m: ev (fst res) (glob A) (snd res)] =
        r * Mrplus.sum (fun (v:input), Pr[A.work(v)@ &m:ev v (glob A) res]) sup.
-  proof.
+  proof -strict.
     intros Hd Hfin /=.
     cut := Mean A &m ev => /= -> //.
     cut := Mrplus.sum_comp (( * ) r) (fun (v:input), Pr[A.work(v)@ &m:ev v (glob A) res]) => /= <-.
@@ -346,7 +346,7 @@ theory Hybrid.
       Pr[GE0(A,E).main() @ &m : p (glob A) (glob E) C.c res] =
       Pr[GL(BLR(A),E).main() @ &m : p (glob A) (glob E) C.c res] -
       Pr[GR(BLR(A),E).main() @ &m : p (glob A) (glob E) C.c res].
-    proof.
+    proof -strict.
       congr;first by equiv_deno GE0_GR.
       by equiv_deno GE_GL.
     qed.

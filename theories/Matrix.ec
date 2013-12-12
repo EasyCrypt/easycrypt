@@ -90,7 +90,7 @@ lemma write_sub: forall (M M':'a matrix) i j,
   0 <= i => i + fst (size M') <= fst (size M) =>
   0 <= j => j + snd (size M') <= snd (size M) =>
   sub (write M (i,j) M' (0,0) (size M')) (i,j) (size M') = M'.
-proof.
+proof -strict.
 intros M M' i j i_0 i_bound j_0 j_bound.
 apply extensionality; rewrite /(==);
 pose m := fst (size M'); pose n := snd (size M'); cut ->: size M' = (m,n); first smt.
@@ -112,7 +112,7 @@ axiom transpose_get: forall (M:'a matrix) i j,
 
 lemma transpose_idempotent: forall (M:'a matrix),
   transpose (transpose M) = M.
-proof.
+proof -strict.
 intros M; apply extensionality.
 cut ext: (size (transpose (transpose M)) = size M /\
           forall i j, 0 <= i => i < fst (size M) => 0 <= j => j < snd (size M) =>
@@ -162,7 +162,7 @@ axiom column_get: forall (M:'a matrix) i j,
 lemma column_transpose_row: forall (M:'a matrix) i,
   0 <= i => i < snd (size M) =>
   row M i = column (transpose M) i.
-proof.
+proof -strict.
 intros M i i_0 i_bound; apply Array.array_ext.
 cut ext_eq: (Array.length (row M i) = fst (size M) /\
              Array.length (column (transpose M) i) = fst (size M) /\

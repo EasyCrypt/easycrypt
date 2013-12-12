@@ -11,7 +11,7 @@ module G0 = {
 
 (* Should not be provable *)
 equiv minimal : G0.f ~ G0.f : true ==> res{1} < res{2}.
-proof.
+proof -strict.
  proc.
  rnd (fun z, z-1) , (fun z, z+1).
  skip. 

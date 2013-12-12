@@ -3,7 +3,7 @@ module M = {
 }.
 
 equiv foo1 : M.f ~ M.f : x{1} = x{1} ==> res{1} = res{1}.
-proof.
+proof -strict.
  conseq (_ : x{1} = x{1} ==> res{1} = res{1}).
  conseq (_ : _ ==> true /\ res{1} = res{1}).
  conseq (_ : ==> true /\ res{1} = res{1}).
@@ -13,7 +13,7 @@ proof.
 qed.
 
 equiv foo2 : M.f ~ M.f : x{1} = x{1} ==> res{1} = res{1}.
-proof.
+proof -strict.
  proc.
  conseq (_ : x{1} = x{1} ==> x{1} = x{1}).
  conseq (_ : _ ==> true /\ x{1} = x{1}).

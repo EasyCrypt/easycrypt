@@ -19,7 +19,7 @@ module G4 = {
 
 (* Should not be provable *)
 equiv equality : G3.f ~ G4.f : true ==> true.
-proof.
+proof -strict.
  proc.
  rnd.
  skip.

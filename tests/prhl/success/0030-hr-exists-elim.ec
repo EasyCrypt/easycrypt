@@ -21,7 +21,7 @@ lemma X_f :
   equiv[X.f ~ X.f :
         x{1} <= y /\ ={x} ==>
         res{1} < y /\ ={res}].
-proof.
+proof -strict.
 intros y.
 proc; skip; smt.
 qed.
@@ -30,7 +30,7 @@ lemma X_main :
   equiv[X.main ~ X.main :
         ={y} ==>
         ={res} /\ res{1}].
-proof.
+proof -strict.
  proc.
  exists * y{1}.
  elim *.

@@ -88,7 +88,7 @@ islossless O2.f =>
 I (glob O1){m} (glob O2){m} =>
 Pr [Experiment(O1, Adv).main() @ &m : P res] <=
 Pr [Experiment(O2, Adv).main() @ &m : P res]  + qO%r * p.
-proof.
+proof -strict.
 intros => O1 O2 Adv I P m g hg hbnd hinint hinit2 hf hf2 hbound_bad hll1 hll2 hlladv hIm.
 apply (Real.Trans _ 
 (Pr [Experiment(O2, Adv).main() @ &m : P res \/ (Experiment.WO.bad /\

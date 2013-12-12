@@ -5,7 +5,7 @@ module M = {
 }.
 
 lemma t1 &m : Pr[M.f() @ &m : !res] = Pr[M.f() @ &m : true] - Pr[M.f() @ &m : res].
-proof.
+proof -strict.
  rewrite Pr mu_not.
  trivial.
 qed.

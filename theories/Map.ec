@@ -181,7 +181,7 @@ by [].
 lemma find_in_p : forall (p:'a -> 'b cpred) (m:('a,'b) map),
   forall x, in_dom x m => p x (proj m.[x]) =>
   (exists x, find p m = Some x /\ in_dom x m /\ p x (proj m.[x])).
-proof.
+proof -strict.
  intros => p m x Hindom Hproj.
  elim (find_in p m _);first by exists x.
  intros x' Hfind.
@@ -192,7 +192,7 @@ lemma find_in_p_unique : forall (p:'a -> 'b cpred) (m:('a,'b) map),
   forall x, in_dom x m => p x (proj m.[x]) =>
   (forall x y, (p x (proj m.[x])) => (p y (proj m.[y])) => x = y) =>
   find p m = Some x.
-proof.
+proof -strict.
  intros => p m x Hindom Hproj Hp.
  elim (find_in_p p m x _ _) => // x' [->][_] Hp'.
  by rewrite (Hp x' x) => //.

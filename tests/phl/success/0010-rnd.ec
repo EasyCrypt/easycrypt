@@ -11,6 +11,6 @@ module G = {
 
 lemma G_in_range:
   hoare [ G.f : true ==> 0 <= res /\ res <= 10 ].
-proof.
+proof -strict.
 proc;rnd;skip;smt.
 qed.

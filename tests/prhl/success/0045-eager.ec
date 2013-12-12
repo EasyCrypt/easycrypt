@@ -63,7 +63,7 @@ section.
   weight dsample = 1%r => 
   equiv [G2.main ~ G1.main : ={glob A} ==>
                             ={glob A,res} /\ ROe.m{1} = ROM.RO.m{2} ].
- proof.
+ proof -strict.
   intros Hw;proc.
   inline ROM.RO.init ROe.init.
   seq 4 2 : (={glob A,x} /\ ROe.m{1} = ROM.RO.m{2} );first by sim. 

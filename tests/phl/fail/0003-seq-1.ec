@@ -8,6 +8,6 @@ module M = {
 }.
 
 lemma foo : hoare [M.f : true ==> res = 1 /\ M.y = 1 ].
-proof.
+proof -strict.
  proc.
  seq 10 : (M.y = x).

@@ -679,6 +679,11 @@ type toextract =
 type withextract = toextract * string 
 
 (* -------------------------------------------------------------------- *)
+type proofmode = {
+  pm_strict : bool;
+}
+
+(* -------------------------------------------------------------------- *)
 type global =
   | Gmodule      of ptopmodule
   | Gdeclare     of pdeclmodule
@@ -701,7 +706,7 @@ type global =
   | GsctOpen
   | GsctClose
   | Grealize     of pqsymbol
-  | Gtactics     of [`Proof of bool | `Actual of ptactic list]
+  | Gtactics     of [`Proof of proofmode | `Actual of ptactic list]
   | Gprover_info of pprover_infos
   | Gsave        of EcLocation.t
   | Gpragma      of psymbol

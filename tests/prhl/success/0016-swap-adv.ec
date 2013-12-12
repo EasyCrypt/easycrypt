@@ -25,7 +25,7 @@ return c = r;
 lemma test :
 forall (A<:T),
 equiv [M1(A).f ~ M2(A).f : true ==> res{1} = res{2}].
-proof.
+proof -strict.
 intros A.
 proc.
 swap{1} 1 1.

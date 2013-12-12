@@ -3,7 +3,7 @@ module M = {
 }.
 
 lemma foo : hoare [M.f : false ==> true].
-proof.
+proof -strict.
   conseq ( _: true ==> false).
   admit.
 qed.

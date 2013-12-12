@@ -68,7 +68,7 @@ qed.
 lemma sum_disj (f:'a -> t) (s1 s2:'a set) :
   disjoint s1 s2 =>
   sum f (union s1 s2) = sum f s1 + sum f s2.
-proof.
+proof -strict.
  elim /set_ind s1.
    by intros Hd;rewrite union0s sum_empty addmC addmZ.
  intros x s Hx Hrec Hd;rewrite union_add sum_add.
@@ -98,7 +98,7 @@ lemma sum_comp (f: t -> t) (g:'a -> t) (s: 'a set):
   (f Z = Z) =>
   (forall x y, f (x + y) = f x + f y) =>
   sum (fun a, f (g a)) s = f (sum g s).
-proof.
+proof -strict.
   intros Hz Ha;elimT set_ind s.
     by rewrite !sum_empty Hz.
   by intros {s} x s Hx Hr;rewrite sum_add // sum_add //= Hr Ha. 
@@ -161,20 +161,20 @@ op sum_ij (i j : int) (f:int -> t)  =
 
 lemma sum_ij_gt (i j:int) f : 
   i > j => sum_ij i j f = Z.
-proof.
+proof -strict.
  by intros Hlt;rewrite /sum_ij interval_neg // sum_empty.
 qed.
 
 lemma sum_ij_split (k i j:int) f:
   i <= k <= j + 1 => sum_ij i j f = sum_ij i (k-1) f + sum_ij k j f.
-proof. 
+proof -strict. 
   intros Hbound;rewrite /sum_ij -sum_disj.
     rewrite disjoint_spec=> x;rewrite !Interval.mem_interval;smt.
   congr=> //; apply set_ext=> x; rewrite mem_union; smt.
 qed.
 
 lemma sum_ij_eq i f: sum_ij i i f = f i.
-proof.
+proof -strict.
  rewrite /sum_ij Interval.interval_single sum_add;first apply mem_empty.
  rewrite sum_empty;apply addmZ.
 qed.
@@ -182,7 +182,7 @@ qed.
 lemma sum_ij_le_r (i j:int) f : 
    i <= j =>
    sum_ij i j f = sum_ij i (j-1) f + f j.
-proof.
+proof -strict.
   intros Hle;rewrite (sum_ij_split j); first by smt.
   by rewrite sum_ij_eq.
 qed.
@@ -190,7 +190,7 @@ qed.
 lemma sum_ij_le_l (i j:int) f : 
    i <= j =>
    sum_ij i j f = f i + sum_ij (i+1) j f.
-proof.
+proof -strict.
  intros Hle; rewrite (sum_ij_split (i+1));smt.
 qed.
 
@@ -261,7 +261,7 @@ theory Miplus.
   op sum_n i j = sum_ij i j (fun (n:int), n).
 
   lemma sum_n_0k (k:int) : 0 <= k => sum_n 0 k = (k*(k + 1))/%2.
-  proof.
+  proof -strict.
     rewrite /sum_n;elim /Int.Induction.induction k.
       rewrite sum_ij_eq => /=.
       by elim (ediv_unique 0 2 0 0 _ _ _) => //; smt.
@@ -288,7 +288,7 @@ theory Miplus.
 
  lemma nosmt sumn_ij_aux (i j:int) : i <= j =>
    sum_n i j = i*((j - i)+1) + sum_n 0 ((j - i)).
- proof.
+ proof -strict.
    intros Hle;rewrite {1} (_: j=i+(j-i));first smt.
    elim /Int.Induction.induction (j-i) => /=;last smt.
     rewrite !sum_n_ii //.
@@ -297,14 +297,14 @@ theory Miplus.
 
  lemma sumn_ij (i j:int) : i <= j =>
    sum_n i j = i*((j - i)+1) + (j-i)*(j-i+1)/%2.
- proof.
+ proof -strict.
    intros Hle; rewrite sumn_ij_aux //;smt.
  qed.
 
 import FSet.Interval.
 
  lemma sumn_pos (i j:int) : 0 <= i => 0 <= sum_n i j.
- proof.
+ proof -strict.
    case (i <= j) => Hle Hp.
      rewrite sumn_ij => //;smt.
    by rewrite /sum_n sum_ij_gt; first smt.
@@ -312,7 +312,7 @@ import FSet.Interval.
 
  lemma sumn_le (i j k:int) : i <= j =>  0 <= j => j <= k =>
    sum_n i j <= sum_n i k.    
- proof.
+ proof -strict.
    intros Hij H0j Hjk;rewrite /sum_n /sum_ij.
    cut -> :interval i k = FSet.union (interval i j) (interval (j+1) k).
      by apply FSet.set_ext => x;rewrite FSet.mem_union ?mem_interval;smt.
@@ -342,7 +342,7 @@ pred disj_or (X:('a->bool) set) =
 
 lemma or_exists (f:'a->bool) s:
   (Mbor.sum f s) <=> (exists x, (mem x s /\ f x)).
-proof.
+proof -strict.
   split;last by intros=> [x [x_in_s f_x]]; rewrite (Mbor.sum_rm _ _ x) // f_x.
   intros=> sum_true; pose p := fun x, mem x s /\ f x; change (exists x, p x);
     apply ex_for; delta p=> {p}; generalize sum_true; apply absurd=> /= h.
@@ -360,13 +360,13 @@ qed.
 pred cpOrs (X:('a cpred) set) (x:'a) = Mbor.sum (fun (P:'a cpred), P x) X.
 
 lemma cpOrs0 : cpOrs (empty <:'a cpred>) = cpFalse.
-proof.
+proof -strict.
   by apply fun_ext => y;rewrite /cpOrs Mbor.sum_empty.
 qed.
 
 lemma cpOrs_add s (p:'a cpred) : 
   cpOrs (FSet.add p s) = cpOr p (cpOrs s).
-proof.
+proof -strict.
   apply fun_ext => y.
   rewrite /cpOrs /cpOr /= !or_exists rw_eq_iff;split=> /=.
     intros [x ];rewrite FSet.mem_add => [ [ ] H H0];first by right;exists x.

@@ -16,6 +16,6 @@ module M = {
 }.
 
 lemma h : phoare[M.g : a = a ==> res = res] = 1%r.
-proof.
+proof -strict.
   proc; inline M.f. wp; skip; smt.
 qed.

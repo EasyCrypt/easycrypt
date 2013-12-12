@@ -71,7 +71,7 @@ lemma foo : forall (A<:Adv{RO,F1,F2}),
   equiv [F1(A).main ~ F2(A).main : 
      (glob A){1} = (glob A){2} /\ F1.xs{1} = F2.xs{2} ==> 
      (!mem F2.xs RO.logA){2} => res{1} = res{2}].
-proof.
+proof -strict.
   intros A Hlossless;proc.
   call (_ : mem F2.xs RO.logA ,
             (RO.logA{1} = RO.logA{2} /\ F1.xs{1} = F2.xs{2} /\

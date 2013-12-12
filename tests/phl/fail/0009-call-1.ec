@@ -11,6 +11,6 @@ module M = {
 
 lemma foo : 
   hoare [M.f : true ==> true].
-proof.
+proof -strict.
  proc.
  call ( _ : true ==> true). 

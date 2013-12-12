@@ -18,13 +18,13 @@ module OneSided = {
 }.
 
 lemma bar : hoare [OneSided.init: true ==> OneSided.x =  0].
-proof.
+proof -strict.
  proc; wp; skip; smt.
 qed.
 
 lemma main :
   equiv [OneSided.main ~ OneSided.main2: true ==> OneSided.x{1} = OneSided.x{2}].
-proof.
+proof -strict.
   proc; seq 1 0: (OneSided.x{1} = 0); last wp; skip; smt.
   call{1} (_ : true ==> OneSided.x = 0).
   apply bar.

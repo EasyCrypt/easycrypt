@@ -177,7 +177,7 @@ qed.
 
 lemma add_add_comm (a b:'a) s:
   add a (add b s) = add b (add a s).
-proof.
+proof -strict.
   apply set_ext => x.
   by rewrite !mem_add !orA (orC (x = b)).
 qed.
@@ -337,7 +337,7 @@ qed.
 op of_list (l:'a list) = List.fold_right add empty l.
 
 lemma of_list_nil : of_list [] = empty <:'a>.
-proof.
+proof -strict.
   by rewrite /of_list List.fold_right_nil.
 qed.
 
@@ -346,7 +346,7 @@ lemma of_list_cons (a:'a) l : of_list (a::l) = add a (of_list l).
 qed.
 
 lemma mem_of_list (x:'a) l : List.mem x l = mem x (of_list l).
-proof.
+proof -strict.
  rewrite /of_list;elimT list_ind l. 
    rewrite fold_right_nil;smt.
  intros {l} y xs;rewrite fold_right_cons;smt.
@@ -354,7 +354,7 @@ qed.
 
 lemma card_of_list (l:'a list) :
    card (of_list l) <= List.length l.
-proof.
+proof -strict.
   rewrite /of_list;elimT list_ind l.
    by rewrite fold_right_nil card_empty length_nil => //.
   intros => {l} x xs H; rewrite fold_right_cons length_cons.  
@@ -397,7 +397,7 @@ by apply set_ext=> x; rewrite mem_union orK.
 qed.
 
 lemma union_add (x:'a) s1 s2: union (add x s1) s2 = add x (union s1 s2).
-proof. 
+proof -strict. 
   apply set_ext => y;rewrite mem_add mem_union mem_add mem_union;smt.
 qed.
 
@@ -555,7 +555,7 @@ qed.
 
 lemma img_add (x:'a) s (f:'a -> 'b): 
    img f (add x s) = add (f x) (img f s).
-proof.
+proof -strict.
   apply set_ext => z.
   rewrite !img_def mem_add.
   split; [intros [w ] | intros [H | H]].
@@ -642,14 +642,14 @@ qed.
 
 lemma interval_single (i:int) :
    interval i i = add i empty.
-proof.
+proof -strict.
   rewrite interval_pos // interval_neg //; smt.
 qed.
 
 lemma interval_addl (i j : int) : 
     i <= j =>
     interval i j = add i (interval (i+1) j).  
-proof.
+proof -strict.
  intros Hle;cut -> : j = (j - i) + i;first smt.
  elim /Int.Induction.induction (j-i) => /=;last smt.
    by rewrite interval_single interval_neg //;first smt.
@@ -752,7 +752,7 @@ qed.
 lemma mu_Lmem_card (l:'a list) (d:'a distr) (bd:real):
   (forall (x : 'a), List.mem x l => mu_x d x = bd) =>
   mu d (fun x, List.mem x l) = (card (of_list l))%r * bd. 
-proof.  
+proof -strict.  
   intros Hmu; rewrite (mu_eq _ _ (cpMem (of_list l))). 
     by intros x;rewrite /cpMem => /=; apply mem_of_list.
   apply mu_cpMem => x. rewrite -mem_of_list;apply Hmu.
@@ -761,7 +761,7 @@ qed.
 lemma mu_Lmem_le_card (l:'a list) (d:'a distr) (bd:real):
   (forall (x : 'a), List.mem x l => mu_x d x <= bd) =>
   mu d (fun x, List.mem x l) <= (card (of_list l))%r * bd. 
-proof.  
+proof -strict.  
   intros Hmu; rewrite (mu_eq _ _ (cpMem (of_list l))). 
     by intros x;rewrite /cpMem => /=; apply mem_of_list.
   apply mu_cpMem_le => x. rewrite -mem_of_list;apply Hmu.
@@ -770,7 +770,7 @@ qed.
 lemma mu_Lmem_le_length (l:'a list) (d:'a distr) (bd:real):
   (forall (x : 'a), List.mem x l => mu_x d x <= bd) =>
   mu d (fun x, List.mem x l) <= (length l)%r * bd. 
-proof.
+proof -strict.
   elimT list_case l.
     intros _; rewrite length_nil (mu_eq _ _ (cpFalse)).
       by intros x; rewrite /cpFalse /= rw_neqF;apply mem_nil.

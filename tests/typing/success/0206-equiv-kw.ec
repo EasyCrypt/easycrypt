@@ -7,4 +7,4 @@ module G = {
 }.
 
 equiv L : G.f ~ G.f : (x{1} = y{1}) ==> (0 = res{1}).
-proof.
+proof -strict.

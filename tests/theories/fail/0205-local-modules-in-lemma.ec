@@ -9,6 +9,6 @@ theory T.
     }.
 
     lemma L : equiv[M.f ~ M.f : true ==> true].
-    proof. admit.
+    proof -strict. admit.
   end section.
 end T.

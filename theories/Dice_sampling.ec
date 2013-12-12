@@ -33,7 +33,7 @@ theory GenDice.
       weight (d i) = 1%r =>
       Pr[RsampleW.sample(i,dfl) @ &m : res = k] = 
          if test i k then 1%r/(card(sub_supp i))%r else 0%r.
-  proof.
+  proof -strict.
     intros i0 dfl0 k.
     pose bdt := (card(sub_supp i0))%r.
     cut bdt_pos: 0 <= card (sub_supp i0) by smt.
@@ -99,7 +99,7 @@ theory GenDice.
   axiom d'_uni : forall i x, in_supp x (d' i) => mu_x (d' i) x = 1%r/(card(sub_supp i))%r.
   
   lemma prSample : forall i k &m, Pr[Sample.sample(i) @ &m : res = k] = mu_x (d' i) k.
-  proof.
+  proof -strict.
     intros i0 k &m; phoare_deno (_: i0 = i ==> k = res) => //;proc.
     rnd;skip;progress.
     by apply (mu_eq (d' i{hr}) (fun (x:t'), k = x) ((=) k)).
@@ -112,7 +112,7 @@ theory GenDice.
        (forall rR, test i{2} rR => f (finv rR) = rR) /\
        (forall rL, in_supp rL (d' i{1}) => finv (f rL) = rL) ==>
        res{1} = finv res{2}.
-  proof.
+  proof -strict.
     bypr (res{1}) (finv res{2}) => //.      
     intros &m1 &m2 k [Heqi [Ht [Hw [Htin [Hffi Hfif]]]]].
     rewrite (_:Pr[RsampleW.sample(i{m2}, r{m2}) @ &m2 : k = finv res] = 

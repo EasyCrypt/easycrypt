@@ -15,7 +15,7 @@ module M = {
 }.
 
 lemma e : equiv[M.g ~ M.g : a{1} = a{2} ==> res{1} = res{2}].
-proof.
+proof -strict.
   proc.
   inline {1} M.f.
   inline {2} M.f.

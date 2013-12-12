@@ -18,7 +18,7 @@ module M = {
 
 lemma foo_side : 
   equiv [M.f ~ M.f : b{1} = b{2} ==> M.x{1}=M.x{2} ].
-proof.
+proof -strict.
  proc.
  if {1}.
  if {2}.
@@ -31,7 +31,7 @@ qed.
 
 lemma foo : 
   equiv [M.f ~ M.f : b{1} = b{2} ==> M.x{1}=M.x{2} ].
-proof.
+proof -strict.
  proc.
  if.
  intros &m1 &m2 Heq;rewrite Heq;simplify;smt.

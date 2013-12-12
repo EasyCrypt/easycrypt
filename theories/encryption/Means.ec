@@ -103,7 +103,7 @@ lemma Mean_uni (A<:Worker) &m (ev:input -> glob A -> output -> bool) r:
    let sup = Finite.toFSet (create (support d)) in
    Pr[Rand(A).main()@ &m: ev (fst res) (glob A) (snd res)] =
      r * Mrplus.sum (fun (v:input), Pr[A.work(v)@ &m:ev v (glob A) res]) sup.
-proof.
+proof -strict.
   intros Hd Hfin /=.
   cut := Mean A &m ev => /= -> //.
   cut := Mrplus.sum_comp (( * ) r) (fun (v:input), Pr[A.work(v)@ &m:ev v (glob A) res]) => /= <-.

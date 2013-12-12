@@ -280,8 +280,8 @@ and process_tactics (scope : EcScope.scope) t =
   let mode = if (!pragma.pm_check) then `Check else `WeakCheck in
 
   match t with
-  | `Actual t -> EcScope.Tactics.process scope mode t
-  | `Proof  b -> EcScope.Tactics.proof   scope mode b
+  | `Actual t  -> EcScope.Tactics.process scope mode t
+  | `Proof  pm -> EcScope.Tactics.proof   scope mode pm.pm_strict
 
 (* -------------------------------------------------------------------- *)
 and process_save (scope : EcScope.scope) loc =

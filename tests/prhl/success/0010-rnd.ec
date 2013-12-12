@@ -15,7 +15,7 @@ module G = {
 
 
 equiv test : G.f ~ G.f : true ==> res{1}=res{2}.
-proof.
+proof -strict.
 proc.
 rnd.
 skip.
@@ -35,7 +35,7 @@ module G' = {
 
 (* /\ and && are not compatible??? *)
 equiv test' : G'.f ~ G'.f : true ==> 0 <= res{1} /\ res{1} <= 10.
-proof.
+proof -strict.
 proc.
 rnd; skip; smt.
 qed.
@@ -60,7 +60,7 @@ module G4 = {
 }.
 
 equiv different : G3.f ~ G4.f : true ==> G3.z{1} + 1 = G4.z{2}.
-proof.
+proof -strict.
  proc.
  rnd (fun z, z + 1) (fun z, z - 1).
  skip.
@@ -117,7 +117,7 @@ axiom aux_test_wp : forall x, in_supp x (dinter a b) =>
 mu_x (dinter a b) x = mu_x (dinter c d) (f x).
 
 equiv test_wp : G5.f ~ G6.f : true ==> Q(G5.z{1},G6.z{2}).
-proof.
+proof -strict.
  proc.
  rnd (fun x, f x) (fun x, finv x).
  skip.
@@ -129,7 +129,7 @@ qed.
 equiv test_sp : G5.f ~ G6.f : Q(G5.z{1},G6.z{2}) ==>
  G6.z{2} = f(G5.z{1}) && a <= G5.z{1} && G5.z{1} <= b && c <= G6.z{2} && G6.z{2} <= d &&
  exists (u v:int), Q(u, v).
-proof.
+proof -strict.
  proc.
  rnd (fun x, f x) (fun x, finv x ).
  skip.
@@ -149,7 +149,7 @@ module M = {
 
 lemma M_in_range:
   equiv [ M.f ~ M.f : true ==> 0 <= res{1} /\ res{2} <= 10 ].
-proof.
+proof -strict.
 proc.
  rnd{1}.
  rnd{2}.

@@ -67,7 +67,7 @@ qed.
 
 lemma congr_fun_app : forall (f g : 'a -> 'b) (x y : 'a),
   f == g => x = y => f x = g y.
-proof.
+proof -strict.
  intros => f g x y heqf ->.
  by rewrite (fun_ext f g _).
 qed.

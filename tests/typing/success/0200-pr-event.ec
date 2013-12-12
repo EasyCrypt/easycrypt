@@ -10,4 +10,4 @@ module G = {
 }.
 
 lemma L : forall &m, Pr[G.f(0, 0) @ &m : 0 = res] = c.
-proof. admit. qed.
+proof -strict. admit. qed.

@@ -8,7 +8,7 @@ module M = {
 lemma foo1 : forall &m1 &m2, 
   M.n{m1} = M.n{m2} => 
   (glob M){m1} = (glob M){m2}. 
-proof.
+proof -strict.
  intros &m1 &m2 H;simplify.
  smt.
 qed.
@@ -25,7 +25,7 @@ module Adv(A:Adv) = {
 lemma foo : forall z &hr,
   Adv.n{hr} + Adv.q{hr} - Adv.g{hr} = z =>
   Adv.n{hr} + Adv.q{hr} = z + Adv.g{hr}.
-proof.
+proof -strict.
 prover "Alt-Ergo".
 smt.
 qed.

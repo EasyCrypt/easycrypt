@@ -242,7 +242,7 @@ section.
                                   C.c <= q] - 
          Pr[INDR(O,A).main() @ &m :  res /\ p (glob A) (glob O) C.c /\
                                   C.c <= q]).
-  proof.
+  proof -strict.
     cut := Hybrid (Orcl2(O)) A' _ _ _ _ _ &m (fun ga go c b, b /\ p ga go c).
       by proc;call losslessL.
       by proc;call losslessO.

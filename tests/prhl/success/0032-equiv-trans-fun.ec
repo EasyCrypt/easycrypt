@@ -36,7 +36,7 @@ module M1' = {
 }.
 
 equiv foo : M.f ~ M'.f : M.w{1} = M'.w{2} + 1 ==> ={res}.
-proof.
+proof -strict.
   transitivity M1.f (={M.w} ==>  ={M.w,res}) 
                     (M.w{1} = M'.w{2} + 1 ==> ={res}).
     intros &m1 &m2 H; exists M.w{m1} => //.
