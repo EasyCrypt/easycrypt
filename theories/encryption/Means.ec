@@ -89,11 +89,11 @@ elim/set_ind (Finite.toFSet (create (support d))).
                (ev x (glob A) (snd res) /\ x = fst res) \/
                cpOrs (img (fun (v : input) (r : input * output),
                              ev v (glob A){hr} (snd r) /\ v = fst r) s) res].
-    rewrite Pr mu_eq => // &m1.
+    rewrite Pr[mu_eq] => // &m1.
     pose f:= (fun (v : input) (r : input * output),
                 ev v (glob A){m1} (snd r) /\ v = fst r).
     by rewrite img_add cpOrs_add; smt.
-  rewrite Pr mu_disjoint; first by smt.
+  rewrite Pr[mu_disjoint]; first by smt.
   by rewrite Hrec (prCond A &m x ev).
 qed.
 

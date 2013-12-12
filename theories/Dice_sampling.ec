@@ -125,7 +125,7 @@ theory GenDice.
       by rewrite Hfif // Htin Heqi.
     rewrite (_:Pr[Sample.sample(i{m1}) @ &m1 : k = res] = 
                Pr[Sample.sample(i{m1}) @ &m1 : res = k]). 
-      by rewrite Pr mu_eq.
+      by rewrite Pr[mu_eq].
     rewrite (prSample i{m1} k &m1) (prRsampleW i{m2} r{m2} (f k) &m2) => //.   
     case (test i{m2} (f k)).
       by rewrite -Heqi -Htin; apply d'_uni.

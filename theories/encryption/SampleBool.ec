@@ -49,14 +49,14 @@ proof strict.
   cut Hd: 2%r <> Real.zero by smt.
   cut -> : Pr[A.work(true) @ &m : true = res /\ p (glob A)] = 
            Pr[A.work(true) @ &m : res /\ p (glob A)].
-    by rewrite Pr mu_eq;smt.
+    by rewrite Pr[mu_eq];smt.
   cut -> : Pr[A.work(false) @ &m : false = res /\ p (glob A)] = 
            Pr[A.work(false) @ &m : !res /\ p (glob A)].
-    by rewrite Pr mu_eq;smt.       
+    by rewrite Pr[mu_eq];smt.       
   cut -> : Pr[A.work(false) @ &m : p (glob A)] = 
            Pr[A.work(false) @ &m : (!res /\ p (glob A)) \/ (res /\ p (glob A))].
-    by rewrite Pr mu_eq;smt.
-  rewrite Pr mu_disjoint;first smt.
+    by rewrite Pr[mu_eq];smt.
+  rewrite Pr[mu_disjoint];first smt.
   by fieldeq.
 qed.
 

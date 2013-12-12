@@ -519,7 +519,7 @@ let rec process_rewrite1 loc ri g =
         end
   end
 
-  | RWRw (s, r, o, l) ->
+  | RWRw (s, r, o, l) -> begin
       let do1 pe g =
         let hyps = get_hyps g in
         let (p, typs, ue, ax) =
@@ -531,6 +531,9 @@ let rec process_rewrite1 loc ri g =
         match r with
         | None -> doall g
         | Some (b, n) -> t_do b n doall g
+    end
+
+  | RWPr x -> EcPhlPrRw.t_pr_rewrite (unloc x) g
 
 (* -------------------------------------------------------------------- *)
 let process_rewrite loc ri (juc, n) =

@@ -122,7 +122,7 @@ apply (Real.Trans _
 Pr [Experiment(O2, Adv).main() @ &m : 
              Experiment.WO.bad /\ Experiment.WO.cO <= qO /\ 
              Experiment.WO.cO = m (glob O2){hr}]) _).
-rewrite Pr mu_or.
+rewrite Pr[mu_or].
 apply (_ : forall (p q r : real), 0%r <= r => p + q - r <= p + q); 
  intros {g hg hbnd hbound_bad}; smt.
 apply (_ : forall (a b c : real), b <= c => a + b <= a + c); 

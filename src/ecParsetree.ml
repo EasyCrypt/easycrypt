@@ -431,7 +431,6 @@ type phltactic =
   | Pfel          of int * (pformula * pformula * pformula * pformula * pfel_spec_preds * pformula option)
   | Phoare
   | Pprbounded
-  | Ppr_rewrite    of symbol
   | Psim           of (pformula_o * pformula_o * pformula_o)
   | Ptrans_stmt    of trans_info
   | Psymmetry
@@ -462,6 +461,7 @@ type rwarg = (tfocus located) option * rwarg1
 and rwarg1 =
   | RWDelta of (rwside * rwocc * pformula)
   | RWRw    of (rwside * trepeat option * rwocc * ffpattern list)
+  | RWPr    of psymbol
   | RWDone  of bool
   | RWSimpl
 

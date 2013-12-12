@@ -146,7 +146,6 @@
 %token AUTO
 %token AXIOM
 %token BACKS
-%token BDEQ
 %token BETA 
 %token BY
 %token BYEQUIV
@@ -1704,6 +1703,9 @@ rwarg1:
        if r <> None then
          parse_error loc (Some "delta-repeat not supported");
        RWDelta (s, o |> omap EcMaps.Sint.of_list, x); }
+
+| PR s=bracket(ident)
+   { RWPr s }
 ;
 
 rwarg:
@@ -2110,7 +2112,6 @@ phltactic:
 (* basic pr based tacs *)
 | HOARE {Phoare}
 | PRBOUNDED {Pprbounded}
-| REWRITE PR s=LIDENT {Ppr_rewrite s}
 | PHOARE SPLIT i=bdhoare_split { Pbdhoare_split i }
 | PHOARE EQUIV s=side pr=sform po=sform { Pbd_equiv(s,pr,po) } 
 ;

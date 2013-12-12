@@ -104,7 +104,6 @@
     "cfold"       , CFOLD      ;        (* KW: tactic *)
     "rnd"         , RND        ;        (* KW: tactic *)
     "pr_bounded"  , PRBOUNDED  ;        (* KW: tactic *)
-    "bd_eq"       , BDEQ       ;        (* KW: tactic *)
     "bypr"        , BYPR       ;        (* KW: tactic *)
     "byphoare"    , BYPHOARE   ;        (* KW: tactic *)
     "byequiv"     , BYEQUIV    ;        (* KW: tactic *)
