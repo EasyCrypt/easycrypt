@@ -918,7 +918,7 @@ module Op = struct
           let env     = scope.sc_env in
           let codom   = TT.transty tp env ue pty in 
           let env, xs = TT.transbinding env ue bd in
-          let body    = TT.transexpcast env ue codom pe in
+          let body    = TT.transexpcast env `InOp ue codom pe in
           let lam     = EcTypes.e_lam xs body in
             (lam.EcTypes.e_ty, `Plain lam)
 
@@ -1019,7 +1019,7 @@ module Op = struct
                     EcEnv.Var.bind_locals pvars env)
                     env ptns
                 in
-                    (ptns, TT.transexpcast env ue codom body)
+                    (ptns, TT.transexpcast env `InOp ue codom body)
               in
                 List.map trans_b pbsmap
             in

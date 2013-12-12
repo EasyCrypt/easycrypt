@@ -407,7 +407,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
                   let env     = scenv in
                   let codom   = EcTyping.transty tp env ue opov.opov_retty in 
                   let env, xs = EcTyping.transbinding env ue opov.opov_args in
-                  let body    = EcTyping.transexpcast env ue codom opov.opov_body in
+                  let body    = EcTyping.transexpcast env `InOp ue codom opov.opov_body in
                   let lam     = EcTypes.e_lam xs body in
                     (lam.EcTypes.e_ty, lam)
                 in

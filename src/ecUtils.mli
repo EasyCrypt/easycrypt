@@ -22,6 +22,9 @@ val (<|) : ('a -> 'b) -> 'a -> 'b
 val curry   : ('a1 -> 'a2 -> 'b) -> 'a1 * 'a2 -> 'b
 val uncurry : ('a1 * 'a2 -> 'b) -> 'a1 -> 'a2 -> 'b
 
+val curry3   : ('a1 -> 'a2 -> 'a3 -> 'b) -> 'a1 * 'a2 * 'a3 -> 'b
+val uncurry3 : ('a1 * 'a2 * 'a3 -> 'b) -> 'a1 -> 'a2 -> 'a3 -> 'b
+
 (* -------------------------------------------------------------------- *)
 val clamp : min:int -> max:int -> int -> int
 
@@ -43,6 +46,7 @@ type 'a tuple6 = 'a * 'a * 'a * 'a * 'a * 'a
 type 'a tuple7 = 'a * 'a * 'a * 'a * 'a * 'a * 'a
 type 'a tuple8 = 'a * 'a * 'a * 'a * 'a * 'a * 'a * 'a
 type 'a tuple9 = 'a * 'a * 'a * 'a * 'a * 'a * 'a * 'a * 'a
+type 'a pair   = 'a tuple2
 
 (* -------------------------------------------------------------------- *)
 val as_seq0 : 'a list -> 'a tuple0
@@ -59,6 +63,11 @@ val int_of_bool : bool -> int
 val proj3_1 : 'a * 'b * 'c -> 'a
 val proj3_2 : 'a * 'b * 'c -> 'b
 val proj3_3 : 'a * 'b * 'c -> 'c
+
+val proj4_1 : 'a * 'b * 'c * 'd -> 'a
+val proj4_2 : 'a * 'b * 'c * 'd -> 'b
+val proj4_3 : 'a * 'b * 'c * 'd -> 'c
+val proj4_4 : 'a * 'b * 'c * 'd -> 'd
 
 val fst_map : ('a -> 'c) -> 'a * 'b -> 'c * 'b
 val snd_map : ('b -> 'c) -> 'a * 'b -> 'a * 'c
