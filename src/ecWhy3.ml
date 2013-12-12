@@ -1255,11 +1255,7 @@ let bool_of_prop t =
   | _ ->
       Term.t_if t Term.t_bool_true Term.t_bool_false
 
-let force_bool t =
-  if t.Term.t_ty = None then bool_of_prop t
-  else t
-
-
+let force_bool t = if t.Term.t_ty = None then bool_of_prop t else t
 
 let mk_not args  =
   match args with
@@ -1662,17 +1658,13 @@ let trans_oper_body env path wparams ty body =
         in
 
         let ptns = List.rev ptns in
-        let ptns =
-          if   List.exists (fun (_, e) -> e.Term.t_ty = None) ptns
-          then List.map (fun (p, e) -> (p, force_prop e)) ptns
-          else ptns in
         let ptns = List.map (fun (p, e) -> Term.t_close_branch p e) ptns in
-        let body =
+        let mtch =
           if   ptermc > 1
           then Term.t_tuple (List.map Term.t_var pterm)
           else Term.t_var (oget (List.ohead pterm)) in
-        let body = Term.t_case body ptns in
-
+        let body = Term.t_case mtch ptns in
+        let body = if body.Term.t_ty = None then force_bool body else body in
           ({ env with env_op = ops; }, rb, ls, Some (vs, body))
 
 let trans_oper env path op =
