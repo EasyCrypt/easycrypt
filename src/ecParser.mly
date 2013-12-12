@@ -2267,6 +2267,7 @@ proof:
 ;
 
 proofmode1:
+| b=boption(MINUS) pm=loc(proofmodename) { (pm, not b) }
 ;
 
 proofmodename:
