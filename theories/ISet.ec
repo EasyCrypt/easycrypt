@@ -187,18 +187,18 @@ lemma inter1s (X:'a set):
 by (apply set_ext; smt).
 
 (** all *)
-op all:'a cpred -> 'a set -> bool.
-axiom all_def (p:'a cpred) X:
+op all:('a -> bool) -> 'a set -> bool.
+axiom all_def (p:('a -> bool)) X:
   all p X <=> (forall x, mem x X => p x).
 
 (** any *)
-op any:'a cpred -> 'a set -> bool.
-axiom any_def (p:'a cpred) X:
+op any:('a -> bool) -> 'a set -> bool.
+axiom any_def (p:('a -> bool)) X:
   any p X <=> (exists x, mem x X /\ p x).
 
 (** filter *)
-op filter:'a cpred -> 'a set -> 'a set.
-axiom mem_filter x (p:'a cpred) X:
+op filter:('a -> bool) -> 'a set -> 'a set.
+axiom mem_filter x (p:('a -> bool)) X:
   mem x (filter p X) <=> (mem x X /\ p x).
 
 lemma filter_cpTrue (X:'a set):
@@ -209,7 +209,7 @@ lemma filter_cpEq_in (x:'a) X:
   mem x X => filter ((=) x) X = single x
 by (intros=> x_in_X; apply set_ext; smt).
 
-lemma leq_filter (p:'a cpred) X:
+lemma leq_filter (p:('a -> bool)) X:
   filter p X <= X
 by [].
 
@@ -228,12 +228,12 @@ by apply set_ext=> a;
 qed.
 
 (** create *)
-op create: 'a cpred -> 'a set.
+op create: ('a -> bool) -> 'a set.
 
 axiom mem_create (x:'a) p:
   mem x (create p) <=> p x.
 
-lemma create_def (p:'a cpred):
+lemma create_def (p:('a -> bool)):
   create p = filter p univ.
 proof strict.
 by apply set_ext=> x;

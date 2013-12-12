@@ -3,7 +3,7 @@ require export Fun.
 require import Int.
 require import Real.
 
-op charfun (p:'a cpred) (x:'a) : real = if p x then 1%r else 0%r.
+op charfun (p:('a -> bool)) (x:'a) : real = if p x then 1%r else 0%r.
 
 op mu_x (d:'a distr) x : real = mu d ((=) x).
 
@@ -23,12 +23,12 @@ pred (==)(d d':'a distr) =
   (forall x, mu_x d x = mu_x d' x).
 
 (** Axioms *)
-axiom mu_bounded (d:'a distr) (p:'a cpred):
+axiom mu_bounded (d:'a distr) (p:('a -> bool)):
   0%r <= mu d p /\ mu d p <= 1%r.
 
 axiom mu_false (d:'a distr): mu d cpFalse = 0%r.
 
-axiom mu_sub (d:'a distr) (p q:'a cpred):
+axiom mu_sub (d:'a distr) (p q:('a -> bool)):
   p <= q => mu d p <= mu d q.
 
 axiom mu_supp_in (d:'a distr) p:
@@ -38,18 +38,18 @@ axiom mu_supp_in (d:'a distr) p:
 axiom pw_eq (d d':'a distr):
   d == d' => d = d'.
 
-axiom mu_or (d:'a distr) (p q:'a cpred):
+axiom mu_or (d:'a distr) (p q:('a -> bool)):
   mu d (cpOr p q) = mu d p + mu d q - mu d (cpAnd p q).
 
-lemma nosmt mu_or_le (d:'a distr) (p q:'a cpred) r1 r2:
+lemma nosmt mu_or_le (d:'a distr) (p q:('a -> bool)) r1 r2:
   mu d p <= r1 => mu d q <= r2 =>
   mu d (cpOr p q) <= r1 + r2 by [].
 
-lemma nosmt mu_and  (d:'a distr) (p q:'a cpred):
+lemma nosmt mu_and  (d:'a distr) (p q:('a -> bool)):
   mu d (cpAnd p q) = mu d p + mu d q - mu d (cpOr p q)
 by [].
 
-lemma nosmt mu_and_le_l (d:'a distr) (p q:'a cpred) r:
+lemma nosmt mu_and_le_l (d:'a distr) (p q:('a -> bool)) r:
   mu d p <= r =>
   mu d (cpAnd p q) <= r.
 proof -strict.
@@ -57,7 +57,7 @@ proof -strict.
   by (apply mu_sub;rewrite /cpAnd => x //).
 qed.
 
-lemma nosmt mu_and_le_r (d:'a distr) (p q:'a cpred) r :
+lemma nosmt mu_and_le_r (d:'a distr) (p q:('a -> bool)) r :
   mu d q <= r => 
   mu d (cpAnd p q) <= r.
 proof -strict.
@@ -72,13 +72,13 @@ proof strict.
 by rewrite mu_supp_in.
 qed.
 
-lemma mu_eq (d:'a distr) (p q:'a cpred):
+lemma mu_eq (d:'a distr) (p q:('a -> bool)):
   p == q => mu d p = mu d q.
 proof -strict.
 by intros=> ext_p_q; congr=> //; apply fun_ext=> //.
 qed.
 
-lemma mu_disjoint (d:'a distr) (p q:'a cpred):
+lemma mu_disjoint (d:'a distr) (p q:('a -> bool)):
   (cpAnd p q <= cpFalse) =>
   mu d (cpOr p q) = mu d p + mu d q.
 proof strict.
@@ -87,30 +87,30 @@ cut inter_empty: cpAnd p q = cpFalse by apply leq_asym=> //;
 by rewrite mu_or inter_empty mu_false.
 qed.
 
-lemma mu_not (d:'a distr) (p:'a cpred):
+lemma mu_not (d:'a distr) (p:('a -> bool)):
   mu d (cpNot p) = mu d cpTrue - mu d p.
 proof strict.
 cut ->: (forall (x y z:real), x = y - z <=> x + z = y) by smt;
 by rewrite -mu_disjoint ?cpEM //; apply leq_refl; rewrite cpC.
 qed.
 
-lemma mu_split (d:'a distr) (p q:'a cpred):
+lemma mu_split (d:'a distr) (p q:('a -> bool)):
   mu d p = mu d (cpAnd p q) + mu d (cpAnd p (cpNot q)).
 proof strict.
 rewrite -mu_disjoint; first smt.
 by apply mu_eq; smt.
 qed.
 
-lemma mu_in_supp (p:'a cpred) (d:'a distr):
+lemma mu_in_supp (p:('a -> bool)) (d:'a distr):
   mu d p = mu d (cpAnd p (support d)).
 proof strict.
 apply Antisymm; last by apply mu_sub=> x; rewrite /cpAnd.
-by cut -> : (forall (p q:'a cpred), (cpAnd p q) = (cpNot (cpOr (cpNot p) (cpNot q))))
+by cut -> : (forall (p q:('a -> bool)), (cpAnd p q) = (cpNot (cpOr (cpNot p) (cpNot q))))
      by (intros=> p' q'; apply fun_ext; smt);
    rewrite mu_not mu_or !mu_not mu_supp; smt.
 qed.
 
-lemma mu_in_supp_sub (d:'a distr) (p q:'a cpred):
+lemma mu_in_supp_sub (d:'a distr) (p q:('a -> bool)):
   cpAnd p (support d) <= cpAnd q (support d) =>
   mu d p <= mu d q.
 proof strict.
@@ -118,7 +118,7 @@ by intros=> ple_p_q; rewrite (mu_in_supp p) (mu_in_supp q);
    apply mu_sub.
 qed.
 
-lemma mu_in_supp_eq (d:'a distr) (p q:'a cpred):
+lemma mu_in_supp_eq (d:'a distr) (p q:('a -> bool)):
   cpAnd p (support d) = cpAnd q (support d) =>
   mu d p = mu d q.
 proof strict.
@@ -131,7 +131,7 @@ lemma mu_weight_0 (d:'a distr):
   weight d = 0%r => forall p, mu d p = 0%r
 by [].
 
-lemma mu_one : forall (P : 'a Fun.cpred)(d : 'a distr),
+lemma mu_one : forall (P : ('a -> bool))(d : 'a distr),
   P == Fun.cpTrue => 
   weight d = 1%r =>
   mu d P = 1%r.
@@ -147,7 +147,7 @@ qed.
 theory Dempty.
   op dempty : 'a distr.
 
-  axiom mu_def (p:'a cpred): mu dempty p = 0%r.
+  axiom mu_def (p:('a -> bool)): mu dempty p = 0%r.
 
   lemma unique (d:'a distr):
     weight d = 0%r <=> d = dempty.
@@ -163,10 +163,10 @@ end Dempty.
 theory Dunit.
   op dunit : 'a -> 'a distr.
 
-  axiom mu_def_in x (p:'a cpred):
+  axiom mu_def_in x (p:('a -> bool)):
     p x => mu (dunit x) p = 1%r.
 
-  lemma mu_def_notin x (p:'a cpred):
+  lemma mu_def_notin x (p:('a -> bool)):
     !p x => mu (dunit x) p = 0%r
   by [].
  
@@ -238,11 +238,11 @@ theory Dscale.
 
   axiom mu_def_0 (d:'a distr):
     weight d = 0%r =>
-    forall (p:'a cpred), mu (dscale d) p = 0%r.
+    forall (p:('a -> bool)), mu (dscale d) p = 0%r.
 
   axiom mu_def_pos (d:'a distr):
     0%r < weight d =>
-    forall (p:'a cpred), mu (dscale d) p = mu d p / weight d.  
+    forall (p:('a -> bool)), mu (dscale d) p = mu d p / weight d.  
 
   lemma weight_0 (d:'a distr):
     weight d = 0%r => weight (dscale d) = 0%r

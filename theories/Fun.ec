@@ -15,51 +15,50 @@ lemma eqR (y:'a): (fun x, x = y) = (=) y
 by (apply fun_ext=> x //=; rewrite (rw_eq_sym x)).
 
 (** Computable predicates *)
-type 'a cpred = 'a -> bool.
-pred (<=) (p q:'a cpred) = forall (a:'a), p a => q a.
+pred (<=) (p q:('a -> bool)) = forall (a:'a), p a => q a.
 
-lemma nosmt leq_refl: forall (X Y:'a cpred), X = Y => X <= Y by [].
-lemma nosmt leq_asym: forall (X Y:'a cpred),
+lemma nosmt leq_refl: forall (X Y:('a -> bool)), X = Y => X <= Y by [].
+lemma nosmt leq_asym: forall (X Y:('a -> bool)),
   X <= Y => Y <= X => X = Y
 by (intros=> X Y X_leq_Y Y_leq_X; apply fun_ext; smt).
-lemma nosmt leq_tran: forall (X Y Z:'a cpred), X <= Y => Y <= Z => X <= Z by [].
+lemma nosmt leq_tran: forall (X Y Z:('a -> bool)), X <= Y => Y <= Z => X <= Z by [].
 
-pred (>=) (p q:'a cpred) = q <= p.
-pred (<)  (p q:'a cpred) = p <= q /\ p <> q.
-pred (>)  (p q:'a cpred) = p >= q /\ p <> q.
+pred (>=) (p q:('a -> bool)) = q <= p.
+pred (<)  (p q:('a -> bool)) = p <= q /\ p <> q.
+pred (>)  (p q:('a -> bool)) = p >= q /\ p <> q.
 
 (** Operators on predicates *)
 op cpTrue (x:'a) : bool = true.
 op cpFalse (x:'a) : bool = false.
 
-op cpNot(p:'a cpred, x:'a) : bool = !p x.
-op cpAnd(p q:'a cpred, x:'a) : bool = p x /\ q x.
-op cpOr(p q:'a cpred, x:'a) : bool = p x \/ q x.
+op cpNot(p:('a -> bool), x:'a) : bool = !p x.
+op cpAnd(p q:('a -> bool), x:'a) : bool = p x /\ q x.
+op cpOr(p q:('a -> bool), x:'a) : bool = p x \/ q x.
 
 (** Lemmas *)
 lemma cpTrue_true : forall (x:'a), cpTrue x by [].
 
-lemma cpTrue_def (p:'a cpred): (forall x, p x) => p = cpTrue.
+lemma cpTrue_def (p:('a -> bool)): (forall x, p x) => p = cpTrue.
 proof strict.
 by intros=> px; apply fun_ext=> x; rewrite px.
 qed.
 
 lemma cpFalse_false : forall (x:'a), !cpFalse x by [].
 
-lemma cpFalse_def (p:'a cpred): (forall x, !p x) => p = cpFalse
+lemma cpFalse_def (p:('a -> bool)): (forall x, !p x) => p = cpFalse
 by [].
 
-lemma cpNot_not : forall (p:'a cpred) x, cpNot p x <=> !p x by [].
+lemma cpNot_not : forall (p:('a -> bool)) x, cpNot p x <=> !p x by [].
 lemma cpAnd_and :
-  forall (p q:'a cpred) (x:'a), cpAnd p q x <=> (p x /\ q x) by [].
+  forall (p q:('a -> bool)) (x:'a), cpAnd p q x <=> (p x /\ q x) by [].
 lemma cpOr_or :
-  forall (p q:'a cpred) (x:'a), cpOr p q x <=> (p x \/ q x) by [].
+  forall (p q:('a -> bool)) (x:'a), cpOr p q x <=> (p x \/ q x) by [].
 
-lemma cpEM: forall (p: 'a cpred),
+lemma cpEM: forall (p: ('a -> bool)),
   cpOr (cpNot p) p = cpTrue
 by (intros p; apply fun_ext; smt).
 
-lemma cpC: forall (p: 'a cpred),
+lemma cpC: forall (p: ('a -> bool)),
   cpAnd (cpNot p) p = cpFalse.
 proof strict.
 intros=> p; apply fun_ext; smt.
