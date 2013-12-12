@@ -88,7 +88,7 @@ let wp_equiv_disj_rnd side g =
   prove_goal_by [concl] rn_hl_hoare_rnd g
 
 (* -------------------------------------------------------------------- *)
-let wp_equiv_rnd (f,finv) g =
+let wp_equiv_rnd bij g =
   let env,_,concl = get_goal_e g in
   let es = t_as_equivS concl in
   let (lvL,muL),(lvR,muR),sl',sr'= s_last_rnds "rnd" es.es_sl es.es_sr in
@@ -102,8 +102,15 @@ let wp_equiv_rnd (f,finv) g =
   let muL = EcFol.form_of_expr (EcMemory.memory es.es_ml) muL in
   let muR = EcFol.form_of_expr (EcMemory.memory es.es_mr) muR in
   (* *)
-  let tf = f tyL tyR in
-  let tfinv = finv tyR tyL in
+  let tf, tfinv =
+    match bij with
+    | Some (f, finv) -> (f tyL tyR, finv tyL tyR)
+    | None ->
+        if not (EcReduction.EqTest.for_type env tyL tyR) then
+          tacuerror "must give an explicit bijection when supports are incompatible";
+        (EcFol.f_identity ~name:"z" tyL, EcFol.f_identity ~name:"z" tyR)
+  in
+
   let f t = f_app tf  [t] tyR in
   let finv t = f_app tfinv [t] tyL in
   let supp_cond1 =  f_eq (f_mu_x muL x) (f_mu_x muR (f x)) in
@@ -120,23 +127,17 @@ let wp_equiv_rnd (f,finv) g =
   prove_goal_by [concl] (rn_hl_equiv_rnd (PTwoRndParams (tf, tfinv))) g
 
 (* -------------------------------------------------------------------- *)
-let t_equiv_rnd side bij_info =
+let t_equiv_rnd side bij_info g =
   match side with
-  | Some side -> wp_equiv_disj_rnd side
-  | None  ->
-    let f,finv =  match bij_info with
-      | Some f, Some finv ->  f, finv
-      | Some bij, None | None, Some bij -> bij, bij
-      | None, None ->
-        let z_id = EcIdent.create "z" in
-        let z = f_local z_id in
-        let bij = fun tyL tyR -> f_lambda [z_id,GTty tyR] (z tyL) in
-          (* TODO Cezar : Can it be not well typed: normally tyL and tyR should
-             be equal.
-             I propose to replace tyL by tyR
-          *)
-        bij, bij
-    in wp_equiv_rnd (f, finv)
+  | Some side -> wp_equiv_disj_rnd side g
+  | None ->
+      let bij =
+        match bij_info with
+        | Some f, Some finv ->  Some (f, finv)
+        | Some bij, None | None, Some bij -> Some (bij, bij)
+        | None, None -> None
+      in
+        wp_equiv_rnd bij g
 
 (* -------------------------------------------------------------------- *)
 let t_bd_hoare_rnd tac_info g =

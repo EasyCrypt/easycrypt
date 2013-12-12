@@ -70,6 +70,9 @@
   (setq proof-shell-start-silent-cmd "pragma silent. "
         proof-shell-stop-silent-cmd  "pragma verbose. ")
 
+  ; Ask for the current goal
+  (setq proof-showproof-command "pragma noop. ")
+
   (easycrypt-init-syntax-table)
   ;; we can cope with nested comments
   (set (make-local-variable 'comment-quote-nested) nil)
@@ -156,6 +159,9 @@
 
 (defun easycrypt-highlight-error-hook ()
   (easycrypt-highlight-error))
+
+(defun easycrypt-redisplay-hook ()
+  (easycrypt-redisplay))
 
 (add-hook 'proof-shell-handle-error-or-interrupt-hook
           'easycrypt-highlight-error-hook t)
