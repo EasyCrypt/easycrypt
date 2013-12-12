@@ -79,7 +79,7 @@ intros=> x_y y_z;
   apply array_ext; split.
     by rewrite ?length_xor.
     intros=> i [leq0_i lti_l]; rewrite ?get_xor //; first 5 smt.
-    by rewrite Bool.xor_associative.
+    by rewrite Bool.xorA.
 qed.
 
 lemma xor0 (x : bitstring):

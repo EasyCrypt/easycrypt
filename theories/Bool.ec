@@ -6,13 +6,13 @@ by [].
 lemma nosmt xor_true b: b ^^ true = !b
 by [].
 
-lemma nosmt xor_comm b1 b2: b1 ^^ b2 = b2 ^^ b1
+lemma nosmt xorA b1 b2 b3: (b1 ^^ b2) ^^ b3 = b1 ^^ (b2 ^^ b3)
 by [].
 
-lemma nosmt xor_nilpotent b: b ^^ b = false
+lemma nosmt xorC b1 b2: b1 ^^ b2 = b2 ^^ b1
 by [].
 
-lemma nosmt xor_associative b1 b2 b3: (b1 ^^ b2) ^^ b3 = b1 ^^ (b2 ^^ b3)
+lemma nosmt xorK b: b ^^ b = false
 by [].
 
 require import Real.
