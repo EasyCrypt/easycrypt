@@ -149,6 +149,8 @@
 %token BDEQ
 %token BETA 
 %token BY
+%token BYEQUIV
+%token BYPHOARE
 %token BYPR
 %token CALL
 %token CASE
@@ -184,7 +186,6 @@
 %token EOF
 %token EQ
 %token EQUIV
-%token EQUIVDENO
 %token EXFALSO
 %token EXIST
 %token EXPORT
@@ -238,7 +239,6 @@
 %token OP
 %token PCENT
 %token PHOARE
-%token PHOAREDENO
 %token PIPE
 %token POSE
 %token PR
@@ -2072,11 +2072,11 @@ phltactic:
 | SPLITWHILE c=expr COLON s=side? o=codepos
     { Psplitwhile (c, s, o) }
 
-| EQUIVDENO info=fpattern(conseq)
-    { Pequivdeno info }
+| BYPHOARE info=fpattern(conseq)
+    { Pbydeno (`PHoare, info) }
 
-| PHOAREDENO info=fpattern(conseq)
-    { Pbdhoaredeno info }
+| BYEQUIV info=fpattern(conseq)
+    { Pbydeno (`Equiv, info) }
 
 | CONSEQ nm=STAR? info=fpattern(conseq_bd)
     { Pconseq (nm<>None, info) }
@@ -2110,7 +2110,6 @@ phltactic:
 
 (* basic pr based tacs *)
 | HOARE {Phoare}
-| PHOARE {Pbdhoare}
 | PRBOUNDED {Pprbounded}
 | REWRITE PR s=LIDENT {Ppr_rewrite s}
 | PHOARE SPLIT i=bdhoare_split { Pbdhoare_split i }
@@ -2268,7 +2267,6 @@ proof:
 ;
 
 proofmode1:
-| b=boption(MINUS) pm=loc(proofmodename) { (pm, b) }
 ;
 
 proofmodename:

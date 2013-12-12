@@ -22,7 +22,7 @@ qed.
 lemma Neg_A_Pr (A<:Adv) &m: 
    Pr[Neg_main(A).main() @ &m : res] = Pr[A.main() @ &m : !res].
 proof -strict.
-  equiv_deno (Neg_A A) => //.
+  byequiv (Neg_A A) => //.
 qed.
 
 lemma Neg_A_Pr_minus (A<:Adv) &m: 
@@ -30,7 +30,7 @@ lemma Neg_A_Pr_minus (A<:Adv) &m:
    Pr[Neg_main(A).main() @ &m : res] = 1%r - Pr[A.main() @ &m : res].
 proof -strict.
   intros Hl; rewrite (Neg_A_Pr A &m); rewrite Pr mu_not; congr => //.
-  by phoare_deno Hl.
+  by byphoare Hl.
 qed.
   
 lemma abs_val : 
@@ -45,12 +45,3 @@ proof -strict.
    cut H1 := Neg_A_Pr_minus A &m _; [trivial | smt].
  cut H := HP &m A;smt.
 qed.
-
-
-
-
-
-
-    
-
-

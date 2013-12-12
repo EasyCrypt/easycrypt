@@ -68,7 +68,7 @@ module Test' = {
 
 lemma test' : forall &m (a:bitstring), length a = k1+k2 => Pr[Test.test() @ &m : a=res]=1%r/(2^(k1+k2))%r.
 intros &m a length_a.
-phoare_deno (_ : (true) ==> (a=res)).
+byphoare (_ : (true) ==> (a=res)).
 proc.
 rnd ((=)a).
 skip.
@@ -101,7 +101,7 @@ lemma test'' : forall &m (a:bitstring), length a = k1+k2 => Pr[Test'.test() @ &m
 cut pow_distr :  ((2 ^ k2)%r * (2 ^ k1)%r = (2 ^ (k1+k2))%r).
 smt.
 intros &m a length_a.
-phoare_deno (_ : (true) ==> (a=res)).
+byphoare (_ : (true) ==> (a=res)).
 proc.
 rnd (sub a 0 k1 =z1) (1%r/(2 ^ (k1))%r) (1%r/(2 ^ (k2))%r) (1%r - 1%r/(2 ^ (k1))%r) (0%r) 
     (fun z, sub a 0 k1 = z1 /\ z= (sub a k1 k2)).

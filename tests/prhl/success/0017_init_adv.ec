@@ -44,7 +44,7 @@ lemma foo : forall &m1 &m2(A<:Adv{O}),
   Pr[G(A).main() @ &m1 : res = 3] = 
   Pr[G(A).main() @ &m2 : res = 3].
 intros &m1 &m2 A Heq.
-equiv_deno (foo3 A);trivial.
+byequiv (foo3 A);trivial.
 qed.
 
 

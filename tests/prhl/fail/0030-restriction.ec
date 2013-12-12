@@ -60,6 +60,6 @@ proof -strict.
 intros Adv &m.
 (* the following shouldn't succeed, as Adv <: ADV, whereas
 G_main needs Adv <: ADV{O1, O2} *)
-equiv_deno (G_main Adv).
+byequiv (G_main Adv).
 trivial. trivial.
 qed.

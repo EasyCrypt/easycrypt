@@ -20,7 +20,7 @@ end
 let rn_hl_deno = RN_xtd (new rn_hl_deno :> xrule)
 
 (* -------------------------------------------------------------------- *)
-let t_bdHoare_deno pre post g =
+let t_phoare_deno pre post g =
   let env,_,concl = get_goal_e g in
   let cmp, f, bd, concl_post =
     match concl.f_node with
@@ -96,14 +96,14 @@ let t_equiv_deno pre post g =
 
 (* -------------------------------------------------------------------- *)
 (* FIXME: too much code repetition w.r.t. ecPhl (César) *)
-let process_bdHoare_deno info (_,n as g) = 
+let process_phoare_deno info (_,n as g) = 
   let process_cut g (pre,post) = 
     let hyps,concl = get_goal g in
     let cmp, f, bd =
       match concl.f_node with
       | Fapp({f_node = Fop(op,_)}, [f;bd]) when is_pr f &&
           (EcPath.p_equal op EcCoreLib.p_eq || 
-             EcPath.p_equal op EcCoreLib.p_real_le ) ->
+             EcPath.p_equal op EcCoreLib.p_real_le) ->
         let cmp = if EcPath.p_equal op EcCoreLib.p_eq then FHeq else FHle in
         cmp, f, bd
       | Fapp({f_node = Fop(op,_)}, [bd;f]) when is_pr f 
@@ -112,7 +112,7 @@ let process_bdHoare_deno info (_,n as g) =
              EcPath.p_equal op EcCoreLib.p_real_le ) ->
         let cmp = if EcPath.p_equal op EcCoreLib.p_eq then FHeq else FHge in
         cmp, f , bd
-      | _ -> cannot_apply "bdHoare_deno" 
+      | _ -> cannot_apply "bydeno" 
         "the conclusion is not a suitable Pr expression" in (* FIXME error message *) 
     let _,f,_,event = destr_pr f in
     let penv, qenv = LDecl.hoareF f hyps in
@@ -126,7 +126,7 @@ let process_bdHoare_deno info (_,n as g) =
     let bhf = t_as_bdHoareF f in
     bhf.bhf_pr, bhf.bhf_po
   in
-    t_on_first (t_use an gs) (t_bdHoare_deno pre post (juc,n))
+    t_on_first (t_use an gs) (t_phoare_deno pre post (juc,n))
 
 let process_equiv_deno info (_,n as g) = 
   let process_cut g (pre,post) = 
@@ -136,7 +136,7 @@ let process_equiv_deno info (_,n as g) =
       | Fapp({f_node = Fop(op,_)}, [f1;f2]) when is_pr f1 && is_pr f2 -> 
         op, f1, f2
       | _ ->  
-        cannot_apply "equiv_deno" "" in (* FIXME error message *) 
+        cannot_apply "bydeno" "" in (* FIXME error message *) 
     let _,fl,_,_ = destr_pr f1 in
     let _,fr,_,_ = destr_pr f2 in
     let penv, qenv = LDecl.equivF fl fr hyps in
@@ -151,3 +151,9 @@ let process_equiv_deno info (_,n as g) =
     ef.ef_pr, ef.ef_po
   in
     t_on_first (t_use an gs) (t_equiv_deno pre post (juc,n))
+
+(* -------------------------------------------------------------------- *)
+let process_deno mode info g =
+  match mode with
+  | `PHoare -> process_phoare_deno info g
+  | `Equiv  -> process_equiv_deno  info g

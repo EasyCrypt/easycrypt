@@ -32,7 +32,7 @@ lemma prCond (A <: Worker) &m (v:input)
     Pr[Rand(A).main() @ &m: ev v (glob A) (snd res) /\ v = fst res] =
       (mu_x d v) * Pr[A.work(v) @ &m : ev v (glob A) res].
 proof strict.
-phoare_deno (_: (glob A) = (glob A){m} ==> 
+byphoare (_: (glob A) = (glob A){m} ==> 
                  ev (fst res) (glob A) (snd res) /\ fst res = v) => //.
 pose pr := Pr[A.work(v) @ &m: ev v (glob A) res];
 conseq* (_: _: = (mu_x d v * pr)). (* WEIRD! *)
@@ -42,7 +42,7 @@ proc; seq 1 : (v = x) (mu_x d v) pr 1%r 0%r ((glob A)=(glob A){m})=> //.
   call (_: (glob A) = (glob A){m} /\ x = v ==> 
            ev v (glob A) res) => //.
   simplify pr; bypr => &m' eqGlob.
-  by equiv_deno (_: ={glob A, x} ==> ={res, glob A}) => //; proc true. 
+  by byequiv (_: ={glob A, x} ==> ={res, glob A}) => //; proc true. 
   by conseq* (_: _ ==> false)=> //.
 qed.
 
@@ -54,7 +54,7 @@ lemma introOrs (A <: Worker) &m (ev:input -> glob A -> output -> bool):
         cpOrs (img (fun v r, ev v (glob A) (snd r) /\ v = fst r) sup) res].
 proof strict.
 intros=> Fsup sup.
-equiv_deno (_: ={glob A} ==> ={glob A, res} /\ in_supp (fst res{1}) d)=> //;
+byequiv (_: ={glob A} ==> ={glob A, res} /\ in_supp (fst res{1}) d)=> //;
   first by proc; call (_: true); rnd.
 intros=> &m1 &m2 [[<- <-] Hin].
 rewrite /cpOrs or_exists;split.
@@ -78,7 +78,7 @@ intros=> Fsup /=.
 cut:= introOrs A &m ev _=> //= ->.
 elim/set_ind (Finite.toFSet (create (support d))).
   rewrite Mrplus.sum_empty.
-  phoare_deno (_ : true ==> false)=> //.
+  byphoare (_ : true ==> false)=> //.
   by rewrite /cpOrs img_empty Mbor.sum_empty.
   intros=> x s Hx Hrec.
   rewrite Mrplus.sum_add //=.

@@ -39,7 +39,7 @@ theory GenDice.
     cut bdt_pos: 0 <= card (sub_supp i0) by smt.
     cut bdt_posr: 0%r <= (card (sub_supp i0))%r by smt.
     case (test i0 k) => Htk &m Hdfl Hweight;
-      phoare_deno (_: !test i r /\ i0 = i ==> k = res) => //;proc.
+      byphoare (_: !test i r /\ i0 = i ==> k = res) => //;proc.
       (* case : test i k *)
       pose bd := mu_x (d i0) k.
       cut d_uni : forall x, in_supp x (d i0) => mu_x (d i0) x = bd.
@@ -100,7 +100,7 @@ theory GenDice.
   
   lemma prSample : forall i k &m, Pr[Sample.sample(i) @ &m : res = k] = mu_x (d' i) k.
   proof -strict.
-    intros i0 k &m; phoare_deno (_: i0 = i ==> k = res) => //;proc.
+    intros i0 k &m; byphoare (_: i0 = i ==> k = res) => //;proc.
     rnd;skip;progress.
     by apply (mu_eq (d' i{hr}) (fun (x:t'), k = x) ((=) k)).
   qed.
@@ -117,7 +117,7 @@ theory GenDice.
     intros &m1 &m2 k [Heqi [Ht [Hw [Htin [Hffi Hfif]]]]].
     rewrite (_:Pr[RsampleW.sample(i{m2}, r{m2}) @ &m2 : k = finv res] = 
                Pr[RsampleW.sample(i{m2}, r{m2}) @ &m2 : res = f k]).
-      equiv_deno (_: ={i,r} /\ i{2} = i{m2} ==> 
+      byequiv (_: ={i,r} /\ i{2} = i{m2} ==> 
                         ={res} /\ test i{m2} res{2}) => //.
         by proc;while (={i,r});[rnd | ];trivial.
       progress => //. 

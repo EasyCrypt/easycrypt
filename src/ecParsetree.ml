@@ -426,12 +426,10 @@ type phltactic =
   | Phr_exists_elim  
   | Phr_exists_intro of pformula list 
   | Pexfalso
-  | Pbdhoaredeno  of cfpattern
-  | Pequivdeno    of cfpattern
+  | Pbydeno       of ([`PHoare | `Equiv ] * cfpattern)
   | PPr           of (pformula * pformula) option 
   | Pfel          of int * (pformula * pformula * pformula * pformula * pfel_spec_preds * pformula option)
   | Phoare
-  | Pbdhoare
   | Pprbounded
   | Pprfalse
   | Ppr_rewrite    of symbol

@@ -35,11 +35,10 @@ let process_phl loc ptac g =
     | Phr_exists_elim           -> EcPhlExists.t_hr_exists_elim
     | Phr_exists_intro fs       -> EcPhlExists.process_exists_intro fs
     | Pexfalso                  -> EcPhlExfalso.t_exfalso
-    | Pbdhoaredeno info         -> EcPhlDeno.process_bdHoare_deno info
+    | Pbydeno (mode, info)      -> EcPhlDeno.process_deno mode info
     | PPr info                  -> EcPhlPr.process_ppr info
     | Pfel (at_pos, info)       -> EcPhlFel.process_fel at_pos info
-    | Pequivdeno info           -> EcPhlDeno.process_equiv_deno info
-    | Phoare | Pbdhoare         -> EcPhlBdHoare.t_hoare_bd_hoare
+    | Phoare                    -> EcPhlBdHoare.t_hoare_bd_hoare
     | Pbdhoare_split i          -> EcPhlPrRw.process_bdhoare_split i
     | Pprbounded                -> EcPhlPr.t_prbounded true
     | Pprfalse                  -> EcPhlPr.t_prfalse

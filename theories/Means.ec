@@ -33,7 +33,7 @@ theory Mean.
       Pr[Rand(A).randAndWork() @ &m: ev v (glob A) (snd res) /\ v = fst res] =
         (mu_x d v) * Pr[A.work(v) @ &m : ev v (glob A) res].
   proof strict.
-  phoare_deno (_: (glob A) = (glob A){m} ==> 
+  byphoare (_: (glob A) = (glob A){m} ==> 
                    ev (fst res) (glob A) (snd res) /\ fst res = v) => //.
   pose pr := Pr[A.work(v) @ &m: ev v (glob A) res];
   conseq* (_: _: = (mu_x d v * pr)). (* WEIRD! *)
@@ -43,7 +43,7 @@ theory Mean.
     call (_: (glob A) = (glob A){m} /\ x = v ==> 
              ev v (glob A) res) => //.
     simplify pr; bypr => &m' eqGlob.
-    by equiv_deno (_: ={glob A, x} ==> ={res, glob A}) => //; proc true. 
+    by byequiv (_: ={glob A, x} ==> ={res, glob A}) => //; proc true. 
     by conseq* (_: _ ==> false)=> //.
   qed.
 
@@ -55,7 +55,7 @@ theory Mean.
           cpOrs (img (fun v r, ev v (glob A) (snd r) /\ v = fst r) sup) res].
   proof strict.
   intros=> Fsup sup.
-  equiv_deno (_: ={glob A} ==> ={glob A, res} /\ in_supp (fst res{1}) d)=> //;
+  byequiv (_: ={glob A} ==> ={glob A, res} /\ in_supp (fst res{1}) d)=> //;
     first by proc; call (_: true); rnd.
   intros=> &m1 &m2 [[<- <-] Hin].
   rewrite /cpOrs or_exists;split.
@@ -79,7 +79,7 @@ theory Mean.
   cut:= introOrs A &m ev _=> //= ->.
   elim/set_ind (Finite.toFSet (create (support d))).
     rewrite Mrplus.sum_empty.
-    phoare_deno (_ : true ==> false)=> //.
+    byphoare (_ : true ==> false)=> //.
     by rewrite /cpOrs img_empty Mbor.sum_empty.
     intros=> x s Hx Hrec.
     rewrite Mrplus.sum_add //=.
@@ -347,8 +347,8 @@ theory Hybrid.
       Pr[GL(BLR(A),E).main() @ &m : p (glob A) (glob E) C.c res] -
       Pr[GR(BLR(A),E).main() @ &m : p (glob A) (glob E) C.c res].
     proof -strict.
-      congr;first by equiv_deno GE0_GR.
-      by equiv_deno GE_GL.
+      congr;first by byequiv GE0_GR.
+      by byequiv GE_GL.
     qed.
 
   end section.
@@ -415,7 +415,7 @@ theory Hybrid.
       Pr[GL(B(A),E).main() @ &m : p (glob A) (glob E) LRB.l res /\ C.c <= 1] = 
       Pr[Rand(W(L(E))).randAndWork() @ &m : p (glob A) (glob E) LRB.l (snd res)].
     proof strict.
-      equiv_deno (_ : ={glob A, glob E} ==> 
+      byequiv (_ : ={glob A, glob E} ==> 
                       ={glob A, glob E,glob LRB} /\ res{1} = snd res{2} /\ C.c{1} <= 1) => //.
       proc; inline{1} GL(B(A), E).A.run;inline{2} W(L(E)).work;wp.
       call (_: ={glob E, glob LRB} /\ C.c{1} = (LRB.l0{1} < LRB.l{1}) ? 1 : 0).
@@ -436,7 +436,7 @@ theory Hybrid.
       Pr[GR(B(A),E).main() @ &m : p (glob A) (glob E) LRB.l res /\ C.c <= 1] = 
       Pr[Rand(W(R(E))).randAndWork() @ &m : p (glob A) (glob E) LRB.l (snd res)].
     proof strict.
-      equiv_deno (_ : ={glob A, glob E} ==> 
+      byequiv (_ : ={glob A, glob E} ==> 
                       ={glob A, glob E, glob LRB} /\ res{1} = snd res{2} /\ C.c{1} <= 1) => //.
       proc; inline{1} GR(B(A), E).A.run;inline{2} W(R(E)).work;wp.
       call (_: ={glob E, glob LRB} /\ C.c{1} = (LRB.l0{1} < LRB.l{1}) ? 1 : 0).
@@ -466,7 +466,7 @@ theory Hybrid.
        Pr[W(L(E)).work(0) @ &m : p (glob A) (glob E) LRB.l res /\ LRB.l <= q] = 
        Pr[GL(A,E).main() @ &m : p (glob A) (glob E) C.c res /\ C.c <= q ].
     proof strict.
-      equiv_deno (_ : ={glob A, glob E} /\ x{1}=0 ==> 
+      byequiv (_ : ={glob A, glob E} /\ x{1}=0 ==> 
                       (LRB.l{1} <= q) = (C.c{2} <= q) /\
                       (C.c{2} <= q =>
                         ={glob A, glob E,res} /\ LRB.l{1} = C.c{2})) => //;last smt.
@@ -504,7 +504,7 @@ theory Hybrid.
        Pr[W(R(E)).work((q-1)) @ &m :  p (glob A) (glob E) LRB.l res /\ LRB.l <= q] = 
        Pr[GR(A,E).main() @ &m :  p (glob A) (glob E) C.c res /\ C.c <= q ].
     proof strict.
-      equiv_deno (_ : ={glob A, glob E} /\ x{1}=q-1 ==> 
+      byequiv (_ : ={glob A, glob E} /\ x{1}=q-1 ==> 
                       (LRB.l{1} <= q) = (C.c{2} <= q) /\
                       (C.c{2} <= q =>
                         ={glob A, glob E, res} /\ LRB.l{1} = C.c{2})) => //;last smt.
@@ -542,7 +542,7 @@ theory Hybrid.
          Pr[W(L(E)).work(v) @ &m: p (glob A) (glob E) LRB.l res] = 
          Pr[W(R(E)).work((v-1)) @ &m : p (glob A) (glob E) LRB.l res].
     proof strict.
-      intros Hv;equiv_deno (_: ={glob A,glob E} /\ x{1} = v /\ x{2} = v-1 ==> 
+      intros Hv;byequiv (_: ={glob A,glob E} /\ x{1} = v /\ x{2} = v-1 ==> 
                                ={glob A,glob E, LRB.l, res}) => //.
       proc.
       call (_: ={glob E, LRB.l} /\ LRB.l0{1} = v /\ LRB.l0{2} = v-1).
@@ -673,7 +673,7 @@ theory Hybrid.
               p' (glob A){hr} (glob E){hr} LRB.l res /\ C.c <= 1] = 
             Pr[GL(B(BLR(A)), E).main() @ &m :
               p' (glob A){hr} (glob E){hr} LRB.l res /\ C.c <= 1].
-     equiv_deno (_: ={glob A, glob E} ==> ={glob A, glob E, LRB.l, C.c, res}) => //.
+     byequiv (_: ={glob A, glob E} ==> ={glob A, glob E, LRB.l, C.c, res}) => //.
      proc.
      inline{1} GL(BLR(B0(A)), E).A.run BLR(B0(A), E, GL(BLR(B0(A)), E).L).A.run.
      inline{2} GL(B(BLR(A)), E).A.run B(BLR(A), E, GL(B(BLR(A)), E).L).A.run;wp.
@@ -691,7 +691,7 @@ theory Hybrid.
               p' (glob A){hr} (glob E){hr} LRB.l res /\ C.c <= 1] = 
             Pr[GR(B(BLR(A)), E).main() @ &m :
               p' (glob A){hr} (glob E){hr} LRB.l res /\ C.c <= 1].
-     equiv_deno (_: ={glob A, glob E} ==> ={glob A, glob E, LRB.l, C.c, res}) => //.
+     byequiv (_: ={glob A, glob E} ==> ={glob A, glob E, LRB.l, C.c, res}) => //.
      proc.
      inline{1} GR(BLR(B0(A)), E).A.run BLR(B0(A), E, GR(BLR(B0(A)), E).R).A.run.
      inline{2} GR(B(BLR(A)), E).A.run B(BLR(A), E, GR(B(BLR(A)), E).R).A.run;wp.

@@ -9,12 +9,12 @@ DONE  - datatype -> type
 DONE  - record -> type
 DONE  - bd_hoare -> phoare
 DONE  - bdhoare_* -> phoare_*
+DONE  - *_deno -> bydeno (byphoare | byequiv)
 
-  - *_deno -> bydeno
   - fst -> .`1
   - snd -> .`2
 
-* Comportement par défaut devrait etre `proof strict' (ceci est une décision unilatérale de François)
+DONE * Comportement par défaut devrait etre `proof strict' (ceci est une décision unilatérale de François)
 
 * Discuter la syntaxe des opérateurs
 

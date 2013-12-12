@@ -114,7 +114,7 @@ section.
      (fun (g:glob WA), let (b,c,go,ga) = g in p ga go c) => /= H.
    cut -> : Pr[INDb(O, A).main() @ &m : res /\ p (glob A) (glob O) C.c] =
     Pr[MB.M.Rand(WA).main() @ &m : fst res = snd res /\ p (glob A) (glob O) C.c].
-     equiv_deno (_: ={glob A,glob O} ==> ={glob A,glob O, C.c} /\
+     byequiv (_: ={glob A,glob O} ==> ={glob A,glob O, C.c} /\
                    res{1} = (fst res = snd res){2}) => //;proc.
      inline C.init WA.work;simplify fst snd. 
      by swap{1} 2 -1; sim; proc (={Orclb.b, C.c}).
@@ -128,13 +128,13 @@ section.
     inline C.init;by wp.
    cut -> : Pr[INDR(O, A).main() @ &m : p (glob A) (glob O) C.c] =
             Pr[WA.work(false) @ &m : p (glob A) (glob O) C.c].
-     by equiv_deno He.
+     by byequiv He.
    cut -> : Pr[INDR(O, A).main() @ &m : res /\ p (glob A) (glob O) C.c] = 
             Pr[WA.work(false) @ &m : res /\ p (glob A) (glob O) C.c].
-     by equiv_deno He.
+     by byequiv He.
    (cut -> : Pr[INDL(O, A).main() @ &m : res /\ p (glob A) (glob O) C.c] = 
             Pr[WA.work(true) @ &m : res /\ p (glob A) (glob O) C.c]) => //.
-   equiv_deno 
+   byequiv 
       (_: x{2}=true /\ ={glob A,glob O} ==> ={res,glob A,glob O, C.c}) => //.
    proc; call (_: ={glob O, C.c} /\ Orclb.b{2} = true).
      by proc (={C.c} /\ Orclb.b{2} = true).      
@@ -256,7 +256,7 @@ section.
                  res /\ p (glob A) (glob O) LRB.l /\ LRB.l <= q /\ C.c <= 1] =
              Pr[Ln(Orcl2(O), H.B(A')).main() @ &m :
                  ((res /\ p (glob A) (glob O) LRB.l) /\ LRB.l <= q) /\ C.c <= 1].
-      equiv_deno (_: ={glob A,glob O} ==>
+      byequiv (_: ={glob A,glob O} ==>
                      ={res,glob A,glob O,glob LRB, C.c}) => //;proc.
       call (_: ={glob A,glob O, C.c} ==> ={glob A,glob O,glob LRB,C.c,res}).
         proc;inline H.B(A', Orcl2(O), Orclc(L(Orcl2(O)))).A.main;wp.
@@ -276,7 +276,7 @@ section.
                  res /\ p (glob A) (glob O) LRB.l /\ LRB.l <= q /\ C.c <= 1] =
              Pr[Rn(Orcl2(O), H.B(A')).main() @ &m :
                  ((res /\ p (glob A) (glob O) LRB.l) /\ LRB.l <= q) /\ C.c <= 1].
-      equiv_deno (_: ={glob A,glob O} ==>
+      byequiv (_: ={glob A,glob O} ==>
                      ={res,glob A,glob O,glob LRB, C.c}) => //;proc.
       call (_: ={glob A,glob O, C.c} ==> ={glob A,glob O,glob LRB,C.c,res}).
         proc;inline H.B(A', Orcl2(O), Orclc(R(Orcl2(O)))).A.main;wp.
@@ -295,7 +295,7 @@ section.
    (* BUG : rewrite H.  *)
    cut -> : Pr[INDL(O, A).main() @ &m : res /\ p (glob A) (glob O) C.c /\ C.c <= q] =
             Pr[Ln(Orcl2(O), A').main() @ &m : (res /\ p (glob A) (glob O) C.c) /\ C.c <= q].
-     equiv_deno (_: ={glob A,glob O} ==>
+     byequiv (_: ={glob A,glob O} ==>
                     ={res,glob A,glob O, C.c}) => //;proc.
       call (_: ={glob A,glob O, C.c} ==> ={glob A,glob O,C.c,res}).
         proc *. inline A'(Orcl2(O), Orclc(L(Orcl2(O)))).main;sim.
@@ -309,7 +309,7 @@ section.
       by call (_:true ==> ={C.c});first by proc;wp.
    cut -> : Pr[INDR(O, A).main() @ &m : res /\ p (glob A) (glob O) C.c /\ C.c <= q] =
             Pr[Rn(Orcl2(O), A').main() @ &m : (res /\ p (glob A) (glob O) C.c) /\ C.c <= q].
-     equiv_deno (_: ={glob A,glob O} ==>
+     byequiv (_: ={glob A,glob O} ==>
                     ={res,glob A,glob O, C.c}) => //;proc.
       call (_: ={glob A,glob O, C.c} ==> ={glob A,glob O,C.c,res}).
         proc *. inline A'(Orcl2(O), Orclc(R(Orcl2(O)))).main;sim.

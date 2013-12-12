@@ -177,7 +177,7 @@ section.
     intros Hq.
     cut -> : Pr[CPAL(S, A).main() @ &m : res /\ K.c <= H.q] =
              Pr[INDL(ToOrcl(S),ToAdv(A)).main() @ &m : res /\ H.C.c <= H.q].
-      equiv_deno (_ : ={glob A, glob S} ==>
+      byequiv (_ : ={glob A, glob S} ==>
                         ={res,glob A, glob S, K.pk} /\ K.c{1} = H.C.c{2}) => //.
       proc. 
       inline INDL(ToOrcl(S), ToAdv(A)).A.main H.C.init  ToOrcl(S).leaks.
@@ -186,7 +186,7 @@ section.
       by wp;call (_:true);wp.
     cut -> : Pr[CPAR(S, A).main() @ &m : res /\ K.c <= H.q] =
              Pr[INDR(ToOrcl(S),ToAdv(A)).main() @ &m : res /\ H.C.c <= H.q].          
-      equiv_deno (_ : ={glob A, glob S} ==>
+      byequiv (_ : ={glob A, glob S} ==>
                         ={res,glob A, glob S, K.pk} /\ K.c{1} = H.C.c{2}) => //.
       proc. 
       inline INDR(ToOrcl(S), ToAdv(A)).A.main H.C.init  ToOrcl(S).leaks.
@@ -199,7 +199,7 @@ section.
       intros O LR Llr Ll Lo;proc;call (La LR _) => //.
       by call Ll.
     intros <-;congr.
-      equiv_deno (_: ={glob S,glob A} ==> ={res,glob H.LRB} /\ K.c{1} = H.C.c{2}) => //.
+      byequiv (_: ={glob S,glob A} ==> ={res,glob H.LRB} /\ K.c{1} = H.C.c{2}) => //.
       proc.
       inline INDR(ToOrcl(S), Ind.B(ToAdv(A))).A.main H.C.init CPAR(S, B(S,A)).A.main
         Ind.B(ToAdv(A), ToOrcl(S), OrclR(ToOrcl(S))).A.main.
@@ -214,7 +214,7 @@ section.
         by call (_: ={glob S, K.pk});first sim.
       swap{1} [4..5] -2;inline ToOrcl(S).leaks;wp.
       by call (_:true);wp;rnd;wp.
-    equiv_deno (_: ={glob S,glob A} ==> ={res,glob H.LRB} /\ K.c{1} = H.C.c{2}) => //.
+    byequiv (_: ={glob S,glob A} ==> ={res,glob H.LRB} /\ K.c{1} = H.C.c{2}) => //.
     proc.
     inline INDL(ToOrcl(S), Ind.B(ToAdv(A))).A.main H.C.init CPAL(S, B(S,A)).A.main
       Ind.B(ToAdv(A), ToOrcl(S), OrclL(ToOrcl(S))).A.main.

@@ -94,7 +94,7 @@ apply (Real.Trans _
 (Pr [Experiment(O2, Adv).main() @ &m : P res \/ (Experiment.WO.bad /\
                           Experiment.WO.cO <= qO /\ 
 Experiment.WO.cO = m (glob O2))]) _).
-equiv_deno (_ : true ==> 
+byequiv (_ : true ==> 
           (! Experiment.WO.bad{2} => ={res}) /\ 
              Experiment.WO.cO{2} <= qO /\
              Experiment.WO.cO{2} = m (glob O2){2})  => //.

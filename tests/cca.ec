@@ -113,7 +113,7 @@ lemma foo2 : forall (x:int) &m1 &m2,
      Pr[G(A').main(x) @ &m1 : res = 0] = Pr[G(A').main(x) @ &m1 : res = 0].
 proof -strict.
  intros xv &m1 &m2.
- equiv_deno (_ : x{1} = x{2} /\ (glob A'){1} = (glob A'){2} ==> 
+ byequiv (_ : x{1} = x{2} /\ (glob A'){1} = (glob A'){2} ==> 
                  res{1} = res{2} /\  (glob A'){1} = (glob A'){2}).
  apply foo1.
  simplify;smt.
