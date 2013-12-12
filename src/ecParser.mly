@@ -245,7 +245,6 @@
 %token PRAGMA
 %token PRBOUNDED
 %token PRED
-%token PRFALSE
 %token PRINT
 %token PROC
 %token PROGRESS
@@ -2114,10 +2113,6 @@ phltactic:
 | REWRITE PR s=LIDENT {Ppr_rewrite s}
 | PHOARE SPLIT i=bdhoare_split { Pbdhoare_split i }
 | PHOARE EQUIV s=side pr=sform po=sform { Pbd_equiv(s,pr,po) } 
-
-(* TODO : remove this tactic *)
-| PRFALSE {Pprfalse}
-| BDEQ {Pbdeq}
 ;
 
 bdhoare_split:

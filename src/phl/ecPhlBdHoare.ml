@@ -15,10 +15,10 @@ end
 let rn_hl_hoare_bd_hoare =
   RN_xtd (new rn_hl_hoare_bd_hoare)
 
-
 (* -------------------------------------------------------------------- *)
-(* This is the 4 basic rules *)
+(* This are the 4 basic rules                                           *)
 let errormsg = "bound is not = 0%r"
+
 let hoare_of_bdhoareS g =
   let concl = get_concl g in
   let bhs = t_as_bdHoareS concl in
@@ -49,8 +49,8 @@ let bdhoare_of_hoareF g =
   let concl1 = f_bdHoareF hf.hf_pr hf.hf_f (f_not hf.hf_po) FHeq f_r0 in
   prove_goal_by [concl1] rn_hl_hoare_bd_hoare g
 
-(* The general tactic *)
-
+(* -------------------------------------------------------------------- *)
+(* The top-level tactic                                                 *)
 let t_hoare_bd_hoare g = 
   let concl = get_concl g in
   match concl.f_node with
@@ -72,15 +72,4 @@ let t_hoare_bd_hoare g =
   | FhoareF _ -> bdhoare_of_hoareF g
   | FhoareS _ -> bdhoare_of_hoareS g
   | _ -> tacuerror "a hoare or phoare judgment was expected"
-
-
-
-
-
-
-let t_bdeq g = 
-  let concl = get_concl g in
-  let bhs = t_as_bdHoareS concl in 
-  let concl = f_bdHoareS_r {bhs with bhs_cmp=FHeq } in
-    prove_goal_by [concl] (RN_xtd (new EcPhlPr.rn_hl_prbounded)) g
     

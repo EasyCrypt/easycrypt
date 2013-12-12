@@ -41,9 +41,7 @@ let process_phl loc ptac g =
     | Phoare                    -> EcPhlBdHoare.t_hoare_bd_hoare
     | Pbdhoare_split i          -> EcPhlPrRw.process_bdhoare_split i
     | Pprbounded                -> EcPhlPr.t_prbounded true
-    | Pprfalse                  -> EcPhlPr.t_prfalse
     | Ppr_rewrite s             -> EcPhlPrRw.t_pr_rewrite s 
-    | Pbdeq                     -> EcPhlBdHoare.t_bdeq
     | Psim info                 -> EcPhlEqobs.process_eqobs_in info
     | Ptrans_stmt info          -> EcPhlTrans.process_equiv_trans info
     | Psymmetry                 -> EcPhlSym.process_equiv_sym

@@ -431,9 +431,7 @@ type phltactic =
   | Pfel          of int * (pformula * pformula * pformula * pformula * pfel_spec_preds * pformula option)
   | Phoare
   | Pprbounded
-  | Pprfalse
   | Ppr_rewrite    of symbol
-  | Pbdeq 
   | Psim           of (pformula_o * pformula_o * pformula_o)
   | Ptrans_stmt    of trans_info
   | Psymmetry
