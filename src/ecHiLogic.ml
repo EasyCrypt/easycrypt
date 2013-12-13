@@ -572,20 +572,20 @@ let process_intros ?(cf = true) pis (juc, n) =
         match EcFol.sform_of_form fp with
         | SFquant (Lforall, (x, _)  , fp) -> (EcIdent.name x, fp)
         | SFlet   (LSymbol (x, _), _, fp) -> (EcIdent.name x, fp)
-        | SFimp   (_                , fp) -> ("h", fp)
+        | SFimp   (_                , fp) -> ("H", fp)
         | _ -> begin
           match EcReduction.h_red_opt EcReduction.full_red hyps fp with
           | None   -> ("_", f_true)
           | Some f -> destruct f
         end
       in
-      let (name, form) = destruct form in
+      let name, form = destruct form in
       let id = 
         lmap (function
-        | `Named x  -> EcIdent.create s
-        | `Clear    -> assert false
-        | `Private  -> EcIdent.create "_"
-        | `AutoName -> LDecl.fresh_id hyps s) s
+        | `NoName       -> EcIdent.create "_"
+        | `FindName     -> LDecl.fresh_id hyps name
+        | `NoRename s   -> EcIdent.create s
+        | `WithRename s -> LDecl.fresh_id hyps s) s
       in
 
       let hyps = LDecl.add_local id.pl_desc (LD_var (tbool, None)) hyps in
@@ -689,6 +689,7 @@ let process_intros ?(cf = true) pis (juc, n) =
       gs
 
   and dointro1 nointro pis (juc, n) = dointro nointro pis (juc, [n]) in
+
     dointro1 true (List.rev (collect [] [] pis)) (juc, n)
 
 (* -------------------------------------------------------------------- *)
