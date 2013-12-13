@@ -78,9 +78,10 @@ lemma Bound_aux &m (A <: Adv):
     (1%r/q%r) * Pr[ G0(A).main(()) @ &m : G0.b ]
   = Pr[ Guess(G0(A)).main(()) @ &m :  G0.b /\ (fst res) = if G0.k >= 0 && G0.k < q then G0.k else 0 ].
 proof.
+  print axiom PBound.
   cut := PBound &m (G0(A)) 
-           (lambda g u, let (k_,b,g_a_) = g in b)
-           (lambda g u, let (k,b_,g_a_) = g in k)
+           (lambda g u, let (b,k_,g_a_) = g in b)
+           (lambda g u, let (b_,k,g_a_) = g in 1)
            tt.
   trivial.
 qed.
