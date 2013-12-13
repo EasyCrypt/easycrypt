@@ -103,6 +103,7 @@ let p_real_pow = _Real id_pow
 let p_real_le  = _Real id_le
 let p_real_lt  = _Real id_lt
 let p_real_ge  = _Real id_ge
+let p_rle_ge_sym  = _Real "le_ge_sym"
 
 (* -------------------------------------------------------------------- *)
 (*                           Finite sets                                *)
@@ -175,6 +176,7 @@ let p_if_intro      = _Logic "ifI"
 let p_eq_refl       = _Logic "eq_refl"
 let p_eq_trans      = _Logic "eq_trans"
 let p_fcongr        = _Logic "fcongr"
+let p_eq_sym        = _Logic "eq_sym"
 
 let p_rewrite_l     = _Logic "rewrite_l"
 let p_rewrite_r     = _Logic "rewrite_r"

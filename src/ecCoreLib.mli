@@ -87,6 +87,7 @@ val p_real_le : path
 val p_real_lt : path
 val p_real_ge : path
 
+val p_rle_ge_sym  : path
 (* -------------------------------------------------------------------- *)
 (*                            Intervals                                 *)
 (* -------------------------------------------------------------------- *)
@@ -126,6 +127,7 @@ val p_iff_intro   : path
 val p_if_intro    : path 
 val p_eq_refl     : path
 val p_eq_trans    : path
+val p_eq_sym      : path
 val p_fcongr      : path
 
 val p_rewrite_l     : path 

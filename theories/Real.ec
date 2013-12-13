@@ -85,6 +85,9 @@ by [].
 lemma nosmt le_ge : forall (x y:real), (x <= y) <=> (y >= x)
 by [].
 
+lemma nosmt le_ge_sym : forall (x y:real), (x <= y) => (y >= x)
+by (intros x y;rewrite le_ge).
+
 lemma nosmt eq_le_ge : forall (x y:real), (x = y) <=> (x <= y /\ x >= y)
 by [].
 

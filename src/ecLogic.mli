@@ -179,6 +179,8 @@ val gen_t_apply_glob :
      'a app_arg_cb -> EcPath.path -> EcTypes.ty list
   -> 'a list -> tactic
 
+val t_apply_glob : EcPath.path -> EcTypes.ty list -> app_arg list -> tactic
+
 val gen_t_apply_form :
      'a app_arg_cb -> form -> 'a list -> tactic
 
