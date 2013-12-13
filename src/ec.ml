@@ -69,9 +69,8 @@ let _ =
   begin
     let theories = resource ["theories"] in
       EcCommands.addidir ~system:true (Filename.concat theories "prelude");
-      EcCommands.addidir ~system:true (Filename.concat theories "core");
       if not ldropts.ldro_boot then
-        EcCommands.addidir ~system:true theories
+        EcCommands.addidir ~system:true ~recursive:true theories;
   end;
 
   (* Initialize I/O + interaction module *)
