@@ -37,4 +37,5 @@ val t_bdHoareS_conseq_nm : form -> form -> tactic
 
 val t_conseq : form -> form -> tactic
 
-val process_conseq : bool -> ccfpattern -> tactic
+val process_conseq :
+ bool -> ccfpattern option * ccfpattern option * ccfpattern option -> tactic

@@ -416,7 +416,9 @@ let t_equivS_conseq_bd side pr po g =
     if side then es.es_ml, es.es_sl,es.es_sr 
     else es.es_mr, es.es_sr, es.es_sl in
   if s'.s_node <> [] then 
-    tacuerror "the other statement should be empty";
+    tacuerror "%s statement should be empty"
+      (if side then "right" else "left");
+  
   let subst = Fsubst.f_subst_mem mhr (fst m) in
   let prs, pos = subst pr, subst po in
   if not (f_equal prs es.es_pr && f_equal pos es.es_po) then
@@ -429,6 +431,7 @@ let t_equivS_conseq_bd side pr po g =
 let rec t_hi_conseq notmod f1 f2 f3 g =
   let t_use (n,gs)= t_use n gs in
   let hyps,concl = get_goal g in
+
   let t_trivial = t_try (t_lseq [t_simplify_nodelta;t_split;t_fail]) in
   match concl.f_node, f1, f2, f3 with
   | FhoareS _, Some(nf1,{f_node = FhoareS hs}), None, None ->
@@ -529,6 +532,18 @@ let rec t_hi_conseq notmod f1 f2 f3 g =
              es.es_pr es.es_po)
           [t_use nf2; t_use nf3; t_use nf1]
       ] g
+
+  | FequivS _, Some((nf1,_),{f_node = FequivS es}), Some (_,f), None when is_bdHoareS f ->
+    let _ = get_goal (fst g, nf1) in
+    let tac = if notmod then t_equivS_conseq_nm else t_equivS_conseq in
+    t_seq_subgoal (tac es.es_pr es.es_po) 
+      [t_trivial; t_trivial; t_hi_conseq notmod None f2 None] g
+  | FequivS _, Some((nf1,_),{f_node = FequivS es}), None, Some (_,f) when is_bdHoareS f ->
+    let _ = get_goal (fst g, nf1) in
+    let tac = if notmod then t_equivS_conseq_nm else t_equivS_conseq in
+    t_seq_subgoal (tac es.es_pr es.es_po) 
+      [t_trivial; t_trivial; t_hi_conseq notmod None None f3] g
+
   | FequivS es, Some _, Some _, None ->
     let (juc,n) = g in
     let f3 = f_hoareS (mhr, snd es.es_mr) f_true es.es_sr f_true in
@@ -594,30 +609,33 @@ let rec t_hi_conseq notmod f1 f2 f3 g =
     let (juc,gs) = EcPhlTauto.t_hoare_true (juc,n2) in
     t_hi_conseq notmod f1 (Some((n2,gs),f2)) f3 (juc,n)
   | _ -> 
-    tacuerror "do not known what to do"
-
-
-
-     
-
+    let pp_f f = 
+      match f.f_node with
+      | FequivF _ -> "equivF"
+      | FequivS _ -> "equivS"
+      | FhoareF _ -> "hoareF"
+      | FhoareS _ -> "hoareS"
+      | FbdHoareF _ -> "phoareF"
+      | FbdHoareS _ -> "phoareS"
+      | _ -> "?" in
+    let pp_o f = 
+      match f with
+      | None -> "_"
+      | Some (_,f) -> pp_f f in
+    tacuerror "do not how to combine %s and %s and %s into %s"
+       (pp_o f1) (pp_o f2) (pp_o f3) (pp_f concl)
 
 
 
 (* -------------------------------------------------------------------- *)
-let process_conseq notmod info (_, n as g) =
-  let process_cut g ((pre,post),bd) =
-    let hyps,concl = get_goal g in
-    let ensure_none o =
-      if o <> None then tacuerror "Can not give a bound here." in
-    let penv, qenv, gpre, gpost, fmake =
+let process_conseq notmod (info1,info2,info3) (juc, n as g) =
+  let hyps,concl = get_goal g in
+  let ensure_none o =
+    if o <> None then tacuerror "Can not give a bound here." in
+
+  let process_cut1 ((pre,post),bd) =
+     let penv, qenv, gpre, gpost, fmake =
       match concl.f_node with
-      | FhoareF hf ->
-        let penv, qenv = LDecl.hoareF hf.hf_f hyps in
-        penv, qenv, hf.hf_pr, hf.hf_po,
-        (fun pre post bd -> 
-          match bd with
-          | None -> f_hoareF pre hf.hf_f post
-          | Some(cmp,bd) -> f_bdHoareF pre hf.hf_f post (oget cmp) bd)
       | FhoareS hs ->
         let env = LDecl.push_active hs.hs_m hyps in
         env, env, hs.hs_pr, hs.hs_po,
@@ -625,29 +643,32 @@ let process_conseq notmod info (_, n as g) =
           match bd with
           | None ->f_hoareS_r { hs with hs_pr = pre; hs_po = post }
           | Some(cmp,bd) -> f_bdHoareS hs.hs_m pre hs.hs_s post (oget cmp) bd)
-      | FbdHoareF bhf ->
-        let penv, qenv = LDecl.hoareF bhf.bhf_f hyps in
-        penv, qenv, bhf.bhf_pr, bhf.bhf_po,
-        (fun pre post bd ->
-          let cmp,bd = odfl (None,bhf.bhf_bd) bd in
-          let cmp = odfl bhf.bhf_cmp cmp in
-          f_bdHoareF pre bhf.bhf_f post cmp bd)
+      | FhoareF hf ->
+        let penv, qenv = LDecl.hoareF hf.hf_f hyps in
+        penv, qenv, hf.hf_pr, hf.hf_po,
+        (fun pre post bd -> 
+          match bd with
+          | None -> f_hoareF pre hf.hf_f post
+          | Some(cmp,bd) -> f_bdHoareF pre hf.hf_f post (oget cmp) bd)
       | FbdHoareS bhs ->
         let env = LDecl.push_active bhs.bhs_m hyps in
         env, env, bhs.bhs_pr, bhs.bhs_po,
         (fun pre post bd ->
-          let cmp,bd = odfl (None,bhs.bhs_bd) bd in
+          let cmp,bd = odfl (None, bhs.bhs_bd) bd in
           let cmp = odfl bhs.bhs_cmp cmp in
           f_bdHoareS_r
             { bhs with bhs_pr = pre; bhs_po = post; bhs_cmp = cmp; bhs_bd = bd})
       | FequivF ef ->
         let penv, qenv = LDecl.equivF ef.ef_fl ef.ef_fr hyps in
         penv, qenv, ef.ef_pr, ef.ef_po,
-        (fun pre post bd -> ensure_none bd;f_equivF pre ef.ef_fl ef.ef_fr post)
+        (fun pre post bd -> 
+          ensure_none bd;f_equivF pre ef.ef_fl ef.ef_fr post)
       | FequivS es ->
         let env = LDecl.push_all [es.es_ml; es.es_mr] hyps in
         env, env, es.es_pr, es.es_po,
-        (fun pre post bd -> ensure_none bd;f_equivS_r { es with es_pr = pre; es_po = post })
+        (fun pre post bd -> 
+          ensure_none bd;
+          f_equivS_r { es with es_pr = pre; es_po = post })
       | _ -> tacuerror "cannot apply conseq rule, not a phl/prhl judgement"
     in
     let pre = match pre with
@@ -665,49 +686,84 @@ let process_conseq notmod info (_, n as g) =
     fmake pre post bd
   in
 
-  let (juc,an), gs = process_mkn_apply (process_cut g) info g in
-  let lt = ref [t_use an gs] in
-  let t_trivial = t_try (t_lseq [t_simplify_nodelta;t_split;t_fail]) in
-  let t_conseq =
-    let (_,f) = get_node (juc,an) in
-    match f.f_node with
-    | FhoareF hf   ->
-      if notmod then t_hoareF_conseq_nm hf.hf_pr hf.hf_po
-      else t_hoareF_conseq hf.hf_pr hf.hf_po
-    | FhoareS hs   ->
-      if notmod then t_hoareS_conseq_nm hs.hs_pr hs.hs_po
-      else t_hoareS_conseq hs.hs_pr hs.hs_po
-    | FbdHoareF hf ->
-      let concl = get_concl g in
-      let tac = 
-        let t1 =
-          if notmod then t_bdHoareF_conseq_nm hf.bhf_pr hf.bhf_po
-          else t_bdHoareF_conseq hf.bhf_pr hf.bhf_po in
-        let t2 = t_bdHoareF_conseq_bd hf.bhf_cmp hf.bhf_bd in
-        lt := t_trivial :: !lt;
-        t_seq_subgoal t2 [t_id None; t1] in
-      if is_hoareF concl then t_seq t_hoareF_conseq_bdhoare tac
-      else tac        
-    | FbdHoareS hs ->
-      let concl = get_concl g in
-      let tac =
-        let t1 =
-          if notmod then t_bdHoareS_conseq_nm hs.bhs_pr hs.bhs_po
-          else t_bdHoareS_conseq hs.bhs_pr hs.bhs_po in
-        let t2 = t_bdHoareS_conseq_bd hs.bhs_cmp hs.bhs_bd in
-        lt := t_trivial :: !lt;
-        t_seq_subgoal t2 [t_id None; t1] in
-      if is_hoareS concl then
-        t_seq t_hoareS_conseq_bdhoare tac
-      else tac  
-    | FequivF ef   ->
-      if notmod then t_equivF_conseq_nm ef.ef_pr ef.ef_po
-      else t_equivF_conseq ef.ef_pr ef.ef_po
-    | FequivS es   ->
-      if notmod then t_equivS_conseq_nm es.es_pr es.es_po
-      else t_equivS_conseq es.es_pr es.es_po
-    | _ -> tacuerror "cannot apply conseq rule, not a phl/prhl judgement"
+  let process_cut2 side ((pre,post),bd) =
+    let penv, qenv, gpre, gpost, fmake =
+      match concl.f_node with
+      | FhoareS hs ->
+        let env = LDecl.push_active hs.hs_m hyps in
+        env, env, hs.hs_pr, hs.hs_po,
+        (fun pre post bd -> 
+          ensure_none bd;f_hoareS_r { hs with hs_pr = pre; hs_po = post })
+      | FhoareF hf ->
+        let penv, qenv = LDecl.hoareF hf.hf_f hyps in
+        penv, qenv, hf.hf_pr, hf.hf_po,
+        (fun pre post bd -> 
+          ensure_none bd;f_hoareF pre hf.hf_f post)
+      | FbdHoareS bhs ->
+        let env = LDecl.push_active bhs.bhs_m hyps in
+        env, env, bhs.bhs_pr, bhs.bhs_po,
+        (fun pre post bd -> 
+          ensure_none bd;f_hoareS bhs.bhs_m pre bhs.bhs_s post)
+      | FequivF ef ->
+        let f = if side then ef.ef_fl else ef.ef_fr in
+        let penv,qenv = LDecl.hoareF f hyps in
+        penv, qenv, f_true, f_true, (* TODO can we improve this ? *)
+        (fun pre post bd -> 
+          ensure_none bd;f_hoareF pre f post)
+      | FequivS es ->
+        let f = if side then es.es_sl else es.es_sr in
+        let m = if side then es.es_ml else es.es_mr in
+        let env = LDecl.push_active m hyps in
+        env, env, f_true, f_true, (* TODO can we improve this ? *)
+        (fun pre post bd ->
+          match info1, bd with
+          | None, _ ->
+            let cmp,bd = odfl (None, f_r1) bd in
+            let cmp = odfl FHeq cmp in 
+            f_bdHoareS m pre f post cmp bd
+          | _, None -> f_hoareS m pre f post
+          | _, Some (cmp,bd) ->
+            let cmp = odfl FHeq cmp in 
+            f_bdHoareS m pre f post cmp bd)
+      | _ -> tacuerror "cannot apply conseq rule, not a phl/prhl judgement"
+    in
+    let pre = match pre with
+      | None -> gpre
+      | Some pre -> process_form penv pre tbool in
+    let post = match post with
+      | None -> gpost
+      | Some post -> process_form qenv post tbool in
+    let bd = match bd with
+      | None -> None
+      | Some (cmp,bd) ->
+        let bd = process_form penv bd treal in
+        let cmp  = cmp |> omap (function PFHle -> FHle | PFHeq -> FHeq | PFHge -> FHge) in
+        Some (cmp,bd) in
+    fmake pre post bd
   in
-    t_subgoal (t_trivial :: t_trivial :: !lt) (t_conseq (juc, n))
 
-
+  let juc, f1 = 
+    match info1 with
+    | None -> juc, None
+    | Some info ->
+      let (juc,nf1), gs1 = process_mkn_apply process_cut1 info g in
+      let f1 = get_concl (juc,nf1) in  
+      juc, Some ((nf1,gs1), f1) in
+  let juc, f2 = 
+    match info2 with
+    | None -> juc, None
+    | Some info ->
+      let (juc,nf2), gs2 = 
+        process_mkn_apply (process_cut2 true) info (juc,n) in
+      let f2 = get_concl (juc,nf2) in
+      juc, Some ((nf2,gs2), f2) in
+  let juc, f3 = 
+    match info3 with
+    | None -> juc, None
+    | Some info ->
+      let (juc,nf3), gs3 = 
+        process_mkn_apply (process_cut2 false) info (juc,n) in
+      let f3 = get_concl (juc,nf3) in
+      juc, Some ((nf3,gs3), f3) in
+  t_hi_conseq notmod f1 f2 f3 (juc,n)
+  
