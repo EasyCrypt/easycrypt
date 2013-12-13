@@ -469,7 +469,7 @@ and rwside = [`LtoR | `RtoL]
 and rwocc  = Sint.t option
 
 type intropattern1 =
-  | IPCore  of renaming located
+  | IPCore  of (trepeat option * renaming) located
   | IPCase  of intropattern list
   | IPRw    of (rwocc * rwside)
   | IPClear of psymbol list
@@ -479,7 +479,10 @@ type intropattern1 =
 and intropattern = intropattern1 list
 
 and renaming = [
-  `NoName | `FindName | `WithRename of string | `NoRename of string
+  | `Named of psymbol
+  | `Clear
+  | `Private
+  | `AutoName
 ]
 
 type pdbmap1 = {

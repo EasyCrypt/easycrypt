@@ -1554,28 +1554,23 @@ tselect:
 (* -------------------------------------------------------------------- *)
 (* tactic                                                               *)
 
-intro_pattern_1_name:
-| s=LIDENT   { s }
-| s=UIDENT   { s }
-| s=MIDENT   { s }
+ip1name:
+| s=LIDENT { s }
+| s=UIDENT { s }
+| s=MIDENT { s }
 ;
 
-intro_pattern_1:
-| UNDERSCORE
-    { `NoName }
-
-| QUESTION
-   { `FindName }
-
-| s=intro_pattern_1_name
-    {`NoRename s}
-
-| s=intro_pattern_1_name NOT
-    {`WithRename s}
+ip1:
+| x=loc(ip1name) { (None, `Named x) }
+| UNDERSCORE     { (None, `Clear  ) }
+| QUESTION       { (None, `Private) }
+| STAR           { (None, `AutoName) }
+| NOT QUESTION   { (Some (`All, None), `Private) }
+| NOT STAR       { (Some (`All, None), `AutoName) }
 ;
 
 intro_pattern:
-| x=loc(intro_pattern_1)
+| x=loc(ip1)
    { IPCore x }
 
 | LBRACKET RBRACKET
