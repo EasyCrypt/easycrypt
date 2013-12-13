@@ -658,6 +658,13 @@ let process_conseq notmod (info1,info2,info3) (juc, n as g) =
           let cmp = odfl bhs.bhs_cmp cmp in
           f_bdHoareS_r
             { bhs with bhs_pr = pre; bhs_po = post; bhs_cmp = cmp; bhs_bd = bd})
+      | FbdHoareF hf ->
+        let penv, qenv = LDecl.hoareF hf.bhf_f hyps in
+        penv, qenv, hf.bhf_pr, hf.bhf_po,
+        (fun pre post bd -> 
+          let cmp,bd = odfl (None, hf.bhf_bd) bd in
+          let cmp = odfl hf.bhf_cmp cmp in
+          f_bdHoareF pre hf.bhf_f post cmp bd)
       | FequivF ef ->
         let penv, qenv = LDecl.equivF ef.ef_fl ef.ef_fr hyps in
         penv, qenv, ef.ef_pr, ef.ef_po,
@@ -747,7 +754,7 @@ let process_conseq notmod (info1,info2,info3) (juc, n as g) =
     | None -> juc, None
     | Some info ->
       let (juc,nf1), gs1 = process_mkn_apply process_cut1 info g in
-      let f1 = get_concl (juc,nf1) in  
+      let _, f1 = get_node (juc,nf1) in  
       juc, Some ((nf1,gs1), f1) in
   let juc, f2 = 
     match info2 with
@@ -755,7 +762,7 @@ let process_conseq notmod (info1,info2,info3) (juc, n as g) =
     | Some info ->
       let (juc,nf2), gs2 = 
         process_mkn_apply (process_cut2 true) info (juc,n) in
-      let f2 = get_concl (juc,nf2) in
+      let _, f2 = get_node (juc,nf2) in
       juc, Some ((nf2,gs2), f2) in
   let juc, f3 = 
     match info3 with
@@ -763,7 +770,7 @@ let process_conseq notmod (info1,info2,info3) (juc, n as g) =
     | Some info ->
       let (juc,nf3), gs3 = 
         process_mkn_apply (process_cut2 false) info (juc,n) in
-      let f3 = get_concl (juc,nf3) in
+      let _, f3 = get_node (juc,nf3) in
       juc, Some ((nf3,gs3), f3) in
   t_hi_conseq notmod f1 f2 f3 (juc,n)
   
