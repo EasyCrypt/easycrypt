@@ -2,8 +2,10 @@
 open EcUtils
 
 (* -------------------------------------------------------------------- *)
+type idx_t = int * int
+
 type ecloader = {
-  mutable ecl_idirs : (bool * string) list;
+  mutable ecl_idirs : ((bool * string) * idx_t) list;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -18,11 +20,32 @@ let dup (ld : ecloader) = { ecl_idirs = ld.ecl_idirs; }
 
 (* -------------------------------------------------------------------- *)
 let forsys (ld : ecloader) =
-  { ecl_idirs = List.filter (fun (b, _) -> b) ld.ecl_idirs; }
+  { ecl_idirs = List.filter (fun ((b, _), _) -> b) ld.ecl_idirs; }
 
 (* -------------------------------------------------------------------- *)
-let addidir ?(system = false) (idir : string) (ecl : ecloader) =
-  ecl.ecl_idirs <- (system, idir) :: ecl.ecl_idirs
+let rec addidir ?(system = false) ?(recursive = false) (idir : string) (ecl : ecloader) =
+  if recursive then begin
+    let isdir filename =
+      let filename = Filename.concat idir filename in
+        try Sys.is_directory filename with Sys_error _ -> false
+    in
+
+    let dirs = (try EcUtils.Os.listdir idir with Unix.Unix_error _ -> []) in
+    let dirs = List.sort compare (List.filter isdir dirs) in
+
+      List.iter (fun filename ->
+        if not (String.startswith "." filename) then
+          let filename = Filename.concat idir filename in
+            addidir ~system ~recursive filename ecl)
+        dirs
+  end;
+
+  match (try Some (Unix.stat idir) with Unix.Unix_error _ -> None) with
+  | None    -> ()
+  | Some st ->
+      let idx = (st.Unix.st_dev, st.Unix.st_ino) in
+        if not (List.exists ((=) idx |- snd) ecl.ecl_idirs) then
+            ecl.ecl_idirs <- ((system, idir), idx) :: ecl.ecl_idirs
 
 (* -------------------------------------------------------------------- *)
 let try_stat name =
@@ -61,7 +84,7 @@ let locate ?(onlysys = false) (name : string) (ecl : ecloader) =
   else
     let name = Printf.sprintf "%s.ec" name in
   
-    let locate (issys, idir) =
+    let locate ((issys, idir), _) =
       match onlysys && not issys with
       | true  -> None
       | false ->
