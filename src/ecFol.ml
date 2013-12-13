@@ -745,6 +745,11 @@ let fop_weight ty = f_op EcCoreLib.p_weight [ty] (tfun (tdistr ty) treal)
 let f_weight ty d = f_app (fop_weight ty) [d] treal
 
 (* -------------------------------------------------------------------- *)
+let f_identity ?(name = "x") ty =
+  let name  = EcIdent.create name in
+    f_lambda [name, GTty ty] (f_local name ty)
+
+(* -------------------------------------------------------------------- *)
 exception DestrError of string
 
 let destr_error e = raise (DestrError e)

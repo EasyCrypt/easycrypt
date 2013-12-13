@@ -231,8 +231,11 @@ let t_do b omax t g =
         in
           if fail then raise e else t_id None g
 
-    | Some (`Success (juc, ln)) -> 
-        t_subgoal (List.map (fun _ -> doit (i+1)) ln) (juc, ln)
+    | Some (`Success (juc, ln)) ->
+        if   ln = [snd g]
+        then (juc, ln)
+        else t_subgoal (List.map (fun _ -> doit (i+1)) ln) (juc, ln)
+
   in
     doit 0 g
 
@@ -288,7 +291,7 @@ let t_subgoal lt gs =
 
 let t_admit g =
   let rule = { pr_name = RN_admit; pr_hyps = []; } in
-  upd_rule_done rule g
+    upd_rule_done rule g
 
 let check_hyps hyps1 hyps2 =
   assert (hyps1 == hyps2) (* FIXME error message *)

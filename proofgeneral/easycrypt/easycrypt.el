@@ -70,6 +70,9 @@
   (setq proof-shell-start-silent-cmd "pragma silent. "
         proof-shell-stop-silent-cmd  "pragma verbose. ")
 
+  ; Ask for the current goal
+  (setq proof-showproof-command "pragma noop. ")
+
   (easycrypt-init-syntax-table)
   ;; we can cope with nested comments
   (set (make-local-variable 'comment-quote-nested) nil)
@@ -81,7 +84,7 @@
   "Configure Proof General shell for EasyCrypt."
   (easycrypt-init-output-syntax-table)
   (setq  proof-shell-auto-terminate-commands    easycrypt-terminal-string)
-  (setq  proof-shell-eager-annotation-start     "^\\[info\\]")
+  (setq  proof-shell-eager-annotation-start     "^\\[W\\] *")
   (setq  proof-shell-strip-crs-from-input       nil)
   (setq  proof-shell-annotated-prompt-regexp    "^\\[[0-9]+|\\sw+\\]>")
   (setq  proof-shell-clear-goals-regexp         easycrypt-shell-proof-completed-regexp)
@@ -156,6 +159,9 @@
 
 (defun easycrypt-highlight-error-hook ()
   (easycrypt-highlight-error))
+
+(defun easycrypt-redisplay-hook ()
+  (easycrypt-redisplay))
 
 (add-hook 'proof-shell-handle-error-or-interrupt-hook
           'easycrypt-highlight-error-hook t)
