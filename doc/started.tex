@@ -25,8 +25,15 @@ local toolchain (including the provers), activates it and builds \EasyCrypt.
 \end{verbatim}
 
 The toolchain and provers may take up to an hour to build, but this only has to
-be done once. To keep your version of \EasyCrypt up to date, simply run the
-following command.
+be done once, although you will need to activate it using the following command
+every time you wish to work with \EasyCrypt.
+
+\begin{verbatim}
+  $(./scripts/activate-toolchain.sh)
+\end{verbatim}
+
+To keep your version of \EasyCrypt up to date, simply run the following command
+(the toolchain must be active).
 
 \begin{verbatim}
   git pull && make
@@ -86,7 +93,9 @@ system.
 
 \subsection{This documentation}
 The source for this document, along with the macros and language definitions
-used, are available in the public repository.
+used, are available in the public repository. Feel free to use the language
+definitions to typeset your \EasyCrypt-related documents, and to contribute
+improvements to the macros if you have any.
 
 %%% Local Variables: 
 %%% mode: latex
