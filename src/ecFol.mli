@@ -267,6 +267,9 @@ val f_mu      : form -> form -> form
 val f_mu_x    : form -> form -> form
 val f_weight  : EcTypes.ty -> form -> form
 
+(* common functions *)
+val f_identity : ?name:EcSymbols.symbol -> EcTypes.ty -> form
+
 (* -------------------------------------------------------------------- *)
 module FSmart : sig
   type a_local = EcIdent.t * ty

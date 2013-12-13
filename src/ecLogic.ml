@@ -249,8 +249,11 @@ let t_do b omax t g =
         in
           if fail then raise e else t_id None g
 
-    | Some (`Success (juc, ln)) -> 
-        t_subgoal (List.map (fun _ -> doit (i+1)) ln) (juc, ln)
+    | Some (`Success (juc, ln)) ->
+        if   ln = [snd g]
+        then (juc, ln)
+        else t_subgoal (List.map (fun _ -> doit (i+1)) ln) (juc, ln)
+
   in
     doit 0 g
 

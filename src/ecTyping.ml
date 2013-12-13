@@ -397,8 +397,8 @@ let select_pv env side name ue tvi psig =
 let gen_select_op ~actonly ~mode (fpv, fop, flc) opsc tvi env name ue psig =
   let filter =
     match mode with
-    | `Expr -> fun op -> not (EcDecl.is_pred op)
-    | `Form -> fun _  -> true
+    | `Expr _ -> fun op -> not (EcDecl.is_pred op)
+    | `Form   -> fun _  -> true
   in
   match (if tvi = None then select_local env name else None) with
   | Some (id, ty) ->
@@ -416,17 +416,21 @@ let gen_select_op ~actonly ~mode (fpv, fop, flc) opsc tvi env name ue psig =
         | _, _ -> ops
       in
       let me, pvs =
-        match EcEnv.Memory.get_active env, actonly with
-        | None, true -> (None, [])
-        | me  , _    -> (  me, select_pv env me name ue tvi psig)
+        match mode with
+        | `Expr `InOp ->
+            (None, [])
+        | `Expr `InProc | `Form ->
+            match EcEnv.Memory.get_active env, actonly with
+            | None, true -> (None, [])
+            | me  , _    -> (  me, select_pv env me name ue tvi psig)
       in
         (List.map (fpv me) pvs) @ (List.map fop ops)
 
-let select_exp_op env opsc name ue tvi psig =
-  let ppv = (fun _ (pv, ty, ue) -> (e_var pv ty, ty, ue))
-  and pop = (fun ((op, tys), ty, ue) -> (e_op op tys ty, ty, ue))
-  and flc = (fun (id, ty, ue) -> (e_local id ty, ty, ue)) in
-    gen_select_op ~actonly:false ~mode:`Expr (ppv, pop, flc)
+let select_exp_op env mode opsc name ue tvi psig =
+  let ppv  = (fun _ (pv, ty, ue) -> (e_var pv ty, ty, ue))
+  and pop  = (fun ((op, tys), ty, ue) -> (e_op op tys ty, ty, ue))
+  and flc  = (fun (id, ty, ue) -> (e_local id ty, ty, ue)) in
+    gen_select_op ~actonly:false ~mode:(`Expr mode) (ppv, pop, flc)
       opsc tvi env name ue psig 
 
 let select_form_op env opsc name ue tvi psig =
@@ -1018,7 +1022,7 @@ let trans_record env ue subtt (loc, fields) =
     (ctor, fields, (rtvi, reccty))
 
 (* -------------------------------------------------------------------- *)
-let transexp (env : EcEnv.env) (ue : EcUnify.unienv) e =
+let transexp (env : EcEnv.env) mode ue e =
   let rec transexp_r (osc : EcPath.path option) (env : EcEnv.env) (e : pexpr) =
     let loc = e.pl_loc in
     let transexp = transexp_r osc in
@@ -1028,7 +1032,7 @@ let transexp (env : EcEnv.env) (ue : EcUnify.unienv) e =
 
     | PEident ({ pl_desc = name }, tvi) -> 
         let tvi = tvi |> omap (transtvi env ue) in
-        let ops = select_exp_op env osc name ue tvi [] in
+        let ops = select_exp_op env mode osc name ue tvi [] in
         begin match ops with
         | [] -> tyerror loc env (UnknownVarOrOp (name, []))
 
@@ -1048,7 +1052,7 @@ let transexp (env : EcEnv.env) (ue : EcUnify.unienv) e =
         let tvi  = tvi |> omap (transtvi env ue) in  
         let es   = List.map (transexp env) pes in
         let esig = snd (List.split es) in
-        let ops  = select_exp_op env osc name ue tvi esig in
+        let ops  = select_exp_op env mode osc name ue tvi esig in
         begin match ops with
         | [] ->
           let esig = Tuni.offun_dom (EcUnify.UniEnv.assubst ue) esig in
@@ -1133,14 +1137,14 @@ let transexp (env : EcEnv.env) (ue : EcUnify.unienv) e =
   in
     transexp_r None env e
 
-let transexpcast (env : EcEnv.env) (ue : EcUnify.unienv) t e =
-  let (e', t') = transexp env ue e in
+let transexpcast (env : EcEnv.env) mode ue t e =
+  let (e', t') = transexp env mode ue e in
     unify_or_fail env ue e.pl_loc ~expct:t t'; e'
 
-let transexpcast_opt (env : EcEnv.env) (ue : EcUnify.unienv) oty e =
+let transexpcast_opt (env : EcEnv.env) mode ue oty e =
   match oty with
-  | None -> fst (transexp env ue e)
-  | Some t -> transexpcast env ue t e
+  | None   -> fst (transexp env mode ue e)
+  | Some t -> transexpcast env mode ue t e
 
 (* -------------------------------------------------------------------- *)
 exception DuplicatedSigItemName
@@ -1473,7 +1477,7 @@ and transbody ue symbols (env : EcEnv.env) retty pbody =
 
     let xs     = snd (unloc local.pfl_names) in
     let mode   = fst (unloc local.pfl_names) in
-    let init   = local.pfl_init |> omap (fst -| transexp !env ue) in
+    let init   = local.pfl_init |> omap (fst -| transexp !env `InProc ue) in
     let ty     = local.pfl_type |> omap (transty tp_uni !env ue) in
 
     let ty =
@@ -1532,7 +1536,7 @@ and transbody ue symbols (env : EcEnv.env) retty pbody =
         None
 
     | Some pe ->
-        let (e, ety) = transexp !env ue pe in
+        let (e, ety) = transexp !env `InProc ue pe in
           try
             EcUnify.unify !env ue tunit retty;
             tyerror loc !env UnitFunWithReturn
@@ -1591,7 +1595,7 @@ and transinstr (env : EcEnv.env) ue (i : pinstr) =
         List.map2
           (fun a {v_type = ty} ->
             let loc = a.pl_loc in
-            let a, aty = transexp env ue a in
+            let a, aty = transexp env `InProc ue a in
             unify_or_fail env ue loc ~expct:ty aty; a)
           args fdef.f_sig.fs_params
       in
@@ -1601,13 +1605,13 @@ and transinstr (env : EcEnv.env) ue (i : pinstr) =
   match i.pl_desc with
   | PSasgn (plvalue, prvalue) -> 
       let lvalue, lty = translvalue ue env plvalue in
-      let rvalue, rty = transexp env ue prvalue in
+      let rvalue, rty = transexp env `InProc ue prvalue in
       unify_or_fail env ue prvalue.pl_loc ~expct:lty rty;
       i_asgn (lvalue, rvalue)
 
   | PSrnd (plvalue, prvalue) -> 
       let lvalue, lty = translvalue ue env plvalue in
-      let rvalue, rty = transexp env ue prvalue in
+      let rvalue, rty = transexp env `InProc ue prvalue in
       unify_or_fail env ue prvalue.pl_loc ~expct:(tdistr lty) rty;
       i_rnd (lvalue, rvalue)
 
@@ -1632,20 +1636,20 @@ and transinstr (env : EcEnv.env) ue (i : pinstr) =
         transinstr env ue (mk_loc i.pl_loc (PSasgn (lvalue, ope)))
 
   | PSif (pe, s1, s2) ->
-      let e, ety = transexp env ue pe in
+      let e, ety = transexp env `InProc ue pe in
       let s1 = transstmt env ue  s1 in
       let s2 = transstmt env ue s2 in
       unify_or_fail env ue pe.pl_loc ~expct:tbool ety;
       i_if (e, s1, s2)
 
   | PSwhile (pe, pbody) ->
-      let e, ety = transexp env ue pe in
+      let e, ety = transexp env `InProc ue pe in
       let body = transstmt env ue pbody in
       unify_or_fail env ue pe.pl_loc ~expct:tbool ety;
       i_while (e, body)
 
   | PSassert pe ->
-      let e, ety = transexp env ue pe in 
+      let e, ety = transexp env `InProc ue pe in 
       unify_or_fail env ue pe.pl_loc ~expct:tbool ety;
       i_assert e
 
@@ -1673,10 +1677,10 @@ and translvalue ue (env : EcEnv.env) lvalue =
       let tvi = tvi |> omap (transtvi env ue) in
       let codomty = UE.fresh ue in
       let pv,xty = trans_pv env x in
-      let e, ety = transexp env ue e in
+      let e, ety = transexp env `InProc ue e in
       let name =  ([],EcCoreLib.s_set) in
       let esig = [xty; ety; codomty] in
-      let ops = select_exp_op env None name ue tvi esig in
+      let ops = select_exp_op env `InProc None name ue tvi esig in
 
       match ops with
       | [] ->

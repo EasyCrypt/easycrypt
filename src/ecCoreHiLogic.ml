@@ -47,10 +47,10 @@ let process_formula hyps pf =
   process_form hyps pf tbool
 
 (* -------------------------------------------------------------------- *)
-let process_exp hyps e oty =
+let process_exp hyps mode e oty =
   let env  = LDecl.toenv hyps in
   let ue  = unienv_of_hyps hyps in
-  let e   =  TT.transexpcast_opt env ue oty e in
+  let e   =  TT.transexpcast_opt env mode ue oty e in
     EcTypes.e_uni (EcUnify.UniEnv.close ue) e
 
 (* -------------------------------------------------------------------- *)

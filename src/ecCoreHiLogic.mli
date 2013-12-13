@@ -77,7 +77,7 @@ val concretize_pterm :
 val process_form_opt : LDecl.hyps -> pformula -> ty option -> form
 val process_form     : LDecl.hyps -> pformula -> ty -> form
 val process_formula  : LDecl.hyps -> pformula -> form
-val process_exp      : LDecl.hyps -> pexpr -> ty option -> expr
+val process_exp      : LDecl.hyps -> [`InProc|`InOp] -> pexpr -> ty option -> expr
 
 (* -------------------------------------------------------------------- *)
 val process_mkn_apply :
