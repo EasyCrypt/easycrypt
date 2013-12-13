@@ -286,32 +286,35 @@ let process_apply loc pe g =
   let args = List.map (trans_pterm_argument hyps ue) pe.fp_args in
   let (ax, ids) = check_pterm_arguments hyps ue ax args in
 
-  let rec instanciate (ax, ids) =
-    let ev = evmap_of_pterm_arguments ids in
-
-    try  (ax, ids, EcMetaProg.f_match hyps (ue, ev) ax fp);
-    with MatchFailure ->
-      match destruct_product hyps ax with
-      | None   -> tacuerror "in apply, cannot find instance"
-      | Some _ ->
-          let (ax, id) = check_pterm_argument hyps ue ax None in
-            instanciate (ax, id :: ids)
-  in
-
   let (_, ids, (_, tue, ev)) =
-    let fully_instantiate =
-      can_concretize_pterm_arguments (ue, EV.empty) ids
+    let rec instanciate (ax, ids) =
+      let withmatch () =
+        let ev = evmap_of_pterm_arguments ids in
+  
+          try  (ax, ids, EcMetaProg.f_match hyps (ue, ev) ax fp);
+          with MatchFailure ->
+            match destruct_product hyps ax with
+            | None   -> tacuerror "in apply, cannot find instance"
+            | Some _ ->
+              let (ax, id) = check_pterm_argument hyps ue ax None in
+                instanciate (ax, id :: ids)
+      in
+  
+      let flinst = can_concretize_pterm_arguments (ue, EV.empty) ids in
+  
+        match flinst with
+        | false -> withmatch ()
+        | true  ->
+            let closedax = Fsubst.uni (EcUnify.UniEnv.close ue) ax in
+  
+            if EcReduction.is_conv hyps closedax fp then begin
+              (ax, ids, (ue, EcUnify.UniEnv.close ue, EV.empty))
+            end else
+              withmatch ()
+
     in
+      instanciate (ax, ids)
 
-      match fully_instantiate with
-      | false -> instanciate (ax, ids)
-      | true  ->
-          let closedax = Fsubst.uni (EcUnify.UniEnv.close ue) ax in
-
-          if EcReduction.is_conv hyps closedax fp then begin
-            (ax, ids, (ue, EcUnify.UniEnv.close ue, EV.empty))
-          end else
-            instanciate (ax, ids)
   in
 
   let args = concretize_pterm_arguments (tue, ev) ids in
