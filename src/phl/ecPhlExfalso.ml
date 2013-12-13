@@ -1,6 +1,5 @@
 (* -------------------------------------------------------------------- *)
 open EcFol
-open EcBaseLogic
 open EcLogic
 open EcCorePhl
 open EcPhlTauto
