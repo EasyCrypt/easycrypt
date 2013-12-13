@@ -29,7 +29,6 @@ let p_bool  = _Pervasive "bool"
 let p_int   = _Pervasive "int"
 let p_real  = _Pervasive "real"
 let p_distr = _Pervasive "distr"
-let p_cpred = _Pervasive "cpred"
 
 (* -------------------------------------------------------------------- *)
 (*                         Numbers theories                             *)

@@ -35,7 +35,6 @@ val p_bool  : path
 val p_int   : path
 val p_real  : path
 val p_distr : path 
-val p_cpred : path 
 val p_fset  : path
 
 (* -------------------------------------------------------------------- *)
