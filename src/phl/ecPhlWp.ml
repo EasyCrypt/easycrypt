@@ -48,7 +48,7 @@ module LowInternal = struct
     | _ -> raise No_wp
 end
 
-let wp ?(onesided=true) env m s post =
+let wp ?(onesided=false) env m s post =
   let r,letsf = LowInternal.wp_stmt onesided env m (List.rev s.s_node) ([],post) in
     (List.rev r, mk_let_of_lv_substs env letsf)
 
