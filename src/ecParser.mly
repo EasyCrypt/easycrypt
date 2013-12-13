@@ -2075,9 +2075,23 @@ phltactic:
 | BYEQUIV info=fpattern(conseq)
     { Pbydeno (`Equiv, info) }
 
-| CONSEQ nm=STAR? info=fpattern(conseq_bd)
-    { Pconseq (nm<>None, info) }
+| CONSEQ nm=STAR? info1=fpattern(conseq_bd)
+    { Pconseq (nm<>None, (Some info1,None,None)) }
+| CONSEQ nm=STAR? info1=fpattern(conseq_bd) info2=fpattern(conseq_bd)
+                                                               UNDERSCORE?
+    { Pconseq(nm<>None, (Some info1,Some info2, None)) }
+| CONSEQ nm=STAR? info1=fpattern(conseq_bd) UNDERSCORE 
+                                                 info3=fpattern(conseq_bd)
+    { Pconseq(nm<>None, (Some info1,None,Some info3)) }
+| CONSEQ nm=STAR? 
+    info1=fpattern(conseq_bd) info2=fpattern(conseq_bd) 
+                                                 info3=fpattern(conseq_bd)
+    { Pconseq (nm<>None, (Some info1,Some info2,Some info3)) }
 
+| CONSEQ nm=STAR? UNDERSCORE info2=fpattern(conseq_bd) UNDERSCORE?
+    { Pconseq(nm<>None, (None,Some info2, None)) }
+| CONSEQ nm=STAR? UNDERSCORE UNDERSCORE info3=fpattern(conseq_bd) 
+    { Pconseq(nm<>None, (None,None,Some info3)) }
 | ELIM STAR
     { Phr_exists_elim }
 
