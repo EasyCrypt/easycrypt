@@ -291,7 +291,7 @@ let t_subgoal lt gs =
 
 let t_admit g =
   let rule = { pr_name = RN_admit; pr_hyps = []; } in
-  upd_rule_done rule g
+    upd_rule_done rule g
 
 let check_hyps hyps1 hyps2 =
   assert (hyps1 == hyps2) (* FIXME error message *)

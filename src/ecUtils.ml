@@ -12,6 +12,74 @@ let clamp ~min ~max i =
   Pervasives.min max (Pervasives.max min i)
 
 (* -------------------------------------------------------------------- *)
+module B64 : sig
+  exception InvalidB64
+
+  val decode : string -> string
+end = struct
+  let chars = [|
+     'A';'B';'C';'D';'E';'F';'G';'H';'I';'J';'K';'L';'M';'N';'O';'P';
+     'Q';'R';'S';'T';'U';'V';'W';'X';'Y';'Z';'a';'b';'c';'d';'e';'f';
+     'g';'h';'i';'j';'k';'l';'m';'n';'o';'p';'q';'r';'s';'t';'u';'v';
+     'w';'x';'y';'z';'0';'1';'2';'3';'4';'5';'6';'7';'8';'9';'+';'/'
+  |]
+
+  let ichars =
+    let ichars = Array.make 256 (-1) in
+      for i = 0 to 64-1 do
+        ichars.(Char.code chars.(i)) <- i
+      done; ichars
+
+  exception InvalidB64
+
+  let decode (s : string) =
+    if String.length s mod 4 <> 0 then raise InvalidB64;
+
+    let aout = Buffer.create (3 * (String.length s / 4)) in
+    let pdg  = ref false in
+
+    let decode1 oin =
+      let x = ref 0 in
+      let r = ref 0 in
+
+      for i = 0 to 3 do
+        match s.[oin + i] with
+        | '=' -> pdg := true; incr r; x := !x lsl 6
+        | c   ->
+            if !pdg then raise InvalidB64;
+            match ichars.(Char.code c) with
+            | c when c < 0 -> raise InvalidB64
+            | c -> x := !x lsl 6 + c
+      done;
+      if !r > 2 then raise InvalidB64;
+      Buffer.add_char aout (Char.chr ((!x lsr 16) land 0xff));
+      if !r < 2 then Buffer.add_char aout (Char.chr ((!x lsr  8) land 0xff));
+      if !r < 1 then Buffer.add_char aout (Char.chr ((!x lsr  0) land 0xff))
+
+    in
+      for i = 0 to (String.length s / 4)-1 do decode1 (i * 4) done;
+      Buffer.contents aout
+end
+
+let b64decode (s : string) =
+  try  Some (B64.decode s)
+  with B64.InvalidB64  -> None
+
+(* -------------------------------------------------------------------- *)
+let rot13 (s : string) =
+  let forc c =
+    match
+      match c with
+      | 'a'..'z' -> Some (Char.code 'a', Char.code c)
+      | 'A'..'Z' -> Some (Char.code 'A', Char.code c)
+      | _        -> None
+    with
+    | None        -> c
+    | Some (b, i) -> Char.chr (b + ((i - b) + 13) mod 26)
+  in
+    String.map forc s
+
+(* -------------------------------------------------------------------- *)
 let tryexn (ignoreexn : exn -> bool) (f : unit -> 'a) =
   try  Some (f ())
   with e -> if ignoreexn e then None else raise e
@@ -331,7 +399,7 @@ module List = struct
   let rec pmap (f : 'a -> 'b option) (xs : 'a list) =
     match xs with
     | []      -> []
-    | x :: xs -> ocons (f x) (pmap f xs)
+    | x :: xs -> let v = f x in ocons v (pmap f xs)
 
   let rec iter2o f xs ys =
     match xs, ys with

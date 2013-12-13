@@ -28,6 +28,12 @@ let process_case loc pf g =
 let process_debug (juc, n) = (juc, [n])
 
 (* -------------------------------------------------------------------- *)
+let process_admit g =
+  (* FIXME: use notifier *)
+  EcFortune.pick () |> oiter (fun msg -> Printf.printf "[W] %s\n%!" msg);
+  t_admit g
+
+(* -------------------------------------------------------------------- *)
 let process_progress (prtc, mkpv) t =
   let t = 
     match t with 
@@ -84,7 +90,7 @@ and process_tactic_core mkpv (tac : ptactic_core) (gs : goals) : goals =
     | Pseq tacs       -> `One (fun (juc, n) -> process_tactics mkpv tacs (juc, [n]))
     | Pcase i         -> `One (process_case loc i)
     | Pprogress t     -> `One (process_progress (process_tactic_core1, mkpv) t)
-    | Padmit          -> `One (t_admit)
+    | Padmit          -> `One (process_admit)
     | Pdebug          -> `One (process_debug)
     | Plogic t        -> `One (process_logic (eng, mkpv) loc t)
     | PPhl tac        -> `One (EcHiPhl.process_phl loc tac)

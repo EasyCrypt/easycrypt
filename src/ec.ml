@@ -135,6 +135,9 @@ let _ =
   (* Instantiate terminal *)
   let lazy terminal = terminal in
 
+  (* Initialize PRNG *)
+  Random.self_init ();
+
   try
     (* Set notifier (TODO: fix this global stuff *)
     EcCommands.set_notifier

@@ -84,7 +84,7 @@
   "Configure Proof General shell for EasyCrypt."
   (easycrypt-init-output-syntax-table)
   (setq  proof-shell-auto-terminate-commands    easycrypt-terminal-string)
-  (setq  proof-shell-eager-annotation-start     "^\\[info\\]")
+  (setq  proof-shell-eager-annotation-start     "^\\[W\\] *")
   (setq  proof-shell-strip-crs-from-input       nil)
   (setq  proof-shell-annotated-prompt-regexp    "^\\[[0-9]+|\\sw+\\]>")
   (setq  proof-shell-clear-goals-regexp         easycrypt-shell-proof-completed-regexp)
