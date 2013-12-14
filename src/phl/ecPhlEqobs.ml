@@ -156,11 +156,19 @@ let rec eqobs_inF env eqg (inv,ifvl,ifvr as inve) log fl fr eqO =
     | _, _ -> raise EqObsInError 
  
 (* -------------------------------------------------------------------- *)
+
 let process_eqobs_in (geq', ginv, eqs') g = 
   let env, hyps, concl = get_goal_e g in
   let ienv = LDecl.inv_memenv hyps in
-  let es = t_as_equivS concl in
-  let ml, mr =  fst es.es_ml, fst es.es_mr in
+
+  let isfun, ml, mr, post = 
+    match concl.f_node with
+    | FequivS es ->
+      `Stmt(es.es_sl, es.es_sr), fst es.es_ml, fst es.es_mr, es.es_po
+    | FequivF ef ->
+      `Fun(ef.ef_fl, ef.ef_fr), mleft, mright, ef.ef_po
+    | _ -> tacuerror "The conclusion does not end by a prhl judgment"
+  in
  
   let toeq ml mr f = 
     try EcPV.Mpv2.of_form env ml mr f 
@@ -184,18 +192,26 @@ let process_eqobs_in (geq', ginv, eqs') g =
     match eqs' with 
     | None -> 
       begin 
-        try EcPV.Mpv2.needed_eq env ml mr es.es_po 
+        try EcPV.Mpv2.needed_eq env ml mr post
         with _ -> tacuerror "cannot infer the set of equalities" 
       end
     | Some eqs' -> 
-      let eqs = process_prhl_formula g eqs' in
+      let eqs = process_prhl_post g eqs' in
       set_loc eqs'.pl_loc (toeq ml mr) eqs in
 
-  let _, _, (log,_), _ = 
-    EcPV.eqobs_in env
-      (eqobs_inF env geq (ginv,ifvl,ifvr))
-      { query = []; forproof = Mf.empty }
-      es.es_sl es.es_sr eqs (ifvl,ifvr) in
+  let log, eqO = 
+    match isfun with
+    | `Stmt(sl,sr) ->
+      let _, _, (log,_), _ = 
+        EcPV.eqobs_in env
+          (eqobs_inF env geq (ginv,ifvl,ifvr))
+          { query = []; forproof = Mf.empty }
+          sl sr eqs (ifvl,ifvr) in log, eqs
+    | `Fun(fl,fr) ->
+      let eqO = (Mpv2.remove env (pv_res fl) (pv_res fr) eqs) in
+      let log, _, _ = eqobs_inF env geq (ginv,ifvl,ifvr) 
+        { query = []; forproof = Mf.empty } fl fr eqO in
+      log,eqO in
     
   let onF _ fl fr eqo = 
     match find_eqobs_in_log log fl fr eqo with
@@ -250,8 +266,20 @@ let process_eqobs_in (geq', ginv, eqs') g =
         (t_eqobs eqs) g 
     | Some (EORI_unknown (Some id)) ->
       t_hyp id g
-    | _ -> t_fail g
+    | _ -> 
+      t_fail g
   in
-  t_on_last 
-    (t_seq (t_eqobs eqs) (t_repeat t_rec))
-    (t_cut_spec tocut g) 
+
+  let t_last g = 
+    match isfun with
+    | `Fun (fl,fr) -> 
+      let _, _, spec = onF () fl fr eqO in
+      let ef = t_as_equivF spec in
+      t_seq_subgoal 
+        (EcPhlConseq.t_equivF_conseq ef.ef_pr ef.ef_po)
+        [t_logic_trivial;
+         t_logic_trivial;
+         t_repeat t_rec] g
+    | _ ->  t_seq (t_eqobs eqs) (t_repeat t_rec) g in
+
+  t_on_last t_last (t_cut_spec tocut g) 

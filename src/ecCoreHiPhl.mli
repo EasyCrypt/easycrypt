@@ -12,6 +12,7 @@ val process_phl_exp      : bool option -> pexpr -> ty option -> goal -> expr
 
 val process_prhl_form    : ty -> goal -> pformula -> form
 val process_prhl_formula : goal -> pformula -> form
+val process_prhl_post    : goal -> pformula -> form
 
 val process_prhl_stmt    : bool -> goal -> pstmt -> stmt
 
