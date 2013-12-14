@@ -48,7 +48,7 @@ let t_core_phoare_deno pre post g =
     prove_goal_by [concl_e;concl_pr;concl_po] rn_hl_deno g  
 
 let t_phoare_deno pre post g = 
-  let env,_, concl = get_goal_e g in
+  let concl = get_concl g in
   match concl.f_node with
   | Fapp({f_node = Fop(op,_)}, [bd;f]) when
       EcPath.p_equal op EcCoreLib.p_real_ge ->
