@@ -142,13 +142,15 @@ let rec eqobs_inF env eqg (inv,ifvl,ifvr as inve) log fl fr eqO =
           let pre = f_and eq_params (Mpv2.to_form ml mr geqi inv) in
           let post = f_and eq_res (Mpv2.to_form ml mr eqO inv) in
           let spec = f_equivF pre fl fr post in 
-          let log = add_eqobs_in_log fl fr eqO (geqi,spec,  EORI_fun eqo') log in
+          let log = 
+            add_eqobs_in_log fl fr eqO (geqi,spec,  EORI_fun eqo') log in
           log, geqi, spec
         with EqObsInError ->
           if not (Mpv2.subset eqO eqg) then raise EqObsInError;
           let inv = Mpv2.to_form mleft mright eqg inv in
           let spec = mk_inv_spec inv fl fr in
-          let log  = add_eqobs_in_log fl fr eqO (eqg,spec,EORI_unknown None) log in
+          let log  = 
+            add_eqobs_in_log fl fr eqO (eqg,spec,EORI_unknown None) log in
           log, eqg, spec
       end
     | _, _ -> raise EqObsInError 
@@ -250,6 +252,6 @@ let process_eqobs_in (geq', ginv, eqs') g =
       t_hyp id g
     | _ -> t_fail g
   in
-    t_on_last 
-      (t_seq (t_eqobs eqs) (t_repeat t_rec))
-      (t_cut_spec tocut g) 
+  t_on_last 
+    (t_seq (t_eqobs eqs) (t_repeat t_rec))
+    (t_cut_spec tocut g) 

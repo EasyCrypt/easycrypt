@@ -858,6 +858,8 @@ let rec add_eqs env local eqs e1 e2 : Mpv2.t =
     add_eqs env blocal eqs b1 b2
   | Etuple es1, Etuple es2 ->
     List.fold_left2 (add_eqs env local) eqs es1 es2
+  | Eproj(es1,i1), Eproj(es2,i2) when i1 = i2 ->
+    add_eqs env local eqs es1 es2
   | Eif(e1,t1,f1), Eif(e2,t2,f2) ->
     List.fold_left2 (add_eqs env local) eqs [e1;t1;f1] [e2;t2;f2]
   | _, _ -> raise EqObsInError
