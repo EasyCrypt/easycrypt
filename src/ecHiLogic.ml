@@ -278,7 +278,7 @@ let try_match hyps (ue, ev) p form =
   with RwMatchFound (ue, tue, ev) -> Some (ue, tue, ev)
 
 (* -------------------------------------------------------------------- *)
-let process_apply loc pe g =
+let process_apply_on_goal loc pe g =
   let (hyps, fp) = (get_hyps g, get_concl g) in
   let (p, typs, ue, ax) = process_pterm loc (process_formula hyps) hyps pe in
   let args = List.map (trans_pterm_argument hyps ue) pe.fp_args in
@@ -330,6 +330,69 @@ let process_apply loc pe g =
         assert (typs = []);
         gen_t_apply_form (fun _ _ x -> x)
           (Fsubst.uni (EcUnify.UniEnv.close ue) fc) args g
+
+(* -------------------------------------------------------------------- *)
+let process_apply_on_hyp loc (pe, hyp) g =
+  let (hyps, _) = (get_hyps g, get_concl g) in
+
+  if not (LDecl.has_hyp (unloc hyp) hyps) then
+    tacuerror "unknown hypothesis: %s" (unloc hyp);
+
+  let hyp, fp = LDecl.lookup_hyp (unloc hyp) hyps in
+  let (p, typs, ue, ax) = process_pterm loc (process_formula hyps) hyps pe in
+  let args = List.map (trans_pterm_argument hyps ue) pe.fp_args in
+  let (ax, ids) = check_pterm_arguments hyps ue ax args in
+
+  let (_, ids, (_, tue, ev), (_, cutf)) =
+    let rec instanciate (ax, ids) =
+      match destruct_product hyps ax with
+      | None -> tacuerror "in apply, cannot find instance"
+
+      | Some (`Forall _) ->
+          let (ax, id) = check_pterm_argument hyps ue ax None in
+            instanciate (ax, id :: ids)
+
+      | Some (`Imp (f1, f2)) ->
+          let ev = evmap_of_pterm_arguments ids in
+  
+          try  (ax, ids, EcMetaProg.f_match hyps (ue, ev) f1 fp, (f1, f2));
+          with MatchFailure ->
+            tacuerror "in apply, cannot find instance"
+
+    in
+      instanciate (ax, ids)
+
+  in
+
+  let cutf  = concretize_form (tue, ev) cutf in
+  let bargs = concretize_pterm_arguments (tue, ev) ids in
+  let args  = bargs @ [AAnode] in
+  let typs  = List.map (Tuni.offun tue) typs in
+  let tcut  =
+    match p with
+    | `Global p ->
+        gen_t_apply_glob (fun _ _ x -> x) p typs args
+
+    | `Local x -> 
+        assert (typs = []);
+        gen_t_apply_hyp (fun _ _ x -> x) x args
+
+    | `Cut fc ->
+        assert (typs = []);
+        gen_t_apply_form
+          (fun _ _ x -> x)
+          (Fsubst.uni (EcUnify.UniEnv.close ue) fc) args
+  in
+    t_subgoal
+      [t_seq (t_clear (Sid.singleton hyp)) (t_intros_i [hyp]);
+       (fun g -> t_on_last (t_hyp hyp) (tcut g))]
+      (t_rotate `Left 1 (t_cut cutf g))
+
+(* -------------------------------------------------------------------- *)
+let process_apply loc (pe, tg) g =
+  match tg with
+  | None    -> process_apply_on_goal loc pe g
+  | Some tg -> process_apply_on_hyp  loc (pe, tg) g
 
 (* -------------------------------------------------------------------- *)
 let process_rewrite1_core (s, o) (p, typs, ue, ax) args g =

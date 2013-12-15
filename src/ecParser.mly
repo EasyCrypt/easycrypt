@@ -1927,7 +1927,10 @@ logtactic:
    { PelimT (f, Some p) }
 
 | APPLY e=fpattern(form)
-   { Papply e }
+   { Papply (e, None) }
+
+| APPLY e=fpattern(form) IN x=ident
+   { Papply (e, Some x) }
 
 | l=simplify
    { Psimplify (mk_simplify l) }
