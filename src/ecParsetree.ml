@@ -505,7 +505,7 @@ type logtactic =
   | Ptrivial
   | Pcongr
   | Pelim       of ffpattern 
-  | Papply      of ffpattern
+  | Papply      of (ffpattern * psymbol option)
   | Pcut        of (intropattern1 option * pformula * ptactic_core option)
   | Pcutdef     of (intropattern1 option * pterm)
   | Pgeneralize of (rwocc * pformula) list
