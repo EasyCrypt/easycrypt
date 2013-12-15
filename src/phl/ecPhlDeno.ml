@@ -17,7 +17,7 @@ end
 let rn_hl_deno = RN_xtd (new rn_hl_deno :> xrule)
 
 (* -------------------------------------------------------------------- *)
-let t_phoare_deno pre post g =
+let t_core_phoare_deno pre post g =
   let env,_,concl = get_goal_e g in
   let cmp, f, bd, concl_post =
     match concl.f_node with
@@ -26,9 +26,6 @@ let t_phoare_deno pre post g =
       FHle, f, bd, fun ev -> f_imp_simpl ev post
     | Fapp({f_node = Fop(op,_)}, [f;bd]) when is_pr f &&
         EcPath.p_equal op EcCoreLib.p_eq ->
-      FHeq, f, bd, f_iff_simpl post
-    | Fapp({f_node = Fop(op,_)}, [bd;f]) when is_pr f &&
-        (EcPath.p_equal op EcCoreLib.p_eq) ->
       FHeq, f, bd, f_iff_simpl post
     | Fapp({f_node = Fop(op,_)}, [bd;f]) when is_pr f &&
         EcPath.p_equal op EcCoreLib.p_real_le ->
@@ -49,6 +46,21 @@ let t_phoare_deno pre post g =
   let me = EcEnv.Fun.actmem_post mhr f fun_ in
   let concl_po = f_forall_mems [me] (concl_post ev) in
     prove_goal_by [concl_e;concl_pr;concl_po] rn_hl_deno g  
+
+let t_phoare_deno pre post g = 
+  let concl = get_concl g in
+  match concl.f_node with
+  | Fapp({f_node = Fop(op,_)}, [bd;f]) when
+      EcPath.p_equal op EcCoreLib.p_real_ge ->
+    t_seq (t_apply_glob EcCoreLib.p_rle_ge_sym [] [AAform f;AAform bd; AAnode])
+      (t_core_phoare_deno pre post) g
+  | Fapp({f_node = Fop(op,_)}, [f;bd]) when
+    EcPath.p_equal op EcCoreLib.p_eq && not (is_pr f) -> 
+      t_seq (t_apply_glob EcCoreLib.p_eq_sym [f.f_ty] 
+               [AAform bd;AAform f; AAnode])
+      (t_core_phoare_deno pre post) g
+  | _ -> 
+     t_core_phoare_deno pre post g
 
 let t_equiv_deno pre post g =
   let env, _, concl = get_goal_e g in
@@ -96,21 +108,26 @@ let t_equiv_deno pre post g =
 let process_phoare_deno info (_,n as g) = 
   let process_cut g (pre,post) = 
     let hyps,concl = get_goal g in
+    let error () = 
+      tacuerror "the conclusion is not a suitable Pr expression" in
     let cmp, f, bd =
       match concl.f_node with
-      | Fapp({f_node = Fop(op,_)}, [f;bd]) when is_pr f &&
-          (EcPath.p_equal op EcCoreLib.p_eq || 
-             EcPath.p_equal op EcCoreLib.p_real_le) ->
-        let cmp = if EcPath.p_equal op EcCoreLib.p_eq then FHeq else FHle in
-        cmp, f, bd
-      | Fapp({f_node = Fop(op,_)}, [bd;f]) when is_pr f 
-          &&
-          (EcPath.p_equal op EcCoreLib.p_eq || 
-             EcPath.p_equal op EcCoreLib.p_real_le ) ->
-        let cmp = if EcPath.p_equal op EcCoreLib.p_eq then FHeq else FHge in
-        cmp, f , bd
-      | _ -> cannot_apply "bydeno" 
-        "the conclusion is not a suitable Pr expression" in (* FIXME error message *) 
+      | Fapp({f_node = Fop(op,_)}, [f1;f2]) when 
+          EcPath.p_equal op EcCoreLib.p_eq ->
+        if is_pr f1 then FHeq, f1, f2
+        else if is_pr f2 then FHeq, f2, f1
+        else error ()
+      | Fapp({f_node = Fop(op,_)}, [f1;f2]) when 
+          EcPath.p_equal op EcCoreLib.p_real_le ->
+        if is_pr f1 then FHle, f1, f2 (* f1 <= f2 *)
+        else if is_pr f2 then FHge, f2, f1 (* f2 >= f1 *)
+        else error ()
+      | Fapp({f_node = Fop(op,_)}, [f1;f2]) when 
+          EcPath.p_equal op EcCoreLib.p_real_ge ->
+        if is_pr f1 then FHge, f1, f2  (* f1 >= f2 *)
+        else if is_pr f2 then FHle, f2, f1 (* f2 <= f1 *)
+        else error ()
+      | _ -> error () in
     let _,f,_,event = destr_pr f in
     let penv, qenv = LDecl.hoareF f hyps in
     let pre  = pre  |> omap_dfl (fun p -> process_form penv p tbool) f_true in

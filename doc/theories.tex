@@ -1,30 +1,24 @@
 % !TeX root = easycrypt.tex
 
 \chapter{The Languages of \EasyCrypt\label{chap:theories}}
-Definitions and lemmas can be grouped in theories, that can be imported to
-provide new language functionalities as required for a particular proof.
-Currently, \EasyCrypt supports user-defined types and operators
-(Section~\ref{sec:types}) and user-defined distributions
-(Section~\ref{sec:distributions}). In addition, theories can declare modules and
-functors (Section~\ref{sec:modules}), used to represent schemes, oracles and
-experiments, as well as abstract types for such modules, which can be used to
-modularize proofs or represent abstract adversaries. Finally, theories can be
-cloned and refined (Section~\ref{sec:cloning}), which allows the user to
-consider small variants of a theory without having to create a new one from
-scratch, or to consider concrete implementation details only when necessary for
-the proof.
+The definitions and lemmas one writes and proves in \EasyCrypt can be grouped
+into theories.
+
+These can then be imported, exported and reused following the
+requirements of each particular proof. \EasyCrypt supports user-defined
+\emph{types} and \emph{operators} (Section~\ref{sec:types}) and
+\emph{distributions} (Section~\ref{sec:distributions}). These definitions can
+then be used to write \emph{modules} and \emph{functors}
+(Section~\ref{sec:modules}) modelling games, experiments, schemes and
+adversaries. Powerful refinement mechanisms can be used to instantiate theories
+with concrete parameters (constant, types or functions), allowing a certain
+degree of proof reuse (Section~\ref{sec:cloning}).
 
 
 \section{The Expression Language\label{sec:types}}
-At the core of any \EasyCrypt specification is a collection of types and functional
-operators on those types. Formally, \EasyCrypt types are \emph{non-empty} sets of
+At the core of any \EasyCrypt specification is a collection of types and operators
+over those types. Formally, \EasyCrypt types are \emph{non-empty} sets of
 values, and operators are \emph{mathematical} functions between them.
-
-\warningbox{Currently, the easiest way to define types and operators is to
-declare them abstractly and specify them using axioms. It is \emph{very}
-important for the consistency of the logical context to remember that types are
-\emph{always} assumed to be non-empty, and that operators are total mathematical
-functions when writing such definitions.}
 
 The \EasyCrypt type system supports polymorphic, higher-order types: the type of
 lists can be declared independently of the type of their contents, and operators
@@ -33,10 +27,7 @@ types and relevant operators before moving on to explaining how new definitions
 can be built from them.
 
 \subsection{Built-Ins}
-The language is equipped with a few built-in types\footnote{This is only to
-bridge our language with \WhyThree's logic and avoid the introduction of
-indirection layers in the proof obligations sent to the SMT solvers: all these
-built-in types could in theory be defined in \EasyCrypt itself.}:
+The language is equipped with a few built-in types:
 \begin{itemize}\itemsep-.5em
 \item the \rawec{unit}\index{easycrypt}{types!unit@\ec{unit}} type, which
         contains a unique element
@@ -46,12 +37,12 @@ built-in types could in theory be defined in \EasyCrypt itself.}:
 \item the \rawec{real} type of real numbers (in $\mathbb{R}$).
 \end{itemize}
 
-Some symbols are defined, declared or imported from \WhyThree in the
-corresponding libraries, and are discussed further in the library documentation.
+Further symbols are defined or declared in the corresponding libraries, and are
+discussed further in the library documentation.
 
 \subsubsection*{The \rawec{bool} type}
 \index{easycrypt}{types!bool@\ec{bool}}
-Boolean expression terms can be built from the constant
+Boolean expression terms can be built from the constants
 \rawec{true}\index{easycrypt}{constants!true@\ec{true : bool}} and
 \rawec{false}\index{easycrypt}{constants!true@\ec{true : bool}}, in combination
 with operators for logical conjunction and disjunction
@@ -63,34 +54,31 @@ and
 \rawec{||}\index{easycrypt}{operators!ora@\ec{(''ora) : bool -> bool -> bool}}),
 and xor
 (\rawec{\^\^}\index{easycrypt}{operators!xor@\ec{(\^\^) : bool -> bool -> bool}}).
-Additional operators and simple rewriting rules are made available in the
-\rawec{Bool} theory.
+Basic lemmas are made available in the \rawec{Bool} theory, although we mostly
+rely on \SMT solvers to discharge boolean proof obligations.
 
 \subsubsection*{The \rawec{int} type}
 \index{easycrypt}{types!int@\ec{int}}
-Integer expression terms can be built from numerical constants between $0$ and
-$2^{62} - 1$ (non-negative OCaml integers), in combintation with operators for
-unary negation (\rawec{-}), and all arithmetic and comparison (\rawec{+},
-\rawec{-}, \rawec{*}, \rawec{/}, \rawec{\%}, \rawec{^}, \rawec{=}, \rawec{<},
-\rawec{<=}, \rawec{>}, \rawec{>=} \ldots). It is necessary to import the integer
-library (via \rawec{require import Int.}, see Section~\ref{sec:cloning}) to have
-access to these operators. Since this type is identified with the \WhyThree type
-of integers, all \WhyThree lemmas on it can be used by the SMT solvers, and are
-accessible by name for use in interactive proofs. We will eventually be
-providing uniformly named wrappers and algebraic structures.
+Integer expression terms can be built from arbitrary numerical constants, in
+combination with operators for unary negation (\rawec{-}), and all arithmetic
+and comparison (\rawec{+}, \rawec{-}, \rawec{*}, \rawec{/}, \rawec{\%},
+\rawec{^}, \rawec{=}, \rawec{<}, \rawec{<=}, \rawec{>}, \rawec{>=} \ldots).
+Since this type is identified with the \WhyThree type of integers, all \WhyThree
+lemmas on it can be used by the \SMT solvers to reason about integers. The
+\rawec{Int} library provides uniformly named wrappers and algebraic structures
+for use in interactive proofs.
 
 \subsubsection*{The \rawec{real} type}
 \index{easycrypt}{types!real@\ec{real}}
 Real expression terms can be built from integer constants suffixed with a
 \rawec{\%r} (for example, \rawec{0\%r} is 0 in the \rawec{real} type), in
-combination with the same operators available on integers. It is necessary to
-import the library (using \rawec{require import Real.}) to access these
-operators in scope. This type is also identified with the \WhyThree type of
-reals, which provides some lemmas and tighter integration with the underlying
-theories, but SMT solvers often have very limited support for real numbers and
-will often fail to prove seemingly trivial results, with Z3 often outperforming
-other solvers. We will be working on enriching the library of lemmas available
-in this theory to allow more complex interactive proofs when automation fails.
+combination with the same operators available on integers. This type is
+identified with the \WhyThree type of reals, which provides some lemmas and
+tighter integration with the underlying theories, but \SMT solvers often have
+very limited support for real numbers and will often fail to prove seemingly
+trivial results. We are working on enriching the library of lemmas available
+in this theory to allow more complex interactive proofs if (or rather, when)
+automation fails.
 
 \warningbox{\rawec{(1/2)\%r} and \rawec{1\%r/2\%r} are very different
 expressions. The former evaluates to $0$ (the division is in $\mathbb{Z}$, and
@@ -99,10 +87,44 @@ $0.5$ (the operands are interpreted and the operator is applied in
 $\mathbb{R}$). Eventually, we will introduce notations for scoping that should
 allow less cluttered real expressions.}
 
-\subsection{Types}
+\subsection{Constructing Types}
 From these base types, many more can be built. \EasyCrypt allows the user to declare
- (polymorphic) abstract types, and combine existing types into tuple types or
-function types.
+ (polymorphic) abstract types, and combine existing types into inductive datatypes,
+record types, tuple types or function types.
+
+\subsubsection*{Inductive datatypes}
+The following type definition defines a polymorphic type for lists: for any
+base type \ec{'a}, one can build a list over \ec{'a} from the constant
+constructor \ec{Nil}, and the binary constructor \ec{Cons} that prepends a
+value of type \ec{'a} to a list over \ec{'a}.
+
+\begin{easycrypt}[label={lst:inductive}]{A simple inductive type.}
+type 'a list = [
+  | Nil
+  | Cons of 'a & 'a list ].
+\end{easycrypt}
+
+Defining an inductive datatype $\tau$ automatically generates a recursor
+$\tau$\ec{_rect}, an induction principle $\tau$\ec{_ind} and a case distinction
+lemma $\tau$\ec{_case} for use in further definitions and proofs. For example,
+Listing~\ref{lst:derived_ind} displays these three generated definitions for the
+type of lists defined in Listing~\ref{lst:inductive}.
+
+\begin{easycrypt}[label={lst:derived_ind}]{Generated entities for polymorphic lists.}
+op list_rect (v:'b) (f:'a -> 'a list -> 'b -> 'b) (xs:'a list) =
+  with xs = Nil        => v
+  with xs = Cons x xs => f x xs (list_rect v f xs).
+
+lemma list_ind (p:'a list -> bool):
+  p Nil =>
+  (forall x xs, p xs => p (Cons x xs)) =>
+  (forall xs, p xs).
+
+lemma list_case (p:'a list -> bool):
+  p Nil =>
+  (forall x xs, p (Cons x xs)) =>
+  (forall xs, p xs).
+\end{easycrypt}
 
 \subsubsection*{Tuple types}
 Given two types \ec{'t} and \ec{'t'}, \ec{('t * 't')} denotes the type of pairs
