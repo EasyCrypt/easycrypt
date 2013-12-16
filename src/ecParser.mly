@@ -29,6 +29,17 @@
     | Some (args, `Expr e ) -> PO_concr (args, ty, e)
     | Some (args, `Case bs) -> PO_case  (args, ty, bs)
 
+  let lqident_of_fident (nm, name) =
+    let module E = struct exception Invalid end in
+
+    let nm =
+      let for1 (x, args) =
+        if args <> None then raise E.Invalid else unloc x
+      in
+        List.map for1 nm
+    in
+      try Some (nm, unloc name) with E.Invalid -> None
+
   let mk_peid_symb loc s ti = 
     mk_loc loc (PEident (pqsymb_of_symb loc s, ti))
 
@@ -1001,14 +1012,18 @@ param_decl:
 (* Statements                                                           *)
 
 lvalue_u:
-| x=qident
-   { PLvSymbol x }
+| x=loc(fident)
+   { match lqident_of_fident x.pl_desc with
+     | None   -> parse_error x.pl_loc None
+     | Some v -> PLvSymbol (mk_loc x.pl_loc v) }
 
 | LPAREN p=plist2(qident, COMMA) RPAREN
    { PLvTuple p }
 
-| x=qident DLBRACKET ti=tvars_app? e=expr RBRACKET
-   { PLvMap(x, ti, e) }
+| x=loc(fident) DLBRACKET ti=tvars_app? e=expr RBRACKET
+   { match lqident_of_fident x.pl_desc with
+     | None   -> parse_error x.pl_loc None
+     | Some v -> PLvMap (mk_loc x.pl_loc v, ti, e) }
 ;
 
 %inline lvalue:
@@ -1022,7 +1037,10 @@ base_instr:
 | x=lvalue EQ e=expr
     { PSasgn (x, e) }
 
-| f=qident LPAREN es=loc(plist0(expr, COMMA)) RPAREN
+| x=lvalue LEFTARROW f=loc(fident) LPAREN es=loc(plist0(expr, COMMA)) RPAREN
+    { PScall (Some x, f, es) }
+
+| f=loc(fident) LPAREN es=loc(plist0(expr, COMMA)) RPAREN
     { PScall (None, f, es) }
 
 | ASSERT LPAREN c=expr RPAREN 

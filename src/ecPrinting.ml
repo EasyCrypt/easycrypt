@@ -1021,10 +1021,16 @@ let pp_instr_for_form (ppe : PPEnv.t) fmt i =
         (pp_list ",@ " (pp_expr ppe)) args
 
   | Scall (Some lv, xp, args) ->
-      Format.fprintf fmt "%a =@;<1 2>@[%a(@[<hov 0>%a@]);@]"
-        (pp_lvalue ppe) lv
-        (pp_funname ppe) xp
-        (pp_list ",@ " (pp_expr ppe)) args
+      let assign_operator =
+        match xp.EcPath.x_top.EcPath.m_args with
+        | [] -> "="
+        | _  -> "<-"
+      in
+        Format.fprintf fmt "%a %s@;<1 2>@[%a(@[<hov 0>%a@]);@]"
+          (pp_lvalue ppe) lv
+          assign_operator
+          (pp_funname ppe) xp
+          (pp_list ",@ " (pp_expr ppe)) args
 
   | Sassert e ->
       Format.fprintf fmt "assert %a;"

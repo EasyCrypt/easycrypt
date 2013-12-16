@@ -87,7 +87,7 @@ and plvalue = plvalue_r located
 type pinstr_r =
   | PSasgn   of plvalue * pexpr
   | PSrnd    of plvalue * pexpr
-  | PScall   of plvalue option * pqsymbol * (pexpr list) located
+  | PScall   of plvalue option * pgamepath * (pexpr list) located
   | PSif     of pexpr * pstmt * pstmt
   | PSwhile  of pexpr * pstmt
   | PSassert of pexpr
