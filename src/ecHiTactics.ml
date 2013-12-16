@@ -107,5 +107,9 @@ and process_tactic_core1 mkpv (tac : ptactic_core) ((juc, n) : goal) : goals =
 
 (* -------------------------------------------------------------------- *)
 and process_by mkpv t (juc, n) =
-  let gs = process_tactics mkpv t (juc, [n]) in
-    t_on_goals EcHiLogic.process_done gs
+  let goal =
+    match t with
+    | None   -> (juc, [n])
+    | Some t -> process_tactics mkpv t (juc, [n])
+  in
+    t_on_goals EcHiLogic.process_done goal

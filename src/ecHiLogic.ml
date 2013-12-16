@@ -765,7 +765,7 @@ let process_cut (engine : engine) ip phi t g =
     | Some t ->
         let l = t.pl_loc in
         let t = { pt_core = t; pt_intros = []; } in
-        let t = mk_loc l (Pby [t]) in
+        let t = mk_loc l (Pby (Some [t])) in
           t_on_first (engine t) g
   in
 

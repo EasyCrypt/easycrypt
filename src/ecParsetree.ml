@@ -524,7 +524,7 @@ and ptactic_core_r =
   | Pidtac      of string option
   | Pdo         of trepeat * ptactic_core
   | Ptry        of ptactic_core
-  | Pby         of ptactic list
+  | Pby         of (ptactic list) option
   | Pseq        of ptactic list
   | Pcase       of pformula 
   | Plogic      of logtactic

@@ -173,6 +173,7 @@
 %token DELTA
 %token DLBRACKET
 %token DO
+%token DONE
 %token DOT
 %token DOTDOT
 %token DOTTICK
@@ -2183,7 +2184,10 @@ tactic_core_r:
    { Ptry t }
 
 | BY t=tactics
-   { Pby t }
+   { Pby (Some t) }
+
+| BY bracket(empty) | DONE
+   { Pby None }
 
 | DO t=tactic_core
    { Pdo ((`All, None), t) }
