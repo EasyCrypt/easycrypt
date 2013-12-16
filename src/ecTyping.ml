@@ -1679,11 +1679,19 @@ and transinstr (env : EcEnv.env) ue (i : pinstr) =
   in
 
   match i.pl_desc with
-  | PSasgn (plvalue, prvalue) -> 
-      let lvalue, lty = translvalue ue env plvalue in
-      let rvalue, rty = transexp env `InProc ue prvalue in
-      unify_or_fail env ue prvalue.pl_loc ~expct:lty rty;
-      i_asgn (lvalue, rvalue)
+  | PSasgn (plvalue, prvalue) -> begin
+      match unloc prvalue with
+      | PEapp ( { pl_desc = PEident (f, None) },
+                [{ pl_desc = PEtuple es; pl_loc = les; }])
+          when EcEnv.Fun.lookup_opt (unloc f) env <> None
+        ->
+          transinstr env ue (mk_loc i.pl_loc (PScall (Some plvalue, f, mk_loc les es)))
+      | _ ->
+        let lvalue, lty = translvalue ue env plvalue in
+        let rvalue, rty = transexp env `InProc ue prvalue in
+          unify_or_fail env ue prvalue.pl_loc ~expct:lty rty;
+          i_asgn (lvalue, rvalue)
+    end
 
   | PSrnd (plvalue, prvalue) -> 
       let lvalue, lty = translvalue ue env plvalue in
@@ -1697,19 +1705,10 @@ and transinstr (env : EcEnv.env) ue (i : pinstr) =
       i_call (None, fpath, args)
 
   | PScall (Some lvalue, name, args) ->
-      if EcEnv.Fun.lookup_opt (unloc name) env <> None then
-        let lvalue, lty = translvalue ue env lvalue in
-        let (fpath, args, rty) = transcall name (unloc args) in
-        unify_or_fail env ue name.pl_loc ~expct:lty rty;
-        i_call (Some lvalue, fpath, args)
-      else
-        let fe   = mk_loc name.pl_loc (PEident (name, None)) in
-        let args = mk_loc args.pl_loc (PEtuple (unloc args)) in
-        
-        let ope =
-          mk_loc (EcLocation.merge fe.pl_loc args.pl_loc) (PEapp (fe, [args]))
-        in
-        transinstr env ue (mk_loc i.pl_loc (PSasgn (lvalue, ope)))
+      let lvalue, lty = translvalue ue env lvalue in
+      let (fpath, args, rty) = transcall name (unloc args) in
+      unify_or_fail env ue name.pl_loc ~expct:lty rty;
+      i_call (Some lvalue, fpath, args)
 
   | PSif (pe, s1, s2) ->
       let e, ety = transexp env `InProc ue pe in

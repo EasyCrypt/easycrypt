@@ -1020,17 +1020,7 @@ base_instr:
     { PSrnd (x, e) }
 
 | x=lvalue EQ e=expr
-    { let islow = function 'a'..'z' -> true | _ -> false in
-      let islow = fun s -> s <> "" && islow s.[0] in
-
-        match unloc e with
-        | PEapp ( { pl_desc = PEident (({ pl_desc = (_, fx) } as f), None) },
-                 [{ pl_desc = PEtuple es; pl_loc = les; }])
-            when islow fx ->
-          begin
-            PScall (Some x, f, mk_loc les es)
-          end
-        | _ -> PSasgn (x, e) }
+    { PSasgn (x, e) }
 
 | f=qident LPAREN es=loc(plist0(expr, COMMA)) RPAREN
     { PScall (None, f, es) }
