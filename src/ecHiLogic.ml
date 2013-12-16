@@ -284,18 +284,26 @@ let process_apply_on_goal loc pe g =
   let args = List.map (trans_pterm_argument hyps ue) pe.fp_args in
   let (ax, ids) = check_pterm_arguments hyps ue ax args in
 
-  let (_, ids, (_, tue, ev)) =
-    let rec instanciate (ax, ids) =
+  let (_, ids, (_, tue, ev), iff) =
+    let rec instanciate (ax, ids, iff) =
       let withmatch () =
         let ev = evmap_of_pterm_arguments ids in
   
-          try  (ax, ids, EcMetaProg.f_match hyps (ue, ev) ax fp);
+          try  (ax, ids, EcMetaProg.f_match hyps (ue, ev) ax fp, iff);
           with MatchFailure ->
             match destruct_product hyps ax with
-            | None   -> tacuerror "in apply, cannot find instance"
             | Some _ ->
-              let (ax, id) = check_pterm_argument hyps ue ax None in
-                instanciate (ax, id :: ids)
+                let (ax, id) = check_pterm_argument hyps ue ax None in
+                  instanciate (ax, id :: ids, iff)
+            | None when iff <> None ->
+                tacuerror "in apply, cannot find instance"
+            | None -> begin
+                match sform_of_form ax with
+                | SFiff (f1, f2) ->
+                    instanciate (f_imp f1 f2, ids, Some (List.length ids, f1, f2))
+                | _ ->
+                  tacuerror "in apply, cannot find instance"
+            end
       in
   
       let flinst = can_concretize_pterm_arguments (ue, EV.empty) ids in
@@ -306,18 +314,19 @@ let process_apply_on_goal loc pe g =
             let closedax = Fsubst.uni (EcUnify.UniEnv.close ue) ax in
   
             if EcReduction.is_conv hyps closedax fp then begin
-              (ax, ids, (ue, EcUnify.UniEnv.close ue, EV.empty))
+              (ax, ids, (ue, EcUnify.UniEnv.close ue, EV.empty), iff)
             end else
               withmatch ()
 
     in
-      instanciate (ax, ids)
+      instanciate (ax, ids, None)
 
   in
 
   let args = concretize_pterm_arguments (tue, ev) ids in
   let typs = List.map (Tuni.offun tue) typs in
 
+  let do_top_apply args g =
     match p with
     | `Global p ->
         gen_t_apply_glob (fun _ _ x -> x) p typs args g
@@ -330,6 +339,34 @@ let process_apply_on_goal loc pe g =
         assert (typs = []);
         gen_t_apply_form (fun _ _ x -> x)
           (Fsubst.uni (EcUnify.UniEnv.close ue) fc) args g
+  in
+
+  match iff with
+  | None -> do_top_apply args g
+
+  | Some (iff, f1, f2) ->
+      let f1 = concretize_form (tue, ev) f1 in
+      let f2 = concretize_form (tue, ev) f2 in
+      let (a1, a2) = List.take_n iff args in
+        Printf.printf "%d %d\n%!" (List.length a1) (List.length a2);
+        t_subgoal
+          [(* apply view and then apply user argument *)
+           (fun g ->
+             t_seq
+               (gen_t_apply_glob (fun _ _ x -> x)
+                  EcCoreLib.p_iff_lr [] [AAform f1; AAform f2; AAnode])
+               (do_top_apply a1)
+               g);
+           (* intros sub-sequent hyph. (after view) and apply it *)
+           (fun g ->
+             let h = EcIdent.create "_" in
+             let g = t_intros_1 [h] g in
+               t_seq
+                 (gen_t_apply_hyp (fun _ _ x -> x) h a2)
+                 (t_clear (Sid.singleton h))
+                 g)
+          ]
+          (t_cut (f_imp f1 f2) g)
 
 (* -------------------------------------------------------------------- *)
 let process_apply_on_hyp loc (pe, hyp) g =
