@@ -144,10 +144,16 @@ let t_inline_equiv side sp g =
 (* -------------------------------------------------------------------- *)
 module HiInternal = struct
   let pat_all fs s =
+    let test f =
+      match fs with
+      | None    -> true
+      | Some fs -> EcPath.Sx.mem f fs
+    in
+
     let rec aux_i i = 
       match i.i_node with
       | Scall(_,f,_) -> 
-        if EcPath.Sx.mem f fs then Some IPpat else None
+        if test f then Some IPpat else None
       | Sif(_,s1,s2) -> 
         let sp1 = aux_s 0 s1.s_node in
         let sp2 = aux_s 0 s2.s_node in
@@ -267,8 +273,10 @@ let process_inline infos g =
           EcPath.Sx.add f fs) EcPath.Sx.empty fs 
       in
       match occs with
-      | None -> process_inline_all side fs g
+      | None -> process_inline_all side (Some fs) g
       | Some occs -> process_inline_occs side fs occs g
     end
+
+  | `All side -> process_inline_all side None g
 
   | `ByPattern _ -> failwith "not-implemented"

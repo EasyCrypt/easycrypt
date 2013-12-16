@@ -451,7 +451,8 @@ type phltactic =
 
 and pinline_arg =
   [ `ByName    of tac_side * (pgamepath list * int list option)
-  | `ByPattern of pipattern ]
+  | `ByPattern of pipattern
+  | `All       of tac_side ]
 
 type trepeat = [`All | `Maybe] * int option
 type tfocus  = (int option * int option) * [`Include | `Exclude]
