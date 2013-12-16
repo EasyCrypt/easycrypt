@@ -18,8 +18,9 @@ DONE * Comportement par défaut devrait etre `proof strict' (ceci est une décis
 
 * Discuter la syntaxe des opérateurs
 
-* Type de retour optionnel pour les procédures + inférence pour les var. locales
-
+* Type de retour optionnel pour les procédures
+DONE  + inférence pour les var. locales
+DONE
 DONE * Chainage pour les déclarations abstraites:
 DONE
 DONE   type t1, ..., tn.
@@ -36,20 +37,20 @@ DONE
 DONE   + `arg' peut maintenant être de la forme `_ : t1 * ... * tn'
 DONE      actuellement, la syntaxe est ,t1 * ... * tn
 
-* if / while -> parenthèses sur la condition ? (interaction avec les accolades)
+WONT * if / while -> parenthèses sur la condition ? (interaction avec les accolades)
+       Wont because braces are not mandatory for the body
 
 * intro-pattern ->>, <<- pour substitution d'une variable par un terme (voir pour un rewrite in *)
 
-* rewrite in + apply in à la Coq
-
-DONE for apply
+* rewrite in
+DONE  + apply in à la Coq
 
 * by < ; < first, last -> cas t; first by (t2; t3); t4
 
 DONE * cut by t -> currently cut; first t. Should be cut; first by t.
 DONE   idem for lemma ... by ...
 
-* by [] everywhere
+DONE * by [] everywhere
 
 * apply -> gestion de <=>
 
