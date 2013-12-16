@@ -137,7 +137,9 @@ let pp_tyerror fmt env error =
       msg "type variables not allowed"
 
   | OnlyMonoTypeAllowed ->
-      msg "only monomorph types allowed here"
+      msg "%s, %s"
+        "only monomorphic types are allowed"
+        "you may have to add type annotations"
 
   | UnboundTypeParameter x ->
       msg "unbound type parameter: %s" x
@@ -1561,21 +1563,22 @@ and transbody ue symbols (env : EcEnv.env) retty pbody =
 
     let ty =
       match ty, init with
-      | None   , None   -> assert false
-      | Some ty, None   -> ty
-      | None   , Some e -> e.e_ty
+      | None   , None   -> None
+      | Some ty, None   -> Some ty
+      | None   , Some e -> Some e.e_ty
       | Some ty, Some e -> begin
           let loc =  (oget local.pfl_init).pl_loc in
-            unify_or_fail !env ue loc ~expct:ty e.e_ty; ty
+            unify_or_fail !env ue loc ~expct:ty e.e_ty; Some ty
       end
     in
 
     let xsvars = List.map (fun _ -> UE.fresh ue) xs in
 
     begin
-      match mode with
-      | `Single -> List.iter (fun a -> EcUnify.unify !env ue a ty) xsvars
-      | `Tuple  -> unify_or_fail !env ue local.pfl_names.pl_loc ~expct:ty (ttuple xsvars)
+      ty |> oiter (fun ty ->
+        match mode with
+        | `Single -> List.iter (fun a -> EcUnify.unify !env ue a ty) xsvars
+        | `Tuple  -> unify_or_fail !env ue local.pfl_names.pl_loc ~expct:ty (ttuple xsvars))
     end;
 
     env := begin
@@ -1623,6 +1626,8 @@ and transbody ue symbols (env : EcEnv.env) retty pbody =
             unify_or_fail !env ue pe.pl_loc ~expct:retty ety;
             Some e
   in
+    if not (UE.closed ue) then
+      tyerror loc !env OnlyMonoTypeAllowed;
     (!env, body, result, List.rev !prelude, List.rev !locals)
 
 (* -------------------------------------------------------------------- *)

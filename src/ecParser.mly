@@ -1068,6 +1068,9 @@ loc_decl_names:
 ;
 
 loc_decl_r:
+| VAR x=loc(loc_decl_names)
+    { { pfl_names = x; pfl_type = None; pfl_init = None; } }
+
 | VAR x=loc(loc_decl_names) COLON ty=loc(type_exp)
     { { pfl_names = x; pfl_type = Some ty; pfl_init = None; } }
 
