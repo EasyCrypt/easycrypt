@@ -1462,9 +1462,9 @@ nosmt:
 ;
 
 axiom_tc:
-| /* empty */      { PILemma }
-| BY bracket(none) { PLemma None }
-| BY t=tactic      { PLemma (Some t) }
+| /* empty */       { PILemma }
+| BY bracket(empty) { PLemma None }
+| BY t=tactic       { PLemma (Some t) }
 ;
 
 axiom:
@@ -1474,8 +1474,9 @@ axiom:
 | l=local LEMMA o=nosmt d=lemma_decl ao=axiom_tc
     { mk_axiom ~local:l ~nosmt:o d ao }
 
-| l=local EQUIV x=ident pd=pgtybindings? COLON p=loc(equiv_body(none)) ao=axiom_tc
-| l=local HOARE x=ident pd=pgtybindings? COLON p=loc(hoare_body(none)) ao=axiom_tc
+| l=local  EQUIV x=ident pd=pgtybindings? COLON p=loc( equiv_body(none)) ao=axiom_tc
+| l=local  HOARE x=ident pd=pgtybindings? COLON p=loc( hoare_body(none)) ao=axiom_tc
+| l=local PHOARE x=ident pd=pgtybindings? COLON p=loc(phoare_body(none)) ao=axiom_tc
     { mk_axiom ~local:l (x, None, pd, p) ao }
 ;
 
