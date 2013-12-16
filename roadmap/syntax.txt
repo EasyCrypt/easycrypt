@@ -27,9 +27,9 @@ DONE   type t1, ..., tn.
 DONE   var  x1, ..., xn.
 DONE
 DONE   result: with comma (Avec ou sans virgule ?)
-
-* Permettre les accès directs aux fonctions dans les foncteurs
-
+DONE
+DONE * Permettre les accès directs aux fonctions dans les foncteurs
+DONE   (via `x <- call')
 DONE * interface de module / proc.
 DONE
 DONE   proc * id(arg...) : t { restr } (* `*' est maintenant en dehors - 16082 *)
