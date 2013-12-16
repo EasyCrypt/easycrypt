@@ -11,8 +11,8 @@ DONE  - bd_hoare -> phoare
 DONE  - bdhoare_* -> phoare_*
 DONE  - *_deno -> bydeno (byphoare | byequiv)
 
-  - fst -> .`1
-  - snd -> .`2
+WONT  - fst -> .`1
+WONT  - snd -> .`2
 
 DONE * Comportement par défaut devrait etre `proof strict' (ceci est une décision unilatérale de François)
 
@@ -43,6 +43,8 @@ DONE      actuellement, la syntaxe est ,t1 * ... * tn
 
 * rewrite in + apply in à la Coq
 
+DONE for apply
+
 * by < ; < first, last -> cas t; first by (t2; t3); t4
 
 DONE * cut by t -> currently cut; first t. Should be cut; first by t.
@@ -56,7 +58,7 @@ DONE   idem for lemma ... by ...
 
 * case pour PHL -> à lier à celui de la logique ambiente
 
-* bd_hoare / hoare à top-level
+DONE * bd_hoare / hoare à top-level
 
 * bd_hoare -> phoare / phl
 	bd_hoare [fident ...] relation form // pas sform
@@ -86,7 +88,7 @@ HALF-DONE (only for non-exported functions) * détection du code mort
 
     rnd -> mettre ou enlever le `:' (rnd_info)
 
-    inline * -> inline tout le monde d'un niveau
+    DONE inline * -> inline tout le monde d'un niveau
 
     kill -> utiliser la syntaxe des intervals pour rewrite
 
