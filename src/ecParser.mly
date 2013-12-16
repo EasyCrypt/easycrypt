@@ -753,10 +753,7 @@ sform_u(P):
        parse_error n.pl_loc (Some "tuple projection start at 1");
      PFproji(f,n.pl_desc - 1) }
 
-| HOARE LBRACKET
-    mp=loc(fident) COLON pre=form_r(P) LONGARROW post=form_r(P)
-  RBRACKET
-    { PFhoareF (pre, mp, post) }
+| HOARE LBRACKET hb=hoare_body(P) RBRACKET { hb }
 
 | EQUIV LBRACKET eb=equiv_body(P) RBRACKET { eb }
 
@@ -865,12 +862,7 @@ form_u(P):
       let loc = EcLocation.make $startpos $endpos in
         PFapp (mk_loc loc id, [e]) }
 
-| PHOARE 
-    LBRACKET mp=loc(fident) COLON
-      pre=form_r(P) LONGARROW post=form_r(P)
-    RBRACKET
-      cmp=hoare_bd_cmp bd=sform_r(P)
-	{ PFBDhoareF (pre, mp, post, cmp, bd) }
+| PHOARE pb=phoare_body(P) { pb }
 
 | PHOARE 
     LBRACKET s=loc(fun_def_body) COLON
@@ -913,16 +905,30 @@ hoare_bd_cmp :
 | EQ {PFHeq}
 | GE {PFHge}
 
+hoare_body(P):
+  mp=loc(fident) COLON pre=form_r(P) LONGARROW post=form_r(P)
+    { PFhoareF (pre, mp, post) }
+;
+
+phoare_body(P):
+  LBRACKET mp=loc(fident) COLON
+    pre=form_r(P) LONGARROW post=form_r(P)
+  RBRACKET
+    cmp=hoare_bd_cmp bd=sform_r(P)
+  { PFBDhoareF (pre, mp, post, cmp, bd) }
+;
+
 equiv_body(P):
   mp1=loc(fident) TILD mp2=loc(fident)
   COLON pre=form_r(P) LONGARROW post=form_r(P)
-
     { PFequivF (pre, (mp1, mp2), post) }
+;
 
 eager_body(P):
 | s1=stmt COMMA  mp1=loc(fident) TILD mp2=loc(fident) COMMA s2=stmt
     COLON pre=form_r(P) LONGARROW post=form_r(P)
     { PFeagerF (pre, (s1, mp1, mp2,s2), post) }
+;
 
 pgtybinding1:
 | x=ptybinding1 { List.map (fun (xs,ty) -> xs, PGTY_Type ty) x }
@@ -1450,32 +1456,27 @@ nosmt:
 | empty { false }
 ;
 
-local:
+%inline local:
 | LOCAL { true  }
 | empty { false }
+;
+
+axiom_tc:
+| /* empty */      { PILemma }
+| BY bracket(none) { PLemma None }
+| BY t=tactic      { PLemma (Some t) }
 ;
 
 axiom:
 | l=local AXIOM o=nosmt d=lemma_decl 
     { mk_axiom ~local:l ~nosmt:o d PAxiom }
 
-| l=local LEMMA o=nosmt d=lemma_decl
-    { mk_axiom ~local:l ~nosmt:o d PILemma }
+| l=local LEMMA o=nosmt d=lemma_decl ao=axiom_tc
+    { mk_axiom ~local:l ~nosmt:o d ao }
 
-| l=local LEMMA o=nosmt d=lemma_decl BY t=tactic
-    { mk_axiom ~local:l ~nosmt:o d (PLemma (Some t)) }
-
-| l=local LEMMA o=nosmt d=lemma_decl BY LBRACKET RBRACKET
-    { mk_axiom ~local:l ~nosmt:o d (PLemma None) }
-
-| l=local EQUIV x=ident pd=pgtybindings? COLON p=loc(equiv_body(none))
-    { mk_axiom ~local:l (x, None, pd, p) PILemma }
-
-| l=local EQUIV x=ident pd=pgtybindings? COLON p=loc(equiv_body(none)) BY t=tactic
-    { mk_axiom ~local:l (x, None, pd, p) (PLemma (Some t)) }
-
-| l=local EQUIV x=ident pd=pgtybindings? COLON p=loc(equiv_body(none)) BY LBRACKET RBRACKET
-    { mk_axiom ~local:l (x, None, pd, p) (PLemma None) }
+| l=local EQUIV x=ident pd=pgtybindings? COLON p=loc(equiv_body(none)) ao=axiom_tc
+| l=local HOARE x=ident pd=pgtybindings? COLON p=loc(hoare_body(none)) ao=axiom_tc
+    { mk_axiom ~local:l (x, None, pd, p) ao }
 ;
 
 (* -------------------------------------------------------------------- *)
@@ -2427,12 +2428,12 @@ realize:
 (* -------------------------------------------------------------------- *)
 (* Printing                                                             *)
 print:
-| TYPE   qs=qident { Pr_ty qs }
-| OP     qs=qoident { Pr_op qs }
-| THEORY qs=qident { Pr_th qs }
-| PRED   qs=qoident { Pr_pr qs } 
-| AXIOM  qs=qident { Pr_ax qs }
-| MODULE qs=qident { Pr_mod qs }
+| TYPE   qs=qident      { Pr_ty qs }
+| OP     qs=qoident     { Pr_op qs }
+| THEORY qs=qident      { Pr_th qs }
+| PRED   qs=qoident     { Pr_pr qs } 
+| AXIOM  qs=qident      { Pr_ax qs }
+| MODULE qs=qident      { Pr_mod qs }
 | MODULE TYPE qs=qident { Pr_mty qs }
 ;
 
