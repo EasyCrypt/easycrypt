@@ -510,8 +510,10 @@ let priority_of_binop name =
   match EcIo.lex_single_token name with
   | Some EP.IMPL  -> Some e_bin_prio_impl
   | Some EP.IFF   -> Some e_bin_prio_iff
-  | Some(EP.OR _) -> Some e_bin_prio_or
-  | Some(EP.AND _)-> Some e_bin_prio_and
+  | Some EP.ORA   -> Some e_bin_prio_or
+  | Some EP.OR    -> Some e_bin_prio_or
+  | Some EP.ANDA  -> Some e_bin_prio_and
+  | Some EP.AND   -> Some e_bin_prio_and
   | Some EP.EQ    -> Some e_bin_prio_eq
   | Some EP.NE    -> Some e_bin_prio_eq
   | Some EP.GT    -> Some e_bin_prio_order

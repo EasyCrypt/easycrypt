@@ -129,8 +129,8 @@
 %token <string> STRING
 
 (* Tokens *)
-%token <bool> AND (* true asym : &&, false sym : /\ *)
-%token <bool> OR  (* true asym : ||, false sym : \/ *)
+%token ANDA AND (* asym : &&, sym : /\ *)
+%token ORA  OR  (* asym : ||, sym : \/ *)
 
 %token <EcParsetree.codepos> CPOS
 
@@ -320,8 +320,8 @@
 %nonassoc prec_below_IMPL
 %right    IMPL
 %nonassoc IFF
-%right    OR 
-%right    AND 
+%right    ORA  OR
+%right    ANDA AND
 %nonassoc NOT
 
 %nonassoc EQ NE
@@ -454,6 +454,15 @@ fident:
 | x=OP1 { Printf.sprintf "[%s]" x }
 | ADD   { "[+]" }
 | MINUS { "[-]" }
+
+(* -------------------------------------------------------------------- *)
+%inline or_:
+| ORA { true  }
+| OR  { false }
+
+%inline and_:
+| ANDA { true  }
+| AND  { false }
 
 (* -------------------------------------------------------------------- *)
 pside_:
@@ -613,10 +622,10 @@ expr_u:
 | e1=expr op=loc(IFF) ti=tvars_app? e2=expr 
     { peapp_symb op.pl_loc "<=>" ti [e1; e2] }
 
-| e1=expr op=loc(OR) ti=tvars_app? e2=expr  
+| e1=expr op=loc(or_) ti=tvars_app? e2=expr  
     { peapp_symb op.pl_loc (str_or op.pl_desc) ti [e1; e2] }
 
-| e1=expr op=loc(AND) ti=tvars_app? e2=expr 
+| e1=expr op=loc(and_) ti=tvars_app? e2=expr 
     { peapp_symb op.pl_loc (str_and op.pl_desc) ti [e1; e2] }
 
 | e1=expr op=loc(STAR) ti=tvars_app?  e2=expr  
@@ -830,10 +839,10 @@ form_u(P):
 | e1=form_r(P) op=loc(IFF) ti=tvars_app? e2=form_r(P)  
     { pfapp_symb op.pl_loc "<=>" ti [e1; e2] }
 
-| e1=form_r(P) op=loc(OR) ti=tvars_app? e2=form_r(P)  
+| e1=form_r(P) op=loc(or_) ti=tvars_app? e2=form_r(P)  
     { pfapp_symb op.pl_loc (str_or op.pl_desc) ti [e1; e2] }
 
-| e1=form_r(P) op=loc(AND) ti=tvars_app? e2=form_r(P)  
+| e1=form_r(P) op=loc(and_) ti=tvars_app? e2=form_r(P)  
     { pfapp_symb op.pl_loc (str_and op.pl_desc) ti [e1; e2] }
 
 | e1=form_r(P) op=loc(STAR) ti=tvars_app? e2=form_r(P)  
@@ -2225,12 +2234,21 @@ tactic_core_r:
 | x=loc(tactic_core_r) { x }
 ;
 
-tactic:
-| t=tactic_core
+tactic_ip:
+| t=tactic_core %prec prec_below_IMPL
     { mk_core_tactic t }
 
 | t=tactic_core IMPL ip=intro_pattern+
     { { pt_core = t; pt_intros = ip; } }
+;
+
+tactic:
+| t=tactic_ip %prec prec_below_IMPL
+    { t }
+
+| t1=tactic_ip ORA t2=tactic_ip
+    { let loc = EcLocation.make $startpos $endpos in
+        mk_core_tactic (mk_loc loc (Por (t1, t2))) }
 ;
 
 tactic_chain:
@@ -2248,7 +2266,6 @@ tactic_chain:
 
 | FIRST n=uint LAST  { Protate (`Left , n) }
 | LAST  n=uint FIRST { Protate (`Right, n) }
-
 ;
 
 subtactic:
