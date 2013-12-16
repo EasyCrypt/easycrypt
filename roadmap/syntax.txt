@@ -49,12 +49,14 @@ DONE  + apply in à la Coq
 
 DONE * cut by t -> currently cut; first t. Should be cut; first by t.
 DONE   idem for lemma ... by ...
-
+DONE
 DONE * by [] everywhere
+DONE
+DONE * apply -> gestion de <=>
+DONE
+DONE * t1 || t2 -> or-else
 
-* apply -> gestion de <=>
-
-* t1 || t2 -> or-else
+    ; < || < first, last
 
 * case pour PHL -> à lier à celui de la logique ambiente
 
@@ -107,11 +109,11 @@ HALF-DONE (only for non-exported functions) * détection du code mort
     pr_bounded -> à virer
 
     DONE hoare / bdhoare -> fusionner en hoare
-
+    DONE
     DONE rewrite Pr -> intégrer dans rewrite
-
+    DONE
     DONE pr_false -> à enlever
-
+    DONE
     DONE pr_eq -> à enlever (* Ce fait avec conseq *)
 	
 	exists* -> utilise alias
