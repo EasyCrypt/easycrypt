@@ -529,7 +529,7 @@ and ptactic_core_r =
   | Pcase       of pformula 
   | Plogic      of logtactic
   | PPhl        of phltactic
-  | Pprogress   of ptactic_core option
+  | Pprogress   of bool * ptactic_core option
   | Psubgoal    of ptactic_chain
   | Padmit
   | Pdebug
