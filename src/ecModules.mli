@@ -90,22 +90,6 @@ type funsig = {
   fs_anames : variable list option; 
   fs_ret    : EcTypes.ty;
 }
-(* fun f (x:int, y: bool) : real 
-   { fs_name   = f;
-     fs_arg    = int * bool;
-     fs_anames = Some [(x,int);(y,bool)];
-     fs_ret    = real;
-   }
-
-   fun f int * bool : real 
-   { fs_name   = f;
-     fs_arg    = int * bool;
-     fs_pnames = None;
-     fs_ret    = real;
-   }
-*)
-
-
 
 (* -------------------------------------------------------------------- *)
 (* An oracle in a function provided by a module parameter of a functor *)

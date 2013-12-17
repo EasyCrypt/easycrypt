@@ -137,7 +137,9 @@ let pp_tyerror fmt env error =
       msg "type variables not allowed"
 
   | OnlyMonoTypeAllowed ->
-      msg "only monomorph types allowed here"
+      msg "%s, %s"
+        "only monomorphic types are allowed"
+        "you may have to add type annotations"
 
   | UnboundTypeParameter x ->
       msg "unbound type parameter: %s" x
@@ -1193,9 +1195,8 @@ let transmodtype (env : EcEnv.env) (modty : pmodule_type) =
   } in
     (modty, sig_)
 
-
-let trans_call transexp env ue loc fdef  args =
-  let targ = fdef.f_sig.fs_arg in
+let trans_call transexp env ue loc fsig args =
+  let targ = fsig.fs_arg in
   let process_args tys =
     if List.length args <> List.length tys then
       tyerror loc env (InvalidFunAppl FAE_WrongArgCount);
@@ -1203,7 +1204,8 @@ let trans_call transexp env ue loc fdef  args =
       (fun a ty ->
         let loc = a.pl_loc in
         let a, aty = transexp a in
-        unify_or_fail env ue loc ~expct:ty aty; a) args tys in
+        unify_or_fail env ue loc ~expct:ty aty; a) args tys
+  in
   let args = 
     match List.length args with
     | 0 -> 
@@ -1216,8 +1218,9 @@ let trans_call transexp env ue loc fdef  args =
         match (EcEnv.Ty.hnorm targ env).ty_node with
         | Ttuple lty -> lty
         | _ -> [targ] in
-      process_args lty in
-  (args, fdef.f_sig.fs_ret)
+      process_args lty
+  in
+    (args, fsig.fs_ret)
 
 (* -------------------------------------------------------------------- *)
 let trans_gamepath (env : EcEnv.env) gp =
@@ -1228,13 +1231,15 @@ let trans_gamepath (env : EcEnv.env) gp =
   let xp =
     match EcEnv.Fun.sp_lookup_opt (modsymb, funsymb) env with
     | None -> tyerror gp.pl_loc env (UnknownFunName (modsymb, funsymb))
-    | Some (xp,_) -> xp in
-  if modsymb = [] then xp
-  else
-    let (mpath, _sig) = trans_msymbol env (mk_loc loc (fst (unloc gp))) in
-    if _sig.mis_params <> [] then
-      tyerror gp.pl_loc env (UnknownFunName (modsymb, funsymb));
-    EcPath.xpath_fun mpath funsymb
+    | Some (xp,_) -> xp
+  in
+    match modsymb with
+    | [] -> xp
+    | _ ->
+      let (mpath, _sig) = trans_msymbol env (mk_loc loc (fst (unloc gp))) in
+        if _sig.mis_params <> [] then
+          tyerror gp.pl_loc env (UnknownFunName (modsymb, funsymb));
+        EcPath.xpath_fun mpath funsymb
 
 (* -------------------------------------------------------------------- *)
 let rec transmodsig (env : EcEnv.env) (name : symbol) (modty : pmodule_sig) =
@@ -1561,21 +1566,22 @@ and transbody ue symbols (env : EcEnv.env) retty pbody =
 
     let ty =
       match ty, init with
-      | None   , None   -> assert false
-      | Some ty, None   -> ty
-      | None   , Some e -> e.e_ty
+      | None   , None   -> None
+      | Some ty, None   -> Some ty
+      | None   , Some e -> Some e.e_ty
       | Some ty, Some e -> begin
           let loc =  (oget local.pfl_init).pl_loc in
-            unify_or_fail !env ue loc ~expct:ty e.e_ty; ty
+            unify_or_fail !env ue loc ~expct:ty e.e_ty; Some ty
       end
     in
 
     let xsvars = List.map (fun _ -> UE.fresh ue) xs in
 
     begin
-      match mode with
-      | `Single -> List.iter (fun a -> EcUnify.unify !env ue a ty) xsvars
-      | `Tuple  -> unify_or_fail !env ue local.pfl_names.pl_loc ~expct:ty (ttuple xsvars)
+      ty |> oiter (fun ty ->
+        match mode with
+        | `Single -> List.iter (fun a -> EcUnify.unify !env ue a ty) xsvars
+        | `Tuple  -> unify_or_fail !env ue local.pfl_names.pl_loc ~expct:ty (ttuple xsvars))
     end;
 
     env := begin
@@ -1623,6 +1629,8 @@ and transbody ue symbols (env : EcEnv.env) retty pbody =
             unify_or_fail !env ue pe.pl_loc ~expct:retty ety;
             Some e
   in
+    if not (UE.closed ue) then
+      tyerror loc !env OnlyMonoTypeAllowed;
     (!env, body, result, List.rev !prelude, List.rev !locals)
 
 (* -------------------------------------------------------------------- *)
@@ -1666,19 +1674,34 @@ and transstmt (env : EcEnv.env) ue (stmt : pstmt) : stmt =
 (* -------------------------------------------------------------------- *)
 and transinstr (env : EcEnv.env) ue (i : pinstr) =
   let transcall name args = 
-    let fpath, fdef = lookup_fun env name in
+    let fpath = trans_gamepath env name in
+    let fsig  = (EcEnv.Fun.by_xpath fpath env).f_sig in
     let (args, ty) =
-      trans_call (transexp env `InProc ue) env ue name.pl_loc fdef args
+      trans_call (transexp env `InProc ue) env ue name.pl_loc fsig args
     in
       (fpath, args, ty)
   in
 
   match i.pl_desc with
-  | PSasgn (plvalue, prvalue) -> 
-      let lvalue, lty = translvalue ue env plvalue in
-      let rvalue, rty = transexp env `InProc ue prvalue in
-      unify_or_fail env ue prvalue.pl_loc ~expct:lty rty;
-      i_asgn (lvalue, rvalue)
+  | PSasgn (plvalue, prvalue) -> begin
+      match unloc prvalue with
+      | PEapp ( { pl_desc = PEident (f, None) },
+                [{ pl_desc = PEtuple es; pl_loc = les; }])
+          when EcEnv.Fun.lookup_opt (unloc f) env <> None
+          ->
+        let fident { pl_loc = loc; pl_desc = (nm, x); } =
+          let nm = List.map (fun x -> (mk_loc loc x, None)) nm in
+            mk_loc loc (nm, mk_loc loc x)
+        in
+        let call = PScall (Some plvalue, fident f, mk_loc les es) in
+          transinstr env ue (mk_loc i.pl_loc call)
+
+      | _ ->
+        let lvalue, lty = translvalue ue env plvalue in
+        let rvalue, rty = transexp env `InProc ue prvalue in
+          unify_or_fail env ue prvalue.pl_loc ~expct:lty rty;
+          i_asgn (lvalue, rvalue)
+    end
 
   | PSrnd (plvalue, prvalue) -> 
       let lvalue, lty = translvalue ue env plvalue in
@@ -1692,19 +1715,10 @@ and transinstr (env : EcEnv.env) ue (i : pinstr) =
       i_call (None, fpath, args)
 
   | PScall (Some lvalue, name, args) ->
-      if EcEnv.Fun.lookup_opt (unloc name) env <> None then
-        let lvalue, lty = translvalue ue env lvalue in
-        let (fpath, args, rty) = transcall name (unloc args) in
-        unify_or_fail env ue name.pl_loc ~expct:lty rty;
-        i_call (Some lvalue, fpath, args)
-      else
-        let fe   = mk_loc name.pl_loc (PEident (name, None)) in
-        let args = mk_loc args.pl_loc (PEtuple (unloc args)) in
-        
-        let ope =
-          mk_loc (EcLocation.merge fe.pl_loc args.pl_loc) (PEapp (fe, [args]))
-        in
-        transinstr env ue (mk_loc i.pl_loc (PSasgn (lvalue, ope)))
+      let lvalue, lty = translvalue ue env lvalue in
+      let (fpath, args, rty) = transcall name (unloc args) in
+      unify_or_fail env ue name.pl_loc ~expct:lty rty;
+      i_call (Some lvalue, fpath, args)
 
   | PSif (pe, s1, s2) ->
       let e, ety = transexp env `InProc ue pe in
@@ -1983,7 +1997,7 @@ let trans_form_or_pattern env (ps, ue) pf tt =
         let fun_  = EcEnv.Fun.by_xpath fpath env in
         let args,_ = 
           trans_call (fun f -> let f = transf env f in f, f.f_ty)
-            env ue f.pl_loc fun_ args in
+            env ue f.pl_loc fun_.f_sig args in
         let memid = transmem env m in
         let env = EcEnv.Fun.prF fpath env in
         let event' = transf env event in

@@ -29,6 +29,17 @@
     | Some (args, `Expr e ) -> PO_concr (args, ty, e)
     | Some (args, `Case bs) -> PO_case  (args, ty, bs)
 
+  let lqident_of_fident (nm, name) =
+    let module E = struct exception Invalid end in
+
+    let nm =
+      let for1 (x, args) =
+        if args <> None then raise E.Invalid else unloc x
+      in
+        List.map for1 nm
+    in
+      try Some (nm, unloc name) with E.Invalid -> None
+
   let mk_peid_symb loc s ti = 
     mk_loc loc (PEident (pqsymb_of_symb loc s, ti))
 
@@ -129,8 +140,8 @@
 %token <string> STRING
 
 (* Tokens *)
-%token <bool> AND (* true asym : &&, false sym : /\ *)
-%token <bool> OR  (* true asym : ||, false sym : \/ *)
+%token ANDA AND (* asym : &&, sym : /\ *)
+%token ORA  OR  (* asym : ||, sym : \/ *)
 
 %token <EcParsetree.codepos> CPOS
 
@@ -173,6 +184,7 @@
 %token DELTA
 %token DLBRACKET
 %token DO
+%token DONE
 %token DOT
 %token DOTDOT
 %token DOTTICK
@@ -319,8 +331,8 @@
 %nonassoc prec_below_IMPL
 %right    IMPL
 %nonassoc IFF
-%right    OR 
-%right    AND 
+%right    ORA  OR
+%right    ANDA AND
 %nonassoc NOT
 
 %nonassoc EQ NE
@@ -453,6 +465,15 @@ fident:
 | x=OP1 { Printf.sprintf "[%s]" x }
 | ADD   { "[+]" }
 | MINUS { "[-]" }
+
+(* -------------------------------------------------------------------- *)
+%inline or_:
+| ORA { true  }
+| OR  { false }
+
+%inline and_:
+| ANDA { true  }
+| AND  { false }
 
 (* -------------------------------------------------------------------- *)
 pside_:
@@ -612,10 +633,10 @@ expr_u:
 | e1=expr op=loc(IFF) ti=tvars_app? e2=expr 
     { peapp_symb op.pl_loc "<=>" ti [e1; e2] }
 
-| e1=expr op=loc(OR) ti=tvars_app? e2=expr  
+| e1=expr op=loc(or_) ti=tvars_app? e2=expr  
     { peapp_symb op.pl_loc (str_or op.pl_desc) ti [e1; e2] }
 
-| e1=expr op=loc(AND) ti=tvars_app? e2=expr 
+| e1=expr op=loc(and_) ti=tvars_app? e2=expr 
     { peapp_symb op.pl_loc (str_and op.pl_desc) ti [e1; e2] }
 
 | e1=expr op=loc(STAR) ti=tvars_app?  e2=expr  
@@ -829,10 +850,10 @@ form_u(P):
 | e1=form_r(P) op=loc(IFF) ti=tvars_app? e2=form_r(P)  
     { pfapp_symb op.pl_loc "<=>" ti [e1; e2] }
 
-| e1=form_r(P) op=loc(OR) ti=tvars_app? e2=form_r(P)  
+| e1=form_r(P) op=loc(or_) ti=tvars_app? e2=form_r(P)  
     { pfapp_symb op.pl_loc (str_or op.pl_desc) ti [e1; e2] }
 
-| e1=form_r(P) op=loc(AND) ti=tvars_app? e2=form_r(P)  
+| e1=form_r(P) op=loc(and_) ti=tvars_app? e2=form_r(P)  
     { pfapp_symb op.pl_loc (str_and op.pl_desc) ti [e1; e2] }
 
 | e1=form_r(P) op=loc(STAR) ti=tvars_app? e2=form_r(P)  
@@ -991,14 +1012,18 @@ param_decl:
 (* Statements                                                           *)
 
 lvalue_u:
-| x=qident
-   { PLvSymbol x }
+| x=loc(fident)
+   { match lqident_of_fident x.pl_desc with
+     | None   -> parse_error x.pl_loc None
+     | Some v -> PLvSymbol (mk_loc x.pl_loc v) }
 
 | LPAREN p=plist2(qident, COMMA) RPAREN
    { PLvTuple p }
 
-| x=qident DLBRACKET ti=tvars_app? e=expr RBRACKET
-   { PLvMap(x, ti, e) }
+| x=loc(fident) DLBRACKET ti=tvars_app? e=expr RBRACKET
+   { match lqident_of_fident x.pl_desc with
+     | None   -> parse_error x.pl_loc None
+     | Some v -> PLvMap (mk_loc x.pl_loc v, ti, e) }
 ;
 
 %inline lvalue:
@@ -1010,19 +1035,12 @@ base_instr:
     { PSrnd (x, e) }
 
 | x=lvalue EQ e=expr
-    { let islow = function 'a'..'z' -> true | _ -> false in
-      let islow = fun s -> s <> "" && islow s.[0] in
+    { PSasgn (x, e) }
 
-        match unloc e with
-        | PEapp ( { pl_desc = PEident (({ pl_desc = (_, fx) } as f), None) },
-                 [{ pl_desc = PEtuple es; pl_loc = les; }])
-            when islow fx ->
-          begin
-            PScall (Some x, f, mk_loc les es)
-          end
-        | _ -> PSasgn (x, e) }
+| x=lvalue LEFTARROW f=loc(fident) LPAREN es=loc(plist0(expr, COMMA)) RPAREN
+    { PScall (Some x, f, es) }
 
-| f=qident LPAREN es=loc(plist0(expr, COMMA)) RPAREN
+| f=loc(fident) LPAREN es=loc(plist0(expr, COMMA)) RPAREN
     { PScall (None, f, es) }
 
 | ASSERT LPAREN c=expr RPAREN 
@@ -1068,6 +1086,9 @@ loc_decl_names:
 ;
 
 loc_decl_r:
+| VAR x=loc(loc_decl_names)
+    { { pfl_names = x; pfl_type = None; pfl_init = None; } }
+
 | VAR x=loc(loc_decl_names) COLON ty=loc(type_exp)
     { { pfl_names = x; pfl_type = Some ty; pfl_init = None; } }
 
@@ -2180,7 +2201,10 @@ tactic_core_r:
    { Ptry t }
 
 | BY t=tactics
-   { Pby t }
+   { Pby (Some t) }
+
+| BY bracket(empty) | DONE
+   { Pby None }
 
 | DO t=tactic_core
    { Pdo ((`All, None), t) }
@@ -2218,12 +2242,21 @@ tactic_core_r:
 | x=loc(tactic_core_r) { x }
 ;
 
-tactic:
-| t=tactic_core
+tactic_ip:
+| t=tactic_core %prec prec_below_IMPL
     { mk_core_tactic t }
 
 | t=tactic_core IMPL ip=intro_pattern+
     { { pt_core = t; pt_intros = ip; } }
+;
+
+tactic:
+| t=tactic_ip %prec prec_below_IMPL
+    { t }
+
+| t1=tactic_ip ORA t2=tactic_ip
+    { let loc = EcLocation.make $startpos $endpos in
+        mk_core_tactic (mk_loc loc (Por (t1, t2))) }
 ;
 
 tactic_chain:
@@ -2241,7 +2274,6 @@ tactic_chain:
 
 | FIRST n=uint LAST  { Protate (`Left , n) }
 | LAST  n=uint FIRST { Protate (`Right, n) }
-
 ;
 
 subtactic:

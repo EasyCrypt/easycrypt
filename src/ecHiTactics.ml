@@ -90,6 +90,7 @@ and process_tactic_core mkpv (tac : ptactic_core) (gs : goals) : goals =
     | Pdo ((b, n), t) -> `One (t_do b n (process_tactic_core1 mkpv t))
     | Ptry t          -> `One (t_try (process_tactic_core1 mkpv t))
     | Pby t           -> `One (process_by mkpv t)
+    | Por (t1, t2)    -> `One (process_or  mkpv t1 t2)
     | Pseq tacs       -> `One (fun (juc, n) -> process_tactics mkpv tacs (juc, [n]))
     | Pcase i         -> `One (process_case loc i)
     | Pprogress (s,t) -> `One (process_progress s (process_tactic_core1,mkpv) t)
@@ -110,5 +111,16 @@ and process_tactic_core1 mkpv (tac : ptactic_core) ((juc, n) : goal) : goals =
 
 (* -------------------------------------------------------------------- *)
 and process_by mkpv t (juc, n) =
-  let gs = process_tactics mkpv t (juc, [n]) in
-    t_on_goals EcHiLogic.process_done gs
+  let goal =
+    match t with
+    | None   -> (juc, [n])
+    | Some t -> process_tactics mkpv t (juc, [n])
+  in
+    t_on_goals EcHiLogic.process_done goal
+
+(* -------------------------------------------------------------------- *)
+and process_or mkpv t1 t2 g =
+  t_or
+    (process_tactic1 mkpv t1)
+    (process_tactic1 mkpv t2)
+    g

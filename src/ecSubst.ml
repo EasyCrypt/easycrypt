@@ -117,10 +117,11 @@ let subst_oracle_info (s:_subst) (x:oracle_info) =
 let subst_funsig (s : _subst) (funsig : funsig) =
   let fs_arg = s.s_ty funsig.fs_arg in
   let fs_ret = s.s_ty funsig.fs_ret in
+  let fs_anm = funsig.fs_anames |> omap (List.map (subst_variable s)) in
 
   { fs_name   = funsig.fs_name;
     fs_arg    = fs_arg;
-    fs_anames = funsig.fs_anames;
+    fs_anames = fs_anm;
     fs_ret    = fs_ret; }
 
 (* -------------------------------------------------------------------- *)

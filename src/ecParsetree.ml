@@ -87,7 +87,7 @@ and plvalue = plvalue_r located
 type pinstr_r =
   | PSasgn   of plvalue * pexpr
   | PSrnd    of plvalue * pexpr
-  | PScall   of plvalue option * pqsymbol * (pexpr list) located
+  | PScall   of plvalue option * pgamepath * (pexpr list) located
   | PSif     of pexpr * pstmt * pstmt
   | PSwhile  of pexpr * pstmt
   | PSassert of pexpr
@@ -524,7 +524,8 @@ and ptactic_core_r =
   | Pidtac      of string option
   | Pdo         of trepeat * ptactic_core
   | Ptry        of ptactic_core
-  | Pby         of ptactic list
+  | Pby         of (ptactic list) option
+  | Por         of ptactic * ptactic
   | Pseq        of ptactic list
   | Pcase       of pformula 
   | Plogic      of logtactic

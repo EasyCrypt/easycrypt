@@ -181,6 +181,14 @@ lemma nosmt iffI : forall (a b : bool),
   (a => b) => (b => a) => (a <=> b)
 by [].
 
+lemma nosmt iffLR (a b : bool):
+  (a <=> b) => a => b
+by [].
+
+lemma nosmt iffRL (a b : bool):
+  (a <=> b) => b => a
+by [].
+
 (** if *)
 lemma nosmt ifE : forall (a bt bf c: bool), 
   (if a then bt else bf) =>

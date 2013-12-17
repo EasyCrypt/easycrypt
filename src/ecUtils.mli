@@ -167,8 +167,6 @@ module List : sig
 
   val uniq : 'a list -> bool
 
-  val take_n : int -> 'a list -> 'a list
-
   val take : int -> 'a list -> 'a list
 
   val split_n : int -> 'a list -> 'a list * 'a * 'a list

@@ -1428,7 +1428,7 @@ module Ax = struct
                 dtc
         in
 
-        let tc = { pl_loc = loc; pl_desc = Pby [tc] } in
+        let tc = { pl_loc = loc; pl_desc = Pby (Some [tc]) } in
         let tc = { pt_core = tc; pt_intros = []; } in
 
         let scope = Tactics.process_r false mode scope [tc] in
@@ -1685,7 +1685,7 @@ module Ty = struct
       List.iter
         (fun (x, pt, f) ->
           let t  = { pt_core = pt; pt_intros = []; } in
-          let t  = { pl_loc = pt.pl_loc; pl_desc = Pby [t] } in
+          let t  = { pl_loc = pt.pl_loc; pl_desc = Pby (Some [t]) } in
           let t  = { pt_core = t; pt_intros = []; } in
           let ax = { ax_tparams = [];
                      ax_spec    = Some f;
@@ -2098,7 +2098,7 @@ module Theory = struct
       | None -> Some (axc.C.axc_axiom, axc.C.axc_path, axc.C.axc_env)
       | Some pt ->
           let t = { pt_core = pt; pt_intros = []; } in
-          let t = { pl_loc = pt.pl_loc; pl_desc = Pby [t]; } in
+          let t = { pl_loc = pt.pl_loc; pl_desc = Pby (Some [t]); } in
           let t = { pt_core = t; pt_intros = []; } in
           let (x, ax) = axc.C.axc_axiom in
 

@@ -510,8 +510,10 @@ let priority_of_binop name =
   match EcIo.lex_single_token name with
   | Some EP.IMPL  -> Some e_bin_prio_impl
   | Some EP.IFF   -> Some e_bin_prio_iff
-  | Some(EP.OR _) -> Some e_bin_prio_or
-  | Some(EP.AND _)-> Some e_bin_prio_and
+  | Some EP.ORA   -> Some e_bin_prio_or
+  | Some EP.OR    -> Some e_bin_prio_or
+  | Some EP.ANDA  -> Some e_bin_prio_and
+  | Some EP.AND   -> Some e_bin_prio_and
   | Some EP.EQ    -> Some e_bin_prio_eq
   | Some EP.NE    -> Some e_bin_prio_eq
   | Some EP.GT    -> Some e_bin_prio_order
@@ -1019,10 +1021,16 @@ let pp_instr_for_form (ppe : PPEnv.t) fmt i =
         (pp_list ",@ " (pp_expr ppe)) args
 
   | Scall (Some lv, xp, args) ->
-      Format.fprintf fmt "%a =@;<1 2>@[%a(@[<hov 0>%a@]);@]"
-        (pp_lvalue ppe) lv
-        (pp_funname ppe) xp
-        (pp_list ",@ " (pp_expr ppe)) args
+      let assign_operator =
+        match xp.EcPath.x_top.EcPath.m_args with
+        | [] -> "="
+        | _  -> "<-"
+      in
+        Format.fprintf fmt "%a %s@;<1 2>@[%a(@[<hov 0>%a@]);@]"
+          (pp_lvalue ppe) lv
+          assign_operator
+          (pp_funname ppe) xp
+          (pp_list ",@ " (pp_expr ppe)) args
 
   | Sassert e ->
       Format.fprintf fmt "assert %a;"
