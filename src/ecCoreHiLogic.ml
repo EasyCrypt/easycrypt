@@ -362,17 +362,25 @@ let ffpattern_of_genpattern hyps (ge : genpattern) =
   match ge with
   | `FPattern pe      -> Some pe
   | `Form (Some _, _) -> None
-  | `Form (None, fp)  -> begin
-      match
+  | `Form (None, fp)  ->
+      let rec destr_app fp =
         match unloc fp with
+        | PFtuple [fp] -> destr_app fp
         | PFapp (fh, fargs) -> (fh, fargs)
         | _ -> (fp, [])
-      with
-      | ({ pl_desc = PFident (p, tya) }, args)
-          when lookup_named_psymbol hyps (p, tya) <> None
-        ->
-          Some ({ fp_kind = FPNamed (p, tya);
-                  fp_args = List.map (fun x -> mk_loc x.pl_loc (EA_form x)) args; })
-      | _ -> None
- end
-          
+
+      and ae_of_form fp =
+        match unloc fp with
+        | PFhole -> mk_loc fp.pl_loc EA_none
+        | _      -> mk_loc fp.pl_loc (EA_form fp)
+      in
+        match destr_app fp with
+        | ({ pl_desc = PFident (p, tya) }, args) ->
+            if lookup_named_psymbol hyps (p, tya) <> None then
+              Some ({ fp_kind = FPNamed (p, tya);
+                      fp_args = List.map ae_of_form args; })
+            else
+              None
+  
+        | _ -> None
+

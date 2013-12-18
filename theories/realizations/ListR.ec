@@ -143,11 +143,11 @@ lemma any_cons (p:('a -> bool)) x xs:
   any p (x::xs) = ((p x) \/ any p xs).
 proof strict.
 rewrite /any rw_eq_iff; split.
-  intros=> Hxxs; elim Hxxs=> {Hxxs} x' [Hxxs Hxs] //; case (x' = x)=> x'_x.
+  intros=> Hxxs; elim Hxxs=> x' [Hxxs Hxs] //; case (x' = x)=> x'_x.
     by subst x'; left.
     by right; exists x'; split=> //;
        generalize Hxxs; rewrite mem_cons=> Hxxs; elim Hxxs=> //; apply absurd.
-   by intros=> [Hx | Hxs]; [exists x | elim Hxs=> {Hxs} x' [Hxs Hx']; exists x']; split;
+   by intros=> [Hx | Hxs]; [exists x | elim Hxs=> x' [Hxs Hx']; exists x']; split;
       rewrite ?mem_cons //; right.
 qed.
 

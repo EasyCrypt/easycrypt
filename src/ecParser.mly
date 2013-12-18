@@ -1947,7 +1947,7 @@ logtactic:
 | RIGHT
     { Pright }
 
-| ELIM e=fpattern(form)?
+| ELIM e=genpattern*
    { Pelim e }
 
 | ELIMT f=sform

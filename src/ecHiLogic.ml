@@ -649,17 +649,6 @@ let process_rewrite loc ri (juc, n) =
     set_loc loc (fun () -> List.fold_left do1 (juc, [n]) ri) ()
 
 (* -------------------------------------------------------------------- *)
-let process_elim loc pe ((_, n) as g) =
-  match pe with
-  | None    -> t_elim g
-  | Some pe ->
-      let ((juc, an), gs) = process_mkn_apply (process_formula (get_hyps g)) pe g in
-      let (_, f) = get_node (juc, an) in
-        t_on_last
-          (set_loc loc t_elim)
-          (t_on_first (t_use an gs) (t_cut f (juc, n)))
-
-(* -------------------------------------------------------------------- *)
 let process_exists fs g =
   gen_t_exists check_pterm_arg_for_ty fs g
 
@@ -936,6 +925,12 @@ let process_generalize loc patterns g =
 
   in
     t_lseq (List.rev_map pr1 patterns) g
+
+(* -------------------------------------------------------------------- *)
+let process_elim loc pe g =
+  t_on_last
+    (set_loc loc t_elim)
+    (process_generalize loc pe g)
 
 (* -------------------------------------------------------------------- *)
 let process_elimT loc (pf, qs) g =

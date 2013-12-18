@@ -39,16 +39,14 @@ proof -strict.
     proc;wp;skip.
     intros &m1 &m2 h;simplify;assumption.
   skip.
-  intros &m1 &m2 h;elim h;clear h;intros h1 h2.
-  elim h2;clear h2;intros h2 h3.
+  intros &m1 &m2 h;elim h;intros h1 h2.
+  elim h2;intros h2 h3.
   rewrite h1; rewrite h3;simplify;split.
 qed.
-
 
 module type Adv = {
   proc f() : unit
 }.
-
 
 module M(A:Adv) = {
 
@@ -66,4 +64,3 @@ call (_ : true ==> true).
 proc true;progress.
 skip;progress.
 qed.
-

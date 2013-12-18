@@ -107,8 +107,8 @@ proof strict.
 intros=> x m v x_in_dom_m.
 apply ISet.set_ext; delta ISet.(==); beta=> v'.
 rewrite ISet.mem_add rng_def; split=> in_rng; first smt.
-  elim in_rng; clear in_rng; rewrite 1?rng_def=> in_rng; last smt.
-  elim in_rng; clear in_rng => x0 in_rng; exists x0; smt.
+  elim in_rng; rewrite 1?rng_def=> in_rng; last smt.
+  elim in_rng => x0 in_rng; exists x0; smt.
 qed.
 
 lemma in_rng_setNE_in_rng: forall (v:'b) (m:('a,'b) map) x v',
@@ -118,7 +118,7 @@ lemma in_rng_setNE_in_rng: forall (v:'b) (m:('a,'b) map) x v',
 proof strict.
 intros=> v m x v' v_neq_v';
 delta in_rng beta; rewrite 2!rng_def=> v_in_rng_set;
-elim v_in_rng_set=> {v_in_rng_set} x' get_set;
+elim v_in_rng_set=> x' get_set;
 cut x_neq_x':x' <> x.
   generalize get_set; apply absurd; simplify=> x_x'; subst x'; rewrite get_setE; smt. (* TODO: Injectivity lemma *)
   generalize get_set; rewrite get_setNE; first smt.
