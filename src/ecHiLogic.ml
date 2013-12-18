@@ -650,10 +650,14 @@ let process_rewrite loc ri (juc, n) =
 
 (* -------------------------------------------------------------------- *)
 let process_elim loc pe ((_, n) as g) =
-  let ((juc, an), gs) = process_mkn_apply (process_formula (get_hyps g)) pe g in
-  let (_, f) = get_node (juc, an) in
-
-    t_on_first (t_use an gs) (set_loc loc (t_elim f) (juc, n))
+  match pe with
+  | None    -> t_elim g
+  | Some pe ->
+      let ((juc, an), gs) = process_mkn_apply (process_formula (get_hyps g)) pe g in
+      let (_, f) = get_node (juc, an) in
+        t_on_last
+          (set_loc loc t_elim)
+          (t_on_first (t_use an gs) (t_cut f (juc, n)))
 
 (* -------------------------------------------------------------------- *)
 let process_exists fs g =
@@ -692,17 +696,6 @@ let process_intros ?(cf = true) pis (juc, n) =
         (hyps, form), id)
       (get_goal g) ids)) g
   in
-
-  let elim_top g =
-    let h       = EcIdent.create "_" in
-    let (g, an) = EcLogic.t_intros_1 [h] g in
-    let (g, n)  =
-      try  mkn_hyp g (get_hyps (g, an)) h
-      with LDecl.Ldecl_error _ -> tacuerror "nothing to elim" in
-    let f       = snd (get_node (g, n)) in
-      t_on_goals
-        (t_clear (EcIdent.Sid.of_list [h]))
-        (t_on_first (t_use n []) (t_elim f (g, an))) in
 
   let rec collect acc core pis =
     let maybe_core () =
@@ -761,10 +754,10 @@ let process_intros ?(cf = true) pis (juc, n) =
                 | true  -> t_subgoal (List.map (dointro1 false) pis) gs
                 | false -> begin
                     match pis with
-                    | [] -> t_on_goals elim_top gs
+                    | [] -> t_on_goals t_elim gs
                     | _  ->
                         let t gs =
-                          t_subgoal (List.map (dointro1 false) pis) (elim_top gs)
+                          t_subgoal (List.map (dointro1 false) pis) (t_elim gs)
                         in
                           t_on_goals t gs
                 end

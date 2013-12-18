@@ -126,7 +126,7 @@ val t_intros_1 : EcIdent.t list -> goal -> goal
 val t_intros   : EcIdent.t located list -> tactic
 
 val t_elim_hyp : EcIdent.t -> tactic
-val t_elim     : form -> tactic
+val t_elim     : tactic
 
 val t_elimT : EcTypes.ty list -> EcPath.path -> form -> int -> tactic
 

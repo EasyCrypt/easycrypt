@@ -1937,7 +1937,7 @@ logtactic:
 | RIGHT
     { Pright }
 
-| ELIM e=fpattern(form)
+| ELIM e=fpattern(form)?
    { Pelim e }
 
 | ELIMT f=sform

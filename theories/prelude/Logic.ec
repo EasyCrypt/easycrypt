@@ -50,7 +50,7 @@ lemma nosmt absurd : forall (b a : bool), (!a => !b) => b => a by [].
 
 (** and *)
 lemma nosmt andE : forall (a b c:bool), 
-    (a /\ b) => (a => b => c) => c
+    (a => b => c) => (a /\ b) => c
 by [].
 
 lemma nosmt andEl : forall (a b:bool),
@@ -87,7 +87,7 @@ by [].
 
 (** or *)
 lemma nosmt orE : forall (a b c:bool), 
-    (a \/ b) => (a => c) => (b => c) => c
+    (a => c) => (b => c) => (a \/ b) => c
 by [].
 
 lemma nosmt orIl : forall (a b : bool),
@@ -136,7 +136,7 @@ by [].
 
 (** anda *)
 lemma nosmt andaE : forall (a b c:bool),
-    (a && b) => (a => b => c) => c
+    (a => b => c) => (a && b) => c
 by [].
 
 lemma nosmt andaEl : forall (a b:bool),
@@ -157,7 +157,7 @@ by [].
 
 (** ora *)
 lemma nosmt oraE : forall (a b c:bool),
-    (a || b) => (a => c) => (!a => b => c) => c
+    (a => c) => (!a => b => c) => (a || b) => c
 by [].
 
 lemma nosmt oraIl : forall (a b : bool),
@@ -174,7 +174,7 @@ by [].
 
 (** iff *)
 lemma nosmt iffE : forall (a b c:bool),
-  (a <=> b) => ((a => b) => (b => a) => c) => c
+  ((a => b) => (b => a) => c) => (a <=> b) => c
 by [].
 
 lemma nosmt iffI : forall (a b : bool),
@@ -191,8 +191,8 @@ by [].
 
 (** if *)
 lemma nosmt ifE : forall (a bt bf c: bool), 
-  (if a then bt else bf) =>
-  (a => bt => c) => (!a => bf => c) => c
+  (a => bt => c) => (!a => bf => c)
+    => (if a then bt else bf) => c
 by [].
 
 lemma nosmt ifI : forall (a bt bf : bool),
