@@ -167,6 +167,8 @@ val t_assumption : tactic
 
 val t_progress : tactic -> tactic
 
+val t_progress_one : tactic
+
 val t_logic_trivial : tactic
 
 val t_admit : tactic

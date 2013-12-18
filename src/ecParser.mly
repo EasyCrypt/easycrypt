@@ -2224,8 +2224,8 @@ tactic_core_r:
 | CASE f=sform
    { Pcase f }
 
-| PROGRESS t=tactic_core?
-   { Pprogress t }
+| PROGRESS s=STAR? t=tactic_core?
+   { Pprogress (s<>None, t) }
 
 | x=logtactic
    { Plogic x }

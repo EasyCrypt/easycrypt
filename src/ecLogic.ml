@@ -1170,7 +1170,9 @@ let t_split g =
           t_on_first proof gs
          | _ -> aux_red f
       end
-    | Fif(f1,_f2,_f3) -> t_case f1 g
+    | Fif(f1,_f2,_f3) -> 
+      if f_equal concl f then t_case f1 g
+      else t_seq (t_change f) (t_case f1) g
     | _ ->  aux_red f
   and aux_red f =
     match h_red_opt full_red hyps f with
@@ -1401,8 +1403,7 @@ let t_progress tac g =
         t_seq (t_elim_hyp id) (t_clear (Sid.singleton id)),
         aux0
       | Fquant(Lexists,_,_) -> 
-        t_seq (t_elim_hyp id) (t_clear (Sid.singleton id)),
-        aux0
+        t_elim_hyp id, aux0
       | _ when is_eq f -> 
         let f1, f2 = destr_eq f in
         if is_tuple f1 && is_tuple f2 then 
@@ -1412,6 +1413,231 @@ let t_progress tac g =
       | _ -> t_try (t_subst1_id id), aux in
     t_seq t1 aux g in
   aux g
+
+let rec t_split_build g =
+  let hyps, concl = get_goal g in
+  let rec aux f =
+    match f.f_node with
+    | Fop(p,_) when EcPath.p_equal p p_true -> 
+      let id = EcIdent.create "_" in
+      (id, f_true), t_true
+    | Fapp({f_node = Fop(p,_)}, [f1;f2]) ->
+      begin match op_kind p with
+      | OK_and b -> 
+        let tac = t_apply_logic (if b then p_anda_intro else p_and_intro)
+                [] [AAform f1;AAform f2;AAnode;AAnode] in 
+        let (juc, gs) = tac g in
+        let (id1, ff1), tac1 = t_build (juc, List.nth gs 0) in
+        let (id2, ff2), tac2 = t_build (juc, List.nth gs 1) in
+        let ff = f_and ff1 ff2 in
+        (id1, ff),
+        t_lseq [
+          t_elim_hyp id1;t_clear (Sid.singleton id1); t_intros_i [id1;id2];
+          t_seq_subgoal tac [
+            t_seq (t_clear (Sid.singleton id2)) tac1;
+            t_seq (t_clear (Sid.singleton id1)) tac2]]
+
+      | OK_eq when EcReduction.is_conv hyps f1 f2 -> 
+        let id = EcIdent.create "_" in
+        (id, f_true), (t_reflex ~reduce:true) 
+      | OK_eq when is_tuple f1 && is_tuple f2 ->
+          let fs1 = destr_tuple f1 in
+          let fs2 = destr_tuple f2 in
+          let types = List.map (fun v -> v.f_ty) fs1 in
+          let args = List.map (fun f -> AAform f) (fs1@fs2) in
+          let nodes = List.map (fun _ -> AAnode) fs1 in
+          let lemma = gen_split_tuple_lemma types in
+          let proof = gen_split_tuple_proof types in
+          let (juc,gs) = t_apply_form lemma (args@nodes) g in
+          let gs = List.tl gs in
+          let idfts = List.map (fun n -> t_build0 (juc,n)) gs in
+          let ids = 
+            List.fold_left (fun ids ((id,_),_) -> Sid.add id ids) Sid.empty idfts in
+          let tacs = 
+            List.map (fun ((id,_), tac) -> 
+              t_seq (t_clear (Sid.remove id ids)) tac) idfts in
+          let ff = f_ands (List.map (fun ((_,f), _) -> f) idfts) in
+          let id = EcIdent.create "_" in
+          let rec etacs ids = 
+            match ids with 
+            | [] -> assert false
+            | [(idi,_),_] -> 
+              t_seq (t_generalize_hyps true [id]) (t_intros_i [idi])
+            | ((idi,_),_) :: ids ->
+              t_lseq [t_elim_hyp id; t_clear (Sid.singleton id);
+                      t_intros_i [idi;id]; etacs ids] in
+          (id, ff),
+          t_seq (etacs idfts)
+            (t_seq_subgoal
+               (t_apply_form lemma (args@nodes))
+               (proof :: tacs))
+          
+      | _ -> aux_red f
+      end
+    | Fif(f1,_f2,_f3) ->
+      let same = f_equal f concl in
+      let tac = 
+        if same then t_case f1
+        else t_seq (t_change f) (t_case f1) in
+      let (juc,gs) = tac g in
+      let (id1, ff1), tac1 = t_build (juc, List.nth gs 0) in
+      let (id2, ff2), tac2 = t_build (juc, List.nth gs 1) in
+      let id = EcIdent.create "_" in
+      let h1 = EcIdent.create "_" in
+      let h2 = EcIdent.create "_" in
+      let h3 = EcIdent.create "_" in
+      let u1, tacu1 =
+        if is_imp ff1 then
+          let (f1',u1) = destr_imp ff1 in
+          if f_equal f1 f1' then u1, t_intros_i [h3]
+          else ff1, t_id None
+        else ff1, t_id None in
+      let u2, tacu2 =
+        if is_imp ff2 then 
+          let (nf1',u2) = destr_imp ff2 in
+          if f_equal (f_not f1) nf1' then u2, t_intros_i [h3]
+          else ff2, t_id None
+        else ff2, t_id None in
+      let ff = f_if f1 u1 u2 in
+      let tac = 
+        t_seq_subgoal 
+          (t_seq (t_generalize_hyps true [id]) 
+             (if same then t_seq (t_change (f_imp ff f)) (t_case f1)
+              else t_case f1))
+          [(* hyps |- f1 => u1 => f2{f1<-true} *)
+            t_seq_subgoal (t_seq (t_intros_i [h1;h2]) (t_cut ff1))
+              [t_seq tacu1 (t_apply_hyp h2 []);
+               t_lseq [t_intros_i [id1];t_generalize_hyp h1;
+                       t_clear (Sid.add h1 (Sid.singleton h2));
+                       tac1]];
+           (* hyps |- !f1 => u2 => f3{f1<-false} *)
+            t_seq_subgoal (t_seq (t_intros_i [h1;h2]) (t_cut ff2))
+              [t_seq tacu2 (t_apply_hyp h2 []);
+               t_lseq [t_intros_i [id2];t_generalize_hyp h1;
+                       t_clear (Sid.add h1 (Sid.singleton h2));
+                       tac2]] ] in
+      (id, ff), tac
+
+    | _ ->  aux_red f
+  and aux_red f =
+    match h_red_opt full_red hyps f with
+    | Some f -> aux f
+    | None -> 
+      let id = EcIdent.create "_" in
+      (id,concl), t_hyp id in
+  aux concl
+    
+and t_build g = 
+  let (juc,gs) = t_simplify_nodelta g in
+  let idf,tac = t_build0 (juc, List.nth gs 0) in
+  idf, t_seq t_simplify_nodelta tac
+
+and t_build0 g =
+  let hyps, concl = get_goal g in
+  try 
+    let h = gen_find_in_hyps EcReduction.is_alpha_eq concl hyps in
+    let id = EcIdent.create "_" in
+    (id, f_true), t_hyp h
+  with Not_found -> t_build1 g
+
+and t_build1 g =
+  let hyps, concl = get_goal g in
+  match concl.f_node with
+  | Fquant(Lforall,bd,_) ->
+    let ids = 
+      LDecl.fresh_ids hyps (List.map (fun (id,_) -> EcIdent.name id) bd) in
+    let (juc,gs) = t_intros_i ids g in
+    let (id,u), tac = t_build1 (juc, List.hd gs) in
+    let params = List.map2 (fun (_, x) id -> id, x) bd ids in
+    let doarg (_, gty) id = 
+      match gty with
+      | GTty ty -> AAform (f_local id ty)
+      | GTmodty (mt,_mr) -> 
+        let sig_ = ModTy.sig_of_mt (LDecl.toenv hyps) mt in
+        AAmp (EcPath.mident id, sig_) 
+      | GTmem _mt -> AAmem id in
+    let args = List.map2 doarg bd ids in
+    let ff = f_forall params u in
+    let id' = EcIdent.create "_" in
+    let tac'= 
+      t_seq (t_intros_i ids) 
+        (t_seq_subgoal (t_cut u)
+           [t_apply_hyp id' args;
+            t_lseq [t_clear (Sid.singleton id'); t_intros_i [id];
+                    tac]]) in
+    (id', ff), tac'
+
+  | Flet (LTuple fs,f1,_) ->
+    let p = p_tuple_ind (List.length fs) in
+    let tac = t_elimT (List.map snd fs) p f1 0 in
+    let (juc,gs) = tac g in
+    let idf,tac1 = t_build0 (juc, List.hd gs) in
+    idf, t_seq tac tac1
+
+  | Fapp({f_node = Fop(p,_)}, [f1;_]) when EcPath.p_equal p EcCoreLib.p_imp ->
+    t_build2 f1 g
+  | _ -> 
+    t_split_build g
+
+and t_build2 f1 g = 
+  match f1.f_node with
+  | Fapp({f_node = Fop(p,_)}, [_;_] ) when is_op_and p ->
+    let id = EcIdent.create "_" in
+    let tac = 
+      t_lseq [t_intros_i [id]; t_elim_hyp id; t_clear (Sid.singleton id)] in
+    let (juc, gs) = tac g in
+    let idf, tac1 = t_build0 (juc, List.hd gs) in
+    idf, t_seq tac tac1
+  | Fquant(Lexists,_,_) ->
+    let id = EcIdent.create "_" in
+    let tac = 
+      t_lseq [t_intros_i [id]; t_elim_hyp id] in
+    let (juc, gs) = tac g in
+    let (id1,ff1), tac1 = t_build0 (juc, List.hd gs) in
+    (id1, ff1), t_seq tac tac1
+
+  | _ when is_eq_or_iff f1 -> 
+    let f, f2 = destr_eq f1 in
+    let id = EcIdent.create "_" in
+    if is_tuple f && is_tuple f2 then 
+      let tac = 
+        t_lseq [t_intros_i [id]; t_elim_hyp id;t_clear (Sid.singleton id)] in
+      let (juc,gs) = tac g in
+      let (idf,tac1) = t_build0 (juc, List.hd gs) in
+      idf, t_seq tac tac1
+    else 
+      let tac1 = t_intros_i [id] in
+      let (juc,gs), tac2 = 
+        match t_try_base (t_seq tac1 (t_subst1_id id)) g with
+        | `Failure _ -> tac1 g, t_id None
+        | `Success g -> g, (t_subst1_id id) in
+      let (id1,ff1), tac3 = t_build0 (juc, List.hd gs) in
+      let ff = f_imp f1 ff1 in
+      (id1, ff),
+      t_seq tac1
+        (t_seq_subgoal (t_cut ff1) [
+          t_seq (t_apply_hyp id1 [AAnode]) (t_hyp id);
+          t_lseq [tac2; t_try (t_clear (Sid.singleton id1)); 
+                  t_intros_i [id1]; tac3]])
+  | _ -> 
+    let id = EcIdent.create "_" in
+    let tac = t_intros_i [id] in
+    let (juc,gs) = tac g in
+    let (id1,ff1), tac1 = t_build0 (juc, List.hd gs) in
+    let ff = f_imp f1 ff1 in
+    (id1, ff),
+    t_seq tac
+      (t_seq_subgoal (t_cut ff1) [
+        t_seq (t_apply_hyp id1 [AAnode]) (t_hyp id);
+        t_lseq [t_clear (Sid.singleton id1); t_intros_i [id1]; tac1]])
+
+
+let t_progress_one g =
+  let (id,f), tac = t_build g in
+  t_seq_subgoal (t_cut f) 
+    [t_simplify_nodelta;
+     t_seq (t_intros_i [id]) tac] g
+
 
 (* -------------------------------------------------------------------- *)
 let t_congr f (args, ty) g =

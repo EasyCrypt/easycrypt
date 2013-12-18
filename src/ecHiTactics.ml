@@ -34,13 +34,16 @@ let process_admit g =
   t_admit g
 
 (* -------------------------------------------------------------------- *)
-let process_progress (prtc, mkpv) t =
+let process_progress s (prtc, mkpv) t =
   let t = 
     match t with 
     | None   -> t_id None 
-    | Some t -> prtc mkpv t
+    | Some t -> 
+      if s then tacuerror "progress * do not accept tactic";
+      prtc mkpv t
   in
-    t_progress t
+  if s then t_progress_one
+  else t_progress t 
 
 (* -------------------------------------------------------------------- *)
 let rec process_tactics mkpv (tacs : ptactic list) (gs : goals) : goals =
@@ -90,7 +93,7 @@ and process_tactic_core mkpv (tac : ptactic_core) (gs : goals) : goals =
     | Por (t1, t2)    -> `One (process_or  mkpv t1 t2)
     | Pseq tacs       -> `One (fun (juc, n) -> process_tactics mkpv tacs (juc, [n]))
     | Pcase i         -> `One (process_case loc i)
-    | Pprogress t     -> `One (process_progress (process_tactic_core1, mkpv) t)
+    | Pprogress (s,t) -> `One (process_progress s (process_tactic_core1,mkpv) t)
     | Padmit          -> `One (process_admit)
     | Pdebug          -> `One (process_debug)
     | Plogic t        -> `One (process_logic (eng, mkpv) loc t)
