@@ -803,7 +803,7 @@ let process_cut (engine : engine) ip phi t g =
 
 (* -------------------------------------------------------------------- *)
 let process_cutdef loc ip cd g =
-  let (hyps, _) = (get_hyps g, get_concl g) in
+  let hyps = get_hyps g in
   let (p, typs, ue, ax) = process_named_pterm loc hyps (cd.pt_name, cd.pt_tys) in
   let args = List.map (trans_pterm_argument hyps ue) cd.pt_args in
   let (ax, ids) = check_pterm_arguments hyps ue ax args in
@@ -812,7 +812,7 @@ let process_cutdef loc ip cd g =
     if not (can_concretize_pterm_arguments (ue, ev) ids) then
       tacuerror ~loc "cannot infer all placeholders";
 
-  let tue = EcUnify.UniEnv.close ue in
+  let tue  = EcUnify.UniEnv.close ue in
   let args = concretize_pterm_arguments (tue, ev) ids in
   let ax   = concretize_pterm (tue, ev) ids ax in
   let typs = List.map (Tuni.offun tue) typs in
@@ -873,46 +873,69 @@ let process_pose loc xsym o p g =
       g
 
 (* -------------------------------------------------------------------- *)
-let process_generalize l =
-  let pr1 (occ, pf) g =
+let process_generalize loc patterns g =
+  let pr1 pattern g =
     let hyps = get_hyps g in
-    match pf.pl_desc with
-    | PFident ({pl_desc = ([], s)}, None)
-        when occ = None && LDecl.has_symbol s hyps
-        ->
-      let id = fst (LDecl.lookup s hyps) in
-        t_seq (t_generalize_hyp id) (t_clear (Sid.singleton id)) g
 
-    | _ ->
-      let (hyps, concl) = get_goal g in
-      let env = LDecl.toenv hyps in
-      let (ps, ue) = (ref Mid.empty, unienv_of_hyps hyps) in
-      let p = TT.trans_pattern env (ps, ue) pf in
-      let ev = EV.of_idents (Mid.keys !ps) in
-    
-      let (_ue, tue, ev) =
-        match try_match hyps (ue, ev) p concl with
-        | None   -> tacuerror "cannot find an occurence for [generalize]"
-        | Some x -> x
-      in
-    
-      let p    = concretize_form (tue, ev) p in
-      let cpos =
-        try  FPosition.select_form hyps occ p concl
-        with InvalidOccurence -> tacuerror "invalid occurence selector"
-      in
+    let onresolved pattern =
+      match pattern with
+      | `Form (occ, pf) -> begin
+          match pf.pl_desc with
+          | PFident ({pl_desc = ([], s)}, None)
+              when occ = None && LDecl.has_symbol s hyps
+            ->
+              let id = fst (LDecl.lookup s hyps) in
+                t_seq (t_generalize_hyp id) (t_clear (Sid.singleton id)) g
+          | _ ->
+            let (hyps, concl) = get_goal g in
+            let env = LDecl.toenv hyps in
+            let (ps, ue) = (ref Mid.empty, unienv_of_hyps hyps) in
+            let p = TT.trans_pattern env (ps, ue) pf in
+            let ev = EV.of_idents (Mid.keys !ps) in
+          
+            let (_ue, tue, ev) =
+              match try_match hyps (ue, ev) p concl with
+              | None   -> tacuerror "cannot find an occurence for [generalize]"
+              | Some x -> x
+            in
+          
+            let p    = concretize_form (tue, ev) p in
+            let cpos =
+              try  FPosition.select_form hyps occ p concl
+              with InvalidOccurence -> tacuerror "invalid occurence selector"
+            in
+      
+            let name =
+              match EcParsetree.pf_ident pf with
+              | None   -> EcIdent.create "x"
+              | Some x -> EcIdent.create x
+            in
+      
+            let fpat _ _ _ = FPosition.topattern ~x:name cpos concl in
+              t_generalize_form ~fpat None p g
+      end
 
-      let name =
-        match EcParsetree.pf_ident pf with
-        | None   -> EcIdent.create "x"
-        | Some x -> EcIdent.create x
-      in
+      | `FPattern fp -> begin
+          match fp.fp_kind with
+          | FPCut f ->
+              t_cut (process_formula (get_hyps g) f) g
 
-      let fpat _ _ _ = FPosition.topattern ~x:name cpos concl in
-        t_generalize_form ~fpat None p g
+          | FPNamed ({ pl_desc = ([], s) }, None) when LDecl.has_symbol s hyps ->
+              let id = fst (LDecl.lookup s hyps) in
+                t_seq (t_generalize_hyp id) (t_clear (Sid.singleton id)) g
+
+          | FPNamed (q, tys) ->
+              let cd = { pt_name = q; pt_tys = tys; pt_args = fp.fp_args } in
+                process_cutdef loc None cd g
+      end
+    in
+
+    match ffpattern_of_genpattern (get_hyps g) pattern with
+    | Some ff -> onresolved (`FPattern ff)
+    | None    -> onresolved pattern
 
   in
-    t_lseq (List.rev_map pr1 l)
+    t_lseq (List.rev_map pr1 patterns) g
 
 (* -------------------------------------------------------------------- *)
 let process_elimT loc (pf, qs) g =
@@ -1055,7 +1078,7 @@ let process_logic (engine, hitenv) loc t =
   | Papply pe      -> process_apply loc pe
   | Pcut (ip, f, t)-> process_cut engine ip f t
   | Pcutdef (ip, f)-> process_cutdef loc ip f
-  | Pgeneralize l  -> process_generalize l
+  | Pgeneralize l  -> process_generalize loc l
   | Pclear l       -> process_clear l
   | Prewrite ri    -> process_rewrite loc ri
   | Psubst   ri    -> process_subst loc ri

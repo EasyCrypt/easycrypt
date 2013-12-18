@@ -1738,7 +1738,17 @@ rwarg:
 ;
 
 genpattern:
-| o=rwocc? l=sform_h %prec prec_tactic { (o |> omap EcMaps.Sint.of_list, l) }
+| l=sform_h %prec prec_tactic
+    { `Form (None, l) }
+
+| o=rwocc l=sform_h %prec prec_tactic
+    { `Form (Some (EcMaps.Sint.of_list o), l) }
+
+| LPAREN UNDERSCORE COLON f=form RPAREN
+    { `FPattern (mk_fpattern (FPCut f) []) }
+
+| LPAREN LPAREN UNDERSCORE COLON f=form RPAREN args=loc(fpattern_arg)* RPAREN
+    { `FPattern (mk_fpattern (FPCut f) args) }
 ;
 
 simplify_arg: 

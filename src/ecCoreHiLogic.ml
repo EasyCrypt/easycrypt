@@ -128,26 +128,32 @@ let trans_pterm_argument hyps ue arg =
       None
 
   | EA_mod mp ->
-    let m = TT.trans_msymbol env mp in
-    Some (`FormOrMod (None, Some m))
+      let m = TT.trans_msymbol env mp in
+        Some (`FormOrMod (None, Some m))
+
+(* -------------------------------------------------------------------- *)
+let lookup_named_psymbol hyps (fp, tvi) =
+  match unloc fp with
+  | ([], x) when LDecl.has_hyp x hyps && tvi = None ->
+      let (x, fp) = LDecl.lookup_hyp x hyps in
+        Some (`Local x, [], fp)
+
+  | _ ->
+    match EcEnv.Ax.lookup_opt (unloc fp) (LDecl.toenv hyps) with
+    | Some (p, ({ EcDecl.ax_spec = Some fp } as ax)) ->
+        Some (`Global p, ax.EcDecl.ax_tparams, fp)
+    | _ -> None
 
 (* -------------------------------------------------------------------- *)
 let process_named_pterm _loc hyps (fp, tvi) =
   let env = LDecl.toenv hyps in
 
   let (p, typ, ax) =
-    match unloc fp with
-    | ([], x) when LDecl.has_hyp x hyps ->
-        let (x, fp) = LDecl.lookup_hyp x hyps in
-          (`Local x, [], fp)
-
-    | _ -> begin
-      match EcEnv.Ax.lookup_opt (unloc fp) env with
-      | Some (p, ({ EcDecl.ax_spec = Some fp } as ax)) ->
-          (`Global p, ax.EcDecl.ax_tparams, fp)
-
-      | _ -> tacuerror "cannot find lemma %s" (string_of_qsymbol (unloc fp))
-    end
+    match lookup_named_psymbol hyps (fp, tvi) with
+    | Some (p, typ, ax) -> (p, typ, ax)
+    | None ->
+        let strp = string_of_qsymbol (unloc fp) in
+          tacuerror "cannot find lemma %s" strp
   in
 
   let ue  = unienv_of_hyps hyps in
@@ -343,3 +349,30 @@ let process_mkn_apply prcut pe ((juc, _) as g) =
   let (juc, an), ags = mkn_apply (fun _ _ a -> a) (juc, fn) args in
 
     ((juc, an), fgs @ ags)
+
+(* -------------------------------------------------------------------- *)
+(* Try to extract a ffpattern parse-tree from a genpattern parse-tree.
+ * This allows to mix proof-terms and formulas/values in tactic
+ * arguments. Priority should always been given to ffpattern as it is
+ * always possible to force the interpretation of a genpattern as a
+ * formula with holes by annotating it with an empty {} occurences
+ * selector *)
+
+let ffpattern_of_genpattern hyps (ge : genpattern) =
+  match ge with
+  | `FPattern pe      -> Some pe
+  | `Form (Some _, _) -> None
+  | `Form (None, fp)  -> begin
+      match
+        match unloc fp with
+        | PFapp (fh, fargs) -> (fh, fargs)
+        | _ -> (fp, [])
+      with
+      | ({ pl_desc = PFident (p, tya) }, args)
+          when lookup_named_psymbol hyps (p, tya) <> None
+        ->
+          Some ({ fp_kind = FPNamed (p, tya);
+                  fp_args = List.map (fun x -> mk_loc x.pl_loc (EA_form x)) args; })
+      | _ -> None
+ end
+          

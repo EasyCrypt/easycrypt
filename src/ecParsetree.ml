@@ -311,13 +311,11 @@ type 'a fpattern = {
   fp_args : fpattern_arg located list 
 }
 
-type ffpattern = pformula fpattern
+type ffpattern  = pformula fpattern
 
-type pformula_o = pformula option
-
-type cfpattern = (pformula_o * pformula_o) fpattern
-type ccfpattern =  
-  ((pformula_o * pformula_o) * 
+type cfpattern  = (pformula option pair) fpattern
+type ccfpattern =
+  ((pformula option pair) * 
    (phoarecmp option * pformula) option) fpattern
 
 type preduction = {
@@ -361,7 +359,7 @@ type codepos = int * ((int * codepos) option)
 type call_info = 
   | CI_spec of (pformula * pformula)
   | CI_inv  of pformula
-  | CI_upto of (pformula * pformula * pformula_o)
+  | CI_upto of (pformula * pformula * pformula option)
   
 (* AppSingle are optional for bounded Phl judgments
    AppMult is required by most general rule for upper bounded Phl
@@ -371,7 +369,7 @@ type call_info =
 type p_app_bd_info = 
   | PAppNone 
   | PAppSingle of pformula 
-  | PAppMult   of pformula_o tuple5
+  | PAppMult   of (pformula option) tuple5
 
 type ('a, 'b, 'c) rnd_tac_info = 
   | PNoRndParams 
@@ -402,12 +400,12 @@ type bdh_split =
 type phltactic = 
   | Pfun_def  
   | Pfun_abs    of pformula
-  | Pfun_upto   of (pformula * pformula * pformula_o)
+  | Pfun_upto   of (pformula * pformula * pformula option)
   | Pfun_to_code 
   | Pskip
   | Papp        of (tac_dir * int doption * pformula * p_app_bd_info)
   | Pwp         of int doption option 
-  | Pwhile      of tac_side * (pformula * pformula_o * (pformula * pformula) option)
+  | Pwhile      of tac_side * (pformula * pformula option * (pformula * pformula) option)
   | Pfission    of (tac_side * codepos * (int * (int * int)))
   | Pfusion     of (tac_side * codepos * (int * (int * int)))
   | Punroll     of (tac_side * codepos)
@@ -422,7 +420,7 @@ type phltactic =
   | Prnd        of tac_side * (pformula, pformula option, pformula) rnd_tac_info
   | Palias      of (tac_side * codepos * psymbol option)
   | Pset        of (bool * tac_side * codepos * psymbol * pexpr)
-  | Pconseq     of bool*(ccfpattern option * ccfpattern option * ccfpattern option)
+  | Pconseq     of bool * (ccfpattern option * ccfpattern option * ccfpattern option)
   | Phr_exists_elim  
   | Phr_exists_intro of pformula list 
   | Pexfalso
@@ -431,7 +429,7 @@ type phltactic =
   | Pfel          of int * (pformula * pformula * pformula * pformula * pfel_spec_preds * pformula option)
   | Phoare
   | Pprbounded
-  | Psim           of (pformula_o * pformula_o * pformula_o)
+  | Psim           of (pformula option) tuple3
   | Ptrans_stmt    of trans_info
   | Psymmetry
   | Psp            of (bool option)
@@ -483,6 +481,8 @@ and renaming = [
   `NoName | `FindName | `WithRename of string | `NoRename of string
 ]
 
+type genpattern = [`FPattern of ffpattern | `Form of (rwocc * pformula)]
+
 type pdbmap1 = {
   pht_flag : [ `Include | `Exclude ];
   pht_kind : [ `Theory  | `Lemma   ];
@@ -511,7 +511,7 @@ type logtactic =
   | Papply      of (ffpattern * psymbol option)
   | Pcut        of (intropattern1 option * pformula * ptactic_core option)
   | Pcutdef     of (intropattern1 option * pterm)
-  | Pgeneralize of (rwocc * pformula) list
+  | Pgeneralize of genpattern list
   | Pclear      of psymbol list
   | Prewrite    of rwarg list
   | Psubst      of pformula list
@@ -579,7 +579,7 @@ type ptycinstance = {
 (* -------------------------------------------------------------------- *)
 type ident_spec = psymbol list
 
-type inv = (pformula, (pformula * pformula) * pformula_o) EcAstlogic.g_inv
+type inv = (pformula, (pformula * pformula) * pformula option) EcAstlogic.g_inv
 
 type equiv_concl =
   | Aequiv_spec of (pformula * pformula) * (pexpr * pexpr) option

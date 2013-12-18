@@ -1414,6 +1414,7 @@ let t_progress tac g =
     t_seq t1 aux g in
   aux g
 
+(* -------------------------------------------------------------------- *)
 let rec t_split_build g =
   let hyps, concl = get_goal g in
   let rec aux f =
@@ -1631,13 +1632,11 @@ and t_build2 f1 g =
         t_seq (t_apply_hyp id1 [AAnode]) (t_hyp id);
         t_lseq [t_clear (Sid.singleton id1); t_intros_i [id1]; tac1]])
 
-
+(* -------------------------------------------------------------------- *)
 let t_progress_one g =
-  let (id,f), tac = t_build g in
-  t_seq_subgoal (t_cut f) 
-    [t_simplify_nodelta;
-     t_seq (t_intros_i [id]) tac] g
-
+  let (id, f), tac = t_build g in
+    t_seq_subgoal (t_cut f) 
+      [t_simplify_nodelta; t_seq (t_intros_i [id]) tac] g
 
 (* -------------------------------------------------------------------- *)
 let t_congr f (args, ty) g =
