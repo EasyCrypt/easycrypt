@@ -186,6 +186,8 @@ let p_rewrite_bool  = _Logic "rewrite_bool"
 let p_iff_lr        = _Logic "iffLR"
 let p_iff_rl        = _Logic "iffRL"
 
+let p_negbTE        = _Logic "negbTE"
+
 let p_case_eq_bool  = _Logic "bool_case_eq"
 
 let p_tuple_ind n = 

@@ -40,3 +40,7 @@ lemma L6 : (forall x, at x <=> (ct x => bt x)) => forall y, ct y => at y => bt y
 proof.
   by intros=> h y hc ha; apply h; [apply ha|apply hc].
 qed.
+
+(* -------------------------------------------------------------------- *)
+lemma L7 : a => !a => false.
+proof. by intros=> h Nh; apply Nh; apply h. qed.
