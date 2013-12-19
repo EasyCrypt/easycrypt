@@ -328,11 +328,7 @@ let t_simplify ri (juc,n1 as g) =
   let rule = { pr_name = RN_conv; pr_hyps = [RA_node n] } in
   upd_rule rule (juc,n1)
 
-let t_simplify_nodelta g = 
-  let ri = 
-    { full_red with delta_h = Some Mid.empty; 
-      delta_p = Some EcPath.Mp.empty } in 
-  t_simplify ri g
+let t_simplify_nodelta g = t_simplify nodelta g
   
 let mkn_hyp juc hyps id =
   let f = LDecl.lookup_hyp_by_id id hyps in
@@ -1530,7 +1526,7 @@ let rec t_split_build g =
     
 and t_build g = 
   let (juc,gs) = t_simplify_nodelta g in
-  let idf,tac = t_build0 (juc, List.nth gs 0) in
+  let idf,tac = t_build0 (juc, List.hd gs) in
   idf, t_seq t_simplify_nodelta tac
 
 and t_build0 g =
@@ -1636,7 +1632,45 @@ and t_build2 f1 g =
 let t_progress_one g =
   let (id, f), tac = t_build g in
     t_seq_subgoal (t_cut f) 
-      [t_simplify_nodelta; t_seq (t_intros_i [id]) tac] g
+      [t_seq t_simplify_nodelta (t_try t_true);
+       t_seq (t_intros_i [id]) tac] g
+
+let rec t_intros_elim n g =
+  if n = 0 then t_id None g
+  else 
+    let hyps, concl = get_goal g in
+    match concl.f_node with
+    | Fquant (Lforall, bd, _) ->
+      let bd, n = 
+        let len = List.length bd in
+        if len <= n then bd, n-len
+        else List.take n bd, 0 in
+      let ids = 
+        LDecl.fresh_ids hyps (List.map (fun (id,_) -> EcIdent.name id) bd) in
+      t_seq (t_intros_i ids) (t_intros_elim n) g
+    |  Fapp({f_node = Fop(p,_)}, [f;_]) when EcPath.p_equal p EcCoreLib.p_imp ->
+      begin match f.f_node with
+      | Fapp({f_node = Fop(p,_)}, [_;_] ) when is_op_and p ->
+        t_seq t_elim_and (t_intros_elim (n+1)) g
+      | Fquant(Lexists,bd,_) ->
+        t_seq t_elim (t_intros_elim (n+List.length bd)) g
+      | _ when is_eq_or_iff f ->
+        let f1, f2 = destr_eq f in
+        if is_tuple f1 && is_tuple f2 then
+          let l = destr_tuple f1 in
+          t_seq t_elim_eq_tuple (t_intros_elim (n+ List.length l - 1)) g
+        else
+          let id = LDecl.fresh_id hyps "H" in
+          t_lseq [t_intros_i [id];t_try(t_subst1_id id);t_intros_elim (n-1)] g
+      | _ ->
+        let id = LDecl.fresh_id hyps "H" in
+        t_seq (t_intros_i [id]) (t_intros_elim (n-1)) g
+      end
+    | _ -> tacuerror "don't known what to introduce"
+
+      
+ 
+      
 
 (* -------------------------------------------------------------------- *)
 let t_congr f (args, ty) g =

@@ -114,3 +114,7 @@ val generalize_subst :
   -> (EcIdent.t * gty) list * (form, form) EcPV.Mpv.t
 
 val generalize_mod : EcEnv.env -> EcIdent.t -> EcPV.PV.t -> form -> form
+
+val generalize_mod_ : EcEnv.env -> EcIdent.t -> EcPV.PV.t -> form -> 
+    form * ((EcIdent.t * EcFol.gty) list * EcPath.mpath list) *
+           ((EcIdent.t * EcFol.gty) list * (EcTypes.prog_var * EcTypes.ty) list)

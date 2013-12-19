@@ -167,6 +167,9 @@ val t_assumption : tactic
 
 val t_progress : tactic -> tactic
 
+val t_build : goal -> (EcIdent.t * form) * tactic
+
+val t_intros_elim : int -> tactic
 val t_progress_one : tactic
 
 val t_logic_trivial : tactic

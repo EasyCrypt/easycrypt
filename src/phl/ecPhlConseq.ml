@@ -625,6 +625,364 @@ let rec t_hi_conseq notmod f1 f2 f3 g =
     tacuerror "do not how to combine %s and %s and %s into %s"
        (pp_o f1) (pp_o f2) (pp_o f3) (pp_f concl)
 
+let t_infer_conseq (juc, _ as g) =
+  let env, hyps, concl = get_goal_e g in
+  let pre, ms, po = 
+    match concl.f_node with
+    | FhoareF hf -> 
+      let _, mp = EcEnv.Fun.hoareF_memenv hf.hf_f env in
+      hf.hf_pr, [mp], hf.hf_po 
+    | FhoareS hs -> hs.hs_pr, [hs.hs_m], hs.hs_po
+    | FbdHoareF hf -> 
+      let _, mp = EcEnv.Fun.hoareF_memenv hf.bhf_f env in
+      hf.bhf_pr, [mp], hf.bhf_po
+    | FbdHoareS hs -> hs.bhs_pr, [hs.bhs_m], hs.bhs_po
+    | FequivF ef ->
+      let _,(mpl, mpr) =  EcEnv.Fun.equivF_memenv ef.ef_fl ef.ef_fr env in
+      ef.ef_pr, [mpl; mpr], ef.ef_po
+    | FequivS es -> es.es_pr, [es.es_ml; es.es_mr], es.es_po
+    | _ -> tacuerror "Do not known what to do" in
+  let ids = 
+    LDecl.fresh_ids hyps (List.map (fun (id,_) -> EcIdent.name id) ms) in
+  let subst = 
+    List.fold_left2 (fun s id (id',_) -> Fsubst.f_bind_mem s id id')
+      Fsubst.f_subst_id ids ms in
+  let po = f_forall_mems ms po in
+  let g' = new_goal juc (hyps, po) in
+  let (juc', gs) = t_intros_i ids g' in
+  let g' = (juc', List.hd gs) in
+  let hyps',concl' = get_goal g' in
+  let (id,f), tac1 = t_build g' in
+  let po = Fsubst.f_subst subst f in
+  let po = EcReduction.simplify EcReduction.nodelta hyps' po in
+  t_seq_subgoal (t_conseq pre po)
+    [t_true;
+     t_lseq [t_intros_i ids; t_change (f_imp f concl');t_intros_i [id]; tac1];
+     t_id None] g
+
+(* TODO : this code is borring it should be factorized *)
+let t_infer_conseq_notmod (juc, _ as g) = 
+  let env, hyps, concl = get_goal_e g in
+  match concl.f_node with
+  | FhoareS hs ->
+    let m = fst hs.hs_m in
+    let modi = s_write env hs.hs_s in
+    let po,bg,bv = generalize_mod_ env m modi hs.hs_po in
+    let cond = f_forall_mems [hs.hs_m] (f_imp hs.hs_pr po) in
+    let g' = new_goal juc (hyps, cond) in
+    let rename (l1,l2) = List.map (fun (_,x) -> EcIdent.create "_", x) l1, l2 in
+    let bg = rename bg and bv = rename bv in
+    let ids = List.map fst (fst bg) @ List.map fst (fst bv) in
+    let m' = EcIdent.create "_" in
+    let h = EcIdent.create "_" in
+    let (juc,gs) = t_intros_i (m'::h::ids) g' in
+    let g' = (juc, List.hd gs) in
+    let hyps1, post1 = get_goal g' in
+    let (juc,gs) = 
+      t_lseq [t_generalize_hyp h;t_clear (EcIdent.Sid.singleton h);
+              t_intros_elim 1] g' in
+    let (id,f), tac = t_build (juc,List.hd gs) in
+    let subst = Fsubst.f_subst_id in
+    let subst = Fsubst.f_bind_mem subst m' m in
+    let bindg m subst (id,_) mp =
+      Fsubst.f_bind_local subst id (f_glob mp m) in
+    let bindv m subst (id,_) (pv,ty) =
+      Fsubst.f_bind_local subst id (f_pvar pv ty m) in
+    let subst = List.fold_left2 (bindv m) subst (fst bv) (snd bv) in
+    let subst = List.fold_left2 (bindg m) subst (fst bg) (snd bg) in
+    let po' = Fsubst.f_subst subst f in
+    let spo' = EcReduction.simplify EcReduction.nodelta hyps1 po' in
+    t_seq_subgoal (t_hoareS_notmod spo')
+      [t_lseq [
+        t_intros_i (m'::h::ids);
+         t_change (f_imp f post1);
+         t_intros_i [id];
+         t_generalize_hyp h;t_clear (EcIdent.Sid.singleton h);
+         t_intros_elim 1;
+         tac];
+       t_id None ] g
+
+  | FhoareF hf ->
+    let f = hf.hf_f in
+    let mpr, mpo = Fun.hoareF_memenv f env in
+    let fsig = (Fun.by_xpath f env).f_sig in
+    let pvres = pv_res f in
+    let vres = LDecl.fresh_id hyps "result" in
+    let fres = f_local vres fsig.fs_ret in
+    let m = fst mpo in
+    let s = PVM.add env pvres m fres PVM.empty in
+    let cond = PVM.subst env s hf.hf_po in
+    let modi = f_write env f in
+    let cond,bg,bv = generalize_mod_ env m modi cond in
+    let cond =f_forall [(vres, GTty fsig.fs_ret)] cond in
+    assert (fst mpr = m);
+    let cond = f_forall_mems [mpr] (f_imp hf.hf_pr cond) in
+    let g' = new_goal juc (hyps, cond) in
+    let rename (l1,l2) = List.map (fun (_,x) -> EcIdent.create "_", x) l1, l2 in
+    let bg = rename bg and bv = rename bv in
+    let ids = List.map fst (fst bg) @ List.map fst (fst bv) in
+    let m' = EcIdent.create "_" in
+    let h = EcIdent.create "_" in
+    let (juc,gs) = t_intros_i (m'::h::vres::ids) g' in
+    let g' = (juc,List.hd gs) in
+    let hyps1,post1 = get_goal g' in
+    let (juc,gs) = 
+      t_lseq [t_generalize_hyp h;t_clear (EcIdent.Sid.singleton h);
+              t_intros_elim 1] g' in
+    let (id,f), tac = t_build (juc,List.hd gs) in
+    let subst = Fsubst.f_subst_id in
+    let subst = Fsubst.f_bind_mem subst m' m in
+    let bindg m subst (id,_) mp =
+      Fsubst.f_bind_local subst id (f_glob mp m) in
+    let bindv m subst (id,_) (pv,ty) =
+      Fsubst.f_bind_local subst id (f_pvar pv ty m) in
+    let subst = List.fold_left2 (bindv m) subst (fst bv) (snd bv) in
+    let subst = List.fold_left2 (bindg m) subst (fst bg) (snd bg) in
+    let subst = Fsubst.f_bind_local subst vres (f_pvar pvres fsig.fs_ret m) in
+    let po' = Fsubst.f_subst subst f in
+    let spo' = EcReduction.simplify EcReduction.nodelta hyps1 po' in
+    (* Unsure that parameters do not occur in the new post *)
+    let check_res pv _ =
+      if is_loc pv then
+        let xp = pv.pv_name in
+        if EcPath.basename (xp.EcPath.x_sub) <> "res" then
+          tacuerror "Sorry: infered postcondition use parameter %a" 
+            (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (LDecl.toenv hyps)))
+            spo' in
+    PV.iter check_res (fun _ -> ()) (PV.fv env m spo');
+    t_seq_subgoal (t_equivF_notmod spo')
+      [t_lseq [
+         t_intros_i (m'::h::vres::ids);
+         t_change (f_imp f post1);
+         t_intros_i [id];
+         t_generalize_hyp h;t_clear (EcIdent.Sid.singleton h);
+         t_intros_elim 1;
+         tac];
+       t_id None ] g
+
+  | FbdHoareS hs ->
+    let m = fst hs.bhs_m in
+    let modi = s_write env hs.bhs_s in
+    let po,bg,bv = generalize_mod_ env m modi hs.bhs_po in
+    let cond = f_forall_mems [hs.bhs_m] (f_imp hs.bhs_pr po) in
+    let g' = new_goal juc (hyps, cond) in
+    let rename (l1,l2) = List.map (fun (_,x) -> EcIdent.create "_", x) l1, l2 in
+    let bg = rename bg and bv = rename bv in
+    let ids = List.map fst (fst bg) @ List.map fst (fst bv) in
+    let m' = EcIdent.create "_" in
+    let h = EcIdent.create "_" in
+    let (juc,gs) = t_intros_i (m'::h::ids) g' in
+    let g' = (juc, List.hd gs) in
+    let hyps1, post1 = get_goal g' in
+    let (juc,gs) = 
+      t_lseq [t_generalize_hyp h;t_clear (EcIdent.Sid.singleton h);
+              t_intros_elim 1] g' in
+    let (id,f), tac = t_build (juc,List.hd gs) in
+    let subst = Fsubst.f_subst_id in
+    let subst = Fsubst.f_bind_mem subst m' m in
+    let bindg m subst (id,_) mp =
+      Fsubst.f_bind_local subst id (f_glob mp m) in
+    let bindv m subst (id,_) (pv,ty) =
+      Fsubst.f_bind_local subst id (f_pvar pv ty m) in
+    let subst = List.fold_left2 (bindv m) subst (fst bv) (snd bv) in
+    let subst = List.fold_left2 (bindg m) subst (fst bg) (snd bg) in
+    let po' = Fsubst.f_subst subst f in
+    let spo' = EcReduction.simplify EcReduction.nodelta hyps1 po' in
+    t_seq_subgoal (t_hoareS_notmod spo')
+      [t_lseq [
+        t_intros_i (m'::h::ids);
+         t_change (f_imp f post1);
+         t_intros_i [id];
+         t_generalize_hyp h;t_clear (EcIdent.Sid.singleton h);
+         t_intros_elim 1;
+         tac];
+       t_id None ] g
+
+  | FbdHoareF hf ->
+    let f = hf.bhf_f in
+    let mpr, mpo = Fun.hoareF_memenv f env in
+    let fsig = (Fun.by_xpath f env).f_sig in
+    let pvres = pv_res f in
+    let vres = LDecl.fresh_id hyps "result" in
+    let fres = f_local vres fsig.fs_ret in
+    let m = fst mpo in
+    let s = PVM.add env pvres m fres PVM.empty in
+    let cond = PVM.subst env s hf.bhf_po in
+    let modi = f_write env f in
+    let cond,bg,bv = generalize_mod_ env m modi cond in
+    let cond =f_forall [(vres, GTty fsig.fs_ret)] cond in
+    assert (fst mpr = m);
+    let cond = f_forall_mems [mpr] (f_imp hf.bhf_pr cond) in
+    let g' = new_goal juc (hyps, cond) in
+    let rename (l1,l2) = List.map (fun (_,x) -> EcIdent.create "_", x) l1, l2 in
+    let bg = rename bg and bv = rename bv in
+    let ids = List.map fst (fst bg) @ List.map fst (fst bv) in
+    let m' = EcIdent.create "_" in
+    let h = EcIdent.create "_" in
+    let (juc,gs) = t_intros_i (m'::h::vres::ids) g' in
+    let g' = (juc,List.hd gs) in
+    let hyps1,post1 = get_goal g' in
+    let (juc,gs) = 
+      t_lseq [t_generalize_hyp h;t_clear (EcIdent.Sid.singleton h);
+              t_intros_elim 1] g' in
+    let (id,f), tac = t_build (juc,List.hd gs) in
+    let subst = Fsubst.f_subst_id in
+    let subst = Fsubst.f_bind_mem subst m' m in
+    let bindg m subst (id,_) mp =
+      Fsubst.f_bind_local subst id (f_glob mp m) in
+    let bindv m subst (id,_) (pv,ty) =
+      Fsubst.f_bind_local subst id (f_pvar pv ty m) in
+    let subst = List.fold_left2 (bindv m) subst (fst bv) (snd bv) in
+    let subst = List.fold_left2 (bindg m) subst (fst bg) (snd bg) in
+    let subst = Fsubst.f_bind_local subst vres (f_pvar pvres fsig.fs_ret m) in
+    let po' = Fsubst.f_subst subst f in
+    let spo' = EcReduction.simplify EcReduction.nodelta hyps1 po' in
+    (* Unsure that parameters do not occur in the new post *)
+    let check_res pv _ =
+      if is_loc pv then
+        let xp = pv.pv_name in
+        if EcPath.basename (xp.EcPath.x_sub) <> "res" then
+          tacuerror "Sorry: infered postcondition use parameter %a" 
+            (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (LDecl.toenv hyps)))
+            spo' in
+    PV.iter check_res (fun _ -> ()) (PV.fv env m spo');
+    t_seq_subgoal (t_equivF_notmod spo')
+      [t_lseq [
+         t_intros_i (m'::h::vres::ids);
+         t_change (f_imp f post1);
+         t_intros_i [id];
+         t_generalize_hyp h;t_clear (EcIdent.Sid.singleton h);
+         t_intros_elim 1;
+         tac];
+       t_id None ] g
+ 
+  | FequivS es ->
+    let ml, mr = fst es.es_ml, fst es.es_mr in    
+    let modil, modir = s_write env es.es_sl, s_write env es.es_sr in
+    let po,bgr,bvr = generalize_mod_ env mr modir es.es_po in
+    let po,bgl,bvl = generalize_mod_ env ml modil po in
+    let cond = f_forall_mems [es.es_ml; es.es_mr] (f_imp es.es_pr po) in
+    let g' = new_goal juc (hyps, cond) in
+    let rename (l1,l2) = List.map (fun (_,x) -> EcIdent.create "_", x) l1, l2 in
+    let bgr = rename bgr and bgl = rename bgl in
+    let bvr = rename bvr and bvl = rename bvl in
+    let ids =
+      List.map fst (fst bgl) @ List.map fst (fst bvl) @
+        List.map fst (fst bgr) @ List.map fst (fst bvr) in
+    let ml', mr' = EcIdent.create "_", EcIdent.create "_" in
+    let h = EcIdent.create "_" in
+    let (juc,gs) = t_intros_i (ml'::mr'::h::ids) g' in
+    let g' = (juc, List.hd gs) in
+    let hyps1, post1 = get_goal g' in
+    let (juc,gs) = 
+      t_lseq [t_generalize_hyp h;t_clear (EcIdent.Sid.singleton h);
+              t_intros_elim 1] g' in
+    let (id,f), tac = t_build (juc,List.hd gs) in
+    let subst = Fsubst.f_subst_id in
+    let subst = Fsubst.f_bind_mem (Fsubst.f_bind_mem subst ml' ml) mr' mr in
+    let bindg m subst (id,_) mp =
+      Fsubst.f_bind_local subst id (f_glob mp m) in
+    let bindv m subst (id,_) (pv,ty) =
+      Fsubst.f_bind_local subst id (f_pvar pv ty m) in
+    let subst = List.fold_left2 (bindv mr) subst (fst bvr) (snd bvr) in
+    let subst = List.fold_left2 (bindv ml) subst (fst bvl) (snd bvl) in
+    let subst = List.fold_left2 (bindg mr) subst (fst bgr) (snd bgr) in
+    let subst = List.fold_left2 (bindg ml) subst (fst bgl) (snd bgl) in
+    let po' = Fsubst.f_subst subst f in
+    let spo' = EcReduction.simplify EcReduction.nodelta hyps1 po' in
+    t_seq_subgoal (t_equivS_notmod spo')
+      [t_lseq [
+        t_intros_i (ml'::mr'::h::ids);
+         t_change (f_imp f post1);
+         t_intros_i [id];
+         t_generalize_hyp h;t_clear (EcIdent.Sid.singleton h);
+         t_intros_elim 1;
+         tac];
+       t_id None ] g
+  | FequivF ef ->
+    let fl, fr = ef.ef_fl, ef.ef_fr in
+    let (mprl,mprr),(mpol,mpor) = Fun.equivF_memenv fl fr env in
+    let fsigl = (Fun.by_xpath fl env).f_sig in
+    let fsigr = (Fun.by_xpath fr env).f_sig in
+    let pvresl = pv_res fl and pvresr = pv_res fr in
+    let vresl = LDecl.fresh_id hyps "result_L" in
+    let vresr = LDecl.fresh_id hyps "result_R" in
+    let fresl = f_local vresl fsigl.fs_ret in
+    let fresr = f_local vresr fsigr.fs_ret in
+    let ml, mr = fst mpol, fst mpor in
+    let s = 
+      PVM.add env pvresl ml fresl (PVM.add env pvresr mr fresr PVM.empty) in
+    let cond = PVM.subst env s ef.ef_po in
+    let modil, modir = f_write env fl, f_write env fr in
+    let cond,bgr,bvr = generalize_mod_ env mr modir cond in
+    let cond,bgl,bvl = generalize_mod_ env ml modil cond in
+    let cond =
+      f_forall
+        [(vresl, GTty fsigl.fs_ret);
+         (vresr, GTty fsigr.fs_ret)]
+        cond in
+    assert (fst mprl = ml && fst mprr = mr);
+    let cond = f_forall_mems [mprl; mprr] (f_imp ef.ef_pr cond) in
+    let g' = new_goal juc (hyps, cond) in
+    let rename (l1,l2) = List.map (fun (_,x) -> EcIdent.create "_", x) l1, l2 in
+    let bgr = rename bgr and bgl = rename bgl in
+    let bvr = rename bvr and bvl = rename bvl in
+    let ids =
+      List.map fst (fst bgl) @ List.map fst (fst bvl) @
+        List.map fst (fst bgr) @ List.map fst (fst bvr) in
+    let ml', mr' = EcIdent.create "_", EcIdent.create "_" in
+    let h = EcIdent.create "_" in
+    let (juc,gs) = t_intros_i (ml'::mr'::h::vresl::vresr::ids) g' in
+    let g' = (juc,List.hd gs) in
+    let hyps1,post1 = get_goal g' in
+    let (juc,gs) = 
+      t_lseq [t_generalize_hyp h;t_clear (EcIdent.Sid.singleton h);
+              t_intros_elim 1] g' in
+    let (id,f), tac = t_build (juc,List.hd gs) in
+    let subst = Fsubst.f_subst_id in
+    let subst = Fsubst.f_bind_mem (Fsubst.f_bind_mem subst ml' ml) mr' mr in
+    let bindg m subst (id,_) mp =
+      Fsubst.f_bind_local subst id (f_glob mp m) in
+    let bindv m subst (id,_) (pv,ty) =
+      Fsubst.f_bind_local subst id (f_pvar pv ty m) in
+    let subst = List.fold_left2 (bindv mr) subst (fst bvr) (snd bvr) in
+    let subst = List.fold_left2 (bindv ml) subst (fst bvl) (snd bvl) in
+    let subst = List.fold_left2 (bindg mr) subst (fst bgr) (snd bgr) in
+    let subst = List.fold_left2 (bindg ml) subst (fst bgl) (snd bgl) in
+    let subst = 
+      Fsubst.f_bind_local subst vresl (f_pvar pvresl fsigl.fs_ret ml) in
+    let subst = 
+      Fsubst.f_bind_local subst vresr (f_pvar pvresr fsigr.fs_ret mr) in
+    let po' = Fsubst.f_subst subst f in
+    let spo' = EcReduction.simplify EcReduction.nodelta hyps1 po' in
+    (* Unsure that parameters do not occur in the new post *)
+    let check_res pv _ =
+      if is_loc pv then
+        let xp = pv.pv_name in
+        if EcPath.basename (xp.EcPath.x_sub) <> "res" then
+          tacuerror "Sorry: infered postcondition use parameter %a" 
+            (EcPrinting.pp_form (EcPrinting.PPEnv.ofenv (LDecl.toenv hyps)))
+            spo' in
+    PV.iter check_res (fun _ -> ()) (PV.fv env ml spo');
+    PV.iter check_res (fun _ -> ()) (PV.fv env mr spo');
+    t_seq_subgoal (t_equivF_notmod spo')
+      [t_lseq [
+         t_intros_i (ml'::mr'::h::vresl::vresr::ids);
+         t_change (f_imp f post1);
+         t_intros_i [id];
+         t_generalize_hyp h;t_clear (EcIdent.Sid.singleton h);
+         t_intros_elim 1;
+         tac];
+       t_id None ] g
+
+  | _ -> tacuerror "Do not known what to do" 
+
+
+         
+         
+              
+
+  
 
 
 (* -------------------------------------------------------------------- *)
@@ -749,28 +1107,31 @@ let process_conseq notmod (info1,info2,info3) (juc, n as g) =
     fmake pre post bd
   in
 
-  let juc, f1 = 
-    match info1 with
-    | None -> juc, None
-    | Some info ->
-      let (juc,nf1), gs1 = process_mkn_apply process_cut1 info g in
-      let _, f1 = get_node (juc,nf1) in  
-      juc, Some ((nf1,gs1), f1) in
-  let juc, f2 = 
-    match info2 with
-    | None -> juc, None
-    | Some info ->
-      let (juc,nf2), gs2 = 
-        process_mkn_apply (process_cut2 true) info (juc,n) in
-      let _, f2 = get_node (juc,nf2) in
-      juc, Some ((nf2,gs2), f2) in
-  let juc, f3 = 
-    match info3 with
-    | None -> juc, None
-    | Some info ->
-      let (juc,nf3), gs3 = 
-        process_mkn_apply (process_cut2 false) info (juc,n) in
-      let _, f3 = get_node (juc,nf3) in
-      juc, Some ((nf3,gs3), f3) in
-  t_hi_conseq notmod f1 f2 f3 (juc,n)
-  
+  if info1 = None && info2 = None && info3 = None then
+    if notmod then t_infer_conseq_notmod g else t_infer_conseq g
+  else
+    let juc, f1 = 
+      match info1 with
+      | None -> juc, None
+      | Some info ->
+        let (juc,nf1), gs1 = process_mkn_apply process_cut1 info g in
+        let _, f1 = get_node (juc,nf1) in  
+        juc, Some ((nf1,gs1), f1) in
+    let juc, f2 = 
+      match info2 with
+      | None -> juc, None
+      | Some info ->
+        let (juc,nf2), gs2 = 
+          process_mkn_apply (process_cut2 true) info (juc,n) in
+        let _, f2 = get_node (juc,nf2) in
+        juc, Some ((nf2,gs2), f2) in
+    let juc, f3 = 
+      match info3 with
+      | None -> juc, None
+      | Some info ->
+        let (juc,nf3), gs3 = 
+          process_mkn_apply (process_cut2 false) info (juc,n) in
+        let _, f3 = get_node (juc,nf3) in
+        juc, Some ((nf3,gs3), f3) in
+    t_hi_conseq notmod f1 f2 f3 (juc,n)
+      

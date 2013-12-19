@@ -2119,6 +2119,9 @@ phltactic:
 | BYEQUIV info=fpattern(conseq)
     { Pbydeno (`Equiv, info) }
 
+| CONSEQ nm=STAR?
+    { Pconseq(nm<>None, (None,None,None)) }
+
 | CONSEQ nm=STAR? info1=fpattern(conseq_bd)
     { Pconseq (nm<>None, (Some info1,None,None)) }
 | CONSEQ nm=STAR? info1=fpattern(conseq_bd) info2=fpattern(conseq_bd)

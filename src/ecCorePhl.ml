@@ -359,7 +359,7 @@ let mk_inv_spec env inv fl fr =
 
 (* -------------------------------------------------------------------- *)
 (* Remark: m is only used to create fresh name, id_of_pv *)
-let generalize_subst env m uelts uglob = 
+let generalize_subst_ env m uelts uglob = 
   let create (pv, ty) = id_of_pv pv m, GTty ty in
   let b = List.map create uelts in
   let s =
@@ -376,9 +376,9 @@ let generalize_subst env m uelts uglob =
         Mpv.add_glob env mp (f_local id (tglob mp)) s)
       s uglob b'
   in
-    (b' @ b, s)
+    (b', b, s)
 
-let generalize_mod env m modi f =
+let generalize_mod_ env m modi f =
   let (elts, glob) = PV.elements modi in
 
   (* 1. Compute the prog-vars and the globals used in [f] *)
@@ -392,7 +392,7 @@ let generalize_mod env m modi f =
   (* 3. We build the related substitution *)
 
   (* 3.a. Add the global variables *)
-  let (bd, s) = generalize_subst env m uelts uglob in
+  let (bd', bd, s) = generalize_subst_ env m uelts uglob in
 
   (* 3.b. Check that the substituion don't clash with some
           other unmodified variables *)
@@ -402,4 +402,12 @@ let generalize_mod env m modi f =
   (* 3.c. Perform the substitution *)
   let s = PVM.of_mpv s m in
   let f = PVM.subst env s f in
-    f_forall_simpl bd f
+  f_forall_simpl (bd'@bd) f, (bd', uglob), (bd, uelts)
+
+let generalize_subst env m uelts uglob = 
+  let (b',b,f) = generalize_subst_ env m uelts uglob in
+  b'@b, f
+
+let generalize_mod env m modi f =
+  let res, _, _ = generalize_mod_ env m modi f in
+  res
