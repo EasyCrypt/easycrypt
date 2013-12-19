@@ -458,6 +458,8 @@ let mk_form node ty =  Hsform.hashcons
       f_fv   = Mid.empty;
       f_tag  = -1; }
 
+let f_node { f_node = form } = form
+
 let ty_bool = tbool
 let ty_int  = tint 
 let ty_unit = tunit

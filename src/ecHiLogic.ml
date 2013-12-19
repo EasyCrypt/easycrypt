@@ -252,7 +252,7 @@ let process_subst loc ri g =
 (* -------------------------------------------------------------------- *)
 exception RwMatchFound of EcUnify.unienv * (uid -> ty option) * form evmap
 
-let try_match hyps (ue, ev) p form =
+let try_match opts hyps (ue, ev) p form =
   let na = List.length (snd (EcFol.destr_app p)) in
 
   let trymatch bds tp =
@@ -268,7 +268,7 @@ let try_match hyps (ue, ev) p form =
       if not (Mid.set_disjoint bds tp.f_fv) then
         None
       else
-        let (ue, tue, ev) = f_match hyps (ue, ev) ~ptn:p tp in
+        let (ue, tue, ev) = f_match opts hyps (ue, ev) ~ptn:p tp in
           raise (RwMatchFound (ue, tue, ev))
     with MatchFailure -> None
   in
@@ -289,7 +289,7 @@ let process_apply_on_goal loc pe g =
       let withmatch () =
         let ev = evmap_of_pterm_arguments ids in
   
-          try  (ax, ids, EcMetaProg.f_match hyps (ue, ev) ax fp, view);
+          try  (ax, ids, EcMetaProg.f_match fmdelta hyps (ue, ev) ax fp, view);
           with MatchFailure ->
             match destruct_product hyps ax with
             | Some _ ->
@@ -397,7 +397,7 @@ let process_apply_on_hyp loc (pe, hyp) g =
       | Some (`Imp (f1, f2)) ->
           let ev = evmap_of_pterm_arguments ids in
   
-          try  (ax, ids, EcMetaProg.f_match hyps (ue, ev) f1 fp, (f1, f2));
+          try  (ax, ids, EcMetaProg.f_match fmdelta hyps (ue, ev) f1 fp, (f1, f2));
           with MatchFailure ->
             tacuerror "in apply, cannot find instance"
 
@@ -467,7 +467,7 @@ let process_rewrite1_core (s, o) (p, typs, ue, ax) args g =
   let (_ue, tue, ev) =
     let ev = evmap_of_pterm_arguments ids in
 
-    match try_match hyps (ue, ev) fp concl with
+    match try_match fmrigid hyps (ue, ev) fp concl with
     | None   -> tacuerror "cannot find an occurence for [rewrite]"
     | Some x -> x
   in
@@ -544,7 +544,7 @@ let rec process_rewrite1 loc ri g =
 
       match s with
       | `LtoR -> begin
-        let ctxt = try_match hyps (ue, ev) p concl in
+        let ctxt = try_match fmrigid hyps (ue, ev) p concl in
   
         match ctxt with
         | None -> t_id None g
@@ -607,7 +607,7 @@ let rec process_rewrite1 loc ri g =
             with EcBaseLogic.NotReducible -> fp
         in
 
-        let ctxt = try_match hyps (ue, ev) fp concl in
+        let ctxt = try_match fmrigid hyps (ue, ev) fp concl in
   
         match ctxt with
         | None -> t_id None g
@@ -832,7 +832,7 @@ let process_pose loc xsym o p g =
   let ev  = EV.of_idents ids in
 
   let (_ue, tue, ev, dopat) =
-    match try_match hyps (ue, ev) p concl with
+    match try_match fmrigid hyps (ue, ev) p concl with
     | Some (ue, tue, ev) -> (ue, tue, ev, true)
     | None -> begin
         let ids = List.map (fun x -> `UnknownVar (x, ())) ids in
@@ -888,7 +888,7 @@ let process_generalize loc patterns g =
             let ev = EV.of_idents (Mid.keys !ps) in
           
             let (_ue, tue, ev) =
-              match try_match hyps (ue, ev) p concl with
+              match try_match fmrigid hyps (ue, ev) p concl with
               | None   -> tacuerror "cannot find an occurence for [generalize]"
               | Some x -> x
             in
