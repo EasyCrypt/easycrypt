@@ -140,3 +140,5 @@ val p_tuple_ind     : int -> path
 
 val p_iff_lr : path
 val p_iff_rl : path
+
+val p_negbTE : path

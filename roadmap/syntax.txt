@@ -124,8 +124,8 @@ HALF-DONE (only for non-exported functions) * détection du code mort
 	
 X : tacdir : << | >> | ε
 
-* Semantique des tactiques:
-    eqobs_in, hoare devraient sur les procedures, pas seulement les statements
+DONE * Semantique des tactiques:
+DONE    eqobs_in, hoare devraient sur les procedures, pas seulement les statements
 
     Pr[...] sur les statements et pas seulement sur les procedures?
 

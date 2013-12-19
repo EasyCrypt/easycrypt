@@ -880,7 +880,7 @@ let t_elim_r ?(tryreduce = true) txs goal =
 let t_elim_false_r ((_, sf) : form * sform) concl goal =
   match sf with
   | SFfalse ->
-      let args = [AAform concl; AAnode] in
+      let args = [AAform concl] in
         t_apply_logic Logic.false_elim [] args goal
   | _ -> raise NoMatchForTactic
 
