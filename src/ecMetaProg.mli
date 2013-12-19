@@ -107,8 +107,16 @@ end
 (* -------------------------------------------------------------------- *)
 exception MatchFailure
 
+type fmoptions = {
+  fm_delta : bool;
+}
+
+val fmrigid : fmoptions
+val fmdelta : fmoptions
+
 val f_match :
-     EcEnv.LDecl.hyps
+     fmoptions
+  -> EcEnv.LDecl.hyps
   -> unienv * form evmap
   -> ptn:form
   -> form
