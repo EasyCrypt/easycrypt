@@ -263,7 +263,7 @@ intros=> m1 m2 x eqe m1_x_nnone;
 apply map_ext; delta (==) beta=> x';
 cut m1_x_some: exists z, m1.[x] = Some z.
   generalize m1_x_nnone; apply absurd; simplify; smt.
-elim m1_x_some=> {m1_x_some} z m1_x_some; rewrite m1_x_some proj_some; smt.
+elim m1_x_some=> z m1_x_some; rewrite m1_x_some proj_some; smt.
 qed.
 
 (** disj *)
