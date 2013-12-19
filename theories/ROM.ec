@@ -1,4 +1,4 @@
-require import FMap. import OptionGet.
+require import FMap.
 require import Distr.
 
 theory Types.
@@ -51,7 +51,7 @@ theory Lazy.
     var m:(from, to) map
 
     proc init():unit = {
-      m = FMap.Core.empty;
+      m = FMap.empty;
     }
   
     proc o(x:from):to = {
@@ -106,7 +106,7 @@ theory Eager.
       var work:from set;
       var f:from;
 
-      m = FMap.Core.empty;
+      m = FMap.empty;
       work = toFSet univ;
       while (work <> FSet.empty)
       {
@@ -188,7 +188,7 @@ theory LazyEager.
       var m:(from, to) map
 
       proc init():unit = {
-        m = FMap.Core.empty;
+        m = FMap.empty;
       }
   
       proc o(x:from):to = {
@@ -270,7 +270,7 @@ theory LazyEager.
     proc main(): bool = {
       var b:bool;
 
-      H.m = FMap.Core.empty;
+      H.m = FMap.empty;
       resample();
       b = D.distinguish();
 
@@ -334,9 +334,9 @@ theory LazyEager.
                (!mem x work => in_dom x IND_Eager.H.m){1} /\
                IND_Lazy.H.m.[x]{2} = Some y0{1} /\
                if (in_dom x IND_Eager.H.m){1}
-                 then IND_Eager.H.m{1} = IND_Lazy.H.m{2}
-                 else eq_except IND_Eager.H.m{1} IND_Lazy.H.m{2} x{1}).
-      wp; rnd; wp; skip; progress=> //; try case (pick work = x){2}; smt.
+               then IND_Eager.H.m{1} = IND_Lazy.H.m{2}
+               else eq_except IND_Eager.H.m{1} IND_Lazy.H.m{2} x{1}).
+      by wp; rnd; wp; skip; progress=> //; try case (pick work = x){2}; smt.
     by wp; rnd; skip; progress=> //; smt.
 
   wp; while (={x,work} /\
@@ -496,7 +496,7 @@ theory Wrappers.
 
     proc init(): unit = {
       H.init();
-      qs = FMap.Core.empty;
+      qs = FMap.empty;
       qc = 0;
     }
 
