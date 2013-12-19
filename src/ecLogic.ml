@@ -1039,7 +1039,7 @@ let t_generalize_hyps clear ids g =
   else t_generalize_hyps ids g
 
 (* -------------------------------------------------------------------- *)
-let t_elimT tys p f sk g =
+let t_elimT_form tys p f sk g =
   let noelim () = tacuerror "not a valid elimination principle" in
 
   let (hyps, concl) = get_goal g in
@@ -1111,9 +1111,28 @@ let t_elimT tys p f sk g =
         t_apply_glob p tys (AAform pf :: aa1 @ (AAform f :: (aa2 @ aa3))) g
 
 (* -------------------------------------------------------------------- *)
+let t_elimT_ind goal =
+  let error () = tacuerror "don't know what to eliminate" in
+
+  let hyps = get_hyps goal in
+  let env  = LDecl.toenv (get_hyps goal) in
+
+  match sform_of_form (get_concl goal) with
+  | SFquant (Lforall, (x, GTty ty), _) -> begin
+      match EcEnv.Ty.scheme_of_ty ty env with
+      | None -> error ()
+      | Some (p, tys) ->
+          let id = LDecl.fresh_id hyps (EcIdent.name x) in
+            t_seq
+              (t_intros_i [id])
+              (t_elimT_form tys p (f_local id ty) 0)
+    end
+
+  | _ -> error ()
+
+(* -------------------------------------------------------------------- *)
 let t_case f g =
-  check_logic (LDecl.toenv (get_hyps g)) p_case_eq_bool;
-  t_elimT [] p_case_eq_bool f 0 g
+  t_elimT_form [] p_case_eq_bool f 0 g
 
 let gen_t_exists do_arg fs (juc,n as g) =
   let hyps,concl = get_goal g in
@@ -1363,10 +1382,11 @@ let find_in_hyps f hyps = gen_find_in_hyps is_conv f hyps
 let t_gen_assumption eq g =
   let (hyps,concl) = get_goal g in
   let h = 
-    try gen_find_in_hyps eq concl hyps 
-    with Not_found -> tacuerror "no assumption" in
-  t_hyp h g
-      
+    try  gen_find_in_hyps eq concl hyps 
+    with Not_found -> tacuerror "no assumption"
+  in
+    t_hyp h g
+
 let t_alpha_assumption g = t_gen_assumption EcReduction.is_alpha_eq g
 
 let t_assumption g = 
@@ -1386,7 +1406,7 @@ let t_progress tac g =
       t_seq (t_intros_i ids) aux0 g
     | Flet (LTuple fs,f1,_) ->
       let p = p_tuple_ind (List.length fs) in
-      t_seq (t_elimT (List.map snd fs) p f1 0) aux0 g
+      t_seq (t_elimT_form (List.map snd fs) p f1 0) aux0 g
     | Fapp({f_node = Fop(p,_)}, [f1;_]) when EcPath.p_equal p EcCoreLib.p_imp ->
       let id = LDecl.fresh_id hyps "H" in
       t_seq (t_intros_i [id]) (aux2 id f1) g
@@ -1418,6 +1438,7 @@ let rec t_split_build g =
     | Fop(p,_) when EcPath.p_equal p p_true -> 
       let id = EcIdent.create "_" in
       (id, f_true), t_true
+
     | Fapp({f_node = Fop(p,_)}, [f1;f2]) ->
       begin match op_kind p with
       | OK_and b -> 
@@ -1566,7 +1587,7 @@ and t_build1 g =
 
   | Flet (LTuple fs,f1,_) ->
     let p = p_tuple_ind (List.length fs) in
-    let tac = t_elimT (List.map snd fs) p f1 0 in
+    let tac = t_elimT_form (List.map snd fs) p f1 0 in
     let (juc,gs) = tac g in
     let idf,tac1 = t_build0 (juc, List.hd gs) in
     idf, t_seq tac tac1
@@ -1635,6 +1656,7 @@ let t_progress_one g =
       [t_seq t_simplify_nodelta (t_try t_true);
        t_seq (t_intros_i [id]) tac] g
 
+(* -------------------------------------------------------------------- *)
 let rec t_intros_elim n g =
   if n = 0 then t_id None g
   else 
@@ -1667,10 +1689,6 @@ let rec t_intros_elim n g =
         t_seq (t_intros_i [id]) (t_intros_elim (n-1)) g
       end
     | _ -> tacuerror "don't known what to introduce"
-
-      
- 
-      
 
 (* -------------------------------------------------------------------- *)
 let t_congr f (args, ty) g =

@@ -128,7 +128,7 @@ val t_intros   : EcIdent.t located list -> tactic
 val t_elim_hyp : EcIdent.t -> tactic
 val t_elim     : tactic
 
-val t_elimT : EcTypes.ty list -> EcPath.path -> form -> int -> tactic
+val t_elimT_form : EcTypes.ty list -> EcPath.path -> form -> int -> tactic
 
 val t_case : form -> tactic
 

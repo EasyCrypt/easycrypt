@@ -949,8 +949,8 @@ let process_elimT loc (pf, qs) g =
     | Some qs -> qs
     | None    -> begin
         match EcEnv.Ty.scheme_of_ty pf.f_ty (LDecl.toenv hyps) with
-        | None    -> noelim ()
-        | Some qs -> mk_loc loc (EcPath.toqsymbol qs)
+        | None -> noelim ()
+        | Some (qs, _) -> mk_loc loc (EcPath.toqsymbol qs)
     end
   in
 
@@ -1005,7 +1005,7 @@ let process_elimT loc (pf, qs) g =
   let sk = skipmatch ax body 0 in
 
   t_seq
-    (set_loc loc (t_elimT (List.map (Tuni.offun tue) typs) p pf sk))
+    (set_loc loc (t_elimT_form (List.map (Tuni.offun tue) typs) p pf sk))
     (t_simplify EcReduction.beta_red) g
 
 (* -------------------------------------------------------------------- *)
