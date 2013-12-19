@@ -131,7 +131,7 @@ elim/set_comp s'.
   rewrite IH; first apply (leq_tran s')=> //; apply rm_leq.
   rewrite img_rm;
   (cut ->: (forall x, mem x s' => g (pick s') = g x => pick s' = x) = true)=> //;
-  apply eqT=> x x_in_s g_pick.
+  rewrite eqT=> x x_in_s g_pick.
   rewrite -pcan_g'_g; first by apply leq_s'_s.
   by rewrite -g_pick pcan_g'_g //; apply leq_s'_s; apply mem_pick.
 qed.
@@ -149,7 +149,7 @@ elim/set_comp s'.
   case (p (pick s'))=> p_pick.
     by rewrite (sum_rm _ (filter p s') (pick s')) ?rm_filter // mem_filter;
        split=> //; apply mem_pick.
-    by rewrite f_Z // -rm_filter addmC addmZ -rm_nin_id // mem_filter -rw_nand;
+    by rewrite f_Z // -rm_filter addmC addmZ -rm_nin_id // mem_filter -nand;
        right=> //.
 qed.
 
@@ -351,8 +351,8 @@ proof -strict.
   intros=> {s'} x s' nmem IH leq_adds'_s;
   cut leq_s'_s : s' <= s by (apply (FSet.leq_tran (add x s'))=> //; 
   apply leq_add);
-  rewrite Mbor.sum_add // -rw_nor IH // /=;
-  cut := h x; rewrite -rw_nand;
+  rewrite Mbor.sum_add // -nor IH // /=;
+  cut := h x; rewrite -nand;
   case (mem x s)=> //=;
   by cut := leq_adds'_s x; rewrite mem_add //= => ->.
 qed.
@@ -368,7 +368,7 @@ lemma cpOrs_add s (p:('a -> bool)) :
   cpOrs (FSet.add p s) = cpOr p (cpOrs s).
 proof -strict.
   apply fun_ext => y.
-  rewrite /cpOrs /cpOr /= !or_exists rw_eq_iff;split=> /=.
+  rewrite /cpOrs /cpOr /= !or_exists eq_iff;split=> /=.
     intros [x ];rewrite FSet.mem_add => [ [ ] H H0];first by right;exists x.
     by left;rewrite -H.
   intros [H | [x [H1 H2]]];first by exists p;rewrite FSet.mem_add.
@@ -403,7 +403,7 @@ proof strict.
   pose sup := ISet.Finite.toFSet (ISet.create (support d)).
   pose is  := img (fun x y, p x /\ x = y) sup.
   rewrite mu_in_supp (mu_eq d _ (cpOrs is)).
-    intros y;rewrite /cpAnd /is /cpOrs /= or_exists rw_eq_iff;split.
+    intros y;rewrite /cpAnd /is /cpOrs /= or_exists eq_iff;split.
       intros [H1 H2];exists ((fun x0 y0, p x0 /\ x0 = y0) y);split => //.
       by apply mem_img;rewrite /sup ISet.Finite.mem_toFSet // ISet.mem_create.
     intros [p' []].

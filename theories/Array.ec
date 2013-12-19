@@ -149,7 +149,7 @@ lemma nosmt set_setN x i j (y:'a) xs:
   i <> j =>
   xs.[i <- x].[j <- y] = xs.[j <- y].[i <- x].
 proof strict.
-by rewrite set_set -rw_neqF=> ->.
+by rewrite set_set -neqF=> ->.
 qed.
 
 (* make *)
@@ -560,7 +560,7 @@ theory Darray.
   proof strict.
   rewrite /mu_x=> len_neg; case (x = empty).
     by intros=> ->; rewrite mu_neg.
-    by rewrite mu_neg // /charfun -rw_neqF=> ->.
+    by rewrite mu_neg // /charfun -neqF=> ->.
   qed.
 
   lemma supp_neg (len:int) (d:'a distr) (x:'a array):

@@ -1,4 +1,4 @@
-require import FMap. import OptionGet.
+require import FMap.
 require import Distr.
 
 type from.
@@ -14,7 +14,7 @@ module RO = {
   var m:(from,to) map
 
   proc init(): unit = {
-    m = empty;
+    m = FMap.empty;
   }
 
   proc o(x:from): to = {
@@ -34,7 +34,7 @@ module ROe = {
 
   proc init (x:from) : unit = {
     xs = x;
-    m = empty;
+    m = FMap.empty;
     hs = $dsample;
 
   }
@@ -42,7 +42,7 @@ module ROe = {
   proc o(x:from) : to = {
     var y : to;
     y = $dsample;
-    if (!in_dom x m) 
+    if (!in_dom x m)
       m.[x] = if x = xs then hs else y;
     return proj (m.[x]);
   }

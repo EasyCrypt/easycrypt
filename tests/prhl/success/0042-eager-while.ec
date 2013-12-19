@@ -1,7 +1,7 @@
 require import Int.
 require import Bool.
 require import Distr.
-require import Map.
+require import FMap.
 
 module M = {
   var m : (int, int) map

@@ -1,6 +1,6 @@
 require import Distr.
 require import FSet.
-require import Map. 
+require import FMap.
 require import Int.
 
 module type O = { 
@@ -17,7 +17,7 @@ module RO = {
   proc hash (x:int) : int = { 
     var r : int;
     r = $[0..10];
-    if (!in_dom x mH) mH.[x] = r;
+    if (!mem x (dom mH)) mH.[x] = r;
     return (proj mH.[x]);
   }
 
@@ -40,7 +40,7 @@ module F1(A:Adv) = {
   proc main() : int = { 
     var h: int;
     var r : int;
-    RO.mH    = Map.empty;
+    RO.mH    = FMap.empty;
     RO.logA  = FSet.empty;
     h        = RO.hash(xs);
     r        = A1.a(h);
@@ -56,7 +56,7 @@ module F2(A:Adv) = {
   proc main() : int = { 
     var h: int;
     var r : int;
-    RO.mH    = Map.empty;
+    RO.mH    = FMap.empty;
     RO.logA  = FSet.empty;
     h        = $[0..10];
     r        = A1.a(h);
@@ -77,7 +77,9 @@ proof -strict.
             (RO.logA{1} = RO.logA{2} /\ F1.xs{1} = F2.xs{2} /\
             eq_except RO.mH{1} RO.mH{2} F2.xs{2}),  
             (F1.xs{1} = F2.xs{2})).
-    proc; inline RO.hash;wp;rnd;wp;skip;simplify;smt.
+timeout 10.
+    proc; inline RO.hash;wp;rnd;wp;skip;simplify; progress=> //; smt.
+timeout 3.
 
     (* Hoare goal *)
     intros &2 h.
