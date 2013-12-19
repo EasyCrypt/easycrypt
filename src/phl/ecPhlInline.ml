@@ -143,12 +143,19 @@ let t_inline_equiv side sp g =
 
 (* -------------------------------------------------------------------- *)
 module HiInternal = struct
-  let pat_all fs s =
+  let pat_all env fs s =
     let test f =
       match fs with
-      | None    -> true
       | Some fs -> EcPath.Sx.mem f fs
+      | None    ->
+          let f = EcEnv.NormMp.norm_xfun env f in
+          let f = EcEnv.Fun.by_xpath f env in
+            match f.f_def with
+            | FBdef _ -> true
+            | _ -> false
     in
+
+    let test = EcPath.Hx.memo 0 test in
 
     let rec aux_i i = 
       match i.i_node with
@@ -212,7 +219,8 @@ end
 
 (* -------------------------------------------------------------------- *)  
 let rec process_inline_all side fs g =
-  let concl = get_concl g in
+  let (env, _, concl) = get_goal_e g in
+
   match concl.f_node, side with
   | FequivS _, None ->
       t_seq
@@ -220,7 +228,7 @@ let rec process_inline_all side fs g =
         (process_inline_all (Some false) fs) g
 
   | FequivS es, Some b ->
-      let sp = HiInternal.pat_all fs (if b then es.es_sl else es.es_sr) in
+      let sp = HiInternal.pat_all env fs (if b then es.es_sl else es.es_sr) in
         if   sp = []
         then t_id None g
         else t_seq
@@ -228,7 +236,7 @@ let rec process_inline_all side fs g =
                (process_inline_all side fs) g
 
   | FhoareS hs, None ->
-      let sp = HiInternal.pat_all fs hs.hs_s in
+      let sp = HiInternal.pat_all env fs hs.hs_s in
         if   sp = []
         then t_id None g
         else t_seq
@@ -236,7 +244,7 @@ let rec process_inline_all side fs g =
                (process_inline_all side fs) g
 
   | FbdHoareS bhs, None ->
-      let sp = HiInternal.pat_all fs bhs.bhs_s in
+      let sp = HiInternal.pat_all env fs bhs.bhs_s in
       if   sp = []
       then t_id None g
       else t_seq

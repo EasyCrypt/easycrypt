@@ -1,3 +1,4 @@
+(* -------------------------------------------------------------------- *)
 require import Int.
 
 module M = {
@@ -9,12 +10,26 @@ module M = {
   proc g(a : int) : int = {
     var z : int;
 
-    z  = f(a, a);
+    z = f(a, a);
     return z;
   }
 }.
 
-lemma h : hoare[M.g : a = a ==> res = res].
-proof -strict.
-  proc; inline M.f. wp; skip; smt.
+(* -------------------------------------------------------------------- *)
+lemma h1 : hoare[M.g : a = a ==> res = res].
+proof.
+  by proc; inline M.f; wp; skip; smt.
+qed.
+
+(* -------------------------------------------------------------------- *)
+module type T = { proc f() : unit }.
+
+module F(A:T) : T = {
+  proc f() : unit = { A.f(); }
+}.
+
+hoare h2 (A <: T{M}) : F(A).f :true ==> true.
+proof.
+  proc; inline *.
+  admit.
 qed.
