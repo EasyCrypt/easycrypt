@@ -154,7 +154,6 @@
 %token ASSERT
 %token ASSUMPTION
 %token AT
-%token AUTO
 %token AXIOM
 %token BACKS
 %token BETA 
@@ -308,6 +307,7 @@
 %token TOP
 %token TRANSITIVITY
 %token TRIVIAL
+%token AUTO
 %token TRY
 %token TYPE
 %token UNDERSCORE
@@ -2171,6 +2171,8 @@ phltactic:
 | PRBOUNDED {Pprbounded}
 | PHOARE SPLIT i=bdhoare_split { Pbdhoare_split i }
 | PHOARE EQUIV s=side pr=sform po=sform { Pbd_equiv(s,pr,po) } 
+(* Automation *)
+| AUTO { Pauto }
 ;
 
 bdhoare_split:

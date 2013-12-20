@@ -446,6 +446,8 @@ type phltactic =
 
     (* Relation between logic *)
   | Pbd_equiv of (bool * pformula * pformula)
+    (* Automation *)
+  | Pauto
 
 and pinline_arg =
   [ `ByName    of tac_side * (pgamepath list * int list option)

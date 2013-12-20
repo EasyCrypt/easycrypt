@@ -29,4 +29,11 @@ class rn_hl_bhl_rnd : bhl_infos_t -> object
 end
 
 (* -------------------------------------------------------------------- *)
+val t_hoare_rnd : tactic
+val t_bd_hoare_rnd : bhl_infos_t -> tactic
+val wp_equiv_rnd : ((EcTypes.ty -> EcTypes.ty -> EcFol.form) *
+                    (EcTypes.ty -> EcTypes.ty -> EcFol.form)) option -> tactic
+val wp_equiv_disj_rnd : bool -> tactic
+
+(* -------------------------------------------------------------------- *)
 val process_rnd : tac_side -> (pformula, pformula option, pformula) rnd_tac_info -> tactic

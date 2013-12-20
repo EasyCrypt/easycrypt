@@ -54,6 +54,7 @@ let process_phl loc ptac g =
       let info = Some {fp_kind = FPCut((Some pr,Some po),None); fp_args = []} in
       let info2, info3 = if side then info, None else None, info in
       EcPhlConseq.process_conseq true (None, info2, info3)
+    | Pauto                     -> EcAuto.t_auto 
 
   in
     set_loc loc t g
