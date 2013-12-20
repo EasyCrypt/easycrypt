@@ -5,7 +5,8 @@ theory Types.
   type from.
   type to.
 
-  op dsample: from -> to distr. (* Distribution to use on the target type; it can be parameterized by the input *)
+  (* Distribution to use on the target type; it can be parameterized by the input *)
+  op dsample: from -> to distr.
 
   (* A signature for random oracles from "from" to "to". *)
   module type Oracle =
@@ -159,8 +160,6 @@ theory LazyEager.
   require import FSet.
 
   type from.
-  axiom finite: finite univ<:from>.
-
   type to.
 
   op dsample: from -> to distr.
@@ -227,10 +226,12 @@ theory LazyEager.
     }
   }.
 
-  local lemma IND_Lazy: (forall x, mu (dsample x) cpTrue = 1%r) =>
+  local lemma IND_Lazy:
+    finite univ<:from> =>
+    (forall x, mu (dsample x) cpTrue = 1%r) =>
     equiv [IND(Lazy.RO,D).main ~ IND_Lazy.main: true ==> ={res}].
   proof strict.
-  intros=> dsampleL; proc; seq 2 2: (={b}).
+  intros=> fromF dsampleL; proc; seq 2 2: (={b}).
     call (_: Lazy.RO.m{1} = IND_Lazy.H.m{2}); first by (proc; sim).
     by call (_: true ==> Lazy.RO.m{1} = IND_Lazy.H.m{2})=> //;
       first by proc; wp.
@@ -278,14 +279,16 @@ theory LazyEager.
     }
   }.
 
-  local lemma eager_query: (forall x, mu (dsample x) cpTrue = 1%r) =>
+  local lemma eager_query:
+    finite univ<:from> =>
+    (forall x, mu (dsample x) cpTrue = 1%r) =>
     eager [IND_Eager.resample(); ,
                IND_Eager.H.o ~ IND_Lazy.H.o,
            IND_Lazy.resample();:
       ={x} /\ IND_Eager.H.m{1} = IND_Lazy.H.m{2} ==>
       ={res} /\ IND_Eager.H.m{1} = IND_Lazy.H.m{2}].
   proof strict.
-  intros=> dsampleL; eager proc.
+  intros=> fromF dsampleL; eager proc.
   inline IND_Eager.resample IND_Lazy.resample; swap{2} 4 -3.
   seq 1 1: (={x,work} /\
             IND_Eager.H.m{1} = IND_Lazy.H.m{2} /\
@@ -336,7 +339,9 @@ theory LazyEager.
                if (in_dom x IND_Eager.H.m){1}
                then IND_Eager.H.m{1} = IND_Lazy.H.m{2}
                else eq_except IND_Eager.H.m{1} IND_Lazy.H.m{2} x{1}).
-      by wp; rnd; wp; skip; progress=> //; try case (pick work = x){2}; smt.
+timeout 10.
+       by wp; rnd; wp; skip; progress=> //; try case (pick work = x){2}; try (intros=> H10; apply map_ext); smt.
+timeout 3.
     by wp; rnd; skip; progress=> //; smt.
 
   wp; while (={x,work} /\
@@ -347,10 +352,12 @@ theory LazyEager.
   by wp; rnd{2}; skip; smt.
   qed.
 
-  local lemma eager_aux: (forall x, mu (dsample x) cpTrue = 1%r) =>
+  local lemma eager_aux:
+    finite univ<:from> =>
+    (forall x, mu (dsample x) cpTrue = 1%r) =>
     equiv [IND_Lazy.main ~ IND_Eager.main: true ==> ={res}].
   proof strict.
-  intros=> dsampleL; proc; inline IND_Lazy.H.init.
+  intros=> fromF dsampleL; proc; inline IND_Lazy.H.init.
   seq 1 1: (IND_Lazy.H.m{1} = IND_Eager.H.m{2}); first by wp.
   symmetry;
   eager (H: IND_Eager.resample(); ~ IND_Lazy.resample();:
@@ -362,10 +369,12 @@ theory LazyEager.
   by proc; sim.
   qed.
 
-  local lemma IND_Eager: (forall x, mu (dsample x) cpTrue = 1%r) =>
+  local lemma IND_Eager:
+    finite univ<:from> =>
+    (forall x, mu (dsample x) cpTrue = 1%r) =>
     equiv [IND_Eager.main ~ IND(Eager.RO,D).main: true ==> ={res}].
   proof strict.
-  intros=> dsampleL; proc.
+  intros=> fromF dsampleL; proc.
   call (_: (forall x, in_dom x IND_Eager.H.m{1}) /\ IND_Eager.H.m{1} = Eager.RO.m{2}).
     by proc; skip; smt.
   inline RO.init IND_Eager.resample.
@@ -374,15 +383,17 @@ theory LazyEager.
     by wp; skip; smt.
   qed.
 
-  lemma eagerRO: (forall x, mu (dsample x) cpTrue = 1%r) =>
+  lemma eagerRO:
+    finite univ<:from> =>
+    (forall x, mu (dsample x) cpTrue = 1%r) =>
     equiv [IND(Lazy.RO,D).main ~ IND(Eager.RO,D).main: true ==> ={res}].
   proof strict.
-  intros=> dsampleL; bypr (res{1}) (res{2})=> //; intros=> &1 &2 a.
+  intros=> fromF dsampleL; bypr (res{1}) (res{2})=> //; intros=> &1 &2 a.
   apply (eq_trans _ Pr[IND_Lazy.main() @ &1: a = res]);
-    first by byequiv (IND_Lazy _).
+    first by byequiv (IND_Lazy _ _).
   apply (eq_trans _ Pr[IND_Eager.main() @ &1: a = res]);
-    first by byequiv (eager_aux _).
-  by byequiv (IND_Eager _).
+    first by byequiv (eager_aux _ _).
+  by byequiv (IND_Eager _ _).
   qed.
   end section.
 end LazyEager.
