@@ -847,6 +847,49 @@ let destr_exists f =
   | Fquant(Lexists,bd,p) -> bd, p 
   | _ -> destr_error "exists"
 
+(* destr_exists_prenex destructs recursively existentials in a formula
+   whenever possible. For instance:
+   - E x p1 /\ E y p2 -> [x,y] (p1 /\ p2)
+   - E x p1 /\ E x p2 -> [] (E x p1 /\ E x p2)
+   - p1 => E x p2 -> [x] (p1 => p2)
+   - E x p1 => p2 -> [] (E x p1 => p2)
+*)
+let destr_exists_prenex f =
+  let disjoint bds1 bds2 =
+    List.for_all (fun (id1,_) -> List.for_all(fun (id2,_) ->id1<>id2) bds2) bds1
+  in
+  let rec prenex_exists bds p = match p.f_node with
+    | Fapp({f_node = Fop(op,_)},[f1;f2]) when is_op_and op ->
+      let bds1,f1 = prenex_exists [] f1 in
+      let bds2,f2 = prenex_exists [] f2 in
+      if disjoint bds1 bds2 then
+        (bds1@bds2@bds),(f_and f1 f2)
+      else bds,p
+    | Fapp({f_node = Fop(op,_)},[f1;f2]) when is_op_or op ->
+      let bds1,f1 = prenex_exists [] f1 in
+      let bds2,f2 = prenex_exists [] f2 in
+      if disjoint bds1 bds2 then
+        bds1@bds2@bds,f_or f1 f2
+      else bds,p
+    | Fapp({f_node = Fop(op,_)},[f1;f2]) when EcPath.p_equal op EcCoreLib.p_imp ->
+      let bds2,f2 = prenex_exists bds f2 in
+      bds,f_imp f1 f2
+    | Fquant  (Lexists,bd,p) ->
+      let bds,p = prenex_exists bds p in bd@bds,p
+
+    | Fif (f,ft,fe) ->
+      let bds1,f1 = prenex_exists [] ft in
+      let bds2,f2 = prenex_exists [] fe in
+      if disjoint bds1 bds2 then
+        bds1@bds2@bds,f_if f f1 f2
+      else bds,p
+    | _ -> bds,p
+  in
+  (* Make it fail as with destr_exists *)
+  let bds,f = prenex_exists [] f in
+  if bds=[] then destr_error "exists" else bds,f
+
+
 let destr_let1 f = 
   match f.f_node with
   | Flet(LSymbol(x,ty), e1,e2) -> x,ty,e1,e2 

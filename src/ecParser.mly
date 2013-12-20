@@ -1999,8 +1999,8 @@ phltactic:
 | WP n=code_position?
    { Pwp n }
 
-| SP s=side?
-    { Psp s }
+| SP n=code_position?
+    { Psp n }
 
 | SKIP
     { Pskip }

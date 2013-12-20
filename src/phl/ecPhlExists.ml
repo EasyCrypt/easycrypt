@@ -43,7 +43,7 @@ end
 let t_hr_exists_elim g = 
   let concl = get_concl g in
   let pre = get_pre concl in
-  let bd, pre = destr_exists pre in
+  let bd, pre = destr_exists_prenex pre in
   (* TODO check that bd is not bind in the post *)
   let concl = f_forall bd (set_pre ~pre concl) in
     prove_goal_by [concl] rn_hl_exists_elim g
@@ -86,7 +86,7 @@ let process_exists_intro fs g =
     | FbdHoareS bhs -> LDecl.push_active bhs.bhs_m hyps 
     | FequivF ef -> fst (LDecl.equivF ef.ef_fl ef.ef_fr hyps)
     | FequivS es -> LDecl.push_all [es.es_ml; es.es_mr] hyps 
-    | _ -> tacuerror "cannot apply conseq rule, not a phl/prhl judgement"
+    | _ -> tacuerror "cannot apply rule, not a judgement"
   in
 
   let fs = List.map (fun f -> process_form_opt penv f None) fs in

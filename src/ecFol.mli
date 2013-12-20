@@ -357,6 +357,7 @@ val destr_forall    : form -> binding * form
 val decompose_forall: form -> binding * form 
 val destr_exists1   : form -> EcIdent.t * gty * form
 val destr_exists    : form -> binding * form
+val destr_exists_prenex : form -> binding * form
 val destr_equivF    : form -> equivF
 val destr_equivS    : form -> equivS
 val destr_eagerF    : form -> eagerF

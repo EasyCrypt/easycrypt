@@ -407,6 +407,7 @@ type phltactic =
   | Pskip
   | Papp        of (tac_dir * int doption * pformula * p_app_bd_info)
   | Pwp         of int doption option 
+  | Psp         of int doption option
   | Pwhile      of tac_side * (pformula * pformula_o * (pformula * pformula) option)
   | Pfission    of (tac_side * codepos * (int * (int * int)))
   | Pfusion     of (tac_side * codepos * (int * (int * int)))
@@ -434,7 +435,6 @@ type phltactic =
   | Psim           of (pformula_o * pformula_o * pformula_o)
   | Ptrans_stmt    of trans_info
   | Psymmetry
-  | Psp            of (bool option)
   | Pbdhoare_split of bdh_split 
 
     (* Eager *)
