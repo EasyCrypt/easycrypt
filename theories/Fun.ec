@@ -12,7 +12,7 @@ lemma eqL (x:'a): (fun y, x = y) = (=) x
 by apply fun_ext.
 
 lemma eqR (y:'a): (fun x, x = y) = (=) y
-by (apply fun_ext=> x //=; rewrite (rw_eq_sym x)).
+by (apply fun_ext=> x //=; rewrite (eq_sym x)).
 
 (** Computable predicates *)
 pred (<=) (p q:('a -> bool)) = forall (a:'a), p a => q a.

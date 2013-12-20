@@ -22,24 +22,18 @@ lemma nosmt bool_case : forall (p:bool -> bool),
 by [].
 
 (** boolean rewriting *)
-lemma nosmt rw_eq_iff : forall (a b:bool), (a = b) = (a <=> b) by [].
+lemma nosmt eq_iff : forall (a b:bool), (a = b) <=> (a <=> b) by [].
 
-lemma nosmt eqT  : forall (x:bool), x => (x = true) by [].
-lemma nosmt neqF : forall (x:bool), !x => (x = false) by [].
-
-lemma nosmt rw_eqT : forall (x:bool), (x = true) <=> x by [].
-lemma nosmt rw_neqF : forall (x:bool), (x = false) <=> !x by [].
+lemma nosmt eqT : forall (x:bool), (x = true) <=> x by [].
+lemma nosmt neqF : forall (x:bool), (x = false) <=> !x by [].
 
 lemma nosmt not_def: forall (x:bool), (x => false) <=> !x by [].
 lemma nosmt nnot: forall (x:bool), (!(!x)) = x by [].
 
 lemma nosmt negbTE: forall (x:bool), !x => (x => false) by [].
 
-lemma nosmt nor : forall (a b:bool), (!a /\ !b) => !(a \/ b) by [].
-lemma nosmt nand: forall (a b:bool), (!a \/ !b) => !(a /\ b) by [].
-
-lemma nosmt rw_nand: forall (a b:bool), (!a) \/ (!b) <=> !(a /\ b) by [].
-lemma nosmt rw_nor : forall (a b:bool), (!a) /\ (!b) <=> !(a \/ b) by [].
+lemma nosmt nand: forall (a b:bool), (!a) \/ (!b) <=> !(a /\ b) by [].
+lemma nosmt nor : forall (a b:bool), (!a) /\ (!b) <=> !(a \/ b) by [].
 
 lemma nosmt for_ex: forall (p:'a -> bool), !(exists (x:'a), !p x) => forall (x:'a), p x by [].
 lemma nosmt ex_for: forall (p:'a -> bool), !(forall (x:'a), !p x) => exists (x:'a), p x by [].
@@ -236,14 +230,12 @@ lemma nosmt rewrite_if: forall (f:'a -> 'b) b x1 x2,
   f (if b then x1 else x2) = (if b then f x1 else f x2)
 by [].
 
-lemma nosmt rw_imp   : forall (x y : bool), (x => y) = ((!x)\/y) by [].
+lemma nosmt imp   : forall (x y : bool), (x => y) <=> ((!x)\/y) by [].
 
 (** equality *)
 lemma nosmt eq_refl  : forall (x:'a), x = x by [].
-lemma nosmt eq_sym   : forall (x y : 'a), x = y => y = x by [].
+lemma nosmt eq_sym   : forall (x y : 'a), x = y <=> y = x by [].
 lemma nosmt eq_trans : forall (x y z : 'a), x = y => y = z => x = z by [].
-
-lemma nosmt rw_eq_sym   : forall (x y : 'a), (x = y) = (y = x) by [].
 
 (** tuples *) 
 lemma nosmt tuple2_ind : 

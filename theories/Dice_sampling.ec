@@ -51,13 +51,13 @@ theory GenDice.
         intros Hw; alias 2 r0 = r.
         cut Htk' := Htk;generalize Htk';rewrite -test_sub_supp => Hmemk.
         phoare split bd ((1%r - bdt*bd) * (1%r/bdt)) : (k=r0).
-          by intros &hr [H1 H2]; rewrite (neqF (test i{hr} r{hr})) //=;fieldeq.
+          by intros &hr [H1 H2]; rewrite (_: test i{hr} r{hr} = false) 1:neqF //=; fieldeq=> //.
           (* bounding pr : k = r0 /\ k = r *)
           seq 2 : (k = r0) bd 1%r 1%r 0%r (r0 = r /\ i = i0) => //.
             by wp;rnd => //.
             wp;rnd;skip;progress => //. 
             rewrite /bd /mu_x;apply mu_eq => w' //.
-            conseq * Hw;progress => //; rewrite (eqT (test i{hr} r{hr})) //.
+            by conseq * Hw;progress => //; rewrite Htk.
           by conseq * (_: _ ==> false) => //.
         (* bounding pr : ! k = r0 /\ k = r *)
        seq 2 : (test i r0) _ 0%r (1%r - bdt*bd) (1%r/bdt) 
@@ -65,7 +65,7 @@ theory GenDice.
          by wp;rnd.
          case (k = r0);first by conseq * (_ : _ ==> false) => //.
          conseq * Hw;progress => //.
-         by rewrite (eqT (test i{hr} r{hr})) //= /charfun (neqF (k = r{hr})) //.
+         by rewrite H0 //= /charfun (_: (k = r{hr}) = false) 1:neqF //.
          phoare split ! 1%r (bdt*bd);wp;rnd => //.
           skip;progress => //.
           rewrite -(mu_eq (d i{hr}) (cpMem (sub_supp i{hr}))).

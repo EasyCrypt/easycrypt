@@ -73,6 +73,7 @@
     "subst"       , SUBST      ;        (* KW: tactic *)
     "progress"    , PROGRESS   ;        (* KW: tactic *)
     "trivial"     , TRIVIAL    ;        (* KW: tactic *)
+    "auto"        , AUTO       ;        (* KW: tactic *)
     
     (* Other tactics *)
     "idtac"       , IDTAC      ;        (* KW: tactic *)
