@@ -224,7 +224,7 @@ theory NatMul.
     last by delta s'; apply leq_refl.
   elim/set_comp s'.
     by rewrite sum_empty card_empty MulZ.
-    intros=> {s'} s' s'_nempty IH leq_s'_s.
+    intros=> s' s'_nempty IH leq_s'_s.
     rewrite (sum_rm _ _ (pick s'));first by rewrite mem_pick.
     rewrite IH; first by apply (leq_tran s')=> //; apply rm_leq.
     rewrite f_x; first by apply leq_s'_s; apply mem_pick.
@@ -263,7 +263,7 @@ theory Miplus.
     rewrite /sum_n;elim /Int.Induction.induction k.
       rewrite sum_ij_eq => /=.
       by elim (ediv_unique 0 2 0 0 _ _ _) => //; smt.
-    intros {k} k Hk Hrec;rewrite sum_ij_le_r;first smt.
+    intros k Hk Hrec;rewrite sum_ij_le_r;first smt.
     cut -> : k + 1 - 1 = k;first smt.
     rewrite Hrec /=.
     elim (ediv_unique ((k + 1) * (k + 1 + 1)) 2 (k * (k + 1) /% 2 + (k + 1)) 0 _ _ _) => //.
@@ -288,8 +288,8 @@ theory Miplus.
    sum_n i j = i*((j - i)+1) + sum_n 0 ((j - i)).
  proof -strict.
    intros Hle;rewrite {1} (_: j=i+(j-i));first smt.
-   elim /Int.Induction.induction (j-i) => /=;last smt.
-    rewrite !sum_n_ii //.
+   cut: 0 <= (j-i) by smt; elim/Int.Induction.induction (j-i)=> //=.
+   by rewrite !sum_n_ii.
    intros {j Hle} j Hj; rewrite -CommutativeGroup.Assoc sum_n_ij1;smt.
  qed.
 
@@ -346,7 +346,7 @@ proof -strict.
     apply ex_for; delta p=> {p}; generalize sum_true; apply absurd=> /= h.
   cut := FSet.leq_refl s; pose {1 3} s' := s;elim/set_ind s'.
     by rewrite Mbor.sum_empty.
-  intros=> {s'} x s' nmem IH leq_adds'_s;
+  intros=> x s' nmem IH leq_adds'_s;
   cut leq_s'_s : s' <= s by (apply (FSet.leq_tran (add x s'))=> //; 
   apply leq_add);
   rewrite Mbor.sum_add // -nor IH // /=;
@@ -377,7 +377,7 @@ lemma mu_ors d (X:('a->bool) set):
   disj_or X =>
   mu d (cpOrs X) = Mrplus.sum (fun P, mu d P) X.
 proof strict.
-  elim/set_ind X=> {X}.
+  elim/set_ind X.
     by intros disj;rewrite Mrplus.sum_empty cpOrs0 mu_false.
   intros f X f_nin_X IH disj; rewrite Mrplus.sum_add // cpOrs_add mu_disjoint.
     rewrite /cpAnd /cpFalse=> x' /=;

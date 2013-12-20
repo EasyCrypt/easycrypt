@@ -706,7 +706,7 @@ theory Hybrid.
        by proc (={glob LRB,C.c}).
        by proc (={glob LRB,C.c}).
      conseq (_ : _ ==> ={glob A, glob E, glob LRB, C.c}) => //;sim.
-   clear p2;generalize p';apply (Hybrid E (<:BLR(A)) _ _ _ _ _ &m p) => //.
+   clear p2; apply (Hybrid E (<:BLR(A)) _ _ _ _ _ &m p) => //.
    intros E0 LR Hlr HI HL HE;proc.
    call (_: true => true) => //.
    by proc;call Hlr.

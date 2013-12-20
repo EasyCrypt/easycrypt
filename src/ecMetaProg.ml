@@ -594,6 +594,10 @@ module FPosition = struct
             let subctxt = List.fold_left ((^~) Sid.add) ctxt (lp_ids lp) in
               doit (`WithSubCtxt [(ctxt, f1); (subctxt, f2)])
 
+          | Fpr (m, _, f1, f2) ->
+            let subctxt = Sid.add m ctxt in
+              doit (`WithSubCtxt [(ctxt, f1); (subctxt, f2)])
+
           | _ -> None
         in
           omap (fun p -> `Sub p) subp
@@ -687,10 +691,17 @@ module FPosition = struct
           | Ftuple fs ->
               let fs' = doit p fs in
                 FSmart.f_tuple (fp, fs) fs'
-          | Fproj(f,_) -> as_seq1 (doit p [f])
+
+          | Fproj(f,_) ->
+              as_seq1 (doit p [f])
+
           | Flet (lv, f1, f2) ->
               let (f1', f2') = as_seq2 (doit p [f1; f2]) in
                 FSmart.f_let (fp, (lv, f1, f2)) (lv, f1', f2')
+
+          | Fpr (m, xp, f1, f2) ->
+              let (f1', f2') = as_seq2 (doit p [f1; f2]) in
+                f_pr m xp f1' f2'
   
           | FhoareF   _ -> raise InvalidPosition
           | FhoareS   _ -> raise InvalidPosition
@@ -699,7 +710,6 @@ module FPosition = struct
           | FequivF   _ -> raise InvalidPosition
           | FequivS   _ -> raise InvalidPosition
           | FeagerF   _ -> raise InvalidPosition
-          | Fpr       _ -> raise InvalidPosition
       end
   
     and doit ps fps =
