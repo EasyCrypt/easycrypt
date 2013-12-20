@@ -625,10 +625,11 @@ axiom interval_pos (x y:int): x <= y => interval x y = add y (interval x (y-1)).
 lemma mem_interval (x y a:int): (mem a (interval x y)) <=> (x <= a <= y).
 proof strict.
   case (x <= y)=> x_le_y;last smt.
-  cut ->: y = (y - x + 1) - 1 + x;first smt.
-  elim/Int.Induction.induction (y - x + 1);[smt| |smt].
+  cut ->: y = (y - x + 1) - 1 + x by smt.
+  cut: 0 <= (y - x + 1) by smt.
+  elim/Int.Induction.induction (y - x + 1); first smt.
   intros j j_pos IH.
-  rewrite interval_pos;first smt.
+  rewrite interval_pos; first smt.
   rewrite mem_add.
   rewrite (_:j + 1 - 1 + x - 1 = j - 1 + x);first smt.
   rewrite IH.
@@ -645,8 +646,9 @@ lemma interval_addl (i j : int) :
     i <= j =>
     interval i j = add i (interval (i+1) j).  
 proof -strict.
- intros Hle;cut -> : j = (j - i) + i;first smt.
- elim /Int.Induction.induction (j-i) => /=;last smt.
+ intros Hle;cut -> : j = (j - i) + i by smt.
+ cut: 0 <= (j - i) by smt.
+ elim /Int.Induction.induction (j-i)=> //=.
    by rewrite interval_single interval_neg //;first smt.
  clear j Hle => j Hle Heq.
  rewrite (interval_pos i (j + 1 + i));first smt.
@@ -661,7 +663,8 @@ proof strict.
   intros h.
   rewrite (_:interval x y=interval x (x+(y-x+1)-1));first smt.
   rewrite (_:max (y - x + 1) 0 = y-x+1);first smt.
-  elim/Int.Induction.induction (y-x+1);[smt| |smt].
+  cut: 0 <= (y - x + 1) by smt.
+  elim/Int.Induction.induction (y-x+1); first smt.
   intros j hh hrec.
   rewrite (interval_pos x (x+(j+1)-1) _);smt.
 qed.
@@ -700,7 +703,7 @@ proof strict.
     rewrite (mu_eq d _ Fun.cpFalse).
       by intros x;rewrite /cpMem /cpFalse /= neqF;apply mem_empty.
     by rewrite mu_false card_empty //.
-  intros {s} x s Hnmem IH d bd Hmu_x.
+  intros x s Hnmem IH d bd Hmu_x.
   rewrite (_: (card (add x s))%r * bd = 
           bd + (card s)%r * bd); first by rewrite card_add_nin //=;ringeq.
   rewrite (mu_eq d _ (Fun.cpOr ((=) x) (cpMem s))).
@@ -722,7 +725,7 @@ proof strict.
     rewrite (mu_eq d _ Fun.cpFalse).
       by intros x;rewrite /cpMem /cpFalse /= neqF;apply mem_empty.
     by rewrite -le_ge mu_false card_empty //.
-  intros {s} x s Hnmem IH d bd Hmu_x.
+  intros x s Hnmem IH d bd Hmu_x.
   rewrite (_: (card (add x s))%r * bd = 
           bd + (card s)%r * bd); first by rewrite card_add_nin //=;ringeq.
   rewrite (mu_eq d _ (Fun.cpOr ((=) x) (cpMem s))).
@@ -773,7 +776,7 @@ proof -strict.
   intros x l0 Hmu.
   cut Hbd : 0%r <= bd.
     by cut H := Hmu x _; [ by rewrite mem_cons | smt].
-  generalize (x :: l0) Hmu => {l x l0} l Hmu. 
+  generalize (x :: l0) Hmu => {x l0} l Hmu. 
   apply (Real.Trans _ ((card (of_list l))%r * bd)).
     by apply mu_Lmem_le_card.
   cut H := card_of_list l; smt.
