@@ -2010,6 +2010,9 @@ phltactic:
 | WP n=code_position?
    { Pwp n }
 
+| SP n=code_position?
+    { Psp n }
+
 | SKIP
     { Pskip }
 
@@ -2118,8 +2121,6 @@ phltactic:
 | SYMMETRY 
     { Psymmetry }    
 
-| SP s=side?
-   {Psp s}
 (* NEW : ADDED FOR EAGER *)
 | EAGER t=eager_tac { t }
 

@@ -20,6 +20,8 @@ module Test = {
 lemma test : hoare [Test.test : Test.z=10 ==> Test.z=1 /\ Test.y=10 /\ Test.x=11].
 fun.
 sp 1.
-skip.
-smt.
-save.
+sp.
+skip;trivial.
+qed.
+
+

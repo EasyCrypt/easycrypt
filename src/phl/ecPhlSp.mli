@@ -1,4 +1,5 @@
 (* -------------------------------------------------------------------- *)
+open EcParsetree
 open EcBaseLogic
 open EcLogic
 
@@ -8,4 +9,4 @@ class rn_hl_sp : object
 end
 
 (* -------------------------------------------------------------------- *)
-val t_sp : bool option -> tactic
+val t_sp : (int doption) option  -> tactic
