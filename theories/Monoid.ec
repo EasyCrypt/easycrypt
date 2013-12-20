@@ -69,7 +69,7 @@ lemma sum_disj (f:'a -> t) (s1 s2:'a set) :
   disjoint s1 s2 =>
   sum f (union s1 s2) = sum f s1 + sum f s2.
 proof -strict.
- elim /set_ind s1.
+ elim/set_ind s1.
    by intros Hd;rewrite union0s sum_empty addmC addmZ.
  intros x s Hx Hrec Hd;rewrite union_add sum_add.
    by generalize Hd;rewrite disjoint_spec mem_union;smt.
@@ -82,9 +82,9 @@ lemma sum_eq (f1 f2:'a -> t) (s: 'a set) :
    (forall x, mem x s => f1 x = f2 x) =>
    sum f1 s = sum f2 s.
 proof strict.
-  elimT set_ind s.
+  elim/set_ind s.
     by rewrite !sum_empty.
-  intros {s} x s Hx Hr Hf;rewrite sum_add // sum_add // Hf;first smt.
+  intros x s Hx Hr Hf;rewrite sum_add // sum_add // Hf;first smt.
   by rewrite Hr // => y Hin;apply Hf;smt.
 qed.
 
@@ -99,16 +99,16 @@ lemma sum_comp (f: t -> t) (g:'a -> t) (s: 'a set):
   (forall x y, f (x + y) = f x + f y) =>
   sum (fun a, f (g a)) s = f (sum g s).
 proof -strict.
-  intros Hz Ha;elimT set_ind s.
+  intros Hz Ha;elim/set_ind s.
     by rewrite !sum_empty Hz.
-  by intros {s} x s Hx Hr;rewrite sum_add // sum_add //= Hr Ha. 
+  by intros x s Hx Hr;rewrite sum_add // sum_add //= Hr Ha. 
 qed.
 
 lemma sum_add2 (f:'a -> t) (g:'a -> t) (s:'a set):
   (sum f s) + (sum g s) = sum (fun x, f x + g x) s.
 proof strict.
 elim/set_comp s;first by rewrite !sum_empty addmZ.
-intros {s} s s_nempty IH;
+intros s s_nempty IH;
 rewrite (sum_rm f _ (pick s)); first by rewrite mem_pick.
 rewrite (sum_rm g _ (pick s)); first by rewrite mem_pick.
 rewrite (sum_rm _ s (pick s)); first by rewrite mem_pick.
@@ -120,10 +120,9 @@ lemma sum_chind (f:'a -> t) (g:'a -> 'b) (g':'b -> 'a) (s:'a set):
   (sum f s) = sum (fun x, f (g' x)) (img g s).
 proof strict.
 intros=> pcan_g'_g;
-cut := leq_refl s; pose {1 3 4} s' := s.
-elim/set_comp s'.
+elim/set_comp {1 3 4}s (leq_refl s).
   by rewrite !sum_empty img_empty sum_empty.
-  intros {s'} s' s'_nempty IH leq_s'_s;
+  intros s' s'_nempty IH leq_s'_s;
   rewrite (sum_rm _ _ (pick s'));first by rewrite mem_pick.
   rewrite (sum_rm _ (img g s') (g (pick s'))) /=;
     first by rewrite mem_img // mem_pick.
@@ -140,10 +139,9 @@ lemma sum_filter (f:'a -> t) (p:'a -> bool) (s:'a set):
   (forall x, (!p x) => f x = Z) =>
   sum f (filter p s) = sum f s.
 proof strict.
-intros=> f_Z; cut := leq_refl s; pose {1 3 4} s' := s;
-elim/set_comp s'.
+intros=> f_Z; elim/set_comp {1 3 4}s (leq_refl s).
   by rewrite FSet.filter_empty.
-  intros=> {s'} s' s'_nempty IH leq_s'_s;
+  intros=> s' s'_nempty IH leq_s'_s;
   rewrite (sum_rm _ s' (pick s')); first by apply mem_pick.
   rewrite -IH;first apply (leq_tran s')=> //; apply rm_leq.
   case (p (pick s'))=> p_pick.
@@ -412,7 +410,7 @@ proof strict.
     rewrite /is => x1 x2 Hx; rewrite !img_def => [y1 [Heq1 Hm1]] [y2 [Heq2 Hm2]].
     subst; generalize Hx => /= Hx a [Hpa1 Heq1];rewrite -not_def => [Hpa2 Heq2].
     by subst; generalize Hx;rewrite not_def.
-  rewrite /is => {is};elimT set_ind sup.
+  rewrite /is => {is};elim/set_ind sup.
     by rewrite img_empty !Mrplus.sum_empty.
   intros x s Hnm Hrec;rewrite FSet.img_add Mrplus.sum_add0.
     rewrite img_def /= => [x0 [H1 H2]].

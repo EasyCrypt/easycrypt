@@ -118,7 +118,7 @@ type dofpattern = LDecl.hyps -> form -> form -> (EcIdent.t * form)
 
 val t_hyp : EcIdent.t -> tactic
 
-val t_generalize_hyp  : EcIdent.t -> tactic
+val t_generalize_hyp  : ?clear:bool -> EcIdent.t -> tactic
 val t_generalize_form : ?fpat:dofpattern -> symbol option -> form -> tactic
 
 val t_intros_i : EcIdent.t list -> tactic
@@ -129,6 +129,7 @@ val t_elim_hyp : EcIdent.t -> tactic
 val t_elim     : tactic
 
 val t_elimT_form : EcTypes.ty list -> EcPath.path -> form -> int -> tactic
+val t_elimT_ind  : tactic
 
 val t_case : form -> tactic
 

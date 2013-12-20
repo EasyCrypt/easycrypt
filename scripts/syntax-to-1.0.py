@@ -69,6 +69,16 @@ class CPred(codetx):
         return re.sub(r"('?\w+)\s+(\w+\.)*cpred\b", '(\\1 -> bool)', code)
 
 # --------------------------------------------------------------------
+class ElimT(codetx):
+    def __init__(self):
+        pass
+
+    def __call__(self, code):
+        code = re.sub(r'\belimT\s+(\S+)\s+(\w+)\.', 'elim/\\1 \\2.', code)
+        code = re.sub(r'\belimT\b', 'elim', code)
+        return code
+
+# --------------------------------------------------------------------
 ALLTX = [
     WordRename({'fun': 'proc', 'lambda' : 'fun'}),
     OracleInfo(),
@@ -85,6 +95,7 @@ ALLTX = [
                 'xor_associative': 'xorA',
                 'xor_nilpotent': 'xorK'}),
     CPred(),
+    ElimT()
 ]
 
 ALLTX = [ALLTX[-1]]

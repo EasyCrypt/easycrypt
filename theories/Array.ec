@@ -384,9 +384,9 @@ by [].
 lemma fold_right_map (f:'x -> 'y -> 'x) (x:'x) (g:'z -> 'y) (zs:'z array):
  fold_right f x (map g zs) = fold_right (fun x y, f x (g y)) x zs.
 proof strict.
-generalize x; elim/array_ind zs.
+ elim/array_ind zs x.
   by intros=> x; rewrite !fold_right_empty ?length_map ?length_empty.
-  intros=> {zs} z zs IH x; rewrite !(fold_right_cons _ x); first 2 smt.
+  intros=> z zs IH x; rewrite !(fold_right_cons _ x); first 2 smt.
   by rewrite map_cons !sub_cons IH 2?get_cons; first 2 smt.
 qed.
 
@@ -398,8 +398,7 @@ lemma array_ind_snoc (p:'x array -> bool):
 proof strict.
 intros=> p0 prec xs.
 cut h : (forall n, 0 <= n => forall xs, length xs = n => p xs).
-  intros=> n hn.
-  elim/Induction.induction n=> //; first smt.
+  elim/Induction.induction => //; first smt.
   intros=> i ipos hrec xs' hlen.
   cut ->: xs' = (sub xs' 0 i):::xs'.[i] by (apply array_ext; smt).
   apply prec.
@@ -414,7 +413,7 @@ lemma fold_length (xs:'x array):
 proof strict.
 elim/array_ind xs.
   by rewrite fold_left_empty length_empty.
-  by intros=> {xs} x xs IH; rewrite fold_left_cons;
+  by intros=> x xs IH; rewrite fold_left_cons;
        [ | cut ->: sub (x::xs) 1 (length (x::xs) - 1) = xs by (apply array_ext; smt)];
      smt.
 qed.

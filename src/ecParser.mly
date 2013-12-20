@@ -191,7 +191,6 @@
 %token DROP
 %token EAGER
 %token ELIM
-%token ELIMT
 %token ELSE
 %token END
 %token EOF
@@ -1948,16 +1947,10 @@ logtactic:
     { Pright }
 
 | ELIM e=genpattern*
-   { Pelim e }
+   { Pelim (e, None) }
 
-| ELIMT f=sform
-   { PelimT (f, None) }
-
-| ELIMT p=qident f=sform
-   { PelimT (f, Some p) }
-
-| ELIM SLASH p=qident f=sform
-   { PelimT (f, Some p) }
+| ELIM SLASH p=qident e=genpattern*
+   { Pelim (e, Some p) }
 
 | APPLY e=fpattern(form)
    { Papply (e, None) }

@@ -993,7 +993,7 @@ let t_generalize_form ?fpat name f g =
   let ff = f_forall [x,GTty f.f_ty] body in
   t_apply_form ff [AAform f] g
 
-let t_generalize_hyps ids g =
+let t_generalize_hyps ?(clear = false) ids g =
   let hyps,concl = get_goal g in
   let env1 = LDecl.toenv hyps in
   let rec aux (s:f_subst) ids = 
@@ -1006,10 +1006,10 @@ let t_generalize_hyps ids g =
         let s = Fsubst.f_bind_local s id (f_local x ty) in
         let ff,args,lt = aux s ids in
         begin match body with
-        | None -> 
-          f_forall [x, GTty ty] ff, AAform (f_local id ty) :: args, lt
-        | Some body ->
+        | Some body when not clear ->
           f_let (LSymbol(x,ty)) body ff, args, lt
+        | _ -> 
+          f_forall [x, GTty ty] ff, AAform (f_local id ty) :: args, lt
         end
       | LD_mem mt ->
         let x = EcIdent.fresh id in
@@ -1031,7 +1031,7 @@ let t_generalize_hyps ids g =
   let ff, args, lt = aux Fsubst.f_subst_id ids in
   t_seq_subgoal (t_apply_form ff args) (t_id None :: lt) g
 
-let t_generalize_hyp id g = t_generalize_hyps [id] g
+let t_generalize_hyp ?clear id g = t_generalize_hyps ?clear [id] g
 
 let t_generalize_hyps clear ids g = 
   if clear then 
@@ -1123,9 +1123,12 @@ let t_elimT_ind goal =
       | None -> error ()
       | Some (p, tys) ->
           let id = LDecl.fresh_id hyps (EcIdent.name x) in
-            t_seq
-              (t_intros_i [id])
-              (t_elimT_form tys p (f_local id ty) 0)
+            t_lseq
+              [t_intros_i [id];
+               t_elimT_form tys p (f_local id ty) 0;
+               t_clear (Sid.singleton id);
+               t_simplify EcReduction.beta_red]
+              goal
     end
 
   | _ -> error ()
@@ -1670,6 +1673,7 @@ let rec t_intros_elim n g =
       let ids = 
         LDecl.fresh_ids hyps (List.map (fun (id,_) -> EcIdent.name id) bd) in
       t_seq (t_intros_i ids) (t_intros_elim n) g
+
     |  Fapp({f_node = Fop(p,_)}, [f;_]) when EcPath.p_equal p EcCoreLib.p_imp ->
       begin match f.f_node with
       | Fapp({f_node = Fop(p,_)}, [_;_] ) when is_op_and p ->
@@ -1688,7 +1692,8 @@ let rec t_intros_elim n g =
         let id = LDecl.fresh_id hyps "H" in
         t_seq (t_intros_i [id]) (t_intros_elim (n-1)) g
       end
-    | _ -> tacuerror "don't known what to introduce"
+
+    | _ -> tacuerror "nothing to introduce"
 
 (* -------------------------------------------------------------------- *)
 let t_congr f (args, ty) g =

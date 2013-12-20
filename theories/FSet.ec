@@ -134,11 +134,9 @@ axiom pick_def (X:'a set):
 lemma mem_pick (X:'a set):
   X <> empty => mem (pick X) X.
 proof strict.
-rewrite pick_def;
-elim/list_case_eq (elems X).
-  by rewrite -empty_elems_nil //.
-  by intros=> x l; rewrite -mem_def=> -> _;
-     rewrite hd_cons mem_cons //.
+  rewrite empty_elems_nil pick_def -mem_def.
+  elim/list_ind (elems X) => // x l _ _.
+  by rewrite hd_cons mem_cons.
 qed.
 
 lemma pick_single (x:'a):
@@ -347,17 +345,17 @@ qed.
 
 lemma mem_of_list (x:'a) l : List.mem x l = mem x (of_list l).
 proof -strict.
- rewrite /of_list;elimT list_ind l. 
+ rewrite /of_list;elim/list_ind l. 
    rewrite fold_right_nil;smt.
- intros {l} y xs;rewrite fold_right_cons;smt.
+ intros y xs;rewrite fold_right_cons;smt.
 qed.
 
 lemma card_of_list (l:'a list) :
    card (of_list l) <= List.length l.
 proof -strict.
-  rewrite /of_list;elimT list_ind l.
+  rewrite /of_list;elim/list_ind l.
    by rewrite fold_right_nil card_empty length_nil => //.
-  intros => {l} x xs H; rewrite fold_right_cons length_cons.  
+  intros => x xs H; rewrite fold_right_cons length_cons.  
   case (mem x (fold_right add empty xs))=> Hin; 
      [rewrite card_add_in // | rewrite card_add_nin //];smt.
 qed.
@@ -700,7 +698,7 @@ lemma mu_cpMem_le (s:'a set): forall (d:'a distr) (bd:real),
   (forall (x : 'a), mem x s => mu_x d x <= bd) =>
     mu d (cpMem s) <= (card s)%r * bd.
 proof strict.
-  elimT set_ind s.
+  elim/set_ind s.
     intros d bd Hmu_x.
     rewrite (mu_eq d _ Fun.cpFalse).
       by intros x;rewrite /cpMem /cpFalse /= rw_neqF;apply mem_empty.
@@ -722,7 +720,7 @@ lemma mu_cpMem_ge (s:'a set): forall (d:'a distr) (bd:real),
   (forall (x : 'a), mem x s => mu_x d x >= bd) =>
     mu d (cpMem s) >= (card s)%r * bd.
 proof strict.
-  elimT set_ind s.
+  elim/set_ind s.
     intros d bd Hmu_x.
     rewrite (mu_eq d _ Fun.cpFalse).
       by intros x;rewrite /cpMem /cpFalse /= rw_neqF;apply mem_empty.
@@ -771,7 +769,7 @@ lemma mu_Lmem_le_length (l:'a list) (d:'a distr) (bd:real):
   (forall (x : 'a), List.mem x l => mu_x d x <= bd) =>
   mu d (fun x, List.mem x l) <= (length l)%r * bd. 
 proof -strict.
-  elimT list_case l.
+  elim/list_case l.
     intros _; rewrite length_nil (mu_eq _ _ (cpFalse)).
       by intros x; rewrite /cpFalse /= rw_neqF;apply mem_nil.
     by rewrite mu_false.

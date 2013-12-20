@@ -879,7 +879,7 @@ let process_generalize loc patterns g =
               when occ = None && LDecl.has_symbol s hyps
             ->
               let id = fst (LDecl.lookup s hyps) in
-                t_seq (t_generalize_hyp id) (t_clear (Sid.singleton id)) g
+                t_seq (t_generalize_hyp ~clear:true id) (t_clear (Sid.singleton id)) g
           | _ ->
             let (hyps, concl) = get_goal g in
             let env = LDecl.toenv hyps in
@@ -932,27 +932,21 @@ let process_generalize loc patterns g =
     t_lseq (List.rev_map pr1 patterns) g
 
 (* -------------------------------------------------------------------- *)
-let process_elim loc pe g =
-  t_on_last
-    (set_loc loc t_elim)
-    (process_generalize loc pe g)
-
-(* -------------------------------------------------------------------- *)
-let process_elimT loc (pf, qs) g =
+let process_elimT loc qs g =
   let noelim () = tacuerror "cannot recognize elimination principle" in
 
   let (hyps, concl) = get_goal g in
 
-  let pf = process_form_opt hyps pf None in
-  let qs =
-    match qs with
-    | Some qs -> qs
-    | None    -> begin
-        match EcEnv.Ty.scheme_of_ty pf.f_ty (LDecl.toenv hyps) with
-        | None -> noelim ()
-        | Some (qs, _) -> mk_loc loc (EcPath.toqsymbol qs)
-    end
+  let (pf, pfty, _concl) =
+    match sform_of_form concl with
+    | SFquant (Lforall, (x, GTty xty), concl) -> (x, xty, concl)
+    | _ -> noelim()
   in
+
+  let pf = LDecl.fresh_id hyps (EcIdent.name pf) in
+  let g  = t_intros_1 [pf] g in
+
+  let (hyps, concl) = get_goal g in
 
   let (p, typs, ue, ax) =
     match process_named_pterm loc hyps (qs, None) with
@@ -967,7 +961,7 @@ let process_elimT loc (pf, qs) g =
   in
 
   begin
-    try  EcUnify.unify (LDecl.toenv hyps) ue (tfun pf.f_ty tbool) xpty
+    try  EcUnify.unify (LDecl.toenv hyps) ue (tfun pfty tbool) xpty
     with EcUnify.UnificationFailure _ -> noelim ()
   end;
 
@@ -976,8 +970,6 @@ let process_elimT loc (pf, qs) g =
     with EcUnify.UninstanciateUni -> noelim ()
   in
 
-  let ax = Fsubst.uni tue ax in
-
   let rec skip ax =
     match destruct_product hyps ax with
     | Some (`Imp (_f1, f2)) -> skip f2
@@ -985,12 +977,12 @@ let process_elimT loc (pf, qs) g =
     | _ -> noelim ()
   in
 
-  let ((x, _xty), ax) = skip ax in
+  let ((x, _xty), ax) = skip (Fsubst.uni tue ax) in
 
-  let ptnpos = FPosition.select_form hyps None pf concl in
+  let fpf  = f_local pf pfty in
+  let typs = List.map (Tuni.offun tue) typs in
 
-  if FPosition.is_empty ptnpos then noelim ();
-
+  let ptnpos = FPosition.select_form hyps None fpf concl in
   let (_xabs, body) = FPosition.topattern ~x:x ptnpos concl in
 
   let rec skipmatch ax body sk =
@@ -1004,9 +996,24 @@ let process_elimT loc (pf, qs) g =
 
   let sk = skipmatch ax body 0 in
 
-  t_seq
-    (set_loc loc (t_elimT_form (List.map (Tuni.offun tue) typs) p pf sk))
-    (t_simplify EcReduction.beta_red) g
+  t_lseq
+    [set_loc loc (t_elimT_form typs p fpf sk);
+     t_or
+       (t_clear (Sid.singleton pf))
+       (t_seq (t_generalize_hyp pf) (t_clear (Sid.singleton pf)));
+     t_simplify EcReduction.beta_red]
+    g
+
+(* -------------------------------------------------------------------- *)
+let process_elim loc (pe, qs) g =
+  let real_elim g =
+    match qs with
+    | None    -> t_or t_elim t_elimT_ind g
+    | Some qs -> process_elimT loc qs g
+  in
+    t_on_last
+      (set_loc loc real_elim)
+      (process_generalize loc pe g)
 
 (* -------------------------------------------------------------------- *)
 let process_algebra mode kind eqs g =
@@ -1084,5 +1091,4 @@ let process_logic (engine, hitenv) loc t =
   | Psubst   ri    -> process_subst loc ri
   | Psimplify ri   -> process_simplify ri
   | Pchange pf     -> process_change pf
-  | PelimT i       -> process_elimT loc i
   | Ppose (x, o, p)-> process_pose loc x o p

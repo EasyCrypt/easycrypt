@@ -71,7 +71,6 @@
     "apply"       , APPLY      ;        (* KW: tactic *)
     "rewrite"     , REWRITE    ;        (* KW: tactic *)
     "subst"       , SUBST      ;        (* KW: tactic *)
-    "elimT"       , ELIMT      ;        (* KW: tactic *)
     "progress"    , PROGRESS   ;        (* KW: tactic *)
     "trivial"     , TRIVIAL    ;        (* KW: tactic *)
     

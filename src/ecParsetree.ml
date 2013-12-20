@@ -507,7 +507,7 @@ type logtactic =
   | Pright                        
   | Ptrivial
   | Pcongr
-  | Pelim       of genpattern list
+  | Pelim       of (genpattern list * pqsymbol option)
   | Papply      of (ffpattern * psymbol option)
   | Pcut        of (intropattern1 option * pformula * ptactic_core option)
   | Pcutdef     of (intropattern1 option * pterm)
@@ -517,7 +517,6 @@ type logtactic =
   | Psubst      of pformula list
   | Psimplify   of preduction 
   | Pchange     of pformula
-  | PelimT      of (pformula * pqsymbol option)
   | Ppose       of (psymbol * rwocc * pformula)
 
 and ptactic_core_r =
