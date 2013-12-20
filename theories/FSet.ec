@@ -504,16 +504,13 @@ lemma fold_set_list (f:'a -> 'b -> 'b) (e:'b) xs:
 proof strict.
 intros=> C; elim/set_comp xs;
   first by rewrite fold_empty elems_empty fold_right_nil.
-intros s nempty Hind; elim/list_case_eq (elems s);
-  first by apply absurd=> _;rewrite -elems_empty elems_eq.
-intros=> x l' h.
-cut xval : pick s = x;first rewrite pick_def h hd_cons //.
+intros=> s s_nempty IH; cut [x xs elems_decomp]: exists x xs, elems s = x::xs by smt.
+cut xval: pick s = x by rewrite pick_def elems_decomp hd_cons.
 subst x.
-rewrite h fold_rm_pick // fold_right_cons Hind //.
+rewrite elems_decomp fold_rm_pick // fold_right_cons IH //.
 congr => //.
 apply fold_permC; first assumption.
-rewrite (_:l' = rm (pick s) (elems s)).
-rewrite h rm_cons //.
+rewrite (_:xs = rm (pick s) (elems s)) 1:elems_decomp 1:rm_cons //=.
 apply elems_rm.
 qed.
 
