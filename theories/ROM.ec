@@ -398,6 +398,68 @@ timeout 3.
   end section.
 end LazyEager.
 
+theory Upto.
+  require import List.
+
+  clone import Types.
+  clone import Lazy with
+    type from  <- from,
+    type to    <- to,
+    op dsample <- dsample.
+
+  module Queries (O:Oracle) = {
+    var qs:from list
+
+    proc init(): unit = {
+      O.init();
+      qs = [];
+    }
+
+    proc o(x:from): to = {
+      var r:to;
+
+      qs = x::qs;
+      r = O.o(x);
+      return r;
+    }
+  }.
+
+  lemma Queries_initL (O <: Oracle):
+    islossless O.init =>
+    islossless Queries(O).init.
+  proof strict.
+  by intros=> O_initL; proc; wp; call O_initL.
+  qed.
+
+  lemma Queries_oL (O <: Oracle):
+    islossless O.o =>
+    islossless Queries(O).o.
+  proof strict.
+  by intros=> O_oL; proc; call O_oL; wp.
+  qed.
+
+  lemma Queries_o_stable (O <: Oracle) q:
+    islossless O.o =>
+    phoare[ Queries(O).o: mem q Queries.qs ==> mem q Queries.qs ] = 1%r.
+  proof strict.
+  by intros=> O_oL; proc; call O_oL; wp; skip;
+     progress; rewrite mem_cons; right.
+  qed.
+
+  equiv RO_upto_o r:
+    Queries(RO).o ~ Queries(RO).o:
+      !mem r Queries.qs{2} /\
+      ={x, Queries.qs} /\
+      eq_except RO.m{1} RO.m{2} r ==>
+      !mem r Queries.qs{2} =>
+      ={res, Queries.qs} /\
+      eq_except RO.m{1} RO.m{2} r.
+  proof strict.
+  by proc; inline RO.o; wp; rnd; wp; skip; progress; smt.
+  qed.
+end Upto.
+
+(*
 theory Wrappers.
   clone import Types.
   clone Lazy with
@@ -523,3 +585,4 @@ theory Wrappers.
     }
   }.
 end Wrappers.
+*)
