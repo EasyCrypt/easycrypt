@@ -443,7 +443,7 @@ theory Upto.
     phoare[ Queries(O).o: mem q Queries.qs ==> mem q Queries.qs ] = 1%r.
   proof strict.
   by intros=> O_oL; proc; call O_oL; wp; skip;
-     progress; rewrite mem_cons; right.
+     progress; right.
   qed.
 
   equiv RO_upto_o r:

@@ -83,7 +83,7 @@ axiom mem_empty (x:'a): !(mem x empty).
 
 lemma elems_empty: elems<:'a> empty = [].
 proof strict.
-by rewrite nil_nmem=> x; rewrite -List.count_mem nnot;
+by rewrite -nmem_nil=> x; rewrite -List.count_mem nnot;
    apply Logic.eq_sym; rewrite count_nmem; apply mem_empty.
 qed.
 
@@ -92,7 +92,7 @@ lemma empty_elems_nil (X:'a set):
 proof strict.
 split=> h; first by rewrite h; apply elems_empty.
 by apply set_ext; delta (==) beta=> x; rewrite -mem_def h;
-   split; apply absurd=> _; [ apply mem_nil | apply mem_empty ].
+   split; apply absurd=> _ //=; apply mem_empty.
 qed.
 
 lemma empty_nmem (X:'a set):
@@ -136,7 +136,7 @@ lemma mem_pick (X:'a set):
 proof strict.
   rewrite empty_elems_nil pick_def -mem_def.
   elim/list_ind (elems X) => // x l _ _.
-  by rewrite hd_cons mem_cons.
+  by rewrite hd_cons.
 qed.
 
 lemma pick_single (x:'a):
@@ -166,7 +166,7 @@ by [].
 lemma elems_add_nin (x:'a) (X:'a set):
   !mem x X => elems (add x X) <-> x::(elems X).
 proof strict.
-rewrite -count_nmem=> x_nin_X x'; rewrite count_cons; case (x = x')=> /=.
+rewrite -count_nmem=> x_nin_X x' //=; case (x = x')=> /=.
   by intros=> <-; rewrite x_nin_X /= count_mem mem_add; right.
   intros=> x_neq_x'; elim (count_set x' X).
     by intros=> x'_in_X; rewrite x'_in_X; generalize x'_in_X; rewrite 2!count_mem mem_add=> x'_in_X; left.
@@ -312,8 +312,8 @@ lemma card_add_nin (x:'a) (X:'a set):
 proof strict.
 intros=> x_nin_X;
 rewrite 2!card_def (perm_length (elems (add x X)) (x::(elems X))).
-  by apply elems_add_nin=> //.
-  by rewrite length_cons; smt.
+  by apply elems_add_nin.
+  by smt.
 qed.
 
 lemma nosmt card_rm_in (x:'a) (X:'a set):
@@ -332,31 +332,30 @@ by rewrite -(card_rm_in x) ?rm_single ?card_empty //; apply mem_single_eq.
 qed.
 
 (** of_list *)
-op of_list (l:'a list) = List.fold_right add empty l.
+op of_list (l:'a list) = List.foldr add empty l.
 
 lemma of_list_nil : of_list [] = empty <:'a>.
 proof -strict.
-  by rewrite /of_list List.fold_right_nil.
+  by rewrite /of_list.
 qed.
 
 lemma of_list_cons (a:'a) l : of_list (a::l) = add a (of_list l).
-   by rewrite /of_list List.fold_right_cons.
+   by rewrite /of_list.
 qed.
 
 lemma mem_of_list (x:'a) l : List.mem x l = mem x (of_list l).
 proof -strict.
- rewrite /of_list;elim/list_ind l. 
-   rewrite fold_right_nil;smt.
- intros y xs;rewrite fold_right_cons;smt.
+ rewrite /of_list;elim/list_ind l=> //=; first smt.
+ intros=> y xs //=;smt.
 qed.
 
 lemma card_of_list (l:'a list) :
    card (of_list l) <= List.length l.
 proof -strict.
   rewrite /of_list;elim/list_ind l.
-   by rewrite fold_right_nil card_empty length_nil => //.
-  intros => x xs H; rewrite fold_right_cons length_cons.  
-  case (mem x (fold_right add empty xs))=> Hin; 
+   by rewrite //= card_empty.
+  intros => x xs H //=.
+  case (mem x (foldr add empty xs))=> Hin; 
      [rewrite card_add_in // | rewrite card_add_nin //];smt.
 qed.
 
@@ -500,14 +499,14 @@ axiom fold_rm_pick (f:'a -> 'b -> 'b) (e:'b) xs:
 
 lemma fold_set_list (f:'a -> 'b -> 'b) (e:'b) xs:
   (forall a b X, f a (f b X) = f b (f a X)) =>
-    fold f e xs = List.fold_right f e (elems xs).
+    fold f e xs = List.foldr f e (elems xs).
 proof strict.
 intros=> C; elim/set_comp xs;
-  first by rewrite fold_empty elems_empty fold_right_nil.
+  first by rewrite fold_empty elems_empty.
 intros=> s s_nempty IH; cut [x xs elems_decomp]: exists x xs, elems s = x::xs by smt.
 cut xval: pick s = x by rewrite pick_def elems_decomp hd_cons.
 subst x.
-rewrite elems_decomp fold_rm_pick // fold_right_cons IH //.
+rewrite elems_decomp fold_rm_pick //= IH //.
 congr => //.
 apply fold_permC; first assumption.
 rewrite (_:xs = rm (pick s) (elems s)) 1:elems_decomp 1:rm_cons //=.
@@ -770,12 +769,12 @@ lemma mu_Lmem_le_length (l:'a list) (d:'a distr) (bd:real):
   mu d (fun x, List.mem x l) <= (length l)%r * bd. 
 proof -strict.
   elim/list_case l.
-    intros _; rewrite length_nil (mu_eq _ _ (cpFalse)).
-      by intros x; rewrite /cpFalse /= neqF;apply mem_nil.
+    intros=> _ //=; rewrite (mu_eq _ _ (cpFalse)).
+      by intros=> x; rewrite /cpFalse //=.
     by rewrite mu_false.
   intros x l0 Hmu.
   cut Hbd : 0%r <= bd.
-    by cut H := Hmu x _; [ by rewrite mem_cons | smt].
+    by cut H := Hmu x _; last smt.
   generalize (x :: l0) Hmu => {x l0} l Hmu. 
   apply (Real.Trans _ ((card (of_list l))%r * bd)).
     by apply mu_Lmem_le_card.

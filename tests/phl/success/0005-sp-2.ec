@@ -13,7 +13,7 @@ require import Int.
 op fst (x:int*int) = let (x,y) = x in x.
 op snd (x:int*int) = let (y,x) = x in x.
 
-require import Map.
+require import FMap.
 
 module Test = {
 

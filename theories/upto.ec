@@ -133,7 +133,7 @@ fel 2 Experiment.WO.cO g  qO (Experiment.WO.bad)
 (m (glob O2) = Experiment.WO.cO) => //. 
 by inline Experiment(O2, Adv).WO.init; call hinit2; wp.
  proc.
- sp; if => //; wp; last first.
+ sp 2; if => //; wp; last first.
   hoare; progress; first smt.
   by skip; progress.
 

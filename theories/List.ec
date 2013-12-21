@@ -1,268 +1,280 @@
-require import Logic.
 require import Int.
 require import Fun.
 
-(*** Type Definition is imported from Why3 *)
-theory Core.
-  import why3 "list" "List"
-    op "Nil" as "[]";
-    op "Cons" as "_::_".
+type 'a list = [
+  | "[]"
+  | (::) of 'a & 'a list ].
 
-  (*** Recursion and Induction Principles *)
-  (** Recursion principle *)
-  op list_rect: 'b -> ('a -> 'a list -> 'b -> 'b) -> 'a list -> 'b.
-  axiom list_rect_nil: forall v f,
-    list_rect<:'b,'a> v f [] = v.
-  axiom list_rect_cons: forall v f x xs,
-    list_rect<:'b,'a> v f (x::xs) = f x xs (list_rect v f xs).
+(*** Recursor and Derived Induction Principles *)
+(** Recursor *)
+op list_rect (v:'b) (f:'a -> 'a list -> 'b -> 'b) (xs:'a list) =
+  with xs = "[]"      => v
+  with xs = (::) x xs => f x xs (list_rect v f xs).
 
-  (** Induction principle. *)
-  (* We cannot prove it from list_rect because
-     types and terms are disjoint. *)
-  axiom list_ind: forall (p:'a list -> bool),
-    p [] =>
-    (forall x xs, p xs => p (x::xs)) =>
-    (forall xs, p xs).
-end Core.
-export Core.
+(** Induction principles. *)
+lemma list_case_eq (P:'a list -> bool):
+  (forall xs, xs = [] => P xs) => 
+  (forall xs x' xs', xs = x'::xs' => P xs) =>
+  (forall xs, P xs).
+proof strict.
+intros=> P_nil P_cons; elim/list_case.
+  by apply P_nil.
+  by intros=> x' xs'; apply (P_cons (x'::xs') x' xs').
+qed.
+
+lemma list_ind_eq (P:'a list -> bool):
+  (forall xs, xs = [] => P xs) =>
+  (forall xs x' xs', xs = x'::xs' => P xs' => P xs) =>
+  (forall xs, P xs).
+proof strict.
+intros=> P_nil P_cons; elim.
+  by apply P_nil.
+  by intros=> x' xs' P_xs'; apply (P_cons (x'::xs') x' xs').
+qed.
 
 (*** Destructors (partially specified) *)
 (** Head *)
 op hd: 'a list -> 'a.
-axiom hd_cons: forall (x:'a) xs, hd (x::xs) = x.
+axiom hd_cons (x:'a) xs: hd (x::xs) = x.
 
 (** Tail *)
 op tl: 'a list -> 'a list.
-axiom tl_cons: forall (x:'a) xs, tl (x::xs) = xs.
+axiom tl_cons (x:'a) xs: tl (x::xs) = xs.
 
-(*** General Lemmas *)
-(** List case analysis *)
-lemma list_case: forall (p: 'a list -> bool), 
-    p [] => 
-    (forall x l, p (x::l)) =>
-    (forall l, p l)
-by [].
+(*** Operators *)
+(** foldr *)
+op foldr (f:'a -> 'b -> 'b) (v:'b) (xs:'a list) =
+  with xs = "[]"      => v
+  with xs = (::) x xs => f x (foldr f v xs).
 
-lemma list_case_eq: forall (p: 'a list -> bool) (l:'a list),
-    (l = [] => p l) =>
-    (forall x l', l = x::l' => p l) =>
-    p l.
-intros=> p l.
-elim/list_case l => //.
-intros=> x l' _ h.
-apply (h x l').
-qed.
-
-(** Constructor Disjointness *)
-lemma nil_neq_cons: forall (x:'a) xs, [] <> x::xs by [].
-
-(** Datatype *)
-lemma list_destruct: forall (xs:'a list),
-  xs = [] \/ (exists (y:'a) ys, xs = y::ys)
-by [].
-
-(** A lemma on hd and tail *)
-lemma hd_tl_cons: forall (xs:'a list),
-  xs <> [] => (hd xs)::(tl xs) = xs.
-proof strict.
-intros=> xs; elim/list_ind xs=> // x xs' IH h {h};
-rewrite hd_cons tl_cons=> //.
-qed.
-
-(*** Operator Specifications *)
-(** Fold *)
-op fold_right:('a -> 'b -> 'b) -> 'b -> 'a list -> 'b.
-axiom fold_right_nil: forall (f:'a -> 'b -> 'b) (e:'b),
-  fold_right f  e [] = e.
-axiom fold_right_cons: forall (f:'a -> 'b -> 'b) (e:'b) x xs,
-  fold_right f e (x::xs) = f x (fold_right f e xs).
+(** foldl *)
+op foldl (f:'a -> 'b -> 'b) (v:'b) (xs:'a list) =
+  with xs = "[]"      => v
+  with xs = (::) x xs => foldl f (f x v) xs.
 
 (** mem *)
-op mem:'a -> 'a list -> bool.
-axiom mem_nil: forall (x:'a), !(mem x []).
-axiom mem_cons: forall (y x:'a) xs,
-  mem y (x::xs) = ((y = x) \/ mem y xs).
+op mem (e:'a) (xs:'a list) =
+  with xs = "[]"      => false
+  with xs = (::) x xs => x = e \/ mem e xs.
 
-(* Lemmas *)
-lemma mem_consE: forall (x:'a) xs, mem x (x::xs) by [].
-lemma mem_consNE: forall (x y:'a) xs, x <> y => mem y (x::xs) = mem y xs by [].
-lemma memM_cons : forall (x y:'a) xs, mem y xs => mem y (x::xs) by [].
-lemma mem_hd: forall (xs:'a list), xs <> [] => mem (hd xs) xs by [].
-lemma nil_nmem: forall (xs:'a list), xs = [] <=> (forall x, !mem x xs) by [].
+(* alternate definitions: short-circuiting and foldr *)
+op memsc (e:'a) (xs:'a list) =
+  with xs = "[]"      => false
+  with xs = (::) x xs => x = e || memsc e xs.
 
-(*** length *)
-op length:'a list -> int.
-op "`|_|":'a list -> int  = length. (* notation *)
-axiom length_nil: length<:'a> [] = 0.
-axiom length_cons: forall (x:'a) xs, length (x::xs) = 1 + length xs.
-
-(* Lemmas *)
-lemma length_nneg: forall (xs:'a list), 0 <= length xs.
+lemma memsc_mem (e:'a) xs:
+  memsc e xs = mem e xs.
 proof strict.
-intros=> xs; elim/list_ind xs; first smt.
-by intros=> x xs' len_xs'_nneg; rewrite length_cons; smt.
+by elim xs=> //= x xs ->; rewrite ora_or.
 qed.
 
-lemma length_cons_pos: forall (x:'a) xs, 0 < length (x::xs) by [].
-
-lemma length0_nil: forall (xs:'a list), length xs = 0 => xs = [].
+lemma mem_foldr (e:'a) xs:
+  foldr (fun x b, x = e || b) false xs = mem e xs.
 proof strict.
-intros=> xs; elim/list_ind xs=> //; smt.
+by elim xs=> //= x xs ->; rewrite ora_or.
 qed.
+
+(* Lemmas *)
+lemma mem_cons_eq (x:'a) xs: mem x (x::xs) by [].
+lemma mem_cons_neq (x y:'a) xs: x <> y => mem y (x::xs) = mem y xs by [].
+
+lemma cons_mem (x y:'a) xs: mem y xs => mem y (x::xs) by [].
+
+lemma mem_hd (xs:'a list): mem (hd xs) xs <=> xs <> [] by [].
+
+lemma nmem_nil (xs:'a list): (forall x, !mem x xs) <=> xs = [] by [].
+
+(** length *)
+op length (xs:'a list) =
+  with xs = "[]"      => 0
+  with xs = (::) x xs => 1 + length xs.
+
+(* Notation *)
+op "`|_|":'a list -> int  = length.
+
+(* Lemmas *)
+lemma length_nneg (xs:'a list): 0 <= length xs
+by (elim xs=> //=; smt).
+
+lemma length_cons_pos (x:'a) xs: 0 < length (x::xs)
+by (elim xs=> //=; smt).
+
+lemma length0_nil (xs:'a list): length xs = 0 <=> xs = []
+by (elim xs=> //=; smt).
 
 (** append *)
-op (++):'a list -> 'a list -> 'a list.
-axiom app_nil: forall (ys:'a list), [] ++ ys = ys.
-axiom app_cons: forall (x:'a) xs ys, (x::xs) ++ ys = x::(xs ++ ys).
+op (++) (xs ys:'a list) =
+  with xs = "[]"      => ys
+  with xs = (::) x xs => x::(xs ++ ys).
 
 (* Lemmas *)
-lemma appCcons: forall (x:'a) xs ys, (x::xs) ++ ys = x::(xs ++ ys) by [].
+lemma app_consC (x:'a) xs ys: (x::xs) ++ ys = x::(xs ++ ys)
+by elim xs.
 
-lemma app_nilR: forall (xs:'a list), xs ++ [] = xs.
-proof strict.
-by intros=> xs; elim/list_ind xs; smt.
-qed.
+lemma appl_nil (xs:'a list): xs ++ [] = xs
+by (elim xs=> //= x xs ->).
 
-lemma appA: forall (xs ys zs:'a list),
-  (xs ++ ys) ++ zs = xs ++ (ys ++ zs).
-proof strict.
-by intros=> xs ys zs; elim/list_ind xs; smt.
-qed.
+lemma appA (xs ys zs:'a list):
+  xs ++ (ys ++ zs) = (xs ++ ys) ++ zs
+by (elim xs=> //= x xs->).
 
-lemma length_app: forall (xs ys:'a list),
-  length (xs ++ ys) = length xs + length ys.
-proof strict.
-by intros=> xs ys; elim/list_ind xs; smt.
-qed.
+lemma length_app (xs ys:'a list):
+  length (xs ++ ys) = length xs + length ys
+by (elim xs=> //= xs ->; smt).
 
-lemma mem_app: forall (y:'a) xs ys,
-  (mem y xs \/ mem y ys) = mem y (xs ++ ys).
-proof strict.
-intros=> y xs ys; elim/list_ind xs; first smt.
-intros=> x xs' IH.
-by rewrite appCcons 2!mem_cons orA IH.
-qed.
+lemma mem_app (y:'a) xs ys:
+  mem y (xs ++ ys) = (mem y xs \/ mem y ys)
+by (elim xs=> //= x xs ->; rewrite orA).
 
 (** rev *)
-op rev: 'a list -> 'a list.
-axiom rev_nil: rev<:'a> [] = [].
-axiom rev_cons: forall (x:'a) xs, rev (x::xs) = (rev xs) ++ (x::[]).
+op rev (xs:'a list) =
+  with xs = "[]"      => []
+  with xs = (::) x xs => rev xs ++ [x].
 
-(* Lemmas *)
-lemma rev_app: forall (xs ys:'a list),
+op revacc (acc:'a list) (xs:'a list) =
+  with xs = "[]"      => acc
+  with xs = (::) x xs => revacc (x::acc) xs.
+
+lemma revacc_rev (xs:'a list):
+  revacc [] xs = rev xs.
+proof strict.
+rewrite -(appl_nil (rev xs)); generalize [].
+by elim xs=> //= x xs IH acc; rewrite IH -appA.
+qed.
+
+(* Lemmas *)  
+lemma rev_app (xs ys:'a list):
   rev (xs ++ ys) = (rev ys) ++ (rev xs).
 proof strict.
-intros=> xs; elim/list_ind xs.
-  by intros=> ys; rewrite rev_nil app_nil app_nilR //.
-  by intros=> x xs IH ys; rewrite appCcons 2!rev_cons -appA IH //.
+elim xs=> //=.
+  by rewrite appl_nil.
+  by intros=> x xs ->; rewrite appA.
 qed.
 
-lemma rev_rev: forall (xs:'a list),
+lemma rev_rev (xs:'a list):
   rev (rev xs) = xs.
 proof strict.
-intros=> xs; elim/list_ind xs.
-  by rewrite 2!rev_nil //.
-  by intros=> x xs IH; rewrite rev_cons rev_app IH rev_cons
-                               rev_nil app_nil appCcons app_nil //.
+by elim xs=> //= x xs; rewrite rev_app //= => ->.
 qed.
+
+lemma mem_rev (e:'a) xs:
+  mem e (rev xs) <=> mem e xs.
+proof strict.
+by elim xs=> //= x xs; rewrite mem_app orC=> ->.
+qed.
+
+lemma eq_rev (xs ys:'a list):
+  rev xs = rev ys <=> xs = ys
+by [].
 
 (** all *)
-pred all(p:('a -> bool)) xs = forall x, mem x xs => p x.
+pred all (p:'a -> bool) xs = forall x, mem x xs => p x.
 
 (* Direct inductive definition *)
-lemma all_nil: forall (p:('a -> bool)), all p [] by [].
-lemma all_cons: forall (p:('a -> bool)) x xs, all p (x::xs) = ((p x) /\ all p xs) by [].
+lemma all_nil (p:'a -> bool): all p [] by [].
+lemma all_cons (p:'a -> bool) x xs: all p (x::xs) = (p x /\ all p xs) by [].
 
 (* Lemmas *)
-lemma all_app: forall (p:('a -> bool)) xs ys, all p (xs ++ ys) = (all p xs /\ all p ys) by [].
+lemma all_app (p:'a -> bool) xs ys: all p (xs ++ ys) = (all p xs /\ all p ys) by [].
 
-(** forallb *)
-op forallb:('a -> bool) -> 'a list -> bool.
-axiom forallb_nil: forall (p:('a -> bool)), forallb p [].
-axiom forallb_cons: forall (p:('a -> bool)) x xs,
-  forallb p (x::xs) = ((p x) /\ forallb p xs).
+(** allb *)
+op allb (p:'a -> bool) (xs:'a list) =
+  with xs = "[]"      => true
+  with xs = (::) x xs => p x /\ allb p xs.
+
+op allbsc (p:'a -> bool) (xs:'a list) =
+  with xs = "[]"      => true
+  with xs = (::) x xs => p x && allbsc p xs.
 
 (* Lemmas *)
-lemma forallb_eq_all: forall (p:('a -> bool)) xs, all p xs <=> forallb p xs.
-proof strict.
-intros=> p xs; elim/list_ind xs; first smt.
-by intros=> y ys IH; rewrite all_cons forallb_cons IH.
-qed.
+lemma allbsc_allb (p:'a -> bool) (xs:'a list):
+  allbsc p xs <=> allb p xs
+by (elim xs=> //= x xs ->; rewrite anda_and).
+
+lemma allb_all (p:'a -> bool) xs:
+  allb p xs <=> all p xs
+by (elim xs=> //= x xs ->; rewrite all_cons).
 
 (** any *)
-pred any (p:('a -> bool)) xs = exists x, mem x xs /\ p x.
+pred any (p:'a -> bool) xs = exists x, mem x xs /\ p x.
 
 (* Direct inductive definition *)
-lemma any_nil: forall (p:('a -> bool)), !(any p []) by [].
-lemma any_cons: forall (p:('a -> bool)) x xs, any p (x::xs) = ((p x) \/ any p xs) by [].
+lemma any_nil (p:'a -> bool): !(any p []) by [].
+lemma any_cons (p:'a -> bool) x xs: any p (x::xs) = (p x \/ any p xs) by [].
 
 (* Lemmas *)
-lemma any_app: forall (p:('a -> bool)) xs ys, any p (xs ++ ys) = (any p xs \/ any p ys) by [].
+lemma any_app (p:('a -> bool)) xs ys: any p (xs ++ ys) = (any p xs \/ any p ys) by [].
 
-(** existsb *)
-op existsb:('a -> bool) -> 'a list -> bool.
-axiom existsb_nil: forall (p:('a -> bool)), !(existsb p []).
-axiom existsb_cons: forall (p:('a -> bool)) x xs,
-  existsb p (x::xs) = ((p x) \/ existsb p xs).
+(** anyb *)
+op anyb (p:'a -> bool) (xs:'a list) =
+  with xs = "[]"      => false
+  with xs = (::) x xs => p x \/ anyb p xs.
+
+op anybsc (p:'a -> bool) (xs:'a list) =
+  with xs = "[]"      => false
+  with xs = (::) x xs => p x || anybsc p xs.
 
 (* Lemmas *)
-lemma existsb_eq_any: forall (p:('a -> bool)) xs, any p xs <=> existsb p xs.
-proof strict.
-intros=> p xs; elim/list_ind xs; first smt.
-by intros=> y ys IH; rewrite any_cons existsb_cons IH.
-qed.
+lemma anybsc_anyb (p:'a -> bool) xs:
+  anybsc p xs <=> anyb p xs
+by (elim xs=> //= x xs ->; rewrite ora_or).
+
+lemma anyb_any (p:'a -> bool) xs: anyb p xs <=> any p xs
+by (elim xs=> //= x xs ->; rewrite any_cons).
 
 (** filter *)
-op filter:('a -> bool) -> 'a list -> 'a list.
-axiom filter_nil: forall (p:('a -> bool)), filter p [] = [].
-axiom filter_cons: forall (p:('a -> bool)) x xs,
-  filter p (x::xs) = let rest = filter p xs in
-                     if p x then x::rest else rest.
+op filter (p:'a -> bool) (xs:'a list) =
+  with xs = "[]"      => []
+  with xs = (::) x xs => let rest = filter p xs in
+                         if p x then x::rest else rest.
+
+op revfilter (acc:'a list) (p:'a -> bool) (xs:'a list) =
+  with xs = "[]"      => acc
+  with xs = (::) x xs => if p x then revfilter (x::acc) p xs
+                                else revfilter acc p xs.
 
 (* Lemmas *)
-lemma filter_consT: forall (p:('a -> bool)) x xs,
+lemma revfilter_filter (p:'a -> bool) xs:
+  rev (revfilter [] p xs) = filter p xs.
+proof strict.
+rewrite -(rev_rev (filter p xs)); congr.
+rewrite -(appl_nil (rev (filter p xs))); generalize [].
+by elim xs=> //= x xs IH acc; case (p x)=> _; rewrite IH - ?appA.
+qed.
+
+lemma filter_cons_in (p:'a -> bool) x xs:
   p x => filter p (x::xs) = x::(filter p xs)
 by [].
 
-lemma filter_consF: forall (p:('a -> bool)) x xs,
+lemma filter_cons_nin (p:'a -> bool) x xs:
   !(p x) => filter p (x::xs) = filter p xs
 by [].
 
-lemma filter_mem: forall (p:('a -> bool)) x xs,
-  mem x (filter p xs) = (mem x xs /\ p x).
-proof strict.
-intros=> p x xs; elim/list_ind xs; first smt.
-intros=> x' xs' IH; case (p x')=> p_x'.
-  by rewrite filter_consT // 2!mem_cons; smt.
-  by rewrite filter_consF // mem_cons;smt.
-qed.
+lemma mem_filter (p:'a -> bool) e xs:
+  mem e (filter p xs) <=> (mem e xs /\ p e)
+by (elim xs=> //=; smt).
 
-lemma filter_app: forall (p:('a -> bool)) xs ys,
-  filter p (xs ++ ys) = filter p xs ++ filter p ys.
-proof strict.
-by intros=> p xs ys; elim/list_ind xs; smt.
-qed.
+lemma filter_app (p:'a -> bool) xs ys:
+  filter p (xs ++ ys) = filter p xs ++ filter p ys
+by (elim xs=> //= x xs ->; case (p x)).
 
-lemma length_filter: forall (p:('a -> bool)) xs,
-  length (filter p xs) <= length xs.
-proof strict.
-by intros=> p xs; elim/list_ind xs; smt.
-qed.
+lemma length_filter (p:'a -> bool) xs:
+  length (filter p xs) <= length xs
+by (elim xs=> //=; smt).
 
-lemma all_filter: forall (p:('a -> bool)) xs,
+lemma all_filter (p:'a -> bool) xs:
   all p (filter p xs)
 by [].
 
-lemma filter_imp: forall (p q:('a -> bool)) xs,
+lemma filter_leq (p q:'a -> bool) xs:
   p <= q =>
   forall x, mem x (filter p xs) => mem x (filter q xs)
 by [].
 
 (** map *)
-op map:('a -> 'b) -> 'a list -> 'b list.
-axiom map_nil: forall (f:'a -> 'b), map f [] = [].
-axiom map_cons: forall (f:'a -> 'b) x xs,
-  map f (x::xs) = (f x)::(map f xs).
+op map (f:'a -> 'b) (xs:'a list) =
+  with xs = "[]"      => []
+  with xs = (::) x xs => (f x)::(map f xs).
 
 (* Lemmas *)
 lemma map_in: forall (f:'a -> 'b) x xs,
@@ -289,112 +301,145 @@ proof strict.
 by intros f xs; elim/list_ind xs; smt.
 qed.
 
+(** revmap *)
+op revmap (acc:'b list) (f:'a -> 'b) (xs:'a list) =
+  with xs = "[]"      => acc
+  with xs = (::) x xs => revmap ((f x)::acc) f xs.
+
+(* Lemmas *)
+lemma revmap_map (f:'a -> 'b) (xs:'a list):
+  rev (revmap [] f xs) = map f xs.
+proof strict.
+rewrite -(rev_rev (map f xs)); congr.
+rewrite -(appl_nil (rev (map f xs))); generalize [].
+by elim xs=> //= x xs IH acc; rewrite IH - ?appA.
+qed.
+
 (** nth *)
 require import Option.
 require import Pair.
 
-op nth:'a list -> int -> 'a option.
-axiom nth_nil: forall n, nth<:'a> [] n = None.
-axiom nth_cons0: forall (x:'a) xs,
-  nth (x::xs) 0 = Some x.
-axiom nth_consN: forall (x:'a) xs n,
-  0 <> n =>
-  nth (x::xs) n = nth xs (n - 1).
+op nth (xs:'a list) n =
+  with xs = "[]" => None
+  with xs = (::) x xs => if n = 0
+                         then Some x
+                         else nth xs (n - 1).
 
 (* Lemmas *)
-lemma nth_neg: forall (xs:'a list) n, n < 0 => nth xs n = None.
+lemma nth_cons0 (x:'a) xs:
+  nth (x::xs) 0 = Some x
+by done.
+
+lemma nth_consN (x:'a) xs n:
+  n <> 0 =>
+  nth (x::xs) n = nth xs (n - 1)
+by rewrite //= -neqF=> ->.
+
+(* Lemmas *)
+lemma nth_neg (xs:'a list) n: n < 0 => nth xs n = None.
 proof strict.
-intros=> xs; elim/list_ind xs; first smt.
-by intros=> x xs IH n n_neg; rewrite nth_consN 1?IH; smt.
+generalize n; elim xs=> //= x xs IH n n_neg.
+cut ->: (n = 0) = false by smt.
+by rewrite //= IH; smt.
 qed.
 
-lemma nth_geq_len: forall (xs:'a list) n, length xs <= n => nth xs n = None.
+lemma nth_geq_len (xs:'a list) n: length xs <= n => nth xs n = None.
 proof strict.
-intros=> xs; elim/list_ind xs; first smt.
-by intros=> x xs IH n n_len; rewrite nth_consN 1?IH; smt.
+generalize n; elim xs=> //= x xs IH n n_geq_len.
+cut ->: (n = 0) = false by smt.
+by rewrite //= IH; smt.
 qed.
 
-lemma nth_mem: forall (xs:'a list) (i:int),
-  0 <= i => i < length xs => 
-  mem (proj (nth xs i)) xs.
+lemma nth_range (xs:'a list) n:
+  0 <= n < length xs =>
+  nth xs n <> None.
 proof strict.
-intros=> xs; elim/list_ind xs; first smt.
-intros=> x xs IH i le_0_i lt_i_lxs; rewrite mem_cons; case (i = 0)=> eq0_i.
-  by subst i; rewrite nth_cons0 proj_some; left.
-  rewrite nth_consN; first smt.
-    by right; apply IH; smt.
+generalize n; elim xs=> //=; first smt.
+intros=> x xs IH n n_range; case (n = 0)=> // neq0_n.
+by rewrite IH; smt.
 qed.
 
-lemma mem_nth: forall (x:'a) (xs:'a list),
-  mem x xs =>
-  exists (i : int), 0 <= i < length xs /\  nth xs i = Some x.
+lemma mem_nth (xs:'a list) (n:int):
+  0 <= n < length xs =>
+  mem (proj (nth xs n)) xs.
 proof strict.
-intros=> x xs; elim/list_ind xs; first smt.
-intros=> x' xs IH x_in_x'xs; case (x' = x)=> x_x'.
-  by subst x'; exists 0; rewrite nth_cons0; progress; rewrite length_cons; smt.
-
-  generalize x_in_x'xs; rewrite mem_consNE // => x_in_xs;
-  cut H : exists i, 0 <= i < length xs /\ nth xs i = Some x; first by apply IH.
-  elim H=> i [[le_0_i le_i_lxs] nth_xs_i]; exists (i + 1); progress; first smt.
-    by rewrite length_cons; smt.
-    by (rewrite nth_consN; first smt); cut ->: i + 1 - 1 = i; first smt.
+generalize n; elim xs=> //=; first smt.
+intros=> x xs IH n n_range; case (n = 0).
+  by rewrite proj_some=> _; left.
+  by intros=> neq0_n; right; rewrite IH; first smt.
 qed.
 
-lemma nth_append_fst: forall (i:int) (xs ys:'a list),
-  0 <= i => i < length xs =>
-  proj (nth (xs ++ ys) i) = proj (nth xs i).
+lemma mem_ex_nth (e:'a) (xs:'a list):
+  mem e xs =>
+  exists (n:int), 0 <= n < length xs /\ nth xs n = Some e.
 proof strict.
-intros=> i xs; generalize i; elim/list_ind xs; first smt.
-intros=> x xs IH i ys le_0_i le_i_lxxs; rewrite app_cons; case (0 = i)=> i_0.
-  by subst i; rewrite 2!nth_cons0.
-  by rewrite nth_consN // nth_consN // IH; smt.
+elim xs=> //= x xs IH [x_e | e_in_xs].
+  by exists 0; split=> //=; [smt|rewrite x_e].
+  by apply IH in e_in_xs; elim e_in_xs=> n [n_bnd nth_e];
+     exists (n + 1); smt.
 qed.
 
-lemma nth_append_snd: forall (i:int) (xs ys:'a list),
-  length xs <= i => i < length xs + length ys =>
-  proj (nth (xs ++ ys) i) = proj (nth ys (i - length xs)).
+lemma nth_append_left (ys xs:'a list) (n:int):
+  0 <= n < length xs =>
+  proj (nth (xs ++ ys) n) = proj (nth xs n).
 proof strict.
-intros=> i xs; generalize i; elim/list_ind xs; first smt.
-intros=> x xs IH i ys le_lxxs_i le_i_lxxsys; rewrite app_cons; case (length (x::xs) = i)=> i_lxxs.
-  subst i; rewrite nth_consN.
-    by rewrite length_cons; smt.
-    by rewrite IH;smt.
-  by rewrite nth_consN ?IH; smt.
+generalize n; elim xs=> //=; first smt.
+intros=> x xs IH n n_bnd; case (n = 0)=> //=.
+by intros=> neq0_n; rewrite IH; first smt.
+qed.
+
+lemma nth_append_right (xs ys:'a list) (n:int):
+  length xs <= n < length xs + length ys =>
+  proj (nth (xs ++ ys) n) = proj (nth ys (n - length xs)).
+proof strict.
+generalize n; elim xs=> //= x xs IH n n_bnd.
+cut ->: (n = 0) = false by smt.
+by rewrite //= IH; smt.
 qed.
 
 (** nth_default *)
 op nth_default (xs:'a list) (dv:'a) n =
   let r = nth xs n in
-  if (r <> None)
-  then proj r
-  else dv.
+  if (r <> None) then proj r
+                 else dv.
 
 (** count *)
-op count:'a -> 'a list -> int.
-axiom count_nil: forall (x:'a), count x [] = 0.
-axiom count_cons: forall (x y:'a) xs,
-  count y (x::xs) = count y xs + if (x = y) then 1 else 0.
+op count (e:'a) (xs:'a list) =
+  with xs = "[]"      => 0
+  with xs = (::) x xs => count e xs + ((x = e)?1:0).
+
+op countacc (acc:int) (e:'a) (xs:'a list) =
+  with xs = "[]"      => acc
+  with xs = (::) x xs => countacc (acc + ((x = e)?1:0)) e xs.
 
 (* Lemmas *)
-lemma nosmt count_consE: forall (x:'a) xs, count x (x::xs) = 1 + count x xs by [].
-lemma nosmt count_consNE: forall (x y:'a) xs, x <> y => count y (x::xs) = count y xs by [].
-
-lemma count_nneg: forall (x:'a) (xs:'a list),
-  0 <= count x xs.
+lemma countacc_count (e:'a) xs:
+  countacc 0 e xs = count e xs.
 proof strict.
-intros=> x xs; generalize x; elim/list_ind xs=> x.
-  by rewrite count_nil; smt. (* reflexivity of Int.(<=) *)
-  intros=> xs IH x'; rewrite count_cons; smt. (* 0 <= x => 0 <= y => 0 <= y + x *)
+cut ->: count e xs = count e xs + 0 by smt; generalize 0.
+elim xs=> //= x xs IH n; case (x = e).
+  by rewrite IH; smt.
+  by rewrite /= IH.
 qed.
 
-lemma count_mem: forall (x:'a) (xs:'a list),
-  0 <> count x xs <=> mem x xs.
+lemma nosmt count_cons_eq (x:'a) xs: count x (x::xs) = 1 + count x xs by [].
+lemma nosmt count_cons_neq (x y:'a) xs: x <> y => count y (x::xs) = count y xs by [].
+
+lemma leq0_count (e:'a) (xs:'a list):
+  0 <= count e xs.
 proof strict.
-intros=> x xs; generalize x; elim/list_ind xs=> x.
-  rewrite count_nil; simplify; apply mem_nil.
-  intros=> xs IH x'; rewrite count_cons; smt.
+by elim xs=> //= x xs IH; smt.
 qed.
 
+lemma count_mem (e:'a) (xs:'a list):
+  0 <> count e xs <=> mem e xs.
+proof strict.
+elim xs=> //= x xs IH; case (x = e)=> /=.
+  smt.
+  by rewrite IH.
+qed.
+
+(** DONE *)
 (** unique *)
 op unique:'a list -> bool.
 axiom unique_nil: unique<:'a> [].
@@ -406,11 +451,11 @@ lemma unique_count: forall (xs:'a list),
 proof strict.
 intros=> xs; split.
   elim/list_ind xs.
-    by intros=> h x {h}; rewrite count_nil; smt.
+    by intros=> h x {h} //=; smt.
     intros=> x xs IH; rewrite unique_cons -count_mem;
     simplify; intros=> [u_xs x_nin_xs] x'; case (x = x')=> x_x'.
-      by subst x'; rewrite count_consE -x_nin_xs; smt.
-      by rewrite count_consNE //; apply IH=> //.
+      by subst x'; rewrite -x_nin_xs; smt.
+      by rewrite /= IH.
   elim/list_ind xs.
     by intros=> h {h}; apply unique_nil.
     intros=> x xs IH count_xs; rewrite unique_cons; split.
@@ -433,10 +478,10 @@ lemma length_rm: forall (x:'a) xs,
   length (rm x xs) = length xs - 1.
 proof strict.
 intros=> x xs; elim/list_ind xs.
-  by apply absurd=> h {h}; apply mem_nil.
-  intros=> x' xs IH x_in_xs; rewrite length_cons; case (x' = x)=> x_x'.
+  by apply absurd=> h {h} //=.
+  intros=> x' xs IH x_in_xs //=; case (x' = x)=> x_x'.
     by subst x'; rewrite rm_consE; smt.
-    by generalize x_in_xs; rewrite mem_consNE // rm_consNE // length_cons=> x_in_xs; rewrite IH //; smt.
+    generalize x_in_xs; rewrite // rm_consNE //= => x_in_xs; rewrite IH //; smt.
 qed.
 
 lemma count_rm_in: forall (x:'a) (xs:'a list),
@@ -444,7 +489,7 @@ lemma count_rm_in: forall (x:'a) (xs:'a list),
   count x (rm x xs) = count x xs - 1.
 proof strict.
 intros=> x xs; generalize x; elim/list_ind xs=> x.
-  apply absurd=> _; apply mem_nil.
+  apply absurd=> _ //=.
   intros=> xs IH y x'; rewrite rm_cons (rewrite_if (count y)); smt.
 qed.
 
@@ -454,7 +499,7 @@ lemma count_rm_nin: forall (x:'a) (xs:'a list),
 proof strict.
 intros=> x xs; generalize x; elim/list_ind xs=> x.
   intros=> h {h}; rewrite rm_nil //.
-  intros=> xs IH x'; rewrite mem_cons; smt.
+  intros=> xs IH x' //=; smt.
 qed.
 
 lemma count_rm_neq: forall (x y:'a) (xs:'a list),
@@ -481,8 +526,8 @@ theory PermutationLists.
   proof strict.
   intros=> xs; delta (<->) beta=> xs_nil;
   cut h: forall (x:'a), count x xs = 0.
-    by intros=> x; rewrite -(count_nil x) xs_nil //.
-    smt. (* TODO: Add lemmas to count *)
+    by intros=> x; rewrite xs_nil.
+  smt. (* TODO: Add lemmas to count *)
   qed.
 
   lemma perm_cons: forall x (xs ys:'a list),
@@ -508,21 +553,20 @@ qed.
 lemma foldC: forall (x:'a) (f:'a -> 'b -> 'b) (z:'b) (xs:'a list),
     (forall a b X, f a (f b X) = f b (f a X)) =>
     mem x xs =>
-    fold_right f z xs = f x (fold_right f z (rm x xs)).
+    foldr f z xs = f x (foldr f z (rm x xs)).
 proof strict.
 intros=> x f z xs C; elim/list_ind xs; first smt.
-  intros=> x' xs IH.
-  rewrite fold_right_cons.
+  intros=> x' xs IH //=.
   case (x' = x)=> x_x';first subst x';rewrite rm_consE //.
-  rewrite mem_consNE=> // x_in_xs.
-  by rewrite rm_consNE // fold_right_cons IH // C //.
+  intros=> // x_in_xs.
+  by rewrite rm_consNE //= IH // C //.
 qed.
 
 lemma foldCA: forall (f:'a -> 'a -> 'a) (z x:'a) (xs:'a list),
   (forall x y, f x y = f y x) =>
   (forall x y z, f x (f y z) = f (f x y) z) =>
   mem x xs =>
-  fold_right f z xs = f x (fold_right f z (rm x xs)).
+  foldr f z xs = f x (foldr f z (rm x xs)).
 proof strict.
 intros f z x xs C A.
 apply foldC=> a b c.
@@ -532,22 +576,22 @@ qed.
 lemma fold_permC: forall (f:'a -> 'b -> 'b) (z:'b) (xs ys:'a list),
   (forall a b X, f a (f b X) = f b (f a X)) =>
   xs <-> ys =>
-  fold_right f z xs = fold_right f z ys.
+  foldr f z xs = foldr f z ys.
 proof strict.
 intros=> f z xs ys C;generalize ys; elim/list_ind xs.
   by intros=> ys nil_ys; rewrite (perm_nil ys); [apply perm_symm=> // | trivial ].
-  intros=> x xs IH ys xs_ys; rewrite fold_right_cons (foldC x _ _ ys); first assumption.
+  intros=> x xs IH ys xs_ys; rewrite (foldC x _ _ ys); first assumption.
   rewrite -count_mem -xs_ys; smt.
-     congr=> //; cut rm_xs_ys: xs <-> rm x ys;
+     cut rm_xs_ys: xs <-> rm x ys;
        first by rewrite -(rm_consE x xs); apply perm_rm=> //.
-      rewrite (IH (rm x ys))=> //.
+      rewrite //= (IH (rm x ys))=> //.
 qed.
 
 lemma fold_perm: forall (f:'a -> 'a -> 'a) (z:'a) (xs ys:'a list),
   (forall x y, f x y = f y x) =>
   (forall x y z, f x (f y z) = f (f x y) z) =>
   xs <-> ys =>
-  fold_right f z xs = fold_right f z ys.
+  foldr f z xs = foldr f z ys.
 proof strict.
 intros f z x xs C A.
 apply fold_permC=> a b c.
@@ -573,8 +617,8 @@ lemma perm_length: forall (xs ys:'a list),
 proof strict.
 intros=> xs; elim/list_ind xs.
   smt.
-  intros=> x xs IH ys xs_ys.
-    rewrite length_cons (IH (rm x ys)).
+  intros=> x xs IH ys xs_ys //=.
+    rewrite (IH (rm x ys)).
       by rewrite -(rm_consE x xs); apply perm_rm=> //. (* This should become a lemma *)
       by rewrite length_rm; smt.
 qed.
