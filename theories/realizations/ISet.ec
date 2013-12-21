@@ -105,7 +105,7 @@ proof strict.
 intros=> p X; delta mem any inter cpAnd; beta; split=> h; last smt.
   cut h1: exists x, (fun x, p x /\ X x) x. (* This proof is disgusting *)
     generalize h; apply absurd; simplify=> h; apply set_ext; smt.
-    elim h1; beta=> {h1} x x_in_inter; exists x; smt.
+    elim h1; beta=> x x_in_inter; exists x; smt.
 qed.
 
 (** filter *)

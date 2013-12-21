@@ -32,7 +32,7 @@ op f1 (x:int, y:int) : int = x + y.
 
 axiom foo6 : forall (x:int, y:int), - (f1 x y) = x.
 
-require import Map.
+require import FMap.
 
 axiom foo7 : forall (x:int, y:int, m:(int,int)map),
    m.[x<-y] = m.
@@ -44,5 +44,3 @@ op do_m : ('a,'b)map -> ('a,'b) map.
 
 axiom foo9 : forall (x:int, y:int, m:(int,int)map),
    (do_m m).[x<-y].[x] = Some y.
-
-

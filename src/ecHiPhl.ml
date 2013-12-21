@@ -49,6 +49,12 @@ let process_phl loc ptac g =
     | Peager_fun_abs(info,eqI)  -> EcEager.process_fun_abs info eqI
     | Peager_call info          -> EcEager.process_call info
     | Peager(info, eqI)         -> EcEager.process_eager info eqI
-    | Pbd_equiv info            -> EcPhlFact.process_bd_equiv info
+    | Pbd_equiv info            -> 
+      let side, pr, po = info in
+      let info = Some {fp_kind = FPCut((Some pr,Some po),None); fp_args = []} in
+      let info2, info3 = if side then info, None else None, info in
+      EcPhlConseq.process_conseq true (None, info2, info3)
+    | Pauto                     -> EcAuto.t_auto 
+
   in
     set_loc loc t g

@@ -134,11 +134,9 @@ axiom pick_def (X:'a set):
 lemma mem_pick (X:'a set):
   X <> empty => mem (pick X) X.
 proof strict.
-rewrite pick_def;
-elim/list_case_eq (elems X).
-  by rewrite -empty_elems_nil //.
-  by intros=> x l; rewrite -mem_def=> -> _;
-     rewrite hd_cons mem_cons //.
+  rewrite empty_elems_nil pick_def -mem_def.
+  elim/list_ind (elems X) => // x l _ _.
+  by rewrite hd_cons mem_cons.
 qed.
 
 lemma pick_single (x:'a):
@@ -198,7 +196,7 @@ lemma mem_rm (x x':'a) (X:'a set):
   mem x (rm x' X) = (mem x X /\ x <> x').
 proof strict.
 case (x = x')=> x_x'.
-  by subst x'=> /=; apply neqF; apply mem_rm_eq.
+  by subst x'=> /=; rewrite neqF; apply mem_rm_eq.
   by intros=> /=; apply mem_rm_neq.
 qed.
 
@@ -227,7 +225,7 @@ proof strict.
 intros=> x'; elim (count_set x' (rm x X))=> x'_rmX.
   by rewrite x'_rmX; generalize x'_rmX; rewrite count_mem mem_rm=> [x'_in_X x'_neq_x];
      apply eq_sym; rewrite count_rm_neq ?count_mem //; smt.
-  rewrite x'_rmX; generalize x'_rmX; rewrite count_nmem mem_rm -rw_nand /=; intros=> [x'_nin_X | x_eq_x'].
+  rewrite x'_rmX; generalize x'_rmX; rewrite count_nmem mem_rm -nand /=; intros=> [x'_nin_X | x_eq_x'].
     apply eq_sym; case (x = x').
       by intros=> ->; rewrite count_rm_nin ?mem_def // count_nmem.
       by intros=> x_neq_x'; rewrite count_rm_neq // count_nmem.
@@ -241,7 +239,7 @@ lemma nosmt rm_leq (x:'a) (X:'a set): rm x X <= X by [].
 lemma rm_add_eq (x:'a) X:
   rm x (add x X) = rm x X.
 proof strict.
-by apply set_ext=> x'; rewrite 2!mem_rm mem_add orDand (rw_eq_sym x' x);
+by apply set_ext=> x'; rewrite 2!mem_rm mem_add orDand (eq_sym x' x);
    cut ->: (x = x' /\ !x = x') = false by (by case (x = x')=> h).
 qed.
 
@@ -347,17 +345,17 @@ qed.
 
 lemma mem_of_list (x:'a) l : List.mem x l = mem x (of_list l).
 proof -strict.
- rewrite /of_list;elimT list_ind l. 
+ rewrite /of_list;elim/list_ind l. 
    rewrite fold_right_nil;smt.
- intros {l} y xs;rewrite fold_right_cons;smt.
+ intros y xs;rewrite fold_right_cons;smt.
 qed.
 
 lemma card_of_list (l:'a list) :
    card (of_list l) <= List.length l.
 proof -strict.
-  rewrite /of_list;elimT list_ind l.
+  rewrite /of_list;elim/list_ind l.
    by rewrite fold_right_nil card_empty length_nil => //.
-  intros => {l} x xs H; rewrite fold_right_cons length_cons.  
+  intros => x xs H; rewrite fold_right_cons length_cons.  
   case (mem x (fold_right add empty xs))=> Hin; 
      [rewrite card_add_in // | rewrite card_add_nin //];smt.
 qed.
@@ -461,7 +459,7 @@ proof strict.
 intros=> x_in_X; apply set_ext=> x';
 rewrite mem_filter; case (x = x').
   by intros=> <-; simplify; split=> _ //; apply mem_single_eq.
-  by rewrite rw_eq_sym => x_x'; simplify; apply mem_single_neq.
+  by rewrite eq_sym => x_x'; simplify; apply mem_single_neq.
 qed.
 
 lemma card_filter_cpEq (x:'a) (X:'a set):
@@ -506,16 +504,13 @@ lemma fold_set_list (f:'a -> 'b -> 'b) (e:'b) xs:
 proof strict.
 intros=> C; elim/set_comp xs;
   first by rewrite fold_empty elems_empty fold_right_nil.
-intros s nempty Hind; elim/list_case_eq (elems s);
-  first by apply absurd=> _;rewrite -elems_empty elems_eq.
-intros=> x l' h.
-cut xval : pick s = x;first rewrite pick_def h hd_cons //.
+intros=> s s_nempty IH; cut [x xs elems_decomp]: exists x xs, elems s = x::xs by smt.
+cut xval: pick s = x by rewrite pick_def elems_decomp hd_cons.
 subst x.
-rewrite h fold_rm_pick // fold_right_cons Hind //.
+rewrite elems_decomp fold_rm_pick // fold_right_cons IH //.
 congr => //.
 apply fold_permC; first assumption.
-rewrite (_:l' = rm (pick s) (elems s)).
-rewrite h rm_cons //.
+rewrite (_:xs = rm (pick s) (elems s)) 1:elems_decomp 1:rm_cons //=.
 apply elems_rm.
 qed.
 
@@ -582,8 +577,8 @@ split.
 
 intros=> [a];intros => [h1 h2];split;first exists a;split;[ |apply (mem_rm_left _ x)];trivial.
 cut ? : !(x = a);[
-rewrite rw_eq_sym;apply (mem_rm_right _ _ xs);assumption h2|
-generalize H0;rewrite -h1 (rw_eq_sym (f a)); apply absurd;simplify;apply H;apply (mem_rm_left _ x);trivial].
+rewrite eq_sym;apply (mem_rm_right _ _ xs);assumption h2|
+generalize H0;rewrite -h1 (eq_sym (f a)); apply absurd;simplify;apply H;apply (mem_rm_left _ x);trivial].
 
 intros=> [h h1];generalize h=>[a];intros => [h2 h3];exists a;split;trivial.
 rewrite mem_rm;split;first trivial.
@@ -601,18 +596,18 @@ intros=> [a];intros=> [h1 h2].
 cut [b] : (exists (x' : 'a), !(mem x' xs => f x = f x' => x = x'));first (apply (ex_for (fun x',
 !(mem x' xs => f x = f x' => x = x')) _));apply H.
 clear H.
-rewrite (rw_imp (mem b xs)).
-rewrite (rw_imp (f x = f b)).
-rewrite -rw_nor.
-rewrite -rw_nor.
+rewrite (imp (mem b xs)).
+rewrite (imp (f x = f b)).
+rewrite -nor.
+rewrite -nor.
 simplify.
 intros=> [? ?];generalize H0;intros=> [? ?].
 
 case (a=x)=> ?.
   exists b.
   split.
-    by rewrite -H0 -h1;congr;rewrite rw_eq_sym;apply H2.
-    by (rewrite mem_rm_neq;first rewrite rw_eq_sym);trivial.
+    by rewrite -H0 -h1;congr;rewrite eq_sym;apply H2.
+    by (rewrite mem_rm_neq;first rewrite eq_sym);trivial.
   exists a.
   split.
     apply h1.
@@ -630,10 +625,11 @@ axiom interval_pos (x y:int): x <= y => interval x y = add y (interval x (y-1)).
 lemma mem_interval (x y a:int): (mem a (interval x y)) <=> (x <= a <= y).
 proof strict.
   case (x <= y)=> x_le_y;last smt.
-  cut ->: y = (y - x + 1) - 1 + x;first smt.
-  elim/Int.Induction.induction (y - x + 1);[smt| |smt].
+  cut ->: y = (y - x + 1) - 1 + x by smt.
+  cut: 0 <= (y - x + 1) by smt.
+  elim/Int.Induction.induction (y - x + 1); first smt.
   intros j j_pos IH.
-  rewrite interval_pos;first smt.
+  rewrite interval_pos; first smt.
   rewrite mem_add.
   rewrite (_:j + 1 - 1 + x - 1 = j - 1 + x);first smt.
   rewrite IH.
@@ -650,8 +646,9 @@ lemma interval_addl (i j : int) :
     i <= j =>
     interval i j = add i (interval (i+1) j).  
 proof -strict.
- intros Hle;cut -> : j = (j - i) + i;first smt.
- elim /Int.Induction.induction (j-i) => /=;last smt.
+ intros Hle;cut -> : j = (j - i) + i by smt.
+ cut: 0 <= (j - i) by smt.
+ elim /Int.Induction.induction (j-i)=> //=.
    by rewrite interval_single interval_neg //;first smt.
  clear j Hle => j Hle Heq.
  rewrite (interval_pos i (j + 1 + i));first smt.
@@ -666,7 +663,8 @@ proof strict.
   intros h.
   rewrite (_:interval x y=interval x (x+(y-x+1)-1));first smt.
   rewrite (_:max (y - x + 1) 0 = y-x+1);first smt.
-  elim/Int.Induction.induction (y-x+1);[smt| |smt].
+  cut: 0 <= (y - x + 1) by smt.
+  elim/Int.Induction.induction (y-x+1); first smt.
   intros j hh hrec.
   rewrite (interval_pos x (x+(j+1)-1) _);smt.
 qed.
@@ -700,16 +698,16 @@ lemma mu_cpMem_le (s:'a set): forall (d:'a distr) (bd:real),
   (forall (x : 'a), mem x s => mu_x d x <= bd) =>
     mu d (cpMem s) <= (card s)%r * bd.
 proof strict.
-  elimT set_ind s.
+  elim/set_ind s.
     intros d bd Hmu_x.
     rewrite (mu_eq d _ Fun.cpFalse).
-      by intros x;rewrite /cpMem /cpFalse /= rw_neqF;apply mem_empty.
+      by intros x;rewrite /cpMem /cpFalse /= neqF;apply mem_empty.
     by rewrite mu_false card_empty //.
-  intros {s} x s Hnmem IH d bd Hmu_x.
+  intros x s Hnmem IH d bd Hmu_x.
   rewrite (_: (card (add x s))%r * bd = 
           bd + (card s)%r * bd); first by rewrite card_add_nin //=;ringeq.
   rewrite (mu_eq d _ (Fun.cpOr ((=) x) (cpMem s))).
-    by intros z;rewrite /cpMem /cpOr mem_add orC (rw_eq_sym z).
+    by intros z;rewrite /cpMem /cpOr mem_add orC (eq_sym z).
   rewrite mu_disjoint.
    by rewrite /cpAnd /cpOr /cpFalse /cpMem => z /=;smt.
   (cut ->: (mu d ((=) x) = mu_x d x)) => //.
@@ -722,16 +720,16 @@ lemma mu_cpMem_ge (s:'a set): forall (d:'a distr) (bd:real),
   (forall (x : 'a), mem x s => mu_x d x >= bd) =>
     mu d (cpMem s) >= (card s)%r * bd.
 proof strict.
-  elimT set_ind s.
+  elim/set_ind s.
     intros d bd Hmu_x.
     rewrite (mu_eq d _ Fun.cpFalse).
-      by intros x;rewrite /cpMem /cpFalse /= rw_neqF;apply mem_empty.
+      by intros x;rewrite /cpMem /cpFalse /= neqF;apply mem_empty.
     by rewrite -le_ge mu_false card_empty //.
-  intros {s} x s Hnmem IH d bd Hmu_x.
+  intros x s Hnmem IH d bd Hmu_x.
   rewrite (_: (card (add x s))%r * bd = 
           bd + (card s)%r * bd); first by rewrite card_add_nin //=;ringeq.
   rewrite (mu_eq d _ (Fun.cpOr ((=) x) (cpMem s))).
-    by intros z;rewrite /cpMem /cpOr mem_add orC (rw_eq_sym z).
+    by intros z;rewrite /cpMem /cpOr mem_add orC (eq_sym z).
   rewrite mu_disjoint.
    by rewrite /cpAnd /cpOr /cpFalse /cpMem => z /=;smt.
   (cut ->: (mu d ((=) x) = mu_x d x)) => //.
@@ -771,14 +769,14 @@ lemma mu_Lmem_le_length (l:'a list) (d:'a distr) (bd:real):
   (forall (x : 'a), List.mem x l => mu_x d x <= bd) =>
   mu d (fun x, List.mem x l) <= (length l)%r * bd. 
 proof -strict.
-  elimT list_case l.
+  elim/list_case l.
     intros _; rewrite length_nil (mu_eq _ _ (cpFalse)).
-      by intros x; rewrite /cpFalse /= rw_neqF;apply mem_nil.
+      by intros x; rewrite /cpFalse /= neqF;apply mem_nil.
     by rewrite mu_false.
   intros x l0 Hmu.
   cut Hbd : 0%r <= bd.
     by cut H := Hmu x _; [ by rewrite mem_cons | smt].
-  generalize (x :: l0) Hmu => {l x l0} l Hmu. 
+  generalize (x :: l0) Hmu => {x l0} l Hmu. 
   apply (Real.Trans _ ((card (of_list l))%r * bd)).
     by apply mu_Lmem_le_card.
   cut H := card_of_list l; smt.

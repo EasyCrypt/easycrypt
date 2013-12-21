@@ -22,22 +22,18 @@ lemma nosmt bool_case : forall (p:bool -> bool),
 by [].
 
 (** boolean rewriting *)
-lemma nosmt rw_eq_iff : forall (a b:bool), (a = b) = (a <=> b) by [].
+lemma nosmt eq_iff : forall (a b:bool), (a = b) <=> (a <=> b) by [].
 
-lemma nosmt eqT  : forall (x:bool), x => (x = true) by [].
-lemma nosmt neqF : forall (x:bool), !x => (x = false) by [].
-
-lemma nosmt rw_eqT : forall (x:bool), (x = true) <=> x by [].
-lemma nosmt rw_neqF : forall (x:bool), (x = false) <=> !x by [].
+lemma nosmt eqT : forall (x:bool), (x = true) <=> x by [].
+lemma nosmt neqF : forall (x:bool), (x = false) <=> !x by [].
 
 lemma nosmt not_def: forall (x:bool), (x => false) <=> !x by [].
 lemma nosmt nnot: forall (x:bool), (!(!x)) = x by [].
 
-lemma nosmt nor : forall (a b:bool), (!a /\ !b) => !(a \/ b) by [].
-lemma nosmt nand: forall (a b:bool), (!a \/ !b) => !(a /\ b) by [].
+lemma nosmt negbTE: forall (x:bool), !x => (x => false) by [].
 
-lemma nosmt rw_nand: forall (a b:bool), (!a) \/ (!b) <=> !(a /\ b) by [].
-lemma nosmt rw_nor : forall (a b:bool), (!a) /\ (!b) <=> !(a \/ b) by [].
+lemma nosmt nand: forall (a b:bool), (!a) \/ (!b) <=> !(a /\ b) by [].
+lemma nosmt nor : forall (a b:bool), (!a) /\ (!b) <=> !(a \/ b) by [].
 
 lemma nosmt for_ex: forall (p:'a -> bool), !(exists (x:'a), !p x) => forall (x:'a), p x by [].
 lemma nosmt ex_for: forall (p:'a -> bool), !(forall (x:'a), !p x) => exists (x:'a), p x by [].
@@ -50,7 +46,7 @@ lemma nosmt absurd : forall (b a : bool), (!a => !b) => b => a by [].
 
 (** and *)
 lemma nosmt andE : forall (a b c:bool), 
-    (a /\ b) => (a => b => c) => c
+    (a => b => c) => (a /\ b) => c
 by [].
 
 lemma nosmt andEl : forall (a b:bool),
@@ -87,7 +83,7 @@ by [].
 
 (** or *)
 lemma nosmt orE : forall (a b c:bool), 
-    (a \/ b) => (a => c) => (b => c) => c
+    (a => c) => (b => c) => (a \/ b) => c
 by [].
 
 lemma nosmt orIl : forall (a b : bool),
@@ -136,7 +132,7 @@ by [].
 
 (** anda *)
 lemma nosmt andaE : forall (a b c:bool),
-    (a && b) => (a => b => c) => c
+    (a => b => c) => (a && b) => c
 by [].
 
 lemma nosmt andaEl : forall (a b:bool),
@@ -157,7 +153,7 @@ by [].
 
 (** ora *)
 lemma nosmt oraE : forall (a b c:bool),
-    (a || b) => (a => c) => (!a => b => c) => c
+    (a => c) => (!a => b => c) => (a || b) => c
 by [].
 
 lemma nosmt oraIl : forall (a b : bool),
@@ -174,17 +170,25 @@ by [].
 
 (** iff *)
 lemma nosmt iffE : forall (a b c:bool),
-  (a <=> b) => ((a => b) => (b => a) => c) => c
+  ((a => b) => (b => a) => c) => (a <=> b) => c
 by [].
 
 lemma nosmt iffI : forall (a b : bool),
   (a => b) => (b => a) => (a <=> b)
 by [].
 
+lemma nosmt iffLR (a b : bool):
+  (a <=> b) => a => b
+by [].
+
+lemma nosmt iffRL (a b : bool):
+  (a <=> b) => b => a
+by [].
+
 (** if *)
 lemma nosmt ifE : forall (a bt bf c: bool), 
-  (if a then bt else bf) =>
-  (a => bt => c) => (!a => bf => c) => c
+  (a => bt => c) => (!a => bf => c)
+    => (if a then bt else bf) => c
 by [].
 
 lemma nosmt ifI : forall (a bt bf : bool),
@@ -226,14 +230,12 @@ lemma nosmt rewrite_if: forall (f:'a -> 'b) b x1 x2,
   f (if b then x1 else x2) = (if b then f x1 else f x2)
 by [].
 
-lemma nosmt rw_imp   : forall (x y : bool), (x => y) = ((!x)\/y) by [].
+lemma nosmt imp   : forall (x y : bool), (x => y) <=> ((!x)\/y) by [].
 
 (** equality *)
 lemma nosmt eq_refl  : forall (x:'a), x = x by [].
-lemma nosmt eq_sym   : forall (x y : 'a), x = y => y = x by [].
+lemma nosmt eq_sym   : forall (x y : 'a), x = y <=> y = x by [].
 lemma nosmt eq_trans : forall (x y z : 'a), x = y => y = z => x = z by [].
-
-lemma nosmt rw_eq_sym   : forall (x y : 'a), (x = y) = (y = x) by [].
 
 (** tuples *) 
 lemma nosmt tuple2_ind : 

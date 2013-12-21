@@ -29,6 +29,17 @@
     | Some (args, `Expr e ) -> PO_concr (args, ty, e)
     | Some (args, `Case bs) -> PO_case  (args, ty, bs)
 
+  let lqident_of_fident (nm, name) =
+    let module E = struct exception Invalid end in
+
+    let nm =
+      let for1 (x, args) =
+        if args <> None then raise E.Invalid else unloc x
+      in
+        List.map for1 nm
+    in
+      try Some (nm, unloc name) with E.Invalid -> None
+
   let mk_peid_symb loc s ti = 
     mk_loc loc (PEident (pqsymb_of_symb loc s, ti))
 
@@ -129,8 +140,8 @@
 %token <string> STRING
 
 (* Tokens *)
-%token <bool> AND (* true asym : &&, false sym : /\ *)
-%token <bool> OR  (* true asym : ||, false sym : \/ *)
+%token ANDA AND (* asym : &&, sym : /\ *)
+%token ORA  OR  (* asym : ||, sym : \/ *)
 
 %token <EcParsetree.codepos> CPOS
 
@@ -143,7 +154,6 @@
 %token ASSERT
 %token ASSUMPTION
 %token AT
-%token AUTO
 %token AXIOM
 %token BACKS
 %token BETA 
@@ -173,13 +183,13 @@
 %token DELTA
 %token DLBRACKET
 %token DO
+%token DONE
 %token DOT
 %token DOTDOT
 %token DOTTICK
 %token DROP
 %token EAGER
 %token ELIM
-%token ELIMT
 %token ELSE
 %token END
 %token EOF
@@ -296,6 +306,7 @@
 %token TOP
 %token TRANSITIVITY
 %token TRIVIAL
+%token AUTO
 %token TRY
 %token TYPE
 %token UNDERSCORE
@@ -319,8 +330,8 @@
 %nonassoc prec_below_IMPL
 %right    IMPL
 %nonassoc IFF
-%right    OR 
-%right    AND 
+%right    ORA  OR
+%right    ANDA AND
 %nonassoc NOT
 
 %nonassoc EQ NE
@@ -453,6 +464,15 @@ fident:
 | x=OP1 { Printf.sprintf "[%s]" x }
 | ADD   { "[+]" }
 | MINUS { "[-]" }
+
+(* -------------------------------------------------------------------- *)
+%inline or_:
+| ORA { true  }
+| OR  { false }
+
+%inline and_:
+| ANDA { true  }
+| AND  { false }
 
 (* -------------------------------------------------------------------- *)
 pside_:
@@ -612,10 +632,10 @@ expr_u:
 | e1=expr op=loc(IFF) ti=tvars_app? e2=expr 
     { peapp_symb op.pl_loc "<=>" ti [e1; e2] }
 
-| e1=expr op=loc(OR) ti=tvars_app? e2=expr  
+| e1=expr op=loc(or_) ti=tvars_app? e2=expr  
     { peapp_symb op.pl_loc (str_or op.pl_desc) ti [e1; e2] }
 
-| e1=expr op=loc(AND) ti=tvars_app? e2=expr 
+| e1=expr op=loc(and_) ti=tvars_app? e2=expr 
     { peapp_symb op.pl_loc (str_and op.pl_desc) ti [e1; e2] }
 
 | e1=expr op=loc(STAR) ti=tvars_app?  e2=expr  
@@ -753,10 +773,7 @@ sform_u(P):
        parse_error n.pl_loc (Some "tuple projection start at 1");
      PFproji(f,n.pl_desc - 1) }
 
-| HOARE LBRACKET
-    mp=loc(fident) COLON pre=form_r(P) LONGARROW post=form_r(P)
-  RBRACKET
-    { PFhoareF (pre, mp, post) }
+| HOARE LBRACKET hb=hoare_body(P) RBRACKET { hb }
 
 | EQUIV LBRACKET eb=equiv_body(P) RBRACKET { eb }
 
@@ -832,10 +849,10 @@ form_u(P):
 | e1=form_r(P) op=loc(IFF) ti=tvars_app? e2=form_r(P)  
     { pfapp_symb op.pl_loc "<=>" ti [e1; e2] }
 
-| e1=form_r(P) op=loc(OR) ti=tvars_app? e2=form_r(P)  
+| e1=form_r(P) op=loc(or_) ti=tvars_app? e2=form_r(P)  
     { pfapp_symb op.pl_loc (str_or op.pl_desc) ti [e1; e2] }
 
-| e1=form_r(P) op=loc(AND) ti=tvars_app? e2=form_r(P)  
+| e1=form_r(P) op=loc(and_) ti=tvars_app? e2=form_r(P)  
     { pfapp_symb op.pl_loc (str_and op.pl_desc) ti [e1; e2] }
 
 | e1=form_r(P) op=loc(STAR) ti=tvars_app? e2=form_r(P)  
@@ -865,12 +882,7 @@ form_u(P):
       let loc = EcLocation.make $startpos $endpos in
         PFapp (mk_loc loc id, [e]) }
 
-| PHOARE 
-    LBRACKET mp=loc(fident) COLON
-      pre=form_r(P) LONGARROW post=form_r(P)
-    RBRACKET
-      cmp=hoare_bd_cmp bd=sform_r(P)
-	{ PFBDhoareF (pre, mp, post, cmp, bd) }
+| PHOARE pb=phoare_body(P) { pb }
 
 | PHOARE 
     LBRACKET s=loc(fun_def_body) COLON
@@ -913,16 +925,30 @@ hoare_bd_cmp :
 | EQ {PFHeq}
 | GE {PFHge}
 
+hoare_body(P):
+  mp=loc(fident) COLON pre=form_r(P) LONGARROW post=form_r(P)
+    { PFhoareF (pre, mp, post) }
+;
+
+phoare_body(P):
+  LBRACKET mp=loc(fident) COLON
+    pre=form_r(P) LONGARROW post=form_r(P)
+  RBRACKET
+    cmp=hoare_bd_cmp bd=sform_r(P)
+  { PFBDhoareF (pre, mp, post, cmp, bd) }
+;
+
 equiv_body(P):
   mp1=loc(fident) TILD mp2=loc(fident)
   COLON pre=form_r(P) LONGARROW post=form_r(P)
-
     { PFequivF (pre, (mp1, mp2), post) }
+;
 
 eager_body(P):
 | s1=stmt COMMA  mp1=loc(fident) TILD mp2=loc(fident) COMMA s2=stmt
     COLON pre=form_r(P) LONGARROW post=form_r(P)
     { PFeagerF (pre, (s1, mp1, mp2,s2), post) }
+;
 
 pgtybinding1:
 | x=ptybinding1 { List.map (fun (xs,ty) -> xs, PGTY_Type ty) x }
@@ -985,14 +1011,18 @@ param_decl:
 (* Statements                                                           *)
 
 lvalue_u:
-| x=qident
-   { PLvSymbol x }
+| x=loc(fident)
+   { match lqident_of_fident x.pl_desc with
+     | None   -> parse_error x.pl_loc None
+     | Some v -> PLvSymbol (mk_loc x.pl_loc v) }
 
 | LPAREN p=plist2(qident, COMMA) RPAREN
    { PLvTuple p }
 
-| x=qident DLBRACKET ti=tvars_app? e=expr RBRACKET
-   { PLvMap(x, ti, e) }
+| x=loc(fident) DLBRACKET ti=tvars_app? e=expr RBRACKET
+   { match lqident_of_fident x.pl_desc with
+     | None   -> parse_error x.pl_loc None
+     | Some v -> PLvMap (mk_loc x.pl_loc v, ti, e) }
 ;
 
 %inline lvalue:
@@ -1004,19 +1034,12 @@ base_instr:
     { PSrnd (x, e) }
 
 | x=lvalue EQ e=expr
-    { let islow = function 'a'..'z' -> true | _ -> false in
-      let islow = fun s -> s <> "" && islow s.[0] in
+    { PSasgn (x, e) }
 
-        match unloc e with
-        | PEapp ( { pl_desc = PEident (({ pl_desc = (_, fx) } as f), None) },
-                 [{ pl_desc = PEtuple es; pl_loc = les; }])
-            when islow fx ->
-          begin
-            PScall (Some x, f, mk_loc les es)
-          end
-        | _ -> PSasgn (x, e) }
+| x=lvalue LEFTARROW f=loc(fident) LPAREN es=loc(plist0(expr, COMMA)) RPAREN
+    { PScall (Some x, f, es) }
 
-| f=qident LPAREN es=loc(plist0(expr, COMMA)) RPAREN
+| f=loc(fident) LPAREN es=loc(plist0(expr, COMMA)) RPAREN
     { PScall (None, f, es) }
 
 | ASSERT LPAREN c=expr RPAREN 
@@ -1062,6 +1085,9 @@ loc_decl_names:
 ;
 
 loc_decl_r:
+| VAR x=loc(loc_decl_names)
+    { { pfl_names = x; pfl_type = None; pfl_init = None; } }
+
 | VAR x=loc(loc_decl_names) COLON ty=loc(type_exp)
     { { pfl_names = x; pfl_type = Some ty; pfl_init = None; } }
 
@@ -1250,8 +1276,8 @@ tcand:
 ;
 
 dt_ctor_def:
-| x=ident { (x, []) }
-| x=ident OF ty=plist1(loc(simpl_type_exp), tcand) { (x, ty) }
+| x=oident { (x, []) }
+| x=oident OF ty=plist1(loc(simpl_type_exp), tcand) { (x, ty) }
 ;
 
 %inline datatype_def:
@@ -1450,32 +1476,28 @@ nosmt:
 | empty { false }
 ;
 
-local:
+%inline local:
 | LOCAL { true  }
 | empty { false }
+;
+
+axiom_tc:
+| /* empty */       { PILemma }
+| BY bracket(empty) { PLemma None }
+| BY t=tactic       { PLemma (Some t) }
 ;
 
 axiom:
 | l=local AXIOM o=nosmt d=lemma_decl 
     { mk_axiom ~local:l ~nosmt:o d PAxiom }
 
-| l=local LEMMA o=nosmt d=lemma_decl
-    { mk_axiom ~local:l ~nosmt:o d PILemma }
+| l=local LEMMA o=nosmt d=lemma_decl ao=axiom_tc
+    { mk_axiom ~local:l ~nosmt:o d ao }
 
-| l=local LEMMA o=nosmt d=lemma_decl BY t=tactic
-    { mk_axiom ~local:l ~nosmt:o d (PLemma (Some t)) }
-
-| l=local LEMMA o=nosmt d=lemma_decl BY LBRACKET RBRACKET
-    { mk_axiom ~local:l ~nosmt:o d (PLemma None) }
-
-| l=local EQUIV x=ident pd=pgtybindings? COLON p=loc(equiv_body(none))
-    { mk_axiom ~local:l (x, None, pd, p) PILemma }
-
-| l=local EQUIV x=ident pd=pgtybindings? COLON p=loc(equiv_body(none)) BY t=tactic
-    { mk_axiom ~local:l (x, None, pd, p) (PLemma (Some t)) }
-
-| l=local EQUIV x=ident pd=pgtybindings? COLON p=loc(equiv_body(none)) BY LBRACKET RBRACKET
-    { mk_axiom ~local:l (x, None, pd, p) (PLemma None) }
+| l=local  EQUIV x=ident pd=pgtybindings? COLON p=loc( equiv_body(none)) ao=axiom_tc
+| l=local  HOARE x=ident pd=pgtybindings? COLON p=loc( hoare_body(none)) ao=axiom_tc
+| l=local PHOARE x=ident pd=pgtybindings? COLON p=loc(phoare_body(none)) ao=axiom_tc
+    { mk_axiom ~local:l (x, None, pd, p) ao }
 ;
 
 (* -------------------------------------------------------------------- *)
@@ -1715,7 +1737,17 @@ rwarg:
 ;
 
 genpattern:
-| o=rwocc? l=sform_h %prec prec_tactic { (o |> omap EcMaps.Sint.of_list, l) }
+| l=sform_h %prec prec_tactic
+    { `Form (None, l) }
+
+| o=rwocc l=sform_h %prec prec_tactic
+    { `Form (Some (EcMaps.Sint.of_list o), l) }
+
+| LPAREN UNDERSCORE COLON f=form RPAREN
+    { `FPattern (mk_fpattern (FPCut f) []) }
+
+| LPAREN LPAREN UNDERSCORE COLON f=form RPAREN args=loc(fpattern_arg)* RPAREN
+    { `FPattern (mk_fpattern (FPCut f) args) }
 ;
 
 simplify_arg: 
@@ -1914,20 +1946,17 @@ logtactic:
 | RIGHT
     { Pright }
 
-| ELIM e=fpattern(form)
-   { Pelim e }
+| ELIM e=genpattern*
+   { Pelim (e, None) }
 
-| ELIMT f=sform
-   { PelimT (f, None) }
-
-| ELIMT p=qident f=sform
-   { PelimT (f, Some p) }
-
-| ELIM SLASH p=qident f=sform
-   { PelimT (f, Some p) }
+| ELIM SLASH p=qident e=genpattern*
+   { Pelim (e, Some p) }
 
 | APPLY e=fpattern(form)
-   { Papply e }
+   { Papply (e, None) }
+
+| APPLY e=fpattern(form) IN x=ident
+   { Papply (e, Some x) }
 
 | l=simplify
    { Psimplify (mk_simplify l) }
@@ -2032,8 +2061,11 @@ phltactic:
 | RND s=side? info=rnd_info
     { Prnd (s, info) }
 
-| INLINE s=side? o=occurences? f=plist0(loc(fident), empty)
+| INLINE s=side? o=occurences? f=plist1(loc(fident), empty)
     { Pinline (`ByName (s, (f, o))) }
+
+| INLINE s=side? STAR
+    { Pinline (`All s) }
 
 | KILL s=side? o=codepos 
     { Pkill (s, o, Some 1) }
@@ -2080,9 +2112,26 @@ phltactic:
 | BYEQUIV info=fpattern(conseq)
     { Pbydeno (`Equiv, info) }
 
-| CONSEQ nm=STAR? info=fpattern(conseq_bd)
-    { Pconseq (nm<>None, info) }
+| CONSEQ nm=STAR?
+    { Pconseq(nm<>None, (None,None,None)) }
 
+| CONSEQ nm=STAR? info1=fpattern(conseq_bd)
+    { Pconseq (nm<>None, (Some info1,None,None)) }
+| CONSEQ nm=STAR? info1=fpattern(conseq_bd) info2=fpattern(conseq_bd)
+                                                               UNDERSCORE?
+    { Pconseq(nm<>None, (Some info1,Some info2, None)) }
+| CONSEQ nm=STAR? info1=fpattern(conseq_bd) UNDERSCORE 
+                                                 info3=fpattern(conseq_bd)
+    { Pconseq(nm<>None, (Some info1,None,Some info3)) }
+| CONSEQ nm=STAR? 
+    info1=fpattern(conseq_bd) info2=fpattern(conseq_bd) 
+                                                 info3=fpattern(conseq_bd)
+    { Pconseq (nm<>None, (Some info1,Some info2,Some info3)) }
+
+| CONSEQ nm=STAR? UNDERSCORE info2=fpattern(conseq_bd) UNDERSCORE?
+    { Pconseq(nm<>None, (None,Some info2, None)) }
+| CONSEQ nm=STAR? UNDERSCORE UNDERSCORE info3=fpattern(conseq_bd) 
+    { Pconseq(nm<>None, (None,None,Some info3)) }
 | ELIM STAR
     { Phr_exists_elim }
 
@@ -2115,6 +2164,8 @@ phltactic:
 | PRBOUNDED {Pprbounded}
 | PHOARE SPLIT i=bdhoare_split { Pbdhoare_split i }
 | PHOARE EQUIV s=side pr=sform po=sform { Pbd_equiv(s,pr,po) } 
+(* Automation *)
+| AUTO { Pauto }
 ;
 
 bdhoare_split:
@@ -2158,7 +2209,10 @@ tactic_core_r:
    { Ptry t }
 
 | BY t=tactics
-   { Pby t }
+   { Pby (Some t) }
+
+| BY bracket(empty) | DONE
+   { Pby None }
 
 | DO t=tactic_core
    { Pdo ((`All, None), t) }
@@ -2178,8 +2232,8 @@ tactic_core_r:
 | CASE f=sform
    { Pcase f }
 
-| PROGRESS t=tactic_core?
-   { Pprogress t }
+| PROGRESS s=STAR? t=tactic_core?
+   { Pprogress (s<>None, t) }
 
 | x=logtactic
    { Plogic x }
@@ -2196,12 +2250,21 @@ tactic_core_r:
 | x=loc(tactic_core_r) { x }
 ;
 
-tactic:
-| t=tactic_core
+tactic_ip:
+| t=tactic_core %prec prec_below_IMPL
     { mk_core_tactic t }
 
 | t=tactic_core IMPL ip=intro_pattern+
     { { pt_core = t; pt_intros = ip; } }
+;
+
+tactic:
+| t=tactic_ip %prec prec_below_IMPL
+    { t }
+
+| t1=tactic_ip ORA t2=tactic_ip
+    { let loc = EcLocation.make $startpos $endpos in
+        mk_core_tactic (mk_loc loc (Por (t1, t2))) }
 ;
 
 tactic_chain:
@@ -2219,7 +2282,6 @@ tactic_chain:
 
 | FIRST n=uint LAST  { Protate (`Left , n) }
 | LAST  n=uint FIRST { Protate (`Right, n) }
-
 ;
 
 subtactic:
@@ -2407,12 +2469,12 @@ realize:
 (* -------------------------------------------------------------------- *)
 (* Printing                                                             *)
 print:
-| TYPE   qs=qident { Pr_ty qs }
-| OP     qs=qoident { Pr_op qs }
-| THEORY qs=qident { Pr_th qs }
-| PRED   qs=qoident { Pr_pr qs } 
-| AXIOM  qs=qident { Pr_ax qs }
-| MODULE qs=qident { Pr_mod qs }
+| TYPE   qs=qident      { Pr_ty qs }
+| OP     qs=qoident     { Pr_op qs }
+| THEORY qs=qident      { Pr_th qs }
+| PRED   qs=qoident     { Pr_pr qs } 
+| AXIOM  qs=qident      { Pr_ax qs }
+| MODULE qs=qident      { Pr_mod qs }
 | MODULE TYPE qs=qident { Pr_mty qs }
 ;
 

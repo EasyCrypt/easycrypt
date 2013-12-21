@@ -71,9 +71,9 @@
     "apply"       , APPLY      ;        (* KW: tactic *)
     "rewrite"     , REWRITE    ;        (* KW: tactic *)
     "subst"       , SUBST      ;        (* KW: tactic *)
-    "elimT"       , ELIMT      ;        (* KW: tactic *)
     "progress"    , PROGRESS   ;        (* KW: tactic *)
     "trivial"     , TRIVIAL    ;        (* KW: tactic *)
+    "auto"        , AUTO       ;        (* KW: tactic *)
     
     (* Other tactics *)
     "idtac"       , IDTAC      ;        (* KW: tactic *)
@@ -88,6 +88,7 @@
     "smt"         , SMT        ;        (* KW: bytac *)
     "by"          , BY         ;        (* KW: bytac *)
     "reflexivity" , REFLEX     ;        (* KW: bytac *)
+    "done"        , DONE       ;        (* KW: bytac *)
 
     (* PHL: tactics *)
     "transitivity", TRANSITIVITY;       (* KW: tactic *)
@@ -248,13 +249,13 @@ rule main = parse
   | "\"" { STRING (Buffer.contents (string (Buffer.create 0) lexbuf)) }
 
   (* boolean operators *)
-  | '!'   { NOT }
-  | "&&"  { AND true }
-  | "/\\" { AND false }
-  | "||"  { OR true }
-  | "\\/" { OR false }
+  | '!'   { NOT  }
+  | "&&"  { ANDA }
+  | "/\\" { AND  }
+  | "||"  { ORA  }
+  | "\\/" { OR   }
   | "=>"  { IMPL }
-  | "<=>" { IFF }
+  | "<=>" { IFF  }
 
   (* string symbols *)
   | "<-"    { LEFTARROW }

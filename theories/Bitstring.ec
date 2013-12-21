@@ -89,7 +89,7 @@ apply array_ext; split; first smt.
 by cut lx_x0: length (zeros (length x)) = length x
      by (by rewrite length_zeros ?length_pos);
    intros=> i; rewrite length_xor ?lx_x0 // => [leq0_i lti_lx];
-   rewrite get_xor 1?rw_eq_sym // get_zeros // Bool.xor_false.
+   rewrite get_xor 1?eq_sym // get_zeros // Bool.xor_false.
 qed.
 
 require import Real.

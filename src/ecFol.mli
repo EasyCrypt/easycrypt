@@ -137,6 +137,7 @@ module Hf : EHashtbl.S with type key = form
 
 (* -------------------------------------------------------------------- *)
 val mk_form : f_node -> EcTypes.ty -> form
+val f_node  : form -> f_node
 
 (* soft-constructors - common leaves *)
 val f_local : EcIdent.t -> EcTypes.ty -> form

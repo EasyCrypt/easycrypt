@@ -31,6 +31,16 @@ let process_prhl_form ty g phi =
   let hyps = LDecl.push_all [ml; mr] hyps in
     EcCoreHiLogic.process_form hyps phi ty
 
+let process_prhl_post g phi =
+  let env, hyps, concl = get_goal_e g in
+  let (ml, mr) =
+    match concl.f_node with
+    | FequivS es -> (es.es_ml, es.es_mr)
+    | FequivF ef -> snd (EcEnv.Fun.equivF_memenv ef.ef_fl ef.ef_fr env)
+    | _ -> tacuerror "expecting a PRHL statement" in
+  let hyps = LDecl.push_all [ml; mr] hyps in
+  EcCoreHiLogic.process_form hyps phi tbool
+  
 (* -------------------------------------------------------------------- *)
 let process_phl_exp side e ty g =
   let (hyps, concl) = get_goal g in

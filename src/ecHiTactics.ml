@@ -34,13 +34,16 @@ let process_admit g =
   t_admit g
 
 (* -------------------------------------------------------------------- *)
-let process_progress (prtc, mkpv) t =
+let process_progress s (prtc, mkpv) t =
   let t = 
     match t with 
     | None   -> t_id None 
-    | Some t -> prtc mkpv t
+    | Some t -> 
+      if s then tacuerror "progress * do not accept tactic";
+      prtc mkpv t
   in
-    t_progress t
+  if s then t_progress_one
+  else t_progress t 
 
 (* -------------------------------------------------------------------- *)
 let rec process_tactics mkpv (tacs : ptactic list) (gs : goals) : goals =
@@ -87,9 +90,10 @@ and process_tactic_core mkpv (tac : ptactic_core) (gs : goals) : goals =
     | Pdo ((b, n), t) -> `One (t_do b n (process_tactic_core1 mkpv t))
     | Ptry t          -> `One (t_try (process_tactic_core1 mkpv t))
     | Pby t           -> `One (process_by mkpv t)
+    | Por (t1, t2)    -> `One (process_or  mkpv t1 t2)
     | Pseq tacs       -> `One (fun (juc, n) -> process_tactics mkpv tacs (juc, [n]))
     | Pcase i         -> `One (process_case loc i)
-    | Pprogress t     -> `One (process_progress (process_tactic_core1, mkpv) t)
+    | Pprogress (s,t) -> `One (process_progress s (process_tactic_core1,mkpv) t)
     | Padmit          -> `One (process_admit)
     | Pdebug          -> `One (process_debug)
     | Plogic t        -> `One (process_logic (eng, mkpv) loc t)
@@ -107,5 +111,16 @@ and process_tactic_core1 mkpv (tac : ptactic_core) ((juc, n) : goal) : goals =
 
 (* -------------------------------------------------------------------- *)
 and process_by mkpv t (juc, n) =
-  let gs = process_tactics mkpv t (juc, [n]) in
-    t_on_goals EcHiLogic.process_done gs
+  let goal =
+    match t with
+    | None   -> (juc, [n])
+    | Some t -> process_tactics mkpv t (juc, [n])
+  in
+    t_on_goals EcHiLogic.process_done goal
+
+(* -------------------------------------------------------------------- *)
+and process_or mkpv t1 t2 g =
+  t_or
+    (process_tactic1 mkpv t1)
+    (process_tactic1 mkpv t2)
+    g

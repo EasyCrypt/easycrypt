@@ -69,7 +69,7 @@ lemma sum_disj (f:'a -> t) (s1 s2:'a set) :
   disjoint s1 s2 =>
   sum f (union s1 s2) = sum f s1 + sum f s2.
 proof -strict.
- elim /set_ind s1.
+ elim/set_ind s1.
    by intros Hd;rewrite union0s sum_empty addmC addmZ.
  intros x s Hx Hrec Hd;rewrite union_add sum_add.
    by generalize Hd;rewrite disjoint_spec mem_union;smt.
@@ -82,9 +82,9 @@ lemma sum_eq (f1 f2:'a -> t) (s: 'a set) :
    (forall x, mem x s => f1 x = f2 x) =>
    sum f1 s = sum f2 s.
 proof strict.
-  elimT set_ind s.
+  elim/set_ind s.
     by rewrite !sum_empty.
-  intros {s} x s Hx Hr Hf;rewrite sum_add // sum_add // Hf;first smt.
+  intros x s Hx Hr Hf;rewrite sum_add // sum_add // Hf;first smt.
   by rewrite Hr // => y Hin;apply Hf;smt.
 qed.
 
@@ -99,16 +99,16 @@ lemma sum_comp (f: t -> t) (g:'a -> t) (s: 'a set):
   (forall x y, f (x + y) = f x + f y) =>
   sum (fun a, f (g a)) s = f (sum g s).
 proof -strict.
-  intros Hz Ha;elimT set_ind s.
+  intros Hz Ha;elim/set_ind s.
     by rewrite !sum_empty Hz.
-  by intros {s} x s Hx Hr;rewrite sum_add // sum_add //= Hr Ha. 
+  by intros x s Hx Hr;rewrite sum_add // sum_add //= Hr Ha. 
 qed.
 
 lemma sum_add2 (f:'a -> t) (g:'a -> t) (s:'a set):
   (sum f s) + (sum g s) = sum (fun x, f x + g x) s.
 proof strict.
 elim/set_comp s;first by rewrite !sum_empty addmZ.
-intros {s} s s_nempty IH;
+intros s s_nempty IH;
 rewrite (sum_rm f _ (pick s)); first by rewrite mem_pick.
 rewrite (sum_rm g _ (pick s)); first by rewrite mem_pick.
 rewrite (sum_rm _ s (pick s)); first by rewrite mem_pick.
@@ -120,10 +120,9 @@ lemma sum_chind (f:'a -> t) (g:'a -> 'b) (g':'b -> 'a) (s:'a set):
   (sum f s) = sum (fun x, f (g' x)) (img g s).
 proof strict.
 intros=> pcan_g'_g;
-cut := leq_refl s; pose {1 3 4} s' := s.
-elim/set_comp s'.
+elim/set_comp {1 3 4}s (leq_refl s).
   by rewrite !sum_empty img_empty sum_empty.
-  intros {s'} s' s'_nempty IH leq_s'_s;
+  intros s' s'_nempty IH leq_s'_s;
   rewrite (sum_rm _ _ (pick s'));first by rewrite mem_pick.
   rewrite (sum_rm _ (img g s') (g (pick s'))) /=;
     first by rewrite mem_img // mem_pick.
@@ -131,7 +130,7 @@ elim/set_comp s'.
   rewrite IH; first apply (leq_tran s')=> //; apply rm_leq.
   rewrite img_rm;
   (cut ->: (forall x, mem x s' => g (pick s') = g x => pick s' = x) = true)=> //;
-  apply eqT=> x x_in_s g_pick.
+  rewrite eqT=> x x_in_s g_pick.
   rewrite -pcan_g'_g; first by apply leq_s'_s.
   by rewrite -g_pick pcan_g'_g //; apply leq_s'_s; apply mem_pick.
 qed.
@@ -140,16 +139,15 @@ lemma sum_filter (f:'a -> t) (p:'a -> bool) (s:'a set):
   (forall x, (!p x) => f x = Z) =>
   sum f (filter p s) = sum f s.
 proof strict.
-intros=> f_Z; cut := leq_refl s; pose {1 3 4} s' := s;
-elim/set_comp s'.
+intros=> f_Z; elim/set_comp {1 3 4}s (leq_refl s).
   by rewrite FSet.filter_empty.
-  intros=> {s'} s' s'_nempty IH leq_s'_s;
+  intros=> s' s'_nempty IH leq_s'_s;
   rewrite (sum_rm _ s' (pick s')); first by apply mem_pick.
   rewrite -IH;first apply (leq_tran s')=> //; apply rm_leq.
   case (p (pick s'))=> p_pick.
     by rewrite (sum_rm _ (filter p s') (pick s')) ?rm_filter // mem_filter;
        split=> //; apply mem_pick.
-    by rewrite f_Z // -rm_filter addmC addmZ -rm_nin_id // mem_filter -rw_nand;
+    by rewrite f_Z // -rm_filter addmC addmZ -rm_nin_id // mem_filter -nand;
        right=> //.
 qed.
 
@@ -226,7 +224,7 @@ theory NatMul.
     last by delta s'; apply leq_refl.
   elim/set_comp s'.
     by rewrite sum_empty card_empty MulZ.
-    intros=> {s'} s' s'_nempty IH leq_s'_s.
+    intros=> s' s'_nempty IH leq_s'_s.
     rewrite (sum_rm _ _ (pick s'));first by rewrite mem_pick.
     rewrite IH; first by apply (leq_tran s')=> //; apply rm_leq.
     rewrite f_x; first by apply leq_s'_s; apply mem_pick.
@@ -265,7 +263,7 @@ theory Miplus.
     rewrite /sum_n;elim /Int.Induction.induction k.
       rewrite sum_ij_eq => /=.
       by elim (ediv_unique 0 2 0 0 _ _ _) => //; smt.
-    intros {k} k Hk Hrec;rewrite sum_ij_le_r;first smt.
+    intros k Hk Hrec;rewrite sum_ij_le_r;first smt.
     cut -> : k + 1 - 1 = k;first smt.
     rewrite Hrec /=.
     elim (ediv_unique ((k + 1) * (k + 1 + 1)) 2 (k * (k + 1) /% 2 + (k + 1)) 0 _ _ _) => //.
@@ -290,8 +288,8 @@ theory Miplus.
    sum_n i j = i*((j - i)+1) + sum_n 0 ((j - i)).
  proof -strict.
    intros Hle;rewrite {1} (_: j=i+(j-i));first smt.
-   elim /Int.Induction.induction (j-i) => /=;last smt.
-    rewrite !sum_n_ii //.
+   cut: 0 <= (j-i) by smt; elim/Int.Induction.induction (j-i)=> //=.
+   by rewrite !sum_n_ii.
    intros {j Hle} j Hj; rewrite -CommutativeGroup.Assoc sum_n_ij1;smt.
  qed.
 
@@ -348,11 +346,11 @@ proof -strict.
     apply ex_for; delta p=> {p}; generalize sum_true; apply absurd=> /= h.
   cut := FSet.leq_refl s; pose {1 3} s' := s;elim/set_ind s'.
     by rewrite Mbor.sum_empty.
-  intros=> {s'} x s' nmem IH leq_adds'_s;
+  intros=> x s' nmem IH leq_adds'_s;
   cut leq_s'_s : s' <= s by (apply (FSet.leq_tran (add x s'))=> //; 
   apply leq_add);
-  rewrite Mbor.sum_add // -rw_nor IH // /=;
-  cut := h x; rewrite -rw_nand;
+  rewrite Mbor.sum_add // -nor IH // /=;
+  cut := h x; rewrite -nand;
   case (mem x s)=> //=;
   by cut := leq_adds'_s x; rewrite mem_add //= => ->.
 qed.
@@ -368,7 +366,7 @@ lemma cpOrs_add s (p:('a -> bool)) :
   cpOrs (FSet.add p s) = cpOr p (cpOrs s).
 proof -strict.
   apply fun_ext => y.
-  rewrite /cpOrs /cpOr /= !or_exists rw_eq_iff;split=> /=.
+  rewrite /cpOrs /cpOr /= !or_exists eq_iff;split=> /=.
     intros [x ];rewrite FSet.mem_add => [ [ ] H H0];first by right;exists x.
     by left;rewrite -H.
   intros [H | [x [H1 H2]]];first by exists p;rewrite FSet.mem_add.
@@ -379,7 +377,7 @@ lemma mu_ors d (X:('a->bool) set):
   disj_or X =>
   mu d (cpOrs X) = Mrplus.sum (fun P, mu d P) X.
 proof strict.
-  elim/set_ind X=> {X}.
+  elim/set_ind X.
     by intros disj;rewrite Mrplus.sum_empty cpOrs0 mu_false.
   intros f X f_nin_X IH disj; rewrite Mrplus.sum_add // cpOrs_add mu_disjoint.
     rewrite /cpAnd /cpFalse=> x' /=;
@@ -403,7 +401,7 @@ proof strict.
   pose sup := ISet.Finite.toFSet (ISet.create (support d)).
   pose is  := img (fun x y, p x /\ x = y) sup.
   rewrite mu_in_supp (mu_eq d _ (cpOrs is)).
-    intros y;rewrite /cpAnd /is /cpOrs /= or_exists rw_eq_iff;split.
+    intros y;rewrite /cpAnd /is /cpOrs /= or_exists eq_iff;split.
       intros [H1 H2];exists ((fun x0 y0, p x0 /\ x0 = y0) y);split => //.
       by apply mem_img;rewrite /sup ISet.Finite.mem_toFSet // ISet.mem_create.
     intros [p' []].
@@ -412,7 +410,7 @@ proof strict.
     rewrite /is => x1 x2 Hx; rewrite !img_def => [y1 [Heq1 Hm1]] [y2 [Heq2 Hm2]].
     subst; generalize Hx => /= Hx a [Hpa1 Heq1];rewrite -not_def => [Hpa2 Heq2].
     by subst; generalize Hx;rewrite not_def.
-  rewrite /is => {is};elimT set_ind sup.
+  rewrite /is => {is};elim/set_ind sup.
     by rewrite img_empty !Mrplus.sum_empty.
   intros x s Hnm Hrec;rewrite FSet.img_add Mrplus.sum_add0.
     rewrite img_def /= => [x0 [H1 H2]].

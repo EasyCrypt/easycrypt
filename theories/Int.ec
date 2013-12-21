@@ -118,7 +118,7 @@ theory Power.
 
   lemma Power_pos (x n:int): 0 <= n => 0 < x => 0 < x ^ n.
   proof -strict.
-  by intros n_pos x_pos; elim/Induction.induction n=> //; smt.
+  by intros n_pos x_pos; elim/Induction.induction n n_pos=> //; smt.
   qed.
 end Power.
 export Power.
@@ -153,7 +153,7 @@ theory ForLoop.
   intros=> eq_iBj_n gt0_n; generalize i j eq_iBj_n.
   cut ge0_n: 0 <= n by smt; generalize ge0_n gt0_n st.
   elim/Induction.induction n; first smt.
-  intros=> {n} n ge0_n IH _ st i j.
+  intros=> n ge0_n IH _ st i j.
   case (n = 0); first intros=> -> h.
     by (cut ->: j = i+1 by smt); rewrite range_ind ?range_base; smt.
   intros=> nz_n eq_iBj_Sn; rewrite range_ind; first by smt.
@@ -167,11 +167,8 @@ theory ForLoop.
      (b /\ forall k, i <= k < j => p k).
   proof strict.
   case (i < j)=> i_j; last smt.
-  pose n:= j - i; cut ->: j = n + i by smt.
-  elim/Induction.induction n; first last; last 2 smt.
-  intros=> k leq0_k IH.
-  rewrite ForLoop.range_ind_lazy //= 1?(_: k + 1 + i - 1 = k + i); first 2 smt.
-  by rewrite IH; smt.
+  pose n := j - i; cut ->: j = n + i by smt.
+  by cut: 0 <= n by smt; elim/Induction.induction n; smt.
   qed.
 
   (* General result on restricting the range *)
@@ -179,14 +176,9 @@ theory ForLoop.
     0 <= j - i =>
     ForLoop.range i j base (fun k a, if i <= k < j then f k a else a) = ForLoop.range i j base f.
   proof strict.
-  intros=> h.
-  case (0 = j - i)=> h2; first smt.
-  pose k:= j - i - 1.
-  cut {1 3}->: j = k + i + 1 by smt.
-  cut: k < j - i by smt.
-  elim /Induction.induction k; first last; last 2 smt.
-  progress; rewrite !(ForLoop.range_ind_lazy _ (i0 + 1 + i + 1)); first 2 smt.
-  cut ->: i0 + 1 + i + 1 - 1 = i0 + i + 1 by smt.
-  by rewrite H0; smt.
+  intros=> h; case (0 = j - i)=> h2; first smt.
+  pose k:= j - i - 1; cut {1 3}->: j = k + i + 1 by smt.
+  cut: k < j - i by smt; cut: 0 <= k by smt.
+  by elim/Induction.induction k; smt.
   qed.
 end ForLoop.

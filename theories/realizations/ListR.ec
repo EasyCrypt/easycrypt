@@ -113,7 +113,7 @@ qed.
 lemma all_cons (p:('a -> bool)) x xs:
   all p (x::xs) = ((p x) /\ all p xs).
 proof strict.
-rewrite /all rw_eq_iff; split.
+rewrite /all eq_iff; split.
   intros=> Hxxs; split; try (intros=> x' x'_in_xs); apply Hxxs; rewrite mem_cons; [by left | by right].
   intros=> [Hx Hxs] x' x'_in_xxs; case (x' = x)=> x_x'.
     by subst x'.
@@ -142,12 +142,12 @@ lemma any_nil (p:('a -> bool)): !(any p []) by [].
 lemma any_cons (p:('a -> bool)) x xs:
   any p (x::xs) = ((p x) \/ any p xs).
 proof strict.
-rewrite /any rw_eq_iff; split.
-  intros=> Hxxs; elim Hxxs=> {Hxxs} x' [Hxxs Hxs] //; case (x' = x)=> x'_x.
+rewrite /any eq_iff; split.
+  intros=> Hxxs; elim Hxxs=> x' [Hxxs Hxs] //; case (x' = x)=> x'_x.
     by subst x'; left.
     by right; exists x'; split=> //;
        generalize Hxxs; rewrite mem_cons=> Hxxs; elim Hxxs=> //; apply absurd.
-   by intros=> [Hx | Hxs]; [exists x | elim Hxs=> {Hxs} x' [Hxs Hx']; exists x']; split;
+   by intros=> [Hx | Hxs]; [exists x | elim Hxs=> x' [Hxs Hx']; exists x']; split;
       rewrite ?mem_cons //; right.
 qed.
 
@@ -224,7 +224,7 @@ lemma count_nil (x:'a): count x [] = 0 by [].
 lemma count_cons (x y:'a) xs:
   count y (x::xs) = count y xs + (if (x = y) then 1 else 0).
 proof strict.
-by rewrite /count list_rect_cons /= (rw_eq_sym x y).
+by rewrite /count list_rect_cons /= (eq_sym x y).
 qed.
 
 (** unique *)
@@ -251,7 +251,7 @@ by (rewrite /rm list_rect_nil //).
 lemma rm_cons (x y:'a) xs:
   rm y (x::xs) = ((x = y) ? xs : (x::rm y xs)).
 proof strict.
-by rewrite /rm list_rect_cons /= (rw_eq_sym x y).
+by rewrite /rm list_rect_cons /= (eq_sym x y).
 qed.
 
 (** Equality up to permutation *)

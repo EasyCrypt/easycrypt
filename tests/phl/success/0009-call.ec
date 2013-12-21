@@ -23,5 +23,5 @@ proof -strict.
     proc;wp;skip.
     intros &m _;subst;simplify;split.
   skip.
-  intros &m h;elim h;clear h;intros _ _;subst;simplify;split.
+  intros &m h; elim h => _ _; subst; simplify; split.
 qed.

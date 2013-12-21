@@ -366,11 +366,11 @@ and process_internal ld scope g =
 (* -------------------------------------------------------------------- *)
 let loader  = EcLoader.create ()
 
-let addidir ?system (idir : string) =
-  EcLoader.addidir ?system idir loader
+let addidir ?system ?recursive (idir : string) =
+  EcLoader.addidir ?system ?recursive idir loader
 
 let loadpath () =
-  EcLoader.aslist loader
+  List.map fst (EcLoader.aslist loader)
 
 (* -------------------------------------------------------------------- *)
 let initial ~boot ~wrapper =

@@ -11,25 +11,25 @@ DONE  - bd_hoare -> phoare
 DONE  - bdhoare_* -> phoare_*
 DONE  - *_deno -> bydeno (byphoare | byequiv)
 
-  - fst -> .`1
-  - snd -> .`2
+WONT  - fst -> .`1
+WONT  - snd -> .`2
 
 DONE * Comportement par défaut devrait etre `proof strict' (ceci est une décision unilatérale de François)
 
 * Discuter la syntaxe des opérateurs
 
-* Type de retour optionnel pour les procédures + inférence pour les var. locales
-
-* Chainage pour les déclarations abstraites:
-
+* Type de retour optionnel pour les procédures
+DONE  + inférence pour les var. locales
+DONE
+DONE * Chainage pour les déclarations abstraites:
+DONE
 DONE   type t1, ..., tn.
-
-  var  x1, ..., xn.
-
-  Avec ou sans virgule ?
-
-* Permettre les accès directs aux fonctions dans les foncteurs
-
+DONE   var  x1, ..., xn.
+DONE
+DONE   result: with comma (Avec ou sans virgule ?)
+DONE
+DONE * Permettre les accès directs aux fonctions dans les foncteurs
+DONE   (via `x <- call')
 DONE * interface de module / proc.
 DONE
 DONE   proc * id(arg...) : t { restr } (* `*' est maintenant en dehors - 16082 *)
@@ -37,26 +37,30 @@ DONE
 DONE   + `arg' peut maintenant être de la forme `_ : t1 * ... * tn'
 DONE      actuellement, la syntaxe est ,t1 * ... * tn
 
-* if / while -> parenthèses sur la condition ? (interaction avec les accolades)
+WONT * if / while -> parenthèses sur la condition ? (interaction avec les accolades)
+       Wont because braces are not mandatory for the body
 
 * intro-pattern ->>, <<- pour substitution d'une variable par un terme (voir pour un rewrite in *)
 
-* rewrite in + apply in à la Coq
+* rewrite in
+DONE  + apply in à la Coq
 
 * by < ; < first, last -> cas t; first by (t2; t3); t4
 
 DONE * cut by t -> currently cut; first t. Should be cut; first by t.
 DONE   idem for lemma ... by ...
+DONE
+DONE * by [] everywhere
+DONE
+DONE * apply -> gestion de <=>
+DONE
+DONE * t1 || t2 -> or-else
 
-* by [] everywhere
-
-* apply -> gestion de <=>
-
-* t1 || t2 -> or-else
+    ; < || < first, last
 
 * case pour PHL -> à lier à celui de la logique ambiente
 
-* bd_hoare / hoare à top-level
+DONE * bd_hoare / hoare à top-level
 
 * bd_hoare -> phoare / phl
 	bd_hoare [fident ...] relation form // pas sform
@@ -86,7 +90,7 @@ HALF-DONE (only for non-exported functions) * détection du code mort
 
     rnd -> mettre ou enlever le `:' (rnd_info)
 
-    inline * -> inline tout le monde d'un niveau
+    DONE inline * -> inline tout le monde d'un niveau
 
     kill -> utiliser la syntaxe des intervals pour rewrite
 
@@ -105,11 +109,11 @@ HALF-DONE (only for non-exported functions) * détection du code mort
     pr_bounded -> à virer
 
     DONE hoare / bdhoare -> fusionner en hoare
-
+    DONE
     DONE rewrite Pr -> intégrer dans rewrite
-
+    DONE
     DONE pr_false -> à enlever
-
+    DONE
     DONE pr_eq -> à enlever (* Ce fait avec conseq *)
 	
 	exists* -> utilise alias
@@ -120,8 +124,8 @@ HALF-DONE (only for non-exported functions) * détection du code mort
 	
 X : tacdir : << | >> | ε
 
-* Semantique des tactiques:
-    eqobs_in, hoare devraient sur les procedures, pas seulement les statements
+DONE * Semantique des tactiques:
+DONE    eqobs_in, hoare devraient sur les procedures, pas seulement les statements
 
     Pr[...] sur les statements et pas seulement sur les procedures?
 

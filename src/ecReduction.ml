@@ -210,7 +210,9 @@ let no_red = {
 
 let beta_red = { no_red with beta = true }
 let betaiota_red = { no_red with beta = true; iota = true }
-
+let nodelta = 
+  { full_red with delta_h = Some Mid.empty; 
+    delta_p = Some EcPath.Mp.empty }
 let reduce_local ri hyps x  = 
   match ri.delta_h with
   | None -> LDecl.reduce_var x hyps 

@@ -46,6 +46,8 @@ type 'a pterm_arg =
   | `SideCond   of EcFol.form
   | `UnknownVar of EcIdent.t * 'a ]
 
+val ffpattern_of_genpattern : LDecl.hyps -> genpattern -> ffpattern option
+
 val evmap_of_pterm_arguments : ('a pterm_arg) list -> form EcMetaProg.evmap
 
 val check_pterm_arg_for_ty :

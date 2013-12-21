@@ -36,6 +36,7 @@ val full_red     : reduction_info
 val no_red       : reduction_info
 val beta_red     : reduction_info
 val betaiota_red : reduction_info
+val nodelta      : reduction_info
 
 val h_red_opt : reduction_info -> LDecl.hyps -> form -> form option
 val h_red     : reduction_info -> LDecl.hyps -> form -> form

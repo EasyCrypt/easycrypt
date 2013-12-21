@@ -291,7 +291,7 @@ module Ty : sig
   val unfold  : path -> EcTypes.ty list -> env -> EcTypes.ty
   val hnorm   : EcTypes.ty -> env -> EcTypes.ty
 
-  val scheme_of_ty : EcTypes.ty -> env -> path option
+  val scheme_of_ty : EcTypes.ty -> env -> (path * EcTypes.ty list) option
 end
 
 (* -------------------------------------------------------------------- *)

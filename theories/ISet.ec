@@ -76,7 +76,7 @@ lemma mem_rm (x x':'a) (X:'a set):
   mem x (rm x' X) = (mem x X /\ x <> x').
 proof strict.
 case (x = x')=> x_x'.
-  by subst x'; logic; apply neqF; apply mem_rm_eq.
+  by subst x'; logic; rewrite neqF; apply mem_rm_eq.
   by logic; apply mem_rm_neq.
 qed.
 
@@ -269,7 +269,7 @@ theory Finite.
   lemma mem_toFSet (x:'a) X: finite X =>
     FSet.mem x (toFSet X) <=> mem x X.
   proof strict.
-  intros=> fX; rewrite -rw_eq_iff rw_eq_sym rw_eq_iff.
+  intros=> fX; rewrite -eq_iff eq_sym eq_iff.
   generalize x; rewrite -/(Finite.(==) X _).
   by apply toFSet_cor.
   qed.
@@ -310,9 +310,9 @@ theory Finite.
   (* We should then show that all set operations correspond as expected *)
   lemma finite_empty: finite empty<:'a>.
   proof strict.
-  exists FSet.empty=> x. 
-  rewrite (neqF (mem x empty)); first by rewrite mem_empty.
-  by rewrite (neqF (FSet.mem x (FSet.empty))) ?FSet.mem_empty.
+  exists FSet.empty=> x.
+  rewrite (_: (mem x empty) = false) 1:neqF 1:mem_empty //.
+  by rewrite (_: (FSet.mem x (FSet.empty)) = false) 1:neqF 1:FSet.mem_empty.
   qed.
 
   lemma toFSet_empty: toFSet empty<:'a> = FSet.empty.

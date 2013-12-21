@@ -109,12 +109,19 @@ let unify_core (env : EcEnv.env) (tvtc : Sp.t Mid.t) (uf : UF.t) t1 t2 =
       if odfl false (snd ti |> omap (ocheck i)) then failure ();
       List.iter (Queue.push^~ pb) effects;
       uf := UF.set i ti !uf
+
+  and getvar t =
+    match t.ty_node with
+    | Tunivar i -> odfl t (snd (UF.data i !uf))
+    | _ -> t
+
   in
 
   let doit () =
     while not (Queue.is_empty pb) do
       match Queue.pop pb with
       | `TyUni (t1, t2) -> begin
+        let (t1, t2) = (getvar t1, getvar t2) in
         match ty_equal t1 t2 with
         | true  -> ()
         | false -> begin

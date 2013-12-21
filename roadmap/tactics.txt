@@ -3,11 +3,7 @@ idees: un mot cle de memoire old accessible uniquement en post x{old}, x{old.`1}
 
 extention a fun:
   eqobs_in
-  hoare
 
-bypr doit marcher sur hoare (forall &m, pre{m} => Pr[f: post] <> 0)
-
-fun * doit marcher en bd hoare 
 extention:
   wp
   sp
