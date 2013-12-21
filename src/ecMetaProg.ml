@@ -295,100 +295,147 @@ end
 (* -------------------------------------------------------------------- *)
 exception MatchFailure
 
+type fmoptions = {
+  fm_delta : bool;
+}
+
+let fmrigid = { fm_delta = false; }
+let fmdelta = { fm_delta = true ; }
+
 (* Rigid unification *)
-let f_match hyps ue ev ptn subject =
+let f_match opts hyps ue ev ptn subject =
   let ue  = EcUnify.UniEnv.copy ue in
   let ev  = let Ev ev = ev in ref ev in
   let env = EcEnv.LDecl.toenv hyps in
 
   let rec doit ((subst, mxs) as ilc) ptn subject =
-    match ptn.f_node, subject.f_node with
-    | Flocal x1, Flocal x2 when Mid.mem x1 mxs -> begin
-        if not (id_equal (oget (Mid.find_opt x1 mxs)) x2) then
-          raise MatchFailure;
-        try  EcUnify.unify env ue ptn.f_ty subject.f_ty
-        with EcUnify.UnificationFailure _ -> raise MatchFailure
-    end
-
-    | Flocal x1, Flocal x2 when id_equal x1 x2 -> begin
-        try  EcUnify.unify env ue ptn.f_ty subject.f_ty
-        with EcUnify.UnificationFailure _ -> raise MatchFailure
-    end
-
-    | Flocal x, _ -> begin
-        match Mid.find_opt x !ev with
-        | None ->
-            raise MatchFailure
-
-        | Some None ->
-          if not (Mid.set_disjoint mxs subject.f_fv) then
+    try
+      match ptn.f_node, subject.f_node with
+      | Flocal x1, Flocal x2 when Mid.mem x1 mxs -> begin
+          if not (id_equal (oget (Mid.find_opt x1 mxs)) x2) then
             raise MatchFailure;
-          begin
-            try  EcUnify.unify env ue ptn.f_ty subject.f_ty
-            with EcUnify.UnificationFailure _ -> raise MatchFailure;
-          end;
-          ev := Mid.add x (Some subject) !ev
-
-        | Some (Some a) -> begin
-            if not (EcReduction.is_alpha_eq hyps subject a) then
+          try  EcUnify.unify env ue ptn.f_ty subject.f_ty
+          with EcUnify.UnificationFailure _ -> raise MatchFailure
+      end
+  
+      | Flocal x1, Flocal x2 when id_equal x1 x2 -> begin
+          try  EcUnify.unify env ue ptn.f_ty subject.f_ty
+          with EcUnify.UnificationFailure _ -> raise MatchFailure
+      end
+  
+      | Flocal x, _ -> begin
+          match Mid.find_opt x !ev with
+          | None ->
+              raise MatchFailure
+  
+          | Some None ->
+            if not (Mid.set_disjoint mxs subject.f_fv) then
               raise MatchFailure;
-            try  EcUnify.unify env ue ptn.f_ty subject.f_ty
-            with EcUnify.UnificationFailure _ -> raise MatchFailure
-        end
-    end
+            begin
+              try  EcUnify.unify env ue ptn.f_ty subject.f_ty
+              with EcUnify.UnificationFailure _ -> raise MatchFailure;
+            end;
+            ev := Mid.add x (Some subject) !ev
   
-    | Fquant (b1, q1, f1), Fquant (b2, q2, f2)
-        when b1 = b2 && List.length q1 = List.length q2
-      ->
-      let (subst, mxs) = doit_bindings (subst, mxs) q1 q2 in
-        doit (subst, mxs) f1 f2
-
-    | Fquant _, Fquant _ ->
-        raise MatchFailure
-
-    | Fpvar (pv1, m1), Fpvar (pv2, m2) ->
-        let pv1 = EcEnv.NormMp.norm_pvar env pv1 in
-        let pv2 = EcEnv.NormMp.norm_pvar env pv2 in
-          if not (EcTypes.pv_equal pv1 pv2) then
-            raise MatchFailure;
-          if not (EcMemory.mem_equal m1 m2) then
-            raise MatchFailure
+          | Some (Some a) -> begin
+              if not (EcReduction.is_alpha_eq hyps subject a) then
+                raise MatchFailure;
+              try  EcUnify.unify env ue ptn.f_ty subject.f_ty
+              with EcUnify.UnificationFailure _ -> raise MatchFailure
+          end
+      end
+    
+      | Fquant (b1, q1, f1), Fquant (b2, q2, f2)
+          when b1 = b2 && List.length q1 = List.length q2
+        ->
+        let (subst, mxs) = doit_bindings (subst, mxs) q1 q2 in
+          doit (subst, mxs) f1 f2
   
-    | Fif (c1, t1, e1), Fif (c2, t2, e2) ->
-        List.iter2 (doit ilc) [c1; t1; e1] [c2; t2; e2]
-  
-    | Fint i1, Fint i2 ->
-        if i1 <> i2 then raise MatchFailure
-  
-    | Fapp (f1, fs1), Fapp (f2, fs2) ->
-        if List.length fs1 <> List.length fs2 then
-          raise MatchFailure;
-        List.iter2 (doit ilc) (f1::fs1) (f2::fs2)
-  
-    | Fop (op1, tys1), Fop (op2, tys2) -> begin
-        if not (EcPath.p_equal op1 op2) then
-          raise MatchFailure;
-        try  List.iter2 (EcUnify.unify env ue) tys1 tys2
-        with EcUnify.UnificationFailure _ -> raise MatchFailure
-    end
-  
-    | Fglob (mp1, me1), Fglob (mp2, me2) ->
-        let mp1 = EcEnv.NormMp.norm_mpath env mp1 in
-        let mp2 = EcEnv.NormMp.norm_mpath env mp2 in
-          if not (EcPath.m_equal mp1 mp2) then
-            raise MatchFailure;
-          if not (EcMemory.mem_equal me1 me2) then
-            raise MatchFailure
-  
-    | Ftuple fs1, Ftuple fs2 ->
-        if List.length fs1 <> List.length fs2 then
-          raise MatchFailure;
-        List.iter2 (doit ilc) fs1 fs2
-
-    | _, _ ->
-      let ptn = Fsubst.f_subst subst ptn in
-        if not (EcReduction.is_alpha_eq hyps ptn subject) then
+      | Fquant _, Fquant _ ->
           raise MatchFailure
+  
+      | Fpvar (pv1, m1), Fpvar (pv2, m2) ->
+          let pv1 = EcEnv.NormMp.norm_pvar env pv1 in
+          let pv2 = EcEnv.NormMp.norm_pvar env pv2 in
+            if not (EcTypes.pv_equal pv1 pv2) then
+              raise MatchFailure;
+            if not (EcMemory.mem_equal m1 m2) then
+              raise MatchFailure
+    
+      | Fif (c1, t1, e1), Fif (c2, t2, e2) ->
+          List.iter2 (doit ilc) [c1; t1; e1] [c2; t2; e2]
+    
+      | Fint i1, Fint i2 ->
+          if i1 <> i2 then raise MatchFailure
+
+      | Fapp (f1, fs1), Fapp (f2, fs2) ->
+          doit_args ilc (f1::fs1) (f2::fs2)
+   
+      | Fglob (mp1, me1), Fglob (mp2, me2) ->
+          let mp1 = EcEnv.NormMp.norm_mpath env mp1 in
+          let mp2 = EcEnv.NormMp.norm_mpath env mp2 in
+            if not (EcPath.m_equal mp1 mp2) then
+              raise MatchFailure;
+            if not (EcMemory.mem_equal me1 me2) then
+              raise MatchFailure
+    
+      | Ftuple fs1, Ftuple fs2 ->
+          if List.length fs1 <> List.length fs2 then
+            raise MatchFailure;
+          List.iter2 (doit ilc) fs1 fs2
+  
+      | Fop (op1, tys1), Fop (op2, tys2) -> begin
+          if not (EcPath.p_equal op1 op2) then
+            raise MatchFailure;
+          try  List.iter2 (EcUnify.unify env ue) tys1 tys2
+          with EcUnify.UnificationFailure _ -> raise MatchFailure
+      end
+  
+      | _, _ ->
+        let ptn = Fsubst.f_subst subst ptn in
+          if not (EcReduction.is_alpha_eq hyps ptn subject) then
+            raise MatchFailure
+
+    with MatchFailure when opts.fm_delta ->
+      match fst_map f_node (destr_app ptn),
+            fst_map f_node (destr_app subject)
+      with
+      | (Fop (op1, tys1), args1), (Fop (op2, tys2), args2) -> begin
+          try
+            if not (EcPath.p_equal op1 op2) then
+              raise MatchFailure;
+            try
+              List.iter2 (EcUnify.unify env ue) tys1 tys2;
+              doit_args ilc args1 args2
+            with EcUnify.UnificationFailure _ -> raise MatchFailure
+          with MatchFailure ->
+            if EcEnv.Op.reducible env op1 then
+              doit_reduce ((doit ilc)^~ subject) ptn.f_ty op1 tys1 args1
+            else if EcEnv.Op.reducible env op2 then
+              doit_reduce (doit ilc ptn) subject.f_ty op2 tys2 args2
+            else
+              raise MatchFailure
+      end
+  
+      | (Fop (op1, tys1), args1), _ when EcEnv.Op.reducible env op1 ->
+          doit_reduce ((doit ilc)^~ subject) ptn.f_ty op1 tys1 args1
+  
+      | _, (Fop (op2, tys2), args2) when EcEnv.Op.reducible env op2 ->
+          doit_reduce (doit ilc ptn) subject.f_ty op2 tys2 args2
+
+      | _, _ -> raise MatchFailure
+
+  and doit_args ilc fs1 fs2 =
+    if List.length fs1 <> List.length fs2 then
+      raise MatchFailure;
+    List.iter2 (doit ilc) fs1 fs2
+
+  and doit_reduce cb ty op tys f =
+    let reduced =
+      try  f_app (EcEnv.Op.reduce env op tys) f ty
+      with NotReducible -> raise MatchFailure
+    in
+      cb (odfl reduced (EcReduction.h_red_opt EcReduction.beta_red hyps reduced))
 
   and doit_bindings (subst, mxs) q1 q2 =
     let doit_binding (subst, mxs) (x1, gty1) (x2, gty2) =
@@ -451,8 +498,8 @@ let f_match hyps ue ev ptn subject =
   in
     doit (Fsubst.f_subst_id, Mid.empty) ptn subject; (ue, Ev !ev)
 
-let f_match hyps (ue, ev) ~ptn subject =
-  let (ue, Ev ev) = f_match hyps ue ev ptn subject in
+let f_match opts hyps (ue, ev) ~ptn subject =
+  let (ue, Ev ev) = f_match opts hyps ue ev ptn subject in
     if not (Mid.for_all (fun _ x -> x <> None) ev) then
       raise MatchFailure;
     let clue =

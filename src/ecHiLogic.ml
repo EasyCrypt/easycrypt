@@ -254,7 +254,7 @@ let process_subst loc ri g =
 (* -------------------------------------------------------------------- *)
 exception RwMatchFound of EcUnify.unienv * (uid -> ty option) * form evmap
 
-let try_match hyps (ue, ev) p form =
+let try_match opts hyps (ue, ev) p form =
   let na = List.length (snd (EcFol.destr_app p)) in
 
   let trymatch bds tp =
@@ -270,7 +270,7 @@ let try_match hyps (ue, ev) p form =
       if not (Mid.set_disjoint bds tp.f_fv) then
         None
       else
-        let (ue, tue, ev) = f_match hyps (ue, ev) ~ptn:p tp in
+        let (ue, tue, ev) = f_match opts hyps (ue, ev) ~ptn:p tp in
           raise (RwMatchFound (ue, tue, ev))
     with MatchFailure -> None
   in
@@ -280,38 +280,41 @@ let try_match hyps (ue, ev) p form =
   with RwMatchFound (ue, tue, ev) -> Some (ue, tue, ev)
 
 (* -------------------------------------------------------------------- *)
-let process_apply loc pe g =
+let process_apply_on_goal loc pe g =
   let (hyps, fp) = (get_hyps g, get_concl g) in
   let (p, typs, ue, ax) = process_pterm loc (process_formula hyps) hyps pe in
   let args = List.map (trans_pterm_argument hyps ue) pe.fp_args in
   let (ax, ids) = check_pterm_arguments hyps ue ax args in
 
-  let rec instanciate (ax, ids) =
-    let ev = evmap_of_pterm_arguments ids in
-
-    try  (ax, ids, EcMetaProg.f_match hyps (ue, ev) ax fp);
-    with MatchFailure ->
-      match destruct_product hyps ax with
-      | None   -> tacuerror "in apply, cannot find instance"
-      | Some _ ->
-          let (ax, id) = check_pterm_argument hyps ue ax None in
-            instanciate (ax, id :: ids)
-  in
-
   let (_, ids, (_, tue, ev)) =
-    let fully_instantiate =
-      can_concretize_pterm_arguments (ue, EV.empty) ids
+    let rec instanciate (ax, ids) =
+      let withmatch () =
+        let ev = evmap_of_pterm_arguments ids in
+  
+          try  (ax, ids, EcMetaProg.f_match fmdelta hyps (ue, ev) ax fp);
+          with MatchFailure ->
+            match destruct_product hyps ax with
+            | None   -> tacuerror "in apply, cannot find instance"
+            | Some _ ->
+              let (ax, id) = check_pterm_argument hyps ue ax None in
+                instanciate (ax, id :: ids)
+      in
+  
+      let flinst = can_concretize_pterm_arguments (ue, EV.empty) ids in
+  
+        match flinst with
+        | false -> withmatch ()
+        | true  ->
+            let closedax = Fsubst.uni (EcUnify.UniEnv.close ue) ax in
+  
+            if EcReduction.is_conv hyps closedax fp then begin
+              (ax, ids, (ue, EcUnify.UniEnv.close ue, EV.empty))
+            end else
+              withmatch ()
+
     in
+      instanciate (ax, ids)
 
-      match fully_instantiate with
-      | false -> instanciate (ax, ids)
-      | true  ->
-          let closedax = Fsubst.uni (EcUnify.UniEnv.close ue) ax in
-
-          if EcReduction.is_conv hyps closedax fp then begin
-            (ax, ids, (ue, EcUnify.UniEnv.close ue, EV.empty))
-          end else
-            instanciate (ax, ids)
   in
 
   let args = concretize_pterm_arguments (tue, ev) ids in
@@ -329,6 +332,69 @@ let process_apply loc pe g =
         assert (typs = []);
         gen_t_apply_form (fun _ _ x -> x)
           (Fsubst.uni (EcUnify.UniEnv.close ue) fc) args g
+
+(* -------------------------------------------------------------------- *)
+let process_apply_on_hyp loc (pe, hyp) g =
+  let (hyps, _) = (get_hyps g, get_concl g) in
+
+  if not (LDecl.has_hyp (unloc hyp) hyps) then
+    tacuerror "unknown hypothesis: %s" (unloc hyp);
+
+  let hyp, fp = LDecl.lookup_hyp (unloc hyp) hyps in
+  let (p, typs, ue, ax) = process_pterm loc (process_formula hyps) hyps pe in
+  let args = List.map (trans_pterm_argument hyps ue) pe.fp_args in
+  let (ax, ids) = check_pterm_arguments hyps ue ax args in
+
+  let (_, ids, (_, tue, ev), (_, cutf)) =
+    let rec instanciate (ax, ids) =
+      match destruct_product hyps ax with
+      | None -> tacuerror "in apply, cannot find instance"
+
+      | Some (`Forall _) ->
+          let (ax, id) = check_pterm_argument hyps ue ax None in
+            instanciate (ax, id :: ids)
+
+      | Some (`Imp (f1, f2)) ->
+          let ev = evmap_of_pterm_arguments ids in
+  
+          try  (ax, ids, EcMetaProg.f_match fmdelta hyps (ue, ev) f1 fp, (f1, f2));
+          with MatchFailure ->
+            tacuerror "in apply, cannot find instance"
+
+    in
+      instanciate (ax, ids)
+
+  in
+
+  let cutf  = concretize_form (tue, ev) cutf in
+  let bargs = concretize_pterm_arguments (tue, ev) ids in
+  let args  = bargs @ [AAnode] in
+  let typs  = List.map (Tuni.offun tue) typs in
+  let tcut  =
+    match p with
+    | `Global p ->
+        gen_t_apply_glob (fun _ _ x -> x) p typs args
+
+    | `Local x -> 
+        assert (typs = []);
+        gen_t_apply_hyp (fun _ _ x -> x) x args
+
+    | `Cut fc ->
+        assert (typs = []);
+        gen_t_apply_form
+          (fun _ _ x -> x)
+          (Fsubst.uni (EcUnify.UniEnv.close ue) fc) args
+  in
+    t_subgoal
+      [t_seq (t_clear (Sid.singleton hyp)) (t_intros_i [hyp]);
+       (fun g -> t_on_last (t_hyp hyp) (tcut g))]
+      (t_rotate `Left 1 (t_cut cutf g))
+
+(* -------------------------------------------------------------------- *)
+let process_apply loc (pe, tg) g =
+  match tg with
+  | None    -> process_apply_on_goal loc pe g
+  | Some tg -> process_apply_on_hyp  loc (pe, tg) g
 
 (* -------------------------------------------------------------------- *)
 let process_rewrite1_core (s, o) (p, typs, ue, ax) args g =
@@ -361,7 +427,7 @@ let process_rewrite1_core (s, o) (p, typs, ue, ax) args g =
   let (_ue, tue, ev) =
     let ev = evmap_of_pterm_arguments ids in
 
-    match try_match hyps (ue, ev) fp concl with
+    match try_match fmrigid hyps (ue, ev) fp concl with
     | None   -> tacuerror "cannot find an occurence for [rewrite]"
     | Some x -> x
   in
@@ -438,7 +504,7 @@ let rec process_rewrite1 loc ri g =
 
       match s with
       | `LtoR -> begin
-        let ctxt = try_match hyps (ue, ev) p concl in
+        let ctxt = try_match fmrigid hyps (ue, ev) p concl in
   
         match ctxt with
         | None -> t_id None g
@@ -501,7 +567,7 @@ let rec process_rewrite1 loc ri g =
             with EcBaseLogic.NotReducible -> fp
         in
 
-        let ctxt = try_match hyps (ue, ev) fp concl in
+        let ctxt = try_match fmrigid hyps (ue, ev) fp concl in
   
         match ctxt with
         | None -> t_id None g
@@ -737,7 +803,7 @@ let process_pose loc xsym o p g =
   let ev  = EV.of_idents ids in
 
   let (_ue, tue, ev, dopat) =
-    match try_match hyps (ue, ev) p concl with
+    match try_match fmrigid hyps (ue, ev) p concl with
     | Some (ue, tue, ev) -> (ue, tue, ev, true)
     | None -> begin
         let ids = List.map (fun x -> `UnknownVar (x, ())) ids in
@@ -790,7 +856,7 @@ let process_generalize l =
       let ev = EV.of_idents (Mid.keys !ps) in
     
       let (_ue, tue, ev) =
-        match try_match hyps (ue, ev) p concl with
+        match try_match fmrigid hyps (ue, ev) p concl with
         | None   -> tacuerror "cannot find an occurence for [generalize]"
         | Some x -> x
       in

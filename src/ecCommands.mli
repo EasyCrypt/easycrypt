@@ -8,7 +8,7 @@ exception TopError of EcLocation.t * exn
 val toperror_of_exn : ?gloc:EcLocation.t -> exn -> exn
 
 (* -------------------------------------------------------------------- *)
-val addidir  : ?system:bool -> string -> unit
+val addidir  : ?system:bool -> ?recursive:bool -> string -> unit
 val loadpath : unit -> (bool * string) list
 
 (* -------------------------------------------------------------------- *)

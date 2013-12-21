@@ -33,6 +33,7 @@ and prv_options = {
 
 and ldr_options = {
   ldro_idirs : string list;
+  ldro_rdirs : string list;
   ldro_boot  : bool;
 }
 
@@ -220,6 +221,7 @@ let specs = {
 
     ("loader", "Options related to loader", [
       `Spec ("I"   , `String, "Add <dir> to the list of include directories");
+      `Spec ("R"   , `String, "Recursively add <dir> to the list of include directories");
       `Spec ("boot", `Flag  , "Don't load prelude")])
   ]
 }
@@ -251,6 +253,7 @@ let get_strings name values =
 (* -------------------------------------------------------------------- *)
 let ldr_options_of_values values =
   { ldro_idirs = get_strings "I"    values;
+    ldro_rdirs = get_strings "R"    values;
     ldro_boot  = get_flag    "boot" values; }
 
 let glb_options_of_values values =

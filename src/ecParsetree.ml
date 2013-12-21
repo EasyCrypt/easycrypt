@@ -450,7 +450,8 @@ type phltactic =
 
 and pinline_arg =
   [ `ByName    of tac_side * (pgamepath list * int list option)
-  | `ByPattern of pipattern ]
+  | `ByPattern of pipattern
+  | `All       of tac_side ]
 
 type trepeat = [`All | `Maybe] * int option
 type tfocus  = (int option * int option) * [`Include | `Exclude]
@@ -505,7 +506,7 @@ type logtactic =
   | Ptrivial
   | Pcongr
   | Pelim       of ffpattern 
-  | Papply      of ffpattern
+  | Papply      of (ffpattern * psymbol option)
   | Pcut        of (intropattern1 option * pformula * ptactic_core option)
   | Pcutdef     of (intropattern1 option * pterm)
   | Pgeneralize of (rwocc * pformula) list

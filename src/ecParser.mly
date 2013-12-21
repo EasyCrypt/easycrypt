@@ -1936,7 +1936,10 @@ logtactic:
    { PelimT (f, Some p) }
 
 | APPLY e=fpattern(form)
-   { Papply e }
+   { Papply (e, None) }
+
+| APPLY e=fpattern(form) IN x=ident
+   { Papply (e, Some x) }
 
 | l=simplify
    { Psimplify (mk_simplify l) }
@@ -2037,8 +2040,11 @@ phltactic:
 | RND s=side? info=rnd_info
     { Prnd (s, info) }
 
-| INLINE s=side? o=occurences? f=plist0(loc(fident), empty)
+| INLINE s=side? o=occurences? f=plist1(loc(fident), empty)
     { Pinline (`ByName (s, (f, o))) }
+
+| INLINE s=side? STAR
+    { Pinline (`All s) }
 
 | KILL s=side? o=codepos 
     { Pkill (s, o, Some 1) }
