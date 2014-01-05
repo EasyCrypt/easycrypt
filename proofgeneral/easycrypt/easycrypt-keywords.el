@@ -1,10 +1,11 @@
-; Generated on Sat Nov 23 09:59:47 2013
+; Generated on Fri Dec 20 16:32:05 2013
 
 (defvar easycrypt-bytac-keywords '(
   "assumption"
   "smt"
   "by"
   "reflexivity"
+  "done"
 ))
 
 (defvar easycrypt-dangerous-keywords '(
@@ -16,7 +17,6 @@
   "lemma"
   "realize"
   "proof"
-  "save"
   "qed"
   "claim"
   "end"
@@ -36,8 +36,6 @@
   "type"
   "class"
   "instance"
-  "datatype"
-  "record"
   "print"
   "why3"
   "as"
@@ -45,10 +43,7 @@
   "clone"
   "with"
   "prover"
-  "checkproof"
   "timeout"
-  "on"
-  "off"
   "nolocals"
   "Top"
 ))
@@ -62,12 +57,12 @@
 (defvar easycrypt-prog-keywords '(
   "forall"
   "exists"
-  "lambda"
+  "fun"
   "glob"
   "let"
   "in"
   "var"
-  "fun"
+  "proc"
   "if"
   "then"
   "else"
@@ -77,7 +72,7 @@
   "res"
   "equiv"
   "hoare"
-  "bd_hoare"
+  "phoare"
   "islossless"
 ))
 
@@ -103,9 +98,9 @@
   "apply"
   "rewrite"
   "subst"
-  "elimT"
   "progress"
   "trivial"
+  "auto"
   "idtac"
   "same"
   "modpath"
@@ -118,7 +113,7 @@
   "seq"
   "wp"
   "sp"
-  "eqobs_in"
+  "sim"
   "skip"
   "call"
   "rcondt"
@@ -126,13 +121,11 @@
   "swap"
   "cfold"
   "rnd"
-  "bdhoare_deno"
   "pr_bounded"
-  "pr_false"
-  "bd_eq"
   "bypr"
+  "byphoare"
+  "byequiv"
   "fel"
-  "equiv_deno"
   "conseq"
   "exfalso"
   "inline"

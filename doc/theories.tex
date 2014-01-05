@@ -1,6 +1,6 @@
 % !TeX root = easycrypt.tex
 
-\chapter{The Languages of \EasyCrypt\label{chap:theories}}
+\chapter{Writing Specifications\label{chap:theories}}
 The definitions and lemmas one writes and proves in \EasyCrypt can be grouped
 into theories.
 
@@ -15,10 +15,11 @@ with concrete parameters (constant, types or functions), allowing a certain
 degree of proof reuse (Section~\ref{sec:cloning}).
 
 
-\section{The Expression Language\label{sec:types}}
-At the core of any \EasyCrypt specification is a collection of types and operators
+\section{Defining Mathematical Functions\label{sec:types}}
+At the core of any \EasyCrypt specification is a collection of types and functions
 over those types. Formally, \EasyCrypt types are \emph{non-empty} sets of
-values, and operators are \emph{mathematical} functions between them.
+values, and functions (or operators) are \emph{mathematical} functions between
+them. (By mathematical, we mean total, deterministic and pure.)
 
 The \EasyCrypt type system supports polymorphic, higher-order types: the type of
 lists can be declared independently of the type of their contents, and operators
@@ -31,7 +32,7 @@ The language is equipped with a few built-in types:
 \begin{itemize}\itemsep-.5em
 \item the \rawec{unit}\index{easycrypt}{types!unit@\ec{unit}} type, which
         contains a unique element
-        \rawec{tt}\index{easycrypt}{constants!tt@\ec{tt : unit}},
+        \rawec{tt} (or \rawec{()}) \index{easycrypt}{constants!tt@\ec{tt : unit}},
 \item the \rawec{bool} type of booleans,
 \item the \rawec{int} type of arithmetic integers (in $\mathbb{Z}$),
 \item the \rawec{real} type of real numbers (in $\mathbb{R}$).
@@ -87,10 +88,33 @@ $0.5$ (the operands are interpreted and the operator is applied in
 $\mathbb{R}$). Eventually, we will introduce notations for scoping that should
 allow less cluttered real expressions.}
 
-\subsection{Constructing Types}
-From these base types, many more can be built. \EasyCrypt allows the user to declare
- (polymorphic) abstract types, and combine existing types into inductive datatypes,
-record types, tuple types or function types.
+\subsection{Writing functions}
+From these base types and values, many more can be built. \EasyCrypt allows the
+user to declare  (polymorphic) abstract types, and combine existing types into
+inductive datatypes, record types, tuple types or function types, as well as to
+construct typed values.
+
+\subsubsection*{Tuple types}
+Given two types \ec{'t} and \ec{'t'}, \ec{('t * 't')} (or \ec{'t *'t'},
+whenever possible) denotes the type of pairs of elements of \ec{'t} and
+\ec{'t'}. More generally, the product can be iterated to produce tuple types of
+arbitrary arity. For example, Listing~\ref{lst:tuples} declares two abstract
+types, \ec{pkey} and \ec{skey}, and then defines the type \ec{keypairs} as the
+type of pairs of elements of \ec{pkey} and \ec{skey}.
+
+\warningbox{Types \ec{'t * 't' * 't''}, \ec{('t * 't') * 't''} and
+\ec{'t * ('t' * 't'')} are distinct (but isomorphic).}
+
+\begin{easycrypt}[label={lst:tuples}]{A simple tuple type.}
+type pkey.
+type skey.
+
+type keypair = pkey * skey.
+\end{easycrypt}
+
+Values of tuple types are constructed using a comma. For example, given two
+values \ec{pk:pkey} and \ec{sk:skey}, one can simply define the key pair
+\ec{kp:keypair = (pk,sk)}.
 
 \subsubsection*{Inductive datatypes}
 The following type definition defines a polymorphic type for lists: for any
@@ -111,7 +135,7 @@ Listing~\ref{lst:derived_ind} displays these three generated definitions for the
 type of lists defined in Listing~\ref{lst:inductive}.
 
 \begin{easycrypt}[label={lst:derived_ind}]{Generated entities for polymorphic lists.}
-op list_rect (v:'b) (f:'a -> 'a list -> 'b -> 'b) (xs:'a list) =
+fun list_rect (v:'b) (f:'a -> 'a list -> 'b -> 'b) (xs:'a list) =
   with xs = Nil        => v
   with xs = Cons x xs => f x xs (list_rect v f xs).
 
@@ -126,44 +150,27 @@ lemma list_case (p:'a list -> bool):
   (forall xs, p xs).
 \end{easycrypt}
 
-\subsubsection*{Tuple types}
-Given two types \ec{'t} and \ec{'t'}, \ec{('t * 't')} denotes the type of pairs
-of elements of \ec{'t} and \ec{'t'}. More generally, the product can be iterated
-to produce tuple types of arbitrary arity. For example, Listing~\ref{lst:tuples}
-declares two abstract types, \ec{pkey} and \ec{skey}, and then defines a type
-\ec{keypairs} as the type of pairs of elements of \ec{pkey} and \ec{skey}.
+Keep in mind that all types must be inhabited, and some type definitions may be
+rejected by \EasyCrypt when \WhyThree fails to prove that they are not empty. In
+general, any inductive definition that has at least one non-recursive
+constructor will be accepted. Constructors can be applied partially.
 
-\warningbox{Types \ec{('t * 't' * 't'')}, \ec{(('t * 't') * 't'')} and
-\ec{('t * ('t' * 't''))} are distinct (but isomorphic).}
+Function \ec{list_rect} in Listing~\ref{lst:derived_ind} illustrates the
+definition of a fixpoint (inductive function) by simple pattern-matching and
+induction. Pattern-matching can be applied to tuples as well, but must be
+exhaustive. In addition to the exhaustivity check, \WhyThree checks that the
+fixpoint exists by requiring that all inductive calls are made on strict
+subterms of the argument.
 
-\begin{easycrypt}[label={lst:tuples}]{A simple tuple type.}
-type pkey.
-type skey.
+\subsubsection*{Record types}
+Record types (or structure types) can be defined by listing the field names and
+their types, as illustrated in Listing~\ref{lst:records}.
 
-type keypair = (pkey * skey).
+\begin{easycrypt}[label={lst:records}]{A simple record type.}
+type complex = { r: real; i: real }.
 \end{easycrypt}
 
-\subsubsection*{Function types}
-Given two types \ec{'t} and \ec{'t'}, \ec{'t -> 't'} is the type of total
-functions from \ec{'t} to \ec{'t'}. Listing~\ref{lst:functions} illustrates such
-a type definition, and the use of polymorphism, by defining a polymorphic type
-of predicates. For any type \rawec{'a}, we construct a type \rawec{'a cpred} of
-functions from \rawec{'a} to \rawec{bool}.
-
-\begin{easycrypt}[label={lst:functions}]{A simple polymorphic function type.}
-type 'a cpred = 'a -> bool.
-\end{easycrypt}
-
-\subsubsection*{Type application}
-Polymorphic types can be instantiated with particular type parameters if
-desired. For example, sets of integers could be defined as predicates on
-integers as shown in Listing~\ref{lst:type_app}. Using the polymorphic type of
-predicates defined in Listing~\ref{lst:functions}, we simply apply it to
-\ec{int} to instatiate \rawec{'a} with \rawec{int}.
-
-\begin{easycrypt}[label={lst:type_app}]{A simple type application.}
-type intSet = int cpred.
-\end{easycrypt}
+TODO: record accessors, "with" notation?
 
 \subsubsection*{On currying}
 It is standard practice to write functions of several arguments in curried form,
@@ -177,11 +184,11 @@ separated by spaces rather than the more standard commas.
 Listing~\ref{lst:currying} illustrates this.
 
 \begin{easycrypt}[label={lst:currying}]{Currying and partial function application.}
-op log: int -> int -> int.
-op log2: int-> int = log_curried 2.
+fun log: int -> int -> int.
+fun log2: int-> int = log_curried 2.
 
-op log_pair: (int * int) -> int.
-op log2_pair (n:int): int = log (2,n).
+fun log_pair: (int * int) -> int.
+fun log2_pair (n:int): int = log (2,n).
 \end{easycrypt}
 
 The \rawec{log} is declared as an integer function of two (curried) integer
@@ -195,76 +202,6 @@ Contrasting with the curried form described above, \rawec{log_pair} is declared
 as an integer function of a single argument (whose type is a pair type).
 Partial application is slightly more verbose, but the syntax of application may
 look more familiar to imperative programmers.
-
-\subsection{Terms}
-Under the assumption that all abstract types are inhabited, all types that can
-be constructed using the operations above are also inhabited. We now show how
-terms of each of the types can be constructed, serving as witnesses. The partial
-applications in Listing~\ref{lst:currying} are small examples of building terms
-of type \rawec{int -> int} given terms of other types.
-%The reader eager to
-%perform proofs can start drawing parallels between this subsection and the term
-%reduction (computation) rules at the beginning of Chapter~\ref{chap:tactics}.
-%TODO: More precise cross-reference
-
-We provide almost all standard constructions of the polymophic
-$\lambda$-calculus, with the notable exception of pattern-matching and fixpoint
-constructions, since we do not currently support inductive types or recursion
-directly. This limitation is easily worked around by axiomatically defining the
-recursion and induction principle whenever declaring a type that is meant to be
-inductive, and using them to provide realizations of axiomatically specified
-theories. For example, the \textsf{List} standard theory of inductive lists
-currently uses this two-stage architecture.
-
-\warningbox{This version of the documentation is incomplete on this subject,
-and only provides pointers to examples that may not be sufficient to fully
-document the language. Please contact us as needed.}
-
-\subsection{Predicates and Ambient Lemmas\label{sec:ec-specifics}}
-In \EasyCrypt, booleans are used not only to represent binary program variables, but
-also to type logical formulas. In addition to the operator symbols already
-introduced, the \rawec{bool} type is therefore equipped with
-symbols for universal and existential quantification, equivalence and
-implication. However, since the program logic assumes that expressions are
-terminating, we need to restrict the class of boolean formulas that can be used
-when defining operators and writing programs. To this effect, we consider two
-distinct classes of functional symbols: \emph{predicates}, that may not be
-computable in general, and cannot be used to write programs (although they can
-be used to specify them), and \emph{operators}, that are computable and can be
-used for defining predicates and other operators, and to write programs.
-Universal and existential quantification (\rawec{forall} and \rawec{exists}),
-implication (\rawec{=>}) and equivalence (\rawec{<=>}) are internally defined as
-predicate symbols, and therefore cannot be used to define operators. All other
-boolean function symbols (in particular those discussed previously) are defined
-as operators and can be used in any context.
-
-Using these symbols, and since functions are values, one can express complex
-logical formulas in higher-order logic, that can then be wrapped into
-predicates, lemmas or axioms. We call this fragment of our logic that only
-deals with operators the \emph{ambient logic}. Listing~\ref{lst:formulas}
-displays a possible definition for a commutativity predicate on internal
-operators, and expresses the fact that integer addition is commutative by
-applying it. We also display a simple proof using the \rawec{smt} tactic, which
-simply asks the SMT solvers to discharge the lemma. (The proof system and
-tactics are documented more throroughly in Chapter~\ref{chap:tactics}.
-
-\begin{easycrypt}[label={lst:formulas}]{Examples of ambient formulas: predicates and lemmas}
-pred commutative (ope: 'a -> 'a -> 'b) =
-  forall x y, ope x y = ope y x.
-
-lemma addiC: commutative Int.(+) by smt.
-\end{easycrypt}
-
-Any lemma or axiom that starts with universal quantifiers can instead be
-parameterized by those quantified variables. This does not change the semantics,
-but may make proofs slightly more elegant. For example, the two lemmas below
-are strictly equivalent.\footnote{To as lesser extent, this trick also works on
-predicate definitions, except that it changes the predicate's type.}
-\begin{easycrypt}[label={lst:formulas}]{Examples of ambient formulas: predicates and lemmas}
-lemma xorbC: forall (b b' : bool), b ^^ b' = b' ^^ b.
-
-lemma xorbC' (b b' : bool): b ^^ b' = b' ^^ b.
-\end{easycrypt}
 
 \section{Probabilistic Expressions\label{sec:distributions}}
 
@@ -557,13 +494,43 @@ When such access exists, we say that a module \emph{depends} on another module.
 \item Functor signatures, oracle access restrictions
 \end{itemize}
 
-\section{Program Judgements}
+\section{Writing Axioms and Lemmas}
+We now know how to define mathematical functions and types, and how to describe
+schemes, oracles, experiments and games. We now briefly present the language of
+formulas on those objects. The tools to prove such lemmas are presented in
+Chapter~\ref{chap:tactics}.
 
-With modules and functors in place, it is now possible to express properties
-pertaining to stateful functions, rather than simply to operators. In addition,
-the use of module signatures, with additional restrictions, allows us to
-universally and existentially quantify over modules of a certain type. We are
-interested in three kinds of judgements about programs:
+\subsection{Simple Lemmas\label{sec:ec-specifics}}
+Using these symbols, and since functions are values, one can express complex
+logical formulas in higher-order logic, that can then be wrapped into
+predicates, lemmas or axioms. We call this fragment of our logic that only
+deals with operators the \emph{ambient logic}. Listing~\ref{lst:formulas}
+displays a possible definition for a commutativity predicate on internal
+operators, and expresses the fact that integer addition is commutative by
+applying it. We also display a simple proof using the \rawec{smt} tactic, which
+simply asks the SMT solvers to discharge the lemma.
+
+\begin{easycrypt}[label={lst:formulas}]{Examples of ambient formulas: predicates and lemmas}
+pred commutative (ope: 'a -> 'a -> 'b) =
+  forall x y, ope x y = ope y x.
+
+lemma addiC: commutative Int.(+) by smt.
+\end{easycrypt}
+
+Any lemma or axiom that starts with universal quantifiers can instead be
+parameterized by those quantified variables. This does not change the semantics,
+but may make proofs slightly more elegant. For example, the two lemmas below
+are strictly equivalent.\footnote{To as lesser extent, this trick also works on
+predicate definitions, although it changes the predicate's type. The reader
+familiar with \Coq may not see this as a problem.}
+\begin{easycrypt}[label={lst:formulas}]{Examples of ambient formulas: predicates and lemmas}
+lemma xorbC: forall (b b' : bool), b ^^ b' = b' ^^ b.
+
+lemma xorbC' (b b' : bool): b ^^ b' = b' ^^ b.
+\end{easycrypt}
+
+\subsection{Lemmas on Procedures}
+We are interested in three kinds of judgements about programs:
 \begin{itemize}\itemsep-.5em
 \item Standard Hoare logic judgements, consisting of two predicates over
   memories: a precondition and a postcondition;
@@ -573,31 +540,26 @@ interested in three kinds of judgements about programs:
   relations on memories.
 \end{itemize}
 This section informally describes their syntax and semantic interpretations.
+We leave formal definitions to a future reference manual. They can also be
+found in \CertiCrypt-related documents.
 
 \warningbox{In the following, note the distinct implication symbols.
 $\Rightarrow$ is implication in the ambient logic (corresponding to the
 \rawec{=>} predicate), whereas $\Longrightarrow$ is used to express contracts on
-functions (corresponding to \rawec{==>} in raw \EasyCrypt code).
-\footnote{From Francois: it may be worth considering the use of
-another arrow symbol (for example $\Rrightarrow$) for contracts.}}
+functions (corresponding to \rawec{==>} in raw \EasyCrypt code).}
 
-\subsection{(Possibilistic) Hoare Judgements}
+\subsubsection*{(Possibilistic) Hoare Judgements}
 Given a statement $\mathsf{c}$ and two predicates $\pre$ and $\post$ on
 memories, judgement \[\Hoare{c}{\pre}{\post}\] means that for any memory
 $\mathsf{m}$ such that $\pre\ \mathsf{m}$ and any memory $\mathsf{m'}$ that may
 be obtained by executing $\mathsf{c}$ in $\mathsf{m}$, $\post\ \mathsf{m'}$.
 
-%Interpretation:
-%\begin{displaymath}
-%\Hoare{c}{\pre}{\post}
-%\quad\doteq\quad
-%\forall m.~ \pre\,m \Rightarrow \range Q ([\![ c ]\!]\,m)
-%\end{displaymath}
-%%
-%where $\range \varphi \mu \doteq \forall f.~ (\forall x.~ \varphi\,x
-%\Rightarrow f\,x=0) \Rightarrow \mu\,f=0$
+In \EasyCrypt, such judgments are written as follows:
+\begin{easycrypt}[frame=none]{}
+hoare [c: pre ==> post]
+\end{easycrypt}
 
-\subsection{Probabilistic Hoare Judgements}
+\subsubsection*{Probabilistic Hoare Judgements}
 Given a statement $\mathsf{c}$, two predicates $\pre$ and $\post$ on
 memories, a relation $\mathfrak{R} \in \left\{=,\leq,\geq\right\}$ and a real bound $\delta$,
 judgement \[\Hoare{c}{\pre}{\post} \mathrel{\mathfrak{R}} \delta\] means that for
@@ -605,53 +567,59 @@ any memory $\mathsf{m}$ such that $\pre\ \mathsf{m}$ the probability that
 $\post$ holds after executing $\mathsf{c}$ in $\mathsf{m}$ is related to
 $\delta$ by $\mathfrak{R}$.
 
+In \EasyCrypt, such judgments are written as follows:
+\begin{easycrypt}[frame=none]{}
+phoare [c: pre ==> post] R d
+\end{easycrypt}
 
-%Interpretation:
-%\begin{displaymath}
-%\HoareLe{c}{\pre}{\post}{\delta} 
-%\quad\doteq\quad
-%\forall m.~ \pre\,m \Rightarrow [\![ c ]\!]\,m\,\charfun_\post \leq
-%\delta\,m
-%\end{displaymath}
-%
-%Property?:
-%\begin{displaymath}
-%\Hoare{c}{\pre}{\post}
-%\Leftrightarrow
-%\HoareEq{c}{\pre}{\neg\post}{0}
-%\end{displaymath}
-%
-%Property?:
-%\begin{displaymath}
-%\Hoare{c}{\pre}{\post} \land \HoareEq{c}{\pre}{\true}{1}
-%\Leftrightarrow
-%\HoareEq{c}{\pre}{\post}{1}
-%\end{displaymath}
+\subsubsection*{Relational Hoare Judgements}
+Given two statements $c_1$ and $c_2$ and two relations $\pre$
+and $\post$ on pairs of memories, judgment
+\[\Equiv{c_1}{c_2}{\pre}{\post}\]
+means that for any memories $\mathsf{m_1}$ and $\mathsf{m_2}$ such that
+$\pre\ \mathsf{m_1}\ \mathsf{m_2}$, then $c_1$ terminates on $\mathsf{m_1}$
+exactly when $c_2$ terminates on $\mathsf{m_2}$, and for any resulting pair of
+memories $\mathsf{m_1'}$ and $\mathsf{m_2'}$, we have
+$\post\ \mathsf{m_1'}\ \mathsf{m_2'}$.
 
-\subsection{Relational Hoare Judgements}
+In \EasyCrypt, such judgments are written as follows:
+\begin{easycrypt}[frame=none]{}
+equiv [c1 ~ c2: pre ==> post]
+\end{easycrypt}
 
-\section{Sections}
-The section mechanism allows parts of a proof to be abstracted away. In
-particular proof steps that require the use of intermediate games often leave
-traces in the final theorem statement in the form of access restrictions on the
-adversary. Sections corrects these unsightly appearances by allowing the user
-to declare some modules and lemmas as local to a section, erasing them entirely
-from the environment once the section is closed.
+\subsubsection*{Probabilities of Events}
+Given a procedure $\mathsf{f}$, well-typed inputs x to $\mathsf{f}$, a memory
+$\mathsf{m}$ and a boolean formula $\mathsf{E}$ that may refer to the global
+state of any module in scope or to the special variable \ec{res},
+the \EasyCrypt expression \ec{Pr[f(x) \@ \&m: E]} is the probability of event
+$\mathsf{E}$ after executing $\mathsf{f}$ on $\mathsf{x}$ in initial memory
+$\mathsf{m}$.
 
-\warningbox{This feature is not yet fully documented.}
+\subsubsection*{Simplified Notations for Lemmas on Procedures}
+The \ec{hoare}, \ec{phoare} and \ec{equiv} keywords can be used in place of
+\ec{lemma}, whenever the lemma is an unconditional judgment of the appropriate
+form. In such a case, the square brackets are omitted, as illustrated in the
+following listing, showing two equivalent notations for a \pRHL lemma.
+(Note that universal quantifications can still be made.)
 
-\section{Working with Theories\label{sec:cloning}}
+\begin{easycrypt}{}
+lemma G0_G1_E (A <: Adv):
+  equiv [G0(A).main ~ G1(A).main: true==> ={res}].
 
-Theories can be cloned and refined using the \ec{clone} keyword, which creates
-a new theory containing exactly the same declarations and definitions as the
-original. It is possible to refine abstract definitions when cloning a theory.
+equiv G0_G1_E' (A <: Adv):
+  G0(A).main ~ G1(A).main: true ==> ={res}.
+\end{easycrypt}
 
-%\subsection{\rawec{print}}
-
-
+\section{The Ambient Logic}
+As an important step towards writing modular proofs, all the logical judgments
+described above can be interpreted as valid expressions in an all-encompassing
+\emph{ambient logic}. In particular, equivalences, probability bounds and Hoare
+judgments can be used as premises in theorems, making it possible to express
+complex abstract results that can then be applied to concrete schemes.
+In addition, probability expressions using \ec{Pr} can be used as real-valued
+expressions in other formulas.
 
 %%% Local Variables: 
 %%% mode: latex
 %%% TeX-master: "easycrypt"
 %%% End: 
-
