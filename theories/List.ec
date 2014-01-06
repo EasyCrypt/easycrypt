@@ -80,7 +80,8 @@ lemma mem_cons_neq (x y:'a) xs: x <> y => mem y (x::xs) = mem y xs by [].
 
 lemma cons_mem (x y:'a) xs: mem y xs => mem y (x::xs) by [].
 
-lemma mem_hd (xs:'a list): mem (hd xs) xs <=> xs <> [] by [].
+lemma mem_hd (xs:'a list): mem (hd xs) xs <=> xs <> []
+by (split; smt).
 
 lemma nmem_nil (xs:'a list): (forall x, !mem x xs) <=> xs = [] by [].
 

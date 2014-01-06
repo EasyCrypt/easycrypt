@@ -447,7 +447,7 @@ axiom mem_filter x (p:('a -> bool)) (X:'a set):
   mem x (filter p X) <=> (mem x X /\ p x).
 
 lemma filter_cpTrue (X:'a set):
-  filter cpTrue X = X.
+  filter True X = X.
 proof strict.
 by apply set_ext=> x; rewrite mem_filter.
 qed.
@@ -699,16 +699,16 @@ lemma mu_cpMem_le (s:'a set): forall (d:'a distr) (bd:real),
 proof strict.
   elim/set_ind s.
     intros d bd Hmu_x.
-    rewrite (mu_eq d _ Fun.cpFalse).
-      by intros x;rewrite /cpMem /cpFalse /= neqF;apply mem_empty.
+    rewrite (mu_eq d _ Fun.False).
+      by intros x;rewrite /cpMem /False /= neqF;apply mem_empty.
     by rewrite mu_false card_empty //.
   intros x s Hnmem IH d bd Hmu_x.
   rewrite (_: (card (add x s))%r * bd = 
           bd + (card s)%r * bd); first by rewrite card_add_nin //=;ringeq.
-  rewrite (mu_eq d _ (Fun.cpOr ((=) x) (cpMem s))).
-    by intros z;rewrite /cpMem /cpOr mem_add orC (eq_sym z).
+  rewrite (mu_eq d _ (((=) x) \/ (cpMem s))).
+    by intros z;rewrite /cpMem /Fun.(\/) mem_add orC (eq_sym z).
   rewrite mu_disjoint.
-   by rewrite /cpAnd /cpOr /cpFalse /cpMem => z /=;smt.
+   by rewrite /Fun.(/\) /Fun.(\/) /False /cpMem => z /=;smt.
   (cut ->: (mu d ((=) x) = mu_x d x)) => //.
   apply addleM.
     by apply Hmu_x; first rewrite mem_add.   
@@ -721,16 +721,16 @@ lemma mu_cpMem_ge (s:'a set): forall (d:'a distr) (bd:real),
 proof strict.
   elim/set_ind s.
     intros d bd Hmu_x.
-    rewrite (mu_eq d _ Fun.cpFalse).
-      by intros x;rewrite /cpMem /cpFalse /= neqF;apply mem_empty.
+    rewrite (mu_eq d _ False).
+      by intros x;rewrite /cpMem /False /= neqF;apply mem_empty.
     by rewrite -le_ge mu_false card_empty //.
   intros x s Hnmem IH d bd Hmu_x.
   rewrite (_: (card (add x s))%r * bd = 
           bd + (card s)%r * bd); first by rewrite card_add_nin //=;ringeq.
-  rewrite (mu_eq d _ (Fun.cpOr ((=) x) (cpMem s))).
-    by intros z;rewrite /cpMem /cpOr mem_add orC (eq_sym z).
+  rewrite (mu_eq d _ (((=) x) \/ (cpMem s))).
+    by intros z;rewrite /cpMem /Fun.(\/) mem_add orC (eq_sym z).
   rewrite mu_disjoint.
-   by rewrite /cpAnd /cpOr /cpFalse /cpMem => z /=;smt.
+   by rewrite /Fun.(/\) /Fun.(\/) /False /cpMem => z /=;smt.
   (cut ->: (mu d ((=) x) = mu_x d x)) => //.
   apply addgeM.
     by apply Hmu_x; first rewrite mem_add.   
@@ -769,8 +769,8 @@ lemma mu_Lmem_le_length (l:'a list) (d:'a distr) (bd:real):
   mu d (fun x, List.mem x l) <= (length l)%r * bd. 
 proof -strict.
   elim/list_case l.
-    intros=> _ //=; rewrite (mu_eq _ _ (cpFalse)).
-      by intros=> x; rewrite /cpFalse //=.
+    intros=> _ //=; rewrite (mu_eq _ _ False).
+      by intros=> x; rewrite /False //=.
     by rewrite mu_false.
   intros x l0 Hmu.
   cut Hbd : 0%r <= bd.
@@ -861,7 +861,7 @@ theory Dinter_uni.
     mu (dinter i j) (fun x, i <= x <= j) = 1%r.
   proof strict.
   by intros=> H;
-     rewrite -(mu_in_supp_eq (dinter i j) cpTrue);
+     rewrite -(mu_eq_support (dinter i j) True);
      try apply fun_ext; smt.
   qed.
 end Dinter_uni.

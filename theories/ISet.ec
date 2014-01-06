@@ -202,7 +202,7 @@ axiom mem_filter x (p:('a -> bool)) X:
   mem x (filter p X) <=> (mem x X /\ p x).
 
 lemma filter_cpTrue (X:'a set):
-  filter cpTrue X = X
+  filter True X = X
 by (apply set_ext; smt).
 
 lemma filter_cpEq_in (x:'a) X:

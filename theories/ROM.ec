@@ -69,7 +69,7 @@ theory Lazy.
   qed.
 
   lemma lossless_o:
-    (forall x, mu (dsample x) cpTrue = 1%r) =>
+    (forall x, mu (dsample x) True = 1%r) =>
     islossless RO.o.
   proof strict.
   by intros=> dsampleL; proc; wp; rnd; skip; smt.
@@ -125,12 +125,12 @@ theory Eager.
 
   lemma lossless_init:
     finite univ<:from> =>
-    (forall x, mu (dsample x) cpTrue = 1%r) =>
+    (forall x, mu (dsample x) True = 1%r) =>
     islossless RO.init.
   proof strict.
   intros=> fType dsampleL; proc.
   while (true) (card work).
-    by intros=> z; wp; rnd cpTrue; wp;
+    by intros=> z; wp; rnd True; wp;
        skip; smt.
   by wp; skip; smt.
   qed.
@@ -228,7 +228,7 @@ theory LazyEager.
 
   local lemma IND_Lazy:
     finite univ<:from> =>
-    (forall x, mu (dsample x) cpTrue = 1%r) =>
+    (forall x, mu (dsample x) True = 1%r) =>
     equiv [IND(Lazy.RO,D).main ~ IND_Lazy.main: true ==> ={res}].
   proof strict.
   intros=> fromF dsampleL; proc; seq 2 2: (={b}).
@@ -281,7 +281,7 @@ theory LazyEager.
 
   local lemma eager_query:
     finite univ<:from> =>
-    (forall x, mu (dsample x) cpTrue = 1%r) =>
+    (forall x, mu (dsample x) True = 1%r) =>
     eager [IND_Eager.resample(); ,
                IND_Eager.H.o ~ IND_Lazy.H.o,
            IND_Lazy.resample();:
@@ -354,7 +354,7 @@ timeout 3.
 
   local lemma eager_aux:
     finite univ<:from> =>
-    (forall x, mu (dsample x) cpTrue = 1%r) =>
+    (forall x, mu (dsample x) True = 1%r) =>
     equiv [IND_Lazy.main ~ IND_Eager.main: true ==> ={res}].
   proof strict.
   intros=> fromF dsampleL; proc; inline IND_Lazy.H.init.
@@ -371,7 +371,7 @@ timeout 3.
 
   local lemma IND_Eager:
     finite univ<:from> =>
-    (forall x, mu (dsample x) cpTrue = 1%r) =>
+    (forall x, mu (dsample x) True = 1%r) =>
     equiv [IND_Eager.main ~ IND(Eager.RO,D).main: true ==> ={res}].
   proof strict.
   intros=> fromF dsampleL; proc.
@@ -385,7 +385,7 @@ timeout 3.
 
   lemma eagerRO:
     finite univ<:from> =>
-    (forall x, mu (dsample x) cpTrue = 1%r) =>
+    (forall x, mu (dsample x) True = 1%r) =>
     equiv [IND(Lazy.RO,D).main ~ IND(Eager.RO,D).main: true ==> ={res}].
   proof strict.
   intros=> fromF dsampleL; bypr (res{1}) (res{2})=> //; intros=> &1 &2 a.

@@ -1,11 +1,11 @@
 (** Extensional equality for functions *)
 pred (==) (f g:'a -> 'b) = forall x, f x = g x.
 
-lemma nosmt eq_refl: forall (X:'a -> 'b), X == X by [].
-lemma nosmt eq_symm: forall (X Y:'a -> 'b), X == Y => Y == X by [].
-lemma nosmt eq_tran: forall (X Y Z:'a -> 'b), X == Y => Y == Z => X == Z by [].
+lemma nosmt eq_refl (X:'a -> 'b):     X == X by [].
+lemma nosmt eq_symm (X Y:'a -> 'b):   X == Y => Y == X by [].
+lemma nosmt eq_tran (X Y Z:'a -> 'b): X == Y => Y == Z => X == Z by [].
 
-axiom fun_ext: forall (f g:'a -> 'b), f == g => f = g.
+axiom fun_ext (f g:'a -> 'b): f == g <=> f = g.
 
 (* We need to have these two explicit, since = is not an operator *)
 lemma eqL (x:'a): (fun y, x = y) = (=) x
@@ -14,62 +14,69 @@ by apply fun_ext.
 lemma eqR (y:'a): (fun x, x = y) = (=) y
 by (apply fun_ext=> x //=; rewrite (eq_sym x)).
 
-(** Computable predicates *)
-pred (<=) (p q:('a -> bool)) = forall (a:'a), p a => q a.
+(*** Working with predicates *)
+(** Inclusion order *)
+pred (<=) (p q:'a -> bool) =
+  forall (a:'a), p a => q a.
 
-lemma nosmt leq_refl: forall (X Y:('a -> bool)), X = Y => X <= Y by [].
-lemma nosmt leq_asym: forall (X Y:('a -> bool)),
-  X <= Y => Y <= X => X = Y
-by (intros=> X Y X_leq_Y Y_leq_X; apply fun_ext; smt).
-lemma nosmt leq_tran: forall (X Y Z:('a -> bool)), X <= Y => Y <= Z => X <= Z by [].
-
-pred (>=) (p q:('a -> bool)) = q <= p.
-pred (<)  (p q:('a -> bool)) = p <= q /\ p <> q.
-pred (>)  (p q:('a -> bool)) = p >= q /\ p <> q.
-
-(** Operators on predicates *)
-op cpTrue (x:'a) : bool = true.
-op cpFalse (x:'a) : bool = false.
-
-op cpNot(p:('a -> bool), x:'a) : bool = !p x.
-op cpAnd(p q:('a -> bool), x:'a) : bool = p x /\ q x.
-op cpOr(p q:('a -> bool), x:'a) : bool = p x \/ q x.
-
-(** Lemmas *)
-lemma cpTrue_true : forall (x:'a), cpTrue x by [].
-
-lemma cpTrue_def (p:('a -> bool)): (forall x, p x) => p = cpTrue.
-proof strict.
-by intros=> px; apply fun_ext=> x; rewrite px.
-qed.
-
-lemma cpFalse_false : forall (x:'a), !cpFalse x by [].
-
-lemma cpFalse_def (p:('a -> bool)): (forall x, !p x) => p = cpFalse
+lemma nosmt leq_refl (X Y:'a -> bool):
+  X = Y => X <= Y
 by [].
 
-lemma cpNot_not : forall (p:('a -> bool)) x, cpNot p x <=> !p x by [].
-lemma cpAnd_and :
-  forall (p q:('a -> bool)) (x:'a), cpAnd p q x <=> (p x /\ q x) by [].
-lemma cpOr_or :
-  forall (p q:('a -> bool)) (x:'a), cpOr p q x <=> (p x \/ q x) by [].
+lemma nosmt leq_asym (X Y:'a -> bool):
+  X <= Y => Y <= X => X = Y
+by (rewrite -fun_ext; smt).
 
-lemma cpEM: forall (p: ('a -> bool)),
-  cpOr (cpNot p) p = cpTrue
-by (intros p; apply fun_ext; smt).
+lemma nosmt leq_tran (X Y Z:'a -> bool):
+  X <= Y => Y <= Z => X <= Z
+by [].
 
-lemma cpC: forall (p: ('a -> bool)),
-  cpAnd (cpNot p) p = cpFalse.
+pred (>=) (p q:'a -> bool) = q <= p.
+pred (<)  (p q:'a -> bool) = p <= q /\ p <> q.
+pred (>)  (p q:'a -> bool) = p >= q /\ p <> q.
+
+(** Lifting boolean operators to predicates *)
+op True (x:'a) : bool = true.
+op False (x:'a): bool = false.
+
+op [!]  (p:'a -> bool)  : 'a -> bool = fun x, !p x.
+op (/\) (p q:'a -> bool): 'a -> bool = fun x, p x /\ q x.
+op (\/) (p q:'a -> bool): 'a -> bool = fun x, p x \/ q x.
+
+(** Lemmas *)
+lemma True_true (x:'a): True x by done.
+
+lemma True_unique (p:'a -> bool): (forall x, p x) => p = True.
 proof strict.
-intros=> p; apply fun_ext; smt.
+by rewrite -fun_ext=> px x; rewrite px.
 qed.
 
-lemma congr_fun_app : forall (f g : 'a -> 'b) (x y : 'a),
-  f == g => x = y => f x = g y.
-proof -strict.
- intros => f g x y heqf ->.
- by rewrite (fun_ext f g _).
+lemma False_false (x:'a): !False x by [].
+
+lemma False_unique (p:'a -> bool): (forall x, !p x) => p = False.
+proof strict.
+by rewrite -fun_ext=> px x; rewrite /False neqF px.
 qed.
+
+lemma Not_not (p:'a -> bool) x: (!p) x <=> !p x by [].
+
+lemma And_and (p q:'a -> bool) x: (p /\ q) x <=> (p x /\ q x) by [].
+
+lemma Or_or (p q:'a -> bool) x: (p \/ q) x <=> (p x \/ q x) by [].
+
+lemma Excluded_Middle (p:'a -> bool): ((!p) \/ p) = True
+by (apply fun_ext; smt).
+
+lemma Sound (p:'a -> bool): ((!p) /\ p) = False
+by (apply fun_ext; smt).
+
+lemma congr_ext (f g:'a -> 'b) (x y:'a):
+  f == g => x = y => f x = g y
+by [].
+
+lemma And_leq_l (p q:'a -> bool): (p /\ q) <= p by [].
+
+lemma And_leq_r (p q:'a -> bool): (p /\ q) <= q by [].
  
 (*
 (** Properties of functions *)

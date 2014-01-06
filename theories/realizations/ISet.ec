@@ -35,7 +35,7 @@ by delta (<=) beta; intros=> X Y Z X_leq_Y Y_leq_Z x x_in_X;
 qed.
 
 (** mem *)
-op empty = cpFalse<:'a>.
+op empty = False<:'a>.
 lemma mem_empty: forall (x:'a), !(mem x empty) by [].
 
 (** add *)
@@ -63,24 +63,24 @@ lemma mem_single_neq: forall (x x':'a),
 by [].
 
 (** compl *)
-op compl (X:'a set) = cpNot X.
+op compl (X:'a set) = !X.
 lemma mem_compl: forall x (X:'a set),
   mem x (compl X) <=> !mem x X
 by [].
 
 (** univ *)
-op univ:'a set = cpTrue.
+op univ:'a set = True.
 lemma univ_n0: univ<:'a> = compl empty
 by (apply set_ext; smt).
 
 (** union *)
-op union = cpOr<:'a>.
+op union = Fun.(\/)<:'a>.
 lemma mem_union: forall x (X1 X2:'a set),
   mem x (union X1 X2) <=> (mem x X1 \/ mem x X2)
 by [].
 
 (** inter *)
-op inter = cpAnd<:'a>.
+op inter = Fun.(/\)<:'a>.
 lemma mem_inter: forall x (X1 X2:'a set),
   mem x (inter X1 X2) <=> (mem x X1 /\ mem x X2)
 by [].
@@ -90,7 +90,7 @@ op all (p:('a -> bool)) (X:'a set) = (inter p X) = X.
 lemma all_def: forall (p:('a -> bool)) X,
   all p X <=> (forall x, mem x X => p x).
 proof strict.
-intros=> p X; delta mem all inter cpAnd; beta; split=> h.
+intros=> p X; delta mem all inter Fun.(/\); beta; split=> h.
   rewrite -h=> //.
   apply set_ext; delta (==); beta=> x.
   cut ->: (p x /\ X x) <=> X x; last by trivial.
@@ -102,7 +102,7 @@ op any (p:('a -> bool)) (X:'a set) = (inter p X) <> empty.
 lemma any_def: forall (p:('a -> bool)) X,
   any p X <=> (exists x, mem x X /\ p x).
 proof strict.
-intros=> p X; delta mem any inter cpAnd; beta; split=> h; last smt.
+intros=> p X; delta mem any inter Fun.(/\); beta; split=> h; last smt.
   cut h1: exists x, (fun x, p x /\ X x) x. (* This proof is disgusting *)
     generalize h; apply absurd; simplify=> h; apply set_ext; smt.
     elim h1; beta=> x x_in_inter; exists x; smt.
