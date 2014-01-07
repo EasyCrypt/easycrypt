@@ -27,6 +27,12 @@ can take and return other operators. We first describe the various built-in
 types and relevant operators before moving on to explaining how new definitions
 can be built from them.
 
+\warningbox{Although \EasyCrypt provides a wide variety of constructs, one may
+still want to define functions axiomatically. (For example, so that they are
+only partially specified.) In such a case, it is important to keep in mind that
+\EasyCrypt functions are \emph{always} total, deterministic and pure. This
+should \emph{never} be contradicted by user-provided axioms.}
+
 \subsection{Built-Ins}
 The language is equipped with a few built-in types:
 \begin{itemize}\itemsep-.5em
@@ -103,7 +109,8 @@ types, \ec{pkey} and \ec{skey}, and then defines the type \ec{keypairs} as the
 type of pairs of elements of \ec{pkey} and \ec{skey}.
 
 \warningbox{Types \ec{'t * 't' * 't''}, \ec{('t * 't') * 't''} and
-\ec{'t * ('t' * 't'')} are distinct (but isomorphic).}
+\ec{'t * ('t' * 't'')} are distinct (but isomorphic). This may cause confusing
+error messages.}
 
 \begin{easycrypt}[label={lst:tuples}]{A simple tuple type.}
 type pkey.
@@ -167,10 +174,18 @@ Record types (or structure types) can be defined by listing the field names and
 their types, as illustrated in Listing~\ref{lst:records}.
 
 \begin{easycrypt}[label={lst:records}]{A simple record type.}
-type complex = { r: real; i: real }.
+type intpoint = { x:int; y:int; }.
 \end{easycrypt}
 
-TODO: record accessors, "with" notation?
+Record values can be constructed by assigning all fields, as illustrated in
+Listing~\ref{lst:recordvalues}, and fields can be accessed using the
+illustrated notation.
+
+\begin{easycrypt}[label={lst:recordvalues}]{Simple record values.}
+op origin = {| x = 0; y = 0; |}.
+
+op x_coord (p:intpoint) = p.`x.
+\end{easycrypt}
 
 \subsubsection*{On currying}
 It is standard practice to write functions of several arguments in curried form,
@@ -203,6 +218,11 @@ as an integer function of a single argument (whose type is a pair type).
 Partial application is slightly more verbose, but the syntax of application may
 look more familiar to imperative programmers.
 
+\subsubsection*{Infix\index{easycrypt}{infix} and mixfix\index{easycrypt}{mixfix} operators}
+Binary operators can be declared in infix form by parenthesizing their name when
+the desired infix symbol starts with \ec{+}, \ec{:}, \ec{^}, or \ec{*} (in the
+latter case, a space
+
 \section{Probabilistic Expressions\label{sec:distributions}}
 
 %%%% From Gilles:
@@ -214,11 +234,11 @@ satisfy the basic axioms of probability sub-distributions:
 \begin{itemize}\itemsep-.5em
 \item probabilities lie in the unit interval;
 \item the probability of false is null;
+\item probabilities are monotonic with respect to event inclusion;
+\item any event whose probability is that of the constantly true event
+  contains the distribution's support;
 \item the probability of a union of events is equal to the sum of
   their probabilities, minus the probability of their intersection;
-\item probabilities are monotonic with respect to event inclusion;
-\item the probability of an event is equal to the probability of the
-  intersection of that event and the distribution's support;
 \item two sub-distributions are equal if and only if they are pointwise equal.
 \end{itemize}
 
@@ -232,7 +252,7 @@ the standard library, as displayed in Listing~\ref{lst:dbool}, where
 \begin{easycrypt}[label={lst:dbool}]{[Uniform Boolean distribution]Defining the uniform distribution on booleans}
 op dbool: bool distr.
 
-axiom mu_def: forall (p:bool -> bool), 
+axiom mu_def (p:bool -> bool):
   mu dbool p =
     (1%r/2%r) * charfun p true +
     (1%r/2%r) * charfun p false.
@@ -244,12 +264,12 @@ introduces several auxiliary quantities on distributions that are useful in
 probability computations and for defining more complex distributions (that may
 be difficult, or even impossible, to describe purely using \rawec{mu}). The
 definitions of these quantities is shown in Listing~\ref{lst:mu_aux}, where
-\rawec{cpTrue} is the constantly true predicate. Note the use of partial
+\rawec{True} is the constantly true predicate. Note the use of partial
 application to the equality operator when defining \rawec{mu_x}.
 
 \begin{easycrypt}[label={lst:mu_aux}]{Auxiliary operators on distributions}
 op mu_x (d:'a distr) (x:'a): real = mu d ((=) x).
-op weight (d:'a distr): real = mu d cPtrue.
+op weight (d:'a distr): real = mu d True.
 op in_supp (x:'a) (d:'a distr): bool = 0%r < mu_x d x.
 \end{easycrypt}
 
@@ -267,10 +287,10 @@ powerful, they fail to properly capture the kind of objects cryptographers
 manipulate. \EasyCrypt uses the same language, \pWHILE, to describe
 cryptographic schemes, oracles, and experiments as modules. Modules are
 wrappers that declare a collection of typed global variables and define a set
-of imperative procedures, or \emph{functions} %Terminology! "operators" are functions, "functions" are procedures
-that may read and write (amongst other things) the module's globals. We first
-briefly describe the \pWHILE language before giving an overview of the two main
-mechanisms for module composition: direct usage and functor application.
+of imperative \emph{procedures} that may read and write (amongst other things)
+the module's global state. We first briefly describe the \pWHILE language before
+giving an overview of the two main mechanisms for module composition: direct
+usage and functor application.
 
 \subsection{The \pWHILE language}
 \pWHILE programs are composed of a set of typed local variables and a
@@ -291,9 +311,12 @@ the function's body needs to be a \rawec{return}.
 Listing~\ref{lst:pWhile} shows a module implementing a random oracle where the
 number of queries is bounded and the responses are sampled (but not assigned to
 any particular queries) during initialization. In this display, we use the type
-\rawec{word} to model bitstrings of an arbitrary fixed length, and
+\rawec{word} to model bitstrings of an arbitrary but fixed length, and
 \rawec{dword} to model the uniform distribution on words. Random sampling is
-denoted by preceding a distribution with the \textsf{\$} symbol.
+denoted by preceding a distribution with the \textsf{\$} symbol. Note that
+complex update statements are available for any type for which a mixfix set
+operator is defined. In this example, the map \ec{mG} is updated at location
+\ec{x} using a statement of the form \ec{mG.[x] = v}.
 
 \begin{easycrypt}[label={lst:pWhile}]{Example of a module}
 module RO_E = {
@@ -316,8 +339,9 @@ module RO_E = {
     var res:word;
     if (`|tape| <> 0)
     {
-      if (!in_dom x mG)) mG[x] = hd tape;
-      res = mG[x];
+      if (!in_dom x mG)
+        mG.[x] = hd tape;
+      res = mG.[x];
       tape = tl tape;
     }
     else
@@ -326,6 +350,9 @@ module RO_E = {
   }
 }.
 \end{easycrypt}
+
+The return type for procedures, as well as the types of local variables can be
+inferred automatically by \EasyCrypt.
 
 %
 %\subsection{Module Signatures}
