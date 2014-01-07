@@ -263,7 +263,7 @@ qed.
 
 lemma nosmt add_destruct (x:'a) (X:'a set):
   (exists (X':'a set), !mem x X' /\ X = add x X') <=> mem x X
-by [].
+by (split; smt).
 
 lemma rm_single (x:'a):
   rm x (single x) = empty.
@@ -503,7 +503,11 @@ lemma fold_set_list (f:'a -> 'b -> 'b) (e:'b) xs:
 proof strict.
 intros=> C; elim/set_comp xs;
   first by rewrite fold_empty elems_empty.
-intros=> s s_nempty IH; cut [x xs elems_decomp]: exists x xs, elems s = x::xs by smt.
+intros=> s s_nempty IH.
+cut [x xs elems_decomp]: exists x xs, elems s = x::xs.
+  case (elems s = []).
+    by apply absurd=> _; rewrite -elems_empty elems_eq.
+    by intros=> elems_nempty; exists (hd (elems s)); exists (tl (elems s)); apply cons_hd_tl.
 cut xval: pick s = x by rewrite pick_def elems_decomp hd_cons.
 subst x.
 rewrite elems_decomp fold_rm_pick //= IH //.

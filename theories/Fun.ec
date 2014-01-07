@@ -77,14 +77,14 @@ by [].
 lemma And_leq_l (p q:'a -> bool): (p /\ q) <= p by [].
 
 lemma And_leq_r (p q:'a -> bool): (p /\ q) <= q by [].
- 
-(*
-(** Properties of functions *)
-op id (x:'a): 'a = x.
 
-op compose: ('b -> 'c) -> ('a -> 'b) -> ('a -> 'c).
-axiom compose_def: forall (f:'a -> 'b) (g:'b -> 'c) (x:'a),
-  compose g f x = g (f x).
+(** Properties of functions *)
+(* id<:'a> is the identity function on 'a *)
+op id (x:'a) = x.
+
+(* function composition *)
+op compose (g:'b -> 'c) (f:'a -> 'b): ('a -> 'c) =
+  fun x, g (f x).
 
 pred injective (f:'a -> 'b) =
   forall (x y:'a), f x = f y => x = y.
@@ -104,66 +104,86 @@ pred bijective (f:'a -> 'b) =
 pred involutive (f:'a -> 'a) = cancel f f.
 
 (** Properties of operators *)
+(* e is a left-identity element for o *)
 pred left_id (e:'a) (o:'a -> 'a -> 'a) =
   forall (x:'a), o e x = x.
 
+(* e is a right-identity element for o *)
 pred right_id (e:'a) (o:'a -> 'a -> 'a) =
   forall (x:'a), o x e = x.
 
+(* inv is a left inverse for o (with identity e) *)
 pred left_inverse (e:'a) (inv:'a -> 'a) (o:'a -> 'a -> 'a) =
   forall (x:'a), o (inv x) x = e.
 
+(* inv is a right inverse for o (with identity e) *)
 pred right_inverse (e:'a) (inv:'a -> 'a) (o:'a -> 'a -> 'a) =
   forall (x:'a), o x (inv x) = e.
 
+(* o is its own inverse (with identity e) *)
 pred self_inverse (e:'a) (o:'a -> 'a -> 'a) =
   forall (x:'a), o x x = e.
 
+(* o is idempotent *)
 pred idempotent (o:'a -> 'a -> 'a) =
   forall (x:'a), o x x = x.
 
+(* o is associative: oA *)
 pred associative (o:'a -> 'a -> 'a) =
   forall (x y z:'a), o x (o y z) = o (o x y) z.
 
+(* o is commutative: oC *)
 pred commutative (o:'a -> 'a -> 'a) =
   forall (x y:'a),  o x y = o y x.
 
+(* o is left-commutative: oAC *)
 pred left_commutative (o:'a -> 'a -> 'a) =
   forall (x y z:'a), o x (o y z) = o y (o x z).
 
+(* o is right-commutative: oCA *)
 pred right_commutative (o:'a -> 'a -> 'a) =
   forall (x y z:'a), o (o x y) z = o (o x z) y.
 
+(* z is a left-zero for o *)
 pred left_zero (z:'a) (o:'a -> 'a -> 'a) =
-  forall (x:'a), o z x = x.
+  forall (x:'a), o z x = z.
 
+(* z is a right-zero for o *)
 pred right_zero (z:'a) (o:'a -> 'a -> 'a) =
-  forall (x:'a), o x z = x.
+  forall (x:'a), o x z = z.
 
+(* o1 distributes to the left over o2 *)
 pred left_distributive (o1:'a -> 'a -> 'a) (o2:'a -> 'a -> 'a) =
   forall (x y z:'a), o1 (o2 x y) z = o2 (o1 x z) (o1 y z).
 
+(* o1 distributes to the right over o2 *)
 pred right_distributive (o1:'a -> 'a -> 'a) (o2:'a -> 'a -> 'a) =
   forall (x y z:'a), o1 x (o2 y z) = o2 (o1 x y) (o1 x y).
 
+(* o1 and o2 satisfy an interchange law *)
 pred interchange (o1:'a -> 'a -> 'a) (o2:'a -> 'a -> 'a) =
   forall (x y z t:'a), o1 (o2 x y) (o2 z t) = o2 (o1 x z) (o1 y t).
 
+(* o is injective in its first argument *)
 pred left_injective (o:'a -> 'a -> 'a) =
   forall (x y z:'a), o x y = o z y => x = z.
 
+(* o is injective in its second argument *)
 pred right_injective (o:'a -> 'a -> 'a) =
   forall (x y z:'a), o x y = o x z => y = z.
 
+(* o (inv x) is always a left inverse of o x *)
 pred left_loop (inv:'a -> 'a) (o:'a -> 'a -> 'a) =
   forall (x y:'a), o (inv x) (o x y) = y.
 
+(* o x is always a left inverse of o (inv x) *)
 pred rev_left_loop (inv:'a -> 'a) (o:'a -> 'a -> 'a) =
   forall (x y:'a), o x (o (inv x) y) = y.
 
+(* same things with right inverse *)
 pred right_loop (inv:'a -> 'a) (o:'a -> 'a -> 'a) =
   forall (x y:'a), o (o x y) (inv y) = x.
 
+(* ditto *)
 pred rev_right_loop (inv:'a -> 'a) (o:'a -> 'a -> 'a) =
   forall (x y:'a), o (o x (inv y)) y = x.
-*)

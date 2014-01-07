@@ -185,18 +185,23 @@ theory Dunit.
   lemma nosmt mu_def_notin x (p:('a -> bool)):
     !p x => mu (dunit x) p = 0%r
   by [].
- 
+
+  lemma nosmt mu_x_def (x y:'a):
+    mu_x (dunit y) x = if x = y then 1%r else 0%r
+  by [].
+(*  by rewrite /mu_x mu_def /charfun. *)
+
   lemma nosmt mu_x_def_eq (x:'a):
     mu_x (dunit x) x = 1%r
-  by [].
+  by rewrite mu_x_def.
 
   lemma nosmt mu_x_def_neq (x y:'a):
     x <> y => mu_x (dunit x) y = 0%r
-  by [].
+  by (rewrite mu_x_def; smt).
 
   lemma supp_def (x y:'a):
     in_supp x (dunit y) <=> x = y
-  by [].
+  by (rewrite /in_supp mu_x_def; case (x = y)).
 
   lemma lossless (x:'a):
     weight (dunit x) = 1%r
@@ -208,32 +213,38 @@ theory Dunit.
 end Dunit.
 
 (** Uniform distribution on (closed) integer intervals *)
+(* A concrete realization of this distribution using uniform
+   distributions on finite sets of integers is available as
+   FSet.Dinter_uni.dinter, so these axioms are untrusted. *)
 theory Dinter.
   op dinter: int -> int -> int distr.
 
   axiom supp_def (i j x:int):
     in_supp x (dinter i j) <=> i <= x <= j.
 
-  (* A concrete realization of this distribution using uniform
-     distributions on finite sets of integers is available as
-     FSet.Dinter_uni.dinter.
-     Definitions for the two distributions are equal, and the
-     set-based definition may prove useful for computations. *)
-
-  axiom mu_x_def_in (i j x:int):
-    in_supp x (dinter i j) =>
-    mu_x (dinter i j) x = 1%r / (j - i + 1)%r.
-
-  axiom mu_x_def_notin (i j x:int):
-    !in_supp x (dinter i j) => mu_x (dinter i j) x = 0%r.
-
   axiom weight_def (i j:int):
     weight (dinter i j) = if i <= j then 1%r else 0%r.
+
+  axiom mu_x_def (i j x:int):
+    mu_x (dinter i j) x =
+      if in_supp x (dinter i j)
+      then 1%r / (j - i + 1)%r
+      else 0%r.
+
+  lemma nosmt mu_x_def_in (i j x:int):
+    in_supp x (dinter i j) =>
+    mu_x (dinter i j) x = 1%r / (j - i + 1)%r
+  by rewrite mu_x_def=> ->.
+
+  lemma nosmt mu_x_def_notin (i j x:int):
+    !in_supp x (dinter i j) =>
+    mu_x (dinter i j) x = 0%r
+  by rewrite mu_x_def -neqF=> ->.
 
   lemma mu_in_supp (i j : int):
     i <= j => 
     mu (dinter i j) (fun x, i <= x <= j) = 1%r.
-  proof -strict.
+  proof strict.
   by intros=> H;
      rewrite -(mu_eq_support (dinter i j) True);
        try apply fun_ext;

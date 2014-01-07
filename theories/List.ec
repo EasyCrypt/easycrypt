@@ -12,14 +12,13 @@ op list_rect (v:'b) (f:'a -> 'a list -> 'b -> 'b) (xs:'a list) =
   with xs = (::) x xs => f x xs (list_rect v f xs).
 
 (** Induction principles. *)
-lemma list_case_eq (P:'a list -> bool):
-  (forall xs, xs = [] => P xs) => 
-  (forall xs x' xs', xs = x'::xs' => P xs) =>
-  (forall xs, P xs).
+lemma list_case_eq (P:'a list -> bool) (xs:'a list):
+  (xs = [] => P xs) => 
+  ((exists x' xs', xs = x'::xs') => P xs) =>
+  P xs.
 proof strict.
-intros=> P_nil P_cons; elim/list_case.
-  by apply P_nil.
-  by intros=> x' xs'; apply (P_cons (x'::xs') x' xs').
+elim/list_case xs=> //= x xs -> //.
+by exists x; exists xs.
 qed.
 
 lemma list_ind_eq (P:'a list -> bool):
@@ -40,6 +39,14 @@ axiom hd_cons (x:'a) xs: hd (x::xs) = x.
 (** Tail *)
 op tl: 'a list -> 'a list.
 axiom tl_cons (x:'a) xs: tl (x::xs) = xs.
+
+(** Lemma *)
+lemma cons_hd_tl (xs:'a list):
+  xs <> [] => xs = (hd xs)::(tl xs).
+proof strict.
+elim/list_case xs=> //= x xs.
+by rewrite hd_cons tl_cons.
+qed.
 
 (*** Operators *)
 (** foldr *)
@@ -528,7 +535,7 @@ theory PermutationLists.
   intros=> xs; delta (<->) beta=> xs_nil;
   cut h: forall (x:'a), count x xs = 0.
     by intros=> x; rewrite xs_nil.
-  smt. (* TODO: Add lemmas to count *)
+  by apply nmem_nil=> x; rewrite -count_mem eq_sym //= h.
   qed.
 
   lemma perm_cons: forall x (xs ys:'a list),
@@ -536,91 +543,91 @@ theory PermutationLists.
     (x::xs) <-> (x::ys)
   by [].
 
-lemma perm_rm: forall x (xs ys:'a list),
-  xs <-> ys =>
-  (rm x xs) <-> (rm x ys).
-proof strict.
-intros=> x xs ys; case (mem x xs).
-  intros=> x_in_xs xs_ys; cut x_in_ys: mem x ys; first by rewrite -count_mem -(xs_ys x) count_mem //.
+  lemma perm_rm: forall x (xs ys:'a list),
+    xs <-> ys =>
+    (rm x xs) <-> (rm x ys).
+  proof strict.
+  intros=> x xs ys; case (mem x xs).
+    intros=> x_in_xs xs_ys; cut x_in_ys: mem x ys; first by rewrite -count_mem -(xs_ys x) count_mem //.
     delta (<->) beta=> x'; case (x = x')=> x_x'.
-      subst x'; rewrite count_rm_in // count_rm_in // xs_ys //.
-      rewrite count_rm_neq // count_rm_neq // xs_ys //.
-  intros=> x_nin_xs xs_ys; cut x_nin_ys: !mem x ys; first by rewrite -count_mem -(xs_ys x) count_mem //.
-    delta (<->) beta=> x'; case (x = x')=> x_x'.
-      subst x'; rewrite count_rm_nin // count_rm_nin // xs_ys //.
-      rewrite count_rm_neq // count_rm_neq // xs_ys //.
-qed.
+        subst x'; rewrite count_rm_in // count_rm_in // xs_ys //.
+        rewrite count_rm_neq // count_rm_neq // xs_ys //.
+    intros=> x_nin_xs xs_ys; cut x_nin_ys: !mem x ys; first by rewrite -count_mem -(xs_ys x) count_mem //.
+      delta (<->) beta=> x'; case (x = x')=> x_x'.
+        subst x'; rewrite count_rm_nin // count_rm_nin // xs_ys //.
+        rewrite count_rm_neq // count_rm_neq // xs_ys //.
+  qed.
 
-lemma foldC: forall (x:'a) (f:'a -> 'b -> 'b) (z:'b) (xs:'a list),
-    (forall a b X, f a (f b X) = f b (f a X)) =>
+  lemma foldC: forall (x:'a) (f:'a -> 'b -> 'b) (z:'b) (xs:'a list),
+      (forall a b X, f a (f b X) = f b (f a X)) =>
+      mem x xs =>
+      foldr f z xs = f x (foldr f z (rm x xs)).
+  proof strict.
+  intros=> x f z xs C; elim/list_ind xs; first smt.
+    intros=> x' xs IH //=.
+    case (x' = x)=> x_x';first subst x';rewrite rm_consE //.
+    intros=> // x_in_xs.
+    by rewrite rm_consNE //= IH // C //.
+  qed.
+
+  lemma foldCA: forall (f:'a -> 'a -> 'a) (z x:'a) (xs:'a list),
+    (forall x y, f x y = f y x) =>
+    (forall x y z, f x (f y z) = f (f x y) z) =>
     mem x xs =>
     foldr f z xs = f x (foldr f z (rm x xs)).
-proof strict.
-intros=> x f z xs C; elim/list_ind xs; first smt.
-  intros=> x' xs IH //=.
-  case (x' = x)=> x_x';first subst x';rewrite rm_consE //.
-  intros=> // x_in_xs.
-  by rewrite rm_consNE //= IH // C //.
-qed.
+  proof strict.
+  intros f z x xs C A.
+  apply foldC=> a b c.
+  rewrite A (C a) -A //.
+  qed.
 
-lemma foldCA: forall (f:'a -> 'a -> 'a) (z x:'a) (xs:'a list),
-  (forall x y, f x y = f y x) =>
-  (forall x y z, f x (f y z) = f (f x y) z) =>
-  mem x xs =>
-  foldr f z xs = f x (foldr f z (rm x xs)).
-proof strict.
-intros f z x xs C A.
-apply foldC=> a b c.
-rewrite A (C a) -A //.
-qed.
+  lemma fold_permC: forall (f:'a -> 'b -> 'b) (z:'b) (xs ys:'a list),
+    (forall a b X, f a (f b X) = f b (f a X)) =>
+    xs <-> ys =>
+    foldr f z xs = foldr f z ys.
+  proof strict.
+  intros=> f z xs ys C;generalize ys; elim/list_ind xs.
+    by intros=> ys nil_ys; rewrite (perm_nil ys); [apply perm_symm=> // | trivial ].
+    intros=> x xs IH ys xs_ys; rewrite (foldC x _ _ ys); first assumption.
+    rewrite -count_mem -xs_ys; smt.
+       cut rm_xs_ys: xs <-> rm x ys;
+         first by rewrite -(rm_consE x xs); apply perm_rm=> //.
+        rewrite //= (IH (rm x ys))=> //.
+  qed.
 
-lemma fold_permC: forall (f:'a -> 'b -> 'b) (z:'b) (xs ys:'a list),
-  (forall a b X, f a (f b X) = f b (f a X)) =>
-  xs <-> ys =>
-  foldr f z xs = foldr f z ys.
-proof strict.
-intros=> f z xs ys C;generalize ys; elim/list_ind xs.
-  by intros=> ys nil_ys; rewrite (perm_nil ys); [apply perm_symm=> // | trivial ].
-  intros=> x xs IH ys xs_ys; rewrite (foldC x _ _ ys); first assumption.
-  rewrite -count_mem -xs_ys; smt.
-     cut rm_xs_ys: xs <-> rm x ys;
-       first by rewrite -(rm_consE x xs); apply perm_rm=> //.
-      rewrite //= (IH (rm x ys))=> //.
-qed.
+  lemma fold_perm: forall (f:'a -> 'a -> 'a) (z:'a) (xs ys:'a list),
+    (forall x y, f x y = f y x) =>
+    (forall x y z, f x (f y z) = f (f x y) z) =>
+    xs <-> ys =>
+    foldr f z xs = foldr f z ys.
+  proof strict.
+  intros f z x xs C A.
+  apply fold_permC=> a b c.
+  rewrite A (C a) -A //.
+  qed.
 
-lemma fold_perm: forall (f:'a -> 'a -> 'a) (z:'a) (xs ys:'a list),
-  (forall x y, f x y = f y x) =>
-  (forall x y z, f x (f y z) = f (f x y) z) =>
-  xs <-> ys =>
-  foldr f z xs = foldr f z ys.
-proof strict.
-intros f z x xs C A.
-apply fold_permC=> a b c.
-rewrite A (C a) -A //.
-qed.
+  (** Properties of unique lists up to permutation *)
+  lemma perm_unique: forall (xs ys:'a list),
+    xs <-> ys =>
+    unique xs =>
+    unique ys
+  by [].
 
-(** Properties of unique lists up to permutation *)
-lemma perm_unique: forall (xs ys:'a list),
-  xs <-> ys =>
-  unique xs =>
-  unique ys
-by [].
+  lemma cons_nin: forall (x:'a) (xs ys:'a list),
+    unique ys =>
+    x::xs <-> ys =>
+    !mem x xs
+  by [].
 
-lemma cons_nin: forall (x:'a) (xs ys:'a list),
-  unique ys =>
-  x::xs <-> ys =>
-  !mem x xs
-by [].
-
-lemma perm_length: forall (xs ys:'a list),
-  xs <-> ys =>
-  length xs = length ys.
-proof strict.
-intros=> xs; elim/list_ind xs.
-  smt.
-  intros=> x xs IH ys xs_ys //=.
-    rewrite (IH (rm x ys)).
-      by rewrite -(rm_consE x xs); apply perm_rm=> //. (* This should become a lemma *)
-      by rewrite length_rm; smt.
-qed.
+  lemma perm_length: forall (xs ys:'a list),
+    xs <-> ys =>
+    length xs = length ys.
+  proof strict.
+  intros=> xs; elim/list_ind xs.
+    smt.
+    intros=> x xs IH ys xs_ys //=.
+      rewrite (IH (rm x ys)).
+        by rewrite -(rm_consE x xs); apply perm_rm=> //. (* This should become a lemma *)
+        by rewrite length_rm; smt.
+  qed.
 end PermutationLists.
