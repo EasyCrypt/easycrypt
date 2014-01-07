@@ -17,6 +17,7 @@ DISTDIR  := easycrypt-$(VERSION)
 THEORIES := $(wildcard theories/*.ec)
 REALIZED := $(wildcard theories/realizations/*.ec)
 PRELUDE  := $(wildcard theories/prelude/*.ec)
+CORE     := $(wildcard theories/core/*.ec)
 INSTALL  := scripts/install-sh
 
 # --------------------------------------------------------------------
@@ -73,6 +74,7 @@ install: ec.native uninstall
 	$(INSTALL) -m 0755 -d $(DESTDIR)$(SYSDIR)
 	$(INSTALL) -m 0755 -T system/callprover $(DESTDIR)$(SYSDIR)/callprover
 	$(call install-theories,,$(THEORIES))
+	$(call install-theories,core,$(CORE))
 	$(call install-theories,prelude,$(PRELUDE))
 	$(call install-theories,realizations,$(REALIZED))
 
@@ -91,6 +93,7 @@ uninstall:
 	$(call rmdir,$(DESTDIR)$(SYSDIR))
 	$(call uninstall-theories,realizations,$(REALIZED))
 	$(call uninstall-theories,prelude,$(PRELUDE))
+	$(call uninstall-theories,core,$(CORE))
 	$(call uninstall-theories,,$(THEORIES))
 	$(call rmdir,$(DESTDIR)$(LIBDIR))
 
