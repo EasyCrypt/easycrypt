@@ -1,5 +1,5 @@
 require import Int.
-require import Fun.
+require import Pred.
 
 (** This is a library for (possibly infinite) sets,
     usable as domains for maps, but not really in

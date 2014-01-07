@@ -3,16 +3,6 @@ type 'a option = [
   | Some of 'a
 ].
 
-lemma option_ind_eq (P:'a option -> bool) (xo:'a option):
-  (xo = None => P xo) =>
-  ((exists x, xo = Some x) => P xo) =>
-  P xo.
-proof strict.
-elim/option_ind xo=> //.
-by intros=> x _ -> //; exists x.
-qed.
-
-(* We like anonymous fixpoints, so we reclaim them from Pierre-Yves's clutch *)
 op option_rect (v:'a) (f:'b -> 'a) xo =
   with xo = None   => v
   with xo = Some x => f x.
@@ -24,12 +14,6 @@ by iota.
 lemma nosmt option_rect_some (v:'a) (f:'b -> 'a) (x:'b):
   option_rect v f (Some x) = f x
 by iota.
-
-(*
-function
-| None => true
-| Some _ => false
-*)
 
 (** Projection functions *)
 op proj_def (d:'a) xo =

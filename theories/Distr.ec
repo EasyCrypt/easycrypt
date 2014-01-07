@@ -1,5 +1,5 @@
 require import Logic.
-require export Fun.
+require export Pred.
 require import Int.
 require import Real.
 
@@ -66,7 +66,7 @@ lemma nosmt mu_and_le_l (d:'a distr) (p q:'a -> bool) r:
   mu d (p /\ q) <= r.
 proof strict.
 apply (Real.Trans _ (mu d p)).
-by apply mu_sub; rewrite /Fun.(/\)=> x.
+by apply mu_sub; rewrite /Pred.(/\)=> x.
 qed.
 
 lemma nosmt mu_and_le_r (d:'a distr) (p q:'a -> bool) r :
@@ -74,7 +74,7 @@ lemma nosmt mu_and_le_r (d:'a distr) (p q:'a -> bool) r :
   mu d (p /\ q) <= r.
 proof strict.
 apply (Real.Trans _ (mu d q)).
-by apply mu_sub; rewrite /Fun.(/\)=> x.
+by apply mu_sub; rewrite /Pred.(/\)=> x.
 qed.
 
 lemma mu_supp (d:'a distr):
@@ -303,7 +303,7 @@ theory Dapply.
     in_supp y (dapply f d) <=> exists x, y = f x /\ in_supp x d.
   proof strict.
   rewrite /in_supp /mu_x mu_def; split.
-    rewrite mu_support /Fun.(/\) /= => in_sup; smt.
+    rewrite mu_support /Pred.(/\) /= => in_sup; smt.
     by intros=> [x]; rewrite /in_supp /mu_x=> [y_def nempty];
        cut : (=) x <= (fun x, y = f x) by (by intros=> w);
        smt.

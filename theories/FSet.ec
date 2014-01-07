@@ -1,5 +1,5 @@
 require import Int.
-require import Fun.
+require import Pred.
 require import List.
   import PermutationLists.
 
@@ -703,16 +703,16 @@ lemma mu_cpMem_le (s:'a set): forall (d:'a distr) (bd:real),
 proof strict.
   elim/set_ind s.
     intros d bd Hmu_x.
-    rewrite (mu_eq d _ Fun.False).
+    rewrite (mu_eq d _ Pred.False).
       by intros x;rewrite /cpMem /False /= neqF;apply mem_empty.
     by rewrite mu_false card_empty //.
   intros x s Hnmem IH d bd Hmu_x.
   rewrite (_: (card (add x s))%r * bd = 
           bd + (card s)%r * bd); first by rewrite card_add_nin //=;ringeq.
   rewrite (mu_eq d _ (((=) x) \/ (cpMem s))).
-    by intros z;rewrite /cpMem /Fun.(\/) mem_add orC (eq_sym z).
+    by intros z;rewrite /cpMem /Pred.(\/) mem_add orC (eq_sym z).
   rewrite mu_disjoint.
-   by rewrite /Fun.(/\) /Fun.(\/) /False /cpMem => z /=;smt.
+   by rewrite /Pred.(/\) /Pred.(\/) /False /cpMem => z /=;smt.
   (cut ->: (mu d ((=) x) = mu_x d x)) => //.
   apply addleM.
     by apply Hmu_x; first rewrite mem_add.   
@@ -732,9 +732,9 @@ proof strict.
   rewrite (_: (card (add x s))%r * bd = 
           bd + (card s)%r * bd); first by rewrite card_add_nin //=;ringeq.
   rewrite (mu_eq d _ (((=) x) \/ (cpMem s))).
-    by intros z;rewrite /cpMem /Fun.(\/) mem_add orC (eq_sym z).
+    by intros z;rewrite /cpMem /Pred.(\/) mem_add orC (eq_sym z).
   rewrite mu_disjoint.
-   by rewrite /Fun.(/\) /Fun.(\/) /False /cpMem => z /=;smt.
+   by rewrite /Pred.(/\) /Pred.(\/) /False /cpMem => z /=;smt.
   (cut ->: (mu d ((=) x) = mu_x d x)) => //.
   apply addgeM.
     by apply Hmu_x; first rewrite mem_add.   

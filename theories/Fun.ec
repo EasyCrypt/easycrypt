@@ -1,102 +1,54 @@
-(** Extensional equality for functions *)
-pred (==) (f g:'a -> 'b) = forall x, f x = g x.
+require import ExtEq.
 
-lemma nosmt eq_refl (X:'a -> 'b):     X == X by [].
-lemma nosmt eq_symm (X Y:'a -> 'b):   X == Y => Y == X by [].
-lemma nosmt eq_tran (X Y Z:'a -> 'b): X == Y => Y == Z => X == Z by [].
-
-axiom fun_ext (f g:'a -> 'b): f == g <=> f = g.
-
-(* We need to have these two explicit, since = is not an operator *)
-lemma eqL (x:'a): (fun y, x = y) = (=) x
-by apply fun_ext.
-
-lemma eqR (y:'a): (fun x, x = y) = (=) y
-by (apply fun_ext=> x //=; rewrite (eq_sym x)).
-
-(*** Working with predicates *)
-(** Inclusion order *)
-pred (<=) (p q:'a -> bool) =
-  forall (a:'a), p a => q a.
-
-lemma nosmt leq_refl (X Y:'a -> bool):
-  X = Y => X <= Y
-by [].
-
-lemma nosmt leq_asym (X Y:'a -> bool):
-  X <= Y => Y <= X => X = Y
-by (rewrite -fun_ext; smt).
-
-lemma nosmt leq_tran (X Y Z:'a -> bool):
-  X <= Y => Y <= Z => X <= Z
-by [].
-
-pred (>=) (p q:'a -> bool) = q <= p.
-pred (<)  (p q:'a -> bool) = p <= q /\ p <> q.
-pred (>)  (p q:'a -> bool) = p >= q /\ p <> q.
-
-(** Lifting boolean operators to predicates *)
-op True (x:'a) : bool = true.
-op False (x:'a): bool = false.
-
-op [!]  (p:'a -> bool)  : 'a -> bool = fun x, !p x.
-op (/\) (p q:'a -> bool): 'a -> bool = fun x, p x /\ q x.
-op (\/) (p q:'a -> bool): 'a -> bool = fun x, p x \/ q x.
-
-(** Lemmas *)
-lemma True_true (x:'a): True x by done.
-
-lemma True_unique (p:'a -> bool): (forall x, p x) => p = True.
-proof strict.
-by rewrite -fun_ext=> px x; rewrite px.
-qed.
-
-lemma False_false (x:'a): !False x by [].
-
-lemma False_unique (p:'a -> bool): (forall x, !p x) => p = False.
-proof strict.
-by rewrite -fun_ext=> px x; rewrite /False neqF px.
-qed.
-
-lemma Not_not (p:'a -> bool) x: (!p) x <=> !p x by [].
-
-lemma And_and (p q:'a -> bool) x: (p /\ q) x <=> (p x /\ q x) by [].
-
-lemma Or_or (p q:'a -> bool) x: (p \/ q) x <=> (p x \/ q x) by [].
-
-lemma Excluded_Middle (p:'a -> bool): ((!p) \/ p) = True
-by (apply fun_ext; smt).
-
-lemma Sound (p:'a -> bool): ((!p) /\ p) = False
-by (apply fun_ext; smt).
-
-lemma congr_ext (f g:'a -> 'b) (x y:'a):
-  f == g => x = y => f x = g y
-by [].
-
-lemma And_leq_l (p q:'a -> bool): (p /\ q) <= p by [].
-
-lemma And_leq_r (p q:'a -> bool): (p /\ q) <= q by [].
-
-(** Properties of functions *)
+(*** Properties of functions (see ssrfun) *)
+(** Definitions *)
 (* id<:'a> is the identity function on 'a *)
 op id (x:'a) = x.
 
-(* function composition *)
-op compose (g:'b -> 'c) (f:'a -> 'b): ('a -> 'c) =
-  fun x, g (f x).
+(** Definitions for composition *)
+theory Composition.
+  op comp (g:'b -> 'c) (f:'a -> 'b): ('a -> 'c) =
+    fun x, g (f x).
+end Composition.
+export Composition.
+
+theory Morphism.
+  (** Morphisms *)
+  (* Morphism property for unary and binary functions *)
+  pred morphism_1 (f:'a -> 'b) aF rF =
+    forall x, f (aF x) = rF (f x).
+
+  pred morphism_2 (f:'a -> 'b) aOp rOp =
+    forall x y, f (aOp x y) = rOp (f x) (f y).
+
+  (* Homomorphism property for unary and binary relations *)
+  pred homomorphism_1 (f:'a -> 'b) aP rP =
+    forall x, aP x => rP (f x).
+
+  pred homomorphism_2 (f:'a -> 'b) aR rR =
+    forall x y, aR x y => rR (f x) (f y).
+
+  (* Stability property for unary and binary relations *)
+  pred monomorphism_1 (f:'a -> 'b) (aP: 'a -> 'c) rP =
+    forall x, rP (f x) = aP x.
+
+  pred monmorphism_2 (f:'a -> 'b) (aR:'a -> 'a -> 'c) rR =
+    forall x y, rR (f x) (f y) = aR x y.
+end Morphism.
+export Morphism.
 
 pred injective (f:'a -> 'b) =
   forall (x y:'a), f x = f y => x = y.
 
 pred cancel (f:'a -> 'b) (g:'b -> 'a) =
-  compose g f = id.
+  comp g f = id.
 
 pred pcancel (f:'a -> 'b) (g:'b -> 'a) (p:'b -> bool) =
-  forall (x:'a), p (f x) /\ compose g f x = x.
+  forall (x:'a), p (f x) /\ comp g f x = x.
 
+(* NOTE: ssreflect ocancel deals with options *)
 pred ocancel (f:'a -> 'b) (g:'b -> 'a) (p:'a -> bool) =
-  forall (x:'a), p x => compose g f x = x.
+  forall (x:'a), p x => comp g f x = x.
 
 pred bijective (f:'a -> 'b) =
   exists (g:'b -> 'a), cancel f g /\ cancel g f.

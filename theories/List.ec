@@ -1,5 +1,5 @@
 require import Int.
-require import Fun.
+require import Pred.
 
 type 'a list = [
   | "[]"
