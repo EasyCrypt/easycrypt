@@ -94,25 +94,22 @@ lemma nosmt orIr : forall (a b : bool),
   b => a \/ b
 by [].
 
-lemma nosmt orA : forall (a b c : bool),
-  ((a \/ b) \/ c) = (a \/ (b \/ c))
+lemma nosmt orbA : forall (a b c : bool),
+  a \/ (b \/ c) = (a \/ b) \/ c
 by [].
 
-lemma nosmt orC : forall (a b : bool),
+lemma nosmt orbC : forall (a b : bool),
   (a \/ b) = (b \/ a)
 by [].
 
-lemma nosmt orK : forall (b : bool),
+lemma nosmt orbK : forall (b : bool),
   (b \/ b) = b
 by [].
 
-lemma nosmt orT : forall (b : bool),
-  (b \/ true) = true
-by [].
-
-lemma nosmt orF : forall (b : bool),
-  (b \/ false) = b
-by [].
+lemma nosmt orTb (b : bool): (true  \/ b) = true  by [].
+lemma nosmt orFb (b : bool): (false \/ b) = b     by [].
+lemma nosmt orbT (b : bool): (b \/ true ) = true  by [].
+lemma nosmt orbF (b : bool): (b \/ false) = b     by [].
 
 (** Distributivity and/or *)
 lemma nosmt orDand : forall (a b c : bool),
