@@ -284,6 +284,8 @@ let process_apply_on_goal loc pe g =
   let args = List.map (trans_pterm_argument hyps ue) pe.fp_args in
   let (ax, ids) = check_pterm_arguments hyps ue ax args in
 
+  let module E = struct exception NoInstance end in
+
   let (_, ids, (_, tue, ev), view) =
     let rec instanciate (ax, ids, view) =
       let withmatch () =
@@ -296,19 +298,25 @@ let process_apply_on_goal loc pe g =
                 let (ax, id) = check_pterm_argument hyps ue ax None in
                   instanciate (ax, id :: ids, view)
             | None when view <> None ->
-                tacuerror "in apply, cannot find instance"
+                raise E.NoInstance
             | None -> begin
                 match sform_of_form ax with
-                | SFiff (f1, f2) ->
-                    let cut  = f_imp f1 f2 in
-                    let view = (List.length ids, [f1; f2], EcCoreLib.p_iff_lr,cut) in
-                      instanciate (cut, ids, Some view)
+                | SFiff (f1, f2) -> begin
+                    try
+                      let cut  = f_imp f1 f2 in
+                      let view = (List.length ids, [f1; f2], EcCoreLib.p_iff_lr, cut) in
+                        instanciate (cut, ids, Some view)
+                    with E.NoInstance ->
+                      let cut  = f_imp f2 f1 in
+                      let view = (List.length ids, [f1; f2], EcCoreLib.p_iff_rl, cut) in
+                        instanciate (cut, ids, Some view)
+                  end
                 | SFnot f1 ->
                     let cut  = f_imp f1 f_false in
                     let view = (List.length ids, [f1], EcCoreLib.p_negbTE, cut) in
                       instanciate (cut, ids, Some view)
                 | _ ->
-                  tacuerror "in apply, cannot find instance"
+                  raise E.NoInstance
             end
       in
   
@@ -325,7 +333,8 @@ let process_apply_on_goal loc pe g =
               withmatch ()
 
     in
-      instanciate (ax, ids, None)
+      try  instanciate (ax, ids, None)
+      with E.NoInstance -> tacuerror "in apply, cannot find instance"
 
   in
 
