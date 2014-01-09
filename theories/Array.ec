@@ -76,7 +76,7 @@ lemma cons_nonempty (x:'x) (xs:'x array):
   x::xs <> empty.
 proof strict.
 by rewrite -not_def=> cons_empty;
-   cut:= fcongr length (x::xs) empty _=> //;
+   cut:= congr1 length (x::xs) empty _=> //;
    rewrite length_empty length_cons; smt.
 qed.
 
@@ -108,7 +108,7 @@ lemma snoc_nonempty (xs:'x array, x:'x):
   xs:::x <> empty.
 proof strict.
 by rewrite -not_def=> snoc_empty;
-   cut:= fcongr length (xs:::x) empty _=> //;
+   cut:= congr1 length (xs:::x) empty _=> //;
    rewrite length_empty length_snoc; smt.
 qed.
 

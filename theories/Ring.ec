@@ -1,97 +1,73 @@
-(* This theory should make use of theories for groups.
-   It is currently mostly being developed towards getting
-   fixed-length bitstrings formalized as boolean rings,
-   automatically yielding many useful lemmas from a
-   small number of simple core axioms. *)
+(* -------------------------------------------------------------------- *)
 theory Ring.
+  require import Fun.
+
   type ring.
 
-  (** Ring addition *)
-  const zero: ring.
+  op zeror : ring.
+  op oner  : ring.
+
   op ( + ) : ring -> ring -> ring.
   op [ - ] : ring -> ring.
-  op ( - ) r1 r2 = r1 + -r2.
+  op ( * ) : ring -> ring -> ring.
 
-  axiom addrA: forall r1 r2 r3,
-    (r1 + r2) + r3 = r1 + (r2 + r3).
+  op ( - ) (x y : ring) = x + -y.
 
-  axiom addrC: forall r1 r2,
-    r1 + r2 = r2 + r1.
+  axiom nosmt oner_neq0 : oner <> zeror.
 
-  axiom add0r: forall r,
-    zero + r = r.
+  axiom nosmt addrA (x y z : ring): x + (y + z) = (x + y) + z.
+  axiom nosmt addrC (x y   : ring): x + y = y + x.
+  axiom nosmt add0r (x     : ring): zeror + x = x.
+  axiom nosmt addNr (x     : ring): (-x) + x = zeror.
 
-  axiom addNr: forall r,
-    r + -r = zero.
+  axiom nosmt mulrA  (x y z : ring): x * (y * z) = (x * y) * z.
+  axiom nosmt mulrC  (x y   : ring): x * y = y * x.
+  axiom nosmt mul1r  (x     : ring): oner * x = x.
+  axiom nosmt mulrDl (x y z : ring): (x + y) * z = x * z + y * z.
 
-  (** Ring multiplication *)
-  const one: ring.
-  op ( * ): ring -> ring -> ring.
+  lemma nosmt addr0 (x : ring): x + zeror = x.
+  proof. by rewrite addrC add0r. qed.
 
-  axiom mulrA: forall r1 r2 r3,
-    (r1 * r2) * r3 = r1 * (r2 * r3).
+  lemma nosmt addrN (x : ring): x + (-x) = zeror.
+  proof. by rewrite addrC addNr. qed.
 
-  axiom mul1r: forall r,
-    one * r = r.
+  lemma nosmt subrr (x : ring): x - x = zeror by apply addrN.
 
-  (** Distributivity of addition over multiplication *)
-  axiom mulrDadd: forall r1 r2 r3,
-    r1 * (r2 + r3)= (r1 * r2) + (r1 * r3).
+  lemma nosmt addKr (x y : ring): -x + (x + y) = y.
+  proof. by rewrite addrA addNr add0r. qed.
 
-  axiom mulDradd: forall r1 r2 r3,
-    (r1 + r2) * r3 = (r1 * r3) + (r2 * r3).
+  lemma nosmt addrK (x y : ring): (x + y) + -y = x.
+  proof. by rewrite -addrA addrN addr0. qed.
 
+  lemma nosmt addrI (x y z : ring): x + y = x + z => y = z.
+  proof. cut := addKr; smt. qed.
 
-  (** Lemmas *)
-  lemma addr0: forall r,
-    r + zero = r
-  by (intros=> r; rewrite addrC; apply add0r).
+  lemma nosmt addIr (x y z : ring): y + x = z + x => y = z.
+  proof. cut := addrK; smt. qed.
 
-  lemma addrN: forall r,
-    -r + r = zero
-  by (intros=> r; rewrite addrC; apply addNr).
+  lemma nosmt opprK (x : ring): -(-x) = x.
+  proof. by apply (addIr (-x)); rewrite addNr addrN. qed.
 
-  lemma addIr: forall r r1 r2,
-    (r1 + r = r2 + r) <=>
-    r1 = r2.
-  proof strict.
-  intros=> r r1 r2; split=> r1_r2; last by congr=> //.
-  by rewrite -addr0 -(addr0 r2) -(addNr r) -2!addrA -r1_r2.
-  qed.
+  lemma nosmt oppr0: -zeror = zeror.
+  proof. by rewrite -(addr0 (-zeror)) addNr. qed.
 
-  lemma addrI: forall r r1 r2,
-    (r + r1 = r + r2) <=>
-    r1 = r2.
-  proof strict.
-  by intros=> r r1 r2; rewrite 2!(addrC r); apply addIr.
-  qed.
+  lemma subr0 (x : ring): x - zeror = x.
+  proof. by rewrite /Ring.(-) oppr0 addr0. qed.
+
+  lemma sub0r (x : ring): zeror - x = - x.
+  proof. by rewrite /Ring.(-) add0r. qed.
+
+  lemma nosmt mulr1 (x : ring): x * oner = x.
+  proof. by rewrite mulrC mul1r. qed.
+
+  lemma nosmt mulrDr (x y z : ring): x * (y + z) = x * y + x * z.
+  proof. by rewrite mulrC mulrDl !(mulrC _ x). qed.
 end Ring.
 
-theory CRing.
-  clone Ring. import Ring.
+(* -------------------------------------------------------------------- *)
+theory IDomain.
+  clone export Ring.
 
-  axiom mulrC: forall r1 r2,
-    r1 * r2 = r2 * r1.
-end CRing.
-
-theory BooleanRing.
-  clone Ring. import Ring.
-
-  axiom mulK: forall r,
-    r * r = r.
-
-  lemma neg_is_id: forall r,
-    r + r = zero.
-  proof strict.
-  by intros=> r;
-     rewrite -(addIr (r + r)) add0r -(mulK r) -{1 2}mulrDadd -mulDradd 2!mulK.
-  qed.
-
-  lemma mulrC: forall r1 r2,
-    r1 * r2 = r2 * r1.
-  proof strict.
-  intros=> r1 r2;
-  by rewrite -(addIr (r2 * r1)) neg_is_id -(addIr r2) (add0r r2) addrA -(addrI r1) -addrA
-             -{1}(mulK r1) -{3}(mulK r2) -2!mulrDadd -mulDradd mulK.
-  qed.
-end BooleanRing.
+  axiom nosmt integral (x y : ring):
+    x * y = zeror => (x = zeror) \/ (y = zeror).
+end IDomain.

@@ -95,7 +95,7 @@ lemma nosmt orIr : forall (a b : bool),
 by [].
 
 lemma nosmt orbA : forall (a b c : bool),
-  a \/ (b \/ c) = (a \/ b) \/ c
+  (a \/ (b \/ c)) = ((a \/ b) \/ c)
 by [].
 
 lemma nosmt orbC : forall (a b : bool),
@@ -218,12 +218,12 @@ lemma nosmt rewrite_bool (x : bool) (p:bool -> bool):
   x => p true => p x
 by [].
 
-lemma nosmt fcongr :
+lemma nosmt congr1 :
   forall (f : 'a -> 'b) (x1 x2 : 'a),
     x1 = x2 => f x1 = f x2
 by [].
 
-lemma nosmt rewrite_if: forall (f:'a -> 'b) b x1 x2,
+lemma nosmt fun_if: forall (f:'a -> 'b) b x1 x2,
   f (if b then x1 else x2) = (if b then f x1 else f x2)
 by [].
 

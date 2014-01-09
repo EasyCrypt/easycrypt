@@ -72,7 +72,7 @@ and process_tactic mkpv (tac : ptactic) (gs : goals) : goals =
   in
 
   let gs = process_tactic_core mkpv tac.pt_core gs in
-  let gs = t_on_goals (EcHiLogic.process_intros ~cf tac.pt_intros) gs in
+  let gs = EcHiLogic.process_mintros ~cf tac.pt_intros gs in
     gs
 
 (* -------------------------------------------------------------------- *)

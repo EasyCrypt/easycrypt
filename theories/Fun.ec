@@ -41,7 +41,13 @@ pred injective (f:'a -> 'b) =
   forall (x y:'a), f x = f y => x = y.
 
 pred cancel (f:'a -> 'b) (g:'b -> 'a) =
-  comp g f = id.
+  forall x, g (f x) = x.
+
+lemma nosmt can_inj (f : 'a -> 'b) g: cancel f g => injective f.
+proof.
+  intros=> fK x y h; apply (congr1 g) in h.
+  by generalize h; rewrite !fK.
+qed.
 
 pred pcancel (f:'a -> 'b) (g:'b -> 'a) (p:'b -> bool) =
   forall (x:'a), p (f x) /\ comp g f x = x.

@@ -1,7 +1,7 @@
 require import Int.
 require import Pred.
 require import List.
-  import PermutationLists.
+(*---*) import PermutationLists.
 
 type 'a set.
 
@@ -177,7 +177,7 @@ lemma add_add_comm (a b:'a) s:
   add a (add b s) = add b (add a s).
 proof -strict.
   apply set_ext => x.
-  by rewrite !mem_add !orA (orC (x = b)).
+  by rewrite !mem_add -!orbA (orbC (x = b)).
 qed.
 
 (** disjoint *)
@@ -367,13 +367,13 @@ axiom mem_union x (X1 X2:'a set):
 lemma unionC (X1 X2:'a set):
   union X1 X2 = union X2 X1.
 proof strict.
-by apply set_ext=> x; rewrite 2!mem_union orC //.
+by apply set_ext=> x; rewrite 2!mem_union orbC //.
 qed.
 
 lemma unionA (X1 X2 X3:'a set):
   union (union X1 X2) X3 = union X1 (union X2 X3).
 proof strict.
-by apply set_ext=> x; rewrite !mem_union orA //.
+by apply set_ext=> x; rewrite !mem_union -orbA //.
 qed.
 
 lemma union0s (X:'a set): union empty X = X.
@@ -390,7 +390,7 @@ qed.
 
 lemma unionK (X:'a set): union X X = X.
 proof strict.
-by apply set_ext=> x; rewrite mem_union orK.
+by apply set_ext=> x; rewrite mem_union orbK.
 qed.
 
 lemma union_add (x:'a) s1 s2: union (add x s1) s2 = add x (union s1 s2).
@@ -710,7 +710,7 @@ proof strict.
   rewrite (_: (card (add x s))%r * bd = 
           bd + (card s)%r * bd); first by rewrite card_add_nin //=;ringeq.
   rewrite (mu_eq d _ (((=) x) \/ (cpMem s))).
-    by intros z;rewrite /cpMem /Pred.(\/) mem_add orC (eq_sym z).
+    by intros z;rewrite /cpMem /Pred.(\/) mem_add -orbC (eq_sym z).
   rewrite mu_disjoint.
    by rewrite /Pred.(/\) /Pred.(\/) /False /cpMem => z /=;smt.
   (cut ->: (mu d ((=) x) = mu_x d x)) => //.
@@ -732,7 +732,7 @@ proof strict.
   rewrite (_: (card (add x s))%r * bd = 
           bd + (card s)%r * bd); first by rewrite card_add_nin //=;ringeq.
   rewrite (mu_eq d _ (((=) x) \/ (cpMem s))).
-    by intros z;rewrite /cpMem /Pred.(\/) mem_add orC (eq_sym z).
+    by intros z;rewrite /cpMem /Pred.(\/) mem_add -orbC (eq_sym z).
   rewrite mu_disjoint.
    by rewrite /Pred.(/\) /Pred.(\/) /False /cpMem => z /=;smt.
   (cut ->: (mu d ((=) x) = mu_x d x)) => //.

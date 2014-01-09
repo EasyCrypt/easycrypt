@@ -174,7 +174,7 @@ let p_iff_intro     = _Logic "iffI"
 let p_if_intro      = _Logic "ifI"
 let p_eq_refl       = _Logic "eq_refl"
 let p_eq_trans      = _Logic "eq_trans"
-let p_fcongr        = _Logic "fcongr"
+let p_fcongr        = _Logic "congr1"
 let p_eq_sym        = _Logic "eq_sym"
 
 let p_rewrite_l     = _Logic "rewrite_l"

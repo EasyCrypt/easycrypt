@@ -672,7 +672,7 @@ let process_change pf g =
     set_loc pf.pl_loc (t_change f) g
 
 (* -------------------------------------------------------------------- *)
-let process_intros ?(cf = true) pis (juc, n) =
+let process_mintros ?(cf = true) pis gs =
   let mk_intro ids g =
     t_intros (snd (List.map_fold (fun (hyps, form) s ->
       let rec destruct fp =
@@ -786,7 +786,11 @@ let process_intros ?(cf = true) pis (juc, n) =
 
   and dointro1 nointro pis (juc, n) = dointro nointro pis (juc, [n]) in
 
-    dointro1 true (List.rev (collect [] [] pis)) (juc, n)
+    dointro true (List.rev (collect [] [] pis)) gs
+
+(* -------------------------------------------------------------------- *)
+let process_intros ?cf pis (juc, n) =
+  process_mintros ?cf pis (juc,[n])
 
 (* -------------------------------------------------------------------- *)
 let process_cut (engine : engine) ip phi t g =

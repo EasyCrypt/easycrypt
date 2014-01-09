@@ -132,7 +132,7 @@ by (elim xs=> //= xs ->; smt).
 
 lemma mem_app (y:'a) xs ys:
   mem y (xs ++ ys) = (mem y xs \/ mem y ys)
-by (elim xs=> //= x xs ->; rewrite orA).
+by (elim xs=> //= x xs ->; rewrite -orbA).
 
 (** rev *)
 op rev (xs:'a list) =
@@ -168,7 +168,7 @@ qed.
 lemma mem_rev (e:'a) xs:
   mem e (rev xs) <=> mem e xs.
 proof strict.
-by elim xs=> //= x xs; rewrite mem_app orC=> ->.
+by elim xs=> //= x xs; rewrite mem_app -orbC=> ->.
 qed.
 
 lemma eq_rev (xs ys:'a list):
@@ -498,7 +498,7 @@ lemma count_rm_in: forall (x:'a) (xs:'a list),
 proof strict.
 intros=> x xs; generalize x; elim/list_ind xs=> x.
   apply absurd=> _ //=.
-  intros=> xs IH y x'; rewrite rm_cons (rewrite_if (count y)); smt.
+  intros=> xs IH y x'; rewrite rm_cons (fun_if (count y)); smt.
 qed.
 
 lemma count_rm_nin: forall (x:'a) (xs:'a list),
