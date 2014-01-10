@@ -1,4 +1,4 @@
-; Generated on Fri Dec 20 16:32:05 2013
+; Generated on Fri Jan 10 16:03:39 2014
 
 (defvar easycrypt-bytac-keywords '(
   "assumption"
@@ -14,6 +14,7 @@
 
 (defvar easycrypt-global-keywords '(
   "axiom"
+  "axiomatized"
   "lemma"
   "realize"
   "proof"

@@ -122,6 +122,7 @@
     "eager"       , EAGER      ;        (* KW: tactic *)
 
     "axiom"       , AXIOM      ;        (* KW: global *)
+    "axiomatized" , AXIOMATIZED;        (* KW: global *)
     "lemma"       , LEMMA      ;        (* KW: global *)
     "realize"     , REALIZE    ;        (* KW: global *)
     "proof"       , PROOF      ;        (* KW: global *)

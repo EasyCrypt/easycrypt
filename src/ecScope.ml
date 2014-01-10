@@ -890,6 +890,224 @@ module Tactics = struct
 end
 
 (* -------------------------------------------------------------------- *)
+module Ax = struct
+  open EcParsetree
+  open EcDecl
+
+  module TT = EcTyping
+
+  type mode = [`WeakCheck | `Check]
+
+  (* ------------------------------------------------------------------ *)
+  let bind (scope : scope) local ((x, ax) : _ * axiom) =
+    assert (scope.sc_pr_uc = None);
+    let scope = { scope with sc_env = EcEnv.Ax.bind x ax scope.sc_env; } in
+    let scope = maybe_add_to_section scope (EcTheory.CTh_axiom (x, ax)) in
+    let scope =
+      match CoreSection.opath scope.sc_section with
+      | None -> scope
+      | Some _ ->
+          let lvl1 = if local then `Local else `Global in
+          let lvl2 = if ax.ax_kind = `Axiom then `Axiom else `Lemma in
+
+          if lvl2 = `Axiom && ax.ax_tparams <> [] then
+            hierror "axiom must be monomorphic in sections";
+
+          let axpath = EcPath.pqname (path scope) x in
+          let ec = CoreSection.add_lemma axpath (lvl1, lvl2) scope.sc_section in
+            { scope with sc_section = ec }
+    in
+      scope
+
+  (* ------------------------------------------------------------------ *)
+  let start_lemma scope (cont, axflags) check name axd =
+    let puc =
+      match check with
+      | false -> PSNoCheck
+      | true  ->
+          (* FIXME: TC HOOK *)
+          let hyps = EcEnv.LDecl.init scope.sc_env (List.map fst axd.ax_tparams) in
+            PSCheck (EcLogic.open_juc (hyps, oget axd.ax_spec), [0])
+    in 
+    let puc = { puc_active = Some {
+                  puc_name  = name;
+                  puc_mode  = None;
+                  puc_jdg   = puc;
+                  puc_flags = axflags;
+                  puc_crt   = axd;
+                };
+                puc_cont = cont; }
+    in
+      { scope with sc_pr_uc = Some puc }
+
+  (* ------------------------------------------------------------------ *)
+  let rec add_r (scope : scope) mode (ax : paxiom located) =
+    assert (scope.sc_pr_uc = None);
+
+    let loc = ax.pl_loc and ax = ax.pl_desc in
+    let ue  = TT.transtyvars scope.sc_env (loc, ax.pa_tyvars) in
+
+    if ax.pa_local && not (CoreSection.in_section scope.sc_section) then
+      hierror "cannot declare a local lemma outside of a section";
+
+    let (pconcl, tintro) =
+      match ax.pa_vars with
+      | None    -> (ax.pa_formula, [])
+      | Some vs -> 
+          let pconcl = { pl_loc = loc; pl_desc = PFforall (vs, ax.pa_formula) } in
+            (pconcl, List.flatten (List.map fst vs))
+    in
+
+    let tintro =
+      List.map
+        (fun x -> IPCore (mk_loc x.pl_loc (`NoRename x.pl_desc)))
+        tintro in
+    let tintro = mk_loc loc (Plogic (Pintro tintro)) in
+
+    let concl = TT.trans_prop scope.sc_env ue pconcl in
+
+    if not (EcUnify.UniEnv.closed ue) then
+      hierror "the formula contains free type variables";
+
+    let concl   = EcFol.Fsubst.uni (EcUnify.UniEnv.close ue) concl in
+    let tparams = EcUnify.UniEnv.tparams ue in
+
+    let axd  =
+      let kind = match ax.pa_kind with PAxiom -> `Axiom | _ -> `Lemma in
+        { ax_tparams = tparams;
+          ax_spec    = Some concl;
+          ax_kind    = kind;
+          ax_nosmt   = ax.pa_nosmt; }
+    in
+
+    let check    = Check_mode.check scope.sc_options in
+    let pucflags = { puc_nosmt = ax.pa_nosmt; puc_local = ax.pa_local; } in
+    let pucflags = (([], None), pucflags) in
+
+    if not ax.pa_local then begin
+      match CoreSection.olocals scope.sc_section with
+      | None -> ()
+      | Some locals ->
+          if CoreSection.form_use_local concl locals then
+            hierror "this lemma uses local modules and must be declared as local"
+    end;
+
+    if ax.pa_local && ax.pa_kind = PAxiom then
+      hierror "an axiom cannot be local";
+
+    match ax.pa_kind with
+    | PILemma ->
+        let scope = start_lemma scope pucflags check (unloc ax.pa_name) axd in
+        let scope = Tactics.process_core false `Check scope [tintro] in
+          None, scope
+
+    | PLemma tc ->
+        let scope = start_lemma scope pucflags check (unloc ax.pa_name) axd in
+        let scope = Tactics.process_core false `Check scope [tintro] in
+        let scope = Tactics.proof scope mode (if tc = None then true else false) in
+
+        let tc =
+          match tc with
+          | Some tc -> tc
+          | None    ->
+              let dtc = Plogic (Psmt (None, empty_pprover)) in
+              let dtc = { pl_loc = loc; pl_desc = dtc } in
+              let dtc = { pt_core = dtc; pt_intros = []; } in
+                dtc
+        in
+
+        let tc = { pl_loc = loc; pl_desc = Pby (Some [tc]) } in
+        let tc = { pt_core = tc; pt_intros = []; } in
+
+        let scope = Tactics.process_r false mode scope [tc] in
+          save scope loc
+
+    | PAxiom ->
+          Some (unloc ax.pa_name),
+          bind scope (snd pucflags).puc_local (unloc ax.pa_name, axd)
+
+  (* ------------------------------------------------------------------ *)
+  and add_for_cloning (scope : scope) proofs =
+    match proofs with
+    | [] -> scope
+    | _  ->
+        assert (scope.sc_pr_uc = None);
+        let puc = { puc_active = None; puc_cont = (proofs, Some scope.sc_env); } in
+          { scope with sc_pr_uc = Some puc; }
+
+  (* ------------------------------------------------------------------ *)
+  and save scope _loc =
+    check_state `InProof "save" scope;
+
+    let puc = oget scope.sc_pr_uc in
+    let pac =
+      match puc.puc_active with
+      | None -> hierror "no active lemma"
+      | Some pac -> begin
+          match pac.puc_jdg with
+          | PSNoCheck  -> ()
+          | PSCheck gs ->
+              try  ignore (EcLogic.close_juc (fst gs))
+              with EcBaseLogic.StillOpenGoal _ ->
+                hierror "cannot save an incomplete proof"
+      end; pac
+    in
+
+    let scope = { scope with sc_pr_uc = Some { puc with puc_active = None; } } in
+
+    let scope =
+      match fst puc.puc_cont with
+      | [] -> { scope with sc_pr_uc = None; }
+      | _  -> scope
+    in
+
+    let scope =
+      match snd puc.puc_cont with
+      | Some e -> { scope with sc_env = e }
+      | None   -> bind scope pac.puc_flags.puc_local (pac.puc_name, pac.puc_crt)
+    in
+
+      (Some pac.puc_name, scope)
+
+  (* ------------------------------------------------------------------ *)
+  let add (scope : scope) mode (ax : paxiom located) =
+    add_r scope mode ax
+
+  (* ------------------------------------------------------------------ *)
+  let activate (scope : scope) (qn : pqsymbol) =
+    check_state `InProof "activate" scope;
+
+    let qn = EcPath.fromqsymbol (unloc qn) in
+
+    let puc = oget scope.sc_pr_uc in
+    let _ =
+      match puc.puc_active with
+      | Some _ -> hierror "a lemma is already active"
+      | None -> ()
+    in
+
+    let (((x, ax), _, axenv), proofs) =
+      let rec doit past proofs =
+        match proofs with
+        | [] -> hierror "no such lemma: `%s'" (EcPath.tostring qn)
+        | (((_, _), p, _) as st) :: proofs ->
+            match EcPath.p_equal p qn with
+            | false -> doit (st :: past) proofs
+            | true  -> (st, List.rev_append past proofs)
+      in
+        doit [] (fst puc.puc_cont)
+    in
+    let pucflags = { puc_nosmt = ax.ax_nosmt; puc_local = false; } in
+    let pucflags = ((proofs, snd puc.puc_cont), pucflags) in
+    let check    = Check_mode.check scope.sc_options in
+
+    let scope = { scope with sc_env = axenv } in
+    let scope = start_lemma scope pucflags check x ax in
+
+      scope
+end
+
+(* -------------------------------------------------------------------- *)
 module Op = struct
   open EcTypes
   open EcDecl
@@ -1169,7 +1387,42 @@ module Op = struct
         with EcUnify.UnificationFailure _ -> ()
     end;
 
-    bind scope (unloc op.po_name, tyop)
+    match op.po_ax with
+    | None    -> bind scope (unloc op.po_name, tyop)
+    | Some ax -> begin
+        match tyop.op_kind with
+        | OB_oper (Some (OP_Plain bd)) ->
+            let axbd = EcFol.form_of_expr EcFol.mhr bd in
+            let axbd, axpm =
+              let bdpm = List.map fst tyop.op_tparams in
+              let axpm = List.map EcIdent.fresh bdpm in
+                (EcFol.Fsubst.subst_tvar
+                   (EcTypes.Tvar.init bdpm (List.map tvar axpm))
+                   axbd,
+                 List.combine axpm (List.map snd tyop.op_tparams))
+            in
+
+            let axspec =
+              EcFol.f_eq
+                (EcFol.f_op
+                   (EcPath.pqname (path scope) (unloc op.po_name))
+                   (List.map (tvar |- fst) axpm)
+                   axbd.EcFol.f_ty)
+                axbd
+            in                   
+
+            let tyop = { tyop with op_kind = OB_oper None } in
+            let axop = { ax_tparams = axpm;
+                         ax_spec    = Some axspec;
+                         ax_kind    = `Axiom;
+                         ax_nosmt   = false; } in
+
+            let scope = bind scope (unloc op.po_name, tyop) in
+              Ax.bind scope false (unloc ax, axop)
+
+        | _ -> hierror ~loc "cannot axiomatized non-plain operators"
+    end
+        
 end
 
 (* -------------------------------------------------------------------- *)
@@ -1298,225 +1551,6 @@ module ModType = struct
     assert (scope.sc_pr_uc = None);
     let tysig = EcTyping.transmodsig scope.sc_env name i in
       bind scope (name, tysig)
-end
-
-
-(* -------------------------------------------------------------------- *)
-module Ax = struct
-  open EcParsetree
-  open EcDecl
-
-  module TT = EcTyping
-
-  type mode = [`WeakCheck | `Check]
-
-  (* ------------------------------------------------------------------ *)
-  let bind (scope : scope) local ((x, ax) : _ * axiom) =
-    assert (scope.sc_pr_uc = None);
-    let scope = { scope with sc_env = EcEnv.Ax.bind x ax scope.sc_env; } in
-    let scope = maybe_add_to_section scope (EcTheory.CTh_axiom (x, ax)) in
-    let scope =
-      match CoreSection.opath scope.sc_section with
-      | None -> scope
-      | Some _ ->
-          let lvl1 = if local then `Local else `Global in
-          let lvl2 = if ax.ax_kind = `Axiom then `Axiom else `Lemma in
-
-          if lvl2 = `Axiom && ax.ax_tparams <> [] then
-            hierror "axiom must be monomorphic in sections";
-
-          let axpath = EcPath.pqname (path scope) x in
-          let ec = CoreSection.add_lemma axpath (lvl1, lvl2) scope.sc_section in
-            { scope with sc_section = ec }
-    in
-      scope
-
-  (* ------------------------------------------------------------------ *)
-  let start_lemma scope (cont, axflags) check name axd =
-    let puc =
-      match check with
-      | false -> PSNoCheck
-      | true  ->
-          (* FIXME: TC HOOK *)
-          let hyps = EcEnv.LDecl.init scope.sc_env (List.map fst axd.ax_tparams) in
-            PSCheck (EcLogic.open_juc (hyps, oget axd.ax_spec), [0])
-    in 
-    let puc = { puc_active = Some {
-                  puc_name  = name;
-                  puc_mode  = None;
-                  puc_jdg   = puc;
-                  puc_flags = axflags;
-                  puc_crt   = axd;
-                };
-                puc_cont = cont; }
-    in
-      { scope with sc_pr_uc = Some puc }
-
-  (* ------------------------------------------------------------------ *)
-  let rec add_r (scope : scope) mode (ax : paxiom located) =
-    assert (scope.sc_pr_uc = None);
-
-    let loc = ax.pl_loc and ax = ax.pl_desc in
-    let ue  = TT.transtyvars scope.sc_env (loc, ax.pa_tyvars) in
-
-    if ax.pa_local && not (CoreSection.in_section scope.sc_section) then
-      hierror "cannot declare a local lemma outside of a section";
-
-    let (pconcl, tintro) =
-      match ax.pa_vars with
-      | None    -> (ax.pa_formula, [])
-      | Some vs -> 
-          let pconcl = { pl_loc = loc; pl_desc = PFforall (vs, ax.pa_formula) } in
-            (pconcl, List.flatten (List.map fst vs))
-    in
-
-    let tintro =
-      List.map
-        (fun x -> IPCore (mk_loc x.pl_loc (`NoRename x.pl_desc)))
-        tintro in
-    let tintro = mk_loc loc (Plogic (Pintro tintro)) in
-
-    let concl = TT.trans_prop scope.sc_env ue pconcl in
-
-    if not (EcUnify.UniEnv.closed ue) then
-      hierror "the formula contains free type variables";
-
-    let concl   = EcFol.Fsubst.uni (EcUnify.UniEnv.close ue) concl in
-    let tparams = EcUnify.UniEnv.tparams ue in
-
-    let axd  =
-      let kind = match ax.pa_kind with PAxiom -> `Axiom | _ -> `Lemma in
-        { ax_tparams = tparams;
-          ax_spec    = Some concl;
-          ax_kind    = kind;
-          ax_nosmt   = ax.pa_nosmt; }
-    in
-
-    let check    = Check_mode.check scope.sc_options in
-    let pucflags = { puc_nosmt = ax.pa_nosmt; puc_local = ax.pa_local; } in
-    let pucflags = (([], None), pucflags) in
-
-    if not ax.pa_local then begin
-      match CoreSection.olocals scope.sc_section with
-      | None -> ()
-      | Some locals ->
-          if CoreSection.form_use_local concl locals then
-            hierror "this lemma uses local modules and must be declared as local"
-    end;
-
-    if ax.pa_local && ax.pa_kind = PAxiom then
-      hierror "an axiom cannot be local";
-
-    match ax.pa_kind with
-    | PILemma ->
-        let scope = start_lemma scope pucflags check (unloc ax.pa_name) axd in
-        let scope = Tactics.process_core false `Check scope [tintro] in
-          None, scope
-
-    | PLemma tc ->
-        let scope = start_lemma scope pucflags check (unloc ax.pa_name) axd in
-        let scope = Tactics.process_core false `Check scope [tintro] in
-        let scope = Tactics.proof scope mode (if tc = None then true else false) in
-
-        let tc =
-          match tc with
-          | Some tc -> tc
-          | None    ->
-              let dtc = Plogic (Psmt (None, empty_pprover)) in
-              let dtc = { pl_loc = loc; pl_desc = dtc } in
-              let dtc = { pt_core = dtc; pt_intros = []; } in
-                dtc
-        in
-
-        let tc = { pl_loc = loc; pl_desc = Pby (Some [tc]) } in
-        let tc = { pt_core = tc; pt_intros = []; } in
-
-        let scope = Tactics.process_r false mode scope [tc] in
-          save scope loc
-
-    | PAxiom ->
-          Some (unloc ax.pa_name),
-          bind scope (snd pucflags).puc_local (unloc ax.pa_name, axd)
-
-  (* ------------------------------------------------------------------ *)
-  and add_for_cloning (scope : scope) proofs =
-    match proofs with
-    | [] -> scope
-    | _  ->
-        assert (scope.sc_pr_uc = None);
-        let puc = { puc_active = None; puc_cont = (proofs, Some scope.sc_env); } in
-          { scope with sc_pr_uc = Some puc; }
-
-  (* ------------------------------------------------------------------ *)
-  and save scope _loc =
-    check_state `InProof "save" scope;
-
-    let puc = oget scope.sc_pr_uc in
-    let pac =
-      match puc.puc_active with
-      | None -> hierror "no active lemma"
-      | Some pac -> begin
-          match pac.puc_jdg with
-          | PSNoCheck  -> ()
-          | PSCheck gs ->
-              try  ignore (EcLogic.close_juc (fst gs))
-              with EcBaseLogic.StillOpenGoal _ ->
-                hierror "cannot save an incomplete proof"
-      end; pac
-    in
-
-    let scope = { scope with sc_pr_uc = Some { puc with puc_active = None; } } in
-
-    let scope =
-      match fst puc.puc_cont with
-      | [] -> { scope with sc_pr_uc = None; }
-      | _  -> scope
-    in
-
-    let scope =
-      match snd puc.puc_cont with
-      | Some e -> { scope with sc_env = e }
-      | None   -> bind scope pac.puc_flags.puc_local (pac.puc_name, pac.puc_crt)
-    in
-
-      (Some pac.puc_name, scope)
-
-  (* ------------------------------------------------------------------ *)
-  let add (scope : scope) mode (ax : paxiom located) =
-    add_r scope mode ax
-
-  (* ------------------------------------------------------------------ *)
-  let activate (scope : scope) (qn : pqsymbol) =
-    check_state `InProof "activate" scope;
-
-    let qn = EcPath.fromqsymbol (unloc qn) in
-
-    let puc = oget scope.sc_pr_uc in
-    let _ =
-      match puc.puc_active with
-      | Some _ -> hierror "a lemma is already active"
-      | None -> ()
-    in
-
-    let (((x, ax), _, axenv), proofs) =
-      let rec doit past proofs =
-        match proofs with
-        | [] -> hierror "no such lemma: `%s'" (EcPath.tostring qn)
-        | (((_, _), p, _) as st) :: proofs ->
-            match EcPath.p_equal p qn with
-            | false -> doit (st :: past) proofs
-            | true  -> (st, List.rev_append past proofs)
-      in
-        doit [] (fst puc.puc_cont)
-    in
-    let pucflags = { puc_nosmt = ax.ax_nosmt; puc_local = false; } in
-    let pucflags = ((proofs, snd puc.puc_cont), pucflags) in
-    let check    = Check_mode.check scope.sc_options in
-
-    let scope = { scope with sc_env = axenv } in
-    let scope = start_lemma scope pucflags check x ax in
-
-      scope
 end
 
 (* -------------------------------------------------------------------- *)

@@ -155,6 +155,7 @@
 %token ASSUMPTION
 %token AT
 %token AXIOM
+%token AXIOMATIZED
 %token BACKS
 %token BETA 
 %token BY
@@ -1376,41 +1377,50 @@ operator:
     { po_kind   = k;
       po_name   = x;
       po_tyvars = tyvars;
-      po_def    = opdef_of_opbody sty None; }
+      po_def    = opdef_of_opbody sty None;
+      po_ax     = None; }
   }
 
-| k=op_or_const x=oident tyvars=tyvars_decl? COLON sty=loc(type_exp) EQ b=opbody {
+| k=op_or_const x=oident tyvars=tyvars_decl? COLON sty=loc(type_exp) EQ b=opbody opax=opax? {
     { po_kind   = k;
       po_name   = x;
       po_tyvars = tyvars;
-      po_def    = opdef_of_opbody sty (Some ([], b)); }
+      po_def    = opdef_of_opbody sty (Some ([], b));
+      po_ax     = opax; }
   }
 
-| k=op_or_const x=oident tyvars=tyvars_decl? eq=loc(EQ) b=opbody {
+| k=op_or_const x=oident tyvars=tyvars_decl? eq=loc(EQ) b=opbody opax=opax? {
     { po_kind   = k;
       po_name   = x;
       po_tyvars = tyvars;
-      po_def    = opdef_of_opbody (mk_loc eq.pl_loc PTunivar) (Some ([], b)); }
+      po_def    = opdef_of_opbody (mk_loc eq.pl_loc PTunivar) (Some ([], b));
+      po_ax     = opax; }
   }
 
-| k=op_or_const x=oident tyvars=tyvars_decl? p=ptybindings eq=loc(EQ) b=opbody {
+| k=op_or_const x=oident tyvars=tyvars_decl? p=ptybindings eq=loc(EQ) b=opbody opax=opax? {
     { po_kind   = k;
       po_name   = x;
       po_tyvars = tyvars;
-      po_def    = opdef_of_opbody (mk_loc eq.pl_loc PTunivar) (Some (p, b)); }
+      po_def    = opdef_of_opbody (mk_loc eq.pl_loc PTunivar) (Some (p, b));
+      po_ax     = opax; }
   }
 
-| k=op_or_const x=oident tyvars=tyvars_decl? p=ptybindings COLON codom=loc(type_exp) EQ b=opbody {
+| k=op_or_const x=oident tyvars=tyvars_decl? p=ptybindings COLON codom=loc(type_exp) EQ b=opbody opax=opax? {
     { po_kind   = k;
       po_name   = x;
       po_tyvars = tyvars;
-      po_def    = opdef_of_opbody codom (Some (p, b)); }
+      po_def    = opdef_of_opbody codom (Some (p, b));
+      po_ax     = opax; }
   }
 ;
 
 opbody:
 | e=expr     { `Expr e  }
 | bs=opcase+ { `Case bs }
+;
+
+opax:
+| AXIOMATIZED BY x=ident { x }
 ;
 
 opcase:
