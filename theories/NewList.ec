@@ -1,4 +1,34 @@
 (* -------------------------------------------------------------------- *)
+require import Int.
+
+(* -------------------------------------------------------------------- *)
+op pred1  ['a] (c : 'a) = fun (x : 'a), c = x.
+op predT  ['a] = fun (x : 'a), true.
+op pred0  ['a] = fun (x : 'a), false.
+op predC  ['a] (P : 'a -> bool) = fun (x : 'a), ! (P x).
+op predC1 ['a] (c : 'a) = fun (x : 'a), c <> x.
+
+pred preim ['a 'b] (f : 'a -> 'b) p x = p (f x).
+
+op int_of_bool (b : bool) = if b then 1 else 0.
+
+(* -------------------------------------------------------------------- *)
+theory IntTh.
+  lemma nosmt subzz (z : int): z - z = 0 by [].
+
+  lemma nosmt lezz (z : int): z <= z by [].
+  lemma nosmt ltzz (z : int): z < z <=> false by [].
+
+  lemma nosmt ltzNge (x y : int): (x <  y) <=> !(y <= x) by [].
+  lemma nosmt lezNgt (x y : int): (x <= y) <=> !(y <  x) by [].
+
+  lemma nosmt gez_le (x y : int): (x >= y) <=> (y <= x) by [].
+  lemma nosmt gtz_lt (x y : int): (x >  y) <=> (y <  x) by [].
+end IntTh.
+
+import IntTh.
+
+(* -------------------------------------------------------------------- *)
 type 'a list = [
   | "[]"
   | (::) of  'a & 'a list
