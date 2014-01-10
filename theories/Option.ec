@@ -1,57 +1,35 @@
-type 'a option = [
-  | None
-  | Some of 'a
-].
+(* -------------------------------------------------------------------- *)
+op witness : 'a.                (* All types are inhabited in EC *)
+
+(* -------------------------------------------------------------------- *)
+type 'a option = [None | Some of 'a].
 
 op option_rect (v:'a) (f:'b -> 'a) xo =
   with xo = None   => v
   with xo = Some x => f x.
 
-lemma nosmt option_rect_none (v:'a) (f:'b -> 'a):
-  option_rect v f None = v
-by iota.
+op oapp ['a 'b] (f : 'a -> 'b) d ox : 'b =
+  with ox = None   => d
+  with ox = Some x => f x.
 
-lemma nosmt option_rect_some (v:'a) (f:'b -> 'a) (x:'b):
-  option_rect v f (Some x) = f x
-by iota.
+op odflt (d : 'a) ox =
+  with ox = None   => d
+  with ox = Some x => x.
 
-(** Projection functions *)
-op proj_def (d:'a) xo =
-  with xo = None   => d
-  with xo = Some x => x.
+op obind ['a 'b] (f : 'a -> 'b option) ox =
+  with ox = None   => None
+  with ox = Some x => f x.
 
-op proj:'a option -> 'a.
-axiom proj_some (x:'a): proj (Some x) = x.
+op omap ['a 'b] (f : 'a -> 'b) ox =
+  with ox = None   => None
+  with ox = Some x => Some (f x).
 
-lemma nosmt projI (x y:'a) x' y':
-  x' = Some x =>
-  y' = Some y =>
-  proj x' = proj y' =>
-  x = y.
-proof strict.
-by intros=> -> ->; rewrite !proj_some.
-qed.
+op oget (ox : 'a option) = odflt witness<:'a> ox.
 
-lemma nosmt someI (x y:'a):
-  Some x = Some y =>
-  x = y
-by [].
+lemma nosmt oget_none: oget None<:'a> = witness.
+proof. by []. qed.
 
-lemma nosmt some_proj (x:'a option):
-  x <> None =>
-  Some (proj x) = x
-by [].
+lemma nosmt oget_some (x : 'a): oget (Some x) = x.
+proof. by []. qed.
 
-(** Useful tools *)
-(* lift: lift functions to the option type *)
-op lift (f:'a -> 'b) xo =
-  with xo = None => None
-  with xo = Some x => Some (f x).
-
-lemma lift_None (f:'a -> 'b):
-  (lift f) None = None
-by iota.
-
-lemma lift_Some (f:'a -> 'b) (x:'a):
-  (lift f) (Some x) = Some (f x)
-by iota.
+lemma nosmt someI (x y:'a): Some x = Some y => x = y by [].

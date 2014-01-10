@@ -36,14 +36,14 @@ theory Ring.
   lemma nosmt addKr (x y : ring): -x + (x + y) = y.
   proof. by rewrite addrA addNr add0r. qed.
 
-  lemma nosmt addrK (x y : ring): (x + y) + -y = x.
+  lemma nosmt addrK (y x : ring): (x + y) + -y = x.
   proof. by rewrite -addrA addrN addr0. qed.
 
   lemma nosmt addrI (x y z : ring): x + y = x + z => y = z.
-  proof. cut := addKr; smt. qed.
+  proof. cut := addKr x; smt. qed.
 
   lemma nosmt addIr (x y z : ring): y + x = z + x => y = z.
-  proof. cut := addrK; smt. qed.
+  proof. cut := addrK x; smt. qed.
 
   lemma nosmt opprK (x : ring): -(-x) = x.
   proof. by apply (addIr (-x)); rewrite addNr addrN. qed.

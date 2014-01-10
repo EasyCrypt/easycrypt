@@ -59,7 +59,7 @@ theory Lazy.
       var y:to;
       y = $dsample x;
       if (!in_dom x m) m.[x] = y;
-      return proj (m.[x]);
+      return oget (m.[x]);
     }
   }.
 
@@ -119,7 +119,7 @@ theory Eager.
     }
 
     proc o(x:from): to = {
-      return proj m.[x];
+      return oget m.[x];
     }
   }.
 
@@ -194,7 +194,7 @@ theory LazyEager.
         var y:to;
         y = $dsample x;
         if (!in_dom x m) m.[x] = y;
-        return proj (m.[x]);
+        return oget (m.[x]);
       }
     }
 
@@ -247,7 +247,7 @@ theory LazyEager.
       var m:(from,to) map
 
       proc o(x:from): to = {
-        return proj (m.[x]);
+        return oget (m.[x]);
       }
     }
 
@@ -304,7 +304,7 @@ theory LazyEager.
                          IND_Eager.H.m.[f] = if f = x then y0 else y;
                        work = rm f work;
                      }
-                     result = proj IND_Eager.H.m.[x]; }
+                     result = oget IND_Eager.H.m.[x]; }
                      (={x,work,IND_Eager.H.m} ==> ={result,IND_Eager.H.m})
                      ((={x,work} /\
                       IND_Eager.H.m{1} = IND_Lazy.H.m{2} /\
@@ -320,7 +320,7 @@ theory LazyEager.
                        work = rm f work;
                      }
                      y0 = $dsample x;
-                     result = proj IND_Eager.H.m.[x]; }
+                     result = oget IND_Eager.H.m.[x]; }
                      (={x,work,IND_Eager.H.m} ==> ={result,IND_Eager.H.m})
                      (={x,work,IND_Eager.H.m} ==> ={result,IND_Eager.H.m})=> //.
       by intros &1 &2 H; exists IND_Eager.H.m{2}, x{2}, work{2}; generalize H.
@@ -347,7 +347,7 @@ timeout 3.
   wp; while (={x,work} /\
              IND_Eager.H.m{1} = IND_Lazy.H.m{2} /\
              in_dom x{2} IND_Lazy.H.m{2} /\ 
-             proj IND_Eager.H.m.[x]{1} = result{2}).
+             oget IND_Eager.H.m.[x]{1} = result{2}).
      by wp; rnd; wp; skip; progress=> //; smt.
   by wp; rnd{2}; skip; smt.
   qed.

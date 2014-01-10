@@ -369,11 +369,11 @@ qed.
 
 lemma mem_nth (xs:'a list) (n:int):
   0 <= n < length xs =>
-  mem (proj (nth xs n)) xs.
+  mem (oget (nth xs n)) xs.
 proof strict.
 generalize n; elim xs=> //=; first smt.
 intros=> x xs IH n n_range; case (n = 0).
-  by rewrite proj_some=> _; left.
+  by rewrite oget_some=> _; left.
   by intros=> neq0_n; right; rewrite IH; first smt.
 qed.
 
@@ -389,7 +389,7 @@ qed.
 
 lemma nth_append_left (ys xs:'a list) (n:int):
   0 <= n < length xs =>
-  proj (nth (xs ++ ys) n) = proj (nth xs n).
+  oget (nth (xs ++ ys) n) = oget (nth xs n).
 proof strict.
 generalize n; elim xs=> //=; first smt.
 intros=> x xs IH n n_bnd; case (n = 0)=> //=.
@@ -398,7 +398,7 @@ qed.
 
 lemma nth_append_right (xs ys:'a list) (n:int):
   length xs <= n < length xs + length ys =>
-  proj (nth (xs ++ ys) n) = proj (nth ys (n - length xs)).
+  oget (nth (xs ++ ys) n) = oget (nth ys (n - length xs)).
 proof strict.
 generalize n; elim xs=> //= x xs IH n n_bnd.
 cut ->: (n = 0) = false by smt.
@@ -408,7 +408,7 @@ qed.
 (** nth_default *)
 op nth_default (xs:'a list) (dv:'a) n =
   let r = nth xs n in
-  if (r <> None) then proj r
+  if (r <> None) then oget r
                  else dv.
 
 (** count *)

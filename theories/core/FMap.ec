@@ -1,3 +1,4 @@
+require import ExtEq.
 require import Int.
 require export Option.
 require import FSet.
@@ -279,7 +280,7 @@ qed.
 (* all and allb *)
 pred all (p:'a -> 'b -> bool) (m:('a,'b) map) = forall x,
   mem x (dom m) =>
-  p x (proj m.[x]).
+  p x (oget m.[x]).
 
 op allb: ('a -> 'b -> bool) -> ('a,'b) map -> bool.
 
@@ -288,7 +289,7 @@ axiom allb_all (p:'a -> 'b -> bool) (m:('a,'b) map):
 
 (* exist and existb *)
 pred exist (p:'a -> 'b -> bool) (m:('a,'b) map) = exists x,
-  mem x (dom m) /\ p x (proj m.[x]).
+  mem x (dom m) /\ p x (oget m.[x]).
 
 op existb: ('a -> 'b -> bool) -> ('a,'b) map -> bool.
 
@@ -313,7 +314,7 @@ lemma all_set_all_in (p:'a -> 'b -> bool) (m:('a,'b) map) x y:
   all p m.[x <- y].
 proof strict.
 intros=> p_m p_xy a; case (x = a).
-  by intros=> <- _; rewrite get_set_eq proj_some.
+  by intros=> <- _; rewrite get_set_eq oget_some.
   intros=> a_x; rewrite get_set_neq // dom_set mem_add (_: (a = x) = false) 1:(eq_sym a) 1:neqF //= => a_m.
   by rewrite p_m.
 qed.
@@ -329,13 +330,13 @@ axiom find_nin (p:'a -> 'b -> bool) m:
 
 axiom find_cor (p:'a -> 'b -> bool) m x:
   find p m = Some x =>
-  mem x (dom m) /\ p x (proj m.[x]).
+  mem x (dom m) /\ p x (oget m.[x]).
 
 (* filter *)
 op filter: ('a -> 'b -> bool) -> ('a,'b) map -> ('a,'b) map.
 
 axiom get_filter f (m:('a,'b) map) x:
-  (filter f m).[x] = if f x (proj m.[x]) then m.[x] else None.
+  (filter f m).[x] = if f x (oget m.[x]) then m.[x] else None.
 
 lemma nosmt get_filter_nin f (m:('a,'b) map) x:
   !mem x (dom m) =>
@@ -345,22 +346,22 @@ by rewrite get_filter mem_dom /= => ->.
 qed.
 
 lemma dom_filter f (m:('a,'b) map):
-  dom (filter f m) = filter (fun x, f x (proj m.[x])) (dom m).
+  dom (filter f m) = filter (fun x, f x (oget m.[x])) (dom m).
 proof strict.
 by apply set_ext=> x; rewrite mem_dom get_filter mem_filter mem_dom /=;
-   case (f x (proj m.[x])).
+   case (f x (oget m.[x])).
 qed.
 
 lemma dom_filter_fst f (m:('a,'b) map):
   dom (filter (fun x y, f x) m) = filter f (dom m).
 proof strict.
-by cut:= dom_filter (fun x (y:'b), f x) m => //= ->;
-   congr=> //; apply Fun.fun_ext.
+  cut:= dom_filter (fun x (y:'b), f x) m => //= ->.
+  by congr=> //=; apply ExtEq.fun_ext.
 qed.
 
 lemma mem_dom_filter f (m:('a,'b) map) x:
   mem x (dom (filter f m)) =>
-  mem x (dom m) /\ f x (proj m.[x])
+  mem x (dom m) /\ f x (oget m.[x])
 by (rewrite dom_filter mem_filter).
 
 lemma leq_filter f (m:('a,'b) map):
@@ -418,21 +419,21 @@ progress.
 op map: ('b -> 'c) -> ('a,'b) map -> ('a,'c) map.
 
 axiom get_map (f:'b -> 'c) (m:('a,'b) map) (x:'a):
-  (map f m).[x] = lift f m.[x].
+  (map f m).[x] = omap f m.[x].
 
 op mapi: ('a -> 'b -> 'c) -> ('a,'b) map -> ('a,'c) map.
 
 axiom get_mapi (f:'a -> 'b -> 'c) (m:('a,'b) map) (x:'a):
-  (mapi f m).[x] = lift (f x) m.[x].
+  (mapi f m).[x] = omap (f x) m.[x].
 
 (** Miscellaneous higher-order stuff *)
 (* lam and lamo: turning maps into lambdas *)
-op lam (m:('a,'b) map) = fun x, proj m.[x].
+op lam (m:('a,'b) map) = fun x, oget m.[x].
 op lamo (m:('a,'b) map) = "_.[_]" m.
 
 lemma lamo_map (f:'b -> 'c) (m:('a,'b) map):
-  lamo (map f m) = fun x, (lift f) ((lamo m) x).
+  lamo (map f m) = fun x, (omap f) ((lamo m) x).
 proof strict.
-apply Fun.fun_ext=> x //=.
+apply ExtEq.fun_ext=> x //=.
 by rewrite /lamo /lamo get_map; elim/option_ind m.[x].
 qed.

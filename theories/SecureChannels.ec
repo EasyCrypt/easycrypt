@@ -72,7 +72,7 @@ theory MultiUser.
       if (0 <= i < users)
       {
         r = S.recv(ks.[i],c);
-        if (r <> None /\ !mem (proj r) qs)
+        if (r <> None /\ !mem (oget r) qs)
           auth = true;
       }
       else

@@ -18,7 +18,7 @@ module RO = {
     var r : int;
     r = $[0..10];
     if (!mem x (dom mH)) mH.[x] = r;
-    return (proj mH.[x]);
+    return (oget mH.[x]);
   }
 
   var logA : int set

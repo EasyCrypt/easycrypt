@@ -1,4 +1,6 @@
 (* -------------------------------------------------------------------- *)
+require import Pred.
+require import Option.
 require import Int.
 
 (* -------------------------------------------------------------------- *)
@@ -91,6 +93,17 @@ op nth x (xs : 'a list) n : 'a =
   with xs = "[]"      => x
   with xs = (::) y ys => if n = 0 then y else (nth x ys (n-1)).
 
+op onth (xs : 'a list) n : 'a option =
+  with xs = "[]"      => None
+  with xs = (::) y ys =>  if n = 0 then Some y else (onth ys (n-1)).
+
+lemma nosmt nth_onth (z : 'a) xs n: nth z xs n = odflt z (onth xs n).
+proof. by elim xs n => //=; smt. qed.
+
+lemma nosmt onth_nth (z : 'a) xs n:
+  0 <= n < size xs => onth xs n = Some (nth z xs n).
+proof. by elim xs n => //=; smt. qed.
+
 lemma nth_default (z : 'a) s n: size s <= n => nth z s n = z.
 proof.
   elim s n => //= x s IHs n; case (n = 0).
@@ -115,6 +128,9 @@ op mem (s : 'a list) (z : 'a) =
 lemma in_nil (x : 'a): mem [] x = false.
 proof. by []. qed.
 
+lemma in_nilE: mem [<:'a>] = pred0.
+proof. by apply fun_ext. qed.
+
 lemma in_cons y s (x : 'a): mem (y :: s) x <=> (x = y) \/ (mem s x).
 proof. by []. qed.
 
@@ -136,39 +152,21 @@ lemma mem_seq4 (x y1 y2 y3 y4 : 'a):
   mem [y1; y2; y3; y4] x <=> (x = y1 \/ x = y2 \/ x = y3 \/ x = y4).
 proof. by []. qed.
 
-op uniq (s : 'a list) =
-  with s = "[]"      => true
-  with s = (::) x s' => !(mem s' x) /\ uniq s'.
+lemma mem_cat (x : 'a) s1 s2:
+  mem (s1 ++ s2) x <=> mem s1 x \/ mem s2 x.
+proof. by elim s1 => //=; smt. qed.
 
-op undup (s : 'a list) =
-  with s = "[]"      => []
-  with s = (::) x s' => if mem s' x then undup s' else x :: undup s'.
-
-lemma size_undup (s : 'a list): size (undup s) <= size s.
-proof. by elim s => //= x s IHs; smt. qed.
-
-lemma mem_undup (s : 'a list): forall x, mem (undup s) x = mem s x.
-proof. intros=> x; elim s => //= y s IHs; smt. qed.
-
-lemma undup_uniq (s : 'a list): uniq (undup s).
-proof. by elim s => //= x s IHs; case (mem s x); smt. qed.
-
-lemma undup_id (s : 'a list): uniq s => undup s = s.
-proof. by elim s => //= x s IHs; smt. qed.
-
-op filter (p : 'a -> bool) xs =
-  with xs = "[]"      => []
-  with xs = (::) y ys => if p y then y :: filter p ys else filter p ys.
-
-lemma filter_pred0 (s : 'a list): filter pred0 s = [].
-proof. by elim s. qed.
-
-lemma filter_predT (s : 'a list): filter predT s = s.
-proof. by elim s => //= x s ->. qed.
+lemma mem_rcons s (y : 'a):
+  forall x, mem (rcons s y) x = mem (y :: s) x.
+proof. by intros=> x; rewrite -cats1 /= !mem_cat /= orbC. qed.
 
 op count ['a] (p : 'a -> bool) xs =
   with xs = "[]"      => 0
   with xs = (::) y ys => (int_of_bool (p y)) + (count p ys).
+
+op filter (p : 'a -> bool) xs =
+  with xs = "[]"      => []
+  with xs = (::) y ys => if p y then y :: filter p ys else filter p ys.
 
 lemma count_ge0 (p : 'a -> bool) s: 0 <= count p s.
 proof. by elim s=> //= x s; smt. qed.
@@ -199,6 +197,12 @@ proof.
   intros=> h; split; [by apply h | apply IH2].
   by intros=> y y_in_s; apply h; right.
 qed.
+
+lemma filter_pred0 (s : 'a list): filter pred0 s = [].
+proof. by elim s. qed.
+
+lemma filter_predT (s : 'a list): filter predT s = s.
+proof. by elim s => //= x s ->. qed.
 
 lemma count_filter p (s : 'a list): count p s = size (filter p s).
 proof. by elim s => //= x s ->; case (p x). qed.
@@ -272,9 +276,6 @@ proof. by elim s1 => //= x s1 IHs; rewrite IHs. qed.
 lemma mem_filter (p : 'a -> bool) x s:
   mem (filter p s) x <=> p x /\ (mem s x).
 proof. by elim s => //= y s IHs; smt. qed.
-
-lemma filter_uniq (s : 'a list) p: uniq s => uniq (filter p s).
-proof. elim s => //= x s IHs [Hx Hs]; smt. qed.
 
 op perm_eq ['a] (s1 s2 : 'a list) =
   all (fun x, count (pred1 x) s1 = count (pred1 x) s2) (s1 ++ s2).
@@ -446,6 +447,26 @@ proof.
   rewrite -{2}(cat_take_drop n s) nth_cat size_take //; smt.
 qed.
 
+op rot n (s : 'a list) = drop n s ++ take n s.
+
+lemma rot0 (s : 'a list): rot 0 s = s.
+proof. smt. qed.
+
+lemma size_rot n (s : 'a list): size (rot n s) = size s.
+proof. smt. qed.
+
+lemma rot_oversize n (s : 'a list): size s <= n => rot n s = s.
+proof. smt. qed.
+
+lemma rot_size (s : 'a list): rot (size s) s = s.
+proof. by apply rot_oversize. qed.
+
+lemma has_rot n (s : 'a list) p: has p (rot n s) = has p s.
+proof. by rewrite /rot has_cat orbC -has_cat cat_take_drop. qed.
+
+lemma rot_size_cat (s1 s2 : 'a list): rot (size s1) (s1 ++ s2) = s2 ++ s1.
+proof. by rewrite /rot take_size_cat ?drop_size_cat. qed.
+
 op catrev (s1 s2 : 'a list) =
   with s1 = "[]"      => s2
   with s1 = (::) x s1 => catrev s1 (x :: s2).
@@ -483,6 +504,68 @@ proof. by rewrite -cats1 rev_cat /rev /=. qed.
 
 lemma revK (s : 'a list): rev (rev s) = s.
 proof. by elim s; smt. qed.
+
+lemma mem_rev (s : 'a list):
+  forall x, mem (rev s) x = mem s x.
+proof.
+  intros=> x; elim s; first by rewrite rev_nil.
+  by intros=> y s IHs; rewrite rev_cons mem_rcons /= IHs.
+qed.
+
+op uniq (s : 'a list) =
+  with s = "[]"      => true
+  with s = (::) x s' => !(mem s' x) /\ uniq s'.
+
+lemma cons_uniq (x : 'a) s:
+  uniq (x :: s) <=> (!mem s x) /\ uniq s.
+proof. by []. qed.
+
+lemma cat_uniq (s1 s2 : 'a list):
+  uniq (s1 ++ s2) <=> uniq s1 /\ ! has (mem s1) s2 /\ uniq s2.
+proof.
+  elim s1 => [|x s1 IHs]; first by rewrite /= in_nilE has_pred0.
+  by rewrite has_sym /= IHs has_sym mem_cat => {IHs}; smt.
+qed.
+
+lemma uniq_catC (s1 s2 : 'a list): uniq (s1 ++ s2) = uniq (s2 ++ s1).
+proof. by rewrite !cat_uniq has_sym; smt. qed.
+
+lemma uniq_catCA (s1 s2 s3 : 'a list):
+  uniq (s1 ++ s2 ++ s3) <=> uniq (s2 ++ s1 ++ s3).
+proof.
+  by rewrite -!(uniq_catC s3) !(cat_uniq s3) uniq_catC !has_cat orbC.
+qed.
+
+lemma rcons_uniq s (x : 'a): uniq (rcons s x) <=> (!mem s x) /\ uniq s.
+proof. by rewrite -cats1 uniq_catC /=. qed.
+
+lemma filter_uniq (s : 'a list) p: uniq s => uniq (filter p s).
+proof. by elim s => //=; smt. qed.
+
+lemma rot_uniq n (s : 'a list): uniq (rot n s) = uniq s.
+proof. by rewrite /rot uniq_catC cat_take_drop. qed.
+
+lemma rev_uniq (s : 'a list): uniq (rev s) <=> uniq s.
+proof.
+  elim s => /=; [by rewrite rev_nil | intros=> x s IHs].
+  by rewrite rev_cons -cats1 cat_uniq IHs /= mem_rev.
+qed.
+
+op undup (s : 'a list) =
+  with s = "[]"      => []
+  with s = (::) x s' => if mem s' x then undup s' else x :: undup s'.
+
+lemma size_undup (s : 'a list): size (undup s) <= size s.
+proof. by elim s => //= x s IHs; smt. qed.
+
+lemma mem_undup (s : 'a list): forall x, mem (undup s) x = mem s x.
+proof. intros=> x; elim s => //= y s IHs; smt. qed.
+
+lemma undup_uniq (s : 'a list): uniq (undup s).
+proof. by elim s => //= x s IHs; case (mem s x); smt. qed.
+
+lemma undup_id (s : 'a list): uniq s => undup s = s.
+proof. by elim s => //= x s IHs; smt. qed.
 
 op map (f : 'a -> 'b) xs =
   with xs = "[]"      => []

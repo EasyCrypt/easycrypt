@@ -22,7 +22,7 @@ module RO = {
 
     y = $dsample;
     if (!in_dom x m) m.[x] = y;
-    return proj m.[x];
+    return oget m.[x];
   }
 }.
 
@@ -44,7 +44,7 @@ module ROe = {
     y = $dsample;
     if (!in_dom x m)
       m.[x] = if x = xs then hs else y;
-    return proj (m.[x]);
+    return oget (m.[x]);
   }
      
 }.
