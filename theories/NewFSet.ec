@@ -2,7 +2,7 @@
 require import NewList.
 
 (* -------------------------------------------------------------------- *)
-(* Finite sets are abstractely represented has the quotient by
+(* Finite sets are abstractely represented as the quotient by
  * [perm_eq] of lists without duplicates. *)
 
 type 'a fset.
