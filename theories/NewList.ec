@@ -335,6 +335,15 @@ lemma perm_eq_size (s1 s2 : 'a list):
   perm_eq s1 s2 => size s1 = size s2.
 proof. by rewrite perm_eqP=> h; rewrite -!count_predT h. qed.
 
+lemma perm_eq_small (s1 s2 : 'a list):
+  size s2 <= 1 => perm_eq s1 s2 => s1 = s2.
+proof.
+  move=> s2_le1 eqs12; move: s2_le1 (perm_eq_mem s1 s2 _) => //.
+  move: (perm_eq_size s1 s2 _) => // {eqs12}.
+  case s2 => [|x []] //=; first last; last 2 smt.
+  by case s1 => [|y []] //=; smt.
+qed.
+
 op rem (z : 'a) s =
   with s = "[]"      => []
   with s = (::) x s' => if x = z then s' else x :: (rem z s').
