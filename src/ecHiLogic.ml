@@ -1030,6 +1030,31 @@ let process_elim loc (pe, qs) g =
       (process_generalize loc pe g)
 
 (* -------------------------------------------------------------------- *)
+let process_case loc gp g =
+  let module E = struct exception LEMFailure end in
+
+  try
+    match gp with
+    | [`Form (None, pf)] ->
+        let (env, _, _) = get_goal_e g in
+        let f =
+          try  process_formula (get_hyps g) pf
+          with TT.TyError _ | LocError (_, TT.TyError _) -> raise E.LEMFailure
+        in
+          if not (EcReduction.EqTest.for_type env f.f_ty tbool) then
+            raise E.LEMFailure;
+          t_seq
+            (set_loc loc (t_case f))
+            (t_simplify EcReduction.betaiota_red) g
+
+    | _ -> raise E.LEMFailure
+
+  with E.LEMFailure ->
+    t_on_last
+      (set_loc loc (t_or t_elim (t_elimT_ind `Case)))
+      (process_generalize loc gp g)
+
+(* -------------------------------------------------------------------- *)
 let process_algebra mode kind eqs g =
   let (env, hyps, concl) = get_goal_e g in
 

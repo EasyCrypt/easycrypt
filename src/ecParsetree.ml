@@ -529,7 +529,7 @@ and ptactic_core_r =
   | Pby         of (ptactic list) option
   | Por         of ptactic * ptactic
   | Pseq        of ptactic list
-  | Pcase       of pformula
+  | Pcase       of genpattern list
   | Plogic      of logtactic
   | PPhl        of phltactic
   | Pprogress   of bool * ptactic_core option

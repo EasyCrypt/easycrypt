@@ -10,19 +10,25 @@ open EcHiLogic
 open EcCoreHiPhl
 
 (* -------------------------------------------------------------------- *)
-let process_case loc pf g =
-  let concl = get_concl g in
-  match concl.f_node with
-  | FbdHoareS _ | FhoareS _ -> 
-    let f = process_phl_formula g pf in
-    EcPhlCase.t_hl_case f g
-  | FequivS _ -> 
-    let f = process_prhl_formula g pf in
-    EcPhlCase.t_equiv_case f g
-  | _ ->
-    let f = process_formula (get_hyps g) pf in
-    t_seq (set_loc loc (t_case f))
-      (t_simplify EcReduction.betaiota_red) g
+let process_case loc gp g =
+  let form_of_gp () =
+    match gp with
+    | [`Form (occ, pf)] ->
+        if occ <> None then
+          tacuerror ~loc "cannot specify an occurence selector"
+        else pf
+    | _ -> tacuerror ~loc "must give exactly one boolean formula"
+  in
+    match (get_concl g).f_node with
+    | FbdHoareS _ | FhoareS _ -> 
+        EcPhlCase.t_hl_case
+          (process_phl_formula g (form_of_gp ())) g
+
+    | FequivS _ -> 
+        EcPhlCase.t_equiv_case
+          (process_prhl_formula g (form_of_gp ())) g
+
+    | _ -> process_case loc gp g
 
 (* -------------------------------------------------------------------- *)
 let process_debug (juc, n) = (juc, [n])

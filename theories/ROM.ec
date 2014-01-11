@@ -294,8 +294,8 @@ theory LazyEager.
             IND_Eager.H.m{1} = IND_Lazy.H.m{2} /\
             mem x{1} work{1});
      first by wp; skip; smt.
-  case (!in_dom x IND_Lazy.H.m){2}; [rcondt{2} 2; first by intros=> &m; rnd |
-                                     rcondf{2} 2; first by intros=> &m; rnd].
+  case (!in_dom x{2} IND_Lazy.H.m{2}); [rcondt{2} 2; first by intros=> &m; rnd |
+                                        rcondf{2} 2; first by intros=> &m; rnd].
     transitivity{1} {y0 = $dsample x;
                      while (work <> FSet.empty) {
                        f = pick work;
@@ -328,7 +328,7 @@ theory LazyEager.
 
     wp; symmetry.
     eager while (H:y0 = $dsample x; ~ y0 = $dsample x; : ={x} ==> ={y0})=> //; first by rnd.
-      swap{2} 5 -4; swap [2..3] -1; case (x = pick work){1}.
+      swap{2} 5 -4; swap [2..3] -1; case ((x = pick work){1}).
         by wp; rnd{2}; rnd; rnd{1}; wp; skip; smt.
         by wp; do 2!rnd; wp; skip; smt.
       by sim.
@@ -340,7 +340,8 @@ theory LazyEager.
                then IND_Eager.H.m{1} = IND_Lazy.H.m{2}
                else eq_except IND_Eager.H.m{1} IND_Lazy.H.m{2} x{1}).
 timeout 10.
-       by wp; rnd; wp; skip; progress=> //; try case (pick work = x){2}; try (intros=> H10; apply map_ext); smt.
+       by wp; rnd; wp; skip; progress=> //;
+            try case ((pick work = x){2}); try (intros=> H10; apply map_ext); smt.
 timeout 3.
     by wp; rnd; skip; progress=> //; smt.
 

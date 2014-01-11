@@ -2133,21 +2133,25 @@ phltactic:
 
 | CONSEQ nm=STAR? info1=fpattern(conseq_bd)
     { Pconseq (nm<>None, (Some info1,None,None)) }
-| CONSEQ nm=STAR? info1=fpattern(conseq_bd) info2=fpattern(conseq_bd)
-                                                               UNDERSCORE?
+
+| CONSEQ nm=STAR? info1=fpattern(conseq_bd) info2=fpattern(conseq_bd) UNDERSCORE?
     { Pconseq(nm<>None, (Some info1,Some info2, None)) }
-| CONSEQ nm=STAR? info1=fpattern(conseq_bd) UNDERSCORE 
-                                                 info3=fpattern(conseq_bd)
+
+| CONSEQ nm=STAR? info1=fpattern(conseq_bd) UNDERSCORE info3=fpattern(conseq_bd)
     { Pconseq(nm<>None, (Some info1,None,Some info3)) }
+
 | CONSEQ nm=STAR? 
-    info1=fpattern(conseq_bd) info2=fpattern(conseq_bd) 
-                                                 info3=fpattern(conseq_bd)
-    { Pconseq (nm<>None, (Some info1,Some info2,Some info3)) }
+    info1=fpattern(conseq_bd)
+    info2=fpattern(conseq_bd) 
+    info3=fpattern(conseq_bd)
+      { Pconseq (nm<>None, (Some info1,Some info2,Some info3)) }
 
 | CONSEQ nm=STAR? UNDERSCORE info2=fpattern(conseq_bd) UNDERSCORE?
     { Pconseq(nm<>None, (None,Some info2, None)) }
+
 | CONSEQ nm=STAR? UNDERSCORE UNDERSCORE info3=fpattern(conseq_bd) 
     { Pconseq(nm<>None, (None,None,Some info3)) }
+
 | ELIM STAR
     { Phr_exists_elim }
 
@@ -2161,7 +2165,7 @@ phltactic:
 | BYPR f1=sform f2=sform { PPr( Some (f1,f2)) }
 
 | FEL at_pos=uint cntr=sform delta=sform q=sform f_event=sform some_p=fel_pred_specs inv=sform?
-   {Pfel (at_pos,(cntr,delta,q,f_event,some_p,inv))}
+    { Pfel (at_pos,(cntr,delta,q,f_event,some_p,inv)) }
 
 | SIM info=eqobs_in
     { Psim info }
@@ -2245,8 +2249,8 @@ tactic_core_r:
 | ADMIT
    { Padmit }
 
-| CASE f=sform
-   { Pcase f }
+| CASE gp=genpattern*
+   { Pcase gp }
 
 | PROGRESS s=STAR? t=tactic_core?
    { Pprogress (s<>None, t) }

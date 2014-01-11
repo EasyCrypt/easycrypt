@@ -34,5 +34,6 @@ val process_logic   : engine * hitenv -> EcLocation.t -> logtactic -> tactic
 val process_intros  : ?cf:bool -> intropattern -> goal  -> goals
 val process_mintros : ?cf:bool -> intropattern -> goals -> goals
 val process_trivial : tactic
+val process_case    : EcLocation.t -> genpattern list -> tactic
 val process_rewrite : EcLocation.t -> rwarg list -> tactic
 val process_done    : tactic

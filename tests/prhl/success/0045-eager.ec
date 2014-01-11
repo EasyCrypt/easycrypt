@@ -94,12 +94,12 @@ section.
   rnd{1} => //.
   eager proc h (ROe.m{1} = RO.m{2}) => //.
   eager proc.
-  case (!in_dom x ROe.m){1}.
+  case (!in_dom x{1} ROe.m{1}).
    rcondt{1} 3.
      intros &m;conseq * (_ : _ ==> true) => //.
    rcondt{2} 2.
      intros &m;conseq * (_ : _ ==> true) => //.
-   wp;case (x=ROe.xs){1}.
+   wp;case (x{1} = ROe.xs{1}).
     rnd{1};rnd => //.
     rnd;rnd{1};skip;progress => //;smt.
   rcondf{1} 3.
