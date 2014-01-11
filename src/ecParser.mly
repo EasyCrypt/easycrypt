@@ -358,7 +358,7 @@
 %left OP2 MINUS ADD
 %right ARROW
 %left OP3 STAR SLASH
-%left OP4 DCOLON
+%left OP4 AT DCOLON
 
 %nonassoc LBRACE
 
@@ -645,6 +645,9 @@ expr_u:
 | e1=expr op=loc(SLASH) ti=tvars_app?  e2=expr  
     { peapp_symb op.pl_loc "/" ti [e1; e2] }
 
+| e1=expr op=loc(AT) ti=tvars_app?  e2=expr  
+    { peapp_symb op.pl_loc "@" ti [e1; e2] }
+
 | c=expr QUESTION e1=expr COLON e2=expr %prec OP2
    { PEif (c, e1, e2) }
 
@@ -859,6 +862,9 @@ form_u(P):
 
 | e1=form_r(P) op=loc(SLASH) ti=tvars_app? e2=form_r(P)  
     { pfapp_symb op.pl_loc "/" ti [e1; e2] }
+
+| e1=form_r(P) op=loc(AT) ti=tvars_app? e2=form_r(P)  
+    { pfapp_symb op.pl_loc "@" ti [e1; e2] }
 
 | c=form_r(P) QUESTION e1=form_r(P) COLON e2=form_r(P) %prec OP2
     { PFif (c, e1, e2) }
