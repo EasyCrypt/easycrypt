@@ -1111,7 +1111,7 @@ let t_elimT_form tys p f sk g =
         t_apply_glob p tys (AAform pf :: aa1 @ (AAform f :: (aa2 @ aa3))) g
 
 (* -------------------------------------------------------------------- *)
-let t_elimT_ind goal =
+let t_elimT_ind mode goal =
   let error () = tacuerror "don't know what to eliminate" in
 
   let hyps = get_hyps goal in
@@ -1119,7 +1119,7 @@ let t_elimT_ind goal =
 
   match sform_of_form (get_concl goal) with
   | SFquant (Lforall, (x, GTty ty), _) -> begin
-      match EcEnv.Ty.scheme_of_ty ty env with
+      match EcEnv.Ty.scheme_of_ty mode ty env with
       | None -> error ()
       | Some (p, tys) ->
           let id = LDecl.fresh_id hyps (EcIdent.name x) in

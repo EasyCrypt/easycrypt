@@ -1222,15 +1222,21 @@ module Ty = struct
     | Tconstr (p, tys) when defined p env -> hnorm (unfold p tys env) env
     | _ -> ty
 
-  let scheme_of_ty (ty : ty) (env : env) =
+  let scheme_of_ty mode (ty : ty) (env : env) =
     let ty = hnorm ty env in
       match ty.ty_node with
       | Tconstr (p, tys) -> begin
           match by_path_opt p env with
-          | Some ({ tyd_type = (`Datatype _ | `Record _) }) ->
+          | Some ({ tyd_type = (`Datatype _ | `Record _) as body }) ->
               let prefix   = EcPath.prefix   p in
               let basename = EcPath.basename p in
-                Some (EcPath.pqoname prefix (basename ^ "_ind"), tys)
+              let basename =
+                match body, mode with
+                | `Record   _, (`Ind | `Case) -> basename ^ "_ind"
+                | `Datatype _, `Ind           -> basename ^ "_ind"
+                | `Datatype _, `Case          -> basename ^ "_case"
+              in
+                Some (EcPath.pqoname prefix basename, tys)
           | _ -> None
       end
       | _ -> None

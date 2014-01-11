@@ -752,15 +752,16 @@ let process_mintros ?(cf = true) pis gs =
               (nointro, t_on_goals (process_clear xs) gs)
 
           | `Case pis ->
+              let tc = t_or t_elim (t_elimT_ind `Case) in
               let gs =
                 match nointro && not cf with
                 | true  -> t_subgoal (List.map (dointro1 false) pis) gs
                 | false -> begin
                     match pis with
-                    | [] -> t_on_goals t_elim gs
+                    | [] -> t_on_goals tc gs
                     | _  ->
                         let t gs =
-                          t_subgoal (List.map (dointro1 false) pis) (t_elim gs)
+                          t_subgoal (List.map (dointro1 false) pis) (tc gs)
                         in
                           t_on_goals t gs
                 end
@@ -1021,7 +1022,7 @@ let process_elimT loc qs g =
 let process_elim loc (pe, qs) g =
   let real_elim g =
     match qs with
-    | None    -> t_or t_elim t_elimT_ind g
+    | None    -> t_or t_elim (t_elimT_ind `Ind) g
     | Some qs -> process_elimT loc qs g
   in
     t_on_last

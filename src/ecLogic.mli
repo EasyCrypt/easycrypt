@@ -129,7 +129,7 @@ val t_elim_hyp : EcIdent.t -> tactic
 val t_elim     : tactic
 
 val t_elimT_form : EcTypes.ty list -> EcPath.path -> form -> int -> tactic
-val t_elimT_ind  : tactic
+val t_elimT_ind  : [`Ind | `Case] -> tactic
 
 val t_case : form -> tactic
 
