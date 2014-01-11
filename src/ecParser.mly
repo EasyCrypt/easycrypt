@@ -241,6 +241,7 @@
 %token MINUS
 %token MODPATH
 %token MODULE
+%token MOVE
 %token NE
 %token NOLOCALS
 %token NOSMT
@@ -1928,6 +1929,12 @@ logtactic:
 
 | GENERALIZE l=genpattern+
    { Pgeneralize l } 
+
+| MOVE
+   { Pgeneralize [] }
+
+| MOVE COLON gp=genpattern+
+   { Pgeneralize gp }
 
 | CLEAR l=ident+
    { Pclear l }

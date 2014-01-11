@@ -77,6 +77,7 @@
     
     (* Other tactics *)
     "idtac"       , IDTAC      ;        (* KW: tactic *)
+    "move"        , MOVE       ;        (* KW: tactic *)
     "same"        , SAME       ;        (* KW: tactic *)
     "modpath"     , MODPATH    ;        (* KW: tactic *)
     "using"       , USING      ;        (* KW: tactic *)

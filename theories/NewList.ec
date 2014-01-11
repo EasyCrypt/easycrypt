@@ -107,8 +107,8 @@ proof. by elim xs n => //=; smt. qed.
 lemma nth_default (z : 'a) s n: size s <= n => nth z s n = z.
 proof.
   elim s n => //= x s IHs n; case (n = 0).
-    by intros=> ->; smt.
-    by intros=> _ _; rewrite IHs; smt.
+    by move=> ->; smt.
+    by move=> _ _; rewrite IHs; smt.
 qed.
 
 lemma nth_neg (x0 : 'a) s n: n < 0 => nth x0 s n = x0.
@@ -158,7 +158,7 @@ proof. by elim s1 => //=; smt. qed.
 
 lemma mem_rcons s (y : 'a):
   forall x, mem (rcons s y) x = mem (y :: s) x.
-proof. by intros=> x; rewrite -cats1 /= !mem_cat /= orbC. qed.
+proof. by move=> x; rewrite -cats1 /= !mem_cat /= orbC. qed.
 
 op count ['a] (p : 'a -> bool) xs =
   with xs = "[]"      => 0
@@ -193,9 +193,9 @@ lemma allP p (s : 'a list):
   all p s <=> (forall x, mem s x => p x).
 proof.
   elim s=> //= x s [IH1 IH2]; split.
-    by elim=> _ h y []; [intros=> -> // | apply IH1].
-  intros=> h; split; [by apply h | apply IH2].
-  by intros=> y y_in_s; apply h; right.
+    by elim=> _ h y []; [move=> -> // | apply IH1].
+  move=> h; split; [by apply h | apply IH2].
+  by move=> y y_in_s; apply h; right.
 qed.
 
 lemma filter_pred0 (s : 'a list): filter pred0 s = [].
@@ -232,16 +232,16 @@ lemma all_predT (s : 'a list): all predT s.
 proof. by rewrite all_count count_predT. qed.
 
 lemma eq_filter p1 p2 (s : 'a list): p1 = p2 => filter p1 s = filter p2 s.
-proof. by intros=> h; elim s=> //= x l; rewrite h => ->. qed.
+proof. by move=> h; elim s=> //= x l; rewrite h => ->. qed.
 
 lemma eq_count p1 p2 (s : 'a list): p1 = p2 => count p1 s = count p2 s.
-proof. by intros=> h; rewrite !count_filter (eq_filter _ p2). qed.
+proof. by move=> h; rewrite !count_filter (eq_filter _ p2). qed.
 
 lemma eq_has p1 p2 (s : 'a list): p1 = p2 => has p1 s <=> has p2 s.
-proof. by intros=> h; rewrite !has_count (eq_count _ p2). qed.
+proof. by move=> h; rewrite !has_count (eq_count _ p2). qed.
 
 lemma eq_all p1 p2 (s : 'a list): p1 = p2 => has p1 s <=> has p2 s.
-proof. by intros=> h; rewrite !has_count (eq_count _ p2). qed.
+proof. by move=> h; rewrite !has_count (eq_count _ p2). qed.
 
 lemma has_sym (s1 s2 : 'a list): has (mem s1) s2 <=> has (mem s2) s1.
 proof. smt. qed.
@@ -254,7 +254,7 @@ proof. by elim s => //= x s IHs; case (p x). qed.
 
 lemma all_filterP p (s : 'a list): all p s <=> filter p s = s.
 proof.
-  split; last by intros=> <-; apply filter_all.
+  split; last by move=> <-; apply filter_all.
   by elim s => //= x s IHs [-> Hs]; rewrite IHs.
 qed.
 
@@ -297,8 +297,8 @@ proof. by rewrite !perm_eqP => h1 h2 p; rewrite h1 h2. qed.
 lemma perm_eqlP (s1 s2 : 'a list):
   perm_eq s1 s2 <=> (forall s, perm_eq s1 s <=> perm_eq s2 s).
 proof.
-  split; last by intros=> ->; rewrite perm_eq_refl.
-  intros=> h s; split; last by apply perm_eq_trans.
+  split; last by move=> ->; rewrite perm_eq_refl.
+  move=> h s; split; last by apply perm_eq_trans.
   by apply perm_eq_trans; apply perm_eq_sym.
 qed.
 
@@ -325,7 +325,7 @@ proof. by rewrite -!perm_eqlP perm_cat2r perm_catC. qed.
 
 lemma perm_cons (x : 'a) s1 s2:
   perm_eq (x :: s1) (x :: s2) <=> perm_eq s1 s2.
-proof. by generalize (perm_cat2l [x]) => /= h; apply h. qed.
+proof. by move: (perm_cat2l [x]) => /= h; apply h. qed.
 
 lemma perm_eq_mem (s1 s2 : 'a list):
   perm_eq s1 s2 => forall x, mem s1 x <=> mem s2 x.
@@ -342,21 +342,21 @@ op rem (z : 'a) s =
 lemma rem_id (z : 'a) s: ! mem s z => rem z s = s.
 proof.
   elim s => //= y s IHs; rewrite -nor; elim.
-  intros=> neq_yz s_notin_z; rewrite IHs // (eq_sym y).
+  move=> neq_yz s_notin_z; rewrite IHs // (eq_sym y).
   by cut ->: (z = y) <=> false.
 qed.
 
 lemma perm_to_rem (z : 'a) s : mem s z => perm_eq s (z :: rem z s).
 proof.
   elim s => //= y s IHs; rewrite eq_sym perm_eq_sym.
-  rewrite -ora_or; elim; first by intros=> -> /=; rewrite perm_eq_refl.
+  rewrite -ora_or; elim; first by move=> -> /=; rewrite perm_eq_refl.
   rewrite -neqF => -> /= z_in_s; rewrite -(cat1s z) -(cat1s y) catA.
   by rewrite perm_catCAl /= perm_cons perm_eq_sym IHs.
 qed.
 
 lemma size_rem (x : 'a) s: mem s x => size (rem x s) = (size s) - 1.
 proof.
-  intros=> h; apply perm_to_rem in h; apply perm_eq_size in h.
+  move=> h; apply perm_to_rem in h; apply perm_eq_size in h.
   by rewrite h; smt.
 qed.
 
@@ -393,7 +393,7 @@ proof. by elim s1 n => //=; smt. qed.
 
 lemma drop_size_cat n (s1 s2 : 'a list):
   size s1 = n => drop n (s1 ++ s2) = s2.
-proof. by intros=> <-; rewrite drop_cat subzz ltzz drop0. qed.
+proof. by move=> <-; rewrite drop_cat subzz ltzz drop0. qed.
 
 op take n (xs : 'a list) =
   with xs = "[]"      => []
@@ -428,7 +428,7 @@ proof. by elim s1 n => //=; smt. qed.
 
 lemma take_size_cat n (s1 s2 : 'a list):
   size s1 = n => take n (s1 ++ s2) = s1.
-proof. by intros=> <-; rewrite take_cat subzz ltzz take0 cats0. qed.
+proof. by move=> <-; rewrite take_cat subzz ltzz take0 cats0. qed.
 
 lemma cat_take_drop n (s : 'a list): take n s ++ drop n s = s.
 proof. by elim s n; smt. qed.
@@ -436,14 +436,14 @@ proof. by elim s n; smt. qed.
 lemma nth_drop (x0 : 'a) n s i:
   0 <= n => 0 <= i => nth x0 (drop n s) i = nth x0 s (n + i).
 proof.
-  intros=> n_ge0 i_ge0; case (n < size s) => [lt_n_s|le_s_n]; last smt.
+  move=> n_ge0 i_ge0; case (n < size s) => [lt_n_s|le_s_n]; last smt.
   rewrite -{2}(cat_take_drop n s) nth_cat size_take //; smt.
 qed.
 
 lemma nth_take (x0 : 'a) n s i:
   0 <= n => 0 <= i => nth x0 (drop n s) i = nth x0 s (n + i).
 proof.
-  intros=> n_ge0 i_ge0; case (n < size s) => [lt_n_s|le_s_n]; last smt.
+  move=> n_ge0 i_ge0; case (n < size s) => [lt_n_s|le_s_n]; last smt.
   rewrite -{2}(cat_take_drop n s) nth_cat size_take //; smt.
 qed.
 
@@ -493,7 +493,7 @@ proof. by rewrite -cats1 -catrevE. qed.
 lemma size_rev (s : 'a list): size (rev s) = size s.
 proof.
   elim s; first by rewrite /rev.
-  by intros=> x s IHs; rewrite rev_cons size_rcons IHs /=; smt.
+  by move=> x s IHs; rewrite rev_cons size_rcons IHs /=; smt.
 qed.
 
 lemma rev_cat (s t : 'a list): rev (s ++ t) = rev t ++ rev s.
@@ -508,8 +508,8 @@ proof. by elim s; smt. qed.
 lemma mem_rev (s : 'a list):
   forall x, mem (rev s) x = mem s x.
 proof.
-  intros=> x; elim s; first by rewrite rev_nil.
-  by intros=> y s IHs; rewrite rev_cons mem_rcons /= IHs.
+  move=> x; elim s; first by rewrite rev_nil.
+  by move=> y s IHs; rewrite rev_cons mem_rcons /= IHs.
 qed.
 
 op uniq (s : 'a list) =
@@ -547,7 +547,7 @@ proof. by rewrite /rot uniq_catC cat_take_drop. qed.
 
 lemma rev_uniq (s : 'a list): uniq (rev s) <=> uniq s.
 proof.
-  elim s => /=; [by rewrite rev_nil | intros=> x s IHs].
+  elim s => /=; [by rewrite rev_nil | move=> x s IHs].
   by rewrite rev_cons -cats1 cat_uniq IHs /= mem_rev.
 qed.
 
@@ -559,7 +559,7 @@ lemma size_undup (s : 'a list): size (undup s) <= size s.
 proof. by elim s => //= x s IHs; smt. qed.
 
 lemma mem_undup (s : 'a list): forall x, mem (undup s) x = mem s x.
-proof. intros=> x; elim s => //= y s IHs; smt. qed.
+proof. move=> x; elim s => //= y s IHs; smt. qed.
 
 lemma undup_uniq (s : 'a list): uniq (undup s).
 proof. by elim s => //= x s IHs; case (mem s x); smt. qed.

@@ -1,4 +1,4 @@
-; Generated on Fri Jan 10 16:03:39 2014
+; Generated on Sat Jan 11 19:35:28 2014
 
 (defvar easycrypt-bytac-keywords '(
   "assumption"
@@ -103,6 +103,7 @@
   "trivial"
   "auto"
   "idtac"
+  "move"
   "same"
   "modpath"
   "using"
