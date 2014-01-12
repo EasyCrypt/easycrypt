@@ -50,6 +50,33 @@ theory BigComoid.
     big (i :: r) P F = if P i then (F i) * (big r P F) else (big r P F).
   proof. by rewrite (bigE (i :: r)) /=; case (P i). qed.
 
+  lemma big_rec (K : comoid -> bool) r P (F : 'a -> comoid):
+    K I => (forall i x, P i => K x => K (F i * x)) => K (big r P F).
+  proof.
+    move=> Kidx Kop; elim r => //= i r; rewrite big_cons.
+    by case (P i) => //=; apply Kop.
+  qed.
+
+  lemma big_ind (K : comoid -> bool) r P (F : 'a -> comoid):
+       (forall x y, K x => K y => K (x * y))
+    => K I => (forall i, P i => K (F i))
+    => K (big r P F).
+  proof.
+    move=> Kop Kidx K_F; apply big_rec => //.
+    by move=> i x Pi Kx; apply Kop => //; apply K_F.
+  qed.
+
+  lemma big_endo (f : comoid -> comoid):
+       f I  = I
+    => (forall (x y : comoid), f (x * y) = f x * f y)
+    => forall r P (F : 'a -> comoid),
+         f (big r P F) = big r P (comp f F).
+  proof.
+    (* FIX: should be a consequence of big_morph *)
+    move=> fI fM; elim=> //= i r IHr P F; rewrite !big_cons.
+    by case (P i) => //=; rewrite 1?fM IHr.
+  qed.
+
   lemma nosmt big_map (h : 'b -> 'a) r P F:
     big (map h r) P F = big r (comp P h) (comp F h).
   proof. by elim r => //= x s IHs; rewrite !big_cons IHs. qed.
