@@ -390,17 +390,6 @@ theory Seq.
 end Seq.
 
 (* -------------------------------------------------------------------- *)
-theory Iota.
-  import Seq.
-
-  op iota_ : int -> int -> int list.
-
-  axiom size_iota i j: size (iota_ i j) = max 0 j.
-
-  axiom nth_iota i j n: n < max 0 j => nth 0 (iota_ i j) n = i + n.
-end Iota.
-
-(* -------------------------------------------------------------------- *)
 theory Bigop.
   import Seq.
 
