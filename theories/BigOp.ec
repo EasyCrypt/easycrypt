@@ -51,6 +51,9 @@ theory BigComoid.
     big (i :: r) P F = if P i then (F i) * (big r P F) else (big r P F).
   proof. by rewrite (bigE (i :: r)) /=; case (P i). qed.
 
+  (* -------------------------------------------------------------------- *)
+  (*                      Induction principle                             *)
+  (* -------------------------------------------------------------------- *)
   lemma nosmt big_rec (K : comoid -> bool) r P (F : 'a -> comoid):
     K I => (forall i x, P i => K x => K (F i * x)) => K (big r P F).
   proof.
@@ -67,6 +70,27 @@ theory BigComoid.
     by move=> i x Pi Kx; apply Kop => //; apply K_F.
   qed.
 
+  lemma nosmt big_rec2:
+    forall (K : comoid -> comoid -> bool) r P (F1 F2 : 'a -> comoid),
+         K I I
+      => (forall i y1 y2, P i => K y1 y2 => K (F1 i * y1) (F2 i * y2))
+      => K (big r P F1) (big r P F2).
+  proof.
+    move=> K r P F1 F2 KI KF; elim r => //= i r IHr.
+    by rewrite !big_cons; case (P i) => _ //=; apply KF.
+  qed.
+  
+  lemma nosmt big_ind2:
+    forall (K : comoid -> comoid -> bool) r P (F1 F2 : 'a -> comoid),
+         (forall x1 x2 y1 y2, K x1 x2 => K y1 y2 => K (x1 * y1) (x2 * y2))
+      => K I I
+      => (forall i, P i => K (F1 i) (F2 i))
+      => K (big r P F1) (big r P F2).
+  proof.
+    move=> K r P F1 F2 Kop KI KF; apply big_rec2 => //.
+    by move=> i x1 x2 Pi Kx1x2; apply Kop => //; apply KF.
+  qed.
+
   lemma nosmt big_endo (f : comoid -> comoid):
        f I  = I
     => (forall (x y : comoid), f (x * y) = f x * f y)
@@ -78,6 +102,9 @@ theory BigComoid.
     by case (P i) => //=; rewrite 1?fM IHr.
   qed.
 
+  (* -------------------------------------------------------------------- *)
+  (*                    Mapping, filtering, ...                           *)
+  (* -------------------------------------------------------------------- *)
   lemma nosmt big_map (h : 'b -> 'a) r P F:
     big (map h r) P F = big r (comp P h) (comp F h).
   proof. by elim r => //= x s IHs; rewrite !big_cons IHs. qed.
@@ -102,5 +129,56 @@ theory BigComoid.
     rewrite -big_filter -(big_filter r); congr=> //.
     rewrite -filter_predI; apply eq_filter=> x.
     by rewrite !And_and andC.
+  qed.
+
+  lemma nosmt big_hasC r P (F : 'a -> comoid):
+    !has P r => big r P F = I.
+  proof. smt. qed.
+
+  (* -------------------------------------------------------------------- *)
+  (*               Extentional version of congruence.                     *)
+  (* -------------------------------------------------------------------- *)
+  lemma nosmt eq_bigr r P (F1 F2 : 'a -> comoid):
+    (forall i, P i => F1 i = F2 i) =>  big r P F1 = big r P F2.
+  proof. by move=> eqF12; apply big_rec2 => // i x y Pi <-; rewrite eqF12. qed.
+
+  lemma nosmt eq_bigl r P1 P2 (F : 'a -> comoid):
+    (forall x, P1 x <=> P2 x) => big r P1 F = big r P2 F.
+  proof. by move=> eqP12; rewrite -!(big_filter r) (eq_filter P1 P2). qed.
+
+  lemma nosmt eq_big r P1 P2 (F1 F2 : 'a -> comoid):
+       (forall x, P1 x <=> P2 x)
+    => (forall i, P1 i => F1 i = F2 i)
+    => big r P1 F1 = big r P2 F2.
+  proof.
+    move=> h; rewrite -(eq_bigl r P1 P2 F2) // => {h}.
+    by move=> h; rewrite (eq_bigr r P1 F1 F2).
+  qed.
+
+  lemma nosmt congr_big r1 r2 P1 P2 (F1 F2 : 'a -> comoid):
+       r1 = r2
+    => (forall x, P1 x <=> P2 x)
+    => (forall i, P1 i => F1 i = F2 i)
+    => big r1 P1 F1 = big r2 P2 F2.
+  proof. by move=> <-{r2}; apply eq_big. qed.
+
+  (* -------------------------------------------------------------------- *)
+  (*                   Bigop and false predicate                          *)
+  (* -------------------------------------------------------------------- *)
+  lemma nosmt big_pred0_eq r (F : 'a -> comoid): big r pred0 F = I.
+  proof. by rewrite big_hasC // has_pred0. qed.
+
+  lemma nosmt big_pred0 (r : 'a list) P F:
+    (forall x, P x <=> false) => big r P F = I.
+  proof. by move=> h; rewrite (eq_bigl _ _ pred0) // big_pred0_eq. qed.
+
+  (* ------------------------------------------------------------------- *)
+  (*                         Bigop and cat                               *)
+  (* ------------------------------------------------------------------- *)
+  lemma big_cat_nested r1 r2 P (F : 'a -> comoid):
+    big (r1 ++ r2) P F = Bigop.big (big r2 P F) Comoid.( * ) r1 P F.
+  proof. (* FIX: /Bigop.big should unfold all occurences *)
+    rewrite /big; do! rewrite /Bigop.big.
+    by rewrite filter_cat map_cat foldr_cat.
   qed.
 end BigComoid.

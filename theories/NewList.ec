@@ -265,19 +265,19 @@ lemma all_predT (s : 'a list): all predT s.
 proof. by rewrite all_count count_predT. qed.
 
 lemma eq_filter p1 p2 (s : 'a list):
-  (forall x, p1 x = p2 x) => filter p1 s = filter p2 s.
+  (forall x, p1 x <=> p2 x) => filter p1 s = filter p2 s.
 proof. by move=> h; elim s=> //= x l; rewrite h => ->. qed.
 
 lemma eq_count p1 p2 (s : 'a list):
-  (forall x, p1 x = p2 x) => count p1 s = count p2 s.
+  (forall x, p1 x <=> p2 x) => count p1 s = count p2 s.
 proof. by move=> h; rewrite !count_filter (eq_filter _ p2). qed.
 
 lemma eq_has p1 p2 (s : 'a list):
-  (forall x, p1 x = p2 x) => has p1 s <=> has p2 s.
+  (forall x, p1 x <=> p2 x) => has p1 s <=> has p2 s.
 proof. by move=> h; rewrite !has_count (eq_count _ p2). qed.
 
 lemma eq_all p1 p2 (s : 'a list):
-  (forall x, p1 x = p2 x) => has p1 s <=> has p2 s.
+  (forall x, p1 x <=> p2 x) => has p1 s <=> has p2 s.
 proof. by move=> h; rewrite !has_count (eq_count _ p2). qed.
 
 lemma has_sym (s1 s2 : 'a list): has (mem s1) s2 <=> has (mem s2) s1.
@@ -744,6 +744,14 @@ qed.
 op foldr (f : 'a -> 'b -> 'b) z0 xs =
   with xs = "[]"      => z0
   with xs = (::) y ys => f y (foldr f z0 ys).
+
+lemma foldr_cat (f : 'a -> 'b -> 'b) z0 s1 s2:
+  foldr f z0 (s1 ++ s2) = foldr f (foldr f z0 s2) s1.
+proof. by elim s1 => //= x s1 ->. qed.
+
+lemma foldr_map ['a 'b 'c] (f : 'a -> 'b -> 'b) (h : 'c -> 'a) z0 s:
+  foldr f z0 (map h s) = foldr (fun x z, f (h x) z) z0 s.
+proof. by elim s => //= x s ->. qed.
 
 (* -------------------------------------------------------------------- *)
 (*                            Flattening                                *)
