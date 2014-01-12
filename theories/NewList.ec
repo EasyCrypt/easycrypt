@@ -43,6 +43,12 @@ op size (xs : 'a list) =
 lemma size_ge0 (s : 'a list): 0 <= size s.
 proof. by elim s=> //= x s; smt. qed.
 
+lemma size_eq0 (s : 'a list): (size s = 0) <=> (s = []).
+proof. by case s => //=; smt. qed.
+
+(* -------------------------------------------------------------------- *)
+(*                    Sequence catenation "cat"                         *)
+(* -------------------------------------------------------------------- *)
 op (++) (s1 s2 : 'a list) =
   with s1 = "[]"      => s2
   with s1 = (::) x s1 => x :: (s1 ++ s2).
@@ -89,6 +95,9 @@ proof. by rewrite -cats1 -catA. qed.
 lemma rcons_cat (x : 'a) s1 s2 : rcons (s1 ++ s2) x = s1 ++ rcons s2 x.
 proof. by rewrite -!cats1 catA. qed.
 
+(* -------------------------------------------------------------------- *)
+(*                        Sequence indexing                             *)
+(* -------------------------------------------------------------------- *)
 op nth x (xs : 'a list) n : 'a =
   with xs = "[]"      => x
   with xs = (::) y ys => if n = 0 then y else (nth x ys (n-1)).
@@ -121,6 +130,20 @@ proof.
   by elim s1 n n_ge0; smt.
 qed.
 
+lemma eq_from_nth x0 (s1 s2 : 'a list):
+     size s1 = size s2
+  => (forall i, 0 <= i < size s1 => nth x0 s1 i = nth x0 s2 i)
+  => s1 = s2.
+proof.                        (* BUG: CHECKING IS TOO LONG *)
+  elim s1 s2 => [|x1 s1 IHs1] [|x2 s2] //=; first 2 smt.
+  move=> eq_szS h; cut eq_sz: size s1 = size s2 by smt.
+  cut := h 0 => /= ->; first smt. rewrite (IHs1 s2) // => i le_i_s1.
+  cut := h (i+1); smt.
+qed.
+
+(* -------------------------------------------------------------------- *)
+(*                       Sequence membership                            *)
+(* -------------------------------------------------------------------- *)
 op mem (s : 'a list) (z : 'a) =
   with s = "[]"      => false
   with s = (::) x s' => (z = x) \/ mem s' z.
@@ -160,6 +183,9 @@ lemma mem_rcons s (y : 'a):
   forall x, mem (rcons s y) x = mem (y :: s) x.
 proof. by move=> x; rewrite -cats1 /= !mem_cat /= orbC. qed.
 
+(* -------------------------------------------------------------------- *)
+(*                     filter, count, has, all                          *)
+(* -------------------------------------------------------------------- *)
 op count ['a] (p : 'a -> bool) xs =
   with xs = "[]"      => 0
   with xs = (::) y ys => (int_of_bool (p y)) + (count p ys).
@@ -277,6 +303,9 @@ lemma mem_filter (p : 'a -> bool) x s:
   mem (filter p s) x <=> p x /\ (mem s x).
 proof. by elim s => //= y s IHs; smt. qed.
 
+(* -------------------------------------------------------------------- *)
+(*                    Equality up to permutation                        *)
+(* -------------------------------------------------------------------- *)
 op perm_eq ['a] (s1 s2 : 'a list) =
   all (fun x, count (pred1 x) s1 = count (pred1 x) s2) (s1 ++ s2).
 
@@ -344,6 +373,9 @@ proof.
   by case s1 => [|y []] //=; smt.
 qed.
 
+(* -------------------------------------------------------------------- *)
+(*                         Element removal                              *)
+(* -------------------------------------------------------------------- *)
 op rem (z : 'a) s =
   with s = "[]"      => []
   with s = (::) x s' => if x = z then s' else x :: (rem z s').
@@ -369,6 +401,9 @@ proof.
   by rewrite h; smt.
 qed.
 
+(* -------------------------------------------------------------------- *)
+(*                            drop, take                                *)
+(* -------------------------------------------------------------------- *)
 op drop n (xs : 'a list) =
   with xs = "[]"      => []
   with xs = (::) y ys =>
@@ -456,6 +491,9 @@ proof.
   rewrite -{2}(cat_take_drop n s) nth_cat size_take //; smt.
 qed.
 
+(* -------------------------------------------------------------------- *)
+(*                          Sequence shift                              *)
+(* -------------------------------------------------------------------- *)
 op rot n (s : 'a list) = drop n s ++ take n s.
 
 lemma rot0 (s : 'a list): rot 0 s = s.
@@ -476,6 +514,9 @@ proof. by rewrite /rot has_cat orbC -has_cat cat_take_drop. qed.
 lemma rot_size_cat (s1 s2 : 'a list): rot (size s1) (s1 ++ s2) = s2 ++ s1.
 proof. by rewrite /rot take_size_cat ?drop_size_cat. qed.
 
+(* -------------------------------------------------------------------- *)
+(*                        Sequence reversal                             *)
+(* -------------------------------------------------------------------- *)
 op catrev (s1 s2 : 'a list) =
   with s1 = "[]"      => s2
   with s1 = (::) x s1 => catrev s1 (x :: s2).
@@ -521,6 +562,9 @@ proof.
   by move=> y s IHs; rewrite rev_cons mem_rcons /= IHs.
 qed.
 
+(* -------------------------------------------------------------------- *)
+(*                        Duplicate-freenes                             *)
+(* -------------------------------------------------------------------- *)
 op uniq (s : 'a list) =
   with s = "[]"      => true
   with s = (::) x s' => !(mem s' x) /\ uniq s'.
@@ -560,6 +604,9 @@ proof.
   by rewrite rev_cons -cats1 cat_uniq IHs /= mem_rev.
 qed.
 
+(* -------------------------------------------------------------------- *)
+(*                       Removing duplicates                            *)
+(* -------------------------------------------------------------------- *)
 op undup (s : 'a list) =
   with s = "[]"      => []
   with s = (::) x s' => if mem s' x then undup s' else x :: undup s'.
@@ -579,6 +626,11 @@ proof. by elim s => //= x s IHs; smt. qed.
 op map (f : 'a -> 'b) xs =
   with xs = "[]"      => []
   with xs = (::) y ys => (f y) :: (map f ys).
+
+lemma eq_map (f1 f2 : 'a -> 'b):
+     (forall x, f1 x = f2 x)
+  => forall s, map f1 s = map f2 s.
+proof. by move=> Ef; elim=> //= x s ->; rewrite Ef. qed.
 
 lemma map_cons (f : 'a -> 'b) x s: map f (x :: s) = f x :: map f s.
 proof. by []. qed.
@@ -638,12 +690,58 @@ lemma map_rev (f : 'a -> 'b) s:
   map f (rev s) = rev (map f s).
 proof. elim s; first by rewrite rev_nil. smt. qed.
 
+(* -------------------------------------------------------------------- *)
+(*                          Index sequence                              *)
+(* -------------------------------------------------------------------- *)
+theory Iota.
+  op iota_ : int -> int -> int list.
+
+  axiom size_iota i j: size (iota_ i j) = max 0 j.
+  axiom nth_iota i j n: n < max 0 j => nth 0 (iota_ i j) n = i + n.
+end Iota.
+
+export Iota.
+
+(* -------------------------------------------------------------------- *)
+(*         Sequence from a function computing from indexes              *)
+(* -------------------------------------------------------------------- *)
+op mkseq (f : int -> 'a) n = map f (iota_ 0 n).
+
+lemma size_mkseq (f : int -> 'a) n: size (mkseq f n) = max 0 n.
+proof. by rewrite /mkseq size_map size_iota. qed.
+
+lemma eq_mkseq (f g : int -> 'a):
+     (forall x, f x = g x)
+  => forall n, mkseq f n = mkseq g n.
+proof. by move=> Efg n; apply eq_map. qed.
+
+lemma nth_mkseq x0 (f : int -> 'a) n i:
+  0 <= i < n => nth x0 (mkseq f n) i = f i.
+proof.
+  by move=> Hi; rewrite /mkseq (nth_map 0) ?nth_iota ?size_iota; smt.
+qed.
+
+lemma mkseq_nth (x0 : 'a) s: mkseq (nth x0 s) (size s) = s.
+proof.
+  apply (eq_from_nth x0); rewrite size_mkseq; first smt.
+  by move=> i Hi; rewrite nth_mkseq //; smt.
+qed.
+
+(* -------------------------------------------------------------------- *)
+(*                         Sequence folding                             *)
+(* -------------------------------------------------------------------- *)
 op foldr (f : 'a -> 'b -> 'b) z0 xs =
   with xs = "[]"      => z0
   with xs = (::) y ys => f y (foldr f z0 ys).
 
+(* -------------------------------------------------------------------- *)
+(*                            Flattening                                *)
+(* -------------------------------------------------------------------- *)
 op flatten ['a] = foldr (++) [<:'a>].
 
+(* -------------------------------------------------------------------- *)
+(*                         Sequence sorting                             *)
+(* -------------------------------------------------------------------- *)
 op path (e : 'a -> 'a -> bool) (x : 'a) (p : 'a list) : bool =
   with p = "[]"      => true
   with p = (::) y p' => e x y /\ path e y p'.
