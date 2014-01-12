@@ -1,4 +1,5 @@
 (* -------------------------------------------------------------------- *)
+require import Pred.
 require import Fun.
 require import Int.
 require import NewList.
@@ -50,14 +51,14 @@ theory BigComoid.
     big (i :: r) P F = if P i then (F i) * (big r P F) else (big r P F).
   proof. by rewrite (bigE (i :: r)) /=; case (P i). qed.
 
-  lemma big_rec (K : comoid -> bool) r P (F : 'a -> comoid):
+  lemma nosmt big_rec (K : comoid -> bool) r P (F : 'a -> comoid):
     K I => (forall i x, P i => K x => K (F i * x)) => K (big r P F).
   proof.
     move=> Kidx Kop; elim r => //= i r; rewrite big_cons.
     by case (P i) => //=; apply Kop.
   qed.
 
-  lemma big_ind (K : comoid -> bool) r P (F : 'a -> comoid):
+  lemma nosmt big_ind (K : comoid -> bool) r P (F : 'a -> comoid):
        (forall x y, K x => K y => K (x * y))
     => K I => (forall i, P i => K (F i))
     => K (big r P F).
@@ -66,7 +67,7 @@ theory BigComoid.
     by move=> i x Pi Kx; apply Kop => //; apply K_F.
   qed.
 
-  lemma big_endo (f : comoid -> comoid):
+  lemma nosmt big_endo (f : comoid -> comoid):
        f I  = I
     => (forall (x y : comoid), f (x * y) = f x * f y)
     => forall r P (F : 'a -> comoid),
@@ -87,4 +88,19 @@ theory BigComoid.
         (fun i, P (nth x0 r i))
         (fun i, F (nth x0 r i)).
   proof. by rewrite -{1}(mkseq_nth x0 r) /mkseq big_map. qed.
+
+  lemma nosmt big_filter r P (F : 'a -> comoid):
+    big (filter P r) predT F = big r P F.
+  proof.
+    elim r => //= i r IHr; rewrite !big_cons -IHr.
+    by case (P i); rewrite ?big_cons.
+  qed.
+
+  lemma nosmt big_filter_cond r P1 P2 (F : 'a -> comoid):
+    big (filter P1 r) P2 F = big r (P1 /\ P2) F.
+  proof.
+    rewrite -big_filter -(big_filter r); congr=> //.
+    rewrite -filter_predI; apply eq_filter=> x.
+    by rewrite !And_and andC.
+  qed.
 end BigComoid.

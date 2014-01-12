@@ -230,6 +230,13 @@ proof. by elim s. qed.
 lemma filter_predT (s : 'a list): filter predT s = s.
 proof. by elim s => //= x s ->. qed.
 
+lemma filter_predI (p1 p2 : 'a -> bool) (s : 'a list):
+  filter (p1 /\ p2) s = filter p1 (filter p2 s).
+proof.
+  elim s => //= x s IHs; rewrite IHs /Pred.(/\).
+  by case (p2 x) => //=; case (p1 x) => //=.
+qed.
+
 lemma count_filter p (s : 'a list): count p s = size (filter p s).
 proof. by elim s => //= x s ->; case (p x). qed.
 
@@ -257,16 +264,20 @@ proof. by rewrite all_count count_pred0 eq_sym. qed.
 lemma all_predT (s : 'a list): all predT s.
 proof. by rewrite all_count count_predT. qed.
 
-lemma eq_filter p1 p2 (s : 'a list): p1 = p2 => filter p1 s = filter p2 s.
+lemma eq_filter p1 p2 (s : 'a list):
+  (forall x, p1 x = p2 x) => filter p1 s = filter p2 s.
 proof. by move=> h; elim s=> //= x l; rewrite h => ->. qed.
 
-lemma eq_count p1 p2 (s : 'a list): p1 = p2 => count p1 s = count p2 s.
+lemma eq_count p1 p2 (s : 'a list):
+  (forall x, p1 x = p2 x) => count p1 s = count p2 s.
 proof. by move=> h; rewrite !count_filter (eq_filter _ p2). qed.
 
-lemma eq_has p1 p2 (s : 'a list): p1 = p2 => has p1 s <=> has p2 s.
+lemma eq_has p1 p2 (s : 'a list):
+  (forall x, p1 x = p2 x) => has p1 s <=> has p2 s.
 proof. by move=> h; rewrite !has_count (eq_count _ p2). qed.
 
-lemma eq_all p1 p2 (s : 'a list): p1 = p2 => has p1 s <=> has p2 s.
+lemma eq_all p1 p2 (s : 'a list):
+  (forall x, p1 x = p2 x) => has p1 s <=> has p2 s.
 proof. by move=> h; rewrite !has_count (eq_count _ p2). qed.
 
 lemma has_sym (s1 s2 : 'a list): has (mem s1) s2 <=> has (mem s2) s1.
