@@ -346,7 +346,8 @@
 %left OP2 MINUS ADD
 %right ARROW
 %left OP3 STAR SLASH
-%left OP4 AT DCOLON
+%left OP4 AT
+%right DCOLON
 
 %nonassoc LBRACE
 

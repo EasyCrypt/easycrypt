@@ -495,6 +495,7 @@ let e_bin_prio_op1    = (30, `Infix `Left)
 let e_bin_prio_op2    = (40, `Infix `Left)
 let e_bin_prio_op3    = (50, `Infix `Left)
 let e_bin_prio_op4    = (60, `Infix `Left)
+let e_bin_prio_op5    = (70, `Infix `Right)
 
 let e_uni_prio_not    = 26
 let e_uni_prio_lsless = 10000
@@ -508,27 +509,28 @@ let max_op_prec = (max_int, `Infix `NonAssoc)
 (* -------------------------------------------------------------------- *)
 let priority_of_binop name =
   match EcIo.lex_single_token name with
-  | Some EP.IMPL  -> Some e_bin_prio_impl
-  | Some EP.IFF   -> Some e_bin_prio_iff
-  | Some EP.ORA   -> Some e_bin_prio_or
-  | Some EP.OR    -> Some e_bin_prio_or
-  | Some EP.ANDA  -> Some e_bin_prio_and
-  | Some EP.AND   -> Some e_bin_prio_and
-  | Some EP.EQ    -> Some e_bin_prio_eq
-  | Some EP.NE    -> Some e_bin_prio_eq
-  | Some EP.GT    -> Some e_bin_prio_order
-  | Some EP.GE    -> Some e_bin_prio_order
-  | Some EP.LT    -> Some e_bin_prio_order
-  | Some EP.LE    -> Some e_bin_prio_order
-  | Some EP.OP1 _ -> Some e_bin_prio_op1
-  | Some EP.OP2 _ -> Some e_bin_prio_op2
-  | Some EP.ADD   -> Some e_bin_prio_op2
-  | Some EP.MINUS -> Some e_bin_prio_op2
-  | Some EP.OP3 _ -> Some e_bin_prio_op3
-  | Some EP.STAR  -> Some e_bin_prio_op3
-  | Some EP.SLASH -> Some e_bin_prio_op3
-  | Some EP.OP4 _ -> Some e_bin_prio_op4
-  | Some EP.AT    -> Some e_bin_prio_op4
+  | Some EP.IMPL   -> Some e_bin_prio_impl
+  | Some EP.IFF    -> Some e_bin_prio_iff
+  | Some EP.ORA    -> Some e_bin_prio_or
+  | Some EP.OR     -> Some e_bin_prio_or
+  | Some EP.ANDA   -> Some e_bin_prio_and
+  | Some EP.AND    -> Some e_bin_prio_and
+  | Some EP.EQ     -> Some e_bin_prio_eq
+  | Some EP.NE     -> Some e_bin_prio_eq
+  | Some EP.GT     -> Some e_bin_prio_order
+  | Some EP.GE     -> Some e_bin_prio_order
+  | Some EP.LT     -> Some e_bin_prio_order
+  | Some EP.LE     -> Some e_bin_prio_order
+  | Some EP.OP1 _  -> Some e_bin_prio_op1
+  | Some EP.OP2 _  -> Some e_bin_prio_op2
+  | Some EP.ADD    -> Some e_bin_prio_op2
+  | Some EP.MINUS  -> Some e_bin_prio_op2
+  | Some EP.OP3 _  -> Some e_bin_prio_op3
+  | Some EP.STAR   -> Some e_bin_prio_op3
+  | Some EP.SLASH  -> Some e_bin_prio_op3
+  | Some EP.OP4 _  -> Some e_bin_prio_op4
+  | Some EP.AT     -> Some e_bin_prio_op4
+  | Some EP.DCOLON -> Some e_bin_prio_op5
 
   | _ -> None
 
@@ -694,8 +696,8 @@ let pp_opapp (ppe : PPEnv.t) t_ty pp_sub outer fmt (pred, op, tvi, es) =
       | x, [e1; e2] when x = EcCoreLib.s_cons ->
           let pp fmt =
             Format.fprintf fmt "%a :: %a"
-              (pp_sub ppe (inm, (e_bin_prio_op4, `Left ))) e1
-              (pp_sub ppe (inm, (e_bin_prio_op4, `Right))) e2
+              (pp_sub ppe (inm, (e_bin_prio_op5, `Left ))) e1
+              (pp_sub ppe (inm, (e_bin_prio_op5, `Right))) e2
           in
             (pp, e_bin_prio_op4)
 
