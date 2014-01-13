@@ -3,7 +3,9 @@ require export ExtEq.
 (*** Working with predicates *)
 (** Inclusion order *)
 pred (<=) (p q:'a -> bool) =
-  forall (a:'a), p a => q a.
+  forall a, p a => q a.
+
+pred (<) (p q:'a -> bool) = p <= q /\ !(q <= p).
 
 lemma nosmt leq_refl (X Y:'a -> bool):
   X = Y => X <= Y
@@ -17,9 +19,9 @@ lemma nosmt leq_tran (X Y Z:'a -> bool):
   X <= Y => Y <= Z => X <= Z
 by [].
 
-pred (>=) (p q:'a -> bool) = q <= p.
-pred (<)  (p q:'a -> bool) = p <= q /\ p <> q.
-pred (>)  (p q:'a -> bool) = p >= q /\ p <> q.
+lemma nosmt subpred_eqP (p1 p2 : 'a -> bool):
+  (forall x, p1 x <=> p2 x) <=> (p1 <= p2 /\ p2 <= p1).
+proof. smt. qed.
 
 (** Lifting boolean operators to predicates *)
 op True (x:'a) : bool = true.
