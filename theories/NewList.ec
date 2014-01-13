@@ -708,7 +708,8 @@ theory Iota.
   op iota_ : int -> int -> int list.
 
   axiom size_iota i j: size (iota_ i j) = max 0 j.
-  axiom nth_iota i j n: n < max 0 j => nth 0 (iota_ i j) n = i + n.
+
+  axiom nth_iota i j n: 0 <= n < max 0 j => nth 0 (iota_ i j) n = i + n.
 end Iota.
 
 export Iota.
