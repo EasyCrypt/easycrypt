@@ -9,6 +9,7 @@ op predT  ['a] = fun (x : 'a), true.
 op pred0  ['a] = fun (x : 'a), false.
 op predC  ['a] (P : 'a -> bool) = fun (x : 'a), ! (P x).
 op predC1 ['a] (c : 'a) = fun (x : 'a), c <> x.
+op predD1 ['a] (P : 'a -> bool) (c : 'a) = fun (x : 'a), c <> x /\ P x.
 
 pred preim ['a 'b] (f : 'a -> 'b) p x = p (f x).
 
@@ -26,6 +27,8 @@ theory IntTh.
 
   lemma nosmt gez_le (x y : int): (x >= y) <=> (y <= x) by [].
   lemma nosmt gtz_lt (x y : int): (x >  y) <=> (y <  x) by [].
+
+  lemma nosmt neq_ltz (x y : int): (x <> y) <=> (x < y \/ y < x) by [].
 end IntTh.
 
 import IntTh.
@@ -246,6 +249,10 @@ proof. by rewrite count_filter filter_pred0. qed.
 lemma count_predT (s : 'a list): count predT s = size s.
 proof. by rewrite count_filter filter_predT. qed.
 
+lemma count_predC p (s : 'a list):
+  count p s + count (predC p) s = size s.
+proof. elim s; smt. qed.
+
 lemma has_count p (s : 'a list): has p s <=> (0 < count p s).
 proof. by elim s => //= x s -> /=; case (p x); smt. qed.
 
@@ -322,7 +329,23 @@ op perm_eq ['a] (s1 s2 : 'a list) =
 
 lemma perm_eqP (s1 s2 : 'a list):
   perm_eq s1 s2 <=> (forall p, count p s1 = count p s2).
-proof. admit. qed.
+proof.
+  rewrite /perm_eq allP /=; split; last by move=> h x _; apply h.
+  move=> eq_cnt1 a; cut ltzSz: forall z, z < z + 1 by smt.
+  (* FIX: negative occurence selector *)
+  cut {ltzSz} := ltzSz (count a (s1 ++ s2)); move: {1 3 4}a.
+  pose x := _ + 1; cut : 0 <= x by smt; move: x => {a}.
+  elim/Int.Induction.induction; first by smt.
+  move=> i i_ge0 IHi a le_ai; case (count a (s1 ++ s2) = 0).
+    by rewrite count_cat; smt.
+  rewrite neq_ltz ltzNge count_ge0 /=; rewrite -has_count hasP.
+  case=> x [s12x a_x]; pose a' := predD1 a x.
+  cut cnt_a': forall s, count a s = count (pred1 x) s + count a' s.
+    move=> s; rewrite count_filter -(count_predC (pred1 x)).
+    rewrite  2!count_filter -!filter_predI -!count_filter.
+    by congr; apply eq_count => y; delta.
+  by rewrite !cnt_a' (eq_cnt1 x) // (IHi a') //; smt.
+qed.
 
 lemma perm_eq_refl (s : 'a list): perm_eq s s.
 proof. by apply perm_eqP. qed.
