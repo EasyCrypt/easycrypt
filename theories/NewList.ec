@@ -768,7 +768,7 @@ op path (e : 'a -> 'a -> bool) (x : 'a) (p : 'a list) : bool =
 
 op sorted (e : 'a -> 'a -> bool) (xs : 'a list) =
   with xs = "[]"      => true
-  with xs = (::) y ys => false. (* BUG: path e y ys. *) 
+  with xs = (::) y ys => path e y ys.
 
 op sort : ('a -> 'a -> bool) -> 'a list -> 'a list.
 
@@ -785,4 +785,4 @@ op lex (e : 'a -> 'a -> bool) s1 s2 =
   with s1 = "[]"      , s2 = (::) y2 s2 => true
   with s1 = (::) y1 s1, s2 = "[]"       => false
   with s1 = (::) y1 s1, s2 = (::) y2 s2 =>
-    if e y1 y2 then true else false.
+    if e y1 y2 then lex e s1 s2 else false.
