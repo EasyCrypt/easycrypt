@@ -342,6 +342,10 @@ proof.
   by apply perm_eq_trans; apply perm_eq_sym.
 qed.
 
+lemma perm_eqlE (s1 s2 : 'a list):
+  perm_eq s1 s2 => forall s, perm_eq s1 s <=> perm_eq s2 s.
+proof. by move=> h; apply perm_eqlP. qed.
+
 lemma perm_catC (s1 s2 : 'a list): perm_eq (s1 ++ s2) (s2 ++ s1).
 proof. by rewrite !perm_eqP => p; rewrite !count_cat; smt. qed.
 
@@ -362,6 +366,18 @@ proof. by do 2! rewrite perm_eq_sym perm_catCl; apply perm_cat2l. qed.
 lemma perm_catCAl (s1 s2 s3 : 'a list):
   forall s, perm_eq (s1 ++ s2 ++ s3) s <=> perm_eq (s2 ++ s1 ++ s3) s.
 proof. by rewrite -!perm_eqlP perm_cat2r perm_catC. qed.
+
+lemma perm_catAC (s1 s2 s3 : 'a list):
+  forall s, perm_eq ((s1 ++ s2) ++ s3) s <=> perm_eq ((s1 ++ s3) ++ s2) s.
+proof. by rewrite -perm_eqlP -!catA perm_cat2l perm_catCl perm_eq_refl. qed.
+
+lemma perm_catCA (s1 s2 s3 : 'a list):
+  forall s, perm_eq (s1 ++ s2 ++ s3) s <=> perm_eq (s2 ++ s1 ++ s3) s.
+proof. by rewrite -perm_eqlP; rewrite perm_cat2r perm_catC. qed.
+
+lemma perm_consCA (x y : 'a) s:
+  forall s', perm_eq (x :: y :: s) s' <=> perm_eq (y :: x :: s) s'.
+proof. by move=> s'; cut := perm_catCA [x] [y] s s'. qed.
 
 lemma perm_cons (x : 'a) s1 s2:
   perm_eq (x :: s1) (x :: s2) <=> perm_eq s1 s2.
@@ -770,16 +786,56 @@ op sorted (e : 'a -> 'a -> bool) (xs : 'a list) =
   with xs = "[]"      => true
   with xs = (::) y ys => path e y ys.
 
-op sort : ('a -> 'a -> bool) -> 'a list -> 'a list.
+theory InsertSort.
+  op insert (e : 'a -> 'a -> bool) (x : 'a) (s : 'a list) =
+    with s = "[]"      => [x]
+    with s = (::) y s' => if e x y then x :: s else y :: (insert e x s').
 
-axiom sort_sorted (e : 'a -> 'a -> bool) (xs : 'a list):
-     (forall x y, e x y || e y x)
-  => sorted e (sort e xs).
+  op sort (e : 'a -> 'a -> bool) (s : 'a list) =
+    with s = "[]"      => []
+    with s = (::) x s' => insert e x (sort e s').
 
-axiom perm_sort (e : 'a -> 'a -> bool) (xs : 'a list):
-     (forall x y, e x y || e y x)
-  => perm_eq (sort e xs) xs.
+  lemma nosmt perm_insert (e : 'a -> 'a -> bool) x s:
+    perm_eq (x :: s) (insert e x s).
+  proof.
+    elim s => //= y s IHs; case (e x y) => exy.
+      by rewrite perm_cons perm_eq_refl.
+    by rewrite perm_consCA perm_cons.
+  qed.
 
+  lemma nosmt perm_sort (e : 'a -> 'a -> bool) s: perm_eq (sort e s) s.
+  proof.
+    elim s=> //= x s IHs; cut h := perm_insert e x (sort e s).
+    by apply perm_eqlE in h; rewrite -h perm_cons => {h}.
+  qed.
+
+  lemma nosmt sorted_insert (e : 'a -> 'a -> bool) x s:
+       (forall x y, e x y \/ e y x)
+    => sorted e s => sorted e (insert e x s).
+  proof.
+    move=> e_ltgt; case s => //= y s; case (e x y) => [-> -> // |].
+    elim s x y => /= [|z s IHs] x y; first by smt.
+    move=> Nexy [eyz pt_zs]; case (e x z); first by smt.
+    by move=> Nexz; rewrite eyz /= IHs.
+  qed.
+
+  lemma nosmt sort_sorted (e : 'a -> 'a -> bool) (s : 'a list):
+     (forall x y, e x y \/ e y x) => sorted e (sort e s).
+  proof. by move=> e_ltgt; elim s => //= x s IHs; apply sorted_insert. qed.
+end InsertSort.
+
+op sort (e : 'a -> 'a -> bool) s = InsertSort.sort e s axiomatized by sortE.
+
+lemma perm_sort e (s : 'a list): perm_eq (sort e s) s.
+proof. by rewrite sortE /=; apply InsertSort.perm_sort. qed.
+
+lemma sort_sorted (e : 'a -> 'a -> bool) s:
+  (forall (x y : 'a), e x y \/ e y x) => sorted e (sort e s).
+proof. by rewrite sortE /=; apply InsertSort.sort_sorted. qed.
+
+(* -------------------------------------------------------------------- *)
+(*                          Order lifting                               *)
+(* -------------------------------------------------------------------- *)
 op lex (e : 'a -> 'a -> bool) s1 s2 =
   with s1 = "[]"      , s2 = "[]"       => false
   with s1 = "[]"      , s2 = (::) y2 s2 => true
