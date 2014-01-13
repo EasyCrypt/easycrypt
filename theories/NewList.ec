@@ -837,8 +837,13 @@ proof. by rewrite sortE /=; apply InsertSort.sort_sorted. qed.
 (*                          Order lifting                               *)
 (* -------------------------------------------------------------------- *)
 op lex (e : 'a -> 'a -> bool) s1 s2 =
-  with s1 = "[]"      , s2 = "[]"       => false
+  with s1 = "[]"      , s2 = "[]"       => true
   with s1 = "[]"      , s2 = (::) y2 s2 => true
   with s1 = (::) y1 s1, s2 = "[]"       => false
   with s1 = (::) y1 s1, s2 = (::) y2 s2 =>
-    if e y1 y2 then lex e s1 s2 else false.
+    if e y1 y2 then if e y2 y1 then lex e s1 s1 else true else false.
+
+lemma lex_total (e : 'a -> 'a -> bool):
+     (forall x y, e x y \/ e y x)
+  => (forall s1 s2, lex e s1 s2 \/ lex e s2 s1).
+proof. by move=> h; elim=> [|x1 s1 IHs1] [|x2 s2] //=; smt. qed.
