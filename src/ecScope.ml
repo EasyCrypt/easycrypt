@@ -1672,7 +1672,10 @@ module Ty = struct
             let filter op = match op.op_kind with OB_oper _ -> true | _ -> false in
             match EcEnv.Op.all filter (unloc op) env with
             | []      -> hierror ~loc:op.pl_loc "unknown operator"
-            | _::_::_ -> hierror ~loc:op.pl_loc "ambiguous operator"
+            | op1::op2::_ -> 
+              hierror ~loc:op.pl_loc "ambiguous operator %s %s" 
+                (EcPath.tostring (fst op1)) (EcPath.tostring (fst op2))
+              
             | [op]    -> op
           in
             Mstr.change
