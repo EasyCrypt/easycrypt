@@ -59,7 +59,7 @@ theory Dword.
 
   lemma in_supp_def w: in_supp w dword.
   proof -strict.
-  by rewrite /in_supp mu_x_def; smt.
+  rewrite /in_supp mu_x_def;smt.
   qed.
 
   lemma mu_cpMemw X:

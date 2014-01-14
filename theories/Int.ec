@@ -1,23 +1,169 @@
-require import Logic.
-
-import why3 "int" "Int" 
-  (* Il y a un bug dans ecScope il refuse d'avoir deux operateurs avec des 
-     types different et la meme syntaxe *)
+import why3 "int" "Int"
   op "prefix -" as "[-]".
+  
+(* Group operation *)
 
-theory Abs.
+op zeroz = 0.
+op onez  = 1.
 
-  import why3 "int" "Abs"
-    op "abs" as "`|_|".
+lemma nosmt onez_neq0 : 1 <> 0 
+by [].
 
-end Abs.
-export Abs.
+lemma nosmt addzA (x y z : int): x + (y + z) = (x + y) + z
+by [].
 
-theory Triangle.
-  lemma nosmt triangle_inequality (x y z:int):
-     `| x - y | <= `| x - z | + `| y - z |
-  by [].
-end Triangle.
+lemma nosmt addzC (x y   : int): x + y = y + x
+by [].
+
+lemma nosmt add0z (x     : int): 0 + x = x
+by [].
+
+lemma nosmt addNz (x     : int): (-x) + x = 0
+by [].
+
+lemma nosmt mulzA  (x y z : int): x * (y * z) = (x * y) * z
+by [].
+
+lemma nosmt mulzC  (x y   : int): x * y = y * x
+by [].
+
+lemma nosmt mul1z  (x     : int): 1 * x = x
+by [].
+
+lemma nosmt mulzDl (x y z : int): (x + y) * z = x * z + y * z
+by [].
+
+require import Ring.
+clone export IDomain as Rz with
+  type Ring.ring <- int,
+  op Ring.zeror <- 0,
+  op Ring.oner  <- 1,
+  op Ring.( + ) <- ( + ),
+  op Ring.([-]) <- [-],
+  op Ring.( * ) <- ( * ),
+  op Ring.( - ) <- ( - )
+  proof * by smt.
+
+(** Number theory *)
+
+op "`|_|" (x:int) = (0 <= x) ? x : -x.
+
+lemma nosmt lez_norm_add (x y : int): `|x + y| <= `|x| + `|y|
+by [].
+
+lemma nosmt addz_gt0     (x y : int): 0 < x => 0 < y => 0 < x + y
+by [].
+
+lemma nosmt norm_eq0     (x   : int): `|x| = 0 => x = 0
+by [].
+
+lemma nosmt gez_leVge    (x y : int): 0 <= x => 0 <= y => x <= y \/ y <= x
+by [].
+
+lemma nosmt normzM       (x y : int): `|x * y| = `|x| * `|y|
+by [].
+
+lemma nosmt lez_def      (x y : int): x <= y <=> `|y - x| = y - x
+by [].
+
+lemma nosmt ltz_def      (x y : int): x < y <=> ( y <> x /\ x <= y)
+by [].
+
+theory Induction.
+
+  axiom nosmt induction (p:int -> bool):
+    (p 0) =>
+    (forall i, 0 <= i => p i => p (i + 1)) =>
+    (forall i, 0 <= i => p i).
+
+  lemma nosmt strongInduction (p:int -> bool):
+    (forall j, 0 <= j => (forall k, 0 <= k < j => p k) => p j) =>
+    (forall i, 0 <= i => p i).
+  proof strict.
+  by intros hyp i iVal;
+     apply (induction (fun i, forall k, 0 <= k <= i => p k) _ _ i); smt.
+  qed.
+
+end Induction.
+
+(* Fold operator *)
+
+op fold : ('a -> 'a) -> 'a -> int -> 'a.
+
+axiom foldle0 p (f : 'a -> 'a) a: p <= 0 => fold f a p = a.
+
+lemma fold0 (f : 'a -> 'a) a: fold f a 0 = a
+by [].
+
+axiom foldS (f : 'a -> 'a) a n: 0 <= n => fold f a (n+1) = f (fold f a n).
+
+lemma nosmt foldpos (f : 'a -> 'a) a n: 0 < n => f (fold f a (n-1)) = fold f a n
+by [].
+
+lemma fold_add (f : 'a -> 'a) a n1 n2 : 0 <= n1 => 0 <= n2 =>
+   fold f (fold f a n2) n1 = fold f a (n1 + n2).
+proof strict. elim /Induction.induction n1; smt. qed.
+
+(* Power *)
+
+op ( ^ ) (x:int) (p:int) = fold (( * ) x) 1 p
+axiomatized by powE.
+
+lemma nosmt powNeg p x: p <= 0 => x ^ p = 1
+by [].
+
+lemma pow0 x: x ^ 0 = 1
+by [].
+
+lemma powS p x: 0 <= p => x ^ (p+1) = x * x ^ p
+by [].
+
+lemma pow_add z p1 p2: 0 <= p1 => 0 <= p2 => z^p1 * z^p2 = z^(p1+p2).
+proof strict. 
+  intros Hp1;elim /Induction.induction p2;smt.
+qed.
+
+lemma pow_mul z p1 p2: 0 <= p1 => 0 <= p2 => (z^p1)^p2 = z^(p1*p2).
+proof strict. 
+  intros Hp1;elim /Induction.induction p2;smt.
+qed.
+
+lemma powPos z p: 0 < z => 0 < z ^ p.
+proof.
+ case (0 <= p); intros Hp Hz; last smt.
+ elim /Induction.induction p Hp; smt.
+qed.
+
+(* Diveucl *)
+
+import why3 "int" "EuclideanDivision"
+  op "div" as "/%";
+  op "mod" as "%%".
+
+theory EuclDiv.
+
+  axiom ediv_spec m d:
+    d <> 0 =>
+    0 <= m %% d < `|d| /\
+    m = (m /% d) * d + (m %% d).
+
+  axiom ediv_unique m d q r:
+    d <> 0 =>
+    0 <= r < `|d| =>
+    m = q * d + r =>
+    q = m /% d /\ r = m %% d.
+
+  axiom ediv_Mle : forall (m1 m2 d:int), 0 < d => m1 <= m2 => m1/%d <= m2/%d.
+
+  lemma ediv_pos : forall m d, 0 < d => 0 <= m => 0 <= m /%d.
+  proof -strict. 
+    intros m d Hd Hm.
+    apply (Trans _ (0/%d));last apply ediv_Mle;smt.
+    elim (ediv_unique 0 d 0 0 _ _ _) => //;smt.
+  qed.
+end EuclDiv.
+
+export EuclDiv.
 
 theory Extrema.
   op min (a b:int) = if (a < b) then a else b.
@@ -69,60 +215,6 @@ theory Extrema.
 end Extrema.
 export Extrema.
 
-theory EuclDiv.
-  op (/%): int -> int -> int.
-  op (%%): int -> int -> int.
-
-  axiom ediv_spec m d:
-    d <> 0 =>
-    0 <= m %% d < `|d| /\
-    m = (m /% d) * d + (m %% d).
-
-  axiom ediv_unique m d q r:
-    d <> 0 =>
-    0 <= r < `|d| =>
-    m = q * d + r =>
-    q = m /% d /\ r = m %% d.
-
-  axiom ediv_Mle : forall (m1 m2 d:int), 0 < d => m1 <= m2 => m1/%d <= m2/%d.
-
-  lemma ediv_pos : forall m d, 0 < d => 0 <= m => 0 <= m /%d.
-  proof -strict. 
-    intros m d Hd Hm.
-    apply (Trans _ (0/%d));last apply ediv_Mle;smt.
-    elim (ediv_unique 0 d 0 0 _ _ _) => //;smt.
-  qed.
-end EuclDiv.
-
-export EuclDiv.
-
-theory Induction.
-  axiom nosmt induction (p:int -> bool):
-    (p 0) =>
-    (forall i, 0 <= i => p i => p (i + 1)) =>
-    (forall i, 0 <= i => p i).
-
-  lemma nosmt strongInduction (p:int -> bool):
-    (forall j, 0 <= j => (forall k, 0 <= k < j => p k) => p j) =>
-    (forall i, 0 <= i => p i).
-  proof strict.
-  by intros hyp i iVal;
-     apply (induction (fun i, forall k, 0 <= k <= i => p k) _ _ i); smt.
-  qed.
-end Induction.
-
-(* Not sure we should use this one *)
-theory Power.
-  import why3 "int" "Power"
-    op "power" as "^".
-
-  lemma Power_pos (x n:int): 0 <= n => 0 < x => 0 < x ^ n.
-  proof -strict.
-  by intros n_pos x_pos; elim/Induction.induction n n_pos=> //; smt.
-  qed.
-end Power.
-export Power.
-
 lemma mulMle : forall (x1 x2 y1 y2:int),
    0 <= x1 <= x2 => 0 <= y1 <= y2 => x1 * y1 <= x2 * y2.
 proof -strict.
@@ -168,7 +260,8 @@ theory ForLoop.
   proof strict.
   case (i < j)=> i_j; last smt.
   pose n := j - i; cut ->: j = n + i by smt.
-  by cut: 0 <= n by smt; elim/Induction.induction n; smt.
+  cut: 0 <= n by smt; elim/Induction.induction n;first by smt.
+  intros i0 Hi0 Hrec;smt.
   qed.
 
   (* General result on restricting the range *)

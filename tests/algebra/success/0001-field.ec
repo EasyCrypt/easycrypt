@@ -9,7 +9,7 @@ instance ring with int
   op add   = Int.( + )
   op opp   = Int.([-])
   op mul   = Int.( * )
-  op expr  = Int.Power.( ^ )
+  op expr  = Int.( ^ )
   op sub   = Int.(-)
 
   proof oner_neq0 by smt

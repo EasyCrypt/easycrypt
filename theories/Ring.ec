@@ -52,10 +52,10 @@ theory Ring.
   lemma nosmt oppr0: -zeror = zeror.
   proof. by rewrite -(addr0 (-zeror)) addNr. qed.
 
-  lemma subr0 (x : ring): x - zeror = x.
+  lemma nosmt subr0 (x : ring): x - zeror = x.
   proof. by rewrite subrE /= oppr0 addr0. qed.
 
-  lemma sub0r (x : ring): zeror - x = - x.
+  lemma nosmt sub0r (x : ring): zeror - x = - x.
   proof. by rewrite subrE /= add0r. qed.
 
   lemma nosmt mulr1 (x : ring): x * oner = x.

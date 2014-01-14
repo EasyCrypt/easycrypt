@@ -267,7 +267,6 @@ theory Miplus.
     cut -> : k + 1 - 1 = k;first smt.
     rewrite Hrec /=.
     elim (ediv_unique ((k + 1) * (k + 1 + 1)) 2 (k * (k + 1) /% 2 + (k + 1)) 0 _ _ _) => //.
-    smt.
     cut -> : (k + 1) * (k + 1 + 1) = k * (k+1) + 2*(k+1) by smt.
     elim (ediv_spec (k*(k+1)) 2 _) => //.
     intros _ {1}->.

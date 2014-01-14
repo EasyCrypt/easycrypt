@@ -114,10 +114,9 @@ lemma transpose_idempotent: forall (M:'a matrix),
   transpose (transpose M) = M.
 proof -strict.
 intros M; apply extensionality.
-cut ext: (size (transpose (transpose M)) = size M /\
+cut ext: (size (transpose (transpose M)) = size M &&
           forall i j, 0 <= i => i < fst (size M) => 0 <= j => j < snd (size M) =>
-            (transpose (transpose M)).[(i,j)] = M.[(i,j)]);
-smt.
+            (transpose (transpose M)).[(i,j)] = M.[(i,j)]) by (split;smt);smt.
 qed.
 
 (* Interactions with arrays *)

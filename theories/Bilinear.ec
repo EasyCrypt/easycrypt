@@ -55,7 +55,7 @@ theory Prime_field.
     import Int.
     axiom toint_bounded (x:t): 0 <= toint x < q.
     axiom oftoint (x:t): ofint (toint x) = x.
-    axiom toofint_mod (x:int): toint (ofint x) = Int.EuclDiv.(%%) x q. 
+    axiom toofint_mod (x:int): toint (ofint x) = Int.(%%) x q. 
 
   end Base.
   export Base.

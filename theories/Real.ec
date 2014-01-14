@@ -14,7 +14,7 @@ export Abs.
 
 theory Triangle.
 
-  lemma triangular_inequality x y z:
+  lemma triangular_inequality (x y z:real):
      `| x-y | <= `| x-z |  + `| y-z |
   by [].
 
@@ -60,11 +60,11 @@ lemma mul_div: forall (x:real),
   x <> from_int 0 => x / x = from_int 1
 by [].
 
-lemma mulrM: forall (x y z:real),
+axiom mulrM: forall (x y z:real),
   from_int 0 < z =>
   x < y =>
-  x * z < y * z
-by [].
+  x * z < y * z.
+(* by []. *) (* FIXME it should be a lemma *)
 
 lemma nosmt addleM : forall (x1 x2 y1 y2:real),
    x1 <= x2 => y1 <= y2 => x1 + y1 <= x2 + y2 
@@ -99,9 +99,7 @@ theory Exp.
   import why3 "real" "ExpLog"
     op "exp" as "exp".
   axiom exp_zero : exp (from_int 0) = from_int 1.
-  axiom exp_monotonous : forall x y , x<=y => exp x <= exp y.
-(* op exp : real -> real. *)
-(* TODO : add axioms*)
+  axiom exp_monotonous : forall (x y:real) , x<=y => exp x <= exp y.
 
 end Exp.
 export Exp.

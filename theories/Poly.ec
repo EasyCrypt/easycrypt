@@ -10,7 +10,7 @@ op predC1 ['a] (c : 'a) = fun (x : 'a), c <> x.
 op int_of_bool (b : bool) = if b then 1 else 0.
 
 (* -------------------------------------------------------------------- *)
-theory Ring.
+(*theory Ring.
   type ring.
 
   op zeror : ring.
@@ -51,7 +51,7 @@ theory Ring.
   lemma oppr0: -zeror = zeror.
   proof. by rewrite -(add0r (-zeror)) addrN. qed.
 end Ring.
-
+*)
 (* -------------------------------------------------------------------- *)
 theory Seq.
   type 'a list = [
@@ -398,11 +398,12 @@ theory Bigop.
 end Bigop.
 
 (* -------------------------------------------------------------------- *)
+
 theory BigSum.
   (*-*) import Seq.
-  clone import Ring.
+  clone import Top.Ring.Ring.
 
-  op sum (s : 'a list) P F = Bigop.bigop zeror Ring.(+) s P F.
+  op sum (s : 'a list) P F = Bigop.bigop Ring.zeror Ring.(+) s P F.
 end BigSum.
 
 (* -------------------------------------------------------------------- *)
@@ -415,7 +416,7 @@ theory FreeGroup.
 
   op lez : K -> K -> bool.
 
-  clone import Ring   with type ring <- Z.
+  clone import Top.Ring.Ring   with type ring <- Z.
   clone import BigSum with type Ring.ring <- Z.
 
   type freeg.
@@ -438,7 +439,7 @@ theory Poly.
   (*---*) import Iota.
   (*---*) import Seq.
   (*---*) import Bigop.
-  clone   import Ring.
+  clone   import Top.Ring.Ring.
 
   (* Polynomials with a countable set of indeterminates *)
   type poly.
