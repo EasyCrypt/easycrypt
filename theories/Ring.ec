@@ -11,7 +11,7 @@ theory Ring.
   op [ - ] : ring -> ring.
   op ( * ) : ring -> ring -> ring.
 
-  op ( - ) (x y : ring) = x + -y.
+  op ( - ) (x y : ring) = x + -y axiomatized by subrE.
 
   axiom nosmt oner_neq0 : oner <> zeror.
 
@@ -31,7 +31,8 @@ theory Ring.
   lemma nosmt addrN (x : ring): x + (-x) = zeror.
   proof. by rewrite addrC addNr. qed.
 
-  lemma nosmt subrr (x : ring): x - x = zeror by apply addrN.
+  lemma nosmt subrr (x : ring): x - x = zeror.
+  proof. by rewrite subrE /= addrN. qed.
 
   lemma nosmt addKr (x y : ring): -x + (x + y) = y.
   proof. by rewrite addrA addNr add0r. qed.
@@ -52,10 +53,10 @@ theory Ring.
   proof. by rewrite -(addr0 (-zeror)) addNr. qed.
 
   lemma subr0 (x : ring): x - zeror = x.
-  proof. by rewrite /Ring.(-) oppr0 addr0. qed.
+  proof. by rewrite subrE /= oppr0 addr0. qed.
 
   lemma sub0r (x : ring): zeror - x = - x.
-  proof. by rewrite /Ring.(-) add0r. qed.
+  proof. by rewrite subrE /= add0r. qed.
 
   lemma nosmt mulr1 (x : ring): x * oner = x.
   proof. by rewrite mulrC mul1r. qed.
