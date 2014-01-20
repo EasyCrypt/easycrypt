@@ -1076,11 +1076,13 @@ let transexp (env : EcEnv.env) mode ue e =
         let codom = ty_fun_app loc env ue ty esig in
           (e_app e (List.map fst es) codom, codom)
 
-    | PElet (p, pe1, pe2) ->
+    | PElet (p, (pe1, paty), pe2) ->
         let (penv, pt, pty) = transpattern env ue p in
-  
+        let aty = paty |> omap (transty tp_relax env ue) in
+
         let e1, ty1 = transexp env pe1 in
-          unify_or_fail env ue pe1.pl_loc ~expct:pty ty1;
+        unify_or_fail env ue pe1.pl_loc ~expct:pty ty1;
+        aty |> oiter (fun aty -> unify_or_fail env ue pe1.pl_loc ~expct:aty ty1);
   
         let e2, ty2 = transexp penv pe2 in
         (e_let pt e1 e2, ty2)
@@ -1861,11 +1863,13 @@ let trans_form_or_pattern env (ps, ue) pf tt =
           unify_or_fail env ue pf3.pl_loc ~expct:f2.f_ty f3.f_ty;
           f_if f1 f2 f3
 
-    | PFlet (lp, pf1, f2) ->
+    | PFlet (lp, (pf1, paty), f2) ->
         let (penv, p, pty) = transpattern env ue lp in
+        let aty = paty |> omap (transty tp_uni env ue) in
         let f1 = transf env pf1 in
         let f2 = transf penv f2 in
           unify_or_fail env ue pf1.pl_loc ~expct:pty f1.f_ty;
+          aty |> oiter (fun aty -> unify_or_fail env ue pf1.pl_loc ~expct:pty aty);
           f_let p f1 f2 
 
     | PFforall (xs, pf) ->
