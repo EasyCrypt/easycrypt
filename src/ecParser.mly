@@ -657,7 +657,10 @@ expr_u:
    { PEif (c, e1, e2) }
 
 | LET p=lpattern EQ e1=expr IN e2=expr
-   { PElet (p, e1, e2) }
+   { PElet (p, (e1, None), e2) }
+
+| LET p=lpattern COLON ty=loc(type_exp) EQ e1=expr IN e2=expr
+   { PElet (p, (e1, Some ty), e2) }
 
 | r=loc(RBOOL) TILD e=sexpr
     { let id  = PEident(mk_loc r.pl_loc EcCoreLib.s_dbitstring, None) in
@@ -880,7 +883,10 @@ form_u(P):
     { PFif (c, e1, e2) }
 
 | LET p=lpattern EQ e1=form_r(P) IN e2=form_r(P)
-    { PFlet (p, e1, e2) }
+    { PFlet (p, (e1, None), e2) }
+
+| LET p=lpattern COLON ty=loc(type_exp) EQ e1=form_r(P) IN e2=form_r(P)
+    { PFlet (p, (e1, Some ty), e2) }
 
 | FORALL pd=pgtybindings COMMA e=form_r(P) { PFforall (pd, e) }
 | EXIST  pd=pgtybindings COMMA e=form_r(P) { PFexists (pd, e) }
