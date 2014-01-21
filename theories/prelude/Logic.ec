@@ -1,3 +1,7 @@
+(* --------------------------------------------------------------------
+ * Copyright IMDEA Software Institute / INRIA - 2013, 2014
+ * -------------------------------------------------------------------- *)
+
 (*** Base Logic Rules *)
 (** cut *)
 lemma nosmt cut_lemma : forall (a b: bool), a => (a => b) => b by [].

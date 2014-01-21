@@ -1,3 +1,7 @@
+(* --------------------------------------------------------------------
+ * Copyright IMDEA Software Institute / INRIA - 2013, 2014
+ * -------------------------------------------------------------------- *)
+
 require        Distr.
 require        Bool.
 require import Int.

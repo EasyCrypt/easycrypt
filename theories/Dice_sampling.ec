@@ -1,3 +1,7 @@
+(* --------------------------------------------------------------------
+ * Copyright IMDEA Software Institute / INRIA - 2013, 2014
+ * -------------------------------------------------------------------- *)
+
 require import Distr.
 require import Int.
 require import Real.

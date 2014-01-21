@@ -1,3 +1,7 @@
+(* --------------------------------------------------------------------
+ * Copyright IMDEA Software Institute / INRIA - 2013, 2014
+ * -------------------------------------------------------------------- *)
+
 (* Definitions for Public-Key Signatures Schemes *)
 require import FSet.
 require import Pair.

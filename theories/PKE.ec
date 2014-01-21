@@ -1,3 +1,7 @@
+(* --------------------------------------------------------------------
+ * Copyright IMDEA Software Institute / INRIA - 2013, 2014
+ * -------------------------------------------------------------------- *)
+
 require import Bool.
 require import Int.
 require import Option.

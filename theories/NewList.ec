@@ -1,3 +1,10 @@
+(* --------------------------------------------------------------------
+ * Copyright IMDEA Software Institute / INRIA - 2013, 2014
+ * -------------------------------------------------------------------- *)
+
+(* This API has been imported from the [seq] library of the ssreflect
+ * library that is (c) Copyright Microsoft Corporation and Inria. *)
+
 (* -------------------------------------------------------------------- *)
 require import Fun.
 require import Pred.

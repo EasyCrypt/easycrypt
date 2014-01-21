@@ -1,3 +1,7 @@
+(* --------------------------------------------------------------------
+ * Copyright IMDEA Software Institute / INRIA - 2013, 2014
+ * -------------------------------------------------------------------- *)
+
 (** Extensional equality for functions *)
 (* This is separate from more advanced
    definitions and results on functions
