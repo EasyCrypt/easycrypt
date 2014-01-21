@@ -18,9 +18,14 @@ op oflist : 'a list -> 'a fset.
 axiom elemsK  (s : 'a fset): oflist (elems  s) = s.
 axiom oflistK (s : 'a list): perm_eq (undup s) (elems (oflist s)).
 
-(* We are still missing some properties on lists *)
 lemma uniq_elems (s : 'a fset): uniq (elems s).
-proof. admit. qed.
+proof.
+  rewrite -(elemsK s); move: (elems s) => {s} s.
+  by rewrite -(perm_eq_uniq (undup s)) ?(undup_uniq, oflistK).
+qed.
+
+axiom fset_eq (s1 s2 : 'a fset): (* FIXME: Provable? *)
+  (perm_eq (elems s1) (elems s2)) => (s1 = s2).
 
 (* -------------------------------------------------------------------- *)
 op card ['a] (s : 'a fset) = size (elems s) axiomatized by cardE.
@@ -39,7 +44,10 @@ qed.
 
 lemma setP (s1 s2 : 'a fset):
   (s1 = s2) <=> (forall x, mem s1 x <=> mem s2 x).
-proof. split => [-> // |]. admit. qed.
+proof.
+  split => [-> // | h]; apply fset_eq; rewrite uniq_perm_eq;
+    by rewrite 1?uniq_elems; move: h; rewrite memE /=.
+qed.
 
 (* -------------------------------------------------------------------- *)
 op set0 ['a] = oflist [<:'a>] axiomatized by set0E.
