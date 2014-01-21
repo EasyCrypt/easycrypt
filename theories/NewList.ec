@@ -1,4 +1,5 @@
 (* -------------------------------------------------------------------- *)
+require import Fun.
 require import Pred.
 require import Option.
 require import Int.
@@ -187,8 +188,12 @@ lemma mem_rcons s (y : 'a):
 proof. by move=> x; rewrite -cats1 /= !mem_cat /= orbC. qed.
 
 (* -------------------------------------------------------------------- *)
-(*                     filter, count, has, all                          *)
+(*                  find, filter, count, has, all                       *)
 (* -------------------------------------------------------------------- *)
+op find ['a] (p : 'a -> bool) s =
+  with s = "[]"      => 0
+  with s = (::) x s' => if p x then 0 else find p s' + 1.
+
 op count ['a] (p : 'a -> bool) xs =
   with xs = "[]"      => 0
   with xs = (::) y ys => (int_of_bool (p y)) + (count p ys).
@@ -252,6 +257,9 @@ proof. by rewrite count_filter filter_predT. qed.
 lemma count_predC p (s : 'a list):
   count p s + count (predC p) s = size s.
 proof. elim s; smt. qed.
+
+lemma has_nil p : has p [<:'a>] <=> false.
+proof. by []. qed.
 
 lemma has_count p (s : 'a list): has p s <=> (0 < count p s).
 proof. by elim s => //= x s -> /=; case (p x); smt. qed.
@@ -320,6 +328,194 @@ proof. by elim s1 => //= x s1 IHs; rewrite IHs. qed.
 lemma mem_filter (p : 'a -> bool) x s:
   mem (filter p s) x <=> p x /\ (mem s x).
 proof. by elim s => //= y s IHs; smt. qed.
+
+lemma find_ge0 p (s : 'a list): 0 <= find p s.
+proof. elim s; smt. qed.
+
+lemma has_find p (s : 'a list): has p s <=> (find p s < size s).
+proof. elim s; smt. qed.
+
+lemma find_size p (s : 'a list): find p s <= size s.
+proof. elim s; smt. qed.
+
+lemma find_cat p (s1 s2 : 'a list):
+  find p (s1 ++ s2) = if has p s1 then find p s1 else size s1 + find p s2.
+proof. elim s1; smt. qed.
+
+lemma nth_find z0 p (s : 'a list): has p s => p (nth z0 s (find p s)).
+proof. elim s; smt. qed.
+
+(* -------------------------------------------------------------------- *)
+(*                              Lookup                                  *)
+(* -------------------------------------------------------------------- *)
+op index (x : 'a) = find (pred1 x).
+
+lemma index_cons x y (s : 'a list):
+  index x (y :: s) = if x = y then 0 else index x s + 1.
+proof. by []. qed.
+
+lemma index_ge0 x (s : 'a list): 0 <= index x s.
+proof. by rewrite /index find_ge0. qed.
+
+lemma index_size x (s : 'a list): index x s <= size s.
+proof. by rewrite /index find_size. qed.
+
+lemma index_mem x (s : 'a list): (index x s < size s) = (mem s x).
+proof. by rewrite -has_pred1 has_find. qed.
+
+lemma nth_index z0 x (s : 'a list): mem s x => nth z0 s (index x s) = x.
+proof.
+  rewrite -has_pred1 => h; apply (nth_find z0 (pred1 x)) in h.
+  by move: h; rewrite /pred1 => {2}->.
+qed.
+
+lemma index_cat x (s1 s2 : 'a list):
+ index x (s1 ++ s2) = if mem s1 x then index x s1 else size s1 + index x s2.
+proof. by rewrite /index find_cat has_pred1. qed.
+
+lemma index_head x (s : 'a list): index x (x :: s) = 0.
+proof. by []. qed.
+
+(* -------------------------------------------------------------------- *)
+(*                            drop, take                                *)
+(* -------------------------------------------------------------------- *)
+op drop n (xs : 'a list) =
+  with xs = "[]"      => []
+  with xs = (::) y ys =>
+    if n <= 0 then xs else drop (n-1) ys.
+
+lemma drop0 (s : 'a list): drop 0 s = s.
+proof. by elim s. qed.
+
+lemma drop_neg n (s : 'a list): n < 0 => drop n s = s.
+proof. by elim s => //= x s IHs n_lt0; smt. qed.
+
+lemma drop_oversize n (s : 'a list):
+  size s <= n => drop n s = [].
+proof. by elim s n; smt. qed.
+
+lemma drop_size (s : 'a list): drop (size s) s = [].
+proof. by rewrite drop_oversize. qed.
+
+lemma drop_cons n x (s : 'a list):
+  drop n (x :: s) = if 0 < n then drop (n-1) s else x :: s.
+proof. by rewrite /= lezNgt; case (0 < n). qed.
+
+lemma size_drop n (s : 'a list):
+  0 <= n => size (drop n s) = max 0 (size s - n).
+proof. by elim s n => //=; smt. qed.
+
+lemma drop_cat n (s1 s2 : 'a list):
+    drop n (s1 ++ s2) =
+      if n < size s1 then drop n s1 ++ s2 else drop (n - size s1) s2.
+proof. by elim s1 n => //=; smt. qed.
+
+lemma drop_size_cat n (s1 s2 : 'a list):
+  size s1 = n => drop n (s1 ++ s2) = s2.
+proof. by move=> <-; rewrite drop_cat subzz ltzz drop0. qed.
+
+op take n (xs : 'a list) =
+  with xs = "[]"      => []
+  with xs = (::) y ys =>
+    if n <= 0 then [] else y :: take (n-1) ys.
+
+lemma take0 (s : 'a list): take 0 s = [].
+proof. by elim s. qed.
+
+lemma take_neg n (s : 'a list): n < 0 => take n s = [].
+proof. by elim s; smt. qed.
+
+lemma take_oversize n (s : 'a list):
+  size s <= n => take n s = s.
+proof. by elim s n; smt. qed.
+
+lemma take_size (s : 'a list): take (size s) s = s.
+proof. by rewrite take_oversize. qed.
+
+lemma take_cons n x (s : 'a list):
+  take n (x :: s) = if 0 < n then x :: take (n-1) s else [].
+proof. by rewrite /= lezNgt; case (0 < n). qed.
+
+lemma size_take n (s : 'a list):
+  0 <= n => size (take n s) = if n < size s then n else size s.
+proof. by elim s n => //=; smt. qed.
+
+lemma take_cat n (s1 s2 : 'a list):
+   take n (s1 ++ s2) =
+     if n < size s1 then take n s1 else s1 ++ take (n - size s1) s2.
+proof. by elim s1 n => //=; smt. qed.
+
+lemma take_size_cat n (s1 s2 : 'a list):
+  size s1 = n => take n (s1 ++ s2) = s1.
+proof. by move=> <-; rewrite take_cat subzz ltzz take0 cats0. qed.
+
+lemma cat_take_drop n (s : 'a list): take n s ++ drop n s = s.
+proof. by elim s n; smt. qed.
+
+lemma nth_drop (x0 : 'a) n s i:
+  0 <= n => 0 <= i => nth x0 (drop n s) i = nth x0 s (n + i).
+proof.
+  move=> n_ge0 i_ge0; case (n < size s) => [lt_n_s|le_s_n]; last smt.
+  rewrite -{2}(cat_take_drop n s) nth_cat size_take //; smt.
+qed.
+
+lemma nth_take (x0 : 'a) n s i:
+  0 <= n => 0 <= i => nth x0 (drop n s) i = nth x0 s (n + i).
+proof.
+  move=> n_ge0 i_ge0; case (n < size s) => [lt_n_s|le_s_n]; last smt.
+  rewrite -{2}(cat_take_drop n s) nth_cat size_take //; smt.
+qed.
+
+(* -------------------------------------------------------------------- *)
+(*                          Sequence shift                              *)
+(* -------------------------------------------------------------------- *)
+op rot n (s : 'a list) = drop n s ++ take n s.
+
+lemma rot0 (s : 'a list): rot 0 s = s.
+proof. smt. qed.
+
+lemma rot_neg n (s : 'a list): n < 0 => rot n s = s.
+proof. by move=> lt0_n; rewrite /rot !(drop_neg, take_neg) // cats0. qed.
+
+lemma size_rot n (s : 'a list): size (rot n s) = size s.
+proof. smt. qed.
+
+lemma rot_oversize n (s : 'a list): size s <= n => rot n s = s.
+proof. smt. qed.
+
+lemma rot_size (s : 'a list): rot (size s) s = s.
+proof. by apply rot_oversize. qed.
+
+lemma has_rot n (s : 'a list) p: has p (rot n s) = has p s.
+proof. by rewrite /rot has_cat orbC -has_cat cat_take_drop. qed.
+
+lemma rot_size_cat (s1 s2 : 'a list): rot (size s1) (s1 ++ s2) = s2 ++ s1.
+proof. by rewrite /rot take_size_cat ?drop_size_cat. qed.
+
+lemma mem_rot n (s : 'a list): forall x, mem (rot n s) x <=> mem s x.
+proof.
+  by move=> x; rewrite -{2}(cat_take_drop n s) /rot !mem_cat orbC.
+qed.
+
+op rotr n (s : 'a list) = rot (size s - n) s.
+
+lemma rotK n: cancel<:'a list,'a list> (rot n) (rotr n).
+proof. smt. qed.
+
+lemma rot_inj n (s1 s2 : 'a list): rot n s1 = rot n s2 => s1 = s2.
+proof. by apply (can_inj (rot n) (rotr n)); apply rotK. qed.
+
+lemma rot1_cons x (s : 'a list): rot 1 (x :: s) = rcons s x.
+proof. by rewrite /rot /= take0 drop0 -cats1. qed.
+
+lemma rot_to (s : 'a list) x:
+  mem s x => exists i s', rot i s = x :: s'.
+proof.
+  move=> s_x; pose i := index x s.
+  exists i; exists (drop (i + 1) s ++ take i s).
+  rewrite -cat_cons /i /rot => {i}; congr => //=.
+  elim s s_x => //= y s IHs; case (x = y); smt.
+qed.
 
 (* -------------------------------------------------------------------- *)
 (*                    Equality up to permutation                        *)
@@ -450,119 +646,6 @@ proof.
   move=> h; apply perm_to_rem in h; apply perm_eq_size in h.
   by rewrite h; smt.
 qed.
-
-(* -------------------------------------------------------------------- *)
-(*                            drop, take                                *)
-(* -------------------------------------------------------------------- *)
-op drop n (xs : 'a list) =
-  with xs = "[]"      => []
-  with xs = (::) y ys =>
-    if n <= 0 then xs else drop (n-1) ys.
-
-lemma drop0 (s : 'a list): drop 0 s = s.
-proof. by elim s. qed.
-
-lemma drop_neg n (s : 'a list): n < 0 => drop n s = s.
-proof. by elim s => //= x s IHs n_lt0; smt. qed.
-
-lemma drop_oversize n (s : 'a list):
-  size s <= n => drop n s = [].
-proof. by elim s n; smt. qed.
-
-lemma drop_size (s : 'a list): drop (size s) s = [].
-proof. by rewrite drop_oversize. qed.
-
-lemma drop_cons n x (s : 'a list):
-  drop n (x :: s) = if 0 < n then drop (n-1) s else x :: s.
-proof. by rewrite /= lezNgt; case (0 < n). qed.
-
-lemma size_drop n (s : 'a list):
-  0 <= n => size (drop n s) = max 0 (size s - n).
-proof. by elim s n => //=; smt. qed.
-
-lemma drop_cat n (s1 s2 : 'a list):
-    drop n (s1 ++ s2) =
-      if n < size s1 then drop n s1 ++ s2 else drop (n - size s1) s2.
-proof. by elim s1 n => //=; smt. qed.
-
-lemma drop_size_cat n (s1 s2 : 'a list):
-  size s1 = n => drop n (s1 ++ s2) = s2.
-proof. by move=> <-; rewrite drop_cat subzz ltzz drop0. qed.
-
-op take n (xs : 'a list) =
-  with xs = "[]"      => []
-  with xs = (::) y ys =>
-    if n <= 0 then [] else y :: take (n-1) ys.
-
-lemma take0 (s : 'a list): take 0 s = [].
-proof. by elim s. qed.
-
-lemma take_neg n (s : 'a list): n < 0 => take n s = [].
-proof. by elim s; smt. qed.
-
-lemma take_oversize n (s : 'a list):
-  size s <= n => take n s = s.
-proof. by elim s n; smt. qed.
-
-lemma take_size (s : 'a list): take (size s) s = s.
-proof. by rewrite take_oversize. qed.
-
-lemma take_cons n x (s : 'a list):
-  take n (x :: s) = if 0 < n then x :: take (n-1) s else [].
-proof. by rewrite /= lezNgt; case (0 < n). qed.
-
-lemma size_take n (s : 'a list):
-  0 <= n => size (take n s) = if n < size s then n else size s.
-proof. by elim s n => //=; smt. qed.
-
-lemma take_cat n (s1 s2 : 'a list):
-   take n (s1 ++ s2) =
-     if n < size s1 then take n s1 else s1 ++ take (n - size s1) s2.
-proof. by elim s1 n => //=; smt. qed.
-
-lemma take_size_cat n (s1 s2 : 'a list):
-  size s1 = n => take n (s1 ++ s2) = s1.
-proof. by move=> <-; rewrite take_cat subzz ltzz take0 cats0. qed.
-
-lemma cat_take_drop n (s : 'a list): take n s ++ drop n s = s.
-proof. by elim s n; smt. qed.
-
-lemma nth_drop (x0 : 'a) n s i:
-  0 <= n => 0 <= i => nth x0 (drop n s) i = nth x0 s (n + i).
-proof.
-  move=> n_ge0 i_ge0; case (n < size s) => [lt_n_s|le_s_n]; last smt.
-  rewrite -{2}(cat_take_drop n s) nth_cat size_take //; smt.
-qed.
-
-lemma nth_take (x0 : 'a) n s i:
-  0 <= n => 0 <= i => nth x0 (drop n s) i = nth x0 s (n + i).
-proof.
-  move=> n_ge0 i_ge0; case (n < size s) => [lt_n_s|le_s_n]; last smt.
-  rewrite -{2}(cat_take_drop n s) nth_cat size_take //; smt.
-qed.
-
-(* -------------------------------------------------------------------- *)
-(*                          Sequence shift                              *)
-(* -------------------------------------------------------------------- *)
-op rot n (s : 'a list) = drop n s ++ take n s.
-
-lemma rot0 (s : 'a list): rot 0 s = s.
-proof. smt. qed.
-
-lemma size_rot n (s : 'a list): size (rot n s) = size s.
-proof. smt. qed.
-
-lemma rot_oversize n (s : 'a list): size s <= n => rot n s = s.
-proof. smt. qed.
-
-lemma rot_size (s : 'a list): rot (size s) s = s.
-proof. by apply rot_oversize. qed.
-
-lemma has_rot n (s : 'a list) p: has p (rot n s) = has p s.
-proof. by rewrite /rot has_cat orbC -has_cat cat_take_drop. qed.
-
-lemma rot_size_cat (s1 s2 : 'a list): rot (size s1) (s1 ++ s2) = s2 ++ s1.
-proof. by rewrite /rot take_size_cat ?drop_size_cat. qed.
 
 (* -------------------------------------------------------------------- *)
 (*                        Sequence reversal                             *)
