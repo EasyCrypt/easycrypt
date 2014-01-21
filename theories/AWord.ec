@@ -14,15 +14,77 @@ op zeros: word.
 op ones: word.
 
 op ( ^ ): word -> word -> word.
+op land : word -> word -> word.
+op lopp (x:word) = x.
+
+axiom ones_neq0 : ones <> zeros.
 
 axiom xorwA (w1 w2 w3:word):
   w1 ^ (w2 ^ w3) = (w1 ^ w2) ^ w3.
 axiom xorwC (w1 w2:word):
   w1 ^ w2 = w2 ^ w1.
-axiom xorw0 (w:word):
-  w ^ zeros = w.
+axiom xor0w x: zeros ^ x = x.
 axiom xorwK (w:word):
   w ^ w = zeros.
+
+lemma nosmt xorw0 (w:word): w ^ zeros = w
+by [].
+
+lemma nosmt xorNw (x:word): (lopp x) ^ x = zeros
+by [].
+
+axiom landwA x y z: land x (land y z) = land (land x y) z.
+axiom landwC x y: land x y = land y x.
+axiom land1w x: land ones x = x.
+axiom landwDl (x y z:word): land (x ^ y) z = land x z ^ land y z.
+
+lemma subwE : Top.( ^ ) = fun (x y: word), x ^ lopp y.
+proof.
+  rewrite -ExtEq.fun_ext => x; rewrite -ExtEq.fun_ext => y; smt.
+qed.
+
+(** View bitstring as a group *)
+clone export Top.Ring.Ring as Rw with
+  type ring <- word,
+  op zeror <- zeros,
+  op oner  <- ones,
+  op ( + ) <- Top.( ^ ),
+  op ([-]) <- lopp,
+  op ( * ) <- land,
+  op ( - ) <- Top.( ^ )
+  proof * by smt.
+
+require import AlgTactic.
+
+op expr (x:word) (p:int) = fold (land x) ones p.
+op ofint (p:int) = fold ((^) ones) zeros `|p|.
+
+instance ring with word
+  op rzero = zeros
+  op rone  = ones
+  op add   = Top.( ^ )
+  op opp   = lopp 
+  op mul   = land
+  op expr  = expr
+  op sub   = Top.( ^ )
+  op ofint = ofint
+
+  proof oner_neq0 by smt
+  proof addr0     by smt
+  proof addrA     by smt
+  proof addrC     by smt
+  proof addrN     by smt
+  proof mulr1     by smt
+  proof mulrA     by smt
+  proof mulrC     by smt
+  proof mulrDl    by smt
+  proof expr0     by smt
+  proof exprS     by smt
+  proof subrE     by smt
+  proof ofint0    by smt
+  proof ofint1    by rewrite /ofint /Int."`|_|" /= -foldpos //= fold0 xorw0
+  proof ofintS    by smt
+  proof ofintN    by smt.
 
 require export ABitstring.
 op to_bits: word -> bitstring.
