@@ -3,7 +3,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-theory Ring.
+theory R.
   require import Fun.
 
   type ring.
@@ -67,11 +67,11 @@ theory Ring.
 
   lemma nosmt mulrDr (x y z : ring): x * (y + z) = x * y + x * z.
   proof. by rewrite mulrC mulrDl !(mulrC _ x). qed.
-end Ring.
+end R.
 
 (* -------------------------------------------------------------------- *)
 theory IDomain.
-  clone export Ring.
+  clone export R.
 
   axiom nosmt integral (x y : ring):
     x * y = zeror => (x = zeror) \/ (y = zeror).

@@ -39,13 +39,13 @@ by [].
 
 require import Ring.
 clone export IDomain as Rz with
-  type Ring.ring <- int,
-  op Ring.zeror <- 0,
-  op Ring.oner  <- 1,
-  op Ring.( + ) <- ( + ),
-  op Ring.([-]) <- [-],
-  op Ring.( * ) <- ( * ),
-  op Ring.( - ) <- ( - )
+  type R.ring <- int,
+  op R.zeror <- 0,
+  op R.oner  <- 1,
+  op R.( + ) <- ( + ),
+  op R.([-]) <- [-],
+  op R.( * ) <- ( * ),
+  op R.( - ) <- ( - )
   proof * by smt.
 
 (** Number theory *)
