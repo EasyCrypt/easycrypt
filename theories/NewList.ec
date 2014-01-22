@@ -37,6 +37,11 @@ theory IntTh.
   lemma nosmt gtz_lt (x y : int): (x >  y) <=> (y <  x) by [].
 
   lemma nosmt neq_ltz (x y : int): (x <> y) <=> (x < y \/ y < x) by [].
+  lemma nosmt eqz_leq (x y : int): (x = y) <=> (x <= y /\ y <= x) by [].
+
+  lemma nosmt lez_addl (x y z : int): (x + y <= x + z) <=> (y <= z) by [].
+
+  lemma nosmt lez_def (x y : int): (x < y) <=> (1 + x <= y) by [].
 end IntTh.
 
 import IntTh.
@@ -763,6 +768,97 @@ proof. by elim s => //= x s IHs; case (mem s x); smt. qed.
 lemma undup_id (s : 'a list): uniq s => undup s = s.
 proof. by elim s => //= x s IHs; smt. qed.
 
+lemma count_uniq_mem s (x : 'a):
+  uniq s => count (pred1 x) s = int_of_bool (mem s x).
+proof. elim s; smt. qed.
+
+lemma uniq_leq_size (s1 s2 : 'a list):
+  uniq s1 => (mem s1 <= mem s2) => size s1 <= size s2.
+proof.                          (* FIXME: test case for views *)
+  rewrite /Pred.(<=); elim s1 s2 => //.
+    by move=> s2 /=; rewrite size_ge0.
+  move=> x s1 IHs s2 [not_s1x Us1]; rewrite -(allP (mem s2)) /=.
+  case=> s2x; rewrite allP => ss12; cut := rot_to s2 x _ => //.
+  case=> i s3 def_s2; rewrite -(size_rot i s2) def_s2 /= lez_addl.
+  apply IHs => // y s1y; cut := ss12 y _ => //.
+  rewrite -(mem_rot i) def_s2 in_cons; case=> // eq_xy.
+  by move: s1y not_s1x; rewrite eq_xy => ->.
+qed.
+
+lemma leq_size_uniq (s1 s2 : 'a list):
+  uniq s1 => (mem s1 <= mem s2) => size s2 <= size s1 => uniq s2.
+proof.
+  rewrite /Pred.(<=); elim s1 s2 => [[] | x s1 IHs s2] //; first smt.
+  move=> Us1x; cut [not_s1x Us1] := Us1x; rewrite -(allP (mem s2)).  
+  case=> s2x; rewrite allP => ss12 le_s21.
+  cut := rot_to s2 x _ => //; case=> {s2x} i s3 def_s2.
+  move: le_s21; rewrite -(rot_uniq i) -(size_rot i) def_s2 /= lez_addl => le_s31.
+  cut ss13: forall y, mem s1 y => mem s3 y.
+    move=> y s1y; cut := ss12 y _ => //.
+    rewrite -(mem_rot i) def_s2 in_cons; case=> // eq_yx.
+    by move: s1y not_s1x; rewrite eq_yx => ->.
+  rewrite IHs //=; move: le_s31; apply contraL; rewrite -ltzNge => s3x.
+  rewrite lez_def; cut := uniq_leq_size (x::s1) s3 _ => //= -> //.
+  by apply (allP (mem s3)); rewrite /= s3x /= allP.
+qed.
+
+lemma uniq_size_uniq (s1 s2 : 'a list):
+     uniq s1 => (forall x, mem s1 x <=> mem s2 x)
+  => uniq s2 <=> (size s2 = size s1).
+proof.
+  move=> Us1 eqs12; split=> [Us2 | eq_sz12].
+    by rewrite eqz_leq !uniq_leq_size // => y; rewrite eqs12.
+  apply (leq_size_uniq s1) => //; first by move=> x; rewrite eqs12.
+  by rewrite eq_sz12 lezz.
+qed.
+
+lemma leq_size_perm (s1 s2 : 'a list):
+    uniq s1 => (mem s1 <= mem s2) => size s2 <= size s1
+  => (forall x, mem s1 x <=> mem s2 x) /\ (size s1 = size s2).
+proof.
+  move=> Us1 ss12 le_s21; cut Us2 := leq_size_uniq s1 s2 _ _ _ => //.
+  rewrite -anda_and; split=> [|h]; last by rewrite eq_sym -uniq_size_uniq.
+  move=> x; split; [by apply ss12 | move=> s2x; move: le_s21].
+  apply absurd => not_s1x; rewrite -ltzNge lez_def.
+  cut := uniq_leq_size (x :: s1) => /= -> //=.
+  by rewrite /Pred.(<=) -(allP (mem s2)) /= s2x /= allP.
+qed.
+
+lemma perm_uniq (s1 s2 : 'a list):
+     (forall x, mem s1 x <=> mem s2 x) => size s1 = size s2
+  => uniq s1 <=> uniq s2.
+proof.
+  move=> Es12 Hs12; split=> Us.
+  by rewrite (uniq_size_uniq s1) // eq_sym.
+  by rewrite (uniq_size_uniq s2) // => y; rewrite Es12.
+qed.
+
+lemma perm_eq_uniq (s1 s2 : 'a list):
+  perm_eq s1 s2 => uniq s1 <=> uniq s2.
+proof.
+  move=> eq_s12; apply perm_uniq;
+    [by apply perm_eq_mem | by apply perm_eq_size].
+qed.
+
+lemma uniq_perm_eq (s1 s2 : 'a list):
+  uniq s1 => uniq s2 => (forall x, mem s1 x <=> mem s2 x) => perm_eq s1 s2.
+proof.
+  move=> Us1 Us2 eq12; rewrite /perm_eq allP => x _ /=.
+  by rewrite !count_uniq_mem // eq12.
+qed.
+
+lemma count_mem_uniq (s : 'a list):
+  (forall x, count (pred1 x) s = int_of_bool (mem s x)) => uniq s.
+proof.
+  move=> count1_s; cut Uus := undup_uniq s.
+  apply (perm_eq_uniq (undup s)); last by apply undup_uniq.
+  rewrite /perm_eq allP => x _ /=; rewrite count1_s.
+  by rewrite (count_uniq_mem (undup s) x) ?undup_uniq // mem_undup.
+qed.
+
+(* -------------------------------------------------------------------- *)
+(*                             Mapping                                  *)
+(* -------------------------------------------------------------------- *)
 op map (f : 'a -> 'b) xs =
   with xs = "[]"      => []
   with xs = (::) y ys => (f y) :: (map f ys).

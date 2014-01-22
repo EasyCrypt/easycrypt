@@ -46,7 +46,11 @@ lemma nosmt nexists: forall (p:'a -> bool), (forall (x:'a), !p x) => !exists (x:
 lemma nosmt nforall: forall (p:'a -> bool), (exists (x:'a), !p x) => !forall (x:'a), p x by [].
 
 (** absurd *)
-lemma nosmt absurd : forall (b a : bool), (!a => !b) => b => a by [].
+lemma nosmt absurd  : forall (b a : bool), (!a => !b) => b => a by [].
+
+lemma nosmt contra  (c b : bool) : (c  =>  b) => !b => !c by [].
+lemma nosmt contraL (c b : bool) : ( c => !b) =>  b => !c by [].
+lemma nosmt contraR (c b : bool) : (!c =>  b) => !b =>  c by [].
 
 (** and *)
 lemma nosmt andE : forall (a b c:bool), 
