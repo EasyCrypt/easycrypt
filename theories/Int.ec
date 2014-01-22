@@ -265,7 +265,7 @@ theory ForLoop.
   case (i < j)=> i_j; last smt.
   pose n := j - i; cut ->: j = n + i by smt.
   cut: 0 <= n by smt; elim/Induction.induction n;first by smt.
-  intros i0 Hi0 Hrec;smt.
+  intros i0 Hi0 Hrec;rewrite range_ind_lazy;smt.
   qed.
 
   (* General result on restricting the range *)

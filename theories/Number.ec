@@ -7,7 +7,7 @@ require Ring.
 
 (* -------------------------------------------------------------------- *)
 theory NumTheory.
-  clone import Ring.Ring.
+  clone import Ring.R.
 
   op norm : ring -> ring.
   op le   : ring -> ring -> bool.

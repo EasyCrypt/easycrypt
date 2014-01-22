@@ -14,49 +14,6 @@ op predC1 ['a] (c : 'a) = fun (x : 'a), c <> x.
 op int_of_bool (b : bool) = if b then 1 else 0.
 
 (* -------------------------------------------------------------------- *)
-(*theory Ring.
-  type ring.
-
-  op zeror : ring.
-  op oner  : ring.
-
-  op ( + ) : ring -> ring -> ring.
-  op [ - ] : ring -> ring.
-  op ( * ) : ring -> ring -> ring.
-
-  op ( - ) (x y : ring) = x + -x.
-
-  axiom nosmt oner_neq0 : oner <> zeror.
-
-  axiom nosmt addrA (x y z : ring): x + (y + z) = (x + y) + z.
-  axiom nosmt addrC (x y   : ring): x + y = y + x.
-  axiom nosmt add0r (x     : ring): zeror + x = x.
-  axiom nosmt addNr (x     : ring): (-x) + x = zeror.
-
-  axiom nosmt mulrA  (x y z : ring): x * (y * z) = (x * y) * z.
-  axiom nosmt mulrC  (x y   : ring): x * y = y * x.
-  axiom nosmt mul1r  (x     : ring): oner * x = x.
-  axiom nosmt mulrDl (x y z : ring): (x + y) * z = x * z + y * z.
-
-  lemma nosmt addr0 (x : ring): x + zeror = x.
-  proof. by rewrite addrC add0r. qed.
-
-  lemma nosmt addrN (x : ring): x + (-x) = zeror.
-  proof. by rewrite addrC addNr. qed.
-
-  lemma nosmt subrr (x : ring): x - x = zeror by apply addrN.
-
-  lemma nosmt mulr1 (x : ring): x * oner = x.
-  proof. by rewrite mulrC mul1r. qed.
-
-  lemma nosmt mulrDr (x y z : ring): x * (y + z) = x * y + x * z.
-  proof. by rewrite mulrC mulrDl !(mulrC _ x). qed.
-
-  lemma oppr0: -zeror = zeror.
-  proof. by rewrite -(add0r (-zeror)) addrN. qed.
-end Ring.
-*)
-(* -------------------------------------------------------------------- *)
 theory Seq.
   type 'a list = [
     | "[]"
@@ -405,9 +362,9 @@ end Bigop.
 
 theory BigSum.
   (*-*) import Seq.
-  clone import Top.Ring.Ring.
+  clone import Ring.R.
 
-  op sum (s : 'a list) P F = Bigop.bigop Ring.zeror Ring.(+) s P F.
+  op sum (s : 'a list) P F = Bigop.bigop R.zeror R.(+) s P F.
 end BigSum.
 
 (* -------------------------------------------------------------------- *)
@@ -420,8 +377,8 @@ theory FreeGroup.
 
   op lez : K -> K -> bool.
 
-  clone import Top.Ring.Ring   with type ring <- Z.
-  clone import BigSum with type Ring.ring <- Z.
+  clone import Ring.R   with type ring <- Z.
+  clone import BigSum with type R.ring <- Z.
 
   type freeg.
   type repr = (Z * K) list.
