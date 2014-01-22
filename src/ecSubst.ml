@@ -373,14 +373,18 @@ let subst_ring (s : _subst) cr =
     r_zero  = s.s_p cr.r_zero;
     r_one   = s.s_p cr.r_one;
     r_add   = s.s_p cr.r_add;
-    r_opp   = s.s_p cr.r_opp;
+    r_opp   = cr.r_opp |> omap s.s_p;
     r_mul   = s.s_p cr.r_mul;
-    r_exp   = s.s_p cr.r_exp;
+    r_exp   = cr.r_exp |> omap s.s_p;
     r_sub   = cr.r_sub |> omap s.s_p;
     r_embed =
-      match cr.r_embed with
+      begin match cr.r_embed with
       | `Direct  -> `Direct
-      | `Embed p -> `Embed (s.s_p p); }
+      | `Default -> `Default
+      | `Embed p -> `Embed (s.s_p p)
+      end;
+    r_bool = cr.r_bool
+  }
 
 let subst_field (s : _subst) cr =
   { f_ring = subst_ring s cr.f_ring;
@@ -509,6 +513,7 @@ let subst_path         s = (_subst_of_subst s).s_p
 
 let subst_form         s = fun f -> (Fsubst.f_subst (f_subst_of_subst (_subst_of_subst s)) f)
 
+let subst_instance     s = subst_instance (_subst_of_subst s)
 (* -------------------------------------------------------------------- *)
 let freshen_type (typ, ty) =
   let empty = _subst_of_subst empty in

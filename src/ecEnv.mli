@@ -297,6 +297,7 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Algebra : sig
+  val add       : path -> tcinstance -> env -> env 
   val add_ring  : path -> EcAlgebra.ring  -> env -> env
   val add_field : path -> EcAlgebra.field -> env -> env
 
