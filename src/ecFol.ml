@@ -39,7 +39,7 @@ and f_node =
   | Fquant  of quantif * binding * form
   | Fif     of form * form * form
   | Flet    of lpattern * form * form
-  | Fint    of int
+  | Fint    of int (* Change this *)
   | Flocal  of EcIdent.t
   | Fpvar   of EcTypes.prog_var * memory
   | Fglob   of EcPath.mpath     * memory
