@@ -22,8 +22,12 @@ module Axioms = struct
   let expr  = "expr"
   let embed = "ofint"
 
-  let core   = ["oner_neq0"; "addr0"; "addrA"; "addrC"; "addrN";
-                "mulr1"; "mulrA"; "mulrC"; "mulrDl"]
+  let core_add = ["oner_neq0"; "addr0"; "addrA"; "addrC";]
+  let core_mul = [ "mulr1"; "mulrA"; "mulrC"; "mulrDl"]
+  let core   = core_add @ "addrN" :: core_mul
+  let core_bool = core_add @ "addrrN" :: "bmulrI" :: core_mul
+
+  let ofoppbool = ["oppE"] 
   let intpow = ["expr0"; "exprS"]
   let ofint  = ["ofint0"; "ofint1"; "ofintS"; "ofintN"]
   let ofsub  = ["subrE"]
@@ -34,22 +38,22 @@ module Axioms = struct
   let ty1 ty = tfun ty (ty0 ty)
   let ty2 ty = tfun ty (ty1 ty)
 
-  let ring_symbols env ty =
+  let ring_symbols env boolean ty =
     let symbols =
       [(zero, (true , ty0 ty));
        (one , (true , ty0 ty));
        (add , (true , ty2 ty));
-       (opp , (true , ty1 ty));
+       (opp , (not boolean, ty1 ty));
        (sub , (false, ty2 ty));
        (mul , (true , ty2 ty));
-       (expr, (true , toarrow [ty; tint] ty))]
+       (expr, (false, toarrow [ty; tint] ty))]
     in
       if   EcReduction.EqTest.for_type env ty tint
       then symbols
-      else symbols @ [(embed, (true, tfun tint ty))]
+      else symbols @ [(embed, (false, tfun tint ty))]
 
   let field_symbols env ty =
-    (ring_symbols env ty)
+    (ring_symbols env false ty)
       @ [(inv, (true , ty1 ty));
          (div, (false, ty2 ty))]
 
@@ -57,17 +61,23 @@ module Axioms = struct
     let crcore = [(zero, cr.r_zero);
                   (one , cr.r_one );
                   (add , cr.r_add );
-                  (opp , cr.r_opp );
-                  (mul , cr.r_mul );
-                  (expr, cr.r_exp )] in
+                  (mul , cr.r_mul ); ] in
 
     let xpath  = fun x -> EcPath.pqname tmod x in
     let add    = fun subst x p -> EcSubst.add_path subst (xpath x) p in
-
-    let subst  = EcSubst.add_tydef EcSubst.empty (xpath tname) ([], cr.r_type) in
-    let subst  = List.fold_left (fun subst (x, p) -> add subst x p) subst crcore in
+    
+    let subst  = 
+      EcSubst.add_tydef EcSubst.empty (xpath tname) ([], cr.r_type) in
+    let subst  =
+      List.fold_left (fun subst (x, p) -> add subst x p) subst crcore in
+    let subst  = odfl subst (cr.r_opp |> omap (fun p -> add subst opp p)) in
     let subst  = odfl subst (cr.r_sub |> omap (fun p -> add subst sub p)) in
-    let subst  = cr.r_embed |> (function `Direct -> subst | `Embed p -> add subst embed p) in
+    let subst  = odfl subst (cr.r_exp |> omap (fun p -> add subst expr p)) in
+
+    let subst  = 
+      cr.r_embed |> 
+          (function `Direct | `Default -> subst | `Embed p -> add subst embed p)
+    in
       subst
 
   let subst_of_field (cr : field) =
@@ -80,7 +90,7 @@ module Axioms = struct
       subst
 
   (* FIXME: should use operators inlining when available *)
-  let get axs env cr =
+  let get cr env axs =
     let subst  =
       match cr with
       | `Ring  cr -> subst_of_ring  cr
@@ -94,24 +104,33 @@ module Axioms = struct
     in
       List.map for1 axs
 
-  let get_core   = fun env cr -> get core   env (`Ring  cr)
-  let get_expr   = fun env cr -> get intpow env (`Ring  cr)
-  let get_ofint  = fun env cr -> get ofint  env (`Ring  cr)
-  let get_ofsub  = fun env cr -> get ofsub  env (`Ring  cr)
-  let get_field  = fun env cr -> get field  env (`Field cr)
-  let get_ofdiv  = fun env cr -> get ofdiv  env (`Field cr)
+  let getr env cr axs = get (`Ring cr) env axs
+  let getf env cr axs = get (`Field cr) env axs 
 
   let ring_axioms env (cr : ring) =
-    let axcore = (get_core env cr) @ (get_expr env cr) in
-    let axint  = match cr.r_embed with `Direct -> [] | `Embed _ -> get_ofint env cr in
-    let axsub  = match cr.r_sub with None -> [] | Some _ -> get_ofsub env cr in
-      List.flatten [axcore; axint; axsub]
+    let axcore = 
+      if cr.r_bool then getr env cr core_bool
+      else getr env cr core in
+    let axint  = 
+      match cr.r_embed with 
+      | `Direct | `Default -> [] | `Embed _ -> getr env cr ofint in
+    let axopp = 
+      match cr.r_opp with
+      | Some _ when cr.r_bool -> getr env cr ofoppbool
+      | _ -> [] in
+    let axsub  = 
+      match cr.r_sub with None -> [] | Some _ -> getr env cr ofsub in
+    let axexp  = 
+      match cr.r_exp with None -> [] | Some _ -> getr env cr intpow in
+
+    List.flatten [axcore; axopp; axexp; axint; axsub]
 
   let field_axioms env (cr : field) =
     let axring = ring_axioms env cr.f_ring in
-    let axcore = get_field env cr in
-    let axdiv  = match cr.f_div with None -> [] | Some _ -> get_ofdiv env cr in
-      List.flatten [axring; axcore; axdiv]
+    let axcore = getf env cr field in
+    let axdiv  = match cr.f_div with None -> [] | Some _ -> getf env cr ofdiv in
+    List.flatten [axring; axcore; axdiv]
+
 end
 
 let ring_symbols  = Axioms.ring_symbols

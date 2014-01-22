@@ -7,11 +7,12 @@ type ring = {
   r_zero  : EcPath.path;
   r_one   : EcPath.path;
   r_add   : EcPath.path;
-  r_opp   : EcPath.path;
+  r_opp   : EcPath.path option;
   r_mul   : EcPath.path;
-  r_exp   : EcPath.path;
+  r_exp   : EcPath.path option;
   r_sub   : EcPath.path option;
-  r_embed : [ `Direct | `Embed of EcPath.path ];
+  r_embed : [ `Direct | `Embed of EcPath.path | `Default];
+  r_bool  : bool; (* true means boolean ring *)
 }
 
 val ring_equal : ring -> ring -> bool

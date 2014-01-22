@@ -1741,21 +1741,26 @@ module Ty = struct
         axs
 
   (* ------------------------------------------------------------------ *)
-  let ring_of_symmap ty symbols =
+  let ring_of_symmap env ty boolean symbols =
     { r_type  = ty;
       r_zero  = oget (Mstr.find_opt "rzero" symbols);
       r_one   = oget (Mstr.find_opt "rone"  symbols);
       r_add   = oget (Mstr.find_opt "add"   symbols);
-      r_opp   = oget (Mstr.find_opt "opp"   symbols);
+      r_opp   = Mstr.find_opt "opp"   symbols;
       r_mul   = oget (Mstr.find_opt "mul"   symbols);
-      r_exp   = oget (Mstr.find_opt "expr"  symbols);
+      r_exp   = Mstr.find_opt "expr"  symbols;
       r_sub   = Mstr.find_opt "sub" symbols;
       r_embed =
-        match Mstr.find_opt "ofint" symbols with
-        | None   -> `Direct
-        | Some p -> `Embed p }
+        begin match Mstr.find_opt "ofint" symbols with
+        | None   -> 
+          if EcReduction.EqTest.for_type env ty tint then `Direct
+          else `Default
+        | Some p -> `Embed p
+        end;
+      r_bool = boolean;
+    }
 
-  let addring (scope : scope) mode { pl_desc = tci; pl_loc = loc } =
+  let addring (scope : scope) mode (boolean, { pl_desc = tci; pl_loc = loc }) =
     if not (EcAlgTactic.is_module_loaded scope.sc_env) then
       hierror "load AlgTactic first";
 
@@ -1767,16 +1772,16 @@ module Ty = struct
         | Tconstr (p, []) -> (ty,  p)
         | _ -> assert false
     in
-    let symbols = EcAlgTactic.ring_symbols scope.sc_env ty in
+    let symbols = EcAlgTactic.ring_symbols scope.sc_env boolean ty in
     let symbols = check_tci_operators scope.sc_env tci.pti_ops symbols in
-    let cr      = ring_of_symmap ty symbols in
+    let cr      = ring_of_symmap scope.sc_env ty boolean symbols in
     let axioms  = EcAlgTactic.ring_axioms scope.sc_env cr in
       check_tci_axioms scope mode tci.pti_axs axioms;
       { scope with sc_env = EcEnv.Algebra.add_ring p cr scope.sc_env }
 
   (* ------------------------------------------------------------------ *)
-  let field_of_symmap ty symbols =
-    { f_ring = ring_of_symmap ty symbols;
+  let field_of_symmap env ty symbols =
+    { f_ring = ring_of_symmap env ty false symbols;
       f_inv  = oget (Mstr.find_opt "inv" symbols);
       f_div  = Mstr.find_opt "div" symbols; }
 
@@ -1794,7 +1799,7 @@ module Ty = struct
     in
     let symbols = EcAlgTactic.field_symbols scope.sc_env ty in
     let symbols = check_tci_operators scope.sc_env tci.pti_ops symbols in
-    let cr      = field_of_symmap ty symbols in
+    let cr      = field_of_symmap scope.sc_env ty symbols in
     let axioms  = EcAlgTactic.field_axioms scope.sc_env cr in
       check_tci_axioms scope mode tci.pti_axs axioms;
       { scope with sc_env = EcEnv.Algebra.add_field p cr scope.sc_env }
@@ -1803,8 +1808,9 @@ module Ty = struct
   (* We currently only deal with [ring] and [field] *)
   let add_instance (scope : scope) mode ({ pl_desc = tci } as toptci) =
     match unloc tci.pti_name with
-    | ([], "ring" ) -> addring  scope  mode toptci
-    | ([], "field") -> addfield scope  mode toptci
+    | ([], "boolean_ring") -> addring  scope mode (true,toptci)
+    | ([], "ring"        ) -> addring  scope mode (false,toptci)
+    | ([], "field"       ) -> addfield scope mode toptci
     | _ -> hierror "unknown type class"
 
   (* ------------------------------------------------------------------ *)

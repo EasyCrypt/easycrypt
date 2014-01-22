@@ -42,11 +42,12 @@ type ring = {
   r_zero  : EcPath.path;
   r_one   : EcPath.path;
   r_add   : EcPath.path;
-  r_opp   : EcPath.path;
+  r_opp   : EcPath.path option; 
   r_mul   : EcPath.path;
-  r_exp   : EcPath.path;
+  r_exp   : EcPath.path option;
   r_sub   : EcPath.path option;
-  r_embed : [ `Direct | `Embed of EcPath.path ];
+  r_embed : [ `Direct | `Embed of EcPath.path | `Default];
+  r_bool  : bool (* true means boolean ring *)
 }
 
 let ring_equal r1 r2 = 
@@ -54,13 +55,15 @@ let ring_equal r1 r2 =
   EcPath.p_equal r1.r_zero r2.r_zero &&
   EcPath.p_equal r1.r_one  r2.r_one  &&
   EcPath.p_equal r1.r_add  r2.r_add  &&
-  EcPath.p_equal r1.r_opp  r2.r_opp  &&
+  EcUtils.oall2 EcPath.p_equal r1.r_opp r2.r_opp  &&
   EcPath.p_equal r1.r_mul  r2.r_mul  &&
-  EcPath.p_equal r1.r_exp  r2.r_exp  &&
+  EcUtils.oall2 EcPath.p_equal r1.r_exp  r2.r_exp  &&
   EcUtils.oall2 EcPath.p_equal r1.r_sub r2.r_sub &&
+  r1.r_bool = r2.r_bool &&
   match r1.r_embed, r2.r_embed with
   | `Direct, `Direct -> true
   | `Embed p1, `Embed p2 -> EcPath.p_equal p1 p2
+  | `Default, `Default -> true
   | _, _ -> false
 
   
@@ -88,9 +91,19 @@ let rzero r = rapp r r.r_zero []
 let rone  r = rapp r r.r_one  []
 
 let radd r e1 e2 = rapp r r.r_add [e1; e2]
-let ropp r e     = rapp r r.r_opp [e]
+let ropp r e     = 
+  match r.r_opp with
+  | Some opp -> rapp r opp [e]
+  | None -> assert r.r_bool; e
+
 let rmul r e1 e2 = rapp r r.r_mul [e1; e2]
-let rexp r e  i  = rapp r r.r_exp [e; f_int i]
+let rexp r e  i  = 
+  match r.r_exp with
+  | Some r_exp -> rapp r r_exp [e; f_int i]
+  | None -> 
+    assert (1 <= i);
+    let rec aux exp i = if i = 1 then exp else aux (rmul r exp e) (i-1) in
+    aux e i
 
 let rsub r e1 e2 =
   match r.r_sub with
@@ -101,6 +114,12 @@ let rofint r i =
   match r.r_embed with
   | `Direct  -> f_int i
   | `Embed p -> rapp r p [f_int i]
+  | `Default ->
+    let one = rone r in
+    let rec aux i = if i = 1 then one else radd r (aux (i-1)) one in
+    if i = 0 then rzero r
+    else if 1 <= i then aux i
+    else ropp r (aux i)
 
 (* -------------------------------------------------------------------- *)
 let fzero  f = rzero  f.f_ring
@@ -142,14 +161,15 @@ let cring_of_ring (r : ring) : cring =
   let cr = [(r.r_zero, `Zero);
             (r.r_one , `One );
             (r.r_add , `Add );
-            (r.r_opp , `Opp );
-            (r.r_mul , `Mul );
-            (r.r_exp , `Exp )]
+            (r.r_mul , `Mul );]
   in
 
   let cr = List.fold_left (fun m (p, op) -> Mp.add p op m) Mp.empty cr in
+  let cr = odfl cr (r.r_opp |> omap (fun p -> Mp.add p `Opp cr)) in
   let cr = odfl cr (r.r_sub |> omap (fun p -> Mp.add p `Sub cr)) in
-  let cr = r.r_embed |> (function `Direct -> cr | `Embed p -> Mp.add p `OfInt cr) in
+  let cr = odfl cr (r.r_exp |> omap (fun p -> Mp.add p `Exp cr)) in
+  let cr = r.r_embed |> 
+      (function (`Direct | `Default) -> cr | `Embed p -> Mp.add p `OfInt cr) in
     (r, cr)
 
 (* -------------------------------------------------------------------- *)
@@ -194,7 +214,7 @@ let toring ((r, cr) : cring) (rmap : RState.rstate) (form : form) =
   and of_int f =
     let abstract () =
       match r.r_embed with
-      | `Direct  -> abstract f
+      | `Direct | `Default -> abstract f
       | `Embed p -> abstract (rapp r p [f])
     in
       match f.f_node with
@@ -259,7 +279,7 @@ let tofield ((r, cr) : cfield) (rmap : RState.rstate) (form : form) =
   and of_int f =
     let abstract () =
       match r.f_ring.r_embed with
-      | `Direct  -> abstract f
+      | `Direct | `Default -> abstract f
       | `Embed p -> abstract (rapp r.f_ring p [f])
     in
 
@@ -289,23 +309,18 @@ let tofield ((r, cr) : cfield) (rmap : RState.rstate) (form : form) =
   let form = doit form in (form, !rmap)
 
 (* -------------------------------------------------------------------- *)
-let ofring (r : ring) (rmap : RState.rstate) (e : pol) : form =
-  let rec doit idx e =
-    match e with
-    | Pc c when ceq c c0 -> emb_rzero r
-    | Pc c when ceq c c1 -> emb_rone  r
-    | Pc c -> rofint r (Big_int.int_of_big_int c)
-
-    | Pinj (j, e) -> doit (idx+j) e
-
-    | PX (p, i, q) ->
-        let f = oget (RState.get idx rmap) in
-        let f = match i with 1 -> f | _ -> rexp r f i in
-        let f = if peq p (Pc c1) then f else rmul r (doit idx p) f in
-        let f = if peq q (Pc c0) then f else radd r f (doit (idx+1) q) in
-          f
-  in
-    doit 1 e
+let rec ofring (r:ring) (rmap:RState.rstate) (e:pexpr) : form = 
+  match e with
+  | PEc c ->
+    if ceq c c0 then emb_rzero r
+    else if ceq c c1 then emb_rone r
+    else rofint r (Big_int.int_of_big_int c)
+  | PEX idx -> oget (RState.get idx rmap)
+  | PEadd(p1,p2) -> radd r (ofring r rmap p1) (ofring r rmap p2)
+  | PEsub(p1,p2) -> rsub r (ofring r rmap p1) (ofring r rmap p2)
+  | PEmul(p1,p2) -> rmul r (ofring r rmap p1) (ofring r rmap p2)
+  | PEopp p1     -> ropp r (ofring r rmap p1)
+  | PEpow(p1,i)  -> rexp r (ofring r rmap p1) i 
 
 (* -------------------------------------------------------------------- *)
 let ring_simplify (cr : cring) (eqs : eqs) (form : form) =
@@ -314,7 +329,10 @@ let ring_simplify (cr : cring) (eqs : eqs) (form : form) =
 
   let form = toring form in
   let eqs  = List.map (fun (f1, f2) -> (toring f1, toring f2)) eqs in
-    ofring (fst cr) !map (norm form eqs)
+  let norm = 
+    if (fst cr).r_bool then Bring.norm_pe form eqs
+    else Iring.norm_pe form eqs in
+  ofring (fst cr) !map norm
 
 (* -------------------------------------------------------------------- *)
 let ring_eq (cr : cring) (eqs : eqs) (f1 : form) (f2 : form) =
@@ -341,6 +359,9 @@ let field_eq (cr : cfield) (eqs : eqs) (f1 : form) (f2 : form) =
   let eqs = List.map (fun (f1, f2) -> (tofield f1, tofield f2)) eqs in
   let eqs = List.pmap get_field_equation eqs in
 
+  
+  let norm = 
+    if (fst cr).f_ring.r_bool then Bring.norm_pe else Iring.norm_pe in
   let norm form = ofring (norm form eqs) in
 
   let num1   = norm num1   in
@@ -363,6 +384,7 @@ let field_simplify (cr : cfield) (eqs : eqs) (f : form) =
   let eqs = List.map (fun (f1, f2) -> (tofield f1, tofield f2)) eqs in
   let eqs = List.pmap get_field_equation eqs in
 
+  let norm = 
+    if (fst cr).f_ring.r_bool then Bring.norm_pe else Iring.norm_pe in
   let norm form = ofring (norm form eqs) in
-
-    (List.map norm cond, norm num, norm denum)
+  (List.map norm cond, norm num, norm denum)

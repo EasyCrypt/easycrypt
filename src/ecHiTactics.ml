@@ -5,7 +5,6 @@ open EcParsetree
 open EcFol
 
 open EcLogic
-open EcCoreHiLogic
 open EcHiLogic
 open EcCoreHiPhl
 

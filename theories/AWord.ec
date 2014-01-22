@@ -2,13 +2,13 @@
  * Copyright IMDEA Software Institute / INRIA - 2013, 2014
  * -------------------------------------------------------------------- *)
 
-require import Int.
+require Int.
 require import FSet.
 
 type word.
 
 const length:int.
-axiom leq0_length: 0 <= length.
+axiom leq0_length: Int.(<=) 0 length.
 
 op zeros: word.
 op ones: word.
@@ -37,54 +37,44 @@ axiom landwA x y z: land x (land y z) = land (land x y) z.
 axiom landwC x y: land x y = land y x.
 axiom land1w x: land ones x = x.
 axiom landwDl (x y z:word): land (x ^ y) z = land x z ^ land y z.
+axiom landI (x:word): land x x = x.
 
-lemma subwE : Top.( ^ ) = fun (x y: word), x ^ lopp y.
+lemma subwE : ( ^ ) = fun (x y: word), x ^ lopp y.
 proof.
   rewrite -ExtEq.fun_ext => x; rewrite -ExtEq.fun_ext => y; smt.
 qed.
 
 (** View bitstring as a group *)
-clone export Top.Ring.Ring as Rw with
+clone export Ring.R as Rw with
   type ring <- word,
   op zeror <- zeros,
   op oner  <- ones,
-  op ( + ) <- Top.( ^ ),
+  op ( + ) <- ( ^ ),
   op ([-]) <- lopp,
   op ( * ) <- land,
-  op ( - ) <- Top.( ^ )
+  op ( - ) <- ( ^ )
   proof * by smt.
 
 require import AlgTactic.
 
-op expr (x:word) (p:int) = fold (land x) ones p.
-op ofint (p:int) = fold ((^) ones) zeros `|p|.
-
-instance ring with word
+instance boolean_ring with word
   op rzero = zeros
   op rone  = ones
-  op add   = Top.( ^ )
+  op add   = ( ^ )
   op opp   = lopp 
   op mul   = land
-  op expr  = expr
-  op sub   = Top.( ^ )
-  op ofint = ofint
 
   proof oner_neq0 by smt
   proof addr0     by smt
   proof addrA     by smt
   proof addrC     by smt
-  proof addrN     by smt
+  proof addrrN    by smt
   proof mulr1     by smt
   proof mulrA     by smt
   proof mulrC     by smt
   proof mulrDl    by smt
-  proof expr0     by smt
-  proof exprS     by smt
-  proof subrE     by smt
-  proof ofint0    by smt
-  proof ofint1    by rewrite /ofint /Int."`|_|" /= -foldpos //= fold0 xorw0
-  proof ofintS    by smt
-  proof ofintN    by smt.
+  proof oppE      by smt 
+  proof bmulrI    by smt.
 
 require export ABitstring.
 op to_bits: word -> bitstring.
@@ -99,6 +89,7 @@ axiom pcan_to_from (b:bitstring):
   to_bits (from_bits b) = b.
 
 (** Conversion with int *)
+import Int.
 op to_int   : word -> int.
 op from_int : int -> word.
 
