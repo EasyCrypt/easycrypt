@@ -68,13 +68,13 @@ instance boolean_ring with word
   proof addr0     by smt
   proof addrA     by smt
   proof addrC     by smt
-  proof addrrN    by smt
+  proof addrK     by smt
   proof mulr1     by smt
   proof mulrA     by smt
   proof mulrC     by smt
   proof mulrDl    by smt
-  proof oppE      by smt 
-  proof bmulrI    by smt.
+  proof oppr_id   by smt 
+  proof mulrK     by smt.
 
 require export ABitstring.
 op to_bits: word -> bitstring.

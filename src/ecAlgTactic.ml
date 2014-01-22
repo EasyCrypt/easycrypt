@@ -22,17 +22,17 @@ module Axioms = struct
   let expr  = "expr"
   let embed = "ofint"
 
-  let core_add = ["oner_neq0"; "addr0"; "addrA"; "addrC";]
-  let core_mul = [ "mulr1"; "mulrA"; "mulrC"; "mulrDl"]
-  let core   = core_add @ "addrN" :: core_mul
-  let core_bool = core_add @ "addrrN" :: "bmulrI" :: core_mul
+  let core_add  = ["oner_neq0"; "addr0"; "addrA"; "addrC";]
+  let core_mul  = [ "mulr1"; "mulrA"; "mulrC"; "mulrDl"]
+  let core      = core_add @ "addrN" :: core_mul
+  let core_bool = core_add @ "addrK" :: "mulrK" :: core_mul
 
-  let ofoppbool = ["oppE"] 
-  let intpow = ["expr0"; "exprS"]
-  let ofint  = ["ofint0"; "ofint1"; "ofintS"; "ofintN"]
-  let ofsub  = ["subrE"]
-  let field  = ["mulrV"; "exprN"]
-  let ofdiv  = ["divrE"]
+  let ofoppbool = ["oppr_id"]
+  let intpow    = ["expr0"; "exprS"]
+  let ofint     = ["ofint0"; "ofint1"; "ofintS"; "ofintN"]
+  let ofsub     = ["subrE"]
+  let field     = ["mulrV"; "exprN"]
+  let ofdiv     = ["divrE"]
 
   let ty0 ty = ty
   let ty1 ty = tfun ty (ty0 ty)

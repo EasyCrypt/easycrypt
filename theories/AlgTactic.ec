@@ -71,10 +71,10 @@ theory Requires.
     forall (x : domain), add x (opp x) = rzero.
 
   (* For boolean ring *)
-  axiom nosmt addrrN:
+  axiom nosmt addrK:
     forall (x : domain), add x x = rzero.
 
-  axiom nosmt oppE:
+  axiom nosmt oppr_id:
     forall (x : domain), opp x = x.
 
   axiom nosmt mulr1:
@@ -90,7 +90,7 @@ theory Requires.
     forall (x y z: domain), mul x (add y z) = add (mul x y) (mul x z).
    
   (* For boolean ring *)
-  axiom nosmt bmulrI :
+  axiom nosmt mulrK:
     forall (x:domain), mul x x = x.
 
   axiom nosmt expr0:
