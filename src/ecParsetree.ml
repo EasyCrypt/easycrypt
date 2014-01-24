@@ -544,6 +544,7 @@ and ptactic_chain =
   | Psubtacs of ptactic list
   | Pfirst   of ptactic * int
   | Plast    of ptactic * int
+  | Pexpect  of ptactic * int
   | Protate  of [`Left | `Right] * int
 
 (* -------------------------------------------------------------------- *)
