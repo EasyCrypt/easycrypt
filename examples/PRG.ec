@@ -1,194 +1,248 @@
-require import List.
-require import Map.
-require import Distr.
 require import Int.
 require import Real.
-require Monoid.
-import Monoid.Miplus.
-require AdvAbsVal.
+require import Distr.
+require import List.
+require import FMap.
 
+require        Monoid.
+(*---*) import Monoid.Miplus.
 
-type t1.
-type t2. 
+require        AdvAbsVal.
 
-op dsample1 : t1 distr.
-op dsample2 : t2 distr.
+(*** Some type definitions *)
+(** Our PRG uses a type for internal seeds
+    and a type for its actual output. *)
+type seed.
 
-module type OrclRnd = {
-  fun f (x:t1) : t1 * t2
+op dseed: seed distr.
+axiom dseedL: mu dseed True = 1%r.
+
+type output.
+
+op dout: output distr.
+axiom doutL: mu dout True = 1%r.
+
+(** We use a PRF that, on input a seed, produces a seed and an output... *)
+module type PRF = {
+  proc * init()  : unit
+  proc f (x:seed): seed * output
 }.
 
-module type AOrclPrg = {
-  fun prg () : t2 
-}.
- 
-module type OrclPrg = {
-  fun init () : unit 
-  fun prg () : t2 
-}.
-  
-module type Adv (P:AOrclPrg,R:OrclRnd) = {
-  fun a() : bool {P.prg R.f}
+(** ... to build a PRG that produces random output without requiring new input... *)
+module type PRG = {
+  proc * init(): unit (* We let our PRG have internal state, which we should be able to initialize *)
+  proc prg ()  : output
 }.
 
-op qF : int.
-op qP : int.
-
-module F = {
-  var m : (t1, t1 * t2) map
-  fun init() : unit = {
-     m   = Map.empty;
-  }
-  fun f (x:t1) : t1 * t2 = {
-    var r1 : t1;
-    var r2 : t2;
-    r1 = $dsample1;
-    r2 = $dsample2;
-    if (!in_dom x m) m.[x] = (r1,r2);
-    return proj (m.[x]);
-  }
+(*** Defining security *)
+(** Distinguishers are given access to the PRG and the PRF
+    and should produce a boolean *)
+module type Adv (F:PRF,P:PRG) = {
+  proc a(): bool { F.f P.prg } (* We do not let the adversary call the initialization oracles *)
 }.
 
-module Prg = {
-  var logP : t1 list
-  var seed : t1
+module Exp (A:Adv,F:PRF,P:PRG) = {
+  module A = A(F,P)
 
-  fun prg () : t2 = {
-    var r:t2;
-    (seed,r) = F.f (seed);
-    return r;
-  }
+  proc main():bool = {
+    var b: bool;
 
-  fun init () : unit = {
-    seed = $dsample1;
-  }
-
-}.
-
-module Prg_r = {   
-
- fun prg() : t2 = {
-    var r : t2;
-    r = $dsample2;
-    return r;
-  }
-
-  fun init () : unit = {
-  }
-   
-}.
- 
-module Exp(A:Adv, Prg:OrclPrg) = {
-  module A = A(Prg,F)
-
-  fun main():bool = {
-    var b : bool;
     F.init();
-    Prg.init();
+    P.init();
     b = A.a();
     return b;
   }
 }.
 
-module Prg_rB = {   
+(** A PRG is secure iff it is indistinguishable from
+    sampling in $dout by an adversary with access to the PRF
+    and the PRG interfaces *)
+module PrgI = {
+  proc init () : unit = { }
 
-  fun prg() : t2 = {
-    var r1 : t1;
-    var r2 : t2;
-    r1 = $dsample1;
-    r2 = $dsample2;
-    Prg.logP = Prg.seed :: Prg.logP;
-    Prg.seed = r1; 
-    return r2;
-  }
+  proc prg(): output = {
+    var r;
 
-  fun init () : unit = {
-    Prg.seed = $dsample1;
-    Prg.logP = [];
+    r = $dout;
+    return r;
   }
-   
 }.
 
-(* We prove :
-    lemma 1 : Pr[G(A,Prg   ).main : res] <= 
-              Pr[G(A,Prg_rB).main : res] + 
-              Pr[G(A,Prg_rB).main : Bad(Prg.logP, Prg.mf)]
-    lemma 2 : Pr[G(A,Prg_rB).main : res] = Pr[G(A,Prg_r).main : res]
-  where Bad(Prg.logP, Prg.mf) = 
-    !unique Prg.logP || exists r, mem r Prg.logP /\ in_dom r Prg.mf  
-   We get  
-       Pr[G(A,Prg   ).main : res] <= 
-          Pr[G(A,Prg_r ).main : res] + 
-          Pr[G(A,Prg_rB).main : Bad(Prg.logP, Prg.mf)]
-   We conclude 
-       | Pr[G(A,Prg   ).main : res] - Pr[G(A,Prg_r ).main : res] | <=
-         Pr[G(A,Prg_rB).main : Bad(Prg.logP, Prg.mf)]
-*)
+(*** Concrete considerations *)
+(** We use the following PRF *)
+module F = {
+  var m:(seed,seed * output) map
 
-axiom lossless1 : weight dsample1 = 1%r.
-axiom lossless2 : weight dsample2 = 1%r.
+  proc init(): unit = {
+     m = empty;
+  }
 
-pred bad logP (m:('a,'b) map) = !unique logP \/ exists r, mem r logP /\ in_dom r m.
-pred inv (m1 m2:('a,'b) map) logP = 
-   (*logP <> [] /\
-   s = hd (logP) /\*)
-   (forall r, in_dom r m1 <=> (in_dom r m2 \/ mem r logP)) /\
-   (forall r, in_dom r m2 => m1.[r] = m2.[r]).
+  proc f (x:seed) : seed * output = {
+    var r1, r2;
 
-lemma lossless_Ff : islossless F.f.
+    r1 = $dseed;
+    r2 = $dout;
+    if (!in_dom x m)
+      m.[x] = (r1,r2);
+
+    return oget (m.[x]);
+  }
+}.
+
+lemma FfL: islossless F.f.
 proof.
-  fun;wp;do !rnd;skip;progress;[apply lossless2 | apply lossless1].
-save.
+by proc; wp; do!rnd (True);
+   skip; smt.
+qed.
 
+(** And we are proving the security of the following PRG *)
+module P (F:PRF) = {
+  var seed: seed
+
+  proc init(): unit = {
+    seed = $dseed;
+  }
+
+  proc prg(): output = {
+    var r;
+
+    (seed,r) = F.f (seed);
+    return r;
+  }
+}.
+
+(*** The Proof ***)
 section.
-  declare module A:Adv{Prg,F}. (* Since Prg use F, adding the restriction F redondant *)
+  declare module A:Adv {P,F}.
+  axiom AaL (F <: PRF {A}) (P <: PRG {A}):
+    islossless F.f =>
+    islossless P.prg =>
+    islossless A(F,P).a.
 
-  lemma equiv_rB : 
-     (forall (O1 <: AOrclPrg{A}) (O2<:OrclRnd{A}), islossless O1.prg => islossless O2.f => 
-        islossless A(O1,O2).a) =>
-     equiv [Exp(A,Prg).main ~ Exp(A,Prg_rB).main :
-            ={glob A} ==> !(bad Prg.logP F.m){2} => ={res}].
+  (** Adding some logging so we can express the bad event *)
+  local module Plog = {
+    var seed:seed
+    var logP:seed list
+
+    proc init(): unit = {
+      seed = $dseed;
+      logP = [];
+    }
+
+    proc prg(): output = {
+      var r;
+
+      logP = seed :: logP;
+      (seed,r) = F.f(seed);
+      return r;
+    }
+  }.
+
+  local lemma P_Plog &m:
+    Pr[Exp(A,F,P(F)).main() @ &m: res] = Pr[Exp(A,F,Plog).main() @ &m: res].
   proof.
-    intros Hlossless;fun;call (_ : (bad Prg.logP F.m), ={Prg.seed} /\
-                                inv F.m{1} F.m{2} Prg.logP{2}).  
-    fun;inline F.f;wp;do !rnd;wp;skip.
-    intros &m1 &m2 /= [Hnbad [-> [Hdom Hget]]] /= r1L r1R HinL1 HinR1;split;
-     first by trivial.
-    intros H => {H} r2L r2R HinL2 HinR2;split; first by trivial.
-    intros H => {H};case (!in_dom Prg.seed{m2} F.m{m1}) => Hin; by smt.
-    intros _ _;fun. call lossless_Ff => //.
-    intros _;fun;wp;do !rnd;skip; progress;try smt. 
+  byequiv (_: ={glob A} ==> ={res})=> //.
+  by do !sim.
+  qed.
 
-    fun;wp => /=; do !rnd;skip => /=.
-    intros &m1 &m2 /= [Hnbad [-> [-> [Hdom Hget]]]] /= r1L r1R HinL1 HinR1;split;
-    first by trivial.
-    intros H => {H} r2L r2R HinL2 HinR2;split; first by trivial.
-    intros H => {H};split => /= H1;split => H2 /=; last 3 smt.
-    intros _;progress => //; try smt.
-    intros _ _; apply lossless_Ff.
-    intros _;fun;wp; conseq * (_ : _ ==> true) => /=.
-    intros &hr Hb r1 r2;split => //=; smt.
-     do !rnd;skip;progress; [apply lossless2 | apply lossless1].
-    inline F.init Prg.init Prg_rB.init;wp;rnd;wp;skip;smt.
-  save.   
+  pred Bad logP (m:('a,'b) map) =          (* Bad holds whenever: *)
+       !unique logP                        (*  - there is a cycle in the state, OR *)
+    \/ exists r, mem r logP /\ in_dom r m. (*  - an adversary query collides with an internal seed. *)
 
-  equiv equiv_rB_r : Exp(A,Prg_rB).main ~ Exp(A,Prg_r).main : 
-     ={glob A} ==> ={res}.
+  lemma notBad logP (m:('a,'b) map):
+    !Bad logP m <=>
+      (unique logP /\ forall r, !mem r logP \/ !in_dom r m)
+  by smt.
+
+  (* In this game, we replace the PRF with fresh samples *)
+  local module Psample = {
+    proc init(): unit = {
+      Plog.seed = $dseed;
+      Plog.logP = [];
+    }
+
+    proc prg(): output = {
+      var r1, r2;
+
+      r1 = $dseed;
+      r2 = $dout;
+      Plog.logP = Plog.seed :: Plog.logP;
+      Plog.seed = r1;
+      return r2;
+    }
+  }.
+
+  pred inv (m1 m2:('a,'b) map) logP =
+    (forall r, in_dom r m1 <=> (in_dom r m2 \/ mem r logP)) /\
+    (forall r, in_dom r m2 => m1.[r] = m2.[r]).
+
+  local lemma Plog_Psample &m:
+    Pr[Exp(A,F,Plog).main() @ &m: res] <=
+      Pr[Exp(A,F,Psample).main() @ &m: res] +
+      Pr[Exp(A,F,Psample).main() @ &m: Bad Plog.logP F.m].
   proof.
-    fun;call (_ : ={F.m}).
-    fun.
-    wp;rnd;rnd{1};skip;progress => //;apply lossless1.
-    fun;eqobs_in.
-    conseq (_ : _ ==>  ={glob A, F.m}) => //.
-    inline F.init Prg_rB.init Prg_r.init.
-    wp;rnd{1};wp;skip;progress => //;apply lossless1.
-  save.
+  apply (Trans _ (Pr[Exp(A,F,Psample).main() @ &m: res \/ Bad Plog.logP F.m]));
+    last by rewrite Pr [mu_or]; smt.
+  byequiv (_: ={glob A} ==> !(Bad Plog.logP F.m){2} => ={res})=> //; last smt.
+  proc.
+  call (_: Bad Plog.logP F.m, ={Plog.seed} /\ inv F.m{1} F.m{2} Plog.logP{2}).
+    (* adversary is lossless *)
+    by apply AaL.
+    (* [F.f ~ F.f: I] when Bad does not hold *)
+    by proc; wp; do !rnd; wp; skip; progress; smt.
+    (* F.f is lossless when Bad holds *)
+    by intros=> _ _; apply FfL.
+    (* F.f preserves bad *)
+    intros=> _ //=; proc.
+    case (in_dom x F.m).
+      by rcondf 3; do !rnd=> //; skip; smt.
+    rcondt 3; first by do !rnd.
+    by wp; do !rnd (True); skip; smt.
+    (* [Psample.prg ~ Plog.prg: I] when Bad does not hold *)
+    proc; inline F.f; swap{2} 3 -2.
+    wp; do 2!rnd; wp; skip; progress; first 2 last; last 9 smt.
+    by cut:= H8; rewrite notBad=> [logP_unique contradiction]; smt.
+    (* Plog.prg is lossless when Bad holds *)
+    by intros=> _ _; proc; inline F.f;
+       wp; do 2!rnd (True); wp;
+       skip; smt.
+    (* Psample.prg preserves bad *)
+    by intros=> _ //=; proc; wp; do 2!rnd; skip;
+       progress; smt.
+  (* Returning to main *)
+  call (_: ={glob F} ==> ={glob Plog} /\ inv F.m{1} F.m{2} Plog.logP{2});
+    first by proc; wp; rnd; skip; smt.
+  call (_: true ==> ={glob F}); first by sim.
+  by skip; smt.
+  qed.
 
- 
+  local lemma Psample_PrgI &m:
+    Pr[Exp(A,F,Psample).main() @ &m: res] = Pr[Exp(A,F,PrgI).main() @ &m: res].
+  proof.
+  byequiv (_: ={glob A} ==> ={res})=> //; proc.
+  call (_: ={glob F})=> //.
+    (* F.f *)
+    by sim.
+    (* Psample.prg ~ PrgI.prg *)
+    by proc; wp; rnd; rnd{1}; wp; skip; smt.
+  conseq* (_: _ ==> ={glob A, glob F})=> //.
+  sim.
+  by proc; wp; rnd{1}; skip; smt.
+  qed.
 
-  (* We should now bound the probability of bad *)
+  local lemma P_PrgI &m:
+    Pr[Exp(A,F,P(F)).main() @ &m: res] <=
+      Pr[Exp(A,F,PrgI).main() @ &m: res] + Pr[Exp(A,F,Psample).main() @ &m: Bad Plog.logP F.m].
+  proof.
+  by rewrite (P_Plog &m) -(Psample_PrgI &m) (Plog_Psample &m).
+  qed.
+
+  (** We now bound Pr[Exp(A,F,Psample).main() @ &m: Bad Plog.logP F.m] *)
+end section.
+
+(*
+  (* We should now bound Pr[Exp(A,F,Psample).main() @ &m: Bad Plog.logP F.m] *)
   (* For this we use eager/lazy, then we compute the probability. *)
-
   module Resample = {
     fun resample() : unit = {
       var n : int;
@@ -489,3 +543,4 @@ proof.
  by cut H := conclusion_aux A _ &m => //;smt.
 save.
 
+*)
