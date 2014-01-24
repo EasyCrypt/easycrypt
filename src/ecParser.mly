@@ -198,6 +198,7 @@
 %token EQUIV
 %token EXFALSO
 %token EXIST
+%token EXPECT
 %token EXPORT
 %token EXTRACTION
 %token FEL
@@ -2316,6 +2317,8 @@ tactic_chain:
 
 | FIRST n=uint LAST  { Protate (`Left , n) }
 | LAST  n=uint FIRST { Protate (`Right, n) }
+
+| EXPECT n=uint t=loc(tactics) { Pexpect (mk_core_tactic (mk_loc t.pl_loc (Pseq (unloc t))), n) }
 ;
 
 subtactic:

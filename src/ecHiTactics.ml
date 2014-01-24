@@ -66,6 +66,10 @@ and process_tactic_chain mkpv (t : ptactic_chain) (gs : goals) : goals =
   | Pfirst   (t, i) -> t_on_firsts (process_tactic1 mkpv t) i gs
   | Plast    (t, i) -> t_on_lasts  (process_tactic1 mkpv t) i gs
   | Protate  (d, i) -> t_rotate    d i gs
+  | Pexpect  (t, n) ->
+      if List.length (snd gs) <> n then
+        tacuerror "expecting exactly %d subgoal(s)" n;
+      t_on_goals (process_tactic1 mkpv t) gs
 
 (* -------------------------------------------------------------------- *)
 and process_tactic mkpv (tac : ptactic) (gs : goals) : goals =

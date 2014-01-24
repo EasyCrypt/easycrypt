@@ -43,6 +43,7 @@
     "last"        , LAST       ;        (* KW: tactical *)
     "do"          , DO         ;        (* KW: tactical *)
     "strict"      , STRICT     ;        (* KW: tactical *)
+    "expect"      , EXPECT     ;        (* KW: tactical *)
     
     (* Lambda tactics *)
     "beta"        , BETA       ;        (* KW: tactic *)
