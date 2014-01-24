@@ -4,11 +4,6 @@ require import Distr.
 require import List.
 require import FMap.
 
-require        Monoid.
-(*---*) import Monoid.Miplus.
-
-require        AdvAbsVal.
-
 (*** Some type definitions *)
 (** Our PRG uses a type for internal seeds
     and a type for its actual output. *)
@@ -35,8 +30,16 @@ module type PRG = {
 }.
 
 (*** Defining security *)
-(** Distinguishers are given access to the PRG and the PRF
-    and should produce a boolean *)
+(** Distinguishers can call
+    the PRG at most qP times and
+    the PRF at most qF times and
+    return a boolean *)
+op qP:int.
+axiom leq0_qP: 0 <= qP.
+
+op qF:int.
+axiom leq0_qF: 0 <= qF.
+
 module type Adv (F:PRF,P:PRG) = {
   proc a(): bool { F.f P.prg } (* We do not let the adversary call the initialization oracles *)
 }.
@@ -238,6 +241,76 @@ section.
   qed.
 
   (** We now bound Pr[Exp(A,F,Psample).main() @ &m: Bad Plog.logP F.m] *)
+  local module Resample = {
+    proc resample() : unit = {
+      var n, r;
+
+      n = length Plog.logP;
+      Plog.logP = [];
+      Plog.seed = $dseed;
+      while (length Plog.logP < n) {
+        r = $dseed;
+        Plog.logP = r :: Plog.logP;
+      }
+    }
+  }.
+
+  local module Exp' = {
+    module A = A(F,Psample)
+
+    proc main():bool = {
+      var b : bool;
+      F.init();
+      Psample.init();
+      b = A.a();
+      Resample.resample();
+      return b;
+    }
+  }.
+
+  local lemma ExpPsample_Exp' &m:
+    Pr[Exp(A,F,Psample).main() @ &m: Bad Plog.logP F.m] = Pr[Exp'.main() @ &m: Bad Plog.logP F.m].
+  proof.
+  byequiv (_: ={glob A} ==> ={Plog.logP, F.m})=> //; proc.
+  transitivity{1} { F.init(); Psample.init(); Resample.resample(); b = Exp'.A.a(); }
+     (={glob A} ==> ={F.m, Plog.logP}) 
+     (={glob A} ==> ={F.m, Plog.logP})=> //.
+    (* Equality on A's globals *)
+    by intros=> &1 &2 A; exists (glob A){1}.
+    (* no sampling ~ presampling *)
+    sim; inline Resample.resample Psample.init F.init.
+    rcondf{2} 7;
+      first by intros=> _; rnd; wp; conseq (_: _ ==> true) => //.
+    by wp; rnd; wp; rnd{2} (True); wp; skip; smt.
+    (* presampling ~ postsampling *)
+    seq 2 2: (={glob A, glob F, glob Plog}); first by sim.
+    eager (H: Resample.resample(); ~ Resample.resample();: ={glob Plog, glob F} ==> ={glob Plog})
+            : (={glob Plog, glob F, glob A})=> //;
+      first by sim.
+    eager proc H (={glob Plog, glob F})=> //.
+      by eager proc; swap{1} 1 4; sim.
+      by sim.
+      eager proc; inline Resample.resample.
+      swap{1} 3 3. swap{2} [4..5] 2. swap{2} [6..8] 1.
+      swap{1} 4 3. swap{1} 4 2. swap{2} 2 4.
+      sim.
+      splitwhile (length Plog.logP < n - 1):{2} 5 .
+      conseq* (_ : _ ==> ={Plog.logP})=> //.
+      seq 3 5: (={Plog.logP} /\ (length Plog.logP = n - 1){2}).
+        while (={Plog.logP} /\ n{2} = n{1} + 1 /\ length Plog.logP{1} <= n{1});
+          first by wp; rnd; skip; progress; smt.
+        by wp; rnd{2}; skip; progress=> //; smt.
+      rcondt{2} 1; first by intros=> _; skip; smt.
+      rcondf{2} 3; first by intros=> _; wp; rnd; skip; smt.
+      by sim.
+      by sim.
+  qed.
+
+(*
+  lemma Bad_bound:
+    phoare [Exp'.main : true ==> Bad Plog.logP F.m] <= ((qP*qF + (qP - 1)*qP/%2)%r*bd1).
+  proof.
+*)
 end section.
 
 (*
@@ -271,44 +344,6 @@ end section.
     }
   }.
   local module Exp1 =  Exp'(A).
-
-  local equiv Exp_Exp' : Exp(A,Prg_rB).main ~ Exp1.main : ={glob A} ==> ={F.m, Prg.logP}.
-  proof.
-   fun.
-   transitivity{1} { F.init(); Prg_rB.init();Resample.resample(); b = Exp1.A.a(); } 
-     (={glob A} ==> ={F.m, Prg.logP}) 
-     (={glob A} ==> ={F.m, Prg.logP});[smt | trivial | | ].
-     eqobs_in;inline Resample.resample Prg_rB.init F.init.
-     rcondf{2} 7.
-       intros &m;rnd;wp. 
-       conseq (_ : _ ==> true) => //.
-     wp;rnd;wp;rnd{2};wp;skip;progress => //; apply lossless1.
-   seq 2 2 : (={glob A, F.m, glob Prg_rB}); first by eqobs_in.
-   eager (h : Resample.resample(); ~ Resample.resample(); 
-         : ={Prg.logP} ==> ={Prg.logP, Prg.seed}) : 
-         (={Prg.logP,F.m,Prg.seed,glob A}) => //.
-   eqobs_in => //.
-   eager fun h (={Prg.logP,F.m,Prg.seed}) => //.
-   eager fun.
-     inline Resample.resample.
-     swap{1} 3 3. swap{2} [4..5] 2. swap{2} [6..8] 1.
-     swap{1} 4 3. swap{1} 4 2. swap{2} 2 4.
-     eqobs_in.
-     splitwhile (length Prg.logP < n - 1) : {2} 5 .
-     conseq * (_ : _ ==> ={Prg.logP}) => //.
-     seq 3 5 : (={Prg.logP} /\ (length Prg.logP = n - 1){2}).
-     while (={Prg.logP} /\ n{2} = n{1} + 1 /\ (length Prg.logP <= n){1}).
-       wp;rnd;skip;progress => //;smt.
-     wp;rnd{2};skip;progress => //; smt.
-     rcondt{2} 1.
-       intros &m;skip;smt.
-     rcondf{2} 3;first intros &m;wp;rnd;skip;smt.
-     eqobs_in.
-   fun;eqobs_in.
-   eager fun.
-    swap{2} 5 -4;eqobs_in.
-   fun;eqobs_in.
-  save.
 
   lemma Pr1 : 
     (forall (O1 <: AOrclPrg{A}) (O2<:OrclRnd{A}), islossless O1.prg => islossless O2.f => 
