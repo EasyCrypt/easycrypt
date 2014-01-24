@@ -38,7 +38,8 @@ The language is equipped with a few built-in types:
 \begin{itemize}\itemsep-.5em
 \item the \rawec{unit}\index{easycrypt}{types!unit@\ec{unit}} type, which
         contains a unique element
-        \rawec{tt} (or \rawec{()}) \index{easycrypt}{constants!tt@\ec{tt : unit}},
+        \rawec{tt} (or \rawec{()}) \index{easycrypt}{operators!unit_tt@\ec{tt: unit}}%
+\index{easycrypt}{operators!unit_tt@\ec{():unit}}),
 \item the \rawec{bool} type of booleans,
 \item the \rawec{int} type of arithmetic integers (in $\mathbb{Z}$),
 \item the \rawec{real} type of real numbers (in $\mathbb{R}$).
@@ -50,17 +51,17 @@ discussed further in the library documentation.
 \subsubsection*{The \rawec{bool} type}
 \index{easycrypt}{types!bool@\ec{bool}}
 Boolean expression terms can be built from the constants
-\rawec{true}\index{easycrypt}{constants!true@\ec{true : bool}} and
-\rawec{false}\index{easycrypt}{constants!true@\ec{true : bool}}, in combination
+\rawec{true}\index{easycrypt}{operators!boolc_true@\ec{true: bool}} and
+\rawec{false}\index{easycrypt}{operators!boolc_false@\ec{false: bool}}, in combination
 with operators for logical conjunction and disjunction
-(\rawec{/\\}\index{easycrypt}{operators!and@\ec{(/\\) : bool -> bool -> bool}} and
-\rawec{\\\/}\index{easycrypt}{operators!or@\ec{(\\/) : bool -> bool -> bool}}),
+(\rawec{/\\}\index{easycrypt}{operators!boolo_and@\ec{(/\\): bool -> bool -> bool}} and
+\rawec{\\\/}\index{easycrypt}{operators!boolo_or@\ec{(\\/): bool -> bool -> bool}}),
 short-circuiting conjunction and disjunction
-(\rawec{\&\&}\index{easycrypt}{operators!anda@\ec{(&&) : bool -> bool -> bool}}
+(\rawec{\&\&}\index{easycrypt}{operators!boolo_anda@\ec{(&&): bool -> bool -> bool}}
 and
-\rawec{||}\index{easycrypt}{operators!ora@\ec{(''ora) : bool -> bool -> bool}}),
+\rawec{||}\index{easycrypt}{operators!boolo_ora@\ec{(''ora): bool -> bool -> bool}}),
 and xor
-(\rawec{\^\^}\index{easycrypt}{operators!xor@\ec{(\^\^) : bool -> bool -> bool}}).
+(\rawec{\^\^}\index{easycrypt}{operators!boolo_xor@\ec{(\^\^): bool -> bool -> bool}}).
 Basic lemmas are made available in the \rawec{Bool} theory, although we mostly
 rely on \SMT solvers to discharge boolean proof obligations.
 
@@ -101,12 +102,13 @@ inductive datatypes, record types, tuple types or function types, as well as to
 construct typed values.
 
 \subsubsection*{Tuple types}
-Given two types \ec{'t} and \ec{'t'}, \ec{('t * 't')} (or \ec{'t *'t'},
-whenever possible) denotes the type of pairs of elements of \ec{'t} and
-\ec{'t'}. More generally, the product can be iterated to produce tuple types of
-arbitrary arity. For example, Listing~\ref{lst:tuples} declares two abstract
-types, \ec{pkey} and \ec{skey}, and then defines the type \ec{keypairs} as the
-type of pairs of elements of \ec{pkey} and \ec{skey}.
+Given two types \ec{'t} and \ec{'t'},
+\ec{('t * 't')}\index{easycrypt}{types!prod@\ec{'a * 'b}}
+(or \ec{'t *'t'}, whenever possible) denotes the type of pairs of elements of
+\ec{'t} and \ec{'t'}. More generally, the product can be iterated to produce
+tuple types of arbitrary arity. For example, Listing~\ref{lst:tuples} declares
+two abstract types, \ec{pkey} and \ec{skey}, and then defines the type
+\ec{keypairs} as the type of pairs of elements of \ec{pkey} and \ec{skey}.
 
 \warningbox{Types \ec{'t * 't' * 't''}, \ec{('t * 't') * 't''} and
 \ec{'t * ('t' * 't'')} are distinct (but isomorphic). This may cause confusing
@@ -187,6 +189,9 @@ op origin = {| x = 0; y = 0; |}.
 op x_coord (p:intpoint) = p.`x.
 \end{easycrypt}
 
+\subsubsection*{Function types}
+\index{easycrypt}{types!function@\ec{'a -> 'b}}
+
 \subsubsection*{On currying}
 It is standard practice to write functions of several arguments in curried form,
 where applying the function symbol to the first argument returns a function that
@@ -200,7 +205,7 @@ Listing~\ref{lst:currying} illustrates this.
 
 \begin{easycrypt}[label={lst:currying}]{Currying and partial function application.}
 fun log: int -> int -> int.
-fun log2: int-> int = log_curried 2.
+fun log2: int-> int = log 2.
 
 fun log_pair: (int * int) -> int.
 fun log2_pair (n:int): int = log (2,n).
@@ -209,9 +214,12 @@ fun log2_pair (n:int): int = log (2,n).
 The \rawec{log} is declared as an integer function of two (curried) integer
 arguments, and the log base 2, \rawec{log2}, is defined as its partial
 application to 2. This definition could have been equivalently written as
-follows.
 \begin{easycrypt}[frame=none]{}
 op log2 (n:int): int = log 2 n.
+\end{easycrypt}
+or
+\begin{easycrypt}[frame=none]{}
+op log2: int = fun (n:int), log 2 n.
 \end{easycrypt}
 Contrasting with the curried form described above, \rawec{log_pair} is declared
 as an integer function of a single argument (whose type is a pair type).
@@ -220,31 +228,63 @@ look more familiar to imperative programmers.
 
 \subsubsection*{Infix\index{easycrypt}{infix} and mixfix\index{easycrypt}{mixfix} operators}
 Binary operators can be declared in infix form by parenthesizing their name when
-the desired infix symbol starts with \ec{+}, \ec{:}, \ec{^}, or \ec{*}. (In the
-latter case, a space is needed to avoid parsing the operator declaration as a comment.)
+the desired infix symbol starts with \ec{+}, \ec{:}, \ec{^}, \ec{@} or \ec{*}. (In the
+latter case, spaces may be needed to avoid parsing part of the operator
+declaration as a comment separator.) Once the infix symbols are declared, they
+can simply be used as desired. However, the priorities and associativity of
+user-defined infix operators are fixed by the syntax. In the absence of a
+reference manual detailing these priorities, we recommend parenthesizing when
+in doubt. Infix operators can be used in prefix form by wrapping them in
+parentheses.
+
+In addition, \EasyCrypt supports some built-in mixfix notations. They can be
+used by replacing the \ec{_} symbols with parameters, or in prefix form by
+wrapping them in double quotes. We list the available mixfix notations below.
+\begin{itemize}\itemsep-.5em
+\item \rawec{[]}, can represent, say, empty collections,
+\item \rawec{_.[_]}, can be used to denote getting an element from an indexed
+  collection, (expects at least a binary definition)
+\item \rawec{_.[_ <- _]}, can be used to denote updating one element of an
+  indexed collection, (expects at least a ternary definition).
+\end{itemize}
 
 \section{Probabilistic Expressions\label{sec:distributions}}
 
-%%%% From Gilles:
-\EasyCrypt features a polymorphic type \rawec{'a distr} of \emph{discrete
-sub-distributions} over a base type \rawec{'a}. The primary operation over
-sub-distributions is the function \rawec{op mu: 'a distr -> ('a -> bool) ->
-real.} which measures the probability of an event. The function is assumed to
-satisfy the basic axioms of probability sub-distributions:
+\EasyCrypt features a polymorphic type
+\rawec{'a distr}\index{easycrypt}{types!distr@\ec{'a distr}} of
+\emph{discrete sub-distributions} over a base type \rawec{'a}. The primary
+operation over sub-distributions is the function
+\rawec{op mu (d:'a distr) (E:'a -> bool): real.}%
+\index{easycrypt}{operators!mu@\ec{mu: 'a distr -> ('a -> bool) -> real}},
+which measures the probability of event \ec{E} in distribution \ec{d}.
+Function \rawec{mu} is assumed to satisfy the following axioms:
 \begin{itemize}\itemsep-.5em
-\item probabilities lie in the unit interval;
-\item the probability of false is null;
-\item probabilities are monotonic with respect to event inclusion;
+\item probabilities lie in the unit interval;\\
+  \ec{axiom mu_unit d E: 0\%r <= mu d E <= 1\%r.}
+\item the probability of the constantly false predicate \ec{False} is null;\\
+  \ec{axiom mu_false d: mu d False <= 0\%r.}
+\item probabilities are monotonic with respect to event inclusion;\\
+  \ec{axiom mu_leq d E E': E <= E' => mu d E <= mu d E'.}
 \item any event whose probability is that of the constantly true event
-  contains the distribution's support;
+  \ec{True} contains the distribution's support;\\
+  \ec{axiom mu_supp d E: mu d E = mu d True => support d <= E.}
 \item the probability of a union of events is equal to the sum of
-  their probabilities, minus the probability of their intersection;
-\item two sub-distributions are equal if and only if they are pointwise equal.
+  their probabilities, minus the probability of their intersection;\\
+  \ec{axiom mu_or d E E': mu d (E \\/ E') = mu d E + mu d E' - mu d (E /\\ E').}
+\item two sub-distributions are equal if and only if they are pointwise equal;
+  \ec{axiom mu_pw d d': d == d' <=> d = d'.}
 \end{itemize}
 
-Sub-distributions are introduced axiomatically, and no well-formedness checks
-are performed. For example, the uniform distribution on booleans is defined, in
-the standard library, as displayed in Listing~\ref{lst:dbool}, where
+where the standard library \ec{Distr} defines, among other auxiliary operators,
+\begin{easycrypt}[frame=none]{}
+pred (==) (d d':'a distr) = forall x, mu d ((=) x) = mu d' ((=) x).
+
+op support (d:'a distr) x = mu d ((=) x) <> 0%r.
+\end{easycrypt}
+
+Sub-distributions can be user-defined axiomatically, and no well-formedness
+checks are performed. For example, the uniform distribution on booleans is
+defined, in the standard library, as displayed in Listing~\ref{lst:dbool}, where
 \rawec{charfun P x} is the characteristic function of \rawec{P} evaluated in
 \rawec{x} (that is, \rawec{1\%r} if \rawec{P} holds on \rawec{x} and
 \rawec{0\%r} otherwise).
@@ -258,39 +298,42 @@ axiom mu_def (p:bool -> bool):
     (1%r/2%r) * charfun p false.
 \end{easycrypt}
 
-The standard library on distributions
-%, discussed further in Chapter~\ref{chap:libraries},
-introduces several auxiliary quantities on distributions that are useful in
-probability computations and for defining more complex distributions (that may
-be difficult, or even impossible, to describe purely using \rawec{mu}). The
-definitions of these quantities is shown in Listing~\ref{lst:mu_aux}, where
-\rawec{True} is the constantly true predicate. Note the use of partial
-application to the equality operator when defining \rawec{mu_x}.
-
-\begin{easycrypt}[label={lst:mu_aux}]{Auxiliary operators on distributions}
-op mu_x (d:'a distr) (x:'a): real = mu d ((=) x).
-op weight (d:'a distr): real = mu d True.
-op in_supp (x:'a) (d:'a distr): bool = 0%r < mu_x d x.
-\end{easycrypt}
-
-With these auxiliary operators, it is in fact fairly easy to check that the
-simple axiom from Listing~\ref{lst:dbool} does indeed define a distribution, by
-proving the following lemma, which can be discharged automatically.
+It is in fact fairly easy to check that the simple axiom from
+Listing~\ref{lst:dbool} does indeed define a distribution, by proving the
+following lemma, which can be discharged automatically.
 
 \begin{easycrypt}[]{}
-lemma lossless : weight dbool = 1%r by smt.
+lemma lossless : mu dbool True = 1%r by smt.
+\end{easycrypt}
+
+However, the consistency of such axiomatic definitions needs to be carefully
+checked and justified, just like any user-provided axiom. Once good axiomatics
+definitions are given to a sufficient collection of primitive distributions, it
+should be possible to define further distributions by applying distribution
+transformers, properly defined as operators, to the core distributions.
+
+For example, the standard library \ec{Pair} provides a distribution transformer
+\rawec{(*): 'a distr -> 'b distr -> ('a * 'b) distr} that can be used to define
+the uniform distribution on pairs of booleans, without adding any axioms to
+\EasyCrypt. We also display a direct consequence of this definition.
+
+\begin{easycrypt}[]{}
+op dbpair = {0,1} * {0,1}.
+
+lemma dbpair_x b b': mu dbpair ((=) (b,b')) = 1%r/4%r.
 \end{easycrypt}
 
 \section{\pWHILE, Modules and Functors\label{sec:modules}}
 Although the languages for expressions and probabilistic expressions are quite
 powerful, they fail to properly capture the kind of objects cryptographers
 manipulate. \EasyCrypt uses the same language, \pWHILE, to describe
-cryptographic schemes, oracles, and experiments as modules. Modules are
-wrappers that declare a collection of typed global variables and define a set
-of imperative \emph{procedures} that may read and write (amongst other things)
-the module's global state. We first briefly describe the \pWHILE language before
-giving an overview of the two main mechanisms for module composition: direct
-usage and functor application.
+cryptographic schemes, oracles, and experiments, all represented as
+\emph{modules}\index{easycrypt}{modules}.
+Modules are wrappers that declare a collection of typed global variables and
+define a set of imperative \emph{procedures} that may read and write
+(amongst other things) the module's global state. We first briefly describe the
+\pWHILE language before giving an overview of the two main mechanisms for
+module composition: direct usage and functor application.
 
 \subsection{The \pWHILE language}
 \pWHILE programs are composed of a set of typed local variables and a
@@ -302,11 +345,12 @@ sequential compositions of statements that include:
 \item assignment of a freshly sampled random value to a local or global
   variable,
 \item conditional branching,
-\item looping (only in the form of \rawec{while} loops)
+\item looping (only in the form of \rawec{while} loops).
 % missing things?
 \end{itemize}
 Unless the return type of the function is \rawec{unit}, the final statement in
-the function's body needs to be a \rawec{return}.
+the function's body needs to be a \rawec{return} (and a \rawec{return}
+statement can only be the last statement in a procedure's body).
 
 Listing~\ref{lst:pWhile} shows a module implementing a random oracle where the
 number of queries is bounded and the responses are sampled (but not assigned to
