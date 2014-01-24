@@ -241,11 +241,12 @@ In addition, \EasyCrypt supports some built-in mixfix notations. They can be
 used by replacing the \ec{_} symbols with parameters, or in prefix form by
 wrapping them in double quotes. We list the available mixfix notations below.
 \begin{itemize}\itemsep-.5em
-\item \rawec{[]}, can represent, say, empty collections,
+\item \rawec{[]}, can represent, say, empty collections;
+\item \rawec{[_]}, can represent, for example, singleton collections;
 \item \rawec{_.[_]}, can be used to denote getting an element from an indexed
-  collection, (expects at least a binary definition)
+  collection (it expects at least a binary definition);
 \item \rawec{_.[_ <- _]}, can be used to denote updating one element of an
-  indexed collection, (expects at least a ternary definition).
+  indexed collection (it expects at least a ternary definition).
 \end{itemize}
 
 \section{Probabilistic Expressions\label{sec:distributions}}
@@ -336,8 +337,8 @@ define a set of imperative \emph{procedures} that may read and write
 module composition: direct usage and functor application.
 
 \subsection{The \pWHILE language}
-\pWHILE programs are composed of a set of typed local variables and a
-sequential compositions of statements that include:
+\pWHILE procedures are composed of a set of typed local variables and a
+sequence of statements that include:
 \begin{itemize}\itemsep-.5em
 \item assignment of an expression to a local or global variable,
 \item assignment of the result of a function call (on expressions) to a local
@@ -345,7 +346,8 @@ sequential compositions of statements that include:
 \item assignment of a freshly sampled random value to a local or global
   variable,
 \item conditional branching,
-\item looping (only in the form of \rawec{while} loops).
+\item looping (only in the form of \rawec{while} loops),
+\item return statements.
 % missing things?
 \end{itemize}
 Unless the return type of the function is \rawec{unit}, the final statement in
