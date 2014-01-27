@@ -3,6 +3,9 @@ require import Real.
 require import Distr.
 require import List.
 require import FMap.
+require import FSet.
+require Monoid.
+(*---*) import Monoid.Miplus.
 
 (*** Some type definitions *)
 (** Our PRG uses a type for internal seeds
@@ -11,6 +14,10 @@ type seed.
 
 op dseed: seed distr.
 axiom dseedL: mu dseed True = 1%r.
+axiom dseedU: isuniform dseed.
+axiom dseedF (x:seed): in_supp x dseed.
+
+op pr_dseed = mu_x dseed witness.
 
 type output.
 
@@ -40,8 +47,16 @@ axiom leq0_qP: 0 <= qP.
 op qF:int.
 axiom leq0_qF: 0 <= qF.
 
-module type Adv (F:PRF,P:PRG) = {
-  proc a(): bool { F.f P.prg } (* We do not let the adversary call the initialization oracles *)
+module type APRF = {
+  proc f(x:seed): seed * output
+}.
+
+module type APRG = {
+  proc prg(): output
+}.
+
+module type Adv (F:APRF,P:APRG) = {
+  proc a(): bool {F.f P.prg} (* Fixing the order of oracles for stability *)
 }.
 
 module Exp (A:Adv,F:PRF,P:PRG) = {
@@ -77,7 +92,7 @@ module F = {
   var m:(seed,seed * output) map
 
   proc init(): unit = {
-     m = empty;
+     m = FMap.empty;
   }
 
   proc f (x:seed) : seed * output = {
@@ -101,6 +116,7 @@ qed.
 (** And we are proving the security of the following PRG *)
 module P (F:PRF) = {
   var seed: seed
+  var logP: seed list
 
   proc init(): unit = {
     seed = $dseed;
@@ -114,32 +130,89 @@ module P (F:PRF) = {
   }
 }.
 
+(** We use the following oracle in an intermediate game
+    that links two sections. Ideally, we would hide it
+    somehwere, but nested sections don't work yet. *)
+(* Note that it uses P's state (in which we have a
+   useless thing) to avoid contaminating the final
+   result. *)
+module Psample = {
+  proc init(): unit = {
+    P.seed = $dseed;
+    P.logP = [];
+  }
+
+  proc prg(): output = {
+    var r1, r2;
+
+    r1 = $dseed;
+    r2 = $dout;
+    P.logP = P.seed :: P.logP;
+    P.seed = r1;
+    return r2;
+  }
+}.
+
+lemma PsampleprgL: islossless Psample.prg.
+proof. by proc; wp; do 2!rnd (True); skip; smt. qed.
+
+(** In preparation of the eager/lazy reasoning step *)
+(* Again, note that none of these have their own state.
+   Therefore, it does not matter overmuch that they
+   are not hidden. *)
+module Resample = {
+  proc resample() : unit = {
+    var n, r;
+
+    n = length P.logP;
+    P.logP = [];
+    P.seed = $dseed;
+    while (length P.logP < n) {
+      r = $dseed;
+      P.logP = r :: P.logP;
+    }
+  }
+}.
+
+module Exp'(A:Adv) = {
+  module A = A(F,Psample)
+
+  proc main():bool = {
+    var b : bool;
+    F.init();
+    Psample.init();
+    b = A.a();
+    Resample.resample();
+    return b;
+  }
+}.
+
 (*** The Proof ***)
 section.
   declare module A:Adv {P,F}.
-  axiom AaL (F <: PRF {A}) (P <: PRG {A}):
+  axiom AaL (F <: APRF {A}) (P <: APRG {A}):
     islossless F.f =>
     islossless P.prg =>
     islossless A(F,P).a.
 
   (** Adding some logging so we can express the bad event *)
   local module Plog = {
-    var seed:seed
-    var logP:seed list
-
     proc init(): unit = {
-      seed = $dseed;
-      logP = [];
+      P.seed = $dseed;
+      P.logP = [];
     }
 
     proc prg(): output = {
       var r;
 
-      logP = seed :: logP;
-      (seed,r) = F.f(seed);
+      P.logP = P.seed :: P.logP;
+      (P.seed,r) = F.f(P.seed);
       return r;
     }
   }.
+
+  local lemma PlogprgL: islossless Plog.prg.
+  proof. by proc; call FfL; wp. qed.
 
   local lemma P_Plog &m:
     Pr[Exp(A,F,P(F)).main() @ &m: res] = Pr[Exp(A,F,Plog).main() @ &m: res].
@@ -158,37 +231,20 @@ section.
   by smt.
 
   (* In this game, we replace the PRF with fresh samples *)
-  local module Psample = {
-    proc init(): unit = {
-      Plog.seed = $dseed;
-      Plog.logP = [];
-    }
-
-    proc prg(): output = {
-      var r1, r2;
-
-      r1 = $dseed;
-      r2 = $dout;
-      Plog.logP = Plog.seed :: Plog.logP;
-      Plog.seed = r1;
-      return r2;
-    }
-  }.
-
-  pred inv (m1 m2:('a,'b) map) logP =
+  pred inv (m1 m2:('a,'b) map) (logP:'a list) =
     (forall r, in_dom r m1 <=> (in_dom r m2 \/ mem r logP)) /\
     (forall r, in_dom r m2 => m1.[r] = m2.[r]).
 
   local lemma Plog_Psample &m:
     Pr[Exp(A,F,Plog).main() @ &m: res] <=
       Pr[Exp(A,F,Psample).main() @ &m: res] +
-      Pr[Exp(A,F,Psample).main() @ &m: Bad Plog.logP F.m].
+      Pr[Exp(A,F,Psample).main() @ &m: Bad P.logP F.m].
   proof.
-  apply (Trans _ (Pr[Exp(A,F,Psample).main() @ &m: res \/ Bad Plog.logP F.m]));
+  apply (Trans _ (Pr[Exp(A,F,Psample).main() @ &m: res \/ Bad P.logP F.m]));
     last by rewrite Pr [mu_or]; smt.
-  byequiv (_: ={glob A} ==> !(Bad Plog.logP F.m){2} => ={res})=> //; last smt.
+  byequiv (_: ={glob A} ==> !(Bad P.logP F.m){2} => ={res})=> //; last smt.
   proc.
-  call (_: Bad Plog.logP F.m, ={Plog.seed} /\ inv F.m{1} F.m{2} Plog.logP{2}).
+  call (_: Bad P.logP F.m, ={P.seed} /\ inv F.m{1} F.m{2} P.logP{2}).
     (* adversary is lossless *)
     by apply AaL.
     (* [F.f ~ F.f: I] when Bad does not hold *)
@@ -198,11 +254,11 @@ section.
     (* F.f preserves bad *)
     intros=> _ //=; proc.
     case (in_dom x F.m).
-      by rcondf 3; do !rnd=> //; skip; smt.
-    rcondt 3; first by do !rnd.
-    by wp; do !rnd (True); skip; smt.
+      by rcondf 3; wp; do !rnd=> //; wp; skip; smt.
+    rcondt 3; first by do !rnd; wp.
+    by wp; do !rnd (True); wp; skip; smt.
     (* [Psample.prg ~ Plog.prg: I] when Bad does not hold *)
-    proc; inline F.f; swap{2} 3 -2.
+    proc; inline F.f. swap{2} 3 -2.
     wp; do 2!rnd; wp; skip; progress; first 2 last; last 9 smt.
     by cut:= H8; rewrite notBad=> [logP_unique contradiction]; smt.
     (* Plog.prg is lossless when Bad holds *)
@@ -210,10 +266,11 @@ section.
        wp; do 2!rnd (True); wp;
        skip; smt.
     (* Psample.prg preserves bad *)
-    by intros=> _ //=; proc; wp; do 2!rnd; skip;
-       progress; smt.
+    by intros=> _ //=; proc;
+       wp; do 2!rnd; wp;
+       skip; progress; smt.
   (* Returning to main *)
-  call (_: ={glob F} ==> ={glob Plog} /\ inv F.m{1} F.m{2} Plog.logP{2});
+  call (_: ={glob F} ==> ={glob P} /\ inv F.m{1} F.m{2} P.logP{2});
     first by proc; wp; rnd; skip; smt.
   call (_: true ==> ={glob F}); first by sim.
   by skip; smt.
@@ -233,48 +290,23 @@ section.
   by proc; wp; rnd{1}; skip; smt.
   qed.
 
-  local lemma P_PrgI &m:
-    Pr[Exp(A,F,P(F)).main() @ &m: res] <=
-      Pr[Exp(A,F,PrgI).main() @ &m: res] + Pr[Exp(A,F,Psample).main() @ &m: Bad Plog.logP F.m].
+  local lemma Resample_resampleL: islossless Resample.resample.
   proof.
-  by rewrite (P_Plog &m) -(Psample_PrgI &m) (Plog_Psample &m).
+  proc.
+  while (true) (n - length P.logP);
+    first by intros=> z; wp; rnd (True); skip; smt.
+  by rnd (True); wp; skip; smt.
   qed.
 
-  (** We now bound Pr[Exp(A,F,Psample).main() @ &m: Bad Plog.logP F.m] *)
-  local module Resample = {
-    proc resample() : unit = {
-      var n, r;
-
-      n = length Plog.logP;
-      Plog.logP = [];
-      Plog.seed = $dseed;
-      while (length Plog.logP < n) {
-        r = $dseed;
-        Plog.logP = r :: Plog.logP;
-      }
-    }
-  }.
-
-  local module Exp' = {
-    module A = A(F,Psample)
-
-    proc main():bool = {
-      var b : bool;
-      F.init();
-      Psample.init();
-      b = A.a();
-      Resample.resample();
-      return b;
-    }
-  }.
+  local module Exp'A = Exp'(A).
 
   local lemma ExpPsample_Exp' &m:
-    Pr[Exp(A,F,Psample).main() @ &m: Bad Plog.logP F.m] = Pr[Exp'.main() @ &m: Bad Plog.logP F.m].
+    Pr[Exp(A,F,Psample).main() @ &m: Bad P.logP F.m] = Pr[Exp'(A).main() @ &m: Bad P.logP F.m].
   proof.
-  byequiv (_: ={glob A} ==> ={Plog.logP, F.m})=> //; proc.
-  transitivity{1} { F.init(); Psample.init(); Resample.resample(); b = Exp'.A.a(); }
-     (={glob A} ==> ={F.m, Plog.logP}) 
-     (={glob A} ==> ={F.m, Plog.logP})=> //.
+  byequiv (_: ={glob A} ==> ={P.logP, F.m})=> //; proc.
+  transitivity{1} { F.init(); Psample.init(); Resample.resample(); b = Exp'A.A.a(); }
+     (={glob A} ==> ={F.m, P.logP}) 
+     (={glob A} ==> ={F.m, P.logP})=> //.
     (* Equality on A's globals *)
     by intros=> &1 &2 A; exists (glob A){1}.
     (* no sampling ~ presampling *)
@@ -284,8 +316,8 @@ section.
     by wp; rnd; wp; rnd{2} (True); wp; skip; smt.
     (* presampling ~ postsampling *)
     seq 2 2: (={glob A, glob F, glob Plog}); first by sim.
-    eager (H: Resample.resample(); ~ Resample.resample();: ={glob Plog, glob F} ==> ={glob Plog})
-            : (={glob Plog, glob F, glob A})=> //;
+    eager (H: Resample.resample(); ~ Resample.resample();: ={glob Plog} ==> ={glob Plog}):
+          (={glob A, glob Plog, glob F})=> //;
       first by sim.
     eager proc H (={glob Plog, glob F})=> //.
       by eager proc; swap{1} 1 4; sim.
@@ -294,10 +326,10 @@ section.
       swap{1} 3 3. swap{2} [4..5] 2. swap{2} [6..8] 1.
       swap{1} 4 3. swap{1} 4 2. swap{2} 2 4.
       sim.
-      splitwhile (length Plog.logP < n - 1):{2} 5 .
-      conseq* (_ : _ ==> ={Plog.logP})=> //.
-      seq 3 5: (={Plog.logP} /\ (length Plog.logP = n - 1){2}).
-        while (={Plog.logP} /\ n{2} = n{1} + 1 /\ length Plog.logP{1} <= n{1});
+      splitwhile (length P.logP < n - 1):{2} 5 .
+      conseq* (_ : _ ==> ={P.logP})=> //.
+      seq 3 5: (={P.logP} /\ (length P.logP = n - 1){2}).
+        while (={P.logP} /\ n{2} = n{1} + 1 /\ length P.logP{1} <= n{1});
           first by wp; rnd; skip; progress; smt.
         by wp; rnd{2}; skip; progress=> //; smt.
       rcondt{2} 1; first by intros=> _; skip; smt.
@@ -306,206 +338,203 @@ section.
       by sim.
   qed.
 
-(*
-  lemma Bad_bound:
-    phoare [Exp'.main : true ==> Bad Plog.logP F.m] <= ((qP*qF + (qP - 1)*qP/%2)%r*bd1).
+  lemma P_PrgI &m:
+    Pr[Exp(A,F,P(F)).main() @ &m: res] <=
+      Pr[Exp(A,F,PrgI).main() @ &m: res] + Pr[Exp'(A).main() @ &m: Bad P.logP F.m].
   proof.
-*)
+  by rewrite (P_Plog &m) -(ExpPsample_Exp' &m) -(Psample_PrgI &m) (Plog_Psample &m).
+  qed.
 end section.
 
-(*
-  (* We should now bound Pr[Exp(A,F,Psample).main() @ &m: Bad Plog.logP F.m] *)
-  (* For this we use eager/lazy, then we compute the probability. *)
-  module Resample = {
-    fun resample() : unit = {
-      var n : int;
-      var r : t1;
-      n = length Prg.logP;
-      Prg.logP = [];
-      Prg.seed = $dsample1;  
-      while (List.length Prg.logP < n) {
-        r = $dsample1;
-        Prg.logP = r :: Prg.logP;
-      }
+(** We now bound Pr[Exp(A,F,Psample).main() @ &m: Bad Plog.logP F.m] *)
+(* For now, we use the following counting variant of
+   the adversary to epxress the final result. Everything
+   up to now applies to non-counting adversaries, but we
+   need the counting to bound the probability of Bad. *)
+module C (A:Adv,F:APRF,P:APRG) = {
+  var cF, cP:int
+
+  module CF = {
+    proc f(x): seed * output = {
+      var r = witness;
+
+      if (cF < qF) { cF = cF + 1; r = F.f(x);}
+      return r;
     }
-  }.
+  }
 
-  module Exp'(A:Adv) = {
-  
-    module A = A(Prg_rB,F)
+  module CP = {
+    proc prg (): output = {
+      var r = witness;
 
-    fun main():bool = {
-      var b : bool;
-      F.init();
-      Prg_rB.init();
-      b = A.a();
-      Resample.resample();
-      return b;
+      if (cP < qP) { cP = cP + 1; r = P.prg();}
+      return r;
     }
-  }.
-  local module Exp1 =  Exp'(A).
+  }
 
-  lemma Pr1 : 
-    (forall (O1 <: AOrclPrg{A}) (O2<:OrclRnd{A}), islossless O1.prg => islossless O2.f => 
-       islossless A(O1,O2).a) =>
-    forall &m, 
-      Pr[Exp(A,Prg).main() @ &m : res] <= 
-        Pr[Exp(A,Prg_r).main() @ &m : res] + 
-        Pr[Exp'(A).main() @ &m : bad Prg.logP F.m].
-  proof.
-    intros Hll &m.
-    apply (Real.Trans _ Pr[Exp(A,Prg_rB).main() @ &m : res \/ bad Prg.logP F.m]).
-    equiv_deno (equiv_rB _) => //; smt.
-    rewrite Pr mu_or.
-    rewrite  (_:Pr[Exp(A, Prg_rB).main() @ &m : res] = Pr[Exp(A, Prg_r).main() @ &m : res]).
-    equiv_deno equiv_rB_r => //.
-    rewrite ( _: Pr[Exp(A, Prg_rB).main() @ &m : bad Prg.logP F.m] = Pr[Exp'(A).main() @ &m : bad Prg.logP F.m]);[ | smt].
-    equiv_deno Exp_Exp' => //.
-  save.
+  module A = A(CF,CP)
 
-end section.
+  proc a(): bool = {
+    var b:bool;
 
-op default1 : t1.
-op default2 : t2.
+    cF = 0;
+    cP = 0;
+    b = A.a();
+    return b;
+  }
+}.
 
-module C(A:Adv,P:AOrclPrg,R:OrclRnd) = {
-    module CP = {
-      var c : int
-      fun prg () : t2 = {
-        var r : t2;
-        if (c < qP) { c = c + 1; r = P.prg();}
-        else r = default2;
-        return r;
-      }
-    }
-
-    module CF = {
-      var c : int 
-      fun f (x) : t1 * t2 = {
-        var r : t1*t2;
-        if (c < qF) { c = c + 1; r = R.f(x);}
-        else r = (default1,default2);
-        return r;
-      }
-    } 
-    
-    module A = A(CP,CF)
-
-    fun a() : bool = {
-      var b:bool;
-      CP.c = 0;
-      CF.c = 0;
-      b = A.a();
-      return b;
-    }
-  }.
-
-op bd1 : real.
-
-axiom dsample1_uni : forall r, in_supp r dsample1 => mu_x dsample1 r = bd1.
-axiom bd1_pos : 0%r <= bd1.
-import FSet.
-import ISet.Finite.
-
-axiom qP_pos : 0 <= qP.
-axiom qF_pos : 0 <= qF.
-
-lemma Pr3 (A<:Adv{Prg,F,C}) : 
-   bd_hoare [ Exp'(C(A)).main : true ==> bad Prg.logP F.m] <= ((qP*qF + (qP - 1)*qP/%2)%r*bd1).
+lemma CFfL (A <: Adv) (F <: APRF) (P <: APRG):
+  islossless F.f =>
+  islossless C(A,F,P).CF.f.
 proof.
-  fun.
-  seq 3 : true (1%r)  ((qP*qF + (qP - 1)*qP/%2)%r*bd1) 0%r 1%r  
-        (finite (dom F.m) /\ length Prg.logP <= qP /\ FSet.card (toFSet (dom F.m)) <= qF) => //.
-    inline Exp'(C(A)).A.a;wp.
-    call (_: finite (dom F.m) /\ length Prg.logP = C.CP.c /\ C.CP.c <= qP /\ 
-             card (toFSet (dom F.m)) <= C.CF.c /\ C.CF.c <= qF).
-      fun;if.
-       call (_: length Prg.logP = C.CP.c - 1 ==> length Prg.logP = C.CP.c).
-         fun;wp;do !rnd; skip; progress => //. smt.
-       wp;skip;progress => //;smt.
-      wp => //.
-      fun;if.
-        call (_: finite (dom F.m) /\ card (toFSet (dom F.m)) <= C.CF.c - 1 ==> 
-                 finite (dom F.m) /\ card (toFSet (dom F.m)) <= C.CF.c).
-         fun;wp;do !rnd;skip;progress => //. smt.
-         rewrite dom_set;smt. smt.
-        wp;skip;progress => //;smt.
-      wp => //.
-  inline F.init Prg_rB.init;wp;rnd;wp;skip;progress => //; smt.
+intros=> FfL.
+proc; sp; if=> //.
+by call FfL; wp.
+qed.
+
+lemma CPprgL (A <: Adv) (F <: APRF) (P <: APRG):
+  islossless P.prg =>
+  islossless C(A,F,P).CP.prg.
+proof.
+intros=> PprgL.
+proc; sp; if=> //.
+by call PprgL; wp.
+qed.
+
+lemma CaL (A <: Adv {C}) (F <: APRF {A}) (P <: APRG {A}):
+  (forall (F <: APRF {A}) (P <: APRG {A}),
+    islossless F.f =>
+    islossless P.prg =>
+    islossless A(F,P).a) =>
+  islossless F.f =>
+  islossless P.prg =>
+  islossless C(A,F,P).a.
+proof.
+intros=> AaL FfL PprgL.
+proc.
+call (AaL (<: C(A,F,P).CF) (<: C(A,F,P).CP) _ _).
+  by apply (CFfL A F P); assumption.
+  by apply (CPprgL A F P); assumption.
+by wp.
+qed.
+
+section.
+  declare module A:Adv {C,P,F}.
+  axiom AaL (F <: APRF {A}) (P <: APRG {A}):
+    islossless F.f =>
+    islossless P.prg =>
+    islossless A(F,P).a.
+
+  lemma pr &m:
+    Pr[Exp(C(A),F,P(F)).main() @ &m: res] <=
+      Pr[Exp(C(A),F,PrgI).main() @ &m: res] + Pr[Exp'(C(A)).main() @ &m: Bad P.logP F.m].
+  proof.
+  apply (P_PrgI (<: C(A)) _ &m).
+    intros=> F0 P0 F0fL P0prgL; apply (CaL A F0 P0); last 2 assumption.
+    by apply AaL.
+  qed.
+
+  local lemma Bad_bound:
+    phoare [Exp'(C(A)).main : true ==> Bad P.logP F.m] <= ((qP * qF + (qP - 1) * qP /% 2)%r * pr_dseed).
+  proof.
+  proc.
+  seq 3: true
+         1%r ((qP * qF + (qP - 1) * qP /% 2)%r * pr_dseed)
+         0%r 1%r  
+         (length P.logP <= qP /\ card (dom F.m) <= qF)=> //.
+    inline Exp'(C(A)).A.a; wp.
+    call (_: length P.logP = C.cP /\ C.cP <= qP /\
+             card (dom F.m) <= C.cF /\ C.cF <= qF).
+      (* f *)
+      proc; sp; if=> //.
+      call (_: card (dom F.m) < C.cF ==> card (dom F.m) <= C.cF);
+        first by proc; wp; do !rnd; skip; smt.
+      by wp; skip; smt.
+      (* prg *)
+      proc; sp; if=> //.
+      call (_: length P.logP = C.cP - 1 ==> length P.logP = C.cP);
+        first by proc; wp; do !rnd; skip; smt.
+      by wp; skip; smt.
+    by inline Psample.init F.init;
+       wp; rnd; wp; skip; smt.
   inline Resample.resample.
-  exists * Prg.logP;elim * => logP0.
-  seq 3 : true 
-     1%r  ((qP*qF + (qP - 1)*qP/%2)%r*bd1)
-     0%r 1%r 
-         (finite (dom F.m) /\ n = length logP0 /\ n <= qP /\ Prg.logP = [] /\ 
-          card (toFSet (dom F.m)) <= qF) => //.
-    by rnd;wp.
-    conseq (_:_: <= (if bad Prg.logP F.m then 1%r else 
-                    ((sum_n (qF + length Prg.logP) (qF + n - 1))%r*bd1))).
-      progress.
-       rewrite (_:bad [] F.m{hr} = false); first rewrite /bad;smt.
-      progress;apply CompatOrderMult => //;last smt.
-      rewrite length_nil /=.
-      generalize H0;elimT list_case logP0.
-        rewrite length_nil /sum_n sum_ij_gt. smt.
-        intros _. cut HqP : 0 <= (qP-1) * qP by smt.
-        cut Hmod : 0 <= ( (qP - 1) * qP /% 2) by smt.
-        by rewrite from_intMle;smt.
-      intros x l H0;rewrite sumn_ij;first smt.
-      rewrite ?FromInt.Add.
-      apply addleM;first smt.
-      rewrite from_intMle;apply ediv_Mle => //. 
-      apply mulMle;smt.
-    while{1} (finite (dom F.m) /\ n <= qP /\ card (toFSet (dom F.m)) <= qF).
-      intros Hw.
-      exists * Prg.logP, F.m, n;elim * => logP fm n0.
-      case (bad Prg.logP F.m).
-       conseq * ( _ : _ : <= (1%r)) => //. smt.
-      seq 2 : (bad Prg.logP F.m) 
-          ((qF + length logP)%r * bd1) 1%r
-          1%r ((sum_n (qF + (length logP + 1)) (qF + n - 1))%r * bd1)
-          (n = n0 /\ F.m = fm /\ finite (dom F.m) /\ r::logP = Prg.logP /\ 
-          n <= qP /\ card (toFSet (dom F.m)) <= qF) => //.
-        by wp;rnd => //.
-        wp;rnd;skip;progress.
-        generalize H3;rewrite !FromInt.Add Mul_distr_r /bad -rw_nor /= => [Hu He].
-        apply (Real.Trans _ (mu dsample1 (cpOr (lambda x, in_dom x F.m{hr})
-                                            (lambda x, mem x Prg.logP{hr})))).
-          by apply mu_sub => x /=; rewrite /cpOr; smt.
-        apply mu_or_le.
-          rewrite (mu_eq _ _ (cpMem (toFSet (dom F.m{hr})))).
-            by intros x; rewrite /= /cpMem;smt.
-          by apply (Real.Trans _ ((card (toFSet (dom F.m{hr})))%r * bd1));smt.
+  exists* P.logP; elim* => logP.
+  seq 3: true
+         1%r  ((qP * qF + (qP - 1) * qP /% 2)%r * pr_dseed)
+         0%r 1%r
+         (n = length logP /\ n <= qP /\ P.logP = [] /\
+          card (dom F.m) <= qF)=> //.
+    by rnd; wp.
+  conseq (_:_: <= (if Bad P.logP F.m then 1%r else 
+                  ((sum_n (qF + length P.logP) (qF + n - 1))%r * pr_dseed))).
+    progress; cut ->: Bad [] F.m{hr} = false by smt.
+    rewrite //=; apply CompatOrderMult=> //; last smt.
+    generalize H0 H; elim/list_case logP=> //=.
+      (* logP = [] *)
+      rewrite /sum_n sum_ij_gt; first smt.
+      cut HqP: 0 <= (qP - 1)* qP by smt.
+      cut Hmod: 0 <= (qP - 1) * qP /% 2 by smt.
+      by rewrite from_intMle; smt.
+      (* logP = x::xs *)
+      intros=> x l H0 H; rewrite sumn_ij; first smt.
+      rewrite !FromInt.Add.
+      apply addleM.
+        cut ->: (qF + (1 + length l) - 1 - qF + 1) = (1 + length l) by smt.
+        cut ->: qF * (1 + length l) = (1 + length l) * qF by smt.
+        smt.
+      rewrite from_intMle; apply ediv_Mle=> //.
+      by apply mulMle; smt.
+  while{1} (n <= qP /\ card (dom F.m) <= qF).
+    intros Hw.
+    exists* P.logP, F.m, n; elim* => logPw m n0.
+    case (Bad P.logP F.m).
+      by conseq* ( _ : _ : <= (1%r))=> //; smt.
+    seq 2: (Bad P.logP F.m) 
+           ((qF + length logPw)%r * pr_dseed) 1%r
+           1%r ((sum_n (qF + (length logPw + 1)) (qF + n - 1))%r * pr_dseed)
+           (n = n0 /\ F.m = m /\ r::logPw = P.logP /\ 
+            n <= qP /\ card (dom F.m) <= qF)=> //.
+      by wp; rnd=> //.
+      wp; rnd; skip; progress.
+      generalize H2; rewrite !FromInt.Add Mul_distr_r /Bad -nor=> //= [Hu Hf].
+      apply (Real.Trans _ (mu dseed ((fun x, in_dom x F.m{hr})
+                                  \/ (fun x, mem x P.logP{hr}))));
+        first by apply mu_sub=> x /=; rewrite /Pred.(\/); smt.
+      apply mu_or_le.
+        rewrite (mu_eq _ _ (cpMem (dom F.m{hr})));
+          first by intros x; rewrite /= /cpMem; smt.
+        apply (Real.Trans _ ((card (dom F.m{hr}))%r * pr_dseed)).
+          apply mu_cpMem_le=> x _.
+            by rewrite (dseedU x witness) 3:/pr_dseed // dseedF.
+            by apply CompatOrderMult; smt.
         by apply mu_Lmem_le_length; smt.
-        conseq Hw; progress => //.
-        by rewrite (neqF ( bad (r{hr} :: logP) F.m{hr})) => //=; smt.
+        conseq Hw; progress=> //.
+        generalize H1; rewrite -neqF=> -> //=.
+        cut ->: 1 + length logPw = length logPw + 1 by smt.
+        done.
       progress => //.
-      rewrite (neqF (bad Prg.logP{hr} F.m{hr}) _) => //=.
-      rewrite -Mul_distr_r -Int.CommutativeGroup.Assoc -FromInt.Add sum_n_i1j //; smt.
-    by skip;progress => //;smt.
-save.
+      generalize H2; rewrite -neqF=> -> //=.
+      rewrite -Mul_distr_r -Int.CommutativeGroup.Assoc -FromInt.Add sum_n_i1j //.
+      smt.
+    by skip; progress; smt.
+  qed.
 
-lemma conclusion_aux (A<:Adv{Prg,F,C}) :
-    (forall (O1 <: AOrclPrg{A}) (O2<:OrclRnd{A}), islossless O1.prg => islossless O2.f => 
-       islossless A(O1,O2).a) =>
-    forall &m, 
-      Pr[Exp(C(A),Prg).main() @ &m : res] <= 
-        Pr[Exp(C(A),Prg_r).main() @ &m : res] +  (qP*qF + (qP - 1)*qP/%2)%r*bd1.
-proof.
- intros HA &m.      
- apply (Real.Trans _ (Pr[Exp(C(A),Prg_r).main() @ &m : res] + 
-        Pr[Exp'(C(A)).main() @ &m : bad Prg.logP F.m])).
- apply (Pr1 (<:C(A)) _ &m). 
- intros O1 O2 HO1 HO2;fun.
- call (HA (<:C(A,O1,O2).CP) (<:C(A,O1,O2).CF) _ _).
-  fun;if;[call HO1 | ];wp => //.
-  fun;if;[call HO2 | ];wp => //.
-  wp => //.
- cut _ : Pr[Exp'(C(A)).main() @ &m : bad Prg.logP F.m] <= (qP*qF + (qP - 1)*qP/%2)%r*bd1;
-   last smt.
- bdhoare_deno (Pr3 A) => //.
-save.
+  lemma conclusion &m:
+    Pr[Exp(C(A),F,P(F)).main() @ &m: res] <=
+      Pr[Exp(C(A),F,PrgI).main() @ &m: res] +  (qP * qF + (qP - 1) * qP /% 2)%r* mu_x dseed witness.
+  proof.
+  apply (Real.Trans _ (Pr[Exp(C(A),F,PrgI).main() @ &m: res] +
+                         Pr[Exp'(C(A)).main() @ &m: Bad P.logP F.m])).
+    by apply (pr &m).
+  cut: Pr[Exp'(C(A)).main() @ &m: Bad P.logP F.m] <= (qP * qF + (qP - 1) * qP/%2)%r * pr_dseed
+    by byphoare Bad_bound.
+  smt.
+  qed.
+end section.
 
+(**** This is leftover from an old proof that went all the way to the absolute value... Should we care? *)
+(*
 module NegA (A:Adv, P:AOrclPrg, R:OrclRnd) = {
   module A = A(P,R)
   fun a() : bool = { 
