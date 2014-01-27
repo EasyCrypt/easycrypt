@@ -26,14 +26,14 @@ axiom doutL: mu dout True = 1%r.
 
 (** We use a PRF that, on input a seed, produces a seed and an output... *)
 module type PRF = {
-  proc * init()  : unit
-  proc f (x:seed): seed * output
+  proc * init() : unit
+  proc f(x:seed): seed * output
 }.
 
 (** ... to build a PRG that produces random output without requiring new input... *)
 module type PRG = {
   proc * init(): unit (* We let our PRG have internal state, which we should be able to initialize *)
-  proc prg ()  : output
+  proc prg()   : output
 }.
 
 (*** Defining security *)
