@@ -1,0 +1,284 @@
+% !TeX root = easycrypt.tex
+
+In this section, we discuss a simple proof showing that a pseudo-random
+generator can be constructed from a pseudo-random function by splitting the
+PRF's output into some intermediate internal state and some output. We detail
+the formalization and intermediate games below, and leave the \pRHL proofs to
+the reader (an example proof is given in the \EasyCrypt distribution
+(\ec{examples/PRG.ec}).
+
+We write our construction on two abstract types \ec{seed} and \ec{output}, on
+which we assume two (lossless) distributions. The distribution on \ec{seed} is
+assumed to be full (that is, every element of type \ec{seed} has non-zero
+probability), and uniform. We denote with \ec{pr\_seed} the probability of
+sampling any given element in \ec{dseed}. The fullness and uniformity conditions
+are only used rather late in the proof.
+
+\begin{easycrypt}[style=easycrypt-pretty]{Setting up some types and distributions}
+(* A type for the PRG's output *)
+type output.
+
+op dout: output distr.
+axiom doutL: mu dout True = 1%r.
+
+(* A type for the internal seeds *)
+type seed.
+
+op dseed: seed distr.
+axiom dseedL: mu dseed True = 1%r.
+axiom dseedU: isuniform dseed.
+axiom dseedF (x:seed): mu dseed ((=) x) <> 0%r.
+
+op pr_dseed = mu dseed ((=) witness).
+\end{easycrypt}
+
+The overall goal is to use a PRF that, on input a \ec{seed}, produces a
+\ec{seed} and an \ec{output}, potentially using and updating some internal
+state, to construct a PRG that only uses internal state to produce an
+\ec{output} every time it is called. Each of the module types describing these
+abstract functionalities is equipped with an initializer procedure \ec{init} so
+the theorems discussed later can be instantiated with stateful concrete
+definitions. Recall that the \ec{*} annotation on a procedure's signature
+indicates that it should initialize the module's global state
+(see Section~\ref{sec:procedure_annotations}).
+
+\begin{easycrypt}[style=easycrypt-pretty]{Setting up the module types}
+module type PRF = {
+  proc * init(): unit
+  proc f(x:seed): seed * output
+}.
+
+module type PRG = {
+  proc * init(): unit
+  proc prg() : output
+}.
+\end{easycrypt}
+
+We can now define our notion of adversaries. To do so, we introduce restricted
+signatures for the PRF and PRG that hide the \ec{init} procedures from the
+adversary. An adversary is a functor that provides a function \ec{a} that takes
+no input and uses both the PRF and PRG to return a boolean. Note that the oracle
+restrictions given to \ec{a} are not restricting the adversary's power in any way,
+but are only used to provide some stability to proof scripts in this
+intermediate version of the tool. See Sections~\ref{sec:module_types}
+and~\ref{sec:functors} for more information on module types and subtyping, and
+functors.
+
+\begin{easycrypt}[style=easycrypt-pretty]{Defining the class of adversaries}
+module type APRF = {
+  proc f(x:seed): seed * output
+}.
+
+module type APRG = {
+  proc prg(): output
+}.
+
+module type Adv (F:APRF,P:APRG) = {
+  proc a(): bool {F.f P.prg}
+}.
+\end{easycrypt}
+
+We can now define the security of a PRG using two concrete modules: \ec{PrgI},
+that defines an ideal PRG that simply samples from the output distribution
+\ec{dout} and a simple indistinguishability experiment \ec{Exp}. In this
+setting, given a concrete PRF \ec{F} and a concrete PRG \ec{P(F)}, the security
+of \ec{P(F)} is proved by bounding the probability
+\ec{Pr[Exp(A,F,P(F)).main() @ &m: res]} by a function of
+\ec{Pr[Exp(A,F,PrgI).main() @ &m: res]} for any adversary \ec{A}. More can be read on
+the interpretation of probability expressions in
+Section~\ref{sec:probability_expressions}. The language of procedures is
+described in details in Section~\ref{sec:pWhile}.
+In practice, our final theorem will only discuss the case where the adversary
+makes only a bounded number of queries to the PRF and PRG. We detail this later,
+when it becomes important to the proof.
+
+\begin{easycrypt}[style=easycrypt-pretty]{Defining security}
+module PrgI = {
+  proc init () : unit = { }
+
+  proc prg(): output = {
+    var r;
+
+    r = $dout;
+    return r;
+  }
+}.
+
+module Exp (A:Adv,F:PRF,P:PRG) = {
+  module A = A(F,P)
+
+  proc main():bool = {
+    var b: bool;
+
+    F.init();
+    P.init();
+    b = A.a();
+    return b;
+  }
+}.
+\end{easycrypt}
+
+Concretely, we use an ideal PRF, defined below as \ec{F}, and prove the
+security of the concrete PRG \ec{P} whose definition is also given below.
+The \ec{logP} variable in \ec{P} is a proof artefact due to a currently missing
+feature in \EasyCrypt and should be fixed by the release. A simple proof step
+would allow us to quantify over a PRF, and add the probability of distinguishing
+the concrete PRF from \ec{F} to the final bound.
+
+\begin{easycrypt}[style=easycrypt-pretty]{Concrete definitions}
+module F = {
+  var m:(seed,seed * output) map
+
+  proc init(): unit = {
+     m = FMap.empty;
+  }
+
+  proc f (x:seed) : seed * output = {
+    var r1, r2;
+
+    r1 = $dseed;
+    r2 = $dout;
+    if (!in_dom x m)
+      m.[x] = (r1,r2);
+
+    return oget (m.[x]);
+  }
+}.
+
+module P (F:PRF) = {
+  var seed: seed
+  var logP: seed list
+
+  proc init(): unit = {
+    seed = $dseed;
+  }
+
+  proc prg(): output = {
+    var r;
+
+    (seed,r) = F.f (seed);
+    return r;
+  }
+}.
+\end{easycrypt}
+
+In a first step, we relate the probability \ec{Pr[Exp(A,F,P(F)).main() @ &m: res]}
+to the probability of \ec{Pr[Exp(A,F,Psample).main() @ &m: res \/ Bad P.logP F.m]},
+where \ec{Psample} and \ec{Bad} are defined below. Intuitively, \ec{Bad}
+is true whenever the PRG's internal seed is twice set to the same value, or
+the adversary manages to guess any one of the internal states. The following
+display also lists a lemma relating \ec{Pr[Exp(A,F,P(F)) @ &m: res]}
+to the probability of the adversary returning 1 when playing the \ec{Exp} game
+against the ideal PRG (\ec{Pr[Exp(A,F,PrgI).main() @ &m: res]}) using \ec{F} as
+a PRF, and the probability \ec{Pr[Exp(A,F,Psample).main() @ &m: Bad P.logP F.m]}
+of the \ec{Bad} event occurring when the adversary plays against \ec{Psample}.
+To prove these lemmas, it may be useful to open a section in which an abstract
+adversary \ec{A} can be considered without requiring so many quantifications.
+More details on sections can be found in Section~\ref{sec:sections}.
+(Losslessness conditions are ommitted from the lemma statements.)
+
+\begin{easycrypt}[style=easycrypt-pretty]{Equivalence up to collisions}
+module Psample = {
+  proc init(): unit = {
+    P.seed = $dseed;
+    P.logP = [];
+  }
+
+  proc prg(): output = {
+    var r1, r2;
+
+    r1 = $dseed;
+    r2 = $dout;
+    P.logP = P.seed :: P.logP;
+    P.seed = r1;
+    return r2;
+  }
+}.
+
+pred Bad logP (m:('a,'b) map) =
+       !unique logP
+    \/ exists r, mem r logP /\ in_dom r m.
+
+lemma P_Psample (A <: Adv {F,P}) &m:
+  Pr[Exp(A,F,P(F)).main() @ &m: res] <=
+    Pr[Exp(A,F,Psample).main() @ &m: res \/ Bad P.logP F.m].
+
+lemma P_PrgI (A <:Adv {F,P}) &m:
+  Pr[Exp(A,F,P(F)).main() @ &m: res] <=
+      Pr[Exp(A,F,PrgI).main() @ &m: res] +
+      Pr[Exp(A,F,Psample).main() @ &m: Bad P.logP F.m].
+\end{easycrypt}
+
+All that remains to do is to bound the probability of the \ec{Bad} event.
+To do so, we declare two abstract positive integers \ec{qP} and \ec{qF}
+and a transformer on adversaries that bound the number of oracle queries
+they can make. Note that, given an adversary only, the functor \ec{Bound}
+constructs a well-formed adversary, that takes a PRF and a PRG to construct
+a well-typed procedure \ec{a}. This allows us to directly apply
+Lemma~\ec{P\_PrgI} to \ec{Bound(A)} for any adversary \ec{A} without having to
+re-prove it in this restricted case.
+
+\begin{easycrypt}[style=easycrypt-pretty]{Bounding the adversary}
+op qP:int.
+axiom leq0_qP: 0 <= qP.
+
+op qF:int.
+axiom leq0_qF: 0 <= qF.
+
+module Bound (A:Adv,F:APRF,P:APRG) = {
+  var cF, cP:int
+
+  module CF = {
+    proc f(x): seed * output = {
+      var r = witness;
+
+      if (cF < qF) { cF = cF + 1; r = F.f(x);}
+      return r;
+    }
+  }
+
+  module CP = {
+    proc prg (): output = {
+      var r = witness;
+
+      if (cP < qP) { cP = cP + 1; r = P.prg();}
+      return r;
+    }
+  }
+
+  module A = A(CF,CP)
+
+  proc a(): bool = {
+    var b:bool;
+
+    cF = 0;
+    cP = 0;
+    b = A.a();
+    return b;
+  }
+}.
+
+lemma P_PrgI_bounded (A <:Adv {Bound,F,P}) &m:
+  Pr[Exp(Bound(A),F,P(F)).main() @ &m: res] <=
+      Pr[Exp(Bound(A),F,PrgI).main() @ &m: res] +
+      Pr[Exp(Bound(A),F,Psample).main() @ &m: Bad P.logP F.m].
+  proof.
+  apply (P_PrgI (<: C(A)) _ &m).
+  qed.
+\end{easycrypt}
+
+Finally, we bound the probability of the \ec{Bad} event occurring and conclude.
+In the example proof, this is proved using eager sampling. By the release, this
+should be changed to illustrate the plug and pray technique, since eager will be
+illustrated in other places.
+
+\begin{easycrypt}[style=easycrypt-pretty]{Bounding the probability of \ec{Bad}}
+lemma Bad_bound (A <: Adv {Bound,F,P}) &m:
+  Pr[Exp(Bound(A),F,Psample).main() @ &m: Bad P.logP F.m] <=
+    (qP * qF + (qP - 1) * qP /% 2)%r * pr_dseed.
+
+lemma conclusion (A <: Adv {Bound,F,P}) &m:
+  Pr[Exp(Bound(A),F,P(F)).main() @ &m: res] <=
+    Pr[Exp(Bound(A),F,PrgI).main() @ &m: res] +
+    (qP * qF + (qP - 1) * qP /% 2)%r * pr_dseed.
+\end{easycrypt}
