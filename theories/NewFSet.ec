@@ -24,7 +24,7 @@ proof.
   by rewrite -(perm_eq_uniq (undup s)) ?(undup_uniq, oflistK).
 qed.
 
-axiom fset_eq (s1 s2 : 'a fset): (* FIXME: Provable? *)
+axiom fset_eq (s1 s2 : 'a fset):
   (perm_eq (elems s1) (elems s2)) => (s1 = s2).
 
 (* -------------------------------------------------------------------- *)

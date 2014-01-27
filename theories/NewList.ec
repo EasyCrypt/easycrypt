@@ -146,6 +146,11 @@ proof.
   by elim s1 n n_ge0; smt.
 qed.
 
+lemma nth_rcons x0 (s : 'a list) x n:
+  nth x0 (rcons s x) n =
+    if n < size s then nth x0 s n else if n = size s then x else x0.
+proof. elim s n; smt. qed.
+
 lemma eq_from_nth x0 (s1 s2 : 'a list):
      size s1 = size s2
   => (forall i, 0 <= i < size s1 => nth x0 s1 i = nth x0 s2 i)
@@ -685,6 +690,9 @@ proof. by rewrite /rev. qed.
 lemma rev_cons (x : 'a) s: rev (x :: s) = rcons (rev s) x.
 proof. by rewrite -cats1 -catrevE. qed.
 
+lemma rev1 (x : 'a): rev [x] = [x].
+proof. by []. qed.
+
 lemma size_rev (s : 'a list): size (rev s) = size s.
 proof.
   elim s; first by rewrite /rev.
@@ -1041,6 +1049,17 @@ proof. by rewrite sortE /=; apply InsertSort.perm_sort. qed.
 lemma sort_sorted (e : 'a -> 'a -> bool) s:
   (forall (x y : 'a), e x y \/ e y x) => sorted e (sort e s).
 proof. by rewrite sortE /=; apply InsertSort.sort_sorted. qed.
+
+(* -------------------------------------------------------------------- *)
+(*                   rcons / induction principle                        *)
+(* -------------------------------------------------------------------- *)
+lemma last_ind (p : 'a list -> bool):
+  p [] => (forall s x, p s => p (rcons s x)) => forall s, p s.
+proof.
+  move=> Hnil Hlast s; rewrite -(cat0s s).
+  elim s [] Hnil => [|x s2 IHs] s1 Hs1; first by rewrite cats0.
+  by rewrite -cat_rcons (IHs (rcons s1 x)) // Hlast.
+qed.
 
 (* -------------------------------------------------------------------- *)
 (*                          Order lifting                               *)
