@@ -375,6 +375,27 @@ by rewrite /Top.(<=)=> x x_in_f; rewrite get_filter;
    cut:= mem_dom_filter f m x _; last intros=> [_ ->].
 qed.
 
+lemma filter_set_true f (m:('a,'b) map) x y:
+  f x y =>
+  filter f m.[x <- y] = (filter f m).[x <- y].
+proof strict.
+intros=> f_xy; apply map_ext=> a.
+case (x = a).
+  by intros=> <-; rewrite get_filter 2!get_set_eq /oget //= f_xy.
+  by intros=> neq_x_a; rewrite get_filter !get_set_neq // -get_filter.
+qed.
+
+lemma filter_set_false f (m:('a,'b) map) x y:
+  !f x y =>
+  filter f m.[x <- y] = rm x (filter f m).
+proof strict.
+rewrite -neqF=> not_f_xy; apply map_ext=> a.
+case (x = a).
+  by intros=> <-; rewrite get_filter get_set_eq /oget //= not_f_xy get_rm.
+  by rewrite -neqF=> neq_x_a;
+     rewrite get_filter get_set_neq 1:neq_x_a // get_rm neq_x_a //= -get_filter.
+qed.
+
 (* TODO: Prove
      lemma size_filter f m: size (filter f m) <= size m.
    This is simple once we have size_leq. *)
