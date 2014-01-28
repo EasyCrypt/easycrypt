@@ -291,6 +291,16 @@ theory Core.
      cut:= filter_dom f m x _; last intros=> [_ ->].
   qed.
 
+  lemma filter_add_true p (m : ('a, 'b) map) x y : p x y => filter p m.[x<-y] = (filter p m).[x<-y].
+  proof strict.
+  intros H. apply map_ext. intros a. 
+  case (x = a). intros <-. rewrite get_setE. rewrite get_filter. 
+  by rewrite get_setE proj_some H.
+  intros H1.
+  rewrite get_setN //. 
+  by rewrite get_filter get_setN // get_filter.
+  qed.
+
   (* TODO: Prove
        lemma size_filter f m: size (filter f m) <= size m.
      This is simple once we have size_leq. *)
