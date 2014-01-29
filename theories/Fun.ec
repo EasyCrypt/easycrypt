@@ -53,6 +53,18 @@ proof.
   by generalize h; rewrite !fK.
 qed.
 
+lemma nosmt inj_eq (f : 'a -> 'b):
+  injective f => forall x y, (f x = f y) <=> (x = y).
+proof. by move=> inj_f x y; split=> [| -> //]; apply inj_f. qed.
+
+lemma nosmt can_eq (f : 'a -> 'b) g:
+  cancel f g => forall x y, (f x = f y) <=> (x = y).
+proof. by move=> can_fg; apply inj_eq; apply (can_inj f g). qed.
+
+lemma nosmt can2_eq (f : 'a -> 'b) g:
+  cancel f g => cancel g f => forall x y, (f x = y) <=> (x = g y).
+proof. by move=> fK gK x y; rewrite -{1}gK; apply (can_eq f g). qed.
+
 pred pcancel (f:'a -> 'b) (g:'b -> 'a) (p:'b -> bool) =
   forall (x:'a), p (f x) /\ comp g f x = x.
 
