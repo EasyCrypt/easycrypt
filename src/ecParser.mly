@@ -280,6 +280,7 @@
 %token RND
 %token RPAREN
 %token RPBRACE
+%token RWNORMAL
 %token SAME
 %token SAMPLE
 %token SECTION
@@ -1997,6 +1998,9 @@ logtactic:
 
 | REWRITE a=rwarg+
    { Prewrite a }
+
+| RWNORMAL f=sform WITH ps=qident+
+   { Prwnormal (f, ps) }
 
 | SUBST l=sform*
    { Psubst l }

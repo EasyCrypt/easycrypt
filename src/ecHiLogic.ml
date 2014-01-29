@@ -252,25 +252,29 @@ let process_subst loc ri g =
 (* -------------------------------------------------------------------- *)
 exception RwMatchFound of EcUnify.unienv * (uid -> ty option) * form evmap
 
-let try_match opts hyps (ue, ev) p form =
+let try_match ?posf opts hyps (ue, ev) p form =
   let na = List.length (snd (EcFol.destr_app p)) in
 
-  let trymatch bds tp =
-    let tp =
-      match tp.f_node with
-      | Fapp (h, hargs) when List.length hargs > na ->
-          let (a1, a2) = List.take_n na hargs in
-            f_app h a1 (toarrow (List.map f_ty a2) tp.f_ty)
-      | _ -> tp
-    in
-
-    try
-      if not (Mid.set_disjoint bds tp.f_fv) then
-        None
-      else
-        let (ue, tue, ev) = f_match opts hyps (ue, ev) ~ptn:p tp in
-          raise (RwMatchFound (ue, tue, ev))
-    with MatchFailure -> None
+  let trymatch bds pos tp =
+    match posf, pos with
+    | Some _   , ([] | [_]) -> `Continue
+    | Some posf, [x; 0] when x <> posf -> `Reject
+    | _ ->
+      let tp =
+        match tp.f_node with
+        | Fapp (h, hargs) when List.length hargs > na ->
+            let (a1, a2) = List.take_n na hargs in
+              f_app h a1 (toarrow (List.map f_ty a2) tp.f_ty)
+        | _ -> tp
+      in
+  
+      try
+        if not (Mid.set_disjoint bds tp.f_fv) then
+          `Continue
+        else
+          let (ue, tue, ev) = f_match opts hyps (ue, ev) ~ptn:p tp in
+            raise (RwMatchFound (ue, tue, ev))
+      with MatchFailure -> `Continue
   in
 
   try
@@ -446,7 +450,7 @@ let process_apply loc (pe, tg) g =
   | Some tg -> process_apply_on_hyp  loc (pe, tg) g
 
 (* -------------------------------------------------------------------- *)
-let process_rewrite1_core (s, o) (p, typs, ue, ax) args g =
+let process_rewrite1_core ?posf (s, o) (p, typs, ue, ax) args g =
   let (hyps, concl) = get_goal g in
   let env = LDecl.toenv hyps in
 
@@ -476,7 +480,7 @@ let process_rewrite1_core (s, o) (p, typs, ue, ax) args g =
   let (_ue, tue, ev) =
     let ev = evmap_of_pterm_arguments ids in
 
-    match try_match fmrigid hyps (ue, ev) fp concl with
+    match try_match ?posf fmrigid hyps (ue, ev) fp concl with
     | None   -> tacuerror "cannot find an occurence for [rewrite]"
     | Some x -> x
   in
@@ -486,7 +490,7 @@ let process_rewrite1_core (s, o) (p, typs, ue, ax) args g =
   let fp   = concretize_pterm (tue, ev) ids fp in
 
   let cpos =
-    try  FPosition.select_form hyps o fp concl
+    try  FPosition.select_form ?posf hyps o fp concl
     with InvalidOccurence -> tacuerror "invalid occurence selector"
   in
 
@@ -560,7 +564,7 @@ let rec process_rewrite1 loc ri g =
         | Some (_ue, tue, ev) -> begin
             let p    = concretize_form (tue, ev) p in
             let cpos =
-              let test = fun _ fp ->
+              let test = fun _ _ fp ->
                 let fp =
                   match fp.f_node with
                   | Fapp (h, hargs) when List.length hargs > na ->
@@ -569,8 +573,8 @@ let rec process_rewrite1 loc ri g =
                   | _ -> fp
                 in
                   if   EcReduction.is_alpha_eq hyps p fp
-                  then Some (-1)
-                  else None
+                  then `Accept (-1)
+                  else `Continue
               in
                 try  FPosition.select ?o test concl
                 with InvalidOccurence ->
@@ -1106,28 +1110,92 @@ let process_algebra mode kind eqs g =
     tactic g
 
 (* -------------------------------------------------------------------- *)
+let normalize (rw : EcPath.path list) (f : form) ((juc, an) : goal) =
+  let g = new_goal juc (get_hyps (juc, an), EcFol.f_eq f f) in
+
+  let rw =
+    let hyps = get_hyps g in
+
+    let do1 p =
+      let (p, typ, ax) =
+        match EcEnv.Ax.by_path_opt p (LDecl.toenv hyps) with
+        | Some ({ EcDecl.ax_spec = Some fp } as ax) ->
+            (`Global p, ax.EcDecl.ax_tparams, fp)
+        | _ -> assert false
+      in
+
+      let ue  = unienv_of_hyps hyps in
+      let fs  = EcUnify.UniEnv.opentvi ue typ None in
+      let ax  = Fsubst.subst_tvar fs ax in
+      let typ = List.map (fun (a, _) -> EcIdent.Mid.find a fs) typ in (* FIXME: TC HOOK *)
+
+        (p, typ, ue, ax)
+
+    in
+      List.map do1 rw
+
+  in
+
+  let g =
+    let rec t g =
+      let do1 (p, typ, ue, ax) g =
+        let ue = EcUnify.UniEnv.copy ue in
+          process_rewrite1_core ~posf:2 (`LtoR, None) (p, typ, ue, ax) [] g
+      in
+        match t_try_base (t_lor (List.map do1 rw)) g with
+        | `Failure _ -> t_id None g
+        | `Success g -> t_on_last t g
+
+    in
+      t g
+  in
+
+  let (juc, cn, fn) =
+    match t_rotate `Right 1 g with
+    | (juc, cn :: fn) -> (juc, cn, fn)
+    | _ -> assert false
+  in
+
+  let eq  = get_concl (juc, cn) in
+  let juc = fst (upd_rule { pr_name = RN_revert;
+                            pr_hyps = List.map (fun x -> RA_node x) fn; }
+                   (juc, cn))
+  in
+    t_on_first
+      (t_use cn fn)
+      (t_cut eq (juc, an))
+
+(* -------------------------------------------------------------------- *)
+let process_normalize f ps g =
+  let env = LDecl.toenv (get_hyps g) in
+  let ps  = List.map (fun p -> EcEnv.Ax.lookup_path (unloc p) env) ps in
+  let f   = process_formula (get_hyps g) f in
+    normalize ps f g
+
+(* -------------------------------------------------------------------- *)
 let process_logic (engine, hitenv) loc t =
   match t with
-  | Preflexivity   -> process_reflexivity loc
-  | Passumption pq -> process_assumption loc pq
-  | Psmt pi        -> process_smt hitenv pi
-  | Pintro pi      -> process_intros pi
-  | Psplit         -> t_split
-  | Pfield st      -> process_algebra `Solve `Field st
-  | Pring st       -> process_algebra `Solve `Ring  st
-  | Pexists fs     -> process_exists fs
-  | Pleft          -> t_left
-  | Pright         -> t_right
-  | Pcongr         -> process_congr
-  | Ptrivial       -> process_trivial
-  | Pelim pe       -> process_elim loc pe
-  | Papply pe      -> process_apply loc pe
-  | Pcut (ip, f, t)-> process_cut engine ip f t
-  | Pcutdef (ip, f)-> process_cutdef loc ip f
-  | Pgeneralize l  -> process_generalize loc l
-  | Pclear l       -> process_clear l
-  | Prewrite ri    -> process_rewrite loc ri
-  | Psubst   ri    -> process_subst loc ri
-  | Psimplify ri   -> process_simplify ri
-  | Pchange pf     -> process_change pf
-  | Ppose (x, o, p)-> process_pose loc x o p
+  | Preflexivity      -> process_reflexivity loc
+  | Passumption pq    -> process_assumption loc pq
+  | Psmt pi           -> process_smt hitenv pi
+  | Pintro pi         -> process_intros pi
+  | Psplit            -> t_split
+  | Pfield st         -> process_algebra `Solve `Field st
+  | Pring st          -> process_algebra `Solve `Ring  st
+  | Pexists fs        -> process_exists fs
+  | Pleft             -> t_left
+  | Pright            -> t_right
+  | Pcongr            -> process_congr
+  | Ptrivial          -> process_trivial
+  | Pelim pe          -> process_elim loc pe
+  | Papply pe         -> process_apply loc pe
+  | Pcut (ip, f, t)   -> process_cut engine ip f t
+  | Pcutdef (ip, f)   -> process_cutdef loc ip f
+  | Pgeneralize l     -> process_generalize loc l
+  | Pclear l          -> process_clear l
+  | Prewrite ri       -> process_rewrite loc ri
+  | Prwnormal (f, p)  -> process_normalize f p
+  | Psubst   ri       -> process_subst loc ri
+  | Psimplify ri      -> process_simplify ri
+  | Pchange pf        -> process_change pf
+  | Ppose (x, o, p)   -> process_pose loc x o p

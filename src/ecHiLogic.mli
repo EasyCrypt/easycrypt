@@ -1,6 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcSymbols
 open EcParsetree
+open EcFol
 open EcLogic
 
 (* -------------------------------------------------------------------- *)
@@ -37,3 +38,6 @@ val process_trivial : tactic
 val process_case    : EcLocation.t -> genpattern list -> tactic
 val process_rewrite : EcLocation.t -> rwarg list -> tactic
 val process_done    : tactic
+
+(* -------------------------------------------------------------------- *)
+val normalize : EcPath.path list -> form -> goal -> goals

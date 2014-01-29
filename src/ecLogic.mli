@@ -93,6 +93,8 @@ val t_close : tactic -> tactic
 
 val t_rotate : [`Left | `Right] -> int -> goals -> goals
 
+val t_try_base : tactic -> goal -> [`Success of goals | `Failure of exn]
+
 (* -------------------------------------------------------------------- *)
 (* TODO : move this in ecEnv.Mod *)
 val gen_check_restr : 
@@ -157,7 +159,7 @@ val t_clear : EcIdent.Sid.t -> tactic
 
 val t_glob : EcPath.path -> EcTypes.ty list -> tactic
 
-val t_use : int -> 'a -> goal -> judgment_uc * 'a
+val t_use : int -> int list -> goal -> goals
 
 val t_change : form -> tactic
 

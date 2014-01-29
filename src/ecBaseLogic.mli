@@ -54,6 +54,7 @@ type rule =
 | RN_weak       of Sid.t
 | RN_apply
 | RN_smt
+| RN_revert
 | RN_hypothesis of EcIdent.t
 | RN_lemma      of EcPath.path * ty list
 | RN_xtd        of xrule

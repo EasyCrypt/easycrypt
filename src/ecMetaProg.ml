@@ -517,6 +517,8 @@ exception InvalidPosition
 exception InvalidOccurence
 
 module FPosition = struct
+  type select = [`Accept of int | `Reject | `Continue]
+
   (* ------------------------------------------------------------------ *)
   let empty : ptnpos = Mint.empty
 
@@ -575,45 +577,46 @@ module FPosition = struct
 
   (* ------------------------------------------------------------------ *)
   let select ?o test =
-    let rec doit1 ctxt fp =
-      match test ctxt fp with
-      | Some i -> Some (`Select i)
-      | None   -> begin
+    let rec doit1 ctxt pos fp =
+      match test ctxt pos fp with
+      | `Accept i -> Some (`Select i)
+      | `Reject   -> None
+      | `Continue -> begin
         let subp =
           match fp.f_node with
-          | Fif    (c, f1, f2) -> doit (`WithCtxt (ctxt, [c; f1; f2]))
-          | Fapp   (f, fs)     -> doit (`WithCtxt (ctxt, f :: fs))
-          | Ftuple fs          -> doit (`WithCtxt (ctxt, fs))
+          | Fif    (c, f1, f2) -> doit pos (`WithCtxt (ctxt, [c; f1; f2]))
+          | Fapp   (f, fs)     -> doit pos (`WithCtxt (ctxt, f :: fs))
+          | Ftuple fs          -> doit pos (`WithCtxt (ctxt, fs))
 
           | Fquant (_, b, f) ->
             let xs   = List.pmap (function (x, GTty _) -> Some x | _ -> None) b in
             let ctxt = List.fold_left ((^~) Sid.add) ctxt xs in
-              doit (`WithCtxt (ctxt, [f]))
+              doit pos (`WithCtxt (ctxt, [f]))
 
           | Flet (lp, f1, f2) ->
             let subctxt = List.fold_left ((^~) Sid.add) ctxt (lp_ids lp) in
-              doit (`WithSubCtxt [(ctxt, f1); (subctxt, f2)])
+              doit pos (`WithSubCtxt [(ctxt, f1); (subctxt, f2)])
 
           | Fpr (m, _, f1, f2) ->
             let subctxt = Sid.add m ctxt in
-              doit (`WithSubCtxt [(ctxt, f1); (subctxt, f2)])
+              doit pos (`WithSubCtxt [(ctxt, f1); (subctxt, f2)])
 
           | _ -> None
         in
           omap (fun p -> `Sub p) subp
       end
 
-    and doit fps =
+    and doit pos fps =
       let fps =
         match fps with
         | `WithCtxt (ctxt, fps) ->
             List.mapi
-              (fun i fp -> doit1 ctxt fp |> omap (fun p -> (i, p)))
+              (fun i fp -> doit1 ctxt (i::pos) fp |> omap (fun p -> (i, p)))
               fps
 
         | `WithSubCtxt fps ->
             List.mapi
-              (fun i (ctxt, fp) -> doit1 ctxt fp |> omap (fun p -> (i, p)))
+              (fun i (ctxt, fp) -> doit1 ctxt (i::pos) fp |> omap (fun p -> (i, p)))
               fps
       in
 
@@ -625,7 +628,7 @@ module FPosition = struct
     in
       fun fp ->
         let cpos =
-          match doit (`WithCtxt (Sid.empty, [fp])) with
+          match doit [] (`WithCtxt (Sid.empty, [fp])) with
           | None   -> Mint.empty
           | Some p -> p
         in
@@ -637,17 +640,21 @@ module FPosition = struct
             filter o cpos
 
   (* ------------------------------------------------------------------ *)
-  let select_form hyps o p target =
+  let select_form ?posf hyps o p target =
     let na = List.length (snd (EcFol.destr_app p)) in
-    let test _ tp =
-      let (tp, ti) =
-        match tp.f_node with
-        | Fapp (h, hargs) when List.length hargs > na ->
-            let (a1, a2) = List.take_n na hargs in
-              (f_app h a1 (toarrow (List.map f_ty a2) tp.f_ty), na)
-        | _ -> (tp, -1)
-      in
-        if EcReduction.is_alpha_eq hyps p tp then Some ti else None
+    let test _ pos tp =
+      match posf, pos with
+      | Some _, ([] | [_]) -> `Continue
+      | Some posf, [x; 0] when x <> posf -> `Reject
+      | _ ->
+        let (tp, ti) =
+          match tp.f_node with
+          | Fapp (h, hargs) when List.length hargs > na ->
+              let (a1, a2) = List.take_n na hargs in
+                (f_app h a1 (toarrow (List.map f_ty a2) tp.f_ty), na)
+          | _ -> (tp, -1)
+        in
+          if EcReduction.is_alpha_eq hyps p tp then `Accept ti else `Continue
     in
       select ?o test target
 

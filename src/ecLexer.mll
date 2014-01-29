@@ -71,6 +71,7 @@
     (* Auto tactics *)
     "apply"       , APPLY      ;        (* KW: tactic *)
     "rewrite"     , REWRITE    ;        (* KW: tactic *)
+    "rwnormal"    , RWNORMAL   ;        (* KW: tactic *)
     "subst"       , SUBST      ;        (* KW: tactic *)
     "progress"    , PROGRESS   ;        (* KW: tactic *)
     "trivial"     , TRIVIAL    ;        (* KW: tactic *)

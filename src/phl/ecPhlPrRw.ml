@@ -108,7 +108,7 @@ let t_pr_rewrite s g =
     | `MuOr
     | `MuDisj  -> select_pr is_or in
 
-  let select xs fp = if select xs fp then Some (-1) else None in
+  let select xs _ fp = if select xs fp then `Accept (-1) else `Continue in
   let env, _, concl = get_goal_e g in
   let torw =
     try
