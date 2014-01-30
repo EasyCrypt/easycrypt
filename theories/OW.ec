@@ -15,17 +15,23 @@ type skey.
 op keypairs: (pkey * skey) distr.
 axiom keypairsL: weight keypairs = 1%r.
 
-(* The distribution from which the challenge is sampled *)
-(* Note: We use its support as the permutation's domain! *)
-op challenge: pkey -> t distr.
-axiom challengeL pk: weight (challenge pk) = 1%r.
-axiom challengeU pk: isuniform (challenge pk).
-
-(** Concrete definitions *)
-pred valid_keys (ks:pkey * skey) = in_supp ks keypairs.
+pred valid_keys (ks:pkey * skey) = support keypairs ks.
 pred valid_pkey (pk:pkey) = exists sk, valid_keys (pk,sk).
 pred valid_skey (sk:skey) = exists pk, valid_keys (pk,sk).
 
+(* The distribution from which the challenge is sampled *)
+(* Note: We use its support as the permutation's domain! *)
+op challenge: pkey -> t distr.
+
+axiom challengeL pk:
+  valid_pkey pk =>
+  mu (challenge pk) True = 1%r.
+
+axiom challengeU pk:
+  valid_pkey pk =>
+  isuniform (challenge pk).
+
+(** Concrete definitions *)
 op f: pkey -> t -> t.
 pred f_dom (pk:pkey) (x:t) =
   support (challenge pk) x.
