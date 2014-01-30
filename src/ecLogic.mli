@@ -149,7 +149,7 @@ val t_split : tactic
 val t_left  : tactic
 val t_right : tactic
 
-val t_congr : form -> (form * form) list * EcTypes.ty -> tactic
+val t_congr : form * form -> (form * form) list * EcTypes.ty -> tactic
 
 val t_smt : strict:bool -> bool * hints -> EcProvers.prover_infos -> tactic
 

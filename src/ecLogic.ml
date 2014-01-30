@@ -1696,23 +1696,23 @@ let rec t_intros_elim n g =
     | _ -> tacuerror "nothing to introduce"
 
 (* -------------------------------------------------------------------- *)
-let t_congr f (args, ty) g =
+let t_congr (f1, f2) (args, ty) g =
   let rec doit args ty g =
     match args with
     | [] -> t_reflex g
 
     | (a1, a2) :: args->
         let aty  = a1.f_ty in
-        let m1   = f_app f (List.rev_map fst args) (tfun aty ty) in
-        let m2   = f_app f (List.rev_map snd args) (tfun aty ty) in
+        let m1   = f_app f1 (List.rev_map fst args) (tfun aty ty) in
+        let m2   = f_app f2 (List.rev_map snd args) (tfun aty ty) in
         let tcgr = t_apply_logic EcCoreLib.p_fcongr
                      [ty; aty]
-                     [AAform m1; AAform a1; AAform a2; AAnode] in
+                     [AAform m2; AAform a1; AAform a2; AAnode] in
 
         let tsub g =
           let fx   = EcIdent.create "f" in
           let fty  = tfun aty ty in
-          let body = f_app (f_local fx fty) [a2] ty in
+          let body = f_app (f_local fx fty) [a1] ty in
           let lam  = EcFol.f_lambda [(fx, GTty fty)] body in
             t_subgoal
               [doit args fty]
@@ -1721,11 +1721,10 @@ let t_congr f (args, ty) g =
                  [AAform lam; AAform m1; AAform m2; AAnode] g)
         in
           t_subgoal
-            [tcgr; tsub]
-            (t_transitivity (EcFol.f_app m1 [a2] ty) g)
+            [tsub; tcgr]
+            (t_transitivity (EcFol.f_app m2 [a1] ty) g)
   in
     t_on_goals (t_try t_assumption) (doit (List.rev args) ty g)
-
 
 (* -------------------------------------------------------------------- *)
 let t_logic_trivial =

@@ -99,10 +99,10 @@ let process_congr g =
   | Fapp (o1, a1), Fapp (o2, a2)
       when    EcReduction.is_alpha_eq hyps o1 o2
            && List.length a1 = List.length a2 ->
-    t_congr o1 ((List.combine a1 a2), f1.f_ty) g
+    t_congr (o1, o2) ((List.combine a1 a2), f1.f_ty) g
 
   | _, _ when EcReduction.is_alpha_eq hyps f1 f2 ->
-    t_congr f1 ([], f1.f_ty) g
+    t_congr (f1, f2) ([], f1.f_ty) g
 
   | _, _ -> tacuerror "congr: no congruence"
 
