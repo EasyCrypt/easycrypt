@@ -27,9 +27,9 @@ end Triangle.
 theory FromInt.
   require import Int.
   import why3 "real" "FromInt".
-  lemma from_intM: forall (a b:int),
+  lemma from_intM (a b:int):
     (from_int a < from_int b) <=> (a < b)%Int
-  by [].
+  by (split; smt).
 
   lemma from_intMle : forall (a b : int), from_int a <= from_int b <=> a <= b
   by [].

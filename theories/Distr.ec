@@ -50,6 +50,13 @@ axiom pw_eq (d d':'a distr):
   d == d' <=> d = d'.
 
 (** Lemmas *)
+lemma witness_nzero p (d:'a distr):
+  0%r < mu d p =>
+  (exists x, p x).
+proof strict.
+by cut: p <> False => (exists x, p x); smt.
+qed.
+
 lemma ew_eq (d d':'a distr):
   d === d' => d = d'.
 proof strict.
@@ -126,6 +133,16 @@ cut ->: forall (p q:'a -> bool), (p /\ q) = !((!p) \/ (!q))
 by rewrite mu_not mu_or !mu_not mu_supp; smt.
 qed.
 
+lemma witness_support p (d:'a distr):
+  0%r < mu d p =>
+  (exists x, p x /\ in_supp x d).
+proof.
+rewrite mu_support=> nzero.
+apply witness_nzero in nzero; case nzero=> x.
+rewrite /Pred.(/\) /support //= => p_supp.
+by exists x.
+qed.
+
 lemma mu_sub_support (d:'a distr) (p q:('a -> bool)):
   (p /\ (support d)) <= (q /\ (support d)) =>
   mu d p <= mu d q.
@@ -192,8 +209,7 @@ theory Dunit.
 
   lemma nosmt mu_x_def (x y:'a):
     mu_x (dunit y) x = if x = y then 1%r else 0%r
-  by [].
-(*  by rewrite /mu_x mu_def /charfun. *)
+  by rewrite /mu_x mu_def /charfun.
 
   lemma nosmt mu_x_def_eq (x:'a):
     mu_x (dunit x) x = 1%r
@@ -307,7 +323,7 @@ theory Dapply.
     in_supp y (dapply f d) <=> exists x, y = f x /\ in_supp x d.
   proof strict.
   rewrite /in_supp /mu_x mu_def; split.
-    rewrite mu_support /Pred.(/\) /= => in_sup; smt.
+    rewrite mu_support /Pred.(/\) /= => in_sup. smt.
     by intros=> [x]; rewrite /in_supp /mu_x=> [y_def nempty];
        cut : (=) x <= (fun x, y = f x) by (by intros=> w);
        smt.
