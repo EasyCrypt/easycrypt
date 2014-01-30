@@ -66,6 +66,7 @@ val t_id : string option -> tactic
 val t_fail : tactic
 
 val t_reflex : ?reduce:bool -> tactic
+val t_transitivity : form -> tactic
 
 val t_focus : tfocus -> tactic -> goals -> goals
 
@@ -155,7 +156,9 @@ val t_smt : strict:bool -> bool * hints -> EcProvers.prover_infos -> tactic
 
 val t_cut : form -> tactic
 
-val t_clear : EcIdent.Sid.t -> tactic
+val t_clear_set : EcIdent.Sid.t  -> tactic
+val t_clear     : EcIdent.t      -> tactic
+val t_clears    : EcIdent.t list -> tactic
 
 val t_glob : EcPath.path -> EcTypes.ty list -> tactic
 

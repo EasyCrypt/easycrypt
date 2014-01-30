@@ -202,7 +202,7 @@ let t_eager_if g =
                        [AAmem m1;AAmem m2;AAnode])
                     (t_hyp h1)]);
            t_split;
-           t_seq (t_clear (EcIdent.Sid.singleton a))
+           t_seq (t_clear a)
              (t_seq_subgoal (t_cut bT)
                 [ t_id None;
                   t_seq (t_intros_i [a])

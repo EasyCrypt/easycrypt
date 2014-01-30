@@ -373,7 +373,7 @@ let t_smt ~strict hints pi g =
         with EcWhy3.CannotTranslate _ ->
           error "cannot prove goal"
 
-let t_clear ids (juc,n as g) =
+let t_clear_set ids (juc,n as g) =
   let pp_id fmt id = Format.fprintf fmt "%s" (EcIdent.name id) in
   let hyps,concl = get_goal g in
   if not (Mid.set_disjoint ids concl.f_fv) then begin
@@ -391,6 +391,9 @@ let t_clear ids (juc,n as g) =
   let juc,n1 = new_goal juc (hyps,concl) in
   let rule = { pr_name = RN_weak ids; pr_hyps = [RA_node n1] } in
   upd_rule rule (juc,n)
+
+let t_clears ids g = t_clear_set (EcIdent.Sid.of_list ids) g
+let t_clear id g = t_clear_set (EcIdent.Sid.singleton id) g
 
 let gen_check_restr env pp_a a use restr =
   let restr = NormMp.norm_restr env restr in 
@@ -1035,7 +1038,7 @@ let t_generalize_hyp ?clear id g = t_generalize_hyps ?clear [id] g
 
 let t_generalize_hyps clear ids g = 
   if clear then 
-    t_seq (t_generalize_hyps ids) (t_clear (EcIdent.Sid.of_list ids)) g
+    t_seq (t_generalize_hyps ids) (t_clears ids) g
   else t_generalize_hyps ids g
 
 (* -------------------------------------------------------------------- *)
@@ -1126,7 +1129,7 @@ let t_elimT_ind mode goal =
             t_lseq
               [t_intros_i [id];
                t_elimT_form tys p (f_local id ty) 0;
-               t_clear (Sid.singleton id);
+               t_clear id;
                t_simplify EcReduction.beta_red]
               goal
     end
@@ -1223,7 +1226,7 @@ let t_subst_gen x h side g =
   let t_first =
     t_seq_subgoal (t_rewrite side f)
       [ t_hyp h;
-        t_seq (t_clear (Sid.of_list (x::h::ids))) (t_intros_i ids) ] in
+        t_seq (t_clears (x::h::ids)) (t_intros_i ids) ] in
   t_seq_subgoal (t_apply_form concl (List.map (fun _ -> AAnode) aa))
     (t_first :: List.map t_hyp aa) g
 
@@ -1293,7 +1296,7 @@ let t_subst_pv_gen h side g =
   t_seq (t_generalize_hyps true to_gen)
     (t_seq_subgoal (t_rewrite_gen pattern_pv side f)
             [t_hyp h; 
-             t_seq (t_clear (EcIdent.Sid.singleton h))
+             t_seq (t_clear h)
                (t_intros to_intros)]) g
 
 let cansubst_pv_eq hyps fx f1 f2 = 
@@ -1419,14 +1422,14 @@ let t_progress tac g =
       match f.f_node with
       | Fop(p,_) when EcPath.p_equal p p_false -> t_elim_hyp id, aux
       | Fapp({f_node = Fop(p,_)}, [_;_] ) when is_op_and p -> 
-        t_seq (t_elim_hyp id) (t_clear (Sid.singleton id)),
+        t_seq (t_elim_hyp id) (t_clear id),
         aux0
       | Fquant(Lexists,_,_) -> 
         t_elim_hyp id, aux0
       | _ when is_eq f -> 
         let f1, f2 = destr_eq f in
         if is_tuple f1 && is_tuple f2 then 
-          t_seq (t_elim_hyp id) (t_clear (Sid.singleton id)), aux0
+          t_seq (t_elim_hyp id) (t_clear id), aux0
         else t_try (t_subst1_id id), aux 
           
       | _ -> t_try (t_subst1_id id), aux in
@@ -1453,10 +1456,10 @@ let rec t_split_build g =
         let ff = f_and ff1 ff2 in
         (id1, ff),
         t_lseq [
-          t_elim_hyp id1;t_clear (Sid.singleton id1); t_intros_i [id1;id2];
+          t_elim_hyp id1;t_clear id1; t_intros_i [id1;id2];
           t_seq_subgoal tac [
-            t_seq (t_clear (Sid.singleton id2)) tac1;
-            t_seq (t_clear (Sid.singleton id1)) tac2]]
+            t_seq (t_clear id2) tac1;
+            t_seq (t_clear id1) tac2]]
 
       | OK_eq when EcReduction.is_conv hyps f1 f2 -> 
         let id = EcIdent.create "_" in
@@ -1476,7 +1479,7 @@ let rec t_split_build g =
             List.fold_left (fun ids ((id,_),_) -> Sid.add id ids) Sid.empty idfts in
           let tacs = 
             List.map (fun ((id,_), tac) -> 
-              t_seq (t_clear (Sid.remove id ids)) tac) idfts in
+              t_seq (t_clear_set (Sid.remove id ids)) tac) idfts in
           let ff = f_ands (List.map (fun ((_,f), _) -> f) idfts) in
           let id = EcIdent.create "_" in
           let rec etacs ids = 
@@ -1485,7 +1488,7 @@ let rec t_split_build g =
             | [(idi,_),_] -> 
               t_seq (t_generalize_hyps true [id]) (t_intros_i [idi])
             | ((idi,_),_) :: ids ->
-              t_lseq [t_elim_hyp id; t_clear (Sid.singleton id);
+              t_lseq [t_elim_hyp id; t_clear id;
                       t_intros_i [idi;id]; etacs ids] in
           (id, ff),
           t_seq (etacs idfts)
@@ -1529,13 +1532,13 @@ let rec t_split_build g =
             t_seq_subgoal (t_seq (t_intros_i [h1;h2]) (t_cut ff1))
               [t_seq tacu1 (t_apply_hyp h2 []);
                t_lseq [t_intros_i [id1];t_generalize_hyp h1;
-                       t_clear (Sid.add h1 (Sid.singleton h2));
+                       t_clears [h1; h2];
                        tac1]];
            (* hyps |- !f1 => u2 => f3{f1<-false} *)
             t_seq_subgoal (t_seq (t_intros_i [h1;h2]) (t_cut ff2))
               [t_seq tacu2 (t_apply_hyp h2 []);
                t_lseq [t_intros_i [id2];t_generalize_hyp h1;
-                       t_clear (Sid.add h1 (Sid.singleton h2));
+                       t_clears [h1;h2];
                        tac2]] ] in
       (id, ff), tac
 
@@ -1584,7 +1587,7 @@ and t_build1 g =
       t_seq (t_intros_i ids) 
         (t_seq_subgoal (t_cut u)
            [t_apply_hyp id' args;
-            t_lseq [t_clear (Sid.singleton id'); t_intros_i [id];
+            t_lseq [t_clear id'; t_intros_i [id];
                     tac]]) in
     (id', ff), tac'
 
@@ -1605,7 +1608,7 @@ and t_build2 f1 g =
   | Fapp({f_node = Fop(p,_)}, [_;_] ) when is_op_and p ->
     let id = EcIdent.create "_" in
     let tac = 
-      t_lseq [t_intros_i [id]; t_elim_hyp id; t_clear (Sid.singleton id)] in
+      t_lseq [t_intros_i [id]; t_elim_hyp id; t_clear id] in
     let (juc, gs) = tac g in
     let idf, tac1 = t_build0 (juc, List.hd gs) in
     idf, t_seq tac tac1
@@ -1622,7 +1625,7 @@ and t_build2 f1 g =
     let id = EcIdent.create "_" in
     if is_tuple f && is_tuple f2 then 
       let tac = 
-        t_lseq [t_intros_i [id]; t_elim_hyp id;t_clear (Sid.singleton id)] in
+        t_lseq [t_intros_i [id]; t_elim_hyp id;t_clear id] in
       let (juc,gs) = tac g in
       let (idf,tac1) = t_build0 (juc, List.hd gs) in
       idf, t_seq tac tac1
@@ -1638,7 +1641,7 @@ and t_build2 f1 g =
       t_seq tac1
         (t_seq_subgoal (t_cut ff1) [
           t_seq (t_apply_hyp id1 [AAnode]) (t_hyp id);
-          t_lseq [tac2; t_try (t_clear (Sid.singleton id1)); 
+          t_lseq [tac2; t_try (t_clear id1); 
                   t_intros_i [id1]; tac3]])
   | _ -> 
     let id = EcIdent.create "_" in
@@ -1650,7 +1653,7 @@ and t_build2 f1 g =
     t_seq tac
       (t_seq_subgoal (t_cut ff1) [
         t_seq (t_apply_hyp id1 [AAnode]) (t_hyp id);
-        t_lseq [t_clear (Sid.singleton id1); t_intros_i [id1]; tac1]])
+        t_lseq [t_clear id1; t_intros_i [id1]; tac1]])
 
 (* -------------------------------------------------------------------- *)
 let t_progress_one g =

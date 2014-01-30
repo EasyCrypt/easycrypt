@@ -679,7 +679,7 @@ let t_infer_conseq_notmod (juc, _ as g) =
     let g' = (juc, List.hd gs) in
     let hyps1, post1 = get_goal g' in
     let (juc,gs) = 
-      t_lseq [t_generalize_hyp h;t_clear (EcIdent.Sid.singleton h);
+      t_lseq [t_generalize_hyp h;t_clear h;
               t_intros_elim 1] g' in
     let (id,f), tac = t_build (juc,List.hd gs) in
     let subst = Fsubst.f_subst_id in
@@ -697,7 +697,7 @@ let t_infer_conseq_notmod (juc, _ as g) =
         t_intros_i (m'::h::ids);
          t_change (f_imp f post1);
          t_intros_i [id];
-         t_generalize_hyp h;t_clear (EcIdent.Sid.singleton h);
+         t_generalize_hyp h;t_clear h;
          t_intros_elim 1;
          tac];
        t_id None ] g
@@ -727,7 +727,7 @@ let t_infer_conseq_notmod (juc, _ as g) =
     let g' = (juc,List.hd gs) in
     let hyps1,post1 = get_goal g' in
     let (juc,gs) = 
-      t_lseq [t_generalize_hyp h;t_clear (EcIdent.Sid.singleton h);
+      t_lseq [t_generalize_hyp h;t_clear h;
               t_intros_elim 1] g' in
     let (id,f), tac = t_build (juc,List.hd gs) in
     let subst = Fsubst.f_subst_id in
@@ -755,7 +755,7 @@ let t_infer_conseq_notmod (juc, _ as g) =
          t_intros_i (m'::h::vres::ids);
          t_change (f_imp f post1);
          t_intros_i [id];
-         t_generalize_hyp h;t_clear (EcIdent.Sid.singleton h);
+         t_generalize_hyp h;t_clear h;
          t_intros_elim 1;
          tac];
        t_id None ] g
@@ -775,7 +775,7 @@ let t_infer_conseq_notmod (juc, _ as g) =
     let g' = (juc, List.hd gs) in
     let hyps1, post1 = get_goal g' in
     let (juc,gs) = 
-      t_lseq [t_generalize_hyp h;t_clear (EcIdent.Sid.singleton h);
+      t_lseq [t_generalize_hyp h;t_clear h;
               t_intros_elim 1] g' in
     let (id,f), tac = t_build (juc,List.hd gs) in
     let subst = Fsubst.f_subst_id in
@@ -793,7 +793,7 @@ let t_infer_conseq_notmod (juc, _ as g) =
         t_intros_i (m'::h::ids);
          t_change (f_imp f post1);
          t_intros_i [id];
-         t_generalize_hyp h;t_clear (EcIdent.Sid.singleton h);
+         t_generalize_hyp h;t_clear h;
          t_intros_elim 1;
          tac];
        t_id None ] g
@@ -823,7 +823,7 @@ let t_infer_conseq_notmod (juc, _ as g) =
     let g' = (juc,List.hd gs) in
     let hyps1,post1 = get_goal g' in
     let (juc,gs) = 
-      t_lseq [t_generalize_hyp h;t_clear (EcIdent.Sid.singleton h);
+      t_lseq [t_generalize_hyp h;t_clear h;
               t_intros_elim 1] g' in
     let (id,f), tac = t_build (juc,List.hd gs) in
     let subst = Fsubst.f_subst_id in
@@ -851,7 +851,7 @@ let t_infer_conseq_notmod (juc, _ as g) =
          t_intros_i (m'::h::vres::ids);
          t_change (f_imp f post1);
          t_intros_i [id];
-         t_generalize_hyp h;t_clear (EcIdent.Sid.singleton h);
+         t_generalize_hyp h;t_clear h;
          t_intros_elim 1;
          tac];
        t_id None ] g
@@ -875,7 +875,7 @@ let t_infer_conseq_notmod (juc, _ as g) =
     let g' = (juc, List.hd gs) in
     let hyps1, post1 = get_goal g' in
     let (juc,gs) = 
-      t_lseq [t_generalize_hyp h;t_clear (EcIdent.Sid.singleton h);
+      t_lseq [t_generalize_hyp h;t_clear h;
               t_intros_elim 1] g' in
     let (id,f), tac = t_build (juc,List.hd gs) in
     let subst = Fsubst.f_subst_id in
@@ -895,7 +895,7 @@ let t_infer_conseq_notmod (juc, _ as g) =
         t_intros_i (ml'::mr'::h::ids);
          t_change (f_imp f post1);
          t_intros_i [id];
-         t_generalize_hyp h;t_clear (EcIdent.Sid.singleton h);
+         t_generalize_hyp h;t_clear h;
          t_intros_elim 1;
          tac];
        t_id None ] g
@@ -936,7 +936,7 @@ let t_infer_conseq_notmod (juc, _ as g) =
     let g' = (juc,List.hd gs) in
     let hyps1,post1 = get_goal g' in
     let (juc,gs) = 
-      t_lseq [t_generalize_hyp h;t_clear (EcIdent.Sid.singleton h);
+      t_lseq [t_generalize_hyp h;t_clear h;
               t_intros_elim 1] g' in
     let (id,f), tac = t_build (juc,List.hd gs) in
     let subst = Fsubst.f_subst_id in
@@ -970,7 +970,7 @@ let t_infer_conseq_notmod (juc, _ as g) =
          t_intros_i (ml'::mr'::h::vresl::vresr::ids);
          t_change (f_imp f post1);
          t_intros_i [id];
-         t_generalize_hyp h;t_clear (EcIdent.Sid.singleton h);
+         t_generalize_hyp h;t_clear h;
          t_intros_elim 1;
          tac];
        t_id None ] g

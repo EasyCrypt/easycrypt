@@ -13,6 +13,7 @@ open EcBaseLogic
 open EcEnv
 open EcLogic
 open EcCoreHiLogic
+open EcStrongRing
 
 module Sp = EcPath.Sp
 
@@ -203,8 +204,7 @@ let process_clear l g =
     let s = ps.pl_desc in
     if LDecl.has_symbol s hyps then (fst (LDecl.lookup s hyps))
     else error ps.pl_loc (UnknownHypSymbol s) in
-  let ids = EcIdent.Sid.of_list (List.map toid l) in
-  t_clear ids g
+  t_clears (List.map toid l) g
 
 (* -------------------------------------------------------------------- *)
 let process_simplify ri g =
@@ -381,7 +381,7 @@ let process_apply_on_goal loc pe g =
              let g = t_intros_1 [h] g in
                t_seq
                  (gen_t_apply_hyp (fun _ _ x -> x) h a2)
-                 (t_clear (Sid.singleton h))
+                 (t_clear h)
                  g)
           ]
           (t_cut cut g)
@@ -439,7 +439,7 @@ let process_apply_on_hyp loc (pe, hyp) g =
           (Fsubst.uni (EcUnify.UniEnv.close ue) fc) args
   in
     t_subgoal
-      [t_seq (t_clear (Sid.singleton hyp)) (t_intros_i [hyp]);
+      [t_seq (t_clear hyp) (t_intros_i [hyp]);
        (fun g -> t_on_last (t_hyp hyp) (tcut g))]
       (t_rotate `Left 1 (t_cut cutf g))
 
@@ -781,7 +781,7 @@ let process_mintros ?(cf = true) pis gs =
                   let eq = LDecl.lookup_hyp_by_id h (get_hyps g) in
                     process_rewrite1_core (s, o) (`Local h, [], ue, eq) [] g
                 in
-                  t_lseq [t_intros_i [h]; rwt; t_clear (Sid.singleton h)] g
+                  t_lseq [t_intros_i [h]; rwt; t_clear h] g
               in
                 (false, t_on_goals t gs))
 
@@ -897,7 +897,7 @@ let process_generalize loc patterns g =
               when occ = None && LDecl.has_symbol s hyps
             ->
               let id = fst (LDecl.lookup s hyps) in
-                t_seq (t_generalize_hyp ~clear:true id) (t_clear (Sid.singleton id)) g
+                t_seq (t_generalize_hyp ~clear:true id) (t_clear id) g
           | _ ->
             let (hyps, concl) = get_goal g in
             let env = LDecl.toenv hyps in
@@ -934,7 +934,7 @@ let process_generalize loc patterns g =
 
           | FPNamed ({ pl_desc = ([], s) }, None) when LDecl.has_symbol s hyps ->
               let id = fst (LDecl.lookup s hyps) in
-                t_seq (t_generalize_hyp id) (t_clear (Sid.singleton id)) g
+                t_seq (t_generalize_hyp id) (t_clear id) g
 
           | FPNamed (q, tys) ->
               let cd = { pt_name = q; pt_tys = tys; pt_args = fp.fp_args } in
@@ -1017,8 +1017,8 @@ let process_elimT loc qs g =
   t_lseq
     [set_loc loc (t_elimT_form typs p fpf sk);
      t_or
-       (t_clear (Sid.singleton pf))
-       (t_seq (t_generalize_hyp pf) (t_clear (Sid.singleton pf)));
+       (t_clear pf)
+       (t_seq (t_generalize_hyp pf) (t_clear pf));
      t_simplify EcReduction.beta_red]
     g
 

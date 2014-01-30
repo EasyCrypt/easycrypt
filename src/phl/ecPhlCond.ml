@@ -77,9 +77,9 @@ let rec t_equiv_cond side g =
           t_seq (t_intros_i [hiff])
             (t_seq_subgoal (t_equiv_cond (Some true))
                [t_seq_subgoal (EcPhlRCond.Low.t_equiv_rcond false true  1) 
-                   [t_aux; t_clear (Sid.singleton hiff)];
+                   [t_aux; t_clear hiff];
                 t_seq_subgoal (EcPhlRCond.Low.t_equiv_rcond false false 1) 
-                  [t_aux; t_clear (Sid.singleton hiff)]
+                  [t_aux; t_clear hiff]
                ])
         ] g
 
