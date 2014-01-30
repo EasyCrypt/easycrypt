@@ -3,6 +3,7 @@ open EcSymbols
 open EcTypes
 open EcFol
 open EcLogic
+open EcRing
 open EcAlgebra
 
 (* -------------------------------------------------------------------- *)
@@ -16,6 +17,10 @@ val ring_axioms  : EcEnv.env -> ring  -> (symbol * form) list
 val field_axioms : EcEnv.env -> field -> (symbol * form) list
 
 (* -------------------------------------------------------------------- *)
+val t_cut_ring_congr : 
+  cring -> RState.rstate -> pexpr -> int list -> EcFol.form list -> tactic
+val t_cut_ring_norm :
+  cring -> RState.rstate -> (pexpr * pexpr) list -> pexpr -> tactic
 val t_ring : ring -> eqs -> form * form -> tactic
 val t_ring_simplify : ring -> eqs -> form * form -> tactic
 

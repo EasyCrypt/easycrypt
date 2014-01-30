@@ -277,6 +277,7 @@
 %token REWRITE
 %token RIGHT
 %token RING
+%token ALGNORM
 %token RND
 %token RPAREN
 %token RPBRACE
@@ -1973,6 +1974,9 @@ logtactic:
 
 | RING eqs=ident*
     { Pring eqs }
+
+| ALGNORM f=sform 
+    { Palg_norm f }
 
 | EXIST a=iplist1(loc(fpattern_arg), COMMA) %prec prec_below_comma
    { Pexists a }

@@ -142,12 +142,45 @@ let field_axioms = Axioms.field_axioms
 (* -------------------------------------------------------------------- *)
 open EcBaseLogic
 open EcLogic
+open EcReduction
 
-class rn_ring  = object inherit xrule "ring"  end
-class rn_field = object inherit xrule "field" end
+class rn_ring_congr = object inherit xrule "ring_congr"  end
+class rn_ring_norm  = object inherit xrule "ring_norm"  end
+class rn_ring       = object inherit xrule "ring"  end
+class rn_field      = object inherit xrule "field" end
 
-let rn_ring  = RN_xtd (new rn_ring)
-let rn_field = RN_xtd (new rn_field)
+let rn_ring_congr = RN_xtd (new rn_ring_congr)
+let rn_ring_norm  = RN_xtd (new rn_ring_norm) 
+let rn_ring       = RN_xtd (new rn_ring)
+let rn_field      = RN_xtd (new rn_field)
+
+let t_cut_ring_congr (cr:cring) (rm:RState.rstate) pe li lv g = 
+  let rm' = RState.update rm li lv in
+  let env,_,_ = get_goal_e g in
+  let mk_goal i =
+    let r1 = oget (RState.get i rm) in
+    let r2 = oget (RState.get i rm') in
+    EqTest.for_type_exn env r1.f_ty r2.f_ty;
+    f_eq r1 r2 in
+  let t_congr g = 
+    let sg = List.map mk_goal li in
+    prove_goal_by sg rn_ring_congr g in
+  let ofring = ofring (ring_of_cring cr) in
+  let r1 = ofring rm  pe in
+  let r2 = ofring rm' pe in
+  t_on_first t_congr (t_cut (f_eq r1 r2) g)
+
+
+let t_cut_ring_norm (cr:cring) (rm:RState.rstate) eqs pe g =
+  let ofring = ofring (ring_of_cring cr) rm in
+  let t_norm g = 
+    let sg = List.map (fun (pe1,pe2) -> f_eq (ofring pe1) (ofring pe2)) eqs in
+    prove_goal_by sg rn_ring_norm g in
+  let npe = ring_simplify_pe cr eqs pe in
+  let r1 = ofring pe in
+  let r2 = ofring npe in
+  t_on_first t_norm (t_cut (f_eq r1 r2) g)
+
 
 let t_ring_simplify cr eqs (f1, f2) g =
   let cr = cring_of_ring cr in

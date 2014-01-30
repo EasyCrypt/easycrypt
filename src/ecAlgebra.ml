@@ -14,6 +14,7 @@ module RState : sig
   val empty   : rstate
   val add     : form -> rstate -> int * rstate
   val get     : int -> rstate -> form option
+  val update  : rstate -> int list -> form list -> rstate
 end = struct
   type rstate = {
     rst_map : int Mf.t;
@@ -34,6 +35,17 @@ end = struct
 
   let get (i : int) (rmap : rstate) =
     Mint.find_opt i rmap.rst_inv
+
+  let update1 rmap i f' = 
+    match get i rmap with
+    | Some f ->
+      {rmap with 
+        rst_map = Mf.add f' i (Mf.remove f rmap.rst_map);
+        rst_inv = Mint.add i f' rmap.rst_inv}
+    | None -> rmap
+
+  let update rmap li lf = List.fold_left2 update1 rmap li lf
+
 end
 
 (* -------------------------------------------------------------------- *)
@@ -171,6 +183,8 @@ let cring_of_ring (r : ring) : cring =
   let cr = r.r_embed |> 
       (function (`Direct | `Default) -> cr | `Embed p -> Mp.add p `OfInt cr) in
     (r, cr)
+
+let ring_of_cring (cr:cring) = fst cr
 
 (* -------------------------------------------------------------------- *)
 let cfield_of_field (r : field) : cfield =
@@ -323,16 +337,17 @@ let rec ofring (r:ring) (rmap:RState.rstate) (e:pexpr) : form =
   | PEpow(p1,i)  -> rexp r (ofring r rmap p1) i 
 
 (* -------------------------------------------------------------------- *)
+let ring_simplify_pe (cr:cring) peqs pe = 
+  if (fst cr).r_bool then Bring.norm_pe pe peqs
+  else Iring.norm_pe pe peqs 
+
+
 let ring_simplify (cr : cring) (eqs : eqs) (form : form) =
   let map = ref RState.empty in
   let toring form = reffold (fun map -> toring cr map form) map in
-
   let form = toring form in
   let eqs  = List.map (fun (f1, f2) -> (toring f1, toring f2)) eqs in
-  let norm = 
-    if (fst cr).r_bool then Bring.norm_pe form eqs
-    else Iring.norm_pe form eqs in
-  ofring (fst cr) !map norm
+  ofring (fst cr) !map (ring_simplify_pe cr eqs form)
 
 (* -------------------------------------------------------------------- *)
 let ring_eq (cr : cring) (eqs : eqs) (f1 : form) (f2 : form) =

@@ -86,6 +86,7 @@
     "compute"     , COMPUTE    ;        (* KW: tactic *)
     "fieldeq"     , FIELD      ;        (* KW: tactic *)
     "ringeq"      , RING       ;        (* KW: tactic *)
+    "algnorm"     , ALGNORM    ;        (* KW: tactic *)
 
     "assumption"  , ASSUMPTION ;        (* KW: bytac *)
     "smt"         , SMT        ;        (* KW: bytac *)

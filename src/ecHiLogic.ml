@@ -1113,6 +1113,15 @@ let process_algebra mode kind eqs g =
   in
     tactic g
 
+let process_alg_norm f g =
+  let env, hyps, _ = get_goal_e g in
+
+  if not (EcAlgTactic.is_module_loaded env) then
+    tacuerror "alg_norm cannot be used when AlgTactic is not loaded";
+  
+  let f = process_form_opt hyps f None in
+  t_alg_normalize f g
+
 (* -------------------------------------------------------------------- *)
 let normalize (rw : EcPath.path list) (f : form) ((juc, an) : goal) =
   let g = new_goal juc (get_hyps (juc, an), EcFol.f_eq f f) in
@@ -1186,6 +1195,7 @@ let process_logic (engine, hitenv) loc t =
   | Psplit            -> t_split
   | Pfield st         -> process_algebra `Solve `Field st
   | Pring st          -> process_algebra `Solve `Ring  st
+  | Palg_norm f       -> process_alg_norm f
   | Pexists fs        -> process_exists fs
   | Pleft             -> t_left
   | Pright            -> t_right

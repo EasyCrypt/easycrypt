@@ -1,5 +1,16 @@
 (* -------------------------------------------------------------------- *)
 open EcFol
+open EcRing
+
+module RState : sig
+  type rstate
+
+  val empty   : rstate
+  val add     : form -> rstate -> int * rstate
+  val get     : int -> rstate -> form option
+  val update  : rstate -> int list -> form list -> rstate
+end
+
 
 (* -------------------------------------------------------------------- *)
 type ring = {
@@ -64,8 +75,13 @@ type cfield
 
 val cring_of_ring   : ring  -> cring
 val cfield_of_field : field -> cfield
+val ring_of_cring   : cring -> ring 
 
 (* -------------------------------------------------------------------- *)
+val toring : cring -> RState.rstate -> form -> pexpr * RState.rstate
+val ofring : ring -> RState.rstate -> pexpr -> form
+val ring_simplify_pe : cring -> (pexpr * pexpr) list -> pexpr -> pexpr
+
 val ring_simplify : cring -> eqs -> form -> form
 val ring_eq : cring -> eqs -> form -> form -> form
 

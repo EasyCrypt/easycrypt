@@ -9,7 +9,7 @@
  *)
 
 (* -------------------------------------------------------------------- *)
-
+open EcMaps
 open Big_int
 
 type pexpr = 
@@ -41,6 +41,18 @@ let rec pexpr_eq (e1 : pexpr) (e2 : pexpr) : bool =
   | (PEpow (e3,n3), PEpow (e4,n4)) -> n3 = n4 && pexpr_eq e3 e4 
   | (_,_) -> false
 
+let fv_pe = 
+  let rec aux fv = function
+    | PEc _        -> fv
+    | PEX i        -> Sint.add i fv
+    | PEadd(e1,e2) -> aux (aux fv e1) e2
+    | PEsub(e1,e2) -> aux (aux fv e1) e2
+    | PEmul(e1,e2) -> aux (aux fv e1) e2
+    | PEopp e1     -> aux fv e1
+    | PEpow(e1,_)  -> aux fv e1 in
+  aux Sint.empty 
+
+  
 type 'a cmp_sub = 
   | Eq 
   | Lt of 'a

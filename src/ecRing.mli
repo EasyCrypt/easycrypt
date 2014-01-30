@@ -1,3 +1,4 @@
+open EcMaps
 open Big_int
 (* -------------------------------------------------------------------- *)
 
@@ -12,6 +13,8 @@ type pexpr =
 
 val pexpr_eq : pexpr -> pexpr -> bool
 val pp_pe  : Format.formatter -> pexpr -> unit
+
+val fv_pe  : pexpr -> Sint.t 
 
 (* -------------------------------------------------------------------- *)
 
