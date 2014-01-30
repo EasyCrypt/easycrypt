@@ -870,7 +870,7 @@ theory Dinter_uni.
   proof strict.
   by intros=> H;
      rewrite -(mu_eq_support (dinter i j) True);
-     try apply fun_ext; smt.
+     try (apply fun_ext; rewrite /Pred.(/\)); smt.
   qed.
 end Dinter_uni.
 
