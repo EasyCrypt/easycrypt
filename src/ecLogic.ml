@@ -1702,7 +1702,7 @@ let rec t_intros_elim n g =
 let t_congr (f1, f2) (args, ty) g =
   let rec doit args ty g =
     match args with
-    | [] -> t_reflex g
+    | [] -> t_id None g
 
     | (a1, a2) :: args->
         let aty  = a1.f_ty in
@@ -1727,7 +1727,7 @@ let t_congr (f1, f2) (args, ty) g =
             [tsub; tcgr]
             (t_transitivity (EcFol.f_app m2 [a1] ty) g)
   in
-    t_on_goals (t_try t_assumption) (doit (List.rev args) ty g)
+  doit (List.rev args) ty g
 
 (* -------------------------------------------------------------------- *)
 let t_logic_trivial =
