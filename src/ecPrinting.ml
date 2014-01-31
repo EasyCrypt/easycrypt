@@ -490,6 +490,7 @@ let priority_of_binop name =
   | Some EP.STAR  -> Some e_bin_prio_op3
   | Some EP.SLASH -> Some e_bin_prio_op3
   | Some EP.OP4 _ -> Some e_bin_prio_op4
+  | Some EP.AT    -> Some e_bin_prio_op4
 
   | _ -> None
 

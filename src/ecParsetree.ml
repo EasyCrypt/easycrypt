@@ -58,7 +58,7 @@ and pexpr_r =
   | PEint    of int                               (* int. literal       *)
   | PEident  of pqsymbol * ptyannot option        (* symbol             *)
   | PEapp    of pexpr * pexpr list                (* op. application    *)
-  | PElet    of plpattern * pexpr * pexpr         (* let binding        *)
+  | PElet    of plpattern * pexpr_wty * pexpr     (* let binding        *)
   | PEtuple  of pexpr list                        (* tuple constructor  *)
   | PEif     of pexpr * pexpr * pexpr             (* _ ? _ : _          *)
   | PElambda of ptybindings * pexpr               (* lambda abstraction *)
@@ -67,6 +67,7 @@ and pexpr_r =
   | PEscope  of pqsymbol * pexpr                  (* scope selection    *)
 
 and pexpr = pexpr_r located
+and pexpr_wty = pexpr * pty option
 
 and 'a rfield = {
   rf_name  : pqsymbol;
@@ -211,7 +212,7 @@ and pformula_r =
   | PFside   of pformula * (int * symbol) located
   | PFapp    of pformula * pformula list
   | PFif     of pformula * pformula * pformula
-  | PFlet    of plpattern * pformula * pformula
+  | PFlet    of plpattern * (pformula * pty option) * pformula
   | PFforall of pgtybindings * pformula
   | PFexists of pgtybindings * pformula
   | PFlambda of ptybindings * pformula
@@ -543,6 +544,7 @@ and ptactic_chain =
   | Psubtacs of ptactic list
   | Pfirst   of ptactic * int
   | Plast    of ptactic * int
+  | Pexpect  of ptactic * int
   | Protate  of [`Left | `Right] * int
 
 (* -------------------------------------------------------------------- *)
