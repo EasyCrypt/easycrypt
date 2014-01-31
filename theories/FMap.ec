@@ -60,6 +60,28 @@ theory Core.
      rewrite -rw_neqF mem_dom get_empty; intros=> ->.
   qed.
 
+
+  (** Range *)
+
+  op rng: ('a,'b) map -> 'b set.
+  op in_rng (y:'b) (m:('a,'b) map) = mem y (rng m).
+
+  axiom mem_rng (m:('a,'b) map) y:
+    mem y (rng m) <=> (exists x, in_dom x m /\ get m x = Some y).
+
+  lemma nosmt in_rng_spec (m:('a,'b) map) y:
+    in_rng y m <=> (exists x, in_dom x m /\ get m x = Some y).
+  proof strict.
+  by rewrite /in_rng; apply mem_rng.
+  qed.
+
+  lemma rng_empty:
+    rng empty<:'a,'b> = empty<:'b>.
+  proof strict.
+  by apply set_ext=> y; cut:= mem_empty y;
+     rewrite -rw_neqF mem_rng => -> /=; rewrite -not_def => [x]; rewrite get_empty.
+  qed.
+
   (** Less defined than *)
   pred (<=) (m1 m2:('a,'b) map) =
     forall x, mem x (dom m1) => get m1 x = get m2 x.
