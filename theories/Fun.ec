@@ -14,6 +14,9 @@ require import Option.
 (* id<:'a> is the identity function on 'a *)
 op id (x:'a) = x.
 
+(* preim f p x <=> x is in the preimage of p by f *)
+pred preim ['a 'b] (f : 'a -> 'b) p x = p (f x).
+
 (** Definitions for composition *)
 theory Composition.
   op comp (g:'b -> 'c) (f:'a -> 'b): ('a -> 'c) =
@@ -50,7 +53,7 @@ theory Morphism.
   pred monomorphism_1 (f:'a -> 'b) (aP: 'a -> 'c) rP =
     forall x, rP (f x) = aP x.
 
-  pred monmorphism_2 (f:'a -> 'b) (aR:'a -> 'a -> 'c) rR =
+  pred monomorphism_2 (f:'a -> 'b) (aR:'a -> 'a -> 'c) rR =
     forall x y, rR (f x) (f y) = aR x y.
 end Morphism.
 export Morphism.

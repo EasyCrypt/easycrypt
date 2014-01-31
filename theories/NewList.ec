@@ -12,41 +12,6 @@ require import Option.
 require import Int.
 
 (* -------------------------------------------------------------------- *)
-op pred1  ['a] (c : 'a) = fun (x : 'a), c = x.
-op predT  ['a] = fun (x : 'a), true.
-op pred0  ['a] = fun (x : 'a), false.
-op predC  ['a] (P : 'a -> bool) = fun (x : 'a), ! (P x).
-op predC1 ['a] (c : 'a) = fun (x : 'a), c <> x.
-op predD1 ['a] (P : 'a -> bool) (c : 'a) = fun (x : 'a), c <> x /\ P x.
-
-pred preim ['a 'b] (f : 'a -> 'b) p x = p (f x).
-
-op int_of_bool (b : bool) = if b then 1 else 0.
-
-(* -------------------------------------------------------------------- *)
-theory IntTh.
-  lemma nosmt subzz (z : int): z - z = 0 by [].
-
-  lemma nosmt lezz (z : int): z <= z by [].
-  lemma nosmt ltzz (z : int): z < z <=> false by [].
-
-  lemma nosmt ltzNge (x y : int): (x <  y) <=> !(y <= x) by [].
-  lemma nosmt lezNgt (x y : int): (x <= y) <=> !(y <  x) by [].
-
-  lemma nosmt gez_le (x y : int): (x >= y) <=> (y <= x) by [].
-  lemma nosmt gtz_lt (x y : int): (x >  y) <=> (y <  x) by [].
-
-  lemma nosmt neq_ltz (x y : int): (x <> y) <=> (x < y \/ y < x) by [].
-  lemma nosmt eqz_leq (x y : int): (x = y) <=> (x <= y /\ y <= x) by [].
-
-  lemma nosmt lez_addl (x y z : int): (x + y <= x + z) <=> (y <= z) by [].
-
-  lemma nosmt lez_def (x y : int): (x < y) <=> (1 + x <= y) by [].
-end IntTh.
-
-import IntTh.
-
-(* -------------------------------------------------------------------- *)
 type 'a list = [
   | "[]"
   | (::) of  'a & 'a list
@@ -806,7 +771,7 @@ proof.
     rewrite -(mem_rot i) def_s2 in_cons; case=> // eq_yx.
     by move: s1y not_s1x; rewrite eq_yx => ->.
   rewrite IHs //=; move: le_s31; apply contraL; rewrite -ltzNge => s3x.
-  rewrite lez_def; cut := uniq_leq_size (x::s1) s3 _ => //= -> //.
+  rewrite -lez_add1r; cut := uniq_leq_size (x::s1) s3 _ => //= -> //.
   by apply (allP (mem s3)); rewrite /= s3x /= allP.
 qed.
 
@@ -827,7 +792,7 @@ proof.
   move=> Us1 ss12 le_s21; cut Us2 := leq_size_uniq s1 s2 _ _ _ => //.
   rewrite -anda_and; split=> [|h]; last by rewrite eq_sym -uniq_size_uniq.
   move=> x; split; [by apply ss12 | move=> s2x; move: le_s21].
-  apply absurd => not_s1x; rewrite -ltzNge lez_def.
+  apply absurd => not_s1x; rewrite -ltzNge -lez_add1r.
   cut := uniq_leq_size (x :: s1) => /= -> //=.
   by rewrite /Pred.(<=) -(allP (mem s2)) /= s2x /= allP.
 qed.
