@@ -67,6 +67,7 @@ val t_fail : tactic
 
 val t_reflex : ?reduce:bool -> tactic
 val t_transitivity : form -> tactic
+val t_symmetry : tactic
 
 val t_focus : tfocus -> tactic -> goals -> goals
 

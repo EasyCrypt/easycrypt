@@ -714,13 +714,18 @@ let t_reflex ?(reduce = false) g =
     doit (get_concl g)
 
 let t_transitivity f g =
-  let concl = snd (get_goal g) in
+  let concl = get_concl g in
   let (f1, f2) = destr_eq concl in
     t_apply_logic
       p_eq_trans [f.f_ty]
       (  (List.map (fun f -> AAform f) [f1; f; f2])
        @ (List.create 2 AAnode))
       g
+
+let t_symmetry g = 
+  let concl = get_concl g in
+  let (f1,f2) = destr_eq concl in
+  t_rewrite_glob `LtoR EcCoreLib.p_eq_sym [f1.f_ty] [AAform f1;AAform f2] g
 
 let t_true g = t_apply_logic p_true_intro [] [] g
   
