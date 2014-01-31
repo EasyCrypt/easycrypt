@@ -187,10 +187,9 @@ let t_ring_simplify cr eqs (f1, f2) g =
 let t_ring r eqs (f1, f2) g =
   let cr = cring_of_ring r in
   let f  = ring_eq cr eqs f1 f2 in
-
-    if   EcReduction.is_conv (get_hyps g) f (emb_rzero r)
-    then prove_goal_by [] rn_ring g
-    else prove_goal_by [f_eq f (emb_rzero r)] rn_ring g
+  if   EcReduction.is_conv (get_hyps g) f (emb_rzero r)
+  then prove_goal_by [] rn_ring g
+  else prove_goal_by [f_eq f (emb_rzero r)] rn_ring g
 
 let t_field_simplify r eqs (f1, f2) g =
   let cr = cfield_of_field r in
