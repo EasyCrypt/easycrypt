@@ -19,16 +19,21 @@ type norm_kind =
   | NKdefault
 
 type info = 
-  { i_env   : env;
-    hyp_tbl : (EcIdent.t option * form) Hf.t; 
-    (* hyp_tbl f -> (h,f') means that h is an hypothesis proving that f = f' *)
-    kind_tbl : norm_kind Hty.t
+  {         i_env    : env;
+            kind_tbl : norm_kind Hty.t;
+    mutable i_juc    : judgment_uc;
+            hyp_tbl  : (int * int list * LDecl.hyps * form) option Hf.t; 
+    (* hyp_tbl f -> Some (n,ns,hyps,f') means that 
+         n is a node proving : hyps |- f = f' 
+         ns is the remaining subgoal of n
+       hyp_tbl f -> None means that f is known to be in normal form *)
   }
 
-let init_info env = 
+let init_info env juc = 
   { i_env    = env;
-    hyp_tbl  = Hf.create 523;
     kind_tbl = Hty.create 23;
+    i_juc    = juc;
+    hyp_tbl  = Hf.create 523;
   }
  
 let get_field info ty () = 
@@ -55,122 +60,101 @@ let norm_kind info ty =
     Hty.add info.kind_tbl ty kind;
     kind
 
-let t_intros_eq info g =
-  let hyps,concl = get_goal g in
-  let h = LDecl.fresh_id hyps "_" in
-  let f,f' = 
-    try destr_eq (fst (destr_imp concl)) 
-    with DestrError _ -> assert false in
-  Hf.add info.hyp_tbl f (Some h,f');
-  t_intros_i [h] g
 
-let t_add_refl info f g =
-  Hf.add info.hyp_tbl f (None, f);
-  t_id None g
+let add_refl info f =
+  Hf.add info.hyp_tbl f None;
+  None
 
-let already_done info f = Hf.mem info.hyp_tbl f 
+let add_proof info n (juc,ns) =
+  info.i_juc <- juc;
+  let hyps, concl = get_node (juc, n) in
+  let f,f' = destr_eq concl in
+  let res = Some(n,ns,hyps,f') in
+  Hf.add info.hyp_tbl f res;
+  res
 
-let get_heq info f = 
-  try Hf.find info.hyp_tbl f
-  with Not_found -> assert false
+let new_goal info hyps f f' =
+  new_goal info.i_juc (hyps, f_eq f f')
 
-let get_heqs info fs = List.map (get_heq info) fs
+let get_norm f = function
+  | None -> f
+  | Some(_,_,_,f') -> f'
 
-let get_eqs info fs = List.map snd (get_heqs info fs)
-
-
-let t_subterm (h,_) = omap_dfl t_hyp t_reflex h 
+let t_subterm = function
+  | None -> t_reflex ~reduce:false
+  | Some (n,ns,_,_) -> t_use n ns
 
 let t_subterms hfs = List.map t_subterm hfs
 
-let t_trans info ht g =
-  let hyps, concl = get_goal g in
-  let hr = LDecl.fresh_id hyps "_" in
-  let f,f' = destr_eq (LDecl.lookup_hyp_by_id ht hyps) in
-  let f'', fn = destr_eq (fst (destr_imp concl)) in
-  assert (f_equal f' f'');
-  t_seq_subgoal (t_seq (t_intros_i [hr]) (t_cut (f_eq f fn)))
-    [ t_seq_subgoal (t_transitivity f') [t_hyp ht; t_hyp hr];
-      t_seq (t_clears [ht;hr]) (t_intros_eq info)] g 
-
-let rec t_normalize info f g =
-  if already_done info f then t_id None g
-  else match norm_kind info f.f_ty with
-  | NKring(cr,m)  -> t_normalize_ring info cr m f g
-  | NKfield(cr,m) -> t_normalize_field info cr m f g
-  | NKdefault     -> t_normalize_subterm info f g
+let rec t_normalize info hyps f =
+  try Hf.find info.hyp_tbl f
+  with Not_found ->
+    match norm_kind info f.f_ty with
+    | NKring(cr,m)  -> t_normalize_ring info cr m hyps f
+    | NKfield(cr,m) -> t_normalize_field info cr m hyps f 
+    | NKdefault     -> t_normalize_subterm info hyps f 
       
-and t_normalize_subterm info f g =
+and t_normalize_subterm info hyps f =
   match f.f_node with
   | Fapp(op, fs) ->
-    let lt = List.map (t_normalize info) fs in
-    let t_eq g =
-      let hfs' = get_heqs info fs in
-      let fs'  = List.map snd hfs' in
-      let f' = f_app op fs' f.f_ty in
-      if f_equal f f' then t_add_refl info f g
-      else
-        t_seq_subgoal (t_cut (f_eq f f')) 
-          [ t_seq_subgoal (t_congr (op,op) (List.combine fs fs', f.f_ty))
-              (t_reflex :: t_subterms hfs');
-            t_intros_eq info] g in
-    t_seq (t_lseq lt) t_eq g
+    let ln = List.map (t_normalize info hyps) fs in
+    let fs' = List.map2 get_norm fs ln in
+    let f' = f_app op fs' f.f_ty in
+    if f_equal f f' then add_refl info f
+    else 
+      let g = new_goal info hyps f f' in
+      let gs =
+        t_seq_subgoal (t_congr (op,op) (List.combine fs fs', f.f_ty))
+          (t_reflex :: t_subterms ln) g in
+      add_proof info (snd g) gs
   | Ftuple fs ->
-    let lt = List.map (t_normalize info) fs in
-    let t_eq g = 
-      let hfs' = get_heqs info fs in
-      let fs'  = List.map snd hfs' in
-      let f' = f_tuple fs' in
-      if f_equal f f' then t_add_refl info f g
-      else
-        t_seq_subgoal (t_cut (f_eq f f')) 
-          [ t_seq_subgoal t_split (t_subterms hfs');
-            t_intros_eq info] g in
-    t_seq (t_lseq lt) t_eq g
-  | _ -> t_add_refl info f g
+    let ln = List.map (t_normalize info hyps) fs in
+    let fs' = List.map2 get_norm fs ln in
+    let f' = f_tuple fs' in
+    if f_equal f f' then add_refl info f
+    else 
+      let g = new_goal info hyps f f' in
+      let gs = t_seq_subgoal t_split (t_subterms ln) g in
+      add_proof info (snd g) gs
+  | _ -> add_refl info f 
       
-and t_normalize_ring info cr rm f g = 
+and t_normalize_ring info cr rm hyps f = 
   let pe, rm' = toring cr !rm f in
-  let fv = Sint.elements (EcRing.fv_pe pe) in
-  let fs = List.map (fun i -> oget (RState.get i rm')) fv in
-  let lt = List.map (t_normalize_subterm info) fs in
-  let t_cut_ring_norm ht g = 
-    let hyps = get_hyps g in
-    let _, f' = destr_eq (LDecl.lookup_hyp_by_id ht hyps) in
-    let pe, rm' = toring cr !rm f' in
+  rm := rm';
+  let fv  = Sint.elements (EcRing.fv_pe pe) in
+  let fs  = List.map (fun i -> oget (RState.get i rm')) fv in
+  let ln  = List.map (t_normalize_subterm info hyps) fs in
+  let fs' = List.map2 get_norm fs ln in
+  let f1, n_congr =
+    if List.all2 f_equal fs fs' then f, None
+    else
+      let f1,n1,gs = n_ring_congr info.i_juc hyps cr !rm f fv fs' in
+      let (juc,ns1) = t_subgoal (t_subterms ln) gs in
+      info.i_juc <- juc;
+      f1, Some (n1,ns1) in
+  let f2, juc, n_norm = 
+    let rm', f2, n2, (juc,ns2) = n_ring_norm info.i_juc hyps cr !rm f1 in
     rm := rm';
-    t_cut_ring_norm cr rm' [] pe g in
-  let t_ring g =
-    let hyps = get_hyps g in
-    let ht = LDecl.fresh_id hyps "_" in
-    t_lseq 
-      [t_intros_i [ht];
-       t_cut_ring_norm ht;
-       t_trans info ht] g in
-  let t_eq g =
-    let hfs' = get_heqs info fs in
-    let fs' = List.map snd hfs' in
-    t_seq_subgoal (t_cut_ring_congr cr rm' pe fv fs')
-      (t_subterms hfs' @ [t_ring]) g in
-  t_seq (t_lseq lt) t_eq g
+    if f_equal f1 f2 then f1, info.i_juc, None
+    else f2, juc, Some(n2,ns2) in
+  match n_congr, n_norm with
+  | None, None -> None
+  | Some (n1,ns1), None -> add_proof info n1 (juc,ns1)
+  | None, Some(n2,ns2)  -> add_proof info n2 (juc,ns2)
+  | Some (n1,ns1), Some(n2,ns2) ->
+    info.i_juc <- juc;
+    let g = new_goal info hyps f f2 in
+    let gs = 
+      t_seq_subgoal (t_transitivity f1) [t_use n1 ns1; t_use n2 ns2] g in
+    add_proof info (snd g) gs
 
-
-and t_normalize_field _info _cr _rm _f _g = assert false  
+and t_normalize_field _info _cr _rm _hyps _f = assert false  
 
 let t_alg_normalize f g =
-  let env,_,_ = get_goal_e g in
-  let info = init_info env in
-  let t_end g =
-    let hf = get_heq info f in
-    let add_clear h s = 
-      match h with
-      | None -> s
-      | Some h -> EcIdent.Sid.add h s in
-    let toclear = 
-      Hf.fold (fun _ (h,_) s -> add_clear h s) info.hyp_tbl EcIdent.Sid.empty in
-    t_seq_subgoal (t_cut (f_eq f (snd hf)))
-      [ t_subterm hf;
-        t_clear_set toclear] g in
-  t_on_last t_end (t_normalize info f g)
-
+  let env,hyps,_ = get_goal_e g in
+  let info = init_info env (fst g) in
+  let res = t_normalize info hyps f in
+  let f' = get_norm f res in
+  let g = if f_equal f f' then g else (info.i_juc, snd g) in
+  t_on_first (t_subterm res) (t_cut (f_eq f f') g)
 

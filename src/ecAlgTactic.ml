@@ -154,33 +154,29 @@ let rn_ring_norm  = RN_xtd (new rn_ring_norm)
 let rn_ring       = RN_xtd (new rn_ring)
 let rn_field      = RN_xtd (new rn_field)
 
-let t_cut_ring_congr (cr:cring) (rm:RState.rstate) pe li lv g = 
+let n_ring_congr juc hyps (cr:cring) (rm:RState.rstate) f li lv =
+  let pe,rm = toring cr rm f in
   let rm' = RState.update rm li lv in
-  let env,_,_ = get_goal_e g in
+  let env = EcEnv.LDecl.toenv hyps in
   let mk_goal i =
     let r1 = oget (RState.get i rm) in
     let r2 = oget (RState.get i rm') in
     EqTest.for_type_exn env r1.f_ty r2.f_ty;
-    f_eq r1 r2 in
-  let t_congr g = 
-    let sg = List.map mk_goal li in
-    prove_goal_by sg rn_ring_congr g in
-  let ofring = ofring (ring_of_cring cr) in
-  let r1 = ofring rm  pe in
-  let r2 = ofring rm' pe in
-  t_on_first t_congr (t_cut (f_eq r1 r2) g)
+    f_eq r1 r2 in 
+  let f' = ofring (ring_of_cring cr) rm' pe in
+  let g = new_goal juc (hyps, f_eq f f') in
+  let sg = List.map mk_goal li in
+  let gs = prove_goal_by sg rn_ring_congr g in
+  f', snd g, gs
 
-
-let t_cut_ring_norm (cr:cring) (rm:RState.rstate) eqs pe g =
+let n_ring_norm juc hyps (cr:cring) (rm:RState.rstate) f =
+  let pe, rm = toring cr rm f in
   let ofring = ofring (ring_of_cring cr) rm in
-  let t_norm g = 
-    let sg = List.map (fun (pe1,pe2) -> f_eq (ofring pe1) (ofring pe2)) eqs in
-    prove_goal_by sg rn_ring_norm g in
-  let npe = ring_simplify_pe cr eqs pe in
-  let r1 = ofring pe in
-  let r2 = ofring npe in
-  t_on_first t_norm (t_cut (f_eq r1 r2) g)
-
+  let npe    = ring_simplify_pe cr [] pe in
+  let f'     = ofring npe in
+  let g      = new_goal juc (hyps, f_eq f f') in
+  let gs     = prove_goal_by [] rn_ring_norm g in
+  rm, f', snd g, gs
 
 let t_ring_simplify cr eqs (f1, f2) g =
   let cr = cring_of_ring cr in

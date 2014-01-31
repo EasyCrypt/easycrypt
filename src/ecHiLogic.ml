@@ -13,7 +13,6 @@ open EcBaseLogic
 open EcEnv
 open EcLogic
 open EcCoreHiLogic
-open EcStrongRing
 
 module Sp = EcPath.Sp
 
@@ -1120,7 +1119,7 @@ let process_alg_norm f g =
     tacuerror "alg_norm cannot be used when AlgTactic is not loaded";
   
   let f = process_form_opt hyps f None in
-  t_alg_normalize f g
+  EcStrongRing.t_alg_normalize f g
 
 (* -------------------------------------------------------------------- *)
 let normalize (rw : EcPath.path list) (f : form) ((juc, an) : goal) =
