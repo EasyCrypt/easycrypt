@@ -1721,6 +1721,7 @@ module Ty = struct
         reqs;
       List.iter
         (fun (x, pt, f) ->
+          let x  = "$" ^ x in
           let t  = { pt_core = pt; pt_intros = []; } in
           let t  = { pl_loc = pt.pl_loc; pl_desc = Pby (Some [t]) } in
           let t  = { pt_core = t; pt_intros = []; } in
@@ -1804,8 +1805,8 @@ module Ty = struct
   (* We currently only deal with [ring] and [field] *)
   let add_instance (scope : scope) mode ({ pl_desc = tci } as toptci) =
     match unloc tci.pti_name with
-    | ([], "boolean_ring") -> addring  scope mode (true,toptci)
-    | ([], "ring"        ) -> addring  scope mode (false,toptci)
+    | ([], "boolean_ring") -> addring  scope mode (true , toptci)
+    | ([], "ring"        ) -> addring  scope mode (false, toptci)
     | ([], "field"       ) -> addfield scope mode toptci
     | _ -> hierror "unknown type class"
 
