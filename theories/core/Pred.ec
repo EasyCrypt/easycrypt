@@ -9,7 +9,8 @@ require export ExtEq.
 pred (<=) (p q:'a -> bool) =
   forall a, p a => q a.
 
-pred (<) (p q:'a -> bool) = p <= q /\ !(q <= p).
+pred (< ) (p q:'a -> bool) =
+  p <= q /\ !(q <= p).
 
 lemma nosmt leq_refl (X Y:'a -> bool):
   X = Y => X <= Y
@@ -28,12 +29,19 @@ lemma nosmt subpred_eqP (p1 p2 : 'a -> bool):
 proof. smt. qed.
 
 (** Lifting boolean operators to predicates *)
-op True (x:'a) : bool = true.
-op False (x:'a): bool = false.
+op pred1  ['a] (c : 'a) = fun (x : 'a), c = x.
+op predT  ['a] = fun (x : 'a), true.
+op pred0  ['a] = fun (x : 'a), false.
+op predC  ['a] (P : 'a -> bool) = fun (x : 'a), ! (P x).
+op predC1 ['a] (c : 'a) = fun (x : 'a), c <> x.
+op predD1 ['a] (P : 'a -> bool) (c : 'a) = fun (x : 'a), c <> x /\ P x.
 
-op [!]  (p:'a -> bool)  : 'a -> bool = fun x, !p x.
-op (/\) (p q:'a -> bool): 'a -> bool = fun x, p x /\ q x.
-op (\/) (p q:'a -> bool): 'a -> bool = fun x, p x \/ q x.
+op True   = fun (x:'a), true.
+op False  = fun (x:'a), false.
+
+op [!]  (P:'a -> bool)  : 'a -> bool = fun x, !P x.
+op (/\) (P Q:'a -> bool): 'a -> bool = fun x, P x /\ Q x.
+op (\/) (P Q:'a -> bool): 'a -> bool = fun x, P x \/ Q x.
 
 (** Lemmas *)
 (* True *)

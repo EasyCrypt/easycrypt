@@ -4,6 +4,9 @@
 
 import why3 "int" "Int"
   op "prefix -" as "[-]".
+
+(* Random thing *)
+op int_of_bool (b : bool) = if b then 1 else 0.
   
 (* Group operation *)
 
@@ -49,6 +52,7 @@ clone export IDomain as Rz with
   proof * by smt.
 
 (** Number theory *)
+(* TODO: I merged in some stray bits from NewList and this may appear to be in whatever order... it is. *)
 
 op "`|_|" (x:int) = (0 <= x) ? x : -x.
 
@@ -72,6 +76,24 @@ by [].
 
 lemma nosmt ltz_def      (x y : int): x < y <=> ( y <> x /\ x <= y)
 by [].
+
+lemma nosmt subzz (z : int): z - z = 0 by [].
+
+lemma nosmt lezz (z : int): z <= z by [].
+lemma nosmt ltzz (z : int): z < z <=> false by [].
+
+lemma nosmt ltzNge (x y : int): (x <  y) <=> !(y <= x) by [].
+lemma nosmt lezNgt (x y : int): (x <= y) <=> !(y <  x) by [].
+
+lemma nosmt gez_le (x y : int): (x >= y) <=> (y <= x) by [].
+lemma nosmt gtz_lt (x y : int): (x >  y) <=> (y <  x) by [].
+
+lemma nosmt neq_ltz (x y : int): (x <> y) <=> (x < y \/ y < x) by [].
+lemma nosmt eqz_leq (x y : int): (x = y) <=> (x <= y /\ y <= x) by [].
+
+lemma nosmt lez_addl (x y z : int): (x + y <= x + z) <=> (y <= z) by [].
+
+lemma nosmt lez_add1r (x y : int): (1 + x <= y) = (x < y) by [].
 
 theory Induction.
 

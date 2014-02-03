@@ -4,8 +4,6 @@ require import Pred.
 require import Int.
 require import NewList.
 
-import NewList.IntTh.
-
 (* -------------------------------------------------------------------- *)
 type R.
 type poly.
