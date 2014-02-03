@@ -382,14 +382,10 @@ instance field with t
 *)
   lemma test g f : e g f = ge ^ (log f * log g).
   proof -strict.
-    rewrite loge_log;congr; last by trivial.
+    rewrite loge_log;congr; first by trivial.
     by fieldeq .
   qed.
 
 (*    fieldeq. (* bug, need to redeclare the field *) *)
 
 end Bilinear.
-
-
-
-

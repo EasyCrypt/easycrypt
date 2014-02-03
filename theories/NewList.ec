@@ -633,7 +633,8 @@ proof.
   move=> s2_le1 eqs12; move: s2_le1 (perm_eq_mem s1 s2 _) => //.
   move: (perm_eq_size s1 s2 _) => // {eqs12}.
   case s2 => [|x []] //=; first last; last 2 smt.
-  by case s1 => [|y []] //=; smt.
+  case s1 => [|y []] //=; last smt.
+  by move=> h; cut := h x => /= ->.
 qed.
 
 (* -------------------------------------------------------------------- *)

@@ -534,11 +534,11 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
       | CTh_export p ->
           (subst, proofs, EcEnv.Theory.export (EcSubst.subst_path subst p) scenv)
 
-      | CTh_instance (p,tc) ->
-        (* TODO: PY does it make sense *)
-        let p = EcSubst.subst_path subst p in
-        let tc = EcSubst.subst_instance subst tc in
-          (subst, proofs, EcEnv.Algebra.add p tc scenv)
+      | CTh_instance (ty, tc) ->
+          (* TODO: PY does it make sense *)
+          let ty = EcSubst.subst_ty subst ty in
+          let tc = EcSubst.subst_instance subst tc in
+            (subst, proofs, EcEnv.Algebra.add ty tc scenv)
 
       | CTh_typeclass _ ->
           (* Currently, type classes don't survive cloning *)

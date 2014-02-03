@@ -351,7 +351,7 @@ theory Hybrid.
       Pr[GL(BLR(A),E).main() @ &m : p (glob A) (glob E) C.c res] -
       Pr[GR(BLR(A),E).main() @ &m : p (glob A) (glob E) C.c res].
     proof -strict.
-      congr;first by byequiv GE0_GR.
+      congr;last by byequiv GE0_GR.
       by byequiv GE_GL.
     qed.
 

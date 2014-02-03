@@ -139,7 +139,7 @@ type preenv = {
   env_memories : EcMemory.memenv MMsym.t;
   env_actmem   : EcMemory.memory option;
   env_abs_st   : EcBaseLogic.abs_uses Mid.t;
-  env_tci      : (tcinstance list) Mp.t;
+  env_tci      : (tcinstance list) Mty.t;
   env_tc       : TC.graph;
   env_modlcs   : Sid.t;                 (* declared modules *)
   env_w3       : EcWhy3.env;
@@ -209,7 +209,7 @@ let empty () =
       env_memories = MMsym.empty;
       env_actmem   = None;
       env_abs_st   = Mid.empty;
-      env_tci      = Mp.empty;
+      env_tci      = Mty.empty;
       env_tc       = TC.Graph.empty;
       env_modlcs   = Sid.empty;
       env_w3       = EcWhy3.empty;
@@ -2390,7 +2390,9 @@ end
 module Algebra = struct
   open EcAlgebra
 
-  let bind p cr tci = 
+  let bind ty cr env tci = 
+    assert (Mid.is_empty ty.ty_fv);
+
     let change tci = 
       let tci = odfl [] tci in
       let eq cr1 cr2 = 
@@ -2402,20 +2404,19 @@ module Algebra = struct
       in
         Some (if List.exists (eq cr) tci then tci else cr::tci)
     in
-      Mp.change change p tci
+      Mty.change change (Ty.hnorm ty env) tci
  
-  let add p cr env = 
+  let add ty cr env = 
     { env with
-        env_tci  = bind p cr env.env_tci;
-        env_item = CTh_instance (p, cr) :: env.env_item; }
+        env_tci  = bind ty cr env env.env_tci;
+        env_item = CTh_instance (ty, cr) :: env.env_item; }
 
-  let add_ring  p cr env = add p (`Ring  cr) env
-  let add_field p cr env = add p (`Field cr) env
+  let add_ring  ty cr env = add ty (`Ring  cr) env
+  let add_field ty cr env = add ty (`Field cr) env
 
   let get_instances ty env =
-    match (Ty.hnorm ty env).ty_node with
-    | Tconstr (p, []) -> odfl [] (Mp.find_opt p env.env_tci)
-    | _ -> []
+    let ty = Ty.hnorm ty env in
+      odfl [] (Mty.find_opt ty env.env_tci)
 
   let get_ring ty env =
     let module E = struct exception Found of ring end in
@@ -2447,15 +2448,15 @@ module Theory = struct
           { cth_desc = CTh_struct items; cth_struct = items; }
 
   and ctheory_item_of_theory_item = function
-    | Th_type      (x, ty) -> CTh_type      (x, ty)
-    | Th_operator  (x, op) -> CTh_operator  (x, op)
-    | Th_axiom     (x, ax) -> CTh_axiom     (x, ax)
-    | Th_modtype   (x, mt) -> CTh_modtype   (x, mt)
-    | Th_module    m       -> CTh_module    m
-    | Th_theory    (x, th) -> CTh_theory    (x, ctheory_of_theory th)
-    | Th_export    name    -> CTh_export    name
-    | Th_typeclass name    -> CTh_typeclass name
-    | Th_instance  (p, cr) -> CTh_instance  (p, cr)
+    | Th_type      (x, ty)  -> CTh_type      (x, ty)
+    | Th_operator  (x, op)  -> CTh_operator  (x, op)
+    | Th_axiom     (x, ax)  -> CTh_axiom     (x, ax)
+    | Th_modtype   (x, mt)  -> CTh_modtype   (x, mt)
+    | Th_module    m        -> CTh_module    m
+    | Th_theory    (x, th)  -> CTh_theory    (x, ctheory_of_theory th)
+    | Th_export    name     -> CTh_export    name
+    | Th_typeclass name     -> CTh_typeclass name
+    | Th_instance  (ty, cr) -> CTh_instance  (ty, cr)
 
   (* ------------------------------------------------------------------ *)
   let enter name env =
@@ -2486,13 +2487,14 @@ module Theory = struct
     fst (lookup name env)
 
   (* ------------------------------------------------------------------ *)
-  let rec bind_instance_cth inst cth = 
-    List.fold_left bind_instance_cth_item inst cth.cth_struct 
+  let rec bind_instance_cth env inst cth = 
+    List.fold_left (bind_instance_cth_item env) inst cth.cth_struct 
 
-  and bind_instance_cth_item inst item = 
+  (* FIXME: hnorm won't be triggered in the right env. *)
+  and bind_instance_cth_item env inst item = 
     match item with
-    | CTh_instance (p,k)  -> Algebra.bind p k inst
-    | CTh_theory (_, cth) -> bind_instance_cth inst cth 
+    | CTh_instance (ty, k)  -> Algebra.bind ty k env inst
+    | CTh_theory (_, cth) -> bind_instance_cth env inst cth 
     | CTh_type _ | CTh_operator _ | CTh_axiom _ 
     | CTh_modtype _ | CTh_module _ | CTh_export _
     | CTh_typeclass _ -> inst           (* FIXME: TC HOOK *)
@@ -2503,7 +2505,7 @@ module Theory = struct
         env_w3   = EcWhy3.rebind env.env_w3 cth.cth3_rebind;
         env_rb   = List.rev_append cth.cth3_rebind env.env_rb;
         env_item = (CTh_theory (id, cth.cth3_theory)) :: env.env_item; 
-        env_tci  = bind_instance_cth env.env_tci cth.cth3_theory;
+        env_tci  = bind_instance_cth env env.env_tci cth.cth3_theory;
        (* FIXME: TC HOOK *)
     }
 

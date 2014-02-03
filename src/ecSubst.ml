@@ -423,8 +423,10 @@ let rec subst_theory_item (s : _subst) (item : theory_item) =
   | Th_export p -> 
       Th_export (s.s_p p)
 
-  | Th_instance (p, tci) ->
-      Th_instance (s.s_p p, subst_instance s tci)
+  | Th_instance (ty, tci) ->
+      assert (Mid.is_empty ty.ty_fv);
+      let s = init_tparams s [] [] in
+        Th_instance (s.s_ty ty, subst_instance s tci)
 
   | Th_typeclass (x : EcSymbols.symbol) ->
       Th_typeclass x
@@ -457,8 +459,10 @@ and subst_ctheory_item (s : _subst) (item : ctheory_item) =
   | CTh_export p ->
       CTh_export (s.s_p p)
 
-  | CTh_instance (p, cr) ->
-      CTh_instance (s.s_p p, subst_instance s cr)
+  | CTh_instance (ty, cr) ->
+      assert (Mid.is_empty ty.ty_fv);
+      let s = init_tparams s [] [] in
+        CTh_instance (s.s_ty ty, subst_instance s cr)
 
   | CTh_typeclass x ->
       CTh_typeclass x
@@ -512,8 +516,10 @@ let subst_mpath        s = (_subst_of_subst s).s_fmp
 let subst_path         s = (_subst_of_subst s).s_p
 
 let subst_form         s = fun f -> (Fsubst.f_subst (f_subst_of_subst (_subst_of_subst s)) f)
+let subst_ty           s = fun t -> ((_subst_of_subst s).s_ty t)
 
 let subst_instance     s = subst_instance (_subst_of_subst s)
+
 (* -------------------------------------------------------------------- *)
 let freshen_type (typ, ty) =
   let empty = _subst_of_subst empty in

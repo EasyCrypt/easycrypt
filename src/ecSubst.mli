@@ -48,4 +48,5 @@ val subst_modsig       : ?params:(ident list) -> subst -> module_sig -> module_s
 val subst_modsig_body  : subst -> module_sig_body -> module_sig_body
 
 (* -------------------------------------------------------------------- *)
+val subst_ty   : subst -> ty   -> ty
 val subst_form : subst -> form -> form

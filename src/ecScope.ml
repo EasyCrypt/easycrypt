@@ -1764,20 +1764,18 @@ module Ty = struct
     if not (EcAlgTactic.is_module_loaded scope.sc_env) then
       hierror "load AlgTactic first";
 
-    let (ty, p) =
+    let ty =
       let ue = TT.transtyvars scope.sc_env (loc, Some []) in
       let ty = mk_loc tci.pti_type.pl_loc (PTnamed tci.pti_type) in
       let ty = transty tp_tydecl scope.sc_env ue ty in
-        match (EcEnv.Ty.hnorm ty scope.sc_env).ty_node with
-        | Tconstr (p, []) -> (ty,  p)
-        | _ -> assert false
+        ty
     in
     let symbols = EcAlgTactic.ring_symbols scope.sc_env boolean ty in
     let symbols = check_tci_operators scope.sc_env tci.pti_ops symbols in
     let cr      = ring_of_symmap scope.sc_env ty boolean symbols in
     let axioms  = EcAlgTactic.ring_axioms scope.sc_env cr in
       check_tci_axioms scope mode tci.pti_axs axioms;
-      { scope with sc_env = EcEnv.Algebra.add_ring p cr scope.sc_env }
+      { scope with sc_env = EcEnv.Algebra.add_ring ty cr scope.sc_env }
 
   (* ------------------------------------------------------------------ *)
   let field_of_symmap env ty symbols =
@@ -1789,20 +1787,18 @@ module Ty = struct
     if not (EcAlgTactic.is_module_loaded scope.sc_env) then
       hierror "load AlgTactic first";
 
-    let (ty, p) =
+    let ty =
       let ue = TT.transtyvars scope.sc_env (loc, Some []) in
       let ty = mk_loc tci.pti_type.pl_loc (PTnamed tci.pti_type) in
       let ty = transty tp_tydecl scope.sc_env ue ty in
-        match (EcEnv.Ty.hnorm ty scope.sc_env).ty_node with
-        | Tconstr (p, []) -> (ty, p)
-        | _ -> assert false
+        ty
     in
     let symbols = EcAlgTactic.field_symbols scope.sc_env ty in
     let symbols = check_tci_operators scope.sc_env tci.pti_ops symbols in
     let cr      = field_of_symmap scope.sc_env ty symbols in
     let axioms  = EcAlgTactic.field_axioms scope.sc_env cr in
       check_tci_axioms scope mode tci.pti_axs axioms;
-      { scope with sc_env = EcEnv.Algebra.add_field p cr scope.sc_env }
+      { scope with sc_env = EcEnv.Algebra.add_field ty cr scope.sc_env }
 
   (* ------------------------------------------------------------------ *)
   (* We currently only deal with [ring] and [field] *)
