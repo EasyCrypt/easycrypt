@@ -28,7 +28,7 @@ type axclone = {
   axc_axiom : symbol * EcDecl.axiom;
   axc_path  : EcPath.path;
   axc_env   : EcEnv.env;
-  axc_tac   : EcParsetree.ptactic_core option;
+  axc_tac   : pthp_tactic option;
 }
 
 val clone : EcEnv.env -> theory_cloning -> symbol * axclone list * ctheory_w3

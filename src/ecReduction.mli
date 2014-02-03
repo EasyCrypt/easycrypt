@@ -45,3 +45,6 @@ val simplify : reduction_info -> LDecl.hyps -> form -> form
 
 val is_conv    : LDecl.hyps -> form -> form -> bool
 val check_conv : LDecl.hyps -> form -> form -> unit
+
+val is_gen_conv : env -> (EcDecl.ty_params * form) -> (EcDecl.ty_params * form) -> bool
+

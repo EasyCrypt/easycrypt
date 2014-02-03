@@ -2423,7 +2423,10 @@ clone_lemma_1:
     { { pthp_mode = cl; pthp_tactic = None; } }
 
 | cl=clone_lemma_1_core BY t=tactic_core
-    { { pthp_mode = cl; pthp_tactic = Some t; } }
+    { { pthp_mode = cl; pthp_tactic = Some (`Tactic t); } }
+
+| cl=clone_lemma_1_core DONE
+    { { pthp_mode = cl; pthp_tactic = Some `Done; } }
 ;
 
 clone_lemma:

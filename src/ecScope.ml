@@ -2135,7 +2135,7 @@ module Theory = struct
     let proofs = List.pmap (fun axc ->
       match axc.C.axc_tac with
       | None -> Some (axc.C.axc_axiom, axc.C.axc_path, axc.C.axc_env)
-      | Some pt ->
+      | Some (`Tactic pt) ->
           let t = { pt_core = pt; pt_intros = []; } in
           let t = { pl_loc = pt.pl_loc; pl_desc = Pby (Some [t]); } in
           let t = { pt_core = t; pt_intros = []; } in
@@ -2149,7 +2149,27 @@ module Theory = struct
           let escope = Ax.start_lemma escope pucflags check x ax in
           let escope = Tactics.proof escope mode true in
           let escope = Tactics.process_r false mode escope [t] in
-            ignore (Ax.save escope pt.pl_loc); None)
+            ignore (Ax.save escope pt.pl_loc); None
+
+      | Some `Done ->
+          let axb = snd axc.C.axc_axiom
+          and axp =
+            match EcEnv.Ax.by_path_opt axc.C.axc_path scope.sc_env with
+            | None    -> hierror "no existing proof for `%s'" (fst axc.C.axc_axiom)
+            | Some ax -> ax
+          in
+
+          let conv =
+            EcReduction.is_gen_conv scope.sc_env
+              (axb.ax_tparams, oget axb.ax_spec)
+              (axp.ax_tparams, oget axp.ax_spec)
+          in
+
+            if not conv then
+              hierror
+                "existing proof for `%s' is not compatible"
+                (fst axc.C.axc_axiom);
+            None)
       proofs
     in
 
