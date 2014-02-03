@@ -41,7 +41,7 @@ type axclone = {
   axc_axiom : symbol * EcDecl.axiom;
   axc_path  : EcPath.path;
   axc_env   : EcEnv.env;
-  axc_tac   : pthp_tactic option;
+  axc_tac   : EcParsetree.ptactic_core option;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -91,8 +91,8 @@ type evclone = {
 }
 
 and evlemma = {
-  ev_global  : (pthp_tactic option) option;
-  ev_bynames : (pthp_tactic option) Msym.t;
+  ev_global  : (ptactic_core option) option;
+  ev_bynames : (ptactic_core option) Msym.t;
 }
 
 let evc_empty =
@@ -278,7 +278,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
                   let tc = Papply ({ fp_kind = tc; fp_args = []; }, None) in
                   let tc = mk_loc l (Plogic tc) in
                   let pr = { pthp_mode   = `Named (mk_loc l (xdth @ prefix, x));
-                             pthp_tactic = Some (`Tactic tc) }
+                             pthp_tactic = Some tc }
                   in
                     (pr :: proofs, evc)
 

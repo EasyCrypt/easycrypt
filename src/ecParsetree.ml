@@ -648,10 +648,8 @@ type theory_cloning = {
 and theory_cloning_proof = {
   pthp_mode   : [ `All   of pqsymbol option
                 | `Named of pqsymbol];
-  pthp_tactic : pthp_tactic option;
+  pthp_tactic : ptactic_core option;
 }
-
-and pthp_tactic = [`Done | `Tactic of ptactic_core ]
 
 and theory_override =
 | PTHO_Type   of ty_override

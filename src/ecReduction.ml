@@ -662,25 +662,3 @@ and simplify_rec ri hyps f =
       when ri.logic && is_logical_op p ->
     f_app fo (List.map (simplify_rec ri hyps) args) f.f_ty    
   | _ -> f_map (fun ty -> ty) (simplify ri hyps) f
-
-(* -------------------------------------------------------------------- *)
-let is_gen_conv env (typ1, f1) (typ2, f2) =
-  let module E = struct exception NotCnv end in
-
-  try
-    let ids1, sp1 = List.split typ1 in
-    let ids2, sp2 = List.split typ2 in
-
-    if not (List.all2 Sp.equal sp1 sp2) then raise E.NotCnv;
-
-    let f2 =
-      EcFol.Fsubst.subst_tvar
-        (EcTypes.Tvar.init ids2 (List.map tvar ids1))
-        f2
-    in
-
-    if not (is_conv (LDecl.init env ids1) f1 f2) then
-      raise E.NotCnv;
-    true
-
-  with E.NotCnv -> false
