@@ -15,7 +15,7 @@ theory Types.
   (* A signature for random oracles from "from" to "to". *)
   module type Oracle =
   {
-    proc * init():unit
+    proc init():unit
     proc o (x:from):to
   }.
 
@@ -24,7 +24,7 @@ theory Types.
   }.
 
   module type Dist (H:ARO) = {
-    proc * distinguish(): bool
+    proc distinguish(): bool
   }.
 
   module IND(H:Oracle,D:Dist) = {
@@ -233,16 +233,16 @@ theory LazyEager.
   local lemma IND_Lazy:
     finite univ<:from> =>
     (forall x, mu (dsample x) True = 1%r) =>
-    equiv [IND(Lazy.RO,D).main ~ IND_Lazy.main: true ==> ={res}].
+    equiv [IND(Lazy.RO,D).main ~ IND_Lazy.main: ={glob D} ==> ={res}].
   proof strict.
   intros=> fromF dsampleL; proc; seq 2 2: (={b}).
     call (_: Lazy.RO.m{1} = IND_Lazy.H.m{2}); first by (proc; sim).
-    by call (_: true ==> Lazy.RO.m{1} = IND_Lazy.H.m{2})=> //;
+    by call (_: ={glob D} ==> Lazy.RO.m{1} = IND_Lazy.H.m{2})=> //;
       first by proc; wp.
     inline IND_Lazy.resample;
     while{2} (true) (card work{2}).
       intros=> &m z; wp; rnd; wp; skip; progress=> //; last smt.
-        by rewrite card_rm_in ?mem_pick //; smt. (* This should definitely be a lemma in FSet. *)
+      by rewrite card_rm_in ?mem_pick //; smt. (* This should definitely be a lemma in FSet. *)
     by wp; skip; progress=> //; smt.
   qed.
 
@@ -297,7 +297,7 @@ theory LazyEager.
   seq 1 1: (={x,work} /\
             IND_Eager.H.m{1} = IND_Lazy.H.m{2} /\
             mem x{1} work{1});
-     first by wp; skip; smt.
+    first by wp; skip; smt.
   case (!in_dom x{2} IND_Lazy.H.m{2}); [rcondt{2} 2; first by intros=> &m; rnd |
                                         rcondf{2} 2; first by intros=> &m; rnd].
     transitivity{1} {y0 = $dsample x;
@@ -343,10 +343,24 @@ theory LazyEager.
                if (in_dom x IND_Eager.H.m){1}
                then IND_Eager.H.m{1} = IND_Lazy.H.m{2}
                else eq_except IND_Eager.H.m{1} IND_Lazy.H.m{2} x{1}).
-timeout 10.
-       by wp; rnd; wp; skip; progress=> //;
-            try case ((pick work = x){2}); try (intros=> H10; apply map_ext); smt.
-timeout 3.
+      (* We should have a good battery of lemmas on eq_except to deal with this *)
+      wp; rnd; wp; skip; progress.
+        smt.
+        smt.
+        smt.
+        by case ((pick work = x){2}); smt.
+        smt.
+        smt.
+        smt.
+        smt.
+        smt.
+        case ((pick work = x){2})=> pick_x; last smt.
+        subst x{2}; generalize H8 H1; rewrite -neqF eq_except_def=> -> /= eq_exc.
+        apply map_ext=> x0; case (pick work{2} = x0).
+          by intros=> <-; rewrite get_set_eq H0.
+          by intros=> neq_x0_pick; rewrite get_set_neq // eq_exc //.
+        by case ((pick work = x){2}); smt.
+        smt.
     by wp; rnd; skip; progress=> //; smt.
 
   wp; while (={x,work} /\
@@ -360,14 +374,14 @@ timeout 3.
   local lemma eager_aux:
     finite univ<:from> =>
     (forall x, mu (dsample x) True = 1%r) =>
-    equiv [IND_Lazy.main ~ IND_Eager.main: true ==> ={res}].
+    equiv [IND_Lazy.main ~ IND_Eager.main: ={glob D} ==> ={res}].
   proof strict.
   intros=> fromF dsampleL; proc; inline IND_Lazy.H.init.
-  seq 1 1: (IND_Lazy.H.m{1} = IND_Eager.H.m{2}); first by wp.
+  seq 1 1: (={glob D} /\ IND_Lazy.H.m{1} = IND_Eager.H.m{2}); first by wp.
   symmetry;
   eager (H: IND_Eager.resample(); ~ IND_Lazy.resample();:
               IND_Eager.H.m{1} = IND_Lazy.H.m{2} ==> IND_Eager.H.m{1} = IND_Lazy.H.m{2}): 
-        (IND_Eager.H.m{1} = IND_Lazy.H.m{2})=> //;
+        (={glob D} /\ IND_Eager.H.m{1} = IND_Lazy.H.m{2})=> //;
     first by sim.
   eager proc H (IND_Eager.H.m{1} = IND_Lazy.H.m{2})=> //;
     first by apply eager_query=> //.
@@ -377,7 +391,7 @@ timeout 3.
   local lemma IND_Eager:
     finite univ<:from> =>
     (forall x, mu (dsample x) True = 1%r) =>
-    equiv [IND_Eager.main ~ IND(Eager.RO,D).main: true ==> ={res}].
+    equiv [IND_Eager.main ~ IND(Eager.RO,D).main: ={glob D} ==> ={res}].
   proof strict.
   intros=> fromF dsampleL; proc.
   call (_: (forall x, in_dom x IND_Eager.H.m{1}) /\ IND_Eager.H.m{1} = Eager.RO.m{2}).
@@ -391,9 +405,9 @@ timeout 3.
   lemma eagerRO:
     finite univ<:from> =>
     (forall x, mu (dsample x) True = 1%r) =>
-    equiv [IND(Lazy.RO,D).main ~ IND(Eager.RO,D).main: true ==> ={res}].
+    equiv [IND(Lazy.RO,D).main ~ IND(Eager.RO,D).main: ={glob D} ==> ={res}].
   proof strict.
-  intros=> fromF dsampleL; bypr (res{1}) (res{2})=> //; intros=> &1 &2 a.
+  intros=> fromF dsampleL; bypr (res{1}) (res{2})=> //; intros=> &1 &2 a eq_D.
   apply (eq_trans _ Pr[IND_Lazy.main() @ &1: a = res]);
     first by byequiv (IND_Lazy _ _).
   apply (eq_trans _ Pr[IND_Eager.main() @ &1: a = res]);
@@ -473,7 +487,7 @@ theory Wrappers.
     op dsample = dsample.
 
   module type WRO = {
-    proc * init(qO:int): unit {}
+    proc init(qO:int): unit {}
     proc o(x:from): to
   }.
 
