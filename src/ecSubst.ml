@@ -370,9 +370,9 @@ let subst_ax (s : _subst) (ax : axiom) =
 (* -------------------------------------------------------------------- *)
 let subst_ring (s : _subst) cr =
   { r_type  = s.s_ty cr.r_type;
-    r_zero  = s.s_p cr.r_zero;
-    r_one   = s.s_p cr.r_one;
-    r_add   = s.s_p cr.r_add;
+    r_zero  = s.s_p  cr.r_zero;
+    r_one   = s.s_p  cr.r_one;
+    r_add   = s.s_p  cr.r_add;
     r_opp   = cr.r_opp |> omap s.s_p;
     r_mul   = s.s_p cr.r_mul;
     r_exp   = cr.r_exp |> omap s.s_p;
@@ -386,6 +386,7 @@ let subst_ring (s : _subst) cr =
     r_bool = cr.r_bool
   }
 
+(* -------------------------------------------------------------------- *)
 let subst_field (s : _subst) cr =
   { f_ring = subst_ring s cr.f_ring;
     f_inv  = s.s_p cr.f_inv;

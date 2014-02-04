@@ -6,6 +6,9 @@ open EcParsetree
 open EcDecl
 open EcModules
 open EcTheory
+open EcAlgebra
+
+module Mp = EcPath.Mp
 
 (* ------------------------------------------------------------------ *)
 type ovkind =
@@ -113,6 +116,14 @@ let rec evc_update (upt : evclone -> evclone) (nm : symbol list) (evc : evclone)
           x evc.evc_ths
       in
         { evc with evc_ths = ths }
+
+let rec evc_get (nm : symbol list) (evc : evclone) =
+  match nm with
+  | []      -> Some evc
+  | x :: nm ->
+      match Msym.find_opt x evc.evc_ths with
+      | None     -> None
+      | Some evc -> evc_get nm evc
 
 (* -------------------------------------------------------------------- *)
 exception Incompatible
@@ -349,7 +360,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
   in
 
   let (proofs, nth) =
-    let rec ovr1 prefix ovrds (subst, proofs, scenv) item =
+    let rec ovr1 prefix ovrds (subst, ops, proofs, scenv) item =
       let xpath x = EcPath.pappend opath (EcPath.fromqsymbol (prefix, x)) in
 
       match item with
@@ -357,7 +368,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
           match Msym.find_opt x ovrds.evc_types with
           | None ->
               let otyd = EcSubst.subst_tydecl subst otyd in
-                (subst, proofs, EcEnv.Ty.bind x otyd scenv)
+                (subst, ops, proofs, EcEnv.Ty.bind x otyd scenv)
 
           | Some { pl_desc = (nargs, ntyd, mode) } -> begin
             (* Already checked:
@@ -376,21 +387,21 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
                     { tyd_params = nargs;
                       tyd_type   = `Concrete ntyd; }
                   in
-                    (subst, proofs, EcEnv.Ty.bind x binding scenv)
+                    (subst, ops, proofs, EcEnv.Ty.bind x binding scenv)
 
               | `Inline ->
                   let subst =
                     (* FIXME: TC HOOK *)
                     EcSubst.add_tydef subst (xpath x) (List.map fst nargs, ntyd)
                   in
-                    (subst, proofs, scenv)
+                    (subst, ops, proofs, scenv)
           end
       end
 
       | CTh_operator (x, ({ op_kind = OB_oper None } as oopd)) -> begin
           match Msym.find_opt x ovrds.evc_ops with
           | None ->
-              (subst, proofs, EcEnv.Op.bind x (EcSubst.subst_op subst oopd) scenv)
+              (subst, ops, proofs, EcEnv.Op.bind x (EcSubst.subst_op subst oopd) scenv)
 
           | Some { pl_desc = (opov, opmode); pl_loc = loc; } ->
               let (reftyvars, refty) =
@@ -399,7 +410,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
                   (refop.op_tparams, refop.op_ty)
               in
 
-              let (newop, subst, dobind) =
+              let (newop, subst, alias) =
                 let tp = opov.opov_tyvars |> omap (List.map (fun tv -> (tv, []))) in
                 let ue = EcTyping.transtyvars scenv (loc, tp) in
                 let tp = EcTyping.tp_relax in
@@ -418,24 +429,32 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
                 let tparams = EcUnify.UniEnv.tparams ue in
                 let newop   = mk_op tparams ty (Some (OP_Plain body)) in
                   match opmode with
-                  | `Alias  -> (newop, subst, true)
+                  | `Alias  ->
+                      (newop, subst, true)
+
                   (* FIXME: TC HOOK *)
                   | `Inline ->
-                      let subst = EcSubst.add_opdef subst (xpath x)  (List.map fst tparams, body) in
+                      let subst =
+                        EcSubst.add_opdef subst (xpath x)  (List.map fst tparams, body)
+                      in
                         (newop, subst, false)
             in
 
             let (newtyvars, newty) = (newop.op_tparams, newop.op_ty) in
               (* FIXME: TC HOOK *)
-              if not (ty_compatible scenv (List.map fst reftyvars, refty) (List.map fst newtyvars, newty)) then
+              if not (ty_compatible scenv
+                        (List.map fst reftyvars, refty)
+                        (List.map fst newtyvars, newty))
+              then
                 clone_error scenv (CE_OpIncompatible (prefix, x));
-              (subst, proofs, if dobind then EcEnv.Op.bind x newop scenv else scenv)
+              let ops = Mp.add (EcPath.fromqsymbol (prefix, x)) (newop, alias) ops in
+                (subst, ops, proofs, if alias then EcEnv.Op.bind x newop scenv else scenv)
           end
 
       | CTh_operator (x, ({ op_kind = OB_pred None} as oopr)) -> begin
           match Msym.find_opt x ovrds.evc_preds with
           | None ->
-              (subst, proofs, EcEnv.Op.bind x (EcSubst.subst_op subst oopr) scenv)
+              (subst, ops, proofs, EcEnv.Op.bind x (EcSubst.subst_op subst oopr) scenv)
 
           | Some { pl_desc = prov; pl_loc = loc; } ->
               let (reftyvars, refty) =
@@ -472,14 +491,17 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
 
               let (newtyvars, newty) = (newpr.op_tparams, newpr.op_ty) in
                 (* FIXME: TC HOOK *)
-                if not (ty_compatible scenv (List.map fst reftyvars, refty) (List.map fst newtyvars, newty)) then
+                if not (ty_compatible scenv 
+                          (List.map fst reftyvars, refty)
+                          (List.map fst newtyvars, newty))
+                then
                   clone_error scenv (CE_OpIncompatible (prefix, x));
-                (subst, proofs, EcEnv.Op.bind x newpr scenv)
+                (subst, ops, proofs, EcEnv.Op.bind x newpr scenv)
         end
 
       | CTh_operator (x, oopd) ->
           let oopd = EcSubst.subst_op subst oopd in
-            (subst, proofs, EcEnv.Op.bind x oopd scenv)
+            (subst, ops, proofs, EcEnv.Op.bind x oopd scenv)
 
       | CTh_axiom (x, ax) -> begin
           let ax = EcSubst.subst_ax subst ax in
@@ -505,49 +527,111 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
                     (ax, axc :: proofs)
           in
 
-            (subst, proofs, EcEnv.Ax.bind x ax scenv)
+            (subst, ops, proofs, EcEnv.Ax.bind x ax scenv)
       end
 
       | CTh_modtype (x, modty) ->
           let modty = EcSubst.subst_modsig subst modty in
-            (subst, proofs, EcEnv.ModTy.bind x modty scenv)
+            (subst, ops, proofs, EcEnv.ModTy.bind x modty scenv)
 
       | CTh_module me ->
           let me = EcSubst.subst_module subst me in
-            (subst, proofs, EcEnv.Mod.bind me.me_name me scenv)
+            (subst, ops, proofs, EcEnv.Mod.bind me.me_name me scenv)
 
       | CTh_theory (x, cth) -> begin
           let subovrds = Msym.find_opt x ovrds.evc_ths in
           let subovrds = EcUtils.odfl evc_empty subovrds in
-          let (subst, proofs, nth) =
+          let (subst, ops, proofs, nth) =
             let subscenv = EcEnv.Theory.enter x scenv in
-            let (subst, proofs, subscenv) =
+            let (subst, ops, proofs, subscenv) =
               List.fold_left
                 (ovr1 (prefix @ [x]) subovrds)
-                (subst, proofs, subscenv) cth.cth_struct
+                (subst, ops, proofs, subscenv) cth.cth_struct
             in
-              (subst, proofs, EcEnv.Theory.close subscenv)
+              (subst, ops, proofs, EcEnv.Theory.close subscenv)
           in
-            (subst, proofs, EcEnv.Theory.bind x nth scenv)
+            (subst, ops, proofs, EcEnv.Theory.bind x nth scenv)
       end
 
       | CTh_export p ->
-          (subst, proofs, EcEnv.Theory.export (EcSubst.subst_path subst p) scenv)
+          (subst, ops, proofs, EcEnv.Theory.export (EcSubst.subst_path subst p) scenv)
 
-      | CTh_instance (ty, tc) ->
-          (* TODO: PY does it make sense *)
-          let ty = EcSubst.subst_ty subst ty in
-          let tc = EcSubst.subst_instance subst tc in
-            (subst, proofs, EcEnv.Algebra.add ty tc scenv)
+      | CTh_instance (ty, tc) -> begin
+          let module E = struct exception InvInstPath end in
+
+          let forpath (p : EcPath.path) =
+            match EcPath.getprefix p opath |> omap List.rev with
+            | None | Some [] -> None
+            | Some (x::px) ->
+                let q = EcPath.fromqsymbol (px, x) in
+
+                match Mp.find_opt q ops with
+                | None -> None
+                | Some (op, alias) ->
+                    match alias with
+                    | true  -> Some (EcPath.pappend npath q)
+                    | false ->
+                        match op.EcDecl.op_kind with
+                        | OB_pred _    -> assert false
+                        | OB_oper None -> None
+                        | OB_oper (Some (OP_Constr _))
+                        | OB_oper (Some (OP_Record _))
+                        | OB_oper (Some (OP_Proj   _))
+                        | OB_oper (Some (OP_Fix    _)) ->
+                            Some (EcPath.pappend npath q)
+                        | OB_oper (Some (OP_Plain  e)) ->
+                            match e.EcTypes.e_node with
+                            | EcTypes.Eop (r, _) -> Some r
+                            | _ -> raise E.InvInstPath
+          in
+
+          let forpath p = odfl p (forpath p) in
+
+          try
+            let ty = EcSubst.subst_ty subst ty in
+            let tc =
+              let rec doring cr =
+                { r_type  = EcSubst.subst_ty subst cr.r_type;
+                  r_zero  = forpath cr.r_zero;
+                  r_one   = forpath cr.r_one;
+                  r_add   = forpath cr.r_add;
+                  r_opp   = cr.r_opp |> omap forpath;
+                  r_mul   = forpath cr.r_mul;
+                  r_exp   = cr.r_exp |> omap forpath;
+                  r_sub   = cr.r_sub |> omap forpath;
+                  r_embed =
+                    begin match cr.r_embed with
+                    | `Direct  -> `Direct
+                    | `Default -> `Default
+                    | `Embed p -> `Embed (forpath p)
+                    end;
+                  r_bool = cr.r_bool; }
+  
+              and dofield cr =
+                { f_ring = doring cr.f_ring;
+                  f_inv  = forpath cr.f_inv;
+                  f_div  = cr.f_div |> omap forpath; }
+              in
+                match tc with
+                | `Ring    cr -> `Ring  (doring  cr)
+                | `Field   cr -> `Field (dofield cr)
+                | `General p  -> `General (forpath p)
+            in
+              (subst, ops, proofs, EcEnv.Algebra.add ty tc scenv)
+
+          with E.InvInstPath ->
+            (subst, ops, proofs, scenv)
+      end
 
       | CTh_typeclass _ ->
           (* Currently, type classes don't survive cloning *)
-          (subst, proofs, scenv)
+          (subst, ops, proofs, scenv)
 
     in
       let scenv = EcEnv.Theory.enter name scenv in
-      let _, proofs, scenv =
-        List.fold_left (ovr1 [] ovrds) (subst, [], scenv) oth.cth_struct
+      let _, _, proofs, scenv =
+        List.fold_left
+          (ovr1 [] ovrds) (subst, Mp.empty, [], scenv) oth.cth_struct
       in
         (List.rev proofs, EcEnv.Theory.close scenv)
   in

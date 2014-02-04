@@ -28,7 +28,9 @@ val tostring    : path -> string
 val toqsymbol   : path -> qsymbol
 val fromqsymbol : qsymbol -> path
 val basename    : path -> symbol
+val extend      : path -> symbol list -> path
 val prefix      : path -> path option
+val getprefix   : path -> path -> symbol list option
 val isprefix    : path -> path -> bool
 val rootname    : path -> symbol
 val tolist      : path -> symbol list 

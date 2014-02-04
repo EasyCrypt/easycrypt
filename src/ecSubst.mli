@@ -36,7 +36,7 @@ val subst_ax      : subst -> axiom -> axiom
 val subst_op      : subst -> operator -> operator
 val subst_tydecl  : subst -> tydecl -> tydecl
 val subst_ctheory : subst -> ctheory -> ctheory
-val subst_instance : subst -> tcinstance -> tcinstance
+
 (* -------------------------------------------------------------------- *)
 val subst_path         : subst -> path  -> path
 val subst_mpath        : subst -> mpath -> mpath

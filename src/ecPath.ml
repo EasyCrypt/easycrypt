@@ -93,19 +93,28 @@ let basename p =
   | Psymbol x     -> x
   | Pqname (_, x) -> x
 
-let prefix p = 
+let extend p s =
+  List.fold_left pqname p s
+
+let prefix p =
   match p.p_node with 
   | Psymbol _ -> None
   | Pqname (p, _) -> Some p
 
-let rec isprefix p q =
-  if   p_equal p q
-  then true
-  else begin
-    match prefix q with
-    | None -> false
-    | Some q -> isprefix p q
-  end
+let rec getprefix_r acc p q =
+  match p_equal p q with
+  | true  -> Some acc
+  | false ->
+      match q.p_node with
+      | Psymbol _     -> None
+      | Pqname (q, x) -> getprefix_r (x::acc) p q
+
+let getprefix p q = getprefix_r [] p q
+
+let isprefix p q =
+  match getprefix p q with
+  | None   -> false
+  | Some _ -> true
 
 let rec rootname p = 
   match p.p_node with 
