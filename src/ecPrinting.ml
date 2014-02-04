@@ -6,6 +6,7 @@ open EcTypes
 open EcModules
 open EcDecl
 open EcFol
+open EcAlgebra
 
 module P  = EcPath
 module EP = EcParser
@@ -2182,5 +2183,50 @@ let rec pp_theory ppe (fmt:Format.formatter) (path, cth) =
   | EcTheory.CTh_typeclass _ ->
       Format.fprintf fmt "typeclass <FIXME>."
 
-  | EcTheory.CTh_instance _ ->
-      Format.fprintf fmt "instance <FIXME>."
+  | EcTheory.CTh_instance (ty, tc) -> begin
+      match tc with
+      | (`Ring _ | `Field _) as tc -> begin
+          let (name, ops) =
+            let rec ops_of_ring cr =
+              let embedp =
+                match cr.r_embed with
+                | `Direct | `Default -> None
+                | `Embed p -> Some p
+              in
+                [("rzero", Some cr.r_zero);
+                 ("rone" , Some cr.r_one );
+                 ("add"  , Some cr.r_add );
+                 ("opp"  ,      cr.r_opp );
+                 ("mul"  , Some cr.r_mul );
+                 ("expr" ,      cr.r_exp );
+                 ("sub"  ,      cr.r_sub );
+                 ("ofint",      embedp   )]
+            and ops_of_field cr =
+              ops_of_ring cr.f_ring @
+                [("inv", Some cr.f_inv);
+                 ("div",      cr.f_div)]
+            in
+              match tc with
+              | `Ring  cr when cr.r_bool -> ("boolean_ring", ops_of_ring cr)
+              | `Ring  cr -> ("ring", ops_of_ring cr)
+              | `Field cr -> ("field", ops_of_field cr)
+          in
+
+          let ops = List.pmap
+            (function (_, None) -> None | (x, Some y) -> Some (x, y))
+            ops
+          in
+            Format.fprintf fmt
+              "instance %s with %a@\n@[<hov 2>  %a@]" name
+              (pp_type ppe) ty
+              (pp_list "@\n"
+                 (fun fmt (name, op) ->
+                   Format.fprintf fmt "op %s = %s"
+                     name (EcPath.tostring op)))
+              ops
+      end
+
+      | `General p ->
+          Format.fprintf fmt "instance %a with %a."
+            (pp_type ppe) ty pp_path p
+  end

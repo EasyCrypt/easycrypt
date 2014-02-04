@@ -560,7 +560,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
           let module E = struct exception InvInstPath end in
 
           let forpath (p : EcPath.path) =
-            match EcPath.getprefix p opath |> omap List.rev with
+            match EcPath.getprefix opath p |> omap List.rev with
             | None | Some [] -> None
             | Some (x::px) ->
                 let q = EcPath.fromqsymbol (px, x) in

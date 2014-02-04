@@ -2411,6 +2411,12 @@ module Algebra = struct
         env_tci  = bind ty cr env env.env_tci;
         env_item = CTh_instance (ty, cr) :: env.env_item; }
 
+  let bind_ring ty cr env =
+    { env with env_tci = bind ty (`Ring cr) env env.env_tci }
+
+  let bind_field ty cr env =
+    { env with env_tci = bind ty (`Field cr) env env.env_tci }
+
   let add_ring  ty cr env = add ty (`Ring  cr) env
   let add_field ty cr env = add ty (`Field cr) env
 
@@ -2493,7 +2499,7 @@ module Theory = struct
   (* FIXME: hnorm won't be triggered in the right env. *)
   and bind_instance_cth_item env inst item = 
     match item with
-    | CTh_instance (ty, k)  -> Algebra.bind ty k env inst
+    | CTh_instance (ty, k) -> Algebra.bind ty k env inst
     | CTh_theory (_, cth) -> bind_instance_cth env inst cth 
     | CTh_type _ | CTh_operator _ | CTh_axiom _ 
     | CTh_modtype _ | CTh_module _ | CTh_export _
@@ -2506,7 +2512,7 @@ module Theory = struct
         env_rb   = List.rev_append cth.cth3_rebind env.env_rb;
         env_item = (CTh_theory (id, cth.cth3_theory)) :: env.env_item; 
         env_tci  = bind_instance_cth env env.env_tci cth.cth3_theory;
-       (* FIXME: TC HOOK *)
+        (* FIXME: TC HOOK *)
     }
 
   (* ------------------------------------------------------------------ *)
@@ -2548,8 +2554,8 @@ module Theory = struct
 
         | CTh_instance (p, cr) -> begin
             match cr with
-            | `Ring    cr -> Algebra.add_ring  p cr env
-            | `Field   cr -> Algebra.add_field p cr env
+            | `Ring    cr -> Algebra.bind_ring  p cr env
+            | `Field   cr -> Algebra.bind_field p cr env
             | `General _  -> env        (* FIXME: TC HOOK *)
         end
       in

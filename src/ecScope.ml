@@ -1747,10 +1747,10 @@ module Ty = struct
       r_zero  = oget (Mstr.find_opt "rzero" symbols);
       r_one   = oget (Mstr.find_opt "rone"  symbols);
       r_add   = oget (Mstr.find_opt "add"   symbols);
-      r_opp   = Mstr.find_opt "opp"   symbols;
+      r_opp   =      (Mstr.find_opt "opp"   symbols);
       r_mul   = oget (Mstr.find_opt "mul"   symbols);
-      r_exp   = Mstr.find_opt "expr"  symbols;
-      r_sub   = Mstr.find_opt "sub" symbols;
+      r_exp   =      (Mstr.find_opt "expr"  symbols);
+      r_sub   =      (Mstr.find_opt "sub"   symbols);
       r_embed =
         begin match Mstr.find_opt "ofint" symbols with
         | None   -> 
