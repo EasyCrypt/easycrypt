@@ -131,7 +131,7 @@ let rofint r i =
     let rec aux i = if i = 1 then one else radd r (aux (i-1)) one in
     if i = 0 then rzero r
     else if 1 <= i then aux i
-    else ropp r (aux i)
+    else ropp r (aux (-i))
 
 (* -------------------------------------------------------------------- *)
 let fzero  f = rzero  f.f_ring
