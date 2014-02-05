@@ -345,7 +345,7 @@ theory Dapply.
     mu (dapply f d) (fun y, y = x) = mu d (fun y, y = g x).
   proof. move=> fK gK; rewrite mu_def; apply mu_eq; smt. qed.
 
-  lemma mux_dapply_pij (d:'a distr) (f:'a -> 'b) g x P:
+  lemma mux_dapply_pbij (d:'a distr) (f:'a -> 'b) g x P:
     (forall x, P x => g (f x) = x) =>
     (forall y, f (g y) = y) =>
     support d <= P =>
