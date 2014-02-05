@@ -53,6 +53,7 @@ type tyerror =
 | NonUnitFunWithoutReturn
 | UnitFunWithReturn
 | TypeMismatch           of (ty * ty) * (ty * ty)
+| TypeClassMismatch
 | TypeModMismatch        of tymod_cnv_failure
 | NotAFunction
 | UnknownVarOrOp         of qsymbol * ty list
@@ -130,3 +131,7 @@ val trans_gamepath   : EcEnv.env -> pgamepath -> xpath
 
 (* -------------------------------------------------------------------- *)
 val check_sig_mt_cnv : EcEnv.env -> module_sig -> module_type -> unit 
+
+(* -------------------------------------------------------------------- *)
+val get_ring  : ty -> EcEnv.env -> EcAlgebra.ring  option
+val get_field : ty -> EcEnv.env -> EcAlgebra.field option

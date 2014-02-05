@@ -21,8 +21,8 @@ and theory_item =
   | Th_module    of module_expr
   | Th_theory    of (symbol * theory)
   | Th_export    of EcPath.path
-  | Th_instance  of EcTypes.ty * tcinstance
-  | Th_typeclass of symbol
+  | Th_instance  of (ty_params * EcTypes.ty) * tcinstance
+  | Th_typeclass of (symbol * typeclass)
 
 and tcinstance = [ `Ring of ring | `Field of field | `General of path ]
 
@@ -46,8 +46,8 @@ and ctheory_item =
   | CTh_module    of module_expr
   | CTh_theory    of (symbol * ctheory)
   | CTh_export    of EcPath.path
-  | CTh_instance  of EcTypes.ty * tcinstance
-  | CTh_typeclass of symbol
+  | CTh_instance  of (ty_params * EcTypes.ty) * tcinstance
+  | CTh_typeclass of (symbol * typeclass)
 
 and ctheory_clone = {
   cthc_base : EcPath.path;

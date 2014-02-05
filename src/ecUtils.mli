@@ -205,6 +205,8 @@ module List : sig
 
   val tryassoc : 'a -> ('a * 'b) list -> 'b option
 
+  val find_map : ('a -> 'b option) -> 'a list -> 'b
+
   val pmap : ('a -> 'b option) -> 'a list -> 'b list
 
   val prmap : ('a -> 'b option) -> 'a list -> 'b list

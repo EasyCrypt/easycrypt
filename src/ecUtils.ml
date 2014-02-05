@@ -471,6 +471,14 @@ module List = struct
   let tryassoc (x : 'a) (xs : ('a * 'b) list) =
     tryassoc_eq (=) x xs
 
+  let rec find_map (p : 'a -> 'b option) (xs : 'a list) =
+    match xs with
+    | []      -> raise Not_found
+    | x :: xs ->
+        match p x with
+        | None   -> find_map p xs
+        | Some v -> v
+
   let take_n (n : int) (xs : 'a list) =
     let rec take n xs acc =
       match n, xs with

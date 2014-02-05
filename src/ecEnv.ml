@@ -113,7 +113,7 @@ type mc = {
   mc_operators  : (ipath * EcDecl.operator) MMsym.t;
   mc_axioms     : (ipath * EcDecl.axiom) MMsym.t;
   mc_theories   : (ipath * ctheory) MMsym.t;
-  mc_typeclasses: (ipath * unit) MMsym.t;
+  mc_typeclasses: (ipath * typeclass) MMsym.t;
   mc_components : ipath MMsym.t;
 }
 
@@ -139,7 +139,7 @@ type preenv = {
   env_memories : EcMemory.memenv MMsym.t;
   env_actmem   : EcMemory.memory option;
   env_abs_st   : EcBaseLogic.abs_uses Mid.t;
-  env_tci      : (tcinstance list) Mty.t;
+  env_tci      : ((ty_params * ty) * tcinstance) list;
   env_tc       : TC.graph;
   env_modlcs   : Sid.t;                 (* declared modules *)
   env_w3       : EcWhy3.env;
@@ -209,7 +209,7 @@ let empty () =
       env_memories = MMsym.empty;
       env_actmem   = None;
       env_abs_st   = Mid.empty;
-      env_tci      = Mty.empty;
+      env_tci      = [];
       env_tc       = TC.Graph.empty;
       env_modlcs   = Sid.empty;
       env_w3       = EcWhy3.empty;
@@ -641,8 +641,8 @@ module MC = struct
       let ipath name = IPPath (EcPath.pqoname (EcPath.prefix mypath) name) in
 
       match tyd.tyd_type with
+      | `Concrete _  -> mc
       | `Abstract _ -> mc
-      | `Concrete _ -> mc
 
       | `Datatype dtype ->
           let cs      = dtype.tydt_ctors   in
@@ -745,7 +745,71 @@ module MC = struct
   let _up_typeclass candup mc x obj =
     if not candup && MMsym.last x mc.mc_typeclasses <> None then
       raise (DuplicatedBinding x);
-    { mc with mc_typeclasses = MMsym.add x obj mc.mc_typeclasses }
+    let mc = { mc with mc_typeclasses = MMsym.add x obj mc.mc_typeclasses } in
+    let mc =
+      let mypath, tc =
+        match obj with IPPath p, x -> (p, x) | _, _ -> assert false in
+      let xpath name = EcPath.pqoname (EcPath.prefix mypath) name in
+
+      let self = EcIdent.create "'self" in
+
+      let tsubst =
+        { ty_subst_id with
+          ts_def = Mp.add mypath ([], tvar self) Mp.empty }
+      in
+
+      let operators =
+        let on1 (opid, optype) =
+          let opname = EcIdent.name opid in
+          let optype = ty_subst tsubst optype in
+          let opdecl = mk_op [(self, Sp.singleton mypath)] optype None in
+            (opid, xpath opname, optype, opdecl)
+        in
+          List.map on1 tc.tc_ops
+      in
+
+      let fsubst =
+        List.fold_left
+          (fun s (x, xp, xty, _) ->
+            let fop = EcFol.f_op xp [tvar self] xty in
+              Fsubst.f_bind_local s x fop)
+          (Fsubst.f_subst_init false Mid.empty tsubst Mp.empty)
+          operators
+      in
+
+      let axioms =
+        List.map
+          (fun (x, ax) ->
+            let ax = Fsubst.f_subst fsubst ax in
+              (x, { ax_tparams = [(self, Sp.singleton mypath)];
+                    ax_spec    = Some ax;
+                    ax_kind    = `Axiom;
+                    ax_nosmt   = true; }))
+          tc.tc_axs
+      in
+
+      let mc =
+        List.fold_left
+          (fun mc (_, fpath, _, fop) ->
+            _up_operator candup mc (EcPath.basename fpath) (IPPath fpath, fop))
+          mc operators
+      in
+        List.fold_left
+          (fun mc (x, ax) ->
+            _up_axiom candup mc x (IPPath (xpath x), ax))
+          mc axioms
+
+
+    in
+      mc
+
+(*
+type typeclass = {
+  tc_ops : (EcIdent.t * EcTypes.ty) list;
+  tc_axs : form list;
+}
+*)
+
 
   let import_typeclass p ax env =
     import (_up_typeclass true) (IPPath p) ax env
@@ -888,8 +952,8 @@ module MC = struct
           let mc = _up_mc false mc (IPPath (expath xsubth)) in
             (add2mc _up_theory xsubth subth mc, Some submcs)
 
-      | CTh_typeclass x ->
-          (add2mc _up_typeclass x () mc, None)
+      | CTh_typeclass (x, tc) ->
+          (add2mc _up_typeclass x tc mc, None)
 
       | CTh_export _ -> (mc, None)
 
@@ -1108,9 +1172,9 @@ let try_lf f =
   try  Some (f ())
   with LookupFailure _ -> None
 
-(* -------------------------------------------------------------------- *)
+(* ------------------------------------------------------------------ *)
 module TypeClass = struct
-  type t = unit
+  type t = typeclass
 
   let by_path_opt (p : EcPath.path) (env : env) =
     omap 
@@ -1126,11 +1190,12 @@ module TypeClass = struct
     let obj = by_path p env in
       MC.import_typeclass p obj env
 
+  let rebind name tc env =
+    MC.bind_typeclass name tc env
+
   let bind name tc env =
-    let env = MC.bind_typeclass name tc env in
-    let env = { env with env_item = CTh_typeclass name :: env.env_item } in
-      (* FIXME: TC HOOK *)
-      env
+    { (rebind name tc env) with
+        env_item = CTh_typeclass (name, tc) :: env.env_item }
 
   let lookup qname (env : env) =
     MC.lookup_typeclass qname env
@@ -1144,12 +1209,15 @@ module TypeClass = struct
   let graph (env : env) =
     env.env_tc
 
-  let tc_of_typename (_p : EcPath.path) (_env : env) =
-    (* FIXME: TC HOOK *)
-    Sp.empty
+  let bind_instance ty cr tci = 
+    (ty, cr) :: tci
 
-  let add_abstract_instance ~src ~dst env =
-    { env with env_tc = TC.Graph.add ~src ~dst env.env_tc; }
+  let add_instance ty cr env = 
+    { env with
+        env_tci  = bind_instance ty cr env.env_tci;
+        env_item = CTh_instance (ty, cr) :: env.env_item; }
+
+  let get_instances env = env.env_tci
 end
 
 (* -------------------------------------------------------------------- *)
@@ -1178,31 +1246,6 @@ module Ty = struct
 
   let lookup_path name env =
     fst (lookup name env)
-
-  let rebind name ty env =
-    let mypath = EcPath.pqname (root env) name in
-    let env    = MC.bind_tydecl name ty env in
-    let env    =
-      match ty.tyd_type with
-      | `Abstract tc -> Sp.fold
-          (fun dst env ->
-             TypeClass.add_abstract_instance ~src:mypath ~dst env)
-          tc env
-
-      | _ -> env
-    in
-      env
-
-  let bind name ty env =
-    let env = rebind name ty env in
-    let (w3, rb) =
-        EcWhy3.add_ty env.env_w3
-          (EcPath.pqname (root env) name) ty
-    in
-      { env with
-          env_w3   = w3;
-          env_rb   = rb @ env.env_rb;
-          env_item = CTh_type (name, ty) :: env.env_item; }
 
   let defined (name : EcPath.path) (env : env) =
     match by_path_opt name env with
@@ -1240,7 +1283,36 @@ module Ty = struct
           | _ -> None
       end
       | _ -> None
- end
+
+  let rebind name ty env =
+    let env = MC.bind_tydecl name ty env in
+
+    match ty.tyd_type with
+    | `Abstract tc ->
+        let myty =
+          let myp = EcPath.pqname (root env) name in
+          let typ = List.map (fst_map EcIdent.fresh) ty.tyd_params in
+            (typ, EcTypes.tconstr myp (List.map (tvar |- fst) typ)) in
+        let instr =
+          Sp.fold
+            (fun p inst -> TypeClass.bind_instance myty (`General p) inst)
+            tc env.env_tci
+        in
+          { env with env_tci = instr }
+
+    | _ -> env
+
+  let bind name ty env =
+    let env = rebind name ty env in
+    let (w3, rb) =
+        EcWhy3.add_ty env.env_w3
+          (EcPath.pqname (root env) name) ty
+    in
+      { env with
+          env_w3   = w3;
+          env_rb   = rb @ env.env_rb;
+          env_item = CTh_type (name, ty) :: env.env_item; }
+end
 
 (* -------------------------------------------------------------------- *)
 module Fun = struct
@@ -2388,59 +2460,18 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Algebra = struct
-  open EcAlgebra
-
-  let bind ty cr env tci = 
-    assert (Mid.is_empty ty.ty_fv);
-
-    let change tci = 
-      let tci = odfl [] tci in
-      let eq cr1 cr2 = 
-        match cr1, cr2 with
-        | `Ring    r1, `Ring    r2 -> ring_equal  r1 r2
-        | `Field   f1, `Field   f2 -> field_equal f1 f2
-        | `General p1, `General p2 -> p_equal     p1 p2
-        | _, _ -> false
-      in
-        Some (if List.exists (eq cr) tci then tci else cr::tci)
-    in
-      Mty.change change (Ty.hnorm ty env) tci
- 
-  let add ty cr env = 
-    { env with
-        env_tci  = bind ty cr env env.env_tci;
-        env_item = CTh_instance (ty, cr) :: env.env_item; }
-
   let bind_ring ty cr env =
-    { env with env_tci = bind ty (`Ring cr) env env.env_tci }
+    assert (Mid.is_empty ty.ty_fv);
+    { env with env_tci =
+        TypeClass.bind_instance ([], ty) (`Ring cr) env.env_tci }
 
   let bind_field ty cr env =
-    { env with env_tci = bind ty (`Field cr) env env.env_tci }
+    assert (Mid.is_empty ty.ty_fv);
+    { env with env_tci =
+        TypeClass.bind_instance ([], ty) (`Field cr) env.env_tci }
 
-  let add_ring  ty cr env = add ty (`Ring  cr) env
-  let add_field ty cr env = add ty (`Field cr) env
-
-  let get_instances ty env =
-    let ty = Ty.hnorm ty env in
-      odfl [] (Mty.find_opt ty env.env_tci)
-
-  let get_ring ty env =
-    let module E = struct exception Found of ring end in
-      try
-        List.iter
-          (function `Ring cr -> raise (E.Found cr) | _ -> ())
-          (get_instances ty env);
-        None
-      with E.Found cr -> Some cr
-
-  let get_field ty env =
-    let module E = struct exception Found of field end in
-      try
-        List.iter
-          (function `Field cr -> raise (E.Found cr) | _ -> ())
-          (get_instances ty env);
-        None
-      with E.Found cr -> Some cr
+  let add_ring  ty cr env = TypeClass.add_instance ([], ty) (`Ring  cr) env
+  let add_field ty cr env = TypeClass.add_instance ([], ty) (`Field cr) env
 end
 
 (* -------------------------------------------------------------------- *)
@@ -2493,27 +2524,41 @@ module Theory = struct
     fst (lookup name env)
 
   (* ------------------------------------------------------------------ *)
-  let rec bind_instance_cth env inst cth = 
-    List.fold_left (bind_instance_cth_item env) inst cth.cth_struct 
+  let rec bind_instance_cth path inst cth = 
+    List.fold_left (bind_instance_cth_item path) inst cth.cth_struct 
 
-  (* FIXME: hnorm won't be triggered in the right env. *)
-  and bind_instance_cth_item env inst item = 
+  and bind_instance_cth_item path inst item = 
+    let xpath x = EcPath.pqname path x in
+
     match item with
-    | CTh_instance (ty, k) -> Algebra.bind ty k env inst
-    | CTh_theory (_, cth) -> bind_instance_cth env inst cth 
-    | CTh_type _ | CTh_operator _ | CTh_axiom _ 
-    | CTh_modtype _ | CTh_module _ | CTh_export _
-    | CTh_typeclass _ -> inst           (* FIXME: TC HOOK *)
-    
-  let bind id cth env =
-    let env = MC.bind_theory id cth.cth3_theory env in
+    | CTh_instance (ty, k)  -> TypeClass.bind_instance ty k inst
+    | CTh_theory   (x, cth) -> bind_instance_cth (xpath x) inst cth 
+
+    | CTh_type (x, tyd) -> begin
+        match tyd.tyd_type with
+        | `Abstract tc ->
+            let myty =
+              let typ = List.map (fst_map EcIdent.fresh) tyd.tyd_params in
+                (typ, EcTypes.tconstr (xpath x) (List.map (tvar |- fst) typ))
+            in
+              Sp.fold
+                (fun p inst -> TypeClass.bind_instance myty (`General p) inst)
+                tc inst
+
+        | _ -> inst
+    end
+
+    | _ -> inst
+
+  let bind name cth env =
+    let env = MC.bind_theory name cth.cth3_theory env in
     { env with
         env_w3   = EcWhy3.rebind env.env_w3 cth.cth3_rebind;
         env_rb   = List.rev_append cth.cth3_rebind env.env_rb;
-        env_item = (CTh_theory (id, cth.cth3_theory)) :: env.env_item; 
-        env_tci  = bind_instance_cth env env.env_tci cth.cth3_theory;
-        (* FIXME: TC HOOK *)
-    }
+        env_item = (CTh_theory (name, cth.cth3_theory)) :: env.env_item; 
+        env_tci  = bind_instance_cth
+                     (EcPath.pqname (root env) name)
+                     env.env_tci cth.cth3_theory; }
 
   (* ------------------------------------------------------------------ *)
   let rebind name cth env =
@@ -2549,15 +2594,12 @@ module Theory = struct
             let env = MC.import_mc (IPPath (xpath x)) env in
               env
 
-        | CTh_typeclass x ->
-            MC.import_typeclass (xpath x) () env
+        | CTh_typeclass (x, tc) ->
+            MC.import_typeclass (xpath x) tc env
 
-        | CTh_instance (p, cr) -> begin
-            match cr with
-            | `Ring    cr -> Algebra.bind_ring  p cr env
-            | `Field   cr -> Algebra.bind_field p cr env
-            | `General _  -> env        (* FIXME: TC HOOK *)
-        end
+        | CTh_instance _ ->
+            env
+
       in
         List.fold_left import_cth_item env cth.cth_struct
 
@@ -2603,10 +2645,14 @@ module Theory = struct
     let comps = env.env_comps in
     let comps = Mip.add (IPPath rootnm) topmc comps in
 
-    { env with
-        env_current = current;
-        env_comps   = comps;
-        env_w3      = EcWhy3.rebind env.env_w3 cth.cth3_rebind; }
+    let env =
+      { env with
+          env_current = current;
+          env_comps   = comps;
+          env_w3      = EcWhy3.rebind env.env_w3 cth.cth3_rebind; }
+    in
+       { env with env_tci =
+           bind_instance_cth thpath env.env_tci cth.cth3_theory; }
 end
 
 (* -------------------------------------------------------------------- *)
@@ -2898,8 +2944,6 @@ module LDecl = struct
     { le_initial_env = lenv.le_initial_env;
       le_env         = nenv;
       le_hyps        = nhyps; }
-
-
 
   let lookup s h = lookup s (tohyps h)
 

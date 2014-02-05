@@ -556,7 +556,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
       | CTh_export p ->
           (subst, ops, proofs, EcEnv.Theory.export (EcSubst.subst_path subst p) scenv)
 
-      | CTh_instance (ty, tc) -> begin
+      | CTh_instance ((typ, ty), tc) -> begin
           let module E = struct exception InvInstPath end in
 
           let forpath (p : EcPath.path) =
@@ -588,7 +588,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
           let forpath p = odfl p (forpath p) in
 
           try
-            let ty = EcSubst.subst_ty subst ty in
+            let (typ, ty) = EcSubst.subst_genty subst (typ, ty) in
             let tc =
               let rec doring cr =
                 { r_type  = EcSubst.subst_ty subst cr.r_type;
@@ -617,7 +617,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
                 | `Field   cr -> `Field (dofield cr)
                 | `General p  -> `General (forpath p)
             in
-              (subst, ops, proofs, EcEnv.Algebra.add ty tc scenv)
+              (subst, ops, proofs, EcEnv.TypeClass.add_instance (typ, ty) tc scenv)
 
           with E.InvInstPath ->
             (subst, ops, proofs, scenv)

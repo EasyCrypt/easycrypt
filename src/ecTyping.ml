@@ -8,6 +8,7 @@ open EcTypes
 open EcDecl
 open EcModules
 open EcFol
+open EcAlgebra
 
 module MMsym = EcSymbols.MMsym
 
@@ -69,6 +70,7 @@ type tyerror =
 | NonUnitFunWithoutReturn
 | UnitFunWithReturn
 | TypeMismatch           of (ty * ty) * (ty * ty)
+| TypeClassMismatch
 | TypeModMismatch        of tymod_cnv_failure
 | NotAFunction
 | UnknownVarOrOp         of qsymbol * ty list
@@ -204,6 +206,9 @@ let pp_tyerror fmt env error =
       msg "but is expected to have type@\n";
       msg "  @[<hov 2> %a@]" pp_type ty1
 
+  | TypeClassMismatch ->
+      msg "Type-class unification failure"
+
   | TypeModMismatch err ->
       msg "this module body does not meet its interface:@\n";
       msg "  @[<hov 2>%t@]" (fun fmt -> pp_cnv_failure fmt env err)
@@ -281,10 +286,14 @@ module UE = EcUnify.UniEnv
 
 let unify_or_fail (env : EcEnv.env) ue loc ~expct:ty1 ty2 = 
   try  EcUnify.unify env ue ty1 ty2 
-  with EcUnify.UnificationFailure (t1, t2) ->
-    let tyinst = Tuni.offun (UE.assubst ue) in
-      tyerror loc env (TypeMismatch ((tyinst ty1, tyinst ty2),
-                                     (tyinst  t1, tyinst  t2)))
+  with EcUnify.UnificationFailure pb ->
+    match pb with
+    | `TyUni (t1, t2)->
+        let tyinst = Tuni.offun (UE.assubst ue) in
+          tyerror loc env (TypeMismatch ((tyinst ty1, tyinst ty2),
+                                         (tyinst  t1, tyinst  t2)))
+    | `TcCtt _ ->
+        tyerror loc env TypeClassMismatch
 
 (* -------------------------------------------------------------------- *)
 let e_inuse =
@@ -496,7 +505,7 @@ let transtcs (env : EcEnv.env) tcs =
   let for1 tc =
     match EcEnv.TypeClass.lookup_opt (unloc tc) env with
     | None -> tyerror tc.pl_loc env (UnknownTypeClass (unloc tc))
-    | Some (p, ()) -> p
+    | Some (p, _) -> p                  (* FIXME: TC HOOK *)
   in
     Sp.of_list (List.map for1 tcs)
 
@@ -2155,3 +2164,37 @@ let trans_prop env ue pf =
 (* -------------------------------------------------------------------- *)
 let trans_pattern env (ps, ue) pf =
   trans_form_or_pattern env (Some ps, ue) pf None
+
+(* -------------------------------------------------------------------- *)
+let get_instances bty env =
+  let inst = List.pmap
+    (function (_, (`Ring _ | `Field _)) as x -> Some x | _ -> None)
+    (EcEnv.TypeClass.get_instances env) in
+
+  let inst = List.filter (fun ((typ, gty), _cr) ->
+    let ue = EcUnify.UniEnv.create (Some []) in
+    let (gty, _typ) = EcUnify.UniEnv.openty ue typ None gty in
+      try  EcUnify.unify env ue bty gty; true
+      with EcUnify.UnificationFailure _ -> false)
+    inst
+
+  in
+    List.map snd inst
+
+let get_ring ty env =
+  let module E = struct exception Found of ring end in
+    try
+      List.iter
+        (function `Ring cr -> raise (E.Found cr) | _ -> ())
+        (get_instances ty env);
+      None
+    with E.Found cr -> Some cr
+
+let get_field ty env =
+  let module E = struct exception Found of field end in
+    try
+      List.iter
+        (function `Field cr -> raise (E.Found cr) | _ -> ())
+        (get_instances ty env);
+      None
+    with E.Found cr -> Some cr

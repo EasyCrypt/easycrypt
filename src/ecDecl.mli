@@ -96,5 +96,5 @@ type axiom = {
 (* -------------------------------------------------------------------- *)
 type typeclass = {
   tc_ops : (EcIdent.t * EcTypes.ty) list;
-  tc_axs : form list;
+  tc_axs : (EcSymbols.symbol * form) list;
 }

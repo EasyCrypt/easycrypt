@@ -154,5 +154,5 @@ let operator_as_fix (op : operator) =
 (* -------------------------------------------------------------------- *)
 type typeclass = {
   tc_ops : (EcIdent.t * EcTypes.ty) list;
-  tc_axs : EcFol.form list;
+  tc_axs : (EcSymbols.symbol * EcFol.form) list;
 }

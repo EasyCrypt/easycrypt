@@ -251,8 +251,9 @@ and subst_module (s : _subst) (m : module_expr) =
 
 (* -------------------------------------------------------------------- *)
 let init_tparams (s : _subst) (params : ty_params) (params' : ty_params) =
-  if params = [] then s
-  else
+  match params with
+  | [] -> s
+  | _  ->
     let styv =  
       List.fold_left2 (fun m (p, _) (p', _) -> Mid.add p (tvar p') m) 
         Mid.empty params params' in
@@ -265,9 +266,20 @@ let init_tparams (s : _subst) (params : ty_params) (params' : ty_params) =
     in
       { s with s_sty = sty; s_ty = EcTypes.ty_subst sty } 
 
+(* -------------------------------------------------------------------- *)
 let subst_typaram (s : _subst) ((id, tc) : ty_param) =
   (EcIdent.fresh id, Sp.fold (fun p tc -> Sp.add (s.s_p p) tc) tc Sp.empty)
 
+let subst_typarams (s : _subst) (typ : ty_params) =
+  List.map (subst_typaram s) typ
+
+(* -------------------------------------------------------------------- *)
+let subst_genty (s : _subst) (typ, ty) =
+  let typ' = subst_typarams s typ in
+  let s    = init_tparams s typ typ' in
+    (typ', s.s_ty ty)
+
+(* -------------------------------------------------------------------- *)
 let subst_tydecl (s : _subst) (tyd : tydecl) =
   let params' = List.map (subst_typaram s) tyd.tyd_params in
   let body = 
@@ -425,12 +437,10 @@ let rec subst_theory_item (s : _subst) (item : theory_item) =
       Th_export (s.s_p p)
 
   | Th_instance (ty, tci) ->
-      assert (Mid.is_empty ty.ty_fv);
-      let s = init_tparams s [] [] in
-        Th_instance (s.s_ty ty, subst_instance s tci)
+      Th_instance (subst_genty s ty, subst_instance s tci)
 
-  | Th_typeclass (x : EcSymbols.symbol) ->
-      Th_typeclass x
+  | Th_typeclass (x, tc) ->
+      Th_typeclass (x, tc)              (* FIXME *)
 
 (* -------------------------------------------------------------------- *)
 and subst_theory (s : _subst) (items : theory) =
@@ -461,9 +471,7 @@ and subst_ctheory_item (s : _subst) (item : ctheory_item) =
       CTh_export (s.s_p p)
 
   | CTh_instance (ty, cr) ->
-      assert (Mid.is_empty ty.ty_fv);
-      let s = init_tparams s [] [] in
-        CTh_instance (s.s_ty ty, subst_instance s cr)
+      CTh_instance (subst_genty s ty, subst_instance s cr)
 
   | CTh_typeclass x ->
       CTh_typeclass x
@@ -518,6 +526,7 @@ let subst_path         s = (_subst_of_subst s).s_p
 
 let subst_form         s = fun f -> (Fsubst.f_subst (f_subst_of_subst (_subst_of_subst s)) f)
 let subst_ty           s = fun t -> ((_subst_of_subst s).s_ty t)
+let subst_genty        s = fun t -> (subst_genty (_subst_of_subst s) t)
 
 let subst_instance     s = subst_instance (_subst_of_subst s)
 

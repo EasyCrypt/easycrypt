@@ -6,7 +6,7 @@ open EcTypes
 open EcDecl
 
 (* -------------------------------------------------------------------- *)
-exception UnificationFailure of ty * ty
+exception UnificationFailure of [`TyUni of ty * ty | `TcCtt of ty * Sp.t]
 exception UninstanciateUni
 
 type unienv
@@ -16,6 +16,7 @@ type tvar_inst =
 | TVInamed  of (EcSymbols.symbol * ty) list
 
 type tvi = tvar_inst option
+type uidmap = uid -> ty option
 
 module UniEnv : sig
   val create     : (EcIdent.t * Sp.t) list option -> unienv
@@ -28,8 +29,8 @@ module UniEnv : sig
   val openty     : unienv -> ty_params -> tvi -> ty -> ty * ty list
   val opentys    : unienv -> ty_params -> tvi -> ty list -> ty list * ty list
   val closed     : unienv -> bool
-  val close      : unienv -> (uid -> ty option)
-  val assubst    : unienv -> (uid -> ty option)
+  val close      : unienv -> uidmap
+  val assubst    : unienv -> uidmap
   val tparams    : unienv -> ty_params
 end
 

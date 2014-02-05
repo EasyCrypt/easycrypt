@@ -1096,13 +1096,13 @@ let process_algebra mode kind eqs g =
     with
     | `Ring t ->
         let r =
-          match EcEnv.Algebra.get_ring ty env with
+          match TT.get_ring ty env with
           | None   -> tacuerror "cannot find a ring structure"
           | Some r -> r
         in t r eqs (f1, f2)
     | `Field t ->
         let r =
-          match EcEnv.Algebra.get_field ty env with
+          match TT.get_field ty env with
           | None   -> tacuerror "cannot find a field structure"
           | Some r -> r
         in t r eqs (f1, f2)

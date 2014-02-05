@@ -571,12 +571,12 @@ type ptypeclass = {
   ptc_name : psymbol;
   ptc_inth : pqsymbol option;
   ptc_ops  : (psymbol * pty) list;
-  ptc_axs  : pformula list;
+  ptc_axs  : (psymbol * pformula) list;
 }
 
 type ptycinstance = {
   pti_name : pqsymbol;
-  pti_type : pqsymbol;
+  pti_type : (psymbol * pqsymbol list) list * pty;
   pti_ops  : (psymbol * pqsymbol) list;
   pti_axs  : (psymbol * ptactic_core) list;
 }

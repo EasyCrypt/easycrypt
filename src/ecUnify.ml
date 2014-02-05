@@ -1,8 +1,9 @@
 (* -------------------------------------------------------------------- *)
+open EcSymbols
+open EcIdent
 open EcMaps
 open EcUtils
 open EcUid
-open EcIdent
 open EcTypes
 open EcDecl
 
@@ -10,7 +11,7 @@ module Sp = EcPath.Sp
 module TC = EcTypeClass
 
 (* -------------------------------------------------------------------- *)
-exception UnificationFailure of ty * ty
+exception UnificationFailure of [`TyUni of ty * ty | `TcCtt of ty * Sp.t]
 exception UninstanciateUni
 
 (* -------------------------------------------------------------------- *)
@@ -46,7 +47,7 @@ module UFArgs = struct
 
       | (tc1, None   ), (tc2, Some ty)
       | (tc2, Some ty), (tc1, None   ) ->
-          let tc = Sp.diff tc2 tc1 in
+          let tc = Sp.diff tc1 tc2 in
             if   Sp.is_empty tc
             then ((Sp.union tc1 tc2, Some ty), [])
             else ((Sp.union tc1 tc2, Some ty), [`TcCtt (ty, tc)])
@@ -56,28 +57,59 @@ end
 module UF = EcUFind.Make(UFArgs.I)(UFArgs.D)
 
 (* -------------------------------------------------------------------- *)
-type tvtc = TC.nodes
+module UnifyCore = struct
+  let fresh ?(tc = Sp.empty) ?ty uf = 
+    let uid = EcUid.unique () in
+    let uf  =
+      match ty with
+      | Some { ty_node = Tunivar id } ->
+          let uf = UF.set uid (tc, None) uf in
+            fst (UF.union uid id uf)
+      | None | Some _ -> UF.set uid (tc, ty) uf
+    in
+      (uf, tuni uid)
+end
 
-let hastc env tvtc ty tc =
-  let tytc =
-    match ty.ty_node with
-    | Tvar    x      -> odfl Sp.empty (Mid.find_opt x tvtc)
-    | Tconstr (p, _) -> EcEnv.TypeClass.tc_of_typename p env
-    | _              -> Sp.empty
+(* -------------------------------------------------------------------- *)
+let rec tostring ty =
+  match ty.ty_node with
+  | Tglob p -> EcPath.m_tostring p
+  | Tunivar i -> Printf.sprintf "#%d" i
+  | Tvar id -> EcIdent.tostring id
+  | Ttuple tys -> Printf.sprintf "(%s)" (String.concat ", " (List.map tostring tys))
+  | Tconstr (p, tys) -> Printf.sprintf "%s[%s]" (EcPath.tostring p) (String.concat ", " (List.map tostring tys))
+  | Tfun (t1, t2) -> Printf.sprintf "(%s) -> (%s)" (tostring t1) (tostring t2)
 
-  and gr = EcEnv.TypeClass.graph env in
+(* -------------------------------------------------------------------- *)
+let rec unify_core (env : EcEnv.env) (tvtc : Sp.t Mid.t) (uf : UF.t) pb =
+  let failure () = raise (UnificationFailure pb) in
 
-    Sp.for_all
-      (fun dst ->
-        let check = fun src -> TC.Graph.has_path ~src ~dst gr in
-          Sp.exists check tytc)
-      tc
-
-let unify_core (env : EcEnv.env) (tvtc : Sp.t Mid.t) (uf : UF.t) t1 t2 =
-  let failure () = raise (UnificationFailure (t1, t2)) in
+  let gr   = EcEnv.TypeClass.graph env in
+  let inst = EcEnv.TypeClass.get_instances env in
 
   let uf = ref uf in
-  let pb = let x = Queue.create () in Queue.push (`TyUni (t1, t2)) x; x in
+  let pb = let x = Queue.create () in Queue.push pb x; x in
+
+  let instances_for_tcs tcs =
+    let tcfilter (i, tc) =
+      match tc with `General p -> Some (i, p) | _ -> None
+    in
+      List.filter
+        (fun (_, tc1) ->
+          Sp.for_all
+            (fun tc2 -> TC.Graph.has_path ~src:tc1 ~dst:tc2 gr)
+            tcs)
+        (List.pmap tcfilter inst)
+  in
+
+  let has_tcs ~src ~dst =
+    Sp.for_all
+      (fun dst1 ->
+        Sp.exists
+          (fun src1 -> TC.Graph.has_path ~src:src1 ~dst:dst1 gr)
+          src)
+      dst
+  in
 
   let ocheck i t =
     let i   = UF.find i !uf in
@@ -112,8 +144,8 @@ let unify_core (env : EcEnv.env) (tvtc : Sp.t Mid.t) (uf : UF.t) t1 t2 =
 
   and getvar t =
     match t.ty_node with
-    | Tunivar i -> odfl t (snd (UF.data i !uf))
-    | _ -> t
+    | Tunivar i -> snd_map (odfl t) (UF.data i !uf)
+    | _ -> (Sp.empty, t)
 
   in
 
@@ -121,7 +153,8 @@ let unify_core (env : EcEnv.env) (tvtc : Sp.t Mid.t) (uf : UF.t) t1 t2 =
     while not (Queue.is_empty pb) do
       match Queue.pop pb with
       | `TyUni (t1, t2) -> begin
-        let (t1, t2) = (getvar t1, getvar t2) in
+        let (t1, t2) = (snd (getvar t1), snd (getvar t2)) in
+
         match ty_equal t1 t2 with
         | true  -> ()
         | false -> begin
@@ -163,8 +196,47 @@ let unify_core (env : EcEnv.env) (tvtc : Sp.t Mid.t) (uf : UF.t) t1 t2 =
         end
       end
 
-      | `TcCtt (ty, tc) ->
-          if not (hastc env tvtc ty tc) then failure ()
+      | `TcCtt (ty, tc) -> begin
+          let tytc, ty = getvar ty in
+
+          match ty.ty_node with
+          | Tunivar i ->
+              uf := UF.set i (Sp.union tc tytc, None) !uf
+
+          | Tvar x ->
+              let xtcs = odfl Sp.empty (Mid.find_opt x tvtc) in
+                if not (has_tcs ~src:xtcs ~dst:tc) then
+                  failure ()
+
+          | _ ->
+              if not (has_tcs ~src:tytc ~dst:tc) then
+                let module E = struct exception Failure end in
+
+                let inst = instances_for_tcs tc in
+
+                let for1 uf p =
+                   let for_inst ((typ, gty), p') =
+                     try
+                       if p <> p' then raise E.Failure;
+                       let (uf, gty) =
+                         let (uf, subst) =
+                           List.fold_left
+                             (fun (uf, s) (v, tc) ->
+                               let (uf, uid) = UnifyCore.fresh ~tc uf in
+                                 (uf, Mid.add v uid s))
+                             (uf, Mid.empty) typ
+                         in
+                           (uf, Tvar.subst subst gty)
+                       in
+                         try  Some (unify_core env tvtc uf (`TyUni (gty, ty)))
+                         with UnificationFailure _ -> raise E.Failure
+                     with E.Failure -> None
+                   in
+                     try  List.find_map for_inst inst
+                     with Not_found -> failure ()
+                in
+                  uf := List.fold_left for1 !uf (Sp.elements tc)
+      end
     done
   in
     doit (); !uf
@@ -216,6 +288,7 @@ type tvar_inst =
 | TVInamed  of (EcSymbols.symbol * ty) list
 
 type tvi = tvar_inst option
+type uidmap = uid -> ty option
 
 module UniEnv = struct
   let copy (ue : unienv) : unienv =
@@ -258,16 +331,9 @@ module UniEnv = struct
     in
       ref ue
 
-  let fresh ?(tc = Sp.empty) ?ty ue = 
-    let uid = EcUid.unique () in
-    let uf  =
-      match ty with
-      | Some { ty_node = Tunivar id } ->
-          let uf = UF.set uid (tc, None) (!ue).ue_uf in
-            fst (UF.union uid id uf)
-      | None | Some _ -> UF.set uid (tc, ty) (!ue).ue_uf
-    in
-      ue := { !ue with ue_uf = uf }; tuni uid
+  let fresh ?tc ?ty ue =
+    let (uf, uid) = UnifyCore.fresh ?tc ?ty (!ue).ue_uf in
+      ue := { !ue with ue_uf = uf }; uid
 
   let opentvi ue (params : ty_params) tvi =
     match tvi with
@@ -327,7 +393,11 @@ end
 
 (* -------------------------------------------------------------------- *)
 let unify env ue t1 t2 =
-  let uf = unify_core env (!ue).ue_tvtc (!ue).ue_uf t1 t2 in
+  let uf = unify_core env (!ue).ue_tvtc (!ue).ue_uf (`TyUni (t1, t2)) in
+    ue := { !ue with ue_uf = uf; }
+
+let hastc env ue ty tc =
+  let uf = unify_core env (!ue).ue_tvtc (!ue).ue_uf (`TcCtt (ty, tc)) in
     ue := { !ue with ue_uf = uf; }
 
 (* -------------------------------------------------------------------- *)
@@ -341,8 +411,6 @@ let select_op ?(filter = fun _ -> true) tvi env name ue psig =
   let filter op =
     (* Filter operator based on given type variables instanciation *)
     let filter_on_tvi =
-      let tvtc = (!ue).ue_tvtc in
-  
       match tvi with
       | None -> fun _ -> true
   
@@ -350,33 +418,50 @@ let select_op ?(filter = fun _ -> true) tvi env name ue psig =
           let len = List.length lt in
             fun op ->
               let tparams = op.D.op_tparams in
-                 (List.length tparams = len)
-              && (List.for_all2
-                    (fun (_, tc) ty -> hastc env tvtc ty tc)
-                    tparams lt)
+                 List.length tparams = len
   
       | Some (TVInamed ls) -> fun op ->
-          let tparams = op.D.op_tparams in
-          let for1 (s, ty) =
-            match
-              try  Some (List.find (fun (id, _) -> EcIdent.name id = s) tparams)
-              with Not_found -> None
-            with
-            | None -> false
-            | Some (_, tc) -> hastc env tvtc ty tc
-          in
-            List.for_all for1 ls
+          let tparams = List.map (fst_map EcIdent.name) op.D.op_tparams in
+          let tparams = Msym.of_list tparams in
+            List.for_all (fun (x, _) -> Msym.mem x tparams) ls
+
     in
       filter op && filter_on_tvi op
   in
 
   let select (path, op) =
+    let module E = struct exception Failure end in
+
     let subue = UniEnv.copy ue in
-    let (top, tys) = UniEnv.openty subue op.D.op_tparams tvi (D.op_ty op) in
-      try 
+
+    try 
+      begin try
+        match tvi with
+        | None ->
+            ()
+  
+        | Some (TVIunamed lt) ->
+            List.iter2
+              (fun ty (_, tc) -> hastc env subue ty tc)
+              lt op.D.op_tparams
+  
+        | Some (TVInamed ls) ->
+            let tparams = List.map (fst_map EcIdent.name) op.D.op_tparams in
+            let tparams = Msym.of_list tparams in
+              List.iter (fun (x, ty) ->
+                hastc env subue ty (oget (Msym.find_opt x tparams)))
+                ls
+        with UnificationFailure _ -> raise E.Failure
+      end;
+  
+      let (top, tys) = UniEnv.openty subue op.D.op_tparams tvi (D.op_ty op) in
         let texpected = tfun_expected subue psig in
-          unify env subue top texpected; 
+          (try  unify env subue top texpected
+           with UnificationFailure _ -> raise E.Failure);
+
           Some ((path, tys), top, subue) 
-      with UnificationFailure _ -> None
+
+    with E.Failure -> None
+
   in
     List.pmap select (EcEnv.Op.all filter name env)

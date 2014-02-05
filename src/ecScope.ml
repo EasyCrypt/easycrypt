@@ -1602,10 +1602,10 @@ module Ty = struct
       bind scope (unloc name, tydecl)
 
   (* ------------------------------------------------------------------ *)
-  let bindclass (scope : scope) (x, (tc : unit)) =
+  let bindclass (scope : scope) (x, tc) =
     assert (scope.sc_pr_uc = None);
     let scope = { scope with sc_env = EcEnv.TypeClass.bind x tc scope.sc_env; } in
-    let scope = maybe_add_to_section scope (EcTheory.CTh_typeclass x) in
+    let scope = maybe_add_to_section scope (EcTheory.CTh_typeclass (x, tc)) in
       scope
 
   (* ------------------------------------------------------------------ *)
@@ -1617,8 +1617,7 @@ module Ty = struct
 
     check_name_available scope tcd.ptc_name;
 
-    let _tclass =
-
+    let tclass =
       let uptc =
         tcd.ptc_inth |> omap
           (fun { pl_loc = uploc; pl_desc = uptc } ->
@@ -1636,7 +1635,10 @@ module Ty = struct
       (* Check for duplicated field names *)
       Msym.odup unloc (List.map fst tcd.ptc_ops)
         |> oiter (fun (x, y) -> hierror ~loc:y.pl_loc
-                    "duplicated field name: `%s'" x.pl_desc);
+                    "duplicated operator name: `%s'" x.pl_desc);
+      Msym.odup unloc (List.map fst tcd.ptc_axs)
+        |> oiter (fun (x, y) -> hierror ~loc:y.pl_loc
+                    "duplicated axiom name: `%s'" x.pl_desc);
     
       (* Check operators types *)
       let operators =
@@ -1649,16 +1651,16 @@ module Ty = struct
       (* Check axioms *)
       let axioms =
         let scenv = EcEnv.Var.bind_locals operators scenv in
-        let check1 ax =
+        let check1 (x, ax) =
           let ue = EcUnify.UniEnv.create (Some []) in
-            trans_prop scenv ue ax
+            (unloc x, trans_prop scenv ue ax)
         in
           tcd.ptc_axs |> List.map check1 in
     
       (* Construct actual type-class *)
       { tc_ops = operators; tc_axs = axioms; }
     in
-      bindclass scope (name, ())
+      bindclass scope (name, tclass)
 
   (* ------------------------------------------------------------------ *)
   let check_tci_operators env ops reqs =
@@ -1671,12 +1673,11 @@ module Ty = struct
           let op =
             let filter op = match op.op_kind with OB_oper _ -> true | _ -> false in
             match EcEnv.Op.all filter (unloc op) env with
-            | []      -> hierror ~loc:op.pl_loc "unknown operator"
+            | [] -> hierror ~loc:op.pl_loc "unknown operator"
             | op1::op2::_ -> 
-              hierror ~loc:op.pl_loc "ambiguous operator %s %s" 
-                (EcPath.tostring (fst op1)) (EcPath.tostring (fst op2))
-              
-            | [op]    -> op
+                hierror ~loc:op.pl_loc "ambiguous operator %s %s" 
+                  (EcPath.tostring (fst op1)) (EcPath.tostring (fst op2))
+            | [op] -> op
           in
             Mstr.change
               (function
@@ -1766,9 +1767,8 @@ module Ty = struct
       hierror "load AlgTactic first";
 
     let ty =
-      let ue = TT.transtyvars scope.sc_env (loc, Some []) in
-      let ty = mk_loc tci.pti_type.pl_loc (PTnamed tci.pti_type) in
-      let ty = transty tp_tydecl scope.sc_env ue ty in
+      let ue = TT.transtyvars scope.sc_env (loc, Some (fst tci.pti_type)) in
+      let ty = transty tp_tydecl scope.sc_env ue (snd tci.pti_type) in
         ty
     in
     let symbols = EcAlgTactic.ring_symbols scope.sc_env boolean ty in
@@ -1784,14 +1784,13 @@ module Ty = struct
       f_inv  = oget (Mstr.find_opt "inv" symbols);
       f_div  = Mstr.find_opt "div" symbols; }
 
-  let addfield (scope : scope) mode { pl_desc = tci; pl_loc = loc } =
+  let addfield (scope : scope) mode { pl_desc = tci; pl_loc = loc; } =
     if not (EcAlgTactic.is_module_loaded scope.sc_env) then
       hierror "load AlgTactic first";
 
     let ty =
-      let ue = TT.transtyvars scope.sc_env (loc, Some []) in
-      let ty = mk_loc tci.pti_type.pl_loc (PTnamed tci.pti_type) in
-      let ty = transty tp_tydecl scope.sc_env ue ty in
+      let ue = TT.transtyvars scope.sc_env (loc, Some (fst tci.pti_type)) in
+      let ty = transty tp_tydecl scope.sc_env ue (snd tci.pti_type) in
         ty
     in
     let symbols = EcAlgTactic.field_symbols scope.sc_env ty in
@@ -1802,13 +1801,34 @@ module Ty = struct
       { scope with sc_env = EcEnv.Algebra.add_field ty cr scope.sc_env }
 
   (* ------------------------------------------------------------------ *)
+  let add_generic_tc (scope : scope) mode { pl_desc = tci; pl_loc = loc; } =
+    let ty =
+      let ue = TT.transtyvars scope.sc_env (loc, Some (fst tci.pti_type)) in
+      let ty = transty tp_tydecl scope.sc_env ue (snd tci.pti_type) in
+        assert (EcUnify.UniEnv.closed ue);
+        (EcUnify.UniEnv.tparams ue, ty)
+    in
+
+    let tc =
+      match EcEnv.TypeClass.lookup_opt (unloc tci.pti_name) (env scope) with
+      | None ->
+          hierror ~loc:tci.pti_name.pl_loc
+            "unknown type-class: %s" (string_of_qsymbol (unloc tci.pti_name))
+
+      | Some (p, _) -> p
+    in
+      { scope with
+          sc_env = EcEnv.TypeClass.add_instance ty (`General tc) scope.sc_env }
+
+  (* ------------------------------------------------------------------ *)
   (* We currently only deal with [ring] and [field] *)
   let add_instance (scope : scope) mode ({ pl_desc = tci } as toptci) =
     match unloc tci.pti_name with
     | ([], "boolean_ring") -> addring  scope mode (true , toptci)
     | ([], "ring"        ) -> addring  scope mode (false, toptci)
     | ([], "field"       ) -> addfield scope mode toptci
-    | _ -> hierror "unknown type class"
+
+    | _ -> add_generic_tc scope mode toptci
 
   (* ------------------------------------------------------------------ *)
   let add_datatype (scope : scope) (tydname : tydname) dt =
@@ -2237,14 +2257,11 @@ module Section = struct
               let _, scope = Theory.exit scope in
                 scope
 
-          | T.CTh_typeclass x -> Ty.bindclass scope (x, ())
+          | T.CTh_typeclass (x, tc) -> Ty.bindclass scope (x, tc)
 
-          | T.CTh_instance (p, cr) -> begin
-              match cr with
-              | `Ring    cr -> { scope with sc_env = EcEnv.Algebra.add_ring  p cr scope.sc_env }
-              | `Field   cr -> { scope with sc_env = EcEnv.Algebra.add_field p cr scope.sc_env }
-              | `General _  -> scope    (* FIXME: TC HOOK *)
-          end
+          | T.CTh_instance (p, cr) ->
+              { scope with
+                  sc_env = EcEnv.TypeClass.add_instance p cr scope.sc_env }
         in
 
         List.fold_left bind1 scope oitems

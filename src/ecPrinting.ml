@@ -1449,11 +1449,19 @@ let pp_typedecl (ppe : PPEnv.t) fmt (x, tyd) =
     Format.fprintf fmt "@[%t%t.@]" pp_prelude pp_body
 
 (* -------------------------------------------------------------------- *)
+let pp_tyvar_ctt (ppe : PPEnv.t) fmt (tvar, ctt) =
+  match EcPath.Sp.elements ctt with
+  | []  -> pp_tyvar ppe fmt tvar
+  | ctt ->
+      Format.fprintf fmt "%a <: %a"
+        (pp_tyvar ppe) tvar
+        (pp_list " &@ " pp_path) ctt
+
+(* -------------------------------------------------------------------- *)
 let pp_tyvarannot (ppe : PPEnv.t) fmt ids =
-  (* FIXME: TC HOOK *)
-  match List.map fst ids with
+  match ids with
   | []  -> ()
-  | ids -> Format.fprintf fmt "[%a]" (pp_list ",@ " (pp_tyvar ppe)) ids
+  | ids -> Format.fprintf fmt "[%a]" (pp_list ",@ " (pp_tyvar_ctt ppe)) ids
 
 (* -------------------------------------------------------------------- *)
 let pp_opdecl_pr (ppe : PPEnv.t) fmt (x, ts, ty, op) =
@@ -1548,14 +1556,11 @@ let pp_axiom (ppe : PPEnv.t) fmt (x, ax) =
     | Some f -> pp_form ppe fmt f
 
   and pp_name fmt =
-    (* FIXME: TC HOOK *)
-    match List.map fst ax.ax_tparams with
+    match ax.ax_tparams with
     | [] -> pp_string fmt basename
-    | ts ->
-        Format.fprintf fmt "%s [%a]" basename
-          (pp_list ",@ " (pp_tyvar ppe)) ts
+    | ts -> Format.fprintf fmt "%s %a" basename (pp_tyvarannot ppe) ts
   in
-    Format.fprintf fmt "@[<hov 2>%s %t :@,%t.@]"
+    Format.fprintf fmt "@[<hov 2>%s %t:@ %t.@]"
       (string_of_axkind ax.ax_kind) pp_name pp_spec
 
 (* -------------------------------------------------------------------- *)
@@ -2183,7 +2188,9 @@ let rec pp_theory ppe (fmt:Format.formatter) (path, cth) =
   | EcTheory.CTh_typeclass _ ->
       Format.fprintf fmt "typeclass <FIXME>."
 
-  | EcTheory.CTh_instance (ty, tc) -> begin
+  | EcTheory.CTh_instance ((typ, ty), tc) -> begin
+      let ppe = PPEnv.add_locals ppe (List.map fst typ) in (* FIXME *)
+
       match tc with
       | (`Ring _ | `Field _) as tc -> begin
           let (name, ops) =
@@ -2217,7 +2224,8 @@ let rec pp_theory ppe (fmt:Format.formatter) (path, cth) =
             ops
           in
             Format.fprintf fmt
-              "instance %s with %a@\n@[<hov 2>  %a@]" name
+              "instance %s with [%a] %a@\n@[<hov 2>  %a@]" name
+              (pp_paren (pp_list ",@ " (pp_tyvar ppe))) (List.map fst typ)
               (pp_type ppe) ty
               (pp_list "@\n"
                  (fun fmt (name, op) ->

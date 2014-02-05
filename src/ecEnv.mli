@@ -240,7 +240,6 @@ module Theory : sig
   val add : path -> env -> env
 
   val bind  : symbol -> ctheory_w3 -> env -> env
-(*  val bindx : symbol -> ctheory -> env -> env *)
 
   val require : symbol -> ctheory_w3 -> env -> env
   val import  : path -> env -> env
@@ -297,17 +296,13 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Algebra : sig
-  val add       : ty -> tcinstance -> env -> env 
   val add_ring  : ty -> EcAlgebra.ring  -> env -> env
   val add_field : ty -> EcAlgebra.field -> env -> env
-
-  val get_ring  : ty -> env -> EcAlgebra.ring  option
-  val get_field : ty -> env -> EcAlgebra.field option
 end
 
 (* -------------------------------------------------------------------- *)
 module TypeClass : sig
-  type t = unit
+  type t = typeclass
 
   val add   : path -> env -> env
   val bind  : symbol -> t -> env -> env
@@ -319,12 +314,14 @@ module TypeClass : sig
   val lookup_opt  : qsymbol -> env -> (path * t) option
   val lookup_path : qsymbol -> env -> path
 
-  val tc_of_typename : path -> env -> Sp.t
+  val add_instance  : (ty_params * ty) -> tcinstance -> env -> env
+  val get_instances : env -> ((ty_params * ty) * tcinstance) list
 end
 
 (* -------------------------------------------------------------------- *)
 module AbsStmt : sig
   type t = EcBaseLogic.abs_uses
+
   val byid : EcIdent.t -> env -> t
 end
 

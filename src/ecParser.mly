@@ -1328,7 +1328,7 @@ typedecl:
 (* -------------------------------------------------------------------- *)
 (* Type classes                                                         *)
 typeclass:
-| TYPE CLASS x=lident inth=tc_inth? EQ LBRACE body=tc_body RBRACE {
+| TYPE CLASS typ=typarams x=lident inth=tc_inth? EQ LBRACE body=tc_body RBRACE {
     { ptc_name = x;
       ptc_inth = inth;
       ptc_ops  = fst body;
@@ -1342,19 +1342,28 @@ tc_inth:
 
 tc_body: ops=tc_op* axs=tc_ax* { (ops, axs) };
 
-tc_op: OP x=lident COLON ty=loc(type_exp) { (x, ty) };
+tc_op: OP x=ident COLON ty=loc(type_exp) { (x, ty) };
 
-tc_ax: AXIOM ax=form { ax };
+tc_ax: AXIOM x=ident COLON ax=form { (x, ax) };
 
 (* -------------------------------------------------------------------- *)
 (* Type classes (instances)                                             *)
 tycinstance:
-| INSTANCE x=qident WITH ty=qident ops=tyci_op* axs=tyci_ax* {
+| INSTANCE x=qident WITH typ=tyc_typ? ty=loc(type_exp) ops=tyci_op* axs=tyci_ax* {
     { pti_name = x;
-      pti_type = ty;
+      pti_type = (odfl [] typ, ty);
       pti_ops  = ops;
       pti_axs  = axs; }
   }
+;
+
+tyc_typ:
+| LBRACKET typ=tyc_typ1+ RBRACKET { typ }
+;
+
+tyc_typ1:
+| x=tident { (x, []) }
+| x=tident LTCOLON ctt=rlist1(qident, COMMA) { (x, ctt) }
 ;
 
 tyci_op:
