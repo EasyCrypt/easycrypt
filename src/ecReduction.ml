@@ -313,6 +313,11 @@ let rec h_red ri env hyps f =
           f_app (h_red ri env hyps f1) args f.f_ty
       end
 
+    (* ι-reduction (tuples projection) *)
+  | Fproj(f1, i) when ri.iota ->
+      let f' = f_proj_simpl f1 i f.f_ty in
+        if f_equal f f' then f_proj (h_red ri env hyps f1) i f.f_ty else f'
+
     (* ι-reduction (if-then-else) *)
   | Fif (f1, f2, f3) when ri.iota ->
       let f' = f_if_simpl f1 f2 f3 in
