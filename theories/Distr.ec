@@ -6,6 +6,7 @@ require import Logic.
 require export Pred.
 require import Int.
 require import Real.
+require import Fun.
 
 op charfun (p:'a -> bool) x: real = if p x then 1%r else 0%r.
 
@@ -333,6 +334,28 @@ theory Dapply.
     weight (dapply f d) = weight d.
   proof strict.
   by rewrite /weight mu_def /True.
+  qed.
+
+  lemma dapply_preim (d:'a distr) (f:'a -> 'b) P:
+    mu (dapply f d) P = mu d (preim f P)
+  by rewrite mu_def.
+
+  lemma mux_dapply_bij (d:'a distr) (f:'a -> 'b) g x:
+    cancel g f => cancel f g =>
+    mu (dapply f d) (fun y, y = x) = mu d (fun y, y = g x).
+  proof. move=> fK gK; rewrite mu_def; apply mu_eq; smt. qed.
+
+  lemma mux_dapply_pbij (d:'a distr) (f:'a -> 'b) g x P:
+    (forall x, P x => g (f x) = x) =>
+    (forall y, f (g y) = y) =>
+    support d <= P =>
+    mu (dapply f d) (fun y, y = x) = mu d (fun y, y = g x).
+  proof.
+    move=> fK gK leq_supp_P.
+    rewrite mu_def /= (mu_support (fun y, f y = x)) (mu_support (fun y, y = g x)); apply mu_eq=> x0.
+    rewrite /Pred.(/\) eq_iff /=; split.
+      by case => f_x0 sup_x0; split=> //; rewrite -fK 1:leq_supp_P // -f_x0.
+      by case => x0_g supp_x0; split=> //; rewrite -(gK x) x0_g.
   qed.
 end Dapply.
 

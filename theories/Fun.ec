@@ -68,7 +68,7 @@ theory Injections.
   pred pcancel (f:'a -> 'b) (g:'b -> 'a option) =
     forall x, g (f x) = Some x.
 
-  pred ocancel (f:'a -> 'b) (g:'b -> 'a option) h =
+  pred ocancel (g:'b -> 'a option) h =
     forall x, oapp h x (g x) = x.
 
   lemma nosmt can_pcan (f:'a -> 'b) g: cancel f g => pcancel f (fun y, Some (g y)).
