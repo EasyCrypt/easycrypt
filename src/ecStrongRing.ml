@@ -44,7 +44,7 @@ let init_info env juc =
   }
  
 let get_field env ty () = 
-  match Algebra.get_field ty env with
+  match EcTyping.get_field ty env with
   | Some f ->
     let cr = cfield_of_field f in
     let m  = ref RState.empty in
@@ -52,7 +52,7 @@ let get_field env ty () =
   | None -> None
 
 let get_ring env ty () = 
-  match Algebra.get_ring ty env with
+  match EcTyping.get_ring ty env with
   | Some r ->
     let cr = cring_of_ring r in
     let m = ref RState.empty in
