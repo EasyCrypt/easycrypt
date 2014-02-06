@@ -71,16 +71,6 @@ module UnifyCore = struct
 end
 
 (* -------------------------------------------------------------------- *)
-let rec tostring ty =
-  match ty.ty_node with
-  | Tglob p -> EcPath.m_tostring p
-  | Tunivar i -> Printf.sprintf "#%d" i
-  | Tvar id -> EcIdent.tostring id
-  | Ttuple tys -> Printf.sprintf "(%s)" (String.concat ", " (List.map tostring tys))
-  | Tconstr (p, tys) -> Printf.sprintf "%s[%s]" (EcPath.tostring p) (String.concat ", " (List.map tostring tys))
-  | Tfun (t1, t2) -> Printf.sprintf "(%s) -> (%s)" (tostring t1) (tostring t2)
-
-(* -------------------------------------------------------------------- *)
 let rec unify_core (env : EcEnv.env) (tvtc : Sp.t Mid.t) (uf : UF.t) pb =
   let failure () = raise (UnificationFailure pb) in
 
@@ -217,7 +207,8 @@ let rec unify_core (env : EcEnv.env) (tvtc : Sp.t Mid.t) (uf : UF.t) pb =
                 let for1 uf p =
                    let for_inst ((typ, gty), p') =
                      try
-                       if p <> p' then raise E.Failure;
+                       if not (TC.Graph.has_path ~src:p' ~dst:p gr) then
+                         raise E.Failure;
                        let (uf, gty) =
                          let (uf, subst) =
                            List.fold_left

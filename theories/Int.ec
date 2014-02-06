@@ -40,17 +40,6 @@ by [].
 lemma nosmt mulzDl (x y z : int): (x + y) * z = x * z + y * z
 by [].
 
-require import Ring.
-clone export IDomain as Rz with
-  type R.ring <- int,
-  op R.zeror <- 0,
-  op R.oner  <- 1,
-  op R.( + ) <- ( + ),
-  op R.([-]) <- [-],
-  op R.( * ) <- ( * ),
-  op R.( - ) <- ( - )
-  proof * by smt.
-
 (** Number theory *)
 (* TODO: I merged in some stray bits from NewList and this may appear to be in whatever order... it is. *)
 

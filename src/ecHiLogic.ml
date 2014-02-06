@@ -1089,6 +1089,8 @@ let process_algebra mode kind eqs g =
     in List.map eq1 eqs
   in
 
+  let tparams = (LDecl.tohyps hyps).h_tvar in
+
   let tactic =
     match
       match mode, kind with
@@ -1099,13 +1101,13 @@ let process_algebra mode kind eqs g =
     with
     | `Ring t ->
         let r =
-          match TT.get_ring ty env with
+          match TT.get_ring (tparams, ty) env with
           | None   -> tacuerror "cannot find a ring structure"
           | Some r -> r
         in t r eqs (f1, f2)
     | `Field t ->
         let r =
-          match TT.get_field ty env with
+          match TT.get_field (tparams, ty) env with
           | None   -> tacuerror "cannot find a field structure"
           | Some r -> r
         in t r eqs (f1, f2)

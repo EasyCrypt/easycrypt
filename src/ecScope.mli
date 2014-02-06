@@ -68,7 +68,7 @@ end
 module Ty : sig
   type tydname = (ptyparams * psymbol) located
 
-  val add : scope -> tydname -> scope
+  val add : scope -> tydname -> pqsymbol list -> scope
 
   val add_class    : scope -> ptypeclass located -> scope
   val add_instance : scope -> Ax.mode -> ptycinstance located -> scope

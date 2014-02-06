@@ -35,6 +35,7 @@ module UniEnv : sig
 end
 
 val unify : EcEnv.env -> unienv -> ty -> ty -> unit
+val hastc : EcEnv.env -> unienv -> ty -> Sp.t -> unit
 
 val tfun_expected : unienv -> EcTypes.ty list -> EcTypes.ty
 

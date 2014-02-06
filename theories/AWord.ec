@@ -55,6 +55,7 @@ clone export Ring.R as Rw with
   op ( - ) <- ( ^ )
   proof * by smt.
 
+require import Ring.
 require import AlgTactic.
 
 instance boolean_ring with word

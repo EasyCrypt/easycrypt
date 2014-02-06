@@ -1313,7 +1313,10 @@ rec_field_def:
 
 typedecl:
 | TYPE td=rlist1(tyd_name, COMMA)
-    { List.map (mk_tydecl^~ PTYD_Abstract) td }
+    { List.map (mk_tydecl^~ (PTYD_Abstract [])) td }
+
+| TYPE td=tyd_name LTCOLON tcs=rlist1(qident, COMMA)
+    { [mk_tydecl td (PTYD_Abstract tcs)] }
 
 | TYPE td=tyd_name EQ te=loc(type_exp)
     { [mk_tydecl td (PTYD_Alias te)] }
@@ -1343,7 +1346,7 @@ tc_inth:
 
 tc_body: ops=tc_op* axs=tc_ax* { (ops, axs) };
 
-tc_op: OP x=ident COLON ty=loc(type_exp) { (x, ty) };
+tc_op: OP x=oident COLON ty=loc(type_exp) { (x, ty) };
 
 tc_ax: AXIOM x=ident COLON ax=form { (x, ax) };
 
@@ -1359,10 +1362,10 @@ tycinstance:
 ;
 
 tyci_op:
-| OP x=ident EQ tg=qoident
+| OP x=oident EQ tg=qoident
     { (x, ([], tg)) }
 
-| OP x=ident EQ tg=qoident LTCOLON tvi=plist0(loc(type_exp), COMMA) GT
+| OP x=oident EQ tg=qoident LTCOLON tvi=plist0(loc(type_exp), COMMA) GT
     { (x, (tvi, tg)) }
 ;
 

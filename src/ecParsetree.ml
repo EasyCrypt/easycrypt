@@ -187,7 +187,7 @@ type ptydecl = {
 }
 
 and ptydbody =
-| PTYD_Abstract
+| PTYD_Abstract of pqsymbol list
 | PTYD_Alias    of pty
 | PTYD_Record   of precord
 | PTYD_Datatype of pdatatype

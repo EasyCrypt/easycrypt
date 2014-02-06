@@ -12,6 +12,7 @@ module Graph : sig
   val empty : graph
   val add : src:node -> dst:node -> graph -> graph
   val has_path : src:node -> dst:node -> graph -> bool
+  val dump : graph -> string
 end
 
 module Nodes : sig

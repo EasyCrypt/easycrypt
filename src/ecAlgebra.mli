@@ -27,6 +27,7 @@ type ring = {
 }
 
 val ring_equal : ring -> ring -> bool
+
 (* -------------------------------------------------------------------- *)
 type field = {
   f_ring : ring;

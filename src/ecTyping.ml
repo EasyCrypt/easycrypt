@@ -2173,35 +2173,71 @@ let trans_pattern env (ps, ue) pf =
   trans_form_or_pattern env (Some ps, ue) pf None
 
 (* -------------------------------------------------------------------- *)
-let get_instances bty env =
+let p_zmod  x = EcPath.fromqsymbol ([EcCoreLib.id_top; "Ring"; "ZModule"], x)
+let p_ring  x = EcPath.fromqsymbol ([EcCoreLib.id_top; "Ring"; "ComRing"], x)
+let p_idom  x = EcPath.fromqsymbol ([EcCoreLib.id_top; "Ring"; "IDomain"], x)
+let p_field x = EcPath.fromqsymbol ([EcCoreLib.id_top; "Ring"; "Field"], x)
+
+let general_ring ty = {
+  r_type  = ty;
+  r_zero  = p_zmod "zeror";
+  r_one   = p_ring "oner";
+  r_add   = p_zmod "+";
+  r_opp   = Some (p_zmod "[-]");
+  r_mul   = p_ring "*";
+  r_exp   = None;
+  r_sub   = None;
+  r_embed = `Default;
+  r_bool  = false;
+}
+
+let general_field ty = {
+  f_ring = general_ring ty;
+  f_inv  = p_field "inv";
+  f_div  = None;
+}
+
+let get_instances (tvi, bty) env =
   let inst = List.pmap
-    (function (_, (`Ring _ | `Field _)) as x -> Some x | _ -> None)
+    (function
+     | (_, (`Ring _ | `Field _)) as x -> Some x
+     | (t, `General p) ->
+         if   EcPath.p_equal p (p_idom "idomain")
+         then Some (t, `GeneralRing)
+         else if   EcPath.p_equal p (p_field "field")
+              then Some (t, `GeneralField)
+              else None)
     (EcEnv.TypeClass.get_instances env) in
 
-  let inst = List.filter (fun ((typ, gty), _cr) ->
-    let ue = EcUnify.UniEnv.create (Some []) in
+  List.filter (fun ((typ, gty), _cr) ->
+    let ue = EcUnify.UniEnv.create (Some tvi) in
     let (gty, _typ) = EcUnify.UniEnv.openty ue typ None gty in
       try  EcUnify.unify env ue bty gty; true
       with EcUnify.UnificationFailure _ -> false)
     inst
 
-  in
-    List.map snd inst
-
-let get_ring ty env =
+let get_ring (typ, ty) env =
   let module E = struct exception Found of ring end in
     try
       List.iter
-        (function `Ring cr -> raise (E.Found cr) | _ -> ())
-        (get_instances ty env);
+        (fun ((_, ty), cr) ->
+          match cr with
+          | `Ring cr -> raise (E.Found cr)
+          | `GeneralRing -> raise (E.Found (general_ring ty))
+          | _ -> ())
+        (get_instances (typ, ty) env);
       None
     with E.Found cr -> Some cr
 
-let get_field ty env =
+let get_field (typ, ty) env =
   let module E = struct exception Found of field end in
     try
       List.iter
-        (function `Field cr -> raise (E.Found cr) | _ -> ())
-        (get_instances ty env);
+        (fun ((_, ty), cr) ->
+          match cr with
+          | `Field cr -> raise (E.Found cr)
+          | `GeneralField -> raise (E.Found (general_field ty))
+          | _ -> ())
+        (get_instances (typ, ty) env);
       None
     with E.Found cr -> Some cr
