@@ -73,9 +73,12 @@ module LowInternal = struct
         if List.length newpv = List.length args then
           List.map2 (fun npv e -> i_asgn(LvVar npv, e)) newpv args
         else
-          [i_asgn(LvTuple newpv, e_tuple args)] in
+          match newpv with
+          | [x] -> [i_asgn(LvVar x, e_tuple args)]
+          | _   -> [i_asgn(LvTuple newpv, e_tuple args)]
+      in
   
-      let body  = s_subst subst fdef.f_body in
+      let body = s_subst subst fdef.f_body in
   
       let resasgn =
         match fdef.f_ret with
