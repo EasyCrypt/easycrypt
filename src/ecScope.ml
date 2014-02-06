@@ -1578,13 +1578,19 @@ module Ty = struct
       scope
 
   (* ------------------------------------------------------------------ *)
-  let add (scope : scope) info =
+  let add (scope : scope) info tcs =
     assert (scope.sc_pr_uc = None);
+
     let (args, name) = info.pl_desc and loc = info.pl_loc in
+    let tcs =
+      List.map
+        (fun tc -> fst (EcEnv.TypeClass.lookup (unloc tc) scope.sc_env))
+        tcs
+    in
     let ue = TT.transtyvars scope.sc_env (loc, Some args) in
     let tydecl = {
       tyd_params = EcUnify.UniEnv.tparams ue;
-      tyd_type   = `Abstract Sp.empty;
+      tyd_type   = `Abstract (Sp.of_list tcs);
     } in
       bind scope (unloc name, tydecl)
 
@@ -1857,12 +1863,7 @@ module Ty = struct
       | None ->
           hierror ~loc:tci.pti_name.pl_loc
             "unknown type-class: %s" (string_of_qsymbol (unloc tci.pti_name))
-      | Some tc ->
-          let ue = EcUnify.UniEnv.create (Some []) in
-          let ty = fst (EcUnify.UniEnv.openty ue (fst ty) None (snd ty)) in
-            try  EcUnify.hastc scope.sc_env ue ty (Sp.singleton (fst tc)); tc
-            with EcUnify.UnificationFailure _ ->
-              hierror "type must be an instance of `%s'" (EcPath.tostring (fst tc))
+      | Some tc -> tc
     in
 
     let symbols = symbols_of_tc scope.sc_env (snd ty) (tcp, tc) in
@@ -1870,6 +1871,14 @@ module Ty = struct
 
     { scope with
         sc_env = EcEnv.TypeClass.add_instance ty (`General tcp) scope.sc_env }
+
+(*
+          let ue = EcUnify.UniEnv.create (Some []) in
+          let ty = fst (EcUnify.UniEnv.openty ue (fst ty) None (snd ty)) in
+            try  EcUnify.hastc scope.sc_env ue ty (Sp.singleton (fst tc)); tc
+            with EcUnify.UnificationFailure _ ->
+              hierror "type must be an instance of `%s'" (EcPath.tostring (fst tc))
+*)
 
   (* ------------------------------------------------------------------ *)
   let add_instance (scope : scope) mode ({ pl_desc = tci } as toptci) =

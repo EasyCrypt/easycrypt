@@ -2671,8 +2671,9 @@ module Theory = struct
           env_comps   = comps;
           env_w3      = EcWhy3.rebind env.env_w3 cth.cth3_rebind; }
     in
-       { env with env_tci =
-           bind_instance_cth thpath env.env_tci cth.cth3_theory; }
+       { env with
+           env_tci = bind_instance_cth thpath env.env_tci cth.cth3_theory;
+           env_tc  = bind_tc_cth thpath env.env_tc cth.cth3_theory; }
 end
 
 (* -------------------------------------------------------------------- *)

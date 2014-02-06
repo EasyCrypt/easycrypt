@@ -24,6 +24,15 @@ module Graph = struct
     tcg_closure = Mp.empty;
   }
 
+  let dump gr =
+    Printf.sprintf "%s\n"
+      (String.concat "\n"
+         (List.map
+            (fun (p, ps) -> Printf.sprintf "%s -> %s"
+              (EcPath.tostring p)
+              (String.concat ", " (List.map EcPath.tostring (Sp.elements ps))))
+            (Mp.bindings  gr.tcg_nodes)))
+
   let has_path ~src ~dst g =
     if EcPath.p_equal src dst then
       true
