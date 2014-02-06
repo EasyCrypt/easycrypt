@@ -349,10 +349,10 @@ theory Dapply.
     (forall x, P x => g (f x) = x) =>
     (forall y, f (g y) = y) =>
     support d <= P =>
-    mu (dapply f d) (fun y, y = x) = mu d (fun y, y = g x).
+    mu (dapply f d) ((=) x) = mu d ((=) (g x)).
   proof.
     move=> fK gK leq_supp_P.
-    rewrite mu_def /= (mu_support (fun y, f y = x)) (mu_support (fun y, y = g x)); apply mu_eq=> x0.
+    rewrite mu_def /= (mu_support (fun y, x = f y)) (mu_support ((=) (g x))); apply mu_eq=> x0.
     rewrite /Pred.(/\) eq_iff /=; split.
       by case => f_x0 sup_x0; split=> //; rewrite -fK 1:leq_supp_P // -f_x0.
       by case => x0_g supp_x0; split=> //; rewrite -(gK x) x0_g.
