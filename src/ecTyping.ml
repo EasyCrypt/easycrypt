@@ -445,8 +445,8 @@ let gen_select_op ~actonly ~mode (fpv, fop, flc) opsc tvi env name ue psig =
 let select_exp_op env mode opsc name ue tvi psig =
   let ppv = (fun _ (pv, ty, ue) -> match pv with
     | `Var pv -> e_var pv ty, ty, ue
-    | `Proj (pv,_,(0,1)) -> e_var pv ty, ty, ue
-    | `Proj(pv,ty', (i, _)) -> e_proj (e_var pv ty') i ty, ty, ue)
+    | `Proj (pv, _ , (0, 1)) -> e_var pv ty, ty, ue
+    | `Proj (pv, ty', (i, _)) -> e_proj (e_var pv ty') i ty, ty, ue)
   and pop  = (fun ((op, tys), ty, ue) -> (e_op op tys ty, ty, ue))
   and flc  = (fun (id, ty, ue) -> (e_local id ty, ty, ue)) in
     gen_select_op ~actonly:false ~mode:(`Expr mode) (ppv, pop, flc)

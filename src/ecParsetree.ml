@@ -577,7 +577,7 @@ type ptypeclass = {
 type ptycinstance = {
   pti_name : pqsymbol;
   pti_type : (psymbol * pqsymbol list) list * pty;
-  pti_ops  : (psymbol * pqsymbol) list;
+  pti_ops  : (psymbol * (pty list * pqsymbol)) list;
   pti_axs  : (psymbol * ptactic_core) list;
 }
 

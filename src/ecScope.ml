@@ -925,8 +925,7 @@ module Ax = struct
       match check with
       | false -> PSNoCheck
       | true  ->
-          (* FIXME: TC HOOK *)
-          let hyps = EcEnv.LDecl.init scope.sc_env (List.map fst axd.ax_tparams) in
+          let hyps = EcEnv.LDecl.init scope.sc_env axd.ax_tparams in
             PSCheck (EcLogic.open_juc (hyps, oget axd.ax_spec), [0])
     in 
     let puc = { puc_active = Some {
@@ -1663,29 +1662,46 @@ module Ty = struct
       bindclass scope (name, tclass)
 
   (* ------------------------------------------------------------------ *)
-  let check_tci_operators env ops reqs =
+  let check_tci_operators env tcty ops reqs =
+    let ue   = EcUnify.UniEnv.create (Some (fst tcty)) in
     let rmap = Mstr.of_list reqs in
+
     let ops =
-      List.fold_left
-        (fun m (x, op) ->
-          if not (Mstr.mem (unloc x) rmap) then
-            hierror ~loc:x.pl_loc "invalid operator name: `%s'" (unloc x);
-          let op =
-            let filter op = match op.op_kind with OB_oper _ -> true | _ -> false in
-            match EcEnv.Op.all filter (unloc op) env with
-            | [] -> hierror ~loc:op.pl_loc "unknown operator"
-            | op1::op2::_ -> 
-                hierror ~loc:op.pl_loc "ambiguous operator %s %s" 
-                  (EcPath.tostring (fst op1)) (EcPath.tostring (fst op2))
-            | [op] -> op
-          in
-            Mstr.change
-              (function
-               | None   -> Some (x.pl_loc, op)
-               | Some _ -> hierror ~loc:(x.pl_loc)
-                             "duplicated operator name: `%s'" (unloc x))
-              (unloc x) m)
-        Mstr.empty ops
+      let tt1 m (x, (tvi, op)) =
+        if not (Mstr.mem (unloc x) rmap) then
+          hierror ~loc:x.pl_loc "invalid operator name: `%s'" (unloc x);
+
+        let tvi = List.map (TT.transty tp_tydecl env ue) tvi in
+        let selected =
+          EcUnify.select_op ~filter:EcDecl.is_oper 
+            (Some (EcUnify.TVIunamed tvi)) env (unloc op) ue []
+        in
+        let op =
+          match selected with
+          | [] -> hierror ~loc:op.pl_loc "unknown operator"
+          | op1::op2::_ -> 
+              hierror ~loc:op.pl_loc
+                "ambiguous operator (%s / %s)"
+                (EcPath.tostring (fst (proj3_1 op1)))
+                (EcPath.tostring (fst (proj3_1 op2)))
+          | [((p, _), _, _)] ->
+              let op   = EcEnv.Op.by_path p env in
+              let opty =
+                Tvar.subst
+                  (Tvar.init (List.map fst op.op_tparams) tvi)
+                  op.op_ty
+              in
+                (p, opty)
+
+        in
+          Mstr.change
+            (function
+            | None   -> Some (x.pl_loc, op)
+            | Some _ -> hierror ~loc:(x.pl_loc)
+              "duplicated operator name: `%s'" (unloc x))
+            (unloc x) m
+      in
+        List.fold_left tt1 Mstr.empty ops
     in
       List.iter
         (fun (x, (req, _)) ->
@@ -1696,8 +1712,8 @@ module Ty = struct
         (fun m (x, (_, ty)) ->
            match Mstr.find_opt x ops with
            | None -> m
-           | Some (loc, (p, op)) ->
-               if not (EcReduction.EqTest.for_type env ty (op_ty op)) then
+           | Some (loc, (p, opty)) ->
+               if not (EcReduction.EqTest.for_type env ty opty) then
                  hierror ~loc "invalid type for operator `%s'" x;
                Mstr.add x p m)
         Mstr.empty reqs
@@ -1769,14 +1785,15 @@ module Ty = struct
     let ty =
       let ue = TT.transtyvars scope.sc_env (loc, Some (fst tci.pti_type)) in
       let ty = transty tp_tydecl scope.sc_env ue (snd tci.pti_type) in
-        ty
+        assert (EcUnify.UniEnv.closed ue);
+        (EcUnify.UniEnv.tparams ue, ty)
     in
-    let symbols = EcAlgTactic.ring_symbols scope.sc_env boolean ty in
-    let symbols = check_tci_operators scope.sc_env tci.pti_ops symbols in
-    let cr      = ring_of_symmap scope.sc_env ty boolean symbols in
+    let symbols = EcAlgTactic.ring_symbols scope.sc_env boolean (snd ty) in
+    let symbols = check_tci_operators scope.sc_env ty tci.pti_ops symbols in
+    let cr      = ring_of_symmap scope.sc_env (snd ty) boolean symbols in
     let axioms  = EcAlgTactic.ring_axioms scope.sc_env cr in
       check_tci_axioms scope mode tci.pti_axs axioms;
-      { scope with sc_env = EcEnv.Algebra.add_ring ty cr scope.sc_env }
+      { scope with sc_env = EcEnv.Algebra.add_ring (snd ty) cr scope.sc_env }
 
   (* ------------------------------------------------------------------ *)
   let field_of_symmap env ty symbols =
@@ -1791,14 +1808,22 @@ module Ty = struct
     let ty =
       let ue = TT.transtyvars scope.sc_env (loc, Some (fst tci.pti_type)) in
       let ty = transty tp_tydecl scope.sc_env ue (snd tci.pti_type) in
-        ty
+        assert (EcUnify.UniEnv.closed ue);
+        (EcUnify.UniEnv.tparams ue, ty)
     in
-    let symbols = EcAlgTactic.field_symbols scope.sc_env ty in
-    let symbols = check_tci_operators scope.sc_env tci.pti_ops symbols in
-    let cr      = field_of_symmap scope.sc_env ty symbols in
+    let symbols = EcAlgTactic.field_symbols scope.sc_env (snd ty) in
+    let symbols = check_tci_operators scope.sc_env ty tci.pti_ops symbols in
+    let cr      = field_of_symmap scope.sc_env (snd ty) symbols in
     let axioms  = EcAlgTactic.field_axioms scope.sc_env cr in
       check_tci_axioms scope mode tci.pti_axs axioms;
-      { scope with sc_env = EcEnv.Algebra.add_field ty cr scope.sc_env }
+      { scope with sc_env = EcEnv.Algebra.add_field (snd ty) cr scope.sc_env }
+
+  (* ------------------------------------------------------------------ *)
+  let symbols_of_tc (_env : EcEnv.env) ty (tcp, tc) =
+    let subst = { ty_subst_id with ts_def = Mp.of_list [tcp, ([], ty)] } in
+      List.map (fun (x, opty) ->
+        (EcIdent.name x, (true, ty_subst subst opty)))
+        tc.tc_ops
 
   (* ------------------------------------------------------------------ *)
   let add_generic_tc (scope : scope) mode { pl_desc = tci; pl_loc = loc; } =
@@ -1809,19 +1834,21 @@ module Ty = struct
         (EcUnify.UniEnv.tparams ue, ty)
     in
 
-    let tc =
+    let (tcp, tc) =
       match EcEnv.TypeClass.lookup_opt (unloc tci.pti_name) (env scope) with
       | None ->
           hierror ~loc:tci.pti_name.pl_loc
             "unknown type-class: %s" (string_of_qsymbol (unloc tci.pti_name))
-
-      | Some (p, _) -> p
+      | Some tc -> tc
     in
-      { scope with
-          sc_env = EcEnv.TypeClass.add_instance ty (`General tc) scope.sc_env }
+
+    let symbols = symbols_of_tc scope.sc_env (snd ty) (tcp, tc) in
+    let symbols = check_tci_operators scope.sc_env ty tci.pti_ops symbols in
+
+    { scope with
+        sc_env = EcEnv.TypeClass.add_instance ty (`General tcp) scope.sc_env }
 
   (* ------------------------------------------------------------------ *)
-  (* We currently only deal with [ring] and [field] *)
   let add_instance (scope : scope) mode ({ pl_desc = tci } as toptci) =
     match unloc tci.pti_name with
     | ([], "boolean_ring") -> addring  scope mode (true , toptci)

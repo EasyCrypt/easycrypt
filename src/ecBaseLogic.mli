@@ -14,7 +14,7 @@ exception NotReducible
 type abs_uses = {
   aus_calls  : EcPath.xpath list;
   aus_reads  : (prog_var * ty) list;
-  aus_writes  : (prog_var * ty) list;
+  aus_writes : (prog_var * ty) list;
 }
 type local_kind =
   | LD_var    of ty * form option
@@ -26,7 +26,7 @@ type local_kind =
 type l_local = EcIdent.t * local_kind
 
 type hyps = {
-  h_tvar  : EcIdent.t list;
+  h_tvar  : EcDecl.ty_params;
   h_local : l_local list;
 }
 

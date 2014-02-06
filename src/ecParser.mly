@@ -1367,7 +1367,11 @@ tyc_typ1:
 ;
 
 tyci_op:
-| OP x=ident EQ tg=qoident { (x, tg) }
+| OP x=ident EQ tg=qoident
+    { (x, ([], tg)) }
+
+| OP x=ident EQ tg=qoident LTCOLON tvi=plist0(loc(type_exp), COMMA) GT
+    { (x, (tvi, tg)) }
 ;
 
 tyci_ax:

@@ -41,7 +41,7 @@ type local_kind =
 type l_local = EcIdent.t * local_kind
 
 type hyps = {
-    h_tvar  : EcIdent.t list;
+    h_tvar  : EcDecl.ty_params;
     h_local : l_local list;
   }
 

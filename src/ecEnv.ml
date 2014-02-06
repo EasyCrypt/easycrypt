@@ -2748,6 +2748,7 @@ let bindall (items : (symbol * ebinding) list) (env : env) =
 (* -------------------------------------------------------------------- *)
 module LDecl = struct
   open EcIdent
+
   type error = 
     | UnknownSymbol   of EcSymbols.symbol 
     | UnknownIdent    of EcIdent.t

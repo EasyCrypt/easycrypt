@@ -127,6 +127,13 @@ module PPEnv = struct
     in
       p_shorten exists p
 
+  let tc_symb (ppe : t) p = 
+      let exists sm =
+      try  EcPath.p_equal (EcEnv.TypeClass.lookup_path sm ppe.ppe_env) p
+      with EcEnv.LookupFailure _ -> false
+    in
+      p_shorten exists p
+
   let op_symb (ppe : t) p info =
     let lookup = 
       match info with
@@ -338,6 +345,10 @@ let pp_tyunivar ppe fmt x =
 (* -------------------------------------------------------------------- *)
 let pp_tyname ppe fmt p =
   Format.fprintf fmt "%a" EcSymbols.pp_qsymbol (PPEnv.ty_symb ppe p)
+
+(* -------------------------------------------------------------------- *)
+let pp_tcname ppe fmt p =
+  Format.fprintf fmt "%a" EcSymbols.pp_qsymbol (PPEnv.tc_symb ppe p)
 
 (* -------------------------------------------------------------------- *)
 let pp_funname (ppe : PPEnv.t) fmt p =
@@ -1455,7 +1466,7 @@ let pp_tyvar_ctt (ppe : PPEnv.t) fmt (tvar, ctt) =
   | ctt ->
       Format.fprintf fmt "%a <: %a"
         (pp_tyvar ppe) tvar
-        (pp_list " &@ " pp_path) ctt
+        (pp_list " &@ " (pp_tcname ppe)) ctt
 
 (* -------------------------------------------------------------------- *)
 let pp_tyvarannot (ppe : PPEnv.t) fmt ids =
@@ -1925,7 +1936,7 @@ let pp_equivS (ppe : PPEnv.t) fmt es =
 let goalline = String.make 72 '-'
 
 let pp_goal (ppe : PPEnv.t) fmt (n, (hyps, concl)) =
-  let ppe = PPEnv.add_locals ppe hyps.EcBaseLogic.h_tvar in
+  let ppe = PPEnv.add_locals ppe (List.map fst hyps.EcBaseLogic.h_tvar) in
 
   let pp_hyp ppe (id, k) = 
     let ppe =
@@ -1978,7 +1989,7 @@ let pp_goal (ppe : PPEnv.t) fmt (n, (hyps, concl)) =
     | [] -> Format.fprintf fmt "Type variables: <none>@\n\n%!"
     | tv ->
       Format.fprintf fmt "Type variables: %a@\n\n%!"
-        (pp_list ", " (pp_tyvar ppe)) tv
+        (pp_list ", " (pp_tyvar_ctt ppe)) tv
   end;
 
     let ppe =

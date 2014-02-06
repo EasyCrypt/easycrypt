@@ -24,7 +24,6 @@ module Mid = EcIdent.Mid
 let unienv_of_hyps hyps =
   (* FIXME: TC HOOK *)
   let tv = (LDecl.tohyps hyps).h_tvar in
-  let tv = List.map (fun x -> (x, Sp.empty)) tv in
     EcUnify.UniEnv.create (Some tv)
 
 (* -------------------------------------------------------------------- *)

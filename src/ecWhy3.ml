@@ -1911,7 +1911,7 @@ let check_goal me_of_mt env pi hints (hyps, concl) =
 
     with CannotTranslate _ -> ()
   in
-  List.iter trans_tv hyps.h_tvar;
+  List.iter trans_tv (List.map fst hyps.h_tvar);
   List.iter trans_hyp (List.rev hyps.h_local);
   let env, _, concl = trans_form !env concl in
   let task = filter_task env hints env.logic_task in

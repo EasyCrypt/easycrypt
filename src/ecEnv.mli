@@ -358,7 +358,7 @@ module LDecl : sig
 
   type hyps
 
-  val init   : env -> EcIdent.t list -> hyps
+  val init   : env -> ty_params -> hyps
   val tohyps : hyps -> EcBaseLogic.hyps
   val toenv  : hyps -> env
 
