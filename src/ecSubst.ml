@@ -95,6 +95,11 @@ let f_subst_of_subst (s:_subst) =
   Fsubst.f_subst_init true s.s_s.sb_modules s.s_sty s.s_op
 
 (* -------------------------------------------------------------------- *)
+let subst_form (s : _subst) =
+  let s = f_subst_of_subst s in
+    fun f -> Fsubst.f_subst s f
+
+(* -------------------------------------------------------------------- *)
 let subst_variable (s : _subst) (x : variable) =
   { x with v_type = s.s_ty x.v_type; }
 
@@ -412,6 +417,12 @@ let subst_instance (s : _subst) tci =
   | `General p  -> `General (s.s_p p)
 
 (* -------------------------------------------------------------------- *)
+let subst_type_class (s : _subst) tc =
+  let ops = List.map (snd_map s.s_ty) tc.tc_ops in
+  let axs = List.map (snd_map (subst_form s)) tc.tc_axs in
+    { tc_ops = ops; tc_axs = axs; }
+
+(* -------------------------------------------------------------------- *)
 (* SUBSTITUTION OVER THEORIES *)
 let rec subst_theory_item (s : _subst) (item : theory_item) =
   match item with
@@ -440,7 +451,7 @@ let rec subst_theory_item (s : _subst) (item : theory_item) =
       Th_instance (subst_genty s ty, subst_instance s tci)
 
   | Th_typeclass (x, tc) ->
-      Th_typeclass (x, tc)              (* FIXME *)
+      Th_typeclass (x, subst_type_class s tc)
 
 (* -------------------------------------------------------------------- *)
 and subst_theory (s : _subst) (items : theory) =
@@ -473,8 +484,8 @@ and subst_ctheory_item (s : _subst) (item : ctheory_item) =
   | CTh_instance (ty, cr) ->
       CTh_instance (subst_genty s ty, subst_instance s cr)
 
-  | CTh_typeclass x ->
-      CTh_typeclass x
+  | CTh_typeclass (x, tc) ->
+      CTh_typeclass (x, subst_type_class s tc)
 
 (* -------------------------------------------------------------------- *)
 and subst_ctheory_struct (s : _subst) (th : ctheory_struct) =
