@@ -1887,30 +1887,37 @@ let trans_form_or_pattern env (ps, ue) pf tt =
           match EcEnv.Var.lookup_progvar_opt ~side:me (unloc x) env with
           | None -> tyerror x.pl_loc env (UnknownVarOrOp (unloc x, []))
           | Some (x, ty) -> 
-            match x with
-            | `Var x -> f_pvar x ty me
-            | `Proj(x,ty',(i,n)) -> 
-              if i = 0 && n = 1 then f_pvar x ty me 
-              else f_proj (f_pvar x ty' me) i ty
+              match x with
+              | `Var x -> f_pvar x ty me
+              | `Proj (x, ty', (i, n)) -> 
+                  if   i = 0 && n = 1
+                  then f_pvar x ty me 
+                  else f_proj (f_pvar x ty' me) i ty
         in
+
         let check_mem loc me = 
           match EcEnv.Memory.byid me env with
           | None -> tyerror loc env NoActiveMemory (* FIXME error message *)
-          | Some _ -> () in
+          | Some _ -> ()
+        in
+
         let do1 = function
           | GVvar x ->
-            let x1 = lookup EcFol.mleft x in
-            let x2 = lookup EcFol.mright x in
-            f_eq x1 x2
+              let x1 = lookup EcFol.mleft x in
+              let x2 = lookup EcFol.mright x in
+                unify_or_fail env ue x.pl_loc ~expct:x1.f_ty x2.f_ty;
+                f_eq x1 x2
+
           | GVglob gp ->
-            let (mp,_) = trans_msymbol env gp in
-            check_mem gp.pl_loc EcFol.mleft;
-            check_mem gp.pl_loc EcFol.mright;
-            let x1 = f_glob mp EcFol.mleft in
-            let x2 = f_glob mp EcFol.mright in
-            f_eq x1 x2 in
-        let eqs = List.map do1 xs in
-        EcFol.f_ands eqs
+              let (mp, _) = trans_msymbol env gp in
+                check_mem gp.pl_loc EcFol.mleft;
+                check_mem gp.pl_loc EcFol.mright;
+                let x1 = f_glob mp EcFol.mleft in
+                let x2 = f_glob mp EcFol.mright in
+                  unify_or_fail env ue gp.pl_loc ~expct:x1.f_ty x2.f_ty;
+                  f_eq x1 x2
+        in
+          EcFol.f_ands (List.map do1 xs)
 
     | PFapp ({pl_desc = PFident ({ pl_desc = name; pl_loc = loc }, tvi)}, pes) ->
         let tvi  = tvi |> omap (transtvi env ue) in  

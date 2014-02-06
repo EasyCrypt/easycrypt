@@ -484,7 +484,8 @@ let f_pvarg f ty m = f_pvar (pv_arg f) ty m
 let f_pvloc f v m = 
   f_pvar (EcTypes.pv_loc f v.v_name) v.v_type m
 
-let f_glob mp m = mk_form (Fglob(mp,m)) (tglob mp)
+let f_glob mp m =
+  mk_form (Fglob (mp, m)) (tglob mp)
 
 (* -------------------------------------------------------------------- *)
 let f_tt    = f_op EcCoreLib.p_tt [] tunit
