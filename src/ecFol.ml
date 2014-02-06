@@ -482,7 +482,8 @@ let f_pvloc f v m =
 let f_pvlocs f vs m =
   List.map (fun v -> f_pvloc f v m) vs
 
-let f_glob mp m = mk_form (Fglob(mp,m)) (tglob mp)
+let f_glob mp m =
+  mk_form (Fglob (mp, m)) (tglob mp)
 
 (* -------------------------------------------------------------------- *)
 let f_tuple args = 
