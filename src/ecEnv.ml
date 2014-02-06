@@ -755,7 +755,7 @@ module MC = struct
 
       let tsubst =
         { ty_subst_id with
-          ts_def = Mp.add mypath ([], tvar self) Mp.empty }
+            ts_def = Mp.add mypath ([], tvar self) Mp.empty }
       in
 
       let operators =
@@ -802,14 +802,6 @@ module MC = struct
 
     in
       mc
-
-(*
-type typeclass = {
-  tc_ops : (EcIdent.t * EcTypes.ty) list;
-  tc_axs : form list;
-}
-*)
-
 
   let import_typeclass p ax env =
     import (_up_typeclass true) (IPPath p) ax env
@@ -1191,7 +1183,12 @@ module TypeClass = struct
       MC.import_typeclass p obj env
 
   let rebind name tc env =
-    MC.bind_typeclass name tc env
+    let env = MC.bind_typeclass name tc env in
+      match tc.tc_prt with
+      | None -> env
+      | Some prt ->
+          let myself = EcPath.pqname (root env) name in
+            { env with env_tc = TC.Graph.add ~src:myself ~dst:prt env.env_tc }
 
   let bind name tc env =
     { (rebind name tc env) with
@@ -2550,6 +2547,26 @@ module Theory = struct
 
     | _ -> inst
 
+  (* ------------------------------------------------------------------ *)
+  let rec bind_tc_cth path gr cth =
+    List.fold_left (bind_tc_cth_item path) gr cth.cth_struct
+
+  and bind_tc_cth_item path gr item =
+    let xpath x = EcPath.pqname path x in
+
+    match item with
+    | CTh_theory (x, cth) ->
+        bind_tc_cth (xpath x) gr cth 
+
+    | CTh_typeclass (x, tc) -> begin
+        match tc.tc_prt with
+        | None     -> gr
+        | Some prt -> TC.Graph.add ~src:(xpath x) ~dst:prt gr
+    end
+
+    | _ -> gr
+
+  (* ------------------------------------------------------------------ *)
   let bind name cth env =
     let env = MC.bind_theory name cth.cth3_theory env in
     { env with
@@ -2558,7 +2575,10 @@ module Theory = struct
         env_item = (CTh_theory (name, cth.cth3_theory)) :: env.env_item; 
         env_tci  = bind_instance_cth
                      (EcPath.pqname (root env) name)
-                     env.env_tci cth.cth3_theory; }
+                     env.env_tci cth.cth3_theory;
+        env_tc   = bind_tc_cth
+                     (EcPath.pqname (root env) name)
+                     env.env_tc cth.cth3_theory; }
 
   (* ------------------------------------------------------------------ *)
   let rebind name cth env =

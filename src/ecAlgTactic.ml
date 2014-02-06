@@ -11,6 +11,12 @@ module Axioms = struct
   let tmod  = EcPath.fromqsymbol ([EcCoreLib.id_top; "AlgTactic"], "Requires")
   let tname = "domain"
 
+
+  let tmod_and_deps =
+    tmod :: [
+      EcPath.fromqsymbol ([EcCoreLib.id_top; "Ring"], "Field")
+    ]
+
   let zero  = "rzero"
   let one   = "rone"
   let add   = "add"
@@ -187,4 +193,6 @@ let t_field r eqs (f1, f2) g =
 
 (* -------------------------------------------------------------------- *)
 let is_module_loaded env =
-  EcEnv.Theory.by_path_opt Axioms.tmod env <> None
+  List.for_all
+    (fun x -> EcEnv.Theory.by_path_opt x env <> None)
+    Axioms.tmod_and_deps

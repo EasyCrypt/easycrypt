@@ -1623,7 +1623,7 @@ module Ty = struct
             match EcEnv.TypeClass.lookup_opt uptc scenv with
             | None -> hierror ~loc:uploc "unknown type-class: `%s'"
                         (string_of_qsymbol uptc)
-            | Some (p, _) -> p)
+            | Some (tcp, _) -> tcp)
       in
 
       let asty  =
@@ -1643,7 +1643,9 @@ module Ty = struct
       let operators =
         let check1 (x, ty) =
           let ue = EcUnify.UniEnv.create (Some []) in
-            (EcIdent.create (unloc x), transty tp_tydecl scenv ue ty)
+          let ty = transty tp_tydecl scenv ue ty in
+          let ty = Tuni.offun (EcUnify.UniEnv.close ue) ty in
+            (EcIdent.create (unloc x), ty)
         in
           tcd.ptc_ops |> List.map check1 in
     
@@ -1652,12 +1654,14 @@ module Ty = struct
         let scenv = EcEnv.Var.bind_locals operators scenv in
         let check1 (x, ax) =
           let ue = EcUnify.UniEnv.create (Some []) in
-            (unloc x, trans_prop scenv ue ax)
+          let ax = trans_prop scenv ue ax in
+          let ax = EcFol.Fsubst.uni (EcUnify.UniEnv.close ue) ax in
+            (unloc x, ax)
         in
           tcd.ptc_axs |> List.map check1 in
     
       (* Construct actual type-class *)
-      { tc_ops = operators; tc_axs = axioms; }
+      { tc_prt = uptc; tc_ops = operators; tc_axs = axioms; }
     in
       bindclass scope (name, tclass)
 
@@ -1759,6 +1763,12 @@ module Ty = struct
         axs
 
   (* ------------------------------------------------------------------ *)
+  let p_zmod    = EcPath.fromqsymbol ([EcCoreLib.id_top; "Ring"; "ZModule"], "zmodule")
+  let p_ring    = EcPath.fromqsymbol ([EcCoreLib.id_top; "Ring"; "ComRing"], "ring"   )
+  let p_idomain = EcPath.fromqsymbol ([EcCoreLib.id_top; "Ring"; "IDomain"], "idomain")
+  let p_field   = EcPath.fromqsymbol ([EcCoreLib.id_top; "Ring"; "Field"  ], "field"  )
+
+  (* ------------------------------------------------------------------ *)
   let ring_of_symmap env ty boolean symbols =
     { r_type  = ty;
       r_zero  = oget (Mstr.find_opt "rzero" symbols);
@@ -1780,20 +1790,24 @@ module Ty = struct
 
   let addring (scope : scope) mode (boolean, { pl_desc = tci; pl_loc = loc }) =
     if not (EcAlgTactic.is_module_loaded scope.sc_env) then
-      hierror "load AlgTactic first";
+      hierror "load AlgTactic/Ring first";
 
     let ty =
       let ue = TT.transtyvars scope.sc_env (loc, Some (fst tci.pti_type)) in
       let ty = transty tp_tydecl scope.sc_env ue (snd tci.pti_type) in
         assert (EcUnify.UniEnv.closed ue);
-        (EcUnify.UniEnv.tparams ue, ty)
+        (EcUnify.UniEnv.tparams ue, Tuni.offun (EcUnify.UniEnv.close ue) ty)
     in
     let symbols = EcAlgTactic.ring_symbols scope.sc_env boolean (snd ty) in
     let symbols = check_tci_operators scope.sc_env ty tci.pti_ops symbols in
     let cr      = ring_of_symmap scope.sc_env (snd ty) boolean symbols in
     let axioms  = EcAlgTactic.ring_axioms scope.sc_env cr in
       check_tci_axioms scope mode tci.pti_axs axioms;
-      { scope with sc_env = EcEnv.Algebra.add_ring (snd ty) cr scope.sc_env }
+      { scope with sc_env =
+          List.fold_left
+            (fun env p -> EcEnv.TypeClass.add_instance ty (`General p) env)
+            (EcEnv.Algebra.add_ring (snd ty) cr scope.sc_env)
+            [p_zmod; p_ring; p_idomain] }
 
   (* ------------------------------------------------------------------ *)
   let field_of_symmap env ty symbols =
@@ -1803,20 +1817,24 @@ module Ty = struct
 
   let addfield (scope : scope) mode { pl_desc = tci; pl_loc = loc; } =
     if not (EcAlgTactic.is_module_loaded scope.sc_env) then
-      hierror "load AlgTactic first";
+      hierror "load AlgTactic/Ring first";
 
     let ty =
       let ue = TT.transtyvars scope.sc_env (loc, Some (fst tci.pti_type)) in
       let ty = transty tp_tydecl scope.sc_env ue (snd tci.pti_type) in
         assert (EcUnify.UniEnv.closed ue);
-        (EcUnify.UniEnv.tparams ue, ty)
+        (EcUnify.UniEnv.tparams ue, Tuni.offun (EcUnify.UniEnv.close ue) ty)
     in
     let symbols = EcAlgTactic.field_symbols scope.sc_env (snd ty) in
     let symbols = check_tci_operators scope.sc_env ty tci.pti_ops symbols in
     let cr      = field_of_symmap scope.sc_env (snd ty) symbols in
     let axioms  = EcAlgTactic.field_axioms scope.sc_env cr in
       check_tci_axioms scope mode tci.pti_axs axioms;
-      { scope with sc_env = EcEnv.Algebra.add_field (snd ty) cr scope.sc_env }
+      { scope with sc_env =
+          List.fold_left
+            (fun env p -> EcEnv.TypeClass.add_instance ty (`General p) env)
+            (EcEnv.Algebra.add_field (snd ty) cr scope.sc_env)
+            [p_zmod; p_ring; p_idomain; p_field] }
 
   (* ------------------------------------------------------------------ *)
   let symbols_of_tc (_env : EcEnv.env) ty (tcp, tc) =
@@ -1831,7 +1849,7 @@ module Ty = struct
       let ue = TT.transtyvars scope.sc_env (loc, Some (fst tci.pti_type)) in
       let ty = transty tp_tydecl scope.sc_env ue (snd tci.pti_type) in
         assert (EcUnify.UniEnv.closed ue);
-        (EcUnify.UniEnv.tparams ue, ty)
+        (EcUnify.UniEnv.tparams ue, Tuni.offun (EcUnify.UniEnv.close ue) ty)
     in
 
     let (tcp, tc) =
@@ -1839,7 +1857,12 @@ module Ty = struct
       | None ->
           hierror ~loc:tci.pti_name.pl_loc
             "unknown type-class: %s" (string_of_qsymbol (unloc tci.pti_name))
-      | Some tc -> tc
+      | Some tc ->
+          let ue = EcUnify.UniEnv.create (Some []) in
+          let ty = fst (EcUnify.UniEnv.openty ue (fst ty) None (snd ty)) in
+            try  EcUnify.hastc scope.sc_env ue ty (Sp.singleton (fst tc)); tc
+            with EcUnify.UnificationFailure _ ->
+              hierror "type must be an instance of `%s'" (EcPath.tostring (fst tc))
     in
 
     let symbols = symbols_of_tc scope.sc_env (snd ty) (tcp, tc) in

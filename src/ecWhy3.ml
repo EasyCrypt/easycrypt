@@ -17,6 +17,8 @@ module Mm   = EcPath.Mm
 module Mx   = EcPath.Mx
 module Msym = EcSymbols.Msym
 
+exception CannotTranslate of string
+
 (* ----------------------------------------------------------------------*)
 module Talpha = struct 
   type t = Term.vsymbol list * Term.term
@@ -1296,8 +1298,7 @@ let trans_op env p tys =
       let ls,ls', tvs =
         match Mp.find_opt p env.env_op with
         | None ->
-            Printf.printf "<lv>: %s\n%!" (EcPath.tostring p);
-            assert false
+            raise (CannotTranslate "trans_op")
         | Some x -> x in
       let mtv = 
         List.fold_left2 (fun mtv tv ty ->
@@ -1346,8 +1347,6 @@ let destr_ty_tuple t =
 let merge_branches lb =
   if List.exists (fun b -> b.Term.t_ty = None) lb then List.map force_prop lb
   else lb
-
-exception CannotTranslate of string
 
 let trans_gty env gty =
   match gty with
@@ -1730,11 +1729,13 @@ let add_ty env path td =
     (add_ts env path ts decl, [RBty (path, ts, decl)])
 
 let add_op env path op =
-  let env, rb, ls, wparams, decl = trans_oper env path op in
-  let odecl = mk_highorder_func ls in
-  let env = add_ls env path ls wparams decl odecl in
-  let rb = RBop(path,(ls,wparams),decl,odecl)::rb in
-    (env, rb)
+  try
+    let env, rb, ls, wparams, decl = trans_oper env path op in
+    let odecl = mk_highorder_func ls in
+    let env = add_ls env path ls wparams decl odecl in
+    let rb = RBop(path,(ls,wparams),decl,odecl)::rb in
+      (env, rb)
+  with CannotTranslate _ -> (env, [])
 
 let add_ax env path ax =
   let pr = Decl.create_prsymbol (preid_p path) in

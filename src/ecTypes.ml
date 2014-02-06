@@ -86,12 +86,32 @@ module Sty = MSHty.S
 module Hty = MSHty.H
 
 (* -------------------------------------------------------------------- *)
-let tuni uid = mk_ty (Tunivar uid)
+let rec dump_ty ty =
+  match ty.ty_node with
+  | Tglob p ->
+      EcPath.m_tostring p
 
-let tvar id = mk_ty (Tvar id)
+  | Tunivar i ->
+      Printf.sprintf "#%d" i
 
-let tconstr p lt = mk_ty (Tconstr(p,lt))
-let tfun t1 t2   = mk_ty (Tfun(t1,t2)) 
+  | Tvar id ->
+      EcIdent.tostring id
+
+  | Ttuple tys ->
+      Printf.sprintf "(%s)" (String.concat ", " (List.map dump_ty tys))
+
+  | Tconstr (p, tys) ->
+      Printf.sprintf "%s[%s]" (EcPath.tostring p)
+        (String.concat ", " (List.map dump_ty tys))
+
+  | Tfun (t1, t2) ->
+      Printf.sprintf "(%s) -> (%s)" (dump_ty t1) (dump_ty t2)
+
+(* -------------------------------------------------------------------- *)
+let tuni uid     = mk_ty (Tunivar uid)
+let tvar id      = mk_ty (Tvar id)
+let tconstr p lt = mk_ty (Tconstr (p, lt))
+let tfun t1 t2   = mk_ty (Tfun (t1, t2)) 
 let tglob m      = mk_ty (Tglob m)
 
 (* -------------------------------------------------------------------- *)

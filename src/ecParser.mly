@@ -1342,7 +1342,7 @@ tc_inth:
 
 tc_body: ops=tc_op* axs=tc_ax* { (ops, axs) };
 
-tc_op: OP x=ident COLON ty=loc(type_exp) { (x, ty) };
+tc_op: OP x=oident COLON ty=loc(type_exp) { (x, ty) };
 
 tc_ax: AXIOM x=ident COLON ax=form { (x, ax) };
 
@@ -1358,10 +1358,10 @@ tycinstance:
 ;
 
 tyci_op:
-| OP x=ident EQ tg=qoident
+| OP x=oident EQ tg=qoident
     { (x, ([], tg)) }
 
-| OP x=ident EQ tg=qoident LTCOLON tvi=plist0(loc(type_exp), COMMA) GT
+| OP x=oident EQ tg=qoident LTCOLON tvi=plist0(loc(type_exp), COMMA) GT
     { (x, (tvi, tg)) }
 ;
 

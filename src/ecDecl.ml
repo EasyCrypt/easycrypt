@@ -153,6 +153,7 @@ let operator_as_fix (op : operator) =
 
 (* -------------------------------------------------------------------- *)
 type typeclass = {
+  tc_prt : EcPath.path option;
   tc_ops : (EcIdent.t * EcTypes.ty) list;
   tc_axs : (EcSymbols.symbol * EcFol.form) list;
 }

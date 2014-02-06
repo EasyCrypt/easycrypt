@@ -3,90 +3,93 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
+require import Fun.
+
+(* -------------------------------------------------------------------- *)
 theory ZModule.
-  require import Fun.
+  type class zmodule = {
+    op zeror : zmodule
+    op ( + ) : zmodule -> zmodule -> zmodule
+    op [ - ] : zmodule -> zmodule
 
-  type zmodule.
+    axiom addrA: forall (x y z : zmodule), x + (y + z) = (x + y) + z
+    axiom addrC: forall (x y   : zmodule), x + y = y + x
+    axiom add0r: forall (x     : zmodule), zeror + x = x
+    axiom addNr: forall (x     : zmodule), (-x) + x = zeror
+  }.
 
-  op zeror : zmodule.
+  op ( - ) ['a <: zmodule] (x y : 'a) = x + -y axiomatized by subrE.
 
-  op ( + ) : zmodule -> zmodule -> zmodule.
-  op [ - ] : zmodule -> zmodule.
-
-  op ( - ) (x y : zmodule) = x + -y axiomatized by subrE.
-
-  axiom nosmt addrA (x y z : zmodule): x + (y + z) = (x + y) + z.
-  axiom nosmt addrC (x y   : zmodule): x + y = y + x.
-  axiom nosmt add0r (x     : zmodule): zeror + x = x.
-  axiom nosmt addNr (x     : zmodule): (-x) + x = zeror.
-
-  lemma nosmt addr0 (x : zmodule): x + zeror = x.
+  lemma nosmt addr0 ['a <: zmodule] (x : 'a): x + zeror = x.
   proof. by rewrite addrC add0r. qed.
 
-  lemma nosmt addrN (x : zmodule): x + (-x) = zeror.
+  lemma nosmt addrN ['a <: zmodule] (x : 'a): x + (-x) = zeror.
   proof. by rewrite addrC addNr. qed.
 
-  lemma addrCA (x y z): x + (y + z) = y + (x + z).
+  lemma nosmt addrCA ['a <: zmodule] (x y z : 'a):
+    x + (y + z) = y + (x + z).
   proof. by rewrite !addrA (addrC x y). qed.
 
-  lemma addrAC (x y z): (x + y) + z = (x + z) + y.
+  lemma nosmt addrAC ['a <: zmodule] (x y z : 'a):
+    (x + y) + z = (x + z) + y.
   proof. by rewrite -!addrA (addrC y z). qed.
 
-  lemma nosmt subrr (x : zmodule): x - x = zeror.
+  lemma nosmt subrr ['a <: zmodule] (x : 'a): x - x = zeror.
   proof. by rewrite subrE /= addrN. qed.
 
-  lemma nosmt addKr (x y : zmodule): -x + (x + y) = y.
+  lemma nosmt addKr ['a <: zmodule] (x y : 'a): -x + (x + y) = y.
   proof. by rewrite addrA addNr add0r. qed.
 
-  lemma nosmt addNKr (x y : zmodule): x + (-x + y) = y.
+  lemma nosmt addNKr ['a <: zmodule] (x y : 'a): x + (-x + y) = y.
   proof. by rewrite addrA addrN add0r. qed.
 
-  lemma nosmt addrK (y x : zmodule): (x + y) + -y = x.
+  lemma nosmt addrK ['a <: zmodule] (y x : 'a): (x + y) + -y = x.
   proof. by rewrite -addrA addrN addr0. qed.
 
-  lemma nosmt addrNK (x y : zmodule): (x + -y) + y = x.
+  lemma nosmt addrNK ['a <: zmodule] (x y : 'a): (x + -y) + y = x.
   proof. by rewrite -addrA addNr addr0. qed.
 
-  lemma nosmt addrI (x y z : zmodule): x + y = x + z => y = z.
-  proof. cut := addKr x; smt. qed.
+  lemma nosmt addrI ['a <: zmodule] (x y z : 'a): x + y = x + z => y = z.
+  proof. by move=> h; rewrite -(addKr x z) -h addKr. qed.
 
-  lemma nosmt addIr (x y z : zmodule): y + x = z + x => y = z.
-  proof. cut := addrK x; smt. qed.
+  lemma nosmt addIr ['a <: zmodule] (x y z : 'a): y + x = z + x => y = z.
+  proof. by move=> h; rewrite -(addrK x z) -h addrK. qed.
 
-  lemma nosmt opprK (x : zmodule): -(-x) = x.
+  lemma nosmt opprK ['a <: zmodule] (x : 'a): -(-x) = x.
   proof. by apply (addIr (-x)); rewrite addNr addrN. qed.
 
-  lemma nosmt oppr0: -zeror = zeror.
+  lemma nosmt oppr0 ['a <: zmodule]: -zeror<:'a> = zeror.
   proof. by rewrite -(addr0 (-zeror)) addNr. qed.
 
-  lemma nosmt subr0 (x : zmodule): x - zeror = x.
+  lemma nosmt subr0 ['a <: zmodule](x : 'a): x - zeror = x.
   proof. by rewrite subrE /= oppr0 addr0. qed.
 
-  lemma nosmt sub0r (x : zmodule): zeror - x = - x.
+  lemma nosmt sub0r ['a <: zmodule](x : 'a): zeror - x = - x.
   proof. by rewrite subrE /= add0r. qed.
 
-  lemma nosmt opprD (x y : zmodule): -(x + y) = -x + -y.
+  lemma nosmt opprD ['a <: zmodule](x y : 'a): -(x + y) = -x + -y.
   proof.
     by apply (addrI (x + y)); rewrite addrA addrN addrAC addrK addrN.
   qed.
 
-  lemma nosmt opprB (x y : zmodule): -(x - y) = y - x.
+  lemma nosmt opprB ['a <: zmodule] (x y : 'a): -(x - y) = y - x.
   proof. by rewrite subrE /= opprD opprK addrC. qed.
 
-  lemma nosmt subr_eq x y z : (x - z = y) <=> (x = y + z).
+  lemma nosmt subr_eq ['a <: zmodule] (x y z : 'a):
+    (x - z = y) <=> (x = y + z).
   proof.
     move: (can2_eq (fun x, x - z) (fun x, x + z) _ _ x y) => //=.
     by move=> {x} x /=; rewrite subrE /= addrNK.
     by move=> {x} x /=; rewrite subrE /= addrK.
   qed.
 
-  lemma nosmt subr_eq0 (x y : zmodule): (x - y = zeror) <=> (x = y).
+  lemma nosmt subr_eq0 ['a <: zmodule] (x y : 'a): (x - y = zeror) <=> (x = y).
   proof. by rewrite subr_eq add0r. qed.
 
-  lemma nosmt addr_eq0 (x y : zmodule): (x + y = zeror) <=> (x = -y).
+  lemma nosmt addr_eq0 ['a <: zmodule] (x y : 'a): (x + y = zeror) <=> (x = -y).
   proof. by rewrite -(subr_eq0 x) subrE /= opprK. qed.
 
-  lemma nosmt eqr_opp (x y : zmodule): (- x = - y) <=> (x = y).
+  lemma nosmt eqr_opp ['a <: zmodule] (x y : 'a): (- x = - y) <=> (x = y).
   proof.
     move: (can_eq (fun z, -z) (fun z, -z) _ x y) => //=.
     by move=> z /=; rewrite opprK.
@@ -94,76 +97,45 @@ theory ZModule.
 end ZModule.
 
 (* -------------------------------------------------------------------- *)
-theory R.
-  require import Fun.
+theory ComRing.
+  export ZModule.
 
-  type ring.
+  type class ring <: zmodule = {
+    op oner  : ring
+    op ( * ) : ring -> ring -> ring
 
-  op zeror : ring.
-  op oner  : ring.
+    axiom oner_neq0 : oner <> zeror
+    axiom mulrA     : forall (x y z : ring), x * (y * z) = (x * y) * z
+    axiom mulrC     : forall (x y   : ring), x * y = y * x
+    axiom mul1r     : forall (x     : ring), oner * x = x
+    axiom mulrDl    : forall (x y z : ring), (x + y) * z = (x * z) + (y * z)
+  }.
 
-  op ( + ) : ring -> ring -> ring.
-  op [ - ] : ring -> ring.
-  op ( * ) : ring -> ring -> ring.
-
-  op ( - ) (x y : ring) = x + -y axiomatized by subrE.
-
-  axiom nosmt oner_neq0 : oner <> zeror.
-
-  axiom nosmt addrA (x y z : ring): x + (y + z) = (x + y) + z.
-  axiom nosmt addrC (x y   : ring): x + y = y + x.
-  axiom nosmt add0r (x     : ring): zeror + x = x.
-  axiom nosmt addNr (x     : ring): (-x) + x = zeror.
-
-  axiom nosmt mulrA  (x y z : ring): x * (y * z) = (x * y) * z.
-  axiom nosmt mulrC  (x y   : ring): x * y = y * x.
-  axiom nosmt mul1r  (x     : ring): oner * x = x.
-  axiom nosmt mulrDl (x y z : ring): (x + y) * z = x * z + y * z.
-
-  lemma nosmt addr0 (x : ring): x + zeror = x.
-  proof. by rewrite addrC add0r. qed.
-
-  lemma nosmt addrN (x : ring): x + (-x) = zeror.
-  proof. by rewrite addrC addNr. qed.
-
-  lemma nosmt subrr (x : ring): x - x = zeror.
-  proof. by rewrite subrE /= addrN. qed.
-
-  lemma nosmt addKr (x y : ring): -x + (x + y) = y.
-  proof. by rewrite addrA addNr add0r. qed.
-
-  lemma nosmt addrK (y x : ring): (x + y) + -y = x.
-  proof. by rewrite -addrA addrN addr0. qed.
-
-  lemma nosmt addrI (x y z : ring): x + y = x + z => y = z.
-  proof. cut := addKr x; smt. qed.
-
-  lemma nosmt addIr (x y z : ring): y + x = z + x => y = z.
-  proof. cut := addrK x; smt. qed.
-
-  lemma nosmt opprK (x : ring): -(-x) = x.
-  proof. by apply (addIr (-x)); rewrite addNr addrN. qed.
-
-  lemma nosmt oppr0: -zeror = zeror.
-  proof. by rewrite -(addr0 (-zeror)) addNr. qed.
-
-  lemma nosmt subr0 (x : ring): x - zeror = x.
-  proof. by rewrite subrE /= oppr0 addr0. qed.
-
-  lemma nosmt sub0r (x : ring): zeror - x = - x.
-  proof. by rewrite subrE /= add0r. qed.
-
-  lemma nosmt mulr1 (x : ring): x * oner = x.
+  lemma nosmt mulr1 ['a <: ring] (x : 'a): x * oner = x.
   proof. by rewrite mulrC mul1r. qed.
 
-  lemma nosmt mulrDr (x y z : ring): x * (y + z) = x * y + x * z.
+  lemma nosmt mulrDr ['a <: ring] (x y z : 'a):
+    x * (y + z) = x * y + x * z.
   proof. by rewrite mulrC mulrDl !(mulrC _ x). qed.
-end R.
+end ComRing.
 
 (* -------------------------------------------------------------------- *)
 theory IDomain.
-  clone export R.
+  export ComRing.
 
-  axiom nosmt integral (x y : ring):
-    x * y = zeror => (x = zeror) \/ (y = zeror).
+  type class idomain <: ring = {
+    axiom mulf_eq0: forall (x y : idomain), 
+      x * y = zeror => x = zeror \/ y = zeror
+  }.
 end IDomain.
+
+(* -------------------------------------------------------------------- *)
+theory Field.
+  export IDomain.
+
+  type class field <: ring = {
+    op inv : field -> field
+
+    axiom mulVf : forall (x : field), x <> zeror => (inv x) * x = oner
+  }.
+end Field.

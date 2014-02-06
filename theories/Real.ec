@@ -109,6 +109,7 @@ end Exp.
 export Exp.
 
 
+require import Ring.
 require import AlgTactic.
 
 instance ring with real
