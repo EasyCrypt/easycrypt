@@ -1328,7 +1328,7 @@ typedecl:
 (* -------------------------------------------------------------------- *)
 (* Type classes                                                         *)
 typeclass:
-| TYPE CLASS typ=typarams x=lident inth=tc_inth? EQ LBRACE body=tc_body RBRACE {
+| TYPE CLASS x=lident inth=tc_inth? EQ LBRACE body=tc_body RBRACE {
     { ptc_name = x;
       ptc_inth = inth;
       ptc_ops  = fst body;
@@ -1349,21 +1349,12 @@ tc_ax: AXIOM x=ident COLON ax=form { (x, ax) };
 (* -------------------------------------------------------------------- *)
 (* Type classes (instances)                                             *)
 tycinstance:
-| INSTANCE x=qident WITH typ=tyc_typ? ty=loc(type_exp) ops=tyci_op* axs=tyci_ax* {
+| INSTANCE x=qident WITH typ=tyvars_decl? ty=loc(type_exp) ops=tyci_op* axs=tyci_ax* {
     { pti_name = x;
       pti_type = (odfl [] typ, ty);
       pti_ops  = ops;
       pti_axs  = axs; }
   }
-;
-
-tyc_typ:
-| LBRACKET typ=tyc_typ1+ RBRACKET { typ }
-;
-
-tyc_typ1:
-| x=tident { (x, []) }
-| x=tident LTCOLON ctt=rlist1(qident, COMMA) { (x, ctt) }
 ;
 
 tyci_op:
@@ -1393,7 +1384,8 @@ op_tydom:
 ;
 
 tyvars_decl:
-| LBRACKET tyvars=typaram* RBRACKET { tyvars }
+| LBRACKET tyvars=rlist0(typaram, COMMA) RBRACKET { tyvars }
+| LBRACKET tyvars=rlist2(tident , empty) RBRACKET { List.map (fun x -> (x, [])) tyvars }
 ;
 
 %inline op_or_const:
