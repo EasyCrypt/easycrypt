@@ -2202,7 +2202,7 @@ let get_instances (tvi, bty) env =
     (function
      | (_, (`Ring _ | `Field _)) as x -> Some x
      | (t, `General p) ->
-         if   EcPath.p_equal p (p_idom "idomain")
+         if   EcPath.p_equal p (p_ring "ring")
          then Some (t, `GeneralRing)
          else if   EcPath.p_equal p (p_field "field")
               then Some (t, `GeneralField)
