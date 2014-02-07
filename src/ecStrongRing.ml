@@ -43,28 +43,32 @@ let init_info env juc =
     hyp_tbl  = Hf.create 523;
   }
  
-let get_field env ty () = 
-  match EcTyping.get_field ty env with
+let get_field env hyps ty () = 
+  let tparams = (LDecl.tohyps hyps).EcBaseLogic.h_tvar in
+  match EcTyping.get_field (tparams, ty) env with
   | Some f ->
     let cr = cfield_of_field f in
     let m  = ref RState.empty in
     Some (NKfield(cr,m))
   | None -> None
 
-let get_ring env ty () = 
-  match EcTyping.get_ring ty env with
+let get_ring env hyps ty () = 
+  let tparams = (LDecl.tohyps hyps).EcBaseLogic.h_tvar in
+  match EcTyping.get_ring (tparams,ty) env with
   | Some r ->
     let cr = cring_of_ring r in
     let m = ref RState.empty in
     Some (NKring(cr,m))
   | None -> None
 
-let norm_kind einfo ty =
+let norm_kind einfo hyps ty =
   try Hty.find einfo.kind_tbl ty 
   with Not_found ->
     let kind = 
       odfl NKdefault 
-        (List.fpick [get_field einfo.i_env ty; get_ring einfo.i_env ty]) in
+        (List.fpick 
+           [get_field einfo.i_env hyps ty; 
+            get_ring einfo.i_env hyps ty]) in
     Hty.add einfo.kind_tbl ty kind;
     kind
 
@@ -97,7 +101,7 @@ let t_subterms hfs = List.map t_subterm hfs
 let rec t_normalize info hyps f =
   try Hf.find info.hyp_tbl f
   with Not_found ->
-    match norm_kind info.i_einfo f.f_ty with
+    match norm_kind info.i_einfo hyps f.f_ty with
     | NKring(cr,m)  -> t_normalize_ring info cr m hyps f
     | NKfield(cr,m) -> t_normalize_field info cr m hyps f 
     | NKdefault     -> t_normalize_subterm info hyps f 
@@ -235,10 +239,10 @@ let rec t_alg_eq info htbl g =
 
 and t_cut_alg_eq info htbl f1 f2 g =
   if is_in_hyp htbl f1 f2 then t_id None g
-  else match norm_kind info f1.f_ty with
-  | NKring(cr,m)  -> t_cut_ring_eq  info htbl cr m f1 f2 g
-  | NKfield(cr,m) -> t_cut_field_eq info htbl cr m f1 f2 g
-  | NKdefault     -> t_cut_subterm_eq info htbl f1 f2 g
+  else match norm_kind info (get_hyps g) f1.f_ty with
+    | NKring(cr,m)  -> t_cut_ring_eq  info htbl cr m f1 f2 g
+    | NKfield(cr,m) -> t_cut_field_eq info htbl cr m f1 f2 g
+    | NKdefault     -> t_cut_subterm_eq info htbl f1 f2 g
 
 and t_cut_subterm_eq info htbl f1 f2 g =
   match f1.f_node, f2.f_node with
