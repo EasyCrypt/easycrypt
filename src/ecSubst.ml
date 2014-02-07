@@ -417,7 +417,7 @@ let subst_instance (s : _subst) tci =
   | `General p  -> `General (s.s_p p)
 
 (* -------------------------------------------------------------------- *)
-let subst_type_class (s : _subst) tc =
+let subst_tc (s : _subst) tc =
   let tc_prt = tc.tc_prt |> omap s.s_p in
   let tc_ops = List.map (snd_map s.s_ty) tc.tc_ops in
   let tc_axs = List.map (snd_map (subst_form s)) tc.tc_axs in
@@ -452,7 +452,7 @@ let rec subst_theory_item (s : _subst) (item : theory_item) =
       Th_instance (subst_genty s ty, subst_instance s tci)
 
   | Th_typeclass (x, tc) ->
-      Th_typeclass (x, subst_type_class s tc)
+      Th_typeclass (x, subst_tc s tc)
 
 (* -------------------------------------------------------------------- *)
 and subst_theory (s : _subst) (items : theory) =
@@ -486,7 +486,7 @@ and subst_ctheory_item (s : _subst) (item : ctheory_item) =
       CTh_instance (subst_genty s ty, subst_instance s cr)
 
   | CTh_typeclass (x, tc) ->
-      CTh_typeclass (x, subst_type_class s tc)
+      CTh_typeclass (x, subst_tc s tc)
 
 (* -------------------------------------------------------------------- *)
 and subst_ctheory_struct (s : _subst) (th : ctheory_struct) =
@@ -523,6 +523,7 @@ and subst_ctheory (s : _subst) (cth : ctheory) =
 let subst_ax           s = subst_ax (_subst_of_subst s)
 let subst_op           s = subst_op (_subst_of_subst s)
 let subst_tydecl       s = subst_tydecl (_subst_of_subst s)
+let subst_tc           s = subst_tc (_subst_of_subst s)
 let subst_theory       s = subst_theory (_subst_of_subst s)
 let subst_ctheory      s = subst_ctheory (_subst_of_subst s)
 

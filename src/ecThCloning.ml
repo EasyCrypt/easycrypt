@@ -623,9 +623,9 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
             (subst, ops, proofs, scenv)
       end
 
-      | CTh_typeclass _ ->
-          (* Currently, type classes don't survive cloning *)
-          (subst, ops, proofs, scenv)
+      | CTh_typeclass (x, tc) ->
+          let tc = EcSubst.subst_tc subst tc in
+            (subst, ops, proofs, EcEnv.TypeClass.bind x tc scenv)
 
     in
       let scenv = EcEnv.Theory.enter name scenv in

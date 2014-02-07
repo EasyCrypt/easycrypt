@@ -52,7 +52,6 @@ and ctheory_clone = {
 and ctheory_override =
 | CTHO_Type   of EcTypes.ty
 
-
 (* -------------------------------------------------------------------- *)
 val module_comps_of_module_sig_comps:
   module_sig_body -> module_item list
