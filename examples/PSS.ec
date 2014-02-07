@@ -7,7 +7,6 @@ require import FMap.
 require import Pair.
 require import Distr.
 
-pragma nocheck.
 (*** These belong somewhere else *)
 op pi3_1 (t:'a * 'b * 'c): 'a =
   let (a,b,c) = t in a.
@@ -837,7 +836,6 @@ section.
        rewrite /s_gtag; apply gtagU=> //;
        rewrite /sample_gtag; apply GTag.Dword.in_supp_def.
     by rewrite /s_gtag /sample_gtag; apply GTag.Dword.in_supp_def.
-pragma check.
     (* All these are ring rewrites *)
     by rewrite GTag.xorwA GTag.xorwK GTag.xorwC GTag.xorw0.
     by rewrite GTag.xorwA GTag.xorwK GTag.xorwC GTag.xorw0.
