@@ -44,38 +44,23 @@ proof.
   rewrite -ExtEq.fun_ext => x; rewrite -ExtEq.fun_ext => y; smt.
 qed.
 
-(** View bitstring as a group *)
-clone export Ring.R as Rw with
-  type ring <- word,
-  op zeror <- zeros,
-  op oner  <- ones,
-  op ( + ) <- ( ^ ),
-  op ([-]) <- lopp,
-  op ( * ) <- land,
-  op ( - ) <- ( ^ )
-  proof * by smt.
-
-require import Ring.
-require import AlgTactic.
-
-instance boolean_ring with word
+(** View bitstring as a ring *)
+instance ring with word
   op rzero = zeros
   op rone  = ones
-  op add   = ( ^ )
-  op opp   = lopp 
+  op add   = (   ^  )
   op mul   = land
+  op opp   = lopp
 
   proof oner_neq0 by smt
   proof addr0     by smt
   proof addrA     by smt
   proof addrC     by smt
-  proof addrK     by smt
+  proof addrN     by smt
   proof mulr1     by smt
   proof mulrA     by smt
   proof mulrC     by smt
-  proof mulrDl    by smt
-  proof oppr_id   by smt 
-  proof mulrK     by smt.
+  proof mulrDl    by smt.
 
 require export ABitstring.
 op to_bits: word -> bitstring.
