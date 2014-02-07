@@ -120,6 +120,18 @@ theory ComRing.
 end ComRing.
 
 (* -------------------------------------------------------------------- *)
+theory BoolRing.
+  export ComRing.
+
+  type class bring <: ring = {
+    axiom mulrr : forall (x : bring), x * x = x
+  }.
+
+  lemma nosmt addrK ['a <: bring] (x : 'a): x + x = zeror.
+  proof. by apply (addrI (x + x)); rewrite addr0 -{1 2 3 4}mulrr -mulrDr -mulrDl mulrr. qed.
+end BoolRing.
+
+(* -------------------------------------------------------------------- *)
 theory IDomain.
   export ComRing.
 
