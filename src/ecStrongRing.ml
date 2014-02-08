@@ -1,3 +1,4 @@
+(* -------------------------------------------------------------------- *)
 open EcUtils
 open EcMaps
 open EcTypes
@@ -6,32 +7,26 @@ open EcEnv
 open EcAlgebra
 open EcLogic
 open EcAlgTactic
-(* I assume I have a tactic 
-    norm_rewrite : EcIdent.t -> rw -> form -> tactic 
-    the semantic is the following :
-    [norm_rewrite h rw e 
-       hyps |- concl ---> hyps, (h:e =e') |- concl 
-     where e' is the normal form of e upto rewriting in rw *)
 
 type norm_kind = 
-  | NKring of cring * RState.rstate ref 
+  | NKring  of cring * RState.rstate ref 
   | NKfield of cfield * RState.rstate ref 
   | NKdefault
 
-type einfo = 
-  { i_env    : env;
-    kind_tbl : norm_kind Hty.t;
-  }
+type einfo = {
+  i_env    : env;
+  kind_tbl : norm_kind Hty.t;
+}
 
-type info = 
-  {         i_einfo  : einfo;
-    mutable i_juc    : judgment_uc;
-            hyp_tbl  : (int * int list * LDecl.hyps * form) option Hf.t; 
-  }
-    (* hyp_tbl f -> Some (n,ns,hyps,f') means that 
-         n is a node proving : hyps |- f = f' 
-         ns is the remaining subgoal of n
-       hyp_tbl f -> None means that f is known to be in normal form *)
+(* hyp_tbl f -> Some = (n, ns, hyps, f') means that
+ *  1. n is a node proving : hyps |- f = f'
+ *  2. ns is the remaining subgoal of n
+ * hyp_tbl f -> None = means that f is known to be in normal form *)
+type info = {
+  (*---*) i_einfo : einfo;
+  mutable i_juc   : judgment_uc;
+  (*---*) hyp_tbl : (int * int list * LDecl.hyps * form) option Hf.t; 
+}
 
 let init_einfo env = 
   { i_env    = env;
@@ -40,8 +35,7 @@ let init_einfo env =
 let init_info env juc = 
   { i_einfo  = init_einfo env;
     i_juc    = juc;
-    hyp_tbl  = Hf.create 523;
-  }
+    hyp_tbl  = Hf.create 523; }
  
 let get_field env hyps ty () = 
   let tparams = (LDecl.tohyps hyps).EcBaseLogic.h_tvar in
@@ -71,7 +65,6 @@ let norm_kind einfo hyps ty =
             get_ring einfo.i_env hyps ty]) in
     Hty.add einfo.kind_tbl ty kind;
     kind
-
 
 let add_refl info f =
   Hf.add info.hyp_tbl f None;
@@ -169,7 +162,6 @@ let t_alg_normalize f g =
   let f' = get_norm f res in
   let g = if f_equal f f' then g else (info.i_juc, snd g) in
   t_on_first (t_subterm res) (t_cut (f_eq f f') g)
-
 
 let t_seq_last t1 t2 g =
   t_on_last t2 (t1 g)
@@ -286,7 +278,6 @@ and t_cut_merges info  rm fv fs g =
     oget (RState.get i' !rm) in
   let fs' = List.map get fv in
   gs, fs' 
-
 
 let t_alg_eq g = 
   let env,_,_ = get_goal_e g in

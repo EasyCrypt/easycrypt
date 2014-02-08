@@ -1116,11 +1116,9 @@ let process_algebra mode kind eqs g =
 
 let process_alg_norm g =
   let env, _, _ = get_goal_e g in
-  if not (EcAlgTactic.is_module_loaded env) then
-    tacuerror "alg_norm cannot be used when AlgTactic is not loaded"; 
-  
-(*  let f = process_form_opt hyps f None in *)
-  EcStrongRing.t_alg_eq g
+    if not (EcAlgTactic.is_module_loaded env) then
+      tacuerror "alg_norm cannot be used when AlgTactic is not loaded"; 
+    EcStrongRing.t_alg_eq g
 
 (* -------------------------------------------------------------------- *)
 let normalize (rw : EcPath.path list) (f : form) ((juc, an) : goal) =

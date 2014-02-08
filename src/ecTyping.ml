@@ -2208,18 +2208,20 @@ let get_instances (tvi, bty) env =
               else None)
     (EcEnv.TypeClass.get_instances env) in
 
-  List.filter (fun ((typ, gty), _cr) ->
+  List.pmap (fun ((typ, gty), cr) ->
     let ue = EcUnify.UniEnv.create (Some tvi) in
     let (gty, _typ) = EcUnify.UniEnv.openty ue typ None gty in
-      try  EcUnify.unify env ue bty gty; true
-      with EcUnify.UnificationFailure _ -> false)
+      try
+        EcUnify.unify env ue bty gty;
+        Some (inst, Tuni.offun (EcUnify.UniEnv.close ue) gty, cr)
+      with EcUnify.UnificationFailure _ -> None)
     inst
 
 let get_ring (typ, ty) env =
   let module E = struct exception Found of ring end in
     try
       List.iter
-        (fun ((_, ty), cr) ->
+        (fun (_, ty, cr) ->
           match cr with
           | `Ring cr -> raise (E.Found cr)
           | `GeneralRing -> raise (E.Found (general_ring ty))
@@ -2232,7 +2234,7 @@ let get_field (typ, ty) env =
   let module E = struct exception Found of field end in
     try
       List.iter
-        (fun ((_, ty), cr) ->
+        (fun (_, ty, cr) ->
           match cr with
           | `Field cr -> raise (E.Found cr)
           | `GeneralField -> raise (E.Found (general_field ty))
