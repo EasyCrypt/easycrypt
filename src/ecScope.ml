@@ -1556,8 +1556,7 @@ end
 module Ty = struct
   open EcDecl
   open EcTyping
-  open EcAlgebra
-
+ 
   module TT = EcTyping
 
   type tydname = (ptyparams * psymbol) located

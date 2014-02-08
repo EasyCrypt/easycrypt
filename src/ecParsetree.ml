@@ -506,7 +506,7 @@ type logtactic =
   | Psplit
   | Pfield	of psymbol list
   | Pring 	of psymbol list
-  | Palg_norm   of pformula
+  | Palg_norm   
   | Pexists     of fpattern_arg located list
   | Pleft
   | Pright

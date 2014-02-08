@@ -170,6 +170,8 @@ val t_change : form -> tactic
 val t_subst_all : tactic
 val t_subst1    : form option -> tactic
 
+val alpha_find_in_hyps : EcFol.form -> EcEnv.LDecl.hyps -> EcIdent.t
+val t_alpha_assumption : tactic
 val t_assumption : tactic
 
 val t_progress : tactic -> tactic

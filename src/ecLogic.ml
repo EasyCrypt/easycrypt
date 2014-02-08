@@ -1388,7 +1388,12 @@ let gen_find_in_hyps eq f hyps =
     | _ -> false in
   fst (List.find test (LDecl.tohyps hyps).h_local)
 
-let find_in_hyps f hyps = gen_find_in_hyps is_conv f hyps
+let alpha_find_in_hyps f hyps = 
+  gen_find_in_hyps EcReduction.is_alpha_eq f hyps
+
+let find_in_hyps f hyps = 
+  gen_find_in_hyps is_conv f hyps
+
 
 let t_gen_assumption eq g =
   let (hyps,concl) = get_goal g in

@@ -171,36 +171,6 @@ let t_alg_normalize f g =
   t_on_first (t_subterm res) (t_cut (f_eq f f') g)
 
 
-(*let repr info f =
-  let tbl = info.ehyp_tbl in
-  let rec aux f hs =
-    match Hf.find_opt tbl f with
-    | None -> f, hs
-    | Some(h,f') -> aux f' (h::hs) in
-  aux f []
-    
-let rec remove_common hs1 hs2 =
-  match hs1, hs2 with
-  | h1::hs1, h2::hs2 when EcIdent.id_equal h1 h2 -> remove_common hs1 hs2
-  | _, _ -> List.rev hs1, List.rev hs2
-
-let t_alg_trans hs1 hs2 g = 
-  let hs1,hs2 = remove_common hs1 hs2 in
-  let t_trans1 h g =
-    let hyps = get_hyps g in
-    let _, f' = LDecl.lookup_hyp_by_id hyps id in
-    t_transitivity f' g in
-  let t_shyp h g = t_seq t_sym (t_hyp h2) in
-  let rec t_trans hs1 hs2 g = 
-    match hs1, hs2 with
-    | [], []       -> t_reflex g
-    | [h1], []     -> t_hyp h1 g
-    | h1::hs1, hs2 -> t_seq_subgoal (t_trans1 h1) [t_hyp h1; t_trans hs1 hs2] g
-    | [], [h2]     -> t_shyp g
-    | [], h2::hs2  -> t_seq_subgoal (t_trans1 h2); [t_trans [] hs2;t_shyp h2] g
-  in
-  t_trans hs1 hs2 g *)
-
 let t_seq_last t1 t2 g =
   t_on_last t2 (t1 g)
 
@@ -209,60 +179,53 @@ let rec t_lseq_last lt g =
   | [] -> t_id None g
   | t::lt -> t_seq_last t (t_lseq_last lt) g
 
+let t_reflex_assumption g = 
+  (* FIXME : we should not use _ in try *)
+  let t_reflex g = try t_reflex g with _ -> t_fail g in
+  t_lor [t_reflex; t_assumption; t_seq t_symmetry t_assumption] g
 
-type hyp_tbl = EcIdent.t Mf.t ref
-
-let t_hyp_assumption (htbl:hyp_tbl) g = 
-  let concl = get_concl g in
-  let f1,f2 = destr_eq concl in
-  if f_equal f1 f2 then t_reflex g
-  else
-    let tac =
-      try t_hyp (Mf.find concl !htbl) 
-      with Not_found -> 
-        t_seq t_symmetry (t_hyp (Mf.find (f_eq f2 f1) !htbl)) in
-    tac g
-
-let is_in_hyp htbl f1 f2 = 
-  f_equal f1 f2 || Mf.mem (f_eq f1 f2) !htbl || Mf.mem (f_eq f2 f1) !htbl 
-
-let t_intro_eq htbl g = 
-  let hyps, concl = get_goal g in
-  let eq = fst (destr_imp concl) in
-  let h  = LDecl.fresh_id hyps "_" in
-  htbl := Mf.add eq h !htbl;
+let t_intro_eq g = 
+  let h  = LDecl.fresh_id (get_hyps g) "_" in
   t_intros_i [h] g
 
-let rec t_alg_eq info htbl g =
+let is_in_hyp hyps f1 f2 =
+  let is_in hyps f1 f2 = 
+    try ignore (alpha_find_in_hyps (f_eq f1 f2) hyps); true
+    with Not_found -> false in
+  EcReduction.is_alpha_eq hyps f1 f2 ||
+    is_in hyps f1 f2 || is_in hyps f2 f1
+
+let rec t_alg_eq info g =
   let f1, f2 = destr_eq (get_concl g) in
-  t_seq (t_cut_alg_eq info htbl f1 f2) (t_hyp_assumption htbl) g
+  t_seq (t_cut_alg_eq info f1 f2) t_reflex_assumption g
 
-and t_cut_alg_eq info htbl f1 f2 g =
-  if is_in_hyp htbl f1 f2 then t_id None g
-  else match norm_kind info (get_hyps g) f1.f_ty with
-    | NKring(cr,m)  -> t_cut_ring_eq  info htbl cr m f1 f2 g
-    | NKfield(cr,m) -> t_cut_field_eq info htbl cr m f1 f2 g
-    | NKdefault     -> t_cut_subterm_eq info htbl f1 f2 g
+and t_cut_alg_eq info f1 f2 g =
+  let hyps = get_hyps g in
+  if is_in_hyp hyps f1 f2 then t_id None g
+  else match norm_kind info hyps f1.f_ty with
+    | NKring(cr,m)  -> t_cut_ring_eq  info cr m f1 f2 g
+    | NKfield(cr,m) -> t_cut_field_eq info cr m f1 f2 g
+    | NKdefault     -> t_cut_subterm_eq info f1 f2 g
 
-and t_cut_subterm_eq info htbl f1 f2 g =
+and t_cut_subterm_eq info f1 f2 g =
   match f1.f_node, f2.f_node with
   | Fapp(op1,fs1), Fapp(op2,fs2) when f_equal op1 op2 ->
-    t_seq_last (t_lseq_last (List.map2 (t_cut_alg_eq info htbl) fs1 fs2))
+    t_seq_last (t_lseq_last (List.map2 (t_cut_alg_eq info) fs1 fs2))
       (t_seq_subgoal (t_cut (f_eq f1 f2)) [
         t_seq 
           (t_congr (op1,op1) (List.combine fs1 fs2, f1.f_ty)) 
-          (t_hyp_assumption htbl);
-        t_intro_eq htbl]) g
+          t_reflex_assumption;
+        t_intro_eq]) g
   | Ftuple fs1, Ftuple fs2 ->
-    t_seq_last (t_lseq_last (List.map2 (t_cut_alg_eq info htbl) fs1 fs2))
+    t_seq_last (t_lseq_last (List.map2 (t_cut_alg_eq info) fs1 fs2))
       (t_seq_subgoal (t_cut (f_eq f1 f2)) [
-        t_seq t_split (t_hyp_assumption htbl);
-        t_intro_eq htbl]) g
+        t_seq t_split t_reflex_assumption;
+        t_intro_eq]) g
   | _, _ -> t_fail g
 
-and t_cut_field_eq _info _htbl _cr _rm _f1 _f2 _g = assert false
+and t_cut_field_eq _info _cr _rm _f1 _f2 g = t_fail g 
 
-and t_cut_ring_eq info htbl cr rm f1 f2 g =
+and t_cut_ring_eq info  cr rm f1 f2 g =
   let hyps = get_hyps g in
   let pe1, rm' = toring hyps cr !rm f1 in
   let pe2, rm' = toring hyps cr rm' f2 in
@@ -273,14 +236,14 @@ and t_cut_ring_eq info htbl cr rm f1 f2 g =
   if fv = [] then
     t_seq_subgoal (t_cut (f_eq f1 f2)) 
       [ t_ring r [] (f1,f2) ;
-        t_intro_eq htbl] g
+        t_intro_eq ] g
   else
     let fs  = List.map (fun i -> oget (RState.get i rm')) fv in
-    let gs, fs' = t_cut_merges info htbl rm fv fs g in
+    let gs, fs' = t_cut_merges info  rm fv fs g in
     let cut_congr f h (juc,n1 as g) =
       let hyps = get_hyps g in
       let f', n, gs = n_ring_congr juc hyps cr !rm f fv fs' in
-      let (juc,ns) = t_on_goals (t_hyp_assumption htbl) gs in
+      let (juc,ns) = t_on_goals t_reflex_assumption gs in
       t_seq_subgoal (t_cut (f_eq f f')) 
         [ t_use n ns;
           t_intros_i [h]] (juc,n1) in
@@ -298,19 +261,17 @@ and t_cut_ring_eq info htbl cr rm f1 f2 g =
       let h1, h2 = as_seq2 (LDecl.fresh_ids hyps ["_";"_"]) in
       t_seq_subgoal (t_cut (f_eq f1 f2))
         [ t_lseq [ cut_congr f1 h1; cut_congr f2 h2; t_trans_ring h1 h2];
-          t_intro_eq htbl] g in
+          t_intro_eq ] g in
     t_on_last t_end gs
    
-and t_cut_merges info htbl rm fv fs g = 
+and t_cut_merges info  rm fv fs g = 
   let m = ref Mint.empty in
   let t_unify1 i1 f1 i2 f2 g = 
-    let gs = t_cut_subterm_eq info htbl f1 f2 g in
+    let gs = t_cut_subterm_eq info  f1 f2 g in
     m := Mint.add i1 i2 !m; gs in
   let tomatch = ref [] in
   let t_tomatch i1 f1 g = 
-    let htbl' = !htbl in
     let rec t_match l g = 
-      htbl := htbl';
       match l with
       | [] -> tomatch := (i1,f1) :: !tomatch; t_id None g
       | (i2,f2)::l -> t_or (t_unify1 i1 f1 i2 f2) (t_match l) g in
@@ -330,4 +291,4 @@ and t_cut_merges info htbl rm fv fs g =
 let t_alg_eq g = 
   let env,_,_ = get_goal_e g in
   let info = init_einfo env in
-  t_alg_eq info (ref Mf.empty) g
+  t_alg_eq info g

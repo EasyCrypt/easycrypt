@@ -1114,7 +1114,7 @@ let process_algebra mode kind eqs g =
   in
     tactic g
 
-let process_alg_norm _f g =
+let process_alg_norm g =
   let env, _, _ = get_goal_e g in
   if not (EcAlgTactic.is_module_loaded env) then
     tacuerror "alg_norm cannot be used when AlgTactic is not loaded"; 
@@ -1195,7 +1195,7 @@ let process_logic (engine, hitenv) loc t =
   | Psplit            -> t_split
   | Pfield st         -> process_algebra `Solve `Field st
   | Pring st          -> process_algebra `Solve `Ring  st
-  | Palg_norm f       -> process_alg_norm f
+  | Palg_norm         -> process_alg_norm 
   | Pexists fs        -> process_exists fs
   | Pleft             -> t_left
   | Pright            -> t_right

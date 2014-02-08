@@ -1978,8 +1978,7 @@ logtactic:
 | RING eqs=ident*
     { Pring eqs }
 
-| ALGNORM f=sform 
-    { Palg_norm f }
+| ALGNORM { Palg_norm }
 
 | EXIST a=iplist1(loc(fpattern_arg), COMMA) %prec prec_below_comma
    { Pexists a }
