@@ -3,7 +3,7 @@ require import Int.
 require import Real.
 require import ISet.
 require import FSet.
-require import FMap. import OptionGet.
+require import FMap.
 require import Pair.
 require import Distr.
 
@@ -75,7 +75,7 @@ clone import AWord as Salt with
   type word <- salt,
   op length <- k0.
 op sample_salt = Salt.Dword.dword.
-axiom saltL: mu sample_salt cpTrue = 1%r.
+axiom saltL: mu sample_salt True = 1%r.
 
 (* Output of H *)
 type htag.
@@ -83,10 +83,10 @@ clone import AWord as HTag with
   type word <- htag,
   op length <- k1.
 op sample_htag = HTag.Dword.dword.
-axiom htagL: mu sample_htag cpTrue = 1%r.
+axiom htagL: mu sample_htag True = 1%r.
 lemma htagU: isuniform sample_htag by [].
 op s_htag = fun (x:message * salt), sample_htag.
-lemma s_htagL x: mu (s_htag x) cpTrue = 1%r by [].
+lemma s_htagL x: mu (s_htag x) True = 1%r by [].
 
 (* Output of G *)
 type gtag.
@@ -94,10 +94,10 @@ clone import AWord as GTag with
   type word <- gtag,
   op length <- kg.
 op sample_gtag = GTag.Dword.dword.
-axiom gtagL: mu sample_gtag cpTrue = 1%r.
+axiom gtagL: mu sample_gtag True = 1%r.
 lemma gtagU: isuniform sample_gtag by [].
 op s_gtag = fun (x:htag), sample_gtag.
-lemma s_gtagL x: mu (s_gtag x) cpTrue = 1%r by [].
+lemma s_gtagL x: mu (s_gtag x) True = 1%r by [].
 
 (* Output of G2 [G1 produces an HTag] *)
 type g2tag.
@@ -108,7 +108,7 @@ clone import AWord as G2Tag with
 (** Instantiating *)
 require PKS.
 require OW.
-require RandomOracle.
+require ROM.
 
 type pkey.
 type skey.
@@ -220,14 +220,14 @@ axiom f_one pk: valid_pkey pk => f pk (one_sig) = one_sig.
 axiom finv_one sk: valid_skey sk => finv sk (one_sig) = one_sig.
 
 (** Continuing on with instantiation *)
-clone import RandomOracle.LazyEager as Gt with
+clone import ROM.LazyEager as Gt with
   type from <- htag,
   type to <- gtag,
   op dsample <- s_gtag.
 module G = Gt.Lazy.RO.
 module G' = Gt.Eager.RO.
 
-clone import RandomOracle.Lazy as Ht with
+clone import ROM.Lazy as Ht with
   type from <- (message * salt),
   type to <- htag,
   op dsample <- s_htag.
@@ -322,7 +322,8 @@ op lsb0 (pk:pkey) (z:signature) = sub (to_bits z) 0 1 = zeros 1.
 
 clone GenDice as S with 
   type t <- signature,
-    type input = pkey,
+    type input <- pkey,
+    pred valid = valid_pkey,
     type t' <- htag * gtag,
     op d <- sample_plain,
     op test <- lsb0,
@@ -330,7 +331,7 @@ clone GenDice as S with
     op sub_supp <- (fun (pk:pkey),
                       Finite.toFSet (filter (lsb0 pk) univ))
     proof *.
-  realize dU. proof strict. apply RSA.challengeU. qed.
+  realize dU. proof strict. by move=> pk; rewrite /valid=> vpk; apply RSA.challengeU. qed.
   realize test_in_supp. 
   proof strict. intros pk x /=. admit. qed. (* sub (to_bits x) 0 1 = zeros 1 => toInt x <= modulus_p pk *)
   realize test_sub_supp.
@@ -349,6 +350,11 @@ clone GenDice as S with
     cut ->: 1%r / (2^k1)%r * (1%r  /(2^kg)%r) = 1%r / ((2^k1) * (2^kg))%r by smt.
     cut ->: forall m n, 0 <= m => 0 <= n => 2^m * 2^n = 2^(m + n); first 3 smt.
     smt.
+  qed.
+  realize valid_nonempty. proof.
+    cut:= witness_support True keypairs _; first by smt.
+    rewrite /True /= => [ks]; elim/tuple2_ind ks=> ks pk sk ks_def sup_ks.
+    by exists pk; exists sk.
   qed.
 
 section. 
@@ -535,7 +541,7 @@ section.
 
     proc init(ks:pkey*skey) : unit = {
       Hmem.init(ks);
-      m = FMap.Core.empty;
+      m = FMap.empty;
     }
   }.
 
@@ -555,7 +561,7 @@ section.
 
   (* partial equality between simple and extended maps *)
   pred (=<=) (m0:(message * salt,htag) map) (m1:(message * salt,htag * bool * signature) map) =
-    forall x, m0.[x] = if m1.[x] = None then None else Some (pi3_1 (proj m1.[x])).
+    forall x, m0.[x] = if m1.[x] = None then None else Some (pi3_1 (oget m1.[x])).
 
   (** Zeroth Transition:
       We rewrite PSS into an adversary against Gen with G and a trivial split oracle H0. *)
@@ -568,7 +574,7 @@ section.
       var r : htag;
       r = $sample_htag;
       if (!in_dom x Hmap.m) Hmap.m.[x] = (r,c,Signature.ones);
-      return pi3_1 (proj Hmap.m.[x]);
+      return pi3_1 (oget Hmap.m.[x]);
     }
   }.
 
@@ -578,12 +584,11 @@ section.
     H.o ~ H0.o: ={x} /\ H.m{1} =<= Hmap.m{2} ==> ={res} /\ H.m{1} =<= Hmap.m{2}.
   proof strict.
   proc; inline H0.o; wp; rnd; wp; skip.
-  rewrite /(=<=); progress=> //; [smt|case (x = x0){2}|smt|case (x = x0){2}; first smt|smt|smt|smt];
+  rewrite /(=<=); progress=> //; [smt|case ((x = x0){2})|smt|case ((x = x0){2}); first smt|smt|smt|smt];
   last 2 by intros=> x_x0;
-            do 3!rewrite /FMap.OptionGet."_.[_]" ?get_setN //;
-            do 3!rewrite -/(FMap.OptionGet."_.[_]" _ _);
+            do 3!rewrite ?get_set_neq //;
             apply H.
-  by intros=> x_x0; subst; do!rewrite /"_.[_]" get_setE; smt.
+  by intros=> x_x0; subst; rewrite !get_set_eq; smt.
   qed.
 
   (* More informed use of conseq* might speed up some of the smt calls *)
@@ -626,8 +631,10 @@ section.
        wp; rnd.
        by wp; skip; smt.
     (* Initialization code *)
-    inline Hmap.init Hmem.init; wp; rnd{2} cpTrue.
-    by wp; rnd; wp; skip; progress=> //; smt.
+    inline Hmap.init Hmem.init; wp; rnd{2} True.
+    wp; rnd; wp; skip; progress=> //.
+      by rewrite /weight challengeL //; exists pk1skL.`2; smt.
+      smt.
 
   (* Leftover from the main: two successive calls to G.o with
      the same argument yield the same result. *)
@@ -655,7 +662,7 @@ section.
         Hmap.m.[x] = (w,c,Signature.ones);
         st = G.o(w);
       }
-      return pi3_1 (proj Hmap.m.[x]);
+      return pi3_1 (oget Hmap.m.[x]);
     }
   }.
 
@@ -675,7 +682,7 @@ section.
       var r : htag;
       r = $sample_htag;
       if (!in_dom x Hmap.m) Hmap.m.[x] = (r,c,Signature.ones);
-      return pi3_1 (proj Hmap.m.[x]);
+      return pi3_1 (oget Hmap.m.[x]);
     }
   }.
 
@@ -694,7 +701,7 @@ section.
         Hmap.m.[x] = (w,c,Signature.ones);
         st = G.o(w);
       }
-      return pi3_1 (proj Hmap.m.[x]);
+      return pi3_1 (oget Hmap.m.[x]);
     }
   }.
 
@@ -723,17 +730,17 @@ section.
 
   (* Applying eager on D0 *)
   local equiv D0_D0e (Ga <: Gadv {G,G'}):
-    Gt.Types.IND(G,D(Ga,H0')).main ~ Gt.Types.IND(G',D(Ga,H0')).main: true ==> ={res}
-  by (apply (eagerRO (D(Ga,H0')) _); apply s_gtagL).
+    Gt.Types.IND(G,D(Ga,H0')).main ~ Gt.Types.IND(G',D(Ga,H0')).main: ={glob Ga, glob D, glob H0'} ==> ={res}
+  by (conseq* (eagerRO (D(Ga,H0')) _ _)=> //=; [admit (* htag finite *) | apply s_gtagL]).
 
   (* Equivalence of D0 and D1 *)
   local equiv D0e_D1e (Ga <: Gadv {G',Hmap}):
-    Gt.Types.IND(G',D(Ga,H0')).main ~ Gt.Types.IND(G',D(Ga,H1')).main: true ==> ={res}.
+    Gt.Types.IND(G',D(Ga,H0')).main ~ Gt.Types.IND(G',D(Ga,H1')).main: ={glob Ga} ==> ={res}.
   proof strict.
   proc; call (_: ={glob Eager.RO} /\ forall x, in_dom x G'.m{1}).
     call (_: ={glob Eager.RO, glob Hmap} /\ forall x, in_dom x G'.m{1}).
       (* H *)
-      proc; case (in_dom x Hmap.m){1}.
+      proc; case ((in_dom x Hmap.m){1}).
         rcondf{1} 2; first by intros=> &m; rnd.
         by rcondf{2} 1; last wp; rnd{1}; skip; smt.
         rcondt{1} 2; first by intros=> &m; rnd.
@@ -742,18 +749,20 @@ section.
       by conseq* Gt.Eager.abstract_o; first 2 smt.
     call (_: ={ks} ==> ={glob Hmap}); first by sim.
     by rnd; skip; smt.
-  call (Gt.Eager.abstract_init _); first smt. (* Note: We are using the fact that AWord is a finite type without ever explicitly assuming/proving it. There is some dangerous thing going on with cloning. *)
+  call (Gt.Eager.abstract_init _).
+    admit (* htag is finite *).
   by skip; smt.
   qed.
 
   (* Reversting the eager transformation *)
   local equiv D1e_D1 (Ga <: Gadv {G,G'}):
-    Gt.Types.IND(G',D(Ga,H1')).main ~ Gt.Types.IND(G,D(Ga,H1')).main: true ==> ={res}.
+    Gt.Types.IND(G',D(Ga,H1')).main ~ Gt.Types.IND(G,D(Ga,H1')).main: ={glob Ga, glob D, glob H1'} ==> ={res}.
   proof strict.
-  by symmetry;
-     (* Note that we cannot apply the lemma directly because 'res{2} = res{1}' does not match '={res}' *)
-     conseq* (eagerRO (D(Ga,H1')) _)=> //;
-     apply s_gtagL.
+  symmetry.
+  conseq* (eagerRO (D(Ga,H1')) _ _)=> //.
+    by progress; smt.
+    admit (* htag finite *).
+    by apply s_gtagL.
   qed.
 
   (* Rewriting D1 as an adversary G1 against Gen *)
@@ -767,9 +776,9 @@ section.
 
   (* Combining all the proof steps *)
   local equiv G0_G1_abstract (Ga <: Gadv {G,G',Hmap}):
-    Gen(Ga,H0,G).main ~ Gen(Ga,H1,G).main: true ==> ={res}.
+    Gen(Ga,H0,G).main ~ Gen(Ga,H1,G).main: ={glob Ga} ==> ={res}.
   proof strict.
-  bypr (res{1}) (res{2})=> // &1 &2 a.
+  bypr (res{1}) (res{2})=> // &1 &2 a eq_Ga.
   apply (eq_trans _ Pr[Gt.Types.IND(G,D(Ga,H0')).main() @ &1: a = res]);
     first by byequiv (G0_D0 Ga).
   apply (eq_trans _ Pr[Gt.Types.IND(G',D(Ga,H0')).main() @ &1: a = res]);
@@ -781,7 +790,7 @@ section.
   by byequiv (D1_G1 Ga).
   qed.
 
-  local equiv G0_G1_equiv: G0.main ~ G1.main: true ==> ={res}
+  local equiv G0_G1_equiv: G0.main ~ G1.main: ={glob GAdv} ==> ={res}
   by apply (G0_G1_abstract GAdv).
 
   local lemma G0_G1 &m:
@@ -809,7 +818,7 @@ section.
         bad = bad \/ in_dom w G.m;
         G.m.[w] = st ^ (GTag.from_bits (to_bits (snd x) || zeros (kg - k0)));
       }
-      return pi3_1 (proj Hmap.m.[x]);
+      return pi3_1 (oget Hmap.m.[x]);
     }
   }.
 
@@ -849,7 +858,7 @@ section.
         first by apply s_gtagL.
       by wp; rnd; skip; progress=> //; apply htagL.
     intros=> _; proc.
-      by if => //; wp; do !rnd cpTrue;
+      by if => //; wp; do !rnd True;
          skip; smt.
     (* G *)
     by conseq* Gt.Lazy.abstract_o.
@@ -873,9 +882,9 @@ section.
   local lemma GAdv1_GAdv2_BAD &m (qG qH qS:int) ks:
     0 < qG => 0 < qH => 0 < qS =>
     valid_keys ks =>
-    Hmap.m{m} = FMap.Core.empty =>
+    Hmap.m{m} = FMap.empty =>
     !H2.bad{m} =>
-    G.m{m} = FMap.Core.empty =>
+    G.m{m} = FMap.empty =>
     Pr[ GAdv(H2,G).main(ks) @ &m:
           H2.bad /\
           size Hmap.m <= qH + qS /\
@@ -921,16 +930,16 @@ section.
                size Hmap.m <= qH + qS /\
                size G.m <= qG + qH)=> //; proc.
   call (_: valid_keys ks /\
-           Hmap.m{hr} = FMap.Core.empty /\
+           Hmap.m{hr} = FMap.empty /\
            !H2.bad{hr} /\
-           G.m{hr} = FMap.Core.empty ==>
+           G.m{hr} = FMap.empty ==>
            H2.bad /\
            size Hmap.m <= qH + qS /\
            size G.m <= qG + qH).
     by bypr=> &m' [vkeys [Hm_emp [nbad Gm_emp]]]; apply (GAdv1_GAdv2_BAD &m' qG qH qS ks{m'} _ _ _ _).
-  call (_: true ==> Hmap.m = FMap.Core.empty /\ !H2.bad);
-    first by proc; wp; call (_: true ==> Hmap.m = FMap.Core.empty)=> //; proc; wp.
-  call (_: true ==> G.m = FMap.Core.empty);
+  call (_: true ==> Hmap.m = FMap.empty /\ !H2.bad);
+    first by proc; wp; call (_: true ==> Hmap.m = FMap.empty)=> //; proc; wp.
+  call (_: true ==> G.m = FMap.empty);
     first by proc; wp.
   by rnd.
   qed.
@@ -955,12 +964,12 @@ section.
         Hmap.m.[x] = (w,c,Signature.ones);
         G.m.[w] = st ^ (GTag.from_bits (to_bits (snd x) || zeros (kg - k0)));
       } else {
-        if (!c /\ pi3_2 (proj Hmap.m.[x])) {
+        if (!c /\ pi3_2 (oget Hmap.m.[x])) {
           bad = true;
           Hmap.m.[x] = (HTag.zeros,c,Signature.ones);
         }
       }
-      return pi3_1 (proj Hmap.m.[x]);
+      return pi3_1 (oget Hmap.m.[x]);
     }
   }.
 
@@ -987,8 +996,8 @@ section.
     (* H *)
     by conseq* G2_G3_H=> //; smt.
     by intros=> &2 _; conseq* (_: true ==> true)=> //;
-       proc; if=> //; wp; do !rnd cpTrue; skip; smt.
-    by intros=> _; proc; if=> //; wp; try (do !rnd cpTrue); skip; smt.
+       proc; if=> //; wp; do !rnd True; skip; smt.
+    by intros=> _; proc; if=> //; wp; try (do !rnd True); skip; smt.
     (* G *)
     by conseq* Gt.Lazy.abstract_o.
     by intros _ _; conseq* (Gt.Lazy.lossless_o _); apply s_gtagL.
@@ -1045,9 +1054,9 @@ section.
       }
       else
       {
-        if (!c /\ pi3_2 (proj Hmap.m.[x])) Hmap.m.[x] = (HTag.zeros,c,Signature.ones);
+        if (!c /\ pi3_2 (oget Hmap.m.[x])) Hmap.m.[x] = (HTag.zeros,c,Signature.ones);
       }
-      return pi3_1 (proj Hmap.m.[x]);
+      return pi3_1 (oget Hmap.m.[x]);
     }
   }.  
 
@@ -1069,40 +1078,40 @@ section.
     ={glob Hmem, glob G, c, x} /\
     dom Hmap.m{1} = dom Hmap.m{2} /\
     (forall x, in_dom x Hmap.m{1} =>
-       pi3_1 (proj Hmap.m.[x]{1}) = pi3_1 (proj Hmap.m.[x]{2})) /\
+       pi3_1 (oget Hmap.m.[x]{1}) = pi3_1 (oget Hmap.m.[x]{2})) /\
     (forall x, in_dom x Hmap.m{1} =>
-       pi3_2 (proj Hmap.m.[x]{1}) = pi3_2 (proj Hmap.m.[x]{2})) ==>
+       pi3_2 (oget Hmap.m.[x]{1}) = pi3_2 (oget Hmap.m.[x]{2})) ==>
     ={glob Hmem, glob G, res} /\
     dom Hmap.m{1} = dom Hmap.m{2} /\
     (forall x, in_dom x Hmap.m{1} =>
-       pi3_1 (proj Hmap.m.[x]{1}) = pi3_1 (proj Hmap.m.[x]{2})) /\
+       pi3_1 (oget Hmap.m.[x]{1}) = pi3_1 (oget Hmap.m.[x]{2})) /\
     (forall x, in_dom x Hmap.m{1} =>
-       pi3_2 (proj Hmap.m.[x]{1}) = pi3_2 (proj Hmap.m.[x]{2})).
+       pi3_2 (oget Hmap.m.[x]{1}) = pi3_2 (oget Hmap.m.[x]{2})).
   proof strict.
   proc; if; first smt.
     seq 2 3: (={glob Hmem, glob G, c, x, w, st} /\
               dom Hmap.m{1} = dom Hmap.m{2} /\
               (forall x, in_dom x Hmap.m{1} =>
-                pi3_1 (proj Hmap.m.[x]{1}) = pi3_1 (proj Hmap.m.[x]{2})) /\
+                pi3_1 (oget Hmap.m.[x]{1}) = pi3_1 (oget Hmap.m.[x]{2})) /\
               (forall x, in_dom x Hmap.m{1} =>
-                pi3_2 (proj Hmap.m.[x]{1}) = pi3_2 (proj Hmap.m.[x]{2}))).
+                pi3_2 (oget Hmap.m.[x]{1}) = pi3_2 (oget Hmap.m.[x]{2}))).
       by inline S2.sample;wp; do !rnd;wp.
     seq 1 1: (={glob Hmem, glob G, c, x, w, st} /\
               dom Hmap.m{1} = dom Hmap.m{2} /\
               (forall x, in_dom x Hmap.m{1} =>
-                pi3_1 (proj Hmap.m.[x]{1}) = pi3_1 (proj Hmap.m.[x]{2})) /\
+                pi3_1 (oget Hmap.m.[x]{1}) = pi3_1 (oget Hmap.m.[x]{2})) /\
               (forall x, in_dom x Hmap.m{1} =>
-                pi3_2 (proj Hmap.m.[x]{1}) = pi3_2 (proj Hmap.m.[x]{2}))).
+                pi3_2 (oget Hmap.m.[x]{1}) = pi3_2 (oget Hmap.m.[x]{2}))).
       wp; skip; progress=> //; first smt.
-       case (x = x0){2}; first smt.
-       by intros=> x_x0; do 2!rewrite /"_.[_]" ?get_setN //; smt.
-       case (x = x0){2}; first by intros=> x_x0; subst; rewrite /"_.[_]" !get_setE !proj_some /pi3_2 /=.
-       by intros=> x_x0; do 2!rewrite /"_.[_]" ?get_setN //; smt.
+       case ((x = x0){2}); first smt.
+       by intros=> x_x0; do 2!rewrite ?get_set_neq //; smt.
+       case ((x = x0){2}); first by intros=> x_x0; subst; rewrite !get_set_eq.
+       by intros=> x_x0; do 2!rewrite ?get_set_neq //; smt.
     by wp; skip; progress=> //; smt.
 
     if; [smt | | ]; wp; skip; progress=> //; first 2 last; last 3 smt.
-      by case (x = x0){2}; [| intros=> x_x0; do 2!rewrite /"_.[_]" ?get_setN //]; smt.
-      by case (x = x0){2}; [| intros=> x_x0; do 2!rewrite /"_.[_]" ?get_setN //]; smt.
+      by case ((x = x0){2}); [| intros=> x_x0; do 2!rewrite ?get_set_neq //]; smt.
+      by case ((x = x0){2}); [| intros=> x_x0; do 2!rewrite ?get_set_neq //]; smt.
   qed.
 
   local equiv G3_G4_abstract (Ga <: Gadv {H2,H3,G,Hmem}):
@@ -1111,9 +1120,9 @@ section.
   proc; call (_: ={glob Hmem, glob G} /\
                  dom Hmap.m{1} = dom Hmap.m{2} /\
                  (forall x, in_dom x Hmap.m{1} =>
-                   pi3_1 (proj Hmap.m.[x]{1}) = pi3_1 (proj Hmap.m.[x]{2})) /\
+                   pi3_1 (oget Hmap.m.[x]{1}) = pi3_1 (oget Hmap.m.[x]{2})) /\
                  (forall x, in_dom x Hmap.m{1} =>
-                   pi3_2 (proj Hmap.m.[x]{1}) = pi3_2 (proj Hmap.m.[x]{2}))).
+                   pi3_2 (oget Hmap.m.[x]{1}) = pi3_2 (oget Hmap.m.[x]{2}))).
     (* H *)
     by conseq* G3_G4_H. 
     (* G *)
@@ -1141,23 +1150,23 @@ section.
     }
   }.
 
-  local equiv S2_Sw : S2.sample ~ Sw.sample : ={i} ==> ={res}.
+  local equiv S2_Sw : S2.sample ~ Sw.sample : ={i} /\ S.valid i{1} ==> ={res}.
   proof.
-  transitivity S.Sample.sample (={i} ==> ={res}) (={i} ==> ={res}) => //.
-    by intros &m1 &m2 ->;exists i{m2}.
-    bypr (res{1}) (res{2})=> // &1 &2 x Heqi.
+  transitivity S.Sample.sample (={i} /\ S.valid i{1} ==> ={res}) (={i} /\ S.valid i{1} ==> ={res}) => //.
+    by intros &m1 &m2 [-> valid];exists i{m2}.
+    bypr (res{1}) (res{2})=> // &1 &2 x [Heqi Hvalid].
     rewrite (_:Pr[S2.sample(i{1}) @ &1 : x = res] = 1%r/(2^(k1+kg))%r).
       byphoare (_: true ==> x = res) => //; proc.
         seq 1: ((fst x) = w) (1%r/(2^k1)%r) (1%r/(2^kg)%r) _ 0%r => //.
           rnd; skip; progress=> //.
           by rewrite (mu_eq _ _ ((=) (fst x))) => //;apply (HTag.Dword.mu_x_def (fst x)).
           conseq * (_ : _ ==> snd x = st).
-            by progress;elimT tuple2_ind x.
+            by progress; elim/tuple2_ind x.
           rnd;skip;progress => //.
           by rewrite (mu_eq _ _ ((=) (snd x))) => //;apply (GTag.Dword.mu_x_def (snd x)).
           by hoare;rnd;skip;smt.
         progress=> //; cut <-: (2 ^ k1) * (2 ^ kg) = 2 ^ (k1 + kg); smt.
-      rewrite rw_eq_sym. byphoare (_: true ==> x = res) => //; proc.
+      rewrite eq_sym. byphoare (_: S.valid i ==> x = res) => //; last smt. proc.
       rnd;skip;progress => //.
       rewrite (_ : mu (sample_htag * sample_gtag) (fun (x0 : htag * gtag), x = x0) =
                     mu_x (sample_htag * sample_gtag) x).
@@ -1172,11 +1181,11 @@ section.
     call (S.Sample_RsampleW f finv);wp;skip;progress => //.
       rewrite /lsb0 Signature.pcan_to_from; first smt.
       rewrite -{2}(length_ones 1); first smt.
-      by rewrite sub_app_fst; rewrite rw_eq_sym; apply zeros_ones; smt.
+      by rewrite sub_app_fst; rewrite eq_sym; apply zeros_ones; smt.
       smt.
       by rewrite /lsb0 /f Signature.pcan_to_from; smt.
       by rewrite Dprod.supp_def; smt.
-      rewrite /f /finv /fst /snd /=; cut:= H; rewrite /lsb0=> <-.
+      rewrite /f /finv /fst /snd /=; cut:= H0; rewrite /lsb0=> <-.
       rewrite HTag.pcan_to_from; first smt.
       rewrite GTag.pcan_to_from; first smt.
       rewrite {2}(_: 1 = 0 + 1) //; pose x:= to_bits rR.
@@ -1184,7 +1193,7 @@ section.
       rewrite (_: k1 + 1 = 0 + (1 + k1)); first smt.
       by rewrite sub_app_sub //;smt.
     rewrite /finv /f Signature.pcan_to_from;first smt.
-    elimT tuple2_ind rL => l r _;simplify fst snd.
+    generalize H0; elim/tuple2_ind rL => H0 l r _;simplify fst snd.
     rewrite sub_app_snd_le length_zeros //=.
     cut Hl : `|to_bits l| = k1 by smt.
     rewrite sub_app_fst_le - ?Hl //;first smt.
@@ -1197,8 +1206,13 @@ section.
   local module H4' = GenH4 (Sw).
   local module G4' = Gen(GAdv,H4',G).  
 
-  local equiv G4_G4'_H: H4.o ~ H4'.o: ={glob Hmap, c, x} ==> ={glob Hmap, res}
-  by (sim; conseq S2_Sw).
+  local equiv G4_G4'_H: H4.o ~ H4'.o: ={glob Hmap, c, x} /\ S.valid Hmem.pk{1} ==> ={glob Hmap, res}.
+  proof.
+    proc; if=> //; last by wp.
+    seq 1 1: (={glob Hmap, c, x, w, st} /\ !in_dom x{1} Hmap.m{1});
+      first by call S2_Sw.
+    sim.
+  qed.
 
   (** G5: Sampling z in a (non-PTIME) loop *)
   local module H5: SplitOracle = {
@@ -1234,9 +1248,9 @@ section.
       }
       else
       {
-        if (!c /\ pi3_2 (proj Hmap.m.[x])) Hmap.m.[x] = (HTag.zeros,c,Signature.ones);
+        if (!c /\ pi3_2 (oget Hmap.m.[x])) Hmap.m.[x] = (HTag.zeros,c,Signature.ones);
       }
-      return pi3_1 (proj Hmap.m.[x]);
+      return pi3_1 (oget Hmap.m.[x]);
     }
   }.
 
@@ -1275,7 +1289,7 @@ section.
           (GTag.from_bits (to_bits (snd x{1}) || zeros (kg - k0)))%GTag]).
      wp;rnd;skip.
      intros &1 &2 [H1 [H2 H3]]; generalize H2 H1 => /=.
-     rewrite (eqT b{2}) /lsb0;progress => //.
+     rewrite H3 /lsb0;progress => //.
      rewrite HTag.pcan_to_from;first smt.
      rewrite GTag.pcan_to_from;first smt.
      rewrite -H5.
@@ -1289,11 +1303,11 @@ section.
   skip;progress => //.
     rewrite /lsb0 Signature.pcan_to_from;first smt.
     rewrite sub_app_fst_le //;first smt.
-    rewrite rw_eq_sym;apply eqT.
-    by rewrite -{2} (length_ones 1) // sub_full // (rw_eq_sym (ones 1));apply zeros_ones.
-    by generalize H2;rewrite (eqT (lsb0 Hmem.pk{2} r_L)).
-    by generalize H2;rewrite (eqT (lsb0 Hmem.pk{2} r_L)).
-    by generalize H2;rewrite (eqT (lsb0 Hmem.pk{2} r_L)).
+    rewrite eq_sym eqT.
+    by rewrite -{2} (length_ones 1) // sub_full // (eq_sym (ones 1));apply zeros_ones.
+    smt.
+    smt.
+    smt.
   qed.
 
   local lemma G4'_G5_abstract (Ga <: Gadv {H4',H5,G,Hmem}):
@@ -1354,9 +1368,9 @@ section.
       }
       else
       {
-        if (!c /\ pi3_2 (proj Hmap.m.[x])) Hmap.m.[x] = (HTag.zeros,c,Signature.ones);
+        if (!c /\ pi3_2 (oget Hmap.m.[x])) Hmap.m.[x] = (HTag.zeros,c,Signature.ones);
       }
-      return pi3_1 (proj Hmap.m.[x]);
+      return pi3_1 (oget Hmap.m.[x]);
     }
   }.
 
@@ -1368,54 +1382,59 @@ section.
     equiv [Gen(Ga,H5,G).main ~ Gen(Ga,H6,G).main: true ==> !H6.bad{2} => ={res}].
   proof strict.
   intros=> GaL; proc.
-  call (_: H6.bad, ={glob Hmap, glob G}).
+  call (_: H6.bad, ={glob Hmap, glob G} /\ valid_pkey Hmem.pk{1}, ={Hmem.pk} /\ valid_pkey Hmem.pk{1}).
     (* H *)
     proc; sp; if=> //.
       splitwhile (i < kg2): {1} 1.
-      seq 1 1: (={b, i, c, x, w, st, z, u, glob Hmap, glob G} /\ !H6.bad{2}).
+      seq 1 1: (={b, i, c, x, w, st, z, u, glob Hmap, glob G} /\ valid_pkey Hmem.pk{1} /\ !H6.bad{2}).
         while (={b, i, c, x, glob Hmap, glob G} /\ 0 <= i{1} /\ (i{1} > 0 => ={z, w, st, u}) /\ (i{1} = 0 => b{1})).
           seq 5 5: (={b, i, c, x, w, st, z, u, glob Hmap, glob G} /\ 0 <= i{1}).
             by wp; rnd; skip; progress=> //; smt.
             by if=> //; wp; skip; smt.
         by skip; progress=> //; smt.
       case (b{1}).
-        seq 0 1: H6.bad{2}; first by wp; skip; progress=> //; right.
-          conseq* (_: _ ==> true). progress=> //; smt.
-          conseq (_: _ ==> true) (_: true ==> true: =1%r)=> //.
-          while true (if b then 1 else 0) 1 (1%r/2%r) => //;first smt.
+        seq 0 1: (={Hmem.pk} /\ H6.bad{2} /\ valid_pkey Hmem.pk{2}); first by wp; skip; progress=> //; right.
+          conseq* (_: _ ==> true); first by progress=> //; smt.
+          conseq (_: _ ==> true) (_: valid_pkey Hmem.pk ==> true: =1%r)=> //.
+    (* NOTE: 1/2 is not correct! *)
+          while (valid_pkey Hmem.pk) (if b then 1 else 0) 1 (1%r/2%r) => //; first smt.
             intros=> Hw.
-            seq 7 : true 1%r 1%r 0%r _ => //.
-              by wp => /=;rnd;skip;smt.
-              by wp => /=;rnd;skip;smt.
+            seq 7: (valid_pkey Hmem.pk) 1%r 1%r 0%r _ => //.
+              by wp => /=; rnd; skip; progress; smt.
+              by hoare; wp; rnd.
+              by wp => /=; rnd; skip; progress; smt.
               split; first smt.
               intros z0; conseq * (_: true ==> !b) => //;first smt.
               wp=> /=; rnd; skip; progress=> //. admit. (* We need some concrete facts about words of length 1 *)
         by rcondf{1} 1=> //; wp.
       by if=> //; wp.
-    intros=> _ _; proc. 
-    seq 2 : true => //.
+    intros=> &2 _; proc. 
+    seq 2 : (Hmem.pk = Hmem.pk{2} /\ valid_pkey Hmem.pk) => //.
       by wp => //.
     if;[ | wp => //].
-    while true (if b then 1 else 0) 1 (1%r/2%r) => //;first smt.
+    while (valid_pkey Hmem.pk) (if b then 1 else 0) 1 (1%r/2%r) => //;first smt.
       intros Hw.
-      seq 7 : true => //.
+      seq 7 : (valid_pkey Hmem.pk) => //.
       by wp => /=;rnd;skip;smt.
+      by hoare; wp; rnd.
       by wp => /=;rnd;skip;smt.
       split; first smt.
       intros z0; conseq * (_: true ==> !b) => //;first by smt.
       wp=> /=. 
       rnd;skip;progress => //.
       by admit. (* same as above. *)
-    intros=> _; proc; sp; if.
-      wp; while true (kg2 - i); first by intros=> _; wp; rnd cpTrue; skip; smt.
-            by skip; smt.
-      by wp.
+    by hoare; wp.
+    intros=> &1; proc; sp; if.
+      wp; while (valid_pkey Hmem.pk) (kg2 - i);
+        first by intros=> _; wp; rnd True; skip; smt.
+      by skip; smt.
+    by wp.
     (* G *)
     by conseq* Gt.Lazy.abstract_o.
-    by intros=> _ _; apply (Gt.Lazy.lossless_o _); apply s_gtagL.
+    by intros=> _ _; conseq* (Gt.Lazy.lossless_o _); apply s_gtagL.
     by intros=> _; conseq* (Gt.Lazy.lossless_o _); apply s_gtagL.
-  call (_: ={ks} /\ valid_keys ks{1} ==> ={glob Hmap});
-    first by sim.
+  call (_: ={ks} /\ valid_keys ks{1} ==> ={glob Hmap} /\ valid_pkey Hmem.pk{1});
+    first by proc; wp; call Hmap_init; skip; smt.
   call Gt.Lazy.abstract_init.
   by rnd; skip; smt.
   qed.
@@ -1465,9 +1484,9 @@ section.
       }
       else
       {
-        if (!c /\ pi3_2 (proj Hmap.m.[x])) Hmap.m.[x] = (HTag.zeros,c,Signature.ones);
+        if (!c /\ pi3_2 (oget Hmap.m.[x])) Hmap.m.[x] = (HTag.zeros,c,Signature.ones);
       }
-      return pi3_1 (proj Hmap.m.[x]);
+      return pi3_1 (oget Hmap.m.[x]);
     }
   }.
 
@@ -1482,37 +1501,40 @@ section.
   call (_: Hmem.xstar = Signature.zeros,
              ={glob Hmap, glob G} /\
              valid_keys (Hmem.pk,Hmem.sk){2} /\
-             in_supp Hmem.xstar{2} (sample_plain Hmem.pk{2})).
+             in_supp Hmem.xstar{2} (sample_plain Hmem.pk{2}),
+             ={Hmem.pk} /\ valid_pkey Hmem.pk{1}).
     (* H *)
     proc; sp; if=> //.
       wp; while (={x, c, b, i, glob Hmap, glob G} /\
                  valid_keys (Hmem.pk,Hmem.sk){2} /\ 
                  in_supp Hmem.xstar{2} (sample_plain Hmem.pk{2}) /\
                  Hmem.xstar{2} <> Signature.zeros).
-        case c{2}.
+        case (c{2}).
           wp; rnd (fun z, ((inv Hmem.xstar Hmem.pk) * finv Hmem.sk z) Hmem.pk){2}
                   (fun u, ((f Hmem.pk Hmem.xstar) * f Hmem.pk u) Hmem.pk){2};
           skip; progress => //; last 4 smt.
-            by apply (challengeU Hmem.pk{2} _ _ _ _)=> //; rewrite -/(support _ _); apply mulIn; smt.
+            apply (challengeU Hmem.pk{2} _ _ _ _ _)=> //; first smt.
+            by rewrite -/(support _ _); apply mulIn; smt.
             by rewrite -/(support _ _); apply mulIn; rewrite -/(f_dom _ _) f_dom_rng; smt.
-            rewrite homo_f_mul; first 2 smt. rewrite -mulA -homo_f_mul; first 2 smt.
-              by rewrite mul_inv ?fofinv 1?mulC ?mul1 //; smt.
+            rewrite homo_f_mul; first 2 smt.
+            rewrite -mulA -homo_f_mul; first 2 smt.
+            by rewrite mul_inv ?fofinv 1?mulC ?mul1 //; smt.
             by rewrite homo_finv_mul; try (rewrite -/(f_dom _ _) f_dom_rng); smt.
 
           wp; rnd (fun z, finv Hmem.sk z){2} (fun u, f Hmem.pk u){2};
-          skip; progress=> //; last 6 by try (case c{2}); smt.
+          skip; progress=> //; last 6 by try (case (c{2})); smt.
             by apply (challengeU Hmem.pk{2} _ _ _ _)=> //; smt.
             by rewrite -/(support _ _) -/(f_dom _ _) f_dom_rng; smt.
-        done.
-      if=> //; by wp.
+        by skip; smt.
+      if=> //; by wp; skip; smt.
     by intros=> &2 xstar_n0; proc; sp; if;
-         [wp; while true (kg2 - i); [intros=> z; wp; rnd | ]; skip; smt | wp].
+         [wp; while (valid_pkey Hmem.pk) (kg2 - i); [intros=> z; wp; rnd | ]; skip; smt | wp].
     by intros=> &1; proc; sp; if;
-         [wp; while true (kg2 - i); [intros=> z; wp; rnd | ]; skip; smt | wp].
+         [wp; while (valid_pkey Hmem.pk) (kg2 - i); [intros=> z; wp; rnd | ]; skip; smt | wp].
 
     (* G *)
-    by conseq* (_: ={glob G, x} ==> ={glob G, res})=> //; first sim.
-    by intros=> _ _; apply (Gt.Lazy.lossless_o); smt.
+    by conseq* (_: ={glob G, x} ==> ={glob G, res})=> //; [smt | sim].
+    by intros=> _ _; conseq* (Gt.Lazy.lossless_o _); smt.
     by intros=> _; conseq* (Gt.Lazy.lossless_o _); smt.
   call (_: ={ks} /\
            valid_keys ks{1} ==>
@@ -1547,7 +1569,7 @@ section.
               proc; wp; call (_: valid_keys ks ==> Hmem.xstar = Signature.zeros)=> //;
                 proc; rnd; wp; skip; progress=> //. print axiom plain0_bnd.
                   cut:= plain0_bnd (ks.`1{hr}) _; first by rewrite /valid_pkey; exists (ks.`2{hr}); smt.
-                  by rewrite /mu_x (_: (fun x, x = Signature.zeros) = ((=) Signature.zeros))=> //; apply Fun.fun_ext; smt.
+                  by rewrite /mu_x (_: (fun x, x = Signature.zeros) = ((=) Signature.zeros))=> //; apply ExtEq.fun_ext; smt.
       call (_: true)=> //.
       by rnd.
 
@@ -1562,7 +1584,7 @@ section.
     module H = {
       var m:(message * salt,htag * bool * signature) map
 
-      proc init(): unit = { m = FMap.Core.empty; }
+      proc init(): unit = { m = FMap.empty; }
 
       proc o(c:bool,x:message * salt): htag = {
         var b:bool = true;
@@ -1590,9 +1612,9 @@ section.
         }
         else
         {
-          if (!c /\ pi3_2 (proj I.H.m.[x])) m.[x] = (HTag.zeros,c,Signature.ones);
+          if (!c /\ pi3_2 (oget I.H.m.[x])) m.[x] = (HTag.zeros,c,Signature.ones);
         }
-        return pi3_1 (proj m.[x]);
+        return pi3_1 (oget m.[x]);
       }
     }
 
@@ -1612,7 +1634,7 @@ section.
         var w:htag;
         r = $sample_salt;
         w = H.o(false,(m,r));
-        return pi3_3 (proj H.m.[(m,r)]);
+        return pi3_3 (oget H.m.[(m,r)]);
       }
     }
 

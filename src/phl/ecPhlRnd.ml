@@ -104,7 +104,7 @@ let wp_equiv_rnd bij g =
   (* *)
   let tf, tfinv =
     match bij with
-    | Some (f, finv) -> (f tyL tyR, finv tyL tyR)
+    | Some (f, finv) -> (f tyL tyR, finv tyR tyL)
     | None ->
         if not (EcReduction.EqTest.for_type env tyL tyR) then
           tacuerror "must give an explicit bijection when supports are incompatible";

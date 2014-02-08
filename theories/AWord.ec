@@ -45,6 +45,9 @@ proof.
 qed.
 
 (** View bitstring as a ring *)
+require (*--*) Ring.
+(*---*) import Ring.BoolRing.
+
 instance ring with word
   op rzero = zeros
   op rone  = ones
@@ -61,6 +64,9 @@ instance ring with word
   proof mulrA     by smt
   proof mulrC     by smt
   proof mulrDl    by smt.
+
+instance bring with word
+  proof mulrr     by smt.
 
 require export ABitstring.
 op to_bits: word -> bitstring.
