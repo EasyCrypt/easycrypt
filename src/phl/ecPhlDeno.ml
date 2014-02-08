@@ -54,7 +54,7 @@ let t_phoare_deno pre post g =
       EcPath.p_equal op EcCoreLib.p_real_ge ->
     t_seq (t_apply_glob EcCoreLib.p_rle_ge_sym [] [AAform f;AAform bd; AAnode])
       (t_core_phoare_deno pre post) g
-  | Fapp({f_node = Fop(op,_)}, [f;bd]) when
+  | Fapp({f_node = Fop(op,_)}, [f;_bd]) when
     EcPath.p_equal op EcCoreLib.p_eq && not (is_pr f) -> 
     t_seq t_symmetry (t_core_phoare_deno pre post) g
   | _ -> 

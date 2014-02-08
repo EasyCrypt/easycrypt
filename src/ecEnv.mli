@@ -296,8 +296,8 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Algebra : sig
-  val add_ring  : ty -> EcAlgebra.ring  -> env -> env
-  val add_field : ty -> EcAlgebra.field -> env -> env
+  val add_ring  : ty -> EcDecl.ring  -> env -> env
+  val add_field : ty -> EcDecl.field -> env -> env
 end
 
 (* -------------------------------------------------------------------- *)

@@ -156,8 +156,8 @@ and escope = {
 }
 
 and tcinstance = [
-  | `Ring    of EcAlgebra.ring
-  | `Field   of EcAlgebra.field
+  | `Ring    of EcDecl.ring
+  | `Field   of EcDecl.field
   | `General of EcPath.path
 ]
 

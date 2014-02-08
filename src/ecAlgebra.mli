@@ -1,40 +1,17 @@
 (* -------------------------------------------------------------------- *)
 open EcFol
 open EcRing
+open EcDecl
+open EcEnv
 
 module RState : sig
   type rstate
 
   val empty   : rstate
-  val add     : form -> rstate -> int * rstate
+  val add     : LDecl.hyps -> form -> rstate -> int * rstate
   val get     : int -> rstate -> form option
   val update  : rstate -> int list -> form list -> rstate
 end
-
-
-(* -------------------------------------------------------------------- *)
-type ring = {
-  r_type  : EcTypes.ty;
-  r_zero  : EcPath.path;
-  r_one   : EcPath.path;
-  r_add   : EcPath.path;
-  r_opp   : EcPath.path option;
-  r_mul   : EcPath.path;
-  r_exp   : EcPath.path option;
-  r_sub   : EcPath.path option;
-  r_embed : [ `Direct | `Embed of EcPath.path | `Default];
-  r_bool  : bool; (* true means boolean ring *)
-}
-
-val ring_equal : ring -> ring -> bool
-
-(* -------------------------------------------------------------------- *)
-type field = {
-  f_ring : ring;
-  f_inv  : EcPath.path;
-  f_div  : EcPath.path option;
-}
-val field_equal : field -> field -> bool
 
 (* -------------------------------------------------------------------- *)
 val rapp   : ring -> EcPath.path -> form list -> form
@@ -79,13 +56,13 @@ val cfield_of_field : field -> cfield
 val ring_of_cring   : cring -> ring 
 
 (* -------------------------------------------------------------------- *)
-val toring : cring -> RState.rstate -> form -> pexpr * RState.rstate
+val toring : LDecl.hyps -> cring -> RState.rstate -> form -> pexpr * RState.rstate
 val ofring : ring -> RState.rstate -> pexpr -> form
 val ring_simplify_pe : cring -> (pexpr * pexpr) list -> pexpr -> pexpr
 
-val ring_simplify : cring -> eqs -> form -> form
-val ring_eq : cring -> eqs -> form -> form -> form
+val ring_simplify : LDecl.hyps -> cring -> eqs -> form -> form
+val ring_eq : LDecl.hyps -> cring -> eqs -> form -> form -> form
 
 (* -------------------------------------------------------------------- *)
-val field_simplify : cfield -> eqs -> form -> form list * form * form
-val field_eq : cfield -> eqs -> form -> form -> form list * (form * form) * (form * form)
+val field_simplify : LDecl.hyps -> cfield -> eqs -> form -> form list * form * form
+val field_eq : LDecl.hyps -> cfield -> eqs -> form -> form -> form list * (form * form) * (form * form)

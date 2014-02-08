@@ -6,7 +6,6 @@ open EcParsetree
 open EcDecl
 open EcModules
 open EcTheory
-open EcAlgebra
 
 module Mp = EcPath.Mp
 

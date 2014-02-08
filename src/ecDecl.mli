@@ -99,3 +99,27 @@ type typeclass = {
   tc_ops : (EcIdent.t * EcTypes.ty) list;
   tc_axs : (EcSymbols.symbol * form) list;
 }
+
+(* -------------------------------------------------------------------- *)
+type ring = {
+  r_type  : EcTypes.ty;
+  r_zero  : EcPath.path;
+  r_one   : EcPath.path;
+  r_add   : EcPath.path;
+  r_opp   : EcPath.path option;
+  r_mul   : EcPath.path;
+  r_exp   : EcPath.path option;
+  r_sub   : EcPath.path option;
+  r_embed : [ `Direct | `Embed of EcPath.path | `Default];
+  r_bool  : bool; (* true means boolean ring *)
+}
+
+val ring_equal : ring -> ring -> bool
+
+(* -------------------------------------------------------------------- *)
+type field = {
+  f_ring : ring;
+  f_inv  : EcPath.path;
+  f_div  : EcPath.path option;
+}
+val field_equal : field -> field -> bool

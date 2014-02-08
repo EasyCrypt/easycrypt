@@ -5,7 +5,6 @@ open EcDecl
 open EcFol
 open EcModules
 open EcTheory
-open EcAlgebra
 
 module Sp    = EcPath.Sp
 module Sm    = EcPath.Sm

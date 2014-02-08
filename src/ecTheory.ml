@@ -3,7 +3,6 @@ open EcUtils
 open EcSymbols
 open EcPath
 open EcDecl
-open EcAlgebra
 
 open EcModules
 

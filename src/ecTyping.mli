@@ -134,5 +134,5 @@ val trans_gamepath   : EcEnv.env -> pgamepath -> xpath
 val check_sig_mt_cnv : EcEnv.env -> module_sig -> module_type -> unit 
 
 (* -------------------------------------------------------------------- *)
-val get_ring  : (ty_params * ty) -> EcEnv.env -> EcAlgebra.ring  option
-val get_field : (ty_params * ty) -> EcEnv.env -> EcAlgebra.field option
+val get_ring  : (ty_params * ty) -> EcEnv.env -> EcDecl.ring  option
+val get_field : (ty_params * ty) -> EcEnv.env -> EcDecl.field option

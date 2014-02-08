@@ -6,7 +6,6 @@ open EcTypes
 open EcModules
 open EcDecl
 open EcFol
-open EcAlgebra
 
 module P  = EcPath
 module EP = EcParser

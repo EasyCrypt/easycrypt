@@ -157,3 +157,45 @@ type typeclass = {
   tc_ops : (EcIdent.t * EcTypes.ty) list;
   tc_axs : (EcSymbols.symbol * EcFol.form) list;
 }
+
+(* -------------------------------------------------------------------- *)
+type ring = {
+  r_type  : EcTypes.ty;
+  r_zero  : EcPath.path;
+  r_one   : EcPath.path;
+  r_add   : EcPath.path;
+  r_opp   : EcPath.path option; 
+  r_mul   : EcPath.path;
+  r_exp   : EcPath.path option;
+  r_sub   : EcPath.path option;
+  r_embed : [ `Direct | `Embed of EcPath.path | `Default];
+  r_bool  : bool (* true means boolean ring *)
+}
+
+let ring_equal r1 r2 = 
+  EcTypes.ty_equal r1.r_type r2.r_type &&
+  EcPath.p_equal r1.r_zero r2.r_zero &&
+  EcPath.p_equal r1.r_one  r2.r_one  &&
+  EcPath.p_equal r1.r_add  r2.r_add  &&
+  EcUtils.oall2 EcPath.p_equal r1.r_opp r2.r_opp  &&
+  EcPath.p_equal r1.r_mul  r2.r_mul  &&
+  EcUtils.oall2 EcPath.p_equal r1.r_exp  r2.r_exp  &&
+  EcUtils.oall2 EcPath.p_equal r1.r_sub r2.r_sub &&
+  r1.r_bool = r2.r_bool &&
+  match r1.r_embed, r2.r_embed with
+  | `Direct, `Direct -> true
+  | `Embed p1, `Embed p2 -> EcPath.p_equal p1 p2
+  | `Default, `Default -> true
+  | _, _ -> false
+
+  
+type field = {
+  f_ring : ring;
+  f_inv  : EcPath.path;
+  f_div  : EcPath.path option;
+}
+
+let field_equal f1 f2 = 
+  ring_equal f1.f_ring f2.f_ring && 
+  EcPath.p_equal f1.f_inv f2.f_inv &&
+  EcUtils.oall2 EcPath.p_equal f1.f_div f2.f_div

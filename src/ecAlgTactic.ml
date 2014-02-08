@@ -2,6 +2,7 @@
 open EcUtils
 open EcTypes
 open EcFol
+open EcDecl
 open EcAlgebra
 
 (* -------------------------------------------------------------------- *)
@@ -161,7 +162,7 @@ let rn_ring       = RN_xtd (new rn_ring)
 let rn_field      = RN_xtd (new rn_field)
 
 let n_ring_congr juc hyps (cr:cring) (rm:RState.rstate) f li lv =
-  let pe,rm = toring cr rm f in
+  let pe,rm = toring hyps cr rm f in
   let rm' = RState.update rm li lv in
   let env = EcEnv.LDecl.toenv hyps in
   let mk_goal i =
@@ -176,7 +177,7 @@ let n_ring_congr juc hyps (cr:cring) (rm:RState.rstate) f li lv =
   f', snd g, gs
 
 let n_ring_norm juc hyps (cr:cring) (rm:RState.rstate) f =
-  let pe, rm = toring cr rm f in
+  let pe, rm = toring hyps cr rm f in
   let ofring = ofring (ring_of_cring cr) rm in
   let npe    = ring_simplify_pe cr [] pe in
   let f'     = ofring npe in
@@ -185,22 +186,25 @@ let n_ring_norm juc hyps (cr:cring) (rm:RState.rstate) f =
   rm, f', snd g, gs
 
 let t_ring_simplify cr eqs (f1, f2) g =
+  let hyps = get_hyps g in
   let cr = cring_of_ring cr in
-  let f1 = ring_simplify cr eqs f1 in
-  let f2 = ring_simplify cr eqs f2 in
+  let f1 = ring_simplify hyps cr eqs f1 in
+  let f2 = ring_simplify hyps cr eqs f2 in
 	prove_goal_by [f_eq f1 f2] rn_ring g
 
 let t_ring r eqs (f1, f2) g =
+  let hyps = get_hyps g in
   let cr = cring_of_ring r in
-  let f  = ring_eq cr eqs f1 f2 in
+  let f  = ring_eq hyps cr eqs f1 f2 in
   if   EcReduction.is_conv (get_hyps g) f (emb_rzero r)
   then prove_goal_by [] rn_ring g
   else prove_goal_by [f_eq f (emb_rzero r)] rn_ring g
 
 let t_field_simplify r eqs (f1, f2) g =
+  let hyps = get_hyps g in
   let cr = cfield_of_field r in
-  let (c1, n1, d1) = field_simplify cr eqs f1 in
-  let (c2, n2, d2) = field_simplify cr eqs f2 in
+  let (c1, n1, d1) = field_simplify hyps cr eqs f1 in
+  let (c2, n2, d2) = field_simplify hyps cr eqs f2 in
 
   let c = List.map (fun f -> f_not (f_eq f (emb_fzero r))) (c1 @ c2) in
   let f = f_eq (fdiv r n1 d1) (fdiv r n2 d2) in
@@ -208,12 +212,13 @@ let t_field_simplify r eqs (f1, f2) g =
     prove_goal_by (c @ [f]) rn_field g
 
 let t_field r eqs (f1, f2) g =
+  let hyps = get_hyps g in
   let cr = cfield_of_field r in
-  let (c, (n1, n2), (d1, d2)) = field_eq cr eqs f1 f2 in
+  let (c, (n1, n2), (d1, d2)) = field_eq hyps cr eqs f1 f2 in
   let c  = List.map (fun f -> f_not (f_eq f (emb_fzero r))) c in
   let r1 = fmul r n1 d2
   and r2 = fmul r n2 d1 in
-  let f  = ring_eq (cring_of_ring r.f_ring) eqs r1 r2 in
+  let f  = ring_eq hyps (cring_of_ring r.f_ring) eqs r1 r2 in
 
     if   EcReduction.is_conv (get_hyps g) f (emb_fzero r)
     then prove_goal_by c rn_field g

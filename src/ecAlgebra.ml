@@ -4,6 +4,8 @@ open EcMaps
 open EcPath
 open EcTypes
 open EcFol
+open EcDecl
+open EcEnv
 open EcRing
 open EcField
 
@@ -12,9 +14,10 @@ module RState : sig
   type rstate
 
   val empty   : rstate
-  val add     : form -> rstate -> int * rstate
+  val add     : LDecl.hyps -> form -> rstate -> int * rstate
   val get     : int -> rstate -> form option
   val update  : rstate -> int list -> form list -> rstate
+
 end = struct
   type rstate = {
     rst_map : int Mf.t;
@@ -24,14 +27,28 @@ end = struct
 
   let empty = { rst_map = Mf.empty; rst_inv = Mint.empty; rst_idx = 0; }
 
-  let add (form : form) (rmap : rstate) =
-    match Mf.find_opt form rmap.rst_map with
-    | Some i -> (i, rmap)
-    | None ->
-       let i = rmap.rst_idx+1 in
-       let m = Mf  .add form i rmap.rst_map in
-       let v = Mint.add i form rmap.rst_inv in
-         (i, { rst_map = m; rst_inv = v; rst_idx = i; })
+  exception Found of int 
+
+  let find_alpha hyps form map = 
+    match Mf.find_opt form map with
+    | Some i -> Some i
+    | None -> 
+      try 
+        Mf.iter (fun f i ->
+          if EcReduction.is_alpha_eq hyps f form then raise (Found i)) map;
+        None
+      with Found i -> Some i
+       
+  let add hyps (form : form) (rmap : rstate) =
+    let res = 
+      match find_alpha hyps form rmap.rst_map with
+      | Some i -> (i, rmap)
+      | None ->
+        let i = rmap.rst_idx+1 in
+        let m = Mf  .add form i rmap.rst_map in
+        let v = Mint.add i form rmap.rst_inv in
+        (i, { rst_map = m; rst_inv = v; rst_idx = i; }) in
+    res
 
   let get (i : int) (rmap : rstate) =
     Mint.find_opt i rmap.rst_inv
@@ -47,48 +64,6 @@ end = struct
   let update rmap li lf = List.fold_left2 update1 rmap li lf
 
 end
-
-(* -------------------------------------------------------------------- *)
-type ring = {
-  r_type  : EcTypes.ty;
-  r_zero  : EcPath.path;
-  r_one   : EcPath.path;
-  r_add   : EcPath.path;
-  r_opp   : EcPath.path option; 
-  r_mul   : EcPath.path;
-  r_exp   : EcPath.path option;
-  r_sub   : EcPath.path option;
-  r_embed : [ `Direct | `Embed of EcPath.path | `Default];
-  r_bool  : bool (* true means boolean ring *)
-}
-
-let ring_equal r1 r2 = 
-  EcTypes.ty_equal r1.r_type r2.r_type &&
-  EcPath.p_equal r1.r_zero r2.r_zero &&
-  EcPath.p_equal r1.r_one  r2.r_one  &&
-  EcPath.p_equal r1.r_add  r2.r_add  &&
-  EcUtils.oall2 EcPath.p_equal r1.r_opp r2.r_opp  &&
-  EcPath.p_equal r1.r_mul  r2.r_mul  &&
-  EcUtils.oall2 EcPath.p_equal r1.r_exp  r2.r_exp  &&
-  EcUtils.oall2 EcPath.p_equal r1.r_sub r2.r_sub &&
-  r1.r_bool = r2.r_bool &&
-  match r1.r_embed, r2.r_embed with
-  | `Direct, `Direct -> true
-  | `Embed p1, `Embed p2 -> EcPath.p_equal p1 p2
-  | `Default, `Default -> true
-  | _, _ -> false
-
-  
-type field = {
-  f_ring : ring;
-  f_inv  : path;
-  f_div  : path option;
-}
-
-let field_equal f1 f2 = 
-  ring_equal f1.f_ring f2.f_ring && 
-  EcPath.p_equal f1.f_inv f2.f_inv &&
-  EcUtils.oall2 EcPath.p_equal f1.f_div f2.f_div
 
 (* -------------------------------------------------------------------- *)
 type eq  = form * form
@@ -194,10 +169,10 @@ let cfield_of_field (r : field) : cfield =
     (r, cr)
 
 (* -------------------------------------------------------------------- *)
-let toring ((r, cr) : cring) (rmap : RState.rstate) (form : form) =
+let toring hyps ((r, cr) : cring) (rmap : RState.rstate) (form : form) =
   let rmap = ref rmap in
 
-  let int_of_form form = reffold (RState.add form) rmap in
+  let int_of_form form = reffold (RState.add hyps form) rmap in
 
   let rec doit form =
     match sform_of_form form with
@@ -257,10 +232,10 @@ let toring ((r, cr) : cring) (rmap : RState.rstate) (form : form) =
   let form = doit form in (form, !rmap)
 
 (* -------------------------------------------------------------------- *)
-let tofield ((r, cr) : cfield) (rmap : RState.rstate) (form : form) =
+let tofield hyps ((r, cr) : cfield) (rmap : RState.rstate) (form : form) =
   let rmap = ref rmap in
 
-  let int_of_form form = reffold (RState.add form) rmap in
+  let int_of_form form = reffold (RState.add hyps form) rmap in
 
   let rec doit form =
     match sform_of_form form with
@@ -342,16 +317,16 @@ let ring_simplify_pe (cr:cring) peqs pe =
   else Iring.norm_pe pe peqs 
 
 
-let ring_simplify (cr : cring) (eqs : eqs) (form : form) =
+let ring_simplify todo (cr : cring) (eqs : eqs) (form : form) =
   let map = ref RState.empty in
-  let toring form = reffold (fun map -> toring cr map form) map in
+  let toring form = reffold (fun map -> toring todo cr map form) map in
   let form = toring form in
   let eqs  = List.map (fun (f1, f2) -> (toring f1, toring f2)) eqs in
   ofring (fst cr) !map (ring_simplify_pe cr eqs form)
 
 (* -------------------------------------------------------------------- *)
-let ring_eq (cr : cring) (eqs : eqs) (f1 : form) (f2 : form) =
-  ring_simplify cr eqs (rsub (fst cr) f1 f2)
+let ring_eq todo (cr : cring) (eqs : eqs) (f1 : form) (f2 : form) =
+  ring_simplify todo cr eqs (rsub (fst cr) f1 f2)
 
 (* -------------------------------------------------------------------- *)
 let get_field_equation (f1, f2) =
@@ -360,10 +335,10 @@ let get_field_equation (f1, f2) =
   | _ -> None
 
 (* -------------------------------------------------------------------- *)
-let field_eq (cr : cfield) (eqs : eqs) (f1 : form) (f2 : form) =
+let field_eq hyps (cr : cfield) (eqs : eqs) (f1 : form) (f2 : form) =
   let map = ref RState.empty in
 
-  let tofield form = reffold (fun map -> tofield cr map form) map in
+  let tofield form = reffold (fun map -> tofield hyps cr map form) map in
   let ofring  form = ofring (fst cr).f_ring !map form in
 
   let (f1, f2) = (tofield f1, tofield f2) in
@@ -389,10 +364,10 @@ let field_eq (cr : cfield) (eqs : eqs) (f1 : form) (f2 : form) =
     (cond1 @ cond2, (num1, num2), (denum1, denum2))
 
 (* -------------------------------------------------------------------- *)
-let field_simplify (cr : cfield) (eqs : eqs) (f : form) =
+let field_simplify hyps (cr : cfield) (eqs : eqs) (f : form) =
   let map = ref RState.empty in
 
-  let tofield form = reffold (fun map -> tofield cr map form) map in
+  let tofield form = reffold (fun map -> tofield hyps cr map form) map in
   let ofring  form = ofring (fst cr).f_ring !map form in
 
   let (num, denum, cond) = fnorm (tofield f) in

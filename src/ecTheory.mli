@@ -2,7 +2,6 @@
 open EcSymbols
 open EcDecl
 open EcModules
-open EcAlgebra
 
 (* -------------------------------------------------------------------- *)
 type theory = theory_item list

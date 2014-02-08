@@ -131,7 +131,7 @@ and t_normalize_subterm info hyps f =
   | _ -> add_refl info f 
       
 and t_normalize_ring info cr rm hyps f = 
-  let pe, rm' = toring cr !rm f in
+  let pe, rm' = toring hyps cr !rm f in
   rm := rm';
   let fv  = Sint.elements (EcRing.fv_pe pe) in
   let fs  = List.map (fun i -> oget (RState.get i rm')) fv in
@@ -263,8 +263,9 @@ and t_cut_subterm_eq info htbl f1 f2 g =
 and t_cut_field_eq _info _htbl _cr _rm _f1 _f2 _g = assert false
 
 and t_cut_ring_eq info htbl cr rm f1 f2 g =
-  let pe1, rm' = toring cr !rm f1 in
-  let pe2, rm' = toring cr rm' f2 in
+  let hyps = get_hyps g in
+  let pe1, rm' = toring hyps cr !rm f1 in
+  let pe2, rm' = toring hyps cr rm' f2 in
   rm := rm';
   let pe = ring_simplify_pe cr [] (EcRing.PEsub(pe1,pe2)) in
   let fv = Sint.elements (EcRing.fv_pe pe) in

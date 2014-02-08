@@ -1,6 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcSymbols
 open EcTypes
+open EcDecl
 open EcFol
 open EcLogic
 open EcRing

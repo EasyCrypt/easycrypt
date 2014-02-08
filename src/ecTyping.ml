@@ -8,7 +8,6 @@ open EcTypes
 open EcDecl
 open EcModules
 open EcFol
-open EcAlgebra
 
 module MMsym = EcSymbols.MMsym
 
