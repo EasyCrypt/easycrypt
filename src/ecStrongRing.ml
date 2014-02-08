@@ -170,7 +170,17 @@ let rec t_lseq_last lt g =
   match lt with
   | [] -> t_id None g
   | t::lt -> t_seq_last t (t_lseq_last lt) g
+(*
+let pp_concl fmt g = 
+  let env, hyps, concl = get_goal_e g in
+  let ppe = EcPrinting.PPEnv.ofenv env in
+  EcPrinting.pp_goal ppe fmt (1,(LDecl.tohyps hyps,concl))
 
+let pp_form fmt (f,g) = 
+  let env, _,_ = get_goal_e g in
+  let ppe = EcPrinting.PPEnv.ofenv env in
+  EcPrinting.pp_form ppe fmt f
+*)
 let t_reflex_assumption g = 
   (* FIXME : we should not use _ in try *)
   let t_reflex g = try t_reflex g with _ -> t_fail g in
@@ -187,6 +197,9 @@ let is_in_hyp hyps f1 f2 =
   EcReduction.is_alpha_eq hyps f1 f2 ||
     is_in hyps f1 f2 || is_in hyps f2 f1
 
+let t_ring r l (f1,f2) g = 
+  t_seq (t_ring r l (f1,f2)) t_fail g 
+
 let rec t_alg_eq info g =
   let f1, f2 = destr_eq (get_concl g) in
   t_seq (t_cut_alg_eq info f1 f2) t_reflex_assumption g
@@ -201,19 +214,22 @@ and t_cut_alg_eq info f1 f2 g =
 
 and t_cut_subterm_eq info f1 f2 g =
   match f1.f_node, f2.f_node with
-  | Fapp(op1,fs1), Fapp(op2,fs2) when f_equal op1 op2 ->
-    t_seq_last (t_lseq_last (List.map2 (t_cut_alg_eq info) fs1 fs2))
-      (t_seq_subgoal (t_cut (f_eq f1 f2)) [
-        t_seq 
-          (t_congr (op1,op1) (List.combine fs1 fs2, f1.f_ty)) 
-          t_reflex_assumption;
-        t_intro_eq]) g
+  | Fapp(op1,fs1), Fapp(op2,fs2) ->
+    let hyps = get_hyps g in
+    if EcReduction.is_alpha_eq hyps op1 op2 then 
+      t_seq_last (t_lseq_last (List.map2 (t_cut_alg_eq info) fs1 fs2))
+        (t_seq_subgoal (t_cut (f_eq f1 f2)) [
+          t_seq 
+            (t_congr (op1,op2) (List.combine fs1 fs2, f1.f_ty))
+            t_reflex_assumption;
+          t_intro_eq]) g
+    else t_fail g
   | Ftuple fs1, Ftuple fs2 ->
     t_seq_last (t_lseq_last (List.map2 (t_cut_alg_eq info) fs1 fs2))
       (t_seq_subgoal (t_cut (f_eq f1 f2)) [
         t_seq t_split t_reflex_assumption;
         t_intro_eq]) g
-  | _, _ -> t_fail g
+  | _, _ -> t_fail g 
 
 and t_cut_field_eq _info _cr _rm _f1 _f2 g = t_fail g 
 
@@ -254,7 +270,7 @@ and t_cut_ring_eq info  cr rm f1 f2 g =
       t_seq_subgoal (t_cut (f_eq f1 f2))
         [ t_lseq [ cut_congr f1 h1; cut_congr f2 h2; t_trans_ring h1 h2];
           t_intro_eq ] g in
-    t_on_last t_end gs
+    t_on_last t_end gs 
    
 and t_cut_merges info  rm fv fs g = 
   let m = ref Mint.empty in
