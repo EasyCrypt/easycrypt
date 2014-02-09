@@ -1,4 +1,4 @@
-; Generated on Sat Jan 11 19:35:28 2014
+; Generated on Thu Feb  6 16:53:01 2014
 
 (defvar easycrypt-bytac-keywords '(
   "assumption"
@@ -98,6 +98,7 @@
   "clear"
   "apply"
   "rewrite"
+  "rwnormal"
   "subst"
   "progress"
   "trivial"
@@ -146,6 +147,7 @@
   "last"
   "do"
   "strict"
+  "expect"
 ))
 
 (provide 'easycrypt-keywords)
