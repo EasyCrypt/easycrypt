@@ -37,3 +37,7 @@ lemma nosmt oget_some (x : 'a): oget (Some x) = x.
 proof. by []. qed.
 
 lemma nosmt someI (x y:'a): Some x = Some y => x = y by [].
+
+lemma none_omap (f:'a -> 'b) ox:
+  omap f ox = None <=> ox = None
+by case ox.
