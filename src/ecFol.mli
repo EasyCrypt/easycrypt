@@ -284,6 +284,7 @@ module FSmart : sig
   type a_op    = EcPath.path * ty list * ty
   type a_tuple = form list
   type a_app   = form * form list * ty
+  type a_proj  = form * ty
 
   val f_local : (form * a_local) -> a_local -> form
   val f_pvar  : (form * a_pvar ) -> a_pvar  -> form
@@ -293,6 +294,7 @@ module FSmart : sig
   val f_op    : (form * a_op   ) -> a_op    -> form
   val f_tuple : (form * a_tuple) -> a_tuple -> form
   val f_app   : (form * a_app  ) -> a_app   -> form
+  val f_proj  : (form * a_proj ) -> a_proj  -> int -> form
 end
 
 (* -------------------------------------------------------------------- *)

@@ -601,6 +601,9 @@ module FPosition = struct
             let subctxt = Sid.add m ctxt in
               doit pos (`WithSubCtxt [(ctxt, f1); (subctxt, f2)])
 
+          | Fproj (f, _) ->
+              doit pos (`WithCtxt (ctxt, [f]))
+
           | _ -> None
         in
           omap (fun p -> `Sub p) subp
@@ -699,8 +702,8 @@ module FPosition = struct
               let fs' = doit p fs in
                 FSmart.f_tuple (fp, fs) fs'
 
-          | Fproj(f,_) ->
-              as_seq1 (doit p [f])
+          | Fproj (f, i) ->
+              FSmart.f_proj (fp, (f, fp.f_ty)) (as_seq1 (doit p [f]), fp.f_ty) i
 
           | Flet (lv, f1, f2) ->
               let (f1', f2') = as_seq2 (doit p [f1; f2]) in

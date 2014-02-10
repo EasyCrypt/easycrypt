@@ -4,6 +4,8 @@ open EcOptions
 
 module T = EcTerminal
 
+module RemoveMe = EcGoal
+
 (* -------------------------------------------------------------------- *)
 let _ =
   let myname  = Filename.basename Sys.executable_name

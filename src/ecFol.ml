@@ -1001,6 +1001,7 @@ module FSmart = struct
   type a_op    = EcPath.path * ty list * ty
   type a_tuple = form list
   type a_app   = form * form list * ty
+  type a_proj  = form * ty
 
   let f_local (fp, (x, ty)) (x', ty') =
     if   x == x' && ty == ty'
@@ -1045,8 +1046,9 @@ module FSmart = struct
   let f_tuple (fp, fs) fs' =
     if fs == fs' then fp else f_tuple fs'
 
-  let f_proj (fp,f,ty) (f',ty') i = 
-    if f == f' && ty == ty' then fp
+  let f_proj (fp, (f, ty)) (f', ty') i = 
+    if   f == f' && ty == ty'
+    then fp
     else f_proj f' i ty'
 
   let f_equivF (fp, ef) ef' =
@@ -1127,10 +1129,10 @@ let f_map gt g fp =
       let fs' = List.Smart.map g fs in
         FSmart.f_tuple (fp, fs) fs'
 
-  | Fproj(f,i) ->
-    let f' = g f in
-    let ty' = gt fp.f_ty in
-    FSmart.f_proj (fp, f, fp.f_ty) (f',ty') i
+  | Fproj (f, i) ->
+      let f'  = g f in
+      let ty' = gt fp.f_ty in
+        FSmart.f_proj (fp, (f, fp.f_ty)) (f', ty') i
 
   | FhoareF hf ->
       let pr' = g hf.hf_pr in
