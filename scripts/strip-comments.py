@@ -1,0 +1,44 @@
+#! /usr/bin/env python
+
+# --------------------------------------------------------------------
+import sys, os, re, StringIO as sio
+
+# --------------------------------------------------------------------
+def _main():
+    contents = sys.stdin.read()
+    output   = sio.StringIO()
+    depth    = 0
+
+    while contents:
+        m = re.search(r'^(.*?)(\(\*|\*\))', contents, re.S)
+        if m is None: break
+        if depth == 0:
+            output.write(m.group(1))
+        if m.group(2) == '(*':
+            depth += 1
+        else:
+            if depth > 0:
+                depth -= 1
+            else:
+                output.write(m.group(2))
+        contents = contents[len(m.group(0)):]
+
+    if depth == 0:
+        output.write(contents)
+    output = [x.rstrip() for x in output.getvalue().splitlines()]
+    while output and not output[0]:
+        output.pop(0)
+    while output and not output[-1]:
+        output.pop()
+    i = 0
+    while i < len(output):
+        if not output[i]:
+            while i+1 < len(output) and not output[i+1]:
+                output.pop(i+1)
+        i += 1
+
+    print '\n'.join(output) + '\n'
+
+# --------------------------------------------------------------------
+if __name__ == '__main__':
+    _main()
