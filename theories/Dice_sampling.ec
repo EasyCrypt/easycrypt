@@ -103,7 +103,7 @@ theory GenDice.
   module Sample = {  
     proc sample (i:input) : t' = {
       var r : t';
-      r = $(d' i);
+      r = $d' i;
       return r;
     }
   }.
