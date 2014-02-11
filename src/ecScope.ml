@@ -1849,7 +1849,7 @@ module Ty = struct
         tc.tc_ops
 
   (* ------------------------------------------------------------------ *)
-  let add_generic_tc (scope : scope) mode { pl_desc = tci; pl_loc = loc; } =
+  let add_generic_tc (scope : scope) _mode { pl_desc = tci; pl_loc = loc; } =
     let ty =
       let ue = TT.transtyvars scope.sc_env (loc, Some (fst tci.pti_type)) in
       let ty = transty tp_tydecl scope.sc_env ue (snd tci.pti_type) in
@@ -1865,8 +1865,8 @@ module Ty = struct
       | Some tc -> tc
     in
 
-    let symbols = symbols_of_tc scope.sc_env (snd ty) (tcp, tc) in
-    let symbols = check_tci_operators scope.sc_env ty tci.pti_ops symbols in
+    let  symbols = symbols_of_tc scope.sc_env (snd ty) (tcp, tc) in
+    let _symbols = check_tci_operators scope.sc_env ty tci.pti_ops symbols in
 
     { scope with
         sc_env = EcEnv.TypeClass.add_instance ty (`General tcp) scope.sc_env }

@@ -850,49 +850,6 @@ let destr_exists f =
   | Fquant(Lexists,bd,p) -> bd, p 
   | _ -> destr_error "exists"
 
-(* destr_exists_prenex destructs recursively existentials in a formula
-   whenever possible. For instance:
-   - E x p1 /\ E y p2 -> [x,y] (p1 /\ p2)
-   - E x p1 /\ E x p2 -> [] (E x p1 /\ E x p2)
-   - p1 => E x p2 -> [x] (p1 => p2)
-   - E x p1 => p2 -> [] (E x p1 => p2)
-*)
-let destr_exists_prenex f =
-  let disjoint bds1 bds2 =
-    List.for_all (fun (id1,_) -> List.for_all(fun (id2,_) ->id1<>id2) bds2) bds1
-  in
-  let rec prenex_exists bds p = match p.f_node with
-    | Fapp({f_node = Fop(op,_)},[f1;f2]) when is_op_and op ->
-      let bds1,f1 = prenex_exists [] f1 in
-      let bds2,f2 = prenex_exists [] f2 in
-      if disjoint bds1 bds2 then
-        (bds1@bds2@bds),(f_and f1 f2)
-      else bds,p
-    | Fapp({f_node = Fop(op,_)},[f1;f2]) when is_op_or op ->
-      let bds1,f1 = prenex_exists [] f1 in
-      let bds2,f2 = prenex_exists [] f2 in
-      if disjoint bds1 bds2 then
-        bds1@bds2@bds,f_or f1 f2
-      else bds,p
-    | Fapp({f_node = Fop(op,_)},[f1;f2]) when EcPath.p_equal op EcCoreLib.p_imp ->
-      let bds2,f2 = prenex_exists bds f2 in
-      bds,f_imp f1 f2
-    | Fquant  (Lexists,bd,p) ->
-      let bds,p = prenex_exists bds p in bd@bds,p
-
-    | Fif (f,ft,fe) ->
-      let bds1,f1 = prenex_exists [] ft in
-      let bds2,f2 = prenex_exists [] fe in
-      if disjoint bds1 bds2 then
-        bds1@bds2@bds,f_if f f1 f2
-      else bds,p
-    | _ -> bds,p
-  in
-  (* Make it fail as with destr_exists *)
-  let bds,f = prenex_exists [] f in
-  if bds=[] then destr_error "exists" else bds,f
-
-
 let destr_let1 f = 
   match f.f_node with
   | Flet(LSymbol(x,ty), e1,e2) -> x,ty,e1,e2 
@@ -1916,25 +1873,25 @@ type op_kind =
 
 let operators =
   let operators =
-    [EcCoreLib.p_true , OK_true;
-     EcCoreLib.p_false, OK_false;
-     EcCoreLib.p_not  , OK_not; 
-     EcCoreLib.p_anda , OK_and true;
-     EcCoreLib.p_and  , OK_and false; 
-     EcCoreLib.p_ora  , OK_or true;
-     EcCoreLib.p_or   , OK_or  false;
-     EcCoreLib.p_imp  , OK_imp;
-     EcCoreLib.p_iff  , OK_iff;
-     EcCoreLib.p_eq   , OK_eq;
-     EcCoreLib.p_int_le, OK_int_le;
-     EcCoreLib.p_int_lt, OK_int_lt;
-     EcCoreLib.p_real_le, OK_real_le;
-     EcCoreLib.p_real_lt, OK_real_lt;
-     EcCoreLib.p_int_add, OK_int_add;
-     EcCoreLib.p_int_sub, OK_int_sub;
-     EcCoreLib.p_int_mul, OK_int_mul;
-     EcCoreLib.p_int_opp, OK_int_opp;
-     EcCoreLib.p_int_pow, OK_int_exp;
+    [EcCoreLib.p_true    , OK_true;
+     EcCoreLib.p_false   , OK_false;
+     EcCoreLib.p_not     , OK_not; 
+     EcCoreLib.p_anda    , OK_and true;
+     EcCoreLib.p_and     , OK_and false; 
+     EcCoreLib.p_ora     , OK_or  true;
+     EcCoreLib.p_or      , OK_or  false;
+     EcCoreLib.p_imp     , OK_imp;
+     EcCoreLib.p_iff     , OK_iff;
+     EcCoreLib.p_eq      , OK_eq;
+     EcCoreLib.p_int_le  , OK_int_le;
+     EcCoreLib.p_int_lt  , OK_int_lt;
+     EcCoreLib.p_real_le , OK_real_le;
+     EcCoreLib.p_real_lt , OK_real_lt;
+     EcCoreLib.p_int_add , OK_int_add;
+     EcCoreLib.p_int_sub , OK_int_sub;
+     EcCoreLib.p_int_mul , OK_int_mul;
+     EcCoreLib.p_int_opp , OK_int_opp;
+     EcCoreLib.p_int_pow , OK_int_exp;
      EcCoreLib.p_real_add, OK_real_add;
      EcCoreLib.p_real_sub, OK_real_sub;
      EcCoreLib.p_real_mul, OK_real_mul;
@@ -2031,6 +1988,59 @@ let rec sform_of_form fp =
       sform_of_op (op, ty) args
 
   | _ -> SFother fp
+
+(* destr_exists_prenex destructs recursively existentials in a formula
+ *  whenever possible.
+ * For instance:
+ * - E x p1 /\ E y p2 -> [x,y] (p1 /\ p2)
+ * - E x p1 /\ E x p2 -> [] (E x p1 /\ E x p2)
+ * - p1 => E x p2 -> [x] (p1 => p2)
+ * - E x p1 => p2 -> [] (E x p1 => p2)
+ *)
+let destr_exists_prenex f =
+  let disjoint bds1 bds2 =
+    List.for_all
+      (fun (id1, _) -> List.for_all (fun (id2, _) -> id1 <> id2) bds2)
+      bds1
+  in
+
+  let rec prenex_exists bds p =
+    match sform_of_form p with
+    | SFand (false, (f1, f2)) ->
+        let (bds1, f1) = prenex_exists [] f1 in
+        let (bds2, f2) = prenex_exists [] f2 in
+          if   disjoint bds1 bds2
+          then (bds1@bds2@bds, f_and f1 f2)
+          else (bds, p)
+
+    | SFor (false, (f1, f2)) ->
+        let (bds1, f1) = prenex_exists [] f1 in
+        let (bds2, f2) = prenex_exists [] f2 in
+          if   disjoint bds1 bds2
+          then (bds1@bds2@bds, f_or f1 f2)
+          else (bds, p)
+
+    | SFimp (f1, f2) ->
+        let (bds2, f2) = prenex_exists bds f2 in
+          (bds2@bds, f_imp f1 f2)
+
+    | SFquant (Lexists, bd, p) ->
+        let (bds, p) = prenex_exists bds p in
+          (bd::bds, p)
+
+    | SFif (f, ft, fe) ->
+        let (bds1, f1) = prenex_exists [] ft in
+        let (bds2, f2) = prenex_exists [] fe in
+          if   disjoint bds1 bds2
+          then (bds1@bds2@bds, f_if f f1 f2)
+          else (bds, p)
+
+    | _ -> (bds, p)
+  in
+    (* Make it fail as with destr_exists *)
+    match prenex_exists [] f with
+    | [] , _ -> destr_error "exists"
+    | bds, f -> (bds, f)
 
 (* -------------------------------------------------------------------- *)
 let f_check_uni f =  

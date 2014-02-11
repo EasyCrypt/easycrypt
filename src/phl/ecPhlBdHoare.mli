@@ -1,5 +1,4 @@
 (* -------------------------------------------------------------------- *)
-open EcBaseLogic
 open EcLogic
 
 val t_hoare_bd_hoare : tactic
