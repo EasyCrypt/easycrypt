@@ -51,6 +51,7 @@ and opbody =
   | OP_Record of EcPath.path
   | OP_Proj   of EcPath.path * int * int
   | OP_Fix    of opfix
+  | OP_TC
 
 and opfix = {
   opf_args     : (EcIdent.t * EcTypes.ty) list;

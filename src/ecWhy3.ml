@@ -1620,6 +1620,7 @@ let trans_oper_body env path wparams ty body =
     | OB_oper (Some (OP_Constr _))  -> assert false
     | OB_oper (Some (OP_Record _))  -> assert false
     | OB_oper (Some (OP_Proj   _))  -> assert false
+    | OB_oper (Some (OP_TC      ))  -> assert false
     | OB_pred o -> o |> omap (fun x -> `Plain x)
   in
     match body with

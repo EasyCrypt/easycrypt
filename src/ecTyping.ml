@@ -430,6 +430,20 @@ let gen_select_op ~actonly ~mode (fpv, fop, flc) opsc tvi env name ue psig =
               ops
         | _, _ -> ops
       in
+
+      let ops =
+        match
+          List.filter
+            (fun ((p, _), _, _) ->
+               match oget (EcEnv.Op.by_path_opt p env) with
+               | { op_kind = OB_oper (Some OP_TC) } -> false
+               | _ -> true)
+            ops
+        with
+        | []   -> ops
+        | notc -> notc
+      in
+
       let me, pvs =
         match mode with
         | `Expr `InOp ->

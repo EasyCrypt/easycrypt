@@ -414,6 +414,8 @@ let rec compile_op env eenv p =
         assert false                    (* FIXME: IND HOOK *)
       | OB_oper (Some (OP_Fix _)) ->
         assert false                    (* FIXME: IND HOOK *)
+      | OB_oper (Some (OP_TC)) ->
+        assert false                    (* FIXME: TC HOOK *)
       | OB_oper None ->
         OOabs (compile_ty env eenv vtymap op.op_ty) 
       | OB_pred _ -> error "can not extract predicate" in

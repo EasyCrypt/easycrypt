@@ -1537,6 +1537,9 @@ let pp_opdecl_op (ppe : PPEnv.t) fmt (x, ts, ty, op) =
 
     | Some (OP_Fix _) ->
         Format.fprintf fmt " = <match-fix>"
+
+    | Some (OP_TC) ->
+        Format.fprintf fmt " = <type-class-operator>"
   in
 
   match ts with

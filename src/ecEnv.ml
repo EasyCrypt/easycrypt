@@ -762,7 +762,7 @@ module MC = struct
         let on1 (opid, optype) =
           let opname = EcIdent.name opid in
           let optype = ty_subst tsubst optype in
-          let opdecl = mk_op [(self, Sp.singleton mypath)] optype None in
+          let opdecl = mk_op [(self, Sp.singleton mypath)] optype (Some OP_TC) in
             (opid, xpath opname, optype, opdecl)
         in
           List.map on1 tc.tc_ops
@@ -2372,6 +2372,7 @@ module Op = struct
         | OB_oper (Some (OP_Record _))
         | OB_oper (Some (OP_Proj _))
         | OB_oper (Some (OP_Fix _))
+        | OB_oper (Some (OP_TC))
         | OB_pred None -> false
 
     with LookupFailure _ -> false

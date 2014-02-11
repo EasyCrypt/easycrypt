@@ -576,7 +576,8 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
                         | OB_oper (Some (OP_Constr _))
                         | OB_oper (Some (OP_Record _))
                         | OB_oper (Some (OP_Proj   _))
-                        | OB_oper (Some (OP_Fix    _)) ->
+                        | OB_oper (Some (OP_Fix    _))
+                        | OB_oper (Some (OP_TC      )) ->
                             Some (EcPath.pappend npath q)
                         | OB_oper (Some (OP_Plain  e)) ->
                             match e.EcTypes.e_node with

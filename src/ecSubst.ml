@@ -340,6 +340,8 @@ and subst_op_body (s : _subst) (bd : opbody) =
                  opf_struct   = opfix.opf_struct;
                  opf_branches = subst_branches es opfix.opf_branches; }
 
+  | OP_TC -> OP_TC
+
 and subst_branches es = function
   | OPB_Leaf (locals, e) ->
       let (es, locals) =

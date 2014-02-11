@@ -544,6 +544,8 @@ let rec process_rewrite1 loc ri g =
                 tacuerror "this operator is a projection"
             | EcDecl.OB_oper (Some (EcDecl.OP_Fix _)) ->
                 tacuerror "this operator is a match-fix"
+            | EcDecl.OB_oper (Some (EcDecl.OP_TC)) ->
+                tacuerror "this operator is a type-class operator"
             | EcDecl.OB_oper (Some (EcDecl.OP_Plain e)) ->
                 (snd p, op.EcDecl.op_tparams, form_of_expr EcFol.mhr e, args)
             | EcDecl.OB_pred (Some f) ->
