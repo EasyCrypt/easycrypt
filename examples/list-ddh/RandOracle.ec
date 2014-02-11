@@ -111,7 +111,7 @@ theory RandOracle.
   proof strict.
     intros H; fun.
     inline FRO.resample.
-    while true (length (xs)).
+    while true (length xs).
      by intros z; wp; rnd; wp; skip; smt.
      wp; skip; smt.
   qed.

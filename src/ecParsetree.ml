@@ -406,7 +406,7 @@ type phltactic =
   | Pfun_to_code
   | Pskip
   | Papp        of (tac_dir * int doption * pformula * p_app_bd_info)
-  | Pwp         of int doption option
+  | Pwp         of int doption option 
   | Psp         of int doption option
   | Pwhile      of tac_side * (pformula * pformula option * (pformula * pformula) option)
   | Pfission    of (tac_side * codepos * (int * (int * int)))

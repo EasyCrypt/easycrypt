@@ -1,6 +1,4 @@
-
 require import Int.
-
 
 module Test = {
   var x: int

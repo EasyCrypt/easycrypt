@@ -69,13 +69,13 @@ function build_opam {
     "${DEST}"/ocaml-${OVERSION}/bin/opam init ${OPAMFLAGS}
 
     cat >>"${OCONFIG}" <<-EOF
-    export OPAMROOT="${OPAMROOT}"
-    export OCAMLFIND_CONF="${DEST}/ocaml-${OVERSION}/opam/system/lib/findlib.conf"
+export OPAMROOT="${OPAMROOT}"
+export OCAMLFIND_CONF="${DEST}/ocaml-${OVERSION}/opam/system/lib/findlib.conf"
 EOF
-    echo 'eval `opam config env`' >>"${OCONFIG}"
+    echo "eval \`${DEST}/ocaml-${OVERSION}/bin/opam config env\`" >>"${OCONFIG}"
 
     cat >>"${OCONFIG}" <<-EOF
-    export PS1="(ec-tool) \${PS1}"
+export PS1="(ec-tool) \${PS1}"
 EOF
 }
 
@@ -99,7 +99,7 @@ box "EasyCrypt toolchain installed"
 cat <<EOF
 %%% --------------------------------------------------------------------
 %%%
-%%% To use it, type:"
+%%% To use it, type:
 %%% 
 %%%    \$(./scripts/activate-toolchain.sh)
 %%% 

@@ -1,10 +1,7 @@
-
-
+(* -------------------------------------------------------------------- *)
 op test : int*int -> int.
 
-
 op f : int -> int -> int*int.
-
 op g : int -> int -> int*int.
 
 
@@ -52,7 +49,6 @@ module Test = {
     return m;
   }
 
-
   proc eq() : bool = {
     var x, y, z : int;
     x = z;
@@ -78,18 +74,24 @@ module Test = {
 
 }.
 
-lemma if_ : hoare [Test.if_ : true ==> res=1]. proc.
+lemma if_ : hoare [Test.if_ : true ==> res=1].
+proof.
+proc.
 sp.
 if; [| skip;trivial].
 while (x=1); sp; skip; trivial.
 qed.
 
-lemma eq : hoare [Test.eq : true ==> res]. proc.
+lemma eq : hoare [Test.eq : true ==> res].
+proof.
+proc.
 sp.
 skip; trivial.
 qed.
 
-lemma eq_ : hoare [Test.eq : true ==> res]. proc.
+lemma eq_ : hoare [Test.eq : true ==> res].
+proof.
+proc.
 sp 1. (* splitting the sp invocations is equivalent but not syntactically equal *)
 sp 1.
 sp.
@@ -98,20 +100,25 @@ wp. (* neither wp does*)
 skip; trivial.
 qed.
 
-lemma eq__ : equiv [Test.eq ~ Test.eq : true ==> res{1}]. proc.
+lemma eq__ : equiv [Test.eq ~ Test.eq : true ==> res{1}].
+proof.
+proc.
 sp 1 1.
 sp 1 0.
 sp.
 skip; trivial.
 qed.
 
-lemma eq_equiv : hoare [Test.eq : true ==> res]. proc.
+lemma eq_equiv : hoare [Test.eq : true ==> res].
+proof.
+proc.
 wp 1.
 sp.
 skip; trivial.
 qed.
 
 lemma map : hoare [Test.map : x=0 /\ y=1 ==> res.[0]=Some 1].
+proof.
 proc.
 sp.
 elim *; intros m0.
@@ -120,25 +127,28 @@ smt.
 qed.
 
 lemma foo : hoare [Test.foo : 0 <= test(x,y) ==> 0 <= res].
+proof.
 proc.
 sp.
 skip;trivial.
 qed.
 
 lemma bar_ : phoare [Test.bar :  y=1 /\ x=0  ==> snd res = 0 /\ fst res = 1] = 1%r.
+proof.
 proc.
 sp.
 skip; trivial.
 qed.
 
-
 lemma bar : hoare [Test.bar :  y=1 /\ x=0  ==> snd res = 0 /\ fst res = 1].
+proof.
 proc.
 sp.
 skip; trivial.
 qed.
 
 lemma test : hoare [Test.test : x+y = 0 ==> fst res + snd res = 0].
+proof.
 proc.
 sp.
 skip; trivial.

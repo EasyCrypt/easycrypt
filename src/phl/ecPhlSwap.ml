@@ -34,7 +34,7 @@ module LowInternal = struct
     let m1r2 = PV.interdep env m1 r2 in
     let error mode d = 
       EcLogic.tacuerror 
-        "cannot swap:  the two statement are not independent, %t"
+        "cannot swap: the two statements are not independent, %t"
         (fun fmt ->
            let (s1, s2) =
              match mode with
