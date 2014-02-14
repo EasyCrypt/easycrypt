@@ -146,7 +146,7 @@ let t_bdHoare_while_rev_geq inv vrnt k eps (juc,n as g) =
     let k = f_local k_id tint in
     let vrnt_eq_k = f_eq vrnt k in
     let vrnt_lt_k = f_int_lt vrnt k in
-    f_and (f_real_lt f_r0 eps) 
+    f_and (f_forall_mems [mem] (f_imp inv (f_real_lt f_r0 eps)))
     (f_forall_simpl [(k_id,GTty tint)] 
       (f_bdHoareS_r {bhs with bhs_pr=f_ands [inv;loopGuard;vrnt_eq_k];
                      bhs_po=vrnt_lt_k;  bhs_s=loopBody; bhs_cmp=FHge; bhs_bd=eps } ))
