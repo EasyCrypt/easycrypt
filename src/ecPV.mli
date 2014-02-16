@@ -58,6 +58,8 @@ module PV : sig
 
   val is_empty : t -> bool
 
+  val pick : t -> [`Global of mpath | `PV of prog_var] option
+
   val add      : env -> prog_var -> ty -> t -> t
   val add_glob : env -> mpath -> t -> t
   val remove   : env -> prog_var -> t -> t

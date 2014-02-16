@@ -230,6 +230,12 @@ module PV = struct
 
   let is_empty fv = Mnpv.is_empty fv.s_pv && Sm.is_empty fv.s_gl
 
+  let pick fv =
+    try  Some (`Global (Sm.choose fv.s_gl))
+    with Not_found ->
+      try  Some (`PV (fst (Mnpv.choose fv.s_pv)))
+      with Not_found -> None
+
   let global fv = 
     { fv with s_pv = Mnpv.filter (fun pv _ -> is_glob pv) fv.s_pv }
 
