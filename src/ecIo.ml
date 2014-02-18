@@ -85,9 +85,11 @@ let lexer = fun ecreader ->
 let drain (ecreader : ecreader) =
   let ecreader = Disposable.get ecreader in
   let rec drain () =
-    match lexer ecreader with
-    | (EcParser.FINAL, _, _) -> ()
-    | _ -> drain ()
+    try
+      match lexer ecreader with
+      | (EcParser.FINAL, _, _) -> ()
+      | _ -> drain ()
+    with EcLexer.LexicalError _ -> drain ()
   in
     if not ecreader.ecr_atstart then
       drain ()

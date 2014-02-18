@@ -30,9 +30,14 @@ let t_kill side cpos olen g =
   let env = LDecl.toenv (get_hyps g) in
   let kill_stmt _env (_, po) me zpr =
     let error fmt =
-      Format.ksprintf
-        (fun msg -> tacuerror "cannot kill code, %s" msg)
-        fmt
+      (* TO BE MOVED *)
+      let buf  = Buffer.create 127 in
+      let fbuf = Format.formatter_of_buffer buf in
+        Format.kfprintf
+          (fun _ ->
+            Format.pp_print_flush fbuf ();
+            tacuerror "cannot kill code, %s" (Buffer.contents buf))
+          fbuf fmt
     in
 
     let (ks, tl) =
@@ -45,20 +50,43 @@ let t_kill side cpos olen g =
     in
 
     let ks_wr = is_write env PV.empty ks in
-    (* TODO Benj : check the usage of po_rd *)
+    (* FIXME [BG]: check the usage of po_rd *)
     let po_rd = PV.fv env (fst me) po in
+
+    let pp_of_name =
+      let ppe = EcPrinting.PPEnv.ofenv env in
+        fun fmt x ->
+          match x with
+          | `Global p -> EcPrinting.pp_topmod ppe fmt p
+          | `PV     p -> EcPrinting.pp_pv     ppe fmt p
+    in
 
     List.iteri
       (fun i is ->
          let is_rd = is_read env PV.empty is in
-           if not (PV.indep env ks_wr is_rd) then
-             match i with
-             | 0 -> error "code writes variables used by the current block"
-             | _ -> error "code writes variables used by the %dth parent block" i)
+         let indp  = PV.interdep env ks_wr is_rd in
+           match PV.pick indp with
+           | None   -> ()
+           | Some x ->
+               match i with
+               | 0 ->
+                   error
+                     "code writes variables (%a) used by the current block"
+                     pp_of_name x
+               | _ ->
+                 error
+                   "code writes variables (%a) used by the %dth parent block"
+                   pp_of_name x i)
       (Zpr.after ~strict:false { zpr with Zpr.z_tail = tl; });
 
-    if not (PV.indep env ks_wr po_rd) then
-      error "code writes variables used by the post-condition";
+    begin
+      match PV.pick (PV.interdep env ks_wr po_rd) with
+      | None   -> ()
+      | Some x ->
+          error
+            "code writes variables (%a) used by the post-condition"
+            pp_of_name x
+    end;
 
     let kslconcl = EcFol.f_bdHoareS me f_true (stmt ks) f_true FHeq f_r1 in
       (me, { zpr with Zpr.z_tail = tl; }, [kslconcl])
