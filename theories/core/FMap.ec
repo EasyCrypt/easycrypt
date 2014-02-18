@@ -446,6 +446,14 @@ op map: ('b -> 'c) -> ('a,'b) map -> ('a,'c) map.
 axiom get_map (f:'b -> 'c) (m:('a,'b) map) (x:'a):
   (map f m).[x] = omap f m.[x].
 
+lemma map_set (f:'b -> 'c) (m:('a,'b) map) (x:'a) y:
+  map f (m.[x <- y]) = (map f m).[x <- f y].
+proof. by apply map_ext;intros x';case (x = x');smt. qed.
+
+lemma in_dom_map (f:'b -> 'c) (m:('a,'b) map) (x:'a) :
+   in_dom x (map f m) = in_dom x m.
+proof. by simplify in_dom;rewrite !mem_dom get_map;smt. qed.
+
 op mapi: ('a -> 'b -> 'c) -> ('a,'b) map -> ('a,'c) map.
 
 axiom get_mapi (f:'a -> 'b -> 'c) (m:('a,'b) map) (x:'a):
