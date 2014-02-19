@@ -93,10 +93,11 @@ let t_failure_event at_pos cntr ash q f_event pred_specs inv g =
           cannot_apply "fel" "not applicable to abstract functions"
       in
       let s_hd,s_tl = s_split "fel" at_pos fdef.f_body in
-      let fv = PV.fv env mhr f_event in
+      let fve = PV.fv env mhr f_event in
+      let fvc = PV.fv env mhr cntr in
+      let fv  = PV.union fve fvc in
       let os = callable_oracles_stmt env fv (stmt s_tl) in
       (* check that bad event is only modified in oracles *)
-      let fv = PV.fv env mhr f_event in
       let written_except_os = s_write ~except_fs:os env (stmt s_tl) in
       if not (PV.indep env written_except_os fv ) then
         tacuerror
