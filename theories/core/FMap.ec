@@ -342,6 +342,10 @@ op filter: ('a -> 'b -> bool) -> ('a,'b) map -> ('a,'b) map.
 axiom get_filter f (m:('a,'b) map) x:
   (filter f m).[x] = if f x (oget m.[x]) then m.[x] else None.
 
+lemma filter_empty (f:'a -> 'b -> bool): 
+   filter f (empty<:'a,'b>) = empty<:'a,'b>.
+proof. by apply map_ext=> x;smt. qed.
+
 lemma nosmt get_filter_nin f (m:('a,'b) map) x:
   !mem x (dom m) =>
   (filter f m).[x] = m.[x].
@@ -446,6 +450,9 @@ op map: ('b -> 'c) -> ('a,'b) map -> ('a,'c) map.
 axiom get_map (f:'b -> 'c) (m:('a,'b) map) (x:'a):
   (map f m).[x] = omap f m.[x].
 
+lemma map_empty (f:'b -> 'c) : map f (empty<:'a,'b>) = empty<:'a,'c>.
+proof. apply map_ext => x;smt. qed.
+  
 lemma map_set (f:'b -> 'c) (m:('a,'b) map) (x:'a) y:
   map f (m.[x <- y]) = (map f m).[x <- f y].
 proof. by apply map_ext;intros x';case (x = x');smt. qed.
