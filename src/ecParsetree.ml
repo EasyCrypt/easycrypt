@@ -536,6 +536,7 @@ and ptactic_core_r =
   | Plogic      of logtactic
   | PPhl        of phltactic
   | Pprogress   of bool * ptactic_core option
+  | Pintrosprogress 
   | Psubgoal    of ptactic_chain
   | Padmit
   | Pdebug

@@ -103,6 +103,7 @@ and process_tactic_core mkpv (tac : ptactic_core) (gs : goals) : goals =
     | Pseq tacs       -> `One (fun (juc, n) -> process_tactics mkpv tacs (juc, [n]))
     | Pcase i         -> `One (process_case loc i)
     | Pprogress (s,t) -> `One (process_progress s (process_tactic_core1,mkpv) t)
+    | Pintrosprogress -> `One (EcLogic.t_progress ~split:false (t_id None))
     | Padmit          -> `One (process_admit)
     | Pdebug          -> `One (process_debug)
     | Plogic t        -> `One (process_logic (eng, mkpv) loc t)

@@ -260,6 +260,7 @@
 %token PRINT
 %token PROC
 %token PROGRESS
+%token INTROSPROGRESS
 %token PROOF
 %token PROVER
 %token QED
@@ -2285,6 +2286,9 @@ tactic_core_r:
 
 | PROGRESS s=STAR? t=tactic_core?
    { Pprogress (s<>None, t) }
+
+| INTROSPROGRESS 
+   { Pintrosprogress }
 
 | x=logtactic
    { Plogic x }

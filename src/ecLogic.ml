@@ -1408,7 +1408,7 @@ let t_alpha_assumption g = t_gen_assumption EcReduction.is_alpha_eq g
 let t_assumption g = 
   t_or t_alpha_assumption (t_gen_assumption is_conv) g
     
-let t_progress tac g =
+let t_progress ?(split=true) tac g =
   let tac = t_or t_alpha_assumption tac in
   let rec aux g = t_seq t_simplify_nodelta aux0 g 
   and aux0 g =
@@ -1426,7 +1426,8 @@ let t_progress tac g =
     | Fapp({f_node = Fop(p,_)}, [f1;_]) when EcPath.p_equal p EcCoreLib.p_imp ->
       let id = LDecl.fresh_id hyps "H" in
       t_seq (t_intros_i [id]) (aux2 id f1) g
-    | _ -> t_try (t_seq t_split aux0) g
+    | _ -> 
+      if not split then t_id None g else t_try (t_seq t_split aux0) g
   and aux2 id f g = 
     let t1,aux = 
       match f.f_node with

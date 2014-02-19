@@ -74,6 +74,7 @@
     "rwnormal"    , RWNORMAL   ;        (* KW: tactic *)
     "subst"       , SUBST      ;        (* KW: tactic *)
     "progress"    , PROGRESS   ;        (* KW: tactic *)
+    "introsprogress", INTROSPROGRESS;        (* KW: tactic *)
     "trivial"     , TRIVIAL    ;        (* KW: tactic *)
     "auto"        , AUTO       ;        (* KW: tactic *)
     

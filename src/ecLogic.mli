@@ -174,7 +174,7 @@ val alpha_find_in_hyps : EcFol.form -> EcEnv.LDecl.hyps -> EcIdent.t
 val t_alpha_assumption : tactic
 val t_assumption : tactic
 
-val t_progress : tactic -> tactic
+val t_progress : ?split:bool -> tactic -> tactic
 
 val t_build : goal -> (EcIdent.t * form) * tactic
 
