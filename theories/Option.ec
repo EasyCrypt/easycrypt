@@ -41,3 +41,8 @@ lemma nosmt someI (x y:'a): Some x = Some y => x = y by [].
 lemma none_omap (f:'a -> 'b) ox:
   omap f ox = None <=> ox = None
 by case ox.
+
+lemma oget_omap_some (f:'a -> 'b) ox:
+  ox <> None =>
+  oget (omap f ox) = f (oget ox)
+by case ox.
