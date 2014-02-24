@@ -2,16 +2,13 @@
 true : use_menhir, menhir_explain, menhir_table
 true : debug
 true : warn_Z, warn_Y, warn_+28, warn_-23, warn_+33
+true : -traverse
+true : bin_annot
 
 # --------------------------------------------------------------------
-<src>     : include
-<src/phl> : include
+<src>            : include
+<src/phl>        : include
 <src/extraction> : include
-
-<webui>  : -traverse
-<why3>   : -traverse
-<_tools> : -traverse
-<system> : -traverse
 
 # --------------------------------------------------------------------
 <src/*.{ml,mli}> : package(menhirLib), package(why3)
