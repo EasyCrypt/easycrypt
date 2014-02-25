@@ -89,9 +89,11 @@ module Api : sig
 
   exception InvalidStateException of string
 
-  type 'a forward  = 'a -> proofenv -> proofenv * handle
-  type 'a backward = 'a -> tcenv -> tcenv
-  type 'a mixward  = 'a -> tcenv -> tcenv * handle
+  type forward  = proofenv -> proofenv * handle
+  type backward = tcenv -> tcenv
+  type mixward  = tcenv -> tcenv * handle
+
+  val start : LDecl.hyps -> form -> proof
 
   val newgoal : tcenv -> ?hyps:LDecl.hyps -> form -> tcenv * handle
   val close   : tcenv -> validation -> tcenv
@@ -100,15 +102,14 @@ module Api : sig
   type ontest    = int -> proofenv -> handle -> bool
   type direction = [ `Left | `Right ]
 
-  val on     : 'a backward -> ontest -> 'a -> tcenv -> tcenv
-  val first  : 'a backward -> int -> 'a -> tcenv -> tcenv
-  val last   : 'a backward -> int -> 'a -> tcenv -> tcenv
+  val on     : backward -> ontest -> tcenv -> tcenv
+  val first  : backward -> int -> tcenv -> tcenv
+  val last   : backward -> int -> tcenv -> tcenv
   val rotate : direction -> int -> tcenv -> tcenv
 
-  val seq  : 'a backward -> 'a backward -> tcenv -> tcenv
-  val lseq : 'a backward list -> tcenv -> tcenv
+  val seq  : backward -> backward -> tcenv -> tcenv
+  val lseq : backward list -> tcenv -> tcenv
 end
-
 
 (* -------------------------------------------------------------------- *)
 (* Imperative API                                                       *)
@@ -124,4 +125,11 @@ module type IApi = sig
   val thaw   : rtcenv -> rtcenv
 
   (* + missing syntax for easing goals manipulations (using ocaml ppx) *)
+end
+
+(* -------------------------------------------------------------------- *)
+module HiLevel : sig
+  open EcParsetree
+
+  val apply : ptactic list -> proof -> proof
 end

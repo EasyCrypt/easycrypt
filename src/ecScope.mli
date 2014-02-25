@@ -28,7 +28,7 @@ and proof_ctxt = (symbol * EcDecl.axiom) * EcPath.path * EcEnv.env
 
 and proof_state =
 | PSCheck     of (EcLogic.judgment_uc * int list)
-| PSNewEngine of unit
+| PSNewEngine of EcGoal.proof
 | PSNoCheck
 
 and pucflags = {

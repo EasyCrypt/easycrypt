@@ -471,7 +471,7 @@ let pp_current_goal stream =
               EcPrinting.pp_goal ppe stream (List.length ns, g)
       end
 
-      | S.PSNewEngine () ->
+      | S.PSNewEngine _ ->
           Format.fprintf stream "New engine@\n%!"
   end
 

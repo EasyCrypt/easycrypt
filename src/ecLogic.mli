@@ -22,8 +22,8 @@ type judgment_uc = {
 }
 
 type goals  = judgment_uc * int list
-type goal   = judgment_uc * int 
-type tactic = goal -> goals 
+type goal   = judgment_uc * int
+type tactic = goal -> goals
 
 (* -------------------------------------------------------------------- *)
 val cannot_apply : string -> string -> 'a
@@ -99,8 +99,8 @@ val t_try_base : tactic -> goal -> [`Success of goals | `Failure of exn]
 
 (* -------------------------------------------------------------------- *)
 (* TODO : move this in ecEnv.Mod *)
-val gen_check_restr : 
-  env -> 
+val gen_check_restr :
+  env ->
   (EcPrinting.PPEnv.t -> 'a EcPrinting.pp) -> 'a ->
   use -> mod_restr -> unit
 
@@ -113,7 +113,7 @@ val check_modtype_restr :
 type app_arg =
   | AAform of form
   | AAmem  of EcIdent.t
-  | AAmp   of EcPath.mpath * EcModules.module_sig 
+  | AAmp   of EcPath.mpath * EcModules.module_sig
   | AAnode
 
 type 'a app_arg_cb = LDecl.hyps -> gty option -> 'a -> app_arg
@@ -186,7 +186,7 @@ val t_logic_trivial : tactic
 val t_admit : tactic
 
 (* -------------------------------------------------------------------- *)
-val gen_t_apply_hyp : 
+val gen_t_apply_hyp :
      'a app_arg_cb -> EcIdent.t -> 'a list -> tactic
 
 val gen_t_apply_glob :

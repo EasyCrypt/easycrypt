@@ -186,7 +186,7 @@ and proof_ctxt = (symbol * EcDecl.axiom) * EcPath.path * EcEnv.env
 
 and proof_state =
 | PSCheck     of (EcLogic.judgment_uc * int list)
-| PSNewEngine of unit
+| PSNewEngine of EcGoal.proof
 | PSNoCheck
 
 and pucflags = {
@@ -832,8 +832,17 @@ module Tactics = struct
                   { pac with puc_mode = Some false; }
         end
 
-        | None when newengine ->
-            { pac with puc_jdg = PSNewEngine (); puc_mode = Some strict; }
+        | None when newengine -> begin
+            match pac.puc_jdg with
+            | PSNoCheck     -> { pac with puc_mode = Some strict }
+            | PSNewEngine _ -> assert false
+
+            | PSCheck (g, i) ->
+                let { pj_decl = (h, f) } = Mint.find (as_seq1 i) g.juc_map in
+                  { pac with
+                      puc_jdg  = PSNewEngine (EcGoal.Api.start h f);
+                      puc_mode = Some strict; }
+        end
 
         | None   -> { pac with puc_mode = Some strict }
         | Some _ -> hierror "[proof] can only be used at beginning of a proof script"
@@ -886,7 +895,10 @@ module Tactics = struct
           { scope with sc_pr_uc = Some { puc with puc_active = Some pac; } }
     end
 
-    | PSNewEngine () -> assert false
+    | PSNewEngine juc ->
+        let juc = EcGoal.HiLevel.apply tac juc in
+        let pac = { pac with puc_jdg = PSNewEngine juc } in
+          { scope with sc_pr_uc = Some { puc with puc_active = Some pac; } }
 
   let process_core mark mode (scope : scope) (ts : ptactic_core list) =
     let ts = List.map (fun t -> { pt_core = t; pt_intros = []; }) ts in
@@ -1057,7 +1069,7 @@ module Ax = struct
               with EcBaseLogic.StillOpenGoal _ ->
                 hierror "cannot save an incomplete proof"
           end
-          | PSNewEngine () -> assert false
+          | PSNewEngine _ -> assert false
       end; pac
     in
 
