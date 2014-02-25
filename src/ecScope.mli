@@ -27,7 +27,8 @@ and proof_auc = {
 and proof_ctxt = (symbol * EcDecl.axiom) * EcPath.path * EcEnv.env
 
 and proof_state =
-| PSCheck   of (EcLogic.judgment_uc * int list)
+| PSCheck     of (EcLogic.judgment_uc * int list)
+| PSNewEngine of unit
 | PSNoCheck
 
 and pucflags = {
@@ -131,19 +132,19 @@ end
 
 module Tactics : sig
   val process : scope -> Ax.mode -> ptactic list -> scope
-  val proof   : scope -> Ax.mode -> bool -> scope
+  val proof   : scope -> Ax.mode -> bool -> bool -> scope
 end
 
-module Prover : sig 
+module Prover : sig
   val process     : scope -> pprover_infos -> scope
   val set_wrapper : scope -> string option -> scope
-  val set_all     : scope -> scope 
+  val set_all     : scope -> scope
   val set_default : scope -> int -> string list option -> scope
   val full_check  : scope -> scope
   val check_proof : scope -> bool -> scope
 end
 
-module Extraction : sig 
-  val process : 
+module Extraction : sig
+  val process :
     scope -> (string option * toextract list * withextract list) -> scope
 end

@@ -185,7 +185,8 @@ and proof_auc = {
 and proof_ctxt = (symbol * EcDecl.axiom) * EcPath.path * EcEnv.env
 
 and proof_state =
-| PSCheck   of (EcLogic.judgment_uc * int list)
+| PSCheck     of (EcLogic.judgment_uc * int list)
+| PSNewEngine of unit
 | PSNoCheck
 
 and pucflags = {
@@ -355,9 +356,9 @@ end = struct
   let on_mpath_binding cb b =
     match b with
     | EcFol.GTty    ty        -> on_mpath_ty cb ty
-    | EcFol.GTmodty (mty, (rx,r)) -> 
-      on_mpath_modty cb mty; 
-      Sx.iter (fun x -> cb x.x_top) rx; 
+    | EcFol.GTmodty (mty, (rx,r)) ->
+      on_mpath_modty cb mty;
+      Sx.iter (fun x -> cb x.x_top) rx;
       Sm.iter cb r
     | EcFol.GTmem   None      -> ()
     | EcFol.GTmem   (Some m)  -> on_mpath_lcmem cb m
@@ -450,10 +451,10 @@ end = struct
     | ME_Decl (mty, sm) -> on_mpath_mdecl cb (mty, sm)
 
   and on_mpath_mdecl cb (mty,(rx,r)) =
-    on_mpath_modty cb mty; 
-    Sx.iter (fun x -> cb x.x_top) rx; 
+    on_mpath_modty cb mty;
+    Sx.iter (fun x -> cb x.x_top) rx;
     Sm.iter cb r
-  
+
   and on_mpath_mstruct cb st =
     List.iter (on_mpath_mstruct1 cb) st.ms_body
 
@@ -815,7 +816,7 @@ module Tactics = struct
 
   let pi scope pi = Prover.mk_prover_info scope pi
 
-  let proof (scope : scope) mode (strict : bool) =
+  let proof (scope : scope) mode (strict : bool) (newengine : bool) =
     check_state `InActiveProof "proof script" scope;
 
     match (oget scope.sc_pr_uc).puc_active with
@@ -826,11 +827,14 @@ module Tactics = struct
         | None when not strict && mode = `WeakCheck -> begin
             match pac.puc_jdg with
             | PSNoCheck -> { pac with puc_mode = Some false; }
-            | PSCheck _ ->
+            | PSCheck _ | PSNewEngine _ ->
                 let pac = { pac with puc_jdg = PSNoCheck } in
                   { pac with puc_mode = Some false; }
         end
-  
+
+        | None when newengine ->
+            { pac with puc_jdg = PSNewEngine (); puc_mode = Some strict; }
+
         | None   -> { pac with puc_mode = Some strict }
         | Some _ -> hierror "[proof] can only be used at beginning of a proof script"
       in
@@ -852,9 +856,9 @@ module Tactics = struct
     let scope =
       match (oget scope.sc_pr_uc).puc_active with
       | None -> hierror "no active lemma"
-      | Some pac -> 
+      | Some pac ->
           if   mark && pac.puc_mode = None
-          then proof scope mode false
+          then proof scope mode false false
           else scope
     in
 
@@ -863,7 +867,7 @@ module Tactics = struct
 
     match pac.puc_jdg with
     | PSNoCheck -> scope
-    | PSCheck juc ->
+    | PSCheck juc -> begin
         let loc = (oget (List.ohead tac)).pt_core.pl_loc in
 
         let htmode =
@@ -880,6 +884,9 @@ module Tactics = struct
         let juc = process_tactic_on_goal hitenv juc loc tac in
         let pac = { pac with puc_jdg = PSCheck juc; } in
           { scope with sc_pr_uc = Some { puc with puc_active = Some pac; } }
+    end
+
+    | PSNewEngine () -> assert false
 
   let process_core mark mode (scope : scope) (ts : ptactic_core list) =
     let ts = List.map (fun t -> { pt_core = t; pt_intros = []; }) ts in
@@ -927,7 +934,7 @@ module Ax = struct
       | true  ->
           let hyps = EcEnv.LDecl.init scope.sc_env axd.ax_tparams in
             PSCheck (EcLogic.open_juc (hyps, oget axd.ax_spec), [0])
-    in 
+    in
     let puc = { puc_active = Some {
                   puc_name  = name;
                   puc_mode  = None;
@@ -952,7 +959,7 @@ module Ax = struct
     let (pconcl, tintro) =
       match ax.pa_vars with
       | None    -> (ax.pa_formula, [])
-      | Some vs -> 
+      | Some vs ->
           let pconcl = { pl_loc = loc; pl_desc = PFforall (vs, ax.pa_formula) } in
             (pconcl, List.flatten (List.map fst vs))
     in
@@ -1003,7 +1010,7 @@ module Ax = struct
     | PLemma tc ->
         let scope = start_lemma scope pucflags check (unloc ax.pa_name) axd in
         let scope = Tactics.process_core false `Check scope [tintro] in
-        let scope = Tactics.proof scope mode (if tc = None then true else false) in
+        let scope = Tactics.proof scope mode (if tc = None then true else false) false in
 
         let tc =
           match tc with
@@ -1045,10 +1052,12 @@ module Ax = struct
       | Some pac -> begin
           match pac.puc_jdg with
           | PSNoCheck  -> ()
-          | PSCheck gs ->
+          | PSCheck gs -> begin
               try  ignore (EcLogic.close_juc (fst gs))
               with EcBaseLogic.StillOpenGoal _ ->
                 hierror "cannot save an incomplete proof"
+          end
+          | PSNewEngine () -> assert false
       end; pac
     in
 
@@ -1132,7 +1141,7 @@ module Op = struct
 
       | PO_concr (bd, pty, pe) ->
           let env     = scope.sc_env in
-          let codom   = TT.transty tp env ue pty in 
+          let codom   = TT.transty tp env ue pty in
           let env, xs = TT.transbinding env ue bd in
           let body    = TT.transexpcast env `InOp ue codom pe in
           let lam     = EcTypes.e_lam xs body in
@@ -1190,44 +1199,44 @@ module Op = struct
                   let cname  = fst pb.pop_pattern in
                   let tvi    = pb.pop_tvi |> omap (TT.transtvi env ue) in
                   let cts    = EcUnify.select_op ~filter tvi env (unloc cname) ue [] in
-    
+
                   match cts with
                   | [] -> hierror ~loc:cname.pl_loc "unknown constructor name"
                   | _ :: _ :: _ -> hierror ~loc:cname.pl_loc "ambiguous constructor name"
-    
+
                   | [(cp, tvi), opty, subue] ->
                       let ctor = oget (EcEnv.Op.by_path_opt cp env) in
                       let (indp, ctoridx) = EcDecl.operator_as_ctor ctor in
                       let indty = oget (EcEnv.Ty.by_path_opt indp env) in
                       let ind = (EcDecl.tydecl_as_datatype indty).tydt_ctors in
                       let ctorsym, ctorty = List.nth ind ctoridx in
-  
+
                       let args_exp = List.length ctorty in
                       let args_got = List.length (snd pb.pop_pattern) in
-  
+
                       if args_exp <> args_got then
                         hierror ~loc:cname.pl_loc
                           "this constructor takes %d argument(s), got %d" args_exp args_got;
-  
+
                       if not (List.uniq (List.map unloc (snd pb.pop_pattern))) then
                         hierror ~loc:cname.pl_loc "this pattern is non-linear";
-  
+
                       EcUnify.UniEnv.restore ~src:subue ~dst:ue;
-  
+
                       let ctorty =
                         let tvi = Some (EcUnify.TVIunamed tvi) in
                           fst (EcUnify.UniEnv.opentys ue indty.tyd_params tvi ctorty) in
                       let pty = EcUnify.UniEnv.fresh ue in
-  
+
                       (try  EcUnify.unify env ue (toarrow ctorty pty) opty
                        with EcUnify.UnificationFailure _ -> assert false);
                       TT.unify_or_fail env ue pb.pop_name.pl_loc pty xty;
-  
+
                       let pvars = List.map (EcIdent.create |- unloc) (snd pb.pop_pattern) in
                       let pvars = List.combine pvars ctorty in
 
                         (pb, (indp, ind, (ctorsym, ctoridx)), pvars)
-                in  
+                in
 
                 let ptns = List.map trans1 mpty in
                 let env  =
@@ -1408,7 +1417,7 @@ module Op = struct
                    (List.map (tvar |- fst) axpm)
                    axbd.EcFol.f_ty)
                 axbd
-            in                   
+            in
 
             let tyop = { tyop with op_kind = OB_oper None } in
             let axop = { ax_tparams = axpm;
@@ -1421,7 +1430,7 @@ module Op = struct
 
         | _ -> hierror ~loc "cannot axiomatized non-plain operators"
     end
-        
+
 end
 
 (* -------------------------------------------------------------------- *)
@@ -1433,7 +1442,7 @@ module Pred = struct
     let op = op.pl_desc and loc = op.pl_loc in
     let ue     = TT.transtyvars scope.sc_env (loc, op.pp_tyvars) in
     let tp     = TT.tp_relax in
-    let dom, body = 
+    let dom, body =
       match op.pp_def with
       | PPabstr ptys ->
         List.map (TT.transty tp scope.sc_env ue) ptys, None
@@ -1474,20 +1483,20 @@ module Mod = struct
       | false -> scope
       | true  ->
         let mpath = EcPath.pqname (path scope) m.me_name in
-        let env = 
+        let env =
           match m.me_body with
           | ME_Alias _ | ME_Decl _ -> scope.sc_env
           | ME_Structure _ ->
             let env = scope.sc_env in
             (* We keep only the internal part, i.e the inner global variables *)
-            (* TODO : using mod_use here to compute the set of inner global 
+            (* TODO : using mod_use here to compute the set of inner global
                variables is inefficient, change this algo *)
             let mp = EcPath.mpath_crt mpath [] None in
             let use = EcEnv.NormMp.mod_use env mp in
-            let rx = 
-              let add x _ rx = 
+            let rx =
+              let add x _ rx =
                 if EcPath.m_equal (EcPath.m_functor x.EcPath.x_top) mp then
-                  Sx.add x rx 
+                  Sx.add x rx
                 else rx in
               Mx.fold add use.EcEnv.us_pv EcPath.Sx.empty in
             EcEnv.Mod.add_restr_to_locals (rx,EcPath.Sm.empty) env in
@@ -1511,7 +1520,7 @@ module Mod = struct
       | Some locals ->
           if CoreSection.module_use_local_or_abs m locals then
             hierror "this module use local/abstracts modules and must be declared as local";
-          
+
     end;
 
       bind scope ptm.ptm_local m
@@ -1539,7 +1548,7 @@ end
 module ModType = struct
   let bind (scope : scope) ((x, tysig) : _ * module_sig) =
     assert (scope.sc_pr_uc = None);
-    let scope = 
+    let scope =
       { scope with
           sc_env = EcEnv.ModTy.bind x tysig scope.sc_env; }
     in
@@ -1556,7 +1565,7 @@ end
 module Ty = struct
   open EcDecl
   open EcTyping
- 
+
   module TT = EcTyping
 
   type tydname = (ptyparams * psymbol) located
@@ -1565,7 +1574,7 @@ module Ty = struct
   let check_name_available scope x =
     let pname = EcPath.pqname (EcEnv.root (env scope)) x.pl_desc in
 
-    if    EcEnv.Ty       .by_path_opt pname (env scope) <> None 
+    if    EcEnv.Ty       .by_path_opt pname (env scope) <> None
        || EcEnv.TypeClass.by_path_opt pname (env scope) <> None then
       hierror ~loc:x.pl_loc "duplicated type/type-class name `%s'" x.pl_desc
 
@@ -1643,7 +1652,7 @@ module Ty = struct
       Msym.odup unloc (List.map fst tcd.ptc_axs)
         |> oiter (fun (x, y) -> hierror ~loc:y.pl_loc
                     "duplicated axiom name: `%s'" x.pl_desc);
-    
+
       (* Check operators types *)
       let operators =
         let check1 (x, ty) =
@@ -1653,7 +1662,7 @@ module Ty = struct
             (EcIdent.create (unloc x), ty)
         in
           tcd.ptc_ops |> List.map check1 in
-    
+
       (* Check axioms *)
       let axioms =
         let scenv = EcEnv.Var.bind_locals operators scenv in
@@ -1664,7 +1673,7 @@ module Ty = struct
             (unloc x, ax)
         in
           tcd.ptc_axs |> List.map check1 in
-    
+
       (* Construct actual type-class *)
       { tc_prt = uptc; tc_ops = operators; tc_axs = axioms; }
     in
@@ -1682,13 +1691,13 @@ module Ty = struct
 
         let tvi = List.map (TT.transty tp_tydecl env ue) tvi in
         let selected =
-          EcUnify.select_op ~filter:EcDecl.is_oper 
+          EcUnify.select_op ~filter:EcDecl.is_oper
             (Some (EcUnify.TVIunamed tvi)) env (unloc op) ue []
         in
         let op =
           match selected with
           | [] -> hierror ~loc:op.pl_loc "unknown operator"
-          | op1::op2::_ -> 
+          | op1::op2::_ ->
               hierror ~loc:op.pl_loc
                 "ambiguous operator (%s / %s)"
                 (EcPath.tostring (fst (proj3_1 op1)))
@@ -1762,7 +1771,7 @@ module Ty = struct
 
           let escope = scope in
           let escope = Ax.start_lemma escope pucflags check x ax in
-          let escope = Tactics.proof escope mode true in
+          let escope = Tactics.proof escope mode true false in
           let escope = Tactics.process_r false mode escope [t] in
             ignore (Ax.save escope pt.pl_loc))
         axs
@@ -1785,7 +1794,7 @@ module Ty = struct
       r_sub   =      (Mstr.find_opt "sub"   symbols);
       r_embed =
         begin match Mstr.find_opt "ofint" symbols with
-        | None   -> 
+        | None   ->
           if EcReduction.EqTest.for_type env ty tint then `Direct
           else `Default
         | Some p -> `Embed p
@@ -1973,7 +1982,7 @@ module Ty = struct
         let form  =
           let bds = List.map (fun (x, xty) -> (x, EcFol.GTty xty)) xs in
             EcFol.f_forall bds form
-              
+
         in
           form
 
@@ -2048,7 +2057,7 @@ module Ty = struct
     let tparams = EcUnify.UniEnv.tparams ue in
 
     (* Generate induction scheme *)
-    let scheme = 
+    let scheme =
       let targs  = List.map (tvar |- fst) tparams in
       let recty  = tconstr tpath targs in
       let recx   = fresh_id_of_ty recty in
@@ -2226,7 +2235,7 @@ module Theory = struct
 
           let escope = { scope with sc_env = axc.C.axc_env; } in
           let escope = Ax.start_lemma escope pucflags check x ax in
-          let escope = Tactics.proof escope mode true in
+          let escope = Tactics.proof escope mode true false in
           let escope = Tactics.process_r false mode escope [t] in
             ignore (Ax.save escope pt.pl_loc); None)
       proofs
@@ -2327,14 +2336,14 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Extraction = struct
-  let check_top scope = 
-    if not (scope.sc_top = None) then 
+  let check_top scope =
+    if not (scope.sc_top = None) then
       hierror "Extraction can not be done inside a theory";
     if CoreSection.in_section scope.sc_section then
       hierror "Extraction can not be done inside a section"
-    
+
   let process scope todo =
     check_top scope;
     EcExtraction.process_extraction (env scope) scope.sc_required todo;
-    scope 
+    scope
 end

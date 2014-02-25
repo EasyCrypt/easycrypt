@@ -43,8 +43,9 @@
     "last"        , LAST       ;        (* KW: tactical *)
     "do"          , DO         ;        (* KW: tactical *)
     "strict"      , STRICT     ;        (* KW: tactical *)
+    "newengine"   , NEWENGINE  ;        (* KW: tactical *)
     "expect"      , EXPECT     ;        (* KW: tactical *)
-    
+
     (* Lambda tactics *)
     "beta"        , BETA       ;        (* KW: tactic *)
     "iota"        , IOTA       ;        (* KW: tactic *)
@@ -53,7 +54,7 @@
     "delta"       , DELTA      ;        (* KW: tactic *)
     "simplify"    , SIMPLIFY   ;        (* KW: tactic *)
     "congr"       , CONGR      ;        (* KW: tactic *)
-    
+
     (* Logic tactics *)
     "change"      , CHANGE     ;        (* KW: tactic *)
     "split"       , SPLIT      ;        (* KW: tactic *)
@@ -61,13 +62,13 @@
     "right"       , RIGHT      ;        (* KW: tactic *)
     "generalize"  , GENERALIZE ;        (* KW: tactic *)
     "case"        , CASE       ;        (* KW: tactic *)
-    
+
     "intros"      , INTROS     ;        (* KW: tactic *)
     "pose"        , POSE       ;        (* KW: tactic *)
     "cut"         , CUT        ;        (* KW: tactic *)
     "elim"        , ELIM       ;        (* KW: tactic *)
     "clear"       , CLEAR      ;        (* KW: tactic *)
-    
+
     (* Auto tactics *)
     "apply"       , APPLY      ;        (* KW: tactic *)
     "rewrite"     , REWRITE    ;        (* KW: tactic *)
@@ -77,7 +78,7 @@
     "introsprogress", INTROSPROGRESS;        (* KW: tactic *)
     "trivial"     , TRIVIAL    ;        (* KW: tactic *)
     "auto"        , AUTO       ;        (* KW: tactic *)
-    
+
     (* Other tactics *)
     "idtac"       , IDTAC      ;        (* KW: tactic *)
     "move"        , MOVE       ;        (* KW: tactic *)
@@ -147,14 +148,14 @@
     "require"     , REQUIRE    ;        (* KW: global *)
     "theory"      , THEORY     ;        (* KW: global *)
     "section"     , SECTION    ;        (* KW: global *)
-    "extraction"  , EXTRACTION ; 
+    "extraction"  , EXTRACTION ;
     "type"        , TYPE       ;        (* KW: global *)
     "class"       , CLASS      ;        (* KW: global *)
     "instance"    , INSTANCE   ;        (* KW: global *)
     "print"       , PRINT      ;        (* KW: global *)
-    "why3"        , WHY3       ;        (* KW: global *)  
-    "as"          , AS         ;        (* KW: global *)  
-    "Pr"          , PR         ;        (* KW: global *)  
+    "why3"        , WHY3       ;        (* KW: global *)
+    "as"          , AS         ;        (* KW: global *)
+    "Pr"          , PR         ;        (* KW: global *)
     "clone"       , CLONE      ;        (* KW: global *)
     "with"        , WITH       ;        (* KW: global *)
     "prover"      , PROVER     ;        (* KW: global *)
@@ -230,7 +231,7 @@ let op4 = (op_char_4 op_char_4_r*) | ("::" ':'+)
 
 let uniop = '!' | op2
 
-let binop = 
+let binop =
   op1 | op2 | op3 | op4 | '+' | '-' |
   "&&" | "/\\" | "||" | "\\/" | "=>" | "<=>" | "=" |
   '>' | '<' | ">=" | "<="
@@ -277,7 +278,7 @@ rule main = parse
   (* position *)
   | (digit+ ['.' '?'])+ digit+ {
       CPOS (oget (cposition_of_string (Lexing.lexeme lexbuf)))
-    } 
+    }
 
   (* punctuation *)
   | '_'  { UNDERSCORE }
@@ -327,7 +328,7 @@ rule main = parse
   | op4 as s  { OP4 s }
 
   (* end of sentence / stream *)
-  | '.' (eof | blank | newline as r) { 
+  | '.' (eof | blank | newline as r) {
       if r = "\n" then
         Lexing.new_line lexbuf;
       FINAL

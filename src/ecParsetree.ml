@@ -406,7 +406,7 @@ type phltactic =
   | Pfun_to_code
   | Pskip
   | Papp        of (tac_dir * int doption * pformula * p_app_bd_info)
-  | Pwp         of int doption option 
+  | Pwp         of int doption option
   | Psp         of int doption option
   | Pwhile      of tac_side * (pformula * pformula option * (pformula * pformula) option)
   | Pfission    of (tac_side * codepos * (int * (int * int)))
@@ -506,7 +506,7 @@ type logtactic =
   | Psplit
   | Pfield	of psymbol list
   | Pring 	of psymbol list
-  | Palg_norm   
+  | Palg_norm
   | Pexists     of fpattern_arg located list
   | Pleft
   | Pright
@@ -536,7 +536,7 @@ and ptactic_core_r =
   | Plogic      of logtactic
   | PPhl        of phltactic
   | Pprogress   of bool * ptactic_core option
-  | Pintrosprogress 
+  | Pintrosprogress
   | Psubgoal    of ptactic_chain
   | Padmit
   | Pdebug
@@ -685,7 +685,8 @@ type withextract = toextract * string
 
 (* -------------------------------------------------------------------- *)
 type proofmode = {
-  pm_strict : bool;
+  pm_strict    : bool;
+  pm_newengine : bool;
 }
 
 (* -------------------------------------------------------------------- *)

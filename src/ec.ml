@@ -29,7 +29,7 @@ let _ =
     | false ->
         List.fold_left Filename.concat mydir
           ([Filename.parent_dir_name; "lib"; "easycrypt"] @ name)
-  in    
+  in
 
   let pwrapper =
     (* Find provers wrapper *)
@@ -94,7 +94,7 @@ let _ =
           (String.concat ", " (EcProvers.known_provers ()));
         exit 0
     end
-  
+
     | `Cli cliopts -> begin
         let terminal =
           match cliopts.clio_emacs with
@@ -141,11 +141,11 @@ let _ =
     (* Set notifier (TODO: fix this global stuff *)
     EcCommands.set_notifier
       (fun msg -> EcTerminal.notice ~immediate:true msg terminal);
-  
+
     (* Interaction loop *)
     while true do
       let terminate = ref false in
-  
+
       try
         begin
           match EcLocation.unloc (EcTerminal.next terminal) with
@@ -161,7 +161,7 @@ let _ =
                      raise (EcCommands.toperror_of_exn ~gloc:loc e)
                    end)
                 commands
-  
+
           | EcParsetree.P_Undo i ->
               EcCommands.undo i
         end;

@@ -68,19 +68,19 @@ let () =
     EcPException.register pp
 
 (* -------------------------------------------------------------------- *)
-let process_pr fmt scope p = 
+let process_pr fmt scope p =
   let env = EcScope.env scope in
   let ppe = EcPrinting.PPEnv.ofenv env in
 
-  match p with 
+  match p with
   | Pr_ty qs ->
       let (x, ty) = EcEnv.Ty.lookup qs.pl_desc env in
       Format.fprintf fmt "%a@." (EcPrinting.pp_typedecl ppe) (x, ty)
-        
+
   | Pr_op qs | Pr_pr qs ->
       let (x, op) = EcEnv.Op.lookup qs.pl_desc env in
       Format.fprintf fmt "%a@." (EcPrinting.pp_opdecl ppe) (x, op)
-        
+
   | Pr_th qs ->
       let (p, th) = EcEnv.Theory.lookup qs.pl_desc env in
       Format.fprintf fmt "%a@." (EcPrinting.pp_theory ppe) (p, th)
@@ -88,7 +88,7 @@ let process_pr fmt scope p =
   | Pr_ax qs ->
       let (p, ax) = EcEnv.Ax.lookup qs.pl_desc env in
       Format.fprintf fmt "%a@." (EcPrinting.pp_axiom ppe) (p, ax)
-     
+
   | Pr_mod qs ->
       let (_p, me) = EcEnv.Mod.lookup qs.pl_desc env in
       Format.fprintf fmt "%a@." (EcPrinting.pp_modexp ppe) me
@@ -97,7 +97,7 @@ let process_pr fmt scope p =
       let (p, ms) = EcEnv.ModTy.lookup qs.pl_desc env in
       Format.fprintf fmt "%a@." (EcPrinting.pp_modsig ppe) (p, ms)
 
-let process_print scope p = 
+let process_print scope p =
   process_pr Format.std_formatter scope p
 
 (* -------------------------------------------------------------------- *)
@@ -122,7 +122,7 @@ let rec process_type (scope : EcScope.scope) (tyd : ptydecl located) =
   EcScope.check_state `InTop "type" scope;
 
   let tyname = (tyd.pl_desc.pty_tyvars, tyd.pl_desc.pty_name) in
-  let scope = 
+  let scope =
     match tyd.pl_desc.pty_body with
     | PTYD_Abstract bd -> EcScope.Ty.add          scope (mk_loc tyd.pl_loc tyname) bd
     | PTYD_Alias    bd -> EcScope.Ty.define       scope (mk_loc tyd.pl_loc tyname) bd
@@ -207,7 +207,7 @@ and process_th_close (scope : EcScope.scope) name =
   snd (EcScope.Theory.exit scope)
 
 (* -------------------------------------------------------------------- *)
-and process_th_require ld scope (x, io) = 
+and process_th_require ld scope (x, io) =
   EcScope.check_state `InTop "theory require" scope;
 
   let name  = x.pl_desc in
@@ -274,12 +274,12 @@ and process_sct_close (scope : EcScope.scope) =
   EcScope.Section.exit scope
 
 (* -------------------------------------------------------------------- *)
-and process_tactics (scope : EcScope.scope) t = 
+and process_tactics (scope : EcScope.scope) t =
   let mode = if (!pragma.pm_check) then `Check else `WeakCheck in
 
   match t with
   | `Actual t  -> EcScope.Tactics.process scope mode t
-  | `Proof  pm -> EcScope.Tactics.proof   scope mode pm.pm_strict
+  | `Proof  pm -> EcScope.Tactics.proof   scope mode pm.pm_strict pm.pm_newengine
 
 (* -------------------------------------------------------------------- *)
 and process_save (scope : EcScope.scope) loc =
@@ -293,7 +293,7 @@ and process_realize (scope : EcScope.scope) name =
   EcScope.Ax.activate scope name
 
 (* -------------------------------------------------------------------- *)
-and process_proverinfo scope pi = 
+and process_proverinfo scope pi =
   let scope = EcScope.Prover.process scope pi in
     scope
 
@@ -317,7 +317,7 @@ and process_pragma (scope : EcScope.scope) opt =
   end
 
 (* -------------------------------------------------------------------- *)
-and process_extract scope todo = 
+and process_extract scope todo =
   EcScope.Extraction.process scope todo
 
 (* -------------------------------------------------------------------- *)
@@ -404,7 +404,7 @@ let current () =
 (* -------------------------------------------------------------------- *)
 let full_check b max_provers provers =
   let (idx, scope, l) = oget !context in
-  assert (idx = 0 && l = []);  
+  assert (idx = 0 && l = []);
   let scope = EcScope.Prover.set_default scope max_provers provers in
   let scope = if b then EcScope.Prover.full_check scope else scope in
     context := Some (idx, scope, l)
@@ -460,15 +460,19 @@ let pp_current_goal stream =
       match puc.S.puc_jdg with
       | S.PSNoCheck -> ()
 
-      | S.PSCheck (juc, ns) ->
+      | S.PSCheck (juc, ns) -> begin
         let ppe = EcPrinting.PPEnv.ofenv (S.env scope) in
 
           match List.ohead ns with
           | None   -> Format.fprintf stream "No more goals@\n%!"
-          | Some n -> 
+          | Some n ->
             let hyps, concl = get_goal (juc, n) in
             let g = EcEnv.LDecl.tohyps hyps, concl in
               EcPrinting.pp_goal ppe stream (List.length ns, g)
+      end
+
+      | S.PSNewEngine () ->
+          Format.fprintf stream "New engine@\n%!"
   end
 
 let pp_maybe_current_goal stream =
