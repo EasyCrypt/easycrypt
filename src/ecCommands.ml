@@ -471,8 +471,16 @@ let pp_current_goal stream =
               EcPrinting.pp_goal ppe stream (List.length ns, g)
       end
 
-      | S.PSNewEngine _ ->
-          Format.fprintf stream "New engine@\n%!"
+      | S.PSNewEngine pf -> begin
+        let ppe = EcPrinting.PPEnv.ofenv (S.env scope) in
+
+          match EcGoal.Api.focused pf with
+          | None -> Format.fprintf stream "No more goals@\n%!"
+
+          | Some (n, { EcGoal.g_hyps = hyps; EcGoal.g_concl = concl; }) ->
+              let g = EcEnv.LDecl.tohyps hyps, concl in
+                EcPrinting.pp_goal ppe stream (n, g)
+      end
   end
 
 let pp_maybe_current_goal stream =

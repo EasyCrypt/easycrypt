@@ -60,6 +60,12 @@ type proof
 type proofenv
 type tcenv
 
+type pregoal = {
+  g_uid   : handle;
+  g_hyps  : LDecl.hyps;
+  g_concl : form;
+}
+
 type validation =
 | VSmt     : validation                 (* SMT call *)
 | VAdmit   : validation                 (* admit *)
@@ -93,7 +99,8 @@ module Api : sig
   type backward = tcenv -> tcenv
   type mixward  = tcenv -> tcenv * handle
 
-  val start : LDecl.hyps -> form -> proof
+  val start   : LDecl.hyps -> form -> proof
+  val focused : proof -> (int * pregoal) option
 
   val newgoal : tcenv -> ?hyps:LDecl.hyps -> form -> tcenv * handle
   val close   : tcenv -> validation -> tcenv

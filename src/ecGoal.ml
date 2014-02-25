@@ -1,4 +1,5 @@
 (* -------------------------------------------------------------------- *)
+open EcLocation
 open EcUtils
 open EcIdent
 open EcTypes
@@ -69,7 +70,7 @@ and proofenv = {
 }
 
 and pregoal = {
-  g_uid   : ID.id;                      (* this goal ID *)
+  g_uid   : handle;                     (* this goal ID *)
   g_hyps  : LDecl.hyps;                 (* goal local environment *)
   g_concl : form;                       (* goal conclusion *)
 }
@@ -117,19 +118,6 @@ module Api = struct
   type mixward  = tcenv -> tcenv * handle
 
   exception InvalidStateException of string
-
-  (* ------------------------------------------------------------------ *)
-  let start (hyps : LDecl.hyps) (goal : form) =
-    let uid = ID.gen () in
-    let hid = ID.gen () in
-
-    let goal = { g_uid = uid; g_hyps = hyps; g_concl = goal; } in
-    let goal = { g_goal = goal; g_validation = None; } in
-    let env  = { pr_uid   = uid;
-                 pr_main  = hid;
-                 pr_goals = ID.Map.singleton hid goal; } in
-
-      { pr_env = env; pr_opened = [hid]; }
 
   (* ------------------------------------------------------------------ *)
   let newgoal (tc : tcenv) ?(hyps : LDecl.hyps option) (goal : form) =
@@ -257,6 +245,25 @@ module Api = struct
     { tcx with tcec_closed = ID.Set.add hd tcx.tcec_closed }
 
   (* ------------------------------------------------------------------ *)
+  let start (hyps : LDecl.hyps) (goal : form) =
+    let uid = ID.gen () in
+    let hid = ID.gen () in
+
+    let goal = { g_uid = hid; g_hyps = hyps; g_concl = goal; } in
+    let goal = { g_goal = goal; g_validation = None; } in
+    let env  = { pr_uid   = uid;
+                 pr_main  = hid;
+                 pr_goals = ID.Map.singleton hid goal; } in
+
+      { pr_env = env; pr_opened = [hid]; }
+
+  (* ------------------------------------------------------------------ *)
+  let focused (pf : proof) =
+    match pf.pr_opened with
+    | [] -> None
+    | hd :: _ -> Some (List.length pf.pr_opened, get_pregoal_by_id hd pf.pr_env)
+
+  (* ------------------------------------------------------------------ *)
   let close (tc : tcenv) (vx : validation) =
      check_tcenv_opened tc;
 
@@ -314,6 +321,11 @@ module type IApi = sig
 end
 
 (* -------------------------------------------------------------------- *)
+module LowLevel = struct
+  let t_admit (tc : tcenv) = Api.close tc VAdmit
+end
+
+(* -------------------------------------------------------------------- *)
 module HiLevel = struct
   open EcParsetree
 
@@ -341,7 +353,10 @@ module HiLevel = struct
 
   (* ------------------------------------------------------------------ *)
   let apply1 (t : ptactic) (tc : tcenv) =
-    tc
+    match (unloc t.pt_core) with
+    | Padmit -> LowLevel.t_admit tc
+
+    | _ -> assert false
 
   (* ------------------------------------------------------------------ *)
   let apply (t : ptactic list) (pf : proof) =
