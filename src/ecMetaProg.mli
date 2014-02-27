@@ -98,10 +98,12 @@ module EV : sig
   val empty     : 'a evmap
   val of_idents : ident list -> 'a evmap
 
-  val add   : ident -> 'a evmap -> 'a evmap
-  val get   : ident -> 'a evmap -> [`Unset | `Set of 'a] option
-  val doget : ident -> 'a evmap -> 'a
-  val fold  : (ident -> 'a -> 'b -> 'b) -> 'a evmap -> 'b -> 'b
+  val add    : ident -> 'a evmap -> 'a evmap
+  val set    : ident -> 'a -> 'a evmap -> 'a evmap
+  val get    : ident -> 'a evmap -> [`Unset | `Set of 'a] option
+  val doget  : ident -> 'a evmap -> 'a
+  val fold   : (ident -> 'a -> 'b -> 'b) -> 'a evmap -> 'b -> 'b
+  val filled : 'a evmap -> bool
 end
 
 (* -------------------------------------------------------------------- *)

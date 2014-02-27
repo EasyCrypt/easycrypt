@@ -5,6 +5,17 @@ open EcEnv
 open EcFol
 
 (* -------------------------------------------------------------------- *)
+type location = {
+  plc_parent : location option;
+  plc_name   : string;
+  plc_loc    : EcLocation.t;
+}
+
+exception TcError of location * string Lazy.t
+
+val tcerror : location -> string -> 'a
+
+(* -------------------------------------------------------------------- *)
 (* Proof-node ID                                                        *)
 (* -------------------------------------------------------------------- *)
 type handle
@@ -74,7 +85,6 @@ type validation =
 | VRewrite : rwproofterm -> validation  (* rewrite *)
 | VExtern  : 'a -> validation           (* external (hl/phl/prhl/...) proof-node *)
 
-
 (* -------------------------------------------------------------------- *)
 (* Functional API                                                       *)
 (* -------------------------------------------------------------------- *)
@@ -102,7 +112,7 @@ module Api : sig
   val start   : LDecl.hyps -> form -> proof
   val focused : proof -> (int * pregoal) option
 
-  val newgoal : tcenv -> ?hyps:LDecl.hyps -> form -> tcenv * handle
+  val newgoal : tcenv -> ?hyps:LDecl.hyps -> form -> handle * tcenv
   val close   : tcenv -> validation -> tcenv
 
   (* Tacticals *)
@@ -121,17 +131,24 @@ end
 (* -------------------------------------------------------------------- *)
 (* Imperative API                                                       *)
 (* -------------------------------------------------------------------- *)
-module type IApi = sig
-  type rprooftree
+module RApi : sig
+  type rproofenv
   type rtcenv
-  type rtcenvs
 
-  (* Same API as [Api], but mutating the state. We also provide
-   * a freeze/thaw couple of operations. *)
-  val freeze : rtcenv -> rtcenv
-  val thaw   : rtcenv -> rtcenv
+  val newgoal : rtcenv -> ?hyps:LDecl.hyps -> form -> handle
 
-  (* + missing syntax for easing goals manipulations (using ocaml ppx) *)
+  val of_pure : tcenv -> (rtcenv -> 'a) -> 'a * tcenv
+
+  val freeze  : rtcenv -> rtcenv
+  val restore : dst:rtcenv -> src:rtcenv -> unit
+end
+
+type rproofenv = RApi.rproofenv
+type rtcenv    = RApi.rtcenv
+
+(* -------------------------------------------------------------------- *)
+module LowLevel : sig
+  val t_admit : Api.backward
 end
 
 (* -------------------------------------------------------------------- *)

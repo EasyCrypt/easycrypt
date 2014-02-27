@@ -259,37 +259,49 @@ module IMatch = struct
 end
 
 (* -------------------------------------------------------------------- *)
-type 'a evmap = Ev of ('a option) Mid.t
+type 'a evmap = {
+  ev_map   : ('a option) Mid.t;
+  ev_unset : int;
+}
 
 module EV = struct
-  let empty : 'a evmap = Ev Mid.empty
+  let empty : 'a evmap = {
+    ev_map   = Mid.empty;
+    ev_unset = 0;
+  }
 
-  let of_idents (ids : ident list) : 'a evmap =
-    let m =
-      List.fold_left
-        (fun m x -> Mid.add x None m)
-        Mid.empty ids
+  let add (x : ident) (m : 'a evmap) =
+    let chg = function Some _ -> assert false | None -> Some None in
+    let map = Mid.change chg x m.ev_map in
+    { ev_map = map; ev_unset = m.ev_unset + 1; }
+
+  let set (x : ident) (v : 'a) (m : 'a evmap) =
+    let chg = function
+      | None | Some (Some _) -> assert false
+      | Some None -> Some (Some v)
     in
-      Ev m
+      { ev_map = Mid.change chg x m.ev_map; ev_unset = m.ev_unset - 1; }
 
-  let add (x : ident) (Ev m) =
-    Ev (Mid.change (some -| odfl None) x m)
-
-  let get (x : ident) (Ev m) =
-    match Mid.find_opt x m with
+  let get (x : ident) (m : 'a evmap) =
+    match Mid.find_opt x m.ev_map with
     | None          -> None
     | Some None     -> Some `Unset
     | Some (Some a) -> Some (`Set a)
 
-  let doget (x : ident) m =
+  let doget (x : ident) (m : 'a evmap) =
     match get x m with
     | Some (`Set a) -> a
     | _ -> assert false
 
-  let fold (f : ident -> 'a -> 'b -> 'b) (Ev ev) state =
+  let of_idents (ids : ident list) : 'a evmap =
+    List.fold_left ((^~) add) empty ids
+
+  let fold (f : ident -> 'a -> 'b -> 'b) ev state =
     Mid.fold
       (fun x t s -> match t with Some t -> f x t s | None -> s)
-      ev state
+      ev.ev_map state
+
+  let filled (m : 'a evmap) = (m.ev_unset = 0)
 end
 
 (* -------------------------------------------------------------------- *)
@@ -305,7 +317,7 @@ let fmdelta = { fm_delta = true ; }
 (* Rigid unification *)
 let f_match_core opts hyps (ue, ev) ~ptn subject =
   let ue  = EcUnify.UniEnv.copy ue in
-  let ev  = let Ev ev = ev in ref ev in
+  let ev  = ref ev in
   let env = EcEnv.LDecl.toenv hyps in
 
   let rec doit ((subst, mxs) as ilc) ptn subject =
@@ -324,20 +336,20 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
       end
 
       | Flocal x, _ -> begin
-          match Mid.find_opt x !ev with
+          match EV.get x !ev with
           | None ->
               raise MatchFailure
 
-          | Some None ->
+          | Some `Unset ->
             if not (Mid.set_disjoint mxs subject.f_fv) then
               raise MatchFailure;
             begin
               try  EcUnify.unify env ue ptn.f_ty subject.f_ty
               with EcUnify.UnificationFailure _ -> raise MatchFailure;
             end;
-            ev := Mid.add x (Some subject) !ev
+            ev := EV.set x subject !ev
 
-          | Some (Some a) -> begin
+          | Some (`Set a) -> begin
               if not (EcReduction.is_alpha_eq hyps subject a) then
                 raise MatchFailure;
               try  EcUnify.unify env ue ptn.f_ty subject.f_ty
@@ -498,17 +510,17 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
       List.fold_left2 doit_binding (subst, mxs) q1 q2
 
   in
-    doit (Fsubst.f_subst_id, Mid.empty) ptn subject; (ue, Ev !ev)
+    doit (Fsubst.f_subst_id, Mid.empty) ptn subject; (ue, !ev)
 
 let f_match opts hyps (ue, ev) ~ptn subject =
-  let (ue, Ev ev) = f_match_core opts hyps (ue, ev) ~ptn subject in
-    if not (Mid.for_all (fun _ x -> x <> None) ev) then
+  let (ue, ev) = f_match_core opts hyps (ue, ev) ~ptn subject in
+    if not (Mid.for_all (fun _ x -> x <> None) ev.ev_map) then
       raise MatchFailure;
     let clue =
       try  EcUnify.UniEnv.close ue
       with EcUnify.UninstanciateUni -> raise MatchFailure
     in
-      (ue, clue, Ev ev)
+      (ue, clue, ev)
 
 (* -------------------------------------------------------------------- *)
 type ptnpos = [`Select of int | `Sub of ptnpos] Mint.t

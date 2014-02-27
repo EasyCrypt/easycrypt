@@ -504,8 +504,8 @@ type logtactic =
   | Psmt        of (pdbhint option * pprover_infos)
   | Pintro      of intropattern
   | Psplit
-  | Pfield	of psymbol list
-  | Pring 	of psymbol list
+  | Pfield	    of psymbol list
+  | Pring 	    of psymbol list
   | Palg_norm
   | Pexists     of fpattern_arg located list
   | Pleft
