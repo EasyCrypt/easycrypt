@@ -42,7 +42,7 @@ module Zipper : sig
    * is the list of instructions coming directly after the cursor at the
    * same level, the next element is the ones coming after the cursor
    * parent block, and so forth. The cursor is included iff [strict] is [true].
-   *)   
+   *)
   val after : strict:bool -> zipper -> instr list list
 
   type ('a, 'state) folder = 'a -> 'state -> instr -> 'state * instr list

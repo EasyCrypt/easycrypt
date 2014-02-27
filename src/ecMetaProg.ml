@@ -37,10 +37,10 @@ module Zipper = struct
   }
 
   let zipper hd tl zpr = { z_head = hd; z_tail = tl; z_path = zpr; }
-    
+
   let rec zipper_of_cpos ((i, sub) : codepos) zpr s =
     let (s1, i, s2) =
-      try  List.split_n (i-1) s.s_node 
+      try  List.split_n (i-1) s.s_node
       with Not_found -> raise InvalidCPos
     in
     match sub with
@@ -317,17 +317,17 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
           try  EcUnify.unify env ue ptn.f_ty subject.f_ty
           with EcUnify.UnificationFailure _ -> raise MatchFailure
       end
-  
+
       | Flocal x1, Flocal x2 when id_equal x1 x2 -> begin
           try  EcUnify.unify env ue ptn.f_ty subject.f_ty
           with EcUnify.UnificationFailure _ -> raise MatchFailure
       end
-  
+
       | Flocal x, _ -> begin
           match Mid.find_opt x !ev with
           | None ->
               raise MatchFailure
-  
+
           | Some None ->
             if not (Mid.set_disjoint mxs subject.f_fv) then
               raise MatchFailure;
@@ -336,7 +336,7 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
               with EcUnify.UnificationFailure _ -> raise MatchFailure;
             end;
             ev := Mid.add x (Some subject) !ev
-  
+
           | Some (Some a) -> begin
               if not (EcReduction.is_alpha_eq hyps subject a) then
                 raise MatchFailure;
@@ -344,16 +344,16 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
               with EcUnify.UnificationFailure _ -> raise MatchFailure
           end
       end
-    
+
       | Fquant (b1, q1, f1), Fquant (b2, q2, f2)
           when b1 = b2 && List.length q1 = List.length q2
         ->
         let (subst, mxs) = doit_bindings (subst, mxs) q1 q2 in
           doit (subst, mxs) f1 f2
-  
+
       | Fquant _, Fquant _ ->
           raise MatchFailure
-  
+
       | Fpvar (pv1, m1), Fpvar (pv2, m2) ->
           let pv1 = EcEnv.NormMp.norm_pvar env pv1 in
           let pv2 = EcEnv.NormMp.norm_pvar env pv2 in
@@ -361,16 +361,16 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
               raise MatchFailure;
             if not (EcMemory.mem_equal m1 m2) then
               raise MatchFailure
-    
+
       | Fif (c1, t1, e1), Fif (c2, t2, e2) ->
           List.iter2 (doit ilc) [c1; t1; e1] [c2; t2; e2]
-    
+
       | Fint i1, Fint i2 ->
           if i1 <> i2 then raise MatchFailure
 
       | Fapp (f1, fs1), Fapp (f2, fs2) ->
           doit_args ilc (f1::fs1) (f2::fs2)
-   
+
       | Fglob (mp1, me1), Fglob (mp2, me2) ->
           let mp1 = EcEnv.NormMp.norm_mpath env mp1 in
           let mp2 = EcEnv.NormMp.norm_mpath env mp2 in
@@ -378,19 +378,19 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
               raise MatchFailure;
             if not (EcMemory.mem_equal me1 me2) then
               raise MatchFailure
-    
+
       | Ftuple fs1, Ftuple fs2 ->
           if List.length fs1 <> List.length fs2 then
             raise MatchFailure;
           List.iter2 (doit ilc) fs1 fs2
-  
+
       | Fop (op1, tys1), Fop (op2, tys2) -> begin
           if not (EcPath.p_equal op1 op2) then
             raise MatchFailure;
           try  List.iter2 (EcUnify.unify env ue) tys1 tys2
           with EcUnify.UnificationFailure _ -> raise MatchFailure
       end
-  
+
       | _, _ ->
         let ptn = Fsubst.f_subst subst ptn in
           if not (EcReduction.is_alpha_eq hyps ptn subject) then
@@ -416,10 +416,10 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
             else
               raise MatchFailure
       end
-  
+
       | (Fop (op1, tys1), args1), _ when EcEnv.Op.reducible env op1 ->
           doit_reduce ((doit ilc)^~ subject) ptn.f_ty op1 tys1 args1
-  
+
       | _, (Fop (op2, tys2), args2) when EcEnv.Op.reducible env op2 ->
           doit_reduce (doit ilc ptn) subject.f_ty op2 tys2 args2
 
@@ -450,7 +450,7 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
               try  EcUnify.unify env ue ty1 ty2
               with EcUnify.UnificationFailure _ -> raise MatchFailure
             end;
-            
+
             if   id_equal x1 x2
             then subst
             else Fsubst.f_bind_local subst x1 (f_local x2 ty2)
@@ -469,7 +469,7 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
             if not (
               try
                 EcSymbols.Msym.equal
-                  (fun (p1,ty1) (p2,ty2) -> 
+                  (fun (p1,ty1) (p2,ty2) ->
                     if p1 <> p2 then raise MatchFailure;
                     EcUnify.unify env ue ty1 ty2; true)
                   m1 m2
@@ -682,22 +682,22 @@ module FPosition = struct
           | Fglob  _ -> raise InvalidPosition
           | Fop    _ -> raise InvalidPosition
           | Fint   _ -> raise InvalidPosition
-  
+
           | Fquant (q, b, f) ->
               let f' = as_seq1 (doit p [f]) in
                 FSmart.f_quant (fp, (q, b, f)) (q, b, f')
-  
+
           | Fif (c, f1, f2)  ->
               let (c', f1', f2') = as_seq3 (doit p [c; f1; f2]) in
                 FSmart.f_if (fp, (c, f1, f2)) (c', f1', f2')
-  
+
           | Fapp (f, fs) -> begin
               match doit p (f :: fs) with
               | [] -> assert false
               | f' :: fs' ->
                   FSmart.f_app (fp, (f, fs, fp.f_ty)) (f', fs', fp.f_ty)
           end
-  
+
           | Ftuple fs ->
               let fs' = doit p fs in
                 FSmart.f_tuple (fp, fs) fs'
@@ -712,7 +712,7 @@ module FPosition = struct
           | Fpr (m, xp, f1, f2) ->
               let (f1', f2') = as_seq2 (doit p [f1; f2]) in
                 f_pr m xp f1' f2'
-  
+
           | FhoareF   _ -> raise InvalidPosition
           | FhoareS   _ -> raise InvalidPosition
           | FbdHoareF _ -> raise InvalidPosition
@@ -721,7 +721,7 @@ module FPosition = struct
           | FequivS   _ -> raise InvalidPosition
           | FeagerF   _ -> raise InvalidPosition
       end
-  
+
     and doit ps fps =
       match Mint.is_empty ps with
       | true  -> fps
@@ -733,7 +733,7 @@ module FPosition = struct
           let fps = List.mapi (fun i x -> (x, Mint.find_opt i ps)) fps in
           let fps = List.map (function (f, None) -> f | (f, Some p) -> doit1 p f) fps in
             fps
-  
+
     in
       as_seq1 (doit p [f])
 
