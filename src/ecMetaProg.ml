@@ -303,7 +303,7 @@ let fmrigid = { fm_delta = false; }
 let fmdelta = { fm_delta = true ; }
 
 (* Rigid unification *)
-let f_match opts hyps ue ev ptn subject =
+let f_match_core opts hyps (ue, ev) ~ptn subject =
   let ue  = EcUnify.UniEnv.copy ue in
   let ev  = let Ev ev = ev in ref ev in
   let env = EcEnv.LDecl.toenv hyps in
@@ -501,7 +501,7 @@ let f_match opts hyps ue ev ptn subject =
     doit (Fsubst.f_subst_id, Mid.empty) ptn subject; (ue, Ev !ev)
 
 let f_match opts hyps (ue, ev) ~ptn subject =
-  let (ue, Ev ev) = f_match opts hyps ue ev ptn subject in
+  let (ue, Ev ev) = f_match_core opts hyps (ue, ev) ~ptn subject in
     if not (Mid.for_all (fun _ x -> x <> None) ev) then
       raise MatchFailure;
     let clue =

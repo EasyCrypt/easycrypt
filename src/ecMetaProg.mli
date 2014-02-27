@@ -114,6 +114,14 @@ type fmoptions = {
 val fmrigid : fmoptions
 val fmdelta : fmoptions
 
+val f_match_core :
+     fmoptions
+  -> EcEnv.LDecl.hyps
+  -> unienv * form evmap
+  -> ptn:form
+  -> form
+  -> unienv * form evmap
+
 val f_match :
      fmoptions
   -> EcEnv.LDecl.hyps
