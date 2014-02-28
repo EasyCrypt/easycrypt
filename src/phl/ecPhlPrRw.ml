@@ -112,7 +112,7 @@ let t_pr_rewrite s g =
   let env, _, concl = get_goal_e g in
   let torw =
     try
-      ignore (EcMetaProg.FPosition.select select concl);
+      ignore (EcMatching.FPosition.select select concl);
       tacuerror "can not find a pattern for %s" s
     with FoundPr f -> f in
 

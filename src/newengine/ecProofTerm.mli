@@ -7,7 +7,7 @@ open EcEnv
 open EcCoreGoal
 
 (* -------------------------------------------------------------------- *)
-type evmap = form EcMetaProg.evmap
+type evmap = form EcMatching.evmap
 
 type pt_env = {
   pte_pe : proofenv;         (* proofenv of this proof-term *)

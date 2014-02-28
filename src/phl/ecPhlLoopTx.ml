@@ -10,7 +10,7 @@ open EcPV
 open EcCorePhl
 open EcCoreHiPhl
 
-module Zpr = EcMetaProg.Zipper
+module Zpr = EcMatching.Zipper
 
 (* -------------------------------------------------------------------- *)
 let check_fission_independence env b init c1 c2 c3 =

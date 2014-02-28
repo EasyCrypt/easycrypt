@@ -8,7 +8,7 @@ open EcParsetree
 open EcTypes
 open EcFol
 
-open EcMetaProg
+open EcMatching
 open EcBaseLogic
 open EcEnv
 open EcLogic
@@ -298,7 +298,7 @@ let process_apply_on_goal loc pe g =
       let withmatch () =
         let ev = evmap_of_pterm_arguments ids in
   
-          try  (ax, ids, EcMetaProg.f_match fmdelta hyps (ue, ev) ax fp, view);
+          try  (ax, ids, EcMatching.f_match fmdelta hyps (ue, ev) ax fp, view);
           with MatchFailure ->
             match destruct_product hyps ax with
             | Some _ ->
@@ -413,7 +413,7 @@ let process_apply_on_hyp loc (pe, hyp) g =
       | Some (`Imp (f1, f2)) ->
           let ev = evmap_of_pterm_arguments ids in
   
-          try  (ax, ids, EcMetaProg.f_match fmdelta hyps (ue, ev) f1 fp, (f1, f2));
+          try  (ax, ids, EcMatching.f_match fmdelta hyps (ue, ev) f1 fp, (f1, f2));
           with MatchFailure ->
             tacuerror "in apply, cannot find instance"
 

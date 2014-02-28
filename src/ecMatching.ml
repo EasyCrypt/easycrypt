@@ -14,6 +14,91 @@ open EcFol
 open EcBaseLogic
 
 (* -------------------------------------------------------------------- *)
+module Zipper = struct
+  exception InvalidCPos
+
+  module P = EcPath
+
+  type ('a, 'state) folder =
+    'a -> 'state -> instr -> 'state * instr list
+
+  type ipath =
+  | ZTop
+  | ZWhile  of expr * spath
+  | ZIfThen of expr * spath * stmt
+  | ZIfElse of expr * stmt  * spath
+
+  and spath = (instr list * instr list) * ipath
+
+  type zipper = {
+    z_head : instr list;                (* instructions on my left (rev)       *)
+    z_tail : instr list;                (* instructions on my right (me incl.) *)
+    z_path : ipath ;                    (* path (zipper) leading to me         *)
+  }
+
+  let zipper hd tl zpr = { z_head = hd; z_tail = tl; z_path = zpr; }
+
+  let rec zipper_of_cpos ((i, sub) : codepos) zpr s =
+    let (s1, i, s2) =
+      try  List.split_n (i-1) s.s_node
+      with Not_found -> raise InvalidCPos
+    in
+    match sub with
+    | None -> zipper s1 (i::s2) zpr
+    | Some (b, sub) -> begin
+      match i.i_node, b with
+      | Swhile (e, sw), 0 ->
+          zipper_of_cpos sub (ZWhile (e, ((s1, s2), zpr))) sw
+      | Sif (e, ifs1, ifs2), 0 ->
+          zipper_of_cpos sub (ZIfThen (e, ((s1, s2), zpr), ifs2)) ifs1
+      | Sif (e, ifs1, ifs2), 1 ->
+          zipper_of_cpos sub (ZIfElse (e, ifs1, ((s1, s2), zpr))) ifs2
+      | _ -> raise InvalidCPos
+    end
+
+  let zipper_of_cpos cpos s = zipper_of_cpos cpos ZTop s
+
+  let rec zip i ((hd, tl), ip) =
+    let s = stmt (List.rev_append hd (List.ocons i tl)) in
+
+    match ip with
+    | ZTop -> s
+    | ZWhile  (e, sp)     -> zip (Some (i_while (e, s))) sp
+    | ZIfThen (e, sp, se) -> zip (Some (i_if (e, s, se))) sp
+    | ZIfElse (e, se, sp) -> zip (Some (i_if (e, se, s))) sp
+
+  let zip zpr = zip None ((zpr.z_head, zpr.z_tail), zpr.z_path)
+
+  let after ~strict zpr =
+    let rec doit acc ip =
+      match ip with
+      | ZTop                          -> acc
+      | ZWhile  (_, ((_, is), ip))    -> doit (is :: acc) ip
+      | ZIfThen (_, ((_, is), ip), _) -> doit (is :: acc) ip
+      | ZIfElse (_, _, ((_, is), ip)) -> doit (is :: acc) ip
+    in
+
+    let after =
+      match zpr.z_tail, strict with
+      | []     , _     -> doit [[]] zpr.z_path
+      | is     , false -> doit [is] zpr.z_path
+      | _ :: is, true  -> doit [is] zpr.z_path
+    in
+      List.rev after
+
+  let rec fold env cpos f state s =
+    let zpr = zipper_of_cpos cpos s in
+
+      match zpr.z_tail with
+      | []      -> raise InvalidCPos
+      | i :: tl -> begin
+          match f env state i with
+          | (state', [i']) when i == i' && state == state' -> (state, s)
+          | (state', si  ) -> (state', zip { zpr with z_tail = si @ tl })
+      end
+end
+
+(* -------------------------------------------------------------------- *)
 type 'a evmap = {
   ev_map   : ('a option) Mid.t;
   ev_unset : int;

@@ -11,7 +11,7 @@ open EcBaseLogic
 open EcLogic
 open EcPV
 
-module Zpr = EcMetaProg.Zipper
+module Zpr = EcMatching.Zipper
 
 (* -------------------------------------------------------------------- *)
 type 'a sdestr_t  = string -> stmt -> 'a * stmt

@@ -11,7 +11,7 @@ open EcCoreGoal
 module L = EcLocation
 
 (* -------------------------------------------------------------------- *)
-type evmap = form EcMetaProg.evmap
+type evmap = form EcMatching.evmap
 
 type pt_env = {
   pte_pe : proofenv;
@@ -47,18 +47,18 @@ let ptenv_of_tcenv (tc : tcenv) =
   { pte_pe = FApi.tc_penv tc;
     pte_hy = FApi.tc_hyps tc;
     pte_ue = Typing.unienv_of_hyps (FApi.tc_hyps tc);
-    pte_ev = ref EcMetaProg.EV.empty; }
+    pte_ev = ref EcMatching.EV.empty; }
 
 (* -------------------------------------------------------------------- *)
 let pf_form_match (pt : pt_env) ~ptn subject =
   try
     let (ue, ev) =
-      EcMetaProg.f_match_core EcMetaProg.fmrigid pt.pte_hy
+      EcMatching.f_match_core EcMatching.fmrigid pt.pte_hy
         (pt.pte_ue, !(pt.pte_ev)) ~ptn subject
     in
       EcUnify.UniEnv.restore ~dst:pt.pte_ue ~src:ue;
       pt.pte_ev := ev
-  with EcMetaProg.MatchFailure as exn ->
+  with EcMatching.MatchFailure as exn ->
     (* FIXME: should we check for empty inters. with ecmap? *)
     if not (EcReduction.is_conv pt.pte_hy ptn subject) then
       raise exn
@@ -168,7 +168,7 @@ let trans_pterm_arg_value pe ?name { pl_desc = arg } =
   | EA_none ->
       let aty = EcUnify.UniEnv.fresh pe.pte_ue in
       let x   = EcIdent.create (odfl "x" name) in
-        pe.pte_ev := EcMetaProg.EV.add x !(pe.pte_ev);
+        pe.pte_ev := EcMatching.EV.add x !(pe.pte_ev);
         { ptea_env = pe; ptea_arg = PVAFormula (f_local x aty); }
 
   | EA_form fp ->
@@ -252,7 +252,7 @@ let apply_pterm_to_oarg ({ ptev_env = pe; ptev_pt = rawpt; } as pt) oarg =
               try
                 pf_form_match pe ~ptn:arg.ptev_ax f1;
                 (f2, PASub arg.ptev_pt)
-              with EcMetaProg.MatchFailure ->
+              with EcMatching.MatchFailure ->
                 tc_pterm_apperror pe.pte_pe `InvalidArgProof
             end
             | _ -> tc_pterm_apperror pe.pte_pe `PTermWanted
@@ -318,7 +318,7 @@ let tc_process_full_pterm (tc : tcenv) (ff : ffpattern) =
 (* -------------------------------------------------------------------- *)
 let can_concretize (pt : pt_env) =
      EcUnify.UniEnv.closed pt.pte_ue
-  && EcMetaProg.EV.filled  !(pt.pte_ev)
+  && EcMatching.EV.filled  !(pt.pte_ev)
 
 (* -------------------------------------------------------------------- *)
 let concretize ({ ptev_env = pe } as pt) =
@@ -326,7 +326,7 @@ let concretize ({ ptev_env = pe } as pt) =
 
   let tysubst = { ty_subst_id with ts_u = EcUnify.UniEnv.close pe.pte_ue } in
   let subst   =
-    EcMetaProg.EV.fold
+    EcMatching.EV.fold
       (fun x f s -> Fsubst.f_bind_local s x f) !(pe.pte_ev)
       (Fsubst.f_subst_init false Mid.empty tysubst EcPath.Mp.empty)
   in

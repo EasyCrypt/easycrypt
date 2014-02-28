@@ -6,7 +6,7 @@ open EcTypes
 open EcMemory
 open EcModules
 open EcFol
-open EcMetaProg.Zipper
+open EcMatching.Zipper
 open EcEnv
 open EcLogic
 

@@ -11,7 +11,7 @@ open EcPV
 open EcCorePhl
 
 module Mid = EcIdent.Mid
-module Zpr = EcMetaProg.Zipper
+module Zpr = EcMatching.Zipper
 
 (* -------------------------------------------------------------------- *)
 class rn_hl_kill side cpos len =

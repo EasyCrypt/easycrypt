@@ -48,7 +48,7 @@ type 'a pterm_arg =
 
 val ffpattern_of_genpattern : LDecl.hyps -> genpattern -> ffpattern option
 
-val evmap_of_pterm_arguments : ('a pterm_arg) list -> form EcMetaProg.evmap
+val evmap_of_pterm_arguments : ('a pterm_arg) list -> form EcMatching.evmap
 
 val check_pterm_arg_for_ty :
   LDecl.hyps -> gty option -> fpattern_arg located -> app_arg
@@ -64,16 +64,16 @@ val check_pterm_arguments :
   -> form * ty pterm_arg list
 
 val can_concretize_pterm_arguments :
-  unienv * form EcMetaProg.evmap -> ('a pterm_arg) list -> bool
+  unienv * form EcMatching.evmap -> ('a pterm_arg) list -> bool
 
 val concretize_pterm_arguments :
-  (uid -> ty option) * form EcMetaProg.evmap -> ('a pterm_arg) list -> app_arg list
+  (uid -> ty option) * form EcMatching.evmap -> ('a pterm_arg) list -> app_arg list
 
 val concretize_form :
-  (uid -> ty option) * form EcMetaProg.evmap -> form -> form
+  (uid -> ty option) * form EcMatching.evmap -> form -> form
 
 val concretize_pterm :
-  (uid -> ty option) * form EcMetaProg.evmap -> ('a pterm_arg) list -> form -> form
+  (uid -> ty option) * form EcMatching.evmap -> ('a pterm_arg) list -> form -> form
 
 (* -------------------------------------------------------------------- *)
 val process_form_opt : LDecl.hyps -> pformula -> ty option -> form

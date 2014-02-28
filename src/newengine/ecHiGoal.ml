@@ -24,7 +24,7 @@ let process_apply (ff : ffpattern) (tc : tcenv) =
           if not (PT.can_concretize pt.PT.ptev_env) then
             raise E.NoInstance;
           pt
-        with EcMetaProg.MatchFailure ->
+        with EcMatching.MatchFailure ->
           match EcLogic.destruct_product hyps pt.PT.ptev_ax with
           | None   -> raise E.NoInstance
           | Some _ ->

@@ -10,7 +10,7 @@ open EcFol
 open EcEnv
 open EcBaseLogic
 open EcLogic
-open EcMetaProg
+open EcMatching
 
 module TT = EcTyping
 module TC = EcTypeClass
