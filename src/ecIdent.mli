@@ -8,6 +8,8 @@ type ident = private {
   id_tag  : int;
 }
 
+type idents = ident list
+
 type t = ident
 
 val create   : symbol -> t
@@ -18,7 +20,7 @@ val tostring : t -> string
 
 (* -------------------------------------------------------------------- *)
 val id_equal : t -> t -> bool
-val id_compare : t -> t -> int 
+val id_compare : t -> t -> int
 val id_hash : t -> int
 
 (* -------------------------------------------------------------------- *)
@@ -28,8 +30,8 @@ module Sid : Set.S with module M = Map.MakeBase(Mid)
 (* -------------------------------------------------------------------- *)
 val fv_singleton : ident -> int Mid.t
 val fv_union     : int Mid.t -> int Mid.t -> int Mid.t
-val fv_diff      : int Mid.t -> 'a Mid.t -> int Mid.t 
-val fv_add       : ident -> int Mid.t -> int Mid.t 
+val fv_diff      : int Mid.t -> 'a Mid.t -> int Mid.t
+val fv_add       : ident -> int Mid.t -> int Mid.t
 
 (* -------------------------------------------------------------------- *)
 val pp_ident : Format.formatter -> t -> unit

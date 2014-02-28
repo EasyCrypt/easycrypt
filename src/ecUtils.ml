@@ -94,7 +94,7 @@ let try_finally (body : unit -> 'a) (cleanup : unit -> unit) =
   in
     cleanup (); aout
 
-let identity x = x 
+let identity x = x
 
 let (^~) f = fun x y -> f y x
 
@@ -236,11 +236,11 @@ let ofdfl (d : unit -> 'a) (x : 'a option) =
 let oget (x : 'a option) =
   match x with None -> assert false | Some x -> x
 
-let oall2 f x y = 
+let oall2 f x y =
   match x, y with
   | Some x, Some y -> f x y
   | None  , None   -> true
-  | _     , _      -> false 
+  | _     , _      -> false
 
 let ocompare f o1 o2 =
   match o1, o2 with
@@ -251,10 +251,10 @@ let ocompare f o1 o2 =
 
 module OSmart = struct
   let omap (f : 'a -> 'b) (x : 'a option) =
-    match x with 
-    | None   -> x 
-    | Some y -> 
-        let y' = f y in 
+    match x with
+    | None   -> x
+    | Some y ->
+        let y' = f y in
           if y == y' then x else Some y'
 
   let omap_fold (f : 'a -> 'b -> 'a * 'c) (v : 'a) (x : 'b option) =
@@ -264,6 +264,14 @@ module OSmart = struct
         let (v, y') = f v y in
           (v, if y == y' then x else Some y')
 end
+
+(* -------------------------------------------------------------------- *)
+type ('a, 'b) tagged = Tagged of ('a * 'b option)
+
+let tg_val (Tagged (x, _)) = x
+let tg_tag (Tagged (_, t)) = t
+let tg_map f (Tagged (x, t)) = Tagged (f x, t)
+let notag x = Tagged (x, None)
 
 (* -------------------------------------------------------------------- *)
 module Counter : sig
@@ -282,7 +290,7 @@ end = struct
     let aout = state.state in
       state.state <- state.state + 1;
       aout
-end    
+end
 
 (* -------------------------------------------------------------------- *)
 module Disposable : sig
@@ -333,12 +341,12 @@ module List = struct
         | 0 -> compare f s1 s2
         | c -> c
 
-  let hd2 l = 
+  let hd2 l =
     match l with
     | a::b::_ -> a,b
     | _ -> assert false
 
-  let ocons o l = 
+  let ocons o l =
     match o with
     | None -> l
     | Some e -> e :: l
@@ -408,9 +416,9 @@ module List = struct
     | []   , y::ys -> f (None  ) (Some y); iter2o f [] ys
     | x::xs, y::ys -> f (Some x) (Some y); iter2o f xs ys
 
-  let prmap f l = 
-    let rec aux r l = 
-      match l with 
+  let prmap f l =
+    let rec aux r l =
+      match l with
       | [] -> r
       | x::l -> aux (ocons (f x) r) l in
     aux [] l
@@ -463,9 +471,9 @@ module List = struct
   let uniq l = uniqf (=) l
 
   let assoc_eq eq (x : 'a) (xs : ('a * 'b) list) =
-    snd (List.find (fun (x',_) -> eq x x') xs) 
+    snd (List.find (fun (x',_) -> eq x x') xs)
 
-  let tryassoc_eq eq x xs = 
+  let tryassoc_eq eq x xs =
     try_nf (fun () -> assoc_eq eq x xs)
 
   let tryassoc (x : 'a) (xs : ('a * 'b) list) =
@@ -489,21 +497,21 @@ module List = struct
 
   let take (n : int) (xs : 'a list) = fst (take_n n xs)
 
-  let split_n n l = 
-    let rec aux r n l = 
+  let split_n n l =
+    let rec aux r n l =
       match n, l with
-      | _, [] -> raise Not_found 
+      | _, [] -> raise Not_found
       | 0, x::l -> r, x, l
       | _, x::l -> aux (x::r) (n-1) l in
-    aux [] n l 
+    aux [] n l
 
-  let find_split f l = 
-    let rec aux r l = 
-      match l with 
+  let find_split f l =
+    let rec aux r l =
+      match l with
       | [] -> raise Not_found
       | x::l -> if f x then r, x, l else aux (x::r) l in
     aux [] l
- 
+
   let mapi (f : int -> 'a -> 'b) =
     let rec doit n xs =
       match xs with
@@ -514,12 +522,12 @@ module List = struct
 
   let map_fold (f : 'a -> 'b -> 'a * 'c) (a : 'a) (xs : 'b list) =
     let a = ref a in
-    let f b = 
+    let f b =
       let (a',c) = f !a b in
       a := a'; c in
     let l = List.map f xs in
     !a, l
-  
+
   let map_combine
       (f1  : 'a -> 'c) (f2  : 'b -> 'd)
       (xs1 : 'a list ) (xs2 : 'b list )
@@ -536,24 +544,24 @@ module List = struct
   in
       doit xs1 xs2
 
-  let fold_lefti f a l = 
+  let fold_lefti f a l =
     let i = ref (-1) in
     let f a e =  incr i; f !i a e in
     List.fold_left f a l
 
-  let rec filter2 f la lb = 
+  let rec filter2 f la lb =
     match la, lb with
     | [], [] -> [], []
     | a::la, b::lb ->
         let (la,lb as r) = filter2 f la lb in
-        if f a b then a::la, b::lb 
+        if f a b then a::la, b::lb
         else r
     | _, _ -> invalid_arg "List.filter2"
 
   let sum xs = List.fold_left (+) 0 xs
 
   module Smart = struct
-    let rec map f l = 
+    let rec map f l =
       match l with
       | []    -> []
       | x::xs ->
@@ -587,10 +595,10 @@ module Parray = struct
      Array.init (Array.length a) (fun i -> snd a.(i)))
 
   let fold_left2 f a t1 t2 =
-    if Array.length t1 <> Array.length t2 then 
+    if Array.length t1 <> Array.length t2 then
       raise (Invalid_argument "Parray.fold_left2");
-    let rec aux i a t1 t2 = 
-      if i < Array.length t1 then f a t1.(i) t2.(i) 
+    let rec aux i a t1 t2 =
+      if i < Array.length t1 then f a t1.(i) t2.(i)
       else a in
     aux 0 a t1 t2
 
@@ -600,16 +608,16 @@ module Parray = struct
     done
 
   let exists f t =
-    let rec aux i t = 
-      if i < Array.length t then f t.(i) || aux (i+1) t 
-      else false in
-    aux 0 t 
-
-  let for_all f t = 
     let rec aux i t =
-      if i < Array.length t then f t.(i) && aux (i+1) t 
+      if i < Array.length t then f t.(i) || aux (i+1) t
+      else false in
+    aux 0 t
+
+  let for_all f t =
+    let rec aux i t =
+      if i < Array.length t then f t.(i) && aux (i+1) t
       else true in
-    aux 0 t 
+    aux 0 t
 end
 
 (* -------------------------------------------------------------------- *)

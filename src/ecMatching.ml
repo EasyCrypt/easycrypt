@@ -406,6 +406,7 @@ module FPosition = struct
     in
       fun p -> doit 0 p
 
+  (* ------------------------------------------------------------------ *)
   let filter (s : Sint.t) =
     let rec doit1 n p =
       match p with
@@ -441,20 +442,34 @@ module FPosition = struct
           | Ftuple fs          -> doit pos (`WithCtxt (ctxt, fs))
 
           | Fquant (_, b, f) ->
-            let xs   = List.pmap (function (x, GTty _) -> Some x | _ -> None) b in
-            let ctxt = List.fold_left ((^~) Sid.add) ctxt xs in
+              let xs   = List.pmap (function (x, GTty _) -> Some x | _ -> None) b in
+              let ctxt = List.fold_left ((^~) Sid.add) ctxt xs in
               doit pos (`WithCtxt (ctxt, [f]))
 
           | Flet (lp, f1, f2) ->
-            let subctxt = List.fold_left ((^~) Sid.add) ctxt (lp_ids lp) in
-              doit pos (`WithSubCtxt [(ctxt, f1); (subctxt, f2)])
-
-          | Fpr (m, _, f1, f2) ->
-            let subctxt = Sid.add m ctxt in
+              let subctxt = List.fold_left ((^~) Sid.add) ctxt (lp_ids lp) in
               doit pos (`WithSubCtxt [(ctxt, f1); (subctxt, f2)])
 
           | Fproj (f, _) ->
               doit pos (`WithCtxt (ctxt, [f]))
+
+          | Fpr (m, _, f1, f2) ->
+              let subctxt = Sid.add m ctxt in
+              doit pos (`WithSubCtxt [(ctxt, f1); (subctxt, f2)])
+
+          | FhoareF hs ->
+              doit pos (`WithCtxt (Sid.add EcFol.mhr ctxt, [hs.hf_pr; hs.hf_po]))
+
+          | FbdHoareF hs ->
+              let subctxt = Sid.add EcFol.mhr ctxt in
+              doit pos (`WithSubCtxt ([(subctxt, hs.bhf_pr);
+                                       (subctxt, hs.bhf_po);
+                                       (   ctxt, hs.bhf_bd)]))
+
+          | FequivF es ->
+              let ctxt = Sid.add EcFol.mleft  ctxt in
+              let ctxt = Sid.add EcFol.mright ctxt in
+              doit pos (`WithCtxt (ctxt, [es.ef_pr; es.ef_po]))
 
           | _ -> None
         in
@@ -466,12 +481,14 @@ module FPosition = struct
         match fps with
         | `WithCtxt (ctxt, fps) ->
             List.mapi
-              (fun i fp -> doit1 ctxt (i::pos) fp |> omap (fun p -> (i, p)))
+              (fun i fp ->
+                doit1 ctxt (i::pos) fp |> omap (fun p -> (i, p)))
               fps
 
         | `WithSubCtxt fps ->
             List.mapi
-              (fun i (ctxt, fp) -> doit1 ctxt (i::pos) fp |> omap (fun p -> (i, p)))
+              (fun i (ctxt, fp) ->
+                doit1 ctxt (i::pos) fp |> omap (fun p -> (i, p)))
               fps
       in
 
@@ -563,13 +580,23 @@ module FPosition = struct
 
           | Fpr (m, xp, f1, f2) ->
               let (f1', f2') = as_seq2 (doit p [f1; f2]) in
-                f_pr m xp f1' f2'
+              f_pr m xp f1' f2'
 
-          | FhoareF   _ -> raise InvalidPosition
+          | FhoareF hf ->
+              let (hf_pr, hf_po) = as_seq2 (doit p [hf.hf_pr; hf.hf_po]) in
+              f_hoareF_r { hf with hf_pr; hf_po; }
+
+          | FbdHoareF hf ->
+              let sub = doit p [hf.bhf_pr; hf.bhf_po; hf.bhf_bd] in
+              let (bhf_pr, bhf_po, bhf_bd) = as_seq3 sub in
+              f_bdHoareF_r { hf with bhf_pr; bhf_po; bhf_bd; }
+
+          | FequivF ef ->
+              let (ef_pr, ef_po) = as_seq2 (doit p [ef.ef_pr; ef.ef_po]) in
+              f_equivF_r { ef with ef_pr; ef_po; }
+
           | FhoareS   _ -> raise InvalidPosition
-          | FbdHoareF _ -> raise InvalidPosition
           | FbdHoareS _ -> raise InvalidPosition
-          | FequivF   _ -> raise InvalidPosition
           | FequivS   _ -> raise InvalidPosition
           | FeagerF   _ -> raise InvalidPosition
       end

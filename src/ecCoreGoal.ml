@@ -45,11 +45,9 @@ and pt_arg =
 | PASub     of proofterm
 
 (* -------------------------------------------------------------------- *)
-type position
-
 type rwproofterm = {
   rpt_proof : proofterm;
-  rtp_occrs : position list;
+  rpt_occrs : EcMatching.ptnpos;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -88,12 +86,13 @@ and goal = {
 }
 
 and validation =
-| VSmt     : validation                 (* SMT call *)
-| VAdmit   : validation                 (* admit *)
-| VConv    : Sid.t -> validation        (* weakening + conversion *)
-| VApply   : proofterm -> validation    (* modus ponens *)
-| VRewrite : rwproofterm -> validation  (* rewrite *)
-| VExtern  : 'a -> validation           (* external (hl/phl/prhl/...) proof-node *)
+| VSmt                               (* SMT call *)
+| VAdmit                             (* admit *)
+| VIntros  of (handle * idents)      (* intros *)
+| VConv    of (handle * Sid.t)       (* weakening + conversion *)
+| VRewrite of (handle * rwproofterm) (* rewrite *)
+| VApply   of proofterm              (* modus ponens *)
+| VExtern  : 'a -> validation        (* external (hl/phl/prhl/...) proof-node *)
 
 and tcenv = {
   tce_proofenv   : proofenv;           (* top-level proof environment *)
@@ -341,9 +340,16 @@ module FApi = struct
 end
 
 (* -------------------------------------------------------------------- *)
+let (!!) = FApi.tc_penv
+
+(* -------------------------------------------------------------------- *)
 module RApi = struct
   type rproofenv = proofenv ref
   type rtcenv    = tcenv ref
+
+  (* ------------------------------------------------------------------ *)
+  let rtcenv_of_tcenv (tc :  tcenv) : rtcenv = ref tc
+  let tcenv_of_rtcenv (tc : rtcenv) :  tcenv = !tc
 
   (* ------------------------------------------------------------------ *)
   let freeze (pe : rtcenv) =
@@ -361,6 +367,10 @@ module RApi = struct
   (* ------------------------------------------------------------------ *)
   let newgoal pe ?hyps concl =
     reffold (fun pe -> FApi.newgoal pe ?hyps concl) pe
+
+  (* ------------------------------------------------------------------ *)
+  let close tc validation =
+    tc := FApi.close !tc validation
 
   (* ------------------------------------------------------------------ *)
   let pf_get_pregoal_by_id id pf = FApi.get_pregoal_by_id id !pf

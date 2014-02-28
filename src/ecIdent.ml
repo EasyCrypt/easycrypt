@@ -4,10 +4,12 @@ open EcUtils
 open EcMaps
 
 (* -------------------------------------------------------------------- *)
-type ident = { 
+type ident = {
   id_symb : symbol;
   id_tag  : int;
 }
+
+type idents = ident list
 
 (* -------------------------------------------------------------------- *)
 let name x = x.id_symb
@@ -15,8 +17,8 @@ let tag  x = x.id_tag
 
 (* -------------------------------------------------------------------- *)
 let id_equal : ident -> ident -> bool = (==)
-let id_compare i1 i2 = i2.id_tag - i1.id_tag 
-let id_hash id = id.id_tag 
+let id_compare i1 i2 = i2.id_tag - i1.id_tag
+let id_hash id = id.id_tag
 
 (* -------------------------------------------------------------------- *)
 module IdComparable = struct
@@ -36,7 +38,7 @@ let fv_add x m     = Mid.change (fun x -> Some ((odfl 0 x) + 1)) x m
 (* -------------------------------------------------------------------- *)
 type t = ident
 
-let create (x : symbol) = 
+let create (x : symbol) =
   { id_symb = x;
     id_tag  = EcUid.unique () }
 

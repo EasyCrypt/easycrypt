@@ -18,6 +18,7 @@ let _dummy = {
   loc_echar = -1;
 }
 
+(* -------------------------------------------------------------------- *)
 let make (p1 : position) (p2 : position) =
   let mkpos (p : position) =
     (p.pos_lnum, p.pos_cnum - p.pos_bol)
@@ -64,18 +65,22 @@ type 'a located = {
   pl_desc : 'a;
 }
 
+type 'a mloc = ('a, t) EcUtils.tagged
+
+(* -------------------------------------------------------------------- *)
 let unloc  x = x.pl_desc
 let unlocs x = List.map unloc x
 
-let lmap f x = 
+let lmap f x =
   { x with pl_desc = f x.pl_desc }
 
-let mk_loc loc x = { pl_loc = loc; pl_desc = x; }
+let mk_loc loc x =
+  { pl_loc = loc; pl_desc = x; }
 
-(* -------------------------------------------------------------------- *)      
-exception LocError of t * exn 
+(* -------------------------------------------------------------------- *)
+exception LocError of t * exn
 
-let locate_error loc exn = 
+let locate_error loc exn =
   match exn with
   | LocError _ -> raise exn
   | _ -> raise (LocError(loc,exn))

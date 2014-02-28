@@ -1,15 +1,22 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
+open EcLocation
+open EcIdent
+open EcSymbols
+open EcTypes
 open EcFol
 open EcEnv
+open EcMatching
+open EcReduction
 open EcCoreGoal
 
-(* -------------------------------------------------------------------- *)
-let t_admit (tc : tcenv) = FApi.close tc VAdmit
+open EcBaseLogic
+open EcLogic
 
 (* -------------------------------------------------------------------- *)
 exception InvalidProofTerm
 
+(* -------------------------------------------------------------------- *)
 module LowApply = struct
   (* ------------------------------------------------------------------ *)
   let rec check_pthead (pt : pt_head) (tc : rtcenv) =
@@ -88,6 +95,86 @@ module LowApply = struct
     ({ pt_head = nhd; pt_args = nargs }, Fsubst.f_subst sbt ax)
 end
 
+(* -------------------------------------------------------------------- *)
+module LowIntro = struct
+  let valid_value_name (x : symbol) = x <> "_" && EcIo.is_sym_ident x
+  let valid_mod_name   (x : symbol) = x <> "_" && EcIo.is_mem_ident x
+  let valid_mem_name   (x : symbol) = x <> "_" && EcIo.is_mod_ident x
+
+  type kind = [`Value | `Module | `Memory]
+
+  let tc_no_product (_ : proofenv) ?loc () =
+    ignore loc; assert false
+
+  let check_name_validity _pe _kind _x : unit = assert false
+end
+
+(* -------------------------------------------------------------------- *)
+let t_intros (ids : ident mloc list) (tc : tcenv) =
+  let add_local id sbt x gty =
+    let gty = Fsubst.gty_subst sbt gty in
+    let name = tg_map EcIdent.name id in
+    let id   = tg_val id in
+
+    match gty with
+    | GTty ty ->
+        LowIntro.check_name_validity !!tc `Value name;
+        (LD_var (ty, None), Fsubst.f_bind_local sbt x (f_local id ty))
+    | GTmem me ->
+        LowIntro.check_name_validity !!tc `Memory name;
+        (LD_mem me, Fsubst.f_bind_mem sbt x id)
+    | GTmodty (i, r) ->
+        LowIntro.check_name_validity !!tc `Module name;
+        (LD_modty (i, r), Fsubst.f_bind_mod sbt x (EcPath.mident id))
+  in
+
+  let add_ld id ld hyps =
+    set_oloc
+      (tg_tag id)
+      (fun () -> LDecl.add_local (tg_val id) ld hyps) ()
+  in
+
+  let rec intro1 ((hyps, concl), sbt) id =
+    match EcFol.sform_of_form concl with
+    | SFquant (Lforall, (x, gty), concl) ->
+        let (ld, sbt) = add_local id sbt x gty in
+        let hyps = add_ld id ld hyps in
+        (hyps, concl), sbt
+
+    | SFimp (prem, concl) ->
+        let prem = Fsubst.f_subst sbt prem in
+        let hyps = add_ld id (LD_hyp prem) hyps in
+        (hyps, concl), sbt
+
+    | SFlet (LSymbol (x, xty), xe, concl) ->
+        let xty  = sbt.fs_ty xty in
+        let xe   = Fsubst.f_subst sbt xe in
+        let sbt  = Fsubst.f_bind_local sbt x (f_local (tg_val id) xty) in
+        let hyps = add_ld id (LD_var (xty, Some xe)) hyps in
+        (hyps, concl), sbt
+
+    | _ when sbt !=(*φ*) Fsubst.f_subst_id ->
+        let concl = Fsubst.f_subst sbt concl in
+        intro1 ((hyps, concl), Fsubst.f_subst_id) id
+
+    | _ ->
+        match h_red_opt full_red hyps concl with
+        | None       -> LowIntro.tc_no_product !!tc ?loc:(tg_tag id) ()
+        | Some concl -> intro1 ((hyps, concl), sbt) id
+  in
+
+  let (hyps, concl), _ =
+    List.fold_left intro1 (FApi.tc_flat tc, Fsubst.f_subst_id) ids in
+  let (hd, tc) = FApi.newgoal tc ~hyps concl in
+  FApi.close tc (VIntros (hd, List.map tg_val ids))
+
+(* -------------------------------------------------------------------- *)
+let t_intro_i (id : EcIdent.t) (tc : tcenv) =
+  t_intros [notag id] tc
+
+(* -------------------------------------------------------------------- *)
+let t_admit (tc : tcenv) = FApi.close tc VAdmit
+
 (* ------------------------------------------------------------------ *)
 let t_apply (pt : proofterm) (tc : tcenv) =
   let (hyps, concl) = FApi.tc_flat tc in
@@ -96,3 +183,35 @@ let t_apply (pt : proofterm) (tc : tcenv) =
   if not (EcReduction.is_conv hyps concl ax) then
     raise InvalidProofTerm;
   FApi.close tc (VApply pt)
+
+(* -------------------------------------------------------------------- *)
+let t_rewrite (pt : proofterm) (pos : ptnpos) (tc : tcenv) =
+  let tc = RApi.rtcenv_of_tcenv tc in
+  let (hyps, concl) = RApi.tc_flat tc in
+
+  if not (FPosition.is_empty pos) then begin
+    let (pt, ax) = LowApply.check pt tc in
+    let (left, right) =
+      match sform_of_form ax with
+      | SFeq  (f1, f2) -> (f1, f2)
+      | SFiff (f1, f2) -> (f1, f2)
+      | _ -> raise InvalidProofTerm
+    in
+
+    let change f =
+      if not (EcReduction.is_conv hyps f left) then
+        raise InvalidProofTerm;
+      right
+    in
+
+    let newconcl =
+      try  FPosition.map pos change concl
+      with InvalidPosition -> raise InvalidProofTerm in
+
+    let hd   = RApi.newgoal tc newconcl in
+    let rwpt = { rpt_proof = pt; rpt_occrs = pos; } in
+
+    RApi.close tc (VRewrite (hd, rwpt))
+  end;
+
+  RApi.tcenv_of_rtcenv tc

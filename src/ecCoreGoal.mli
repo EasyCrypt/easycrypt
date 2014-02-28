@@ -60,13 +60,11 @@ and pt_arg =
 (*  rwpt := pt * position list                                          *)
 (*    <pt>: equality-proof term                                         *)
 (*                                                                      *)
-(*  position := term position (to be defined)                           *)
+(*  position := EcMatching.ptnpos - pattern position                    *)
 (* -------------------------------------------------------------------- *)
-type position
-
 type rwproofterm = {
   rpt_proof : proofterm;
-  rtp_occrs : position list;
+  rpt_occrs : EcMatching.ptnpos;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -100,12 +98,13 @@ type pregoal = {
 }
 
 type validation =
-| VSmt     : validation                 (* SMT call *)
-| VAdmit   : validation                 (* admit *)
-| VConv    : Sid.t -> validation        (* weakening + conversion *)
-| VApply   : proofterm -> validation    (* modus ponens *)
-| VRewrite : rwproofterm -> validation  (* rewrite *)
-| VExtern  : 'a -> validation           (* external (hl/phl/prhl/...) proof-node *)
+| VSmt                               (* SMT call *)
+| VAdmit                             (* admit *)
+| VIntros  of (handle * idents)      (* intros *)
+| VConv    of (handle * Sid.t)       (* weakening + conversion *)
+| VRewrite of (handle * rwproofterm) (* rewrite *)
+| VApply   of proofterm              (* modus ponens *)
+| VExtern  : 'a -> validation        (* external (hl/phl/prhl/...) proof-node *)
 
 (* -------------------------------------------------------------------- *)
 val tcenv_of_proof : proof -> tcenv
@@ -181,12 +180,17 @@ module FApi : sig
   val lseq : backward list -> tcenv -> tcenv
 end
 
+val (!!) : tcenv -> proofenv
+
 (* -------------------------------------------------------------------- *)
 (* Imperative API                                                       *)
 (* -------------------------------------------------------------------- *)
 module RApi : sig
   type rproofenv
   type rtcenv
+
+  val rtcenv_of_tcenv  : tcenv  -> rtcenv
+  val  tcenv_of_rtcenv : rtcenv ->  tcenv
 
   (* For the following functions, see the [FApi] module *)
   val of_pure : tcenv -> (rtcenv -> 'a) -> 'a * tcenv
@@ -195,6 +199,7 @@ module RApi : sig
   val tc_get_pregoal_by_id : handle -> rtcenv -> pregoal
 
   val newgoal : rtcenv -> ?hyps:LDecl.hyps -> form -> handle
+  val close   : rtcenv -> validation -> unit
 
   (* Accessors for focused goal parts *)
   val tc_penv : rtcenv -> proofenv

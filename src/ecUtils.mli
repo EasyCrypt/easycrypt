@@ -89,7 +89,7 @@ val opt_equal  : 'a eq -> 'a option eq
 val compare_tag : 'a cmp
 val compare2: int lazy_t -> int lazy_t -> int
 val compare3: int lazy_t -> int lazy_t -> int lazy_t -> int
- 
+
 (* -------------------------------------------------------------------- *)
 val none : 'a option
 val some : 'a -> 'a option
@@ -113,6 +113,14 @@ module OSmart : sig
   val omap : ('a -> 'a) -> 'a option -> 'a option
   val omap_fold : ('a -> 'b -> 'a * 'b) -> 'a -> 'b option -> 'a * 'b option
 end
+
+(* -------------------------------------------------------------------- *)
+type ('a, 'b) tagged = Tagged of ('a * 'b option)
+
+val tg_val : ('a, 'b) tagged -> 'a
+val tg_tag : ('a, 'b) tagged -> 'b option
+val tg_map : ('a -> 'b) -> ('a, 'c) tagged -> ('b, 'c) tagged
+val notag  : 'a -> ('a, 'b) tagged
 
 (* -------------------------------------------------------------------- *)
 module Counter : sig
@@ -254,7 +262,7 @@ module Parray : sig
 
   val get : 'a t -> int -> 'a
 
-  val length : 'a t -> int 
+  val length : 'a t -> int
 
   val of_list : 'a list -> 'a t
 
@@ -274,7 +282,7 @@ module Parray : sig
 
   val fold_left2 : ('a -> 'b -> 'c -> 'a) -> 'a -> 'b t -> 'c t -> 'a
 
-  val iter : ('a -> unit) -> 'a t -> unit 
+  val iter : ('a -> unit) -> 'a t -> unit
 
   val iter2 : ('a -> 'b -> unit) -> 'a t -> 'b t -> unit
 
@@ -289,4 +297,3 @@ end
 module Os : sig
   val listdir : string -> string list
 end
-
