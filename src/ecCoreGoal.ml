@@ -59,9 +59,6 @@ type location = {
 
 exception TcError of location * string Lazy.t
 
-let tcerror (lc : location) (msg : string) =
-  raise (TcError (lc, lazy msg))
-
 (* -------------------------------------------------------------------- *)
 type proof = {
   pr_env    : proofenv;
@@ -112,7 +109,7 @@ and tcenv_gzip = {
 }
 
 (* -------------------------------------------------------------------- *)
-let pf_tcerror pe msg =
+let tc_error pe ?loc msg =
   assert false                          (* FIXME *)
 
 (* -------------------------------------------------------------------- *)
@@ -493,7 +490,7 @@ module Typing = struct
 
     | Some (EcUnify.TVIunamed tyargs) ->
         if List.length tyargs <> List.length typ then
-          pf_tcerror pe
+          tc_error pe
             (Printf.sprintf
                "wrong number of type parameters (%d, expecting %d)"
                (List.length tyargs) (List.length typ))
@@ -503,6 +500,6 @@ module Typing = struct
         List.iter
           (fun (x, _) ->
             if not (List.mem x typnames) then
-              pf_tcerror pe ("unknown type variable: " ^ x))
+              tc_error pe ("unknown type variable: " ^ x))
           tyargs
 end

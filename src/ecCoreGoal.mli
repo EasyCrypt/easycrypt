@@ -16,8 +16,6 @@ type location = {
 
 exception TcError of location * string Lazy.t
 
-val tcerror : location -> string -> 'a
-
 (* -------------------------------------------------------------------- *)
 (* Proof-node ID                                                        *)
 (* -------------------------------------------------------------------- *)
@@ -121,6 +119,9 @@ val start : LDecl.hyps -> form -> proof
 val opened : proof -> (int * pregoal) option
 
 (* -------------------------------------------------------------------- *)
+val tc_error :
+  proofenv -> ?loc:EcLocation.t -> string -> 'a
+
 val tc_lookup_error :
   proofenv -> ?loc:EcLocation.t -> [`Lemma] -> qsymbol -> 'a
 

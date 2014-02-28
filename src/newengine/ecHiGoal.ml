@@ -2,7 +2,12 @@
 open EcParsetree
 open EcCoreGoal
 open EcLocation
+open EcTypes
+open EcFol
+open EcEnv
+open EcMatching
 
+module ER = EcReduction
 module PT = EcProofTerm
 
 (* ------------------------------------------------------------------ *)
@@ -37,10 +42,69 @@ let process_apply (ff : ffpattern) (tc : tcenv) =
   EcLowGoal.t_apply pt tc
 
 (* -------------------------------------------------------------------- *)
+let process_rewrite1_core (s, o) pt tc =
+  let hyps, concl = FApi.tc_flat tc in
+  let env = LDecl.toenv hyps in
+
+  let (pt, (f1, f2)) =
+    let rec find_rewrite_pattern pt =
+      let ax = pt.PT.ptev_ax in
+
+      match EcFol.sform_of_form ax with
+      | EcFol.SFeq  (f1, f2) -> (pt, (f1, f2))
+      | EcFol.SFiff (f1, f2) -> (pt, (f1, f2))
+      | _ -> begin
+        match EcLogic.destruct_product hyps ax with
+        | None ->
+            if   s = `LtoR && ER.EqTest.for_type env ax.f_ty tbool
+            then (pt, (ax, f_true))
+            else tc_error !!tc "not an equation to rewrite"
+        | Some _ ->
+            let pt = EcProofTerm.apply_pterm_to_hole pt in
+            find_rewrite_pattern pt
+      end
+    in
+      find_rewrite_pattern pt
+  in
+
+  let fp = match s with `LtoR -> f1 | `RtoL -> f2 in
+
+  (try  PT.pf_find_occurence pt.PT.ptev_env ~ptn:fp concl
+   with EcMatching.MatchFailure -> tc_error !!tc "nothing ot rewrite");
+
+  let fp   = PT.concretize_form pt.PT.ptev_env fp in
+  let pt   = fst (PT.concretize pt) in
+  let cpos =
+    try  FPosition.select_form hyps o fp concl
+    with InvalidOccurence -> tc_error !!tc "invalid occurence selector"
+  in
+
+  EcLowGoal.t_rewrite pt cpos tc
+
+(* -------------------------------------------------------------------- *)
+let rec process_rewrite1 ri tc =
+  let (hyps, concl) = FApi.tc_flat tc in
+
+  match ri with
+  | RWRw (s, None, o, [pt]) ->
+      let pt = PT.tc_process_full_pterm tc pt in
+      process_rewrite1_core (s, o) pt tc
+
+  | _ -> assert false
+
+(* -------------------------------------------------------------------- *)
+let process_rewrite ri tc =
+  match ri with
+  | [(None, ri)] -> process_rewrite1 ri tc
+  | _ -> assert false
+
+(* -------------------------------------------------------------------- *)
 let process1 (t : ptactic) (tc : tcenv) =
   match (unloc t.pt_core) with
   | Padmit  -> EcLowGoal.t_admit tc
-  | Plogic (Papply (ff, None)) -> process_apply ff tc
+  | Plogic (Papply   (ff, None)) -> process_apply ff tc
+  | Plogic (Prewrite ri)         -> process_rewrite ri tc
+
   | _ -> assert false
 
 (* -------------------------------------------------------------------- *)

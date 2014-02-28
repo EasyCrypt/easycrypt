@@ -64,10 +64,40 @@ let pf_form_match (pt : pt_env) ~ptn subject =
       raise exn
 
 (* -------------------------------------------------------------------- *)
+let pf_find_occurence (pt : pt_env) ~ptn subject =
+  let module E = struct exception MatchFound end in
+
+  let na = List.length (snd (EcFol.destr_app ptn)) in
+
+  let trymatch bds _pos tp =
+    let tp =
+      match tp.f_node with
+      | Fapp (h, hargs) when List.length hargs > na ->
+          let (a1, a2) = List.take_n na hargs in
+            f_app h a1 (toarrow (List.map f_ty a2) tp.f_ty)
+      | _ -> tp
+    in
+
+    try
+      if not (Mid.set_disjoint bds tp.f_fv) then
+        `Continue
+      else begin
+        pf_form_match pt ~ptn tp;
+        raise E.MatchFound
+      end
+    with EcMatching.MatchFailure -> `Continue
+  in
+
+  try
+    ignore (EcMatching.FPosition.select trymatch subject);
+    raise EcMatching.MatchFailure
+  with E.MatchFound -> ()
+
+(* -------------------------------------------------------------------- *)
 let pf_unify (pt : pt_env) ty1 ty2 =
   let ue = EcUnify.UniEnv.copy pt.pte_ue in
-    EcUnify.unify (LDecl.toenv pt.pte_hy) ue ty1 ty2;
-    EcUnify.UniEnv.restore ~dst:pt.pte_ue ~src:ue
+  EcUnify.unify (LDecl.toenv pt.pte_hy) ue ty1 ty2;
+  EcUnify.UniEnv.restore ~dst:pt.pte_ue ~src:ue
 
 (* -------------------------------------------------------------------- *)
 let rec pmsymbol_of_pform fp : pmsymbol option =
@@ -85,11 +115,11 @@ let rec pmsymbol_of_pform fp : pmsymbol option =
         args
     in
 
-      match List.exists (fun x -> x = None) args with
-      | true  -> None
-      | false ->
-          let args = List.map (fun a -> oget a) args in
-            Some (mod_ @ [mk_loc loc x, Some args])
+    match List.exists (fun x -> x = None) args with
+    | true  -> None
+    | false ->
+        let args = List.map (fun a -> oget a) args in
+          Some (mod_ @ [mk_loc loc x, Some args])
   end
 
   | PFtuple [fp] -> pmsymbol_of_pform fp
@@ -321,7 +351,7 @@ let can_concretize (pt : pt_env) =
   && EcMatching.EV.filled  !(pt.pte_ev)
 
 (* -------------------------------------------------------------------- *)
-let concretize ({ ptev_env = pe } as pt) =
+let concretize_form_r pe =
   assert (can_concretize pe);
 
   let tysubst = { ty_subst_id with ts_u = EcUnify.UniEnv.close pe.pte_ue } in
@@ -330,14 +360,20 @@ let concretize ({ ptev_env = pe } as pt) =
       (fun x f s -> Fsubst.f_bind_local s x f) !(pe.pte_ev)
       (Fsubst.f_subst_init false Mid.empty tysubst EcPath.Mp.empty)
   in
+    (subst, fun f -> Fsubst.f_subst subst f)
 
-  let onform f = Fsubst.f_subst subst f in
+(* -------------------------------------------------------------------- *)
+let concretize_form pe = snd (concretize_form_r pe)
+
+(* -------------------------------------------------------------------- *)
+let concretize ({ ptev_env = pe } as pt) =
+  let subst, onform = concretize_form_r pe in
 
   let rec onpthead = function
     | PTCut    f        -> PTCut (onform f)
     | PTHandle h        -> PTHandle h
     | PTLocal  x        -> PTLocal  x
-    | PTGlobal (p, tys) -> PTGlobal (p, List.map (ty_subst tysubst) tys)
+    | PTGlobal (p, tys) -> PTGlobal (p, List.map subst.fs_ty tys)
 
   and onptarg = function
     | PAFormula f        -> PAFormula (onform f)

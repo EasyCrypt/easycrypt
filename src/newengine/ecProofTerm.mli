@@ -47,9 +47,11 @@ val apply_pterm_to_arg  : pt_ev -> pt_ev_arg -> pt_ev
 val apply_pterm_to_hole : pt_ev -> pt_ev
 
 (* pattern matching - raise [MatchFailure] on failure. *)
-val pf_form_match : pt_env -> ptn:form -> form -> unit
-val pf_unify      : pt_env -> ty -> ty -> unit
+val pf_form_match     : pt_env -> ptn:form -> form -> unit
+val pf_unify          : pt_env -> ty -> ty -> unit
+val pf_find_occurence : pt_env -> ptn:form -> form -> unit
 
 (* Proof-terms concretization, i.e. evmap/unienv resolution *)
-val can_concretize : pt_env -> bool
-val concretize     : pt_ev  -> proofterm * form
+val can_concretize  : pt_env -> bool
+val concretize      : pt_ev  -> proofterm * form
+val concretize_form : pt_env -> form -> form
