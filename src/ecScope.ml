@@ -186,7 +186,7 @@ and proof_ctxt = (symbol * EcDecl.axiom) * EcPath.path * EcEnv.env
 
 and proof_state =
 | PSCheck     of (EcLogic.judgment_uc * int list)
-| PSNewEngine of EcGoal.proof
+| PSNewEngine of EcCoreGoal.proof
 | PSNoCheck
 
 and pucflags = {
@@ -840,7 +840,7 @@ module Tactics = struct
             | PSCheck (g, i) ->
                 let { pj_decl = (h, f) } = Mint.find (as_seq1 i) g.juc_map in
                   { pac with
-                      puc_jdg  = PSNewEngine (EcGoal.Api.start h f);
+                      puc_jdg  = PSNewEngine (EcCoreGoal.start h f);
                       puc_mode = Some strict; }
         end
 
@@ -896,7 +896,7 @@ module Tactics = struct
     end
 
     | PSNewEngine juc ->
-        let juc = EcGoal.HiLevel.apply tac juc in
+        let juc = EcHiGoal.process tac juc in
         let pac = { pac with puc_jdg = PSNewEngine juc } in
           { scope with sc_pr_uc = Some { puc with puc_active = Some pac; } }
 

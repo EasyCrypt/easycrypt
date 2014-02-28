@@ -1,8 +1,11 @@
 (* -------------------------------------------------------------------- *)
 open EcIdent
+open EcSymbols
+open EcParsetree
 open EcTypes
-open EcEnv
+open EcDecl
 open EcFol
+open EcEnv
 
 (* -------------------------------------------------------------------- *)
 type location = {
@@ -67,6 +70,25 @@ type rwproofterm = {
 }
 
 (* -------------------------------------------------------------------- *)
+(* The type [proof] represents the state an interactive proof at top
+ * level, i.e. the set of goals (opened or closed) + the list of
+ * opened, top-level goals. It cannot be use for proof-progress. Instead,
+ * a [proofenv] or [tcenv] must be created (resp. for forward / backward
+ * reasoning) first.
+ *
+ * A [proofenv] represents the set of goals (opened or closed) of a given
+ * [proof]. An API is provided that allows the creation of new *closed*
+ * goals, i.e. for doing forward reasoning from existing (proven or not)
+ * facts.
+ *
+ * A [tcenv] represents the set of opened goals of a given [proof]. These
+ * goals are organized as a tree + a focus (i.e. a pointed leaf of the
+ * tree). An API is provided allowing reasoning in a mix of backward /
+ * forward reasoning, creating open of closed goals or solving the
+ * current focus. The [tcenv] handle the focus automatically when goals
+ * are created, closed or when composing tactics; but can also be
+ * manipulated explicitely via tacticals. *)
+
 type proof
 type proofenv
 type tcenv
@@ -86,9 +108,27 @@ type validation =
 | VExtern  : 'a -> validation           (* external (hl/phl/prhl/...) proof-node *)
 
 (* -------------------------------------------------------------------- *)
+val tcenv_of_proof : proof -> tcenv
+val proof_of_tcenv : tcenv -> proof
+
+(* Start a new interactive proof in a given local context
+ * [LDecl.hyps] for given [form]. Mainly, a [proof] records the set
+ * of all goals (closed or not - i.e. a proof-environment) + the list
+ * of opened, top-level goals. *)
+val start : LDecl.hyps -> form -> proof
+
+(* Return the first opened goal of this interactive proof and the
+ * number of open goals. *)
+val opened : proof -> (int * pregoal) option
+
+(* -------------------------------------------------------------------- *)
+val tc_lookup_error :
+  proofenv -> ?loc:EcLocation.t -> [`Lemma] -> qsymbol -> 'a
+
+(* -------------------------------------------------------------------- *)
 (* Functional API                                                       *)
 (* -------------------------------------------------------------------- *)
-module Api : sig
+module FApi : sig
   (* - [forward tactic]: take a proofenv, i.e. a set of goals (proven or
    *   not) and generate a new (1-level proven) goal [handle]. Examples
    *   of such tactics are forward congruence or closed rewriting.
@@ -109,11 +149,24 @@ module Api : sig
   type backward = tcenv -> tcenv
   type mixward  = tcenv -> tcenv * handle
 
-  val start   : LDecl.hyps -> form -> proof
-  val focused : proof -> (int * pregoal) option
-
+  (* Create a new opened goal for the given [form] in the backward
+   * environment [tcenv]. If no local context [LDecl.hyps] is given,
+   * use the one of the focused goal in [tcenv] -- it is then an
+   * internal error is no goal is focused. The goal is created as the
+   * last sibling of the current focus. Return the mutated [tcenv]
+   * along with the handle of the new goal. *)
   val newgoal : tcenv -> ?hyps:LDecl.hyps -> form -> handle * tcenv
-  val close   : tcenv -> validation -> tcenv
+
+  (* Mark the focused goal in [tcenv] as solved using the given
+   * [validation]. It is an internal error if no goal is focused. The
+   * focus is then changed to the next opened sibling. *)
+  val close : tcenv -> validation -> tcenv
+
+  (* Accessors for focused goal parts *)
+  val tc_penv : tcenv -> proofenv
+  val tc_flat : tcenv -> LDecl.hyps * form
+  val tc_hyps : tcenv -> LDecl.hyps
+  val tc_goal : tcenv -> form
 
   (* Tacticals *)
   type ontest    = int -> proofenv -> handle -> bool
@@ -135,10 +188,26 @@ module RApi : sig
   type rproofenv
   type rtcenv
 
-  val newgoal : rtcenv -> ?hyps:LDecl.hyps -> form -> handle
-
+  (* For the following functions, see the [FApi] module *)
   val of_pure : tcenv -> (rtcenv -> 'a) -> 'a * tcenv
 
+  val pf_get_pregoal_by_id : handle -> rproofenv -> pregoal
+  val tc_get_pregoal_by_id : handle -> rtcenv -> pregoal
+
+  val newgoal : rtcenv -> ?hyps:LDecl.hyps -> form -> handle
+
+  (* Accessors for focused goal parts *)
+  val tc_penv : rtcenv -> proofenv
+  val tc_flat : rtcenv -> LDecl.hyps * form
+  val tc_hyps : rtcenv -> LDecl.hyps
+  val tc_goal : rtcenv -> form
+
+  (* Recast a rtcenv-imperative function as a tcenv-pure function. *)
+  val of_pure : tcenv -> (rtcenv -> 'a) -> 'a * tcenv
+
+  (* [freeze] returns a copy of the input [rtcenv], whereas [restore]
+   * copies the contents of [src:rtcenv] to [dst:rtcenv]. These
+   * operations are done in constant time. *)
   val freeze  : rtcenv -> rtcenv
   val restore : dst:rtcenv -> src:rtcenv -> unit
 end
@@ -147,13 +216,36 @@ type rproofenv = RApi.rproofenv
 type rtcenv    = RApi.rtcenv
 
 (* -------------------------------------------------------------------- *)
-module LowLevel : sig
-  val t_admit : Api.backward
+module Exn : sig
+  (* Apply the given function in the context of a proof-environment,
+   * adding some more location informations when a typing error is
+   * raised *)
+  val recast_pe : proofenv -> (unit -> 'a) -> 'a
+  val recast_tc : tcenv -> (LDecl.hyps -> 'a) -> 'a
 end
 
 (* -------------------------------------------------------------------- *)
-module HiLevel : sig
-  open EcParsetree
+module Typing : sig
+  (* Top-level typing functions, but applied in the context of a
+   * proof-environment. See the [Exn] module for more information. *)
 
-  val apply : ptactic list -> proof -> proof
+  val unienv_of_hyps : LDecl.hyps -> EcUnify.unienv
+  val pf_check_tvi   : proofenv -> ty_params -> EcUnify.tvi -> unit
+
+  (* Typing in the environment implied by [LDecl.hyps]. *)
+  val process_form_opt : LDecl.hyps -> pformula -> ty option -> form
+  val process_form     : LDecl.hyps -> pformula -> ty -> form
+  val process_formula  : LDecl.hyps -> pformula -> form
+
+  (* Typing in the [LDecl.hyps] implied by the proof env.
+   * Typing exceptions are recasted in the proof env. context *)
+  val pf_process_form_opt : proofenv -> LDecl.hyps -> pformula -> ty option -> form
+  val pf_process_form     : proofenv -> LDecl.hyps -> pformula -> ty -> form
+  val pf_process_formula  : proofenv -> LDecl.hyps -> pformula -> form
+
+  (* Typing in the [proofenv] implies for the [tcenv].
+   * Typing exceptions are recasted in the proof env. context *)
+  val tc_process_form_opt : tcenv -> pformula -> ty option -> form
+  val tc_process_form     : tcenv -> pformula -> ty -> form
+  val tc_process_formula  : tcenv -> pformula -> form
 end

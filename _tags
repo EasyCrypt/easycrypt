@@ -7,6 +7,7 @@ true : bin_annot
 
 # --------------------------------------------------------------------
 <src>            : include
+<src/newengine>  : include
 <src/phl>        : include
 <src/extraction> : include
 
