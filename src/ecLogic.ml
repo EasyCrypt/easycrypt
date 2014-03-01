@@ -733,7 +733,9 @@ let t_symmetry g =
   let (f1,f2) = destr_eq concl in
   t_rewrite_glob `LtoR EcCoreLib.p_eq_sym [f1.f_ty] [AAform f1;AAform f2] g
 
-let t_true g = t_apply_logic p_true_intro [] [] g
+let t_true g =
+  try  t_apply_logic p_true_intro [] [] g
+  with _ -> tacuerror "goal is not conversion to true"
 
 (* Use to create two set of vars of a list of types*)
 let parseType create types =
