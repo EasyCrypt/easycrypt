@@ -159,12 +159,27 @@ module FApi : sig
    * internal error is no goal is focused. By default, the goal is
    * created as the last sibling of the current focus. Return the
    * mutated [tcenv] along with the handle of the new goal. *)
-  val newgoal : tcenv -> ?hyps:LDecl.hyps -> form -> handle * tcenv
+  val newgoal : tcenv -> ?hyps:LDecl.hyps -> form -> tcenv * handle
 
   (* Mark the focused goal in [tcenv] as solved using the given
    * [validation]. It is an internal error if no goal is focused. The
    * focus is then changed to the next opened sibling. *)
   val close : tcenv -> validation -> tcenv
+
+  (* Mutate current goal in [tcenv]. Focused goal will be marked as
+   * resolved using the given [validation] producer. This producer is
+   * applied to the goal freshly created, using given formulas and
+   * focused goal local context. *)
+  val mutate : tcenv -> (handle -> validation) -> form -> tcenv
+
+  (* Apply a forward tactic to a backward environment, using the
+   * proof-environment of the latter *)
+  val bwd_of_fwd : forward -> tcenv -> tcenv * handle
+
+  (* Insert a new fact in a proof-environment *)
+  val newfact :
+       proofenv -> validation -> LDecl.hyps -> form
+    -> proofenv * handle
 
   (* Accessors for focused goal parts *)
   val tc_penv : tcenv -> proofenv
@@ -198,13 +213,13 @@ module RApi : sig
   val  tcenv_of_rtcenv : rtcenv ->  tcenv
 
   (* For the following functions, see the [FApi] module *)
-  val of_pure : tcenv -> (rtcenv -> 'a) -> 'a * tcenv
-
   val pf_get_pregoal_by_id : handle -> rproofenv -> pregoal
   val tc_get_pregoal_by_id : handle -> rtcenv -> pregoal
 
   val newgoal : rtcenv -> ?hyps:LDecl.hyps -> form -> handle
   val close   : rtcenv -> validation -> unit
+
+  val bwd_of_fwd : FApi.forward -> rtcenv -> handle
 
   (* Accessors for focused goal parts *)
   val tc_penv : rtcenv -> proofenv
@@ -213,7 +228,9 @@ module RApi : sig
   val tc_goal : rtcenv -> form
 
   (* Recast a rtcenv-imperative function as a tcenv-pure function. *)
-  val of_pure : tcenv -> (rtcenv -> 'a) -> 'a * tcenv
+  val of_pure   : tcenv  -> (rtcenv -> 'a) -> 'a * tcenv
+  val to_pure   : rtcenv -> (tcenv -> tcenv * 'a) -> 'a
+  val to_pure_u : rtcenv -> (tcenv -> tcenv) -> unit
 
   (* [freeze] returns a copy of the input [rtcenv], whereas [restore]
    * copies the contents of [src:rtcenv] to [dst:rtcenv]. These

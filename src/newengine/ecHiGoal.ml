@@ -83,8 +83,6 @@ let process_rewrite1_core (s, o) pt tc =
 
 (* -------------------------------------------------------------------- *)
 let rec process_rewrite1 ri tc =
-  let (hyps, concl) = FApi.tc_flat tc in
-
   match ri with
   | RWRw (s, None, o, [pt]) ->
       let pt = PT.tc_process_full_pterm tc pt in
@@ -103,12 +101,75 @@ let process_cut fp tc =
   EcLowGoal.t_cut (TcTyping.tc_process_formula tc fp) tc
 
 (* -------------------------------------------------------------------- *)
+let process_reflexivity (tc : tcenv) =
+  EcLowGoal.t_reflex tc
+
+(* -------------------------------------------------------------------- *)
+let process_left (tc : tcenv) =
+  EcLowGoal.t_left tc
+
+(* -------------------------------------------------------------------- *)
+let process_right (tc : tcenv) =
+  EcLowGoal.t_right tc
+
+(* -------------------------------------------------------------------- *)
+let process_split (tc : tcenv) =
+  EcLowGoal.t_split tc
+
+(* -------------------------------------------------------------------- *)
+let process_elim (tc : tcenv) =
+  EcLowGoal.t_elim tc
+
+(* -------------------------------------------------------------------- *)
+let process1_logic (t : logtactic) (tc : tcenv) =
+  let tx =
+    match t with
+    | Preflexivity              -> process_reflexivity
+    | Papply   (ff, None)       -> process_apply   ff
+    | Prewrite ri               -> process_rewrite ri
+    | Pcut     (None, fp, None) -> process_cut     fp
+    | Pleft                     -> process_left
+    | Pright                    -> process_right
+    | Psplit                    -> process_split
+    | Pelim    ([], None)       -> process_elim
+
+    | _ -> assert false
+  in
+    tx tc
+
+(*
+  | Preflexivity
+  | Passumption of (pqsymbol option * ptyannot option)
+  | Psmt        of (pdbhint option * pprover_infos)
+  | Pintro      of intropattern
+  | Psplit
+  | Pfield	    of psymbol list
+  | Pring 	    of psymbol list
+  | Palg_norm
+  | Pexists     of fpattern_arg located list
+  | Pleft
+  | Pright
+  | Ptrivial
+  | Pcongr
+  | Pelim       of (genpattern list * pqsymbol option)
+  | Papply      of (ffpattern * psymbol option)
+  | Pcut        of (intropattern1 option * pformula * ptactic_core option)
+  | Pcutdef     of (intropattern1 option * pterm)
+  | Pgeneralize of genpattern list
+  | Pclear      of psymbol list
+  | Prewrite    of rwarg list
+  | Prwnormal   of pformula * pqsymbol list
+  | Psubst      of pformula list
+  | Psimplify   of preduction
+  | Pchange     of pformula
+  | Ppose       of (psymbol * rwocc * pformula)
+*)
+
+(* -------------------------------------------------------------------- *)
 let process1 (t : ptactic) (tc : tcenv) =
   match (unloc t.pt_core) with
-  | Padmit  -> EcLowGoal.t_admit tc
-  | Plogic (Papply   (ff, None))   -> process_apply ff tc
-  | Plogic (Prewrite ri)           -> process_rewrite ri tc
-  | Plogic (Pcut (None, fp, None)) -> process_cut fp tc
+  | Padmit   -> EcLowGoal.t_admit tc
+  | Plogic t -> process1_logic t tc
 
   | _ -> assert false
 

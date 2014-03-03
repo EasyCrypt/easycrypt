@@ -268,10 +268,10 @@ module FApi = struct
     { tcx with tcec_closed = ID.Set.add hd tcx.tcec_closed }
 
   (* ------------------------------------------------------------------ *)
-  let pf_newgoal (pe : proofenv) (hyps : LDecl.hyps) (concl : form) =
+  let pf_newgoal (pe : proofenv) ?vx hyps concl =
     let hid     = ID.gen () in
     let pregoal = { g_uid = hid; g_hyps = hyps; g_concl = concl; } in
-    let goal    = { g_goal = pregoal; g_validation = None; } in
+    let goal    = { g_goal = pregoal; g_validation = vx; } in
     let pe      = { pe with pr_goals = ID.Map.add pregoal.g_uid goal pe.pr_goals; } in
       (pe, pregoal)
 
@@ -293,7 +293,7 @@ module FApi = struct
           in
             { tc with tce_subgoals = tcz }
     in
-      (pg.g_uid, tc)
+      (tc, pg.g_uid)
 
   (* ------------------------------------------------------------------ *)
   let close (tc : tcenv) (vx : validation) =
@@ -316,6 +316,21 @@ module FApi = struct
     { tc with tce_subgoals =
         push_closed_to_tcenvx current.g_uid tc.tce_subgoals }
 
+  (* ------------------------------------------------------------------ *)
+  let mutate (tc : tcenv) (vx : handle -> validation) (fp : form) =
+    (* FIXME: create on direct left *)
+    let (tc, hd) = newgoal tc fp in close tc (vx hd)
+
+  (* ------------------------------------------------------------------ *)
+  let newfact (pe : proofenv) vx hyps concl =
+    snd_map (fun x -> x.g_uid) (pf_newgoal pe ~vx:vx hyps concl)
+
+  (* ------------------------------------------------------------------ *)
+  let bwd_of_fwd (tx : forward) (tc : tcenv) =
+    let (pe, hd) = tx tc.tce_proofenv in
+    ({ tc with tce_proofenv = pe }, hd)
+
+  (* ------------------------------------------------------------------ *)
   (* Tacticals *)
   type ontest    = int -> proofenv -> handle -> bool
   type direction = [ `Left | `Right ]
@@ -367,12 +382,24 @@ module RApi = struct
     (aout, !rtc)
 
   (* ------------------------------------------------------------------ *)
+  let to_pure (tc : rtcenv) (tx :tcenv -> tcenv * 'a) =
+    reffold (fun tc -> swap (tx tc)) tc
+
+  (* ------------------------------------------------------------------ *)
+  let to_pure_u (tc : rtcenv) (tx :tcenv -> tcenv) : unit =
+    tc := tx !tc
+
+  (* ------------------------------------------------------------------ *)
   let newgoal pe ?hyps concl =
-    reffold (fun pe -> FApi.newgoal pe ?hyps concl) pe
+    reffold (fun pe -> swap (FApi.newgoal pe ?hyps concl)) pe
 
   (* ------------------------------------------------------------------ *)
   let close tc validation =
     tc := FApi.close !tc validation
+
+  (* ------------------------------------------------------------------ *)
+  let bwd_of_fwd (tx : FApi.forward) (tc : rtcenv) =
+    reffold (fun tc -> swap (FApi.bwd_of_fwd tx tc)) tc
 
   (* ------------------------------------------------------------------ *)
   let pf_get_pregoal_by_id id pf = FApi.get_pregoal_by_id id !pf

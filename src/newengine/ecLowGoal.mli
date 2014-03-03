@@ -1,5 +1,6 @@
 (* -------------------------------------------------------------------- *)
 open EcLocation
+open EcUtils
 open EcIdent
 open EcPath
 open EcTypes
@@ -7,10 +8,17 @@ open EcFol
 open EcCoreGoal
 
 (* -------------------------------------------------------------------- *)
-exception InvalidProofTerm
+exception InvalidProofTerm         (* invalid proof term *)
+exception InvalidGoalShape         (* invalid goal shape for tactic *)
+
+type side = [`Left|`Right]
 
 (* -------------------------------------------------------------------- *)
-val t_admit   : FApi.backward
+val t_admit : FApi.backward
+val t_true  : FApi.backward
+
+(* -------------------------------------------------------------------- *)
+val t_reflex : ?reduce:bool -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
 
@@ -28,6 +36,26 @@ val t_apply : ?focus:bool -> proofterm -> FApi.backward
  * skip before applying [p]. *)
 val t_apply_s :
   ?focus:bool -> path -> ty list -> form list -> int -> FApi.backward
+
+(* -------------------------------------------------------------------- *)
+val t_or_intro_s  : bool -> [`Left|`Right] -> form pair -> FApi.backward
+val t_and_intro_s : bool -> form pair -> FApi.backward
+val t_iff_intro_s : form pair -> FApi.backward
+
+val t_or_intro  : ?reduce:bool -> side -> FApi.backward
+val t_and_intro : ?reduce:bool -> FApi.backward
+val t_iff_intro : ?reduce:bool -> FApi.backward
+
+val t_left  : ?reduce:bool -> FApi.backward
+val t_right : ?reduce:bool -> FApi.backward
+val t_split : FApi.backward
+
+(* -------------------------------------------------------------------- *)
+val t_tuple_intro_s : form pair list -> FApi.backward
+val t_tuple_intro   : ?reduce:bool -> FApi.backward
+
+(* -------------------------------------------------------------------- *)
+val t_elim : FApi.backward
 
 (* -------------------------------------------------------------------- *)
 val t_cut : form -> FApi.backward
