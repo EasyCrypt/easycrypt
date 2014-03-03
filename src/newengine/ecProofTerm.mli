@@ -1,5 +1,6 @@
 (* -------------------------------------------------------------------- *)
 open EcLocation
+open EcSymbols
 open EcParsetree
 open EcTypes
 open EcFol
@@ -50,6 +51,10 @@ val apply_pterm_to_hole : pt_ev -> pt_ev
 val pf_form_match     : pt_env -> ptn:form -> form -> unit
 val pf_unify          : pt_env -> ty -> ty -> unit
 val pf_find_occurence : pt_env -> ptn:form -> form -> unit
+
+val pattern_form :
+     ?name:symbol -> LDecl.hyps -> ptn:form -> form
+  -> EcIdent.t * form
 
 (* Proof-terms concretization, i.e. evmap/unienv resolution *)
 val can_concretize  : pt_env -> bool

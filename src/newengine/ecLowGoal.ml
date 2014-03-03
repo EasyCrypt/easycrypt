@@ -500,6 +500,82 @@ let t_elim_default_r = [
 let t_elim tc = t_elim_r t_elim_default_r tc
 
 (* -------------------------------------------------------------------- *)
+(* FIXME: document this function ! *)
+let t_elimT_form (p : path) (tys : ty list) (f : form) (sk : int) (tc : tcenv) =
+  let hyps, concl = FApi.tc_flat tc in
+  let env = LDecl.toenv hyps in
+  let ax  = EcEnv.Ax.by_path p env in
+
+  let rec skip i a f =
+    match i, EcFol.sform_of_form f with
+    | Some i, _ when i <= 0 -> (a, f)
+    | Some i, SFimp (_, f2) -> skip (Some (i-1)) (a+1) f2
+    | None  , SFimp (_, f2) -> skip None (a+1) f2
+    | Some _, _ -> raise InvalidGoalShape
+    | None  , _ -> (a, f)
+  in
+
+  if is_none ax.EcDecl.ax_spec then raise InvalidGoalShape;
+
+  let ax = EcEnv.Ax.instanciate p tys env in
+  let (pr, prty, ax) =
+    match sform_of_form ax with
+    | SFquant (Lforall, (pr, GTty prty), ax) -> (pr, prty, ax)
+    | _ -> raise InvalidGoalShape
+  in
+
+  if not (EqTest.for_type env prty (tfun f.f_ty tbool)) then
+    raise InvalidGoalShape;
+
+  let (aa1, ax) = skip None 0 ax in
+
+  let (x, _xty, ax) =
+    match sform_of_form ax with
+    | SFquant (Lforall, (x, GTty xty), ax) -> (x, xty, ax)
+    | _ -> raise InvalidGoalShape
+  in
+
+  let (aa2, ax) =
+    let rec doit ax aa =
+      match destruct_product hyps ax with
+      | Some (`Imp (f1, f2)) when Mid.mem pr f1.f_fv -> doit f2 (aa+1)
+      | _ -> (aa, ax)
+    in
+      doit ax 0
+  in
+
+  let pf =
+    let (_, concl) = skip (Some sk) 0 concl in
+    let (z, concl) = EcProofTerm.pattern_form ~name:(EcIdent.name x) hyps ~ptn:f concl in
+      Fsubst.f_subst_local pr (f_lambda [(z, GTty f.f_ty)] concl) ax
+  in
+
+  let pf_inst = Fsubst.f_subst_local x f pf in
+
+  let (aa3, sk) =
+    let rec doit pf_inst (aa, sk) =
+      if   EcReduction.is_conv hyps pf_inst concl
+      then (aa, sk)
+      else
+        match destruct_product hyps pf_inst with
+        | Some (`Imp (_, f2)) -> doit f2 (aa+1, sk+1)
+        | _ -> raise InvalidGoalShape
+    in
+      doit pf_inst (0, sk)
+  in
+
+  let pf   = f_lambda [(x, GTty f.f_ty)] (snd (skip (Some sk) 0 pf)) in
+  let args =
+    (PAFormula pf :: (List.create aa1 (PASub None)) @
+     PAFormula  f :: (List.create (aa2+aa3) (PASub None))) in
+  let pt   = { pt_head = PTGlobal (p, tys); pt_args = args; } in
+
+  t_apply ~focus:true pt tc
+
+(* -------------------------------------------------------------------- *)
+let t_case fp tc = t_elimT_form EcCoreLib.p_case_eq_bool [] fp 0 tc
+
+(* -------------------------------------------------------------------- *)
 let t_split (tc : tcenv) =
   let t_split_r (fp : form) (tc : tcenv) =
     let hyps, concl = FApi.tc_flat tc in
@@ -516,13 +592,11 @@ let t_split (tc : tcenv) =
     | SFeq (f1, f2) when is_tuple f1 && is_tuple f2 ->
         let fs = List.combine (destr_tuple f1) (destr_tuple f2) in
         t_tuple_intro_s fs tc
-(*
     | SFif (cond, _, _) ->
+        (* FIXME: simplify goal *)
         let tc = if f_equal concl fp then tc else t_change fp tc in
         let tc = t_case cond tc in
           tc
-*)
-
     | _ -> raise NoMatch
   in
     t_lazy_match t_split_r tc

@@ -50,6 +50,19 @@ let ptenv_of_tcenv (tc : tcenv) =
     pte_ev = ref EcMatching.EV.empty; }
 
 (* -------------------------------------------------------------------- *)
+let pattern_form ?name hyps ~ptn subject =
+  let x    = EcIdent.create (odfl "x" name) in
+  let fx   = EcFol.f_local x ptn.f_ty in
+  let body =
+    Hf.memo_rec 107
+      (fun aux f ->
+        if   EcReduction.is_alpha_eq hyps f ptn
+        then fx
+        else f_map (fun ty -> ty) aux f)
+      subject
+  in (x, body)
+
+(* -------------------------------------------------------------------- *)
 let pf_form_match (pt : pt_env) ~ptn subject =
   try
     let (ue, ev) =

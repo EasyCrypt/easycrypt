@@ -94,6 +94,9 @@ val compare3: int lazy_t -> int lazy_t -> int lazy_t -> int
 val none : 'a option
 val some : 'a -> 'a option
 
+val is_none : 'a option -> bool
+val is_some : 'a option -> bool
+
 val funnone : 'a -> 'b option
 
 (* -------------------------------------------------------------------- *)
