@@ -207,9 +207,9 @@ let t_cut (fp : form) (tc : tcenv) =
 let t_rewrite (pt : proofterm) (pos : ptnpos) (tc : tcenv) =
   let tc = RApi.rtcenv_of_tcenv tc in
   let (hyps, concl) = RApi.tc_flat tc in
+  let (pt, ax) = LowApply.check pt tc in
 
   if not (FPosition.is_empty pos) then begin
-    let (pt, ax) = LowApply.check pt tc in
     let (left, right) =
       match sform_of_form ax with
       | SFeq  (f1, f2) -> (f1, f2)
