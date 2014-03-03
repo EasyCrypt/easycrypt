@@ -99,11 +99,16 @@ let process_rewrite ri tc =
   | _ -> assert false
 
 (* -------------------------------------------------------------------- *)
+let process_cut fp tc =
+  EcLowGoal.t_cut (TcTyping.tc_process_formula tc fp) tc
+
+(* -------------------------------------------------------------------- *)
 let process1 (t : ptactic) (tc : tcenv) =
   match (unloc t.pt_core) with
   | Padmit  -> EcLowGoal.t_admit tc
-  | Plogic (Papply   (ff, None)) -> process_apply ff tc
-  | Plogic (Prewrite ri)         -> process_rewrite ri tc
+  | Plogic (Papply   (ff, None))   -> process_apply ff tc
+  | Plogic (Prewrite ri)           -> process_rewrite ri tc
+  | Plogic (Pcut (None, fp, None)) -> process_cut fp tc
 
   | _ -> assert false
 

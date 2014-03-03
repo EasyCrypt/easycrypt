@@ -46,7 +46,7 @@ let tc_pterm_apperror _pe ?loc _kind =
 let ptenv_of_tcenv (tc : tcenv) =
   { pte_pe = FApi.tc_penv tc;
     pte_hy = FApi.tc_hyps tc;
-    pte_ue = Typing.unienv_of_hyps (FApi.tc_hyps tc);
+    pte_ue = TcTyping.unienv_of_hyps (FApi.tc_hyps tc);
     pte_ev = ref EcMatching.EV.empty; }
 
 (* -------------------------------------------------------------------- *)
@@ -154,7 +154,7 @@ let process_named_pterm pe (tvi, fp) =
       (fun () -> omap (EcTyping.transtvi env pe.pte_ue) tvi)
   in
 
-  Typing.pf_check_tvi pe.pte_pe typ tvi;
+  TcTyping.pf_check_tvi pe.pte_pe typ tvi;
 
   (* FIXME: TC HOOK *)
   let fs  = EcUnify.UniEnv.opentvi pe.pte_ue typ tvi in
@@ -176,7 +176,7 @@ let process_pterm pe pt =
     end
 
   | FPCut fp ->
-      let fp = Typing.pf_process_formula pe.pte_pe pe.pte_hy fp in
+      let fp = TcTyping.pf_process_formula pe.pte_pe pe.pte_hy fp in
         (PTCut fp, fp)
   in
 
@@ -281,7 +281,7 @@ let apply_pterm_to_oarg ({ ptev_env = pe; ptev_pt = rawpt; } as pt) oarg =
             | PVASub arg -> begin
               try
                 pf_form_match pe ~ptn:arg.ptev_ax f1;
-                (f2, PASub arg.ptev_pt)
+                (f2, PASub (Some arg.ptev_pt))
               with EcMatching.MatchFailure ->
                 tc_pterm_apperror pe.pte_pe `InvalidArgProof
             end
@@ -379,7 +379,7 @@ let concretize ({ ptev_env = pe } as pt) =
     | PAFormula f        -> PAFormula (onform f)
     | PAMemory  m        -> PAMemory m
     | PAModule  (mp, ms) -> PAModule (mp, ms)
-    | PASub     pt       -> PASub (onpt pt)
+    | PASub     pt       -> PASub (pt |> omap onpt)
 
   and onpt { pt_head; pt_args } =
     { pt_head = onpthead pt_head;

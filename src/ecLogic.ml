@@ -1678,8 +1678,9 @@ and t_build2 f1 g =
 let t_progress_one g =
   let (id, f), tac = t_build g in
     t_seq_subgoal (t_cut f)
-      [t_seq t_simplify_nodelta (t_try t_true);
-       t_seq (t_intros_i [id]) tac] g
+      [t_seq (t_intros_i [id]) tac;
+       t_seq t_simplify_nodelta (t_try t_true)]
+      g
 
 (* -------------------------------------------------------------------- *)
 let rec t_intros_elim n g =

@@ -51,7 +51,11 @@ and pt_arg =
 | PAFormula of EcFol.form
 | PAMemory  of EcMemory.memory
 | PAModule  of (EcPath.mpath * EcModules.module_sig)
-| PASub     of proofterm
+| PASub     of proofterm option
+
+val paformula : EcFol.form -> pt_arg
+val pamemory  : EcMemory.memory -> pt_arg
+val pamodule  : EcPath.mpath * EcModules.module_sig -> pt_arg
 
 (* -------------------------------------------------------------------- *)
 (* EasyCrypt rewrite proof-term:                                        *)
@@ -152,9 +156,9 @@ module FApi : sig
   (* Create a new opened goal for the given [form] in the backward
    * environment [tcenv]. If no local context [LDecl.hyps] is given,
    * use the one of the focused goal in [tcenv] -- it is then an
-   * internal error is no goal is focused. The goal is created as the
-   * last sibling of the current focus. Return the mutated [tcenv]
-   * along with the handle of the new goal. *)
+   * internal error is no goal is focused. By default, the goal is
+   * created as the last sibling of the current focus. Return the
+   * mutated [tcenv] along with the handle of the new goal. *)
   val newgoal : tcenv -> ?hyps:LDecl.hyps -> form -> handle * tcenv
 
   (* Mark the focused goal in [tcenv] as solved using the given
@@ -231,7 +235,7 @@ module Exn : sig
 end
 
 (* -------------------------------------------------------------------- *)
-module Typing : sig
+module TcTyping : sig
   (* Top-level typing functions, but applied in the context of a
    * proof-environment. See the [Exn] module for more information. *)
 

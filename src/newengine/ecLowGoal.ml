@@ -3,6 +3,7 @@ open EcUtils
 open EcLocation
 open EcIdent
 open EcSymbols
+open EcPath
 open EcTypes
 open EcFol
 open EcEnv
@@ -54,11 +55,16 @@ module LowApply = struct
       | Some t ->
         match t, arg with
         | `Imp (f1, f2), PASub subpt ->
-            let f1 = Fsubst.f_subst sbt f1 in
+            let f1    = Fsubst.f_subst sbt f1 in
+            let subpt =
+              match subpt with
+              | None       -> { pt_head = PTCut f1; pt_args = []; }
+              | Some subpt -> subpt
+            in
             let subpt, subax = check subpt tc in
             if not (EcReduction.is_conv hyps f1 subax) then
               raise InvalidProofTerm;
-            ((sbt, f2), PASub subpt)
+            ((sbt, f2), PASub (Some subpt))
 
         | `Forall (x, xty, f), _ ->
           let xty = Fsubst.gty_subst sbt xty in
@@ -176,13 +182,26 @@ let t_intro_i (id : EcIdent.t) (tc : tcenv) =
 let t_admit (tc : tcenv) = FApi.close tc VAdmit
 
 (* ------------------------------------------------------------------ *)
-let t_apply (pt : proofterm) (tc : tcenv) =
+let t_apply ?(focus = true) (pt : proofterm) (tc : tcenv) =
   let (hyps, concl) = FApi.tc_flat tc in
   let (pt, ax), tc  = RApi.of_pure tc (fun tc -> LowApply.check pt tc) in
 
   if not (EcReduction.is_conv hyps concl ax) then
     raise InvalidProofTerm;
   FApi.close tc (VApply pt)
+
+(* -------------------------------------------------------------------- *)
+let t_apply_s ?focus (p : path) (tys : ty list) (fs : form list) (n : int) (tc : tcenv) =
+  let pt =
+    { pt_head = PTGlobal (p, tys);
+      pt_args = (List.map paformula fs) @ (List.create n (PASub None)); } in
+
+  t_apply ?focus pt tc
+
+(* -------------------------------------------------------------------- *)
+let t_cut (fp : form) (tc : tcenv) =
+  let concl = FApi.tc_goal tc in
+  t_apply_s ~focus:true EcCoreLib.p_cut_lemma [] [fp; concl] 2 tc
 
 (* -------------------------------------------------------------------- *)
 let t_rewrite (pt : proofterm) (pos : ptnpos) (tc : tcenv) =

@@ -42,7 +42,12 @@ and pt_arg =
 | PAFormula of EcFol.form
 | PAMemory  of EcMemory.memory
 | PAModule  of (EcPath.mpath * EcModules.module_sig)
-| PASub     of proofterm
+| PASub     of proofterm option
+
+(* -------------------------------------------------------------------- *)
+let paformula x = PAFormula x
+let pamemory  x = PAMemory  x
+let pamodule  x = PAModule  x
 
 (* -------------------------------------------------------------------- *)
 type rwproofterm = {
@@ -440,7 +445,7 @@ module Exn = struct
 end
 
 (* -------------------------------------------------------------------- *)
-module Typing = struct
+module TcTyping = struct
   open EcBaseLogic
 
   (* ------------------------------------------------------------------ *)
