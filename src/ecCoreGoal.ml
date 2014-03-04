@@ -166,6 +166,11 @@ module FApi = struct
     let { g_hyps; g_concl } = current tc in (g_hyps, g_concl)
 
   (* ------------------------------------------------------------------ *)
+  let tc_eflat (tc : tcenv) =
+    let (hyps, concl) = tc_flat tc in
+      (LDecl.toenv hyps, hyps, concl)
+
+  (* ------------------------------------------------------------------ *)
   let tc_penv (tc : tcenv) = tc.tce_proofenv
   let tc_hyps (tc : tcenv) = fst (tc_flat tc)
   let tc_goal (tc : tcenv) = snd (tc_flat tc)
@@ -406,10 +411,11 @@ module RApi = struct
   let tc_get_pregoal_by_id id pf = FApi.get_pregoal_by_id id (!pf).tce_proofenv
 
   (* ------------------------------------------------------------------ *)
-  let tc_penv (tc : rtcenv) = FApi.tc_penv !tc
-  let tc_flat (tc : rtcenv) = FApi.tc_flat !tc
-  let tc_goal (tc : rtcenv) = FApi.tc_goal !tc
-  let tc_hyps (tc : rtcenv) = FApi.tc_hyps !tc
+  let tc_penv  (tc : rtcenv) = FApi.tc_penv  !tc
+  let tc_flat  (tc : rtcenv) = FApi.tc_flat  !tc
+  let tc_eflat (tc : rtcenv) = FApi.tc_eflat !tc
+  let tc_goal  (tc : rtcenv) = FApi.tc_goal  !tc
+  let tc_hyps  (tc : rtcenv) = FApi.tc_hyps  !tc
 end
 
 type rproofenv = RApi.rproofenv

@@ -182,10 +182,11 @@ module FApi : sig
     -> proofenv * handle
 
   (* Accessors for focused goal parts *)
-  val tc_penv : tcenv -> proofenv
-  val tc_flat : tcenv -> LDecl.hyps * form
-  val tc_hyps : tcenv -> LDecl.hyps
-  val tc_goal : tcenv -> form
+  val tc_penv  : tcenv -> proofenv
+  val tc_flat  : tcenv -> LDecl.hyps * form
+  val tc_eflat : tcenv -> env * LDecl.hyps * form
+  val tc_hyps  : tcenv -> LDecl.hyps
+  val tc_goal  : tcenv -> form
 
   (* Tacticals *)
   type ontest    = int -> proofenv -> handle -> bool
@@ -222,10 +223,11 @@ module RApi : sig
   val bwd_of_fwd : FApi.forward -> rtcenv -> handle
 
   (* Accessors for focused goal parts *)
-  val tc_penv : rtcenv -> proofenv
-  val tc_flat : rtcenv -> LDecl.hyps * form
-  val tc_hyps : rtcenv -> LDecl.hyps
-  val tc_goal : rtcenv -> form
+  val tc_penv  : rtcenv -> proofenv
+  val tc_flat  : rtcenv -> LDecl.hyps * form
+  val tc_eflat : rtcenv -> env * LDecl.hyps * form
+  val tc_hyps  : rtcenv -> LDecl.hyps
+  val tc_goal  : rtcenv -> form
 
   (* Recast a rtcenv-imperative function as a tcenv-pure function. *)
   val of_pure   : tcenv  -> (rtcenv -> 'a) -> 'a * tcenv
