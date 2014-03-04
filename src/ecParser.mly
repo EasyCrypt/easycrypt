@@ -2060,16 +2060,16 @@ eager_tac:
 
 phltactic:
 | PROC
-    { Pfun_def }
+   { Pfun `Def }
 
 | PROC f=sform
-    { Pfun_abs f }
+   { Pfun (`Abs f) }
 
 | PROC bad=sform p=sform q=sform?
-    { Pfun_upto(bad, p, q) }
+   { Pfun (`Upto (bad, p, q)) }
 
 | PROC STAR
-    { Pfun_to_code }
+   { Pfun `Code }
 
 | SEQ d=tac_dir pos=code_position COLON p=sform f=app_bd_info
    { Papp (d, pos, p, f) }

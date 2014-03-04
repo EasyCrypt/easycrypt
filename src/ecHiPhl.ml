@@ -6,10 +6,10 @@ open EcLogic
 let process_phl loc ptac g =
   let t =
     match ptac with
-    | Pfun_def                  -> EcPhlFun.t_fun_def
-    | Pfun_abs f                -> EcPhlFun.process_fun_abs f
-    | Pfun_upto info            -> EcPhlFun.process_fun_upto info 
-    | Pfun_to_code              -> EcPhlFun.t_fun_to_code 
+    | Pfun `Def                 -> EcPhlFun.t_fun_def
+    | Pfun (`Abs f)             -> EcPhlFun.process_fun_abs f
+    | Pfun (`Upto info)         -> EcPhlFun.process_fun_upto info
+    | Pfun `Code                -> EcPhlFun.t_fun_to_code
     | Pskip                     -> EcPhlSkip.t_skip
     | Papp (dir, k, phi, f)     -> EcPhlApp.process_app dir k phi f
     | Pwp k                     -> EcPhlWp.t_wp k

@@ -384,7 +384,7 @@ type tac_dir = Backs | Fwds
 type pfel_spec_preds = (pgamepath*pformula) list
 
 type trans_kind =
-  | TKfun of pgamepath
+  | TKfun  of pgamepath
   | TKstmt of tac_side * pstmt
 
 type trans_info =
@@ -399,11 +399,15 @@ type bdh_split =
   | BDH_split_or_case of pformula * pformula * pformula
   | BDH_split_not of pformula option * pformula
 
+type phlfun = [
+  | `Def
+  | `Code
+  | `Abs  of pformula
+  | `Upto of pformula * pformula * pformula option
+]
+
 type phltactic =
-  | Pfun_def
-  | Pfun_abs    of pformula
-  | Pfun_upto   of (pformula * pformula * pformula option)
-  | Pfun_to_code
+  | Pfun        of phlfun
   | Pskip
   | Papp        of (tac_dir * int doption * pformula * p_app_bd_info)
   | Pwp         of int doption option
