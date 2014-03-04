@@ -258,11 +258,11 @@ let process_eqobs_in (geq', ginv, eqs') g =
     match Mf.find_opt concl !forproof with
     | Some (EORI_adv geq) ->
       let gs =
-        EcPhlFun.FunAbsLow.t_equivF_abs
+        OldEcPhlFun.FunAbsLow.t_equivF_abs
           (EcPV.Mpv2.to_form mleft mright geq ginv) g in
       t_on_firsts t_logic_trivial 2 gs 
     | Some (EORI_fun eqs) ->
-      t_seq EcPhlFun.FunDefLow.t_equivF_fun_def
+      t_seq OldEcPhlFun.FunDefLow.t_equivF_fun_def
         (t_eqobs eqs) g 
     | Some (EORI_unknown (Some id)) ->
       t_hyp id g

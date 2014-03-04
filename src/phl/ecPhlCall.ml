@@ -250,7 +250,7 @@ let process_call side info (_, n as g) =
     match concl.f_node with
     | FequivS es ->
       let (_,fl,_),(_,fr,_),_,_ = s_last_calls "call" es.es_sl es.es_sr in
-      let bad,invP,invQ = EcPhlFun.process_fun_upto_info info g in
+      let bad,invP,invQ = OldEcPhlFun.process_fun_upto_info info g in
       let (topl,fl,oil,sigl),(topr,fr,_,sigr) = abstract_info2 env fl fr in
       let ml, mr = mleft, mright in
       let bad2 = Fsubst.f_subst_mem mhr mr bad in
@@ -278,12 +278,12 @@ let process_call side info (_, n as g) =
     | CI_inv inv ->
       let env, fmake = process_inv side g in
       let inv = process_form env inv tbool in
-      tac_sub :=  (fun g -> t_on_firsts t_logic_trivial 2 (EcPhlFun.t_fun inv g));
+      tac_sub :=  (fun g -> t_on_firsts t_logic_trivial 2 (OldEcPhlFun.t_fun inv g));
       fmake inv 
     | CI_upto info -> 
       let bad,p,q,form = process_upto side info g in
       let t_tr = t_or t_assumption t_logic_trivial in
-      tac_sub := (fun g -> t_on_firsts t_tr 3 (EcPhlFun.UpToLow.t_equivF_abs_upto bad p q g));
+      tac_sub := (fun g -> t_on_firsts t_tr 3 (OldEcPhlFun.UpToLow.t_equivF_abs_upto bad p q g));
       form in
         
   let (juc,an), gs = process_mkn_apply (process_cut g) info g in
