@@ -16,6 +16,10 @@ type side = [`Left|`Right]
 (* -------------------------------------------------------------------- *)
 val t_admit : FApi.backward
 val t_true  : FApi.backward
+val t_id    : string option -> FApi.backward
+
+(* -------------------------------------------------------------------- *)
+val t_logic_trivial : FApi.backward
 
 (* -------------------------------------------------------------------- *)
 val t_reflex : ?reduce:bool -> FApi.backward

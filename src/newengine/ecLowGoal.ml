@@ -124,6 +124,14 @@ end
 let t_admit (tc : tcenv) = FApi.close tc VAdmit
 
 (* -------------------------------------------------------------------- *)
+let t_id (_msg : string option) (tc : tcenv) =
+  tc                                    (* FIXME *)
+
+(* -------------------------------------------------------------------- *)
+let t_logic_trivial (tc : tcenv) =
+  tc                                    (* FIXME *)
+
+(* -------------------------------------------------------------------- *)
 let t_change (fp : form) (tc : tcenv) =
   let hyps, concl = FApi.tc_flat tc in
   if not (EcReduction.is_conv hyps fp concl) then
@@ -332,7 +340,7 @@ let gen_tuple_intro tys =
 (* -------------------------------------------------------------------- *)
 let pf_gen_tuple_intro tys hyps pe =
   let fp = gen_tuple_intro tys in
-  FApi.newfact pe (VExtern (`TupleCongr tys)) hyps fp
+  FApi.newfact pe (VExtern (`TupleCongr tys, [])) hyps fp
 
 (* -------------------------------------------------------------------- *)
 let t_tuple_intro_s (fs : form pair list) (tc : tcenv) =
@@ -455,7 +463,7 @@ let gen_tuple_elim (tys : ty list) : form =
 (* -------------------------------------------------------------------- *)
 let pf_gen_tuple_elim tys hyps pe =
   let fp = gen_tuple_elim tys in
-  FApi.newfact pe (VExtern (`TupleInd tys)) hyps fp
+  FApi.newfact pe (VExtern (`TupleInd tys, [])) hyps fp
 
 (* -------------------------------------------------------------------- *)
 let t_elim_eq_tuple_r ((_, sf) : form * sform) concl tc =
@@ -481,7 +489,7 @@ let t_elim_exists_r ((f, _) : form * sform) concl tc =
   match f.f_node with
   | Fquant (Lexists, bd, body) ->
       let newc = f_forall bd (f_imp body concl) in
-      FApi.mutate tc (fun hd -> VExtern (`Exists hd)) newc
+      FApi.mutate tc (fun hd -> VExtern (`Exists, [hd])) newc
   | _ -> raise NoMatch
 
 let t_elim_exists tc = t_elim_r [t_elim_exists_r] tc

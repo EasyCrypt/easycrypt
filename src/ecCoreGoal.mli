@@ -106,7 +106,8 @@ type validation =
 | VConv    of (handle * Sid.t)       (* weakening + conversion *)
 | VRewrite of (handle * rwproofterm) (* rewrite *)
 | VApply   of proofterm              (* modus ponens *)
-| VExtern  : 'a -> validation        (* external (hl/phl/prhl/...) proof-node *)
+
+| VExtern  : 'a * handle list -> validation (* external (hl/phl/prhl/...) proof-node *)
 
 (* -------------------------------------------------------------------- *)
 val tcenv_of_proof : proof -> tcenv
@@ -172,6 +173,11 @@ module FApi : sig
    * focused goal local context. *)
   val mutate : tcenv -> (handle -> validation) -> form -> tcenv
 
+  (* Same as xmutate, but for an external node resolution depending on
+   * a unbounded numbers of premises. The ['a] argument is the external
+   * validation node. *)
+  val xmutate : tcenv -> 'a -> form list -> tcenv
+
   (* Apply a forward tactic to a backward environment, using the
    * proof-environment of the latter *)
   val bwd_of_fwd : forward -> tcenv -> tcenv * handle
@@ -199,6 +205,8 @@ module FApi : sig
 
   val seq  : backward -> backward -> tcenv -> tcenv
   val lseq : backward list -> tcenv -> tcenv
+
+  val seq_subgoal : backward -> backward list -> backward
 end
 
 val (!!) : tcenv -> proofenv

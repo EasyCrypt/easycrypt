@@ -94,7 +94,8 @@ and validation =
 | VConv    of (handle * Sid.t)       (* weakening + conversion *)
 | VRewrite of (handle * rwproofterm) (* rewrite *)
 | VApply   of proofterm              (* modus ponens *)
-| VExtern  : 'a -> validation        (* external (hl/phl/prhl/...) proof-node *)
+
+| VExtern  : 'a * handle list -> validation (* external (hl/phl/prhl/...) proof-node *)
 
 and tcenv = {
   tce_proofenv   : proofenv;           (* top-level proof environment *)
@@ -327,6 +328,13 @@ module FApi = struct
     let (tc, hd) = newgoal tc fp in close tc (vx hd)
 
   (* ------------------------------------------------------------------ *)
+  let xmutate (tc : tcenv) (vx : 'a) (fp : form list) =
+    let (tc, hds) =
+      (* FIXME: create on direct left *)
+      List.map_fold (fun tc fp -> newgoal tc fp) tc fp in
+    close tc (VExtern (vx, hds))
+
+  (* ------------------------------------------------------------------ *)
   let newfact (pe : proofenv) vx hyps concl =
     snd_map (fun x -> x.g_uid) (pf_newgoal pe ~vx:vx hyps concl)
 
@@ -359,6 +367,8 @@ module FApi = struct
     match tts with
     | []       -> tc
     | t :: tts -> seq t (lseq tts) tc
+
+  let seq_subgoal = assert false
 end
 
 (* -------------------------------------------------------------------- *)
