@@ -4,7 +4,7 @@ open EcFol
 open EcEnv
 open EcBaseLogic
 open EcLogic
-open EcPhlConseq
+open OldEcPhlConseq
 open EcCoreHoareBdHoare
 
 (* -------------------------------------------------------------------- *)
@@ -77,7 +77,7 @@ let gen_S =
     bh,bh.bhs_po, bh.bhs_cmp, bh.bhs_bd in
   let mk_bdh bh po cmp b = 
     f_bdHoareS_r { bh with bhs_po = po; bhs_cmp = cmp; bhs_bd = b } in
-  fun tac -> tac EcPhlConseq.t_bdHoareS_conseq_bd get_bdh mk_bdh 
+  fun tac -> tac OldEcPhlConseq.t_bdHoareS_conseq_bd get_bdh mk_bdh 
 
 let gen_F = 
   let get_bdh g = 
@@ -85,7 +85,7 @@ let gen_F =
     bh,bh.bhf_po, bh.bhf_cmp, bh.bhf_bd in   
   let mk_bdh bh po cmp b = 
     f_bdHoareF bh.bhf_pr bh.bhf_f po cmp b in
-  fun tac -> tac EcPhlConseq.t_bdHoareF_conseq_bd get_bdh mk_bdh
+  fun tac -> tac OldEcPhlConseq.t_bdHoareF_conseq_bd get_bdh mk_bdh
 
 let destr_and f = 
   try destr_and f 
@@ -171,7 +171,7 @@ let process_bdhoare_split info g =
     let b2 = EcCoreHiLogic.process_form penv b2 treal in
     let f  = EcCoreHiLogic.process_form qenv f tbool in
     let t_conseq po lemma tac =
-      t_seq_subgoal (EcPhlConseq.t_conseq pr po)
+      t_seq_subgoal (OldEcPhlConseq.t_conseq pr po)
         [EcLogic.t_true;
          EcLogic.t_lseq [
            EcLogic.t_intros_i [EcIdent.create "_"];

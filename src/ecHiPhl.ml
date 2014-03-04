@@ -29,7 +29,7 @@ let process_phl loc ptac g =
     | Palias info               -> EcPhlCodeTx.process_alias info
     | Pset info                 -> EcPhlCodeTx.process_set info
     | Prnd (side, info)         -> EcPhlRnd.process_rnd side info
-    | Pconseq (nm,info)         -> EcPhlConseq.process_conseq nm info
+    | Pconseq (nm,info)         -> OldEcPhlConseq.process_conseq nm info
     | Phr_exists_elim           -> EcPhlExists.t_hr_exists_elim
     | Phr_exists_intro fs       -> EcPhlExists.process_exists_intro fs
     | Pexfalso                  -> EcPhlExfalso.t_exfalso
@@ -53,7 +53,7 @@ let process_phl loc ptac g =
       let side, pr, po = info in
       let info = Some {fp_kind = FPCut((Some pr,Some po),None); fp_args = []} in
       let info2, info3 = if side then info, None else None, info in
-      EcPhlConseq.process_conseq true (None, info2, info3)
+      OldEcPhlConseq.process_conseq true (None, info2, info3)
     | Pauto                     -> EcAuto.t_auto 
 
   in

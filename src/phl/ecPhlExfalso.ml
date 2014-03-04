@@ -10,6 +10,6 @@ let t_exfalso g =
     t_or
       (t_core_exfalso)
       (t_seq_subgoal
-         (EcPhlConseq.t_conseq f_false (get_post concl))
+         (OldEcPhlConseq.t_conseq f_false (get_post concl))
          [t_id None; t_logic_trivial; t_core_exfalso ])
       g

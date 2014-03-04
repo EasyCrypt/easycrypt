@@ -189,7 +189,7 @@ module FunAbsLow = struct
     let hf = t_as_hoareF concl in
     let pre, post, sg = hoareF_abs_spec env hf.hf_f inv in
     let tac g' = prove_goal_by sg (rn_hl_fun_abs inv) g' in
-      t_on_last tac (EcPhlConseq.t_hoareF_conseq pre post g)
+      t_on_last tac (OldEcPhlConseq.t_hoareF_conseq pre post g)
 
   let equivF_abs_spec env fl fr inv =
     let (topl, fl, oil, sigl) ,
@@ -233,7 +233,7 @@ module FunAbsLow = struct
     let ef = t_as_equivF concl in
     let pre, post, sg = equivF_abs_spec env ef.ef_fl ef.ef_fr inv in
     let tac g' = prove_goal_by sg (rn_hl_fun_abs inv) g' in
-      t_on_last tac (EcPhlConseq.t_equivF_conseq pre post g)
+      t_on_last tac (OldEcPhlConseq.t_equivF_conseq pre post g)
 
   let bdHoareF_abs_spec env f inv =
     let top,_,oi,_fsig = abstract_info env f in
@@ -253,7 +253,7 @@ module FunAbsLow = struct
     | FHeq when f_equal bhf.bhf_bd f_r1 ->
         let pre, post, sg = bdHoareF_abs_spec env bhf.bhf_f inv in
         let tac g' = prove_goal_by sg (rn_hl_fun_abs inv) g' in
-        t_on_last tac (EcPhlConseq.t_bdHoareF_conseq pre post g)
+        t_on_last tac (OldEcPhlConseq.t_bdHoareF_conseq pre post g)
     | _ -> cannot_apply "fun" "expected \"= 1\" as bound"
 end
 
@@ -311,7 +311,7 @@ module UpToLow = struct
     let pre, post, sg =
       equivF_abs_upto env ef.ef_fl ef.ef_fr bad invP invQ in
     let tac g' = prove_goal_by sg (rn_hl_fun_upto bad invP invQ) g' in
-      t_on_last tac (EcPhlConseq.t_equivF_conseq pre post g)
+      t_on_last tac (OldEcPhlConseq.t_equivF_conseq pre post g)
 end
 
 (* -------------------------------------------------------------------- *)

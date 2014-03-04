@@ -182,7 +182,7 @@ let t_eager_if g =
   let tac1 = 
     t_seq (t_intros_i [m2])
       (t_seq_subgoal 
-         (EcPhlConseq.t_hoareS_conseq_nm (f_and p eq2) eq2)
+         (OldEcPhlConseq.t_hoareS_conseq_nm (f_and p eq2) eq2)
          [ t_lseq [t_intros_i [m1;h2];t_elim_hyp h2;t_intros_i [h3;h4];tac0];
            t_lseq [t_intros_i [m1;h2];t_elim_hyp h2;
                    t_intros_i [h3;h4]; t_hyp h3];
@@ -193,7 +193,7 @@ let t_eager_if g =
     [t_id None; (* a *)
      t_seq (t_intros_i [a])
        (t_seq_subgoal 
-          (EcPhlConseq.t_equivS_conseq (f_and es.es_pr eq) es.es_po)
+          (OldEcPhlConseq.t_equivS_conseq (f_and es.es_pr eq) es.es_po)
           [t_seq (t_intros_i [m1;m2;h1])
               (t_seq_subgoal t_split 
                  [t_hyp h1;
@@ -270,7 +270,7 @@ let t_eager_while h g =
     es_sl = c';
     es_sr = c';
     es_po = eqI2 } in
-  t_seq_subgoal (EcPhlConseq.t_equivS_conseq eqI post)
+  t_seq_subgoal (OldEcPhlConseq.t_equivS_conseq eqI post)
    [ t_logic_trivial;
      t_logic_trivial;
      fun g -> 
@@ -383,7 +383,7 @@ let t_eager_fun_abs eqI h g =
   let tac g' = 
     t_on_first (t_hyp h) 
       (prove_goal_by (tH::sg) rn_eager_fun_abs g') in
-  t_on_last tac (EcPhlConseq.t_eagerF_conseq pre post g)
+  t_on_last tac (OldEcPhlConseq.t_eagerF_conseq pre post g)
   
 let process_fun_abs info eqI g = 
   let hyps, _ = get_goal g in

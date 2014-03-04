@@ -68,7 +68,7 @@ let t_hr_exists_intro fs g =
     let do1 (_, side, mk, _) = AAform (mk (if side then ml else mr)) in
       List.map do1 gen
   in
-    t_seq_subgoal (EcPhlConseq.t_conseq pre post)
+    t_seq_subgoal (OldEcPhlConseq.t_conseq pre post)
       [t_lseq [t_intros_i ms;
                gen_t_exists (fun _ _ f -> f) args; 
                t_hyp h];

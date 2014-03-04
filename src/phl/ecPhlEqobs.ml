@@ -225,7 +225,7 @@ let process_eqobs_in (geq', ginv, eqs') g =
     let post = EcPV.Mpv2.to_form ml mr eqs ginv in
     let pre = es.es_pr in
     t_seq_subgoal 
-      (EcPhlConseq.t_equivS_conseq pre post)
+      (OldEcPhlConseq.t_equivS_conseq pre post)
       [t_logic_trivial;
        t_logic_trivial;
        (fun g -> 
@@ -276,7 +276,7 @@ let process_eqobs_in (geq', ginv, eqs') g =
       let _, _, spec = onF () fl fr eqO in
       let ef = t_as_equivF spec in
       t_seq_subgoal 
-        (EcPhlConseq.t_equivF_conseq ef.ef_pr ef.ef_po)
+        (OldEcPhlConseq.t_equivF_conseq ef.ef_pr ef.ef_po)
         [t_logic_trivial;
          t_logic_trivial;
          t_repeat t_rec] g

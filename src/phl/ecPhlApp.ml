@@ -89,7 +89,7 @@ let t_bdHoare_app i info g =
     let concl = get_concl g in
     let hs = t_as_hoareS concl in
     t_lseq 
-       [EcPhlConseq.t_hoareS_conseq_nm hs.hs_pr f_true;
+       [OldEcPhlConseq.t_hoareS_conseq_nm hs.hs_pr f_true;
         EcPhlTrivial.t_trivial;
         t_fail] g in
   let tac g = 

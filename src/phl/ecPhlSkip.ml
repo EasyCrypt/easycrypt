@@ -40,7 +40,7 @@ module LowInternal = struct
 
   let t_bdHoare_skip g =
     let t_trivial = t_try (t_lseq [t_simplify_nodelta;t_split;t_fail]) in
-    t_subgoal [t_trivial;t_bdHoare_skip] (EcPhlConseq.t_bdHoareS_conseq_bd FHeq f_r1 g)
+    t_subgoal [t_trivial;t_bdHoare_skip] (OldEcPhlConseq.t_bdHoareS_conseq_bd FHeq f_r1 g)
     
 
   let t_equiv_skip g =
