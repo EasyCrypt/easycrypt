@@ -38,6 +38,7 @@ val t_apply_s :
   ?focus:bool -> path -> ty list -> form list -> int -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
+(* Introduction of logical operators (backward). *)
 val t_or_intro_s  : bool -> [`Left|`Right] -> form pair -> FApi.backward
 val t_and_intro_s : bool -> form pair -> FApi.backward
 val t_iff_intro_s : form pair -> FApi.backward
@@ -55,9 +56,23 @@ val t_tuple_intro_s : form pair list -> FApi.backward
 val t_tuple_intro   : ?reduce:bool -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
-val t_elim : FApi.backward
+(* Elimination of logical operators (backward). The top-level
+ * assumption is the one that is searched for eliminiation. Do a
+ * generalization first if needed. *)
+val t_elim_false    : FApi.backward
+val t_elim_and      : FApi.backward
+val t_elim_or       : FApi.backward
+val t_elim_if       : FApi.backward
+val t_elim_iff      : FApi.backward
+val t_elim_eq_tuple : FApi.backward
+val t_elim_exists   : FApi.backward
+val t_elim          : FApi.backward
+
+(* Elimination using an custom elimination principle. *)
+val t_elimT_form : path -> ty list -> form -> int -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
+(* Logical cut. *)
 val t_cut : form -> FApi.backward
 
 (* -------------------------------------------------------------------- *)

@@ -207,7 +207,7 @@ let t_intros (ids : ident mloc list) (tc : tcenv) =
 let t_intro_i (id : EcIdent.t) (tc : tcenv) =
   t_intros [notag id] tc
 
-(* ------------------------------------------------------------------ *)
+(* -------------------------------------------------------------------- *)
 let t_apply ?(focus = true) (pt : proofterm) (tc : tcenv) =
   let (hyps, concl) = FApi.tc_flat tc in
   let (pt, ax), tc  = RApi.of_pure tc (fun tc -> LowApply.check pt tc) in
