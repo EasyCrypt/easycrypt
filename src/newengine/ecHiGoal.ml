@@ -137,39 +137,17 @@ let process1_logic (t : logtactic) (tc : tcenv) =
   in
     tx tc
 
-(*
-  | Preflexivity
-  | Passumption of (pqsymbol option * ptyannot option)
-  | Psmt        of (pdbhint option * pprover_infos)
-  | Pintro      of intropattern
-  | Psplit
-  | Pfield	    of psymbol list
-  | Pring 	    of psymbol list
-  | Palg_norm
-  | Pexists     of fpattern_arg located list
-  | Pleft
-  | Pright
-  | Ptrivial
-  | Pcongr
-  | Pelim       of (genpattern list * pqsymbol option)
-  | Papply      of (ffpattern * psymbol option)
-  | Pcut        of (intropattern1 option * pformula * ptactic_core option)
-  | Pcutdef     of (intropattern1 option * pterm)
-  | Pgeneralize of genpattern list
-  | Pclear      of psymbol list
-  | Prewrite    of rwarg list
-  | Prwnormal   of pformula * pqsymbol list
-  | Psubst      of pformula list
-  | Psimplify   of preduction
-  | Pchange     of pformula
-  | Ppose       of (psymbol * rwocc * pformula)
-*)
+(* -------------------------------------------------------------------- *)
+let process1_phl (t : phltactic) (tc : tcenv) =
+  match t with
+  | _ -> assert false
 
 (* -------------------------------------------------------------------- *)
 let process1 (t : ptactic) (tc : tcenv) =
   match (unloc t.pt_core) with
   | Padmit   -> EcLowGoal.t_admit tc
   | Plogic t -> process1_logic t tc
+  | PPhl   t -> process1_phl t tc
 
   | _ -> assert false
 

@@ -87,10 +87,15 @@ type rwproofterm = {
  * forward reasoning, creating open of closed goals or solving the
  * current focus. The [tcenv] handle the focus automatically when goals
  * are created, closed or when composing tactics; but can also be
- * manipulated explicitely via tacticals. *)
+ * manipulated explicitely via tacticals.
+ *
+ * A [tcenv1] is a [tcenv] where it is statically known that the focused
+ * goal has sibling goals. A coercion is given from [tcenv1] to [tcenv].
+ *)
 
 type proof
 type proofenv
+type tcenv1
 type tcenv
 
 type pregoal = {
@@ -107,11 +112,14 @@ type validation =
 | VRewrite of (handle * rwproofterm) (* rewrite *)
 | VApply   of proofterm              (* modus ponens *)
 
-| VExtern  : 'a * handle list -> validation (* external (hl/phl/prhl/...) proof-node *)
+  (* external (hl/phl/prhl/...) proof-node *)
+| VExtern  : 'a * handle list -> validation
 
 (* -------------------------------------------------------------------- *)
-val tcenv_of_proof : proof -> tcenv
-val proof_of_tcenv : tcenv -> proof
+val tcenv_of_tcenv1 : tcenv1 -> tcenv
+val tcenv1_of_proof : proof  -> tcenv1
+val tcenv_of_proof  : proof  -> tcenv
+val proof_of_tcenv  : tcenv  -> proof
 
 (* Start a new interactive proof in a given local context
  * [LDecl.hyps] for given [form]. Mainly, a [proof] records the set
@@ -171,28 +179,35 @@ module FApi : sig
    * resolved using the given [validation] producer. This producer is
    * applied to the goal freshly created, using given formulas and
    * focused goal local context. *)
-  val mutate : tcenv -> (handle -> validation) -> form -> tcenv
+  val mutate : tcenv  -> (handle -> validation) -> form -> tcenv
 
   (* Same as xmutate, but for an external node resolution depending on
    * a unbounded numbers of premises. The ['a] argument is the external
    * validation node. *)
-  val xmutate : tcenv -> 'a -> form list -> tcenv
+  val xmutate : tcenv  -> 'a -> form list -> tcenv
 
   (* Apply a forward tactic to a backward environment, using the
    * proof-environment of the latter *)
-  val bwd_of_fwd : forward -> tcenv -> tcenv * handle
+  val bwd_of_fwd  : forward -> tcenv  -> tcenv  * handle
 
   (* Insert a new fact in a proof-environment *)
   val newfact :
        proofenv -> validation -> LDecl.hyps -> form
     -> proofenv * handle
 
-  (* Accessors for focused goal parts *)
+  (* Accessors for focused goal parts (tcenv) *)
   val tc_penv  : tcenv -> proofenv
   val tc_flat  : tcenv -> LDecl.hyps * form
   val tc_eflat : tcenv -> env * LDecl.hyps * form
   val tc_hyps  : tcenv -> LDecl.hyps
   val tc_goal  : tcenv -> form
+
+  (* Accessors for focused goal parts (tcenv1) *)
+  val tc1_penv  : tcenv1 -> proofenv
+  val tc1_flat  : tcenv1 -> LDecl.hyps * form
+  val tc1_eflat : tcenv1 -> env * LDecl.hyps * form
+  val tc1_hyps  : tcenv1 -> LDecl.hyps
+  val tc1_goal  : tcenv1 -> form
 
   (* Tacticals *)
   type ontest    = int -> proofenv -> handle -> bool
@@ -209,7 +224,8 @@ module FApi : sig
   val seq_subgoal : backward -> backward list -> backward
 end
 
-val (!!) : tcenv -> proofenv
+val (!!) : tcenv  -> proofenv
+val (!@) : tcenv1 -> tcenv
 
 (* -------------------------------------------------------------------- *)
 (* Imperative API                                                       *)

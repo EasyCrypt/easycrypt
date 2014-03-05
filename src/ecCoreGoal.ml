@@ -95,23 +95,25 @@ and validation =
 | VRewrite of (handle * rwproofterm) (* rewrite *)
 | VApply   of proofterm              (* modus ponens *)
 
-| VExtern  : 'a * handle list -> validation (* external (hl/phl/prhl/...) proof-node *)
+  (* external (hl/phl/prhl/...) proof-node *)
+| VExtern  : 'a * handle list -> validation
+
+and tcenv1 = {
+  tce_penv : proofenv;               (* top-level proof environment *)
+  tce_ctxt : tcenv_ctxt;             (* context *)
+  tce_goal : pregoal option;         (* current goal *)
+}
 
 and tcenv = {
-  tce_proofenv   : proofenv;           (* top-level proof environment *)
-  tce_goal       : pregoal option;     (* current goal *)
-  tce_subgoals   : tcenv_ctxt;         (* subgoals (zipper) *)
+  tce_tcenv : tcenv1;
+  tce_goals : tcenv_ctxt1;
 }
 
-and tcenv_ctxt = {
-  tcec_closed : ID.Set.t;
-  tcec_gzip   : tcenv_gzip;
-}
+and tcenv_ctxt = tcenv_ctxt1 list
 
-and tcenv_gzip = {
+and tcenv_ctxt1 = {
   tcez_left  : handle list;
   tcez_right : handle list;
-  tcez_ctxt  : [`Top | `Intern of tcenv_gzip];
 }
 
 (* -------------------------------------------------------------------- *)
@@ -150,128 +152,91 @@ module FApi = struct
       { pe with pr_goals = ID.Map.change change hd pe.pr_goals }
 
   (* ------------------------------------------------------------------ *)
-  let update_goal_map_on_tcenv (tx : goal -> goal) (hd : handle) (tc : tcenv) =
-    { tc with tce_proofenv = update_goal_map tx hd tc.tce_proofenv }
+  let tc1_update_goal_map (tx : goal -> goal) (hd : handle) (tc : tcenv1) =
+    { tc with tce_penv = update_goal_map tx hd tc.tce_penv }
 
   (* ------------------------------------------------------------------ *)
-  let check_tcenv_opened (tc : tcenv) =
+  let tc_update_tcenv (tx : tcenv1 -> tcenv1) (tc : tcenv) =
+    { tc with tce_tcenv = tx tc.tce_tcenv }
+
+  (* ------------------------------------------------------------------ *)
+  let tc1_check_opened (tc : tcenv1) =
     if tc.tce_goal = None then
       raise (InvalidStateException "all-goals-closed")
 
   (* ------------------------------------------------------------------ *)
-  let current (tc : tcenv) =
-    check_tcenv_opened tc; EcUtils.oget (tc.tce_goal)
+  let tc1_current (tc : tcenv1) =
+    tc1_check_opened tc; EcUtils.oget (tc.tce_goal)
 
   (* ------------------------------------------------------------------ *)
-  let tc_flat (tc : tcenv) =
-    let { g_hyps; g_concl } = current tc in (g_hyps, g_concl)
+  let tc1_flat (tc : tcenv1) =
+    let { g_hyps; g_concl } = tc1_current tc in (g_hyps, g_concl)
 
   (* ------------------------------------------------------------------ *)
-  let tc_eflat (tc : tcenv) =
-    let (hyps, concl) = tc_flat tc in
+  let tc1_eflat (tc : tcenv1) =
+    let (hyps, concl) = tc1_flat tc in
       (LDecl.toenv hyps, hyps, concl)
 
   (* ------------------------------------------------------------------ *)
-  let tc_penv (tc : tcenv) = tc.tce_proofenv
-  let tc_hyps (tc : tcenv) = fst (tc_flat tc)
-  let tc_goal (tc : tcenv) = snd (tc_flat tc)
+  let tc1_penv (tc : tcenv1) = tc.tce_penv
+  let tc1_hyps (tc : tcenv1) = fst (tc1_flat tc)
+  let tc1_goal (tc : tcenv1) = snd (tc1_flat tc)
 
   (* ------------------------------------------------------------------ *)
-  let penv_of_tcenv (tc : tcenv) =
-    tc.tce_proofenv
+  let tc_flat  (tc : tcenv) = tc1_flat  tc.tce_tcenv
+  let tc_eflat (tc : tcenv) = tc1_eflat tc.tce_tcenv
+  let tc_penv  (tc : tcenv) = tc1_penv  tc.tce_tcenv
+  let tc_hyps  (tc : tcenv) = tc1_hyps  tc.tce_tcenv
+  let tc_goal  (tc : tcenv) = tc1_goal  tc.tce_tcenv
 
   (* ------------------------------------------------------------------ *)
-  let reduce_tcenvx (tcx : tcenv_ctxt) =
-    if ID.Set.is_empty tcx.tcec_closed then
-      tcx
-    else
-      let filter =
-        List.fold_right
-          (fun id (ids, gs) ->
-            if   ID.Set.mem id ids
-            then (ID.Set.remove id ids, gs)
-            else (ids, id :: gs))
-      in
-
-      let ids = tcx.tcec_closed in
-      let ids, tcez_left  = filter tcx.tcec_gzip.tcez_left  (ids, []) in
-      let ids, tcez_right = filter tcx.tcec_gzip.tcez_right (ids, []) in
-        { tcec_closed = ids;
-          tcec_gzip   = { tcx.tcec_gzip with tcez_left; tcez_right; } }
+  let tcx1_pop (tcx : tcenv_ctxt1) =
+    match tcx.tcez_right with
+    | sg :: rgs -> Some (sg, { tcx with tcez_right = rgs })
+    | [] ->
+        match tcx.tcez_left with
+        | sg :: lgs -> Some (sg, { tcx with tcez_left = lgs })
+        | [] -> None
 
   (* ------------------------------------------------------------------ *)
-  let pop_from_tcenvx (tcx : tcenv_ctxt) =
-    let tcx = reduce_tcenvx tcx in
-    let tcz = tcx.tcec_gzip in
+  let tc_normalize (tc : tcenv) =
+    match tc.tce_tcenv.tce_goal with
+    | Some _ -> tc
+    | None   ->
+        match tcx1_pop tc.tce_goals with
+        | None -> tc
+        | Some (hd, tcx1) ->
+            let goal = get_pregoal_by_id hd tc.tce_tcenv.tce_penv in
+            { tc with
+                tce_tcenv = { tc.tce_tcenv with tce_goal = Some goal };
+                tce_goals = tcx1; }
 
-    let (sg, tcz) =
-      match tcz.tcez_right with
-      | sg :: rgs -> (Some sg, { tcz with tcez_right = rgs })
-      | [] ->
-          match tcz.tcez_left with
-          | sg :: lgs -> (Some sg, { tcz with tcez_left = lgs })
-          | [] -> (None, tcz)
-    in
-      (sg, { tcx with tcec_gzip = tcz })
-
-  (* -------------------------------------------------------------------- *)
-  let reduce_tcenv (tc : tcenv) =
-    match tc.tce_goal with
-    | None ->
-        let (sg, tcx) = pop_from_tcenvx tc.tce_subgoals in
-
+  (* ------------------------------------------------------------------ *)
+  let tc_up (tc : tcenv) =
+    match tc.tce_tcenv.tce_ctxt with
+    | [] -> raise (InvalidStateException "goal-at-top")
+    | tcx1 :: tcx ->
         { tc with
-            tce_goal     = sg |> omap (get_pregoal_by_id^~ tc.tce_proofenv);
-            tce_subgoals = tcx; }
-
-    | Some _ ->
-        { tc with tce_subgoals = reduce_tcenvx tc.tce_subgoals }
-
-  (* ------------------------------------------------------------------ *)
-  let up_tcenvx (tcx : tcenv_ctxt) =
-    let tcz = tcx.tcec_gzip in
-    let tcz =
-      match tcz.tcez_ctxt with
-      | `Top -> raise (InvalidStateException "at-top")
-      | `Intern subtcz ->
-          { tcez_left  = tcz.tcez_left @ subtcz.tcez_left;
-            tcez_right = subtcz.tcez_right @ tcz.tcez_right;
-            tcez_ctxt  = subtcz.tcez_ctxt; }
-    in
-      { tcx with tcec_gzip = tcz }
+            tce_tcenv = { tc.tce_tcenv with tce_ctxt = tcx };
+            tce_goals = {
+              tcez_left  = tc.tce_goals.tcez_left @ tcx1.tcez_left;
+              tcez_right = tcx1.tcez_right @ tc.tce_goals.tcez_right; }}
 
   (* ------------------------------------------------------------------ *)
-  let down_tcenvx (tcx : tcenv_ctxt) =
-    let tcz =
-      { tcez_left  = [];
-        tcez_right = [];
-        tcez_ctxt  = `Intern tcx.tcec_gzip; } in
-
-      { tcx with tcec_gzip = tcz }
-
-  (* ------------------------------------------------------------------ *)
-  let up_tcenv (tc : tcenv) =
-    let tc = { tc with tce_subgoals = up_tcenvx tc.tce_subgoals } in
-      reduce_tcenv tc
-
-  (* ------------------------------------------------------------------ *)
-  let uptop_tcenv (tc : tcenv) =
-    let rec doit tcx =
-      match tcx.tcec_gzip.tcez_ctxt with
-      | `Top      -> tcx
-      | `Intern _ -> doit (up_tcenvx tcx)
+  let tc_uptop (tc : tcenv) =
+    let rec doit tc =
+      match tc.tce_tcenv.tce_ctxt with
+      | [] -> tc
+      | _  -> doit (tc_up tc)
     in
 
-    let tc = { tc with tce_subgoals = doit tc.tce_subgoals } in
-      reduce_tcenv tc
+    tc_normalize (doit tc)
 
   (* ------------------------------------------------------------------ *)
-  let down_tcenv (tc : tcenv) =
-    { tc with tce_subgoals = down_tcenvx tc.tce_subgoals }
-
-  (* ------------------------------------------------------------------ *)
-  let push_closed_to_tcenvx (hd : handle) (tcx : tcenv_ctxt) =
-    { tcx with tcec_closed = ID.Set.add hd tcx.tcec_closed }
+  let tc_down (tc : tcenv) =
+    let tcenv = tc.tce_tcenv in
+    let tcenv = { tcenv with tce_ctxt = tc.tce_goals :: tcenv.tce_ctxt } in
+    tcenv
 
   (* ------------------------------------------------------------------ *)
   let pf_newgoal (pe : proofenv) ?vx hyps concl =
@@ -284,26 +249,22 @@ module FApi = struct
   (* ------------------------------------------------------------------ *)
   let newgoal (tc : tcenv) ?(hyps : LDecl.hyps option) (concl : form) =
     let hyps     = ofdfl (fun () -> tc_hyps tc) hyps in
-    let (pe, pg) = pf_newgoal tc.tce_proofenv hyps concl in
+    let (pe, pg) = pf_newgoal (tc_penv tc) hyps concl in
 
-    let tc = { tc with tce_proofenv = pe; } in
+    let tc = tc_update_tcenv (fun te -> { te with tce_penv = pe }) tc in
     let tc =
-      match tc.tce_goal with
-      | None   -> { tc with tce_goal = Some pg }
+      match tc.tce_tcenv.tce_goal with
+      | None   -> tc_update_tcenv (fun te -> { te with tce_goal = Some pg }) tc
       | Some _ ->
-          let tcz = tc.tce_subgoals in
-          let tcz =
-            { tcz with tcec_gzip =
-                { tcz.tcec_gzip with tcez_right =
-                    tcz.tcec_gzip.tcez_right @ [pg.g_uid] } }
-          in
-            { tc with tce_subgoals = tcz }
+          { tc with tce_goals = {
+              tc.tce_goals with tcez_right =
+                pg.g_uid :: tc.tce_goals.tcez_right } }
     in
       (tc, pg.g_uid)
 
   (* ------------------------------------------------------------------ *)
-  let close (tc : tcenv) (vx : validation) =
-    let current = current tc in
+  let tc1_close (tc : tcenv1) (vx : validation) =
+    let current = tc1_current tc in
 
     let change g =
       if g.g_validation <> None || g.g_goal != current then
@@ -312,15 +273,16 @@ module FApi = struct
     in
 
     (* Close current goal, set focused goal to None *)
-    let tc = update_goal_map_on_tcenv change current.g_uid tc in
+    let tc = tc1_update_goal_map change current.g_uid tc in
     let tc = { tc with tce_goal = None } in
 
-    (* Maybe pop one opened goal from proof context *)
-    let tc = reduce_tcenv tc in
+    tc
 
-    (* Register current goal has being closed *)
-    { tc with tce_subgoals =
-        push_closed_to_tcenvx current.g_uid tc.tce_subgoals }
+  (* ------------------------------------------------------------------ *)
+  let close (tc : tcenv) (vx : validation) =
+    let tc = { tc with tce_tcenv = tc1_close tc.tce_tcenv vx } in
+    (* Maybe pop one opened goal from proof context *)
+    tc_normalize tc
 
   (* ------------------------------------------------------------------ *)
   let mutate (tc : tcenv) (vx : handle -> validation) (fp : form) =
@@ -329,9 +291,7 @@ module FApi = struct
 
   (* ------------------------------------------------------------------ *)
   let xmutate (tc : tcenv) (vx : 'a) (fp : form list) =
-    let (tc, hds) =
-      (* FIXME: create on direct left *)
-      List.map_fold (fun tc fp -> newgoal tc fp) tc fp in
+    let (tc, hds) = List.map_fold (fun tc fp -> newgoal tc fp) tc fp in
     close tc (VExtern (vx, hds))
 
   (* ------------------------------------------------------------------ *)
@@ -340,8 +300,8 @@ module FApi = struct
 
   (* ------------------------------------------------------------------ *)
   let bwd_of_fwd (tx : forward) (tc : tcenv) =
-    let (pe, hd) = tx tc.tce_proofenv in
-    ({ tc with tce_proofenv = pe }, hd)
+    let (pe, hd) = tx (tc_penv tc) in
+    ({ tc with tce_tcenv = { tc.tce_tcenv with tce_penv = pe } }, hd)
 
   (* ------------------------------------------------------------------ *)
   (* Tacticals *)
@@ -417,8 +377,11 @@ module RApi = struct
     reffold (fun tc -> swap (FApi.bwd_of_fwd tx tc)) tc
 
   (* ------------------------------------------------------------------ *)
-  let pf_get_pregoal_by_id id pf = FApi.get_pregoal_by_id id !pf
-  let tc_get_pregoal_by_id id pf = FApi.get_pregoal_by_id id (!pf).tce_proofenv
+  let pf_get_pregoal_by_id id pf =
+    FApi.get_pregoal_by_id id !pf
+
+  let tc_get_pregoal_by_id id tc =
+    FApi.get_pregoal_by_id id (!tc).tce_tcenv.tce_penv
 
   (* ------------------------------------------------------------------ *)
   let tc_penv  (tc : rtcenv) = FApi.tc_penv  !tc
@@ -433,25 +396,32 @@ type rtcenv    = RApi.rtcenv
 
 (* -------------------------------------------------------------------- *)
 let tcenv_of_proof (pf : proof) =
-  let tcenv =
-    { tce_proofenv = pf.pr_env;
-      tce_goal     = None;
-      tce_subgoals = { tcec_closed = ID.Set.empty;
-                       tcec_gzip   = { tcez_left  = [];
-                                       tcez_right = pf.pr_opened;
-                                       tcez_ctxt  = `Top; } } }
-  in
-    FApi.down_tcenv (FApi.reduce_tcenv tcenv)
+  let tcenv = { tce_penv = pf.pr_env; tce_goal = None; tce_ctxt = []; } in
+  let tcz   = { tcez_left = []; tcez_right = pf.pr_opened; } in
+  let tcenv = { tce_tcenv = tcenv; tce_goals = tcz; } in
+  FApi.tc_normalize tcenv
+
+(* -------------------------------------------------------------------- *)
+let tcenv1_of_proof (pf : proof) =
+  FApi.tc_down (tcenv_of_proof pf)
+
+(* -------------------------------------------------------------------- *)
+let tcenv_of_tcenv1 (tc : tcenv1) =
+  let goals = { tcez_left = []; tcez_right = []; } in
+  { tce_tcenv = tc; tce_goals = goals; }
+
+(* -------------------------------------------------------------------- *)
+let (!@) = tcenv_of_tcenv1
 
 (* -------------------------------------------------------------------- *)
 let proof_of_tcenv (tc : tcenv) =
-  let tc  = FApi.reduce_tcenv (FApi.uptop_tcenv tc) in
-  let rg  = tc.tce_subgoals.tcec_gzip.tcez_right in
-  let lg  = tc.tce_subgoals.tcec_gzip.tcez_left  in
-  let fg  = tc.tce_goal |> omap (fun g -> g.g_uid) in
+  let tc  = FApi.tc_uptop tc in
+  let rg  = tc.tce_goals.tcez_right in
+  let lg  = tc.tce_goals.tcez_left  in
+  let fg  = tc.tce_tcenv.tce_goal |> omap (fun g -> g.g_uid) in
 
-    { pr_env    = tc.tce_proofenv;
-      pr_opened = List.rev_append lg (List.ocons fg rg); }
+  { pr_env    = tc.tce_tcenv.tce_penv;
+    pr_opened = List.rev_append lg (List.ocons fg rg); }
 
 (* -------------------------------------------------------------------- *)
 let start (hyps : LDecl.hyps) (goal : form) =
@@ -482,8 +452,8 @@ module Exn = struct
     recast pe f ()
 
   let recast_tc tc f =
-    let penv = FApi.penv_of_tcenv tc in
-    let hyps, _concl = FApi.tc_flat tc in
+    let penv = FApi.tc_penv tc in
+    let hyps = FApi.tc_hyps tc in
       recast_pe penv (fun () -> f hyps)
 end
 
