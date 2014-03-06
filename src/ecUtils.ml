@@ -563,6 +563,16 @@ module List = struct
 
   let sum xs = List.fold_left (+) 0 xs
 
+  let rotate (d : [`Left|`Right]) (i : int) (xs : 'a list) =
+    if i < 0 then invalid_arg "List.rotate: [i < 0]";
+    let i = i mod List.length xs in
+
+    if i = 0 then (0, xs) else
+
+    let mrev   = match d with `Left -> identity | `Right -> rev in
+    let hd, tl = take_n i (mrev xs) in
+    (i, mrev (tl @ hd))
+
   module Smart = struct
     let rec map f l =
       match l with

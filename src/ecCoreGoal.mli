@@ -116,7 +116,6 @@ type validation =
 | VExtern  : 'a * handle list -> validation
 
 (* -------------------------------------------------------------------- *)
-val tcenv_of_tcenv1 : tcenv1 -> tcenv
 val tcenv1_of_proof : proof  -> tcenv1
 val tcenv_of_proof  : proof  -> tcenv
 val proof_of_tcenv  : tcenv  -> proof
@@ -149,18 +148,15 @@ module FApi : sig
    * - [backward tactic]: take a tcenv, i.e. an opened goal, and make
    *   progress over it, potentially creating new subgoals. Examples of
    *   such tactics are backward apply, rewriting, backward congruence.
-   *
-   * - [mixward tactic]: take a tcenv a apply a forward tactic to its
-   *   associated proof-environment, potentially creating subgoals.
-   *   Examples of such tactics are forward apply, conditional closed
-   *   rewriting.
    *)
 
   exception InvalidStateException of string
 
   type forward  = proofenv -> proofenv * handle
-  type backward = tcenv -> tcenv
-  type mixward  = tcenv -> tcenv * handle
+  type backward = tcenv1 -> tcenv
+  type tactical = tcenv -> tcenv
+
+  val tcenv_of_tcenv1 : tcenv1 -> tcenv
 
   (* Create a new opened goal for the given [form] in the backward
    * environment [tcenv]. If no local context [LDecl.hyps] is given,
@@ -179,7 +175,8 @@ module FApi : sig
    * resolved using the given [validation] producer. This producer is
    * applied to the goal freshly created, using given formulas and
    * focused goal local context. *)
-  val mutate : tcenv  -> (handle -> validation) -> form -> tcenv
+  val mutate  : tcenv  -> (handle -> validation) -> form -> tcenv
+  val mutate1 : tcenv1 -> (handle -> validation) -> form -> tcenv1
 
   (* Same as xmutate, but for an external node resolution depending on
    * a unbounded numbers of premises. The ['a] argument is the external
@@ -188,7 +185,8 @@ module FApi : sig
 
   (* Apply a forward tactic to a backward environment, using the
    * proof-environment of the latter *)
-  val bwd_of_fwd  : forward -> tcenv  -> tcenv  * handle
+  val bwd1_of_fwd  : forward -> tcenv1 -> tcenv1 * handle
+  val  bwd_of_fwd  : forward -> tcenv  -> tcenv  * handle
 
   (* Insert a new fact in a proof-environment *)
   val newfact :
@@ -210,21 +208,19 @@ module FApi : sig
   val tc1_goal  : tcenv1 -> form
 
   (* Tacticals *)
-  type ontest    = int -> proofenv -> handle -> bool
   type direction = [ `Left | `Right ]
 
-  val on     : backward -> ontest -> tcenv -> tcenv
-  val first  : backward -> int -> tcenv -> tcenv
-  val last   : backward -> int -> tcenv -> tcenv
-  val rotate : direction -> int -> tcenv -> tcenv
-
-  val seq  : backward -> backward -> tcenv -> tcenv
-  val lseq : backward list -> tcenv -> tcenv
-
-  val seq_subgoal : backward -> backward list -> backward
+  val t_focus  : backward -> tactical
+  val t_firsts : backward -> int -> tactical
+  val t_lasts  : backward -> int -> tactical
+  val t_first  : backward -> tactical
+  val t_last   : backward -> tactical
+  val t_rotate : direction -> int -> tactical
+  val t_seq    : backward -> backward -> backward
+  val t_seqs   : backward list -> backward
 end
 
-val (!!) : tcenv  -> proofenv
+val (!!) : tcenv1 -> proofenv
 val (!@) : tcenv1 -> tcenv
 
 (* -------------------------------------------------------------------- *)
@@ -236,6 +232,7 @@ module RApi : sig
 
   val rtcenv_of_tcenv  : tcenv  -> rtcenv
   val  tcenv_of_rtcenv : rtcenv ->  tcenv
+  val rtcenv_of_tcenv1 : tcenv1 -> rtcenv
 
   (* For the following functions, see the [FApi] module *)
   val pf_get_pregoal_by_id : handle -> rproofenv -> pregoal
@@ -244,9 +241,9 @@ module RApi : sig
   val newgoal : rtcenv -> ?hyps:LDecl.hyps -> form -> handle
   val close   : rtcenv -> validation -> unit
 
-  val bwd_of_fwd : FApi.forward -> rtcenv -> handle
+  val bwd_of_fwd : FApi.forward -> rtcenv  -> handle
 
-  (* Accessors for focused goal parts *)
+  (* Accessors for focused goal parts (rtcenv) *)
   val tc_penv  : rtcenv -> proofenv
   val tc_flat  : rtcenv -> LDecl.hyps * form
   val tc_eflat : rtcenv -> env * LDecl.hyps * form
@@ -254,9 +251,11 @@ module RApi : sig
   val tc_goal  : rtcenv -> form
 
   (* Recast a rtcenv-imperative function as a tcenv-pure function. *)
-  val of_pure   : tcenv  -> (rtcenv -> 'a) -> 'a * tcenv
-  val to_pure   : rtcenv -> (tcenv -> tcenv * 'a) -> 'a
-  val to_pure_u : rtcenv -> (tcenv -> tcenv) -> unit
+  val of_pure_u : ( tcenv -> tcenv) -> rtcenv -> unit
+  val to_pure_u : (rtcenv -> unit ) ->  tcenv -> tcenv
+
+  val of_pure : (tcenv -> 'a * tcenv) -> rtcenv -> 'a
+  val to_pure : (rtcenv -> 'a) -> tcenv -> tcenv * 'a
 
   (* [freeze] returns a copy of the input [rtcenv], whereas [restore]
    * copies the contents of [src:rtcenv] to [dst:rtcenv]. These
@@ -298,7 +297,7 @@ module TcTyping : sig
 
   (* Typing in the [proofenv] implies for the [tcenv].
    * Typing exceptions are recasted in the proof env. context *)
-  val tc_process_form_opt : tcenv -> pformula -> ty option -> form
-  val tc_process_form     : tcenv -> pformula -> ty -> form
-  val tc_process_formula  : tcenv -> pformula -> form
+  val tc1_process_form_opt : tcenv1 -> pformula -> ty option -> form
+  val tc1_process_form     : tcenv1 -> pformula -> ty -> form
+  val tc1_process_formula  : tcenv1 -> pformula -> form
 end

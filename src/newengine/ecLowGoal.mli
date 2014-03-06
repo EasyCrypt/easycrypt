@@ -26,20 +26,17 @@ val t_reflex : ?reduce:bool -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
 
-(* Main low-level MP tactic. Tactic a fully constructed proof-term to
+(* Main low-level MP tactic. Apply a fully constructed proof-term to
  * the focused goal. If the proof-term contains PTCut-terms, create the
- * related subgoals. If [focus] is [true], do the MP in the context of
- * the focus goal - see [FApi.oncurrent]. Raise [InvalidProofTerm] is
- * the proof-term is not valid (not typable or not a proof of the
- * focused goal). *)
-val t_apply : ?focus:bool -> proofterm -> FApi.backward
+ * related subgoals. Raise [InvalidProofTerm] is the proof-term is not
+ * valid (not typable or not a proof of the focused goal). *)
+val t_apply : proofterm -> tcenv1 -> tcenv
 
 (* Apply a proof term of the forms [p<:ty1...tyn> f1...fp _ ... _]
  * constructed for the path, type parameters, and formulas given to
  * the function. The [int] argument gives the number of premises to
  * skip before applying [p]. *)
-val t_apply_s :
-  ?focus:bool -> path -> ty list -> form list -> int -> FApi.backward
+val t_apply_s : path -> ty list -> form list -> int -> tcenv1 -> tcenv
 
 (* -------------------------------------------------------------------- *)
 (* Introduction of logical operators (backward). *)

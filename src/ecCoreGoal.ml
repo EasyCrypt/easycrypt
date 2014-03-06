@@ -51,7 +51,7 @@ let pamodule  x = PAModule  x
 
 (* -------------------------------------------------------------------- *)
 type rwproofterm = {
-  rpt_proof : proofterm;
+ rpt_proof : proofterm;
   rpt_occrs : EcMatching.ptnpos;
 }
 
@@ -109,12 +109,8 @@ and tcenv = {
   tce_goals : tcenv_ctxt1;
 }
 
-and tcenv_ctxt = tcenv_ctxt1 list
-
-and tcenv_ctxt1 = {
-  tcez_left  : handle list;
-  tcez_right : handle list;
-}
+and tcenv_ctxt  = tcenv_ctxt1 list
+and tcenv_ctxt1 = handle list
 
 (* -------------------------------------------------------------------- *)
 let tc_error pe ?loc msg =
@@ -127,8 +123,8 @@ let tc_lookup_error pe ?loc kind qs =
 (* -------------------------------------------------------------------- *)
 module FApi = struct
   type forward  = proofenv -> proofenv * handle
-  type backward = tcenv -> tcenv
-  type mixward  = tcenv -> tcenv * handle
+  type backward = tcenv1 -> tcenv
+  type tactical = tcenv -> tcenv
 
   exception InvalidStateException of string
 
@@ -139,8 +135,24 @@ module FApi = struct
     | Some pr -> pr
 
   (* ------------------------------------------------------------------ *)
+  let tc1_get_goal_by_id (hd : handle) (tc : tcenv1) =
+    get_goal_by_id hd tc.tce_penv
+
+  (* ------------------------------------------------------------------ *)
+  let tc_get_goal_by_id (hd : handle) (tc : tcenv) =
+    get_goal_by_id hd tc.tce_tcenv.tce_penv
+
+  (* ------------------------------------------------------------------ *)
   let get_pregoal_by_id (hd : handle) (pe : proofenv) =
     (get_goal_by_id hd pe).g_goal
+
+  (* ------------------------------------------------------------------ *)
+  let tc1_get_pregoal_by_id (hd : handle) (tc : tcenv1) =
+    (tc1_get_goal_by_id hd tc).g_goal
+
+  (* ------------------------------------------------------------------ *)
+  let tc_get_pregoal_by_id (hd : handle) (tc : tcenv) =
+    (tc_get_goal_by_id hd tc).g_goal
 
   (* ------------------------------------------------------------------ *)
   let update_goal_map (tx : goal -> goal) (hd : handle) (pe : proofenv) =
@@ -158,6 +170,34 @@ module FApi = struct
   (* ------------------------------------------------------------------ *)
   let tc_update_tcenv (tx : tcenv1 -> tcenv1) (tc : tcenv) =
     { tc with tce_tcenv = tx tc.tce_tcenv }
+
+  (* ------------------------------------------------------------------ *)
+  let tc_normalize (tc : tcenv) =
+    match tc.tce_tcenv.tce_goal with
+    | Some _ -> tc
+    | None   ->
+        match tc.tce_goals with
+        | [] -> tc
+        | hd :: tcx1 ->
+            let goal = tc_get_pregoal_by_id hd tc in
+            { tc with
+                tce_tcenv = { tc.tce_tcenv with tce_goal = Some goal };
+                tce_goals = tcx1; }
+
+  (* ------------------------------------------------------------------ *)
+  let tcenv_of_tcenv1 (tc : tcenv1) =
+    { tce_tcenv = tc; tce_goals = []; }
+
+  (* ------------------------------------------------------------------ *)
+  let tcenv1_of_penv ?ctxt (hd : handle) (pe : proofenv) =
+    let gl = get_pregoal_by_id hd pe in
+    { tce_penv = pe; tce_goal = Some gl; tce_ctxt = odfl [] ctxt; }
+
+  (* ------------------------------------------------------------------ *)
+  let tcenv_of_penv ?ctxt (hds : handle list) (pe : proofenv) =
+    let tc = { tce_penv = pe; tce_goal = None; tce_ctxt = odfl [] ctxt; } in
+    let tc = { tce_tcenv = tc; tce_goals = hds; } in
+    tc_normalize tc
 
   (* ------------------------------------------------------------------ *)
   let tc1_check_opened (tc : tcenv1) =
@@ -190,37 +230,20 @@ module FApi = struct
   let tc_goal  (tc : tcenv) = tc1_goal  tc.tce_tcenv
 
   (* ------------------------------------------------------------------ *)
-  let tcx1_pop (tcx : tcenv_ctxt1) =
-    match tcx.tcez_right with
-    | sg :: rgs -> Some (sg, { tcx with tcez_right = rgs })
-    | [] ->
-        match tcx.tcez_left with
-        | sg :: lgs -> Some (sg, { tcx with tcez_left = lgs })
-        | [] -> None
-
-  (* ------------------------------------------------------------------ *)
-  let tc_normalize (tc : tcenv) =
-    match tc.tce_tcenv.tce_goal with
-    | Some _ -> tc
-    | None   ->
-        match tcx1_pop tc.tce_goals with
-        | None -> tc
-        | Some (hd, tcx1) ->
-            let goal = get_pregoal_by_id hd tc.tce_tcenv.tce_penv in
-            { tc with
-                tce_tcenv = { tc.tce_tcenv with tce_goal = Some goal };
-                tce_goals = tcx1; }
+  let tc_opened (tc : tcenv) =
+    let goal = tc.tce_tcenv.tce_goal |> omap (fun g -> g.g_uid) in
+    List.ocons goal tc.tce_goals
 
   (* ------------------------------------------------------------------ *)
   let tc_up (tc : tcenv) =
     match tc.tce_tcenv.tce_ctxt with
     | [] -> raise (InvalidStateException "goal-at-top")
     | tcx1 :: tcx ->
-        { tc with
-            tce_tcenv = { tc.tce_tcenv with tce_ctxt = tcx };
-            tce_goals = {
-              tcez_left  = tc.tce_goals.tcez_left @ tcx1.tcez_left;
-              tcez_right = tcx1.tcez_right @ tc.tce_goals.tcez_right; }}
+        let tc =
+          { tc with
+              tce_tcenv = { tc.tce_tcenv with tce_ctxt = tcx };
+              tce_goals = tc.tce_goals @ tcx1; }
+        in tc_normalize tc
 
   (* ------------------------------------------------------------------ *)
   let tc_uptop (tc : tcenv) =
@@ -252,15 +275,9 @@ module FApi = struct
     let (pe, pg) = pf_newgoal (tc_penv tc) hyps concl in
 
     let tc = tc_update_tcenv (fun te -> { te with tce_penv = pe }) tc in
-    let tc =
-      match tc.tce_tcenv.tce_goal with
-      | None   -> tc_update_tcenv (fun te -> { te with tce_goal = Some pg }) tc
-      | Some _ ->
-          { tc with tce_goals = {
-              tc.tce_goals with tcez_right =
-                pg.g_uid :: tc.tce_goals.tcez_right } }
-    in
-      (tc, pg.g_uid)
+    let tc = { tc with tce_goals = tc.tce_goals @ [pg.g_uid] } in
+
+    (tc_normalize tc, pg.g_uid)
 
   (* ------------------------------------------------------------------ *)
   let tc1_close (tc : tcenv1) (vx : validation) =
@@ -286,8 +303,12 @@ module FApi = struct
 
   (* ------------------------------------------------------------------ *)
   let mutate (tc : tcenv) (vx : handle -> validation) (fp : form) =
-    (* FIXME: create on direct left *)
     let (tc, hd) = newgoal tc fp in close tc (vx hd)
+
+  (* ------------------------------------------------------------------ *)
+  let mutate1 (tc : tcenv1) (vx : handle -> validation) (fp : form) =
+    let tc = mutate (tcenv_of_tcenv1 tc) vx fp in
+    assert (tc.tce_goals = []); tc.tce_tcenv
 
   (* ------------------------------------------------------------------ *)
   let xmutate (tc : tcenv) (vx : 'a) (fp : form list) =
@@ -299,70 +320,114 @@ module FApi = struct
     snd_map (fun x -> x.g_uid) (pf_newgoal pe ~vx:vx hyps concl)
 
   (* ------------------------------------------------------------------ *)
+  let bwd1_of_fwd (tx : forward) (tc : tcenv1) =
+    let (pe, hd) = tx (tc1_penv tc) in
+    ({ tc with tce_penv = pe }, hd)
+
+  (* ------------------------------------------------------------------ *)
   let bwd_of_fwd (tx : forward) (tc : tcenv) =
     let (pe, hd) = tx (tc_penv tc) in
     ({ tc with tce_tcenv = { tc.tce_tcenv with tce_penv = pe } }, hd)
 
   (* ------------------------------------------------------------------ *)
   (* Tacticals *)
-  type ontest    = int -> proofenv -> handle -> bool
   type direction = [ `Left | `Right ]
 
-  let on (tt : backward) (f : ontest) (tc : tcenv) =
-    assert false
+  let t_focus (tt : backward) (tc : tcenv) =
+    tc_up (tt (tc_down tc))
 
-  let first (tt : backward) (i : int) (tc : tcenv) =
-    assert false
+  let on_sub_goals (tt : backward) (hds : handle list) (pe : proofenv) =
+    let do1 pe hd =
+      let tc = tt (tcenv1_of_penv hd pe) in
+      assert (tc.tce_tcenv.tce_ctxt = []);
+      (tc_penv tc, tc_opened tc) in
+    List.map_fold do1 pe hds
 
-  let last (tt : backward) (i : int) (tc : tcenv) =
-    assert false
+  let t_onall (tt : backward) (tc : tcenv) =
+    let pe      = tc.tce_tcenv.tce_penv in
+    let pe, ln  = on_sub_goals tt (tc_opened tc) pe in
+    let ln      = List.flatten ln in
+    tcenv_of_penv ~ctxt:tc.tce_tcenv.tce_ctxt ln pe
 
-  let rotate (d : direction) (i : int) (tc : tcenv) =
-    assert false
+  let t_firsts (tt : backward) (i : int) (tc : tcenv) =
+    if i < 0 then invalid_arg "EcCoreGoal.firsts";
+    let (ln1, ln2) = List.take_n i (tc_opened tc) in
+    let pe, ln1    = on_sub_goals tt ln1 tc.tce_tcenv.tce_penv in
+    let handles    = (List.flatten (ln1 @ [ln2])) in
+    tcenv_of_penv ~ctxt:tc.tce_tcenv.tce_ctxt handles pe
 
-  let seq (tt1 : backward) (tt2 : backward) (tc : tcenv) =
-    tt2 (tt1 tc)
+  let t_lasts (tt : backward) (i : int) (tc : tcenv) =
+    if i < 0 then invalid_arg "EcCoreGoal.firsts";
+    let handles    = tc_opened tc in
+    let nhandles   = List.length handles in
+    let (ln1, ln2) = List.take_n (max 0 (nhandles-i)) handles in
+    let pe, ln2    = on_sub_goals tt ln2 tc.tce_tcenv.tce_penv in
+    let handles = (List.flatten (ln1 :: ln2)) in
+    tcenv_of_penv ~ctxt:tc.tce_tcenv.tce_ctxt handles pe
 
-  let rec lseq (tts : backward list) (tc : tcenv) =
-    match tts with
-    | []       -> tc
-    | t :: tts -> seq t (lseq tts) tc
+  let t_first (tt : backward) (tc : tcenv) = t_firsts tt 1 tc
+  let t_last  (tt : backward) (tc : tcenv) = t_lasts  tt 1 tc
 
-  let seq_subgoal = assert false
+  let t_rotate (d : direction) (i : int) (tc : tcenv) =
+    let mrev = match d with `Left -> identity | `Right -> List.rev in
+
+    match tc.tce_tcenv.tce_goal with
+    | None   -> tc
+    | Some g ->
+        match List.rotate d (max i 0) (tc_opened tc) with
+        | 0, _ -> tc
+        | _, s ->
+            let tcenv = { tc.tce_tcenv with tce_goal = None; } in
+            let tc    = { tc with tce_goals = s; tce_tcenv = tcenv; } in
+            tc_normalize tc
+
+  let t_seq (tt1 : backward) (tt2 : backward) (tc : tcenv1) =
+    t_onall tt2 (tt1 tc)
+
+  let t_seqs (tts : backward list) (tc : tcenv1) =
+    List.fold_left (fun tc tt -> t_onall tt tc) (tcenv_of_tcenv1 tc) tts
 end
 
 (* -------------------------------------------------------------------- *)
-let (!!) = FApi.tc_penv
+let (!!) = FApi.tc1_penv
+let (!@) = FApi.tcenv_of_tcenv1
 
 (* -------------------------------------------------------------------- *)
 module RApi = struct
   type rproofenv = proofenv ref
-  type rtcenv    = tcenv ref
+  type rtcenv    = tcenv    ref
 
   (* ------------------------------------------------------------------ *)
   let rtcenv_of_tcenv (tc :  tcenv) : rtcenv = ref tc
   let tcenv_of_rtcenv (tc : rtcenv) :  tcenv = !tc
 
   (* ------------------------------------------------------------------ *)
+  let rtcenv_of_tcenv1 (tc : tcenv1) =
+    ref (FApi.tcenv_of_tcenv1 tc)
+
+  (* ------------------------------------------------------------------ *)
   let freeze (pe : rtcenv) =
     ref !pe
 
+  (* ------------------------------------------------------------------ *)
   let restore ~(dst:rtcenv) ~(src:rtcenv) =
     dst := !src
 
   (* ------------------------------------------------------------------ *)
-  let of_pure (tc : tcenv) (tx : rtcenv -> 'a) =
-    let rtc  = ref tc in
-    let aout = tx rtc in
-    (aout, !rtc)
-
-  (* ------------------------------------------------------------------ *)
-  let to_pure (tc : rtcenv) (tx :tcenv -> tcenv * 'a) =
-    reffold (fun tc -> swap (tx tc)) tc
-
-  (* ------------------------------------------------------------------ *)
-  let to_pure_u (tc : rtcenv) (tx :tcenv -> tcenv) : unit =
+  let of_pure_u (tx : tcenv -> tcenv) (tc : rtcenv) =
     tc := tx !tc
+
+  (* ------------------------------------------------------------------ *)
+  let to_pure_u (tx : rtcenv -> unit) (tc : tcenv) =
+    let tc = ref tc in tx tc; !tc
+
+  (* ------------------------------------------------------------------ *)
+  let of_pure (tx : tcenv -> 'a * tcenv) (tc : rtcenv) =
+    reffold tx tc
+
+  (* ------------------------------------------------------------------ *)
+  let to_pure (tx : rtcenv -> 'a) (tc : tcenv) =
+    let tc = ref tc in let x = tx tc in (!tc, x)
 
   (* ------------------------------------------------------------------ *)
   let newgoal pe ?hyps concl =
@@ -389,6 +454,7 @@ module RApi = struct
   let tc_eflat (tc : rtcenv) = FApi.tc_eflat !tc
   let tc_goal  (tc : rtcenv) = FApi.tc_goal  !tc
   let tc_hyps  (tc : rtcenv) = FApi.tc_hyps  !tc
+
 end
 
 type rproofenv = RApi.rproofenv
@@ -397,8 +463,7 @@ type rtcenv    = RApi.rtcenv
 (* -------------------------------------------------------------------- *)
 let tcenv_of_proof (pf : proof) =
   let tcenv = { tce_penv = pf.pr_env; tce_goal = None; tce_ctxt = []; } in
-  let tcz   = { tcez_left = []; tcez_right = pf.pr_opened; } in
-  let tcenv = { tce_tcenv = tcenv; tce_goals = tcz; } in
+  let tcenv = { tce_tcenv = tcenv; tce_goals = []; } in
   FApi.tc_normalize tcenv
 
 (* -------------------------------------------------------------------- *)
@@ -406,22 +471,13 @@ let tcenv1_of_proof (pf : proof) =
   FApi.tc_down (tcenv_of_proof pf)
 
 (* -------------------------------------------------------------------- *)
-let tcenv_of_tcenv1 (tc : tcenv1) =
-  let goals = { tcez_left = []; tcez_right = []; } in
-  { tce_tcenv = tc; tce_goals = goals; }
-
-(* -------------------------------------------------------------------- *)
-let (!@) = tcenv_of_tcenv1
-
-(* -------------------------------------------------------------------- *)
 let proof_of_tcenv (tc : tcenv) =
   let tc  = FApi.tc_uptop tc in
-  let rg  = tc.tce_goals.tcez_right in
-  let lg  = tc.tce_goals.tcez_left  in
+  let rg  = tc.tce_goals  in
   let fg  = tc.tce_tcenv.tce_goal |> omap (fun g -> g.g_uid) in
 
   { pr_env    = tc.tce_tcenv.tce_penv;
-    pr_opened = List.rev_append lg (List.ocons fg rg); }
+    pr_opened = List.ocons fg rg; }
 
 (* -------------------------------------------------------------------- *)
 let start (hyps : LDecl.hyps) (goal : form) =
@@ -450,6 +506,11 @@ module Exn = struct
 
   let recast_pe pe f =
     recast pe f ()
+
+  let recast_tc1 tc f =
+    let penv = FApi.tc1_penv tc in
+    let hyps = FApi.tc1_hyps tc in
+      recast_pe penv (fun () -> f hyps)
 
   let recast_tc tc f =
     let penv = FApi.tc_penv tc in
@@ -489,14 +550,14 @@ module TcTyping = struct
     Exn.recast_pe pe (fun () -> process_formula hyps pf)
 
   (* ------------------------------------------------------------------ *)
-  let tc_process_form_opt tc pf oty =
-    Exn.recast_tc tc (fun hyps -> process_form_opt hyps pf oty)
+  let tc1_process_form_opt tc pf oty =
+    Exn.recast_tc1 tc (fun hyps -> process_form_opt hyps pf oty)
 
-  let tc_process_form tc pf ty =
-    Exn.recast_tc tc (fun hyps -> process_form hyps pf ty)
+  let tc1_process_form tc pf ty =
+    Exn.recast_tc1 tc (fun hyps -> process_form hyps pf ty)
 
-  let tc_process_formula tc pf =
-    Exn.recast_tc tc (fun hyps -> process_formula hyps pf)
+  let tc1_process_formula tc pf =
+    Exn.recast_tc1 tc (fun hyps -> process_formula hyps pf)
 
   (* ------------------------------------------------------------------ *)
   (* FIXME: factor out to typing module                                 *)

@@ -43,10 +43,10 @@ let tc_pterm_apperror _pe ?loc _kind =
   assert false
 
 (* -------------------------------------------------------------------- *)
-let ptenv_of_tcenv (tc : tcenv) =
-  { pte_pe = FApi.tc_penv tc;
-    pte_hy = FApi.tc_hyps tc;
-    pte_ue = TcTyping.unienv_of_hyps (FApi.tc_hyps tc);
+let ptenv_of_penv (hyps : LDecl.hyps) (pe : proofenv) =
+  { pte_pe = pe;
+    pte_hy = hyps;
+    pte_ue = TcTyping.unienv_of_hyps hyps;
     pte_ev = ref EcMatching.EV.empty; }
 
 (* -------------------------------------------------------------------- *)
@@ -355,8 +355,16 @@ let process_full_pterm pe pf =
     process_pterm_args_app pt pf.fp_args
 
 (* -------------------------------------------------------------------- *)
+let tc1_process_full_pterm (tc : tcenv1) (ff : ffpattern) =
+  let pe   = FApi.tc1_penv tc in
+  let hyps = FApi.tc1_hyps tc in
+  process_full_pterm (ptenv_of_penv hyps pe) ff
+
+(* -------------------------------------------------------------------- *)
 let tc_process_full_pterm (tc : tcenv) (ff : ffpattern) =
-  process_full_pterm (ptenv_of_tcenv tc) ff
+  let pe   = FApi.tc_penv tc in
+  let hyps = FApi.tc_hyps tc in
+  process_full_pterm (ptenv_of_penv hyps pe) ff
 
 (* -------------------------------------------------------------------- *)
 let can_concretize (pt : pt_env) =

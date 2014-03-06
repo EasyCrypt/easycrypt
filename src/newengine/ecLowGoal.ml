@@ -23,14 +23,14 @@ type side = [`Left|`Right]
 (* -------------------------------------------------------------------- *)
 exception NoMatch
 
-let t_lazy_match ?(reduce = true) (tx : form -> FApi.backward) (tc : tcenv) =
-  let fp = FApi.tc_goal tc in
+let t_lazy_match ?(reduce = true) (tx : form -> FApi.backward) (tc : tcenv1) =
+  let fp = FApi.tc1_goal tc in
 
   try  tx fp tc
   with
   | NoMatch when not reduce -> raise InvalidGoalShape
   | NoMatch -> begin
-    let hyps, concl = FApi.tc_flat tc in
+    let hyps, concl = FApi.tc1_flat tc in
     match h_red_opt full_red hyps concl with
     | None    -> raise InvalidGoalShape
     | Some fp -> tx fp tc
@@ -121,22 +121,24 @@ module LowApply = struct
 end
 
 (* -------------------------------------------------------------------- *)
-let t_admit (tc : tcenv) = FApi.close tc VAdmit
+let t_admit (tc : tcenv1) =
+  FApi.close (FApi.tcenv_of_tcenv1 tc) VAdmit
 
 (* -------------------------------------------------------------------- *)
-let t_id (_msg : string option) (tc : tcenv) =
-  tc                                    (* FIXME *)
+let t_id (msg : string option) (tc : tcenv1) =
+  msg |> oiter (fun x -> Printf.fprintf stderr "DEBUG: %s\n%!" x);
+  FApi.tcenv_of_tcenv1 tc
 
 (* -------------------------------------------------------------------- *)
-let t_logic_trivial (tc : tcenv) =
-  tc                                    (* FIXME *)
+let t_logic_trivial (tc : tcenv1) =
+  FApi.tcenv_of_tcenv1 tc               (* FIXME *)
 
 (* -------------------------------------------------------------------- *)
-let t_change (fp : form) (tc : tcenv) =
-  let hyps, concl = FApi.tc_flat tc in
+let t_change (fp : form) (tc : tcenv1) =
+  let hyps, concl = FApi.tc1_flat tc in
   if not (EcReduction.is_conv hyps fp concl) then
     raise InvalidGoalShape;
-  FApi.mutate tc (fun hd -> VConv (hd, Sid.empty)) fp
+  FApi.mutate1 tc (fun hd -> VConv (hd, Sid.empty)) fp
 
 (* -------------------------------------------------------------------- *)
 module LowIntro = struct
@@ -153,7 +155,7 @@ module LowIntro = struct
 end
 
 (* -------------------------------------------------------------------- *)
-let t_intros (ids : ident mloc list) (tc : tcenv) =
+let t_intros (ids : ident mloc list) (tc : tcenv1) =
   let add_local id sbt x gty =
     let gty = Fsubst.gty_subst sbt gty in
     let name = tg_map EcIdent.name id in
@@ -206,67 +208,77 @@ let t_intros (ids : ident mloc list) (tc : tcenv) =
         | Some concl -> intro1 ((hyps, concl), sbt) id
   in
 
+  let tc = FApi.tcenv_of_tcenv1 tc in
   let (hyps, concl), _ =
     List.fold_left intro1 (FApi.tc_flat tc, Fsubst.f_subst_id) ids in
   let (tc, hd) = FApi.newgoal tc ~hyps concl in
   FApi.close tc (VIntros (hd, List.map tg_val ids))
 
 (* -------------------------------------------------------------------- *)
-let t_intro_i (id : EcIdent.t) (tc : tcenv) =
+let t_intro_i (id : EcIdent.t) (tc : tcenv1) =
   t_intros [notag id] tc
 
 (* -------------------------------------------------------------------- *)
-let t_apply ?(focus = true) (pt : proofterm) (tc : tcenv) =
+let tt_apply (pt : proofterm) (tc : tcenv) =
   let (hyps, concl) = FApi.tc_flat tc in
-  let (pt, ax), tc  = RApi.of_pure tc (fun tc -> LowApply.check pt tc) in
+  let tc, (pt, ax)  = RApi.to_pure (fun tc -> LowApply.check pt tc) tc in
 
   if not (EcReduction.is_conv hyps concl ax) then
     raise InvalidGoalShape;
   FApi.close tc (VApply pt)
 
 (* -------------------------------------------------------------------- *)
-let t_apply_s ?focus (p : path) (tys : ty list) (fs : form list) (n : int) =
+let tt_apply_s (p : path) (tys : ty list) (fs : form list) (n : int) =
   let pt =
     let args = (List.map paformula fs) @ (List.create n (PASub None)) in
     { pt_head = PTGlobal (p, tys); pt_args = args; } in
 
-  fun tc -> t_apply ?focus pt tc
+  fun tc -> tt_apply pt tc
 
 (* -------------------------------------------------------------------- *)
-let t_apply_hd ?focus (hd : handle) (fs : form list) (n : int) =
+let tt_apply_hd (hd : handle) (fs : form list) (n : int) =
   let pt =
     let args = (List.map paformula fs) @ (List.create n (PASub None)) in
     { pt_head = PTHandle hd; pt_args = args; } in
 
-  fun tc -> t_apply ?focus pt tc
+  fun tc -> tt_apply pt tc
 
 (* -------------------------------------------------------------------- *)
-let t_cut (fp : form) (tc : tcenv) =
+let t_apply (pt : proofterm) (tc : tcenv1) =
+  tt_apply pt (FApi.tcenv_of_tcenv1 tc)
+
+(* -------------------------------------------------------------------- *)
+let t_apply_s (p : path) (tys : ty list) (fs : form list) (n : int) (tc : tcenv1) =
+  tt_apply_s p tys fs n (FApi.tcenv_of_tcenv1 tc)
+
+(* -------------------------------------------------------------------- *)
+let t_apply_hd (hd : handle) (fs : form list) (n : int) (tc : tcenv1) =
+  tt_apply_hd hd fs n (FApi.tcenv_of_tcenv1 tc)
+
+(* -------------------------------------------------------------------- *)
+let t_cut (fp : form) (tc : tcenv1) =
   (* FIXME: check that Logic is loaded *)
-  let concl = FApi.tc_goal tc in
-  t_apply_s ~focus:true EcCoreLib.p_cut_lemma [] [fp; concl] 2 tc
+  let concl = FApi.tc1_goal tc in
+  t_apply_s EcCoreLib.p_cut_lemma [] [fp; concl] 2 tc
 
 (* -------------------------------------------------------------------- *)
-let t_true (tc : tcenv) =
-  t_apply_s ~focus:true EcCoreLib.p_true [] [] 0 tc
+let t_true (tc : tcenv1) =
+  t_apply_s EcCoreLib.p_true [] [] 0 tc
 
 (* -------------------------------------------------------------------- *)
-let t_reflex_s (f : form) (tc : tcenv) =
+let t_reflex_s (f : form) (tc : tcenv1) =
   t_apply_s EcCoreLib.p_eq_refl [f.f_ty] [f] 0 tc
 
-let t_reflex ?reduce (tc : tcenv) =
-  let t_reflex_r (fp : form) (tc : tcenv) =
+let t_reflex ?reduce (tc : tcenv1) =
+  let t_reflex_r (fp : form) (tc : tcenv1) =
     match sform_of_form fp with
-    | SFeq (f1, f2) ->
-        if   EcReduction.is_conv (FApi.tc_hyps tc) f1 f2
-        then t_reflex_s f1 tc
-        else raise NoMatch
+    | SFeq (f1, f2) -> t_reflex_s f1 tc
     | _ -> raise NoMatch
   in
     t_lazy_match ?reduce t_reflex_r tc
 
 (* -------------------------------------------------------------------- *)
-let t_or_intro_s (b : bool) (side : side) (f1, f2 : form pair) (tc : tcenv) =
+let t_or_intro_s (b : bool) (side : side) (f1, f2 : form pair) (tc : tcenv1) =
   let p =
     match side, b with
     | `Left , true  -> EcCoreLib.p_ora_intro_l
@@ -274,10 +286,10 @@ let t_or_intro_s (b : bool) (side : side) (f1, f2 : form pair) (tc : tcenv) =
     | `Left , false -> EcCoreLib.p_or_intro_l
     | `Right, false -> EcCoreLib.p_or_intro_r
   in
-  t_apply_s ~focus:true p [] [f1; f2] 1 tc
+  t_apply_s p [] [f1; f2] 1 tc
 
-let t_or_intro ?reduce (side : side) (tc : tcenv) =
-  let t_or_intro_r (fp : form) (tc : tcenv) =
+let t_or_intro ?reduce (side : side) (tc : tcenv1) =
+  let t_or_intro_r (fp : form) (tc : tcenv1) =
     match sform_of_form fp with
     | SFor (b, (left, right)) -> t_or_intro_s b side (left, right) tc
     | _ -> raise NoMatch
@@ -288,12 +300,12 @@ let t_left  ?reduce tc = t_or_intro ?reduce `Left  tc
 let t_right ?reduce tc = t_or_intro ?reduce `Right tc
 
 (* -------------------------------------------------------------------- *)
-let t_and_intro_s (b : bool) (f1, f2 : form pair) (tc : tcenv) =
+let t_and_intro_s (b : bool) (f1, f2 : form pair) (tc : tcenv1) =
   let p = if b then EcCoreLib.p_anda_intro else EcCoreLib.p_and_intro in
-  t_apply_s ~focus:true p [] [f1; f2] 2 tc
+  t_apply_s p [] [f1; f2] 2 tc
 
-let t_and_intro ?reduce (tc : tcenv) =
-  let t_and_intro_r (fp : form) (tc : tcenv) =
+let t_and_intro ?reduce (tc : tcenv1) =
+  let t_and_intro_r (fp : form) (tc : tcenv1) =
     match sform_of_form fp with
     | SFand (b, (left, right)) -> t_and_intro_s b (left, right) tc
     | _ -> raise NoMatch
@@ -301,11 +313,11 @@ let t_and_intro ?reduce (tc : tcenv) =
     t_lazy_match ?reduce t_and_intro_r tc
 
 (* -------------------------------------------------------------------- *)
-let t_iff_intro_s (f1, f2 : form pair) (tc : tcenv) =
-  t_apply_s ~focus:true EcCoreLib.p_iff_intro [] [f1; f2] 2 tc
+let t_iff_intro_s (f1, f2 : form pair) (tc : tcenv1) =
+  t_apply_s EcCoreLib.p_iff_intro [] [f1; f2] 2 tc
 
-let t_iff_intro ?reduce (tc : tcenv) =
-  let t_iff_intro_r (fp : form) (tc : tcenv) =
+let t_iff_intro ?reduce (tc : tcenv1) =
+  let t_iff_intro_r (fp : form) (tc : tcenv1) =
     match sform_of_form fp with
     | SFiff (f1, f2) -> t_iff_intro_s (f1, f2) tc
     | _ -> raise NoMatch
@@ -343,17 +355,17 @@ let pf_gen_tuple_intro tys hyps pe =
   FApi.newfact pe (VExtern (`TupleCongr tys, [])) hyps fp
 
 (* -------------------------------------------------------------------- *)
-let t_tuple_intro_s (fs : form pair list) (tc : tcenv) =
-  let tc  = RApi.rtcenv_of_tcenv tc in
+let t_tuple_intro_s (fs : form pair list) (tc : tcenv1) =
+  let tc  = RApi.rtcenv_of_tcenv1 tc in
   let tys = List.map (fun f -> (fst f).f_ty) fs in
   let hd  = RApi.bwd_of_fwd (pf_gen_tuple_intro tys (RApi.tc_hyps tc)) tc in
   let fs  = List.flatten (List.map (fun (x, y) -> [x; y]) fs) in
 
-  RApi.to_pure_u tc (t_apply_hd ~focus:true hd fs (List.length tys));
+  RApi.of_pure_u (tt_apply_hd hd fs (List.length tys)) tc;
   RApi.tcenv_of_rtcenv tc
 
-let t_tuple_intro ?reduce (tc : tcenv) =
-  let t_tuple_intro_r (fp : form) (tc : tcenv) =
+let t_tuple_intro ?reduce (tc : tcenv1) =
+  let t_tuple_intro_r (fp : form) (tc : tcenv1) =
     match sform_of_form fp with
     | SFeq (f1, f2) when is_tuple f1 && is_tuple f2 ->
         let fs = List.combine (destr_tuple f1) (destr_tuple f2) in
@@ -364,7 +376,7 @@ let t_tuple_intro ?reduce (tc : tcenv) =
 
 (* -------------------------------------------------------------------- *)
 let t_elim_r ?(reduce = true) txs tc =
-  match sform_of_form (FApi.tc_goal tc) with
+  match sform_of_form (FApi.tc1_goal tc) with
   | SFimp (f1, f2) ->
       let rec aux f1 =
         let sf1 = sform_of_form f1 in
@@ -378,7 +390,7 @@ let t_elim_r ?(reduce = true) txs tc =
         | Some gs -> gs
         | None    ->
             if not reduce then raise InvalidGoalShape;
-            match h_red_opt full_red (FApi.tc_hyps tc) f1 with
+            match h_red_opt full_red (FApi.tc1_hyps tc) f1 with
             | None    -> raise InvalidGoalShape
             | Some f1 -> aux f1
       in
@@ -389,7 +401,7 @@ let t_elim_r ?(reduce = true) txs tc =
 (* -------------------------------------------------------------------- *)
 let t_elim_false_r ((_, sf) : form * sform) concl tc =
   match sf with
-  | SFfalse -> t_apply_s ~focus:true EcCoreLib.p_false_elim [] [concl] 0 tc
+  | SFfalse -> t_apply_s EcCoreLib.p_false_elim [] [concl] 0 tc
   | _ -> raise NoMatch
 
 let t_elim_false tc = t_elim_r [t_elim_false_r] tc
@@ -399,7 +411,7 @@ let t_elim_and_r ((_, sf) : form * sform) concl tc =
   match sf with
   | SFand (b, (a1, a2)) ->
       let p = if b then EcCoreLib.p_anda_elim else EcCoreLib.p_and_elim in
-      t_apply_s ~focus:true p [] [a1; a2; concl] 1 tc
+      t_apply_s p [] [a1; a2; concl] 1 tc
   | _ -> raise NoMatch
 
 let t_elim_and goal = t_elim_r [t_elim_and_r] goal
@@ -409,7 +421,7 @@ let t_elim_or_r ((_, sf) : form * sform) concl tc =
   match sf with
   | SFor (b, (a1, a2)) ->
       let p = if b then EcCoreLib.p_ora_elim else EcCoreLib.p_or_elim  in
-      t_apply_s ~focus:true p [] [a1; a2; concl] 2 tc
+      t_apply_s p [] [a1; a2; concl] 2 tc
   | _ -> raise NoMatch
 
 let t_elim_or tc = t_elim_r [t_elim_or_r] tc
@@ -418,7 +430,7 @@ let t_elim_or tc = t_elim_r [t_elim_or_r] tc
 let t_elim_iff_r ((_, sf) : form * sform) concl tc =
   match sf with
   | SFiff (a1, a2) ->
-      t_apply_s ~focus:true EcCoreLib.p_iff_elim [] [a1; a2; concl] 1 tc
+      t_apply_s EcCoreLib.p_iff_elim [] [a1; a2; concl] 1 tc
   | _ -> raise NoMatch
 
 let t_elim_iff tc = t_elim_r [t_elim_iff_r] tc
@@ -427,7 +439,7 @@ let t_elim_iff tc = t_elim_r [t_elim_iff_r] tc
 let t_elim_if_r ((_, sf) : form * sform) concl tc =
   match sf with
   | SFif (a1, a2, a3) ->
-      t_apply_s ~focus:true EcCoreLib.p_if_elim [] [a1; a2; a3; concl] 2 tc
+      t_apply_s EcCoreLib.p_if_elim [] [a1; a2; a3; concl] 2 tc
   | _ -> raise NoMatch
 
 let t_elim_if tc = t_elim_r [t_elim_if_r] tc
@@ -469,7 +481,7 @@ let pf_gen_tuple_elim tys hyps pe =
 let t_elim_eq_tuple_r ((_, sf) : form * sform) concl tc =
   match sf with
   | SFeq (a1, a2) when is_tuple a1 && is_tuple a2 ->
-      let tc   = RApi.rtcenv_of_tcenv tc in
+      let tc   = RApi.rtcenv_of_tcenv1 tc in
       let hyps = RApi.tc_hyps tc in
       let fs   = List.combine (destr_tuple a1) (destr_tuple a2) in
       let tys  = List.map (f_ty |- fst) fs in
@@ -477,7 +489,7 @@ let t_elim_eq_tuple_r ((_, sf) : form * sform) concl tc =
       let args = List.flatten (List.map (fun (x, y) -> [x; y]) fs) in
       let args = concl :: args in
 
-      RApi.to_pure_u tc (t_apply_hd ~focus:true hd args 1);
+      RApi.of_pure_u (tt_apply_hd hd args 1) tc;
       RApi.tcenv_of_rtcenv tc
 
   | _ -> raise NoMatch
@@ -489,7 +501,8 @@ let t_elim_exists_r ((f, _) : form * sform) concl tc =
   match f.f_node with
   | Fquant (Lexists, bd, body) ->
       let newc = f_forall bd (f_imp body concl) in
-      FApi.mutate tc (fun hd -> VExtern (`Exists, [hd])) newc
+      let tc   = FApi.mutate1 tc (fun hd -> VExtern (`Exists, [hd])) newc in
+      FApi.tcenv_of_tcenv1 tc
   | _ -> raise NoMatch
 
 let t_elim_exists tc = t_elim_r [t_elim_exists_r] tc
@@ -509,7 +522,8 @@ let t_elim tc = t_elim_r t_elim_default_r tc
 
 (* -------------------------------------------------------------------- *)
 (* FIXME: document this function ! *)
-let t_elimT_form (p : path) (tys : ty list) (f : form) (sk : int) (tc : tcenv) =
+let t_elimT_form (p : path) (tys : ty list) (f : form) (sk : int) (tc : tcenv1) =
+  let tc = FApi.tcenv_of_tcenv1 tc in
   let hyps, concl = FApi.tc_flat tc in
   let env = LDecl.toenv hyps in
   let ax  = EcEnv.Ax.by_path p env in
@@ -578,15 +592,15 @@ let t_elimT_form (p : path) (tys : ty list) (f : form) (sk : int) (tc : tcenv) =
      PAFormula  f :: (List.create (aa2+aa3) (PASub None))) in
   let pt   = { pt_head = PTGlobal (p, tys); pt_args = args; } in
 
-  t_apply ~focus:true pt tc
+  tt_apply pt tc
 
 (* -------------------------------------------------------------------- *)
 let t_case fp tc = t_elimT_form EcCoreLib.p_case_eq_bool [] fp 0 tc
 
 (* -------------------------------------------------------------------- *)
-let t_split (tc : tcenv) =
-  let t_split_r (fp : form) (tc : tcenv) =
-    let hyps, concl = FApi.tc_flat tc in
+let t_split (tc : tcenv1) =
+  let t_split_r (fp : form) (tc : tcenv1) =
+    let hyps, concl = FApi.tc1_flat tc in
 
     match sform_of_form fp with
     | SFtrue ->
@@ -610,8 +624,8 @@ let t_split (tc : tcenv) =
     t_lazy_match t_split_r tc
 
 (* -------------------------------------------------------------------- *)
-let t_rewrite (pt : proofterm) (pos : ptnpos) (tc : tcenv) =
-  let tc = RApi.rtcenv_of_tcenv tc in
+let t_rewrite (pt : proofterm) (pos : ptnpos) (tc : tcenv1) =
+  let tc = RApi.rtcenv_of_tcenv1 tc in
   let (hyps, concl) = RApi.tc_flat tc in
   let (pt, ax) = LowApply.check pt tc in
 

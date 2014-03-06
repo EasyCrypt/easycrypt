@@ -11,10 +11,10 @@ module ER = EcReduction
 module PT = EcProofTerm
 
 (* ------------------------------------------------------------------ *)
-let process_apply (ff : ffpattern) (tc : tcenv) =
+let process_apply (ff : ffpattern) (tc : tcenv1) =
   let module E = struct exception NoInstance end in
 
-  let (hyps, concl) = FApi.tc_flat tc in
+  let (hyps, concl) = FApi.tc1_flat tc in
 
   let rec instantiate istop pt =
     match istop && PT.can_concretize pt.PT.ptev_env with
@@ -34,16 +34,16 @@ let process_apply (ff : ffpattern) (tc : tcenv) =
           | None   -> raise E.NoInstance
           | Some _ ->
               (* FIXME: add internal marker *)
-              instantiate true (PT.apply_pterm_to_hole pt) in
+              instantiate false (PT.apply_pterm_to_hole pt) in
 
-  let pt  = instantiate true (PT.tc_process_full_pterm tc ff) in
+  let pt  = instantiate true (PT.tc1_process_full_pterm tc ff) in
   let pt  = fst (PT.concretize pt) in
 
   EcLowGoal.t_apply pt tc
 
 (* -------------------------------------------------------------------- *)
 let process_rewrite1_core (s, o) pt tc =
-  let hyps, concl = FApi.tc_flat tc in
+  let hyps, concl = FApi.tc1_flat tc in
   let env = LDecl.toenv hyps in
 
   let (pt, (f1, f2)) =
@@ -85,7 +85,7 @@ let process_rewrite1_core (s, o) pt tc =
 let rec process_rewrite1 ri tc =
   match ri with
   | RWRw (s, None, o, [pt]) ->
-      let pt = PT.tc_process_full_pterm tc pt in
+      let pt = PT.tc1_process_full_pterm tc pt in
       process_rewrite1_core (s, o) pt tc
 
   | _ -> assert false
@@ -98,30 +98,30 @@ let process_rewrite ri tc =
 
 (* -------------------------------------------------------------------- *)
 let process_cut fp tc =
-  EcLowGoal.t_cut (TcTyping.tc_process_formula tc fp) tc
+  EcLowGoal.t_cut (TcTyping.tc1_process_formula tc fp) tc
 
 (* -------------------------------------------------------------------- *)
-let process_reflexivity (tc : tcenv) =
+let process_reflexivity (tc : tcenv1) =
   EcLowGoal.t_reflex tc
 
 (* -------------------------------------------------------------------- *)
-let process_left (tc : tcenv) =
+let process_left (tc : tcenv1) =
   EcLowGoal.t_left tc
 
 (* -------------------------------------------------------------------- *)
-let process_right (tc : tcenv) =
+let process_right (tc : tcenv1) =
   EcLowGoal.t_right tc
 
 (* -------------------------------------------------------------------- *)
-let process_split (tc : tcenv) =
+let process_split (tc : tcenv1) =
   EcLowGoal.t_split tc
 
 (* -------------------------------------------------------------------- *)
-let process_elim (tc : tcenv) =
+let process_elim (tc : tcenv1) =
   EcLowGoal.t_elim tc
 
 (* -------------------------------------------------------------------- *)
-let process1_logic (t : logtactic) (tc : tcenv) =
+let process1_logic (t : logtactic) (tc : tcenv1) =
   let tx =
     match t with
     | Preflexivity              -> process_reflexivity
@@ -138,12 +138,12 @@ let process1_logic (t : logtactic) (tc : tcenv) =
     tx tc
 
 (* -------------------------------------------------------------------- *)
-let process1_phl (t : phltactic) (tc : tcenv) =
+let process1_phl (t : phltactic) (tc : tcenv1) =
   match t with
   | _ -> assert false
 
 (* -------------------------------------------------------------------- *)
-let process1 (t : ptactic) (tc : tcenv) =
+let process1 (t : ptactic) (tc : tcenv1) =
   match (unloc t.pt_core) with
   | Padmit   -> EcLowGoal.t_admit tc
   | Plogic t -> process1_logic t tc
@@ -153,6 +153,6 @@ let process1 (t : ptactic) (tc : tcenv) =
 
 (* -------------------------------------------------------------------- *)
 let process (t : ptactic list) (pf : proof) =
-  let pf = tcenv_of_proof pf in
-  let pf = FApi.lseq (List.map process1 t) pf in
-    proof_of_tcenv pf
+  let pf = tcenv1_of_proof pf in
+  let pf = FApi.t_seqs (List.map process1 t) pf in
+  proof_of_tcenv pf

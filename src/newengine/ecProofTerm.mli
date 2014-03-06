@@ -40,8 +40,9 @@ val process_pterm_arg      : pt_ev  -> fpattern_arg located -> pt_ev_arg
 val process_pterm_args_app : pt_ev  -> fpattern_arg located list -> pt_ev
 val process_full_pterm     : pt_env -> ffpattern -> pt_ev
 
-(* Proof-terms tying in backward tactics *)
-val tc_process_full_pterm : tcenv -> ffpattern -> pt_ev
+(* Proof-terms typing in backward tactics *)
+val tc1_process_full_pterm : tcenv1 -> ffpattern -> pt_ev
+val tc_process_full_pterm  : tcenv  -> ffpattern -> pt_ev
 
 (* Proof-terms manipulation *)
 val apply_pterm_to_arg  : pt_ev -> pt_ev_arg -> pt_ev

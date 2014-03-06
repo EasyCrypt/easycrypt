@@ -228,6 +228,8 @@ module List : sig
 
   val max : 'a -> 'a list -> 'a
 
+  val rotate : [`Left|`Right] -> int -> 'a list -> int * 'a list
+
   module Smart : sig
     val map : ('a -> 'a) -> 'a list -> 'a list
 
