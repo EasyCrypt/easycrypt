@@ -10,6 +10,13 @@ open EcMatching
 module ER = EcReduction
 module PT = EcProofTerm
 
+(* -------------------------------------------------------------------- *)
+type ttenv = {
+  tt_engine  : ptactic_core -> FApi.backward;
+  tt_provers : EcParsetree.pprover_infos -> EcProvers.prover_infos;
+  tt_smtmode : [`Admit | `Strict | `Standard];
+}
+
 (* ------------------------------------------------------------------ *)
 let process_apply (ff : ffpattern) (tc : tcenv1) =
   let module E = struct exception NoInstance end in
@@ -121,7 +128,7 @@ let process_elim (tc : tcenv1) =
   EcLowGoal.t_elim tc
 
 (* -------------------------------------------------------------------- *)
-let process1_logic (t : logtactic) (tc : tcenv1) =
+let process1_logic (ttenv : ttenv) (t : logtactic) (tc : tcenv1) =
   let tx =
     match t with
     | Preflexivity              -> process_reflexivity
@@ -141,18 +148,3 @@ let process1_logic (t : logtactic) (tc : tcenv1) =
 let process1_phl (t : phltactic) (tc : tcenv1) =
   match t with
   | _ -> assert false
-
-(* -------------------------------------------------------------------- *)
-let process1 (t : ptactic) (tc : tcenv1) =
-  match (unloc t.pt_core) with
-  | Padmit   -> EcLowGoal.t_admit tc
-  | Plogic t -> process1_logic t tc
-  | PPhl   t -> process1_phl t tc
-
-  | _ -> assert false
-
-(* -------------------------------------------------------------------- *)
-let process (t : ptactic list) (pf : proof) =
-  let pf = tcenv1_of_proof pf in
-  let pf = FApi.t_seqs (List.map process1 t) pf in
-  proof_of_tcenv pf

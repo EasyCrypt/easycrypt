@@ -896,8 +896,20 @@ module Tactics = struct
     end
 
     | PSNewEngine juc ->
-        let juc = EcHiGoal.process tac juc in
-        let pac = { pac with puc_jdg = PSNewEngine juc } in
+        let module TTC = EcHiTacticals in
+
+        let htmode =
+          match pac.puc_mode, mode with
+          | Some true , `WeakCheck -> `Admit
+          | _         , `WeakCheck ->  hierror "cannot weak-check a non-strict proof script"
+          | Some true , `Check     -> `Strict
+          | Some false, `Check     -> `Standard
+          | _         , `Check     -> `Strict
+        in
+
+        let ttenv = { TTC.tt_provers = pi scope; TTC.tt_smtmode = htmode; } in
+        let juc   = TTC.process ttenv tac juc in
+        let pac   = { pac with puc_jdg = PSNewEngine juc } in
           { scope with sc_pr_uc = Some { puc with puc_active = Some pac; } }
 
   let process_core mark mode (scope : scope) (ts : ptactic_core list) =
