@@ -189,10 +189,6 @@ and process_axiom (scope : EcScope.scope) (ax : paxiom located) =
     scope
 
 (* -------------------------------------------------------------------- *)
-and process_claim (scope : EcScope.scope) _ =
-  scope
-
-(* -------------------------------------------------------------------- *)
 and process_th_open (scope : EcScope.scope) name =
   EcScope.check_state `InTop "theory" scope;
   EcScope.Theory.enter scope name
@@ -336,7 +332,6 @@ and process (ld : EcLoader.ecloader) (scope : EcScope.scope) g =
       | Goperator    o    -> `Fct   (fun scope -> process_operator   scope  (mk_loc loc o))
       | Gpredicate   p    -> `Fct   (fun scope -> process_predicate  scope  (mk_loc loc p))
       | Gaxiom       a    -> `Fct   (fun scope -> process_axiom      scope  (mk_loc loc a))
-      | Gclaim       c    -> `Fct   (fun scope -> process_claim      scope  c)
       | GthOpen      name -> `Fct   (fun scope -> process_th_open    scope  name.pl_desc)
       | GthClose     name -> `Fct   (fun scope -> process_th_close   scope  name.pl_desc)
       | GthRequire   name -> `Fct   (fun scope -> process_th_require ld scope name)

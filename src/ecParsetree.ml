@@ -612,19 +612,6 @@ type equiv = {
 type cnst_decl = (psymbol list * pty) * pexpr option
 
 (* -------------------------------------------------------------------- *)
-type hint =
-  | Husing of psymbol
-  | Hadmit
-  | Hcompute
-  | Hnone
-  | Hsame
-  | Hsplit
-  | Hauto
-  | Hfailure of int * pexpr * pexpr * (psymbol * pexpr) list
-
-type claim = psymbol * (pexpr * hint)
-
-(* -------------------------------------------------------------------- *)
 type pprint =
   | Pr_ty  of pqsymbol
   | Pr_op  of pqsymbol
@@ -701,7 +688,6 @@ type global =
   | Goperator    of poperator
   | Gpredicate   of ppredicate
   | Gaxiom       of paxiom
-  | Gclaim       of claim
   | Gtype        of ptydecl list
   | Gtypeclass   of ptypeclass
   | Gtycinstance of ptycinstance

@@ -167,13 +167,11 @@
 %token CEQ
 %token CFOLD
 %token CHANGE
-%token CLAIM
 %token CLASS
 %token CLEAR
 %token CLONE
 %token COLON
 %token COMMA
-%token COMPUTE
 %token CONGR
 %token CONSEQ
 %token CONST
@@ -284,7 +282,6 @@
 %token RPAREN
 %token RPBRACE
 %token RWNORMAL
-%token SAME
 %token SAMPLE
 %token SECTION
 %token SEMICOLON
@@ -319,7 +316,6 @@
 %token UNDERSCORE
 %token UNDO
 %token UNROLL
-%token USING
 %token VAR
 %token WHILE
 %token WHY3
@@ -1480,30 +1476,6 @@ predicate:
 (* -------------------------------------------------------------------- *)
 (* Global entries                                                       *)
 
-%inline ident_exp:
-| x=ident COMMA e=expr { (x, e) }
-;
-
-real_hint:
-| USING x=ident { Husing x }
-| ADMIT         { Hadmit }
-| COMPUTE       { Hcompute }
-| SPLIT         { Hsplit }
-| SAME          { Hsame }
-| AUTO          { Hauto }
-| empty         { Hnone }
-
-| COMPUTE n=uint e1=expr COMMA e2=expr
-   { Hfailure (n, e1, e2, []) }
-
-| COMPUTE n=uint e1=expr COMMA e2=expr COLON l=plist1(ident_exp, COLON)
-   { Hfailure (n, e1, e2, l) }
-;
-
-claim:
-| CLAIM x=ident COLON e=expr h=real_hint { (x, (e, h)) }
-;
-
 lemma_decl :
 | x=ident tyvars=tyvars_decl? pd=pgtybindings? COLON f=form { x,tyvars,pd,f }
 ;
@@ -2582,7 +2554,6 @@ global_:
 | operator         { Goperator    $1 }
 | predicate        { Gpredicate   $1 }
 | axiom            { Gaxiom       $1 }
-| claim            { Gclaim       $1 }
 | tactics_or_prf   { Gtactics     $1 }
 | realize          { Grealize     $1 }
 | gprover_info     { Gprover_info $1 }
