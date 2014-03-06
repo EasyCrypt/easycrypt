@@ -272,7 +272,7 @@ let t_reflex_s (f : form) (tc : tcenv1) =
 let t_reflex ?reduce (tc : tcenv1) =
   let t_reflex_r (fp : form) (tc : tcenv1) =
     match sform_of_form fp with
-    | SFeq (f1, f2) -> t_reflex_s f1 tc
+    | SFeq (f1, _f2) -> t_reflex_s f1 tc
     | _ -> raise NoMatch
   in
     t_lazy_match ?reduce t_reflex_r tc
