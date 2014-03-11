@@ -1,4 +1,4 @@
-; Generated on Thu Feb  6 16:53:01 2014
+; Generated on Tue Mar 11 09:53:01 2014
 
 (defvar easycrypt-bytac-keywords '(
   "assumption"
@@ -19,7 +19,6 @@
   "realize"
   "proof"
   "qed"
-  "claim"
   "end"
   "import"
   "export"
@@ -101,16 +100,15 @@
   "rwnormal"
   "subst"
   "progress"
+  "introsprogress"
   "trivial"
   "auto"
   "idtac"
   "move"
-  "same"
   "modpath"
-  "using"
-  "compute"
   "fieldeq"
   "ringeq"
+  "algnorm"
   "transitivity"
   "symmetry"
   "seq"
@@ -147,6 +145,7 @@
   "last"
   "do"
   "strict"
+  "newengine"
   "expect"
 ))
 
