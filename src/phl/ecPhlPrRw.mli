@@ -1,14 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcSymbols
-open EcBaseLogic
-open EcLogic
+open EcCoreGoal
 
 (* -------------------------------------------------------------------- *)
-class rn_hl_pr_lemma :
-object
-  inherit xrule
-end
-
-(* -------------------------------------------------------------------- *)
-val t_pr_rewrite : symbol -> tactic
+val t_pr_rewrite : symbol -> FApi.backward
 

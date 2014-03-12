@@ -4,20 +4,28 @@ open EcParsetree
 open EcTypes
 open EcModules
 open EcEnv
-open EcBaseLogic
-open EcLogic
 open EcPV
-open EcCorePhl
-open EcCoreHiPhl
+
+open EcCoreGoal
+open EcLowPhlGoal
 
 module Zpr = EcMatching.Zipper
+module TTC = EcProofTyping
 
 (* -------------------------------------------------------------------- *)
-let check_fission_independence env b init c1 c2 c3 =
+type fission_t    = bool option * codepos * (int * (int * int))
+type fusion_t     = bool option * codepos * (int * (int * int))
+type unroll_t     = bool option * codepos
+type splitwhile_t = pexpr * bool option * codepos
+
+(* -------------------------------------------------------------------- *)
+let check_independence (pf, hyps) b init c1 c2 c3 =
+  let env = LDecl.toenv hyps in
+
   (* TODO improve error message, see swap *)
-  let check_disjoint s1 s2 = 
+  let check_disjoint s1 s2 =
     if not (PV.indep env s1 s2) then
-      tacuerror "in loop-fission, independence check failed"
+      tc_error pf "independence check failed"
   in
 
   let fv_b    = e_read   env PV.empty b    in
@@ -38,39 +46,25 @@ let check_fission_independence env b init c1 c2 c3 =
   List.iter (check_disjoint rd_c3) [wr_c1; wr_c2]
 
 (* -------------------------------------------------------------------- *)
-type fission_t = bool option * codepos * (int * (int * int))
-
-class rn_hl_fission side pos split =
-object
-  inherit xrule "[hl] loop-fission"
-
-  method side     : bool option       = side
-  method position : codepos           = pos
-  method split    : int * (int * int) = split
-end
-
-let rn_hl_fission side pos split =
-  RN_xtd (new rn_hl_fission side pos split :> xrule)
-
-let fission_stmt (il, (d1, d2)) env me zpr =
+let fission_stmt (il, (d1, d2)) (pf, hyps) me zpr =
   if d2 < d1 then
-    tacuerror "%s, %s"
+    tc_error pf "%s, %s"
       "in loop-fission"
       "second break offset must not be lower than the first one";
-  
+
   let (hd, init, b, sw, tl) =
     match zpr.Zpr.z_tail with
     | { i_node = Swhile (b, sw) } :: tl -> begin
         if List.length zpr.Zpr.z_head < il then
-          tacuerror "while-loop is not headed by %d intructions" il;
+          tc_error pf "while-loop is not headed by %d intructions" il;
       let (init, hd) = List.take_n il zpr.Zpr.z_head in
         (hd, init, b, sw, tl)
       end
-    | _ -> tacuerror "code position does not lead to a while-loop"
+    | _ -> tc_error pf "code position does not lead to a while-loop"
   in
 
   if d2 > List.length sw.s_node then
-    tacuerror "in loop fission, invalid offsets range";
+    tc_error pf "in loop fission, invalid offsets range";
 
   let (s1, s2, s3) =
     let (s1, s2) = List.take_n (d1   ) sw.s_node in
@@ -78,7 +72,7 @@ let fission_stmt (il, (d1, d2)) env me zpr =
       (s1, s2, s3)
   in
 
-  check_fission_independence env b init s1 s2 s3;
+  check_independence (pf, hyps) b init s1 s2 s3;
 
   let wl1 = i_while (b, stmt (s1 @ s3)) in
   let wl2 = i_while (b, stmt (s2 @ s3)) in
@@ -87,135 +81,106 @@ let fission_stmt (il, (d1, d2)) env me zpr =
 
     (me, { zpr with Zpr.z_head = hd; Zpr.z_tail = fis @ tl }, [])
 
-let t_fission side cpos infos g =
-  let tr = fun side -> rn_hl_fission side cpos infos in
-  let cb = fun hyps _ me zpr -> fission_stmt infos (LDecl.toenv hyps) me zpr in
+let t_fission_r side cpos infos g =
+  let tr = fun side -> `LoopFission (side, cpos, infos) in
+  let cb = fun cenv _ me zpr -> fission_stmt infos cenv me zpr in
     t_code_transform side cpos tr (t_zip cb) g
 
-let process_fission (side, cpos, infos) g =
-  t_fission side cpos infos g
+let t_fission = FApi.t_low3 "loop-fission" t_fission_r
 
 (* -------------------------------------------------------------------- *)
-type fusion_t = bool option * codepos * (int * (int * int))
+let fusion_stmt (il, (d1, d2)) (pf, hyps) me zpr =
+  let env = LDecl.toenv hyps in
 
-class rn_hl_fusion side pos split =
-object
-  inherit xrule "[hl] loop-fusion"
-
-  method side     : bool option       = side
-  method position : codepos           = pos
-  method split    : int * (int * int) = split
-end
-
-let rn_hl_fusion side pos split =
-  RN_xtd (new rn_hl_fusion side pos split :> xrule)
-
-let fusion_stmt (il, (d1, d2)) env me zpr =
   let (hd, init1, b1, sw1, tl) =
     match zpr.Zpr.z_tail with
     | { i_node = Swhile (b, sw) } :: tl -> begin
         if List.length zpr.Zpr.z_head < il then
-          tacuerror "1st while-loop is not headed by %d intruction(s)" il;
+          tc_error pf "1st while-loop is not headed by %d intruction(s)" il;
       let (init, hd) = List.take_n il zpr.Zpr.z_head in
         (hd, init, b, sw, tl)
       end
-    | _ -> tacuerror "code position does not lead to a while-loop"
+    | _ -> tc_error pf "code position does not lead to a while-loop"
   in
 
   let (init2, b2, sw2, tl) =
     if List.length tl < il then
-      tacuerror "1st first-loop is not followed by %d instruction(s)" il;
+      tc_error pf "1st first-loop is not followed by %d instruction(s)" il;
     let (init2, tl) = List.take_n il tl in
       match tl with
       | { i_node = Swhile (b2, sw2) } :: tl -> (List.rev init2, b2, sw2, tl)
-      | _ -> tacuerror "cannot find the 2nd while-loop"
+      | _ -> tc_error pf "cannot find the 2nd while-loop"
   in
 
   if d1 > List.length sw1.s_node then
-    tacuerror "in loop-fusion, body is less than %d instruction(s)" d1;
+    tc_error pf "in loop-fusion, body is less than %d instruction(s)" d1;
   if d2 > List.length sw2.s_node then
-    tacuerror "in loop-fusion, body is less than %d instruction(s)" d2;
+    tc_error pf "in loop-fusion, body is less than %d instruction(s)" d2;
 
   let (sw1, fini1) = List.take_n d1 sw1.s_node in
   let (sw2, fini2) = List.take_n d2 sw2.s_node in
 
   (* FIXME: costly *)
   if not (EcReduction.EqTest.for_stmt_norm env (stmt init1) (stmt init2)) then
-    tacuerror "in loop-fusion, preludes do not match";
+    tc_error pf "in loop-fusion, preludes do not match";
   if not (EcReduction.EqTest.for_stmt_norm env (stmt fini1) (stmt fini2)) then
-    tacuerror "in loop-fusion, finalizers do not match";
+    tc_error pf "in loop-fusion, finalizers do not match";
   if not (EcReduction.EqTest.for_expr_norm env b1 b2) then
-    tacuerror "in loop-fusion, while conditions do not match";
+    tc_error pf "in loop-fusion, while conditions do not match";
 
-  check_fission_independence env b1 init1 sw1 sw2 fini1;
+  check_independence (pf, hyps) b1 init1 sw1 sw2 fini1;
 
   let wl  = i_while (b1, stmt (sw1 @ sw2 @ fini1)) in
   let fus = List.rev_append init1 [wl] in
 
     (me, { zpr with Zpr.z_head = hd; Zpr.z_tail = fus @ tl; }, [])
 
-let t_fusion side cpos infos g =
-  let tr = fun side -> rn_hl_fusion side cpos infos in
-  let cb = fun hyps _ me zpr -> fusion_stmt infos (LDecl.toenv hyps) me zpr in
+let t_fusion_r side cpos infos g =
+  let tr = fun side -> `LoopFusion (side, cpos, infos) in
+  let cb = fun cenv _ me zpr -> fusion_stmt infos cenv me zpr in
     t_code_transform side cpos tr (t_zip cb) g
 
-let process_fusion (side, cpos, infos) g =
-  t_fusion side cpos infos g
+let t_fusion = FApi.t_low3 "loop-fusion" t_fusion_r
 
 (* -------------------------------------------------------------------- *)
-type unroll_t = bool option * EcParsetree.codepos
-
-class rn_hl_unroll side pos =
-object
-  inherit xrule "[hl] loop-unroll"
-
-  method side     : bool option = side
-  method position : codepos     = pos
-end
-
-let rn_hl_unroll side pos =
-  RN_xtd (new rn_hl_unroll side pos :> xrule)
-
-let unroll_stmt _ me i =
+let unroll_stmt (pf, _) me i =
   match i.i_node with
   | Swhile (e, sw) -> (me, [i_if (e, sw, stmt []); i])
-  | _ -> tacuerror "cannot find a while loop at given position"
+  | _ -> tc_error pf "cannot find a while loop at given position"
 
-let t_unroll side cpos g =
-  let tr = fun side -> rn_hl_unroll side cpos in
+let t_unroll_r side cpos g =
+  let tr = fun side -> `LoopUnraoll (side, cpos) in
     t_code_transform side cpos tr (t_fold unroll_stmt) g
 
-let process_unroll (side, cpos) g =
-  t_unroll side cpos g
+let t_unroll = FApi.t_low2 "loop-unroll" t_unroll_r
 
 (* -------------------------------------------------------------------- *)
-type splitwhile_t = pexpr * bool option * codepos
-
-class rn_hl_splitwhile cond side pos =
-object
-  inherit xrule "[hl] split-while"
-
-  method condition : expr        = cond
-  method side      : bool option = side
-  method position  : codepos     = pos
-end
-
-let rn_hl_splitwhile cond side pos =
-  RN_xtd (new rn_hl_splitwhile cond side pos :> xrule)
-
-let splitwhile_stmt b _env me i =
+let splitwhile_stmt b (pf, _) me i =
   match i.i_node with
-  | Swhile (e, sw) -> 
-      let op_and = e_op EcCoreLib.p_and [] (tfun tbool (tfun tbool tbool)) in
+  | Swhile (e, sw) ->
+      let op_ty  = toarrow [tbool; tbool] tbool in
+      let op_and = e_op EcCoreLib.p_and [] op_ty in
       let e = e_app op_and [e; b] tbool in
         (me, [i_while (e, sw); i])
 
-  | _ -> tacuerror "cannot find a while loop at given position"
+  | _ -> tc_error pf "cannot find a while loop at given position"
 
-let t_splitwhile b side cpos g =
-  let tr = fun side -> rn_hl_splitwhile b side cpos in
+let t_splitwhile_r b side cpos g =
+  let tr = fun side -> `SplitWhile (b, side, cpos) in
     t_code_transform side cpos tr (t_fold (splitwhile_stmt b)) g
 
-let process_splitwhile (b, side, cpos) g =
-  let b = process_phl_exp side b (Some tbool) g in
-    t_splitwhile b side cpos g
+let t_splitwhile = FApi.t_low3 "split-while" t_splitwhile_r
+
+(* -------------------------------------------------------------------- *)
+let process_fission (side, cpos, infos) tc =
+  t_fission side cpos infos tc
+
+let process_fusion (side, cpos, infos) tc =
+  t_fusion side cpos infos tc
+
+let process_unroll (side, cpos) tc =
+  t_unroll side cpos tc
+
+let process_splitwhile (b, side, cpos) tc =
+  let b = TTC.tc1_process_phl_exp tc side (Some tbool) b in
+    t_splitwhile b side cpos tc

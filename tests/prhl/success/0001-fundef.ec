@@ -7,7 +7,7 @@ proof -strict.
  proc.
  skip.
  intros &m1 &m2 h.
- assumption h.
+ exact h.
 qed.
 
 

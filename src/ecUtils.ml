@@ -170,6 +170,14 @@ let as_seq5 = function
   | [x1; x2; x3; x4; x5] -> (x1, x2, x3, x4, x5)
   | _ -> assert false
 
+let as_seq6 = function
+  | [x1; x2; x3; x4; x5; x6] -> (x1, x2, x3, x4, x5, x6)
+  | _ -> assert false
+
+let as_seq7 = function
+  | [x1; x2; x3; x4; x5; x6; x7] -> (x1, x2, x3, x4, x5, x6, x7)
+  | _ -> assert false
+
 (* -------------------------------------------------------------------- *)
 let int_of_bool (b : bool) = if b then 1 else 0
 
@@ -365,10 +373,15 @@ module List = struct
   let min b xs = List.fold_left min b xs
   let max b xs = List.fold_left max b xs
 
-  let rec last = function
-    | []      -> failwith "List.last"
-    | [x]     -> x
-    | _ :: xs -> last xs
+  let rec olast = function
+    | []      -> None
+    | [x]     -> Some x
+    | _ :: xs -> olast xs
+
+  let last (s : 'a list) =
+    match olast s with
+    | None   -> failwith "List.last"
+    | Some x -> x
 
   let create n x =
     let rec aux n xs =

@@ -27,6 +27,10 @@ val p_top  : path
 val id_Pervasive : symbol
 val p_Pervasive  : path
 
+val id_Logic : symbol
+val p_Logic  : path
+val mk_logic : symbol -> path
+
 (* -------------------------------------------------------------------- *)
 (*                            Core Types                                *)
 (* -------------------------------------------------------------------- *)

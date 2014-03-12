@@ -95,8 +95,8 @@ theory Induction.
     (forall j, 0 <= j => (forall k, 0 <= k < j => p k) => p j) =>
     (forall i, 0 <= i => p i).
   proof strict.
-  by intros hyp i iVal;
-     apply (induction (fun i, forall k, 0 <= k <= i => p k) _ _ i); smt.
+    intros hyp i iVal.
+    apply (induction (fun i, forall k, 0 <= k <= i => p k) _ _ i); smt.
   qed.
 
 end Induction.

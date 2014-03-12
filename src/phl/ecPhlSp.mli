@@ -1,12 +1,6 @@
 (* -------------------------------------------------------------------- *)
 open EcParsetree
-open EcBaseLogic
-open EcLogic
+open EcCoreGoal.FApi
 
 (* -------------------------------------------------------------------- *)
-class rn_hl_sp : object
-  inherit xrule
-end
-
-(* -------------------------------------------------------------------- *)
-val t_sp : (int doption) option  -> tactic
+val t_sp : (int doption) option -> backward

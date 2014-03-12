@@ -24,9 +24,9 @@ proof -strict.
  intros &m x0.
  byequiv (_:x{1} = x{2} ==> res{1} => res{2}).
  proc.
- wp;skip;intros &m1 &m2 h; rewrite h;intros h1;assumption h1.
+ wp;skip;intros &m1 &m2 h; rewrite h;intros h1;exact h1.
  split.
- intros &m1 &m2 H;assumption H.
+ intros &m1 &m2 H;exact H.
 qed.
 
 lemma lequiv : equiv [M.f ~ M.f : x{1} = x{2} ==> res{1} = res{2}].

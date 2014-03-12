@@ -1,45 +1,43 @@
 (* --------------------------------------------------------------------- *)
 open EcFol
-open EcBaseLogic
-open EcLogic
-open EcCorePhl
+open EcCoreGoal
+open EcLowPhlGoal
 
 (* --------------------------------------------------------------------- *)
-class rn_hl_case phi =
-object
-  inherit xrule "[hl] case"
-
-  method phi : form = phi
-end
-
-let rn_hl_case phi =
-  RN_xtd (new rn_hl_case phi :> xrule)
-
-let t_hoare_case f g =
-  let concl = get_concl g in
-  let hs = t_as_hoareS concl in
+let t_hoare_case_r f tc =
+  let hs = tc1_as_hoareS tc in
   let concl1 = f_hoareS_r { hs with hs_pr = f_and_simpl hs.hs_pr f } in
   let concl2 = f_hoareS_r { hs with hs_pr = f_and_simpl hs.hs_pr (f_not f) } in
-  prove_goal_by [concl1;concl2] (rn_hl_case f) g
+  FApi.xmutate1 tc (`HlCase f) [concl1; concl2]
 
-let t_bdHoare_case f g =
-  let concl = get_concl g in
-  let bhs = t_as_bdHoareS concl in
-  let concl1 = f_bdHoareS_r 
+(* --------------------------------------------------------------------- *)
+let t_bdhoare_case_r f tc =
+  let bhs = tc1_as_bdhoareS tc in
+  let concl1 = f_bdHoareS_r
     { bhs with bhs_pr = f_and_simpl bhs.bhs_pr f } in
-  let concl2 = f_bdHoareS_r 
+  let concl2 = f_bdHoareS_r
     { bhs with bhs_pr = f_and_simpl bhs.bhs_pr (f_not f) } in
-  prove_goal_by [concl1;concl2] (rn_hl_case f) g
+  FApi.xmutate1 tc (`HlCase f) [concl1; concl2]
 
-let t_equiv_case f g = 
-  let concl = get_concl g in
-  let es = t_as_equivS concl in
+(* --------------------------------------------------------------------- *)
+let t_equiv_case_r f tc =
+  let es = tc1_as_equivS tc in
   let concl1 = f_equivS_r { es with es_pr = f_and es.es_pr f } in
   let concl2 = f_equivS_r { es with es_pr = f_and es.es_pr (f_not f) } in
-  prove_goal_by [concl1;concl2] (rn_hl_case f) g
+  FApi.xmutate1 tc (`HlCase f) [concl1; concl2]
 
-let t_hl_case f g =
+(* --------------------------------------------------------------------- *)
+let t_hoare_case   = FApi.t_low1 "hoare-case"   t_hoare_case_r
+let t_bdhoare_case = FApi.t_low1 "bdhoare-case" t_bdhoare_case_r
+let t_equiv_case   = FApi.t_low1 "equiv-case"   t_equiv_case_r
+
+(* --------------------------------------------------------------------- *)
+let t_hl_case_r f tc =
   t_hS_or_bhS_or_eS
-    ~th:(t_hoare_case f) 
-    ~tbh:(t_bdHoare_case f)
-    ~te:(t_equiv_case f) g 
+    ~th:(t_hoare_case f)
+    ~tbh:(t_bdhoare_case f)
+    ~te:(t_equiv_case f)
+    tc
+
+(* -------------------------------------------------------------------- *)
+let t_hl_case = FApi.t_low1 "hl-case" t_hl_case_r

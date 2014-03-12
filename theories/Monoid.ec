@@ -223,9 +223,9 @@ theory NatMul.
     (forall (x:'a), mem x s => f x = k) =>
     sum f s = (card s)*k.
   proof strict.
-  intros=> f_x; pose s' := s;
-  (cut -> : s' <= s => sum f s' = (card s')*k)=> //;
-    last by delta s'; apply leq_refl.
+  intros=> f_x; pose s' := s.
+  cut -> //: s' <= s => sum f s' = (card s') * k;
+    last by rewrite /s'; apply leq_refl<:'a>. (* FIXME *)
   elim/set_comp s'.
     by rewrite sum_empty card_empty MulZ.
     intros=> s' s'_nempty IH leq_s'_s.

@@ -3,7 +3,6 @@ open EcUtils
 open EcLocation
 open EcParsetree
 open EcTyping
-open EcLogic
 
 (* -------------------------------------------------------------------- *)
 type pragma = {
@@ -24,9 +23,12 @@ exception TopError of EcLocation.t * exn
 
 let rec toperror_of_exn ?gloc exn =
   match exn with
-  | TyError  (loc, _, _) -> Some (loc, exn)
+  | TyError  (loc, _, _)   -> Some (loc, exn)
   | EcBaseLogic.TacError _ -> Some (odfl _dummy gloc, exn)
-  | ParseError (loc, _)  -> Some (loc, exn)
+  | ParseError (loc, _)    -> Some (loc, exn)
+
+  | EcCoreGoal.TcError (_, _, _) ->
+      Some (odfl _dummy gloc, exn)
 
   | LocError (loc, e)    -> begin
       let gloc = if EcLocation.isdummy loc then gloc else Some loc in
@@ -275,7 +277,7 @@ and process_tactics (scope : EcScope.scope) t =
 
   match t with
   | `Actual t  -> EcScope.Tactics.process scope mode t
-  | `Proof  pm -> EcScope.Tactics.proof   scope mode pm.pm_strict pm.pm_newengine
+  | `Proof  pm -> EcScope.Tactics.proof   scope mode pm.pm_strict
 
 (* -------------------------------------------------------------------- *)
 and process_save (scope : EcScope.scope) loc =
@@ -455,19 +457,8 @@ let pp_current_goal stream =
       match puc.S.puc_jdg with
       | S.PSNoCheck -> ()
 
-      | S.PSCheck (juc, ns) -> begin
-        let ppe = EcPrinting.PPEnv.ofenv (S.env scope) in
-
-          match List.ohead ns with
-          | None   -> Format.fprintf stream "No more goals@\n%!"
-          | Some n ->
-            let hyps, concl = get_goal (juc, n) in
-            let g = EcEnv.LDecl.tohyps hyps, concl in
-              EcPrinting.pp_goal ppe stream (List.length ns, g)
-      end
-
-      | S.PSNewEngine pf -> begin
-        let ppe = EcPrinting.PPEnv.ofenv (S.env scope) in
+      | S.PSCheck pf -> begin
+          let ppe = EcPrinting.PPEnv.ofenv (S.env scope) in
 
           match EcCoreGoal.opened pf with
           | None -> Format.fprintf stream "No more goals@\n%!"

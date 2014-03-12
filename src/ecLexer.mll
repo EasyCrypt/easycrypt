@@ -43,7 +43,6 @@
     "last"        , LAST       ;        (* KW: tactical *)
     "do"          , DO         ;        (* KW: tactical *)
     "strict"      , STRICT     ;        (* KW: tactical *)
-    "newengine"   , NEWENGINE  ;        (* KW: tactical *)
     "expect"      , EXPECT     ;        (* KW: tactical *)
 
     (* Lambda tactics *)
@@ -75,7 +74,6 @@
     "rwnormal"    , RWNORMAL   ;        (* KW: tactic *)
     "subst"       , SUBST      ;        (* KW: tactic *)
     "progress"    , PROGRESS   ;        (* KW: tactic *)
-    "introsprogress", INTROSPROGRESS;        (* KW: tactic *)
     "trivial"     , TRIVIAL    ;        (* KW: tactic *)
     "auto"        , AUTO       ;        (* KW: tactic *)
 
@@ -87,6 +85,7 @@
     "ringeq"      , RING       ;        (* KW: tactic *)
     "algnorm"     , ALGNORM    ;        (* KW: tactic *)
 
+    "exact"       , EXACT      ;        (* KW: bytac *)
     "assumption"  , ASSUMPTION ;        (* KW: bytac *)
     "smt"         , SMT        ;        (* KW: bytac *)
     "by"          , BY         ;        (* KW: bytac *)

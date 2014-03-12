@@ -38,7 +38,7 @@ proc.
 call (_ : true ==> ={res, glob Adv2}).
 (* I'm using three argument proc here just to test losslessness *)
 proc (false) (true) (true).
-trivial. trivial. assumption LossAdv2.
+trivial. trivial. exact LossAdv2.
 proc; skip; trivial.
 trivial.
 intros &1; proc; skip; trivial.

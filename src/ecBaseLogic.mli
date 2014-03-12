@@ -41,42 +41,6 @@ type i_pat =
 (* the first pair value represents the number of instructions to skip *)
 and s_pat = (int * i_pat) list        
 
-class virtual xrule : string ->
-object
-  method name : string
-end
-
-type rule =
-| RN_admit
-| RN_conv
-| RN_intro      of [`Raw of EcIdent.t list | `Exist]
-| RN_elim       of [`Exist]
-| RN_weak       of Sid.t
-| RN_apply
-| RN_smt
-| RN_revert
-| RN_hypothesis of EcIdent.t
-| RN_lemma      of EcPath.path * ty list
-| RN_xtd        of xrule
-
-type 'a rule_arg = 
-| RA_form of EcFol.form             (* formula             *)
-| RA_id   of EcIdent.t              (* local ident         *)
-| RA_mp   of EcPath.mpath           (* module              *)
-| RA_node of 'a                     (* sub-derivation      *)
-
-type 'a rnode = {
-  pr_name : rule;
-  pr_hyps : 'a rule_arg list
-}
-
-type l_decl = hyps * form
-
-type judgment = {
-  j_decl : l_decl;
-  j_rule : judgment rnode;
-}
-
 (* -------------------------------------------------------------------- *)
 type tac_error =
   | UnknownAx             of EcPath.path

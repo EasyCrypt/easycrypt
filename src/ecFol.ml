@@ -1456,7 +1456,7 @@ module Fsubst = struct
       assert (not (Mid.mem mhr s.fs_mem));
       let m'    = Mid.find_def m m s.fs_mem in
       let mp'   = EcPath.x_substm s.fs_sty.ts_p s.fs_mp mp in
-      let args' =f_subst s args in
+      let args' = f_subst s args in
       let e'    = f_subst s e in
 
       FSmart.f_pr (fp, (m, mp, args, e)) (m', mp', args', e')
@@ -1930,7 +1930,7 @@ type sform =
   | SFlet   of lpattern * form * form
   | SFtuple of form list
 
-  | SFquant of quantif * (EcIdent.t * gty) * form
+  | SFquant of quantif * (EcIdent.t * gty) * form Lazy.t
   | SFtrue
   | SFfalse
   | SFnot   of form
@@ -1975,8 +1975,8 @@ let rec sform_of_form fp =
   | Ftuple fs           -> SFtuple fs
 
   | Fquant (_, [ ]  , f) -> sform_of_form f
-  | Fquant (q, [b]  , f) -> SFquant (q, b, f)
-  | Fquant (q, b::bs, f) -> SFquant (q, b, f_quant q bs f)
+  | Fquant (q, [b]  , f) -> SFquant (q, b, lazy f)
+  | Fquant (q, b::bs, f) -> SFquant (q, b, lazy (f_quant q bs f))
 
   | FhoareF   hf -> SFhoareF   hf
   | FhoareS   hs -> SFhoareS   hs
@@ -2029,7 +2029,7 @@ let destr_exists_prenex f =
         let (bds2, f2) = prenex_exists bds f2 in
           (bds2@bds, f_imp f1 f2)
 
-    | SFquant (Lexists, bd, p) ->
+    | SFquant (Lexists, bd, lazy p) ->
         let (bds, p) = prenex_exists bds p in
           (bd::bds, p)
 

@@ -584,7 +584,7 @@ split.
 
 intros=> [a];intros => [h1 h2];split;first exists a;split;[ |apply (mem_rm_left _ x)];trivial.
 cut ? : !(x = a);[
-rewrite eq_sym;apply (mem_rm_right _ _ xs);assumption h2|
+rewrite eq_sym;apply (mem_rm_right _ _ xs);exact h2|
 generalize H0;rewrite -h1 (eq_sym (f a)); apply absurd;simplify;apply H;apply (mem_rm_left _ x);trivial].
 
 intros=> [h h1];generalize h=>[a];intros => [h2 h3];exists a;split;trivial.

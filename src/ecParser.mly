@@ -196,6 +196,7 @@
 %token EQUIV
 %token EXFALSO
 %token EXIST
+%token EXACT
 %token EXPECT
 %token EXPORT
 %token EXTRACTION
@@ -242,7 +243,6 @@
 %token MODULE
 %token MOVE
 %token NE
-%token NEWENGINE
 %token NOLOCALS
 %token NOSMT
 %token NOT
@@ -259,7 +259,6 @@
 %token PRINT
 %token PROC
 %token PROGRESS
-%token INTROSPROGRESS
 %token PROOF
 %token PROVER
 %token QED
@@ -937,9 +936,9 @@ form_chained_orderings(P):
 ;
 
 hoare_bd_cmp :
-| LE {PFHle}
-| EQ {PFHeq}
-| GE {PFHge}
+| LE { EcFol.FHle }
+| EQ { EcFol.FHeq }
+| GE { EcFol.FHge }
 
 hoare_body(P):
   mp=loc(fident) COLON pre=form_r(P) LONGARROW post=form_r(P)
@@ -1745,6 +1744,10 @@ rwarg:
 | rg=loc(rwrg) COLON r=rwarg1 { (Some rg, r) }
 ;
 
+tgenoptions:
+| xs=bracket(lident+) { xs }
+;
+
 genpattern:
 | l=sform_h %prec prec_tactic
     { `Form (None, l) }
@@ -1808,25 +1811,34 @@ codepos:
 ;
 
 code_position:
-| n=uint { Single n }
+| n=uint          { Single n }
 | n1=uint n2=uint { Double (n1, n2) }
 ;
 
 while_tac_info :
 | inv=sform
     { (inv, None, None) }
+
 | inv=sform vrnt=sform
     { (inv, Some vrnt, None) }
+
 | inv=sform vrnt=sform k=sform eps=sform
     { (inv, Some vrnt, Some (k,eps)) }
+;
 
 rnd_info:
-| empty {PNoRndParams (* None,None *) }
-| f=sform {PSingleRndParam f}
-| f=sform g=sform {PTwoRndParams (f,g) }
-| phi=sform d1=sform d2=sform d3=sform d4=sform p=sform?
-  {PMultRndParams ((phi,d1,d2,d3,d4),p) }
+| empty
+    { PNoRndParams }
 
+| f=sform
+    { PSingleRndParam f }
+
+| f=sform g=sform
+    { PTwoRndParams (f, g) }
+
+| phi=sform d1=sform d2=sform d3=sform d4=sform p=sform?
+    { PMultRndParams ((phi, d1, d2, d3, d4), p) }
+;
 
 swap_info:
 | s=side? p=swap_pos { s,p }
@@ -1914,10 +1926,7 @@ logtactic:
     { Preflexivity }
 
 | ASSUMPTION
-    { Passumption (None, None) }
-
-| ASSUMPTION p=qident tvi=tvars_app?
-   { Passumption (Some p, tvi) }
+    { Passumption }
 
 | GENERALIZE l=genpattern+
    { Pgeneralize l }
@@ -1971,10 +1980,13 @@ logtactic:
    { Pelim (e, Some p) }
 
 | APPLY e=fpattern(form)
-   { Papply (e, None) }
+   { Papply (e, `Apply None) }
 
 | APPLY e=fpattern(form) IN x=ident
-   { Papply (e, Some x) }
+   { Papply (e, `Apply (Some x)) }
+
+| EXACT e=fpattern(form)
+   { Papply (e, `Exact) }
 
 | l=simplify
    { Psimplify (mk_simplify l) }
@@ -1991,44 +2003,49 @@ logtactic:
 | SUBST l=sform*
    { Psubst l }
 
-| CUT ip=intro_pattern? COLON p=form %prec prec_below_IMPL
+| CUT ip=intro_pattern* COLON p=form %prec prec_below_IMPL
    { Pcut (ip, p, None) }
 
-| CUT ip=intro_pattern? COLON p=form BY t=tactic_core
+| CUT ip=intro_pattern* COLON p=form BY t=tactic_core
    { Pcut (ip, p, Some t) }
 
-| CUT ip=intro_pattern? CEQ fp=pterm
+| CUT ip=intro_pattern* CEQ fp=pterm
    { Pcutdef (ip, fp) }
 
 | POSE o=rwocc? x=lident CEQ p=form_h %prec prec_below_IMPL
    { Ppose (x, o |> omap EcMaps.Sint.of_list, p) }
 ;
 
-(* NEW : ADDED FOR EAGER *)
 eager_info:
 | h=ident
     { LE_done h }
+
 | LPAREN h=ident COLON s1=stmt TILD s2=stmt COLON pr=form LONGARROW po=form RPAREN
-    { LE_todo(h,s1,s2,pr,po) }
+    { LE_todo (h, s1, s2, pr, po) }
 ;
 
 eager_tac:
 | SEQ n1=uint n2=uint i=eager_info COLON p=sform
     { Peager_seq (i,(n1,n2),p) }
+
 | IF
     { Peager_if }
+
 | WHILE i=eager_info
     { Peager_while i }
+
 | PROC
     { Peager_fun_def }
+
 | PROC i=eager_info f=sform
-    { Peager_fun_abs(i,f) }
+    { Peager_fun_abs (i, f) }
+
 | CALL info=fpattern(call_info)
     { Peager_call info }
+
 | info=eager_info COLON p=sform
-    { Peager(info,p) }
+    { Peager (info, p) }
 ;
-(* END EAGER *)
 
 phltactic:
 | PROC
@@ -2056,7 +2073,7 @@ phltactic:
     { Pskip }
 
 | WHILE s=side? info=while_tac_info
-    { Pwhile (s,info) }
+    { Pwhile (s, info) }
 
 | CALL s=side? info=fpattern(call_info)
     { Pcall (s, info) }
@@ -2107,7 +2124,7 @@ phltactic:
     { Palias (s, o, Some x) }
 
 | ALIAS s=side? o=codepos x=lident EQ e=expr
-    { Pset (false,s, o,x,e) }
+    { Pset (s, o, false, x,e) }
 
 | FISSION s=side? o=codepos AT d1=uint COMMA d2=uint
     { Pfission (s, o, (1, (d1, d2))) }
@@ -2257,11 +2274,22 @@ tactic_core_r:
 | CASE gp=genpattern*
    { Pcase gp }
 
-| PROGRESS s=STAR? t=tactic_core?
-   { Pprogress (s<>None, t) }
+| PROGRESS topts=tgenoptions? t=tactic_core? {
+    let check1 opts topt =
+      match unloc topt with
+      | "nosplit" -> { opts with ppgo_split = false; }
+      | "nosolve" -> { opts with ppgo_solve = false; }
+      | "nosubst" -> { opts with ppgo_subst = false; }
+      | x -> parse_error topt.pl_loc (Some ("invalid option: " ^ x))
+    in
 
-| INTROSPROGRESS
-   { Pintrosprogress }
+    let opts = { ppgo_split = true;
+                 ppgo_solve = true;
+                 ppgo_subst = true; } in
+    let opts = List.fold_left check1 opts (odfl [] topts) in
+
+    Pprogress (opts, t)
+  }
 
 | x=logtactic
    { Plogic x }
@@ -2350,9 +2378,8 @@ proof:
              parse_error mode.pl_loc (Some "duplicated flag");
            Hashtbl.add seen mode ();
            match unloc mode with
-           | `Strict -> { pmodes with pm_strict = flag; }
-           | `NewEngine -> { pmodes with pm_newengine = flag; })
-        { pm_strict = true; pm_newengine = false; } modes
+           | `Strict -> { pmodes with pm_strict = flag; })
+        { pm_strict = true; } modes
   }
 ;
 
@@ -2361,8 +2388,7 @@ proofmode1:
 ;
 
 proofmodename:
-| STRICT    { `Strict    }
-| NEWENGINE { `NewEngine }
+| STRICT { `Strict }
 ;
 
 (* -------------------------------------------------------------------- *)

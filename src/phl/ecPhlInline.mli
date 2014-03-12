@@ -1,21 +1,20 @@
 (* -------------------------------------------------------------------- *)
+open EcUtils
 open EcParsetree
-open EcBaseLogic
-open EcLogic
+open EcCoreGoal.FApi
 
 (* -------------------------------------------------------------------- *)
-class rn_hl_inline : bool option -> s_pat ->
-object
-  inherit xrule
+type i_pat =
+  | IPpat
+  | IPif    of s_pat pair
+  | IPwhile of s_pat
 
-  method side    : bool option
-  method pattern : s_pat
-end
-
-(* -------------------------------------------------------------------- *)
-val t_inline_bdHoare : s_pat -> tactic
-val t_inline_hoare   : s_pat -> tactic
-val t_inline_equiv   : bool  -> s_pat -> tactic
+and s_pat = (int * i_pat) list
 
 (* -------------------------------------------------------------------- *)
-val process_inline : pinline_arg -> tactic
+val t_inline_bdhoare : s_pat -> backward
+val t_inline_hoare   : s_pat -> backward
+val t_inline_equiv   : bool  -> s_pat -> backward
+
+(* -------------------------------------------------------------------- *)
+val process_inline : pinline_arg -> backward

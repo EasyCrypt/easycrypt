@@ -22,7 +22,7 @@ type varbind = {
 }
 
 (* -------------------------------------------------------------------- *)
-type env 
+type env
 
 val initial : env
 
@@ -91,18 +91,18 @@ module Fun : sig
   val hoareS_anonym : variable list -> env -> memenv * env
 
   val actmem_post :  memory -> xpath -> function_ -> memenv
-    
-  val inv_memenv : env -> env 
 
-  val equivF_memenv : xpath -> xpath -> env -> 
-    (memenv * memenv) * (memenv * memenv) 
+  val inv_memenv : env -> env
+
+  val equivF_memenv : xpath -> xpath -> env ->
+    (memenv * memenv) * (memenv * memenv)
 
   val equivF : xpath -> xpath -> env -> env * env
 
-  val equivS : xpath -> xpath -> env -> 
+  val equivS : xpath -> xpath -> env ->
     memenv * (funsig * function_def) * memenv * (funsig * function_def) * env
 
-  val equivS_anonym : variable list -> variable list -> env -> 
+  val equivS_anonym : variable list -> variable list -> env ->
     memenv * memenv * env
 end
 
@@ -118,10 +118,10 @@ module Var : sig
   val lookup_local     : symbol -> env -> (EcIdent.t * EcTypes.ty)
   val lookup_local_opt : symbol -> env -> (EcIdent.t * EcTypes.ty) option
 
-  val lookup_progvar     : ?side:memory -> qsymbol -> env -> 
+  val lookup_progvar     : ?side:memory -> qsymbol -> env ->
     ([`Proj of EcTypes.prog_var * EcTypes.ty * (int*int) | `Var of EcTypes.prog_var ] *
      EcTypes.ty)
-  val lookup_progvar_opt : ?side:memory -> qsymbol -> env -> 
+  val lookup_progvar_opt : ?side:memory -> qsymbol -> env ->
     ([`Proj of EcTypes.prog_var * EcTypes.ty * (int*int) | `Var of EcTypes.prog_var ] *
      EcTypes.ty) option
 
@@ -200,25 +200,25 @@ end
 
 (* -------------------------------------------------------------------- *)
 type use = {
-  us_pv : ty EcPath.Mx.t; 
-  us_gl : EcIdent.Sid.t;  
+  us_pv : ty EcPath.Mx.t;
+  us_gl : EcIdent.Sid.t;
 }
- 
+
 module NormMp : sig
-  
+
   val norm_mpath : env -> mpath -> mpath
   val norm_xfun  : env -> xpath -> xpath
   val norm_pvar  : env -> EcTypes.prog_var -> EcTypes.prog_var
   val norm_form  : env -> form -> form
   val mod_use    : env -> mpath -> use
   val fun_use    : env -> xpath -> use
-  val norm_restr : env -> mod_restr  -> use 
+  val norm_restr : env -> mod_restr  -> use
   val equal_restr : env -> mod_restr -> mod_restr -> bool
   val get_restr  : env -> mpath -> use
   val use_mem_xp : xpath -> use -> bool
   val use_mem_gl : mpath -> use -> bool
-  val norm_glob  : env -> EcMemory.memory -> mpath -> EcFol.form 
-  val norm_tglob : env -> mpath -> EcTypes.ty 
+  val norm_glob  : env -> EcMemory.memory -> mpath -> EcFol.form
+  val norm_tglob : env -> mpath -> EcTypes.ty
   val tglob_reducible : env -> mpath -> bool
   val is_abstract_fun : xpath -> env -> bool
 end
@@ -346,7 +346,7 @@ open EcBaseLogic
 
 module LDecl : sig
   type error =
-    | UnknownSymbol   of EcSymbols.symbol 
+    | UnknownSymbol   of EcSymbols.symbol
     | UnknownIdent    of EcIdent.t
     | NotAVariable    of EcIdent.t
     | NotAHypothesis  of EcIdent.t
@@ -358,9 +358,10 @@ module LDecl : sig
 
   type hyps
 
-  val init   : env -> ty_params -> hyps
-  val tohyps : hyps -> EcBaseLogic.hyps
-  val toenv  : hyps -> env
+  val init    : env -> ?locals:EcBaseLogic.l_local list -> ty_params -> hyps
+  val tohyps  : hyps -> EcBaseLogic.hyps
+  val toenv   : hyps -> env
+  val baseenv : hyps -> env
 
   val add_local : EcIdent.t -> local_kind -> hyps -> hyps
 
@@ -391,8 +392,8 @@ module LDecl : sig
 
   val hoareF : xpath -> hyps -> hyps * hyps
   val equivF : xpath -> xpath -> hyps -> hyps * hyps
-  val inv_memenv  : hyps -> hyps 
-  val inv_memenv1 : hyps -> hyps 
+  val inv_memenv  : hyps -> hyps
+  val inv_memenv1 : hyps -> hyps
 end
 
 (* -------------------------------------------------------------------- *)

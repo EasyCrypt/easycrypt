@@ -58,7 +58,7 @@ module UF = EcUFind.Make(UFArgs.I)(UFArgs.D)
 
 (* -------------------------------------------------------------------- *)
 module UnifyCore = struct
-  let fresh ?(tc = Sp.empty) ?ty uf = 
+  let fresh ?(tc = Sp.empty) ?ty uf =
     let uid = EcUid.unique () in
     let uf  =
       match ty with
@@ -154,28 +154,28 @@ let rec unify_core (env : EcEnv.env) (tvtc : Sp.t Mid.t) (uf : UF.t) pb =
                   let effects = reffold (swap |- UF.union id1 id2) uf in
                     List.iter (Queue.push^~ pb) effects
             end
-    
+
             | Tunivar id, _ -> setvar id t2
             | _, Tunivar id -> setvar id t1
-      
+
             | Ttuple lt1, Ttuple lt2 ->
                 if List.length lt1 <> List.length lt2 then failure ();
                 List.iter2 (fun t1 t2 -> Queue.push (`TyUni (t1, t2)) pb) lt1 lt2
-      
+
             | Tfun (t1, t2), Tfun (t1', t2') ->
                 Queue.push (`TyUni (t1, t1')) pb;
                 Queue.push (`TyUni (t2, t2')) pb
-      
+
             | Tconstr (p1, lt1), Tconstr (p2, lt2) when EcPath.p_equal p1 p2 ->
                 if List.length lt1 <> List.length lt2 then failure ();
                 List.iter2 (fun t1 t2 -> Queue.push (`TyUni (t1, t2)) pb) lt1 lt2
-    
+
             | Tconstr (p, lt), _ when EcEnv.Ty.defined p env ->
                 Queue.push (`TyUni (EcEnv.Ty.unfold p lt env, t2)) pb
-                
+
             | _, Tconstr (p, lt) when EcEnv.Ty.defined p env ->
                 Queue.push (`TyUni (t1, EcEnv.Ty.unfold p lt env)) pb
-      
+
             | Tglob mp, _ when EcEnv.NormMp.tglob_reducible env mp ->
                 Queue.push (`TyUni (EcEnv.NormMp.norm_tglob env mp, t2)) pb
 
@@ -249,7 +249,7 @@ let close (uf : UF.t) =
          in
            Hint.add map i t; t
        end
-    end           
+    end
 
     | _ -> ty_map doit t
   in
@@ -288,7 +288,7 @@ module UniEnv = struct
   let restore ~(dst:unienv) ~(src:unienv) =
     dst := !src
 
-  let getnamed ue x = 
+  let getnamed ue x =
       match Mstr.find_opt x (!ue).ue_named with
       | Some a -> a
       | None   -> begin
@@ -328,9 +328,9 @@ module UniEnv = struct
 
   let opentvi ue (params : ty_params) tvi =
     match tvi with
-    | None -> 
+    | None ->
         List.fold_left
-          (fun s (v, tc) -> Mid.add v (fresh ~tc ue) s) 
+          (fun s (v, tc) -> Mid.add v (fresh ~tc ue) s)
           Mid.empty params
 
     | Some (TVIunamed lt) ->
@@ -363,7 +363,7 @@ module UniEnv = struct
     let (subst, tvs) = openty_r ue params tvi in
       (subst ty, tvs)
 
-  let rec repr (ue : unienv) (t : ty) : ty = 
+  let rec repr (ue : unienv) (t : ty) : ty =
     match t.ty_node with
     | Tunivar id -> odfl t (snd (UF.data id (!ue).ue_uf))
     | _ -> t
@@ -392,11 +392,11 @@ let hastc env ue ty tc =
     ue := { !ue with ue_uf = uf; }
 
 (* -------------------------------------------------------------------- *)
-let tfun_expected ue psig = 
+let tfun_expected ue psig =
   let tres = UniEnv.fresh ue in
     EcTypes.toarrow psig tres
 
-let select_op ?(filter = fun _ -> true) tvi env name ue psig = 
+let select_op ?(filter = fun _ -> true) tvi env name ue psig =
   let module D = EcDecl in
 
   let filter op =
@@ -404,13 +404,13 @@ let select_op ?(filter = fun _ -> true) tvi env name ue psig =
     let filter_on_tvi =
       match tvi with
       | None -> fun _ -> true
-  
+
       | Some (TVIunamed lt) ->
           let len = List.length lt in
             fun op ->
               let tparams = op.D.op_tparams in
                  List.length tparams = len
-  
+
       | Some (TVInamed ls) -> fun op ->
           let tparams = List.map (fst_map EcIdent.name) op.D.op_tparams in
           let tparams = Msym.of_list tparams in
@@ -425,17 +425,17 @@ let select_op ?(filter = fun _ -> true) tvi env name ue psig =
 
     let subue = UniEnv.copy ue in
 
-    try 
+    try
       begin try
         match tvi with
         | None ->
             ()
-  
+
         | Some (TVIunamed lt) ->
             List.iter2
               (fun ty (_, tc) -> hastc env subue ty tc)
               lt op.D.op_tparams
-  
+
         | Some (TVInamed ls) ->
             let tparams = List.map (fst_map EcIdent.name) op.D.op_tparams in
             let tparams = Msym.of_list tparams in
@@ -444,13 +444,13 @@ let select_op ?(filter = fun _ -> true) tvi env name ue psig =
                 ls
         with UnificationFailure _ -> raise E.Failure
       end;
-  
+
       let (top, tys) = UniEnv.openty subue op.D.op_tparams tvi (D.op_ty op) in
         let texpected = tfun_expected subue psig in
           (try  unify env subue top texpected
            with UnificationFailure _ -> raise E.Failure);
 
-          Some ((path, tys), top, subue) 
+          Some ((path, tys), top, subue)
 
     with E.Failure -> None
 

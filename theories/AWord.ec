@@ -48,7 +48,7 @@ qed.
 require (*--*) Ring.
 (*---*) import Ring.BoolRing.
 
-instance ring with word
+instance bring with word
   op rzero = zeros
   op rone  = ones
   op add   = (   ^  )
@@ -59,14 +59,13 @@ instance ring with word
   proof addr0     by smt
   proof addrA     by smt
   proof addrC     by smt
-  proof addrN     by smt
+  proof addrK     by smt
   proof mulr1     by smt
   proof mulrA     by smt
   proof mulrC     by smt
-  proof mulrDl    by smt.
-
-instance bring with word
-  proof mulrr     by smt.
+  proof mulrDl    by smt
+  proof mulrK     by smt
+  proof oppr_id   by smt.
 
 require export ABitstring.
 op to_bits: word -> bitstring.

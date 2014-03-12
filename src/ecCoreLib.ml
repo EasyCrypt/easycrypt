@@ -149,8 +149,11 @@ let s_dbool = EcPath.toqsymbol p_dbool
 (* -------------------------------------------------------------------- *)
 (*                          Logical lemmas                              *)
 (* -------------------------------------------------------------------- *)
-let p_Logic = EcPath.pqname p_top "Logic" 
-let _Logic  = fun x -> EcPath.pqname p_Logic x
+let id_Logic = "Logic"
+let p_Logic  = EcPath.pqname p_top id_Logic
+let _Logic   = fun x -> EcPath.pqname p_Logic x
+
+let mk_logic        = _Logic
 
 let p_cut_lemma     = _Logic "cut_lemma"
 let p_false_elim    = _Logic "falseE"

@@ -35,6 +35,7 @@ module type S = sig
   val union : item -> item -> t -> t * effects
   val domain: t -> item list
   val closed: t -> bool
+  val opened: t -> int
 end
 
 (* -------------------------------------------------------------------- *)

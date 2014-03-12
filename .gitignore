@@ -11,6 +11,7 @@ _build
 setup.data
 setup.log
 /attic
+/theories/attic
 
 /system/*.o
 /system/callprover
@@ -31,6 +32,7 @@ setup.log
 
 /doc/easycrypt.pdf
 
+/webui/workspace/
 /webui/webui-env/
 /webui/econline.egg-info/
 /webui/build/

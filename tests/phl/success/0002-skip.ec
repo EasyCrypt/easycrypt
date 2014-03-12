@@ -7,6 +7,6 @@ proof -strict.
  proc.
  skip.
  intros _ h.
- assumption h.
+ exact h.
 qed.
 

@@ -59,6 +59,8 @@ val as_seq2 : 'a list -> 'a tuple2
 val as_seq3 : 'a list -> 'a tuple3
 val as_seq4 : 'a list -> 'a tuple4
 val as_seq5 : 'a list -> 'a tuple5
+val as_seq6 : 'a list -> 'a tuple6
+val as_seq7 : 'a list -> 'a tuple7
 
 (* -------------------------------------------------------------------- *)
 val int_of_bool : bool -> int
@@ -160,6 +162,8 @@ module List : sig
 
   val last : 'a list -> 'a
 
+  val olast : 'a list -> 'a option
+
   val iteri : (int -> 'a -> 'b) -> 'a list -> unit
 
   val iter2i : (int -> 'a -> 'b -> 'c) -> 'a list -> 'b list -> unit
@@ -181,8 +185,6 @@ module List : sig
   val take : int -> 'a list -> 'a list
 
   val split_n : int -> 'a list -> 'a list * 'a * 'a list
-
-  val find_split : (int -> 'a -> 'b -> 'a) -> 'a -> 'b list -> 'a
 
   val fold_lefti : (int -> 'a -> 'b -> 'a) -> 'a -> 'b list -> 'a
 

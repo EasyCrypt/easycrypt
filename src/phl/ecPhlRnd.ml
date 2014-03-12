@@ -4,95 +4,53 @@ open EcParsetree
 open EcTypes
 open EcModules
 open EcFol
-open EcBaseLogic
-open EcLogic
 open EcPV
-open EcCorePhl
-open EcCoreHiPhl
 
-(* -------------------------------------------------------------------- *)
-class rn_hl_hoare_rnd =
-object
-  inherit xrule "[hl] hoare-rnd"
-end
+open EcCoreGoal
+open EcLowPhlGoal
 
-(* -------------------------------------------------------------------- *)
-type hl_infos_t = (form, form, form) rnd_tac_info
-
-class rn_hl_equiv_rnd infos =
-object
-  inherit xrule "[hl] equiv-rnd"
-
-  method infos : hl_infos_t = infos
-end
+module TTC = EcProofTyping
 
 (* -------------------------------------------------------------------- *)
 type bhl_infos_t = (form, ty -> form option, ty -> form) rnd_tac_info
-
-class rn_hl_bhl_rnd infos =
-object
-  inherit xrule "[bhl] hoare-rnd"
-
-  method infos : bhl_infos_t = infos
-end
+type rnd_infos_t = (pformula, pformula option, pformula) rnd_tac_info
+type mkbij_t     = EcTypes.ty -> EcTypes.ty -> EcFol.form
 
 (* -------------------------------------------------------------------- *)
-let rn_hl_hoare_rnd =
-  RN_xtd (new rn_hl_hoare_rnd)
-
-let rn_hl_equiv_rnd infos =
-  RN_xtd (new rn_hl_equiv_rnd infos :> xrule)
-
-let rn_bhl_rnd infos =
-  RN_xtd (new rn_hl_bhl_rnd infos :> xrule)
-
-(* -------------------------------------------------------------------- *)
-let t_hoare_rnd g =
-  let env,_,concl = get_goal_e g in
-  let hs = t_as_hoareS concl in
-  let (lv,distr),s= s_last_rnd "rnd" hs.hs_s in
-  (* FIXME: exception when not rnds found *)
-  let ty_distr = proj_distr_ty (e_ty distr) in
-  let x_id = EcIdent.create (symbol_of_lv lv) in
-  let x = f_local x_id ty_distr in
-  let distr = EcFol.form_of_expr (EcMemory.memory hs.hs_m) distr in
-  let post = subst_form_lv env (EcMemory.memory hs.hs_m) lv x hs.hs_po in
-  let post = f_imp (f_in_supp x distr) post in
-  let post = f_forall_simpl [(x_id,GTty ty_distr)] post in
-  let concl = f_hoareS_r {hs with hs_s=s; hs_po=post} in
-  prove_goal_by [concl] rn_hl_hoare_rnd g
-
-(* -------------------------------------------------------------------- *)
-let wp_equiv_disj_rnd side g =
-  let env,_,concl = get_goal_e g in
-  let es = t_as_equivS concl in
+let wp_equiv_disj_rnd_r side tc =
+  let env = FApi.tc1_env tc in
+  let es  = tc1_as_equivS tc in
   let m,s =
-    if side then es.es_ml, es.es_sl
-    else         es.es_mr, es.es_sr
+    if   side
+    then es.es_ml, es.es_sl
+    else es.es_mr, es.es_sr
   in
-  let (lv,distr),s= s_last_rnd "rnd" s in
 
   (* FIXME: exception when not rnds found *)
+  let (lv, distr), s = tc1_last_rnd tc s in
   let ty_distr = proj_distr_ty (e_ty distr) in
+
   let x_id = EcIdent.create (symbol_of_lv lv) in
-  let x = f_local x_id ty_distr in
+  let x    = f_local x_id ty_distr in
+
   let distr = EcFol.form_of_expr (EcMemory.memory m) distr in
-  let post = subst_form_lv env (EcMemory.memory m) lv x es.es_po in
-  let post = f_imp (f_in_supp x distr) post in
-  let post = f_forall_simpl [(x_id,GTty ty_distr)] post in
-  let post = f_anda (f_eq (f_weight ty_distr distr) f_r1) post in
+  let post  = subst_form_lv env (EcMemory.memory m) lv x es.es_po in
+  let post  = f_imp (f_in_supp x distr) post in
+  let post  = f_forall_simpl [(x_id,GTty ty_distr)] post in
+  let post  = f_anda (f_eq (f_weight ty_distr distr) f_r1) post in
   let concl =
-    if side then f_equivS_r {es with es_sl=s; es_po=post}
-    else  f_equivS_r {es with es_sr=s; es_po=post}
+    if   side
+    then f_equivS_r { es with es_sl=s; es_po=post; }
+    else f_equivS_r { es with es_sr=s; es_po=post; }
   in
-  prove_goal_by [concl] rn_hl_hoare_rnd g
+  FApi.xmutate1 tc `Rnd [concl]
 
 (* -------------------------------------------------------------------- *)
-let wp_equiv_rnd bij g =
-  let env,_,concl = get_goal_e g in
-  let es = t_as_equivS concl in
-  let (lvL,muL),(lvR,muR),sl',sr'= s_last_rnds "rnd" es.es_sl es.es_sr in
-  (* FIXME: exception when not rnds found *)
+let wp_equiv_rnd_r bij tc =
+  let env = FApi.tc1_env tc in
+  let es = tc1_as_equivS tc in
+  let (lvL, muL), sl' = tc1_last_rnd tc es.es_sl in
+  let (lvR, muR), sr' = tc1_last_rnd tc es.es_sr in
   let tyL = proj_distr_ty (e_ty muL) in
   let tyR = proj_distr_ty (e_ty muR) in
   let x_id = EcIdent.create (symbol_of_lv lvL ^ "L")
@@ -101,35 +59,50 @@ let wp_equiv_rnd bij g =
   let y = f_local y_id tyR in
   let muL = EcFol.form_of_expr (EcMemory.memory es.es_ml) muL in
   let muR = EcFol.form_of_expr (EcMemory.memory es.es_mr) muR in
-  (* *)
+
   let tf, tfinv =
     match bij with
     | Some (f, finv) -> (f tyL tyR, finv tyR tyL)
     | None ->
         if not (EcReduction.EqTest.for_type env tyL tyR) then
-          tacuerror "must give an explicit bijection when supports are incompatible";
+          tc_error !!tc "support are not compatible, an explicit bijection is required";
         (EcFol.f_identity ~name:"z" tyL, EcFol.f_identity ~name:"z" tyR)
   in
 
-  let f t = f_app tf  [t] tyR in
+  let f t = f_app tf [t] tyR in
   let finv t = f_app tfinv [t] tyL in
-  let supp_cond1 =  f_eq (f_mu_x muL x) (f_mu_x muR (f x)) in
-  let supp_cond2 =  f_in_supp (finv y) muL in
-  let inv_cond1 =   f_eq (finv (f x)) x in
-  let inv_cond2 =   f_eq (f (finv y)) y in
+  let supp_cond1 = f_eq (f_mu_x muL x) (f_mu_x muR (f x)) in
+  let supp_cond2 = f_in_supp (finv y) muL in
+  let inv_cond1  = f_eq (finv (f x)) x in
+  let inv_cond2  = f_eq (f (finv y)) y in
   let post = subst_form_lv env (EcMemory.memory es.es_ml) lvL x es.es_po in
   let post = subst_form_lv env (EcMemory.memory es.es_mr) lvR (f x) post in
   let post = f_andas [supp_cond1; supp_cond2; inv_cond1; inv_cond2; post] in
   let post = f_imp (f_in_supp y muR) post in
   let post = f_imp (f_in_supp x muL) post in
   let post = f_forall_simpl [(x_id,GTty tyL);(y_id,GTty tyR)] post in
-  let concl = f_equivS_r {es with es_sl=sl'; es_sr=sr'; es_po=post} in
-  prove_goal_by [concl] (rn_hl_equiv_rnd (PTwoRndParams (tf, tfinv))) g
+  let concl = f_equivS_r { es with es_sl=sl'; es_sr=sr'; es_po=post; } in
+  FApi.xmutate1 tc `Rnd [concl]
 
 (* -------------------------------------------------------------------- *)
-let t_equiv_rnd side bij_info g =
+let t_hoare_rnd_r tc =
+  let env = FApi.tc1_env tc in
+  let hs = tc1_as_hoareS tc in
+  let (lv, distr), s = tc1_last_rnd tc hs.hs_s in
+  let ty_distr = proj_distr_ty (e_ty distr) in
+  let x_id = EcIdent.create (symbol_of_lv lv) in
+  let x = f_local x_id ty_distr in
+  let distr = EcFol.form_of_expr (EcMemory.memory hs.hs_m) distr in
+  let post = subst_form_lv env (EcMemory.memory hs.hs_m) lv x hs.hs_po in
+  let post = f_imp (f_in_supp x distr) post in
+  let post = f_forall_simpl [(x_id,GTty ty_distr)] post in
+  let concl = f_hoareS_r {hs with hs_s=s; hs_po=post} in
+  FApi.xmutate1 tc `Rnd [concl]
+
+(* -------------------------------------------------------------------- *)
+let t_equiv_rnd_r side bij_info tc =
   match side with
-  | Some side -> wp_equiv_disj_rnd side g
+  | Some side -> wp_equiv_disj_rnd_r side tc
   | None ->
       let bij =
         match bij_info with
@@ -137,13 +110,13 @@ let t_equiv_rnd side bij_info g =
         | Some bij, None | None, Some bij -> Some (bij, bij)
         | None, None -> None
       in
-        wp_equiv_rnd bij g
+        wp_equiv_rnd_r bij tc
 
 (* -------------------------------------------------------------------- *)
-let t_bd_hoare_rnd tac_info g =
-  let env,_,concl = get_goal_e g in
-  let bhs = t_as_bdHoareS concl in
-  let (lv,distr),s = s_last_rnd "bd_hoare_rnd" bhs.bhs_s in
+let t_bdhoare_rnd_r tac_info tc =
+  let env = FApi.tc1_env tc in
+  let bhs = tc1_as_bdhoareS tc in
+  let (lv,distr),s = tc1_last_rnd tc bhs.bhs_s in
   let ty_distr = proj_distr_ty (e_ty distr) in
   let distr = EcFol.form_of_expr (EcMemory.memory bhs.bhs_m) distr in
   let m = fst bhs.bhs_m in
@@ -186,7 +159,7 @@ let t_bd_hoare_rnd tac_info g =
       | LvVar (pv,_) ->
         f_lambda [x,GTty ty]
           (EcPV.PVM.subst1 env pv m (f_local x ty) bhs.bhs_po)
-      | _ -> tacuerror "Cannot infer a valid event, it must be provided"
+      | _ -> tc_error !!tc "cannot infer a valid event, it must be provided"
   in
   let bound,pre_bound,binders =
     if is_bd_indep then
@@ -260,17 +233,28 @@ let t_bd_hoare_rnd tac_info g =
         f_forall_mems [bhs.bhs_m] (f_imp (f_not phi) post)
       in
       [bd_sgoal;sgoal1;sgoal2;sgoal3;sgoal4]
-    | _, _ -> tacuerror "wrong tactic arguments"
-in
-prove_goal_by subgoals (rn_bhl_rnd tac_info) g
+
+    | _, _ -> tc_error !!tc "invalid arguments"
+  in
+
+  FApi.xmutate1 tc `Rnd subgoals
 
 (* -------------------------------------------------------------------- *)
-let process_rnd side tac_info g =
-  let concl = get_concl g in
+let wp_equiv_disj_rnd = FApi.t_low1 "wp-equiv-disj-rnd" wp_equiv_disj_rnd_r
+let wp_equiv_rnd      = FApi.t_low1 "wp-equiv-rnd"      wp_equiv_rnd_r
+
+(* -------------------------------------------------------------------- *)
+let t_hoare_rnd   = FApi.t_low0 "hoare-rnd"   t_hoare_rnd_r
+let t_bdhoare_rnd = FApi.t_low1 "bdhoare-rnd" t_bdhoare_rnd_r
+let t_equiv_rnd   = FApi.t_low2 "equiv-rnd"   t_equiv_rnd_r
+
+(* -------------------------------------------------------------------- *)
+let process_rnd side tac_info tc =
+  let concl = FApi.tc1_goal tc in
 
   match side, tac_info with
   | None, PNoRndParams when is_hoareS concl ->
-      t_hoare_rnd g
+      t_hoare_rnd tc
 
   | None, _ when is_bdHoareS concl ->
     let tac_info =
@@ -278,31 +262,35 @@ let process_rnd side tac_info g =
       | PNoRndParams ->
           PNoRndParams
 
-      | PSingleRndParam p ->
-          PSingleRndParam (fun t -> process_phl_form (tfun t tbool) g p)
+      | PSingleRndParam fp ->
+          PSingleRndParam
+            (fun t -> TTC.tc1_process_phl_form tc (tfun t tbool) fp)
 
-      | PMultRndParams ((phi,d1,d2,d3,d4),p) ->
-          let p t = p |> omap (process_phl_form (tfun t tbool) g) in
-          let phi = process_phl_form tbool g phi in
-          let d1 = process_phl_form treal g d1 in
-          let d2 = process_phl_form treal g d2 in
-          let d3 = process_phl_form treal g d3 in
-          let d4 = process_phl_form treal g d4 in
-            PMultRndParams ((phi, d1, d2, d3, d4), p)
+      | PMultRndParams ((phi, d1, d2, d3, d4), p) ->
+          let p t = p |> omap (TTC.tc1_process_phl_form tc (tfun t tbool)) in
+          let phi = TTC.tc1_process_phl_form tc tbool phi in
+          let d1  = TTC.tc1_process_phl_form tc treal d1 in
+          let d2  = TTC.tc1_process_phl_form tc treal d2 in
+          let d3  = TTC.tc1_process_phl_form tc treal d3 in
+          let d4  = TTC.tc1_process_phl_form tc treal d4 in
+          PMultRndParams ((phi, d1, d2, d3, d4), p)
 
-      | _ -> tacuerror "wrong tactic arguments"
+      | _ -> tc_error !!tc "invalid arguments"
     in
-      t_bd_hoare_rnd tac_info g
+      t_bdhoare_rnd tac_info tc
 
-  | _ when is_equivS concl ->
-    let process_form f ty1 ty2 = process_prhl_form (tfun ty1 ty2) g f in
+  | _, _ when is_equivS concl ->
+    let process_form f ty1 ty2 =
+      TTC.tc1_process_prhl_form tc (tfun ty1 ty2) f in
+
     let bij_info =
       match tac_info with
       | PNoRndParams -> None, None
       | PSingleRndParam f -> Some (process_form f), None
       | PTwoRndParams (f, finv) -> Some (process_form f), Some (process_form finv)
-      | _ -> tacuerror "wrong tactic arguments"
-    in
-      t_equiv_rnd side bij_info g
+      | _ -> tc_error !!tc "invalid arguments"
 
-  | _ -> cannot_apply "rnd" "unexpected instruction or wrong arguments"
+    in
+      t_equiv_rnd side bij_info tc
+
+  | _ -> tc_error !!tc "invalid arguments"

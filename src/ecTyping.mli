@@ -1,6 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcSymbols
+open EcEnv
 open EcDecl
 open EcPath
 open EcLocation
@@ -74,14 +75,14 @@ type tyerror =
 | UnknownScope           of qsymbol
 
 exception TymodCnvFailure of tymod_cnv_failure
-exception TyError of EcLocation.t * EcEnv.env * tyerror
+exception TyError of EcLocation.t * env * tyerror
 
-val tyerror : EcLocation.t -> EcEnv.env -> tyerror -> 'a
+val tyerror : EcLocation.t -> env -> tyerror -> 'a
 
-val pp_cnv_failure :  Format.formatter -> EcEnv.env -> tymod_cnv_failure -> unit
+val pp_cnv_failure :  Format.formatter -> env -> tymod_cnv_failure -> unit
 
 (* -------------------------------------------------------------------- *)
-val unify_or_fail : EcEnv.env -> EcUnify.unienv -> EcLocation.t -> expct:ty -> ty -> unit
+val unify_or_fail : env -> EcUnify.unienv -> EcLocation.t -> expct:ty -> ty -> unit
 
 (* -------------------------------------------------------------------- *)
 type typolicy
@@ -91,48 +92,55 @@ val tp_relax  : typolicy
 
 (* -------------------------------------------------------------------- *)
 val transtyvars:
-  EcEnv.env -> (EcLocation.t * ptyparams option) -> EcUnify.unienv
+  env -> (EcLocation.t * ptyparams option) -> EcUnify.unienv
 
 (* -------------------------------------------------------------------- *)
-val transty : typolicy -> EcEnv.env -> EcUnify.unienv -> pty -> ty 
+val transty : typolicy -> env -> EcUnify.unienv -> pty -> ty 
 
 val transtys :  
-    typolicy -> EcEnv.env -> EcUnify.unienv -> pty list -> ty list
+    typolicy -> env -> EcUnify.unienv -> pty list -> ty list
 
-val transtvi : EcEnv.env -> EcUnify.unienv -> ptyannot -> EcUnify.tvar_inst
+val transtvi : env -> EcUnify.unienv -> ptyannot -> EcUnify.tvar_inst
 
-val transbinding : EcEnv.env -> EcUnify.unienv -> ptybindings ->
-  EcEnv.env * (EcIdent.t * EcTypes.ty) list
-
-(* -------------------------------------------------------------------- *)
-val transexp         : EcEnv.env -> [`InProc|`InOp] -> EcUnify.unienv -> pexpr -> expr * ty
-val transexpcast     : EcEnv.env -> [`InProc|`InOp] -> EcUnify.unienv -> ty -> pexpr -> expr
-val transexpcast_opt : EcEnv.env -> [`InProc|`InOp] -> EcUnify.unienv -> ty option -> pexpr -> expr
+val transbinding : env -> EcUnify.unienv -> ptybindings ->
+  env * (EcIdent.t * EcTypes.ty) list
 
 (* -------------------------------------------------------------------- *)
-val transstmt    : EcEnv.env -> EcUnify.unienv -> pstmt -> stmt
+val transexp         : env -> [`InProc|`InOp] -> EcUnify.unienv -> pexpr -> expr * ty
+val transexpcast     : env -> [`InProc|`InOp] -> EcUnify.unienv -> ty -> pexpr -> expr
+val transexpcast_opt : env -> [`InProc|`InOp] -> EcUnify.unienv -> ty option -> pexpr -> expr
+
+(* -------------------------------------------------------------------- *)
+val transstmt    : env -> EcUnify.unienv -> pstmt -> stmt
 
 (* -------------------------------------------------------------------- *)
 type ptnmap = ty EcIdent.Mid.t ref
 
-val transmem       : EcEnv.env -> EcSymbols.symbol located -> EcIdent.t
-val trans_form_opt : EcEnv.env -> EcUnify.unienv -> pformula -> ty option -> EcFol.form
-val trans_form     : EcEnv.env -> EcUnify.unienv -> pformula -> ty -> EcFol.form
-val trans_prop     : EcEnv.env -> EcUnify.unienv -> pformula -> EcFol.form
-val trans_pattern  : EcEnv.env -> (ptnmap * EcUnify.unienv) -> pformula -> EcFol.form
+val transmem       : env -> EcSymbols.symbol located -> EcIdent.t
+val trans_form_opt : env -> EcUnify.unienv -> pformula -> ty option -> EcFol.form
+val trans_form     : env -> EcUnify.unienv -> pformula -> ty -> EcFol.form
+val trans_prop     : env -> EcUnify.unienv -> pformula -> EcFol.form
+val trans_pattern  : env -> (ptnmap * EcUnify.unienv) -> pformula -> EcFol.form
 
 (* -------------------------------------------------------------------- *)
-val transmodsig  : EcEnv.env -> symbol -> pmodule_sig  -> module_sig
-val transmodtype : EcEnv.env -> pmodule_type -> module_type * module_sig
-val transmod     : attop:bool -> EcEnv.env -> symbol -> pmodule_expr -> module_expr
+val transmodsig  : env -> symbol -> pmodule_sig  -> module_sig
+val transmodtype : env -> pmodule_type -> module_type * module_sig
+val transmod     : attop:bool -> env -> symbol -> pmodule_expr -> module_expr
 
-val trans_topmsymbol : EcEnv.env -> pmsymbol located -> mpath
-val trans_msymbol    : EcEnv.env -> pmsymbol located -> mpath * module_sig
-val trans_gamepath   : EcEnv.env -> pgamepath -> xpath 
-
-(* -------------------------------------------------------------------- *)
-val check_sig_mt_cnv : EcEnv.env -> module_sig -> module_type -> unit 
+val trans_topmsymbol : env -> pmsymbol located -> mpath
+val trans_msymbol    : env -> pmsymbol located -> mpath * module_sig
+val trans_gamepath   : env -> pgamepath -> xpath 
 
 (* -------------------------------------------------------------------- *)
-val get_ring  : (ty_params * ty) -> EcEnv.env -> EcDecl.ring  option
-val get_field : (ty_params * ty) -> EcEnv.env -> EcDecl.field option
+val check_sig_mt_cnv :
+  env -> module_sig -> module_type -> unit 
+
+val check_restrictions :
+  env -> use -> mod_restr -> unit
+
+val check_modtype_with_restrictions :
+  env -> mpath -> module_sig -> module_type -> mod_restr -> unit
+
+(* -------------------------------------------------------------------- *)
+val get_ring  : (ty_params * ty) -> env -> EcDecl.ring  option
+val get_field : (ty_params * ty) -> env -> EcDecl.field option

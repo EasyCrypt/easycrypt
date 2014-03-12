@@ -199,7 +199,7 @@ and precord = (psymbol * pty) list
 (* -------------------------------------------------------------------- *)
 type pmemory   = psymbol
 
-type phoarecmp = PFHle | PFHeq | PFHge
+type phoarecmp = EcFol.hoarecmp
 
 type glob_or_var =
   | GVglob of pmsymbol located
@@ -426,7 +426,7 @@ type phltactic =
   | Pkill       of (tac_side * codepos * int option)
   | Prnd        of tac_side * (pformula, pformula option, pformula) rnd_tac_info
   | Palias      of (tac_side * codepos * psymbol option)
-  | Pset        of (bool * tac_side * codepos * psymbol * pexpr)
+  | Pset        of (tac_side * codepos * bool * psymbol * pexpr)
   | Pconseq     of bool * (ccfpattern option * ccfpattern option * ccfpattern option)
   | Phr_exists_elim
   | Phr_exists_intro of pformula list
@@ -442,13 +442,13 @@ type phltactic =
   | Pbdhoare_split of bdh_split
 
     (* Eager *)
-  | Peager_seq       of eager_info * (int * int) * pformula
+  | Peager_seq       of (eager_info * (int * int) * pformula)
   | Peager_if
   | Peager_while     of eager_info
   | Peager_fun_def
-  | Peager_fun_abs   of eager_info * pformula
+  | Peager_fun_abs   of (eager_info * pformula)
   | Peager_call      of call_info fpattern
-  | Peager           of eager_info * pformula
+  | Peager           of (eager_info * pformula)
 
     (* Relation between logic *)
   | Pbd_equiv of (bool * pformula * pformula)
@@ -502,9 +502,15 @@ and pdbhint = {
   pht_map : pdbmap1 list;
 }
 
+type ppgoptions = {
+  ppgo_split : bool;
+  ppgo_solve : bool;
+  ppgo_subst : bool;
+}
+
 type logtactic =
   | Preflexivity
-  | Passumption of (pqsymbol option * ptyannot option)
+  | Passumption
   | Psmt        of (pdbhint option * pprover_infos)
   | Pintro      of intropattern
   | Psplit
@@ -517,9 +523,9 @@ type logtactic =
   | Ptrivial
   | Pcongr
   | Pelim       of (genpattern list * pqsymbol option)
-  | Papply      of (ffpattern * psymbol option)
-  | Pcut        of (intropattern1 option * pformula * ptactic_core option)
-  | Pcutdef     of (intropattern1 option * pterm)
+  | Papply      of (ffpattern * [`Apply of psymbol option | `Exact])
+  | Pcut        of (intropattern * pformula * ptactic_core option)
+  | Pcutdef     of (intropattern * pterm)
   | Pgeneralize of genpattern list
   | Pclear      of psymbol list
   | Prewrite    of rwarg list
@@ -539,8 +545,7 @@ and ptactic_core_r =
   | Pcase       of genpattern list
   | Plogic      of logtactic
   | PPhl        of phltactic
-  | Pprogress   of bool * ptactic_core option
-  | Pintrosprogress
+  | Pprogress   of ppgoptions * ptactic_core option
   | Psubgoal    of ptactic_chain
   | Padmit
   | Pdebug
@@ -676,8 +681,7 @@ type withextract = toextract * string
 
 (* -------------------------------------------------------------------- *)
 type proofmode = {
-  pm_strict    : bool;
-  pm_newengine : bool;
+  pm_strict : bool;
 }
 
 (* -------------------------------------------------------------------- *)

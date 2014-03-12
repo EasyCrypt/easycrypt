@@ -1,4 +1,3 @@
 (* -------------------------------------------------------------------- *)
-val t_hoare_true   : EcLogic.tactic
-val t_core_exfalso : EcLogic.tactic
-
+lemma L: forall a, a => a.
+proof. move=> a h; exact h. qed.

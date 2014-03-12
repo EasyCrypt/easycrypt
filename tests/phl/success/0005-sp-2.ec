@@ -153,8 +153,3 @@ proc.
 sp.
 skip; trivial.
 qed.
-
-
-
-
-

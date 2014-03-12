@@ -1,5 +1,6 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
+open EcPath
 open EcMaps
 open EcSymbols
 open EcLocation
@@ -10,16 +11,10 @@ open EcModules
 open EcFol
 
 module MMsym = EcSymbols.MMsym
-
-module Sp  = EcPath.Sp
-module Mp  = EcPath.Mp
-module Sm  = EcPath.Sm
-module Mm  = EcPath.Mm
-module Sx  = EcPath.Sx
-module Mx  = EcPath.Mx
-module Mid = EcIdent.Mid
+module Mid   = EcIdent.Mid
 
 module EqTest = EcReduction.EqTest
+module NormMp = EcEnv.NormMp
 
 module TC = EcTypeClass
 
@@ -651,6 +646,72 @@ let check_sig_mt_cnv env sin tyout =
   let sout = EcEnv.ModTy.sig_of_mt env tyout in
   check_sig_cnv `Sub env sin sout
 
+(* -------------------------------------------------------------------- *)
+type restriction_error =
+| RE_UseVariable          of EcPath.xpath
+| RE_UseVariableViaModule of EcPath.xpath * EcPath.mpath
+| RE_UseModule            of EcPath.mpath
+| RE_VMissingRestriction  of EcPath.xpath * EcPath.mpath pair
+| RE_MMissingRestriction  of EcPath.mpath * EcPath.mpath pair
+
+exception RestrictionError of restriction_error
+
+(* -------------------------------------------------------------------- *)
+let check_restrictions env use restr =
+  let re_error = fun x -> raise (RestrictionError x) in
+
+  let restr = NormMp.norm_restr env restr in
+
+  let check_xp xp _ =
+    (* We check that the variable is not a variable in restr *)
+    if NormMp.use_mem_xp xp restr then
+      re_error (RE_UseVariable xp);
+
+    (* We check that the variable is in the restriction of the
+     * abstract module in restr. *)
+    let check id2 =
+      let mp2 = EcPath.mident id2 in
+      let r2  = NormMp.get_restr env mp2 in
+
+      if not (NormMp.use_mem_xp xp r2) then
+        re_error (RE_UseVariableViaModule (xp, mp2));
+    in
+      EcIdent.Sid.iter check restr.EcEnv.us_gl
+  in
+  EcPath.Mx.iter check_xp (use.EcEnv.us_pv);
+
+  let check_gl id =
+    let mp1 = EcPath.mident id in
+
+    if NormMp.use_mem_gl mp1 restr then
+      re_error (RE_UseModule mp1);
+
+    let r1 = NormMp.get_restr env mp1 in
+
+    let check_v xp2 _ =
+      if not (NormMp.use_mem_xp xp2 r1) then
+        re_error (RE_VMissingRestriction (xp2, (xp2.x_top, mp1)))
+    in
+    Mx.iter check_v restr.EcEnv.us_pv;
+
+    let check_g id2 =
+      let mp2 = EcPath.mident id2 in
+
+      if not (NormMp.use_mem_gl mp2 r1) then
+        let r2 = NormMp.get_restr env mp2 in
+        if not (NormMp.use_mem_gl mp1 r2) then
+          re_error (RE_MMissingRestriction (mp1, (mp1, mp2)));
+    in
+    EcIdent.Sid.iter check_g restr.EcEnv.us_gl
+
+  in
+  EcIdent.Sid.iter check_gl use.EcEnv.us_gl
+
+(* -------------------------------------------------------------------- *)
+let check_modtype_with_restrictions env mp mt i restr =
+  check_sig_mt_cnv env mt i;
+  let use = NormMp.mod_use env mp in
+  check_restrictions env use restr
 
 (* -------------------------------------------------------------------- *)
 let split_msymb (env : EcEnv.env) (msymb : pmsymbol located) =
@@ -2072,7 +2133,6 @@ let trans_form_or_pattern env (ps, ue) pf tt =
         let pre'  = transf penv pre in
         let post' = transf qenv post in
         let bd'   = transf penv bd in
-        let hcmp  = match hcmp with PFHle -> FHle | PFHeq -> FHeq | PFHge -> FHge in
           (* FIXME: check that there are not pvars in bd *)
           unify_or_fail penv ue pre .pl_loc ~expct:tbool pre' .f_ty;
           unify_or_fail qenv ue post.pl_loc ~expct:tbool post'.f_ty;
@@ -2086,9 +2146,6 @@ let trans_form_or_pattern env (ps, ue) pf tt =
     | PFBDhoareS (pre, body, post, hcmp, bd) ->
         let symbols = ref Mstr.empty in
         let ue      = UE.create (Some []) in
-        let hcmp = 
-          match hcmp with PFHle -> FHle | PFHeq -> FHeq | PFHge -> FHge
-        in
         let (env, stmt, _re, prelude, locals) =
           let env = EcEnv.Fun.enter "$stmt" env in
             (* FIXME: $stmt ? *)
@@ -2186,40 +2243,11 @@ let trans_pattern env (ps, ue) pf =
   trans_form_or_pattern env (Some ps, ue) pf None
 
 (* -------------------------------------------------------------------- *)
-let p_zmod  x = EcPath.fromqsymbol ([EcCoreLib.id_top; "Ring"; "ZModule"], x)
-let p_ring  x = EcPath.fromqsymbol ([EcCoreLib.id_top; "Ring"; "ComRing"], x)
-let p_idom  x = EcPath.fromqsymbol ([EcCoreLib.id_top; "Ring"; "IDomain"], x)
-let p_field x = EcPath.fromqsymbol ([EcCoreLib.id_top; "Ring"; "Field"], x)
-
-let general_ring ty = {
-  r_type  = ty;
-  r_zero  = p_zmod "zeror";
-  r_one   = p_ring "oner";
-  r_add   = p_zmod "+";
-  r_opp   = Some (p_zmod "[-]");
-  r_mul   = p_ring "*";
-  r_exp   = None;
-  r_sub   = None;
-  r_embed = `Default;
-  r_bool  = false;
-}
-
-let general_field ty = {
-  f_ring = general_ring ty;
-  f_inv  = p_field "inv";
-  f_div  = None;
-}
-
 let get_instances (tvi, bty) env =
   let inst = List.pmap
     (function
      | (_, (`Ring _ | `Field _)) as x -> Some x
-     | (t, `General p) ->
-         if   EcPath.p_equal p (p_ring "ring")
-         then Some (t, `GeneralRing)
-         else if   EcPath.p_equal p (p_field "field")
-              then Some (t, `GeneralField)
-              else None)
+     | _ -> None)
     (EcEnv.TypeClass.get_instances env) in
 
   List.pmap (fun ((typ, gty), cr) ->
@@ -2235,10 +2263,9 @@ let get_ring (typ, ty) env =
   let module E = struct exception Found of ring end in
     try
       List.iter
-        (fun (_, ty, cr) ->
+        (fun (_, _, cr) ->
           match cr with
           | `Ring cr -> raise (E.Found cr)
-          | `GeneralRing -> raise (E.Found (general_ring ty))
           | _ -> ())
         (get_instances (typ, ty) env);
       None
@@ -2248,10 +2275,9 @@ let get_field (typ, ty) env =
   let module E = struct exception Found of field end in
     try
       List.iter
-        (fun (_, ty, cr) ->
+        (fun (_, _, cr) ->
           match cr with
           | `Field cr -> raise (E.Found cr)
-          | `GeneralField -> raise (E.Found (general_field ty))
           | _ -> ())
         (get_instances (typ, ty) env);
       None

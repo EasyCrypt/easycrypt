@@ -1,13 +1,11 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
+open EcPath
+open EcFol
 open EcParsetree
-open EcBaseLogic
-open EcLogic
+open EcCoreGoal
+open EcCoreGoal.FApi
 
 (* -------------------------------------------------------------------- *)
-class rn_eqobs_in : object
-  inherit xrule
-end
-
-(* -------------------------------------------------------------------- *)
-val process_eqobs_in : pformula option tuple3 -> tactic
+val mk_inv_spec : proofenv -> EcEnv.env -> form -> xpath -> xpath -> form
+val process_eqobs_in : pformula option tuple3 -> backward

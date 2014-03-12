@@ -2,24 +2,15 @@
 open EcPath
 open EcParsetree
 open EcFol
-open EcBaseLogic
-open EcLogic
-
-(* -------------------------------------------------------------------- *)
-class rn_hl_fel : form -> form -> form -> form -> (xpath * form) list ->
-object
-  inherit xrule
-
-  method ash    : form
-  method cntr   : form
-  method fevent : form
-  method preds  : (xpath * form) list
-  method q      : form
-end
+open EcCoreGoal.FApi
 
 (* -------------------------------------------------------------------- *)
 val t_failure_event :
-  int -> form -> form -> form -> form -> (xpath * form) list -> form -> tactic
+     int
+  -> form -> form -> form -> form
+  -> (xpath * form) list
+  -> form
+  -> backward
 
 (* -------------------------------------------------------------------- *)
 type pfel_t =
@@ -30,4 +21,4 @@ type pfel_t =
   * (pgamepath * pformula) list
   * pformula option
 
-val process_fel : int -> pfel_t -> tactic
+val process_fel : int -> pfel_t -> backward

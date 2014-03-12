@@ -1,9 +1,5 @@
 (* -------------------------------------------------------------------- *)
-open EcBaseLogic
-open EcLogic
+open EcCoreGoal
 
 (* -------------------------------------------------------------------- *)
-class rn_hl_skip : object inherit xrule end
-
-(* -------------------------------------------------------------------- *)
-val t_skip : tactic
+val t_skip : FApi.backward

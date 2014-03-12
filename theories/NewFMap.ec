@@ -157,7 +157,7 @@ proof.
     by (rewrite setP=> x'; rewrite in_setI in_dom_mapSl in_dom_mapSr in_set0;
         case (omap (P x') m.[x'])=> //=; smt).
   rewrite mapP=> x; rewrite get_mapU //.
-  rewrite in_dom_mapSl get_mapSl 2:get_mapSr //; case (m.[x])=> //= y.
+  rewrite in_dom_mapSl get_mapSl get_mapSr //; case (m.[x])=> //= y.
   by case (P x y)=> //=; cut ->: (Some false = Some true) = false by smt.
 qed.
 

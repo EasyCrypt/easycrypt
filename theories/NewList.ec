@@ -22,7 +22,7 @@ op size (xs : 'a list) =
   with xs = (::) y ys => 1 + (size ys).
 
 lemma size_ge0 (s : 'a list): 0 <= size s.
-proof. by elim s=> //= x s; smt. qed.
+proof. by elim s => //= x s; smt. qed.
 
 lemma size_eq0 (s : 'a list): (size s = 0) <=> (s = []).
 proof. by case s => //=; smt. qed.
@@ -481,7 +481,7 @@ qed.
 
 op rotr n (s : 'a list) = rot (size s - n) s.
 
-lemma rotK n: cancel<:'a list,'a list> (rot n) (rotr n).
+lemma rotK n: cancel<:'a list, 'a list> (rot n) (rotr n).
 proof. smt. qed.
 
 lemma rot_inj n (s1 s2 : 'a list): rot n s1 = rot n s2 => s1 = s2.
@@ -495,7 +495,7 @@ lemma rot_to (s : 'a list) x:
 proof.
   move=> s_x; pose i := index x s.
   exists i; exists (drop (i + 1) s ++ take i s).
-  rewrite -cat_cons /i /rot => {i}; congr => //=.
+  rewrite -cat_cons /i /rot => {i}; congr=> //=.
   elim s s_x => //= y s IHs; case (x = y); smt.
 qed.
 

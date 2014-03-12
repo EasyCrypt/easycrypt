@@ -6,13 +6,13 @@ open EcTypes
 (* -------------------------------------------------------------------- *)
 (* LvMap (op, m, x, ty)
  * - op is the map-set operator
- * - m  is the map to be updated 
+ * - m  is the map to be updated
  * - x  is the index to update
  * - ty is the type of the value [m] *)
 type lvalue =
   | LvVar   of (EcTypes.prog_var * EcTypes.ty)
   | LvTuple of (EcTypes.prog_var * EcTypes.ty) list
-  | LvMap   of (EcPath.path * EcTypes.ty list) * 
+  | LvMap   of (EcPath.path * EcTypes.ty list) *
                   EcTypes.prog_var * EcTypes.expr * EcTypes.ty
 
 val lv_equal : lvalue -> lvalue -> bool
@@ -33,7 +33,7 @@ and instr_node =
   | Sif       of EcTypes.expr * stmt * stmt
   | Swhile    of EcTypes.expr * stmt
   | Sassert   of EcTypes.expr
-  | Sabstract of EcIdent.t 
+  | Sabstract of EcIdent.t
 
 and stmt = private {
   s_node : instr list;
@@ -46,12 +46,13 @@ val i_equal   : instr -> instr -> bool
 val i_compare : instr -> instr -> int
 val i_hash    : instr -> int
 val i_fv      : instr -> int EcIdent.Mid.t
+val i_node    : instr -> instr_node
 
 val s_equal   : stmt -> stmt -> bool
 val s_compare : stmt -> stmt -> int
 val s_hash    : stmt -> int
 val s_fv      : stmt -> int EcIdent.Mid.t
-val s_subst   : e_subst -> stmt -> stmt 
+val s_subst   : e_subst -> stmt -> stmt
 
 (* -------------------------------------------------------------------- *)
 val i_asgn    : lvalue * expr -> instr
@@ -70,7 +71,7 @@ val rstmt : instr list -> stmt
 
 val s_split : int -> stmt -> instr list * instr list
 
-(* the following functions raise Not_found if the argument does not match *) 
+(* the following functions raise Not_found if the argument does not match *)
 val destr_asgn   : instr -> lvalue * expr
 val destr_rnd    : instr -> lvalue * expr
 val destr_call   : instr -> lvalue option * xpath * expr list
@@ -87,7 +88,7 @@ type variable = {
 type funsig = {
   fs_name   : symbol;
   fs_arg    : EcTypes.ty;
-  fs_anames : variable list option; 
+  fs_anames : variable list option;
   fs_ret    : EcTypes.ty;
 }
 
@@ -138,7 +139,7 @@ type function_def = {
 
 type function_body =
   | FBdef   of function_def
-  | FBalias of xpath 
+  | FBalias of xpath
   | FBabs   of oracle_info
 
 type function_ = {
@@ -157,18 +158,18 @@ type module_expr = {
   me_name  : symbol;
   me_body  : module_body;
   me_comps : module_comps;
-  me_sig   : module_sig; 
+  me_sig   : module_sig;
 }
 
 and module_body =
-  | ME_Alias       of int * EcPath.mpath 
+  | ME_Alias       of int * EcPath.mpath
                       (* The int represent the number of argument *)
   | ME_Structure   of module_structure
-  | ME_Decl        of module_type * mod_restr 
+  | ME_Decl        of module_type * mod_restr
 
 (* [ms_vars]: the set of global variables declared by the module and
  * all it submodules.
- * 
+ *
  * [ms_uses]: the set of external top-level modules used by the module
  * We ensure that these paths lead to defined modules (i.e having
  * ME_structure as body)

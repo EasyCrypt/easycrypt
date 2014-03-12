@@ -26,10 +26,7 @@ and proof_auc = {
 
 and proof_ctxt = (symbol * EcDecl.axiom) * EcPath.path * EcEnv.env
 
-and proof_state =
-| PSCheck     of (EcLogic.judgment_uc * int list)
-| PSNewEngine of EcCoreGoal.proof
-| PSNoCheck
+and proof_state = PSNoCheck | PSCheck of EcCoreGoal.proof
 
 and pucflags = {
   puc_nosmt : bool;
@@ -132,7 +129,7 @@ end
 
 module Tactics : sig
   val process : scope -> Ax.mode -> ptactic list -> scope
-  val proof   : scope -> Ax.mode -> bool -> bool -> scope
+  val proof   : scope -> Ax.mode -> bool -> scope
 end
 
 module Prover : sig

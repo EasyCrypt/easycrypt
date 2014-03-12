@@ -229,7 +229,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
               | None -> clone_error scenv (CE_UnkOverride (OVK_Theory, unloc xsth))
               | Some (sp, _) -> sp
             in
-  
+
             let xsth = let xsth = EcPath.toqsymbol sp in (fst xsth @ [snd xsth]) in
             let xdth = nm @ [x] in
 
@@ -285,7 +285,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
 
                   let tc = FPNamed (mk_loc l (xsth @ prefix, x),
                                     Some (mk_loc l (TVIunamed params))) in
-                  let tc = Papply ({ fp_kind = tc; fp_args = []; }, None) in
+                  let tc = Papply ({ fp_kind = tc; fp_args = []; }, `Exact) in
                   let tc = mk_loc l (Plogic tc) in
                   let pr = { pthp_mode   = `Named (mk_loc l (xdth @ prefix, x));
                              pthp_tactic = Some tc }
@@ -415,7 +415,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
                 let tp = EcTyping.tp_relax in
                 let (ty, body) =
                   let env     = scenv in
-                  let codom   = EcTyping.transty tp env ue opov.opov_retty in 
+                  let codom   = EcTyping.transty tp env ue opov.opov_retty in
                   let env, xs = EcTyping.transbinding env ue opov.opov_args in
                   let body    = EcTyping.transexpcast env `InOp ue codom opov.opov_body in
                   let lam     = EcTypes.e_lam xs body in
@@ -490,7 +490,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
 
               let (newtyvars, newty) = (newpr.op_tparams, newpr.op_ty) in
                 (* FIXME: TC HOOK *)
-                if not (ty_compatible scenv 
+                if not (ty_compatible scenv
                           (List.map fst reftyvars, refty)
                           (List.map fst newtyvars, newty))
                 then
@@ -606,7 +606,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
                     | `Embed p -> `Embed (forpath p)
                     end;
                   r_bool = cr.r_bool; }
-  
+
               and dofield cr =
                 { f_ring = doring cr.f_ring;
                   f_inv  = forpath cr.f_inv;

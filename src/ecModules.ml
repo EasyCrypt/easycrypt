@@ -7,7 +7,7 @@ open EcPath
 type lvalue =
   | LvVar   of (EcTypes.prog_var * EcTypes.ty)
   | LvTuple of (EcTypes.prog_var * EcTypes.ty) list
-  | LvMap   of (EcPath.path * EcTypes.ty list) * 
+  | LvMap   of (EcPath.path * EcTypes.ty list) *
                   EcTypes.prog_var * EcTypes.expr * EcTypes.ty
 
 let lv_equal lv1 lv2 =
@@ -35,15 +35,15 @@ let lv_equal lv1 lv2 =
   | _, _ -> false
 
 let lv_fv = function
-  | LvVar (pv,_) -> EcTypes.pv_fv pv 
-  | LvTuple pvs -> 
+  | LvVar (pv,_) -> EcTypes.pv_fv pv
+  | LvTuple pvs ->
       let add s (pv,_) = EcIdent.fv_union s (EcTypes.pv_fv pv) in
-      List.fold_left add EcIdent.Mid.empty pvs 
+      List.fold_left add EcIdent.Mid.empty pvs
   | LvMap(_,pv,e,_) -> EcIdent.fv_union (EcTypes.pv_fv pv) (EcTypes.e_fv e)
 
 let symbol_of_lv = function
   | LvVar(pv, _) -> EcTypes.symbol_of_pv pv
-  | LvTuple pvs -> 
+  | LvTuple pvs ->
       let ls = List.map (fun (pv,_) -> EcTypes.symbol_of_pv pv) pvs in
         String.concat "" ls
   | LvMap(_,pv,_,_) -> EcTypes.symbol_of_pv pv
@@ -67,7 +67,7 @@ and instr_node =
   | Sif       of EcTypes.expr * stmt * stmt
   | Swhile    of EcTypes.expr * stmt
   | Sassert   of EcTypes.expr
-  | Sabstract of EcIdent.t 
+  | Sabstract of EcIdent.t
 
 and stmt = {
   s_node : instr list;
@@ -80,17 +80,18 @@ let i_equal   = ((==) : instr -> instr -> bool)
 let i_hash    = fun i -> i.i_tag
 let i_compare = fun i1 i2 -> i_hash i1 - i_hash i2
 let i_fv i    = i.i_fv
+let i_node i  = i.i_node
 
 let s_equal   = ((==) : stmt -> stmt -> bool)
 let s_hash    = fun s -> s.s_tag
 let s_compare = fun s1 s2 -> s_hash s1 - s_hash s2
-let s_fv s = s.s_fv 
+let s_fv s = s.s_fv
 
 (* -------------------------------------------------------------------- *)
-module Hinstr = Why3.Hashcons.Make (struct 
+module Hinstr = Why3.Hashcons.Make (struct
   type t = instr
 
-  let equal_node i1 i2 = 
+  let equal_node i1 i2 =
     match i1, i2 with
     | Sasgn (lv1, e1), Sasgn (lv2, e2) ->
         (lv_equal lv1 lv2) && (EcTypes.e_equal e1 e2)
@@ -121,7 +122,7 @@ module Hinstr = Why3.Hashcons.Make (struct
 
   let equal i1 i2 = equal_node i1.i_node i2.i_node
 
-  let hash p = 
+  let hash p =
     match p.i_node with
     | Sasgn (lv, e) ->
         Why3.Hashcons.combine
@@ -149,29 +150,29 @@ module Hinstr = Why3.Hashcons.Make (struct
     | Sabstract id -> EcIdent.id_hash id
 
   let i_fv   = function
-    | Sasgn(lv,e) -> 
+    | Sasgn(lv,e) ->
         EcIdent.fv_union (lv_fv lv) (EcTypes.e_fv e)
-    | Srnd (lv,e) -> 
+    | Srnd (lv,e) ->
         EcIdent.fv_union (lv_fv lv) (EcTypes.e_fv e)
     | Scall(olv,f,args) ->
         let ffv = EcPath.x_fv EcIdent.Mid.empty f in
         let ofv = olv |> ofold (fun lv s -> EcIdent.fv_union s (lv_fv lv)) ffv in
         List.fold_left
           (fun s a -> EcIdent.fv_union s (EcTypes.e_fv a)) ofv args
-    | Sif(e,s1,s2) -> 
-        EcIdent.fv_union (EcTypes.e_fv e) 
+    | Sif(e,s1,s2) ->
+        EcIdent.fv_union (EcTypes.e_fv e)
           (EcIdent.fv_union (s_fv s1) (s_fv s2))
-    | Swhile(e,s)  -> 
+    | Swhile(e,s)  ->
         EcIdent.fv_union (EcTypes.e_fv e) (s_fv s)
-    | Sassert e    -> 
-        EcTypes.e_fv e 
+    | Sassert e    ->
+        EcTypes.e_fv e
     | Sabstract id -> EcIdent.fv_singleton id
-          
+
   let tag n p = { p with i_tag = n; i_fv = i_fv p.i_node }
 end)
 
 (* -------------------------------------------------------------------- *)
-module Hstmt = Why3.Hashcons.Make (struct 
+module Hstmt = Why3.Hashcons.Make (struct
   type t = stmt
 
   let equal_node s1 s2 =
@@ -181,16 +182,16 @@ module Hstmt = Why3.Hashcons.Make (struct
 
   let hash p =
     Why3.Hashcons.combine_list i_hash 0 p.s_node
-          
+
   let tag n p = { p with s_tag = n;
-                  s_fv = 
+                  s_fv =
                   List.fold_left (fun s i -> EcIdent.fv_union s (i_fv i))
                     EcIdent.Mid.empty p.s_node
                 }
 end)
 
 (* -------------------------------------------------------------------- *)
-let mk_instr i = 
+let mk_instr i =
   Hinstr.hashcons { i_node = i; i_tag = -1; i_fv = EcIdent.Mid.empty }
 
 let i_asgn   (lv, e)      = mk_instr (Sasgn (lv, e))
@@ -201,7 +202,7 @@ let i_while  (c, s)       = mk_instr (Swhile (c, s))
 let i_assert e            = mk_instr (Sassert e)
 let i_abstract id         = mk_instr (Sabstract id)
 
-let stmt s = 
+let stmt s =
   Hstmt.hashcons { s_node = s; s_tag = -1; s_fv = EcIdent.Mid.empty}
 
 let s_seq s1 s2 = stmt (s1.s_node @ s2.s_node)
@@ -210,32 +211,32 @@ let rstmt s = stmt (List.rev s)
 
 let s_split n s = List.take_n n s.s_node
 
-let destr_asgn i = 
+let destr_asgn i =
   match i.i_node with
   | Sasgn(lv,e) -> (lv,e)
   | _ -> raise Not_found
 
-let destr_rnd i = 
+let destr_rnd i =
   match i.i_node with
   | Srnd(lv,e) -> (lv,e)
   | _ -> raise Not_found
 
-let destr_call i = 
+let destr_call i =
   match i.i_node with
   | Scall(lv,f,es) -> (lv,f,es)
   | _ -> raise Not_found
 
-let destr_if i = 
+let destr_if i =
   match i.i_node with
   | Sif(e,s1,s2) -> (e,s1,s2)
   | _ -> raise Not_found
 
-let destr_while i = 
+let destr_while i =
   match i.i_node with
   | Swhile(e,s) -> (e,s)
   | _ -> raise Not_found
 
-let destr_assert i = 
+let destr_assert i =
   match i.i_node with
   | Sassert e -> e
   | _ -> raise Not_found
@@ -244,19 +245,19 @@ let destr_assert i =
 module MSHi = EcMaps.MakeMSH(struct type t = instr let tag i = i.i_tag end)
 module Hi = MSHi.H
 
-let s_subst (s: EcTypes.e_subst) = 
+let s_subst (s: EcTypes.e_subst) =
   let e_subst = EcTypes.e_subst s in
-  if e_subst == identity then identity 
+  if e_subst == identity then identity
   else
 
-    let pvt_subst (pv,ty as p) = 
+    let pvt_subst (pv,ty as p) =
       let pv' = EcTypes.pv_subst s.EcTypes.es_xp pv in
       let ty' = s.EcTypes.es_ty ty in
-      if pv == pv' && ty == ty' then p else 
+      if pv == pv' && ty == ty' then p else
         (pv',ty') in
-    
-    let lv_subst lv = 
-      match lv with 
+
+    let lv_subst lv =
+      match lv with
       | LvVar pvt ->
         let pvt' = pvt_subst pvt in
         if pvt == pvt' then lv else
@@ -272,24 +273,24 @@ let s_subst (s: EcTypes.e_subst) =
         let ty'  = s.EcTypes.es_ty ty in
         if p==p' && tys==tys' && pv==pv' && e==e' && ty==ty' then lv else
           LvMap((p',tys'),pv',e',ty') in
-    
-    let rec i_subst i = 
+
+    let rec i_subst i =
       match i.i_node with
       | Sasgn(lv,e) ->
         let lv' = lv_subst lv in
         let e'  = e_subst e in
-        if lv == lv' && e == e' then i else 
+        if lv == lv' && e == e' then i else
           i_asgn(lv',e')
       | Srnd(lv,e) ->
         let lv' = lv_subst lv in
         let e'  = e_subst e in
-        if lv == lv' && e == e' then i else 
+        if lv == lv' && e == e' then i else
           i_rnd(lv',e')
       | Scall(olv,mp,args) ->
         let olv' = olv |> OSmart.omap lv_subst in
         let mp'  = s.EcTypes.es_xp mp in
         let args' = List.Smart.map e_subst args in
-        if olv == olv' && mp == mp' && args == args' then i else 
+        if olv == olv' && mp == mp' && args == args' then i else
           i_call(olv',mp',args')
       | Sif(e,s1,s2) ->
         let e' = e_subst e in
@@ -302,19 +303,19 @@ let s_subst (s: EcTypes.e_subst) =
         let s1' = s_subst s1 in
         if e == e' && s1 == s1' then i else
           i_while(e', s1')
-      | Sassert e -> 
+      | Sassert e ->
         let e' = e_subst e in
         if e == e' then i else
           i_assert e'
-      | Sabstract _ -> 
+      | Sabstract _ ->
         i
-            
-    and s_subst s = 
+
+    and s_subst s =
       let is = s.s_node in
       let is' = List.Smart.map i_subst is in
       if is == is' then s else stmt is' in
 
-    s_subst 
+    s_subst
 
 (* -------------------------------------------------------------------- *)
 type variable = {
@@ -322,10 +323,10 @@ type variable = {
   v_type : EcTypes.ty;
 }
 
-type funsig = { 
+type funsig = {
   fs_name   : symbol;
   fs_arg    : EcTypes.ty;
-  fs_anames : variable list option; 
+  fs_anames : variable list option;
   fs_ret    : EcTypes.ty;
 }
 
@@ -358,7 +359,7 @@ type uses = {
   us_writes : Sx.t;
 }
 
-let mk_uses c r w = 
+let mk_uses c r w =
   let map s = Sx.fold (fun x s -> Sx.add (EcTypes.xp_glob x) s) s Sx.empty in
   {us_calls = c; us_reads = map r; us_writes = map w }
 
@@ -372,7 +373,7 @@ type function_def = {
 
 type function_body =
 | FBdef of function_def
-| FBalias of xpath 
+| FBalias of xpath
 | FBabs of oracle_info
 
 type function_ = {
@@ -384,14 +385,14 @@ type function_ = {
 (* -------------------------------------------------------------------- *)
 type mod_restr = EcPath.Sx.t * EcPath.Sm.t
 
-let mr_equal (rx1,r1) (rx2,r2) = 
+let mr_equal (rx1,r1) (rx2,r2) =
   EcPath.Sx.equal rx1 rx2 && EcPath.Sm.equal r1 r2
 
 type module_expr = {
   me_name      : symbol;
   me_body      : module_body;
   me_comps     : module_comps;
-  me_sig       : module_sig; 
+  me_sig       : module_sig;
 }
 
 and module_body =
@@ -413,8 +414,8 @@ and module_comps = module_comps_item list
 and module_comps_item = module_item
 
 (* -------------------------------------------------------------------- *)
-let vd_equal vd1 vd2 = 
-  vd1.v_name = vd2.v_name && 
+let vd_equal vd1 vd2 =
+  vd1.v_name = vd2.v_name &&
   EcTypes.ty_equal vd1.v_type vd2.v_type
 
 let vd_hash vd =
@@ -450,4 +451,3 @@ let rec mty_equal mty1 mty2 =
      (EcPath.p_equal mty1.mt_name mty2.mt_name)
   && (List.all2 EcPath.m_equal mty1.mt_args mty2.mt_args)
   && (List.all2 (pair_equal EcIdent.id_equal mty_equal) mty1.mt_params mty2.mt_params)
-

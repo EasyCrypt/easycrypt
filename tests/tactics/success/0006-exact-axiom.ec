@@ -1,6 +1,10 @@
 (* -------------------------------------------------------------------- *)
-open EcParsetree
-open EcLogic
+type t.
+
+pred p: t.
+
+axiom Ap: forall x, p x.
 
 (* -------------------------------------------------------------------- *)
-val process_phl : EcLocation.t -> phltactic -> goal -> goals
+lemma L: forall x, p x.
+proof. exact Ap. qed.

@@ -3,6 +3,7 @@ open EcUtils
 open EcTypes
 open EcFol
 open EcDecl
+open EcCoreGoal
 open EcAlgebra
 
 (* -------------------------------------------------------------------- *)
@@ -147,61 +148,29 @@ let ring_axioms  = Axioms.ring_axioms
 let field_axioms = Axioms.field_axioms
 
 (* -------------------------------------------------------------------- *)
-open EcBaseLogic
-open EcLogic
-open EcReduction
+let is_module_loaded env =
+  List.for_all
+    (fun x -> EcEnv.Theory.by_path_opt x env <> None)
+    Axioms.tmod_and_deps
 
-class rn_ring_congr = object inherit xrule "ring_congr"  end
-class rn_ring_norm  = object inherit xrule "ring_norm"  end
-class rn_ring       = object inherit xrule "ring"  end
-class rn_field      = object inherit xrule "field" end
-
-let rn_ring_congr = RN_xtd (new rn_ring_congr)
-let rn_ring_norm  = RN_xtd (new rn_ring_norm) 
-let rn_ring       = RN_xtd (new rn_ring)
-let rn_field      = RN_xtd (new rn_field)
-
-let n_ring_congr juc hyps (cr:cring) (rm:RState.rstate) f li lv =
-  let pe,rm = toring hyps cr rm f in
-  let rm' = RState.update rm li lv in
-  let env = EcEnv.LDecl.toenv hyps in
-  let mk_goal i =
-    let r1 = oget (RState.get i rm) in
-    let r2 = oget (RState.get i rm') in
-    EqTest.for_type_exn env r1.f_ty r2.f_ty;
-    f_eq r1 r2 in 
-  let f' = ofring (ring_of_cring cr) rm' pe in
-  let g = new_goal juc (hyps, f_eq f f') in
-  let sg = List.map mk_goal li in
-  let gs = prove_goal_by sg rn_ring_congr g in
-  f', snd g, gs
-
-let n_ring_norm juc hyps (cr:cring) (rm:RState.rstate) f =
-  let pe, rm = toring hyps cr rm f in
-  let ofring = ofring (ring_of_cring cr) rm in
-  let npe    = ring_simplify_pe cr [] pe in
-  let f'     = ofring npe in
-  let g      = new_goal juc (hyps, f_eq f f') in
-  let gs     = prove_goal_by [] rn_ring_norm g in
-  rm, f', snd g, gs
-
-let t_ring_simplify cr eqs (f1, f2) g =
-  let hyps = get_hyps g in
+(* -------------------------------------------------------------------- *)
+let t_ring_simplify cr eqs (f1, f2) tc =
+  let hyps = FApi.tc1_hyps tc in
   let cr = cring_of_ring cr in
   let f1 = ring_simplify hyps cr eqs f1 in
   let f2 = ring_simplify hyps cr eqs f2 in
-	prove_goal_by [f_eq f1 f2] rn_ring g
+  FApi.xmutate1 tc `Ring [f_eq f1 f2]
 
-let t_ring r eqs (f1, f2) g =
-  let hyps = get_hyps g in
+let t_ring r eqs (f1, f2) tc =
+  let hyps = FApi.tc1_hyps tc in
   let cr = cring_of_ring r in
   let f  = ring_eq hyps cr eqs f1 f2 in
-  if   EcReduction.is_conv (get_hyps g) f (emb_rzero r)
-  then prove_goal_by [] rn_ring g
-  else prove_goal_by [f_eq f (emb_rzero r)] rn_ring g
+  if   EcReduction.is_conv hyps f (emb_rzero r)
+  then FApi.xmutate1 tc `Ring []
+  else FApi.xmutate1 tc `Ring [f_eq f (emb_rzero r)]
 
-let t_field_simplify r eqs (f1, f2) g =
-  let hyps = get_hyps g in
+let t_field_simplify r eqs (f1, f2) tc =
+  let hyps = FApi.tc1_hyps tc in
   let cr = cfield_of_field r in
   let (c1, n1, d1) = field_simplify hyps cr eqs f1 in
   let (c2, n2, d2) = field_simplify hyps cr eqs f2 in
@@ -209,10 +178,10 @@ let t_field_simplify r eqs (f1, f2) g =
   let c = List.map (fun f -> f_not (f_eq f (emb_fzero r))) (c1 @ c2) in
   let f = f_eq (fdiv r n1 d1) (fdiv r n2 d2) in
 
-    prove_goal_by (c @ [f]) rn_field g
+  FApi.xmutate1 tc `Field (c @ [f])
 
-let t_field r eqs (f1, f2) g =
-  let hyps = get_hyps g in
+let t_field r eqs (f1, f2) tc =
+  let hyps = FApi.tc1_hyps tc in
   let cr = cfield_of_field r in
   let (c, (n1, n2), (d1, d2)) = field_eq hyps cr eqs f1 f2 in
   let c  = List.map (fun f -> f_not (f_eq f (emb_fzero r))) c in
@@ -220,12 +189,6 @@ let t_field r eqs (f1, f2) g =
   and r2 = fmul r n2 d1 in
   let f  = ring_eq hyps (cring_of_ring r.f_ring) eqs r1 r2 in
 
-    if   EcReduction.is_conv (get_hyps g) f (emb_fzero r)
-    then prove_goal_by c rn_field g
-    else prove_goal_by (c @ [f_eq f (emb_fzero r)]) rn_field g
-
-(* -------------------------------------------------------------------- *)
-let is_module_loaded env =
-  List.for_all
-    (fun x -> EcEnv.Theory.by_path_opt x env <> None)
-    Axioms.tmod_and_deps
+  if   EcReduction.is_conv hyps f (emb_fzero r)
+  then FApi.xmutate1 tc `Field []
+  else FApi.xmutate1 tc `Field (c @ [f_eq f (emb_fzero r)])

@@ -1564,7 +1564,7 @@ let trans_form env f =
     (* We compute the free variable of the lambda *)
       let fv     =
         List.fold_left (fun s x -> Term.Mvs.remove x s)
-          body.Term.t_vars vs in
+          (body.Term.t_vars) vs in
       let fv_ids = Term.Mvs.keys fv in
       let tfv = List.map (fun v -> v.Term.vs_ty) fv_ids in
       let tvs = List.map (fun v -> v.Term.vs_ty) vs in

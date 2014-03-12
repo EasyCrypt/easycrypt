@@ -39,6 +39,7 @@ module type S = sig
   val union : item -> item -> t -> t * effects
   val domain: t -> item list
   val closed: t -> bool
+  val opened: t -> int
 end
 
 (* -------------------------------------------------------------------- *)
@@ -95,7 +96,7 @@ module Make (I : Item) (D : Data) = struct
       { forest = M.add item (Root (w, data)) uf.forest;
         nvoids = uf.nvoids
                    - (odfl 0 (olddata |> omap (int_of_bool |- D.isvoid)))
-                   + (int_of_bool (D.isvoid data   )); }
+                   + (int_of_bool (D.isvoid data)); }
 
   (* ------------------------------------------------------------------ *)
   let isset (item : item) (uf : t) =
@@ -133,6 +134,10 @@ module Make (I : Item) (D : Data) = struct
   (* ------------------------------------------------------------------ *)
   let closed (uf : t) =
     uf.nvoids = 0
+
+  (* ------------------------------------------------------------------ *)
+  let opened (uf : t) =
+    uf.nvoids
 end
 
 (* -------------------------------------------------------------------- *)

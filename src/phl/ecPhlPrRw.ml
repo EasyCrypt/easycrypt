@@ -2,25 +2,17 @@
 open EcUtils
 open EcFol
 open EcEnv
-open EcBaseLogic
-open EcLogic
+
+open EcCoreGoal
+open EcLowGoal
 
 module Mid = EcIdent.Mid
 
 (* -------------------------------------------------------------------- *)
-class rn_hl_pr_lemma =
-object
-  inherit xrule "[hl] pr-lemma"
-end
-
-let rn_hl_pr_lemma =
-  RN_xtd (new rn_hl_pr_lemma)
-
-(* -------------------------------------------------------------------- *)
-let t_pr_lemma lemma g = 
-  let concl = get_concl g in
-    assert (f_equal concl lemma);
-    prove_goal_by [] rn_hl_pr_lemma g
+let t_pr_lemma lemma tc = 
+  let concl = FApi.tc1_goal tc in
+  assert (f_equal concl lemma);
+  FApi.xmutate1 tc `RwPr []
 
 (* -------------------------------------------------------------------- *)
 let pr_eq env m f args p1 p2 = 
@@ -95,10 +87,10 @@ let pr_rewrite_lemma =
    "mu_disjoint", `MuDisj]
 
 (* -------------------------------------------------------------------- *)
-let t_pr_rewrite s g = 
+let t_pr_rewrite s tc = 
   let kind = 
     try List.assoc s pr_rewrite_lemma with Not_found -> 
-      tacuerror "Do not reconize %s as a probability lemma" s in
+      tc_error !!tc "do not reconize %s as a probability lemma" s in
   let select = 
     match kind with 
     | `MuEq    -> select_pr_cmp (EcPath.p_equal EcCoreLib.p_eq)
@@ -109,11 +101,11 @@ let t_pr_rewrite s g =
     | `MuDisj  -> select_pr is_or in
 
   let select xs _ fp = if select xs fp then `Accept (-1) else `Continue in
-  let env, _, concl = get_goal_e g in
+  let env, _, concl = FApi.tc1_eflat tc in
   let torw =
     try
       ignore (EcMatching.FPosition.select select concl);
-      tacuerror "can not find a pattern for %s" s
+      tc_error !!tc "can not find a pattern for %s" s
     with FoundPr f -> f in
 
   let lemma, args = 
@@ -124,30 +116,35 @@ let t_pr_rewrite s g =
                  {f_node = Fpr(_,_,_,ev2)}])
         -> begin
           match kind with
-          | `MuEq  -> (pr_eq  env m f args ev1 ev2, [AAnode])
-          | `MuSub -> (pr_sub env m f args ev1 ev2, [AAnode])
+          | `MuEq  -> (pr_eq  env m f args ev1 ev2, 1)
+          | `MuSub -> (pr_sub env m f args ev1 ev2, 1)
         end
       | _ -> assert false
       end
 
     | `MuFalse ->
-        let m,f,args,_ = destr_pr torw in (pr_false m f args, [])
+        let m,f,args,_ = destr_pr torw in (pr_false m f args, 0)
 
     | `MuNot ->
         let m,f,args,ev = destr_pr torw in
         let ev = destr_not ev in
-          (pr_not m f args ev, [])
+          (pr_not m f args ev, 0)
 
     | `MuOr ->
         let m,f,args,ev = destr_pr torw in
         let asym,ev1,ev2 = destr_or_kind ev in
-          (pr_or m f args (if asym then f_ora else f_or) ev1 ev2, [])
+          (pr_or m f args (if asym then f_ora else f_or) ev1 ev2, 0)
 
     | `MuDisj ->
         let m,f,args,ev = destr_pr torw in
         let asym,ev1,ev2 = destr_or_kind ev in
-          (pr_disjoint env m f args (if asym then f_ora else f_or) ev1 ev2, [AAnode])
+          (pr_disjoint env m f args (if asym then f_ora else f_or) ev1 ev2, 1)
   in
-    t_on_first
-      (t_pr_lemma lemma)
-      (t_rewrite_form `LtoR lemma args g)
+
+  let rwpt =
+    { pt_head = PTCut lemma;
+      pt_args = List.create args (PASub None); } in
+
+  FApi.t_first
+    (t_pr_lemma lemma)
+    (t_rewrite rwpt (`LtoR, None) tc)

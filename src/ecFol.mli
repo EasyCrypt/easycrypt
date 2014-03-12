@@ -490,7 +490,7 @@ type sform =
   | SFlet   of lpattern * form * form
   | SFtuple of form list
 
-  | SFquant of quantif * (EcIdent.t * gty) * form
+  | SFquant of quantif * (EcIdent.t * gty) * form Lazy.t
   | SFtrue
   | SFfalse
   | SFnot   of form

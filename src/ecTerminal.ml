@@ -125,16 +125,29 @@ object(self)
     (Sys.os_type = "Unix") &&
     (Unix.isatty (Unix.descr_of_out_channel stdout))
 
+
   method private _update_progress position =
+    let mem = (Gc.stat ()).Gc.live_words in
+    let mem = (float_of_int mem) *. (float_of_int (Sys.word_size / 8)) in
+
+    let rec human x st all =
+      match all with
+      | [] -> (x, st)
+      | _ when x < 1024.-> (x, st)
+      | st' :: all -> human (x /. 1024.) st' all in
+
+    let mem, memst = human mem "B" ["kB"; "MB"; "GB"] in
+
     if sz >= 0 && doprg then begin
       tick <- (tick + 1) mod (String.length ticks);
-      Format.eprintf "[%c] %.1f %%\r%!"
+      Format.eprintf "[%c] %.1f %% (%.1f%s)\r%!"
         ticks.[tick]
         (100. *. ((float_of_int position) /. (float_of_int sz)))
+        mem memst
     end
 
   method private _clear_update =
-    let fmt = "[*] ---.- %" in
+    let fmt = "[*] ---.- ----.-?B%" in
       if sz >= 0 && doprg then
         Format.eprintf "%*s\r%!" (String.length fmt) "";
       doprg <- false

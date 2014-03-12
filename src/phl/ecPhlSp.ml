@@ -2,48 +2,49 @@
 open EcUtils
 open EcModules
 open EcFol
-open EcBaseLogic
-open EcLogic
-open EcCorePhl
+open EcParsetree
+
+open EcCoreGoal
+open EcLowPhlGoal
+
+(*
+ *   SP carries three elements,
+ *   - bds: a set of existential binders
+ *   - assoc: a set of pairs (x,e) such that x=e holds
+ *            for instance after an assignment x <- e
+ *   - pre: the actual precondition (progressively weakened)
+ *   After an assignment of the form x <- e the three elements are updated.
+ *   Normally,
+ *   1) a new fresh local x' is added to the list of existential binders
+ *   2) (x,e) is added to the assoc list, and every other (y,d) is replaced by
+ *      (y[x->x'],d[x->x'])
+ *   3) pre is replaced by pre[x->x']
+ *  The simplification of this version comes from two tricks.
+ *  First, notice that the replacement of (y[x->x']) introduces a simplification
+ *  opportunity. There is no need to keep (x',d[x->x']) as a
+ *  conjuction x'=d[x->x']: it is enough to perform the substitution
+ *  of d[x->x'] for x' in place
+ *  (it is a mess however to implement this idea with simultaneous assigns)
+ *  The second ...
+ *)
 
 (* -------------------------------------------------------------------- *)
-class rn_hl_sp = object
-  inherit xrule "[hl] SP"
-end
-
-let rn_hl_sp = RN_xtd (new rn_hl_sp :> xrule)
-
-(* -------------------------------------------------------------------- *)
-
 module LowInternal = struct
+  (* ------------------------------------------------------------------ *)
+  exception No_sp
 
-  (* Yet another substitution? Documented code could save me a lot of time! *)
-  type assignable = APVar of (EcTypes.prog_var * EcTypes.ty) | ALocal of (EcIdent.t* EcTypes.ty)
+  (* ------------------------------------------------------------------ *)
+  type assignable =
+  | APVar  of (EcTypes.prog_var * EcTypes.ty)
+  | ALocal of (EcIdent.t * EcTypes.ty)
+
   type assoc_t = (assignable list * form) list
 
+  (* ------------------------------------------------------------------ *)
+  let isAPVar  = function APVar  _ -> true | _ -> false
   let isALocal = function ALocal _ -> true | _ -> false
 
-
-  (*
-     SP carries three elements,
-     - bds: a set of existential binders
-     - assoc: a set of pairs (x,e) such that x=e holds
-              for instance after an assignment x <- e
-     - pre: the actual precondition (progressively weakened)
-     After an assignment of the form x <- e the three elements are updated.
-     Normally,
-     1) a new fresh local x' is added to the list of existential binders
-     2) (x,e) is added to the assoc list, and every other (y,d) is replaced by
-        (y[x->x'],d[x->x'])
-     3) pre is replaced by pre[x->x']
-    The simplification of this version comes from two tricks.
-    First, notice that the replacement of (y[x->x']) introduces a simplification
-    opportunity. There is no need to keep (x',d[x->x']) as a
-    conjuction x'=d[x->x']: it is enough to perform the substitution
-    of d[x->x'] for x' in place
-    (it is a mess however to implement this idea with simultaneous assigns)
-    The second ...
-  *)
+  (* ------------------------------------------------------------------ *)
   let rec sp_asgn mem env lv e (bds,assoc,pre) =
     (* aux substitution function *)
     let subst_in_assoc lv new_id_exp new_ids ((ass:assignable list),f) =
@@ -129,6 +130,7 @@ module LowInternal = struct
         let e = EcTypes.e_app set [EcTypes.e_var pv ty; e'; e] ty in
         sp_asgn mem env (LvVar(pv,ty)) e (bds,assoc,pre)
 
+  (* ------------------------------------------------------------------ *)
   let build_sp mem bds assoc pre =
     let f_assoc a = match a with
       | APVar (pv,pv_ty) -> f_pvar pv pv_ty mem
@@ -162,9 +164,7 @@ module LowInternal = struct
     let pre = List.fold_left merge_assoc pre assoc in
     EcFol.f_exists_simpl (List.map (fun (id,t) -> (id,EcFol.GTty t)) bds) pre
 
-
-  exception No_sp
-
+  (* ------------------------------------------------------------------ *)
   let rec sp_stmt m env (bds,assoc,pre) stmt = match stmt with
     | [] -> [],(bds,assoc,pre)
     | i::is ->
@@ -191,59 +191,63 @@ module LowInternal = struct
     let stmt,(bds,assoc,pre) = sp_stmt m env ([],[],f) stmt in
     let pre = build_sp m bds assoc pre in
     stmt, pre
-
 end
 
-open EcParsetree
-
-let destr_single_pos pos = match pos with
+(* -------------------------------------------------------------------- *)
+let destr_single_pos pf pos = match pos with
   | Some (Single i) -> Some i
   | None -> None
-  | _ -> tacuerror "Bad usage of position parameter"
+  | _ -> tc_error pf "bad usage of position parameter"
 
-let destr_double_pos pos = match pos with
+let destr_double_pos pf pos = match pos with
   | Some (Double (i,j)) -> Some i, Some j
   | None -> None, None
-  | _ -> tacuerror "Bad usage of position parameter"
+  | _ -> tc_error pf "Bad usage of position parameter"
 
-let s_split msg pos stmt = match pos with
-  | None -> stmt.s_node,[]
-  | Some i -> s_split msg i stmt
+let s_split pos stmt =
+  match pos with
+  | None   -> (stmt.s_node, [])
+  | Some i -> s_split i stmt
 
-let t_sp_side pos g =
-  let env,_,concl = get_goal_e g in
+(* -------------------------------------------------------------------- *)
+let t_sp_side pos tc =
+  let env, _, concl = FApi.tc1_eflat tc in
+
   match concl.f_node with
     | FhoareS hs ->
-      let pos = destr_single_pos pos in
-      let stmt1,stmt2 = s_split "sp" pos hs.hs_s in
+      let pos = destr_single_pos !!tc pos in
+      let stmt1,stmt2 = s_split pos hs.hs_s in
       let (stmt1,pre) = LowInternal.sp_stmt (EcMemory.memory hs.hs_m) env stmt1 hs.hs_pr in
       let subgoal = f_hoareS_r {hs with hs_s=EcModules.stmt (stmt1@stmt2); hs_pr=pre} in
-      prove_goal_by [subgoal] rn_hl_sp g
+      FApi.xmutate1 tc `Sp [subgoal]
+
     | FbdHoareS bhs ->
-      let pos = destr_single_pos pos in
-      let stmt1,stmt2 = s_split "sp" pos bhs.bhs_s in
+      let pos = destr_single_pos !!tc pos in
+      let stmt1,stmt2 = s_split pos bhs.bhs_s in
       begin (* being carefull with the bound expression *)
         let write_set = EcPV.s_write env (EcModules.stmt stmt1) in
         let read_set  = EcPV.PV.fv env (EcMemory.memory bhs.bhs_m) bhs.bhs_bd in
         if not (EcPV.PV.indep env write_set read_set) then
-          tacuerror "Cannot apply sp: the bound expression can be modified. (FIXME)"
+          tc_error !!tc "the bound expression can be modified"
       end;
       let (stmt1,pre) = LowInternal.sp_stmt (EcMemory.memory bhs.bhs_m) env stmt1 bhs.bhs_pr in
       let subgoal = f_bdHoareS_r {bhs with bhs_s=EcModules.stmt (stmt1@stmt2); bhs_pr=pre} in
-      prove_goal_by [subgoal] rn_hl_sp g
+      FApi.xmutate1 tc `Sp [subgoal]
+
     | FequivS es ->
-      let posL,posR = destr_double_pos pos in
-      let stmtL1,stmtL2 = s_split "sp" posL es.es_sl in
-      let stmtR1,stmtR2 = s_split "sp" posR es.es_sr in
+      let posL,posR = destr_double_pos !!tc pos in
+      let stmtL1,stmtL2 = s_split posL es.es_sl in
+      let stmtR1,stmtR2 = s_split posR es.es_sr in
       let (stmtL1,pre) = LowInternal.sp_stmt (EcMemory.memory es.es_ml) env stmtL1 es.es_pr in
       let (stmtR1,pre) = LowInternal.sp_stmt (EcMemory.memory es.es_mr) env stmtR1 pre in
       let subgoal = f_equivS_r {es with
         es_sl=EcModules.stmt (stmtL1@stmtL2);
         es_sr=EcModules.stmt (stmtR1@stmtR2);
-        es_pr=pre} in
-      prove_goal_by [subgoal] rn_hl_sp g
-    | _ -> tacuerror "sp tactic expects an statement judgment as goal"
+        es_pr=pre
+      } in
+      FApi.xmutate1 tc `Sp [subgoal]
 
+    | _ -> tc_error !!tc "expects a statement judgment as goal"
 
-
-let t_sp pos g = t_sp_side pos g
+(* -------------------------------------------------------------------- *)
+let t_sp = FApi.t_low1 "sp" t_sp_side

@@ -371,7 +371,7 @@ theory LazyEager.
       symmetry.
       eager (H: IND_Eager.resample(); ~ IND_Lazy.resample();:
                   IND_Eager.H.m{1} = IND_Lazy.H.m{2} ==> IND_Eager.H.m{1} = IND_Lazy.H.m{2}): 
-            (={glob D} /\ IND_Eager.H.m{1} = IND_Lazy.H.m{2})=> //;
+            (={glob D} /\ IND_Eager.H.m{1} = IND_Lazy.H.m{2}) => //;
         first by sim.
       eager proc H (IND_Eager.H.m{1} = IND_Lazy.H.m{2})=> //;
         first by apply eager_query.

@@ -1,57 +1,16 @@
 (* -------------------------------------------------------------------- *)
 open EcParsetree
-open EcBaseLogic
-open EcLogic
+open EcTypes
+open EcCoreGoal.FApi
 
 (* -------------------------------------------------------------------- *)
-class rn_hl_kill : bool option -> codepos -> int option ->
-object
-  inherit xrule
-
-  method length   : int option
-  method position : codepos
-  method side     : bool option
-end
-
-val t_kill : bool option -> codepos -> int option -> tactic
-val process_kill : bool option * codepos * int option -> tactic
+val t_kill  : bool option -> codepos -> int option -> backward
+val t_alias : bool option -> codepos -> psymbol option -> backward
+val t_set   : bool option -> codepos -> bool * psymbol -> expr -> backward
+val t_cfold : bool option -> codepos -> int option -> backward
 
 (* -------------------------------------------------------------------- *)
-class rn_hl_alias : bool option -> codepos ->
-object
-  inherit xrule
-
-  method position : codepos
-  method side     : bool option
-end
-
-val t_alias : bool option -> codepos -> psymbol option -> tactic
-val process_alias : bool option * codepos * psymbol option -> tactic
-
-(* -------------------------------------------------------------------- *)
-class rn_hl_set : bool option -> codepos ->
-object
-  inherit xrule
-
-  method position : codepos
-  method side     : bool option
-end
-
-val t_set : bool -> bool option -> 
-   codepos -> psymbol -> EcTypes.expr -> tactic
-val process_set : 
-  bool * bool option * codepos * psymbol * pexpr -> tactic
-
-(* -------------------------------------------------------------------- *)
-class rn_hl_cfold : bool option -> codepos -> int option ->
-object
-  inherit xrule
-
-  method length   : int option
-  method position : codepos
-  method side     : bool option
-end
-
-val t_cfold : bool option -> codepos -> int option -> tactic
-val process_cfold : bool option * codepos * int option -> tactic
-
+val process_kill  : bool option * codepos * int option -> backward
+val process_alias : bool option * codepos * psymbol option -> backward
+val process_set   : bool option * codepos * bool * psymbol * pexpr -> backward
+val process_cfold : bool option * codepos * int option -> backward

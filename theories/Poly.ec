@@ -3,12 +3,13 @@ require import Fun.
 require import Pred.
 require import Int.
 require import NewList.
+require (*--*) Ring.
 
 (* -------------------------------------------------------------------- *)
 type R.
 type poly.
 
-clone import Ring.R with type ring <- R.
+clone import Ring.ComRing with type t <- R.
 
 op ofseq : R list -> poly.
 op toseq : poly   -> R list.

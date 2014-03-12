@@ -40,6 +40,6 @@ proof -strict.
  while (x=1).   
    wp;skip.
    intros _ h.
-   elim h;intros h1 _; assumption h1.
+   elim h;intros h1 _; exact h1.
  wp;skip => /= x -> //.
 qed.

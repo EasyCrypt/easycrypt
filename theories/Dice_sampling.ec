@@ -70,8 +70,8 @@ theory GenDice.
             by wp;rnd => //.
             wp;rnd;skip;progress => //. 
             rewrite /bd /mu_x;apply mu_eq => w' //.
-            by conseq * Hw;progress => //; rewrite Htk.
-          by conseq * (_: _ ==> false) => //.
+            by conseq * Hw; progress => //; rewrite Htk.
+          by conseq * (_ : _ ==> false) => //.
         (* bounding pr : ! k = r0 /\ k = r *)
        seq 2 : (test i r0) _ 0%r (1%r - bdt*bd) (1%r/bdt) 
                            (i0 = i /\ test i k /\ r0 = r) => //.
@@ -80,7 +80,7 @@ theory GenDice.
          conseq * Hw;progress => //.
          by rewrite H0 //= /charfun (_: (k = r{hr}) = false) 1:neqF //.
          phoare split ! 1%r (bdt*bd);wp;rnd => //.
-          skip;progress => //.
+          skip; progress=> //.
           rewrite -(mu_eq (d i{hr}) (cpMem (sub_supp i{hr}))).
             by intros x ; rewrite /= -test_sub_supp.
           apply (mu_cpMem (sub_supp i{hr}) (d i{hr}) bd _) => x Hx.

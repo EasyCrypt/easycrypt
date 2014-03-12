@@ -2,6 +2,8 @@
 open EcSymbols
 open EcModules
 open EcProvers
+open EcFol
+open EcBaseLogic
 
 (* -------------------------------------------------------------------- *)
 type env
@@ -47,4 +49,4 @@ exception CannotTranslate of string
 
 type me_of_mt = EcIdent.t -> module_type -> mod_restr -> module_expr
 
-val check_goal : me_of_mt -> env -> prover_infos -> hints -> EcBaseLogic.l_decl -> bool
+val check_goal : me_of_mt -> env -> prover_infos -> hints -> hyps * form -> bool

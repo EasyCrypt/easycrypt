@@ -1,19 +1,10 @@
 (* -------------------------------------------------------------------- *)
 open EcFol
-open EcBaseLogic
-open EcLogic
+open EcCoreGoal.FApi
 
 (* -------------------------------------------------------------------- *)
-class rn_hl_case : form ->
-object
-  inherit xrule
+val t_hoare_case   : form -> backward
+val t_bdhoare_case : form -> backward
+val t_equiv_case   : form -> backward
 
-  method phi : form
-end
-
-(* -------------------------------------------------------------------- *)
-val t_hoare_case   : form -> tactic
-val t_bdHoare_case : form -> tactic
-val t_equiv_case   : form -> tactic
-
-val t_hl_case : form -> tactic
+val t_hl_case : form -> backward
