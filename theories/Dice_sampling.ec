@@ -63,7 +63,8 @@ theory GenDice.
         intros Hw; alias 2 r0 = r.
         cut:= Htk; rewrite -test_sub_supp // => Hmemk.
         phoare split bd ((1%r - bdt*bd) * (1%r/bdt)) : (k=r0).
-          by intros &hr [H1 H2]; rewrite (_: test i{hr} r{hr} = false) 1:neqF //=; fieldeq=> //.
+          move=> &hr [H1 H2]; rewrite (_: test i{hr} r{hr} = false) 1:neqF //=.
+          by cut {1}->: bd = bd * bdt / bdt; smt.
           (* bounding pr : k = r0 /\ k = r *)
           seq 2 : (k = r0) bd 1%r 1%r 0%r (r0 = r /\ i = i0) => //.
             by wp;rnd => //.
