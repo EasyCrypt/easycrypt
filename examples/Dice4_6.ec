@@ -13,7 +13,14 @@ clone GenDice as D4_6 with
   op sub_supp (i:unit) <- Interval.interval 1 4,
   type t' <- int,
   op d' (i:unit) <- [1..4]
-  proof * by smt.
+  proof *.
+realize valid_nonempty. smt. qed.
+realize dU. smt. qed.
+realize test_sub_supp. smt. qed.
+realize test_in_supp. smt. qed.
+realize d'_uni.
+  by progress; rewrite -Dinter_uni.dinter_is_dinter /Dinter_uni.dinter Duni.mu_x_def_in; first smt.
+qed.
 
 module D4 = {
   proc sample () : int = { 

@@ -11,10 +11,12 @@ require (*--*) PKE.
 type bits.
 op k: int.
 op uniform: bits distr.
+op (^^): bits -> bits -> bits.
 
 clone import AWord as Bitstring with
   type word <- bits,
   op length <- k,
+  op (^)    <- (^^),
   op Dword.dword <- uniform.
 
 (* Upper bound on the number of calls to H *)
@@ -31,8 +33,6 @@ type pkey       = group.
 type skey       = int.
 type plaintext  = bits.
 type ciphertext = group * bits.
-
-op (^^): bits -> bits -> bits = (^)%Bitstring.
 
 clone import PKE as PKE_ with
   type pkey <- pkey,
@@ -221,18 +221,9 @@ section.
         smt.
         smt.
         by apply guessL.
-        proc; sp; if=> //.
-        inline RO.o; wp; rnd; wp; skip; progress.
-          smt.
-          rewrite eq_except_def=> x' neq.
-          by move: H0; rewrite eq_except_def=> H0; cut:= H0 x' _=> //; smt.
-          smt.
-          by cut:= H0; rewrite eq_except_def; smt.
-          smt.
-          by cut:= H0; rewrite eq_except_def; smt.
-          smt.
-        by progress; proc; sp; if=> //; wp; call (lossless_o _); first smt.
-        progress; proc; sp; if=> //; wp; call (lossless_o _); first smt.
+        by proc; sp; if=> //; inline RO.o; wp; rnd; wp; skip; progress; smt.
+        by progress; proc; sp; if=> //; wp; call (RO_o_ll _); first smt.
+        progress; proc; sp; if=> //; wp; call (RO_o_ll _); first smt.
         by skip; smt.
     by inline H.hash RO.o; auto; progress; smt.
   qed.
@@ -279,8 +270,8 @@ section.
       by sim.
     inline H.init RO.init.
     auto; progress; first 2 smt.
-      by rewrite /(^^) /(^^) -xorwA xorwK xorw0.
-      by rewrite /(^^) /(^^) -xorwA xorwK xorw0.
+      by rewrite -xorwA xorwK xorw0.
+      by rewrite -xorwA xorwK xorw0.
   qed.
 
   local lemma Pr_G1_G2_res &m:
@@ -297,10 +288,10 @@ section.
     proc; rnd ((=) b').
     call (_: true)=> //.
       by apply guessL.
-      by proc; sp; if=> //; wp; call (lossless_o _); first smt.
+      by proc; sp; if=> //; wp; call (RO_o_ll _); first smt.
     wp; rnd; call (_ : true).
       by apply chooseL.
-      by proc; sp; if=> //; wp; call (lossless_o _); first smt.
+      by proc; sp; if=> //; wp; call (RO_o_ll _); first smt.
     by inline H.init RO.init; auto; progress; smt.
   qed.
 

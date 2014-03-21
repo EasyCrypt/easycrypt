@@ -405,15 +405,36 @@ qed.
    This is simple once we have size_leq. *)
 
 (* eq_except *)
-op eq_except: ('a,'b) map -> ('a,'b) map -> 'a -> bool.
+pred eq_except (m1 m2:('a,'b) map) x = forall x',
+  x <> x' => m1.[x'] = m2.[x'].
 
-axiom eq_except_def (m1 m2:('a,'b) map) x:
-  eq_except m1 m2 x = forall x', x <> x' => m1.[x'] = m2.[x'].
-
-lemma eq_eq_except (m:('a,'b) map) x:
+lemma eq_except_refl (m:('a,'b) map) x:
   eq_except m m x
 by [].
 
+lemma eq_except_symm (m1 m2:('a,'b) map) x:
+  eq_except m1 m2 x = eq_except m2 m1 x
+by [].
+
+lemma eq_except_set1_eq (m1 m2:('a,'b) map) x y:
+  eq_except m1 m2 x =>
+  eq_except m1.[x <- y] m2 x
+by [].
+
+lemma eq_except_set2 (m1 m2:('a,'b) map) x x' y1 y2:
+  eq_except m1 m2 x =>
+  (eq_except m1.[x' <- y1] m2.[x' <- y2] x <=>
+   x = x' \/ y1 = y2).
+proof.
+  move=> m1_eqe_m2_x; split.
+    case (x = x')=> //= x_neq_x' eqe_set2.
+    by cut:= eqe_set2 x' _=> //; rewrite !get_set_eq; apply someI.
+  move=> [<- | <-] x0 x_neq_x0.
+    by rewrite !get_set_neq //; apply m1_eqe_m2_x.
+    by rewrite !get_set; case (x' = x0)=> //= _; apply m1_eqe_m2_x.
+qed.
+
+(*
 lemma eq_except_set_eq (m1 m2:('a,'b) map) x y:
   eq_except m1 m2 x =>
   mem x (dom m1) =>
@@ -425,6 +446,7 @@ apply map_ext=> x'; rewrite get_set; case (x = x').
   by intros=> <-; rewrite m2x.
   by apply eqe.
 qed.
+*)
 
 (* (* This is the way eq_except is most likely to be used: preservation of eq_except in ROMs *)
 lemma eq_except_ROM (m1 m2:('a,'b) map) x0 x y0 y:
