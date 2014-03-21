@@ -712,7 +712,8 @@ proof strict.
     by rewrite mu_false card_empty //.
   intros x s Hnmem IH d bd Hmu_x.
   rewrite (_: (card (add x s))%r * bd = 
-          bd + (card s)%r * bd); first by rewrite card_add_nin //=;ringeq.
+          bd + (card s)%r * bd).
+    by rewrite card_add_nin //=; smt.
   rewrite (mu_eq d _ (((=) x) \/ (cpMem s))).
     by intros z;rewrite /cpMem /Pred.(\/) mem_add -orbC (eq_sym z).
   rewrite mu_disjoint.
@@ -734,7 +735,8 @@ proof strict.
     by rewrite -le_ge mu_false card_empty //.
   intros x s Hnmem IH d bd Hmu_x.
   rewrite (_: (card (add x s))%r * bd = 
-          bd + (card s)%r * bd); first by rewrite card_add_nin //=;ringeq.
+          bd + (card s)%r * bd);
+    first by rewrite card_add_nin //=; smt.
   rewrite (mu_eq d _ (((=) x) \/ (cpMem s))).
     by intros z;rewrite /cpMem /Pred.(\/) mem_add -orbC (eq_sym z).
   rewrite mu_disjoint.
