@@ -125,6 +125,16 @@ theory Eager.
     }
   }.
 
+  lemma RO_init_full:
+    finite univ<:from> =>
+    hoare [RO.init: true ==> forall x, mem x (dom RO.m)].
+  proof.
+    move=> fType; proc.
+    while (forall x, mem x work \/ mem x (dom RO.m)).
+      by auto; smt.
+    by auto; smt.
+  qed.
+
   lemma RO_init_ll:
     finite univ<:from> =>
     (forall x, mu (dsample x) True = 1%r) =>
