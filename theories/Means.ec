@@ -112,7 +112,7 @@ theory Mean.
     intros Hd Hfin /=.
     cut := Mean A &m ev => /= -> //.
     cut := Mrplus.sum_comp (( * ) r) (fun (v:input), Pr[A.work(v)@ &m:ev v (glob A) res]) => /= <-.
-      by intros x y;ringeq.
+      by intros x y; smt.
     apply Mrplus.sum_eq => /= x.
     by rewrite Finite.mem_toFSet // mem_create /support => Hin;rewrite Hd.
   qed.
@@ -154,7 +154,7 @@ theory LR.
     cut -> : Pr[A.work(false) @ &m : false = res] = Pr[A.work(false) @ &m : !res].
       by rewrite Pr[mu_eq];smt.       
     rewrite Pr[mu_not].
-    by rewrite Hloss;fieldeq.
+    by rewrite Hloss; smt.
   qed.
 
 end LR.
@@ -608,7 +608,6 @@ theory Hybrid.
       rewrite Mrplus.sum_add /=.
         by rewrite Interval.mem_interval;smt.
       cut Hq : q%r <> Real.zero by smt.
-      fieldeq => //.
       rewrite -(Mrplus.sum_comp (( * ) (-1)%r)) //;first intros x y;ringeq.
       rewrite (Mrplus_inter_shift 0 (q - 1 - 1) (-1)) /=.
       cut -> : q - 1 - 1 - -1 = q - 1; first by smt.

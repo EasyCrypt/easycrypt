@@ -51,6 +51,7 @@ axiom pw_eq (d d':'a distr):
   d == d' <=> d = d'.
 
 axiom uniform_unique (d d':'a distr):
+  mu d True = mu d' True =>
   support d = support d' =>
   isuniform d  =>
   isuniform d' =>
