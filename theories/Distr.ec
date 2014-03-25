@@ -50,6 +50,12 @@ axiom mu_or (d:'a distr) (p q:('a -> bool)):
 axiom pw_eq (d d':'a distr):
   d == d' <=> d = d'.
 
+axiom uniform_unique (d d':'a distr):
+  support d = support d' =>
+  isuniform d  =>
+  isuniform d' =>
+  d = d'.
+
 (** Lemmas *)
 lemma witness_nzero p (d:'a distr):
   0%r < mu d p =>
