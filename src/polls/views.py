@@ -4,6 +4,7 @@ from django.core.urlresolvers import reverse
 from django.views import generic
 from django.utils import timezone
 
+from polls.forms import ContactForm
 from polls.models import Poll, Choice
 
 
@@ -45,3 +46,13 @@ def vote(request, poll_id):
         selected_choice.votes += 1
         selected_choice.save()
         return HttpResponseRedirect(reverse('polls:results', args=(p.id,)))
+
+
+def contact(request):
+    if request.method == 'POST':
+        form = ContactForm(request.POST)
+        if form.is_valid():
+            return HttpResponseRedirect(reverse('polls:contact'))
+    else:
+        form = ContactForm()
+    return render(request, 'polls/contact.html', {'form': form})
