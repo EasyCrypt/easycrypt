@@ -149,8 +149,13 @@ proof.
  elim /Induction.induction p Hp; smt.
 qed.
 
-(* Diveucl *)
+lemma pow_Mle (x y:int): 0 <= x <= y => 2^x <= 2^y.
+proof.
+  intros [leq0_x leqx_y]; cut leq0_y: 0 <= y by smt.
+  move: leqx_y; elim /Induction.induction y leq0_y; smt.
+qed.
 
+(* Diveucl *)
 import why3 "int" "EuclideanDivision"
   op "div" as "/%";
   op "mod" as "%%".

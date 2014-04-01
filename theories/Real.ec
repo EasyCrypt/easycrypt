@@ -40,9 +40,14 @@ export FromInt.
 theory PowerInt.
   import why3 "real" "PowerInt"
      op "power" as "^".
+
   axiom pow_inv_pos :
     forall (x : real) (n : int), Int.(<=) 0 n => x ^ (Int.([-]) n) = inv (x ^ n).
-   
+
+  axiom pow_div_den (a b:int):
+    Int.(<=) a b =>
+    from_int (Int.(^) 2 a) / from_int (Int.(^) 2 b)
+    = from_int 1 / from_int (Int.(^) 2 (Int.(-) b a)).
 end PowerInt.
 export PowerInt.
 
