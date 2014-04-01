@@ -98,6 +98,24 @@ proof -strict.
  by intros _ <-.
 qed.
 
+(** univ *)
+
+theory Univ.
+  op univ = FSet.img from_int (Interval.interval 0  (2^length -1)).
+
+  lemma mem_univ w: mem w univ.
+  proof.
+    rewrite /univ img_def; exists (to_int w);rewrite to_from Interval.mem_interval/=.
+    by rewrite -to_from from_to;smt.
+  qed.
+
+  require import ISet.
+
+  lemma finite_univ : Finite.finite (ISet.univ <:word>).
+  proof. by exists Univ.univ => x;rewrite ISet.mem_univ Univ.mem_univ. qed.
+
+end Univ.
+ 
 theory Dword.
   require import Distr.
   require import Real.
