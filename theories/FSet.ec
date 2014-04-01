@@ -623,6 +623,35 @@ case (a=x)=> ?.
       apply h2.
 qed.
 
+theory Product.
+
+ op ( ** ) (X:'a set) (Y:'b set) = 
+   List.foldr (fun x p, 
+      union p (List.foldr (fun y, add (x,y)) empty (elems Y)))
+       empty (elems X).
+
+ lemma mem_prod (X:'a set) (Y:'b set) (p:'a*'b):
+    (mem p.`1 X /\ mem p.`2 Y) <=> mem p (X ** Y).
+ proof.
+   rewrite /( ** ) -mem_def -(mem_def p.`2).
+   move:(elems X);elim; simplify; first by smt.
+   intros x lX Hrec;rewrite mem_union -Hrec => {Hrec}.
+   by move:(elems Y);elim;simplify;smt.
+ qed.
+
+ op prod3 (X:'a set) (Y:'b set) (Z:'c set) = 
+   img (fun (p:('a*'b)*'c), (p.`1.`1,p.`1.`2, p.`2)) (X ** Y ** Z). 
+
+ lemma mem_prod3 (X:'a set) (Y:'b set) (Z:'c set) (p:'a*'b*'c): 
+    (mem p.`1 X /\ mem p.`2 Y /\ mem p.`3 Z) <=> mem p (prod3 X Y Z).
+ proof.
+   rewrite /prod3 img_def;split. 
+    by intros H;exists ((p.`1,p.`2),p.`3) => /=;rewrite -!mem_prod /=;smt.
+   by intros [x [/= <-]] /=; rewrite -!mem_prod.
+ qed.
+
+end Product.
+
 theory Interval.
 
 op interval : int -> int -> int set.
