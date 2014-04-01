@@ -1,0 +1,44 @@
+from django.shortcuts import render
+from django.http import HttpResponseRedirect
+from django.core.urlresolvers import reverse
+from django.contrib import auth
+
+from django.views import generic
+
+from ec.forms import RegisterForm, LoginForm
+
+
+class IndexView(generic.TemplateView):
+    template_name = 'ec/index.html'
+
+
+def register(request):
+    if request.method == 'POST':
+        form = RegisterForm(request.POST)
+        if form.is_valid():
+            form.save()
+            return HttpResponseRedirect(reverse('ec:index'))
+        else:
+            return render(request, 'ec/register.html', {'form': form})
+    else:
+        form = RegisterForm()
+        return render(request, 'ec/register.html', {'form': form})
+
+
+def login(request):
+    if request.method == 'POST':
+        form = LoginForm(request, request.POST)
+        if form.is_valid():
+            user = form.get_user()
+            auth.login(request, user)
+            return HttpResponseRedirect(reverse('ec:index'))
+        else:
+            return render(request, 'ec/login.html', {'form': form})
+    else:
+        form = LoginForm(request)
+        return render(request, 'ec/login.html', {'form': form})
+
+
+def logout(request):
+    auth.logout(request)
+    return HttpResponseRedirect(reverse('ec:index'))

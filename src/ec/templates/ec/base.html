@@ -1,0 +1,25 @@
+{% load staticfiles %}
+
+<!DOCTYPE HTML>
+
+<html>
+	<head>
+		<meta charset="utf-8">
+		<meta http-equiv="X-UA-Compatible" content="IE=edge">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<title>{% block title %}EasyCrypt WebUI{% endblock %}</title>
+		
+		<!-- Bootstrap -->
+		<link href="{% static 'polls/css/bootstrap.min.css' %}" rel="stylesheet">
+ 	</head>
+ 	<body>
+ 		{% block body %}
+ 		{% endblock %}
+ 		
+ 		<!-- jQuery -->
+ 		<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.0/jquery.min.js"></script>
+ 		
+ 		<!-- Bootstrap -->
+ 		<script src="{% static 'polls/js/bootstrap.min.js' %}"></script>
+ 	</body>
+</html>

@@ -8,6 +8,7 @@ urlpatterns = patterns('',
     # url(r'^$', 'webui.views.home', name='home'),
     # url(r'^blog/', include('blog.urls')),
 
+    url(r'^ec/', include('ec.urls', namespace="ec")),
     url(r'^polls/', include('polls.urls', namespace="polls")),
     url(r'^admin/', include(admin.site.urls)),
 )

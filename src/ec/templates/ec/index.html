@@ -1,0 +1,11 @@
+{% load staticfiles %}
+
+{% if user.is_authenticated %}
+{{ user }}
+<a href="{% url 'ec:logout' %}">Logout</a>
+{% else %}
+<a href="{% url 'ec:register' %}">Register</a>
+<a href="{% url 'ec:login' %}">Login</a>
+{% endif %}
+
+
