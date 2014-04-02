@@ -10,16 +10,18 @@ class RegisterForm(UserCreationForm):
     username = forms.RegexField(
         label=_("Username"), max_length=30,
         regex=r'^\w+$',
-        help_text=_("30 characters or fewer. Letters, "
-                    "underscores and digits only"),
         error_messages={'invalid':
                         _("This value may contain only letters, "
                           "underscores and numbers.")})
 
+    password2 = forms.CharField(
+        label=_("Password confirmation"),
+        widget=forms.PasswordInput)
+
     def __init__(self, *args, **kwargs):
         self.helper = FormHelper()
         self.helper.form_action = reverse('ec:register')
-        self.helper.add_input(Submit('submit', 'Submit'))
+        self.helper.add_input(Submit('submit', 'Register'))
         super(RegisterForm, self).__init__(*args, **kwargs)
 
 
@@ -27,5 +29,5 @@ class LoginForm(AuthenticationForm):
     def __init__(self, *args, **kwargs):
         self.helper = FormHelper()
         self.helper.form_action = reverse('ec:login')
-        self.helper.add_input(Submit('submit', 'Submit'))
+        self.helper.add_input(Submit('submit', 'Log in'))
         super(LoginForm, self).__init__(*args, **kwargs)

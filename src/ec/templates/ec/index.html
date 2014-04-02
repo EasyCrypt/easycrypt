@@ -1,11 +1,7 @@
-{% load staticfiles %}
+{% extends "ec/base.html" %}
 
-{% if user.is_authenticated %}
-{{ user }}
-<a href="{% url 'ec:logout' %}">Logout</a>
-{% else %}
-<a href="{% url 'ec:register' %}">Register</a>
-<a href="{% url 'ec:login' %}">Login</a>
-{% endif %}
+{% block content %}
 
+<h1>Welcome to the EasyCrypt WebUI</h1>
 
+{% endblock %}
