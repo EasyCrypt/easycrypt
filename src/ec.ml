@@ -124,8 +124,9 @@ let _ =
 
   (* Initialize the proof mode *)
   EcCommands.full_check
+    ~nprovers:prvopts.prvo_maxjobs
+    ~timeout:prvopts.prvo_timeout
     prvopts.pvro_checkall
-    prvopts.prvo_maxjobs
     prvopts.prvo_provers;
 
   if prvopts.pvro_weakchk then

@@ -287,8 +287,8 @@ type ppredicate = {
 
 (* -------------------------------------------------------------------- *)
 type pprover_infos = {
-  pprov_max : int option;
-  pprov_time : int option;
+  pprov_max   : int option;
+  pprov_time  : int option;
   pprov_names : string located list option
 }
 

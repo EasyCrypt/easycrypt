@@ -22,7 +22,7 @@ val initialize : boot:bool -> wrapper:(string option) -> unit
 val current    : unit -> EcScope.scope
 
 (* -------------------------------------------------------------------- *)
-val full_check : bool -> int -> string list option -> unit
+val full_check : bool -> timeout:int -> nprovers:int -> string list option -> unit
 val process    : EcParsetree.global located -> unit
 
 val undo : int  -> unit

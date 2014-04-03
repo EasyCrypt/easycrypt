@@ -22,6 +22,7 @@ and cli_option = {
 
 and prv_options = {
   prvo_maxjobs  : int;
+  prvo_timeout  : int;
   prvo_provers  : string list option;
   pvro_checkall : bool;
   pvro_weakchk  : bool;

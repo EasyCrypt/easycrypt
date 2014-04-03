@@ -756,7 +756,7 @@ module Prover = struct
 
   let mk_prover_info scope maxprocs time ns =
     let dft      = Prover_info.get scope.sc_options in
-    let time     = max 1 (odfl dft.EcProvers.pr_timelimit time) in
+    let time     = max 0 (odfl dft.EcProvers.pr_timelimit time) in
     let provers  = odfl dft.EcProvers.pr_provers ns in
     let maxprocs = odfl dft.EcProvers.pr_maxprocs maxprocs in
       { EcProvers.pr_maxprocs  = maxprocs;
@@ -772,7 +772,7 @@ module Prover = struct
     let provers = EcProvers.known_provers () in
       set_prover_info scope None None (Some provers)
 
-  let set_default scope max provers =
+  let set_default scope ~timeout ~nprovers provers =
     let provers =
       match provers with
       | None ->
@@ -785,7 +785,7 @@ module Prover = struct
                 raise (Unknown_prover name)) provers;
           provers
     in
-      set_prover_info scope (Some max) (Some 3) (Some provers)
+      set_prover_info scope (Some nprovers) (Some timeout) (Some provers)
 
   let process scope pi =
     let max  = pi.pprov_max in

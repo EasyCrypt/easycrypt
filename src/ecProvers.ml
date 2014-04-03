@@ -181,7 +181,10 @@ let execute_task (pi : prover_infos) task =
           | None -> command
           | Some wrapper -> Printf.sprintf "%s %s" wrapper command
         in
-          Driver.prove_task ~command ~timelimit:pi.pr_timelimit dr task ()
+
+        let timelimit =
+          if pi.pr_timelimit <= 0 then None else Some pi.pr_timelimit in
+        Driver.prove_task ~command ?timelimit dr task ()
       in
         pcs.(i) <- Some (prover, pc)
     with e ->
@@ -198,7 +201,7 @@ let execute_task (pi : prover_infos) task =
         (fun i prover ->
            if i < pi.pr_maxprocs then run i prover else Queue.add prover pqueue)
         pi.pr_provers;
-           
+
       (* Wait for the first prover giving a definitive answer *)
       let status = ref None in
       let alives = ref (-1) in
@@ -220,7 +223,7 @@ let execute_task (pi : prover_infos) task =
                 | CP.Valid   -> status := Some true
                 | CP.Invalid -> status := Some false
                 | CP.Failure _ | CP.HighFailure ->
-                  Format.printf "[info] Warning: prover %s exited with %a\n%!" 
+                  Format.printf "[info] Warning: prover %s exited with %a\n%!"
                     _prover CP.print_prover_answer ans;
                   if not (Queue.is_empty pqueue) then run i (Queue.take pqueue)
                 | _ ->

@@ -397,10 +397,10 @@ let current () =
   let (_, scope, _) = oget !context in scope
 
 (* -------------------------------------------------------------------- *)
-let full_check b max_provers provers =
+let full_check b ~timeout ~nprovers provers =
   let (idx, scope, l) = oget !context in
   assert (idx = 0 && l = []);
-  let scope = EcScope.Prover.set_default scope max_provers provers in
+  let scope = EcScope.Prover.set_default scope ~timeout ~nprovers provers in
   let scope = if b then EcScope.Prover.full_check scope else scope in
     context := Some (idx, scope, l)
 

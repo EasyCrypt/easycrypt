@@ -26,6 +26,7 @@ and cli_option = {
 
 and prv_options = {
   prvo_maxjobs  : int;
+  prvo_timeout  : int;
   prvo_provers  : string list option;
   pvro_checkall : bool;
   pvro_weakchk  : bool;
@@ -82,7 +83,7 @@ let print_usage ?progname ?(out = stderr) ?msg specs =
 
   and ccgroups specs =
     List.pmap (function `Group x -> Some x | _ -> None) specs
-  in  
+  in
     msg |> oiter (fun msg -> Printf.fprintf out "Error: %s\n\n%!" msg);
     Printf.fprintf out "Usage: %s [command] [options...] [args...]\n" progname;
 
@@ -173,14 +174,14 @@ let parse spec argv =
           List.map for1 csp
       in
 
-      let argv = 
+      let argv =
         Array.init
           (Array.length argv - 1)
           (function 0 -> argv.(0) | i -> argv.(i+1))
       in
         begin
           try
-            Arg.parse_argv ~current argv csp 
+            Arg.parse_argv ~current argv csp
               (fun anon -> anons := anon :: !anons)
               ""
           with Arg.Bad msg ->
@@ -216,6 +217,7 @@ let specs = {
     ("provers", "Options related to provers", [
       `Spec ("p"          , `String, "Add a prover to the set of provers");
       `Spec ("max-provers", `Int   , "Maximum number of prover running in the same time");
+      `Spec ("timeout"    , `Int   , "Set the SMT timeout");
       `Spec ("check-all"  , `Flag  , "Force checking all files");
       `Spec ("weak-check" , `Flag  , "Start prover in weak check mode")]);
 
@@ -266,6 +268,7 @@ let prv_options_of_values values =
     | [] -> None | provers -> Some provers
   in
     { prvo_maxjobs  = odfl 4 (get_int "max-provers" values);
+      prvo_timeout  = odfl 3 (get_int "timeout" values);
       prvo_provers  = provers;
       pvro_checkall = get_flag "check-all" values;
       pvro_weakchk  = get_flag "weak-check" values; }
