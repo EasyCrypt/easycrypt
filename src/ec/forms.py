@@ -7,6 +7,19 @@ from crispy_forms.layout import Submit, Layout, Field
 from crispy_forms.bootstrap import FormActions
 
 
+def _field_set_attr(self, field, attr):
+    self.fields[field].widget.attrs[attr] = unicode(attr)
+
+
+def require(self, fields):
+    for field in fields:
+        _field_set_attr(self, field, 'required')
+
+
+def autofocus(self, field):
+    _field_set_attr(self, field, 'autofocus')
+
+
 class RegisterForm(UserCreationForm):
     username = forms.RegexField(
         label=(""), max_length=30,
@@ -24,6 +37,8 @@ class RegisterForm(UserCreationForm):
         widget=forms.PasswordInput)
 
     def __init__(self, *args, **kwargs):
+        super(RegisterForm, self).__init__(*args, **kwargs)
+
         self.helper = FormHelper()
         self.helper.form_action = reverse('ec:register')
         self.helper.form_class = "form form-register form-centered"
@@ -38,7 +53,9 @@ class RegisterForm(UserCreationForm):
                     css_class="btn btn-lg btn-primary btn-block fld-mg-top")
             )
         )
-        super(RegisterForm, self).__init__(*args, **kwargs)
+
+        require(self, ['username', 'password1', 'password2'])
+        autofocus(self, 'username')
 
 
 class LoginForm(AuthenticationForm):
@@ -54,6 +71,8 @@ class LoginForm(AuthenticationForm):
         widget=forms.PasswordInput)
 
     def __init__(self, *args, **kwargs):
+        super(LoginForm, self).__init__(*args, **kwargs)
+
         self.helper = FormHelper()
         self.helper.form_action = reverse('ec:login')
         self.helper.form_class = "form form-centered"
@@ -66,4 +85,6 @@ class LoginForm(AuthenticationForm):
                     css_class="btn btn-lg btn-primary btn-block fld-mg-top")
             )
         )
-        super(LoginForm, self).__init__(*args, **kwargs)
+
+        require(self, ['username', 'password'])
+        autofocus(self, 'username')
