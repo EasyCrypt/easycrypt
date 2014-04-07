@@ -239,7 +239,7 @@ let t_intros (ids : ident mloc list) (tc : tcenv1) =
   in
 
   let add_ld id ld hyps =
-    EcLogic.set_oloc
+    EcLocation.set_oloc
       (tg_tag id)
       (fun () -> LDecl.add_local (tg_val id) ld hyps) ()
   in

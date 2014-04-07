@@ -1,13 +1,8 @@
 (* -------------------------------------------------------------------- *)
-open EcIdent
 open EcTypes
 open EcFol
 
 (* -------------------------------------------------------------------- *)
-exception UnknownSubgoal of int
-exception NotAnOpenGoal of int option
-exception InvalidNumberOfTactic of int * int
-exception StillOpenGoal of int
 exception NotReducible
 
 (* -------------------------------------------------------------------- *)
@@ -16,12 +11,13 @@ type abs_uses = {
   aus_reads  : (prog_var * ty) list;
   aus_writes : (prog_var * ty) list;
 }
+
 type local_kind =
-  | LD_var    of ty * form option
-  | LD_mem    of EcMemory.memtype
-  | LD_modty  of EcModules.module_type * EcModules.mod_restr
-  | LD_hyp    of form
-  | LD_abs_st of abs_uses
+| LD_var    of ty * form option
+| LD_mem    of EcMemory.memtype
+| LD_modty  of EcModules.module_type * EcModules.mod_restr
+| LD_hyp    of form                     (* of type bool *)
+| LD_abs_st of abs_uses
 
 type l_local = EcIdent.t * local_kind
 
@@ -29,32 +25,3 @@ type hyps = {
   h_tvar  : EcDecl.ty_params;
   h_local : l_local list;
 }
-
-(* -------------------------------------------------------------------- *)
-type tac_pos = int EcParsetree.doption
-
-type i_pat =
-  | IPpat
-  | IPif of s_pat * s_pat
-  | IPwhile of s_pat 
-
-(* the first pair value represents the number of instructions to skip *)
-and s_pat = (int * i_pat) list        
-
-(* -------------------------------------------------------------------- *)
-type tac_error =
-  | UnknownAx             of EcPath.path
-  | NotAHypothesis        of EcIdent.t
-  | TooManyArguments
-  | InvalNumOfTactic      of int * int
-  | NotPhl                of bool option
-  | NoSkipStmt
-  | InvalidExfalso
-  | InvalidCodePosition   of string*int*int*int
-  | InvalidName           of string
-  | User                  of string
-
-exception TacError of bool * tac_error
-
-val tacerror  : ?catchable:bool -> tac_error -> 'a
-val tacuerror : ?catchable:bool -> ('a, Format.formatter, unit, 'b) format4 -> 'a

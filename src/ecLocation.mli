@@ -11,8 +11,11 @@ type t = {
   loc_echar : int;
 }
 
-val _dummy : t
+(* -------------------------------------------------------------------- *)
+type 'a mloc = ('a, t) tagged
 
+(* -------------------------------------------------------------------- *)
+val _dummy    : t
 val make      : position -> position -> t
 val of_lexbuf : lexbuf -> t
 val tostring  : t -> string
@@ -31,9 +34,9 @@ val mk_loc : t -> 'a -> 'a located
 val lmap   : ('a -> 'b) -> 'a located -> 'b located
 
 (* -------------------------------------------------------------------- *)
-type 'a mloc = ('a, t) tagged
-
-(* -------------------------------------------------------------------- *)
 exception LocError of t * exn
 
 val locate_error : t -> exn -> 'a
+
+val set_loc  : t -> ('a -> 'b) -> 'a -> 'b
+val set_oloc : t option -> ('a -> 'b) -> 'a -> 'b

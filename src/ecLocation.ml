@@ -84,3 +84,11 @@ let locate_error loc exn =
   match exn with
   | LocError _ -> raise exn
   | _ -> raise (LocError(loc,exn))
+
+let set_loc loc f x =
+  try f x with e -> locate_error loc e
+
+let set_oloc oloc f x =
+  match oloc with
+  | None     -> f x
+  | Some loc -> set_loc loc f x

@@ -317,11 +317,11 @@ let abstract_info env f1 =
     | _ -> 
       let ppe = EcPrinting.PPEnv.ofenv env in
         if EcPath.x_equal f1 f then 
-          EcLogic.tacuerror
+          EcCoreGoal.tacuerror
             "The function %a should be abstract"
             (EcPrinting.pp_funname ppe) f1
         else 
-          EcLogic.tacuerror 
+          EcCoreGoal.tacuerror 
             "The function %a, which reduces to %a, should be abstract"
             (EcPrinting.pp_funname ppe) f1
             (EcPrinting.pp_funname ppe) f
@@ -336,7 +336,7 @@ let abstract_info2 env fl' fr' =
   let fr1 = EcPath.xpath topr fr.EcPath.x_sub in
     if not (EcPath.x_equal fl1 fr1) then begin
       let ppe = EcPrinting.PPEnv.ofenv env in
-        EcLogic.tacuerror 
+        EcCoreGoal.tacuerror 
           "function %a reduces to %a and %a reduces to %a, %a and %a should be equal"
           (EcPrinting.pp_funname ppe) fl'
           (EcPrinting.pp_funname ppe) fl1

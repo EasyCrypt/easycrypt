@@ -146,6 +146,16 @@ let tc_error (_pe : proofenv) ?(catchable = true) ?loc ?who fmt =
       fbuf fmt
 
 (* -------------------------------------------------------------------- *)
+let tacuerror ?(catchable = true) fmt =
+  let buf  = Buffer.create 127 in
+  let fbuf = Format.formatter_of_buffer buf in
+    Format.kfprintf
+      (fun _ ->
+         Format.pp_print_flush fbuf ();
+         raise (TcError (catchable, None, lazy (Buffer.contents buf))))
+      fbuf fmt
+
+(* -------------------------------------------------------------------- *)
 let tc_error_lazy (_pe : proofenv) ?(catchable = true) ?loc ?who msg =
   let getmsg () =
     let buf  = Buffer.create 127 in

@@ -145,6 +145,8 @@ val tc_error :
      proofenv -> ?catchable:bool -> ?loc:EcLocation.t -> ?who:string
   -> ('a, Format.formatter, unit, 'b) format4 -> 'a
 
+val tacuerror : ?catchable:bool -> ('a, Format.formatter, unit, 'b) format4 -> 'a
+
 val tc_error_lazy :
      proofenv -> ?catchable:bool -> ?loc:EcLocation.t -> ?who:string
   -> (Format.formatter -> unit) -> 'a

@@ -11,8 +11,8 @@ type ptnenv = ty Mid.t * EcUnify.unienv
 
 (* ------------------------------------------------------------------ *)
 let unienv_of_hyps hyps =
-   let tv = (LDecl.tohyps hyps).h_tvar in
-     EcUnify.UniEnv.create (Some tv)
+   let tv = (LDecl.tohyps hyps).EcBaseLogic.h_tvar in
+   EcUnify.UniEnv.create (Some tv)
 
 (* ------------------------------------------------------------------ *)
 let process_form_opt hyps pf oty =

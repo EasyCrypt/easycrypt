@@ -44,7 +44,7 @@ let _ = EcPException.register (fun fmt exn ->
 let pvm = EcEnv.NormMp.norm_pvar
 
 let uerror env c = 
-  EcBaseLogic.tacuerror "%a" (pp_alias_clash env) c
+  EcCoreGoal.tacuerror "%a" (pp_alias_clash env) c
 
 module Mnpv = 
   EcMaps.Map.Make(struct
@@ -341,7 +341,7 @@ module PV = struct
       let check_v v _ = 
         if is_loc v then begin
           let ppe = EcPrinting.PPEnv.ofenv env in
-          EcBaseLogic.tacuerror 
+          EcCoreGoal.tacuerror 
             "only global variable can be used in inv, %a is local"
             (EcPrinting.pp_pv ppe) v
         end;
@@ -1109,7 +1109,7 @@ and eqobs_inF_refl env f' eqo =
     else
       let diff = PV.diff local params in 
       let ppe = EcPrinting.PPEnv.ofenv env in
-      EcBaseLogic.tacuerror "In function %a, %a are used before being initialized"
+      EcCoreGoal.tacuerror "In function %a, %a are used before being initialized"
         (EcPrinting.pp_funname ppe) f' (PV.pp env) diff
 
   | FBabs oi -> 
@@ -1124,7 +1124,7 @@ and eqobs_inF_refl env f' eqo =
       let eqi = aux (PV.remove_glob top eqo) in
       if PV.mem_glob env top eqi then begin
         let ppe = EcPrinting.PPEnv.ofenv env in
-        EcBaseLogic.tacuerror "Function %a may use oracles that need equality on glob %a."
+        EcCoreGoal.tacuerror "Function %a may use oracles that need equality on glob %a."
         (EcPrinting.pp_funname ppe) f' (EcPrinting.pp_topmod ppe) top 
       end;
       eqi
@@ -1149,7 +1149,7 @@ let check_module_in env mp mt =
         List.fold_left (fun eqi mp -> PV.remove_glob mp eqi) eqi extra in 
       if not (oi.oi_in) && not (PV.is_empty eqi) then
         let ppe = EcPrinting.PPEnv.ofenv env in
-        EcBaseLogic.tacuerror "The function %a should initialize %a"
+        EcCoreGoal.tacuerror "The function %a should initialize %a"
           (EcPrinting.pp_funname ppe) f (PV.pp env) eqi in
       
   List.iter check sig_.mis_body
