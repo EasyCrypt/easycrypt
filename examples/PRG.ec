@@ -266,9 +266,9 @@ section.
        wp; do 2!rnd (True); wp;
        skip; smt.
     (* Psample.prg preserves bad *)
-    by intros=> _ //=; proc;
-       wp; do 2!rnd; wp;
-       skip; progress; smt.
+    move=> _ //=; proc.
+    wp; do 2!rnd; wp.
+    by skip; progress; rewrite -/True; smt.
   (* Returning to main *)
   call (_: ={glob F} ==> ={glob P} /\ inv F.m{1} F.m{2} P.logP{2});
     first by proc; wp; rnd; skip; smt.
