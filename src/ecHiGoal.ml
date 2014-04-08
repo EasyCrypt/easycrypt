@@ -834,7 +834,7 @@ type cutdef_t = intropattern * pterm
 
 let process_cutdef (ip, pt) (tc : tcenv1) =
   let pt = { fp_kind = FPNamed (pt.pt_name, pt.pt_tys);
-             fp_args = pt.pt_args; } in
+             fp_args = pt.EcParsetree.pt_args; } in
   let pt = PT.tc1_process_full_pterm tc pt in
 
   if not (PT.can_concretize pt.ptev_env) then
