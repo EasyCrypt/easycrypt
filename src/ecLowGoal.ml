@@ -1161,7 +1161,16 @@ let t_subst ?kind ?var ?eqid (tc : tcenv1) =
           let hyps'  =
             LDecl.init (LDecl.baseenv hyps)
               ~locals:hyps' (LDecl.tohyps hyps).h_tvar in
-          let clear  = match var with `Local x -> t_clear x | _ -> t_id in
+
+          let clear  =
+            match var with
+            | `Local x -> begin
+              match LDecl.lookup_by_id x hyps with
+              | LD_var (_, None) -> t_clear x
+              | _ -> t_id
+            end
+            | _ -> t_id
+          in
 
           FApi.t_focus clear (FApi.xmutate1_hyps tc `Subst [hyps', concl'])
         in
