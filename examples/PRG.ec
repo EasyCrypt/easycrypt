@@ -248,7 +248,7 @@ section.
     (* adversary is lossless *)
     by apply AaL.
     (* [F.f ~ F.f: I] when Bad does not hold *)
-    by proc; wp; do !rnd; wp; skip; progress; smt.
+    by proc; wp; do !rnd; wp; skip; rewrite /Top.inv; progress; smt.
     (* F.f is lossless when Bad holds *)
     by intros=> _ _; apply FfL.
     (* F.f preserves bad *)
@@ -268,7 +268,7 @@ section.
     (* Psample.prg preserves bad *)
     move=> _ //=; proc.
     wp; do 2!rnd; wp.
-    by skip; progress; rewrite -/True; smt.
+    by skip; rewrite /Bad; progress; smt.
   (* Returning to main *)
   call (_: ={glob F} ==> ={glob P} /\ inv F.m{1} F.m{2} P.logP{2});
     first by proc; wp; rnd; skip; smt.
