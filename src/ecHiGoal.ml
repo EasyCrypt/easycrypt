@@ -187,6 +187,7 @@ module LowRewrite = struct
   | LRW_NotAnEquation
   | LRW_NothingToRewrite
   | LRW_InvalidOccurence
+  | LRW_CannotInfer
 
   exception RewriteError of error
 
@@ -220,6 +221,9 @@ module LowRewrite = struct
     (try  PT.pf_find_occurence pt.PT.ptev_env ~ptn:fp concl
      with EcMatching.MatchFailure -> raise (RewriteError LRW_NothingToRewrite));
 
+    if not (PT.can_concretize pt.PT.ptev_env) then
+      raise (RewriteError LRW_CannotInfer);
+
     let fp   = PT.concretize_form pt.PT.ptev_env fp in
     let pt   = fst (PT.concretize pt) in
     let cpos =
@@ -250,6 +254,8 @@ let process_rewrite1_core (s, o) pt tc =
           tc_error !!tc "nothing to rewrite"
       | LowRewrite.LRW_InvalidOccurence ->
           tc_error !!tc "invalid occurence selector"
+      | LowRewrite.LRW_CannotInfer ->
+          tc_error !!tc "cannot infer all placeholders"
 
 (* -------------------------------------------------------------------- *)
 let process_delta (s, o, p) tc =

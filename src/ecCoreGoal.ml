@@ -169,8 +169,19 @@ let tc_error_lazy (_pe : proofenv) ?(catchable = true) ?loc ?who msg =
 (* -------------------------------------------------------------------- *)
 type symkind = [`Lemma | `Operator | `Local]
 
-let tc_lookup_error pe ?loc ?who _kind _qs =
-  tc_error pe ~catchable:true ?loc ?who "lookup-error"
+let tc_lookup_error pe ?loc ?who kind qs =
+  let string_of_kind kind =
+    match kind with
+    | `Lemma    -> "lemma"
+    | `Operator -> "operator"
+    | `Local    -> "local variable"
+  in
+
+  tc_error_lazy pe ~catchable:true ?loc ?who
+    (fun fmt ->
+      Format.fprintf fmt "unknown %s `%s'"
+        (string_of_kind kind)
+        (EcSymbols.string_of_qsymbol qs))
 
 (* -------------------------------------------------------------------- *)
 let reloc _ f x = f x                   (* FIXME *)

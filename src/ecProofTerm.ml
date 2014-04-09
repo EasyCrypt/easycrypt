@@ -70,7 +70,7 @@ type cptenv = CPTEnv of f_subst
 
 (* -------------------------------------------------------------------- *)
 let concretize_env pe =
-  assert (can_concretize pe);
+(*  assert (can_concretize pe); *)
 
   let tysubst  = { ty_subst_id with ts_u = EcUnify.UniEnv.close pe.pte_ue } in
   let ftysubst = Fsubst.f_subst_init false Mid.empty tysubst EcPath.Mp.empty in
@@ -137,7 +137,9 @@ let pt_of_global pf hyps p tys =
 
 (* -------------------------------------------------------------------- *)
 let pattern_form ?name hyps ~ptn subject =
-  let x    = EcIdent.create (odfl "x" name) in
+  let dfl () = Printf.sprintf "x%d" (EcUid.unique ()) in
+
+  let x    = EcIdent.create (ofdfl dfl name) in
   let fx   = EcFol.f_local x ptn.f_ty in
   let body =
     Hf.memo_rec 107
@@ -332,12 +334,14 @@ let trans_pterm_arg_impl pe f =
 
 (* ------------------------------------------------------------------ *)
 let trans_pterm_arg_value pe ?name { pl_desc = arg } =
+  let dfl () = Printf.sprintf "x%d" (EcUid.unique ()) in
+
   match arg with
   | EA_mod _ | EA_mem _ -> tc_pterm_apperror pe.pte_pe `FormWanted
 
   | EA_none ->
       let aty = EcUnify.UniEnv.fresh pe.pte_ue in
-      let x   = EcIdent.create (odfl "x" name) in
+      let x   = EcIdent.create (ofdfl dfl name) in
         pe.pte_ev := EcMatching.EV.add x !(pe.pte_ev);
         { ptea_env = pe; ptea_arg = PVAFormula (f_local x aty); }
 
