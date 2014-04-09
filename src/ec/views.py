@@ -9,12 +9,18 @@ from ec.forms import RegisterForm, LoginForm
 
 
 def index(request):
-    if request.user.is_authenticated:
+    if request.user.is_authenticated():
         project_list = request.user.project_set.all()
     else:
         project_list = []
+
+    if len(project_list) > 0:
+        open_files = project_list[0].file_set.all()
+    else:
+        open_files = []
+
     return render(request, 'ec/index.html', {'project_list': project_list,
-            'open_files': [f for f in project_list[0].file_set.all()]})
+                                             'open_files': open_files})
 
 
 def register(request):
