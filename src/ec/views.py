@@ -3,13 +3,18 @@ from django.http import HttpResponseRedirect
 from django.core.urlresolvers import reverse
 from django.contrib import auth
 
-from django.views import generic
+#from django.views import generic
 
 from ec.forms import RegisterForm, LoginForm
 
 
-class IndexView(generic.TemplateView):
-    template_name = 'ec/index.html'
+def index(request):
+    if request.user.is_authenticated:
+        project_list = request.user.project_set.all()
+    else:
+        project_list = []
+    return render(request, 'ec/index.html', {'project_list': project_list,
+            'open_files': [f for f in project_list[0].file_set.all()]})
 
 
 def register(request):

@@ -2,6 +2,53 @@
 
 {% block content %}
 
+{% if user.is_authenticated %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-sm-3 col-md-2 sidebar">
+            <ul class="nav nav-sidebar active-no-hover">
+                {% if project_list %}
+                {% for project in project_list %}
+                <li id="proj{{ project.id }}"><a href="#">{{ project.name }}</a></li>
+                {% if project.file_set.all %}
+                <ul class="nav">
+                {% for file in project.file_set.all %}
+                    <li><a href="#"">{{ file.name }}</a></li>
+                {% endfor %}
+                </ul>
+                {% endif %}
+                {% endfor %}
+                {% endif %}
+            </ul>
+            <ul id="project-controls" class="nav nav-sidebar">
+                <button type="button" class="btn btn-default">New project</button>
+            </ul>
+        </div>
+    </div>
+    <div class="col-sm-9 col-sm-offset-3 col-md-10 col-md-offset-2 main">
+        {% if open_files %}
+        <ul class="nav nav-pills">
+            {% for file in open_files %}
+            <li><a data-toggle="pill" href="#">{{ file.name }}</a></li>
+            {% endfor %}
+        </ul>
+        <div class="jumbotron">
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% else %}
 <h1>Welcome to the EasyCrypt WebUI</h1>
+{% endif %}
 
+{% endblock %}
+
+
+{% block js %}
+<script>
+$('.nav li a').on('click', function() {
+	$(this).parent().parent().find('.active').removeClass('active');
+	$(this).parent().addClass('active');
+});
+</script>
 {% endblock %}
