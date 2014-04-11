@@ -1,3 +1,7 @@
+html, body, .main-content, .container-fluid {
+	height: 100%;
+}
+
 body {
 	padding-top: 40px;
 	padding-bottom: 40px;
@@ -40,6 +44,20 @@ body {
 	margin: 10px;
 	bottom: 10px;
 	margin-left: auto;
+}
+
+.editor {
+	height: 100%;
+	padding: 0px;
+}
+
+#file-contents {
+	resize: none;
+	height: 100%;
+	border-top-left-radius: 0;
+	border-top-right-radius: 0;
+	border-bottom-left-radius: 0;
+	border-bottom-right-radius: 0;
 }
 
 .main-content {

@@ -60,12 +60,9 @@
                 </div>
             </div>
         </div>
-
-        <div class="container">
-            <div class="main-content">
-                {% block content %}
-                {% endblock %}
-            </div>
+        <div class="main-content">
+            {% block content %}
+            {% endblock %}
         </div>
 
         <!-- jQuery -->
@@ -74,6 +71,10 @@
         <!-- Bootstrap JS -->
         <script src="{% static 'ec/js/bootstrap.min.js' %}"></script>
 
-        {% block js %}{% endblock %}
+        <script>
+            $(document).ready(function () {
+                {% block jquery %}{% endblock %}
+            });
+        </script>
     </body>
 </html>

@@ -14,13 +14,7 @@ def index(request):
     else:
         project_list = []
 
-    if len(project_list) > 0:
-        open_files = project_list[0].file_set.all()
-    else:
-        open_files = []
-
-    return render(request, 'ec/index.html', {'project_list': project_list,
-                                             'open_files': open_files})
+    return render(request, 'ec/index.html', {'project_list': project_list})
 
 
 def register(request):

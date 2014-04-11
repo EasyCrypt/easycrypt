@@ -1,54 +1,89 @@
 {% extends "ec/base.html" %}
 
 {% block content %}
-
 {% if user.is_authenticated %}
-<div class="container-fluid">
-    <div class="row">
-        <div class="col-sm-3 col-md-2 sidebar">
-            <ul class="nav nav-sidebar active-no-hover">
-                {% if project_list %}
-                {% for project in project_list %}
-                <li id="proj{{ project.id }}"><a href="#">{{ project.name }}</a></li>
+<div class="row">
+    <div class="col-sm-3 col-md-2 sidebar">
+        <ul id="projects" class="nav nav-sidebar active-no-hover">
+            {% if project_list %}
+            {% for project in project_list %}
+                <li><a href="#">{{project.name }}</a></li>
                 {% if project.file_set.all %}
-                <ul class="nav">
+                <ul id="project-files" class="nav">
                 {% for file in project.file_set.all %}
-                    <li><a href="#"">{{ file.name }}</a></li>
+                    <li file_id="{{ file.id }}"><a href="#"">{{ file.name }}</a></li>
                 {% endfor %}
                 </ul>
                 {% endif %}
                 {% endfor %}
-                {% endif %}
-            </ul>
-            <ul id="project-controls" class="nav nav-sidebar">
-                <button type="button" class="btn btn-default">New project</button>
-            </ul>
-        </div>
-    </div>
-    <div class="col-sm-9 col-sm-offset-3 col-md-10 col-md-offset-2 main">
-        {% if open_files %}
-        <ul class="nav nav-pills">
-            {% for file in open_files %}
-            <li><a data-toggle="pill" href="#">{{ file.name }}</a></li>
-            {% endfor %}
+            {% endif %}
         </ul>
-        <div class="jumbotron">
-        </div>
-        {% endif %}
+        <ul id="project-controls" class="nav nav-sidebar">
+            <button type="button" class="btn btn-default">New project</button>
+        </ul>
     </div>
 </div>
+<div class="col-sm-9 col-sm-offset-3 col-md-10 col-md-offset-2 editor">
+    <div class="row">
+        <div class="col-md-10">
+            <ul id="tabs" class="nav nav-pills">
+            </ul>
+        </div>
+        <div class="col-md-2">
+            <ul id="tab-controls" class="nav navbar-right nav-pills">
+                <li><a href="#"><span class="glyphicon glyphicon-plus"></span></a></li>
+                <li><a href="#"><span class="glyphicon glyphicon-minus"></span></a></li>
+            </ul>
+        </div>
+    </div>
+    <textarea disabled id="file-contents" class="form-control"></textarea>
+</div>
 {% else %}
-<h1>Welcome to the EasyCrypt WebUI</h1>
+<h1>Welcome to the EasyCrypt WebUI.</h1>
+<h4>Please log in to start working.</h4>
 {% endif %}
-
 {% endblock %}
 
 
-{% block js %}
 <script>
-$('.nav li a').on('click', function() {
-	$(this).parent().parent().find('.active').removeClass('active');
+{% block jquery %}
+var tabs = $('#tabs');
+
+/* Project click callback */
+$('#projects li a').on('click', function() {
+	$(this).parent().parent().children('.active').removeClass('active');
 	$(this).parent().addClass('active');
 });
-</script>
+
+/* Tab click callback (load file contents) */
+var file_contents = $("#file-contents");
+function set_file_contents(use_this) {
+	return function () {
+		var source = use_this ? $(this) : tabs.children('.active').children();
+		var id = source.parent().attr('file_id');
+		var name = source.html();
+		file_contents.val("<contents of " + name + " (id=" + id + ")>");
+	};
+};
+function set_tab_click_callback() {
+	$('#tabs li a').click(set_file_contents(true));
+};
+set_tab_click_callback();
+
+/* File click callback: open new tab or change focus */
+$('#project-files li a').click(function() {
+	var id = $(this).parent().attr('file_id');
+	var matching_tabs = tabs.children("li[file_id='" + id + "']");
+	if (matching_tabs.length == 1) {
+		tabs.children('.active').removeClass('active');
+		matching_tabs.addClass('active');
+	} else {
+		tabs.children('.active').removeClass('active');
+		tabs.append('<li class="active" file_id="' + id +
+				'"><a data-toggle="pill" href="#">' + $(this).html() + '</a></li>');
+		set_tab_click_callback();
+	}
+	set_file_contents(false)();
+});
 {% endblock %}
+</script>
