@@ -71,10 +71,6 @@
         <!-- Bootstrap JS -->
         <script src="{% static 'ec/js/bootstrap.min.js' %}"></script>
 
-        <script>
-            $(document).ready(function () {
-                {% block jquery %}{% endblock %}
-            });
-        </script>
+        {% block jquery %}{% endblock %}
     </body>
 </html>

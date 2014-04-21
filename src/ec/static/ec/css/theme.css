@@ -39,13 +39,6 @@ body {
 	background-color: #428bca;
 }
 
-#project-controls {
-	position: absolute;
-	margin: 10px;
-	bottom: 10px;
-	margin-left: auto;
-}
-
 .editor {
 	height: 100%;
 	padding: 0px;
