@@ -1,12 +1,46 @@
 $(document).ready(function() {
-var tabs = $('#tabs');
+
+/* Project class */
+var Project = function(id, name) {
+	this.id = id
+	this.name = name
+}
+
+/* Workspace object (state) */
+var ws = {
+	projects: [],
+	curr_project: null,
+	tabs: [],
+	curr_tab: null,
+
+//	/* Update the frontend */
+//	sync: function() {
+//		
+//	}
+}
+
+/* Load project data */
+$.get('projects/', function(ps) {
+	function parseProject(p) {
+		return new Project(p.pk, p.fields.name)
+	}
+	ws.projects = map(parseProject, ps);
+})
 
 /* Project click callback */
-$('#projects li a').on('click',
-	function() {
-	$(this).parent().parent().children('.active').removeClass('active');
-	$(this).parent().addClass('active');
+$('#projects li a').on('click', function() {
+	var my_id = parseInt($(this).parent().attr('project_id'));
+	ws.curr_project = find(function (p) { return p.id === my_id }, ws.projects);
+//	ws.sync();
 });
+
+//$('#projects li a').on('click',
+//function() {
+//$(this).parent().parent().children('.active').removeClass('active');
+//$(this).parent().addClass('active');
+//});
+
+var tabs = $('#tabs');
 
 /* Tab click callback (load file contents) */
 var file_contents = $("#file-contents");

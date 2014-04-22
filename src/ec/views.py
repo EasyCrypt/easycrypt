@@ -1,5 +1,6 @@
 from django.shortcuts import render
-from django.http import HttpResponseRedirect
+from django.http import HttpResponse, HttpResponseRedirect
+from django.core import serializers
 from django.core.urlresolvers import reverse
 from django.contrib import auth
 
@@ -47,3 +48,11 @@ def login(request):
 def logout(request):
     auth.logout(request)
     return HttpResponseRedirect(reverse('ec:index'))
+
+
+def get_projects(request):
+    if request.user.is_authenticated():
+        resp = serializers.serialize('json', request.user.project_set.all())
+        return HttpResponse(resp, content_type="application/json")
+    else:
+        return HttpResponse('Unauthorized', status=401)

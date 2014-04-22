@@ -9,7 +9,7 @@
             <ul id="projects" class="nav nav-sidebar active-no-hover">
                 {% if project_list %}
                 {% for project in project_list %}
-                    <li><a href="#">{{project.name }}</a></li>
+                    <li project_id="{{ project.id }}"><a href="#">{{project.name }}</a></li>
                     {% if project.file_set.all %}
                     <ul class="nav project-files">
                     {% for file in project.file_set.all %}
