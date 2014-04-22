@@ -1,78 +1,148 @@
-$(document).ready(function() {
-
-/* Project class */
+/* ---------------------------------------------------------------- */
 var Project = function(id, name) {
-	this.id = id
-	this.name = name
+  this.id    = id;
+  this.name  = name;
+  this.files = [];
 }
 
-/* Workspace object (state) */
-var ws = {
-	projects: [],
-	curr_project: null,
-	tabs: [],
-	curr_tab: null,
-
-//	/* Update the frontend */
-//	sync: function() {
-//		
-//	}
+/* ---------------------------------------------------------------- */
+var File = function(id, name, contents, project) {
+  this.id       = id;
+  this.name     = name;
+  this.contents = contents;
+  this.project  = project;
 }
 
-/* Load project data */
-$.get('projects/', function(ps) {
-	function parseProject(p) {
-		return new Project(p.pk, p.fields.name)
-	}
-	ws.projects = map(parseProject, ps);
-})
+/* ---------------------------------------------------------------- */
+var Tab = function(file, display) {
+  this.file    = file;
+  this.display = display || file.name;
+}
 
-/* Project click callback */
-$('#projects li a').on('click', function() {
-	var my_id = parseInt($(this).parent().attr('project_id'));
-	ws.curr_project = find(function (p) { return p.id === my_id }, ws.projects);
-//	ws.sync();
-});
+/* ---------------------------------------------------------------- */
+var Workspace = function() {
+  this.ui       = null;
+  this.projects = null;
+  this.tabs     = [];
+  this.active   = null; /* index of the active tab */
 
-//$('#projects li a').on('click',
-//function() {
-//$(this).parent().parent().children('.active').removeClass('active');
-//$(this).parent().addClass('active');
-//});
+  this.ui = {}
+  this.ui.tabs     = $('#tabs');
+  this.ui.contents = $('#file-contents');
+  this.ui.treeview = $('#projects');
 
-var tabs = $('#tabs');
+  this.load();
+}
 
-/* Tab click callback (load file contents) */
-var file_contents = $("#file-contents");
-function set_file_contents(use_this) {
-	return function() {
-		var source = use_this ? $(this) : tabs.children('.active').children();
-		var id = source.parent().attr('file_id');
-		var name = source.html();
-		file_contents.val("<contents of " + name + " (id=" + id + ")>");
-	};
-};
+/* ---------------------------------------------------------------- */
+Workspace.prototype.load = function() {
+  $.get('projects/', function(ps) {
+    this.projects = ps.map(function(p) {
+      var project = new Project(p.id, p.name);
+      for (var i = 0; i < p.files.length; ++i) {
+        var file = p.files[i];
+        project.files.push(new File(file.id, file.name, null, p));
+      }
+      return project;
+    });
 
-function set_tab_click_callback() {
-	$('#tabs li a').click(set_file_contents(true));
-};
-set_tab_click_callback();
+    for (var i = 0; i < this.projects.length; ++i) {
+      var project = this.projects[i];
+      var node    = $('<li>').text(project.name);
+      
+      this.ui.treeview.append(node);
+      if (project.files.length) {
+        var subnode = $('<ul class="nav project-files">');
+        
+        node.append(subnode);
+        for (var j = 0; j < project.files.length; ++j) {
+          var file     = project.files[j];
+          var filenode = $('<li>');
+          var filelink = $('<a>').text(file.name);
 
-/* File click callback: open new tab or change focus */
-$('.project-files li a').click(
-	function() {
-		var id = $(this).parent().attr('file_id');
-		var matching_tabs = tabs.children("li[file_id='" + id + "']");
-		if (matching_tabs.length == 1) {
-			tabs.children('.active').removeClass('active');
-			matching_tabs.addClass('active');
-		} else {
-			tabs.children('.active').removeClass('active');
-			tabs.append('<li class="active" file_id="' + id
-					+ '"><a data-toggle="pill" href="#">'
-					+ $(this).html() + '</a></li>');
-			set_tab_click_callback();
-		}
-		set_file_contents(false)();
-	});
-});
+          filenode.append(filelink);
+          subnode .append(filenode);
+
+          filelink.on('click', this._callback_for_open_by_id(file.id));
+        }
+      }
+    }
+  }.bind(this));
+}
+
+/* ---------------------------------------------------------------- */
+Workspace.prototype.find_file_by_id = function(id) {
+  for (var i = 0; i < this.projects.length; ++i) {
+    var project = this.projects[i]
+    for (var fileidx = 0; fileidx < project.files.length; ++fileidx) {
+      if (project.files[fileidx].id == id)
+        return project.files[fileidx];
+    }
+  }
+}
+
+/* ---------------------------------------------------------------- */
+Workspace.prototype.find_tab_for_file_id = function(id) {
+  for (var i = 0; i < this.tabs.length; ++i) {
+    if (this.tabs[i].file.id == id)
+      return i;
+  }
+  return -1;
+}
+
+/* ---------------------------------------------------------------- */
+Workspace.prototype.append_new_tab = function(file) {
+  this.tabs.push(new Tab(file));
+
+  var node = $('<li>');
+  var link = $('<a data-toggle="pill">').text(file.name);
+
+  node.append(link);
+  this.ui.tabs.append(node);
+
+  link.on('click', function () { console.log('click'); });
+}
+
+/* ---------------------------------------------------------------- */
+Workspace.prototype.activate_tab_by_index = function(index) {
+  console.log('activate');
+}
+
+/* ---------------------------------------------------------------- */
+Workspace.prototype.open = function(id) {
+  if (!(file = this.find_file_by_id(id)))
+    return ;
+  if ((filetab = this.find_tab_for_file_id(file.id)) < 0) {
+    this.append_new_tab(file);
+  }
+  this.activate_tab_by_index(filetab < 0 ? this.tabs.length-1 : filetab);
+}
+
+/* ---------------------------------------------------------------- */
+Workspace.prototype.set_tab_click_callback = function() {
+  $('#tabs li a').click(set_file_contents(true));
+}
+
+/* ---------------------------------------------------------------- */
+Workspace.prototype.set_file_contents = function(use_this) {
+  return function() {
+    var source = use_this ? $(this) : tabs.children('.active').children();
+    var id = source.parent().attr('file_id');
+    var name = source.html();
+    file_contents.val("<contents of " + name + " (id=" + id + ")>");
+  }
+}
+
+/* ---------------------------------------------------------------- */
+Workspace.prototype._callback_for_open_by_id = function(id) {
+  return (function() { this.open(id); }).bind(this);
+}
+
+/* ---------------------------------------------------------------- */
+var ws = null;
+
+function ec_initialize() {
+  ws = new Workspace();
+}
+    
+$(document).ready(ec_initialize);

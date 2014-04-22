@@ -1,22 +1,17 @@
 from django.shortcuts import render
 from django.http import HttpResponse, HttpResponseRedirect
-from django.core import serializers
 from django.core.urlresolvers import reverse
 from django.contrib import auth
+from django.utils import simplejson
 
 #from django.views import generic
 
+from ec.models import File
 from ec.forms import RegisterForm, LoginForm
 
 
 def index(request):
-    if request.user.is_authenticated():
-        project_list = request.user.project_set.all()
-    else:
-        project_list = []
-
-    return render(request, 'ec/index.html', {'project_list': project_list})
-
+    return render(request, 'ec/index.html')
 
 def register(request):
     if request.method == 'POST':
@@ -51,8 +46,17 @@ def logout(request):
 
 
 def get_projects(request):
-    if request.user.is_authenticated():
-        resp = serializers.serialize('json', request.user.project_set.all())
-        return HttpResponse(resp, content_type="application/json")
-    else:
+    if not request.user.is_authenticated():
         return HttpResponse('Unauthorized', status=401)
+
+    dbprojects = request.user.project_set.all()
+    projects = []
+
+    for dbproject in dbprojects:
+        dbfiles = File.objects.filter(project = dbproject.id)
+        files   = [dict(id = x.id, name = x.name) for x in dbfiles]
+        projects.append(dict(name  = dbproject.name,
+                             files = files))
+
+    resp = simplejson.dumps(projects)
+    return HttpResponse(resp, content_type="application/json")

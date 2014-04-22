@@ -6,20 +6,7 @@
 <div class="row">
     <div class="col-sm-3 col-md-2 sidebar">
         <div class="row">
-            <ul id="projects" class="nav nav-sidebar active-no-hover">
-                {% if project_list %}
-                {% for project in project_list %}
-                    <li project_id="{{ project.id }}"><a href="#">{{project.name }}</a></li>
-                    {% if project.file_set.all %}
-                    <ul class="nav project-files">
-                    {% for file in project.file_set.all %}
-                        <li file_id="{{ file.id }}"><a href="#"">{{ file.name }}</a></li>
-                    {% endfor %}
-                    </ul>
-                    {% endif %}
-                    {% endfor %}
-                {% endif %}
-            </ul>
+            <ul id="projects" class="nav nav-sidebar active-no-hover" />
         </div>
         <div class="row">
             <button type="button" class="btn btn-default">New project</button>
