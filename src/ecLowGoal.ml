@@ -205,8 +205,8 @@ module LowIntro = struct
 
   type kind = [`Value | `Module | `Memory]
 
-  let tc_no_product (_ : proofenv) ?loc () =
-    ignore loc; assert false
+  let tc_no_product (pe : proofenv) ?loc () =
+    tc_error pe ?loc "nothing to introduce"
 
   let check_name_validity pe kind x : unit =
     let ok =
