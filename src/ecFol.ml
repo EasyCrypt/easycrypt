@@ -582,9 +582,9 @@ let f_ands fs =
   | f::fs -> List.fold_left ((^~) f_and) f fs
 
 let f_andas fs =
-  match fs with
+  match List.rev fs with
   | [] -> f_true
-  | f::fs -> List.fold_left f_anda f fs
+  | f::fs -> List.fold_left ((^~) f_anda) f fs
 
 let f_ors fs =
   match List.rev fs with
@@ -592,9 +592,9 @@ let f_ors fs =
   | f::fs -> List.fold_left ((^~) f_or) f fs
 
 let f_oras fs =
-  match fs with
+  match List.rev fs with
   | [] -> f_false
-  | f::fs -> List.fold_left f_ora f fs
+  | f::fs -> List.fold_left ((^~) f_ora) f fs
 
 let f_imps = List.fold_right f_imp
 
