@@ -349,7 +349,7 @@ theory LazyEager.
           (* "expect 12 (move)" is used for catching changes in tactic behaviour early *)
           auto; (progress; expect 12 move); last 2 first; first 11 smt.
           case ((pick work = x){2})=> pick_x; last smt.
-          subst x{2}; generalize H8 H1; rewrite -neqF /eq_except=> -> /= eq_exc.
+          subst x{2}; generalize H7 H1; rewrite -neqF /eq_except=> -> /= eq_exc.
           by apply map_ext=> x0; case (pick work{2} = x0); smt.
         by auto; smt.
 

@@ -53,10 +53,10 @@ let wp_equiv_rnd_r bij tc =
   let (lvR, muR), sr' = tc1_last_rnd tc es.es_sr in
   let tyL = proj_distr_ty (e_ty muL) in
   let tyR = proj_distr_ty (e_ty muR) in
-  let x_id = EcIdent.create (symbol_of_lv lvL ^ "L")
-  and y_id = EcIdent.create (symbol_of_lv lvR ^ "R") in
-  let x = f_local x_id tyL in
-  let y = f_local y_id tyR in
+  let xL_id = EcIdent.create (symbol_of_lv lvL ^ "L")
+  and xR_id = EcIdent.create (symbol_of_lv lvR ^ "R") in
+  let xL = f_local xL_id tyL in
+  let xR = f_local xR_id tyR in
   let muL = EcFol.form_of_expr (EcMemory.memory es.es_ml) muL in
   let muR = EcFol.form_of_expr (EcMemory.memory es.es_mr) muR in
 
@@ -65,23 +65,40 @@ let wp_equiv_rnd_r bij tc =
     | Some (f, finv) -> (f tyL tyR, finv tyR tyL)
     | None ->
         if not (EcReduction.EqTest.for_type env tyL tyR) then
-          tc_error !!tc "support are not compatible, an explicit bijection is required";
-        (EcFol.f_identity ~name:"z" tyL, EcFol.f_identity ~name:"z" tyR)
+          tc_error !!tc "%s, %s"
+            "support are not compatible"
+            "an explicit bijection is required";
+        (EcFol.f_identity ~name:"z" tyL,
+         EcFol.f_identity ~name:"z" tyR)
   in
 
-  let f t = f_app tf [t] tyR in
-  let finv t = f_app tfinv [t] tyL in
-  let supp_cond1 = f_eq (f_mu_x muL x) (f_mu_x muR (f x)) in
-  let supp_cond2 = f_in_supp (finv y) muL in
-  let inv_cond1  = f_eq (finv (f x)) x in
-  let inv_cond2  = f_eq (f (finv y)) y in
-  let post = subst_form_lv env (EcMemory.memory es.es_ml) lvL x es.es_po in
-  let post = subst_form_lv env (EcMemory.memory es.es_mr) lvR (f x) post in
-  let post = f_andas [supp_cond1; supp_cond2; inv_cond1; inv_cond2; post] in
-  let post = f_imp (f_in_supp y muR) post in
-  let post = f_imp (f_in_supp x muL) post in
-  let post = f_forall_simpl [(x_id,GTty tyL);(y_id,GTty tyR)] post in
-  let concl = f_equivS_r { es with es_sl=sl'; es_sr=sr'; es_po=post; } in
+  (*     (∀ x₂, x₂ ∈ ℑ(D₂) ⇒ x₂ = f(f⁻¹(x₂))
+   *  && (∀ x₂, x₂ ∈ ℑ(D₂) ⇒ μ(x₂, D₂) = μ(f⁻¹(x₂), D₁))
+   *  && (∀ x₁, x₁ ∈ ℑ(D₁) ⇒ f(x₁) ∈ ℑ(D₂) && x₁ = f⁻¹(f(x₁)) && φ(x₁, f(x₁)))
+   *)
+
+  let f    t = f_app_simpl tf    [t] tyR in
+  let finv t = f_app_simpl tfinv [t] tyL in
+
+  let cond_fbij      = f_eq xL (finv (f xL)) in
+  let cond_fbij_inv  = f_eq xR (f (finv xR)) in
+
+  let post = es.es_po in
+  let post = subst_form_lv env (EcMemory.memory es.es_ml) lvL xL     post in
+  let post = subst_form_lv env (EcMemory.memory es.es_mr) lvR (f xL) post in
+
+  let cond1 = f_imp (f_in_supp xR muR) cond_fbij_inv in
+  let cond2 = f_imp (f_in_supp xR muR) (f_eq (f_mu_x muR xR) (f_mu_x muL (finv xR))) in
+  let cond3 = f_andas [f_in_supp (f xL) muR; cond_fbij; post] in
+  let cond3 = f_imp (f_in_supp xL muL) cond3 in
+
+  let concl = f_andas
+    [f_forall_simpl [(xR_id, GTty tyR)] cond1;
+     f_forall_simpl [(xR_id, GTty tyR)] cond2;
+     f_forall_simpl [(xL_id, GTty tyL)] cond3] in
+
+  let concl = f_equivS_r { es with es_sl=sl'; es_sr=sr'; es_po=concl; } in
+
   FApi.xmutate1 tc `Rnd [concl]
 
 (* -------------------------------------------------------------------- *)
