@@ -260,7 +260,7 @@ section.
     (* [Psample.prg ~ Plog.prg: I] when Bad does not hold *)
     proc; inline F.f. swap{2} 3 -2.
     wp; do 2!rnd; wp; skip; progress; first 2 last; last 9 smt.
-    by cut:= H8; rewrite notBad=> [logP_unique contradiction]; smt.
+    by move: H6; rewrite notBad=> [logP_unique contradiction]; smt.
     (* Plog.prg is lossless when Bad holds *)
     by intros=> _ _; proc; inline F.f;
        wp; do 2!rnd (True); wp;
