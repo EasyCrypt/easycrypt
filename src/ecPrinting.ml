@@ -1057,6 +1057,7 @@ let pp_instr_for_form (ppe : PPEnv.t) fmt i =
   | Sif (e, _, _) ->
       Format.fprintf fmt "if (%a) {...}"
         (pp_expr ppe) e
+
   | Sabstract id -> (* FIXME *)
       Format.fprintf fmt "%s" (EcIdent.name id)
 
@@ -1279,22 +1280,22 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
   | Flocal id ->
       pp_local ppe fmt id
 
-  | Fpvar (x, i) ->
-    begin match EcEnv.Memory.get_active ppe.PPEnv.ppe_env with
+  | Fpvar (x, i) -> begin
+    match EcEnv.Memory.get_active ppe.PPEnv.ppe_env with
     | Some i' when EcMemory.mem_equal i i' ->
-      Format.fprintf fmt "%a" (pp_pv ppe) x
+        Format.fprintf fmt "%a" (pp_pv ppe) x
     | _ ->
-      let ppe = PPEnv.enter_by_memid ppe i in
-      Format.fprintf fmt "%a{%a}" (pp_pv ppe) x (pp_mem ppe) i
+        let ppe = PPEnv.enter_by_memid ppe i in
+        Format.fprintf fmt "%a{%a}" (pp_pv ppe) x (pp_mem ppe) i
     end
 
-  | Fglob (mp, i) ->
-    begin match EcEnv.Memory.get_active ppe.PPEnv.ppe_env with
+  | Fglob (mp, i) -> begin
+    match EcEnv.Memory.get_active ppe.PPEnv.ppe_env with
     | Some i' when EcMemory.mem_equal i i' ->
-      Format.fprintf fmt "(glob %a)" (pp_topmod ppe) mp
+        Format.fprintf fmt "(glob %a)" (pp_topmod ppe) mp
     | _ ->
-      let ppe = PPEnv.enter_by_memid ppe i in
-      Format.fprintf fmt "(glob %a){%a}" (pp_topmod ppe) mp (pp_mem ppe) i
+        let ppe = PPEnv.enter_by_memid ppe i in
+        Format.fprintf fmt "(glob %a){%a}" (pp_topmod ppe) mp (pp_mem ppe) i
     end
 
   | Fquant (q, bd, f) ->
