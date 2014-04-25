@@ -2012,7 +2012,7 @@ logtactic:
 | CUT ip=intro_pattern* CEQ fp=pterm
    { Pcutdef (ip, fp) }
 
-| POSE o=rwocc? x=lident CEQ p=form_h %prec prec_below_IMPL
+| POSE o=rwocc? x=ident CEQ p=form_h %prec prec_below_IMPL
    { Ppose (x, o |> omap EcMaps.Sint.of_list, p) }
 ;
 
