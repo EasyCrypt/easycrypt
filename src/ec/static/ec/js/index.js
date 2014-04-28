@@ -11,6 +11,8 @@ var File = function(id, name, contents, project) {
   this.name     = name;
   this.contents = contents;
   this.project  = project;
+
+  this.is_loading = false;
 }
 
 /* ---------------------------------------------------------------- */
@@ -97,17 +99,29 @@ Workspace.prototype.find_tab_for_file_id = function(id) {
 }
 
 /* ---------------------------------------------------------------- */
+Workspace.prototype.refresh_contents = function() {
+  var current_file = this.tabs[this.active].file;
+  this.ui.contents.val(current_file.contents);
+  if (current_file.is_loading)
+    this.ui.contents.attr('disabled','disabled');
+  else
+    this.ui.contents.removeAttr('disabled');
+}
+
+/* ---------------------------------------------------------------- */
 Workspace.prototype.set_contents = function(id) {
   if (!(file = this.find_file_by_id(id)))
     return ;
   if (!file.contents) {
-    $.get('files/' + file.id + "/contents", (function (contents) {
+    file.is_loading = true;
+    file.contents = "loading...";
+    $.get('files/' + file.id + "/contents", (function (file,contents) {
       file.contents = contents;
-      this.ui.contents.val(contents);
-    }).bind(this));
-  } else {
-    this.ui.contents.val(file.contents);
+      file.is_loading = false;
+      this.refresh_contents();
+    }).bind(this,file));
   }
+  this.refresh_contents();
 }
 
 /* ---------------------------------------------------------------- */
@@ -115,16 +129,16 @@ Workspace.prototype.append_new_tab = function(file) {
   this.tabs.push(new Tab(file));
 
   var node = $('<li>');
-  var link = $('<a>').attr('data-toggle', 'pill').text(file.name);
+  var link = $('<a>').text(file.name);
 
   node.append(link);
   this.ui.tabs.append(node);
 
-  link.on('click', this._callback_for_set_contents_by_id(file.id));
+  link.on('click', this._callback_for_activate_tab_by_index(this.tabs.length-1));
 }
 
 /* ---------------------------------------------------------------- */
-Workspace.prototype.activate_tab_by_index = function(index) {
+Workspace.prototype.activate_tab = function(index) {
   if (index > this.tabs.length-1)
     return ;
   this.active = index;
@@ -140,7 +154,7 @@ Workspace.prototype.open = function(id) {
   if ((filetab = this.find_tab_for_file_id(file.id)) < 0) {
     this.append_new_tab(file);
   }
-  this.activate_tab_by_index(filetab < 0 ? this.tabs.length-1 : filetab);
+  this.activate_tab(filetab < 0 ? this.tabs.length-1 : filetab);
 }
 
 /* ---------------------------------------------------------------- */
@@ -153,6 +167,10 @@ Workspace.prototype._callback_for_set_contents_by_id = function(id) {
   return (function() { this.set_contents(id); }).bind(this);
 }
 
+/* ---------------------------------------------------------------- */
+Workspace.prototype._callback_for_activate_tab_by_index = function(index) {
+  return (function() { this.activate_tab(index); }).bind(this);
+}
 /* ---------------------------------------------------------------- */
 var ws = null;
 
