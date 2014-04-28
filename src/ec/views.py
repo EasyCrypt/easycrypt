@@ -13,6 +13,7 @@ from ec.forms import RegisterForm, LoginForm
 def index(request):
     return render(request, 'ec/index.html')
 
+
 def register(request):
     if request.method == 'POST':
         form = RegisterForm(request.POST)
@@ -53,10 +54,10 @@ def get_projects(request):
     projects = []
 
     for dbproject in dbprojects:
-        dbfiles = File.objects.filter(project = dbproject.id)
-        files   = [dict(id = x.id, name = x.name) for x in dbfiles]
-        projects.append(dict(name  = dbproject.name,
-                             files = files))
+        dbfiles = File.objects.filter(project=dbproject.id)
+        files = [dict(id=x.id, name=x.name) for x in dbfiles]
+        projects.append(dict(name=dbproject.name,
+                             files=files))
 
     resp = simplejson.dumps(projects)
     return HttpResponse(resp, content_type="application/json")
