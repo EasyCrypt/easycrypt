@@ -48,12 +48,18 @@ Workspace.prototype.load = function() {
 
     for (var i = 0; i < this.projects.length; ++i) {
       var project = this.projects[i];
-      var node    = $('<li>').text(project.name);
+      var node    = $('<li>');
+      var link = $('<a>').text(project.name);
       
+      node.append(link);
       this.ui.treeview.append(node);
       if (project.files.length) {
-        var subnode = $('<ul>').addClass('nav project-files');
+        var subnode = $('<ul>').addClass('nav project-files collapse')
         
+        // Collapse project files
+        link.attr('data-toggle', 'collapse').attr('data-target', '#projfs_'+i);
+        subnode.attr('id', 'projfs_'+i);
+
         node.append(subnode);
         for (var j = 0; j < project.files.length; ++j) {
           var file     = project.files[j];
