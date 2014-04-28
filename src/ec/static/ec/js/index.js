@@ -52,7 +52,7 @@ Workspace.prototype.load = function() {
       
       this.ui.treeview.append(node);
       if (project.files.length) {
-        var subnode = $('<ul class="nav project-files">');
+        var subnode = $('<ul>').addClass('nav project-files');
         
         node.append(subnode);
         for (var j = 0; j < project.files.length; ++j) {
@@ -109,7 +109,7 @@ Workspace.prototype.append_new_tab = function(file) {
   this.tabs.push(new Tab(file));
 
   var node = $('<li>');
-  var link = $('<a data-toggle="pill">').text(file.name);
+  var link = $('<a>').attr('data-toggle', 'pill').text(file.name);
 
   node.append(link);
   this.ui.tabs.append(node);
