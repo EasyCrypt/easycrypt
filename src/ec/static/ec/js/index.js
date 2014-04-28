@@ -91,6 +91,20 @@ Workspace.prototype.find_tab_for_file_id = function(id) {
 }
 
 /* ---------------------------------------------------------------- */
+Workspace.prototype.set_contents = function(id) {
+  if (!(file = this.find_file_by_id(id)))
+    return ;
+  if (!file.contents) {
+    $.get('files/' + file.id + "/contents", (function (contents) {
+      file.contents = contents;
+      this.ui.contents.val(contents);
+    }).bind(this));
+  } else {
+    this.ui.contents.val(file.contents);
+  }
+}
+
+/* ---------------------------------------------------------------- */
 Workspace.prototype.append_new_tab = function(file) {
   this.tabs.push(new Tab(file));
 
@@ -100,12 +114,17 @@ Workspace.prototype.append_new_tab = function(file) {
   node.append(link);
   this.ui.tabs.append(node);
 
-  link.on('click', function () { console.log('click'); });
+  link.on('click', this._callback_for_set_contents_by_id(file.id));
 }
 
 /* ---------------------------------------------------------------- */
 Workspace.prototype.activate_tab_by_index = function(index) {
-  console.log('activate');
+  if (index > this.tabs.length-1)
+    return ;
+  this.active = index;
+  this.ui.tabs.find('.active').removeClass('active');
+  this.ui.tabs.find(':nth-child(' + (index+1) + ')').addClass('active');
+  this.set_contents(this.tabs[index].file.id);
 }
 
 /* ---------------------------------------------------------------- */
@@ -119,23 +138,13 @@ Workspace.prototype.open = function(id) {
 }
 
 /* ---------------------------------------------------------------- */
-Workspace.prototype.set_tab_click_callback = function() {
-  $('#tabs li a').click(set_file_contents(true));
-}
-
-/* ---------------------------------------------------------------- */
-Workspace.prototype.set_file_contents = function(use_this) {
-  return function() {
-    var source = use_this ? $(this) : tabs.children('.active').children();
-    var id = source.parent().attr('file_id');
-    var name = source.html();
-    file_contents.val("<contents of " + name + " (id=" + id + ")>");
-  }
-}
-
-/* ---------------------------------------------------------------- */
 Workspace.prototype._callback_for_open_by_id = function(id) {
   return (function() { this.open(id); }).bind(this);
+}
+
+/* ---------------------------------------------------------------- */
+Workspace.prototype._callback_for_set_contents_by_id = function(id) {
+  return (function() { this.set_contents(id); }).bind(this);
 }
 
 /* ---------------------------------------------------------------- */

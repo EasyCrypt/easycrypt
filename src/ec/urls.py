@@ -10,4 +10,6 @@ urlpatterns = patterns('',
 
    # Information retrieval from the client (not meant for user interaction)
    url(r'^projects/$', views.get_projects, name='get_projects'),
+   url(r'^files/(?P<file_id>\d+)/contents$', views.get_file_contents,
+       name='get_file_contents'),
 )
