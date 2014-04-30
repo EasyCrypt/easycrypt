@@ -6,12 +6,14 @@ from django.utils import simplejson
 
 #from django.views import generic
 
-from ec.models import File
-from ec.forms import RegisterForm, LoginForm
+from ec.models import File, Project
+from ec.forms import RegisterForm, LoginForm, ProjectCreationFormModal
 
 
 def index(request):
-    return render(request, 'ec/index.html')
+    newprojform = ProjectCreationFormModal()
+    return render(request, 'ec/index.html',
+                  {'newprojform': newprojform})
 
 
 def register(request):
@@ -61,6 +63,22 @@ def get_projects(request):
 
     resp = simplejson.dumps(projects)
     return HttpResponse(resp, content_type="application/json")
+
+
+def create_project(request):
+    if not request.user.is_authenticated():
+        return HttpResponse('Unauthorized', status=401)
+
+    if request.method == 'POST':
+        form = ProjectCreationFormModal(request.POST)
+        if form.is_valid():
+            proj = Project(name=form.cleaned_data['name'], owner=request.user)
+            proj.save()
+            return HttpResponseRedirect(reverse('ec:index'))
+        else:
+            return HttpResponse(str(form.errors), status=400)
+    else:
+        return HttpResponse('Only POST method allowed', status=405)
 
 
 def get_file_contents(request, file_id):

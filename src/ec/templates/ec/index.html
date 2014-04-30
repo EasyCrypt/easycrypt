@@ -1,5 +1,6 @@
 {% extends "ec/base.html" %}
 {% load staticfiles %}
+{% load crispy_forms_tags %}
 
 {% block content %}
 {% if user.is_authenticated %}
@@ -9,12 +10,15 @@
             <ul id="projects" class="nav nav-sidebar active-no-hover" />
         </div>
         <div class="row">
-            <button type="button" class="btn btn-default">New project</button>
+            <button type="button" class="btn btn-default"
+                    data-toggle="modal" data-target="#newprojmodal">New project</button>
+
             <button type="button" class="btn btn-default">New file</button>
             <hr />
         </div>
     </div>
 </div>
+
 <div class="col-sm-9 col-sm-offset-3 col-md-10 col-md-offset-2 editor">
     <div class="row">
         <div class="col-md-10">
@@ -32,6 +36,16 @@
         <textarea id="file-contents" class="form-control"></textarea>
     </div>
 </div>
+
+<!-- Modals -->
+<div class="modal fade" id="newprojmodal" role="dialog"
+     aria-labelledby="myModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-sm"><div class="modal-content">
+        {% crispy newprojform %}
+    </div></div>
+</div>
+<!------------>
+
 {% else %}
 <h1>Welcome to the EasyCrypt WebUI.</h1>
 <h4>Please log in to start working.</h4>

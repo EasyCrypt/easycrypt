@@ -3,7 +3,7 @@ from django.core.urlresolvers import reverse
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 from django.utils.translation import ugettext_lazy as _
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Submit, Layout, Field
+from crispy_forms.layout import Submit, Button, Layout, Field, Div, HTML
 from crispy_forms.bootstrap import FormActions
 
 
@@ -88,3 +88,33 @@ class LoginForm(AuthenticationForm):
 
         require(self, ['username', 'password'])
         autofocus(self, 'username')
+
+
+class ProjectCreationFormModal(forms.Form):
+    name = forms.RegexField(
+        label=(""), max_length=30,
+        regex=r'^[a-zA-Z0-9_ ]+$',
+        error_messages={'invalid':
+                        _("This value may contain only letters, "
+                          "underscores, spaces and numbers.")})
+
+    def __init__(self, *args, **kwargs):
+        super(ProjectCreationFormModal, self).__init__(*args, **kwargs)
+
+        self.helper = FormHelper()
+        self.helper.form_action = reverse('ec:create_project')
+        self.helper.form_class = "form form-centered"
+        self.helper.layout = Layout(
+            Div(Field('name', placeholder="Project name",
+                      css_class="form-control"),
+                css_class="modal-body"),
+            Div(FormActions(Button('cancel', 'Cancel',
+                                   css_class="btn btn-default",
+                                   data_dismiss="modal"),
+                            Submit('create_project', 'New project',
+                                   css_class="btn btn-primary")),
+                css_class="modal-footer"),
+        )
+
+        require(self, ['name'])
+        autofocus(self, 'name')
