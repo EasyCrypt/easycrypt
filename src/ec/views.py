@@ -2,7 +2,7 @@ from django.shortcuts import render, get_object_or_404
 from django.http import HttpResponse, HttpResponseRedirect
 from django.core.urlresolvers import reverse
 from django.contrib import auth
-from django.utils import simplejson
+import json
 
 #from django.views import generic
 
@@ -61,7 +61,7 @@ def get_projects(request):
         projects.append(dict(name=dbproject.name,
                              files=files))
 
-    resp = simplejson.dumps(projects)
+    resp = json.dumps(projects)
     return HttpResponse(resp, content_type="application/json")
 
 
@@ -86,5 +86,5 @@ def get_file_contents(request, file_id):
         return HttpResponse('Unauthorized', status=401)
 
     f = get_object_or_404(File, pk=file_id)
-    resp = simplejson.dumps(f.contents)
+    resp = json.dumps(f.contents)
     return HttpResponse(resp, content_type="application/json")
