@@ -50,19 +50,29 @@ Workspace.prototype.load = function() {
 
     for (var i = 0; i < this.projects.length; ++i) {
       var project = this.projects[i];
-      var node    = $('<li>');
-      var link = $('<a>').text(project.name);
+
+      var toggle_col = $('<div>').addClass('col-sm-3 col-md-2');
+      var toggle = $('<a>').attr('href','#').text("►");
+      toggle.on('click', this._callback_for_collapse(toggle));
+      toggle_col.append(toggle);
+
+      var proj_col  = $('<div>').addClass('col-sm-9 col-md-10');
+      var name_row  = $('<div>').addClass('row').text(project.name);
+      var files_row = $('<div>').addClass('row');
+      proj_col.append(name_row, files_row);
+
+      var proj_row   = $('<div>').addClass('row');
+      proj_row.append(toggle_col, proj_col);
       
-      node.append(link);
-      this.ui.treeview.append(node);
+      this.ui.treeview.append(proj_row);
       if (project.files.length) {
         var subnode = $('<ul>').addClass('nav project-files collapse')
         
         // Collapse project files
-        link.attr('data-toggle', 'collapse').attr('data-target', '#projfs_'+i);
+        toggle.attr('data-toggle', 'collapse').attr('data-target', '#projfs_'+i);
         subnode.attr('id', 'projfs_'+i);
 
-        node.append(subnode);
+        files_row.append(subnode);
         for (var j = 0; j < project.files.length; ++j) {
           var file     = project.files[j];
           var filenode = $('<li>');
@@ -171,6 +181,11 @@ Workspace.prototype._callback_for_set_contents_by_id = function(id) {
 Workspace.prototype._callback_for_activate_tab_by_index = function(index) {
   return (function() { this.activate_tab(index); }).bind(this);
 }
+
+Workspace.prototype._callback_for_collapse = function(toggle) {
+  return function() { toggle.text(toggle.text() == "▼" ? "►" : "▼"); };
+}
+
 /* ---------------------------------------------------------------- */
 var ws = null;
 
