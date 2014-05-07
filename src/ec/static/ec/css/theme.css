@@ -15,8 +15,8 @@ body {
 	padding-top: 15px;
 	padding-left: 30px;
 	border-right: 1px solid #eee;
-/* 	overflow-x: hidden;
-	overflow-y: auto;
+	overflow-x: hidden;
+/*	overflow-y: auto;
 	display: block; */
 }
 
@@ -93,4 +93,8 @@ body {
 
 .fld-mg-bot {
 	margin-bottom: 10px;
+}
+
+.red {
+	color: red;
 }

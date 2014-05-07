@@ -5,10 +5,10 @@
 {% block content %}
 {% if user.is_authenticated %}
 <div class="row full-height">
-    <div id="projects" class="col-sm-3 col-md-2 full-height">
+    <div id="projects" class="col-sm-2 col-md-2 full-height">
     </div>
 
-    <div class="col-sm-9 col-md-10 full-height">
+    <div class="col-sm-10 col-md-10 full-height">
         <div class="row">
             <div class="col-md-10">
                 <ul id="tabs" class="nav nav-pills">
@@ -21,7 +21,7 @@
             </div>
         </div>
         <div class="row full-height">
-            <textarea id="file-contents" class="form-control"></textarea>
+            <textarea id="file-contents" class="form-control" disabled></textarea>
         </div>
     </div>
 </div>
@@ -36,8 +36,10 @@
 <!------------>
 
 {% else %}
+<center>
 <h1>Welcome to the EasyCrypt WebUI.</h1>
 <h4>Please log in to start working.</h4>
+</center>
 {% endif %}
 {% endblock %}
 

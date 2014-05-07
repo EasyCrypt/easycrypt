@@ -51,39 +51,30 @@ Workspace.prototype.load = function() {
     for (var i = 0; i < this.projects.length; ++i) {
       var project = this.projects[i];
 
-      var toggle_col = $('<div>').addClass('col-sm-3 col-md-2');
-      var toggle = $('<span>').addClass('glyphicon glyphicon-chevron-up');
-      toggle.attr('data-toggle', 'collapse').attr('data-target', '#projfs_'+i);
-      toggle_col.append(toggle);
+      var expand_proj = glyph('glyphicon-chevron-up');
+      var target_id = "proj_files_" + i
+      expand_proj.attr('data-toggle', 'collapse').attr('data-target', '#'+target_id);
+      var files_col = col(11, 1).addClass('collapse').attr('id', target_id);
 
-      var proj_col  = $('<div>').addClass('col-sm-9 col-md-10');
-      var name_row  = $('<div>').addClass('row').text(project.name);
-      var files_row = $('<div>').addClass('row');
-      proj_col.append(name_row, files_row);
-
-      var proj_row   = $('<div>').addClass('row');
-      proj_row.append(toggle_col, proj_col);
+      var toggle_glyph = this._callback_for_toggle_glyph(expand_proj);
+      files_col.on('shown.bs.collapse', toggle_glyph);
+      files_col.on('hidden.bs.collapse', toggle_glyph);
       
-      this.ui.treeview.append(proj_row);
-      if (project.files.length) {
-        var subnode = $('<ul>').addClass('nav collapse');
-        subnode.attr('id', 'projfs_'+i);
-        var collapse_callback = this._callback_for_collapse(toggle);
-        subnode.on('shown.bs.collapse', collapse_callback);
-        subnode.on('hidden.bs.collapse', collapse_callback);
+      // TODO The collapse logic should be controlled from the Project models
 
-        files_row.append(subnode);
-        for (var j = 0; j < project.files.length; ++j) {
-          var file     = project.files[j];
-          var filenode = $('<li>');
-          var filelink = $('<a>').text(file.name);
-
-          filenode.append(filelink);
-          subnode .append(filenode);
-
-          filelink.on('click', this._callback_for_open_by_id(file.id));
-        }
+      for (var j = 0; j < project.files.length; ++j) {
+        var file      = project.files[j];
+        var filelink  = $('<a>').text(file.name);
+        filelink.on('click', this._callback_for_open_by_id(file.id));
+        files_col.append(row(filelink, glyph('glyphicon-remove pull-right red')));
       }
+      files_col.append(row(glyph('glyphicon-plus')));
+
+      var project_tree =
+        row(col(12,0, row(expand_proj, " ", project.name),
+                      row(files_col),
+                      $('<hr />')));
+      this.ui.treeview.append(project_tree);
     }
   }.bind(this));
 }
@@ -182,8 +173,10 @@ Workspace.prototype._callback_for_activate_tab_by_index = function(index) {
   return (function() { this.activate_tab(index); }).bind(this);
 }
 
-Workspace.prototype._callback_for_collapse = function(toggle) {
-  return function() { toggle.toggleClass('glyphicon-chevron-up glyphicon-chevron-down'); };
+Workspace.prototype._callback_for_toggle_glyph = function(glyph) {
+  return function() {
+    glyph.toggleClass('glyphicon-chevron-up glyphicon-chevron-down');
+  };
 }
 
 /* ---------------------------------------------------------------- */
