@@ -52,8 +52,8 @@ Workspace.prototype.load = function() {
       var project = this.projects[i];
 
       var toggle_col = $('<div>').addClass('col-sm-3 col-md-2');
-      var toggle = $('<a>').attr('href','#').text("►");
-      toggle.on('click', this._callback_for_collapse(toggle));
+      var toggle = $('<span>').addClass('glyphicon glyphicon-chevron-up');
+      toggle.attr('data-toggle', 'collapse').attr('data-target', '#projfs_'+i);
       toggle_col.append(toggle);
 
       var proj_col  = $('<div>').addClass('col-sm-9 col-md-10');
@@ -66,11 +66,11 @@ Workspace.prototype.load = function() {
       
       this.ui.treeview.append(proj_row);
       if (project.files.length) {
-        var subnode = $('<ul>').addClass('nav project-files collapse')
-        
-        // Collapse project files
-        toggle.attr('data-toggle', 'collapse').attr('data-target', '#projfs_'+i);
+        var subnode = $('<ul>').addClass('nav collapse');
         subnode.attr('id', 'projfs_'+i);
+        var collapse_callback = this._callback_for_collapse(toggle);
+        subnode.on('shown.bs.collapse', collapse_callback);
+        subnode.on('hidden.bs.collapse', collapse_callback);
 
         files_row.append(subnode);
         for (var j = 0; j < project.files.length; ++j) {
@@ -183,7 +183,7 @@ Workspace.prototype._callback_for_activate_tab_by_index = function(index) {
 }
 
 Workspace.prototype._callback_for_collapse = function(toggle) {
-  return function() { toggle.text(toggle.text() == "▼" ? "►" : "▼"); };
+  return function() { toggle.toggleClass('glyphicon-chevron-up glyphicon-chevron-down'); };
 }
 
 /* ---------------------------------------------------------------- */
