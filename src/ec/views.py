@@ -88,3 +88,12 @@ def get_file_contents(request, file_id):
     f = get_object_or_404(File, pk=file_id)
     resp = json.dumps(f.contents)
     return HttpResponse(resp, content_type="application/json")
+
+
+def rm_file(request, file_id):
+    if not request.user.is_authenticated():
+        return HttpResponse('Unauthorized', status=401)
+
+    f = get_object_or_404(File, pk=file_id)
+    f.delete()
+    return HttpResponse('OK', status=200)

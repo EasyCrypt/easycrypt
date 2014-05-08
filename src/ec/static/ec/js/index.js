@@ -37,8 +37,16 @@ var Workspace = function() {
 }
 
 /* ---------------------------------------------------------------- */
+Workspace.prototype.reset_ui = function() {
+  this.ui.tabs.children().remove();
+  this.ui.treeview.children().remove();
+  this.refresh_contents();
+}
+
+/* ---------------------------------------------------------------- */
 Workspace.prototype.load = function() {
   $.get('projects/', function(ps) {
+    this.reset_ui();
     this.projects = ps.map(function(p) {
       var project = new Project(p.id, p.name);
       for (var i = 0; i < p.files.length; ++i) {
@@ -66,7 +74,9 @@ Workspace.prototype.load = function() {
         var file      = project.files[j];
         var filelink  = $('<a>').text(file.name);
         filelink.on('click', this._callback_for_open_by_id(file.id));
-        files_col.append(row(filelink, glyph('glyphicon-remove pull-right red')));
+        var rm_but = glyph('glyphicon-remove pull-right red');
+        rm_but.on('click', this._callback_for_rm_file(file.id));
+        files_col.append(row(filelink, rm_but));
       }
       files_col.append(row(glyph('glyphicon-plus')));
 
@@ -74,9 +84,15 @@ Workspace.prototype.load = function() {
         row(col(12,0, row(expand_proj, " ", project.name),
                       row(files_col),
                       $('<hr />')));
+
       this.ui.treeview.append(project_tree);
     }
   }.bind(this));
+}
+
+/* ---------------------------------------------------------------- */
+Workspace.prototype.load_ui = function() {
+  ws = new Workspace()
 }
 
 /* ---------------------------------------------------------------- */
@@ -101,12 +117,17 @@ Workspace.prototype.find_tab_for_file_id = function(id) {
 
 /* ---------------------------------------------------------------- */
 Workspace.prototype.refresh_contents = function() {
-  var current_file = this.tabs[this.active].file;
-  this.ui.contents.val(current_file.contents);
-  if (current_file.is_loading)
-    this.ui.contents.attr('disabled','disabled');
-  else
-    this.ui.contents.removeAttr('disabled');
+  if (this.active != null) {
+    var current_file = this.tabs[this.active].file;
+    this.ui.contents.val(current_file.contents);
+    if (current_file.is_loading)
+      this.ui.contents.attr('disabled','disabled');
+    else
+      this.ui.contents.removeAttr('disabled');
+  } else {
+    this.ui.contents.val("");
+    this.ui.contents.attr('disabled', 'disabled');
+  }
 }
 
 /* ---------------------------------------------------------------- */
@@ -173,10 +194,18 @@ Workspace.prototype._callback_for_activate_tab_by_index = function(index) {
   return (function() { this.activate_tab(index); }).bind(this);
 }
 
+/* ---------------------------------------------------------------- */
 Workspace.prototype._callback_for_toggle_glyph = function(glyph) {
   return function() {
     glyph.toggleClass('glyphicon-chevron-up glyphicon-chevron-down');
   };
+}
+
+/* ---------------------------------------------------------------- */
+Workspace.prototype._callback_for_rm_file = function(id) {
+  return (function () {
+    $.get('files/' + id + '/rm', ec_initialize);
+  }).bind(this);
 }
 
 /* ---------------------------------------------------------------- */
@@ -185,5 +214,5 @@ var ws = null;
 function ec_initialize() {
   ws = new Workspace();
 }
-    
+
 $(document).ready(ec_initialize);

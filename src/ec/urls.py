@@ -13,4 +13,6 @@ urlpatterns = patterns('',
    url(r'^projects/create$', views.create_project, name='create_project'),
    url(r'^files/(?P<file_id>\d+)/contents$', views.get_file_contents,
        name='get_file_contents'),
+   url(r'^files/(?P<file_id>\d+)/rm$', views.rm_file,
+       name='rm_file'),
 )

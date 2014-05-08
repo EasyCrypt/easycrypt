@@ -3,7 +3,7 @@ from django.core.urlresolvers import reverse
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 from django.utils.translation import ugettext_lazy as _
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Submit, Button, Layout, Field, Div, HTML
+from crispy_forms.layout import Submit, Button, Layout, Field, Div
 from crispy_forms.bootstrap import FormActions
 
 
