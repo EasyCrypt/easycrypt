@@ -88,6 +88,9 @@ USE_TZ = True
 STATIC_URL = '/static/'
 
 
+LOGIN_URL = '/ec/login'
+
+
 TEMPLATE_DIRS = [os.path.join(BASE_DIR, 'templates')]
 
 

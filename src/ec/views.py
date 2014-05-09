@@ -2,6 +2,7 @@ from django.shortcuts import render, get_object_or_404
 from django.http import HttpResponse, HttpResponseRedirect
 from django.core.urlresolvers import reverse
 from django.contrib import auth
+from django.contrib.auth.decorators import login_required
 import json
 
 #from django.views import generic
@@ -48,10 +49,8 @@ def logout(request):
     return HttpResponseRedirect(reverse('ec:index'))
 
 
+@login_required
 def get_projects(request):
-    if not request.user.is_authenticated():
-        return HttpResponse('Unauthorized', status=401)
-
     dbprojects = request.user.project_set.all()
     projects = []
 
@@ -65,10 +64,8 @@ def get_projects(request):
     return HttpResponse(resp, content_type="application/json")
 
 
+@login_required
 def create_project(request):
-    if not request.user.is_authenticated():
-        return HttpResponse('Unauthorized', status=401)
-
     if request.method == 'POST':
         form = ProjectCreationFormModal(request.POST)
         if form.is_valid():
@@ -90,10 +87,8 @@ def get_file_contents(request, file_id):
     return HttpResponse(resp, content_type="application/json")
 
 
+@login_required
 def rm_file(request, file_id):
-    if not request.user.is_authenticated():
-        return HttpResponse('Unauthorized', status=401)
-
     f = get_object_or_404(File, pk=file_id)
     f.delete()
     return HttpResponse('OK', status=200)
