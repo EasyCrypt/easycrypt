@@ -6,6 +6,10 @@ html, body {
 	height: 100%;
 }
 
+.no-resize {
+	resize: none;
+}
+
 body {
 	padding-top: 40px;
 }

@@ -8,13 +8,19 @@ import json
 #from django.views import generic
 
 from ec.models import File, Project
-from ec.forms import RegisterForm, LoginForm, ProjectCreationFormModal
+
+from ec.forms import RegisterForm, LoginForm
+from ec.forms import ProjectCreationFormModal, FileCreationFormModal
+
+
+def _json_HttpResponse(resp):
+    return HttpResponse(json.dumps(resp), content_type="application/json")
 
 
 def index(request):
-    newprojform = ProjectCreationFormModal()
     return render(request, 'ec/index.html',
-                  {'newprojform': newprojform})
+                  {'newprojform': ProjectCreationFormModal(),
+                   'newfileform': FileCreationFormModal()})
 
 
 def register(request):
@@ -57,11 +63,11 @@ def get_projects(request):
     for dbproject in dbprojects:
         dbfiles = File.objects.filter(project=dbproject.id)
         files = [dict(id=x.id, name=x.name) for x in dbfiles]
-        projects.append(dict(name=dbproject.name,
+        projects.append(dict(id=dbproject.id,
+                             name=dbproject.name,
                              files=files))
 
-    resp = json.dumps(projects)
-    return HttpResponse(resp, content_type="application/json")
+    return _json_HttpResponse(projects)
 
 
 @login_required
@@ -69,7 +75,8 @@ def create_project(request):
     if request.method == 'POST':
         form = ProjectCreationFormModal(request.POST)
         if form.is_valid():
-            proj = Project(name=form.cleaned_data['name'], owner=request.user)
+            proj = Project(name=form.cleaned_data['proj_name'],
+                           owner=request.user)
             proj.save()
             return HttpResponseRedirect(reverse('ec:index'))
         else:
@@ -78,13 +85,26 @@ def create_project(request):
         return HttpResponse('Only POST method allowed', status=405)
 
 
-def get_file_contents(request, file_id):
-    if not request.user.is_authenticated():
-        return HttpResponse('Unauthorized', status=401)
+@login_required
+def create_file(request, proj_id):
+    if request.method == 'POST':
+        form = FileCreationFormModal(request.POST)
+        if form.is_valid():
+            proj = get_object_or_404(Project, pk=proj_id)
+            f = File(name=form.cleaned_data['file_name'],
+                     contents=form.cleaned_data['file_contents'], project=proj)
+            f.save()
+            return HttpResponseRedirect(reverse('ec:index'))
+        else:
+            return HttpResponse(str(form.errors), status=400)
+    else:
+        return HttpResponse('Only POST method allowed', status=405)
 
+
+@login_required
+def get_file_contents(request, file_id):
     f = get_object_or_404(File, pk=file_id)
-    resp = json.dumps(f.contents)
-    return HttpResponse(resp, content_type="application/json")
+    return _json_HttpResponse(f.contents)
 
 
 @login_required

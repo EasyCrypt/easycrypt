@@ -91,7 +91,7 @@ class LoginForm(AuthenticationForm):
 
 
 class ProjectCreationFormModal(forms.Form):
-    name = forms.RegexField(
+    proj_name = forms.RegexField(
         label=(""), max_length=30,
         regex=r'^[a-zA-Z0-9_ ]+$',
         error_messages={'invalid':
@@ -105,16 +105,49 @@ class ProjectCreationFormModal(forms.Form):
         self.helper.form_action = reverse('ec:create_project')
         self.helper.form_class = "form form-centered"
         self.helper.layout = Layout(
-            Div(Field('name', placeholder="Project name",
+            Div(Field('proj_name', placeholder="Project name",
                       css_class="form-control"),
                 css_class="modal-body"),
-            Div(FormActions(Button('cancel', 'Cancel',
+            Div(FormActions(Button('proj_cancel', 'Cancel',
                                    css_class="btn btn-default",
                                    data_dismiss="modal"),
-                            Submit('create_project', 'New project',
+                            Submit('proj_create', 'New project',
                                    css_class="btn btn-primary")),
                 css_class="modal-footer"),
         )
 
-        require(self, ['name'])
-        autofocus(self, 'name')
+        require(self, ['proj_name'])
+        autofocus(self, 'proj_name')
+
+
+class FileCreationFormModal(forms.Form):
+    file_name = forms.RegexField(
+        label=(""), max_length=30,
+        regex=r'^[a-zA-Z0-9_ ]+$',
+        error_messages={'invalid':
+                        _("This value may contain only letters, "
+                          "underscores, spaces and numbers.")})
+    file_contents = forms.CharField(label=(""),
+        widget=forms.Textarea(attrs={'size': 30}))
+
+    def __init__(self, *args, **kwargs):
+        super(FileCreationFormModal, self).__init__(*args, **kwargs)
+
+        self.helper = FormHelper()
+        self.helper.form_class = "form"
+        self.helper.layout = Layout(
+            Div(Field('file_name', placeholder="File name",
+                      css_class="form-control fld-seq-fst"),
+                Field('file_contents', placeholder="Contents (optional)",
+                      css_class="form-control no-resize fld-seq-lst"),
+                css_class="modal-body"),
+            Div(FormActions(Button('file_cancel', 'Cancel',
+                                   css_class="btn btn-default",
+                                   data_dismiss="modal"),
+                            Submit('file_create', 'New file',
+                                   css_class="btn btn-primary")),
+                css_class="modal-footer"),
+        )
+
+        require(self, ['file_name'])
+        autofocus(self, 'file_name')

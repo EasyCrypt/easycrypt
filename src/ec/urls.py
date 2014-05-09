@@ -11,6 +11,8 @@ urlpatterns = patterns('',
    # Information retrieval from the client (not meant for user interaction)
    url(r'^projects/$', views.get_projects, name='get_projects'),
    url(r'^projects/create$', views.create_project, name='create_project'),
+   url(r'^projects/(?P<proj_id>\d+)/files/create$', views.create_file,
+       name='create_file'),
    url(r'^files/(?P<file_id>\d+)/contents$', views.get_file_contents,
        name='get_file_contents'),
    url(r'^files/(?P<file_id>\d+)/rm$', views.rm_file,

@@ -27,10 +27,14 @@
 </div>
 
 <!-- Modals -->
-<div class="modal fade" id="newprojmodal" role="dialog"
-     aria-labelledby="myModalLabel" aria-hidden="true">
+<div class="modal fade" id="newprojmodal" role="dialog" aria-hidden="true">
     <div class="modal-dialog modal-sm"><div class="modal-content">
         {% crispy newprojform %}
+    </div></div>
+</div>
+<div class="modal fade" id="newfilemodal" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-md"><div class="modal-content">
+        {% crispy newfileform %}
     </div></div>
 </div>
 <!------------>

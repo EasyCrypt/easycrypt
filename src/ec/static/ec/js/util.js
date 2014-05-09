@@ -21,7 +21,7 @@ function row() {
   return node;
 };
 
-//Extra arguments are appended as inner nodes
+// Extra arguments are appended as inner nodes
 function col(size, offset) {
   function class_for_device(device) {
     var base = "col-" + device + "-";

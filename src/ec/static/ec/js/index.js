@@ -72,13 +72,15 @@ Workspace.prototype.load = function() {
 
       for (var j = 0; j < project.files.length; ++j) {
         var file      = project.files[j];
-        var filelink  = $('<a>').text(file.name);
+        var filelink  = $('<a>').text(file.name).attr('href','#');
         filelink.on('click', this._callback_for_open_by_id(file.id));
         var rm_but = glyph('glyphicon-remove pull-right red');
         rm_but.on('click', this._callback_for_rm_file(file.id));
         files_col.append(row(filelink, rm_but));
       }
-      files_col.append(row(glyph('glyphicon-plus')));
+      var add_but = glyph('glyphicon-plus');
+      add_but.on('click', this._callback_for_add_file_modal(project.id));
+      files_col.append(row(add_but));
 
       var project_tree =
         row(col(12,0, row(expand_proj, " ", project.name),
@@ -205,6 +207,20 @@ Workspace.prototype._callback_for_toggle_glyph = function(glyph) {
 Workspace.prototype._callback_for_rm_file = function(id) {
   return (function () {
     $.get('files/' + id + '/rm', ec_initialize);
+  }).bind(this);
+}
+
+/* ---------------------------------------------------------------- */
+Workspace.prototype._callback_for_add_file_modal = function(id) {
+  return (function () {
+    var form = $('#newfilemodal form');
+    form.each (function () { this.reset(); });
+    form.one('submit', function (event) {
+      $(this).attr('action', "/ec/projects/" + id + "/files/create");
+      event.preventDefault();
+      $(this).submit();
+    });
+    $('#newfilemodal').modal();
   }).bind(this);
 }
 
