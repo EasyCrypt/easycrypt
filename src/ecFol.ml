@@ -582,9 +582,9 @@ let f_ands fs =
   | f::fs -> List.fold_left ((^~) f_and) f fs
 
 let f_andas fs =
-  match fs with
+  match List.rev fs with
   | [] -> f_true
-  | f::fs -> List.fold_left f_anda f fs
+  | f::fs -> List.fold_left ((^~) f_anda) f fs
 
 let f_ors fs =
   match List.rev fs with
@@ -592,9 +592,9 @@ let f_ors fs =
   | f::fs -> List.fold_left ((^~) f_or) f fs
 
 let f_oras fs =
-  match fs with
+  match List.rev fs with
   | [] -> f_false
-  | f::fs -> List.fold_left f_ora f fs
+  | f::fs -> List.fold_left ((^~) f_ora) f fs
 
 let f_imps = List.fold_right f_imp
 
@@ -1234,6 +1234,20 @@ module Fsubst = struct
       { s with fs_mp = smp; fs_sty = sty; fs_ty = ty_subst sty }
 
   (* ------------------------------------------------------------------ *)
+  let f_rem_local s x =
+    { s with fs_loc = Mid.remove x s.fs_loc }
+
+  let f_rem_mem s m =
+    { s with fs_mem = Mid.remove m s.fs_mem }
+
+  let f_rem_mod s m =
+    let smp = Mid.remove m s.fs_mp in
+    let sty = s.fs_sty in
+    let sty = { sty with ts_mp = EcPath.m_subst sty.ts_p smp } in
+
+    { s with fs_mp = smp; fs_sty = sty; fs_ty = ty_subst sty }
+
+  (* ------------------------------------------------------------------ *)
   let add_local s (x,t as xt) =
     let x' = if s.fs_freshen then EcIdent.fresh x else x in
     let t' = s.fs_ty t in
@@ -1302,7 +1316,14 @@ module Fsubst = struct
     let gty' = gty_subst s gty in
     let x'   = if s.fs_freshen then EcIdent.fresh x else x in
 
-    if x == x' && gty == gty' then (s, xt)
+    if   x == x' && gty == gty'
+    then
+      let s = match gty with
+        | GTty    _ -> f_rem_local s x
+        | GTmodty _ -> f_rem_mod   s x
+        | GTmem   _ -> f_rem_mem   s x
+      in
+        (s, xt)
     else
       let s = match gty' with
         | GTty   ty -> f_bind_local s x (f_local x' ty)

@@ -192,442 +192,6 @@ and pucflags = {
 }
 
 (* -------------------------------------------------------------------- *)
-module CoreSection : sig
-  open EcFol
-
-  type locals
-
-  val env_of_locals   : locals -> EcEnv.env
-  val items_of_locals : locals -> EcTheory.ctheory_item list
-
-  val is_local : [`Lemma | `Module] -> path -> locals -> bool
-  val is_mp_local : mpath -> locals -> bool
-
-  val form_use_local : form  -> locals -> bool
-  val module_use_local_or_abs : module_expr -> locals -> bool
-
-  val abstracts : locals -> (EcIdent.t * (module_type * mod_restr)) list * Sid.t
-
-  val generalize : EcEnv.env -> locals -> form -> form
-
-  type t
-
-  exception NoSectionOpened
-
-  val initial : t
-
-  val in_section : t -> bool
-
-  val enter : EcEnv.env -> t -> t
-  val exit  : t -> locals * t
-
-  val path  : t -> path
-  val opath : t -> path option
-
-  val locals  : t -> locals
-  val olocals : t -> locals option
-
-  type lvl = [`Local | `Global] * [`Axiom | `Lemma]
-
-  val add_local_mod : path -> t -> t
-  val add_lemma     : path -> lvl -> t -> t
-  val add_item      : EcTheory.ctheory_item -> t -> t
-  val add_abstract  : EcIdent.t -> (module_type * mod_restr) -> t -> t
-end = struct
-  exception NoSectionOpened
-
-  type lvl = [`Local | `Global] * [`Axiom | `Lemma]
-
-  type locals = {
-    lc_env       : EcEnv.env;
-    lc_lemmas    : (path * lvl) list * lvl Mp.t;
-    lc_modules   : Sp.t;
-    lc_abstracts : (EcIdent.t * (module_type * mod_restr)) list * Sid.t;
-    lc_items     : EcTheory.ctheory_item list;
-  }
-
-  let env_of_locals (lc : locals) = lc.lc_env
-
-  let items_of_locals (lc : locals) = lc.lc_items
-
-  let is_local who p (lc : locals) =
-    match who with
-    | `Lemma  -> Mp.find_opt p (snd lc.lc_lemmas) |> omap fst = Some `Local
-    | `Module -> Sp.mem p lc.lc_modules
-
-  let rec is_mp_local mp (lc : locals) =
-    let toplocal =
-      match mp.m_top with
-      | `Local _ -> false
-      | `Concrete (p, _) -> is_local `Module p lc
-    in
-      toplocal || (List.exists (is_mp_local^~ lc) mp.m_args)
-
-  let rec is_mp_abstract mp (lc : locals) =
-    let toplocal =
-      match mp.m_top with
-      | `Concrete _ -> false
-      | `Local i -> Sid.mem i (snd lc.lc_abstracts)
-    in
-      toplocal || (List.exists (is_mp_abstract^~ lc) mp.m_args)
-
-  let rec on_mpath_ty cb (ty : ty) =
-    match ty.ty_node with
-    | Tunivar _        -> ()
-    | Tvar    _        -> ()
-    | Tglob mp         -> cb mp
-    | Ttuple tys       -> List.iter (on_mpath_ty cb) tys
-    | Tconstr (_, tys) -> List.iter (on_mpath_ty cb) tys
-    | Tfun (ty1, ty2)  -> List.iter (on_mpath_ty cb) [ty1; ty2]
-
-  let on_mpath_pv cb (pv : prog_var)=
-    cb pv.pv_name.x_top
-
-  let on_mpath_lp cb (lp : lpattern) =
-    match lp with
-    | LSymbol (_, ty) -> on_mpath_ty cb ty
-    | LTuple  xs      -> List.iter (fun (_, ty) -> on_mpath_ty cb ty) xs
-    | LRecord (_, xs) -> List.iter (on_mpath_ty cb |- snd) xs
-
-  let rec on_mpath_expr cb (e : expr) =
-    let cbrec = on_mpath_expr cb in
-
-    let fornode () =
-      match e.e_node with
-      | Eint   _            -> ()
-      | Elocal _            -> ()
-      | Evar   _            -> ()
-      | Eop    (_, tys)     -> List.iter (on_mpath_ty cb) tys
-      | Eapp   (e, es)      -> List.iter cbrec (e :: es)
-      | Elet   (lp, e1, e2) -> on_mpath_lp cb lp; List.iter cbrec [e1; e2]
-      | Etuple es           -> List.iter cbrec es
-      | Eproj  (e,_)        -> cbrec e
-      | Eif    (e1, e2, e3) -> List.iter cbrec [e1; e2; e3]
-      | Elam   (xs, e)      ->
-          List.iter (fun (_, ty) -> on_mpath_ty cb ty) xs;
-          cbrec e
-    in
-      on_mpath_ty cb e.e_ty;  fornode ()
-
-  let on_mpath_lv cb (lv : lvalue) =
-    let for1 (pv, ty) = on_mpath_pv cb pv; on_mpath_ty cb ty in
-
-      match lv with
-      | LvVar   pv  -> for1 pv
-      | LvTuple pvs -> List.iter for1 pvs
-
-      | LvMap ((_, pty), pv, e, ty) ->
-          List.iter (on_mpath_ty cb) pty;
-          on_mpath_ty   cb ty;
-          on_mpath_pv   cb pv;
-          on_mpath_expr cb e
-
-  let rec on_mpath_instr cb (i : instr)=
-    match i.i_node with
-    | Sasgn   _ -> ()
-    | Srnd    _ -> ()
-    | Sassert _ -> ()
-    | Sabstract _ -> ()
-
-    | Scall (_, f, _) -> cb f.x_top
-    | Sif (_, s1, s2) -> List.iter (on_mpath_stmt cb) [s1; s2]
-    | Swhile (_, s)   -> on_mpath_stmt cb s
-
-
-  and on_mpath_stmt cb (s : stmt) =
-    List.iter (on_mpath_instr cb) s.s_node
-
-  let on_mpath_lcmem cb m =
-      cb (EcMemory.lmt_xpath m).x_top;
-      Msym.iter (fun _ (_,ty) -> on_mpath_ty cb ty) (EcMemory.lmt_bindings m)
-
-  let on_mpath_memenv cb (m : EcMemory.memenv) =
-    match snd m with
-    | None    -> ()
-    | Some lm -> on_mpath_lcmem cb lm
-
-  let rec on_mpath_modty cb mty =
-    List.iter (fun (_, mty) -> on_mpath_modty cb mty) mty.mt_params;
-    List.iter cb mty.mt_args
-
-  let on_mpath_binding cb b =
-    match b with
-    | EcFol.GTty    ty        -> on_mpath_ty cb ty
-    | EcFol.GTmodty (mty, (rx,r)) ->
-      on_mpath_modty cb mty;
-      Sx.iter (fun x -> cb x.x_top) rx;
-      Sm.iter cb r
-    | EcFol.GTmem   None      -> ()
-    | EcFol.GTmem   (Some m)  -> on_mpath_lcmem cb m
-
-  let on_mpath_bindings cb b =
-    List.iter (fun (_, b) -> on_mpath_binding cb b) b
-
-  let rec on_mpath_form cb (f : EcFol.form) =
-    let cbrec = on_mpath_form cb in
-
-    let rec fornode () =
-      match f.EcFol.f_node with
-      | EcFol.Fint      _            -> ()
-      | EcFol.Flocal    _            -> ()
-      | EcFol.Fquant    (_, b, f)    -> on_mpath_bindings cb b; cbrec f
-      | EcFol.Fif       (f1, f2, f3) -> List.iter cbrec [f1; f2; f3]
-      | EcFol.Flet      (_, f1, f2)  -> List.iter cbrec [f1; f2]
-      | EcFol.Fop       (_, ty)      -> List.iter (on_mpath_ty cb) ty
-      | EcFol.Fapp      (f, fs)      -> List.iter cbrec (f :: fs)
-      | EcFol.Ftuple    fs           -> List.iter cbrec fs
-      | EcFol.Fproj     (f,_)        -> cbrec f
-      | EcFol.Fpvar     (pv, _)      -> on_mpath_pv  cb pv
-      | EcFol.Fglob     (mp, _)      -> cb mp
-      | EcFol.FhoareF   hf           -> on_mpath_hf  cb hf
-      | EcFol.FhoareS   hs           -> on_mpath_hs  cb hs
-      | EcFol.FequivF   ef           -> on_mpath_ef  cb ef
-      | EcFol.FequivS   es           -> on_mpath_es  cb es
-      | EcFol.FeagerF   eg           -> on_mpath_eg  cb eg
-      | EcFol.FbdHoareS bhs          -> on_mpath_bhs cb bhs
-      | EcFol.FbdHoareF bhf          -> on_mpath_bhf cb bhf
-      | EcFol.Fpr       pr           -> on_mpath_pr  cb pr
-
-    and on_mpath_hf cb hf =
-      on_mpath_form cb hf.EcFol.hf_pr;
-      on_mpath_form cb hf.EcFol.hf_po;
-      cb hf.EcFol.hf_f.x_top
-
-    and on_mpath_hs cb hs =
-      on_mpath_form cb hs.EcFol.hs_pr;
-      on_mpath_form cb hs.EcFol.hs_po;
-      on_mpath_stmt cb hs.EcFol.hs_s;
-      on_mpath_memenv cb hs.EcFol.hs_m
-
-    and on_mpath_ef cb ef =
-      on_mpath_form cb ef.EcFol.ef_pr;
-      on_mpath_form cb ef.EcFol.ef_po;
-      cb ef.EcFol.ef_fl.x_top;
-      cb ef.EcFol.ef_fr.x_top
-
-    and on_mpath_es cb es =
-      on_mpath_form cb es.EcFol.es_pr;
-      on_mpath_form cb es.EcFol.es_po;
-      on_mpath_stmt cb es.EcFol.es_sl;
-      on_mpath_stmt cb es.EcFol.es_sr;
-      on_mpath_memenv cb es.EcFol.es_ml;
-      on_mpath_memenv cb es.EcFol.es_mr
-
-    and on_mpath_eg cb eg =
-      on_mpath_form cb eg.EcFol.eg_pr;
-      on_mpath_form cb eg.EcFol.eg_po;
-      cb eg.EcFol.eg_fl.x_top;
-      cb eg.EcFol.eg_fr.x_top;
-      on_mpath_stmt cb eg.EcFol.eg_sl;
-      on_mpath_stmt cb eg.EcFol.eg_sr;
-
-    and on_mpath_bhf cb bhf =
-      on_mpath_form cb bhf.EcFol.bhf_pr;
-      on_mpath_form cb bhf.EcFol.bhf_po;
-      on_mpath_form cb bhf.EcFol.bhf_bd;
-      cb bhf.EcFol.bhf_f.x_top
-
-    and on_mpath_bhs cb bhs =
-      on_mpath_form cb bhs.EcFol.bhs_pr;
-      on_mpath_form cb bhs.EcFol.bhs_po;
-      on_mpath_form cb bhs.EcFol.bhs_bd;
-      on_mpath_stmt cb bhs.EcFol.bhs_s;
-      on_mpath_memenv cb bhs.EcFol.bhs_m
-
-    and on_mpath_pr cb (_, xp, fs, f) =
-      cb xp.x_top;
-      List.iter (on_mpath_form cb) [f ; fs]
-
-    in
-      on_mpath_ty cb f.EcFol.f_ty; fornode ()
-
-  let rec on_mpath_module cb (me : module_expr) =
-    match me.me_body with
-    | ME_Alias (_, mp)  -> cb mp
-    | ME_Structure st   -> on_mpath_mstruct cb st
-    | ME_Decl (mty, sm) -> on_mpath_mdecl cb (mty, sm)
-
-  and on_mpath_mdecl cb (mty,(rx,r)) =
-    on_mpath_modty cb mty;
-    Sx.iter (fun x -> cb x.x_top) rx;
-    Sm.iter cb r
-
-  and on_mpath_mstruct cb st =
-    List.iter (on_mpath_mstruct1 cb) st.ms_body
-
-  and on_mpath_mstruct1 cb item =
-    match item with
-    | MI_Module   me -> on_mpath_module cb me
-    | MI_Variable x  -> on_mpath_ty cb x.v_type
-    | MI_Function f  -> on_mpath_fun cb f
-
-  and on_mpath_fun cb fun_ =
-    on_mpath_fun_sig  cb fun_.f_sig;
-    on_mpath_fun_body cb fun_.f_def
-
-  and on_mpath_fun_sig cb fsig =
-    on_mpath_ty cb fsig.fs_arg;
-    on_mpath_ty cb fsig.fs_ret
-
-  and on_mpath_fun_body cb fbody =
-    match fbody with
-    | FBalias xp -> cb xp.x_top
-    | FBdef fdef -> on_mpath_fun_def cb fdef
-    | FBabs oi   -> on_mpath_fun_oi  cb oi
-
-  and on_mpath_fun_def cb fdef =
-    List.iter (fun v -> on_mpath_ty cb v.v_type) fdef.f_locals;
-    on_mpath_stmt cb fdef.f_body;
-    fdef.f_ret |> oiter (on_mpath_expr cb);
-    on_mpath_uses cb fdef.f_uses
-
-  and on_mpath_uses cb uses =
-    List.iter (fun x -> cb x.x_top) uses.us_calls;
-    Sx.iter   (fun x -> cb x.x_top) uses.us_reads;
-    Sx.iter   (fun x -> cb x.x_top) uses.us_writes
-
-  and on_mpath_fun_oi cb oi =
-    List.iter (fun x -> cb x.x_top) oi.oi_calls
-
-  exception UseLocal
-
-  let check_use_local lc mp =
-    if is_mp_local mp lc then
-      raise UseLocal
-
-  let check_use_local_or_abs lc mp =
-    if is_mp_local mp lc || is_mp_abstract mp lc then
-      raise UseLocal
-
-  let form_use_local f lc =
-    try  on_mpath_form (check_use_local lc) f; false
-    with UseLocal -> true
-
-  let module_use_local_or_abs m lc =
-    try  on_mpath_module (check_use_local_or_abs lc) m; false
-    with UseLocal -> true
-
-  let abstracts lc = lc.lc_abstracts
-
-  let generalize env lc (f : EcFol.form) =
-    let axioms =
-      List.pmap
-        (fun (p, lvl) ->
-           match lvl with `Global, `Axiom -> Some p | _ -> None)
-        (fst lc.lc_lemmas)
-    in
-
-    match axioms with
-    | [] ->
-      let mods = Sid.of_list (List.map fst (fst lc.lc_abstracts)) in
-        if   Mid.set_disjoint mods f.EcFol.f_fv
-        then f
-        else begin
-          List.fold_right
-            (fun (x, (mty, rt)) f ->
-               match Mid.mem x f.EcFol.f_fv with
-               | false -> f
-               | true  -> EcFol.f_forall [(x, EcFol.GTmodty (mty, rt))] f)
-            (fst lc.lc_abstracts) f
-        end
-
-    | _ ->
-      let f =
-        let do1 p f =
-          let ax = EcEnv.Ax.by_path p env in
-            EcFol.f_imp (oget ax.ax_spec) f
-        in
-            List.fold_right do1 axioms f in
-      let f =
-        let do1 (x, (mty, rt)) f =
-          EcFol.f_forall [(x, EcFol.GTmodty (mty, rt))] f
-        in
-          List.fold_right do1 (fst lc.lc_abstracts) f
-      in
-        f
-
-  let elocals (env : EcEnv.env) : locals =
-    { lc_env       = env;
-      lc_lemmas    = ([], Mp.empty);
-      lc_modules   = Sp.empty;
-      lc_abstracts = ([], Sid.empty);
-      lc_items     = []; }
-
-  type t = locals list
-
-  let initial : t = []
-
-  let in_section (cs : t) =
-    match cs with [] -> false | _ -> true
-
-  let enter (env : EcEnv.env) (cs : t) : t =
-    match List.ohead cs with
-    | None    -> [elocals env]
-    | Some ec ->
-      let ec =
-        { ec with
-            lc_items = [];
-            lc_abstracts = ([], snd ec.lc_abstracts);
-            lc_env = env; }
-      in
-        ec :: cs
-
-  let exit (cs : t) =
-    match cs with
-    | [] -> raise NoSectionOpened
-    | ec :: cs ->
-        ({ ec with lc_items     = List.rev ec.lc_items;
-                   lc_abstracts = fst_map List.rev ec.lc_abstracts;
-                   lc_lemmas    = fst_map List.rev ec.lc_lemmas},
-         cs)
-
-  let path (cs : t) : path =
-    match cs with
-    | [] -> raise NoSectionOpened
-    | ec :: _ -> EcEnv.root ec.lc_env
-
-  let opath (cs : t) =
-    try Some (path cs) with NoSectionOpened -> None
-
-  let locals (cs : t) : locals =
-    match cs with
-    | [] -> raise NoSectionOpened
-    | ec :: _ -> ec
-
-  let olocals (cs : t) =
-    try Some (locals cs) with NoSectionOpened -> None
-
-  let onactive (f : locals -> locals) (cs : t) =
-    match cs with
-    | []      -> raise NoSectionOpened
-    | c :: cs -> (f c) :: cs
-
-  let add_local_mod (p : path) (cs : t) : t =
-    onactive (fun ec -> { ec with lc_modules = Sp.add p ec.lc_modules }) cs
-
-  let add_lemma (p : path) (lvl : lvl) (cs : t) : t =
-    onactive (fun ec ->
-      let (axs, map) = ec.lc_lemmas in
-        { ec with lc_lemmas = ((p, lvl) :: axs, Mp.add p lvl map) })
-      cs
-
-  let add_item item (cs : t) : t =
-    let doit ec = { ec with lc_items = item :: ec.lc_items } in
-      onactive doit cs
-
-  let add_abstract id mt (cs : t) : t =
-    let doit ec =
-      match Sid.mem id (snd ec.lc_abstracts) with
-      | true  -> assert false
-      | false ->
-          let (ids, set) = ec.lc_abstracts in
-          let (ids, set) = ((id, mt) :: ids, Sid.add id set) in
-            { ec with lc_abstracts = (ids, set) }
-    in
-      onactive doit cs
-end
-
-(* -------------------------------------------------------------------- *)
 type scope = {
   sc_name     : symbol;
   sc_env      : EcEnv.env;
@@ -636,7 +200,7 @@ type scope = {
   sc_required : symbol list;
   sc_pr_uc    : proof_uc option;
   sc_options  : Options.options;
-  sc_section  : CoreSection.t;
+  sc_section  : EcSection.t;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -649,7 +213,7 @@ let empty =
       sc_required   = [];
       sc_pr_uc      = None;
       sc_options    = Options.init ();
-      sc_section    = CoreSection.initial;
+      sc_section    = EcSection.initial;
     }
 
 (* -------------------------------------------------------------------- *)
@@ -719,13 +283,13 @@ let subscope (scope : scope) (name : symbol) =
 
 (* -------------------------------------------------------------------- *)
 let maybe_add_to_section scope item =
-  match CoreSection.opath scope.sc_section with
+  match EcSection.opath scope.sc_section with
   | None    -> scope
   | Some sp -> begin
       match EcPath.p_equal sp (EcEnv.root scope.sc_env) with
       | false -> scope
       | true  ->
-        let ec = CoreSection.add_item item scope.sc_section in
+        let ec = EcSection.add_item item scope.sc_section in
           { scope with sc_section = ec }
   end
 
@@ -888,7 +452,7 @@ module Ax = struct
     let scope = { scope with sc_env = EcEnv.Ax.bind x ax scope.sc_env; } in
     let scope = maybe_add_to_section scope (EcTheory.CTh_axiom (x, ax)) in
     let scope =
-      match CoreSection.opath scope.sc_section with
+      match EcSection.opath scope.sc_section with
       | None -> scope
       | Some _ ->
           let lvl1 = if local then `Local else `Global in
@@ -898,7 +462,7 @@ module Ax = struct
             hierror "axiom must be monomorphic in sections";
 
           let axpath = EcPath.pqname (path scope) x in
-          let ec = CoreSection.add_lemma axpath (lvl1, lvl2) scope.sc_section in
+          let ec = EcSection.add_lemma axpath (lvl1, lvl2) scope.sc_section in
             { scope with sc_section = ec }
     in
       scope
@@ -931,7 +495,7 @@ module Ax = struct
     let loc = ax.pl_loc and ax = ax.pl_desc in
     let ue  = TT.transtyvars scope.sc_env (loc, ax.pa_tyvars) in
 
-    if ax.pa_local && not (CoreSection.in_section scope.sc_section) then
+    if ax.pa_local && not (EcSection.in_section scope.sc_section) then
       hierror "cannot declare a local lemma outside of a section";
 
     let (pconcl, tintro) =
@@ -969,10 +533,10 @@ module Ax = struct
     let pucflags = (([], None), pucflags) in
 
     if not ax.pa_local then begin
-      match CoreSection.olocals scope.sc_section with
+      match EcSection.olocals scope.sc_section with
       | None -> ()
       | Some locals ->
-          if CoreSection.form_use_local concl locals then
+          if EcSection.form_use_local concl locals then
             hierror "this lemma uses local modules and must be declared as local"
     end;
 
@@ -1476,7 +1040,7 @@ module Mod = struct
                 else rx in
               Mx.fold add use.EcEnv.us_pv EcPath.Sx.empty in
             EcEnv.Mod.add_restr_to_locals (rx,EcPath.Sm.empty) env in
-        let ec = CoreSection.add_local_mod mpath scope.sc_section in
+        let ec = EcSection.add_local_mod mpath scope.sc_section in
         { scope with sc_section = ec; sc_env = env }
     in
       scope
@@ -1484,17 +1048,17 @@ module Mod = struct
   let add (scope : scope) (ptm : ptopmodule) =
     assert (scope.sc_pr_uc = None);
 
-    if ptm.ptm_local && not (CoreSection.in_section scope.sc_section) then
+    if ptm.ptm_local && not (EcSection.in_section scope.sc_section) then
       hierror "cannot declare a local module outside of a section";
 
     let (name, m) = ptm.ptm_def in
     let m = TT.transmod scope.sc_env ~attop:true (unloc name) m in
 
     if not ptm.ptm_local then begin
-      match CoreSection.olocals scope.sc_section with
+      match EcSection.olocals scope.sc_section with
       | None -> ()
       | Some locals ->
-          if CoreSection.module_use_local_or_abs m locals then
+          if EcSection.module_use_local_or_abs m locals then
             hierror "this module use local/abstracts modules and must be declared as local";
 
     end;
@@ -1502,7 +1066,7 @@ module Mod = struct
       bind scope ptm.ptm_local m
 
   let declare (scope : scope) m =
-    if not (CoreSection.in_section scope.sc_section) then
+    if not (EcSection.in_section scope.sc_section) then
       hierror "cannot declare an abstract module outside of a section";
 
     let modty = m.ptmd_modty in
@@ -1514,7 +1078,7 @@ module Mod = struct
       { scope with
           sc_env = EcEnv.Mod.declare_local
             name tysig restr scope.sc_env;
-          sc_section = CoreSection.add_abstract
+          sc_section = EcSection.add_abstract
             name (tysig, restr) scope.sc_section }
     in
       scope
@@ -2114,7 +1678,7 @@ module Theory = struct
     | None     -> raise TopScope
     | Some sup ->
         begin
-          match CoreSection.opath scope.sc_section with
+          match EcSection.opath scope.sc_section with
           | None -> ()
           | Some sp ->
               if p_equal sp (EcEnv.root scope.sc_env) then
@@ -2193,7 +1757,7 @@ module Theory = struct
 
     assert (scope.sc_pr_uc = None);
 
-    if CoreSection.in_section scope.sc_section then
+    if EcSection.in_section scope.sc_section then
       hierror "cannot clone a theory while a section is active";
 
     let (name, proofs, nth) = C.clone scope.sc_env thcl in
@@ -2228,7 +1792,7 @@ module Theory = struct
   let import_w3 scope dir file renaming =
     assert (scope.sc_pr_uc = None);
 
-    if CoreSection.in_section scope.sc_section then
+    if EcSection.in_section scope.sc_section then
       hierror "cannot import a Why3 theory while a section is active";
 
     let mk_renaming (l,k,s) =
@@ -2253,17 +1817,17 @@ module Section = struct
   let enter (scope : scope) =
     assert (scope.sc_pr_uc = None);
     { scope with
-        sc_section = CoreSection.enter scope.sc_env scope.sc_section }
+        sc_section = EcSection.enter scope.sc_env scope.sc_section }
 
   let exit (scope : scope) =
-    match CoreSection.opath scope.sc_section with
+    match EcSection.opath scope.sc_section with
     | None -> hierror "no section to close"
     | Some sp ->
         if not (p_equal sp (EcEnv.root (scope.sc_env))) then
           hierror "cannot close a section containing pending theories";
-        let (locals, osc) = CoreSection.exit scope.sc_section in
-        let oenv   = CoreSection.env_of_locals locals in
-        let oitems = CoreSection.items_of_locals locals in
+        let (locals, osc) = EcSection.exit scope.sc_section in
+        let oenv   = EcSection.env_of_locals locals in
+        let oitems = EcSection.items_of_locals locals in
         let scenv  = scope.sc_env in
         let scope  = { scope with sc_env = oenv; sc_section = osc; } in
 
@@ -2275,7 +1839,7 @@ module Section = struct
 
           | T.CTh_module me ->
             let mep = EcPath.pqname (path scope) me.me_name in
-              if not (CoreSection.is_local `Module mep locals) then
+              if not (EcSection.is_local `Module mep locals) then
                 Mod.bind scope false me
               else
                 scope
@@ -2285,10 +1849,10 @@ module Section = struct
             | `Axiom -> scope
             | `Lemma ->
                 let axp = EcPath.pqname (path scope) x in
-                  if not (CoreSection.is_local `Lemma axp locals) then
+                  if not (EcSection.is_local `Lemma axp locals) then
                     Ax.bind scope false
                       (x, { ax with ax_spec =
-                              ax.ax_spec |> omap (CoreSection.generalize scenv locals) })
+                              ax.ax_spec |> omap (EcSection.generalize scenv locals) })
                   else
                     scope
           end
@@ -2316,9 +1880,9 @@ end
 module Extraction = struct
   let check_top scope =
     if not (scope.sc_top = None) then
-      hierror "Extraction can not be done inside a theory";
-    if CoreSection.in_section scope.sc_section then
-      hierror "Extraction can not be done inside a section"
+      hierror "Extraction cannot be done inside a theory";
+    if EcSection.in_section scope.sc_section then
+      hierror "Extraction cannot be done inside a section"
 
   let process scope todo =
     check_top scope;

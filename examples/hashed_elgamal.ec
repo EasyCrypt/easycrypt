@@ -269,9 +269,7 @@ section.
     call (_: ={glob H} /\ G1.gxy{1} = G2.gxy{2}).
       by sim.
     inline H.init RO.init.
-    auto; progress; first 2 smt.
-      by rewrite -xorwA xorwK xorw0.
-      by rewrite -xorwA xorwK xorw0.
+    by auto; progress; smt.
   qed.
 
   local lemma Pr_G1_G2_res &m:

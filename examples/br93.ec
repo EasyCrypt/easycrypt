@@ -133,11 +133,7 @@ lemma eq1_enc :
 proof.
  proc;inline RO.o.
  wp;rnd ((^) m{1}) ((^) m{1}).
- wp;rnd;skip;progress => //;first 2 by smt.
- by rewrite Plaintext.xorwA Plaintext.xorwK;smt.
- by rewrite Plaintext.xorwA Plaintext.xorwK;smt.
- by smt.
- by smt.
+ wp;rnd;skip;progress => //; smt.
 qed.
 
 module CPA2(S : Scheme, A_ : Adv) = {
@@ -356,4 +352,3 @@ proof.
 qed.
 
 end section.
-
