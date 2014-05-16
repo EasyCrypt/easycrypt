@@ -457,7 +457,7 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
     t_on1seq 2
       (tac (f_and hs.hf_pr hs2.hf_pr) (f_and hs.hf_po hs2.hf_po))
       (FApi.t_seqsub
-         (t_hoareS_conseq_conj hs2.hf_pr hs2.hf_po hs.hf_pr hs.hf_po)
+         (t_hoareF_conseq_conj hs2.hf_pr hs2.hf_po hs.hf_pr hs.hf_po)
          [t_apply_r nf2; t_apply_r nf1])
       tc
 

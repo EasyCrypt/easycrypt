@@ -93,16 +93,6 @@ module R (Ob:Orclb) : Orcl = {
   }
 }.
 
-module LoR (Ob:Orclb) : Orcl = {
-  var b:bool
-  proc orcl (m:input) : output = {
-    var r : output;
-    if (b) r = Ob.orcl1(m);
-    else r = Ob.orcl2(m);
-    return r;
-  }
-}.
-
 module type OrclbAdv (Ob:Orclb, O:Orcl) = {
   proc main () : outputA
 }.
@@ -128,6 +118,7 @@ module LRB (Ob:Orclb,O:Orcl) = {
 }.
 
 op q : int.
+axiom q_pos : 0 < q.
   
 module B(A:OrclbAdv, Ob:Orclb, O:Orcl) = {
   module LR = LRB(Ob,O)
@@ -223,8 +214,6 @@ section.
     islossless LR.orcl => 
     islossless Ob0.leaks => islossless Ob0.orcl1 => islossless Ob0.orcl2 =>
     islossless A(Ob0, LR).main.
-
-  axiom q_pos : 0 < q.
 
   local lemma WL0_GLA &m (p:glob A -> glob Ob -> int -> outputA -> bool): 
      Pr[W(L(Ob)).work(0) @ &m : p (glob A) (glob Ob) LRB.l res /\ LRB.l <= q] = 
@@ -382,3 +371,160 @@ section.
   qed.
 
 end section.
+
+(* Simplifications *)
+
+section.
+  declare module Ob : Orclb    {C,LRB}.
+  declare module A  : OrclbAdv {C,LRB,Ob}.
+
+  axiom A_call : forall (O<:Orcl{C,A}), hoare [ Orcln(A(Ob), O).main : true ==> C.c <= q ].
+
+  local module Al = Orcln(A(Ob),LRB(Ob,L(Ob))).
+
+  local module Bl = {
+      proc main():outputA = {
+        var r:outputA;
+        LRB.l0 = $[0..q-1];
+        LRB.l  = 0;
+        r = Al.main();
+        return r;
+      }
+    }.
+
+  local module Ar = Orcln(A(Ob),LRB(Ob,R(Ob))).
+
+  local module Br = {
+      proc main():outputA = {
+        var r:outputA;
+        LRB.l0 = $[0..q-1];
+        LRB.l  = 0;
+        r = Ar.main();
+        return r;
+      }
+    }.
+
+  local equiv B_Bl : B(A,Ob,L(Ob)).main ~ Bl.main :
+     ={glob A, glob Ob} ==>
+     ={glob A, glob Ob, glob LRB, res} /\ C.c{2} = LRB.l{2} /\ C.c{2} <= q.
+  proof.
+    conseq (_:  ={glob A, glob Ob} ==>  ={glob A, glob Ob, glob LRB, res}) _ 
+           (_:true ==> C.c = LRB.l /\ C.c <= q).
+     conseq (_:true ==> C.c = LRB.l) (_: true ==> C.c <= q).
+       proc; call (A_call (<:LRB(Ob,L(Ob)))) => //.
+     proc;inline *;wp;call (_ : C.c = LRB.l).
+     proc;inline *;wp; by conseq * (_: _ ==> true) => //.
+     conseq * (_: _ ==> true) => //. conseq * (_: _ ==> true) => //. conseq * (_: _ ==> true) => //. 
+     by wp.
+    proc;inline Al.main;wp. call (_: ={glob Ob, glob LRB}).
+    proc;inline *;wp. sp;if => //. call (_:true) => //.
+      if => //. wp;call (_:true) => //. wp=> //. call (_:true) => //.
+    proc (={glob LRB}) => //. proc (={glob LRB}) => //. proc (={glob LRB}) => //.
+    inline *;wp;rnd => //.
+  qed.
+
+  local equiv B_Br : B(A,Ob,R(Ob)).main ~ Br.main :
+     ={glob A, glob Ob} ==>
+     ={glob A, glob Ob, glob LRB, res} /\ C.c{2} = LRB.l{2} /\ C.c{2} <= q.
+  proof.
+    conseq (_:  ={glob A, glob Ob} ==>  ={glob A, glob Ob, glob LRB, res}) _ 
+           (_:true ==> C.c = LRB.l /\ C.c <= q).
+     conseq (_:true ==> C.c = LRB.l) (_: true ==> C.c <= q).
+       proc; call (A_call (<:LRB(Ob,R(Ob)))) => //.
+     proc;inline *;wp;call (_ : C.c = LRB.l).
+     proc;inline *;wp; by conseq * (_: _ ==> true) => //.
+     conseq * (_: _ ==> true) => //. conseq * (_: _ ==> true) => //. conseq * (_: _ ==> true) => //. 
+     by wp.
+    proc;inline Ar.main;wp. call (_: ={glob Ob, glob LRB}).
+    proc;inline *;wp. sp;if => //. call (_:true) => //.
+      if => //. wp;call (_:true) => //. wp=> //. call (_:true) => //.
+    proc (={glob LRB}) => //. proc (={glob LRB}) => //. proc (={glob LRB}) => //.
+    inline *;wp;rnd => //.
+  qed.
+
+  local lemma Pr_Bl &m (p:glob A -> glob Ob -> int -> outputA -> bool): 
+     Pr[B(A,Ob,L(Ob)).main() @ &m : p (glob A) (glob Ob) LRB.l res] =
+     Pr[B(A,Ob,L(Ob)).main() @ &m : p (glob A) (glob Ob) LRB.l res /\ LRB.l <= q].
+  proof.
+    cut -> : 
+       Pr[B(A,Ob,L(Ob)).main() @ &m : p (glob A) (glob Ob) LRB.l res] =
+       Pr[Bl.main() @ &m : p (glob A) (glob Ob) LRB.l res /\ LRB.l <= q].
+      byequiv B_Bl => //.
+    apply eq_sym.  byequiv B_Bl => //.   
+  qed.
+
+  local lemma Pr_Br &m (p:glob A -> glob Ob -> int -> outputA -> bool): 
+     Pr[B(A,Ob,R(Ob)).main() @ &m : p (glob A) (glob Ob) LRB.l res] =
+     Pr[B(A,Ob,R(Ob)).main() @ &m : p (glob A) (glob Ob) LRB.l res /\ LRB.l <= q].
+  proof.
+    cut -> : 
+       Pr[B(A,Ob,R(Ob)).main() @ &m : p (glob A) (glob Ob) LRB.l res] =
+       Pr[Br.main() @ &m : p (glob A) (glob Ob) LRB.l res /\ LRB.l <= q].
+      byequiv B_Br => //.
+    apply eq_sym.  byequiv B_Br => //.   
+  qed.
+
+  axiom losslessL: islossless Ob.leaks.
+  axiom losslessOb1: islossless Ob.orcl1. 
+  axiom losslessOb2: islossless Ob.orcl2. 
+  axiom losslessA (Ob0 <: Orclb{A}) (LR <: Orcl{A}):
+    islossless LR.orcl => 
+    islossless Ob0.leaks => islossless Ob0.orcl1 => islossless Ob0.orcl2 =>
+    islossless A(Ob0, LR).main.
+
+  lemma Hybrid_restr &m (p:glob A -> glob Ob -> int -> outputA -> bool):
+      Pr[B(A,Ob,L(Ob)).main() @ &m : p (glob A) (glob Ob) LRB.l res] -
+      Pr[B(A,Ob,R(Ob)).main() @ &m : p (glob A) (glob Ob) LRB.l res] =
+      1%r/q%r * (
+         Pr[Ln(Ob,A).main() @ &m : p (glob A) (glob Ob) C.c res] - 
+         Pr[Rn(Ob,A).main() @ &m : p (glob A) (glob Ob) C.c res]).
+   proof.
+     pose p' := fun ga ge l r, p ga ge l r /\ l <= q.
+     cut -> : Pr[Ln(Ob,A).main() @ &m : p  (glob A) (glob Ob) C.c res] =
+              Pr[Ln(Ob,A).main() @ &m : p' (glob A) (glob Ob) C.c res].
+       byequiv (_ : ={glob A, glob Ob} ==> ={glob A, glob Ob, C.c, res} /\ C.c{1} <= q) => //;
+         last by rewrite /p'.
+       conseq (_:  ={glob A, glob Ob} ==> ={glob A, glob Ob, C.c, res}) (_ : true ==> C.c <= q);
+         last by sim;  proc (={C.c}).
+       apply (A_call (<:L(Ob))).
+     cut -> : Pr[Rn(Ob,A).main() @ &m : p  (glob A) (glob Ob) C.c res] =
+              Pr[Rn(Ob,A).main() @ &m : p' (glob A) (glob Ob) C.c res].
+       byequiv (_ : ={glob A, glob Ob} ==> ={glob A, glob Ob, C.c, res} /\ C.c{1} <= q) => //;
+         last by rewrite /p'.
+       conseq (_:  ={glob A, glob Ob} ==> ={glob A, glob Ob, C.c, res}) (_ : true ==> C.c <= q);
+         last by sim;  proc (={C.c}).
+       apply (A_call (<:R(Ob))).
+     rewrite (Pr_Bl &m p) (Pr_Br &m p).
+     cut := Hybrid Ob A _ _ _ _ &m p. 
+      apply losslessL. apply losslessOb1. apply losslessOb2. apply losslessA.
+     move=> /= H. rewrite /p' -H.
+     congr.
+     byequiv (_ : ={glob A, glob Ob} ==> ={glob A, glob Ob, glob LRB, res} /\ C.c{2} <= 1) => //.
+       proc;inline *;wp.
+       call (_ : ={glob Ob, glob LRB} /\ (if LRB.l <= LRB.l0 then C.c = 0 else C.c =1){2}). 
+        proc. inline *;wp. 
+        if => //. call (_: ={glob LRB});auto; smt.
+        if => //. wp;call (_: ={glob LRB});auto; smt. call (_: ={glob LRB});auto; smt.
+       conseq * (_: _ ==> ={res,glob Ob}) => //. sim.
+       conseq * (_: _ ==> ={res,glob Ob}) => //. sim.
+       conseq * (_: _ ==> ={res,glob Ob}) => //. sim.
+       auto;progress;smt.
+     byequiv (_ : ={glob A, glob Ob} ==> ={glob A, glob Ob, glob LRB, res} /\ C.c{2} <= 1) => //.
+       proc;inline *;wp.
+       call (_ : ={glob Ob, glob LRB} /\ (if LRB.l <= LRB.l0 then C.c = 0 else C.c =1){2}). 
+        proc. inline *;wp. 
+        if => //. call (_: ={glob LRB});auto; smt.
+        if => //. wp;call (_: ={glob LRB});auto; smt. call (_: ={glob LRB});auto; smt.
+       conseq * (_: _ ==> ={res,glob Ob}) => //. sim.
+       conseq * (_: _ ==> ={res,glob Ob}) => //. sim.
+       conseq * (_: _ ==> ={res,glob Ob}) => //. sim.
+       auto;progress;smt.
+    qed.
+
+end section.
+
+section.
+
+  declare module Ob : Orclb    {C,LRB}.
+  declare module A  : OrclbAdv {C,LRB,Ob}.
+
