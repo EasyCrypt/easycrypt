@@ -523,8 +523,4 @@ section.
 
 end section.
 
-section.
-
-  declare module Ob : Orclb    {C,LRB}.
-  declare module A  : OrclbAdv {C,LRB,Ob}.
 
