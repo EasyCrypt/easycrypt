@@ -16,6 +16,8 @@ let _ =
     | _ -> fun (x : string) -> x
   in
 
+  let psep = match Sys.os_type with "Win32" -> ";" | _ -> ":" in
+
   let resource name =
     match eclocal with
     | true ->
@@ -38,6 +40,32 @@ let _ =
       then Some wrapper
       else None
   in
+
+  (* If in local mode, add the toolchain bin/ path to $PATH *)
+  if eclocal then begin
+    let module E = struct exception Found of string end in
+
+    let rootdir = resource ["_tools"] in
+    let regexp  = Str.regexp "^ocaml-[0-9.]+$" in
+
+    if Sys.is_directory rootdir then begin
+      let dirs = Sys.readdir rootdir in
+
+      try
+        for i = 0 to (Array.length dirs) - 1 do
+          let target = Filename.concat rootdir dirs.(i) in
+            if Sys.is_directory target then
+              if Str.string_match regexp dirs.(i) 0 then
+                raise (E.Found target)
+        done
+      with E.Found target ->
+        let target = List.fold_left
+          Filename.concat target ["opam"; "system"; "bin"] in
+        let path = try Unix.getenv "PATH" with Not_found -> "" in
+        let path = Printf.sprintf "%s%s%s" target psep path in
+        Unix.putenv "PATH" path
+    end
+  end;
 
   (* Parse command line arguments *)
   let options = EcOptions.parse Sys.argv in
@@ -92,6 +120,12 @@ let _ =
         | Some wrapper -> Format.eprintf "  %s@\n%!" wrapper end;
         Format.eprintf "known provers: %s@\n%!"
           (String.concat ", " (EcProvers.known_provers ()));
+        Format.eprintf "System PATH:@\n%!";
+        List.iter
+          (fun x -> Format.eprintf "  %s@\n%!" x)
+          (Str.split
+             (Str.regexp (Str.quote psep))
+             (try Sys.getenv "PATH" with Not_found -> ""));
         exit 0
     end
 
