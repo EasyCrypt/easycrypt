@@ -1,10 +1,11 @@
 #! /bin/bash
 
 # --------------------------------------------------------------------
+: ${OVERSION=4.01.0}
 : ${DEST="$(dirname $0)/../_tools"}
 
 # --------------------------------------------------------------------
-target="${DEST}/ocaml-4.00.1/etc/ocamlbrew.bashrc"
+target="${DEST}/ocaml-${OVERSION}/etc/ocamlbrew.bashrc"
 
 if [ ! -e "$target" ]; then
   cat <<__EOF__ >&2

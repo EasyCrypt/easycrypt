@@ -4,20 +4,21 @@
 set -e
 
 # --------------------------------------------------------------------
-: ${OVERSION=4.00.1}
+: ${OVERSION=4.01.0}
 : ${DEST="${PWD}/_tools"}       # MUST BE ABSOLUTE
 
 # --------------------------------------------------------------------
-OBREW_URL=https://raw.github.com/hcarty/ocamlbrew/master/ocamlbrew-install
-ECOPAM_URL=http://ci.easycrypt.info/opam
+PATCHES=ocaml-patches.diff
+OBREW_URL=https://www.easycrypt.info/toolchain/ocamlbrew
 
-OPAM_VERSION=1.0.0
-OPAM_URL=http://www.ocamlpro.com/pub/opam-full-1.0.0.tar.gz
+OPAM_VERSION=1.1.1
+OPAM_URL=http://www.ocamlpro.com/pub/opam-full-${OPAM_VERSION}.tar.gz
+ECOPAM_URL=https://www.easycrypt.info/opam-${OPAM_VERSION}
 
 OCONFIG="${DEST}/ocaml-${OVERSION}/etc/ocamlbrew.bashrc"
 
 export OCAMLBREW_BASE=${DEST}
-export OCAMLBREW_FLAGS="-v ${OVERSION} -f"
+export OCAMLBREW_FLAGS="-v ${OVERSION} -p ${PWD}/scripts/patches/${PATCHES} -f"
 
 export OPAMROOT=${DEST}/ocaml-${OVERSION}/opam
 export OPAMFLAGS="--no-setup default ${ECOPAM_URL}"
@@ -46,13 +47,13 @@ check_cmd autoconf
 check_cmd gcc
 check_cmd g++
 check_cmd curl
-
+ 
 # --------------------------------------------------------------------
-set -x
+set -e
 
 rm -rf "${DEST}" && mkdir "${DEST}" "${DEST}/src"
 curl -f -kL -o "${DEST}/src/ocamlbrew" ${OBREW_URL}
-bash "${DEST}/src/ocamlbrew"
+bash "${DEST}/src/ocamlbrew" ${OCAMLBREW_FLAGS}
 
 # --------------------------------------------------------------------
 function build_opam {

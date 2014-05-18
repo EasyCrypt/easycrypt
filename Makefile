@@ -172,8 +172,6 @@ webui-stop:
 	bash ./scripts/ec-run-webui stop
 
 # --------------------------------------------------------------------
-TOOLCHAIN_URL := http://ci.easycrypt.info/scripts/ec-build-toolchain
-
 toolchain:
 	export OPAMVERBOSE=1; bash ./scripts/ec-build-toolchain
 
