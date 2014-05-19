@@ -1390,49 +1390,54 @@ tyvars_decl:
 ;
 
 %inline op_or_const:
-| OP    { `Op }
-| CONST { `Const }
+| OP    x=nosmt { (`Op   , x) }
+| CONST x=nosmt { (`Const, x) }
 ;
 
 operator:
 | k=op_or_const x=oident tyvars=tyvars_decl? COLON sty=loc(type_exp) {
-    { po_kind   = k;
+    { po_kind   = fst k;
       po_name   = x;
       po_tyvars = tyvars;
       po_def    = opdef_of_opbody sty None;
-      po_ax     = None; }
+      po_ax     = None;
+      po_nosmt  = snd k; }
   }
 
 | k=op_or_const x=oident tyvars=tyvars_decl? COLON sty=loc(type_exp) EQ b=opbody opax=opax? {
-    { po_kind   = k;
+    { po_kind   = fst k;
       po_name   = x;
       po_tyvars = tyvars;
       po_def    = opdef_of_opbody sty (Some ([], b));
-      po_ax     = opax; }
+      po_ax     = opax;
+      po_nosmt  = snd k; }
   }
 
 | k=op_or_const x=oident tyvars=tyvars_decl? eq=loc(EQ) b=opbody opax=opax? {
-    { po_kind   = k;
+    { po_kind   = fst k;
       po_name   = x;
       po_tyvars = tyvars;
       po_def    = opdef_of_opbody (mk_loc eq.pl_loc PTunivar) (Some ([], b));
-      po_ax     = opax; }
+      po_ax     = opax;
+      po_nosmt  = snd k; }
   }
 
 | k=op_or_const x=oident tyvars=tyvars_decl? p=ptybindings eq=loc(EQ) b=opbody opax=opax? {
-    { po_kind   = k;
+    { po_kind   = fst k;
       po_name   = x;
       po_tyvars = tyvars;
       po_def    = opdef_of_opbody (mk_loc eq.pl_loc PTunivar) (Some (p, b));
-      po_ax     = opax; }
+      po_ax     = opax;
+      po_nosmt  = snd k; }
   }
 
 | k=op_or_const x=oident tyvars=tyvars_decl? p=ptybindings COLON codom=loc(type_exp) EQ b=opbody opax=opax? {
-    { po_kind   = k;
+    { po_kind   = fst k;
       po_name   = x;
       po_tyvars = tyvars;
       po_def    = opdef_of_opbody codom (Some (p, b));
-      po_ax     = opax; }
+      po_ax     = opax;
+      po_nosmt  = snd k; }
   }
 ;
 

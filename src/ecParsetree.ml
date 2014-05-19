@@ -273,6 +273,7 @@ type poperator = {
   po_tyvars : (psymbol * pqsymbol list) list option;
   po_def    : pop_def;
   po_ax     : psymbol option;
+  po_nosmt  : bool;
 }
 
 type ppred_def =

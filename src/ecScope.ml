@@ -921,6 +921,9 @@ module Op = struct
 
     let tyop = EcDecl.mk_op tparams ty body in
 
+    if op.po_nosmt && (is_none op.po_ax) then
+      hierror ~loc "[nosmt] is only supported for axiomatized operators";
+
     if op.po_kind = `Const then begin
       let tue   = EcUnify.UniEnv.copy ue in
       let ty, _ = EcUnify.UniEnv.openty tue tparams None ty in
@@ -963,7 +966,7 @@ module Op = struct
             let axop = { ax_tparams = axpm;
                          ax_spec    = Some axspec;
                          ax_kind    = `Axiom;
-                         ax_nosmt   = false; } in
+                         ax_nosmt   = op.po_nosmt; } in
 
             let scope = bind scope (unloc op.po_name, tyop) in
               Ax.bind scope false (unloc ax, axop)
