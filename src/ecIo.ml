@@ -27,6 +27,7 @@ type parser_t =
 type ecreader_r = {
   (*---*) ecr_lexbuf  : Lexing.lexbuf;
   (*---*) ecr_parser  : parser_t;
+  mutable ecr_tokens  : EcParser.token list;
   mutable ecr_atstart : bool;
 }
 
@@ -43,7 +44,8 @@ let from_channel ~name channel =
     Disposable.create
       { ecr_lexbuf  = lexbuf;
         ecr_parser  = parserfun ();
-        ecr_atstart = true; }
+        ecr_atstart = true;
+        ecr_tokens  = []; }
 
 (* -------------------------------------------------------------------- *)
 let from_file filename =
@@ -54,7 +56,8 @@ let from_file filename =
         Disposable.create ~cb:(fun _ -> close_in channel)
           { ecr_lexbuf  = lexbuf;
             ecr_parser  = parserfun ();
-            ecr_atstart = true; }
+            ecr_atstart = true;
+            ecr_tokens  = []; }
 
     with
       | e ->
@@ -68,7 +71,8 @@ let from_string data =
     Disposable.create
       { ecr_lexbuf  = lexbuf;
         ecr_parser  = parserfun ();
-        ecr_atstart = true; }
+        ecr_atstart = true;
+        ecr_tokens  = []; }
 
 (* -------------------------------------------------------------------- *)
 let finalize (ecreader : ecreader) =
@@ -77,9 +81,19 @@ let finalize (ecreader : ecreader) =
 (* -------------------------------------------------------------------- *)
 let lexer = fun ecreader ->
   let lexbuf = ecreader.ecr_lexbuf in
-  let token  = EcLexer.main lexbuf in
-    ecreader.ecr_atstart <- (token = EcParser.FINAL);
-    (token, Lexing.lexeme_start_p lexbuf, Lexing.lexeme_end_p lexbuf)
+
+  if ecreader.ecr_tokens = [] then
+    ecreader.ecr_tokens <- EcLexer.main lexbuf;
+
+  match ecreader.ecr_tokens with
+  | [] ->
+      failwith "short-read-from-lexer"
+
+  | token :: queue -> begin
+      ecreader.ecr_tokens <- queue;
+      ecreader.ecr_atstart <- (token = EcParser.FINAL);
+      (token, Lexing.lexeme_start_p lexbuf, Lexing.lexeme_end_p lexbuf)
+  end
 
 (* -------------------------------------------------------------------- *)
 let drain (ecreader : ecreader) =
@@ -114,11 +128,17 @@ let parseall (ecreader : ecreader) =
 (* -------------------------------------------------------------------- *)
 let lex_single_token name =
   try
-    let lexbuf = Lexing.from_string name in
-    let token  = EcLexer.main lexbuf in
-      match EcLexer.main lexbuf with
-      | EcParser.EOF -> Some token
-      | _ -> None
+    let ecr =
+      { ecr_lexbuf  = Lexing.from_string name;
+        ecr_parser  = parserfun ();
+        ecr_atstart = true;
+        ecr_tokens  = []; } in
+
+    let (token, _, _) = lexer ecr in
+
+    match lexer ecr with
+    | (EcParser.EOF, _, _) -> Some token
+    | _ -> None
 
   with EcLexer.LexicalError _ -> None
 

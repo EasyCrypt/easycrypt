@@ -192,6 +192,7 @@
     with InvalidCodePosition -> None
 }
 
+let empty   = ""
 let blank   = [' ' '\t' '\r']
 let newline = '\n'
 let upper   = ['A'-'Z']
@@ -235,103 +236,101 @@ let binop =
 rule main = parse
   | newline      { Lexing.new_line lexbuf; main lexbuf }
   | blank+       { main lexbuf }
-  | lident as id { try Hashtbl.find keywords id with Not_found -> LIDENT id }
-  | uident as id { try Hashtbl.find keywords id with Not_found -> UIDENT id }
-  | tident       { TIDENT (Lexing.lexeme lexbuf) }
-  | mident       { MIDENT (Lexing.lexeme lexbuf) }
-  | uint         { UINT (int_of_string (Lexing.lexeme lexbuf)) }
-  | "<<"         { BACKS }
-  | ">>"         { FWDS }
+  | lident as id { try [Hashtbl.find keywords id] with Not_found -> [LIDENT id] }
+  | uident as id { try [Hashtbl.find keywords id] with Not_found -> [UIDENT id] }
+  | tident       { [TIDENT (Lexing.lexeme lexbuf)] }
+  | mident       { [MIDENT (Lexing.lexeme lexbuf)] }
+  | uint         { [UINT (int_of_string (Lexing.lexeme lexbuf))] }
+  | "<<"         { [BACKS] }
+  | ">>"         { [FWDS] }
 
   | "(*" binop "*)" { main lexbuf }
-  | '(' blank* (binop as s) blank* ')' { PBINOP s }
-  | '[' blank* (uniop as s) blank* ']' { PUNIOP (Printf.sprintf "[%s]" s) }
+  | '(' blank* (binop as s) blank* ')' { [PBINOP s] }
+  | '[' blank* (uniop as s) blank* ']' { [PUNIOP (Printf.sprintf "[%s]" s)] }
 
   | "(*" { comment lexbuf; main lexbuf }
-  | "\"" { STRING (Buffer.contents (string (Buffer.create 0) lexbuf)) }
+  | "\"" { [STRING (Buffer.contents (string (Buffer.create 0) lexbuf))] }
 
   (* boolean operators *)
-  | '!'   { NOT  }
-  | "&&"  { ANDA }
-  | "/\\" { AND  }
-  | "||"  { ORA  }
-  | "\\/" { OR   }
-  | "=>"  { IMPL }
-  | "<=>" { IFF  }
+  | '!'   { [NOT ] }
+  | "&&"  { [ANDA] }
+  | "/\\" { [AND ] }
+  | "||"  { [ORA ] }
+  | "\\/" { [OR  ] }
+  | "=>"  { [IMPL] }
+  | "<=>" { [IFF ] }
 
   (* string symbols *)
-  | "<-"    { LEFTARROW }
-  | "->"    { ARROW  }
-  | ".."    { DOTDOT }
-  | ".["    { DLBRACKET }
-  | ".`"    { DOTTICK }
-  | ":="    { CEQ }
-  | "::"    { DCOLON }
-  | "%r"    { FROM_INT }
-  | "{0,1}" { RBOOL }
+  | "<-"    { [LEFTARROW] }
+  | "->"    { [ARROW    ] }
+  | ".."    { [DOTDOT   ] }
+  | ".["    { [DLBRACKET] }
+  | ".`"    { [DOTTICK  ] }
+  | ":="    { [CEQ      ] }
+  | "::"    { [DCOLON   ] }
+  | "%r"    { [FROM_INT ] }
+  | "{0,1}" { [RBOOL    ] }
 
   (* position *)
   | (digit+ ['.' '?'])+ digit+ {
-      CPOS (oget (cposition_of_string (Lexing.lexeme lexbuf)))
+      [CPOS (oget (cposition_of_string (Lexing.lexeme lexbuf)))]
     }
 
   (* punctuation *)
-  | '_'  { UNDERSCORE }
-  | '('  { LPAREN }
-  | ')'  { RPAREN }
-  | '{'  { LBRACE }
-  | '}'  { RBRACE }
-  | '['  { LBRACKET }
-  | ']'  { RBRACKET }
-  | "<:" { LTCOLON }
-  | ','  { COMMA }
-  | ';'  { SEMICOLON }
-  | ':'  { COLON }
-  | '?'  { QUESTION }
-  | '%'  { PCENT }
-  | "*"  { STAR }
-  | "/"  { SLASH }
-  | "$"  { SAMPLE }
-  | "|"  { PIPE }
-  | "`|" { TICKPIPE }
-  | "@"  { AT }
-  | "~"  { TILD }
-  | "{|" { LPBRACE }
-  | "|}" { RPBRACE }
+  | '_'   { [UNDERSCORE] }
+  | '('   { [LPAREN    ] }
+  | ')'   { [RPAREN    ] }
+  | '{'   { [LBRACE    ] }
+  | '}'   { [RBRACE    ] }
+  | '['   { [LBRACKET  ] }
+  | ']'   { [RBRACKET  ] }
+  | "<:"  { [LTCOLON   ] }
+  | ','   { [COMMA     ] }
+  | ';'   { [SEMICOLON ] }
+  | ':'   { [COLON     ] }
+  | '?'   { [QUESTION  ] }
+  | '%'   { [PCENT     ] }
+  | "*"   { [STAR      ] }
+  | "/"   { [SLASH     ] }
+  | "$"   { [SAMPLE    ] }
+  | "|"   { [PIPE      ] }
+  | "`|"  { [TICKPIPE  ] }
+  | "@"   { [AT        ] }
+  | "~"   { [TILD      ] }
+  | "{|"  { [LPBRACE   ] }
+  | "|}"  { [RPBRACE   ] }
+  | "==>" { [LONGARROW ] }
 
-  | "==>" { LONGARROW }
+  (* equality / ordering *)
+  | "="   { [EQ] }
+  | "<>"  { [NE] }
+  | ">"   { [GT] }
+  | "<"   { [LT] }
+  | ">="  { [GE] }
+  | "<="  { [LE] }
 
-  (* comparison *)
-  | "="  { EQ }
-  | "<>" { NE }
+  | "-"   { [MINUS] }
+  | "+"   { [ADD  ] }
 
-  | ">"   { GT }
-  | "<"   { LT }
-  | ">="  { GE }
-  | "<="  { LE }
+  | "//"  { [SLASHSLASH  ] }
+  | "/="  { [SLASHEQ     ] }
+  | "//=" { [SLASHSLASHEQ] }
 
-  | "-" { MINUS }
-  | "+" { ADD }
-
-  | "//"  { SLASHSLASH }
-  | "/="  { SLASHEQ }
-  | "//=" { SLASHSLASHEQ }
-
-  | op1 as s  { OP1 s }
-  | op2 as s  { OP2 s }
-  | op3 as s  { OP3 s }
-  | op4 as s  { OP4 s }
+  | op1 as s  { [OP1 s] }
+  | op2 as s  { [OP2 s] }
+  | op3 as s  { [OP3 s] }
+  | op4 as s  { [OP4 s] }
 
   (* end of sentence / stream *)
   | '.' (eof | blank | newline as r) {
       if r = "\n" then
         Lexing.new_line lexbuf;
-      FINAL
+      [FINAL]
     }
 
-  | "." { DOT }
+  | "." { [DOT] }
 
-  | eof { EOF }
+  | eof { [EOF] }
 
   |  _ as c  { lex_error lexbuf ("illegal character: " ^ String.make 1 c) }
 
@@ -349,5 +348,4 @@ and string buf = parse
   | "\\" (_ as c) { Buffer.add_char buf c   ; string buf lexbuf }
   | newline       { Buffer.add_string buf (Lexing.lexeme lexbuf); string buf lexbuf }
   | _ as c        { Buffer.add_char buf c   ; string buf lexbuf }
-
   | eof           { unterminated_string () }
