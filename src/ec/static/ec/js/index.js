@@ -233,14 +233,23 @@ Workspace.prototype._callback_for_rm_file = function(id) {
 /* ---------------------------------------------------------------- */
 Workspace.prototype._callback_for_add_file_modal = function(id) {
   return (function () {
+    var modal = $('#newfilemodal');
     var form = $('#newfilemodal form');
+    var ws = this;
     form.each (function () { this.reset(); });
     form.one('submit', function (event) {
-      $(this).attr('action', "/ec/projects/" + id + "/files/create");
+      $.ajax({
+        url: "/ec/projects/" + id + "/files/create",
+        data: $(this).serialize(),
+        type: 'POST',
+        success: function(data) {
+          modal.modal('hide');
+          ws.load();
+        },
+      });
       event.preventDefault();
-      $(this).submit();
     });
-    $('#newfilemodal').modal();
+    modal.modal();
   }).bind(this);
 }
 
