@@ -124,6 +124,11 @@ Workspace.prototype.refresh_ui = function() {
 
 /* ---------------------------------------------------------------- */
 Workspace.prototype.load = function() {
+  $("#close-tab").on('click', function() {
+    this.close_tab_by_index(this.active);
+    this.refresh_tabs();
+    this.refresh_contents();
+  }.bind(this));
   $.get('projects/', function(ps) {
     var new_projects = [];
     for (var i = 0; i < ps.length; ++i) {
@@ -173,11 +178,18 @@ Workspace.prototype.find_tab_for_file_id = function(id) {
 }
 
 /* ---------------------------------------------------------------- */
-Workspace.prototype.close_tab_by_file_id = function(id) {
-  if ((tab = this.find_tab_for_file_id(id)) >= 0) {
+Workspace.prototype.close_tab_by_index = function(tab) {
+  if (tab >= 0) {
     this.tabs.splice(tab, 1);
     if (this.tabs.length === 0) this.active = null;
     else if (this.active > this.tabs.length-1) --this.active;
+  }
+}
+
+/* ---------------------------------------------------------------- */
+Workspace.prototype.close_tab_by_file_id = function(id) {
+  if ((index = this.find_tab_for_file_id(id)) >= 0) {
+    this.close_tab_by_index(index);
   }
 }
 
