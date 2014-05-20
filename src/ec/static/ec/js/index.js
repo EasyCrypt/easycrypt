@@ -173,6 +173,15 @@ Workspace.prototype.find_tab_for_file_id = function(id) {
 }
 
 /* ---------------------------------------------------------------- */
+Workspace.prototype.close_tab_by_file_id = function(id) {
+  if ((tab = this.find_tab_for_file_id(id)) >= 0) {
+    this.tabs.splice(tab, 1);
+    if (this.tabs.length === 0) this.active = null;
+    else if (this.active > this.tabs.length-1) --this.active;
+  }
+}
+
+/* ---------------------------------------------------------------- */
 Workspace.prototype.activate_tab = function(index) {
   if (index > this.tabs.length-1)
     return ;
@@ -214,7 +223,10 @@ Workspace.prototype._callback_for_toggle_glyph = function(proj, glyph) {
 /* ---------------------------------------------------------------- */
 Workspace.prototype._callback_for_rm_file = function(id) {
   return (function () {
-    $.get('files/' + id + '/rm', this.load.bind(this));
+    $.get('files/' + id + '/rm', function() {
+      this.close_tab_by_file_id(id);
+      this.load();
+    }.bind(this))
   }).bind(this);
 }
 
