@@ -38,9 +38,21 @@ and pt_ev_arg_r =
 | PVASub     of pt_ev
 
 (* -------------------------------------------------------------------- *)
-let tc_pterm_apperror _pe ?loc _kind =
-  ignore loc;
-  assert false
+let tc_pterm_apperror pe ?loc kind =
+  let msg =
+    match kind with
+    | `FormWanted      -> "expecting a formula"
+    | `MemoryWanted    -> "expecting a memory"
+    | `ModuleWanted    -> "expecting a module expression"
+    | `PTermWanted     -> "expecting a proof-term"
+    | `CannotInferMod  -> "cannot infer module arguments"
+    | `CannotInferMem  -> "cannot infer memory arguments"
+    | `NotFunctional   -> "too many argument"
+    | `InvalidArgForm  -> "invalid argument (incompatible type)"
+    | `InvalidArgProof -> "invalid proof-term"
+    | `InvalidArgMod   -> "invalid argument (incompatible module type)"
+  in
+    EcCoreGoal.tc_error pe ?loc "%s" msg
 
 (* -------------------------------------------------------------------- *)
 let ptenv pe hyps (ue, ev) =
@@ -355,7 +367,7 @@ let trans_pterm_arg_value pe ?name { pl_desc = arg } =
 let trans_pterm_arg_mod pe arg =
   let mp =
     match unloc arg with
-    | EA_none    -> tc_pterm_apperror pe.pte_pe `CannotInfer
+    | EA_none    -> tc_pterm_apperror pe.pte_pe `CannotInferMod
     | EA_mem _   -> tc_pterm_apperror pe.pte_pe `ModuleWanted
     | EA_mod mp  -> mp
     | EA_form fp ->
@@ -373,7 +385,7 @@ let trans_pterm_arg_mod pe arg =
 (* ------------------------------------------------------------------ *)
 let trans_pterm_arg_mem pe { pl_desc = arg } =
   match arg with
-  | EA_none -> tc_pterm_apperror pe.pte_pe `CannotInfer
+  | EA_none -> tc_pterm_apperror pe.pte_pe `CannotInferMem
   | EA_mod _ | EA_form _ -> tc_pterm_apperror pe.pte_pe `MemoryWanted
 
   | EA_mem mem ->
@@ -436,10 +448,14 @@ let check_pterm_oarg pe (x, xty) f arg =
 
   | GTmodty (emt, restr) -> begin
       match dfl_arg_for_mod pe arg with
-      | PVAModule (mp, mt) ->
+      | PVAModule (mp, mt) -> begin
+        try
           EcTyping.check_modtype_with_restrictions env mp mt emt restr;
           EcPV.check_module_in env mp emt;
           (Fsubst.f_subst_mod x mp f, PAModule (mp, mt))
+        with EcTyping.TymodCnvFailure _ ->
+          tc_pterm_apperror pe.pte_pe `InvalidArgMod
+      end
       | _ -> tc_pterm_apperror pe.pte_pe `ModuleWanted
   end
 
