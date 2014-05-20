@@ -390,42 +390,45 @@ let msymbol_of_pv (ppe : PPEnv.t) p =
 let pp_pv ppe fmt p =
   EcSymbols.pp_msymbol fmt (msymbol_of_pv ppe p)
 
+(* -------------------------------------------------------------------- *)
 exception NoProjArg
-let get_projarg ppe e i =
+
+let get_projarg_for_var mkvar ppe x i =
+  if not (is_loc x) then
+    raise NoProjArg;
+  if EcPath.basename x.pv_name.EcPath.x_sub <> "arg" then
+    raise NoProjArg;
+      
+  let x = x.pv_name in
+  let f =
+      EcPath.xpath
+        x.EcPath.x_top
+        (oget (EcPath.prefix x.EcPath.x_sub)) in
+  let fd = EcEnv.Fun.by_xpath f ppe.PPEnv.ppe_env in
+
+  match fd.f_sig.fs_anames with
+  | Some [_] -> raise NoProjArg
+  | Some ((_ :: _ :: _) as vs) when i < List.length vs ->
+      (mkvar f (List.nth vs i))
+  | _ -> raise NoProjArg
+
+let get_f_projarg ppe e i =
   match e.f_node with
-  | Fpvar(x,m) when is_loc x &&
-      EcPath.basename x.pv_name.EcPath.x_sub = "arg" ->
-    let x = x.pv_name in
-    let f =
-      EcPath.xpath x.EcPath.x_top (oget (EcPath.prefix x.EcPath.x_sub)) in
-    let fd = EcEnv.Fun.by_xpath f ppe.PPEnv.ppe_env in
-    begin match fd.f_sig.fs_anames with
-    | Some [_] -> raise NoProjArg
-    | Some vs when i < List.length vs ->
-      let v = List.nth vs i in
-      (f_pvar (pv_loc f v.v_name) v.v_type m)
-    | _ -> raise NoProjArg
-    end
+  | Fpvar (x, m) ->
+      get_projarg_for_var
+        (fun f v -> f_pvar (pv_loc f v.v_name) v.v_type m)
+        ppe x i
+
   | _ -> raise NoProjArg
 
-let get_eprojarg ppe e i =
+let get_e_projarg ppe e i =
   match e.e_node with
-  | Evar x when is_loc x &&
-      EcPath.basename x.pv_name.EcPath.x_sub = "arg" ->
-    let x = x.pv_name in
-    let f =
-      EcPath.xpath x.EcPath.x_top (oget (EcPath.prefix x.EcPath.x_sub)) in
-    let fd = EcEnv.Fun.by_xpath f ppe.PPEnv.ppe_env in
-    begin match fd.f_sig.fs_anames with
-    | Some [_] -> raise NoProjArg
-    | Some vs when i < List.length vs ->
-      let v = List.nth vs i in
-      e_var (pv_loc f v.v_name) v.v_type
-    | _ -> raise NoProjArg
-    end
+  | Evar x ->
+      get_projarg_for_var
+        (fun f v -> e_var (pv_loc f v.v_name) v.v_type)
+        ppe x i
+
   | _ -> raise NoProjArg
-
-
 
 (* -------------------------------------------------------------------- *)
 let pp_modtype (ppe : PPEnv.t) fmt ((mty, r) : module_type * _) =
@@ -975,13 +978,12 @@ and pp_expr_core_r (ppe : PPEnv.t) outer fmt (e : expr) =
   | Etuple es ->
       pp_tuple `ForTuple ppe pp_expr_r (fst outer) fmt es
 
-  | Eproj(e1,i) ->
-    begin
+  | Eproj (e1, i) -> begin
       try
-        let v = get_eprojarg ppe e1 i in
+        let v = get_e_projarg ppe e1 i in
         pp_expr_core_r ppe outer fmt v
       with NoProjArg ->
-        pp_proji ppe pp_expr_r (fst outer) fmt (e,i)
+        pp_proji ppe pp_expr_r (fst outer) fmt (e1, i)
     end
 
   | Eapp ({e_node = Eop (op, tys) }, args) ->
@@ -1179,12 +1181,15 @@ let rec try_pp_form_eqveq (ppe : PPEnv.t) _outer fmt f =
       let pv2 = (PPEnv.mod_symb ppe x2) in
 
       if pv1 = pv2 then Some (`Glob pv1) else None
-    | SFeq({f_node = Fproj(f1,i1)},{f_node = Fproj(f2,i2)}) ->
-      (try
-         let x1 = get_projarg ppe f1 i1 in
-         let x2 = get_projarg ppe f2 i2 in
-         collect1 (f_eq x1 x2)
-       with NoProjArg -> None)
+
+    | SFeq ({ f_node = Fproj (f1, i1) },
+            { f_node = Fproj (f2, i2) }) -> begin
+      try
+        let x1 = get_f_projarg ppe f1 i1 in
+        let x2 = get_f_projarg ppe f2 i2 in
+        collect1 (f_eq x1 x2)
+       with NoProjArg -> None
+    end
 
     | _ -> None
 
@@ -1323,10 +1328,9 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
   | Ftuple args ->
       pp_tuple `ForTuple ppe pp_form_r (fst outer) fmt args
 
-  | Fproj(e1,i) ->
-    begin
+  | Fproj (e1, i) -> begin
       try
-        let v = get_projarg ppe e1 i in
+        let v = get_f_projarg ppe e1 i in
         pp_form_core_r ppe outer fmt v
       with NoProjArg ->
         pp_proji ppe pp_form_r (fst outer) fmt (e1,i)
