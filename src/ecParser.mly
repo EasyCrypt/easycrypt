@@ -2532,14 +2532,14 @@ realize:
 (* -------------------------------------------------------------------- *)
 (* Printing                                                             *)
 print:
-| TYPE        qs=qident  { Pr_ty   qs }
-| GLOB        qs=qident  { Pr_glob qs }
-| OP          qs=qoident { Pr_op   qs }
-| THEORY      qs=qident  { Pr_th   qs }
-| PRED        qs=qoident { Pr_pr   qs }
-| AXIOM       qs=qident  { Pr_ax   qs }
-| MODULE      qs=qident  { Pr_mod  qs }
-| MODULE TYPE qs=qident  { Pr_mty  qs }
+| TYPE        qs=qident          { Pr_ty   qs }
+| GLOB        qs=loc(mod_qident) { Pr_glob qs }
+| OP          qs=qoident         { Pr_op   qs }
+| THEORY      qs=qident          { Pr_th   qs }
+| PRED        qs=qoident         { Pr_pr   qs }
+| AXIOM       qs=qident          { Pr_ax   qs }
+| MODULE      qs=qident          { Pr_mod  qs }
+| MODULE TYPE qs=qident          { Pr_mty  qs }
 ;
 
 prover_iconfig:

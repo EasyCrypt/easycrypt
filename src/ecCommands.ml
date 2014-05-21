@@ -81,8 +81,8 @@ let process_pr fmt scope p =
       let (x, ty) = EcEnv.Ty.lookup qs.pl_desc env in
       Format.fprintf fmt "%a@." (EcPrinting.pp_typedecl ppe) (x, ty)
 
-  | Pr_glob qs -> begin
-      let (p, _me) = EcEnv.Mod.lookup qs.pl_desc env in
+  | Pr_glob pm -> begin
+      let (p, _) = EcTyping.trans_msymbol env pm in
       let us = EcEnv.NormMp.mod_use env p in
 
       Format.fprintf fmt "Globals [# = %d]:@."

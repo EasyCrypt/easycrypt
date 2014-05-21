@@ -878,8 +878,6 @@ let rec transty (tp : typolicy) (env : EcEnv.env) ue ty =
   | PTglob gp ->
     let m,_ = trans_msymbol env gp in
     tglob m
-    
-
 
 and transtys tp (env : EcEnv.env) ue tys = 
   List.map (transty tp env ue) tys
