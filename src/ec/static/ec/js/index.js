@@ -129,6 +129,9 @@ Workspace.prototype.load = function() {
     this.refresh_tabs();
     this.refresh_contents();
   }.bind(this));
+  $(".modal").on('shown.bs.modal', function(e) {
+    $(':input:enabled:visible:first').focus();
+  });
   $.get('projects/', function(ps) {
     var new_projects = [];
     for (var i = 0; i < ps.length; ++i) {
@@ -160,7 +163,7 @@ Workspace.prototype.find_project_by_id = function(id) {
 /* ---------------------------------------------------------------- */
 Workspace.prototype.find_file_by_id = function(id) {
   for (var i = 0; i < this.projects.length; ++i) {
-    var project = this.projects[i]
+    var project = this.projects[i];
     for (var fileidx = 0; fileidx < project.files.length; ++fileidx) {
       if (project.files[fileidx].id == id)
         return project.files[fileidx];
@@ -238,7 +241,7 @@ Workspace.prototype._callback_for_rm_file = function(id) {
     $.get('files/' + id + '/rm', function() {
       this.close_tab_by_file_id(id);
       this.load();
-    }.bind(this))
+    }.bind(this));
   }).bind(this);
 }
 
