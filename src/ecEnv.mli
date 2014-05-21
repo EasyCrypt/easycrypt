@@ -205,7 +205,6 @@ type use = {
 }
 
 module NormMp : sig
-
   val norm_mpath : env -> mpath -> mpath
   val norm_xfun  : env -> xpath -> xpath
   val norm_pvar  : env -> EcTypes.prog_var -> EcTypes.prog_var
