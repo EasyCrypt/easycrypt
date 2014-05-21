@@ -941,7 +941,10 @@ let process_elim (pe, qs) tc =
         let qs = { fp_kind = FPNamed (qs, None); fp_args = []; } in
         process_elimT qs tc
   in
-    FApi.t_last doelim (process_generalize pe tc)
+    try
+      FApi.t_last doelim (process_generalize pe tc)
+    with EcCoreGoal.InvalidGoalShape ->
+      tc_error !!tc "don't know what to eliminate"
 
 (* -------------------------------------------------------------------- *)
 let process_case gp tc =
@@ -966,9 +969,12 @@ let process_case gp tc =
     | _ -> raise E.LEMFailure
 
   with E.LEMFailure ->
-    FApi.t_last
-      (t_or t_elim (t_elimT_ind `Case))
-      (process_generalize gp tc)
+    try
+      FApi.t_last
+        (t_or t_elim (t_elimT_ind `Case))
+        (process_generalize gp tc)
+    with EcCoreGoal.InvalidGoalShape ->
+      tc_error !!tc "don't known what to eliminate"
 
 (* -------------------------------------------------------------------- *)
 let process_exists args (tc : tcenv1) =
