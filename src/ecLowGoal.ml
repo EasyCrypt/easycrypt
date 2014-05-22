@@ -753,26 +753,6 @@ let t_elim_exists_r ((f, _) : form * sform) concl tc =
 let t_elim_exists tc = t_elim_r [t_elim_exists_r] tc
 
 (* -------------------------------------------------------------------- *)
-let t_elim_default_r = [
-  t_elim_false_r;
-  t_elim_and_r;
-  t_elim_or_r;
-  t_elim_iff_r;
-  t_elim_if_r;
-  t_elim_eq_tuple_r;
-  t_elim_exists_r;
-]
-
-let t_elim ?reduce tc = t_elim_r ?reduce t_elim_default_r tc
-
-(* -------------------------------------------------------------------- *)
-let t_elim_hyp h tc =
-  (* FIXME: exception? *)
-  let f  = LDecl.lookup_hyp_by_id h (FApi.tc1_hyps tc) in
-  let pt = { pt_head = PTLocal h; pt_args = []; } in
-  FApi.t_seq (t_cutdef pt f) t_elim tc
-
-(* -------------------------------------------------------------------- *)
 (* FIXME: document this function ! *)
 let t_elimT_form (ind : proofterm) ?(sk = 0) (f : form) (tc : tcenv1) =
   let tc    = FApi.tcenv_of_tcenv1 tc in
@@ -852,7 +832,7 @@ let t_elimT_form_global p ?(typ = []) ?sk f tc =
   t_elimT_form pt f ?sk tc
 
 (* -------------------------------------------------------------------- *)
-let gen_tuple_elim (tys : ty list) : form =
+let gen_tuple_elim ?(witheq = true) (tys : ty list) : form =
   let var i ty =
     let var = EcIdent.create (Printf.sprintf "%s%d" "x" (i+1)) in
     (var, f_local var ty) in
@@ -866,7 +846,7 @@ let gen_tuple_elim (tys : ty list) : form =
   let tf   = f_tuple (List.map snd vars) in
 
   let indh = f_app fp [tf] tbool in
-  let indh = f_imp (f_eq ft tf) indh in
+  let indh = if witheq then f_imp (f_eq ft tf) indh else indh in
   let indh = f_forall (List.map (snd_map (fun f -> GTty f.f_ty)) vars) indh in
 
   let concl = f_forall [] (f_imp indh (f_app fp [ft] tbool)) in
@@ -876,29 +856,66 @@ let gen_tuple_elim (tys : ty list) : form =
   concl
 
 (* -------------------------------------------------------------------- *)
-let pf_gen_tuple_elim tys hyps pe =
-  let fp = gen_tuple_elim tys in
+let pf_gen_tuple_elim ?witheq tys hyps pe =
+  let fp = gen_tuple_elim ?witheq tys in
   FApi.newfact pe (VExtern (`TupleElim tys, [])) hyps fp
 
 (* -------------------------------------------------------------------- *)
 let t_elimT_ind mode (tc : tcenv1) =
-  let env, hyps, concl = FApi.tc1_eflat tc in
+  let elim (id, ty) tc =
+    let tc, pt =
+      let env, hyps, _ = FApi.tc1_eflat tc in
 
-  match sform_of_form concl with
-  | SFquant (Lforall, (x, GTty ty), _) -> begin
       match EcEnv.Ty.scheme_of_ty mode ty env with
-      | None -> raise InvalidGoalShape
       | Some (p, typ) ->
-          let id   = LDecl.fresh_id hyps (EcIdent.name x) in
-          let elim = t_elimT_form_global p ~typ (f_local id ty) in
+          let pt = { pt_head = PTGlobal (p, typ); pt_args = []; } in
+          (tc, pt)
 
-            FApi.t_seqs
-              [t_intros_i_seq ~clear:true [id] elim;
-               t_simplify_with_info EcReduction.beta_red]
-              tc
+      | None ->
+          match ty.ty_node with
+          | Ttuple tys ->
+              let indtc = pf_gen_tuple_elim ~witheq:false tys hyps in
+              let tc, hd = FApi.bwd1_of_fwd indtc tc in
+              let pt = { pt_head = PTHandle hd; pt_args = []; } in
+              (tc, pt)
+
+          | _ -> raise InvalidGoalShape
+    in
+      t_elimT_form pt (f_local id ty) tc
+  in
+
+  match sform_of_form (FApi.tc1_goal tc) with
+  | SFquant (Lforall, (x, GTty ty), _) -> begin
+      let hyps = FApi.tc1_hyps tc in
+      let id   = LDecl.fresh_id hyps (EcIdent.name x) in
+
+      FApi.t_seqs
+        [t_intros_i_seq ~clear:true [id] (elim (id, ty));
+        t_simplify_with_info EcReduction.beta_red]
+        tc
     end
 
   | _ -> raise InvalidGoalShape
+
+(* -------------------------------------------------------------------- *)
+let t_elim_default_r = [
+  t_elim_false_r;
+  t_elim_and_r;
+  t_elim_or_r;
+  t_elim_iff_r;
+  t_elim_if_r;
+  t_elim_eq_tuple_r;
+  t_elim_exists_r;
+]
+
+let t_elim ?reduce tc = t_elim_r ?reduce t_elim_default_r tc
+
+(* -------------------------------------------------------------------- *)
+let t_elim_hyp h tc =
+  (* FIXME: exception? *)
+  let f  = LDecl.lookup_hyp_by_id h (FApi.tc1_hyps tc) in
+  let pt = { pt_head = PTLocal h; pt_args = []; } in
+  FApi.t_seq (t_cutdef pt f) t_elim tc
 
 (* -------------------------------------------------------------------- *)
 let t_case fp tc = t_elimT_form_global EcCoreLib.p_case_eq_bool fp tc
