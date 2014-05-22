@@ -123,15 +123,7 @@ Workspace.prototype.refresh_ui = function() {
 }
 
 /* ---------------------------------------------------------------- */
-Workspace.prototype.load = function() {
-  $("#close-tab").on('click', function() {
-    this.close_tab_by_index(this.active);
-    this.refresh_tabs();
-    this.refresh_contents();
-  }.bind(this));
-  $(".modal").on('shown.bs.modal', function(e) {
-    $(':input:enabled:visible:first').focus();
-  });
+Workspace.prototype.reload_projects = function() {
   $.get('projects/', function(ps) {
     var new_projects = [];
     for (var i = 0; i < ps.length; ++i) {
@@ -149,6 +141,19 @@ Workspace.prototype.load = function() {
     this.projects = new_projects;
     this.refresh_ui();
   }.bind(this));
+}
+
+/* ---------------------------------------------------------------- */
+Workspace.prototype.load = function() {
+  $("#close-tab").on('click', function() {
+    this.close_tab_by_index(this.active);
+    this.refresh_tabs();
+    this.refresh_contents();
+  }.bind(this));
+  $(".modal").on('shown.bs.modal', function(e) {
+    $(':input:enabled:visible:first').focus();
+  });
+  this.reload_projects();
 }
 
 /* ---------------------------------------------------------------- */
@@ -240,7 +245,7 @@ Workspace.prototype._callback_for_rm_file = function(id) {
   return (function () {
     $.get('files/' + id + '/rm', function() {
       this.close_tab_by_file_id(id);
-      this.load();
+      this.reload_projects();
     }.bind(this));
   }).bind(this);
 }
@@ -259,7 +264,7 @@ Workspace.prototype._callback_for_add_file_modal = function(id) {
         type: 'POST',
         success: function(data) {
           modal.modal('hide');
-          ws.load();
+          ws.reload_projects();
         },
       });
       event.preventDefault();
