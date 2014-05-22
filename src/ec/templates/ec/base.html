@@ -21,14 +21,6 @@
         <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
         <![endif]-->
 
-        <!-- jQuery -->
-        <script src="{% static 'ec/js/jquery-1.11.0.js' %}"></script>
-
-        <!-- Bootstrap JS -->
-        <script src="{% static 'ec/js/bootstrap.min.js' %}"></script>
-        <script src="{% static 'ec/js/util.js' %}"></script>
-
-        {% block jquery %}{% endblock %}
     </head>
     <body>
         <div class="navbar navbar-inverse navbar-fixed-top" role="navigation">
@@ -76,5 +68,14 @@
             {% block content %}
             {% endblock %}
         </div>
+
+        <!-- jQuery -->
+        <script src="{% static 'ec/js/jquery-1.11.0.js' %}"></script>
+
+        <!-- Bootstrap JS -->
+        <script src="{% static 'ec/js/bootstrap.min.js' %}"></script>
+        <script src="{% static 'ec/js/util.js' %}"></script>
+
+        {% block js %}{% endblock %}
     </body>
 </html>

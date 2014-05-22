@@ -30,9 +30,10 @@ var Workspace = function() {
   this.tabs     = [];
   this.active   = null; /* index of the active tab */
 
+  this.editor   = null;
+
   this.ui = {}
   this.ui.tabs     = $('#tabs');
-  this.ui.contents = $('#file-contents');
   this.ui.treeview = $('#projects');
 
   this.load();
@@ -45,25 +46,25 @@ Workspace.prototype.get_file_contents = function(file) {
   $.get('files/' + file.id + "/contents", (function (file,contents) {
     file.contents = contents;
     file.is_loading = false;
-    this.refresh_contents();
+    this.refresh_editor();
   }).bind(this,file));
 }
 
 /* ---------------------------------------------------------------- */
-Workspace.prototype.refresh_contents = function() {
+Workspace.prototype.refresh_editor = function() {
   if (this.active != null) {
     var current_file = this.tabs[this.active].file;
     if (!file.contents) {
       this.get_file_contents(file);
     }
-    this.ui.contents.val(current_file.contents);
+    this.editor.setValue(current_file.contents);
     if (current_file.is_loading)
-      this.ui.contents.attr('disabled','disabled');
+      this.editor.setReadOnly(true);
     else
-      this.ui.contents.removeAttr('disabled');
+      this.editor.setReadOnly(false);
   } else {
-    this.ui.contents.val("");
-    this.ui.contents.attr('disabled', 'disabled');
+    this.editor.setValue("");
+    this.editor.setReadOnly(true);
   }
 }
 Workspace.prototype.refresh_projects = function() {
@@ -117,7 +118,7 @@ Workspace.prototype.refresh_tabs = function() {
   }
 }
 Workspace.prototype.refresh_ui = function() {
-  this.refresh_contents();
+  this.refresh_editor();
   this.refresh_projects();
   this.refresh_tabs();
 }
@@ -148,11 +149,14 @@ Workspace.prototype.load = function() {
   $("#close-tab").on('click', function() {
     this.close_tab_by_index(this.active);
     this.refresh_tabs();
-    this.refresh_contents();
+    this.refresh_editor();
   }.bind(this));
   $(".modal").on('shown.bs.modal', function(e) {
     $(':input:enabled:visible:first').focus();
   });
+  this.editor = ace.edit("editor");
+  this.editor.setTheme("ace/theme/monokai");
+  this.editor.getSession().setMode("ace/mode/javascript");
   this.reload_projects();
 }
 
@@ -207,7 +211,7 @@ Workspace.prototype.activate_tab = function(index) {
     return ;
   this.active = index;
   this.refresh_tabs();
-  this.refresh_contents();
+  this.refresh_editor();
 }
 
 /* ---------------------------------------------------------------- */

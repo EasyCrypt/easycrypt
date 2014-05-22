@@ -20,9 +20,7 @@
                 </ul>
             </div>
         </div>
-        <div class="row full-height">
-            <textarea id="file-contents" class="form-control" disabled></textarea>
-        </div>
+        <div id="editor" class="row full-height"></div>
     </div>
 </div>
 
@@ -47,6 +45,7 @@
 {% endif %}
 {% endblock %}
 
-{% block jquery %}
+{% block js %}
+<script src="{% static 'ec/js/ace/src/ace.js' %}" type="text/javascript" charset="utf-8"></script>
 <script src="{% static 'ec/js/index.js' %}"></script>
 {% endblock %}
