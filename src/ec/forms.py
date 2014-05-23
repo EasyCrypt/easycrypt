@@ -102,7 +102,7 @@ class ProjectCreationFormModal(forms.Form):
         super(ProjectCreationFormModal, self).__init__(*args, **kwargs)
 
         self.helper = FormHelper()
-        self.helper.form_action = reverse('ec:create_project')
+        self.helper.form_action = reverse('ec:projects')
         self.helper.form_class = "form form-centered"
         self.helper.layout = Layout(
             Div(Field('proj_name', placeholder="Project name",

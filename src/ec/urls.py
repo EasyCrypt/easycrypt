@@ -9,12 +9,8 @@ urlpatterns = patterns('',
    url(r'^logout/$', views.logout, name='logout'),
 
    # Information retrieval from the client (not meant for user interaction)
-   url(r'^projects/$', views.get_projects, name='get_projects'),
-   url(r'^projects/create$', views.create_project, name='create_project'),
-   url(r'^projects/(?P<proj_id>\d+)/files/create$', views.create_file,
-       name='create_file'),
-   url(r'^files/(?P<file_id>\d+)/contents$', views.file_contents,
-       name='file_contents'),
-   url(r'^files/(?P<file_id>\d+)/rm$', views.rm_file,
-       name='rm_file'),
+   url(r'^projects$', views.projects, name='projects'),
+   url(r'^projects/(?P<proj_id>\d+)/files$', views.project_files,
+       name='project_files'),
+   url(r'^files/(?P<file_id>\d+)$', views.file_, name='file'),
 )

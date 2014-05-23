@@ -40,38 +40,43 @@ var Workspace = function() {
 }
 
 /* ---------------------------------------------------------------- */
+Workspace.prototype.current_file = function() {
+  if (this.active != null)
+    return this.tabs[this.active].file;
+  else
+    return null;
+}
+
+/* ---------------------------------------------------------------- */
 Workspace.prototype.get_file_contents = function(file) {
   file.is_loading = true;
   file.contents = "loading...";
-  $.get('files/' + file.id + "/contents", (function (file,contents) {
+  $.get('files/' + file.id, (function (file,contents) {
     file.contents = contents;
     file.is_loading = false;
     this.refresh_editor();
   }).bind(this,file));
 }
 
-/* ---------------------------------------------------------------- */
 Workspace.prototype.push_file_contents = function(file) {
-  $.post('files/' + file.id + "/contents", {contents:file.contents});
+  $.post('files/' + file.id, {contents:file.contents});
 }
 
 /* ---------------------------------------------------------------- */
 Workspace.prototype.refresh_editor = function() {
-  if (this.active != null) {
-    var current_file = this.tabs[this.active].file;
-    if (!file.contents) {
-      this.get_file_contents(file);
+  var current_file = this.current_file();
+  if (current_file != null) {
+    if (!current_file.contents) {
+      this.get_file_contents(current_file);
     }
     this.editor.setValue(current_file.contents);
-    if (current_file.is_loading)
-      this.editor.setReadOnly(true);
-    else
-      this.editor.setReadOnly(false);
+    this.editor.setReadOnly(current_file.is_loading);
   } else {
     this.editor.setValue("");
     this.editor.setReadOnly(true);
   }
 }
+
 Workspace.prototype.refresh_projects = function() {
   this.ui.treeview.children().remove();
   for (var i = 0; i < this.projects.length; ++i) {
@@ -107,6 +112,7 @@ Workspace.prototype.refresh_projects = function() {
     this.ui.treeview.append(project_tree);
   }
 }
+
 Workspace.prototype.refresh_tabs = function() {
   this.ui.tabs.children().remove();
   for (var i = 0; i < this.tabs.length; ++i) {
@@ -122,6 +128,7 @@ Workspace.prototype.refresh_tabs = function() {
     this.ui.tabs.append(node);
   }
 }
+
 Workspace.prototype.refresh_ui = function() {
   this.refresh_editor();
   this.refresh_projects();
@@ -129,8 +136,8 @@ Workspace.prototype.refresh_ui = function() {
 }
 
 /* ---------------------------------------------------------------- */
-Workspace.prototype.reload_projects = function() {
-  $.get('projects/', function(ps) {
+Workspace.prototype.load_projects = function() {
+  $.get('projects', function(ps) {
     var new_projects = [];
     for (var i = 0; i < ps.length; ++i) {
       var p = ps[i];
@@ -149,7 +156,12 @@ Workspace.prototype.reload_projects = function() {
   }.bind(this));
 }
 
-/* ---------------------------------------------------------------- */
+Workspace.prototype.load_editor = function() {
+  this.editor = ace.edit("editor");
+  this.editor.setTheme("ace/theme/monokai");
+  this.editor.getSession().setMode("ace/mode/javascript");
+}
+
 Workspace.prototype.load = function() {
   $("#close-tab").on('click', function() {
     this.close_tab_by_index(this.active);
@@ -159,37 +171,9 @@ Workspace.prototype.load = function() {
   $(".modal").on('shown.bs.modal', function(e) {
     $(':input:enabled:visible:first').focus();
   });
-  var csrftoken = $.cookie('csrftoken');
-  function csrfSafeMethod(method) {
-    return (/^(GET|HEAD|OPTIONS|TRACE)$/.test(method));
-  }
-  function sameOrigin(url) {
-    // test that a given url is a same-origin URL
-    // url could be relative or scheme relative or absolute
-    var host = document.location.host; // host + port
-    var protocol = document.location.protocol;
-    var sr_origin = '//' + host;
-    var origin = protocol + sr_origin;
-    // Allow absolute or scheme relative URLs to same origin
-    return (url == origin || url.slice(0, origin.length + 1) == origin + '/') ||
-        (url == sr_origin || url.slice(0, sr_origin.length + 1) == sr_origin + '/') ||
-        // or any other URL that isn't scheme relative or absolute i.e relative.
-        !(/^(\/\/|http:|https:).*/.test(url));
-  }
-  $.ajaxSetup({
-    beforeSend: function(xhr, settings) {
-        if (!csrfSafeMethod(settings.type) && sameOrigin(settings.url)) {
-            // Send the token to same-origin, relative URLs only.
-            // Send the token only if the method warrants CSRF protection
-            // Using the CSRFToken value acquired earlier
-            xhr.setRequestHeader("X-CSRFToken", csrftoken);
-        }
-    }
-  });
-  this.editor = ace.edit("editor");
-  this.editor.setTheme("ace/theme/monokai");
-  this.editor.getSession().setMode("ace/mode/javascript");
-  this.reload_projects();
+  set_up_csrf_token();
+  this.load_editor();
+  this.load_projects();
 }
 
 /* ---------------------------------------------------------------- */
@@ -205,14 +189,12 @@ Workspace.prototype.find_project_by_id = function(id) {
 Workspace.prototype.find_file_by_id = function(id) {
   for (var i = 0; i < this.projects.length; ++i) {
     var project = this.projects[i];
-    for (var fileidx = 0; fileidx < project.files.length; ++fileidx) {
-      if (project.files[fileidx].id == id)
-        return project.files[fileidx];
+    for (var j = 0; j < project.files.length; ++j) {
+      if (project.files[j].id == id)
+        return project.files[j];
     }
   }
 }
-
-/* ---------------------------------------------------------------- */
 Workspace.prototype.find_tab_for_file_id = function(id) {
   for (var i = 0; i < this.tabs.length; ++i) {
     if (this.tabs[i].file.id == id)
@@ -230,7 +212,6 @@ Workspace.prototype.close_tab_by_index = function(tab) {
   }
 }
 
-/* ---------------------------------------------------------------- */
 Workspace.prototype.close_tab_by_file_id = function(id) {
   if ((index = this.find_tab_for_file_id(id)) >= 0) {
     this.close_tab_by_index(index);
@@ -242,9 +223,9 @@ Workspace.prototype.activate_tab = function(index) {
   if (index > this.tabs.length-1)
     return ;
   if (this.active != null && index != this.active) {
-    var file = this.tabs[this.active].file;
-    file.contents = this.editor.getValue();
-    this.push_file_contents(file);
+    var current_file = this.current_file();
+    current_file.contents = this.editor.getValue();
+    this.push_file_contents(current_file);
   }
   this.active = index;
   this.refresh_tabs();
@@ -263,17 +244,16 @@ Workspace.prototype.open_file = function(id) {
   }
 }
 
+/*                             CALLBACKS                            */
 /* ---------------------------------------------------------------- */
 Workspace.prototype._callback_for_open_file_by_id = function(id) {
   return (function() { this.open_file(id); }).bind(this);
 }
 
-/* ---------------------------------------------------------------- */
 Workspace.prototype._callback_for_activate_tab_by_index = function(index) {
   return (function() { this.activate_tab(index); }).bind(this);
 }
 
-/* ---------------------------------------------------------------- */
 Workspace.prototype._callback_for_toggle_glyph = function(proj, glyph) {
   return function() {
     proj.is_unfolded = !proj.is_unfolded;
@@ -281,34 +261,36 @@ Workspace.prototype._callback_for_toggle_glyph = function(proj, glyph) {
   };
 }
 
-/* ---------------------------------------------------------------- */
 Workspace.prototype._callback_for_rm_file = function(id) {
-  return (function () {
-    $.get('files/' + id + '/rm', function() {
-      this.close_tab_by_file_id(id);
-      this.reload_projects();
-    }.bind(this));
+  return (function() {
+    $.ajax({
+      url: 'files/' + id,
+      type: 'DELETE',
+      success: function() {
+        this.close_tab_by_file_id(id);
+        this.load_projects();
+      }.bind(this)
+    });
   }).bind(this);
 }
 
-/* ---------------------------------------------------------------- */
 Workspace.prototype._callback_for_add_file_modal = function(id) {
-  return (function () {
+  return (function() {
     var modal = $('#newfilemodal');
     var form = $('#newfilemodal form');
     var ws = this;
-    form.each (function () { this.reset(); });
-    form.one('submit', function (event) {
+    form.each (function() { this.reset(); });
+    form.one('submit', function(e) {
       $.ajax({
-        url: "/ec/projects/" + id + "/files/create",
+        url: "/ec/projects/" + id + "/files",
         data: $(this).serialize(),
         type: 'POST',
         success: function(data) {
           modal.modal('hide');
-          ws.reload_projects();
+          ws.load_projects();
         },
       });
-      event.preventDefault();
+      e.preventDefault();
     });
     modal.modal();
   }).bind(this);

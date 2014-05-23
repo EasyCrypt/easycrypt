@@ -56,23 +56,20 @@ def logout(request):
 
 
 @login_required
-def get_projects(request):
-    dbprojects = request.user.project_set.all()
-    projects = []
+def projects(request):
+    if request.method == 'GET':
+        dbprojects = request.user.project_set.all()
+        projects = []
 
-    for dbproject in dbprojects:
-        dbfiles = File.objects.filter(project=dbproject.id)
-        files = [dict(id=x.id, name=x.name) for x in dbfiles]
-        projects.append(dict(id=dbproject.id,
-                             name=dbproject.name,
-                             files=files))
+        for dbproject in dbprojects:
+            dbfiles = File.objects.filter(project=dbproject.id)
+            files = [dict(id=x.id, name=x.name) for x in dbfiles]
+            projects.append(dict(id=dbproject.id,
+                                 name=dbproject.name,
+                                 files=files))
 
-    return _json_HttpResponse(projects)
-
-
-@login_required
-def create_project(request):
-    if request.method == 'POST':
+        return _json_HttpResponse(projects)
+    elif request.method == 'POST':
         form = ProjectCreationFormModal(request.POST)
         if form.is_valid():
             proj = Project(name=form.cleaned_data['proj_name'],
@@ -82,11 +79,11 @@ def create_project(request):
         else:
             return HttpResponse(str(form.errors), status=400)
     else:
-        return HttpResponse('Only POST method allowed', status=405)
+        return HttpResponse('Only GET/POST methods allowed', status=405)
 
 
 @login_required
-def create_file(request, proj_id):
+def project_files(request, proj_id):
     if request.method == 'POST':
         form = FileCreationFormModal(request.POST)
         if form.is_valid():
@@ -102,19 +99,18 @@ def create_file(request, proj_id):
 
 
 @login_required
-def file_contents(request, file_id):
-    if request.method == 'POST':
+def file_(request, file_id):
+    if request.method == 'GET':
+        f = get_object_or_404(File, pk=file_id)
+        return _json_HttpResponse(f.contents)
+    elif request.method == 'POST':
         f = get_object_or_404(File, pk=file_id)
         f.contents = request.POST['contents']
         f.save()
         return HttpResponse('OK', status=200)
-    else:
+    elif request.method == 'DELETE':
         f = get_object_or_404(File, pk=file_id)
-        return _json_HttpResponse(f.contents)
-
-
-@login_required
-def rm_file(request, file_id):
-    f = get_object_or_404(File, pk=file_id)
-    f.delete()
-    return HttpResponse('OK', status=200)
+        f.delete()
+        return HttpResponse('OK', status=200)
+    else:
+        return HttpResponse('Only GET/POST/REMOVE method allowed', status=405)

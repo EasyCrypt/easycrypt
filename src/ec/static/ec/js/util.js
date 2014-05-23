@@ -9,11 +9,27 @@ function find(f, xs) {
 	return null;
 };
 
+/* CSRF (https://docs.djangoproject.com/en/dev/ref/contrib/csrf/) */
+/* -------------------------------------------------------------- */
+function set_up_csrf_token() {
+  var csrftoken = $.cookie('csrftoken');
+  function csrfSafeMethod(method) {
+    return (/^(GET|HEAD|OPTIONS|TRACE)$/.test(method));
+  }
+  $.ajaxSetup({
+    crossDomain: false,
+    beforeSend: function(xhr, settings) {
+      if (!csrfSafeMethod(settings.type)) {
+          xhr.setRequestHeader("X-CSRFToken", csrftoken);
+      }
+    }
+  });
+}
+
 /*                      Node creation helpers                     */
 /* -------------------------------------------------------------- */
 
-// Extra arguments are appended as inner nodes
-function row() {
+function row() { // Extra arguments are appended as inner nodes
   var node = $('<div>').addClass('row');
   for (var i = 0; i < arguments.length; i++) {
     node.append(arguments[i]);
@@ -21,8 +37,7 @@ function row() {
   return node;
 };
 
-// Extra arguments are appended as inner nodes
-function col(size, offset) {
+function col(size, offset) { // Extra arguments are appended as inner nodes
   function class_for_device(device) {
     var base = "col-" + device + "-";
     var size_class = base + size;
