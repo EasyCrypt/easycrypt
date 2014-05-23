@@ -102,9 +102,15 @@ def create_file(request, proj_id):
 
 
 @login_required
-def get_file_contents(request, file_id):
-    f = get_object_or_404(File, pk=file_id)
-    return _json_HttpResponse(f.contents)
+def file_contents(request, file_id):
+    if request.method == 'POST':
+        f = get_object_or_404(File, pk=file_id)
+        f.contents = request.POST['contents']
+        f.save()
+        return HttpResponse('OK', status=200)
+    else:
+        f = get_object_or_404(File, pk=file_id)
+        return _json_HttpResponse(f.contents)
 
 
 @login_required
