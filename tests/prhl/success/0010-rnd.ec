@@ -104,7 +104,12 @@ axiom aux_test_wp:
 (* -------------------------------------------------------------------- *)
 equiv test_wp : G5.f ~ G6.f : true ==> Q(G5.z{1},G6.z{2}).
 proof.
- proc. rnd (fun x, f x) (fun x, finv x). skip. smt.
+ proc. rnd (fun x, f x) (fun x, finv x). skip. progress.
+  smt.
+  smt.
+  smt.
+  smt.
+  smt.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -118,7 +123,7 @@ equiv test_sp :
        && G6.z{2} <= d
        && exists (u v:int), Q(u, v).
 proof.
- proc. rnd (fun x, f x) (fun x, finv x). skip. smt.
+ proc. rnd (fun x, f x) (fun x, finv x). skip. progress; smt.
 qed.
 
 (* -------------------------------------------------------------------- *)
