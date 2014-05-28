@@ -9,6 +9,15 @@ function find(f, xs) {
 	return null;
 };
 
+function find_idx(f, xs) {
+  for (var i in xs) {
+    if (f(xs[i])) {
+      return i;
+    }
+  }
+  return -1;
+};
+
 /* CSRF (https://docs.djangoproject.com/en/dev/ref/contrib/csrf/) */
 /* -------------------------------------------------------------- */
 function set_up_csrf_token() {

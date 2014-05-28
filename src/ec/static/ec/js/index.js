@@ -14,13 +14,15 @@ var File = function(id, name, contents, project) {
   this.contents = contents;
   this.project  = project;
 
-  this.is_loading = false;
+  this.session  = null;
 }
 
 /* ---------------------------------------------------------------- */
-var Tab = function(file, display) {
-  this.file    = file;
-  this.display = display || file.name;
+var Tab = function(id, session, file, display) {
+  this.id      = id;
+  this.session = session;
+  this.file    = file || null;
+  this.display = display || (file ? file.name : "<detached tab " + id + ">");
 }
 
 /* ---------------------------------------------------------------- */
@@ -28,32 +30,23 @@ var Workspace = function() {
   this.ui       = null;
   this.projects = [];
   this.tabs     = [];
-  this.active   = null; /* index of the active tab */
+  this.active   = null;
 
   this.editor   = null;
 
   this.ui = {}
-  this.ui.tabs     = $('#tabs');
   this.ui.treeview = $('#projects');
+  this.ui.contents = $('#contents');
+  this.ui.tabctl   = $('#tabs');
 
   this.load();
 }
 
 /* ---------------------------------------------------------------- */
-Workspace.prototype.current_file = function() {
-  if (this.active != null)
-    return this.tabs[this.active].file;
-  else
-    return null;
-}
-
-/* ---------------------------------------------------------------- */
 Workspace.prototype.get_file_contents = function(file) {
-  file.is_loading = true;
-  file.contents = "loading...";
   $.get('files/' + file.id, (function (file,contents) {
     file.contents = contents;
-    file.is_loading = false;
+    file.session.setValue(contents);
     this.refresh_editor();
   }).bind(this,file));
 }
@@ -63,20 +56,6 @@ Workspace.prototype.push_file_contents = function(file) {
 }
 
 /* ---------------------------------------------------------------- */
-Workspace.prototype.refresh_editor = function() {
-  var current_file = this.current_file();
-  if (current_file != null) {
-    if (!current_file.contents) {
-      this.get_file_contents(current_file);
-    }
-    this.editor.setValue(current_file.contents);
-    this.editor.setReadOnly(current_file.is_loading);
-  } else {
-    this.editor.setValue("");
-    this.editor.setReadOnly(true);
-  }
-}
-
 Workspace.prototype.refresh_projects = function() {
   this.ui.treeview.children().remove();
   for (var i = 0; i < this.projects.length; ++i) {
@@ -113,26 +92,23 @@ Workspace.prototype.refresh_projects = function() {
   }
 }
 
-Workspace.prototype.refresh_tabs = function() {
-  this.ui.tabs.children().remove();
-  for (var i = 0; i < this.tabs.length; ++i) {
-    var tab = this.tabs[i];
-
-    var node = $('<li>');
-    if (i === this.active) node.addClass('active');
-
-    var link = $('<a>').text(tab.display);
-    link.on('click', this._callback_for_activate_tab_by_index(i));
-
-    node.append(link);
-    this.ui.tabs.append(node);
+Workspace.prototype.refresh_editor = function() {
+  if (this.active != null) {
+    var current_file = this.active.file;
+    if (!current_file.contents) {
+      this.get_file_contents(current_file);
+    }
+    this.editor.setSession(this.active.file.session);
+    this.editor.setReadOnly(!current_file.contents);
+  } else {
+    this.editor.setValue("");
+    this.editor.setReadOnly(true);
   }
 }
 
 Workspace.prototype.refresh_ui = function() {
-  this.refresh_editor();
   this.refresh_projects();
-  this.refresh_tabs();
+  this.refresh_editor();
 }
 
 /* ---------------------------------------------------------------- */
@@ -152,40 +128,52 @@ Workspace.prototype.load_projects = function() {
       new_projects.push(project);
     }
     this.projects = new_projects;
-    this.refresh_ui();
+
+    this.refresh_projects();
   }.bind(this));
 }
 
 Workspace.prototype.load_editor = function() {
   this.editor = ace.edit("editor");
   this.editor.setTheme("ace/theme/monokai");
-  this.editor.getSession().setMode("ace/mode/javascript");
+
+  this.ui.tabctl.tabs({
+    active: 1,
+    activate: function(event, ui) {
+      var tab = this.tabs[this.find_tab_by_id(ui.newTab.attr('tid'))];
+      this.active = tab;
+      this.refresh_editor();
+      this.editor.focus();
+    }.bind(this),
+  });
+  this.ui.tabctl.find(".ui-tabs-nav").sortable({
+    axis: "x",
+    stop: function() {
+      this.ui.tabctl.tabs("refresh");
+    }.bind(this),
+  });
+  this.ui.tabctl.delegate("span.ui-icon-close", "click", function() {
+    var tid = $(this).closest("li").attr('tid');
+    ws.close_tab_by_id(parseInt(tid));
+  });
+
+  this.refresh_editor();
 }
 
 Workspace.prototype.load = function() {
-  $("#close-tab").on('click', function() {
-    this.close_tab_by_index(this.active);
-    this.refresh_tabs();
-    this.refresh_editor();
-  }.bind(this));
   $(".modal").on('shown.bs.modal', function(e) {
     $(':input:enabled:visible:first').focus();
   });
   set_up_csrf_token();
-  this.load_editor();
   this.load_projects();
+  this.load_editor();
 }
 
 /* ---------------------------------------------------------------- */
 Workspace.prototype.find_project_by_id = function(id) {
-  for (var i = 0; i < this.projects.length; ++i) {
-    var project = this.projects[i];
-    if (project.id == id)
-      return project;
-  }
+  return find(function(proj) { return proj.id == id }, this.projects);
 }
 
-/* ---------------------------------------------------------------- */
 Workspace.prototype.find_file_by_id = function(id) {
   for (var i = 0; i < this.projects.length; ++i) {
     var project = this.projects[i];
@@ -195,63 +183,62 @@ Workspace.prototype.find_file_by_id = function(id) {
     }
   }
 }
-Workspace.prototype.find_tab_for_file_id = function(id) {
-  for (var i = 0; i < this.tabs.length; ++i) {
-    if (this.tabs[i].file.id == id)
-      return i;
-  }
-  return -1;
+Workspace.prototype.find_tab_by_file_id = function(id) {
+  return find_idx(function(tab) { return tab.file.id == id }, this.tabs);
+}
+Workspace.prototype.find_tab_by_id = function(id) {
+  return find_idx(function(tab) { return tab.id == id }, this.tabs);
 }
 
 /* ---------------------------------------------------------------- */
-Workspace.prototype.close_tab_by_index = function(tab) {
-  if (tab >= 0) {
-    this.tabs.splice(tab, 1);
-    if (this.tabs.length === 0) this.active = null;
-    else if (this.active > this.tabs.length-1) --this.active;
-  }
+Workspace.prototype.add_tab = function(tab) {
+  this.tabs.push(tab);
+
+  var tab_li   = $('<li>').attr('tid', tab.id);
+  var tab_a    = $('<a>').attr('href', "#jqueryui-editor").text(tab.display);
+  var tab_span = $('<span>').addClass("ui-icon ui-icon-close").attr('role', "presenstation");
+  tab_li.append(tab_a,tab_span);
+  this.ui.tabctl.children("ul").append(tab_li);
+  this.ui.tabctl.tabs('refresh');
 }
 
-Workspace.prototype.close_tab_by_file_id = function(id) {
-  if ((index = this.find_tab_for_file_id(id)) >= 0) {
-    this.close_tab_by_index(index);
-  }
+Workspace.prototype.new_tab_from_file = function(file) {
+  file.session = ace.createEditSession(file.contents || "<loading>");
+  file.session.setMode("ace/mode/javascript");        // TODO easycrypt
+  var tab = new Tab(file.id, file.session, file);
+  this.add_tab(tab);
 }
 
-/* ---------------------------------------------------------------- */
 Workspace.prototype.activate_tab = function(index) {
-  if (index > this.tabs.length-1)
-    return ;
-  if (this.active != null && index != this.active) {
-    var current_file = this.current_file();
-    current_file.contents = this.editor.getValue();
-    this.push_file_contents(current_file);
+  this.ui.tabctl.tabs('option', 'active', index);
+}
+
+Workspace.prototype.close_tab_by_id = function(id) {
+  var idx = this.find_tab_by_id(id);
+  if (idx != -1) {
+    this.tabs.splice(idx, 1);
+    if (this.tabs.length == 0) this.active = null;
+    this.ui.tabctl.children("ul").children("[tid=" + id + "]").remove();
+    this.ui.tabctl.tabs("refresh");
+    this.refresh_editor();
   }
-  this.active = index;
-  this.refresh_tabs();
-  this.refresh_editor();
 }
 
 /* ---------------------------------------------------------------- */
 Workspace.prototype.open_file = function(id) {
   if (!(file = this.find_file_by_id(id)))
     return ;
-  if ((filetab = this.find_tab_for_file_id(file.id)) < 0) {
-    this.tabs.push(new Tab(file));
-    this.activate_tab(this.tabs.length-1);
-  } else {
-    this.activate_tab(filetab);
+  if ((tab = this.find_tab_by_file_id(file.id)) < 0) {
+    this.new_tab_from_file(file);
+    tab = this.tabs.length-1;
   }
+  this.activate_tab(tab);
 }
 
 /*                             CALLBACKS                            */
 /* ---------------------------------------------------------------- */
 Workspace.prototype._callback_for_open_file_by_id = function(id) {
   return (function() { this.open_file(id); }).bind(this);
-}
-
-Workspace.prototype._callback_for_activate_tab_by_index = function(index) {
-  return (function() { this.activate_tab(index); }).bind(this);
 }
 
 Workspace.prototype._callback_for_toggle_glyph = function(proj, glyph) {
@@ -267,7 +254,8 @@ Workspace.prototype._callback_for_rm_file = function(id) {
       url: 'files/' + id,
       type: 'DELETE',
       success: function() {
-        this.close_tab_by_file_id(id);
+        var tab = this.tabs[this.find_tab_by_file_id(id)];
+        this.close_tab_by_id(tab.id);
         this.load_projects();
       }.bind(this)
     });

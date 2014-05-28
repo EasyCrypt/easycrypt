@@ -5,22 +5,12 @@
 {% block content %}
 {% if user.is_authenticated %}
 <div class="row full-height">
-    <div id="projects" class="col-sm-2 col-md-2 full-height">
-    </div>
-
-    <div class="col-sm-10 col-md-10 full-height">
-        <div class="row">
-            <div class="col-md-10">
-                <ul id="tabs" class="nav nav-pills">
-                </ul>
-            </div>
-            <div class="col-md-2">
-                <ul id="tab-controls" class="nav navbar-right nav-pills">
-                    <li><a id="close-tab" href="#"><span class="glyphicon glyphicon-minus"></span></a></li>
-                </ul>
-            </div>
+    <div id="projects" class="col-sm-2 col-md-2 full-height"></div>
+    <div id="contents" class="col-sm-10 col-md-10 full-height">
+        <div id="tabs" class="full-height">
+            <ul></ul>
+            <div id="jqueryui-editor" class="full-height"><div id="editor" class="full-height"></div></div>
         </div>
-        <div id="editor" class="row full-height"></div>
     </div>
 </div>
 
@@ -45,7 +35,12 @@
 {% endif %}
 {% endblock %}
 
+{% block css %}
+<link rel="stylesheet" href="{% static 'ec/jquery-ui/css/smoothness/jquery-ui-1.10.4.custom.css' %}">
+{% endblock %}
+
 {% block js %}
 <script src="{% static 'ec/js/ace/src/ace.js' %}" type="text/javascript" charset="utf-8"></script>
+<script src="{% static 'ec/jquery-ui/js/jquery-ui-1.10.4.custom.js' %}"></script>
 <script src="{% static 'ec/js/index.js' %}"></script>
 {% endblock %}

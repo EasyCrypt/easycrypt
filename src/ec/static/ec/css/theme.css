@@ -1,4 +1,5 @@
 html, body {
+	margin:0; padding:0;
 	height: 100%;
 }
 
@@ -22,6 +23,23 @@ body {
 	overflow-x: hidden;
 /*	overflow-y: auto;
 	display: block; */
+}
+
+#contents {
+	padding-left:  0px;
+	padding-right: 0px;
+}
+
+#tabs {
+	border-width: 0px;
+}
+
+#tabs, .ui-tabs .ui-tabs-panel {
+    padding: 0 0 0 0;
+}
+
+.ui-tabs-nav li :focus {
+	outline:none;
 }
 
 .nav-sidebar {
