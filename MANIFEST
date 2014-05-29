@@ -76,3 +76,4 @@ scripts/ec-build-toolchain
 scripts/activate-toolchain.sh
 scripts/ec-build-webui-env
 scripts/ec-run-webui
+find:scripts/patches/:*
