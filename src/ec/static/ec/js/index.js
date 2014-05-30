@@ -23,6 +23,8 @@ var Tab = function(id, session, file, display) {
   this.session = session;
   this.file    = file || null;
   this.display = display || (file ? file.name : "<detached tab " + id + ">");
+
+  this.ui      = null;  // jQuery object containing the tab (<li>) in the DOM
 }
 
 /* ---------------------------------------------------------------- */
@@ -42,17 +44,45 @@ var Workspace = function() {
   this.load();
 }
 
+
+/* ---------------------------------------------------------------- */
+Workspace.prototype.set_session_star_event = function(session) {
+  session.on('change', function(session, e) {
+    if (!session.changed) {
+      session.changed = true;
+      var idx = this.find_tab_by_session(session);
+      if (idx != -1) {
+        var ui_tab_a = this.tabs[idx].ui.children("a");
+        ui_tab_a.text(ui_tab_a.text() + "*");
+      }
+    }
+  }.bind(this, session));
+}
+
 /* ---------------------------------------------------------------- */
 Workspace.prototype.get_file_contents = function(file) {
   $.get('files/' + file.id, (function (file,contents) {
     file.contents = contents;
     file.session.setValue(contents);
+    file.session.changed = false;
+    this.set_session_star_event(file.session);
     this.refresh_editor();
   }).bind(this,file));
 }
 
 Workspace.prototype.push_file_contents = function(file) {
-  $.post('files/' + file.id, {contents:file.contents});
+  var tab = this.tabs[this.find_tab_by_file_id(file.id)];
+  file.contents = tab.session.getValue();
+  if (tab.session.changed) {
+    $.post('files/' + file.id, {contents:file.contents}, function(resp) {
+      if (resp == "OK") {
+        var ui_tab_a = tab.ui.children("a");
+        ui_tab_a.text(ui_tab_a.text().slice(0,-1));
+        tab.session.changed = false;
+      };
+      this.set_session_star_event(tab.session);
+    }.bind(this));
+  };
 }
 
 /* ---------------------------------------------------------------- */
@@ -136,6 +166,18 @@ Workspace.prototype.load_projects = function() {
 Workspace.prototype.load_editor = function() {
   this.editor = ace.edit("editor");
   this.editor.setTheme("ace/theme/monokai");
+  this.editor.commands.addCommand({
+    name: 'save',
+    bindKey: {
+      mac: 'Command-S',
+      win: 'Ctrl-S',     // In Ace, "win" = "not mac"
+    },
+    exec: function(editor) {
+      var curr_tab = this.tabs[this.find_tab_by_session(editor.getSession())];
+      this.push_file_contents(curr_tab.file);
+    }.bind(this),
+    readOnly: false,
+  });
 
   this.ui.tabctl.tabs({
     active: 1,
@@ -183,6 +225,9 @@ Workspace.prototype.find_file_by_id = function(id) {
     }
   }
 }
+Workspace.prototype.find_tab_by_session = function(session) {
+  return find_idx(function(tab) { return tab.session == session}, this.tabs);
+}
 Workspace.prototype.find_tab_by_file_id = function(id) {
   return find_idx(function(tab) { return tab.file.id == id }, this.tabs);
 }
@@ -192,14 +237,15 @@ Workspace.prototype.find_tab_by_id = function(id) {
 
 /* ---------------------------------------------------------------- */
 Workspace.prototype.add_tab = function(tab) {
-  this.tabs.push(tab);
-
   var tab_li   = $('<li>').attr('tid', tab.id);
   var tab_a    = $('<a>').attr('href', "#jqueryui-editor").text(tab.display);
   var tab_span = $('<span>').addClass("ui-icon ui-icon-close").attr('role', "presenstation");
   tab_li.append(tab_a,tab_span);
   this.ui.tabctl.children("ul").append(tab_li);
   this.ui.tabctl.tabs('refresh');
+
+  tab.ui = tab_li;
+  this.tabs.push(tab);
 }
 
 Workspace.prototype.new_tab_from_file = function(file) {
@@ -216,10 +262,10 @@ Workspace.prototype.activate_tab = function(index) {
 Workspace.prototype.close_tab_by_id = function(id) {
   var idx = this.find_tab_by_id(id);
   if (idx != -1) {
+    this.tabs[idx].ui.remove();
+    this.ui.tabctl.tabs("refresh");
     this.tabs.splice(idx, 1);
     if (this.tabs.length == 0) this.active = null;
-    this.ui.tabctl.children("ul").children("[tid=" + id + "]").remove();
-    this.ui.tabctl.tabs("refresh");
     this.refresh_editor();
   }
 }

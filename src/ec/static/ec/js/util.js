@@ -12,7 +12,7 @@ function find(f, xs) {
 function find_idx(f, xs) {
   for (var i in xs) {
     if (f(xs[i])) {
-      return i;
+      return parseInt(i);
     }
   }
   return -1;
