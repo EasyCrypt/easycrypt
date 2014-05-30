@@ -1,3 +1,4 @@
+/*                     List processing helpers                    */
 /* -------------------------------------------------------------- */
 function find(f, xs) {
 	for (var i in xs) {
@@ -17,6 +18,13 @@ function find_idx(f, xs) {
   }
   return -1;
 };
+
+/* -------------------------------------------------------------- */
+function neq(x) {
+  return function(y) {
+    return x !== y;
+  }
+}
 
 /* CSRF (https://docs.djangoproject.com/en/dev/ref/contrib/csrf/) */
 /* -------------------------------------------------------------- */
