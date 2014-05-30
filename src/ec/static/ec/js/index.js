@@ -51,7 +51,7 @@ Workspace.prototype.set_session_star_event = function(session) {
     if (!session.changed) {
       session.changed = true;
       var idx = this.find_tab_by_session(session);
-      if (idx != -1) {
+      if (idx !== -1) {
         var ui_tab_a = this.tabs[idx].ui.children("a");
         ui_tab_a.text(ui_tab_a.text() + "*");
       }
@@ -75,7 +75,7 @@ Workspace.prototype.push_file_contents = function(file) {
   file.contents = tab.session.getValue();
   if (tab.session.changed) {
     $.post('files/' + file.id, {contents:file.contents}, function(resp) {
-      if (resp == "OK") {
+      if (resp === "OK") {
         var ui_tab_a = tab.ui.children("a");
         ui_tab_a.text(ui_tab_a.text().slice(0,-1));
         tab.session.changed = false;
@@ -123,7 +123,7 @@ Workspace.prototype.refresh_projects = function() {
 }
 
 Workspace.prototype.refresh_editor = function() {
-  if (this.active != null) {
+  if (this.active !== null) {
     var current_file = this.active.file;
     if (!current_file.contents) {
       this.get_file_contents(current_file);
@@ -182,8 +182,8 @@ Workspace.prototype.load_editor = function() {
   this.ui.tabctl.tabs({
     active: 1,
     activate: function(event, ui) {
-      var tab = this.tabs[this.find_tab_by_id(ui.newTab.attr('tid'))];
-      this.active = tab;
+      var tid = parseInt(ui.newTab.attr('tid'));
+      this.active = this.tabs[this.find_tab_by_id(tid)];
       this.refresh_editor();
       this.editor.focus();
     }.bind(this),
@@ -213,26 +213,26 @@ Workspace.prototype.load = function() {
 
 /* ---------------------------------------------------------------- */
 Workspace.prototype.find_project_by_id = function(id) {
-  return find(function(proj) { return proj.id == id }, this.projects);
+  return find(function(proj) { return proj.id === id }, this.projects);
 }
 
 Workspace.prototype.find_file_by_id = function(id) {
   for (var i = 0; i < this.projects.length; ++i) {
     var project = this.projects[i];
     for (var j = 0; j < project.files.length; ++j) {
-      if (project.files[j].id == id)
+      if (project.files[j].id === id)
         return project.files[j];
     }
   }
 }
 Workspace.prototype.find_tab_by_session = function(session) {
-  return find_idx(function(tab) { return tab.session == session}, this.tabs);
+  return find_idx(function(tab) { return tab.session === session}, this.tabs);
 }
 Workspace.prototype.find_tab_by_file_id = function(id) {
-  return find_idx(function(tab) { return tab.file.id == id }, this.tabs);
+  return find_idx(function(tab) { return tab.file.id === id }, this.tabs);
 }
 Workspace.prototype.find_tab_by_id = function(id) {
-  return find_idx(function(tab) { return tab.id == id }, this.tabs);
+  return find_idx(function(tab) { return tab.id === id }, this.tabs);
 }
 
 /* ---------------------------------------------------------------- */
@@ -261,11 +261,11 @@ Workspace.prototype.activate_tab = function(index) {
 
 Workspace.prototype.close_tab_by_id = function(id) {
   var idx = this.find_tab_by_id(id);
-  if (idx != -1) {
+  if (idx !== -1) {
     this.tabs[idx].ui.remove();
     this.ui.tabctl.tabs("refresh");
     this.tabs.splice(idx, 1);
-    if (this.tabs.length == 0) this.active = null;
+    if (this.tabs.length === 0) this.active = null;
     this.refresh_editor();
   }
 }
