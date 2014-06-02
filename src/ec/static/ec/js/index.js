@@ -106,7 +106,7 @@ Workspace.prototype.refresh_projects = function() {
       var filelink  = $('<a>').text(file.name).attr('href','#');
       filelink.on('click', this._callback_for_open_file_by_id(file.id));
       var rm_but = glyph('glyphicon-remove pull-right red');
-      rm_but.on('click', this._callback_for_rm_file(file.id));
+      rm_but.on('click', this._callback_for_rm_file_modal(file.id));
       files_col.append(row(filelink, rm_but));
     }
     var add_but = glyph('glyphicon-plus');
@@ -244,7 +244,7 @@ Workspace.prototype.find_tab_by_id = function(id) {
 Workspace.prototype.add_tab = function(tab) {
   var tab_li   = $('<li>').attr('tid', tab.id);
   var tab_a    = $('<a>').attr('href', "#jqueryui-editor").text(tab.display);
-  var tab_span = $('<span>').addClass("ui-icon ui-icon-close").attr('role', "presenstation");
+  var tab_span = $('<span>').addClass("ui-icon ui-icon-close").attr('role', "presentation");
   tab_li.append(tab_a,tab_span);
   this.ui.tabctl.children("ul").append(tab_li);
   this.ui.tabctl.tabs('refresh');
@@ -274,14 +274,44 @@ Workspace.prototype.activate_tab = function(tab) {
   }
 }
 
+Workspace.prototype.delete_tab = function(tab) {
+  tab.ui.remove();
+  this.ui.tabctl.tabs("refresh");
+  this.tabs = this.tabs.filter(neq(tab), this.tabs);
+  if (this.tabs.length === 0) this.active = null;
+  this.refresh_editor();
+}
+
 Workspace.prototype.close_tab_by_id = function(id) {
   var tab = this.find_tab_by_id(id);
   if (tab !== null) {
-    tab.ui.remove();
-    this.ui.tabctl.tabs("refresh");
-    this.tabs = this.tabs.filter(neq(tab), this.tabs);
-    if (this.tabs.length === 0) this.active = null;
-    this.refresh_editor();
+    if (tab.session.changed) {
+      bootbox.dialog({
+        message: "Save changes to file?",
+        buttons: {
+          cancel: {
+            label: "Cancel"
+          },
+          no: {
+            label: "Don't save",
+            className: "btn-danger",
+            callback: function() {
+              this.delete_tab(tab);
+            }.bind(this)
+          },
+          yes: {
+            label: "Save",
+            className: "btn-primary",
+            callback: function() {
+              this.push_file_contents (tab.file);
+              this.delete_tab(tab);
+            }.bind(this)
+          }
+        }
+      });
+    } else {
+      this.delete_tab(tab);
+    }
   }
 }
 
@@ -310,22 +340,6 @@ Workspace.prototype._callback_for_toggle_glyph = function(proj, glyph) {
   };
 }
 
-Workspace.prototype._callback_for_rm_file = function(id) {
-  return (function() {
-    $.ajax({
-      url: 'files/' + id,
-      type: 'DELETE',
-      success: function() {
-        var tab = this.find_tab_by_file_id(id);
-        if (tab !== null) {
-          this.close_tab_by_id(tab.id);
-        }
-        this.load_projects();
-      }.bind(this)
-    });
-  }).bind(this);
-}
-
 Workspace.prototype._callback_for_add_file_modal = function(id) {
   return (function() {
     var modal = $('#newfilemodal');
@@ -346,6 +360,28 @@ Workspace.prototype._callback_for_add_file_modal = function(id) {
     });
     modal.modal();
   }).bind(this);
+}
+
+Workspace.prototype._callback_for_rm_file_modal = function(id) {
+  var file = this.find_file_by_id(id);
+  return (function() {
+    var msg = "Are you sure you want to remove the file '" + file.name + "'?";
+    bootbox.confirm(msg, function(result) {
+      if (result) {
+        $.ajax({
+          url: 'files/' + id,
+          type: 'DELETE',
+          success: function() {
+            var tab = this.find_tab_by_file_id(id);
+            if (tab !== null) {
+              this.close_tab_by_id(tab.id);
+            }
+            this.load_projects();
+          }.bind(this)
+        });
+      }
+    }.bind(this));
+  }.bind(this));
 }
 
 /* ---------------------------------------------------------------- */
