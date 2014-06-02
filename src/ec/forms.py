@@ -127,8 +127,6 @@ class FileCreationFormModal(forms.Form):
         error_messages={'invalid':
                         _("This value may contain only letters, "
                           "underscores, spaces and numbers.")})
-    file_contents = forms.CharField(label=(""),
-        widget=forms.Textarea(attrs={'size': 30}))
 
     def __init__(self, *args, **kwargs):
         super(FileCreationFormModal, self).__init__(*args, **kwargs)
@@ -137,9 +135,7 @@ class FileCreationFormModal(forms.Form):
         self.helper.form_class = "form"
         self.helper.layout = Layout(
             Div(Field('file_name', placeholder="File name",
-                      css_class="form-control fld-seq-fst"),
-                Field('file_contents', placeholder="Contents (optional)",
-                      css_class="form-control no-resize fld-seq-lst"),
+                      css_class="form-control"),
                 css_class="modal-body"),
             Div(FormActions(Button('file_cancel', 'Cancel',
                                    css_class="btn btn-default",

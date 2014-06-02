@@ -88,8 +88,7 @@ def project_files(request, proj_id):
         form = FileCreationFormModal(request.POST)
         if form.is_valid():
             proj = get_object_or_404(Project, pk=proj_id)
-            f = File(name=form.cleaned_data['file_name'],
-                     contents=form.cleaned_data['file_contents'], project=proj)
+            f = File(name=form.cleaned_data['file_name'], project=proj)
             f.save()
             return HttpResponseRedirect(reverse('ec:index'))
         else:

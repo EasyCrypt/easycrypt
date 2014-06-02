@@ -125,13 +125,13 @@ Workspace.prototype.refresh_projects = function() {
 Workspace.prototype.refresh_editor = function() {
   if (this.active !== null) {
     var current_file = this.active.file;
-    if (!current_file.contents) {
+    if (current_file.contents === null) {
       this.get_file_contents(current_file);
     } else {
       this.set_session_star_event(current_file.session);
     }
     this.editor.setSession(this.active.file.session);
-    this.editor.setReadOnly(!current_file.contents);
+    this.editor.setReadOnly(current_file.contents === null);
   } else {
     this.editor.setSession(this.editor.emptySession);
     this.editor.setReadOnly(true);
@@ -224,8 +224,9 @@ Workspace.prototype.find_file_by_id = function(id) {
   for (var i = 0; i < this.projects.length; ++i) {
     var project = this.projects[i];
     for (var j = 0; j < project.files.length; ++j) {
-      if (project.files[j].id === id)
+      if (project.files[j].id === id) {
         return project.files[j];
+      }
     }
   }
 }
@@ -253,7 +254,7 @@ Workspace.prototype.add_tab = function(tab) {
 }
 
 Workspace.prototype.new_tab_from_file = function(file) {
-  file.session = ace.createEditSession(file.contents || "<loading>");
+  file.session = ace.createEditSession(file.contents !== null ? file.contents : "<loading>");
   file.session.setMode("ace/mode/javascript");        // TODO easycrypt
   var tab = new Tab(file.id, file.session, file);
   this.add_tab(tab);
@@ -264,11 +265,13 @@ Workspace.prototype.activate_tab = function(tab) {
   var uitabs = this.ui.tabctl.find("ul li");
   var idx = -1;
   for (var i = 0; i < uitabs.length; i++) {
-    if (parseInt($(uitabs[i]).attr('tid')) === tab.id)
+    if (parseInt($(uitabs[i]).attr('tid')) === tab.id) {
       idx = i;
+    }
   }
-  if (idx !== -1)
+  if (idx !== -1) {
     this.ui.tabctl.tabs('option', 'active', idx);
+  }
 }
 
 Workspace.prototype.close_tab_by_id = function(id) {
@@ -284,11 +287,13 @@ Workspace.prototype.close_tab_by_id = function(id) {
 
 /* ---------------------------------------------------------------- */
 Workspace.prototype.open_file = function(id) {
-  if (!(file = this.find_file_by_id(id)))
+  if ((file = this.find_file_by_id(id)) === null) {
     return ;
+  }
   var tab = this.find_tab_by_file_id(file.id);
-  if (tab === null)
+  if (tab === null) {
     tab = this.new_tab_from_file(file);
+  }
   this.activate_tab(tab);
 }
 
@@ -312,7 +317,9 @@ Workspace.prototype._callback_for_rm_file = function(id) {
       type: 'DELETE',
       success: function() {
         var tab = this.find_tab_by_file_id(id);
-        this.close_tab_by_id(tab.id);
+        if (tab !== null) {
+          this.close_tab_by_id(tab.id);
+        }
         this.load_projects();
       }.bind(this)
     });
