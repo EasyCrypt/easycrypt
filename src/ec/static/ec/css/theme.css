@@ -38,6 +38,10 @@ body {
     padding: 0 0 0 0;
 }
 
+#tabs ul {
+	min-height: 41px;
+}
+
 #tabs li .ui-icon-close {
 	float: left; margin: 0.4em 0.2em 0 0; cursor: pointer;
 }

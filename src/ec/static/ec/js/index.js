@@ -40,6 +40,7 @@ var Workspace = function() {
   this.ui.treeview = $('#projects');
   this.ui.contents = $('#contents');
   this.ui.tabctl   = $('#tabs');
+  this.ui.editor   = $('#editor');
 
   this.load();
 }
@@ -202,6 +203,17 @@ Workspace.prototype.load_editor = function() {
     var tid = $(this).closest("li").attr('tid');
     ws.close_tab_by_id(parseInt(tid));
   });
+
+  var tabHeight = 41;
+  prevHeight = this.ui.tabctl.height() - tabHeight;
+  this.ui.editor.height(prevHeight);
+  $(window).resize(function() {
+    var newHeight = this.ui.tabctl.height() - tabHeight;
+    if (newHeight !== prevHeight) {
+      this.ui.editor.height(newHeight);
+      prevHeight = newHeight;
+    }
+  }.bind(this));
 
   this.refresh_editor();
 }

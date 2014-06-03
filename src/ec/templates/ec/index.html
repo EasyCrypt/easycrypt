@@ -9,7 +9,7 @@
     <div id="contents" class="col-sm-10 col-md-10 full-height">
         <div id="tabs" class="full-height">
             <ul></ul>
-            <div id="jqueryui-editor" class="full-height"><div id="editor" class="full-height"></div></div>
+            <div id="jqueryui-editor"><div id="editor" class="full-height"></div></div>
         </div>
     </div>
 </div>
@@ -40,7 +40,15 @@
 {% endblock %}
 
 {% block js %}
+<!-- Ace editor -->
 <script src="{% static 'ec/js/ace/src/ace.js' %}" type="text/javascript" charset="utf-8"></script>
+
+<!-- Bootbox (dialogs using Bootstrap modals) -->
+<script src="{% static 'ec/js/bootbox.js' %}"></script>
+
+<!-- Custom jQuery UI -->
 <script src="{% static 'ec/jquery-ui/js/jquery-ui-1.10.4.custom.js' %}"></script>
+
+<!-- /index functionality -->
 <script src="{% static 'ec/js/index.js' %}"></script>
 {% endblock %}
