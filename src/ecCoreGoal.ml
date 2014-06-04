@@ -587,7 +587,7 @@ module FApi = struct
     | `Success tc -> t_focus ifok tc
 
   (* ------------------------------------------------------------------ *)
-  let t_do b omax t tc =
+  let t_do_r ?focus b omax t tc =
     let max = max (odfl max_int omax) 0 in
 
     let rec doit i tc =
@@ -610,10 +610,18 @@ module FApi = struct
           match tc_opened tc with
           | [] -> tc
           | [hd'] when eq_handle hd hd' -> tc
-          | _ -> t_onall (doit (i+1)) tc
+          | _ -> doit_focus (i+1) tc
 
-    in
-      doit 0 tc
+    and doit_focus i tc =
+      match focus with
+      | None   -> t_onall (doit i) tc
+      | Some f -> t_on1 f (doit i) tc
+
+    in doit_focus 0 tc
+
+  (* ------------------------------------------------------------------ *)
+  let t_do b omax t tc =
+    t_do_r b omax t (tcenv_of_tcenv1 tc)
 
   (* ------------------------------------------------------------------ *)
   let t_repeat tt tc =
