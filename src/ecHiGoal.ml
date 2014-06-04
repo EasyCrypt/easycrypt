@@ -404,8 +404,20 @@ let rec process_rewrite1 ri tc =
 
   | RWRw (s, r, o, pts) -> begin
       let do1 pt tc =
-        let pt = PT.tc1_process_full_pterm tc pt in
-        process_rewrite1_core (s, o) pt tc in
+        let is_baserw p tc = 
+          EcEnv.BaseRw.is_base p.pl_desc (FApi.tc1_env tc) in
+        match pt with 
+        | {fp_kind = FPNamed(p,None); fp_args = []} when is_baserw p tc ->
+          let env = FApi.tc1_env tc in
+          let _, ls = EcEnv.BaseRw.lookup p.pl_desc env in
+          let ls = EcPath.Sp.elements ls in
+          let do1 lemma tc = 
+            let pt = PT.pt_of_uglobal !!tc (FApi.tc1_hyps tc) lemma in
+            process_rewrite1_core (s, o) pt tc in
+          t_ors (List.map do1 ls) tc
+        | _ ->
+          let pt = PT.tc1_process_full_pterm tc pt in
+          process_rewrite1_core (s, o) pt tc in
       let doall tc = t_ors (List.map do1 pts) tc in
 
       match r with

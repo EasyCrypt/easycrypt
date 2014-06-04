@@ -1264,6 +1264,11 @@ module BaseRw = struct
   let lookup_opt name env =
     try_lf (fun () -> lookup name env)   
 
+  let is_base name env = 
+    match lookup_opt name env with
+    | None -> false
+    | Some _ -> true
+
   let bind name env = 
     let p = EcPath.pqname (root env) name in
     let env = MC.bind_rwbase name p env in
