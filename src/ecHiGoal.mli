@@ -27,6 +27,8 @@ end
 (* -------------------------------------------------------------------- *)
 module LowRewrite : sig
   val t_rewrite : [`LtoR|`RtoL] * Sint.t option -> proofterm -> backward
+
+  val t_autorewrite: EcPath.path list -> backward
 end
 
 (* -------------------------------------------------------------------- *)

@@ -239,6 +239,21 @@ module LowRewrite = struct
     let ptenv  = ptenv_of_penv hyps !!tc in
 
     t_rewrite_r (s, o) { ptev_env = ptenv; ptev_pt = pt; ptev_ax = ax; } tc
+
+  let t_autorewrite lemmas (tc : tcenv1) =
+    let pts =
+      let do1 lemma =
+        PT.pt_of_uglobal !!tc (FApi.tc1_hyps tc) lemma in
+      List.map do1 lemmas
+    in
+
+    let try1 pt tc =
+      let pt = { pt with PT.ptev_env = PT.copy pt.ptev_env } in
+        try  t_rewrite_r (`LtoR, None) pt tc
+        with RewriteError _ -> raise InvalidGoalShape
+    in
+
+      t_do_r ~focus:0 `Maybe None (t_ors (List.map try1 pts)) !@tc
 end
 
 (* -------------------------------------------------------------------- *)

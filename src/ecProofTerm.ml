@@ -148,6 +148,22 @@ let pt_of_global pf hyps p tys =
     ptev_ax  = ax; }
 
 (* -------------------------------------------------------------------- *)
+let pt_of_uglobal pf hyps p =
+  let ptenv   = ptenv_of_penv hyps pf in
+  let env     = LDecl.toenv hyps in
+  let ax      = oget (EcEnv.Ax.by_path_opt p env) in
+  let typ, ax = (ax.EcDecl.ax_tparams, oget ax.EcDecl.ax_spec) in
+
+  (* FIXME: TC HOOK *)
+  let fs  = EcUnify.UniEnv.opentvi ptenv.pte_ue typ None in
+  let ax  = Fsubst.subst_tvar fs ax in
+  let typ = List.map (fun (a, _) -> EcIdent.Mid.find a fs) typ in
+
+  { ptev_env = ptenv;
+    ptev_pt  = { pt_head = PTGlobal (p, typ); pt_args = []; };
+    ptev_ax  = ax; }
+
+(* -------------------------------------------------------------------- *)
 let pattern_form ?name hyps ~ptn subject =
   let dfl () = Printf.sprintf "x%d" (EcUid.unique ()) in
 
