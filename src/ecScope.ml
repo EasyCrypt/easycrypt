@@ -1909,7 +1909,23 @@ module BaseRw = struct
 
   let process_addrw scope (x,l) = 
     let env = env scope in
-    let base,_ = EcEnv.BaseRw.lookup x.pl_desc env in
+    let env, base = 
+      match EcEnv.BaseRw.lookup_opt x.pl_desc env with
+      | None -> 
+        let pre, base = x.pl_desc in 
+        if pre <> [] then 
+          hierror ~loc:x.pl_loc 
+            "Can not create a hint rewrite base outside the theory";
+        let p = EcPath.pqname (EcEnv.root env) base in
+        begin match EcEnv.Ax.by_path_opt p env with
+        | None -> ()
+        | Some _ ->  
+          hierror ~loc:x.pl_loc 
+            "An axiom with the same name already exists";
+        end;
+        let env = EcEnv.BaseRw.bind base env in
+        env, fst (EcEnv.BaseRw.lookup x.pl_desc env) 
+      | Some (base, _) -> env, base in
     let l = List.map (fun l -> EcEnv.Ax.lookup_path l.pl_desc env) l in
     { scope with
       sc_env = EcEnv.BaseRw.bind_addrw base l env }

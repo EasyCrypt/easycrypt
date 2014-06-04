@@ -697,7 +697,6 @@ type global =
   | Gtype        of ptydecl list
   | Gtypeclass   of ptypeclass
   | Gtycinstance of ptycinstance
-  | Gbaserw      of psymbol
   | Gaddrw       of (pqsymbol * pqsymbol list)
   | Gprint       of pprint
   | GthOpen      of psymbol
