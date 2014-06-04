@@ -2256,3 +2256,11 @@ let rec pp_theory ppe (fmt:Format.formatter) (path, cth) =
           Format.fprintf fmt "instance %a with %a."
             (pp_type ppe) ty pp_path p
   end
+  
+  | EcTheory.CTh_baserw name ->
+    Format.fprintf fmt "declare rewrite %s." name
+
+  | EcTheory.CTh_addrw (p,l) ->
+    Format.fprintf fmt "hint rewrite %a : %a."
+      pp_path p (pp_list "@ " pp_path) l
+      

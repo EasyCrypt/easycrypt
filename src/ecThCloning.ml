@@ -555,6 +555,15 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
       | CTh_export p ->
           (subst, ops, proofs, EcEnv.Theory.export (EcSubst.subst_path subst p) scenv)
 
+      | CTh_baserw x ->
+        (subst, ops, proofs, EcEnv.BaseRw.bind x scenv)
+
+      | CTh_addrw (p,l) ->
+        let p = EcSubst.subst_path subst p in
+        let l = List.map (EcSubst.subst_path subst) l in
+        (subst, ops, proofs, EcEnv.BaseRw.bind_addrw p l scenv)
+        
+
       | CTh_instance ((typ, ty), tc) -> begin
           let module E = struct exception InvInstPath end in
 

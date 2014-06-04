@@ -477,7 +477,8 @@ and compile_thitem env eenv p = function
         ignore (compile_op env eenv (EcPath.pqname p s))
   | CTh_theory (s,_) -> compile_theory env eenv (EcPath.pqname p s)
   | CTh_export _ | CTh_modtype _ | CTh_module _ 
-  | CTh_axiom _ | CTh_instance _ | CTh_typeclass _ -> ()
+  | CTh_axiom _ | CTh_instance _ | CTh_typeclass _ 
+  | CTh_baserw _ | CTh_addrw _ -> ()
 
 (*************************************************************************)
 (* Once the compilation of every element is done we can extract the      *)
@@ -529,7 +530,8 @@ and finalize_item eenv p item r =
         odecl_kind = ODKmod items; } in
       decl :: r
   | CTh_export _ | CTh_modtype _ | CTh_module _ 
-  | CTh_axiom _ | CTh_instance _ | CTh_typeclass _ -> r
+  | CTh_axiom _ | CTh_instance _ | CTh_typeclass _ 
+  | CTh_baserw _ |CTh_addrw _ -> r
   
 let finalize required env eenv =
   let ct = (EcEnv.ctheory_of_ctheory_w3 (EcEnv.Theory.close env)).cth_struct in
@@ -584,7 +586,8 @@ and compile_dummy_item p ls r item =
   | CTh_theory (s,cth) ->
     compile_dummy_th (EcPath.pqname p s) (s::ls) cth :: r
   | CTh_export _ | CTh_modtype _ | CTh_module _ 
-  | CTh_axiom _ | CTh_instance _ | CTh_typeclass _ -> r
+  | CTh_axiom _ | CTh_instance _ | CTh_typeclass _ 
+  | CTh_baserw _|CTh_addrw _ -> r
   
 
 let rec add_dummy_decl eenv decl = 

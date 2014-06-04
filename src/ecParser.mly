@@ -321,7 +321,7 @@
 %token WITH
 %token WP
 %token ZETA
-
+%token HINT
 %token <string> OP1 OP2 OP3 OP4
 %token LTCOLON GT LT GE LE
 
@@ -2564,6 +2564,12 @@ gprover_info:
     { { pprov_max = None; pprov_time = Some t; pprov_names = None } }
 ;
 
+baserw:
+| DECLARE REWRITE id=lident { id }
+;
+
+addrw:
+| HINT REWRITE p=lqident COLON l=lqident* {p,l} 
 (* -------------------------------------------------------------------- *)
 (* Global entries                                                       *)
 
@@ -2595,6 +2601,8 @@ global_:
 | PRAGMA x=lident  { Gpragma    x   }
 
 | EXTRACTION i=extract_info { Gextract i }
+| baserw           { Gbaserw $1 }
+| addrw            { Gaddrw $1 }
 ;
 
 extract_info:

@@ -455,6 +455,12 @@ let rec subst_theory_item (s : _subst) (item : theory_item) =
   | Th_typeclass (x, tc) ->
       Th_typeclass (x, subst_tc s tc)
 
+  | Th_baserw _ -> 
+      item
+      
+  | Th_addrw(b,ls) -> 
+      Th_addrw(s.s_p b, List.map s.s_p ls)
+    
 (* -------------------------------------------------------------------- *)
 and subst_theory (s : _subst) (items : theory) =
   List.map (subst_theory_item s) items 
@@ -488,6 +494,12 @@ and subst_ctheory_item (s : _subst) (item : ctheory_item) =
 
   | CTh_typeclass (x, tc) ->
       CTh_typeclass (x, subst_tc s tc)
+
+  | CTh_baserw _ -> 
+      item
+      
+  | CTh_addrw(b,ls) -> 
+      CTh_addrw(s.s_p b, List.map s.s_p ls)
 
 (* -------------------------------------------------------------------- *)
 and subst_ctheory_struct (s : _subst) (th : ctheory_struct) =

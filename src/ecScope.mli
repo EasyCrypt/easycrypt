@@ -145,3 +145,8 @@ module Extraction : sig
   val process :
     scope -> (string option * toextract list * withextract list) -> scope
 end
+
+module BaseRw : sig
+  val process       : scope -> psymbol -> scope
+  val process_addrw : scope -> (pqsymbol * pqsymbol list) -> scope
+end

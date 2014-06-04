@@ -1874,6 +1874,12 @@ module Section = struct
           | T.CTh_instance (p, cr) ->
               { scope with
                   sc_env = EcEnv.TypeClass.add_instance p cr scope.sc_env }
+          | T.CTh_baserw x -> 
+              { scope with 
+                sc_env = EcEnv.BaseRw.bind x scope.sc_env }
+          | T.CTh_addrw(p,l) ->
+              { scope with
+                sc_env = EcEnv.BaseRw.bind_addrw p l scope.sc_env }
         in
 
         List.fold_left bind1 scope oitems
@@ -1891,4 +1897,21 @@ module Extraction = struct
     check_top scope;
     EcExtraction.process_extraction (env scope) scope.sc_required todo;
     scope
+end
+
+(* -------------------------------------------------------------------- *)
+
+module BaseRw = struct
+
+  let process scope x = 
+    { scope with 
+      sc_env = EcEnv.BaseRw.bind x.pl_desc (env scope) }
+
+  let process_addrw scope (x,l) = 
+    let env = env scope in
+    let base,_ = EcEnv.BaseRw.lookup x.pl_desc env in
+    let l = List.map (fun l -> EcEnv.Ax.lookup_path l.pl_desc env) l in
+    { scope with
+      sc_env = EcEnv.BaseRw.bind_addrw base l env }
+
 end

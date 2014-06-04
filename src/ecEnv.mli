@@ -316,7 +316,13 @@ module TypeClass : sig
   val add_instance  : (ty_params * ty) -> tcinstance -> env -> env
   val get_instances : env -> ((ty_params * ty) * tcinstance) list
 end
-
+(* -------------------------------------------------------------------- *)
+module BaseRw : sig
+  type t = Sp.t
+  val lookup : qsymbol -> env -> path * Sp.t
+  val bind : symbol -> env -> env
+  val bind_addrw : path -> path list -> env -> env
+end
 (* -------------------------------------------------------------------- *)
 module AbsStmt : sig
   type t = EcBaseLogic.abs_uses

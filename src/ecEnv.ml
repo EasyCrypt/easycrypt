@@ -114,6 +114,7 @@ type mc = {
   mc_axioms     : (ipath * EcDecl.axiom) MMsym.t;
   mc_theories   : (ipath * ctheory) MMsym.t;
   mc_typeclasses: (ipath * typeclass) MMsym.t;
+  mc_rwbase     : (ipath * path) MMsym.t; 
   mc_components : ipath MMsym.t;
 }
 
@@ -141,6 +142,7 @@ type preenv = {
   env_abs_st   : EcBaseLogic.abs_uses Mid.t;
   env_tci      : ((ty_params * ty) * tcinstance) list;
   env_tc       : TC.graph;
+  env_rwbase   : Sp.t Mip.t;
   env_modlcs   : Sid.t;                 (* declared modules *)
   env_w3       : EcWhy3.env;
   env_rb       : EcWhy3.rebinding;      (* in reverse order *)
@@ -191,6 +193,7 @@ let empty_mc params = {
   mc_variables  = MMsym.empty;
   mc_functions  = MMsym.empty;
   mc_typeclasses= MMsym.empty;
+  mc_rwbase     = MMsym.empty;
   mc_components = MMsym.empty;
 }
 
@@ -211,6 +214,7 @@ let empty () =
       env_abs_st   = Mid.empty;
       env_tci      = [];
       env_tc       = TC.Graph.empty;
+      env_rwbase   = Mip.empty;
       env_modlcs   = Sid.empty;
       env_w3       = EcWhy3.empty;
       env_rb       = [];
@@ -422,6 +426,7 @@ module MC = struct
   let _downpath_for_operator  = _downpath_for_th
   let _downpath_for_axiom     = _downpath_for_th
   let _downpath_for_typeclass = _downpath_for_th
+  let _downpath_for_rwbase    = _downpath_for_th
 
   (* ------------------------------------------------------------------ *)
   let _params_of_path p env =
@@ -807,6 +812,20 @@ module MC = struct
     import (_up_typeclass true) (IPPath p) ax env
 
   (* -------------------------------------------------------------------- *)
+  let lookup_rwbase qnx env =
+    match lookup (fun mc -> mc.mc_rwbase) qnx env with
+    | None -> lookup_error (`QSymbol qnx)
+    | Some (p, (args, obj)) -> (_downpath_for_rwbase env p args, obj)
+
+  let _up_rwbase candup mc x obj=
+    if not candup && MMsym.last x mc.mc_rwbase <> None then
+      raise (DuplicatedBinding x);
+    { mc with mc_rwbase = MMsym.add x obj mc.mc_rwbase } 
+
+  let import_rwbase p env = 
+    import (_up_rwbase true) (IPPath p) p env
+
+  (* -------------------------------------------------------------------- *)
   let _up_theory candup mc x obj =
     if not candup && MMsym.last x mc.mc_theories <> None then
       raise (DuplicatedBinding x);
@@ -947,6 +966,11 @@ module MC = struct
       | CTh_typeclass (x, tc) ->
           (add2mc _up_typeclass x tc mc, None)
 
+      | CTh_baserw x ->
+          (add2mc _up_rwbase x (expath x) mc, None)
+  
+      | CTh_addrw _ -> (mc, None)
+
       | CTh_export _ -> (mc, None)
 
       | CTh_instance _ -> (mc, None)
@@ -1027,6 +1051,9 @@ module MC = struct
 
   and bind_typeclass x tc env =
     bind _up_typeclass x tc env
+
+  and bind_rwbase x p env =
+    bind _up_rwbase x p env
 end
 
 (* -------------------------------------------------------------------- *)
@@ -1215,6 +1242,47 @@ module TypeClass = struct
         env_item = CTh_instance (ty, cr) :: env.env_item; }
 
   let get_instances env = env.env_tci
+end
+
+(* -------------------------------------------------------------------- *)
+module BaseRw = struct
+  type t = Sp.t 
+    
+  let by_path_opt (p: EcPath.path) (env:env) = 
+    let ip = IPPath p in
+    Mip.find_opt ip env.env_rwbase
+
+  let by_path (p:EcPath.path) env = 
+    match by_path_opt p env with
+    | None -> lookup_error (`Path p)
+    | Some obj -> obj
+
+  let lookup qname env =
+    let _ip, p = MC.lookup_rwbase qname env in
+    p, by_path p env
+
+  let lookup_opt name env =
+    try_lf (fun () -> lookup name env)   
+
+  let bind name env = 
+    let p = EcPath.pqname (root env) name in
+    let env = MC.bind_rwbase name p env in
+    let ip = IPPath p in
+    { env with 
+      env_rwbase = Mip.add ip Sp.empty env.env_rwbase;
+      env_item   = CTh_baserw name :: env.env_item
+    }
+
+  let bind_addrw p l env =
+    { env with
+      env_rwbase = 
+        Mip.change 
+          (omap (fun s -> List.fold_left (fun s r -> Sp.add r s) s l)) 
+          (IPPath p)
+          env.env_rwbase;
+      env_item = CTh_addrw(p,l) :: env.env_item
+    }
+    
 end
 
 (* -------------------------------------------------------------------- *)
@@ -2492,6 +2560,8 @@ module Theory = struct
     | Th_export    name     -> CTh_export    name
     | Th_typeclass name     -> CTh_typeclass name
     | Th_instance  (ty, cr) -> CTh_instance  (ty, cr)
+    | Th_baserw    x        -> CTh_baserw x
+    | Th_addrw     (b,l)    -> CTh_addrw (b,l)
 
   (* ------------------------------------------------------------------ *)
   let enter name env =
@@ -2568,6 +2638,28 @@ module Theory = struct
     | _ -> gr
 
   (* ------------------------------------------------------------------ *)
+  let rec bind_br_cth path m cth =
+    List.fold_left (bind_br_cth_item path) m cth.cth_struct
+
+  and bind_br_cth_item path m item = 
+    let xpath x = EcPath.pqname path x in
+    match item with
+    | CTh_theory (x, cth) ->
+      bind_br_cth (xpath x) m cth
+    | CTh_baserw x ->
+      let ip = IPPath (xpath x) in
+      assert (not (Mip.mem ip m));
+      Mip.add ip Sp.empty m
+    | CTh_addrw(b,r) ->
+      let ip = IPPath b in
+      let add s = 
+        match s with
+        | None -> assert false
+        | Some s -> Some (List.fold_left (fun s r -> Sp.add r s) s r) in
+      Mip.change add ip m 
+    | _ -> m
+
+  (* ------------------------------------------------------------------ *)
   let bind name cth env =
     let env = MC.bind_theory name cth.cth3_theory env in
     { env with
@@ -2579,7 +2671,11 @@ module Theory = struct
                      env.env_tci cth.cth3_theory;
         env_tc   = bind_tc_cth
                      (EcPath.pqname (root env) name)
-                     env.env_tc cth.cth3_theory; }
+                     env.env_tc cth.cth3_theory; 
+        env_rwbase = bind_br_cth
+                       (EcPath.pqname (root env) name)
+                       env.env_rwbase cth.cth3_theory; 
+    }
 
   (* ------------------------------------------------------------------ *)
   let rebind name cth env =
@@ -2617,6 +2713,12 @@ module Theory = struct
 
         | CTh_typeclass (x, tc) ->
             MC.import_typeclass (xpath x) tc env
+
+        | CTh_baserw x ->
+            MC.import_rwbase (xpath x) env
+
+        | CTh_addrw _ ->
+            env
 
         | CTh_instance _ ->
             env
