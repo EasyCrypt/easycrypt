@@ -146,7 +146,7 @@ and pstructure = {
 }
 
 and pstructure_item =
-  | Pst_mod    of pmodule
+  | Pst_mod    of (psymbol * pmodule_expr)
   | Pst_var    of (psymbol list * pty)
   | Pst_fun    of (pfunction_decl * pfunction_body)
   | Pst_alias  of (psymbol * pgamepath)
@@ -163,16 +163,13 @@ and pfunction_local = {
   pfl_init  : pexpr option;
 }
 
-
-
-and pmodule = (psymbol * pmodule_expr)
-
-and ptopmodule = {
-  ptm_def   : pmodule;
+and pmodule_def = {
+  ptm_name  : psymbol;
+  ptm_body  : pmodule_expr;
   ptm_local : bool;
 }
 
-and pdeclmodule = {
+and pmodule_decl = {
   ptmd_name  : psymbol;
   ptmd_modty : pmodule_type_restr;
 }
@@ -285,6 +282,10 @@ type ppredicate = {
   pp_tyvars : (psymbol * pqsymbol list) list option;
   pp_def    : ppred_def;
 }
+
+(* -------------------------------------------------------------------- *)
+type pdeclare =
+| PDCL_Module of pmodule_decl
 
 (* -------------------------------------------------------------------- *)
 type pprover_infos = {
@@ -688,8 +689,8 @@ type proofmode = {
 
 (* -------------------------------------------------------------------- *)
 type global =
-  | Gmodule      of ptopmodule
-  | Gdeclare     of pdeclmodule
+  | Gdeclare     of pdeclare
+  | Gmodule      of pmodule_def
   | Ginterface   of (psymbol * pmodule_sig)
   | Goperator    of poperator
   | Gpredicate   of ppredicate

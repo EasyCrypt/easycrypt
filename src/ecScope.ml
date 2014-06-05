@@ -1048,13 +1048,13 @@ module Mod = struct
     in
       scope
 
-  let add (scope : scope) (ptm : ptopmodule) =
+  let add (scope : scope) (ptm : pmodule_def) =
     assert (scope.sc_pr_uc = None);
 
     if ptm.ptm_local && not (EcSection.in_section scope.sc_section) then
       hierror "cannot declare a local module outside of a section";
 
-    let (name, m) = ptm.ptm_def in
+    let { ptm_name = name; ptm_body = m; } = ptm in
     let m = TT.transmod scope.sc_env ~attop:true (unloc name) m in
 
     if not ptm.ptm_local then begin

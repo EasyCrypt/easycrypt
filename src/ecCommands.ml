@@ -183,9 +183,12 @@ and process_module (scope : EcScope.scope) m =
   EcScope.Mod.add scope m
 
 (* -------------------------------------------------------------------- *)
-and process_declare (scope : EcScope.scope) m =
-  EcScope.check_state `InTop "module" scope;
-  EcScope.Mod.declare scope m
+and process_declare (scope : EcScope.scope) x =
+  match x with
+  | PDCL_Module m -> begin
+      EcScope.check_state `InTop "module" scope;
+      EcScope.Mod.declare scope m
+  end
 
 (* -------------------------------------------------------------------- *)
 and process_interface (scope : EcScope.scope) (x, i) =

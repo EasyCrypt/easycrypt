@@ -77,8 +77,8 @@ module Ty : sig
 end
 
 module Mod : sig
-  val add : scope -> ptopmodule -> scope
-  val declare : scope -> pdeclmodule -> scope
+  val add : scope -> pmodule_def -> scope
+  val declare : scope -> pmodule_decl -> scope
 end
 
 module ModType : sig

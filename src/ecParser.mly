@@ -125,8 +125,10 @@
 
   let mk_core_tactic t = { pt_core = t; pt_intros = []; }
 
-  let mk_topmod ~local def =
-    { ptm_def = def; ptm_local = local; }
+  let mk_topmod ~local (name, body) =
+    { ptm_name  = name ;
+      ptm_body  = body ;
+      ptm_local = local; }
 %}
 
 %token <EcSymbols.symbol> LIDENT
@@ -1179,9 +1181,6 @@ mod_def:
     { let p = EcUtils.odfl [] p in
         match body.pl_desc with
         | `Alias m ->
-            (* if p <> [] then
-               parse_error (EcLocation.make $startpos $endpos)
-                 (Some "cannot parameterize module alias"); *)
              if t <> None then
                parse_error (EcLocation.make $startpos $endpos)
                  (Some "cannot bind module type to module alias");
@@ -1192,11 +1191,8 @@ mod_def:
 ;
 
 top_mod_def:
-| x=mod_def
-    { mk_topmod ~local:false x }
-
-| LOCAL x=mod_def
-    { mk_topmod ~local:true  x }
+| LOCAL x=mod_def { mk_topmod ~local:true  x }
+| /*-*/ x=mod_def { mk_topmod ~local:false x }
 ;
 
 top_mod_decl:
@@ -1475,6 +1471,11 @@ predicate:
    { { pp_name   = x;
        pp_tyvars = tyvars;
        pp_def    = PPconcr(p,f); } }
+;
+
+(* -------------------------------------------------------------------- *)
+top_decl:
+| x=top_mod_decl { PDCL_Module x }
 ;
 
 (* -------------------------------------------------------------------- *)
@@ -2580,8 +2581,8 @@ global_:
 | theory_w3        { GthW3        $1 }
 | section_open     { GsctOpen        }
 | section_close    { GsctClose       }
+| top_decl         { Gdeclare     $1 }
 | top_mod_def      { Gmodule      $1 }
-| top_mod_decl     { Gdeclare     $1 }
 | sig_def          { Ginterface   $1 }
 | typedecl         { Gtype        $1 }
 | typeclass        { Gtypeclass   $1 }
