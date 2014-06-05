@@ -23,6 +23,7 @@ val t_fail  : FApi.backward
 val t_id    : FApi.backward
 
 (* -------------------------------------------------------------------- *)
+val alpha_find_in_hyps : EcEnv.LDecl.hyps -> EcFol.form -> EcIdent.t
 val t_assumption    : [`Alpha | `Conv] -> FApi.backward
 val t_logic_trivial : FApi.backward
 val t_trivial       : FApi.backward option -> FApi.backward
@@ -36,6 +37,7 @@ val t_change : form -> tcenv1 -> tcenv1
 
 (* -------------------------------------------------------------------- *)
 val t_reflex   : ?reduce:bool -> FApi.backward
+val t_transitivity : ?reduce:bool -> form -> FApi.backward
 val t_symmetry : ?reduce:bool -> FApi.backward
 
 (* -------------------------------------------------------------------- *)

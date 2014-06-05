@@ -83,7 +83,7 @@
     "modpath"     , MODPATH    ;        (* KW: tactic *)
     "fieldeq"     , FIELD      ;        (* KW: tactic *)
     "ringeq"      , RING       ;        (* KW: tactic *)
-    "algnorm"     , ALGNORM    ;        (* KW: tactic *)
+    "algebra"     , ALGNORM    ;        (* KW: tactic *)
 
     "exact"       , EXACT      ;        (* KW: bytac *)
     "assumption"  , ASSUMPTION ;        (* KW: bytac *)

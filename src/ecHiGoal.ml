@@ -1111,3 +1111,5 @@ let process_algebra mode kind eqs (tc : tcenv1) =
   in
 
   tactic tc
+
+

@@ -457,6 +457,9 @@ module LowAssumption = struct
 end
 
 (* -------------------------------------------------------------------- *)
+let alpha_find_in_hyps hyps f = 
+   LowAssumption.gen_find_in_hyps EcReduction.is_alpha_eq hyps f
+
 let t_assumption mode (tc : tcenv1) =
   let convs =
     match mode with

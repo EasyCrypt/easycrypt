@@ -19,6 +19,8 @@ val field_axioms : EcEnv.env -> field -> (symbol * form) list
 (* -------------------------------------------------------------------- *)
 val t_ring : ring -> eqs -> form * form -> FApi.backward
 val t_ring_simplify : ring -> eqs -> form * form -> FApi.backward
+val t_ring_congr : cring -> RState.rstate ->
+           EcRing.pexpr -> int list -> form list -> FApi.backward 
 
 val t_field : field -> eqs -> form * form -> FApi.backward
 val t_field_simplify : field -> eqs -> form * form -> FApi.backward

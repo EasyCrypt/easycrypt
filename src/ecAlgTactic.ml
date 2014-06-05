@@ -169,6 +169,22 @@ let t_ring r eqs (f1, f2) tc =
   then FApi.xmutate1 tc `Ring []
   else FApi.xmutate1 tc `Ring [f_eq f (emb_rzero r)]
 
+let t_ring_congr (cr:cring) (rm:RState.rstate) pe li lv tc =
+  let rm' = RState.update rm li lv in
+  let env = FApi.tc1_env tc in
+  let mk_goal i =
+    let r1 = oget (RState.get i rm) in
+    let r2 = oget (RState.get i rm') in
+    EcReduction.EqTest.for_type_exn env r1.f_ty r2.f_ty;
+    f_eq r1 r2 in 
+  let r = ring_of_cring cr in
+  let f = ofring r rm pe in
+  let f' = ofring r rm' pe in
+  let concl = FApi.tc1_goal tc in
+  if not (f_equal (f_eq f f') concl) then raise InvalidGoalShape;
+  let sg = List.map mk_goal li in
+  FApi.xmutate1 tc `Ring_congr sg 
+
 let t_field_simplify r eqs (f1, f2) tc =
   let hyps = FApi.tc1_hyps tc in
   let cr = cfield_of_field r in

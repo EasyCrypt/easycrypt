@@ -91,6 +91,7 @@ and process1_logic (ttenv : ttenv) (t : logtactic) (tc : tcenv1) =
     | Psplit            -> process_split
     | Pfield st         -> process_algebra `Solve `Field st
     | Pring st          -> process_algebra `Solve `Ring  st
+    | Palg_norm         -> EcStrongRing.t_alg_eq 
     | Pexists fs        -> process_exists fs
     | Pleft             -> process_left
     | Pright            -> process_right

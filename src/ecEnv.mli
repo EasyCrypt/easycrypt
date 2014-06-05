@@ -319,6 +319,7 @@ end
 (* -------------------------------------------------------------------- *)
 module BaseRw : sig
   type t = Sp.t
+  val by_path : path -> env -> Sp.t 
   val lookup : qsymbol -> env -> path * Sp.t
   val lookup_opt : qsymbol -> env -> (path * Sp.t) option
   val is_base : qsymbol -> env -> bool

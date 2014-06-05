@@ -154,3 +154,8 @@ theory Field.
 
   axiom mulVf: forall (x : t), x <> zeror => (inv x) * x = oner.
 end Field.
+
+(* --------------------------------------------------------------------- *)
+(* Rewrite database for algebra tactic                                   *)
+
+hint rewrite rw_algebra : .
