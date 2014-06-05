@@ -206,5 +206,5 @@ let t_field r eqs (f1, f2) tc =
   let f  = ring_eq hyps (cring_of_ring r.f_ring) eqs r1 r2 in
 
   if   EcReduction.is_conv hyps f (emb_fzero r)
-  then FApi.xmutate1 tc `Field []
+  then FApi.xmutate1 tc `Field c
   else FApi.xmutate1 tc `Field (c @ [f_eq f (emb_fzero r)])
