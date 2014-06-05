@@ -8,6 +8,7 @@ open EcAlgebra
 open EcAlgTactic
 open EcCoreGoal
 open EcLowGoal
+open FApi
 
 type norm_kind = 
   | NKring  of cring * RState.rstate ref 
@@ -59,9 +60,9 @@ let norm_kind einfo hyps ty =
     kind
 
 let t_reflex_assumption g = 
-  FApi.t_ors [t_reflex; 
+  t_ors [t_reflex; 
               t_assumption `Alpha ; 
-              FApi.t_seq t_symmetry (t_assumption `Alpha)] g
+              t_seq t_symmetry (t_assumption `Alpha)] g
 
 let t_intro_eq g = t_intros_s (`Symbol ["_"]) g
 
@@ -73,25 +74,56 @@ let is_in_hyps hyps f1 f2 =
     is_in hyps f1 f2 || is_in hyps f2 f1
 
 let t_ring r l (f1,f2) g = 
-  FApi.t_seq (t_ring r l (f1,f2)) t_fail g 
+  t_seq (t_ring r l (f1,f2)) t_fail g 
+
+let destr_neq f = 
+  match sform_of_form f with
+  | SFnot f ->
+    begin match sform_of_form f with
+    | SFeq(f1,f2) -> Some(f1,f2)
+    | _ -> None
+    end
+  | _ -> None
+
+let t_field_neq r g = 
+  let env, hyps, concl = tc1_eflat g in
+  match destr_neq concl with 
+  | Some (f1,f2) -> 
+    let ty = f1.f_ty in
+    let h = EcEnv.LDecl.fresh_id hyps "_" in
+    let can_app (id,lk) = 
+      match lk with
+      | EcBaseLogic.LD_hyp f -> 
+        begin match destr_neq f with
+        | Some (f1',f2') when EcReduction.EqTest.for_type env f1'.f_ty ty ->
+          Some (t_seqsub 
+                  (t_apply_s EcCoreLib.p_negbTE [] ~args:[f_eq f1' f2'] ~sk:2)
+                  [ t_apply_hyp id;
+                    t_ring r [(f1,f2)] (f1', f2')])
+        | _ -> None
+        end
+      | _ -> None in
+    let tacs = List.prmap can_app (EcEnv.LDecl.tohyps hyps).EcBaseLogic.h_local in
+    t_try (t_seqs [
+      (fun g -> !@ (t_change (f_imp (f_eq f1 f2) f_false) g));
+      t_intros_i [h];
+      t_ors tacs]) g
+  | _ -> t_fail g
 
 let t_field r l (f1,f2) g =
-  let t_fail_if_eq g =
-    if is_eq (FApi.tc1_goal g) then t_fail g 
-    else t_id g in
-  FApi.t_seq (t_field r l (f1,f2)) t_fail_if_eq g
+  t_seq (t_field r l (f1,f2)) (t_field_neq r.EcDecl.f_ring) g
 
 let pp_concl fmt g = 
-  let env, hyps, concl = FApi.tc1_eflat g in
+  let env, hyps, concl = tc1_eflat g in
   let ppe = EcPrinting.PPEnv.ofenv env in
   EcPrinting.pp_goal ppe fmt (1,(LDecl.tohyps hyps,concl))
 
 let pp_form fmt (f,g) = 
-  let env = FApi.tc1_env g in
+  let env = tc1_env g in
   let ppe = EcPrinting.PPEnv.ofenv env in
   EcPrinting.pp_form ppe fmt f
 
-open FApi
+
 
 let autorewrite info f1 f2 g = 
   let res = ref (f_true, f_true) in
