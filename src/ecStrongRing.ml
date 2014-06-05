@@ -75,46 +75,62 @@ let is_in_hyps hyps f1 f2 =
 let t_ring r l (f1,f2) g = 
   FApi.t_seq (t_ring r l (f1,f2)) t_fail g 
 
-let t_seq_last t1 t2 g =
-  FApi.t_last t2 (t1 g)
+let t_field r l (f1,f2) g =
+  let t_fail_if_eq g =
+    if is_eq (FApi.tc1_goal g) then t_fail g 
+    else t_id g in
+  FApi.t_seq (t_field r l (f1,f2)) t_fail_if_eq g
 
-let rec t_lseq_last lt g =
-  match lt with
-  | [] -> t_id g
-  | t::lt -> t_seq_last t (t_lseq_last lt) g
-(*
 let pp_concl fmt g = 
-  let env, hyps, concl = get_goal_e g in
+  let env, hyps, concl = FApi.tc1_eflat g in
   let ppe = EcPrinting.PPEnv.ofenv env in
   EcPrinting.pp_goal ppe fmt (1,(LDecl.tohyps hyps,concl))
 
 let pp_form fmt (f,g) = 
-  let env, _,_ = get_goal_e g in
+  let env = FApi.tc1_env g in
   let ppe = EcPrinting.PPEnv.ofenv env in
   EcPrinting.pp_form ppe fmt f
-*)
 
 open FApi
 
 let autorewrite info f1 f2 g = 
-  let g = fst (newgoal (!@ g) (f_eq f1 f2)) in
-  let g = EcHiGoal.LowRewrite.t_autorewrite info.rw_info (as_tcenv1 g) in
-  destr_eq (tc_goal g)   
+  let res = ref (f_true, f_true) in
+  let t_get_res g = 
+    res := destr_eq (tc1_goal g);
+    t_id g in
+  let _ = 
+    t_first 
+      (fun g -> t_first t_get_res (EcHiGoal.LowRewrite.t_autorewrite info.rw_info g)) 
+      (t_cut (f_eq f1 f2) g) in
+  !res 
 
 let t_autorw info g = 
   EcHiGoal.LowRewrite.t_autorewrite info.rw_info g
 
 let rec t_alg_eq info g =
+(*  Format.eprintf "t_alg_eq %a" pp_concl g; *)
   let f1, f2 = destr_eq (tc1_goal g) in
   t_cut_alg_eq t_reflex_assumption info f1 f2 g
 
 and t_cut_alg_eq t_cont info f1 f2 g =
   let hyps = tc1_hyps g in
   if is_in_hyps hyps f1 f2 then t_id g
-  else match norm_kind info hyps f1.f_ty with
+  else 
+    let f1', f2' = autorewrite info f1 f2 g in
+    let t_cont g = 
+      t_seqsub (t_cut (f_eq f1 f2)) 
+        [ (fun g -> t_first t_reflex_assumption (t_autorw info g));
+          t_seq t_intro_eq t_cont] g in
+    t_cut_alg_eq1 t_cont info f1' f2' g 
+
+and t_cut_alg_eq1 t_cont info f1 f2 g =
+  let hyps = tc1_hyps g in
+  if is_in_hyps hyps f1 f2 then t_id g
+  else 
+    match norm_kind info hyps f1.f_ty with
     | NKring(cr,m)  -> t_cut_ring_eq t_cont info cr m f1 f2 g
     | NKfield(cr,m) -> t_cut_field_eq t_cont info cr m f1 f2 g
-    | NKdefault     -> t_cut_subterm_eq1 t_cont info f1 f2 g
+    | NKdefault     -> t_cut_subterm_eq2 t_cont info f1 f2 g
 
 and t_cut_alg_eqs t_cont info fs1 fs2 g =
   match fs1, fs2 with
@@ -129,6 +145,7 @@ and t_cut_subterm_eq t_cont info f1 f2 g =
   else t_cut_subterm_eq1 t_cont info f1 f2 g 
 
 and t_cut_subterm_eq1 t_cont info f1 f2 g = 
+(*  Format.eprintf "t_cut_subterm_eq1 %a@." pp_form (f_eq f1 f2, g); *)
   let f1', f2' = autorewrite info f1 f2 g in
   let t_cont g = 
     t_seqsub (t_cut (f_eq f1 f2)) 
@@ -137,6 +154,7 @@ and t_cut_subterm_eq1 t_cont info f1 f2 g =
   t_cut_subterm_eq2 t_cont info f1' f2' g 
 
 and t_cut_subterm_eq2 t_cont info f1 f2 g = 
+(*  Format.eprintf "t_cut_subterm_eq2 %a@." pp_form (f_eq f1 f2, g); *)
   let hyps = tc1_hyps g in
   if is_in_hyps hyps f1 f2 then t_cont g 
   else match f1.f_node, f2.f_node with
@@ -160,9 +178,40 @@ and t_cut_subterm_eq2 t_cont info f1 f2 g =
     t_cut_alg_eqs t_cont info fs1 fs2 g
   | _, _ -> t_fail g 
 
-and t_cut_field_eq _t_cont _info _cr _rm _f1 _f2 g = t_fail g 
+and t_cut_field_eq t_cont info cr rm f1 f2 g = 
+  let hyps = tc1_hyps g in
+  let pe1, rm' = tofield hyps cr !rm f1 in
+  let pe2, rm' = tofield hyps cr rm' f2 in
+  rm := rm';
+  let (_,pe,_) = field_simplify_pe cr [] (EcField.FEsub(pe1,pe2)) in
+  let fv = Sint.elements (EcRing.fv_pe pe) in
+  let r = field_of_cfield cr in
+  if fv = [] then
+    t_seqsub (t_cut (f_eq f1 f2)) 
+      [ t_field r [] (f1,f2);
+        t_seq t_intro_eq t_cont ] g
+  else
+    let fs  = List.map (fun i -> oget (RState.get i rm')) fv in
+    let t_end fs' g = 
+      let rm' = RState.update !rm fv fs' in
+      let f1' = offield r rm' pe1 in
+      let f2' = offield r rm' pe2 in
+      t_seqsub (t_cut (f_eq f1 f2))
+        [t_seqsub (t_transitivity f1')
+            [t_seq (t_field_congr cr !rm pe1 fv fs') t_reflex_assumption;
+             t_seqsub (t_transitivity f2') 
+               [t_field r [] (f1',f2');
+                t_seq t_symmetry 
+                  (t_seq (t_field_congr cr !rm pe1 fv fs') t_reflex_assumption)
+               ]
+            ];
+         t_seq t_intro_eq t_cont] g in
+    t_cut_merges t_end info rm fv fs g
+
+
 
 and t_cut_ring_eq t_cont info cr rm f1 f2 g = 
+(*  Format.eprintf "t_cut_ring_eq %a@." pp_form (f_eq f1 f2, g); *)
   let hyps = tc1_hyps g in
   let pe1, rm' = toring hyps cr !rm f1 in
   let pe2, rm' = toring hyps cr rm' f2 in

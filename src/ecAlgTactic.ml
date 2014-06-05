@@ -208,3 +208,19 @@ let t_field r eqs (f1, f2) tc =
   if   EcReduction.is_conv hyps f (emb_fzero r)
   then FApi.xmutate1 tc `Field c
   else FApi.xmutate1 tc `Field (c @ [f_eq f (emb_fzero r)])
+
+let t_field_congr (cr:cfield) (rm:RState.rstate) pe li lv tc =
+  let rm' = RState.update rm li lv in
+  let env = FApi.tc1_env tc in
+  let mk_goal i =
+    let r1 = oget (RState.get i rm) in
+    let r2 = oget (RState.get i rm') in
+    EcReduction.EqTest.for_type_exn env r1.f_ty r2.f_ty;
+    f_eq r1 r2 in 
+  let r = field_of_cfield cr in
+  let f = offield r rm pe in
+  let f' = offield r rm' pe in
+  let concl = FApi.tc1_goal tc in
+  if not (f_equal (f_eq f f') concl) then raise InvalidGoalShape;
+  let sg = List.map mk_goal li in
+  FApi.xmutate1 tc `Field_congr sg 

@@ -24,3 +24,5 @@ val t_ring_congr : cring -> RState.rstate ->
 
 val t_field : field -> eqs -> form * form -> FApi.backward
 val t_field_simplify : field -> eqs -> form * form -> FApi.backward
+val t_field_congr : cfield -> RState.rstate ->
+           EcField.fexpr -> int list -> form list -> FApi.backward 

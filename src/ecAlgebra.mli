@@ -1,6 +1,7 @@
 (* -------------------------------------------------------------------- *)
 open EcFol
 open EcRing
+open EcField
 open EcDecl
 open EcEnv
 
@@ -54,6 +55,7 @@ type cfield
 val cring_of_ring   : ring  -> cring
 val cfield_of_field : field -> cfield
 val ring_of_cring   : cring -> ring 
+val field_of_cfield : cfield-> field
 
 (* -------------------------------------------------------------------- *)
 val toring : LDecl.hyps -> cring -> RState.rstate -> form -> pexpr * RState.rstate
@@ -64,5 +66,13 @@ val ring_simplify : LDecl.hyps -> cring -> eqs -> form -> form
 val ring_eq : LDecl.hyps -> cring -> eqs -> form -> form -> form
 
 (* -------------------------------------------------------------------- *)
+val tofield : EcEnv.LDecl.hyps ->
+           cfield ->
+           RState.rstate -> form -> fexpr * RState.rstate
+val offield : field -> RState.rstate -> fexpr -> form
+
+val field_simplify_pe : 
+  cfield -> (pexpr * pexpr) list -> fexpr -> pexpr list * pexpr * pexpr
+
 val field_simplify : LDecl.hyps -> cfield -> eqs -> form -> form list * form * form
 val field_eq : LDecl.hyps -> cfield -> eqs -> form -> form -> form list * (form * form) * (form * form)

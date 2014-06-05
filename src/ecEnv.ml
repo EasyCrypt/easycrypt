@@ -2781,7 +2781,9 @@ module Theory = struct
     in
        { env with
            env_tci = bind_instance_cth thpath env.env_tci cth.cth3_theory;
-           env_tc  = bind_tc_cth thpath env.env_tc cth.cth3_theory; }
+           env_tc  = bind_tc_cth thpath env.env_tc cth.cth3_theory;
+           env_rwbase = bind_br_cth thpath env.env_rwbase cth.cth3_theory; 
+       }
 end
 
 (* -------------------------------------------------------------------- *)

@@ -168,6 +168,8 @@ let cfield_of_field (r : field) : cfield =
   let cr = odfl cr (r.f_div |> omap (fun p -> Mp.add p `Div cr)) in
     (r, cr)
 
+let field_of_cfield (cr:cfield) : field = fst cr
+
 (* -------------------------------------------------------------------- *)
 let toring hyps ((r, cr) : cring) (rmap : RState.rstate) (form : form) =
   let rmap = ref rmap in
@@ -364,6 +366,29 @@ let field_eq hyps (cr : cfield) (eqs : eqs) (f1 : form) (f2 : form) =
     (cond1 @ cond2, (num1, num2), (denum1, denum2))
 
 (* -------------------------------------------------------------------- *)
+
+let rec offield (r:field) (rmap:RState.rstate) (e:fexpr) : form = 
+  match e with
+  | FEc c ->
+    if ceq c c0 then emb_fzero r
+    else if ceq c c1 then emb_fone r
+    else fofint r (Big_int.int_of_big_int c)
+  | FEX idx -> oget (RState.get idx rmap)
+  | FEadd(p1,p2) -> fadd r (offield r rmap p1) (offield r rmap p2)
+  | FEsub(p1,p2) -> fsub r (offield r rmap p1) (offield r rmap p2)
+  | FEmul(p1,p2) -> fmul r (offield r rmap p1) (offield r rmap p2)
+  | FEopp p1     -> fopp r (offield r rmap p1)
+  | FEpow(p1,i)  -> fexp r (offield r rmap p1) i 
+  | FEinv p1     -> finv r (offield r rmap p1)
+  | FEdiv(p1,p2) -> fdiv r (offield r rmap p1) (offield r rmap p2)
+
+let field_simplify_pe (cr:cfield) peqs pe = 
+  let (num,denum,cond) = fnorm pe in
+  let norm = 
+    if (fst cr).f_ring.r_bool then Bring.norm_pe else Iring.norm_pe in
+  let norm f = norm f peqs in 
+  (List.map norm cond, norm num, norm denum)
+
 let field_simplify hyps (cr : cfield) (eqs : eqs) (f : form) =
   let map = ref RState.empty in
 
@@ -378,3 +403,5 @@ let field_simplify hyps (cr : cfield) (eqs : eqs) (f : form) =
     if (fst cr).f_ring.r_bool then Bring.norm_pe else Iring.norm_pe in
   let norm form = ofring (norm form eqs) in
   (List.map norm cond, norm num, norm denum)
+
+
