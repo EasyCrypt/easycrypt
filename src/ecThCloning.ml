@@ -574,7 +574,8 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
                 let q = EcPath.fromqsymbol (px, x) in
 
                 match Mp.find_opt q ops with
-                | None -> None
+                | None ->
+                    Some (EcPath.pappend npath q)
                 | Some (op, alias) ->
                     match alias with
                     | true  -> Some (EcPath.pappend npath q)
@@ -588,7 +589,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
                         | OB_oper (Some (OP_Fix    _))
                         | OB_oper (Some (OP_TC      )) ->
                             Some (EcPath.pappend npath q)
-                        | OB_oper (Some (OP_Plain  e)) ->
+                        | OB_oper (Some (OP_Plain e)) ->
                             match e.EcTypes.e_node with
                             | EcTypes.Eop (r, _) -> Some r
                             | _ -> raise E.InvInstPath
