@@ -707,8 +707,8 @@ type global =
   | GthExport    of pqsymbol
   | GthClone     of (theory_cloning * [`Import|`Export] option)
   | GthW3        of (string list * string * w3_renaming list)
-  | GsctOpen
-  | GsctClose
+  | GsctOpen     of psymbol option
+  | GsctClose    of psymbol option
   | Grealize     of pqsymbol
   | Gtactics     of [`Proof of proofmode | `Actual of ptactic list]
   | Gprover_info of pprover_infos

@@ -17,6 +17,7 @@ type lvl = [`Local | `Global] * [`Axiom | `Lemma]
 
 type locals = {
   lc_env       : EcEnv.env;
+  lc_name      : symbol option;
   lc_lemmas    : (path * lvl) list * lvl Mp.t;
   lc_modules   : Sp.t;
   lc_abstracts : (EcIdent.t * (module_type * mod_restr)) list * Sid.t;
@@ -323,8 +324,9 @@ let generalize env lc (f : EcFol.form) =
     in
       f
 
-let elocals (env : EcEnv.env) : locals =
+let elocals (env : EcEnv.env) (name : symbol option) : locals =
   { lc_env       = env;
+    lc_name      = name;
     lc_lemmas    = ([], Mp.empty);
     lc_modules   = Sp.empty;
     lc_abstracts = ([], Sid.empty);
@@ -337,15 +339,16 @@ let initial : t = []
 let in_section (cs : t) =
   match cs with [] -> false | _ -> true
 
-let enter (env : EcEnv.env) (cs : t) : t =
+let enter (env : EcEnv.env) (name : symbol option) (cs : t) : t =
   match List.ohead cs with
-  | None    -> [elocals env]
+  | None    -> [elocals env name]
   | Some ec ->
     let ec =
       { ec with
           lc_items = [];
           lc_abstracts = ([], snd ec.lc_abstracts);
-          lc_env = env; }
+          lc_env = env;
+          lc_name = name; }
     in
       ec :: cs
 
@@ -358,10 +361,10 @@ let exit (cs : t) =
                  lc_lemmas    = fst_map List.rev ec.lc_lemmas},
        cs)
 
-let path (cs : t) : path =
+let path (cs : t) : symbol option * path =
   match cs with
   | [] -> raise NoSectionOpened
-  | ec :: _ -> EcEnv.root ec.lc_env
+  | ec :: _ -> (ec.lc_name, EcEnv.root ec.lc_env)
 
 let opath (cs : t) =
   try Some (path cs) with NoSectionOpened -> None

@@ -123,8 +123,8 @@ module Theory : sig
 end
 
 module Section : sig
-  val enter : scope -> scope
-  val exit  : scope -> scope
+  val enter : scope -> psymbol option -> scope
+  val exit  : scope -> psymbol option-> scope
 end
 
 module Tactics : sig
