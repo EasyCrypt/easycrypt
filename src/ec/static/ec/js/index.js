@@ -47,6 +47,12 @@ var Workspace = function() {
 
 
 /* ---------------------------------------------------------------- */
+Workspace.prototype.create_session = function(contents) {
+  var session = ace.createEditSession(contents);
+  session.setTabSize(2);
+  return session;
+}
+
 Workspace.prototype.set_session_star_event = function(session) {
   session.on('change', function(session, e) {
     if (!session.changed) {
@@ -95,7 +101,7 @@ Workspace.prototype.refresh_projects = function() {
     var expand_proj = glyph(project.is_unfolded ? 'glyphicon-chevron-down' : 'glyphicon-chevron-up');
     var target_id = "proj_files_" + i;
     expand_proj.attr('data-toggle', 'collapse').attr('data-target', '#'+target_id);
-    var files_col = col(11, 1).addClass('collapse').attr('id', target_id);
+    var files_col = col(10, 1).addClass('collapse').attr('id', target_id);
     if (project.is_unfolded) files_col.addClass('in');
 
     var toggle_glyph = this._callback_for_toggle_glyph(project, expand_proj);
@@ -168,8 +174,8 @@ Workspace.prototype.load_projects = function() {
 
 Workspace.prototype.load_editor = function() {
   this.editor = ace.edit("editor");
-  this.editor.setTheme("ace/theme/monokai");
-  this.editor.emptySession = ace.createEditSession("");
+  this.editor.setTheme("ace/theme/chrome");
+  this.editor.emptySession = this.create_session("");
   this.editor.setSession(this.editor.emptySession);
   this.editor.commands.addCommand({
     name: 'save',
@@ -266,7 +272,7 @@ Workspace.prototype.add_tab = function(tab) {
 }
 
 Workspace.prototype.new_tab_from_file = function(file) {
-  file.session = ace.createEditSession(file.contents !== null ? file.contents : "<loading>");
+  file.session = this.create_session(file.contents !== null ? file.contents : "<loading>");
   file.session.setMode("ace/mode/javascript");        // TODO easycrypt
   var tab = new Tab(file.id, file.session, file);
   this.add_tab(tab);

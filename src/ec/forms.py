@@ -123,7 +123,7 @@ class ProjectCreationFormModal(forms.Form):
 class FileCreationFormModal(forms.Form):
     file_name = forms.RegexField(
         label=(""), max_length=30,
-        regex=r'^[a-zA-Z0-9_ ]+$',
+        regex=r'^[a-zA-Z0-9_\-. ]+$',
         error_messages={'invalid':
                         _("This value may contain only letters, "
                           "underscores, spaces and numbers.")})
