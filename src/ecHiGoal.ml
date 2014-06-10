@@ -58,7 +58,9 @@ let process_assumption (tc : tcenv1) =
 
 (* -------------------------------------------------------------------- *)
 let process_reflexivity (tc : tcenv1) =
-  EcLowGoal.t_reflex tc
+  try  EcLowGoal.t_reflex tc
+  with InvalidGoalShape ->
+    tc_error !!tc "cannot prove goal by reflexivity"
 
 (* -------------------------------------------------------------------- *)
 let process_trivial (tc : tcenv1) =
