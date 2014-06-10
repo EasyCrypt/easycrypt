@@ -273,7 +273,7 @@ Workspace.prototype.add_tab = function(tab) {
 
 Workspace.prototype.new_tab_from_file = function(file) {
   file.session = this.create_session(file.contents !== null ? file.contents : "<loading>");
-  file.session.setMode("ace/mode/javascript");        // TODO easycrypt
+  file.session.setMode("ace/mode/easycrypt");
   var tab = new Tab(file.id, file.session, file);
   this.add_tab(tab);
   return tab;
