@@ -1,4 +1,5 @@
 (* -------------------------------------------------------------------- *)
+open EcSymbols
 open EcIdent
 open EcPath
 open EcFol
@@ -29,11 +30,11 @@ val initial : t
 
 val in_section : t -> bool
 
-val enter : EcEnv.env -> t -> t
+val enter : EcEnv.env -> symbol option -> t -> t
 val exit  : t -> locals * t
 
-val path  : t -> path
-val opath : t -> path option
+val path  : t -> symbol option * path
+val opath : t -> (symbol option * path) option
 
 val locals  : t -> locals
 val olocals : t -> locals option

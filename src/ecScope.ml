@@ -284,8 +284,8 @@ let subscope (scope : scope) (name : symbol) =
 (* -------------------------------------------------------------------- *)
 let maybe_add_to_section scope item =
   match EcSection.opath scope.sc_section with
-  | None    -> scope
-  | Some sp -> begin
+  | None -> scope
+  | Some (_, sp) -> begin
       match EcPath.p_equal sp (EcEnv.root scope.sc_env) with
       | false -> scope
       | true  ->
@@ -1683,7 +1683,7 @@ module Theory = struct
         begin
           match EcSection.opath scope.sc_section with
           | None -> ()
-          | Some sp ->
+          | Some (_, sp) ->
               if p_equal sp (EcEnv.root scope.sc_env) then
                 hierror "cannot close a theory with active sections";
         end;
@@ -1817,17 +1817,23 @@ end
 module Section = struct
   module T = EcTheory
 
-  let enter (scope : scope) =
+  let enter (scope : scope) (name : psymbol option) =
     assert (scope.sc_pr_uc = None);
     { scope with
-        sc_section = EcSection.enter scope.sc_env scope.sc_section }
+        sc_section =
+          EcSection.enter scope.sc_env
+            (omap unloc name) scope.sc_section; }
 
-  let exit (scope : scope) =
+  let exit (scope : scope) (name : psymbol option) =
     match EcSection.opath scope.sc_section with
     | None -> hierror "no section to close"
-    | Some sp ->
+    | Some (sname, sp) ->
         if not (p_equal sp (EcEnv.root (scope.sc_env))) then
           hierror "cannot close a section containing pending theories";
+        if sname <> (omap unloc name) then
+          hierror "expecting [%s], not [%s]"
+            (match sname with None -> "<empty>" | Some x -> x)
+            (match  name with None -> "<empty>" | Some x -> unloc x);
         let (locals, osc) = EcSection.exit scope.sc_section in
         let oenv   = EcSection.env_of_locals locals in
         let oitems = EcSection.items_of_locals locals in

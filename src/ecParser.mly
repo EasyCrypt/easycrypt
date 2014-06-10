@@ -1520,8 +1520,8 @@ axiom:
 theory_open  : THEORY  x=uident  { x }
 theory_close : END     x=uident  { x }
 
-section_open  : SECTION     { () }
-section_close : END SECTION { () }
+section_open  : SECTION     x=option(uident) { x }
+section_close : END SECTION x=option(uident) { x }
 
 import_flag:
 | IMPORT { `Import }
@@ -2579,8 +2579,8 @@ global_:
 | theory_export    { GthExport    $1 }
 | theory_clone     { GthClone     $1 }
 | theory_w3        { GthW3        $1 }
-| section_open     { GsctOpen        }
-| section_close    { GsctClose       }
+| section_open     { GsctOpen     $1 }
+| section_close    { GsctClose    $1 }
 | top_decl         { Gdeclare     $1 }
 | top_mod_def      { Gmodule      $1 }
 | sig_def          { Ginterface   $1 }
