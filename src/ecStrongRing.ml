@@ -149,10 +149,13 @@ and t_cut_alg_eq t_cont info f1 f2 g =
   if is_in_hyps hyps f1 f2 then t_id g
   else 
     let f1', f2' = autorewrite info f1 f2 g in
-    let t_cont g = 
-      t_seqsub (t_cut (f_eq f1 f2)) 
-        [ (fun g -> t_first t_reflex_assumption (t_autorw info g));
-          t_seq t_intro_eq t_cont] g in
+    let t_cont = 
+      if f_equal f1 f1' && f_equal f2 f2' then t_cont 
+      else
+        fun g ->
+          t_seqsub (t_cut (f_eq f1 f2)) 
+            [ (fun g -> t_first t_reflex_assumption (t_autorw info g));
+              t_seq t_intro_eq t_cont] g in
     t_cut_alg_eq1 t_cont info f1' f2' g 
 
 and t_cut_alg_eq1 t_cont info f1 f2 g =
@@ -179,10 +182,13 @@ and t_cut_subterm_eq t_cont info f1 f2 g =
 and t_cut_subterm_eq1 t_cont info f1 f2 g = 
 (*  Format.eprintf "t_cut_subterm_eq1 %a@." pp_form (f_eq f1 f2, g); *)
   let f1', f2' = autorewrite info f1 f2 g in
-  let t_cont g = 
-    t_seqsub (t_cut (f_eq f1 f2)) 
-      [ (fun g -> t_first t_reflex_assumption (t_autorw info g));
-        t_seq t_intro_eq t_cont] g in
+  let t_cont = 
+    if f_equal f1 f1' && f_equal f2 f2' then t_cont 
+    else 
+      fun g -> 
+        t_seqsub (t_cut (f_eq f1 f2)) 
+          [ (fun g -> t_first t_reflex_assumption (t_autorw info g));
+            t_seq t_intro_eq t_cont] g in
   t_cut_subterm_eq2 t_cont info f1' f2' g 
 
 and t_cut_subterm_eq2 t_cont info f1 f2 g = 
