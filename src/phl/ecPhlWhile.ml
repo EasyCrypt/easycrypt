@@ -126,7 +126,7 @@ let t_bdhoare_while_rev_geq_r inv vrnt k eps tc =
   let modi     = s_write env lp_body in
 
   (* 1. Pre-invariant *)
-  let pre_inv_concl = f_imp b_pre inv in
+  let pre_inv_concl = f_forall_mems [mem] (f_imp b_pre inv) in
 
   (* 2. Pre-bound *)
   let pre_bound_concl =
@@ -297,7 +297,7 @@ let process_while side_opt phi vrnt_opt o_info tc =
             (TTC.tc1_process_phl_form tc tint vrnt)
             tc
 
-      | Some vrnt, Some (k,eps) ->
+      | Some vrnt, Some (k, eps) ->
         t_bdhoare_while_rev_geq
           (TTC.tc1_process_phl_formula tc phi)
           (TTC.tc1_process_phl_form    tc tint vrnt)
