@@ -234,7 +234,7 @@ and t_cut_field_eq t_cont info cr rm f1 f2 g =
              t_seqsub (t_transitivity f2') 
                [t_field r [] (f1',f2');
                 t_seq t_symmetry 
-                  (t_seq (t_field_congr cr !rm pe1 fv fs') t_reflex_assumption)
+                  (t_seq (t_field_congr cr !rm pe2 fv fs') t_reflex_assumption)
                ]
             ];
          t_seq t_intro_eq t_cont] g in
@@ -267,7 +267,7 @@ and t_cut_ring_eq t_cont info cr rm f1 f2 g =
              t_seqsub (t_transitivity f2') 
                [t_ring r [] (f1',f2');
                 t_seq t_symmetry 
-                  (t_seq (t_ring_congr cr !rm pe1 fv fs') t_reflex_assumption)
+                  (t_seq (t_ring_congr cr !rm pe2 fv fs') t_reflex_assumption)
                ]
             ];
          t_seq t_intro_eq t_cont] g in
