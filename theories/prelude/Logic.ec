@@ -246,6 +246,8 @@ lemma nosmt eq_refl  : forall (x:'a), x = x by [].
 lemma nosmt eq_sym   : forall (x y : 'a), x = y <=> y = x by [].
 lemma nosmt eq_trans : forall (x y z : 'a), x = y => y = z => x = z by [].
 
+lemma nosmt eq_sym_imp : forall (x y : 'a), x = y => y = x by [].
+
 (** tuples *) 
 lemma nosmt tuple2_ind : 
   forall 

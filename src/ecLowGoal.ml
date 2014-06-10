@@ -495,7 +495,7 @@ let t_reflex ?reduce (tc : tcenv1) =
 
 (* -------------------------------------------------------------------- *)
 let t_symmetry_s f1 f2 tc =
-  t_apply_s EcCoreLib.p_eq_sym [f1.f_ty] ~args:[f1; f2] tc
+  t_apply_s EcCoreLib.p_eq_sym_imp [f1.f_ty] ~args:[f1; f2] ~sk:1 tc
 
 let t_symmetry ?reduce (tc : tcenv1) =
   let t_symmetry_r (fp : form) (tc : tcenv1) =
