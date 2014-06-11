@@ -90,7 +90,7 @@ let t_failure_event_r (at_pos, cntr, ash, q, f_event, pred_specs, inv) tc =
   in
 
   let m = oget (Memory.byid m env) in
-
+  let f = NormMp.norm_xfun env f in
   let memenv, (_, fdef), _ =
     try  Fun.hoareS f env
     with _ -> tc_error !!tc "not applicable to abstract functions"
@@ -174,8 +174,9 @@ let t_failure_event_r (at_pos, cntr, ash, q, f_event, pred_specs, inv) tc =
 
   let os_goals = List.concat (List.map oracle_goal (Sx.elements os)) in
   let concls   = bound_goal :: post_goal :: init_goal :: os_goals in
+  let res = FApi.xmutate1 tc (`Fel (cntr, ash, q, f_event, pred_specs)) concls in
+  res
 
-  FApi.xmutate1 tc (`Fel (cntr, ash, q, f_event, pred_specs)) concls
 
 (* -------------------------------------------------------------------- *)
 let t_failure_event at_pos cntr ash q f_event pred_specs inv tc =
