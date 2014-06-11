@@ -155,7 +155,7 @@ module HiInternal = struct
       let is_defined = function FBdef _ -> true | _ -> false in
 
       match fs with
-      | Some fs -> EcPath.Sx.mem f fs
+      | Some fs -> EcPath.Sx.mem (EcEnv.NormMp.norm_xfun env f) fs
       | None    ->
           let f = EcEnv.NormMp.norm_xfun env f in
           let f = EcEnv.Fun.by_xpath f env in
@@ -277,10 +277,11 @@ let rec process_inline_all side fs tc =
 
 (* -------------------------------------------------------------------- *)
 let process_inline_occs side fs occs tc =
+  let env = FApi.tc1_env tc in
   let cond =
     if   EcPath.Sx.is_empty fs
     then fun _ -> true
-    else fun f -> EcPath.Sx.mem f fs in
+    else fun f -> EcPath.Sx.mem (EcEnv.NormMp.norm_xfun env f) fs in
   let occs  = Sint.of_list occs in
   let concl = FApi.tc1_goal tc in
 
@@ -304,7 +305,7 @@ let process_inline infos tc =
       let fs  =
         List.fold_left (fun fs f ->
           let f = EcTyping.trans_gamepath env f in
-            EcPath.Sx.add f fs)
+            EcPath.Sx.add (EcEnv.NormMp.norm_xfun env f) fs)
           EcPath.Sx.empty fs
       in
         match occs with
