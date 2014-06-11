@@ -193,7 +193,11 @@ type pfel_t =
   * pformula option
 
 let process_fel at_pos ((cntr, ash, q, f_event, pred_specs, o_inv) : pfel_t) tc =
-  let hyps, concl = FApi.tc1_flat tc in
+  let env, hyps, concl = FApi.tc1_eflat tc in
+
+  if EcEnv.Theory.by_path_opt EcCoreLib.p_Sum env = None then 
+    tacuerror "fel tactic cannot be used when theory Sum is not loaded";
+
 
   let f = match concl.f_node with
     | Fapp ({ f_node = Fop (op, _) }, [pr; _])
