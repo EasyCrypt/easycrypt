@@ -145,8 +145,9 @@ let rec t_alg_eq info g =
   t_cut_alg_eq t_reflex_assumption info f1 f2 g
 
 and t_cut_alg_eq t_cont info f1 f2 g =
+(*  Format.eprintf "t_cut_alg_eq %a@." pp_form (f_eq f1 f2, g); *)
   let hyps = tc1_hyps g in
-  if is_in_hyps hyps f1 f2 then t_id g
+  if is_in_hyps hyps f1 f2 then t_cont g
   else 
     let f1', f2' = autorewrite info f1 f2 g in
     let t_cont = 
@@ -160,7 +161,7 @@ and t_cut_alg_eq t_cont info f1 f2 g =
 
 and t_cut_alg_eq1 t_cont info f1 f2 g =
   let hyps = tc1_hyps g in
-  if is_in_hyps hyps f1 f2 then t_id g
+  if is_in_hyps hyps f1 f2 then t_cont g
   else 
     match norm_kind info hyps f1.f_ty with
     | NKring(cr,m)  -> t_cut_ring_eq t_cont info cr m f1 f2 g
@@ -168,6 +169,7 @@ and t_cut_alg_eq1 t_cont info f1 f2 g =
     | NKdefault     -> t_cut_subterm_eq2 t_cont info f1 f2 g
 
 and t_cut_alg_eqs t_cont info fs1 fs2 g =
+(*  Format.eprintf "t_cut_alg_eqs@."; *)
   match fs1, fs2 with
   | [], [] -> t_cont g
   | f1::fs1, f2::fs2 -> 
