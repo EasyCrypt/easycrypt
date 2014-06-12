@@ -186,7 +186,7 @@ let toring hyps ((r, cr) : cring) (rmap : RState.rstate) (form : form) =
           | `Zero, []           -> PEc c0
           | `One , []           -> PEc c1
           | `Add , [arg1; arg2] -> PEadd (doit arg1, doit arg2)
-          | `Opp , [arg1]       -> PEsub (PEc c0, doit arg1)
+          | `Opp , [arg1]       -> PEopp (doit arg1)
           | `Sub , [arg1; arg2] -> PEsub (doit arg1, doit arg2)
           | `Mul , [arg1; arg2] -> PEmul (doit arg1, doit arg2)
           | `Exp , [arg1; arg2] -> begin
@@ -249,10 +249,10 @@ let tofield hyps ((r, cr) : cfield) (rmap : RState.rstate) (form : form) =
           | `Zero, []           -> FEc c0
           | `One , []           -> FEc c1
           | `Add , [arg1; arg2] -> FEadd (doit arg1, doit arg2)
-          | `Opp , [arg1]       -> FEsub (FEc c0, doit arg1)
+          | `Opp , [arg1]       -> FEopp (doit arg1)
           | `Sub , [arg1; arg2] -> FEsub (doit arg1, doit arg2)
           | `Mul , [arg1; arg2] -> FEmul (doit arg1, doit arg2)
-          | `Inv , [arg1]       -> FEdiv (FEc c1, doit arg1)
+          | `Inv , [arg1]       -> FEinv (doit arg1)
           | `Div , [arg1; arg2] -> FEdiv (doit arg1, doit arg2)
           | `Exp , [arg1; arg2] -> begin
             match arg2.f_node with
