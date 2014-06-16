@@ -927,8 +927,7 @@ theory Dexcepted.
   op (\) (d:'a distr, X:'a set) : 'a distr = Dscale.dscale (Drestr.drestr d X).
 
   lemma supp_def (x:'a) d X:
-    (in_supp x (d \ X) => (in_supp x d /\ !mem x X)) /\
-    ((in_supp x d /\ !mem x X) => in_supp x (d \ X)).
+    in_supp x (d \ X) <=> (in_supp x d /\ !mem x X).
   proof strict.
   by rewrite /(\) Dscale.supp_def Drestr.supp_def.
   qed.

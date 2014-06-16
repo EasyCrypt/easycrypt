@@ -333,6 +333,14 @@ clone Comoid as Mrplus with
    op Base.Z   <- 0%r,
    op NatMul.( * ) = fun n, (Real.( * ) (n%r))
   proof Base.* by smt, NatMul.* by smt.
+import Int.  
+import Real.
+
+lemma NatMul_mul : forall (n:int) (r:real), 0 <= n => 
+    Mrplus.NatMul.( * ) n r = n%r * r.
+proof.    
+  move => n r;elim /Int.Induction.induction n;smt.
+qed.
 
 require import FSet.
 require import Distr.
