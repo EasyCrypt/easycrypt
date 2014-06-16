@@ -79,7 +79,12 @@ proof -strict.
    by generalize Hd;rewrite disjoint_spec mem_union;smt.
  rewrite sum_add.
    by generalize Hd;rewrite disjoint_spec;smt.
- rewrite Hrec;smt.
+ rewrite Hrec.
+   move: Hd; rewrite !disjoint_spec=> Hd x0.
+   cut:= Hd x0; case (x0 = x).
+     move=> ->; cut -> //=: mem x (add x s) by smt; smt.
+     by rewrite -neqF mem_add=> ->.
+ smt.
 qed.
 
 lemma sum_eq (f1 f2:'a -> t) (s: 'a set) :  
