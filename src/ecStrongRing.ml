@@ -141,7 +141,10 @@ let t_autorw info g =
 
 let rec t_alg_eq info g =
 (*  Format.eprintf "t_alg_eq %a" pp_concl g; *)
-  let f1, f2 = destr_eq (tc1_goal g) in
+  let f1, f2 = 
+    try destr_eq (tc1_goal g) 
+    with EcFol.DestrError _ -> raise InvalidGoalShape
+  in
   t_cut_alg_eq t_reflex_assumption info f1 f2 g
 
 and t_cut_alg_eq t_cont info f1 f2 g =
