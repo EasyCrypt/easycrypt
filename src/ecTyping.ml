@@ -1218,7 +1218,36 @@ let transexp (env : EcEnv.env) mode ue e =
     | PEproj (sube, x) -> begin
       let sube, ety = transexp env sube in
       match select_proj env osc (unloc x) ue None ety with
-      | [] -> tyerror x.pl_loc env (UnknownProj (unloc x))
+      | [] -> 
+        let ty = Tuni.offun (EcUnify.UniEnv.assubst ue) ety in
+        let me = EcFol.mhr in
+        let mp = 
+          match ty.ty_node with
+          | Tglob mp -> mp 
+          | _ -> tyerror x.pl_loc env (UnknownProj (unloc x)) in
+        let f = NormMp.norm_glob env me mp in
+        let lf = 
+          match f.f_node with
+          | Ftuple l -> l 
+          | _ -> tyerror x.pl_loc env (UnknownProj (unloc x)) in
+        let vx,ty =
+          match EcEnv.Var.lookup_progvar_opt ~side:me (unloc x) env with
+          | None -> tyerror x.pl_loc env (UnknownVarOrOp (unloc x, []))
+          | Some (x1, ty) -> 
+              match x1 with
+              | `Var x -> NormMp.norm_pvar env x, ty 
+              | _ -> tyerror x.pl_loc env (UnknownVarOrOp (unloc x, [])) in 
+        let find f1 =
+           match f1.f_node with
+            | Fpvar (x1, _) -> EcTypes.pv_equal vx (NormMp.norm_pvar env x1)
+            | _ -> false in 
+        let i = 
+          match List.findex find lf with
+          | None -> tyerror x.pl_loc env (UnknownProj (unloc x))
+          | Some i -> i in
+        e_proj sube i ty, ty
+        
+
       | _::_::_ -> tyerror x.pl_loc env (AmbiguousProj (unloc x))
       | [(op, tvi), pty, subue] ->
         EcUnify.UniEnv.restore ~src:subue ~dst:ue;
@@ -2065,7 +2094,35 @@ let trans_form_or_pattern env (ps, ue) pf tt =
     | PFproj (subf, x) -> begin
       let subf = transf env subf in
       match select_proj env opsc (unloc x) ue None subf.f_ty with
-      | [] -> tyerror x.pl_loc env (UnknownProj (unloc x))
+      | [] -> 
+        let ty = Tuni.offun (EcUnify.UniEnv.assubst ue) subf.f_ty in
+        let me = EcFol.mhr in
+        let mp = 
+          match ty.ty_node with
+          | Tglob mp -> mp 
+          | _ -> tyerror x.pl_loc env (UnknownProj (unloc x)) in
+        let f = NormMp.norm_glob env me mp in
+        let lf = 
+          match f.f_node with
+          | Ftuple l -> l 
+          | _ -> tyerror x.pl_loc env (UnknownProj (unloc x)) in
+        let vx,ty =
+          match EcEnv.Var.lookup_progvar_opt ~side:me (unloc x) env with
+          | None -> tyerror x.pl_loc env (UnknownVarOrOp (unloc x, []))
+          | Some (x1, ty) -> 
+              match x1 with
+              | `Var x -> NormMp.norm_pvar env x, ty 
+              | _ -> tyerror x.pl_loc env (UnknownVarOrOp (unloc x, [])) in 
+        let find f1 =
+           match f1.f_node with
+            | Fpvar (x1, _) -> EcTypes.pv_equal vx (NormMp.norm_pvar env x1)
+            | _ -> false in 
+        let i = 
+          match List.findex find lf with
+          | None -> tyerror x.pl_loc env (UnknownProj (unloc x))
+          | Some i -> i in
+        f_proj subf i ty
+
       | _::_::_ -> tyerror x.pl_loc env (AmbiguousProj (unloc x))
       | [(op, tvi), pty, subue] ->
         EcUnify.UniEnv.restore ~src:subue ~dst:ue;
