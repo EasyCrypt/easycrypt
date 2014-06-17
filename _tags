@@ -10,6 +10,7 @@ true : bin_annot
 <src/why3>       : include
 <src/phl>        : include
 <src/extraction> : include
+<src/system>     : include
 
 # --------------------------------------------------------------------
 <src/*.{ml,mli}>   : package(menhirLib), package(why3)

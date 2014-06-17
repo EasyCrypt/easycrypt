@@ -29,10 +29,6 @@ val uncurry3 : ('a1 * 'a2 * 'a3 -> 'b) -> 'a1 -> 'a2 -> 'a3 -> 'b
 val clamp : min:int -> max:int -> int -> int
 
 (* -------------------------------------------------------------------- *)
-val b64decode : string -> string option
-val rot13     : string -> string
-
-(* -------------------------------------------------------------------- *)
 val copy : 'a -> 'a
 
 (* -------------------------------------------------------------------- *)
@@ -261,6 +257,8 @@ module String : sig
   val split : char -> string -> string list
 
   val splitlines : string -> string list
+
+  val strip : string -> string
 end
 
 (* -------------------------------------------------------------------- *)

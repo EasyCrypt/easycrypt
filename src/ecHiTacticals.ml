@@ -34,6 +34,8 @@ and process1_try (ttenv : ttenv) (t : ptactic_core) (tc : tcenv1) =
 
 (* -------------------------------------------------------------------- *)
 and process1_admit (_ : ttenv) (tc : tcenv1) =
+  (* FIXME: use notifier *)
+  EcFortune.pick () |> oiter (fun msg -> Printf.printf "[W] %s\n%!" msg);
   EcLowGoal.t_admit tc
 
 (* -------------------------------------------------------------------- *)

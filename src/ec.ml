@@ -181,6 +181,9 @@ let _ =
   (* Initialize PRNG *)
   Random.self_init ();
 
+  (* Initialize fortune *)
+  EcFortune.init ();
+
   (* Display Copyright *)
   if EcTerminal.interactive terminal then
     EcTerminal.notice ~immediate:true copyright terminal;
