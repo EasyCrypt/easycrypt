@@ -259,6 +259,8 @@ module String : sig
   val slice : ?first:int -> ?last:int -> string -> string
 
   val split : char -> string -> string list
+
+  val splitlines : string -> string list
 end
 
 (* -------------------------------------------------------------------- *)

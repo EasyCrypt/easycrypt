@@ -692,6 +692,8 @@ module String = struct
             ((slice ~first:(i+1) s) :: acc)
     in
       split s []
+
+  let splitlines = split '\n'
 end
 
 (* -------------------------------------------------------------------- *)

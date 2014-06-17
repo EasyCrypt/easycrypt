@@ -1,4 +1,6 @@
 (* -------------------------------------------------------------------- *)
+open EcUtils
+
 module L = Lexing
 
 (* -------------------------------------------------------------------- *)
@@ -42,7 +44,9 @@ object(self)
   method interactive = true
 
   method private _notice (msg : string) =
-    Printf.printf "%s\n%!" msg
+    List.iter
+      (fun x -> Printf.printf "%s\n%!" x)
+      (String.splitlines msg)
 
   method next =
     begin
@@ -96,8 +100,11 @@ object
     EcIo.drain iparser;
     EcIo.parse iparser
 
-  method notice ~(immediate:bool) (_msg : string) =
-    ignore (immediate)
+  method notice ~(immediate:bool) (msg : string) =
+    ignore immediate;
+    List.iter
+      (fun x -> Printf.fprintf stderr "%s\n%!" x)
+      (String.splitlines msg)
 
   method finish (status : status) =
     match status with
@@ -160,7 +167,7 @@ object(self)
       self#_update_progress loc.EcLocation.loc_echar; aout
 
   method notice ~(immediate:bool) (_msg : string) =
-    ignore (immediate)
+    ignore immediate
 
   method finish (status : status) =
     match status with

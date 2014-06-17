@@ -5,6 +5,15 @@ open EcOptions
 module T = EcTerminal
 
 (* -------------------------------------------------------------------- *)
+let copyright = String.concat "\n" [
+  " +---------------------------------------------------------------+";
+  " | EasyCrypt version pre-1.0                                     |";
+  " | Copyright 2012-2014 INRIA and IMDEA Software Institute        |";
+  " | Distributed under the terms of the CeCILL-B license           |";
+  " +---------------------------------------------------------------+";
+]
+
+(* -------------------------------------------------------------------- *)
 let _ =
   let myname  = Filename.basename Sys.executable_name
   and mydir   = Filename.dirname  Sys.executable_name in
@@ -171,6 +180,10 @@ let _ =
 
   (* Initialize PRNG *)
   Random.self_init ();
+
+  (* Display Copyright *)
+  if EcTerminal.interactive terminal then
+    EcTerminal.notice ~immediate:true copyright terminal;
 
   try
     (* Set notifier (TODO: fix this global stuff *)
