@@ -273,25 +273,27 @@ let generalize_subst_ env m uelts uglob =
     (b', b, s)
 
 let generalize_mod_ env m modi f =
-  let (elts, glob) = PV.elements modi in
+  let (melts, mglob) = PV.elements modi in
 
   (* 1. Compute the prog-vars and the globals used in [f] *)
   let fv = PV.fv env m f in
+  let felts, fglob = PV.elements fv in
 
   (* 2. Split [modi] into two parts:
-   *     the one used in the free-vars and the others *)
-  let (uelts, nelts) = List.partition (fun (pv, _) -> PV.mem_pv env pv fv) elts in
-  let (uglob, nglob) = List.partition (fun mp -> PV.mem_glob env mp fv) glob in
+   *    the one used in the free-vars and the others *)
+  let (uelts, nelts) = List.partition (fun (pv, _) -> PV.mem_pv env pv modi) felts in
+  let (uglob, nglob) = List.partition (fun mp -> PV.mem_glob env mp modi) fglob in
 
   (* 3. We build the related substitution *)
 
   (* 3.a. Add the global variables *)
-  let (bd', bd, s) = generalize_subst_ env m uelts uglob in
+  let scheck = proj3_3 (generalize_subst_ env m melts mglob )in
+  let (bd', bd, s ) = generalize_subst_ env m uelts uglob in
 
-  (* 3.b. Check that the substituion don't clash with some
+  (* 3.b. Check that the substitution doesn't clash with some
           other unmodified variables *)
-  List.iter (fun (pv,_) -> Mpv.check_npv env pv s) nelts;
-  List.iter (fun mp -> Mpv.check_glob env mp s) nglob;
+  List.iter (fun (pv,_) -> Mpv.check_npv env pv scheck) nelts;
+  List.iter (fun mp -> Mpv.check_glob env mp scheck) nglob;
 
   (* 3.c. Perform the substitution *)
   let s = PVM.of_mpv s m in
