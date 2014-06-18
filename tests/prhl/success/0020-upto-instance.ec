@@ -74,11 +74,11 @@ qed.
 
 axiom G' :
   forall (Adv2 <: ADV2{Or}),
-  (forall (O <: OR), islossless O.f => islossless Adv2(O).h) =>
+  (forall (O <: OR {Adv2}), islossless O.f => islossless Adv2(O).h) =>
   equiv[G(Adv2).g ~ G(Adv2).g : true ==> ={res}].
 
 local lemma G_Inst' :
-  (forall (O <: OR), islossless O.f => islossless Adv1(O).g) =>
+  (forall (O <: OR {Adv1}), islossless O.f => islossless Adv1(O).g) =>
   equiv[G(Adv2).g ~ G(Adv2).g : true ==> ={res}].
 proof -strict.
 intros LossAdv1.

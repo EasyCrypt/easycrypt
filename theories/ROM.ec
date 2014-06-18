@@ -489,7 +489,7 @@ theory ListLog.
   lemma Log_o_ll (O <: Oracle): islossless O.o => islossless Log(O).o.
   proof. by move=> O_oL; proc; call O_oL; wp. qed.
 
-  lemma Log_o_stable (O <: Oracle) q:
+  lemma Log_o_stable (O <: Oracle {Log}) q:
     islossless O.o => phoare[Log(O).o: mem q Log.qs ==> mem q Log.qs] = 1%r.
   proof. by move=> O_o_ll; proc; call O_o_ll; auto; progress; right. qed.
 
@@ -550,7 +550,7 @@ theory SetLog.
   lemma Log_o_ll (O <: Oracle): islossless O.o => islossless Log(O).o.
   proof. by move=> O_o_ll; proc; wp; call O_o_ll; wp. qed.
 
-  hoare Log_o_stable (O <: Oracle) x: Log(O).o: mem x Log.qs ==> mem x Log.qs.
+  hoare Log_o_stable (O <: Oracle {Log}) x: Log(O).o: mem x Log.qs ==> mem x Log.qs.
   proof. by proc; wp; call (_: true); skip; smt. qed.
 
   module Bound(O:Oracle) = {
@@ -571,10 +571,10 @@ theory SetLog.
   lemma Bound_init_ll (O <: Oracle): islossless O.init => islossless Bound(O).init.
   proof. by move=> O_init_ll; proc; wp; call O_init_ll. qed.
 
-  lemma Bound_o_ll (O <: Oracle): islossless O.o => islossless Bound(O).o.
+  lemma Bound_o_ll (O <: Oracle {Log}): islossless O.o => islossless Bound(O).o.
   proof. by move=> O_o_ll; proc; sp; if=> //; wp; call (Log_o_ll O _). qed.
 
-  hoare Bound_o_stable (O <: Oracle) x: Bound(O).o: mem x Log.qs ==> mem x Log.qs.
+  hoare Bound_o_stable (O <: Oracle {Log}) x: Bound(O).o: mem x Log.qs ==> mem x Log.qs.
   proof. by proc; sp; if=> //; wp; call (Log_o_stable O x). qed.
 
   equiv Log_Bound (O <: Oracle {Log}) (D <: Dist {O,Log}):
