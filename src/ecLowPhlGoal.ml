@@ -287,13 +287,27 @@ let generalize_mod_ env m modi f =
   (* 3. We build the related substitution *)
 
   (* 3.a. Add the global variables *)
-  let scheck = proj3_3 (generalize_subst_ env m melts mglob )in
+ 
+(*  let scheck = proj3_3 (generalize_subst_ env m melts mglob )in *)
   let (bd', bd, s ) = generalize_subst_ env m uelts uglob in
-
-  (* 3.b. Check that the substitution doesn't clash with some
-          other unmodified variables *)
-  List.iter (fun (pv,_) -> Mpv.check_npv env pv scheck) nelts;
-  List.iter (fun mp -> Mpv.check_glob env mp scheck) nglob;
+   (* 3.b. Check that the modify variables does not clash with
+           the variables not generalized *)
+  let restrs = 
+    List.fold_left (fun r mp -> 
+      let restr = NormMp.get_restr env mp in
+      EcPath.Mm.add mp restr r) EcPath.Mm.empty mglob in
+  List.iter (fun (npv,_) -> 
+    if is_glob npv then
+      let check1 mp restr =  Mpv.check_npv_mp env npv mp restr in
+      EcPath.Mm.iter check1 restrs) nelts;
+  List.iter (fun mp ->
+    let restr = NormMp.get_restr env mp in
+    let check (npv,_) =
+      if is_glob npv then 
+        Mpv.check_npv_mp env npv mp restr in
+    List.iter check melts;
+    let check mp' restr' = Mpv.check_mp_mp env mp restr mp' restr' in
+    EcPath.Mm.iter check restrs) nglob;
 
   (* 3.c. Perform the substitution *)
   let s = PVM.of_mpv s m in
