@@ -1,3 +1,6 @@
+(* Copyright (c) - 2012-2014 - IMDEA Software Institute and INRIA
+ * Distributed under the terms of the CeCILL-B license *)
+
 (* Copyright The Coq Development Team, 1999-2010
  * Copyright INRIA - CNRS - LIX - LRI - PPS, 1999-2010
  *
