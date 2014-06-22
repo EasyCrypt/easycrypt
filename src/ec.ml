@@ -8,13 +8,16 @@ open EcOptions
 module T = EcTerminal
 
 (* -------------------------------------------------------------------- *)
-let copyright = String.concat "\n" [
-  " +---------------------------------------------------------------+";
-  " | EasyCrypt version pre-1.0                                     |";
-  " | Copyright 2012-2014 INRIA and IMDEA Software Institute        |";
-  " | Distributed under the terms of the CeCILL-B license           |";
-  " +---------------------------------------------------------------+";
-]
+let copyright =
+  let sentences =
+    List.flatten
+      [String.splitlines EcVersion.copyright;
+       String.splitlines EcVersion.license  ; ] in
+
+  String.concat "\n"
+    (List.map
+       (fun s -> Printf.sprintf ">> %s" s)
+       sentences)
 
 (* -------------------------------------------------------------------- *)
 let _ =
