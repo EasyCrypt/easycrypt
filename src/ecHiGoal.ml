@@ -283,7 +283,7 @@ let process_delta (s, o, p) tc =
 
   let (ptenv, p) =
     let (ps, ue), p = TTC.tc1_process_pattern tc p in
-    let ev = EV.of_idents (Mid.keys ps) in
+    let ev = MEV.of_idents (Mid.keys ps) `Form in
       (ptenv !!tc hyps (ue, ev), p)
   in
 
@@ -584,7 +584,7 @@ let process_generalize1 pattern (tc : tcenv1) =
         | _ ->
           let (ptenv, p) =
             let (ps, ue), p = TTC.tc1_process_pattern tc pf in
-            let ev = EV.of_idents (Mid.keys ps) in
+            let ev = MEV.of_idents (Mid.keys ps) `Form in
               (ptenv !!tc hyps (ue, ev), p)
           in
 
@@ -642,7 +642,7 @@ let process_pose xsym o p (tc : tcenv1) =
 
   let (ptenv, p) =
     let (ps, ue), p = TTC.tc1_process_pattern tc p in
-    let ev = EV.of_idents (Mid.keys ps) in
+    let ev = MEV.of_idents (Mid.keys ps) `Form in
       (ptenv !!tc hyps (ue, ev), p)
   in
 
@@ -1011,7 +1011,7 @@ let process_case gp tc =
 (* -------------------------------------------------------------------- *)
 let process_exists args (tc : tcenv1) =
   let hyps = FApi.tc1_hyps tc in
-  let pte  = (TTC.unienv_of_hyps hyps, EcMatching.EV.empty) in
+  let pte  = (TTC.unienv_of_hyps hyps, EcMatching.MEV.empty) in
   let pte  = PT.ptenv !!tc (FApi.tc1_hyps tc) pte in
 
   let for1 concl arg =

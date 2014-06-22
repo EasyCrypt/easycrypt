@@ -148,6 +148,53 @@ module EV = struct
 end
 
 (* -------------------------------------------------------------------- *)
+type mevmap = {
+  evm_form : form            evmap;
+  evm_mem  : EcMemory.memory evmap;
+  evm_mod  : EcPath.mpath    evmap;
+}
+
+(* -------------------------------------------------------------------- *)
+module MEV = struct
+  type item = [
+    | `Form of form
+    | `Mem  of EcMemory.memory
+    | `Mod  of EcPath.mpath
+  ]
+
+  type kind = [ `Form | `Mem | `Mod ]
+
+  let empty : mevmap = {
+    evm_form = EV.empty;
+    evm_mem  = EV.empty;
+    evm_mod  = EV.empty;
+  }
+
+  let of_idents ids k =
+    match k with
+    | `Form -> { empty with evm_form = EV.of_idents ids; }
+    | `Mem  -> { empty with evm_mem  = EV.of_idents ids; }
+    | `Mod  -> { empty with evm_mod  = EV.of_idents ids; }
+
+  let add x k m =
+    match k with
+    | `Form -> { m with evm_form = EV.add x m.evm_form }
+    | `Mem  -> { m with evm_mem  = EV.add x m.evm_mem  }
+    | `Mod  -> { m with evm_mod  = EV.add x m.evm_mod  }
+
+  let filled m =
+       EV.filled m.evm_form
+    && EV.filled m.evm_mem
+    && EV.filled m.evm_mod
+
+  let fold (f : _ -> item -> _ -> _) m v =
+    let v = EV.fold (fun x k v -> f x (`Form k) v) m.evm_form v in
+    let v = EV.fold (fun x k v -> f x (`Mem  k) v) m.evm_mem  v in
+    let v = EV.fold (fun x k v -> f x (`Mod  k) v) m.evm_mod  v in
+    v
+end
+
+(* -------------------------------------------------------------------- *)
 exception MatchFailure
 
 type fmoptions = {
@@ -179,7 +226,7 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
       end
 
       | Flocal x, _ -> begin
-          match EV.get x !ev with
+          match EV.get x !ev.evm_form with
           | None ->
               raise MatchFailure
 
@@ -190,7 +237,7 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
               try  EcUnify.unify env ue ptn.f_ty subject.f_ty
               with EcUnify.UnificationFailure _ -> raise MatchFailure;
             end;
-            ev := EV.set x subject !ev
+            ev := { !ev with evm_form = EV.set x subject !ev.evm_form }
 
           | Some (`Set a) -> begin
               if not (EcReduction.is_alpha_eq hyps subject a) then
@@ -214,8 +261,7 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
           let pv2 = EcEnv.NormMp.norm_pvar env pv2 in
             if not (EcTypes.pv_equal pv1 pv2) then
               raise MatchFailure;
-            if not (EcMemory.mem_equal m1 m2) then
-              raise MatchFailure
+            doit_mem mxs m1 m2
 
       | Fif (c1, t1, e1), Fif (c2, t2, e2) ->
           List.iter2 (doit ilc) [c1; t1; e1] [c2; t2; e2]
@@ -231,8 +277,7 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
           let mp2 = EcEnv.NormMp.norm_mpath env mp2 in
             if not (EcPath.m_equal mp1 mp2) then
               raise MatchFailure;
-            if not (EcMemory.mem_equal me1 me2) then
-              raise MatchFailure
+            doit_mem mxs me1 me2
 
       | Ftuple fs1, Ftuple fs2 ->
           if List.length fs1 <> List.length fs2 then
@@ -291,6 +336,21 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
       with NotReducible -> raise MatchFailure
     in
       cb (odfl reduced (EcReduction.h_red_opt EcReduction.beta_red hyps reduced))
+
+  and doit_mem mxs m1 m2 =
+    match EV.get m1 !ev.evm_mem with
+    | None ->
+        if not (EcMemory.mem_equal m1 m2) then
+          raise MatchFailure
+
+    | Some `Unset ->
+        if Mid.mem m2 mxs then
+          raise MatchFailure;
+        ev := { !ev with evm_mem = EV.set m1 m2 !ev.evm_mem }
+
+    | Some (`Set m1) ->
+        if not (EcMemory.mem_equal m1 m2) then
+          raise MatchFailure
 
   and doit_bindings (subst, mxs) q1 q2 =
     let doit_binding (subst, mxs) (x1, gty1) (x2, gty2) =
@@ -357,7 +417,7 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
 
 let f_match opts hyps (ue, ev) ~ptn subject =
   let (ue, ev) = f_match_core opts hyps (ue, ev) ~ptn subject in
-    if not (Mid.for_all (fun _ x -> x <> None) ev.ev_map) then
+    if not (MEV.filled ev) then
       raise MatchFailure;
     let clue =
       try  EcUnify.UniEnv.close ue

@@ -12,13 +12,11 @@ open EcMatching
 open EcCoreGoal
 
 (* -------------------------------------------------------------------- *)
-type evmap = form EcMatching.evmap
-
 type pt_env = {
   pte_pe : proofenv;         (* proofenv of this proof-term *)
   pte_hy : LDecl.hyps;       (* local context *)
   pte_ue : EcUnify.unienv;   (* unification env. *)
-  pte_ev : evmap ref;        (* metavar env. *)
+  pte_ev : mevmap ref;       (* metavar env. *)
 }
 
 type pt_ev = {
@@ -41,7 +39,7 @@ and pt_ev_arg_r =
 (* Arguments typing *)
 val trans_pterm_arg_value : pt_env -> ?name:symbol -> fpattern_arg located -> pt_ev_arg
 val trans_pterm_arg_mod   : pt_env -> fpattern_arg located -> pt_ev_arg
-val trans_pterm_arg_mem   : pt_env -> fpattern_arg located -> pt_ev_arg
+val trans_pterm_arg_mem   : pt_env -> ?name:symbol -> fpattern_arg located -> pt_ev_arg
 
 (* Proof-terms typing *)
 val process_pterm_cut             : prcut:('a -> form) -> pt_env -> 'a fpattern_kind -> pt_ev
@@ -89,7 +87,7 @@ val concretize_e_arg  : cptenv -> pt_arg -> pt_arg
 (* PTEnv constructor *)
 val ptenv_of_penv : LDecl.hyps -> proofenv -> pt_env
 
-val ptenv : proofenv -> LDecl.hyps -> (EcUnify.unienv * evmap) -> pt_env
+val ptenv : proofenv -> LDecl.hyps -> (EcUnify.unienv * mevmap) -> pt_env
 val copy  : pt_env -> pt_env
 
 (* Proof-terms construction from components *)

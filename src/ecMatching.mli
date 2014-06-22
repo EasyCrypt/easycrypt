@@ -78,6 +78,31 @@ module EV : sig
 end
 
 (* -------------------------------------------------------------------- *)
+type mevmap = {
+  evm_form : form            evmap;
+  evm_mem  : EcMemory.memory evmap;
+  evm_mod  : EcPath.mpath    evmap;
+}
+
+(* -------------------------------------------------------------------- *)
+module MEV : sig
+  type item = [
+    | `Form of form
+    | `Mem  of EcMemory.memory
+    | `Mod  of EcPath.mpath
+  ]
+
+  type kind = [ `Form | `Mem | `Mod ]
+
+  val empty     : mevmap
+  val of_idents : ident list -> kind -> mevmap
+
+  val add    : ident -> kind -> mevmap -> mevmap
+  val filled : mevmap -> bool
+  val fold   : (ident -> item -> 'a -> 'a) -> mevmap -> 'a -> 'a
+end
+
+(* -------------------------------------------------------------------- *)
 exception MatchFailure
 
 type fmoptions = {
@@ -90,18 +115,18 @@ val fmdelta : fmoptions
 val f_match_core :
      fmoptions
   -> EcEnv.LDecl.hyps
-  -> unienv * form evmap
+  -> unienv * mevmap
   -> ptn:form
   -> form
-  -> unienv * form evmap
+  -> unienv * mevmap
 
 val f_match :
      fmoptions
   -> EcEnv.LDecl.hyps
-  -> unienv * form evmap
+  -> unienv * mevmap
   -> ptn:form
   -> form
-  -> unienv * (uid -> ty option) * form evmap
+  -> unienv * (uid -> ty option) * mevmap
 
 (* -------------------------------------------------------------------- *)
 type ptnpos = private [`Select of int | `Sub of ptnpos] Mint.t

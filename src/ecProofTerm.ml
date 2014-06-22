@@ -14,13 +14,11 @@ open EcCoreGoal
 module L = EcLocation
 
 (* -------------------------------------------------------------------- *)
-type evmap = form EcMatching.evmap
-
 type pt_env = {
   pte_pe : proofenv;
   pte_hy : LDecl.hyps;
   pte_ue : EcUnify.unienv;
-  pte_ev : evmap ref;
+  pte_ev : EcMatching.mevmap ref;
 }
 
 type pt_ev = {
@@ -49,7 +47,6 @@ let tc_pterm_apperror pe ?loc kind =
     | `ModuleWanted    -> "expecting a module expression"
     | `PTermWanted     -> "expecting a proof-term"
     | `CannotInferMod  -> "cannot infer module arguments"
-    | `CannotInferMem  -> "cannot infer memory arguments"
     | `NotFunctional   -> "too many argument"
     | `InvalidArgForm  -> "invalid argument (incompatible type)"
     | `InvalidArgProof -> "invalid proof-term"
@@ -73,31 +70,33 @@ let ptenv_of_penv (hyps : LDecl.hyps) (pe : proofenv) =
   { pte_pe = pe;
     pte_hy = hyps;
     pte_ue = EcProofTyping.unienv_of_hyps hyps;
-    pte_ev = ref EcMatching.EV.empty; }
+    pte_ev = ref EcMatching.MEV.empty; }
 
 (* -------------------------------------------------------------------- *)
 let can_concretize (pt : pt_env) =
      EcUnify.UniEnv.closed pt.pte_ue
-  && EcMatching.EV.filled  !(pt.pte_ev)
+  && EcMatching.MEV.filled !(pt.pte_ev)
 
 (* -------------------------------------------------------------------- *)
 type cptenv = CPTEnv of f_subst
 
 (* -------------------------------------------------------------------- *)
 let concretize_env pe =
-(*  assert (can_concretize pe); *)
-
   let tysubst  = { ty_subst_id with ts_u = EcUnify.UniEnv.close pe.pte_ue } in
   let ftysubst = Fsubst.f_subst_init false Mid.empty tysubst EcPath.Mp.empty in
-  let subst   =
-    EcMatching.EV.fold
-      (fun x f s ->
-         let f = Fsubst.f_subst ftysubst f in
-           Fsubst.f_bind_local s x f)
-      !(pe.pte_ev)
-      (Fsubst.f_subst_init false Mid.empty tysubst EcPath.Mp.empty)
-  in
-    CPTEnv subst
+  let subst    = ftysubst in
+
+  CPTEnv (
+    EcMatching.MEV.fold
+      (fun x v s ->
+        match v with
+        | `Form f ->
+            Fsubst.f_bind_local s x (Fsubst.f_subst ftysubst f)
+        | `Mem m ->
+            Fsubst.f_bind_mem s x m
+        | `Mod m ->
+            Fsubst.f_bind_mod s x m)
+      !(pe.pte_ev) subst)
 
 (* -------------------------------------------------------------------- *)
 let concretize_e_form (CPTEnv subst) f =
@@ -107,7 +106,7 @@ let concretize_e_form (CPTEnv subst) f =
 let rec concretize_e_arg ((CPTEnv subst) as cptenv) arg =
   match arg with
   | PAFormula f        -> PAFormula (Fsubst.f_subst subst f)
-  | PAMemory  m        -> PAMemory m
+  | PAMemory  m        -> PAMemory (Mid.find_def m m subst.fs_mem)
   | PAModule  (mp, ms) -> PAModule (mp, ms)
   | PASub     pt       -> PASub (pt |> omap (concretize_e_pt cptenv))
 
@@ -373,7 +372,7 @@ let trans_pterm_arg_value pe ?name { pl_desc = arg } =
   | EA_none ->
       let aty = EcUnify.UniEnv.fresh pe.pte_ue in
       let x   = EcIdent.create (ofdfl dfl name) in
-        pe.pte_ev := EcMatching.EV.add x !(pe.pte_ev);
+        pe.pte_ev := EcMatching.MEV.add x `Form !(pe.pte_ev);
         { ptea_env = pe; ptea_arg = PVAFormula (f_local x aty); }
 
   | EA_form fp ->
@@ -402,10 +401,16 @@ let trans_pterm_arg_mod pe arg =
     { ptea_env = pe; ptea_arg = PVAModule mod_; }
 
 (* ------------------------------------------------------------------ *)
-let trans_pterm_arg_mem pe { pl_desc = arg } =
+let trans_pterm_arg_mem pe ?name { pl_desc = arg } =
+  let dfl () = Printf.sprintf "&m%d" (EcUid.unique ()) in
+
   match arg with
-  | EA_none -> tc_pterm_apperror pe.pte_pe `CannotInferMem
   | EA_mod _ | EA_form _ -> tc_pterm_apperror pe.pte_pe `MemoryWanted
+
+  | EA_none ->
+      let x = EcIdent.create (ofdfl dfl name) in
+      pe.pte_ev := EcMatching.MEV.add x `Mem !(pe.pte_ev);
+      { ptea_env = pe; ptea_arg = PVAMemory x; }
 
   | EA_mem mem ->
       let env = LDecl.toenv pe.pte_hy in
