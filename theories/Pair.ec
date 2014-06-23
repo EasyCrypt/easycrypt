@@ -65,5 +65,44 @@ theory Dprod.
   intros Hd1 Hd2 x y; rewrite ?supp_def ?mu_x_def=> [Hx1 Hx2] [Hy1 Hy2].
   by rewrite (Hd1 _ (fst y)) // (Hd2 _ (snd y)).
   qed.
+
+  theory Sample.
+    type t1.
+    type t2.
+    op d1 : t1 distr.
+    op d2 : t2 distr.
+
+    module S = {
+      proc sample () : t1 * t2 = {
+        var r;
+        r = $ d1 * d2;
+        return r;
+      }
+      proc sample2 () : t1 * t2 = {
+        var r1, r2;
+        r1 = $ d1;
+        r2 = $ d2;
+        return (r1,r2);
+      }
+    }.
+ 
+    equiv sample_sample2 : S.sample ~ S.sample2 : true ==> ={res}.
+    proof.
+     bypr (res{1}) (res{2}) => //.
+     intros &m1 &m2 a.
+     cut ->: Pr[S.sample() @ &m1: a = res] = mu (d1*d2) ((=) a).
+      byphoare (_: true ==> a = res)=> //.
+      by proc; rnd; skip; rewrite eqL.
+     apply eq_sym; cut := mu_x_def d1 d2 a. rewrite /mu_x => ->.
+     elim /tuple2_ind a => a a1 a2 _;rewrite /fst /snd /=.
+     byphoare (_: true ==>  a1 = res.`1 /\ a2 = res.`2) => //;last by smt.
+     proc; seq 1 : (a1 = r1) (mu_x d1 a1) (mu_x d2 a2) _ 0%r true => //.
+       by rnd ((=) a1);auto.
+       by rnd ((=) a2);auto.
+     hoare;auto;smt.
+    qed.
+
+  end Sample.
+
 end Dprod.
 
