@@ -57,7 +57,7 @@ type tyerror =
 | MixingRecFields        of EcPath.path tuple2
 | UnknownProj            of qsymbol
 | AmbiguousProj          of qsymbol
-| AmbiguousProji         of int
+| AmbiguousProji         of int * ty
 | InvalidTypeAppl        of qsymbol * int * int
 | DuplicatedTyVar
 | DuplicatedLocal        of symbol
@@ -169,9 +169,9 @@ let pp_tyerror fmt env error =
   | AmbiguousProj qs ->
       msg "ambiguous record projection: %a" pp_qsymbol qs
 
-  | AmbiguousProji i ->
+  | AmbiguousProji (i, ty) ->
     let i = max (i + 1) 2 in
-    msg "should be a tuple of at least %i elements" i 
+    msg "type %a should be a tuple of at least %i elements" pp_type ty i 
 
   | InvalidTypeAppl (name, _, _) ->
       msg "invalid type application: %a" pp_qsymbol name
@@ -1261,11 +1261,12 @@ let transexp (env : EcEnv.env) mode ue e =
     end
     | PEproji(sube, i) -> begin
       let sube', ety = transexp env sube in
-      match (EcEnv.Ty.hnorm ety env).ty_node with
+      let ty = Tuni.offun (EcUnify.UniEnv.assubst ue) ety in
+      match (EcEnv.Ty.hnorm ty env).ty_node with
       | Ttuple l when i < List.length l ->
         let ty = List.nth l i in
         e_proj sube' i ty, ty
-      | _ -> tyerror sube.pl_loc env (AmbiguousProji i)
+      | _ -> tyerror sube.pl_loc env (AmbiguousProji(i,ty))
     end
         
   in
@@ -2063,10 +2064,10 @@ let trans_form_or_pattern env (ps, ue) pf tt =
         let (penv, p, pty) = transpattern env ue lp in
         let aty = paty |> omap (transty tp_uni env ue) in
         let f1 = transf env pf1 in
+        unify_or_fail env ue pf1.pl_loc ~expct:pty f1.f_ty;
+        aty |> oiter (fun aty-> unify_or_fail env ue pf1.pl_loc ~expct:pty aty);
         let f2 = transf penv f2 in
-          unify_or_fail env ue pf1.pl_loc ~expct:pty f1.f_ty;
-          aty |> oiter (fun aty -> unify_or_fail env ue pf1.pl_loc ~expct:pty aty);
-          f_let p f1 f2 
+        f_let p f1 f2 
 
     | PFforall (xs, pf) ->
         let env, xs = trans_fbind env ue xs in
@@ -2137,11 +2138,12 @@ let trans_form_or_pattern env (ps, ue) pf tt =
 
     | PFproji (subf, i) -> begin
       let subf' = transf env subf in
-      match (EcEnv.Ty.hnorm subf'.f_ty env).ty_node with
+      let ty = Tuni.offun (EcUnify.UniEnv.assubst ue) subf'.f_ty in
+      match (EcEnv.Ty.hnorm ty env).ty_node with
       | Ttuple l when i < List.length l ->
         let ty = List.nth l i in
         f_proj subf' i ty
-      | _ -> tyerror subf.pl_loc env (AmbiguousProji i)
+      | _ -> tyerror subf.pl_loc env (AmbiguousProji(i,ty))
     end
 
     | PFprob (gp, args, m, event) ->
