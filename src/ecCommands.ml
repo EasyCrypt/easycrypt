@@ -218,7 +218,10 @@ and process_axiom (scope : EcScope.scope) (ax : paxiom located) =
   let mode = if (!pragma).pm_check then `Check else `WeakCheck in
   let (name, scope) = EcScope.Ax.add scope mode ax in
     name |> EcUtils.oiter
-      (fun x -> notify scope "added axiom: `%s'" x);
+      (fun x ->
+         match (unloc ax).pa_kind with
+         | PAxiom -> notify scope "added axiom: `%s'" x
+         | _      -> notify scope "added lemma: `%s'" x);
     scope
 
 (* -------------------------------------------------------------------- *)
