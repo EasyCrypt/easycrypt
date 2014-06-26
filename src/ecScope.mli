@@ -47,7 +47,9 @@ val xgoal   : scope -> proof_uc option
 val verbose     : scope -> bool
 val set_verbose : scope -> bool -> scope
 
-val check_state : [`InProof | `InTop] -> string -> scope -> unit
+type topmode = [`InProof | `InActiveProof | `InTop]
+
+val check_state : topmode -> string -> scope -> unit
 
 module Op : sig
   val add : scope -> poperator located -> scope

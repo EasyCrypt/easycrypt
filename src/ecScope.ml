@@ -244,9 +244,14 @@ let xgoal (scope : scope) =
   scope.sc_pr_uc
 
 (* -------------------------------------------------------------------- *)
-let check_state mode action (scope : scope) =
+type topmode = [`InProof | `InActiveProof | `InTop]
+
+let check_state (mode : topmode) action (scope : scope) =
   match mode with
   | `InProof when scope.sc_pr_uc = None ->
+      hierror "cannot process [%s] outside a proof script" action
+
+  | `InActiveProof when scope.sc_pr_uc = None ->
       hierror "cannot process [%s] outside a proof script" action
 
   | `InTop when scope.sc_pr_uc <> None ->
