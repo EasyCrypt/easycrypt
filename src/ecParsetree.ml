@@ -485,6 +485,7 @@ type intropattern1 =
   | IPCore  of renaming located
   | IPCase  of intropattern list
   | IPRw    of (rwocc * rwside)
+  | IPSubst of rwside
   | IPClear of psymbol list
   | IPDone  of bool
   | IPSimplify

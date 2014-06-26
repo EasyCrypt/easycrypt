@@ -1025,6 +1025,8 @@ type subst_kind = {
 let  full_subst_kind = { sk_local = true ; sk_pvar  = true ; sk_glob  = true ; }
 let empty_subst_kind = { sk_local = false; sk_pvar  = false; sk_glob  = false; }
 
+type tside = [`All | `LtoR | `RtoL]
+
 (* -------------------------------------------------------------------- *)
 module LowSubst = struct
   (* ------------------------------------------------------------------ *)
@@ -1065,14 +1067,25 @@ module LowSubst = struct
     | _, _ -> None
 
   (* ------------------------------------------------------------------ *)
-  let is_eq_for_subst ?kind hyps var (f1, f2) =
+  let is_eq_for_subst ?kind ?(tside = (`All : tside)) hyps var (f1, f2) =
+    let canl = match tside with `All | `LtoR -> true | `RtoL -> false in
+    let canr = match tside with `All | `RtoL -> true | `LtoR -> false in
+
+    let is_member_for_subst ?kind side env var f =
+      match side with
+      | `Left  when canl -> is_member_for_subst ?kind env var f
+      | `Right when canr -> is_member_for_subst ?kind env var f
+      | _                -> None
+
+    in
+
     let env = LDecl.toenv hyps in
 
     let var =
-      match is_member_for_subst ?kind env var f1 with
+      match is_member_for_subst ?kind `Left env var f1 with
       | Some var -> Some (var, f2)
       | None ->
-        match is_member_for_subst ?kind env var f2 with
+        match is_member_for_subst ?kind `Right env var f2 with
         | Some var -> Some (var, f1)
         | None -> None
     in
@@ -1117,7 +1130,7 @@ module LowSubst = struct
 end
 
 (* -------------------------------------------------------------------- *)
-let t_subst ?kind ?var ?eqid (tc : tcenv1) =
+let t_subst ?kind ?(clear = true) ?var ?tside ?eqid (tc : tcenv1) =
   let env, hyps, concl = FApi.tc1_eflat tc in
 
   let subst1 (subst, check) moved (id, lk) =
@@ -1192,7 +1205,7 @@ let t_subst ?kind ?var ?eqid (tc : tcenv1) =
 
           let clear  =
             match var with
-            | `Local x -> begin
+            | `Local x when clear -> begin
               match LDecl.lookup_by_id x hyps with
               | LD_var (_, None) -> t_clear x
               | _ -> t_id
@@ -1204,7 +1217,9 @@ let t_subst ?kind ?var ?eqid (tc : tcenv1) =
         in
 
         try
-          LowSubst.is_eq_for_subst ?kind hyps var (destr_eq_or_iff f) |> omap dosubst
+          LowSubst.is_eq_for_subst
+            ?kind ?tside hyps var (destr_eq_or_iff f)
+          |> omap dosubst
         with EcPV.MemoryClash -> None
     end
 

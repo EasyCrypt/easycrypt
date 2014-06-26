@@ -501,6 +501,9 @@ let process_mintros ?(cf = true) pis gs =
 
     | IPRw x :: pis ->
         collect (`Rw x :: maybe_core ()) [] pis
+
+    | IPSubst x :: pis ->
+        collect (`Subst x :: maybe_core ()) [] pis
   in
 
   let rec dointro nointro pis (gs : tcenv) =
@@ -551,6 +554,17 @@ let process_mintros ?(cf = true) pis gs =
                   process_rewrite1_core (s, o) pt tc
                 in
                   t_seqs [t_intros_i [h]; rwt; t_clear h] tc
+              in
+                (false, t_onall t gs)
+
+          | `Subst d ->
+              let t tc =
+                try
+                  t_intros_i_seq ~clear:true [EcIdent.create "_"]
+                    (EcLowGoal.t_subst ~clear:false ~tside:(d :> tside))
+                    tc
+                with InvalidGoalShape ->
+                  tc_error !!tc "nothing to substitute"
               in
                 (false, t_onall t gs))
 

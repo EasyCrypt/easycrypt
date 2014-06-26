@@ -1634,6 +1634,12 @@ intro_pattern:
 | o=rwocc? LARROW
    { IPRw (o |> omap (snd_map EcMaps.Sint.of_list), `RtoL) }
 
+| RRARROW
+   { IPSubst `LtoR }
+
+| LLARROW
+   { IPSubst `RtoL }
+
 | LBRACE xs=ident+ RBRACE
    { IPClear xs }
 

@@ -144,7 +144,15 @@ type rwspec = [`LtoR|`RtoL] * ptnpos option
 val t_rewrite     : proofterm -> rwspec -> FApi.backward
 val t_rewrite_hyp : EcIdent.t -> rwspec -> FApi.backward
 
-val t_subst : ?kind:subst_kind -> ?var:vsubst -> ?eqid:EcIdent.t -> FApi.backward
+type tside = [`All | `LtoR | `RtoL]
+
+val t_subst:
+     ?kind:subst_kind
+  -> ?clear:bool
+  -> ?var:vsubst
+  -> ?tside:tside
+  -> ?eqid:EcIdent.t
+  -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
 type iname  = [`Symbol of symbol      | `Ident of EcIdent.t     ]
