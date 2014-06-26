@@ -52,6 +52,11 @@ lemma nosmt contra  (c b : bool) : (c  =>  b) => !b => !c by [].
 lemma nosmt contraL (c b : bool) : ( c => !b) =>  b => !c by [].
 lemma nosmt contraR (c b : bool) : (!c =>  b) => !b =>  c by [].
 
+(** unit *)
+lemma nosmt unit_ind (P : unit -> bool):
+  P tt => forall x, P x
+by [].
+
 (** and *)
 lemma nosmt andE : forall (a b c:bool), 
     (a => b => c) => (a /\ b) => c

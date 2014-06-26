@@ -113,6 +113,7 @@ val p_weight  : path
 (*                          Logical lemmas                              *)
 (* -------------------------------------------------------------------- *)
 val p_cut_lemma  : path
+val p_unit_elim  : path
 val p_false_elim : path
 val p_and_elim   : path
 val p_and_proj_l : path

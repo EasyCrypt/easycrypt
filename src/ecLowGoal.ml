@@ -885,6 +885,11 @@ let t_elimT_ind mode (tc : tcenv1) =
               let pt     = { pt_head = PTHandle hd; pt_args = []; } in
               (tc, pt)
 
+          | _ when EcReduction.EqTest.for_type env tunit ty ->
+              let pt = { pt_head = PTGlobal (EcCoreLib.p_unit_elim, []);
+                         pt_args = []; } in
+              (tc, pt)
+
           | _ -> raise InvalidGoalShape
     in
       t_elimT_form pt (f_local id ty) tc

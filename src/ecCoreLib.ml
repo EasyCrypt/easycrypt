@@ -159,6 +159,7 @@ let _Logic   = fun x -> EcPath.pqname p_Logic x
 let mk_logic        = _Logic
 
 let p_cut_lemma     = _Logic "cut_lemma"
+let p_unit_elim     = _Logic "unit_ind"
 let p_false_elim    = _Logic "falseE"
 let p_and_elim      = _Logic "andE"
 let p_anda_elim     = _Logic "andaE"
