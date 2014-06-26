@@ -265,8 +265,10 @@ rule main = parse
   | "<=>" { [IFF ] }
 
   (* string symbols *)
-  | "<-"    { [LEFTARROW] }
-  | "->"    { [ARROW    ] }
+  | "<-"    { [LARROW   ] }
+  | "->"    { [RARROW   ] }
+  | "<<-"   { [LLARROW  ] }
+  | "->>"   { [RRARROW  ] }
   | ".."    { [DOTDOT   ] }
   | ".["    { [DLBRACKET] }
   | ".`"    { [DOTTICK  ] }

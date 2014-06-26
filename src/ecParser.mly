@@ -152,13 +152,14 @@
 
 %token ADD
 %token ADMIT
+%token ALGNORM
 %token ALIAS
 %token APPLY
-%token ARROW
 %token AS
 %token ASSERT
 %token ASSUMPTION
 %token AT
+%token AUTO
 %token AXIOM
 %token AXIOMATIZED
 %token BACKS
@@ -199,9 +200,9 @@
 %token EOF
 %token EQ
 %token EQUIV
+%token EXACT
 %token EXFALSO
 %token EXIST
-%token EXACT
 %token EXPECT
 %token EXPORT
 %token EXTRACTION
@@ -217,6 +218,7 @@
 %token FWDS
 %token GENERALIZE
 %token GLOB
+%token HINT
 %token HOARE
 %token IDTAC
 %token IF
@@ -230,13 +232,14 @@
 %token INTROS
 %token IOTA
 %token KILL
+%token LARROW
 %token LAST
 %token LBRACE
 %token LBRACKET
 %token LEFT
-%token LEFTARROW
 %token LEMMA
 %token LET
+%token LLARROW
 %token LOCAL
 %token LOGIC
 %token LONGARROW
@@ -268,6 +271,7 @@
 %token PROVER
 %token QED
 %token QUESTION
+%token RARROW
 %token RBOOL
 %token RBRACE
 %token RBRACKET
@@ -281,10 +285,10 @@
 %token REWRITE
 %token RIGHT
 %token RING
-%token ALGNORM
 %token RND
 %token RPAREN
 %token RPBRACE
+%token RRARROW
 %token RWNORMAL
 %token SAMPLE
 %token SECTION
@@ -314,7 +318,6 @@
 %token TOP
 %token TRANSITIVITY
 %token TRIVIAL
-%token AUTO
 %token TRY
 %token TYPE
 %token UNDERSCORE
@@ -326,7 +329,6 @@
 %token WITH
 %token WP
 %token ZETA
-%token HINT
 %token <string> OP1 OP2 OP3 OP4
 %token LTCOLON GT LT GE LE
 
@@ -349,7 +351,7 @@
 %left OP1
 %right QUESTION
 %left OP2 MINUS ADD
-%right ARROW
+%right RARROW
 %left OP3 STAR SLASH
 %left OP4 AT
 %right DCOLON
@@ -559,7 +561,7 @@ sexpr_u:
 | se=sexpr DLBRACKET ti=tvars_app? e=expr RBRACKET
    { peget (EcLocation.make $startpos $endpos) ti se e }
 
-| se=sexpr DLBRACKET ti=tvars_app? e1=expr LEFTARROW e2=expr RBRACKET
+| se=sexpr DLBRACKET ti=tvars_app? e1=expr LARROW e2=expr RBRACKET
    { peset (EcLocation.make $startpos $endpos) ti se e1 e2 }
 
 | TICKPIPE ti=tvars_app? e=expr PIPE
@@ -761,7 +763,7 @@ sform_u(P):
 | se=sform_r(P) DLBRACKET ti=tvars_app? e=form_r(P) RBRACKET
    { pfget (EcLocation.make $startpos $endpos) ti se e }
 
-| se=sform_r(P) DLBRACKET ti=tvars_app? e1=form_r(P) LEFTARROW e2=form_r(P) RBRACKET
+| se=sform_r(P) DLBRACKET ti=tvars_app? e1=form_r(P) LARROW e2=form_r(P) RBRACKET
    { pfset (EcLocation.make $startpos $endpos) ti se e1 e2 }
 
 | x=sform_r(P) s=loc(pside)
@@ -1003,9 +1005,9 @@ type_args:
 ;
 
 type_exp:
-| ty=simpl_type_exp                              { ty }
-| ty=plist2(loc(simpl_type_exp), STAR)           { PTtuple ty }
-| ty1=loc(type_exp) ARROW ty2=loc(type_exp)      { PTfun(ty1,ty2) }
+| ty=simpl_type_exp                          { ty }
+| ty=plist2(loc(simpl_type_exp), STAR)       { PTtuple ty }
+| ty1=loc(type_exp) RARROW ty2=loc(type_exp) { PTfun(ty1,ty2) }
 ;
 
 (* -------------------------------------------------------------------- *)
@@ -1056,7 +1058,7 @@ base_instr:
 | x=lvalue EQ e=expr
     { PSasgn (x, e) }
 
-| x=lvalue LEFTARROW f=loc(fident) LPAREN es=loc(plist0(expr, COMMA)) RPAREN
+| x=lvalue LARROW f=loc(fident) LPAREN es=loc(plist0(expr, COMMA)) RPAREN
     { PScall (Some x, f, es) }
 
 | f=loc(fident) LPAREN es=loc(plist0(expr, COMMA)) RPAREN
@@ -1626,10 +1628,10 @@ intro_pattern:
 | LBRACKET ip=plist2(intro_pattern*, PIPE) RBRACKET
    { IPCase ip }
 
-| o=rwocc? ARROW
+| o=rwocc? RARROW
    { IPRw (o |> omap (snd_map EcMaps.Sint.of_list), `LtoR) }
 
-| o=rwocc? LEFTARROW
+| o=rwocc? LARROW
    { IPRw (o |> omap (snd_map EcMaps.Sint.of_list), `RtoL) }
 
 | LBRACE xs=ident+ RBRACE
@@ -2466,8 +2468,8 @@ clone_proof:
 ;
 
 opclmode:
-| EQ { `Alias }
-| LEFTARROW { `Inline }
+| EQ     { `Alias }
+| LARROW { `Inline }
 ;
 
 cltyparams:
@@ -2480,7 +2482,7 @@ clone_override:
 | TYPE ps=cltyparams x=qident EQ t=loc(type_exp)
    { (x, PTHO_Type (ps, t, `Alias)) }
 
-| TYPE ps=cltyparams x=qident LEFTARROW t=loc(type_exp)
+| TYPE ps=cltyparams x=qident LARROW t=loc(type_exp)
    { (x, PTHO_Type (ps, t, `Inline)) }
 
 | OP x=qoident tyvars=bracket(tident*)? COLON sty=loc(type_exp) mode=opclmode e=expr
