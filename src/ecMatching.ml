@@ -427,6 +427,7 @@ let f_match opts hyps (ue, ev) ~ptn subject =
 
 (* -------------------------------------------------------------------- *)
 type ptnpos = [`Select of int | `Sub of ptnpos] Mint.t
+type occ    = [`Inclusive | `Exclusive] * Sint.t
 
 exception InvalidPosition
 exception InvalidOccurence
@@ -470,10 +471,15 @@ module FPosition = struct
       fun p -> doit 0 p
 
   (* ------------------------------------------------------------------ *)
-  let filter (s : Sint.t) =
+  let filter ((mode, s) : occ) =
     let rec doit1 n p =
       match p with
-      | `Select _ -> (n+1, if Sint.mem n s then Some p else None)
+      | `Select _ -> begin
+        match mode with
+        | `Inclusive -> (n+1, if Sint.mem n s then Some p else None  )
+        | `Exclusive -> (n+1, if Sint.mem n s then None   else Some p)
+      end
+
       | `Sub p  -> begin
           match doit n p with
           | (n, sub) when Mint.is_empty sub -> (n, None)
@@ -570,7 +576,7 @@ module FPosition = struct
           match o with
           | None   -> cpos
           | Some o ->
-            if not (is_occurences_valid o cpos) then
+            if not (is_occurences_valid (snd o) cpos) then
               raise InvalidOccurence;
             filter o cpos
 

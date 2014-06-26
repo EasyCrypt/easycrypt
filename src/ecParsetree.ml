@@ -478,7 +478,8 @@ and rwarg1 =
   | RWSimpl
 
 and rwside = [`LtoR | `RtoL]
-and rwocc  = Sint.t option
+and rwocc  = (rwocci * Sint.t) option
+and rwocci = [`Inclusive | `Exclusive]
 
 type intropattern1 =
   | IPCore  of renaming located

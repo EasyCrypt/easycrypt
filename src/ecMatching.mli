@@ -130,6 +130,7 @@ val f_match :
 
 (* -------------------------------------------------------------------- *)
 type ptnpos = private [`Select of int | `Sub of ptnpos] Mint.t
+type occ    = [`Inclusive | `Exclusive] * Sint.t
 
 exception InvalidPosition
 exception InvalidOccurence
@@ -143,15 +144,15 @@ module FPosition : sig
 
   val tostring : ptnpos -> string
 
-  val select : ?o:Sint.t -> (Sid.t -> int list -> form -> select) -> form -> ptnpos
+  val select : ?o:occ -> (Sid.t -> int list -> form -> select) -> form -> ptnpos
 
-  val select_form : ?posf:int -> LDecl.hyps -> Sint.t option -> form -> form -> ptnpos
+  val select_form : ?posf:int -> LDecl.hyps -> occ option -> form -> form -> ptnpos
 
   val is_occurences_valid : Sint.t -> ptnpos -> bool
 
   val occurences : ptnpos -> int
 
-  val filter : Sint.t -> ptnpos -> ptnpos
+  val filter : occ -> ptnpos -> ptnpos
 
   val map : ptnpos -> (form -> form) -> form -> form
 

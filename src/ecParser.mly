@@ -1627,10 +1627,10 @@ intro_pattern:
    { IPCase ip }
 
 | o=rwocc? ARROW
-   { IPRw (o |> omap EcMaps.Sint.of_list, `LtoR) }
+   { IPRw (o |> omap (snd_map EcMaps.Sint.of_list), `LtoR) }
 
 | o=rwocc? LEFTARROW
-   { IPRw (o |> omap EcMaps.Sint.of_list, `RtoL) }
+   { IPRw (o |> omap (snd_map EcMaps.Sint.of_list), `RtoL) }
 
 | LBRACE xs=ident+ RBRACE
    { IPClear xs }
@@ -1722,7 +1722,8 @@ rwrepeat:
 ;
 
 rwocc:
-| LBRACE x=uint+ RBRACE { x }
+| LBRACE       x=uint+ RBRACE { (`Inclusive, x) }
+| LBRACE MINUS x=uint+ RBRACE { (`Exclusive, x) }
 ;
 
 rwarg1:
@@ -1736,13 +1737,13 @@ rwarg1:
    { RWSimpl }
 
 | s=rwside r=rwrepeat? o=rwocc? fp=fpattern_list(form)
-   { RWRw (s, r, o |> omap EcMaps.Sint.of_list, fp) }
+   { RWRw (s, r, o |> omap (snd_map EcMaps.Sint.of_list), fp) }
 
 | s=rwside r=rwrepeat? o=rwocc? SLASH x=sform_h %prec prec_tactic
    { let loc = EcLocation.make $startpos $endpos in
        if r <> None then
          parse_error loc (Some "delta-repeat not supported");
-       RWDelta (s, o |> omap EcMaps.Sint.of_list, x); }
+       RWDelta (s, o |> omap (snd_map EcMaps.Sint.of_list), x); }
 
 | PR s=bracket(ident)
    { RWPr s }
@@ -1762,7 +1763,7 @@ genpattern:
     { `Form (None, l) }
 
 | o=rwocc l=sform_h %prec prec_tactic
-    { `Form (Some (EcMaps.Sint.of_list o), l) }
+    { `Form (Some (snd_map EcMaps.Sint.of_list o), l) }
 
 | LPAREN UNDERSCORE COLON f=form RPAREN
     { `FPattern (mk_fpattern (FPCut f) []) }
@@ -2022,7 +2023,7 @@ logtactic:
    { Pcutdef (ip, fp) }
 
 | POSE o=rwocc? x=ident CEQ p=form_h %prec prec_below_IMPL
-   { Ppose (x, o |> omap EcMaps.Sint.of_list, p) }
+   { Ppose (x, o |> omap (snd_map EcMaps.Sint.of_list), p) }
 ;
 
 eager_info:
