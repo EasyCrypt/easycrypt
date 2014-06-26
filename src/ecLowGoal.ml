@@ -878,11 +878,11 @@ let t_elimT_ind mode (tc : tcenv1) =
           (tc, pt)
 
       | None ->
-          match ty.ty_node with
+          match (EcEnv.Ty.hnorm ty env).ty_node with
           | Ttuple tys ->
-              let indtc = pf_gen_tuple_elim ~witheq:false tys hyps in
+              let indtc  = pf_gen_tuple_elim ~witheq:false tys hyps in
               let tc, hd = FApi.bwd1_of_fwd indtc tc in
-              let pt = { pt_head = PTHandle hd; pt_args = []; } in
+              let pt     = { pt_head = PTHandle hd; pt_args = []; } in
               (tc, pt)
 
           | _ -> raise InvalidGoalShape

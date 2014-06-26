@@ -234,4 +234,3 @@ val e_uni   : (uid -> ty option) -> expr -> expr
 (* -------------------------------------------------------------------- *)
 (* projects 'a Distr type into 'a *)
 val proj_distr_ty : ty -> ty
-
