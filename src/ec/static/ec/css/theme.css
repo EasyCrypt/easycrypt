@@ -30,6 +30,13 @@ body {
 	padding-right: 0px;
 }
 
+#results {
+	font-size: 10px;
+	padding-left:  5px;
+	padding-right: 5px;
+	margin: 0;
+}
+
 #tabs {
 	border-width: 0px;
 }
@@ -44,6 +51,10 @@ body {
 
 #tabs li .ui-icon-close {
 	float: left; margin: 0.4em 0.2em 0 0; cursor: pointer;
+}
+
+.ace_loading {
+	background-color: #bbbbbb;
 }
 
 .ui-tabs-nav li :focus {

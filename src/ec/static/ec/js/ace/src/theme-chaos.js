@@ -21,7 +21,7 @@
  * IN THE SOFTWARE.
  * ***** END LICENSE BLOCK ***** */
 
-define('ace/theme/chaos', ['require', 'exports', 'module' , 'ace/lib/dom'], function(require, exports, module) {
+ace.define('ace/theme/chaos', ['require', 'exports', 'module' , 'ace/lib/dom'], function(require, exports, module) {
 
 exports.isDark = true;
 exports.cssClass = "ace-chaos";
@@ -149,13 +149,13 @@ border: none;\
 box-shadow: none;\
 }\
 .ace-chaos .ace_fold-widget.ace_start:after {\
-content: '▾'\
+content: '\u25be'\
 }\
 .ace-chaos .ace_fold-widget.ace_end:after {\
-content: '▴'\
+content: '\u25b4'\
 }\
 .ace-chaos .ace_fold-widget.ace_closed:after {\
-content: '‣'\
+content: '\u2023'\
 }\
 .ace-chaos .ace_indent-guide {\
 border-right:1px dotted #333;\

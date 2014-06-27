@@ -1,4 +1,4 @@
-define('ace/snippets/jsp', ['require', 'exports', 'module' ], function(require, exports, module) {
+ace.define('ace/snippets/jsp', ['require', 'exports', 'module' ], function(require, exports, module) {
 
 
 exports.snippetText = "snippet @page\n\

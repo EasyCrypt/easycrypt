@@ -1,4 +1,4 @@
-define('ace/mode/easycrypt',
+ace.define('ace/mode/easycrypt',
       ['require', 'exports', 'module' , 'ace/lib/oop', 'ace/mode/text',
        'ace/mode/easycrypt_highlight_rules', 'ace/mode/matching_brace_outdent', 'ace/range'],
        function(require, exports, module) {
@@ -16,7 +16,7 @@ var Mode = function() {
 };
 oop.inherits(Mode, TextMode);
 
-var indenter = /(?:[({[=:]|[-=]|(?:lemma|equiv|hoare|realize|proof.))\s*$/;
+var indenter = /(?:[({[=:,-]|(?:lemma|equiv|hoare|realize|proof.))\s*$/;
 
 (function() {
   this.toggleCommentLines = function(state, doc, startRow, endRow) {
@@ -67,7 +67,7 @@ var indenter = /(?:[({[=:]|[-=]|(?:lemma|equiv|hoare|realize|proof.))\s*$/;
       exports.Mode = Mode;
     });
 
-define('ace/mode/easycrypt_highlight_rules',
+ace.define('ace/mode/easycrypt_highlight_rules',
       ['require', 'exports', 'module', 'ace/lib/oop', 'ace/mode/text_highlight_rules'],
       function(require, exports, module) {
 
@@ -174,16 +174,16 @@ var EasycryptHighlightRules = function() {
     }, {
       token : "string",
       regex : '.+'
-          } ]
-        };
-      };
+    } ]
+  };
+};
 
-      oop.inherits(EasycryptHighlightRules, TextHighlightRules);
-      exports.EasycryptHighlightRules = EasycryptHighlightRules;
-    });
+oop.inherits(EasycryptHighlightRules, TextHighlightRules);
+exports.EasycryptHighlightRules = EasycryptHighlightRules;
+});
 
-define('ace/mode/matching_brace_outdent', [ 'require', 'exports', 'module', 'ace/range' ], function(require, exports, module) {
-
+/* -------------------------------------------------------------- */
+ace.define('ace/mode/matching_brace_outdent', [ 'require', 'exports', 'module', 'ace/range' ], function(require, exports, module) {
 var Range = require("../range").Range;
 
 var MatchingBraceOutdent = function() {};

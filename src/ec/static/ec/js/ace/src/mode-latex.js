@@ -1,4 +1,4 @@
-define('ace/mode/latex', ['require', 'exports', 'module' , 'ace/lib/oop', 'ace/mode/text', 'ace/mode/latex_highlight_rules', 'ace/mode/folding/latex', 'ace/range'], function(require, exports, module) {
+ace.define('ace/mode/latex', ['require', 'exports', 'module' , 'ace/lib/oop', 'ace/mode/text', 'ace/mode/latex_highlight_rules', 'ace/mode/folding/latex', 'ace/range'], function(require, exports, module) {
 
 
 var oop = require("../lib/oop");
@@ -22,7 +22,7 @@ oop.inherits(Mode, TextMode);
 exports.Mode = Mode;
 
 });
-define('ace/mode/latex_highlight_rules', ['require', 'exports', 'module' , 'ace/lib/oop', 'ace/mode/text_highlight_rules'], function(require, exports, module) {
+ace.define('ace/mode/latex_highlight_rules', ['require', 'exports', 'module' , 'ace/lib/oop', 'ace/mode/text_highlight_rules'], function(require, exports, module) {
 
 
 var oop = require("../lib/oop");
@@ -55,7 +55,7 @@ exports.LatexHighlightRules = LatexHighlightRules;
 
 });
 
-define('ace/mode/folding/latex', ['require', 'exports', 'module' , 'ace/lib/oop', 'ace/mode/folding/fold_mode', 'ace/range', 'ace/token_iterator'], function(require, exports, module) {
+ace.define('ace/mode/folding/latex', ['require', 'exports', 'module' , 'ace/lib/oop', 'ace/mode/folding/fold_mode', 'ace/range', 'ace/token_iterator'], function(require, exports, module) {
 
 
 var oop = require("../../lib/oop");

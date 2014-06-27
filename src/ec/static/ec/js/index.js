@@ -189,6 +189,18 @@ Workspace.prototype.load_editor = function() {
     }.bind(this),
     readOnly: false,
   });
+  this.editor.commands.addCommand({
+    name: 'step',
+    bindKey: {
+      mac: 'Shift-Ctrl-N',
+      win: 'Ctrl-C Ctrl-N',
+    },
+    exec: function(editor) {
+      editor.step(conn);
+    }.bind(this),
+    readOnly: false,
+  });
+  ecLift(this.editor);
 
   this.ui.tabctl.tabs({
     active: 1,
@@ -404,9 +416,11 @@ Workspace.prototype._callback_for_rm_file_modal = function(id) {
 
 /* ---------------------------------------------------------------- */
 var ws = null;
+var conn = null;
 
 function ec_initialize() {
   ws = new Workspace();
+  conn = new Conn(ws);
 }
 
 $(document).ready(ec_initialize);

@@ -28,7 +28,7 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-define('ace/ext/whitespace', ['require', 'exports', 'module' , 'ace/lib/lang'], function(require, exports, module) {
+ace.define('ace/ext/whitespace', ['require', 'exports', 'module' , 'ace/lib/lang'], function(require, exports, module) {
 
 
 var lang = require("../lib/lang");
@@ -81,9 +81,8 @@ exports.$detectIndentation = function(lines, fallback) {
         } else
             var score = getScore(i) / spaceIndents;
 
-        if (changes[i]) {
+        if (changes[i])
             score += changes[i] / changesTotal;
-        }
 
         if (score > first.score)
             first = {score: score, length: i};
@@ -207,3 +206,8 @@ exports.commands = [{
 }];
 
 });
+;
+                (function() {
+                    ace.require(["ace/ext/whitespace"], function() {});
+                })();
+            

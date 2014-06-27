@@ -1,4 +1,4 @@
-define('ace/snippets/perl', ['require', 'exports', 'module' ], function(require, exports, module) {
+ace.define('ace/snippets/perl', ['require', 'exports', 'module' ], function(require, exports, module) {
 
 
 exports.snippetText = "# #!/usr/bin/perl\n\

@@ -28,7 +28,7 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-define('ace/theme/dreamweaver', ['require', 'exports', 'module' , 'ace/lib/dom'], function(require, exports, module) {
+ace.define('ace/theme/dreamweaver', ['require', 'exports', 'module' , 'ace/lib/dom'], function(require, exports, module) {
 exports.isDark = false;
 exports.cssClass = "ace-dreamweaver";
 exports.cssText = ".ace-dreamweaver .ace_gutter {\
@@ -130,6 +130,9 @@ border: 1px solid rgb(192, 192, 192);\
 }\
 .ace-dreamweaver .ace_marker-layer .ace_active-line {\
 background: rgba(0, 0, 0, 0.07);\
+}\
+.ace-dreamweaver .ace_gutter-active-line {\
+background-color : #DCDCDC;\
 }\
 .ace-dreamweaver .ace_marker-layer .ace_selected-word {\
 background: rgb(250, 250, 255);\

@@ -35,7 +35,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  *
  */
-define('ace/mode/r', ['require', 'exports', 'module' , 'ace/range', 'ace/lib/oop', 'ace/mode/text', 'ace/mode/text_highlight_rules', 'ace/mode/r_highlight_rules', 'ace/mode/matching_brace_outdent', 'ace/unicode'], function(require, exports, module) {
+ace.define('ace/mode/r', ['require', 'exports', 'module' , 'ace/range', 'ace/lib/oop', 'ace/mode/text', 'ace/mode/text_highlight_rules', 'ace/mode/r_highlight_rules', 'ace/mode/matching_brace_outdent', 'ace/unicode'], function(require, exports, module) {
    
 
    var Range = require("../range").Range;
@@ -60,7 +60,7 @@ define('ace/mode/r', ['require', 'exports', 'module' , 'ace/range', 'ace/lib/oop
    }).call(Mode.prototype);
    exports.Mode = Mode;
 });
-define('ace/mode/r_highlight_rules', ['require', 'exports', 'module' , 'ace/lib/oop', 'ace/lib/lang', 'ace/mode/text_highlight_rules', 'ace/mode/tex_highlight_rules'], function(require, exports, module) {
+ace.define('ace/mode/r_highlight_rules', ['require', 'exports', 'module' , 'ace/lib/oop', 'ace/lib/lang', 'ace/mode/text_highlight_rules', 'ace/mode/tex_highlight_rules'], function(require, exports, module) {
 
    var oop = require("../lib/oop");
    var lang = require("../lib/lang");
@@ -216,7 +216,7 @@ define('ace/mode/r_highlight_rules', ['require', 'exports', 'module' , 'ace/lib/
 
    exports.RHighlightRules = RHighlightRules;
 });
-define('ace/mode/tex_highlight_rules', ['require', 'exports', 'module' , 'ace/lib/oop', 'ace/lib/lang', 'ace/mode/text_highlight_rules'], function(require, exports, module) {
+ace.define('ace/mode/tex_highlight_rules', ['require', 'exports', 'module' , 'ace/lib/oop', 'ace/lib/lang', 'ace/mode/text_highlight_rules'], function(require, exports, module) {
 
 
 var oop = require("../lib/oop");
@@ -295,7 +295,7 @@ oop.inherits(TexHighlightRules, TextHighlightRules);
 exports.TexHighlightRules = TexHighlightRules;
 });
 
-define('ace/mode/matching_brace_outdent', ['require', 'exports', 'module' , 'ace/range'], function(require, exports, module) {
+ace.define('ace/mode/matching_brace_outdent', ['require', 'exports', 'module' , 'ace/range'], function(require, exports, module) {
 
 
 var Range = require("../range").Range;

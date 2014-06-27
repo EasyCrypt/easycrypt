@@ -6,12 +6,15 @@
 {% if user.is_authenticated %}
 <div class="row full-height">
     <div id="projects" class="col-sm-2 col-md-2 full-height"></div>
-    <div id="contents" class="col-sm-10 col-md-10 full-height">
+    <div id="contents" class="col-sm-6 col-md-6 full-height">
         <div id="tabs" class="full-height">
             <ul></ul>
             <div id="jqueryui-editor"><div id="editor" class="full-height"></div></div>
         </div>
     </div>
+    <pre id="results" class="col-sm-4 col-md-4 full-height">
+&lt;offline&gt;
+    </pre>
 </div>
 
 <!-- Modals -->
@@ -49,6 +52,10 @@
 <!-- Custom jQuery UI -->
 <script src="{% static 'ec/jquery-ui/js/jquery-ui-1.10.4.custom.js' %}"></script>
 
-<!-- /index functionality -->
+<!-- Index functionality -->
 <script src="{% static 'ec/js/index.js' %}"></script>
+<script src="{% static 'ec/js/ecLift.js' %}"></script>
+
+<!-- Communication with EasyCrypt server -->
+<script src="{% static 'ec/js/comm.js' %}"></script>
 {% endblock %}

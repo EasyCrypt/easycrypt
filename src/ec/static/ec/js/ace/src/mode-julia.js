@@ -33,7 +33,7 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-define('ace/mode/julia', ['require', 'exports', 'module' , 'ace/lib/oop', 'ace/mode/text', 'ace/mode/julia_highlight_rules', 'ace/mode/folding/cstyle'], function(require, exports, module) {
+ace.define('ace/mode/julia', ['require', 'exports', 'module' , 'ace/lib/oop', 'ace/mode/text', 'ace/mode/julia_highlight_rules', 'ace/mode/folding/cstyle'], function(require, exports, module) {
 
 
 var oop = require("../lib/oop");
@@ -56,7 +56,7 @@ oop.inherits(Mode, TextMode);
 exports.Mode = Mode;
 });
 
-define('ace/mode/julia_highlight_rules', ['require', 'exports', 'module' , 'ace/lib/oop', 'ace/mode/text_highlight_rules'], function(require, exports, module) {
+ace.define('ace/mode/julia_highlight_rules', ['require', 'exports', 'module' , 'ace/lib/oop', 'ace/mode/text_highlight_rules'], function(require, exports, module) {
 
 
 var oop = require("../lib/oop");
@@ -83,11 +83,11 @@ var JuliaHighlightRules = function() {
            regex: '(#)(?!\\{)(.*$)'} ],
       '#function_call': 
        [ { token: [ 'support.function.julia', 'text' ],
-           regex: '([a-zA-Z0-9_]+!?)(\\w*\\()'} ],
+           regex: '([a-zA-Z0-9_]+!?)([\\w\\xff-\\u218e\\u2455-\\uffff]*\\()'} ],
       '#function_decl': 
        [ { token: [ 'keyword.other.julia', 'meta.function.julia',
                'entity.name.function.julia', 'meta.function.julia','text' ],
-           regex: '(function|macro)(\\s*)([a-zA-Z0-9_\\{]+!?)(\\w*)([(\\\\{])'} ],
+           regex: '(function|macro)(\\s*)([a-zA-Z0-9_\\{]+!?)([\\w\\xff-\\u218e\\u2455-\\uffff]*)([(\\\\{])'} ],
       '#keyword':
        [ { token: 'keyword.other.julia',
            regex: '\\b(?:function|type|immutable|macro|quote|abstract|bitstype|typealias|module|baremodule|new)\\b' },
@@ -95,7 +95,7 @@ var JuliaHighlightRules = function() {
            regex: '\\b(?:if|else|elseif|while|for|in|begin|let|end|do|try|catch|finally|return|break|continue)\\b' },
          { token: 'storage.modifier.variable.julia',
            regex: '\\b(?:global|local|const|export|import|importall|using)\\b' },
-         { token: 'variable.macro.julia', regex: '@\\w+\\b' } ],
+         { token: 'variable.macro.julia', regex: '@[\\w\\xff-\\u218e\\u2455-\\uffff]+\\b' } ],
       '#number': 
        [ { token: 'constant.numeric.julia',
            regex: '\\b0(?:x|X)[0-9a-fA-F]*|(?:\\b[0-9]+\\.?[0-9]*|\\.[0-9]+)(?:(?:e|E)(?:\\+|-)?[0-9]*)?(?:im)?|\\bInf(?:32)?\\b|\\bNaN(?:32)?\\b|\\btrue\\b|\\bfalse\\b' } ],
@@ -119,7 +119,7 @@ var JuliaHighlightRules = function() {
          { token: 'keyword.operator.interpolation.julia',
            regex: '\\$#?(?=.)' },
          { token: [ 'variable', 'keyword.operator.transposed-variable.julia' ],
-           regex: '(\\w+)((?:\'|\\.\')*\\.?\')' },
+           regex: '([\\w\\xff-\\u218e\\u2455-\\uffff]+)((?:\'|\\.\')*\\.?\')' },
          { token: 'text',
            regex: '\\[|\\('},
          { token: [ 'text', 'keyword.operator.transposed-matrix.julia' ],
@@ -142,10 +142,10 @@ var JuliaHighlightRules = function() {
               { include: '#string_escaped_char' },
               { defaultToken: 'string.quoted.double.julia' } ] },
          { token: 'punctuation.definition.string.begin.julia',
-           regex: '\\b\\w+"',
+           regex: '\\b[\\w\\xff-\\u218e\\u2455-\\uffff]+"',
            push: 
             [ { token: 'punctuation.definition.string.end.julia',
-                regex: '"\\w*',
+                regex: '"[\\w\\xff-\\u218e\\u2455-\\uffff]*',
                 next: 'pop' },
               { include: '#string_custom_escaped_char' },
               { defaultToken: 'string.quoted.custom-double.julia' } ] },
@@ -189,7 +189,7 @@ oop.inherits(JuliaHighlightRules, TextHighlightRules);
 exports.JuliaHighlightRules = JuliaHighlightRules;
 });
 
-define('ace/mode/folding/cstyle', ['require', 'exports', 'module' , 'ace/lib/oop', 'ace/range', 'ace/mode/folding/fold_mode'], function(require, exports, module) {
+ace.define('ace/mode/folding/cstyle', ['require', 'exports', 'module' , 'ace/lib/oop', 'ace/range', 'ace/mode/folding/fold_mode'], function(require, exports, module) {
 
 
 var oop = require("../../lib/oop");

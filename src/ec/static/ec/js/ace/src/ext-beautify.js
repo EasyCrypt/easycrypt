@@ -28,7 +28,7 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-define('ace/ext/beautify', ['require', 'exports', 'module' , 'ace/token_iterator', 'ace/ext/beautify/php_rules'], function(require, exports, module) {
+ace.define('ace/ext/beautify', ['require', 'exports', 'module' , 'ace/token_iterator', 'ace/ext/beautify/php_rules'], function(require, exports, module) {
 
 var TokenIterator = require("ace/token_iterator").TokenIterator;
 
@@ -54,7 +54,7 @@ exports.commands = [{
 
 });
 
-define('ace/ext/beautify/php_rules', ['require', 'exports', 'module' , 'ace/token_iterator'], function(require, exports, module) {
+ace.define('ace/ext/beautify/php_rules', ['require', 'exports', 'module' , 'ace/token_iterator'], function(require, exports, module) {
 
 var TokenIterator = require("ace/token_iterator").TokenIterator;
 exports.newLines = [{
@@ -357,4 +357,8 @@ exports.transform = function(iterator, maxPos, context) {
 
 
 
-});
+});;
+                (function() {
+                    ace.require(["ace/ext/beautify"], function() {});
+                })();
+            

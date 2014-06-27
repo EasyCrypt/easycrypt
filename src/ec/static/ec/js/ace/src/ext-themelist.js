@@ -30,7 +30,7 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-define('ace/ext/themelist', ['require', 'exports', 'module' , 'ace/lib/fixoldbrowsers'], function(require, exports, module) {
+ace.define('ace/ext/themelist', ['require', 'exports', 'module' , 'ace/lib/fixoldbrowsers'], function(require, exports, module) {
 
 require("ace/lib/fixoldbrowsers");
 
@@ -85,3 +85,8 @@ exports.themes = themeData.map(function(data) {
 
 });
 
+;
+                (function() {
+                    ace.require(["ace/ext/themelist"], function() {});
+                })();
+            

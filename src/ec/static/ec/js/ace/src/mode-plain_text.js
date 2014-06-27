@@ -28,7 +28,7 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-define('ace/mode/plain_text', ['require', 'exports', 'module' , 'ace/lib/oop', 'ace/mode/text', 'ace/mode/text_highlight_rules', 'ace/mode/behaviour'], function(require, exports, module) {
+ace.define('ace/mode/plain_text', ['require', 'exports', 'module' , 'ace/lib/oop', 'ace/mode/text', 'ace/mode/text_highlight_rules', 'ace/mode/behaviour'], function(require, exports, module) {
 
 
 var oop = require("../lib/oop");

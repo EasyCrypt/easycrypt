@@ -28,7 +28,7 @@
  *
  * ***** END LICENSE BLOCK ***** */
  
-define('ace/mode/cirru', ['require', 'exports', 'module' , 'ace/lib/oop', 'ace/mode/text', 'ace/mode/cirru_highlight_rules', 'ace/mode/folding/coffee'], function(require, exports, module) {
+ace.define('ace/mode/cirru', ['require', 'exports', 'module' , 'ace/lib/oop', 'ace/mode/text', 'ace/mode/cirru_highlight_rules', 'ace/mode/folding/coffee'], function(require, exports, module) {
 
 
 var oop = require("../lib/oop");
@@ -50,7 +50,7 @@ oop.inherits(Mode, TextMode);
 exports.Mode = Mode;
 });
  
-define('ace/mode/cirru_highlight_rules', ['require', 'exports', 'module' , 'ace/lib/oop', 'ace/mode/text_highlight_rules'], function(require, exports, module) {
+ace.define('ace/mode/cirru_highlight_rules', ['require', 'exports', 'module' , 'ace/lib/oop', 'ace/mode/text_highlight_rules'], function(require, exports, module) {
 
 
 var oop = require("../lib/oop");
@@ -144,7 +144,7 @@ oop.inherits(CirruHighlightRules, TextHighlightRules);
 exports.CirruHighlightRules = CirruHighlightRules;
 });
 
-define('ace/mode/folding/coffee', ['require', 'exports', 'module' , 'ace/lib/oop', 'ace/mode/folding/fold_mode', 'ace/range'], function(require, exports, module) {
+ace.define('ace/mode/folding/coffee', ['require', 'exports', 'module' , 'ace/lib/oop', 'ace/mode/folding/fold_mode', 'ace/range'], function(require, exports, module) {
 
 
 var oop = require("../../lib/oop");

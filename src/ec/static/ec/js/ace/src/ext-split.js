@@ -28,12 +28,12 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-define('ace/ext/split', ['require', 'exports', 'module' , 'ace/split'], function(require, exports, module) {
+ace.define('ace/ext/split', ['require', 'exports', 'module' , 'ace/split'], function(require, exports, module) {
 module.exports = require("../split");
 
 });
 
-define('ace/split', ['require', 'exports', 'module' , 'ace/lib/oop', 'ace/lib/lang', 'ace/lib/event_emitter', 'ace/editor', 'ace/virtual_renderer', 'ace/edit_session'], function(require, exports, module) {
+ace.define('ace/split', ['require', 'exports', 'module' , 'ace/lib/oop', 'ace/lib/lang', 'ace/lib/event_emitter', 'ace/editor', 'ace/virtual_renderer', 'ace/edit_session'], function(require, exports, module) {
 
 
 var oop = require("./lib/oop");
@@ -269,3 +269,8 @@ function UndoManagerProxy(undoManager, session) {
 
 exports.Split = Split;
 });
+;
+                (function() {
+                    ace.require(["ace/ext/split"], function() {});
+                })();
+            
