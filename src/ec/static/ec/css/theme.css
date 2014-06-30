@@ -53,8 +53,14 @@ body {
 	float: left; margin: 0.4em 0.2em 0 0; cursor: pointer;
 }
 
+.ace_loaded {
+	position: absolute;
+	background-color: #55cccc;
+}
+
 .ace_loading {
-	background-color: #bbbbbb;
+	position: absolute;
+	background-color: #dd6666;
 }
 
 .ui-tabs-nav li :focus {

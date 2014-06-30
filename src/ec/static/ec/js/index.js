@@ -192,11 +192,11 @@ Workspace.prototype.load_editor = function() {
   this.editor.commands.addCommand({
     name: 'step',
     bindKey: {
-      mac: 'Shift-Ctrl-N',
-      win: 'Ctrl-C Ctrl-N',
+      mac: 'Ctrl-N',
+      win: 'Ctrl-N',
     },
     exec: function(editor) {
-      editor.step(conn);
+      editor.do_step(conn);
     }.bind(this),
     readOnly: false,
   });

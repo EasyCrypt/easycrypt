@@ -27,10 +27,12 @@ Conn.prototype.open = function(addr) {
 
   this.socket.onopen = function(e) {
     console.log("[+] Opened '" + addr + "'");
+    this.ws.editor.online();
     this.results.html("");
   }.bind(this);
   this.socket.onclose = function(e) {
     console.log("[+] Closed '" + addr + "'");
+    this.ws.editor.offline();
     this.results.text("<offline>");
   }.bind(this);
   this.socket.onmessage = function(e) {
@@ -38,7 +40,7 @@ Conn.prototype.open = function(addr) {
     switch (data.type) {
     case "step":
       show_header(data);
-      this.ws.editor.setStep(data.step);
+      this.ws.editor.set_step(data.step);
       break;
     case "notice":
       show_header(data);
