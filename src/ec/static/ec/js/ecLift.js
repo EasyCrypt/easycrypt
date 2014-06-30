@@ -44,6 +44,15 @@ function ecLift(editor) {
     }
   }
 
+  editor.undo_step = function(conn) {
+    if (this._online /* and not loading things*/) {
+      this.points.pop();
+      this.step--;
+      conn.send("undo " + this.step + ".");
+      this.update_markers();
+    }
+  }
+
   editor.set_step = function(newStep) {
     this.step = newStep;
     if (newStep !== 0)

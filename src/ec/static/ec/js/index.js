@@ -200,6 +200,17 @@ Workspace.prototype.load_editor = function() {
     }.bind(this),
     readOnly: false,
   });
+  this.editor.commands.addCommand({
+    name: 'undo',
+    bindKey: {
+      mac: 'Ctrl-P',
+      win: 'Ctrl-P',
+    },
+    exec: function(editor) {
+      editor.undo_step(conn);
+    }.bind(this),
+    readOnly: false,
+  });
   ecLift(this.editor);
 
   this.ui.tabctl.tabs({
