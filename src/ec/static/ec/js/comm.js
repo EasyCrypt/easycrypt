@@ -108,9 +108,11 @@ function ecLiftEditor(editor) {
     search.setOptions({
       start: _range_of_point(point),
       needle: /\.$|\.\W/,
+      wrap: false,
       regExp: true
     });
-    return search.find(this.getSession()).end;
+    var stop = search.find(this.getSession());
+    return (stop && stop.end);
   }
 
   editor.next_stop = function() {
@@ -122,17 +124,19 @@ function ecLiftEditor(editor) {
     if (this.online) {
       var from = this.loading_point();
       var to = this.next_stop();
-      var stmt_range = Range.fromPoints(from, to);
-      this.conn.send(this.getSession().getTextRange(stmt_range));
+      if (to !== null) {
+        var stmt_range = Range.fromPoints(from, to);
+        this.conn.send(this.getSession().getTextRange(stmt_range));
 
-      this.points = this.points.concat([to]);
-      this._loading = true;
-      this.update_markers();
+        this.points = this.points.concat([to]);
+        this._loading = true;
+        this.update_markers();
+      }
     }
   }
 
   editor.undo = function(step) {
-    if (this.online && !this._loading) {
+    if (this.online && !this._loading && step >= 0) {
       this.points.splice(step+1);
       this.step = step;
       this._loading = true;
@@ -148,11 +152,12 @@ function ecLiftEditor(editor) {
   editor.step_until_cursor = function() {
     if (this.online) {
       var from = this.loading_point();
-      var to = this.next_stop_from(this.getCursorPosition());
-      switch (_compare_points(from, to)) {
+      var cursor = this.getCursorPosition();
+      switch (_compare_points(from, cursor)) {
       case 0:
         break;
       case -1:
+        var to = this.next_stop_from(cursor);
         for (var i = 0; i < this.points.length; i++) {
           if (_compare_points(this.points[i], to) === 0) {
             this.undo(i);
@@ -161,9 +166,17 @@ function ecLiftEditor(editor) {
         }
         break;
       case 1:
-        while (_compare_points(from, to) > 0) {
-          this.do_step();
-          from = this.loading_point();
+        var to = this.next_stop_from(cursor);
+        if (to === null) {
+          while (this.next_stop_from(from) !== null) {
+            this.do_step();
+            from = this.loading_point();
+          }
+        } else {
+          while (_compare_points(from, to) > 0) {
+            this.do_step();
+            from = this.loading_point();
+          }
         }
         break;
       }
