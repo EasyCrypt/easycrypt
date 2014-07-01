@@ -1,54 +1,53 @@
 /* ---------------------------------------------------------------- */
-var Conn = function(s) {
+var Conn = function(editor) {
   this.srv_addr = "ws://localhost:8888/";
   this.socket = null;
-  this.ws     = ws;
+  this.results = $("#results");
+  this.editor = editor;
 
   this.init();
 }
 
-/* ---------------------------------------------------------------- */
-Conn.prototype.init = function(ws) {
+Conn.prototype.init = function(editor) {
   if (this.socket !== null) this.close();
   this.open(this.srv_addr);
 }
 
 Conn.prototype.open = function(addr) {
-  function show_header(data) {
-    console.log("\n\n======== [" + addr + "] (" + data.type + ")\n");
+  this.socket = new WebSocket(addr);
+
+  function debug(data) {
+    //console.log("\n\n======== [" + addr + "] (" + data.type + ")\n");
   }
   function toHTML(data) {
     return data.replace(/&/g, "&amp;").replace(/</g, "&lt;")
                .replace(/>/g, "&gt;").replace(/\n/g, "<br />");
   }
 
-  this.socket = new WebSocket(addr);
-  this.results = $("#results");
-
   this.socket.onopen = function(e) {
     console.log("[+] Opened '" + addr + "'");
-    this.ws.editor.online();
+    this.editor.online = true;
     this.results.html("");
   }.bind(this);
   this.socket.onclose = function(e) {
     console.log("[+] Closed '" + addr + "'");
-    this.ws.editor.offline();
+    this.editor.online = false;
     this.results.text("<offline>");
   }.bind(this);
   this.socket.onmessage = function(e) {
     var data = JSON.parse(e.data);
     switch (data.type) {
     case "step":
-      show_header(data);
-      this.ws.editor.set_step(data.step);
+      debug(data);
+      this.editor.set_step(data.step);
       break;
     case "notice":
     case "proof":
-      show_header(data);
+      debug(data);
       this.results.html(toHTML(data.value));
       break;
     case "error":
-      show_header(data);
+      debug(data);
       break;
     default:
       console.log("ERROR");
@@ -64,4 +63,108 @@ Conn.prototype.close = function() {
 
 Conn.prototype.send = function(data) {
   this.socket.send(data + "\n");
+}
+
+
+/* ---------------------------------------------------------------- */
+function ecLiftEditor(editor) {
+  var Range = ace.require("ace/range").Range
+  var Search = ace.require("ace/search").Search
+
+  function _point(row, col) {
+    return (new Range(row, col, row, col).start)
+  }
+  function _range_of_point(p) {
+    return new Range(p.row, p.column, p.row, p.column);
+  }
+
+  /* -------------------------------------------------------------- */
+  editor.conn = null;
+  editor.online = false;
+
+  editor.step = 0;
+  editor._start = _point(0, 0);
+  editor.points = [editor._start];
+
+  editor._loading = false;
+  editor.loading_marker = null;
+  editor.loaded_marker  = null;
+
+  /* -------------------------------------------------------------- */
+  editor.loading_point = function() {
+    return this.points[this.points.length - 1];
+  }
+
+  editor.loaded_point = function() {
+    return this.points[this.step];
+  }
+
+  /* -------------------------------------------------------------- */
+  editor.next_stop_from = function(point) {
+    var search = new Search();
+    search.setOptions({
+      start: _range_of_point(point),
+      needle: /\.$|\.\W/,
+      regExp: true
+    });
+    return search.find(this.getSession()).end;
+  }
+
+  editor.next_stop = function() {
+    return this.next_stop_from(this.loading_point());
+  }
+
+  /* -------------------------------------------------------------- */
+  editor.do_step = function() {
+    if (this.online) {
+      var from = this.loading_point();
+      var to = this.next_stop();
+      var stmt_range = Range.fromPoints(from, to);
+      this.conn.send(this.getSession().getTextRange(stmt_range));
+
+      this.points = this.points.concat([to]);
+      this._loading = true;
+      this.update_markers();
+    }
+  }
+
+  editor.undo_step = function() {
+    if (this.online && !this._loading) {
+      this.points.pop();
+      this.step--;
+      this._loading = true;
+      this.conn.send("undo " + this.step + ".");
+      this.update_markers();
+    }
+  }
+
+  /* -------------------------------------------------------------- */
+  editor.set_step = function(newStep) {
+    this.step = newStep;
+    if (newStep !== 0)
+      this.update_markers();
+    if (newStep === this.points.length-1)
+      this._loading = false;
+  }
+
+  /* -------------------------------------------------------------- */
+  editor.update_markers = function() {
+    var session = this.getSession();
+
+    if (this.loading_marker !== null)
+      session.removeMarker(this.loading_marker);
+    if (this.loaded_marker !== null)
+      session.removeMarker(this.loaded_marker);
+
+    var loaded_pt = this.loaded_point();
+    var loaded_range = Range.fromPoints(this._start, loaded_pt);
+    this.loaded_marker = session.addMarker(loaded_range, "ace_loaded", "text");
+
+    var loading_pt = this.loading_point();
+    var loading_range = Range.fromPoints(loaded_pt, loading_pt);
+    this.loading_marker = session.addMarker(loading_range, "ace_loading", "text");
+  }
+
+  /* -------------------------------------------------------------- */
+  editor.conn = new Conn(editor);
 }

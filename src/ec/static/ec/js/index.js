@@ -196,22 +196,22 @@ Workspace.prototype.load_editor = function() {
       win: 'Ctrl-N',
     },
     exec: function(editor) {
-      editor.do_step(conn);
+      editor.do_step();
     }.bind(this),
     readOnly: false,
   });
   this.editor.commands.addCommand({
     name: 'undo',
     bindKey: {
-      mac: 'Ctrl-P',
-      win: 'Ctrl-P',
+      mac: 'Ctrl-U',
+      win: 'Ctrl-U',
     },
     exec: function(editor) {
-      editor.undo_step(conn);
+      editor.undo_step();
     }.bind(this),
     readOnly: false,
   });
-  ecLift(this.editor);
+  ecLiftEditor(this.editor);
 
   this.ui.tabctl.tabs({
     active: 1,
@@ -427,11 +427,9 @@ Workspace.prototype._callback_for_rm_file_modal = function(id) {
 
 /* ---------------------------------------------------------------- */
 var ws = null;
-var conn = null;
 
 function ec_initialize() {
   ws = new Workspace();
-  conn = new Conn(ws);
 }
 
 $(document).ready(ec_initialize);
