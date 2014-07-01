@@ -14,13 +14,15 @@ function ecLift(editor) {
   editor.loading_marker = null;
   editor.loaded_marker  = null;
 
+  editor._online = false;
   editor.online = function() {
     this._online = true;
   }
-
   editor.offline = function() {
     this._online = false;
   }
+
+  editor._loading = false;
 
   editor.next_point = function() {
     var search = new Search();
@@ -40,12 +42,13 @@ function ecLift(editor) {
       conn.send(this.getSession().getTextRange(stmt_range));
 
       this.points = this.points.concat([to]);
+      this._loading = true;
       this.update_markers();
     }
   }
 
   editor.undo_step = function(conn) {
-    if (this._online /* and not loading things*/) {
+    if (this._online && !this._loading) {
       this.points.pop();
       this.step--;
       conn.send("undo " + this.step + ".");
@@ -57,6 +60,8 @@ function ecLift(editor) {
     this.step = newStep;
     if (newStep !== 0)
       this.update_markers();
+    if (newStep === this.points.length-1)
+      this._loading = false;
   }
 
   editor.update_markers = function() {
