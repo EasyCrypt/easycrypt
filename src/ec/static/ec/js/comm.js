@@ -43,6 +43,7 @@ Conn.prototype.open = function(addr) {
       this.ws.editor.set_step(data.step);
       break;
     case "notice":
+    case "proof":
       show_header(data);
       this.results.html(toHTML(data.value));
       break;
