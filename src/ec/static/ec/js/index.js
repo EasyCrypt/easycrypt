@@ -211,6 +211,17 @@ Workspace.prototype.load_editor = function() {
     }.bind(this),
     readOnly: false,
   });
+  this.editor.commands.addCommand({
+    name: 'step_cursor',
+    bindKey: {
+      mac: 'Ctrl-Enter',
+      win: 'Ctrl-Enter',
+    },
+    exec: function(editor) {
+      editor.step_until_cursor();
+    }.bind(this),
+    readOnly: false,
+  });
   ecLiftEditor(this.editor);
 
   this.ui.tabctl.tabs({

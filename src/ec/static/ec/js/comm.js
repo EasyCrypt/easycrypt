@@ -77,6 +77,9 @@ function ecLiftEditor(editor) {
   function _range_of_point(p) {
     return new Range(p.row, p.column, p.row, p.column);
   }
+  function _compare_points(p1, p2) {
+    return _range_of_point(p1).compare(p2.row, p2.column);
+  }
 
   /* -------------------------------------------------------------- */
   editor.conn = null;
@@ -128,13 +131,42 @@ function ecLiftEditor(editor) {
     }
   }
 
-  editor.undo_step = function() {
+  editor.undo = function(step) {
     if (this.online && !this._loading) {
-      this.points.pop();
-      this.step--;
+      this.points.splice(step+1);
+      this.step = step;
       this._loading = true;
-      this.conn.send("undo " + this.step + ".");
+      this.conn.send("undo " + step + ".");
       this.update_markers();
+    }
+  }
+
+  editor.undo_step = function() {
+    this.undo(this.step-1);
+  }
+
+  editor.step_until_cursor = function() {
+    if (this.online) {
+      var from = this.loading_point();
+      var to = this.next_stop_from(this.getCursorPosition());
+      switch (_compare_points(from, to)) {
+      case 0:
+        break;
+      case -1:
+        for (var i = 0; i < this.points.length; i++) {
+          if (_compare_points(this.points[i], to) === 0) {
+            this.undo(i);
+            break;
+          }
+        }
+        break;
+      case 1:
+        while (_compare_points(from, to) > 0) {
+          this.do_step();
+          from = this.loading_point();
+        }
+        break;
+      }
     }
   }
 
