@@ -10,6 +10,13 @@ ifeq ($(shell echo $$TERM), dumb)
 endif
 OCAMLBUILD := $(OCAMLBUILD_BIN) $(OCAMLBUILD_EXTRA)
 
+UNAME_O := $(shell uname -o)
+ifeq ($(UNAME_O),Cygwin)
+  SHELL = bash -o igncr
+else
+  SHELL = bash
+endif
+
 DESTDIR  ?=
 PREFIX   ?= /usr/local
 VERSION  ?= $(shell date '+%F')
@@ -173,16 +180,16 @@ webui-stop:
 
 # --------------------------------------------------------------------
 toolchain:
-	export OPAMVERBOSE=1; bash ./scripts/ec-build-toolchain
+	export OPAMVERBOSE=1; $(SHELL) ./scripts/ec-build-toolchain
 
 update-toolchain:
-	export OPAMVERBOSE=1; $$(./scripts/activate-toolchain.sh) \
+	export OPAMVERBOSE=1; $$($(SHELL) ./scripts/activate-toolchain.sh) \
 	  && opam update  -y \
 	  && opam remove  -y ec-toolchain \
 	  && opam install -y ec-toolchain
 
 provers:
-	export OPAMVERBOSE=1; $$(./scripts/activate-toolchain.sh) \
+	export OPAMVERBOSE=1; $$($(SHELL) ./scripts/activate-toolchain.sh) \
 	  && opam update  -y \
 	  && opam remove  -y ec-provers \
 	  && opam install -y ec-provers \
@@ -190,7 +197,7 @@ provers:
 	  && why3config --detect -C _tools/why3.local.conf
 
 webui-env:
-	bash ./scripts/ec-build-webui-env
+	$(SHELL) ./scripts/ec-build-webui-env
 
 update:
 	git pull

@@ -30,7 +30,7 @@
 
    Available at http://proofgeneral.inf.ed.ac.uk/
 
-* LOCAL TOOLCHAIN
+* LOCAL TOOLCHAIN (POSIX systems)
 ====================================================================
 
 You can install a local copy of OCaml and all the needed libraries by
@@ -67,6 +67,40 @@ provers. After having installing the toolchain, type:
 This also create a configuration file for Why3 in
 _tools/why3.local.conf. This file is automatically loaded by EasyCrypt
 when started locally.
+
+* LOCAL TOOLCHAIN (cygwin)
+====================================================================
+
+WARNING: the ocaml compiler currently shipped with cygwin64 is
+broken. You have to use the 32bits version of cygwin.
+
+  git,wget,unzip,make,m4,gcc-core,gcc=g++,libmpfr4,autoconf,flexdll,
+  libncurses-devel,curl,ocaml,ocaml-compiler-libs,patch
+
+By default, the destination directory is ${PWD}/_tools. You can change
+this by setting the $DEST variable, e.g.:
+
+  make DEST=/opt/ec-toolchain toolchain
+
+Note that $DEST cannot contain spaces.
+
+The toolchain is not activated by default. You have to:
+
+  `bash -o ingcr ./scripts/activate-toolchain.sh`
+
+This command has to be repeated each time you start a fresh terminal.
+
+Regarding the Why3 configuration file, easycrypt is using the default
+Why3 location, i.e. ~/.why3.conf, or _tools/why3.local.conf when it
+exists. If you have several versions of Why3 installed, it may be
+impossible to share the same configuration file among them. EasyCrypt,
+via the option -why3, allows you to load a Why3 configuration file
+from a custom location. For instance:
+
+  why3config --detect -C $DEST/why3.conf
+  ./ec.native -why3 $DEST/why3.conf
+
+We do NOT provide an automated way to install provers.
 
 * COMPILATION
 ====================================================================
