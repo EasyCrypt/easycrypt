@@ -1651,6 +1651,9 @@ intro_pattern:
 
 | SLASHEQ
    { IPSimplify }
+
+| SLASH f=fpattern(form)
+   { IPView f }
 ;
 
 fpattern_head(F):
@@ -2201,8 +2204,11 @@ phltactic:
 | EXFALSO
     { Pexfalso }
 
-| BYPR { PPr ( None ) }
-| BYPR f1=sform f2=sform { PPr( Some (f1,f2)) }
+| BYPR
+    { PPr None }
+
+| BYPR f1=sform f2=sform
+    { PPr (Some (f1, f2)) }
 
 | FEL at_pos=uint cntr=sform delta=sform q=sform f_event=sform some_p=fel_pred_specs inv=sform?
     { Pfel (at_pos,(cntr,delta,q,f_event,some_p,inv)) }
@@ -2219,19 +2225,30 @@ phltactic:
 | EAGER t=eager_tac
     { t }
 
-(* basic pr based tacs *)
-| HOARE {Phoare}
-| PRBOUNDED {Pprbounded}
-| PHOARE SPLIT i=bdhoare_split { Pbdhoare_split i }
-| PHOARE EQUIV s=side pr=sform po=sform { Pbd_equiv(s,pr,po) }
-(* Automation *)
+| HOARE
+    { Phoare }
+
+| PRBOUNDED
+    { Pprbounded }
+
+| PHOARE SPLIT i=bdhoare_split
+    { Pbdhoare_split i }
+
+| PHOARE EQUIV s=side pr=sform po=sform
+    { Pbd_equiv(s, pr, po) }
+
 | AUTO { Pauto }
 ;
 
 bdhoare_split:
-| b1=sform b2=sform b3=sform? { BDH_split_bop (b1,b2,b3) }
-| b1=sform b2=sform COLON f=sform { BDH_split_or_case (b1,b2,f) }
-| NOT b1=sform b2=sform      { BDH_split_not (Some b1,b2) }
+| b1=sform b2=sform b3=sform?
+    { BDH_split_bop (b1,b2,b3) }
+
+| b1=sform b2=sform COLON f=sform
+    { BDH_split_or_case (b1,b2,f) }
+
+| NOT b1=sform b2=sform
+    { BDH_split_not (Some b1,b2) }
 ;
 
 trans_kind:

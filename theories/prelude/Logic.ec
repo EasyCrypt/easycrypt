@@ -246,6 +246,10 @@ by [].
 
 lemma nosmt imp   : forall (x y : bool), (x => y) <=> ((!x)\/y) by [].
 
+lemma nosmt imp_trans (a b c : bool):
+  (a => b) => (b => c) => (a => c)
+by [].
+
 (** equality *)
 lemma nosmt eq_refl  : forall (x:'a), x = x by [].
 lemma nosmt eq_sym   : forall (x y : 'a), x = y <=> y = x by [].

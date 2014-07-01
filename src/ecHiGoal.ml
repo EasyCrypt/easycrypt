@@ -484,7 +484,8 @@ let process_mintros ?(cf = true) pis gs =
     match pis with
     | [] -> maybe_core ()
 
-    | IPCore x :: pis -> collect acc (x :: core) pis
+    | IPCore x :: pis ->
+        collect acc (x :: core) pis
 
     | IPDone b :: pis ->
         collect (`Done b :: maybe_core ()) [] pis
@@ -501,6 +502,9 @@ let process_mintros ?(cf = true) pis gs =
 
     | IPRw x :: pis ->
         collect (`Rw x :: maybe_core ()) [] pis
+
+    | IPView x :: pis ->
+        collect (`View x :: maybe_core ()) [] pis
 
     | IPSubst x :: pis ->
         collect (`Subst x :: maybe_core ()) [] pis
@@ -556,6 +560,49 @@ let process_mintros ?(cf = true) pis gs =
                   t_seqs [t_intros_i [h]; rwt; t_clear h] tc
               in
                 (false, t_onall t gs)
+
+          | `View pe ->
+              let on1 tc =
+                let module E = struct exception NoInstance end in
+
+                let hyps = tc1_hyps tc in
+                let pte  = PT.tc1_process_full_pterm tc pe in
+  
+                let rec instantiate fp pte =
+                  match TTC.destruct_product hyps pte.PT.ptev_ax with
+                  | None -> raise E.NoInstance
+  
+                  | Some (`Forall _) ->
+                      instantiate fp (PT.apply_pterm_to_hole pte)
+  
+                  | Some (`Imp (f1, f2)) ->
+                      try
+                        PT.pf_form_match ~mode:fmdelta pte.PT.ptev_env ~ptn:f1 fp;
+                        (pte, f2)
+                      with MatchFailure -> raise E.NoInstance
+                in
+
+                try
+                  match TTC.destruct_product hyps (FApi.tc1_goal tc) with
+                  | None | Some (`Forall _) -> raise E.NoInstance
+
+                  | Some (`Imp (f1, f2)) ->
+                      let (pte, cutf) = instantiate f1 pte in
+                      let cutf = PT.concretize_form pte.PT.ptev_env cutf in
+                      let pt = fst (PT.concretize pte) in
+                      let pt = { pt with
+                                  pt_head = PTGlobal (EcCoreLib.p_imp_trans, []);
+                                  pt_args = [PAFormula f1       ;
+                                             PAFormula cutf     ;
+                                             PAFormula f2       ;
+                                             PASub     (Some pt);
+                                             PASub     None     ]; } in
+                      EcLowGoal.t_apply pt tc
+  
+                with E.NoInstance ->
+                  tc_error !!tc "cannot apply view"
+              in
+                (false, t_onall on1 gs)
 
           | `Subst d ->
               let t tc =

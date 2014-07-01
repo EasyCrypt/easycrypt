@@ -484,6 +484,7 @@ and rwocci = [`Inclusive | `Exclusive]
 type intropattern1 =
   | IPCore  of renaming located
   | IPCase  of intropattern list
+  | IPView  of ffpattern
   | IPRw    of (rwocc * rwside)
   | IPSubst of rwside
   | IPClear of psymbol list

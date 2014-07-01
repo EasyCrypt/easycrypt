@@ -138,6 +138,7 @@ val p_eq_trans    : path
 val p_eq_sym      : path
 val p_eq_sym_imp  : path
 val p_fcongr      : path
+val p_imp_trans   : path
 
 val p_rewrite_l     : path 
 val p_rewrite_r     : path 
