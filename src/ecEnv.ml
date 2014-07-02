@@ -61,13 +61,6 @@ let ibasename p =
   | IPIdent (m, None) -> EcIdent.name m
   | IPIdent (_, Some p) -> EcPath.basename p
 
-(* let itostring = function *)
-(*   | IPPath p -> EcPath.tostring p *)
-(*   | IPIdent (m, None) -> EcIdent.tostring m *)
-(*   | IPIdent (m, Some p) -> *)
-(*       Printf.sprintf "%s.%s" *)
-(*         (EcIdent.tostring m) (EcPath.tostring p) *)
-
 module IPathC = struct
   type t = ipath
 
@@ -121,10 +114,10 @@ type mc = {
   mc_components : ipath MMsym.t;
 }
 
-type use =
- { us_pv : ty Mx.t;
-   us_gl : Sid.t;
- }
+type use = {
+  us_pv : ty Mx.t;
+  us_gl : Sid.t;
+}
 
 type env_norm = {
   norm_mp   : EcPath.mpath Mm.t;
@@ -1531,15 +1524,6 @@ module Fun = struct
     let fd, memenv = actmem_body EcFol.mhr path fun_ in
     memenv, fd, Memory.push_active memenv env
 
-  let hoareS_anonym _locals _env =      (* FIXME *)
-    assert false
-
-(*
-    let path = env.env_scope in
-    let memenv = actmem_body_anonym EcFol.mhr path locals in
-    memenv, Memory.push_active memenv env
-*)
-
   let equivF_memenv path1 path2 env =
     let (ip1, _) = oget (ipath_of_xpath path1) in
     let (ip2, _) = oget (ipath_of_xpath path2) in
@@ -1563,16 +1547,6 @@ module Fun = struct
     let fd1, mem1 = actmem_body EcFol.mleft path1 fun1 in
     let fd2, mem2 = actmem_body EcFol.mright path2 fun2 in
     mem1, fd1, mem2, fd2, Memory.push_all [mem1; mem2] env
-
-  let equivS_anonym _locals1 _locals2 _env = (* FIXME *)
-    assert false
-
-(*
-    let path1, path2 = env.env_scope, env.env_scope in
-    let mem1 = actmem_body_anonym EcFol.mleft path1 locals1 in
-    let mem2 = actmem_body_anonym EcFol.mright path2 locals2 in
-    mem1, mem2, Memory.push_all [mem1; mem2] env
-*)
 end
 
 (* -------------------------------------------------------------------- *)
@@ -1925,7 +1899,6 @@ module Mod = struct
     in
       List.fold_left do1 env bd
 end
-
 
 (* -------------------------------------------------------------------- *)
 module NormMp = struct

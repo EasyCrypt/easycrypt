@@ -91,8 +91,6 @@ module Fun : sig
 
   val hoareS : xpath -> env -> memenv * (funsig * function_def) * env
 
-  val hoareS_anonym : variable list -> env -> memenv * env
-
   val actmem_post :  memory -> xpath -> function_ -> memenv
 
   val inv_memenv : env -> env
@@ -104,9 +102,6 @@ module Fun : sig
 
   val equivS : xpath -> xpath -> env ->
     memenv * (funsig * function_def) * memenv * (funsig * function_def) * env
-
-  val equivS_anonym : variable list -> variable list -> env ->
-    memenv * memenv * env
 end
 
 (* -------------------------------------------------------------------- *)

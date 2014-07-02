@@ -1914,9 +1914,7 @@ module Extraction = struct
 end
 
 (* -------------------------------------------------------------------- *)
-
 module BaseRw = struct
-
   let process scope x = 
     { scope with 
       sc_env = EcEnv.BaseRw.bind x.pl_desc (env scope) }
@@ -1929,13 +1927,13 @@ module BaseRw = struct
         let pre, base = x.pl_desc in 
         if pre <> [] then 
           hierror ~loc:x.pl_loc 
-            "Can not create a hint rewrite base outside the theory";
+            "cannot create a hint rewrite base outside a theory";
         let p = EcPath.pqname (EcEnv.root env) base in
         begin match EcEnv.Ax.by_path_opt p env with
         | None -> ()
         | Some _ ->  
           hierror ~loc:x.pl_loc 
-            "An axiom with the same name already exists";
+            "an axiom with the same name already exists";
         end;
         let env = EcEnv.BaseRw.bind base env in
         env, fst (EcEnv.BaseRw.lookup x.pl_desc env) 
@@ -1943,5 +1941,4 @@ module BaseRw = struct
     let l = List.map (fun l -> EcEnv.Ax.lookup_path l.pl_desc env) l in
     { scope with
       sc_env = EcEnv.BaseRw.bind_addrw base l env }
-
 end

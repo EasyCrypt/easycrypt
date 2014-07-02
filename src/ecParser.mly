@@ -795,12 +795,6 @@ sform_u(P):
 
 | EAGER LBRACKET eb=eager_body(P) RBRACKET { eb }
 
-| HOARE LBRACKET
-    s=loc(fun_def_body)
-    COLON pre=form_r(P) LONGARROW post=form_r(P)
-  RBRACKET
-	{ PFhoareS (pre, s, post) }
-
 | PR LBRACKET
     mp=loc(fident) args=paren(plist0(form_r(P), COMMA)) AT pn=mident
     COLON event=form_r(P)
@@ -905,13 +899,6 @@ form_u(P):
         PFapp (mk_loc loc id, [e]) }
 
 | PHOARE pb=phoare_body(P) { pb }
-
-| PHOARE
-    LBRACKET s=loc(fun_def_body) COLON
-      pre=form_r(P) LONGARROW post=form_r(P)
-    RBRACKET
-      cmp=hoare_bd_cmp bd=sform_r(P)
-	{ PFBDhoareS (pre, s, post, cmp, bd) }
 
 | LOSSLESS mp=loc(fident)
     { PFlsless mp }

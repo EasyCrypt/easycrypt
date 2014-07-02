@@ -1910,7 +1910,7 @@ let transmem env m =
   | None ->
       tyerror m.pl_loc env (UnknownMemName (0, unloc m))
       
-  | Some me -> 
+  | Some me ->
 (*      if (EcMemory.memtype me) <> None then
         tyerror m.pl_loc env (InvalidMem (unloc m, MAE_IsConcrete)); *)
       (fst me)
@@ -2167,26 +2167,6 @@ let trans_form_or_pattern env (ps, ue) pf tt =
           unify_or_fail qenv ue post.pl_loc ~expct:tbool post'.f_ty;
           f_hoareF pre' fpath post'
 
-    | PFhoareS (pre, body, post) ->
-        let symbols = ref Mstr.empty in
-        let ue = UE.create (Some []) in
-        let (env, stmt, _re, prelude, locals) =
-          let env = EcEnv.Fun.enter "$stmt" env in
-            (* FIXME: $stmt ? *)
-            transbody ue symbols env tunit body
-        in
-        let su      = Tuni.offun (UE.close ue) in
-        let locals  = List.map (fundef_check_decl  su env) locals in
-        let prelude = List.map (fundef_check_iasgn su env) prelude in
-        let clsubst = { EcTypes.e_subst_id with es_ty = su } in
-        let stmt    = s_subst clsubst stmt in
-        let (menv, env) = EcEnv.Fun.hoareS_anonym locals env in
-        let pre'  = transf env pre in
-        let post' = transf env post in
-        unify_or_fail env ue pre.pl_loc  ~expct:tbool pre' .f_ty;
-        unify_or_fail env ue post.pl_loc ~expct:tbool post'.f_ty;
-        f_hoareS menv pre' (EcModules.stmt (List.flatten prelude @ stmt.s_node)) post'
-
     | PFBDhoareF (pre, gp, post, hcmp, bd) ->
         let fpath = trans_gamepath env gp in
         let penv, qenv = EcEnv.Fun.hoareF fpath env in
@@ -2202,29 +2182,6 @@ let trans_form_or_pattern env (ps, ue) pf tt =
     | PFlsless gp ->
         let fpath = trans_gamepath env gp in
           f_losslessF fpath
-
-    | PFBDhoareS (pre, body, post, hcmp, bd) ->
-        let symbols = ref Mstr.empty in
-        let ue      = UE.create (Some []) in
-        let (env, stmt, _re, prelude, locals) =
-          let env = EcEnv.Fun.enter "$stmt" env in
-            (* FIXME: $stmt ? *)
-            transbody ue symbols env tunit body
-        in
-        let su      = Tuni.offun (UE.close ue) in
-        let locals  = List.map (fundef_check_decl  su env) locals in
-        let prelude = List.map (fundef_check_iasgn su env) prelude in
-        let clsubst = { EcTypes.e_subst_id with es_ty = su } in
-        let stmt    = s_subst clsubst stmt in
-        let (menv, env) = EcEnv.Fun.hoareS_anonym locals env in
-        let pre'  = transf env pre in
-        let post' = transf env post in
-        let bd'   = transf env bd in
-          (* FIXME: check that there are not pvars in bd *)
-          unify_or_fail env ue pre .pl_loc ~expct:tbool pre' .f_ty;
-          unify_or_fail env ue post.pl_loc ~expct:tbool post'.f_ty;
-          unify_or_fail env ue bd  .pl_loc ~expct:treal bd'  .f_ty;
-          f_bdHoareS menv pre' (EcModules.stmt (List.flatten prelude @ stmt.s_node)) post' hcmp bd'
 
     | PFequivF (pre, (gp1, gp2), post) ->
         let fpath1 = trans_gamepath env gp1 in
@@ -2247,7 +2204,6 @@ let trans_form_or_pattern env (ps, ue) pf tt =
         unify_or_fail penv ue pre .pl_loc ~expct:tbool pre' .f_ty;
         unify_or_fail qenv ue post.pl_loc ~expct:tbool post'.f_ty;
         f_eagerF pre' s1 fpath1 fpath2 s2 post'
-        
 
   and trans_fbind env ue decl = 
     let trans1 env (xs, pgty) =
