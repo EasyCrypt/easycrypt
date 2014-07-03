@@ -190,7 +190,7 @@ Workspace.prototype.load_editor = function() {
     readOnly: false,
   });
   this.editor.commands.addCommand({
-    name: 'step',
+    name: 'do_step',
     bindKey: {
       mac: 'Ctrl-N',
       win: 'Ctrl-N',
@@ -201,7 +201,7 @@ Workspace.prototype.load_editor = function() {
     readOnly: false,
   });
   this.editor.commands.addCommand({
-    name: 'undo',
+    name: 'undo_step',
     bindKey: {
       mac: 'Ctrl-U',
       win: 'Ctrl-U',
@@ -212,7 +212,7 @@ Workspace.prototype.load_editor = function() {
     readOnly: false,
   });
   this.editor.commands.addCommand({
-    name: 'step_cursor',
+    name: 'step_until_cursor',
     bindKey: {
       mac: 'Ctrl-Enter',
       win: 'Ctrl-Enter',

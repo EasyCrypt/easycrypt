@@ -134,7 +134,7 @@ function ecLiftEditor(editor) {
     }
   }
 
-  editor.undo = function(step) {
+  editor.undo_to_step = function(step) {
     if (this.online && !this._loading && step >= 0) {
       this.points.splice(step+1);
       this.step = step;
@@ -145,7 +145,7 @@ function ecLiftEditor(editor) {
   }
 
   editor.undo_step = function() {
-    this.undo(this.step-1);
+    this.undo_to_step(this.step-1);
   }
 
   editor.step_until_cursor = function() {
