@@ -90,8 +90,7 @@ function ecLiftEditor(editor) {
   editor.points = [editor._start];
 
   editor._loading = false;
-  editor.loading_marker = null;
-  editor.loaded_marker  = null;
+  editor.markers = [];
 
   /* -------------------------------------------------------------- */
   editor.loading_point = function() {
@@ -196,18 +195,17 @@ function ecLiftEditor(editor) {
   editor.update_markers = function() {
     var session = this.getSession();
 
-    if (this.loading_marker !== null)
-      session.removeMarker(this.loading_marker);
-    if (this.loaded_marker !== null)
-      session.removeMarker(this.loaded_marker);
+    for (var i = 0; i < this.markers.length; i++)
+      session.removeMarker(this.markers[i]);
 
     var loaded_pt = this.loaded_point();
-    var loaded_range = Range.fromPoints(this._start, loaded_pt);
-    this.loaded_marker = session.addMarker(loaded_range, "ace_loaded", "text");
-
     var loading_pt = this.loading_point();
+
+    var loaded_range = Range.fromPoints(this._start, loaded_pt);
     var loading_range = Range.fromPoints(loaded_pt, loading_pt);
-    this.loading_marker = session.addMarker(loading_range, "ace_loading", "text");
+
+    this.markers = [ session.addMarker(loaded_range, "ace_loaded"),
+                     session.addMarker(loading_range, "ace_loading") ];
   }
 
   /* -------------------------------------------------------------- */
