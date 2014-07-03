@@ -142,7 +142,6 @@ function ecLiftEditor(editor) {
 
         this.points = this.points.concat([to]);
         this._loading = true;
-        this.setReadOnly(true);
         this.update_markers();
       }
     }
@@ -162,16 +161,29 @@ function ecLiftEditor(editor) {
     this.undo_to_step(this.step-1);
   }
 
-  editor.step_until_cursor = function(prev) {
+  editor.step_until_cursor = function(until_prev) {
+    until_prev = until_prev || false;
     if (this.online) {
       var from = this.loading_point();
       var cursor = this.getCursorPosition();
+      var prev_stop = this.prev_stop_from(cursor);
+
+      var search = new Search();
+      search.setOptions({
+        range: Range.fromPoints(prev_stop, cursor),
+        needle: /^\W*$/,
+        wrap: false,
+        regExp: true
+      });
+      var cursor_after_stop =
+        cursor.row === prev_stop.row && search.find(this.getSession());
+
       switch (_compare_points(from, cursor)) {
       case 0:
         break;
       case -1:  // Step backward (undo)
-        if (prev) {
-          var to = this.prev_stop_from(cursor);
+        if (until_prev || cursor_after_stop) {
+          var to = prev_stop;
         } else {
           var to = this.next_stop_from(cursor);
         }
@@ -183,8 +195,8 @@ function ecLiftEditor(editor) {
         }
         break;
       case 1:   // Step forward
-        if (prev) {
-          var to = this.prev_stop_from(cursor);
+        if (until_prev || cursor_after_stop) {
+          var to = prev_stop;
         } else {
           var to = this.next_stop_from(cursor);
         }
@@ -211,7 +223,6 @@ function ecLiftEditor(editor) {
       this.update_markers();
     if (newStep === this.points.length-1) {
       this._loading = false;
-      this.setReadOnly(false);
     }
   }
 
@@ -236,13 +247,7 @@ function ecLiftEditor(editor) {
   editor.on("change", function(e) {
     var from = this.loading_point();
     if ((Range.fromPoints(this._start, from)).intersects(e.data.range)) {
-      var to = this.prev_stop_from(e.data.range.start);
-      for (var i = 0; i < this.points.length; i++) {
-        if (_compare_points(this.points[i], to) === 0) {
-          this.undo_to_step(i);
-          break;
-        }
-      }
+      this.step_until_cursor(true);
     }
   }.bind(editor));
 
