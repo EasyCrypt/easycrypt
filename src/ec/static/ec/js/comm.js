@@ -102,6 +102,19 @@ function ecLiftEditor(editor) {
   }
 
   /* -------------------------------------------------------------- */
+  editor.prev_stop_from = function(point) {
+    var search = new Search();
+    search.setOptions({
+      backwards: true,
+      start: _range_of_point(point),
+      needle: /\.$|\.\W/g,
+      wrap: false,
+      regExp: true
+    });
+    var stop = search.find(this.getSession());
+    return (stop ? stop.end : this._start);
+  }
+
   editor.next_stop_from = function(point) {
     var search = new Search();
     search.setOptions({
@@ -129,6 +142,7 @@ function ecLiftEditor(editor) {
 
         this.points = this.points.concat([to]);
         this._loading = true;
+        this.setReadOnly(true);
         this.update_markers();
       }
     }
@@ -148,7 +162,7 @@ function ecLiftEditor(editor) {
     this.undo_to_step(this.step-1);
   }
 
-  editor.step_until_cursor = function() {
+  editor.step_until_cursor = function(prev) {
     if (this.online) {
       var from = this.loading_point();
       var cursor = this.getCursorPosition();
@@ -156,7 +170,11 @@ function ecLiftEditor(editor) {
       case 0:
         break;
       case -1:  // Step backward (undo)
-        var to = this.next_stop_from(cursor);
+        if (prev) {
+          var to = this.prev_stop_from(cursor);
+        } else {
+          var to = this.next_stop_from(cursor);
+        }
         for (var i = 0; i < this.points.length; i++) {
           if (_compare_points(this.points[i], to) === 0) {
             this.undo_to_step(i);
@@ -165,7 +183,11 @@ function ecLiftEditor(editor) {
         }
         break;
       case 1:   // Step forward
-        var to = this.next_stop_from(cursor);
+        if (prev) {
+          var to = this.prev_stop_from(cursor);
+        } else {
+          var to = this.next_stop_from(cursor);
+        }
         if (to === null) {   // At the end of the document
           while (this.next_stop_from(from) !== null) {
             this.do_step();
@@ -187,8 +209,10 @@ function ecLiftEditor(editor) {
     this.step = newStep;
     if (newStep !== 0)
       this.update_markers();
-    if (newStep === this.points.length-1)
+    if (newStep === this.points.length-1) {
       this._loading = false;
+      this.setReadOnly(false);
+    }
   }
 
   /* -------------------------------------------------------------- */
@@ -207,6 +231,20 @@ function ecLiftEditor(editor) {
     this.markers = [ session.addMarker(loaded_range, "ace_loaded"),
                      session.addMarker(loading_range, "ace_loading") ];
   }
+
+  /* -------------------------------------------------------------- */
+  editor.on("change", function(e) {
+    var from = this.loading_point();
+    if ((Range.fromPoints(this._start, from)).intersects(e.data.range)) {
+      var to = this.prev_stop_from(e.data.range.start);
+      for (var i = 0; i < this.points.length; i++) {
+        if (_compare_points(this.points[i], to) === 0) {
+          this.undo_to_step(i);
+          break;
+        }
+      }
+    }
+  }.bind(editor));
 
   /* -------------------------------------------------------------- */
   editor.conn = new Conn(editor);
