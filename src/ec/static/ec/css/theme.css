@@ -55,12 +55,12 @@ body {
 
 .ace_loaded {
 	position: absolute;
-	background-color: #55cccc;
+	background-color: #88ffff;
 }
 
 .ace_loading {
 	position: absolute;
-	background-color: #dd6666;
+	background-color: #ff8888;
 }
 
 .ui-tabs-nav li :focus {

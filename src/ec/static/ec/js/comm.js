@@ -155,18 +155,18 @@ function ecLiftEditor(editor) {
       switch (_compare_points(from, cursor)) {
       case 0:
         break;
-      case -1:
+      case -1:  // Step backward (undo)
         var to = this.next_stop_from(cursor);
         for (var i = 0; i < this.points.length; i++) {
           if (_compare_points(this.points[i], to) === 0) {
-            this.undo(i);
+            this.undo_to_step(i);
             break;
           }
         }
         break;
-      case 1:
+      case 1:   // Step forward
         var to = this.next_stop_from(cursor);
-        if (to === null) {
+        if (to === null) {   // At the end of the document
           while (this.next_stop_from(from) !== null) {
             this.do_step();
             from = this.loading_point();
