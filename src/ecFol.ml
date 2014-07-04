@@ -1778,6 +1778,8 @@ let f_anda_simpl f1 f2 =
   else if is_false f2 then f_false
   else f_anda f1 f2
 
+let f_andas_simpl = List.fold_right f_anda_simpl
+
 let f_or_simpl f1 f2 =
   if is_true f1 then f_true
   else if is_false f1 then f2
@@ -1832,7 +1834,7 @@ let f_iff_simpl f1 f2 =
   else if is_false f2 then f_not_simpl f1
   else f_iff f1 f2
 
-let f_eq_simpl f1 f2 =
+let rec f_eq_simpl f1 f2 =
   if f_equal f1 f2 then f_true
   else match f1.f_node, f2.f_node with
   | Fint _ , Fint _ -> f_false
@@ -1845,6 +1847,8 @@ let f_eq_simpl f1 f2 =
      EcPath.p_equal op2 EcCoreLib.p_false) ||
      (EcPath.p_equal op2 EcCoreLib.p_true &&
      EcPath.p_equal op1 EcCoreLib.p_false) -> f_false
+  | Ftuple fs1, Ftuple fs2 when List.length fs1 = List.length fs2 -> 
+    f_andas_simpl (List.map2 f_eq_simpl fs1 fs2) f_true
   | _ -> f_eq f1 f2
 
 let f_int_le_simpl f1 f2 =
