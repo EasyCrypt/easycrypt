@@ -1847,7 +1847,7 @@ let rec f_eq_simpl f1 f2 =
      EcPath.p_equal op2 EcCoreLib.p_false) ||
      (EcPath.p_equal op2 EcCoreLib.p_true &&
      EcPath.p_equal op1 EcCoreLib.p_false) -> f_false
-  | Ftuple fs1, Ftuple fs2 when List.length fs1 = List.length fs2 -> 
+  | Ftuple fs1, Ftuple fs2 when List.length fs1 = List.length fs2 ->
     f_andas_simpl (List.map2 f_eq_simpl fs1 fs2) f_true
   | _ -> f_eq f1 f2
 
