@@ -215,7 +215,7 @@ let op_char_1    = ['=' '<' '>']
 let op_char_2    = ['+' '-']
 let op_char_3_r  = ['*' '%' '\\']
 let op_char_3    = op_char_3_r | '/'
-let op_char_4_r  = ['$' '&' '?' '^' '|' '#']
+let op_char_4_r  = ['$' '&' '^' '|' '#']
 let op_char_4    = op_char_4_r | '@'
 let op_char_34   = op_char_3 | op_char_4
 let op_char_234  = op_char_2 | op_char_34
