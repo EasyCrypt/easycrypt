@@ -1957,7 +1957,7 @@ type sform =
   | SFif    of form * form * form
   | SFlet   of lpattern * form * form
   | SFtuple of form list
-
+  | SFproj  of form * int
   | SFquant of quantif * (EcIdent.t * gty) * form Lazy.t
   | SFtrue
   | SFfalse
@@ -2001,6 +2001,7 @@ let rec sform_of_form fp =
   | Fif    (c, f1, f2)  -> SFif    (c, f1, f2)
   | Flet   (lv, f1, f2) -> SFlet   (lv, f1, f2)
   | Ftuple fs           -> SFtuple fs
+  | Fproj (f, i)        -> SFproj  (f,i)
 
   | Fquant (_, [ ]  , f) -> sform_of_form f
   | Fquant (q, [b]  , f) -> SFquant (q, b, lazy f)

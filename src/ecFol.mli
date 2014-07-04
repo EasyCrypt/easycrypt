@@ -492,6 +492,7 @@ type sform =
   | SFif    of form * form * form
   | SFlet   of lpattern * form * form
   | SFtuple of form list
+  | SFproj  of form * int
 
   | SFquant of quantif * (EcIdent.t * gty) * form Lazy.t
   | SFtrue
