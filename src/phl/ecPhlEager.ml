@@ -184,7 +184,14 @@ let t_eager_while_r h tc =
   let to_form eq =  Mpv2.to_form (fst eC.es_ml) (fst eC.es_mr) eq f_true in
 
   let eqI  = eC.es_pr in
-  let seqI = Mpv2.of_form env (fst eC.es_ml) (fst eC.es_mr) eqI in
+  let seqI = 
+    try 
+      Mpv2.of_form env (fst eC.es_ml) (fst eC.es_mr) eqI 
+    with Not_found ->
+      tc_error_lazy !!tc (fun fmt ->
+        let ppe  = EcPrinting.PPEnv.ofenv env in
+        Format.fprintf fmt "recognize equalities in %a@." (EcPrinting.pp_form ppe) eqI)
+  in
   let eqI2 = to_form (Mpv2.eq_fv2 seqI) in
   let e1   = form_of_expr (fst eC.es_ml) e in
   let e2   = form_of_expr (fst eC.es_mr) e' in
