@@ -409,7 +409,7 @@ let rec h_red ri env hyps f =
                   if idx p1 <> idx p2 then f_false else fallback ()
 
             | Ftuple es1, Ftuple es2 ->
-                f_andas (List.map2 f_eq es1 es2)
+                f_ands (List.map2 f_eq es1 es2)
 
             | _ -> fallback ()
         end
