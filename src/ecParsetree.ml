@@ -469,7 +469,7 @@ type rwarg = (tfocus located) option * rwarg1
 
 and rwarg1 =
   | RWDelta of (rwside * rwocc * pformula)
-  | RWRw    of (rwside * trepeat option * rwocc * ffpattern list)
+  | RWRw    of (rwside * trepeat option * rwocc * (rwside * ffpattern) list)
   | RWPr    of psymbol
   | RWDone  of bool
   | RWSimpl

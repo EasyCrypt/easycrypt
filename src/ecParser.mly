@@ -1673,14 +1673,6 @@ fpattern(F):
    { mk_fpattern hd args }
 ;
 
-fpattern_list(F):
-| f=fpattern(F)
-    { [f] }
-
-| LPAREN fs=rlist2(fpattern(F), COMMA) RPAREN
-    { fs }
-;
-
 pterm:
 | p=qident tvi=tvars_app? args=loc(fpattern_arg)*
     { { pt_name = p; pt_tys = tvi; pt_args = args; } }
@@ -1734,7 +1726,7 @@ rwarg1:
 | SLASHEQ
    { RWSimpl }
 
-| s=rwside r=rwrepeat? o=rwocc? fp=fpattern_list(form)
+| s=rwside r=rwrepeat? o=rwocc? fp=rwfpatterns(form)
    { RWRw (s, r, o |> omap (snd_map EcMaps.Sint.of_list), fp) }
 
 | s=rwside r=rwrepeat? o=rwocc? SLASH x=sform_h %prec prec_tactic
@@ -1745,6 +1737,19 @@ rwarg1:
 
 | PR s=bracket(ident)
    { RWPr s }
+;
+
+rwfpatterns(F):
+| f=fpattern(F)
+    { [(`LtoR, f)] }
+
+| LPAREN fs=rlist2(rwfpattern(F), COMMA) RPAREN
+    { fs }
+;
+
+rwfpattern(F):
+| s=rwside f=fpattern(F)
+    { (s, f) }
 ;
 
 rwarg:
