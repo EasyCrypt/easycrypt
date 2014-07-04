@@ -407,6 +407,10 @@ let rec h_red ri env hyps f =
                     snd (EcDecl.operator_as_ctor idx)
                 in
                   if idx p1 <> idx p2 then f_false else fallback ()
+
+            | Ftuple es1, Ftuple es2 ->
+                f_andas (List.map2 f_eq es1 es2)
+
             | _ -> fallback ()
         end
         | _  -> f
