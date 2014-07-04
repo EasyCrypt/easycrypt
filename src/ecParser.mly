@@ -1731,9 +1731,7 @@ rwarg1:
 
 | s=rwside r=rwrepeat? o=rwocc? SLASH x=sform_h %prec prec_tactic
    { let loc = EcLocation.make $startpos $endpos in
-       if r <> None then
-         parse_error loc (Some "delta-repeat not supported");
-       RWDelta (s, o |> omap (snd_map EcMaps.Sint.of_list), x); }
+       RWDelta (s, r, o |> omap (snd_map EcMaps.Sint.of_list), x); }
 
 | PR s=bracket(ident)
    { RWPr s }

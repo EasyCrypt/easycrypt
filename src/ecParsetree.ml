@@ -468,7 +468,7 @@ type tfocus  = (int option * int option) * [`Include | `Exclude]
 type rwarg = (tfocus located) option * rwarg1
 
 and rwarg1 =
-  | RWDelta of (rwside * rwocc * pformula)
+  | RWDelta of (rwside * trepeat option * rwocc * pformula)
   | RWRw    of (rwside * trepeat option * rwocc * (rwside * ffpattern) list)
   | RWPr    of psymbol
   | RWDone  of bool

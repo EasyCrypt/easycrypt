@@ -404,8 +404,13 @@ let rec process_rewrite1 ri tc =
   | RWSimpl ->
       t_simplify ~delta:false tc
 
-  | RWDelta (s, o, p) ->
-      process_delta (s, o, p) tc
+  | RWDelta (s, r, o, p) -> begin
+      let do1 tc = process_delta (s, o, p) tc in
+
+      match r with
+      | None -> do1 tc
+      | Some (b, n) -> t_do b n do1 tc
+  end
 
   | RWRw ((s : rwside), r, o, pts) -> begin
       let do1 ((subs : rwside), pt) tc =
