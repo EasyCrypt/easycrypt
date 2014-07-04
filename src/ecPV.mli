@@ -10,7 +10,15 @@ open EcEnv
 open EcFol
 
 (* -------------------------------------------------------------------- *)
+module PVMap : sig
+  type 'a t
 
+  val create : env -> 'a t
+  val add    : prog_var -> 'a -> 'a t -> 'a t
+  val find   : prog_var -> 'a t -> 'a option
+end
+
+(* -------------------------------------------------------------------- *)
 module Mpv : sig 
   type ('a,'b) t
 
@@ -33,9 +41,9 @@ module Mpv : sig
   val find_glob : env -> mpath -> ('a,'b) t -> 'b
 
   val issubst : env -> (expr, unit) t -> instr list -> instr list
-
 end 
 
+(* -------------------------------------------------------------------- *)
 exception MemoryClash
 
 module PVM : sig
@@ -53,8 +61,7 @@ module PVM : sig
 
   val subst   : env -> subst -> form  -> form
 
-  val subst1  : env -> prog_var -> EcIdent.t -> form -> form -> form
-    
+  val subst1  : env -> prog_var -> EcIdent.t -> form -> form -> form    
 end
 
 (* -------------------------------------------------------------------- *)
@@ -74,11 +81,10 @@ module PV : sig
   val diff     : t -> t -> t
   val subset   : t -> t -> bool
     
-  val interdep : env -> t -> t -> t
-  val indep    : env -> t -> t -> bool
+  val interdep     : env -> t -> t -> t
+  val indep        : env -> t -> t -> bool
   val check_depend : env -> t -> mpath -> unit
-
-  val elements : t -> (prog_var * ty) list * mpath list
+  val elements     : t -> (prog_var * ty) list * mpath list
 
   val mem_pv   : env -> prog_var -> t -> bool
   val mem_glob : env -> mpath -> t -> bool
@@ -88,9 +94,9 @@ module PV : sig
   val pp : env -> Format.formatter -> t -> unit
 
   val iter : (prog_var -> ty -> unit) -> (mpath -> unit) -> t -> unit
-
 end
 
+(* -------------------------------------------------------------------- *)
 val s_write  : ?except_fs:EcPath.Sx.t -> env -> stmt -> PV.t
 val is_write : ?except_fs:EcPath.Sx.t -> env -> PV.t -> instr list -> PV.t
 val f_write  : ?except_fs:EcPath.Sx.t -> env -> EcPath.xpath -> PV.t
@@ -102,6 +108,7 @@ val f_read   : env -> EcPath.xpath -> PV.t
 
 val while_info : env -> expr -> stmt -> EcBaseLogic.abs_uses
 
+(* -------------------------------------------------------------------- *)
 exception EqObsInError
 
 module Mpv2 : sig
@@ -137,8 +144,10 @@ module Mpv2 : sig
   val split_mod : PV.t -> PV.t -> t -> t
 end
 
+(* -------------------------------------------------------------------- *)
 val add_eqs : EcEnv.env -> Mpv2.t -> EcTypes.expr -> EcTypes.expr -> Mpv2.t
 
+(* -------------------------------------------------------------------- *)
 val eqobs_in :
   EcEnv.env ->
   ('log ->

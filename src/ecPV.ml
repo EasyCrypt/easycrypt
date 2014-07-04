@@ -11,7 +11,6 @@ open EcFol
 open EcEnv
 
 (* -------------------------------------------------------------------- *)
-
 type alias_clash = 
  | AC_concrete_abstract of mpath * prog_var 
  | AC_abstract_abstract of mpath * mpath
@@ -58,6 +57,25 @@ module Mnpv =
 
 module Snpv = EcMaps.Set.MakeOfMap(Mnpv)    
 
+(* -------------------------------------------------------------------- *)
+module PVMap = struct
+  type 'a t = {
+    pvm_env : EcEnv.env;
+    pvm_map : 'a Mnpv.t;
+  }
+
+  let create (env : EcEnv.env) =
+    { pvm_env = env; pvm_map = Mnpv.empty; }
+
+  let add k v m =
+    { m with pvm_map =
+        Mnpv.add (pvm m.pvm_env k) v m.pvm_map; }
+
+  let find k m =
+    Mnpv.find_opt (pvm m.pvm_env k) m.pvm_map
+end
+
+(* -------------------------------------------------------------------- *)
 module Mpv = struct
   type ('a, 'b) t = 
     { s_pv : 'a Mnpv.t; 
@@ -545,13 +563,14 @@ let while_info env e s =
     EcBaseLogic.aus_calls = Sx.elements c; }
 
 
+(* -------------------------------------------------------------------- *)
 exception EqObsInError
 
 module Mpv2 = struct 
-
-  type t =
-    { s_pv : (Snpv.t * ty) Mnpv.t;
-      s_gl : Sm.t; }
+  type t = {
+    s_pv : (Snpv.t * ty) Mnpv.t;
+    s_gl : Sm.t;
+  }
 
   let empty = { s_pv = Mnpv.empty; s_gl = Sm.empty }
 
@@ -973,7 +992,6 @@ let eqobs_in env
       s_eqobs_in rsl rsr fhyps eqo 
     (* TODO add the same for lossless random *) 
 
-
     | [], _ -> [], rsr, fhyps, eqo
     | _, [] -> rsl, [], fhyps, eqo
     | il::rsl', ir::rsr' ->
@@ -1132,8 +1150,7 @@ and eqobs_inF_refl env f' eqo =
       end;
       eqi
 
-
-
+(* -------------------------------------------------------------------- *)
 let check_module_in env mp mt =
   let sig_ = ModTy.sig_of_mt env mt in
   let params = sig_.mis_params in

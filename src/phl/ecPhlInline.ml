@@ -8,6 +8,7 @@ open EcTypes
 open EcModules
 open EcFol
 open EcEnv
+open EcPV
 
 open EcCoreGoal
 open EcLowGoal
@@ -20,6 +21,42 @@ type i_pat =
   | IPwhile of s_pat
 
 and s_pat = (int * i_pat) list
+ 
+(* -------------------------------------------------------------------- *)
+module LowSubst = struct
+  let pvsubst m pv =
+    odfl pv (PVMap.find pv m)
+
+  let rec esubst m e =
+    match e.e_node with
+    | Evar pv -> e_var (pvsubst m pv) e.e_ty
+    | _ -> EcTypes.e_map (fun ty -> ty) (esubst m) e
+
+  let lvsubst m lv =
+    match lv with
+    | LvVar   (pv, ty)       -> LvVar (pvsubst m pv, ty)
+    | LvTuple pvs            -> LvTuple (List.map (fst_map (pvsubst m)) pvs)
+    | LvMap   (p, pv, e, ty) -> LvMap (p, pvsubst m pv, esubst m e, ty)
+
+  let rec isubst m (i : instr) =
+    let esubst = esubst m in
+    let ssubst = ssubst m in
+
+    match i.i_node with
+    | Sasgn  (lv, e)     -> i_asgn   (lvsubst m lv, esubst e)
+    | Srnd   (lv, e)     -> i_rnd    (lvsubst m lv, esubst e)
+    | Scall  (lv, f, es) -> i_call   (lv |> omap (lvsubst m), f, List.map esubst es)
+    | Sif    (c, s1, s2) -> i_if     (esubst c, ssubst s1, ssubst s2)
+    | Swhile (e, stmt)   -> i_while  (esubst e, ssubst stmt)
+    | Sassert e          -> i_assert (esubst e)
+    | Sabstract _        -> i
+
+  and issubst m (is : instr list) =
+    List.map (isubst m) is
+
+  and ssubst m (st : stmt) =
+    stmt (issubst m st.s_node)
+end
 
 (* --------------------------------------------------------------------- *)
 module LowInternal = struct
@@ -37,13 +74,13 @@ module LowInternal = struct
             tc_error_lazy !!tc (fun fmt ->
               let ppe = EcPrinting.PPEnv.ofenv env in
                 Format.fprintf fmt
-                  "Abstract function `%a' cannot be inlined"
+                  "abstract function `%a' cannot be inlined"
                   (EcPrinting.pp_funname ppe) p)
         end
       in
       let params =
         match f.f_sig.fs_anames with
-        | None -> [{v_name = "arg"; v_type = f.f_sig.fs_arg}]
+        | None -> [{ v_name = "arg"; v_type = f.f_sig.fs_arg; }]
         | Some lv -> lv in
       let me, anames =
         List.map_fold fresh_pv me params in
@@ -51,19 +88,16 @@ module LowInternal = struct
         List.map_fold fresh_pv me fdef.f_locals in
       let subst =
         let for1 mx v x =
-          EcPath.Mx.add
-            (EcPath.xqname p v.v_name)
-            (EcPath.xqname (EcMemory.xpath me) x)
+          PVMap.add
+            (pv_loc p v.v_name)
+            (pv_loc (EcMemory.xpath me) x)
             mx
         in
-        let mx = EcPath.Mx.empty in
+        let mx = PVMap.create env in
         let mx = List.fold_left2 for1 mx params anames in
         let mx = List.fold_left2 for1 mx fdef.f_locals lnames in
-        let on_xp xp =
-          let xp' = EcEnv.NormMp.norm_xfun env xp in
-          EcPath.Mx.find_def xp xp' mx
-        in
-        { e_subst_id with es_xp = on_xp }
+
+        mx
       in
 
       let prelude =
@@ -79,12 +113,12 @@ module LowInternal = struct
           | _   -> [i_asgn(LvTuple newpv, e_tuple args)]
       in
 
-      let body = s_subst subst fdef.f_body in
+      let body = LowSubst.ssubst subst fdef.f_body in
 
       let resasgn =
         match fdef.f_ret with
         | None   -> None
-        | Some r -> Some (i_asgn (oget lv, e_subst subst r)) in
+        | Some r -> Some (i_asgn (oget lv, LowSubst.esubst subst r)) in
 
       me, prelude @ body.s_node @ (otolist resasgn) in
 
