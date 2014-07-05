@@ -1735,6 +1735,9 @@ rwarg1:
 
 | PR s=bracket(ident)
    { RWPr s }
+
+| SMT
+   { RWSmt }
 ;
 
 rwfpatterns(F):

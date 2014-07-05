@@ -473,6 +473,7 @@ and rwarg1 =
   | RWPr    of psymbol
   | RWDone  of bool
   | RWSimpl
+  | RWSmt
 
 and rwside = [`LtoR | `RtoL]
 and rwocc  = (rwocci * Sint.t) option

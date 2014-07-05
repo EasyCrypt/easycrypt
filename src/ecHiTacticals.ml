@@ -108,7 +108,7 @@ and process1_logic (ttenv : ttenv) (t : logtactic) (tc : tcenv1) =
     | Pcutdef (ip, f)   -> process_cutdef (ip, f)
     | Pgeneralize l     -> process_generalize l
     | Pclear l          -> process_clear l
-    | Prewrite ri       -> process_rewrite ri
+    | Prewrite ri       -> process_rewrite ttenv ri
     | Psubst   ri       -> process_subst ri
     | Psimplify ri      -> process_simplify ri
     | Pchange pf        -> process_change pf

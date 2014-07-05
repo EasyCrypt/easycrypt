@@ -42,7 +42,7 @@ val process_generalize  : genpattern list -> backward
 val process_clear       : psymbol list -> backward
 val process_smt         : ttenv -> smtinfo -> backward
 val process_apply       : apply_t -> backward
-val process_rewrite     : (tfocus located option * rwarg1) list -> backward
+val process_rewrite     : ttenv -> (tfocus located option * rwarg1) list -> backward
 val process_subst       : pformula list -> backward
 val process_cut         : engine -> cut_t -> backward
 val process_cutdef      : cutdef_t -> backward

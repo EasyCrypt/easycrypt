@@ -395,7 +395,7 @@ let process_delta (s, o, p) tc =
     end else t_id tc
 
 (* -------------------------------------------------------------------- *)
-let rec process_rewrite1 ri tc =
+let rec process_rewrite1 ttenv ri tc =
   match ri with
   | RWDone b ->
       let tt = if b then t_simplify ~delta:false else t_id in
@@ -448,15 +448,18 @@ let rec process_rewrite1 ri tc =
 
   | RWPr x -> EcPhlPrRw.t_pr_rewrite (unloc x) tc
 
+  | RWSmt ->
+      process_smt ttenv (None, empty_pprover) tc
+
 (* -------------------------------------------------------------------- *)
-let process_rewrite ri tc =
+let process_rewrite ttenv ri tc =
   let do1 tc (fc, ri) =
     let tx =
       match fc |> omap ((process_tfocus tc) |- unloc) with
       | None    -> FApi.t_onall
       | Some fc -> (fun tc -> FApi.t_onselect fc tc)
     in
-      tx (process_rewrite1 ri) tc
+      tx (process_rewrite1 ttenv ri) tc
   in
 
   List.fold_left do1 (tcenv_of_tcenv1 tc) ri
