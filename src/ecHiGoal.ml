@@ -553,18 +553,21 @@ let process_mintros ?(cf = true) pis gs =
               (nointro, t_onall (process_clear xs) gs)
 
           | `Case pis ->
+              let onsub gs =
+                if FApi.tc_count gs <> List.length pis then
+                  tc_error !$gs
+                    "not the right number of intro-patterns (got %d, expecting %d)"
+                    (List.length pis) (FApi.tc_count gs);
+                t_sub (List.map (dointro1 false) pis) gs in
+
               let tc = t_or t_elim (t_elimT_ind `Case) in
               let gs =
                 match nointro && not cf with
-                | true  -> t_sub (List.map (dointro1 false) pis) gs
+                | true  -> onsub gs
                 | false -> begin
                     match pis with
                     | [] -> t_onall tc gs
-                    | _  ->
-                        let t gs =
-                          t_sub (List.map (dointro1 false) pis) (tc gs)
-                        in
-                          t_onall t gs
+                    | _  -> t_onall (fun gs -> onsub (tc gs)) gs
                 end
               in
                 (false, gs)
