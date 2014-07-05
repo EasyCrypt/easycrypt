@@ -18,8 +18,7 @@ open EcCoreGoal
 (* -------------------------------------------------------------------- *)
 exception InvalidProofTerm         (* invalid proof term *)
 
-type side    = [`Left|`Right]
-type lazyred = EcProofTyping.lazyred
+type side = [`Left|`Right]
 
 (* -------------------------------------------------------------------- *)
 val t_admit : FApi.backward
@@ -41,9 +40,9 @@ val t_simplify_with_info : reduction_info -> FApi.backward
 val t_change : form -> tcenv1 -> tcenv1
 
 (* -------------------------------------------------------------------- *)
-val t_reflex       : ?reduce:lazyred -> FApi.backward
-val t_transitivity : ?reduce:lazyred -> form -> FApi.backward
-val t_symmetry     : ?reduce:lazyred -> FApi.backward
+val t_reflex       : ?reduce:bool -> FApi.backward
+val t_transitivity : ?reduce:bool -> form -> FApi.backward
+val t_symmetry     : ?reduce:bool -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
 module LowApply : sig
@@ -81,22 +80,19 @@ val t_or_intro_s  : bool -> [`Left|`Right] -> form pair -> FApi.backward
 val t_and_intro_s : bool -> form pair -> FApi.backward
 val t_iff_intro_s : form pair -> FApi.backward
 
-val t_or_intro  : ?reduce:lazyred -> side -> FApi.backward
-val t_and_intro : ?reduce:lazyred -> FApi.backward
-val t_iff_intro : ?reduce:lazyred -> FApi.backward
+val t_or_intro  : ?reduce:bool -> side -> FApi.backward
+val t_and_intro : ?reduce:bool -> FApi.backward
+val t_iff_intro : ?reduce:bool -> FApi.backward
 
-val t_left  : ?reduce:lazyred -> FApi.backward
-val t_right : ?reduce:lazyred -> FApi.backward
+val t_left  : ?reduce:bool -> FApi.backward
+val t_right : ?reduce:bool -> FApi.backward
+val t_split : ?reduce:bool -> FApi.backward
 
-(* -------------------------------------------------------------------- *)
-val t_split : ?closeonly:bool -> ?reduce:lazyred -> FApi.backward
-
-(* -------------------------------------------------------------------- *)
 val t_exists_intro_s : pt_arg list -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
 val t_tuple_intro_s : form pair list -> FApi.backward
-val t_tuple_intro   : ?reduce:lazyred -> FApi.backward
+val t_tuple_intro   : ?reduce:bool -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
 (* Elimination of logical operators (backward). The top-level
@@ -109,7 +105,7 @@ val t_elim_if       : FApi.backward
 val t_elim_iff      : FApi.backward
 val t_elim_eq_tuple : FApi.backward
 val t_elim_exists   : FApi.backward
-val t_elim          : ?reduce:lazyred -> FApi.backward
+val t_elim          : ?reduce:bool -> FApi.backward
 val t_elim_hyp      : EcIdent.t -> FApi.backward
 
 (* Elimination using an custom elimination principle. *)
