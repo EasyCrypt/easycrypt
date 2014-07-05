@@ -155,18 +155,26 @@ let pf_check_tvi (pe : proofenv) typ tvi =
 (* -------------------------------------------------------------------- *)
 exception NoMatch
 
-let t_lazy_match ?(reduce = true) (tx : form -> FApi.backward) (tc : tcenv1) =
+type lazyred = [`Full | `NoDelta | `None]
+
+let t_lazy_match ?(reduce = `Full) (tx : form -> FApi.backward) (tc : tcenv1) =
   let hyps, concl = FApi.tc1_flat tc in
 
   let rec do1 fp =
     try  tx fp tc
     with
-    | NoMatch when not reduce -> raise InvalidGoalShape
     | NoMatch -> begin
-      match EcReduction.h_red_opt EcReduction.full_red hyps fp with
-      | None    -> raise InvalidGoalShape
-      | Some fp -> do1 fp
+        let strategy =
+          match reduce with
+          | `None    -> raise InvalidGoalShape
+          | `Full    -> EcReduction.full_red
+          | `NoDelta -> EcReduction.nodelta in
+
+        match EcReduction.h_red_opt strategy hyps fp with
+        | None    -> raise InvalidGoalShape
+        | Some fp -> do1 fp
     end
+
   in do1 concl
 
 (* -------------------------------------------------------------------- *)
