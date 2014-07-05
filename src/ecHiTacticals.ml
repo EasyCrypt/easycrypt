@@ -71,7 +71,13 @@ and process1_case (_ : ttenv) gp (tc : tcenv1) =
 (* -------------------------------------------------------------------- *)
 and process1_progress (ttenv : ttenv) options t (tc : tcenv1) =
   let t = t |> omap (process1_core ttenv) |> odfl EcLowGoal.t_id in
-  EcLowGoal.t_progress ~options t tc
+
+  let options =
+    EcLowGoal.PGOptions.merge
+      EcLowGoal.PGOptions.default
+      options
+
+  in EcLowGoal.t_progress ~options t tc
 
 (* -------------------------------------------------------------------- *)
 and process1_seq (ttenv : ttenv) (ts : ptactic list) (tc : tcenv1) =

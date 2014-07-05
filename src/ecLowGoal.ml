@@ -3,7 +3,6 @@
 
 (* -------------------------------------------------------------------- *)
 open EcUtils
-open EcParsetree
 open EcLocation
 open EcIdent
 open EcSymbols
@@ -16,6 +15,7 @@ open EcReduction
 open EcCoreGoal
 open EcBaseLogic
 
+module EP  = EcParsetree
 module ER  = EcReduction
 module TTC = EcProofTyping
 
@@ -932,7 +932,7 @@ let t_elim_hyp h tc =
 let t_case fp tc = t_elimT_form_global EcCoreLib.p_case_eq_bool fp tc
 
 (* -------------------------------------------------------------------- *)
-let t_split (tc : tcenv1) =
+let t_split ?reduce (tc : tcenv1) =
   let t_split_r (fp : form) (tc : tcenv1) =
     let hyps, concl = FApi.tc1_flat tc in
 
@@ -955,7 +955,7 @@ let t_split (tc : tcenv1) =
           tc
     | _ -> raise TTC.NoMatch
   in
-    TTC.t_lazy_match t_split_r tc
+    TTC.t_lazy_match ?reduce t_split_r tc
 
 (* -------------------------------------------------------------------- *)
 type rwspec = [`LtoR|`RtoL] * ptnpos option
@@ -1230,17 +1230,33 @@ let t_subst ?kind ?(clear = true) ?var ?tside ?eqid (tc : tcenv1) =
   with Not_found -> raise InvalidGoalShape
 
 (* -------------------------------------------------------------------- *)
-type pgoptions = EcParsetree.ppgoptions
-
-let default_progress_options = {
-  ppgo_split = true;
-  ppgo_solve = true;
-  ppgo_subst = true;
+type pgoptions =  {
+  pgo_split : bool;
+  pgo_solve : bool;
+  pgo_subst : bool;
+  pgo_delta : bool;
 }
 
+module PGOptions = struct
+  let default = {
+    pgo_split = true ;
+    pgo_solve = true ;
+    pgo_subst = true ;
+    pgo_delta = false;
+  }
+
+  let merge opts new_ =
+    let for1 = function | b, None | _, Some b -> b in
+
+    { pgo_split = for1 (opts.pgo_split, new_.EP.ppgo_split);
+      pgo_solve = for1 (opts.pgo_solve, new_.EP.ppgo_solve);
+      pgo_subst = for1 (opts.pgo_subst, new_.EP.ppgo_subst);
+      pgo_delta = for1 (opts.pgo_delta, new_.EP.ppgo_delta); }
+end
+
 let t_progress ?options (tt : FApi.backward) (tc : tcenv1) =
-  let options = odfl default_progress_options options in
-  let tt = if options.ppgo_solve then FApi.t_or (t_assumption `Alpha) tt else tt in
+  let options = odfl PGOptions.default options in
+  let tt = if options.pgo_solve then FApi.t_or (t_assumption `Alpha) tt else tt in
 
   let t_progress_subst ?eqid =
     let sk1 = { empty_subst_kind with sk_local = true ; } in
@@ -1249,7 +1265,7 @@ let t_progress ?options (tt : FApi.backward) (tc : tcenv1) =
   in
 
   (* Entry of progress: simplify goal, and chain with progress *)
-  let rec entry tc = FApi.t_seq (t_simplify ~delta:false) aux0 tc
+  let rec entry tc = FApi.t_seq (t_simplify ~delta:options.pgo_delta) aux0 tc
 
   (* Progress (level 0): try to apply use tactic, chain with level 1. *)
   and aux0 tc = FApi.t_seq (FApi.t_try tt) aux1 tc
@@ -1279,7 +1295,7 @@ let t_progress ?options (tt : FApi.backward) (tc : tcenv1) =
       | _ ->
           let iffail tc =
             let ts =
-              if   options.ppgo_subst
+              if   options.pgo_subst
               then FApi.t_try (t_progress_subst ~eqid:id)
               else t_id
             in
@@ -1291,10 +1307,12 @@ let t_progress ?options (tt : FApi.backward) (tc : tcenv1) =
             t_elim_and_r;
             t_elim_eq_tuple_r] in
 
-          FApi.t_switch (t_elim_r ~reduce:false elims) ~ifok:aux0 ~iffail tc
+          FApi.t_switch
+            (t_elim_r ~reduce:options.pgo_delta elims)
+            ~ifok:aux0 ~iffail tc
     end
 
-    | _ when options.ppgo_split ->
+    | _ when options.pgo_split ->
         FApi.t_try (FApi.t_seq t_split aux0) tc
 
     | _ -> t_id tc

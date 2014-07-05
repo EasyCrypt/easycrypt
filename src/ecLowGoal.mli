@@ -3,6 +3,7 @@
 
 (* -------------------------------------------------------------------- *)
 open EcLocation
+open EcParsetree
 open EcUtils
 open EcSymbols
 open EcIdent
@@ -39,9 +40,9 @@ val t_simplify_with_info : reduction_info -> FApi.backward
 val t_change : form -> tcenv1 -> tcenv1
 
 (* -------------------------------------------------------------------- *)
-val t_reflex   : ?reduce:bool -> FApi.backward
+val t_reflex       : ?reduce:bool -> FApi.backward
 val t_transitivity : ?reduce:bool -> form -> FApi.backward
-val t_symmetry : ?reduce:bool -> FApi.backward
+val t_symmetry     : ?reduce:bool -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
 module LowApply : sig
@@ -85,7 +86,7 @@ val t_iff_intro : ?reduce:bool -> FApi.backward
 
 val t_left  : ?reduce:bool -> FApi.backward
 val t_right : ?reduce:bool -> FApi.backward
-val t_split : FApi.backward
+val t_split : ?reduce:bool -> FApi.backward
 
 val t_exists_intro_s : pt_arg list -> FApi.backward
 
@@ -179,7 +180,17 @@ val t_clear  : ident -> FApi.backward
 val t_clears : ident list -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
-type pgoptions = EcParsetree.ppgoptions
+type pgoptions = {
+  pgo_split : bool;
+  pgo_solve : bool;
+  pgo_subst : bool;
+  pgo_delta : bool;
+}
+
+module PGOptions : sig
+  val default : pgoptions
+  val merge   : pgoptions -> ppgoptions -> pgoptions
+end
 
 val t_progress : ?options:pgoptions -> FApi.backward -> FApi.backward
 

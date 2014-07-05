@@ -509,9 +509,10 @@ and pdbhint = {
 }
 
 type ppgoptions = {
-  ppgo_split : bool;
-  ppgo_solve : bool;
-  ppgo_subst : bool;
+  ppgo_split : bool option;
+  ppgo_solve : bool option;
+  ppgo_subst : bool option;
+  ppgo_delta : bool option;
 }
 
 type logtactic =

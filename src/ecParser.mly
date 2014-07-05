@@ -2305,15 +2305,22 @@ tactic_core_r:
 | PROGRESS topts=tgenoptions? t=tactic_core? {
     let check1 opts topt =
       match unloc topt with
-      | "nosplit" -> { opts with ppgo_split = false; }
-      | "nosolve" -> { opts with ppgo_solve = false; }
-      | "nosubst" -> { opts with ppgo_subst = false; }
+      | "split"   -> { opts with ppgo_split = Some true ; }
+      | "solve"   -> { opts with ppgo_solve = Some true ; }
+      | "subst"   -> { opts with ppgo_subst = Some true ; }
+      | "delta"   -> { opts with ppgo_delta = Some true ; }
+      | "nosplit" -> { opts with ppgo_split = Some false; }
+      | "nosolve" -> { opts with ppgo_solve = Some false; }
+      | "nosubst" -> { opts with ppgo_subst = Some false; }
+      | "nodelta" -> { opts with ppgo_delta = Some false; }
+
       | x -> parse_error topt.pl_loc (Some ("invalid option: " ^ x))
     in
 
-    let opts = { ppgo_split = true;
-                 ppgo_solve = true;
-                 ppgo_subst = true; } in
+    let opts = { ppgo_split = None;
+                 ppgo_solve = None;
+                 ppgo_subst = None;
+                 ppgo_delta = None; } in
     let opts = List.fold_left check1 opts (odfl [] topts) in
 
     Pprogress (opts, t)
