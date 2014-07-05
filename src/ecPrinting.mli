@@ -47,4 +47,5 @@ val pp_path  : EcPath.path pp
 val pp_equivS : PPEnv.t -> EcFol.equivS pp
 val pp_goal   : PPEnv.t -> (int * (EcBaseLogic.hyps * EcFol.form)) pp
 
+val pp_stmt  : PPEnv.t -> EcModules.stmt pp 
 val pp_instr : PPEnv.t -> EcModules.instr pp 
