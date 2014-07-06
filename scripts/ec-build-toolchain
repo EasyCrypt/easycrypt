@@ -28,11 +28,19 @@ unset OCAMLFIND_CONF
 unset OCAML_TOPLEVEL_PATH
 unset CAML_LD_LIBRARY_PATH
 
+case $(uname -s) in
+  CYGWIN*)
+    buildtype=cygwin;;
+  *)
+    buildtype=posix;;
+esac
+
+
 # --------------------------------------------------------------------
 if [ "${DEST}" != "${DEST//[ ]/}" ]; then
-    echo "Destination folder contains spaces" >&2
-    echo "Please, set the DEST variable to a valid value" >&2
-    exit 1
+  echo "Destination folder contains spaces" >&2
+  echo "Please, set the DEST variable to a valid value" >&2
+  exit 1
 fi
 
 # --------------------------------------------------------------------
@@ -49,7 +57,7 @@ check_cmd gcc
 check_cmd g++
 check_cmd curl
 
-if [ $(uname -o) = "Cygwin" ]; then
+if [ ${buildtype} = "cygwin" ]; then
   check_cmd ocaml
 fi
 
@@ -58,7 +66,7 @@ set -e
 
 rm -rf "${DEST}" && mkdir "${DEST}" "${DEST}/src"
 
-if [ $(uname -o) != "Cygwin" ]; then
+if [ ${buildtype} != "cygwin" ]; then
   curl -f -kL -o "${DEST}/src/ocamlbrew" ${OBREW_URL}
   bash "${DEST}/src/ocamlbrew" ${OCAMLBREW_FLAGS}
 else
