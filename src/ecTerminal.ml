@@ -157,7 +157,7 @@ object(self)
     end
 
   method private _clear_update =
-    let fmt = "[*] ---.- ----.-?B%" in
+    let fmt = "[*] ---.- ------.-?B%" in
       if sz >= 0 && doprg then
         Format.eprintf "%*s\r%!" (String.length fmt) "";
       doprg <- false
