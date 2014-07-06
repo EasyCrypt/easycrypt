@@ -1241,29 +1241,46 @@ type pgoptions =  {
   pgo_split : bool;
   pgo_solve : bool;
   pgo_subst : bool;
-  pgo_delta : bool;
+  pgo_delta : pgo_delta;
+}
+
+and pgo_delta = {
+  pgod_case  : bool;
+  pgod_split : bool;
 }
 
 module PGOptions = struct
-  let default = {
-    pgo_split = true ;
-    pgo_solve = true ;
-    pgo_subst = true ;
-    pgo_delta = false;
-  }
+  let default =
+    let fordelta = 
+      { pgod_case  = false;
+        pgod_split = true ; }; in
 
-  let merge opts new_ =
-    let for1 = function | b, None | _, Some b -> b in
+    { pgo_split = true;
+      pgo_solve = true;
+      pgo_subst = true;
+      pgo_delta = fordelta; }
 
-    { pgo_split = for1 (opts.pgo_split, new_.EP.ppgo_split);
-      pgo_solve = for1 (opts.pgo_solve, new_.EP.ppgo_solve);
-      pgo_subst = for1 (opts.pgo_subst, new_.EP.ppgo_subst);
-      pgo_delta = for1 (opts.pgo_delta, new_.EP.ppgo_delta); }
+  let merged1 opts (b, x) =
+    match x with
+    | None -> { pgod_case = b; pgod_split = b; }
+    | Some `Case  -> { opts with pgod_case  = b; }
+    | Some `Split -> { opts with pgod_split = b; }
+
+  let merge1 opts ((b, x) : bool * EcParsetree.ppgoption) =
+    match x with
+    | `Split -> { opts with pgo_split = b; }
+    | `Solve -> { opts with pgo_solve = b; }
+    | `Subst -> { opts with pgo_subst = b; }
+
+    | `Delta x ->
+        { opts with pgo_delta = merged1 opts.pgo_delta (b, x); }
+
+  let merge opts (specs : EcParsetree.ppgoptions) =
+    List.fold_left merge1 opts specs
 end
 
 let t_progress ?options (tt : FApi.backward) (tc : tcenv1) =
   let options = odfl PGOptions.default options in
-  let lazyred = if options.pgo_delta then `Full else `NoDelta in
   let tt = if options.pgo_solve then FApi.t_or (t_assumption `Alpha) tt else tt in
 
   let t_progress_subst ?eqid =
@@ -1273,7 +1290,7 @@ let t_progress ?options (tt : FApi.backward) (tc : tcenv1) =
   in
 
   (* Entry of progress: simplify goal, and chain with progress *)
-  let rec entry tc = FApi.t_seq (t_simplify ~delta:options.pgo_delta) aux0 tc
+  let rec entry tc = FApi.t_seq (t_simplify ~delta:false) aux0 tc
 
   (* Progress (level 0): try to apply use tactic, chain with level 1. *)
   and aux0 tc = FApi.t_seq (FApi.t_try tt) aux1 tc
@@ -1315,16 +1332,19 @@ let t_progress ?options (tt : FApi.backward) (tc : tcenv1) =
             t_elim_and_r;
             t_elim_eq_tuple_r] in
 
-          FApi.t_switch (t_elim_r ~reduce:lazyred elims) ~ifok:aux0 ~iffail tc
+          let reduce =
+            if options.pgo_delta.pgod_case then `Full else `NoDelta in
+
+          FApi.t_switch (t_elim_r ~reduce elims) ~ifok:aux0 ~iffail tc
     end
 
     | _ when options.pgo_split ->
        let thesplit =
-         match options.pgo_delta with
-         | true  -> t_split ~closeonly:false ~reduce:lazyred
+         match options.pgo_delta.pgod_split with
+         | true  -> t_split ~closeonly:false ~reduce:`NoDelta
          | false ->
              FApi.t_or
-               (t_split ~reduce:lazyred)
+               (t_split ~reduce:`NoDelta)
                (t_split ~closeonly:true ~reduce:`Full) in
 
         FApi.t_try (FApi.t_seq thesplit aux0) tc

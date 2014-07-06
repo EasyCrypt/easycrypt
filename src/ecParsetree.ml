@@ -508,12 +508,14 @@ and pdbhint = {
   pht_map : pdbmap1 list;
 }
 
-type ppgoptions = {
-  ppgo_split : bool option;
-  ppgo_solve : bool option;
-  ppgo_subst : bool option;
-  ppgo_delta : bool option;
-}
+type ppgoption = [
+  | `Delta of [`Case | `Split] option
+  | `Split
+  | `Solve
+  | `Subst
+]
+
+type ppgoptions = (bool * ppgoption) list
 
 type logtactic =
   | Preflexivity

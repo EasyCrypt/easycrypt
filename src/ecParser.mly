@@ -1730,8 +1730,7 @@ rwarg1:
    { RWRw (s, r, o |> omap (snd_map EcMaps.Sint.of_list), fp) }
 
 | s=rwside r=rwrepeat? o=rwocc? SLASH x=sform_h %prec prec_tactic
-   { let loc = EcLocation.make $startpos $endpos in
-       RWDelta (s, r, o |> omap (snd_map EcMaps.Sint.of_list), x); }
+   { RWDelta (s, r, o |> omap (snd_map EcMaps.Sint.of_list), x); }
 
 | PR s=bracket(ident)
    { RWPr s }
@@ -1756,10 +1755,6 @@ rwfpattern(F):
 rwarg:
 | r=rwarg1 { (None, r) }
 | rg=loc(rwrg) COLON r=rwarg1 { (Some rg, r) }
-;
-
-tgenoptions:
-| xs=bracket(lident+) { xs }
 ;
 
 genpattern:
@@ -2268,6 +2263,31 @@ eqobs_in:
 | f1=sform f2=sform COLON f3=sform?  { (Some f1, Some f2, f3)   }
 ;
 
+pgoption:
+| b=boption(MINUS) DELTA
+    { (b, `Delta None) }
+
+| b=boption(MINUS) DELTA COLON SPLIT
+    { (b, `Delta (Some `Split)) }
+
+| b=boption(MINUS) DELTA COLON CASE
+    { (b, `Delta (Some `Case)) }
+
+| b=boption(MINUS) x=lident {
+    match unloc x with
+    | "split"   -> (b, `Split)
+    | "solve"   -> (b, `Solve)
+    | "subst"   -> (b, `Subst)
+    | _ ->
+        parse_error x.pl_loc
+          (Some ("invalid option: " ^ (unloc x)))
+  }
+;
+
+pgoptions:
+| xs=bracket(pgoption+) { xs }
+;
+
 tactic_core_r:
 | IDTAC
    { Pidtac None }
@@ -2302,28 +2322,8 @@ tactic_core_r:
 | CASE gp=genpattern*
    { Pcase gp }
 
-| PROGRESS topts=tgenoptions? t=tactic_core? {
-    let check1 opts topt =
-      match unloc topt with
-      | "split"   -> { opts with ppgo_split = Some true ; }
-      | "solve"   -> { opts with ppgo_solve = Some true ; }
-      | "subst"   -> { opts with ppgo_subst = Some true ; }
-      | "delta"   -> { opts with ppgo_delta = Some true ; }
-      | "nosplit" -> { opts with ppgo_split = Some false; }
-      | "nosolve" -> { opts with ppgo_solve = Some false; }
-      | "nosubst" -> { opts with ppgo_subst = Some false; }
-      | "nodelta" -> { opts with ppgo_delta = Some false; }
-
-      | x -> parse_error topt.pl_loc (Some ("invalid option: " ^ x))
-    in
-
-    let opts = { ppgo_split = None;
-                 ppgo_solve = None;
-                 ppgo_subst = None;
-                 ppgo_delta = None; } in
-    let opts = List.fold_left check1 opts (odfl [] topts) in
-
-    Pprogress (opts, t)
+| PROGRESS opts=pgoptions? t=tactic_core? {
+    Pprogress (odfl [] opts, t)
   }
 
 | x=logtactic
