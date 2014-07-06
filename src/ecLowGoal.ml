@@ -1341,7 +1341,7 @@ let t_progress ?options (tt : FApi.backward) (tc : tcenv1) =
     | _ when options.pgo_split ->
        let thesplit =
          match options.pgo_delta.pgod_split with
-         | true  -> t_split ~closeonly:false ~reduce:`NoDelta
+         | true  -> t_split ~closeonly:false ~reduce:`Full
          | false ->
              FApi.t_or
                (t_split ~reduce:`NoDelta)
