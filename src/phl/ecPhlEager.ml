@@ -41,15 +41,18 @@ let tc1_destr_eagerS tc s s' =
 
   if not (List.all2 i_equal s1 s.s_node) then begin
     let ppe  = EcPrinting.PPEnv.ofenv (FApi.tc1_env tc) in
-    tc_error !!tc 
-      "the head of the left statement is not of the right form:@\n%a should be@\n%a"
-      (EcPrinting.pp_stmt ppe) (stmt s1) (EcPrinting.pp_stmt ppe) s
+    tc_error_lazy !!tc (fun fmt ->
+      Format.fprintf fmt
+        "the head of the left statement is not of the right form:@\n%a should be@\n%a"
+        (EcPrinting.pp_stmt ppe) (stmt s1) (EcPrinting.pp_stmt ppe) s)
   end;
+
   if not (List.all2 i_equal s1' s'.s_node) then begin
     let ppe  = EcPrinting.PPEnv.ofenv (FApi.tc1_env tc) in
-    tc_error !!tc 
-      "the tail of the right statement is not of the right form:@\n%a should be@\n%a"
-    (EcPrinting.pp_stmt ppe) (stmt s1') (EcPrinting.pp_stmt ppe) s'
+    tc_error_lazy !!tc (fun fmt ->
+      Format.fprintf fmt
+        "the tail of the right statement is not of the right form:@\n%a should be@\n%a"
+        (EcPrinting.pp_stmt ppe) (stmt s1') (EcPrinting.pp_stmt ppe) s')
   end;
 
   (es, stmt c, stmt c')
