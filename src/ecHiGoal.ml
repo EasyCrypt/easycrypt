@@ -560,7 +560,7 @@ let process_mintros ?(cf = true) pis gs =
                     (List.length pis) (FApi.tc_count gs);
                 t_sub (List.map (dointro1 false) pis) gs in
 
-              let tc = t_or t_elim (t_elimT_ind `Case) in
+              let tc = t_or (t_elimT_ind `Case) t_elim in
               let gs =
                 match nointro && not cf with
                 | true  -> onsub gs
@@ -1051,7 +1051,7 @@ let process_elimT qs tc =
 let process_elim (pe, qs) tc =
   let doelim tc =
     match qs with
-    | None    -> t_or t_elim (t_elimT_ind `Ind) tc
+    | None    -> t_or (t_elimT_ind `Ind) t_elim tc
     | Some qs ->
         let qs = { fp_kind = FPNamed (qs, None); fp_args = []; } in
         process_elimT qs tc
@@ -1086,7 +1086,7 @@ let process_case gp tc =
   with E.LEMFailure ->
     try
       FApi.t_last
-        (t_or t_elim (t_elimT_ind `Case))
+        (t_or (t_elimT_ind `Case) t_elim)
         (process_generalize gp tc)
     with EcCoreGoal.InvalidGoalShape ->
       tc_error !!tc "don't known what to eliminate"

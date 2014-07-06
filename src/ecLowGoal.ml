@@ -324,10 +324,11 @@ let t_intros_s_seq ids tt tc =
 (* -------------------------------------------------------------------- *)
 let tt_apply (pt : proofterm) (tc : tcenv) =
   let (hyps, concl) = FApi.tc_flat tc in
+
   let tc, (pt, ax)  =
     RApi.to_pure (fun tc -> LowApply.check `Elim pt (`Tc tc)) tc in
 
-  if not (EcReduction.is_conv hyps concl ax) then
+  if not (EcReduction.is_conv hyps ax concl) then
     raise InvalidGoalShape;
   FApi.close tc (VApply pt)
 
@@ -909,7 +910,7 @@ let t_elimT_ind mode (tc : tcenv1) =
 
       FApi.t_seqs
         [t_intros_i_seq ~clear:true [id] (elim (id, ty));
-        t_simplify_with_info EcReduction.beta_red]
+         t_simplify_with_info EcReduction.beta_red]
         tc
     end
 

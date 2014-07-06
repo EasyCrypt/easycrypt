@@ -628,6 +628,7 @@ let check_alpha_equal ri hyps f1 f2 =
       aux env subst f1' f2'
 
     | _, _ -> error ()
+
   and aux env subst f1 f2 =
     try aux1 env subst f1 f2
     with e when e == exn ->
