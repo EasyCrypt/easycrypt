@@ -2271,19 +2271,19 @@ pgoptionkw:
 
 pgoption:
 | b=boption(MINUS) DELTA
-    { (b, `Delta None) }
+    { (not b, `Delta None) }
 
 | b=boption(MINUS) DELTA COLON SPLIT
-    { (b, `Delta (Some `Split)) }
+    { (not b, `Delta (Some `Split)) }
 
 | b=boption(MINUS) DELTA COLON CASE
-    { (b, `Delta (Some `Case)) }
+    { (not b, `Delta (Some `Case)) }
 
 | b=boption(MINUS) x=pgoptionkw {
     match unloc x with
-    | "split"   -> (b, `Split)
-    | "solve"   -> (b, `Solve)
-    | "subst"   -> (b, `Subst)
+    | "split"   -> (not b, `Split)
+    | "solve"   -> (not b, `Solve)
+    | "subst"   -> (not b, `Subst)
     | _ ->
         parse_error x.pl_loc
           (Some ("invalid option: " ^ (unloc x)))
