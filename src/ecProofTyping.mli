@@ -69,4 +69,7 @@ val destruct_exists  : EcEnv.LDecl.hyps -> form -> dexists  option
 (* -------------------------------------------------------------------- *)
 exception NoMatch
 
-val t_lazy_match : ?reduce:bool -> (form -> FApi.backward)-> FApi.backward
+type lazyred = [`Full | `NoDelta | `None]
+
+val t_lazy_match:
+  ?reduce:lazyred -> (form -> FApi.backward)-> FApi.backward

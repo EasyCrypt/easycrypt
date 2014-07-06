@@ -22,7 +22,8 @@ module TTC = EcProofTyping
 (* -------------------------------------------------------------------- *)
 exception InvalidProofTerm
 
-type side = [`Left|`Right]
+type side    = [`Left|`Right]
+type lazyred = EcProofTyping.lazyred
 
 (* -------------------------------------------------------------------- *)
 module LowApply = struct
@@ -626,7 +627,7 @@ let t_tuple_intro ?reduce (tc : tcenv1) =
     TTC.t_lazy_match ?reduce t_tuple_intro_r tc
 
 (* -------------------------------------------------------------------- *)
-let t_elim_r ?(reduce = true) txs tc =
+let t_elim_r ?(reduce = (`Full : lazyred)) txs tc =
   match sform_of_form (FApi.tc1_goal tc) with
   | SFimp (f1, f2) ->
       let rec aux f1 =
@@ -639,11 +640,17 @@ let t_elim_r ?(reduce = true) txs tc =
             txs
         with
         | Some gs -> gs
-        | None    ->
-            if not reduce then raise InvalidGoalShape;
-            match h_red_opt full_red (FApi.tc1_hyps tc) f1 with
+        | None    -> begin
+          let strategy =
+            match reduce with
+            | `None    -> raise InvalidGoalShape
+            | `Full    -> EcReduction.full_red
+            | `NoDelta -> EcReduction.nodelta in
+
+            match h_red_opt strategy (FApi.tc1_hyps tc) f1 with
             | None    -> raise InvalidGoalShape
             | Some f1 -> aux f1
+        end
       in
         aux f1
 
@@ -932,23 +939,23 @@ let t_elim_hyp h tc =
 let t_case fp tc = t_elimT_form_global EcCoreLib.p_case_eq_bool fp tc
 
 (* -------------------------------------------------------------------- *)
-let t_split ?reduce (tc : tcenv1) =
+let t_split ?(closeonly = false) ?reduce (tc : tcenv1) =
   let t_split_r (fp : form) (tc : tcenv1) =
     let hyps, concl = FApi.tc1_flat tc in
 
     match sform_of_form fp with
     | SFtrue ->
         t_true tc
-    | SFand (b, (f1, f2)) ->
+    | SFand (b, (f1, f2)) when not closeonly ->
         t_and_intro_s b (f1, f2) tc
-    | SFiff (f1, f2) ->
+    | SFiff (f1, f2) when not closeonly ->
         t_iff_intro_s (f1, f2) tc
     | SFeq (f1, f2) when EcReduction.is_conv hyps f1 f2 ->
         t_reflex_s f1 tc
-    | SFeq (f1, f2) when is_tuple f1 && is_tuple f2 ->
+    | SFeq (f1, f2) when not closeonly && (is_tuple f1 && is_tuple f2) ->
         let fs = List.combine (destr_tuple f1) (destr_tuple f2) in
         t_tuple_intro_s fs tc
-    | SFif (cond, _, _) ->
+    | SFif (cond, _, _) when not closeonly ->
         (* FIXME: simplify goal *)
         let tc = if f_equal concl fp then tc else t_change fp tc in
         let tc = t_case cond tc in
@@ -1256,6 +1263,7 @@ end
 
 let t_progress ?options (tt : FApi.backward) (tc : tcenv1) =
   let options = odfl PGOptions.default options in
+  let lazyred = if options.pgo_delta then `Full else `NoDelta in
   let tt = if options.pgo_solve then FApi.t_or (t_assumption `Alpha) tt else tt in
 
   let t_progress_subst ?eqid =
@@ -1307,13 +1315,19 @@ let t_progress ?options (tt : FApi.backward) (tc : tcenv1) =
             t_elim_and_r;
             t_elim_eq_tuple_r] in
 
-          FApi.t_switch
-            (t_elim_r ~reduce:options.pgo_delta elims)
-            ~ifok:aux0 ~iffail tc
+          FApi.t_switch (t_elim_r ~reduce:lazyred elims) ~ifok:aux0 ~iffail tc
     end
 
     | _ when options.pgo_split ->
-        FApi.t_try (FApi.t_seq t_split aux0) tc
+       let thesplit =
+         match options.pgo_delta with
+         | true  -> t_split ~closeonly:false ~reduce:lazyred
+         | false ->
+             FApi.t_or
+               (t_split ~reduce:lazyred)
+               (t_split ~closeonly:true ~reduce:`Full) in
+
+        FApi.t_try (FApi.t_seq thesplit aux0) tc
 
     | _ -> t_id tc
 
