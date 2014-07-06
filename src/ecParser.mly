@@ -2263,6 +2263,12 @@ eqobs_in:
 | f1=sform f2=sform COLON f3=sform?  { (Some f1, Some f2, f3)   }
 ;
 
+pgoptionkw:
+| x=loc(SPLIT) { mk_loc x.pl_loc "split" }
+| x=loc(SUBST) { mk_loc x.pl_loc "subst" }
+| x=lident     { x }
+;
+
 pgoption:
 | b=boption(MINUS) DELTA
     { (b, `Delta None) }
@@ -2273,7 +2279,7 @@ pgoption:
 | b=boption(MINUS) DELTA COLON CASE
     { (b, `Delta (Some `Case)) }
 
-| b=boption(MINUS) x=lident {
+| b=boption(MINUS) x=pgoptionkw {
     match unloc x with
     | "split"   -> (b, `Split)
     | "solve"   -> (b, `Solve)
