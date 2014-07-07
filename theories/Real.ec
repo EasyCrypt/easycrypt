@@ -61,8 +61,9 @@ lemma real_lt_trans: forall (a b c:real),
  a < b => b <= c => a < c
 by [].
 
-lemma nosmt div_def: forall (x:real),
-  x / x = x * (from_int 1 / x)
+lemma div_def (x y:real):
+  y <> from_int 0 =>
+  x / y = x * (from_int 1 / y)
 by [].
 
 lemma mul_div: forall (x:real),
