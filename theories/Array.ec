@@ -178,6 +178,8 @@ axiom get_init l (f:int -> 'x) i:
   0 <= i < l =>
   (init l f).[i] = f i.
 
+axiom nosmt make_init n (a:'a) : init n (fun x, a) = make n a.
+
 (* append *)
 op (||): 'x array -> 'x array -> 'x array.
 
@@ -198,6 +200,22 @@ lemma nosmt get_append_right (xs0 xs1:'x array) (i:int):
  (xs0 || xs1).[i] = xs1.[i - length xs0]
 by smt.
 
+axiom set_append (xs0 xs1:'x array) (i:int) v:
+  0 <= i < length (xs0 || xs1) =>
+  (xs0 || xs1).[i <- v] = (0 <= i < length xs0) ? 
+     (xs0.[i <- v] || xs1) : (xs0 || xs1.[i - length xs0 <- v]).
+
+lemma nosmt set_append_left (xs0 xs1:'x array) (i:int) v:
+ 0 <= i < length xs0 =>
+ (xs0 || xs1).[i <- v] = (xs0.[i <- v] || xs1)
+by smt.
+
+lemma nosmt set_append_right (xs0 xs1:'x array) (i:int) v:
+ length xs0 <= i < length xs0 + length xs1 =>
+ (xs0 || xs1).[i <- v] = (xs0 || xs1.[i - length xs0 <- v])
+by smt.
+
+axiom make_append (a:'a) (l1 l2:int) : make (l1 + l2) a = (make l1 a || make l2 a).
 (* sub *)
 op sub: 'x array -> int -> int -> 'x array.
 

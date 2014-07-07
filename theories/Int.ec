@@ -294,4 +294,8 @@ theory ForLoop.
   cut: k < j - i by smt; cut: 0 <= k by smt.
   by elim/Induction.induction k; smt.
   qed.
+
+  axiom range_add i j1 j2 (a:'a) f : 0 <= j1 => 0 <= j2 => i <= j1 =>
+    range i (j1 + j2) a f = range (i+j1) (j1 + j2) (range i j1 a f) f.
+
 end ForLoop.
