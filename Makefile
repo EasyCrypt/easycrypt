@@ -11,7 +11,7 @@ endif
 OCAMLBUILD := $(OCAMLBUILD_BIN) $(OCAMLBUILD_EXTRA)
 
 UNAME_S := $(shell uname -s)
-ifneq (, $(findstring cygwin, $(UNAME_S)))
+ifneq (, $(findstring CYGWIN, $(UNAME_S)))
   SHELL = bash -o igncr
 else
   SHELL = bash
