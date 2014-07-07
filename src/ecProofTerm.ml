@@ -40,19 +40,24 @@ and pt_ev_arg_r =
 
 (* -------------------------------------------------------------------- *)
 let tc_pterm_apperror pe ?loc kind =
-  let msg =
+  let msg fmt =
     match kind with
-    | `FormWanted      -> "expecting a formula"
-    | `MemoryWanted    -> "expecting a memory"
-    | `ModuleWanted    -> "expecting a module expression"
-    | `PTermWanted     -> "expecting a proof-term"
-    | `CannotInferMod  -> "cannot infer module arguments"
-    | `NotFunctional   -> "too many argument"
-    | `InvalidArgForm  -> "invalid argument (incompatible type)"
-    | `InvalidArgProof -> "invalid proof-term argument"
-    | `InvalidArgMod   -> "invalid argument (incompatible module type)"
+    | `FormWanted      -> Format.fprintf fmt "%s" "expecting a formula"
+    | `MemoryWanted    -> Format.fprintf fmt "%s" "expecting a memory"
+    | `ModuleWanted    -> Format.fprintf fmt "%s" "expecting a module expression"
+    | `PTermWanted     -> Format.fprintf fmt "%s" "expecting a proof-term"
+    | `CannotInferMod  -> Format.fprintf fmt "%s" "cannot infer module arguments"
+    | `NotFunctional   -> Format.fprintf fmt "%s" "too many argument"
+    | `InvalidArgForm  -> Format.fprintf fmt "%s" "invalid argument (incompatible type)"
+    | `InvalidArgProof -> Format.fprintf fmt "%s" "invalid proof-term argument"
+    | `InvalidArgMod   -> Format.fprintf fmt "%s" "invalid argument (incompatible module type)"
+
+    | `InvalidArgModRestr (env, e) ->
+         Format.fprintf fmt "%a"
+           (EcTyping.pp_restriction_error env)
+           e
   in
-    EcCoreGoal.tc_error pe ?loc "%s" msg
+    EcCoreGoal.tc_error_lazy pe ?loc msg
 
 (* -------------------------------------------------------------------- *)
 let ptenv pe hyps (ue, ev) =
@@ -322,7 +327,7 @@ let process_named_pterm pe (tvi, fp) =
   in
 
   let tvi =
-    Exn.recast_pe pe.pte_pe
+    Exn.recast_pe pe.pte_pe pe.pte_hy
       (fun () -> omap (EcTyping.transtvi env pe.pte_ue) tvi)
   in
 
@@ -381,7 +386,7 @@ and trans_pterm_arg_value pe ?name { pl_desc = arg } =
   | EA_form fp ->
       let env = LDecl.toenv pe.pte_hy in
       let fp  = (fun () -> EcTyping.trans_form_opt env pe.pte_ue fp None) in
-      let fp  = Exn.recast_pe pe.pte_pe fp in
+      let fp  = Exn.recast_pe pe.pte_pe pe.pte_hy fp in
         { ptea_env = pe; ptea_arg = PVAFormula fp; }
 
 (* ------------------------------------------------------------------ *)
@@ -399,7 +404,7 @@ and trans_pterm_arg_mod pe arg =
 
   let env  = LDecl.toenv pe.pte_hy in
   let mod_ = (fun () -> EcTyping.trans_msymbol env mp) in
-  let mod_ = Exn.recast_pe pe.pte_pe mod_ in
+  let mod_ = Exn.recast_pe pe.pte_pe pe.pte_hy mod_ in
 
     { ptea_env = pe; ptea_arg = PVAModule mod_; }
 
@@ -417,7 +422,7 @@ and trans_pterm_arg_mem pe ?name { pl_desc = arg } =
 
   | EA_mem mem ->
       let env = LDecl.toenv pe.pte_hy in
-      let mem = Exn.recast_pe pe.pte_pe (fun () -> EcTyping.transmem env mem) in
+      let mem = Exn.recast_pe pe.pte_pe pe.pte_hy (fun () -> EcTyping.transmem env mem) in
         { ptea_env = pe; ptea_arg = PVAMemory mem; }
 
 (* ------------------------------------------------------------------ *)
@@ -490,8 +495,11 @@ and check_pterm_oarg pe (x, xty) f arg =
           EcTyping.check_modtype_with_restrictions env mp mt emt restr;
           EcPV.check_module_in env mp emt;
           (Fsubst.f_subst_mod x mp f, PAModule (mp, mt))
-        with EcTyping.TymodCnvFailure _ ->
-          tc_pterm_apperror pe.pte_pe `InvalidArgMod
+        with
+        | EcTyping.TymodCnvFailure _ ->
+            tc_pterm_apperror pe.pte_pe `InvalidArgMod
+        | EcTyping.RestrictionError e ->
+            tc_pterm_apperror pe.pte_pe (`InvalidArgModRestr (env, e))
       end
       | _ -> tc_pterm_apperror pe.pte_pe `ModuleWanted
   end

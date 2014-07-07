@@ -761,26 +761,23 @@ let closed (pf : proof) = List.isempty pf.pr_opened
 
 (* -------------------------------------------------------------------- *)
 module Exn = struct
-  (* FIXME: cast-and-reraise *)
-  let recast pe f x = f x 
- 
-  let recast_pe pe f =
-    recast pe f ()
+  let recast pe hyps f x =
+    try  f x
+    with EcTyping.RestrictionError e ->
+      tc_error_lazy pe (fun fmt -> 
+        let env = EcEnv.LDecl.toenv hyps in
+        EcTyping.pp_restriction_error env fmt e)
 
-  let recast_hyps pe f hyps = 
-   try f hyps 
-   with EcTyping.RestrictionError e ->
-     tc_error_lazy pe (fun fmt -> 
-       let env = EcEnv.LDecl.toenv hyps in
-       EcTyping.pp_restriction_error env fmt e)
+  let recast_pe pe hyps f =
+    recast pe hyps f ()
 
   let recast_tc1 tc f =
     let penv = FApi.tc1_penv tc in
     let hyps = FApi.tc1_hyps tc in
-    recast_hyps penv f hyps 
+    recast_pe penv hyps (fun () -> f hyps)
 
   let recast_tc tc f =
     let penv = FApi.tc_penv tc in
     let hyps = FApi.tc_hyps tc in
-    recast_hyps penv f hyps 
+    recast_pe penv hyps (fun () -> f hyps)
 end

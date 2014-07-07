@@ -135,7 +135,6 @@ val trans_msymbol    : env -> pmsymbol located -> mpath * module_sig
 val trans_gamepath   : env -> pgamepath -> xpath 
 
 (* -------------------------------------------------------------------- *)
-
 type restriction_error
   
 exception RestrictionError of restriction_error

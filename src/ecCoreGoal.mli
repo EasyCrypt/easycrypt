@@ -342,7 +342,7 @@ module Exn : sig
   (* Apply the given function in the context of a proof-environment,
    * adding some more location informations when a typing error is
    * raised *)
-  val recast_pe  : proofenv -> (unit -> 'a) -> 'a
+  val recast_pe  : proofenv -> LDecl.hyps -> (unit -> 'a) -> 'a
   val recast_tc  : tcenv -> (LDecl.hyps -> 'a) -> 'a
   val recast_tc1 : tcenv1 -> (LDecl.hyps -> 'a) -> 'a
 end

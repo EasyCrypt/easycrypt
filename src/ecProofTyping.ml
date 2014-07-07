@@ -43,19 +43,19 @@ let process_pattern hyps fp =
 
 (* ------------------------------------------------------------------ *)
 let pf_process_form_opt pe hyps oty pf =
-  Exn.recast_pe pe (fun () -> process_form_opt hyps pf oty)
+  Exn.recast_pe pe hyps (fun () -> process_form_opt hyps pf oty)
 
 let pf_process_form pe hyps ty pf =
-  Exn.recast_pe pe (fun () -> process_form hyps pf ty)
+  Exn.recast_pe pe hyps (fun () -> process_form hyps pf ty)
 
 let pf_process_formula pe hyps pf =
-  Exn.recast_pe pe (fun () -> process_formula hyps pf)
+  Exn.recast_pe pe hyps (fun () -> process_formula hyps pf)
 
 let pf_process_exp pe hyps mode oty e =
-  Exn.recast_pe pe (fun () -> process_exp hyps mode oty e)
+  Exn.recast_pe pe hyps (fun () -> process_exp hyps mode oty e)
 
 let pf_process_pattern pe hyps fp =
-  Exn.recast_pe pe (fun () -> process_pattern hyps fp)
+  Exn.recast_pe pe hyps (fun () -> process_pattern hyps fp)
 
 (* ------------------------------------------------------------------ *)
 let tc1_process_form_opt tc oty pf =
@@ -115,8 +115,8 @@ let tc1_process_prhl_stmt tc side c =
   let hyps = LDecl.push_active (mhr,mt) hyps in
   let env  = LDecl.toenv hyps in
   let ue   = unienv_of_hyps hyps in
-  let c    = Exn.recast_pe !!tc (fun () -> EcTyping.transstmt env ue c) in
-  let esub = Exn.recast_pe !!tc (fun () -> Tuni.offun (EcUnify.UniEnv.close ue)) in
+  let c    = Exn.recast_pe !!tc hyps (fun () -> EcTyping.transstmt env ue c) in
+  let esub = Exn.recast_pe !!tc hyps (fun () -> Tuni.offun (EcUnify.UniEnv.close ue)) in
   let esub = { e_subst_id with es_ty = esub; } in
   EcModules.s_subst esub c
 
