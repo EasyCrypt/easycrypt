@@ -733,12 +733,12 @@ let process_pose xsym o p (tc : tcenv1) =
     try  PT.pf_find_occurence ptenv ~ptn:p concl; true
     with MatchFailure ->
       if not (PT.can_concretize ptenv) then
-        if not (EcUnify.UniEnv.closed ptenv.PT.pte_ue) then
+        if not (EcMatching.MEV.filled !(ptenv.PT.pte_ev)) then
+          tc_error !!tc "cannot find an occurence"
+        else
           tc_error !!tc "%s - %s"
             "cannot find an occurence"
             "instanciate type variables manually"
-        else
-          tc_error !!tc "cannot find an occurence"
       else
         false
   in

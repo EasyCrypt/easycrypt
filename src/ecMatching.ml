@@ -231,16 +231,18 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
               raise MatchFailure
 
           | Some `Unset ->
-            if not (Mid.set_disjoint mxs subject.f_fv) then
-              raise MatchFailure;
-            begin
-              try  EcUnify.unify env ue ptn.f_ty subject.f_ty
-              with EcUnify.UnificationFailure _ -> raise MatchFailure;
-            end;
-            ev := { !ev with evm_form = EV.set x subject !ev.evm_form }
+              let ssbj = Fsubst.f_subst subst subject in
+              if not (Mid.set_disjoint mxs ssbj.f_fv) then
+                raise MatchFailure;
+              begin
+                try  EcUnify.unify env ue ptn.f_ty subject.f_ty
+                with EcUnify.UnificationFailure _ -> raise MatchFailure;
+              end;
+              ev := { !ev with evm_form = EV.set x ssbj !ev.evm_form }
 
           | Some (`Set a) -> begin
-              if not (EcReduction.is_alpha_eq hyps subject a) then
+              let ssbj = Fsubst.f_subst subst subject in
+              if not (EcReduction.is_alpha_eq hyps ssbj a) then
                 raise MatchFailure;
               try  EcUnify.unify env ue ptn.f_ty subject.f_ty
               with EcUnify.UnificationFailure _ -> raise MatchFailure
@@ -292,7 +294,7 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
       end
 
       | _, _ ->
-        let ptn = Fsubst.f_subst subst ptn in
+        let subject = Fsubst.f_subst subst subject in
           if not (EcReduction.is_alpha_eq hyps ptn subject) then
             raise MatchFailure
 
@@ -368,7 +370,7 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
 
             if   id_equal x1 x2
             then subst
-            else Fsubst.f_bind_local subst x1 (f_local x2 ty2)
+            else Fsubst.f_bind_local subst x2 (f_local x1 ty2)
 
         | GTmem None, GTmem None ->
             subst
@@ -394,7 +396,7 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
 
             if   id_equal x1 x2
             then subst
-            else Fsubst.f_bind_mem subst x1 x2
+            else Fsubst.f_bind_mem subst x2 x1
 
         | GTmodty (p1, r1), GTmodty (p2, r2) ->
             if not (ModTy.mod_type_equiv env p1 p2) then
@@ -404,7 +406,7 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
 
             if   id_equal x1 x2
             then subst
-            else Fsubst.f_bind_mod subst x1 (EcPath.mident x2)
+            else Fsubst.f_bind_mod subst x2 (EcPath.mident x1)
 
         | _, _ -> raise MatchFailure
       in
