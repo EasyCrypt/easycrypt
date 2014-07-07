@@ -182,12 +182,12 @@ object(self)
         self#_clear_update;
         match e with
         | EcCommands.TopError (loc, e) ->
-            Format.eprintf "%s: %a\n%!"
+            Format.eprintf "\n%s: %a\n%!"
               (EcLocation.tostring loc)
               EcPException.exn_printer e
 
         | _ ->
-            Format.eprintf "%a\n%!"
+            Format.eprintf "\n%a\n%!"
               EcPException.exn_printer e
       end
 
