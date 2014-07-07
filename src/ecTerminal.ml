@@ -136,7 +136,7 @@ object(self)
     (Unix.isatty (Unix.descr_of_out_channel stdout))
 
 
-  method private _update_progress position =
+  method private _update_progress (lineno, position) =
     let mem = (Gc.stat ()).Gc.live_words in
     let mem = (float_of_int mem) *. (float_of_int (Sys.word_size / 8)) in
 
@@ -150,14 +150,14 @@ object(self)
 
     if sz >= 0 && doprg then begin
       tick <- (tick + 1) mod (String.length ticks);
-      Format.eprintf "[%c] %.1f %% (%.1f%s)\r%!"
-        ticks.[tick]
+      Format.eprintf "[%c] [%.4d] %.1f %% (%.1f%s)\r%!"
+        ticks.[tick] lineno
         (100. *. ((float_of_int position) /. (float_of_int sz)))
         mem memst
     end
 
   method private _clear_update =
-    let fmt = "[*] ---.- ------.-?B%" in
+    let fmt = "[*] [----] ---.- ------.-?B%" in
       if sz >= 0 && doprg then
         Format.eprintf "%*s\r%!" (String.length fmt) "";
       doprg <- false
@@ -167,7 +167,9 @@ object(self)
   method next =
     let aout = EcIo.parse iparser in
     let loc  = aout.EcLocation.pl_loc in
-      self#_update_progress loc.EcLocation.loc_echar; aout
+      self#_update_progress
+        (fst (loc.EcLocation.loc_end), loc.EcLocation.loc_echar);
+      aout
 
   method notice ~(immediate:bool) (_msg : string) =
     ignore immediate
