@@ -42,4 +42,9 @@ setup.log
 /webui/backend.log
 /webui/backend.pid
 
+/extraction/Makefile
+/extraction/setup.*
+/extraction/configure
+/extraction/_build/
+
 /sandbox
