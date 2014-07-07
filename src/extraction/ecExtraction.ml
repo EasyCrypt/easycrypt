@@ -726,6 +726,19 @@ let process_extraction env required (file, toextract, withextract) =
       let fmt = Format.std_formatter in
       fmt, fun _ -> Format.fprintf fmt "@\n@."
     | Some filename ->
+      let module E = struct exception InvalidPath end in
+
+      let rec makedirs filename =
+        let dirname = Filename.dirname filename in
+
+        if Sys.file_exists dirname then begin
+          if not (Sys.is_directory dirname) then
+            raise E.InvalidPath
+        end else makedirs dirname;
+        Unix.mkdir filename 0o755
+      in
+
+      makedirs (Filename.dirname filename);
       let outc = open_out filename in
       Format.formatter_of_out_channel outc, fun _ -> close_out outc in
   let err = ref None in
