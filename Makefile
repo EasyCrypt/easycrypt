@@ -10,8 +10,8 @@ ifeq ($(shell echo $$TERM), dumb)
 endif
 OCAMLBUILD := $(OCAMLBUILD_BIN) $(OCAMLBUILD_EXTRA)
 
-UNAME_O := $(shell uname -o)
-ifeq ($(UNAME_O),Cygwin)
+UNAME_S := $(shell uname -s)
+ifneq (, $(findstring cygwin, $(UNAME_S)))
   SHELL = bash -o igncr
 else
   SHELL = bash
