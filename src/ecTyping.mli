@@ -135,11 +135,19 @@ val trans_msymbol    : env -> pmsymbol located -> mpath * module_sig
 val trans_gamepath   : env -> pgamepath -> xpath 
 
 (* -------------------------------------------------------------------- *)
+
+type restriction_error
+  
+exception RestrictionError of restriction_error
+
+val pp_restriction_error : 
+   EcEnv.env -> Format.formatter -> restriction_error -> unit
+
 val check_sig_mt_cnv :
   env -> module_sig -> module_type -> unit 
 
-val check_restrictions :
-  env -> use -> mod_restr -> unit
+val check_restrictions_fun :
+  env -> xpath -> use -> mod_restr -> unit
 
 val check_modtype_with_restrictions :
   env -> mpath -> module_sig -> module_type -> mod_restr -> unit

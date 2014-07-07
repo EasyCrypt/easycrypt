@@ -650,18 +650,48 @@ let check_sig_mt_cnv env sin tyout =
   check_sig_cnv `Sub env sin sout
 
 (* -------------------------------------------------------------------- *)
-type restriction_error =
+
+type restriction_who =
+| RW_mod of EcPath.mpath
+| RW_fun of EcPath.xpath 
+
+type restriction_err =
 | RE_UseVariable          of EcPath.xpath
 | RE_UseVariableViaModule of EcPath.xpath * EcPath.mpath
 | RE_UseModule            of EcPath.mpath
 | RE_VMissingRestriction  of EcPath.xpath * EcPath.mpath pair
 | RE_MMissingRestriction  of EcPath.mpath * EcPath.mpath pair
 
+type restriction_error = restriction_who * restriction_err
+  
 exception RestrictionError of restriction_error
 
+let pp_restriction_error env fmt (w,e) = 
+  let ppe = EcPrinting.PPEnv.ofenv env in
+  let pp_v fmt xp = EcPrinting.pp_pv ppe fmt (pv_glob xp) in
+  let pp_m fmt m  = EcPrinting.pp_topmod ppe fmt m in
+  let pp_restriction_who fmt = function
+    | RW_mod mp -> Format.fprintf fmt "The module %a" pp_m mp
+    | RW_fun xp -> Format.fprintf fmt "The procedure %a" (EcPrinting.pp_funname ppe) xp in
+  let pp_restriction_err fmt = function
+    | RE_UseVariable x -> 
+      Format.fprintf fmt "can not uses the variable %a" pp_v x
+    | RE_UseVariableViaModule (x,m) -> 
+      Format.fprintf fmt "uses module %a which uses %a" pp_m m pp_v x
+    | RE_UseModule m -> 
+      Format.fprintf fmt "can not uses the module %a" pp_m m
+    | RE_VMissingRestriction (x,(m1,m2))->
+      Format.fprintf fmt "can uses %a, add restriction %a to %a"
+        pp_v x pp_m m1 pp_m m2
+    | RE_MMissingRestriction (m,(m1,m2))->
+      Format.fprintf fmt "can uses %a, add restriction %a to %a or %a to %a"
+        pp_m m pp_m m1 pp_m m2 pp_m m2 pp_m m1
+  in
+  Format.fprintf fmt "%a %a" pp_restriction_who w pp_restriction_err e
+
 (* -------------------------------------------------------------------- *)
-let check_restrictions env use restr =
-  let re_error = fun x -> raise (RestrictionError x) in
+let check_restrictions env who use restr =
+  let re_error = fun x -> raise (RestrictionError(who, x)) in
 
   let restr = NormMp.norm_restr env restr in
 
@@ -710,11 +740,14 @@ let check_restrictions env use restr =
   in
   EcIdent.Sid.iter check_gl use.EcEnv.us_gl
 
+let check_restrictions_fun env xp use restr =
+  check_restrictions env (RW_fun xp) use restr 
+
 (* -------------------------------------------------------------------- *)
 let check_modtype_with_restrictions env mp mt i restr =
   check_sig_mt_cnv env mt i;
   let use = NormMp.mod_use env mp in
-  check_restrictions env use restr
+  check_restrictions env (RW_mod mp) use restr
 
 (* -------------------------------------------------------------------- *)
 let split_msymb (env : EcEnv.env) (msymb : pmsymbol located) =

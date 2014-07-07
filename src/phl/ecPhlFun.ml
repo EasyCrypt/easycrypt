@@ -27,7 +27,7 @@ module TTC = EcProofTyping
 (* -------------------------------------------------------------------- *)
 let check_oracle_use (_pf : proofenv) env adv o =
   let use = NormMp.fun_use env o in
-  EcTyping.check_restrictions env use (Sx.empty, Sm.singleton adv)
+  EcTyping.check_restrictions_fun env o use (Sx.empty, Sm.singleton adv)
 
 let check_concrete pf env f =
   if NormMp.is_abstract_fun f env then
