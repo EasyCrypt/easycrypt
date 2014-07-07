@@ -1,4 +1,4 @@
-; Generated on Mon Jun 16 00:50:07 2014
+; Generated on Mon Jul  7 23:07:58 2014
 
 (defvar easycrypt-bytac-keywords '(
   "exact"
@@ -16,6 +16,7 @@
 (defvar easycrypt-global-keywords '(
   "axiom"
   "axiomatized"
+  "hypothesis"
   "lemma"
   "realize"
   "proof"
