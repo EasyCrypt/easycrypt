@@ -240,7 +240,7 @@ let rec out_expr mname fmt e =
 
 and out_bexpr mname fmt e = 
   match e with
-  | Olam _ | Oapp _ | Olet _ | Oif _ ->
+  | Olam _ | Oapp _ | Olet _ | Oif _ | Oproj _ ->
     EcPrinting.pp_paren (out_expr mname) fmt e
   | _ -> out_expr mname fmt e
 
