@@ -36,6 +36,7 @@ type ocaml_expr =
   | Olet   of opattern * ocaml_expr * ocaml_expr
   | Otuple of ocaml_expr list 
   | Oif    of ocaml_expr * ocaml_expr * ocaml_expr
+  | Oproj  of (int * int) * ocaml_expr
 
 type ocaml_op_decl = 
   | OOabs of ocaml_ty
@@ -111,6 +112,7 @@ let rec uniq_expr restr = function
     let restr = uniq_add_opat restr p in
     uniq_expr restr e2
   | Otuple es -> List.iter (uniq_expr restr) es
+  | Oproj (_, e) -> uniq_expr restr e
   | Oif(e1,e2,e3) -> 
     uniq_expr restr e1; uniq_expr restr e2; uniq_expr restr e3 
 
@@ -230,6 +232,11 @@ let rec out_expr mname fmt e =
     Format.fprintf fmt "@[@[<hov 2>(if %a@ then@ %a@]@ @[<hov 2>else@ %a)@]@]"
       (out_expr mname) e1 (out_expr mname) e2 
       (out_expr mname) e3
+  | Oproj ((i, n), e) ->
+      let var idx = Printf.sprintf "x_%d" idx in
+      Format.fprintf fmt "@[<hov 2>(fun (%s) -> %s)@ %a@]"
+        (String.concat ", " (List.init n var)) (var i)
+        (out_bexpr mname) e
 
 and out_bexpr mname fmt e = 
   match e with
@@ -462,7 +469,14 @@ and compile_expr env eenv vtymap lmap e =
     Olet(p,e1,e2)
   | Etuple es ->
     Otuple (List.map (compile_expr env eenv vtymap lmap) es)
-  | Eproj _ -> assert false (* Not Implemented *)
+  | Eproj (e, i) -> begin
+    match (EcEnv.Ty.hnorm e.e_ty env).ty_node with
+    | Ttuple ts ->
+      let n = List.length ts in
+      let e = compile_expr env eenv vtymap lmap e in
+      Oproj ((i, n), e)
+    | _ -> assert false
+  end
   | Eif(e1,e2,e3) ->
     let e1 = compile_expr env eenv vtymap lmap e1 in
     let e2 = compile_expr env eenv vtymap lmap e2 in
