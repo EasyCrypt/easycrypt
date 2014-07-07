@@ -410,7 +410,7 @@ module Tactics = struct
       | None -> hierror "no active lemma"
       | Some pac ->
           if   mark && pac.puc_mode = None
-          then proof scope mode false
+          then proof scope mode true
           else scope
     in
 
@@ -485,14 +485,14 @@ module Ax = struct
           let proof = EcCoreGoal.start hyps (oget axd.ax_spec) in
           PSCheck proof
     in
-    let puc = { puc_active = Some {
-                  puc_name  = name;
-                  puc_mode  = None;
-                  puc_jdg   = puc;
-                  puc_flags = axflags;
-                  puc_crt   = axd;
-                };
-                puc_cont = cont; }
+    let puc =
+      { puc_active = Some {
+          puc_name  = name;
+          puc_mode  = None;
+          puc_jdg   = puc;
+          puc_flags = axflags;
+          puc_crt   = axd; };
+        puc_cont = cont; }
     in
       { scope with sc_pr_uc = Some puc }
 
