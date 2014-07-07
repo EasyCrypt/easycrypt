@@ -734,8 +734,10 @@ let process_extraction env required (file, toextract, withextract) =
         if Sys.file_exists dirname then begin
           if not (Sys.is_directory dirname) then
             raise E.InvalidPath
-        end else makedirs dirname;
-        Unix.mkdir filename 0o755
+        end else begin
+          makedirs dirname;
+          Unix.mkdir filename 0o755
+        end
       in
 
       makedirs (Filename.dirname filename);
