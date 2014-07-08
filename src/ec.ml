@@ -63,7 +63,7 @@ let _ =
     let rootdir = resource ["_tools"] in
     let regexp  = Str.regexp "^ocaml-[0-9.]+$" in
 
-    if Sys.is_directory rootdir then begin
+    if Sys.file_exists rootdir && Sys.is_directory rootdir then begin
       let dirs = Sys.readdir rootdir in
 
       try
