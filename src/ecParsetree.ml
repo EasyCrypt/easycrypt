@@ -574,7 +574,10 @@ and ptactic_chain =
   | Protate  of [`Left | `Right] * int
 
 (* -------------------------------------------------------------------- *)
-type paxiom_kind = PAxiom | PLemma of ptactic option | PILemma
+type paxiom_kind =
+| PAxiom of [`Axiom | `Hypothesis]
+| PLemma of ptactic option
+| PILemma
 
 type paxiom = {
   pa_name    : psymbol;

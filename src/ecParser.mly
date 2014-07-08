@@ -220,6 +220,7 @@
 %token GLOB
 %token HINT
 %token HOARE
+%token HYPOTHESIS
 %token IDTAC
 %token IF
 %token IFF
@@ -1329,11 +1330,17 @@ tc_inth:
 | LTCOLON x=lqident { x }
 ;
 
-tc_body: ops=tc_op* axs=tc_ax* { (ops, axs) };
+tc_body:
+| ops=tc_op* axs=tc_ax* { (ops, axs) }
+;
 
-tc_op: OP x=oident COLON ty=loc(type_exp) { (x, ty) };
+tc_op:
+| OP x=oident COLON ty=loc(type_exp) { (x, ty) }
+;
 
-tc_ax: AXIOM x=ident COLON ax=form { (x, ax) };
+tc_ax:
+| AXIOM x=ident COLON ax=form { (x, ax) }
+;
 
 (* -------------------------------------------------------------------- *)
 (* Type classes (instances)                                             *)
@@ -1495,7 +1502,10 @@ axiom_tc:
 
 axiom:
 | l=local AXIOM o=nosmt d=lemma_decl
-    { mk_axiom ~local:l ~nosmt:o d PAxiom }
+    { mk_axiom ~local:l ~nosmt:o d (PAxiom `Axiom) }
+
+| l=local HYPOTHESIS o=nosmt d=lemma_decl
+    { mk_axiom ~local:l ~nosmt:o d (PAxiom `Hypothesis) }
 
 | l=local LEMMA o=nosmt d=lemma_decl ao=axiom_tc
     { mk_axiom ~local:l ~nosmt:o d ao }
@@ -1537,9 +1547,9 @@ theory_w3:
 ;
 
 renaming:
-| TYPE l=string_list AS s=STRING { l, RNty, s }
-| OP   l=string_list AS s=STRING { l, RNop, s }
-| AXIOM l=string_list AS s=STRING {l, RNpr, s }
+| TYPE  l=string_list AS s=STRING { l, RNty, s }
+| OP    l=string_list AS s=STRING { l, RNop, s }
+| AXIOM l=string_list AS s=STRING { l, RNpr, s }
 ;
 
 %inline string_list: l=plist1(STRING,empty) { l };

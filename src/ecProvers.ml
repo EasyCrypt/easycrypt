@@ -191,7 +191,7 @@ let execute_task (pi : prover_infos) task =
       in
         pcs.(i) <- Some (prover, pc)
     with e ->
-      Format.printf "Error when starting %s: %a" prover
+      Format.printf "\nError when starting %s: %a" prover
         EcPException.exn_printer e;
       ()
   in
@@ -226,7 +226,7 @@ let execute_task (pi : prover_infos) task =
                 | CP.Valid   -> status := Some true
                 | CP.Invalid -> status := Some false
                 | CP.Failure _ | CP.HighFailure ->
-                  Format.printf "[info] Warning: prover %s exited with %a\n%!"
+                  Format.printf "\n[info] Warning: prover %s exited with %a\n%!"
                     _prover CP.print_prover_answer ans;
                   if not (Queue.is_empty pqueue) then run i (Queue.take pqueue)
                 | _ ->

@@ -529,7 +529,7 @@ module Ax = struct
     let tparams = EcUnify.UniEnv.tparams ue in
 
     let axd  =
-      let kind = match ax.pa_kind with PAxiom -> `Axiom | _ -> `Lemma in
+      let kind = match ax.pa_kind with PAxiom _ -> `Axiom | _ -> `Lemma in
         { ax_tparams = tparams;
           ax_spec    = Some concl;
           ax_kind    = kind;
@@ -548,7 +548,7 @@ module Ax = struct
             hierror "this lemma uses local modules and must be declared as local"
     end;
 
-    if ax.pa_local && ax.pa_kind = PAxiom then
+    if ax.pa_local && ax.pa_kind = (PAxiom `Axiom) then
       hierror "an axiom cannot be local";
 
     match ax.pa_kind with
@@ -578,7 +578,7 @@ module Ax = struct
         let scope = Tactics.process_r false mode scope [tc] in
           save scope loc
 
-    | PAxiom ->
+    | PAxiom _ ->
           Some (unloc ax.pa_name),
           bind scope (snd pucflags).puc_local (unloc ax.pa_name, axd)
 
