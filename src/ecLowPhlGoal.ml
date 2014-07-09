@@ -174,12 +174,12 @@ let t_hS_or_bhS_or_eS ?th ?tbh ?te tc =
 
   | _ -> tc_error_notphl !!tc None      (* FIXME *)
 
-let t_hF_or_bhF_or_eF ?th ?tbh ?te tc =
+let t_hF_or_bhF_or_eF ?th ?tbh ?te ?teg tc =
   match (FApi.tc1_goal tc).f_node with
   | FhoareF   _ when th  <> None -> (oget th ) tc
   | FbdHoareF _ when tbh <> None -> (oget tbh) tc
   | FequivF   _ when te  <> None -> (oget te ) tc
-
+  | FeagerF   _ when teg <> None -> (oget teg) tc
   | _ -> tc_error_notphl !!tc None      (* FIXME *)
 
 (* -------------------------------------------------------------------- *)

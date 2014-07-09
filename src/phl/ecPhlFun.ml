@@ -401,17 +401,35 @@ let t_fun_to_code_equiv_r tc =
 
   FApi.xmutate1 tc `FunToCode [concl]
 
+let t_fun_to_code_eager_r tc =
+  let env = FApi.tc1_env tc in
+  let eg = tc1_as_eagerF tc in
+  let (fl,fr) = eg.eg_fl, eg.eg_fr in
+  let (ml,mr), _ = Fun.equivF_memenv fl fr env in
+  let ml, sl, rl, tyl = ToCodeLow.to_code env fl ml in
+  let mr, sr, rr, tyr = ToCodeLow.to_code env fr mr in
+  let s = PVM.empty in
+  let s = PVM.add env (pv_res fl) (fst ml) (f_pvar rl tyl (fst ml)) s in
+  let s = PVM.add env (pv_res fr) (fst mr) (f_pvar rr tyr (fst mr)) s in
+  let post  = PVM.subst env s eg.eg_po in
+  let concl = 
+    f_equivS ml mr eg.eg_pr (s_seq eg.eg_sl sl) (s_seq sr eg.eg_sr) post in
+  FApi.xmutate1 tc `FunToCode [concl]
+
 (* -------------------------------------------------------------------- *)
 let t_fun_to_code_hoare   = FApi.t_low0 "hoare-fun-to-code"   t_fun_to_code_hoare_r
 let t_fun_to_code_bdhoare = FApi.t_low0 "bdhoare-fun-to-code" t_fun_to_code_bdhoare_r
 let t_fun_to_code_equiv   = FApi.t_low0 "equiv-fun-to-code"   t_fun_to_code_equiv_r
+let t_fun_to_code_eager   = FApi.t_low0 "eager-fun-to-code"   t_fun_to_code_eager_r
+
 
 (* -------------------------------------------------------------------- *)
 let t_fun_to_code_r tc =
   let th  = t_fun_to_code_hoare in
   let tbh = t_fun_to_code_bdhoare in
   let te  = t_fun_to_code_equiv in
-  t_hF_or_bhF_or_eF ~th ~tbh ~te tc
+  let teg = t_fun_to_code_eager in
+  t_hF_or_bhF_or_eF ~th ~tbh ~te ~teg tc
 
 let t_fun_to_code = FApi.t_low0 "fun-to-code" t_fun_to_code_r
 

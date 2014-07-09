@@ -284,7 +284,6 @@ let t_eager_fun_def_r tc =
   let s = EcPhlFun.subst_pre env fr fsigr mr s in
   let pre = PVM.subst env s eg.eg_pr in
 
-  (* FIXME: the pre-condition should be substituted. *)
   let cond = f_equivS_r {
     es_ml = meml;
     es_mr = memr;
