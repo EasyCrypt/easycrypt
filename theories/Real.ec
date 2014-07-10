@@ -57,7 +57,12 @@ theory Square.
 end Square.
 export Square.
 
-lemma real_lt_trans: forall (a b c:real), 
+lemma nosmt sign_inv (x:real):
+  from_int 0 < x =>
+  from_int 0 < inv x
+by [].
+
+lemma real_lt_trans (a b c:real):
  a < b => b <= c => a < c
 by [].
 
@@ -66,15 +71,21 @@ lemma div_def (x y:real):
   x / y = x * (from_int 1 / y)
 by [].
 
-lemma mul_div: forall (x:real),
+lemma mul_div (x:real):
   x <> from_int 0 => x / x = from_int 1
 by [].
 
-axiom mulrM: forall (x y z:real),
+lemma mulrMle (x y z:real):
+  from_int 0 <= z =>
+  x <= y =>
+  x * z <= y * z
+by [].
+
+lemma mulrM (x y z:real):
   from_int 0 < z =>
   x < y =>
-  x * z < y * z.
-(* by []. *) (* FIXME it should be a lemma *)
+  x * z < y * z
+by [].
 
 lemma nosmt addleM : forall (x1 x2 y1 y2:real),
    x1 <= x2 => y1 <= y2 => x1 + y1 <= x2 + y2 
