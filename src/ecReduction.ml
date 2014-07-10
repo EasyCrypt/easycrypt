@@ -666,6 +666,6 @@ let rec simplify ri hyps f =
 and simplify_rec ri hyps f =
   match f.f_node with
   | Fapp({f_node = Fop _} as fo, args) -> 
-    let f' = f_app fo (List.map (simplify_rec ri hyps) args) f.f_ty in
+    let f' = f_app fo (List.map (simplify ri hyps) args) f.f_ty in
     (try h_red ri hyps f' with NotReducible -> f')
   | _ -> f_map (fun ty -> ty) (simplify ri hyps) f
