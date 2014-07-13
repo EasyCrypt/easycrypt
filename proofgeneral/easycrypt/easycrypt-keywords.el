@@ -1,4 +1,4 @@
-; Generated on Mon Jul  7 23:07:58 2014
+; Generated on Sun Jul 13 10:20:00 2014
 
 (defvar easycrypt-bytac-keywords '(
   "exact"
@@ -15,8 +15,8 @@
 
 (defvar easycrypt-global-keywords '(
   "axiom"
-  "axiomatized"
   "hypothesis"
+  "axiomatized"
   "lemma"
   "realize"
   "proof"
@@ -69,6 +69,7 @@
   "if"
   "then"
   "else"
+  "elif"
   "while"
   "assert"
   "return"
