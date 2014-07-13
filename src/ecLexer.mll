@@ -32,6 +32,7 @@
     "if"          , IF         ;        (* KW: prog *)
     "then"        , THEN       ;        (* KW: prog *)
     "else"        , ELSE       ;        (* KW: prog *)
+    "elif"        , ELIF       ;        (* KW: prog *)
     "while"       , WHILE      ;        (* KW: prog *)
     "assert"      , ASSERT     ;        (* KW: prog *)
     "return"      , RETURN     ;        (* KW: prog *)

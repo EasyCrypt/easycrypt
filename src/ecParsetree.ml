@@ -92,10 +92,11 @@ type pinstr_r =
   | PSasgn   of plvalue * pexpr
   | PSrnd    of plvalue * pexpr
   | PScall   of plvalue option * pgamepath * (pexpr list) located
-  | PSif     of pexpr * pstmt * pstmt
-  | PSwhile  of pexpr * pstmt
+  | PSif     of pscond * pscond list * pstmt
+  | PSwhile  of pscond
   | PSassert of pexpr
 
+and pscond = pexpr * pstmt
 and pinstr = pinstr_r located
 and pstmt  = pinstr list
 

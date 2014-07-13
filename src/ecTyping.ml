@@ -1869,12 +1869,18 @@ and transinstr (env : EcEnv.env) ue (i : pinstr) =
       unify_or_fail env ue name.pl_loc ~expct:lty rty;
       i_call (Some lvalue, fpath, args)
 
-  | PSif (pe, s1, s2) ->
-      let e, ety = transexp env `InProc ue pe in
-      let s1 = transstmt env ue  s1 in
-      let s2 = transstmt env ue s2 in
-      unify_or_fail env ue pe.pl_loc ~expct:tbool ety;
-      i_if (e, s1, s2)
+  | PSif ((pe, s), cs, sel) -> begin
+      let rec for1_i (pe, s) sel =
+        let e, ety = transexp env `InProc ue pe in
+        let s = transstmt env ue s in
+        unify_or_fail env ue pe.pl_loc ~expct:tbool ety;
+        i_if (e, s, sel)
+      
+      and for1_s (pe, s) sel = stmt [for1_i (pe, s) sel] in
+
+      for1_i (pe, s)
+        (List.fold_right for1_s cs (transstmt env ue sel))
+  end
 
   | PSwhile (pe, pbody) ->
       let e, ety = transexp env `InProc ue pe in

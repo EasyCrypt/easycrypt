@@ -194,6 +194,7 @@
 %token DOTTICK
 %token DROP
 %token EAGER
+%token ELIF
 %token ELIM
 %token ELSE
 %token END
@@ -1060,14 +1061,24 @@ instr:
 | bi=base_instr SEMICOLON
    { bi }
 
-| IF LPAREN c=expr RPAREN b1=block ELSE b2=block
-   { PSif (c, b1, b2) }
-
-| IF LPAREN c=expr RPAREN b=block
-   { PSif (c, b , []) }
+| i=if_expr
+   { i }
 
 | WHILE LPAREN c=expr RPAREN b=block
    { PSwhile (c, b) }
+;
+
+if_expr:
+| IF c=paren(expr) b=block el=if_else_expr
+   { PSif ((c, b), fst el, snd el) }
+;
+
+if_else_expr:
+|  /* empty */ { ([], []) }
+| ELSE b=block { ([],  b) }
+
+| ELIF e=paren(expr) b=block el=if_else_expr
+    { ((e, b) :: fst el, snd el) }
 ;
 
 block:
