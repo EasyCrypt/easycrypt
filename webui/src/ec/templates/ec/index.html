@@ -1,0 +1,60 @@
+{% extends "ec/base.html" %}
+{% load staticfiles %}
+{% load crispy_forms_tags %}
+
+{% block content %}
+{% if user.is_authenticated %}
+<div class="row full-height">
+    <div id="projects" class="col-sm-2 col-md-2 full-height"></div>
+    <div id="contents" class="col-sm-6 col-md-6 full-height">
+        <div id="tabs" class="full-height">
+            <ul></ul>
+            <div id="jqueryui-editor"><div id="editor" class="full-height"></div></div>
+        </div>
+    </div>
+    <pre id="results" class="col-sm-4 col-md-4 full-height">
+&lt;offline&gt;
+    </pre>
+</div>
+
+<!-- Modals -->
+<div class="modal fade" id="newprojmodal" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-sm"><div class="modal-content">
+        {% crispy newprojform %}
+    </div></div>
+</div>
+<div class="modal fade" id="newfilemodal" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-sm"><div class="modal-content">
+        {% crispy newfileform %}
+    </div></div>
+</div>
+<!------------>
+
+{% else %}
+<center>
+<h1>Welcome to the EasyCrypt WebUI.</h1>
+<h4>Please log in to start working.</h4>
+</center>
+{% endif %}
+{% endblock %}
+
+{% block css %}
+<link rel="stylesheet" href="{% static 'ec/jquery-ui/css/smoothness/jquery-ui-1.10.4.custom.css' %}">
+{% endblock %}
+
+{% block js %}
+<!-- Ace editor -->
+<script src="{% static 'ec/js/ace/src/ace.js' %}" type="text/javascript" charset="utf-8"></script>
+
+<!-- Bootbox (dialogs using Bootstrap modals) -->
+<script src="{% static 'ec/js/bootbox.js' %}"></script>
+
+<!-- Custom jQuery UI -->
+<script src="{% static 'ec/jquery-ui/js/jquery-ui-1.10.4.custom.js' %}"></script>
+
+<!-- Index functionality -->
+<script src="{% static 'ec/js/index.js' %}"></script>
+
+<!-- Communication with EasyCrypt server -->
+<script src="{% static 'ec/js/comm.js' %}"></script>
+{% endblock %}
