@@ -41,7 +41,6 @@ CHECK     = scripts/runtest.py --bin-args="$(ECARGS)" config/tests.config
 .PHONY: all build byte native tests check check-xunit examples
 .PHONY: clean install uninstall uninstall-purge dist distcheck
 .PHONY: callprover pg toolchain update-toolchain provers update
-.PHONY: webui webui-start webui-stop webui-env
 .PHONY: %.ml %.mli %.inferred.mli
 
 all: build
@@ -169,16 +168,6 @@ pg:
 	  $(MAKE) -C proofgeneral run-local
 
 # --------------------------------------------------------------------
-webui:
-	@python -mwebbrowser 'http://localhost:6543'
-
-webui-start: native
-	bash ./scripts/ec-run-webui start
-
-webui-stop:
-	bash ./scripts/ec-run-webui stop
-
-# --------------------------------------------------------------------
 toolchain:
 	export OPAMVERBOSE=1; $(SHELL) ./scripts/ec-build-toolchain
 
@@ -195,9 +184,6 @@ provers:
 	  && opam install -y ec-provers \
 	  && rm -f _tools/why3.local.conf \
 	  && why3config --detect -C _tools/why3.local.conf
-
-webui-env:
-	$(SHELL) ./scripts/ec-build-webui-env
 
 update:
 	git pull

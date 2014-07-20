@@ -32,16 +32,6 @@ setup.log
 
 /doc/easycrypt.pdf
 
-/webui/workspace/
-/webui/webui-env/
-/webui/econline.egg-info/
-/webui/build/
-/webui/dist/
-/webui/econline.log
-/webui/econline.pid
-/webui/backend.log
-/webui/backend.pid
-
 /extraction/Makefile
 /extraction/setup.*
 /extraction/configure
