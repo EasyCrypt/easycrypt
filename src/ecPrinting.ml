@@ -1407,10 +1407,15 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
 
   | Fpr (m, f, args, ev) ->
       let ppe = PPEnv.create_and_push_mem ppe ~active:true (EcFol.mhr, f) in
-      Format.fprintf fmt "Pr[@[%a(@[%a@]) @@ %a :@ %a@]]"
+      Format.fprintf fmt "Pr[@[%a@[%t@] @@ %a :@ %a@]]"
         (pp_funname ppe) f
-        (*(pp_list ",@ " (pp_form ppe)) args *)
-        (pp_form ppe) args
+        (match args.f_node with
+         | Ftuple _ ->
+             (fun fmt -> pp_form ppe fmt args)
+         | _ when EcFol.f_equal f_tt args ->
+             (fun fmt -> pp_string fmt "()")
+         | _ ->
+             (fun fmt -> Format.fprintf fmt "(%a)" (pp_form ppe) args))
         (pp_local ppe) m
         (pp_form ppe) ev
 
