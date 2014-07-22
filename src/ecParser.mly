@@ -2595,6 +2595,7 @@ print:
 | THEORY      qs=qident          { Pr_th   qs }
 | PRED        qs=qoident         { Pr_pr   qs }
 | AXIOM       qs=qident          { Pr_ax   qs }
+| LEMMA       qs=qident          { Pr_ax   qs }
 | MODULE      qs=qident          { Pr_mod  qs }
 | MODULE TYPE qs=qident          { Pr_mty  qs }
 ;
