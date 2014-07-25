@@ -238,5 +238,3 @@ proof.
 qed.
 
 end section.
-
-

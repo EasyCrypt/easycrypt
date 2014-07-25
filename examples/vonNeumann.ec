@@ -147,4 +147,35 @@ theory VonNeumann.
       return b;
     }
   }.
+
+  lemma Simulate_is_Fair (x:bool) &m: Pr[Simulate.sample() @ &m: res = x] = Pr[Fair.sample() @ &m: res = x].
+  proof.
+    cut <-: Pr[SamplePair.sample() @ &m: res = x] = Pr[Fair.sample() @ &m: res = x].
+      by byequiv samplePair.
+    (** The following can probably be done more cleanly by cloning WhileSampling **)
+    cut ->: Pr[SamplePair.sample() @ &m: res = x] = mu vn (fun (bb:bool * bool), bb.`1 = x).
+      byphoare (_: true ==> res = x)=> //.
+      by proc; rnd (fun (bb:bool * bool), bb.`1 = x).
+    byphoare (_: true ==> res = x)=> //.
+    proc; sp.
+    while true (if (b <> b') then 0 else 1) 1 (2%r * p * (1%r - p))=> //.
+      smt.
+      move=> IH.
+      seq  2: true 1%r (mu vn (fun (bb:bool * bool), bb.`1 = x)) 0%r _ => //.
+        by auto; smt.
+      by auto; smt.
+      split=> //=.
+        cut lt0p: 0%r < p by smt.
+        cut ltp1: 0%r < (1%r - p) by smt.
+        smt.
+      move=> z.
+      conseq* (_: true ==> b <> b')=> //=.
+        by progress; rewrite H.
+      seq  1: b p (1%r - p) (1%r - p) p=> //.
+        by rnd; skip=> //=; rewrite biased_def.
+        by rnd; skip=> //= &hr hb; rewrite hb biased_def.
+        by rnd; skip=> //=; rewrite biased_def.
+        by rnd; skip=> //= &hr; rewrite -neqF=> ->>; rewrite biased_def.
+        smt.
+  qed.
 end VonNeumann.

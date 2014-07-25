@@ -71,6 +71,6 @@ proof.
       by apply fun_ext=> x //=; rewrite H /= (eq_sym x).
     by rewrite -/(mu_x _ _) Distr.Dinter.mu_x_def_in; smt.
     (* probability that sampling changes '!phi (glob G) o' to 'phi (glob G) o' zero *)
-    hoare; rnd; skip; progress [nosplit].
+    hoare; rnd; skip; progress [-split].
     by move: H; rewrite -neqF /snd /= => ->.
 qed.
