@@ -1,0 +1,8 @@
+<RCC>
+    <qresource prefix="/icons/FlatIcon">
+        <file alias="index.theme">icons/FlatIcon/index.theme</file>
+        <file alias="scalable/menu.svg">icons/FlatIcon/scalable/actions/menu.svg</file>
+        <file alias="scalable/left.svg">icons/FlatIcon/scalable/actions/left.svg</file>
+        <file alias="scalable/right.svg">icons/FlatIcon/scalable/actions/right.svg</file>
+    </qresource>
+</RCC>

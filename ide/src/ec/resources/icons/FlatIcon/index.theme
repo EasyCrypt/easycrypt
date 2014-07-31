@@ -1,0 +1,12 @@
+[Icon Theme]
+Name=FlatIcon
+Comment=Icon theme 
+Inherits=default
+Directories=scalable/actions
+
+[scalable]
+Size=48
+Type=Scalable
+MinSize=1
+MaxSize=256
+Context=Actions

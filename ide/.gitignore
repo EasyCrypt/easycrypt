@@ -1,0 +1,4 @@
+*.rcc
+/.project
+/.pydevproject
+/.settings

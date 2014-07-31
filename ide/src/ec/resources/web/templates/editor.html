@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>editor</title>
+
+  <link rel="stylesheet" type="text/css" href="styles.css" />
+
+  <script src="../jquery/jquery.js" type="text/javascript" charset="utf-8"></script>
+  <script src="../ace/src-noconflict/ace.js" type="text/javascript" charset="utf-8"></script>
+
+  <script src="editor.js" type="text/javascript" charset="utf-8"></script>
+
+  <script>
+    var editor = null;
+
+    $(function () {
+    	editor = create_editor(window.ecdoc);
+    	delete window.ecdoc;
+    	editor.focus();
+     });
+  </script>
+</head>
+<body><div id="editor"></div></body>
+</html>
