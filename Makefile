@@ -10,13 +10,6 @@ ifeq ($(shell echo $$TERM), dumb)
 endif
 OCAMLBUILD := $(OCAMLBUILD_BIN) $(OCAMLBUILD_EXTRA)
 
-UNAME_S := $(shell uname -s)
-ifneq (, $(findstring CYGWIN, $(UNAME_S)))
-  SHELL = bash -o igncr
-else
-  SHELL = bash
-endif
-
 DESTDIR  ?=
 PREFIX   ?= /usr/local
 VERSION  ?= $(shell date '+%F')
@@ -26,6 +19,8 @@ REALIZED := $(wildcard theories/realizations/*.ec)
 PRELUDE  := $(wildcard theories/prelude/*.ec)
 CORE     := $(wildcard theories/core/*.ec)
 INSTALL  := scripts/install-sh
+
+include Makefile.system
 
 # --------------------------------------------------------------------
 BINDIR := $(PREFIX)/bin
@@ -44,18 +39,23 @@ CHECK     = scripts/runtest.py --bin-args="$(ECARGS)" config/tests.config
 .PHONY: %.ml %.mli %.inferred.mli
 
 all: build
+	@true
 
 build: callprover native
 
 define do-build
-	$(OCAMLBUILD) "$(1)"
+	rm -f "$(1)$(EXE)"
+	$(OCAMLBUILD) "src/$(1)"
+	if [ ! -z "$(EXE)" ]; then \
+	  cp "_build/src/$(1)" "$(1)$(EXE)"; \
+	fi
 endef
 
 byte:
-	$(call do-build,src/ec.byte)
+	$(call do-build,ec.byte)
 
 native:
-	$(call do-build,src/ec.native)
+	$(call do-build,ec.native)
 
 callprover:
 	$(MAKE) -C system
@@ -127,6 +127,7 @@ checklibs: ec.native
 clean:
 	$(OCAMLBUILD) -clean
 	rm -f ec.native ec.byte
+	rm -f ec.native.exe ec.byte.exe
 	$(MAKE) -C system clean
 
 # --------------------------------------------------------------------
@@ -169,16 +170,16 @@ pg:
 
 # --------------------------------------------------------------------
 toolchain:
-	export OPAMVERBOSE=1; $(SHELL) ./scripts/ec-build-toolchain
+	export OPAMVERBOSE=1; bash ./scripts/ec-build-toolchain
 
 update-toolchain:
-	export OPAMVERBOSE=1; $$($(SHELL) ./scripts/activate-toolchain.sh) \
+	export OPAMVERBOSE=1; $$(bash ./scripts/activate-toolchain.sh) \
 	  && opam update  -y \
 	  && opam remove  -y ec-toolchain \
 	  && opam install -y ec-toolchain
 
 provers:
-	export OPAMVERBOSE=1; $$($(SHELL) ./scripts/activate-toolchain.sh) \
+	export OPAMVERBOSE=1; $$(bash ./scripts/activate-toolchain.sh) \
 	  && opam update  -y \
 	  && opam remove  -y ec-provers \
 	  && opam install -y ec-provers \

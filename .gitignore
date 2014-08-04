@@ -2,6 +2,7 @@
 _build
 *.native
 *.byte
+*.exe
 *.pyc
 *.pyo
 /local

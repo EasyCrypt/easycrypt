@@ -1,5 +1,6 @@
 #!/bin/sh
 # install - install a program, script, or datafile
+(set -o igncr) 2>/dev/null && set -o igncr; # this comment is required
 
 scriptversion=2011-01-19.21; # UTC
 

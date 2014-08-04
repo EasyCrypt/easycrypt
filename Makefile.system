@@ -1,0 +1,20 @@
+# -*- Makefile -*-
+
+# --------------------------------------------------------------------
+OCAML    := $(shell ocamlbuild -which ocamlc)
+CC       := gcc
+MACHINE  := $(shell $(OCAML) -ccopt -dumpmachine dummy.c)
+UNAME    := $(shell uname -s)
+EXE      :=
+
+ifneq (,$(findstring CYGWIN,$(UNAME)))
+  CC = $(MACHINE)-gcc
+endif
+
+ifneq (,$(findstring mingw,$(MACHINE)))
+EXE := .exe
+endif
+
+ifneq (,$(findstring cygwin,$(MACHINE)))
+EXE := .exe
+endif

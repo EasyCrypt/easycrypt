@@ -7,6 +7,9 @@ PGROOT ?= /usr/share/emacs/site-lisp/ProofGeneral
 EMACS  ?= $(shell ./scripts/find-emacs)
 
 # --------------------------------------------------------------------
+UNAME_S := $(shell uname -s)
+
+# --------------------------------------------------------------------
 all:
 	@echo "Type '$(MAKE) install' for installing ec-mode"
 
@@ -38,8 +41,15 @@ uninstall: $(PGROOT)/easycrypt
 	rm -rf $(PGROOT)/easycrypt
 
 # --------------------------------------------------------------------
-PGVER := 4.2
-PGURL := http://proofgeneral.inf.ed.ac.uk/releases/ProofGeneral-$(PGVER).tgz
+PGVER  := 4.2
+PGURL  := http://proofgeneral.inf.ed.ac.uk/releases/ProofGeneral-$(PGVER).tgz
+PGDIR  := $(CURDIR)
+ECPATH := $(CURDIR)/../ec.native
+
+ifneq (,$(findstring CYGWIN,$(UNAME_S)))
+  PGDIR  := $(shell cygpath -ml "$(PGDIR)")
+  ECPATH := $(shell cygpath -ml "$(ECPATH).exe")
+endif
 
 local:
 	rm -rf _local && mkdir _local
@@ -51,7 +61,7 @@ local:
              && patch -t -p1 < $(CURDIR)/pg-$(PGVER).patch;  ); \
          fi \
 	  || exit 1
-	$(MAKE) PGROOT=$(CURDIR)/_local/ProofGeneral-$(PGVER) install-soft
+	$(MAKE) PGROOT=$(CURDIR)/_local/ProofGeneral-$(PGVER) install
 	$(MAKE) EMACS=$(EMACS) -C $(CURDIR)/_local/ProofGeneral-$(PGVER) clean
 	$(MAKE) EMACS=$(EMACS) -C $(CURDIR)/_local/ProofGeneral-$(PGVER)
 	sed -e s/@VERSION@/$(PGVER)/g config/emacs.rc.in > \
@@ -60,7 +70,7 @@ local:
 run-local:
 	$(EMACS) \
 	  --execute '(load-file "_local/emacs.rc")' \
-	  --execute '(load-file "$(CURDIR)/emacs.local.rc")' \
-	  --execute '(cd "$(CURDIR)/..")' \
-	  --execute '(setq easycrypt-prog-name "$(CURDIR)/../ec.native -emacs")' \
-	  --no-init-file --no-site-file
+	  --execute '(load-file "$(PGDIR)/emacs.local.rc")' \
+	  --execute '(cd "$(PGDIR)/..")' \
+	  --execute '(setq easycrypt-prog-name "$(ECPATH)")' \
+	  --no-init-file --no-site-file --debug-init

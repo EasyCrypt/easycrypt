@@ -23,7 +23,11 @@ let copyright =
 let _ =
   let myname  = Filename.basename Sys.executable_name
   and mydir   = Filename.dirname  Sys.executable_name in
-  let eclocal = List.mem myname ["ec.native"; "ec.byte"] in
+
+  let eclocal =
+    let re = Str.regexp "^ec\\.\\(native\\|byte\\)\\(\\.exe\\)?$" in
+    Str.string_match re myname 0
+  in
 
   let bin =
     match Sys.os_type with
@@ -50,10 +54,13 @@ let _ =
 
   let pwrapper =
     (* Find provers wrapper *)
-    let wrapper = resource ["system"; bin "callprover"] in
-      if   Sys.file_exists wrapper
-      then Some wrapper
-      else None
+    match Sys.os_type with
+    | "Win32" -> None
+    | _ ->
+      let wrapper = resource ["system"; bin "callprover"] in
+        if   Sys.file_exists wrapper
+        then Some wrapper
+        else None
   in
 
   (* If in local mode, add the toolchain bin/ path to $PATH *)

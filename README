@@ -18,10 +18,6 @@
 
    Why3 libraries must be installed (make byte && make install-lib)
 
- * Unix extlib
-
-   Available at http://extunix.forge.ocamlcore.org/
-
  * GNU Emacs (>= 23.3)
 
    Available at http://www.gnu.org/software/emacs/
@@ -104,6 +100,78 @@ from a custom location. For instance:
 
 We do NOT provide an automated way to install provers.
 
+* LOCAL TOOLCHAIN (win32)
+====================================================================
+
+WARNING: the instructions are given for the 32bit version of
+cygwin. Replace 32- by 64- if you are using the 64bit version.
+
+NOTE: The build process relies on cygwin. Still, the resulting
+EasyCrypt binary will by a native win32 programm independent from the
+cygwin DLL.
+
+First, install cygwin32 and && wodi32 (package manager for OCaml
+targetting win32). Wodi is coming with a automated installer that
+install both. However, you may already have a installation and
+cygwin. In that case, you can install wodi32 in your cygwin32
+installation as follows:
+
+  1. Download http://ml.ignorelist.com/wodi/6/wodi32.tar.xz
+
+  2. Extract the archive. You will obtain a wodi32/ directory.
+     Go to wodi32/ and run ./install.sh
+     The installer may require you to install some cygwin
+     packages. Wodi will by installed in /opt/wodi32.
+
+  3. Create a win32 symlink from C:/cygwin (or wherever your cygwin
+     base directory is) to C:/wodi32. For that, you may start a win32
+     shell command as an administrator and type
+
+     $> mklink /D C:/cygwin C:/wodi32
+
+  4. Restart a fresh cygwin shell to get a working wodi
+     environment. Type:
+
+     $> /opt/wodi32/lib/godi/winconfig.sh --add-startmenu-folder
+
+  5. Find the wodi package manager in the start menu and install the
+     following packages:
+
+       menhir, batteries, ocamlgraph, lalgtk2, lablgtk2-extras
+
+  6. Install why3 0.81. Download why3 at:
+
+       https://gforge.inria.fr/frs/download.php/file/33491/why3-0.81.tar.gz
+
+     Untar, go to the why3-0.81/ directory and type
+
+       $> CC=i686-w64-mingw32-gcc.exe ./configure --prefix=C:/wodi32/opt/wodi32/ --disable-ide
+       $> make opt byte
+       $> make install install-lib
+
+     Fix the why3 installation paths:
+
+       $> rm -rf /opt/wodi32/lib/ocaml/pkg-list
+       $> mv /opt/wodi32/lib/ocaml/std-lib/why3 /opt/wodi32/lib/ocaml/pkg-lib
+
+     You can check that why3 is correctly installed:
+
+       $> ocamlfind list | fgrep -w why3
+
+Regarding the Why3 configuration file, easycrypt is using the default
+Why3 location, i.e. ~/.why3.conf, or _tools/why3.local.conf when it
+exists. If you have several versions of Why3 installed, it may be
+impossible to share the same configuration file among them. EasyCrypt,
+via the option -why3, allows you to load a Why3 configuration file
+from a custom location. For instance:
+
+  why3config --detect -C $DEST/why3.conf
+  ./ec.native -why3 $DEST/why3.conf
+
+We do NOT provide an automated way to install provers. However, for a
+first test, you may want to install alt-ergo form the wodi package
+manager.
+
 * COMPILATION
 ====================================================================
 
@@ -119,7 +187,20 @@ environment variable PREFIX:
 
   make PREFIX=/my/prefix install
 
-* INSTALLING THE PROOFGENERAL FRONT-END
+* INSTALLING THE PROOFGENERAL FRONT-END (local)
+====================================================================
+
+You can install a local copy of ProofGeneral by running:
+
+  make -C proofgeneral local
+
+This process is trying to find emacs in different places and then
+searches it in the $PATH. You can change this by setting the $EMACS
+environment variable.
+
+To run this local copy, run [make pg].
+
+* INSTALLING THE PROOFGENERAL FRONT-END (system - manual)
 ====================================================================
 
 Add the following entry to <proof-general-home>/generic/proof-site.el
@@ -147,3 +228,19 @@ inside Emacs:
 setting its value to:
 
   "<path-to-easycrypt>/easycrypt -emacs"
+
+
+* INSTALLING THE PROOFGENERAL FRONT-END (system - automatic)
+====================================================================
+
+The manual process can be automatized by running:
+
+  make PGROOT=/path/to/proof-general-home install
+
+along with
+
+  make PGROOT=/path/to/proof-general-home uninstall
+
+for uninstall the EasyCrypt mode. If the EasyCrypt executable is not
+in your path, refer to the previous section to configure ProofGeneral
+properly.

@@ -159,95 +159,149 @@ module Hints = struct
 end
 
 (* -------------------------------------------------------------------- *)
-let restartable_syscall (call : unit -> 'a) : 'a =
-  let output = ref None in
-    while !output = None do
-      try  output := Some (call ())
-      with
-      | Unix.Unix_error (errno, _, _) when errno = Unix.EINTR -> ()
-    done;
-    EcUtils.oget !output
-
-let execute_task (pi : prover_infos) task =
-  let module CP = Call_provers in
-
-  let pcs = Array.create pi.pr_maxprocs None in
-
-  (* Run process, ignoring prover failing to start *)
-  let run i prover =
-    try
-      let (_, pr, dr)  = get_prover prover in
-      let pc =
-        let command = pr.Whyconf.command in
-        let command =
-          match pi.pr_wrapper with
-          | None -> command
-          | Some wrapper -> Printf.sprintf "%s %s" wrapper command
-        in
-
-        let timelimit =
-          if pi.pr_timelimit <= 0 then None else Some pi.pr_timelimit in
-        Driver.prove_task ~command ?timelimit dr task ()
+let run_prover (pi : prover_infos) (prover : string) task =
+  try
+    let (_, pr, dr)  = get_prover prover in
+    let pc =
+      let command = pr.Whyconf.command in
+      let command =
+        match pi.pr_wrapper with
+        | None -> command
+        | Some wrapper -> Printf.sprintf "%s %s" wrapper command
       in
-        pcs.(i) <- Some (prover, pc)
-    with e ->
-      Format.printf "\nError when starting %s: %a" prover
-        EcPException.exn_printer e;
-      ()
-  in
 
-  EcUtils.try_finally
-    (fun () ->
-      (* Start the provers, at most maxprocs run in the same time *)
-      let pqueue = Queue.create () in
-      List.iteri
-        (fun i prover ->
-           if i < pi.pr_maxprocs then run i prover else Queue.add prover pqueue)
-        pi.pr_provers;
+      let timelimit =
+        if pi.pr_timelimit <= 0 then None else Some pi.pr_timelimit in
+      Driver.prove_task ~command ?timelimit dr task ()
+    in
+      Some (prover, pc)
 
-      (* Wait for the first prover giving a definitive answer *)
-      let status = ref None in
-      let alives = ref (-1) in
-      while !alives <> 0 && !status = None do
-        let pid, st =
-          try  restartable_syscall Unix.wait
-          with Unix.Unix_error _ -> (-1, Unix.WEXITED 127)
-        in
-        alives := 0;
+  with e ->
+    Format.printf "\nError when starting %s: %a" prover
+      EcPException.exn_printer e;
+    None
+
+(* -------------------------------------------------------------------- *)
+module type PExec = sig
+  val execute_task : prover_infos -> Why3.Task.task -> bool option
+end
+
+(* -------------------------------------------------------------------- *)
+module POSIX : PExec = struct
+  let restartable_syscall (call : unit -> 'a) : 'a =
+    let output = ref None in
+      while !output = None do
+        try  output := Some (call ())
+        with
+        | Unix.Unix_error (errno, _, _) when errno = Unix.EINTR -> ()
+      done;
+      EcUtils.oget !output
+
+  let execute_task (pi : prover_infos) task =
+    let module CP = Call_provers in
+
+    let pcs = Array.create pi.pr_maxprocs None in
+
+    (* Run process, ignoring prover failing to start *)
+    let run i prover =
+      run_prover pi prover task
+        |> oiter (fun (prover, pc) -> pcs.(i) <- Some (prover, pc))
+    in
+
+    EcUtils.try_finally
+      (fun () ->
+        (* Start the provers, at most maxprocs run in the same time *)
+        let pqueue = Queue.create () in
+        List.iteri
+          (fun i prover ->
+             if i < pi.pr_maxprocs then run i prover else Queue.add prover pqueue)
+          pi.pr_provers;
+  
+        (* Wait for the first prover giving a definitive answer *)
+        let status = ref None in
+        let alives = ref (-1) in
+        while !alives <> 0 && !status = None do
+          let pid, st =
+            try  restartable_syscall Unix.wait
+            with Unix.Unix_error _ -> (-1, Unix.WEXITED 127)
+          in
+          alives := 0;
+          for i = 0 to (Array.length pcs) - 1 do
+            match pcs.(i) with
+            | None -> ()
+            | Some (prover, pc) ->
+                if CP.prover_call_pid pc = pid then begin
+                  pcs.(i) <- None;            (* DO IT FIRST *)
+                  let result = CP.post_wait_call pc st () in
+                  let answer = result.CP.pr_answer in
+                  match answer with
+                  | CP.Valid   -> status := Some true
+                  | CP.Invalid -> status := Some false
+                  | CP.Failure _ | CP.HighFailure ->
+                    Format.printf "\n[info] Warning: prover %s exited with %a\n%!"
+                      prover CP.print_prover_answer answer;
+                    if not (Queue.is_empty pqueue) then run i (Queue.take pqueue)
+                  | _ ->
+                    if not (Queue.is_empty pqueue) then run i (Queue.take pqueue)
+                end;
+                if pcs.(i) <> None then incr alives
+          done
+        done;
+        !status)
+
+      (* Clean-up: hard kill + wait for remaining provers *)
+      (fun () ->
         for i = 0 to (Array.length pcs) - 1 do
           match pcs.(i) with
           | None -> ()
-          | Some (_prover, pc) ->
-              if CP.prover_call_pid pc = pid then begin
-                pcs.(i) <- None;            (* DO IT FIRST *)
-                let result = CP.post_wait_call pc st () in
-                let ans = result.CP.pr_answer in
-                match ans with
-                | CP.Valid   -> status := Some true
-                | CP.Invalid -> status := Some false
-                | CP.Failure _ | CP.HighFailure ->
-                  Format.printf "\n[info] Warning: prover %s exited with %a\n%!"
-                    _prover CP.print_prover_answer ans;
-                  if not (Queue.is_empty pqueue) then run i (Queue.take pqueue)
-                | _ ->
-                  if not (Queue.is_empty pqueue) then run i (Queue.take pqueue)
-              end;
-              if pcs.(i) <> None then incr alives
-        done
-      done;
-      !status)
+          | Some (_prover,pc) ->
+              let pid = CP.prover_call_pid pc in
+              pcs.(i) <- None;
+              begin try Unix.kill pid 15 with Unix.Unix_error _ -> () end;
+              let _, st =
+                restartable_syscall (fun () -> Unix.waitpid [] pid)
+              in
+              ignore (CP.post_wait_call pc st ());
+        done)
+end
 
-    (* Clean-up: hard kill + wait for remaining provers *)
-    (fun () ->
-      for i = 0 to (Array.length pcs) - 1 do
-        match pcs.(i) with
-        | None -> ()
-        | Some (_prover,pc) ->
-            let pid = CP.prover_call_pid pc in
-            pcs.(i) <- None;
-            begin try Unix.kill pid 15 with Unix.Unix_error _ -> () end;
-            let _, st =
-              restartable_syscall (fun () -> Unix.waitpid [] pid)
-            in
-            ignore (CP.post_wait_call pc st ());
-      done)
+(* -------------------------------------------------------------------- *)
+module Win32 : PExec = struct
+  exception Answer of bool
+
+  let execute_task (pi : prover_infos) task =
+    let module CP = Call_provers in
+
+    let wait1 (prover, pc) =
+      let result = CP.wait_on_call pc () in
+      let answer = result.CP.pr_answer in
+
+      match answer with
+      | CP.Valid   -> raise (Answer true)
+      | CP.Invalid -> raise (Answer false)
+      | CP.Failure _ | CP.HighFailure ->
+          Format.printf "\n[info] Warning: prover %s exited with %a\n%!"
+          prover CP.print_prover_answer answer;
+      | _ -> ()
+
+    in
+
+    let do1 (prover : string) =
+      run_prover pi prover task |> oiter (fun (prover, pc) ->
+        try  wait1 (prover, pc)
+        with e -> begin
+          (try  Unix.kill (CP.prover_call_pid pc) Sys.sigkill
+	   with Unix.Unix_error _ -> ());
+          raise e
+        end)
+     in
+
+     try  List.iter do1 pi.pr_provers; None
+     with Answer b -> Some b
+end
+
+(* -------------------------------------------------------------------- *)
+let execute_task =
+  match Sys.os_type with
+  | "Win32" -> Win32.execute_task
+  | _       -> POSIX.execute_task
