@@ -107,11 +107,11 @@ WARNING: the instructions are given for the 32bit version of
 cygwin. Replace 32- by 64- if you are using the 64bit version.
 
 NOTE: The build process relies on cygwin. Still, the resulting
-EasyCrypt binary will by a native win32 programm independent from the
+EasyCrypt binary will by a native win32 program independent from the
 cygwin DLL.
 
-First, install cygwin32 and && wodi32 (package manager for OCaml
-targetting win32). Wodi is coming with a automated installer that
+First, install cygwin32 && wodi32 (a package manager for OCaml
+targetting win32). Wodi is coming with an automated installer that
 install both. However, you may already have a installation and
 cygwin. In that case, you can install wodi32 in your cygwin32
 installation as follows:
