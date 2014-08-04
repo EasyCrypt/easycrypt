@@ -6,9 +6,6 @@ let _ = dispatch begin function
        Options.ocamlopt := S[!Options.ocamlopt; A"-rectypes"];
 
    | After_rules ->
-        (* Stop complaining under wodi *)
-        mark_tag_used "use_menhir";
-
        (* Numerical warnings *)
        begin
          let wflag error mode wid =
