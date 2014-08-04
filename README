@@ -74,7 +74,9 @@ when started locally.
 WARNING: the ocaml compiler currently shipped with cygwin64 is
 broken. You have to use the 32bits version of cygwin.
 
-  git,wget,unzip,make,m4,gcc-core,gcc=g++,libmpfr4,autoconf,flexdll,
+First, install the following cygwin32 packages:
+
+  git,wget,unzip,make,m4,gcc-core,gcc-g++,libmpfr4,autoconf,flexdll,
   libncurses-devel,curl,ocaml,ocaml-compiler-libs,patch,ncurses
 
 By default, the destination directory is ${PWD}/_tools. You can change
