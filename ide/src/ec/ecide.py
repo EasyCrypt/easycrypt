@@ -1,7 +1,7 @@
 #! /usr/bin/env python3
 
 # --------------------------------------------------------------------
-import sys, magic, resources, widgets.editor as editor
+import sys, os, resources, widgets.editor as editor
 
 from PyQt5 import uic, QtCore, QtGui, QtWidgets, QtWebKit #@UnresolvedImport
 
@@ -68,9 +68,9 @@ class MainWindow(QtWidgets.QMainWindow):
         if not filename: return
         with open(filename, 'rb') as stream:
             contents = stream.read()
-        mg = magic.open(magic.MAGIC_MIME_ENCODING); mg.load()
-        encoding = mg.buffer(contents)
-        contents = str(contents, encoding)
+        #mg = magic.open(magic.MAGIC_MIME_ENCODING); mg.load()
+        #encoding = mg.buffer(contents)
+        contents = str(contents, 'utf-8')
         self._view.setContents(contents)
 
     @QtCore.pyqtSlot(name='on_action_find_triggered')
@@ -85,8 +85,11 @@ class MainWindow(QtWidgets.QMainWindow):
 # --------------------------------------------------------------------
 def main():
     app = QtWidgets.QApplication(sys.argv)
+    res = resources.Resource.rcc('icons')
+    
+    sys.path.append(resources.Resource.ROOT)
+    __import__(os.path.splitext(os.path.basename(res))[0])
 
-    QtCore.QResource.registerResource(resources.Resource.rcc('icons'))
     QtGui.QIcon.setThemeName("FlatIcon")
 
     QtWebKit.QWebSettings.globalSettings().setAttribute(

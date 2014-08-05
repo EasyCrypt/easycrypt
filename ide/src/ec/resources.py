@@ -11,7 +11,7 @@ class Resource(object):
 
     @classmethod
     def rcc(cls, name):
-        rccname = cls.get('%s.rcc' % (name,))
+        rccname = cls.get('%srcc.py' % (name,))
         qrcname = cls.get('%s.qrc' % (name,))
 
         if os.path.exists(qrcname):
@@ -22,7 +22,7 @@ class Resource(object):
                 qmtime, rmtime = 1, 0
 
             if qmtime > rmtime:
-                sp.call(['rcc', '-binary', '-o', rccname, qrcname])
+                sp.call(['pyrcc5', '-o', rccname, qrcname])
 
         return rccname
 
