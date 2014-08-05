@@ -126,13 +126,18 @@ installation as follows:
 
      Go to wodi32/ and run ./install.sh
 
+     Wodi will be installed in /opt/wodi32.
+
      The installer may require you to install some cygwin packages:
 
        bash bzip2 coreutils cpio cygwin dash diffutils dos2unix file
        findutils gawk getent grep gzip make mingw64-i686-gcc-core
        mingw64-x86_64-gcc-core mintty patch sed tar xz
 
-     Wodi will be installed in /opt/wodi32.
+     For easing their installation, you can give the full list of
+     cygwin packages to the cygwin setup.exe:
+
+       /path/to/cygwin/setup.exe -P <packages list>
 
   3. Create a win32 symlink from C:/cygwin (or wherever your cygwin
      base directory is) to C:/wodi32. For that, you may start a win32
