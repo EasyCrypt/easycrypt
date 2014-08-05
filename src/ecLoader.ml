@@ -45,10 +45,19 @@ let rec addidir ?(system = false) ?(recursive = false) (idir : string) (ecl : ec
 
   match (try Some (Unix.stat idir) with Unix.Unix_error _ -> None) with
   | None    -> ()
-  | Some st ->
+  | Some st -> begin
       let idx = (st.Unix.st_dev, st.Unix.st_ino) in
-        if not (List.exists ((=) idx |- snd) ecl.ecl_idirs) then
+
+      match Sys.os_type with
+      | "Win32" ->
+          let test ((_, name), _) = name = idir in
+          if not (List.exists test ecl.ecl_idirs) then
             ecl.ecl_idirs <- ((system, idir), idx) :: ecl.ecl_idirs
+
+      | _ ->
+          if not (List.exists ((=) idx |- snd) ecl.ecl_idirs) then
+            ecl.ecl_idirs <- ((system, idir), idx) :: ecl.ecl_idirs
+  end
 
 (* -------------------------------------------------------------------- *)
 let try_stat name =
