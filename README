@@ -155,7 +155,7 @@ installation as follows:
 
      Fix the why3 installation paths:
 
-       $> rm -rf /opt/wodi32/lib/ocaml/pkg-list
+       $> rm -rf /opt/wodi32/lib/ocaml/pkg-lib/why3
        $> mv /opt/wodi32/lib/ocaml/std-lib/why3 /opt/wodi32/lib/ocaml/pkg-lib
 
      You can check that why3 is correctly installed:
