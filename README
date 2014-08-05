@@ -118,6 +118,10 @@ installation as follows:
 
   1. Download http://ml.ignorelist.com/wodi/6/wodi32.tar.xz
 
+     The EasyCrypt webpage is hosting a copy of the archive:
+
+     https://www.easycrypt.info/wodi/wodi32-4.02-beta.tar.xz
+
   2. Extract the archive. You will obtain a wodi32/ directory.
      Go to wodi32/ and run ./install.sh
      The installer may require you to install some cygwin
