@@ -125,13 +125,17 @@ installation as follows:
   2. Extract the archive. You will obtain a wodi32/ directory.
      Go to wodi32/ and run ./install.sh
      The installer may require you to install some cygwin
-     packages. Wodi will by installed in /opt/wodi32.
+     packages like mingw64-i686-gcc-core and cpio. 
+     Wodi will by installed in /opt/wodi32.
 
   3. Create a win32 symlink from C:/cygwin (or wherever your cygwin
      base directory is) to C:/wodi32. For that, you may start a win32
      shell command as an administrator and type
 
-     $> mklink /D C:/cygwin C:/wodi32
+     $> mklink /D C:/wodi32 D:/cygwin 
+
+     Note that in windows everything is mirrored "/" vs "\" (both work), 
+     "Target" vs "Name" of link as first argument.
 
   4. Restart a fresh cygwin shell to get a working wodi
      environment. Type:
