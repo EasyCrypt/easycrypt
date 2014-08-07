@@ -1,7 +1,8 @@
 /* ------------------------------------------------------------------------ */
-function create_editor(document) {
+function create_editor(manager) {
     editor = ace.edit("editor");
-    editor.ecdoc = window.ecdoc;
+    editor.ecmanager = manager;
+    editor.ecdoc = null;
 
     editor.setTheme("ace/theme/xcode");
     editor.setFontSize("14px");
@@ -9,9 +10,9 @@ function create_editor(document) {
     editor.getSession().setMode("ace/mode/easycrypt");
     editor.getSession().setValue("");
 
-    editor.ecdoc.loaded.connect(function () {
-    	this.setValue(this.ecdoc.contents);
-    	this.gotoLine(0, 0, false);
+    editor.ecmanager.loaded.connect(function () {
+    	this.ecdoc = manager.document;
+    	console.log(this.ecdoc);
     }.bind(editor));
     
     return editor;

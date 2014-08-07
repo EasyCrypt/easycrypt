@@ -4,7 +4,7 @@ import os, json
 from PyQt5 import QtCore, QtWidgets, QtWebKitWidgets #@UnresolvedImport
 
 from resources import Resource
-from document  import ECDocument
+from document  import ECDocument, ECDocumentManager
 
 # ------------------------------------------------------------------------
 class JSObject(object):
@@ -32,9 +32,9 @@ class ECEditor(QtWidgets.QWidget):
         self._view     = QtWebKitWidgets.QWebView(self)
         self._editor   = None
         self._sopts    = {}
-        self._document = ECDocument(self)
+        self._manager  = ECDocumentManager()
 
-        self._view.page().mainFrame().addToJavaScriptWindowObject('ecdoc', self._document)
+        self._view.page().mainFrame().addToJavaScriptWindowObject('ecmanager', self._manager)
         self._view.loadFinished.connect(self._cb_ready)
         self._view.load(QtCore.QUrl.fromLocalFile(Resource.html('editor')))
 
@@ -60,7 +60,7 @@ class ECEditor(QtWidgets.QWidget):
         self._editor.setTheme('ace/theme/%s' % (theme,))
 
     def setContents(self, contents):
-        self._document.setContents(contents)
+        self._manager.setDocument(ECDocument(contents))
 
     def search(self, needle):
         print(self._sopts)
