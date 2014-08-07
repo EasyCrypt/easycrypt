@@ -180,6 +180,8 @@ var Mode = function() {
 oop.inherits(Mode, TextMode);
 
 (function() {
+    this.type = "text";
+    
     this.lineCommentStart = "%";
 
     this.$id = "ace/mode/latex";

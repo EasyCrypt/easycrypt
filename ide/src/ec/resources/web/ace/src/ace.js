@@ -1534,6 +1534,8 @@ exports.addMultiMouseDownListener = function(el, timeouts, eventHandler, callbac
                 startY = e.clientY;
             }
         }
+        
+        e._clicks = clicks;
 
         eventHandler[callbackName]("mousedown", e);
 
@@ -2369,16 +2371,16 @@ function DefaultHandlers(mouseHandler) {
             var selectionRange = editor.getSelectionRange();
             var selectionEmpty = selectionRange.isEmpty();
 
-            if (selectionEmpty) {
+            if (selectionEmpty)
                 editor.selection.moveToPosition(pos);
-            }
             editor.textInput.onContextMenu(ev.domEvent);
             return; // stopping event here breaks contextmenu on ff mac
         }
+
+        this.mousedownEvent.time = Date.now();
         if (inSelection && !editor.isFocused()) {
             editor.focus();
             if (this.$focusTimout && !this.$clickSelection && !editor.inMultiSelectMode) {
-                this.mousedownEvent.time = Date.now();
                 this.setState("focusWait");
                 this.captureMouse(ev);
                 return;
@@ -2386,28 +2388,20 @@ function DefaultHandlers(mouseHandler) {
         }
 
         this.captureMouse(ev);
-        if (!inSelection || this.$clickSelection || ev.getShiftKey() || editor.inMultiSelectMode) {
-            this.startSelect(pos);
-        } else if (inSelection) {
-            this.mousedownEvent.time = Date.now();
-            this.startSelect(pos);
-        }
+        this.startSelect(pos, ev.domEvent._clicks > 1);
         return ev.preventDefault();
     };
 
-    this.startSelect = function(pos) {
+    this.startSelect = function(pos, waitForClickSelection) {
         pos = pos || this.editor.renderer.screenToTextCoordinates(this.x, this.y);
         var editor = this.editor;
-        var shiftPressed = this.mousedownEvent.getShiftKey();
-        setTimeout(function(){
-            if (shiftPressed) {
-                editor.selection.selectToPosition(pos);
-            }
-            else if (!this.$clickSelection) {
-                editor.selection.moveToPosition(pos);
-            }
+        
+        if (this.mousedownEvent.getShiftKey())
+            editor.selection.selectToPosition(pos);
+        else if (!waitForClickSelection)
+            editor.selection.moveToPosition(pos);
+        if (!waitForClickSelection)
             this.select();
-        }.bind(this), 0);
         if (editor.renderer.scroller.setCapture) {
             editor.renderer.scroller.setCapture();
         }
@@ -2506,6 +2500,7 @@ function DefaultHandlers(mouseHandler) {
             this.setState("selectByWords");
         }
         this.$clickSelection = range;
+        this.select();
     };
 
     this.onTripleClick = function(ev) {
@@ -2520,6 +2515,7 @@ function DefaultHandlers(mouseHandler) {
         } else {
             this.$clickSelection = editor.selection.getLineRange(pos.row);
         }
+        this.select();
     };
 
     this.onQuadClick = function(ev) {
@@ -5056,11 +5052,14 @@ var Tokenizer = function(rules) {
                     type = rule.token;
 
                 if (rule.next) {
-                    if (typeof rule.next == "string")
+                    if (typeof rule.next == "string") {
+                        if (stack.length && stack[0] == currentState && stack[1] == rule.next)
+                            stack.shift();
                         currentState = rule.next;
-                    else
+                    } else {
                         currentState = rule.next(currentState, stack);
-
+                    }
+                    
                     state = this.states[currentState];
                     if (!state) {
                         window.console && console.error && console.error(currentState, "doesn't exist");
@@ -6414,10 +6413,9 @@ var BackgroundTokenizer = function(tokenizer, editor) {
                 currentLine++;
             } while (self.lines[currentLine]);
             processedLines ++;
-            if ((processedLines % 5 == 0) && (new Date() - workerStart) > 20) {                
+            if ((processedLines % 5 === 0) && (new Date() - workerStart) > 20) {                
                 self.running = setTimeout(self.$worker, 20);
-                self.currentLine = currentLine;
-                return;
+                break;
             }
         }
         self.currentLine = currentLine;
@@ -11424,10 +11422,11 @@ var Editor = function(renderer, session) {
             lastRow = range.end.row;
         else
             lastRow = Infinity;
-        this.renderer.updateLines(range.start.row, lastRow);
+        this.renderer.updateLines(range.start.row, lastRow, this.session.$useWrapMode);
 
         this._signal("change", e);
         this.$cursorChange();
+        this.$updateHighlightActiveLine();
     };
 
     this.onTokenizerUpdate = function(e) {
@@ -14239,7 +14238,12 @@ var FontMetrics = exports.FontMetrics = function(parentEl, interval) {
 
     this.$measureSizes = function() {
         if (CHAR_COUNT === 1) {
-            var rect = this.$measureNode.getBoundingClientRect();
+            var rect = null;
+            try { 
+               rect = this.$measureNode.getBoundingClientRect();
+            } catch(e) {
+               rect = {width: 0, height:0 };
+            };
             var size = {
                 height: rect.height,
                 width: rect.width
@@ -14835,7 +14839,7 @@ var VirtualRenderer = function(container, theme) {
         this.onChangeNewLineMode()
         this.session.doc.on("changeNewLineMode", this.onChangeNewLineMode);
     };
-    this.updateLines = function(firstRow, lastRow) {
+    this.updateLines = function(firstRow, lastRow, force) {
         if (lastRow === undefined)
             lastRow = Infinity;
 
@@ -14852,9 +14856,13 @@ var VirtualRenderer = function(container, theme) {
             if (this.$changedLines.lastRow < lastRow)
                 this.$changedLines.lastRow = lastRow;
         }
-
-        if (this.$changedLines.firstRow > this.layerConfig.lastRow ||
-            this.$changedLines.lastRow < this.layerConfig.firstRow)
+        if (this.$changedLines.lastRow < this.layerConfig.firstRow) {
+            if (force)
+                this.$changedLines.lastRow = this.layerConfig.lastRow;
+            else
+                return;
+        }
+        if (this.$changedLines.firstRow > this.layerConfig.lastRow)
             return;
         this.$loop.schedule(this.CHANGE_LINES);
     };
@@ -18053,11 +18061,21 @@ exports.edit = function(el) {
             throw new Error("ace.edit can't find div #" + _id);
     }
 
-    if (el.env && el.env.editor instanceof Editor)
+    if (el && el.env && el.env.editor instanceof Editor)
         return el.env.editor;
 
-    var doc = exports.createEditSession(dom.getInnerText(el));
-    el.innerHTML = '';
+    var value = "";
+    if (el && /input|textarea/i.test(el.tagName)) {
+        var oldNode = el;
+        value = oldNode.value;
+        el = dom.createElement("pre");
+        oldNode.parentNode.replaceChild(el, oldNode);
+    } else {
+        value = dom.getInnerText(el);
+        el.innerHTML = '';
+    }
+
+    var doc = exports.createEditSession(value);
 
     var editor = new Editor(new Renderer(el));
     editor.setSession(doc);
@@ -18067,11 +18085,12 @@ exports.edit = function(el) {
         editor: editor,
         onResize: editor.resize.bind(editor, null)
     };
+    if (oldNode) env.textarea = oldNode;
     event.addListener(window, "resize", env.onResize);
     editor.on("destroy", function() {
         event.removeListener(window, "resize", env.onResize);
     });
-    el.env = editor.env = env;
+    editor.container.env = editor.env = env;
     return editor;
 };
 exports.createEditSession = function(text, mode) {

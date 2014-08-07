@@ -1,4 +1,4 @@
-ace.define('ace/mode/easycrypt',
+define('ace/mode/easycrypt',
       ['require', 'exports', 'module' , 'ace/lib/oop', 'ace/mode/text',
        'ace/mode/easycrypt_highlight_rules', 'ace/mode/matching_brace_outdent', 'ace/range'],
        function(require, exports, module) {
@@ -67,7 +67,7 @@ var indenter = /(?:[({[=:,-]|(?:lemma|equiv|hoare|realize|proof.))\s*$/;
       exports.Mode = Mode;
     });
 
-ace.define('ace/mode/easycrypt_highlight_rules',
+define('ace/mode/easycrypt_highlight_rules',
       ['require', 'exports', 'module', 'ace/lib/oop', 'ace/mode/text_highlight_rules'],
       function(require, exports, module) {
 
@@ -183,7 +183,7 @@ exports.EasycryptHighlightRules = EasycryptHighlightRules;
 });
 
 /* -------------------------------------------------------------- */
-ace.define('ace/mode/matching_brace_outdent', [ 'require', 'exports', 'module', 'ace/range' ], function(require, exports, module) {
+define('ace/mode/matching_brace_outdent', [ 'require', 'exports', 'module', 'ace/range' ], function(require, exports, module) {
 var Range = require("../range").Range;
 
 var MatchingBraceOutdent = function() {};
