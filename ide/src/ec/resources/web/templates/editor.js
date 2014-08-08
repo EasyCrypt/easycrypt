@@ -13,6 +13,7 @@ function create_editor(manager) {
     editor.ecmanager.loaded.connect(function () {
     	this.ecdoc = manager.document;
     	console.log(this.ecdoc);
+    	this.getSession().getDocument().setBackend(this.ecdoc);
     }.bind(editor));
     
     return editor;
