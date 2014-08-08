@@ -6024,14 +6024,65 @@ var EventEmitter = require("./lib/event_emitter").EventEmitter;
 var Range = require("./range").Range;
 var Anchor = require("./anchor").Anchor;
 
-var Document = function(text) {
-    this.$lines = [];
-    if (text.length === 0) {
-        this.$lines = [""];
-    } else if (Array.isArray(text)) {
-        this._insertLines(0, text);
-    } else {
-        this.insert({row: 0, column:0}, text);
+/*
+ * Document backend interface:
+ * 
+ *  getLength : () -> Int
+ *  getRow : Int -> String
+ *  getRows : Int -> Int -> [String]
+ *  setRow : Int -> String -> ()
+ *  insertLine : Int -> String -> ()
+ *  insertLines : Int -> [String] -> ()
+ *  removeRow : Int -> ()
+ *  removeRows : Int -> Int -> ()
+ * 
+ * */
+var DefaultDocumentBackend = function() {
+    var _lines = [""];
+
+    this.getLength = function() {
+        return _lines.length;
+    };
+
+    this.getRow = function(row) {
+        return _lines[row] || null;
+    };
+
+    this.getRows = function(row_from, row_to) {
+        return _lines.slice(row_from, row_to);
+    };
+
+    this.setRow = function(row, line) {
+        _lines[row] = line;
+    };
+
+    this.insertLine = function(row, line) {
+        _lines.splice(row, 0, line)[0];
+    };
+
+    this.insertLines = function(row, lines) {
+        var args = [row, 0];
+        args.push.apply(args, lines);
+        _lines.splice.apply(_lines, args);
+    };
+
+    this.removeRow = function(row) {
+        _lines.splice(row, 1)[0];
+    };
+
+    this.removeRows = function(row_from, row_to) {
+        _lines.splice(row_from, row_to - row_from);
+    };
+}
+
+var Document = function(text, backend) {
+    this.$lines = backend || new DefaultDocumentBackend();
+    if (text.length > 0) {
+        if (Array.isArray(text)) {
+            this._insertLines(0, text);
+        } else {
+            this.insert({row: 0, column:0}, text);
+        }
     }
 };
 
@@ -6075,6 +6126,11 @@ var Document = function(text) {
         }
     };
 
+    this.setBackend = function(backend) {
+      this.$lines = backend;
+      this.setValue(this.getValue());  // Emit signals
+    };
+
     this.$autoNewLine = "";
     this.$newLineMode = "auto";
     this.setNewLineMode = function(newLineMode) {
@@ -6091,16 +6147,16 @@ var Document = function(text) {
         return (text == "\r\n" || text == "\r" || text == "\n");
     };
     this.getLine = function(row) {
-        return this.$lines[row] || "";
+        return this.$lines.getRow(row) || "";
     };
     this.getLines = function(firstRow, lastRow) {
-        return this.$lines.slice(firstRow, lastRow + 1);
+        return this.$lines.getRows(firstRow, lastRow + 1);
     };
     this.getAllLines = function() {
         return this.getLines(0, this.getLength());
     };
     this.getLength = function() {
-        return this.$lines.length;
+        return this.$lines.getLength();
     };
     this.getTextRange = function(range) {
         if (range.start.row == range.end.row) {
@@ -6158,9 +6214,7 @@ var Document = function(text) {
             row = end.row;
         }
 
-        var args = [row, 0];
-        args.push.apply(args, lines);
-        this.$lines.splice.apply(this.$lines, args);
+        this.$lines.insertLines(row, lines);
 
         var range = new Range(row, 0, row + lines.length, 0);
         var delta = {
@@ -6173,10 +6227,10 @@ var Document = function(text) {
     };
     this.insertNewLine = function(position) {
         position = this.$clipPosition(position);
-        var line = this.$lines[position.row] || "";
+        var line = this.$lines.getRow(position.row) || "";
 
-        this.$lines[position.row] = line.substring(0, position.column);
-        this.$lines.splice(position.row + 1, 0, line.substring(position.column, line.length));
+        this.$lines.setRow(position.row, line.substring(0, position.column));
+        this.$lines.insertLine(position.row + 1, line.substring(position.column, line.length));
 
         var end = {
             row : position.row + 1,
@@ -6196,10 +6250,10 @@ var Document = function(text) {
         if (text.length == 0)
             return position;
 
-        var line = this.$lines[position.row] || "";
+        var line = this.$lines.getRow(position.row) || "";
 
-        this.$lines[position.row] = line.substring(0, position.column) + text
-                + line.substring(position.column);
+        this.$lines.setRow(position.row, line.substring(0, position.column) + text
+                + line.substring(position.column));
 
         var end = {
             row : position.row,
@@ -6255,7 +6309,7 @@ var Document = function(text) {
         var line = this.getLine(row);
         var removed = line.substring(startColumn, endColumn);
         var newLine = line.substring(0, startColumn) + line.substring(endColumn, line.length);
-        this.$lines.splice(row, 1, newLine);
+        this.$lines.setRow(row, newLine);
 
         var delta = {
             action: "removeText",
@@ -6273,7 +6327,8 @@ var Document = function(text) {
 
     this._removeLines = function(firstRow, lastRow) {
         var range = new Range(firstRow, 0, lastRow + 1, 0);
-        var removed = this.$lines.splice(firstRow, lastRow - firstRow + 1);
+        var removed = this.$lines.getRows(firstRow, lastRow + 1);
+        this.$lines.removeRows(firstRow, lastRow + 1);
 
         var delta = {
             action: "removeLines",
@@ -6291,7 +6346,8 @@ var Document = function(text) {
         var range = new Range(row, firstLine.length, row+1, 0);
         var line = firstLine + secondLine;
 
-        this.$lines.splice(row, 2, line);
+        this.$lines.removeRow(row);
+        this.$lines.setRow(row, line);
 
         var delta = {
             action: "removeText",
@@ -6350,7 +6406,7 @@ var Document = function(text) {
         }
     };
     this.indexToPosition = function(index, startRow) {
-        var lines = this.$lines || this.getAllLines();
+        var lines = this.getAllLines();
         var newlineLength = this.getNewLineCharacter().length;
         for (var i = startRow || 0, l = lines.length; i < l; i++) {
             index -= lines[i].length + newlineLength;
@@ -6360,7 +6416,7 @@ var Document = function(text) {
         return {row: l-1, column: lines[l-1].length};
     };
     this.positionToIndex = function(pos, startRow) {
-        var lines = this.$lines || this.getAllLines();
+        var lines = this.getAllLines();
         var newlineLength = this.getNewLineCharacter().length;
         var index = 0;
         var row = Math.min(pos.row, lines.length);
