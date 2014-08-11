@@ -78,3 +78,81 @@ function glyph(classes) {
   var node = $('<span>').addClass('glyphicon ' + classes);
   return node;
 };
+
+/*                 WebSocket EcConn implementation                */
+/* -------------------------------------------------------------- */
+
+var WSEcConn = function() {
+  this.srv_addr = "ws://localhost:8888/";
+  this.socket = null;
+  this.conn_ops = {
+      open: null,
+      close: null,
+      step: null,
+      notice: null,
+      proof: null,
+      error: null
+  }
+}
+
+WSEcConn.prototype.open = function() {
+  this.close();
+
+  this.socket = new WebSocket(this.srv_addr);
+  this.socket.onopen = this.conn_ops.open;
+  this.socket.onclose = this.conn_ops.close;
+  this.socket.onerror = function(e) { console.log("======== [" + addr + "] ERROR\n" + e.data + "========\n"); };
+  this.socket.onmessage = function(e) {
+    var data = JSON.parse(e.data);
+    switch (data.type) {
+    case "step":
+      if (this.conn_ops.step !== null) this.conn_ops.step(data.step);
+      break;
+    case "notice":
+      if (this.conn_ops.notice !== null) this.conn_ops.notice(data.value);
+      break;
+    case "proof":
+      if (this.conn_ops.proof !== null) this.conn_ops.proof(data.value);
+      break;
+    case "error":
+      if (this.conn_ops.error !== null) this.conn_ops.error(data.value);
+      break;
+    default:
+      console.log("ERROR: no parse from server data");
+    }
+  }.bind(this);
+  return this.socket;
+}
+
+WSEcConn.prototype.close = function() {
+  if (this.socket !== null) this.socket.close();
+}
+
+WSEcConn.prototype.eval = function(stmt) {
+  this.socket.send(stmt + "\n");
+}
+
+WSEcConn.prototype.undo = function(step) {
+  this.socket.send("undo " + step + ".\n");
+}
+
+WSEcConn.prototype.onOpen = function(callback) {
+  this.conn_ops.open = callback;
+}
+WSEcConn.prototype.onClose = function(callback) {
+  this.conn_ops.close = callback;
+}
+WSEcConn.prototype.onStep = function(callback) {
+  this.conn_ops.step = callback;
+}
+WSEcConn.prototype.onNotice = function(callback) {
+  this.conn_ops.notice = callback;
+}
+WSEcConn.prototype.onProof = function(callback) {
+  this.conn_ops.proof = callback;
+}
+WSEcConn.prototype.onError = function(callback) {
+  this.conn_ops.error = callback;
+}
+
+/* -------------------------------------------------------------- */

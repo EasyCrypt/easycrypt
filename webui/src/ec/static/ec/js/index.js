@@ -222,7 +222,7 @@ Workspace.prototype.load_editor = function() {
     }.bind(this),
     readOnly: false,
   });
-  ecLiftEditor(this.editor);
+  ecLiftEditor(this.editor, new WSEcConn());
 
   this.ui.tabctl.tabs({
     active: 1,

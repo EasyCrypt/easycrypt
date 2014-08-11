@@ -1,73 +1,23 @@
-/* ---------------------------------------------------------------- */
-var Conn = function(editor) {
-  this.srv_addr = "ws://localhost:8888/";
-  this.socket = null;
-  this.results = $("#results");
-  this.editor = editor;
-
-  this.init();
-}
-
-Conn.prototype.init = function(editor) {
-  if (this.socket !== null) this.close();
-  this.open(this.srv_addr);
-}
-
-Conn.prototype.open = function(addr) {
-  this.socket = new WebSocket(addr);
-
-  function debug(data) {
-    //console.log("\n\n======== [" + addr + "] (" + data.type + ")\n");
-  }
-  function toHTML(data) {
-    return data.replace(/&/g, "&amp;").replace(/</g, "&lt;")
-               .replace(/>/g, "&gt;").replace(/\n/g, "<br />");
-  }
-
-  this.socket.onopen = function(e) {
-    console.log("[+] Opened '" + addr + "'");
-    this.editor.online = true;
-    this.results.html("");
-  }.bind(this);
-  this.socket.onclose = function(e) {
-    console.log("[+] Closed '" + addr + "'");
-    this.editor.online = false;
-    this.results.text("<offline>");
-  }.bind(this);
-  this.socket.onmessage = function(e) {
-    var data = JSON.parse(e.data);
-    switch (data.type) {
-    case "step":
-      debug(data);
-      this.editor.set_step(data.step);
-      break;
-    case "notice":
-    case "proof":
-      debug(data);
-      this.results.html(toHTML(data.value));
-      break;
-    case "error":
-      debug(data);
-      break;
-    default:
-      console.log("ERROR");
-    }
-  }.bind(this);
-  this.socket.onerror = function(e) { console.log("======== [" + addr + "] ERROR\n" + e.data + "========\n"); };
-  return this.socket;
-}
-
-Conn.prototype.close = function() {
-  this.socket.close();
-}
-
-Conn.prototype.send = function(data) {
-  this.socket.send(data + "\n");
-}
+/*
+ * EcConn interface:
+ *
+ *  open  : () -> ()
+ *  close : () -> ()
+ *  eval  : String -> ()
+ *  undo  : Int -> ()
+ *
+ *  onOpen   : (() -> ()) -> ()
+ *  onClose  : (() -> ()) -> ()
+ *  onStep   : (Int -> ()) -> ()
+ *  onNotice : (String -> ()) -> ()
+ *  onProof  : (String -> ()) -> ()
+ *  onError  : (String -> ()) -> ()
+ *
+ */
 
 
 /* ---------------------------------------------------------------- */
-function ecLiftEditor(editor) {
+function ecLiftEditor(editor, conn /* : EcConn */) {
   var Range = ace.require("ace/range").Range
   var Search = ace.require("ace/search").Search
 
@@ -82,7 +32,6 @@ function ecLiftEditor(editor) {
   }
 
   /* -------------------------------------------------------------- */
-  editor.conn = null;
   editor.online = false;
 
   editor.step = 0;
@@ -138,7 +87,7 @@ function ecLiftEditor(editor) {
       var to = this.next_stop();
       if (to !== null) {
         var stmt_range = Range.fromPoints(from, to);
-        this.conn.send(this.getSession().getTextRange(stmt_range));
+        this.conn.eval(this.getSession().getTextRange(stmt_range));
 
         this.points = this.points.concat([to]);
         this._loading = true;
@@ -152,7 +101,7 @@ function ecLiftEditor(editor) {
       this.points.splice(step+1);
       this.step = step;
       this._loading = true;
-      this.conn.send("undo " + step + ".");
+      this.conn.undo(step);
       this.update_markers();
     }
   }
@@ -252,5 +201,32 @@ function ecLiftEditor(editor) {
   }.bind(editor));
 
   /* -------------------------------------------------------------- */
-  editor.conn = new Conn(editor);
+  editor.conn = conn;
+
+  function toHTML(data) {
+    return data.replace(/&/g, "&amp;").replace(/</g, "&lt;")
+               .replace(/>/g, "&gt;").replace(/\n/g, "<br />");
+  }
+
+  var results = $("#results");
+  editor.conn.onOpen(function() {
+    this.online = true;
+    results.html("");
+  }.bind(editor));
+  editor.conn.onClose(function() {
+    this.online = false;
+    results.text("<offline>");
+  }.bind(editor));
+  editor.conn.onStep(editor.set_step.bind(editor));
+  editor.conn.onNotice(function(text) {
+    results.html(toHTML(text));
+  }.bind(editor));
+  editor.conn.onProof(function(text) {
+    results.html(toHTML(text));
+  }.bind(editor));
+  editor.conn.onError(function(text) {
+    results.html(toHTML("ERROR: " + text));
+  }.bind(editor));
+
+  editor.conn.open();
 }
