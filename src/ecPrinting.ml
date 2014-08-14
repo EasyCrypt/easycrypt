@@ -2053,25 +2053,25 @@ let pp_mod_params ppe bms =
 let pp_pvdecl ppe fmt v =
   Format.fprintf fmt "%s : %a" v.v_name (pp_type ppe) v.v_type
 
-let pp_funsig ppe fmt fs =
+let pp_funsig ppe fmt (oi_in, fs) =
   match fs.fs_anames with
   | None ->
-    Format.fprintf fmt "@[<hov 2>fun %s %a :@ %a@]"
+    Format.fprintf fmt "@[<hov 2>proc%s %s %a :@ %a@]"
+      (if oi_in then "" else " *")
       fs.fs_name (pp_type ppe) fs.fs_arg (pp_type ppe) fs.fs_ret
   | Some params ->
-    Format.fprintf fmt "@[<hov 2>fun %s(%a) :@ %a@]"
-      fs.fs_name
+    Format.fprintf fmt "@[<hov 2>proc%s %s(%a) :@ %a@]"
+      (if oi_in then "" else " *") fs.fs_name
       (pp_list ", " (pp_pvdecl ppe)) params
       (pp_type ppe) fs.fs_ret
 
 let pp_orclinfo ppe fmt oi =
-  Format.fprintf fmt "{%s%a}"
-    (if oi.oi_in then "" else "* ")
+  Format.fprintf fmt "{%a}"
     (pp_list ",@ " (pp_funname ppe)) oi.oi_calls
 
 let pp_sigitem ppe fmt (Tys_function(fs,oi)) =
   Format.fprintf fmt "@[<hov 2>%a@ %a@]"
-    (pp_funsig ppe) fs (pp_orclinfo ppe) oi
+    (pp_funsig ppe) (oi.oi_in, fs) (pp_orclinfo ppe) oi
 
 let pp_modsig ppe fmt (p,ms) =
   let (ppe,pp) = pp_mod_params ppe ms.mis_params in
@@ -2166,7 +2166,7 @@ and pp_moditem ppe fmt = function
       | _ -> Format.fprintf fmt "?ABSTRACT?" in
 
     Format.fprintf fmt "@[<v>%a = %a@]"
-      (pp_funsig ppe) f.f_sig
+      (pp_funsig ppe) (false, f.f_sig)
       (pp_fundef ppe) f.f_def
 
 let pp_modexp ppe fmt me =
