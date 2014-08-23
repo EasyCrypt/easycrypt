@@ -368,6 +368,16 @@ theory Finite.
   by rewrite mem_union FSet.mem_union X_X' Y_Y'.
   qed.
 
+  lemma finite_prod:
+     finite univ<:'a> =>
+     finite univ<:'b> =>
+     finite univ<:'a * 'b>.
+  proof strict.
+  case=> [A eqA] [B eqB].
+  exists (FSet.Product.(**) A B)=> x; rewrite mem_univ.
+  by rewrite -FSet.Product.mem_prod -eqA -eqB !mem_univ.
+  qed.
+
   lemma unionM (X Y:'a set):
     finite X =>
     finite Y =>
