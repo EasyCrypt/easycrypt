@@ -1389,7 +1389,7 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
 
   | FbdHoareF hf ->
       let ppe = PPEnv.create_and_push_mem ppe ~active:true (EcFol.mhr, hf.bhf_f) in
-      Format.fprintf fmt "bd_hoare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]] %s %a"
+      Format.fprintf fmt "phoare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]] %s %a"
         (pp_funname ppe) hf.bhf_f
         (pp_form ppe) hf.bhf_pr
         (pp_form ppe) hf.bhf_po
@@ -1398,7 +1398,7 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
 
   | FbdHoareS hs ->
       let ppe = PPEnv.push_mem ppe ~active:true hs.bhs_m in
-      Format.fprintf fmt "bd_hoare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]] %s %a"
+      Format.fprintf fmt "phoare[@[<hov 2>@ %a :@ @[%a ==>@ %a@]@]] %s %a"
         (pp_stmt_for_form ppe) hs.bhs_s
         (pp_form ppe) hs.bhs_pr
         (pp_form ppe) hs.bhs_po
