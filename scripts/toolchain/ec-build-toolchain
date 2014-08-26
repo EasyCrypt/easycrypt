@@ -6,7 +6,7 @@ set -e
 
 # --------------------------------------------------------------------
 : ${OVERSION=4.01.0}
-: ${DEST="${PWD}/_tools"}       # MUST BE ABSOLUTE
+: ${EC_TOOLCHAIN_ROOT="${PWD}/_tools"}       # MUST BE ABSOLUTE
 
 # --------------------------------------------------------------------
 PATCHES=ocaml-patches.diff
@@ -17,12 +17,12 @@ OPAM_URL=http://www.ocamlpro.com/pub/opam-full-${OPAM_VERSION}.tar.gz
 ECOPAM_URL=https://www.easycrypt.info/opam-${OPAM_VERSION}
 
 OCONFIG_BASE="ocaml-${OVERSION}/etc/ocamlbrew.bashrc"
-OCONFIG="${DEST}/${OCONFIG_BASE}"
+OCONFIG="${EC_TOOLCHAIN_ROOT}/${OCONFIG_BASE}"
 
-export OCAMLBREW_BASE=${DEST}
+export OCAMLBREW_BASE=${EC_TOOLCHAIN_ROOT}
 export OCAMLBREW_FLAGS="-v ${OVERSION} -p ${PWD}/scripts/patches/${PATCHES} -f"
 
-export OPAMROOT=${DEST}/ocaml-${OVERSION}/opam
+export OPAMROOT=${EC_TOOLCHAIN_ROOT}/ocaml-${OVERSION}/opam
 export OPAMFLAGS="--no-setup default ${ECOPAM_URL}"
 
 unset OCAMLFIND_CONF
@@ -38,9 +38,9 @@ esac
 
 
 # --------------------------------------------------------------------
-if [ "${DEST}" != "${DEST//[ ]/}" ]; then
+if [ "${EC_TOOLCHAIN_ROOT}" != "${EC_TOOLCHAIN_ROOT//[ ]/}" ]; then
   echo "Destination folder contains spaces" >&2
-  echo "Please, set the DEST variable to a valid value" >&2
+  echo "Please, set the EC_TOOLCHAIN_ROOT variable to a valid value" >&2
   exit 1
 fi
 
@@ -65,17 +65,18 @@ fi
 # --------------------------------------------------------------------
 set -e
 
-rm -rf "${DEST}" && mkdir "${DEST}" "${DEST}/src"
+rm -rf "${EC_TOOLCHAIN_ROOT}" && \
+  mkdir "${EC_TOOLCHAIN_ROOT}" "${EC_TOOLCHAIN_ROOT}/src"
 
 if [ ${buildtype} != "cygwin" ]; then
-  curl -f -kL -o "${DEST}/src/ocamlbrew" ${OBREW_URL}
-  bash "${DEST}/src/ocamlbrew" ${OCAMLBREW_FLAGS}
+  curl -f -kL -o "${EC_TOOLCHAIN_ROOT}/src/ocamlbrew" ${OBREW_URL}
+  bash "${EC_TOOLCHAIN_ROOT}/src/ocamlbrew" ${OCAMLBREW_FLAGS}
 else
-  mkdir "${DEST}"/ocaml-${OVERSION}/
-  mkdir "${DEST}"/ocaml-${OVERSION}/build
-  mkdir "${DEST}"/ocaml-${OVERSION}/etc
+  mkdir "${EC_TOOLCHAIN_ROOT}"/ocaml-${OVERSION}/
+  mkdir "${EC_TOOLCHAIN_ROOT}"/ocaml-${OVERSION}/build
+  mkdir "${EC_TOOLCHAIN_ROOT}"/ocaml-${OVERSION}/etc
   cat >>"${OCONFIG}" <<-EOF
-export PATH="${DEST}/ocaml-${OVERSION}/bin:\${PATH}"
+export PATH="${EC_TOOLCHAIN_ROOT}/ocaml-${OVERSION}/bin:\${PATH}"
 EOF
 fi
 
@@ -88,21 +89,21 @@ function build_opam {
     tar -xozf opam-full-${OPAM_VERSION}.tar.gz
 
     cd opam-full-${OPAM_VERSION}
-    ./configure --prefix="${DEST}/ocaml-${OVERSION}"
+    ./configure --prefix="${EC_TOOLCHAIN_ROOT}/ocaml-${OVERSION}"
     make && make install
 
-    "${DEST}"/ocaml-${OVERSION}/bin/opam init ${OPAMFLAGS}
+    "${EC_TOOLCHAIN_ROOT}"/ocaml-${OVERSION}/bin/opam init ${OPAMFLAGS}
 
     cat >>"${OCONFIG}" <<-EOF
 export PS1="(ec-tool) \${PS1}"
-export OCAMLFIND_CONF="${DEST}/ocaml-${OVERSION}/opam/system/lib/findlib.conf"
+export OCAMLFIND_CONF="${EC_TOOLCHAIN_ROOT}/ocaml-${OVERSION}/opam/system/lib/findlib.conf"
 export OPAMROOT="${OPAMROOT}"
 EOF
 
-    echo "eval \`${DEST}/ocaml-${OVERSION}/bin/opam config env\`" >>"${OCONFIG}"
+    echo "eval \`${EC_TOOLCHAIN_ROOT}/ocaml-${OVERSION}/bin/opam config env\`" >>"${OCONFIG}"
 }
 
-( set -e; cd "${DEST}"/ocaml-${OVERSION}/build && build_opam )
+( set -e; cd "${EC_TOOLCHAIN_ROOT}"/ocaml-${OVERSION}/build && build_opam )
 
 source "${OCONFIG}"
 
@@ -124,7 +125,7 @@ cat <<EOF
 %%%
 %%% To use it, type:
 %%% 
-%%%    \$(./scripts/activate-toolchain.sh)
+%%%    source ./scripts/activate-toolchain.sh
 %%% 
 %%% Don't forget to [make clean] the easycrypt source tree
 %%%

@@ -33,15 +33,15 @@ You can install a local copy of OCaml and all the needed libraries by
 running [make toolchain]. You only need [curl] and the [gcc] compiler.
 
 By default, the destination directory is ${PWD}/_tools. You can change
-this by setting the $DEST variable, e.g.:
+this by setting the $EC_TOOLCHAIN_ROOT variable, e.g.:
 
-  make DEST=/opt/ec-toolchain toolchain
+  make EC_TOOLCHAIN_ROOT=/opt/ec-toolchain toolchain
 
-Note that $DEST cannot contain spaces.
+Note that $EC_TOOLCHAIN_ROOT cannot contain spaces.
 
 The toolchain is not activated by default. You have to:
 
-  `./scripts/activate-toolchain.sh`
+  source ./scripts/activate-toolchain.sh
 
 This command has to be repeated each time you start a fresh terminal.
 
@@ -52,8 +52,8 @@ impossible to share the same configuration file among them. EasyCrypt,
 via the option -why3, allows you to load a Why3 configuration file
 from a custom location. For instance:
 
-  why3config --detect -C $DEST/why3.conf
-  ./ec.native -why3 $DEST/why3.conf
+  why3config --detect -C $EC_TOOLCHAIN_ROOT/why3.conf
+  ./ec.native -why3 $EC_TOOLCHAIN_ROOT/why3.conf
 
 We also provide an automated way to install a set of core
 provers. After having installing the toolchain, type:
@@ -76,15 +76,15 @@ First, install the following cygwin32 packages:
   libncurses-devel,curl,ocaml,ocaml-compiler-libs,patch,ncurses
 
 By default, the destination directory is ${PWD}/_tools. You can change
-this by setting the $DEST variable, e.g.:
+this by setting the $EC_TOOLCHAIN_ROOT variable, e.g.:
 
-  make DEST=/opt/ec-toolchain toolchain
+  make EC_TOOLCHAIN_ROOT=/opt/ec-toolchain toolchain
 
-Note that $DEST cannot contain spaces.
+Note that $EC_TOOLCHAIN_ROOT cannot contain spaces.
 
 The toolchain is not activated by default. You have to:
 
-  `bash -o ingcr ./scripts/activate-toolchain.sh`
+  source ./scripts/activate-toolchain.sh
 
 This command has to be repeated each time you start a fresh terminal.
 
@@ -95,8 +95,8 @@ impossible to share the same configuration file among them. EasyCrypt,
 via the option -why3, allows you to load a Why3 configuration file
 from a custom location. For instance:
 
-  why3config --detect -C $DEST/why3.conf
-  ./ec.native -why3 $DEST/why3.conf
+  why3config --detect -C $EC_TOOLCHAIN_ROOT/why3.conf
+  ./ec.native -why3 $EC_TOOLCHAIN_ROOT/why3.conf
 
 We do NOT provide an automated way to install provers.
 
@@ -184,8 +184,8 @@ impossible to share the same configuration file among them. EasyCrypt,
 via the option -why3, allows you to load a Why3 configuration file
 from a custom location. For instance:
 
-  why3config --detect -C $DEST/why3.conf
-  ./ec.native -why3 $DEST/why3.conf
+  why3config --detect -C $EC_TOOLCHAIN_ROOT/why3.conf
+  ./ec.native -why3 $EC_TOOLCHAIN_ROOT/why3.conf
 
 We do NOT provide an automated way to install provers. However, for a
 first test, you may want to install alt-ergo form the wodi package
