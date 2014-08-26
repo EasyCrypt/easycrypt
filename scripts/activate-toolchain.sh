@@ -46,7 +46,7 @@ Install the EasyCrypt toolchain (${oversion}) first ([make toolchain])
 If you have a toolchain installed in a different version, you can
 set the OVERSION environment variable to the right version.
 
-You can find bellow the list of installed toolchains:
+You can find below the list of installed toolchains:
 
 __EOF__
 
