@@ -21,16 +21,24 @@ val get_notifier : unit -> notifier
 val notify : EcScope.scope -> ('a, unit, string, unit) format4 -> 'a
 
 (* -------------------------------------------------------------------- *)
-val initialize : boot:bool -> wrapper:(string option) -> unit
+type checkmode = {
+  cm_checkall : bool;
+  cm_timeout  : int;
+  cm_nprovers : int;
+  cm_provers  : string list option;
+  cm_wrapper  : string option;
+}
+
+val initialize : boot:bool -> checkmode:checkmode -> unit
 val current    : unit -> EcScope.scope
 
 (* -------------------------------------------------------------------- *)
-val full_check : bool -> timeout:int -> nprovers:int -> string list option -> unit
-val process    : EcParsetree.global located -> unit
+val process : EcParsetree.global located -> unit
 
-val undo : int  -> unit
-val uuid : unit -> int
-val mode : unit -> string
+val undo  : int  -> unit
+val reset : unit -> unit
+val uuid  : unit -> int
+val mode  : unit -> string
 
 (* -------------------------------------------------------------------- *)
 val pp_current_goal : Format.formatter -> unit

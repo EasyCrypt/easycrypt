@@ -20,6 +20,49 @@ let copyright =
        sentences)
 
 (* -------------------------------------------------------------------- *)
+let psep = match Sys.os_type with "Win32" -> ";" | _ -> ":"
+
+(* -------------------------------------------------------------------- *)
+type pconfig = {
+  pc_why3     : string option;
+  pc_pwrapper : string option;
+  pc_loadpath : (bool * string) list;
+}
+
+let print_config config =
+  (* Print load path *)
+  Format.eprintf "load-path:@\n%!";
+  List.iter
+    (fun (sys, dir) ->
+       Format.eprintf "  <%.6s>@@%s@\n%!"
+         (if sys then "system" else "user") dir)
+    (EcCommands.loadpath ());
+
+  (* Print why3 configuration file location *)
+  Format.eprintf "why3 configuration file@\n%!";
+  begin match config.pc_why3 with
+  | None   -> Format.eprintf "  <why3 default>@\n%!"
+  | Some f -> Format.eprintf "  %s@\n%!" f end;
+
+  (* Print prover wrapper *)
+  Format.eprintf "prover wrapper@\n%!";
+  begin match config.pc_pwrapper with
+  | None -> Format.eprintf "  <none>@\n%!"
+  | Some wrapper -> Format.eprintf "  %s@\n%!" wrapper end;
+
+  (* Print list of known provers *)
+  Format.eprintf "known provers: %s@\n%!"
+    (String.concat ", " (EcProvers.known_provers ()));
+
+  (* Print system PATH *)
+  Format.eprintf "System PATH:@\n%!";
+  List.iter
+    (fun x -> Format.eprintf "  %s@\n%!" x)
+    (Str.split
+       (Str.regexp (Str.quote psep))
+       (try Sys.getenv "PATH" with Not_found -> ""))
+
+(* -------------------------------------------------------------------- *)
 let _ =
   let myname  = Filename.basename Sys.executable_name
   and mydir   = Filename.dirname  Sys.executable_name in
@@ -34,8 +77,6 @@ let _ =
     | "Win32" | "Cygwin" -> fun (x : string) -> x ^ ".exe"
     | _ -> fun (x : string) -> x
   in
-
-  let psep = match Sys.os_type with "Win32" -> ";" | _ -> ":" in
 
   let resource name =
     match eclocal with
@@ -118,38 +159,24 @@ let _ =
 
   begin
     let theories = resource ["theories"] in
-      EcCommands.addidir ~system:true (Filename.concat theories "prelude");
-      if not ldropts.ldro_boot then
-        EcCommands.addidir ~system:true ~recursive:true theories;
+
+    EcCommands.addidir ~system:true (Filename.concat theories "prelude");
+    if not ldropts.ldro_boot then
+      EcCommands.addidir ~system:true ~recursive:true theories;
+    List.iter EcCommands.addidir ldropts.ldro_idirs;
   end;
 
   (* Initialize I/O + interaction module *)
   let (prvopts, input, terminal) =
     match options.o_command with
-    | `Config -> begin
-        Format.eprintf "load-path:@\n%!";
-        List.iter
-          (fun (sys, dir) ->
-             Format.eprintf "  <%.6s>@@%s@\n%!" (if sys then "system" else "user") dir)
-          (EcCommands.loadpath ());
-        Format.eprintf "why3 configuration file@\n%!";
-        begin match why3conf with
-        | None   -> Format.eprintf "  <why3 default>@\n%!"
-        | Some f -> Format.eprintf "  %s@\n%!" f end;
-        Format.eprintf "prover wrapper@\n%!";
-        begin match pwrapper with
-        | None -> Format.eprintf "  <none>@\n%!"
-        | Some wrapper -> Format.eprintf "  %s@\n%!" wrapper end;
-        Format.eprintf "known provers: %s@\n%!"
-          (String.concat ", " (EcProvers.known_provers ()));
-        Format.eprintf "System PATH:@\n%!";
-        List.iter
-          (fun x -> Format.eprintf "  %s@\n%!" x)
-          (Str.split
-             (Str.regexp (Str.quote psep))
-             (try Sys.getenv "PATH" with Not_found -> ""));
-        exit 0
-    end
+    | `Config ->
+        let config = {
+          pc_why3     = why3conf;
+          pc_pwrapper = pwrapper;
+          pc_loadpath = EcCommands.loadpath ();
+        } in 
+
+        print_config config; exit 0
 
     | `Cli cliopts -> begin
         let terminal =
@@ -167,23 +194,22 @@ let _ =
     end
   in
 
+  (match input with
+   | None -> EcCommands.addidir Filename.current_dir_name
+   | Some input -> EcCommands.addidir (Filename.dirname input));
+
   (* Initialize global scope *)
-  EcCommands.initialize ~boot:ldropts.ldro_boot  ~wrapper:pwrapper;
-
-  (* Initialize loader *)
   begin
-    List.iter EcCommands.addidir ldropts.ldro_idirs;
-    match input with
-    | None -> EcCommands.addidir Filename.current_dir_name
-    | Some input -> EcCommands.addidir (Filename.dirname input)
-  end;
+    let checkmode = {
+      EcCommands.cm_checkall = prvopts.pvro_checkall;
+      EcCommands.cm_timeout  = prvopts.prvo_timeout;
+      EcCommands.cm_nprovers = prvopts.prvo_maxjobs;
+      EcCommands.cm_provers  = prvopts.prvo_provers ;
+      EcCommands.cm_wrapper  = pwrapper;
+    } in
 
-  (* Initialize the proof mode *)
-  EcCommands.full_check
-    ~nprovers:prvopts.prvo_maxjobs
-    ~timeout:prvopts.prvo_timeout
-    prvopts.pvro_checkall
-    prvopts.prvo_provers;
+    EcCommands.initialize ~boot:ldropts.ldro_boot ~checkmode
+  end;
 
   if prvopts.pvro_weakchk then
     EcCommands.pragma_check false;

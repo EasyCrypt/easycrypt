@@ -148,6 +148,9 @@ let notify scope msg =
     msg
 
 (* -------------------------------------------------------------------- *)
+exception Pragma of [`Reset]
+
+(* -------------------------------------------------------------------- *)
 let rec process_type (scope : EcScope.scope) (tyd : ptydecl located) =
   EcScope.check_state `InTop "type" scope;
 
@@ -345,6 +348,7 @@ and process_pragma (scope : EcScope.scope) opt =
     | "nocheck" -> check false
     | "check"   -> check true
     | "noop"    -> ()
+    | "reset"   -> raise (Pragma `Reset)
     | _         -> ()
   end
 
@@ -400,7 +404,7 @@ and process_internal ld scope g =
   odfl scope (process ld scope g)
 
 (* -------------------------------------------------------------------- *)
-let loader  = EcLoader.create ()
+let loader = EcLoader.create ()
 
 let addidir ?system ?recursive (idir : string) =
   EcLoader.addidir ?system ?recursive idir loader
@@ -409,7 +413,15 @@ let loadpath () =
   List.map fst (EcLoader.aslist loader)
 
 (* -------------------------------------------------------------------- *)
-let initial ~boot ~wrapper =
+type checkmode = {
+  cm_checkall : bool;
+  cm_timeout  : int;
+  cm_nprovers : int;
+  cm_provers  : string list option;
+  cm_wrapper  : string option;
+}
+
+let initial ~checkmode ~boot =
   let prelude = (mk_loc _dummy "Prelude", Some `Export) in
   let loader  = EcLoader.forsys loader in
   let scope   = EcScope.empty in
@@ -422,32 +434,59 @@ let initial ~boot ~wrapper =
         scope [prelude]
   in
 
-  let scope   = EcScope.Prover.set_wrapper scope wrapper in
-    scope
+  let checkall = checkmode.cm_checkall in
+  let timeout  = checkmode.cm_timeout  in
+  let nprovers = checkmode.cm_nprovers in
+  let provers  = checkmode.cm_provers  in
+  let wrapper  = checkmode.cm_wrapper  in
+
+  let scope = EcScope.Prover.set_wrapper scope wrapper in
+  let scope = EcScope.Prover.set_default scope ~timeout ~nprovers provers in
+  let scope = if checkall then EcScope.Prover.full_check scope else scope in
+
+  scope
 
 (* -------------------------------------------------------------------- *)
-let context = ref None
+type context = {
+  ct_level   : int;
+  ct_current : EcScope.scope;
+  ct_root    : EcScope.scope;
+  ct_stack   : EcScope.scope list;
+}
+
+let context = ref (None : context option)
+
+let rootctxt (scope : EcScope.scope) =
+  { ct_level = 0; ct_current = scope; ct_root = scope; ct_stack = []; }
 
 (* -------------------------------------------------------------------- *)
-let initialize ~boot ~wrapper =
+let pop_context context =
+  assert (not (List.isempty context.ct_stack));
+
+  { ct_level   = context.ct_level - 1;
+    ct_root    = context.ct_root;
+    ct_current = List.hd context.ct_stack;
+    ct_stack   = List.tl context.ct_stack; }
+
+(* -------------------------------------------------------------------- *)
+let push_context scope context =
+  { ct_level   = context.ct_level + 1;
+    ct_root    = context.ct_root;
+    ct_current = scope;
+    ct_stack   = context.ct_current :: context.ct_stack; }
+
+(* -------------------------------------------------------------------- *)
+let initialize ~boot ~checkmode =
   assert (!context = None);
-  context := Some (0, initial ~boot ~wrapper, [])
+  context := Some (rootctxt (initial ~checkmode ~boot))
 
 (* -------------------------------------------------------------------- *)
 let current () =
-  let (_, scope, _) = oget !context in scope
-
-(* -------------------------------------------------------------------- *)
-let full_check b ~timeout ~nprovers provers =
-  let (idx, scope, l) = oget !context in
-  assert (idx = 0 && l = []);
-  let scope = EcScope.Prover.set_default scope ~timeout ~nprovers provers in
-  let scope = if b then EcScope.Prover.full_check scope else scope in
-    context := Some (idx, scope, l)
+  (oget !context).ct_current
 
 (* -------------------------------------------------------------------- *)
 let uuid () : int =
-  let (idx, _, _) = oget !context in idx
+  (oget !context).ct_level
 
 (* -------------------------------------------------------------------- *)
 let mode () : string =
@@ -458,26 +497,31 @@ let mode () : string =
 (* -------------------------------------------------------------------- *)
 let undo (olduuid : int) =
   if olduuid < (uuid ()) then
-    begin
-      for i = (uuid ()) - 1 downto olduuid do
-        let (_, _scope, stack) = oget !context in
-        context := Some (i, List.hd stack, List.tl stack)
-      done
-    end
+    for i = (uuid ()) - 1 downto olduuid do
+      context := Some (pop_context (oget !context))
+    done
 
 (* -------------------------------------------------------------------- *)
-let process (g : global located) =
-  let (idx, scope, stack) = oget !context in
-    match process loader scope g with
-    | None -> ()
-    | Some newscope -> context := Some (idx+1, newscope, scope :: stack)
+let reset () =
+  context := Some (rootctxt (oget !context).ct_root)
+
+(* -------------------------------------------------------------------- *)
+let process (g : global located) : unit =
+  let current = oget !context in
+  let scope   = current.ct_current in
+
+  try
+    process loader scope g
+      |> oiter (fun scope -> context := Some (push_context scope current))
+  with Pragma `Reset ->
+    reset ()
 
 (* -------------------------------------------------------------------- *)
 module S = EcScope
 module L = EcBaseLogic
 
 let pp_current_goal stream =
-  let (_, scope, _) = oget !context in
+  let scope = current () in
 
   match S.xgoal scope with
   | None -> ()
