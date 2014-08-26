@@ -473,6 +473,10 @@ lemma eq_except_set1_eq (m1 m2:('a,'b) map) x y:
   eq_except m1.[x <- y] m2 x
 by [].
 
+lemma eq_except_in_dom (m1 m2:('a, 'b) map) (x y:'a) :
+  eq_except m1 m2 x => x <> y => (in_dom y m1 <=> in_dom y m2) 
+by [].
+
 lemma eq_except_set2 (m1 m2:('a,'b) map) x x' y1 y2:
   eq_except m1 m2 x =>
   (eq_except m1.[x' <- y1] m2.[x' <- y2] x <=>
