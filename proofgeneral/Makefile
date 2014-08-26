@@ -24,8 +24,8 @@ install: $(PGROOT)
 	  exit 1; \
 	fi
 	( cd $(PGROOT)/generic && patch -p0 -t ) < proof-site.patch
-	../scripts/install-sh -m 0755 -d $(PGROOT)/easycrypt
-	../scripts/install-sh -m 0644 -t $(PGROOT)/easycrypt easycrypt/*.el
+	../scripts/install/install-sh -m 0755 -d $(PGROOT)/easycrypt
+	../scripts/install/install-sh -m 0644 -t $(PGROOT)/easycrypt easycrypt/*.el
 
 install-soft: $(PGROOT)
 	@if [ -d $(PGROOT)/easycrypt ]; then \
@@ -33,7 +33,7 @@ install-soft: $(PGROOT)
 	  exit 1; \
 	fi
 	( cd $(PGROOT)/generic && patch -p0 -t ) < proof-site.patch
-	../scripts/install-sh -m 0755 -d $(PGROOT)/easycrypt
+	../scripts/install/install-sh -m 0755 -d $(PGROOT)/easycrypt
 	for i in easycrypt/*.el; do ln -s $(CURDIR)/$$i $(PGROOT)/easycrypt; done
 
 uninstall: $(PGROOT)/easycrypt

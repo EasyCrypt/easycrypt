@@ -9,10 +9,10 @@ WARNING:     >> source ${0}
 __EOF__
 
 # --------------------------------------------------------------------
-EC_SRC_ROOT="$(dirname $0)"
+: ${EC_SRC_ROOT="$(dirname $0)"}
 
 # --------------------------------------------------------------------
-function activate {
+activate () {
   : ${EC_TOOLCHAIN_ROOT="${EC_SRC_ROOT}/../_tools"}
   : ${OVERSION=4.01.0}
 
@@ -34,16 +34,16 @@ You can find bellow the list of installed toolchains:
 
 __EOF__
 
-    echo '---------- START OF LISTING ----------'
+    echo '---------- START OF LISTING ----------' >&2
     [ -d "${EC_TOOLCHAIN_ROOT}" ] && {
       ls -1 "${EC_TOOLCHAIN_ROOT}" | grep '^ocaml-' | sed 's/ocaml-//';
     }
-    echo '---------- END OF LISTING   ----------'
+    echo '---------- END OF LISTING   ----------' >&2
 
     return
   fi
 
-  source "${EC_TOOLCHAIN_ETC}"
+  . "${EC_TOOLCHAIN_ETC}"
 
   export EC_TOOLCHAIN_ACTIVATED=1
 }

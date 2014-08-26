@@ -19,6 +19,7 @@ REALIZED := $(wildcard theories/realizations/*.ec)
 PRELUDE  := $(wildcard theories/prelude/*.ec)
 CORE     := $(wildcard theories/core/*.ec)
 INSTALL  := scripts/install/install-sh
+PWD      := $(shell pwd)
 
 include Makefile.system
 
@@ -35,7 +36,7 @@ CHECK     = scripts/testing/runtest --bin-args="$(ECARGS)" config/tests.config
 # --------------------------------------------------------------------
 .PHONY: all build byte native tests check check-xunit examples
 .PHONY: clean install uninstall uninstall-purge dist distcheck
-.PHONY: callprover pg toolchain update-toolchain provers update
+.PHONY: callprover pg toolchain update-toolchain provers
 .PHONY: %.ml %.mli %.inferred.mli
 
 all: build
@@ -165,27 +166,33 @@ distcheck: dist
 
 # --------------------------------------------------------------------
 pg:
-	if [ -d _tools ]; then $$(./scripts/activate-toolchain.sh); fi; \
-	  $(MAKE) -C proofgeneral run-local
+	@if [ "$$EC_TOOLCHAIN_ACTIVATED" = "" -a -d _tools ]; then \
+	  EC_SRC_ROOT="$(PWD)/scripts" . ./scripts/activate-toolchain.sh 2>/dev/null; \
+	  if [ "$$EC_TOOLCHAIN_ACTIVATED" = "" ]; then \
+	    echo "Toolchain activation failed" >&2; \
+	  fi; \
+	fi; $(MAKE) -C proofgeneral run-local
 
 # --------------------------------------------------------------------
 toolchain:
 	export OPAMVERBOSE=1; bash ./scripts/toolchain/ec-build-toolchain
 
 update-toolchain:
-	export OPAMVERBOSE=1; $$(bash ./scripts/activate-toolchain.sh) \
-	  && opam update  -y \
+	@[ "$$EC_TOOLCHAIN_ACTIVATED" != "" ] || { \
+	  echo "Activate the EasyCrypt toolchain first" >&2; false; \
+	}
+	export OPAMVERBOSE=1; \
+             opam update  -y \
 	  && opam remove  -y ec-toolchain \
 	  && opam install -y ec-toolchain
 
 provers:
-	export OPAMVERBOSE=1; $$(bash ./scripts/activate-toolchain.sh) \
-	  && opam update  -y \
+	@[ "$$EC_TOOLCHAIN_ACTIVATED" != "" ] || { \
+	  echo "Activate the EasyCrypt toolchain first" >&2; false; \
+	}
+	export OPAMVERBOSE=1; \
+	     opam update  -y \
 	  && opam remove  -y ec-provers \
 	  && opam install -y ec-provers \
 	  && rm -f _tools/why3.local.conf \
 	  && why3config --detect -C _tools/why3.local.conf
-
-update:
-	git pull
-	make clean && make
