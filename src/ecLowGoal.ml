@@ -181,14 +181,14 @@ let t_clears xs tc =
   let (hyps, concl) = FApi.tc1_flat tc in
 
   if not (Mid.set_disjoint xs concl.f_fv) then
-    let x () = (Sid.elements (Mid.set_inter xs concl.f_fv), None) in
-    raise (ClearError (lazy (x ())))
+    let ids () = Sid.elements (Mid.set_inter xs concl.f_fv) in
+    raise (ClearError (lazy (`ClearInGoal (ids ()))))
   else
 
   let hyps =
     try  LDecl.clear xs hyps
     with LDecl.Ldecl_error (LDecl.CanNotClear(id1, id2)) ->
-      raise (ClearError (lazy ([id1], Some id2)))
+      raise (ClearError (lazy (`ClearDep (id1, id2))))
   in
 
   FApi.mutate (!@tc) (fun hd -> VConv (hd, xs)) ~hyps concl

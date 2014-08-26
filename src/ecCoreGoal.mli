@@ -20,7 +20,14 @@ exception TcError of bool * location option * string Lazy.t
 
 (* -------------------------------------------------------------------- *)
 exception InvalidGoalShape
-exception ClearError of (EcIdent.t list * EcIdent.t option) Lazy.t
+
+(* -------------------------------------------------------------------- *)
+type clearerror = [
+  | `ClearInGoal of EcIdent.t list
+  | `ClearDep    of EcIdent.t pair
+]
+
+exception ClearError of clearerror Lazy.t
 
 (* -------------------------------------------------------------------- *)
 (* Proof-node ID                                                        *)
@@ -154,6 +161,11 @@ val tc_error_lazy :
      proofenv -> ?catchable:bool -> ?loc:EcLocation.t -> ?who:string
   -> (Format.formatter -> unit) -> 'a
 
+val tc_error_clear :
+     proofenv -> ?catchable:bool -> ?loc:EcLocation.t -> ?who:string
+  -> clearerror Lazy.t -> 'a
+
+(* -------------------------------------------------------------------- *)
 type symkind = [`Lemma | `Operator | `Local]
 
 val tc_lookup_error :

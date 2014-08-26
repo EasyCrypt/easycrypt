@@ -172,19 +172,7 @@ let process_clear symbols tc =
   in
 
   try  t_clears (List.map toid symbols) tc
-  with ClearError err ->
-    tc_error_lazy !!tc (fun fmt ->
-      let pp_id fmt id = Format.fprintf fmt "%s" (EcIdent.name id) in
-
-      match err with
-      | lazy (xs, None) ->
-          Format.fprintf fmt
-            "cannot clear %a that is/are used in the conclusion"
-            (EcPrinting.pp_list ",@ " pp_id) xs
-      | lazy (xs, Some x) ->
-          Format.fprintf fmt
-            "cannot clear %a that is/are used in %a"
-            (EcPrinting.pp_list ",@ " pp_id) xs pp_id x)
+  with ClearError err -> tc_error_clear !!tc err
 
 (* -------------------------------------------------------------------- *)
 module LowRewrite = struct
@@ -717,7 +705,10 @@ let process_generalize1 pattern (tc : tcenv1) =
 
 (* -------------------------------------------------------------------- *)
 let process_generalize patterns (tc : tcenv1) =
-  FApi.t_seqs (List.rev_map process_generalize1 patterns) tc
+  try
+    FApi.t_seqs (List.rev_map process_generalize1 patterns) tc
+  with EcCoreGoal.ClearError err ->
+    tc_error_clear !!tc err
 
 (* -------------------------------------------------------------------- *)
 let process_pose xsym o p (tc : tcenv1) =

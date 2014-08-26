@@ -13,7 +13,14 @@ module L = EcLocation
 
 (* -------------------------------------------------------------------- *)
 exception InvalidGoalShape
-exception ClearError of (EcIdent.t list * EcIdent.t option) Lazy.t
+
+(* -------------------------------------------------------------------- *)
+type clearerror = [
+  | `ClearInGoal of EcIdent.t list
+  | `ClearDep    of EcIdent.t pair
+]
+
+exception ClearError of clearerror Lazy.t
 
 (* -------------------------------------------------------------------- *)
 module ID : sig
@@ -168,6 +175,20 @@ let tc_error_lazy (_pe : proofenv) ?(catchable = true) ?loc ?who msg =
   in
 
   raise (TcError (catchable, None, lazy (getmsg ())))
+
+(* -------------------------------------------------------------------- *)
+let tc_error_clear (pe : proofenv) ?catchable ?loc ?who err =
+    tc_error_lazy pe ?catchable ?loc ?who (fun fmt ->
+      let pp_id fmt id = Format.fprintf fmt "%s" (EcIdent.name id) in
+      match Lazy.force err with
+      | `ClearInGoal xs ->
+          Format.fprintf fmt
+            "cannot clear %a that is/are used in the conclusion"
+            (EcPrinting.pp_list ",@ " pp_id) xs
+      | `ClearDep (x, y) ->
+          Format.fprintf fmt
+            "cannot clear %a that is used in %a"
+            pp_id x pp_id y)
 
 (* -------------------------------------------------------------------- *)
 type symkind = [`Lemma | `Operator | `Local]
