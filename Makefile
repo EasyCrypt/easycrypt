@@ -167,7 +167,8 @@ distcheck: dist
 # --------------------------------------------------------------------
 pg:
 	@if [ "$$EC_TOOLCHAIN_ACTIVATED" = "" -a -d _tools ]; then \
-	  EC_SRC_ROOT="$(PWD)/scripts" . ./scripts/activate-toolchain.sh 2>/dev/null; \
+	  EC_SRC_ROOT="$(PWD)/scripts" \
+	    . ./scripts/activate-toolchain.sh 2>/dev/null; \
 	  if [ "$$EC_TOOLCHAIN_ACTIVATED" = "" ]; then \
 	    echo "Toolchain activation failed" >&2; \
 	  fi; \
