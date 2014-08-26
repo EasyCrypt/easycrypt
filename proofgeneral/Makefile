@@ -16,7 +16,7 @@ all:
 keywords: easycrypt/easycrypt-keywords.el
 
 easycrypt/easycrypt-keywords.el: ../src/ecLexer.mll
-	../scripts/keywords.py -m emacs < $< > $@
+	../scripts/srctx/keywords -m emacs < $< > $@
 
 install: $(PGROOT)
 	@if [ -d $(PGROOT)/easycrypt ]; then \

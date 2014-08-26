@@ -18,7 +18,7 @@ THEORIES := $(wildcard theories/*.ec)
 REALIZED := $(wildcard theories/realizations/*.ec)
 PRELUDE  := $(wildcard theories/prelude/*.ec)
 CORE     := $(wildcard theories/core/*.ec)
-INSTALL  := scripts/install-sh
+INSTALL  := scripts/install/install-sh
 
 include Makefile.system
 
@@ -30,7 +30,7 @@ SYSDIR := $(LIBDIR)/system
 # --------------------------------------------------------------------
 XUNITOUT ?= xunit.xml
 ECARGS   ?=
-CHECK     = scripts/runtest.py --bin-args="$(ECARGS)" config/tests.config
+CHECK     = scripts/testing/runtest --bin-args="$(ECARGS)" config/tests.config
 
 # --------------------------------------------------------------------
 .PHONY: all build byte native tests check check-xunit examples
@@ -133,7 +133,7 @@ clean:
 # --------------------------------------------------------------------
 dist:
 	if [ -e $(DISTDIR) ]; then rm -rf $(DISTDIR); fi
-	./scripts/distribution.py $(DISTDIR) MANIFEST
+	./scripts/install/distribution $(DISTDIR) MANIFEST
 	BZIP2=-9 tar -cjf $(DISTDIR).tar.bz2 --owner=0 --group=0 $(DISTDIR)
 	rm -rf $(DISTDIR)
 
@@ -170,7 +170,7 @@ pg:
 
 # --------------------------------------------------------------------
 toolchain:
-	export OPAMVERBOSE=1; bash ./scripts/ec-build-toolchain
+	export OPAMVERBOSE=1; bash ./scripts/toolchain/ec-build-toolchain
 
 update-toolchain:
 	export OPAMVERBOSE=1; $$(bash ./scripts/activate-toolchain.sh) \

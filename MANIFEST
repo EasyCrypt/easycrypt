@@ -62,12 +62,10 @@ find:tests/typing:*.ec
 find:tests/unclassified:*.ec
 
 # Build scripts
-scripts/install-sh
-scripts/runtest.py
-scripts/distribution.py
-scripts/keywords.py
-scripts/ec-build-toolchain
 scripts/activate-toolchain.sh
-scripts/ec-build-webui-env
-scripts/ec-run-webui
+scripts/toolchain/ec-build-toolchain
+scripts/install/install-sh
+scripts/install/distribution
+scripts/testing/runtest
+scripts/srctx/keywords
 find:scripts/patches/:*
