@@ -33,7 +33,8 @@
   ;; For undo
   (setq  proof-find-and-forget-fn              'easycrypt-find-and-forget
          proof-completed-proof-behaviour       nil
-         proof-non-undoables-regexp            easycrypt-non-undoables-regexp)
+         proof-non-undoables-regexp            easycrypt-non-undoables-regexp
+         proof-shell-restart-cmd               "pragma reset. ")
 
   (set (make-local-variable 'comment-quote-nested) nil)
 
