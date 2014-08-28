@@ -65,8 +65,12 @@ fi
 # --------------------------------------------------------------------
 set -e
 
-rm -rf "${EC_TOOLCHAIN_ROOT}" && \
-  mkdir "${EC_TOOLCHAIN_ROOT}" "${EC_TOOLCHAIN_ROOT}/src"
+if [ -e "${EC_TOOLCHAIN_ROOT}" ]; then
+  echo "Remove ${EC_TOOLCHAIN_ROOT first." >&2
+  exit 1
+fi
+
+mkdir "${EC_TOOLCHAIN_ROOT}" "${EC_TOOLCHAIN_ROOT}/src"
 
 if [ ${buildtype} != "cygwin" ]; then
   curl -f -kL -o "${EC_TOOLCHAIN_ROOT}/src/ocamlbrew" ${OBREW_URL}
