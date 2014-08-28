@@ -34,36 +34,35 @@ module Talpha = struct
   let w3_ls_compare l1 l2 = Term.ls_hash l1 - Term.ls_hash l2
       
   let rec pat_compare_alpha m1 m2 p1 p2 =
-    if Term.pat_equal p1 p2 then 0 else
-      let ct = w3_ty_compare p1.Term.pat_ty p2.Term.pat_ty in
-      if ct <> 0 then ct else
-        match p1.Term.pat_node, p2.Term.pat_node with
-        | Term.Pwild, Term.Pwild -> 0
+    let ct = w3_ty_compare p1.Term.pat_ty p2.Term.pat_ty in
+    if ct <> 0 then ct else
+      match p1.Term.pat_node, p2.Term.pat_node with
+      | Term.Pwild, Term.Pwild -> 0
 
-        | Term.Pvar v1, Term.Pvar v2 -> begin
-            match Term.Mvs.find_opt v1 m1.tae_map,
-                  Term.Mvs.find_opt v2 m2.tae_map
-            with
-            | Some _ , None    -> 1
-            | None   , Some _  -> -1
-            | None   , None    -> Term.vs_hash v1 - Term.vs_hash v2
-            | Some i1, Some i2 -> i1 - i2
-          end
+      | Term.Pvar v1, Term.Pvar v2 -> begin
+          match Term.Mvs.find_opt v1 m1.tae_map,
+                Term.Mvs.find_opt v2 m2.tae_map
+          with
+          | Some _ , None    -> 1
+          | None   , Some _  -> -1
+          | None   , None    -> Term.vs_hash v1 - Term.vs_hash v2
+          | Some i1, Some i2 -> i1 - i2
+        end
 
-        | Term.Papp (f1, l1), Term.Papp (f2, l2) ->
-            compare2
-              (lazy (w3_ls_compare f1 f2))
-              (lazy (List.compare (pat_compare_alpha m1 m2) l1 l2))
+      | Term.Papp (f1, l1), Term.Papp (f2, l2) ->
+          compare2
+            (lazy (w3_ls_compare f1 f2))
+            (lazy (List.compare (pat_compare_alpha m1 m2) l1 l2))
 
-        | Term.Pas (p1, _), Term.Pas (p2, _) ->
-            pat_compare_alpha m1 m2 p1 p2
+      | Term.Pas (p1, _), Term.Pas (p2, _) ->
+          pat_compare_alpha m1 m2 p1 p2
 
-        | Term.Por (p1, q1), Term.Por (p2, q2) ->
-            compare2
-              (lazy (pat_compare_alpha m1 m2 p1 p2))
-              (lazy (pat_compare_alpha m1 m2 q1 q2))
+      | Term.Por (p1, q1), Term.Por (p2, q2) ->
+          compare2
+            (lazy (pat_compare_alpha m1 m2 p1 p2))
+            (lazy (pat_compare_alpha m1 m2 q1 q2))
 
-        | _ -> compare_tag  p1.Term.pat_node p2.Term.pat_node
+      | _ -> compare_tag  p1.Term.pat_node p2.Term.pat_node
         
   let rec t_compare_alpha m1 m2 t1 t2 =
     if Term.t_equal t1 t2 then 0 else 

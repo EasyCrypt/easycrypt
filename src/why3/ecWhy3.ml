@@ -698,10 +698,9 @@ let import_w3_term env tvm =
         with UnboundLS f as e ->
           if Term.is_fs_tuple f then f_tuple args
           else
-            if (Term.ls_equal f Term.fs_func_app ||
-            Term.ls_equal f Term.ps_pred_app) then
-              let a1,a2 = List.hd2 args in
-              f_app a1 [a2] codom
+            if Term.ls_equal f Term.fs_func_app then
+              let (a1, a2) = List.hd2 args in
+                f_app a1 [a2] codom
             else raise e
         end
 
@@ -1405,7 +1404,7 @@ let trans_form env f =
     (* We compute the free variable of the lambda *)
       let fv     =
         List.fold_left (fun s x -> Term.Mvs.remove x s)
-          (body.Term.t_vars) vs in
+          (Term.t_vars body) vs in
       let fv_ids = Term.Mvs.keys fv in
       let tfv = List.map (fun v -> v.Term.vs_ty) fv_ids in
       let tvs = List.map (fun v -> v.Term.vs_ty) vs in
