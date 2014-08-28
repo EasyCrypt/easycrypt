@@ -63,12 +63,12 @@ if [ ${buildtype} = "cygwin" ]; then
 fi
 
 # --------------------------------------------------------------------
-set -e
-
 if [ -e "${EC_TOOLCHAIN_ROOT}" ]; then
-  echo "Remove ${EC_TOOLCHAIN_ROOT first." >&2
+  echo "Remove ${EC_TOOLCHAIN_ROOT} first." >&2
   exit 1
 fi
+
+set -e
 
 mkdir "${EC_TOOLCHAIN_ROOT}" "${EC_TOOLCHAIN_ROOT}/src"
 
