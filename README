@@ -5,7 +5,7 @@
 
    Available at http://caml.inria.fr/
 
- * Why3 (= 0.81)
+ * Why3 (= 0.83)
 
    Available at http://why3.lri.fr/
 
@@ -161,20 +161,14 @@ installation as follows:
 
        menhir, yojson, batteries, ocamlgraph, lalgtk2, lablgtk2-extras
 
-  6. Install why3 0.81. Download why3 at:
+  6. Install why3 0.83. Download why3 at:
+       https://gforge.inria.fr/frs/download.php/33490/why3-0.83.tar.gz
 
-       https://gforge.inria.fr/frs/download.php/file/33491/why3-0.81.tar.gz
-
-     Untar, go to the why3-0.81/ directory and type
+     Untar, go to the why3-0.83/ directory and type
 
        $> CC=i686-w64-mingw32-gcc.exe ./configure --prefix=C:/wodi32/opt/wodi32/ --disable-ide
        $> make opt byte
        $> make install install-lib
-
-     Fix the why3 installation paths:
-
-       $> rm -rf /opt/wodi32/lib/ocaml/pkg-lib/why3
-       $> mv /opt/wodi32/lib/ocaml/std-lib/why3 /opt/wodi32/lib/ocaml/pkg-lib
 
      You can check that why3 is correctly installed:
 
