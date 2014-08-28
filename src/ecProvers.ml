@@ -96,7 +96,16 @@ let test_if_evict_prover tests prover =
   with E.Evict cause -> Some cause
 
 (* -------------------------------------------------------------------- *)
-let evictions : prover_eviction_test list = []
+module Evictions = struct
+  let alt_ergo_lt_0_96 = {
+    pe_cause = `Inconsistent;
+    pe_test  = `ByVersion ("Alt-Ergo", (`Lt, VP.of_tuple (0, 96, 0)));
+  }
+end
+
+let evictions : prover_eviction_test list = [
+  Evictions.alt_ergo_lt_0_96;
+]
 
 (* -------------------------------------------------------------------- *)
 type prname = string * string
