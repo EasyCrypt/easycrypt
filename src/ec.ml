@@ -51,8 +51,30 @@ let print_config config =
   | Some wrapper -> Format.eprintf "  %s@\n%!" wrapper end;
 
   (* Print list of known provers *)
-  Format.eprintf "known provers: %s@\n%!"
-    (String.concat ", " (EcProvers.known_provers ()));
+  begin
+    let string_of_prover (name, version) =
+      Printf.sprintf "%s@%s" name version in
+    let provers = EcProvers.known () in
+
+    Format.eprintf "known provers: %s@\n%!"
+      (String.concat ", " (List.map string_of_prover provers))
+  end;
+
+  (* Print list of known provers *)
+  begin
+    let string_of_eviction ((name, version), cause) =
+      let cause =
+        match cause with
+        | `Inconsistent -> "inconsistent"
+      in
+      Printf.sprintf "%s@%s [%s]" name version cause
+    in
+
+    let filtered = EcProvers.filtered () in
+
+    Format.eprintf "known but filtered provers: %s@\n%!"
+      (String.concat ", " (List.map string_of_eviction filtered))
+  end;
 
   (* Print system PATH *)
   Format.eprintf "System PATH:@\n%!";

@@ -5,6 +5,10 @@
 open EcPath
 
 (* -------------------------------------------------------------------- *)
+type prover_eviction = [
+  | `Inconsistent
+]
+
 type prover_infos = {
   pr_maxprocs  : int;
   pr_provers   : string list;
@@ -15,7 +19,9 @@ type prover_infos = {
 val dft_prover_infos : prover_infos
 val dft_prover_names : string list
 
-val known_provers : unit -> string list
+val known    : unit -> (string * string) list
+val filtered : unit -> ((string * string) * prover_eviction) list
+
 val is_prover_known : string -> bool
 
 (* -------------------------------------------------------------------- *)

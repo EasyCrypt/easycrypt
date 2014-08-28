@@ -337,7 +337,7 @@ module Prover = struct
       { scope with sc_options = Prover_info.set scope.sc_options pi }
 
   let set_all scope =
-    let provers = EcProvers.known_provers () in
+    let provers = List.map fst (EcProvers.known ()) in
       set_prover_info scope None None (Some provers)
 
   let set_default scope ~timeout ~nprovers provers =

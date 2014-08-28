@@ -6,8 +6,8 @@ type symbol  = string
 type qsymbol = symbol list * symbol
 type msymbol = (symbol * msymbol list) list
 
-let equal : symbol -> symbol -> bool = (=)
-let compare : symbol -> symbol -> int = Pervasives.compare
+let sym_equal   : symbol -> symbol -> bool = (=)
+let sym_compare : symbol -> symbol -> int  = Pervasives.compare
 
 (* -------------------------------------------------------------------- *)
 module SymCmp = struct

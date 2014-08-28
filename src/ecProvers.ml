@@ -3,44 +3,160 @@
 
 (* -------------------------------------------------------------------- *)
 open EcUtils
-open EcSymbols
 open Why3
+open EcSymbols
 
-(* ----------------------------------------------------------------------*)
-module Config : sig
-  type prover =
-    string * Why3.Whyconf.config_prover * Why3.Driver.driver
+(* -------------------------------------------------------------------- *)
+module Version : sig
+  type version
 
-  val load    : string option -> unit
-  val w3_env  : unit -> Env.env
-  val provers : unit -> prover list
-  val known_provers : unit -> string list
+  val parse   : string -> version
+  val compare : version -> version -> int
+
+  val of_tuple  : int * int * int -> version
+  val to_string : version -> string
 end = struct
-  type prover =
-    string * Why3.Whyconf.config_prover * Why3.Driver.driver
+  type version = {
+    v_major    : int;
+    v_minor    : int;
+    v_subminor : int;
+    v_extra    : string;
+  }
 
+  let of_tuple (v_major, v_minor, v_subminor) =
+    { v_major; v_minor; v_subminor; v_extra = ""; }
+
+  let parse =
+    let pop (version : string) =
+      let re = Str.regexp "^\\([0-9]+\\)[.-]?\\(.*\\)" in
+      match Str.string_match re version 0 with
+      | false -> (0, version)
+      | true  ->
+        let g1 = Str.matched_group 1 version
+        and g2 = Str.matched_group 2 version in
+        (int_of_string g1, g2)
+    in
+
+    fun (version : string) ->
+      let (major   , version) = pop version in
+      let (minor   , version) = pop version in
+      let (subminor, version) = pop version in
+      { v_major    = major;
+        v_minor    = minor;
+        v_subminor = subminor;
+        v_extra    = version; }
+
+  let compare (v1 : version) (v2 : version) =
+    match compare v1.v_major    v2.v_major    with n when n <> 0 -> n | _ ->
+    match compare v1.v_minor    v2.v_minor    with n when n <> 0 -> n | _ ->
+    match compare v1.v_subminor v2.v_subminor with n when n <> 0 -> n | _ ->
+    compare v1.v_extra v2.v_extra
+
+  let to_string (v : version) =
+    Printf.sprintf "%d.%d.%d.%s"
+      v.v_major v.v_minor v.v_subminor v.v_extra
+      
+end
+
+module VP = Version
+
+(* -------------------------------------------------------------------- *)
+type prover_eviction = [
+  | `Inconsistent
+]
+
+type prover_eviction_test = {
+  pe_cause : prover_eviction;
+  pe_test  : [ `ByVersion of string * ([`Eq | `Lt] * VP.version) ];
+}
+
+let test_if_evict_prover test (name, version) =
+  let evict =
+    match test.pe_test with
+    | `ByVersion (tname, (trel, tversion)) when name = tname -> begin
+        let cmp = VP.compare (VP.parse version) tversion in
+        match trel with
+        | `Eq -> cmp = 0
+        | `Lt -> cmp < 0
+      end
+  
+    | `ByVersion (_, _) -> false
+
+  in if evict then Some test.pe_cause else None
+
+let test_if_evict_prover tests prover =
+  let module E = struct exception Evict of prover_eviction end in
+  try
+    List.iter (fun test ->
+      match test_if_evict_prover test prover with
+      | None -> ()
+      | Some cause -> raise (E.Evict cause))
+      tests;
+    None
+  with E.Evict cause -> Some cause
+
+(* -------------------------------------------------------------------- *)
+let evictions : prover_eviction_test list = []
+
+(* -------------------------------------------------------------------- *)
+type prname = string * string
+
+type prover = {
+  pr_name   : prname;
+  pr_config : Why3.Whyconf.config_prover;
+  pr_driver : Why3.Driver.driver;
+}
+
+module Config : sig
+  val load     : string option -> unit
+  val w3_env   : unit -> Env.env
+  val provers  : unit -> prover list
+  val known    : unit -> prname list
+  val filtered : unit -> (prname * prover_eviction) list
+end = struct
   let theconfig  : (Whyconf.config option) ref = ref None
   let themain    : (Whyconf.main   option) ref = ref None
   let thew3_env  : (Env.env        option) ref = ref None
   let theprovers : (_              list  ) ref = ref []
+  let thefiltered: (_              list  ) ref = ref []
 
   let load why3config =
     if !theconfig = None then begin
       let config  = Whyconf.read_config why3config in
       let main    = Whyconf.get_main config in
+
       Whyconf.load_plugins main;
+
       let w3_env  = Env.create_env (Whyconf.loadpath main) in
+
+      let load_prover p config =
+        let name    = p.Whyconf.prover_name in
+        let version = p.Whyconf.prover_version in
+        let driver  = Driver.load_driver w3_env config.Whyconf.driver [] in
+  
+        { pr_name   = (name, version);
+          pr_config = config;
+          pr_driver = driver; }
+      in
+
       let provers =
         Whyconf.Mprover.fold
-          (fun p config l ->
-            (p.Whyconf.prover_name, config,
-             Driver.load_driver w3_env config.Whyconf.driver []) :: l)
-          (Whyconf.get_provers config) []
+          (fun p c acc -> load_prover p c :: acc)
+          (Whyconf.get_provers config) [] in
+
+      let (provers, filtered) =
+        List.fold_right (fun prover (provers, filtered) ->
+          match test_if_evict_prover evictions prover.pr_name with
+          | None       -> (prover :: provers, filtered)
+          | Some cause -> (provers, (prover.pr_name, cause) :: filtered))
+          provers ([], [])
       in
-        theconfig  := Some config;
-        themain    := Some main;
-        thew3_env  := Some w3_env;
-        theprovers := provers
+
+      theconfig   := Some config;
+      themain     := Some main;
+      thew3_env   := Some w3_env;
+      theprovers  := provers;
+      thefiltered := filtered;
     end
 
   let w3_env () =
@@ -49,18 +165,22 @@ end = struct
   let provers () =
     load None; !theprovers
 
-  let known_provers () =
-    List.map (fun (p,_,_) -> p) (provers())
+  let filtered () =
+    load None; !thefiltered
+
+  let known () =
+    List.map (fun p -> p.pr_name) (provers())
 end
 
-let initialize    = Config.load
-let known_provers = Config.known_provers
+let initialize = Config.load
+let known      = Config.known
+let filtered   = Config.filtered
 
 (* -------------------------------------------------------------------- *)
 exception UnknownProver of string
 
 let get_prover name =
-  try  List.find (fun (s,_,_) -> s = name) (Config.provers ())
+  try  List.find (fun p -> fst p.pr_name = name) (Config.provers ())
   with Not_found -> raise (UnknownProver name)
 
 let is_prover_known name =
@@ -85,7 +205,7 @@ let dft_prover_infos = {
   pr_wrapper   = None;
 }
 
-let dft_prover_names = ["Alt-Ergo"; "Z3"; "Vampire"; "Eprover"; "Yices"]
+let dft_prover_names = ["Z3"; "CVC4"; "Alt-Ergo"; "Eprover"; "Yices"]
 
 (* -------------------------------------------------------------------- *)
 type hflag = [ `Include | `Exclude ]
@@ -161,7 +281,7 @@ end
 (* -------------------------------------------------------------------- *)
 let run_prover (pi : prover_infos) (prover : string) task =
   try
-    let (_, pr, dr)  = get_prover prover in
+    let { pr_config = pr; pr_driver = dr; } = get_prover prover in
     let pc =
       let command = pr.Whyconf.command in
       let command =

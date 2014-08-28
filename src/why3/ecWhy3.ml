@@ -51,10 +51,10 @@ and ty_body =
 
 let ty_body_equal ((ty1, xi1) : ty_body) ((ty2, xi2) : ty_body) =
   let c_equal (c1, l1) (c2, l2) =
-    EcSymbols.equal c1 c2 && Term.ls_equal l1  l2
+    sym_equal c1 c2 && Term.ls_equal l1  l2
 
   and r_equal (c1, l1, ty1) (c2, l2, ty2) =
-       EcSymbols.equal c1 c2
+       sym_equal c1 c2
     && Term.ls_equal l1 l2
     && Ty.ty_equal ty1 ty2
   in
@@ -67,7 +67,7 @@ let ty_body_equal ((ty1, xi1) : ty_body) ((ty2, xi2) : ty_body) =
              List.all2 c_equal ls1 ls2
 
          | `Record ((c1, l1), fs1), `Record ((c2, l2), fs2) ->
-                EcSymbols.equal c1 c2
+                sym_equal c1 c2
              && Term.ls_equal l1  l2
              && List.all2 r_equal fs1 fs2
 
@@ -836,7 +836,7 @@ let import_decls rn path env rb decls =
     match ls, z, path.EcPath.p_node with
     | [], _, _ -> path, z
     | s::ls, Zenter id:: z, EcPath.Pqname(p,id') ->
-        assert (s = id && EcSymbols.equal id id');
+        assert (s = id && sym_equal id id');
         close [] ls p (Zdecl (Th_theory (id, accu)) :: z)
     | _s::_ls, Zenter _id:: _z, _ -> assert false
     | _, Zdecl d::z, _ -> close (d::accu) ls path z

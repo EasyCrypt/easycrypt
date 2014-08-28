@@ -10,8 +10,8 @@ type qsymbol = symbol list * symbol
 type msymbol = (symbol * msymbol list) list
 
 (* -------------------------------------------------------------------- *)
-val equal : symbol -> symbol -> bool
-val compare : symbol -> symbol -> int
+val sym_equal   : symbol -> symbol -> bool
+val sym_compare : symbol -> symbol -> int
 
 (* -------------------------------------------------------------------- *)
 module Msym : Map.S with type key = symbol

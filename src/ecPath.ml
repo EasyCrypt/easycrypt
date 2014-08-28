@@ -6,6 +6,7 @@ open EcUtils
 open EcMaps
 open EcSymbols
 open EcIdent
+
 (* -------------------------------------------------------------------- *)
 type path = {
   p_node : path_node;
@@ -26,9 +27,10 @@ module Hspath = Why3.Hashcons.Make (struct
 
   let equal_node p1 p2 = 
     match p1, p2 with
-    | Psymbol id1, Psymbol id2 -> EcSymbols.equal id1 id2
+    | Psymbol id1, Psymbol id2 ->
+        sym_equal id1 id2
     | Pqname (p1, id1), Pqname(p2, id2) -> 
-        EcSymbols.equal id1 id2 && p_equal p1 p2
+        sym_equal id1 id2 && p_equal p1 p2
     | _ -> false
 
   let equal p1 p2 = equal_node p1.p_node p2.p_node
