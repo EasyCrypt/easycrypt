@@ -419,12 +419,21 @@ type checkmode = {
   cm_nprovers : int;
   cm_provers  : string list option;
   cm_wrapper  : string option;
+  cm_profile  : bool;
 }
 
 let initial ~checkmode ~boot =
+  let checkall = checkmode.cm_checkall in
+  let timeout  = checkmode.cm_timeout  in
+  let nprovers = checkmode.cm_nprovers in
+  let provers  = checkmode.cm_provers  in
+  let wrapper  = checkmode.cm_wrapper  in
+  let profile  = checkmode.cm_profile  in
+
   let prelude = (mk_loc _dummy "Prelude", Some `Export) in
   let loader  = EcLoader.forsys loader in
-  let scope   = EcScope.empty in
+  let gstate  = EcGState.from_flags [("profile", profile)] in
+  let scope   = EcScope.empty gstate in
   let scope   =
     if   boot
     then scope
@@ -433,12 +442,6 @@ let initial ~checkmode ~boot =
         (fun scope th -> process_th_require loader scope th)
         scope [prelude]
   in
-
-  let checkall = checkmode.cm_checkall in
-  let timeout  = checkmode.cm_timeout  in
-  let nprovers = checkmode.cm_nprovers in
-  let provers  = checkmode.cm_provers  in
-  let wrapper  = checkmode.cm_wrapper  in
 
   let scope = EcScope.Prover.set_wrapper scope wrapper in
   let scope = EcScope.Prover.set_default scope ~timeout ~nprovers provers in

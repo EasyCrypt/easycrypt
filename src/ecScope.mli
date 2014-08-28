@@ -36,7 +36,7 @@ and pucflags = {
   puc_local : bool;
 }
 
-val empty   : scope
+val empty   : EcGState.gstate -> scope
 val path    : scope -> EcPath.path
 val name    : scope -> symbol
 val env     : scope -> EcEnv.env

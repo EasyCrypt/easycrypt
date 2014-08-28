@@ -27,11 +27,13 @@ type varbind = {
 (* -------------------------------------------------------------------- *)
 type env
 
-val initial : env
+val initial : EcGState.gstate -> env
+val root    : env -> EcPath.path
+val mroot   : env -> EcPath.mpath
+val xroot   : env -> EcPath.xpath option
 
-val root  : env -> EcPath.path
-val mroot : env -> EcPath.mpath
-val xroot : env -> EcPath.xpath option
+(* -------------------------------------------------------------------- *)
+val gstate : env -> EcGState.gstate
 
 (* -------------------------------------------------------------------- *)
 type lookup_error = [

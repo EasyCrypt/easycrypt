@@ -129,6 +129,7 @@ type env_norm = {
 
 (* -------------------------------------------------------------------- *)
 type preenv = {
+  env_gstate   : EcGState.gstate;
   env_scope    : escope;
   env_current  : mc;
   env_comps    : mc Mip.t;
@@ -178,6 +179,10 @@ let xroot (env : env) =
   | _ -> None
 
 (* -------------------------------------------------------------------- *)
+let gstate (env : env) =
+  env.env_gstate
+
+(* -------------------------------------------------------------------- *)
 let empty_mc params = {
   mc_parameters = params;
   mc_modules    = MMsym.empty;
@@ -194,36 +199,38 @@ let empty_mc params = {
 }
 
 (* -------------------------------------------------------------------- *)
-let empty () =
+let empty_norm_cache = 
+  { norm_mp   = Mm.empty;
+    norm_xpv  = Mx.empty;
+    norm_xfun = Mx.empty;
+    mod_use   = Mm.empty;
+    get_restr = Mm.empty; }
+
+(* -------------------------------------------------------------------- *)
+let empty gstate =
   let name = EcCoreLib.id_top in
   let path = EcPath.psymbol name in
 
-  let env  =
-    { env_scope    = { ec_path = path; ec_scope = `Theory; };
-      env_current  = { (empty_mc None) with
-                         mc_components =
-                           MMsym.add name (IPPath path) MMsym.empty; };
-      env_comps    = Mip.singleton (IPPath path) (empty_mc None);
-      env_locals   = MMsym.empty;
-      env_memories = MMsym.empty;
-      env_actmem   = None;
-      env_abs_st   = Mid.empty;
-      env_tci      = [];
-      env_tc       = TC.Graph.empty;
-      env_rwbase   = Mip.empty;
-      env_modlcs   = Sid.empty;
-      env_w3       = EcWhy3.empty;
-      env_rb       = [];
-      env_item     = [];
-      env_norm     = ref { norm_mp   = Mm.empty;
-                           norm_xpv  = Mx.empty;
-                           norm_xfun = Mx.empty;
-                           mod_use   = Mm.empty;
-                           get_restr = Mm.empty;
-                         };
-    }
-  in
-    env
+  let env_current =
+    let icomps = MMsym.add name (IPPath path) MMsym.empty in
+    { (empty_mc None) with mc_components = icomps } in
+
+  { env_gstate   = gstate;
+    env_scope    = { ec_path = path; ec_scope = `Theory; };
+    env_current  = env_current;
+    env_comps    = Mip.singleton (IPPath path) (empty_mc None);
+    env_locals   = MMsym.empty;
+    env_memories = MMsym.empty;
+    env_actmem   = None;
+    env_abs_st   = Mid.empty;
+    env_tci      = [];
+    env_tc       = TC.Graph.empty;
+    env_rwbase   = Mip.empty;
+    env_modlcs   = Sid.empty;
+    env_w3       = EcWhy3.empty;
+    env_rb       = [];
+    env_item     = [];
+    env_norm     = ref empty_norm_cache; }
 
 (* -------------------------------------------------------------------- *)
 type lookup_error = [
@@ -2793,8 +2800,8 @@ let import_w3_dir env dir name rd =
     import_w3 env th rd
 
 (* -------------------------------------------------------------------- *)
-let initial =
-  let env0 = empty () in
+let initial gstate =
+  let env0 = empty gstate in
   let env = enter `Theory EcCoreLib.id_Pervasive env0 in
   let unit_rn =
     let tunit = Why3.Ty.ts_tuple 0 in

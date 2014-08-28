@@ -207,17 +207,16 @@ type scope = {
 }
 
 (* -------------------------------------------------------------------- *)
-let empty =
-  let env = EcEnv.initial in
-    { sc_name       = EcPath.basename (EcEnv.root env);
-      sc_env        = EcEnv.initial;
-      sc_top        = None;
-      sc_loaded     = Msym.empty;
-      sc_required   = [];
-      sc_pr_uc      = None;
-      sc_options    = Options.init ();
-      sc_section    = EcSection.initial;
-    }
+let empty (gstate : EcGState.gstate) =
+  let env = EcEnv.initial gstate in
+  { sc_name       = EcPath.basename (EcEnv.root env);
+    sc_env        = env;
+    sc_top        = None;
+    sc_loaded     = Msym.empty;
+    sc_required   = [];
+    sc_pr_uc      = None;
+    sc_options    = Options.init ();
+    sc_section    = EcSection.initial; }
 
 (* -------------------------------------------------------------------- *)
 let name (scope : scope) =
@@ -271,7 +270,7 @@ let set_verbose (scope : scope) (b : bool) =
 
 (* -------------------------------------------------------------------- *)
 let for_loading (scope : scope) =
-  { empty with
+  { (empty (EcEnv.gstate scope.sc_env)) with
       sc_loaded  = scope.sc_loaded;
       sc_options = Options.for_loading scope.sc_options; }
 

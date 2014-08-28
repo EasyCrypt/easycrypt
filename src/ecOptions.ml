@@ -33,6 +33,7 @@ and prv_options = {
   prvo_provers  : string list option;
   pvro_checkall : bool;
   pvro_weakchk  : bool;
+  pvro_profile  : bool;
 }
 
 and ldr_options = {
@@ -222,7 +223,8 @@ let specs = {
       `Spec ("max-provers", `Int   , "Maximum number of prover running in the same time");
       `Spec ("timeout"    , `Int   , "Set the SMT timeout");
       `Spec ("check-all"  , `Flag  , "Force checking all files");
-      `Spec ("weak-check" , `Flag  , "Start prover in weak check mode")]);
+      `Spec ("weak-check" , `Flag  , "Start prover in weak check mode");
+      `Spec ("profile"    , `Flag  , "Collect some profiling informations")]);
 
     ("loader", "Options related to loader", [
       `Spec ("I"   , `String, "Add <dir> to the list of include directories");
@@ -274,7 +276,8 @@ let prv_options_of_values values =
       prvo_timeout  = odfl 3 (get_int "timeout" values);
       prvo_provers  = provers;
       pvro_checkall = get_flag "check-all" values;
-      pvro_weakchk  = get_flag "weak-check" values; }
+      pvro_weakchk  = get_flag "weak-check" values;
+      pvro_profile  = get_flag "profile" values; }
 
 let cli_options_of_values values =
   { clio_emacs   = get_flag "emacs" values;
