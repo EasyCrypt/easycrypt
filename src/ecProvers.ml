@@ -108,30 +108,41 @@ let evictions : prover_eviction_test list = [
 ]
 
 (* -------------------------------------------------------------------- *)
-type prname = string * string
-
 type prover = {
-  pr_name   : prname;
-  pr_config : Why3.Whyconf.config_prover;
-  pr_driver : Why3.Driver.driver;
+  pr_name    : string;
+  pr_version : string;
+  pr_evicted : (prover_eviction * bool) option;
+}
+
+let is_evicted pr =
+  match pr.pr_evicted with
+  | None | Some (_, true) -> false
+  | Some (_, false) -> true
+
+type why3prover = {
+  pr_prover  : prover;
+  pr_config  : Why3.Whyconf.config_prover;
+  pr_driver  : Why3.Driver.driver;
 }
 
 module Config : sig
-  val load     : string option -> unit
+  val load :
+       ?ovrevict:string list
+    -> ?why3conf:string
+    -> unit -> unit
+
   val w3_env   : unit -> Env.env
-  val provers  : unit -> prover list
-  val known    : unit -> prname list
-  val filtered : unit -> (prname * prover_eviction) list
+  val provers  : unit -> why3prover list
+  val known    : evicted:bool -> prover list
 end = struct
   let theconfig  : (Whyconf.config option) ref = ref None
   let themain    : (Whyconf.main   option) ref = ref None
   let thew3_env  : (Env.env        option) ref = ref None
-  let theprovers : (_              list  ) ref = ref []
-  let thefiltered: (_              list  ) ref = ref []
+  let theprovers : (why3prover     list  ) ref = ref []
 
-  let load why3config =
+  let load ?(ovrevict = []) ?why3conf () =
     if !theconfig = None then begin
-      let config  = Whyconf.read_config why3config in
+      let config  = Whyconf.read_config why3conf in
       let main    = Whyconf.get_main config in
 
       Whyconf.load_plugins main;
@@ -143,9 +154,12 @@ end = struct
         let version = p.Whyconf.prover_version in
         let driver  = Driver.load_driver w3_env config.Whyconf.driver [] in
   
-        { pr_name   = (name, version);
-          pr_config = config;
-          pr_driver = driver; }
+        { pr_prover  =
+            { pr_name    = name;
+              pr_version = version;
+              pr_evicted = None; };
+          pr_config  = config;
+          pr_driver  = driver; }
       in
 
       let provers =
@@ -153,44 +167,64 @@ end = struct
           (fun p c acc -> load_prover p c :: acc)
           (Whyconf.get_provers config) [] in
 
-      let (provers, filtered) =
-        List.fold_right (fun prover (provers, filtered) ->
-          match test_if_evict_prover evictions prover.pr_name with
-          | None       -> (prover :: provers, filtered)
-          | Some cause -> (provers, (prover.pr_name, cause) :: filtered))
-          provers ([], [])
-      in
+      let provers =
+        List.map (fun prover ->
+            let prinfo   = prover.pr_prover in
+            let eviction = test_if_evict_prover evictions in
+            let eviction = eviction (prinfo.pr_name, prinfo.pr_version) in
+            let eviction =
+              eviction |> omap (fun x -> (x, List.mem prinfo.pr_name ovrevict)) in
+            let prinfo   = { prover.pr_prover with pr_evicted = eviction; } in
+            { prover with pr_prover = prinfo })
+          provers in
 
       theconfig   := Some config;
       themain     := Some main;
       thew3_env   := Some w3_env;
       theprovers  := provers;
-      thefiltered := filtered;
     end
 
   let w3_env () =
-    load None; EcUtils.oget !thew3_env
+    load (); EcUtils.oget !thew3_env
 
   let provers () =
-    load None; !theprovers
+    load (); !theprovers
 
-  let filtered () =
-    load None; !thefiltered
+  let known ~evicted =
+    let test p =
+      if   not evicted && is_evicted p.pr_prover
+      then None
+      else Some p.pr_prover in
 
-  let known () =
-    List.map (fun p -> p.pr_name) (provers())
+    List.pmap test (provers ())
 end
 
 let initialize = Config.load
 let known      = Config.known
-let filtered   = Config.filtered
 
 (* -------------------------------------------------------------------- *)
 exception UnknownProver of string
 
+type parsed_pname = {
+  prn_name     : string;
+  prn_ovrevict : bool;
+}
+
+let parse_prover_name name =
+  if   name <> "" && name.[0] = '!'
+  then { prn_name     = String.sub name 1 (String.length name - 1);
+         prn_ovrevict = true; }
+  else { prn_name = name; prn_ovrevict = false; }
+
 let get_prover name =
-  try  List.find (fun p -> fst p.pr_name = name) (Config.provers ())
-  with Not_found -> raise (UnknownProver name)
+  let name = parse_prover_name name in
+
+  let test p =
+       p.pr_prover.pr_name = name.prn_name
+    && (name.prn_ovrevict || not (is_evicted p.pr_prover)) in
+
+  try  List.find test (Config.provers ())
+  with Not_found -> raise (UnknownProver name.prn_name)
 
 let is_prover_known name =
   try ignore (get_prover name); true with UnknownProver _ -> false

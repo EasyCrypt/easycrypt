@@ -9,6 +9,12 @@ type prover_eviction = [
   | `Inconsistent
 ]
 
+type prover = {
+  pr_name    : string;
+  pr_version : string;
+  pr_evicted : (prover_eviction * bool) option;
+}
+
 type prover_infos = {
   pr_maxprocs  : int;
   pr_provers   : string list;
@@ -19,13 +25,22 @@ type prover_infos = {
 val dft_prover_infos : prover_infos
 val dft_prover_names : string list
 
-val known    : unit -> (string * string) list
-val filtered : unit -> ((string * string) * prover_eviction) list
-
-val is_prover_known : string -> bool
+val known : evicted:bool -> prover list
 
 (* -------------------------------------------------------------------- *)
-val initialize : string option -> unit
+type parsed_pname = {
+  prn_name     : string;
+  prn_ovrevict : bool;
+}
+
+val parse_prover_name : string -> parsed_pname
+val is_prover_known   : string -> bool
+
+(* -------------------------------------------------------------------- *)
+val initialize :
+     ?ovrevict:string list
+  -> ?why3conf:string
+  -> unit -> unit
 
 (* -------------------------------------------------------------------- *)
 type hflag = [ `Include | `Exclude ]

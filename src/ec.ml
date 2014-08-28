@@ -52,28 +52,28 @@ let print_config config =
 
   (* Print list of known provers *)
   begin
-    let string_of_prover (name, version) =
-      Printf.sprintf "%s@%s" name version in
-    let provers = EcProvers.known () in
+    let string_of_prover prover =
+      let fullname =
+        Printf.sprintf "%s@%s"
+          prover.EcProvers.pr_name
+          prover.EcProvers.pr_version in
+
+      match prover.EcProvers.pr_evicted with
+      | None -> fullname
+      | Some (cause, overridden) ->
+          let cause =
+            match cause with
+            | `Inconsistent -> "inconsistent"
+          in
+            Printf.sprintf
+              "%s [evicted:%s/overridden=%b]"
+              fullname cause overridden
+    in
+
+    let provers = EcProvers.known ~evicted:true in
 
     Format.eprintf "known provers: %s@\n%!"
       (String.concat ", " (List.map string_of_prover provers))
-  end;
-
-  (* Print list of known provers *)
-  begin
-    let string_of_eviction ((name, version), cause) =
-      let cause =
-        match cause with
-        | `Inconsistent -> "inconsistent"
-      in
-      Printf.sprintf "%s@%s [%s]" name version cause
-    in
-
-    let filtered = EcProvers.filtered () in
-
-    Format.eprintf "known but filtered provers: %s@\n%!"
-      (String.concat ", " (List.map string_of_eviction filtered))
   end;
 
   (* Print system PATH *)
@@ -165,10 +165,11 @@ let _ =
         | true  -> Some why3conf
     end
     | why3conf -> why3conf
-  in
+  
+  and ovrevict = options.o_options.o_ovrevict in
 
   begin
-    try  EcProvers.initialize why3conf
+    try  EcProvers.initialize ~ovrevict ?why3conf ()
     with e ->
       Format.eprintf
       "cannot initialize Why3 engine: %a@."

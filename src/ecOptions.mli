@@ -39,8 +39,9 @@ and ldr_options = {
 }
 
 and glb_options = {
-  o_why3   : string option;
-  o_loader : ldr_options;
+  o_why3     : string option;
+  o_ovrevict : string list;
+  o_loader   : ldr_options;
 }
 
 (* -------------------------------------------------------------------- *)
