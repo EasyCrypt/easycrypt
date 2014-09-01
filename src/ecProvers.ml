@@ -67,7 +67,7 @@ type prover_eviction = [
 
 type prover_eviction_test = {
   pe_cause : prover_eviction;
-  pe_test  : [ `ByVersion of string * ([`Eq | `Lt] * VP.version) ];
+  pe_test  : [ `ByVersion of string * ([`Eq | `Lt | `Le] * VP.version) ];
 }
 
 let test_if_evict_prover test (name, version) =
@@ -76,8 +76,9 @@ let test_if_evict_prover test (name, version) =
     | `ByVersion (tname, (trel, tversion)) when name = tname -> begin
         let cmp = VP.compare (VP.parse version) tversion in
         match trel with
-        | `Eq -> cmp = 0
-        | `Lt -> cmp < 0
+        | `Eq -> cmp =  0
+        | `Lt -> cmp <  0
+        | `Le -> cmp <= 0
       end
   
     | `ByVersion (_, _) -> false
