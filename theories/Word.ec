@@ -53,7 +53,8 @@ qed.
 lemma xorA x y z:
   x ^^ (y ^^ z) = (x ^^ y) ^^ z.
 proof strict.
-by apply word_ext; smt.
+apply word_ext=> i le0i ltilen.
+by rewrite !get_xor // Bool.xorA.
 qed.
 
 lemma xor0 w: w ^^ zeros = w.
