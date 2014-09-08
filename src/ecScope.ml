@@ -2114,7 +2114,7 @@ module Cloning = struct
                       (ax, axc :: proofs)
             in
   
-              (subst, ops, proofs, Ax.bind scope false (x, ax))
+              (subst, ops, proofs, Ax.bind scope thcl.pthc_local (x, ax))
         end
   
         | CTh_modtype (x, modty) ->
