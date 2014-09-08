@@ -2457,21 +2457,23 @@ proofmodename:
 (* Theory cloning                                                       *)
 
 theory_clone:
-| CLONE ip=import_flag? x=uqident cw=clone_with? cp=clone_proof?
+| local=boption(LOCAL) CLONE ip=import_flag? x=uqident cw=clone_with? cp=clone_proof?
    { let oth =
-       { pthc_base = x;
-         pthc_name = None;
-         pthc_ext  = EcUtils.odfl [] cw;
-         pthc_prf  = EcUtils.odfl [] cp; }
+       { pthc_base  = x;
+         pthc_name  = None;
+         pthc_ext   = EcUtils.odfl [] cw;
+         pthc_prf   = EcUtils.odfl [] cp;
+         pthc_local = local; }
      in
        (oth, ip) }
 
-| CLONE ip=import_flag? x=uqident AS y=uident cw=clone_with? cp=clone_proof?
+| local=boption(LOCAL) CLONE ip=import_flag? x=uqident AS y=uident cw=clone_with? cp=clone_proof?
    { let oth =
-       { pthc_base = x;
-         pthc_name = Some y;
-         pthc_ext  = EcUtils.odfl [] cw;
-         pthc_prf  = EcUtils.odfl [] cp; }
+       { pthc_base  = x;
+         pthc_name  = Some y;
+         pthc_ext   = EcUtils.odfl [] cw;
+         pthc_prf   = EcUtils.odfl [] cp;
+         pthc_local = local; }
      in
        (oth, ip) }
 ;

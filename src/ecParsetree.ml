@@ -651,10 +651,11 @@ type w3_renaming =
 
 (* -------------------------------------------------------------------- *)
 type theory_cloning = {
-  pthc_base : pqsymbol;
-  pthc_name : psymbol option;
-  pthc_ext  : (pqsymbol * theory_override) list;
-  pthc_prf  : theory_cloning_proof list;
+  pthc_base  : pqsymbol;
+  pthc_name  : psymbol option;
+  pthc_ext   : (pqsymbol * theory_override) list;
+  pthc_prf   : theory_cloning_proof list;
+  pthc_local : bool;
 }
 
 and theory_cloning_proof = {

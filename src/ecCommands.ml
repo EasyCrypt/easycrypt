@@ -287,7 +287,7 @@ and process_th_export (scope : EcScope.scope) name =
 and process_th_clone (scope : EcScope.scope) (thcl, io) =
   EcScope.check_state `InTop "theory cloning" scope;
   let mode = if (!pragma).pm_check then `Check else `WeakCheck in
-  let (name, scope) = EcScope.Theory.clone scope mode thcl in
+  let (name, scope) = EcScope.Cloning.clone scope mode thcl in
     match io with
     | None         -> scope
     | Some `Export -> process_th_export scope ([], name)

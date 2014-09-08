@@ -372,6 +372,11 @@ let path (cs : t) : symbol option * path =
 let opath (cs : t) =
   try Some (path cs) with NoSectionOpened -> None
 
+let topenv (cs : t) : EcEnv.env =
+  match List.rev cs with
+  | [] -> raise NoSectionOpened
+  | ec :: _ -> ec.lc_env
+
 let locals (cs : t) : locals =
   match cs with
   | [] -> raise NoSectionOpened
