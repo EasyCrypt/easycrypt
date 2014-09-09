@@ -404,7 +404,7 @@ let subst_ring (s : _subst) cr =
       | `Default -> `Default
       | `Embed p -> `Embed (s.s_p p)
       end;
-    r_bool = cr.r_bool
+    r_kind = cr.r_kind
   }
 
 (* -------------------------------------------------------------------- *)

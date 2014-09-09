@@ -35,6 +35,12 @@
  *
  * If an explicit symbol (/) is given for the division:
  * - forall x y, x / y = x * y^-1
+ *
+ * If [Cn] is given:
+ * - Cn%:R = 0
+ *
+ * If [Cp] is given:
+ * - forall x, x^Cp = x
  *)
 
 (* -------------------------------------------------------------------- *)
@@ -115,10 +121,19 @@ theory Requires.
   axiom nosmt mulrV:
     forall (x : domain), x <> rzero => mul x (inv x) = rone.
 
-  (* Can be usefull to add x <> 0 *)
   axiom nosmt exprN:
     forall (x : domain) (n : int), 0 <= n => expr x (-n) = inv (expr x n).
 
   axiom nosmt divrE:
     forall (x y : domain), div x y = mul x (inv y).
+
+  op Cn : int.
+
+  axiom nosmt Cn_eq0: ofint Cn = rzero.
+
+  op Cp : int.
+
+  axiom nosmt Cp_idp:
+    forall (x : domain), expr x Cp = x.
+
 end Requires.

@@ -69,8 +69,7 @@ end = struct
 end
 
 (* -------------------------------------------------------------------- *)
-type eq  = form * form
-type eqs = eq list
+type eq = form * form
 
 (* -------------------------------------------------------------------- *)
 let rapp r op args =
@@ -84,7 +83,7 @@ let radd r e1 e2 = rapp r r.r_add [e1; e2]
 let ropp r e     = 
   match r.r_opp with
   | Some opp -> rapp r opp [e]
-  | None -> assert r.r_bool; e
+  | None -> assert (r.r_kind = `Boolean); e
 
 let rmul r e1 e2 = rapp r r.r_mul [e1; e2]
 let rexp r e  i  = 
@@ -312,12 +311,22 @@ let rec ofring (r:ring) (rmap:RState.rstate) (e:pexpr) : form =
   | PEpow(p1,i)  -> rexp r (ofring r rmap p1) i 
 
 (* -------------------------------------------------------------------- *)
-let ring_simplify_pe (cr:cring) peqs pe = 
-  if (fst cr).r_bool then Bring.norm_pe pe peqs
-  else Iring.norm_pe pe peqs 
+let norm_pe_of_ring (cr : EcDecl.ring) =
+  match cr.r_kind with
+  | `Boolean -> Bring.norm_pe
+  | `Integer -> Iring.norm_pe
 
+  | `Modulus (c, p) ->
+      let module M = struct let c = c let p = p end in
+      let module C = EcRing.Cmod(M) in
+      let module R = EcRing.Make(C) in
+      R.norm_pe
 
-let ring_simplify todo (cr : cring) (eqs : eqs) (form : form) =
+(* -------------------------------------------------------------------- *)
+let ring_simplify_pe (cr:cring) peqs pe =
+  norm_pe_of_ring (fst cr) pe peqs
+
+let ring_simplify todo (cr : cring) (eqs : eq list) (form : form) =
   let map = ref RState.empty in
   let toring form = reffold (fun map -> toring todo cr map form) map in
   let form = toring form in
@@ -325,7 +334,7 @@ let ring_simplify todo (cr : cring) (eqs : eqs) (form : form) =
   ofring (fst cr) !map (ring_simplify_pe cr eqs form)
 
 (* -------------------------------------------------------------------- *)
-let ring_eq todo (cr : cring) (eqs : eqs) (f1 : form) (f2 : form) =
+let ring_eq todo (cr : cring) (eqs : eq list) (f1 : form) (f2 : form) =
   ring_simplify todo cr eqs (rsub (fst cr) f1 f2)
 
 (* -------------------------------------------------------------------- *)
@@ -335,7 +344,7 @@ let get_field_equation (f1, f2) =
   | _ -> None
 
 (* -------------------------------------------------------------------- *)
-let field_eq hyps (cr : cfield) (eqs : eqs) (f1 : form) (f2 : form) =
+let field_eq hyps (cr : cfield) (eqs : eq list) (f1 : form) (f2 : form) =
   let map = ref RState.empty in
 
   let tofield form = reffold (fun map -> tofield hyps cr map form) map in
@@ -349,9 +358,7 @@ let field_eq hyps (cr : cfield) (eqs : eqs) (f1 : form) (f2 : form) =
   let eqs = List.map (fun (f1, f2) -> (tofield f1, tofield f2)) eqs in
   let eqs = List.pmap get_field_equation eqs in
 
-  
-  let norm = 
-    if (fst cr).f_ring.r_bool then Bring.norm_pe else Iring.norm_pe in
+  let norm = norm_pe_of_ring (fst cr).f_ring in
   let norm form = ofring (norm form eqs) in
 
   let num1   = norm num1   in
@@ -361,10 +368,9 @@ let field_eq hyps (cr : cfield) (eqs : eqs) (f1 : form) (f2 : form) =
   let cond1  = List.map norm cond1 in
   let cond2  = List.map norm cond2 in
 
-    (cond1 @ cond2, (num1, num2), (denum1, denum2))
+    (cond1 @ cond2, ((num1, num2), (denum1, denum2)))
 
 (* -------------------------------------------------------------------- *)
-
 let rec offield (r:field) (rmap:RState.rstate) (e:fexpr) : form = 
   match e with
   | FEc c        -> fofint r (Big_int.int_of_big_int c)
@@ -379,12 +385,11 @@ let rec offield (r:field) (rmap:RState.rstate) (e:fexpr) : form =
 
 let field_simplify_pe (cr:cfield) peqs pe = 
   let (num,denum,cond) = fnorm pe in
-  let norm = 
-    if (fst cr).f_ring.r_bool then Bring.norm_pe else Iring.norm_pe in
+  let norm = norm_pe_of_ring (fst cr).f_ring in
   let norm f = norm f peqs in 
-  (List.map norm cond, norm num, norm denum)
+  (List.map norm cond, (norm num, norm denum))
 
-let field_simplify hyps (cr : cfield) (eqs : eqs) (f : form) =
+let field_simplify hyps (cr : cfield) (eqs : eq list) (f : form) =
   let map = ref RState.empty in
 
   let tofield form = reffold (fun map -> tofield hyps cr map form) map in
@@ -394,9 +399,8 @@ let field_simplify hyps (cr : cfield) (eqs : eqs) (f : form) =
   let eqs = List.map (fun (f1, f2) -> (tofield f1, tofield f2)) eqs in
   let eqs = List.pmap get_field_equation eqs in
 
-  let norm = 
-    if (fst cr).f_ring.r_bool then Bring.norm_pe else Iring.norm_pe in
+  let norm = norm_pe_of_ring (fst cr).f_ring in
   let norm form = ofring (norm form eqs) in
-  (List.map norm cond, norm num, norm denum)
+  (List.map norm cond, (norm num, norm denum))
 
 

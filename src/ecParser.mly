@@ -1356,11 +1356,24 @@ tc_ax:
 (* -------------------------------------------------------------------- *)
 (* Type classes (instances)                                             *)
 tycinstance:
-| INSTANCE x=qident WITH typ=tyvars_decl? ty=loc(type_exp) ops=tyci_op* axs=tyci_ax* {
+| INSTANCE x=qident
+    WITH typ=tyvars_decl? ty=loc(type_exp) ops=tyci_op* axs=tyci_ax*
+  {
     { pti_name = x;
       pti_type = (odfl [] typ, ty);
       pti_ops  = ops;
-      pti_axs  = axs; }
+      pti_axs  = axs;
+      pti_args = None; }
+  }
+
+| INSTANCE x=qident c=uoption(UINT) p=uoption(UINT)
+    WITH typ=tyvars_decl? ty=loc(type_exp) ops=tyci_op* axs=tyci_ax*
+  {
+    { pti_name = x;
+      pti_type = (odfl [] typ, ty);
+      pti_ops  = ops;
+      pti_axs  = axs;
+      pti_args = Some (`Ring (c, p)); }
   }
 ;
 
@@ -2771,4 +2784,10 @@ __rlist1(X, S):                         (* left-recursive *)
       pl_loc  = EcLocation.make $startpos $endpos;
     }
   }
+;
+
+(* -------------------------------------------------------------------- *)
+%inline uoption(X):
+| x=X { Some x }
+| UNDERSCORE { None }
 ;

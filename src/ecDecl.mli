@@ -105,6 +105,12 @@ type typeclass = {
 }
 
 (* -------------------------------------------------------------------- *)
+type rkind = [
+  | `Boolean
+  | `Integer
+  | `Modulus of int option * int option
+]
+
 type ring = {
   r_type  : EcTypes.ty;
   r_zero  : EcPath.path;
@@ -115,7 +121,7 @@ type ring = {
   r_exp   : EcPath.path option;
   r_sub   : EcPath.path option;
   r_embed : [ `Direct | `Embed of EcPath.path | `Default];
-  r_bool  : bool; (* true means boolean ring *)
+  r_kind  : rkind;
 }
 
 val ring_equal : ring -> ring -> bool

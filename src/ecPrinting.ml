@@ -2240,7 +2240,9 @@ let rec pp_theory ppe (fmt:Format.formatter) (path, cth) =
                  ("div",      cr.f_div)]
             in
               match tc with
-              | `Ring  cr when cr.r_bool -> ("boolean_ring", ops_of_ring cr)
+              | `Ring  cr when cr.r_kind = `Boolean ->
+                  ("boolean_ring", ops_of_ring cr)
+                (* FIXME: modulus rings *)
               | `Ring  cr -> ("ring", ops_of_ring cr)
               | `Field cr -> ("field", ops_of_field cr)
           in

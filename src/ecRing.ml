@@ -15,6 +15,7 @@
 open EcMaps
 open Big_int
 
+(* -------------------------------------------------------------------- *)
 type pexpr = 
   | PEc of big_int 
   | PEX of int
@@ -55,61 +56,72 @@ let fv_pe =
     | PEpow(e1,_)  -> aux fv e1 in
   aux Sint.empty 
 
-  
-type 'a cmp_sub = 
-  | Eq 
-  | Lt of 'a
-  | Gt of 'a
+(* -------------------------------------------------------------------- *)
+type 'a cmp_sub = [`Eq | `Lt of 'a | `Gt of 'a]
  
+(* -------------------------------------------------------------------- *)
 module type Coef = sig
+  (* ------------------------------------------------------------------ *)
   type c 
+
   val cofint : big_int -> c
   val ctoint : c -> big_int
-  val c0 : c
-  val c1 : c
+
+  val c0   : c
+  val c1   : c
   val cadd : c -> c -> c
   val csub : c -> c -> c
   val cmul : c -> c -> c
   val copp : c -> c 
   val ceq  : c -> c -> bool
-  val cdiv : c -> c -> c*c
+  val cdiv : c -> c -> c * c
 
+  (* ------------------------------------------------------------------ *)
   type p 
+
   val pofint : int -> p
   val ptoint : p -> int 
+
   val padd : p -> p -> p
   val peq  : p -> p -> bool
   val pcmp : p -> p -> p cmp_sub
-    
 end
- 
-module Cint = struct
+
+(* -------------------------------------------------------------------- *) 
+module Cint : Coef = struct
   type c = big_int
+
   let cofint c = c
   let ctoint c = c
+
   let c0 = zero_big_int
   let c1 = unit_big_int
 
-  let cadd a b = add_big_int a  b
-  let csub a b = sub_big_int a  b
-  let cmul a b = mult_big_int a  b
-  let copp a =  minus_big_int a
-  let ceq a b = eq_big_int a b
+  let cadd a b = add_big_int a b
+  let csub a b = sub_big_int a b
+  let cmul a b = mult_big_int a b
+  let copp a   = minus_big_int a
+  let ceq  a b = eq_big_int a b
   let cdiv a b = quomod_big_int a b
     
   type p = int
+
   let pofint p = p
   let ptoint p = p
-  let padd p1 p2 = p1 + p2
-  let peq (p1:p) p2 = p1 = p2
-  let pcmp p1 p2 = 
-    if p1 = p2 then Eq
-    else if p1 < p2 then Lt (p2 - p1)
-    else Gt (p1 - p2)
-    
+
+  let padd (p1 : p) (p2 : p) = p1 + p2
+
+  let peq (p1 : p) (p2 : p) = (p1 = p2)
+
+  let pcmp (p1 : p) (p2 : p) : p cmp_sub = 
+    match compare p1 p2 with
+    | n when n < 0 -> `Lt (p2 - p1)
+    | n when n > 0 -> `Gt (p1 - p2)
+    | _ -> `Eq
 end
 
-module Cbool = struct
+(* -------------------------------------------------------------------- *) 
+module Cbool : Coef = struct
   type c = int
 
   let cofint c = 
@@ -138,19 +150,94 @@ module Cbool = struct
   let padd _p1 _p2 = ()
 
   let peq _p1 _p2 = true
-  let pcmp _p1 _p2 = Eq
+  let pcmp _p1 _p2 : p cmp_sub = `Eq
 
 end
 
-module Make(C:Coef) = struct
+(* -------------------------------------------------------------------- *)
+module type ModVal = sig
+  val c : int option
+  val p : int option
+end
 
-  module C = C
+(* -------------------------------------------------------------------- *)
+module Cmod (M : ModVal) : Coef = struct
+  type c = big_int
+
+  let correct_c =
+    match M.c with
+    | None    -> fun c -> c
+    | Some cn -> 
+        let cn = big_int_of_int cn in
+          fun c -> mod_big_int c cn
+
+  let cofint c = correct_c c
+  let ctoint c = c
+
+  let c0 = correct_c zero_big_int
+  let c1 = correct_c unit_big_int
+
+  let cadd a b = correct_c (add_big_int    a b)
+  let csub a b = correct_c (sub_big_int    a b)
+  let cmul a b = correct_c (mult_big_int   a b)
+  let copp a   = correct_c (minus_big_int  a)
+
+  let cdiv a b =
+    let (q, r) = quomod_big_int a b in
+    (correct_c q, correct_c r)
+
+  let ceq a b  = eq_big_int a b
+    
+  type p = int
+
+  let correct_p =
+    match M.p with
+    | None    -> fun p -> p
+    | Some pn ->
+        let rec doit p =
+          if p < pn then p else doit (p / pn + p mod pn)
+        in doit
+
+  let pofint p = correct_p p
+  let ptoint p = p
+
+  let padd p1 p2 = correct_p (p1 + p2)
+
+  let peq (p1 : p) (p2 : p) =
+    p1 = p2
+
+  let pcmp (p1 : p) (p2 : p) = 
+    match compare p1 p2 with
+    | n when n < 0 -> `Lt (p2 - p1)
+    | n when n > 0 -> `Gt (p1 - p2)
+    | _ -> `Eq
+end
+
+(* -------------------------------------------------------------------- *)
+module type Rnorm = sig
+  module C : Coef 
+    
+  type pol =
+  | Pc   of C.c 
+  | Pinj of int * pol
+  | PX   of pol * C.p * pol
+
+  val peq    : pol -> pol -> bool
+  val norm   : pexpr -> (pexpr * pexpr) list -> pol
+  val norm_pe: pexpr -> (pexpr * pexpr) list -> pexpr
+  val pp_pol : Format.formatter -> pol -> unit
+end
+
+(* -------------------------------------------------------------------- *)
+module Make (C : Coef) : Rnorm = struct
   open C
 
+  module C = C
+
   type pol =
-  | Pc of c 
+  | Pc   of c 
   | Pinj of int * pol
-  | PX of pol * p * pol
+  | PX   of pol * p * pol
       
   let rec pp_pol fmt = function
     | Pc c -> Format.fprintf fmt "%s" (string_of_big_int (ctoint c))
@@ -196,7 +283,6 @@ module Make(C:Coef) = struct
       if peq q' p0 then PX (p',padd i i',q) else PX(p,i,q) 
 
   (* Opposite  *)
-
   let rec popp ( p : pol) : pol =
     match p with
     | Pc c -> Pc (copp c)
@@ -204,7 +290,6 @@ module Make(C:Coef) = struct
     | PX (p,j,q) -> PX (popp p, j, popp q)
 
   (* Addition and Subs *)
-
   let rec paddc (p : pol) (c : c) : pol =
     match p with
     | Pc c' -> Pc (cadd c' c)
@@ -229,9 +314,9 @@ module Make(C:Coef) = struct
         else PX(p',i', padd (Pinj (j-1,q)) q')
       | PX (p,i,q) -> 
         match pcmp i i' with
-        | Eq -> mkPX (padd p p') i (padd q q')
-        | Lt s -> mkPX (paddx p' s p) i (padd q q')
-        | Gt s -> mkPX (padd (PX (p,s,p0)) p') i' (padd q q')
+        | `Eq -> mkPX (padd p p') i (padd q q')
+        | `Lt s -> mkPX (paddx p' s p) i (padd q q')
+        | `Gt s -> mkPX (padd (PX (p,s,p0)) p') i' (padd q q')
 
   and paddi (q : pol) (j : int)  (p : pol) : pol =
     match p with
@@ -252,9 +337,9 @@ module Make(C:Coef) = struct
       else PX (p',i', Pinj (j-1,q'))
     | PX (p,i,q') -> 
       match pcmp i i' with
-      | Eq -> mkPX (padd p p') i q'
-      | Gt s -> mkPX (padd (PX (p,s,p0)) p') i' q'
-      | Lt s -> mkPX (paddx p' s p) i q'
+      | `Eq -> mkPX (padd p p') i q'
+      | `Gt s -> mkPX (padd (PX (p,s,p0)) p') i' q'
+      | `Lt s -> mkPX (paddx p' s p) i q'
 
   let rec psub (p : pol) (p' : pol) : pol =
     match p' with
@@ -268,9 +353,9 @@ module Make(C:Coef) = struct
         else PX (popp p',i', psub (Pinj (j-1,q)) q')
       | PX (p,i,q) -> 
         match pcmp i i' with
-        | Eq -> mkPX  (psub p p') i (psub q q')
-        | Gt s -> mkPX (psub (PX (p,s,p0)) p') i' (psub q q')
-        | Lt s -> mkPX (psubx p' s p) i (psub q q')
+        | `Eq -> mkPX  (psub p p') i (psub q q')
+        | `Gt s -> mkPX (psub (PX (p,s,p0)) p') i' (psub q q')
+        | `Lt s -> mkPX (psubx p' s p) i (psub q q')
 
   and psubi (q : pol) (j : int) ( p : pol) : pol =
     match p with
@@ -291,9 +376,9 @@ module Make(C:Coef) = struct
       else PX (popp p',i', Pinj (j-1,q'))
     | PX (p,i,q') -> 
       match pcmp i i' with
-      | Eq -> mkPX (psub p p') i q'
-      | Gt s -> mkPX (psub (PX (p,s,p0)) p') i' q'
-      | Lt s -> mkPX (psubx p' s  p) i q'
+      | `Eq -> mkPX (psub p p') i q'
+      | `Gt s -> mkPX (psub (PX (p,s,p0)) p') i' q'
+      | `Lt s -> mkPX (psubx p' s  p) i q'
 
   let rec pmulc_aux (p : pol) (c : c) :pol =
     match p with
@@ -344,7 +429,6 @@ module Make(C:Coef) = struct
     ppow_n p (ptoint n)
     
   (* Monomial *)
-
   let mkZmon j m =
     match m with
     | Mon0 -> Mon0
@@ -395,13 +479,13 @@ module Make(C:Coef) = struct
       (mkPX r1 i r2, mkPX s1 i s2)
     | PX (p1,i,q1), Vmon (j,m1) ->
       match pcmp i j with
-      | Eq -> 
+      | `Eq -> 
         let (r1,s1) = mfactor p1 c (mkZmon 1 m1) in
         (mkPX r1 i q1, s1)
-      | Lt s -> 
+      | `Lt s -> 
         let (r1,s1) = mfactor p1 c (Vmon (s,m1)) in
         (mkPX r1 i q1, s1)
-      | Gt s ->
+      | `Gt s ->
         let (r1,s1) = mfactor p1 c (mkZmon 1 m1) in
         (mkPX r1 i q1, mkPX s1 s (Pc c0)) 
 
@@ -462,7 +546,7 @@ module Make(C:Coef) = struct
   let norm_subst (n : int) (lmp : ((c * mon) * pol) list) (p : pexpr) : pol  = 
     pnsubstl (norm_aux p) lmp n n
 
-(* [mon_of_pol p = (c, m, r)] => p = c*m + r *)
+  (* [mon_of_pol p = (c, m, r)] => p = c*m + r *)
   let rec mon_of_pol (p : pol) : (c * mon * pol) =
     match p with
     | Pc c -> c, Mon0, p0
@@ -536,32 +620,19 @@ module Make(C:Coef) = struct
   let norm_pe p lp = topexpr (norm p lp)
 end
 
-module type Rnorm = sig
+(* -------------------------------------------------------------------- *)
+module Iring : Rnorm = Make(Cint)
+module Bring : Rnorm = Make(Cbool)
 
-  module C : Coef 
-    
-  type pol =
-  | Pc of C.c 
-  | Pinj of int * pol
-  | PX of pol * C.p * pol
-
-  val peq    : pol -> pol -> bool
-  val norm   : pexpr -> (pexpr * pexpr) list -> pol
-  val norm_pe: pexpr -> (pexpr * pexpr) list -> pexpr
-  val pp_pol : Format.formatter -> pol -> unit
-end
-
-module Iring = Make(Cint)
-module Bring = Make(Cbool)
-
-
+(* -------------------------------------------------------------------- *)
 type c = big_int
+
 let c0 = zero_big_int
 let c1 = unit_big_int
 
 let cadd a b = add_big_int a  b
 let csub a b = sub_big_int a  b
 let cmul a b = mult_big_int a  b
-let copp a =  minus_big_int a
-let ceq a b = eq_big_int a b
+let copp a   = minus_big_int a
+let ceq  a b = eq_big_int a b
 let cdiv a b = quomod_big_int a b

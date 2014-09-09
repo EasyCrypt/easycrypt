@@ -2,6 +2,7 @@
  * Distributed under the terms of the CeCILL-B license *)
 
 (* -------------------------------------------------------------------- *)
+open EcUtils
 open EcFol
 open EcRing
 open EcField
@@ -48,8 +49,7 @@ val emb_rone : ring  -> form
 val emb_fone : field -> form
 
 (* -------------------------------------------------------------------- *)
-type eq  = form * form
-type eqs = eq list
+type eq = form * form
 
 (* -------------------------------------------------------------------- *)
 type cring
@@ -61,21 +61,69 @@ val ring_of_cring   : cring -> ring
 val field_of_cfield : cfield-> field
 
 (* -------------------------------------------------------------------- *)
-val toring : LDecl.hyps -> cring -> RState.rstate -> form -> pexpr * RState.rstate
-val ofring : ring -> RState.rstate -> pexpr -> form
-val ring_simplify_pe : cring -> (pexpr * pexpr) list -> pexpr -> pexpr
+val toring:
+     LDecl.hyps
+  -> cring                              (* ring structure *)
+  -> RState.rstate                      (* reification state *)
+  -> form                               (* formula to reify *)
+  -> pexpr * RState.rstate              (* (reification, mutated state) *)
 
-val ring_simplify : LDecl.hyps -> cring -> eqs -> form -> form
-val ring_eq : LDecl.hyps -> cring -> eqs -> form -> form -> form
+val ofring:
+     ring                               (* ring structure *)
+  -> RState.rstate                      (* reification state *)
+  -> pexpr -> form
+
+val ring_simplify_pe:
+     cring                              (* ring structure *)
+  -> pexpr pair list                    (* hypotheses (equations) *)
+  -> pexpr                              (* expression to simplify *)
+  -> pexpr                              (* simplified formula *)
+
+val ring_simplify:
+     LDecl.hyps
+  -> cring                              (* ring structure *)
+  -> eq list                            (* hypotheses (equations) *)
+  -> form                               (* formula to simplify *)
+  -> form                               (* simplified formula *)
+
+val ring_eq:
+    LDecl.hyps
+  -> cring                              (* ring structure *)
+  -> eq list                            (* hypotheses (equations) *)
+  -> form                               (* LHS *)
+  -> form                               (* RHS *)
+  -> form
 
 (* -------------------------------------------------------------------- *)
-val tofield : EcEnv.LDecl.hyps ->
-           cfield ->
-           RState.rstate -> form -> fexpr * RState.rstate
-val offield : field -> RState.rstate -> fexpr -> form
+val tofield:
+     EcEnv.LDecl.hyps
+  -> cfield                             (* field structure *)
+  -> RState.rstate                      (* reification state *)
+  -> form                               (* formula to reify *)
+  -> fexpr * RState.rstate              (* (reification, mutated state) *)
 
-val field_simplify_pe : 
-  cfield -> (pexpr * pexpr) list -> fexpr -> pexpr list * pexpr * pexpr
+val offield:
+     field                              (* field structure *)
+  -> RState.rstate                      (* reification state *)
+  -> fexpr -> form
 
-val field_simplify : LDecl.hyps -> cfield -> eqs -> form -> form list * form * form
-val field_eq : LDecl.hyps -> cfield -> eqs -> form -> form -> form list * (form * form) * (form * form)
+val field_simplify_pe:
+     cfield                             (* field structure *)
+  -> pexpr pair list                    (* hypotheses (equations) *)
+  -> fexpr                              (* formula to simplify *)
+  -> pexpr list * pexpr pair            (* (!=0 conditions, (num, den)) *)
+
+val field_simplify:
+     LDecl.hyps
+  -> cfield                             (* field structure *)
+  -> eq list                            (* hypotheses (equations) *)
+  -> form                               (* formula to simplify *)
+  -> form list * form pair              (* (!=0 conditions, (num, den)) *)
+
+val field_eq:
+     LDecl.hyps
+  -> cfield                             (* field structure *)
+  -> eq list                            (* hypotheses (equations) *)
+  -> form                               (* LHS *)
+  -> form                               (* RHS *)
+  -> form list * form pair pair         (* (!=0 conditions, (num, den) pair) *)
