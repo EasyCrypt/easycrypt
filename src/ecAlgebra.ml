@@ -129,11 +129,9 @@ let fdiv f e1 e2 =
   | Some p -> rapp f.f_ring p [e1; e2]
 
 (* -------------------------------------------------------------------- *)
-let emb_rzero r =
-  match r.r_embed with `Direct -> f_int 0 | _ -> rzero r
+let emb_rzero r = rofint r 0
 
-let emb_rone r =
-  match r.r_embed with `Direct -> f_int 1 | _ -> rone r
+let emb_rone r = rofint r 1
 
 let emb_fzero r = emb_rzero r.f_ring
 let emb_fone  r = emb_rone  r.f_ring
@@ -305,10 +303,7 @@ let tofield hyps ((r, cr) : cfield) (rmap : RState.rstate) (form : form) =
 (* -------------------------------------------------------------------- *)
 let rec ofring (r:ring) (rmap:RState.rstate) (e:pexpr) : form = 
   match e with
-  | PEc c ->
-    if ceq c c0 then emb_rzero r
-    else if ceq c c1 then emb_rone r
-    else rofint r (Big_int.int_of_big_int c)
+  | PEc c -> rofint r (Big_int.int_of_big_int c)
   | PEX idx -> oget (RState.get idx rmap)
   | PEadd(p1,p2) -> radd r (ofring r rmap p1) (ofring r rmap p2)
   | PEsub(p1,p2) -> rsub r (ofring r rmap p1) (ofring r rmap p2)
@@ -372,11 +367,8 @@ let field_eq hyps (cr : cfield) (eqs : eqs) (f1 : form) (f2 : form) =
 
 let rec offield (r:field) (rmap:RState.rstate) (e:fexpr) : form = 
   match e with
-  | FEc c ->
-    if ceq c c0 then emb_fzero r
-    else if ceq c c1 then emb_fone r
-    else fofint r (Big_int.int_of_big_int c)
-  | FEX idx -> oget (RState.get idx rmap)
+  | FEc c        -> fofint r (Big_int.int_of_big_int c)
+  | FEX idx      -> oget (RState.get idx rmap)
   | FEadd(p1,p2) -> fadd r (offield r rmap p1) (offield r rmap p2)
   | FEsub(p1,p2) -> fsub r (offield r rmap p1) (offield r rmap p2)
   | FEmul(p1,p2) -> fmul r (offield r rmap p1) (offield r rmap p2)

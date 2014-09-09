@@ -496,6 +496,43 @@ module Make(C:Coef) = struct
     in
     doit 1 p
 
+  let pe0 = PEc zero_big_int
+  let pe1 = PEc unit_big_int
+
+  let topexpr p =
+    let padd pe pe' = 
+      if pe == pe0 then pe'
+      else if pe' == pe0 then pe 
+      else PEadd(pe,pe') in
+    let pmul pe pe' = if pe == pe1 then pe' else PEmul(pe,pe') in
+    let cmono c lm = 
+      let c = ctoint c in
+      if eq_big_int c zero_big_int then pe0
+      else 
+        let s = sign_big_int c in
+        let c = abs_big_int c in
+        let pc = if eq_big_int c unit_big_int then pe1 else PEc c in
+        let pm = List.fold_left pmul pc lm in
+        if s < 0 then PEopp pm else pm in
+    let cons_lm idx p lm = 
+      if p = 0 then lm else
+      let p = ptoint (pofint p) in
+      match p with
+      | 0 -> lm
+      | 1 -> PEX idx :: lm
+      | _ -> PEpow(PEX idx, p) :: lm in
+
+    let rec doit ph idx k lm = function
+      | Pc c -> padd ph (cmono c (cons_lm idx k lm))
+      | Pinj (j,e) -> doit ph (idx+j) 0 (cons_lm idx k lm) e
+      | PX(p,i,q) ->
+        let p = doit ph idx (k + (ptoint i)) lm p in
+        doit p (idx+1) 0 (cons_lm idx k lm) q in
+
+    doit pe0 1 0 [] p
+
+
+
   let norm_pe p lp = topexpr (norm p lp)
 end
 
