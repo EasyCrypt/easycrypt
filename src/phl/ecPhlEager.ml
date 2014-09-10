@@ -463,8 +463,8 @@ let eager pf env s s' inv eqIs eqXs c c' eqO =
     | Sasgn (lvl, el), Sasgn (lvr, er)
     | Srnd  (lvl, el), Srnd  (lvr, er) ->
         check_swap_s il;
-        let eqnm = Mpv2.split_nmod modi modi' eqo in
-        let eqm  = Mpv2.split_mod modi modi' eqo in
+        let eqnm = Mpv2.split_nmod env modi modi' eqo in
+        let eqm  = Mpv2.split_mod env modi modi' eqo in
         if not (Mpv2.subset eqm eqXs) then raise EqObsInError;
         let eqi = Mpv2.union eqIs eqnm in
         (fhyps, add_eqs env (remove lvl lvr eqi) el er)
@@ -476,8 +476,8 @@ let eager pf env s s' inv eqIs eqXs c c' eqO =
         let eqo  = oremove lvl lvr eqo in
         let modl = PV.union modi (f_write env fl) in
         let modr = PV.union modi' (f_write env fr) in
-        let eqnm = Mpv2.split_nmod modl modr eqo in
-        let outf = Mpv2.split_mod  modl modr eqo in
+        let eqnm = Mpv2.split_nmod env modl modr eqo in
+        let outf = Mpv2.split_mod  env modl modr eqo in
         Mpv2.check_glob outf;
         let fhyps, inf = f_eager fhyps fl fr outf in
         let eqi =
@@ -512,8 +512,8 @@ let eager pf env s s' inv eqIs eqXs c c' eqO =
 
     | Sassert el, Sassert er ->
         check_args [el];
-        let eqnm = Mpv2.split_nmod modi modi' eqo in
-        let eqm  = Mpv2.split_mod modi modi' eqo in
+        let eqnm = Mpv2.split_nmod env modi modi' eqo in
+        let eqm  = Mpv2.split_mod  env modi modi' eqo in
         if not (Mpv2.subset eqm eqXs) then raise EqObsInError;
         let eqi = Mpv2.union eqIs eqnm in
         (fhyps, add_eqs env eqi el er)

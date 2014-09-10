@@ -632,29 +632,48 @@ module Mpv2 = struct
     Mnpv.equal (fun (s1,_) (s2,_) -> Snpv.equal s1 s2) eqs1.s_pv eqs2.s_pv &&
     Sm.equal eqs1.s_gl eqs2.s_gl
       
+  let is_mod_pv env pv mod_ = 
+    if Mnpv.mem pv mod_.PV.s_pv then true
+    else
+      if is_glob pv then
+        let x = pv.pv_name in
+        let check_mp mp =
+          let restr = NormMp.get_restr env mp in
+          not (EcPath.Mx.mem x restr.us_pv) in
+        Sm.for_all check_mp mod_.PV.s_gl
+      else false
 
-  let split_nmod modl modr eqo =
+  let is_mod_mp env mp mod_ =
+    let id = EcPath.mget_ident mp in
+    let restr = NormMp.get_restr env mp in
+    let check_mp mp' =
+      not (Sid.mem (EcPath.mget_ident mp') restr.us_gl ||
+        Sid.mem id (NormMp.get_restr env mp').us_gl) in
+    Sm.for_all check_mp mod_.PV.s_gl
+
+  let split_nmod env modl modr eqo =
     { s_pv = 
         Mnpv.mapi_filter (fun pvl (s,ty) ->
-          if Mnpv.mem pvl modl.PV.s_pv then None 
+          if is_mod_pv env pvl modl then None 
           else 
             let s = 
-              Snpv.filter (fun pvr -> not (Mnpv.mem pvr modr.PV.s_pv)) s in
+              Snpv.filter (fun pvr -> not (is_mod_pv env pvr modr)) s in
             if Snpv.is_empty s then None else Some (s,ty)) eqo.s_pv;
       s_gl = 
-        Sm.filter (fun m -> not (Sm.mem m modl.PV.s_gl) && 
-          not (Sm.mem m modl.PV.s_gl)) eqo.s_gl }
+        Sm.filter 
+          (fun m -> not (is_mod_mp env m modl) && not (is_mod_mp env m modr))
+          eqo.s_gl }
 
-  let split_mod modl modr eqo = 
+  let split_mod env modl modr eqo = 
     { s_pv = 
         Mnpv.mapi_filter (fun pvl (s,ty) ->
-          if Mnpv.mem pvl modl.PV.s_pv then Some (s,ty) 
+          if is_mod_pv env pvl modl then Some (s,ty) 
           else 
             let s = 
-              Snpv.filter (fun pvr -> Mnpv.mem pvr modr.PV.s_pv) s in
+              Snpv.filter (fun pvr -> is_mod_pv env pvr modr) s in
             if Snpv.is_empty s then None else Some (s,ty)) eqo.s_pv;
       s_gl = 
-        Sm.filter (fun m -> Sm.mem m modl.PV.s_gl || Sm.mem m modl.PV.s_gl) 
+        Sm.filter (fun m -> is_mod_mp env m modl || is_mod_mp env m modl) 
           eqo.s_gl }
 
   let subst_l env xl x eqs = 
@@ -1008,8 +1027,8 @@ let eqobs_in env
       when List.length argsl = List.length argsr -> 
       let eqo = oremove lvl lvr eqo in
       let modl, modr = f_write env fl, f_write env fr in
-      let eqnm = Mpv2.split_nmod modl modr eqo in
-      let outf = Mpv2.split_mod  modl modr eqo in
+      let eqnm = Mpv2.split_nmod env modl modr eqo in
+      let outf = Mpv2.split_mod  env modl modr eqo in
       Mpv2.check_glob outf;
       (* TODO : ensure that generalize mod can be applied here ? *)
       let log,fhyps = fhyps in
