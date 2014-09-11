@@ -218,16 +218,16 @@ and t_cut_subterm_eq t_cont info f1 f2 g =
   else t_cut_subterm_eq1 t_cont info f1 f2 g 
 
 and t_cut_subterm_eq1 t_cont info f1 f2 g = 
-(*  Format.eprintf "t_cut_subterm_eq1 %a@." pp_form (f_eq f1 f2, g); *)
+  (*  Format.eprintf "t_cut_subterm_eq1 %a@." pp_form (f_eq f1 f2, g); *)
   let f1', f2' = autorewrite info f1 f2 g in
-  let t_cont = 
-    if f_equal f1 f1' && f_equal f2 f2' then t_cont 
-    else 
-      fun g -> 
-        t_seqsub (t_cut (f_eq f1 f2)) 
-          [ (fun g -> t_first t_reflex_assumption (t_autorw info g));
-            t_seq t_intro_eq t_cont] g in
-  t_cut_subterm_eq2 t_cont info f1' f2' g 
+  if f_equal f1 f1' && f_equal f2 f2' then
+    t_cut_subterm_eq2 t_cont info f1' f2' g  
+  else
+    let t_cont g =
+      t_seqsub (t_cut (f_eq f1 f2)) 
+        [ (fun g -> t_first t_reflex_assumption (t_autorw info g));
+          t_seq t_intro_eq t_cont] g in
+    t_cut_alg_eq1 t_cont info f1' f2' g 
 
 and t_cut_subterm_eq2 t_cont info f1 f2 g = 
 (*  Format.eprintf "t_cut_subterm_eq2 %a@." pp_form (f_eq f1 f2, g); *)
@@ -279,22 +279,25 @@ and t_cut_field_eq t_cont info cr rm f1 f2 g =
       [ t_field r [] (f1,f2);
         t_seq t_intro_eq t_cont ] g
   else
-    let fs  = List.map (fun i -> oget (RState.get i rm')) fv in
-    let t_end fs' g = 
-      let rm' = RState.update !rm fv fs' in
-      let f1' = offield r rm' pe1 in
-      let f2' = offield r rm' pe2 in
-      t_seqsub (t_cut (f_eq f1 f2))
-        [t_seqsub (t_transitivity f1')
-            [t_seq (t_field_congr cr !rm pe1 fv fs') t_reflex_assumption;
-             t_seqsub (t_transitivity f2') 
-               [t_field r [] (f1',f2');
-                t_seq t_symmetry 
-                  (t_seq (t_field_congr cr !rm pe2 fv fs') t_reflex_assumption)
-               ]
-            ];
-         t_seq t_intro_eq t_cont] g in
-    t_cut_merges t_end info rm fv fs g
+    let t_end li lf' g = 
+      if li = [] then t_fail g
+      else
+        let rm' = RState.update !rm li lf' in
+        let f1' = offield r rm' pe1 in
+        let f2' = offield r rm' pe2 in
+        t_seqsub (t_cut (f_eq f1 f2))
+          [t_seqsub (t_transitivity f1')
+              [t_seq (t_field_congr cr !rm pe1 li lf') t_reflex_assumption;
+               t_seqsub (t_transitivity f2') 
+                 [t_field r [] (f1',f2');
+                  t_seq t_symmetry 
+                    (t_seq (t_field_congr cr !rm pe2 li lf') 
+                       t_reflex_assumption)
+                 ]
+              ];
+           t_seq t_intro_eq t_cont] g in
+    t_cut_merges t_end info rm' fv [emb_fzero r; emb_fone r] g
+
 
 
 
@@ -312,50 +315,48 @@ and t_cut_ring_eq t_cont info cr rm f1 f2 g =
       [ t_ring r [] (f1,f2);
         t_seq t_intro_eq t_cont ] g
   else
-    let fs  = List.map (fun i -> oget (RState.get i rm')) fv in
-    let t_end fs' g = 
-      let rm' = RState.update !rm fv fs' in
-      let f1' = ofring r rm' pe1 in
-      let f2' = ofring r rm' pe2 in
-      t_seqsub (t_cut (f_eq f1 f2))
-        [t_seqsub (t_transitivity f1')
-            [t_seq (t_ring_congr cr !rm pe1 fv fs') t_reflex_assumption;
-             t_seqsub (t_transitivity f2') 
-               [t_ring r [] (f1',f2');
-                t_seq t_symmetry 
-                  (t_seq (t_ring_congr cr !rm pe2 fv fs') t_reflex_assumption)
-               ]
-            ];
-         t_seq t_intro_eq t_cont] g in
-    t_cut_merges t_end info rm fv fs g
+    let t_end li lf' g = 
+      if li = [] then t_fail g
+      else
+        let rm' = RState.update !rm li lf' in
+        let f1' = ofring r rm' pe1 in
+        let f2' = ofring r rm' pe2 in
+        t_seqsub (t_cut (f_eq f1 f2))
+          [t_seqsub (t_transitivity f1')
+              [t_seq (t_ring_congr cr !rm pe1 li lf') t_reflex_assumption;
+               t_seqsub (t_transitivity f2') 
+                 [t_ring r [] (f1',f2');
+                  t_seq t_symmetry 
+                    (t_seq (t_ring_congr cr !rm pe2 li lf') t_reflex_assumption)
+                 ]
+              ];
+           t_seq t_intro_eq t_cont] g in
+    t_cut_merges t_end info rm' fv  [emb_rzero r; emb_rone r] g
    
-and t_cut_merges t_end info rm fv fs g = 
+and t_cut_merges t_end info rm fv lv g = 
   let m = ref Mint.empty in
-  let t_end g = 
-    let get i =
-      let i' = try Mint.find i !m with Not_found -> i in
-      oget (RState.get i' !rm) in
-    let fs' = List.map get fv in
-    t_end fs' g in
+  let t_end g =
+    let li, lf' = List.split (Mint.bindings !m) in
+    t_end li lf' g in
 
-  let t_unify1 t_cont i1 f1 i2 f2 g = 
-    let t_cont g = m := Mint.add i1 i2 !m; t_cont g in
+  let t_unify1 t_cont i1 f1 f2 g = 
+    let t_cont g = m := Mint.add i1 f2 !m; t_cont g in
     t_cut_subterm_eq t_cont info f1 f2 g in
 
-  let tomatch = ref [] in
+  let tomatch = ref lv in
   let t_tomatch t_cont i1 f1 g = 
     let rec t_match l g = 
       match l with
-      | [] -> tomatch := (i1,f1) :: !tomatch; t_cont g
-      | (i2,f2)::l -> t_or (t_unify1 t_cont i1 f1 i2 f2) (t_match l) g in
+      | [] -> tomatch := f1 :: !tomatch; t_cont g
+      | f2::l -> t_or (t_unify1 t_cont i1 f1 f2) (t_match l) g in
     t_match !tomatch g in
 
-  let rec t_aux ifs g =
-    match ifs with
+  let rec t_aux li g =
+    match li with
     | [] -> t_end g 
-    | (i1,f1) :: ifs -> t_tomatch (t_aux ifs) i1 f1 g in
+    | i :: li -> t_tomatch (t_aux li) i (oget (RState.get i rm)) g in
   
-  t_aux (List.combine fv fs)  g
+  t_aux fv g
 
 let t_alg_eq g = 
   let env = tc1_env g in
