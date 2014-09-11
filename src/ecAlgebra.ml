@@ -177,8 +177,8 @@ let toring hyps ((r, cr) : cring) (rmap : RState.rstate) (form : form) =
   let int_of_form form = reffold (RState.add hyps form) rmap in
 
   let rec doit form =
-    match sform_of_form form with
-    | SFop ((op, _), args) -> begin
+    match form.f_node with
+    | Fapp({f_node = Fop (op, _)}, args) -> begin
         match Mp.find_opt op cr with
         | None -> abstract form
         | Some op -> begin
@@ -199,7 +199,7 @@ let toring hyps ((r, cr) : cring) (rmap : RState.rstate) (form : form) =
           | _, _ -> abstract form
         end
     end
-    | SFint i when r.r_embed = `Direct -> PEc (Big_int.big_int_of_int i)
+    | Fint i when r.r_embed = `Direct -> PEc (Big_int.big_int_of_int i)
     | _ -> abstract form
 
   and of_int f =
@@ -240,8 +240,8 @@ let tofield hyps ((r, cr) : cfield) (rmap : RState.rstate) (form : form) =
   let int_of_form form = reffold (RState.add hyps form) rmap in
 
   let rec doit form =
-    match sform_of_form form with
-    | SFop ((op, _), args) -> begin
+    match form.f_node with
+    | Fapp({f_node = Fop(op, _)}, args) -> begin
         match Mp.find_opt op cr with
         | None -> abstract form
         | Some op -> begin
@@ -264,7 +264,7 @@ let tofield hyps ((r, cr) : cfield) (rmap : RState.rstate) (form : form) =
           | _, _ -> abstract form
         end
     end
-    | SFint i when r.f_ring.r_embed = `Direct -> FEc (Big_int.big_int_of_int i)
+    | Fint i when r.f_ring.r_embed = `Direct -> FEc (Big_int.big_int_of_int i)
     | _ -> abstract form
 
   and of_int f =
