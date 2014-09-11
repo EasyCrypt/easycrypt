@@ -177,8 +177,9 @@ let toring hyps ((r, cr) : cring) (rmap : RState.rstate) (form : form) =
   let int_of_form form = reffold (RState.add hyps form) rmap in
 
   let rec doit form =
-    match form.f_node with
-    | Fapp({f_node = Fop (op, _)}, args) -> begin
+    let o, args = destr_app form in
+    match o.f_node with
+    | Fop (op, _) -> begin
         match Mp.find_opt op cr with
         | None -> abstract form
         | Some op -> begin
@@ -240,8 +241,9 @@ let tofield hyps ((r, cr) : cfield) (rmap : RState.rstate) (form : form) =
   let int_of_form form = reffold (RState.add hyps form) rmap in
 
   let rec doit form =
-    match form.f_node with
-    | Fapp({f_node = Fop(op, _)}, args) -> begin
+    let o, args = destr_app form in
+    match o.f_node with
+    | Fop(op, _) -> begin
         match Mp.find_opt op cr with
         | None -> abstract form
         | Some op -> begin
