@@ -48,7 +48,7 @@ module type Coef = sig
 
   val padd : p -> p -> p
   val peq  : p -> p -> bool
-  val pcmp : p -> p -> p cmp_sub
+  val pcmp : p -> p -> int 
 end
 
 (* -------------------------------------------------------------------- *)
@@ -66,15 +66,8 @@ module Cmod(M : ModVal) : Coef
 module type Rnorm = sig
   module C : Coef 
     
-  type pol =
-  | Pc   of C.c 
-  | Pinj of int * pol
-  | PX   of pol * C.p * pol
-
-  val peq     : pol -> pol -> bool
-  val norm    : pexpr -> (pexpr * pexpr) list -> pol
   val norm_pe : pexpr -> (pexpr * pexpr) list -> pexpr
-  val pp_pol  : Format.formatter -> pol -> unit
+
 end
 
 module Iring : Rnorm
