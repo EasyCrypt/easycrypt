@@ -4,6 +4,7 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
 open EcMaps
+open EcPath
 open EcTypes
 open EcFol
 open EcEnv
@@ -21,17 +22,48 @@ type norm_kind =
 type einfo = {
   i_env    : env;
   kind_tbl : norm_kind Hty.t;
-  rw_info  : EcPath.path list;
+  rw_info  : path list;
+(*  inj_info : path list;
+  all_info : path list; (* union of rw_info and inj_info *) *)
+  inj_info  : Sp.t;
 }
 
 let prewrite = 
   EcPath.extend EcCoreLib.p_top ["Ring"; "rw_algebra"]
 
+let prewrite_inj =
+  EcPath.extend EcCoreLib.p_top ["Ring"; "inj_algebra"]
+
+let get_injection env p =
+  try 
+    let ax = EcEnv.Ax.by_path p env in
+    (* try to match a term of the form  _ = _ <=> inj _ = inj _ *)
+    let _, concl = decompose_forall (oget ax.EcDecl.ax_spec) in
+    let _, f = destr_iff concl in
+    let f1, f2 = destr_eq f in
+    match f1.f_node, f2.f_node with
+    | Fapp({f_node = Fop(op1,_)}, [_]), Fapp({f_node = Fop(op2,_)}, [_]) when
+        EcPath.p_equal op1 op2 ->
+      Some(op1, p)
+    | _ -> None
+  with DestrError _ -> None
+  
 let init_einfo env = 
+  let rw = Sp.elements (EcEnv.BaseRw.by_path prewrite env) in
+  let inj = Sp.elements (EcEnv.BaseRw.by_path prewrite_inj env) in 
+  let inj = List.pmap (get_injection env) inj in
+  let inj_rw = List.map snd inj in
+  let inj_set = List.fold_left (fun s (p,_) -> Sp.add p s) Sp.empty inj in
   { i_env    = env;
     kind_tbl = Hty.create 23;
-    rw_info  = EcPath.Sp.elements (EcEnv.BaseRw.by_path prewrite env);
+    rw_info  = inj_rw @ rw;
+    inj_info = inj_set 
   }
+
+let is_inj info f =
+  match f.f_node with
+  | Fop(p,_) -> Sp.mem p info.inj_info
+  | _ -> false
 
 let get_field env hyps ty () = 
   let tparams = (LDecl.tohyps hyps).EcBaseLogic.h_tvar in
@@ -126,8 +158,6 @@ let pp_form fmt (f,g) =
   let ppe = EcPrinting.PPEnv.ofenv env in
   EcPrinting.pp_form ppe fmt f
 
-
-
 let autorewrite info f1 f2 g = 
   let res = ref (f_true, f_true) in
   let t_get_res g = 
@@ -214,7 +244,10 @@ and t_cut_subterm_eq2 t_cont info f1 f2 g =
             (t_congr (op1,op2) (List.combine fs1 fs2, f1.f_ty))
             t_reflex_assumption;
           t_seq t_intro_eq t_cont]) g in
-      t_cut_alg_eqs t_cont info fs1 fs2 g
+      if is_inj info op1 then
+        t_cut_subterm_eqs2 t_cont info fs1 fs2 g
+      else
+        t_cut_alg_eqs t_cont info fs1 fs2 g
     else t_fail g
   | Ftuple fs1, Ftuple fs2 when List.length fs1 = List.length fs2 ->
     let t_cont g = 
@@ -222,7 +255,16 @@ and t_cut_subterm_eq2 t_cont info f1 f2 g =
         t_seq t_split t_reflex_assumption;
         t_seq t_intro_eq t_cont]) g in
     t_cut_alg_eqs t_cont info fs1 fs2 g
+  (* TODO : add something for if ? *)
   | _, _ -> t_fail g 
+
+and t_cut_subterm_eqs2 t_cont info fs1 fs2 g =
+(*  Format.eprintf "t_cut_alg_eqs@."; *)
+  match fs1, fs2 with
+  | [], [] -> t_cont g
+  | f1::fs1, f2::fs2 -> 
+    t_cut_subterm_eq2 (t_cut_subterm_eqs2 t_cont info fs1 fs2) info f1 f2 g
+  | _, _ -> assert false
 
 and t_cut_field_eq t_cont info cr rm f1 f2 g = 
   let hyps = tc1_hyps g in
