@@ -26,13 +26,11 @@ val t_ring : ring -> eq list -> form * form -> FApi.backward
 val t_ring_simplify : ring -> eq list -> form * form -> FApi.backward
 
 val t_ring_congr :
-     cring -> RState.rstate -> EcRing.pexpr -> int list
-  -> form list -> FApi.backward 
+     cring -> RState.rstate -> int list -> form list -> FApi.backward 
 
 (* -------------------------------------------------------------------- *)
 val t_field : field -> eq list -> form * form -> FApi.backward
 val t_field_simplify : field -> eq list -> form * form -> FApi.backward
 
 val t_field_congr :
-     cfield -> RState.rstate -> EcField.fexpr -> int list
-  -> form list -> FApi.backward 
+     cfield -> RState.rstate -> int list -> form list -> FApi.backward 
