@@ -13,6 +13,7 @@
 
 (* -------------------------------------------------------------------- *)
 open EcMaps
+open EcUtils
 open Big_int
 
 (* -------------------------------------------------------------------- *)
@@ -57,7 +58,7 @@ let fv_pe =
   aux Sint.empty 
 
 (* -------------------------------------------------------------------- *)
-type 'a cmp_sub = [`Eq | `Lt of 'a | `Gt of 'a]
+type 'a cmp_sub = [`Eq | `Lt | `Gt of 'a]
  
 (* -------------------------------------------------------------------- *)
 module type Coef = sig
@@ -85,6 +86,7 @@ module type Coef = sig
   val padd : p -> p -> p
   val peq  : p -> p -> bool
   val pcmp : p -> p -> int 
+  val pcmp_sub : p -> p -> p cmp_sub
 end
 
 (* -------------------------------------------------------------------- *) 
@@ -114,7 +116,13 @@ module Cint : Coef = struct
   let peq (p1 : p) (p2 : p) = (p1 = p2)
 
   let pcmp (p1 : p) (p2 : p) : int = p1 - p2
-    
+
+  let pcmp_sub (p1 : p) (p2 : p) : p cmp_sub = 
+    match pcmp p1 p2 with
+    | c when c < 0 -> `Lt
+    | 0            -> `Eq
+    | _            -> `Gt (p1 - p2)
+
 end
 
 (* -------------------------------------------------------------------- *) 
@@ -149,6 +157,8 @@ module Cbool : Coef = struct
 
   let peq _p1 _p2 = true
   let pcmp _p1 _p2 = 0
+
+  let pcmp_sub _p1 _p2 = `Eq
 
 end
 
@@ -206,6 +216,22 @@ module Cmod (M : ModVal) : Coef = struct
 
   let pcmp (p1 : p) (p2 : p) = p1 - p2
 
+  let pcmp_sub = 
+    match M.p with
+    | None -> 
+      fun (p1 : p) (p2 : p) ->
+        begin match pcmp p1 p2 with
+        | c when c < 0 -> `Lt
+        | 0            -> `Eq
+        | _            -> `Gt (p1 - p2)
+        end
+    | Some pn ->
+      fun (p1 : p) (p2 : p) ->
+        begin match pcmp p1 p2 with
+        | c when c < 0 -> `Gt (p1 + (pn - p2) - 1)
+        | 0 -> `Eq
+        | _ -> `Gt (p1 - p2)
+        end
 end
 
 (* -------------------------------------------------------------------- *)
@@ -224,10 +250,18 @@ module Make (C : Coef) : Rnorm = struct
   module Var = struct
     type t = int
     let compare x y = x - y
+    let eq x y = x == y
   end
 
   module Mon = struct
     type t = (Var.t * p) list
+
+    let rec eq m1 m2 = 
+      match m1, m2 with
+      | [], [] -> true
+      | (x1,p1)::m1, (x2,p2)::m2 ->
+        Var.eq x1 x2 && peq p1 p2 && eq m1 m2
+      | _, _ -> false
       
     let rec compare m1 m2 = 
       match m1, m2 with
@@ -244,8 +278,9 @@ module Make (C : Coef) : Rnorm = struct
 
     let p1 = pofint 1
 
+    let one = []
+
     let cons x p m = (x,p) :: m
-(*      if ptoint p = 0 then m else (x,p) :: m *)
 
     let rec mul m1 m2 = 
       match m1, m2 with
@@ -257,10 +292,43 @@ module Make (C : Coef) : Rnorm = struct
         | 0            -> cons x1 (padd p1 p2) (mul m1' m2')
         | _            -> xp2 :: mul m1 m2'
 
+    (* factor m1 m2 = Some m  => m1 = m*m2 *)
+    let rec factor m m1 m2 =
+      match m1, m2 with
+      | _, [] -> Some (List.rev_append m m1)
+      | [], _ -> None
+      | (x1,p1 as xp1) :: m1', (x2,p2) :: m2' ->
+        match Var.compare x1 x2 with
+        | c when c < 0 -> factor (xp1::m) m1' m2
+        | 0            -> 
+          begin match pcmp_sub p1 p2 with
+          | `Lt -> None
+          | `Eq -> factor m m1' m2'
+          | `Gt p -> factor ((x1,p)::m) m1' m2'
+          end
+        | _            -> None 
+
+    let factor m1 m2 = factor one m1 m2
+
+    let degree m = 
+      List.fold_left (fun i (_,p) -> i + ptoint p) 0 m
+
   end
         
   module Pol = struct
     type t = (c * Mon.t) list
+
+    let rec eq p1 p2 = 
+      match p1, p2 with
+      | [], [] -> true
+      | (c1,m1)::p1, (c2,m2)::p2 ->
+        ceq c1 c2 && Mon.eq m1 m2 && eq p1 p2
+      | _, _ -> false
+
+    let rec opp p = 
+      match p with
+      | [] -> []
+      | (c,m) :: p -> (copp c, m) :: opp p
 
     let cons c m p = 
       if ceq c c0 then p else (c,m)::p
@@ -277,19 +345,15 @@ module Make (C : Coef) : Rnorm = struct
 
     let rec sub p1 p2 = 
       match p1, p2 with
-      | [], _ -> p2
+      | [], _ -> opp p2
       | _, [] -> p1
-      | (c1,m1 as cm1) :: p1', (c2,m2 as cm2) :: p2' ->
+      | (c1,m1 as cm1) :: p1', (c2,m2) :: p2' ->
         match Mon.compare m1 m2 with
         | c when c < 0 -> cm1 :: sub p1' p2
         | 0            -> cons (csub c1 c2) m1 (sub p1' p2')
-        | _            -> cm2 :: sub p1 p2'
+        | _            -> (copp c2, m2) :: sub p1 p2'
       
-    let rec opp p = 
-      match p with
-      | [] -> []
-      | (c,m) :: p -> (copp c, m) :: opp p
-
+  
     let rec mul_mon ((c1,m1) as cm1) p = 
       match p with
       | [] -> []
@@ -310,10 +374,17 @@ module Make (C : Coef) : Rnorm = struct
 
     let pow p e = 
       let n = ptoint e in
-      if n <= 0 then [c1, []] else pow_int p n 
+      if n <= 0 then [c1, Mon.one] else pow_int p n 
+
+    (* pexpr -> pol *)
+    let zero = [] 
+    let one = [c1,Mon.one]
+
+    let cmon c m = 
+      if ceq c c0 then zero else [c,m]
 
     let rec ofpexpr = function
-      | PEc i -> [ cofint i, [] ]
+      | PEc i -> cmon (cofint i) []
       | PEX x -> [ c1, [x, Mon.p1] ]
       | PEadd(p1,p2) -> add (ofpexpr p1) (ofpexpr p2)
       | PEsub(p1,p2) -> sub (ofpexpr p1) (ofpexpr p2)
@@ -321,8 +392,37 @@ module Make (C : Coef) : Rnorm = struct
       | PEopp p      -> opp (ofpexpr p)
       | PEpow(p,i)   -> pow (ofpexpr p) (pofint i)
 
+    (* factorization by a monomial *)
+        
+    let cmfactor (c1,m1 as cm1) (c2,m2) =
+      match Mon.factor m1 m2 with
+      | None -> zero, [cm1]
+      | Some m ->
+        let q,r = cdiv c1 c2 in
+        cmon q m, cmon r m1
+
+    let rec factor p cm =
+      match p with
+      | [] -> zero, zero
+      | cm'::p ->
+        let cq,cr = cmfactor cm' cm in
+        let pq,pr = factor p cm in
+        add cq pq, add cr pr
+
+    let rec rewrite1 p (cm,p' as rw) =
+      let q,r = factor p cm in
+      if eq q zero then r
+      else 
+        let p = add (mul q p') r in
+        rewrite1 p rw
+
+    let rec rewrites p rws =
+      let p' = List.fold_left rewrite1 p rws in
+      if eq p p' then p else rewrites p' rws
+ 
   end
 
+  (* pol -> pexpr *)
   let xptopexpr (x,p) = 
     let x = PEX x in
     if peq p Mon.p1 then x else PEpow(x, ptoint p)
@@ -332,13 +432,18 @@ module Make (C : Coef) : Rnorm = struct
     | [] -> pe
     | xp::m -> mtopexpr (PEmul(pe, xptopexpr xp)) m
 
-  let mtopexpr (c,m) = 
-    if ceq c c1 then 
+  let cm1 = copp c1 
+
+  let mtopexpr (c,m) =
+    let i = ctoint c in
+    let i' = abs_big_int i in
+    let set_sign pe = if sign_big_int i < 0 then PEopp pe else pe in
+    if eq_big_int i' unit_big_int then 
       begin match m with
-      | [] -> PEc(ctoint c)
-      | xp::m -> mtopexpr (xptopexpr xp) m
+      | [] -> set_sign (PEc i')
+      | xp::m -> mtopexpr (set_sign (xptopexpr xp)) m
       end
-    else mtopexpr (PEc(ctoint c)) m
+    else mtopexpr (set_sign (PEc i')) m
       
   let rec topexpr pe p = 
     match p with
@@ -349,10 +454,30 @@ module Make (C : Coef) : Rnorm = struct
     match p with
     | [] -> PEc(ctoint c0)
     | cm :: p -> topexpr (mtopexpr cm) p
-      
+
+  let rec get_mon p =
+    match p with
+    | [] -> c0, Mon.one, 0, Pol.zero
+    | (c,m as cm)::p ->
+      let (c',m',d',p') = get_mon p in
+      let d = Mon.degree m in
+      if d' < d then (c,m,d,p)
+      else (c',m',d',cm::p')
+
+  let mk_rw (pe1,pe2) = 
+    let p1 = Pol.ofpexpr pe1 in
+    let p2 = Pol.ofpexpr pe2 in
+    let (c,m,_,p1') = get_mon p1 in
+    if ceq c c0 || Mon.eq m Mon.one then 
+      let (c,m,_,p2') = get_mon p2 in
+      if ceq c c0 || Mon.eq m Mon.one then None 
+      else Some ((c,m), Pol.sub p1 p2')
+    else Some ((c,m), Pol.sub p2 p1')
+ 
   let norm_pe pe lpe = 
-    assert (lpe = []); (* FIXME *)
-    topexpr (Pol.ofpexpr pe)
+    let rws = List.pmap mk_rw lpe in
+    let p = Pol.ofpexpr pe in
+    topexpr (Pol.rewrites p rws)
 
 end
 

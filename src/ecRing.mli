@@ -21,7 +21,7 @@ val pp_pe : Format.formatter -> pexpr -> unit
 val fv_pe : pexpr -> Sint.t 
 
 (* -------------------------------------------------------------------- *)
-type 'a cmp_sub = [`Eq | `Lt of 'a | `Gt of 'a]
+type 'a cmp_sub = [`Eq | `Lt | `Gt of 'a]
 
 (* -------------------------------------------------------------------- *)
 module type Coef = sig
@@ -49,6 +49,8 @@ module type Coef = sig
   val padd : p -> p -> p
   val peq  : p -> p -> bool
   val pcmp : p -> p -> int 
+
+  val pcmp_sub : p -> p -> p cmp_sub
 end
 
 (* -------------------------------------------------------------------- *)
