@@ -2441,8 +2441,14 @@ tactics0:
 | ts=tactics   { Pseq ts }
 | x=loc(empty) { Pseq [mk_core_tactic (mk_loc x.pl_loc (Pidtac None))] }
 
+toptactic:
+| ADD   t=tactics { t }
+| STAR  t=tactics { t }
+| MINUS t=tactics { t }
+;
+
 tactics_or_prf:
-| t=tactics    { `Actual t    }
+| t=toptactic  { `Actual t    }
 | p=proof      { `Proof  p    }
 ;
 
