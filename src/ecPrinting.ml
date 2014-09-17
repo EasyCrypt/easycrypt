@@ -1003,7 +1003,7 @@ and pp_expr_core_r (ppe : PPEnv.t) outer fmt (e : expr) =
   | Elam (vardecls, e) ->
       let (subppe, pp) = pp_locbinds ppe vardecls in
       let pp fmt () =
-        Format.fprintf fmt "@[<hov 2>lambda %t,@ %a@]"
+        Format.fprintf fmt "@[<hov 2>fun %t,@ %a@]"
           pp (pp_expr_r subppe (fst outer, (min_op_prec, `NonAssoc))) e
       in
         maybe_paren outer (fst outer, e_bin_prio_lambda) pp fmt ()
@@ -1093,7 +1093,7 @@ let pp_stmt_for_form (ppe : PPEnv.t) fmt (s : stmt) =
 let string_of_quant = function
   | Lforall -> "forall"
   | Lexists -> "exists"
-  | Llambda -> "lambda"
+  | Llambda -> "fun"
 
 (* -------------------------------------------------------------------- *)
 let pp_binding (ppe : PPEnv.t) (xs, ty) =
