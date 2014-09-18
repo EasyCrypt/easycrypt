@@ -2445,6 +2445,7 @@ toptactic:
 | ADD   t=tactics { t }
 | STAR  t=tactics { t }
 | MINUS t=tactics { t }
+|       t=tactics { t }
 ;
 
 tactics_or_prf:
