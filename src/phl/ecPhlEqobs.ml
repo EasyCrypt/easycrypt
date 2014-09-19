@@ -269,7 +269,8 @@ let process_eqobs_in (geq', ginv, eqs') tc =
         EcPV.eqobs_in env
           (eqobs_inF !!tc env geq (ginv,ifvl,ifvr))
           { query = []; forproof = Mf.empty; }
-          sl sr eqs (ifvl,ifvr) in log, eqs
+          sl sr eqs (ifvl,ifvr) in 
+      log, eqs
 
     | `Fun(fl,fr) ->
       let eqO = (Mpv2.remove env (pv_res fl) (pv_res fr) eqs) in

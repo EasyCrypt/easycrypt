@@ -642,7 +642,7 @@ module Mpv2 = struct
         let check_mp mp =
           let restr = NormMp.get_restr env mp in
           not (EcPath.Mx.mem x restr.us_pv) in
-        Sm.for_all check_mp mod_.PV.s_gl
+        Sm.exists check_mp mod_.PV.s_gl
       else false
 
   let is_mod_mp env mp mod_ =
