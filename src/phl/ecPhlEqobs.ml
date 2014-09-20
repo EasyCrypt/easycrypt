@@ -138,15 +138,15 @@ let rec eqobs_inF pf env eqg (inv, ifvl, ifvr as inve) log fl fr eqO =
         let log, ieqg =
           try (* Try to infer the good invariant for oracle *)
             let eqo = Mpv2.remove_glob top eqO in
-            let rec aux eqo =
+            let rec aux log eqo =
               let log, eqi =
                 List.fold_left2
                   (fun (log,eqo) o_l o_r ->
                     let log, eqo, _ = eqobs_inF pf env eqg inve log o_l o_r eqo in
                     log, eqo)
                   (log,eqo) oil.oi_calls oir.oi_calls in
-              if Mpv2.subset eqi eqo then log, eqo else aux eqi in
-            aux eqo
+              if Mpv2.subset eqi eqo then log, eqo else aux log eqi in
+            aux log eqo
           with EqObsInError ->
             if not (Mpv2.subset eqO eqg) then raise EqObsInError;
             (log, Mpv2.remove_glob top eqg) in
