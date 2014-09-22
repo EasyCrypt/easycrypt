@@ -1,5 +1,7 @@
-(* Copyright (c) - 2012-2014 - IMDEA Software Institute and INRIA
- * Distributed under the terms of the CeCILL-B license *)
+(* --------------------------------------------------------------------
+ * Copyright (c) - 2012-2014 - IMDEA Software Institute and INRIA
+ * Distributed under the terms of the CeCILL-C license
+ * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
 open EcMaps
@@ -1001,7 +1003,7 @@ and pp_expr_core_r (ppe : PPEnv.t) outer fmt (e : expr) =
   | Elam (vardecls, e) ->
       let (subppe, pp) = pp_locbinds ppe vardecls in
       let pp fmt () =
-        Format.fprintf fmt "@[<hov 2>lambda %t,@ %a@]"
+        Format.fprintf fmt "@[<hov 2>fun %t,@ %a@]"
           pp (pp_expr_r subppe (fst outer, (min_op_prec, `NonAssoc))) e
       in
         maybe_paren outer (fst outer, e_bin_prio_lambda) pp fmt ()
@@ -1091,7 +1093,7 @@ let pp_stmt_for_form (ppe : PPEnv.t) fmt (s : stmt) =
 let string_of_quant = function
   | Lforall -> "forall"
   | Lexists -> "exists"
-  | Llambda -> "lambda"
+  | Llambda -> "fun"
 
 (* -------------------------------------------------------------------- *)
 let pp_binding (ppe : PPEnv.t) (xs, ty) =
@@ -2240,7 +2242,9 @@ let rec pp_theory ppe (fmt:Format.formatter) (path, cth) =
                  ("div",      cr.f_div)]
             in
               match tc with
-              | `Ring  cr when cr.r_bool -> ("boolean_ring", ops_of_ring cr)
+              | `Ring  cr when cr.r_kind = `Boolean ->
+                  ("boolean_ring", ops_of_ring cr)
+                (* FIXME: modulus rings *)
               | `Ring  cr -> ("ring", ops_of_ring cr)
               | `Field cr -> ("field", ops_of_field cr)
           in

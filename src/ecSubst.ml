@@ -1,5 +1,7 @@
-(* Copyright (c) - 2012-2014 - IMDEA Software Institute and INRIA
- * Distributed under the terms of the CeCILL-B license *)
+(* --------------------------------------------------------------------
+ * Copyright (c) - 2012-2014 - IMDEA Software Institute and INRIA
+ * Distributed under the terms of the CeCILL-C license
+ * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
 open EcUtils
@@ -404,7 +406,7 @@ let subst_ring (s : _subst) cr =
       | `Default -> `Default
       | `Embed p -> `Embed (s.s_p p)
       end;
-    r_bool = cr.r_bool
+    r_kind = cr.r_kind
   }
 
 (* -------------------------------------------------------------------- *)

@@ -1,5 +1,7 @@
-(* Copyright (c) - 2012-2014 - IMDEA Software Institute and INRIA
- * Distributed under the terms of the CeCILL-B license *)
+(* --------------------------------------------------------------------
+ * Copyright (c) - 2012-2014 - IMDEA Software Institute and INRIA
+ * Distributed under the terms of the CeCILL-C license
+ * -------------------------------------------------------------------- *)
 
 %{
   open EcUtils
@@ -1356,11 +1358,24 @@ tc_ax:
 (* -------------------------------------------------------------------- *)
 (* Type classes (instances)                                             *)
 tycinstance:
-| INSTANCE x=qident WITH typ=tyvars_decl? ty=loc(type_exp) ops=tyci_op* axs=tyci_ax* {
+| INSTANCE x=qident
+    WITH typ=tyvars_decl? ty=loc(type_exp) ops=tyci_op* axs=tyci_ax*
+  {
     { pti_name = x;
       pti_type = (odfl [] typ, ty);
       pti_ops  = ops;
-      pti_axs  = axs; }
+      pti_axs  = axs;
+      pti_args = None; }
+  }
+
+| INSTANCE x=qident c=uoption(UINT) p=uoption(UINT)
+    WITH typ=tyvars_decl? ty=loc(type_exp) ops=tyci_op* axs=tyci_ax*
+  {
+    { pti_name = x;
+      pti_type = (odfl [] typ, ty);
+      pti_ops  = ops;
+      pti_axs  = axs;
+      pti_args = Some (`Ring (c, p)); }
   }
 ;
 
@@ -2426,8 +2441,15 @@ tactics0:
 | ts=tactics   { Pseq ts }
 | x=loc(empty) { Pseq [mk_core_tactic (mk_loc x.pl_loc (Pidtac None))] }
 
+toptactic:
+| ADD   t=tactics { t }
+| STAR  t=tactics { t }
+| MINUS t=tactics { t }
+|       t=tactics { t }
+;
+
 tactics_or_prf:
-| t=tactics    { `Actual t    }
+| t=toptactic  { `Actual t    }
 | p=proof      { `Proof  p    }
 ;
 
@@ -2773,4 +2795,10 @@ __rlist1(X, S):                         (* left-recursive *)
       pl_loc  = EcLocation.make $startpos $endpos;
     }
   }
+;
+
+(* -------------------------------------------------------------------- *)
+%inline uoption(X):
+| x=X { Some x }
+| UNDERSCORE { None }
 ;

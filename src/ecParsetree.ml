@@ -1,5 +1,7 @@
-(* Copyright (c) - 2012-2014 - IMDEA Software Institute and INRIA
- * Distributed under the terms of the CeCILL-B license *)
+(* --------------------------------------------------------------------
+ * Copyright (c) - 2012-2014 - IMDEA Software Institute and INRIA
+ * Distributed under the terms of the CeCILL-C license
+ * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
 open EcMaps
@@ -603,6 +605,7 @@ type ptycinstance = {
   pti_type : (psymbol * pqsymbol list) list * pty;
   pti_ops  : (psymbol * (pty list * pqsymbol)) list;
   pti_axs  : (psymbol * ptactic_core) list;
+  pti_args : [`Ring of (int option * int option)] option;
 }
 
 (* -------------------------------------------------------------------- *)

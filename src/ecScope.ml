@@ -1,5 +1,7 @@
-(* Copyright (c) - 2012-2014 - IMDEA Software Institute and INRIA
- * Distributed under the terms of the CeCILL-B license *)
+(* --------------------------------------------------------------------
+ * Copyright (c) - 2012-2014 - IMDEA Software Institute and INRIA
+ * Distributed under the terms of the CeCILL-C license
+ * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
 open EcUtils
@@ -1337,7 +1339,7 @@ module Ty = struct
   let p_field   = EcPath.fromqsymbol ([EcCoreLib.id_top; "Ring"; "Field"  ], "field"  )
 
   (* ------------------------------------------------------------------ *)
-  let ring_of_symmap env ty boolean symbols =
+  let ring_of_symmap env ty kind symbols =
     { r_type  = ty;
       r_zero  = oget (Mstr.find_opt "rzero" symbols);
       r_one   = oget (Mstr.find_opt "rone"  symbols);
@@ -1346,17 +1348,13 @@ module Ty = struct
       r_mul   = oget (Mstr.find_opt "mul"   symbols);
       r_exp   =      (Mstr.find_opt "expr"  symbols);
       r_sub   =      (Mstr.find_opt "sub"   symbols);
+      r_kind  = kind;
       r_embed =
-        begin match Mstr.find_opt "ofint" symbols with
-        | None   ->
-          if EcReduction.EqTest.for_type env ty tint then `Direct
-          else `Default
-        | Some p -> `Embed p
-        end;
-      r_bool = boolean;
-    }
+        (match Mstr.find_opt "ofint" symbols with
+         | None when EcReduction.EqTest.for_type env ty tint -> `Direct
+         | None -> `Default | Some p -> `Embed p); }
 
-  let addring (scope : scope) mode (boolean, { pl_desc = tci; pl_loc = loc }) =
+  let addring (scope : scope) mode (kind, { pl_desc = tci; pl_loc = loc }) =
     if not (EcAlgTactic.is_module_loaded scope.sc_env) then
       hierror "load AlgTactic/Ring first";
 
@@ -1366,9 +1364,9 @@ module Ty = struct
         assert (EcUnify.UniEnv.closed ue);
         (EcUnify.UniEnv.tparams ue, Tuni.offun (EcUnify.UniEnv.close ue) ty)
     in
-    let symbols = EcAlgTactic.ring_symbols scope.sc_env boolean (snd ty) in
+    let symbols = EcAlgTactic.ring_symbols scope.sc_env kind (snd ty) in
     let symbols = check_tci_operators scope.sc_env ty tci.pti_ops symbols in
-    let cr      = ring_of_symmap scope.sc_env (snd ty) boolean symbols in
+    let cr      = ring_of_symmap scope.sc_env (snd ty) kind symbols in
     let axioms  = EcAlgTactic.ring_axioms scope.sc_env cr in
       check_tci_axioms scope mode tci.pti_axs axioms;
       { scope with sc_env =
@@ -1379,7 +1377,7 @@ module Ty = struct
 
   (* ------------------------------------------------------------------ *)
   let field_of_symmap env ty symbols =
-    { f_ring = ring_of_symmap env ty false symbols;
+    { f_ring = ring_of_symmap env ty `Integer symbols;
       f_inv  = oget (Mstr.find_opt "inv" symbols);
       f_div  = Mstr.find_opt "div" symbols; }
 
@@ -1447,11 +1445,31 @@ module Ty = struct
   (* ------------------------------------------------------------------ *)
   let add_instance (scope : scope) mode ({ pl_desc = tci } as toptci) =
     match unloc tci.pti_name with
-    | ([], "bring") -> addring  scope mode (true , toptci)
-    | ([], "ring" ) -> addring  scope mode (false, toptci)
+    | ([], "bring") -> begin
+        if EcUtils.is_some tci.pti_args then
+          hierror "unsupported-option";
+        addring scope mode (`Boolean, toptci)
+    end
+
+    | ([], "ring") -> begin
+      let kind =
+        match tci.pti_args with
+        | None -> `Integer
+        | Some (`Ring (c, p)) ->
+            if odfl false (c |> omap (fun c -> c < 2)) then
+              hierror "invalid coefficient modulus";
+            if odfl false (p |> omap (fun p -> p < 2)) then
+              hierror "invalid power modulus";
+            if c = Some 2 && p = Some 2 then `Boolean else `Modulus (c, p)
+      in addring  scope mode (kind, toptci)
+    end
+
     | ([], "field") -> addfield scope mode toptci
 
-    | _ -> failwith "unsupported"       (* FIXME *)
+    | _ ->
+        if EcUtils.is_some tci.pti_args then
+          hierror "unsupported-option";
+        failwith "unsupported"          (* FIXME *)
 
   (* ------------------------------------------------------------------ *)
   let add_datatype (scope : scope) (tydname : tydname) dt =

@@ -1,5 +1,7 @@
-(* Copyright (c) - 2012-2014 - IMDEA Software Institute and INRIA
- * Distributed under the terms of the CeCILL-B license *)
+(* --------------------------------------------------------------------
+ * Copyright (c) - 2012-2014 - IMDEA Software Institute and INRIA
+ * Distributed under the terms of the CeCILL-C license
+ * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
 open EcUtils
@@ -105,6 +107,12 @@ type typeclass = {
 }
 
 (* -------------------------------------------------------------------- *)
+type rkind = [
+  | `Boolean
+  | `Integer
+  | `Modulus of int option * int option
+]
+
 type ring = {
   r_type  : EcTypes.ty;
   r_zero  : EcPath.path;
@@ -115,7 +123,7 @@ type ring = {
   r_exp   : EcPath.path option;
   r_sub   : EcPath.path option;
   r_embed : [ `Direct | `Embed of EcPath.path | `Default];
-  r_bool  : bool; (* true means boolean ring *)
+  r_kind  : rkind;
 }
 
 val ring_equal : ring -> ring -> bool

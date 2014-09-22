@@ -1,5 +1,7 @@
-(* Copyright (c) - 2012-2014 - IMDEA Software Institute and INRIA
- * Distributed under the terms of the CeCILL-B license *)
+(* --------------------------------------------------------------------
+ * Copyright (c) - 2012-2014 - IMDEA Software Institute and INRIA
+ * Distributed under the terms of the CeCILL-C license
+ * -------------------------------------------------------------------- *)
 
 (* Copyright The Coq Development Team, 1999-2010
  * Copyright INRIA - CNRS - LIX - LRI - PPS, 1999-2010
@@ -13,8 +15,10 @@
 
 (* -------------------------------------------------------------------- *)
 open EcMaps
+open EcUtils
 open Big_int
 
+(* -------------------------------------------------------------------- *)
 type pexpr = 
   | PEc of big_int 
   | PEX of int
@@ -55,61 +59,76 @@ let fv_pe =
     | PEpow(e1,_)  -> aux fv e1 in
   aux Sint.empty 
 
-  
-type 'a cmp_sub = 
-  | Eq 
-  | Lt of 'a
-  | Gt of 'a
+(* -------------------------------------------------------------------- *)
+type 'a cmp_sub = [`Eq | `Lt | `Gt of 'a]
  
+(* -------------------------------------------------------------------- *)
 module type Coef = sig
+  (* ------------------------------------------------------------------ *)
   type c 
+
   val cofint : big_int -> c
   val ctoint : c -> big_int
-  val c0 : c
-  val c1 : c
+
+  val c0   : c
+  val c1   : c
   val cadd : c -> c -> c
   val csub : c -> c -> c
   val cmul : c -> c -> c
   val copp : c -> c 
   val ceq  : c -> c -> bool
-  val cdiv : c -> c -> c*c
+  val cdiv : c -> c -> c * c
 
+  (* ------------------------------------------------------------------ *)
   type p 
+
   val pofint : int -> p
   val ptoint : p -> int 
+
   val padd : p -> p -> p
   val peq  : p -> p -> bool
-  val pcmp : p -> p -> p cmp_sub
-    
+  val pcmp : p -> p -> int 
+  val pcmp_sub : p -> p -> p cmp_sub
 end
- 
-module Cint = struct
+
+(* -------------------------------------------------------------------- *) 
+module Cint : Coef = struct
   type c = big_int
+
   let cofint c = c
   let ctoint c = c
+
   let c0 = zero_big_int
   let c1 = unit_big_int
 
-  let cadd a b = add_big_int a  b
-  let csub a b = sub_big_int a  b
-  let cmul a b = mult_big_int a  b
-  let copp a =  minus_big_int a
-  let ceq a b = eq_big_int a b
+  let cadd a b = add_big_int a b
+  let csub a b = sub_big_int a b
+  let cmul a b = mult_big_int a b
+  let copp a   = minus_big_int a
+  let ceq  a b = eq_big_int a b
   let cdiv a b = quomod_big_int a b
     
   type p = int
+
   let pofint p = p
   let ptoint p = p
-  let padd p1 p2 = p1 + p2
-  let peq (p1:p) p2 = p1 = p2
-  let pcmp p1 p2 = 
-    if p1 = p2 then Eq
-    else if p1 < p2 then Lt (p2 - p1)
-    else Gt (p1 - p2)
-    
+
+  let padd (p1 : p) (p2 : p) = p1 + p2
+
+  let peq (p1 : p) (p2 : p) = (p1 = p2)
+
+  let pcmp (p1 : p) (p2 : p) : int = p1 - p2
+
+  let pcmp_sub (p1 : p) (p2 : p) : p cmp_sub = 
+    match pcmp p1 p2 with
+    | c when c < 0 -> `Lt
+    | 0            -> `Eq
+    | _            -> `Gt (p1 - p2)
+
 end
 
-module Cbool = struct
+(* -------------------------------------------------------------------- *) 
+module Cbool : Coef = struct
   type c = int
 
   let cofint c = 
@@ -133,398 +152,350 @@ module Cbool = struct
   let pofint p = 
     assert (1 <= p);
     ()
+
   let ptoint _p = 1
 
   let padd _p1 _p2 = ()
 
   let peq _p1 _p2 = true
-  let pcmp _p1 _p2 = Eq
+  let pcmp _p1 _p2 = 0
+
+  let pcmp_sub _p1 _p2 = `Eq
 
 end
 
-module Make(C:Coef) = struct
-
-  module C = C
-  open C
-
-  type pol =
-  | Pc of c 
-  | Pinj of int * pol
-  | PX of pol * p * pol
-      
-  let rec pp_pol fmt = function
-    | Pc c -> Format.fprintf fmt "%s" (string_of_big_int (ctoint c))
-    | Pinj(i,p) -> 
-      Format.fprintf fmt "%i(%a)" i pp_pol p
-    | PX(q,i,p) -> 
-      Format.fprintf fmt "(%a^%i + %a)" pp_pol q (ptoint i) pp_pol p
-        
-  type mon = Mon0 | Zmon of (int * mon) | Vmon of (p * mon)
-     
-  let p0 = Pc c0
-  let p1 = Pc c1
-
-  let mkXi i = 
-    assert (1 <= i);
-    PX (p1,pofint i,p0) (* 1 * x_0 ^ i + 0  *)
-
-  let mkX = mkXi 1 (* ~= x ^ 1 *)
-
-  let mkPinj_pred j p = 
-    if j=1 then p else Pinj(j-1,p)
-      
-  let mk_X j = mkPinj_pred j mkX
-    
-  let rec peq (p : pol) (q:pol) : bool =
-    match (p,q) with
-    | (Pc c1, Pc c2) -> ceq c1 c2
-    | (Pinj (j1,q1),Pinj (j2,q2)) -> j1 = j2 && peq q1 q2
-    | (PX (p1,i1,q1), PX (p2,i2,q2)) -> C.peq i1 i2 && peq p1 p2 && peq q1 q2
-    | _ -> false
-
-  let mkPinj (j : int) (p : pol) : pol =
-    match p with
-    | Pc _ -> p
-    | Pinj (j',q) -> Pinj ((j+j'),q)
-    | _ -> Pinj (j,p)
-
-  let mkPX p i q =
-    match p with
-    | Pc c -> if ceq c c0 then mkPinj 1 q else PX(p,i,q)
-    | Pinj _ -> PX(p,i,q)
-    | PX (p',i',q') -> 
-      if peq q' p0 then PX (p',padd i i',q) else PX(p,i,q) 
-
-  (* Opposite  *)
-
-  let rec popp ( p : pol) : pol =
-    match p with
-    | Pc c -> Pc (copp c)
-    | Pinj (j,q) -> Pinj (j, popp q)
-    | PX (p,j,q) -> PX (popp p, j, popp q)
-
-  (* Addition and Subs *)
-
-  let rec paddc (p : pol) (c : c) : pol =
-    match p with
-    | Pc c' -> Pc (cadd c' c)
-    | Pinj (j,q) -> Pinj (j,paddc q c)
-    | PX (p,j,q) -> PX (p,j, paddc q c)
-
-  let rec psubc (p : pol) (c : c) : pol =
-    match p with
-    | Pc c' -> Pc (csub c' c)
-    | Pinj (j,q) -> Pinj (j,psubc q c)
-    | PX (p,j,q) -> PX (p,j, psubc q c)
-
-  let rec padd (p : pol) (p' : pol) : pol =
-    match p' with
-    | Pc c -> paddc p c
-    | Pinj (j',q') -> paddi q' j' p
-    | PX (p',i',q') -> 
-      match p with
-      | Pc c ->  PX (p',i',paddc q' c)
-      | Pinj (j,q) -> 
-        if j = 1 then PX (p',i', padd q q') 
-        else PX(p',i', padd (Pinj (j-1,q)) q')
-      | PX (p,i,q) -> 
-        match pcmp i i' with
-        | Eq -> mkPX (padd p p') i (padd q q')
-        | Lt s -> mkPX (paddx p' s p) i (padd q q')
-        | Gt s -> mkPX (padd (PX (p,s,p0)) p') i' (padd q q')
-
-  and paddi (q : pol) (j : int)  (p : pol) : pol =
-    match p with
-    | Pc c -> mkPinj j (paddc q c)
-    | Pinj (j',q') -> 
-      if j' = j then mkPinj j (padd q' q)
-      else if j' > j then mkPinj j (padd (Pinj (j'-j,q')) q)
-      else mkPinj j' (paddi q (j-j') q')
-    | PX (p,i,q') -> 
-      if j = 1 then PX (p,i,padd q' q)
-      else PX (p,i,paddi q (j-1) q')
-
-  and paddx (p' : pol) (i' : C.p) (p : pol) : pol =
-    match p with
-    | Pc _ ->  PX (p',i',p)
-    | Pinj (j,q') -> 
-      if j=1 then PX (p',i',q')
-      else PX (p',i', Pinj (j-1,q'))
-    | PX (p,i,q') -> 
-      match pcmp i i' with
-      | Eq -> mkPX (padd p p') i q'
-      | Gt s -> mkPX (padd (PX (p,s,p0)) p') i' q'
-      | Lt s -> mkPX (paddx p' s p) i q'
-
-  let rec psub (p : pol) (p' : pol) : pol =
-    match p' with
-    | Pc c -> psubc p c
-    | Pinj (j',q') -> psubi q' j' p
-    | PX (p',i',q') -> 
-      match p with
-      | Pc c -> PX (popp p', i', paddc (popp q') c)
-      | Pinj (j,q) -> 
-        if j=1 then PX (popp p',i',psub q q') 
-        else PX (popp p',i', psub (Pinj (j-1,q)) q')
-      | PX (p,i,q) -> 
-        match pcmp i i' with
-        | Eq -> mkPX  (psub p p') i (psub q q')
-        | Gt s -> mkPX (psub (PX (p,s,p0)) p') i' (psub q q')
-        | Lt s -> mkPX (psubx p' s p) i (psub q q')
-
-  and psubi (q : pol) (j : int) ( p : pol) : pol =
-    match p with
-    | Pc c -> mkPinj j (paddc (popp q) c)
-    | Pinj (j',q') -> 
-      if j' = j then mkPinj j (psub q' q)
-      else if j' > j then mkPinj j (psub (Pinj (j' - j,q')) q)   
-      else mkPinj j' (psubi q (j-j') q')
-    | PX (p,i,q') -> 
-      if j = 1 then PX (p,i,psub q' q) 
-      else PX (p,i, psubi q (j-1) q')
-
-  and psubx (p' : pol) (i' : C.p) (p : pol) : pol =
-    match p with
-    | Pc _ -> PX (popp p,i',p)
-    | Pinj (j,q') -> 
-      if j = 1 then PX (popp p',i',q') 
-      else PX (popp p',i', Pinj (j-1,q'))
-    | PX (p,i,q') -> 
-      match pcmp i i' with
-      | Eq -> mkPX (psub p p') i q'
-      | Gt s -> mkPX (psub (PX (p,s,p0)) p') i' q'
-      | Lt s -> mkPX (psubx p' s  p) i q'
-
-  let rec pmulc_aux (p : pol) (c : c) :pol =
-    match p with
-    | Pc c' -> Pc (cmul c' c)
-    | Pinj (j,q) -> mkPinj j (pmulc_aux q c)
-    | PX (p,i,q) -> mkPX (pmulc_aux p c) i (pmulc_aux q c)
-
-  let pmulc (p : pol) (c :c ) : pol =
-    if ceq c c0 then p0 
-    else if ceq c c1 then p else pmulc_aux p c
-
-  let rec pmul (p : pol) (p'' : pol) : pol =
-    match p'' with
-    | Pc c -> pmulc p c
-    | Pinj (j',q') -> pmuli q' j' p
-    | PX (p',i',q') -> 
-      match p with
-      | Pc c -> pmulc p'' c
-      | Pinj (j,q) -> 
-        let qq' = if j = 1 then pmul q q' else pmul (Pinj (j-1,q)) q' in
-        mkPX (pmul p p') i' qq'
-      | PX (p,i,q) -> 
-        let qq' = pmul q q' in
-        let pq' = pmuli q' 1 p in
-        let qp' = pmul (mkPinj 1 q) p' in
-        let pp' = pmul p p' in
-        padd (mkPX (padd (mkPX pp' i p0) qp') i' p0) (mkPX pq' i qq')
-
-  and pmuli (q : pol) (j : int) (p:pol) : pol =
-    match p with
-    | Pc c -> mkPinj j (pmulc q c)
-    | Pinj (j',q') -> 
-      if j' = j then mkPinj j (pmul q' q) 
-      else if j' > j then mkPinj j (pmul (Pinj (j'-j,q')) q) 
-      else mkPinj j' (pmuli q (j-j') q')
-    | PX (p',i',q') -> 
-      if j = 1 then mkPX (pmuli q 1 p') i' (pmul q' q) 
-      else mkPX (pmuli q j p') i' (pmuli q (j-1) q')
-
-  let rec ppow_pos (res : pol) (p : pol) (t : int) : pol =
-    if t = 1 then pmul res p 
-    else ppow_pos (pmul res p) p (t-1)
-
-  let rec ppow_n (p : pol) (n : int) : pol =
-    if (n = 0) then p1 else ppow_pos p1 p n
-
-  let ppow_n (p:pol) (n:C.p) : pol =
-    ppow_n p (ptoint n)
-    
-  (* Monomial *)
-
-  let mkZmon j m =
-    match m with
-    | Mon0 -> Mon0
-    | Zmon(j',m) -> Zmon(j + j', m)
-    | _ -> Zmon (j,m)
-
-  let zmon_pred j m =
-    if j = 1 then m else mkZmon (j-1) m
- 
-  let mkVmon i m =
-    match m with
-    | Mon0 -> Vmon (i,Mon0)
-    | Zmon (j,m) -> Vmon (i,zmon_pred j m)
-    | Vmon (i',m) -> Vmon (C.padd i i',m)
-
-  let rec cfactor (p : pol) ( c : c) : (pol * pol) =
-    match p with
-    | Pc c' ->
-      let (q,r) = cdiv c' c in
-      (Pc r, Pc q) 
-    | Pinj (j1,p1) ->
-      let (r,s) = cfactor p1 c in
-      (mkPinj j1 r, mkPinj j1 s)
-    | PX (p1,i,q1) ->
-      let (r1,s1) = cfactor p1 c in
-      let (r2,s2) = cfactor q1 c in
-      (mkPX r1 i r2, mkPX s1 i s2)
-
-  let rec mfactor (p : pol) (c : c) (m : mon) : pol * pol =
-    match p,m with
-    | _, Mon0 -> if (ceq c c1) then (Pc c0, p) else cfactor p c
-    | Pc _, _ -> (p, Pc c0)
-    | Pinj (j1,p1), Zmon (j2,m1) ->
-      if j1 = j2 then
-        let (r,s) = mfactor p1 c m1 in
-        (mkPinj j1 r, mkPinj j1 s)
-      else if j1 < j2 then
-        let (r,s) = mfactor p1 c (Zmon ((j2-j1),m1)) in
-        (mkPinj j1 r, mkPinj j1 s)
-      else 
-        (p, Pc c0)
-    | Pinj _ , Vmon _ -> 
-      p, Pc c0
-    | PX (p1,i,q1), Zmon (j,m1) ->
-      let m2 = zmon_pred j m1 in
-      let (r1,s1) = mfactor p1 c m in
-      let (r2,s2) = mfactor q1 c m2 in
-      (mkPX r1 i r2, mkPX s1 i s2)
-    | PX (p1,i,q1), Vmon (j,m1) ->
-      match pcmp i j with
-      | Eq -> 
-        let (r1,s1) = mfactor p1 c (mkZmon 1 m1) in
-        (mkPX r1 i q1, s1)
-      | Lt s -> 
-        let (r1,s1) = mfactor p1 c (Vmon (s,m1)) in
-        (mkPX r1 i q1, s1)
-      | Gt s ->
-        let (r1,s1) = mfactor p1 c (mkZmon 1 m1) in
-        (mkPX r1 i q1, mkPX s1 s (Pc c0)) 
-
-
-  let ponesubst (p1 : pol) ((c,m1) : c * mon) (p2 : pol) : pol option =    
-    let (q1,r1) = mfactor p1 c m1 in
-    match r1 with
-    | Pc c -> 
-      if ceq c c0 then None
-      else Some (padd q1 (pmul p2 r1))
-    | _ -> 
-      Some (padd q1 (pmul p2 r1))
-        
-  let rec pnsubstl (p1 : pol) (cm1 : c * mon) (p2 : pol) (n : int) : pol =
-    match ponesubst p1 cm1 p2 with
-    | Some p3 -> 
-      if n = 0 then p3 else
-        pnsubstl p3 cm1 p2 (n-1)
-    | _ -> p1
- 
-  let pnsubst (p1 : pol) (cm1 : c * mon) (p2 :pol) (n : int) : pol option =
-    match ponesubst p1 cm1 p2 with
-    | Some p3 -> 
-      if n = 0 then None
-      else Some (pnsubstl p3 cm1 p2 (n-1))
-    | _ -> None
-
-  let rec psubstl1 (p1 : pol) (lm1 : ((c * mon) * pol) list ) (n : int) : pol =
-    match lm1 with
-    | [] -> p1
-    | (m1,p2) :: lm2 -> psubstl1 (pnsubstl p1 m1 p2 n) lm2 n
-
-  let rec psubstl (p1 : pol) (lm1 : ((c * mon) * pol) list) (n : int) : pol option =
-    match lm1 with
-    | [] -> None
-    | (m1,p2) :: lm2 -> 
-      match pnsubst p1 m1 p2 n with
-      | Some p3 -> Some (psubstl1 p3 lm2 n)
-      | None -> psubstl p1 lm2 n
-
-  let rec pnsubstl (p1 : pol) (lm1 : ((c * mon) * pol) list) (m : int) (n : int) : pol =
-    match psubstl p1 lm1 n with
-    | Some p3 -> if m = 0 then p3 else pnsubstl p3 lm1 (m-1) n
-    | _ -> p1
- 
-  let rec norm_aux (e : pexpr) : pol =
-    match e with
-    | PEc c -> Pc (cofint c)
-    | PEX i -> mk_X i
-    | PEadd (PEopp e1, e2) -> psub (norm_aux e2) (norm_aux e1) 
-    | PEadd (e1, PEopp e2) -> psub (norm_aux e1) (norm_aux e2)
-    | PEadd (e1,e2) -> padd (norm_aux e1) (norm_aux e2)
-    | PEmul (e1,e2) -> pmul (norm_aux e1) (norm_aux e2)
-    | PEsub (e1,e2) -> psub (norm_aux e1) (norm_aux e2)
-    | PEopp e1 -> popp (norm_aux e1)
-    | PEpow (e1,p) -> ppow_n (norm_aux e1) (pofint p) 
-
-  let norm_subst (n : int) (lmp : ((c * mon) * pol) list) (p : pexpr) : pol  = 
-    pnsubstl (norm_aux p) lmp n n
-
-(* [mon_of_pol p = (c, m, r)] => p = c*m + r *)
-  let rec mon_of_pol (p : pol) : (c * mon * pol) =
-    match p with
-    | Pc c -> c, Mon0, p0
-    | Pinj(j,p) ->
-      let c,m,r = mon_of_pol p in
-      c, mkZmon j m, mkPinj j r
-    | PX(p,i,q) ->
-      let c,m,r = mon_of_pol p in
-      c, mkVmon i m, mkPX r i q 
-
-  let rec mk_monpol_list (lpe : (pexpr * pexpr) list) : ((c * mon) * pol) list =
-    match lpe with
-    | [] -> []
-    | (me,pe) :: lpe ->
-      let c,m,r = mon_of_pol (norm_subst 0 [] me) in
-      if ceq c c0 then mk_monpol_list lpe
-      else ((c,m),psub (norm_subst 0 [] pe) r)::mk_monpol_list lpe
-
-  let norm p lp = norm_subst 1000 (mk_monpol_list lp) p
-
-  let topexpr p = 
-    let rec doit idx = function
-      | Pc c -> PEc (ctoint c)
-      | Pinj (j, e) -> doit (idx+j) e
-      | PX (p, i, q) ->
-        let f = PEX idx in
-        let f = match ptoint i with 1 -> f | i -> PEpow(f, i) in
-        let f = if peq p p1 then f else PEmul(doit idx p, f) in
-        let f = if peq q p0 then f else PEadd(f, doit (idx+1) q) in
-        f
-    in
-    doit 1 p
-
-  let norm_pe p lp = topexpr (norm p lp)
+(* -------------------------------------------------------------------- *)
+module type ModVal = sig
+  val c : int option
+  val p : int option
 end
 
+(* -------------------------------------------------------------------- *)
+module Cmod (M : ModVal) : Coef = struct
+  type c = big_int
+
+  let correct_c =
+    match M.c with
+    | None    -> fun c -> c
+    | Some cn -> 
+        let cn = big_int_of_int cn in
+          fun c -> mod_big_int c cn
+
+  let cofint c = correct_c c
+  let ctoint c = c
+
+  let c0 = correct_c zero_big_int
+  let c1 = correct_c unit_big_int
+
+  let cadd a b = correct_c (add_big_int    a b)
+  let csub a b = correct_c (sub_big_int    a b)
+  let cmul a b = correct_c (mult_big_int   a b)
+  let copp a   = correct_c (minus_big_int  a)
+
+  let cdiv a b =
+    let (q, r) = quomod_big_int a b in
+    (correct_c q, correct_c r)
+
+  let ceq a b  = eq_big_int a b
+    
+  type p = int
+
+  let correct_p =
+    match M.p with
+    | None    -> fun p -> p
+    | Some pn ->
+        let rec doit p =
+          if p < pn then p else doit (p / pn + p mod pn)
+        in doit
+
+  let pofint p = correct_p p
+  let ptoint p = p
+
+  let padd p1 p2 = correct_p (p1 + p2)
+
+  let peq (p1 : p) (p2 : p) =
+    p1 = p2
+
+  let pcmp (p1 : p) (p2 : p) = p1 - p2
+
+  let pcmp_sub = 
+    match M.p with
+    | None -> 
+      fun (p1 : p) (p2 : p) ->
+        begin match pcmp p1 p2 with
+        | c when c < 0 -> `Lt
+        | 0            -> `Eq
+        | _            -> `Gt (p1 - p2)
+        end
+    | Some pn ->
+      fun (p1 : p) (p2 : p) ->
+        begin match pcmp p1 p2 with
+        | c when c < 0 -> `Gt (p1 + (pn - p2) - 1)
+        | 0 -> `Eq
+        | _ -> `Gt (p1 - p2)
+        end
+end
+
+(* -------------------------------------------------------------------- *)
 module type Rnorm = sig
-
   module C : Coef 
     
-  type pol =
-  | Pc of C.c 
-  | Pinj of int * pol
-  | PX of pol * C.p * pol
-
-  val peq    : pol -> pol -> bool
-  val norm   : pexpr -> (pexpr * pexpr) list -> pol
   val norm_pe: pexpr -> (pexpr * pexpr) list -> pexpr
-  val pp_pol : Format.formatter -> pol -> unit
 end
 
-module Iring = Make(Cint)
-module Bring = Make(Cbool)
+(* -------------------------------------------------------------------- *)
+module Make (C : Coef) : Rnorm = struct
+  open C
 
+  module C = C
 
+  module Var = struct
+    type t = int
+    let compare x y = x - y
+    let eq x y = x == y
+  end
+
+  module Mon = struct
+    type t = (Var.t * p) list
+
+    let rec eq m1 m2 = 
+      match m1, m2 with
+      | [], [] -> true
+      | (x1,p1)::m1, (x2,p2)::m2 ->
+        Var.eq x1 x2 && peq p1 p2 && eq m1 m2
+      | _, _ -> false
+      
+    let rec compare m1 m2 = 
+      match m1, m2 with
+      | [], [] ->  0
+      | [], _  -> -1
+      | _, []  ->  1
+      | (x1,p1)::m1, (x2,p2)::m2 ->
+        let cmp = Var.compare x1 x2 in
+        if cmp = 0 then
+          let cmp = pcmp p1 p2 in
+          if cmp = 0 then compare m1 m2
+          else cmp
+        else cmp
+
+    let p1 = pofint 1
+
+    let one = []
+
+    let cons x p m = (x,p) :: m
+
+    let rec mul m1 m2 = 
+      match m1, m2 with
+      | [], _ -> m2
+      | _, [] -> m1
+      | (x1,p1 as xp1) :: m1', (x2,p2 as xp2) :: m2' ->
+        match Var.compare x1 x2 with
+        | c when c < 0 -> xp1 :: mul m1' m2
+        | 0            -> cons x1 (padd p1 p2) (mul m1' m2')
+        | _            -> xp2 :: mul m1 m2'
+
+    (* factor m1 m2 = Some m  => m1 = m*m2 *)
+    let rec factor m m1 m2 =
+      match m1, m2 with
+      | _, [] -> Some (List.rev_append m m1)
+      | [], _ -> None
+      | (x1,p1 as xp1) :: m1', (x2,p2) :: m2' ->
+        match Var.compare x1 x2 with
+        | c when c < 0 -> factor (xp1::m) m1' m2
+        | 0            -> 
+          begin match pcmp_sub p1 p2 with
+          | `Lt -> None
+          | `Eq -> factor m m1' m2'
+          | `Gt p -> factor ((x1,p)::m) m1' m2'
+          end
+        | _            -> None 
+
+    let factor m1 m2 = factor one m1 m2
+
+    let degree m = 
+      List.fold_left (fun i (_,p) -> i + ptoint p) 0 m
+
+  end
+        
+  module Pol = struct
+    type t = (c * Mon.t) list
+
+    let rec eq p1 p2 = 
+      match p1, p2 with
+      | [], [] -> true
+      | (c1,m1)::p1, (c2,m2)::p2 ->
+        ceq c1 c2 && Mon.eq m1 m2 && eq p1 p2
+      | _, _ -> false
+
+    let rec opp p = 
+      match p with
+      | [] -> []
+      | (c,m) :: p -> (copp c, m) :: opp p
+
+    let cons c m p = 
+      if ceq c c0 then p else (c,m)::p
+
+    let rec add p1 p2 = 
+      match p1, p2 with
+      | [], _ -> p2
+      | _, [] -> p1
+      | (c1,m1 as cm1) :: p1', (c2,m2 as cm2) :: p2' ->
+        match Mon.compare m1 m2 with
+        | c when c < 0 -> cm1 :: add p1' p2
+        | 0            -> cons (cadd c1 c2) m1 (add p1' p2')
+        | _            -> cm2 :: add p1 p2'
+
+    let rec sub p1 p2 = 
+      match p1, p2 with
+      | [], _ -> opp p2
+      | _, [] -> p1
+      | (c1,m1 as cm1) :: p1', (c2,m2) :: p2' ->
+        match Mon.compare m1 m2 with
+        | c when c < 0 -> cm1 :: sub p1' p2
+        | 0            -> cons (csub c1 c2) m1 (sub p1' p2')
+        | _            -> (copp c2, m2) :: sub p1 p2'
+      
+  
+    let rec mul_mon ((c1,m1) as cm1) p = 
+      match p with
+      | [] -> []
+      | (c2,m2) :: p -> add [cmul c1 c2, Mon.mul m1 m2] (mul_mon cm1 p)
+
+     (* TODO: use (m1 + p1) * (m2 + p2) = m1m2 + (m1p2 + m2p1 + p1p2) ? *)
+    let rec mul p1 p2 =
+      match p1 with
+      | [] -> []
+      | cm1::p1 -> add (mul_mon cm1 p2) (mul p1 p2)
+
+    let rec pow_int p n = 
+      if n = 1 then p
+      else 
+        let r = pow_int p (n/2) in
+        if n mod 2 = 0 then mul r r
+        else mul p (mul r r)
+
+    let pow p e = 
+      let n = ptoint e in
+      if n <= 0 then [c1, Mon.one] else pow_int p n 
+
+    (* pexpr -> pol *)
+    let zero = [] 
+    let one = [c1,Mon.one]
+
+    let cmon c m = 
+      if ceq c c0 then zero else [c,m]
+
+    let rec ofpexpr = function
+      | PEc i -> cmon (cofint i) []
+      | PEX x -> [ c1, [x, Mon.p1] ]
+      | PEadd(p1,p2) -> add (ofpexpr p1) (ofpexpr p2)
+      | PEsub(p1,p2) -> sub (ofpexpr p1) (ofpexpr p2)
+      | PEmul(p1,p2) -> mul (ofpexpr p1) (ofpexpr p2)
+      | PEopp p      -> opp (ofpexpr p)
+      | PEpow(p,i)   -> pow (ofpexpr p) (pofint i)
+
+    (* factorization by a monomial *)
+        
+    let cmfactor (c1,m1 as cm1) (c2,m2) =
+      match Mon.factor m1 m2 with
+      | None -> zero, [cm1]
+      | Some m ->
+        let q,r = cdiv c1 c2 in
+        cmon q m, cmon r m1
+
+    let rec factor p cm =
+      match p with
+      | [] -> zero, zero
+      | cm'::p ->
+        let cq,cr = cmfactor cm' cm in
+        let pq,pr = factor p cm in
+        add cq pq, add cr pr
+
+    let rec rewrite1 p (cm,p' as rw) =
+      let q,r = factor p cm in
+      if eq q zero then r
+      else 
+        let p = add (mul q p') r in
+        rewrite1 p rw
+
+    let rec rewrites p rws =
+      let p' = List.fold_left rewrite1 p rws in
+      if eq p p' then p else rewrites p' rws
+ 
+  end
+
+  (* pol -> pexpr *)
+  let xptopexpr (x,p) = 
+    let x = PEX x in
+    if peq p Mon.p1 then x else PEpow(x, ptoint p)
+
+  let rec mtopexpr pe m = 
+    match m with
+    | [] -> pe
+    | xp::m -> mtopexpr (PEmul(pe, xptopexpr xp)) m
+
+  let cm1 = copp c1 
+
+  let mtopexpr (c,m) =
+    let i = ctoint c in
+    let i' = abs_big_int i in
+    let set_sign pe = if sign_big_int i < 0 then PEopp pe else pe in
+    if eq_big_int i' unit_big_int then 
+      begin match m with
+      | [] -> set_sign (PEc i')
+      | xp::m -> mtopexpr (set_sign (xptopexpr xp)) m
+      end
+    else mtopexpr (set_sign (PEc i')) m
+      
+  let rec topexpr pe p = 
+    match p with
+    | [] -> pe
+    | cm :: p -> topexpr (PEadd(pe, mtopexpr cm)) p
+      
+  let topexpr p = 
+    match p with
+    | [] -> PEc(ctoint c0)
+    | cm :: p -> topexpr (mtopexpr cm) p
+
+  let rec get_mon p =
+    match p with
+    | [] -> c0, Mon.one, 0, Pol.zero
+    | (c,m as cm)::p ->
+      let (c',m',d',p') = get_mon p in
+      let d = Mon.degree m in
+      if d' < d then (c,m,d,p)
+      else (c',m',d',cm::p')
+
+  let mk_rw (pe1,pe2) = 
+    let p1 = Pol.ofpexpr pe1 in
+    let p2 = Pol.ofpexpr pe2 in
+    let (c,m,_,p1') = get_mon p1 in
+    if ceq c c0 || Mon.eq m Mon.one then 
+      let (c,m,_,p2') = get_mon p2 in
+      if ceq c c0 || Mon.eq m Mon.one then None 
+      else Some ((c,m), Pol.sub p1 p2')
+    else Some ((c,m), Pol.sub p2 p1')
+ 
+  let norm_pe pe lpe = 
+    let rws = List.pmap mk_rw lpe in
+    let p = Pol.ofpexpr pe in
+    topexpr (Pol.rewrites p rws)
+
+end
+
+(* -------------------------------------------------------------------- *)
+module Iring : Rnorm = Make(Cint)
+module Bring : Rnorm = Make(Cbool)
+
+(* -------------------------------------------------------------------- *)
 type c = big_int
+
 let c0 = zero_big_int
 let c1 = unit_big_int
 
 let cadd a b = add_big_int a  b
 let csub a b = sub_big_int a  b
 let cmul a b = mult_big_int a  b
-let copp a =  minus_big_int a
-let ceq a b = eq_big_int a b
+let copp a   = minus_big_int a
+let ceq  a b = eq_big_int a b
 let cdiv a b = quomod_big_int a b

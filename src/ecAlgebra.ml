@@ -1,5 +1,7 @@
-(* Copyright (c) - 2012-2014 - IMDEA Software Institute and INRIA
- * Distributed under the terms of the CeCILL-B license *)
+(* --------------------------------------------------------------------
+ * Copyright (c) - 2012-2014 - IMDEA Software Institute and INRIA
+ * Distributed under the terms of the CeCILL-C license
+ * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
 open EcUtils
@@ -69,8 +71,7 @@ end = struct
 end
 
 (* -------------------------------------------------------------------- *)
-type eq  = form * form
-type eqs = eq list
+type eq = form * form
 
 (* -------------------------------------------------------------------- *)
 let rapp r op args =
@@ -84,7 +85,7 @@ let radd r e1 e2 = rapp r r.r_add [e1; e2]
 let ropp r e     = 
   match r.r_opp with
   | Some opp -> rapp r opp [e]
-  | None -> assert r.r_bool; e
+  | None -> assert (r.r_kind = `Boolean); e
 
 let rmul r e1 e2 = rapp r r.r_mul [e1; e2]
 let rexp r e  i  = 
@@ -129,11 +130,9 @@ let fdiv f e1 e2 =
   | Some p -> rapp f.f_ring p [e1; e2]
 
 (* -------------------------------------------------------------------- *)
-let emb_rzero r =
-  match r.r_embed with `Direct -> f_int 0 | _ -> rzero r
+let emb_rzero r = rofint r 0
 
-let emb_rone r =
-  match r.r_embed with `Direct -> f_int 1 | _ -> rone r
+let emb_rone r = rofint r 1
 
 let emb_fzero r = emb_rzero r.f_ring
 let emb_fone  r = emb_rone  r.f_ring
@@ -180,8 +179,9 @@ let toring hyps ((r, cr) : cring) (rmap : RState.rstate) (form : form) =
   let int_of_form form = reffold (RState.add hyps form) rmap in
 
   let rec doit form =
-    match sform_of_form form with
-    | SFop ((op, _), args) -> begin
+    let o, args = destr_app form in
+    match o.f_node with
+    | Fop (op, _) -> begin
         match Mp.find_opt op cr with
         | None -> abstract form
         | Some op -> begin
@@ -202,7 +202,7 @@ let toring hyps ((r, cr) : cring) (rmap : RState.rstate) (form : form) =
           | _, _ -> abstract form
         end
     end
-    | SFint i when r.r_embed = `Direct -> PEc (Big_int.big_int_of_int i)
+    | Fint i when r.r_embed = `Direct -> PEc (Big_int.big_int_of_int i)
     | _ -> abstract form
 
   and of_int f =
@@ -243,8 +243,9 @@ let tofield hyps ((r, cr) : cfield) (rmap : RState.rstate) (form : form) =
   let int_of_form form = reffold (RState.add hyps form) rmap in
 
   let rec doit form =
-    match sform_of_form form with
-    | SFop ((op, _), args) -> begin
+    let o, args = destr_app form in
+    match o.f_node with
+    | Fop(op, _) -> begin
         match Mp.find_opt op cr with
         | None -> abstract form
         | Some op -> begin
@@ -267,7 +268,7 @@ let tofield hyps ((r, cr) : cfield) (rmap : RState.rstate) (form : form) =
           | _, _ -> abstract form
         end
     end
-    | SFint i when r.f_ring.r_embed = `Direct -> FEc (Big_int.big_int_of_int i)
+    | Fint i when r.f_ring.r_embed = `Direct -> FEc (Big_int.big_int_of_int i)
     | _ -> abstract form
 
   and of_int f =
@@ -305,10 +306,7 @@ let tofield hyps ((r, cr) : cfield) (rmap : RState.rstate) (form : form) =
 (* -------------------------------------------------------------------- *)
 let rec ofring (r:ring) (rmap:RState.rstate) (e:pexpr) : form = 
   match e with
-  | PEc c ->
-    if ceq c c0 then emb_rzero r
-    else if ceq c c1 then emb_rone r
-    else rofint r (Big_int.int_of_big_int c)
+  | PEc c -> rofint r (Big_int.int_of_big_int c)
   | PEX idx -> oget (RState.get idx rmap)
   | PEadd(p1,p2) -> radd r (ofring r rmap p1) (ofring r rmap p2)
   | PEsub(p1,p2) -> rsub r (ofring r rmap p1) (ofring r rmap p2)
@@ -317,12 +315,22 @@ let rec ofring (r:ring) (rmap:RState.rstate) (e:pexpr) : form =
   | PEpow(p1,i)  -> rexp r (ofring r rmap p1) i 
 
 (* -------------------------------------------------------------------- *)
-let ring_simplify_pe (cr:cring) peqs pe = 
-  if (fst cr).r_bool then Bring.norm_pe pe peqs
-  else Iring.norm_pe pe peqs 
+let norm_pe_of_ring (cr : EcDecl.ring) =
+  match cr.r_kind with
+  | `Boolean -> Bring.norm_pe
+  | `Integer -> Iring.norm_pe
 
+  | `Modulus (c, p) ->
+      let module M = struct let c = c let p = p end in
+      let module C = EcRing.Cmod(M) in
+      let module R = EcRing.Make(C) in
+      R.norm_pe
 
-let ring_simplify todo (cr : cring) (eqs : eqs) (form : form) =
+(* -------------------------------------------------------------------- *)
+let ring_simplify_pe (cr:cring) peqs pe =
+  norm_pe_of_ring (fst cr) pe peqs
+
+let ring_simplify todo (cr : cring) (eqs : eq list) (form : form) =
   let map = ref RState.empty in
   let toring form = reffold (fun map -> toring todo cr map form) map in
   let form = toring form in
@@ -330,7 +338,7 @@ let ring_simplify todo (cr : cring) (eqs : eqs) (form : form) =
   ofring (fst cr) !map (ring_simplify_pe cr eqs form)
 
 (* -------------------------------------------------------------------- *)
-let ring_eq todo (cr : cring) (eqs : eqs) (f1 : form) (f2 : form) =
+let ring_eq todo (cr : cring) (eqs : eq list) (f1 : form) (f2 : form) =
   ring_simplify todo cr eqs (rsub (fst cr) f1 f2)
 
 (* -------------------------------------------------------------------- *)
@@ -340,7 +348,7 @@ let get_field_equation (f1, f2) =
   | _ -> None
 
 (* -------------------------------------------------------------------- *)
-let field_eq hyps (cr : cfield) (eqs : eqs) (f1 : form) (f2 : form) =
+let field_eq hyps (cr : cfield) (eqs : eq list) (f1 : form) (f2 : form) =
   let map = ref RState.empty in
 
   let tofield form = reffold (fun map -> tofield hyps cr map form) map in
@@ -354,9 +362,7 @@ let field_eq hyps (cr : cfield) (eqs : eqs) (f1 : form) (f2 : form) =
   let eqs = List.map (fun (f1, f2) -> (tofield f1, tofield f2)) eqs in
   let eqs = List.pmap get_field_equation eqs in
 
-  
-  let norm = 
-    if (fst cr).f_ring.r_bool then Bring.norm_pe else Iring.norm_pe in
+  let norm = norm_pe_of_ring (fst cr).f_ring in
   let norm form = ofring (norm form eqs) in
 
   let num1   = norm num1   in
@@ -366,17 +372,13 @@ let field_eq hyps (cr : cfield) (eqs : eqs) (f1 : form) (f2 : form) =
   let cond1  = List.map norm cond1 in
   let cond2  = List.map norm cond2 in
 
-    (cond1 @ cond2, (num1, num2), (denum1, denum2))
+    (cond1 @ cond2, ((num1, num2), (denum1, denum2)))
 
 (* -------------------------------------------------------------------- *)
-
 let rec offield (r:field) (rmap:RState.rstate) (e:fexpr) : form = 
   match e with
-  | FEc c ->
-    if ceq c c0 then emb_fzero r
-    else if ceq c c1 then emb_fone r
-    else fofint r (Big_int.int_of_big_int c)
-  | FEX idx -> oget (RState.get idx rmap)
+  | FEc c        -> fofint r (Big_int.int_of_big_int c)
+  | FEX idx      -> oget (RState.get idx rmap)
   | FEadd(p1,p2) -> fadd r (offield r rmap p1) (offield r rmap p2)
   | FEsub(p1,p2) -> fsub r (offield r rmap p1) (offield r rmap p2)
   | FEmul(p1,p2) -> fmul r (offield r rmap p1) (offield r rmap p2)
@@ -387,12 +389,11 @@ let rec offield (r:field) (rmap:RState.rstate) (e:fexpr) : form =
 
 let field_simplify_pe (cr:cfield) peqs pe = 
   let (num,denum,cond) = fnorm pe in
-  let norm = 
-    if (fst cr).f_ring.r_bool then Bring.norm_pe else Iring.norm_pe in
+  let norm = norm_pe_of_ring (fst cr).f_ring in
   let norm f = norm f peqs in 
-  (List.map norm cond, norm num, norm denum)
+  (List.map norm cond, (norm num, norm denum))
 
-let field_simplify hyps (cr : cfield) (eqs : eqs) (f : form) =
+let field_simplify hyps (cr : cfield) (eqs : eq list) (f : form) =
   let map = ref RState.empty in
 
   let tofield form = reffold (fun map -> tofield hyps cr map form) map in
@@ -402,9 +403,8 @@ let field_simplify hyps (cr : cfield) (eqs : eqs) (f : form) =
   let eqs = List.map (fun (f1, f2) -> (tofield f1, tofield f2)) eqs in
   let eqs = List.pmap get_field_equation eqs in
 
-  let norm = 
-    if (fst cr).f_ring.r_bool then Bring.norm_pe else Iring.norm_pe in
+  let norm = norm_pe_of_ring (fst cr).f_ring in
   let norm form = ofring (norm form eqs) in
-  (List.map norm cond, norm num, norm denum)
+  (List.map norm cond, (norm num, norm denum))
 
 

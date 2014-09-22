@@ -1,5 +1,7 @@
-(* Copyright (c) - 2012-2014 - IMDEA Software Institute and INRIA
- * Distributed under the terms of the CeCILL-B license *)
+(* --------------------------------------------------------------------
+ * Copyright (c) - 2012-2014 - IMDEA Software Institute and INRIA
+ * Distributed under the terms of the CeCILL-C license
+ * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
 open EcPath
@@ -140,8 +142,8 @@ module Mpv2 : sig
   val fv2 : t -> PV.t
   val eq_fv2 : t -> t
 
-  val split_nmod : PV.t -> PV.t -> t -> t
-  val split_mod : PV.t -> PV.t -> t -> t
+  val split_nmod : env -> PV.t -> PV.t -> t -> t
+  val split_mod : env -> PV.t -> PV.t -> t -> t
 end
 
 (* -------------------------------------------------------------------- *)

@@ -1,5 +1,7 @@
-(* Copyright (c) - 2012-2014 - IMDEA Software Institute and INRIA
- * Distributed under the terms of the CeCILL-B license *)
+(* --------------------------------------------------------------------
+ * Copyright (c) - 2012-2014 - IMDEA Software Institute and INRIA
+ * Distributed under the terms of the CeCILL-C license
+ * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
 open EcUtils
@@ -632,29 +634,53 @@ module Mpv2 = struct
     Mnpv.equal (fun (s1,_) (s2,_) -> Snpv.equal s1 s2) eqs1.s_pv eqs2.s_pv &&
     Sm.equal eqs1.s_gl eqs2.s_gl
       
+  let is_mod_pv env pv mod_ = 
+    if Mnpv.mem pv mod_.PV.s_pv then true
+    else
+      if is_glob pv then
+        let x = pv.pv_name in
+        let check_mp mp =
+          let restr = NormMp.get_restr env mp in
+          not (EcPath.Mx.mem x restr.us_pv) in
+        Sm.exists check_mp mod_.PV.s_gl
+      else false
 
-  let split_nmod modl modr eqo =
+  let is_mod_mp env mp mod_ =
+    let id = EcPath.mget_ident mp in
+    let restr = NormMp.get_restr env mp in
+    let check_v pv _ty = 
+      let x = pv.pv_name in
+      not (EcPath.Mx.mem x restr.us_pv) in
+    let check_mp mp' =
+      not (Sid.mem (EcPath.mget_ident mp') restr.us_gl ||
+           Sid.mem id (NormMp.get_restr env mp').us_gl) in
+    Mnpv.exists check_v mod_.PV.s_pv ||
+    Sm.exists check_mp mod_.PV.s_gl  
+
+
+  let split_nmod env modl modr eqo =
     { s_pv = 
         Mnpv.mapi_filter (fun pvl (s,ty) ->
-          if Mnpv.mem pvl modl.PV.s_pv then None 
+          if is_mod_pv env pvl modl then None 
           else 
             let s = 
-              Snpv.filter (fun pvr -> not (Mnpv.mem pvr modr.PV.s_pv)) s in
+              Snpv.filter (fun pvr -> not (is_mod_pv env pvr modr)) s in
             if Snpv.is_empty s then None else Some (s,ty)) eqo.s_pv;
       s_gl = 
-        Sm.filter (fun m -> not (Sm.mem m modl.PV.s_gl) && 
-          not (Sm.mem m modl.PV.s_gl)) eqo.s_gl }
+        Sm.filter 
+          (fun m -> not (is_mod_mp env m modl) && not (is_mod_mp env m modr))
+          eqo.s_gl }
 
-  let split_mod modl modr eqo = 
+  let split_mod env modl modr eqo = 
     { s_pv = 
         Mnpv.mapi_filter (fun pvl (s,ty) ->
-          if Mnpv.mem pvl modl.PV.s_pv then Some (s,ty) 
+          if is_mod_pv env pvl modl then Some (s,ty) 
           else 
             let s = 
-              Snpv.filter (fun pvr -> Mnpv.mem pvr modr.PV.s_pv) s in
+              Snpv.filter (fun pvr -> is_mod_pv env pvr modr) s in
             if Snpv.is_empty s then None else Some (s,ty)) eqo.s_pv;
       s_gl = 
-        Sm.filter (fun m -> Sm.mem m modl.PV.s_gl || Sm.mem m modl.PV.s_gl) 
+        Sm.filter (fun m -> is_mod_mp env m modl || is_mod_mp env m modr) 
           eqo.s_gl }
 
   let subst_l env xl x eqs = 
@@ -986,6 +1012,7 @@ let eqobs_in env
         let xs = destr_tuple_var er in
         s_eqobs_in rsl rsr fhyps (Mpv2.substs_r env xrs xs eqo)
       else rsl, rsr, fhyps, eqo
+    (* this is dead code *)
     | {i_node = Sasgn(lvl,_)} ::rsl, _ when check_not_l lvl eqo ->
       s_eqobs_in rsl rsr fhyps eqo 
     | _, {i_node = Sasgn(lvr,_)}::rsr when check_not_r lvr eqo ->
@@ -995,8 +1022,30 @@ let eqobs_in env
     | [], _ -> [], rsr, fhyps, eqo
     | _, [] -> rsl, [], fhyps, eqo
     | il::rsl', ir::rsr' ->
-      match (try Some (i_eqobs_in il ir fhyps eqo) with _ -> None) with
-      | None -> rsl, rsr, fhyps, eqo
+      match (try Some (i_eqobs_in il ir fhyps eqo) with EqObsInError -> None) with
+      | None -> 
+        (* check if one of the instruction can be removed because:
+           the instruction does not modify the the post and is lossless *) 
+        let rec check_i check_lv i =
+          match i.i_node with
+          | Sasgn(lv,_) -> check_lv lv
+          | Sif(_,s1,s2) -> check_s check_lv s1 && check_s check_lv s2
+          | _ -> false
+          (* TODO : 
+             For random we need a way to known that the distribution 
+             is lossless;
+             For while we can do the same if we are able to ensure 
+             the termination;
+             As well for procedure *)
+        and check_s check_lv s = List.for_all (check_i check_lv) s.s_node in
+        let t1 = check_i (fun lv -> check_not_l lv eqo) il in
+        let t2 = check_i (fun lv -> check_not_r lv eqo) ir in
+        begin match t1, t2 with
+        | true, true   -> s_eqobs_in rsl' rsr' fhyps eqo
+        | true, false  -> s_eqobs_in rsl' rsr  fhyps eqo 
+        | false, true  -> s_eqobs_in rsl  rsr' fhyps eqo
+        | false, false -> rsl, rsr, fhyps, eqo
+        end
       | Some (fhyps, eqi) -> s_eqobs_in rsl' rsr' fhyps eqi
 
   and i_eqobs_in il ir fhyps (eqo:Mpv2.t) = 
@@ -1008,14 +1057,16 @@ let eqobs_in env
       when List.length argsl = List.length argsr -> 
       let eqo = oremove lvl lvr eqo in
       let modl, modr = f_write env fl, f_write env fr in
-      let eqnm = Mpv2.split_nmod modl modr eqo in
-      let outf = Mpv2.split_mod  modl modr eqo in
+      let eqnm = Mpv2.split_nmod env modl modr eqo in
+      let outf = Mpv2.split_mod  env modl modr eqo in
       Mpv2.check_glob outf;
+      
       (* TODO : ensure that generalize mod can be applied here ? *)
       let log,fhyps = fhyps in
       let log, inf, fhyp = 
         try fun_spec log fl fr outf 
         with Not_found -> raise EqObsInError in
+
       let eqi = List.fold_left2 add_eqs (Mpv2.union eqnm inf) argsl argsr in
       (log, fhyp::fhyps), eqi
 
@@ -1030,12 +1081,13 @@ let eqobs_in env
 
     | Swhile(el,sl), Swhile(er,sr) ->
       let sl, sr = rev sl, rev sr in
-      let rec aux eqo = 
+
+      let rec aux fhyps eqo = 
         let r1,r2,fhyps, eqi = s_eqobs_in sl sr fhyps eqo in
         if r1 <> [] || r2 <> [] then raise EqObsInError;
         if Mpv2.subset eqi eqo then fhyps, eqo
-        else aux (Mpv2.union eqi eqo) in
-      aux (add_eqs eqo el er)
+        else aux fhyps (Mpv2.union eqi eqo) in
+      aux fhyps (add_eqs eqo el er)
 
     | Sassert el, Sassert er -> fhyps, add_eqs eqo el er
     | _, _ -> raise EqObsInError

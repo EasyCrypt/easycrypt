@@ -1,5 +1,7 @@
-(* Copyright (c) - 2012-2014 - IMDEA Software Institute and INRIA
- * Distributed under the terms of the CeCILL-B license *)
+(* --------------------------------------------------------------------
+ * Copyright (c) - 2012-2014 - IMDEA Software Institute and INRIA
+ * Distributed under the terms of the CeCILL-C license
+ * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
 open EcUtils
@@ -136,15 +138,15 @@ let rec eqobs_inF pf env eqg (inv, ifvl, ifvr as inve) log fl fr eqO =
         let log, ieqg =
           try (* Try to infer the good invariant for oracle *)
             let eqo = Mpv2.remove_glob top eqO in
-            let rec aux eqo =
+            let rec aux log eqo =
               let log, eqi =
                 List.fold_left2
                   (fun (log,eqo) o_l o_r ->
                     let log, eqo, _ = eqobs_inF pf env eqg inve log o_l o_r eqo in
                     log, eqo)
                   (log,eqo) oil.oi_calls oir.oi_calls in
-              if Mpv2.subset eqi eqo then log, eqo else aux eqi in
-            aux eqo
+              if Mpv2.subset eqi eqo then log, eqo else aux log eqi in
+            aux log eqo
           with EqObsInError ->
             if not (Mpv2.subset eqO eqg) then raise EqObsInError;
             (log, Mpv2.remove_glob top eqg) in
@@ -197,7 +199,8 @@ let rec eqobs_inF pf env eqg (inv, ifvl, ifvr as inve) log fl fr eqO =
           if not (Mpv2.subset eqO eqg) then raise EqObsInError;
           let inv  = Mpv2.to_form mleft mright eqg inv in
           let spec = mk_inv_spec pf env inv fl fr in
-          let log  = add_eqobs_in_log fl fr eqO (eqg,spec,EORI_unknown None) log in
+          let log  = 
+            add_eqobs_in_log fl fr eqO (eqg,spec,EORI_unknown None) log in
           (log, eqg, spec)
       end
 
@@ -267,7 +270,8 @@ let process_eqobs_in (geq', ginv, eqs') tc =
         EcPV.eqobs_in env
           (eqobs_inF !!tc env geq (ginv,ifvl,ifvr))
           { query = []; forproof = Mf.empty; }
-          sl sr eqs (ifvl,ifvr) in log, eqs
+          sl sr eqs (ifvl,ifvr) in 
+      log, eqs
 
     | `Fun(fl,fr) ->
       let eqO = (Mpv2.remove env (pv_res fl) (pv_res fr) eqs) in
@@ -279,8 +283,10 @@ let process_eqobs_in (geq', ginv, eqs') tc =
   in
 
   let onF _ fl fr eqo =
-    let (eqo, spec) = oget (find_eqobs_in_log log fl fr eqo) in
-    (), eqo, spec
+    match find_eqobs_in_log log fl fr eqo with
+    | None -> raise EqObsInError
+    | Some (eqo, spec) ->  (), eqo, spec
+
   in
 
   let t_eqobs eqs tc =

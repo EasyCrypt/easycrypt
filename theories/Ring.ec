@@ -159,3 +159,4 @@ end Field.
 (* Rewrite database for algebra tactic                                   *)
 
 hint rewrite rw_algebra : .
+hint rewrite inj_algebra : .

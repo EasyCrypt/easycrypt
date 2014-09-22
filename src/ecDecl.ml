@@ -1,5 +1,7 @@
-(* Copyright (c) - 2012-2014 - IMDEA Software Institute and INRIA
- * Distributed under the terms of the CeCILL-B license *)
+(* --------------------------------------------------------------------
+ * Copyright (c) - 2012-2014 - IMDEA Software Institute and INRIA
+ * Distributed under the terms of the CeCILL-C license
+ * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
 open EcUtils
@@ -163,6 +165,12 @@ type typeclass = {
 }
 
 (* -------------------------------------------------------------------- *)
+type rkind = [
+  | `Boolean
+  | `Integer
+  | `Modulus of int option * int option
+]
+
 type ring = {
   r_type  : EcTypes.ty;
   r_zero  : EcPath.path;
@@ -173,8 +181,19 @@ type ring = {
   r_exp   : EcPath.path option;
   r_sub   : EcPath.path option;
   r_embed : [ `Direct | `Embed of EcPath.path | `Default];
-  r_bool  : bool (* true means boolean ring *)
+  r_kind  : rkind;
 }
+
+let kind_equal k1 k2 =
+  match k1, k2 with
+  | `Boolean, `Boolean -> true
+  | `Integer, `Integer -> true
+
+  | `Modulus (n1, p1), `Modulus (n2, p2) ->
+         opt_equal ((==) : int -> int -> bool) n1 n2
+      && opt_equal ((==) : int -> int -> bool) p1 p2
+
+  | _, _ -> false
 
 let ring_equal r1 r2 = 
   EcTypes.ty_equal r1.r_type r2.r_type &&
@@ -185,7 +204,7 @@ let ring_equal r1 r2 =
   EcPath.p_equal r1.r_mul  r2.r_mul  &&
   EcUtils.oall2 EcPath.p_equal r1.r_exp  r2.r_exp  &&
   EcUtils.oall2 EcPath.p_equal r1.r_sub r2.r_sub &&
-  r1.r_bool = r2.r_bool &&
+  kind_equal r1.r_kind r2.r_kind &&
   match r1.r_embed, r2.r_embed with
   | `Direct, `Direct -> true
   | `Embed p1, `Embed p2 -> EcPath.p_equal p1 p2
