@@ -648,10 +648,15 @@ module Mpv2 = struct
   let is_mod_mp env mp mod_ =
     let id = EcPath.mget_ident mp in
     let restr = NormMp.get_restr env mp in
+    let check_v pv _ty = 
+      let x = pv.pv_name in
+      not (EcPath.Mx.mem x restr.us_pv) in
     let check_mp mp' =
       not (Sid.mem (EcPath.mget_ident mp') restr.us_gl ||
-        Sid.mem id (NormMp.get_restr env mp').us_gl) in
-    Sm.for_all check_mp mod_.PV.s_gl
+           Sid.mem id (NormMp.get_restr env mp').us_gl) in
+    Mnpv.exists check_v mod_.PV.s_pv ||
+    Sm.exists check_mp mod_.PV.s_gl  
+
 
   let split_nmod env modl modr eqo =
     { s_pv = 
@@ -675,7 +680,7 @@ module Mpv2 = struct
               Snpv.filter (fun pvr -> is_mod_pv env pvr modr) s in
             if Snpv.is_empty s then None else Some (s,ty)) eqo.s_pv;
       s_gl = 
-        Sm.filter (fun m -> is_mod_mp env m modl || is_mod_mp env m modl) 
+        Sm.filter (fun m -> is_mod_mp env m modl || is_mod_mp env m modr) 
           eqo.s_gl }
 
   let subst_l env xl x eqs = 

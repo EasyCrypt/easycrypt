@@ -199,7 +199,8 @@ let rec eqobs_inF pf env eqg (inv, ifvl, ifvr as inve) log fl fr eqO =
           if not (Mpv2.subset eqO eqg) then raise EqObsInError;
           let inv  = Mpv2.to_form mleft mright eqg inv in
           let spec = mk_inv_spec pf env inv fl fr in
-          let log  = add_eqobs_in_log fl fr eqO (eqg,spec,EORI_unknown None) log in
+          let log  = 
+            add_eqobs_in_log fl fr eqO (eqg,spec,EORI_unknown None) log in
           (log, eqg, spec)
       end
 
@@ -282,8 +283,10 @@ let process_eqobs_in (geq', ginv, eqs') tc =
   in
 
   let onF _ fl fr eqo =
-    let (eqo, spec) = oget (find_eqobs_in_log log fl fr eqo) in
-    (), eqo, spec
+    match find_eqobs_in_log log fl fr eqo with
+    | None -> raise EqObsInError
+    | Some (eqo, spec) ->  (), eqo, spec
+
   in
 
   let t_eqobs eqs tc =
