@@ -2224,7 +2224,7 @@ module Cloning = struct
                       | `Default -> `Default
                       | `Embed p -> `Embed (forpath p)
                       end;
-                    r_bool = cr.r_bool; }
+                    r_kind = cr.r_kind; }
   
                 and dofield cr =
                   { f_ring = doring cr.f_ring;
