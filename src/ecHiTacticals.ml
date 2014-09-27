@@ -176,7 +176,15 @@ and process1_phl (_ : ttenv) (t : phltactic) (tc : tcenv1) =
     | Pbd_equiv (nm, f1, f2)    -> EcPhlConseq.process_bd_equiv nm (f1, f2)
     | Pauto                     -> EcPhlAuto.t_auto
 
-  in tx tc
+  in
+
+  try  tx tc
+  with (* PHL Specific low errors *)
+  | EcLowPhlGoal.InvalidSplit (i, lo, hi) ->
+      tc_error_lazy !!tc (fun fmt ->
+        Format.fprintf fmt
+          "invalid split index: %d is not in the interval [%d..%d]" 
+          i lo hi)
 
 (* -------------------------------------------------------------------- *)
 and process_sub (ttenv : ttenv) tts tc =
