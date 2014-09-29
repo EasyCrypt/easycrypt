@@ -2003,20 +2003,17 @@ module NormMp = struct
 
   let rec norm_xfun env p =
     try Mx.find p !(env.env_norm).norm_xfun with Not_found ->
-      let pf, v =
+      let res = 
         match p.x_sub.p_node with
-        | Pqname(pf,x) -> EcPath.xpath p.x_top pf, Some x
-        | _ -> p, None in
-      let mp = norm_mpath env pf.x_top in
-      let pf = EcPath.xpath mp pf.x_sub in
-      let pf =
-        match Fun.by_xpath_opt pf env with (* TODO B:use by_xpath_r *)
-        | Some {f_def = FBalias xp} -> norm_xfun env xp
-        | _ -> pf in
-      let res =
-        match v with
-        | None -> pf
-        | Some v -> EcPath.xpath pf.x_top (EcPath.pqname pf.x_sub v) in
+        | Pqname(pf,x) -> 
+          let pf = norm_xfun env (EcPath.xpath p.x_top pf) in
+          EcPath.xpath pf.x_top (EcPath.pqname pf.x_sub x)
+        | _ ->
+          let mp = norm_mpath env p.x_top in
+          let pf = EcPath.xpath mp p.x_sub in
+          match Fun.by_xpath_opt pf env with (* TODO B:use by_xpath_r *)
+          | Some {f_def = FBalias xp} -> norm_xfun env xp
+          | _ -> pf in
       let en = !(env.env_norm) in
       env.env_norm := { en with norm_xfun = Mx.add p res en.norm_xfun };
       res
