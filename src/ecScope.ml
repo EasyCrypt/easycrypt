@@ -1027,6 +1027,24 @@ end
 module Mod = struct
   module TT = EcTyping
 
+  let add_local_restr env path m =
+    let mpath = EcPath.pqname path m.me_name in
+    match m.me_body with
+    | ME_Alias _ | ME_Decl _ -> env
+    | ME_Structure _ ->
+      (* We keep only the internal part, i.e the inner global variables *)
+      (* TODO : using mod_use here to compute the set of inner global
+         variables is inefficient, change this algo *)
+      let mp = EcPath.mpath_crt mpath [] None in
+      let use = EcEnv.NormMp.mod_use env mp in
+      let rx =
+        let add x _ rx =
+          if EcPath.m_equal (EcPath.m_functor x.EcPath.x_top) mp then
+            Sx.add x rx
+          else rx in
+        Mx.fold add use.EcEnv.us_pv EcPath.Sx.empty in
+      EcEnv.Mod.add_restr_to_locals (rx,EcPath.Sm.empty) env
+
   let bind (scope : scope) (local : bool) (m : module_expr) =
     assert (scope.sc_pr_uc = None);
     let scope =
@@ -1039,23 +1057,7 @@ module Mod = struct
       | false -> scope
       | true  ->
         let mpath = EcPath.pqname (path scope) m.me_name in
-        let env =
-          match m.me_body with
-          | ME_Alias _ | ME_Decl _ -> scope.sc_env
-          | ME_Structure _ ->
-            let env = scope.sc_env in
-            (* We keep only the internal part, i.e the inner global variables *)
-            (* TODO : using mod_use here to compute the set of inner global
-               variables is inefficient, change this algo *)
-            let mp = EcPath.mpath_crt mpath [] None in
-            let use = EcEnv.NormMp.mod_use env mp in
-            let rx =
-              let add x _ rx =
-                if EcPath.m_equal (EcPath.m_functor x.EcPath.x_top) mp then
-                  Sx.add x rx
-                else rx in
-              Mx.fold add use.EcEnv.us_pv EcPath.Sx.empty in
-            EcEnv.Mod.add_restr_to_locals (rx,EcPath.Sm.empty) env in
+        let env = add_local_restr scope.sc_env (path scope) m in
         let ec = EcSection.add_local_mod mpath scope.sc_section in
         { scope with sc_section = ec; sc_env = env }
     in
@@ -1721,14 +1723,47 @@ module Theory = struct
         let section  = scope.sc_section in
         let required = scope.sc_required in
         let sup = { sup with sc_loaded = loaded; sc_section = section; } in
-          ((cth, required), scope.sc_name, sup)
+
+        ((cth, required), section, scope.sc_name, sup)
 
   (* ------------------------------------------------------------------ *)
   let exit (scope : scope) =
+    let rec add_restr1 section where env item : EcEnv.env =
+      match item with 
+      | EcTheory.CTh_theory (name, th) ->
+          add_restr section (EcPath.pqname where name) th env
+  
+      | EcTheory.CTh_module me ->
+          if EcSection.in_section section then begin
+            let islocal =
+              EcSection.is_local `Module
+                (EcPath.pqname where me.me_name)
+                (EcSection.locals section)
+            in
+  
+            if islocal then
+              Mod.add_local_restr env where me
+            else
+              env
+          end else
+            env
+  
+      | _ -> env
+  
+    and add_restr section where th env =
+      List.fold_left (add_restr1 section where) env th.EcTheory.cth_struct
+    in
+
     assert (scope.sc_pr_uc = None);
-    let ((cth, required), name, scope) = exit_r scope in
+    let ((cth, required), section, name, scope) = exit_r scope in
     let scope = List.fold_right require_loaded required scope in
-      (name, bind scope (name, cth))
+    let scope = bind scope (name, cth) in
+    let scope = { scope with sc_env =
+        add_restr section
+          (EcPath.pqname (path scope) name)
+          (EcEnv.ctheory_of_ctheory_w3 cth) scope.sc_env } in
+
+    (name, scope)
 
   (* ------------------------------------------------------------------ *)
   let import (scope : scope) (name : qsymbol) =
@@ -1776,7 +1811,7 @@ module Theory = struct
           let thname   = imported.sc_name in
           let imported = loader imported in
           check_end_required imported thname;
-          let cthr, name, imported = exit_r imported in
+          let cthr, _, name, imported = exit_r imported in
           let scope =
             { scope with
                 sc_loaded = Msym.add name cthr imported.sc_loaded; }
