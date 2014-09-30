@@ -26,7 +26,7 @@ module LowInternal = struct
     | i :: stmt' ->
         try
           let letsf = wp_instr onesided env m i letsf in
-            wp_stmt onesided env m stmt' letsf
+          wp_stmt onesided env m stmt' letsf
         with No_wp -> (stmt, letsf)
 
   and wp_instr onesided env m i letsf =
@@ -52,11 +52,12 @@ module LowInternal = struct
     | _ -> raise No_wp
 end
 
-let wp ?(onesided=false) env m s post =
+let wp ?(uselet=true) ?(onesided=false) env m s post =
   let r,letsf =
     LowInternal.wp_stmt onesided env m (List.rev s.s_node) ([],post)
   in
-  (List.rev r, mk_let_of_lv_substs env letsf)
+  let pre = mk_let_of_lv_substs ~uselet env letsf in
+  (List.rev r, pre)
 
 (* -------------------------------------------------------------------- *)
 module TacInternal = struct
@@ -68,31 +69,31 @@ module TacInternal = struct
           tc_error !!tc "remaining %i instruction(s)" (List.length rm);
         i
 
-  let t_hoare_wp i tc =
+  let t_hoare_wp ?(uselet=true) i tc =
     let env = FApi.tc1_env tc in
     let hs = tc1_as_hoareS tc in
     let (s_hd, s_wp) = s_split_o i hs.hs_s in
     let m = EcMemory.memory hs.hs_m in
     let s_wp = EcModules.stmt s_wp in
-    let (s_wp, post) = wp ~onesided:true env m s_wp hs.hs_po in
+    let (s_wp, post) = wp ~uselet ~onesided:true env m s_wp hs.hs_po in
     ignore (check_wp_progress tc i hs.hs_s s_wp : int);
     let s = EcModules.stmt (s_hd @ s_wp) in
     let concl = f_hoareS_r { hs with hs_s = s; hs_po = post} in
     FApi.xmutate1 tc `Wp [concl]
 
-  let t_bdhoare_wp i tc =
+  let t_bdhoare_wp ?(uselet=true) i tc =
     let env = FApi.tc1_env tc in
     let bhs = tc1_as_bdhoareS tc in
     let (s_hd, s_wp) = s_split_o i bhs.bhs_s in
     let s_wp = EcModules.stmt s_wp in
     let m = EcMemory.memory bhs.bhs_m in
-    let s_wp,post = wp env m s_wp bhs.bhs_po in
+    let s_wp,post = wp ~uselet env m s_wp bhs.bhs_po in
     ignore (check_wp_progress tc i bhs.bhs_s s_wp : int);
     let s = EcModules.stmt (s_hd @ s_wp) in
     let concl = f_bdHoareS_r { bhs with bhs_s = s; bhs_po = post} in
     FApi.xmutate1 tc `Wp [concl]
 
-  let t_equiv_wp ij tc =
+  let t_equiv_wp ?(uselet=true) ij tc =
     let env = FApi.tc1_env tc in
     let es = tc1_as_equivS tc in
     let i = omap fst ij and j = omap snd ij in
@@ -101,8 +102,8 @@ module TacInternal = struct
     let meml, s_wpl = EcMemory.memory es.es_ml, EcModules.stmt s_wpl in
     let memr, s_wpr = EcMemory.memory es.es_mr, EcModules.stmt s_wpr in
     let post = es.es_po in
-    let s_wpl, post =  wp env meml s_wpl post in
-    let s_wpr, post =  wp env memr s_wpr post in
+    let s_wpl, post = wp ~uselet env meml s_wpl post in
+    let s_wpr, post = wp ~uselet env memr s_wpr post in
     ignore (check_wp_progress tc i es.es_sl s_wpl : int);
     ignore (check_wp_progress tc j es.es_sr s_wpr : int);
     let sl = EcModules.stmt (s_hdl @ s_wpl) in
@@ -112,23 +113,23 @@ module TacInternal = struct
 end
 
 (* -------------------------------------------------------------------- *)
-let t_wp_r k g =
+let t_wp_r ?(uselet=true) k g =
   let module T = TacInternal in
 
   let (th, tbh, te) =
     match k with
-    | None -> (Some (T.t_hoare_wp   None),
-               Some (T.t_bdhoare_wp None),
-               Some (T.t_equiv_wp   None))
+    | None -> (Some (T.t_hoare_wp   ~uselet None),
+               Some (T.t_bdhoare_wp ~uselet None),
+               Some (T.t_equiv_wp   ~uselet None))
 
-    | Some (Single i) -> (Some (T.t_hoare_wp   (Some i)),
-                          Some (T.t_bdhoare_wp (Some i)),
+    | Some (Single i) -> (Some (T.t_hoare_wp   ~uselet (Some i)),
+                          Some (T.t_bdhoare_wp ~uselet (Some i)),
                           None (* ------------------- *))
 
     | Some (Double (i, j)) ->
-        (None, None, Some (T.t_equiv_wp (Some (i, j))))
+        (None, None, Some (T.t_equiv_wp ~uselet (Some (i, j))))
 
   in
     t_hS_or_bhS_or_eS ?th ?tbh ?te g
 
-let t_wp = FApi.t_low1 "wp" t_wp_r
+let t_wp ?(uselet=true) = FApi.t_low1 "wp" (t_wp_r ~uselet)

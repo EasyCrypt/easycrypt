@@ -368,6 +368,7 @@ val destr_imp       : form -> form * form
 val destr_iff       : form -> form * form
 val destr_eq        : form -> form * form
 val destr_eq_or_iff : form -> form * form
+val destr_let       : form -> lpattern * form * form
 val destr_let1      : form -> EcIdent.t * ty * form * form
 val destr_forall1   : form -> EcIdent.t * gty * form
 val destr_forall    : form -> binding * form
@@ -422,6 +423,8 @@ type f_subst = private {
   fs_ty      : ty -> ty;
   fs_opdef   : (EcIdent.t list * expr) EcPath.Mp.t;
 }
+
+val can_subst : form -> bool
 
 module Fsubst : sig
   val f_subst_id  : f_subst

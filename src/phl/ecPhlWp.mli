@@ -19,6 +19,6 @@ open EcCoreGoal.FApi
  * soundness of the bounded hoare logic.
  *)
 
-val wp : ?onesided:bool -> env -> memory -> stmt -> form -> instr list * form
+val wp : ?uselet:bool -> ?onesided:bool -> env -> memory -> stmt -> form -> instr list * form
 
-val t_wp : (int doption) option -> backward
+val t_wp : ?uselet:bool -> (int doption) option -> backward
