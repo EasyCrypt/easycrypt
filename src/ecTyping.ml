@@ -2028,7 +2028,7 @@ let trans_form_or_pattern env (ps, ue) pf tt =
           transf (EcEnv.Memory.set_active me env) f
       end
 
-    | PFeqveq xs ->
+    | PFeqveq (xs, om) ->
         let lookup me x =
           match EcEnv.Var.lookup_progvar_opt ~side:me (unloc x) env with
           | None -> tyerror x.pl_loc env (UnknownVarOrOp (unloc x, []))
@@ -2047,10 +2047,18 @@ let trans_form_or_pattern env (ps, ue) pf tt =
           | Some _ -> ()
         in
 
-        let do1 = function
+        let qual (mq : pmsymbol option) (x : pqsymbol) =
+          match mq with
+          | None -> x
+          | Some z ->
+              let (ys,y) = x.pl_desc in
+                { x with pl_desc = ((List.map (fun (ps,_) -> ps.pl_desc) z)@ys,y) }
+        in
+
+         let do1 = function
           | GVvar x ->
-              let x1 = lookup EcFol.mleft x in
-              let x2 = lookup EcFol.mright x in
+              let x1 = lookup EcFol.mleft  (qual (om |> omap fst) x) in
+              let x2 = lookup EcFol.mright (qual (om |> omap snd) x) in
                 unify_or_fail env ue x.pl_loc ~expct:x1.f_ty x2.f_ty;
                 f_eq x1 x2
 

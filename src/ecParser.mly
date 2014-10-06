@@ -882,7 +882,10 @@ form_u(P):
     { PFif (c, e1, e2) }
 
 | EQ LBRACE xs=plist1(qident_or_res_or_glob, COMMA) RBRACE
-    { PFeqveq xs }
+    { PFeqveq (xs, None) }
+
+| EQ LBRACE xs=plist1(qident_or_res_or_glob, COMMA) RBRACE LPAREN  m1=mod_qident COMMA m2=mod_qident RPAREN
+    { PFeqveq (xs, Some (m1, m2)) }
 
 | IF c=form_r(P) THEN e1=form_r(P) ELSE e2=form_r(P)
     { PFif (c, e1, e2) }

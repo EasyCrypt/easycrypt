@@ -226,7 +226,7 @@ and pformula_r =
   | PFproj   of pformula * pqsymbol
   | PFproji  of pformula * int
   | PFglob   of pmsymbol located
-  | PFeqveq  of glob_or_var list
+  | PFeqveq  of glob_or_var list * (pmsymbol pair) option
   | PFlsless of pgamepath
   | PFscope  of pqsymbol * pformula
 
