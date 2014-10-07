@@ -195,7 +195,7 @@ let cfold_stmt (pf, hyps) me olen zpr =
 let t_cfold_r side cpos olen g =
   let tr = fun side -> `Fold (side, cpos, olen) in
   let cb = fun cenv _ me zpr -> cfold_stmt cenv me olen zpr in
-  t_code_transform ~bdhoare:true side cpos tr (t_zip cb) g
+  t_code_transform side ~bdhoare:true cpos tr (t_zip cb) g
 
 (* -------------------------------------------------------------------- *)
 let t_kill  = FApi.t_low3 "code-tx-kill"  t_kill_r
