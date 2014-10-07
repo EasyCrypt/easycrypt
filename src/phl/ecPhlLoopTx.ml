@@ -172,7 +172,7 @@ let splitwhile_stmt b (pf, _) me i =
 
 let t_splitwhile_r b side cpos g =
   let tr = fun side -> `SplitWhile (b, side, cpos) in
-    t_code_transform side cpos tr (t_fold (splitwhile_stmt b)) g
+    t_code_transform side ~bdhoare:true cpos tr (t_fold (splitwhile_stmt b)) g
 
 let t_splitwhile = FApi.t_low3 "split-while" t_splitwhile_r
 
