@@ -415,7 +415,7 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
     t_on1 2 (t_apply_r nf1) (tac hs.hs_pr hs.hs_po tc)
 
   (* ------------------------------------------------------------------ *)
-  (* hoare S/ hoareS / hoareS / ⊥                                       *)
+  (* hoareS/ hoareS / hoareS / ⊥                                       *)
   | FhoareS _,
       Some ((_, { f_node = FhoareS hs }) as nf1),
       Some ((_, f2) as nf2),
@@ -775,6 +775,12 @@ let process_conseq notmod (info1, info2, info3) tc =
         let fmake pre post bd =
           ensure_none bd; f_hoareS bhs.bhs_m pre bhs.bhs_s post
         in (env, env, bhs.bhs_pr, bhs.bhs_po, fmake)
+
+      | FbdHoareF bhf ->
+        let penv, qenv = LDecl.hoareF bhf.bhf_f hyps in
+        let fmake pre post bd = 
+          ensure_none bd; f_hoareF pre bhf.bhf_f post in
+        (penv, qenv, bhf.bhf_pr, bhf.bhf_po, fmake)
 
       | FequivF ef ->
         let f = if side then ef.ef_fl else ef.ef_fr in
