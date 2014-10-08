@@ -17,7 +17,7 @@ module M1 = {
 lemma test1 : hoare [M1.f : true ==> true].
 proof -strict.
   proc.
-  splitwhile (x<=5) : 3.
+  splitwhile 3 : (x<=5).
   while (x<=y).
   wp; skip; smt.
   while (x<=y).
@@ -28,7 +28,7 @@ qed.
 lemma test2 : equiv [M1.f ~ M1.f : true ==> true].
 proof -strict.
   proc.
-  splitwhile (x<=5) : {2} 3.
-  splitwhile (x<=5) : {2} 3.
+  splitwhile {2} 3 : (x<=5).
+  splitwhile {2} 3 : (x<=5).
   admit.
 qed.

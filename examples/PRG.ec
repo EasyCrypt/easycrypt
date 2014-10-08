@@ -328,7 +328,7 @@ section.
       swap{1} 3 3. swap{2} [4..5] 2. swap{2} [6..8] 1.
       swap{1} 4 3. swap{1} 4 2. swap{2} 2 4.
       sim.
-      splitwhile (length P.logP < n - 1):{2} 5 .
+      splitwhile {2} 5 : (length P.logP < n - 1).
       conseq* (_ : _ ==> ={P.logP})=> //.
       seq 3 5: (={P.logP} /\ (length P.logP = n - 1){2}).
         while (={P.logP} /\ n{2} = n{1} + 1 /\ length P.logP{1} <= n{1});

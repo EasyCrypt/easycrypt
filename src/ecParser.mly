@@ -2189,7 +2189,7 @@ phltactic:
 | UNROLL s=side? o=codepos
     { Punroll (s, o) }
 
-| SPLITWHILE c=expr COLON s=side? o=codepos
+| SPLITWHILE s=side? o=codepos COLON c=expr
     { Psplitwhile (c, s, o) }
 
 | BYPHOARE info=fpattern(conseq)
