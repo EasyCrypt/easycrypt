@@ -249,7 +249,7 @@ let close (uf : UF.t) =
        | None   -> begin
          let t =
            match snd (UF.data i uf) with
-           | None   -> t
+           | None   -> tuni (UF.find i uf)
            | Some t -> doit t
          in
            Hint.add map i t; t
