@@ -151,7 +151,7 @@ exception InvalidSplit of int * int * int
 
 let s_split_i i s =
   let len = List.length s.s_node in
-    if i < 0 || len < i then
+    if i < 1 || len < i then
       raise (InvalidSplit (i, 1, len));
     let (hd, tl) = EcModules.s_split (i-1) s in
     (hd, List.hd tl, List.tl tl)
