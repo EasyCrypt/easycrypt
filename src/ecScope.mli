@@ -155,12 +155,21 @@ module Prover : sig
 end
 
 (* -------------------------------------------------------------------- *)
-module Extraction : sig
-  val process :
-    scope -> (string option * toextract list * withextract list) -> scope
+module BaseRw : sig
+  val process_addrw : scope -> (pqsymbol * pqsymbol list) -> scope
 end
 
 (* -------------------------------------------------------------------- *)
-module BaseRw : sig
-  val process_addrw : scope -> (pqsymbol * pqsymbol list) -> scope
+module Cloning : sig
+  (* [clone scope (src, dst)] finds and clones theory [src] in
+   * scope [scope]. Cloned theory name is [dst] if not None. If
+   * [dst] is None, the basename of [src] is used as the cloned
+   * theory name. *)
+  val clone : scope -> Ax.mode -> theory_cloning -> symbol * scope
+end
+
+(* -------------------------------------------------------------------- *)
+module Extraction : sig
+  val process :
+    scope -> (string option * toextract list * withextract list) -> scope
 end
