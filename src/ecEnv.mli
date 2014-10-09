@@ -38,6 +38,9 @@ val xroot   : env -> EcPath.xpath option
 val gstate : env -> EcGState.gstate
 
 (* -------------------------------------------------------------------- *)
+val notify : env -> EcGState.loglevel -> ('a, unit, string, unit) format4 -> 'a
+
+(* -------------------------------------------------------------------- *)
 type lookup_error = [
   | `XPath   of xpath
   | `MPath   of mpath

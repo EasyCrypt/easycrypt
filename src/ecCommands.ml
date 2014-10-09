@@ -133,23 +133,6 @@ let process_print scope p =
   process_pr Format.std_formatter scope p
 
 (* -------------------------------------------------------------------- *)
-type notifier = string -> unit
-
-let default_notifier msg =
-  Format.eprintf "%s\n%!" msg
-
-let _notifier = ref (default_notifier : notifier)
-
-let set_notifier (n : notifier) = _notifier := n
-let get_notifier () = !_notifier
-
-let notify scope msg =
-  Format.ksprintf
-    (fun msg ->
-      if EcScope.verbose scope then !_notifier msg)
-    msg
-
-(* -------------------------------------------------------------------- *)
 exception Pragma of [`Reset]
 
 (* -------------------------------------------------------------------- *)
@@ -164,7 +147,7 @@ let rec process_type (scope : EcScope.scope) (tyd : ptydecl located) =
     | PTYD_Datatype bd -> EcScope.Ty.add_datatype scope (mk_loc tyd.pl_loc tyname) bd
     | PTYD_Record   bd -> EcScope.Ty.add_record   scope (mk_loc tyd.pl_loc tyname) bd
   in
-    notify scope "added type: `%s'" (unloc tyd.pl_desc.pty_name);
+    EcScope.notify scope `Info "added type: `%s'" (unloc tyd.pl_desc.pty_name);
     scope
 
 (* -------------------------------------------------------------------- *)
@@ -175,7 +158,7 @@ and process_types (scope : EcScope.scope) tyds =
 and process_typeclass (scope : EcScope.scope) (tcd : ptypeclass located) =
   EcScope.check_state `InTop "type class" scope;
   let scope = EcScope.Ty.add_class scope tcd in
-    notify scope "added type class: `%s'" (unloc tcd.pl_desc.ptc_name);
+    EcScope.notify scope `Info "added type class: `%s'" (unloc tcd.pl_desc.ptc_name);
     scope
 
 (* -------------------------------------------------------------------- *)
@@ -207,14 +190,14 @@ and process_interface (scope : EcScope.scope) (x, i) =
 and process_operator (scope : EcScope.scope) (op : poperator located) =
   EcScope.check_state `InTop "operator" scope;
   let scope = EcScope.Op.add scope op in
-    notify scope "added operator: `%s'" (unloc op.pl_desc.po_name);
+    EcScope.notify scope `Info "added operator: `%s'" (unloc op.pl_desc.po_name);
     scope
 
 (* -------------------------------------------------------------------- *)
 and process_predicate (scope : EcScope.scope) (p : ppredicate located) =
   EcScope.check_state `InTop "predicate" scope;
   let scope = EcScope.Pred.add scope p in
-    notify scope "added predicate: `%s'" (unloc p.pl_desc.pp_name);
+    EcScope.notify scope `Info "added predicate: `%s'" (unloc p.pl_desc.pp_name);
     scope
 
 (* -------------------------------------------------------------------- *)
@@ -225,8 +208,8 @@ and process_axiom (scope : EcScope.scope) (ax : paxiom located) =
     name |> EcUtils.oiter
       (fun x ->
          match (unloc ax).pa_kind with
-         | PAxiom _ -> notify scope "added axiom: `%s'" x
-         | _        -> notify scope "added lemma: `%s'" x);
+         | PAxiom _ -> EcScope.notify scope `Info "added axiom: `%s'" x
+         | _        -> EcScope.notify scope `Info "added lemma: `%s'" x);
     scope
 
 (* -------------------------------------------------------------------- *)
@@ -322,7 +305,7 @@ and process_tactics (scope : EcScope.scope) t =
 and process_save (scope : EcScope.scope) loc =
   let (name, scope) = EcScope.Ax.save scope loc in
     name |> EcUtils.oiter
-      (fun x -> notify scope "added lemma: `%s'" x);
+      (fun x -> EcScope.notify scope `Info "added lemma: `%s'" x);
     scope
 
 (* -------------------------------------------------------------------- *)
@@ -484,6 +467,14 @@ let push_context scope context =
 let initialize ~boot ~checkmode =
   assert (!context = None);
   context := Some (rootctxt (initial ~checkmode ~boot))
+
+(* -------------------------------------------------------------------- *)
+type notifier = EcGState.loglevel -> string Lazy.t -> unit
+
+let addnotifier (notifier : notifier) =
+  assert (EcUtils.is_some !context);
+  let gstate = EcScope.gstate (oget !context).ct_root in
+  ignore (EcGState.add_notifier notifier gstate)
 
 (* -------------------------------------------------------------------- *)
 let current () =
