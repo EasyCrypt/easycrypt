@@ -401,6 +401,7 @@ let tfun_expected ue psig =
   let tres = UniEnv.fresh ue in
     EcTypes.toarrow psig tres
 
+(* -------------------------------------------------------------------- *)
 let select_op ?(filter = fun _ -> true) tvi env name ue psig =
   let module D = EcDecl in
 

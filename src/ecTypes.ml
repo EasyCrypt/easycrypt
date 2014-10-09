@@ -271,6 +271,7 @@ let rec ty_subst s =
               ty_subst { ty_subst_id with ts_v = Mid.find_opt^~ s; } body
       end)
 
+(* -------------------------------------------------------------------- *)
 module Tuni = struct
   let offun uidmap =
     ty_subst { ty_subst_id with ts_u = uidmap }
@@ -294,15 +295,23 @@ module Tuni = struct
       | _ -> ty_sub_exists aux t in
     aux
 
+  let univars =
+    let rec doit univars t =
+      match t.ty_node with
+      | Tunivar uid -> Suid.add uid univars
+      | _ -> ty_fold doit univars t
+
+    in fun t -> doit Suid.empty t
+
   let rec fv_rec fv t = 
     match t.ty_node with
     | Tunivar id -> Suid.add id fv 
     | _ -> ty_fold fv_rec fv t 
 
   let fv = fv_rec Suid.empty
-
 end
 
+(* -------------------------------------------------------------------- *)
 module Tvar = struct 
   let subst (s : ty Mid.t) =
     ty_subst { ty_subst_id with ts_v = Mid.find_opt^~ s }
@@ -320,7 +329,6 @@ module Tvar = struct
     | _ -> ty_fold fv_rec fv t 
 
   let fv = fv_rec Sid.empty
-
 end
 
 (* -------------------------------------------------------------------- *)

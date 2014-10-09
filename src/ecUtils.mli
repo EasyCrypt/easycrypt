@@ -9,6 +9,9 @@ exception Unexpected
 val unexpected : unit -> 'a
 
 (* -------------------------------------------------------------------- *)
+type 'data cb = Cb : 'a * ('data -> 'a -> unit) -> 'data cb
+
+(* -------------------------------------------------------------------- *)
 val tryexn : (exn -> bool) -> (unit -> 'a) -> 'a option
 val try_nf : (unit -> 'a) -> 'a option
 

@@ -281,7 +281,7 @@ module PPEnv = struct
       in
 
       let x =
-        try  for i = 0 to max_int do findx "'u" i done; assert false
+        try  for i = 0 to max_int do findx "#" i done; assert false
         with FoundUnivarSym x -> x
       in
 
@@ -886,7 +886,11 @@ let pp_chained_orderings (ppe : PPEnv.t) t_ty pp_sub outer fmt (f, fs) =
               f)
           f fs))
 
-(* --------------------------------------------------------------------  *)
+(* -------------------------------------------------------------------- *)
+let pp_opname (ppe : PPEnv.t) fmt (p : EcPath.path) =
+  EcSymbols.pp_qsymbol fmt (PPEnv.op_symb ppe p None)
+
+(* -------------------------------------------------------------------- *)
 let pp_locbind (ppe : PPEnv.t) (x, ty) =
   let tenv1  = PPEnv.add_local ppe x in
   let pp fmt =

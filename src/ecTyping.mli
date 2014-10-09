@@ -15,6 +15,13 @@ open EcTypes
 open EcModules
 
 (* -------------------------------------------------------------------- *)
+type opmatch = [
+  | `Op   of EcPath.path * EcTypes.ty list
+  | `Lc   of EcIdent.t
+  | `Var  of EcTypes.prog_var
+  | `Proj of EcTypes.prog_var * EcTypes.ty * (int * int)
+]
+
 type tymod_cnv_failure =
 | E_TyModCnv_ParamCountMismatch
 | E_TyModCnv_ParamTypeMismatch of EcIdent.t
@@ -64,7 +71,7 @@ type tyerror =
 | TypeModMismatch        of tymod_cnv_failure
 | NotAFunction
 | UnknownVarOrOp         of qsymbol * ty list
-| MultipleOpMatch        of qsymbol * ty list
+| MultipleOpMatch        of qsymbol * ty list * (opmatch * EcUnify.unienv) list
 | UnknownModName         of qsymbol
 | UnknownTyModName       of qsymbol
 | UnknownFunName         of qsymbol
