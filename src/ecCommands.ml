@@ -94,7 +94,7 @@ module ObjectInfo = struct
       let obj = dumper.od_lookup qs env in
       if prcat then
         Format.fprintf fmt "* In [%s]:@\n@." dumper.od_name;
-      Format.fprintf fmt "%a@." (dumper.od_printer ppe) obj
+      Format.fprintf fmt "%a@\n@." (dumper.od_printer ppe) obj
 
     with EcEnv.LookupFailure _ -> raise NoObject
 
