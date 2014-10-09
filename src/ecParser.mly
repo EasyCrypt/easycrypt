@@ -1641,18 +1641,23 @@ intro_pattern_1:
     {`WithRename s}
 ;
 
+%inline icasemode:
+| /* empty */ { `One  }
+| STAR        { `Full }
+;
+
 intro_pattern:
 | x=loc(intro_pattern_1)
    { IPCore x }
 
-| LBRACKET RBRACKET
-   { IPCase [] }
+| LBRACKET mode=icasemode RBRACKET
+   { IPCase (mode, []) }
 
-| LBRACKET ip=intro_pattern+ RBRACKET
-   { IPCase [ip] }
+| LBRACKET mode=icasemode ip=intro_pattern+ RBRACKET
+   { IPCase (mode, [ip]) }
 
-| LBRACKET ip=plist2(intro_pattern*, PIPE) RBRACKET
-   { IPCase ip }
+| LBRACKET mode=icasemode ip=plist2(intro_pattern*, PIPE) RBRACKET
+   { IPCase (mode, ip) }
 
 | o=rwocc? RARROW
    { IPRw (o |> omap (snd_map EcMaps.Sint.of_list), `LtoR) }
