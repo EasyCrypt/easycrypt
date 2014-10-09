@@ -77,27 +77,131 @@ let () =
     EcPException.register pp
 
 (* -------------------------------------------------------------------- *)
+module ObjectInfo = struct
+  exception NoObject
+
+  (* ------------------------------------------------------------------ *)
+  type 'a objdump = {
+    od_name    : string;
+    od_lookup  : EcSymbols.qsymbol -> EcEnv.env -> 'a;
+    od_printer : EcPrinting.PPEnv.t -> Format.formatter -> 'a -> unit;
+  }
+
+  (* -------------------------------------------------------------------- *)
+  let pr_gen_r ?(prcat = false) dumper = fun fmt env qs ->
+    try
+      let ppe = EcPrinting.PPEnv.ofenv env in
+      let obj = dumper.od_lookup qs env in
+      if prcat then
+        Format.fprintf fmt "* In [%s]:@\n@." dumper.od_name;
+      Format.fprintf fmt "%a@." (dumper.od_printer ppe) obj
+
+    with EcEnv.LookupFailure _ -> raise NoObject
+
+  (* -------------------------------------------------------------------- *)
+  let pr_gen dumper =
+    let theprinter = pr_gen_r dumper in
+
+    fun fmt env qs ->
+      try
+        theprinter fmt env qs
+      with NoObject ->
+        Format.fprintf fmt
+          "no such object in the category [%s]@." dumper.od_name
+
+  (* ------------------------------------------------------------------ *)
+  let pr_ty_r =
+    { od_name    = "type declarations";
+      od_lookup  = EcEnv.Ty.lookup;
+      od_printer = EcPrinting.pp_typedecl; }
+
+  let pr_ty = pr_gen pr_ty_r
+
+  (* ------------------------------------------------------------------ *)
+  let pr_op_r =
+    { od_name    = "operators or predicates";
+      od_lookup  = EcEnv.Op.lookup;
+      od_printer = EcPrinting.pp_opdecl; }
+
+  let pr_op = pr_gen pr_op_r
+
+  (* ------------------------------------------------------------------ *)
+  let pr_th_r =
+    { od_name    = "theories";
+      od_lookup  = EcEnv.Theory.lookup;
+      od_printer = EcPrinting.pp_theory; }
+
+  let pr_th = pr_gen pr_th_r
+
+  (* ------------------------------------------------------------------ *)
+  let pr_ax_r =
+    { od_name    = "lemmas or axioms";
+      od_lookup  = EcEnv.Ax.lookup;
+      od_printer = EcPrinting.pp_axiom; }
+
+  let pr_ax = pr_gen pr_ax_r
+
+  (* ------------------------------------------------------------------ *)
+  let pr_mod_r =
+    { od_name    = "modules";
+      od_lookup  = EcEnv.Mod.lookup;
+      od_printer = (fun ppe fmt (_, me) -> EcPrinting.pp_modexp ppe fmt me); }
+
+  let pr_mod = pr_gen pr_mod_r
+
+  (* ------------------------------------------------------------------ *)
+  let pr_mty_r =
+    { od_name    = "module types";
+      od_lookup  = EcEnv.ModTy.lookup;
+      od_printer = EcPrinting.pp_modsig; }
+
+  let pr_mty = pr_gen pr_mty_r
+
+  (* ------------------------------------------------------------------ *)
+  let pr_any fmt env qs =
+    let printers = [pr_gen_r ~prcat:true pr_ty_r ;
+                    pr_gen_r ~prcat:true pr_op_r ;
+                    pr_gen_r ~prcat:true pr_th_r ;
+                    pr_gen_r ~prcat:true pr_ax_r ;
+                    pr_gen_r ~prcat:true pr_mod_r;
+                    pr_gen_r ~prcat:true pr_mty_r; ] in
+
+    let ok = ref (List.length printers) in
+
+    List.iter
+      (fun f -> try f fmt env qs with NoObject -> decr ok)
+      printers;
+    if !ok = 0 then
+      Format.fprintf fmt "%s@." "no such object in any category"
+end
+
+(* -------------------------------------------------------------------- *)
 let process_pr fmt scope p =
   let env = EcScope.env scope in
-  let ppe = EcPrinting.PPEnv.ofenv env in
 
   match p with
-  | Pr_ty qs ->
-      let (x, ty) = EcEnv.Ty.lookup qs.pl_desc env in
-      Format.fprintf fmt "%a@." (EcPrinting.pp_typedecl ppe) (x, ty)
+  | Pr_ty   qs -> ObjectInfo.pr_ty  fmt env qs.pl_desc
+  | Pr_op   qs -> ObjectInfo.pr_op  fmt env qs.pl_desc
+  | Pr_pr   qs -> ObjectInfo.pr_op  fmt env qs.pl_desc
+  | Pr_th   qs -> ObjectInfo.pr_th  fmt env qs.pl_desc
+  | Pr_ax   qs -> ObjectInfo.pr_ax  fmt env qs.pl_desc
+  | Pr_mod  qs -> ObjectInfo.pr_mod fmt env qs.pl_desc
+  | Pr_mty  qs -> ObjectInfo.pr_mty fmt env qs.pl_desc
+  | Pr_any  qs -> ObjectInfo.pr_any fmt env qs.pl_desc
 
   | Pr_glob pm -> begin
+      let ppe = EcPrinting.PPEnv.ofenv env in
       let (p, _) = EcTyping.trans_msymbol env pm in
       let us = EcEnv.NormMp.mod_use env p in
-
+  
       Format.fprintf fmt "Globals [# = %d]:@."
         (Sid.cardinal us.EcEnv.us_gl);
       Sid.iter (fun id ->
         Format.fprintf fmt "  %s@." (EcIdent.name id))
         us.EcEnv.us_gl;
-
+  
       Format.fprintf fmt "@.";
-
+  
       Format.fprintf fmt "Prog. variables [# = %d]:@."
         (Mx.cardinal us.EcEnv.us_pv);
       Mx.iter (fun xp _ ->
@@ -109,26 +213,7 @@ let process_pr fmt scope p =
         us.EcEnv.us_pv
   end
 
-  | Pr_op qs | Pr_pr qs ->
-      let (x, op) = EcEnv.Op.lookup qs.pl_desc env in
-      Format.fprintf fmt "%a@." (EcPrinting.pp_opdecl ppe) (x, op)
-
-  | Pr_th qs ->
-      let (p, th) = EcEnv.Theory.lookup qs.pl_desc env in
-      Format.fprintf fmt "%a@." (EcPrinting.pp_theory ppe) (p, th)
-
-  | Pr_ax qs ->
-      let (p, ax) = EcEnv.Ax.lookup qs.pl_desc env in
-      Format.fprintf fmt "%a@." (EcPrinting.pp_axiom ppe) (p, ax)
-
-  | Pr_mod qs ->
-      let (_p, me) = EcEnv.Mod.lookup qs.pl_desc env in
-      Format.fprintf fmt "%a@." (EcPrinting.pp_modexp ppe) me
-
-  | Pr_mty qs ->
-      let (p, ms) = EcEnv.ModTy.lookup qs.pl_desc env in
-      Format.fprintf fmt "%a@." (EcPrinting.pp_modsig ppe) (p, ms)
-
+(* -------------------------------------------------------------------- *)
 let process_print scope p =
   process_pr Format.std_formatter scope p
 

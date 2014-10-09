@@ -634,6 +634,7 @@ type cnst_decl = (psymbol list * pty) * pexpr option
 
 (* -------------------------------------------------------------------- *)
 type pprint =
+  | Pr_any  of pqsymbol
   | Pr_ty   of pqsymbol
   | Pr_op   of pqsymbol
   | Pr_th   of pqsymbol
