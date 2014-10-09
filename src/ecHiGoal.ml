@@ -505,9 +505,9 @@ let process_mintros ?(cf = true) pis gs =
     | IPClear xs :: pis ->
         collect (`Clear xs :: maybe_core ()) [] pis
 
-    | IPCase x :: pis ->
+    | IPCase (mode, x) :: pis ->
         let x = List.map (List.rev -| collect [] []) x in
-          collect (`Case x :: maybe_core ()) [] pis
+          collect (`Case (mode, x) :: maybe_core ()) [] pis
 
     | IPRw x :: pis ->
         collect (`Rw x :: maybe_core ()) [] pis
@@ -542,7 +542,7 @@ let process_mintros ?(cf = true) pis gs =
           | `Clear xs ->
               (nointro, t_onall (process_clear xs) gs)
 
-          | `Case pis ->
+          | `Case (mode, pis) ->
               let onsub gs =
                 if FApi.tc_count gs <> List.length pis then
                   tc_error !$gs
@@ -551,10 +551,11 @@ let process_mintros ?(cf = true) pis gs =
                 t_sub (List.map (dointro1 false) pis) gs in
 
               let tc = t_or (t_elimT_ind `Case) t_elim in
+              let tc = match mode with `One -> tc | `Full -> t_do `Maybe None tc in
               let gs =
                 match nointro && not cf with
-                | true  -> onsub gs
-                | false -> begin
+                | true when mode = `One -> onsub gs
+                | _ -> begin
                     match pis with
                     | [] -> t_onall tc gs
                     | _  -> t_onall (fun gs -> onsub (tc gs)) gs

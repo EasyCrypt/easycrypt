@@ -185,6 +185,13 @@ let gstate (env : env) =
   env.env_gstate
 
 (* -------------------------------------------------------------------- *)
+let notify (env : preenv) (lvl : EcGState.loglevel) msg =
+  Format.ksprintf
+    (fun msg ->
+      EcGState.notify lvl (lazy msg) (gstate env))
+    msg
+
+(* -------------------------------------------------------------------- *)
 let empty_mc params = {
   mc_parameters = params;
   mc_modules    = MMsym.empty;

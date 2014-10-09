@@ -14,11 +14,13 @@ type status =[
   | `ST_Failure of exn
 ]
 
+type loglevel = EcGState.loglevel
+
 class type terminal =
 object
   method interactive : bool
   method next        : EcParsetree.prog EcLocation.located
-  method notice      : immediate:bool -> string -> unit
+  method notice      : immediate:bool -> loglevel -> string -> unit
   method finish      : status -> unit
   method finalize    : unit
 end
@@ -30,8 +32,8 @@ let interactive (t : terminal) =
 let next (t : terminal) =
   t#next
 
-let notice ~immediate msg (t : terminal) =
-  t#notice ~immediate msg
+let notice ~immediate lvl msg (t : terminal) =
+  t#notice ~immediate lvl msg
 
 let finish status (t : terminal) =
   t#finish status
@@ -48,10 +50,15 @@ object(self)
 
   method interactive = true
 
-  method private _notice (msg : string) =
-    List.iter
-      (fun x -> Printf.printf "%s\n%!" x)
-      (String.splitlines msg)
+  method private _notice (lvl, msg) =
+    let prefix =
+      match lvl with
+      | `Debug | `Warning -> "[W]"
+      | `Info -> ""
+    in
+      List.iter
+        (fun x -> Printf.printf "%s%s\n%!" prefix x)
+        (String.splitlines msg)
 
   method next =
     begin
@@ -63,10 +70,10 @@ object(self)
     Printf.printf "[%d|%s]>\n%!" (EcCommands.uuid ()) (EcCommands.mode ());
     EcIo.parse iparser
 
-  method notice ~(immediate:bool) (msg : string) =
+  method notice ~(immediate:bool) (lvl : loglevel) (msg : string) =
     match immediate with
-    | true  -> self#_notice msg
-    | false -> notices <- msg :: notices
+    | true  -> self#_notice (lvl, msg)
+    | false -> notices <- (lvl, msg) :: notices
 
   method finish (status : status) =
     List.iter self#_notice (List.rev notices);
@@ -105,7 +112,7 @@ object
     EcIo.drain iparser;
     EcIo.parse iparser
 
-  method notice ~(immediate:bool) (msg : string) =
+  method notice ~(immediate:bool) (_ : loglevel) (msg : string) =
     ignore immediate;
     List.iter
       (fun x -> Printf.fprintf stderr "%s\n%!" x)
@@ -133,12 +140,16 @@ object(self)
   val (*---*) iparser = EcIo.from_channel ~name stream
   val mutable sz    = -1
   val mutable tick  = -1
+  val mutable loc   = EcLocation._dummy
   val mutable doprg =
     (Sys.os_type = "Unix") &&
     (Unix.isatty (Unix.descr_of_out_channel stdout))
 
 
-  method private _update_progress (lineno, position) =
+  method private _update_progress =
+    let lineno   = fst (loc.EcLocation.loc_end) in
+    let position = loc.EcLocation.loc_echar in
+
     let mem = (Gc.stat ()).Gc.live_words in
     let mem = (float_of_int mem) *. (float_of_int (Sys.word_size / 8)) in
 
@@ -168,13 +179,18 @@ object(self)
 
   method next =
     let aout = EcIo.parse iparser in
-    let loc  = aout.EcLocation.pl_loc in
-      self#_update_progress
-        (fst (loc.EcLocation.loc_end), loc.EcLocation.loc_echar);
-      aout
+    loc <- aout.EcLocation.pl_loc;
+    self#_update_progress; aout
 
-  method notice ~(immediate:bool) (_msg : string) =
-    ignore immediate
+  method notice ~(immediate:bool) (lvl : loglevel) (msg : string) =
+    let (_ : unit) = ignore immediate in
+
+    if EcGState.accept_log ~level:`Warning ~wanted:lvl then
+      let prefix = EcGState.string_of_loglevel lvl in
+
+      self#_clear_update;
+      Printf.printf "[%.7s] [%s:%d] %s\n%!"
+        prefix name (fst (loc.EcLocation.loc_end)) msg
 
   method finish (status : status) =
     match status with
@@ -184,12 +200,12 @@ object(self)
         self#_clear_update;
         match e with
         | EcCommands.TopError (loc, e) ->
-            Format.eprintf "\n%s: %a\n%!"
+            Format.eprintf "%s: %a\n%!"
               (EcLocation.tostring loc)
               EcPException.exn_printer e
 
         | _ ->
-            Format.eprintf "\n%a\n%!"
+            Format.eprintf "%a\n%!"
               EcPException.exn_printer e
       end
 

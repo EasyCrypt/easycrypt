@@ -9,6 +9,9 @@ exception Unexpected
 let unexpected () = raise Unexpected
 
 (* -------------------------------------------------------------------- *)
+type 'data cb = Cb : 'a * ('data -> 'a -> unit) -> 'data cb
+
+(* -------------------------------------------------------------------- *)
 type 'a eq  = 'a -> 'a -> bool
 type 'a cmp = 'a -> 'a -> int
 

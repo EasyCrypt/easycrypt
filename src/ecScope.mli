@@ -38,7 +38,12 @@ and pucflags = {
   puc_local : bool;
 }
 
+(* -------------------------------------------------------------------- *)
+val notify : scope -> EcGState.loglevel -> ('a, unit, string, unit) format4 -> 'a
+
+(* -------------------------------------------------------------------- *)
 val empty   : EcGState.gstate -> scope
+val gstate  : scope -> EcGState.gstate
 val path    : scope -> EcPath.path
 val name    : scope -> symbol
 val env     : scope -> EcEnv.env
@@ -46,21 +51,21 @@ val attop   : scope -> bool
 val goal    : scope -> proof_auc option
 val xgoal   : scope -> proof_uc option
 
-val verbose     : scope -> bool
-val set_verbose : scope -> bool -> scope
-
 type topmode = [`InProof | `InActiveProof | `InTop]
 
 val check_state : topmode -> string -> scope -> unit
 
+(* -------------------------------------------------------------------- *)
 module Op : sig
   val add : scope -> poperator located -> scope
 end
 
+(* -------------------------------------------------------------------- *)
 module Pred : sig
   val add : scope -> ppredicate located -> scope
 end
 
+(* -------------------------------------------------------------------- *)
 module Ax : sig
   type mode = [`WeakCheck | `Check]
 
@@ -70,6 +75,7 @@ module Ax : sig
   val activate : scope -> EcParsetree.pqsymbol -> scope
 end
 
+(* -------------------------------------------------------------------- *)
 module Ty : sig
   type tydname = (ptyparams * psymbol) located
 
@@ -83,15 +89,18 @@ module Ty : sig
   val define : scope -> tydname -> pty -> scope
 end
 
+(* -------------------------------------------------------------------- *)
 module Mod : sig
   val add : scope -> pmodule_def -> scope
   val declare : scope -> pmodule_decl -> scope
 end
 
+(* -------------------------------------------------------------------- *)
 module ModType : sig
   val add : scope -> symbol -> pmodule_sig -> scope
 end
 
+(* -------------------------------------------------------------------- *)
 module Theory : sig
   exception TopScope
 
@@ -123,16 +132,19 @@ module Theory : sig
   val import_w3 : scope -> string list -> string -> w3_renaming list -> scope
 end
 
+(* -------------------------------------------------------------------- *)
 module Section : sig
   val enter : scope -> psymbol option -> scope
   val exit  : scope -> psymbol option-> scope
 end
 
+(* -------------------------------------------------------------------- *)
 module Tactics : sig
   val process : scope -> Ax.mode -> ptactic list -> scope
   val proof   : scope -> Ax.mode -> bool -> scope
 end
 
+(* -------------------------------------------------------------------- *)
 module Prover : sig
   val process     : scope -> pprover_infos -> scope
   val set_wrapper : scope -> string option -> scope
@@ -142,19 +154,13 @@ module Prover : sig
   val check_proof : scope -> bool -> scope
 end
 
-module BaseRw : sig
-  val process_addrw : scope -> (pqsymbol * pqsymbol list) -> scope
-end
-
-module Cloning : sig
-  (* [clone scope (src, dst)] finds and clones theory [src] in
-   * scope [scope]. Cloned theory name is [dst] if not None. If
-   * [dst] is None, the basename of [src] is used as the cloned
-   * theory name. *)
-  val clone : scope -> Ax.mode -> theory_cloning -> symbol * scope
-end
-
+(* -------------------------------------------------------------------- *)
 module Extraction : sig
   val process :
     scope -> (string option * toextract list * withextract list) -> scope
+end
+
+(* -------------------------------------------------------------------- *)
+module BaseRw : sig
+  val process_addrw : scope -> (pqsymbol * pqsymbol list) -> scope
 end

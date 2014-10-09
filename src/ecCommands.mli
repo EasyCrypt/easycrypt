@@ -16,13 +16,8 @@ val addidir  : ?system:bool -> ?recursive:bool -> string -> unit
 val loadpath : unit -> (bool * string) list
 
 (* -------------------------------------------------------------------- *)
-type notifier = string -> unit
+type notifier = EcGState.loglevel -> string Lazy.t -> unit
 
-val set_notifier : notifier -> unit
-val get_notifier : unit -> notifier
-val notify : EcScope.scope -> ('a, unit, string, unit) format4 -> 'a
-
-(* -------------------------------------------------------------------- *)
 type checkmode = {
   cm_checkall : bool;
   cm_timeout  : int;
@@ -32,8 +27,9 @@ type checkmode = {
   cm_profile  : bool;
 }
 
-val initialize : boot:bool -> checkmode:checkmode -> unit
-val current    : unit -> EcScope.scope
+val initialize  : boot:bool -> checkmode:checkmode -> unit
+val current     : unit -> EcScope.scope
+val addnotifier : notifier -> unit
 
 (* -------------------------------------------------------------------- *)
 val process : EcParsetree.global located -> unit

@@ -387,8 +387,13 @@ section.
   qed.
 
   lemma mult_inv_le_r (x y z:real) : 
-    0%r < x => (1%r / x) * y <= z => y <= x * z
-  by [].
+    0%r < x => (1%r / x) * y <= z => y <= x * z.
+  proof.
+    move=> lt0x ledivxyz.
+    print theory Real.
+    cut:= mulrMle (1%r / x * y) z x _ _; [by smt | done  |].
+    by rewrite -Real.Comm.Comm -Real.Assoc.Assoc -div_def 2:mul_div // smt.
+  qed.    
 
   (** Composing reduction from CPA to SCDH with reduction from SCDH to CDH *)
   lemma Security &m:
@@ -398,7 +403,7 @@ section.
     apply (Trans _ (Pr[SCDH.SCDH(SCDH_from_CPA(A,RO)).main() @ &m: res]));
       first smt.
     apply mult_inv_le_r; first smt.
-    by apply (SCDH.Reduction (SCDH_from_CPA(A,RO)) &m); smt.
+    by apply (SCDH.Reduction (SCDH_from_CPA(A,RO)) &m); apply qH_pos.
   qed.
 end section.
 

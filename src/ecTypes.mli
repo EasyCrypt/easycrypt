@@ -74,6 +74,8 @@ val is_ty_subst_id : ty_subst -> bool
 val ty_subst : ty_subst -> ty -> ty
 
 module Tuni : sig
+  val univars : ty -> Suid.t
+
   val offun     : (uid -> ty option) -> ty  -> ty
   val offun_dom : (uid -> ty option) -> dom -> dom
 

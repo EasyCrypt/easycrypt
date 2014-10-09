@@ -174,8 +174,8 @@ let _ =
     try  EcProvers.initialize ~ovrevict ?why3conf ()
     with e ->
       Format.eprintf
-      "cannot initialize Why3 engine: %a@."
-      EcPException.exn_printer e;
+        "cannot initialize Why3 engine: %a@."
+        EcPException.exn_printer e;
       exit 1
   end;
 
@@ -251,12 +251,14 @@ let _ =
 
   (* Display Copyright *)
   if EcTerminal.interactive terminal then
-    EcTerminal.notice ~immediate:true copyright terminal;
+    EcTerminal.notice ~immediate:true `Warning copyright terminal;
 
   try
-    (* Set notifier (TODO: fix this global stuff *)
-    EcCommands.set_notifier
-      (fun msg -> EcTerminal.notice ~immediate:true msg terminal);
+    begin
+      let notifier (lvl : EcGState.loglevel) (lazy msg) =
+        EcTerminal.notice ~immediate:true lvl msg terminal
+      in EcCommands.addnotifier notifier
+    end;
 
     (* Interaction loop *)
     while true do

@@ -860,6 +860,11 @@ let destr_exists f =
   | Fquant(Lexists,bd,p) -> bd, p
   | _ -> destr_error "exists"
 
+let destr_let f = 
+  match f.f_node with
+  | Flet(lp, e1,e2) -> lp,e1,e2
+  | _ -> destr_error "let"
+
 let destr_let1 f =
   match f.f_node with
   | Flet(LSymbol(x,ty), e1,e2) -> x,ty,e1,e2

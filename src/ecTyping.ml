@@ -4,6 +4,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
+open EcUid
 open EcUtils
 open EcPath
 open EcMaps
@@ -24,6 +25,13 @@ module NormMp = EcEnv.NormMp
 module TC = EcTypeClass
 
 (* -------------------------------------------------------------------- *)
+type opmatch = [
+  | `Op   of EcPath.path * EcTypes.ty list
+  | `Lc   of EcIdent.t
+  | `Var  of EcTypes.prog_var
+  | `Proj of EcTypes.prog_var * EcTypes.ty * (int * int)
+]
+
 type tymod_cnv_failure =
 | E_TyModCnv_ParamCountMismatch
 | E_TyModCnv_ParamTypeMismatch of EcIdent.t
@@ -73,7 +81,7 @@ type tyerror =
 | TypeModMismatch        of tymod_cnv_failure
 | NotAFunction
 | UnknownVarOrOp         of qsymbol * ty list
-| MultipleOpMatch        of qsymbol * ty list
+| MultipleOpMatch        of qsymbol * ty list * (opmatch * EcUnify.unienv) list
 | UnknownModName         of qsymbol
 | UnknownTyModName       of qsymbol
 | UnknownFunName         of qsymbol
@@ -218,12 +226,78 @@ let pp_tyerror fmt env error =
   | UnknownVarOrOp (name, tys) -> begin
       match tys with
       | [] -> msg "unknown variable or constant: `%a'" pp_qsymbol name
-      | _  -> msg "unknown operator `%a' for signature (%a)"
-                pp_qsymbol name (EcPrinting.pp_list " *@ " pp_type) tys
+      | _  ->
+          msg
+            "no matching operator, named `%a', for the following parameters' type:@\n"
+            pp_qsymbol name;
+          List.iteri (fun i ty -> msg "  [%d]: @[%a@]@\n" (i+1) pp_type ty) tys
   end
 
-  | MultipleOpMatch (name, _) ->
-      msg "more than one operator matches: %a" pp_qsymbol name
+  | MultipleOpMatch (name, tys, matches) -> begin
+      let uvars = List.map EcTypes.Tuni.univars tys in
+      let uvars = List.fold_left Suid.union Suid.empty uvars in
+
+      begin match tys with
+      | [] ->
+          msg
+            "more that one variable or constant matches `%a'@\n"
+            pp_qsymbol name
+  
+      | _  ->
+          let pp_argty i ty = msg "  [%d]: @[%a@]@\n" (i+1) pp_type ty in
+          msg "more than one operator, named `%a', matches.@\n@\n" pp_qsymbol name;
+          msg "operator parameters' type were:@\n";
+          List.iteri pp_argty tys
+      end;
+      msg "@\n";
+
+      let pp_op fmt ((op, inst), subue) =
+        let inst = Tuni.offun_dom (EcUnify.UniEnv.assubst subue) inst in
+
+        begin match inst with
+        | [] ->
+            Format.fprintf fmt "%a"
+              EcPrinting.pp_path op
+        | _  ->
+          Format.fprintf fmt "%a <%a>"
+            EcPrinting.pp_path op
+            (EcPrinting.pp_list ",@ " pp_type) inst
+        end;
+
+        let myuvars = List.map EcTypes.Tuni.univars inst in
+        let myuvars = List.fold_left Suid.union uvars myuvars in
+        let myuvars = Suid.elements myuvars in
+
+        let tysubst = Tuni.offun (EcUnify.UniEnv.assubst subue) in
+        let myuvars = List.pmap
+          (fun uid ->
+            match tysubst (tuni uid) with
+            | { ty_node = Tunivar uid' } when uid = uid' -> None
+            | ty -> Some (uid, ty))
+          myuvars
+        in
+
+        if not (List.isempty myuvars) then begin
+          Format.fprintf fmt "@\n    where@\n";
+          List.iter (fun (uid, uidty) ->
+            Format.fprintf fmt "      %a = %a@\n"
+              (EcPrinting.pp_tyunivar env) uid pp_type uidty)
+            myuvars
+        end
+      in
+
+      msg "the list of matching objects follows:@\n";
+      List.iter (fun (m, ue) ->
+        let (title, Cb (x, pp)) =
+          match m with
+          | `Var  pv         -> ("prog. variable", Cb (pv      , EcPrinting.pp_pv env))
+          | `Lc   id         -> ("local variable", Cb (id      , EcPrinting.pp_local env))
+          | `Proj (pv, _, _) -> ("variable proj.", Cb (pv      , EcPrinting.pp_pv env))
+          | `Op   op         -> ("operator"      , Cb ((op, ue), pp_op))
+        in
+          msg "  [%s]: %a@\n" title pp x)
+        matches
+  end
 
   | UnknownModName name ->
       msg "unknown module: %a" pp_qsymbol name
@@ -391,6 +465,7 @@ let select_local env (qs,s) =
   then EcEnv.Var.lookup_local_opt s env 
   else None 
 
+(* -------------------------------------------------------------------- *)
 let select_pv env side name ue tvi psig = 
   if   tvi <> None
   then []
@@ -408,16 +483,54 @@ let select_pv env side name ue tvi psig =
         select pvs
     with EcEnv.LookupFailure _ -> []
 
+(* -------------------------------------------------------------------- *)
+module OpSelect = struct
+  type 'a ctargs = 'a * EcTypes.ty
 
-let gen_select_op ~actonly ~mode (fpv, fop, flc) opsc tvi env name ue psig =
+  type pvctor = [
+    | `Proj of EcTypes.prog_var * EcTypes.ty * (int * int)
+    | `Var  of EcTypes.prog_var
+  ]
+
+  type opctor = EcPath.path * EcTypes.ty list
+
+  type 'a ctor = {
+    ct_pv : EcMemory.memory option -> pvctor ctargs  -> 'a;
+    ct_op : opctor ctargs -> 'a;
+    ct_lc : EcIdent.ident ctargs -> 'a;
+  }
+
+  type mode = [`Form | `Expr of [`InProc | `InOp]]
+end
+
+let gen_select_op
+    ~(actonly : bool)
+    ~(mode    : OpSelect.mode)
+    (ctor     : 'a OpSelect.ctor)
+    (opsc     : path option)
+    (tvi      : EcUnify.tvi)
+    (env      : EcEnv.env)
+    (name     : EcSymbols.qsymbol)
+    (ue       : EcUnify.unienv)
+    (psig     : EcTypes.dom)
+
+    : ('a * EcTypes.ty * EcUnify.unienv * opmatch) list
+=
+
+  let open OpSelect in
+
+  let fpv me (pv, ty, ue) = (ctor.ct_pv me (pv, ty), ty, ue, (pv     :> opmatch)) in
+  let fop    (op, ty, ue) = (ctor.ct_op    (op, ty), ty, ue, (`Op op :> opmatch)) in
+  let flc    (lc, ty, ue) = (ctor.ct_lc    (lc, ty), ty, ue, (`Lc lc :> opmatch)) in
+
   let filter =
     match mode with
     | `Expr _ -> fun op -> not (EcDecl.is_pred op)
     | `Form   -> fun _  -> true
   in
+
   match (if tvi = None then select_local env name else None) with
-  | Some (id, ty) ->
-      [ flc (id, ty, ue) ]
+  | Some (id, ty) -> [ flc (id, ty, ue) ]
 
   | None ->
       let ops = EcUnify.select_op ~filter tvi env name ue psig in
@@ -455,42 +568,58 @@ let gen_select_op ~actonly ~mode (fpv, fop, flc) opsc tvi env name ue psig =
       in
         (List.map (fpv me) pvs) @ (List.map fop ops)
 
+(* -------------------------------------------------------------------- *)
 let select_exp_op env mode opsc name ue tvi psig =
-  let ppv = (fun _ (pv, ty, ue) -> match pv with
-    | `Var pv -> e_var pv ty, ty, ue
-    | `Proj (pv, _ , (0, 1)) -> e_var pv ty, ty, ue
-    | `Proj (pv, ty', (i, _)) -> e_proj (e_var pv ty') i ty, ty, ue)
-  and pop  = (fun ((op, tys), ty, ue) -> (e_op op tys ty, ty, ue))
-  and flc  = (fun (id, ty, ue) -> (e_local id ty, ty, ue)) in
-    gen_select_op ~actonly:false ~mode:(`Expr mode) (ppv, pop, flc)
-      opsc tvi env name ue psig 
+  let ctor =
+    let ppv = (fun _ (pv, ty) -> match pv with
+      | `Var   pv               -> e_var pv ty
+      | `Proj (pv, _  , (0, 1)) -> e_var pv ty
+      | `Proj (pv, ty', (i, _)) -> e_proj (e_var pv ty') i ty)
 
+    and pop  = (fun ((op, tys), ty) -> e_op op tys ty)
+    and flc  = (fun (id, ty) -> e_local id ty) in
+
+    { OpSelect.ct_pv = ppv;
+      OpSelect.ct_op = pop;
+      OpSelect.ct_lc = flc; }
+  in
+
+  gen_select_op ~actonly:false ~mode:(`Expr mode)
+    ctor opsc tvi env name ue psig
+
+(* -------------------------------------------------------------------- *)
 let select_form_op env opsc name ue tvi psig =
-  let ppv = (fun me (pv, ty, ue) -> 
-    match pv with 
-    | `Var pv -> f_pvar pv ty (oget me), ue
-    | `Proj (pv, _, (0, 1)) ->
-        f_pvar pv ty (oget me), ue
-    | `Proj (pv, ty', (i, _)) ->
-        f_proj (f_pvar pv ty' (oget me)) i ty, ue)
-  and pop = (fun ((op, tys), ty, ue) -> (f_op op tys ty, ue))
-  and flc = (fun (id, ty, ue) -> (f_local id ty, ue)) in
-    gen_select_op ~actonly:true ~mode:`Form (ppv, pop, flc)
-      opsc tvi env name ue psig 
+  let ctor =
+    let ppv = (fun me (pv, ty) -> 
+      match pv with 
+      | `Var   pv               -> f_pvar pv ty (oget me)
+      | `Proj (pv, _  , (0, 1)) -> f_pvar pv ty (oget me)
+      | `Proj (pv, ty', (i, _)) -> f_proj (f_pvar pv ty' (oget me)) i ty)
 
+    and pop = (fun ((op, tys), ty) -> f_op op tys ty)
+    and flc = (fun (id, ty) -> f_local id ty) in
+
+    { OpSelect.ct_pv = ppv;
+      OpSelect.ct_op = pop;
+      OpSelect.ct_lc = flc; }
+  in
+
+  gen_select_op ~actonly:true ~mode:`Form
+    ctor opsc tvi env name ue psig 
+
+(* -------------------------------------------------------------------- *)
 let select_proj env opsc name ue tvi recty =
   let filter = (fun op -> EcDecl.is_proj op) in
   let ops = EcUnify.select_op ~filter tvi env name ue [recty] in
-  let ops =
-    match ops, opsc with
-    | _ :: _ :: _, Some opsc ->
-        List.filter
-          (fun ((p, _), _, _) ->
-            EcPath.p_equal opsc (oget (EcPath.prefix p)))
-          ops
-    | _, _ -> ops
-  in
-    ops
+
+  match ops, opsc with
+  | _ :: _ :: _, Some opsc ->
+      List.filter
+        (fun ((p, _), _, _) ->
+          EcPath.p_equal opsc (oget (EcPath.prefix p)))
+        ops
+
+  | _, _ -> ops
 
 (* -------------------------------------------------------------------- *)
 let lookup_scope env popsc =
@@ -652,7 +781,6 @@ let check_sig_mt_cnv env sin tyout =
   check_sig_cnv `Sub env sin sout
 
 (* -------------------------------------------------------------------- *)
-
 type restriction_who =
 | RW_mod of EcPath.mpath
 | RW_fun of EcPath.xpath 
@@ -665,35 +793,52 @@ type restriction_err =
 | RE_MMissingRestriction  of EcPath.mpath * EcPath.mpath pair
 
 type restriction_error = restriction_who * restriction_err
-  
+
 exception RestrictionError of restriction_error
 
-let pp_restriction_error env fmt (w,e) = 
+let pp_restriction_error env fmt (w, e) = 
   let ppe = EcPrinting.PPEnv.ofenv env in
   let pp_v fmt xp = EcPrinting.pp_pv ppe fmt (pv_glob xp) in
   let pp_m fmt m  = EcPrinting.pp_topmod ppe fmt m in
+
   let pp_restriction_who fmt = function
-    | RW_mod mp -> Format.fprintf fmt "The module %a" pp_m mp
-    | RW_fun xp -> Format.fprintf fmt "The procedure %a" (EcPrinting.pp_funname ppe) xp in
+    | RW_mod mp ->
+        Format.fprintf fmt "the module %a" pp_m mp
+
+    | RW_fun xp ->
+        Format.fprintf fmt "the procedure %a" (EcPrinting.pp_funname ppe) xp in
+
   let pp_restriction_err fmt = function
     | RE_UseVariable x -> 
-      Format.fprintf fmt "can not uses the variable %a" pp_v x
-    | RE_UseVariableViaModule (x,m) -> 
-      Format.fprintf fmt "uses module %a which uses %a" pp_m m pp_v x
+        Format.fprintf fmt
+          "should not be able to use the variable %a"
+          pp_v x
+
+    | RE_UseVariableViaModule (x, m) -> 
+        Format.fprintf fmt
+          "should not be able to use %a (via %a)"
+          pp_v x pp_m m
+
     | RE_UseModule m -> 
-      Format.fprintf fmt "can not uses the module %a" pp_m m
-    | RE_VMissingRestriction (x,(m1,m2))->
-      Format.fprintf fmt "can uses %a, add restriction %a to %a"
-        pp_v x pp_m m1 pp_m m2
-    | RE_MMissingRestriction (m,(m1,m2))->
-      Format.fprintf fmt "can uses %a, add restriction %a to %a or %a to %a"
-        pp_m m pp_m m1 pp_m m2 pp_m m2 pp_m m1
-  in
-  Format.fprintf fmt "%a %a" pp_restriction_who w pp_restriction_err e
+        Format.fprintf fmt
+          "should not be able to use the module %a"
+          pp_m m
+
+    | RE_VMissingRestriction (x, (m1, m2))->
+        Format.fprintf fmt
+          "should not be able to use %a, add restriction %a to %a"
+          pp_v x pp_m m1 pp_m m2
+
+    | RE_MMissingRestriction (m, (m1, m2))->
+        Format.fprintf fmt
+          "should not be able to use %a, add restriction %a to %a or %a to %a"
+          pp_m m pp_m m1 pp_m m2 pp_m m2 pp_m m1
+
+  in Format.fprintf fmt "%a %a" pp_restriction_who w pp_restriction_err e
 
 (* -------------------------------------------------------------------- *)
 let check_restrictions env who use restr =
-  let re_error = fun x -> raise (RestrictionError(who, x)) in
+  let re_error = fun x -> raise (RestrictionError (who, x)) in
 
   let restr = NormMp.norm_restr env restr in
 
@@ -1166,12 +1311,13 @@ let transexp (env : EcEnv.env) mode ue e =
         begin match ops with
         | [] -> tyerror loc env (UnknownVarOrOp (name, []))
 
-        | _ :: _ :: _ ->
-            tyerror loc env (MultipleOpMatch (name, []))
-
-        | [op, ty, subue] ->
+        | [op, ty, subue, _] ->
             EcUnify.UniEnv.restore ~src:subue ~dst:ue;
             op, ty
+
+        | _ ->
+          let matches = List.map (fun (_, _, subue, m) -> (m, subue)) ops in
+          tyerror loc env (MultipleOpMatch (name, [], matches))
         end
 
     | PEscope (popsc, e) ->
@@ -1185,18 +1331,19 @@ let transexp (env : EcEnv.env) mode ue e =
         let ops  = select_exp_op env mode osc name ue tvi esig in
         begin match ops with
         | [] ->
-          let esig = Tuni.offun_dom (EcUnify.UniEnv.assubst ue) esig in
-          tyerror loc env (UnknownVarOrOp (name, esig))
-
-        | _ :: _ :: _ ->
             let esig = Tuni.offun_dom (EcUnify.UniEnv.assubst ue) esig in
-              tyerror loc env (MultipleOpMatch (name, esig))
-              
-        | [op, ty, subue] ->
+            tyerror loc env (UnknownVarOrOp (name, esig))
+
+        | [op, ty, subue, _] ->
             EcUnify.UniEnv.restore ~src:subue ~dst:ue;
             let esig = List.map2 (fun e l -> mk_loc l.pl_loc e) esig pes in
             let codom = ty_fun_app _dummy env ue ty esig in
               (e_app op (List.map fst es) codom, codom)
+
+        | _ ->
+            let esig = Tuni.offun_dom (EcUnify.UniEnv.assubst ue) esig in
+            let matches = List.map (fun (_, _, subue, m) -> (m, subue)) ops in
+            tyerror loc env (MultipleOpMatch (name, esig, matches))
         end
 
     | PEapp (pe, pes) ->
@@ -1932,11 +2079,7 @@ and translvalue ue (env : EcEnv.env) lvalue =
           let esig = Tuni.offun_dom (EcUnify.UniEnv.assubst ue) esig in
             tyerror x.pl_loc env (UnknownVarOrOp (name, esig))
 
-      | _ :: _ :: _ ->
-          let esig = Tuni.offun_dom (EcUnify.UniEnv.assubst ue) esig in
-            tyerror x.pl_loc env (MultipleOpMatch (name, esig))
-
-      | [({e_node = Eop (p, tys) }, _, subue)] ->
+      | [{ e_node = Eop (p, tys) }, _, subue, _] ->
           EcUnify.UniEnv.restore ~src:subue ~dst:ue;
           (LvMap ((p, tys), pv, e, xty), codomty)
 
@@ -1944,6 +2087,10 @@ and translvalue ue (env : EcEnv.env) lvalue =
           let esig = Tuni.offun_dom (EcUnify.UniEnv.assubst ue) esig in
             tyerror x.pl_loc env (UnknownVarOrOp (name, esig))
 
+      | _ ->
+          let esig = Tuni.offun_dom (EcUnify.UniEnv.assubst ue) esig in
+          let matches = List.map (fun (_, _, subue, m) -> (m, subue)) ops in
+          tyerror x.pl_loc env (MultipleOpMatch (name, esig, matches))
 
 (* -------------------------------------------------------------------- *)
 let transmem env m =
@@ -2010,12 +2157,12 @@ let trans_form_or_pattern env (ps, ue) pf tt =
         | [] ->
             tyerror loc env (UnknownVarOrOp (name, []))
 
-        | _ :: _ :: _ ->
-            tyerror loc env (MultipleOpMatch (name, []))
+        | [op, _, subue, _] ->
+            EcUnify.UniEnv.restore ~src:subue ~dst:ue; op
 
-        | [op, subue] ->
-            EcUnify.UniEnv.restore ~src:subue ~dst:ue;
-            op
+        | _ ->
+            let matches = List.map (fun (_, _, subue, m) -> (m, subue)) ops in
+            tyerror loc env (MultipleOpMatch (name, [], matches))
         end
 
     | PFside (f, side) -> begin
@@ -2028,7 +2175,7 @@ let trans_form_or_pattern env (ps, ue) pf tt =
           transf (EcEnv.Memory.set_active me env) f
       end
 
-    | PFeqveq xs ->
+    | PFeqveq (xs, om) ->
         let lookup me x =
           match EcEnv.Var.lookup_progvar_opt ~side:me (unloc x) env with
           | None -> tyerror x.pl_loc env (UnknownVarOrOp (unloc x, []))
@@ -2047,10 +2194,18 @@ let trans_form_or_pattern env (ps, ue) pf tt =
           | Some _ -> ()
         in
 
-        let do1 = function
+        let qual (mq : pmsymbol option) (x : pqsymbol) =
+          match mq with
+          | None -> x
+          | Some z ->
+              let (ys,y) = x.pl_desc in
+                { x with pl_desc = ((List.map (fun (ps,_) -> ps.pl_desc) z)@ys,y) }
+        in
+
+         let do1 = function
           | GVvar x ->
-              let x1 = lookup EcFol.mleft x in
-              let x2 = lookup EcFol.mright x in
+              let x1 = lookup EcFol.mleft  (qual (om |> omap fst) x) in
+              let x2 = lookup EcFol.mright (qual (om |> omap snd) x) in
                 unify_or_fail env ue x.pl_loc ~expct:x1.f_ty x2.f_ty;
                 f_eq x1 x2
 
@@ -2075,15 +2230,16 @@ let trans_form_or_pattern env (ps, ue) pf tt =
               let esig = Tuni.offun_dom (EcUnify.UniEnv.assubst ue) esig in
                 tyerror loc env (UnknownVarOrOp (name, esig))
 
-          | _ :: _ :: _ ->
-              let esig = Tuni.offun_dom (EcUnify.UniEnv.assubst ue) esig in
-                tyerror loc env (MultipleOpMatch (name, esig))
-  
-          | [op, subue] ->
+          | [op, _, subue, _] ->
               EcUnify.UniEnv.restore ~src:subue ~dst:ue;
               let esig = List.map2 (fun e l -> mk_loc l.pl_loc e) esig pes in
               let codom = ty_fun_app _dummy env ue op.f_ty esig in
                 f_app op es codom
+
+          | _ ->
+              let esig = Tuni.offun_dom (EcUnify.UniEnv.assubst ue) esig in
+              let matches = List.map (fun (_, _, subue, m) -> (m, subue)) ops in
+              tyerror loc env (MultipleOpMatch (name, esig, matches))
           end
 
     | PFapp (e, pes) ->

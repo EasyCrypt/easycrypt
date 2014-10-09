@@ -73,7 +73,7 @@ module Options : IOptions = struct
   let known_options : options ref = ref Mint.empty
 
   let identity = {
-    for_loading  = (fun x -> x);
+    for_loading = (fun x -> x);
   }
 
   let count = ref 0
@@ -104,30 +104,6 @@ module Options : IOptions = struct
     Mint.map (fun (act, exn) -> act, act.for_loading exn) options
 
   let for_subscope options = options
-end
-
-(* -------------------------------------------------------------------- *)
-module Notifier = struct
-  exception Verbose of [`ForLoading | `Verbose of bool]
-
-  let for_loading = function
-    | Verbose _ -> Verbose `ForLoading
-    | exn -> exn
-
-  let default = Verbose (`Verbose true)
-
-  let mode = Options.register { for_loading } default
-
-  let verbose options =
-    match Options.get options mode with
-    | Verbose b -> b
-    | _ -> assert false
-
-  let set options b =
-    match Options.get options mode with
-    | Verbose (`ForLoading) -> options
-    | Verbose (`Verbose _)  -> Options.set options mode (Verbose (`Verbose b))
-    | _ -> assert false
 end
 
 (* -------------------------------------------------------------------- *)
@@ -221,6 +197,10 @@ let empty (gstate : EcGState.gstate) =
     sc_section    = EcSection.initial; }
 
 (* -------------------------------------------------------------------- *)
+let gstate (scope : scope) =
+  EcEnv.gstate scope.sc_env
+
+(* -------------------------------------------------------------------- *)
 let name (scope : scope) =
   scope.sc_name
 
@@ -261,18 +241,17 @@ let check_state (mode : topmode) action (scope : scope) =
   | _ -> ()
 
 (* -------------------------------------------------------------------- *)
-let verbose (scope : scope) =
-  match Notifier.verbose scope.sc_options with
-  | `ForLoading -> false
-  | `Verbose b  -> b
-
-(* -------------------------------------------------------------------- *)
-let set_verbose (scope : scope) (b : bool) =
-  { scope with sc_options = Notifier.set scope.sc_options b }
+let notify (scope : scope) (lvl : EcGState.loglevel) =
+  EcEnv.notify scope.sc_env lvl
 
 (* -------------------------------------------------------------------- *)
 let for_loading (scope : scope) =
-  { (empty (EcEnv.gstate scope.sc_env)) with
+  let gstate = EcEnv.gstate scope.sc_env in
+  let gstate = EcGState.copy gstate in
+
+  EcGState.set_loglevel `Warning gstate;
+
+  { (empty gstate) with
       sc_loaded  = scope.sc_loaded;
       sc_options = Options.for_loading scope.sc_options; }
 

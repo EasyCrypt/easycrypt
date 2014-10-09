@@ -89,7 +89,7 @@ let fission_stmt (il, (d1, d2)) (pf, hyps) me zpr =
 let t_fission_r side cpos infos g =
   let tr = fun side -> `LoopFission (side, cpos, infos) in
   let cb = fun cenv _ me zpr -> fission_stmt infos cenv me zpr in
-    t_code_transform side cpos tr (t_zip cb) g
+    t_code_transform side ~bdhoare:true cpos tr (t_zip cb) g
 
 let t_fission = FApi.t_low3 "loop-fission" t_fission_r
 
@@ -143,7 +143,7 @@ let fusion_stmt (il, (d1, d2)) (pf, hyps) me zpr =
 let t_fusion_r side cpos infos g =
   let tr = fun side -> `LoopFusion (side, cpos, infos) in
   let cb = fun cenv _ me zpr -> fusion_stmt infos cenv me zpr in
-    t_code_transform side cpos tr (t_zip cb) g
+    t_code_transform side ~bdhoare:true cpos tr (t_zip cb) g
 
 let t_fusion = FApi.t_low3 "loop-fusion" t_fusion_r
 
@@ -155,7 +155,7 @@ let unroll_stmt (pf, _) me i =
 
 let t_unroll_r side cpos g =
   let tr = fun side -> `LoopUnraoll (side, cpos) in
-    t_code_transform side cpos tr (t_fold unroll_stmt) g
+    t_code_transform side  ~bdhoare:true cpos tr (t_fold unroll_stmt) g
 
 let t_unroll = FApi.t_low2 "loop-unroll" t_unroll_r
 
@@ -172,7 +172,7 @@ let splitwhile_stmt b (pf, _) me i =
 
 let t_splitwhile_r b side cpos g =
   let tr = fun side -> `SplitWhile (b, side, cpos) in
-    t_code_transform side cpos tr (t_fold (splitwhile_stmt b)) g
+    t_code_transform side ~bdhoare:true cpos tr (t_fold (splitwhile_stmt b)) g
 
 let t_splitwhile = FApi.t_low3 "split-while" t_splitwhile_r
 

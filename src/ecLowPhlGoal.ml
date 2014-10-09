@@ -20,7 +20,7 @@ module Zpr = EcMatching.Zipper
 type lv_subst_t = (lpattern * form) * (prog_var * memory * form) list
 
 (* -------------------------------------------------------------------- *)
-let tc_error_notphl pf (x : bool option) =
+let tc_error_notphl pf (_x : bool option) =
   tc_error pf "not a HL/PHL/PRHL goal"  (* FIXME *)
 
 (* -------------------------------------------------------------------- *)
@@ -43,12 +43,12 @@ let s_last proj s =
       with Not_found -> None
 
 (* -------------------------------------------------------------------- *)
-let pf_first_gen kind proj pe s =
+let pf_first_gen _kind proj pe s =
   match s_first proj s with
   | None   -> tc_error pe "invalid first instruction"
   | Some x -> x
 
-let pf_last_gen kind proj pe s =
+let pf_last_gen _kind proj pe s =
   match s_last proj s with
   | None   -> tc_error pe "invalid last instruction"
   | Some x -> x
@@ -220,36 +220,109 @@ let fresh_pv me v =
       (EcMemory.bind v.v_name v.v_type me, v.v_name)
 
 (* -------------------------------------------------------------------- *)
-let lv_subst m lv f : lv_subst_t =
+let lv_subst m lv f =
   match lv with
-  | LvVar (pv, t) ->
-    let id = id_of_pv pv m in
-    (LSymbol (id, t), f), [pv,m,f_local id t]
-
-  | LvTuple vs ->
-    let ids = List.map (fun (pv,t) -> id_of_pv pv m, t) vs in
-    let s   = List.map2 (fun (pv,_) (id,t) -> (pv,m,f_local id t)) vs ids in
-    (LTuple ids, f), s
-
+  | LvVar _ -> lv,m,f
+  | LvTuple _ -> lv,m,f
   | LvMap((p,tys),pv,e,ty) ->
-    let id  = id_of_pv pv m in
     let set = f_op p tys (toarrow [ty; e.e_ty; f.f_ty] ty) in
     let f   = f_app set [f_pvar pv ty m; form_of_expr m e; f] ty in
-    (LSymbol (id,ty), f), [pv,m,f_local id ty]
+    LvVar(pv,ty), m, f
 
 (* -------------------------------------------------------------------- *)
-let mk_let_of_lv_substs env (lets, f) =
-  let rec aux s lets =
-    match lets with
-    | [] -> PVM.subst env s f
-    | ((lp, f1), toadd) :: lets ->
+let mk_let_of_lv_substs_nolet env (lets, f) =
+  if List.isempty lets then f 
+  else
+    let s = 
+      List.fold_left (fun s (lv,m,f1) ->
         let f1 = PVM.subst env s f1 in
-        let s  = List.fold_left
-          (fun s (pv,m,fp) -> PVM.add env pv m fp s) s toadd
-        in
-          f_let_simpl lp f1 (aux s lets)
-  in
-  if List.isempty lets then f else aux PVM.empty lets
+        match lv, f1.f_node with
+        | LvVar (pv,_), _ -> PVM.add env pv m f1 s 
+        | LvTuple vs, Ftuple fs -> 
+          List.fold_left2 (fun s (pv,_) f -> PVM.add env pv m f s) s vs fs
+        | LvTuple vs, _ ->
+          List.fold_lefti 
+            (fun i s (pv,ty) -> PVM.add env pv m (f_proj f i ty) s)
+            s vs
+        | LvMap _, _ -> assert false)  PVM.empty lets in
+    PVM.subst env s f
+
+let add_lv_subst env lv m s =
+  match lv with
+  | LvVar (pv,t) -> 
+    let id = id_of_pv pv m in
+    let s = PVM.add env pv m (f_local id t) s in
+    LSymbol(id, t), s
+
+  | LvTuple pvs -> 
+    let s, ids = 
+      List.map_fold (fun s (pv,t) -> 
+        let id = id_of_pv pv m in
+        let s = PVM.add env pv m (f_local id t) s in
+        s, (id,t)) s pvs in
+    LTuple ids, s
+
+  | _ -> assert false
+
+let mk_let_of_lv_substs_let env (lets, f) =
+  if List.isempty lets then f 
+  else
+    let accu,s = 
+      List.fold_left (fun (accu,s) (lv,m,f1) ->
+        let f1 = PVM.subst env s f1 in
+        let lv, s = add_lv_subst env lv m s in
+        (lv,f1)::accu, s) ([],PVM.empty) lets in
+    (* accu is the sequence of let in reverse order *)
+    let f = PVM.subst env s f in
+    (* compute the fv *)
+    let _, fvlets = 
+      List.fold_left (fun (fv2,lets) (lp,f1 as lpf) ->
+        let fv = EcIdent.fv_diff fv2 (lp_fv lp) in
+        let fv = EcIdent.fv_union (f_fv f1) fv in
+        fv, (lpf,fv2)::lets) (f.f_fv,[]) accu in
+    (* fvlets is the sequence of let in the right order *)
+    (* build the lets and perform the substitution/simplification *)
+    let add_id fv (accu,s) (id,ty) f1 = 
+      match EcIdent.Mid.find_opt id fv with
+      | None   -> (accu, s)
+      | Some i ->
+        if   i = 1 || can_subst f1
+        then accu, Fsubst.f_bind_local s id f1 
+        else (LSymbol(id,ty), f1)::accu, s in
+    
+    let rlets, s = 
+      List.fold_left (fun (rlets,s as accus) ((lp,f1),fv) ->
+        let f1 = Fsubst.f_subst s f1 in
+        match lp, f1.f_node with
+        | LRecord _, _ -> assert false
+        | LSymbol idt, _ -> add_id fv accus idt f1
+        | LTuple ids, Ftuple fs -> List.fold_left2 (add_id fv) accus ids fs
+        | LTuple ids, _ ->
+          let used = 
+            List.fold_left (fun u (id, _) ->
+              match u, EcIdent.Mid.find_opt id fv with
+              | Some i1, Some i2 -> Some (i1+i2)
+              | None, i | i, None -> i) None ids in
+          match used with
+          | None -> accus 
+          | Some i ->
+            let accus, fx = 
+              if i = 1 || can_subst f1 then accus, f1
+              else
+                let x = EcIdent.create "tpl" in
+                let ty = ttuple (List.map snd ids) in
+                let lpx = LSymbol(x,ty) in
+                let fx = f_local x ty in
+                ((lpx,f1)::rlets,s), fx in
+            List.fold_lefti (fun i accus (_,ty as idt) ->
+              add_id fv accus idt (f_proj fx i ty)) accus ids)
+        ([],Fsubst.f_subst_id) fvlets in
+    List.fold_left (fun f2 (lp,f1) -> f_let lp f1 f2) (Fsubst.f_subst s f) rlets
+
+
+let mk_let_of_lv_substs ?(uselet=true) env letsf =
+  if uselet then mk_let_of_lv_substs_let env letsf
+  else mk_let_of_lv_substs_nolet env letsf
 
 (* -------------------------------------------------------------------- *)
 let subst_form_lv env m lv t f =

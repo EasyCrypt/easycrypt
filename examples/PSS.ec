@@ -3574,7 +3574,7 @@ section.
   proof.
     proc.
     sp; if=> //.
-    splitwhile (i < k0 + 1): {1} 1.
+    splitwhile {1} 1 : (i < k0 + 1).
     seq  1  1: (={glob Hmap, glob Gmap, u, z, i, ho, w, st, b, c, m, r} /\
                 valid_keys (Hmem.pk,Hmem.sk){1} /\
                 (c{1} = Adv => invertible Hmem.pk{1} Hmem.xstar{1}) /\

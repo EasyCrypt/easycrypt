@@ -4,7 +4,7 @@ require import Distr.
 require import List.
 require import FMap.
 require import FSet.
-require Monoid.
+require (*--*) Monoid.
 (*---*) import Monoid.Miplus.
 
 (*** Some type definitions *)
@@ -256,7 +256,10 @@ section.
     case (in_dom x F.m).
       by rcondf 3; wp; do !rnd=> //; wp; skip; smt.
     rcondt 3; first by do !rnd; wp.
-    by wp; do !rnd (True); wp; skip; smt.
+    auto; progress. smt. smt.
+    elim H=> H; [by left | right].
+    elim H=> r [r_in_logP r_in_m].
+    by exists r; split=> //; rewrite /in_dom dom_set mem_add; left.
     (* [Psample.prg ~ Plog.prg: I] when Bad does not hold *)
     proc; inline F.f. swap{2} 3 -2.
     wp; do 2!rnd; wp; skip; progress; first 2 last; last 9 smt.
@@ -286,8 +289,7 @@ section.
     (* Psample.prg ~ PrgI.prg *)
     by proc; wp; rnd; rnd{1}; wp; skip; smt.
   conseq* (_: _ ==> ={glob A, glob F})=> //.
-  sim.
-  by proc; wp; rnd{1}; skip; smt.
+  by inline *; auto; smt.
   qed.
 
   local lemma Resample_resampleL: islossless Resample.resample.
@@ -326,7 +328,7 @@ section.
       swap{1} 3 3. swap{2} [4..5] 2. swap{2} [6..8] 1.
       swap{1} 4 3. swap{1} 4 2. swap{2} 2 4.
       sim.
-      splitwhile (length P.logP < n - 1):{2} 5 .
+      splitwhile {2} 5 : (length P.logP < n - 1).
       conseq* (_ : _ ==> ={P.logP})=> //.
       seq 3 5: (={P.logP} /\ (length P.logP = n - 1){2}).
         while (={P.logP} /\ n{2} = n{1} + 1 /\ length P.logP{1} <= n{1});

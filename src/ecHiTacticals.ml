@@ -44,7 +44,8 @@ and process1_admit (_ : ttenv) (tc : tcenv1) =
   EcLowGoal.t_admit tc
 
 (* -------------------------------------------------------------------- *)
-and process1_idtac (_ : ttenv) (_msg : string option) (tc : tcenv1) =
+and process1_idtac (_ : ttenv) (msg : string option) (tc : tcenv1) =
+  msg |> oiter (EcEnv.notify (FApi.tc1_env tc) `Warning "%s");
   EcLowGoal.t_id tc
 
 (* -------------------------------------------------------------------- *)

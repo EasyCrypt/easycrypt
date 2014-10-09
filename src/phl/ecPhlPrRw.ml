@@ -110,7 +110,7 @@ let t_pr_rewrite s tc =
   let torw =
     try
       ignore (EcMatching.FPosition.select select concl);
-      tc_error !!tc "can not find a pattern for %s" s
+      tc_error !!tc "cannot find a pattern for %s" s
     with FoundPr f -> f in
 
   let lemma, args = 

@@ -226,7 +226,7 @@ and pformula_r =
   | PFproj   of pformula * pqsymbol
   | PFproji  of pformula * int
   | PFglob   of pmsymbol located
-  | PFeqveq  of glob_or_var list
+  | PFeqveq  of glob_or_var list * (pmsymbol pair) option
   | PFlsless of pgamepath
   | PFscope  of pqsymbol * pformula
 
@@ -484,7 +484,7 @@ and rwocci = [`Inclusive | `Exclusive]
 
 type intropattern1 =
   | IPCore  of renaming located
-  | IPCase  of intropattern list
+  | IPCase  of ([`One|`Full] * intropattern list)
   | IPView  of ffpattern
   | IPRw    of (rwocc * rwside)
   | IPSubst of rwside
@@ -634,6 +634,7 @@ type cnst_decl = (psymbol list * pty) * pexpr option
 
 (* -------------------------------------------------------------------- *)
 type pprint =
+  | Pr_any  of pqsymbol
   | Pr_ty   of pqsymbol
   | Pr_op   of pqsymbol
   | Pr_th   of pqsymbol

@@ -27,6 +27,8 @@ val pp_paren : 'a pp -> 'a pp
 val pp_list : ('a, 'b, 'c, 'd, 'd, 'a) format6 -> 'a pp -> 'a list pp
 
 val pp_pv      : PPEnv.t -> EcTypes.prog_var pp
+val pp_local   : PPEnv.t -> EcIdent.ident pp
+val pp_opname  : PPEnv.t -> EcPath.path pp
 val pp_funname : PPEnv.t -> EcPath.xpath pp
 val pp_topmod  : PPEnv.t -> EcPath.mpath pp
 val pp_form    : PPEnv.t -> EcFol.form pp
@@ -43,8 +45,9 @@ val pp_modsig   : PPEnv.t -> (EcPath.path * EcModules.module_sig         ) pp
 
 val pp_mem : PPEnv.t -> EcIdent.t pp
 
-val pp_tyvar : PPEnv.t -> EcIdent.t pp
-val pp_path  : EcPath.path pp
+val pp_tyvar    : PPEnv.t -> EcIdent.t pp
+val pp_tyunivar : PPEnv.t -> EcUid.uid pp
+val pp_path     : EcPath.path pp
 
 val pp_equivS : PPEnv.t -> EcFol.equivS pp
 val pp_goal   : PPEnv.t -> (int * (EcBaseLogic.hyps * EcFol.form)) pp

@@ -167,11 +167,12 @@ let process_app dir k phi bd_info tc =
       let (ra, f1, f2, f3, f4) = process_phl_bd_info dir bd_info tc in
       t_bdhoare_app i (ra, pia, f1, f2, f3, f4) tc
 
-  | Double(i,j), PAppNone ->
+  | Double(i, j), PAppNone when is_equivS concl ->
       let phi = TTC.tc1_process_prhl_formula tc phi in
       t_equiv_app (i, j) phi tc
 
-  | Single _, PAppNone ->
+  | Single _, PAppNone
+  | Double _, PAppNone ->
       tc_error !!tc "invalid `position' parameter"
 
   | _, _ ->

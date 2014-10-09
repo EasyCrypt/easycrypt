@@ -882,7 +882,10 @@ form_u(P):
     { PFif (c, e1, e2) }
 
 | EQ LBRACE xs=plist1(qident_or_res_or_glob, COMMA) RBRACE
-    { PFeqveq xs }
+    { PFeqveq (xs, None) }
+
+| EQ LBRACE xs=plist1(qident_or_res_or_glob, COMMA) RBRACE LPAREN  m1=mod_qident COMMA m2=mod_qident RPAREN
+    { PFeqveq (xs, Some (m1, m2)) }
 
 | IF c=form_r(P) THEN e1=form_r(P) ELSE e2=form_r(P)
     { PFif (c, e1, e2) }
@@ -1638,18 +1641,23 @@ intro_pattern_1:
     {`WithRename s}
 ;
 
+%inline icasemode:
+| /* empty */ { `One  }
+| STAR        { `Full }
+;
+
 intro_pattern:
 | x=loc(intro_pattern_1)
    { IPCore x }
 
-| LBRACKET RBRACKET
-   { IPCase [] }
+| LBRACKET mode=icasemode RBRACKET
+   { IPCase (mode, []) }
 
-| LBRACKET ip=intro_pattern+ RBRACKET
-   { IPCase [ip] }
+| LBRACKET mode=icasemode ip=intro_pattern+ RBRACKET
+   { IPCase (mode, [ip]) }
 
-| LBRACKET ip=plist2(intro_pattern*, PIPE) RBRACKET
-   { IPCase ip }
+| LBRACKET mode=icasemode ip=plist2(intro_pattern*, PIPE) RBRACKET
+   { IPCase (mode, ip) }
 
 | o=rwocc? RARROW
    { IPRw (o |> omap (snd_map EcMaps.Sint.of_list), `LtoR) }
@@ -2186,7 +2194,7 @@ phltactic:
 | UNROLL s=side? o=codepos
     { Punroll (s, o) }
 
-| SPLITWHILE c=expr COLON s=side? o=codepos
+| SPLITWHILE s=side? o=codepos COLON c=expr
     { Psplitwhile (c, s, o) }
 
 | BYPHOARE info=fpattern(conseq)
@@ -2613,8 +2621,9 @@ realize:
 (* -------------------------------------------------------------------- *)
 (* Printing                                                             *)
 print:
+|             qs=qident          { Pr_any  qs }
+| STAR        qs=qident          { Pr_any  qs }
 | TYPE        qs=qident          { Pr_ty   qs }
-| GLOB        qs=loc(mod_qident) { Pr_glob qs }
 | OP          qs=qoident         { Pr_op   qs }
 | THEORY      qs=qident          { Pr_th   qs }
 | PRED        qs=qoident         { Pr_pr   qs }
@@ -2622,6 +2631,7 @@ print:
 | LEMMA       qs=qident          { Pr_ax   qs }
 | MODULE      qs=qident          { Pr_mod  qs }
 | MODULE TYPE qs=qident          { Pr_mty  qs }
+| GLOB        qs=loc(mod_qident) { Pr_glob qs }
 ;
 
 prover_iconfig:
