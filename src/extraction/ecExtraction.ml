@@ -383,8 +383,8 @@ let rec compile_tyd env eenv p =
 
 and compile_ty env eenv vtymap ty = 
   match ty.ty_node with
-  | Tglob _ -> error "can not extract Tglob"
-  | Tunivar _ -> error "can not extract univar"
+  | Tglob _ -> error "cannot extract Tglob"
+  | Tunivar _ -> error "cannot extract univar"
   | Tvar id -> 
     let s = try Mid.find id vtymap with Not_found -> assert false in
     OTvar s
@@ -430,7 +430,7 @@ let rec compile_op env eenv p =
         assert false                    (* FIXME: TC HOOK *)
       | OB_oper None ->
         OOabs (compile_ty env eenv vtymap op.op_ty) 
-      | OB_pred _ -> error "can not extract predicate" in
+      | OB_pred _ -> error "cannot extract predicate" in
     let res = mk_odef pth s (typarams, def) in
     Hp.add eenv.mp_op p res;
     res.odef_name 
@@ -447,7 +447,7 @@ and compile_expr env eenv vtymap lmap e =
     Olam(bd, body) 
   | Eint n -> Oint n
   | Elocal id -> Olocal (compile_id lmap id)
-  | Evar _ -> error "can not extract program variable"
+  | Evar _ -> error "cannot extract program variable"
   | Eop(p,_) -> Oop (compile_op env eenv p)
   | Eapp(e,es) -> 
     let e = compile_expr env eenv vtymap lmap e in

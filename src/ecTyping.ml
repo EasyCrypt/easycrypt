@@ -806,11 +806,11 @@ let pp_restriction_error env fmt (w,e) =
     | RW_fun xp -> Format.fprintf fmt "The procedure %a" (EcPrinting.pp_funname ppe) xp in
   let pp_restriction_err fmt = function
     | RE_UseVariable x -> 
-      Format.fprintf fmt "can not uses the variable %a" pp_v x
+      Format.fprintf fmt "cannot uses the variable %a" pp_v x
     | RE_UseVariableViaModule (x,m) -> 
       Format.fprintf fmt "uses module %a which uses %a" pp_m m pp_v x
     | RE_UseModule m -> 
-      Format.fprintf fmt "can not uses the module %a" pp_m m
+      Format.fprintf fmt "cannot uses the module %a" pp_m m
     | RE_VMissingRestriction (x,(m1,m2))->
       Format.fprintf fmt "can uses %a, add restriction %a to %a"
         pp_v x pp_m m1 pp_m m2
