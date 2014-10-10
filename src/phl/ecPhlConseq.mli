@@ -32,6 +32,9 @@ val t_bdHoareF_conseq_nm : form -> form -> FApi.backward
 val t_bdHoareS_conseq_nm : form -> form -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
+val t_equivS_conseq_bd : bool -> EcFol.form -> EcFol.form ->FApi.backward
+
+(* -------------------------------------------------------------------- *)
 val t_conseq : form -> form -> FApi.backward
 
 (* -------------------------------------------------------------------- *)

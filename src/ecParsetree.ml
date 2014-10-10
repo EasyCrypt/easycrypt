@@ -411,10 +411,13 @@ type phlfun = [
   | `Upto of pformula * pformula * pformula option
 ]
 
+type app_info = 
+  tac_side * tac_dir * int doption * pformula doption * p_app_bd_info
+
 type phltactic =
   | Pfun        of phlfun
   | Pskip
-  | Papp        of (tac_dir * int doption * pformula * p_app_bd_info)
+  | Papp        of app_info
   | Pwp         of int doption option
   | Psp         of int doption option
   | Pwhile      of tac_side * (pformula * pformula option * (pformula * pformula) option)

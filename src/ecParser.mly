@@ -2100,6 +2100,11 @@ eager_tac:
     { Peager (info, p) }
 ;
 
+form_or_double_form:
+| f=sform { Single f }
+| LPAREN UNDERSCORE COLON f1=form LONGARROW f2=form RPAREN { Double(f1,f2) }
+;
+
 phltactic:
 | PROC
    { Pfun `Def }
@@ -2113,8 +2118,8 @@ phltactic:
 | PROC STAR
    { Pfun `Code }
 
-| SEQ d=tac_dir pos=code_position COLON p=sform f=app_bd_info
-   { Papp (d, pos, p, f) }
+| SEQ s=side? d=tac_dir pos=code_position COLON p=form_or_double_form f=app_bd_info
+   { Papp (s, d, pos, p, f) }
 
 | WP n=code_position?
    { Pwp n }

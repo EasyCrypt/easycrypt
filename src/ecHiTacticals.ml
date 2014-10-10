@@ -136,7 +136,7 @@ and process1_phl (_ : ttenv) (t : phltactic) (tc : tcenv1) =
     | Pfun (`Upto info)         -> EcPhlFun.process_fun_upto info
     | Pfun `Code                -> EcPhlFun.process_fun_to_code
     | Pskip                     -> EcPhlSkip.t_skip
-    | Papp (dir, k, phi, f)     -> EcPhlApp.process_app dir k phi f
+    | Papp info                 -> EcPhlApp.process_app info
     | Pwp wp                    -> EcPhlWp.t_wp wp
     | Psp sp                    -> EcPhlSp.t_sp sp
     | Prcond (side, b, i)       -> EcPhlRCond.t_rcond side b i

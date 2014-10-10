@@ -76,21 +76,22 @@ let tc1_process_pattern tc fp =
   Exn.recast_tc1 tc (fun hyps -> process_pattern hyps fp)
 
 (* ------------------------------------------------------------------ *)
-let tc1_process_phl_form tc ty pf =
+let tc1_process_phl_form ?(side=None) tc ty pf =
   let hyps, concl = FApi.tc1_flat tc in
   let memory =
-    match concl.f_node with
-    | FhoareS   hs -> hs.hs_m
-    | FbdHoareS hs -> hs.bhs_m
-    | _ -> assert false
+    match concl.f_node, side with
+    | FhoareS   hs, None -> hs.hs_m
+    | FbdHoareS hs, None -> hs.bhs_m
+    | FequivS es, Some b -> (mhr, snd (if b then es.es_ml else es.es_mr))
+    | _, _ -> assert false
   in
 
   let hyps = LDecl.push_active memory hyps in
   pf_process_form !!tc hyps ty pf
 
 (* ------------------------------------------------------------------ *)
-let tc1_process_phl_formula tc pf =
-  tc1_process_phl_form tc tbool pf
+let tc1_process_phl_formula ?(side=None) tc pf =
+  tc1_process_phl_form ~side tc tbool pf
 
 (* ------------------------------------------------------------------ *)
 let tc1_process_prhl_form tc ty pf =
