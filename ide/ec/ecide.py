@@ -1,9 +1,12 @@
-#! /usr/bin/env python3
-
 # --------------------------------------------------------------------
-import sys, os, resources, widgets.editor as editor
+import sys, os
+import ec.resources as resources
+import ec.widgets.editor as editor
 
 from PyQt5 import uic, QtCore, QtGui, QtWidgets, QtWebKit #@UnresolvedImport
+
+# cx_freeze fails to find this dependency
+from PyQt5 import QtPrintSupport #@UnresolvedImport
 
 # --------------------------------------------------------------------
 class QTUtils(object):
@@ -83,12 +86,14 @@ class MainWindow(QtWidgets.QMainWindow):
         self.close()
 
 # --------------------------------------------------------------------
-def main():
+def main(forbuild = False):
     app = QtWidgets.QApplication(sys.argv)
     res = resources.Resource.rcc('icons')
-    
+
     sys.path.append(resources.Resource.ROOT)
     __import__(os.path.splitext(os.path.basename(res))[0])
+
+    if forbuild: return
 
     QtGui.QIcon.setThemeName("FlatIcon")
 
@@ -96,8 +101,4 @@ def main():
         QtWebKit.QWebSettings.DeveloperExtrasEnabled, True)
 
     win = MainWindow()
-    win.show(); exit (app.exec_())
-
-# --------------------------------------------------------------------
-if __name__ == '__main__':
-    main()
+    win.show(); sys.exit(app.exec_())

@@ -3,8 +3,8 @@ import os, json
 
 from PyQt5 import QtCore, QtWidgets, QtWebKitWidgets #@UnresolvedImport
 
-from resources import Resource
-from document  import ECDocument, ECDocumentManager
+from ec.resources import Resource
+from ec.document  import ECDocument, ECDocumentManager
 
 # ------------------------------------------------------------------------
 class JSObject(object):
