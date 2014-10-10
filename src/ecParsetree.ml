@@ -345,7 +345,8 @@ type 'a doption =
   | Single of 'a
   | Double of 'a * 'a
 
-type tac_side = bool option
+type side = bool
+type tac_side = side option
 
 type swap_kind =
   | SKbase      of int * int * int
@@ -414,6 +415,11 @@ type phlfun = [
 type app_info = 
   tac_side * tac_dir * int doption * pformula doption * p_app_bd_info
 
+type cond_info = 
+| CiHead of tac_side
+| CiSeq  of tac_side * int option * int option * pformula
+| CiSeqOne of side * int option * pformula * pformula
+
 type phltactic =
   | Pfun        of phlfun
   | Pskip
@@ -427,7 +433,7 @@ type phltactic =
   | Psplitwhile of (pexpr * tac_side * codepos )
   | Pcall       of tac_side * call_info fpattern
   | Prcond      of (bool option * bool * int)
-  | Pcond       of tac_side
+  | Pcond       of cond_info 
   | Pswap       of ((tac_side * swap_kind) located list)
   | Pcfold      of (tac_side * codepos * int option)
   | Pinline     of pinline_arg

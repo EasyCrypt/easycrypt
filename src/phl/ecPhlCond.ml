@@ -108,16 +108,28 @@ let rec t_equiv_cond side tc =
           tc
 
 (* -------------------------------------------------------------------- *)
-let process_cond side tc =
-  let concl = FApi.tc1_goal tc in
+let process_cond info tc =
+  let default_if i s = ofdfl (fun _ -> tc1_pos_last_if tc s) i in
+  
+  match info with
+  | EcParsetree.CiHead side ->
+    t_hS_or_bhS_or_eS ~th:t_hoare_cond ~tbh:t_bdhoare_cond ~te:(t_equiv_cond side) tc
 
-  if   is_equivS concl
-  then t_equiv_cond side tc
-  else begin
-    if not (is_none side) then
-      tc_error !!tc "unexpected side in non relational goal";
+  | EcParsetree.CiSeq(side, i1, i2, f) -> 
+    let es = tc1_as_equivS tc in
+    let f  = EcProofTyping.tc1_process_prhl_formula tc f in
+    let n1 = default_if i1 es.es_sl in
+    let n2 = default_if i2 es.es_sr in
+    FApi.t_seqsub (EcPhlApp.t_equiv_app (n1,n2) f)
+      [ t_id; t_equiv_cond side ] tc
 
-         if is_hoareS   concl then t_hoare_cond   tc
-    else if is_bdHoareS concl then t_bdhoare_cond tc
-    else tc_error !!tc "the conclusion is not a hoare or a equiv goal"
-  end
+  | EcParsetree.CiSeqOne(s, i, f1, f2) -> 
+    let es = tc1_as_equivS tc in
+    let n = default_if i (if s then es.es_sl else es.es_sr) in
+    let side = Some s in
+    let f1 = EcProofTyping.tc1_process_phl_formula ~side tc f1 in
+    let f2 = EcProofTyping.tc1_process_phl_formula ~side tc f2 in
+    FApi.t_seqsub (EcPhlApp.t_equiv_app_onesided s n f1 f2)
+      [ t_id; t_bdhoare_cond] tc
+
+

@@ -2105,6 +2105,38 @@ form_or_double_form:
 | LPAREN UNDERSCORE COLON f1=form LONGARROW f2=form RPAREN { Double(f1,f2) }
 ;
 
+code_pos:
+| i=uint { i }
+;
+
+code_pos_underscore:
+| UNDERSCORE { None }
+| i=code_pos { Some i} 
+;
+
+%inline if_option:
+| s=side?      
+   { CiHead s } 
+
+(*| COLON f=sform
+   { CiSeq(None, None, None, f) } *)
+
+| i1=code_pos_underscore i2=code_pos_underscore COLON f=sform
+   { CiSeq(None, i1, i2, f) } 
+
+(*| s=side COLON f=sform 
+   { CiSeq(Some s, None, None, f) } *)
+
+| s=side i1=code_pos_underscore i2=code_pos_underscore COLON f=sform 
+   { CiSeq(Some s, i1, i2, f) }
+ 
+| s=side i=code_pos? COLON  LPAREN UNDERSCORE COLON f1=form LONGARROW f2=form RPAREN
+   { CiSeqOne(s, i, f1, f2) } 
+
+;
+
+
+
 phltactic:
 | PROC
    { Pfun `Def }
@@ -2142,8 +2174,8 @@ phltactic:
 | RCONDF s=side? i=uint
     { Prcond (s, false, i) }
 
-| IF s=side?
-    { Pcond s }
+| IF opt=if_option
+    { Pcond opt }
 
 | SWAP info=iplist1(loc(swap_info), COMMA) %prec prec_below_comma
     { Pswap info }

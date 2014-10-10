@@ -12,4 +12,4 @@ val t_bdhoare_cond : backward
 val t_equiv_cond   : bool option -> backward
 
 (* -------------------------------------------------------------------- *)
-val process_cond : bool option -> backward
+val process_cond : EcParsetree.cond_info -> backward
