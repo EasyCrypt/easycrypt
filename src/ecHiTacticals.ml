@@ -199,7 +199,7 @@ and process_sub (ttenv : ttenv) tts tc =
 (* -------------------------------------------------------------------- *)
 and process_expect (ttenv : ttenv) (t, n) tc =
   if FApi.tc_count tc <> n then
-    tc_error !$tc "expecting exactly %d subgoal(s)" n;
+    tc_error !$tc "expecting exactly %d subgoal(s), got %d" n (FApi.tc_count tc);
   FApi.t_onall (process1 ttenv t) tc
 
 (* -------------------------------------------------------------------- *)
