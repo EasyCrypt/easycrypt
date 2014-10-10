@@ -389,7 +389,7 @@ let t_equivS_conseq_bd side pr po tc =
   let prs, pos = subst pr, subst po in
   if not (f_equal prs es.es_pr && f_equal pos es.es_po) then
     tc_error !!tc "invalid pre- or post-condition";
-  let g1 = f_bdHoareS m pr s po FHeq f_r1 in
+  let g1 = f_bdHoareS (mhr,snd m) pr s po FHeq f_r1 in
   FApi.xmutate1 tc `HlBdEquiv [g1]
 
 (* -------------------------------------------------------------------- *)
