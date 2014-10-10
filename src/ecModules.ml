@@ -246,6 +246,36 @@ let destr_assert i =
   | Sassert e -> e
   | _ -> raise Not_found
 
+let is_asgn i =
+  match i.i_node with
+  | Sasgn(lv,e) -> true
+  | _ -> false
+
+let is_rnd i =
+  match i.i_node with
+  | Srnd(lv,e) -> true
+  | _ -> false
+
+let is_call i =
+  match i.i_node with
+  | Scall(lv,f,es) -> true
+  | _ -> false
+
+let is_if i =
+  match i.i_node with
+  | Sif(e,s1,s2) -> true
+  | _ -> false
+
+let is_while i =
+  match i.i_node with
+  | Swhile(e,s) -> true
+  | _ -> false
+
+let is_assert i =
+  match i.i_node with
+  | Sassert e -> true
+  | _ -> false
+
 (* -------------------------------------------------------------------- *)
 module MSHi = EcMaps.MakeMSH(struct type t = instr let tag i = i.i_tag end)
 module Hi = MSHi.H

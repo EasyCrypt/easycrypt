@@ -408,6 +408,9 @@ module List = struct
     in
       index 0 xs
 
+  let findex_last (f : 'a -> bool) (xs : 'a list) : int option =
+    omap (fun i -> List.length xs - i - 1) (findex f (List.rev xs))
+
   let index (v : 'a) (xs : 'a list) : int option =
     findex ((=) v) xs
 

@@ -179,6 +179,8 @@ module List : sig
   val findopt : ('a -> bool) -> 'a list -> 'a option
 
   val findex : ('a -> bool) -> 'a list -> int option
+  
+  val findex_last : ('a -> bool) -> 'a list -> int option
 
   val index :  'a -> 'a list -> int option
 

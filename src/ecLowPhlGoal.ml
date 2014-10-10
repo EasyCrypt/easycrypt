@@ -86,6 +86,31 @@ let tc1_last_while  tc st = pf_last_while  !!tc st
 let tc1_last_assert tc st = pf_last_assert !!tc st
 
 (* -------------------------------------------------------------------- *)
+(* TODO: use in change pos *)
+
+let pf_pos_last_gen msg test pe s = 
+  match List.findex_last test s.s_node with
+  | None -> tc_error pe "can not find the last %s instruction" msg
+  | Some i -> i
+
+let pf_pos_last_asgn   pe s = pf_pos_last_gen "asgn"   is_asgn   pe s 
+let pf_pos_last_rnd    pe s = pf_pos_last_gen "rnd"    is_rnd    pe s 
+let pf_pos_last_call   pe s = pf_pos_last_gen "call"   is_call   pe s 
+let pf_pos_last_if     pe s = pf_pos_last_gen "if"     is_if     pe s 
+let pf_pos_last_while  pe s = pf_pos_last_gen "while"  is_while  pe s 
+let pf_pos_last_assert pe s = pf_pos_last_gen "assert" is_assert pe s 
+
+
+let tc1_pos_last_asgn   tc s = pf_pos_last_asgn   !!tc s 
+let tc1_pos_last_rnd    tc s = pf_pos_last_rnd    !!tc s 
+let tc1_pos_last_call   tc s = pf_pos_last_call   !!tc s 
+let tc1_pos_last_if     tc s = pf_pos_last_if     !!tc s 
+let tc1_pos_last_while  tc s = pf_pos_last_while  !!tc s 
+let tc1_pos_last_assert tc s = pf_pos_last_assert !!tc s 
+
+  
+  
+(* -------------------------------------------------------------------- *)
 let pf_as_hoareF   pe c = as_phl (Some true ) (fun () -> destr_hoareF   c) pe
 let pf_as_hoareS   pe c = as_phl (Some true ) (fun () -> destr_hoareS   c) pe
 let pf_as_bdhoareF pe c = as_phl (Some true ) (fun () -> destr_bdHoareF c) pe
