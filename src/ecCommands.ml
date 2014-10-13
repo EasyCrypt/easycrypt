@@ -418,6 +418,7 @@ and process_pragma (scope : EcScope.scope) opt =
     | "nocheck" -> check false
     | "check"   -> check true
     | "noop"    -> ()
+    | "compact" -> Gc.compact ()
     | "reset"   -> raise (Pragma `Reset)
     | _         -> ()
   end
