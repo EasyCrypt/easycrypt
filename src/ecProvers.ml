@@ -369,9 +369,12 @@ module POSIX : PExec = struct
     let pcs = Array.create pi.pr_maxprocs None in
 
     (* Run process, ignoring prover failing to start *)
-    let run i prover =
-      run_prover pi prover task
-        |> oiter (fun (prover, pc) -> pcs.(i) <- Some (prover, pc))
+    let rec run ?(gcdone = false) i prover =
+      try
+        run_prover pi prover task
+          |> oiter (fun (prover, pc) -> pcs.(i) <- Some (prover, pc))
+      with Unix.Unix_error (Unix.ENOMEM, "fork", _) when not gcdone ->
+        Gc.compact (); run ~gcdone:true i prover
     in
 
     EcUtils.try_finally
