@@ -153,6 +153,9 @@ object(self)
     let mem = (Gc.stat ()).Gc.live_words in
     let mem = (float_of_int mem) *. (float_of_int (Sys.word_size / 8)) in
 
+    let unu = (Gc.stat ()).Gc.fragments  in
+    let unu = (float_of_int unu) *. (float_of_int (Sys.word_size / 8)) in
+
     let rec human x st all =
       match all with
       | [] -> (x, st)
@@ -160,17 +163,18 @@ object(self)
       | st' :: all -> human (x /. 1024.) st' all in
 
     let mem, memst = human mem "B" ["kB"; "MB"; "GB"] in
+    let unu, unust = human unu "B" ["kB"; "MB"; "GB"] in
 
     if sz >= 0 && doprg then begin
       tick <- (tick + 1) mod (String.length ticks);
-      Format.eprintf "[%c] [%.4d] %.1f %% (%.1f%s)\r%!"
+      Format.eprintf "[%c] [%.4d] %.1f %% (%.1f%s / [frag %.1f%s])\r%!"
         ticks.[tick] lineno
         (100. *. ((float_of_int position) /. (float_of_int sz)))
-        mem memst
+        mem memst unu unust
     end
 
   method private _clear_update =
-    let fmt = "[*] [----] ---.- ------.-?B%" in
+    let fmt = "[*] [----] ---.- (------.-?B% - [---- ------.-?B%])" in
       if sz >= 0 && doprg then
         Format.eprintf "%*s\r%!" (String.length fmt) "";
       doprg <- false
