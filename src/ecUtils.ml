@@ -487,6 +487,14 @@ module List = struct
     let l = List.map f xs in
     !a, l
 
+  let map_fold2 (f : 'a -> 'b -> 'c -> 'a * 'd) (a : 'a) xs ys =
+    let a = ref a in
+    let f b c =
+      let (a',d) = f !a b c in
+      a := a'; d in
+    let l = List.map2 f xs ys in
+    !a, l
+
   let map_combine
       (f1  : 'a -> 'c) (f2  : 'b -> 'd)
       (xs1 : 'a list ) (xs2 : 'b list )

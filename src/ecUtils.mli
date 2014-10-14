@@ -206,6 +206,8 @@ module List : sig
 
   val map_fold : ('a -> 'b -> 'a * 'c) -> 'a -> 'b list -> 'a * 'c list
 
+  val map_fold2 : ('a -> 'b -> 'c -> 'a * 'd) -> 'a -> 'b list -> 'c list -> 'a * 'd list
+
   val map_combine : ('a -> 'c) -> ('b -> 'd) -> 'a list -> 'b list -> ('c * 'd) list
 
   val take_n : int -> 'a list -> 'a list * 'a list
