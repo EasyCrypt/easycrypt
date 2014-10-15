@@ -325,7 +325,7 @@ module Hints = struct
 end
 
 (* -------------------------------------------------------------------- *)
-let run_prover (pi : prover_infos) (prover : string) task =
+let rec run_prover (pi : prover_infos) (prover : string) task =
   try
     let { pr_config = pr; pr_driver = dr; } = get_prover prover in
     let pc =
@@ -338,7 +338,13 @@ let run_prover (pi : prover_infos) (prover : string) task =
 
       let timelimit =
         if pi.pr_timelimit <= 0 then None else Some pi.pr_timelimit in
-      Driver.prove_task ~command ?timelimit dr task ()
+
+      let rec doit gcdone =
+        try  Driver.prove_task ~command ?timelimit dr task ()
+        with Unix.Unix_error (Unix.ENOMEM, "fork", _) when not gcdone ->
+          Gc.compact (); doit true
+      in doit false
+
     in
       Some (prover, pc)
 
@@ -369,12 +375,9 @@ module POSIX : PExec = struct
     let pcs = Array.create pi.pr_maxprocs None in
 
     (* Run process, ignoring prover failing to start *)
-    let rec run ?(gcdone = false) i prover =
-      try
+    let run i prover =
         run_prover pi prover task
           |> oiter (fun (prover, pc) -> pcs.(i) <- Some (prover, pc))
-      with Unix.Unix_error (Unix.ENOMEM, "fork", _) when not gcdone ->
-        Gc.compact (); run ~gcdone:true i prover
     in
 
     EcUtils.try_finally
