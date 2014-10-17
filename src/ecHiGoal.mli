@@ -6,8 +6,11 @@
 (* -------------------------------------------------------------------- *)
 open EcLocation
 open EcParsetree
+open EcFol
+open EcEnv
 open EcCoreGoal
 open EcCoreGoal.FApi
+open EcProofTerm
 
 (* -------------------------------------------------------------------- *)
 type ttenv = {
@@ -30,7 +33,19 @@ end
 
 (* -------------------------------------------------------------------- *)
 module LowRewrite : sig
-  val t_rewrite : [`LtoR|`RtoL] * EcMatching.occ option -> proofterm -> backward
+  type error =
+  | LRW_NotAnEquation
+  | LRW_NothingToRewrite
+  | LRW_InvalidOccurence
+  | LRW_CannotInfer
+
+  exception RewriteError of error
+
+  val find_rewrite_pattern:
+    rwside -> LDecl.hyps -> pt_ev -> pt_ev * (form * form)
+
+  val t_rewrite:
+    rwside * EcMatching.occ option -> proofterm -> backward
 
   val t_autorewrite: EcPath.path list -> backward
 end

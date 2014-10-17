@@ -186,30 +186,28 @@ module LowRewrite = struct
 
   exception RewriteError of error
 
+  let rec find_rewrite_pattern (dir : rwside) hyps pt =
+    let env = LDecl.toenv hyps in
+    let ax  = pt.PT.ptev_ax in
+
+    match EcFol.sform_of_form ax with
+    | EcFol.SFeq  (f1, f2) -> (pt, (f1, f2))
+    | EcFol.SFiff (f1, f2) -> (pt, (f1, f2))
+    | _ -> begin
+      match TTC.destruct_product hyps ax with
+      | None ->
+          if   dir = `LtoR && ER.EqTest.for_type env ax.f_ty tbool
+          then (pt, (ax, f_true))
+          else raise (RewriteError LRW_NotAnEquation)
+      | Some _ ->
+          let pt = EcProofTerm.apply_pterm_to_hole pt in
+          find_rewrite_pattern dir hyps pt
+    end
+
   let t_rewrite_r (s, o) pt tc =
     let hyps, concl = FApi.tc1_flat tc in
-    let env = LDecl.toenv hyps in
 
-    let (pt, (f1, f2)) =
-      let rec find_rewrite_pattern pt =
-        let ax = pt.PT.ptev_ax in
-
-        match EcFol.sform_of_form ax with
-        | EcFol.SFeq  (f1, f2) -> (pt, (f1, f2))
-        | EcFol.SFiff (f1, f2) -> (pt, (f1, f2))
-        | _ -> begin
-          match TTC.destruct_product hyps ax with
-          | None ->
-              if   s = `LtoR && ER.EqTest.for_type env ax.f_ty tbool
-              then (pt, (ax, f_true))
-              else raise (RewriteError LRW_NotAnEquation)
-          | Some _ ->
-              let pt = EcProofTerm.apply_pterm_to_hole pt in
-              find_rewrite_pattern pt
-        end
-      in
-        find_rewrite_pattern pt
-    in
+    let (pt, (f1, f2)) = find_rewrite_pattern s hyps pt in
 
     let fp = match s with `LtoR -> f1 | `RtoL -> f2 in
 
