@@ -1282,15 +1282,22 @@ module PGOptions = struct
     List.fold_left merge1 opts specs
 end
 
-let t_progress ?options (tt : FApi.backward) (tc : tcenv1) =
+let t_progress ?options ?ti (tt : FApi.backward) 
+       (tc : tcenv1) =
   let options = odfl PGOptions.default options in
-  let tt = if options.pgo_solve then FApi.t_or (t_assumption `Alpha) tt else tt in
-
+  let tt = 
+    if options.pgo_solve then FApi.t_or (t_assumption `Alpha) tt else tt in
+  let ti = odfl (fun (_:EcIdent.t) -> t_id) ti in
   let t_progress_subst ?eqid =
     let sk1 = { empty_subst_kind with sk_local = true ; } in
     let sk2 = {  full_subst_kind with sk_local = false; } in
     FApi.t_or (t_subst ~kind:sk1 ?eqid) (t_subst ~kind:sk2 ?eqid)
   in
+
+  let ts = 
+    if   options.pgo_subst
+    then fun id -> FApi.t_or (t_progress_subst ~eqid:id) (ti id)
+    else ti in
 
   (* Entry of progress: simplify goal, and chain with progress *)
   let rec entry tc = FApi.t_seq (t_simplify ~delta:false) aux0 tc
@@ -1321,13 +1328,18 @@ let t_progress ?options (tt : FApi.backward) (tc : tcenv1) =
       match t_intros_i_seq [id] tt tc with
       | tc when FApi.tc_done tc -> tc
       | _ ->
+          (* on voudrait faire 
+             intros id; on_intro id; entry
+             on_intro :
+               (try subst (if option)
+                or default_intro id);
+             default_intro id = 
+               try absurd id; (* ie si id: b et on a !b *)
+               rewrite_bool id; (* si id: !b -> rewrite b = false, 
+                                   si id : b -> rewrite b = true *)
+               default_on_intro id *) 
           let iffail tc =
-            let ts =
-              if   options.pgo_subst
-              then FApi.t_try (t_progress_subst ~eqid:id)
-              else t_id
-            in
-              t_intros_i_seq [id] (FApi.t_seq ts entry) tc
+            t_intros_i_seq [id] (FApi.t_seq (ts id) entry) tc
 
           and elims = [
             t_elim_false_r;
