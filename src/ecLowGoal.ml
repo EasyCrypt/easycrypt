@@ -439,10 +439,10 @@ let t_generalize_hyp ?clear id tc =
 (* -------------------------------------------------------------------- *)
 module LowAssumption = struct
   (* ------------------------------------------------------------------ *)
-  let gen_find_in_hyps test hyps f =
+  let gen_find_in_hyps test hyps =
     let test (_, lk) =
       match lk with
-      | LD_hyp f' -> test hyps f f'
+      | LD_hyp f  -> test f
       | _         -> false
     in
       fst (List.find test (LDecl.tohyps hyps).h_local)
@@ -455,7 +455,7 @@ module LowAssumption = struct
       try
         List.find_map
           (fun test ->
-            try  Some (gen_find_in_hyps test hyps concl)
+            try  Some (gen_find_in_hyps (test hyps concl) hyps)
             with Not_found -> None)
           tests
       with Not_found -> tc_error !!tc "no assumption"
@@ -465,7 +465,7 @@ end
 
 (* -------------------------------------------------------------------- *)
 let alpha_find_in_hyps hyps f = 
-   LowAssumption.gen_find_in_hyps EcReduction.is_alpha_eq hyps f
+   LowAssumption.gen_find_in_hyps (EcReduction.is_alpha_eq hyps f) hyps
 
 let t_assumption mode (tc : tcenv1) =
   let convs =
