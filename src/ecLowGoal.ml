@@ -1240,6 +1240,40 @@ let t_subst ?kind ?(clear = true) ?var ?tside ?eqid (tc : tcenv1) =
   with Not_found -> raise InvalidGoalShape
 
 (* -------------------------------------------------------------------- *)
+let t_absurd_hyp id tc =
+  let hyps,concl = FApi.tc1_flat tc in
+  let f = LDecl.lookup_hyp_by_id id hyps in
+  let (b,f) = destr_nots f in
+  let test f' = 
+    let (b',f') = destr_nots f' in
+    b = not b' && EcReduction.is_alpha_eq hyps f f' in
+  let id' =
+    try 
+      LowAssumption.gen_find_in_hyps test hyps 
+    with _ -> tc_error !!tc "absurd_hyp no assumption"
+  in
+  let x,hnx,hx = 
+    if b then f, id', id else f_not f, id, id' in
+  FApi.t_seqs [
+    t_apply_s EcCoreLib.p_false_elim [] ~args:[concl] ~sk:1;
+    FApi.t_seqsub (t_apply_s EcCoreLib.p_negbTE [] ~args:[x] ~sk:2)
+      [ t_apply_hyp hnx;
+        t_apply_hyp hx ]
+  ] tc
+
+let t_absurd_hyp ?id tc =
+  match id with
+  | Some id -> t_absurd_hyp id tc
+  | None -> 
+    let hyps = FApi.tc1_hyps tc in
+    let test (id,lk) = 
+      match lk with
+      | LD_hyp f when is_not f -> Some (t_absurd_hyp id)
+      | _ -> None in
+    let tacs = List.pmap test (LDecl.tohyps hyps).h_local in
+    FApi.t_ors tacs tc
+
+(* -------------------------------------------------------------------- *)
 type pgoptions =  {
   pgo_split : bool;
   pgo_solve : bool;

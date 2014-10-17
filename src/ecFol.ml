@@ -835,6 +835,13 @@ let destr_not f =
       f1
   | _ -> destr_error "not"
 
+let destr_nots f = 
+  let rec aux b f = 
+    match try Some (destr_not f) with DestrError _ -> None with
+    | None -> b, f
+    | Some f -> aux (not b) f in
+  aux true f
+
 let destr_forall1 f =
   match f.f_node with
   | Fquant(Lforall,(x,t)::bd,p) -> x,t,f_forall bd p

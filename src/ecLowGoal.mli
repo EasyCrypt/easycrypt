@@ -32,6 +32,7 @@ val t_id    : FApi.backward
 (* -------------------------------------------------------------------- *)
 val alpha_find_in_hyps : EcEnv.LDecl.hyps -> EcFol.form -> EcIdent.t
 val t_assumption    : [`Alpha | `Conv] -> FApi.backward
+val t_absurd_hyp    : ?id:EcIdent.t -> FApi.backward
 val t_logic_trivial : FApi.backward
 val t_trivial       : FApi.backward option -> FApi.backward
 
