@@ -546,7 +546,7 @@ type logtactic =
   | Pcongr
   | Pelim       of (genpattern list * pqsymbol option)
   | Papply      of (ffpattern * [`Apply of psymbol option | `Exact])
-  | Pcut        of (intropattern * pformula * ptactic_core option)
+  | Pcut        of (intropattern * pformula * ptactic list)
   | Pcutdef     of (intropattern * pterm)
   | Pgeneralize of genpattern list
   | Pclear      of psymbol list

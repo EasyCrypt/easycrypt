@@ -94,7 +94,7 @@ and process1_seq (ttenv : ttenv) (ts : ptactic list) (tc : tcenv1) =
 
 (* -------------------------------------------------------------------- *)
 and process1_logic (ttenv : ttenv) (t : logtactic) (tc : tcenv1) =
-  let engine = process1_core ttenv in
+  let engine = process1_seq ttenv in
 
   let tx =
     match t with

@@ -35,7 +35,7 @@ type ttenv = {
   tt_smtmode : [`Admit | `Strict | `Standard];
 }
 
-type engine  = ptactic_core -> FApi.backward
+type engine  = ptactic list -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
 type tfocus  = (int option * int option) * [`Include | `Exclude]
@@ -925,20 +925,12 @@ let process_subst syms (tc : tcenv1) =
   | syms -> FApi.t_seqs (List.map (fun var tc -> t_subst ~var tc) syms) tc
 
 (* -------------------------------------------------------------------- *)
-type cut_t = intropattern * pformula * ptactic_core option
+type cut_t = intropattern * pformula * ptactic list
 
 let process_cut engine (ip, phi, t) tc =
   let phi = TTC.tc1_process_formula tc phi in
   let tc  = EcLowGoal.t_cut phi tc in
-  let tc  =
-    match t with
-    | None   -> tc
-    | Some t ->
-        let l = t.pl_loc in
-        let t = { pt_core = t; pt_intros = []; } in
-        let t = mk_loc l (Pby (Some [t])) in
-          FApi.t_first (engine t) tc
-  in
+  let tc  = FApi.t_first (engine t) tc in
 
   FApi.t_last (process_intros ip) tc
 
