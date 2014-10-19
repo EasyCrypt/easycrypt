@@ -188,10 +188,11 @@ val t_clears : ident list -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
 type pgoptions =  {
-  pgo_split : bool;
-  pgo_solve : bool;
-  pgo_subst : bool;
-  pgo_delta : pgo_delta;
+  pgo_split  : bool;
+  pgo_solve  : bool;
+  pgo_subst  : bool;
+  pgo_disjct : bool;
+  pgo_delta  : pgo_delta;
 }
 
 and pgo_delta = {

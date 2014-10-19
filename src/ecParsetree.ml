@@ -525,6 +525,7 @@ type ppgoption = [
   | `Split
   | `Solve
   | `Subst
+  | `Disjunctive
 ]
 
 type ppgoptions = (bool * ppgoption) list

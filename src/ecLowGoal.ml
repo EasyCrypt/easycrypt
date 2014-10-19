@@ -1275,10 +1275,11 @@ let t_absurd_hyp ?id tc =
 
 (* -------------------------------------------------------------------- *)
 type pgoptions =  {
-  pgo_split : bool;
-  pgo_solve : bool;
-  pgo_subst : bool;
-  pgo_delta : pgo_delta;
+  pgo_split  : bool;
+  pgo_solve  : bool;
+  pgo_subst  : bool;
+  pgo_disjct : bool;
+  pgo_delta  : pgo_delta;
 }
 
 and pgo_delta = {
@@ -1292,10 +1293,11 @@ module PGOptions = struct
       { pgod_case  = false;
         pgod_split = true ; }; in
 
-    { pgo_split = true;
-      pgo_solve = true;
-      pgo_subst = true;
-      pgo_delta = fordelta; }
+    { pgo_split  = true;
+      pgo_solve  = true;
+      pgo_subst  = true;
+      pgo_disjct = false;
+      pgo_delta  = fordelta; }
 
   let merged1 opts (b, x) =
     match x with
@@ -1305,9 +1307,10 @@ module PGOptions = struct
 
   let merge1 opts ((b, x) : bool * EcParsetree.ppgoption) =
     match x with
-    | `Split -> { opts with pgo_split = b; }
-    | `Solve -> { opts with pgo_solve = b; }
-    | `Subst -> { opts with pgo_subst = b; }
+    | `Split       -> { opts with pgo_split  = b; }
+    | `Solve       -> { opts with pgo_solve  = b; }
+    | `Subst       -> { opts with pgo_subst  = b; }
+    | `Disjunctive -> { opts with pgo_disjct = b; }
 
     | `Delta x ->
         { opts with pgo_delta = merged1 opts.pgo_delta (b, x); }
@@ -1316,12 +1319,29 @@ module PGOptions = struct
     List.fold_left merge1 opts specs
 end
 
-let t_progress ?options ?ti (tt : FApi.backward) 
-       (tc : tcenv1) =
+module PGInternals = struct
+  let pg_cnj_elims = [
+    t_elim_false_r   ;
+    t_elim_exists_r  ;
+    t_elim_and_r     ;
+    t_elim_eq_tuple_r;
+  ]
+
+  let pg_djn_elims = [
+    t_elim_or_r
+  ]
+end
+
+let t_progress ?options ?ti (tt : FApi.backward) (tc : tcenv1) =
   let options = odfl PGOptions.default options in
-  let tt = 
-    if options.pgo_solve then FApi.t_or (t_assumption `Alpha) tt else tt in
-  let ti = odfl (fun (_:EcIdent.t) -> t_id) ti in
+
+  let tt =
+    if   options.pgo_solve
+    then FApi.t_or (t_assumption `Alpha) tt
+    else tt
+
+  and ti = odfl (fun (_ : EcIdent.t) -> t_id) ti in
+
   let t_progress_subst ?eqid =
     let sk1 = { empty_subst_kind with sk_local = true ; } in
     let sk2 = {  full_subst_kind with sk_local = false; } in
@@ -1336,7 +1356,7 @@ let t_progress ?options ?ti (tt : FApi.backward)
   (* Entry of progress: simplify goal, and chain with progress *)
   let rec entry tc = FApi.t_seq (t_simplify ~delta:false) aux0 tc
 
-  (* Progress (level 0): try to apply use tactic, chain with level 1. *)
+  (* Progress (level 0): try to apply user tactic, chain with level 1. *)
   and aux0 tc = FApi.t_seq (FApi.t_try tt) aux1 tc
 
   (* Progress (level 1): intro/elim top-level assumption *)
@@ -1362,29 +1382,30 @@ let t_progress ?options ?ti (tt : FApi.backward)
       match t_intros_i_seq [id] tt tc with
       | tc when FApi.tc_done tc -> tc
       | _ ->
-          (* on voudrait faire 
+          (* FIXME: we'd like to do the following:
              intros id; on_intro id; entry
-             on_intro :
+             on_intro:
                (try subst (if option)
                 or default_intro id);
              default_intro id = 
-               try absurd id; (* ie si id: b et on a !b *)
-               rewrite_bool id; (* si id: !b -> rewrite b = false, 
-                                   si id : b -> rewrite b = true *)
-               default_on_intro id *) 
+               try absurd id;   -- ie if id: b and !b is an assumption
+               rewrite_bool id; -- if id: !b -> rewrite b = false, 
+                                   if id:  b -> rewrite b = true
+               default_on_intro id *)
           let iffail tc =
-            t_intros_i_seq [id] (FApi.t_seq (ts id) entry) tc
+            t_intros_i_seq [id] (FApi.t_seq (ts id) entry) tc in
 
-          and elims = [
-            t_elim_false_r;
-            t_elim_exists_r;
-            t_elim_and_r;
-            t_elim_eq_tuple_r] in
+          let elims = PGInternals.pg_cnj_elims in
+          let elims =
+            if   options.pgo_disjct
+            then PGInternals.pg_djn_elims @ elims
+            else elims
+          in
 
           let reduce =
             if options.pgo_delta.pgod_case then `Full else `NoDelta in
 
-          FApi.t_switch (t_elim_r ~reduce elims) ~ifok:aux0 ~iffail tc
+          FApi.t_switch ~on:`All (t_elim_r ~reduce elims) ~ifok:aux0 ~iffail tc
     end
 
     | _ when options.pgo_split ->

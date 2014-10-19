@@ -631,10 +631,11 @@ module FApi = struct
     | `Success tc -> tc
 
   (* ------------------------------------------------------------------ *)
-  let t_switch tt ~ifok ~iffail tc =
-    match t_try_base tt tc with
-    | `Failure _  -> iffail tc
-    | `Success tc -> t_focus ifok tc
+  let t_switch ?(on = `Focus) tt ~ifok ~iffail tc =
+    match on, t_try_base tt tc with
+    | _     , `Failure _  -> iffail tc
+    | `All  , `Success tc -> t_onall ifok tc
+    | `Focus, `Success tc -> t_focus ifok tc
 
   (* ------------------------------------------------------------------ *)
   let t_do_r ?focus b omax t tc =
