@@ -877,7 +877,7 @@ let pf_gen_tuple_elim ?witheq tys hyps pe =
   FApi.newfact pe (VExtern (`TupleElim tys, [])) hyps fp
 
 (* -------------------------------------------------------------------- *)
-let t_elimT_ind mode (tc : tcenv1) =
+let t_elimT_ind ?reduce mode (tc : tcenv1) =
   let elim (id, ty) tc =
     let tc, pt =
       let env, hyps, _ = FApi.tc1_eflat tc in
@@ -905,18 +905,21 @@ let t_elimT_ind mode (tc : tcenv1) =
       t_elimT_form pt (f_local id ty) tc
   in
 
-  match sform_of_form (FApi.tc1_goal tc) with
-  | SFquant (Lforall, (x, GTty ty), _) -> begin
-      let hyps = FApi.tc1_hyps tc in
-      let id   = LDecl.fresh_id hyps (EcIdent.name x) in
+  let rec doit fp tc =
+    match sform_of_form fp with
+    | SFquant (Lforall, (x, GTty ty), _) -> begin
+        let hyps = FApi.tc1_hyps tc in
+        let id   = LDecl.fresh_id hyps (EcIdent.name x) in
+  
+        FApi.t_seqs
+          [t_intros_i_seq ~clear:true [id] (elim (id, ty));
+           t_simplify_with_info EcReduction.beta_red]
+          tc
+      end
 
-      FApi.t_seqs
-        [t_intros_i_seq ~clear:true [id] (elim (id, ty));
-         t_simplify_with_info EcReduction.beta_red]
-        tc
-    end
+    | _ -> raise TTC.NoMatch
 
-  | _ -> raise InvalidGoalShape
+  in TTC.t_lazy_match ?reduce doit tc
 
 (* -------------------------------------------------------------------- *)
 let t_elim_default_r = [

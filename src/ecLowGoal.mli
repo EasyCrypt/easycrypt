@@ -120,7 +120,7 @@ val t_elimT_form : proofterm -> ?sk:int -> form -> FApi.backward
 val t_elimT_form_global : path -> ?typ:(ty list) -> ?sk:int -> form -> FApi.backward
 
 (* Eliminiation using an elimation principle of an induction type *)
-val t_elimT_ind : [ `Case | `Ind ] -> FApi.backward
+val t_elimT_ind : ?reduce:lazyred -> [ `Case | `Ind ] -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
 (* Boolean LEM                                                          *)
