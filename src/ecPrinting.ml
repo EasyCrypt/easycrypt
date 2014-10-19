@@ -139,28 +139,35 @@ module PPEnv = struct
       p_shorten exists p
 
   let op_symb (ppe : t) p info =
+    let specs = [1, EcPath.pqoname (EcPath.prefix EcCoreLib.p_eq) "<>"] in
+
     let lookup =
       match info with
-      | None -> fun sm -> EcEnv.Op.lookup_path sm ppe.ppe_env
+      | None -> fun sm ->
+          EcEnv.Op.lookup_path sm ppe.ppe_env
+
       | Some (mode, typ, dom) ->
           let filter =
             match mode with
             | `Expr -> fun op -> not (EcDecl.is_pred op)
             | `Form -> fun _  -> true
           in
-          let tvi    = Some (EcUnify.TVIunamed typ) in
+          let tvi = Some (EcUnify.TVIunamed typ) in
 
         fun sm ->
           let ue = EcUnify.UniEnv.create None in
           match  EcUnify.select_op ~filter tvi ppe.ppe_env sm ue dom with
-          | [(p1,_), _, _] -> p1
+          | [(p1, _), _, _] -> p1
           | _ -> raise (EcEnv.LookupFailure (`QSymbol sm)) in
 
     let exists sm =
         try  EcPath.p_equal (lookup sm) p
         with EcEnv.LookupFailure _ -> false
     in
-      p_shorten exists p
+      (* FIXME: for special operators, do check `info` *)
+      if   List.exists (fun (_, sp) -> EcPath.p_equal sp p) specs
+      then ([], EcPath.basename p)
+      else p_shorten exists p
 
   let th_symb (ppe : t) p =
     let exists sm =
@@ -995,6 +1002,14 @@ and pp_expr_core_r (ppe : PPEnv.t) outer fmt (e : expr) =
         pp_proji ppe pp_expr_r (fst outer) fmt (e1, i)
     end
 
+  | Eapp ({e_node = Eop (op, _)},
+            [{e_node = Eapp ({e_node = Eop (op', tys)}, [f1; f2])}])
+      when EcPath.p_equal op  EcCoreLib.p_not
+        && EcPath.p_equal op' EcCoreLib.p_eq
+    ->
+      let negop = EcPath.pqoname (EcPath.prefix op') "<>" in
+      pp_opapp ppe e_ty pp_expr_r outer fmt (`Expr, negop, tys, [f1; f2])
+
   | Eapp ({e_node = Eop (op, tys) }, args) ->
       pp_opapp ppe e_ty pp_expr_r outer fmt (`Expr, op, tys, args)
 
@@ -1327,6 +1342,14 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
 
   | Fop (op, tvi) ->
       pp_opapp ppe f_ty pp_form_r outer fmt (`Form, op, tvi, [])
+
+  | Fapp ({f_node = Fop (op, _)},
+            [{f_node = Fapp ({f_node = Fop (op', tys)}, [f1; f2])}])
+      when EcPath.p_equal op  EcCoreLib.p_not
+        && EcPath.p_equal op' EcCoreLib.p_eq
+    ->
+      let negop = EcPath.pqoname (EcPath.prefix op') "<>" in
+      pp_opapp ppe f_ty pp_form_r outer fmt (`Form, negop, tys, [f1; f2])
 
   | Fapp ({f_node = Fop (p, tys)}, args) ->
       pp_opapp ppe f_ty pp_form_r outer fmt (`Form, p, tys, args)
