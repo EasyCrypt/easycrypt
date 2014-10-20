@@ -2057,10 +2057,10 @@ logtactic:
    { Psubst l }
 
 | CUT ip=intro_pattern* COLON p=form %prec prec_below_IMPL
-   { Pcut (ip, p, []) }
+   { Pcut (ip, p, None) }
 
-| CUT ip=intro_pattern* COLON p=form BY t=tactics
-   { Pcut (ip, p, t) }
+| CUT ip=intro_pattern* COLON p=form BY t=loc(tactics)
+   { Pcut (ip, p, Some t) }
 
 | CUT ip=intro_pattern* CEQ fp=pterm
    { Pcutdef (ip, fp) }

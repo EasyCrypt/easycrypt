@@ -541,7 +541,7 @@ type logtactic =
   | Pcongr
   | Pelim       of (genpattern list * pqsymbol option)
   | Papply      of (ffpattern * [`Apply of psymbol option | `Exact])
-  | Pcut        of (intropattern * pformula * ptactic list)
+  | Pcut        of (intropattern * pformula * ptactics located option)
   | Pcutdef     of (intropattern * pterm)
   | Pgeneralize of genpattern list
   | Pclear      of psymbol list
@@ -556,9 +556,9 @@ and ptactic_core_r =
   | Pidtac      of string option
   | Pdo         of trepeat * ptactic_core
   | Ptry        of ptactic_core
-  | Pby         of (ptactic list) option
+  | Pby         of (ptactics) option
   | Por         of ptactic * ptactic
-  | Pseq        of ptactic list
+  | Pseq        of ptactics
   | Pcase       of genpattern list
   | Plogic      of logtactic
   | PPhl        of phltactic
@@ -574,8 +574,10 @@ and ptactic = {
   pt_intros : intropattern;
 }
 
+and ptactics = ptactic list
+
 and ptactic_chain =
-  | Psubtacs of ptactic list
+  | Psubtacs of ptactics
   | Pfirst   of ptactic * int
   | Plast    of ptactic * int
   | Pexpect  of ptactic * int

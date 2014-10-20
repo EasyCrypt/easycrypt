@@ -61,6 +61,11 @@ let merge (p1 : t) (p2 : t) =
     loc_bchar = min p1.loc_bchar p2.loc_bchar;
     loc_echar = max p1.loc_echar p2.loc_echar; }
 
+let mergeall (p : t list) =
+  match p with
+  | []      -> _dummy
+  | t :: ts -> List.fold_left merge t ts
+
 let isdummy (p : t) =
   p.loc_bchar < 0 || p.loc_echar < 0
 
@@ -73,6 +78,7 @@ type 'a located = {
 type 'a mloc = ('a, t) EcUtils.tagged
 
 (* -------------------------------------------------------------------- *)
+let loc    x = x.pl_loc
 let unloc  x = x.pl_desc
 let unlocs x = List.map unloc x
 

@@ -25,6 +25,7 @@ val make      : position -> position -> t
 val of_lexbuf : lexbuf -> t
 val tostring  : t -> string
 val merge     : t -> t -> t
+val mergeall  : t list -> t
 val isdummy   : t -> bool
 
 (* -------------------------------------------------------------------- *)
@@ -33,6 +34,7 @@ type 'a located = {
   pl_desc : 'a;
 }
 
+val loc    : 'a located -> t
 val unloc  : 'a located -> 'a
 val unlocs : ('a located) list -> 'a list
 val mk_loc : t -> 'a -> 'a located

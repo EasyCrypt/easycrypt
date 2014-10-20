@@ -19,10 +19,10 @@ type ttenv = {
 }
 
 type smtinfo = pdbhint option * pprover_infos
-type engine  = ptactic list -> backward
+type engine  = ptactic_core -> backward
 
 (* -------------------------------------------------------------------- *)
-type cut_t    = intropattern * pformula * ptactic list
+type cut_t    = intropattern * pformula * (ptactics located) option
 type cutdef_t = intropattern * pterm
 type apply_t  = ffpattern * [`Apply of psymbol option | `Exact]
 
