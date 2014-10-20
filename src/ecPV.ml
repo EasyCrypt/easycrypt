@@ -834,10 +834,10 @@ module Mpv2 = struct
         
       | Fapp({f_node = Fop(op,_)},a) -> 
         begin match op_kind op with
-        | OK_true -> eqs
-        | OK_eq | OK_iff -> add_eq local eqs (List.nth a 0) (List.nth a 1)
-        | OK_and _ | OK_or _ -> List.fold_left (aux local) eqs a
-        | OK_imp -> aux local eqs (List.nth a 1)
+        | Some `True -> eqs
+        | Some (`Eq | `Iff) -> add_eq local eqs (List.nth a 0) (List.nth a 1)
+        | Some (`And _ | `Or _) -> List.fold_left (aux local) eqs a
+        | Some `Imp -> aux local eqs (List.nth a 1)
         | _ -> raise Not_found
         end    
       | _ -> raise Not_found in

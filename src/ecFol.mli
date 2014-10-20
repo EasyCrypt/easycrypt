@@ -111,31 +111,31 @@ val f_real_div_simpl : form -> form -> form
 val destr_exists_prenex : form -> binding * form
 
 (* -------------------------------------------------------------------- *)
-type op_kind =
-  | OK_true
-  | OK_false
-  | OK_not
-  | OK_and   of bool  (* true = asym *)
-  | OK_or    of bool  (* true = asym *)
-  | OK_imp
-  | OK_iff
-  | OK_eq
-  | OK_int_le
-  | OK_int_lt
-  | OK_real_le
-  | OK_real_lt
-  | OK_int_add
-  | OK_int_sub
-  | OK_int_mul
-  | OK_int_exp
-  | OK_int_opp
-  | OK_real_add
-  | OK_real_sub
-  | OK_real_mul
-  | OK_real_div
-  | OK_other
+type op_kind = [
+  | `True
+  | `False
+  | `Not
+  | `And   of bool  (* true = asym *)
+  | `Or    of bool  (* true = asym *)
+  | `Imp
+  | `Iff
+  | `Eq
+  | `Int_le
+  | `Int_lt
+  | `Real_le
+  | `Real_lt
+  | `Int_add
+  | `Int_sub
+  | `Int_mul
+  | `Int_pow
+  | `Int_opp
+  | `Real_add
+  | `Real_sub
+  | `Real_mul
+  | `Real_div
+]
 
-val op_kind       : path -> op_kind
+val op_kind       : path -> op_kind option
 val is_logical_op : path -> bool
 
 (* -------------------------------------------------------------------- *)

@@ -430,55 +430,55 @@ let f_real_lt_simpl f1 f2 =
   | _, _ -> f_real_lt f1 f2
 
 (* -------------------------------------------------------------------- *)
-type op_kind =
-  | OK_true
-  | OK_false
-  | OK_not
-  | OK_and   of bool
-  | OK_or    of bool
-  | OK_imp
-  | OK_iff
-  | OK_eq
-  | OK_int_le
-  | OK_int_lt
-  | OK_real_le
-  | OK_real_lt
-  | OK_int_add
-  | OK_int_sub
-  | OK_int_mul
-  | OK_int_exp
-  | OK_int_opp
-  | OK_real_add
-  | OK_real_sub
-  | OK_real_mul
-  | OK_real_div
-  | OK_other
+type op_kind = [
+  | `True
+  | `False
+  | `Not
+  | `And   of bool
+  | `Or    of bool
+  | `Imp
+  | `Iff
+  | `Eq
+  | `Int_le
+  | `Int_lt
+  | `Real_le
+  | `Real_lt
+  | `Int_add
+  | `Int_sub
+  | `Int_mul
+  | `Int_pow
+  | `Int_opp
+  | `Real_add
+  | `Real_sub
+  | `Real_mul
+  | `Real_div
+]
 
 let operators =
   let operators =
-    [EcCoreLib.p_true    , OK_true     ;
-     EcCoreLib.p_false   , OK_false    ;
-     EcCoreLib.p_not     , OK_not      ;
-     EcCoreLib.p_anda    , OK_and true ;
-     EcCoreLib.p_and     , OK_and false;
-     EcCoreLib.p_ora     , OK_or  true ;
-     EcCoreLib.p_or      , OK_or  false;
-     EcCoreLib.p_imp     , OK_imp      ;
-     EcCoreLib.p_iff     , OK_iff      ;
-     EcCoreLib.p_eq      , OK_eq       ;
-     EcCoreLib.p_int_le  , OK_int_le   ;
-     EcCoreLib.p_int_lt  , OK_int_lt   ;
-     EcCoreLib.p_real_le , OK_real_le  ;
-     EcCoreLib.p_real_lt , OK_real_lt  ;
-     EcCoreLib.p_int_add , OK_int_add  ;
-     EcCoreLib.p_int_sub , OK_int_sub  ;
-     EcCoreLib.p_int_mul , OK_int_mul  ;
-     EcCoreLib.p_int_opp , OK_int_opp  ;
-     EcCoreLib.p_int_pow , OK_int_exp  ;
-     EcCoreLib.p_real_add, OK_real_add ;
-     EcCoreLib.p_real_sub, OK_real_sub ;
-     EcCoreLib.p_real_mul, OK_real_mul ;
-     EcCoreLib.p_real_div, OK_real_div ; ]
+    [EcCoreLib.p_true    , `True     ;
+     EcCoreLib.p_false   , `False    ;
+     EcCoreLib.p_not     , `Not      ;
+     EcCoreLib.p_anda    , `And true ;
+     EcCoreLib.p_and     , `And false;
+     EcCoreLib.p_ora     , `Or  true ;
+     EcCoreLib.p_or      , `Or  false;
+     EcCoreLib.p_imp     , `Imp      ;
+     EcCoreLib.p_iff     , `Iff      ;
+     EcCoreLib.p_eq      , `Eq       ;
+     EcCoreLib.p_int_le  , `Int_le   ;
+     EcCoreLib.p_int_lt  , `Int_lt   ;
+     EcCoreLib.p_real_le , `Real_le  ;
+     EcCoreLib.p_real_lt , `Real_lt  ;
+     EcCoreLib.p_int_add , `Int_add  ;
+     EcCoreLib.p_int_sub , `Int_sub  ;
+     EcCoreLib.p_int_mul , `Int_mul  ;
+     EcCoreLib.p_int_opp , `Int_opp  ;
+     EcCoreLib.p_int_pow , `Int_pow  ;
+     EcCoreLib.p_real_add, `Real_add ;
+     EcCoreLib.p_real_sub, `Real_sub ;
+     EcCoreLib.p_real_mul, `Real_mul ;
+     EcCoreLib.p_real_div, `Real_div ; ]
   in
 
   let tbl = EcPath.Hp.create 11 in
@@ -486,16 +486,19 @@ let operators =
     tbl
 
 (* -------------------------------------------------------------------- *)
-let op_kind (p : EcPath.path) =
-  try EcPath.Hp.find operators p with Not_found -> OK_other
+let op_kind (p : EcPath.path) : op_kind option =
+  EcPath.Hp.find_opt operators p
 
 (* -------------------------------------------------------------------- *)
 let is_logical_op op =
   match op_kind op with
-  | OK_not | OK_and _ | OK_or _ | OK_imp | OK_iff | OK_eq
-  | OK_int_le| OK_int_lt | OK_real_le | OK_real_lt
-  | OK_int_add | OK_int_sub | OK_int_mul
-  | OK_real_add | OK_real_sub| OK_real_mul | OK_real_div -> true
+  | Some (
+        `Not | `And _ | `Or _ | `Imp | `Iff | `Eq
+      | `Int_le   | `Int_lt   | `Real_le  | `Real_lt
+      | `Int_add  | `Int_sub  | `Int_mul
+      | `Real_add | `Real_sub | `Real_mul | `Real_div
+   ) -> true
+
   | _ -> false
 
 (* -------------------------------------------------------------------- *)
@@ -532,14 +535,15 @@ type sform =
 
 let sform_of_op (op, ty) args =
   match op_kind op, args with
-  | OK_true , [] -> SFtrue
-  | OK_false, [] -> SFfalse
-  | OK_not  , [f] -> SFnot f
-  | OK_and b, [f1; f2] -> SFand (b, (f1, f2))
-  | OK_or  b, [f1; f2] -> SFor  (b, (f1, f2))
-  | OK_imp  , [f1; f2] -> SFimp (f1, f2)
-  | OK_iff  , [f1; f2] -> SFiff (f1, f2)
-  | OK_eq   , [f1; f2] -> SFeq  (f1, f2)
+  | Some (`True ), []       -> SFtrue
+  | Some (`False), []       -> SFfalse
+  | Some (`Not  ), [f]      -> SFnot f
+  | Some (`And b), [f1; f2] -> SFand (b, (f1, f2))
+  | Some (`Or  b), [f1; f2] -> SFor  (b, (f1, f2))
+  | Some (`Imp  ), [f1; f2] -> SFimp (f1, f2)
+  | Some (`Iff  ), [f1; f2] -> SFiff (f1, f2)
+  | Some (`Eq   ), [f1; f2] -> SFeq  (f1, f2)
+
   | _ -> SFop ((op, ty), args)
 
 let rec sform_of_form fp =
