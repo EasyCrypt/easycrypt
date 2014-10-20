@@ -1493,8 +1493,9 @@ let transmodtype (env : EcEnv.env) (modty : pmodule_type) =
   } in
     (modty, sig_)
 
-let trans_call transexp env ue loc fsig args =
+let transcall transexp env ue loc fsig args =
   let targ = fsig.fs_arg in
+
   let process_args tys =
     if List.length args <> List.length tys then
       tyerror loc env (InvalidFunAppl FAE_WrongArgCount);
@@ -1504,19 +1505,26 @@ let trans_call transexp env ue loc fsig args =
         let a, aty = transexp a in
         unify_or_fail env ue loc ~expct:ty aty; a) args tys
   in
+
   let args = 
     match List.length args with
     | 0 -> 
-      if not (EcReduction.EqTest.for_type env targ tunit) then
+        if not (EcReduction.EqTest.for_type env targ tunit) then
+          tyerror loc env (InvalidFunAppl FAE_WrongArgCount);
+        []
+
+    | _ when EcReduction.EqTest.for_type env targ tunit ->
         tyerror loc env (InvalidFunAppl FAE_WrongArgCount);
-      []
+
     | 1 -> process_args [targ]
+
     | _ -> 
       let lty =
         match (EcEnv.Ty.hnorm targ env).ty_node with
         | Ttuple lty -> lty
         | _ -> [targ] in
       process_args lty
+
   in
     (args, fsig.fs_ret)
 
@@ -1975,7 +1983,7 @@ and transinstr (env : EcEnv.env) ue (i : pinstr) =
     let fpath = trans_gamepath env name in
     let fsig  = (EcEnv.Fun.by_xpath fpath env).f_sig in
     let (args, ty) =
-      trans_call (transexp env `InProc ue) env ue name.pl_loc fsig args
+      transcall (transexp env `InProc ue) env ue name.pl_loc fsig args
     in
       (fpath, args, ty)
   in
@@ -2347,7 +2355,7 @@ let trans_form_or_pattern env (ps, ue) pf tt =
         let fpath = trans_gamepath env gp in
         let fun_  = EcEnv.Fun.by_xpath fpath env in
         let args,_ = 
-          trans_call (fun f -> let f = transf env f in f, f.f_ty)
+          transcall (fun f -> let f = transf env f in f, f.f_ty)
             env ue f.pl_loc fun_.f_sig args in
         let memid = transmem env m in
         let env = EcEnv.Fun.prF fpath env in
