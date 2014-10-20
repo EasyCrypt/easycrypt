@@ -1459,3 +1459,36 @@ let can_subst f =
   match f.f_node with
   | Fint _ | Flocal _ | Fpvar _ | Fop _ -> true
   | _ -> false
+
+(* -------------------------------------------------------------------- *)
+type core_op = [
+  | `True
+  | `False
+  | `Not
+  | `And of bool
+  | `Or  of bool
+  | `Imp
+  | `Iff
+  | `Eq
+]
+
+let core_ops =
+  let core_ops =
+    [EcCoreLib.p_true    , `True     ;
+     EcCoreLib.p_false   , `False    ;
+     EcCoreLib.p_not     , `Not      ;
+     EcCoreLib.p_anda    , `And true ;
+     EcCoreLib.p_and     , `And false;
+     EcCoreLib.p_ora     , `Or  true ;
+     EcCoreLib.p_or      , `Or  false;
+     EcCoreLib.p_imp     , `Imp      ;
+     EcCoreLib.p_iff     , `Iff      ;
+     EcCoreLib.p_eq      , `Eq       ; ]
+  in
+
+  let tbl = EcPath.Hp.create 11 in
+    List.iter (fun (p, k) -> EcPath.Hp.add tbl p k) core_ops;
+    tbl
+
+let core_op_kind (p : EcPath.path) =
+  EcPath.Hp.find_opt core_ops p

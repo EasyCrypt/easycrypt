@@ -347,8 +347,6 @@ val is_bdHoareS  : form -> bool
 val is_pr        : form -> bool
 val is_eq_or_iff : form -> bool
 
-  
-
 (* -------------------------------------------------------------------- *)
 val form_of_expr : EcMemory.memory -> EcTypes.expr -> form
 
@@ -390,3 +388,17 @@ end
 
 (* -------------------------------------------------------------------- *)
 val can_subst : form -> bool
+
+(* -------------------------------------------------------------------- *)
+type core_op = [
+  | `True
+  | `False
+  | `Not
+  | `And of bool
+  | `Or  of bool
+  | `Imp
+  | `Iff
+  | `Eq
+]
+
+val core_op_kind : path -> core_op option

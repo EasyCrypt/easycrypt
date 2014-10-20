@@ -9,6 +9,7 @@ open EcUtils
 open EcTypes
 open EcModules
 open EcMemory
+open EcEnv
 
 (* -------------------------------------------------------------------- *)
 include EcCoreFol
@@ -455,30 +456,29 @@ type op_kind =
 
 let operators =
   let operators =
-    [EcCoreLib.p_true    , OK_true;
-     EcCoreLib.p_false   , OK_false;
-     EcCoreLib.p_not     , OK_not;
-     EcCoreLib.p_anda    , OK_and true;
+    [EcCoreLib.p_true    , OK_true     ;
+     EcCoreLib.p_false   , OK_false    ;
+     EcCoreLib.p_not     , OK_not      ;
+     EcCoreLib.p_anda    , OK_and true ;
      EcCoreLib.p_and     , OK_and false;
-     EcCoreLib.p_ora     , OK_or  true;
+     EcCoreLib.p_ora     , OK_or  true ;
      EcCoreLib.p_or      , OK_or  false;
-     EcCoreLib.p_imp     , OK_imp;
-     EcCoreLib.p_iff     , OK_iff;
-     EcCoreLib.p_eq      , OK_eq;
-     EcCoreLib.p_int_le  , OK_int_le;
-     EcCoreLib.p_int_lt  , OK_int_lt;
-     EcCoreLib.p_real_le , OK_real_le;
-     EcCoreLib.p_real_lt , OK_real_lt;
-     EcCoreLib.p_int_add , OK_int_add;
-     EcCoreLib.p_int_sub , OK_int_sub;
-     EcCoreLib.p_int_mul , OK_int_mul;
-     EcCoreLib.p_int_opp , OK_int_opp;
-     EcCoreLib.p_int_pow , OK_int_exp;
-     EcCoreLib.p_real_add, OK_real_add;
-     EcCoreLib.p_real_sub, OK_real_sub;
-     EcCoreLib.p_real_mul, OK_real_mul;
-     EcCoreLib.p_real_div, OK_real_div
-    ]
+     EcCoreLib.p_imp     , OK_imp      ;
+     EcCoreLib.p_iff     , OK_iff      ;
+     EcCoreLib.p_eq      , OK_eq       ;
+     EcCoreLib.p_int_le  , OK_int_le   ;
+     EcCoreLib.p_int_lt  , OK_int_lt   ;
+     EcCoreLib.p_real_le , OK_real_le  ;
+     EcCoreLib.p_real_lt , OK_real_lt  ;
+     EcCoreLib.p_int_add , OK_int_add  ;
+     EcCoreLib.p_int_sub , OK_int_sub  ;
+     EcCoreLib.p_int_mul , OK_int_mul  ;
+     EcCoreLib.p_int_opp , OK_int_opp  ;
+     EcCoreLib.p_int_pow , OK_int_exp  ;
+     EcCoreLib.p_real_add, OK_real_add ;
+     EcCoreLib.p_real_sub, OK_real_sub ;
+     EcCoreLib.p_real_mul, OK_real_mul ;
+     EcCoreLib.p_real_div, OK_real_div ; ]
   in
 
   let tbl = EcPath.Hp.create 11 in

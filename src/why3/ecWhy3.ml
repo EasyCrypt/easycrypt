@@ -13,7 +13,7 @@ open EcPath
 open EcTypes
 open EcBaseLogic
 open EcDecl
-open EcFol
+open EcCoreFol
 open EcModules
 open EcTheory
 open EcWhy3Conv
@@ -694,7 +694,7 @@ let import_w3_term env tvm =
             with _ -> raise (UnboundLS f) in
           let s = Term.ls_app_inst f wargs wty in
           let tys = List.map (fun vs -> import_ty (Ty.Mtv.find vs s)) tvs in
-          let dom = List.map EcFol.f_ty args in
+          let dom = List.map EcCoreFol.f_ty args in
           let op = f_op p tys (toarrow dom codom) in
           f_app op args codom
         with UnboundLS f as e ->
@@ -1123,19 +1123,20 @@ let mk_iff = mk_pred2 Term.t_iff
 let mk_eq  = mk_pred2 Term.t_equ
 
 let trans_op env p tys =
-  match op_kind p with
-  | OK_true  -> ([],None), w3_ls_true, fun _ -> Term.t_true
-  | OK_false -> ([],None), w3_ls_false, fun _ -> Term.t_false
-  | OK_not   -> ([None],None), w3_ls_not, mk_not
-  | OK_and true  -> ([None;None],None), w3_ls_anda, mk_anda
-  | OK_and false -> ([None;None],None), w3_ls_and, mk_and
-  | OK_or  true  -> ([None;None],None), w3_ls_ora, mk_ora
-  | OK_or  false -> ([None;None],None), w3_ls_or, mk_or
-  | OK_imp   -> ([None;None],None), w3_ls_imp, mk_imp
-  | OK_iff   -> ([None;None],None), w3_ls_iff, mk_iff
-  | OK_eq    ->
+  match core_op_kind p with
+  | Some (`True     ) -> ([],None), w3_ls_true, fun _ -> Term.t_true
+  | Some (`False    ) -> ([],None), w3_ls_false, fun _ -> Term.t_false
+  | Some (`Not      ) -> ([None],None), w3_ls_not, mk_not
+  | Some (`And true ) -> ([None;None],None), w3_ls_anda, mk_anda
+  | Some (`And false) -> ([None;None],None), w3_ls_and, mk_and
+  | Some (`Or  true ) -> ([None;None],None), w3_ls_ora, mk_ora
+  | Some (`Or  false) -> ([None;None],None), w3_ls_or, mk_or
+  | Some (`Imp      ) -> ([None;None],None), w3_ls_imp, mk_imp
+  | Some (`Iff      ) -> ([None;None],None), w3_ls_iff, mk_iff
+  | Some (`Eq       ) ->
       let ty = trans_ty env (List.hd tys) in
       ([Some ty;Some ty],None), w3_ls_eq, mk_eq
+
   | _ ->
       let ls,ls', tvs =
         match Mp.find_opt p env.env_op with
@@ -1390,7 +1391,7 @@ let trans_form env f =
           trans_fun !env pr.pr_fun (oget args.Term.t_ty) in
         let mid = save () in
         let env0, ty = trans_gty !env (GTmem None) in
-        let env1, vs  = add_id env0 (EcFol.mhr, ty) in
+        let env1, vs  = add_id env0 (EcCoreFol.mhr, ty) in
         env := env1;
         let evbody = trans_form pr.pr_event in
         let ev = trans_lambda [vs] evbody in
@@ -1457,7 +1458,7 @@ let trans_oper_body env path wparams ty body =
   let body = 
     match body with
     | OB_oper None -> None
-    | OB_oper (Some (OP_Plain  o))  -> Some (`Plain (EcFol.form_of_expr EcFol.mhr o))
+    | OB_oper (Some (OP_Plain  o))  -> Some (`Plain (EcCoreFol.form_of_expr EcCoreFol.mhr o))
     | OB_oper (Some (OP_Fix    o))  -> Some (`Fix o)
     | OB_oper (Some (OP_Constr _))  -> assert false
     | OB_oper (Some (OP_Record _))  -> assert false
@@ -1524,7 +1525,7 @@ let trans_oper_body env path wparams ty body =
                     env locals
                 in
 
-                let env, rb1, e = trans_form env (EcFol.form_of_expr EcFol.mhr e) in
+                let env, rb1, e = trans_form env (EcCoreFol.form_of_expr EcCoreFol.mhr e) in
 
                 let ptn =
                   let for1 (cl, vs) pty =
