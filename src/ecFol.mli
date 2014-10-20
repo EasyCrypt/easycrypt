@@ -115,8 +115,8 @@ type op_kind = [
   | `True
   | `False
   | `Not
-  | `And   of bool  (* true = asym *)
-  | `Or    of bool  (* true = asym *)
+  | `And   of [`Asym | `Sym]
+  | `Or    of [`Asym | `Sym]
   | `Imp
   | `Iff
   | `Eq
@@ -157,8 +157,8 @@ type sform =
   | SFtrue
   | SFfalse
   | SFnot   of form
-  | SFand   of bool * (form * form)
-  | SFor    of bool * (form * form)
+  | SFand   of [`Asym | `Sym] * (form * form)
+  | SFor    of [`Asym | `Sym] * (form * form)
   | SFimp   of form * form
   | SFiff   of form * form
   | SFeq    of form * form

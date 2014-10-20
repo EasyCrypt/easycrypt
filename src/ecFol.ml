@@ -434,8 +434,8 @@ type op_kind = [
   | `True
   | `False
   | `Not
-  | `And   of bool
-  | `Or    of bool
+  | `And   of [`Asym | `Sym]
+  | `Or    of [`Asym | `Sym]
   | `Imp
   | `Iff
   | `Eq
@@ -459,10 +459,10 @@ let operators =
     [EcCoreLib.p_true    , `True     ;
      EcCoreLib.p_false   , `False    ;
      EcCoreLib.p_not     , `Not      ;
-     EcCoreLib.p_anda    , `And true ;
-     EcCoreLib.p_and     , `And false;
-     EcCoreLib.p_ora     , `Or  true ;
-     EcCoreLib.p_or      , `Or  false;
+     EcCoreLib.p_anda    , `And `Asym;
+     EcCoreLib.p_and     , `And `Sym ;
+     EcCoreLib.p_ora     , `Or  `Asym;
+     EcCoreLib.p_or      , `Or  `Sym ;
      EcCoreLib.p_imp     , `Imp      ;
      EcCoreLib.p_iff     , `Iff      ;
      EcCoreLib.p_eq      , `Eq       ;
@@ -516,8 +516,8 @@ type sform =
   | SFtrue
   | SFfalse
   | SFnot   of form
-  | SFand   of bool * (form * form)
-  | SFor    of bool * (form * form)
+  | SFand   of [`Asym | `Sym] * (form * form)
+  | SFor    of [`Asym | `Sym] * (form * form)
   | SFimp   of form * form
   | SFiff   of form * form
   | SFeq    of form * form
@@ -595,14 +595,14 @@ let destr_exists_prenex f =
 
   let rec prenex_exists bds p =
     match sform_of_form p with
-    | SFand (false, (f1, f2)) ->
+    | SFand (`Sym, (f1, f2)) ->
         let (bds1, f1) = prenex_exists [] f1 in
         let (bds2, f2) = prenex_exists [] f2 in
           if   disjoint bds1 bds2
           then (bds1@bds2@bds, f_and f1 f2)
           else (bds, p)
 
-    | SFor (false, (f1, f2)) ->
+    | SFor (`Sym, (f1, f2)) ->
         let (bds1, f1) = prenex_exists [] f1 in
         let (bds2, f2) = prenex_exists [] f2 in
           if   disjoint bds1 bds2

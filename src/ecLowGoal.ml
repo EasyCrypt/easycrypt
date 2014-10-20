@@ -533,13 +533,13 @@ let t_exists_intro_s (args : pt_arg list) (tc : tcenv1) =
   FApi.xmutate1 tc (`Exists args) [ax]
 
 (* -------------------------------------------------------------------- *)
-let t_or_intro_s (b : bool) (side : side) (f1, f2 : form pair) (tc : tcenv1) =
+let t_or_intro_s opsym (side : side) (f1, f2 : form pair) (tc : tcenv1) =
   let p =
-    match side, b with
-    | `Left , true  -> EcCoreLib.p_ora_intro_l
-    | `Right, true  -> EcCoreLib.p_ora_intro_r
-    | `Left , false -> EcCoreLib.p_or_intro_l
-    | `Right, false -> EcCoreLib.p_or_intro_r
+    match side, opsym with
+    | `Left , `Asym -> EcCoreLib.p_ora_intro_l
+    | `Right, `Asym -> EcCoreLib.p_ora_intro_r
+    | `Left , `Sym  -> EcCoreLib.p_or_intro_l
+    | `Right, `Sym  -> EcCoreLib.p_or_intro_r
   in
   t_apply_s p [] ~args:[f1; f2] ~sk:1 tc
 
@@ -555,8 +555,13 @@ let t_left  ?reduce tc = t_or_intro ?reduce `Left  tc
 let t_right ?reduce tc = t_or_intro ?reduce `Right tc
 
 (* -------------------------------------------------------------------- *)
-let t_and_intro_s (b : bool) (f1, f2 : form pair) (tc : tcenv1) =
-  let p = if b then EcCoreLib.p_anda_intro else EcCoreLib.p_and_intro in
+let t_and_intro_s opsym (f1, f2 : form pair) (tc : tcenv1) =
+  let p =
+    match opsym with
+    | `Asym -> EcCoreLib.p_anda_intro
+    | `Sym  -> EcCoreLib.p_and_intro
+  in
+
   t_apply_s p [] ~args:[f1; f2] ~sk:2 tc
 
 let t_and_intro ?reduce (tc : tcenv1) =
@@ -670,9 +675,14 @@ let t_elim_false tc = t_elim_r [t_elim_false_r] tc
 (* --------------------------------------------------------------------- *)
 let t_elim_and_r ((_, sf) : form * sform) concl tc =
   match sf with
-  | SFand (b, (a1, a2)) ->
-      let p = if b then EcCoreLib.p_anda_elim else EcCoreLib.p_and_elim in
-      t_apply_s p [] ~args:[a1; a2; concl] ~sk:1 tc
+  | SFand (opsym, (a1, a2)) ->
+      let p =
+        match opsym with
+        | `Asym -> EcCoreLib.p_anda_elim
+        | `Sym  -> EcCoreLib.p_and_elim
+
+      in t_apply_s p [] ~args:[a1; a2; concl] ~sk:1 tc
+
   | _ -> raise TTC.NoMatch
 
 let t_elim_and goal = t_elim_r [t_elim_and_r] goal
@@ -680,9 +690,14 @@ let t_elim_and goal = t_elim_r [t_elim_and_r] goal
 (* --------------------------------------------------------------------- *)
 let t_elim_or_r ((_, sf) : form * sform) concl tc =
   match sf with
-  | SFor (b, (a1, a2)) ->
-      let p = if b then EcCoreLib.p_ora_elim else EcCoreLib.p_or_elim  in
-      t_apply_s p [] ~args:[a1; a2; concl] ~sk:2 tc
+  | SFor (opsym, (a1, a2)) ->
+      let p =
+        match opsym with
+        | `Asym -> EcCoreLib.p_ora_elim
+        | `Sym  -> EcCoreLib.p_or_elim
+
+      in t_apply_s p [] ~args:[a1; a2; concl] ~sk:2 tc
+
   | _ -> raise TTC.NoMatch
 
 let t_elim_or tc = t_elim_r [t_elim_or_r] tc

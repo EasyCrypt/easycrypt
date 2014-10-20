@@ -96,8 +96,8 @@
       pa_nosmt   = nosmt;
       pa_local   = local; }
 
-  let str_and b = if b then "&&" else "/\\"
-  let str_or  b = if b then "||" else "\\/"
+  let str_and = function `Asym -> "&&" | `Sym -> "/\\"
+  let str_or  = function `Asym -> "||" | `Sym -> "\\/"
 
   let mk_simplify l =
     if l = [] then
@@ -481,12 +481,12 @@ fident:
 
 (* -------------------------------------------------------------------- *)
 %inline or_:
-| ORA { true  }
-| OR  { false }
+| ORA { `Asym }
+| OR  { `Sym  }
 
 %inline and_:
-| ANDA { true  }
-| AND  { false }
+| ANDA { `Asym }
+| AND  { `Sym  }
 
 (* -------------------------------------------------------------------- *)
 pside_:
@@ -699,7 +699,7 @@ expr_chained_orderings:
 | e1=loc(expr_chained_orderings) op=loc(ordering_op) ti=tvars_app? e2=expr
     { let (lce1, (e1, le)) = (e1.pl_loc, unloc e1) in
       let loc = EcLocation.make $startpos $endpos in
-        (peapp_symb loc (str_and true) None
+        (peapp_symb loc (str_and `Asym) None
            [EcLocation.mk_loc lce1 e1;
             EcLocation.mk_loc loc
               (peapp_symb op.pl_loc (unloc op) ti [le; e2])],
@@ -929,7 +929,7 @@ form_chained_orderings(P):
 | f1=loc(form_chained_orderings(P)) op=loc(ordering_op) ti=tvars_app? f2=form_r(P)
     { let (lcf1, (f1, le)) = (f1.pl_loc, unloc f1) in
       let loc = EcLocation.make $startpos $endpos in
-        (pfapp_symb loc (str_and true) None
+        (pfapp_symb loc (str_and `Asym) None
            [EcLocation.mk_loc lcf1 f1;
             EcLocation.mk_loc loc
               (pfapp_symb op.pl_loc (unloc op) ti [le; f2])],

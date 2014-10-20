@@ -1465,8 +1465,8 @@ type core_op = [
   | `True
   | `False
   | `Not
-  | `And of bool
-  | `Or  of bool
+  | `And of [`Asym | `Sym]
+  | `Or  of [`Asym | `Sym]
   | `Imp
   | `Iff
   | `Eq
@@ -1477,10 +1477,10 @@ let core_ops =
     [EcCoreLib.p_true    , `True     ;
      EcCoreLib.p_false   , `False    ;
      EcCoreLib.p_not     , `Not      ;
-     EcCoreLib.p_anda    , `And true ;
-     EcCoreLib.p_and     , `And false;
-     EcCoreLib.p_ora     , `Or  true ;
-     EcCoreLib.p_or      , `Or  false;
+     EcCoreLib.p_anda    , `And `Asym;
+     EcCoreLib.p_and     , `And `Sym ;
+     EcCoreLib.p_ora     , `Or  `Asym;
+     EcCoreLib.p_or      , `Or  `Sym ;
      EcCoreLib.p_imp     , `Imp      ;
      EcCoreLib.p_iff     , `Iff      ;
      EcCoreLib.p_eq      , `Eq       ; ]

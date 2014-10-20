@@ -1249,7 +1249,7 @@ and try_pp_chained_orderings (ppe : PPEnv.t) outer fmt f =
 
   let rec collect acc le f =
     match sform_of_form f with
-    | SFand (true, (f1, f2)) -> begin
+    | SFand (`Asym, (f1, f2)) -> begin
         match f2.f_node with
         | Fapp ({ f_node = Fop (op, tvi) }, [i1; i2])
             when isordering op

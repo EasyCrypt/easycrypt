@@ -394,8 +394,8 @@ type core_op = [
   | `True
   | `False
   | `Not
-  | `And of bool
-  | `Or  of bool
+  | `And of [`Asym | `Sym]
+  | `Or  of [`Asym | `Sym]
   | `Imp
   | `Iff
   | `Eq

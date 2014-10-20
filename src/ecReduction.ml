@@ -380,10 +380,10 @@ let rec h_red ri env hyps f =
       let f' =
         match op_kind p, args with
         | Some (`Not      ), [f1]    -> f_not_simpl f1
-        | Some (`And true ), [f1;f2] -> f_anda_simpl f1 f2
-        | Some (`Or  true ), [f1;f2] -> f_ora_simpl f1 f2
-        | Some (`And false), [f1;f2] -> f_and_simpl f1 f2
-        | Some (`Or  false), [f1;f2] -> f_or_simpl f1 f2
+        | Some (`And `Asym), [f1;f2] -> f_anda_simpl f1 f2
+        | Some (`Or  `Asym), [f1;f2] -> f_ora_simpl f1 f2
+        | Some (`And `Sym ), [f1;f2] -> f_and_simpl f1 f2
+        | Some (`Or  `Sym ), [f1;f2] -> f_or_simpl f1 f2
         | Some (`Imp      ), [f1;f2] -> f_imp_simpl f1 f2
         | Some (`Iff      ), [f1;f2] -> f_iff_simpl f1 f2
         | Some (`Int_le   ), [f1;f2] -> f_int_le_simpl f1 f2

@@ -80,8 +80,8 @@ val t_apply_hd : handle -> ?args:(form list) -> ?sk:int -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
 (* Introduction of logical operators (backward). *)
-val t_or_intro_s  : bool -> [`Left|`Right] -> form pair -> FApi.backward
-val t_and_intro_s : bool -> form pair -> FApi.backward
+val t_or_intro_s  : [`Asym | `Sym] -> [`Left|`Right] -> form pair -> FApi.backward
+val t_and_intro_s : [`Asym | `Sym] -> form pair -> FApi.backward
 val t_iff_intro_s : form pair -> FApi.backward
 
 val t_or_intro  : ?reduce:lazyred -> side -> FApi.backward

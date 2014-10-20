@@ -1127,10 +1127,10 @@ let trans_op env p tys =
   | Some (`True     ) -> ([],None), w3_ls_true, fun _ -> Term.t_true
   | Some (`False    ) -> ([],None), w3_ls_false, fun _ -> Term.t_false
   | Some (`Not      ) -> ([None],None), w3_ls_not, mk_not
-  | Some (`And true ) -> ([None;None],None), w3_ls_anda, mk_anda
-  | Some (`And false) -> ([None;None],None), w3_ls_and, mk_and
-  | Some (`Or  true ) -> ([None;None],None), w3_ls_ora, mk_ora
-  | Some (`Or  false) -> ([None;None],None), w3_ls_or, mk_or
+  | Some (`And `Asym) -> ([None;None],None), w3_ls_anda, mk_anda
+  | Some (`And `Sym ) -> ([None;None],None), w3_ls_and, mk_and
+  | Some (`Or  `Asym) -> ([None;None],None), w3_ls_ora, mk_ora
+  | Some (`Or  `Sym ) -> ([None;None],None), w3_ls_or, mk_or
   | Some (`Imp      ) -> ([None;None],None), w3_ls_imp, mk_imp
   | Some (`Iff      ) -> ([None;None],None), w3_ls_iff, mk_iff
   | Some (`Eq       ) ->
