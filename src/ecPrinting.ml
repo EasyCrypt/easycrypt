@@ -82,15 +82,16 @@ module PPEnv = struct
       || (EcEnv.Var.lookup_progvar_opt ([], name) env <> None)
       || (in_memories name)
 
-  let add_local ppe =
+  let add_local ?(force = false) ppe =
     fun id ->
       let name = ref (EcIdent.name id) in
       let i    = ref 0 in
 
-        while inuse ppe !name do
-          name := Printf.sprintf "%s%d" (EcIdent.name id) !i;
-          incr i
-        done;
+        if not force then
+          while inuse ppe !name do
+            name := Printf.sprintf "%s%d" (EcIdent.name id) !i;
+            incr i
+          done;
 
       let ppe =
         { ppe with
@@ -99,11 +100,11 @@ module PPEnv = struct
       in
         ppe
 
-  let add_locals ppe xs = List.fold_left add_local ppe xs
+  let add_locals ?force ppe xs = List.fold_left (add_local ?force) ppe xs
 
-  let add_mods ppe xs mt =
+  let add_mods ?force ppe xs mt =
     (* TODO B : this is costly *)
-    let ppe = add_locals ppe xs in
+    let ppe = add_locals ?force ppe xs in
     { ppe with ppe_env =
         List.fold_left (fun e x ->
           EcEnv.Mod.bind_local x mt (EcPath.Sx.empty, EcPath.Sm.empty) e)
@@ -1986,11 +1987,13 @@ let pp_goal (ppe : PPEnv.t) fmt (n, (hyps, concl)) =
     let ppe =
       match k with
       | EcBaseLogic.LD_mem (Some m) ->
-        let ppe = PPEnv.add_local ppe id in
-        PPEnv.create_and_push_mem ppe (id, EcMemory.lmt_xpath m)
+          let ppe = PPEnv.add_local ~force:true ppe id in
+          PPEnv.create_and_push_mem ppe (id, EcMemory.lmt_xpath m)
+
       | EcBaseLogic.LD_modty (p,_) ->
-        PPEnv.add_mods ppe [id] p
-      | _ -> PPEnv.add_local ppe id
+          PPEnv.add_mods ~force:true ppe [id] p
+
+      | _ -> PPEnv.add_local ~force:true ppe id
 
     and dk fmt =
         match k with
