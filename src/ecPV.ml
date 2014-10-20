@@ -223,9 +223,9 @@ module PVM = struct
       | FbdHoareS hs -> 
         check_binding (fst hs.bhs_m) s;
         EcFol.f_map (fun ty -> ty) aux f
-      | Fpr(m,_,_,_) ->
+      | Fpr pr ->
         check_binding EcFol.mhr s;
-        check_binding m s;
+        check_binding pr.pr_mem s;
         EcFol.f_map (fun ty -> ty) aux f
       | Fquant(q,b,f1) ->
         let f1 = 
@@ -778,7 +778,7 @@ module Mpv2 = struct
       match f1.f_node, f2.f_node with
       | Fquant(q1,bd1,f1), Fquant(q2,bd2,f2) when q1 = q2 ->
         let local = 
-          let toty (id,gty) = id, destr_gty gty in
+          let toty (id,gty) = id, gty_as_ty gty in
           enter_local env local (List.map toty bd1) (List.map toty bd2) in
         add_eq local eqs f1 f2
       | Fif(e1,t1,f1), Fif(e2,t2,f2) -> 
@@ -818,7 +818,7 @@ module Mpv2 = struct
       match f.f_node with
       | Fquant(_,bd1,f1) ->
         let local = 
-          let toty (id,gty) = id, destr_gty gty in
+          let toty (id,gty) = id, gty_as_ty gty in
           let bd = List.map toty bd1 in
           enter_local env local bd bd in
         aux local eqs f1

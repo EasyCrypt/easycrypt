@@ -369,11 +369,6 @@ type call_info =
   | CI_inv  of pformula
   | CI_upto of (pformula * pformula * pformula option)
 
-(* AppSingle are optional for bounded Phl judgments
-   AppMult is required by most general rule for upper bounded Phl
-   AppNone is required for the rest of judgments
-*)
-
 type p_app_bd_info =
   | PAppNone
   | PAppSingle of pformula

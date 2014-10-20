@@ -1383,16 +1383,16 @@ let trans_form env f =
       let mem = trans_lv !env m in
       get_var mo mem
 
-    | Fpr(mem,mp,args,ev) ->
-        let mem   = trans_lv !env mem in
-        let args  = trans_form_b args in
+    | Fpr pr ->
+        let mem   = trans_lv !env pr.pr_mem in
+        let args  = trans_form_b pr.pr_args in
         let f = 
-          trans_fun !env mp (oget args.Term.t_ty) in
+          trans_fun !env pr.pr_fun (oget args.Term.t_ty) in
         let mid = save () in
         let env0, ty = trans_gty !env (GTmem None) in
         let env1, vs  = add_id env0 (EcFol.mhr, ty) in
         env := env1;
-        let evbody = trans_form ev in
+        let evbody = trans_form pr.pr_event in
         let ev = trans_lambda [vs] evbody in
         restore mid;
         getpr f mem args ev

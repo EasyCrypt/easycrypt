@@ -621,13 +621,11 @@ let check_alpha_equal ri hyps f1 f2 =
       check_s env subst eg1.eg_sl eg2.eg_sl;
       check_s env subst eg1.eg_sr eg2.eg_sr
 
-    | Fpr(m1,p1,args1,f1'), Fpr(m2,p2,args2,f2') ->
-      check_mem subst m1 m2;
-      check_xp env subst p1 p2;
-     (* ensure (List.length args1 = List.length args2);
-      List.iter2 (aux env subst) args1 args2; *)
-      aux env subst args1 args2;
-      aux env subst f1' f2'
+    | Fpr pr1, Fpr pr2 ->
+      check_mem subst pr1.pr_mem pr2.pr_mem;
+      check_xp env subst pr1.pr_fun pr2.pr_fun;
+      aux env subst pr1.pr_args pr2.pr_args;
+      aux env subst pr1.pr_event pr2.pr_event
 
     | _, _ -> error ()
 

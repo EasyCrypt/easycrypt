@@ -1848,8 +1848,6 @@ and transstruct1 (env : EcEnv.env) (st : pstructure_item located) =
       f_def = FBalias f;
     } in
     [(name, MI_Function fun_)]
-    
-
 
 (* -------------------------------------------------------------------- *)
 and transbody ue symbols (env : EcEnv.env) retty pbody =

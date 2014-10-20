@@ -85,7 +85,7 @@ let callable_oracles_stmt env modv =
 let t_failure_event_r (at_pos, cntr, ash, q, f_event, pred_specs, inv) tc =
   let env, _, concl = FApi.tc1_eflat tc in
 
-  let ((m, f, _args, ev), bd) =
+  let (pr, bd) =
     match concl.f_node with
     | Fapp ({ f_node =Fop (op, _) }, [pr; bd])
         when is_pr pr && EcPath.p_equal op EcCoreLib.p_real_le
@@ -94,8 +94,10 @@ let t_failure_event_r (at_pos, cntr, ash, q, f_event, pred_specs, inv) tc =
     | _ -> tc_error !!tc "a goal of the form Pr[ _ ] <= _ is required"
   in
 
-  let m = oget (Memory.byid m env) in
-  let f = NormMp.norm_xfun env f in
+  let m  = oget (Memory.byid pr.pr_mem env) in
+  let f  = NormMp.norm_xfun env pr.pr_fun in
+  let ev = pr.pr_event in
+
   let memenv, (_, fdef), _ =
     try  Fun.hoareS f env
     with _ -> tc_error !!tc "not applicable to abstract functions"
@@ -207,7 +209,7 @@ let process_fel at_pos ((cntr, ash, q, f_event, pred_specs, o_inv) : pfel_t) tc 
   let f = match concl.f_node with
     | Fapp ({ f_node = Fop (op, _) }, [pr; _])
         when is_pr pr && EcPath.p_equal op EcCoreLib.p_real_le
-      -> let (_,f,_,_) = destr_pr pr in f
+      -> let { pr_fun = f } = destr_pr pr in f
 
     | _ -> tc_error !!tc "a goal of the form Pr[ _ ] <= _ is required"
   in

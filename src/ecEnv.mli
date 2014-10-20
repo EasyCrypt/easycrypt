@@ -9,7 +9,7 @@ open EcSymbols
 open EcTypes
 open EcMemory
 open EcDecl
-open EcFol
+open EcCoreFol
 open EcModules
 open EcTheory
 open EcProvers
@@ -154,7 +154,7 @@ module Ax : sig
   val add  : path -> env -> env
   val bind : symbol -> axiom -> env -> env
 
-  val instanciate : path -> EcTypes.ty list -> env -> EcFol.form
+  val instanciate : path -> EcTypes.ty list -> env -> form
 end
 
 (* -------------------------------------------------------------------- *)
@@ -180,7 +180,7 @@ module Mod : sig
   val add_restr_to_locals : mod_restr -> env -> env
 
   (* Only bind module, ie no memory and no local variable *)
-  val add_mod_binding : EcFol.binding -> env -> env
+  val add_mod_binding : binding -> env -> env
 
   val add : mpath -> env -> env
 end
@@ -221,7 +221,7 @@ module NormMp : sig
   val get_restr  : env -> mpath -> use
   val use_mem_xp : xpath -> use -> bool
   val use_mem_gl : mpath -> use -> bool
-  val norm_glob  : env -> EcMemory.memory -> mpath -> EcFol.form
+  val norm_glob  : env -> EcMemory.memory -> mpath -> form
   val norm_tglob : env -> mpath -> EcTypes.ty
   val tglob_reducible : env -> mpath -> bool
   val is_abstract_fun : xpath -> env -> bool
@@ -398,7 +398,7 @@ module LDecl : sig
 
   val clear : EcIdent.Sid.t -> hyps -> hyps
 
-  val ld_subst : EcFol.f_subst -> local_kind -> local_kind
+  val ld_subst : f_subst -> local_kind -> local_kind
 
   val push_all    : memenv list -> hyps -> hyps
   val push_active : memenv -> hyps -> hyps

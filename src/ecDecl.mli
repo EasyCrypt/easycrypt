@@ -7,7 +7,7 @@
 open EcUtils
 open EcPath
 open EcTypes
-open EcFol
+open EcCoreFol
 
 (* -------------------------------------------------------------------- *)
 type ty_param  = EcIdent.t * EcPath.Sp.t
@@ -41,7 +41,7 @@ type locals = EcIdent.t list
 
 type operator_kind = 
   | OB_oper of opbody option
-  | OB_pred of EcFol.form option
+  | OB_pred of form option
 
 and opbody =
   | OP_Plain  of EcTypes.expr
@@ -94,7 +94,7 @@ type axiom_kind = [`Axiom | `Lemma]
 
 type axiom = {
   ax_tparams : ty_params;
-  ax_spec    : EcFol.form option;
+  ax_spec    : form option;
   ax_kind    : axiom_kind;
   ax_nosmt   : bool;
 }

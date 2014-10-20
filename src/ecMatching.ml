@@ -526,9 +526,9 @@ module FPosition = struct
           | Fproj (f, _) ->
               doit pos (`WithCtxt (ctxt, [f]))
 
-          | Fpr (m, _, f1, f2) ->
-              let subctxt = Sid.add m ctxt in
-              doit pos (`WithSubCtxt [(ctxt, f1); (subctxt, f2)])
+          | Fpr pr ->
+              let subctxt = Sid.add pr.pr_mem ctxt in
+              doit pos (`WithSubCtxt [(ctxt, pr.pr_args); (subctxt, pr.pr_event)])
 
           | FhoareF hs ->
               doit pos (`WithCtxt (Sid.add EcFol.mhr ctxt, [hs.hf_pr; hs.hf_po]))
@@ -651,9 +651,9 @@ module FPosition = struct
               let (f1', f2') = as_seq2 (doit p [f1; f2]) in
                 FSmart.f_let (fp, (lv, f1, f2)) (lv, f1', f2')
 
-          | Fpr (m, xp, f1, f2) ->
-              let (f1', f2') = as_seq2 (doit p [f1; f2]) in
-              f_pr m xp f1' f2'
+          | Fpr pr ->
+              let (args', event') = as_seq2 (doit p [pr.pr_args; pr.pr_event]) in
+              f_pr pr.pr_mem pr.pr_fun args' event'
 
           | FhoareF hf ->
               let (hf_pr, hf_po) = as_seq2 (doit p [hf.hf_pr; hf.hf_po]) in

@@ -1435,19 +1435,19 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
         (string_of_hcmp hs.bhs_cmp)
         (pp_form_r ppe (fst outer, (max_op_prec,`NonAssoc))) hs.bhs_bd
 
-  | Fpr (m, f, args, ev) ->
-      let ppe = PPEnv.create_and_push_mem ppe ~active:true (EcFol.mhr, f) in
+  | Fpr pr->
+      let ppe = PPEnv.create_and_push_mem ppe ~active:true (EcFol.mhr, pr.pr_fun) in
       Format.fprintf fmt "Pr[@[%a@[%t@] @@ %a :@ %a@]]"
-        (pp_funname ppe) f
-        (match args.f_node with
+        (pp_funname ppe) pr.pr_fun
+        (match pr.pr_args.f_node with
          | Ftuple _ ->
-             (fun fmt -> pp_form ppe fmt args)
-         | _ when EcFol.f_equal f_tt args ->
+             (fun fmt -> pp_form ppe fmt pr.pr_args)
+         | _ when EcFol.f_equal f_tt pr.pr_args ->
              (fun fmt -> pp_string fmt "()")
          | _ ->
-             (fun fmt -> Format.fprintf fmt "(%a)" (pp_form ppe) args))
-        (pp_local ppe) m
-        (pp_form ppe) ev
+             (fun fmt -> Format.fprintf fmt "(%a)" (pp_form ppe) pr.pr_args))
+        (pp_local ppe) pr.pr_mem
+        (pp_form ppe) pr.pr_event
 
 and pp_form_r (ppe : PPEnv.t) outer fmt f =
   let printers =
@@ -1533,7 +1533,7 @@ let pp_opdecl_pr (ppe : PPEnv.t) fmt (x, ts, ty, op) =
             | Fquant (Llambda, vds, f) -> (vds, f)
             | _ -> ([], f) in
 
-          let vds = List.map (snd_map EcFol.destr_gty) vds in
+          let vds = List.map (snd_map EcFol.gty_as_ty) vds in
             (pp_locbinds ppe vds, f)
         in
           Format.fprintf fmt "%t =@ %a" pp_vds (pp_form subppe) f
