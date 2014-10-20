@@ -120,7 +120,8 @@ proof -strict.
 intros M; apply extensionality.
 cut ext: (size (transpose (transpose M)) = size M &&
           forall i j, 0 <= i => i < fst (size M) => 0 <= j => j < snd (size M) =>
-            (transpose (transpose M)).[(i,j)] = M.[(i,j)]) by (split;smt);smt.
+            (transpose (transpose M)).[(i,j)] = M.[(i,j)]) by split; smt.
+smt.
 qed.
 
 (* Interactions with arrays *)
@@ -172,7 +173,7 @@ cut ext_eq: (Array.length (row M i) = fst (size M) /\
              forall j, 0 <= j => j < fst (size M) =>
                Array."_.[_]" (row M i) j = M.[(j,i)] /\
                Array."_.[_]" (column (transpose M) i) j = (transpose M).[(i,j)] /\
-               (transpose M).[(i,j)] = M.[(j,i)]);[ | smt ];
+               (transpose M).[(i,j)] = M.[(j,i)]); last by smt.
 progress=> //.
   by apply row_length.
   by rewrite column_length=> //; smt.

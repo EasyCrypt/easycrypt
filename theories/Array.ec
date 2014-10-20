@@ -95,7 +95,9 @@ do !split.
   by generalize len; rewrite 2!length_cons; smt.
   intros=> i i_bnd; cut := val (i + 1) _; first smt.
   rewrite 2?get_cons; first 2 smt.
-  by cut ->: (0 = i + 1) = false by smt; cut ->: i + 1 - 1 = i by smt.
+  cut ->: (0 = i + 1) = false by smt.
+  cut ->: i + 1 - 1 = i by smt.
+  smt.
 qed.
 
 (* snoc *)
@@ -520,13 +522,11 @@ cut ->: (p 0 x /\ forall (i:int), 0 <= i < length xs => (fun i x, p (i + 1) x) i
          forall (i:int), 0 <= i < length (x::xs) => p i (x::xs).[i].
   split; first smt.
   intros=> alli; split.
-    by cut ->: x = (x::xs).[0]
-         by (rewrite get_cons //=; smt);
-       apply alli; first smt.
-    by intros=> i i_bnd //=;
-       cut ->: xs.[i] = (x::xs).[i + 1]
-         by (rewrite get_cons //=; smt);
-       apply alli; first smt.
+    cut ->: x = (x::xs).[0] by rewrite get_cons //=; smt.
+    by apply alli; first smt.
+  intros=> i i_bnd //=.
+  cut ->: xs.[i] = (x::xs).[i + 1] by rewrite get_cons //=; smt.
+  by apply alli; first smt.
 by rewrite -alli_def.
 qed.
 

@@ -139,9 +139,9 @@ theory Dword.
   lemma lossless_restrw X:
     card X < 2^length =>
     weight (dword \ X) = 1%r.
-  proof -strict.
-  intros=> card_X; rewrite lossless_restr ?lossless // ?mu_cpMemw;
-  cut <-: (forall x y, x * (1%r / y) = x / y) by smt;
+  proof.
+  move=> lt_CX_2sx; rewrite lossless_restr ?lossless // ?mu_cpMemw.
+  cut <-: (forall x y, x * (1%r / y) = x / y) by smt.
   apply (real_lt_trans _ ((2^length)%r* (1%r/(2^length)%r)) _); last smt.
   apply mulrM; last by rewrite from_intM.
   smt.
