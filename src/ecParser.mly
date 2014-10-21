@@ -2135,8 +2135,6 @@ code_pos_underscore:
 
 ;
 
-
-
 phltactic:
 | PROC
    { Pfun `Def }

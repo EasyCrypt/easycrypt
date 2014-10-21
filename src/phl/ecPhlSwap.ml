@@ -100,7 +100,8 @@ module HiInternal = struct
     | FequivS es, Some side ->
         List.length (if side then es.es_sl.s_node else es.es_sr.s_node)
 
-    | _ -> tc_error_notphl !!tc None    (* FIXME *)
+    | _, None   -> tc_error_noXhl ~kinds:[`Hoare `Stmt; `PHoare `Stmt] !!tc
+    | _, Some _ -> tc_error_noXhl ~kinds:[`Equiv `Stmt] !!tc
 end
 
 (* -------------------------------------------------------------------- *)

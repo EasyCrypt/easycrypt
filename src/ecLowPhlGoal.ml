@@ -20,12 +20,43 @@ module Zpr = EcMatching.Zipper
 type lv_subst_t = (lpattern * form) * (prog_var * memory * form) list
 
 (* -------------------------------------------------------------------- *)
-let tc_error_notphl pf (_x : bool option) =
-  tc_error pf "not a HL/PHL/PRHL goal"  (* FIXME *)
+type hlform = [`Any | `Pred | `Stmt]
+
+type hlkind = [
+  | `Hoare  of hlform
+  | `PHoare of hlform
+  | `Equiv  of hlform
+  | `Eager
+]
+
+and hlkinds = hlkind list
+
+let hlkinds_all : hlkinds = [`Hoare `Any; `PHoare `Any; `Equiv `Any; `Eager]
+let hlkinds_Xhl : hlkinds = [`Hoare `Any; `PHoare `Any; `Equiv `Any]
 
 (* -------------------------------------------------------------------- *)
-let as_phl (kind : bool option) (dx : unit -> 'a) (pe : proofenv) =
-  try dx () with DestrError _ -> tc_error_notphl pe kind
+let tc_error_noXhl ?(kinds : hlkinds option) pf =
+  let string_of_form =
+    function `Pred -> "[F]" | `Stmt -> "[S]" | `Any -> "" in
+
+  let rec string_of_kind kind =
+    let kind, fm =
+      match kind with
+      | `Hoare  fm -> ("hoare" , fm)
+      | `PHoare fm -> ("phoare", fm)
+      | `Equiv  fm -> ("equiv" , fm)
+      | `Eager     -> ("eager" , `Any)
+    in
+      Printf.sprintf "%s%s" kind (fm |> string_of_form)
+  in
+  
+  tc_error_lazy pf (fun fmt ->
+    Format.fprintf fmt "expecting a goal of the form: %s"
+      (String.concat ", " (List.map string_of_kind (odfl [] kinds))))
+
+(* -------------------------------------------------------------------- *)
+let as_phl (kind : hlkind) (dx : unit -> 'a) (pe : proofenv) =
+  try dx () with DestrError _ -> tc_error_noXhl ~kinds:[kind] pe
 
 (* -------------------------------------------------------------------- *)
 let s_first proj s =
@@ -108,16 +139,14 @@ let tc1_pos_last_if     tc s = pf_pos_last_if     !!tc s
 let tc1_pos_last_while  tc s = pf_pos_last_while  !!tc s 
 let tc1_pos_last_assert tc s = pf_pos_last_assert !!tc s 
 
-  
-  
 (* -------------------------------------------------------------------- *)
-let pf_as_hoareF   pe c = as_phl (Some true ) (fun () -> destr_hoareF   c) pe
-let pf_as_hoareS   pe c = as_phl (Some true ) (fun () -> destr_hoareS   c) pe
-let pf_as_bdhoareF pe c = as_phl (Some true ) (fun () -> destr_bdHoareF c) pe
-let pf_as_bdhoareS pe c = as_phl (Some true ) (fun () -> destr_bdHoareS c) pe
-let pf_as_equivF   pe c = as_phl (Some false) (fun () -> destr_equivF   c) pe
-let pf_as_equivS   pe c = as_phl (Some false) (fun () -> destr_equivS   c) pe
-let pf_as_eagerF   pe c = as_phl (Some false) (fun () -> destr_eagerF   c) pe
+let pf_as_hoareF   pe c = as_phl (`Hoare  `Pred) (fun () -> destr_hoareF   c) pe
+let pf_as_hoareS   pe c = as_phl (`Hoare  `Stmt) (fun () -> destr_hoareS   c) pe
+let pf_as_bdhoareF pe c = as_phl (`PHoare `Pred) (fun () -> destr_bdHoareF c) pe
+let pf_as_bdhoareS pe c = as_phl (`PHoare `Stmt) (fun () -> destr_bdHoareS c) pe
+let pf_as_equivF   pe c = as_phl (`Equiv  `Pred) (fun () -> destr_equivF   c) pe
+let pf_as_equivS   pe c = as_phl (`Equiv  `Stmt) (fun () -> destr_equivS   c) pe
+let pf_as_eagerF   pe c = as_phl `Eager          (fun () -> destr_eagerF   c) pe
 
 (* -------------------------------------------------------------------- *)
 let tc1_as_hoareF   tc = pf_as_hoareF   !!tc (FApi.tc1_goal tc)
@@ -141,7 +170,7 @@ let get_pre f =
 
 let tc1_get_pre tc =
   match get_pre (FApi.tc1_goal tc) with
-  | None   -> tc_error_notphl !!tc None
+  | None   -> tc_error_noXhl ~kinds:hlkinds_Xhl !!tc
   | Some f -> f
 
 (* -------------------------------------------------------------------- *)
@@ -157,7 +186,7 @@ let get_post f =
 
 let tc1_get_post tc =
   match get_post (FApi.tc1_goal tc) with
-  | None   -> tc_error_notphl !!tc None
+  | None   -> tc_error_noXhl ~kinds:hlkinds_Xhl !!tc
   | Some f -> f
 
 (* -------------------------------------------------------------------- *)
@@ -195,19 +224,33 @@ let s_split_o i s =
 (* -------------------------------------------------------------------- *)
 let t_hS_or_bhS_or_eS ?th ?tbh ?te tc =
   match (FApi.tc1_goal tc).f_node with
-  | FhoareS   _ when th  <> None -> (oget th ) tc
-  | FbdHoareS _ when tbh <> None -> (oget tbh) tc
-  | FequivS   _ when te  <> None -> (oget te ) tc
+  | FhoareS   _ when EcUtils.is_some th  -> (oget th ) tc
+  | FbdHoareS _ when EcUtils.is_some tbh -> (oget tbh) tc
+  | FequivS   _ when EcUtils.is_some te  -> (oget te ) tc
 
-  | _ -> tc_error_notphl !!tc None      (* FIXME *)
+  | _ ->
+    let kinds = List.flatten [
+         if EcUtils.is_some th  then [`Hoare  `Stmt] else [];
+         if EcUtils.is_some tbh then [`PHoare `Stmt] else [];
+         if EcUtils.is_some te  then [`Equiv  `Stmt] else []]
+
+    in tc_error_noXhl ~kinds !!tc
 
 let t_hF_or_bhF_or_eF ?th ?tbh ?te ?teg tc =
   match (FApi.tc1_goal tc).f_node with
-  | FhoareF   _ when th  <> None -> (oget th ) tc
-  | FbdHoareF _ when tbh <> None -> (oget tbh) tc
-  | FequivF   _ when te  <> None -> (oget te ) tc
-  | FeagerF   _ when teg <> None -> (oget teg) tc
-  | _ -> tc_error_notphl !!tc None      (* FIXME *)
+  | FhoareF   _ when EcUtils.is_some th  -> (oget th ) tc
+  | FbdHoareF _ when EcUtils.is_some tbh -> (oget tbh) tc
+  | FequivF   _ when EcUtils.is_some te  -> (oget te ) tc
+  | FeagerF   _ when EcUtils.is_some teg -> (oget teg) tc
+
+  | _ ->
+    let kinds = List.flatten [
+         if EcUtils.is_some th  then [`Hoare  `Pred] else [];
+         if EcUtils.is_some tbh then [`PHoare `Pred] else [];
+         if EcUtils.is_some te  then [`Equiv  `Pred] else [];
+         if EcUtils.is_some teg then [`Eager       ] else []]
+
+    in tc_error_noXhl ~kinds !!tc
 
 (* -------------------------------------------------------------------- *)
 let tag_sym_with_side name m =
@@ -509,7 +552,10 @@ let t_code_transform side ?(bdhoare = false) cpos tr tx tc =
           let concl = f_bdHoareS_r { bhs with bhs_m = me; bhs_s = stmt; } in
           FApi.xmutate1 tc (tr None) (cs @ [concl])
 
-      | _ -> tc_error_notphl pf None    (* FIXME *)
+      | _ ->
+        match bdhoare with
+        | true  -> tc_error_noXhl ~kinds:[`Hoare `Stmt; `PHoare `Stmt] pf
+        | false -> tc_error_noXhl ~kinds:[`Hoare `Stmt] pf
   end
 
   | Some side ->

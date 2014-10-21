@@ -146,7 +146,7 @@ let t_conseq pre post tc =
   | FequivF _   -> t_equivF_conseq pre post tc
   | FequivS _   -> t_equivS_conseq pre post tc
   | FeagerF _   -> t_eagerF_conseq pre post tc
-  | _           -> tc_error_notphl !!tc None
+  | _           -> tc_error_noXhl !!tc
 
 (* -------------------------------------------------------------------- *)
 let t_equivF_notmod post tc =

@@ -109,7 +109,7 @@ let t_prbounded_r conseq tc =
     | FbdHoareS hf ->
         (hf.bhs_m, hf.bhs_pr, hf.bhs_po, hf.bhs_cmp, hf.bhs_bd)
 
-    | _ -> tc_error_notphl !!tc None    (* FIXME *)
+    | _ -> tc_error_noXhl ~kinds:[`PHoare `Any] !!tc
   in
 
   let cond =
