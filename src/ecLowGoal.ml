@@ -421,12 +421,12 @@ let t_generalize_hyps ?(clear = false) ids tc =
   let (s, bds, args) = List.fold_left for1 (s, bds, args) ids in
 
   let ff =
-    List.fold_right
-      (fun bd ff ->
+    List.fold_left
+      (fun ff bd ->
         match bd with
         | `Forall (x, xty) -> f_forall [x, xty] ff
         | `Imp    pre      -> f_imp pre ff)
-      bds (Fsubst.f_subst s concl) in
+      (Fsubst.f_subst s concl) bds in
 
   let pt = { pt_head = PTCut ff; pt_args = List.rev args; } in
   let tc = t_apply pt tc in
