@@ -97,6 +97,9 @@ type 'a tuple9 = 'a * 'a * 'a * 'a * 'a * 'a * 'a * 'a * 'a
 type 'a pair   = 'a * 'a
 
 (* -------------------------------------------------------------------- *)
+let in_seq1 (x : 'a) = [x]
+
+(* -------------------------------------------------------------------- *)
 let as_seq0 = function [] -> () | _ -> assert false
 let as_seq1 = function [x] -> x | _ -> assert false
 let as_seq2 = function [x1; x2] -> (x1, x2) | _ -> assert false

@@ -343,7 +343,7 @@ type pterm = {
 (* -------------------------------------------------------------------- *)
 type 'a doption =
   | Single of 'a
-  | Double of 'a * 'a
+  | Double of ('a * 'a)
 
 type side = bool
 type tac_side = side option

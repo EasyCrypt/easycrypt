@@ -57,6 +57,9 @@ type 'a tuple9 = 'a * 'a * 'a * 'a * 'a * 'a * 'a * 'a * 'a
 type 'a pair   = 'a tuple2
 
 (* -------------------------------------------------------------------- *)
+val in_seq1: ' a -> 'a list
+
+(* -------------------------------------------------------------------- *)
 val as_seq0 : 'a list -> 'a tuple0
 val as_seq1 : 'a list -> 'a tuple1
 val as_seq2 : 'a list -> 'a tuple2

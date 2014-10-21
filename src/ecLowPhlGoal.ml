@@ -31,8 +31,13 @@ type hlkind = [
 
 and hlkinds = hlkind list
 
-let hlkinds_all : hlkinds = [`Hoare `Any; `PHoare `Any; `Equiv `Any; `Eager]
-let hlkinds_Xhl : hlkinds = [`Hoare `Any; `PHoare `Any; `Equiv `Any]
+let hlkinds_Xhl_r (form : hlform) : hlkinds =
+  [`Hoare form; `PHoare form; `Equiv form]
+
+let hlkinds_Xhl = hlkinds_Xhl_r `Any
+
+let hlkinds_all : hlkinds =
+  [`Hoare `Any; `PHoare `Any; `Equiv `Any; `Eager]
 
 (* -------------------------------------------------------------------- *)
 let tc_error_noXhl ?(kinds : hlkinds option) pf =
