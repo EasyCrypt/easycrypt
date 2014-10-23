@@ -395,10 +395,10 @@
     { nm }
 
 | TOP
-    { [EcCoreLib.id_top] }
+    { [EcCoreLib.i_top] }
 
 | TOP DOT nm=rlist1(UIDENT, DOT)
-    { EcCoreLib.id_top :: nm }
+    { EcCoreLib.i_top :: nm }
 ;
 
 _genqident(X):

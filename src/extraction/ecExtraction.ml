@@ -556,9 +556,9 @@ let finalize required env eenv =
   let ct = (EcEnv.ctheory_of_ctheory_w3 (EcEnv.Theory.close env)).cth_struct in
   assert (
     match List.hd ct with
-    | CTh_theory(s, _) -> s = EcCoreLib.id_Pervasive
+    | CTh_theory(s, _) -> s = EcCoreLib.i_Pervasive
     | _ -> false);
-  let required = EcCoreLib.id_Pervasive :: List.rev required  in
+  let required = EcCoreLib.i_Pervasive :: List.rev required  in
   let required = 
     List.map 
       (fun id -> 
@@ -659,12 +659,12 @@ and add_withth check env eenv qs oname =
 
 let init_withextract =
   let dummy x = EcLocation.mk_loc EcLocation._dummy x in
-  let perv x = dummy ([EcCoreLib.id_top; EcCoreLib.id_Pervasive], x) in
+  let perv x = dummy ([EcCoreLib.i_top; EcCoreLib.i_Pervasive], x) in
   let operv x = "Pervasives." ^ x in
-  let tint x = dummy ([EcCoreLib.id_top; "Int"], x) in
+  let tint x = dummy ([EcCoreLib.i_top; "Int"], x) in
   [
     (* Pervasive *)
-    ExTh (dummy ([EcCoreLib.id_top], EcCoreLib.id_Pervasive)), "EcPervasive"; 
+    ExTh (dummy ([EcCoreLib.i_top], EcCoreLib.i_Pervasive)), "EcPervasive"; 
     ExTy (perv "unit") , "unit"       ;
     ExTy (perv "bool") , "bool"       ; 
     ExOp (perv "true") , "true"       ;
@@ -680,7 +680,7 @@ let init_withextract =
     ExOp (perv "tt")   ,       "()"   ;
     (* Int *) 
     (* TODO : this is dangerous : we should use big_int *)
-    ExTh (dummy ([EcCoreLib.id_top], "Int")), "EcInt";
+    ExTh (dummy ([EcCoreLib.i_top], "Int")), "EcInt";
     ExOp (tint "[-]")  , operv "(~-)" ;
     ExOp (tint "-")    , operv "(-)"  ;
     ExOp (tint "+")    , operv "(+)"  ;
@@ -691,17 +691,17 @@ let init_withextract =
     ExOp (tint ">")    , operv "(>)"  ;
     ExOp (tint "one")  , "1"          ;
     ExOp (tint "zero") , "0"          ;
-    ExOp (dummy ([EcCoreLib.id_top; "Int"; "EuclDiv"], "%%")) , operv "(mod)"  ;
-    ExOp (dummy ([EcCoreLib.id_top; "Int"; "EuclDiv"], "/%")) , operv "(/)"    ;
-    ExOp (dummy ([EcCoreLib.id_top; "Int"; "Extrema"], "max")), operv "max";
-    ExOp (dummy ([EcCoreLib.id_top; "Int"; "Extrema"], "min")), operv "min";
-    ExOp (dummy ([EcCoreLib.id_top; "Int"; "Abs"], "`|_|"))   , operv "abs";
+    ExOp (dummy ([EcCoreLib.i_top; "Int"; "EuclDiv"], "%%")) , operv "(mod)"  ;
+    ExOp (dummy ([EcCoreLib.i_top; "Int"; "EuclDiv"], "/%")) , operv "(/)"    ;
+    ExOp (dummy ([EcCoreLib.i_top; "Int"; "Extrema"], "max")), operv "max";
+    ExOp (dummy ([EcCoreLib.i_top; "Int"; "Extrema"], "min")), operv "min";
+    ExOp (dummy ([EcCoreLib.i_top; "Int"; "Abs"], "`|_|"))   , operv "abs";
     (* Bool *)
-    ExTh (dummy ([EcCoreLib.id_top], "Bool")), "EcBool";
+    ExTh (dummy ([EcCoreLib.i_top], "Bool")), "EcBool";
     (* Pair *)
-    ExTh (dummy ([EcCoreLib.id_top], "Pair")), "EcPair";
-    ExOp (dummy ([EcCoreLib.id_top; "Pair"], "fst")), operv "fst";
-    ExOp (dummy ([EcCoreLib.id_top; "Pair"], "snd")), operv "snd"; 
+    ExTh (dummy ([EcCoreLib.i_top], "Pair")), "EcPair";
+    ExOp (dummy ([EcCoreLib.i_top; "Pair"], "fst")), operv "fst";
+    ExOp (dummy ([EcCoreLib.i_top; "Pair"], "snd")), operv "snd"; 
    ] 
 
 let compile_kind env eenv = function
@@ -747,7 +747,7 @@ let process_extraction env required (file, toextract, withextract) =
       Format.formatter_of_out_channel outc, fun _ -> close_out outc in
   let err = ref None in
   begin 
-    try out_mod_decl [EcCoreLib.id_top] fmt modd
+    try out_mod_decl [EcCoreLib.i_top] fmt modd
     with e -> err := Some e 
   end;
   close (); 

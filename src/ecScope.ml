@@ -1312,10 +1312,10 @@ module Ty = struct
         axs
 
   (* ------------------------------------------------------------------ *)
-  let p_zmod    = EcPath.fromqsymbol ([EcCoreLib.id_top; "Ring"; "ZModule"], "zmodule")
-  let p_ring    = EcPath.fromqsymbol ([EcCoreLib.id_top; "Ring"; "ComRing"], "ring"   )
-  let p_idomain = EcPath.fromqsymbol ([EcCoreLib.id_top; "Ring"; "IDomain"], "idomain")
-  let p_field   = EcPath.fromqsymbol ([EcCoreLib.id_top; "Ring"; "Field"  ], "field"  )
+  let p_zmod    = EcPath.fromqsymbol ([EcCoreLib.i_top; "Ring"; "ZModule"], "zmodule")
+  let p_ring    = EcPath.fromqsymbol ([EcCoreLib.i_top; "Ring"; "ComRing"], "ring"   )
+  let p_idomain = EcPath.fromqsymbol ([EcCoreLib.i_top; "Ring"; "IDomain"], "idomain")
+  let p_field   = EcPath.fromqsymbol ([EcCoreLib.i_top; "Ring"; "Field"  ], "field"  )
 
   (* ------------------------------------------------------------------ *)
   let ring_of_symmap env ty kind symbols =

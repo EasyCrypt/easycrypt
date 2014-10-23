@@ -164,7 +164,7 @@ let splitwhile_stmt b (pf, _) me i =
   match i.i_node with
   | Swhile (e, sw) ->
       let op_ty  = toarrow [tbool; tbool] tbool in
-      let op_and = e_op EcCoreLib.p_and [] op_ty in
+      let op_and = e_op EcCoreLib.CI_Bool.p_and [] op_ty in
       let e = e_app op_and [e; b] tbool in
         (me, [i_while (e, sw); i])
 

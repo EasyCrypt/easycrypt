@@ -140,7 +140,7 @@ module PPEnv = struct
       p_shorten exists p
 
   let op_symb (ppe : t) p info =
-    let specs = [1, EcPath.pqoname (EcPath.prefix EcCoreLib.p_eq) "<>"] in
+    let specs = [1, EcPath.pqoname (EcPath.prefix EcCoreLib.CI_Bool.p_eq) "<>"] in
 
     let lookup =
       match info with
@@ -495,7 +495,7 @@ let maybe_paren (onm, (outer, side)) (inm, inner) pp =
     match inm <> [] && inm <> onm with
     | false -> pp_maybe_paren (not (noparens inner outer side)) pp
     | true  ->
-        let inm = if inm = [EcCoreLib.id_top] then ["top"] else inm in
+        let inm = if inm = [EcCoreLib.i_top] then ["top"] else inm in
           fun fmt x ->
             Format.fprintf fmt "(%a)%%%s" pp x (String.concat "." inm)
 
@@ -563,7 +563,7 @@ let priority_of_binop name =
 
 (* -------------------------------------------------------------------- *)
 let priority_of_unop =
-  let id_not = EcPath.basename EcCoreLib.p_not in
+  let id_not = EcPath.basename EcCoreLib.CI_Bool.p_not in
     fun name ->
       match EcIo.lex_single_token name with
       | Some EP.NOT      -> Some e_uni_prio_not
@@ -939,7 +939,7 @@ and try_pp_expr_chained_orderings (ppe : PPEnv.t) outer fmt e =
   let rec collect acc le e =
     match e.e_node with
     | Eapp ({ e_node = Eop (op, []) }, [e1; e2])
-        when EcPath.p_equal op EcCoreLib.p_anda
+        when EcPath.p_equal op EcCoreLib.CI_Bool.p_anda
       -> begin
         match e2.e_node with
         | Eapp ({ e_node = Eop (op, tvi) }, [i1; i2])
@@ -1005,8 +1005,8 @@ and pp_expr_core_r (ppe : PPEnv.t) outer fmt (e : expr) =
 
   | Eapp ({e_node = Eop (op, _)},
             [{e_node = Eapp ({e_node = Eop (op', tys)}, [f1; f2])}])
-      when EcPath.p_equal op  EcCoreLib.p_not
-        && EcPath.p_equal op' EcCoreLib.p_eq
+      when EcPath.p_equal op  EcCoreLib.CI_Bool.p_not
+        && EcPath.p_equal op' EcCoreLib.CI_Bool.p_eq
     ->
       let negop = EcPath.pqoname (EcPath.prefix op') "<>" in
       pp_opapp ppe e_ty pp_expr_r outer fmt (`Expr, negop, tys, [f1; f2])
@@ -1346,8 +1346,8 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
 
   | Fapp ({f_node = Fop (op, _)},
             [{f_node = Fapp ({f_node = Fop (op', tys)}, [f1; f2])}])
-      when EcPath.p_equal op  EcCoreLib.p_not
-        && EcPath.p_equal op' EcCoreLib.p_eq
+      when EcPath.p_equal op  EcCoreLib.CI_Bool.p_not
+        && EcPath.p_equal op' EcCoreLib.CI_Bool.p_eq
     ->
       let negop = EcPath.pqoname (EcPath.prefix op') "<>" in
       pp_opapp ppe f_ty pp_form_r outer fmt (`Form, negop, tys, [f1; f2])

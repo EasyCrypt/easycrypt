@@ -98,8 +98,8 @@ let t_pr_rewrite s tc =
       tc_error !!tc "do not reconize %s as a probability lemma" s in
   let select = 
     match kind with 
-    | `MuEq    -> select_pr_cmp (EcPath.p_equal EcCoreLib.p_eq)
-    | `MuSub   -> select_pr_cmp (EcPath.p_equal EcCoreLib.p_real_le)
+    | `MuEq    -> select_pr_cmp (EcPath.p_equal EcCoreLib.CI_Bool.p_eq)
+    | `MuSub   -> select_pr_cmp (EcPath.p_equal EcCoreLib.CI_Real.p_real_le)
     | `MuFalse -> select_pr is_false
     | `MuNot   -> select_pr is_not
     | `MuOr
@@ -139,13 +139,13 @@ let t_pr_rewrite s tc =
 
     | `MuOr ->
         let { pr_mem = m ; pr_fun = f; pr_args = args; } as pr = destr_pr torw in
-        let (asym, ev1, ev2) = destr_or_kind pr.pr_event in
-        (pr_or m f args (if asym then f_ora else f_or) ev1 ev2, 0)
+        let (asym, (ev1, ev2)) = destr_or_r pr.pr_event in
+        (pr_or m f args (match asym with | `Asym -> f_ora | `Sym -> f_or) ev1 ev2, 0)
 
     | `MuDisj ->
         let { pr_mem = m ; pr_fun = f; pr_args = args; } as pr = destr_pr torw in
-        let (asym, ev1, ev2) = destr_or_kind pr.pr_event in
-        (pr_disjoint env m f args (if asym then f_ora else f_or) ev1 ev2, 1)
+        let (asym, (ev1, ev2)) = destr_or_r pr.pr_event in
+        (pr_disjoint env m f args (match asym with | `Asym -> f_ora | `Sym -> f_or) ev1 ev2, 1)
   in
 
   let rwpt =

@@ -830,7 +830,7 @@ module Mpv2 = struct
           let lp = lp_bind lp1 in 
           enter_local env local lp lp in
         aux local eqs f1 
-      | Fop(op,_) when EcPath.p_equal op EcCoreLib.p_true -> eqs
+      | Fop(op,_) when EcPath.p_equal op EcCoreLib.CI_Bool.p_true -> eqs
         
       | Fapp({f_node = Fop(op,_)},a) -> 
         begin match op_kind op with

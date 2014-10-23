@@ -299,8 +299,9 @@ val destr_app       : form -> form * form list
 val destr_not       : form -> form
 val destr_nots      : form -> bool * form
 val destr_and       : form -> form * form
+val destr_and_r     : form -> [`Sym | `Asym] * (form * form)
 val destr_or        : form -> form * form
-val destr_or_kind   : form -> bool * form * form (* true asym *)
+val destr_or_r      : form -> [`Sym | `Asym] * (form * form)
 val destr_imp       : form -> form * form
 val destr_iff       : form -> form * form
 val destr_eq        : form -> form * form

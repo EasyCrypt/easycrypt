@@ -25,15 +25,15 @@ let t_core_phoare_deno pre post tc =
   let cmp, f, bd, concl_post =
     match concl.f_node with
     | Fapp ({f_node = Fop (op, _)}, [f; bd])
-        when is_pr f && EcPath.p_equal op EcCoreLib.p_real_le ->
+        when is_pr f && EcPath.p_equal op EcCoreLib.CI_Real.p_real_le ->
       (FHle, f, bd, fun ev -> f_imp_simpl ev post)
 
     | Fapp ({f_node = Fop (op, _)}, [f; bd])
-        when is_pr f && EcPath.p_equal op EcCoreLib.p_eq ->
+        when is_pr f && EcPath.p_equal op EcCoreLib.CI_Bool.p_eq ->
       (FHeq, f, bd, f_iff_simpl post)
 
     | Fapp ({f_node = Fop (op, _)}, [bd; f])
-        when is_pr f && EcPath.p_equal op EcCoreLib.p_real_le ->
+        when is_pr f && EcPath.p_equal op EcCoreLib.CI_Real.p_real_le ->
       (FHge, f, bd, f_imp_simpl post)
 
     | _ -> tc_error !!tc "invalid goal shape"
@@ -63,14 +63,14 @@ let t_phoare_deno_r pre post tc =
 
   match concl.f_node with
   | Fapp ({f_node = Fop (op, _)}, [bd; f])
-      when EcPath.p_equal op EcCoreLib.p_real_ge ->
+      when EcPath.p_equal op EcCoreLib.CI_Real.p_real_ge ->
     FApi.t_seq
-      (t_apply_s EcCoreLib.p_rle_ge_sym [] ~args:[f; bd] ~sk:1)
+      (t_apply_s EcCoreLib.CI_Real.p_rle_ge_sym [] ~args:[f; bd] ~sk:1)
       (t_core_phoare_deno pre post)
       tc
 
   | Fapp ({f_node = Fop (op, _)}, [f; _bd])
-      when EcPath.p_equal op EcCoreLib.p_eq && not (is_pr f) ->
+      when EcPath.p_equal op EcCoreLib.CI_Bool.p_eq && not (is_pr f) ->
     FApi.t_seq t_symmetry (t_core_phoare_deno pre post) tc
 
   | _ -> t_core_phoare_deno pre post tc
@@ -82,12 +82,12 @@ let t_equiv_deno_r pre post tc =
   let cmp, f1, f2 =
     match concl.f_node with
     | Fapp({f_node = Fop(op,_)}, [f1;f2]) when is_pr f1 && is_pr f2 &&
-        (EcPath.p_equal op EcCoreLib.p_eq ||
-           EcPath.p_equal op EcCoreLib.p_real_le ||
-           EcPath.p_equal op EcCoreLib.p_real_ge) ->
+        (EcPath.p_equal op EcCoreLib.CI_Bool.p_eq ||
+           EcPath.p_equal op EcCoreLib.CI_Real.p_real_le ||
+           EcPath.p_equal op EcCoreLib.CI_Real.p_real_ge) ->
       let cmp =
-        if EcPath.p_equal op EcCoreLib.p_eq then `Eq
-        else if EcPath.p_equal op EcCoreLib.p_real_le then `Le else `Ge in
+        if EcPath.p_equal op EcCoreLib.CI_Bool.p_eq then `Eq
+        else if EcPath.p_equal op EcCoreLib.CI_Real.p_real_le then `Le else `Ge in
       cmp, f1, f2
 
     | _ -> tc_error !!tc "invalid goal shape"
@@ -139,21 +139,21 @@ let process_phoare_deno info tc =
     let cmp, f, bd =
       match concl.f_node with
       | Fapp ({f_node = Fop (op, _)}, [f1; f2])
-          when EcPath.p_equal op EcCoreLib.p_eq
+          when EcPath.p_equal op EcCoreLib.CI_Bool.p_eq
         ->
              if is_pr f1 then (FHeq, f1, f2)
         else if is_pr f2 then (FHeq, f2, f1)
         else error ()
 
       | Fapp({f_node = Fop (op, _)}, [f1; f2])
-          when EcPath.p_equal op EcCoreLib.p_real_le
+          when EcPath.p_equal op EcCoreLib.CI_Real.p_real_le
         ->
              if is_pr f1 then (FHle, f1, f2) (* f1 <= f2 *)
         else if is_pr f2 then (FHge, f2, f1) (* f2 >= f1 *)
         else error ()
 
       | Fapp ({f_node = Fop (op, _)}, [f1; f2])
-          when EcPath.p_equal op EcCoreLib.p_real_ge
+          when EcPath.p_equal op EcCoreLib.CI_Real.p_real_ge
         ->
              if is_pr f1 then (FHge, f1, f2) (* f1 >= f2 *)
         else if is_pr f2 then (FHle, f2, f1) (* f2 <= f1 *)

@@ -624,7 +624,7 @@ let select_proj env opsc name ue tvi recty =
 (* -------------------------------------------------------------------- *)
 let lookup_scope env popsc =
   match unloc popsc with
-  | ([], x) when x = EcCoreLib.id_top -> EcCoreLib.p_top
+  | ([], x) when x = EcCoreLib.i_top -> EcCoreLib.p_top
   | _ -> begin
     match EcEnv.Theory.lookup_opt (unloc popsc) env with
     | None -> tyerror popsc.pl_loc env (UnknownScope (unloc popsc))

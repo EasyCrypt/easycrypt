@@ -135,12 +135,12 @@ let t_prfalse tc =
   let (f, ev, bd) =
     match concl.f_node with
     | Fapp ({f_node = Fop (op, _)}, [f; bd]) when is_pr f &&
-          EcPath.p_equal op EcCoreLib.p_real_le
-          || EcPath.p_equal op EcCoreLib.p_eq->
+          EcPath.p_equal op EcCoreLib.CI_Real.p_real_le
+          || EcPath.p_equal op EcCoreLib.CI_Bool.p_eq->
         let pr = destr_pr f in (pr.pr_fun,pr.pr_event,bd)
 
       | Fapp ({f_node = Fop(op,_)}, [bd;f]) when is_pr f &&
-          EcPath.p_equal op EcCoreLib.p_eq->
+          EcPath.p_equal op EcCoreLib.CI_Bool.p_eq->
         let pr = destr_pr f in (pr.pr_fun,pr.pr_event,bd)
 
       | _ -> tc_error !!tc "expecting a conclusion of the form Pr[...]"

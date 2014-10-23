@@ -490,12 +490,9 @@ let f_pvlocs f vs m = List.map (fun v -> f_pvloc f v m) vs
 let f_glob   mp m   = mk_form (Fglob (mp, m)) (tglob mp)
 
 (* -------------------------------------------------------------------- *)
-let f_tt = f_op EcCoreLib.p_tt [] tunit
-
-(* -------------------------------------------------------------------- *)
-let f_tt     = f_op EcCoreLib.p_tt [] tunit
-let f_true   = f_op EcCoreLib.p_true [] tbool
-let f_false  = f_op EcCoreLib.p_false [] tbool
+let f_tt     = f_op EcCoreLib.CI_Unit.p_tt    [] tunit
+let f_true   = f_op EcCoreLib.CI_Bool.p_true  [] tbool
+let f_false  = f_op EcCoreLib.CI_Bool.p_false [] tbool
 let f_bool   = fun b -> if b then f_true else f_false
 
 (* -------------------------------------------------------------------- *)
@@ -533,13 +530,13 @@ let f_forall_mems bds f =
 let ty_fbool1 = toarrow (List.create 1 tbool) tbool
 let ty_fbool2 = toarrow (List.create 2 tbool) tbool
 
-let fop_not  = f_op EcCoreLib.p_not  [] ty_fbool1
-let fop_and  = f_op EcCoreLib.p_and  [] ty_fbool2
-let fop_anda = f_op EcCoreLib.p_anda [] ty_fbool2
-let fop_or   = f_op EcCoreLib.p_or   [] ty_fbool2
-let fop_ora  = f_op EcCoreLib.p_ora  [] ty_fbool2
-let fop_imp  = f_op EcCoreLib.p_imp  [] ty_fbool2
-let fop_iff  = f_op EcCoreLib.p_iff  [] ty_fbool2
+let fop_not  = f_op EcCoreLib.CI_Bool.p_not  [] ty_fbool1
+let fop_and  = f_op EcCoreLib.CI_Bool.p_and  [] ty_fbool2
+let fop_anda = f_op EcCoreLib.CI_Bool.p_anda [] ty_fbool2
+let fop_or   = f_op EcCoreLib.CI_Bool.p_or   [] ty_fbool2
+let fop_ora  = f_op EcCoreLib.CI_Bool.p_ora  [] ty_fbool2
+let fop_imp  = f_op EcCoreLib.CI_Bool.p_imp  [] ty_fbool2
+let fop_iff  = f_op EcCoreLib.CI_Bool.p_iff  [] ty_fbool2
 
 let f_not  f     = f_app fop_not  [f]      tbool
 let f_and  f1 f2 = f_app fop_and  [f1; f2] tbool
@@ -572,7 +569,7 @@ let f_oras fs =
 let f_imps = List.fold_right f_imp
 
 (* -------------------------------------------------------------------- *)
-let fop_eq ty = f_op EcCoreLib.p_eq [ty] (toarrow [ty; ty] tbool)
+let fop_eq ty = f_op EcCoreLib.CI_Bool.p_eq [ty] (toarrow [ty; ty] tbool)
 
 let f_eq f1 f2 = f_app (fop_eq f1.f_ty) [f1; f2] tbool
 
@@ -624,13 +621,13 @@ let f_pr pr_mem pr_fun pr_args pr_event =
   f_pr_r { pr_mem; pr_fun; pr_args; pr_event; }
 
 (* -------------------------------------------------------------------- *)
-let fop_int_opp = f_op EcCoreLib.p_int_opp [] (tfun tint tint)
-let fop_int_add = f_op EcCoreLib.p_int_add   [] (tfun tint  (tfun tint tint))
-let fop_int_sub = f_op EcCoreLib.p_int_sub   [] (tfun tint  (tfun tint tint))
-let fop_int_mul = f_op EcCoreLib.p_int_mul   [] (tfun tint  (tfun tint tint))
-let fop_int_pow = f_op EcCoreLib.p_int_pow   [] (tfun tint  (tfun tint tint))
+let fop_int_opp = f_op EcCoreLib.CI_Int.p_int_opp [] (toarrow [tint]       tint)
+let fop_int_add = f_op EcCoreLib.CI_Int.p_int_add [] (toarrow [tint; tint] tint)
+let fop_int_sub = f_op EcCoreLib.CI_Int.p_int_sub [] (toarrow [tint; tint] tint)
+let fop_int_mul = f_op EcCoreLib.CI_Int.p_int_mul [] (toarrow [tint; tint] tint)
+let fop_int_pow = f_op EcCoreLib.CI_Int.p_int_pow [] (toarrow [tint; tint] tint)
 
-let f_int_opp f     = f_app fop_int_opp [f] tint
+let f_int_opp f     = f_app fop_int_opp [f]      tint
 let f_int_add f1 f2 = f_app fop_int_add [f1; f2] tint
 let f_int_sub f1 f2 = f_app fop_int_sub [f1; f2] tint
 let f_int_mul f1 f2 = f_app fop_int_mul [f1; f2] tint
@@ -960,80 +957,61 @@ let destr_int f =
   | _ -> destr_error "destr_int"
 
 (* -------------------------------------------------------------------- *)
-let is_op_and p =
-  EcPath.p_equal p EcCoreLib.p_and || EcPath.p_equal p EcCoreLib.p_anda
+let is_op_and_sym  p = EcPath.p_equal EcCoreLib.CI_Bool.p_and p
+let is_op_and_asym p = EcPath.p_equal EcCoreLib.CI_Bool.p_anda p
+let is_op_and_any  p = is_op_and_sym p || is_op_and_asym p
+let is_op_or_sym   p = EcPath.p_equal EcCoreLib.CI_Bool.p_and p
+let is_op_or_asym  p = EcPath.p_equal EcCoreLib.CI_Bool.p_anda p
+let is_op_or_any   p = is_op_or_sym  p || is_op_or_asym  p
+let is_op_not      p = EcPath.p_equal EcCoreLib.CI_Bool.p_not p
+let is_op_imp      p = EcPath.p_equal EcCoreLib.CI_Bool.p_imp p
+let is_op_iff      p = EcPath.p_equal EcCoreLib.CI_Bool.p_iff p
+let is_op_eq       p = EcPath.p_equal EcCoreLib.CI_Bool.p_eq  p
 
-let is_op_or p =
-  EcPath.p_equal p EcCoreLib.p_or || EcPath.p_equal p EcCoreLib.p_ora
+(* -------------------------------------------------------------------- *)
+let destr_app   = function { f_node = Fapp (f, fs) } -> (f, fs) | f -> (f, [])
 
-let destr_app f =
-  match f.f_node with
-  | Fapp (f, fs) -> (f, fs)
-  | _ -> (f, [])
+let destr_tuple = function { f_node = Ftuple fs } -> fs | _ -> destr_error "tuple"
+let destr_local = function { f_node = Flocal id } -> id | _ -> destr_error "local"
 
-let destr_tuple f =
-  match f.f_node with
-  | Ftuple fs -> fs
-  | _ -> destr_error "tuple"
+let _destr1 ~name pred form =
+  match destr_app form with
+  | { f_node = Fop (p, _) }, [f] when pred p -> f
+  | _ -> destr_error name
 
-let destr_local f =
-  match f.f_node with
-  | Flocal id -> id
-  | _ -> destr_error "local"
+let _destr2 ~name pred form =
+  match destr_app form with
+  | { f_node = Fop (p, _) }, [f1; f2] when pred p -> (f1, f2)
+  | _ -> destr_error name
 
-let destr_and f =
-  match f.f_node with
-  | Fapp({f_node = Fop(p,_)},[f1;f2]) when is_op_and p -> f1,f2
+let destr_not = _destr1 ~name:"not" is_op_not
+let destr_and = _destr2 ~name:"and" is_op_and_any
+let destr_or  = _destr2 ~name:"or"  is_op_or_any
+let destr_imp = _destr2 ~name:"imp" is_op_imp
+let destr_iff = _destr2 ~name:"iff" is_op_iff
+let destr_eq  = _destr2 ~name:"eq"  is_op_eq
+
+let destr_eq_or_iff = 
+  _destr2 ~name:"eq-or-iff" (fun p -> is_op_eq p || is_op_iff p)
+
+let destr_or_r form =
+  match destr_app form with
+  | { f_node = Fop (p, _) }, [f1; f2] when is_op_or_sym  p -> (`Sym , (f1, f2))
+  | { f_node = Fop (p, _) }, [f1; f2] when is_op_or_asym p -> (`Asym, (f1, f2))
+  | _ -> destr_error "or"
+
+let destr_and_r form =
+  match destr_app form with
+  | { f_node = Fop (p, _) }, [f1; f2] when is_op_and_sym  p -> (`Sym , (f1, f2))
+  | { f_node = Fop (p, _) }, [f1; f2] when is_op_and_asym p -> (`Asym, (f1, f2))
   | _ -> destr_error "and"
 
-let destr_or f =
-  match f.f_node with
-  | Fapp({f_node = Fop(p,_)},[f1;f2]) when is_op_or p -> f1,f2
-  | _ -> destr_error "or"
-
-let destr_or_kind f =
-  match f.f_node with
-  | Fapp({f_node = Fop(p,_)},[f1;f2]) when is_op_or p ->
-    EcPath.p_equal p EcCoreLib.p_ora, f1,f2
-  | _ -> destr_error "or"
-
-let destr_imp f =
-  match f.f_node with
-  | Fapp({f_node = Fop(p,_)},[f1;f2]) when EcPath.p_equal p EcCoreLib.p_imp ->
-      f1,f2
-  | _ -> destr_error "imp"
-
-let destr_iff f =
-  match f.f_node with
-  | Fapp({f_node = Fop(p,_)},[f1;f2]) when EcPath.p_equal p EcCoreLib.p_iff ->
-      f1,f2
-  | _ -> destr_error "iff"
-
-let destr_eq f =
-  match f.f_node with
-  | Fapp({f_node = Fop(p,_)},[f1;f2]) when EcPath.p_equal p EcCoreLib.p_eq ->
-      f1,f2
-  | _ -> destr_error "eq"
-
-let destr_eq_or_iff f =
-  match f.f_node with
-  | Fapp({f_node = Fop(p,_)},[f1;f2]) when
-      EcPath.p_equal p EcCoreLib.p_iff || EcPath.p_equal p EcCoreLib.p_eq ->
-      f1,f2
-  | _ -> destr_error "eq_or_iff"
-
-let destr_not f =
-  match f.f_node with
-  | Fapp({f_node = Fop(p,_)},[f1]) when EcPath.p_equal p EcCoreLib.p_not ->
-      f1
-  | _ -> destr_error "not"
-
-let destr_nots f = 
-  let rec aux b f = 
-    match try Some (destr_not f) with DestrError _ -> None with
-    | None -> b, f
-    | Some f -> aux (not b) f in
-  aux true f
+let destr_nots form =
+  let rec aux b form = 
+    match try Some (destr_not form) with DestrError _ -> None with
+    | None      -> (b, form)
+    | Some form -> aux (not b) form
+  in aux true form
 
 (* -------------------------------------------------------------------- *)
 let is_from_destr dt f =
@@ -1474,16 +1452,16 @@ type core_op = [
 
 let core_ops =
   let core_ops =
-    [EcCoreLib.p_true    , `True     ;
-     EcCoreLib.p_false   , `False    ;
-     EcCoreLib.p_not     , `Not      ;
-     EcCoreLib.p_anda    , `And `Asym;
-     EcCoreLib.p_and     , `And `Sym ;
-     EcCoreLib.p_ora     , `Or  `Asym;
-     EcCoreLib.p_or      , `Or  `Sym ;
-     EcCoreLib.p_imp     , `Imp      ;
-     EcCoreLib.p_iff     , `Iff      ;
-     EcCoreLib.p_eq      , `Eq       ; ]
+    [EcCoreLib.CI_Bool.p_true    , `True     ;
+     EcCoreLib.CI_Bool.p_false   , `False    ;
+     EcCoreLib.CI_Bool.p_not     , `Not      ;
+     EcCoreLib.CI_Bool.p_anda    , `And `Asym;
+     EcCoreLib.CI_Bool.p_and     , `And `Sym ;
+     EcCoreLib.CI_Bool.p_ora     , `Or  `Asym;
+     EcCoreLib.CI_Bool.p_or      , `Or  `Sym ;
+     EcCoreLib.CI_Bool.p_imp     , `Imp      ;
+     EcCoreLib.CI_Bool.p_iff     , `Iff      ;
+     EcCoreLib.CI_Bool.p_eq      , `Eq       ; ]
   in
 
   let tbl = EcPath.Hp.create 11 in

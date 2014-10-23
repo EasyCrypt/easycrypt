@@ -15,13 +15,13 @@ open EcAlgebra
 module Axioms = struct
   open EcDecl
 
-  let tmod  = EcPath.fromqsymbol ([EcCoreLib.id_top; "AlgTactic"], "Requires")
+  let tmod  = EcPath.fromqsymbol ([EcCoreLib.i_top; "AlgTactic"], "Requires")
   let tname = "domain"
 
 
   let tmod_and_deps =
     tmod :: [
-      EcPath.fromqsymbol ([EcCoreLib.id_top; "Ring"], "Field")
+      EcPath.fromqsymbol ([EcCoreLib.i_top; "Ring"], "Field")
     ]
 
   let zero  = "rzero"

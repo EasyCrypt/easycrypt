@@ -88,7 +88,7 @@ let t_failure_event_r (at_pos, cntr, ash, q, f_event, pred_specs, inv) tc =
   let (pr, bd) =
     match concl.f_node with
     | Fapp ({ f_node =Fop (op, _) }, [pr; bd])
-        when is_pr pr && EcPath.p_equal op EcCoreLib.p_real_le
+        when is_pr pr && EcPath.p_equal op EcCoreLib.CI_Real.p_real_le
       -> ((destr_pr pr), bd)
 
     | _ -> tc_error !!tc "a goal of the form Pr[ _ ] <= _ is required"
@@ -202,13 +202,13 @@ type pfel_t =
 let process_fel at_pos ((cntr, ash, q, f_event, pred_specs, o_inv) : pfel_t) tc =
   let env, hyps, concl = FApi.tc1_eflat tc in
 
-  if EcEnv.Theory.by_path_opt EcCoreLib.p_Sum env = None then 
+  if EcEnv.Theory.by_path_opt EcCoreLib.CI_Sum.p_Sum env = None then 
     tacuerror "fel tactic cannot be used when theory Sum is not loaded";
 
 
   let f = match concl.f_node with
     | Fapp ({ f_node = Fop (op, _) }, [pr; _])
-        when is_pr pr && EcPath.p_equal op EcCoreLib.p_real_le
+        when is_pr pr && EcPath.p_equal op EcCoreLib.CI_Real.p_real_le
       -> let { pr_fun = f } = destr_pr pr in f
 
     | _ -> tc_error !!tc "a goal of the form Pr[ _ ] <= _ is required"

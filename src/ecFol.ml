@@ -48,7 +48,7 @@ let f_eqglob mp1 m1 mp2 m2 =
   f_eq (f_glob mp1 m1) (f_glob mp2 m2)
 
 (* -------------------------------------------------------------------- *)
-let f_op_real_of_int = f_op EcCoreLib.p_real_of_int [] (tfun tint treal)
+let f_op_real_of_int = f_op EcCoreLib.CI_Real.p_real_of_int [] (tfun tint treal) (* CORELIB *)
 let f_real_of_int f  = f_app f_op_real_of_int [f] treal
 let f_rint n         = f_real_of_int (f_int n)
 
@@ -64,15 +64,17 @@ let destr_rint f =
   | _ -> destr_error "destr_rint"
 
 (* -------------------------------------------------------------------- *)
-let fop_int_le     = f_op EcCoreLib.p_int_le    [] (tfun tint  (tfun tint tbool))
-let fop_int_lt     = f_op EcCoreLib.p_int_lt    [] (tfun tint  (tfun tint tbool))
-let fop_real_le    = f_op EcCoreLib.p_real_le   [] (tfun treal (tfun treal tbool))
-let fop_real_lt    = f_op EcCoreLib.p_real_lt   [] (tfun treal (tfun treal tbool))
-let fop_real_add   = f_op EcCoreLib.p_real_add  [] (tfun treal (tfun treal treal))
-let fop_real_sub   = f_op EcCoreLib.p_real_sub  [] (tfun treal (tfun treal treal))
-let fop_real_mul   = f_op EcCoreLib.p_real_mul  [] (tfun treal (tfun treal treal))
-let fop_real_div   = f_op EcCoreLib.p_real_div  [] (tfun treal (tfun treal treal))
-let fop_int_intval = f_op EcCoreLib.p_int_intval [] (tfun tint (tfun tint (tfset tint)))
+let tfset ty = tconstr EcCoreLib.CI_FSet.p_fset [ty] (* CORELIB *)
+
+let fop_int_le     = f_op EcCoreLib.CI_Int .p_int_le    [] (tfun tint  (tfun tint tbool))        (* CORELIB *)
+let fop_int_lt     = f_op EcCoreLib.CI_Int .p_int_lt    [] (tfun tint  (tfun tint tbool))        (* CORELIB *)
+let fop_real_le    = f_op EcCoreLib.CI_Real.p_real_le   [] (tfun treal (tfun treal tbool))       (* CORELIB *)
+let fop_real_lt    = f_op EcCoreLib.CI_Real.p_real_lt   [] (tfun treal (tfun treal tbool))       (* CORELIB *)
+let fop_real_add   = f_op EcCoreLib.CI_Real.p_real_add  [] (tfun treal (tfun treal treal))       (* CORELIB *)
+let fop_real_sub   = f_op EcCoreLib.CI_Real.p_real_sub  [] (tfun treal (tfun treal treal))       (* CORELIB *)
+let fop_real_mul   = f_op EcCoreLib.CI_Real.p_real_mul  [] (tfun treal (tfun treal treal))       (* CORELIB *)
+let fop_real_div   = f_op EcCoreLib.CI_Real.p_real_div  [] (tfun treal (tfun treal treal))       (* CORELIB *)
+let fop_int_intval = f_op EcCoreLib.CI_Sum .p_int_intval [] (tfun tint (tfun tint (tfset tint))) (* CORELIB *)
 
 let f_int_le f1 f2 = f_app fop_int_le [f1; f2] tbool
 let f_int_lt f1 f2 = f_app fop_int_lt [f1; f2] tbool
@@ -81,8 +83,8 @@ let f_int_intval k1 k2 =
   f_app fop_int_intval [k1;k2] (tfset tint)
 
 (* -------------------------------------------------------------------- *)
-let fop_int_sum =
-  f_op EcCoreLib.p_int_sum [] (tfun (tfun tint treal) (tfun (tfset tint) treal))
+let fop_int_sum =                       (* CORELIB *)
+  f_op EcCoreLib.CI_Sum.p_int_sum [] (tfun (tfun tint treal) (tfun (tfset tint) treal))
 
 let f_int_sum op intval ty =
   f_app fop_int_sum [op;intval] ty
@@ -96,15 +98,15 @@ let f_real_mul f1 f2 = f_app fop_real_mul [f1; f2] treal
 let f_real_div f1 f2 = f_app fop_real_div [f1; f2] treal
 
 (* -------------------------------------------------------------------- *)
-let fop_in_supp ty = f_op EcCoreLib.p_in_supp [ty] (toarrow [ty; tdistr ty] tbool)
-let fop_mu_x    ty = f_op EcCoreLib.p_mu_x    [ty] (toarrow [tdistr ty; ty] treal)
-let fop_mu      ty = f_op EcCoreLib.p_mu      [ty] (toarrow [tdistr ty; tcpred ty] treal)
+let fop_in_supp ty = f_op EcCoreLib.CI_Distr.p_in_supp [ty] (toarrow [ty; tdistr ty] tbool) (* CORELIB *)
+let fop_mu_x    ty = f_op EcCoreLib.CI_Distr.p_mu_x    [ty] (toarrow [tdistr ty; ty] treal) (* CORELIB *)
+let fop_mu      ty = f_op EcCoreLib.CI_Distr.p_mu      [ty] (toarrow [tdistr ty; tcpred ty] treal) (* CORELIB *)
 
 let f_in_supp f1 f2 = f_app (fop_in_supp f1.f_ty) [f1; f2] tbool
 let f_mu_x    f1 f2 = f_app (fop_mu_x f2.f_ty) [f1; f2] treal
 let f_mu      f1 f2 = f_app (fop_mu (proj_distr_ty f1.f_ty)) [f1; f2] treal
 
-let fop_weight ty = f_op EcCoreLib.p_weight [ty] (tfun (tdistr ty) treal)
+let fop_weight ty = f_op EcCoreLib.CI_Distr.p_weight [ty] (tfun (tdistr ty) treal) (* CORELIB *)
 let f_weight ty d = f_app (fop_weight ty) [d] treal
 
 (* -------------------------------------------------------------------- *)
@@ -393,10 +395,10 @@ let rec f_eq_simpl f1 f2 =
       f_equal op2 f_op_real_of_int ->
     f_false
   | Fop(op1, []) ,Fop (op2, []) when
-    (EcPath.p_equal op1 EcCoreLib.p_true &&
-     EcPath.p_equal op2 EcCoreLib.p_false) ||
-     (EcPath.p_equal op2 EcCoreLib.p_true &&
-     EcPath.p_equal op1 EcCoreLib.p_false) -> f_false
+    (EcPath.p_equal op1 EcCoreLib.CI_Bool.p_true &&
+     EcPath.p_equal op2 EcCoreLib.CI_Bool.p_false) ||
+     (EcPath.p_equal op2 EcCoreLib.CI_Bool.p_true &&
+     EcPath.p_equal op1 EcCoreLib.CI_Bool.p_false) -> f_false
   | Ftuple fs1, Ftuple fs2 when List.length fs1 = List.length fs2 ->
     f_andas_simpl (List.map2 f_eq_simpl fs1 fs2) f_true
   | _ -> f_eq f1 f2
@@ -456,29 +458,29 @@ type op_kind = [
 
 let operators =
   let operators =
-    [EcCoreLib.p_true    , `True     ;
-     EcCoreLib.p_false   , `False    ;
-     EcCoreLib.p_not     , `Not      ;
-     EcCoreLib.p_anda    , `And `Asym;
-     EcCoreLib.p_and     , `And `Sym ;
-     EcCoreLib.p_ora     , `Or  `Asym;
-     EcCoreLib.p_or      , `Or  `Sym ;
-     EcCoreLib.p_imp     , `Imp      ;
-     EcCoreLib.p_iff     , `Iff      ;
-     EcCoreLib.p_eq      , `Eq       ;
-     EcCoreLib.p_int_le  , `Int_le   ;
-     EcCoreLib.p_int_lt  , `Int_lt   ;
-     EcCoreLib.p_real_le , `Real_le  ;
-     EcCoreLib.p_real_lt , `Real_lt  ;
-     EcCoreLib.p_int_add , `Int_add  ;
-     EcCoreLib.p_int_sub , `Int_sub  ;
-     EcCoreLib.p_int_mul , `Int_mul  ;
-     EcCoreLib.p_int_opp , `Int_opp  ;
-     EcCoreLib.p_int_pow , `Int_pow  ;
-     EcCoreLib.p_real_add, `Real_add ;
-     EcCoreLib.p_real_sub, `Real_sub ;
-     EcCoreLib.p_real_mul, `Real_mul ;
-     EcCoreLib.p_real_div, `Real_div ; ]
+    [EcCoreLib.CI_Bool.p_true    , `True     ;
+     EcCoreLib.CI_Bool.p_false   , `False    ;
+     EcCoreLib.CI_Bool.p_not     , `Not      ;
+     EcCoreLib.CI_Bool.p_anda    , `And `Asym;
+     EcCoreLib.CI_Bool.p_and     , `And `Sym ;
+     EcCoreLib.CI_Bool.p_ora     , `Or  `Asym;
+     EcCoreLib.CI_Bool.p_or      , `Or  `Sym ;
+     EcCoreLib.CI_Bool.p_imp     , `Imp      ;
+     EcCoreLib.CI_Bool.p_iff     , `Iff      ;
+     EcCoreLib.CI_Bool.p_eq      , `Eq       ;
+     EcCoreLib.CI_Int .p_int_le  , `Int_le   ;
+     EcCoreLib.CI_Int .p_int_lt  , `Int_lt   ;
+     EcCoreLib.CI_Int .p_int_add , `Int_add  ;
+     EcCoreLib.CI_Int .p_int_sub , `Int_sub  ;
+     EcCoreLib.CI_Int .p_int_mul , `Int_mul  ;
+     EcCoreLib.CI_Int .p_int_opp , `Int_opp  ;
+     EcCoreLib.CI_Int .p_int_pow , `Int_pow  ;
+     EcCoreLib.CI_Real.p_real_add, `Real_add ;
+     EcCoreLib.CI_Real.p_real_sub, `Real_sub ;
+     EcCoreLib.CI_Real.p_real_mul, `Real_mul ;
+     EcCoreLib.CI_Real.p_real_div, `Real_div ;
+     EcCoreLib.CI_Real.p_real_le , `Real_le  ;
+     EcCoreLib.CI_Real.p_real_lt , `Real_lt  ; ]
   in
 
   let tbl = EcPath.Hp.create 11 in

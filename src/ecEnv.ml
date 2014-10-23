@@ -217,7 +217,7 @@ let empty_norm_cache =
 
 (* -------------------------------------------------------------------- *)
 let empty gstate =
-  let name = EcCoreLib.id_top in
+  let name = EcCoreLib.i_top in
   let path = EcPath.psymbol name in
 
   let env_current =
@@ -286,7 +286,7 @@ let _ = EcPException.register (fun fmt exn ->
 (* -------------------------------------------------------------------- *)
 module MC = struct
   (* ------------------------------------------------------------------ *)
-  let top_path = EcPath.psymbol EcCoreLib.id_top
+  let top_path = EcPath.psymbol EcCoreLib.i_top
 
   (* ------------------------------------------------------------------ *)
   let _cutpath i p =
@@ -2809,42 +2809,42 @@ let import_w3_dir env dir name rd =
 (* -------------------------------------------------------------------- *)
 let initial gstate =
   let env0 = empty gstate in
-  let env = enter `Theory EcCoreLib.id_Pervasive env0 in
+  let env = enter `Theory EcCoreLib.i_Pervasive env0 in
   let unit_rn =
     let tunit = Why3.Ty.ts_tuple 0 in
     let nunit = tunit.Why3.Ty.ts_name.Why3.Ident.id_string in
     let tt = Why3.Term.fs_tuple 0 in
     let ntt = tt.Why3.Term.ls_name.Why3.Ident.id_string in
-    [ [nunit],EcWhy3.RDts, EcPath.basename EcCoreLib.p_unit;
-      [ntt], EcWhy3.RDls, EcPath.basename EcCoreLib.p_tt
+    [ [nunit],EcWhy3.RDts, EcPath.basename EcCoreLib.CI_Unit.p_unit;
+      [ntt], EcWhy3.RDls, EcPath.basename EcCoreLib.CI_Unit.p_tt
     ]  in
   let env, _ = import_w3 env (Why3.Theory.tuple_theory 0) unit_rn in
   let bool_rn = [
-    ["bool"] , EcWhy3.RDts, EcPath.basename EcCoreLib.p_bool;
-    ["True"] , EcWhy3.RDls, EcPath.basename EcCoreLib.p_true;
-    ["False"], EcWhy3.RDls, EcPath.basename EcCoreLib.p_false ] in
+    ["bool"] , EcWhy3.RDts, EcPath.basename EcCoreLib.CI_Bool.p_bool;
+    ["True"] , EcWhy3.RDls, EcPath.basename EcCoreLib.CI_Bool.p_true;
+    ["False"], EcWhy3.RDls, EcPath.basename EcCoreLib.CI_Bool.p_false ] in
   let env, _ = import_w3 env Why3.Theory.bool_theory bool_rn in
   let builtin_rn = [
-    ["int"]    , EcWhy3.RDts, EcPath.basename EcCoreLib.p_int;
-    ["real"]   , EcWhy3.RDts, EcPath.basename EcCoreLib.p_real;
-    ["infix ="], EcWhy3.RDls, EcPath.basename EcCoreLib.p_eq
+    ["int"]    , EcWhy3.RDts, EcPath.basename EcCoreLib.CI_Int .p_int;
+    ["real"]   , EcWhy3.RDts, EcPath.basename EcCoreLib.CI_Real.p_real;
+    ["infix ="], EcWhy3.RDls, EcPath.basename EcCoreLib.CI_Bool.p_eq
   ] in
   let env, _ = import_w3 env Why3.Theory.builtin_theory builtin_rn in
   let add_bool sign env path =
     let ty = EcTypes.toarrow sign EcTypes.tbool in
     Op.bind_logical (EcPath.basename path)
       (mk_op [] ty None) env in
-  let env = add_bool [EcTypes.tbool] env EcCoreLib.p_not in
+  let env = add_bool [EcTypes.tbool] env EcCoreLib.CI_Bool.p_not in
   let env = List.fold_left (add_bool [EcTypes.tbool;EcTypes.tbool]) env
-      [EcCoreLib.p_and;EcCoreLib.p_anda;
-       EcCoreLib.p_or;EcCoreLib.p_ora;
-       EcCoreLib.p_imp; EcCoreLib.p_iff] in
+      [EcCoreLib.CI_Bool.p_and;EcCoreLib.CI_Bool.p_anda;
+       EcCoreLib.CI_Bool.p_or;EcCoreLib.CI_Bool.p_ora;
+       EcCoreLib.CI_Bool.p_imp; EcCoreLib.CI_Bool.p_iff] in
  let distr_rn = [
-    ["distr"], EcWhy3.RDts, EcPath.basename EcCoreLib.p_distr;
+    ["distr"], EcWhy3.RDts, EcPath.basename EcCoreLib.CI_Distr.p_distr;
   ] in
   let env, _ = import_w3 env EcWhy3.distr_theory distr_rn in
   let cth = Theory.close env in
-  let env1 = Theory.bind EcCoreLib.id_Pervasive cth env0 in
+  let env1 = Theory.bind EcCoreLib.i_Pervasive cth env0 in
   let env1 = Theory.import EcCoreLib.p_Pervasive env1 in
   env1
 

@@ -28,6 +28,7 @@ module ER  = EcReduction
 module PT  = EcProofTerm
 module TT  = EcTyping
 module TTC = EcProofTyping
+module LG  = EcCoreLib.CI_Logic
 
 (* -------------------------------------------------------------------- *)
 type ttenv = {
@@ -602,7 +603,7 @@ let process_mintros ?(cf = true) pis gs =
                       let cutf = PT.concretize_form pte.PT.ptev_env cutf in
                       let pt = fst (PT.concretize pte) in
                       let pt = { pt with
-                                  pt_head = PTGlobal (EcCoreLib.p_imp_trans, []);
+                                  pt_head = PTGlobal (LG.p_imp_trans, []);
                                   pt_args = [PAFormula f1       ;
                                              PAFormula cutf     ;
                                              PAFormula f2       ;
@@ -813,11 +814,11 @@ module LowApply = struct
                 let views =
                   match sform_of_form pt.PT.ptev_ax with
                   | SFiff (f1, f2) ->
-                      [(EcCoreLib.p_iff_lr, [f1; f2]);
-                       (EcCoreLib.p_iff_rl, [f1; f2])]
+                      [(LG.p_iff_lr, [f1; f2]);
+                       (LG.p_iff_rl, [f1; f2])]
 
                   | SFnot f1 ->
-                      [(EcCoreLib.p_negbTE, [f1])]
+                      [(LG.p_negbTE, [f1])]
 
                   | _ -> []
                 in

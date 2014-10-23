@@ -120,13 +120,12 @@ let tfun t1 t2   = mk_ty (Tfun (t1, t2))
 let tglob m      = mk_ty (Tglob m)
 
 (* -------------------------------------------------------------------- *)
-let tunit      = tconstr EcCoreLib.p_unit  []
-let tbool      = tconstr EcCoreLib.p_bool  []
-let tint       = tconstr EcCoreLib.p_int   []
-let tdistr ty  = tconstr EcCoreLib.p_distr [ty]
-let tfset  ty  = tconstr EcCoreLib.p_fset  [ty]
+let tunit      = tconstr EcCoreLib.CI_Unit .p_unit  []
+let tbool      = tconstr EcCoreLib.CI_Bool .p_bool  []
+let tint       = tconstr EcCoreLib.CI_Int  .p_int   []
+let tdistr ty  = tconstr EcCoreLib.CI_Distr.p_distr [ty]
+let treal      = tconstr EcCoreLib.CI_Real .p_real  []
 let tcpred ty  = tfun ty tbool
-let treal      = tconstr EcCoreLib.p_real  []
 
 let ttuple lt    = 
   match lt with
@@ -588,7 +587,7 @@ end)
 let mk_expr e ty =
   Hexpr.hashcons { e_node = e; e_tag = -1; e_fv = Mid.empty; e_ty = ty }
 
-let e_tt    = mk_expr (Eop (EcCoreLib.p_tt, [])) tunit
+let e_tt    = mk_expr (Eop (EcCoreLib.CI_Unit.p_tt, [])) tunit
 let e_int   = fun i -> mk_expr (Eint i) tint
 let e_local = fun x ty -> mk_expr (Elocal x) ty
 let e_var   = fun x ty -> mk_expr (Evar x) ty
@@ -755,6 +754,13 @@ let e_subst_id = {
     es_loc     = Mid.empty;
  }
 
+(* -------------------------------------------------------------------- *)
+let is_subst_id s = 
+  not s.es_freshen && s.es_p == identity && 
+    s.es_ty == identity && s.es_mp == identity && 
+    s.es_xp == identity && Mid.is_empty s.es_loc 
+
+(* -------------------------------------------------------------------- *)
 let e_subst_init freshen on_path on_ty opdef on_mpath = 
   let on_mp = 
     let f = EcPath.m_subst on_path on_mpath in
@@ -771,6 +777,7 @@ let e_subst_init freshen on_path on_ty opdef on_mpath =
     es_xp      = on_xp;
     es_loc     = Mid.empty; }
   
+(* -------------------------------------------------------------------- *)
 let add_local s ((x, t) as xt) = 
   let x' = if s.es_freshen then EcIdent.fresh x else x in
   let t' = s.es_ty t in
@@ -781,8 +788,10 @@ let add_local s ((x, t) as xt) =
       let merger o = assert (o = None); Some (e_local x' t') in
         ({ s with es_loc = Mid.change merger x s.es_loc }, (x', t'))
       
+(* -------------------------------------------------------------------- *)
 let add_locals = List.Smart.map_fold add_local
 
+(* -------------------------------------------------------------------- *)
 let subst_lpattern (s: e_subst) (lp:lpattern) = 
   match lp with
   | LSymbol x ->
@@ -810,6 +819,7 @@ let subst_lpattern (s: e_subst) (lp:lpattern) =
       in
         (s, ExprSmart.l_record (lp, (p, xs)) (s.es_p p, xs'))
 
+(* -------------------------------------------------------------------- *)
 let rec e_subst (s: e_subst) e =
   match e.e_node with
   | Elocal id -> begin
@@ -883,47 +893,51 @@ and e_subst_op ety tys args (tyids, e) =
   let sag = { e_subst_id with es_loc = sag } in
     e_app (e_subst sag e) args ety
 
+(* -------------------------------------------------------------------- *)
 let e_subst_closure s (args, e) =
   let (s, args) = add_locals s args in
     (args, e_subst s e)
 
-let is_subst_id s = 
-  not s.es_freshen && s.es_p == identity && 
-    s.es_ty == identity && s.es_mp == identity && 
-    s.es_xp == identity && Mid.is_empty s.es_loc 
-
+(* -------------------------------------------------------------------- *)
 let e_subst s =
   if is_subst_id s then identity
   else 
     if s.es_freshen then e_subst s 
     else He.memo 107 (e_subst s)
 
+(* -------------------------------------------------------------------- *)
 let e_mapty onty = 
   e_subst { e_subst_id with es_ty = onty; }
 
+(* -------------------------------------------------------------------- *)
 let e_uni uidmap =
   e_mapty (Tuni.offun uidmap)
 
+(* -------------------------------------------------------------------- *)
 let is_var e = 
   match e.e_node with
   | Evar _ -> true
   | _ -> false
 
+(* -------------------------------------------------------------------- *)
 let destr_var e = 
    match e.e_node with
   | Evar pv -> pv
   | _ -> assert false
 
+(* -------------------------------------------------------------------- *)
 let is_tuple_var e = 
   match e.e_node with
   | Etuple es -> List.for_all is_var es
   | _ -> false
 
+(* -------------------------------------------------------------------- *)
 let destr_tuple_var e = 
    match e.e_node with
   | Etuple es -> List.map destr_var es
   | _ -> assert false
 
+(* -------------------------------------------------------------------- *)
 let proj_distr_ty ty = match ty.ty_node with
   | Tconstr(_,lty) when List.length lty = 1  -> 
     List.hd lty

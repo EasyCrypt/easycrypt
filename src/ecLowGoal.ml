@@ -20,6 +20,7 @@ open EcBaseLogic
 module EP  = EcParsetree
 module ER  = EcReduction
 module TTC = EcProofTyping
+module LG  = EcCoreLib.CI_Logic
 
 (* -------------------------------------------------------------------- *)
 exception InvalidProofTerm
@@ -478,7 +479,7 @@ let t_assumption mode (tc : tcenv1) =
 (* -------------------------------------------------------------------- *)
 let t_cut (fp : form) (tc : tcenv1) =
   let concl = FApi.tc1_goal tc in
-  t_apply_s EcCoreLib.p_cut_lemma [] ~args:[fp; concl] ~sk:2 tc
+  t_apply_s LG.p_cut_lemma [] ~args:[fp; concl] ~sk:2 tc
 
 (* -------------------------------------------------------------------- *)
 let t_cutdef (pt : proofterm) (fp : form) (tc : tcenv1) =
@@ -486,11 +487,11 @@ let t_cutdef (pt : proofterm) (fp : form) (tc : tcenv1) =
 
 (* -------------------------------------------------------------------- *)
 let t_true (tc : tcenv1) =
-  t_apply_s EcCoreLib.p_true_intro [] tc
+  t_apply_s LG.p_true_intro [] tc
 
 (* -------------------------------------------------------------------- *)
 let t_reflex_s (f : form) (tc : tcenv1) =
-  t_apply_s EcCoreLib.p_eq_refl [f.f_ty] ~args:[f] tc
+  t_apply_s LG.p_eq_refl [f.f_ty] ~args:[f] tc
 
 let t_reflex ?reduce (tc : tcenv1) =
   let t_reflex_r (fp : form) (tc : tcenv1) =
@@ -502,7 +503,7 @@ let t_reflex ?reduce (tc : tcenv1) =
 
 (* -------------------------------------------------------------------- *)
 let t_symmetry_s f1 f2 tc =
-  t_apply_s EcCoreLib.p_eq_sym_imp [f1.f_ty] ~args:[f2; f1] ~sk:1 tc
+  t_apply_s LG.p_eq_sym_imp [f1.f_ty] ~args:[f2; f1] ~sk:1 tc
 
 let t_symmetry ?reduce (tc : tcenv1) =
   let t_symmetry_r (fp : form) (tc : tcenv1) =
@@ -514,7 +515,7 @@ let t_symmetry ?reduce (tc : tcenv1) =
 
 (* -------------------------------------------------------------------- *)
 let t_transitivity_s f1 f2 f3 tc =
-  t_apply_s EcCoreLib.p_eq_trans [f1.f_ty] ~args:[f1; f2; f3] ~sk:2 tc
+  t_apply_s LG.p_eq_trans [f1.f_ty] ~args:[f1; f2; f3] ~sk:2 tc
 
 let t_transitivity ?reduce f2 (tc : tcenv1) =
   let t_transitivity_r (fp : form) (tc : tcenv1) =
@@ -536,10 +537,10 @@ let t_exists_intro_s (args : pt_arg list) (tc : tcenv1) =
 let t_or_intro_s opsym (side : side) (f1, f2 : form pair) (tc : tcenv1) =
   let p =
     match side, opsym with
-    | `Left , `Asym -> EcCoreLib.p_ora_intro_l
-    | `Right, `Asym -> EcCoreLib.p_ora_intro_r
-    | `Left , `Sym  -> EcCoreLib.p_or_intro_l
-    | `Right, `Sym  -> EcCoreLib.p_or_intro_r
+    | `Left , `Asym -> LG.p_ora_intro_l
+    | `Right, `Asym -> LG.p_ora_intro_r
+    | `Left , `Sym  -> LG.p_or_intro_l
+    | `Right, `Sym  -> LG.p_or_intro_r
   in
   t_apply_s p [] ~args:[f1; f2] ~sk:1 tc
 
@@ -558,8 +559,8 @@ let t_right ?reduce tc = t_or_intro ?reduce `Right tc
 let t_and_intro_s opsym (f1, f2 : form pair) (tc : tcenv1) =
   let p =
     match opsym with
-    | `Asym -> EcCoreLib.p_anda_intro
-    | `Sym  -> EcCoreLib.p_and_intro
+    | `Asym -> LG.p_anda_intro
+    | `Sym  -> LG.p_and_intro
   in
 
   t_apply_s p [] ~args:[f1; f2] ~sk:2 tc
@@ -574,7 +575,7 @@ let t_and_intro ?reduce (tc : tcenv1) =
 
 (* -------------------------------------------------------------------- *)
 let t_iff_intro_s (f1, f2 : form pair) (tc : tcenv1) =
-  t_apply_s EcCoreLib.p_iff_intro [] ~args:[f1; f2] ~sk:2 tc
+  t_apply_s LG.p_iff_intro [] ~args:[f1; f2] ~sk:2 tc
 
 let t_iff_intro ?reduce (tc : tcenv1) =
   let t_iff_intro_r (fp : form) (tc : tcenv1) =
@@ -667,7 +668,7 @@ let t_elim_r ?(reduce = (`Full : lazyred)) txs tc =
 (* -------------------------------------------------------------------- *)
 let t_elim_false_r ((_, sf) : form * sform) concl tc =
   match sf with
-  | SFfalse -> t_apply_s EcCoreLib.p_false_elim [] ~args:[concl] tc
+  | SFfalse -> t_apply_s LG.p_false_elim [] ~args:[concl] tc
   | _ -> raise TTC.NoMatch
 
 let t_elim_false tc = t_elim_r [t_elim_false_r] tc
@@ -678,8 +679,8 @@ let t_elim_and_r ((_, sf) : form * sform) concl tc =
   | SFand (opsym, (a1, a2)) ->
       let p =
         match opsym with
-        | `Asym -> EcCoreLib.p_anda_elim
-        | `Sym  -> EcCoreLib.p_and_elim
+        | `Asym -> LG.p_anda_elim
+        | `Sym  -> LG.p_and_elim
 
       in t_apply_s p [] ~args:[a1; a2; concl] ~sk:1 tc
 
@@ -693,8 +694,8 @@ let t_elim_or_r ((_, sf) : form * sform) concl tc =
   | SFor (opsym, (a1, a2)) ->
       let p =
         match opsym with
-        | `Asym -> EcCoreLib.p_ora_elim
-        | `Sym  -> EcCoreLib.p_or_elim
+        | `Asym -> LG.p_ora_elim
+        | `Sym  -> LG.p_or_elim
 
       in t_apply_s p [] ~args:[a1; a2; concl] ~sk:2 tc
 
@@ -706,7 +707,7 @@ let t_elim_or tc = t_elim_r [t_elim_or_r] tc
 let t_elim_iff_r ((_, sf) : form * sform) concl tc =
   match sf with
   | SFiff (a1, a2) ->
-      t_apply_s EcCoreLib.p_iff_elim [] ~args:[a1; a2; concl] ~sk:1 tc
+      t_apply_s LG.p_iff_elim [] ~args:[a1; a2; concl] ~sk:1 tc
   | _ -> raise TTC.NoMatch
 
 let t_elim_iff tc = t_elim_r [t_elim_iff_r] tc
@@ -715,7 +716,7 @@ let t_elim_iff tc = t_elim_r [t_elim_iff_r] tc
 let t_elim_if_r ((_, sf) : form * sform) concl tc =
   match sf with
   | SFif (a1, a2, a3) ->
-      t_apply_s EcCoreLib.p_if_elim [] ~args:[a1; a2; a3; concl] ~sk:2 tc
+      t_apply_s LG.p_if_elim [] ~args:[a1; a2; a3; concl] ~sk:2 tc
   | _ -> raise TTC.NoMatch
 
 let t_elim_if tc = t_elim_r [t_elim_if_r] tc
@@ -911,7 +912,7 @@ let t_elimT_ind ?reduce mode (tc : tcenv1) =
               (tc, pt)
 
           | _ when EcReduction.EqTest.for_type env tunit ty ->
-              let pt = { pt_head = PTGlobal (EcCoreLib.p_unit_elim, []);
+              let pt = { pt_head = PTGlobal (LG.p_unit_elim, []);
                          pt_args = []; } in
               (tc, pt)
 
@@ -957,7 +958,7 @@ let t_elim_hyp h tc =
   FApi.t_seq (t_cutdef pt f) t_elim tc
 
 (* -------------------------------------------------------------------- *)
-let t_case fp tc = t_elimT_form_global EcCoreLib.p_case_eq_bool fp tc
+let t_case fp tc = t_elimT_form_global LG.p_case_eq_bool fp tc
 
 (* -------------------------------------------------------------------- *)
 let t_split ?(closeonly = false) ?reduce (tc : tcenv1) =
@@ -1273,8 +1274,8 @@ let t_absurd_hyp id tc =
   let x,hnx,hx = 
     if b then f, id', id else f_not f, id, id' in
   FApi.t_seqs [
-    t_apply_s EcCoreLib.p_false_elim [] ~args:[concl] ~sk:1;
-    FApi.t_seqsub (t_apply_s EcCoreLib.p_negbTE [] ~args:[x] ~sk:2)
+    t_apply_s LG.p_false_elim [] ~args:[concl] ~sk:1;
+    FApi.t_seqsub (t_apply_s LG.p_negbTE [] ~args:[x] ~sk:2)
       [ t_apply_hyp hnx;
         t_apply_hyp hx ]
   ] tc
@@ -1472,7 +1473,7 @@ let t_congr (f1, f2) (args, ty) tc =
         let aty  = a1.f_ty in
         let m1   = f_app f1 (List.rev_map fst args) (tfun aty ty) in
         let m2   = f_app f2 (List.rev_map snd args) (tfun aty ty) in
-        let tcgr = t_apply_s EcCoreLib.p_fcongr [ty; aty] ~args:[m2; a1; a2] ~sk:1 in
+        let tcgr = t_apply_s LG.p_fcongr [ty; aty] ~args:[m2; a1; a2] ~sk:1 in
 
         let tsub tc =
           let fx   = EcIdent.create "f" in
@@ -1481,7 +1482,7 @@ let t_congr (f1, f2) (args, ty) tc =
           let lam  = EcFol.f_lambda [(fx, GTty fty)] body in
             FApi.t_sub
               [doit args fty]
-              (t_apply_s EcCoreLib.p_fcongr [ty; fty] ~args:[lam; m1; m2] ~sk:1 tc)
+              (t_apply_s LG.p_fcongr [ty; fty] ~args:[lam; m1; m2] ~sk:1 tc)
         in
           FApi.t_sub
             [tsub; tcgr]
