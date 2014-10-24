@@ -537,7 +537,7 @@ let t_zip f (cenv : code_txenv) (cpos : codepos) (prpo : form * form) (state, s)
       ((me, Zpr.zip zpr, gs) : memenv * _ * form list)
   with Zpr.InvalidCPos -> tc_error (fst cenv) "invalid code position"
 
-let t_code_transform side ?(bdhoare = false) cpos tr tx tc =
+let t_code_transform (side : oside) ?(bdhoare = false) cpos tr tx tc =
   let pf = FApi.tc1_penv tc in
 
   match side with
@@ -567,12 +567,15 @@ let t_code_transform side ?(bdhoare = false) cpos tr tx tc =
       let hyps      = FApi.tc1_hyps tc in
       let es        = tc1_as_equivS tc in
       let pre, post = es.es_pr, es.es_po in
-      let me, stmt     = if side then (es.es_ml, es.es_sl) else (es.es_mr, es.es_sr) in
+      let me, stmt     =
+        match side with
+        | `Left  -> (es.es_ml, es.es_sl)
+        | `Right -> (es.es_mr, es.es_sr) in
       let me, stmt, cs = tx (pf, hyps) cpos (pre, post) (me, stmt) in
       let concl =
         match side with
-        | true  -> f_equivS_r { es with es_ml = me; es_sl = stmt; }
-        | false -> f_equivS_r { es with es_mr = me; es_sr = stmt; }
+        | `Left  -> f_equivS_r { es with es_ml = me; es_sl = stmt; }
+        | `Right -> f_equivS_r { es with es_mr = me; es_sr = stmt; }
       in
 
       FApi.xmutate1 tc (tr (Some side)) (cs @ [concl])

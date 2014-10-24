@@ -64,8 +64,8 @@ let t_auto_rnd_equiv_r tc =
       then EcPhlRnd.wp_equiv_rnd None tc
       else tc_noauto_error !!tc ()
 
-  | Some (Srnd _), _ -> EcPhlRnd.wp_equiv_disj_rnd true  tc
-  | _, Some (Srnd _) -> EcPhlRnd.wp_equiv_disj_rnd false tc
+  | Some (Srnd _), _ -> EcPhlRnd.wp_equiv_disj_rnd `Left  tc
+  | _, Some (Srnd _) -> EcPhlRnd.wp_equiv_disj_rnd `Right tc
 
   | _, _ -> tc_noauto_error !!tc ()
 

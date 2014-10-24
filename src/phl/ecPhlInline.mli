@@ -19,7 +19,7 @@ and s_pat = (int * i_pat) list
 (* -------------------------------------------------------------------- *)
 val t_inline_bdhoare : s_pat -> backward
 val t_inline_hoare   : s_pat -> backward
-val t_inline_equiv   : bool  -> s_pat -> backward
+val t_inline_equiv   : side  -> s_pat -> backward
 
 (* -------------------------------------------------------------------- *)
-val process_inline : pinline_arg -> backward
+val process_inline : inline_info -> backward

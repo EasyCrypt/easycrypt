@@ -11,7 +11,7 @@ open EcCoreGoal.FApi
 (* -------------------------------------------------------------------- *)
 val t_hoare_swap   : int -> int -> int -> backward
 val t_bdhoare_swap : int -> int -> int -> backward
-val t_equiv_swap   : bool -> int -> int -> int -> backward
+val t_equiv_swap   : side -> int -> int -> int -> backward
 
 (* -------------------------------------------------------------------- *)
-val process_swap : (bool option * swap_kind) located list -> backward
+val process_swap : (oside * swap_kind) located list -> backward

@@ -1870,13 +1870,13 @@ code_position:
 
 while_tac_info :
 | inv=sform
-    { (inv, None, None) }
+    { { wh_inv = inv; wh_vrnt = None; wh_bds = None; } }
 
 | inv=sform vrnt=sform
-    { (inv, Some vrnt, None) }
+    { { wh_inv = inv; wh_vrnt = Some vrnt; wh_bds = None; } }
 
 | inv=sform vrnt=sform k=sform eps=sform
-    { (inv, Some vrnt, Some (k,eps)) }
+    { { wh_inv = inv; wh_vrnt = Some vrnt; wh_bds = Some (k, eps); } }
 ;
 
 rnd_info:
@@ -1919,8 +1919,8 @@ int:
 side:
 | LBRACE n=uint RBRACE {
    match n with
-   | 1 -> true
-   | 2 -> false
+   | 1 -> `Left
+   | 2 -> `Right
    | _ -> parse_error
               (EcLocation.make $startpos $endpos)
               (Some "variable side must be 1 or 2")
@@ -2116,23 +2116,16 @@ code_pos_underscore:
 
 %inline if_option:
 | s=side?      
-   { CiHead s } 
-
-(*| COLON f=sform
-   { CiSeq(None, None, None, f) } *)
+   { `Head s } 
 
 | i1=code_pos_underscore i2=code_pos_underscore COLON f=sform
-   { CiSeq(None, i1, i2, f) } 
-
-(*| s=side COLON f=sform 
-   { CiSeq(Some s, None, None, f) } *)
+   { `Seq (None, i1, i2, f) } 
 
 | s=side i1=code_pos_underscore i2=code_pos_underscore COLON f=sform 
-   { CiSeq(Some s, i1, i2, f) }
+   { `Seq (Some s, i1, i2, f) }
  
 | s=side i=code_pos? COLON  LPAREN UNDERSCORE COLON f1=form LONGARROW f2=form RPAREN
-   { CiSeqOne(s, i, f1, f2) } 
-
+   { `SeqOne (s, i, f1, f2) } 
 ;
 
 phltactic:
@@ -2263,10 +2256,10 @@ phltactic:
     { Pconseq(nm<>None, (None,None,Some info3)) }
 
 | ELIM STAR
-    { Phr_exists_elim }
+    { Phrex_elim }
 
 | EXIST STAR l=iplist1(sform, COMMA) %prec prec_below_comma
-    { Phr_exists_intro l }
+    { Phrex_intro l }
 
 | EXFALSO
     { Pexfalso }
@@ -2302,7 +2295,7 @@ phltactic:
     { Pbdhoare_split i }
 
 | PHOARE EQUIV s=side pr=sform po=sform
-    { Pbd_equiv(s, pr, po) }
+    { Pbd_equiv (s, pr, po) }
 
 | AUTO { Pauto }
 ;

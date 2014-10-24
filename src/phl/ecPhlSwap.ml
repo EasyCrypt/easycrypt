@@ -79,8 +79,8 @@ let t_equiv_swap_r side p1 p2 p3 tc =
   let es    = tc1_as_equivS tc in
   let sl,sr =
     match side with
-    | true  -> LowInternal.swap_stmt tc p1 p2 p3 es.es_sl, es.es_sr
-    | false -> es.es_sl, LowInternal.swap_stmt tc p1 p2 p3 es.es_sr
+    | `Left  -> LowInternal.swap_stmt tc p1 p2 p3 es.es_sl, es.es_sr
+    | `Right -> es.es_sl, LowInternal.swap_stmt tc p1 p2 p3 es.es_sr
   in
   let concl = f_equivS_r { es with es_sl = sl; es_sr = sr; } in
   FApi.xmutate1 tc `Swap [concl]
@@ -97,8 +97,8 @@ module HiInternal = struct
     | FhoareS hs   , None -> List.length hs.hs_s.s_node
     | FbdHoareS bhs, None -> List.length bhs.bhs_s.s_node
 
-    | FequivS es, Some side ->
-        List.length (if side then es.es_sl.s_node else es.es_sr.s_node)
+    | FequivS es, Some `Left  -> List.length es.es_sl.s_node
+    | FequivS es, Some `Right -> List.length es.es_sr.s_node
 
     | _, None   -> tc_error_noXhl ~kinds:[`Hoare `Stmt; `PHoare `Stmt] !!tc
     | _, Some _ -> tc_error_noXhl ~kinds:[`Equiv `Stmt] !!tc
@@ -111,8 +111,8 @@ let rec process_swap1 info tc =
 
   if is_equivS concl && side = None then
     FApi.t_seq
-      (process_swap1 { info with pl_desc = (Some true , pos)})
-      (process_swap1 { info with pl_desc = (Some false, pos)})
+      (process_swap1 { info with pl_desc = (Some `Left , pos)})
+      (process_swap1 { info with pl_desc = (Some `Right, pos)})
       tc
   else
     let p1, p2, p3 = match pos with
@@ -149,8 +149,8 @@ let rec process_swap1 info tc =
             t_bdhoare_swap p1 p2 p3
         | None ->
             FApi.t_seq
-              (process_swap1 { info with pl_desc = (Some true , pos)})
-              (process_swap1 { info with pl_desc = (Some false, pos)})
+              (process_swap1 { info with pl_desc = (Some `Left , pos)})
+              (process_swap1 { info with pl_desc = (Some `Right, pos)})
         | Some side ->
             t_equiv_swap side p1 p2 p3
     in

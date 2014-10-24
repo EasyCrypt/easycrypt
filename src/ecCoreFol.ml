@@ -945,8 +945,8 @@ let destr_programS side f =
   | None  , FbdHoareS bhs -> (bhs.bhs_m, bhs.bhs_s)
   | Some b, FequivS   es  -> begin
       match b with
-      | true  -> (es.es_ml, es.es_sl)
-      | false -> (es.es_mr, es.es_sr)
+      | `Left  -> (es.es_ml, es.es_sl)
+      | `Right -> (es.es_mr, es.es_sr)
   end
   | _, _ -> destr_error "programS"
 

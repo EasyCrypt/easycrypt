@@ -169,8 +169,8 @@ let t_equiv_call1 side fpre fpost tc =
 
   let (me, stmt) =
     match side with
-    | true  -> (EcMemory.memory equiv.es_ml, equiv.es_sl)
-    | false -> (EcMemory.memory equiv.es_mr, equiv.es_sr)
+    | `Left  -> (EcMemory.memory equiv.es_ml, equiv.es_sl)
+    | `Right -> (EcMemory.memory equiv.es_mr, equiv.es_sr)
   in
 
   let (lp, f, args), fstmt = tc1_last_call tc stmt in
@@ -197,8 +197,8 @@ let t_equiv_call1 side fpre fpost tc =
     f_anda_simpl (PVM.subst env spre (Fsubst.f_subst msubst fpre)) post in
   let concl  =
     match side with
-    | true  -> { equiv with es_sl = fstmt; es_po = post; }
-    | false -> { equiv with es_sr = fstmt; es_po = post; } in
+    | `Left  -> { equiv with es_sl = fstmt; es_po = post; }
+    | `Right -> { equiv with es_sr = fstmt; es_po = post; } in
   let concl  = f_equivS_r concl in
 
   FApi.xmutate1 tc `HlCall [fconcl; concl]
@@ -229,7 +229,7 @@ let process_call side info tc =
           (penv, qenv, fun pre post -> f_equivF pre fl fr post)
 
       | FequivS es, Some side ->
-          let fstmt = if side then es.es_sl else es.es_sr in
+          let fstmt = sideif side es.es_sl es.es_sr in
           let (_,f,_) = fst (tc1_last_call tc fstmt) in
           let penv, qenv = LDecl.hoareF f hyps in
           (penv, qenv, fun pre post -> f_bdHoareF pre f post FHeq f_r1)

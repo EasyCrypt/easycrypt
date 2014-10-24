@@ -99,19 +99,18 @@ let t_equiv_app (i, j) phi tc =
 
   FApi.xmutate1 tc `HlApp [a; b]
 
-
 let t_equiv_app_onesided side i pre post tc = 
   let env = FApi.tc1_env tc in
   let es = tc1_as_equivS tc in
   let m, s, s' = 
-    if   side 
-    then es.es_ml, es.es_sl, es.es_sr
-    else es.es_mr, es.es_sr, es.es_sl
+    match side with
+    | `Left  -> es.es_ml, es.es_sl, es.es_sr
+    | `Right -> es.es_mr, es.es_sr, es.es_sl
   in
   let ij = 
-    if   side 
-    then i, List.length s'.s_node 
-    else List.length s'.s_node, i in
+    match side with
+    | `Left  -> (i, List.length s'. s_node)
+    | `Right -> (List.length s'. s_node, i) in
   let _s1, s2 = s_split i s in
 
   let modi = EcPV.s_write env (EcModules.stmt s2) in
@@ -182,7 +181,6 @@ let process_phl_bd_info dir bd_info tc =
       (phi, f1, f2, g1, g2)
 
 (* -------------------------------------------------------------------- *)
-
 let process_app (side, dir, k, phi, bd_info) tc =
   let concl = FApi.tc1_goal tc in
 
@@ -190,10 +188,10 @@ let process_app (side, dir, k, phi, bd_info) tc =
     match phi with
     | Single phi -> phi
     | Double _   -> tc_error !!tc "seq: a single formula is expected" in
+
   let check_side side = 
-    if side <> None then 
+    if EcUtils.is_some side then 
       tc_error !!tc "seq: no side information expected" in
-      
     
   match k, bd_info with
   | Single i, PAppNone when is_hoareS concl ->
@@ -205,9 +203,9 @@ let process_app (side, dir, k, phi, bd_info) tc =
     let pre, post = 
       match phi with
       | Single _ -> tc_error !!tc "seq onsided: a pre and a post is expected" 
-      | Double(pre,post) -> 
-        TTC.tc1_process_phl_formula ~side tc pre, 
-        TTC.tc1_process_phl_formula ~side tc post in
+      | Double (pre, post) -> 
+        TTC.tc1_process_phl_formula ?side tc pre, 
+        TTC.tc1_process_phl_formula ?side tc post in
     let side = 
       match side with
       | None -> tc_error !!tc "seq onsided: side information expected"

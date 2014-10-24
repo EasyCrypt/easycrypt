@@ -18,10 +18,10 @@ module Zpr = EcMatching.Zipper
 module TTC = EcProofTyping
 
 (* -------------------------------------------------------------------- *)
-type fission_t    = bool option * codepos * (int * (int * int))
-type fusion_t     = bool option * codepos * (int * (int * int))
-type unroll_t     = bool option * codepos
-type splitwhile_t = pexpr * bool option * codepos
+type fission_t    = oside * codepos * (int * (int * int))
+type fusion_t     = oside * codepos * (int * (int * int))
+type unroll_t     = oside * codepos
+type splitwhile_t = pexpr * oside * codepos
 
 (* -------------------------------------------------------------------- *)
 let check_independence (pf, hyps) b init c1 c2 c3 =

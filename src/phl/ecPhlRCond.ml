@@ -51,9 +51,9 @@ module Low = struct
   let t_equiv_rcond_r side b at_pos tc =
     let es = tc1_as_equivS tc in
     let m,mo,s =
-      if   side
-      then es.es_ml,es.es_mr, es.es_sl
-      else es.es_mr,es.es_ml, es.es_sr in
+      match side with
+      | `Left  -> es.es_ml,es.es_mr, es.es_sl
+      | `Right -> es.es_mr,es.es_ml, es.es_sr in
     let hd,e,s = gen_rcond !!tc b EcFol.mhr at_pos s in
     let mo' = EcIdent.create "&m" in
     let s1 = Fsubst.f_subst_id in
@@ -63,7 +63,7 @@ module Low = struct
     let concl1 =
       f_forall_mems [mo', EcMemory.memtype mo]
         (f_hoareS (EcFol.mhr, EcMemory.memtype m) pre1 hd e) in
-    let sl,sr = if side then s, es.es_sr else es.es_sl, s in
+    let sl,sr = match side with `Left -> s, es.es_sr | `Right -> es.es_sl, s in
     let concl2 = f_equivS_r { es with es_sl = sl; es_sr = sr } in
     FApi.xmutate1 tc `RCond [concl1; concl2]
 

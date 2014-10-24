@@ -207,9 +207,9 @@ let t_equiv_while_disj_r side vrnt inv tc =
   let env = FApi.tc1_env tc in
   let es = tc1_as_equivS tc in
   let s, m_side, m_other =
-    if   side
-    then es.es_sl, es.es_ml, es.es_mr
-    else es.es_sr, es.es_mr, es.es_ml in
+    match side with
+    | `Left  -> es.es_sl, es.es_ml, es.es_mr
+    | `Right -> es.es_sr, es.es_mr, es.es_ml in
   let (e, c), s = tc1_last_while tc s in
   let e = form_of_expr (EcMemory.memory m_side) e in
 
@@ -242,9 +242,9 @@ let t_equiv_while_disj_r side vrnt inv tc =
   let post = generalize_mod env (EcMemory.memory m_side) modi post in
   let post = f_and_simpl inv post in
   let concl =
-    if   side
-    then f_equivS_r { es with es_sl = s; es_po=post}
-    else f_equivS_r { es with es_sr = s; es_po=post}
+    match side with
+    | `Left  -> f_equivS_r { es with es_sl = s; es_po=post; }
+    | `Right -> f_equivS_r { es with es_sr = s; es_po=post; }
   in
 
   FApi.xmutate1 tc `While [b_concl; concl]
@@ -286,16 +286,20 @@ let t_equiv_while           = FApi.t_low1 "equiv-while"   t_equiv_while_r
 let t_equiv_while_disj      = FApi.t_low3 "equiv-while"   t_equiv_while_disj_r
 
 (* -------------------------------------------------------------------- *)
-let process_while side_opt phi vrnt_opt o_info tc =
+let process_while side winfos tc =
+  let { EcParsetree.wh_inv  = phi ;
+        EcParsetree.wh_vrnt = vrnt;
+        EcParsetree.wh_bds  = bds ; } = winfos in
+
   match (FApi.tc1_goal tc).f_node with
   | FhoareS _ -> begin
-      match vrnt_opt with
+      match vrnt with
       | None -> t_hoare_while (TTC.tc1_process_phl_formula tc phi) tc
       | _    -> tc_error !!tc "invalid arguments"
     end
 
   | FbdHoareS _ -> begin
-      match vrnt_opt, o_info with
+      match vrnt, bds with
       | Some vrnt, None ->
           t_bdhoare_while
             (TTC.tc1_process_phl_formula tc phi)
@@ -317,7 +321,7 @@ let process_while side_opt phi vrnt_opt o_info tc =
   end
 
   | FequivS _ -> begin
-      match side_opt, vrnt_opt with
+      match side, vrnt with
       | None, None ->
           t_equiv_while (TTC.tc1_process_prhl_formula tc phi) tc
 

@@ -321,7 +321,7 @@ val destr_hoareS    : form -> hoareS
 val destr_bdHoareF  : form -> bdHoareF
 val destr_bdHoareS  : form -> bdHoareS
 val destr_pr        : form -> pr
-val destr_programS  : bool option -> form -> memenv * stmt
+val destr_programS  : [`Left | `Right] option -> form -> memenv * stmt
 val destr_int       : form -> int
 
 (* -------------------------------------------------------------------- *)
