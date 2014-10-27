@@ -28,6 +28,7 @@ module ER  = EcReduction
 module PT  = EcProofTerm
 module TT  = EcTyping
 module TTC = EcProofTyping
+module LG  = EcCoreLib.CI_Logic
 
 (* -------------------------------------------------------------------- *)
 type ttenv = {
@@ -186,30 +187,28 @@ module LowRewrite = struct
 
   exception RewriteError of error
 
+  let rec find_rewrite_pattern (dir : rwside) hyps pt =
+    let env = LDecl.toenv hyps in
+    let ax  = pt.PT.ptev_ax in
+
+    match EcFol.sform_of_form ax with
+    | EcFol.SFeq  (f1, f2) -> (pt, (f1, f2))
+    | EcFol.SFiff (f1, f2) -> (pt, (f1, f2))
+    | _ -> begin
+      match TTC.destruct_product hyps ax with
+      | None ->
+          if   dir = `LtoR && ER.EqTest.for_type env ax.f_ty tbool
+          then (pt, (ax, f_true))
+          else raise (RewriteError LRW_NotAnEquation)
+      | Some _ ->
+          let pt = EcProofTerm.apply_pterm_to_hole pt in
+          find_rewrite_pattern dir hyps pt
+    end
+
   let t_rewrite_r (s, o) pt tc =
     let hyps, concl = FApi.tc1_flat tc in
-    let env = LDecl.toenv hyps in
 
-    let (pt, (f1, f2)) =
-      let rec find_rewrite_pattern pt =
-        let ax = pt.PT.ptev_ax in
-
-        match EcFol.sform_of_form ax with
-        | EcFol.SFeq  (f1, f2) -> (pt, (f1, f2))
-        | EcFol.SFiff (f1, f2) -> (pt, (f1, f2))
-        | _ -> begin
-          match TTC.destruct_product hyps ax with
-          | None ->
-              if   s = `LtoR && ER.EqTest.for_type env ax.f_ty tbool
-              then (pt, (ax, f_true))
-              else raise (RewriteError LRW_NotAnEquation)
-          | Some _ ->
-              let pt = EcProofTerm.apply_pterm_to_hole pt in
-              find_rewrite_pattern pt
-        end
-      in
-        find_rewrite_pattern pt
-    in
+    let (pt, (f1, f2)) = find_rewrite_pattern s hyps pt in
 
     let fp = match s with `LtoR -> f1 | `RtoL -> f2 in
 
@@ -604,7 +603,7 @@ let process_mintros ?(cf = true) pis gs =
                       let cutf = PT.concretize_form pte.PT.ptev_env cutf in
                       let pt = fst (PT.concretize pte) in
                       let pt = { pt with
-                                  pt_head = PTGlobal (EcCoreLib.p_imp_trans, []);
+                                  pt_head = PTGlobal (LG.p_imp_trans, []);
                                   pt_args = [PAFormula f1       ;
                                              PAFormula cutf     ;
                                              PAFormula f2       ;
@@ -815,11 +814,11 @@ module LowApply = struct
                 let views =
                   match sform_of_form pt.PT.ptev_ax with
                   | SFiff (f1, f2) ->
-                      [(EcCoreLib.p_iff_lr, [f1; f2]);
-                       (EcCoreLib.p_iff_rl, [f1; f2])]
+                      [(LG.p_iff_lr, [f1; f2]);
+                       (LG.p_iff_rl, [f1; f2])]
 
                   | SFnot f1 ->
-                      [(EcCoreLib.p_negbTE, [f1])]
+                      [(LG.p_negbTE, [f1])]
 
                   | _ -> []
                 in
@@ -927,22 +926,19 @@ let process_subst syms (tc : tcenv1) =
   | syms -> FApi.t_seqs (List.map (fun var tc -> t_subst ~var tc) syms) tc
 
 (* -------------------------------------------------------------------- *)
-type cut_t = intropattern * pformula * ptactic_core option
+type cut_t = intropattern * pformula * (ptactics located) option
 
-let process_cut engine (ip, phi, t) tc =
+let process_cut engine ((ip, phi, t) : cut_t) tc =
   let phi = TTC.tc1_process_formula tc phi in
   let tc  = EcLowGoal.t_cut phi tc in
   let tc  =
     match t with
-    | None   -> tc
+    | None -> tc
     | Some t ->
-        let l = t.pl_loc in
-        let t = { pt_core = t; pt_intros = []; } in
-        let t = mk_loc l (Pby (Some [t])) in
-          FApi.t_first (engine t) tc
-  in
+       let t = mk_loc (loc t) (Pby (Some (unloc t))) in
+       FApi.t_first (engine t) tc
 
-  FApi.t_last (process_intros ip) tc
+  in FApi.t_last (process_intros ip) tc
 
 (* -------------------------------------------------------------------- *)
 type cutdef_t = intropattern * pterm

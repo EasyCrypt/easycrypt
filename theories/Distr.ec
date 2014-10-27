@@ -332,9 +332,9 @@ theory Dapply.
   proof strict.
   rewrite /in_supp /mu_x mu_def; split.
     rewrite mu_support /Pred.(/\) /= => in_sup. smt.
-    by intros=> [x]; rewrite /in_supp /mu_x=> [y_def nempty];
-       cut : (=) x <= (fun x, y = f x) by (by intros=> w);
-       smt.
+    intros=> [x]; rewrite /in_supp /mu_x=> [y_def nempty].
+    cut : (=) x <= (fun x, y = f x) by (by intros=> w).
+    smt.
   qed.
 
   lemma lossless (d : 'a distr) (f : 'a -> 'b):

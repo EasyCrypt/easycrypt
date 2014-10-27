@@ -428,8 +428,8 @@ op countacc (acc:int) (e:'a) (xs:'a list) =
 lemma countacc_count (e:'a) xs:
   countacc 0 e xs = count e xs.
 proof strict.
-cut ->: count e xs = count e xs + 0 by smt; generalize 0.
-elim xs=> //= x xs IH n; case (x = e).
+cut ->: count e xs = count e xs + 0 by smt.
+elim xs 0 => //= x xs IH n; case (x = e).
   by rewrite IH; smt.
   by rewrite /= IH.
 qed.

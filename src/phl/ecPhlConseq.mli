@@ -32,8 +32,11 @@ val t_bdHoareF_conseq_nm : form -> form -> FApi.backward
 val t_bdHoareS_conseq_nm : form -> form -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
+val t_equivS_conseq_bd : side -> EcFol.form -> EcFol.form ->FApi.backward
+
+(* -------------------------------------------------------------------- *)
 val t_conseq : form -> form -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
 val process_conseq   : bool -> ccfpattern option tuple3 -> FApi.backward
-val process_bd_equiv : bool -> pformula pair -> FApi.backward
+val process_bd_equiv : side -> pformula pair -> FApi.backward

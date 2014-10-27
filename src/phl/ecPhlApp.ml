@@ -99,6 +99,33 @@ let t_equiv_app (i, j) phi tc =
 
   FApi.xmutate1 tc `HlApp [a; b]
 
+let t_equiv_app_onesided side i pre post tc = 
+  let env = FApi.tc1_env tc in
+  let es = tc1_as_equivS tc in
+  let m, s, s' = 
+    match side with
+    | `Left  -> es.es_ml, es.es_sl, es.es_sr
+    | `Right -> es.es_mr, es.es_sr, es.es_sl
+  in
+  let ij = 
+    match side with
+    | `Left  -> (i, List.length s'. s_node)
+    | `Right -> (List.length s'. s_node, i) in
+  let _s1, s2 = s_split i s in
+
+  let modi = EcPV.s_write env (EcModules.stmt s2) in
+  let subst = Fsubst.f_subst_mem mhr (fst m) in
+  let p' = subst pre and q' = subst post in
+  let r = f_and p' (generalize_mod env (fst m) modi (f_imp q' es.es_po)) in
+  FApi.t_seqsub (t_equiv_app ij r)
+    [t_id; (* s1 ~ s' : pr ==> r *)
+     FApi.t_seqsub (EcPhlConseq.t_equivS_conseq_nm p' q')
+       [(* r => forall mod, post => post' *) t_logic_trivial;
+        (* r => p' *) t_logic_trivial;
+        (* s1 ~ [] : p' ==> q' *) EcPhlConseq.t_equivS_conseq_bd side pre post
+       ]
+    ] tc
+         
 (* -------------------------------------------------------------------- *)
 let process_phl_bd_info dir bd_info tc =
   match bd_info with
@@ -154,21 +181,44 @@ let process_phl_bd_info dir bd_info tc =
       (phi, f1, f2, g1, g2)
 
 (* -------------------------------------------------------------------- *)
-let process_app dir k phi bd_info tc =
+let process_app (side, dir, k, phi, bd_info) tc =
   let concl = FApi.tc1_goal tc in
 
+  let get_single phi = 
+    match phi with
+    | Single phi -> phi
+    | Double _   -> tc_error !!tc "seq: a single formula is expected" in
+
+  let check_side side = 
+    if EcUtils.is_some side then 
+      tc_error !!tc "seq: no side information expected" in
+    
   match k, bd_info with
   | Single i, PAppNone when is_hoareS concl ->
-      let phi = TTC.tc1_process_phl_formula tc phi in
-      t_hoare_app i phi tc
+    check_side side;
+    let phi = TTC.tc1_process_phl_formula tc (get_single phi) in
+    t_hoare_app i phi tc
+
+  | Single i, PAppNone when is_equivS concl ->
+    let pre, post = 
+      match phi with
+      | Single _ -> tc_error !!tc "seq onsided: a pre and a post is expected" 
+      | Double (pre, post) -> 
+        TTC.tc1_process_phl_formula ?side tc pre, 
+        TTC.tc1_process_phl_formula ?side tc post in
+    let side = 
+      match side with
+      | None -> tc_error !!tc "seq onsided: side information expected"
+      | Some side -> side in
+    t_equiv_app_onesided side i pre post tc
 
   | Single i, _ when is_bdHoareS concl ->
-      let pia = TTC.tc1_process_phl_formula tc phi in
+      let pia = TTC.tc1_process_phl_formula tc (get_single phi) in
       let (ra, f1, f2, f3, f4) = process_phl_bd_info dir bd_info tc in
       t_bdhoare_app i (ra, pia, f1, f2, f3, f4) tc
 
-  | Double(i, j), PAppNone when is_equivS concl ->
-      let phi = TTC.tc1_process_prhl_formula tc phi in
+  | Double(i,j), PAppNone when is_equivS concl ->
+      let phi = TTC.tc1_process_prhl_formula tc (get_single phi) in
       t_equiv_app (i, j) phi tc
 
   | Single _, PAppNone

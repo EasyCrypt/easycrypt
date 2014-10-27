@@ -217,9 +217,9 @@ let rec on_mpath_form cb (f : EcFol.form) =
     on_mpath_stmt cb bhs.EcFol.bhs_s;
     on_mpath_memenv cb bhs.EcFol.bhs_m
 
-  and on_mpath_pr cb (_, xp, fs, f) =
-    cb xp.x_top;
-    List.iter (on_mpath_form cb) [f ; fs]
+  and on_mpath_pr cb pr =
+    cb pr.EcFol.pr_fun.x_top;
+    List.iter (on_mpath_form cb) [pr.EcFol.pr_event; pr.EcFol.pr_args]
 
   in
     on_mpath_ty cb f.EcFol.f_ty; fornode ()

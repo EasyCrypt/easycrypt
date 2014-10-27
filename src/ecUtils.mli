@@ -57,6 +57,9 @@ type 'a tuple9 = 'a * 'a * 'a * 'a * 'a * 'a * 'a * 'a * 'a
 type 'a pair   = 'a tuple2
 
 (* -------------------------------------------------------------------- *)
+val in_seq1: ' a -> 'a list
+
+(* -------------------------------------------------------------------- *)
 val as_seq0 : 'a list -> 'a tuple0
 val as_seq1 : 'a list -> 'a tuple1
 val as_seq2 : 'a list -> 'a tuple2
@@ -179,6 +182,8 @@ module List : sig
   val findopt : ('a -> bool) -> 'a list -> 'a option
 
   val findex : ('a -> bool) -> 'a list -> int option
+  
+  val findex_last : ('a -> bool) -> 'a list -> int option
 
   val index :  'a -> 'a list -> int option
 
@@ -203,6 +208,8 @@ module List : sig
   val mapi : (int -> 'a -> 'b) -> 'a list -> 'b list
 
   val map_fold : ('a -> 'b -> 'a * 'c) -> 'a -> 'b list -> 'a * 'c list
+
+  val map_fold2 : ('a -> 'b -> 'c -> 'a * 'd) -> 'a -> 'b list -> 'c list -> 'a * 'd list
 
   val map_combine : ('a -> 'c) -> ('b -> 'd) -> 'a list -> 'b list -> ('c * 'd) list
 

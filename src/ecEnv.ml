@@ -8,7 +8,7 @@ open EcUtils
 open EcSymbols
 open EcPath
 open EcTypes
-open EcFol
+open EcCoreFol
 open EcMemory
 open EcDecl
 open EcModules
@@ -217,7 +217,7 @@ let empty_norm_cache =
 
 (* -------------------------------------------------------------------- *)
 let empty gstate =
-  let name = EcCoreLib.id_top in
+  let name = EcCoreLib.i_top in
   let path = EcPath.psymbol name in
 
   let env_current =
@@ -286,7 +286,7 @@ let _ = EcPException.register (fun fmt exn ->
 (* -------------------------------------------------------------------- *)
 module MC = struct
   (* ------------------------------------------------------------------ *)
-  let top_path = EcPath.psymbol EcCoreLib.id_top
+  let top_path = EcPath.psymbol EcCoreLib.i_top
 
   (* ------------------------------------------------------------------ *)
   let _cutpath i p =
@@ -788,7 +788,7 @@ module MC = struct
       let fsubst =
         List.fold_left
           (fun s (x, xp, xty, _) ->
-            let fop = EcFol.f_op xp [tvar self] xty in
+            let fop = EcCoreFol.f_op xp [tvar self] xty in
               Fsubst.f_bind_local s x fop)
           (Fsubst.f_subst_init false Mid.empty tsubst Mp.empty)
           operators
@@ -1506,14 +1506,14 @@ module Fun = struct
   let inv_memenv env =
     let path  = mroot env in
     let xpath = EcPath.xpath_fun path "" in (* dummy value *)
-    let meml  = EcMemory.empty_local EcFol.mleft xpath in
-    let memr  = EcMemory.empty_local EcFol.mright xpath in
+    let meml  = EcMemory.empty_local EcCoreFol.mleft xpath in
+    let memr  = EcMemory.empty_local EcCoreFol.mright xpath in
     Memory.push_all [meml;memr] env
 
   let inv_memenv1 env =
     let path  = mroot env in
     let xpath = EcPath.xpath_fun path "" in (* dummy value *)
-    let mem  = EcMemory.empty_local EcFol.mhr xpath in
+    let mem  = EcMemory.empty_local EcCoreFol.mhr xpath in
     Memory.push_active mem env
 
   let prF_memenv m path env =
@@ -1521,14 +1521,14 @@ module Fun = struct
     actmem_post m path fun_
 
   let prF path env =
-    let post = prF_memenv EcFol.mhr path env in
+    let post = prF_memenv EcCoreFol.mhr path env in
     Memory.push_active post env
 
   let hoareF_memenv path env =
     let (ip, _) = oget (ipath_of_xpath path) in
     let fun_ = snd (oget (by_ipath ip env)) in
-    let pre  = actmem_pre EcFol.mhr path fun_ in
-    let post = actmem_post EcFol.mhr path fun_ in
+    let pre  = actmem_pre EcCoreFol.mhr path fun_ in
+    let post = actmem_post EcCoreFol.mhr path fun_ in
     pre, post
 
   let hoareF path env =
@@ -1537,7 +1537,7 @@ module Fun = struct
 
   let hoareS path env =
     let fun_ = by_xpath path env in
-    let fd, memenv = actmem_body EcFol.mhr path fun_ in
+    let fd, memenv = actmem_body EcCoreFol.mhr path fun_ in
     memenv, fd, Memory.push_active memenv env
 
   let equivF_memenv path1 path2 env =
@@ -1546,10 +1546,10 @@ module Fun = struct
 
     let fun1 = snd (oget (by_ipath ip1 env)) in
     let fun2 = snd (oget (by_ipath ip2 env)) in
-    let pre1 = actmem_pre EcFol.mleft path1 fun1 in
-    let pre2 = actmem_pre EcFol.mright path2 fun2 in
-    let post1 = actmem_post EcFol.mleft path1 fun1 in
-    let post2 = actmem_post EcFol.mright path2 fun2 in
+    let pre1 = actmem_pre EcCoreFol.mleft path1 fun1 in
+    let pre2 = actmem_pre EcCoreFol.mright path2 fun2 in
+    let post1 = actmem_post EcCoreFol.mleft path1 fun1 in
+    let post2 = actmem_post EcCoreFol.mright path2 fun2 in
     (pre1,pre2), (post1,post2)
 
   let equivF path1 path2 env =
@@ -1560,8 +1560,8 @@ module Fun = struct
   let equivS path1 path2 env =
     let fun1 = by_xpath path1 env in
     let fun2 = by_xpath path2 env in
-    let fd1, mem1 = actmem_body EcFol.mleft path1 fun1 in
-    let fd2, mem2 = actmem_body EcFol.mright path2 fun2 in
+    let fd1, mem1 = actmem_body EcCoreFol.mleft path1 fun1 in
+    let fd2, mem2 = actmem_body EcCoreFol.mright path2 fun2 in
     mem1, fd1, mem2, fd2, Memory.push_all [mem1; mem2] env
 end
 
@@ -2222,8 +2222,8 @@ module NormMp = struct
       List.exists (fun (_,gty) ->
         match gty with GTmodty _ -> true | _ -> false) b in
 
-    let norm_form =
-      EcFol.Hf.memo_rec 107 (fun aux f ->
+    let norm_form =                     (* FIXME: use FSmart *)
+      EcCoreFol.Hf.memo_rec 107 (fun aux f ->
         match f.f_node with
         | Fquant(q,bd,f) ->
           if has_mod bd then
@@ -2254,14 +2254,15 @@ module NormMp = struct
             ef.ef_fr == r' && ef.ef_po == post' then f else
           f_equivF pre' l' r' post'
 
-        | Fpr(m,p,args,e) ->
-          let p' = norm_xfun env p in
-          let args' = aux args in
-          let e' = aux e in
-          if p == p' && args == args' && e == e' then f else
-          f_pr m p' args' e'
+        | Fpr pr ->
+          let pr' = {
+            pr_mem   = pr.pr_mem;
+            pr_fun   = norm_xfun env pr.pr_fun;
+            pr_args  = aux pr.pr_args;
+            pr_event = aux pr.pr_event;
+          } in FSmart.f_pr (f, pr) pr'
 
-        | _ -> EcFol.f_map norm_ty1 aux f) in
+        | _ -> EcCoreFol.f_map norm_ty1 aux f) in
     norm_form
 
   let norm_op env op =
@@ -2443,11 +2444,11 @@ module Op = struct
     let op = oget (by_path_opt p env) in
     let f  =
       match op.op_kind with
-      | OB_oper (Some (OP_Plain e)) -> EcFol.form_of_expr EcFol.mhr e
+      | OB_oper (Some (OP_Plain e)) -> EcCoreFol.form_of_expr EcCoreFol.mhr e
       | OB_pred (Some idsf) -> idsf
       | _ -> raise NotReducible
     in
-      EcFol.Fsubst.subst_tvar
+      EcCoreFol.Fsubst.subst_tvar
         (EcTypes.Tvar.init (List.map fst op.op_tparams) tys) f
 
   let is_projection env p =
@@ -2808,42 +2809,42 @@ let import_w3_dir env dir name rd =
 (* -------------------------------------------------------------------- *)
 let initial gstate =
   let env0 = empty gstate in
-  let env = enter `Theory EcCoreLib.id_Pervasive env0 in
+  let env = enter `Theory EcCoreLib.i_Pervasive env0 in
   let unit_rn =
     let tunit = Why3.Ty.ts_tuple 0 in
     let nunit = tunit.Why3.Ty.ts_name.Why3.Ident.id_string in
     let tt = Why3.Term.fs_tuple 0 in
     let ntt = tt.Why3.Term.ls_name.Why3.Ident.id_string in
-    [ [nunit],EcWhy3.RDts, EcPath.basename EcCoreLib.p_unit;
-      [ntt], EcWhy3.RDls, EcPath.basename EcCoreLib.p_tt
+    [ [nunit],EcWhy3.RDts, EcPath.basename EcCoreLib.CI_Unit.p_unit;
+      [ntt], EcWhy3.RDls, EcPath.basename EcCoreLib.CI_Unit.p_tt
     ]  in
   let env, _ = import_w3 env (Why3.Theory.tuple_theory 0) unit_rn in
   let bool_rn = [
-    ["bool"] , EcWhy3.RDts, EcPath.basename EcCoreLib.p_bool;
-    ["True"] , EcWhy3.RDls, EcPath.basename EcCoreLib.p_true;
-    ["False"], EcWhy3.RDls, EcPath.basename EcCoreLib.p_false ] in
+    ["bool"] , EcWhy3.RDts, EcPath.basename EcCoreLib.CI_Bool.p_bool;
+    ["True"] , EcWhy3.RDls, EcPath.basename EcCoreLib.CI_Bool.p_true;
+    ["False"], EcWhy3.RDls, EcPath.basename EcCoreLib.CI_Bool.p_false ] in
   let env, _ = import_w3 env Why3.Theory.bool_theory bool_rn in
   let builtin_rn = [
-    ["int"]    , EcWhy3.RDts, EcPath.basename EcCoreLib.p_int;
-    ["real"]   , EcWhy3.RDts, EcPath.basename EcCoreLib.p_real;
-    ["infix ="], EcWhy3.RDls, EcPath.basename EcCoreLib.p_eq
+    ["int"]    , EcWhy3.RDts, EcPath.basename EcCoreLib.CI_Int .p_int;
+    ["real"]   , EcWhy3.RDts, EcPath.basename EcCoreLib.CI_Real.p_real;
+    ["infix ="], EcWhy3.RDls, EcPath.basename EcCoreLib.CI_Bool.p_eq
   ] in
   let env, _ = import_w3 env Why3.Theory.builtin_theory builtin_rn in
   let add_bool sign env path =
     let ty = EcTypes.toarrow sign EcTypes.tbool in
     Op.bind_logical (EcPath.basename path)
       (mk_op [] ty None) env in
-  let env = add_bool [EcTypes.tbool] env EcCoreLib.p_not in
+  let env = add_bool [EcTypes.tbool] env EcCoreLib.CI_Bool.p_not in
   let env = List.fold_left (add_bool [EcTypes.tbool;EcTypes.tbool]) env
-      [EcCoreLib.p_and;EcCoreLib.p_anda;
-       EcCoreLib.p_or;EcCoreLib.p_ora;
-       EcCoreLib.p_imp; EcCoreLib.p_iff] in
+      [EcCoreLib.CI_Bool.p_and;EcCoreLib.CI_Bool.p_anda;
+       EcCoreLib.CI_Bool.p_or;EcCoreLib.CI_Bool.p_ora;
+       EcCoreLib.CI_Bool.p_imp; EcCoreLib.CI_Bool.p_iff] in
  let distr_rn = [
-    ["distr"], EcWhy3.RDts, EcPath.basename EcCoreLib.p_distr;
+    ["distr"], EcWhy3.RDts, EcPath.basename EcCoreLib.CI_Distr.p_distr;
   ] in
   let env, _ = import_w3 env EcWhy3.distr_theory distr_rn in
   let cth = Theory.close env in
-  let env1 = Theory.bind EcCoreLib.id_Pervasive cth env0 in
+  let env1 = Theory.bind EcCoreLib.i_Pervasive cth env0 in
   let env1 = Theory.import EcCoreLib.p_Pervasive env1 in
   env1
 

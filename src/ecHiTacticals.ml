@@ -136,12 +136,12 @@ and process1_phl (_ : ttenv) (t : phltactic) (tc : tcenv1) =
     | Pfun (`Upto info)         -> EcPhlFun.process_fun_upto info
     | Pfun `Code                -> EcPhlFun.process_fun_to_code
     | Pskip                     -> EcPhlSkip.t_skip
-    | Papp (dir, k, phi, f)     -> EcPhlApp.process_app dir k phi f
+    | Papp info                 -> EcPhlApp.process_app info
     | Pwp wp                    -> EcPhlWp.t_wp wp
     | Psp sp                    -> EcPhlSp.t_sp sp
     | Prcond (side, b, i)       -> EcPhlRCond.t_rcond side b i
     | Pcond side                -> EcPhlCond.process_cond side
-    | Pwhile (side, info)       -> curry3 (EcPhlWhile.process_while side) info
+    | Pwhile (side, info)       -> EcPhlWhile.process_while side info
     | Pfission info             -> EcPhlLoopTx.process_fission info
     | Pfusion info              -> EcPhlLoopTx.process_fusion info
     | Punroll info              -> EcPhlLoopTx.process_unroll info
@@ -155,8 +155,8 @@ and process1_phl (_ : ttenv) (t : phltactic) (tc : tcenv1) =
     | Pset info                 -> EcPhlCodeTx.process_set info
     | Prnd (side, info)         -> EcPhlRnd.process_rnd side info
     | Pconseq (nm, info)        -> EcPhlConseq.process_conseq nm info
-    | Phr_exists_elim           -> EcPhlExists.t_hr_exists_elim
-    | Phr_exists_intro fs       -> EcPhlExists.process_exists_intro fs
+    | Phrex_elim                -> EcPhlExists.t_hr_exists_elim
+    | Phrex_intro fs            -> EcPhlExists.process_exists_intro fs
     | Pexfalso                  -> EcPhlAuto.t_exfalso
     | Pbydeno (mode, info)      -> EcPhlDeno.process_deno mode info
     | PPr pr                    -> EcPhlPr.process_ppr pr
@@ -199,7 +199,7 @@ and process_sub (ttenv : ttenv) tts tc =
 (* -------------------------------------------------------------------- *)
 and process_expect (ttenv : ttenv) (t, n) tc =
   if FApi.tc_count tc <> n then
-    tc_error !$tc "expecting exactly %d subgoal(s)" n;
+    tc_error !$tc "expecting exactly %d subgoal(s), got %d" n (FApi.tc_count tc);
   FApi.t_onall (process1 ttenv t) tc
 
 (* -------------------------------------------------------------------- *)

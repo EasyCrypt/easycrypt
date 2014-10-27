@@ -26,6 +26,21 @@ let () =
     EcPException.register pp
 
 (* -------------------------------------------------------------------- *)
+type side  = [`Left | `Right]
+type oside = side option
+
+let side2str (side : side) =
+  match side with
+  | `Left  -> "left"
+  | `Right -> "right"
+
+let negside (side : side) : side =
+  match side with `Left -> `Right | `Right -> `Left
+
+let sideif (side : side) xt xf =
+  match side with `Left -> xt | `Right -> xf
+
+(* -------------------------------------------------------------------- *)
 let qsymb_of_symb (x : symbol) : qsymbol = ([], x)
 
 (* -------------------------------------------------------------------- *)
@@ -343,9 +358,7 @@ type pterm = {
 (* -------------------------------------------------------------------- *)
 type 'a doption =
   | Single of 'a
-  | Double of 'a * 'a
-
-type tac_side = bool option
+  | Double of ('a * 'a)
 
 type swap_kind =
   | SKbase      of int * int * int
@@ -368,11 +381,6 @@ type call_info =
   | CI_inv  of pformula
   | CI_upto of (pformula * pformula * pformula option)
 
-(* AppSingle are optional for bounded Phl judgments
-   AppMult is required by most general rule for upper bounded Phl
-   AppNone is required for the rest of judgments
-*)
-
 type p_app_bd_info =
   | PAppNone
   | PAppSingle of pformula
@@ -390,7 +398,7 @@ type pfel_spec_preds = (pgamepath*pformula) list
 
 type trans_kind =
   | TKfun  of pgamepath
-  | TKstmt of tac_side * pstmt
+  | TKstmt of oside * pstmt
 
 type trans_info =
   trans_kind * pformula * pformula * pformula * pformula
@@ -404,37 +412,61 @@ type bdh_split =
   | BDH_split_or_case of pformula * pformula * pformula
   | BDH_split_not of pformula option * pformula
 
-type phlfun = [
+type fun_info = [
   | `Def
   | `Code
   | `Abs  of pformula
   | `Upto of pformula * pformula * pformula option
 ]
 
+type app_info = 
+  oside * tac_dir * int doption * pformula doption * p_app_bd_info
+
+type pcond_info = [
+  | `Head of oside
+  | `Seq  of oside * int option * int option * pformula
+  | `SeqOne of side * int option * pformula * pformula
+]
+
+type while_info = {
+  wh_inv  : pformula;
+  wh_vrnt : pformula option;
+  wh_bds  : pformula pair option;
+}
+
+type inline_info = [
+  | `ByName    of oside * (pgamepath list * int list option)
+  | `ByPattern of pipattern
+  | `All       of oside
+]
+
+type conseq_info =
+  bool * (ccfpattern option * ccfpattern option * ccfpattern option)
+
 type phltactic =
-  | Pfun        of phlfun
+  | Pfun        of fun_info
   | Pskip
-  | Papp        of (tac_dir * int doption * pformula * p_app_bd_info)
+  | Papp        of app_info
   | Pwp         of int doption option
   | Psp         of int doption option
-  | Pwhile      of tac_side * (pformula * pformula option * (pformula * pformula) option)
-  | Pfission    of (tac_side * codepos * (int * (int * int)))
-  | Pfusion     of (tac_side * codepos * (int * (int * int)))
-  | Punroll     of (tac_side * codepos)
-  | Psplitwhile of (pexpr * tac_side * codepos )
-  | Pcall       of tac_side * call_info fpattern
-  | Prcond      of (bool option * bool * int)
-  | Pcond       of tac_side
-  | Pswap       of ((tac_side * swap_kind) located list)
-  | Pcfold      of (tac_side * codepos * int option)
-  | Pinline     of pinline_arg
-  | Pkill       of (tac_side * codepos * int option)
-  | Prnd        of tac_side * (pformula, pformula option, pformula) rnd_tac_info
-  | Palias      of (tac_side * codepos * psymbol option)
-  | Pset        of (tac_side * codepos * bool * psymbol * pexpr)
-  | Pconseq     of bool * (ccfpattern option * ccfpattern option * ccfpattern option)
-  | Phr_exists_elim
-  | Phr_exists_intro of pformula list
+  | Pwhile      of (oside * while_info)
+  | Pfission    of (oside * codepos * (int * (int * int)))
+  | Pfusion     of (oside * codepos * (int * (int * int)))
+  | Punroll     of (oside * codepos)
+  | Psplitwhile of (pexpr * oside * codepos)
+  | Pcall       of oside * call_info fpattern
+  | Prcond      of (oside * bool * int)
+  | Pcond       of pcond_info 
+  | Pswap       of ((oside * swap_kind) located list)
+  | Pcfold      of (oside * codepos * int option)
+  | Pinline     of inline_info
+  | Pkill       of (oside * codepos * int option)
+  | Prnd        of oside * (pformula, pformula option, pformula) rnd_tac_info
+  | Palias      of (oside * codepos * psymbol option)
+  | Pset        of (oside * codepos * bool * psymbol * pexpr)
+  | Pconseq     of conseq_info
+  | Phrex_elim
+  | Phrex_intro of pformula list
   | Pexfalso
   | Pbydeno       of ([`PHoare | `Equiv ] * cfpattern)
   | PPr           of (pformula * pformula) option
@@ -447,7 +479,7 @@ type phltactic =
   | Pbdhoare_split of bdh_split
 
     (* Eager *)
-  | Peager_seq       of (eager_info * (int * int) * pformula)
+  | Peager_seq       of (eager_info * int pair * pformula)
   | Peager_if
   | Peager_while     of eager_info
   | Peager_fun_def
@@ -456,14 +488,10 @@ type phltactic =
   | Peager           of (eager_info * pformula)
 
     (* Relation between logic *)
-  | Pbd_equiv of (bool * pformula * pformula)
+  | Pbd_equiv of (side * pformula * pformula)
+
     (* Automation *)
   | Pauto
-
-and pinline_arg =
-  [ `ByName    of tac_side * (pgamepath list * int list option)
-  | `ByPattern of pipattern
-  | `All       of tac_side ]
 
 type trepeat = [`All | `Maybe] * int option
 type tfocus  = (int option * int option) * [`Include | `Exclude]
@@ -516,6 +544,7 @@ type ppgoption = [
   | `Split
   | `Solve
   | `Subst
+  | `Disjunctive
 ]
 
 type ppgoptions = (bool * ppgoption) list
@@ -536,7 +565,7 @@ type logtactic =
   | Pcongr
   | Pelim       of (genpattern list * pqsymbol option)
   | Papply      of (ffpattern * [`Apply of psymbol option | `Exact])
-  | Pcut        of (intropattern * pformula * ptactic_core option)
+  | Pcut        of (intropattern * pformula * ptactics located option)
   | Pcutdef     of (intropattern * pterm)
   | Pgeneralize of genpattern list
   | Pclear      of psymbol list
@@ -551,9 +580,9 @@ and ptactic_core_r =
   | Pidtac      of string option
   | Pdo         of trepeat * ptactic_core
   | Ptry        of ptactic_core
-  | Pby         of (ptactic list) option
+  | Pby         of (ptactics) option
   | Por         of ptactic * ptactic
-  | Pseq        of ptactic list
+  | Pseq        of ptactics
   | Pcase       of genpattern list
   | Plogic      of logtactic
   | PPhl        of phltactic
@@ -569,8 +598,10 @@ and ptactic = {
   pt_intros : intropattern;
 }
 
+and ptactics = ptactic list
+
 and ptactic_chain =
-  | Psubtacs of ptactic list
+  | Psubtacs of ptactics
   | Pfirst   of ptactic * int
   | Plast    of ptactic * int
   | Pexpect  of ptactic * int

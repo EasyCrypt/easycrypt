@@ -18,10 +18,10 @@ module Zpr = EcMatching.Zipper
 module TTC = EcProofTyping
 
 (* -------------------------------------------------------------------- *)
-type fission_t    = bool option * codepos * (int * (int * int))
-type fusion_t     = bool option * codepos * (int * (int * int))
-type unroll_t     = bool option * codepos
-type splitwhile_t = pexpr * bool option * codepos
+type fission_t    = oside * codepos * (int * (int * int))
+type fusion_t     = oside * codepos * (int * (int * int))
+type unroll_t     = oside * codepos
+type splitwhile_t = pexpr * oside * codepos
 
 (* -------------------------------------------------------------------- *)
 let check_independence (pf, hyps) b init c1 c2 c3 =
@@ -164,7 +164,7 @@ let splitwhile_stmt b (pf, _) me i =
   match i.i_node with
   | Swhile (e, sw) ->
       let op_ty  = toarrow [tbool; tbool] tbool in
-      let op_and = e_op EcCoreLib.p_and [] op_ty in
+      let op_and = e_op EcCoreLib.CI_Bool.p_and [] op_ty in
       let e = e_app op_and [e; b] tbool in
         (me, [i_while (e, sw); i])
 

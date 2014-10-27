@@ -4,6 +4,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
+open EcParsetree
 open EcUtils
 open EcMaps
 open EcTypes
@@ -172,10 +173,10 @@ let t_inline_equiv_r side sp tc =
   let equiv = tc1_as_equivS tc in
   let concl =
     match side with
-    | true  ->
+    | `Left  ->
         let (me, stmt) = LowInternal.inline tc equiv.es_ml sp equiv.es_sl in
           f_equivS_r { equiv with es_ml = me; es_sl = stmt; }
-    | false ->
+    | `Right ->
         let (me, stmt) = LowInternal.inline tc equiv.es_mr sp equiv.es_sr in
           f_equivS_r { equiv with es_mr = me; es_sr = stmt; }
   in
@@ -280,12 +281,12 @@ let rec process_inline_all side fs tc =
   match concl.f_node, side with
   | FequivS _, None ->
       FApi.t_seq
-        (process_inline_all (Some true ) fs)
-        (process_inline_all (Some false) fs)
+        (process_inline_all (Some `Left ) fs)
+        (process_inline_all (Some `Right) fs)
         tc
 
   | FequivS es, Some b -> begin
-      let st = if b then es.es_sl else es.es_sr in
+      let st = sideif b es.es_sl es.es_sr in
       match HiInternal.pat_all env fs st with
       | [] -> t_id tc
       | sp -> FApi.t_seq
@@ -326,7 +327,7 @@ let process_inline_occs side fs occs tc =
 
   match concl.f_node, side with
   | FequivS es, Some b ->
-      let st = if b then es.es_sl else es.es_sr in
+      let st = sideif b es.es_sl es.es_sr in
       let sp = HiInternal.pat_of_occs cond occs st in
         t_inline_equiv b sp tc
 

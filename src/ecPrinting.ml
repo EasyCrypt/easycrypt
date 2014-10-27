@@ -82,15 +82,16 @@ module PPEnv = struct
       || (EcEnv.Var.lookup_progvar_opt ([], name) env <> None)
       || (in_memories name)
 
-  let add_local ppe =
+  let add_local ?(force = false) ppe =
     fun id ->
       let name = ref (EcIdent.name id) in
       let i    = ref 0 in
 
-        while inuse ppe !name do
-          name := Printf.sprintf "%s%d" (EcIdent.name id) !i;
-          incr i
-        done;
+        if not force then
+          while inuse ppe !name do
+            name := Printf.sprintf "%s%d" (EcIdent.name id) !i;
+            incr i
+          done;
 
       let ppe =
         { ppe with
@@ -99,11 +100,11 @@ module PPEnv = struct
       in
         ppe
 
-  let add_locals ppe xs = List.fold_left add_local ppe xs
+  let add_locals ?force ppe xs = List.fold_left (add_local ?force) ppe xs
 
-  let add_mods ppe xs mt =
+  let add_mods ?force ppe xs mt =
     (* TODO B : this is costly *)
-    let ppe = add_locals ppe xs in
+    let ppe = add_locals ?force ppe xs in
     { ppe with ppe_env =
         List.fold_left (fun e x ->
           EcEnv.Mod.bind_local x mt (EcPath.Sx.empty, EcPath.Sm.empty) e)
@@ -139,28 +140,35 @@ module PPEnv = struct
       p_shorten exists p
 
   let op_symb (ppe : t) p info =
+    let specs = [1, EcPath.pqoname (EcPath.prefix EcCoreLib.CI_Bool.p_eq) "<>"] in
+
     let lookup =
       match info with
-      | None -> fun sm -> EcEnv.Op.lookup_path sm ppe.ppe_env
+      | None -> fun sm ->
+          EcEnv.Op.lookup_path sm ppe.ppe_env
+
       | Some (mode, typ, dom) ->
           let filter =
             match mode with
             | `Expr -> fun op -> not (EcDecl.is_pred op)
             | `Form -> fun _  -> true
           in
-          let tvi    = Some (EcUnify.TVIunamed typ) in
+          let tvi = Some (EcUnify.TVIunamed typ) in
 
         fun sm ->
           let ue = EcUnify.UniEnv.create None in
           match  EcUnify.select_op ~filter tvi ppe.ppe_env sm ue dom with
-          | [(p1,_), _, _] -> p1
+          | [(p1, _), _, _] -> p1
           | _ -> raise (EcEnv.LookupFailure (`QSymbol sm)) in
 
     let exists sm =
         try  EcPath.p_equal (lookup sm) p
         with EcEnv.LookupFailure _ -> false
     in
-      p_shorten exists p
+      (* FIXME: for special operators, do check `info` *)
+      if   List.exists (fun (_, sp) -> EcPath.p_equal sp p) specs
+      then ([], EcPath.basename p)
+      else p_shorten exists p
 
   let th_symb (ppe : t) p =
     let exists sm =
@@ -487,7 +495,7 @@ let maybe_paren (onm, (outer, side)) (inm, inner) pp =
     match inm <> [] && inm <> onm with
     | false -> pp_maybe_paren (not (noparens inner outer side)) pp
     | true  ->
-        let inm = if inm = [EcCoreLib.id_top] then ["top"] else inm in
+        let inm = if inm = [EcCoreLib.i_top] then ["top"] else inm in
           fun fmt x ->
             Format.fprintf fmt "(%a)%%%s" pp x (String.concat "." inm)
 
@@ -555,7 +563,7 @@ let priority_of_binop name =
 
 (* -------------------------------------------------------------------- *)
 let priority_of_unop =
-  let id_not = EcPath.basename EcCoreLib.p_not in
+  let id_not = EcPath.basename EcCoreLib.CI_Bool.p_not in
     fun name ->
       match EcIo.lex_single_token name with
       | Some EP.NOT      -> Some e_uni_prio_not
@@ -931,7 +939,7 @@ and try_pp_expr_chained_orderings (ppe : PPEnv.t) outer fmt e =
   let rec collect acc le e =
     match e.e_node with
     | Eapp ({ e_node = Eop (op, []) }, [e1; e2])
-        when EcPath.p_equal op EcCoreLib.p_anda
+        when EcPath.p_equal op EcCoreLib.CI_Bool.p_anda
       -> begin
         match e2.e_node with
         | Eapp ({ e_node = Eop (op, tvi) }, [i1; i2])
@@ -994,6 +1002,14 @@ and pp_expr_core_r (ppe : PPEnv.t) outer fmt (e : expr) =
       with NoProjArg ->
         pp_proji ppe pp_expr_r (fst outer) fmt (e1, i)
     end
+
+  | Eapp ({e_node = Eop (op, _)},
+            [{e_node = Eapp ({e_node = Eop (op', tys)}, [f1; f2])}])
+      when EcPath.p_equal op  EcCoreLib.CI_Bool.p_not
+        && EcPath.p_equal op' EcCoreLib.CI_Bool.p_eq
+    ->
+      let negop = EcPath.pqoname (EcPath.prefix op') "<>" in
+      pp_opapp ppe e_ty pp_expr_r outer fmt (`Expr, negop, tys, [f1; f2])
 
   | Eapp ({e_node = Eop (op, tys) }, args) ->
       pp_opapp ppe e_ty pp_expr_r outer fmt (`Expr, op, tys, args)
@@ -1233,7 +1249,7 @@ and try_pp_chained_orderings (ppe : PPEnv.t) outer fmt f =
 
   let rec collect acc le f =
     match sform_of_form f with
-    | SFand (true, (f1, f2)) -> begin
+    | SFand (`Asym, (f1, f2)) -> begin
         match f2.f_node with
         | Fapp ({ f_node = Fop (op, tvi) }, [i1; i2])
             when isordering op
@@ -1328,6 +1344,14 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
   | Fop (op, tvi) ->
       pp_opapp ppe f_ty pp_form_r outer fmt (`Form, op, tvi, [])
 
+  | Fapp ({f_node = Fop (op, _)},
+            [{f_node = Fapp ({f_node = Fop (op', tys)}, [f1; f2])}])
+      when EcPath.p_equal op  EcCoreLib.CI_Bool.p_not
+        && EcPath.p_equal op' EcCoreLib.CI_Bool.p_eq
+    ->
+      let negop = EcPath.pqoname (EcPath.prefix op') "<>" in
+      pp_opapp ppe f_ty pp_form_r outer fmt (`Form, negop, tys, [f1; f2])
+
   | Fapp ({f_node = Fop (p, tys)}, args) ->
       pp_opapp ppe f_ty pp_form_r outer fmt (`Form, p, tys, args)
 
@@ -1411,19 +1435,19 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
         (string_of_hcmp hs.bhs_cmp)
         (pp_form_r ppe (fst outer, (max_op_prec,`NonAssoc))) hs.bhs_bd
 
-  | Fpr (m, f, args, ev) ->
-      let ppe = PPEnv.create_and_push_mem ppe ~active:true (EcFol.mhr, f) in
+  | Fpr pr->
+      let ppe = PPEnv.create_and_push_mem ppe ~active:true (EcFol.mhr, pr.pr_fun) in
       Format.fprintf fmt "Pr[@[%a@[%t@] @@ %a :@ %a@]]"
-        (pp_funname ppe) f
-        (match args.f_node with
+        (pp_funname ppe) pr.pr_fun
+        (match pr.pr_args.f_node with
          | Ftuple _ ->
-             (fun fmt -> pp_form ppe fmt args)
-         | _ when EcFol.f_equal f_tt args ->
+             (fun fmt -> pp_form ppe fmt pr.pr_args)
+         | _ when EcFol.f_equal f_tt pr.pr_args ->
              (fun fmt -> pp_string fmt "()")
          | _ ->
-             (fun fmt -> Format.fprintf fmt "(%a)" (pp_form ppe) args))
-        (pp_local ppe) m
-        (pp_form ppe) ev
+             (fun fmt -> Format.fprintf fmt "(%a)" (pp_form ppe) pr.pr_args))
+        (pp_local ppe) pr.pr_mem
+        (pp_form ppe) pr.pr_event
 
 and pp_form_r (ppe : PPEnv.t) outer fmt f =
   let printers =
@@ -1509,7 +1533,7 @@ let pp_opdecl_pr (ppe : PPEnv.t) fmt (x, ts, ty, op) =
             | Fquant (Llambda, vds, f) -> (vds, f)
             | _ -> ([], f) in
 
-          let vds = List.map (snd_map EcFol.destr_gty) vds in
+          let vds = List.map (snd_map EcFol.gty_as_ty) vds in
             (pp_locbinds ppe vds, f)
         in
           Format.fprintf fmt "%t =@ %a" pp_vds (pp_form subppe) f
@@ -1963,11 +1987,13 @@ let pp_goal (ppe : PPEnv.t) fmt (n, (hyps, concl)) =
     let ppe =
       match k with
       | EcBaseLogic.LD_mem (Some m) ->
-        let ppe = PPEnv.add_local ppe id in
-        PPEnv.create_and_push_mem ppe (id, EcMemory.lmt_xpath m)
+          let ppe = PPEnv.add_local ~force:true ppe id in
+          PPEnv.create_and_push_mem ppe (id, EcMemory.lmt_xpath m)
+
       | EcBaseLogic.LD_modty (p,_) ->
-        PPEnv.add_mods ppe [id] p
-      | _ -> PPEnv.add_local ppe id
+          PPEnv.add_mods ~force:true ppe [id] p
+
+      | _ -> PPEnv.add_local ~force:true ppe id
 
     and dk fmt =
         match k with

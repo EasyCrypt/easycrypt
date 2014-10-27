@@ -6,8 +6,11 @@
 (* -------------------------------------------------------------------- *)
 open EcLocation
 open EcParsetree
+open EcFol
+open EcEnv
 open EcCoreGoal
 open EcCoreGoal.FApi
+open EcProofTerm
 
 (* -------------------------------------------------------------------- *)
 type ttenv = {
@@ -19,7 +22,7 @@ type smtinfo = pdbhint option * pprover_infos
 type engine  = ptactic_core -> backward
 
 (* -------------------------------------------------------------------- *)
-type cut_t    = intropattern * pformula * ptactic_core option
+type cut_t    = intropattern * pformula * (ptactics located) option
 type cutdef_t = intropattern * pterm
 type apply_t  = ffpattern * [`Apply of psymbol option | `Exact]
 
@@ -30,7 +33,19 @@ end
 
 (* -------------------------------------------------------------------- *)
 module LowRewrite : sig
-  val t_rewrite : [`LtoR|`RtoL] * EcMatching.occ option -> proofterm -> backward
+  type error =
+  | LRW_NotAnEquation
+  | LRW_NothingToRewrite
+  | LRW_InvalidOccurence
+  | LRW_CannotInfer
+
+  exception RewriteError of error
+
+  val find_rewrite_pattern:
+    rwside -> LDecl.hyps -> pt_ev -> pt_ev * (form * form)
+
+  val t_rewrite:
+    rwside * EcMatching.occ option -> proofterm -> backward
 
   val t_autorewrite: EcPath.path list -> backward
 end

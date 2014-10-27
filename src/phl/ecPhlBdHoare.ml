@@ -229,12 +229,12 @@ let process_bdhoare_split info tc =
 
       t_conseq
         (f_or (f_and f po) (f_and (f_not f) po))
-        (EcCoreLib.mk_logic "orDandN")
+        (EcCoreLib.CI_Logic.mk_logic "orDandN")
         (FApi.t_on1seq 3
            (t_bdhoare_or b1 b2 f_r0)
            (t_conseq
               f_false
-              (EcCoreLib.mk_logic "andDorN")
+              (EcCoreLib.CI_Logic.mk_logic "andDorN")
               EcPhlAuto.t_trivial))
         tc
 

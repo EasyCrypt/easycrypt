@@ -476,7 +476,7 @@ module FApi = struct
     tc_up (tt (tc_down tc))
 
   (* ------------------------------------------------------------------ *)
-  let on_sub_goals (tt : backward) (hds : handle list) (pe : proofenv) =
+  let on_sub1_goals (tt : backward) (hds : handle list) (pe : proofenv) =
     let do1 pe hd =
       let tc = tt (tcenv1_of_penv hd pe) in
       assert (tc.tce_tcenv.tce_ctxt = []);
@@ -484,9 +484,17 @@ module FApi = struct
     List.map_fold do1 pe hds
 
   (* ------------------------------------------------------------------ *)
+  let on_sub_goals (tt : backward list) (hds : handle list) (pe : proofenv) =
+    let do1 pe tt hd =
+      let tc = tt (tcenv1_of_penv hd pe) in
+      assert (tc.tce_tcenv.tce_ctxt = []);
+      (tc_penv tc, tc_opened tc) in
+    List.map_fold2 do1 pe tt hds
+
+  (* ------------------------------------------------------------------ *)
   let t_onall (tt : backward) (tc : tcenv) =
     let pe      = tc.tce_tcenv.tce_penv in
-    let pe, ln  = on_sub_goals tt (tc_opened tc) pe in
+    let pe, ln  = on_sub1_goals tt (tc_opened tc) pe in
     let ln      = List.flatten ln in
     tcenv_of_penv ~ctxt:tc.tce_tcenv.tce_ctxt ln pe
 
@@ -494,23 +502,39 @@ module FApi = struct
   let t_firsts (tt : backward) (i : int) (tc : tcenv) =
     if i < 0 then invalid_arg "EcCoreGoal.firsts";
     let (ln1, ln2) = List.take_n i (tc_opened tc) in
-    let pe, ln1    = on_sub_goals tt ln1 tc.tce_tcenv.tce_penv in
+    let pe, ln1    = on_sub1_goals tt ln1 tc.tce_tcenv.tce_penv in
     let handles    = (List.flatten (ln1 @ [ln2])) in
     tcenv_of_penv ~ctxt:tc.tce_tcenv.tce_ctxt handles pe
 
   (* ------------------------------------------------------------------ *)
   let t_lasts (tt : backward) (i : int) (tc : tcenv) =
-    if i < 0 then invalid_arg "EcCoreGoal.firsts";
+    if i < 0 then invalid_arg "EcCoreGoal.lasts";
     let handles    = tc_opened tc in
     let nhandles   = List.length handles in
     let (ln1, ln2) = List.take_n (max 0 (nhandles-i)) handles in
-    let pe, ln2    = on_sub_goals tt ln2 tc.tce_tcenv.tce_penv in
+    let pe, ln2    = on_sub1_goals tt ln2 tc.tce_tcenv.tce_penv in
     let handles    = (List.flatten (ln1 :: ln2)) in
     tcenv_of_penv ~ctxt:tc.tce_tcenv.tce_ctxt handles pe
 
   (* ------------------------------------------------------------------ *)
   let t_first (tt : backward) (tc : tcenv) = t_firsts tt 1 tc
   let t_last  (tt : backward) (tc : tcenv) = t_lasts  tt 1 tc
+
+  (* ------------------------------------------------------------------ *)
+  let t_subfirsts (tt : backward list) (tc : tcenv) =
+    let (ln1, ln2) = List.take_n (List.length tt) (tc_opened tc) in
+    let pe, ln1    = on_sub_goals tt ln1 tc.tce_tcenv.tce_penv in
+    let handles    = (List.flatten (ln1 @ [ln2])) in
+    tcenv_of_penv ~ctxt:tc.tce_tcenv.tce_ctxt handles pe
+
+  (* ------------------------------------------------------------------ *)
+  let t_sublasts (tt : backward list) (tc : tcenv) =
+    let handles    = tc_opened tc in
+    let nhandles   = List.length handles in
+    let (ln1, ln2) = List.take_n (max 0 (nhandles-(List.length tt))) handles in
+    let pe, ln2    = on_sub_goals tt ln2 tc.tce_tcenv.tce_penv in
+    let handles    = (List.flatten (ln1 :: ln2)) in
+    tcenv_of_penv ~ctxt:tc.tce_tcenv.tce_ctxt handles pe
 
   (* ------------------------------------------------------------------ *)
   let t_sub (ts : backward list) (tc : tcenv) =
@@ -607,10 +631,11 @@ module FApi = struct
     | `Success tc -> tc
 
   (* ------------------------------------------------------------------ *)
-  let t_switch tt ~ifok ~iffail tc =
-    match t_try_base tt tc with
-    | `Failure _  -> iffail tc
-    | `Success tc -> t_focus ifok tc
+  let t_switch ?(on = `Focus) tt ~ifok ~iffail tc =
+    match on, t_try_base tt tc with
+    | _     , `Failure _  -> iffail tc
+    | `All  , `Success tc -> t_onall ifok tc
+    | `Focus, `Success tc -> t_focus ifok tc
 
   (* ------------------------------------------------------------------ *)
   let t_do_r ?focus b omax t tc =

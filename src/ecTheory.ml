@@ -8,7 +8,6 @@ open EcUtils
 open EcSymbols
 open EcPath
 open EcDecl
-
 open EcModules
 
 (* -------------------------------------------------------------------- *)

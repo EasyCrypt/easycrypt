@@ -42,4 +42,4 @@ let t_equiv_sym tc =
   match (FApi.tc1_goal tc).f_node with
   | FequivF _ -> t_equivF_sym tc
   | FequivS _ -> t_equivS_sym tc
-  | _ -> tc_error_notphl !!tc None      (* FIXME *)
+  | _ -> tc_error_noXhl ~kinds:[`Equiv `Any] !!tc

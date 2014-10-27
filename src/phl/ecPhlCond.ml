@@ -60,13 +60,14 @@ let rec t_equiv_cond side tc =
   match side with
   | Some s ->
       let e =
-        if s then
+        match s with
+        | `Left ->
           let (e,_,_) = fst (tc1_first_if tc es.es_sl) in
           form_of_expr (EcMemory.memory es.es_ml) e
-        else
+        | `Right ->
           let (e,_,_) = fst (tc1_first_if tc es.es_sr) in
-          form_of_expr (EcMemory.memory es.es_mr) e in
-      LowInternal.t_gen_cond side e tc
+          form_of_expr (EcMemory.memory es.es_mr) e
+      in LowInternal.t_gen_cond side e tc
 
   | None ->
       let el,_,_ = fst (tc1_first_if tc es.es_sl) in
@@ -98,26 +99,36 @@ let rec t_equiv_cond side tc =
         FApi.t_on1seq 1 (t_cut fiff)
           (t_intros_i_seq [hiff]
              (FApi.t_seqsub
-                (t_equiv_cond (Some true))
+                (t_equiv_cond (Some `Left))
                 [FApi.t_seqsub
-                   (EcPhlRCond.Low.t_equiv_rcond false true  1)
+                   (EcPhlRCond.Low.t_equiv_rcond `Right true  1)
                    [t_aux; t_clear hiff];
                  FApi.t_seqsub
-                   (EcPhlRCond.Low.t_equiv_rcond false false 1)
+                   (EcPhlRCond.Low.t_equiv_rcond `Right false 1)
                    [t_aux; t_clear hiff]]))
           tc
 
 (* -------------------------------------------------------------------- *)
-let process_cond side tc =
-  let concl = FApi.tc1_goal tc in
+let process_cond info tc =
+  let default_if i s = ofdfl (fun _ -> tc1_pos_last_if tc s) i in
+  
+  match info with
+  | `Head side ->
+    t_hS_or_bhS_or_eS ~th:t_hoare_cond ~tbh:t_bdhoare_cond ~te:(t_equiv_cond side) tc
 
-  if   is_equivS concl
-  then t_equiv_cond side tc
-  else begin
-    if not (is_none side) then
-      tc_error !!tc "unexpected side in non relational goal";
+  | `Seq (side, i1, i2, f) -> 
+    let es = tc1_as_equivS tc in
+    let f  = EcProofTyping.tc1_process_prhl_formula tc f in
+    let n1 = default_if i1 es.es_sl in
+    let n2 = default_if i2 es.es_sr in
+    FApi.t_seqsub (EcPhlApp.t_equiv_app (n1,n2) f)
+      [ t_id; t_equiv_cond side ] tc
 
-         if is_hoareS   concl then t_hoare_cond   tc
-    else if is_bdHoareS concl then t_bdhoare_cond tc
-    else tc_error !!tc "the conclusion is not a hoare or a equiv goal"
-  end
+  | `SeqOne (s, i, f1, f2) -> 
+    let es = tc1_as_equivS tc in
+    let n = default_if i (match s with `Left -> es.es_sl | `Right -> es.es_sr) in
+    let f1 = EcProofTyping.tc1_process_phl_formula ~side:s tc f1 in
+    let f2 = EcProofTyping.tc1_process_phl_formula ~side:s tc f2 in
+    FApi.t_seqsub
+      (EcPhlApp.t_equiv_app_onesided s n f1 f2)
+      [ t_id; t_bdhoare_cond] tc

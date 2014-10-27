@@ -134,7 +134,7 @@ let t_field_neq r g =
         begin match destr_neq f with
         | Some (f1',f2') when EcReduction.EqTest.for_type env f1'.f_ty ty ->
           Some (t_seqsub 
-                  (t_apply_s EcCoreLib.p_negbTE [] ~args:[f_eq f1' f2'] ~sk:2)
+                  (t_apply_s EcCoreLib.CI_Logic.p_negbTE [] ~args:[f_eq f1' f2'] ~sk:2)
                   [ t_apply_hyp id;
                     t_ring r [(f1,f2)] (f1', f2')])
         | _ -> None

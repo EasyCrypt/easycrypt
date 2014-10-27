@@ -84,6 +84,13 @@ val destr_if     : instr -> expr * stmt * stmt
 val destr_while  : instr -> expr * stmt
 val destr_assert : instr -> expr
 
+val is_asgn   : instr -> bool
+val is_rnd    : instr -> bool
+val is_call   : instr -> bool
+val is_if     : instr -> bool
+val is_while  : instr -> bool
+val is_assert : instr -> bool 
+
 (* -------------------------------------------------------------------- *)
 type variable = {
   v_name : symbol;

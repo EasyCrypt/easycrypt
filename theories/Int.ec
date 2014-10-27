@@ -263,7 +263,7 @@ theory ForLoop.
   cut: (j-i) = (j-i) by trivial.          (* missing move: on pseudo proof-terms *)
   generalize {2 3}(j-i) => n.             (* missing negative pattern selector *)
   intros=> eq_iBj_n gt0_n; generalize i j eq_iBj_n.
-  cut ge0_n: 0 <= n by smt; generalize ge0_n gt0_n st.
+  cut ge0_n: 0 <= n by smt. generalize ge0_n gt0_n st.
   elim/Induction.induction n; first smt.
   intros=> n ge0_n IH _ st i j.
   case (n = 0); first intros=> -> h.
@@ -280,7 +280,7 @@ theory ForLoop.
   proof strict.
   case (i < j)=> i_j; last smt.
   pose n := j - i; cut ->: j = n + i by smt.
-  cut: 0 <= n by smt; elim/Induction.induction n;first by smt.
+  cut: 0 <= n by smt. elim/Induction.induction n;first by smt.
   intros i0 Hi0 Hrec;rewrite range_ind_lazy;smt.
   qed.
 
@@ -291,11 +291,10 @@ theory ForLoop.
   proof strict.
   intros=> h; case (0 = j - i)=> h2; first smt.
   pose k:= j - i - 1; cut {1 3}->: j = k + i + 1 by smt.
-  cut: k < j - i by smt; cut: 0 <= k by smt.
+  cut: k < j - i by smt. cut: 0 <= k by smt.
   by elim/Induction.induction k; smt.
   qed.
 
   axiom range_add i j1 j2 (a:'a) f : 0 <= j1 => 0 <= j2 => i <= j1 =>
     range i (j1 + j2) a f = range (i+j1) (j1 + j2) (range i j1 a f) f.
-
 end ForLoop.

@@ -10,7 +10,7 @@ open EcModules
 open EcTypes
 open EcTheory
 open EcDecl
-open EcFol
+open EcCoreFol
 
 (* -------------------------------------------------------------------- *)
 type subst_name_clash = [

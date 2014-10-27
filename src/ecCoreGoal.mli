@@ -278,6 +278,8 @@ module FApi : sig
   val t_on1      : int -> ?ttout:backward -> backward -> tactical
   val t_firsts   : backward -> int -> tactical
   val t_lasts    : backward -> int -> tactical
+  val t_subfirsts: backward list -> tactical
+  val t_sublasts : backward list -> tactical
   val t_first    : backward -> tactical
   val t_last     : backward -> tactical
   val t_rotate   : direction -> int -> tactical
@@ -291,7 +293,7 @@ module FApi : sig
   val t_on1seq : int -> backward -> ?ttout:backward -> backward -> backward
 
   val t_try    : backward -> backward
-  val t_switch : backward -> ifok:backward -> iffail:backward -> backward
+  val t_switch : ?on:[`All|`Focus] -> backward -> ifok:backward -> iffail:backward -> backward
   val t_do_r   : ?focus:int -> [`All | `Maybe] -> int option -> backward -> tcenv -> tcenv
   val t_do     : [`All | `Maybe] -> int option -> backward -> backward
   val t_repeat : backward -> backward

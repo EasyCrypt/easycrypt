@@ -603,8 +603,8 @@ let process_info info tc =
       let es    = tc1_as_equivS tc in
       let eqIs  = TTC.tc1_process_prhl_formula tc eqIs in
       let eqXs  = TTC.tc1_process_prhl_formula tc eqXs in
-      let s1    = TTC.tc1_process_prhl_stmt tc true s1 in
-      let s2    = TTC.tc1_process_prhl_stmt tc false s2 in
+      let s1    = TTC.tc1_process_prhl_stmt tc `Left  s1 in
+      let s2    = TTC.tc1_process_prhl_stmt tc `Right s2 in
       let f     = f_equivS es.es_ml es.es_mr eqIs s1 s2 eqXs in
       let h     = LDecl.fresh_id hyps (unloc h) in
       (FApi.t_last (t_intros_i [h]) (t_cut f tc), h)

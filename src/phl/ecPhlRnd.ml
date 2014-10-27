@@ -26,9 +26,9 @@ let wp_equiv_disj_rnd_r side tc =
   let env = FApi.tc1_env tc in
   let es  = tc1_as_equivS tc in
   let m,s =
-    if   side
-    then es.es_ml, es.es_sl
-    else es.es_mr, es.es_sr
+    match side with
+    | `Left  -> es.es_ml, es.es_sl
+    | `Right -> es.es_mr, es.es_sr
   in
 
   (* FIXME: exception when not rnds found *)
@@ -44,9 +44,9 @@ let wp_equiv_disj_rnd_r side tc =
   let post  = f_forall_simpl [(x_id,GTty ty_distr)] post in
   let post  = f_anda (f_eq (f_weight ty_distr distr) f_r1) post in
   let concl =
-    if   side
-    then f_equivS_r { es with es_sl=s; es_po=post; }
-    else f_equivS_r { es with es_sr=s; es_po=post; }
+    match side with
+    | `Left  -> f_equivS_r { es with es_sl=s; es_po=post; }
+    | `Right -> f_equivS_r { es with es_sr=s; es_po=post; }
   in
   FApi.xmutate1 tc `Rnd [concl]
 

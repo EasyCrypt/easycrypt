@@ -215,10 +215,10 @@ let toring hyps ((r, cr) : cring) (rmap : RState.rstate) (form : form) =
       | Fint n -> PEc (Big_int.big_int_of_int n)
       | Fapp ({f_node = Fop (p,_)}, [a1; a2]) -> begin
           match op_kind p with
-          | OK_int_add -> PEadd (of_int a1, of_int a2)
-          | OK_int_sub -> PEsub (of_int a1, of_int a2)
-          | OK_int_mul -> PEmul (of_int a1, of_int a2)
-          | OK_int_exp -> begin
+          | Some `Int_add -> PEadd (of_int a1, of_int a2)
+          | Some `Int_sub -> PEsub (of_int a1, of_int a2)
+          | Some `Int_mul -> PEmul (of_int a1, of_int a2)
+          | Some `Int_pow -> begin
               match a2.f_node with
               | Fint n when 0 <= n -> PEpow (of_int a1, n)
               | _ -> abstract ()
@@ -227,7 +227,7 @@ let toring hyps ((r, cr) : cring) (rmap : RState.rstate) (form : form) =
         end
       | Fapp ({f_node = Fop (p,_)}, [a]) -> begin
           match op_kind p with
-          | OK_int_opp -> PEsub (PEc c0, of_int a)
+          | Some `Int_opp -> PEsub (PEc c0, of_int a)
           | _ -> abstract ()
         end
       | _ -> abstract ()
@@ -282,10 +282,10 @@ let tofield hyps ((r, cr) : cfield) (rmap : RState.rstate) (form : form) =
     | Fint n -> FEc (Big_int.big_int_of_int n)
     | Fapp ({f_node = Fop (p,_)}, [a1; a2]) -> begin
         match op_kind p with
-        | OK_int_add -> FEadd (of_int a1, of_int a2)
-        | OK_int_sub -> FEsub (of_int a1, of_int a2)
-        | OK_int_mul -> FEmul (of_int a1, of_int a2)
-        | OK_int_exp -> begin
+        | Some `Int_add -> FEadd (of_int a1, of_int a2)
+        | Some `Int_sub -> FEsub (of_int a1, of_int a2)
+        | Some `Int_mul -> FEmul (of_int a1, of_int a2)
+        | Some `Int_pow -> begin
           match a2.f_node with
           | Fint n when 0 <= n -> FEpow (of_int a1, n)
           | _ -> abstract ()
@@ -294,7 +294,7 @@ let tofield hyps ((r, cr) : cfield) (rmap : RState.rstate) (form : form) =
       end 
     | Fapp({f_node = Fop (p,_)}, [a]) -> begin
         match op_kind p with
-        | OK_int_opp -> FEsub (FEc c0, of_int a)
+        | Some `Int_opp -> FEsub (FEc c0, of_int a)
         | _ -> abstract ()
       end
     | _ -> abstract ()

@@ -7,7 +7,7 @@
 open EcSymbols
 open EcModules
 open EcProvers
-open EcFol
+open EcCoreFol
 open EcBaseLogic
 
 (* -------------------------------------------------------------------- *)

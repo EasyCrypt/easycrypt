@@ -96,8 +96,8 @@
       pa_nosmt   = nosmt;
       pa_local   = local; }
 
-  let str_and b = if b then "&&" else "/\\"
-  let str_or  b = if b then "||" else "\\/"
+  let str_and = function `Asym -> "&&" | `Sym -> "/\\"
+  let str_or  = function `Asym -> "||" | `Sym -> "\\/"
 
   let mk_simplify l =
     if l = [] then
@@ -395,10 +395,10 @@
     { nm }
 
 | TOP
-    { [EcCoreLib.id_top] }
+    { [EcCoreLib.i_top] }
 
 | TOP DOT nm=rlist1(UIDENT, DOT)
-    { EcCoreLib.id_top :: nm }
+    { EcCoreLib.i_top :: nm }
 ;
 
 _genqident(X):
@@ -481,12 +481,12 @@ fident:
 
 (* -------------------------------------------------------------------- *)
 %inline or_:
-| ORA { true  }
-| OR  { false }
+| ORA { `Asym }
+| OR  { `Sym  }
 
 %inline and_:
-| ANDA { true  }
-| AND  { false }
+| ANDA { `Asym }
+| AND  { `Sym  }
 
 (* -------------------------------------------------------------------- *)
 pside_:
@@ -699,7 +699,7 @@ expr_chained_orderings:
 | e1=loc(expr_chained_orderings) op=loc(ordering_op) ti=tvars_app? e2=expr
     { let (lce1, (e1, le)) = (e1.pl_loc, unloc e1) in
       let loc = EcLocation.make $startpos $endpos in
-        (peapp_symb loc (str_and true) None
+        (peapp_symb loc (str_and `Asym) None
            [EcLocation.mk_loc lce1 e1;
             EcLocation.mk_loc loc
               (peapp_symb op.pl_loc (unloc op) ti [le; e2])],
@@ -929,7 +929,7 @@ form_chained_orderings(P):
 | f1=loc(form_chained_orderings(P)) op=loc(ordering_op) ti=tvars_app? f2=form_r(P)
     { let (lcf1, (f1, le)) = (f1.pl_loc, unloc f1) in
       let loc = EcLocation.make $startpos $endpos in
-        (pfapp_symb loc (str_and true) None
+        (pfapp_symb loc (str_and `Asym) None
            [EcLocation.mk_loc lcf1 f1;
             EcLocation.mk_loc loc
               (pfapp_symb op.pl_loc (unloc op) ti [le; f2])],
@@ -1870,13 +1870,13 @@ code_position:
 
 while_tac_info :
 | inv=sform
-    { (inv, None, None) }
+    { { wh_inv = inv; wh_vrnt = None; wh_bds = None; } }
 
 | inv=sform vrnt=sform
-    { (inv, Some vrnt, None) }
+    { { wh_inv = inv; wh_vrnt = Some vrnt; wh_bds = None; } }
 
 | inv=sform vrnt=sform k=sform eps=sform
-    { (inv, Some vrnt, Some (k,eps)) }
+    { { wh_inv = inv; wh_vrnt = Some vrnt; wh_bds = Some (k, eps); } }
 ;
 
 rnd_info:
@@ -1919,8 +1919,8 @@ int:
 side:
 | LBRACE n=uint RBRACE {
    match n with
-   | 1 -> true
-   | 2 -> false
+   | 1 -> `Left
+   | 2 -> `Right
    | _ -> parse_error
               (EcLocation.make $startpos $endpos)
               (Some "variable side must be 1 or 2")
@@ -2059,7 +2059,7 @@ logtactic:
 | CUT ip=intro_pattern* COLON p=form %prec prec_below_IMPL
    { Pcut (ip, p, None) }
 
-| CUT ip=intro_pattern* COLON p=form BY t=tactic_core
+| CUT ip=intro_pattern* COLON p=form BY t=loc(tactics)
    { Pcut (ip, p, Some t) }
 
 | CUT ip=intro_pattern* CEQ fp=pterm
@@ -2100,6 +2100,34 @@ eager_tac:
     { Peager (info, p) }
 ;
 
+form_or_double_form:
+| f=sform { Single f }
+| LPAREN UNDERSCORE COLON f1=form LONGARROW f2=form RPAREN { Double(f1,f2) }
+;
+
+code_pos:
+| i=uint { i }
+;
+
+code_pos_underscore:
+| UNDERSCORE { None }
+| i=code_pos { Some i} 
+;
+
+%inline if_option:
+| s=side?      
+   { `Head s } 
+
+| i1=code_pos_underscore i2=code_pos_underscore COLON f=sform
+   { `Seq (None, i1, i2, f) } 
+
+| s=side i1=code_pos_underscore i2=code_pos_underscore COLON f=sform 
+   { `Seq (Some s, i1, i2, f) }
+ 
+| s=side i=code_pos? COLON  LPAREN UNDERSCORE COLON f1=form LONGARROW f2=form RPAREN
+   { `SeqOne (s, i, f1, f2) } 
+;
+
 phltactic:
 | PROC
    { Pfun `Def }
@@ -2113,8 +2141,8 @@ phltactic:
 | PROC STAR
    { Pfun `Code }
 
-| SEQ d=tac_dir pos=code_position COLON p=sform f=app_bd_info
-   { Papp (d, pos, p, f) }
+| SEQ s=side? d=tac_dir pos=code_position COLON p=form_or_double_form f=app_bd_info
+   { Papp (s, d, pos, p, f) }
 
 | WP n=code_position?
    { Pwp n }
@@ -2137,8 +2165,8 @@ phltactic:
 | RCONDF s=side? i=uint
     { Prcond (s, false, i) }
 
-| IF s=side?
-    { Pcond s }
+| IF opt=if_option
+    { Pcond opt }
 
 | SWAP info=iplist1(loc(swap_info), COMMA) %prec prec_below_comma
     { Pswap info }
@@ -2228,10 +2256,10 @@ phltactic:
     { Pconseq(nm<>None, (None,None,Some info3)) }
 
 | ELIM STAR
-    { Phr_exists_elim }
+    { Phrex_elim }
 
 | EXIST STAR l=iplist1(sform, COMMA) %prec prec_below_comma
-    { Phr_exists_intro l }
+    { Phrex_intro l }
 
 | EXFALSO
     { Pexfalso }
@@ -2267,7 +2295,7 @@ phltactic:
     { Pbdhoare_split i }
 
 | PHOARE EQUIV s=side pr=sform po=sform
-    { Pbd_equiv(s, pr, po) }
+    { Pbd_equiv (s, pr, po) }
 
 | AUTO { Pauto }
 ;
@@ -2325,9 +2353,10 @@ pgoption:
 
 | b=boption(MINUS) x=pgoptionkw {
     match unloc x with
-    | "split"   -> (not b, `Split)
-    | "solve"   -> (not b, `Solve)
-    | "subst"   -> (not b, `Subst)
+    | "split"    -> (not b, `Split)
+    | "solve"    -> (not b, `Solve)
+    | "subst"    -> (not b, `Subst)
+    | "disjunct" -> (not b, `Disjunctive)
     | _ ->
         parse_error x.pl_loc
           (Some ("invalid option: " ^ (unloc x)))

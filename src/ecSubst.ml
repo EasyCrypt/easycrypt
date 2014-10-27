@@ -7,7 +7,7 @@
 open EcUtils
 open EcTypes
 open EcDecl
-open EcFol
+open EcCoreFol
 open EcModules
 open EcTheory
 

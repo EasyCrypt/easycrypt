@@ -60,7 +60,7 @@ exception FoundPr of form
 
 let select_pr on_ev sid f = 
   match f.f_node with
-  | Fpr(_,_,_,ev) -> 
+  | Fpr { pr_event = ev } ->
       if   on_ev ev && Mid.set_disjoint f.f_fv sid
       then raise (FoundPr f)
       else false
@@ -69,13 +69,13 @@ let select_pr on_ev sid f =
 let select_pr_cmp on_cmp sid f = 
   match f.f_node with
   | Fapp({f_node = Fop(op,_)},
-         [{f_node = Fpr(m1,f1,arg1,_)};
-          {f_node = Fpr(m2,f2,arg2,_)}]) ->
+         [{f_node = Fpr pr1};
+          {f_node = Fpr pr2}]) ->
 
       if    on_cmp op
-         && EcIdent.id_equal m1 m2
-         && EcPath.x_equal f1 f2
-         && f_equal arg1 arg2
+         && EcIdent.id_equal pr1.pr_mem  pr2.pr_mem
+         && EcPath.x_equal   pr1.pr_fun  pr2.pr_fun
+         && f_equal          pr1.pr_args pr2.pr_args
          && Mid.set_disjoint f.f_fv sid
       then raise (FoundPr f)
       else false
@@ -98,8 +98,8 @@ let t_pr_rewrite s tc =
       tc_error !!tc "do not reconize %s as a probability lemma" s in
   let select = 
     match kind with 
-    | `MuEq    -> select_pr_cmp (EcPath.p_equal EcCoreLib.p_eq)
-    | `MuSub   -> select_pr_cmp (EcPath.p_equal EcCoreLib.p_real_le)
+    | `MuEq    -> select_pr_cmp (EcPath.p_equal EcCoreLib.CI_Bool.p_eq)
+    | `MuSub   -> select_pr_cmp (EcPath.p_equal EcCoreLib.CI_Real.p_real_le)
     | `MuFalse -> select_pr is_false
     | `MuNot   -> select_pr is_not
     | `MuOr
@@ -117,9 +117,10 @@ let t_pr_rewrite s tc =
     match kind with
     | (`MuEq | `MuSub as kind) -> begin
       match torw.f_node with
-      | Fapp(_, [{f_node = Fpr(m,f,args,ev1)};
-                 {f_node = Fpr(_,_,_,ev2)}])
+      | Fapp(_, [{f_node = Fpr ({ pr_event = ev1 } as pr) };
+                 {f_node = Fpr ({ pr_event = ev2 }) };])
         -> begin
+          let { pr_mem = m; pr_fun = f; pr_args = args } = pr in
           match kind with
           | `MuEq  -> (pr_eq  env m f args ev1 ev2, 1)
           | `MuSub -> (pr_sub env m f args ev1 ev2, 1)
@@ -128,22 +129,23 @@ let t_pr_rewrite s tc =
       end
 
     | `MuFalse ->
-        let m,f,args,_ = destr_pr torw in (pr_false m f args, 0)
+        let { pr_mem = m ; pr_fun = f; pr_args = args } = destr_pr torw in
+        (pr_false m f args, 0)
 
     | `MuNot ->
-        let m,f,args,ev = destr_pr torw in
-        let ev = destr_not ev in
-          (pr_not m f args ev, 0)
+        let { pr_mem = m ; pr_fun = f; pr_args = args; } as pr = destr_pr torw in
+        let ev = destr_not pr.pr_event in
+        (pr_not m f args ev, 0)
 
     | `MuOr ->
-        let m,f,args,ev = destr_pr torw in
-        let asym,ev1,ev2 = destr_or_kind ev in
-          (pr_or m f args (if asym then f_ora else f_or) ev1 ev2, 0)
+        let { pr_mem = m ; pr_fun = f; pr_args = args; } as pr = destr_pr torw in
+        let (asym, (ev1, ev2)) = destr_or_r pr.pr_event in
+        (pr_or m f args (match asym with | `Asym -> f_ora | `Sym -> f_or) ev1 ev2, 0)
 
     | `MuDisj ->
-        let m,f,args,ev = destr_pr torw in
-        let asym,ev1,ev2 = destr_or_kind ev in
-          (pr_disjoint env m f args (if asym then f_ora else f_or) ev1 ev2, 1)
+        let { pr_mem = m ; pr_fun = f; pr_args = args; } as pr = destr_pr torw in
+        let (asym, (ev1, ev2)) = destr_or_r pr.pr_event in
+        (pr_disjoint env m f args (match asym with | `Asym -> f_ora | `Sym -> f_or) ev1 ev2, 1)
   in
 
   let rwpt =

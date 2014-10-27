@@ -223,9 +223,9 @@ module PVM = struct
       | FbdHoareS hs -> 
         check_binding (fst hs.bhs_m) s;
         EcFol.f_map (fun ty -> ty) aux f
-      | Fpr(m,_,_,_) ->
+      | Fpr pr ->
         check_binding EcFol.mhr s;
-        check_binding m s;
+        check_binding pr.pr_mem s;
         EcFol.f_map (fun ty -> ty) aux f
       | Fquant(q,b,f1) ->
         let f1 = 
@@ -778,7 +778,7 @@ module Mpv2 = struct
       match f1.f_node, f2.f_node with
       | Fquant(q1,bd1,f1), Fquant(q2,bd2,f2) when q1 = q2 ->
         let local = 
-          let toty (id,gty) = id, destr_gty gty in
+          let toty (id,gty) = id, gty_as_ty gty in
           enter_local env local (List.map toty bd1) (List.map toty bd2) in
         add_eq local eqs f1 f2
       | Fif(e1,t1,f1), Fif(e2,t2,f2) -> 
@@ -818,7 +818,7 @@ module Mpv2 = struct
       match f.f_node with
       | Fquant(_,bd1,f1) ->
         let local = 
-          let toty (id,gty) = id, destr_gty gty in
+          let toty (id,gty) = id, gty_as_ty gty in
           let bd = List.map toty bd1 in
           enter_local env local bd bd in
         aux local eqs f1
@@ -830,14 +830,14 @@ module Mpv2 = struct
           let lp = lp_bind lp1 in 
           enter_local env local lp lp in
         aux local eqs f1 
-      | Fop(op,_) when EcPath.p_equal op EcCoreLib.p_true -> eqs
+      | Fop(op,_) when EcPath.p_equal op EcCoreLib.CI_Bool.p_true -> eqs
         
       | Fapp({f_node = Fop(op,_)},a) -> 
         begin match op_kind op with
-        | OK_true -> eqs
-        | OK_eq | OK_iff -> add_eq local eqs (List.nth a 0) (List.nth a 1)
-        | OK_and _ | OK_or _ -> List.fold_left (aux local) eqs a
-        | OK_imp -> aux local eqs (List.nth a 1)
+        | Some `True -> eqs
+        | Some (`Eq | `Iff) -> add_eq local eqs (List.nth a 0) (List.nth a 1)
+        | Some (`And _ | `Or _) -> List.fold_left (aux local) eqs a
+        | Some `Imp -> aux local eqs (List.nth a 1)
         | _ -> raise Not_found
         end    
       | _ -> raise Not_found in

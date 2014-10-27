@@ -16,13 +16,13 @@ type rnd_infos_t = (pformula, pformula option, pformula) rnd_tac_info
 type mkbij_t     = EcTypes.ty -> EcTypes.ty -> EcFol.form
 
 (* -------------------------------------------------------------------- *)
-val wp_equiv_disj_rnd : bool -> backward
+val wp_equiv_disj_rnd : side -> backward
 val wp_equiv_rnd      : (mkbij_t pair) option -> backward
 
 (* -------------------------------------------------------------------- *)
 val t_hoare_rnd   : backward
 val t_bdhoare_rnd : bhl_infos_t -> backward
-val t_equiv_rnd   : bool option -> (mkbij_t option) pair -> backward
+val t_equiv_rnd   : oside -> (mkbij_t option) pair -> backward
 
 (* -------------------------------------------------------------------- *)
-val process_rnd : tac_side -> rnd_infos_t -> backward
+val process_rnd : oside -> rnd_infos_t -> backward

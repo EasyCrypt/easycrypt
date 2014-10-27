@@ -146,7 +146,7 @@ let t_conseq pre post tc =
   | FequivF _   -> t_equivF_conseq pre post tc
   | FequivS _   -> t_equivS_conseq pre post tc
   | FeagerF _   -> t_eagerF_conseq pre post tc
-  | _           -> tc_error_notphl !!tc None
+  | _           -> tc_error_noXhl !!tc
 
 (* -------------------------------------------------------------------- *)
 let t_equivF_notmod post tc =
@@ -377,19 +377,19 @@ let t_equivF_conseq_conj pre1 post1 pre2 post2 pre' post' tc =
 let t_equivS_conseq_bd side pr po tc =
   let es = tc1_as_equivS tc in
   let m,s,s' =
-    if   side
-    then es.es_ml, es.es_sl, es.es_sr
-    else es.es_mr, es.es_sr, es.es_sl
+    match side with
+    | `Left  -> es.es_ml, es.es_sl, es.es_sr
+    | `Right -> es.es_mr, es.es_sr, es.es_sl
   in
   if not (List.isempty s'.s_node) then begin
-    let side = if side then "right" else "left" in
+    let side = side2str (negside side) in
     tc_error !!tc "%s statement should be empty" side
   end;
   let subst = Fsubst.f_subst_mem mhr (fst m) in
   let prs, pos = subst pr, subst po in
   if not (f_equal prs es.es_pr && f_equal pos es.es_po) then
     tc_error !!tc "invalid pre- or post-condition";
-  let g1 = f_bdHoareS m pr s po FHeq f_r1 in
+  let g1 = f_bdHoareS (mhr,snd m) pr s po FHeq f_r1 in
   FApi.xmutate1 tc `HlBdEquiv [g1]
 
 (* -------------------------------------------------------------------- *)
@@ -608,7 +608,7 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
    t_on1seq 2
      (tac pre post)
      (FApi.t_seq
-        (t_equivS_conseq_bd true hs.bhs_pr hs.bhs_po)
+        (t_equivS_conseq_bd `Left hs.bhs_pr hs.bhs_po)
         (t_apply_r nf2))
      tc
 
@@ -623,7 +623,7 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
     t_on1seq 2
       (tac pre post)
       (FApi.t_seq
-         (t_equivS_conseq_bd false hs.bhs_pr hs.bhs_po)
+         (t_equivS_conseq_bd `Right hs.bhs_pr hs.bhs_po)
          (t_apply_r nf3))
       tc
 
@@ -783,14 +783,14 @@ let process_conseq notmod (info1, info2, info3) tc =
         (penv, qenv, bhf.bhf_pr, bhf.bhf_po, fmake)
 
       | FequivF ef ->
-        let f = if side then ef.ef_fl else ef.ef_fr in
+        let f = sideif side ef.ef_fl ef.ef_fr in
         let penv, qenv = LDecl.hoareF f hyps in
         let fmake pre post bd = ensure_none bd; f_hoareF pre f post in
         (penv, qenv, f_true, f_true, fmake)
 
       | FequivS es ->
-        let f = if side then es.es_sl else es.es_sr in
-        let m = if side then es.es_ml else es.es_mr in
+        let f = sideif side es.es_sl es.es_sr in
+        let m = sideif side es.es_ml es.es_mr in
         let env = LDecl.push_active m hyps in
         let fmake pre post bd =
           match info1, bd with
@@ -821,9 +821,9 @@ let process_conseq notmod (info1, info2, info3) tc =
   if   List.for_all is_none [info1; info2; info3]
   then t_id tc
   else
-    let f1 = info1 |> omap (PT.tc1_process_full_closed_pterm_cut ~prcut:(process_cut1      ) tc) in
-    let f2 = info2 |> omap (PT.tc1_process_full_closed_pterm_cut ~prcut:(process_cut2 true ) tc) in
-    let f3 = info3 |> omap (PT.tc1_process_full_closed_pterm_cut ~prcut:(process_cut2 false) tc) in
+    let f1 = info1 |> omap (PT.tc1_process_full_closed_pterm_cut ~prcut:(process_cut1       ) tc) in
+    let f2 = info2 |> omap (PT.tc1_process_full_closed_pterm_cut ~prcut:(process_cut2 `Left ) tc) in
+    let f3 = info3 |> omap (PT.tc1_process_full_closed_pterm_cut ~prcut:(process_cut2 `Right) tc) in
 
     let ofalse = omap (fun (x, y) -> (Some x, y)) in
 
@@ -832,5 +832,5 @@ let process_conseq notmod (info1, info2, info3) tc =
 (* -------------------------------------------------------------------- *)
 let process_bd_equiv side (pr, po) tc =
   let info = Some { fp_kind = FPCut ((Some pr, Some po),None); fp_args = [] } in
-  let info2, info3 = if side then info, None else None, info in
+  let info2, info3 = sideif side (info, None) (None, info) in
   process_conseq true (None, info2, info3) tc

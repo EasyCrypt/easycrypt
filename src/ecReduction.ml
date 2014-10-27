@@ -379,25 +379,25 @@ let rec h_red ri env hyps f =
   | Fapp ({f_node = Fop (p, _); } as fo, args) when ri.logic && is_logical_op p ->
       let f' =
         match op_kind p, args with
-        | OK_not      , [f1]    -> f_not_simpl f1
-        | OK_and true , [f1;f2] -> f_anda_simpl f1 f2
-        | OK_or  true , [f1;f2] -> f_ora_simpl f1 f2
-        | OK_and false, [f1;f2] -> f_and_simpl f1 f2
-        | OK_or  false, [f1;f2] -> f_or_simpl f1 f2
-        | OK_imp      , [f1;f2] -> f_imp_simpl f1 f2
-        | OK_iff      , [f1;f2] -> f_iff_simpl f1 f2
-        | OK_int_le   , [f1;f2] -> f_int_le_simpl f1 f2
-        | OK_int_lt   , [f1;f2] -> f_int_lt_simpl f1 f2
-        | OK_real_le  , [f1;f2] -> f_real_le_simpl f1 f2
-        | OK_real_lt  , [f1;f2] -> f_real_lt_simpl f1 f2
-        | OK_int_add  , [f1;f2] -> f_int_add_simpl f1 f2
-        | OK_int_sub  , [f1;f2] -> f_int_sub_simpl f1 f2
-        | OK_int_mul  , [f1;f2] -> f_int_mul_simpl f1 f2
-        | OK_real_add , [f1;f2] -> f_real_add_simpl f1 f2
-        | OK_real_sub , [f1;f2] -> f_real_sub_simpl f1 f2
-        | OK_real_mul , [f1;f2] -> f_real_mul_simpl f1 f2
-        | OK_real_div , [f1;f2] -> f_real_div_simpl f1 f2
-        | OK_eq       , [f1;f2] -> begin
+        | Some (`Not      ), [f1]    -> f_not_simpl f1
+        | Some (`And `Asym), [f1;f2] -> f_anda_simpl f1 f2
+        | Some (`Or  `Asym), [f1;f2] -> f_ora_simpl f1 f2
+        | Some (`And `Sym ), [f1;f2] -> f_and_simpl f1 f2
+        | Some (`Or  `Sym ), [f1;f2] -> f_or_simpl f1 f2
+        | Some (`Imp      ), [f1;f2] -> f_imp_simpl f1 f2
+        | Some (`Iff      ), [f1;f2] -> f_iff_simpl f1 f2
+        | Some (`Int_le   ), [f1;f2] -> f_int_le_simpl f1 f2
+        | Some (`Int_lt   ), [f1;f2] -> f_int_lt_simpl f1 f2
+        | Some (`Real_le  ), [f1;f2] -> f_real_le_simpl f1 f2
+        | Some (`Real_lt  ), [f1;f2] -> f_real_lt_simpl f1 f2
+        | Some (`Int_add  ), [f1;f2] -> f_int_add_simpl f1 f2
+        | Some (`Int_sub  ), [f1;f2] -> f_int_sub_simpl f1 f2
+        | Some (`Int_mul  ), [f1;f2] -> f_int_mul_simpl f1 f2
+        | Some (`Real_add ), [f1;f2] -> f_real_add_simpl f1 f2
+        | Some (`Real_sub ), [f1;f2] -> f_real_sub_simpl f1 f2
+        | Some (`Real_mul ), [f1;f2] -> f_real_mul_simpl f1 f2
+        | Some (`Real_div ), [f1;f2] -> f_real_div_simpl f1 f2
+        | Some (`Eq       ), [f1;f2] -> begin
             let fallback () = f_eq_simpl f1 f2 in
             match (fst (destr_app f1)).f_node, (fst (destr_app f2)).f_node with
             | Fop (p1, _), Fop (p2, _)
@@ -621,13 +621,11 @@ let check_alpha_equal ri hyps f1 f2 =
       check_s env subst eg1.eg_sl eg2.eg_sl;
       check_s env subst eg1.eg_sr eg2.eg_sr
 
-    | Fpr(m1,p1,args1,f1'), Fpr(m2,p2,args2,f2') ->
-      check_mem subst m1 m2;
-      check_xp env subst p1 p2;
-     (* ensure (List.length args1 = List.length args2);
-      List.iter2 (aux env subst) args1 args2; *)
-      aux env subst args1 args2;
-      aux env subst f1' f2'
+    | Fpr pr1, Fpr pr2 ->
+      check_mem subst pr1.pr_mem pr2.pr_mem;
+      check_xp env subst pr1.pr_fun pr2.pr_fun;
+      aux env subst pr1.pr_args pr2.pr_args;
+      aux env subst pr1.pr_event pr2.pr_event
 
     | _, _ -> error ()
 

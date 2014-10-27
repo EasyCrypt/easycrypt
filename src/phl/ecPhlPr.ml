@@ -109,7 +109,7 @@ let t_prbounded_r conseq tc =
     | FbdHoareS hf ->
         (hf.bhs_m, hf.bhs_pr, hf.bhs_po, hf.bhs_cmp, hf.bhs_bd)
 
-    | _ -> tc_error_notphl !!tc None    (* FIXME *)
+    | _ -> tc_error_noXhl ~kinds:[`PHoare `Any] !!tc
   in
 
   let cond =
@@ -135,15 +135,13 @@ let t_prfalse tc =
   let (f, ev, bd) =
     match concl.f_node with
     | Fapp ({f_node = Fop (op, _)}, [f; bd]) when is_pr f &&
-          EcPath.p_equal op EcCoreLib.p_real_le
-          || EcPath.p_equal op EcCoreLib.p_eq->
-        let (_m,f,_args,ev) = destr_pr f in
-        f,ev,bd
+          EcPath.p_equal op EcCoreLib.CI_Real.p_real_le
+          || EcPath.p_equal op EcCoreLib.CI_Bool.p_eq->
+        let pr = destr_pr f in (pr.pr_fun,pr.pr_event,bd)
 
       | Fapp ({f_node = Fop(op,_)}, [bd;f]) when is_pr f &&
-          EcPath.p_equal op EcCoreLib.p_eq->
-        let (_m,f,_args,ev) = destr_pr f in
-        f,ev,bd
+          EcPath.p_equal op EcCoreLib.CI_Bool.p_eq->
+        let pr = destr_pr f in (pr.pr_fun,pr.pr_event,bd)
 
       | _ -> tc_error !!tc "expecting a conclusion of the form Pr[...]"
   in

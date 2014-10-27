@@ -32,6 +32,7 @@ val t_id    : FApi.backward
 (* -------------------------------------------------------------------- *)
 val alpha_find_in_hyps : EcEnv.LDecl.hyps -> EcFol.form -> EcIdent.t
 val t_assumption    : [`Alpha | `Conv] -> FApi.backward
+val t_absurd_hyp    : ?id:EcIdent.t -> FApi.backward
 val t_logic_trivial : FApi.backward
 val t_trivial       : FApi.backward option -> FApi.backward
 
@@ -79,8 +80,8 @@ val t_apply_hd : handle -> ?args:(form list) -> ?sk:int -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
 (* Introduction of logical operators (backward). *)
-val t_or_intro_s  : bool -> [`Left|`Right] -> form pair -> FApi.backward
-val t_and_intro_s : bool -> form pair -> FApi.backward
+val t_or_intro_s  : [`Asym | `Sym] -> [`Left|`Right] -> form pair -> FApi.backward
+val t_and_intro_s : [`Asym | `Sym] -> form pair -> FApi.backward
 val t_iff_intro_s : form pair -> FApi.backward
 
 val t_or_intro  : ?reduce:lazyred -> side -> FApi.backward
@@ -119,7 +120,7 @@ val t_elimT_form : proofterm -> ?sk:int -> form -> FApi.backward
 val t_elimT_form_global : path -> ?typ:(ty list) -> ?sk:int -> form -> FApi.backward
 
 (* Eliminiation using an elimation principle of an induction type *)
-val t_elimT_ind : [ `Case | `Ind ] -> FApi.backward
+val t_elimT_ind : ?reduce:lazyred -> [ `Case | `Ind ] -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
 (* Boolean LEM                                                          *)
@@ -187,10 +188,11 @@ val t_clears : ident list -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
 type pgoptions =  {
-  pgo_split : bool;
-  pgo_solve : bool;
-  pgo_subst : bool;
-  pgo_delta : pgo_delta;
+  pgo_split  : bool;
+  pgo_solve  : bool;
+  pgo_subst  : bool;
+  pgo_disjct : bool;
+  pgo_delta  : pgo_delta;
 }
 
 and pgo_delta = {
@@ -203,7 +205,10 @@ module PGOptions : sig
   val merge   : pgoptions -> ppgoptions -> pgoptions
 end
 
-val t_progress : ?options:pgoptions -> FApi.backward -> FApi.backward
+val t_progress : 
+     ?options:pgoptions -> 
+     ?ti:(EcIdent.t -> EcCoreGoal.FApi.backward) ->
+     FApi.backward -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
 val t_congr : form pair -> form pair list * ty -> FApi.backward

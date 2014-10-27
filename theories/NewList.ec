@@ -512,7 +512,7 @@ proof.
   move=> eq_cnt1 a; cut ltzSz: forall z, z < z + 1 by smt.
   (* FIX: negative occurence selector *)
   cut {ltzSz} := ltzSz (count a (s1 ++ s2)); move: {1 3 4}a.
-  pose x := _ + 1; cut : 0 <= x by smt; move: x => {a}.
+  pose x := _ + 1; cut : 0 <= x by smt. move: x => {a}.
   elim/Int.Induction.induction; first by smt.
   move=> i i_ge0 IHi a le_ai; case (count a (s1 ++ s2) = 0).
     by rewrite count_cat; smt.

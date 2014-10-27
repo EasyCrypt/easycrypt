@@ -22,13 +22,13 @@ and ty_body = [
   | `Concrete of EcTypes.ty
   | `Abstract of Sp.t
   | `Datatype of ty_dtype
-  | `Record   of EcFol.form * (EcSymbols.symbol * EcTypes.ty) list
+  | `Record   of EcCoreFol.form * (EcSymbols.symbol * EcTypes.ty) list
 ]
 
 and ty_dtype = {
   tydt_ctors   : (EcSymbols.symbol * EcTypes.ty list) list;
-  tydt_schelim : EcFol.form;
-  tydt_schcase : EcFol.form;
+  tydt_schelim : EcCoreFol.form;
+  tydt_schcase : EcCoreFol.form;
 }
 
 let tydecl_as_concrete (td : tydecl) =
@@ -48,7 +48,7 @@ type locals = EcIdent.t list
 
 type operator_kind =
   | OB_oper of opbody option
-  | OB_pred of EcFol.form option
+  | OB_pred of EcCoreFol.form option
 
 and opbody =
   | OP_Plain  of EcTypes.expr
@@ -85,7 +85,7 @@ type axiom_kind = [`Axiom | `Lemma]
 
 type axiom = {
   ax_tparams : ty_params;
-  ax_spec    : EcFol.form option;
+  ax_spec    : EcCoreFol.form option;
   ax_kind    : axiom_kind;
   ax_nosmt   : bool;
 }
@@ -161,7 +161,7 @@ let operator_as_fix (op : operator) =
 type typeclass = {
   tc_prt : EcPath.path option;
   tc_ops : (EcIdent.t * EcTypes.ty) list;
-  tc_axs : (EcSymbols.symbol * EcFol.form) list;
+  tc_axs : (EcSymbols.symbol * EcCoreFol.form) list;
 }
 
 (* -------------------------------------------------------------------- *)

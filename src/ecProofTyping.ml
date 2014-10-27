@@ -76,21 +76,24 @@ let tc1_process_pattern tc fp =
   Exn.recast_tc1 tc (fun hyps -> process_pattern hyps fp)
 
 (* ------------------------------------------------------------------ *)
-let tc1_process_phl_form tc ty pf =
+let tc1_process_phl_form ?side tc ty pf =
   let hyps, concl = FApi.tc1_flat tc in
   let memory =
-    match concl.f_node with
-    | FhoareS   hs -> hs.hs_m
-    | FbdHoareS hs -> hs.bhs_m
-    | _ -> assert false
+    match concl.f_node, side with
+    | FhoareS   hs, None        -> hs.hs_m
+    | FbdHoareS hs, None        -> hs.bhs_m
+    | FequivS   es, Some `Left  -> (mhr, snd es.es_ml)
+    | FequivS   es, Some `Right -> (mhr, snd es.es_mr)
+
+    | _, _ -> assert false
   in
 
   let hyps = LDecl.push_active memory hyps in
   pf_process_form !!tc hyps ty pf
 
 (* ------------------------------------------------------------------ *)
-let tc1_process_phl_formula tc pf =
-  tc1_process_phl_form tc tbool pf
+let tc1_process_phl_formula ?side tc pf =
+  tc1_process_phl_form ?side tc tbool pf
 
 (* ------------------------------------------------------------------ *)
 let tc1_process_prhl_form tc ty pf =
@@ -113,7 +116,7 @@ let tc1_process_prhl_stmt tc side c =
   let hyps, concl = FApi.tc1_flat tc in
   let es = match concl.f_node with FequivS es -> es | _ -> assert false in
 
-  let mt   = snd (if side then es.es_ml else es.es_mr) in
+  let mt   = snd (match side with `Left -> es.es_ml | `Right -> es.es_mr) in
   let hyps = LDecl.push_active (mhr,mt) hyps in
   let env  = LDecl.toenv hyps in
   let ue   = unienv_of_hyps hyps in

@@ -97,6 +97,9 @@ type 'a tuple9 = 'a * 'a * 'a * 'a * 'a * 'a * 'a * 'a * 'a
 type 'a pair   = 'a * 'a
 
 (* -------------------------------------------------------------------- *)
+let in_seq1 (x : 'a) = [x]
+
+(* -------------------------------------------------------------------- *)
 let as_seq0 = function [] -> () | _ -> assert false
 let as_seq1 = function [x] -> x | _ -> assert false
 let as_seq2 = function [x1; x2] -> (x1, x2) | _ -> assert false
@@ -408,6 +411,9 @@ module List = struct
     in
       index 0 xs
 
+  let findex_last (f : 'a -> bool) (xs : 'a list) : int option =
+    omap (fun i -> List.length xs - i - 1) (findex f (List.rev xs))
+
   let index (v : 'a) (xs : 'a list) : int option =
     findex ((=) v) xs
 
@@ -482,6 +488,14 @@ module List = struct
       let (a',c) = f !a b in
       a := a'; c in
     let l = List.map f xs in
+    !a, l
+
+  let map_fold2 (f : 'a -> 'b -> 'c -> 'a * 'd) (a : 'a) xs ys =
+    let a = ref a in
+    let f b c =
+      let (a',d) = f !a b c in
+      a := a'; d in
+    let l = List.map2 f xs ys in
     !a, l
 
   let map_combine

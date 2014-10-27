@@ -51,7 +51,7 @@ module Low = struct
         es_mr = (mright,mt);
         es_sr = c2;
         es_pr = p1;
-        es_po = q1
+        es_po = q1;
       } in
     let cond4 =
       f_equivS_r { es with
@@ -87,7 +87,7 @@ let t_equivF_trans = FApi.t_low3 "equiv-trans" Low.t_equivF_trans_r
 let process_trans_stmt s c p1 q1 p2 q2 tc =
   let hyps = FApi.tc1_hyps tc in
   let es = tc1_as_equivS tc in
-  let mt = snd (if oget s then es.es_ml else es.es_mr) in
+  let mt = snd (match oget s with `Left -> es.es_ml | `Right -> es.es_mr) in
   let p1, q1 =
     let hyps = LDecl.push_all [es.es_ml; (mright, mt)] hyps in
     TTC.pf_process_form !!tc hyps tbool p1,

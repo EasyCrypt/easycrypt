@@ -82,8 +82,8 @@ proof -strict.
  rewrite Hrec.
    move: Hd; rewrite !disjoint_spec=> Hd x0.
    cut:= Hd x0; case (x0 = x).
-     move=> ->; cut -> //=: mem x (add x s) by smt; smt.
-     by rewrite -neqF mem_add=> ->.
+     move=> ->; cut -> //=: mem x (add x s) by smt. smt.
+   by rewrite -neqF mem_add=> ->.
  smt.
 qed.
 
@@ -296,8 +296,9 @@ theory Miplus.
    sum_n i j = i*((j - i)+1) + sum_n 0 ((j - i)).
  proof -strict.
    intros Hle;rewrite {1} (_: j=i+(j-i));first smt.
-   cut: 0 <= (j-i) by smt; elim/Int.Induction.induction (j-i)=> //=.
-   by rewrite !sum_n_ii.
+   cut: 0 <= (j-i) by smt.
+   elim/Int.Induction.induction (j-i)=> //=.
+     by rewrite !sum_n_ii.
    intros {j Hle} j Hj; rewrite -CommutativeGroup.Assoc sum_n_ij1;smt.
  qed.
 
@@ -362,13 +363,11 @@ proof -strict.
     apply ex_for; delta p=> {p}; generalize sum_true; apply absurd=> /= h.
   cut := FSet.leq_refl s; pose {1 3} s' := s;elim/set_ind s'.
     by rewrite Mbor.sum_empty.
-  intros=> x s' nmem IH leq_adds'_s;
-  cut leq_s'_s : s' <= s by (apply (FSet.leq_tran (add x s'))=> //; 
-  apply leq_add);
-  rewrite Mbor.sum_add // -nor IH // /=;
-  cut := h x; rewrite -nand;
-  case (mem x s)=> //=;
-  by cut := leq_adds'_s x; rewrite mem_add //= => ->.
+  intros=> x s' nmem IH leq_adds'_s.
+  cut leq_s'_s : s' <= s.
+    by apply (FSet.leq_tran (add x s'))=> //; apply leq_add.
+  rewrite Mbor.sum_add // -nor IH // /=; cut := h x; rewrite -nand.
+  by case (mem x s)=> //=; cut := leq_adds'_s x; rewrite mem_add //= => ->.
 qed.
 
 pred cpOrs (X:(('a -> bool)) set) (x:'a) = Mbor.sum (fun (P:('a -> bool)), P x) X.

@@ -77,9 +77,9 @@ lemma xorA (x y z : bitstring):
   x ^^ (y ^^ z) = (x ^^ y) ^^ z.
 proof strict.
 intros=> x_y y_z;
-  cut x_z: length x = length z by (by rewrite x_y);
-  cut x_xy: length x = length (x ^^ y) by (by rewrite length_xor);
-  cut x_yz: length x = length (y ^^ z) by (by rewrite length_xor);
+  cut x_z: length x = length z by rewrite x_y.
+  cut x_xy: length x = length (x ^^ y) by rewrite length_xor.
+  cut x_yz: length x = length (y ^^ z) by rewrite length_xor.
   apply array_ext; split.
     by rewrite ?length_xor.
     intros=> i [leq0_i lti_l]; rewrite ?get_xor //; first 5 smt.
@@ -90,10 +90,10 @@ lemma xor0 (x : bitstring):
   x ^^ zeros (length x) = x.
 proof strict.
 apply array_ext; split; first smt.
-by cut lx_x0: length (zeros (length x)) = length x
-     by (by rewrite length_zeros ?length_pos);
-   intros=> i; rewrite length_xor ?lx_x0 // => [leq0_i lti_lx];
-   rewrite get_xor 1?eq_sym // get_zeros // Bool.xor_false.
+cut lx_x0: length (zeros (length x)) = length x.
+  by rewrite length_zeros ?length_pos.
+intros=> i; rewrite length_xor ?lx_x0 // => [leq0_i lti_lx].
+by rewrite get_xor 1?eq_sym // get_zeros // Bool.xor_false.
 qed.
 
 require import Real.
