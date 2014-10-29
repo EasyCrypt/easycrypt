@@ -1760,6 +1760,11 @@ rwocc:
 | LBRACE MINUS x=uint+ RBRACE { (`Exclusive, x) }
 ;
 
+rwpr_arg:
+| i=ident        { (i, None) }
+| i=ident f=form { (i, Some f) }
+;
+
 rwarg1:
 | SLASHSLASH
     { RWDone false }
@@ -1776,7 +1781,7 @@ rwarg1:
 | s=rwside r=rwrepeat? o=rwocc? SLASH x=sform_h %prec prec_tactic
    { RWDelta (s, r, o |> omap (snd_map EcMaps.Sint.of_list), x); }
 
-| PR s=bracket(ident)
+| PR s=bracket(rwpr_arg)
    { RWPr s }
 
 | SMT

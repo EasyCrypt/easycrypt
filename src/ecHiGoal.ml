@@ -435,7 +435,7 @@ let rec process_rewrite1 ttenv ri tc =
       | Some (b, n) -> t_do b n doall tc
   end
 
-  | RWPr x -> EcPhlPrRw.t_pr_rewrite (unloc x) tc
+  | RWPr (x,f) -> EcPhlPrRw.t_pr_rewrite (unloc x, f) tc
 
   | RWSmt ->
       process_smt ttenv (None, empty_pprover) tc
