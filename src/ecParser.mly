@@ -2639,7 +2639,7 @@ clone_override:
      } in
        (x, PTHO_Pred ov) }
 
-| THEORY x=uqident EQ y=uqident
+| THEORY x=uqident LARROW y=uqident
    { (x, PTHO_Theory y) }
 ;
 

@@ -134,7 +134,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
   let name = odfl (EcPath.basename opath) (thcl.pthc_name |> omap unloc) in
 
   let (genproofs, ovrds) =
-    let rec do1 (proofs, evc) ({ pl_loc = l; pl_desc = ((nm, x) as name) }, ovrd) =
+    let rec do1 ?(cancrt = false) (proofs, evc) ({ pl_loc = l; pl_desc = ((nm, x) as name) }, ovrd) =
       let xpath = EcPath.pappend opath (EcPath.fromqsymbol name) in
 
         match ovrd with
@@ -142,7 +142,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
             match EcEnv.Ty.by_path_opt xpath scenv with
             | None ->
                 clone_error scenv (CE_UnkOverride (OVK_Type, name));
-            | Some { EcDecl.tyd_type = `Concrete _ } ->
+            | Some { EcDecl.tyd_type = `Concrete _ } when not cancrt ->
                 clone_error scenv (CE_CrtOverride (OVK_Type, name));
             | Some refty ->
                 if List.length refty.tyd_params <> List.length tyargs then
@@ -163,7 +163,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
             | None
             | Some { op_kind = OB_pred _ } ->
                 clone_error scenv (CE_UnkOverride (OVK_Operator, name));
-            | Some { op_kind = OB_oper (Some _) } ->
+            | Some { op_kind = OB_oper (Some _) } when not cancrt ->
                 clone_error scenv (CE_CrtOverride (OVK_Operator, name));
             | _ -> ()
           end;
@@ -182,7 +182,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
             | None
             | Some { op_kind = OB_oper _ } ->
                 clone_error scenv (CE_UnkOverride (OVK_Predicate, name));
-            | Some { op_kind = OB_pred (Some _) } ->
+            | Some { op_kind = OB_pred (Some _) } when not cancrt ->
                 clone_error scenv (CE_CrtOverride (OVK_Predicate, name));
             | _ -> ()
           end;
@@ -224,8 +224,8 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
                     | pt -> PTapp   (mk_loc l (xsth @ prefix, x), pt)
                   in
                   let tyd  = mk_loc l tyd in
-                  let ovrd = PTHO_Type (params, tyd, `Alias) in
-                    do1 (proofs, evc) (mk_loc l (xdth @ prefix, x), ovrd)
+                  let ovrd = PTHO_Type (params, tyd, `Inline) in
+                    do1 ~cancrt:true (proofs, evc) (mk_loc l (xdth @ prefix, x), ovrd)
 
               | CTh_operator (x, ({ op_kind = OB_oper None } as oopd)) ->
                   (* FIXME: TC HOOK *)
@@ -240,7 +240,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
                       let tya = List.map (fun a -> mk_loc l (PTvar a)) params in
                         mk_loc l (PEident (sym, Some (mk_loc l (TVIunamed tya))));
                   } in
-                    do1 (proofs, evc) (mk_loc l (xdth @ prefix, x), PTHO_Op (ovrd, `Alias))
+                    do1 ~cancrt:true (proofs, evc) (mk_loc l (xdth @ prefix, x), PTHO_Op (ovrd, `Inline))
 
               | CTh_operator (x, ({ op_kind = OB_pred None } as oprd)) ->
                   (* FIXME: TC HOOK *)
@@ -254,7 +254,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
                       let tya = List.map (fun a -> mk_loc l (PTvar a)) params in
                         mk_loc l (PFident (sym, Some (mk_loc l (TVIunamed tya))));
                   } in
-                    do1 (proofs, evc) (mk_loc l (xdth @ prefix, x), PTHO_Pred ovrd)
+                    do1 ~cancrt:true (proofs, evc) (mk_loc l (xdth @ prefix, x), PTHO_Pred ovrd)
 
               | CTh_axiom (x, ({ ax_spec = Some _; ax_kind = `Axiom; } as ax)) ->
                   (* FIXME: TC HOOK *)
