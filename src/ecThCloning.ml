@@ -227,7 +227,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
                   let ovrd = PTHO_Type (params, tyd, `Inline) in
                     do1 ~cancrt:true (proofs, evc) (mk_loc l (xdth @ prefix, x), ovrd)
 
-              | CTh_operator (x, ({ op_kind = OB_oper None } as oopd)) ->
+              | CTh_operator (x, ({ op_kind = OB_oper _ } as oopd)) ->
                   (* FIXME: TC HOOK *)
                   let params = List.map (EcIdent.name |- fst) oopd.op_tparams in
                   let params = List.map (mk_loc l) params in
@@ -242,7 +242,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
                   } in
                     do1 ~cancrt:true (proofs, evc) (mk_loc l (xdth @ prefix, x), PTHO_Op (ovrd, `Inline))
 
-              | CTh_operator (x, ({ op_kind = OB_pred None } as oprd)) ->
+              | CTh_operator (x, ({ op_kind = OB_pred _ } as oprd)) ->
                   (* FIXME: TC HOOK *)
                   let params = List.map (EcIdent.name |- fst) oprd.op_tparams in
                   let params = List.map (mk_loc l) params in
