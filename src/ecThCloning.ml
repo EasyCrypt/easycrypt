@@ -214,7 +214,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
 
             let rec doit prefix (proofs, evc) dth =
               match dth with
-              | CTh_type (x, ({ tyd_type = `Abstract _ } as otyd)) ->
+              | CTh_type (x, otyd) ->
                   (* FIXME: TC HOOK *)
                   let params = List.map (EcIdent.name |- fst) otyd.tyd_params in
                   let params = List.map (mk_loc l) params in
@@ -256,8 +256,9 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
                   } in
                     do1 ~cancrt:true (proofs, evc) (mk_loc l (xdth @ prefix, x), PTHO_Pred ovrd)
 
-              | CTh_axiom (x, ({ ax_spec = Some _; ax_kind = `Axiom; } as ax)) ->
+              | CTh_axiom (x, ({ ax_spec = Some _ } as ax)) ->
                   (* FIXME: TC HOOK *)
+                if ax.ax_kind = `Axiom then
                   let params = List.map (EcIdent.name |- fst) ax.ax_tparams in
                   let params = List.map (mk_loc l) params in
                   let params = List.map (fun a -> mk_loc l (PTvar a)) params in
@@ -270,6 +271,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
                              pthp_tactic = Some tc }
                   in
                     (pr :: proofs, evc)
+                else (proofs,evc)
 
               | CTh_theory (x, dth) ->
                   List.fold_left (doit (prefix @ [x])) (proofs, evc) dth.cth_struct
