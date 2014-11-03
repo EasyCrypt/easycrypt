@@ -1,0 +1,50 @@
+% --------------------------------------------------------------------
+\documentclass[a4paper,oneside]{article}
+
+% --------------------------------------------------------------------
+\title{\EasyCrypt Reference Manual}
+\date{Version 1.x --- \today}
+\author{}
+
+% --------------------------------------------------------------------
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{bold-extra}
+\usepackage[dvipsnames]{xcolor}
+\usepackage{amssymb,dsfont,stmaryrd}
+\usepackage{xspace}
+
+% --------------------------------------------------------------------
+\def\lnkcolor{blue}
+\usepackage{hyperref}
+\hypersetup{bookmarks=true,
+            bookmarksopen=true,
+            bookmarksdepth=2,
+            colorlinks=true,
+            pdfusetitle,
+            linkcolor=\lnkcolor,
+            citecolor=\lnkcolor,
+            urlcolor=\lnkcolor}
+
+% --------------------------------------------------------------------
+\input{prelude}
+\input{notations}
+
+% --------------------------------------------------------------------
+\usepackage{multind}
+\makeindex{tactics}
+
+% --------------------------------------------------------------------
+\begin{document}
+
+\maketitle
+\thispagestyle{empty}
+
+\section{Tactics}
+\input{tactics}
+
+\clearpage
+\printindex{tactics}{Index of Tactics \emph{and al}}
+
+\end{document}

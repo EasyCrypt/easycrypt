@@ -1,0 +1,22 @@
+% --------------------------------------------------------------------
+\DeclareMathVersion{sans}
+\SetSymbolFont{operators}{sans}{OT1}{cmbr}{m}{n}
+\SetSymbolFont{letters}{sans}{OML}{cmbrm}{m}{it}
+\SetSymbolFont{symbols}{sans}{OMS}{cmbrs}{m}{n}
+\SetMathAlphabet{\mathit}{sans}{OT1}{cmbr}{m}{sl}
+\SetMathAlphabet{\mathbf}{sans}{OT1}{cmbr}{bx}{n}
+\SetMathAlphabet{\mathtt}{sans}{OT1}{cmtl}{m}{n}
+\SetSymbolFont{largesymbols}{sans}{OMX}{iwona}{m}{n}
+
+% --------------------------------------------------------------------
+\usepackage[final]{listings}
+
+\def\lstlanguagefiles{easycrypt.lst}
+\lstset{language=easycrypt}
+
+\lstMakeShortInline[language=easycrypt]|
+
+%--------------------------------------------------------------------
+\newenvironment{tactic}[1]%
+{\noindent\index{tactics}{#1}\lstinline[language=easycrypt]{#1}}
+{}
