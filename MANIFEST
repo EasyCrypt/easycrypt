@@ -10,10 +10,10 @@ myocamlbuild.ml
 config/tests.config
 
 # documentation
-doc/Makefile
-doc/*.sty
-doc/*.bib
-doc/*.tex
+doc/userman/Makefile
+doc/userman/*.sty
+doc/userman/*.bib
+doc/userman/*.tex
 
 # proofgeneral
 proofgeneral/Makefile
