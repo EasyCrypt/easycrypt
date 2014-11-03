@@ -244,7 +244,7 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
 
           | Some (`Set a) -> begin
               let ssbj = Fsubst.f_subst subst subject in
-              if not (EcReduction.is_alpha_eq hyps ssbj a) then
+              if not (EcReduction.is_conv hyps ssbj a) then
                 raise MatchFailure;
               try  EcUnify.unify env ue ptn.f_ty subject.f_ty
               with EcUnify.UnificationFailure _ -> raise MatchFailure
@@ -297,7 +297,7 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
 
       | _, _ ->
         let subject = Fsubst.f_subst subst subject in
-          if not (EcReduction.is_alpha_eq hyps ptn subject) then
+          if not (EcReduction.is_conv hyps ptn subject) then
             raise MatchFailure
 
     with MatchFailure when opts.fm_delta ->
