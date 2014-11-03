@@ -373,21 +373,19 @@
 %%
 
 (* -------------------------------------------------------------------- *)
-%inline lident: x=loc(LIDENT) { x };
-%inline uident: x=loc(UIDENT) { x };
-%inline tident: x=loc(TIDENT) { x };
-%inline mident: x=loc(MIDENT) { x };
+%inline lident: x=loc(LIDENT) { x }
+%inline uident: x=loc(UIDENT) { x }
+%inline tident: x=loc(TIDENT) { x }
+%inline mident: x=loc(MIDENT) { x }
 
 %inline _ident:
 | x=LIDENT { x }
 | x=UIDENT { x }
-;
 
 %inline ident:
 | x=loc(_ident) { x }
-;
 
-%inline uint: n=UINT { n };
+%inline uint: n=UINT { n }
 
 (* -------------------------------------------------------------------- *)
 %inline namespace:
@@ -399,30 +397,27 @@
 
 | TOP DOT nm=rlist1(UIDENT, DOT)
     { EcCoreLib.i_top :: nm }
-;
 
 _genqident(X):
 | x=X { ([], x) }
 | xs=namespace DOT x=X { (xs, x) }
-;
 
 genqident(X):
 | x=loc(_genqident(X)) { x }
-;
 
 
 (* -------------------------------------------------------------------- *)
-%inline  qident: x=genqident(_ident) { x };
-%inline uqident: x=genqident(UIDENT) { x };
-%inline lqident: x=genqident(LIDENT) { x };
+%inline  qident: x=genqident(_ident) { x }
+%inline uqident: x=genqident(UIDENT) { x }
+%inline lqident: x=genqident(LIDENT) { x }
 
 (* -------------------------------------------------------------------- *)
 %inline _oident:
-| x=LIDENT { x }
-| x=UIDENT { x }
-| x=PUNIOP { x }
+| x=LIDENT        { x }
+| x=UIDENT        { x }
+| x=PUNIOP        { x }
 | x=paren(PUNIOP) { x }
-| x=PBINOP { x }
+| x=PBINOP        { x }
 
 | paren(DCOLON) { EcCoreLib.s_cons }
 
@@ -431,11 +426,9 @@ genqident(X):
       parse_error x.pl_loc (Some "invalid mixfix operator");
     unloc x
   }
-;
 
 %inline oident:
 | x=loc(_oident) { x }
-;
 
 qoident:
 | x=oident
@@ -446,7 +439,6 @@ qoident:
       pl_loc  = EcLocation.make $startpos $endpos;
     }
   }
-;
 
 (* -------------------------------------------------------------------- *)
 mod_ident1:
@@ -455,16 +447,13 @@ mod_ident1:
 
 | x=uident LPAREN args=plist1(loc(mod_qident), COMMA) RPAREN
     { (x, Some args) }
-;
 
 %inline mod_qident:
 | x=rlist1(mod_ident1, DOT) { x }
-;
 
 fident:
 | nm=mod_qident DOT x=lident { (nm, x) }
 | x=lident { ([], x) }
-;
 
 (* -------------------------------------------------------------------- *)
 %inline ordering_op:
@@ -472,7 +461,6 @@ fident:
 | LT { "<"  }
 | GE { ">=" }
 | LE { "<=" }
-;
 
 %inline uniop:
 | x=OP1 { Printf.sprintf "[%s]" x }
@@ -493,11 +481,9 @@ pside_:
 | x=LIDENT     { (0, Printf.sprintf "&%s" x) }
 | x=UINT       { (0, Printf.sprintf "&%d" x) }
 | ADD x=pside_ { (1 + fst x, snd x) }
-;
 
 pside:
 | x=brace(pside_) { x }
-;
 
 (* -------------------------------------------------------------------- *)
 (* Patterns                                                             *)
@@ -511,35 +497,29 @@ lpattern_u:
 
 | LPBRACE fs=rlist1(lp_field, SEMICOLON) SEMICOLON? RPBRACE
     { LPRecord fs }
-;
 
 lp_field:
 | f=qident EQ x=ident { (f, x) }
-;
 
 %inline lpattern:
 | x=loc(lpattern_u) { x }
-;
 
 (* -------------------------------------------------------------------- *)
 (* Expressions: program expression, real expression                     *)
 
 tyvar_byname1:
 | x=tident EQ ty=loc(type_exp) { (x, ty) }
-;
 
 tyvar_annot:
 | lt = plist1(loc(type_exp), COMMA) { TVIunamed lt }
 | lt = plist1(tyvar_byname1, COMMA) { TVInamed lt }
-;
 
 %inline tvars_app:
 | LTCOLON k=loc(tyvar_annot) GT { k }
-;
 
 (* -------------------------------------------------------------------- *)
-%inline sexpr: x=loc(sexpr_u) { x };
-%inline  expr: x=loc( expr_u) { x };
+%inline sexpr: x=loc(sexpr_u) { x }
+%inline  expr: x=loc( expr_u) { x }
 
 sexpr_u:
 | e=sexpr PCENT p=uqident
@@ -595,7 +575,6 @@ sexpr_u:
    { if n.pl_desc = 0 then
        parse_error n.pl_loc (Some "tuple projection start at 1");
      PEproji(e,n.pl_desc - 1) }
-;
 
 expr_u:
 | e=sexpr_u { e }
@@ -679,17 +658,14 @@ expr_u:
         PEapp (mk_loc loc id, [e]) }
 
 | FUN pd=ptybindings COMMA e=expr { PElambda (pd, e) }
-;
 
 expr_field:
 | x=qident EQ e=expr
     { { rf_name = x ; rf_tvi = None; rf_value = e; } }
-;
 
 expr_ordering:
 | e1=expr op=loc(ordering_op) ti=tvars_app? e2=expr
     { (op, ti, e1, e2) }
-;
 
 expr_chained_orderings:
 | e=expr_ordering
@@ -704,7 +680,6 @@ expr_chained_orderings:
             EcLocation.mk_loc loc
               (peapp_symb op.pl_loc (unloc op) ti [le; e2])],
          e2) }
-;
 
 %inline pty_varty:
 | x=ident+
@@ -713,16 +688,13 @@ expr_chained_orderings:
 
 | x=ident+ COLON ty=loc(type_exp)
    { (x, ty) }
-;
 
 ptybinding1:
 | LPAREN bds=plist1(pty_varty, COMMA) RPAREN { bds }
 | x=ident { [[x], mk_loc x.pl_loc PTunivar] }
-;
 
 ptybindings:
 | x=ptybinding1+ { List.flatten x }
-;
 
 (* -------------------------------------------------------------------- *)
 (* Formulas                                                             *)
@@ -736,8 +708,8 @@ ptybindings:
 %inline sform_h: x=loc(sform_u(hole)) { x }
 %inline  form_h: x=loc( form_u(hole)) { x }
 
-%inline hole: UNDERSCORE { PFhole; }
-%inline none: IMPOSSIBLE { assert false; }
+%inline hole: UNDERSCORE { PFhole }
+%inline none: IMPOSSIBLE { assert false }
 
 qident_or_res_or_glob:
 | x=qident   { GVvar x }
@@ -811,7 +783,6 @@ sform_u(P):
 | LBRACKET ti=tvars_app? e1=form_r(P) op=loc(DOTDOT) e2=form_r(P) RBRACKET
     { let id = PFident(mk_loc op.pl_loc EcCoreLib.s_dinter, ti) in
       PFapp(mk_loc op.pl_loc id, [e1; e2]) }
-;
 
 form_u(P):
 | GLOB mp=loc(mod_qident) { PFglob mp }
@@ -909,17 +880,14 @@ form_u(P):
 
 | LOSSLESS mp=loc(fident)
     { PFlsless mp }
-;
 
 form_field:
 | x=qident EQ f=form
     { { rf_name = x; rf_tvi = None; rf_value = f; } }
-;
 
 form_ordering(P):
 | f1=form_r(P) op=loc(ordering_op) ti=tvars_app? f2=form_r(P)
     { (op, ti, f1, f2) }
-;
 
 form_chained_orderings(P):
 | f=form_ordering(P)
@@ -934,7 +902,6 @@ form_chained_orderings(P):
             EcLocation.mk_loc loc
               (pfapp_symb op.pl_loc (unloc op) ti [le; f2])],
          f2) }
-;
 
 hoare_bd_cmp :
 | LE { EcFol.FHle }
@@ -944,7 +911,6 @@ hoare_bd_cmp :
 hoare_body(P):
   mp=loc(fident) COLON pre=form_r(P) LONGARROW post=form_r(P)
     { PFhoareF (pre, mp, post) }
-;
 
 phoare_body(P):
   LBRACKET mp=loc(fident) COLON
@@ -952,19 +918,16 @@ phoare_body(P):
   RBRACKET
     cmp=hoare_bd_cmp bd=sform_r(P)
   { PFBDhoareF (pre, mp, post, cmp, bd) }
-;
 
 equiv_body(P):
   mp1=loc(fident) TILD mp2=loc(fident)
   COLON pre=form_r(P) LONGARROW post=form_r(P)
     { PFequivF (pre, (mp1, mp2), post) }
-;
 
 eager_body(P):
 | s1=stmt COMMA  mp1=loc(fident) TILD mp2=loc(fident) COMMA s2=stmt
     COLON pre=form_r(P) LONGARROW post=form_r(P)
     { PFeagerF (pre, (s1, mp1, mp2,s2), post) }
-;
 
 pgtybinding1:
 | x=ptybinding1 { List.map (fun (xs,ty) -> xs, PGTY_Type ty) x }
@@ -974,11 +937,9 @@ pgtybinding1:
 
 | pn=mident
     { [[pn], PGTY_Mem] }
-;
 
 pgtybindings:
 | x=pgtybinding1+ { List.flatten x }
-;
 
 (* -------------------------------------------------------------------- *)
 (* Type expressions                                                     *)
@@ -991,18 +952,14 @@ simpl_type_exp:
 | GLOB m=loc(mod_qident)      { PTglob m       }
 | LPAREN ty=type_exp RPAREN   { ty             }
 
-;
-
 type_args:
 | ty=loc(simpl_type_exp)                          { [ty] }
 | LPAREN tys=plist2(loc(type_exp), COMMA) RPAREN  { tys  }
-;
 
 type_exp:
 | ty=simpl_type_exp                          { ty }
 | ty=plist2(loc(simpl_type_exp), STAR)       { PTtuple ty }
 | ty1=loc(type_exp) RARROW ty2=loc(type_exp) { PTfun(ty1,ty2) }
-;
 
 (* -------------------------------------------------------------------- *)
 (* Parameter declarations                                              *)
@@ -1013,7 +970,6 @@ typed_vars:
 
 | xs=ident+
     { List.map (fun v -> (v, mk_loc v.pl_loc PTunivar)) xs }
-;
 
 param_decl:
 | LPAREN aout=plist0(typed_vars, COMMA) RPAREN
@@ -1021,7 +977,6 @@ param_decl:
 
 | LPAREN UNDERSCORE COLON ty=loc(type_exp) RPAREN
     { Fparams_imp ty }
-;
 
 (* -------------------------------------------------------------------- *)
 (* Statements                                                           *)
@@ -1039,11 +994,9 @@ lvalue_u:
    { match lqident_of_fident x.pl_desc with
      | None   -> parse_error x.pl_loc None
      | Some v -> PLvMap (mk_loc x.pl_loc v, ti, e) }
-;
 
 %inline lvalue:
 | x=loc(lvalue_u) { x }
-;
 
 base_instr:
 | x=lvalue EQ SAMPLE e=expr
@@ -1060,7 +1013,6 @@ base_instr:
 
 | ASSERT LPAREN c=expr RPAREN
     { PSassert c }
-;
 
 instr:
 | bi=base_instr SEMICOLON
@@ -1071,12 +1023,10 @@ instr:
 
 | WHILE LPAREN c=expr RPAREN b=block
    { PSwhile (c, b) }
-;
 
 if_expr:
 | IF c=paren(expr) b=block el=if_else_expr
    { PSif ((c, b), fst el, snd el) }
-;
 
 if_else_expr:
 |  /* empty */ { ([], []) }
@@ -1084,7 +1034,6 @@ if_else_expr:
 
 | ELIF e=paren(expr) b=block el=if_else_expr
     { ((e, b) :: fst el, snd el) }
-;
 
 block:
 | i=loc(base_instr) SEMICOLON
@@ -1092,7 +1041,6 @@ block:
 
 | stmt=brace(stmt)
    { stmt }
-;
 
 stmt: aout=loc(instr)* { aout }
 
@@ -1102,13 +1050,11 @@ stmt: aout=loc(instr)* { aout }
 var_decl:
 | VAR xs=plist1(lident, COMMA) COLON ty=loc(type_exp)
    { (xs, ty) }
-;
 
 loc_decl_names:
 | x=plist1(lident, COMMA) { (`Single, x) }
 
 | LPAREN x=plist2(lident, COMMA) RPAREN { (`Tuple, x) }
-;
 
 loc_decl_r:
 | VAR x=loc(loc_decl_names)
@@ -1122,11 +1068,9 @@ loc_decl_r:
 
 | VAR x=loc(loc_decl_names) EQ e=expr
     { { pfl_names = x; pfl_type = None; pfl_init = Some e; } }
-;
 
 loc_decl:
 | x=loc_decl_r SEMICOLON { x }
-;
 
 ret_stmt:
 | RETURN e=expr SEMICOLON
@@ -1134,7 +1078,6 @@ ret_stmt:
 
 | empty
     { None }
-;
 
 fun_def_body:
 | LBRACE decl=loc_decl* s=stmt rs=ret_stmt RBRACE
@@ -1142,7 +1085,6 @@ fun_def_body:
         pfb_body   = s   ;
         pfb_return = rs  ; }
     }
-;
 
 fun_decl:
 | x=lident pd=param_decl COLON ty=loc(type_exp)
@@ -1151,8 +1093,6 @@ fun_decl:
         pfd_tyresult = ty  ;
         pfd_uses     = (true, None); }
     }
-;
-
 
 mod_item:
 | v=var_decl
@@ -1172,7 +1112,6 @@ mod_item:
 
 | PROC x=lident EQ f=loc(fident)
     { Pst_alias (x, f) }
-;
 
 (* -------------------------------------------------------------------- *)
 (* Modules                                                              *)
@@ -1183,7 +1122,6 @@ mod_body:
 
 | LBRACE stt=loc(mod_item)* RBRACE
     { `Struct stt }
-;
 
 mod_def:
 | MODULE x=uident p=mod_params? t=mod_aty? EQ body=loc(mod_body)
@@ -1197,37 +1135,30 @@ mod_def:
 
         | `Struct st ->
              (x, mk_loc body.pl_loc (mk_mod ?modtypes:t p st)) }
-;
 
 top_mod_def:
 | LOCAL x=mod_def { mk_topmod ~local:true  x }
 | /*-*/ x=mod_def { mk_topmod ~local:false x }
-;
 
 top_mod_decl:
 | DECLARE MODULE x=uident COLON t=mod_type_restr
     { { ptmd_name = x; ptmd_modty = t; } }
-;
 
 mod_params:
 | LPAREN a=plist1(sig_param, COMMA) RPAREN  { a }
-;
 
 mod_aty:
 | COLON t=plist1(loc(mod_aty1), COMMA) { t }
-;
 
 mod_aty1:
 | x=qident { (x, []) }
 | x=qident xs=paren(ident+) { (x, xs) }
-;
 
 (* -------------------------------------------------------------------- *)
 (* Modules interfaces                                                   *)
 
 %inline mod_type:
 | x = qident { x }
-;
 
 %inline mod_type_restr:
 | x = qident
@@ -1235,7 +1166,6 @@ mod_aty1:
 
 | x = qident LBRACE restr=plist1(loc(mod_qident), COMMA) RBRACE
     { (x, restr) }
-;
 
 sig_def:
 | MODULE TYPE x=uident args=sig_params? EQ i=sig_body
@@ -1244,25 +1174,20 @@ sig_def:
       (x, Pmty_struct { pmsig_params = args;
                         pmsig_body   = i; })
     }
-;
 
 sig_body:
 | body=sig_struct_body { body }
-;
 
 sig_struct_body:
 | LBRACE ty=signature_item* RBRACE
     { ty }
-;
 
 sig_params:
 | LPAREN params=plist1(sig_param, COMMA) RPAREN
     { params }
-;
 
 sig_param:
 | x=uident COLON i=mod_type { (x, i) }
-;
 
 signature_item:
 | PROC i=boption(STAR) x=lident pd=param_decl COLON ty=loc(type_exp) qs=brace(qident*)?
@@ -1271,7 +1196,6 @@ signature_item:
             pfd_tyargs   = pd;
             pfd_tyresult = ty;
             pfd_uses     = (not i, qs); } }
-;
 
 (* -------------------------------------------------------------------- *)
 (* EcTypes declarations / definitions                                   *)
@@ -1279,39 +1203,31 @@ signature_item:
 typaram:
 | x=tident { (x, []) }
 | x=tident LTCOLON tc=plist1(lqident, tcand) { (x, tc) }
-;
 
 typarams:
 | empty { []  }
 | x=tident { [(x, [])] }
 | xs=paren(plist1(typaram, COMMA)) { xs }
-;
 
 %inline tyd_name:
 | tya=typarams x=ident { (tya, x) }
-;
 
 tcand:
 | x=loc(OP4) { if unloc x <> "&" then parse_error x.pl_loc None }
-;
 
 dt_ctor_def:
 | x=oident { (x, []) }
 | x=oident OF ty=plist1(loc(simpl_type_exp), tcand) { (x, ty) }
-;
 
 %inline datatype_def:
 | LBRACKET PIPE? ctors=plist1(dt_ctor_def, PIPE) RBRACKET { ctors }
-;
 
 rec_field_def:
 | x=ident COLON ty=loc(type_exp) { (x, ty); }
-;
 
 %inline record_def:
 | LBRACE fields=rlist1(rec_field_def, SEMICOLON) SEMICOLON? RBRACE
     { fields }
-;
 
 typedecl:
 | TYPE td=rlist1(tyd_name, COMMA)
@@ -1328,8 +1244,6 @@ typedecl:
 
 | TYPE td=tyd_name EQ te=datatype_def
     { [mk_tydecl td (PTYD_Datatype te)] }
-;
-
 
 (* -------------------------------------------------------------------- *)
 (* Type classes                                                         *)
@@ -1340,23 +1254,18 @@ typeclass:
       ptc_ops  = fst body;
       ptc_axs  = snd body; }
   }
-;
 
 tc_inth:
 | LTCOLON x=lqident { x }
-;
 
 tc_body:
 | ops=tc_op* axs=tc_ax* { (ops, axs) }
-;
 
 tc_op:
 | OP x=oident COLON ty=loc(type_exp) { (x, ty) }
-;
 
 tc_ax:
 | AXIOM x=ident COLON ax=form { (x, ax) }
-;
 
 (* -------------------------------------------------------------------- *)
 (* Type classes (instances)                                             *)
@@ -1380,7 +1289,6 @@ tycinstance:
       pti_axs  = axs;
       pti_args = Some (`Ring (c, p)); }
   }
-;
 
 tyci_op:
 | OP x=oident EQ tg=qoident
@@ -1388,11 +1296,9 @@ tyci_op:
 
 | OP x=oident EQ tg=qoident LTCOLON tvi=plist0(loc(type_exp), COMMA) GT
     { (x, (tvi, tg)) }
-;
 
 tyci_ax:
 | PROOF x=ident BY tg=tactic_core { (x, tg) }
-;
 
 (* -------------------------------------------------------------------- *)
 (* Operator definitions                                                 *)
@@ -1406,17 +1312,14 @@ op_tydom:
 
 | tys=paren(plist2(loc(type_exp), COMMA))
    { tys  }
-;
 
 tyvars_decl:
 | LBRACKET tyvars=rlist0(typaram, COMMA) RBRACKET { tyvars }
 | LBRACKET tyvars=rlist2(tident , empty) RBRACKET { List.map (fun x -> (x, [])) tyvars }
-;
 
 %inline op_or_const:
 | OP    x=nosmt { (`Op   , x) }
 | CONST x=nosmt { (`Const, x) }
-;
 
 operator:
 | k=op_or_const x=oident tyvars=tyvars_decl? COLON sty=loc(type_exp) {
@@ -1463,26 +1366,21 @@ operator:
       po_ax     = opax;
       po_nosmt  = snd k; }
   }
-;
 
 opbody:
 | e=expr     { `Expr e  }
 | bs=opcase+ { `Case bs }
-;
 
 opax:
 | AXIOMATIZED BY x=ident { x }
-;
 
 opcase:
 | WITH ptn=plist1(opptn, COMMA) IMPL e=expr
    { { pop_patterns = ptn; pop_body = e; } }
-;
 
 opptn:
 | x=ident EQ c=qoident tvi=tvars_app? ps=ident*
     { { pop_name = x; pop_tvi = tvi; pop_pattern = (c, ps); } }
-;
 
 predicate:
 | PRED x = oident
@@ -1499,35 +1397,29 @@ predicate:
    { { pp_name   = x;
        pp_tyvars = tyvars;
        pp_def    = PPconcr(p,f); } }
-;
 
 (* -------------------------------------------------------------------- *)
 top_decl:
 | x=top_mod_decl { PDCL_Module x }
-;
 
 (* -------------------------------------------------------------------- *)
 (* Global entries                                                       *)
 
 lemma_decl :
 | x=ident tyvars=tyvars_decl? pd=pgtybindings? COLON f=form { x,tyvars,pd,f }
-;
 
 nosmt:
 | NOSMT { true  }
 | empty { false }
-;
 
 %inline local:
 | LOCAL { true  }
 | empty { false }
-;
 
 axiom_tc:
 | /* empty */       { PILemma }
 | BY bracket(empty) { PLemma None }
 | BY t=tactic       { PLemma (Some t) }
-;
 
 axiom:
 | l=local AXIOM o=nosmt d=lemma_decl
@@ -1543,7 +1435,6 @@ axiom:
 | l=local  HOARE x=ident pd=pgtybindings? COLON p=loc( hoare_body(none)) ao=axiom_tc
 | l=local PHOARE x=ident pd=pgtybindings? COLON p=loc(phoare_body(none)) ao=axiom_tc
     { mk_axiom ~local:l (x, None, pd, p) ao }
-;
 
 (* -------------------------------------------------------------------- *)
 (* Theory interactive manipulation                                      *)
@@ -1557,11 +1448,9 @@ section_close : END SECTION x=option(uident) { x }
 import_flag:
 | IMPORT { `Import }
 | EXPORT { `Export }
-;
 
 theory_require :
 | REQUIRE ip=import_flag? x=uident { (x, ip) }
-;
 
 theory_import: IMPORT x=uqident { x }
 theory_export: EXPORT x=uqident { x }
@@ -1573,22 +1462,19 @@ theory_w3:
       let th = List.hd l in
       let path = List.rev (List.tl l) in
       path,th,r }
-;
 
 renaming:
 | TYPE  l=string_list AS s=STRING { l, RNty, s }
 | OP    l=string_list AS s=STRING { l, RNop, s }
 | AXIOM l=string_list AS s=STRING { l, RNpr, s }
-;
 
-%inline string_list: l=plist1(STRING,empty) { l };
+%inline string_list: l=plist1(STRING,empty) { l }
 
 (* -------------------------------------------------------------------- *)
 (* pattern selection (tactics)                                          *)
 idpattern:
 | x=ident { [x] }
 | LBRACKET xs=ident+ RBRACKET { xs }
-;
 
 ipattern:
 | UNDERSCORE
@@ -1608,15 +1494,12 @@ ipattern:
 
 | WHILE UNDERSCORE LBRACE p=spattern RBRACE
     { PtWhile p }
-;
 
 spattern:
 | UNDERSCORE { () }
-;
 
 tselect:
 | p=ipattern { p }
-;
 
 (* -------------------------------------------------------------------- *)
 (* tactic                                                               *)
@@ -1625,7 +1508,6 @@ intro_pattern_1_name:
 | s=LIDENT   { s }
 | s=UIDENT   { s }
 | s=MIDENT   { s }
-;
 
 intro_pattern_1:
 | UNDERSCORE
@@ -1639,12 +1521,10 @@ intro_pattern_1:
 
 | s=intro_pattern_1_name NOT
     {`WithRename s}
-;
 
 %inline icasemode:
 | /* empty */ { `One  }
 | STAR        { `Full }
-;
 
 intro_pattern:
 | x=loc(intro_pattern_1)
@@ -1685,7 +1565,6 @@ intro_pattern:
 
 | SLASH f=fpattern(form)
    { IPView f }
-;
 
 fpattern_head(F):
 | p=qident tvi=tvars_app?
@@ -1693,7 +1572,6 @@ fpattern_head(F):
 
 | LPAREN UNDERSCORE COLON f=F RPAREN
    { FPCut f }
-;
 
 fpattern_arg:
 | UNDERSCORE
@@ -1707,7 +1585,6 @@ fpattern_arg:
 
 | s=mident
     { EA_mem s }
-;
 
 fpattern(F):
 | hd=fpattern_head(F)
@@ -1715,17 +1592,14 @@ fpattern(F):
 
 | LPAREN hd=fpattern_head(F) args=loc(fpattern_arg)* RPAREN
    { mk_fpattern hd args }
-;
 
 pterm:
 | p=qident tvi=tvars_app? args=loc(fpattern_arg)*
     { { pt_name = p; pt_tys = tvi; pt_args = args; } }
-;
 
 %inline rwside:
 | MINUS { `RtoL }
 | empty { `LtoR }
-;
 
 %inline rwrgint:
 | i=loc(int) {
@@ -1733,37 +1607,31 @@ pterm:
       parse_error i.pl_loc (Some "focus-index cannot be 0");
     i.pl_desc
   }
-;
 
 %inline rwrg:
 | i=rwrgint              { ((Some i, Some i), `Include) }
 | TILD i=rwrgint         { ((Some i, Some i), `Exclude) }
 | rg=rgrw_cp             { (rg, `Include) }
 | TILD rg=paren(rgrw_cp) { (rg, `Exclude) }
-;
 
 %inline rgrw_cp:
 | i1=rwrgint DOTDOT i2=rwrgint { (Some i1, Some i2) }
 | i1=rwrgint DOTDOT            { (Some i1, None   ) }
 |        DOTDOT i2=rwrgint     { (None   , Some i2) }
-;
 
 rwrepeat:
 | NOT             { (`All  , None  ) }
 | QUESTION        { (`Maybe, None  ) }
 | n=uint NOT      { (`All  , Some n) }
 | n=uint QUESTION { (`Maybe, Some n) }
-;
 
 rwocc:
 | LBRACE       x=uint+ RBRACE { (`Inclusive, x) }
 | LBRACE MINUS x=uint+ RBRACE { (`Exclusive, x) }
-;
 
 rwpr_arg:
 | i=ident        { (i, None) }
 | i=ident f=form { (i, Some f) }
-;
 
 rwarg1:
 | SLASHSLASH
@@ -1786,7 +1654,6 @@ rwarg1:
 
 | SMT
    { RWSmt }
-;
 
 rwfpatterns(F):
 | f=fpattern(F)
@@ -1794,17 +1661,14 @@ rwfpatterns(F):
 
 | LPAREN fs=rlist2(rwfpattern(F), COMMA) RPAREN
     { fs }
-;
 
 rwfpattern(F):
 | s=rwside f=fpattern(F)
     { (s, f) }
-;
 
 rwarg:
 | r=rwarg1 { (None, r) }
 | rg=loc(rwrg) COLON r=rwarg1 { (Some rg, r) }
-;
 
 genpattern:
 | l=sform_h %prec prec_tactic
@@ -1818,7 +1682,6 @@ genpattern:
 
 | LPAREN LPAREN UNDERSCORE COLON f=form RPAREN args=loc(fpattern_arg)* RPAREN
     { `FPattern (mk_fpattern (FPCut f) args) }
-;
 
 simplify_arg:
 | DELTA l=qoident* { `Delta l }
@@ -1827,14 +1690,12 @@ simplify_arg:
 | BETA             { `Beta }
 | LOGIC            { `Logic }
 | MODPATH          { `ModPath }
-;
 
 simplify:
 | l=simplify_arg+     { l }
 | SIMPLIFY            { simplify_red }
 | SIMPLIFY l=qoident+ { `Delta l  :: simplify_red  }
 | SIMPLIFY DELTA      { `Delta [] :: simplify_red }
-;
 
 conseq:
 | empty                         { None, None }
@@ -1844,7 +1705,6 @@ conseq:
 | LONGARROW f2=form             { None, Some f2 }
 | UNDERSCORE LONGARROW f2=form  { None, Some f2 }
 | f1=form LONGARROW f2=form     { Some f1, Some f2 }
-;
 
 conseq_bd:
 | c=conseq                                   { c, None }
@@ -1861,17 +1721,14 @@ tac_dir:
 | BACKS { Backs }
 | FWDS  { Fwds }
 | empty { Backs }
-;
 
 codepos:
 | i=uint { (i, None) }
 | c=CPOS { c }
-;
 
 code_position:
 | n=uint          { Single n }
 | n1=uint n2=uint { Double (n1, n2) }
-;
 
 while_tac_info :
 | inv=sform
@@ -1882,7 +1739,6 @@ while_tac_info :
 
 | inv=sform vrnt=sform k=sform eps=sform
     { { wh_inv = inv; wh_vrnt = Some vrnt; wh_bds = Some (k, eps); } }
-;
 
 rnd_info:
 | empty
@@ -1896,11 +1752,9 @@ rnd_info:
 
 | phi=sform d1=sform d2=sform d3=sform d4=sform p=sform?
     { PMultRndParams ((phi, d1, d2, d3, d4), p) }
-;
 
 swap_info:
 | s=side? p=swap_pos { s,p }
-;
 
 swap_pos:
 | i1=uint i2=uint i3=uint
@@ -1914,12 +1768,10 @@ swap_pos:
 
 | LBRACKET i1=uint DOTDOT i2=uint RBRACKET p=int
     { SKmoveinter (i1, i2, p) }
-;
 
 int:
 | n=uint { n }
 | loc(MINUS) n=uint { -n }
-;
 
 side:
 | LBRACE n=uint RBRACE {
@@ -1930,7 +1782,6 @@ side:
               (EcLocation.make $startpos $endpos)
               (Some "variable side must be 1 or 2")
  }
-;
 
 occurences:
 | p=paren(uint+) {
@@ -1940,7 +1791,6 @@ occurences:
         (Some "`0' is not a valid occurence");
     p
   }
-;
 
 dbmap1:
 | f=dbmap_flag? x=dbmap_target {
@@ -1948,36 +1798,30 @@ dbmap1:
       pht_kind = (fst x);
       pht_name = (snd x); }
   }
-;
 
 dbmap_flag:
 | ADD   { `Include }
 | MINUS { `Exclude }
-;
 
 dbmap_target:
 | AT x=uqident { (`Theory, x) }
 | x=qident { (`Lemma, x) }
-;
 
 dbhint:
 | nl=boption(NOLOCALS) m=dbmap1* {
     { pht_nolocals = nl; pht_map = m; }
   }
-;
 
 %inline prod_form:
   | f1=sform f2=sform   { Some f1, Some f2 }
   | UNDERSCORE f2=sform { None   , Some f2 }
   | f1=sform UNDERSCORE { Some f1, None    }
-;
 
 app_bd_info:
   | empty    { PAppNone }
   | f=sform  { PAppSingle f }
   | f=prod_form g=prod_form s=sform?
              { PAppMult (s,fst f,snd f,fst g, snd g) }
-;
 
 logtactic:
 | REFLEX
@@ -2072,7 +1916,6 @@ logtactic:
 
 | POSE o=rwocc? x=ident CEQ p=form_h %prec prec_below_IMPL
    { Ppose (x, o |> omap (snd_map EcMaps.Sint.of_list), p) }
-;
 
 eager_info:
 | h=ident
@@ -2080,7 +1923,6 @@ eager_info:
 
 | LPAREN h=ident COLON s1=stmt TILD s2=stmt COLON pr=form LONGARROW po=form RPAREN
     { LE_todo (h, s1, s2, pr, po) }
-;
 
 eager_tac:
 | SEQ n1=uint n2=uint i=eager_info COLON p=sform
@@ -2103,35 +1945,30 @@ eager_tac:
 
 | info=eager_info COLON p=sform
     { Peager (info, p) }
-;
 
 form_or_double_form:
 | f=sform { Single f }
 | LPAREN UNDERSCORE COLON f1=form LONGARROW f2=form RPAREN { Double(f1,f2) }
-;
 
 code_pos:
 | i=uint { i }
-;
 
 code_pos_underscore:
 | UNDERSCORE { None }
-| i=code_pos { Some i} 
-;
+| i=code_pos { Some i}
 
 %inline if_option:
-| s=side?      
-   { `Head s } 
+| s=side?
+   { `Head s }
 
 | i1=code_pos_underscore i2=code_pos_underscore COLON f=sform
-   { `Seq (None, i1, i2, f) } 
+   { `Seq (None, i1, i2, f) }
 
-| s=side i1=code_pos_underscore i2=code_pos_underscore COLON f=sform 
+| s=side i1=code_pos_underscore i2=code_pos_underscore COLON f=sform
    { `Seq (Some s, i1, i2, f) }
- 
+
 | s=side i=code_pos? COLON  LPAREN UNDERSCORE COLON f1=form LONGARROW f2=form RPAREN
-   { `SeqOne (s, i, f1, f2) } 
-;
+   { `SeqOne (s, i, f1, f2) }
 
 phltactic:
 | PROC
@@ -2303,7 +2140,6 @@ phltactic:
     { Pbd_equiv (s, pr, po) }
 
 | AUTO { Pauto }
-;
 
 bdhoare_split:
 | b1=sform b2=sform b3=sform?
@@ -2314,16 +2150,13 @@ bdhoare_split:
 
 | NOT b1=sform b2=sform
     { BDH_split_not (Some b1,b2) }
-;
 
 trans_kind:
  | s=side  c=brace(stmt) { TKstmt(Some s, c) }
  | f=loc(fident) { TKfun (f) }
-;
 
 trans_hyp:
 | LPAREN p=form LONGARROW q=form RPAREN { (p,q) }
-;
 
 fel_pred_spec:
 | f=loc(fident) COLON p=sform
@@ -2338,13 +2171,11 @@ eqobs_in:
 | COLON f3=sform                     { (None   , None   , Some f3)   }
 | f1=sform COLON f3=sform?           { (Some f1, None   , f3)   }
 | f1=sform f2=sform COLON f3=sform?  { (Some f1, Some f2, f3)   }
-;
 
 pgoptionkw:
 | x=loc(SPLIT) { mk_loc x.pl_loc "split" }
 | x=loc(SUBST) { mk_loc x.pl_loc "subst" }
 | x=lident     { x }
-;
 
 pgoption:
 | b=boption(MINUS) DELTA
@@ -2366,11 +2197,9 @@ pgoption:
         parse_error x.pl_loc
           (Some ("invalid option: " ^ (unloc x)))
   }
-;
 
 pgoptions:
 | xs=bracket(pgoption+) { xs }
-;
 
 tactic_core_r:
 | IDTAC
@@ -2419,11 +2248,9 @@ tactic_core_r:
 (* DEBUG *)
 | DEBUG
     { Pdebug }
-;
 
 %inline tactic_core:
 | x=loc(tactic_core_r) { x }
-;
 
 tactic_ip:
 | t=tactic_core %prec prec_below_IMPL
@@ -2431,7 +2258,6 @@ tactic_ip:
 
 | t=tactic_core IMPL ip=intro_pattern+
     { { pt_core = t; pt_intros = ip; } }
-;
 
 tactic:
 | t=tactic_ip %prec prec_below_IMPL
@@ -2440,7 +2266,6 @@ tactic:
 | t1=tactic_ip ORA t2=tactic_ip
     { let loc = EcLocation.make $startpos $endpos in
         mk_core_tactic (mk_loc loc (Por (t1, t2))) }
-;
 
 tactic_chain:
 | LBRACKET ts=plist1(loc(tactics0), PIPE) RBRACKET
@@ -2459,7 +2284,6 @@ tactic_chain:
 | LAST  n=uint FIRST { Protate (`Right, n) }
 
 | EXPECT n=uint t=loc(tactics) { Pexpect (mk_core_tactic (mk_loc t.pl_loc (Pseq (unloc t))), n) }
-;
 
 subtactic:
 | t=loc(tactic_chain)
@@ -2467,17 +2291,14 @@ subtactic:
 
 | t=tactic
     { t }
-;
 
 subtactics:
 | t=subtactic { [t] }
 | ts=subtactics SEMICOLON t=subtactic { t :: ts }
-;
 
 tactics:
 | t=tactic %prec SEMICOLON { [t] }
 | t=tactic SEMICOLON ts=subtactics { t :: (List.rev ts) }
-;
 
 tactics0:
 | ts=tactics   { Pseq ts }
@@ -2488,12 +2309,10 @@ toptactic:
 | STAR  t=tactics { t }
 | MINUS t=tactics { t }
 |       t=tactics { t }
-;
 
 tactics_or_prf:
 | t=toptactic  { `Actual t    }
 | p=proof      { `Proof  p    }
-;
 
 proof:
 | PROOF modes=proofmode1* {
@@ -2507,15 +2326,12 @@ proof:
            | `Strict -> { pmodes with pm_strict = flag; })
         { pm_strict = true; } modes
   }
-;
 
 proofmode1:
 | b=boption(MINUS) pm=loc(proofmodename) { (pm, not b) }
-;
 
 proofmodename:
 | STRICT { `Strict }
-;
 
 (* -------------------------------------------------------------------- *)
 (* Theory cloning                                                       *)
@@ -2538,16 +2354,13 @@ theory_clone:
          pthc_prf  = EcUtils.odfl [] cp; }
      in
        (oth, ip) }
-;
 
 clone_with:
 | WITH x=plist1(clone_override, COMMA) { x }
-;
 
 clone_lemma_base:
 | STAR     { `All }
 | x=_ident { `Named x }
-;
 
 clone_lemma_1_core:
 | l=genqident(clone_lemma_base) {
@@ -2559,7 +2372,6 @@ clone_lemma_1_core:
       | x :: xs -> `All (Some (mk_loc l.pl_loc (List.rev xs, x)))
     end
   }
-;
 
 clone_lemma_1:
 | cl=clone_lemma_1_core
@@ -2567,7 +2379,6 @@ clone_lemma_1:
 
 | cl=clone_lemma_1_core BY t=tactic_core
     { { pthp_mode = cl; pthp_tactic = Some t; } }
-;
 
 clone_lemma:
 | x=clone_lemma_1
@@ -2575,22 +2386,18 @@ clone_lemma:
 
 | xs=clone_lemma COMMA x=clone_lemma_1
     { x :: xs }
-;
 
 clone_proof:
 | PROOF x=clone_lemma { List.rev x }
-;
 
 opclmode:
 | EQ     { `Alias }
 | LARROW { `Inline }
-;
 
 cltyparams:
 | empty { [] }
 | x=tident { [x] }
 | xs=paren(plist1(tident, COMMA)) { xs }
-;
 
 clone_override:
 | TYPE ps=cltyparams x=qident EQ t=loc(type_exp)
@@ -2644,11 +2451,9 @@ clone_override:
 
 | THEORY x=uqident EQ y=uqident
    { (x, PTHO_Theory y) }
-;
 
 realize:
 | REALIZE x=qident { x }
-;
 
 (* -------------------------------------------------------------------- *)
 (* Printing                                                             *)
@@ -2664,13 +2469,11 @@ print:
 | MODULE      qs=qident          { Pr_mod  qs }
 | MODULE TYPE qs=qident          { Pr_mty  qs }
 | GLOB        qs=loc(mod_qident) { Pr_glob qs }
-;
 
 prover_iconfig:
 | /* empty */     { (None   , None   ) }
 | i=uint          { (Some i , None   ) }
 | i1=uint i2=uint { (Some i1, Some i2) }
-;
 
 prover_info:
 | ic=prover_iconfig pl=plist1(loc(STRING), empty)?
@@ -2678,7 +2481,6 @@ prover_info:
         { pprov_max   = m;
           pprov_time  = t;
           pprov_names = pl; } }
-;
 
 gprover_info:
 | PROVER x=prover_info
@@ -2686,11 +2488,10 @@ gprover_info:
 
 | TIMEOUT t=uint
     { { pprov_max = None; pprov_time = Some t; pprov_names = None } }
-;
 
 addrw:
-| HINT REWRITE p=lqident COLON l=lqident* {p,l} 
-;
+| HINT REWRITE p=lqident COLON l=lqident* {p,l}
+
 (* -------------------------------------------------------------------- *)
 (* Global entries                                                       *)
 
@@ -2723,35 +2524,28 @@ global_:
 
 | EXTRACTION i=extract_info { Gextract i }
 | addrw            { Gaddrw $1 }
-;
 
 extract_info:
-|  s=STRING? qs=plist1(toextract,COMMA) w=withextract { (s,qs,w) }
-;
+| s=STRING? qs=plist1(toextract,COMMA) w=withextract { (s,qs,w) }
 
 toextract:
 | OP q=qoident     {ExOp q}
 | TYPE q=qoident   {ExTy q}
 | THEORY q=qoident {ExTh q}
-;
 
 withextract:
 | empty { [] }
 | WITH w=plist1(withextract1,COMMA) { w }
-;
+
 withextract1:
 | p=toextract EQ s=STRING { p,s }
-;
-
 
 stop:
 | EOF { }
 | DROP DOT { }
-;
 
 global:
 | g=loc(global_) FINAL { g }
-;
 
 prog_r:
 | g=global { P_Prog ([g], false) }
@@ -2762,73 +2556,57 @@ prog_r:
 
 | error
    { parse_error (EcLocation.make $startpos $endpos) None }
-;
 
 prog:
 | x=loc(prog_r) { x }
-;
 
 (* -------------------------------------------------------------------- *)
 %inline plist0(X, S):
 | aout=separated_list(S, X) { aout }
-;
 
 iplist1_r(X, S):
 | x=X { [x] }
 | xs=iplist1_r(X, S) S x=X { x :: xs }
-;
 
 %inline iplist1(X, S):
 | xs=iplist1_r(X, S) { List.rev xs }
-;
 
 %inline plist1(X, S):
 | aout=separated_nonempty_list(S, X) { aout }
-;
 
 %inline plist2(X, S):
 | x=X S xs=plist1(X, S) { x :: xs }
-;
 
 %inline list2(X):
 | x=X xs=X+ { x :: xs }
-;
 
 %inline empty:
 | /**/ { () }
-;
 
 (* -------------------------------------------------------------------- *)
 __rlist1(X, S):                         (* left-recursive *)
 | x=X { [x] }
 | xs=__rlist1(X, S) S x=X { x :: xs }
-;
 
 %inline rlist0(X, S):
 | /* empty */     { [] }
 | xs=rlist1(X, S) { xs }
-;
 
 %inline rlist1(X, S):
 | xs=__rlist1(X, S) { List.rev xs }
-;
 
 %inline rlist2(X, S):
 | xs=__rlist1(X, S) S x=X { List.rev (x :: xs) }
-;
 
 (* -------------------------------------------------------------------- *)
 %inline paren(X):
 | LPAREN x=X RPAREN { x }
-;
 
 %inline brace(X):
 | LBRACE x=X RBRACE { x }
-;
 
 %inline bracket(X):
 | LBRACKET x=X RBRACKET { x }
-;
 
 (* -------------------------------------------------------------------- *)
 %inline loc(X):
@@ -2837,10 +2615,8 @@ __rlist1(X, S):                         (* left-recursive *)
       pl_loc  = EcLocation.make $startpos $endpos;
     }
   }
-;
 
 (* -------------------------------------------------------------------- *)
 %inline uoption(X):
 | x=X { Some x }
 | UNDERSCORE { None }
-;
