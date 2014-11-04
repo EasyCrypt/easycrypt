@@ -22,6 +22,7 @@
 
 \lstdefinestyle{easycrypt-default}{
   columns=fullflexible,
+  keepspaces=true,
   captionpos=b,
   frame=tb,
   xleftmargin=.1\textwidth,
@@ -41,4 +42,6 @@
   keywordstyle=[7]{\color{Blue}},
   keywordstyle=[8]{\color{Red}},
   keywordstyle=[9]{\color{OliveGreen}},
+  literate=
+    {=>}{$\Rightarrow$}{1},
 }

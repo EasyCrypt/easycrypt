@@ -16,6 +16,14 @@
 \usepackage{xspace}
 
 % --------------------------------------------------------------------
+\input{prelude}
+\input{notations}
+
+% --------------------------------------------------------------------
+\usepackage{multind}
+\makeindex{tactics}
+
+% --------------------------------------------------------------------
 \def\lnkcolor{blue}
 \usepackage{hyperref}
 \hypersetup{bookmarks=true,
@@ -28,23 +36,17 @@
             urlcolor=\lnkcolor}
 
 % --------------------------------------------------------------------
-\input{prelude}
-\input{notations}
-
-% --------------------------------------------------------------------
-\usepackage{multind}
-\makeindex{tactics}
-
-% --------------------------------------------------------------------
 \begin{document}
 
 \maketitle
 \thispagestyle{empty}
 
-\section{Tactics}
 \input{tactics}
 
 \clearpage
 \printindex{tactics}{Index of Tactics \emph{and al}}
+
+\clearpage
+\listoffixmes
 
 \end{document}
