@@ -31,12 +31,13 @@
 
 \newenvironment{tactic}[2][\empty]{%
 \setlength{\parindent}{0pt}
+\trivlist{}{}\item\relax%
 \hrule width \hsize \kern .5mm \hrule width \hsize height 1pt \kern -.2mm
 \index{tactics}{#2}%
 \label{tactic-#2}%
 \impmark\ifx\empty#1\tct{#2}\else\tct{#1}\fi\strut
 \hrule width \hsize \kern 1.5mm}
-{\par\addvspace{1.2\baselineskip}}
+{\endtrivlist}
 
 \newenvironment{tsyntax}[2][plain]
 {\IfStrEq{#1}{plain}{\textbf{Syntax:} \tct{#2}.}{
