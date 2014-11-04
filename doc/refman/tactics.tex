@@ -48,13 +48,6 @@
 
 \subsection{Program Logic}
 
-Unless specified, program logic tactics operate on a program's last
-instruction. Although we describe these tactics as if they operated on
-single instructions, their practical implementation automatically and
-implicitly applies tactic \rtactic{seq} to deal with context.
-
-\medskip
-
 \paragraph{Reasoning on Specifications}
 \input{tactics/symmetry.tex}
 \input{tactics/transitivity.tex}
@@ -67,6 +60,14 @@ implicitly applies tactic \rtactic{seq} to deal with context.
 %\input{tactics/pr_bounded.tex}
 
 \paragraph{Reasoning on Programs}
+Unless specified, the following program logic tactics operate on a
+program's last instruction. Although we describe these tactics as if
+they operated on single instructions, their practical implementation
+automatically and implicitly applies tactic \rtactic{seq} to deal with
+context.
+
+\medskip
+
 \input{tactics/skip.tex}
 \input{tactics/seq.tex}
 \input{tactics/sp.tex}
