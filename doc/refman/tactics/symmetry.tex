@@ -1,6 +1,17 @@
 % --------------------------------------------------------------------
 \begin{tactic}{symmetry}
-  \begin{tsyntax}[empty]{symmetry}
-  \fix{Missing description of symmetry}.
+  \begin{tsyntax}{symmetry}
+  In pRHL, swaps the two programs, transforming the pre and
+  postconditions by swapping the memories they refer to.
+
+  $$
+  \inferrule%%
+    {\pRHL{\symrel{P}}{c_2}{c_1}{\symrel{Q}}}%%
+    {\pRHL{P}{c_1}{c_2}{Q}}
+  ,$$
+
+  where, $\symrel{\codt}$ inverses its argument relation. (That is,
+  for any relation $R$ and any $(m_1,m_2)\in{R}$, we have
+  $(m_2,m_1)\in\symrel{R}$.)
   \end{tsyntax}
 \end{tactic}
