@@ -5,6 +5,7 @@
 
 \input{tactics/idtac.tex}
 \input{tactics/move.tex}
+\input{tactics/clear.tex}
 \input{tactics/done.tex}
 \input{tactics/apply.tex}
 \input{tactics/exact.tex}
@@ -34,8 +35,6 @@
 \input{tactics/logic.tex}
 
 \input{tactics/reflexivity.tex}
-\input{tactics/symmetry.tex}
-\input{tactics/transitivity.tex}
 
 \input{tactics/ringeq.tex}
 \input{tactics/fieldeq.tex}
@@ -49,32 +48,55 @@
 
 \subsection{Program Logic}
 
-\input{tactics/auto.tex}
-\input{tactics/alias.tex}
+Unless specified, program logic tactics operate on a program's last
+instruction. Although we describe these tactics as if they operated on
+single instructions, their practical implementation automatically and
+implicitly applies tactic \rtactic{seq} to deal with context.
+
+\medskip
+
+\paragraph{Reasoning on Specifications}
+\input{tactics/symmetry.tex}
+\input{tactics/transitivity.tex}
+\input{tactics/conseq.tex}
 \input{tactics/byequiv.tex}
 \input{tactics/byphoare.tex}
+\input{tactics/hoare.tex}
 \input{tactics/bypr.tex}
-\input{tactics/call.tex}
-\input{tactics/cfold.tex}
-\input{tactics/clear.tex}
-\input{tactics/conseq.tex}
-\input{tactics/eager.tex}
 \input{tactics/exfalso.tex}
-\input{tactics/fel.tex}
-\input{tactics/fission.tex}
-\input{tactics/fusion.tex}
-\input{tactics/inline.tex}
-\input{tactics/kill.tex}
-\input{tactics/modpath.tex}
 %\input{tactics/pr_bounded.tex}
+
+\paragraph{Reasoning on Programs}
+\input{tactics/skip.tex}
+\input{tactics/seq.tex}
+\input{tactics/sp.tex}
+\input{tactics/wp.tex}
+\input{tactics/rnd.tex}
+\input{tactics/if.tex}
+\input{tactics/while.tex}
+\input{tactics/call.tex}
+
+\paragraph{Transforming Programs}
+\input{tactics/swap.tex}
+\input{tactics/inline.tex}
+
 \input{tactics/rcondf.tex}
 \input{tactics/rcondt.tex}
-\input{tactics/rnd.tex}
-\input{tactics/seq.tex}
-\input{tactics/sim.tex}
-\input{tactics/skip.tex}
+
 \input{tactics/splitwhile.tex}
-\input{tactics/sp.tex}
-\input{tactics/swap.tex}
 \input{tactics/unroll.tex}
-\input{tactics/wp.tex}
+\input{tactics/fission.tex}
+\input{tactics/fusion.tex}
+
+\input{tactics/alias.tex}
+\input{tactics/cfold.tex}
+\input{tactics/kill.tex}
+\input{tactics/modpath.tex}
+
+\paragraph{Automated Tactics}
+\input{tactics/auto.tex}
+\input{tactics/sim.tex}
+
+\paragraph{Advanced Tactics}
+\input{tactics/eager.tex}
+\input{tactics/fel.tex}

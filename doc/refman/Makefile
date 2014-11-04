@@ -3,7 +3,8 @@
 # --------------------------------------------------------------------
 .PHONY: all clean __force__
 
-LATEXMK = latexmk -bibtex -output-directory=_build
+LATEXMK = latexmk -bibtex -output-directory=_build\
+                  -synctex=1 -file-line-error
 
 all: easycrypt.pdf
 
