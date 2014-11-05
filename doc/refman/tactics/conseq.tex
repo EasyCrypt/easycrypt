@@ -10,20 +10,25 @@
   $\geq^\uparrow$) is $\Leftarrow$ (resp. $\Leftrightarrow$ and
   $\Rightarrow$).
   \begin{mathpar}
-  \inferrule*[left=(pRHL),rightskip=10em]%%
+  \inferrule*[left=(\prhl),rightskip=10em]%%
     {P' \Rightarrow P \\%
      Q \Rightarrow Q' \\%
      \pRHL{P}{c}{c'}{Q}}%%
     {\pRHL{P'}{c}{c'}{Q'}}%%
     \quad\raisebox{.7em}{\tct{conseq (_: P ==> Q)}} \\
-  \inferrule*[left=(pHL),rightskip=10em]%%
+  \inferrule*[left=(\prhl),rightskip=10em]%%
+    {Q \Rightarrow Q' \\%
+     \pRHL{P'}{c}{c'}{Q}}%%
+    {\pRHL{P'}{c}{c'}{Q'}}%%
+    \quad\raisebox{.7em}{\tct{conseq (_: _ ==> Q)}} \\
+  \inferrule*[left=(\phl),rightskip=10em]%%
     {P' \Rightarrow \delta \mathrel{\diamond} \delta' \\%
      P' \Rightarrow P \\%
      Q \mathrel{\diamond^\uparrow} Q' \\%
      \pHL{P}{c}{Q}{\diamond}{\delta}}%%
     {\pHL{P'}{c}{Q'}{\diamond}{\delta'}}%%
     \quad\raisebox{.7em}{\tct{conseq (_: P ==> Q: $\delta$)}} \\
-  \inferrule*[left=(HL),rightskip=10em]%%
+  \inferrule*[left=(\hl),rightskip=10em]%%
     {P' \Rightarrow P \\%
      Q \Rightarrow Q' \\%
      \HL{P}{c}{Q}}%%
@@ -32,8 +37,16 @@
   \end{mathpar}
   \end{tsyntax}
 
+  \begin{tsyntax}{conseq <lemma>}
+  Only works on procedures. Same as \tct{conseq <specification>}, but
+  the specification to use is inferred from the lemma provided. Raises
+  an error if the lemma does not refer to the expected procedure(s).
+  \end{tsyntax}
+
   \begin{tsyntax}{conseq* <specification>}
   Same as \tct{conseq <specification>}, but the subgoal corresponding
   to the postcondition is refined by a ``may modify'' analysis.
   \end{tsyntax}
+
+  \fix{Missing descriptions of combining variants of conseq}.
 \end{tactic}
