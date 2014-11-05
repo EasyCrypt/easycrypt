@@ -117,7 +117,7 @@ let t_trivial_r tc =
                  EcPhlPr.t_prbounded false;
                  EcPhlSkip.t_skip ]
   in
-    EcLowGoal.t_trivial (Some subtc) tc
+    EcLowGoal.t_trivial (Some (FApi.t_try subtc)) tc
 
 (* -------------------------------------------------------------------- *)
 let t_trivial = FApi.t_low0 "trivial" t_trivial_r
