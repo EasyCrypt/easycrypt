@@ -234,7 +234,8 @@ let op3 = op_char_34* op_char_3 op_char_34*
 let op4 = (op_char_4 op_char_4_r*) | ("::" ':'+)
 let nop = '\\' ichar+
 
-let uniop = op1 | '+' | '-' | nop
+let uniop = '!' | op1 | '+' | '-' | nop
+
 let binop =
     op1  | op2   | op3  | op4   | nop
   | '+'  | '-'   | "=>" | "<=>"
