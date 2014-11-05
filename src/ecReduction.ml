@@ -669,3 +669,12 @@ and simplify_rec ri hyps f =
     let f' = f_app fo (List.map (simplify ri hyps) args) f.f_ty in
     (try h_red ri hyps f' with NotReducible -> f')
   | _ -> f_map (fun ty -> ty) (simplify ri hyps) f
+
+(* -------------------------------------------------------------------- *)
+type xconv = [`Eq | `AlphaEq | `Conv]
+
+let xconv (mode : xconv) hyps =
+  match mode with
+  | `Eq      -> f_equal
+  | `AlphaEq -> is_alpha_eq hyps
+  | `Conv    -> is_conv hyps

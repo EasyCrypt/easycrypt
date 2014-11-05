@@ -685,11 +685,29 @@ module FApi = struct
     | `Failure _  -> tt2 tc
 
   (* ------------------------------------------------------------------ *)
+  let t_ors_pmap (totc : 'a -> backward option) (xs : 'a list) (tc : tcenv1) =
+    let rec doit (failure : exn option) xs =
+      match xs, failure with
+      | [], None   -> tcenv_of_tcenv1 tc
+      | [], Some e -> raise e
+
+      | x :: xs, _ ->
+          match totc x with
+          | None    -> doit failure xs
+          | Some tt ->
+              match t_try_base tt tc with
+              | `Success tc -> tc
+              | `Failure e  -> doit (Some e) xs
+
+    in doit None xs
+
+  (* ------------------------------------------------------------------ *)
+  let t_ors_map (totc : 'a -> backward) (xs : 'a list) (tc : tcenv1) =
+    t_ors_pmap (some |- totc) xs tc
+
+  (* ------------------------------------------------------------------ *)
   let rec t_ors (tts : backward list) (tc : tcenv1) =
-    match tts with
-    | []        -> tcenv_of_tcenv1 tc
-    | [tt]      -> tt tc
-    | tt :: tts -> t_or tt (t_ors tts) tc
+    t_ors_pmap (fun x -> Some x) tts tc
 end
 
 (* -------------------------------------------------------------------- *)

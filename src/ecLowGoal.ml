@@ -1259,38 +1259,41 @@ let t_subst ?kind ?(clear = true) ?var ?tside ?eqid (tc : tcenv1) =
   with Not_found -> raise InvalidGoalShape
 
 (* -------------------------------------------------------------------- *)
-let t_absurd_hyp id tc =
-  let hyps,concl = FApi.tc1_flat tc in
-  let f = LDecl.lookup_hyp_by_id id hyps in
-  let (b,f) = destr_nots f in
-  let test f' = 
-    let (b',f') = destr_nots f' in
-    b = not b' && EcReduction.is_alpha_eq hyps f f' in
+let t_absurd_hyp ?(conv  = `AlphaEq) id tc =
+  let hyps, concl = FApi.tc1_flat tc in
+
+  let b, f = destr_nots (LDecl.lookup_hyp_by_id id hyps) in
+
+  let test f' =
+    let b', f' = destr_nots f' in
+    (b = not b') && EcReduction.xconv conv hyps f f' in
+
   let id' =
-    try 
-      LowAssumption.gen_find_in_hyps test hyps 
-    with _ -> tc_error !!tc "absurd_hyp no assumption"
+    try  LowAssumption.gen_find_in_hyps test hyps 
+    with _ -> raise InvalidGoalShape
   in
-  let x,hnx,hx = 
-    if b then f, id', id else f_not f, id, id' in
-  FApi.t_seqs [
+
+  let x, hnx, hx = if b then f, id, id' else f_not f, id', id in
+
+  FApi.t_internal (FApi.t_seqs [
     t_apply_s LG.p_false_elim [] ~args:[concl] ~sk:1;
     FApi.t_seqsub (t_apply_s LG.p_negbTE [] ~args:[x] ~sk:2)
-      [ t_apply_hyp hnx;
-        t_apply_hyp hx ]
-  ] tc
+      [ t_apply_hyp hnx; t_apply_hyp hx ]
+  ]) tc
 
-let t_absurd_hyp ?id tc =
+let t_absurd_hyp ?conv ?id tc =
+  let tabsurd = t_absurd_hyp ?conv in
+
   match id with
-  | Some id -> t_absurd_hyp id tc
-  | None -> 
-    let hyps = FApi.tc1_hyps tc in
-    let test (id,lk) = 
-      match lk with
-      | LD_hyp f when is_not f -> Some (t_absurd_hyp id)
-      | _ -> None in
-    let tacs = List.pmap test (LDecl.tohyps hyps).h_local in
-    FApi.t_ors tacs tc
+  | Some id -> tabsurd id tc
+  | None    ->
+      let tott (id, lk) =
+        match lk with
+        | LD_hyp f when is_not f -> Some (tabsurd id)
+        | _ -> None
+
+      in let hyps = (LDecl.tohyps (FApi.tc1_hyps tc)).h_local
+      in FApi.t_ors_pmap tott hyps tc
 
 (* -------------------------------------------------------------------- *)
 type pgoptions =  {
@@ -1448,11 +1451,11 @@ let t_logic_trivial (tc : tcenv1) =
     FApi.t_try (t_assumption `Conv);
     t_progress t_id;
     FApi.t_try (t_assumption `Conv);
-    t_fail
+    FApi.t_try (t_absurd_hyp ~conv:`Eq);
+    t_fail;
   ]
 
-  in
-    FApi.t_internal (FApi.t_try (FApi.t_seqs seqs)) tc
+  in FApi.t_internal (FApi.t_try (FApi.t_seqs seqs)) tc
 
 (* -------------------------------------------------------------------- *)
 let t_trivial (ott : FApi.backward option) (tc : tcenv1) =
