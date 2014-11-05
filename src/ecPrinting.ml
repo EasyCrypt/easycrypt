@@ -513,7 +513,8 @@ let e_bin_prio_impl   = (10, `Infix `Right)
 let e_bin_prio_iff    = (12, `NonAssoc)
 let e_bin_prio_if     = (15, `Prefix)
 let e_bin_prio_if3    = (17, `Infix `NonAssoc)
-let e_bin_prio_letin  = (19, `Prefix)
+let e_bin_prio_letin  = (18, `Prefix)
+let e_bin_prio_nop    = (19, `Infix `Left)
 let e_bin_prio_or     = (20, `Infix `Right)
 let e_bin_prio_and    = (25, `Infix `Right)
 let e_bin_prio_eq     = (27, `Infix `NonAssoc)
@@ -558,6 +559,7 @@ let priority_of_binop name =
   | Some EP.OP4 _  -> Some e_bin_prio_op4
   | Some EP.AT     -> Some e_bin_prio_op4
   | Some EP.DCOLON -> Some e_bin_prio_op5
+  | Some EP.NOP _  -> Some e_bin_prio_nop
 
   | _ -> None
 
@@ -566,10 +568,14 @@ let priority_of_unop =
   let id_not = EcPath.basename EcCoreLib.CI_Bool.p_not in
     fun name ->
       match EcIo.lex_single_token name with
-      | Some EP.NOT      -> Some e_uni_prio_not
-      | Some EP.PUNIOP s when s = id_not -> Some e_uni_prio_not
-      | Some EP.PUNIOP _ -> Some e_uni_prio_uminus
-      | _  -> None
+      | Some EP.NOT ->
+          Some e_uni_prio_not
+      | Some EP.PUNIOP s when s = id_not ->
+          Some e_uni_prio_not
+      | Some EP.PUNIOP _ ->
+          Some e_uni_prio_uminus
+      | _ ->
+          None
 
 (* -------------------------------------------------------------------- *)
 let is_binop name =

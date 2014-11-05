@@ -232,13 +232,14 @@ let op1 = op_char_1234* op_char_1 op_char_1234*
 let op2 = op_char_2 | op_char_2 op_char_234_r op_char_234*
 let op3 = op_char_34* op_char_3 op_char_34*
 let op4 = (op_char_4 op_char_4_r*) | ("::" ':'+)
+let nop = '\\' ichar+
 
-let uniop = '!' | op2
-
+let uniop = '!' | op1 | nop
 let binop =
-  op1 | op2 | op3 | op4 | '+' | '-' |
-  "&&" | "/\\" | "||" | "\\/" | "=>" | "<=>" | "=" |
-  '>' | '<' | ">=" | "<="
+    op1  | op2   | op3  | op4   | nop
+  | '+'  | '-'   | "=>" | "<=>"
+  | "&&" | "/\\" | "||" | "\\/"
+  | "="  | ">"   | "<"  | ">="  | "<="
 
 (* -------------------------------------------------------------------- *)
 rule main = parse
@@ -326,6 +327,7 @@ rule main = parse
   | "/="  { [SLASHEQ     ] }
   | "//=" { [SLASHSLASHEQ] }
 
+  | nop as s  { [NOP s] }
   | op1 as s  { [OP1 s] }
   | op2 as s  { [OP2 s] }
   | op3 as s  { [OP3 s] }

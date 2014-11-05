@@ -333,7 +333,7 @@
 %token WITH
 %token WP
 %token ZETA
-%token <string> OP1 OP2 OP3 OP4
+%token <string> NOP OP1 OP2 OP3 OP4
 %token LTCOLON GT LT GE LE
 
 %nonassoc prec_below_comma
@@ -351,6 +351,7 @@
 
 %nonassoc prec_below_order
 
+%left NOP
 %left GT LT GE LE
 %left OP1
 %right QUESTION
@@ -463,7 +464,7 @@ fident:
 | LE { "<=" }
 
 %inline uniop:
-| x=OP1 { Printf.sprintf "[%s]" x }
+| x=OP1 | x=NOP { Printf.sprintf "[%s]" x }
 | ADD   { "[+]" }
 | MINUS { "[-]" }
 
@@ -590,6 +591,9 @@ expr_u:
 
 | e=expr_chained_orderings %prec prec_below_order
    { fst e }
+
+| e1=expr op=loc(NOP) ti=tvars_app? e2=expr
+    { peapp_symb op.pl_loc op.pl_desc ti [e1; e2] }
 
 | e1=expr op=loc(OP1) ti=tvars_app? e2=expr
     { peapp_symb op.pl_loc op.pl_desc ti [e1; e2] }
@@ -796,6 +800,9 @@ form_u(P):
 
 | op=loc(uniop) ti=tvars_app? e=form_r(P)
    { pfapp_symb op.pl_loc op.pl_desc ti [e] }
+
+| e1=form_r(P) op=loc(NOP) ti=tvars_app? e2=form_r(P)
+    { pfapp_symb op.pl_loc op.pl_desc ti [e1; e2] }
 
 | e1=form_r(P) op=loc(OP1) ti=tvars_app? e2=form_r(P)
     { pfapp_symb op.pl_loc op.pl_desc ti [e1; e2] }
