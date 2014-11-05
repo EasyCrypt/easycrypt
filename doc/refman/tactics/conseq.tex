@@ -1,6 +1,39 @@
 % --------------------------------------------------------------------
 \begin{tactic}{conseq}
-  \begin{tsyntax}[empty]{conseq}
-  \fix{Missing description of conseq}.
+  \begin{tsyntax}{conseq <specification>}
+  Rule of consequence. Proves a specification by weakening of a
+  stronger result. Any one of the specification places can be filled
+  with a wildcard \tct{_} to keep the value it contains in the current
+  goal and trivially discharge the corresponding subgoal.
+
+  \textbf{Examples:} In the following, $\leq^\uparrow$ (resp. $=^\uparrow$,
+  $\geq^\uparrow$) is $\Leftarrow$ (resp. $\Leftrightarrow$ and
+  $\Rightarrow$).
+  \begin{mathpar}
+  \inferrule*[left=(pRHL),rightskip=10em]%%
+    {P' \Rightarrow P \\%
+     Q \Rightarrow Q' \\%
+     \pRHL{P}{c}{c'}{Q}}%%
+    {\pRHL{P'}{c}{c'}{Q'}}%%
+    \quad\raisebox{.7em}{\tct{conseq (_: P ==> Q)}} \\
+  \inferrule*[left=(pHL),rightskip=10em]%%
+    {P' \Rightarrow \delta \mathrel{\diamond} \delta' \\%
+     P' \Rightarrow P \\%
+     Q \mathrel{\diamond^\uparrow} Q' \\%
+     \pHL{P}{c}{Q}{\diamond}{\delta}}%%
+    {\pHL{P'}{c}{Q'}{\diamond}{\delta'}}%%
+    \quad\raisebox{.7em}{\tct{conseq (_: P ==> Q: $\delta$)}} \\
+  \inferrule*[left=(HL),rightskip=10em]%%
+    {P' \Rightarrow P \\%
+     Q \Rightarrow Q' \\%
+     \HL{P}{c}{Q}}%%
+    {\HL{P'}{c}{Q'}}%%
+    \quad\raisebox{.7em}{\tct{conseq (_: P ==> Q)}} \\
+  \end{mathpar}
+  \end{tsyntax}
+
+  \begin{tsyntax}{conseq* <specification>}
+  Same as \tct{conseq <specification>}, but the subgoal corresponding
+  to the postcondition is refined by a ``may modify'' analysis.
   \end{tsyntax}
 \end{tactic}

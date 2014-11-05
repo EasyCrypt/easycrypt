@@ -27,7 +27,7 @@
   \vbox to 0pt{\kern-\dp\strutbox \smash{\llap{$\circledcirc$\kern1em}} \vss}}
 \newcommand{\impmark}{\strut\vadjust{\domark}}
 
-\newcommand{\tct}[1]{\ls[language=easycrypt]!#1!}
+\newcommand{\tct}[1]{\ls[language=easycrypt,mathescape]!#1!}
 
 \newenvironment{tactic}[2][\empty]{%
 \setlength{\parindent}{0pt}
@@ -48,3 +48,7 @@
 
 %--------------------------------------------------------------------
 \usepackage{mathpartir}
+
+%--------------------------------------------------------------------
+%% Miscellaneous local notations
+\newcommand{\symrel}[1]{#1^{-1}} %% Inverse relation
