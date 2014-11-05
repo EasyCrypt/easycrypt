@@ -248,32 +248,32 @@ let destr_assert i =
 
 let is_asgn i =
   match i.i_node with
-  | Sasgn(lv,e) -> true
+  | Sasgn(_lv,_e) -> true
   | _ -> false
 
 let is_rnd i =
   match i.i_node with
-  | Srnd(lv,e) -> true
+  | Srnd(_lv,_e) -> true
   | _ -> false
 
 let is_call i =
   match i.i_node with
-  | Scall(lv,f,es) -> true
+  | Scall(_lv,_f,_es) -> true
   | _ -> false
 
 let is_if i =
   match i.i_node with
-  | Sif(e,s1,s2) -> true
+  | Sif(_e,_s1,_s2) -> true
   | _ -> false
 
 let is_while i =
   match i.i_node with
-  | Swhile(e,s) -> true
+  | Swhile(_e,_s) -> true
   | _ -> false
 
 let is_assert i =
   match i.i_node with
-  | Sassert e -> true
+  | Sassert _e -> true
   | _ -> false
 
 (* -------------------------------------------------------------------- *)
