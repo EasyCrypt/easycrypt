@@ -420,9 +420,9 @@ genqident(X):
 | x=paren(PUNIOP) { x }
 | x=PBINOP        { x }
 
-| paren(DCOLON) { EcCoreLib.s_cons }
+| paren(DCOLON)   { EcCoreLib.s_cons }
 
-| x=loc(STRING) {
+| x=loc(STRING)   {
     if not (EcCoreLib.is_mixfix_op (unloc x)) then
       parse_error x.pl_loc (Some "invalid mixfix operator");
     unloc x
