@@ -38,14 +38,37 @@
   \end{tsyntax}
 
   \begin{tsyntax}{conseq <lemma>}
-  Only works on procedures. Same as \tct{conseq <specification>}, but
-  the specification to use is inferred from the lemma provided. Raises
-  an error if the lemma does not refer to the expected procedure(s).
+  Only applies to judgments on procedures. Same as \tct{conseq
+  <specification>}, but the specification to use is inferred from
+  the lemma provided. Raises an error if the lemma does not refer to
+  the expected procedure(s). All variants of \tct{conseq} may take
+  lemmas in place of explicit specifications with the same effect, in
+  which case they must be applied to judgments on procedures.
   \end{tsyntax}
 
-  \begin{tsyntax}{conseq* <specification>}
-  Same as \tct{conseq <specification>}, but the subgoal corresponding
-  to the postcondition is refined by a ``may modify'' analysis.
+  \begin{tsyntax}{conseq* <spec>}
+  Same as \tct{conseq}, but the subgoal corresponding to the
+  postcondition is refined by a ``may modify'' analysis. All variants
+  of \tct{conseq} can be refined using the \tct{*}, with the same
+  effect.
+  \end{tsyntax}
+
+  \begin{tsyntax}{conseq <prhl> <hl> <hl>}
+  Combine relational and non-relational specifications to prove a
+  relational specification. Either one of the Hoare logic
+  specifications can be replaced with a wildcard.
+
+  \textbf{Examples:}
+  \begin{mathpar}
+  \inferrule*[left=(\prhl),rightskip=5em]%%
+    {P' \Rightarrow P \wedge P_1\{1\} \wedge P_2\{2\} \\%
+     Q \wedge Q_1\{1\} \wedge Q_2\{2\} \Rightarrow Q' \\%
+     \HL{P_1}{c_1}{Q_1} \\%
+     \HL{P_2}{c_2}{Q_2} \\%
+     \pRHL{P}{c_1}{c_2}{Q}}%%
+    {\pRHL{P'}{c_1}{c_2}{Q'}}%%
+    \quad\raisebox{.7em}{\tct{conseq (_: P ==> Q) (_: P$_1$ ==> Q$_1$) (_: P$_2$ ==> Q$_2$)}}
+  \end{mathpar}
   \end{tsyntax}
 
   \fix{Missing descriptions of combining variants of conseq}.
