@@ -7,6 +7,7 @@
 open EcUtils
 open EcParsetree
 open EcTypes
+open EcModules
 open EcFol
 open EcEnv
 open EcPV
@@ -184,9 +185,9 @@ let process_phoare_deno info tc =
 (* -------------------------------------------------------------------- *)
 let process_equiv_deno info tc =
   let process_cut (pre, post) =
-    let hyps, concl = FApi.tc1_flat tc in
+    let env, hyps, concl = FApi.tc1_eflat tc in
 
-    let _op, f1, f2 =
+    let op, f1, f2 =
       match concl.f_node with
       | Fapp ({f_node = Fop (op, _)}, [f1; f2]) when is_pr f1 && is_pr f2 ->
           (op, f1, f2)
@@ -194,12 +195,57 @@ let process_equiv_deno info tc =
       | _ -> tc_error !!tc "invalid goal shape"
     in
 
-    let { pr_fun = fl } = destr_pr f1 in
-    let { pr_fun = fr } = destr_pr f2 in
+    let { pr_fun = fl; pr_event = evl } = destr_pr f1 in
+    let { pr_fun = fr; pr_event = evr } = destr_pr f2 in
 
     let penv, qenv = LDecl.equivF fl fr hyps in
-    let pre  = pre  |> omap_dfl (fun p -> TTC.pf_process_formula !!tc penv p) f_true in
-    let post = post |> omap_dfl (fun p -> TTC.pf_process_formula !!tc qenv p) f_true in
+    let post = 
+      match post with
+      | Some p -> TTC.pf_process_formula !!tc qenv p
+      | None ->
+        let evl = EcFol.Fsubst.f_subst_mem mhr mleft evl in
+        let evr = EcFol.Fsubst.f_subst_mem mhr mright evr in
+        if EcPath.p_equal op EcCoreLib.CI_Bool.p_eq then 
+          let post = f_iff evl evr in
+          try 
+            Mpv2.to_form mleft mright 
+              (Mpv2.needed_eq env mleft mright post) f_true
+          with Not_found -> post
+        else if EcPath.p_equal op EcCoreLib.CI_Real.p_real_le then f_imp evl evr
+        else if EcPath.p_equal op EcCoreLib.CI_Real.p_real_ge then f_imp evr evl
+        else tc_error !!tc "not able to reconize a comparison operator" in
+
+    let pre =
+      match pre with
+      | Some p -> TTC.pf_process_formula !!tc penv p
+      | None ->
+        let dog f m = 
+          try 
+            let fv = PV.remove env (pv_res f) (PV.fv env m post) in
+            snd (PV.elements (eqobs_inF_refl env f fv))
+          with EcCoreGoal.TcError _ | EqObsInError -> [] 
+        in
+        let gl = dog fl mleft in
+        let gr = dog fr mright in 
+        let eqparams =
+          let doty f = 
+            (Fun.by_xpath (NormMp.norm_xfun env f) env).f_sig.fs_arg in
+          let tl = doty fl in
+          let tr = doty fr in
+          let check t1 t2 = EcReduction.EqTest.for_type env t1 t2 in
+          if check tl tunit && check tr tunit || not (check tl tr) then f_true
+          else 
+            f_eq (f_pvar (pv_arg fl) tl mleft)
+              (f_pvar (pv_arg fr) tr mright) in
+        let eqg = 
+          List.fold_left (fun qs g ->
+            if List.exists (EcPath.m_equal g) gr then 
+              f_eq (f_glob g mleft) (f_glob g mright) :: qs 
+            else qs) [] gl in
+        f_ands_simpl eqg eqparams 
+    in
+
+   
     f_equivF pre fl fr post
   in
 
