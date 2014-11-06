@@ -196,9 +196,9 @@ module LowRewrite = struct
     | EcFol.SFiff (f1, f2) -> (pt, (f1, f2))
 
     | EcFol.SFnot f ->
-        let pt'  = pt_of_global pt.ptev_env.pte_pe hyps LG.p_negeqF [] in
-        let pt'  = apply_pterm_to_arg_r pt' (PVAFormula f) in
-        let pt'  = apply_pterm_to_arg_r pt' (PVASub pt) in
+        let pt' = pt_of_global_r pt.ptev_env LG.p_negeqF [] in
+        let pt' = apply_pterm_to_arg_r pt' (PVAFormula f) in
+        let pt' = apply_pterm_to_arg_r pt' (PVASub pt) in
         (pt', (f, f_false))
 
     | _ -> begin
@@ -218,6 +218,9 @@ module LowRewrite = struct
     let (pt, (f1, f2)) = find_rewrite_pattern s hyps pt in
 
     let fp = match s with `LtoR -> f1 | `RtoL -> f2 in
+
+    let env = LDecl.toenv hyps in
+    let ppe = EcPrinting.PPEnv.ofenv env in
 
     (try  PT.pf_find_occurence pt.PT.ptev_env ~ptn:fp concl
      with EcMatching.MatchFailure -> raise (RewriteError LRW_NothingToRewrite));

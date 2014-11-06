@@ -157,6 +157,14 @@ let pt_of_global pf hyps p tys =
     ptev_ax  = ax; }
 
 (* -------------------------------------------------------------------- *)
+let pt_of_global_r ptenv p tys =
+  let env = LDecl.toenv ptenv.pte_hy in
+  let ax  = EcEnv.Ax.instanciate p tys env in
+  { ptev_env = ptenv;
+    ptev_pt  = { pt_head = PTGlobal (p, tys); pt_args = []; };
+    ptev_ax  = ax; }
+
+(* -------------------------------------------------------------------- *)
 let pt_of_uglobal pf hyps p =
   let ptenv   = ptenv_of_penv hyps pf in
   let env     = LDecl.toenv hyps in

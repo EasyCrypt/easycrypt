@@ -98,5 +98,7 @@ val pt_of_hyp    : proofenv -> LDecl.hyps -> EcIdent.t -> pt_ev
 val pt_of_global : proofenv -> LDecl.hyps -> EcPath.path -> ty list -> pt_ev
 val pt_of_uglobal: proofenv -> LDecl.hyps -> EcPath.path -> pt_ev
 
+val pt_of_global_r : pt_env -> EcPath.path -> ty list -> pt_ev
+
 (* -------------------------------------------------------------------- *)
 val ffpattern_of_genpattern : LDecl.hyps -> genpattern -> ffpattern option
