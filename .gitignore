@@ -30,6 +30,8 @@ setup.log
 *.log
 *.out
 *.toc
+*.synctex.gz
+*.kilepr
 
 /doc/refman/easycrypt.pdf
 /doc/userman/easycrypt.pdf
