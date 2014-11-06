@@ -194,6 +194,13 @@ module LowRewrite = struct
     match EcFol.sform_of_form ax with
     | EcFol.SFeq  (f1, f2) -> (pt, (f1, f2))
     | EcFol.SFiff (f1, f2) -> (pt, (f1, f2))
+
+    | EcFol.SFnot f ->
+        let pt'  = pt_of_global pt.ptev_env.pte_pe hyps LG.p_negeqF [] in
+        let pt'  = apply_pterm_to_arg_r pt' (PVAFormula f) in
+        let pt'  = apply_pterm_to_arg_r pt' (PVASub pt) in
+        (pt', (f, f_false))
+
     | _ -> begin
       match TTC.destruct_product hyps ax with
       | None ->
