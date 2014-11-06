@@ -769,8 +769,7 @@ proof.
   move: le_s21; rewrite -(rot_uniq i) -(size_rot i) def_s2 /= lez_addl => le_s31.
   cut ss13: forall y, mem s1 y => mem s3 y.
     move=> y s1y; cut := ss12 y _ => //.
-    rewrite -(mem_rot i) def_s2 in_cons; case=> // eq_yx.
-    by move: s1y not_s1x; rewrite eq_yx => ->.
+    by rewrite -(mem_rot i) def_s2 in_cons; case=> // eq_yx.
   rewrite IHs //=; move: le_s31; apply contraL; rewrite -ltzNge => s3x.
   rewrite -lez_add1r; cut := uniq_leq_size (x::s1) s3 _ => //= -> //.
   by apply (allP (mem s3)); rewrite /= s3x /= allP.
