@@ -215,16 +215,15 @@ let uident = upper ichar*
 let tident = '\'' lident
 let mident = '&'  (lident | uint)
 
-let op_char_1    = ['=' '<' '>']
-let op_char_2    = ['+' '-']
-let op_char_3_r  = ['*' '%' '\\']
-let op_char_3    = op_char_3_r | '/'
-let op_char_4_r  = ['$' '&' '^' '|' '#']
-let op_char_4    = op_char_4_r | '@'
-let op_char_34   = op_char_3 | op_char_4
-let op_char_234  = op_char_2 | op_char_34
-let op_char_1234 = op_char_1 | op_char_234
-
+let op_char_1     = ['=' '<' '>']
+let op_char_2     = ['+' '-']
+let op_char_3_r   = ['*' '%' '\\']
+let op_char_3     = op_char_3_r | '/'
+let op_char_4_r   = ['$' '&' '^' '|' '#']
+let op_char_4     = op_char_4_r | '@'
+let op_char_34    = op_char_3 | op_char_4
+let op_char_234   = op_char_2 | op_char_34
+let op_char_1234  = op_char_1 | op_char_234
 let op_char_34_r  = op_char_4_r | op_char_3_r
 let op_char_234_r = op_char_2   | op_char_34_r
 
@@ -234,13 +233,8 @@ let op3 = op_char_34* op_char_3 op_char_34*
 let op4 = (op_char_4 op_char_4_r*) | ("::" ':'+)
 let nop = '\\' ichar+
 
-let uniop = '!' | op1 | '+' | '-' | nop
-
-let binop =
-    op1  | op2   | op3  | op4   | nop
-  | '+'  | '-'   | "=>" | "<=>"
-  | "&&" | "/\\" | "||" | "\\/"
-  | "="  | ">"   | "<"  | ">="  | "<="
+let uniop = '!' | op2 | nop
+let binop = op1 | op2 | op3 | op4 | nop
 
 (* -------------------------------------------------------------------- *)
 rule main = parse

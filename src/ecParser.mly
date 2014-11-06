@@ -435,7 +435,8 @@ qoident:
 | x=oident
     { pqsymb_of_psymb x }
 
-| xs=namespace DOT x=oident {
+| xs=namespace DOT x=oident
+| xs=namespace DOT x=loc(NOP) {
     { pl_desc = (xs, unloc x);
       pl_loc  = EcLocation.make $startpos $endpos;
     }
@@ -464,7 +465,8 @@ fident:
 | LE { "<=" }
 
 %inline uniop:
-| x=OP1 | x=NOP { Printf.sprintf "[%s]" x }
+| x=OP2 { Printf.sprintf "[%s]" x }
+| x=NOP { Printf.sprintf "[%s]" x }
 | ADD   { "[+]" }
 | MINUS { "[-]" }
 
@@ -572,6 +574,7 @@ sexpr_u:
 
 | e=sexpr DOTTICK x=qident
    { PEproj (e, x) }
+
 | e=sexpr DOTTICK n=loc(uint)
    { if n.pl_desc = 0 then
        parse_error n.pl_loc (Some "tuple projection start at 1");
@@ -595,9 +598,6 @@ expr_u:
 | e1=expr op=loc(NOP) ti=tvars_app? e2=expr
     { peapp_symb op.pl_loc op.pl_desc ti [e1; e2] }
 
-| e1=expr op=loc(OP1) ti=tvars_app? e2=expr
-    { peapp_symb op.pl_loc op.pl_desc ti [e1; e2] }
-
 | e1=expr op=loc(EQ) ti=tvars_app? e2=expr
     { peapp_symb op.pl_loc "=" ti [e1; e2] }
 
@@ -610,6 +610,9 @@ expr_u:
 
 | e1=expr op=loc(MINUS) ti=tvars_app? e2=expr
     { peapp_symb op.pl_loc "-" ti [e1; e2] }
+
+| e1=expr op=loc(OP1) ti=tvars_app? e2=expr
+    { peapp_symb op.pl_loc op.pl_desc ti [e1; e2] }
 
 | e1=expr op=loc(OP2) ti=tvars_app? e2=expr
     { peapp_symb op.pl_loc op.pl_desc ti [e1; e2] }
