@@ -62,9 +62,10 @@ val tc1_process_full_closed_pterm_cut : prcut:('a -> form) -> tcenv1 -> 'a fpatt
 val tc1_process_full_closed_pterm     : tcenv1 -> ffpattern -> proofterm * form
 
 (* Proof-terms manipulation *)
-val check_pterm_arg     : pt_env -> EcIdent.t * gty -> form -> pt_ev_arg_r -> form * pt_arg
-val apply_pterm_to_arg  : pt_ev -> pt_ev_arg -> pt_ev
-val apply_pterm_to_hole : pt_ev -> pt_ev
+val check_pterm_arg      : pt_env -> EcIdent.t * gty -> form -> pt_ev_arg_r -> form * pt_arg
+val apply_pterm_to_arg   : pt_ev -> pt_ev_arg -> pt_ev
+val apply_pterm_to_arg_r : pt_ev -> pt_ev_arg_r -> pt_ev
+val apply_pterm_to_hole  : pt_ev -> pt_ev
 
 (* pattern matching - raise [MatchFailure] on failure. *)
 val pf_form_match     : pt_env -> ?mode:fmoptions -> ptn:form -> form -> unit

@@ -545,6 +545,11 @@ and apply_pterm_to_arg pt arg =
   apply_pterm_to_oarg pt (Some arg)
 
 (* -------------------------------------------------------------------- *)
+and apply_pterm_to_arg_r pt arg =
+  let arg = { ptea_arg = arg; ptea_env = pt.ptev_env; } in
+    apply_pterm_to_arg pt arg
+
+(* -------------------------------------------------------------------- *)
 and apply_pterm_to_hole pt =
   apply_pterm_to_oarg pt None
 
