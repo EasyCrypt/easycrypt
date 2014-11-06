@@ -1,3 +1,4 @@
+require import FSet.
 require import FMap.
 require import Distr.
 
@@ -21,7 +22,7 @@ module RO = {
     var y:to;
 
     y = $dsample;
-    if (!in_dom x m) m.[x] = y;
+    if (!mem x (dom m)) m.[x] = y;
     return oget m.[x];
   }
 }.
@@ -42,7 +43,7 @@ module ROe = {
   proc o(x:from) : to = {
     var y : to;
     y = $dsample;
-    if (!in_dom x m)
+    if (!mem x (dom m))
       m.[x] = if x = xs then hs else y;
     return oget (m.[x]);
   }
@@ -94,7 +95,7 @@ section.
   rnd{1} => //.
   eager proc h (ROe.m{1} = RO.m{2}) => //.
   eager proc.
-  case (!in_dom x{1} ROe.m{1}).
+  case (!mem x{1} (dom ROe.m{1})).
    rcondt{1} 3.
      intros &m;conseq * (_ : _ ==> true) => //.
    rcondt{2} 2.
