@@ -562,6 +562,10 @@ and apply_pterm_to_hole pt =
   apply_pterm_to_oarg pt None
 
 (* -------------------------------------------------------------------- *)
+and apply_pterm_to_holes n pt =
+  EcUtils.iterop apply_pterm_to_hole n pt
+
+(* -------------------------------------------------------------------- *)
 and process_pterm_arg_app pt arg =
   apply_pterm_to_arg pt (process_pterm_arg pt arg)
 
