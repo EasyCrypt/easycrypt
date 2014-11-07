@@ -2280,6 +2280,9 @@ module NormMp = struct
     | FBabs _ -> true
     | _ -> false
 
+  let x_equal env f1 f2 = 
+    EcPath.x_equal (norm_xfun env f1) (norm_xfun env f2)
+
 end
 
 (* -------------------------------------------------------------------- *)

@@ -225,6 +225,7 @@ module NormMp : sig
   val norm_tglob : env -> mpath -> EcTypes.ty
   val tglob_reducible : env -> mpath -> bool
   val is_abstract_fun : xpath -> env -> bool
+  val x_equal        : env -> xpath -> xpath -> bool
 end
 
 (* -------------------------------------------------------------------- *)
