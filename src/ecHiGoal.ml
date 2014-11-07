@@ -219,9 +219,6 @@ module LowRewrite = struct
 
     let fp = match s with `LtoR -> f1 | `RtoL -> f2 in
 
-    let env = LDecl.toenv hyps in
-    let ppe = EcPrinting.PPEnv.ofenv env in
-
     (try  PT.pf_find_occurence pt.PT.ptev_env ~ptn:fp concl
      with EcMatching.MatchFailure -> raise (RewriteError LRW_NothingToRewrite));
 
