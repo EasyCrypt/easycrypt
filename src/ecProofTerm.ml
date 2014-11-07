@@ -217,7 +217,7 @@ let pf_find_occurence (pt : pt_env) ~ptn subject =
 
   let na = List.length (snd (EcFol.destr_app ptn)) in
 
-  let trymatch bds _pos tp =
+  let trymatch bds tp =
     let tp =
       match tp.f_node with
       | Fapp (h, hargs) when List.length hargs > na ->

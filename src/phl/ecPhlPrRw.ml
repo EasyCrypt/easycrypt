@@ -123,7 +123,7 @@ let t_pr_rewrite_low (s,dof) tc =
     | `MuDisj  -> select_pr is_or 
     | `MuSplit -> select_pr (fun _ev -> true) in
 
-  let select xs _ fp = if select xs fp then `Accept (-1) else `Continue in
+  let select xs fp = if select xs fp then `Accept (-1) else `Continue in
   let env, _, concl = FApi.tc1_eflat tc in
   let torw =
     try

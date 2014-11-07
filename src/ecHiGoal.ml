@@ -319,7 +319,7 @@ let process_delta (s, o, p) tc =
     if matches then begin
       let p    = concretize_form ptenv p in
       let cpos =
-        let test = fun _ _ fp ->
+        let test = fun _ fp ->
           let fp =
             match fp.f_node with
             | Fapp (h, hargs) when List.length hargs > na ->
