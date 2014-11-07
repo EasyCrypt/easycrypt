@@ -2,8 +2,7 @@ require import Int.
 require import Real.
 require import FSet.
 
-
-(** Minimalist group theory with only needed components *)
+(** Minimalist group theory with only needed components **)
 theory Group.
   type group.
 
@@ -18,9 +17,9 @@ theory Group.
   axiom pow_plus (x y:int): (g ^ x) * (g ^ y) = g ^ (x + y).
 end Group.
 
-(** Computational Diffie-Hellman problem *)
+(** Computational Diffie-Hellman problem **)
 theory CDH.
-  import Group.
+  clone import Group.
 
   module type Adversary = {
     proc solve(gx gy:group): group
@@ -38,9 +37,12 @@ theory CDH.
   }.
 end CDH.
 
-(** Set version of the Computational Diffie-Hellman problem *)
+(** Set version of the Computational Diffie-Hellman problem **)
 theory Set_CDH.
-  import Group.
+  clone (*--*) Group.
+  clone (*--*) CDH with
+    theory Group = Group.
+  import CDH.Group.
 
   const n: int.
 
@@ -69,29 +71,7 @@ theory Set_CDH.
     }
   }.
 
-  (** Naive reduction to CDH *)
-  (* Useful lemmas on reals, maybe move to Real.ec *)
-  lemma nosmt le_compat_r (w x y:real): 0%r < w => x * w <= y * w => x <= y 
-  by [].
-
-  lemma nosmt inv_le (x y:real): 0%r < x => 0%r < y => y <= x => inv x <= inv y.
-  proof.
-    move=> _ _ _.
-    apply (le_compat_r x); first trivial.
-    apply (le_compat_r y); first trivial.
-    cut H: ((x * inv x) * y <= (y * inv y) * x); last smt.
-    rewrite (Inverse y _); first smt.
-    by rewrite (Inverse x _); smt.
-  qed.
-
-  lemma div_le (x y:real): 
-    0%r < x => 0%r < y => y <= x => 1%r / x <= 1%r / y .
-  proof. by progress; cut X:= inv_le x y; smt. qed.
-
-  lemma mu_duni_mem (s:'a set) (x:'a):
-    mem x s => 1%r / (card s)%r <= mu (Duni.duni s) ((=) x).
-  proof. by intros _; rewrite Duni.mu_def; smt. qed.
-
+  (** Naive reduction to CDH **)
   section.
     declare module A: Adversary.
 
@@ -121,34 +101,48 @@ theory Set_CDH.
       1%r / n%r * Pr[SCDH(A).main() @ &m: res]
       <= Pr[CDH.CDH(CDH_from_SCDH(A)).main() @ &m: res].
     proof.
+      (* Move "0 < n" into the context *)
       move=> n_pos.
-      apply (Trans _ Pr[SCDH'.main() @ &m: res]); first last.
-        byequiv (_: ={glob A} ==> ={res})=> //.
-        proc; inline CDH_from_SCDH(A).solve SCDH'.aux.
-        by wp; rnd; wp; call (_: true); wp; do rnd.
+      (* We prove the inequality by transitivity:
+           1%r/n%r * Pr[SCDH(A).main() @ &m: res]
+           <= Pr[SCDH'.main() @ &m: res]
+           <= Pr[CDH.CDH(CDH_from_SCDH(A)).main() @ &m: res]. *)
+      (* "first last" allows us to first focus on the second inequality, which is easier. *)
+      apply (real_le_trans _ Pr[SCDH'.main() @ &m: res]); first last.
+        (* Pr[SCDH'.main() @ &m: res] <= Pr[CDH.CDH(CDH_from_SCDH(A)).main() @ &m: res] *)
+        (* This is in fact an equality, which we prove by program equivalence *)
+        byequiv (_: _ ==> ={res})=> //=.
+        by proc; inline *; auto; call (_: true); auto.
+      (* 1%r/n%r * Pr[SCDH(A).main() @ &m: res] <= Pr[SCDH'.main() @ &m: res] *)
+      (* We do this one using a combination of phoare (to deal with the final sampling of z)
+         and equiv (to show that SCDH'.aux and CDH.CDH are equivalent in context). *)
       byphoare (_: (glob A) = (glob A){m} ==> _)=> //.
-      pose d:= 1%r/n%r * Pr[SCDH(A).main() @ &m: res]; conseq (_: _: >= d). (* bug *)
-      pose d':= Pr[SCDH(A).main() @ &m: res].
+      (* This line is due to a bug in proc *) pose d:= 1%r/n%r * Pr[SCDH(A).main() @ &m: res].
+      pose p:= Pr[SCDH(A).main() @ &m: res]. (* notation for ease of writing below *)
       proc.
-      seq  1: (mem (g ^ (SCDH'.x * SCDH'.y)) s /\ card s <= n)
-              d' (1%r / n%r) _ 0%r => //. 
-        conseq (_ : (glob A) = (glob A){m} : = d').
-        call (_: (glob A) = (glob A){m} ==> mem (g ^ (SCDH'.x * SCDH'.y)) res /\ card res <= n) => //.
-        bypr; progress; rewrite /d'.
-        byequiv (_: ={glob A} ==>
-                    (mem (g ^ (SCDH'.x * SCDH'.y)) res /\
-                     card res <= n){1} = res{2}) => //.
-        proc*; inline SCDH(A).main SCDH'.aux; wp.
-        by call (_: true); do rnd.
-      rnd ((=) (g ^ (SCDH'.x * SCDH'.y))).
-      skip; progress; rewrite Duni.mu_def; first smt.
-      cut ->: card (filter ((=) (g ^ (SCDH'.x * SCDH'.y))) s){hr} = 1 by smt.
-      by apply div_le; expect 3 smt.
+      (* We split the probability computation into:
+           - the probability that s contains g^(x*y) and that |s| <= n is Pr[SCDH(A).main() @ &m: res], and
+           - when s contains g^(x*y), the probability of sampling that one element uniformly in s is bounded
+             by 1/n. *)
+      seq  1: (mem (g ^ (SCDH'.x * SCDH'.y)) s /\ card s <= n) p (1%r/n%r) _ 0%r => //. 
+        (* The first part is dealt with by equivalence with SCDH. *)
+        conseq (_: _: =p). (* strengthening >= into = for simplicity*)
+          call (_: (glob A) = (glob A){m}  ==> mem (g^(SCDH'.x * SCDH'.y)) res /\ card res <= n)=> //.
+            bypr; progress; rewrite /p.
+            byequiv (_: )=> //.
+            by proc *; inline *; wp; call (_: true); auto.
+      (* The second part is just arithmetic, but smt needs some help. *)
+      rnd ((=) (g^(SCDH'.x * SCDH'.y))).
+      skip; progress.
+      rewrite Duni.mu_def; first smt.
+      cut ->: card (filter ((=) (g^(SCDH'.x * SCDH'.y))) s){hr} = 1 by smt.
+      cut H1: 0 < card s{hr} by smt.
+      by rewrite -!inv_def inv_le; smt.
     qed.  
   end section.
 
 (*
-  (** Shoup's reduction to CDH -- would be nice to prove a bound *)
+  (** Shoup's reduction to CDH -- the proof can be done using loop fusion *)
   module CDH_from_SCDH_Shoup (A:Adversary, B:Adversary) : CDH.Adversary = {
     proc solve(gx:group, gy:group) : group = {
       var a, b, s1, s2, r;

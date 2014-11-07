@@ -57,6 +57,10 @@ theory Square.
 end Square.
 export Square.
 
+lemma nosmt inv_def (x:real):
+  inv x = from_int 1 / x
+by [].
+
 lemma nosmt sign_inv (x:real):
   from_int 0 < x =>
   from_int 0 < inv x
@@ -87,6 +91,11 @@ lemma mulrM (x y z:real):
   x * z < y * z
 by [].
 
+lemma mul_compat_le (z x y:real):
+  from_int 0 < z =>
+  (x * z <= y * z <=> x <= y)
+by [].
+
 lemma nosmt addleM : forall (x1 x2 y1 y2:real),
    x1 <= x2 => y1 <= y2 => x1 + y1 <= x2 + y2 
 by [].
@@ -115,8 +124,17 @@ by [].
 lemma nosmt eq_le: forall (x y:real), x = y => x <= y
 by [].
 
-theory Exp.
+lemma nosmt inv_le (x y:real): from_int 0 < x => from_int 0 < y => y <= x => inv x <= inv y.
+proof.
+  move=> _ _ _.
+  rewrite -(mul_compat_le x); first trivial.
+  rewrite -(mul_compat_le y); first trivial.
+  cut H: ((x * inv x) * y <= (y * inv y) * x); last smt.
+  rewrite (Inverse y _); first smt.
+  by rewrite (Inverse x _); smt.
+qed.
 
+theory Exp.
   import why3 "real" "ExpLog"
     op "exp" as "exp".
   axiom exp_zero : exp (from_int 0) = from_int 1.
