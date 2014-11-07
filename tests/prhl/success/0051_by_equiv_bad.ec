@@ -67,6 +67,16 @@ proof.
   by [].
 qed.
 
+lemma bad1_demo1_app' &m  (A<:Adv{M,M'}) : 
+   Pr[ M(A).main() @ &m : res] <=
+   Pr[ M'(A).main() @ &m : res /\ !M'.bad] + 
+   Pr[ M'(A).main() @ &m : M'.bad].
+proof.
+  byequiv (upto1 A).
+  by [].
+  smt.
+qed.
+
 axiom upto1_eq (A<:Adv{M,M'}) :
   equiv [M(A).main ~ M'(A).main : ={glob A} ==> !M'.bad{2} => res{1} = res{2}]. 
 
@@ -146,6 +156,14 @@ lemma bad1_abs &m  (A<:Adv{M, M'}) :
 proof.
   byequiv (: _ ==> _) : (M.bad).
     by apply (upto2 A).
+  by trivial.
+qed.
+
+lemma bad1_abs' &m  (A<:Adv{M, M'}) : 
+   `| Pr[ M(A).main() @ &m : res] - Pr[ M'(A).main() @ &m : res] | <=
+       Pr[ M'(A).main() @ &m : M'.bad].
+proof.
+  byequiv (upto2 A) : (M.bad).
   by trivial.
 qed.
 
