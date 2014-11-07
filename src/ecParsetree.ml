@@ -469,7 +469,7 @@ type phltactic =
   | Phrex_elim
   | Phrex_intro of pformula list
   | Pexfalso
-  | Pbydeno       of ([`PHoare | `Equiv ] * cfpattern)
+  | Pbydeno       of ([`PHoare | `Equiv ] * (cfpattern * pformula option))
   | PPr           of (pformula * pformula) option
   | Pfel          of int * (pformula * pformula * pformula * pformula * pfel_spec_preds * pformula option)
   | Phoare

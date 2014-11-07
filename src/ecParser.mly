@@ -2083,10 +2083,10 @@ phltactic:
     { Psplitwhile (c, s, o) }
 
 | BYPHOARE info=fpattern(conseq)
-    { Pbydeno (`PHoare, info) }
+    { Pbydeno (`PHoare, (info, None)) }
 
-| BYEQUIV info=fpattern(conseq)
-    { Pbydeno (`Equiv, info) }
+| BYEQUIV info=fpattern(conseq) bad1=sform?
+    { Pbydeno (`Equiv, (info,bad1)) }
 
 | CONSEQ nm=STAR?
     { Pconseq(nm<>None, (None,None,None)) }

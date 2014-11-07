@@ -205,3 +205,32 @@ instance field with real
   proof ofint1    by smt
   proof ofintS    by smt
   proof ofintN    by smt.
+
+(* WARNING Lemmas used by tactics : 
+   eq_le addleM real_le_trans and the following lemmas *)
+lemma nosmt upto2_abs (x1 x2 x3 x4 x5:real):
+   FromInt.from_int 0 <= x1 => 
+   FromInt.from_int 0 <= x3 => 
+   x1 <= x5 => 
+   x3 <= x5 => 
+   x2 = x4 =>
+   `|x1 + x2 - (x3 + x4)| <= x5 by [].
+
+lemma nosmt upto2_notbad (ev1 ev2 bad1 bad2:bool) :
+  ((bad1 <=> bad2) /\ (!bad2 => (ev1 <=> ev2))) =>
+  ((ev1 /\ !bad1) <=> (ev2 /\ !bad2)) by [].
+
+lemma nosmt upto2_imp_bad (ev1 ev2 bad1 bad2:bool) :
+  ((bad1 <=> bad2) /\ (!bad2 => (ev1 <=> ev2))) =>
+  (ev1 /\ bad1) => bad2 by [].
+
+lemma nosmt upto_bad_false (ev bad2:bool) :
+  !((ev /\ !bad2) /\ bad2) by [].
+
+lemma nosmt upto_bad_or (ev1 ev2 bad2:bool) :
+   (!bad2 => ev1 => ev2) => ev1 =>
+    ev2 /\ !bad2 \/ bad2 by [].
+
+lemma nosmt upto_bad_sub (ev bad:bool) :
+  ev /\ ! bad => ev by [].
+
