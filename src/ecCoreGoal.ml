@@ -583,7 +583,7 @@ module FApi = struct
 
     match tc.tce_tcenv.tce_goal with
     | None   -> tc
-    | Some g ->
+    | Some _g ->
         match List.rotate d (max i 0) (tc_opened tc) with
         | 0, _ -> tc
         | _, s ->
