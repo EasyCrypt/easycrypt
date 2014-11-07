@@ -23,6 +23,10 @@ module TTC = EcProofTyping
 module LG  = EcCoreLib.CI_Logic
 
 (* -------------------------------------------------------------------- *)
+let (@!) t1 t2 = FApi.t_seq t1 t2
+let (@+) t ts = FApi.t_seqsub t ts 
+
+(* -------------------------------------------------------------------- *)
 exception InvalidProofTerm
 
 type side    = [`Left|`Right]
