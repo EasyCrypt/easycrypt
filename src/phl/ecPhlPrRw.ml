@@ -99,18 +99,19 @@ let pr_rewrite_lemma =
    "mu_split"   , `MuSplit]
 
 (* -------------------------------------------------------------------- *)
-let t_pr_rewrite (s,f) tc = 
+
+let t_pr_rewrite_low (s,dof) tc = 
   let kind = 
     try List.assoc s pr_rewrite_lemma with Not_found -> 
       tc_error !!tc "do not reconize %s as a probability lemma" s in
 
-  let check_f f = 
-    match kind, f with
+  let check_f dof = 
+    match kind, dof with
     | `MuSplit, None -> tc_error !!tc  "argument expected for %s" s
     | `MuSplit, Some _ -> ()
     | _, Some _ -> tc_error !!tc "no argument expected for %s" s
     | _, _ -> () in
-  check_f f;
+  check_f dof;
 
   let select = 
     match kind with 
@@ -123,7 +124,7 @@ let t_pr_rewrite (s,f) tc =
     | `MuSplit -> select_pr (fun _ev -> true) in
 
   let select xs _ fp = if select xs fp then `Accept (-1) else `Continue in
-  let env, hyps, concl = FApi.tc1_eflat tc in
+  let env, _, concl = FApi.tc1_eflat tc in
   let torw =
     try
       ignore (EcMatching.FPosition.select select concl);
@@ -166,9 +167,7 @@ let t_pr_rewrite (s,f) tc =
 
     | `MuSplit ->
       let pr = destr_pr torw in
-      let mp = EcEnv.Fun.prF_memenv EcFol.mhr pr.pr_fun env in
-      let hyps = LDecl.push_active mp hyps in
-      let ev' = EcProofTyping.process_formula hyps (oget f) in
+      let ev' = (oget dof) tc torw in
       (pr_split pr.pr_mem pr.pr_fun pr.pr_args pr.pr_event ev', 0) 
 
   in
@@ -180,3 +179,17 @@ let t_pr_rewrite (s,f) tc =
   FApi.t_first
     (t_pr_lemma lemma)
     (t_rewrite rwpt (`LtoR, None) tc)
+
+let t_pr_rewrite_i (s,f) tc =
+  let do_ev = omap (fun f _ _ -> f) f in
+  t_pr_rewrite_low (s,do_ev) tc
+
+let t_pr_rewrite (s,f) tc = 
+  let do_ev  = 
+    omap (fun f tc torw ->
+      let env,hyps,_ = FApi.tc1_eflat tc in
+      let pr = destr_pr torw in
+      let mp = EcEnv.Fun.prF_memenv EcFol.mhr pr.pr_fun env in
+      let hyps = LDecl.push_active mp hyps in
+      EcProofTyping.process_formula hyps f) f in
+  t_pr_rewrite_low (s,do_ev) tc
