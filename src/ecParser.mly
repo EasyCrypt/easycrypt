@@ -1900,13 +1900,19 @@ logtactic:
    { Pelim (e, Some p) }
 
 | APPLY e=fpattern(form)
-   { Papply (e, `Apply None) }
+   { Papply (`Apply ([e], `Apply)) }
+
+| APPLY es=prefix(SLASH, fpattern(form))+
+   { Papply (`Apply (es, `Apply)) }
 
 | APPLY e=fpattern(form) IN x=ident
-   { Papply (e, `Apply (Some x)) }
+   { Papply (`ApplyIn (e, x)) }
 
 | EXACT e=fpattern(form)
-   { Papply (e, `Exact) }
+   { Papply (`Apply ([e], `Exact)) }
+
+| EXACT es=prefix(SLASH, fpattern(form))+
+   { Papply (`Apply (es, `Exact)) }
 
 | l=simplify
    { Psimplify (mk_simplify l) }
@@ -2637,6 +2643,10 @@ __rlist1(X, S):                         (* left-recursive *)
 
 %inline bracket(X):
 | LBRACKET x=X RBRACKET { x }
+
+(* -------------------------------------------------------------------- *)
+%inline prefix(S, X):
+| S x=X { x }
 
 (* -------------------------------------------------------------------- *)
 %inline loc(X):

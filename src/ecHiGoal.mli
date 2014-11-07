@@ -24,7 +24,7 @@ type engine  = ptactic_core -> backward
 (* -------------------------------------------------------------------- *)
 type cut_t    = intropattern * pformula * (ptactics located) option
 type cutdef_t = intropattern * pterm
-type apply_t  = ffpattern * [`Apply of psymbol option | `Exact]
+type apply_t  = EcParsetree.apply_info
 
 (* -------------------------------------------------------------------- *)
 module LowApply : sig

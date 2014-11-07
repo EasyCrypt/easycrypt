@@ -548,6 +548,11 @@ type ppgoption = [
   | `Disjunctive
 ]
 
+type apply_info = [
+  | `ApplyIn of ffpattern * psymbol
+  | `Apply   of ffpattern list * [`Apply|`Exact]
+]
+
 type ppgoptions = (bool * ppgoption) list
 
 type logtactic =
@@ -556,8 +561,8 @@ type logtactic =
   | Psmt        of (pdbhint option * pprover_infos)
   | Pintro      of intropattern
   | Psplit
-  | Pfield	of psymbol list
-  | Pring 	of psymbol list
+  | Pfield	    of psymbol list
+  | Pring 	    of psymbol list
   | Palg_norm  
   | Pexists     of fpattern_arg located list
   | Pleft
@@ -565,7 +570,7 @@ type logtactic =
   | Ptrivial
   | Pcongr
   | Pelim       of (genpattern list * pqsymbol option)
-  | Papply      of (ffpattern * [`Apply of psymbol option | `Exact])
+  | Papply      of apply_info
   | Pcut        of (intropattern * pformula * ptactics located option)
   | Pcutdef     of (intropattern * pterm)
   | Pgeneralize of genpattern list

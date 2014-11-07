@@ -911,13 +911,16 @@ let process_apply_fwd (pe, hyp) tc =
     tc_error !!tc "cannot apply lemma"
 
 (* -------------------------------------------------------------------- *)
-type apply_t = ffpattern * [`Apply of psymbol option | `Exact]
+type apply_t = EcParsetree.apply_info
 
-let process_apply (pe, tg) tc =
-  match tg with
-  | `Exact           -> process_apply_bwd `Exact pe tc
-  | `Apply None      -> process_apply_bwd `Apply pe tc
-  | `Apply (Some tg) -> process_apply_fwd (pe, tg)  tc
+let process_apply (infos : apply_t) tc =
+  match infos with
+  | `ApplyIn (pe, tg) -> process_apply_fwd (pe, tg) tc
+
+  | `Apply (pe, mode) ->
+      let for1 tc pe = t_last (process_apply_bwd `Apply pe) tc in
+      let tc = List.fold_left for1 (tcenv_of_tcenv1 tc) pe in
+      if mode = `Exact then t_onall process_done tc else tc
 
 (* -------------------------------------------------------------------- *)
 let process_subst syms (tc : tcenv1) =
