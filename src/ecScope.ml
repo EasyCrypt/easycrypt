@@ -930,42 +930,60 @@ module Op = struct
         with EcUnify.UnificationFailure _ -> ()
     end;
 
-    match op.po_ax with
-    | None    -> bind scope (unloc op.po_name, tyop)
-    | Some ax -> begin
-        match tyop.op_kind with
-        | OB_oper (Some (OP_Plain bd)) ->
-            let axbd = EcFol.form_of_expr EcFol.mhr bd in
-            let axbd, axpm =
-              let bdpm = List.map fst tyop.op_tparams in
-              let axpm = List.map EcIdent.fresh bdpm in
-                (EcFol.Fsubst.subst_tvar
-                   (EcTypes.Tvar.init bdpm (List.map tvar axpm))
-                   axbd,
-                 List.combine axpm (List.map snd tyop.op_tparams))
-            in
+    let scope =
+      match op.po_ax with
+      | None    -> bind scope (unloc op.po_name, tyop)
+      | Some ax -> begin
+          match tyop.op_kind with
+          | OB_oper (Some (OP_Plain bd)) ->
+              let axbd = EcFol.form_of_expr EcFol.mhr bd in
+              let axbd, axpm =
+                let bdpm = List.map fst tyop.op_tparams in
+                let axpm = List.map EcIdent.fresh bdpm in
+                  (EcFol.Fsubst.subst_tvar
+                     (EcTypes.Tvar.init bdpm (List.map tvar axpm))
+                     axbd,
+                   List.combine axpm (List.map snd tyop.op_tparams))
+              in
+  
+              let axspec =
+                EcFol.f_eq
+                  (EcFol.f_op
+                     (EcPath.pqname (path scope) (unloc op.po_name))
+                     (List.map (tvar |- fst) axpm)
+                     axbd.EcFol.f_ty)
+                  axbd
+              in
+  
+              let tyop = { tyop with op_kind = OB_oper None } in
+              let axop = { ax_tparams = axpm;
+                           ax_spec    = Some axspec;
+                           ax_kind    = `Axiom;
+                           ax_nosmt   = op.po_nosmt; } in
+  
+              let scope = bind scope (unloc op.po_name, tyop) in
+                Ax.bind scope false (unloc ax, axop)
+  
+          | _ -> hierror ~loc "cannot axiomatized non-plain operators"
+      end
+    in
 
-            let axspec =
-              EcFol.f_eq
-                (EcFol.f_op
-                   (EcPath.pqname (path scope) (unloc op.po_name))
-                   (List.map (tvar |- fst) axpm)
-                   axbd.EcFol.f_ty)
-                axbd
-            in
+    let scope =
+      if not (List.isempty op.po_aliases) then begin
+        if not (EcUtils.is_none body) then
+          hierror ~loc "multiple operator names are only allowed for abstract operators";
+        let addnew scope name =
+          let nparams = List.map (fst_map EcIdent.fresh) tparams in
+          let subst = Tvar.init
+            (List.map fst tparams)
+            (List.map (tvar |- fst) nparams) in
+          let op = EcDecl.mk_op nparams (Tvar.subst subst ty) None in
+          bind scope (unloc name, op)
+        in List.fold_left addnew scope op.po_aliases
 
-            let tyop = { tyop with op_kind = OB_oper None } in
-            let axop = { ax_tparams = axpm;
-                         ax_spec    = Some axspec;
-                         ax_kind    = `Axiom;
-                         ax_nosmt   = op.po_nosmt; } in
+      end else scope
 
-            let scope = bind scope (unloc op.po_name, tyop) in
-              Ax.bind scope false (unloc ax, axop)
-
-        | _ -> hierror ~loc "cannot axiomatized non-plain operators"
-    end
-
+    in scope
 end
 
 (* -------------------------------------------------------------------- *)

@@ -275,7 +275,10 @@ and process_interface (scope : EcScope.scope) (x, i) =
 and process_operator (scope : EcScope.scope) (op : poperator located) =
   EcScope.check_state `InTop "operator" scope;
   let scope = EcScope.Op.add scope op in
-    EcScope.notify scope `Info "added operator: `%s'" (unloc op.pl_desc.po_name);
+    List.iter
+      (fun { pl_desc = name } ->
+        EcScope.notify scope `Info "added operator: `%s'" name)
+      (op.pl_desc.po_name :: op.pl_desc.po_aliases);
     scope
 
 (* -------------------------------------------------------------------- *)

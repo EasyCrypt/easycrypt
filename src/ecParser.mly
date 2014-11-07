@@ -1332,50 +1332,54 @@ tyvars_decl:
 | CONST x=nosmt { (`Const, x) }
 
 operator:
-| k=op_or_const x=oident tyvars=tyvars_decl? COLON sty=loc(type_exp) {
-    { po_kind   = fst k;
-      po_name   = x;
-      po_tyvars = tyvars;
-      po_def    = opdef_of_opbody sty None;
-      po_ax     = None;
-      po_nosmt  = snd k; }
-  }
+| k=op_or_const x=plist1(oident, COMMA) tyvars=tyvars_decl? COLON sty=loc(type_exp)
+  { { po_kind    = fst k;
+      po_name    = List.hd x;
+      po_aliases = List.tl x;
+      po_tyvars  = tyvars;
+      po_def     = opdef_of_opbody sty None;
+      po_ax      = None;
+      po_nosmt   = snd k; } }
 
-| k=op_or_const x=oident tyvars=tyvars_decl? COLON sty=loc(type_exp) EQ b=opbody opax=opax? {
-    { po_kind   = fst k;
-      po_name   = x;
-      po_tyvars = tyvars;
-      po_def    = opdef_of_opbody sty (Some ([], b));
-      po_ax     = opax;
-      po_nosmt  = snd k; }
-  }
+| k=op_or_const x=plist1(oident, COMMA) tyvars=tyvars_decl?
+    COLON sty=loc(type_exp) EQ b=opbody opax=opax?
+  { { po_kind    = fst k;
+      po_name    = List.hd x;
+      po_aliases = List.tl x;
+      po_tyvars  = tyvars;
+      po_def     = opdef_of_opbody sty (Some ([], b));
+      po_ax      = opax;
+      po_nosmt   = snd k; } }
 
-| k=op_or_const x=oident tyvars=tyvars_decl? eq=loc(EQ) b=opbody opax=opax? {
-    { po_kind   = fst k;
-      po_name   = x;
-      po_tyvars = tyvars;
-      po_def    = opdef_of_opbody (mk_loc eq.pl_loc PTunivar) (Some ([], b));
-      po_ax     = opax;
-      po_nosmt  = snd k; }
-  }
+| k=op_or_const x=plist1(oident, COMMA) tyvars=tyvars_decl?
+    eq=loc(EQ) b=opbody opax=opax?
+  { { po_kind    = fst k;
+      po_name    = List.hd x;
+      po_aliases = List.tl x;
+      po_tyvars  = tyvars;
+      po_def     = opdef_of_opbody (mk_loc eq.pl_loc PTunivar) (Some ([], b));
+      po_ax      = opax;
+      po_nosmt   = snd k; } }
 
-| k=op_or_const x=oident tyvars=tyvars_decl? p=ptybindings eq=loc(EQ) b=opbody opax=opax? {
-    { po_kind   = fst k;
-      po_name   = x;
-      po_tyvars = tyvars;
-      po_def    = opdef_of_opbody (mk_loc eq.pl_loc PTunivar) (Some (p, b));
-      po_ax     = opax;
-      po_nosmt  = snd k; }
-  }
+| k=op_or_const x=plist1(oident, COMMA) tyvars=tyvars_decl? p=ptybindings
+    eq=loc(EQ) b=opbody opax=opax?
+  { { po_kind    = fst k;
+      po_name    = List.hd x;
+      po_aliases = List.tl x;
+      po_tyvars  = tyvars;
+      po_def     = opdef_of_opbody (mk_loc eq.pl_loc PTunivar) (Some (p, b));
+      po_ax      = opax;
+      po_nosmt   = snd k; } }
 
-| k=op_or_const x=oident tyvars=tyvars_decl? p=ptybindings COLON codom=loc(type_exp) EQ b=opbody opax=opax? {
-    { po_kind   = fst k;
-      po_name   = x;
-      po_tyvars = tyvars;
-      po_def    = opdef_of_opbody codom (Some (p, b));
-      po_ax     = opax;
-      po_nosmt  = snd k; }
-  }
+| k=op_or_const x=plist1(oident, COMMA) tyvars=tyvars_decl? p=ptybindings
+    COLON codom=loc(type_exp) EQ b=opbody opax=opax?
+  { { po_kind    = fst k;
+      po_name    = List.hd x;
+      po_aliases = List.tl x;
+      po_tyvars  = tyvars;
+      po_def     = opdef_of_opbody codom (Some (p, b));
+      po_ax      = opax;
+      po_nosmt   = snd k; } }
 
 opbody:
 | e=expr     { `Expr e  }

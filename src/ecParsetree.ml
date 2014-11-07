@@ -285,6 +285,7 @@ and pop_pattern = {
 type poperator = {
   po_kind   : [`Op | `Const];
   po_name   : psymbol;
+  po_aliases: psymbol list;
   po_tyvars : (psymbol * pqsymbol list) list option;
   po_def    : pop_def;
   po_ax     : psymbol option;
