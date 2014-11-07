@@ -129,7 +129,7 @@ module BR2(R : Oracle) : Scheme(R) = {
 lemma eq1_enc :
  equiv [ BR(RO).enc ~ BR2(RO).enc : 
 ={pk,RO.m} ==>
-!in_dom M.r{2} RO.m{2} => (={res} /\ eq_except RO.m{1} RO.m{2} M.r{2}) ].
+!mem M.r{2} (dom RO.m{2}) => (={res} /\ eq_except RO.m{1} RO.m{2} M.r{2}) ].
 proof.
  proc;inline RO.o.
  wp;rnd ((^) m{1}) ((^) m{1}).
@@ -181,13 +181,13 @@ proof.
  intros => O Hll;apply (lossless2 O) => //.
  proc;inline RO.o;wp;rnd;wp;skip;progress => //; first 5 last; last 6 smt.
   case ((x = M.r){2}); first smt.
-  by apply (absurd (in_dom x RO.m){2})=> //; smt.
+  by apply (absurd (mem x (dom RO.m)){2})=> //; smt.
  intros _ _;apply lossless_ARO_o.
  intros &m; proc; wp; call (RO_o_ll _); auto; smt.
  call eq1_enc.
  rnd.
  call  (_: ={RO.m,Log.qs} /\
- (forall (x : randomness), mem x Log.qs{2} <=> in_dom x RO.m{2})).
+ (forall (x : randomness), mem x Log.qs{2} <=> mem x (dom RO.m{2}))).
   proc;inline RO.o;wp;rnd;wp;skip;progress;smt.
   inline CPA(BR,A).SO.kg CPA2(BR2,A).SO.kg.
   inline CPA(BR,A).ARO.init CPA2(BR2,A).ARO.init RO.init;wp;rnd;wp;skip.
@@ -277,12 +277,11 @@ module BR_OW(A_ : Adv) : Inverter = {
  }
 }.
 
-lemma f_iny :
-forall (x, y : randomness, pk: pkey, sk : skey), 
+lemma f_iny x  y pk sk: 
 in_supp (pk,sk) keypairs  =>
 f pk x = f pk y => x = y.
 proof.
- intros x y pk sk Hsupp Heqf.
+ move=> Hsupp Heqf.
  rewrite -(finvof pk sk _ _);first smt.
  rewrite -(finvof pk sk _ _);first smt.
  rewrite Heqf;smt.
@@ -300,35 +299,34 @@ proof.
  seq 11 9:
  (={pk,sk,RO.m,Log.qs} /\ pk0{2} = pk{2} /\ 
   in_supp (pk{2},sk{2}) keypairs /\
-(glob A){1} = (glob A){2}  /\ (forall x, in_dom x RO.m{1} = mem x Log.qs{1}) /\
+(glob A){1} = (glob A){2}  /\ (forall x, mem x (dom RO.m){1} = mem x Log.qs{1}) /\
  M.r{1} = x{2} /\ y0{2} = f pk{2} x{2}).
 
- call (_ : ={RO.m,Log.qs} /\ (forall x, in_dom x RO.m{1} = mem x Log.qs{1})).
+ call (_ : ={RO.m,Log.qs} /\ (forall x, mem x (dom RO.m){1} = mem x Log.qs{1})).
  proc;inline RO.o;wp;rnd;wp;skip;progress=> //.
-   by rewrite /in_dom dom_set !mem_add -/(in_dom _ _) H.
+   by rewrite dom_set !mem_add H.
    by rewrite mem_add; rewrite -H; case (x1 = x{2})=> //=;
       intros=> ->; smt.
  wp;rnd;swap{1} -7;wp.
- call (_: ={RO.m,Log.qs}  /\ (forall x, in_dom x RO.m{1} = mem x Log.qs{1})).
+ call (_: ={RO.m,Log.qs}  /\ (forall x, mem x (dom RO.m){1} = mem x Log.qs{1})).
  proc;inline RO.o;wp;rnd;wp;skip;progress=> //.
-   by rewrite /in_dom dom_set !mem_add -/(in_dom _ _) H.
+   by rewrite dom_set !mem_add H.
    by rewrite mem_add; rewrite -H; case (x1 = x{2})=> //=;
       intros=> ->; smt.
  do 2! (wp;rnd);skip;progress;smt.
  wp;skip;progress;first smt.
- cut find_some:= find_in
-                   (fun (p0:randomness) (p1:plaintext), f pk{2} p0 = f pk{2} x{2})
-                   RO.m{2}
-                   _; first exists x{2}; split;smt.
- cut: exists x', find (fun p0 (p1:plaintext), f pk{2} p0 = f pk{2} x{2}) RO.m{2} = Some x'.
-    by move: find_some; case (find (fun p0 (p1:plaintext), f pk{2} p0 = f pk{2} x{2}) RO.m{2})=> //; smt.
- elim=> x' find_def.
- elim (find_cor (fun (p0:randomness) (p1:plaintext), f pk{2} p0 = f pk{2} x{2})
-                   RO.m{2} x'
-                   _); first smt.
- rewrite find_def /= /oget /=.
- intros Hin_dom Hf.
- apply (f_iny _ _ pk{2} sk{2} _ _);smt.
+ pose eq_test:= fun p0 (p1:plaintext), p0 = x{2}.
+ cut ->: (fun p0 (p1:plaintext), f pk{2} p0 = f pk{2} x{2}) = eq_test.
+   apply fun_ext=> y //=.
+   apply fun_ext=> y' //=.
+   rewrite eq_iff /eq_test; split=> //=.
+   by apply (f_iny _ _ _ sk{2} H).
+ cut: exist eq_test RO.m{2}.
+   by rewrite /exist; exists x{2}=> //=; rewrite H0.
+ cut find_cor: forall y, find eq_test RO.m{2} = Some y => x{2} = y.
+   by rewrite /eq_test; move=> y /find_cor.
+ rewrite find_in /oget.
+ by case {-1}(find eq_test RO.m{2}) (Logic.eq_refl (find eq_test RO.m{2})).
 qed.
 
 lemma Reduction &m : 

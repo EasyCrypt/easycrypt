@@ -50,7 +50,7 @@ module PRP : AC = {
  }
  proc f (x : block) : block ={
   var y : block;
-  if (!in_dom x m /\ card s < q) {
+  if (!mem x (dom m) /\ card s < q) {
    y = $uniform;
    if (mem y s) {
     bad = true;
@@ -72,7 +72,7 @@ module PRF : AC = {
  }
  proc f (x : block) : block = {
   var y : block;
-  if (!in_dom x m /\ card s < q) {
+  if (!mem x (dom m) /\ card s < q) {
    y = $uniform;
    m.[x] = y;
    s = add y s; 
@@ -114,7 +114,7 @@ proof.
  proc.
  if;first by smt.
  seq 1 1: 
- ((! PRP.bad{2} /\ ={x,y} /\ PRF.m{1} = PRP.m{2}) /\ ! in_dom x{1} PRF.m{1} /\
+ ((! PRP.bad{2} /\ ={x,y} /\ PRF.m{1} = PRP.m{2}) /\ ! mem x{1} (dom PRF.m{1}) /\
     card PRF.s{1} < q /\ PRF.s{1} = PRP.s{2} /\ card (PRP.s{2}) < q).
  by rnd;skip => //.
  if{2}.
@@ -126,7 +126,7 @@ proof.
  wp;skip;progress;by smt.
  skip;by smt.
  intros &m1;proc;if;wp.
- seq 1: ((PRP.bad /\ true) /\ ! in_dom x PRP.m /\ card PRP.s < q);last by smt.
+ seq 1: ((PRP.bad /\ true) /\ ! mem x (dom PRP.m) /\ card PRP.s < q);last by smt.
  trivial.
  rnd True; skip;by smt.
  if;[rnd True;wp|];skip;by smt.
@@ -190,14 +190,14 @@ q%r * (q-1)%r * (1%r / (2^l)%r).
 proof.
  intros => &m.
  fel 1 (card PRP.s) (fun x, (x%r)* (1%r/(2^l)%r)) 
-     q PRP.bad [PRP.f : (! in_dom x PRP.m /\ card PRP.s < q)] => //. 
+     q PRP.bad [PRP.f : (! mem x (dom PRP.m) /\ card PRP.s < q)] => //. 
   apply sum_prop;by smt.
   inline PRP.init;wp;skip;by smt.
   proc;if;wp.
   seq 1 : (mem y PRP.s) 
           ((card PRP.s)%r * (1%r / (2^l)%r)) (1%r) 
           (1%r - ((card PRP.s)%r * (1%r / (2^l)%r))) (0%r)
-          (!PRP.bad /\ ! in_dom x PRP.m /\ card PRP.s < q) => //. 
+          (!PRP.bad /\ ! mem x (dom PRP.m) /\ card PRP.s < q) => //. 
    by rnd => //.
    rnd  (cpMem PRP.s);skip;progress;last trivial.
    delta uniform Block.length;rewrite Block.Dword.mu_cpMemw.
@@ -209,13 +209,13 @@ proof.
      apply H; smt.
    intros c;proc;if;last by skip;smt.
  
-   wp;seq 1: ((! in_dom x PRP.m /\ card PRP.s < q) /\ c = card PRP.s /\
-  ! in_dom x PRP.m /\ card PRP.s < q /\ in_supp y uniform); first by rnd.
+   wp;seq 1: ((! mem x (dom PRP.m) /\ card PRP.s < q) /\ c = card PRP.s /\
+  ! mem x (dom PRP.m) /\ card PRP.s < q /\ in_supp y uniform); first by rnd.
    if;[rnd;wp|];skip;progress;by smt.
          
   intros b c;proc;wp;if;last by skip;smt.
-  seq 1:  ((! (! in_dom x PRP.m /\ card PRP.s < q) /\ PRP.bad = b /\ 
-          card PRP.s = c) /\ ! in_dom x PRP.m /\ card PRP.s < q /\ 
+  seq 1:  ((! (! mem x (dom PRP.m) /\ card PRP.s < q) /\ PRP.bad = b /\ 
+          card PRP.s = c) /\ ! mem x (dom PRP.m) /\ card PRP.s < q /\ 
           in_supp y uniform);first rnd;skip;by smt.
   if;[wp;rnd|];wp;skip;by smt.
 qed.
