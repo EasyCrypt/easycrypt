@@ -53,7 +53,7 @@ lemma bad1_demo1 &m  (A<:Adv{M,M'}) :
    Pr[ M'(A).main() @ &m : res] + 
    Pr[ M'(A).main() @ &m : M'.bad].
 proof.
-  byequiv (_ : ).
+  byequiv.
     by apply (upto1 A).
   by [].
 qed.
@@ -144,7 +144,7 @@ lemma bad1_abs &m  (A<:Adv{M, M'}) :
    `| Pr[ M(A).main() @ &m : res] - Pr[ M'(A).main() @ &m : res] | <=
        Pr[ M'(A).main() @ &m : M'.bad].
 proof.
-  byequiv (_: _ ==> _) (M.bad).
+  byequiv (: _ ==> _) : (M.bad).
     by apply (upto2 A).
   by trivial.
 qed.
@@ -157,8 +157,8 @@ lemma bad1_abs_sub &m  (A<:Adv{M, M'}) :
    `| Pr[ M(A).main() @ &m : res] - Pr[ M'(A).main() @ &m : res] | <=
        Pr[ M'(A).main() @ &m : M'.bad].
 proof.
-  byequiv (_: _ ==> if M'.bad{2} then M.bad{1} else 
-                    !M.bad{1} /\ res{1} = res{2}) (M.bad).
+  byequiv (: _ ==> if M'.bad{2} then M.bad{1} else 
+                    !M.bad{1} /\ res{1} = res{2}) : (M.bad).
     by apply (upto2_if A).
   by trivial.
   smt.
@@ -168,7 +168,7 @@ lemma bad1_abs_sub' &m  (A<:Adv{M, M'}) :
    `| Pr[ M(A).main() @ &m : res] - Pr[ M'(A).main() @ &m : res] | <=
        Pr[ M'(A).main() @ &m : M'.bad].
 proof.
-  byequiv (upto2_if A) (M.bad).
+  byequiv (upto2_if A) : (M.bad).
   by trivial.
   smt.
 qed.
@@ -181,7 +181,7 @@ lemma bad1_abs_sub_app &m  (A<:Adv{M, M'}) :
    `| Pr[ M(A).main() @ &m : res] - Pr[ M'(A).main() @ &m : res] | <=
        Pr[ M'(A).main() @ &m : M'.bad].
 proof.
-  byequiv (upto2_if_p A _) (M.bad).
+  byequiv (upto2_if_p A _) : (M.bad).
   by apply p_ok.
   by trivial.
   smt.

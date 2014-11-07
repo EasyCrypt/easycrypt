@@ -51,7 +51,7 @@ lemma test_eqM'M' &m (A<:Adv{M,M'}) :
     Pr[M'(A).main(0) @ &m : res /\ M'.x = 1] = 
     Pr[M'(A).main(0) @ &m : res /\ M'.x = 1]. 
 proof.
-  byequiv (_: ) => //. 
+  byequiv (: ) => //. 
   proc;call (_: true);auto.
 qed.
 
@@ -67,6 +67,6 @@ lemma test_ge &m (A<:Adv{M}) :
     Pr[M(A).main() @ &m : res /\ M.x = 1] >= 
        Pr[M(A).main() @ &m : res /\ M.x = 1]. 
 proof.
-  byequiv (_: ={glob A} ) => //. 
+  byequiv (: ={glob A} ) => //. 
   proc;call (_: true);auto.
 qed.

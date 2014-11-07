@@ -134,6 +134,9 @@
     { ptm_name  = name ;
       ptm_body  = body ;
       ptm_local = local; }
+
+  let cfpattern info = 
+    odfl ({fp_kind = FPCut (None,None); fp_args = []}) info 
 %}
 
 %token <EcSymbols.symbol> LIDENT
@@ -1584,7 +1587,7 @@ fpattern_head(F):
 | p=qident tvi=tvars_app?
    { FPNamed (p, tvi) }
 
-| LPAREN UNDERSCORE COLON f=F RPAREN
+| LPAREN UNDERSCORE? COLON f=F RPAREN
    { FPCut f }
 
 fpattern_arg:
@@ -2082,11 +2085,14 @@ phltactic:
 | SPLITWHILE s=side? o=codepos COLON c=expr
     { Psplitwhile (c, s, o) }
 
-| BYPHOARE info=fpattern(conseq)
-    { Pbydeno (`PHoare, (info, None)) }
+| BYPHOARE info=fpattern(conseq)?
+    { Pbydeno (`PHoare, (cfpattern info, None)) }
 
-| BYEQUIV info=fpattern(conseq) bad1=sform?
-    { Pbydeno (`Equiv, (info,bad1)) }
+| BYEQUIV info=fpattern(conseq)? 
+    { Pbydeno (`Equiv, (cfpattern info, None)) }
+
+| BYEQUIV info=fpattern(conseq)? COLON bad1=sform
+    { Pbydeno (`Equiv, (cfpattern info, Some bad1)) }
 
 | CONSEQ nm=STAR?
     { Pconseq(nm<>None, (None,None,None)) }
