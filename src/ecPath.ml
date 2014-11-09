@@ -292,6 +292,8 @@ let x_fv fv xp = m_fv fv xp.x_top
 let xpath_fun mp f = xpath mp (psymbol f)
 let xqname x s = xpath x.x_top (pqname x.x_sub s)
 
+let xbasename xp = basename xp.x_sub
+  
 (* -------------------------------------------------------------------- *)
 let rec m_tostring (m : mpath) = 
   let top, sub = 

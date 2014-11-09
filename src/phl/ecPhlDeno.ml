@@ -7,7 +7,6 @@
 open EcUtils
 open EcParsetree
 open EcTypes
-open EcModules
 open EcFol
 open EcEnv
 open EcPV
@@ -320,7 +319,7 @@ let t_equiv_deno_bad2 pre bad1 tc =
   let fabs' = 
     f_real_abs
       (f_real_sub (f_real_add fpreb1 fpren1) (f_real_add fpreb2 fpren2)) in
-  let [hequiv;hcpre] = EcEnv.LDecl.fresh_ids hyps ["_";"_"] in
+  let hequiv,hcpre = as_seq2 (EcEnv.LDecl.fresh_ids hyps ["_";"_"]) in
   (t_cut equiv @+
     [ t_id;
       t_cut cpre @+
@@ -352,34 +351,35 @@ let t_equiv_deno_bad2 pre bad1 tc =
         ]
     ]) tc
 
-let process_pre tc env post penv fl fr pre = 
+let process_pre tc hyps prl prr pre post = 
+  let fl = prl.pr_fun and fr = prr.pr_fun in
   match pre with
-  | Some p -> TTC.pf_process_formula !!tc penv p
+  | Some p -> 
+    let penv, _ = LDecl.equivF fl fr hyps in
+    TTC.pf_process_formula !!tc penv p
   | None ->
-    let dog f m = 
+    let al = prl.pr_args and ar = prr.pr_args in
+    let ml = prl.pr_mem and mr = prr.pr_mem in
+    let env = LDecl.toenv hyps in
+    let (mel, mer), _ = Fun.equivF_memenv fl fr env in
+    let eqs = ref [] in
+    let push f = eqs := f :: !eqs in
+    let setarg = ref false in
+    let dopv menv m mi x ty = 
+      if is_glob x then push (f_eq (f_pvar x ty m) (f_pvar x ty mi));
+      if EcMemory.is_bound_pv x menv then setarg := true in
+    let doglob m mi g = push (f_eq (f_glob g m) (f_glob g mi)) in
+    let dof f a menv m mi = 
       try 
         let fv = PV.remove env (pv_res f) (PV.fv env m post) in
-        snd (PV.elements (eqobs_inF_refl env f fv))
-      with EcCoreGoal.TcError _ | EqObsInError -> [] 
-    in
-    let gl = dog fl mleft in
-    let gr = dog fr mright in 
-    let eqparams =
-      let doty f = 
-        (Fun.by_xpath (NormMp.norm_xfun env f) env).f_sig.fs_arg in
-      let tl = doty fl in
-      let tr = doty fr in
-      let check t1 t2 = EcReduction.EqTest.for_type env t1 t2 in
-      if check tl tunit && check tr tunit || not (check tl tr) then f_true
-      else 
-        f_eq (f_pvar (pv_arg fl) tl mleft)
-          (f_pvar (pv_arg fr) tr mright) in
-    let eqg = 
-      List.fold_left (fun qs g ->
-        if List.exists (EcPath.m_equal g) gr then 
-          f_eq (f_glob g mleft) (f_glob g mright) :: qs 
-        else qs) [] gl in
-    f_ands_simpl eqg eqparams 
+        PV.iter (dopv menv m mi) (doglob m mi) (eqobs_inF_refl env f fv);
+        if !setarg then
+          push (f_eq (f_pvarg f a.f_ty m) a)
+      with EcCoreGoal.TcError _ | EqObsInError -> () in
+
+    dof fl al mel mleft ml; setarg := false;
+    dof fr ar mer mright mr;
+    f_ands !eqs
         
 let process_equiv_deno1 info tc =
   let process_cut (pre, post) =
@@ -393,13 +393,14 @@ let process_equiv_deno1 info tc =
       | _ -> tc_error !!tc "invalid goal shape"
     in
 
-    let { pr_fun = fl; pr_event = evl } = destr_pr f1 in
-    let { pr_fun = fr; pr_event = evr } = destr_pr f2 in
+    let { pr_fun = fl; pr_event = evl } as prl = destr_pr f1 in
+    let { pr_fun = fr; pr_event = evr } as prr = destr_pr f2 in
 
-    let penv, qenv = LDecl.equivF fl fr hyps in
     let post = 
       match post with
-      | Some p -> TTC.pf_process_formula !!tc qenv p
+      | Some p -> 
+        let _, qenv = LDecl.equivF fl fr hyps in
+        TTC.pf_process_formula !!tc qenv p
       | None ->
         let evl = Fsubst.f_subst_mem mhr mleft evl in
         let evr = Fsubst.f_subst_mem mhr mright evr in
@@ -413,7 +414,7 @@ let process_equiv_deno1 info tc =
         else if EcPath.p_equal op EcCoreLib.CI_Real.p_real_ge then f_imp evr evl
         else tc_error !!tc "not able to reconize a comparison operator" in
 
-    let pre = process_pre tc env post penv fl fr pre in
+    let pre = process_pre tc hyps prl prr pre post in
   
     f_equivF pre fl fr post
   in
@@ -434,20 +435,22 @@ let process_equiv_deno_bad info tc =
     let env, hyps, concl = FApi.tc1_eflat tc in
     let fpr1, fpr2, fprb = tc_destr_deno_bad tc env concl in
 
-    let { pr_fun = fl; pr_event = evl } = destr_pr fpr1 in
-    let { pr_fun = fr; pr_event = evr } = destr_pr fpr2 in
+    let { pr_fun = fl; pr_event = evl } as prl = destr_pr fpr1 in
+    let { pr_fun = fr; pr_event = evr } as prr = destr_pr fpr2 in
 
-    let penv, qenv = LDecl.equivF fl fr hyps in
+
     let post = 
       match post with
-      | Some p -> TTC.pf_process_formula !!tc qenv p
+      | Some p -> 
+        let _, qenv = LDecl.equivF fl fr hyps in
+        TTC.pf_process_formula !!tc qenv p
       | None ->
         let evl = Fsubst.f_subst_mem mhr mleft evl in
         let evr = Fsubst.f_subst_mem mhr mright evr in
         let bad = (destr_pr fprb).pr_event in
         let bad = Fsubst.f_subst_mem mhr mright bad in
         f_imps [f_not bad;evl] evr in
-    let pre = process_pre tc env post penv fl fr pre in
+    let pre = process_pre tc hyps prl prr pre post in
    
     f_equivF pre fl fr post
   in
@@ -481,19 +484,20 @@ let process_equiv_deno_bad2 info bad1 tc =
   let env, hyps, concl = FApi.tc1_eflat tc in
   let fpr1, fpr2, fprb = tc_destr_deno_bad2 tc env concl in
   
-  let { pr_fun = fl; pr_event = evl } = destr_pr fpr1 in
-  let { pr_fun = fr; pr_event = evr } = destr_pr fpr2 in
+  let { pr_fun = fl; pr_event = evl } as prl = destr_pr fpr1 in
+  let { pr_fun = fr; pr_event = evr } as prr = destr_pr fpr2 in
 
   let bad1 = 
     let _, qenv = LDecl.hoareF fl hyps in    
     TTC.pf_process_formula !!tc qenv bad1 in
 
   let process_cut (pre, post) =
-    
-    let penv, qenv = LDecl.equivF fl fr hyps in    
+
     let post = 
       match post with
-      | Some p -> TTC.pf_process_formula !!tc qenv p
+      | Some p -> 
+        let _, qenv = LDecl.equivF fl fr hyps in    
+        TTC.pf_process_formula !!tc qenv p
       | None ->
         let evl = Fsubst.f_subst_mem mhr mleft evl in
         let evr = Fsubst.f_subst_mem mhr mright evr in
@@ -502,7 +506,7 @@ let process_equiv_deno_bad2 info bad1 tc =
         let bad2 = Fsubst.f_subst_mem mhr mright bad2 in
         f_and (f_iff bad1 bad2) (f_imp (f_not bad2) (f_iff evl evr)) in
 
-    let pre = process_pre tc env post penv fl fr pre in
+    let pre = process_pre tc hyps prl prr pre post in
    
     f_equivF pre fl fr post
   in

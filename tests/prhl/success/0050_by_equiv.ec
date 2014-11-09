@@ -23,7 +23,7 @@ qed.
 lemma test_eq' &m (A<:Adv{M}) : 
     Pr[M(A).main() @ &m : res /\ M.x = 1] = Pr[M(A).main() @ &m : res /\ M.x = 1]. 
 proof.
-  byequiv (_: ) => //. 
+  byequiv (_: ) => //.
   proc;call (_: true);auto.
 qed.
 

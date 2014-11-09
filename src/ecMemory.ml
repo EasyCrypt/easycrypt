@@ -94,6 +94,8 @@ let lookup (x : symbol) ((_,mt) : memenv) =
 
 let is_bound x me = lookup x me <> None
   
+let is_bound_pv pv me = 
+  is_loc pv && is_bound (EcPath.xbasename pv.pv_name) me
 (* -------------------------------------------------------------------- *)
 let mt_subst sx st o =
   match o with

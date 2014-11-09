@@ -100,6 +100,8 @@ val x_compare_na : xpath -> xpath -> int
 
 val x_fv : int EcIdent.Mid.t -> xpath -> int EcIdent.Mid.t
 
+val xbasename   : xpath -> symbol
+
 (* -------------------------------------------------------------------- *)
 val m_tostring : mpath -> string
 val x_tostring : xpath -> string
