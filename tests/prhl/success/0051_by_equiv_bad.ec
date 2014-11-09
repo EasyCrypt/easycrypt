@@ -9,6 +9,7 @@ module M(A:Adv) = {
   var bad : bool
   proc main() : bool = {
     var b : bool;
+    bad = false;
     x = 1;
     b = A.a();
     return b;
@@ -20,6 +21,7 @@ module M'(A:Adv) = {
   var bad:bool
   proc main() : bool = {
     var b : bool;
+    bad = false;
     x = 1;
     b = A.a();
     return b;
@@ -54,7 +56,7 @@ lemma bad1_demo1 &m  (A<:Adv{M,M'}) :
    Pr[ M'(A).main() @ &m : M'.bad].
 proof.
   byequiv.
-    by apply (upto1 A).
+    by conseq (upto1 A).
   by [].
 qed.
 
@@ -86,7 +88,7 @@ lemma bad1_demo1_eq &m  (A<:Adv{M,M'}) :
    Pr[ M'(A).main() @ &m : M'.bad].
 proof.
   byequiv (_ : _ ==> !M'.bad{2} => res{1} = res{2}).
-    by apply (upto1_eq A).
+    by conseq (upto1_eq A).
   by [].
   smt.
 qed.
@@ -154,8 +156,8 @@ lemma bad1_abs &m  (A<:Adv{M, M'}) :
    `| Pr[ M(A).main() @ &m : res] - Pr[ M'(A).main() @ &m : res] | <=
        Pr[ M'(A).main() @ &m : M'.bad].
 proof.
-  byequiv (: _ ==> _) : (M.bad).
-    by apply (upto2 A).
+  byequiv [-eq] (: _ ==> _) : (M.bad).
+    by conseq (upto2 A).
   by trivial.
 qed.
 
@@ -177,7 +179,7 @@ lemma bad1_abs_sub &m  (A<:Adv{M, M'}) :
 proof.
   byequiv (: _ ==> if M'.bad{2} then M.bad{1} else 
                     !M.bad{1} /\ res{1} = res{2}) : (M.bad).
-    by apply (upto2_if A).
+    by conseq (upto2_if A).
   by trivial.
   smt.
 qed.

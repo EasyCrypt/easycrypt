@@ -361,26 +361,33 @@ let process_pre tc hyps prl prr pre post =
     let al = prl.pr_args and ar = prr.pr_args in
     let ml = prl.pr_mem and mr = prr.pr_mem in
     let env = LDecl.toenv hyps in
-    let (mel, mer), _ = Fun.equivF_memenv fl fr env in
     let eqs = ref [] in
     let push f = eqs := f :: !eqs in
-    let setarg = ref false in
-    let dopv menv m mi x ty = 
-      if is_glob x then push (f_eq (f_pvar x ty m) (f_pvar x ty mi));
-      if EcMemory.is_bound_pv x menv then setarg := true in
+
+    let dopv m mi x ty = 
+      if is_glob x then push (f_eq (f_pvar x ty m) (f_pvar x ty mi)) in
+
     let doglob m mi g = push (f_eq (f_glob g m) (f_glob g mi)) in
-    let dof f a menv m mi = 
+    let dof f a m mi = 
       try 
         let fv = PV.remove env (pv_res f) (PV.fv env m post) in
-        PV.iter (dopv menv m mi) (doglob m mi) (eqobs_inF_refl env f fv);
-        if !setarg then
+        PV.iter (dopv m mi) (doglob m mi) (eqobs_inF_refl env f fv);
+        if not (EcReduction.EqTest.for_type env a.f_ty tunit) then
           push (f_eq (f_pvarg f a.f_ty m) a)
       with EcCoreGoal.TcError _ | EqObsInError -> () in
 
-    dof fl al mel mleft ml; setarg := false;
-    dof fr ar mer mright mr;
+    dof fl al mleft ml; dof fr ar mright mr;
     f_ands !eqs
-        
+
+let post_iff eq env evl evr =
+  let post = f_iff evl evr in
+  try 
+    if not eq then raise Not_found;
+    Mpv2.to_form mleft mright 
+      (Mpv2.needed_eq env mleft mright post) f_true
+  with Not_found -> post
+
+  
 let process_equiv_deno1 info eq tc =
   let process_cut (pre, post) =
     let env, hyps, concl = FApi.tc1_eflat tc in
@@ -405,12 +412,7 @@ let process_equiv_deno1 info eq tc =
         let evl = Fsubst.f_subst_mem mhr mleft evl in
         let evr = Fsubst.f_subst_mem mhr mright evr in
         if EcPath.p_equal op EcCoreLib.CI_Bool.p_eq then 
-          let post = f_iff evl evr in
-          try 
-            if not eq then raise Not_found;
-            Mpv2.to_form mleft mright 
-              (Mpv2.needed_eq env mleft mright post) f_true
-          with Not_found -> post
+          post_iff eq env evl evr
         else if EcPath.p_equal op EcCoreLib.CI_Real.p_real_le then f_imp evl evr
         else if EcPath.p_equal op EcCoreLib.CI_Real.p_real_ge then f_imp evr evl
         else tc_error !!tc "not able to reconize a comparison operator" in
@@ -438,7 +440,6 @@ let process_equiv_deno_bad info tc =
 
     let { pr_fun = fl; pr_event = evl } as prl = destr_pr fpr1 in
     let { pr_fun = fr; pr_event = evr } as prr = destr_pr fpr2 in
-
 
     let post = 
       match post with
@@ -481,7 +482,7 @@ let process_equiv_deno info eq g =
   with DestrError _ -> 
     process_equiv_deno1 info eq g
 
-let process_equiv_deno_bad2 info bad1 tc =
+let process_equiv_deno_bad2 info eq bad1 tc =
   let env, hyps, concl = FApi.tc1_eflat tc in
   let fpr1, fpr2, fprb = tc_destr_deno_bad2 tc env concl in
   
@@ -505,7 +506,8 @@ let process_equiv_deno_bad2 info bad1 tc =
         let bad1 = Fsubst.f_subst_mem mhr mleft bad1 in
         let bad2 = (destr_pr fprb).pr_event in
         let bad2 = Fsubst.f_subst_mem mhr mright bad2 in
-        f_and (f_iff bad1 bad2) (f_imp (f_not bad2) (f_iff evl evr)) in
+        let iff = post_iff eq env evl evr in
+        f_and (f_iff bad1 bad2) (f_imp (f_not bad2) iff) in
 
     let pre = process_pre tc hyps prl prr pre post in
    
@@ -536,5 +538,5 @@ let process_deno mode (info,eq,bad1) g =
   | `Equiv  -> 
     match bad1 with
     | None -> process_equiv_deno info eq g
-    | Some bad1 -> process_equiv_deno_bad2 info bad1 g
+    | Some bad1 -> process_equiv_deno_bad2 info eq bad1 g
 
