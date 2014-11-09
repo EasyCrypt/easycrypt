@@ -12,19 +12,36 @@
       P~\vec{a}_1~m_1~\vec{a}_2~m_2 \\%
       Q \Rightarrow E_1\{1\}  \Leftrightarrow E_2\{2\} }%%
     { \PR{f_1}{\vec{a}_1}{\mem{m_1}}{E_1} = \PR{f_2}{\vec{a}_2}{m_2}{E_2} }%%
-    \quad\raisebox{.7em}{\tct{byequiv (: P ==> Q)} } \\
+    \raisebox{.7em}{\tct{byequiv (: P ==> Q)} } \\
     \inferrule*[left=(\prhl),rightskip=5em]%%
     { \pRHL{P}{f_1}{f_2}{Q} \\% 
       P~\vec{a}_1~m_1~\vec{a}_2~m_2 \\%
       Q \Rightarrow E_1\{1\}  \Rightarrow E_2\{2\} }%%
     { \PR{f_1}{\vec{a}_1}{\mem{m_1}}{E_1} \leq \PR{f_2}{\vec{a}_2}{m_2}{E_2} }%%
-    \quad\raisebox{.7em}{\tct{byequiv (: P ==> Q)} } \\
+    \raisebox{.7em}{\tct{byequiv (: P ==> Q)} } \\
     \inferrule*[left=(\prhl),rightskip=5em]%%
     { \pRHL{P}{f_1}{f_2}{Q} \\%
       P~\vec{a}_1~m_1~\vec{a}_2~m_2 \\%
       Q \Rightarrow E_2\{2\}  \Rightarrow E_1\{1\} } %%
     { \PR{f_1}{\vec{a}_1}{\mem{m_1}}{E_1} \geq \PR{f_2}{\vec{a}_2}{m_2}{E_2} }%%
-    \raisebox{.7em}{\tct{byequiv (: P ==> Q)} } 
+    \raisebox{.7em}{\tct{byequiv (: P ==> Q)} } \\
+    \inferrule*[left=(\prhl),rightskip=5em]%%
+    { \pRHL{P}{f_1}{f_2}{Q} \\% 
+      P~\vec{a}_1~m_1~\vec{a}_2~m_2 \\%
+      Q \Rightarrow \neg B_2\{2\} \Rightarrow E_1\{1\}  \Rightarrow E_2\{2\} }%%
+    { \PR{f_1}{\vec{a}_1}{\mem{m_1}}{E_1} \leq \PR{f_2}{\vec{a}_2}{m_2}{E_2}
+       +  \PR{f_2}{\vec{a}_2}{m_2}{B_2} }%% 
+    \raisebox{.7em}{\tct{byequiv (: P ==> Q)} } \\
+    \inferrule*[left=(\prhl),rightskip=5em]%%
+    { \pRHL{P}{f_1}{f_2}{Q} \\% 
+      P~\vec{a}_1~m_1~\vec{a}_2~m_2 \\%
+      Q \Rightarrow B_1\{1\} \Leftrightarrow B_2\{2\} \wedge 
+      (\neg B_2\{2\} \Rightarrow E_1\{1\} \Leftrightarrow E_2\{2\}) }%%
+    { | \PR{f_1}{\vec{a}_1}{\mem{m_1}}{E_1} - \PR{f_2}{\vec{a}_2}{m_2}{E_2} |
+       \leq \PR{f_2}{\vec{a}_2}{m_2}{B_2} }%% 
+    \raisebox{.7em}{\tct{byequiv (: P ==> Q) : B_1} } \\
+
+    
   \end{mathpar}
  
  \end{tsyntax}
@@ -34,8 +51,6 @@
   with a wildcard \tct{_}. It that case the corresponding argument 
   is automatically inferred. Some time the infered postcondition  
   is stronger than necessary, in that case use the option \tct{-eq}.
-
-  \fix{Missing description of byequiv for upto}.
   
   \begin{tsyntax}{byequiv <lemma>}
   Same as \tct{byequiv <specification>}, but the specification to use is 
