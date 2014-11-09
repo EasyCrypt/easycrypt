@@ -1988,6 +1988,15 @@ code_pos_underscore:
 | s=side i=code_pos? COLON  LPAREN UNDERSCORE COLON f1=form LONGARROW f2=form RPAREN
    { `SeqOne (s, i, f1, f2) }
 
+byequivopt:
+| b=boption(MINUS) x=lident {
+    match unloc x with
+    | "eq"    -> not b
+    | _ ->
+        parse_error x.pl_loc
+          (Some ("invalid option: " ^ (unloc x)))
+  }
+
 phltactic:
 | PROC
    { Pfun `Def }
@@ -2086,13 +2095,13 @@ phltactic:
     { Psplitwhile (c, s, o) }
 
 | BYPHOARE info=fpattern(conseq)?
-    { Pbydeno (`PHoare, (cfpattern info, None)) }
+    { Pbydeno (`PHoare, (cfpattern info, true, None)) }
 
-| BYEQUIV info=fpattern(conseq)? 
-    { Pbydeno (`Equiv, (cfpattern info, None)) }
+| BYEQUIV eq=bracket(byequivopt)? info=fpattern(conseq)? 
+    { Pbydeno (`Equiv, (cfpattern info, odfl true eq, None)) }
 
-| BYEQUIV info=fpattern(conseq)? COLON bad1=sform
-    { Pbydeno (`Equiv, (cfpattern info, Some bad1)) }
+| BYEQUIV eq=bracket(byequivopt)? info=fpattern(conseq)? COLON bad1=sform
+    { Pbydeno (`Equiv, (cfpattern info, odfl true eq, Some bad1)) }
 
 | CONSEQ nm=STAR?
     { Pconseq(nm<>None, (None,None,None)) }

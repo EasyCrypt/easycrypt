@@ -27,6 +27,20 @@ proof.
   proc;call (_: true);auto.
 qed.
 
+lemma test_eq_opt &m (A<:Adv{M}) : 
+    Pr[M(A).main() @ &m : res /\ M.x = 1] = Pr[M(A).main() @ &m : res /\ M.x = 1]. 
+proof.
+  byequiv [eq] (_: ) => //.
+  proc;call (_: true);auto.
+qed.
+
+lemma test_eq_opt_no &m (A<:Adv{M}) : 
+    Pr[M(A).main() @ &m : res /\ M.x = 1] = Pr[M(A).main() @ &m : res /\ M.x = 1]. 
+proof.
+  byequiv [-eq] (_: ) => //.
+  proc;call (_: true);auto.
+qed.
+
 require import Int.
 
 module M'(A:Adv) = {

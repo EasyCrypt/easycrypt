@@ -381,7 +381,7 @@ let process_pre tc hyps prl prr pre post =
     dof fr ar mer mright mr;
     f_ands !eqs
         
-let process_equiv_deno1 info tc =
+let process_equiv_deno1 info eq tc =
   let process_cut (pre, post) =
     let env, hyps, concl = FApi.tc1_eflat tc in
 
@@ -407,6 +407,7 @@ let process_equiv_deno1 info tc =
         if EcPath.p_equal op EcCoreLib.CI_Bool.p_eq then 
           let post = f_iff evl evr in
           try 
+            if not eq then raise Not_found;
             Mpv2.to_form mleft mright 
               (Mpv2.needed_eq env mleft mright post) f_true
           with Not_found -> post
@@ -473,12 +474,12 @@ let process_equiv_deno_bad info tc =
 
 
 
-let process_equiv_deno info g = 
+let process_equiv_deno info eq g = 
   let env, _hyps, concl = FApi.tc1_eflat g in
   try ignore (destr_deno_bad env concl);
       process_equiv_deno_bad info g
   with DestrError _ -> 
-    process_equiv_deno1 info g
+    process_equiv_deno1 info eq g
 
 let process_equiv_deno_bad2 info bad1 tc =
   let env, hyps, concl = FApi.tc1_eflat tc in
@@ -527,13 +528,13 @@ let process_equiv_deno_bad2 info bad1 tc =
     t_last t_sub (t_rotate `Left 1 (t_equiv_deno_bad2 pre bad1 tc)) in
   t_rotate `Left !torotate gs
 (* -------------------------------------------------------------------- *)
-type denoff = ((pformula option) tuple2) fpattern * pformula option
+type denoff = ((pformula option) tuple2) fpattern * bool * pformula option
 
-let process_deno mode (info,bad1) g =
+let process_deno mode (info,eq,bad1) g =
   match mode with
   | `PHoare -> process_phoare_deno info g
   | `Equiv  -> 
     match bad1 with
-    | None -> process_equiv_deno  info g
+    | None -> process_equiv_deno info eq g
     | Some bad1 -> process_equiv_deno_bad2 info bad1 g
 
