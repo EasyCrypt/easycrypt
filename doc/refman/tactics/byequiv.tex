@@ -1,10 +1,19 @@
 % --------------------------------------------------------------------
 \begin{tactic}{byequiv}
 
-  \begin{tsyntax}{byequiv [option]? <specification>}
-  Derives probability relation from \prhl judgements. 
-  Only applies to judgments on procedures.
- 
+  \begin{tsyntax}{byequiv [option]? <spec>}
+  Derives a probability relation from a \prhl judgement on the
+  procedures involved. \tct{<spec>} can include wildcards when the
+  tactic should infer the pre or postcondition. In addition,
+  \tct{<spec>} can be extended with a failure event to infer precise
+  applications of the Fundamental Lemma.
+
+  \textbf{Options:} By default, (\tct{eq} option) specification
+  inference attempts to infer a conjunction of equalities sufficient
+  to imply the desired relation. Passing the \tct{-eq} option
+  overrides this behaviour, instead using the trivial relation on
+  events.
+
   \textbf{Examples:}
   \begin{mathpar}
     \inferrule*[rightskip=5em]%%
@@ -12,26 +21,26 @@
       P~\vec{a}_1~m_1~\vec{a}_2~m_2 \\%
       Q \Rightarrow E_1\{1\}  \Leftrightarrow E_2\{2\} }%%
     { \PR{f_1}{\vec{a}_1}{\mem{m_1}}{E_1} = \PR{f_2}{\vec{a}_2}{m_2}{E_2} }%%
-    \raisebox{.7em}{\tct{byequiv (: P ==> Q)} } \\
+    \raisebox{.7em}{\tct{byequiv (_: P ==> Q)} } \\
     \inferrule*[rightskip=5em]%%
     { \pRHL{P}{f_1}{f_2}{Q} \\% 
       P~\vec{a}_1~m_1~\vec{a}_2~m_2 \\%
       Q \Rightarrow E_1\{1\}  \Rightarrow E_2\{2\} }%%
     { \PR{f_1}{\vec{a}_1}{\mem{m_1}}{E_1} \leq \PR{f_2}{\vec{a}_2}{m_2}{E_2} }%%
-    \raisebox{.7em}{\tct{byequiv (: P ==> Q)} } \\
+    \raisebox{.7em}{\tct{byequiv (_: P ==> Q)} } \\
     \inferrule*[rightskip=5em]%%
     { \pRHL{P}{f_1}{f_2}{Q} \\%
       P~\vec{a}_1~m_1~\vec{a}_2~m_2 \\%
       Q \Rightarrow E_2\{2\}  \Rightarrow E_1\{1\} } %%
     { \PR{f_1}{\vec{a}_1}{\mem{m_1}}{E_1} \geq \PR{f_2}{\vec{a}_2}{m_2}{E_2} }%%
-    \raisebox{.7em}{\tct{byequiv (: P ==> Q)} } \\
+    \raisebox{.7em}{\tct{byequiv (_: P ==> Q)} } \\
     \inferrule*[rightskip=5em]%%
     { \pRHL{P}{f_1}{f_2}{Q} \\% 
       P~\vec{a}_1~m_1~\vec{a}_2~m_2 \\%
       Q \Rightarrow \neg B_2\{2\} \Rightarrow E_1\{1\}  \Rightarrow E_2\{2\} }%%
     { \PR{f_1}{\vec{a}_1}{\mem{m_1}}{E_1} \leq \PR{f_2}{\vec{a}_2}{m_2}{E_2}
        +  \PR{f_2}{\vec{a}_2}{m_2}{B_2} }%% 
-    \raisebox{.7em}{\tct{byequiv (: P ==> Q)} } \\
+    \raisebox{.7em}{\tct{byequiv (_: P ==> Q)} } \\
     \inferrule*[rightskip=5em]%%
     { \pRHL{P}{f_1}{f_2}{Q} \\% 
       P~\vec{a}_1~m_1~\vec{a}_2~m_2 \\%
@@ -39,23 +48,19 @@
       (\neg B_2\{2\} \Rightarrow E_1\{1\} \Leftrightarrow E_2\{2\}) }%%
     { | \PR{f_1}{\vec{a}_1}{\mem{m_1}}{E_1} - \PR{f_2}{\vec{a}_2}{m_2}{E_2} |
        \leq \PR{f_2}{\vec{a}_2}{m_2}{B_2} }%% 
-    \raisebox{.7em}{\tct{byequiv (: P ==> Q) : B_1} }    
+    \raisebox{.7em}{\tct{byequiv (_: P ==> Q) : B$_1$} } \\%%
+    \inferrule*[rightskip=5em]%%
+    {\pRHL{P}{f_1}{f_2}{E_1\{1\} \Leftrightarrow E_2\{2\}} \\%
+     P~\vec{a}_1~m_1~\vec{a}_2~m_2}%%
+    {\PR{f_1}{\vec{a}_1}{\mem{m_1}}{E_1} = \PR{f_2}{\vec{a}_2}{m_2}{E_2}}%%
+    \raisebox{.7em}{\tct{byequiv [-eq] (_: P ==> _)} }
   \end{mathpar}
- 
  \end{tsyntax}
 
-  Possible options are \tct{-eq} or \tct{eq}.
-  Any one of the specification places can be filled
-  with a wildcard \tct{_}. It that case the corresponding argument 
-  is automatically inferred. Some time the infered postcondition  
-  is stronger than necessary, in that case use the option \tct{-eq}.
-  
   \begin{tsyntax}{byequiv <lemma>}
-  Same as \tct{byequiv <specification>}, but the specification to use is 
-  inferred from the lemma provided. Raises an error if the lemma does 
-  not refer to the expected procedures. All variants of \tct{byequiv} 
-  may take lemmas in place of explicit specifications with the same effect.
+  Same as \tct{byequiv <specification>}, but the specification to use
+  is inferred from the lemma provided. Raises an error if the lemma
+  does not refer to the expected procedures. Inference options have no
+  effect in this setting.
   \end{tsyntax}
-
-
 \end{tactic}
