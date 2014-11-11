@@ -2266,10 +2266,14 @@ module NormMp = struct
     norm_form
 
   let norm_op env op =
-    match op.op_kind with
-    | OB_pred (Some f) ->
-        { op with op_kind = OB_pred (Some (norm_form env f)) }
-    | _ -> op
+    let kind =
+      match op.op_kind with
+      | OB_pred (Some f) -> OB_pred (Some (norm_form env f))
+      | _ -> op.op_kind
+    in
+    { op with
+        op_kind = kind;
+        op_ty   = norm_ty env op.op_ty; }
 
   let norm_ax env ax =
     { ax with ax_spec = ax.ax_spec |> omap (norm_form env) }
