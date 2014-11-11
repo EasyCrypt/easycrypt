@@ -71,5 +71,34 @@
   \end{mathpar}
   \end{tsyntax}
 
+  \begin{tsyntax}{conseq <prhl> <phl> | conseq <prhl> _ <phl>}
+  Strengthen a relational specification where one of the programs is
+  empty into a non-relational specification about the non-empty
+  program. Fails if the program expected to be empty is not. For
+  uniformity and simplicity of use, this variant also allows the user
+  to strengthen the \prhl judgment before abstracting its relational
+  aspects. The general rule below can be understood more clearly when
+  $P = P'$ and $Q = Q'$.
+
+  \textbf{Examples:}
+  \begin{mathpar}
+  \inferrule*[left=(\prhl),rightskip=5em]%%
+    {P' \Rightarrow P \\%
+     Q \Rightarrow Q' \\%
+     P \Rightarrow P_1 \\%
+     Q_1 \Rightarrow Q \\%
+     \pHL{P_1}{c}{Q_1}{=}{1}}
+    {\pRHL{P'}{c}{\Skip}{Q'}}%%
+    \quad\raisebox{.7em}{\tct{conseq (_: P ==> Q) (_: P$_1$ ==> Q$_1$: =1$\%$r)}} \\
+  \inferrule*[left=(\prhl),rightskip=5em]%%
+    {P \Rightarrow P_2 \\%
+     Q_2 \Rightarrow Q \\%
+     \pHL{P_2}{c}{Q_2}{=}{1}}
+    {\pRHL{P}{\Skip}{c}{Q}}%%
+    \quad\raisebox{.7em}{\tct{conseq (_: _ ==> _) _ (_: P$_2$ ==> Q$_2$: =1$\%$r)}}
+  \end{mathpar}
+  \end{tsyntax}
+
+
   \fix{Missing descriptions of combining variants of conseq}.
 \end{tactic}
