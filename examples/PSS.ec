@@ -762,7 +762,7 @@ module Inverter(A:PSS_AdvCMA): RSA.Inverter = {
       var r;
 
       r = $gtag;
-      if (!in_dom w g) g.[w] = (r,Adv);
+      if (!mem w (dom g)) g.[w] = (r,Adv);
       return fst (oget g.[w]);
     }
   }
@@ -801,8 +801,8 @@ module Inverter(A:PSS_AdvCMA): RSA.Inverter = {
           }
           st = st ^ (to_gtag (from_salt r || zeros (kg - k0)));
           if (0 <= z < 2^(k - 1) /\ invertible pk u) {
-            if (!in_dom (m,r) h) {
-              if (!in_dom w g) {
+            if (!mem (m,r) (dom h)) {
+              if (!mem w (dom g)) {
                 h.[(m,r)] = (w,Adv,u);
                 g.[w] = (st,Adv);
               }
@@ -838,8 +838,8 @@ module Inverter(A:PSS_AdvCMA): RSA.Inverter = {
         }
         st = st ^ (to_gtag (from_salt r || zeros (kg - k0)));
         if (0 <= z < 2^(k - 1)) {
-          if (!in_dom (m,r) h) {
-            if (!in_dom w g) {
+          if (!mem (m,r) (dom h)) {
+            if (!mem w (dom g)) {
               h.[(m,r)] = (w,Sig,u);
               g.[w] = (st,Sig);
             }
@@ -874,7 +874,7 @@ module Inverter(A:PSS_AdvCMA): RSA.Inverter = {
     st' = G.o(w);
     r   = to_salt (sub (from_gtag (st ^ st')) 0 k0);
     w'  = $htag;
-    if (in_dom (m,r) h)
+    if (mem (m,r) (dom h))
       (w',c',u) = oget h.[(m,r)];
     x   = ((os2ip s) ** (inv pk u)) pk;
     return x;
@@ -1103,28 +1103,13 @@ section.
     by progress; expect 5 smt.
   qed.
 
-  lemma invrM (r1 r2:real): 0%r < r1 => r1 <= r2 => inv r2 <= inv r1.
-  proof.
-    move=> lt0r1 ler1r2.
-    cut lt0r2: 0%r < r2 by smt.
-    cut ->: inv r2 = 1%r / r2 by smt.
-    cut ->: inv r1 = 1%r / r1 by smt.
-    cut ->: 1%r / r2 = r1 / (r1 * r2) by smt.
-    cut ->: 1%r / r1 = r2 / (r2 * r1) by smt.
-    rewrite (Real.Comm.Comm r2).
-    cut H: forall (x:real), x / (r1 * r2) = x * inv (r1 * r2) by smt.
-    rewrite !H; apply mulrMle=> //.
-    cut lt0r1r2: 0%r < r1 * r2 by smt.
-    by apply sign_inv in lt0r1r2; smt.
-  qed.
-
   lemma divrM (r1 r2 r3:real): 0%r <= r1 => 0%r < r3 <= r2 => r1 / r2 <= r1 / r3.
   proof.
     move=> lt0r1 [lt0r3 ler3r2].
     rewrite !(div_def r1) ~3:smt !(Real.Comm.Comm r1); apply mulrMle=> //.
     cut ->: 1%r / r2 = inv r2 by smt.
     cut ->: 1%r / r3 = inv r3 by smt.
-    by apply invrM.
+    by apply inv_le; first smt.
   qed.
 
   local lemma Hmem_init_bad:
@@ -1177,11 +1162,11 @@ section.
 
   lemma hmap_preq_dom m0 (m1:('a,'b * 'c * 'd) map) x:
     hmap_preq m0 m1 =>
-    in_dom x m0 <=> in_dom x m1.
+    mem x (dom m0) <=> mem x (dom m1).
   proof.
     rewrite /hmap_preq=> m0_m1.
-    cut: !in_dom x m0 <=> !in_dom x m1; last smt.
-    by rewrite /in_dom /in_dom !mem_dom /= m0_m1 none_omap.
+    cut: !mem x (dom m0) <=> !mem x (dom m1); last smt.
+    by rewrite !mem_dom /= m0_m1 none_omap.
   qed.
 
   lemma hmap_preq_get m0 (m1:('a,'b * 'c * 'd) map) x:
@@ -1195,11 +1180,11 @@ section.
 
   lemma gmap_preq_dom m0 (m1:('a,'b * 'c) map) x:
     gmap_preq m0 m1 =>
-    in_dom x m0 <=> in_dom x m1.
+    mem x (dom m0) <=> mem x (dom m1).
   proof.
     rewrite /gmap_preq=> m0_m1.
-    cut: !in_dom x m0 <=> !in_dom x m1; last smt.
-    by rewrite /in_dom /in_dom !mem_dom /= m0_m1 none_omap.
+    cut: !mem x (dom m0) <=> !mem x (dom m1); last smt.
+    by rewrite !mem_dom /= m0_m1 none_omap.
   qed.
 
   lemma gmap_preq_get m0 (m1:('a,'b * 'c) map) x:
@@ -1223,10 +1208,10 @@ section.
 
   lemma hmap_peq_dom (m0 m1:('a,'b * 'c * 'd) map) x:
     hmap_peq m0 m1 =>
-    in_dom x m0 <=> in_dom x m1.
+    mem x (dom m0) <=> mem x (dom m1).
   proof.
-    move=> hmap_peq; cut: !in_dom x m0 <=> !in_dom x m1; last smt.
-    rewrite /in_dom !mem_dom /=.
+    move=> hmap_peq; cut: !mem x (dom m0) <=> !mem x (dom m1); last smt.
+    rewrite !mem_dom /=.
     cut:= hmap_peq x.
     by case (m0.[x])=> //=; [apply none_omap | case (m1.[x])].
   qed.
@@ -1269,7 +1254,7 @@ section.
       var w;
 
       w = $htag;
-      if (!in_dom (m,r) Hmap.m)
+      if (!mem (m,r) (dom Hmap.m))
         Hmap.m.[(m,r)] = (w,c,2^k - 1);
       return omap pi3_1 Hmap.m.[(m,r)];
     }
@@ -1278,7 +1263,7 @@ section.
       var w;
 
       w = $htag;
-      if (in_dom (m,r) Hmap.m)
+      if (mem (m,r) (dom Hmap.m))
         w = pi3_1 (oget Hmap.m.[(m,r)]);
       return w;
     }
@@ -1290,21 +1275,21 @@ section.
     x{1} = (m,r){2} /\ hmap_preq H.m{1} Hmap.m{2} ==> res{2} = Some res{1} /\ hmap_preq H.m{1} Hmap.m{2}.
   proof.
     proc; inline H0.o.
-    case ((in_dom (x) Ht.RO.m){1}).
+    case ((mem x (dom Ht.RO.m)){1}).
       rcondf{1} 2; first by progress; rnd.
       rcondf{2} 2; first by progress; rnd; skip; progress; rewrite -(hmap_preq_dom Ht.RO.m{m}).
       conseq* (_: _ ==> hmap_preq H.m{1} Hmap.m{2}).
         progress.
-        rewrite H; cut: in_dom (m,r){2} Hmap.m{2} by rewrite -(hmap_preq_dom Ht.RO.m{1}).
-        by rewrite /in_dom mem_dom; case (Hmap.m.[(m,r)]{2}).
+        rewrite H; cut: mem (m,r){2} (dom Hmap.m{2}) by rewrite -(hmap_preq_dom Ht.RO.m{1}).
+        by rewrite mem_dom; case (Hmap.m.[(m,r)]{2}).
       by rnd.
       rcondt{1} 2; first by progress ;rnd.
       rcondt{2} 2; first by progress; rnd; skip; progress; rewrite -(hmap_preq_dom Ht.RO.m{m}).
-      conseq* (_: _ ==> in_dom (m,r){2} Hmap.m{2} /\ hmap_preq H.m{1} Hmap.m{2}).
+      conseq* (_: _ ==> mem (m,r){2} (dom Hmap.m){2} /\ hmap_preq H.m{1} Hmap.m{2}).
         progress.
-        by rewrite H2; cut:= H1; rewrite /in_dom mem_dom; case (m_R.[(m,r)]{2}).
+        by rewrite H2; cut:= H1; rewrite mem_dom; case (m_R.[(m,r)]{2}).
       wp; rnd; skip; progress.
-        by rewrite in_dom_set; right.
+        by rewrite dom_set mem_add; right.
         rewrite /hmap_preq=> x; case ((m,r){2} = x)=> [<- | neq_mr_x].
           by rewrite !get_set_eq.
           by rewrite !get_set_neq 3:H.
@@ -1550,7 +1535,7 @@ section.
       var g;
 
       g = $gtag;
-      if (!in_dom w Gmap.m) Gmap.m.[w] = (g,Adv);
+      if (!mem w (dom Gmap.m)) Gmap.m.[w] = (g,Adv);
       return fst (oget Gmap.m.[w]);
     }
   }.
@@ -1564,8 +1549,8 @@ section.
       st = $gtag;
       st = st ^ (GTag.from_bits (from_salt r || zeros (kg - k0)));
       
-      if (!in_dom (m,r) Hmap.m) {
-        if (!in_dom w Gmap.m) {
+      if (!mem (m,r) (dom Hmap.m)) {
+        if (!mem w (dom Gmap.m)) {
           Hmap.m.[(m,r)] = (w,c,2^k - 1);
           Gmap.m.[w] = (st,c);
         }
@@ -1590,7 +1575,7 @@ section.
       var w, st;
 
       w = $htag;
-      if (!in_dom (m,r) Hmap.m) {
+      if (!mem (m,r) (dom Hmap.m)) {
         Hmap.m.[(m,r)] = (w,c,2^k - 1);
         st = G.o(w);
       }
@@ -1624,7 +1609,7 @@ section.
       var w;
 
       w = $htag;
-      if (!in_dom (m,r) Hmap.m)
+      if (!mem (m,r) (dom Hmap.m))
         Hmap.m.[(m,r)] = (w,c,2^k - 1);
       return omap pi3_1 Hmap.m.[(m,r)];
     }
@@ -1633,7 +1618,7 @@ section.
       var w;
 
       w = $htag;
-      if (in_dom (m,r) Hmap.m)
+      if (mem (m,r) (dom Hmap.m))
         w = pi3_1 (oget Hmap.m.[(m,r)]);
       return w;
     }
@@ -1646,7 +1631,7 @@ section.
       var w, st;
 
       w = $htag;
-      if (!in_dom (m,r) Hmap.m) {
+      if (!mem (m,r) (dom Hmap.m)) {
         Hmap.m.[(m,r)] = (w,c,2^k - 1);
         st = G.o(w);
       }
@@ -1686,10 +1671,10 @@ section.
   local equiv D0e_D1e (Ga <: Gadv {Ge,Hmap}):
     Gt.Eager.Types.IND(Ge,D(Ga,H0e)).main ~ Gt.Eager.Types.IND(Ge,D(Ga,H0'1e)).main: ={glob D(Ga,H0e)} ==> ={res}.
   proof.
-    proc; call (_: ={glob Gt.Eager.RO, glob D(Ga,H0e)} /\ forall x, in_dom x Ge.m{1}).
-      call (_: ={glob Gt.Eager.RO, glob Hmap} /\ forall x, in_dom x Ge.m{1}).
+    proc; call (_: ={glob Gt.Eager.RO, glob D(Ga,H0e)} /\ forall x, mem x (dom Ge.m{1})).
+      call (_: ={glob Gt.Eager.RO, glob Hmap} /\ forall x, mem x (dom Ge.m{1})).
         (* H *)
-        proc; case ((in_dom (m,r) Hmap.m){2}).
+        proc; case ((mem (m,r) (dom Hmap.m)){2}).
           rcondf{1} 2; first by progress; rnd.
           rcondf{2} 2; first by progress; rnd.
           by rnd; skip; smt.
@@ -1757,7 +1742,7 @@ section.
       var w, st;
 
       w = $htag;
-      if (!in_dom (m,r) Hmap.m) {
+      if (!mem (m,r) (dom Hmap.m)) {
         Hmap.m.[(m,r)] = (w,c,2^k - 1);
         st = G.o(w);
       } else {
@@ -1792,26 +1777,26 @@ section.
       first by inline*; auto.
     call (_: ={glob Hmap, glob G, glob Mem} /\
              (forall x,
-                in_dom x Hmap.m{2} =>
-                in_dom (pi3_1 (oget Hmap.m.[x])){2} G.m{2})).
+                mem x (dom Hmap.m{2}) =>
+                mem (pi3_1 (oget Hmap.m.[x])){2} (dom G.m{2}))).
       (* sign *)
       proc; sp; if=> //.
       inline *.
       seq 1 1: (={glob Hmap, glob G, glob Mem, m, r, s} /\
                 (forall x,
-                  in_dom x Hmap.m{2} =>
-                  in_dom (pi3_1 (oget Hmap.m.[x])){2} G.m{2}));
+                  mem x (dom Hmap.m{2}) =>
+                  mem (pi3_1 (oget Hmap.m.[x])){2} (dom G.m{2})));
         first by rnd.
       rcondf{1} 9.
-        progress; case (in_dom (m,r) Hmap.m).
+        progress; case (mem (m,r) (dom Hmap.m)).
           by rcondf 6; auto; progress; smt.
           by rcondt 6; auto; progress; smt.
       rcondf{2} 9.
-        progress; case (in_dom (m,r) Hmap.m).
+        progress; case (mem (m,r) (dom Hmap.m)).
           rcondf 6; first by auto.
             by rcondf 7; auto.
           by rcondt 6; auto.
-      case ((in_dom (m,r) Hmap.m){2}).
+      case ((mem (m,r) (dom Hmap.m)){2}).
         rcondf{1} 6; first by auto.
         rcondf{2} 6; first by auto.
         rcondf{2} 7; first by auto.
@@ -1820,18 +1805,18 @@ section.
         rcondt{2} 6; first by auto.
         rcondf{1} 16.
           auto; progress.
-            by rewrite -pairS get_set_eq oget_omap_some // /in_dom mem_dom /oget/pi3_1 /= get_set_eq.
+            by rewrite -pairS get_set_eq oget_omap_some // mem_dom /oget /pi3_1 /= get_set_eq.
             by rewrite -pairS get_set_eq oget_omap_some.
         wp; rnd{1} True; auto; progress.
           smt.
-          by rewrite -pairS !get_set_eq /oget /pi3_1 /= !get_set_eq /oget /oget.
-          by rewrite -pairS !get_set_eq /oget /pi3_1 /= !get_set_eq /oget /oget.
+          by rewrite -pairS get_set_eq /oget /pi3_1 /= get_set_eq /oget /oget.
+          by rewrite -pairS get_set_eq /oget /pi3_1 /= get_set_eq /oget /oget.
           move: H8; rewrite -pairS=> H10; case ((m,r){2} = x1).
-            by move=> <-; rewrite get_set_eq /oget /pi3_1 /= /in_dom mem_dom get_set_eq.
-            move=> neq_mr_x1; rewrite get_set_neq // /in_dom mem_dom get_set_neq.
-              by cut:= H10; rewrite /in_dom mem_dom get_set_neq //; smt.
-            rewrite -mem_dom -/(in_dom _ _); apply H.
-              by cut:= H10; rewrite /in_dom mem_dom get_set_neq //; smt.
+            by move=> <-; rewrite get_set_eq /oget /pi3_1 /= mem_dom get_set_eq.
+            move=> neq_mr_x1; rewrite get_set_neq // mem_dom get_set_neq.
+              by cut:= H10; rewrite mem_dom get_set_neq //; smt.
+            rewrite -mem_dom; apply H.
+              by cut:= H10; rewrite mem_dom get_set_neq //; smt.
           smt.
           by rewrite -pairS !get_set_eq /oget /pi3_1.
           by rewrite -pairS !get_set_eq /oget /pi3_1.
@@ -1839,12 +1824,12 @@ section.
             by move=> <-; rewrite get_set_eq /oget /pi3_1.
             move=> neq_mr_x1; rewrite get_set_neq //.
             apply H.
-              by cut:= H10; rewrite /in_dom mem_dom get_set_neq //; smt.
+              by cut:= H10; rewrite mem_dom get_set_neq //; smt.
       (* Ga *)
       by proc; inline *; sp; if=> //; auto; progress; smt.
       (* Ha *)
       proc; sp; if=> //.
-      inline H0'1.o HG0'1.o; case ((in_dom m Hmap.m){1}).
+      inline H0'1.o HG0'1.o; case ((mem m (dom Hmap.m)){1}).
         rcondf{1} 5; first by auto; smt.
         rcondf{2} 5; first by auto; smt.
         by rcondt{2} 6; auto.
@@ -1853,16 +1838,16 @@ section.
         inline G.o; auto; progress.
           by rewrite -pairS get_set_eq.
           move: H7; rewrite -pairS=> H9; case (m{2} = x0).
-            by move=> <-; rewrite get_set_eq /oget /pi3_1 /= /in_dom mem_dom get_set_eq.
-            move=> neq_m_x0; rewrite get_set_neq // /in_dom mem_dom get_set_neq.
-              by cut:= H9; rewrite /in_dom mem_dom get_set_neq //; smt.
-            rewrite -mem_dom -/(in_dom _ _); apply H.
-              by cut:= H9; rewrite /in_dom mem_dom get_set_neq //; smt.
+            by move=> <-; rewrite get_set_eq /oget /pi3_1 /= mem_dom get_set_eq.
+            move=> neq_m_x0; rewrite get_set_neq // mem_dom get_set_neq.
+              by cut:= H9; rewrite mem_dom get_set_neq //; smt.
+            rewrite -mem_dom; apply H.
+              by cut:= H9; rewrite mem_dom get_set_neq //; smt.
           by rewrite -pairS get_set_eq.
           move: H7; rewrite -pairS=> H7; case (m{2} = x0).
             by move=> <-; rewrite get_set_eq.
             move=> neq_m_x0; rewrite get_set_neq //; apply H.
-            by cut:= H7; rewrite /in_dom mem_dom get_set_neq //; smt.
+            by cut:= H7; rewrite mem_dom get_set_neq //; smt.
     by skip; smt.
   qed.
 
@@ -1886,10 +1871,10 @@ section.
       w = $htag;
       st = $gtag;
       st = st ^ (GTag.from_bits (from_salt r || zeros (kg - k0)));
-      badg = badg \/ in_dom w Gmap.m;
-      badh = badh \/ (in_dom (m,r) Hmap.m /\ !c = Adv);
-      if (!in_dom (m,r) Hmap.m) {
-        if (!in_dom w Gmap.m) {
+      badg = badg \/ mem w (dom Gmap.m);
+      badh = badh \/ (mem (m,r) (dom Hmap.m) /\ !c = Adv);
+      if (!mem (m,r) (dom Hmap.m)) {
+        if (!mem w (dom Gmap.m)) {
            Hmap.m.[(m,r)] = (w,c,2^k - 1);
            Gmap.m.[w] = (st,c);
         }
@@ -1916,23 +1901,23 @@ section.
     proc.
     swap{2} [4..5] -2.
     seq 1 3 : (={glob Hmap, c, m, r, w} /\ G.m{1} = FMap.map fst Gmap.m{2} /\
-              (H0'2.badg = in_dom w Gmap.m){2} /\
-              (H0'2.badh = (in_dom (m, r) Hmap.m /\ ! c = Adv)){2});
+              (H0'2.badg = mem w (dom Gmap.m)){2} /\
+              (H0'2.badh = (mem (m,r) (dom Hmap.m) /\ ! c = Adv)){2});
       first by auto; smt.
     case (H0'2.badg{2} \/ H0'2.badh{2}).
-      conseq * (_ : _ ==> true)=> //; first smt.
+      conseq * (_ : _ ==> true)=> //.
       by wp; rnd{2}; inline G.o; if{1}; wp; [ | sp; if{1}]; auto; progress; expect 3 smt.
-    case ((in_dom (m,r) Hmap.m){1}).
+    case ((mem (m,r) (dom Hmap.m)){1}).
       rcondf{1} 1=> //; rcondf{2} 3; first by auto; smt.
       sp; elim * => wL; if{1}; first by auto; smt.
       by inline G.o; auto; smt.
     rcondt{1} 1=> //; rcondt{2} 3; first by auto; smt.
     inline *; swap{1} 3 -2.
-    case (in_dom w{2} Gmap.m{2}); first by conseq * (_: _ ==> true); auto; smt.
+    case (mem w{2} (dom Gmap.m{2})); first by conseq * (_: _ ==> true); auto; smt.
     rcondt{2} 3; first by auto; smt.
     rcondt{1} 4. 
       auto;progress.
-      move: H0; rewrite /in_dom /in_dom !mem_dom get_map; smt.
+      move: H0; rewrite !mem_dom get_map; smt.
     wp; rnd ((^) (GTag.from_bits (from_salt r || zeros (kg - k0)))){2}; auto; progress; try algebra.
       by apply gtagU; apply gtagF.
       by apply gtagF.
@@ -1962,7 +1947,7 @@ section.
       proc. 
         seq 1 1 : (x{1} = w{2} /\ y{1} = g{2} /\ G.m{1} = map fst Gmap.m{2});first by auto.
         if.
-          by progress [-split]; rewrite /in_dom !mem_dom get_map; smt.
+          by progress [-split]; rewrite !mem_dom get_map; smt.
           by auto; smt.
           by auto; smt.
       by move=> _ _; conseq* (Gt.Lazy.RO_o_ll _); apply gtagL.
@@ -1992,9 +1977,9 @@ section.
         w = $htag;
         st = $gtag;
         st = st ^ (GTag.from_bits (from_salt r || zeros (kg - k0)));
-        H0'2.badg = H0'2.badg \/ in_dom w Gmap.m;
-        if (!in_dom (m,r) Hmap.m) {
-          if (!in_dom w Gmap.m) {
+        H0'2.badg = H0'2.badg \/ mem w (dom Gmap.m);
+        if (!mem (m,r) (dom Hmap.m)) {
+          if (!mem w (dom Gmap.m)) {
             Hmap.m.[(m,r)] = (w,c,2^k - 1);
             Gmap.m.[w] = (st,c);
           }
@@ -2087,10 +2072,10 @@ section.
         smt.
       if; last by hoare.
       wp.
-      seq 1: (in_dom w Gmap.m) ((qS + qH + qG - 1)%r / (2 ^ kh)%r) 1%r _ 0%r (!H0'2.badg) => //;
+      seq 1: (mem w (dom Gmap.m)) ((qS + qH + qG - 1)%r / (2 ^ kh)%r) 1%r _ 0%r (!H0'2.badg) => //;
         first by auto.
         rnd; skip; progress.
-        rewrite /in_dom -/(cpMem _) (mu_cpMem _ _ (1%r / (2^kh)%r)); first smt. 
+        rewrite -/(cpMem _) (mu_cpMem _ _ (1%r / (2^kh)%r)); first smt. 
         cut ->: forall x, x * (1%r / (2^kh)%r) = x / (2^kh)%r by smt. 
         by apply (_: forall (x y z:real), x <= y => 0%r < z => x / z <= y / z); smt.
 (*-*) by hoare; conseq * (_ : _ ==> true) => //; smt.
@@ -2109,13 +2094,13 @@ section.
       proc o(c:caller,m:message,r:salt): (htag *gtag) option = {
         var w, st, ho;
 
-        H0'2.badh = H0'2.badh \/ (in_dom (m,r) Hmap.m /\ !c = Adv);
+        H0'2.badh = H0'2.badh \/ (mem (m,r) (dom Hmap.m) /\ !c = Adv);
         w  = $htag;
         st = $gtag;
         st = st ^ (GTag.from_bits (from_salt r || zeros (kg - k0)));
 
-        if (!in_dom (m,r) Hmap.m) {
-          if (!in_dom w Gmap.m) {
+        if (!mem (m,r) (dom Hmap.m)) {
+          if (!mem w (dom Gmap.m)) {
             Hmap.m.[(m,r)] = (w,c,2^k - 1);
             Gmap.m.[w] = (st,c);
           }
@@ -2155,8 +2140,8 @@ section.
           (m,r) = mr;
           w = $htag;
           st = $gtag;
-          if (!in_dom (m,r) Hmap.m) {
-            if (!in_dom w Gmap.m) {
+          if (!mem (m,r) (dom Hmap.m)) {
+            if (!mem w (dom Gmap.m)) {
               Hmap.m.[(m,r)] = (w,Adv,2^k - 1);
               Gmap.m.[w] = (st ^ (GTag.from_bits (from_salt r || zeros (kg - k0))), Adv);
             }
@@ -2300,17 +2285,17 @@ section.
         cut ->: 0%r = 0%r / (2^k0)%r by smt.
         smt.
       sp; if.
-        seq 1: (in_dom (m,r) Hmap.m /\ c <> Adv) ((qH + qS)%r/(2^k0)%r) (1%r) _ 0%r (!H0'2.badh)=> //.
+        seq 1: (mem (m,r) (dom Hmap.m) /\ c <> Adv) ((qH + qS)%r/(2^k0)%r) (1%r) _ 0%r (!H0'2.badh)=> //.
           by rnd.
-          rnd (fun r, in_dom (m,r) Hmap.m); skip; progress.
+          rnd (fun r, mem (m,r) (dom Hmap.m)); skip; progress.
           cut <-: mu ((Dunit.dunit m{hr}) * salt) (cpMem (dom Hmap.m{hr}))
-                  = mu salt (fun r, in_dom (m{hr},r) Hmap.m{hr}).
+                  = mu salt (fun r, mem (m{hr},r) (dom Hmap.m{hr})).
             cut ->: mu ((Dunit.dunit m{hr}) * salt) (cpMem (dom Hmap.m{hr}))
                     = mu ((Dunit.dunit m{hr}) * salt) (fun x, (fun a, a = m{hr}) (fst x) /\
                                                               (fun b, mem (m{hr},b) (dom Hmap.m{hr})) (snd x)).
               rewrite mu_support /support /Pred.(/\) /cpMem; apply mu_eq=> x //=.
               by rewrite Dprod.supp_def Dunit.supp_def; smt.
-            by rewrite Dprod.mu_def Dunit.mu_def /charfun /= /in_dom.
+            by rewrite Dprod.mu_def Dunit.mu_def /charfun /=.
           apply (Trans _ ((card (dom Hmap.m{hr}))%r * (1%r / (2^k0)%r))).
             apply mu_cpMem_le.
             move=> x mem_x; rewrite /mu_x.
@@ -2386,8 +2371,8 @@ section.
         w  = to_htag (sub (from_signature (i2osp z)) 1 kh);
         st = to_gtag (sub (from_signature (i2osp z)) (1 + kh) kg);
         st = st ^ (to_gtag (from_salt r || zeros (kg - k0)));
-        if (!in_dom (m,r) Hmap.m) {
-          if (!in_dom w Gmap.m) {
+        if (!mem (m,r) (dom Hmap.m)) {
+          if (!mem w (dom Gmap.m)) {
             Hmap.m.[(m,r)] = (w,c,u);
             Gmap.m.[w] = (st,c);
           }
@@ -2424,8 +2409,8 @@ section.
       if (invertible Hmem.pk Hmem.xstar \/ c <> Adv) {
         (w,st) = S.sample(c);
         st = st ^ (to_gtag (from_salt r || zeros (kg - k0)));
-        if (!in_dom (m,r) Hmap.m) {
-          if (!in_dom w Gmap.m) {
+        if (!mem (m,r) (dom Hmap.m)) {
+          if (!mem w (dom Gmap.m)) {
             Hmap.m.[(m,r)] = (w,c,2^k - 1);
             Gmap.m.[w] = (st,c);
           }
@@ -2534,7 +2519,9 @@ section.
     cut ->: Pr[SampleWST.sample(c{1}) @ &1: a = res] = 1%r/(2^(kg + kh))%r.
       byphoare (_: true ==> a = res)=> //; proc.
       seq 1: (w = a.`1) (1%r/(2^kh)%r) (1%r/(2^kg)%r) _ 0%r=> //.
-        by rnd; skip; progress; cut ->: (fun x, x = a.`1) = ((=) a.`1) by (apply fun_ext; smt); smt.
+        rnd; skip; progress.
+        cut ->: (fun x, x = a.`1) = ((=) a.`1) by apply fun_ext; smt.
+        smt.
         by rnd ((=) a.`2); skip; progress; smt.
         by hoare; rnd; skip; smt.
         progress; cut ->: (2^kh)%r * (2^kg)%r = (2^kh * 2^kg)%r by smt.
@@ -2608,10 +2595,10 @@ section.
       auto; progress.
         by apply hmap_peq_set.
       auto; progress.
-        cut indom1: in_dom (m,r){2} Hmap.m{1} by smt.
+        cut indom1: mem (m,r){2} (dom Hmap.m){1} by smt.
         cut:= indom1; rewrite (hmap_peq_dom _ Hmap.m{2}) //.
         move: indom1.
-        rewrite /in_dom !mem_dom /oget /pi3_1.
+        rewrite !mem_dom /oget /pi3_1.
         cut:= H (m,r){2}.
         case (Hmap.m{1}.[(m,r)]{2})=> //=.
         case (Hmap.m.[(m,r)]{2})=> //=.
@@ -2736,7 +2723,7 @@ section.
       g  = G.o(w);
       rs = from_gtag (st ^ g);
       r  = to_salt (sub rs 0 k0);
-      lucky = !in_dom (m,r) Hmap.m;
+      lucky = !mem (m,r) (dom Hmap.m);
       w' = H.v(m,r);
       return sub y 0 1 = zeros 1 /\ w = w' /\ sub rs k0 (kg - k0) = zeros (kg - k0) /\
              0 <= os2ip s < p_n Mem.pk /\ !mem (m,s) Mem.qs;
@@ -2760,8 +2747,8 @@ section.
         w  = to_htag (sub (from_signature (i2osp z)) 1 kh);
         st = to_gtag (sub (from_signature (i2osp z)) (1 + kh) kg);
         st = st ^ (to_gtag (from_salt r || zeros (kg - k0)));
-        if (!in_dom (m,r) Hmap.m) {
-          if (!in_dom w Gmap.m) {
+        if (!mem (m,r) (dom Hmap.m)) {
+          if (!mem w (dom Gmap.m)) {
             Hmap.m.[(m,r)] = (w,c,u);
             Gmap.m.[w] = (st,c);
           }
@@ -2812,8 +2799,8 @@ section.
         st = st ^ (to_gtag (from_salt r || zeros (kg - k0)));
         bad = bad \/ (c = Adv /\ !invertible Hmem.pk u);
         if (c <> Adv \/ invertible Hmem.pk u) {
-          if (!in_dom (m,r) Hmap.m) {
-            if (!in_dom w Gmap.m) {
+          if (!mem (m,r) (dom Hmap.m)) {
+            if (!mem w (dom Gmap.m)) {
               Hmap.m.[(m,r)] = (w,c,u);
               Gmap.m.[w] = (st,c);
             }
@@ -2902,8 +2889,8 @@ section.
             st = st ^ (to_gtag (from_salt r || zeros (kg - k0)));
             H3'1.bad = H3'1.bad \/ !invertible Hmem.pk u;
             if (invertible Hmem.pk u) {
-              if (!in_dom (m,r) Hmap.m) {
-                if (!in_dom w Gmap.m) {
+              if (!mem (m,r) (dom Hmap.m)) {
+                if (!mem w (dom Gmap.m)) {
                   Hmap.m.[(m,r)] = (w,Adv,u);
                   Gmap.m.[w] = (st,Adv);
                 }
@@ -2945,8 +2932,8 @@ section.
         w  = to_htag (sub (from_signature (i2osp z)) 1 kh);
         st = to_gtag (sub (from_signature (i2osp z)) (1 + kh) kg);
         st = st ^ (to_gtag (from_salt r || zeros (kg - k0)));
-        if (!in_dom (m,r) Hmap.m) {
-          if (!in_dom w Gmap.m) {
+        if (!mem (m,r) (dom Hmap.m)) {
+          if (!mem w (dom Gmap.m)) {
             Hmap.m.[(m,r)] = (w,Sig,u);
             Gmap.m.[w] = (st,Sig);
           }
@@ -3109,8 +3096,8 @@ section.
         st = to_gtag (sub (from_signature (i2osp z)) (1 + kh) kg);
         st = st ^ (to_gtag (from_salt r || zeros (kg - k0)));
         if (c <> Adv \/ invertible Hmem.pk u) {
-          if (!in_dom (m,r) Hmap.m) {
-            if (!in_dom w Gmap.m) {
+          if (!mem (m,r) (dom Hmap.m)) {
+            if (!mem w (dom Gmap.m)) {
               Hmap.m.[(m,r)] = (w,c,u);
               Gmap.m.[w] = (st,c);
             }
@@ -3212,10 +3199,11 @@ section.
           by rewrite simul_invK //; smt.
       apply Logic.eq_sym.
       pose bdt:= (2^(k - 1))%r.
-      cut bdt_pos: 0 <= 2^(k - 1) by smt.
-      cut bdt_posr: 0%r <= (2^(k - 1))%r by smt.
+      cut bdt_pos: 0 < 2^(k - 1) by smt.
+      cut bdt_posr: 0%r < (2^(k - 1))%r by smt.
       byphoare (_: i = (pk',sk',b',x') /\ dflt = d ==> res = simul_inv pk' sk' b' x' r')=> //; proc.
       pose bd:= mu_x (challenge pk') r'.
+      cut bd_pos: 0%r < bd by smt.
       cut d_uni: forall x, in_supp x (challenge pk') => mu_x (challenge pk') x = bd.
         by move=> y Hy; rewrite /bd; apply challengeU=> //; smt.
       cut Hdiff: bdt <> (Real.zero)%Real by smt.
@@ -3381,8 +3369,8 @@ section.
         }
         st = st ^ (to_gtag (from_salt r || zeros (kg - k0)));
         if (c <> Adv \/ invertible Hmem.pk u) {
-          if (!in_dom (m,r) Hmap.m) {
-            if (!in_dom w Gmap.m) {
+          if (!mem (m,r) (dom Hmap.m)) {
+            if (!mem w (dom Gmap.m)) {
               Hmap.m.[(m,r)] = (w,c,u);
               Gmap.m.[w] = (st,c);
             }
@@ -3400,7 +3388,7 @@ section.
       var h;
 
       h = $htag;
-      if (in_dom (m,r) Hmap.m) h = pi3_1 (oget Hmap.m.[(m,r)]);
+      if (mem (m,r) (dom Hmap.m)) h = pi3_1 (oget Hmap.m.[(m,r)]);
       return h;
     }
   }.
@@ -3539,8 +3527,8 @@ section.
         }
         st = st ^ (to_gtag (from_salt r || zeros (kg - k0)));
         if (0 <= z < 2^(k - 1) /\ (c <> Adv \/ invertible Hmem.pk u)) {
-          if (!in_dom (m,r) Hmap.m) {
-            if (!in_dom w Gmap.m) {
+          if (!mem (m,r) (dom Hmap.m)) {
+            if (!mem w (dom Gmap.m)) {
               Hmap.m.[(m,r)] = (w,c,u);
               Gmap.m.[w] = (st,c);
             }
@@ -3558,7 +3546,7 @@ section.
       var h;
 
       h = $htag;
-      if (in_dom (m,r) Hmap.m) h = pi3_1 (oget Hmap.m.[(m,r)]);
+      if (mem (m,r) (dom Hmap.m)) h = pi3_1 (oget Hmap.m.[(m,r)]);
       return h;
     }
   }.
@@ -3729,8 +3717,8 @@ section.
           }
           st = st ^ (to_gtag (from_salt r || zeros (kg - k0)));
           if (0 <= z < 2^(k - 1) /\ (c <> Adv \/ invertible Hmem.pk u)) {
-            if (!in_dom (m,r) Hmap.m) {
-              if (!in_dom w Gmap.m) {
+            if (!mem (m,r) (dom Hmap.m)) {
+              if (!mem w (dom Gmap.m)) {
                 Hmap.m.[(m,r)] = (w,c,u);
                 Gmap.m.[w] = (st,c);
               }
@@ -3891,8 +3879,8 @@ section.
         }
         st = st ^ (to_gtag (from_salt r || zeros (kg - k0)));
         if (0 <= z < 2^(k - 1) /\ (c <> Adv \/ invertible Hmem.pk u)) {
-          if (!in_dom (m,r) Hmap.m) {
-            if (!in_dom w Gmap.m) {
+          if (!mem (m,r) (dom Hmap.m)) {
+            if (!mem w (dom Gmap.m)) {
               Hmap.m.[(m,r)] = (w,c,u);
               Gmap.m.[w] = (st,c);
             }
@@ -3910,7 +3898,7 @@ section.
       var h;
 
       h = $htag;
-      if (in_dom (m,r) Hmap.m) h = pi3_1 (oget Hmap.m.[(m,r)]);
+      if (mem (m,r) (dom Hmap.m)) h = pi3_1 (oget Hmap.m.[(m,r)]);
       return h;
     }
   }.
@@ -3997,7 +3985,7 @@ section.
         var r;
 
         r = $gtag;
-        if (!in_dom w Gmap.m) Gmap.m.[w] = (r,Adv);
+        if (!mem w (dom Gmap.m)) Gmap.m.[w] = (r,Adv);
         return fst (oget Gmap.m.[w]);
       }
     }
@@ -4036,8 +4024,8 @@ section.
             }
             st = st ^ (to_gtag (from_salt r || zeros (kg - k0)));
             if (0 <= z < 2^(k - 1) /\ invertible Hmem.pk u) {
-              if (!in_dom (m,r) Hmap.m) {
-                if (!in_dom w Gmap.m) {
+              if (!mem (m,r) (dom Hmap.m)) {
+                if (!mem w (dom Gmap.m)) {
                   Hmap.m.[(m,r)] = (w,Adv,u);
                   Gmap.m.[w] = (st,Adv);
                 }
@@ -4073,8 +4061,8 @@ section.
           }
           st = st ^ (to_gtag (from_salt r || zeros (kg - k0)));
           if (0 <= z < 2^(k - 1)) {
-            if (!in_dom (m,r) Hmap.m) {
-              if (!in_dom w Gmap.m) {
+            if (!mem (m,r) (dom Hmap.m)) {
+              if (!mem w (dom Gmap.m)) {
                 Hmap.m.[(m,r)] = (w,Sig,u);
                 Gmap.m.[w] = (st,Sig);
               }
@@ -4109,7 +4097,7 @@ section.
       st'  = G.o(w);
       r  = to_salt (sub (from_gtag (st ^ st')) 0 k0);
       w' = $htag;
-      if (in_dom (m,r) Hmap.m)
+      if (mem (m,r) (dom Hmap.m))
         (w',c',u) = oget Hmap.m.[(m,r)];
       x = ((os2ip s) ** (inv pk u)) pk;
       return x;
@@ -4189,9 +4177,9 @@ section.
     Hmem.sk = Mem.sk /\
     rsap_dom Hmem.pk Hmem.xstar /\
     (forall m r,
-      in_dom (m,r) Hmap.m =>
+      mem (m,r) (dom Hmap.m) =>
       let (w,c,u) = oget Hmap.m.[(m,r)] in
-      in_dom w Gmap.m /\
+      mem w (dom Gmap.m) /\
       rsap_dom Hmem.pk u /\
       let (st,c') = oget Gmap.m.[w] in
       c = c' /\
@@ -4210,9 +4198,9 @@ section.
          to_gtag (sub (from_signature (i2osp y)) (1 + kh) kg) /\
         mem (m,i2osp u) Mem.qs)) ==>
     (forall m r,
-      in_dom (m,r) Hmap.m =>
+      mem (m,r) (dom Hmap.m) =>
       let (w,c,u) = oget Hmap.m.[(m,r)] in
-      in_dom w Gmap.m /\
+      mem w (dom Gmap.m) /\
       rsap_dom Hmem.pk u /\
       let (st,c') = oget Gmap.m.[w] in
       c = c' /\
@@ -4243,9 +4231,9 @@ section.
              rsap_dom Hmem.pk Hmem.xstar /\
              (0 <= z < 2^(k - 1) => rsap_dom Hmem.pk u) /\
              (forall m r,
-               in_dom (m,r) Hmap.m =>
+               mem (m,r) (dom Hmap.m) =>
                let (w,c,u) = oget Hmap.m.[(m,r)] in
-               in_dom w Gmap.m /\
+               mem w (dom Gmap.m) /\
                rsap_dom Hmem.pk u /\
                let (st,c') = oget Gmap.m.[w] in
                c = c' /\
@@ -4284,74 +4272,74 @@ section.
         rcondf 4; first by auto.
         wp; skip; progress [-split].
         cut:= H2 m2 r2 _ => //; rewrite H9 /= => [x1_in_G].
-        cut:= x1_in_G; rewrite /in_dom mem_dom /oget; case (Gmap.m.[x1]{hr})=> //= [[w st]].
+        cut:= x1_in_G; rewrite mem_dom /oget; case (Gmap.m.[x1]{hr})=> //= [[w st]].
         by progress; cut:= H12 _=> //; progress; rewrite mem_add; left.
       rcondf 6; first by auto.
       wp; skip; progress.
         case ((m1,r1){hr} = (m2,r2)).
           elim=> m_eq r_eq; subst; move: H9; rewrite get_set_eq /oget /= => [->].
-          by rewrite /in_dom mem_dom get_set_eq.
+          by rewrite mem_dom get_set_eq.
           move=> neq; move: H9; rewrite get_set_neq // => hmr.
-          move: H8; rewrite /in_dom mem_dom get_set_neq // -mem_dom -/(in_dom _ _)=> dom_hmr.
+          move: H8; rewrite mem_dom get_set_neq // -mem_dom=> dom_hmr.
           cut:= H2 m2 r2 _=> //; rewrite hmr /=; progress.
-          by rewrite /in_dom mem_dom get_set_neq 2:-mem_dom; first smt.
+          by rewrite mem_dom get_set_neq 2:-mem_dom; first smt.
         case ((m1,r1){hr} = (m2,r2)).
           by elim=> m_eq r_eq; subst; move: H9; rewrite get_set_eq /oget /=; smt.
           move=> neq; move: H9; rewrite get_set_neq // => hmr.
-          move: H8; rewrite /in_dom mem_dom get_set_neq // -mem_dom -/(in_dom _ _)=> dom_hmr.
+          move: H8; rewrite mem_dom get_set_neq // -mem_dom=> dom_hmr.
           by cut:= H2 m2 r2 _=> //; rewrite hmr /=; smt.
         case ((m1,r1){hr} = (m2,r2)).
           by elim=> m_eq r_eq; subst; move: H9; rewrite get_set_eq /oget /=; smt.
           move=> neq; move: H9; rewrite get_set_neq // => hmr.
-          move: H8; rewrite /in_dom mem_dom get_set_neq // -mem_dom -/(in_dom _ _)=> dom_hmr.
+          move: H8; rewrite mem_dom get_set_neq // -mem_dom=> dom_hmr.
           by cut:= H2 m2 r2 _=> //; rewrite hmr /=; smt.
         case ((m1,r1){hr} = (m2,r2)).
           elim=> m_eq r_eq; subst; move: H9; rewrite get_set_eq /oget /= => [w_eq] [c_eq u_eq]; subst.
           by move: H10; rewrite get_set_eq /oget.
           move=> neq; move: H9; rewrite get_set_neq // => hmr.
-          move: H8; rewrite /in_dom mem_dom get_set_neq // -mem_dom -/(in_dom _ _)=> dom_hmr.
+          move: H8; rewrite mem_dom get_set_neq // -mem_dom=> dom_hmr.
           cut:= H2 m2 r2 _=> //; rewrite hmr /=; progress.
           move: H10 H11; rewrite get_set_neq; first smt.
           by move=> -> /=.
         move: H9; case ((m1,r1){hr} = (m2,r2)).
           by elim=> [m_eq r_eq]; subst; rewrite get_set_eq /oget.
           move=> neq; rewrite get_set_neq // => hmr.
-          move: H8; rewrite /in_dom mem_dom get_set_neq // -mem_dom -/(in_dom _ _)=> dom_hmr.
+          move: H8; rewrite mem_dom get_set_neq // -mem_dom=> dom_hmr.
           cut:= H2 m2 r2 _=> //; rewrite hmr /=; progress.
           move: H10 H11; rewrite get_set_neq; first smt.
           by move=> -> /=; smt.
         move: H9; case ((m1,r1){hr} = (m2,r2)).
           by elim=> [m_eq r_eq]; subst; rewrite get_set_eq /oget.
           move=> neq; rewrite get_set_neq // => hmr.
-          move: H8; rewrite /in_dom mem_dom get_set_neq // -mem_dom -/(in_dom _ _)=> dom_hmr.
+          move: H8; rewrite mem_dom get_set_neq // -mem_dom=> dom_hmr.
           cut:= H2 m2 r2 _=> //; rewrite hmr /=; progress.
           move: H10 H11; rewrite get_set_neq; first smt.
           by move=> -> /=; smt.
         move: H9; case ((m1,r1){hr} = (m2,r2)).
           by elim=> [m_eq r_eq]; subst; rewrite get_set_eq /oget.
           move=> neq; rewrite get_set_neq // => hmr.
-          move: H8; rewrite /in_dom mem_dom get_set_neq // -mem_dom -/(in_dom _ _)=> dom_hmr.
+          move: H8; rewrite mem_dom get_set_neq // -mem_dom=> dom_hmr.
           cut:= H2 m2 r2 _=> //; rewrite hmr /=; progress.
           move: H10 H11; rewrite get_set_neq; first smt.
           by move=> -> /=; smt.
         move: H9; case ((m1,r1){hr} = (m2,r2)).
           by elim=> [m_eq r_eq]; subst; rewrite get_set_eq /oget.
           move=> neq; rewrite get_set_neq // => hmr.
-          move: H8; rewrite /in_dom mem_dom get_set_neq // -mem_dom -/(in_dom _ _)=> dom_hmr.
+          move: H8; rewrite mem_dom get_set_neq // -mem_dom=> dom_hmr.
           cut:= H2 m2 r2 _=> //; rewrite hmr /=; progress.
           move: H10 H11; rewrite get_set_neq; first smt.
           by move=> ->.
         move: H9; case ((m1,r1){hr} = (m2,r2)).
           by elim=> [m_eq r_eq]; subst; rewrite get_set_eq /oget /= => [w_eq u_eq]; subst; smt.
           move=> neq; rewrite get_set_neq // => hmr.
-          move: H8; rewrite /in_dom mem_dom get_set_neq // -mem_dom -/(in_dom _ _)=> dom_hmr.
+          move: H8; rewrite mem_dom get_set_neq // -mem_dom=> dom_hmr.
           cut:= H2 m2 r2 _=> //; rewrite hmr /=; progress.
           move: H10 H11; rewrite get_set_neq; first smt.
           by move=> ->.
         move: H9; case ((m1,r1){hr} = (m2,r2)).
           by elim=> [m_eq r_eq]; subst; rewrite get_set_eq /oget /= => [w_eq u_eq]; subst; smt.
           move=> neq; rewrite get_set_neq // => hmr.
-          move: H8; rewrite /in_dom mem_dom get_set_neq // -mem_dom -/(in_dom _ _)=> dom_hmr.
+          move: H8; rewrite mem_dom get_set_neq // -mem_dom=> dom_hmr.
           cut:= H2 m2 r2 _=> //; rewrite hmr /=; progress.
           move: H10 H11; rewrite get_set_neq; first smt.
           by move=> ->.
@@ -4360,7 +4348,7 @@ section.
           move: H10; rewrite get_set_eq /oget /= => [st_eq c'_eq]; subst.
           by rewrite -xorwA xorwK xorw0; smt.
           move=> neq; rewrite get_set_neq // => hmr.
-          move: H8; rewrite /in_dom mem_dom get_set_neq // -mem_dom -/(in_dom _ _)=> dom_hmr.
+          move: H8; rewrite mem_dom get_set_neq // -mem_dom=> dom_hmr.
           cut:= H2 m2 r2 _=> //; rewrite hmr /=; progress.
           move: H10 H11; rewrite get_set_neq; first smt.
           by move=> ->.
@@ -4385,7 +4373,7 @@ section.
           rewrite pcan_os2ip_i2osp; first smt.
           by rewrite z_def rsas_rsap; smt.
           move=> neq.
-          move: H8; rewrite /in_dom mem_dom get_set_neq // -mem_dom -/(in_dom _ _)=> dmrh.
+          move: H8; rewrite mem_dom get_set_neq // -mem_dom=> dmrh.
           move: H9; rewrite get_set_neq // => hmr.
           cut:= H2 m2 r2 _ => //; rewrite hmr /=; progress.
           move: H10 H11; rewrite get_set_neq; first smt.
@@ -4441,9 +4429,9 @@ section.
     Hmem.sk = Mem.sk /\
     rsap_dom Hmem.pk Hmem.xstar /\
     (forall m r,
-      in_dom (m,r) Hmap.m =>
+      mem (m,r) (dom Hmap.m) =>
       let (w,c,u) = oget Hmap.m.[(m,r)] in
-      in_dom w Gmap.m /\
+      mem w (dom Gmap.m) /\
       rsap_dom Hmem.pk u /\
       let (st,c') = oget Gmap.m.[w] in
       c = c' /\
@@ -4462,9 +4450,9 @@ section.
          to_gtag (sub (from_signature (i2osp y)) (1 + kh) kg) /\
         mem (m,i2osp u) Mem.qs)) ==>
     (forall m r,
-      in_dom (m,r) Hmap.m =>
+      mem (m,r) (dom Hmap.m) =>
       let (w,c,u) = oget Hmap.m.[(m,r)] in
-      in_dom w Gmap.m /\
+      mem w (dom Gmap.m) /\
       rsap_dom Hmem.pk u /\
       let (st,c') = oget Gmap.m.[w] in
       c = c' /\
@@ -4496,9 +4484,9 @@ section.
              rsap_dom Hmem.pk Hmem.xstar /\
              (0 <= z < 2^(k - 1) => rsap_dom Hmem.pk u) /\
              (forall m r,
-               in_dom (m,r) Hmap.m =>
+               mem (m,r) (dom Hmap.m) =>
                let (w,c,u) = oget Hmap.m.[(m,r)] in
-               in_dom w Gmap.m /\
+               mem w (dom Gmap.m) /\
                rsap_dom Hmem.pk u /\
                let (st,c') = oget Gmap.m.[w] in
                c = c' /\
@@ -4536,40 +4524,40 @@ section.
     wp; skip; progress.
       case ((m0,r0){hr} = (m1,r1)).
         elim=> m_eq r_eq; subst; move: H10; rewrite get_set_eq /oget /= => [->].
-        by rewrite /in_dom mem_dom get_set_eq.
+        by rewrite mem_dom get_set_eq.
         move=> neq; move: H10; rewrite get_set_neq // => hmr.
-        move: H9; rewrite /in_dom mem_dom get_set_neq // -mem_dom -/(in_dom _ _)=> dom_hmr.
+        move: H9; rewrite mem_dom get_set_neq // -mem_dom=> dom_hmr.
         cut:= H2 m1 r1 _=> //; rewrite hmr /=; progress.
-        by rewrite /in_dom mem_dom get_set_neq 2:-mem_dom; first smt.
+        by rewrite mem_dom get_set_neq 2:-mem_dom; first smt.
       case ((m0,r0){hr} = (m1,r1)).
         by elim=> m_eq r_eq; subst; move: H10; rewrite get_set_eq /oget; smt.
         move=> neq; move: H10; rewrite get_set_neq //.
-        move: H9; rewrite /in_dom mem_dom get_set_neq // -mem_dom -/(in_dom _ _)=> H9 hmr.
+        move: H9; rewrite mem_dom get_set_neq // -mem_dom=> H9 hmr.
         by cut:= H2 m1 r1 _=> //; rewrite hmr /=; progress; smt.
       case ((m0,r0){hr} = (m1,r1)).
         by elim=> m_eq r_eq; subst; move: H10; rewrite get_set_eq /oget; smt.
         move=> neq; move: H10; rewrite get_set_neq //.
-        move: H9; rewrite /in_dom mem_dom get_set_neq // -mem_dom -/(in_dom _ _)=> H9 hmr.
+        move: H9; rewrite mem_dom get_set_neq // -mem_dom=> H9 hmr.
         by cut:= H2 m1 r1 _=> //; rewrite hmr /=; progress; smt.
       case ((m0,r0){hr} = (m1,r1)).
         elim=> m_eq r_eq; subst; move: H10; rewrite get_set_eq /oget /= => [w_eq [c_eq u_eq]]; subst.
         by move: H11; rewrite get_set_eq /oget.
         move=> neq; move: H10; rewrite get_set_neq // => hmr.
-        move: H9; rewrite /in_dom mem_dom get_set_neq // -mem_dom -/(in_dom _ _)=> dom_hmr.
+        move: H9; rewrite mem_dom get_set_neq // -mem_dom=> dom_hmr.
         cut:= H2 m1 r1 _=> //; rewrite hmr /=; progress.
         move: H11 H12; rewrite get_set_neq; first smt.
         by move=> ->.
       move: H10; case ((m0,r0){hr} = (m1,r1)).
         by elim=> [m_eq r_eq]; subst; rewrite get_set_eq /oget; cut:= H3 _.
         move=> neq; rewrite get_set_neq // => hmr.
-        move: H9; rewrite /in_dom mem_dom get_set_neq // -mem_dom -/(in_dom _ _)=> dom_hmr.
+        move: H9; rewrite mem_dom get_set_neq // -mem_dom=> dom_hmr.
         cut:= H2 m1 r1 _=> //; rewrite hmr /=; progress.
         move: H11 H12; rewrite get_set_neq; first smt.
         by move=> ->.
       move: H10; case ((m0,r0){hr} = (m1,r1)).
         by elim=> [m_eq r_eq]; subst; rewrite get_set_eq /oget /= => [w_eq u_eq]; subst; smt.
         move=> neq; rewrite get_set_neq // => hmr.
-        move: H9; rewrite /in_dom mem_dom get_set_neq // -mem_dom -/(in_dom _ _)=> dom_hmr.
+        move: H9; rewrite mem_dom get_set_neq // -mem_dom=> dom_hmr.
         cut:= H2 m1 r1 _=> //; rewrite hmr /=; progress.
         move: H11 H12; rewrite get_set_neq; first smt.
         by move=> ->; rewrite /rsap_dom.
@@ -4578,7 +4566,7 @@ section.
         move: H11; rewrite get_set_eq /oget /= => [st_eq c'_eq]; subst.
         by cut:= H3 _.
         move=> neq; rewrite get_set_neq // => hmr.
-        move: H9; rewrite /in_dom mem_dom get_set_neq // -mem_dom -/(in_dom _ _)=> dom_hmr.
+        move: H9; rewrite mem_dom get_set_neq // -mem_dom=> dom_hmr.
         cut:= H2 m1 r1 _=> //; rewrite hmr /=; progress.
         move: H11 H12; rewrite get_set_neq; first smt.
         by move=> ->.
@@ -4587,35 +4575,35 @@ section.
         move: H11; rewrite get_set_eq /oget /= => [st_eq c'_eq]; subst.
         by rewrite -xorwA xorwK xorw0; cut:= H3 _.
         move=> neq; rewrite get_set_neq // => hmr.
-        move: H9; rewrite /in_dom mem_dom get_set_neq // -mem_dom -/(in_dom _ _)=> dom_hmr.
+        move: H9; rewrite mem_dom get_set_neq // -mem_dom=> dom_hmr.
         cut:= H2 m1 r1 _=> //; rewrite hmr /=; progress.
         move: H11 H12; rewrite get_set_neq; first smt.
         by move=> ->.
       move: H10; case ((m0,r0){hr} = (m1,r1)).
         by elim=> [m_eq r_eq]; subst; rewrite get_set_eq /oget.
         move=> neq; rewrite get_set_neq // => hmr.
-        move: H9; rewrite /in_dom mem_dom get_set_neq // -mem_dom -/(in_dom _ _)=> dom_hmr.
+        move: H9; rewrite mem_dom get_set_neq // -mem_dom=> dom_hmr.
         cut:= H2 m1 r1 _=> //; rewrite hmr /=; progress.
         move: H11 H12; rewrite get_set_neq; first smt.
         by move=> ->.
       move: H10; case ((m0,r0){hr} = (m1,r1)).
         by elim=> [m_eq r_eq]; subst; rewrite get_set_eq /oget.
         move=> neq; rewrite get_set_neq // => hmr.
-        move: H9; rewrite /in_dom mem_dom get_set_neq // -mem_dom -/(in_dom _ _)=> dom_hmr.
+        move: H9; rewrite mem_dom get_set_neq // -mem_dom=> dom_hmr.
         cut:= H2 m1 r1 _=> //; rewrite hmr /=; progress.
         move: H11 H12; rewrite get_set_neq; first smt.
         by move=> ->.
       move: H10; case ((m0,r0){hr} = (m1,r1)).
         by elim=> [m_eq r_eq]; subst; rewrite get_set_eq /oget.
         move=> neq; rewrite get_set_neq // => hmr.
-        move: H9; rewrite /in_dom mem_dom get_set_neq // -mem_dom -/(in_dom _ _)=> dom_hmr.
+        move: H9; rewrite mem_dom get_set_neq // -mem_dom=> dom_hmr.
         cut:= H2 m1 r1 _=> //; rewrite hmr /=; progress.
         move: H11 H12; rewrite get_set_neq; first smt.
         by move=> ->.
       move: H10; case ((m0,r0){hr} = (m1,r1)).
         by elim=> [m_eq r_eq]; subst; rewrite get_set_eq /oget.
         move=> neq; rewrite get_set_neq // => hmr.
-        move: H9; rewrite /in_dom mem_dom get_set_neq // -mem_dom -/(in_dom _ _)=> dom_hmr.
+        move: H9; rewrite mem_dom get_set_neq // -mem_dom=> dom_hmr.
         cut:= H2 m1 r1 _=> //; rewrite hmr /=; progress.
         move: H11 H12; rewrite get_set_neq; first smt.
         by move=> ->.
@@ -4641,7 +4629,7 @@ section.
   proof.
     byphoare (_: true ==> res /\ GAdv3.lucky)=> //; proc.
     inline Gen1(GAdv3,H4,G1).GA.main.
-    seq 12: (in_dom (m,r) Hmap.m) 1%r 0%r 1%r (1%r/(2^kh)%r)=> //.
+    seq 12: (mem (m,r) (dom Hmap.m)) 1%r 0%r 1%r (1%r/(2^kh)%r)=> //.
       by hoare; inline H4.v; rcondt 5; auto; smt.
       inline H4.v; rcondf 5; first by auto.
       by wp; rnd ((=) w); wp; skip; progress; smt.
@@ -4650,9 +4638,9 @@ section.
   local hoare GInv w0: G1.o:
     w = w0 /\
     (forall m r,
-       in_dom (m,r) Hmap.m =>
+       mem (m,r) (dom Hmap.m) =>
        let (w,c,u) = oget Hmap.m.[(m,r)] in
-       in_dom w Gmap.m /\
+       mem w (dom Gmap.m) /\
        rsap_dom Hmem.pk u /\
        let (st,c') = oget Gmap.m.[w] in
        c = c' /\
@@ -4672,9 +4660,9 @@ section.
          mem (m,i2osp u) Mem.qs)) ==>
      omap fst Gmap.m.[w0] = Some res /\
      (forall m r,
-       in_dom (m,r) Hmap.m =>
+       mem (m,r) (dom Hmap.m) =>
        let (w,c,u) = oget Hmap.m.[(m,r)] in
-       in_dom w Gmap.m /\
+       mem w (dom Gmap.m) /\
        rsap_dom Hmem.pk u /\
        let (st,c') = oget Gmap.m.[w] in
        c = c' /\
@@ -4693,32 +4681,32 @@ section.
           to_gtag (sub (from_signature (i2osp y)) (1 + kh) kg) /\
          mem (m,i2osp u) Mem.qs)).
   proof.
-    proc; case (in_dom w Gmap.m).
-      by rcondf 2; auto; progress; cut:= H0; rewrite /in_dom mem_dom /fst /oget; case (Gmap.m.[w]{hr}).
+    proc; case (mem w (dom Gmap.m)).
+      by rcondf 2; auto; progress; cut:= H0; rewrite mem_dom /fst /oget; case (Gmap.m.[w]{hr}).
       rcondt 2; first by auto.
-      auto; progress;
+      auto; progress; (* Good opportunity for progress* *)
         last 9 by (cut:= H m r _=> //; rewrite H3 => [x2_sig] [x_in_G];
-                   cut neq_w_x: w{hr} <> x1 by smt;
+                   (cut neq_w_x: w{hr} <> x1 by smt);
                    cut:= H4; rewrite get_set_neq /rsap_dom // => ->).
         by rewrite /fst /oget get_set_eq.
-        by cut:= H m r _=> //; rewrite H3 => [x2_sig] [x_in_G];
-           cut neq_w_x: w{hr} <> x1 by smt;
-           rewrite /in_dom mem_dom get_set_neq // -mem_dom -/(in_dom _ _).
-        by cut:= H m r _=> //; rewrite H3 => [x2_sig] [x_in_G];
-           cut neq_w_x: w{hr} <> x1 by smt;
-           smt.
-        by cut:= H m r _=> //; rewrite H3 => [x2_sig] [x_in_G];
-           cut neq_w_x: w{hr} <> x1 by smt;
-           smt.
+        cut:= H m r _=> //; rewrite H3 => [x2_sig] [x_in_G].
+        cut neq_w_x: w{hr} <> x1 by smt.
+        by rewrite mem_dom get_set_neq // -mem_dom.
+        cut:= H m r _=> //; rewrite H3 => [x2_sig] [x_in_G].
+        cut neq_w_x: w{hr} <> x1 by smt.
+        smt.
+        cut:= H m r _=> //; rewrite H3 => [x2_sig] [x_in_G].
+        cut neq_w_x: w{hr} <> x1 by smt.
+        smt.
   qed.
 
   local equiv G_LocalG w0: G1.o ~ LocalInverter(A).G.o:
     ={Hmem.pk, Gmap.m, w} /\
     w{1} = w0 /\
     (forall m r,
-       in_dom (m,r) Hmap.m{1} =>
+       mem (m,r) (dom Hmap.m){1} =>
        let (w,c,u) = oget Hmap.m.[(m,r)]{1} in
-       in_dom w Gmap.m{1} /\
+       mem w (dom Gmap.m){1} /\
        rsap_dom Hmem.pk{1} u /\
        let (st,c') = oget Gmap.m.[w]{1} in
        c = c' /\
@@ -4739,9 +4727,9 @@ section.
      ={Gmap.m, res} /\
      omap fst Gmap.m.[w0]{1} = Some res{1} /\
      (forall m r,
-       in_dom (m,r) Hmap.m{1} =>
+       mem (m,r) (dom Hmap.m){1} =>
        let (w,c,u) = oget Hmap.m.[(m,r)]{1} in
-       in_dom w Gmap.m{1} /\
+       mem w (dom Gmap.m){1} /\
        rsap_dom Hmem.pk{1} u /\
        let (st,c') = oget Gmap.m.[w]{1} in
        c = c' /\
@@ -4824,9 +4812,9 @@ section.
                 Hmem.sk{1} = Mem.sk{1} /\
                 rsap_dom Hmem.pk{1} Hmem.xstar{1} /\
                 (forall m r,
-                  in_dom (m,r) Hmap.m{1} =>
+                  mem (m,r) (dom Hmap.m){1} =>
                   let (w,c,u) = oget Hmap.m.[(m,r)]{1} in
-                  in_dom w Gmap.m{1} /\
+                  mem w (dom Gmap.m){1} /\
                   rsap_dom Hmem.pk{1} u /\
                   let (st,c') = oget Gmap.m.[w]{1} in
                   c = c' /\
@@ -4851,9 +4839,9 @@ section.
                    Hmem.sk{1} = Mem.sk{1} /\
                    rsap_dom Hmem.pk{1} Hmem.xstar{1} /\
                    (forall m r,
-                     in_dom (m,r) Hmap.m{1} =>
+                     mem (m,r) (dom Hmap.m){1} =>
                      let (w,c,u) = oget Hmap.m.[(m,r)]{1} in
-                     in_dom w Gmap.m{1} /\
+                     mem w (dom Gmap.m){1} /\
                      rsap_dom Hmem.pk{1} u /\
                      let (st,c') = oget Gmap.m.[w]{1} in
                      c = c' /\
@@ -4893,9 +4881,9 @@ section.
                   Hmem.sk{1} = Mem.sk{1} /\
                   rsap_dom Hmem.pk{1} Hmem.xstar{1} /\
                   (forall m r,
-                    in_dom (m,r) Hmap.m{1} =>
+                    mem (m,r) (dom Hmap.m){1} =>
                     let (w,c,u) = oget Hmap.m.[(m,r)]{1} in
-                    in_dom w Gmap.m{1} /\
+                    mem w (dom Gmap.m){1} /\
                     rsap_dom Hmem.pk{1} u /\
                     let (st,c') = oget Gmap.m.[w]{1} in
                     c = c' /\
@@ -4928,9 +4916,9 @@ section.
                   Hmem.sk{1} = Mem.sk{1} /\
                   rsap_dom Hmem.pk{1} Hmem.xstar{1} /\
                   (forall m r,
-                    in_dom (m,r) Hmap.m{1} =>
+                    mem (m,r) (dom Hmap.m){1} =>
                     let (w,c,u) = oget Hmap.m.[(m,r)]{1} in
-                    in_dom w Gmap.m{1} /\
+                    mem w (dom Gmap.m){1} /\
                     rsap_dom Hmem.pk{1} u /\
                     let (st,c') = oget Gmap.m.[w]{1} in
                     c = c' /\
@@ -4952,11 +4940,11 @@ section.
       inline H4.v; wp; rnd; wp; skip; progress.
         move: H5 H7; pose r:= to_salt (sub (from_gtag (to_gtag (sub (from_signature (i2osp (rsap Mem.pk{1} (os2ip s{2})))) (1 + kh) kg) ^ st'{2})) 0 k0); move=> H5 H7.
         cut:= H2 m{2} r _=> //; move: H5 H7.
-        rewrite /in_dom mem_dom /oget /pi3_1; case (Hmap.m.[(m,r)]{2})=> //= hmr.
+        rewrite mem_dom /oget /pi3_1; case (Hmap.m.[(m,r)]{2})=> //= hmr.
         elim/tuple3_ind hmr=> hmr w c u //=.
         case c=> //= hmr_def.
           (* c = Adv *)
-          move=> w_def []; cut:= H; rewrite w_def /in_dom mem_dom /oget /fst; case (Gmap.m.[w]{2})=> //= stc'.
+          move=> w_def []; cut:= H; rewrite w_def mem_dom /oget /fst; case (Gmap.m.[w]{2})=> //= stc'.
           elim/tuple2_ind stc'=> stc' st c' stc'_def //= st'_def [c'_def] [u_inv].
           apply someI in st'_def.
           rewrite -H6 -w_def -H8 /r.
@@ -4979,7 +4967,7 @@ section.
           rewrite mulzp1; first smt.
           smt.
           (* c = Sig: ignore the goal and prove s{2} = i2osp u *)
-          move=> w_def []; cut:= H; rewrite w_def /in_dom mem_dom /oget /fst; case (Gmap.m.[w]{2})=> //= stc'.
+          move=> w_def []; cut:= H; rewrite w_def mem_dom /oget /fst; case (Gmap.m.[w]{2})=> //= stc'.
           elim/tuple2_ind stc'=> stc' st c' stc'_def //= st'_def [c'_def].
           apply someI in st'_def.
           rewrite -H6 -w_def -H8 /r.
