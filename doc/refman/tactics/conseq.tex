@@ -1,6 +1,6 @@
 % --------------------------------------------------------------------
 \begin{tactic}{conseq}
-  \begin{tsyntax}{conseq <specification>}
+  \begin{tsyntax}{conseq <spec>}
   Rule of consequence. Proves a specification by weakening of a
   stronger result. Any one of the specification places can be filled
   with a wildcard \tct{_} to keep the value it contains in the current
@@ -27,7 +27,7 @@
      Q \mathrel{\diamond^\uparrow} Q' \\%
      \pHL{P}{c}{Q}{\diamond}{\delta}}%%
     {\pHL{P'}{c}{Q'}{\diamond}{\delta'}}%%
-    \quad\raisebox{.7em}{\tct{conseq (_: P ==> Q: $\delta$)}} \\
+    \quad\raisebox{.7em}{\tct{conseq (_: P ==> Q: $\;\delta$)}} \\
   \inferrule*[left=(\hl),rightskip=10em]%%
     {P' \Rightarrow P \\%
      Q \Rightarrow Q' \\%
@@ -35,11 +35,25 @@
     {\HL{P'}{c}{Q'}}%%
     \quad\raisebox{.7em}{\tct{conseq (_: P ==> Q)}} \\
   \end{mathpar}
+
+  \textbf{Note:} The \phl variant can also be used to strenghten the
+  relation $\diamond$ into an equality by forcing the equality into
+  the specification. For example, the following is a valid application
+  of \tct{conseq}.
+  \begin{mathpar}
+    \inferrule*[left=(\phl),rightskip=10em]%%
+    {P' \Rightarrow \delta \mathrel{=} \delta' \\%
+     P' \Rightarrow P \\%
+     Q \mathrel{\Leftrightarrow} Q' \\%
+     \pHL{P}{c}{Q}{=}{\delta}}%%
+    {\pHL{P'}{c}{Q'}{\leq}{\delta'}}%%
+    \quad\raisebox{.7em}{\tct{conseq (_: P ==> Q: $\;\mathop{=}\delta$)}} \\
+  \end{mathpar}  
   \end{tsyntax}
 
   \begin{tsyntax}{conseq <lemma>}
   Only applies to judgments on procedures. Same as \tct{conseq
-  <specification>}, but the specification to use is inferred from
+  <spec>}, but the specification to use is inferred from
   the lemma provided. Raises an error if the lemma does not refer to
   the expected procedure(s). All variants of \tct{conseq} may take
   lemmas in place of explicit specifications with the same effect, in
