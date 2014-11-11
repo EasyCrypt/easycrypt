@@ -12,6 +12,11 @@
 \newcommand{\HL}[3]{\{#1\}\; #2\; \{#3\}}
 \newcommand{\PR}[4]{\mathbf{Pr} [#3, #1(#2) : #4]}
 
+\newcommand{\pRHLs}[4]{\tct{equiv [#2 ~ #3: #1 ==> #4]}}
+\newcommand{\pHLs}[5]{\tct{phoare [#2: #1 ==> #3] #4 #5}}
+\newcommand{\HLs}[3]{\tct{hoare [#2: #1 ==> #3]}}
+\newcommand{\PRs}[4]{\tct{Pr[#1(#2) @ &#3: #4]}}
+
 %--------------------------------------------------------------------
 %% Typesetting program constructs
 \newcommand{\mem}[1]{#1} %{\&#1}
