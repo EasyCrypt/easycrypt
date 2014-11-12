@@ -331,7 +331,7 @@ theory LazyEager.
                          (={x,work,IND_Eager.H.m} ==> ={result,IND_Eager.H.m})
                          (={x,work,IND_Eager.H.m} ==> ={result,IND_Eager.H.m})=> //.
           by move=> &1 &2 H; exists IND_Eager.H.m{2}, x{2}, work{2}; generalize H.
-        by sim; rnd{2}; sim true true: (={x,IND_Eager.H.m}); smt.
+        by sim; rnd{2}; sim : (={x,IND_Eager.H.m}); smt.
 
         wp; symmetry.
         eager while (H:y0 = $dsample x; ~ y0 = $dsample x; : ={x} ==> ={y0})=> //; first by rnd.

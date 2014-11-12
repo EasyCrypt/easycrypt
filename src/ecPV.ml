@@ -410,6 +410,20 @@ module PV = struct
   let iter fpv fm fv =
     Mnpv.iter fpv fv.s_pv;
     Sm.iter fm fv.s_gl
+
+  let check_notmod env pv fv = 
+    if mem_pv env pv fv then false 
+    else 
+      try 
+        if is_glob pv then begin
+          let pv = EcEnv.NormMp.norm_pvar env pv in
+          let check1 mp = 
+            let restr = NormMp.get_restr env mp in
+            Mpv.check_npv_mp env pv mp restr in
+          Sm.iter check1 fv.s_gl
+        end;
+        true
+      with _ -> false 
     
 end
 
@@ -886,217 +900,43 @@ module Mpv2 = struct
     Sm.iter fg fv.PV.s_gl;
     { s_pv = !pv; s_gl = !gl }
     
+(*add_eqs env local eqs e1 e2 : collect a set of equalities with ensure the
+   equality of e1 and e2 *)
+  let rec add_eqs env local eqs e1 e2 =
+    match e1.e_node, e2.e_node with
+    | Elam(ids1,e1), Elam(ids2,e2) ->
+      let local = enter_local env local ids1 ids2 in
+      add_eqs env local eqs e1 e2 
+    | Eint i1, Eint i2 when i1 = i2 -> eqs 
+    | Elocal x1, Elocal x2 when 
+        opt_equal EcIdent.id_equal (Some x1) (Mid.find_opt x2 local) -> eqs 
+    | Evar pv1, Evar pv2 
+      when EcReduction.EqTest.for_type env e1.e_ty e2.e_ty -> 
+      add env e1.e_ty pv1 pv2 eqs
+  (* TODO it could be greate to work up to reduction,
+     I postpone this for latter *)
+    | Eop(op1,tys1), Eop(op2,tys2) 
+      when EcPath.p_equal op1 op2 &&
+        List.all2  (EcReduction.EqTest.for_type env) tys1 tys2 -> eqs
+    | Eapp(f1,a1), Eapp(f2,a2) -> 
+      List.fold_left2 (add_eqs env local) eqs (f1::a1) (f2::a2)
+    | Elet(lp1,a1,b1), Elet(lp2,a2,b2) ->
+      let blocal = enter_local env local (lp_bind lp1) (lp_bind lp2) in
+      let eqs = add_eqs env local eqs a1 a2 in
+      add_eqs env blocal eqs b1 b2
+    | Etuple es1, Etuple es2 ->
+      List.fold_left2 (add_eqs env local) eqs es1 es2
+    | Eproj(es1,i1), Eproj(es2,i2) when i1 = i2 ->
+      add_eqs env local eqs es1 es2
+    | Eif(e1,t1,f1), Eif(e2,t2,f2) ->
+      List.fold_left2 (add_eqs env local) eqs [e1;t1;f1] [e2;t2;f2]
+    | _, _ -> raise EqObsInError
+      
+  let add_eqs env e1 e2 eqs =  add_eqs env Mid.empty eqs e1 e2 
 
 end
 
-(*add_eqs env local eqs e1 e2 : collect a set of equalities with ensure the
-   equality of e1 and e2 *)
-let rec add_eqs env local eqs e1 e2 : Mpv2.t =
-  match e1.e_node, e2.e_node with
-  | Elam(ids1,e1), Elam(ids2,e2) ->
-    let local = Mpv2.enter_local env local ids1 ids2 in
-    add_eqs env local eqs e1 e2 
-  | Eint i1, Eint i2 when i1 = i2 -> eqs 
-  | Elocal x1, Elocal x2 when 
-      opt_equal EcIdent.id_equal (Some x1) (Mid.find_opt x2 local) -> eqs 
-  | Evar pv1, Evar pv2 when EcReduction.EqTest.for_type env e1.e_ty e2.e_ty -> 
-    Mpv2.add env e1.e_ty pv1 pv2 eqs
-  (* TODO it could be greate to work up to reduction,
-     I postpone this for latter *)
-  | Eop(op1,tys1), Eop(op2,tys2) when EcPath.p_equal op1 op2 &&
-      List.all2  (EcReduction.EqTest.for_type env) tys1 tys2 -> eqs
-  | Eapp(f1,a1), Eapp(f2,a2) -> 
-     List.fold_left2 (add_eqs env local) eqs (f1::a1) (f2::a2)
-  | Elet(lp1,a1,b1), Elet(lp2,a2,b2) ->
-    let blocal = Mpv2.enter_local env local (lp_bind lp1) (lp_bind lp2) in
-    let eqs = add_eqs env local eqs a1 a2 in
-    add_eqs env blocal eqs b1 b2
-  | Etuple es1, Etuple es2 ->
-    List.fold_left2 (add_eqs env local) eqs es1 es2
-  | Eproj(es1,i1), Eproj(es2,i2) when i1 = i2 ->
-    add_eqs env local eqs es1 es2
-  | Eif(e1,t1,f1), Eif(e2,t2,f2) ->
-    List.fold_left2 (add_eqs env local) eqs [e1;t1;f1] [e2;t2;f2]
-  | _, _ -> raise EqObsInError
-
-let add_eqs env eqs e1 e2 =  add_eqs env Mid.empty eqs e1 e2
   
-(* Invariant ifvl,ifvr = PV.fv env ml inv, PV.fv env mr inv *)
-let eqobs_in env 
-   (fun_spec : 'log -> EcPath.xpath -> EcPath.xpath ->
-                Mpv2.t -> 'log * Mpv2.t * 'spec) 
-   loG c1 c2 eqO (ifvl,ifvr) =
-
-  let add_eqs eqs e1 e2 = add_eqs env eqs e1 e2 in
-
-  let rev st = List.rev st.s_node in
-
-  let check pv fv = 
-    if PV.mem_pv env pv fv then false 
-    else 
-      try 
-        if is_glob pv then begin
-          let pv = pvm env pv in
-          let check1 mp = 
-            let restr = NormMp.get_restr env mp in
-            Mpv.check_npv_mp env pv mp restr in
-          Sm.iter check1 fv.PV.s_gl
-        end;
-        true
-      with _ -> false in
-
-  let checks pvs fv = List.for_all (fun (pv,_) -> check pv fv) pvs in
-
-  let check_not_l lvl eqo =
-    let aux (pv,_) =
-      check pv ifvl &&
-      not (Mpv2.mem_pv_l env pv eqo) in
-    match lvl with
-    | LvVar xl   -> aux xl
-    | LvTuple ll -> List.for_all aux ll
-    | LvMap(_, pvl, _, _) -> aux (pvl,tint) in
-
-  let check_not_r lvr eqo =
-    let aux (pv,_) =
-      check pv ifvr && 
-      not (Mpv2.mem_pv_r env pv eqo) in
-    match lvr with
-    | LvVar xr   -> aux xr
-    | LvTuple lr -> List.for_all aux lr
-    | LvMap(_, pvr, _, _) -> aux (pvr,tint) in
-
-  let remove lvl lvr eqs = 
-    let aux eqs (pvl,tyl) (pvr,tyr) = 
-      if EcReduction.EqTest.for_type env tyl tyr then begin
-        if not (check pvl ifvl && check pvr ifvr) then
-          raise EqObsInError;
-        Mpv2.remove env pvl pvr eqs
-      end else raise EqObsInError in
-
-    match lvl, lvr with
-    | LvVar xl, LvVar xr -> aux eqs xl xr 
-    | LvTuple ll, LvTuple lr when List.length ll = List.length lr->
-      List.fold_left2 aux eqs ll lr
-    | LvMap((pl,tysl), pvl, el, tyl),
-        LvMap((pr,tysr), pvr, er,tyr) when EcPath.p_equal pl pr &&
-      List.all2  (EcReduction.EqTest.for_type env) (tyl::tysl) (tyr::tysr) ->
-      if not (check pvl ifvl && check pvr ifvr) then
-        raise EqObsInError;
-      add_eqs (Mpv2.remove env pvl pvr eqs) el er
-    | _, _ -> raise EqObsInError in
-
-  let oremove lvl lvr eqs = 
-    match lvl, lvr with
-    | None, None -> eqs
-    | Some lvl, Some lvr -> remove lvl lvr eqs 
-    | _, _ -> raise EqObsInError in
-
-  let rec s_eqobs_in rsl rsr fhyps (eqo:Mpv2.t) = 
-    match rsl, rsr with
-    | { i_node = Sasgn(LvVar (xl,_), el)}::rsl, _ when is_var el ->
-      if check xl ifvl then
-        let x = destr_var el in
-        s_eqobs_in rsl rsr fhyps (Mpv2.subst_l env xl x eqo)
-      else rsl, rsr, fhyps, eqo
-    | _, { i_node = Sasgn(LvVar (xr,_), er)} :: rsr when is_var er ->
-      if check xr ifvr then 
-        let x = destr_var er in
-        s_eqobs_in rsl rsr fhyps (Mpv2.subst_r env xr x eqo)
-      else rsl, rsr, fhyps, eqo
-    | { i_node = Sasgn(LvTuple xls, el)}::rsl, _ when is_tuple_var el ->
-      if checks xls ifvl then
-        let xs = destr_tuple_var el in
-        s_eqobs_in rsl rsr fhyps (Mpv2.substs_l env xls xs eqo)
-      else rsl, rsr, fhyps, eqo
-    | _, { i_node = Sasgn(LvTuple xrs, er)} :: rsr when is_tuple_var er ->
-      if checks xrs ifvr then 
-        let xs = destr_tuple_var er in
-        s_eqobs_in rsl rsr fhyps (Mpv2.substs_r env xrs xs eqo)
-      else rsl, rsr, fhyps, eqo
-    (* this is dead code *)
-    | {i_node = Sasgn(lvl,_)} ::rsl, _ when check_not_l lvl eqo ->
-      s_eqobs_in rsl rsr fhyps eqo 
-    | _, {i_node = Sasgn(lvr,_)}::rsr when check_not_r lvr eqo ->
-      s_eqobs_in rsl rsr fhyps eqo 
-    (* TODO add the same for lossless random *) 
-
-    | [], _ -> [], rsr, fhyps, eqo
-    | _, [] -> rsl, [], fhyps, eqo
-    | il::rsl', ir::rsr' ->
-      match (try Some (i_eqobs_in il ir fhyps eqo) with EqObsInError -> None) with
-      | None -> 
-        (* check if one of the instruction can be removed because:
-           the instruction does not modify the the post and is lossless *) 
-        let rec check_i check_lv i =
-          match i.i_node with
-          | Sasgn(lv,_) -> check_lv lv
-          | Sif(_,s1,s2) -> check_s check_lv s1 && check_s check_lv s2
-          | _ -> false
-          (* TODO : 
-             For random we need a way to known that the distribution 
-             is lossless;
-             For while we can do the same if we are able to ensure 
-             the termination;
-             As well for procedure *)
-        and check_s check_lv s = List.for_all (check_i check_lv) s.s_node in
-        let t1 = check_i (fun lv -> check_not_l lv eqo) il in
-        let t2 = check_i (fun lv -> check_not_r lv eqo) ir in
-        begin match t1, t2 with
-        | true, true   -> s_eqobs_in rsl' rsr' fhyps eqo
-        | true, false  -> s_eqobs_in rsl' rsr  fhyps eqo 
-        | false, true  -> s_eqobs_in rsl  rsr' fhyps eqo
-        | false, false -> rsl, rsr, fhyps, eqo
-        end
-      | Some (fhyps, eqi) -> s_eqobs_in rsl' rsr' fhyps eqi
-
-  and i_eqobs_in il ir fhyps (eqo:Mpv2.t) = 
-    match il.i_node, ir.i_node with
-    | Sasgn(lvl,el), Sasgn(lvr,er) | Srnd(lvl,el), Srnd(lvr,er) ->
-      fhyps, add_eqs (remove lvl lvr eqo) el er 
-
-    | Scall(lvl,fl,argsl), Scall(lvr,fr,argsr) 
-      when List.length argsl = List.length argsr -> 
-      let eqo = oremove lvl lvr eqo in
-      let modl, modr = f_write env fl, f_write env fr in
-      let eqnm = Mpv2.split_nmod env modl modr eqo in
-      let outf = Mpv2.split_mod  env modl modr eqo in
-      Mpv2.check_glob outf;
-      
-      (* TODO : ensure that generalize mod can be applied here ? *)
-      let log,fhyps = fhyps in
-      let log, inf, fhyp = 
-        try fun_spec log fl fr outf 
-        with Not_found -> raise EqObsInError in
-
-      let eqi = List.fold_left2 add_eqs (Mpv2.union eqnm inf) argsl argsr in
-      (log, fhyp::fhyps), eqi
-
-    | Sif(el,stl,sfl), Sif(er,str,sfr) ->
-      let r1,r2,fhyps1, eqs1 = s_eqobs_in (rev stl) (rev str) fhyps eqo in
-      if r1 <> [] || r2 <> [] then raise EqObsInError;
-      let r1,r2, fhyps2, eqs2 = s_eqobs_in (rev sfl) (rev sfr) fhyps1 eqo in
-      if r1 <> [] || r2 <> [] then raise EqObsInError;
-      let eqi = Mpv2.union eqs1 eqs2 in
-      let eqe = add_eqs eqi el er in
-      fhyps2, eqe 
-
-    | Swhile(el,sl), Swhile(er,sr) ->
-      let sl, sr = rev sl, rev sr in
-
-      let rec aux fhyps eqo = 
-        let r1,r2,fhyps, eqi = s_eqobs_in sl sr fhyps eqo in
-        if r1 <> [] || r2 <> [] then raise EqObsInError;
-        if Mpv2.subset eqi eqo then fhyps, eqo
-        else aux fhyps (Mpv2.union eqi eqo) in
-      aux fhyps (add_eqs eqo el er)
-
-    | Sassert el, Sassert er -> fhyps, add_eqs eqo el er
-    | _, _ -> raise EqObsInError
-  in
-
-  let rl,rr, hyps, eqi = s_eqobs_in (rev c1) (rev c2) (loG,[]) eqO in
-  rstmt rl, rstmt rr, hyps, eqi
-
 (* Same function but specialized to the case where c1 and c2 are equal,
    and where the invariant is true *)
 

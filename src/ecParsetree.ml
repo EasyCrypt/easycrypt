@@ -444,6 +444,15 @@ type inline_info = [
 type conseq_info =
   bool * (ccfpattern option * ccfpattern option * ccfpattern option)
 
+type sim_info = {
+  sim_pos : (int * int) option;
+  sim_hint : ((pgamepath option * pgamepath option) * pformula) list * 
+            pformula option;
+  sim_eqs : pformula option
+}
+
+(*type sim_info = pformula option * pformula option * pformula option *)
+
 type phltactic =
   | Pfun        of fun_info
   | Pskip
@@ -474,7 +483,7 @@ type phltactic =
   | Pfel          of int * (pformula * pformula * pformula * pformula * pfel_spec_preds * pformula option)
   | Phoare
   | Pprbounded
-  | Psim           of (pformula option) tuple3
+  | Psim           of sim_info 
   | Ptrans_stmt    of trans_info
   | Psymmetry
   | Pbdhoare_split of bdh_split

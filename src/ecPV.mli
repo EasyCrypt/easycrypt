@@ -96,6 +96,8 @@ module PV : sig
   val pp : env -> Format.formatter -> t -> unit
 
   val iter : (prog_var -> ty -> unit) -> (mpath -> unit) -> t -> unit
+
+  val check_notmod : EcEnv.env -> EcTypes.prog_var -> t -> bool
 end
 
 (* -------------------------------------------------------------------- *)
@@ -125,7 +127,12 @@ module Mpv2 : sig
   (* remove_glob mp t, mp should be a top abstract functor *)
   val remove_glob : mpath -> t -> t
   val add_glob : env -> mpath -> mpath -> t -> t
-
+  val add_eqs : env -> expr -> expr -> t -> t
+  val subst_l : env -> prog_var -> prog_var -> t -> t
+  val subst_r : env -> prog_var -> prog_var -> t -> t
+  val substs_l : env -> (prog_var * 'a) list -> prog_var list -> t -> t
+  val substs_r : env -> (prog_var * 'a) list -> prog_var list -> t -> t
+    
   val check_glob : t -> unit 
 
   (* [mem x1 x2 eq] return true if (x1,x2) is in eq.
@@ -144,13 +151,17 @@ module Mpv2 : sig
 
   val split_nmod : env -> PV.t -> PV.t -> t -> t
   val split_mod : env -> PV.t -> PV.t -> t -> t
+
+  val mem_pv_l : env -> prog_var -> t -> bool
+  val mem_pv_r : env -> prog_var -> t -> bool
+
 end
 
 (* -------------------------------------------------------------------- *)
-val add_eqs : EcEnv.env -> Mpv2.t -> EcTypes.expr -> EcTypes.expr -> Mpv2.t
+
 
 (* -------------------------------------------------------------------- *)
-val eqobs_in :
+(*val eqobs_in :
   EcEnv.env ->
   ('log ->
    EcPath.xpath -> EcPath.xpath -> Mpv2.t -> 'log * Mpv2.t * 'spec) ->
@@ -159,7 +170,7 @@ val eqobs_in :
   EcModules.stmt ->
   Mpv2.t ->
   PV.t * PV.t ->
-  EcModules.stmt * EcModules.stmt * ('log * 'spec list) * Mpv2.t
+  EcModules.stmt * EcModules.stmt * ('log * 'spec list) * Mpv2.t *)
 
 val i_eqobs_in_refl : env -> instr -> PV.t -> PV.t
 val eqobs_inF_refl : env -> EcPath.xpath -> PV.t -> PV.t
