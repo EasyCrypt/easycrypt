@@ -78,7 +78,7 @@ lemma G1_G2_main :
   equiv[G1.main ~ G2.main : ={x} ==> ={res}].
 proof -strict.
 proc.
-sim (G1.u{1} = G2.u{2}) true : (={z}).
+sim (:G1.u{1} = G2.u{2}) : (={z}).
 apply G1_G2_f.
 qed.
 

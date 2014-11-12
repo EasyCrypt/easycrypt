@@ -435,7 +435,7 @@ let eager pf env s s' inv eqIs eqXs c c' eqO =
         when EcPath.p_equal pl pr
           && List.all2 (ER.EqTest.for_type env) (tyl::tysl) (tyr::tysr)
       ->
-        add_eqs env (Mpv2.remove env pvl pvr eqs) el er
+        Mpv2.add_eqs env el er (Mpv2.remove env pvl pvr eqs)
 
     | _, _ -> raise EqObsInError in
 
@@ -469,7 +469,7 @@ let eager pf env s s' inv eqIs eqXs c c' eqO =
         let eqm  = Mpv2.split_mod env modi modi' eqo in
         if not (Mpv2.subset eqm eqXs) then raise EqObsInError;
         let eqi = Mpv2.union eqIs eqnm in
-        (fhyps, add_eqs env (remove lvl lvr eqi) el er)
+        (fhyps, Mpv2.add_eqs env el er (remove lvl lvr eqi) )
 
     | Scall (lvl, fl, argsl), Scall (lvr, fr, argsr)
         when List.length argsl = List.length argsr
@@ -483,7 +483,9 @@ let eager pf env s s' inv eqIs eqXs c c' eqO =
         Mpv2.check_glob outf;
         let fhyps, inf = f_eager fhyps fl fr outf in
         let eqi =
-          List.fold_left2 (add_eqs env) (Mpv2.union eqnm inf) argsl argsr
+          List.fold_left2 
+            (fun eqs e1 e2 -> Mpv2.add_eqs env e1 e2 eqs) 
+            (Mpv2.union eqnm inf) argsl argsr
         in
           (fhyps, eqi)
 
@@ -494,7 +496,7 @@ let eager pf env s s' inv eqIs eqXs c c' eqO =
         let r1,r2, fhyps2, eqs2 = s_eager fhyps1 (rev sfl) (rev sfr) eqo in
         if r1 <> [] || r2 <> [] then raise EqObsInError;
         let eqi = Mpv2.union eqs1 eqs2 in
-        let eqe = add_eqs env eqi el er in
+        let eqe = Mpv2.add_eqs env el er eqi in
         (fhyps2, eqe)
 
     | Swhile (el, sl), Swhile (er, sr2) ->
@@ -506,7 +508,7 @@ let eager pf env s s' inv eqIs eqXs c c' eqO =
           if Mpv2.subset eqi eqo then fhyps, eqo
           else aux (Mpv2.union eqi eqo)
         in
-        let fhyps, eqi = aux (Mpv2.union eqIs (add_eqs env eqo el er)) in
+        let fhyps, eqi = aux (Mpv2.union eqIs (Mpv2.add_eqs env el er eqo)) in
         (* by construction condition (a), (b) and (c) are satisfied *)
         pf_compat pf env modi modi' eqi eqIs eqXs; (* ensure (e) and (f) *)
         (* (h) is assumed *)
@@ -518,7 +520,7 @@ let eager pf env s s' inv eqIs eqXs c c' eqO =
         let eqm  = Mpv2.split_mod  env modi modi' eqo in
         if not (Mpv2.subset eqm eqXs) then raise EqObsInError;
         let eqi = Mpv2.union eqIs eqnm in
-        (fhyps, add_eqs env eqi el er)
+        (fhyps, Mpv2.add_eqs env el er eqi)
 
     | Sabstract _, Sabstract _ -> assert false (* FIXME *)
 

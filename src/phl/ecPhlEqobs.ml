@@ -5,8 +5,6 @@
 
 (* -------------------------------------------------------------------- *)
 open EcUtils
-open EcLocation
-open EcPath
 open EcTypes
 open EcModules
 open EcFol
@@ -19,65 +17,6 @@ open EcLowPhlGoal
 
 module TTC = EcProofTyping
 
-(* -------------------------------------------------------------------- *)
-(* Remark: for the adversary case we assume that inv do not contain
- * the equality of glob *)
-let mk_inv_spec (_pf : proofenv) env inv fl fr =
-  match NormMp.is_abstract_fun fl env with
-  | true ->
-    let (topl, _, oil, sigl),
-      (topr, _, _  , sigr) = EcLowPhlGoal.abstract_info2 env fl fr in
-    let eqglob = f_eqglob topl mleft topr mright in
-    let lpre = if oil.oi_in then [eqglob;inv] else [inv] in
-    let eq_params =
-      f_eqparams
-        fl sigl.fs_arg sigl.fs_anames mleft
-        fr sigr.fs_arg sigr.fs_anames mright in
-    let eq_res = f_eqres fl sigl.fs_ret mleft fr sigr.fs_ret mright in
-    let pre    = f_ands (eq_params::lpre) in
-    let post   = f_ands [eq_res; eqglob; inv] in
-      f_equivF pre fl fr post
-
-  | false ->
-      let defl = EcEnv.Fun.by_xpath fl env in
-      let defr = EcEnv.Fun.by_xpath fr env in
-      let sigl, sigr = defl.f_sig, defr.f_sig in
-      let testty =
-           EcReduction.EqTest.for_type env sigl.fs_arg sigr.fs_arg
-        && EcReduction.EqTest.for_type env sigl.fs_ret sigr.fs_ret
-      in
-
-      if not testty then raise EqObsInError;
-      let eq_params =
-        f_eqparams
-          fl sigl.fs_arg sigl.fs_anames mleft
-          fr sigr.fs_arg sigr.fs_anames mright in
-      let eq_res = f_eqres fl sigl.fs_ret mleft fr sigr.fs_ret mright in
-      let pre = f_and eq_params inv in
-      let post = f_and eq_res inv in
-        f_equivF pre fl fr post
-
-(* -------------------------------------------------------------------- *)
-type eqobs_in_rec_info =
-  | EORI_adv of Mpv2.t
-  | EORI_fun of Mpv2.t
-  | EORI_unknown of EcIdent.t option
-
-type eqobs_in_log = {
-  query    : ((xpath * xpath * Mpv2.t) * (Mpv2.t * form)) list;
-  forproof : eqobs_in_rec_info Mf.t ;
-}
-
-(* -------------------------------------------------------------------- *)
-let find_eqobs_in_log log fl fr eqo =
-  let test ((fl',fr',eqo'), _) =
-    EcPath.x_equal fl fl' && EcPath.x_equal fr fr' && Mpv2.equal eqo eqo' in
-  try Some (snd (List.find test log.query)) with Not_found -> None
-
-(* -------------------------------------------------------------------- *)
-let add_eqobs_in_log fl fr eqo (eqi,spec,info) log =
-  { query = ((fl,fr,eqo), (eqi,spec)) :: log.query;
-    forproof = Mf.add spec info log.forproof }
 
 (* -------------------------------------------------------------------- *)
 let extend_body f fsig body =
@@ -98,263 +37,424 @@ let extend_body f fsig body =
     (arg, s_seq (stmt i) body)
 
 (* -------------------------------------------------------------------- *)
-let t_eqobs_inS_r finfo eqo inv tc =
+
+
+(* Invariant ifvl,ifvr = PV.fv env ml inv, PV.fv env mr inv *)
+type sim = {
+  sim_env      : env;
+  sim_inv      : form;
+  sim_ifvl     : PV.t;
+  sim_ifvr     : PV.t;
+  default_spec : EcPath.xpath -> EcPath.xpath -> Mpv2.t -> Mpv2.t;
+  needed_spec  : (EcPath.xpath * EcPath.xpath * Mpv2.t) list;
+}  
+
+let init_sim env spec inv =
+
+  let default_spec fl fr eqo =
+    let check_eq eqo' = Mpv2.subset eqo eqo' in
+    let test1 (ofl',ofr', eqo') =
+      match ofl', ofr' with
+      | Some fl', Some fr' -> 
+        NormMp.x_equal env fl fl' && NormMp.x_equal env fr fr' && check_eq eqo'
+      | _, _ -> false in
+    let test2 (ofl',ofr', eqo') =
+      match ofl', ofr' with
+      | Some fl', None -> NormMp.x_equal env fl fl' && check_eq eqo'
+      | None, Some fr' -> NormMp.x_equal env fr fr' && check_eq eqo'
+      | _, _ -> false in
+    let test3 (ofl',ofr', eqo') =
+      match ofl', ofr' with
+      | None, None -> check_eq eqo'
+      | _, _ -> false in
+    let get test () = 
+      List.pick 
+        (fun (_,_,eqo' as t) -> if test t then Some eqo' else None) spec in
+    match List.fpick [get test1; get test2; get test3] with
+    | None -> raise EqObsInError
+    | Some eq -> eq in
+  
+  { sim_env  = env;
+    sim_inv  = inv;
+    sim_ifvl = PV.fv env mleft inv;
+    sim_ifvr = PV.fv env mright inv;
+    default_spec = default_spec;
+    needed_spec  = [];
+  } 
+
+let default_spec sim fl fr eqo = 
+  let eqi = sim.default_spec fl fr eqo in
+  let env = sim.sim_env in
+  let test (fl', fr', eqi') = 
+    NormMp.x_equal env fl fl' && NormMp.x_equal env fr fr' && 
+      Mpv2.equal eqi' eqi in
+  let sim =
+    if List.exists test sim.needed_spec then sim
+    else { sim with needed_spec = (fl,fr,eqi)::sim.needed_spec } in
+  sim, eqi
+    
+let add_eqs sim eqs e1 e2 = Mpv2.add_eqs sim.sim_env e1 e2 eqs                 
+
+let check sim pv fv = PV.check_notmod sim.sim_env pv fv
+
+let checks sim pvs fv = List.for_all (fun (pv,_) -> check sim pv fv) pvs 
+
+let check_lvalue aux lv = 
+   match lv with
+  | LvVar (xl,_)   -> aux xl
+
+  | LvTuple ll -> List.for_all (fun (x,_) -> aux x)  ll
+  | LvMap(_, pvl, _, _) -> aux pvl 
+
+let check_not_l sim lvl eqo =
+  let aux pv = 
+    check sim pv sim.sim_ifvl && 
+      not (Mpv2.mem_pv_l sim.sim_env pv eqo) in
+  check_lvalue aux lvl
+
+let check_not_r sim lvr eqo =
+  let aux pv = 
+    check sim pv sim.sim_ifvr && 
+      not (Mpv2.mem_pv_r sim.sim_env pv eqo) in
+  check_lvalue aux lvr
+
+let remove sim lvl lvr eqs = 
+  let env = sim.sim_env in
+  let aux eqs (pvl,tyl) (pvr,tyr) = 
+    if EcReduction.EqTest.for_type env tyl tyr then begin
+      if not (check sim pvl sim.sim_ifvl && check sim pvr sim.sim_ifvr) then
+        raise EqObsInError;
+      Mpv2.remove env pvl pvr eqs
+    end else 
+      raise EqObsInError in
+
+  match lvl, lvr with
+  | LvVar xl, LvVar xr -> aux eqs xl xr 
+  | LvTuple ll, LvTuple lr when List.length ll = List.length lr->
+    List.fold_left2 aux eqs ll lr
+  | LvMap((pl,tysl), pvl, el, tyl), LvMap((pr,tysr), pvr, er,tyr) when 
+      EcPath.p_equal pl pr &&
+        List.all2  (EcReduction.EqTest.for_type env) (tyl::tysl) (tyr::tysr) &&
+        check sim pvl sim.sim_ifvl && check sim pvr sim.sim_ifvr ->
+    add_eqs sim (Mpv2.remove env pvl pvr eqs) el er
+  | _, _ -> raise EqObsInError 
+
+let oremove sim lvl lvr eqs = 
+  match lvl, lvr with
+  | None, None -> eqs
+  | Some lvl, Some lvr -> remove sim lvl lvr eqs 
+  | _, _ -> raise EqObsInError 
+
+let rec check_deadcode_i check_lv i =
+  match i.i_node with
+  | Sasgn(lv,_) -> check_lv lv
+  | Sif(_,s1,s2) -> check_deadcode_s check_lv s1 && check_deadcode_s check_lv s2
+  | _ -> false
+        (* TODO : 
+           For random we need a way to known that the distribution 
+           is lossless;
+           For while we can do the same if we are able to ensure 
+           the termination;
+           As well for procedure *)
+and check_deadcode_s check_lv s = 
+  List.for_all (check_deadcode_i check_lv) s.s_node 
+ 
+let rec s_eqobs_in_rev rsl rsr sim (eqo:Mpv2.t) = 
+  match rsl, rsr with
+  | { i_node = Sasgn(LvVar (xl,_), el)}::rsl, _ 
+    when is_var el && check sim xl sim.sim_ifvl ->
+    s_eqobs_in_rev rsl rsr sim (Mpv2.subst_l sim.sim_env xl (destr_var el) eqo)
+  | _, { i_node = Sasgn(LvVar (xr,_), er)} :: rsr 
+    when is_var er && check sim xr sim.sim_ifvr ->
+    s_eqobs_in_rev rsl rsr sim (Mpv2.subst_r sim.sim_env xr (destr_var er) eqo)
+
+  | { i_node = Sasgn(LvTuple xls, el)}::rsl, _ 
+    when is_tuple_var el && checks sim xls sim.sim_ifvl ->
+    s_eqobs_in_rev rsl rsr sim 
+      (Mpv2.substs_l sim.sim_env xls (destr_tuple_var el) eqo)
+  | _, { i_node = Sasgn(LvTuple xrs, er)} :: rsr 
+    when is_tuple_var er && checks sim xrs sim.sim_ifvr ->
+    s_eqobs_in_rev rsl rsr sim 
+      (Mpv2.substs_r sim.sim_env xrs (destr_tuple_var er) eqo)
+
+    (* this is dead code *)
+  | il :: rsl, _ when check_deadcode_i (fun lv -> check_not_l sim lv eqo) il ->
+    s_eqobs_in_rev rsl rsr sim eqo 
+  | _, ir::rsr when check_deadcode_i (fun lv -> check_not_r sim lv eqo) ir ->
+    s_eqobs_in_rev rsl rsr sim eqo 
+
+  | [], _ | _, [] -> rsl, rsr, sim, eqo
+
+  | il::rsl', ir::rsr' ->
+    let o = 
+      try Some (i_eqobs_in il ir sim eqo) with EqObsInError -> None in 
+    match o with
+    | None -> rsl, rsr, sim, eqo
+    | Some (sim, eqi) -> s_eqobs_in_rev rsl' rsr' sim eqi 
+      
+and i_eqobs_in il ir sim (eqo:Mpv2.t) = 
+  match il.i_node, ir.i_node with
+  | Sasgn(lvl,el), Sasgn(lvr,er) | Srnd(lvl,el), Srnd(lvr,er) ->
+    sim, add_eqs sim (remove sim lvl lvr eqo) el er 
+
+  | Scall(lvl,fl,argsl), Scall(lvr,fr,argsr) 
+    when List.length argsl = List.length argsr -> 
+    let eqo = oremove sim lvl lvr eqo in
+    let env = sim.sim_env in
+    let modl, modr = f_write env fl, f_write env fr in
+    let eqnm = Mpv2.split_nmod env modl modr eqo in
+    let outf = Mpv2.split_mod  env modl modr eqo in
+    Mpv2.check_glob outf;
+    let sim, eqi = f_eqobs_in fl fr sim outf in
+    let eqi = List.fold_left2 (add_eqs sim) (Mpv2.union eqnm eqi) argsl argsr in
+    sim, eqi
+
+  | Sif(el,stl,sfl), Sif(er,str,sfr) ->
+    let sim, eqs1 = s_eqobs_in_full stl str sim eqo in
+    let sim, eqs2 = s_eqobs_in_full sfl sfr sim eqo in
+    let eqi = add_eqs sim (Mpv2.union eqs1 eqs2) el er in
+    sim, eqi 
+
+  | Swhile(el,sl), Swhile(er,sr) ->
+    let rec aux eqo = 
+      let sim', eqi = s_eqobs_in_full sl sr sim eqo in
+      if Mpv2.subset eqi eqo then sim', eqo
+      else aux (Mpv2.union eqi eqo) in
+    aux (add_eqs sim eqo el er) 
+
+  | Sassert el, Sassert er -> sim, add_eqs sim eqo el er
+  | _, _ -> raise EqObsInError 
+
+and s_eqobs_in_full sl sr sim eqo = 
+  let r1,r2,sim, eqi = s_eqobs_in sl sr sim eqo in
+  if r1 <> [] || r2 <> [] then raise EqObsInError;
+  sim, eqi
+
+and s_eqobs_in sl sr sim eqo = 
+  s_eqobs_in_rev (List.rev sl.s_node) (List.rev sr.s_node) sim eqo
+
+and f_eqobs_in fl fr sim eqO = 
+
+  let env = sim.sim_env in
+  let nfl  = NormMp.norm_xfun env fl in
+  let nfr  = NormMp.norm_xfun env fr in
+  let modl, modr = f_write env fl, f_write env fr in
+  let eqnm = Mpv2.split_nmod env modl modr eqO in
+  let outf = Mpv2.split_mod  env modl modr eqO in
+
+  let defl = Fun.by_xpath nfl env in
+  let defr = Fun.by_xpath nfr env in
+  (* TODO check that inv contain only global *)
+  let sim, eqi =
+    try 
+      match defl.f_def, defr.f_def with
+      | FBabs oil, FBabs oir -> 
+        let (topl,_,_,_), (topr,_,_,_) = 
+          try EcLowPhlGoal.abstract_info2 env fl fr 
+          with TcError _ -> raise EqObsInError in
+
+        let top = EcPath.m_functor nfl.EcPath.x_top in
+        let sim, eqi =
+          (* Try to infer the good invariant for oracle *)
+          let eqo = Mpv2.remove_glob top outf in
+          let rec aux eqo =
+            let sim, eqi =
+              List.fold_left2
+                (fun (sim,eqo) o_l o_r -> f_eqobs_in o_l o_r sim eqo) 
+                (sim,eqo) oil.oi_calls oir.oi_calls in
+            if Mpv2.subset eqi eqo then sim, eqo 
+            else aux (Mpv2.union eqi eqo) in
+          aux eqo in
+        begin
+          try
+            let inv = Mpv2.to_form mleft mright eqi sim.sim_inv in
+            let fvl = PV.fv env mleft inv in
+            let fvr = PV.fv env mright inv in
+            PV.check_depend env fvl topl;
+            PV.check_depend env fvr topr
+          with TcError _ -> raise EqObsInError 
+        end;
+        let eqi = if oil.oi_in then Mpv2.add_glob env top top eqi else eqi in
+        sim, eqi
+    
+      | FBdef funl, FBdef funr -> 
+        let sigl, sigr = defl.f_sig, defr.f_sig in
+        let testty =
+          EcReduction.EqTest.for_type env sigl.fs_arg sigr.fs_arg
+          && EcReduction.EqTest.for_type env sigl.fs_ret sigr.fs_ret
+        in
+        if not testty then raise EqObsInError;
+        let eqo' =
+          match funl.f_ret, funr.f_ret with
+          | None, None -> outf
+          | Some el, Some er -> add_eqs sim outf el er
+          | _, _ -> raise EqObsInError in
+      
+        let argl, bodyl = extend_body nfl sigl funl.f_body in
+        let argr, bodyr = extend_body nfr sigr funr.f_body in
+        let sim, eqi    = s_eqobs_in_full bodyl bodyr sim eqo' in
+      
+        let eqi = Mpv2.remove sim.sim_env argl argr eqi in
+        Mpv2.check_glob eqi;
+        sim, eqi
+      | _, _ -> raise EqObsInError
+    with EqObsInError ->
+      default_spec sim nfl nfr outf in
+  sim, Mpv2.union eqnm eqi
+
+let mk_inv_spec2 env inv (fl, fr, eqi, eqo) =
+  let defl = Fun.by_xpath fl env in
+  let defr = Fun.by_xpath fr env in
+  let sigl, sigr = defl.f_sig, defr.f_sig in
+  let testty =
+    EcReduction.EqTest.for_type env sigl.fs_arg sigr.fs_arg
+    && EcReduction.EqTest.for_type env sigl.fs_ret sigr.fs_ret in
+  if not testty then raise EqObsInError;
+  let eq_params =
+    f_eqparams
+      fl sigl.fs_arg sigl.fs_anames mleft
+      fr sigr.fs_arg sigr.fs_anames mright in
+  let eq_res = f_eqres fl sigl.fs_ret mleft fr sigr.fs_ret mright in
+  let pre = f_and eq_params (Mpv2.to_form mleft mright eqi inv) in
+  let post = f_and eq_res (Mpv2.to_form mleft mright eqo inv) in
+  f_equivF pre fl fr post
+
+let mk_inv_spec env inv (fl, fr, eqg) = 
+  mk_inv_spec2 env inv (fl, fr, eqg, eqg)
+
+let t_eqobs_inS_r sim eqo tc =
   let env, hyps, _ = FApi.tc1_eflat tc in
+  let sim = { sim with sim_env = env } in
   let es = tc1_as_equivS tc in
-  let ml, mr = fst es.es_ml, fst es.es_mr in
-
-  (* TODO check that inv contains only global *)
-  let ifvl = PV.fv env ml inv in
-  let ifvr = PV.fv env mr inv in
-
-  let sl,sr,(_,sg),eqi =
-    EcPV.eqobs_in env finfo () es.es_sl es.es_sr eqo (ifvl, ifvr) in
-
+  let ml = fst (es.es_ml) and mr = fst (es.es_mr) in
+  let sl, sr, sim, eqi = 
+    try s_eqobs_in es.es_sl es.es_sr sim eqo 
+    with EqObsInError -> tc_error !!tc "cannot apply sim ..."
+  in
+  let inv = sim.sim_inv in
   let post = Mpv2.to_form ml mr eqo inv in
   let pre  = Mpv2.to_form ml mr eqi inv in
 
+  let sl = stmt (List.rev sl) and sr = stmt (List.rev sr) in
   if not (EcReduction.is_alpha_eq hyps post es.es_po) then
-    tc_error !!tc "cannot apply eqobs_in";
+    tc_error !!tc "cannot apply sim";
 
+  let sg = List.map (mk_inv_spec env inv) sim.needed_spec in
   let concl = f_equivS es.es_ml es.es_mr es.es_pr sl sr pre in
 
   FApi.xmutate1 tc `EqobsIn (sg @ [concl])
 
-let t_eqobs_inS = FApi.t_low3 "eqobs-in" t_eqobs_inS_r
+let t_eqobs_inS = FApi.t_low2 "eqobs-in" t_eqobs_inS_r
 
-(* -------------------------------------------------------------------- *)
-let rec eqobs_inF pf env eqg (inv, ifvl, ifvr as inve) log fl fr eqO =
-  match find_eqobs_in_log log fl fr eqO with
-  | Some (eqi, spec) -> (log, eqi, spec)
-  | None ->
-    let nfl  = NormMp.norm_xfun env fl in
-    let nfr  = NormMp.norm_xfun env fr in
-    let defl = Fun.by_xpath nfl env in
-    let defr = Fun.by_xpath nfr env in
-
-    match defl.f_def, defr.f_def with
-    | FBabs oil, FBabs oir -> begin
-        let top = EcPath.m_functor nfl.EcPath.x_top in
-        let log, ieqg =
-          try (* Try to infer the good invariant for oracle *)
-            let eqo = Mpv2.remove_glob top eqO in
-            let rec aux log eqo =
-              let log, eqi =
-                List.fold_left2
-                  (fun (log,eqo) o_l o_r ->
-                    let log, eqo, _ = eqobs_inF pf env eqg inve log o_l o_r eqo in
-                    log, eqo)
-                  (log,eqo) oil.oi_calls oir.oi_calls in
-              if Mpv2.subset eqi eqo then log, eqo else aux log eqi in
-            aux log eqo
-          with EqObsInError ->
-            if not (Mpv2.subset eqO eqg) then raise EqObsInError;
-            (log, Mpv2.remove_glob top eqg) in
-
-        let peqg = if oil.oi_in then Mpv2.add_glob env top top ieqg else ieqg in
-        let inv  = Mpv2.to_form mleft mright ieqg inv in
-        let spec = mk_inv_spec pf env inv fl fr in
-        let log  = add_eqobs_in_log fl fr eqO (peqg,spec, EORI_adv ieqg) log in
-        (log, peqg, spec)
-    end
-
-    | FBdef funl, FBdef funr -> begin
-        try
-          let sigl, sigr = defl.f_sig, defr.f_sig in
-          let testty =
-               EcReduction.EqTest.for_type env sigl.fs_arg sigr.fs_arg
-            && EcReduction.EqTest.for_type env sigl.fs_ret sigr.fs_ret
-          in
-          if not testty then raise EqObsInError;
-          let eqo' =
-            match funl.f_ret, funr.f_ret with
-            | None, None -> eqO
-            | Some el, Some er -> add_eqs env eqO el er
-            | _, _ -> raise EqObsInError in
-
-          let argl, bodyl = extend_body nfl sigl funl.f_body in
-          let argr, bodyr = extend_body nfr sigr funr.f_body in
-          let sl, sr, (log,_), eqi =
-            eqobs_in env
-              (eqobs_inF pf env eqg inve)
-              log bodyl bodyr eqo' (ifvl,ifvr) in
-
-          if sl.s_node <> [] || sr.s_node <> [] then
-            raise EqObsInError;
-
-          let geqi = Mpv2.remove env argl argr eqi in
-          Mpv2.check_glob geqi;
-          let eq_params =
-            f_eqparams
-              fl sigl.fs_arg sigl.fs_anames mleft
-              fr sigr.fs_arg sigr.fs_anames mright in
-          let eq_res = f_eqres fl sigl.fs_ret mleft fr sigr.fs_ret mright in
-          let pre    = f_and eq_params (Mpv2.to_form mleft mright geqi inv) in
-          let post   = f_and eq_res (Mpv2.to_form mleft mright eqO inv) in
-          let spec   = f_equivF pre fl fr post in
-          let log    = add_eqobs_in_log fl fr eqO (geqi, spec, EORI_fun eqo') log in
-          (log, geqi, spec)
-
-        with EqObsInError ->
-          if not (Mpv2.subset eqO eqg) then raise EqObsInError;
-          let inv  = Mpv2.to_form mleft mright eqg inv in
-          let spec = mk_inv_spec pf env inv fl fr in
-          let log  = 
-            add_eqobs_in_log fl fr eqO (eqg,spec,EORI_unknown None) log in
-          (log, eqg, spec)
-      end
-
-    | _, _ -> raise EqObsInError
-
-(* -------------------------------------------------------------------- *)
-let tc_process_prhl_post tc phi =
+let t_eqobs_inF_r sim eqo tc =
   let env, hyps, concl = FApi.tc1_eflat tc in
-  let (ml, mr) =
-    match concl.f_node with
-    | FequivS es -> (es.es_ml, es.es_mr)
-    | FequivF ef -> snd (EcEnv.Fun.equivF_memenv ef.ef_fl ef.ef_fr env)
-    | _          -> assert false
-  in
-  let hyps = LDecl.push_all [ml; mr] hyps in
-  TTC.pf_process_form !!tc hyps tbool phi
+  let sim = { sim with sim_env = env } in
+  let ef = tc1_as_equivF tc in
+  let sim, eqi = 
+    try f_eqobs_in ef.ef_fl ef.ef_fr sim eqo 
+    with EqObsInError -> tc_error !!tc "cannot apply sim ..." in
+  let inv = sim.sim_inv in
+  let sg = List.map (mk_inv_spec env inv) sim.needed_spec in
+  let concl' = mk_inv_spec2 env inv (ef.ef_fl, ef.ef_fr, eqi, eqo) in
+  if not (EcReduction.is_alpha_eq hyps concl concl') then
+    tc_error !!tc "cannot apply sim for fun";
+  FApi.xmutate1 tc `EqobsIn sg
 
-(* -------------------------------------------------------------------- *)
-let process_eqobs_in (geq', ginv, eqs') tc =
-  let env, hyps, concl = FApi.tc1_eflat tc in
+let t_eqobs_inF = FApi.t_low2 "eqobs-in" t_eqobs_inF_r
+
+let process_eqs env tc f = 
+   try 
+      Mpv2.of_form env mleft mright f
+   with Not_found ->
+     tc_error_lazy !!tc (fun fmt ->
+       let ppe = EcPrinting.PPEnv.ofenv env in
+       Format.fprintf fmt
+         "cannot recognize %a as a set of equalities"
+         (EcPrinting.pp_form ppe) f) 
+
+let process_hint tc hyps (feqs, inv) =
+  let env = LDecl.toenv hyps in
   let ienv = LDecl.inv_memenv hyps in
+  let doinv pf = TTC.pf_process_form !!tc ienv tbool pf in
+  let doeq pf = process_eqs env tc (doinv pf) in
+  let dof g = omap (EcTyping.trans_gamepath env) g in
+  let geqs = 
+    List.map (fun ((f1,f2),geq) -> dof f1, dof f2, doeq geq)
+      feqs in
+  let ginv = odfl f_true (omap doinv inv) in
+  geqs, ginv
 
-  let isfun, ml, mr, post =
-    match concl.f_node with
-    | FequivS es ->
-        (`Stmt (es.es_sl, es.es_sr), fst es.es_ml, fst es.es_mr, es.es_po)
-    | FequivF ef ->
-        (`Fun (ef.ef_fl, ef.ef_fr), mleft, mright, ef.ef_po)
-    | _ -> tc_error !!tc "the conclusion does not end with a prhl judgment"
-  in
+let process_eqobs_inS info tc =
+  let env, hyps, _ = FApi.tc1_eflat tc in
+  let es = tc1_as_equivS tc in
+  let spec, inv = process_hint tc hyps info.EcParsetree.sim_hint in
+  let eqo = 
+    match info.EcParsetree.sim_eqs with
+    | Some pf ->
+      process_eqs env tc (TTC.tc1_process_prhl_formula tc pf)
+    | None ->
+      try Mpv2.needed_eq env mleft mright es.es_po
+      with _ -> tc_error !!tc "cannot infer the set of equalities" in
+  let post = Mpv2.to_form mleft mright eqo inv in
+  let sim = init_sim env spec inv in
+  let t_main tc =
+    match info.EcParsetree.sim_pos with
+    | None -> 
+      FApi.t_last
+        (FApi.t_try (FApi.t_seq EcPhlSkip.t_skip t_logic_trivial))
+        (t_eqobs_inS sim eqo tc)
+    | Some(p1,p2) ->
+      let _,sl2 = s_split p1 es.es_sl in
+      let _,sr2 = s_split p2 es.es_sr in
+      let _, eqi =
+        try s_eqobs_in_full (stmt sl2) (stmt sr2) sim eqo 
+        with EqObsInError -> tc_error !!tc "cannot apply sim" in
+      (EcPhlApp.t_equiv_app (p1,p2) (Mpv2.to_form mleft mright eqi inv) @+ [
+        t_id;
+        fun tc ->
+          FApi.t_last
+            (EcPhlSkip.t_skip @! t_logic_trivial)
+            (t_eqobs_inS sim eqo tc) 
+      ]) tc in
+  (EcPhlConseq.t_equivS_conseq es.es_pr post @+
+    [t_logic_trivial;
+     t_logic_trivial;
+     t_main]) tc
 
-  let toeq ml mr f =
-    try EcPV.Mpv2.of_form env ml mr f
-    with _ ->
-      tc_error_lazy !!tc (fun fmt ->
-        let ppe = EcPrinting.PPEnv.ofenv env in
-        Format.fprintf fmt
-          "cannot recognize %a as a set of equalities"
-          (EcPrinting.pp_form ppe) f)
-  in
 
-  let geq =
-    match geq' with
-    | None -> toeq mleft mright f_true
-    | Some geq' ->
-      let geq = TTC.pf_process_form !!tc ienv tbool geq' in
-      reloc geq'.pl_loc (toeq mleft mright) geq in
 
-  let ginv = ginv |> omap (TTC.pf_process_form !!tc ienv tbool) |> odfl f_true in
-  let ifvl = EcPV.PV.fv env ml ginv in
-  let ifvr = EcPV.PV.fv env mr ginv in
+let process_eqobs_inF info tc = 
+  if info.EcParsetree.sim_pos <> None then
+    tc_error !!tc "no positions excepted";
+  let env, hyps, _ = FApi.tc1_eflat tc in
+  let ef = tc1_as_equivF tc in
+  let spec, inv = process_hint tc hyps info.EcParsetree.sim_hint in
+  let fl = ef.ef_fl and fr = ef.ef_fr in
+  let eqo = 
+    match info.EcParsetree.sim_eqs with
+    | Some pf ->
+      let _,(ml,mr) = Fun.equivF_memenv fl fr env in
+      let hyps = LDecl.push_all [ml;mr] hyps in
+      process_eqs env tc (TTC.pf_process_form !!tc hyps tbool pf)
+    | None ->
+      try Mpv2.needed_eq env mleft mright ef.ef_po
+      with _ -> tc_error !!tc "cannot infer the set of equalities" in
+  let eqo = Mpv2.remove env (pv_res fl) (pv_res fr) eqo in
+  let sim = init_sim env spec inv in
+  let _, eqi = f_eqobs_in fl fr sim eqo in 
+  let ef' = destr_equivF (mk_inv_spec2 env inv (fl, fr, eqi, eqo)) in
+  (EcPhlConseq.t_equivF_conseq ef'.ef_pr ef'.ef_po @+ [
+    t_logic_trivial;
+    t_logic_trivial;
+     t_eqobs_inF sim eqo]) tc
 
-  let eqs =
-    match eqs' with
-    | None -> begin
-        try EcPV.Mpv2.needed_eq env ml mr post
-        with _ -> tc_error !!tc "cannot infer the set of equalities"
-      end
-    | Some eqs' ->
-      let eqs = tc_process_prhl_post tc eqs' in
-      reloc eqs'.pl_loc (toeq ml mr) eqs in
+  
 
-  let log, eqO =
-    match isfun with
-    | `Stmt(sl,sr) ->
-      let _, _, (log,_), _ =
-        EcPV.eqobs_in env
-          (eqobs_inF !!tc env geq (ginv,ifvl,ifvr))
-          { query = []; forproof = Mf.empty; }
-          sl sr eqs (ifvl,ifvr) in 
-      log, eqs
+let process_eqobs_in info tc = 
+  let concl = FApi.tc1_goal tc in
+  match concl.f_node with
+  | FequivF _ -> process_eqobs_inF info tc
+  | FequivS _ -> process_eqobs_inS info tc
+  | _ -> tc_error_noXhl ~kinds:[`Equiv `Any] !!tc
 
-    | `Fun(fl,fr) ->
-      let eqO = (Mpv2.remove env (pv_res fl) (pv_res fr) eqs) in
-      let log = proj3_1 (
-        eqobs_inF
-          !!tc env geq (ginv,ifvl,ifvr)
-          { query = []; forproof = Mf.empty } fl fr eqO) in
-      (log, eqO)
-  in
-
-  let onF _ fl fr eqo =
-    match find_eqobs_in_log log fl fr eqo with
-    | None -> raise EqObsInError
-    | Some (eqo, spec) ->  (), eqo, spec
-
-  in
-
-  let t_eqobs eqs tc =
-    let es = tc1_as_equivS tc in
-    let ml, mr = fst es.es_ml, fst es.es_mr in
-    let post = EcPV.Mpv2.to_form ml mr eqs ginv in
-    let pre  = es.es_pr in
-      FApi.t_seqsub
-        (EcPhlConseq.t_equivS_conseq pre post)
-        [t_logic_trivial;
-         t_logic_trivial;
-         (fun tc ->
-           FApi.t_last
-             (FApi.t_try (FApi.t_seq EcPhlSkip.t_skip t_logic_trivial))
-             (t_eqobs_inS onF eqs ginv tc))]
-        tc
-  in
-
-  let tocut =
-    Mf.fold (fun spec eori l ->
-      match eori with
-      | EORI_unknown None -> spec :: l
-      | _ -> l) log.forproof [] in
-
-  let forproof = ref log.forproof in
-
-  let rec t_cut_spec l tc =
-    match l with
-    | [] -> t_id tc
-    | spec :: l ->
-      let hyps = FApi.tc1_hyps tc in
-      let id   = LDecl.fresh_id hyps "H" in
-        forproof := Mf.add spec (EORI_unknown (Some id)) !forproof;
-        FApi.t_seqsub (t_cut spec)
-          [t_id; FApi.t_seq (t_intros_i [id]) (t_cut_spec l)]
-          tc
-  in
-
-  let t_rec tc =
-    let concl = FApi.tc1_goal tc in
-    match Mf.find_opt concl !forproof with
-    | Some (EORI_adv geq) ->
-      let tc =
-        EcPhlFun.t_equivF_abs
-          (EcPV.Mpv2.to_form mleft mright geq ginv) tc
-      in
-        FApi.t_firsts t_logic_trivial 2 tc
-
-    | Some (EORI_fun eqs) ->
-        FApi.t_seq EcPhlFun.t_equivF_fun_def (t_eqobs eqs) tc
-
-    | Some (EORI_unknown (Some id)) -> t_apply_hyp id tc
-
-    | _ -> t_fail tc
-  in
-
-  let t_last tc =
-    match isfun with
-    | `Fun (fl,fr) ->
-      let spec = proj3_3 (onF () fl fr eqO) in
-      let ef   = pf_as_equivF !!tc spec in
-      FApi.t_seqsub
-        (EcPhlConseq.t_equivF_conseq ef.ef_pr ef.ef_po)
-        [t_logic_trivial;
-         t_logic_trivial;
-         FApi.t_repeat t_rec] tc
-
-    | _ -> FApi.t_seq (t_eqobs eqs) (FApi.t_repeat t_rec) tc
-  in
-
-  FApi.t_last t_last (t_cut_spec tocut tc)
+  

@@ -46,7 +46,7 @@ qed.
 
 equiv foo1_0 (A<:Adv {O} ) : G(A).main ~ G(A).main : ={x,O.m,O.l} ==> ={res,O.m,glob A}.
 proc.
-sim true : (={O.m,glob A,x,O.l}).
+sim (:true) : (={O.m,glob A,x,O.l}).
 qed.
 
 equiv foo1_1 (A<:Adv {O} ) : G(A).main ~ G(A).main : ={x,O.m,O.l} ==> ={res,O.m,glob A}.

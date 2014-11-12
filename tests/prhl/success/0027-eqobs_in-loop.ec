@@ -30,5 +30,20 @@ sim.
 wp => //.
 qed.
 
+equiv foo1 : M1.f ~ M1'.f : ={x} ==> ={res}.
+proc.
+sim 2 2.
+wp => //.
+qed.
+
+equiv foo2 : M1.f ~ M1'.f : ={x} ==> ={res}.
+proc.
+sim 1 2.
+wp => //.
+qed.
+
+
+
+
 
 

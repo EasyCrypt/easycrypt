@@ -2202,11 +2202,38 @@ fel_pred_specs:
 | LBRACKET assoc_ps = plist0(fel_pred_spec, SEMICOLON) RBRACKET
     {assoc_ps}
 
+
+eqobs_in_pos:
+| i1=uint i2=uint { i1, i2 }
+
+eqobs_in_eqglob1:
+| LPAREN mp1= uoption(loc(fident)) COMMA mp2= uoption(loc(fident)) COLON 
+  geq=form RPAREN 
+  {((mp1, mp2),geq) } 
+
+| LPAREN UNDERSCORE?    COLON geq=form RPAREN { ((None,None), geq) }
+
+eqobs_in_inv:
+| SLASH inv=sform { inv }
+
+eqobs_in_eqinv:
+| geqs=eqobs_in_eqglob1+ inv=eqobs_in_inv? { (geqs,inv) }
+
+eqobs_in_eqpost:
+| COLON f=sform   { f }
+
 eqobs_in:
+| pos=eqobs_in_pos? i=eqobs_in_eqinv? p=eqobs_in_eqpost? {
+    { sim_pos = pos;
+      sim_hint = odfl ([], None) i;
+      sim_eqs = p; } 
+}
+
+(*eqobs_in:
 | empty                              { (None   , None   , None) }
 | COLON f3=sform                     { (None   , None   , Some f3)   }
 | f1=sform COLON f3=sform?           { (Some f1, None   , f3)   }
-| f1=sform f2=sform COLON f3=sform?  { (Some f1, Some f2, f3)   }
+| f1=sform f2=sform COLON f3=sform?  { (Some f1, Some f2, f3)   } *)
 
 pgoptionkw:
 | x=loc(SPLIT) { mk_loc x.pl_loc "split" }

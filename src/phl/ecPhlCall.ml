@@ -204,6 +204,41 @@ let t_equiv_call1 side fpre fpost tc =
   FApi.xmutate1 tc `HlCall [fconcl; concl]
 
 (* -------------------------------------------------------------------- *)
+let mk_inv_spec (_pf : proofenv) env inv fl fr =
+  match NormMp.is_abstract_fun fl env with
+  | true ->
+    let (topl, _, oil, sigl),
+      (topr, _, _  , sigr) = EcLowPhlGoal.abstract_info2 env fl fr in
+    let eqglob = f_eqglob topl mleft topr mright in
+    let lpre = if oil.oi_in then [eqglob;inv] else [inv] in
+    let eq_params =
+      f_eqparams
+        fl sigl.fs_arg sigl.fs_anames mleft
+        fr sigr.fs_arg sigr.fs_anames mright in
+    let eq_res = f_eqres fl sigl.fs_ret mleft fr sigr.fs_ret mright in
+    let pre    = f_ands (eq_params::lpre) in
+    let post   = f_ands [eq_res; eqglob; inv] in
+      f_equivF pre fl fr post
+
+  | false ->
+      let defl = EcEnv.Fun.by_xpath fl env in
+      let defr = EcEnv.Fun.by_xpath fr env in
+      let sigl, sigr = defl.f_sig, defr.f_sig in
+      let testty =
+           EcReduction.EqTest.for_type env sigl.fs_arg sigr.fs_arg
+        && EcReduction.EqTest.for_type env sigl.fs_ret sigr.fs_ret
+      in
+
+      if not testty then raise EqObsInError;
+      let eq_params =
+        f_eqparams
+          fl sigl.fs_arg sigl.fs_anames mleft
+          fr sigr.fs_arg sigr.fs_anames mright in
+      let eq_res = f_eqres fl sigl.fs_ret mleft fr sigr.fs_ret mright in
+      let pre = f_and eq_params inv in
+      let post = f_and eq_res inv in
+        f_equivF pre fl fr post
+
 let process_call side info tc =
   let process_spec tc side =
     let (hyps, concl) = FApi.tc1_flat tc in
@@ -257,7 +292,7 @@ let process_call side info tc =
       let (_,fr,_) = fst (tc1_last_call tc es.es_sr) in
       let penv = LDecl.inv_memenv hyps in
       let env  = LDecl.toenv hyps in
-      (penv, fun inv -> EcPhlEqobs.mk_inv_spec !!tc env inv fl fr)
+      (penv, fun inv -> mk_inv_spec !!tc env inv fl fr)
 
     | _ -> tc_error !!tc "the conclusion is not a hoare or an equiv" in
 
