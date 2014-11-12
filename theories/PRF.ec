@@ -26,9 +26,9 @@ module PRFr = {
 }.
 
 (** Security is expressed with respect to the Random Function defined
-    by some uniform distribution on an unspecified subset of R. *)
-op uR:R distr.
-axiom uR_uf: isuniform uR.
+    by some distribution on (a subset of) R. *)
+op dR:R distr.
+axiom dR_ll: mu dR True = 1%r.
 
 module type PRF = {
   proc init(): unit
@@ -61,18 +61,19 @@ module PRFi = {
   proc init(): unit = { m = FMap.empty; }
 
   proc f (x:D): R = {
-    if (!mem x (dom m)) m.[x] = $uR;
+    if (!mem x (dom m)) m.[x] = $dR;
     return (oget m.[x]);
   }
 }.
 
-(*** TODO: define notations ***)
+(* TODO: define notations *)
 (** Advantage of a distinguisher against a PRF oracle F:
       Adv^PRF_F(&m,D) = `|Pr[IND(F,D) @ &m: res] - Pr[IND(PRFi,D) @ &m: res]| **)
 (** Advantage of a distinguisher against **the** PRF operator F:
       Adv^PRF_F(&m,D) = `|Pr[IND(PRFr,D) @ &m: res] - Pr[IND(PRFi,D) @ &m: res]| **)
 
 (** Useful lemmas **)
+(* TODO: complete *)
 lemma PRFr_init_ll: islossless PRFr.init.
 proof. by proc; auto; smt. qed.
 

@@ -30,10 +30,9 @@ module PRPr = {
 }.
 
 (** Security is expressed with respect to the Random Permutation defined
-    by some uniform distribution on D. *)
-op uD:D distr.
-axiom uD_uf: isuniform uD.
-axiom uD_fu: support uD = True.
+    by some distribution on D. *)
+op dD:D distr.
+axiom dD_ll: mu dD True = 1%r.
 
 module type PRP = {
   proc init(): unit
@@ -66,7 +65,7 @@ module PRPi = {
   proc init(): unit = { m = FMap.empty; }
 
   proc p(x:D): D = {
-    if (!mem x (dom m)) m.[x] = $uD \ (rng m);
+    if (!mem x (dom m)) m.[x] = $dD \ (rng m);
     return (oget m.[x]);
   }
 }.
