@@ -56,16 +56,20 @@ let t_hoareS_conseq pre post tc =
   FApi.xmutate1 tc `HlConseq [concl1; concl2; concl3]
 
 (* -------------------------------------------------------------------- *)
+let bdHoare_conseq_conds cmp pr po new_pr new_po = 
+  let cond1, cond2 = conseq_cond pr po new_pr new_po in
+  let cond2 = match cmp with
+    | FHle -> f_imp po new_po
+    | FHeq -> f_iff po new_po 
+    | FHge -> cond2
+  in
+  cond1, cond2 
 let t_bdHoareF_conseq pre post tc =
   let env = FApi.tc1_env tc in
   let bhf = tc1_as_bdhoareF tc in
   let mpr,mpo = EcEnv.Fun.hoareF_memenv bhf.bhf_f env in
-  let cond1, cond2 = conseq_cond bhf.bhf_pr bhf.bhf_po pre post in
-  let cond2 = match bhf.bhf_cmp with
-    | FHle -> f_imp bhf.bhf_po post
-    | FHeq -> f_iff bhf.bhf_po post
-    | FHge -> cond2
-  in
+  let cond1, cond2 = 
+    bdHoare_conseq_conds bhf.bhf_cmp bhf.bhf_pr bhf.bhf_po pre post in
   let concl1 = f_forall_mems [mpr] cond1 in
   let concl2 = f_forall_mems [mpo] cond2 in
   let concl3 = f_bdHoareF pre bhf.bhf_f post bhf.bhf_cmp bhf.bhf_bd in
@@ -74,12 +78,8 @@ let t_bdHoareF_conseq pre post tc =
 (* -------------------------------------------------------------------- *)
 let t_bdHoareS_conseq pre post tc =
   let bhs = tc1_as_bdhoareS tc in
-  let cond1, cond2 = conseq_cond bhs.bhs_pr bhs.bhs_po pre post in
-  let cond2 = match bhs.bhs_cmp with
-    | FHle -> f_imp bhs.bhs_po post
-    | FHeq -> f_iff bhs.bhs_po post
-    | FHge -> cond2
-  in
+  let cond1, cond2 = 
+    bdHoare_conseq_conds bhs.bhs_cmp bhs.bhs_pr bhs.bhs_po pre post in
   let concl1 = f_forall_mems [bhs.bhs_m] cond1 in
   let concl2 = f_forall_mems [bhs.bhs_m] cond2 in
   let concl3 = f_bdHoareS_r { bhs with bhs_pr = pre; bhs_po = post } in
@@ -239,7 +239,8 @@ let t_bdHoareF_notmod post tc =
   let fres = f_local vres fsig.fs_ret in
   let m    = fst mpo in
   let s = PVM.add env pvres m fres PVM.empty in
-  let cond = f_imp post hf.bhf_po in
+  let _, cond =
+    bdHoare_conseq_conds hf.bhf_cmp hf.bhf_pr hf.bhf_po hf.bhf_pr post in
   let cond = PVM.subst env s cond in
   let modi = f_write env f in
   let cond = generalize_mod env m modi cond in
@@ -255,7 +256,8 @@ let t_bdHoareS_notmod post tc =
   let hs = tc1_as_bdhoareS tc in
   let s = hs.bhs_s in
   let m = fst hs.bhs_m in
-  let cond = f_imp post hs.bhs_po in
+  let _, cond = 
+    bdHoare_conseq_conds hs.bhs_cmp hs.bhs_pr hs.bhs_po hs.bhs_pr post in
   let modi = s_write env s in
   let cond = generalize_mod env m modi cond in
   let cond1 = f_forall_mems [hs.bhs_m] (f_imp hs.bhs_pr cond) in
