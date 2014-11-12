@@ -26,7 +26,7 @@ axiom bijective_P k:
 module PRPr = {
   var k:K
   proc init(): unit = { k = $dK; }
-  proc p(x:D): D = { return P k x; }
+  proc f(x:D): D = { return P k x; }
 }.
 
 (** Security is expressed with respect to the Random Permutation defined
@@ -36,11 +36,11 @@ axiom dD_ll: mu dD True = 1%r.
 
 module type PRP = {
   proc init(): unit
-  proc p(x:D): D
+  proc f(x:D): D
 }.
 
 module type PRPA = {
-  proc p(x:D): D
+  proc f(x:D): D
 }.
 
 module type Distinguisher(F:PRPA) = {
@@ -64,7 +64,7 @@ module PRPi = {
 
   proc init(): unit = { m = FMap.empty; }
 
-  proc p(x:D): D = {
+  proc f(x:D): D = {
     if (!mem x (dom m)) m.[x] = $dD \ (rng m);
     return (oget m.[x]);
   }
@@ -80,7 +80,7 @@ module PRPi = {
 lemma PRPr_init_ll: islossless PRPr.init.
 proof. by proc; auto; smt. qed.
 
-lemma PRPr_p_ll: islossless PRPr.p.
+lemma PRPr_f_ll: islossless PRPr.f.
 proof. by proc. qed.
 
 
