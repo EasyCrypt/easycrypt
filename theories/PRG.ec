@@ -1,0 +1,40 @@
+(*** A formalization of pseudo-random generators **)
+
+(** A stateful random generator for type output is a pair of
+    algorithms init and next as specified below **)
+type output.
+
+module type RG = {
+  proc init(): unit
+  proc next(): output
+}.
+
+(** PRG-security is expressed w.r.t. an arbitrary distribution dout on
+    type output (usually the uniform distribution on the full type):
+    no adversary should be able to distinguish between a sequence of
+    outputs produced by the SRG and a sequence of samples in dout **)
+op dout:output distr.
+
+module type RGA = { proc next(): output }.
+
+module type Distinguisher(G:RGA) = { proc distinguish(): bool }.
+
+module IND(G:RG,D:Distinguisher) = {
+  module D = D(G)
+
+  proc main(): bool = {
+    var b;
+
+    G.init();
+    b = D.distinguish();
+    return b;
+  }
+}.
+
+module PRGi:RG,RGA = {
+  proc init(): unit = { }
+  proc next(): output = { var r; r = $dout; return r; }
+}.
+
+(** Advantage of a distinguisher against a PRG G:
+      Adv^PRG_G(&m,D) = `|Pr[IND(G,D) @ &m: res] - Pr[IND(PRGi,D) @ &m: res]| **)
