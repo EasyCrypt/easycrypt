@@ -49,6 +49,7 @@ val bind     : symbol -> EcTypes.ty -> memenv -> memenv
 val bind_proj: int -> int -> symbol -> EcTypes.ty -> memenv -> memenv
 val lookup   : symbol -> memenv -> ((int*int) option * EcTypes.ty) option
 val is_bound : symbol -> memenv -> bool
+val is_bound_pv : EcTypes.prog_var -> memenv -> bool
 
 (* -------------------------------------------------------------------- *)
 val mt_subst :

@@ -143,6 +143,7 @@ module CI_Logic = struct
   let p_eq_sym_imp    = _Logic "eq_sym_imp"
   let p_imp_trans     = _Logic "imp_trans"
   let p_negbTE        = _Logic "negbTE"
+  let p_negeqF        = _Logic "negeqF"
 
   let p_rewrite_l     = _Logic "rewrite_l"
   let p_rewrite_r     = _Logic "rewrite_r"

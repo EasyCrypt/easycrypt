@@ -100,7 +100,7 @@ module F = {
 
     r1 = $dseed;
     r2 = $dout;
-    if (!in_dom x m)
+    if (!mem x (dom m))
       m.[x] = (r1,r2);
 
     return oget (m.[x]);
@@ -223,17 +223,17 @@ section.
 
   pred Bad logP (m:('a,'b) map) =          (* Bad holds whenever: *)
        !unique logP                        (*  - there is a cycle in the state, OR *)
-    \/ exists r, mem r logP /\ in_dom r m. (*  - an adversary query collides with an internal seed. *)
+    \/ exists r, mem r logP /\ mem r (dom m). (*  - an adversary query collides with an internal seed. *)
 
   lemma notBad logP (m:('a,'b) map):
     !Bad logP m <=>
-      (unique logP /\ forall r, !mem r logP \/ !in_dom r m)
+      (unique logP /\ forall r, !mem r logP \/ !mem r (dom m))
   by smt.
 
   (* In this game, we replace the PRF with fresh samples *)
   pred inv (m1 m2:('a,'b) map) (logP:'a list) =
-    (forall r, in_dom r m1 <=> (in_dom r m2 \/ mem r logP)) /\
-    (forall r, in_dom r m2 => m1.[r] = m2.[r]).
+    (forall r, mem r (dom m1) <=> (mem r (dom m2) \/ mem r logP)) /\
+    (forall r, mem r (dom m2) => m1.[r] = m2.[r]).
 
   local lemma Plog_Psample &m:
     Pr[Exp(A,F,Plog).main() @ &m: res] <=
@@ -253,13 +253,13 @@ section.
     by intros=> _ _; apply FfL.
     (* F.f preserves bad *)
     intros=> _ //=; proc.
-    case (in_dom x F.m).
+    case (mem x (dom F.m)).
       by rcondf 3; wp; do !rnd=> //; wp; skip; smt.
     rcondt 3; first by do !rnd; wp.
     auto; progress. smt. smt.
     elim H=> H; [by left | right].
     elim H=> r [r_in_logP r_in_m].
-    by exists r; split=> //; rewrite /in_dom dom_set mem_add; left.
+    by exists r; split=> //; rewrite dom_set mem_add; left.
     (* [Psample.prg ~ Plog.prg: I] when Bad does not hold *)
     proc; inline F.f. swap{2} 3 -2.
     wp; do 2!rnd; wp; skip; progress; first 2 last; last 9 smt.
@@ -500,7 +500,7 @@ section.
       by wp; rnd=> //.
       wp; rnd; skip; progress.
       generalize H2; rewrite !FromInt.Add Mul_distr_r /Bad -nor=> //= [Hu Hf].
-      apply (Real.Trans _ (mu dseed ((fun x, in_dom x F.m{hr})
+      apply (Real.Trans _ (mu dseed ((fun x, mem x (dom F.m{hr}))
                                   \/ (fun x, mem x P.logP{hr}))));
         first by apply mu_sub=> x /=; rewrite /Pred.(\/); smt.
       apply mu_or_le.

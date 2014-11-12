@@ -1,0 +1,54 @@
+% --------------------------------------------------------------------
+\usepackage[draft,silent,targetlayout=plain,layout=inline]{fixme}
+
+\newcommand{\fix}[1]{\fxnote{#1}}
+
+% --------------------------------------------------------------------
+\DeclareMathVersion{sans}
+\SetSymbolFont{operators}{sans}{OT1}{cmbr}{m}{n}
+\SetSymbolFont{letters}{sans}{OML}{cmbrm}{m}{it}
+\SetSymbolFont{symbols}{sans}{OMS}{cmbrs}{m}{n}
+\SetMathAlphabet{\mathit}{sans}{OT1}{cmbr}{m}{sl}
+\SetMathAlphabet{\mathbf}{sans}{OT1}{cmbr}{bx}{n}
+\SetMathAlphabet{\mathtt}{sans}{OT1}{cmtl}{m}{n}
+\SetSymbolFont{largesymbols}{sans}{OMX}{iwona}{m}{n}
+
+% --------------------------------------------------------------------
+\usepackage[final]{listings}
+
+\def\lstlanguagefiles{easycrypt.lst}
+\lstset{language=easycrypt,mathescape}
+\def\ls{\lstinline}
+
+%--------------------------------------------------------------------
+\usepackage{xstring}
+
+\newcommand{\domark}{%
+  \vbox to 0pt{\kern-\dp\strutbox \smash{\llap{$\circledcirc$\kern1em}} \vss}}
+\newcommand{\impmark}{\strut\vadjust{\domark}}
+
+\newcommand{\tct}[1]{\ls[language=easycrypt,mathescape]!#1!}
+
+\newenvironment{tactic}[2][\empty]{%
+\setlength{\parindent}{0pt}
+\trivlist{}{}\item\relax%
+\hrule width \hsize \kern .5mm \hrule width \hsize height 1pt \kern -.2mm
+\index{tactics}{#2}%
+\label{tactic-#2}%
+\impmark\ifx\empty#1\tct{#2}\else\tct{#1}\fi\strut
+\hrule width \hsize \kern 1.5mm}
+{\endtrivlist}
+
+\newenvironment{tsyntax}[2][plain]
+{\IfStrEq{#1}{plain}{\textbf{Syntax:} \tct{#2}.}{
+ \IfStrEq{#1}{empty}{\relax}{\errmessage{invalid tsyntax mode: #1}}}}
+{\par\addvspace{.5\baselineskip}}
+
+\newcommand{\rtactic}[1]{\tct{#1} (p.~\pageref{tactic-#1})}
+
+%--------------------------------------------------------------------
+\usepackage{mathpartir}
+
+%--------------------------------------------------------------------
+%% Miscellaneous local notations
+\newcommand{\symrel}[1]{#1^{-1}} %% Inverse relation

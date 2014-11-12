@@ -2,12 +2,13 @@ require import Int.
 require import Real.
 require import FMap. 
 require import FSet.
-require import CDH.
+
+require (*--*) CDH.
 require (*--*) AWord.
 require (*--*) ROM.
 require (*--*) PKE.
 
-(* The type of plaintexts: bitstrings of length k *)
+(** The type of plaintexts: bitstrings of length k **)
 type bits.
 op k: int.
 op uniform: bits distr.
@@ -19,16 +20,28 @@ clone import AWord as Bitstring with
   op (^)    <- (^^),
   op Dword.dword <- uniform.
 
-(* Upper bound on the number of calls to H *)
+(** Upper bound on the number of calls to H **)
 op qH: int.
 axiom qH_pos: 0 < qH.
 
-(* Assumption *)
-clone Set_CDH as SCDH with
+(** Assumption: set CDH with n = qH **)
+clone import CDH.Set_CDH as SCDH with
   op n <- qH.
-
 import Group.
 
+(** Assumption: a ROM (lazy) **)
+module type Hash = {
+  proc init(): unit
+  proc hash(x:group): bits
+}.
+
+clone import ROM.Lazy as RandOrcl_group with 
+  type from  <- group,
+  type to    <- bits,
+  op dsample <- fun (x:group), uniform.
+import Types.
+
+(** Construction: a PKE **)
 type pkey       = group.
 type skey       = int.
 type plaintext  = bits.
@@ -40,11 +53,7 @@ clone import PKE as PKE_ with
   type plaintext <- plaintext,
   type ciphertext <- ciphertext. 
 
-module type Hash = {
-  proc init(): unit
-  proc hash(x:group): bits
-}.
-
+(** Concrete Construction: Hashed ElGammal **)
 module Hashed_ElGamal (H:Hash): Scheme = {
   proc kg(): pkey * skey = {
     var sk;
@@ -71,18 +80,15 @@ module Hashed_ElGamal (H:Hash): Scheme = {
   }
 }.
 
-clone import ROM.Lazy as RandOrcl_group with 
-  type from  <- group,
-  type to    <- bits,
-  op dsample <- fun (x:group), uniform.
-import Types.
-
-(* Adversary Definitions *)
+(** Adversary Definitions **)
 module type Adversary (O:ARO) = {
   proc choose(pk:pkey)    : plaintext * plaintext
   proc guess(c:ciphertext): bool
 }.
 
+(* We give the adversary access to a version of the ROM that stops
+   answering past a certain number of queries *)
+(* TODO: use generic defs from ROM.ec *)
 module Bounder(A:Adversary,O:ARO) = {
   module ARO = {
     var qs:group set
@@ -104,21 +110,22 @@ module Bounder(A:Adversary,O:ARO) = {
   proc guess  = A'.guess
 }.
 
-(* Specializing and merging the hash function *)
+(* Specializing the hash function and merging it into the bounding wrapper *)
 module H:Hash = {
   proc init(): unit = { RO.init(); Bounder.ARO.qs = FSet.empty; }
-  proc hash(x:group): bits = { var y; y = RO.o(x); return y; }
+  proc hash = RO.o
 }.
 
-(* The initial scheme *)
+(* The initial scheme: Our construction applied to the ROM H *)
 module S = Hashed_ElGamal(H).
 
-(* Correctness result *)
+(** Correctness **)
 hoare Correctness: Correctness(S).main: true ==> res.
-proof. by proc; inline *; auto; progress; smt. qed.
+proof. by proc; inline*; auto; progress; smt. qed.
 
-(* The reduction *)
-module SCDH_from_CPA(A:Adversary,O:ARO): SCDH.Adversary = {
+(** Security **)
+(* Reduction *)
+module SCDH_from_CPA(A:Adversary,O:ARO): Top.SCDH.Adversary = {
   module BA = Bounder(A,O)
 
   proc solve(gx:group, gy:group): group set = {
@@ -133,7 +140,7 @@ module SCDH_from_CPA(A:Adversary,O:ARO): SCDH.Adversary = {
 }.
 
 (* We want to bound the probability of A winning CPA(Bounder(A,RO),S) in terms of
-   the probability of B = CDH_from_CPA(SCDH_from_CPA(A,RO)) winning CDH(B) *)
+   the probability of B = CDH_from_SCDH(SCDH_from_CPA(A,RO)) winning CDH(B) *)
 section.
   declare module A: Adversary {RO, Bounder}.
 
@@ -142,6 +149,7 @@ section.
 
   local module BA = Bounder(A,RO).
 
+  (* Inline the challenge encryption *)
   local module G0 = {
     var gxy:group
 
@@ -180,6 +188,7 @@ section.
     Pr[CPA(S,BA).main() @ &m: res] = Pr[G0.main() @ &m: res]
   by byequiv CPA_G0.
 
+  (* Replace the challenge hash with a random sampling *)
   local module G1 = { 
     var gxy : group
 
@@ -201,31 +210,33 @@ section.
     }
   }.
 
+  (* The equivalence is up to the adversary guessing the challenge *)
   local equiv G0_G1:
     G0.main ~ G1.main: ={glob A} ==> !(mem G1.gxy Bounder.ARO.qs){2} => ={res}.
   proof.
     proc.
+    (* Up until the hash call, the two games are equivalent *)
     seq  7  7: (={glob BA, x, y, b, m0, m1} /\ G0.gxy{1} = G1.gxy{2} /\
                 (Bounder.ARO.qs = dom RO.m){2}).
       rnd; call (_: ={glob Bounder, glob H} /\
                     (Bounder.ARO.qs = dom RO.m){2}).
         by proc; sp; if=> //; inline RO.o; wp; rnd; wp; skip; smt.
       by inline H.init RO.init; wp; do !rnd; wp; skip; smt.
-    call (_: (!mem G1.gxy Bounder.ARO.qs){2}
-            => ={glob A, Bounder.ARO.qs, c}
-            /\ eq_except RO.m{1} RO.m{2} G1.gxy{2}
-           ==> (!mem G1.gxy Bounder.ARO.qs){2}
-            => ={glob A, Bounder.ARO.qs, res}
-            /\ eq_except RO.m{1} RO.m{2} G1.gxy{2})=> //.
+    (* After that, the equivalence relation may be broken if the adversary queries g^(x*y) from the ROM *)
+    (* BUG: the invariant form of call raises an anomaly *)
+    call (_: (!mem G1.gxy Bounder.ARO.qs){2} =>
+             ={glob A, Bounder.ARO.qs, c} /\ eq_except RO.m{1} RO.m{2} G1.gxy{2}
+             ==>
+             (!mem G1.gxy Bounder.ARO.qs){2} =>
+             ={glob A, Bounder.ARO.qs, res} /\ eq_except RO.m{1} RO.m{2} G1.gxy{2})=> //.
       proc (mem G1.gxy Bounder.ARO.qs) (={Bounder.ARO.qs} /\ eq_except RO.m{1} RO.m{2} G1.gxy{2})=> //.
-        smt.
-        smt.
-        by apply guessL.
-        by proc; sp; if=> //; inline RO.o; wp; rnd; wp; skip; progress; smt.
-        by progress; proc; sp; if=> //; wp; call (RO_o_ll _); first smt.
-        progress; proc; sp; if=> //; wp; call (RO_o_ll _); first smt.
-        by skip; smt.
-    by inline H.hash RO.o; auto; progress; smt.
+        by move=> &1 &2 H /H.
+        by move=> &1 &2 H /H.
+        exact guessL.
+        by proc; sp; if=> //; inline *; auto; smt.
+        by move=> &2 bad; proc; sp; if=> //; wp; call (RO_o_ll _); first smt.
+        by move=> &1; proc; sp; if=> //; wp; call (RO_o_ll _); [ | skip]; smt.
+    by inline H.hash RO.o; auto; smt.
   qed.
 
   local lemma Pr_G0_G1 &m:
@@ -236,6 +247,7 @@ section.
     by rewrite Pr [mu_or]; smt.
   qed.
 
+  (* Make it clear that the result is independent from the adversary's message *)
   local module G2 = {
     var gxy : group
    
@@ -280,26 +292,30 @@ section.
     Pr[G1.main() @ &m: mem G1.gxy Bounder.ARO.qs] = Pr[G2.main() @ &m: mem G2.gxy Bounder.ARO.qs]
   by byequiv G1_G2.
 
+  (* G2 is clearly uniform random *)
   local lemma Pr_G2 &m: Pr[G2.main() @ &m: res] = 1%r / 2%r.
   proof.
     byphoare (_: true ==> _)=> //.
-    proc; rnd ((=) b').
-    call (_: true)=> //.
+    proc; rnd ((=) b')=> //=.
+    conseq* (_: _ ==> true); first smt.
+    call (_: true)=> //=.
       by apply guessL.
       by proc; sp; if=> //; wp; call (RO_o_ll _); first smt.
-    wp; rnd; call (_ : true).
+    wp; rnd; call (_ : true)=> //=.
       by apply chooseL.
       by proc; sp; if=> //; wp; call (RO_o_ll _); first smt.
-    by inline H.init RO.init; auto; progress; smt.
+    by inline H.init RO.init; auto; smt.
   qed.
 
-  local equiv G2_SCDH: G2.main ~ SCDH.SCDH(SCDH_from_CPA(A,RO)).main:
+  (** Final reduction **)
+  (* We add the bound on the number of ROM queries answered to facilitate the computation later on *)
+  local equiv G2_SCDH: G2.main ~ SCDH(SCDH_from_CPA(A,RO)).main:
     ={glob A} ==> (mem G2.gxy Bounder.ARO.qs){1} = res{2} /\ card Bounder.ARO.qs{1} <= qH.
   proof.
     proc.
     inline SCDH_from_CPA(A,RO).solve.
     swap{2} 5 -4.
-    rnd{1}; wp.  
+    rnd{1}; wp.
     seq  8  7: (={glob BA} /\
                 c{1} = (gy, h){2} /\
                 G2.gxy{1} = g ^ (x * y){2} /\
@@ -314,32 +330,30 @@ section.
       
   local lemma Pr_G2_SCDH &m : 
     Pr[G2.main() @ &m : mem G2.gxy Bounder.ARO.qs]
-    = Pr[SCDH.SCDH(SCDH_from_CPA(A,RO)).main() @ &m : res]
+    = Pr[SCDH(SCDH_from_CPA(A,RO)).main() @ &m : res]
   by byequiv G2_SCDH.
    
   local lemma Reduction &m :
     Pr[CPA(S,BA).main() @ &m : res] <=
-    1%r / 2%r + Pr[SCDH.SCDH(SCDH_from_CPA(A,RO)).main() @ &m : res].
+    1%r / 2%r + Pr[SCDH(SCDH_from_CPA(A,RO)).main() @ &m : res].
   proof. 
     rewrite (Pr_CPA_G0 &m).
-    apply (Trans _ (Pr[G1.main() @ &m : res] + Pr[G1.main() @ &m: mem G1.gxy Bounder.ARO.qs]));
+    apply (real_le_trans _ (Pr[G1.main() @ &m : res] + Pr[G1.main() @ &m: mem G1.gxy Bounder.ARO.qs]));
       first by apply (Pr_G0_G1 &m).
     by rewrite (Pr_G1_G2_res &m) (Pr_G2 &m) (Pr_G1_G2_coll &m) (Pr_G2_SCDH &m).
   qed.
 
-  lemma mult_inv_le_r (x y z:real) : 
-    0%r < x => (1%r / x) * y <= z => y <= x * z
-  by [].
-
   (** Composing reduction from CPA to SCDH with reduction from SCDH to CDH *)
   lemma Security &m :
       Pr[CPA(S,Bounder(A,RO)).main() @ &m: res] - 1%r / 2%r <= 
-      qH%r * Pr[CDH.CDH(SCDH.CDH_from_SCDH(SCDH_from_CPA(A,RO))).main() @ &m: res].
+      qH%r * Pr[CDH.CDH(CDH_from_SCDH(SCDH_from_CPA(A,RO))).main() @ &m: res].
   proof.
-    apply (Trans _ (Pr[SCDH.SCDH(SCDH_from_CPA(A,RO)).main() @ &m: res]));
+    apply (Trans _ (Pr[SCDH(SCDH_from_CPA(A,RO)).main() @ &m: res]));
       first smt.
-    apply mult_inv_le_r; first smt.
-    by apply (SCDH.Reduction (SCDH_from_CPA(A,RO)) &m); smt.
+    rewrite -(mul_compat_le (1%r/qH%r)) 1:smt.
+    rewrite !(Real.Comm.Comm _ (1%r/qH%r)) -Real.Assoc.Assoc -{2}inv_def (Real.Comm.Comm _ qH%r).
+    rewrite (_: forall x, qH%r * (inv qH%r) * x = x) 1:smt.
+    by rewrite (Top.SCDH.Reduction (SCDH_from_CPA(A,RO)) &m); smt.
   qed.
 end section.
 

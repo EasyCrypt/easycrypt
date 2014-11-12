@@ -234,6 +234,36 @@ by (elim xs=> //= x xs ->; rewrite ora_or).
 lemma anyb_any (p:'a -> bool) xs: anyb p xs <=> any p xs
 by (elim xs=> //= x xs ->; rewrite any_cons).
 
+(** find *)
+require import Option.
+op find (p:'a -> bool) (xs:'a list) =
+  with xs = "[]"      => None
+  with xs = (::) x xs => if p x then Some x else find p xs.
+
+lemma find_in (p:'a -> bool) (xs:'a list):
+  any p xs <=> find p xs <> None.
+proof.
+  rewrite -anyb_any; elim xs=> //= x xs IH.
+  by case (p x).
+qed.
+
+lemma find_nin (p:'a -> bool) (xs:'a list):
+  all (!p) xs <=> find p xs = None.
+proof.
+  rewrite -allb_all /Pred.([!]); elim xs=> //= x xs IH.
+  by case (p x).
+qed.
+
+lemma find_cor (p:'a -> bool) (xs:'a list) (a:'a):
+  find p xs = Some a =>
+  mem a xs /\ p a.
+proof.
+  move: a; elim xs=> //= x xs IH a.
+  case (p x)=> //=.
+    by move=> px /someI <-.
+    by move=> _ /IH [] -> ->.
+qed.
+
 (** filter *)
 op filter (p:'a -> bool) (xs:'a list) =
   with xs = "[]"      => []
@@ -328,7 +358,6 @@ by elim xs=> //= x xs IH acc; rewrite IH - ?appA.
 qed.
 
 (** nth *)
-require import Option.
 require import Pair.
 
 op nth (xs:'a list) n =
@@ -366,7 +395,7 @@ lemma nth_range (xs:'a list) n:
   0 <= n < length xs =>
   nth xs n <> None.
 proof strict.
-generalize n; elim xs=> //=; first smt.
+move: n; elim xs=> //=; first smt.
 intros=> x xs IH n n_range; case (n = 0)=> // neq0_n.
 by rewrite IH; smt.
 qed.

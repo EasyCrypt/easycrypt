@@ -1,0 +1,18 @@
+% --------------------------------------------------------------------
+\begin{tactic}{symmetry}
+  \begin{tsyntax}{symmetry}
+  In \prhl, swaps the two programs, transforming the pre and
+  postconditions by swapping the memories they refer to.
+
+  \textbf{Examples:} In the following, $\symrel{\cdot}$ inverses its
+  argument relation. (That is, for any relation $R$ and any $m_1$,
+  $m_2$, we have
+  $(m_1,m_2)\in{R}\Leftrightarrow(m_2,m_1)\in\symrel{R}$.)
+  $$
+  \inferrule*[left=(\prhl)]%%
+    {\pRHL{\symrel{P}}{c_2}{c_1}{\symrel{Q}}}%%
+    {\pRHL{P}{c_1}{c_2}{Q}}%%
+    \quad\raisebox{.7em}{\tct{symmetry}}
+  $$
+  \end{tsyntax}
+\end{tactic}

@@ -285,6 +285,7 @@ and pop_pattern = {
 type poperator = {
   po_kind   : [`Op | `Const];
   po_name   : psymbol;
+  po_aliases: psymbol list;
   po_tyvars : (psymbol * pqsymbol list) list option;
   po_def    : pop_def;
   po_ax     : psymbol option;
@@ -468,7 +469,7 @@ type phltactic =
   | Phrex_elim
   | Phrex_intro of pformula list
   | Pexfalso
-  | Pbydeno       of ([`PHoare | `Equiv ] * cfpattern)
+  | Pbydeno       of ([`PHoare | `Equiv ] * (cfpattern * bool * pformula option))
   | PPr           of (pformula * pformula) option
   | Pfel          of int * (pformula * pformula * pformula * pformula * pfel_spec_preds * pformula option)
   | Phoare
@@ -501,7 +502,7 @@ type rwarg = (tfocus located) option * rwarg1
 and rwarg1 =
   | RWDelta of (rwside * trepeat option * rwocc * pformula)
   | RWRw    of (rwside * trepeat option * rwocc * (rwside * ffpattern) list)
-  | RWPr    of psymbol
+  | RWPr    of (psymbol * pformula option)
   | RWDone  of bool
   | RWSimpl
   | RWSmt
@@ -547,6 +548,11 @@ type ppgoption = [
   | `Disjunctive
 ]
 
+type apply_info = [
+  | `ApplyIn of ffpattern * psymbol
+  | `Apply   of ffpattern list * [`Apply|`Exact]
+]
+
 type ppgoptions = (bool * ppgoption) list
 
 type logtactic =
@@ -555,8 +561,8 @@ type logtactic =
   | Psmt        of (pdbhint option * pprover_infos)
   | Pintro      of intropattern
   | Psplit
-  | Pfield	of psymbol list
-  | Pring 	of psymbol list
+  | Pfield	    of psymbol list
+  | Pring 	    of psymbol list
   | Palg_norm  
   | Pexists     of fpattern_arg located list
   | Pleft
@@ -564,7 +570,7 @@ type logtactic =
   | Ptrivial
   | Pcongr
   | Pelim       of (genpattern list * pqsymbol option)
-  | Papply      of (ffpattern * [`Apply of psymbol option | `Exact])
+  | Papply      of apply_info
   | Pcut        of (intropattern * pformula * ptactics located option)
   | Pcutdef     of (intropattern * pterm)
   | Pgeneralize of genpattern list

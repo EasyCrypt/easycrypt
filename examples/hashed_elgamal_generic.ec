@@ -4,7 +4,7 @@ require import Int.
 require import Real.
 require import FMap. 
 require import FSet.
-require import CDH.
+require (*--*) CDH.
 require (*--*) AWord.
 require (*--*) ROM.
 require (*--*) PKE.
@@ -35,7 +35,7 @@ op qH: int.
 axiom qH_pos: 0 < qH.
 
 (* Assumption *)
-clone Set_CDH as SCDH with
+clone import CDH.Set_CDH as SCDH with
   op n <- qH.
 
 import Group.
@@ -109,7 +109,7 @@ hoare Correctness: Correctness(S).main: true ==> res.
 proof. by proc; inline *; auto; progress; smt. qed.
 
 (* The reduction *)
-module SCDH_from_CPA(A:Adversary,O:Oracle): SCDH.Adversary = {
+module SCDH_from_CPA(A:Adversary,O:Oracle): Top.SCDH.Adversary = {
   module BA = A(Bound(O))
 
   proc solve(gx:group, gy:group): group set = {
@@ -352,7 +352,7 @@ section.
     by inline H.init RO.init; auto; progress; smt.
   qed.
 
-  local equiv G2'_SCDH: G2'.main ~ SCDH.SCDH(SCDH_from_CPA(A,RO)).main:
+  local equiv G2'_SCDH: G2'.main ~ SCDH(SCDH_from_CPA(A,RO)).main:
     ={glob A} ==> res{1} = res{2} /\ card Log.qs{1} <= qH.
   proof.
     proc.
@@ -373,12 +373,12 @@ section.
       
   local lemma Pr_G2'_SCDH &m : 
     Pr[G2'.main() @ &m: res]
-    = Pr[SCDH.SCDH(SCDH_from_CPA(A,RO)).main() @ &m : res]
+    = Pr[SCDH(SCDH_from_CPA(A,RO)).main() @ &m : res]
   by byequiv G2'_SCDH.
    
   local lemma Reduction &m :
     Pr[CPA(S,BA).main() @ &m : res] <=
-    1%r / 2%r + Pr[SCDH.SCDH(SCDH_from_CPA(A,RO)).main() @ &m : res].
+    1%r / 2%r + Pr[SCDH(SCDH_from_CPA(A,RO)).main() @ &m : res].
   proof. 
     rewrite (Pr_CPA_G0 &m).
     rewrite -(Pr_G1' &m) -(G1_G1' &m).
@@ -398,12 +398,12 @@ section.
   (** Composing reduction from CPA to SCDH with reduction from SCDH to CDH *)
   lemma Security &m:
       Pr[CPA(S,A(Bound(RO))).main() @ &m: res] - 1%r / 2%r <= 
-      qH%r * Pr[CDH.CDH(SCDH.CDH_from_SCDH(SCDH_from_CPA(A,RO))).main() @ &m: res].
+      qH%r * Pr[CDH.CDH(CDH_from_SCDH(SCDH_from_CPA(A,RO))).main() @ &m: res].
   proof.
-    apply (Trans _ (Pr[SCDH.SCDH(SCDH_from_CPA(A,RO)).main() @ &m: res]));
+    apply (Trans _ (Pr[SCDH(SCDH_from_CPA(A,RO)).main() @ &m: res]));
       first smt.
     apply mult_inv_le_r; first smt.
-    by apply (SCDH.Reduction (SCDH_from_CPA(A,RO)) &m); apply qH_pos.
+    by apply (Top.SCDH.Reduction (SCDH_from_CPA(A,RO)) &m); apply qH_pos.
   qed.
 end section.
 

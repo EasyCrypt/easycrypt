@@ -57,6 +57,10 @@ theory Square.
 end Square.
 export Square.
 
+lemma nosmt inv_def (x:real):
+  inv x = from_int 1 / x
+by [].
+
 lemma nosmt sign_inv (x:real):
   from_int 0 < x =>
   from_int 0 < inv x
@@ -87,6 +91,11 @@ lemma mulrM (x y z:real):
   x * z < y * z
 by [].
 
+lemma mul_compat_le (z x y:real):
+  from_int 0 < z =>
+  (x * z <= y * z <=> x <= y)
+by [].
+
 lemma nosmt addleM : forall (x1 x2 y1 y2:real),
    x1 <= x2 => y1 <= y2 => x1 + y1 <= x2 + y2 
 by [].
@@ -115,8 +124,17 @@ by [].
 lemma nosmt eq_le: forall (x y:real), x = y => x <= y
 by [].
 
-theory Exp.
+lemma nosmt inv_le (x y:real): from_int 0 < x => from_int 0 < y => y <= x => inv x <= inv y.
+proof.
+  move=> _ _ _.
+  rewrite -(mul_compat_le x); first trivial.
+  rewrite -(mul_compat_le y); first trivial.
+  cut H: ((x * inv x) * y <= (y * inv y) * x); last smt.
+  rewrite (Inverse y _); first smt.
+  by rewrite (Inverse x _); smt.
+qed.
 
+theory Exp.
   import why3 "real" "ExpLog"
     op "exp" as "exp".
   axiom exp_zero : exp (from_int 0) = from_int 1.
@@ -187,3 +205,32 @@ instance field with real
   proof ofint1    by smt
   proof ofintS    by smt
   proof ofintN    by smt.
+
+(* WARNING Lemmas used by tactics : 
+   eq_le addleM real_le_trans and the following lemmas *)
+lemma nosmt upto2_abs (x1 x2 x3 x4 x5:real):
+   FromInt.from_int 0 <= x1 => 
+   FromInt.from_int 0 <= x3 => 
+   x1 <= x5 => 
+   x3 <= x5 => 
+   x2 = x4 =>
+   `|x1 + x2 - (x3 + x4)| <= x5 by [].
+
+lemma nosmt upto2_notbad (ev1 ev2 bad1 bad2:bool) :
+  ((bad1 <=> bad2) /\ (!bad2 => (ev1 <=> ev2))) =>
+  ((ev1 /\ !bad1) <=> (ev2 /\ !bad2)) by [].
+
+lemma nosmt upto2_imp_bad (ev1 ev2 bad1 bad2:bool) :
+  ((bad1 <=> bad2) /\ (!bad2 => (ev1 <=> ev2))) =>
+  (ev1 /\ bad1) => bad2 by [].
+
+lemma nosmt upto_bad_false (ev bad2:bool) :
+  !((ev /\ !bad2) /\ bad2) by [].
+
+lemma nosmt upto_bad_or (ev1 ev2 bad2:bool) :
+   (!bad2 => ev1 => ev2) => ev1 =>
+    ev2 /\ !bad2 \/ bad2 by [].
+
+lemma nosmt upto_bad_sub (ev bad:bool) :
+  ev /\ ! bad => ev by [].
+

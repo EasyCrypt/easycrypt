@@ -9,7 +9,6 @@ open EcUtils
 open EcTypes
 open EcModules
 open EcMemory
-open EcEnv
 
 (* -------------------------------------------------------------------- *)
 include EcCoreFol

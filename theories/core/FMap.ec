@@ -43,16 +43,9 @@ axiom mem_dom (m:('a,'b) map) x:
   mem x (dom m) <=> m.[x] <> None.
 
 lemma dom_empty: dom empty<:'a,'b> = FSet.empty.
-proof strict.
+proof.
 apply set_ext=> x.
-by rewrite mem_dom get_empty /= mem_empty.
-qed.
-
-op in_dom (x:'a) (m:('a,'b) map) = mem x (dom m).
-
-lemma in_dom_empty x: !in_dom x empty<:'a,'b>.
-proof strict.
-by rewrite /in_dom mem_dom get_empty /=.
+by rewrite mem_dom get_empty mem_empty.
 qed.
 
 (** Range *)
@@ -75,16 +68,9 @@ pred (<=) (m1 m2:('a,'b) map) = forall x,
 lemma leq_dom (m1 m2:('a,'b) map):
   m1 <= m2 =>
   dom m1 <= dom m2.
-proof strict.
+proof.
 intros=> H x x_m1; rewrite mem_dom.
 by cut <-:= H x _=> //; rewrite -mem_dom.
-qed.
-
-lemma leq_in_dom (m1 m2:('a,'b) map) x:
-  m1 <= m2 =>
-  in_dom x m1 => in_dom x m2.
-proof strict.
-by rewrite /in_dom=> m1_m2; apply leq_dom.
 qed.
 
 lemma leq_rng (m1 m2:('a,'b) map):
@@ -102,14 +88,14 @@ by done.
 
 lemma nosmt leq_tran (m2 m1 m3:('a,'b) map):
   m1 <= m2 => m2 <= m3 => m1 <= m3.
-proof strict.
+proof.
 intros=> m1_m2 m2_m3 x x_m1.
 by rewrite m1_m2 2:m2_m3 2:(leq_dom m1 m2 _ x _).
 qed.
 
 lemma nosmt leq_asym (m1 m2:('a,'b) map):
   m1 <= m2 => m2 <= m1 => m1 == m2.
-proof strict.
+proof.
 intros=> m1_m2 m2_m1 x.
 case (m1.[x] <> None)=> /= x_m1.
   by rewrite m1_m2 1:mem_dom.
@@ -122,12 +108,12 @@ qed.
 op size (m:('a,'b) map) = card (dom m).
 
 lemma nosmt size_nneg (m:('a,'b) map): 0 <= size m.
-proof strict.
+proof.
 by rewrite /size card_def List.length_nneg.
 qed.
 
 lemma nosmt size_empty: size empty<:'a,'b> = 0.
-proof strict.
+proof.
 by rewrite /size dom_empty card_empty.
 qed.
 
@@ -152,30 +138,11 @@ by (rewrite -neqF get_rm=> ->).
 
 lemma dom_rm (m:('a,'b) map) x:
   dom (rm x m) = rm x (dom m).
-proof strict.
+proof.
 apply set_ext=> x'; rewrite mem_dom get_rm mem_rm;
 case (x = x').
   by intros=> <-.
   by rewrite eq_sym mem_dom=> ->.
-qed.
-
-lemma in_dom_rm (m:('a,'b) map) x x':
-  in_dom x (rm x' m) = (in_dom x m /\ x <> x').
-proof strict.
-by rewrite /in_dom dom_rm mem_rm.
-qed.
-
-lemma in_dom_rm_eq (m:('a,'b) map) x:
-  !in_dom x (rm x m).
-proof strict.
-by rewrite /in_dom mem_dom get_rm.
-qed.
-
-lemma in_dom_rm_neq (m:('a,'b) map) x x':
-  x <> x' =>
-  in_dom x (rm x' m) = in_dom x m.
-proof strict.
-by intros=> x_x'; rewrite in_dom_rm x_x'.
 qed.
 
 lemma rng_rm (m:('a,'b) map) x y:
@@ -190,25 +157,25 @@ proof.
 qed.
 
 lemma size_rm (m:('a,'b) map) x:
-  size (rm x m) = if in_dom x m then size m - 1 else size m.
-proof strict.
-rewrite /size dom_rm; case (in_dom x m)=> x_m.
+  size (rm x m) = if mem x (dom m) then size m - 1 else size m.
+proof.
+rewrite /size dom_rm; case (mem x (dom m))=> x_m.
   by rewrite card_rm_in.
   by rewrite card_rm_nin.
 qed.
 
 lemma nosmt size_rm_in (m:('a,'b) map) x:
-  in_dom x m =>
+  mem x (dom m) =>
   size (rm x m) = size m - 1.
-proof strict.
+proof.
 by rewrite /size dom_rm=> x_m;
    rewrite card_rm_in.
 qed.
 
 lemma nosmt size_rm_nin (m:('a,'b) map) x:
-  !in_dom x m =>
+  !mem x (dom m) =>
   size (rm x m) = size m.
-proof strict.
+proof.
 by rewrite /size dom_rm=> x_m;
    rewrite card_rm_nin.
 qed.
@@ -239,38 +206,24 @@ qed.
 
 lemma dom_set (m:('a,'b) map) x y:
   dom (m.[x <- y]) = add x (dom m).
-proof strict.
+proof.
 apply set_ext=> x'; rewrite mem_add; case (x = x').
-  by intros=> <-; rewrite mem_dom get_set.
+  by move=> <-; rewrite mem_dom get_set.
   by rewrite -neqF=> x_x'; rewrite (eq_sym x') 2!mem_dom get_set_neq ?x_x'.
 qed.
 
 lemma nosmt dom_set_in (m:('a,'b) map) x y:
   mem x (dom m) =>
   dom (m.[x <- y]) = dom m.
-proof strict.
-by intros=> x_m; rewrite dom_set -add_in_id.
+proof.
+by move=> x_m; rewrite dom_set -add_in_id.
 qed.
 
-lemma in_dom_set (m:('a,'b) map) x y x':
-  in_dom x' (m.[x <- y]) = (in_dom x' m \/ x' = x).
-proof strict.
-by rewrite /in_dom -mem_add; congr=> //; apply dom_set.
-qed.
-
-lemma nosmt in_dom_set_in (m:('a,'b) map) x y:
-  in_dom x m =>
-  forall x', in_dom x' (m.[x <- y]) <=> in_dom x' m.
-proof strict.
-by rewrite /in_dom=> x'_m; rewrite dom_set_in.
-qed.
-
-lemma nosmt in_dom_set_nin (m:('a,'b) map) x y x':
-  !in_dom x' m =>
-  (in_dom x' (m.[x <- y]) <=> x' = x).
-proof strict.
-by rewrite /in_dom=> x_m;
-   rewrite dom_set mem_add (_: mem x' (dom m) = false) 1:neqF.
+lemma nosmt dom_set_nin (m:('a,'b) map) x y x':
+  !mem x' (dom m) =>
+  (mem x' (dom (m.[x <- y])) <=> x' = x).
+proof.
+by rewrite dom_set mem_add=> ->.
 qed.
 
 lemma rng_set (m:('a,'b) map) x y:
@@ -286,25 +239,25 @@ proof.
 qed.
 
 lemma size_set (m:('a,'b) map) x y:
-  size m.[x <- y] = if in_dom x m then size m else size m + 1.
-proof strict.
-rewrite /size dom_set; case (in_dom x m)=> x_m.
+  size m.[x <- y] = if mem x(dom m) then size m else size m + 1.
+proof.
+rewrite /size dom_set; case (mem x (dom m))=> x_m.
   by rewrite card_add_in.
   by rewrite card_add_nin.
 qed.
 
 lemma nosmt size_set_in (m:('a,'b) map) x y:
-  in_dom x m =>
+  mem x (dom m) =>
   size m.[x <- y] = size m.
-proof strict.
+proof.
 by rewrite /size dom_set=> x_m;
    rewrite card_add_in.
 qed.
 
 lemma nosmt size_set_nin (m:('a,'b) map) x y:
-  !in_dom x m =>
+  !mem x (dom m) =>
   size m.[x <- y] = size m + 1.
-proof strict.
+proof.
 by rewrite /size dom_set=> x_m;
    rewrite card_add_nin.
 qed.
@@ -312,7 +265,7 @@ qed.
 lemma set_set (m:('a,'b) map) x x' y y':
   m.[x <- y].[x' <- y'] = if x = x' then m.[x' <- y']
                                     else m.[x' <- y'].[x <- y].
-proof strict.
+proof.
 apply map_ext=> x0; case (x = x').
   intros=> ->; case (x' = x0).
     by intros=> ->; rewrite 2!get_set_eq.
@@ -354,13 +307,13 @@ axiom existb_exist (p:'a -> 'b -> bool) (m:('a,'b) map):
 
 lemma not_exist_all (p:'a -> 'b -> bool) (m:('a,'b) map):
   (!exist p m) = all (fun x y, !(p x y)) m.
-proof strict.
+proof.
 by rewrite eq_iff /exist /Top.all; split; smt.
 qed.
 
 lemma not_existb_allb (p:'a -> 'b -> bool) (m:('a,'b) map):
   (!existb p m) = allb (fun x y, !(p x y)) m.
-proof strict.
+proof.
 by rewrite existb_exist allb_all not_exist_all.
 qed.
 
@@ -368,7 +321,7 @@ lemma all_set_all_in (p:'a -> 'b -> bool) (m:('a,'b) map) x y:
   all p m =>
   p x y =>
   all p m.[x <- y].
-proof strict.
+proof.
 intros=> p_m p_xy a; case (x = a).
   by intros=> <- _; rewrite get_set_eq oget_some.
   intros=> a_x; rewrite get_set_neq // dom_set mem_add (_: (a = x) = false) 1:(eq_sym a) 1:neqF //= => a_m.
@@ -378,15 +331,20 @@ qed.
 (* find *) (* Reduce the axiomatization *)
 op find: ('a -> 'b -> bool) -> ('a,'b) map -> 'a option.
 
-axiom find_in (p:'a -> 'b -> bool) (m:('a,'b) map):
-  exist p m => find p m <> None.
-
 axiom find_nin (p:'a -> 'b -> bool) m:
-  all (fun x y, !p x y) m => find p m = None.
+  all (fun x y, !p x y) m <=> find p m = None.
 
 axiom find_cor (p:'a -> 'b -> bool) m x:
   find p m = Some x =>
   mem x (dom m) /\ p x (oget m.[x]).
+
+lemma find_in (p:'a -> 'b -> bool) (m:('a,'b) map):
+  exist p m <=> find p m <> None.
+proof.
+  case {-1}(find p m) (Logic.eq_refl (find p m))=> //=.
+    by rewrite -find_nin; smt. (* de Morgan *)
+    by move=> x /find_cor found; exists x.
+qed.
 
 (* filter *)
 op filter: ('a -> 'b -> bool) -> ('a,'b) map -> ('a,'b) map.
@@ -401,20 +359,20 @@ proof. by apply map_ext=> x;smt. qed.
 lemma nosmt get_filter_nin f (m:('a,'b) map) x:
   !mem x (dom m) =>
   (filter f m).[x] = m.[x].
-proof strict.
+proof.
 by rewrite get_filter mem_dom /= => ->.
 qed.
 
 lemma dom_filter f (m:('a,'b) map):
   dom (filter f m) = filter (fun x, f x (oget m.[x])) (dom m).
-proof strict.
+proof.
 by apply set_ext=> x; rewrite mem_dom get_filter mem_filter mem_dom /=;
    case (f x (oget m.[x])).
 qed.
 
 lemma dom_filter_fst f (m:('a,'b) map):
   dom (filter (fun x y, f x) m) = filter f (dom m).
-proof strict.
+proof.
   cut:= dom_filter (fun x (y:'b), f x) m => //= ->.
   by congr=> //=; apply ExtEq.fun_ext.
 qed.
@@ -426,7 +384,7 @@ by (rewrite dom_filter mem_filter).
 
 lemma leq_filter f (m:('a,'b) map):
   filter f m <= m.
-proof strict.
+proof.
 by rewrite /Top.(<=)=> x x_in_f; rewrite get_filter;
    cut:= mem_dom_filter f m x _; last intros=> [_ ->].
 qed.
@@ -434,7 +392,7 @@ qed.
 lemma filter_set_true f (m:('a,'b) map) x y:
   f x y =>
   filter f m.[x <- y] = (filter f m).[x <- y].
-proof strict.
+proof.
 intros=> f_xy; apply map_ext=> a.
 case (x = a).
   by intros=> <-; rewrite get_filter 2!get_set_eq /oget //= f_xy.
@@ -444,7 +402,7 @@ qed.
 lemma filter_set_false f (m:('a,'b) map) x y:
   !f x y =>
   filter f m.[x <- y] = rm x (filter f m).
-proof strict.
+proof.
 rewrite -neqF=> not_f_xy; apply map_ext=> a.
 case (x = a).
   by intros=> <-; rewrite get_filter get_set_eq /oget //= not_f_xy get_rm.
@@ -474,7 +432,7 @@ lemma eq_except_set1_eq (m1 m2:('a,'b) map) x y:
 by [].
 
 lemma eq_except_in_dom (m1 m2:('a, 'b) map) (x y:'a) :
-  eq_except m1 m2 x => x <> y => (in_dom y m1 <=> in_dom y m2) 
+  eq_except m1 m2 x => x <> y => (mem y (dom m1) <=> mem y (dom m2))
 by [].
 
 lemma eq_except_set2 (m1 m2:('a,'b) map) x x' y1 y2:
@@ -490,38 +448,6 @@ proof.
     by rewrite !get_set; case (x' = x0)=> //= _; apply m1_eqe_m2_x.
 qed.
 
-(*
-lemma eq_except_set_eq (m1 m2:('a,'b) map) x y:
-  eq_except m1 m2 x =>
-  mem x (dom m1) =>
-  m2.[x] = Some y =>
-  m1.[x <- y] = m2.
-proof strict.
-rewrite eq_except_def=> eqe x_ndom_m1 m2x.
-apply map_ext=> x'; rewrite get_set; case (x = x').
-  by intros=> <-; rewrite m2x.
-  by apply eqe.
-qed.
-*)
-
-(* (* This is the way eq_except is most likely to be used: preservation of eq_except in ROMs *)
-lemma eq_except_ROM (m1 m2:('a,'b) map) x0 x y0 y:
-  let m1' = if !mem x0 (dom m1) then m1.[x0 <- (x0 = x) ? y : y0] else m1 in
-  let m2' = if !mem x0 (dom m2) then m2.[x0 <- y0] else m2 in
-  (if mem x (dom m1) then m1 = m2 else eq_except m1 m2 x) =>
-  m2.[x] = Some y0 =>
-  (if mem x (dom m1) then m1' = m2' else eq_except m1' m2' x).
-proof strict.
-progress.
-  smt.
-  smt.
-  cut:= H; rewrite (_: (mem x (dom m1)) = false) 1:neqF //=.
-  rewrite eq_except_def allb_all /Top.all //= => {H} H x'.
-    intros=> ->; rewrite H1 /= 1:(_: (!mem x (dom m2)) = false) 1:mem_dom 1:H0 //=.
-    by cut:= H; rewrite H1.
-    smt.
-*)  
-
 (* map *)
 op map: ('b -> 'c) -> ('a,'b) map -> ('a,'c) map.
 
@@ -535,13 +461,13 @@ lemma map_set (f:'b -> 'c) (m:('a,'b) map) (x:'a) y:
   map f (m.[x <- y]) = (map f m).[x <- f y].
 proof. by apply map_ext;intros x';case (x = x');smt. qed.
 
-lemma in_dom_map (f:'b -> 'c) (m:('a,'b) map) (x:'a) :
-   in_dom x (map f m) = in_dom x m.
-proof. by simplify in_dom;rewrite !mem_dom get_map;smt. qed.
+lemma dom_map (f:'b -> 'c) (m:('a,'b) map):
+   dom (map f m) = dom m.
+proof. by apply set_ext=> x; rewrite !mem_dom get_map; case (m.[x]). qed.
 
 lemma mem_rng_map (f:'b -> 'c) (m:('a,'b) map) (y:'c):
   mem y (rng (map f m)) = exists x, omap f m.[x] = Some y
-by smt.
+by [].
 
 op mapi: ('a -> 'b -> 'c) -> ('a,'b) map -> ('a,'c) map.
 
@@ -555,7 +481,7 @@ op lamo (m:('a,'b) map) = "_.[_]" m.
 
 lemma lamo_map (f:'b -> 'c) (m:('a,'b) map):
   lamo (map f m) = fun x, (omap f) ((lamo m) x).
-proof strict.
+proof.
 apply ExtEq.fun_ext=> x //=.
 by rewrite /lamo /lamo get_map; elim/option_ind m.[x].
 qed.

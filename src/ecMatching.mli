@@ -138,7 +138,7 @@ exception InvalidPosition
 exception InvalidOccurence
 
 module FPosition : sig
-  type select = [`Accept of int | `Reject | `Continue]
+  type select = [`Accept of int | `Continue]
 
   val empty : ptnpos
 
@@ -146,9 +146,9 @@ module FPosition : sig
 
   val tostring : ptnpos -> string
 
-  val select : ?o:occ -> (Sid.t -> int list -> form -> select) -> form -> ptnpos
+  val select : ?o:occ -> (Sid.t -> form -> select) -> form -> ptnpos
 
-  val select_form : ?posf:int -> LDecl.hyps -> occ option -> form -> form -> ptnpos
+  val select_form : LDecl.hyps -> occ option -> form -> form -> ptnpos
 
   val is_occurences_valid : Sint.t -> ptnpos -> bool
 

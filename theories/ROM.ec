@@ -63,7 +63,7 @@ theory Lazy.
     proc o(x:from):to = {
       var y:to;
       y = $dsample x;
-      if (!in_dom x m) m.[x] = y;
+      if (!mem x (dom m)) m.[x] = y;
       return oget (m.[x]);
     }
   }.
@@ -201,7 +201,7 @@ theory LazyEager.
         proc o(x:from):to = {
           var y:to;
           y = $dsample x;
-          if (!in_dom x m) m.[x] = y;
+          if (!mem x (dom m)) m.[x] = y;
           return oget (m.[x]);
         }
       }
@@ -216,7 +216,7 @@ theory LazyEager.
         {
           f = pick work;
           y = $dsample f;
-          if (!in_dom f H.m) H.m.[f] = y;
+          if (!mem f (dom H.m)) H.m.[f] = y;
           work = rm f work;
         }
       }
@@ -268,7 +268,7 @@ theory LazyEager.
         {
           f = pick work;
           y = $dsample f;
-          if (!in_dom f H.m) H.m.[f] = y;
+          if (!mem f (dom H.m)) H.m.[f] = y;
           work = rm f work;
         }
       }
@@ -301,13 +301,13 @@ theory LazyEager.
                 IND_Eager.H.m{1} = IND_Lazy.H.m{2} /\
                 mem x{1} work{1});
         first by auto; smt.
-      case (!in_dom x{2} IND_Lazy.H.m{2}); [rcondt{2} 2; first by auto |
+      case (!mem x{2} (dom IND_Lazy.H.m{2})); [rcondt{2} 2; first by auto |
                                             rcondf{2} 2; first by auto].
         transitivity{1} {y0 = $dsample x;
                          while (work <> FSet.empty) {
                            f = pick work;
                            y = $dsample f;
-                           if (!in_dom f IND_Eager.H.m)
+                           if (!mem f (dom IND_Eager.H.m))
                              IND_Eager.H.m.[f] = if f = x then y0 else y;
                            work = rm f work;
                          }
@@ -316,13 +316,13 @@ theory LazyEager.
                          ((={x,work} /\
                           IND_Eager.H.m{1} = IND_Lazy.H.m{2} /\
                           mem x{1} work{1}) /\
-                          !in_dom x{2} IND_Lazy.H.m{2} ==>
+                          !mem x{2} (dom IND_Lazy.H.m{2}) ==>
                           ={result} /\ IND_Eager.H.m{1} = IND_Lazy.H.m{2}) => //.
           by move=> &1 &2 H; exists IND_Lazy.H.m{2}, x{2}, work{2}; generalize H.
         transitivity{1} {while (work <> FSet.empty) {
                            f = pick work;
                            y = $dsample f;
-                           if (!in_dom f IND_Eager.H.m)
+                           if (!mem f (dom IND_Eager.H.m))
                              IND_Eager.H.m.[f] = y;
                            work = rm f work;
                          }
@@ -341,9 +341,9 @@ theory LazyEager.
           by sim.
 
         wp; while (={x, work} /\
-                   (!mem x work => in_dom x IND_Eager.H.m){1} /\
+                   (!mem x work => mem x (dom IND_Eager.H.m)){1} /\
                    IND_Lazy.H.m.[x]{2} = Some y0{1} /\
-                   if (in_dom x IND_Eager.H.m){1}
+                   if (mem x (dom IND_Eager.H.m)){1}
                    then IND_Eager.H.m{1} = IND_Lazy.H.m{2}
                    else eq_except IND_Eager.H.m{1} IND_Lazy.H.m{2} x{1}).
           (* "expect 12 (move)" is used for catching changes in tactic behaviour early *)
@@ -355,7 +355,7 @@ theory LazyEager.
 
       wp; while (={x,work} /\
                  IND_Eager.H.m{1} = IND_Lazy.H.m{2} /\
-                 in_dom x{2} IND_Lazy.H.m{2} /\ 
+                 mem x{2} (dom IND_Lazy.H.m{2}) /\
                  oget IND_Eager.H.m.[x]{1} = result{2}).
          by auto; smt.
       by auto; smt.
@@ -384,11 +384,11 @@ theory LazyEager.
       equiv [IND_Eager.main ~ IND(Eager.RO,D).main: ={glob D} ==> ={res}].
     proof.
       move=> fromF dsampleL; proc.
-      call (_: (forall x, in_dom x IND_Eager.H.m{1}) /\ IND_Eager.H.m{1} = Eager.RO.m{2});
+      call (_: (forall x, mem x (dom IND_Eager.H.m{1})) /\ IND_Eager.H.m{1} = Eager.RO.m{2});
         first by proc; skip; smt.
       inline RO.init IND_Eager.resample.
       while (={work} /\
-             (forall x, !in_dom x IND_Eager.H.m{1} <=>
+             (forall x, !mem x (dom IND_Eager.H.m{1}) <=>
                         mem x work{1}) /\ IND_Eager.H.m{1} = Eager.RO.m{2}).
         by auto; progress; smt.
       by auto; smt.

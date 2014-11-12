@@ -18,20 +18,23 @@ setup.log
 /system/callprover
 /system/callprover.exe
 
-/doc/*.aux
-/doc/*.bbl
-/doc/*.blg
-/doc/*.brf
-/doc/*.fdb_latexmk
-/doc/*.fls
-/doc/*.idx
-/doc/*.ilg
-/doc/*.ind
-/doc/*.log
-/doc/*.out
-/doc/*.toc
+*.aux
+*.bbl
+*.blg
+*.brf
+*.fdb_latexmk
+*.fls
+*.idx
+*.ilg
+*.ind
+*.log
+*.out
+*.toc
+*.synctex.gz
+*.kilepr
 
-/doc/easycrypt.pdf
+/doc/refman/easycrypt.pdf
+/doc/userman/easycrypt.pdf
 
 /extraction/Makefile
 /extraction/setup.*

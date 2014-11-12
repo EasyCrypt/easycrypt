@@ -1,0 +1,112 @@
+% --------------------------------------------------------------------
+\section{Tactics}
+
+\subsection{Ambient logic}
+
+\input{tactics/idtac.tex}
+\input{tactics/move.tex}
+\input{tactics/clear.tex}
+\input{tactics/done.tex}
+\input{tactics/apply.tex}
+\input{tactics/exact.tex}
+\input{tactics/assumption.tex}
+\input{tactics/pose.tex}
+\input{tactics/cut.tex}
+
+\input{tactics/rewrite.tex}
+\input{tactics/rwnormal.tex}
+\input{tactics/subst.tex}
+
+\input{tactics/split.tex}
+\input{tactics/left.tex}
+\input{tactics/right.tex}
+
+\input{tactics/case.tex}
+\input{tactics/elim.tex}
+
+\input{tactics/change.tex}
+\input{tactics/simplify.tex}
+\input{tactics/progress.tex}
+
+\input{tactics/beta.tex}
+\input{tactics/delta.tex}
+\input{tactics/zeta.tex}
+\input{tactics/iota.tex}
+\input{tactics/logic.tex}
+
+\input{tactics/reflexivity.tex}
+
+\input{tactics/ringeq.tex}
+\input{tactics/fieldeq.tex}
+\input{tactics/algebra.tex}
+\input{tactics/congr.tex}
+
+\input{tactics/trivial.tex}
+\input{tactics/smt.tex}
+
+\input{tactics/admit.tex}
+
+\subsection{Program Logic}
+
+Judgments in the program logics may refer to procedures or
+statements. Whenever the context allows both, we use $c$ to denote
+programs, using $f$ when only judgments on procedures are allowed by
+the context, and $s$ when only judgments on statements are allowed.
+
+TODO: define \tct{<spec>}, \tct{<lemma>}, \tct{<prhl>}, \tct{<phl>}, \tct{<hl>}.
+
+\paragraph{Reasoning on Specifications}
+\input{tactics/symmetry.tex}
+\input{tactics/transitivity.tex}
+\input{tactics/conseq.tex}
+\input{tactics/byequiv.tex}
+\input{tactics/byphoare.tex}
+\input{tactics/hoare.tex}
+\input{tactics/bypr.tex}
+\input{tactics/exfalso.tex}
+%\input{tactics/pr_bounded.tex}
+
+\paragraph{Reasoning on Programs}
+Unless specified, the following program logic tactics operate on a
+program's last instruction. Although we describe these tactics as if
+they operated on single instructions, their practical implementation
+automatically and implicitly applies tactic \rtactic{seq} to deal with
+context when necessary.
+
+\medskip
+
+\input{tactics/skip.tex}
+\input{tactics/seq.tex}
+\input{tactics/sp.tex}
+\input{tactics/wp.tex}
+\input{tactics/rnd.tex}
+\input{tactics/if.tex}
+\input{tactics/while.tex}
+\input{tactics/call.tex}
+\input{tactics/proc.tex}
+
+
+\paragraph{Transforming Programs}
+\input{tactics/swap.tex}
+\input{tactics/inline.tex}
+
+\input{tactics/rcondf.tex}
+\input{tactics/rcondt.tex}
+
+\input{tactics/splitwhile.tex}
+\input{tactics/unroll.tex}
+\input{tactics/fission.tex}
+\input{tactics/fusion.tex}
+
+\input{tactics/alias.tex}
+\input{tactics/cfold.tex}
+\input{tactics/kill.tex}
+\input{tactics/modpath.tex}
+
+\paragraph{Automated Tactics}
+\input{tactics/auto.tex}
+\input{tactics/sim.tex}
+
+\paragraph{Advanced Tactics}
+\input{tactics/eager.tex}
+\input{tactics/fel.tex}

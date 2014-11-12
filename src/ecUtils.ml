@@ -228,6 +228,12 @@ let tg_map f (Tagged (x, t)) = Tagged (f x, t)
 let notag x = Tagged (x, None)
 
 (* -------------------------------------------------------------------- *)
+let iterop (op : 'a -> 'a) (n : int) (x : 'a) =
+  let rec doit n x = if n <= 0 then x else doit (n-1) (op x) in
+  if n < 0 then invalid_arg "[iterop]: n < 0";
+  doit n x
+
+(* -------------------------------------------------------------------- *)
 module Counter : sig
   type t
 

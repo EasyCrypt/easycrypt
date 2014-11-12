@@ -24,12 +24,15 @@ type engine  = ptactic_core -> backward
 (* -------------------------------------------------------------------- *)
 type cut_t    = intropattern * pformula * (ptactics located) option
 type cutdef_t = intropattern * pterm
-type apply_t  = ffpattern * [`Apply of psymbol option | `Exact]
+type apply_t  = EcParsetree.apply_info
 
 (* -------------------------------------------------------------------- *)
 module LowApply : sig
+  val t_apply_bwd_r : pt_ev -> backward
   val t_apply_bwd : proofterm -> backward
 end
+
+val t_apply_pt : pt -> backward
 
 (* -------------------------------------------------------------------- *)
 module LowRewrite : sig
@@ -44,11 +47,16 @@ module LowRewrite : sig
   val find_rewrite_pattern:
     rwside -> LDecl.hyps -> pt_ev -> pt_ev * (form * form)
 
+  val t_rewrite_r:
+    rwside * EcMatching.occ option -> pt_ev -> backward
+
   val t_rewrite:
     rwside * EcMatching.occ option -> proofterm -> backward
 
   val t_autorewrite: EcPath.path list -> backward
 end
+
+val t_rewrite_pt : rwside * EcMatching.occ option -> pt -> backward
 
 (* -------------------------------------------------------------------- *)
 val process_reflexivity : backward

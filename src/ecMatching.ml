@@ -244,7 +244,7 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
 
           | Some (`Set a) -> begin
               let ssbj = Fsubst.f_subst subst subject in
-              if not (EcReduction.is_alpha_eq hyps ssbj a) then
+              if not (EcReduction.is_conv hyps ssbj a) then
                 raise MatchFailure;
               try  EcUnify.unify env ue ptn.f_ty subject.f_ty
               with EcUnify.UnificationFailure _ -> raise MatchFailure
@@ -297,7 +297,7 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
 
       | _, _ ->
         let subject = Fsubst.f_subst subst subject in
-          if not (EcReduction.is_alpha_eq hyps ptn subject) then
+          if not (EcReduction.is_conv hyps ptn subject) then
             raise MatchFailure
 
     with MatchFailure when opts.fm_delta ->
@@ -437,7 +437,7 @@ exception InvalidPosition
 exception InvalidOccurence
 
 module FPosition = struct
-  type select = [`Accept of int | `Reject | `Continue]
+  type select = [`Accept of int | `Continue]
 
   (* ------------------------------------------------------------------ *)
   let empty : ptnpos = Mint.empty
@@ -504,9 +504,8 @@ module FPosition = struct
   (* ------------------------------------------------------------------ *)
   let select ?o test =
     let rec doit1 ctxt pos fp =
-      match test ctxt pos fp with
+      match test ctxt fp with
       | `Accept i -> Some (`Select i)
-      | `Reject   -> None
       | `Continue -> begin
         let subp =
           match fp.f_node with
@@ -585,23 +584,19 @@ module FPosition = struct
             filter o cpos
 
   (* ------------------------------------------------------------------ *)
-  let select_form ?posf hyps o p target =
+  let select_form hyps o p target =
     let na = List.length (snd (EcFol.destr_app p)) in
-    let test _ pos tp =
-      match posf, pos with
-      | Some _, ([] | [_]) -> `Continue
-      | Some posf, [x; 0] when x <> posf -> `Reject
-      | _ ->
-        let (tp, ti) =
-          match tp.f_node with
-          | Fapp (h, hargs) when List.length hargs > na ->
-              let (a1, a2) = List.take_n na hargs in
-                (f_app h a1 (toarrow (List.map f_ty a2) tp.f_ty), na)
-          | _ -> (tp, -1)
-        in
-          if EcReduction.is_alpha_eq hyps p tp then `Accept ti else `Continue
-    in
-      select ?o test target
+    let test _ tp =
+      let (tp, ti) =
+        match tp.f_node with
+        | Fapp (h, hargs) when List.length hargs > na ->
+            let (a1, a2) = List.take_n na hargs in
+              (f_app h a1 (toarrow (List.map f_ty a2) tp.f_ty), na)
+        | _ -> (tp, -1)
+      in
+        if EcReduction.is_alpha_eq hyps p tp then `Accept ti else `Continue
+
+    in select ?o test target
 
   (* ------------------------------------------------------------------ *)
   let map (p : ptnpos) (tx : form -> form) (f : form) =

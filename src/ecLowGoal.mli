@@ -24,6 +24,9 @@ type side    = [`Left|`Right]
 type lazyred = EcProofTyping.lazyred
 
 (* -------------------------------------------------------------------- *)
+val (@!) : FApi.backward -> FApi.backward -> FApi.backward
+val (@+) : FApi.backward -> FApi.backward list -> FApi.backward
+
 val t_admit : FApi.backward
 val t_true  : FApi.backward
 val t_fail  : FApi.backward
@@ -31,10 +34,10 @@ val t_id    : FApi.backward
 
 (* -------------------------------------------------------------------- *)
 val alpha_find_in_hyps : EcEnv.LDecl.hyps -> EcFol.form -> EcIdent.t
-val t_assumption    : [`Alpha | `Conv] -> FApi.backward
-val t_absurd_hyp    : ?id:EcIdent.t -> FApi.backward
-val t_logic_trivial : FApi.backward
-val t_trivial       : FApi.backward option -> FApi.backward
+val t_assumption       : [`Alpha | `Conv] -> FApi.backward
+val t_absurd_hyp       : ?conv:xconv -> ?id:EcIdent.t -> FApi.backward
+val t_logic_trivial    : FApi.backward
+val t_trivial          : FApi.backward option -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
 val t_simplify : ?delta:bool -> FApi.backward

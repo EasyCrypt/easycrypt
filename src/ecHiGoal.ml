@@ -194,6 +194,13 @@ module LowRewrite = struct
     match EcFol.sform_of_form ax with
     | EcFol.SFeq  (f1, f2) -> (pt, (f1, f2))
     | EcFol.SFiff (f1, f2) -> (pt, (f1, f2))
+
+    | EcFol.SFnot f ->
+        let pt' = pt_of_global_r pt.ptev_env LG.p_negeqF [] in
+        let pt' = apply_pterm_to_arg_r pt' (PVAFormula f) in
+        let pt' = apply_pterm_to_arg_r pt' (PVASub pt) in
+        (pt', (f, f_false))
+
     | _ -> begin
       match TTC.destruct_product hyps ax with
       | None ->
@@ -249,6 +256,9 @@ module LowRewrite = struct
 
       t_do_r ~focus:0 `Maybe None (t_ors (List.map try1 pts)) !@tc
 end
+
+let t_rewrite_pt info pt tc = 
+  LowRewrite.t_rewrite_r info (build_pt_ev pt tc) tc
 
 (* -------------------------------------------------------------------- *)
 let process_rewrite1_core (s, o) pt tc =
@@ -309,7 +319,7 @@ let process_delta (s, o, p) tc =
     if matches then begin
       let p    = concretize_form ptenv p in
       let cpos =
-        let test = fun _ _ fp ->
+        let test = fun _ fp ->
           let fp =
             match fp.f_node with
             | Fapp (h, hargs) when List.length hargs > na ->
@@ -435,7 +445,7 @@ let rec process_rewrite1 ttenv ri tc =
       | Some (b, n) -> t_do b n doall tc
   end
 
-  | RWPr x -> EcPhlPrRw.t_pr_rewrite (unloc x) tc
+  | RWPr (x,f) -> EcPhlPrRw.t_pr_rewrite (unloc x, f) tc
 
   | RWSmt ->
       process_smt ttenv (None, empty_pprover) tc
@@ -841,6 +851,9 @@ module LowApply = struct
     t_apply_bwd_r { ptev_env = ptenv; ptev_pt = pt; ptev_ax = ax; } tc
 end
 
+let t_apply_pt pt tc = 
+  LowApply.t_apply_bwd_r (build_pt_ev pt tc) tc
+
 (* -------------------------------------------------------------------- *)
 let process_apply_bwd mode (ff : ffpattern) (tc : tcenv1) =
   try
@@ -898,13 +911,16 @@ let process_apply_fwd (pe, hyp) tc =
     tc_error !!tc "cannot apply lemma"
 
 (* -------------------------------------------------------------------- *)
-type apply_t = ffpattern * [`Apply of psymbol option | `Exact]
+type apply_t = EcParsetree.apply_info
 
-let process_apply (pe, tg) tc =
-  match tg with
-  | `Exact           -> process_apply_bwd `Exact pe tc
-  | `Apply None      -> process_apply_bwd `Apply pe tc
-  | `Apply (Some tg) -> process_apply_fwd (pe, tg)  tc
+let process_apply (infos : apply_t) tc =
+  match infos with
+  | `ApplyIn (pe, tg) -> process_apply_fwd (pe, tg) tc
+
+  | `Apply (pe, mode) ->
+      let for1 tc pe = t_last (process_apply_bwd `Apply pe) tc in
+      let tc = List.fold_left for1 (tcenv_of_tcenv1 tc) pe in
+      if mode = `Exact then t_onall process_done tc else tc
 
 (* -------------------------------------------------------------------- *)
 let process_subst syms (tc : tcenv1) =
@@ -1189,5 +1205,3 @@ let process_algebra mode kind eqs (tc : tcenv1) =
   in
 
   tactic tc
-
-

@@ -1,0 +1,25 @@
+% --------------------------------------------------------------------
+\begin{tactic}{exfalso}
+  \begin{tsyntax}{exfalso}
+  Combines \rtactic{conseq}, \rtactic{byequiv}, \rtactic{byphoare},
+  \rtactic{hoare} and \rtactic{bypr} to strengthen the precondition
+  into $\mathsf{false}$ and to discharge the resulting trivial goal.
+
+  \textbf{Examples:}
+  \begin{mathpar}
+  \inferrule*[left=(\prhl),rightskip=10em]%%
+    {P \Rightarrow \mathsf{false}}%%
+    {\pRHL{P}{c}{c'}{Q}}%%
+    \quad\raisebox{.7em}{\tct{exfalso}} \\
+  \inferrule*[left=(\phl),rightskip=10em]%%
+    {P \Rightarrow \mathsf{false}}%%
+    {\pHL{P}{c}{Q}{\diamond}{\delta}}%%
+    \quad\raisebox{.7em}{\tct{exfalso}} \\
+  \inferrule*[left=(\hl),rightskip=10em]%%
+    {P \Rightarrow \mathsf{false}}%%
+    {\HL{P}{c}{Q}}%%
+    \quad\raisebox{.7em}{\tct{exfalso}} \\
+  \end{mathpar}
+  \fix{Move \tct{exfalso} to automatic tactics}?
+  \end{tsyntax}
+\end{tactic}

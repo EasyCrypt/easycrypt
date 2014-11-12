@@ -157,6 +157,14 @@ let pt_of_global pf hyps p tys =
     ptev_ax  = ax; }
 
 (* -------------------------------------------------------------------- *)
+let pt_of_global_r ptenv p tys =
+  let env = LDecl.toenv ptenv.pte_hy in
+  let ax  = EcEnv.Ax.instanciate p tys env in
+  { ptev_env = ptenv;
+    ptev_pt  = { pt_head = PTGlobal (p, tys); pt_args = []; };
+    ptev_ax  = ax; }
+
+(* -------------------------------------------------------------------- *)
 let pt_of_uglobal pf hyps p =
   let ptenv   = ptenv_of_penv hyps pf in
   let env     = LDecl.toenv hyps in
@@ -209,7 +217,7 @@ let pf_find_occurence (pt : pt_env) ~ptn subject =
 
   let na = List.length (snd (EcFol.destr_app ptn)) in
 
-  let trymatch bds _pos tp =
+  let trymatch bds tp =
     let tp =
       match tp.f_node with
       | Fapp (h, hargs) when List.length hargs > na ->
@@ -545,8 +553,17 @@ and apply_pterm_to_arg pt arg =
   apply_pterm_to_oarg pt (Some arg)
 
 (* -------------------------------------------------------------------- *)
+and apply_pterm_to_arg_r pt arg =
+  let arg = { ptea_arg = arg; ptea_env = pt.ptev_env; } in
+    apply_pterm_to_arg pt arg
+
+(* -------------------------------------------------------------------- *)
 and apply_pterm_to_hole pt =
   apply_pterm_to_oarg pt None
+
+(* -------------------------------------------------------------------- *)
+and apply_pterm_to_holes n pt =
+  EcUtils.iterop apply_pterm_to_hole n pt
 
 (* -------------------------------------------------------------------- *)
 and process_pterm_arg_app pt arg =
@@ -619,3 +636,39 @@ let tc1_process_full_closed_pterm (tc : tcenv1) (ff : ffpattern) =
   let pe   = FApi.tc1_penv tc in
   let hyps = FApi.tc1_hyps tc in
   process_full_closed_pterm (ptenv_of_penv hyps pe) ff
+
+(* -------------------------------------------------------------------- *)
+
+type pt = [
+  | `Hy   of EcIdent.t 
+  | `G    of EcPath.path * ty list 
+  | `UG   of EcPath.path
+  | `App  of pt * pt_args
+]
+
+and pt_args = pt_arg list
+
+and pt_arg = 
+  [ `F of form
+  | `Mem of EcMemory.memory
+  | `Mod of (EcPath.mpath * EcModules.module_sig)
+  | `Sub of pt
+  | `H_ ]
+
+let build_pt_ev pt tc = 
+  let hyps = FApi.tc1_hyps tc in
+  let pe = !!tc in
+  let rec build_pt = function
+    | `Hy id        -> pt_of_hyp pe hyps id
+    | `G (p,tys)    -> pt_of_global pe hyps p tys
+    | `UG p         -> pt_of_global pe hyps p []
+    | `App(pt,args) -> List.fold_left app_pt_ev (build_pt pt) args
+  and app_pt_ev pt_ev = function
+    | `F f    -> apply_pterm_to_arg_r pt_ev (PVAFormula f)
+    | `Mem m  -> apply_pterm_to_arg_r pt_ev (PVAMemory m)
+    | `Mod m  -> apply_pterm_to_arg_r pt_ev (PVAModule m)
+    | `Sub pt -> apply_pterm_to_arg_r pt_ev (PVASub (build_pt pt))
+    | `H_     -> apply_pterm_to_hole pt_ev in
+  build_pt pt
+
+

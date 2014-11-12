@@ -265,7 +265,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
 
                   let tc = FPNamed (mk_loc l (xsth @ prefix, x),
                                     Some (mk_loc l (TVIunamed params))) in
-                  let tc = Papply ({ fp_kind = tc; fp_args = []; }, `Exact) in
+                  let tc = Papply (`Apply ([{ fp_kind = tc; fp_args = []}], `Exact)) in
                   let tc = mk_loc l (Plogic tc) in
                   let pr = { pthp_mode   = `Named (mk_loc l (xdth @ prefix, x));
                              pthp_tactic = Some tc }

@@ -162,5 +162,6 @@ val eqobs_in :
   EcModules.stmt * EcModules.stmt * ('log * 'spec list) * Mpv2.t
 
 val i_eqobs_in_refl : env -> instr -> PV.t -> PV.t
+val eqobs_inF_refl : env -> EcPath.xpath -> PV.t -> PV.t
 
 val check_module_in : env -> mpath -> module_type -> unit

@@ -114,16 +114,16 @@ examples:
 	$(CHECK) examples
 
 fullcheck: ec.native
-	$(CHECK) prelude theories realized examples unit
+	$(CHECK) prelude core theories realized examples unit
 
 check: ec.native
 	$(CHECK) prelude theories realized unit
 
 check-xunit: ec.native
-	$(CHECK) --xunit="$(XUNITOUT)" prelude theories realized unit
+	$(CHECK) --xunit="$(XUNITOUT)" prelude core theories realized unit
 
 checklibs: ec.native
-	$(CHECK) --xunit=libresults.xml prelude theories realized
+	$(CHECK) --xunit=libresults.xml prelude core theories realized
 
 clean:
 	$(OCAMLBUILD) -clean

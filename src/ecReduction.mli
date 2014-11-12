@@ -50,3 +50,8 @@ val simplify : reduction_info -> LDecl.hyps -> form -> form
 
 val is_conv    : LDecl.hyps -> form -> form -> bool
 val check_conv : LDecl.hyps -> form -> form -> unit
+
+(* -------------------------------------------------------------------- *)
+type xconv = [`Eq | `AlphaEq | `Conv]
+
+val xconv : xconv -> LDecl.hyps -> form -> form -> bool

@@ -154,6 +154,7 @@ module CI_Logic : sig
   val p_eq_sym_imp    : path
   val p_imp_trans     : path
   val p_negbTE        : path
+  val p_negeqF        : path
 
   val p_rewrite_l     : path
   val p_rewrite_r     : path

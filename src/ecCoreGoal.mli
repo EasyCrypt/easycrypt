@@ -298,8 +298,10 @@ module FApi : sig
   val t_do     : [`All | `Maybe] -> int option -> backward -> backward
   val t_repeat : backward -> backward
 
-  val t_or     : backward -> backward -> backward
-  val t_ors    : backward list -> backward
+  val t_or       : backward -> backward -> backward
+  val t_ors_pmap : ('a -> backward option) -> 'a list -> backward
+  val t_ors_map  : ('a -> backward) -> 'a list -> backward
+  val t_ors      : backward list -> backward
 
   val t_internal : ?info:string -> backward -> backward
 end

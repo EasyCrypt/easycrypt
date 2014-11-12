@@ -62,9 +62,10 @@ val tc1_process_full_closed_pterm_cut : prcut:('a -> form) -> tcenv1 -> 'a fpatt
 val tc1_process_full_closed_pterm     : tcenv1 -> ffpattern -> proofterm * form
 
 (* Proof-terms manipulation *)
-val check_pterm_arg     : pt_env -> EcIdent.t * gty -> form -> pt_ev_arg_r -> form * pt_arg
-val apply_pterm_to_arg  : pt_ev -> pt_ev_arg -> pt_ev
-val apply_pterm_to_hole : pt_ev -> pt_ev
+val check_pterm_arg      : pt_env -> EcIdent.t * gty -> form -> pt_ev_arg_r -> form * pt_arg
+val apply_pterm_to_arg   : pt_ev -> pt_ev_arg -> pt_ev
+val apply_pterm_to_arg_r : pt_ev -> pt_ev_arg_r -> pt_ev
+val apply_pterm_to_hole  : pt_ev -> pt_ev
 
 (* pattern matching - raise [MatchFailure] on failure. *)
 val pf_form_match     : pt_env -> ?mode:fmoptions -> ptn:form -> form -> unit
@@ -97,5 +98,27 @@ val pt_of_hyp    : proofenv -> LDecl.hyps -> EcIdent.t -> pt_ev
 val pt_of_global : proofenv -> LDecl.hyps -> EcPath.path -> ty list -> pt_ev
 val pt_of_uglobal: proofenv -> LDecl.hyps -> EcPath.path -> pt_ev
 
+val pt_of_global_r : pt_env -> EcPath.path -> ty list -> pt_ev
+
 (* -------------------------------------------------------------------- *)
 val ffpattern_of_genpattern : LDecl.hyps -> genpattern -> ffpattern option
+
+(* -------------------------------------------------------------------- *)
+type pt = [
+  | `Hy   of EcIdent.t 
+  | `G    of EcPath.path * EcTypes.ty list 
+  | `UG   of EcPath.path
+  | `App  of pt * pt_args
+]
+
+and pt_args = pt_arg list
+
+and pt_arg = 
+  [ `F of form
+  | `Mem of EcMemory.memory
+  | `Mod of (EcPath.mpath * EcModules.module_sig)
+  | `Sub of pt
+  | `H_ ]
+
+val build_pt_ev : pt -> tcenv1 -> pt_ev
+
