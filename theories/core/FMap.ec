@@ -226,6 +226,14 @@ proof.
 by rewrite dom_set mem_add=> ->.
 qed.
 
+lemma mem_dom_set y x (m:('a,'b) map) x':
+  mem x' (dom m.[x <- y]) <=> (mem x' (dom m) \/ x' = x).
+proof. by rewrite dom_set mem_add. qed.
+
+lemma dom_set_stable (m:('a,'b) map) x y x':
+  mem x' (dom m) => mem x' (dom m.[x <- y]).
+proof. by rewrite mem_dom_set=> H; left. qed.
+
 lemma rng_set (m:('a,'b) map) x y:
   rng (m.[x <- y]) = add y (rng (rm x m)).
 proof.
