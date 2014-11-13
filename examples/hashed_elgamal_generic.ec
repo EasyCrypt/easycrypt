@@ -390,7 +390,6 @@ section.
     0%r < x => (1%r / x) * y <= z => y <= x * z.
   proof.
     move=> lt0x ledivxyz.
-    print theory Real.
     cut:= mulrMle (1%r / x * y) z x _ _; [by smt | done  |].
     by rewrite -Real.Comm.Comm -Real.Assoc.Assoc -div_def 2:mul_div // smt.
   qed.    
