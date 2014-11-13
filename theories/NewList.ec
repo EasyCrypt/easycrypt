@@ -87,10 +87,10 @@ op onth (xs : 'a list) n : 'a option =
   with xs = "[]"      => None
   with xs = (::) y ys =>  if n = 0 then Some y else (onth ys (n-1)).
 
-lemma nosmt nth_onth (z : 'a) xs n: nth z xs n = odflt z (onth xs n).
+lemma nth_onth (z : 'a) xs n: nth z xs n = odflt z (onth xs n).
 proof. by elim xs n => //=; smt. qed.
 
-lemma nosmt onth_nth (z : 'a) xs n:
+lemma onth_nth (z : 'a) xs n:
   0 <= n < size xs => onth xs n = Some (nth z xs n).
 proof. by elim xs n => //=; smt. qed.
 
@@ -853,6 +853,9 @@ proof. by elim s => [// | x s /= ->]. qed.
 
 lemma nth_map x1 x2 (f : 'a -> 'b) n s:
   0 <= n < size s => nth x2 (map f s) n = f (nth x1 s n).
+proof. by elim s n; smt. qed.
+
+lemma onth_nth_map (s : 'a list) n: onth s n = nth None (map Some s) n.
 proof. by elim s n; smt. qed.
 
 lemma map_rcons (f : 'a -> 'b) s x:
