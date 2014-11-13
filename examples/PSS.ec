@@ -2535,8 +2535,16 @@ section.
     proc; elim/tuple2_ind a=> a w0 st0 a_def.
     wp 2.
     conseq* (_: _ ==>
-                z  = os2ip (to_signature (zeros 1 || from_htag w0 || from_gtag st0))).
-      by progress; rewrite /from_htag /to_htag /from_gtag /to_gtag /from_signature /to_signature; smt.
+                z  = os2ip (to_signature (zeros 1 || from_htag w0 || from_gtag st0)))
+            (_: _ ==> 0 <= z < 2^(k-1)) => //;first by (auto;smt).
+      progress; rewrite /from_htag /to_htag /from_gtag /to_gtag /from_signature 
+        /to_signature; last 2 by smt.
+      cut [_ <-] := msb0_bnd (i2osp z0);first by smt.
+      rewrite /from_signature HTag.pcan_to_from 1:smt. 
+      rewrite GTag.pcan_to_from 1:smt. 
+      rewrite sub_app_sub //;first 3 smt.
+      rewrite  app_sub;first 3 smt.
+      by rewrite Signature.can_from_to; smt.
     wp; rnd; skip; progress.
     rewrite /sigd mu_def /=.
     rewrite mu_support /Pred.(/\) /=.
@@ -3244,7 +3252,8 @@ section.
             conseq* Hw; progress=> //.
             cut ->: 0 <= z{hr} < 2^(k - 1) by smt.
             by rewrite /charfun.
-            by conseq* (_: _ ==> false).
+            hoare; conseq* (_: _ ==> true) => //. 
+            by progress;rewrite -nand;left.
           seq 3: (0 <= z0 < 2^(k - 1)) _ 0%r (1%r - bdt * bd) (1%r/bdt)
                  ((pk,sk,b,x) = (pk',sk',b',x') /\ 0 <= r' < 2^(k - 1) /\ z0 = z /\
                   simul_inv pk' sk' b' x' z = u)=> //.
@@ -3760,14 +3769,14 @@ section.
     seq 6 6 : (={m,s,glob A, glob Hmap, glob Gmap, glob Mem, H3'3.bad} /\
                (Hmem.ystar = rsap Hmem.pk Hmem.xstar){2} /\ support keypairs (Hmem.pk, Hmem.sk){2} /\
                 (rsap_dom Hmem.pk Hmem.xstar){2} /\ H3'3bad.cH{2} <= qH + qS);
-     last by sim (={glob Hmap, glob Gmap, glob Mem}) (H3'3bad.cH{2} <= qH + qS) : (={H3'3.bad}).
+     last by sim (: ={glob Hmap, glob Gmap, glob Mem}) /(H3'3bad.cH{2} <= qH + qS) : (={H3'3.bad}).
     call (_: ={glob Hmap, glob Gmap, glob Mem, H3'3.bad} /\
             (Hmem.ystar = rsap Hmem.pk Hmem.xstar){2} /\ support keypairs (Hmem.pk, Hmem.sk){2} /\
             (rsap_dom Hmem.pk Hmem.xstar){2} /\
             (H3'3bad.cH = Mem.cH + Mem.cS){2} /\ Mem.cH{2} <= qH /\ Mem.cS{2} <= qS). 
       proc;sp;if => //;wp; inline GAdv3(H3'3, G1).Hs.o GAdv3(H3'3bad, G1).Hs.o;wp.
       call H3'3o;wp;rnd;skip;progress;smt.
-      by sim (={glob Gmap}) ((Hmem.ystar = rsap Hmem.pk Hmem.xstar){2} /\ support keypairs (Hmem.pk, Hmem.sk){2} /\ 
+      by sim (: ={glob Gmap}) / ((Hmem.ystar = rsap Hmem.pk Hmem.xstar){2} /\ support keypairs (Hmem.pk, Hmem.sk){2} /\ 
                              (rsap_dom Hmem.pk Hmem.xstar){2} /\
                              H3'3bad.cH{2} = Mem.cH{2} + Mem.cS{2} /\ Mem.cH{2} <= qH /\ Mem.cS{2} <= qS) :
         (={res,glob Hmap, glob Gmap, glob Mem, H3'3.bad}).
@@ -3799,8 +3808,9 @@ section.
       proc;sp;if;last by hoare.
       if;last by hoare;auto.
       wp => /=;simplify.
-      conseq * (_ : _ ==> !b : <= (1%r/(2^(k0+1-i))%r)) (_: _ ==> (0 <= z < 2 ^ (k - 1)) => b) => //;first by smt.
+      conseq * (_ : _ ==> !b : <= (1%r/(2^(k0+1-i))%r)) (_: _ ==> (0 <= z < 2 ^ (k - 1)) => b) => //.
         by while (0 <= z < 2 ^ (k - 1) => b); auto;smt.
+        by smt.
       while  (0 <= i <= k0 + 1 /\ (c = Adv => invertible Hmem.pk Hmem.xstar) /\
               rsap_dom Hmem.pk Hmem.xstar /\
               Hmem.ystar = rsap Hmem.pk Hmem.xstar /\ support keypairs (Hmem.pk, Hmem.sk)) => //.

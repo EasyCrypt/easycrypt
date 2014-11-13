@@ -248,7 +248,7 @@ section.
     (* adversary is lossless *)
     by apply AaL.
     (* [F.f ~ F.f: I] when Bad does not hold *)
-    by proc; wp; do !rnd; wp; skip; rewrite /Top.inv; progress; smt.
+    proc; wp; do !rnd; wp; skip; rewrite /Top.inv; progress;expect 13 smt. 
     (* F.f is lossless when Bad holds *)
     by intros=> _ _; apply FfL.
     (* F.f preserves bad *)
