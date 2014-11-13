@@ -1,3 +1,4 @@
+timeout 0.
 (** This proof is naively adapted from
     "Making RSA-PSS secure against non-random faults"
     As such, it may contain some weird quirks that are
@@ -3808,9 +3809,10 @@ section.
       proc;sp;if;last by hoare.
       if;last by hoare;auto.
       wp => /=;simplify.
-      conseq * (_ : _ ==> !b : <= (1%r/(2^(k0+1-i))%r)) (_: _ ==> (0 <= z < 2 ^ (k - 1)) => b) => //.
+      conseq * (_: _ ==> !b : <= (1%r/(2^(k0+1-i))%r))
+               (_: _ ==> (0 <= z < 2 ^ (k - 1) /\ (c <> Adv \/ invertible Hmem.pk u)) <=> b)=> //.
         by while (0 <= z < 2 ^ (k - 1) => b); auto;smt.
-        by smt.
+        by progress; rewrite -not_def=> /H11.
       while  (0 <= i <= k0 + 1 /\ (c = Adv => invertible Hmem.pk Hmem.xstar) /\
               rsap_dom Hmem.pk Hmem.xstar /\
               Hmem.ystar = rsap Hmem.pk Hmem.xstar /\ support keypairs (Hmem.pk, Hmem.sk)) => //.
@@ -3831,9 +3833,9 @@ section.
          cut : (1%r/2%r <=  (2 ^ (k - 1))%r / (p_n Hmem.pk{hr})%r); last smt.
          apply (_:forall x1 x2 y1 y2, 0%r < y1 => 0%r < y2 => x1 * y2 <= x2 * y1 => x1/y1 <= x2/y2) => //=.
            intros x1 x2 y1 y2 Hy1 Hy2 Hm.
-           apply (_: forall (x y z:real), 0%r < z => x*z <= y => x <= y / z) => //; first by smt. 
+           apply (_: forall (x y z:real), 0%r < z => x*z <= y => x <= y / z) => //; first by smt.
            by cut -> : ((x1 / y1) * y2 = (x1*y2) / y1);smt.
-           by smt.          
+           by smt.
          rewrite {2} (_:2 = 2^1); first by rewrite (_: 1 = 0 + 1) // powS // pow0. 
          rewrite (_:(2 ^ (k - 1))%r * (2 ^ 1)%r = (2 ^ (k - 1) * 2 ^ 1)%r); first smt.
          by rewrite pow_add //;smt.
@@ -3843,13 +3845,13 @@ section.
        progress. 
          rewrite (_ : (2%r * (2 ^ (k0 + 1 - (i{hr} + 1)))%r) = (2 ^ (k0 + 1 - i{hr}))%r) //.
          rewrite {1}(_: 2 = (2^1)); first by rewrite (_: 1 = 0 + 1) // powS // pow0.
-         cut ->: (2^1)%r * (2 ^ (k0 + 1 - (i{hr} + 1)))%r = (2^1 * 2^(k0 + 1 - (i{hr} + 1)))%r. smt. 
+         cut ->: (2^1)%r * (2 ^ (k0 + 1 - (i{hr} + 1)))%r = (2^1 * 2^(k0 + 1 - (i{hr} + 1)))%r.
+         smt.
        by rewrite pow_add //;smt.
        by skip;smt. 
        by intros c;proc;sp;rcondt 1 => //;wp;conseq * (_ : _ ==> true)=> //;smt.
     by intros b c;proc;sp;rcondf 1.
   qed.
-
   (* end of computation *)
 
   local lemma Game3'2_3'3 &m:
