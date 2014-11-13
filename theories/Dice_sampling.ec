@@ -46,7 +46,7 @@ theory GenDice.
     Pr[RsampleW.sample(i,dfl) @ &m : res = k] = 
       if test i k then 1%r/(card(sub_supp i))%r else 0%r.
   proof.
-    intros i0 dfl0.
+    move=> i0 dfl0.
     pose bdt := (card(sub_supp i0))%r.
     cut bdt_pos: 0 <= card (sub_supp i0) by smt.
     cut bdt_posr: 0%r <= (card (sub_supp i0))%r by smt.
@@ -71,7 +71,7 @@ theory GenDice.
             wp;rnd;skip;progress => //. 
             rewrite /bd /mu_x;apply mu_eq => w' //.
             by conseq * Hw; progress => //; rewrite Htk.
-          by conseq * (_ : _ ==> false) => //.
+          by hoare; conseq* (_: _ ==> true)=> //; smt.
         (* bounding pr : ! k = r0 /\ k = r *)
        seq 2 : (test i r0) _ 0%r (1%r - bdt*bd) (1%r/bdt) 
                            (i0 = i /\ test i k /\ r0 = r) => //.
