@@ -434,6 +434,12 @@ lemma eq_except_symm (m1 m2:('a,'b) map) x:
   eq_except m1 m2 x = eq_except m2 m1 x
 by [].
 
+lemma eq_except_eq (m1 m2:('a,'b) map) x x':
+  eq_except m1 m2 x =>
+  mem x' (dom m1) <=> !mem x' (dom m2) =>
+  x = x'
+by [].
+
 lemma eq_except_set1_eq (m1 m2:('a,'b) map) x y:
   eq_except m1 m2 x =>
   eq_except m1.[x <- y] m2 x
