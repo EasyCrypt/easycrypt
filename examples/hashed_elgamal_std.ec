@@ -18,8 +18,8 @@ clone import AWord as Bitstring with
   op Dword.dword <- uniform.
 
 (** Assumption: DDH **)
-clone import CDH.DDH as DDH.
-import Group.
+clone import CDH as CDH0.
+import DDH.
 
 (** Assumption Entropy Smoothing *)
 type hkey.
@@ -43,17 +43,17 @@ module ES0 (A:AdvES) = {
 
 module ES1 (A:AdvES) = {  
   proc main () : bool = {
-    var b, hk, i;
+    var b, hk, z;
     hk = $sample_hkey;
-    i = $[0..q-1];
-    b = A.guess(hk, hash hk (g^i));
+    z = $FDistr.dt;
+    b = A.guess(hk, hash hk (g^z));
     return b;
   }
 }.
 
 (** Construction: a PKE **)
 type pkey       = hkey*group.
-type skey       = hkey*int.
+type skey       = hkey*F.t.
 type plaintext  = bits.
 type ciphertext = group * bits.
 
@@ -69,14 +69,14 @@ module Hashed_ElGamal : Scheme = {
     var hk,sk;
 
     hk = $sample_hkey;
-    sk = $[0..q-1];
+    sk = $FDistr.dt;
     return ((hk,g ^ sk), (hk,sk));   
   }
 
   proc enc(pk:pkey, m:plaintext): ciphertext = {
     var y, h;
 
-    y = $[0..q-1];
+    y = $FDistr.dt;
     h = hash pk.`1 (pk.`2 ^ y);
     return (g ^ y, h ^^ m);
   }
@@ -92,7 +92,10 @@ module Hashed_ElGamal : Scheme = {
 
 (** Correctness of the scheme *)
 hoare Correctness: Correctness( Hashed_ElGamal).main: true ==> res.
-proof. by proc; inline*; auto; progress; smt. qed.
+proof. 
+  proc; inline*; auto; progress.
+  by rewrite !pow_pow F.mulC;smt.
+qed.
 
 (** Exact security *)
 
@@ -111,8 +114,8 @@ module DDHAdv(A:Adversary) = {
 module ESAdv(A:Adversary) = {
   proc guess (hk, h) : bool = {
     var x, y, m0, m1, b, b';
-    x = $[0..q-1];
-    y = $[0..q-1];
+    x = $FDistr.dt;
+    y = $FDistr.dt;
     (m0, m1) = A.choose((hk,g^x));
     b = ${0,1};
     b' = A.guess(g^y, h ^^ (b?m1:m0));
@@ -146,8 +149,8 @@ section Security.
     proc main () : bool = {
       var hk, x, y, v,m0, m1, b, b';
       hk = $sample_hkey;
-      x  = $[0..q-1];
-      y  = $[0..q-1];
+      x  = $FDistr.dt;
+      y  = $FDistr.dt;
       (m0,m1) = A.choose(hk,g^x);
       v  = $uniform;
       b' = A.guess(g^y, v);
@@ -187,7 +190,7 @@ section Security.
     `| Pr[ES0(ESAdv(A)).main() @ &m : res] - 
          Pr[ES1(ESAdv(A)).main() @ &m : res]|.
   proof.
-   rewrite (cpa_ddh0 &m) -(Gb_half &m) -(es0_Gb &m) (ddh1_es1 &m);smt.
+   rewrite (cpa_ddh0 &m) (ddh1_es1 &m) (es0_Gb &m) (Gb_half &m);smt.
   qed.
 
 end section Security.

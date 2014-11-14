@@ -25,9 +25,10 @@ op qH: int.
 axiom qH_pos: 0 < qH.
 
 (** Assumption: set CDH with n = qH **)
-clone import CDH.Set_CDH as SCDH with
-  op n <- qH.
-import Group.
+clone import CDH as CDH0
+  with op Set_CDH.n <- qH.
+import CDH0.CDH.
+import Set_CDH.
 
 (** Assumption: a ROM (lazy) **)
 module type Hash = {
@@ -43,7 +44,7 @@ import Types.
 
 (** Construction: a PKE **)
 type pkey       = group.
-type skey       = int.
+type skey       = F.t.
 type plaintext  = bits.
 type ciphertext = group * bits.
 
@@ -59,14 +60,14 @@ module Hashed_ElGamal (H:Hash): Scheme = {
     var sk;
 
     H.init();
-    sk = $[0..q-1];
+    sk = $FDistr.dt;
     return (g ^ sk, sk);   
   }
 
   proc enc(pk:pkey, m:plaintext): ciphertext = {
     var y, h;
 
-    y = $[0..q-1];
+    y = $FDistr.dt;
     h = H.hash(pk ^ y);
     return (g ^ y, h ^^ m);
   }
@@ -121,11 +122,15 @@ module S = Hashed_ElGamal(H).
 
 (** Correctness **)
 hoare Correctness: Correctness(S).main: true ==> res.
-proof. by proc; inline*; auto; progress; smt. qed.
+proof. 
+  proc; inline*; auto => /= &hr sk0 Hsk0 y Hy y0 Hy0.
+  rewrite !(dom_empty, mem_empty) /= !pow_pow F.mulC dom_set mem_add /= => y1 _.
+  algebra.
+qed.
 
 (** Security **)
 (* Reduction *)
-module SCDH_from_CPA(A:Adversary,O:ARO): Top.SCDH.Adversary = {
+module SCDH_from_CPA(A:Adversary,O:ARO): Set_CDH.Adversary = {
   module BA = Bounder(A,O)
 
   proc solve(gx:group, gy:group): group set = {
@@ -158,8 +163,8 @@ section.
       var x, y, h, gx;
 
       H.init();
-      x       = $[0..q-1];
-      y       = $[0..q-1];
+      x       = $FDistr.dt;
+      y       = $FDistr.dt;
       gx      = g ^ x; 
       gxy     = gx ^ y;
       (m0,m1) = BA.choose(gx);
@@ -197,8 +202,8 @@ section.
       var x, y, h, gx;
 
       H.init();
-      x       = $[0..q-1];
-      y       = $[0..q-1];
+      x       = $FDistr.dt;
+      y       = $FDistr.dt;
       gx      = g ^ x; 
       gxy     = gx ^ y;
       (m0,m1) = BA.choose(gx);
@@ -256,8 +261,8 @@ section.
       var x, y, h, gx;
 
       H.init();
-      x        = $[0..q-1];
-      y        = $[0..q-1];
+      x        = $FDistr.dt;
+      y        = $FDistr.dt;
       gx       = g ^ x; 
       gxy      = gx ^ y;
       (m0,m1)  = BA.choose(gx);
@@ -280,8 +285,7 @@ section.
     rnd (fun h, h ^^ if b then m1 else m0){1}; rnd.
     call (_: ={glob H} /\ G1.gxy{1} = G2.gxy{2}).
       by sim.
-    inline H.init RO.init.
-    by auto; progress; smt.
+    inline H.init RO.init; auto; progress; [algebra | smt | smt | algebra].
   qed.
 
   local lemma Pr_G1_G2_res &m:
@@ -346,14 +350,16 @@ section.
   (** Composing reduction from CPA to SCDH with reduction from SCDH to CDH *)
   lemma Security &m :
       Pr[CPA(S,Bounder(A,RO)).main() @ &m: res] - 1%r / 2%r <= 
-      qH%r * Pr[CDH.CDH(CDH_from_SCDH(SCDH_from_CPA(A,RO))).main() @ &m: res].
+      qH%r * Pr[CDH(CDH_from_SCDH(SCDH_from_CPA(A,RO))).main() @ &m: res].
   proof.
     apply (Trans _ (Pr[SCDH(SCDH_from_CPA(A,RO)).main() @ &m: res]));
       first smt.
-    rewrite -(mul_compat_le (1%r/qH%r)) 1:smt.
-    rewrite !(Real.Comm.Comm _ (1%r/qH%r)) -Real.Assoc.Assoc -{2}inv_def (Real.Comm.Comm _ qH%r).
-    rewrite (_: forall x, qH%r * (inv qH%r) * x = x) 1:smt.
-    by rewrite (Top.SCDH.Reduction (SCDH_from_CPA(A,RO)) &m); smt.
+    rewrite -(mul_compat_le (1%r/qH%r)).  
+     by rewrite -Real.inv_def; apply sign_inv; smt.
+    rewrite !(Real.Comm.Comm _ (1%r/qH%r)) -Real.Assoc.Assoc -{2}Real.inv_def (Real.Comm.Comm _ qH%r).
+    rewrite (_: forall x, qH%r * (inv qH%r) * x = x).
+     intros x;fieldeq;smt.
+    by rewrite (Set_CDH.Reduction (SCDH_from_CPA(A,RO)) &m); smt.
   qed.
 end section.
 
