@@ -2207,25 +2207,25 @@ eqobs_in_pos:
 | i1=uint i2=uint { i1, i2 }
 
 eqobs_in_eqglob1:
-| LPAREN mp1= uoption(loc(fident)) COMMA mp2= uoption(loc(fident)) COLON 
+| LPAREN mp1= uoption(loc(fident)) TILD mp2= uoption(loc(fident)) COLON 
   geq=form RPAREN 
   {((mp1, mp2),geq) } 
 
-| LPAREN UNDERSCORE?    COLON geq=form RPAREN { ((None,None), geq) }
+| LPAREN UNDERSCORE? COLON geq=form RPAREN { ((None,None), geq) }
 
 eqobs_in_inv:
 | SLASH inv=sform { inv }
 
 eqobs_in_eqinv:
-| geqs=eqobs_in_eqglob1+ inv=eqobs_in_inv? { (geqs,inv) }
+| geqs=eqobs_in_eqglob1* inv=eqobs_in_inv? { (geqs,inv) }
 
 eqobs_in_eqpost:
 | COLON f=sform   { f }
 
 eqobs_in:
-| pos=eqobs_in_pos? i=eqobs_in_eqinv? p=eqobs_in_eqpost? {
+| pos=eqobs_in_pos? i=eqobs_in_eqinv p=eqobs_in_eqpost? {
     { sim_pos = pos;
-      sim_hint = odfl ([], None) i;
+      sim_hint = i;
       sim_eqs = p; } 
 }
 
