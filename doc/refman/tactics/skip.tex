@@ -6,15 +6,15 @@
   \begin{mathpar}
   \inferrule*[left=(\prhl),rightskip=10em]%%
     {P \Rightarrow Q }%%
-    {\pRHL{P}{[]}{[]}{Q}}%%
+    {\pRHL{P}{\Skip}{\Skip}{Q}}%%
     \quad\raisebox{.7em}{\tct{skip}} \\
   \inferrule*[left=(\phl),rightskip=10em]%%
     {P \Rightarrow Q }%%
-    {\pHL{P'}{[]}{Q'}{\diamond}{1}}%%
+    {\pHL{P'}{\Skip}{Q'}{\diamond}{1}}%%
     \quad\raisebox{.7em}{\tct{skip}} \\
   \inferrule*[left=(\hl),rightskip=10em]%%
     {P \Rightarrow Q}%%
-    {\HL{P}{[]}{Q}}%%
+    {\HL{P}{\Skip}{Q}}%%
     \quad\raisebox{.7em}{\tct{skip}} \\
   \end{mathpar}
   \end{tsyntax}
