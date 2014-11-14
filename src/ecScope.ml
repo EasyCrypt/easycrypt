@@ -264,6 +264,15 @@ let notify (scope : scope) (lvl : EcGState.loglevel) =
   EcEnv.notify scope.sc_env lvl
 
 (* -------------------------------------------------------------------- *)
+module Options = struct
+  let get_implicits scope =
+    Implicits.get scope.sc_options
+
+  let set_implicits scope value =
+    { scope with sc_options = Implicits.set scope.sc_options value }
+end
+
+(* -------------------------------------------------------------------- *)
 let for_loading (scope : scope) =
   let gstate = EcEnv.gstate scope.sc_env in
   let gstate = EcGState.copy gstate in

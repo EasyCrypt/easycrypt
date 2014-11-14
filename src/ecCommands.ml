@@ -428,6 +428,7 @@ and process_pragma (scope : EcScope.scope) opt =
 (* -------------------------------------------------------------------- *)
 and process_option (scope : EcScope.scope) (name, value) =
   match unloc name with
+  | "implicits" -> EcScope.Options.set_implicits scope value
   | _ -> EcScope.hierror "unknown option: %s" (unloc name)
 
 (* -------------------------------------------------------------------- *)
