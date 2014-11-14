@@ -17,7 +17,11 @@
     {\HL{P}{\Skip}{Q}}%%
     \quad\raisebox{.7em}{\tct{skip}} \\
   \end{mathpar}
+
+  \textbf{Note:} Note that the \phl rule forces the bound of the goal
+  to be 1. If you end up with an empty program and a bound other than
+  1, you might want to use \rtactic{hoare} or \rtactic{conseq}. If
+  neither of these work, you should probably have used \rtactic{seq}
+  or \rtactic{phoare split} earlier on in your proof.
   \end{tsyntax}
-
-
 \end{tactic}
