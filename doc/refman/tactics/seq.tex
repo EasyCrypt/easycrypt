@@ -1,6 +1,31 @@
 % --------------------------------------------------------------------
 \begin{tactic}{seq}
-  \begin{tsyntax}[empty]{seq}
-  \fix{Missing description of seq}.
+  Rules for sequences:
+
+  \begin{tsyntax}{seq p1 p2 : R}
+  \begin{mathpar}
+  \inferrule*[left=(\prhl),rightskip=10em]%%
+    {|c_1| = \tct{p1}\\%%
+     |c_2| = \tct{p2}\\%%
+     \pRHL{P}{c_1}{c_2}{R}\\%%
+     \pRHL{R}{c_1'}{c_2'}{Q}}%%
+    {\pRHL{P}{c_1;c_1'}{c_2;c_2'}{Q}}%%
+    \quad\raisebox{.7em}{\tct{seq p1 p2 : R}}\\%%
+  \end{mathpar}
   \end{tsyntax}
+
+  \begin{tsyntax}{seq p : R}
+  \begin{mathpar}
+  \inferrule*[left=(\hl),rightskip=10em]%%
+    { |c| = \tct{p}\\%%
+     \HL{P}{c}{R}\\%%
+     \HL{R}{c'}{Q} }%%
+    {\HL{P}{c;c'}{Q}}%%
+    \quad\raisebox{.7em}{\tct{seq p : R}}\\%%
+  \end{mathpar}
+  \end{tsyntax}
+
+
+  \fix{Missing description of seq for phl}.
+
 \end{tactic}

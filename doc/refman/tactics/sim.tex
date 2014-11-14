@@ -1,6 +1,13 @@
 % --------------------------------------------------------------------
 \begin{tactic}{sim}
-  \begin{tsyntax}[empty]{sim}
+  \begin{tsyntax}{sim <pos>? <hintgeqs>* <hintinv>? <eqs>?}\\
+    where \begin{tabular}{lrl}
+       <pos>      & = & <uint> <uint> \\
+       <hintgeqs> & = & (<procname>? $\sim$ <procname>? : <formula>) \\
+                  & | & ($\_$? : <formula>  \\
+       <eqs>      & = & : <formula> \\
+    \end{tabular}
+  
   \fix{Missing description of sim}.
   \end{tsyntax}
 \end{tactic}
