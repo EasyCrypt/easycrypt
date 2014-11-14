@@ -104,21 +104,19 @@ val pt_of_global_r : pt_env -> EcPath.path -> ty list -> pt_ev
 val ffpattern_of_genpattern : LDecl.hyps -> genpattern -> ffpattern option
 
 (* -------------------------------------------------------------------- *)
-type pt = [
+type prept = [
   | `Hy   of EcIdent.t 
-  | `G    of EcPath.path * EcTypes.ty list 
+  | `G    of EcPath.path * ty list 
   | `UG   of EcPath.path
-  | `App  of pt * pt_args
+  | `App  of prept * prept_arg list
 ]
 
-and pt_args = pt_arg list
-
-and pt_arg = 
-  [ `F of form
+and prept_arg =  [
+  | `F   of form
   | `Mem of EcMemory.memory
   | `Mod of (EcPath.mpath * EcModules.module_sig)
-  | `Sub of pt
-  | `H_ ]
+  | `Sub of prept
+  | `H_
+]
 
-val build_pt_ev : pt -> tcenv1 -> pt_ev
-
+val pt_of_prept: tcenv1 -> prept -> pt_ev

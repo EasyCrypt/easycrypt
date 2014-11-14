@@ -67,8 +67,8 @@ let t_phoare_deno_r pre post tc =
   match concl.f_node with
   | Fapp ({f_node = Fop (op, _)}, [bd; f])
       when EcPath.p_equal op EcCoreLib.CI_Real.p_real_ge ->
-    (t_apply_pt (`App(`UG EcCoreLib.CI_Real.p_rle_ge_sym,
-                      [`F f; `F bd; `H_])) @!
+    (t_apply_prept
+       (`App(`UG EcCoreLib.CI_Real.p_rle_ge_sym, [`F f; `F bd; `H_])) @!
        t_core_phoare_deno pre post) tc
 
   | Fapp ({f_node = Fop (op, _)}, [f; _bd])
@@ -230,7 +230,7 @@ let real_upto_or      = real_lemma "upto_bad_or"
 let real_upto_sub     = real_lemma "upto_bad_sub"
 
 let t_real_le_trans f2 tc = 
-  t_apply_pt (`App(`UG real_le_trans, [`H_;`F f2]))tc
+  t_apply_prept (`App(`UG real_le_trans, [`H_;`F f2]))tc
 
 let t_pr_pos tc = 
   let pr =
@@ -250,7 +250,7 @@ let t_equiv_deno_bad pre tc =
   let fand = f_and pr2.pr_event (f_not prb.pr_event) in
   let pro = f_pr_r { pr2 with pr_event = f_or fand prb.pr_event } in
   let pra = f_pr_r { pr2 with pr_event = fand } in
-  let t_false tc = t_apply_pt (`UG real_upto_false) tc in
+  let t_false tc = t_apply_prept (`UG real_upto_false) tc in
 
   let post = 
     let subst_l = Fsubst.f_subst_mem mhr mleft in
@@ -264,14 +264,14 @@ let t_equiv_deno_bad pre tc =
      [t_equiv_deno pre post @+ [
        t_id;
        t_id;
-       t_intros_s (`Symbol ["_";"_"]) @! t_apply_pt (`UG real_upto_or) ];
+       t_intros_s (`Symbol ["_";"_"]) @! t_apply_prept (`UG real_upto_or) ];
       t_pr_rewrite_i ("mu_disjoint", None) @+
        [ t_intro_s (`Symbol "_") @! t_false;
-         t_apply_pt 
+         t_apply_prept 
            (`App (`UG real_addleM, [`F pra;`F fpr2;`F fprb;`F fprb; `H_; `H_]))
            @+ [ 
              t_pr_rewrite_i ("mu_sub",None) @+ [
-               t_intros_s (`Symbol ["_"]) @! t_apply_pt (`UG real_upto_sub);
+               t_intros_s (`Symbol ["_"]) @! t_apply_prept (`UG real_upto_sub);
                t_trivial None;
              ];
              t_true;
@@ -326,25 +326,25 @@ let t_equiv_deno_bad2 pre bad1 tc =
         [ t_id;
           t_intros_i [hcpre; hequiv] @!
             t_real_le_trans fabs' @+
-            [ t_apply_pt (`UG real_eq_le) @!
+            [ t_apply_prept (`UG real_eq_le) @!
                 process_congr @! (* abs *)
                 process_congr @+ (* sub *) 
                 [ t_pr_rewrite_i ("mu_split", Some bad1) @! t_reflex;
                   t_pr_rewrite_i ("mu_split", Some bad2) @! t_reflex ] ;
-              t_apply_pt (`UG real_upto) @+
+              t_apply_prept (`UG real_upto) @+
                 [ t_pr_pos;
                   t_pr_pos;
                   t_equiv_deno pre post @+ [
                     t_apply_hyp hequiv;
                     t_apply_hyp hcpre;
                     t_intros_s (`Symbol ["_"; "_"]) @!
-                      t_apply_pt (`UG real_upto_imp_bad) ];
+                      t_apply_prept (`UG real_upto_imp_bad) ];
                   t_pr_rewrite ("mu_sub",None) @! t_logic_trivial;
                   t_equiv_deno pre post @+ [
                     t_apply_hyp hequiv;
                     t_apply_hyp hcpre;
                     t_intros_s (`Symbol ["_"; "_"]) @!
-                    t_apply_pt (`UG real_upto_notbad) 
+                    t_apply_prept (`UG real_upto_notbad) 
                   ];
                 ]
             ]

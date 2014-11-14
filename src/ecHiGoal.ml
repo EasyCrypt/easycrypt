@@ -257,8 +257,8 @@ module LowRewrite = struct
       t_do_r ~focus:0 `Maybe None (t_ors (List.map try1 pts)) !@tc
 end
 
-let t_rewrite_pt info pt tc = 
-  LowRewrite.t_rewrite_r info (build_pt_ev pt tc) tc
+let t_rewrite_prept info pt tc = 
+  LowRewrite.t_rewrite_r info (pt_of_prept tc pt) tc
 
 (* -------------------------------------------------------------------- *)
 let process_rewrite1_core (s, o) pt tc =
@@ -851,8 +851,8 @@ module LowApply = struct
     t_apply_bwd_r { ptev_env = ptenv; ptev_pt = pt; ptev_ax = ax; } tc
 end
 
-let t_apply_pt pt tc = 
-  LowApply.t_apply_bwd_r (build_pt_ev pt tc) tc
+let t_apply_prept pt tc = 
+  LowApply.t_apply_bwd_r (pt_of_prept tc pt) tc
 
 (* -------------------------------------------------------------------- *)
 let process_apply_bwd mode (ff : ffpattern) (tc : tcenv1) =

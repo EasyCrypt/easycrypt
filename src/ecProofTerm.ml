@@ -638,37 +638,36 @@ let tc1_process_full_closed_pterm (tc : tcenv1) (ff : ffpattern) =
   process_full_closed_pterm (ptenv_of_penv hyps pe) ff
 
 (* -------------------------------------------------------------------- *)
-
-type pt = [
+type prept = [
   | `Hy   of EcIdent.t 
   | `G    of EcPath.path * ty list 
   | `UG   of EcPath.path
-  | `App  of pt * pt_args
+  | `App  of prept * prept_arg list
 ]
 
-and pt_args = pt_arg list
-
-and pt_arg = 
-  [ `F of form
+and prept_arg =  [
+  | `F   of form
   | `Mem of EcMemory.memory
   | `Mod of (EcPath.mpath * EcModules.module_sig)
-  | `Sub of pt
-  | `H_ ]
+  | `Sub of prept
+  | `H_
+]
 
-let build_pt_ev pt tc = 
-  let hyps = FApi.tc1_hyps tc in
-  let pe = !!tc in
+(* -------------------------------------------------------------------- *)
+let pt_of_prept tc pt = 
+  let hyps, pe = FApi.tc1_hyps tc, !!tc in
+
   let rec build_pt = function
-    | `Hy id        -> pt_of_hyp pe hyps id
-    | `G (p,tys)    -> pt_of_global pe hyps p tys
-    | `UG p         -> pt_of_global pe hyps p []
-    | `App(pt,args) -> List.fold_left app_pt_ev (build_pt pt) args
+    | `Hy  id         -> pt_of_hyp pe hyps id
+    | `G   (p, tys)   -> pt_of_global pe hyps p tys
+    | `UG  p          -> pt_of_global pe hyps p []
+    | `App (pt, args) -> List.fold_left app_pt_ev (build_pt pt) args
+
   and app_pt_ev pt_ev = function
     | `F f    -> apply_pterm_to_arg_r pt_ev (PVAFormula f)
     | `Mem m  -> apply_pterm_to_arg_r pt_ev (PVAMemory m)
     | `Mod m  -> apply_pterm_to_arg_r pt_ev (PVAModule m)
     | `Sub pt -> apply_pterm_to_arg_r pt_ev (PVASub (build_pt pt))
-    | `H_     -> apply_pterm_to_hole pt_ev in
-  build_pt pt
+    | `H_     -> apply_pterm_to_hole pt_ev
 
-
+  in build_pt pt
