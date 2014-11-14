@@ -414,17 +414,16 @@ and process_pragma (scope : EcScope.scope) opt =
     | _ -> pragma_check mode
   in
 
-  begin
-    match unloc opt with
-    | "silent"  -> pragma_verbose false
-    | "verbose" -> pragma_verbose true
-    | "nocheck" -> check false
-    | "check"   -> check true
-    | "noop"    -> ()
-    | "compact" -> Gc.compact ()
-    | "reset"   -> raise (Pragma `Reset)
-    | _         -> ()
-  end
+  match unloc opt with
+  | "silent"  -> pragma_verbose false
+  | "verbose" -> pragma_verbose true
+  | "nocheck" -> check false
+  | "check"   -> check true
+  | "noop"    -> ()
+  | "compact" -> Gc.compact ()
+  | "reset"   -> raise (Pragma `Reset)
+  | _         -> ()
+
 (* -------------------------------------------------------------------- *)
 and process_option (scope : EcScope.scope) (name, value) =
   match unloc name with
