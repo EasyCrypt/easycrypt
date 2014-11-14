@@ -576,7 +576,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
             match EcPath.getprefix opath p |> omap List.rev with
             | None | Some [] -> None
             | Some (x::px) ->
-                let q = EcPath.fromqsymbol (px, x) in
+                let q = EcPath.fromqsymbol (List.rev px, x) in
 
                 match Mp.find_opt q ops with
                 | None ->
