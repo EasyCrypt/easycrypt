@@ -17,6 +17,39 @@ theory Group.
   axiom pow_plus (x y:int): (g ^ x) * (g ^ y) = g ^ (x + y).
 end Group.
 
+theory DDH.
+  clone import Group.
+   
+  module type Adversary = {
+    proc guess(gx gy gz:group): bool
+  }.
+
+  module DDH0 (A:Adversary) = {
+    proc main() : bool = {
+      var b, x, y;
+      x = $[0..q-1];
+      y = $[0..q-1];
+      b = A.guess(g ^ x, g ^ y, g ^ (x*y));
+      return b;
+    }
+  }.
+
+  module DDH1 (A:Adversary) = {
+    proc main() : bool = {
+      var b, x, y, z;
+        
+      x = $[0..q-1];
+      y = $[0..q-1];
+      z = $[0..q-1];
+      b = A.guess(g ^ x, g ^ y, g ^ z);
+      return b;
+    }
+  }.
+
+end DDH.
+  
+
+
 (** Computational Diffie-Hellman problem **)
 theory CDH.
   clone import Group.
