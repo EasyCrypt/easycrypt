@@ -2583,7 +2583,11 @@ global_:
 
 | x=loc(QED)       { Gsave x.pl_loc }
 | PRINT p=print    { Gprint     p   }
+
 | PRAGMA x=lident  { Gpragma    x   }
+
+| PRAGMA ADD   x=lident { Goption (x, true ) }
+| PRAGMA MINUS x=lident { Goption (x, false) }
 
 | EXTRACTION i=extract_info { Gextract i }
 | addrw            { Gaddrw $1 }

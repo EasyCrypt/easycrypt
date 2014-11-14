@@ -425,6 +425,10 @@ and process_pragma (scope : EcScope.scope) opt =
     | "reset"   -> raise (Pragma `Reset)
     | _         -> ()
   end
+(* -------------------------------------------------------------------- *)
+and process_option (scope : EcScope.scope) (name, value) =
+  match unloc name with
+  | _ -> EcScope.hierror "unknown option: %s" (unloc name)
 
 (* -------------------------------------------------------------------- *)
 and process_extract scope todo =
@@ -465,6 +469,7 @@ and process (ld : EcLoader.ecloader) (scope : EcScope.scope) g =
       | Gprover_info pi   -> `Fct   (fun scope -> process_proverinfo scope  pi)
       | Gsave        loc  -> `Fct   (fun scope -> process_save       scope  loc)
       | Gpragma      opt  -> `State (fun scope -> process_pragma     scope  opt)
+      | Goption      opt  -> `Fct   (fun scope -> process_option     scope  opt)
       | Gextract     todo -> `Fct   (fun scope -> process_extract    scope todo)
       | Gaddrw       hint -> `Fct   (fun scope -> process_addrw      scope hint)
     with

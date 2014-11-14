@@ -775,6 +775,7 @@ type global =
   | Gprover_info of pprover_infos
   | Gsave        of EcLocation.t
   | Gpragma      of psymbol
+  | Goption      of (psymbol * bool)
   | Gextract     of (string option * toextract list * withextract list)
 
 type prog =

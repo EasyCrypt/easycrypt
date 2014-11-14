@@ -65,7 +65,7 @@ module type IOptions = sig
 end
 
 (* -------------------------------------------------------------------- *)
-module Options : IOptions = struct
+module GenOptions : IOptions = struct
   type option = int
 
   type options = (action * exn) Mint.t
@@ -111,42 +111,61 @@ module Check_mode = struct
   exception Full_check    (* Disable: checkproof off, i.e. check everything *)
   exception Check of bool (* true check proofs, false do not check *)
 
-  let for_loading = function
-    | Check _ -> Check false
-    | exn     -> exn
-
-  let default = Check true
-
-  let mode = Options.register { for_loading } default
+  let mode =
+    let default = Check true in
+    let for_loading = function
+      | Check _ -> Check false
+      | exn     -> exn
+    in GenOptions.register { for_loading } default
 
   let check options =
-    match Options.get options mode with
+    match GenOptions.get options mode with
     | Check b -> b
     | _       -> true
 
   let check_proof options b =
-    match Options.get options mode with
+    match GenOptions.get options mode with
     | Check b' when b <> b' ->
-        Options.set options mode (Check b')
+        GenOptions.set options mode (Check b')
     | _ -> options
 
   let full_check options =
-    Options.set options mode Full_check
+    GenOptions.set options mode Full_check
 end
 
 (* -------------------------------------------------------------------- *)
 module Prover_info = struct
   exception PI of EcProvers.prover_infos
 
-  let npi = Options.register_identity (PI EcProvers.dft_prover_infos)
+  let npi = GenOptions.register_identity (PI EcProvers.dft_prover_infos)
 
   let set options pi =
-    Options.set options npi (PI pi)
+    GenOptions.set options npi (PI pi)
 
   let get options =
-    match Options.get options npi with
+    match GenOptions.get options npi with
     | PI pi -> pi
     | _     -> assert false
+end
+
+(* -------------------------------------------------------------------- *)
+module Implicits = struct
+  exception Implicits of bool
+
+  let implicits =
+    let default = Implicits true in
+    let for_loading = function
+      | Implicits _ -> Implicits false
+      | exn         -> exn
+    in GenOptions.register { for_loading } default
+
+  let set options value =
+    GenOptions.set options implicits (Implicits value)
+
+  let get options =
+    match GenOptions.get options implicits with
+    | Implicits value -> value
+    | _ -> assert false
 end
 
 (* -------------------------------------------------------------------- *)
@@ -180,7 +199,7 @@ type scope = {
   sc_loaded   : (EcEnv.ctheory_w3 * symbol list) Msym.t;
   sc_required : symbol list;
   sc_pr_uc    : proof_uc option;
-  sc_options  : Options.options;
+  sc_options  : GenOptions.options;
   sc_section  : EcSection.t;
 }
 
@@ -193,7 +212,7 @@ let empty (gstate : EcGState.gstate) =
     sc_loaded     = Msym.empty;
     sc_required   = [];
     sc_pr_uc      = None;
-    sc_options    = Options.init ();
+    sc_options    = GenOptions.init ();
     sc_section    = EcSection.initial; }
 
 (* -------------------------------------------------------------------- *)
@@ -253,7 +272,7 @@ let for_loading (scope : scope) =
 
   { (empty gstate) with
       sc_loaded  = scope.sc_loaded;
-      sc_options = Options.for_loading scope.sc_options; }
+      sc_options = GenOptions.for_loading scope.sc_options; }
 
 (* -------------------------------------------------------------------- *)
 let subscope (scope : scope) (name : symbol) =
@@ -265,7 +284,7 @@ let subscope (scope : scope) (name : symbol) =
     sc_loaded     = scope.sc_loaded;
     sc_required   = scope.sc_required;
     sc_pr_uc      = None;
-    sc_options    = Options.for_subscope scope.sc_options;
+    sc_options    = GenOptions.for_subscope scope.sc_options;
     sc_section    = scope.sc_section;
   }
 
