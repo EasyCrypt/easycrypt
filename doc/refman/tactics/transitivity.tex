@@ -1,6 +1,42 @@
 % --------------------------------------------------------------------
 \begin{tactic}{transitivity}
-  \begin{tsyntax}{transitivity\{side\} c (_: P ==> Q)}
-  \fix{Missing description of transitivity}.
+  \begin{tsyntax}{transitivity c ($P_1$ ==> $\ Q_1$) ($P_2$ ==> $\ Q_2$)}
+  In \prhl, applies the transitivity of program equivalence using the
+  specified program and specifications. When the goal is a judgment on
+  procedures, \tct{c} should be a procedure. When the goal is a
+  judgment on statements, \tct{c} should be a statement.
+
+  \textbf{Examples:}
+  \begin{mathpar}
+  \inferrule*[left=(\prhl),rightskip=10em]%%
+    {\forall \mem{m_1}\ \mem{m_2}.\, P~\mem{m_1}~\mem{m_2} \Rightarrow
+        \exists \mem{m}.\,P1~\mem{m_1}~\mem{m} \wedge P2~\mem{m}~\mem{m_2} \\%
+     \forall \mem{m_1}\ \mem{m}\ \mem{m_2}.\,
+        Q1~\mem{m_1}~\mem{m} \Rightarrow
+        Q2~\mem{m}~\mem{m_2} \Rightarrow
+        Q~\mem{m_1}~\mem{m_2} \\%
+     \pRHL{P_1}{f_1}{f}{Q_1} \\%
+     \pRHL{P_2}{f}{f_2}{Q_2}}%%
+    {\pRHL{P}{f_1}{f_2}{Q}}%%
+    \quad\raisebox{.7em}{\tct{transitivity f ($P_1$ ==> $\ Q_1$) ($P_2$ ==> $\ Q_2$)}} \\
+    \inferrule*[left=(\prhl),rightskip=10em]%%
+    {\forall \mem{m_1}\ \mem{m_2}.\, P~\mem{m_1}~\mem{m_2} \Rightarrow
+        \exists \mem{m}.\,P1~\mem{m_1}~\mem{m} \wedge P2~\mem{m}~\mem{m_2} \\%
+     \forall \mem{m_1}\ \mem{m}\ \mem{m_2}.\,
+        Q1~\mem{m_1}~\mem{m} \Rightarrow
+        Q2~\mem{m}~\mem{m_2} \Rightarrow
+        Q~\mem{m_1}~\mem{m_2} \\%
+     \pRHL{P_1}{s_1}{s}{Q_1} \\%
+     \pRHL{P_2}{s}{s_2}{Q_2}}%%
+    {\pRHL{P}{s_1}{s_2}{Q}}%%
+    \quad\raisebox{.7em}{\tct{transitivity{side} { s } ($P_1$ ==> $\ Q_1$) ($P_2$ ==> $\ Q_2$)}} \\
+  \end{mathpar}
+
+  \textbf{Note:} In practice, the existential quantification over
+  memory $\mem{m}$ in the first generated subgoal is replaced with an
+  existential quantification over the program variables appearing in $P$,
+  $P_1$, ot $P_2$.
+
+  \fix{In transitivity, describe the effect of the side argument.}
   \end{tsyntax}
 \end{tactic}
