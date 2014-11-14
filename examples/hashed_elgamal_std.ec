@@ -93,8 +93,8 @@ module Hashed_ElGamal : Scheme = {
 (** Correctness of the scheme *)
 hoare Correctness: Correctness( Hashed_ElGamal).main: true ==> res.
 proof. 
-  proc; inline*; auto; progress.
-  by rewrite !pow_pow F.mulC;smt.
+  proc; inline*; auto; progress. 
+  rewrite !pow_pow F.mulC;algebra.
 qed.
 
 (** Exact security *)
