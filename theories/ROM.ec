@@ -708,8 +708,8 @@ theory ROM_BadCall.
             by apply Da2L.
             by proc; inline RO.o; auto; smt.
             by progress; apply (Log_o_ll RO); apply (RO_o_ll _); smt.
-            progress; exists* G1'.x; elim* => x; conseq* (Log_o_ll RO _) (Log_o_stable RO x)=> //.
-            by apply (RO_o_ll _); smt.
+            move=> &1; proc; wp; call (RO_o_ll _); first smt.
+            by skip; rewrite mem_add=> //= &hr ->.
           inline RO.o; auto.
           call (_: ={glob Log, glob RO} /\ Log.qs{2} = dom RO.m{2}).
             by proc; inline RO.o; auto; smt.
@@ -804,8 +804,9 @@ theory ROM_BadCall.
             by apply Da2L.
             by proc; inline Bound(RO).LO.o RO.o; sp; if=> //; auto; smt.
             by progress; apply (Bound_o_ll RO); apply (RO_o_ll _); smt.
-            progress; exists* G1'.x; elim* => x; conseq* (Bound_o_ll RO _) (Bound_o_stable RO x)=> //.
-            by apply (RO_o_ll _); smt.
+            move=> &1; proc; sp; if=> //=.
+            inline Bound(RO).LO.o; wp; call (RO_o_ll _); first smt.
+            by auto; rewrite mem_add=> //= &hr [*] _ ->.
           inline RO.o; auto.
           call (_: ={glob Log, glob RO} /\ Log.qs{2} = dom RO.m{2}).
             by proc; inline Bound(RO).LO.o RO.o; sp; if=> //; auto; smt.
@@ -1050,3 +1051,4 @@ theory Wrappers.
   }.
 end Wrappers.
 *)
+
