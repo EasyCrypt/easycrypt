@@ -153,7 +153,7 @@ module Implicits = struct
   exception Implicits of bool
 
   let implicits =
-    let default = Implicits true in
+    let default = Implicits false in
     let for_loading = function
       | Implicits _ -> Implicits false
       | exn         -> exn
