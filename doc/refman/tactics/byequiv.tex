@@ -16,44 +16,46 @@
 
   \textbf{Examples:}
   \begin{mathpar}
-    \inferrule*[rightskip=5em]%%
-    { \pRHL{P}{f_1}{f_2}{Q} \\%
-      P~\vec{a}_1~m_1~\vec{a}_2~m_2 \\%
-      Q \Rightarrow E_1\{1\}  \Leftrightarrow E_2\{2\} }%%
-    { \PR{f_1}{\vec{a}_1}{\mem{m_1}}{E_1} = \PR{f_2}{\vec{a}_2}{m_2}{E_2} }%%
-    \raisebox{.7em}{\tct{byequiv (_: P ==> Q)} } \\
-    \inferrule*[rightskip=5em]%%
-    { \pRHL{P}{f_1}{f_2}{Q} \\% 
-      P~\vec{a}_1~m_1~\vec{a}_2~m_2 \\%
-      Q \Rightarrow E_1\{1\}  \Rightarrow E_2\{2\} }%%
-    { \PR{f_1}{\vec{a}_1}{\mem{m_1}}{E_1} \leq \PR{f_2}{\vec{a}_2}{m_2}{E_2} }%%
-    \raisebox{.7em}{\tct{byequiv (_: P ==> Q)} } \\
-    \inferrule*[rightskip=5em]%%
-    { \pRHL{P}{f_1}{f_2}{Q} \\%
-      P~\vec{a}_1~m_1~\vec{a}_2~m_2 \\%
-      Q \Rightarrow E_2\{2\}  \Rightarrow E_1\{1\} } %%
-    { \PR{f_1}{\vec{a}_1}{\mem{m_1}}{E_1} \geq \PR{f_2}{\vec{a}_2}{m_2}{E_2} }%%
-    \raisebox{.7em}{\tct{byequiv (_: P ==> Q)} } \\
-    \inferrule*[rightskip=5em]%%
-    { \pRHL{P}{f_1}{f_2}{Q} \\% 
-      P~\vec{a}_1~m_1~\vec{a}_2~m_2 \\%
-      Q \Rightarrow \neg B_2\{2\} \Rightarrow E_1\{1\}  \Rightarrow E_2\{2\} }%%
-    { \PR{f_1}{\vec{a}_1}{\mem{m_1}}{E_1} \leq \PR{f_2}{\vec{a}_2}{m_2}{E_2}
-       +  \PR{f_2}{\vec{a}_2}{m_2}{B_2} }%% 
-    \raisebox{.7em}{\tct{byequiv (_: P ==> Q)} } \\
-    \inferrule*[rightskip=5em]%%
-    { \pRHL{P}{f_1}{f_2}{Q} \\% 
-      P~\vec{a}_1~m_1~\vec{a}_2~m_2 \\%
-      Q \Rightarrow B_1\{1\} \Leftrightarrow B_2\{2\} \wedge 
-      (\neg B_2\{2\} \Rightarrow E_1\{1\} \Leftrightarrow E_2\{2\}) }%%
-    { | \PR{f_1}{\vec{a}_1}{\mem{m_1}}{E_1} - \PR{f_2}{\vec{a}_2}{m_2}{E_2} |
-       \leq \PR{f_2}{\vec{a}_2}{m_2}{B_2} }%% 
-    \raisebox{.7em}{\tct{byequiv (_: P ==> Q) : B$_1$} } \\%%
-    \inferrule*[rightskip=5em]%%
-    {\pRHL{P}{f_1}{f_2}{E_1\{1\} \Leftrightarrow E_2\{2\}} \\%
-     P~\vec{a}_1~m_1~\vec{a}_2~m_2}%%
-    {\PR{f_1}{\vec{a}_1}{\mem{m_1}}{E_1} = \PR{f_2}{\vec{a}_2}{m_2}{E_2}}%%
-    \raisebox{.7em}{\tct{byequiv [-eq] (_: P ==> _)} }
+    \inferrule%%
+      {\pRHL{P}{f_1}{f_2}{Q} \\%
+       P~\vec{a}_1~m_1~\vec{a}_2~m_2 \\%
+       Q \Rightarrow E_1\{1\}  \Leftrightarrow E_2\{2\}}%%
+      {\PR{f_1}{\vec{a}_1}{\mem{m_1}}{E_1} = \PR{f_2}{\vec{a}_2}{m_2}{E_2}}%%
+      \quad\mbox{\parbox{200pt}{\tct{byequiv (_: P ==> Q)}}} \\
+    \inferrule%%
+      {\pRHL{P}{f_1}{f_2}{Q} \\% 
+       P~\vec{a}_1~m_1~\vec{a}_2~m_2 \\%
+       Q \Rightarrow E_1\{1\}  \Rightarrow E_2\{2\}}%%
+      {\PR{f_1}{\vec{a}_1}{\mem{m_1}}{E_1} \leq \PR{f_2}{\vec{a}_2}{m_2}{E_2}}%%
+      \quad\mbox{\parbox{200pt}{\tct{byequiv (_: P ==> Q)}}} \\
+    \inferrule%%
+      {\pRHL{P}{f_1}{f_2}{Q} \\%
+       P~\vec{a}_1~m_1~\vec{a}_2~m_2 \\%
+       Q \Rightarrow E_2\{2\}  \Rightarrow E_1\{1\}} %%
+      {\PR{f_1}{\vec{a}_1}{\mem{m_1}}{E_1} \geq \PR{f_2}{\vec{a}_2}{m_2}{E_2}}%%
+      \quad\mbox{\parbox{200pt}{\tct{byequiv (_: P ==> Q)}}} \\
+    \inferrule%%
+      {\pRHL{P}{f_1}{f_2}{Q} \\% 
+       P~\vec{a}_1~m_1~\vec{a}_2~m_2 \\%
+       Q \Rightarrow \neg B_2\{2\} \Rightarrow E_1\{1\}  \Rightarrow E_2\{2\}}%%
+      {\PR{f_1}{\vec{a}_1}{\mem{m_1}}{E_1}
+       \leq \PR{f_2}{\vec{a}_2}{m_2}{E_2}
+          + \PR{f_2}{\vec{a}_2}{m_2}{B_2}}%% 
+      \quad\mbox{\parbox{200pt}{\tct{byequiv (_: P ==> Q)}}} \\
+    \inferrule%%
+      {\pRHL{P}{f_1}{f_2}{Q} \\% 
+       P~\vec{a}_1~m_1~\vec{a}_2~m_2 \\%
+       Q \Rightarrow
+         (B_1\{1\} \Leftrightarrow B_2\{2\})
+         \wedge (\neg B_2\{2\} \Rightarrow E_1\{1\} \Leftrightarrow E_2\{2\})}%%
+      {| \PR{f_1}{\vec{a}_1}{\mem{m_1}}{E_1} - \PR{f_2}{\vec{a}_2}{m_2}{E_2} |
+       \leq \PR{f_2}{\vec{a}_2}{m_2}{B_2}}%% 
+      \quad\mbox{\parbox{200pt}{\tct{byequiv (_: P ==> Q) : B$_1$}}} \\%%
+    \inferrule%%
+      {\pRHL{P}{f_1}{f_2}{E_1\{1\} \Leftrightarrow E_2\{2\}} \\%
+       P~\vec{a}_1~m_1~\vec{a}_2~m_2}%%
+      {\PR{f_1}{\vec{a}_1}{\mem{m_1}}{E_1} = \PR{f_2}{\vec{a}_2}{m_2}{E_2}}%%
+      \quad\mbox{\parbox{200pt}{\tct{byequiv [-eq] (_: P ==> _)}}}
   \end{mathpar}
  \end{tsyntax}
 

@@ -7,18 +7,18 @@
 
   \textbf{Examples:}
   \begin{mathpar}
-  \inferrule*[left=(\prhl),rightskip=10em]%%
+  \inferrule%%
     {P \Rightarrow \mathsf{false}}%%
     {\pRHL{P}{c}{c'}{Q}}%%
-    \quad\raisebox{.7em}{\tct{exfalso}} \\
-  \inferrule*[left=(\phl),rightskip=10em]%%
+    \quad\mbox{(\prhl)\quad\parbox{200pt}{\tct{exfalso}}} \\
+  \inferrule%%
     {P \Rightarrow \mathsf{false}}%%
     {\pHL{P}{c}{Q}{\diamond}{\delta}}%%
-    \quad\raisebox{.7em}{\tct{exfalso}} \\
-  \inferrule*[left=(\hl),rightskip=10em]%%
+    \quad\mbox{(\phl)\quad\parbox{200pt}{\tct{exfalso}}} \\
+  \inferrule%%
     {P \Rightarrow \mathsf{false}}%%
     {\HL{P}{c}{Q}}%%
-    \quad\raisebox{.7em}{\tct{exfalso}} \\
+    \quad\mbox{(\hl)\quad\parbox{200pt}{\tct{exfalso}}} \\
   \end{mathpar}
   \fix{Move \tct{exfalso} to automatic tactics}?
   \end{tsyntax}

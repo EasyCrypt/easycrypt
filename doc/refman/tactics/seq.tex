@@ -5,11 +5,11 @@
 
   \textbf{Examples:}
   \begin{mathpar}
-  \inferrule*[left=(\prhl),rightskip=10em]%%
+  \inferrule%%
     {\pRHL{P}{c_1}{c_2}{R}\\%%
      \pRHL{R}{c_1'}{c_2'}{Q}}%%
     {\pRHL{P}{c_1;c_1'}{c_2;c_2'}{Q}}%%
-    \quad\raisebox{.7em}{\tct{seq $\ \left|c_1\right|$ $\ \left|c_2\right|$: R}}\\%%
+    \quad\mbox{(\prhl)\quad\parbox{200pt}{\tct{seq $\ \left|c_1\right|$ $\ \left|c_2\right|$: R}}}\\%%
   \end{mathpar}
   \end{tsyntax}
 
@@ -18,11 +18,11 @@
 
   \textbf{Examples:}
   \begin{mathpar}
-  \inferrule*[left=(\hl),rightskip=10em]%%
+  \inferrule%%
     {\HL{P}{c}{R}\\%%
      \HL{R}{c'}{Q} }%%
     {\HL{P}{c;c'}{Q}}%%
-    \quad\raisebox{.7em}{\tct{seq $\ \left|c\right|$: R}}\\%%
+    \quad\mbox{(\hl)\quad\parbox{200pt}{\tct{seq $\ \left|c\right|$: R}}}\\%%
   \end{mathpar}
   \end{tsyntax}
 
@@ -37,7 +37,7 @@
 
   \textbf{Examples:}
   \begin{mathpar}
-  \inferrule*[left=(\phl),rightskip=10em]%%
+  \inferrule%%
     {\HL{P}{c}{I} \\%
      \pHL{P}{c}{R}{\diamond}{\delta_1}  \\%
      \pHL{R \wedge I}{c'}{Q}{\diamond}{\delta_2} \\%
@@ -45,15 +45,15 @@
      \pHL{\neg R \wedge I}{c'}{Q}{\diamond}{\delta_4} \\%
      \delta_1 \delta_2 + \delta_3 \delta_4 \diamond \delta}%%
     {\pHL{P}{c;c'}{Q}{\diamond}{\delta}}%%
-    \quad\raisebox{.7em}{\tct{seq $\ \left|c\right|$: R $\ \delta_1$ $\ \delta_2$ $\ \delta_3$ $\ \delta_4$ I}}\\%%
-  \inferrule*[left=(\phl),rightskip=10em]%%
+    \quad\mbox{(\phl)\quad\parbox{200pt}{\tct{seq $\ \left|c\right|$: R $\ \delta_1$ $\ \delta_2$ $\ \delta_3$ $\ \delta_4$ I}}}\\%%
+  \inferrule%%
     {\HL{P}{c}{\mathsf{true}} \\%
      \pHL{P}{c}{R}{\diamond}{\delta_1}  \\%
      \pHL{R \wedge I}{c'}{Q}{\diamond}{\delta_2} \\%
      \pHL{\neg R \wedge I}{c'}{Q}{\diamond}{0} \\%
      \delta_1 \delta_2 \diamond \delta}%%
     {\pHL{P}{c;c'}{Q}{\diamond}{\delta}}%%
-    \quad\raisebox{.7em}{\tct{seq $\ \left|c\right|$: R $\ \delta_1$ $\ \delta_2$ _ $0$}}\\%%
+    \quad\mbox{(\phl)\quad\parbox{200pt}{\tct{seq $\ \left|c\right|$: R $\ \delta_1$ $\ \delta_2$ _ $0$}}}\\%%
   \end{mathpar}
 
   \textbf{Note:} Since most tactics implicitly apply the \rtactic{seq}

@@ -7,20 +7,20 @@
 
   \textbf{Examples:}
   \begin{mathpar}
-  \inferrule*[rightskip=5em]%%
+  \inferrule%%
     {\delta_{A} + \delta_{B} - \delta_{AB} \diamond \delta \\%
      \pHL{P}{c}{A}{\diamond}{\delta_{A}} \\%
      \pHL{P}{c}{B}{\diamond}{\delta_{B}} \\%
-     \pHL{P}{c}{A \wedge B}{\symrel{\diamond}}{\delta_{AB}}}%%
+     \pHL{P}{c}{A \wedge B}{\invrel{\diamond}}{\delta_{AB}}}%%
     {\pHL{P}{c}{A \vee B}{\diamond}{\delta}}%%
-    \quad\raisebox{.7em}{\tct{phoare split $\ \delta_{A}$ $\ \delta_{B}$ $\ \delta_{AB}$}} \\%%
-  \inferrule*[rightskip=5em]%%
+    \quad\mbox{(\phl)\quad\parbox{200pt}{\tct{phoare split $\ \delta_{A}$ $\ \delta_{B}$ $\ \delta_{AB}$}}} \\%%
+  \inferrule%%
     {\delta_{A} + \delta_{B} - \delta_{AB} \diamond \delta \\%
      \pHL{P}{c}{A}{\diamond}{\delta_{A}} \\%
      \pHL{P}{c}{B}{\diamond}{\delta_{B}} \\%
-     \pHL{P}{c}{A \vee B}{\symrel{\diamond}}{\delta_{AB}}}%%
+     \pHL{P}{c}{A \vee B}{\invrel{\diamond}}{\delta_{AB}}}%%
     {\pHL{P}{c}{A \wedge B}{\diamond}{\delta}}%%
-    \quad\raisebox{.7em}{\tct{phoare split $\ \delta_{A}$ $\ \delta_{B}$ $\ \delta_{AB}$}} \\%%
+    \quad\mbox{(\phl)\quad\parbox{200pt}{\tct{phoare split $\ \delta_{A}$ $\ \delta_{B}$ $\ \delta_{AB}$}}} \\%%
   \end{mathpar}
   \end{tsyntax}
 
@@ -30,12 +30,12 @@
 
   \textbf{Examples:}
   \begin{mathpar}
-  \inferrule*[rightskip=5em]%%
+  \inferrule%%
     {\delta_{\top} - \delta_{!} \diamond \delta \\%
      \pHL{P}{c}{\mathsf{true}}{\diamond}{\delta_{\top}} \\%
-     \pHL{P}{c}{!Q}{\symrel{\diamond}}{\delta_{!}}}%%
+     \pHL{P}{c}{!Q}{\invrel{\diamond}}{\delta_{!}}}%%
     {\pHL{P}{c}{Q}{\diamond}{\delta}}%%
-    \quad\raisebox{.7em}{\tct{phoare split $\ {!}$ $\ \delta_{\top}$ $\ \delta_{!}$}} \\%%
+    \quad\mbox{(\phl)\quad\parbox{200pt}{\tct{phoare split $\ {!}$ $\ \delta_{\top}$ $\ \delta_{!}$}}} \\%%
   \end{mathpar}
   \end{tsyntax}
 
@@ -44,12 +44,12 @@
 
   \textbf{Examples:}
   \begin{mathpar}
-  \inferrule*[rightskip=5em]%%
+  \inferrule%%
     {\delta_{A} + \delta_{!A} \diamond \delta \\%
      \pHL{P}{c}{Q \wedge A}{\diamond}{\delta_{A}} \\%
      \pHL{P}{c}{Q \wedge \neg A}{\diamond}{\delta_{!A}}}%%
     {\pHL{P}{c}{Q}{\diamond}{\delta}}%%
-    \quad\raisebox{.7em}{\tct{phoare split $\ \delta_{A}$ $\ \delta_{!A}$: A}} \\%%
+    \quad\mbox{(\phl)\quad\parbox{200pt}{\tct{phoare split $\ \delta_{A}$ $\ \delta_{!A}$: A}}} \\%%
   \end{mathpar}
   \end{tsyntax}  
 \end{tactic}

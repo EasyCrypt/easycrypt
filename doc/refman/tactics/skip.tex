@@ -4,18 +4,18 @@
 
   \textbf{Examples:} 
   \begin{mathpar}
-  \inferrule*[left=(\prhl),rightskip=10em]%%
+  \inferrule%%
     {P \Rightarrow Q }%%
     {\pRHL{P}{\Skip}{\Skip}{Q}}%%
-    \quad\raisebox{.7em}{\tct{skip}} \\
-  \inferrule*[left=(\phl),rightskip=10em]%%
+    \quad\mbox{(\prhl)\quad\parbox{200pt}{\tct{skip}}} \\
+  \inferrule%%
     {P \Rightarrow Q }%%
     {\pHL{P'}{\Skip}{Q'}{\diamond}{1}}%%
-    \quad\raisebox{.7em}{\tct{skip}} \\
-  \inferrule*[left=(\hl),rightskip=10em]%%
+    \quad\mbox{(\phl)\quad\parbox{200pt}{\tct{skip}}} \\
+  \inferrule%%
     {P \Rightarrow Q}%%
     {\HL{P}{\Skip}{Q}}%%
-    \quad\raisebox{.7em}{\tct{skip}} \\
+    \quad\mbox{(\hl)\quad\parbox{200pt}{\tct{skip}}} \\
   \end{mathpar}
 
   \textbf{Note:} Note that the \phl rule forces the bound of the goal
