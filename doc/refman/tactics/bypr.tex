@@ -7,17 +7,23 @@
   \textbf{Examples:}
   \begin{mathpar}
     \inferrule%%
-      {\forall m_1, m_2, a.\, E_1 = a \Rightarrow E_2 = a \Rightarrow Q~m_1~ m_2 \\%
-       \forall \vec{a}_1, \vec{a}_2, m_1, m_2, a.\, P~\vec{a}_1~m_1~\vec{a}_2~m_2 \Rightarrow%
-         \PR{f_1}{\vec{a}_1}{\mem{m_1}}{a = E_1} = \PR{f_2}{\vec{a}_2}{\mem{m_2}}{a = E_2}} %%
+      {\forall \mem{m_1}, \mem{m_2}, a.\,
+          r_1 = a \Rightarrow
+          r_2 = a \Rightarrow
+          \Rel{Q}{\mem{m_1}}{\mem{m_2}} \\%
+       \forall \vec{a}_1, \vec{a}_2, \mem{m_1}, \mem{m_2}, a.\,
+          \Rel{P}{\mem{m_1}[\Arg\mapsto\vec{a}_1]}{\mem{m_2}[\Arg\mapsto\vec{a}_2]} \Rightarrow%
+         \PR{f_1}{\vec{a}_1}{\mem{m_1}}{a = r_1} = \PR{f_2}{\vec{a}_2}{\mem{m_2}}{a = r_2}} %%
       {\pRHL{P}{f_1}{f_2}{Q}}%%
-      \quad\mbox{(\prhl)\quad\parbox{200pt}{\tct{bypr (E$_1$) (E$_2$)}}} \\
+      \quad\mbox{(\prhl)\quad\parbox{200pt}{\tct{bypr (r$_1$) (r$_2$)}}} \\
     \inferrule%%
-      {\forall m, \vec{a}.\,P~\vec{a}~m \Rightarrow \PR{f}{\vec{a}}{m}{E} \mathrel{\diamond} \delta\{m\}}%%
+      {\forall \mem{m}, \vec{a}.\,\Pred{P}{m[\Arg\mapsto\vec{a}]} \Rightarrow
+          \PR{f}{\vec{a}}{m}{E} \mathrel{\diamond} \delta}%%
       {\pHL{P}{f}{E}{\diamond}{\delta}}
       \quad\mbox{(\phl)\quad\parbox{200pt}{\tct{bypr}}} \\
     \inferrule%%
-      {\forall m, \vec{a}.\,P~\vec{a}~m \Rightarrow \PR{f}{\vec{a}}{m}{\neg E} \mathop{=}0$\%$r}%%
+      {\forall \mem{m}, \vec{a}.\,\Pred{P}{m[\Arg\mapsto\vec{a}]} \Rightarrow
+          \PR{f}{\vec{a}}{m}{\neg E} \mathop{=}0$\%$r}%%
       {\HL{P}{f}{E}}
       \quad\mbox{(\hl)\quad\parbox{200pt}{\tct{bypr}}} \\
   \end{mathpar}

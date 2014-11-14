@@ -6,9 +6,7 @@
   with a wildcard \tct{_} to keep the value it contains in the current
   goal and trivially discharge the corresponding subgoal.
 
-  \textbf{Examples:} In the following, $\leq^\uparrow$ (resp. $=^\uparrow$,
-  $\geq^\uparrow$) is $\Leftarrow$ (resp. $\Leftrightarrow$ and
-  $\Rightarrow$).
+  \textbf{Examples:}
   \begin{mathpar}
   \inferrule%%
     {P' \Rightarrow P \\%
@@ -75,8 +73,8 @@
   \textbf{Examples:}
   \begin{mathpar}
   \inferrule%%
-    {P' \Rightarrow P \wedge P_1\{1\} \wedge P_2\{2\} \\%
-     Q \wedge Q_1\{1\} \wedge Q_2\{2\} \Rightarrow Q' \\%
+    {P' \Rightarrow P \wedge \inmem{P_1}{1} \wedge \inmem{P_2}{2} \\%
+     Q \wedge \inmem{Q_1}{1} \wedge \inmem{Q_2}{2} \Rightarrow Q' \\%
      \HL{P_1}{c_1}{Q_1} \\%
      \HL{P_2}{c_2}{Q_2} \\%
      \pRHL{P}{c_1}{c_2}{Q}}%%

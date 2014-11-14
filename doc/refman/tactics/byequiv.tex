@@ -18,25 +18,25 @@
   \begin{mathpar}
     \inferrule%%
       {\pRHL{P}{f_1}{f_2}{Q} \\%
-       P~\vec{a}_1~m_1~\vec{a}_2~m_2 \\%
+       \Rel{P}{m_1[\Arg\mapsto\vec{a}_1]}{m_2[\Arg\mapsto\vec{a}_2]} \\%
        Q \Rightarrow E_1\{1\}  \Leftrightarrow E_2\{2\}}%%
       {\PR{f_1}{\vec{a}_1}{\mem{m_1}}{E_1} = \PR{f_2}{\vec{a}_2}{m_2}{E_2}}%%
       \quad\mbox{\parbox{200pt}{\tct{byequiv (_: P ==> Q)}}} \\
     \inferrule%%
       {\pRHL{P}{f_1}{f_2}{Q} \\% 
-       P~\vec{a}_1~m_1~\vec{a}_2~m_2 \\%
+       \Rel{P}{m_1[\Arg\mapsto\vec{a}_1]}{m_2[\Arg\mapsto\vec{a}_2]} \\%
        Q \Rightarrow E_1\{1\}  \Rightarrow E_2\{2\}}%%
       {\PR{f_1}{\vec{a}_1}{\mem{m_1}}{E_1} \leq \PR{f_2}{\vec{a}_2}{m_2}{E_2}}%%
       \quad\mbox{\parbox{200pt}{\tct{byequiv (_: P ==> Q)}}} \\
     \inferrule%%
       {\pRHL{P}{f_1}{f_2}{Q} \\%
-       P~\vec{a}_1~m_1~\vec{a}_2~m_2 \\%
+       \Rel{P}{m_1[\Arg\mapsto\vec{a}_1]}{m_2[\Arg\mapsto\vec{a}_2]} \\%
        Q \Rightarrow E_2\{2\}  \Rightarrow E_1\{1\}} %%
       {\PR{f_1}{\vec{a}_1}{\mem{m_1}}{E_1} \geq \PR{f_2}{\vec{a}_2}{m_2}{E_2}}%%
       \quad\mbox{\parbox{200pt}{\tct{byequiv (_: P ==> Q)}}} \\
     \inferrule%%
       {\pRHL{P}{f_1}{f_2}{Q} \\% 
-       P~\vec{a}_1~m_1~\vec{a}_2~m_2 \\%
+       \Rel{P}{m_1[\Arg\mapsto\vec{a}_1]}{m_2[\Arg\mapsto\vec{a}_2]} \\%
        Q \Rightarrow \neg B_2\{2\} \Rightarrow E_1\{1\}  \Rightarrow E_2\{2\}}%%
       {\PR{f_1}{\vec{a}_1}{\mem{m_1}}{E_1}
        \leq \PR{f_2}{\vec{a}_2}{m_2}{E_2}
@@ -44,7 +44,7 @@
       \quad\mbox{\parbox{200pt}{\tct{byequiv (_: P ==> Q)}}} \\
     \inferrule%%
       {\pRHL{P}{f_1}{f_2}{Q} \\% 
-       P~\vec{a}_1~m_1~\vec{a}_2~m_2 \\%
+       \Rel{P}{m_1[\Arg\mapsto\vec{a}_1]}{m_2[\Arg\mapsto\vec{a}_2]} \\%
        Q \Rightarrow
          (B_1\{1\} \Leftrightarrow B_2\{2\})
          \wedge (\neg B_2\{2\} \Rightarrow E_1\{1\} \Leftrightarrow E_2\{2\})}%%
@@ -53,14 +53,14 @@
       \quad\mbox{\parbox{200pt}{\tct{byequiv (_: P ==> Q) : B$_1$}}} \\%%
     \inferrule%%
       {\pRHL{P}{f_1}{f_2}{E_1\{1\} \Leftrightarrow E_2\{2\}} \\%
-       P~\vec{a}_1~m_1~\vec{a}_2~m_2}%%
+       \Rel{P}{m_1[\Arg\mapsto\vec{a}_1]}{m_2[\Arg\mapsto\vec{a}_2]}}%%
       {\PR{f_1}{\vec{a}_1}{\mem{m_1}}{E_1} = \PR{f_2}{\vec{a}_2}{m_2}{E_2}}%%
       \quad\mbox{\parbox{200pt}{\tct{byequiv [-eq] (_: P ==> _)}}}
   \end{mathpar}
  \end{tsyntax}
 
   \begin{tsyntax}{byequiv <lemma>}
-  Same as \tct{byequiv <specification>}, but the specification to use
+  Same as \tct{byequiv <spec>}, but the specification to use
   is inferred from the lemma provided. Raises an error if the lemma
   does not refer to the expected procedures. Inference options have no
   effect in this setting.

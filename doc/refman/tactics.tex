@@ -54,7 +54,59 @@ to denote programs, using $f$ (or \tct{f}) when only judgments on
 procedures are allowed by the context, and $s$ (or \tct{s}) when only
 judgments on statements are allowed.
 
-TODO: define \tct{<spec>}, \tct{<lemma>}, \tct{<prhl>}, \tct{<phl>}, \tct{<hl>}.
+\EasyCrypt includes three different program logics:
+\begin{itemize}
+\item \prhl, or probabilistic relational Hoare logic, with judgments of the form
+%%
+$$\pRHL{P}{c_1}{c_2}{Q}$$
+%%
+where $c_1$ and $c_2$ are programs, and $P$ and $Q$
+are relations on memories.
+\item \phl, or probabilistic Hoare logic, with judgments of the form
+%%
+$$\pHL{P}{c}{Q}{\diamond}{\delta}$$
+%%
+where $c$ is a program, $P$ and $Q$ are predicates on memories,
+$\diamond\in\{\leq,\geq,=\}$ is a comparison relation and $\delta$ is
+a real-valued expression, evaluated in the initial memory.
+\item \hl, or (possibilistic) Hoare logic, with judgments of the form
+%%
+$$\HL{P}{c}{Q}$$
+%%
+where $c$ is a program, and $P$ and $Q$ are predicates on memories.
+\end{itemize}
+
+When $c$ is a procedure, preconditions ($P$ above) operate on memories
+extended with a special $\Arg$ location that refers to the procedure's
+arguments, and postcondition ($Q$ above) operate on memories extended
+with a special $\Res$ location that refers to the procedure's return
+value.
+
+In the following, given a relation $R$, we denote with $\invrel{R}$
+its inverse relation (that is,
+%%
+$\Rel{R}{m_1}{m_2} \Leftrightarrow \Rel{\invrel{R}}{m_2}{m_1}$).
+
+We denote with $\diamond^{\uparrow}$ the function defined by
+$$
+\cdot^{\uparrow} =
+\left\{\begin{array}{l @{\quad\mapsto\quad} r}
+=    & \Leftrightarrow \\
+\leq & \Leftarrow      \\
+\geq & \Rightarrow
+\end{array}\right.
+$$
+
+Given a predicate $P$, we denote with $\inmem{P}{1}$
+(resp. $\inmem{P}{2}$) the relation defined by
+%%
+$\Rel{\inmem{P}{1}}{m_1}{m_2} \Leftrightarrow \Pred{P}{m_1}$
+(resp. $\Rel{\inmem{P}{2}}{m_1}{m_2} \Leftrightarrow \Pred{P}{m_2}$).
+We lift logical connectors to predicates and relations over memories
+in the natural way.
+
+TODO: define \tct{<spec>}, \tct{<lemma>}, \tct{<prhl>}, \tct{<phl>},
+\tct{<hl>}.
 
 \paragraph{Reasoning on Specifications}
 \input{tactics/symmetry.tex}
