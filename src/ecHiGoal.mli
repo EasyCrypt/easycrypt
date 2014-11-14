@@ -14,8 +14,9 @@ open EcProofTerm
 
 (* -------------------------------------------------------------------- *)
 type ttenv = {
-  tt_provers : EcParsetree.pprover_infos -> EcProvers.prover_infos;
-  tt_smtmode : [`Admit | `Strict | `Standard];
+  tt_provers   : EcParsetree.pprover_infos -> EcProvers.prover_infos;
+  tt_smtmode   : [`Admit | `Strict | `Standard];
+  tt_implicits : bool;
 }
 
 type smtinfo = pdbhint option * pprover_infos
@@ -66,7 +67,7 @@ val process_mintros     : ?cf:bool -> intropattern -> tactical
 val process_generalize  : genpattern list -> backward
 val process_clear       : psymbol list -> backward
 val process_smt         : ttenv -> smtinfo -> backward
-val process_apply       : apply_t -> backward
+val process_apply       : implicits:bool -> apply_t -> backward
 val process_rewrite     : ttenv -> (tfocus located option * rwarg1) list -> backward
 val process_subst       : pformula list -> backward
 val process_cut         : engine -> cut_t -> backward

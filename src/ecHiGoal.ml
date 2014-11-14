@@ -32,8 +32,9 @@ module LG  = EcCoreLib.CI_Logic
 
 (* -------------------------------------------------------------------- *)
 type ttenv = {
-  tt_provers : EcParsetree.pprover_infos -> EcProvers.prover_infos;
-  tt_smtmode : [`Admit | `Strict | `Standard];
+  tt_provers   : EcParsetree.pprover_infos -> EcProvers.prover_infos;
+  tt_smtmode   : [`Admit | `Strict | `Standard];
+  tt_implicits : bool;
 }
 
 type engine  = ptactic_core -> FApi.backward
@@ -855,9 +856,9 @@ let t_apply_prept pt tc =
   LowApply.t_apply_bwd_r (pt_of_prept tc pt) tc
 
 (* -------------------------------------------------------------------- *)
-let process_apply_bwd mode (ff : ffpattern) (tc : tcenv1) =
+let process_apply_bwd ~implicits mode (ff : ffpattern) (tc : tcenv1) =
   try
-    let pt   = PT.tc1_process_full_pterm tc ff in
+    let pt   = PT.tc1_process_full_pterm ~implicits tc ff in
     let aout = LowApply.t_apply_bwd_r pt tc in
 
     match mode with
@@ -872,7 +873,7 @@ let process_apply_bwd mode (ff : ffpattern) (tc : tcenv1) =
     tc_error !!tc "cannot apply lemma"
 
 (* -------------------------------------------------------------------- *)
-let process_apply_fwd (pe, hyp) tc =
+let process_apply_fwd ~implicits (pe, hyp) tc =
   let module E = struct exception NoInstance end in
 
   let hyps = FApi.tc1_hyps tc in
@@ -881,7 +882,7 @@ let process_apply_fwd (pe, hyp) tc =
     tc_error !!tc "unknown hypothesis: %s" (unloc hyp);
 
   let hyp, fp = LDecl.lookup_hyp (unloc hyp) hyps in
-  let pte = PT.tc1_process_full_pterm tc pe in
+  let pte = PT.tc1_process_full_pterm ~implicits tc pe in
 
   let rec instantiate pte =
     match TTC.destruct_product hyps pte.PT.ptev_ax with
@@ -913,12 +914,19 @@ let process_apply_fwd (pe, hyp) tc =
 (* -------------------------------------------------------------------- *)
 type apply_t = EcParsetree.apply_info
 
-let process_apply (infos : apply_t) tc =
+let process_apply ~implicits (infos : apply_t) tc =
+  let implicits = function
+    | `Implicit -> implicits
+    | `Explicit -> false
+  in
+
   match infos with
-  | `ApplyIn (pe, tg) -> process_apply_fwd (pe, tg) tc
+  | `ApplyIn ((mode, pe), tg) ->
+      process_apply_fwd ~implicits:(implicits mode) (pe, tg) tc
 
   | `Apply (pe, mode) ->
-      let for1 tc pe = t_last (process_apply_bwd `Apply pe) tc in
+      let for1 tc (mode, pe) =
+        t_last (process_apply_bwd ~implicits:(implicits mode) `Apply pe) tc in
       let tc = List.fold_left for1 (tcenv_of_tcenv1 tc) pe in
       if mode = `Exact then t_onall process_done tc else tc
 

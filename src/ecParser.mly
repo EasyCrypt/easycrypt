@@ -1610,6 +1610,10 @@ fpattern(F):
 | LPAREN hd=fpattern_head(F) args=loc(fpattern_arg)* RPAREN
    { mk_fpattern hd args }
 
+efpattern:
+| x=boption(AT) ff=fpattern(form)
+    { (if x then `Explicit else `Implicit), ff }
+
 pterm:
 | p=qident tvi=tvars_app? args=loc(fpattern_arg)*
     { { pt_name = p; pt_tys = tvi; pt_args = args; } }
@@ -1899,19 +1903,19 @@ logtactic:
 | ELIM SLASH p=qident e=genpattern*
    { Pelim (e, Some p) }
 
-| APPLY e=fpattern(form)
+| APPLY e=efpattern
    { Papply (`Apply ([e], `Apply)) }
 
-| APPLY es=prefix(SLASH, fpattern(form))+
+| APPLY es=prefix(SLASH, efpattern)+
    { Papply (`Apply (es, `Apply)) }
 
-| APPLY e=fpattern(form) IN x=ident
+| APPLY e=efpattern IN x=ident
    { Papply (`ApplyIn (e, x)) }
 
-| EXACT e=fpattern(form)
+| EXACT e=efpattern
    { Papply (`Apply ([e], `Exact)) }
 
-| EXACT es=prefix(SLASH, fpattern(form))+
+| EXACT es=prefix(SLASH, efpattern)+
    { Papply (`Apply (es, `Exact)) }
 
 | l=simplify

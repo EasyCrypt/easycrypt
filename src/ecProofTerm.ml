@@ -13,7 +13,8 @@ open EcFol
 open EcEnv
 open EcCoreGoal
 
-module L = EcLocation
+module L  = EcLocation
+module PT = EcProofTyping
 
 (* -------------------------------------------------------------------- *)
 type pt_env = {
@@ -76,7 +77,7 @@ let copy pe =
 let ptenv_of_penv (hyps : LDecl.hyps) (pe : proofenv) =
   { pte_pe = pe;
     pte_hy = hyps;
-    pte_ue = EcProofTyping.unienv_of_hyps hyps;
+    pte_ue = PT.unienv_of_hyps hyps;
     pte_ev = ref EcMatching.MEV.empty; }
 
 (* -------------------------------------------------------------------- *)
@@ -341,7 +342,7 @@ let process_named_pterm pe (tvi, fp) =
       (fun () -> omap (EcTyping.transtvi env pe.pte_ue) tvi)
   in
 
-  EcProofTyping.pf_check_tvi pe.pte_pe typ tvi;
+  PT.pf_check_tvi pe.pte_pe typ tvi;
 
   (* FIXME: TC HOOK *)
   let fs  = EcUnify.UniEnv.opentvi pe.pte_ue typ tvi in
@@ -371,7 +372,7 @@ let process_pterm_cut ~prcut pe pt =
 
 (* ------------------------------------------------------------------ *)
 let process_pterm pe pt =
-  let prcut = EcProofTyping.pf_process_formula pe.pte_pe pe.pte_hy in
+  let prcut = PT.pf_process_formula pe.pte_pe pe.pte_hy in
   process_pterm_cut prcut pe pt
 
 (* ------------------------------------------------------------------ *)
@@ -437,7 +438,7 @@ and trans_pterm_arg_mem pe ?name { pl_desc = arg } =
 
 (* ------------------------------------------------------------------ *)
 and process_pterm_arg ({ ptev_env = pe } as pt) arg =
-  match EcProofTyping.destruct_product pe.pte_hy pt.ptev_ax with
+  match PT.destruct_product pe.pte_hy pt.ptev_ax with
   | None -> tc_pterm_apperror pe.pte_pe `NotFunctional
 
   | Some (`Imp (f, _)) -> begin
@@ -524,7 +525,7 @@ and apply_pterm_to_oarg ({ ptev_env = pe; ptev_pt = rawpt; } as pt) oarg =
 
   let oarg = oarg |> omap (fun arg -> arg.ptea_arg) in
 
-  match EcProofTyping.destruct_product pe.pte_hy pt.ptev_ax with
+  match PT.destruct_product pe.pte_hy pt.ptev_ax with
   | None   -> tc_pterm_apperror pe.pte_pe `NotFunctional
   | Some t ->
       let (newax, newarg) =
@@ -574,9 +575,27 @@ and process_pterm_args_app pt args =
   List.fold_left process_pterm_arg_app pt args
 
 (* -------------------------------------------------------------------- *)
-and process_full_pterm pe pf =
+and process_full_pterm ?(implicits = false) pe pf =
   let pt = process_pterm pe pf.fp_kind in
-    process_pterm_args_app pt pf.fp_args
+  let pt =
+    match implicits with
+    | false -> pt
+    | true  ->
+      let rec apply ({ ptev_pt = pt; ptev_env = env; } as pe) =
+        match PT.destruct_product env.pte_hy pe.ptev_ax with
+        | Some (`Forall (x, xty, f)) ->
+            let (newax, newarg) = check_pterm_oarg env (x, xty) f None in
+            let pt = { pt with pt_args = pt.pt_args @ [newarg] } in
+            let pe = { pe with ptev_ax = newax; ptev_pt = pt } in
+            apply pe
+        | _ -> pe
+
+    in
+
+    let isform = function PAFormula _ -> true | _ -> false in
+    if not (List.for_all isform pt.ptev_pt.pt_args) then pt else apply pt
+
+  in process_pterm_args_app pt pf.fp_args
 
 (* -------------------------------------------------------------------- *)
 let process_full_pterm_cut ~prcut pe pf =
@@ -620,10 +639,10 @@ let tc1_process_full_pterm_cut ~prcut (tc : tcenv1) (ff : 'a fpattern) =
   process_full_pterm_cut ~prcut (ptenv_of_penv hyps pe) ff
 
 (* -------------------------------------------------------------------- *)
-let tc1_process_full_pterm (tc : tcenv1) (ff : ffpattern) =
+let tc1_process_full_pterm ?implicits (tc : tcenv1) (ff : ffpattern) =
   let pe   = FApi.tc1_penv tc in
   let hyps = FApi.tc1_hyps tc in
-  process_full_pterm (ptenv_of_penv hyps pe) ff
+  process_full_pterm ?implicits (ptenv_of_penv hyps pe) ff
 
 (* -------------------------------------------------------------------- *)
 let tc1_process_full_closed_pterm_cut ~prcut (tc : tcenv1) (ff : 'a fpattern) =

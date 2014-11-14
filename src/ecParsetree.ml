@@ -334,7 +334,8 @@ type 'a fpattern = {
   fp_args : fpattern_arg located list
 }
 
-type ffpattern  = pformula fpattern
+type ffpattern = pformula fpattern
+type efpattern = [`Implicit | `Explicit] * ffpattern
 
 type cfpattern  = (pformula option pair) fpattern
 type ccfpattern =
@@ -558,8 +559,8 @@ type ppgoption = [
 ]
 
 type apply_info = [
-  | `ApplyIn of ffpattern * psymbol
-  | `Apply   of ffpattern list * [`Apply|`Exact]
+  | `ApplyIn of efpattern * psymbol
+  | `Apply   of efpattern list * [`Apply|`Exact]
 ]
 
 type ppgoptions = (bool * ppgoption) list

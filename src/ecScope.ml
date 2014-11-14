@@ -444,7 +444,11 @@ module Tactics = struct
           | _         , `Check     -> `Strict
         in
 
-        let ttenv = { EcHiGoal.tt_provers = pi scope; EcHiGoal.tt_smtmode = htmode; } in
+        let ttenv = {
+          EcHiGoal.tt_provers   = pi scope;
+          EcHiGoal.tt_smtmode   = htmode;
+          EcHiGoal.tt_implicits = Options.get_implicits scope; } in
+
         let juc   = TTC.process ttenv tac juc in
         let pac   = { pac with puc_jdg = PSCheck juc } in
           { scope with sc_pr_uc = Some { puc with puc_active = Some pac; } }

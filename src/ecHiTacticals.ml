@@ -112,7 +112,7 @@ and process1_logic (ttenv : ttenv) (t : logtactic) (tc : tcenv1) =
     | Pcongr            -> process_congr
     | Ptrivial          -> process_trivial
     | Pelim pe          -> process_elim pe
-    | Papply pe         -> process_apply pe
+    | Papply pe         -> process_apply ~implicits:ttenv.tt_implicits pe
     | Pcut (ip, f, t)   -> process_cut engine (ip, f, t)
     | Pcutdef (ip, f)   -> process_cutdef (ip, f)
     | Pgeneralize l     -> process_generalize l

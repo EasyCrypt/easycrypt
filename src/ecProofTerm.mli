@@ -49,7 +49,7 @@ val process_pterm                 : pt_env -> pformula fpattern_kind -> pt_ev
 val process_pterm_arg             : pt_ev  -> fpattern_arg located -> pt_ev_arg
 val process_pterm_args_app        : pt_ev  -> fpattern_arg located list -> pt_ev
 val process_full_pterm_cut        : prcut:('a -> form) -> pt_env -> 'a fpattern -> pt_ev
-val process_full_pterm            : pt_env -> ffpattern -> pt_ev
+val process_full_pterm            : ?implicits:bool -> pt_env -> ffpattern -> pt_ev
 val process_full_closed_pterm_cut : prcut:('a -> form) -> pt_env -> 'a fpattern -> proofterm * form
 val process_full_closed_pterm     : pt_env -> ffpattern -> proofterm * form
 
@@ -57,7 +57,7 @@ val process_full_closed_pterm     : pt_env -> ffpattern -> proofterm * form
 val tc1_process_pterm_cut             : prcut:('a -> form) -> tcenv1 -> 'a fpattern_kind -> pt_ev
 val tc1_process_pterm                 : tcenv1 -> pformula fpattern_kind -> pt_ev
 val tc1_process_full_pterm_cut        : prcut:('a -> form) -> tcenv1 -> 'a fpattern -> pt_ev
-val tc1_process_full_pterm            : tcenv1 -> ffpattern -> pt_ev
+val tc1_process_full_pterm            : ?implicits:bool -> tcenv1 -> ffpattern -> pt_ev
 val tc1_process_full_closed_pterm_cut : prcut:('a -> form) -> tcenv1 -> 'a fpattern -> proofterm * form
 val tc1_process_full_closed_pterm     : tcenv1 -> ffpattern -> proofterm * form
 
