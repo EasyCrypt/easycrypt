@@ -3,7 +3,7 @@ require import Real.
 require import FMap. 
 require import FSet.
 
-require (*--*) CDH.
+require (*--*) DiffieHellman.
 require (*--*) AWord.
 require (*--*) ROM.
 require (*--*) PKE.
@@ -25,9 +25,9 @@ op qH: int.
 axiom qH_pos: 0 < qH.
 
 (** Assumption: set CDH with n = qH **)
-clone import CDH as CDH0
+clone import DiffieHellman as DH
   with op Set_CDH.n <- qH.
-import CDH0.CDH.
+import CDH.
 import Set_CDH.
 
 (** Assumption: a ROM (lazy) **)

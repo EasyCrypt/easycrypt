@@ -3,12 +3,12 @@ require import Real.
 require import FMap. 
 require import FSet.
 
-require (*--*) CDH.
+require (*--*) DiffieHellman.
 require (*--*) PKE.
 
 (** Assumption: set DDH *)
-clone import CDH as CDH0.
-import CDH0.DDH.
+clone import DiffieHellman as DH.
+import DDH.
 
 (** Construction: a PKE **)
 type pkey       = group.
@@ -49,7 +49,7 @@ module ElGamal : Scheme = {
 (** Correctness of the scheme *)
 
 hoare Correctness: Correctness(ElGamal).main: true ==> res.
-proof. by proc; inline*; auto; progress;smt. qed.
+proof. proc; inline*; auto; progress; algebra. qed.
 
 (** Exact security *)
 

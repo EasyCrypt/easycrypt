@@ -2,7 +2,7 @@ require import Option.
 require import Int.
 require import Real.
 
-require (*--*) CDH.
+require (*--*) DiffieHellman.
 require (*--*) AWord.
 require (*--*) PKE.
 
@@ -18,7 +18,7 @@ clone import AWord as Bitstring with
   op Dword.dword <- uniform.
 
 (** Assumption: DDH **)
-clone import CDH as CDH0.
+clone import DiffieHellman as DH.
 import DDH.
 
 (** Assumption Entropy Smoothing *)
