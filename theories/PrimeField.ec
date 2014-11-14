@@ -58,56 +58,10 @@ theory F.
 end F.
 export F.
 
-(** Lemmas *)
-lemma subff (x:t): (x - x) = zero
-by [].
-
-lemma add0f (x:t): zero + x = x
-by [].
-
-lemma mulf0 (x:t): x * zero = zero
-by [].
-
-lemma mulNf (x y:t): (-x) * y = - (x * y)
-by [].
-
-lemma mulfN (x y:t): y * (-x)= - (y * x)
-by [].  
-
-lemma nosmt oppK (x:t): -(-x) = x
-by [].
-
-lemma mulfNl (x y z:t): x * y - x * z = x * (y - z)
-by [].
-
-lemma mulN1f (x:t): (-one) * x = -x
-by [].
-
-lemma oppfD (x y:t): (-x) + (-y) = -(x + y)
-by [].
-
-import Int.
-lemma toint_pos (x:t): 0 <= toint x
-by [].
-
-lemma toint_lt (x:t): toint x < q
-by [].
-
-lemma toint_le (x:t): toint x <= q - 1
-by [].
-
-lemma toofint (x:int): 0 <= x => x < q => toint (ofint x) = x.
-proof.
-  intros Hp Hlt;rewrite toofint_mod.
-  by cut H:= ediv_unique x q 0 x _; smt.
-qed.
-
-lemma ofint1_: ofint 1 = F.one 
-by [].
-
 (* Declaring the ring and field structure *)
 require AlgTactic.
 require Ring.
+
 instance ring with t
   op rzero = F.zero
   op rone  = F.one
@@ -166,6 +120,53 @@ instance field with t
   proof ofint1    by smt
   proof ofintS    by smt
   proof ofintN    by smt.
+
+(** Lemmas *)
+lemma nosmt subff (x:t): (x - x) = zero
+by ringeq.
+
+lemma nosmt add0f (x:t): zero + x = x
+by ringeq.
+
+lemma nosmt mulf0 (x:t): x * zero = zero
+by ringeq.
+
+lemma nosmt mulNf (x y:t): (-x) * y = - (x * y)
+by ringeq.
+
+lemma nosmt mulfN (x y:t): y * (-x)= - (y * x)
+by ringeq.  
+
+lemma nosmt oppK (x:t): -(-x) = x
+by ringeq.
+
+lemma nosmt mulfNl (x y z:t): x * y - x * z = x * (y - z)
+by ringeq.
+
+lemma nosmt mulN1f (x:t): (-one) * x = -x
+by ringeq.
+
+lemma nosmt oppfD (x y:t): (-x) + (-y) = -(x + y)
+by ringeq.
+
+import Int.
+lemma nosmt toint_pos (x:t): 0 <= toint x
+by [].
+
+lemma nosmt toint_lt (x:t): toint x < q
+by [].
+
+lemma nosmt toint_le (x:t): toint x <= q - 1
+by [].
+
+lemma nosmt toofint (x:int): 0 <= x => x < q => toint (ofint x) = x.
+proof.
+  intros Hp Hlt;rewrite toofint_mod.
+  by cut H:= ediv_unique x q 0 x _; smt.
+qed.
+
+lemma nosmt ofint1_: ofint 1 = F.one 
+by [].
 
 theory FDistr.
 
