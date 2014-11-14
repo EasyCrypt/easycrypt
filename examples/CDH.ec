@@ -2,33 +2,21 @@ require import Int.
 require import Real.
 require import FSet.
 
-(** Minimalist group theory with only needed components **)
-theory Group.
-  type group.
+require (*  *) CyclicGroup.
 
-  const q: int.
-  const g: group.
-  axiom q_pos: 0 < q.
-
-  op ( * ): group -> group -> group.
-  op ( ^ ): group -> int -> group.
-
-  axiom pow_mult (x y:int): (g ^ x) ^ y = g ^ (x * y). 
-  axiom pow_plus (x y:int): (g ^ x) * (g ^ y) = g ^ (x + y).
-end Group.
+clone export CyclicGroup as G.
 
 theory DDH.
-  clone import Group.
    
   module type Adversary = {
-    proc guess(gx gy gz:group): bool
+    proc guess(gx gy gz:G.group): bool
   }.
 
   module DDH0 (A:Adversary) = {
     proc main() : bool = {
       var b, x, y;
-      x = $[0..q-1];
-      y = $[0..q-1];
+      x = $FDistr.dt;
+      y = $FDistr.dt;
       b = A.guess(g ^ x, g ^ y, g ^ (x*y));
       return b;
     }
@@ -38,9 +26,9 @@ theory DDH.
     proc main() : bool = {
       var b, x, y, z;
         
-      x = $[0..q-1];
-      y = $[0..q-1];
-      z = $[0..q-1];
+      x = $FDistr.dt;
+      y = $FDistr.dt;
+      z = $FDistr.dt;
       b = A.guess(g ^ x, g ^ y, g ^ z);
       return b;
     }
@@ -52,7 +40,6 @@ end DDH.
 
 (** Computational Diffie-Hellman problem **)
 theory CDH.
-  clone import Group.
 
   module type Adversary = {
     proc solve(gx gy:group): group
@@ -62,8 +49,8 @@ theory CDH.
     proc main(): bool = {
       var x, y, r;
 
-      x = $[0..q-1];
-      y = $[0..q-1];
+      x = $FDistr.dt;
+      y = $FDistr.dt;
       r = A.solve(g ^ x, g ^ y);
       return (r = g ^ (x * y));
     }
@@ -72,10 +59,6 @@ end CDH.
 
 (** Set version of the Computational Diffie-Hellman problem **)
 theory Set_CDH.
-  clone (*--*) Group.
-  clone (*--*) CDH with
-    theory Group = Group.
-  import CDH.Group.
 
   const n: int.
 
@@ -87,8 +70,8 @@ theory Set_CDH.
     proc main(): bool = {
       var x, y, s;
 
-      x = $[0..q-1];
-      y = $[0..q-1];
+      x = $FDistr.dt;
+      y = $FDistr.dt;
       s = B.solve(g ^ x, g ^ y);
       return (mem (g ^ (x * y)) s /\ card s <= n);
     }
@@ -109,13 +92,13 @@ theory Set_CDH.
     declare module A: Adversary.
 
     local module SCDH' = {
-      var x, y: int
+      var x, y: F.t
 
       proc aux(): group set = {
         var s;
 
-        x = $[0..q-1];
-        y = $[0..q-1];
+        x = $FDistr.dt;
+        y = $FDistr.dt;
         s = A.solve(g ^ x, g ^ y);
         return s;
       }
@@ -170,23 +153,8 @@ theory Set_CDH.
       rewrite Duni.mu_def; first smt.
       cut ->: card (filter ((=) (g^(SCDH'.x * SCDH'.y))) s){hr} = 1 by smt.
       cut H1: 0 < card s{hr} by smt.
-      by rewrite -!inv_def inv_le; smt.
+      by rewrite -!Real.inv_def inv_le; smt.
     qed.  
   end section.
 
-(*
-  (** Shoup's reduction to CDH -- the proof can be done using loop fusion *)
-  module CDH_from_SCDH_Shoup (A:Adversary, B:Adversary) : CDH.Adversary = {
-    proc solve(gx:group, gy:group) : group = {
-      var a, b, s1, s2, r;
-
-      s1 = A.solve(gx, gy);
-      a = $[0..q-1];
-      b = $[0..q-1];
-      s2 = B.solve(gx ^ a * g ^ b, g ^ b);    
-      r = pick (filter (fun (z:group), mem (z ^ a * gy ^ b) s2) s1);
-      return r;
-    }
-  }.
-*)
 end Set_CDH.
