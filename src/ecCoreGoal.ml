@@ -591,6 +591,27 @@ module FApi = struct
             let tc    = { tc with tce_goals = s; tce_tcenv = tcenv; } in
             tc_normalize tc
 
+  let t_swap_goals (g:int) (delta:int) (tc:tcenv) =
+    if delta = 0 || tc.tce_tcenv.tce_goal = None then tc
+    else
+      let s = 
+        let rgs1,g, gs2 = List.split_n g (tc_opened tc) in
+        if delta < 0 then
+          let len = List.length rgs1 in
+          let rgs2, rgs1 = List.take_n (min (-delta) len) rgs1 in
+          List.rev_append rgs1 (g :: List.rev_append rgs2 gs2)
+        else
+          let len = List.length gs2 in
+          let gs1, gs2 = List.take_n (min delta len) gs2 in
+          List.rev_append rgs1 (gs1 @ g :: gs2) in
+      let tcenv = { tc.tce_tcenv with tce_goal = None; } in
+      let tc    = { tc with tce_goals = s; tce_tcenv = tcenv; } in
+      tc_normalize tc
+
+      
+  
+    
+
   (* ------------------------------------------------------------------ *)
   let t_seq (tt1 : backward) (tt2 : backward) (tc : tcenv1) =
     t_onall tt2 (tt1 tc)

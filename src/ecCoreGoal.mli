@@ -283,6 +283,7 @@ module FApi : sig
   val t_first    : backward -> tactical
   val t_last     : backward -> tactical
   val t_rotate   : direction -> int -> tactical
+  val t_swap_goals: int -> int -> tactical
 
   val t_sub    : backward list -> tactical
 
