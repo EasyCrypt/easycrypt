@@ -883,6 +883,7 @@ let process_conseq notmod (info1, info2, info3) tc =
       | FequivS es ->
         let f = sideif side es.es_sl es.es_sr in
         let m = sideif side es.es_ml es.es_mr in
+        let m = (mhr, snd m) in
         let env = LDecl.push_active m hyps in
         let fmake pre post bd =
           match info1, bd with
