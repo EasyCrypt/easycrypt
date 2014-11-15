@@ -267,11 +267,13 @@ let t_bdHoareS_notmod post tc =
 
 (* -------------------------------------------------------------------- *)
 let gen_conseq_nm tnm tc pre post =
-  FApi.t_internal ~info:"generic-conseq-nm" (
-    FApi.t_seqsub (tnm post)
-      [ t_id;
-        FApi.t_seqsub (tc pre post)
-          [t_id; t_logic_trivial; t_id] ])
+  FApi.t_internal ~info:"generic-conseq-nm" (fun g ->
+    let gs = 
+      (tnm post @+
+        [ t_id;
+          tc pre post @+ [t_id; t_logic_trivial; t_id] ]) g in
+    FApi.t_swap_goals 0 1 gs
+  )
 
 let t_hoareF_conseq_nm   = gen_conseq_nm t_hoareF_notmod   t_hoareF_conseq
 let t_hoareS_conseq_nm   = gen_conseq_nm t_hoareS_notmod   t_hoareS_conseq
