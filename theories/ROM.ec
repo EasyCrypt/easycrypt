@@ -553,6 +553,9 @@ theory SetLog.
   hoare Log_o_stable (O <: Oracle {Log}) x: Log(O).o: mem x Log.qs ==> mem x Log.qs.
   proof. by proc; wp; call (_: true); skip; smt. qed.
 
+  hoare Log_o_Dom: Log(RO).o: Log.qs = dom RO.m ==> Log.qs = dom RO.m.
+  proof. proc; inline*; auto; smt. qed.
+
   module Bound(O:Oracle) = {
     module LO = Log(O)
 

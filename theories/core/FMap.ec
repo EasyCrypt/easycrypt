@@ -336,7 +336,7 @@ intros=> p_m p_xy a; case (x = a).
   by rewrite p_m.
 qed.
 
-(* find *) (* Reduce the axiomatization *)
+(* find *)
 op find: ('a -> 'b -> bool) -> ('a,'b) map -> 'a option.
 
 axiom find_nin (p:'a -> 'b -> bool) m:
@@ -352,6 +352,46 @@ proof.
   case {-1}(find p m) (Logic.eq_refl (find p m))=> //=.
     by rewrite -find_nin; smt. (* de Morgan *)
     by move=> x /find_cor found; exists x.
+qed.
+
+lemma find_ext (p':'a -> 'b -> bool) (m:('a,'b) map) p:
+  (forall x y, p x y = p' x y) => (* extending both arguments *)
+  find p m = find p' m.
+proof.
+  move=> p_p'.
+  cut -> //=: p = p'.
+  apply fun_ext=> x /=.
+  apply fun_ext=> y /=.
+  by rewrite p_p'.
+qed.
+
+lemma find_unique x' p (m:('a,'b) map):
+  (forall x, p x (oget m.[x]) => x = x') =>
+  (mem x' (dom m) /\ p x' (oget m.[x'])) <=> find p m = Some x'.
+proof.
+  move=> p_unique; split.
+    move=> [] x'_in_m p_x'; case {-1}(find p m) (Logic.eq_refl (find p m))=> //=.
+      by rewrite -find_nin; smt. (* de Morgan *)
+      by move=> x0 /find_cor [] _ /p_unique.
+    by move=> /find_cor.
+qed.
+
+(* find1 *)
+op find1: ('a -> bool) -> ('a,'b) map -> 'a option.
+
+axiom find1_nin (p:'a -> bool) (m:('a,'b) map):
+  all (fun x y, !p x) m <=> find1 p m = None.
+
+axiom find1_cor (p:'a -> bool) (m:('a,'b) map) x:
+  find1 p m = Some x =>
+  mem x (dom m) /\ p x.
+
+lemma find1_in (p:'a -> bool) (m:('a,'b) map):
+  exist (fun x y, p x) m <=> find1 p m <> None.
+proof.
+  case {-1}(find1 p m) (Logic.eq_refl (find1 p m))=> //=.
+    by rewrite -find1_nin; smt. (* de Morgan *)
+    by move=> x /find1_cor found; exists x.
 qed.
 
 (* filter *)
