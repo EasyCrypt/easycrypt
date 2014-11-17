@@ -30,6 +30,7 @@ module MMsym : sig
   val all    : symbol -> 'a t -> 'a list
   val fold   : (symbol -> 'a list -> 'b -> 'b) -> 'a t -> 'b -> 'b
   val map_at : ('a list -> 'a list) -> symbol -> 'a t -> 'a t
+  val iter   : (symbol -> 'a -> unit) -> 'a t -> unit
 end = struct
   type 'a t = ('a list) Msym.t
 
@@ -57,6 +58,9 @@ end = struct
         | [] -> None
         | v  -> Some v)
       x m
+
+  let iter f (m:'a t) =
+    Msym.iter (fun s -> List.iter (f s)) m
 end
 
 (* -------------------------------------------------------------------- *)

@@ -155,6 +155,9 @@ module Ax : sig
   val bind : symbol -> axiom -> env -> env
 
   val instanciate : path -> EcTypes.ty list -> env -> form
+
+  val iter : (path -> axiom -> unit) -> env -> unit
+
 end
 
 (* -------------------------------------------------------------------- *)

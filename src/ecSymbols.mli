@@ -28,6 +28,7 @@ module MMsym : sig
   val all    : symbol -> 'a t -> 'a list
   val fold   : (symbol -> 'a list -> 'b -> 'b) -> 'a t -> 'b -> 'b
   val map_at : ('a list -> 'a list) -> symbol -> 'a t -> 'a t
+  val iter   : (symbol -> 'a -> unit) -> 'a t -> unit
 end
 
 (* -------------------------------------------------------------------- *)

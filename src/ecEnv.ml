@@ -2524,6 +2524,12 @@ module Ax = struct
         Fsubst.subst_tvar
           (EcTypes.Tvar.init (List.map fst ax.ax_tparams) tys) f
     | _ -> raise (LookupFailure (`Path p))
+
+  let iter f env = 
+    let on_ax _ (ip, ax) = match ip with IPPath p -> f p ax | _ -> () in
+    let iter_mc mc = MMsym.iter on_ax mc.mc_axioms in
+    Mip.iter (fun _ -> iter_mc) env.env_comps
+    
 end
 
 (* -------------------------------------------------------------------- *)
