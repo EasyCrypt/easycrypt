@@ -2526,8 +2526,8 @@ realize:
 (* -------------------------------------------------------------------- *)
 (* Printing                                                             *)
 print:
-|             qs=qident          { Pr_any  qs }
-| STAR        qs=qident          { Pr_any  qs }
+|             qs=qoident         { Pr_any  qs }
+| STAR        qs=qoident         { Pr_any  qs }
 | TYPE        qs=qident          { Pr_ty   qs }
 | OP          qs=qoident         { Pr_op   qs }
 | THEORY      qs=qident          { Pr_th   qs }
