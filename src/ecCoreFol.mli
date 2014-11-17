@@ -145,7 +145,9 @@ val mk_form : f_node -> EcTypes.ty -> form
 val f_node  : form -> f_node
 
 (* -------------------------------------------------------------------- *)
+(* not recursive *)
 val f_map : (EcTypes.ty -> EcTypes.ty) -> (form -> form) -> form -> form
+val form_exists : (form -> bool) -> form -> bool
 
 (* -------------------------------------------------------------------- *)
 val gty_as_ty : gty -> EcTypes.ty

@@ -859,6 +859,31 @@ let f_iter g f =
   | Fpr       pr  -> g pr.pr_args; g pr.pr_event
 
 (* -------------------------------------------------------------------- *)
+let form_exists g f =
+  match f.f_node with
+  | Fint     _
+  | Flocal   _
+  | Fpvar    _
+  | Fglob    _ 
+  | Fop      _ -> false
+
+  | Fquant   (_ , _ , f1) -> g f1
+  | Fif      (f1, f2, f3) -> g f1 || g f2 || g f3
+  | Flet     (_, f1, f2)  -> g f1 || g f2
+  | Fapp     (e, es)      -> List.exists g (e :: es)
+  | Ftuple   es           -> List.exists g es
+  | Fproj    (e, _)       -> g e
+
+  | FhoareF   hf  -> g hf.hf_pr || g hf.hf_po
+  | FhoareS   hs  -> g hs.hs_pr || g hs.hs_po
+  | FbdHoareF bhf -> g bhf.bhf_pr || g bhf.bhf_po
+  | FbdHoareS bhs -> g bhs.bhs_pr || g bhs.bhs_po
+  | FequivF   ef  -> g ef.ef_pr || g ef.ef_po
+  | FequivS   es  -> g es.es_pr || g es.es_po
+  | FeagerF   eg  -> g eg.eg_pr || g eg.eg_po
+  | Fpr       pr  -> g pr.pr_args || g pr.pr_event
+
+(* -------------------------------------------------------------------- *)
 exception DestrError of string
 
 let destr_error e = raise (DestrError e)
