@@ -367,13 +367,14 @@ qed.
 
 lemma find_unique x' p (m:('a,'b) map):
   (forall x, p x (oget m.[x]) => x = x') =>
-  (mem x' (dom m) /\ p x' (oget m.[x'])) <=> find p m = Some x'.
+  mem x' (dom m) =>
+  p x' (oget m.[x']) =>
+  find p m = Some x'.
 proof.
-  move=> p_unique; split.
-    move=> [] x'_in_m p_x'; case {-1}(find p m) (Logic.eq_refl (find p m))=> //=.
-      by rewrite -find_nin; smt. (* de Morgan *)
-      by move=> x0 /find_cor [] _ /p_unique.
-    by move=> /find_cor.
+  move=> p_unique x'_in_m p_x'.
+  case {-1}(find p m) (Logic.eq_refl (find p m))=> //=.
+    by rewrite -find_nin; smt. (* de Morgan *)
+    by move=> x0 /find_cor [] _ /p_unique.
 qed.
 
 (* find1 *)
