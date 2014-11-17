@@ -1598,10 +1598,15 @@ let pp_opdecl_op (ppe : PPEnv.t) fmt (x, ts, ty, op) =
         basename (pp_tyvarannot ppe) ts pp_body
 
 
-let pp_opdecl (ppe : PPEnv.t) fmt (x, op) =
-  match op.op_kind with
-  | OB_oper i -> pp_opdecl_op ppe fmt (x, op.op_tparams, op_ty op, i)
-  | OB_pred i -> pp_opdecl_pr ppe fmt (x, op.op_tparams, op_ty op, i)
+let pp_opdecl ?(long=false) (ppe : PPEnv.t) fmt (x, op) =
+  let pp_name fmt x = 
+    if long then 
+      Format.fprintf fmt "(* %a *)@ " (pp_opname ppe) x in
+  let pp_decl fmt op = 
+    match op.op_kind with
+    | OB_oper i -> pp_opdecl_op ppe fmt (x, op.op_tparams, op_ty op, i)
+    | OB_pred i -> pp_opdecl_pr ppe fmt (x, op.op_tparams, op_ty op, i) in
+  Format.fprintf fmt "@[<v>%a%a@]" pp_name x pp_decl op
 
 (* -------------------------------------------------------------------- *)
 let string_of_axkind = function

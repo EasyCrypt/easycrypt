@@ -130,8 +130,12 @@ module ObjectInfo = struct
   (* ------------------------------------------------------------------ *)
   let pr_op_r =
     { od_name    = "operators or predicates";
-      od_lookup  = EcEnv.Op.lookup;
-      od_printer = EcPrinting.pp_opdecl; }
+      od_lookup  = EcEnv.Op.all (fun _ -> true) ;
+      od_printer = 
+        fun ppe fmt l ->
+          let long = l <> [] in
+          Format.fprintf fmt "@[<v>%a@]"
+            (EcPrinting.pp_list "@ " (EcPrinting.pp_opdecl ~long ppe)) l; }
 
   let pr_op = pr_gen pr_op_r
 
