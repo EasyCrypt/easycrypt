@@ -2563,7 +2563,7 @@ module Theory = struct
     | Th_typeclass name     -> CTh_typeclass name
     | Th_instance  (ty, cr) -> CTh_instance  (ty, cr)
     | Th_baserw    x        -> CTh_baserw x
-    | Th_addrw     (b,l)    -> CTh_addrw (b,l)
+    | Th_addrw     (b,l)    -> CTh_addrw     (b, l)
 
   (* ------------------------------------------------------------------ *)
   let enter name env =

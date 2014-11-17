@@ -298,6 +298,7 @@
 %token RRARROW
 %token RWNORMAL
 %token SAMPLE
+%token SEARCH
 %token SECTION
 %token SEMICOLON
 %token SEQ
@@ -2587,6 +2588,7 @@ global_:
 
 | x=loc(QED)       { Gsave x.pl_loc }
 | PRINT p=print    { Gprint     p   }
+| SEARCH           { Gsearch        }
 
 | PRAGMA x=lident  { Gpragma    x   }
 

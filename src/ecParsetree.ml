@@ -762,6 +762,7 @@ type global =
   | Gtycinstance of ptycinstance
   | Gaddrw       of (pqsymbol * pqsymbol list)
   | Gprint       of pprint
+  | Gsearch
   | GthOpen      of psymbol
   | GthClose     of psymbol
   | GthRequire   of (psymbol * [`Import|`Export] option)

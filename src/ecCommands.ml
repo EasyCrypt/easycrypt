@@ -77,6 +77,16 @@ let () =
     EcPException.register pp
 
 (* -------------------------------------------------------------------- *)
+module Search = struct
+  let search (scope : EcScope.scope) =
+    let env = EcScope.env scope in
+    ignore (EcEnv.Theory.by_path EcCoreLib.p_top env)
+end
+
+let process_search scope =
+  Search.search scope
+
+(* -------------------------------------------------------------------- *)
 module ObjectInfo = struct
   exception NoObject
 
@@ -464,6 +474,7 @@ and process (ld : EcLoader.ecloader) (scope : EcScope.scope) g =
       | GsctClose    name -> `Fct   (fun scope -> process_sct_close  scope  name)
       | GthW3        a    -> `Fct   (fun scope -> process_w3_import  scope  a)
       | Gprint       p    -> `Fct   (fun scope -> process_print      scope  p; scope)
+      | Gsearch           -> `Fct   (fun scope -> process_search     scope; scope)
       | Gtactics     t    -> `Fct   (fun scope -> process_tactics    scope  t)
       | Grealize     p    -> `Fct   (fun scope -> process_realize    scope  p)
       | Gprover_info pi   -> `Fct   (fun scope -> process_proverinfo scope  pi)
