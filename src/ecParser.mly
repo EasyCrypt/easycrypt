@@ -2588,7 +2588,7 @@ global_:
 
 | x=loc(QED)       { Gsave x.pl_loc }
 | PRINT p=print    { Gprint     p   }
-| SEARCH           { Gsearch        }
+| SEARCH qs=qoident { Gsearch    qs  }
 
 | PRAGMA x=lident  { Gpragma    x   }
 

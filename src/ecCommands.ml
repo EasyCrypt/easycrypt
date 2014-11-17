@@ -78,13 +78,38 @@ let () =
 
 (* -------------------------------------------------------------------- *)
 module Search = struct
-  let search (scope : EcScope.scope) =
+  let search fmt (scope : EcScope.scope) qs  =
     let env = EcScope.env scope in
-    ignore (EcEnv.Theory.by_path EcCoreLib.p_top env)
+    let all_path = EcEnv.Op.all (fun _ -> true) qs.pl_desc env in
+    let ppe = EcPrinting.PPEnv.ofenv env in
+    let do1 fmt (p, _) =
+      let rec exists f =
+        match f.EcFol.f_node with
+        | EcFol.Fop(p', _) -> EcPath.p_equal p p' 
+        | _ -> EcFol.form_exists exists f in
+(*      let exists f = 
+        Format.printf "start exists @.";
+        let r = exists f in
+        Format.printf "end exists@.";
+        r *)
+        
+          
+
+      let doax pax ax = 
+        match ax.EcDecl.ax_spec with
+        | None -> ()
+        | Some f -> 
+          if exists f then 
+            Format.fprintf fmt "%a@ " (EcPrinting.pp_axiom ppe) (pax,ax) 
+          else () in
+      EcEnv.Ax.iter doax env in
+    Format.fprintf fmt "@[<v>%a@]@."
+      (EcPrinting.pp_list "@ " do1) all_path;
+
 end
 
-let process_search scope =
-  Search.search scope
+let process_search scope qs =
+  Search.search  Format.std_formatter scope qs
 
 (* -------------------------------------------------------------------- *)
 module ObjectInfo = struct
@@ -478,7 +503,7 @@ and process (ld : EcLoader.ecloader) (scope : EcScope.scope) g =
       | GsctClose    name -> `Fct   (fun scope -> process_sct_close  scope  name)
       | GthW3        a    -> `Fct   (fun scope -> process_w3_import  scope  a)
       | Gprint       p    -> `Fct   (fun scope -> process_print      scope  p; scope)
-      | Gsearch           -> `Fct   (fun scope -> process_search     scope; scope)
+      | Gsearch      qs   -> `Fct   (fun scope -> process_search     scope qs ; scope)
       | Gtactics     t    -> `Fct   (fun scope -> process_tactics    scope  t)
       | Grealize     p    -> `Fct   (fun scope -> process_realize    scope  p)
       | Gprover_info pi   -> `Fct   (fun scope -> process_proverinfo scope  pi)
