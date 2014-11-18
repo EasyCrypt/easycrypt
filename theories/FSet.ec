@@ -491,6 +491,18 @@ by apply set_ext=> a;
    rewrite mem_filter mem_rm mem_filter mem_rm.
 qed.
 
+lemma card_subset (s1 s2 : 'a set):
+  s1 <= s2 => card s1 <= card s2.
+proof.
+  elim/set_ind s1 s2 => [|x s1 x_notin_s1 ih] s2 subset.
+    by rewrite card_empty; smt.
+  rewrite card_add_nin //; case (mem x s2); last smt.
+  move=> x_in_s2; cut := add_destruct x s2 => /iffRL.
+  move=> h; cut := h x_in_s2; case=> s2' [x_notin_s2' s2'E] {h}.
+  rewrite s2'E card_add_nin //; cut: card s1 <= card s2'; last smt.
+  by apply/ih; move: subset; rewrite s2'E /Top.(<=); smt.
+qed.
+
 (* fold *)
 op fold : ('a -> 'b -> 'b) -> 'b -> 'a set -> 'b.
 
