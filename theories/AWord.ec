@@ -8,7 +8,7 @@ require import FSet.
 type word.
 
 const length:int.
-axiom leq0_length: Int.(<=) 0 length.
+axiom leq0_length: Int.(<) 0 length.
 
 op zeros: word.
 op ones: word.
