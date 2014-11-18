@@ -26,6 +26,7 @@ and cmp_option = {
 
 and cli_option = {
   clio_emacs   : bool;
+  clio_webui   : bool;
   clio_provers : prv_options;
 }
 
@@ -217,7 +218,8 @@ let specs = {
     ("cli", "Run EasyCrypt top-level", [
       `Group "loader";
       `Group "provers";
-      `Spec  ("emacs", `Flag, "Output format set to <emacs>")]);
+      `Spec  ("emacs", `Flag, "Output format set to <emacs>");
+      `Spec  ("webui", `Flag, "Output format set to <webui>")]);
 
     ("config", "Print EasyCrypt configuration", [])
   ];
@@ -287,6 +289,7 @@ let prv_options_of_values values =
 
 let cli_options_of_values values =
   { clio_emacs   = get_flag "emacs" values;
+    clio_webui   = get_flag "webui" values;
     clio_provers = prv_options_of_values values; }
 
 let cmp_options_of_values values input =

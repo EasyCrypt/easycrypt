@@ -1,10 +1,10 @@
 # ------------------------------------------------------------------------
-import os, json
+import json
 
 from PyQt5 import QtCore, QtWidgets, QtWebKitWidgets #@UnresolvedImport
 
 from ec.resources import Resource
-from ec.document  import ECDocument, ECDocumentManager
+from ec.driver    import ECDriver
 
 # ------------------------------------------------------------------------
 class JSObject(object):
@@ -25,6 +25,24 @@ class JSObject(object):
         return Proxy(self.frame, self.name, attr)
 
 # ------------------------------------------------------------------------
+# FIXME: emit a signal when the driver is changed
+class ECObjManager(QtCore.QObject):
+    def __init__(self, parent = None):
+        super().__init__(parent)
+        self._driver   = None
+
+    def getDriver(self):
+        return self._driver
+
+    def setDriver(self, driver):
+        assert(isinstance(driver, ECDriver))
+        if self._driver and self._driver.parent() is self:
+            self._driver.deleteLater()
+        self._driver = driver
+
+    driver = QtCore.pyqtProperty('QVariant', getDriver  , setDriver)
+
+# ------------------------------------------------------------------------
 class ECEditor(QtWidgets.QWidget):
     def __init__(self, parent = None):
         super().__init__(parent)
@@ -32,7 +50,8 @@ class ECEditor(QtWidgets.QWidget):
         self._view     = QtWebKitWidgets.QWebView(self)
         self._editor   = None
         self._sopts    = {}
-        self._manager  = ECDocumentManager()
+        self._manager  = ECObjManager(self)
+        self._driver   = None
 
         self._view.page().mainFrame().addToJavaScriptWindowObject('ecmanager', self._manager)
         self._view.loadFinished.connect(self._cb_ready)
@@ -44,27 +63,28 @@ class ECEditor(QtWidgets.QWidget):
 
     ready    = property(lambda self : self._editor is not None)
     document = property(lambda self : self._document)
+    driver   = property(lambda self : self._driver)
 
     def _cb_ready(self):
         self._editor = JSObject(self._view.page().mainFrame(), 'editor')
 
-    @staticmethod
-    def getThemes():
-        themes = os.listdir(Resource.get('web/ace/src-noconflict'))
-        themes = [x.split('-', 1)[1] for x in themes if x.startswith('theme-')]
-        themes = [os.path.splitext(x)[0] for x in themes if x.endswith('.js')]
-        themes = [x.replace('_', '-') for x in themes]
-        return themes
+    def to_cursor(self):
+        return self._editor.to_cursor()
 
-    def setTheme(self, theme):
-        self._editor.setTheme('ace/theme/%s' % (theme,))
+    def next_sentence(self):
+        return self._editor.next_sentence()
+        
+    def prev_sentence(self):
+        return self._editor.prev_sentence()
 
-    def setContents(self, contents):
-        self._manager.setDocument(ECDocument(contents))
+    def set_contents(self, contents=''):
+        self._editor.set_contents(contents)
+
+    def set_driver(self, driver):
+        self._manager.setDriver(driver)
 
     def search(self, needle):
-        print(self._sopts)
         self._sopts = self._editor.find(needle, self._sopts, True)
 
-    def resetSearch(self):
+    def reset_search(self):
         self._sopts = {}

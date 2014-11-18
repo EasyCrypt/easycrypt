@@ -1,12 +1,11 @@
 # --------------------------------------------------------------------
-import sys, os
-import ec.resources as resources
-import ec.widgets.editor as editor
+import sys, os, html
+import ec.resources as resources, ec.driver as driver
 
 from PyQt5 import uic, QtCore, QtGui, QtWidgets, QtWebKit #@UnresolvedImport
 
 # cx_freeze fails to find this dependency
-from PyQt5 import QtPrintSupport #@UnresolvedImport
+from PyQt5 import QtPrintSupport #@UnresolvedImport @UnusedImport
 
 # --------------------------------------------------------------------
 class QTUtils(object):
@@ -32,7 +31,6 @@ class MainWindow(QtWidgets.QMainWindow):
         super().__init__(parent)
         self._ui = uic.loadUiType(resources.Resource.ui('main'))[0]()
         self._ui.setupUi(self)
-        self._view = editor.ECEditor(parent = self)
 
         mmenu = QtWidgets.QMenu(self)
         mmenu.addAction(self._ui.action_open)
@@ -53,17 +51,37 @@ class MainWindow(QtWidgets.QMainWindow):
         self._ui.search = QtWidgets.QLineEdit(self)
         self._ui.search.setPlaceholderText(self.tr('Search'))
         self._ui.search.setFixedWidth(300)
-        self._ui.search.textChanged.connect(self._view.search)
+        self._ui.search.textChanged.connect(self._ui.editor.search)
 
         self._ui.menu.addAction(baction)
         self._ui.menu.addSeparator()
         self._ui.menu.addAction(self._ui.action_ec_previous)
+        self._ui.menu.addAction(self._ui.action_ec_to_cursor)
         self._ui.menu.addAction(self._ui.action_ec_next)
         self._ui.menu.addWidget(QTUtils.HWSpacer(1, self))
         self._ui.menu.addWidget(self._ui.search)
         bmenu.setAutoRaise(False)
 
-        self.setCentralWidget(self._view)
+        self._process = driver.ECDriver(parent=self)
+        self._process.warning.connect(self._on_ec_warning)
+        self._process.exited.connect(self._on_ec_exited)
+        self._process.ecerror.connect(self._on_ec_error)
+        self._process.display.connect(self._on_ec_display)
+        self._process.start()
+        
+        self._ui.editor.set_driver(self._process)
+
+    def _on_ec_exited(self, ok):
+        self._ui.messages.appendHtml('<b>%s</b>\n' % 'EasyCrypt process exited')
+
+    def _on_ec_display(self, display):
+        self._ui.proofenv.setPlainText(display)
+
+    def _on_ec_warning(self, msg):
+        self._ui.messages.appendHtml('<i>%s</i>\n' % html.escape(msg.rstrip('\r\n')))
+
+    def _on_ec_error(self, start, stop, msg):
+        self._ui.messages.appendHtml('<b>%s</b>\n' % html.escape(msg.rstrip('\r\n')))
 
     @QtCore.pyqtSlot(name='on_action_open_triggered')
     def _ui_open(self):
@@ -74,7 +92,25 @@ class MainWindow(QtWidgets.QMainWindow):
         #mg = magic.open(magic.MAGIC_MIME_ENCODING); mg.load()
         #encoding = mg.buffer(contents)
         contents = str(contents, 'utf-8')
-        self._view.setContents(contents)
+        self._ui.editor.set_contents(contents)
+
+    @QtCore.pyqtSlot(name='on_action_ec_next_triggered')
+    def _ui_ec_next(self):
+        if self._process.state == driver.WAITING:
+            self._ui.messages.clear()
+        self._ui.editor.next_sentence()
+
+    @QtCore.pyqtSlot(name='on_action_ec_to_cursor_triggered')
+    def _ui_ec_to_cursor(self):
+        if self._process.state == driver.WAITING:
+            self._ui.messages.clear()
+        self._ui.editor.to_cursor();
+    
+    @QtCore.pyqtSlot(name='on_action_ec_previous_triggered')
+    def _ui_ec_prev(self):
+        if self._process.state == driver.WAITING:
+            self._ui.messages.clear()
+        self._ui.editor.prev_sentence()
 
     @QtCore.pyqtSlot(name='on_action_find_triggered')
     def _ui_find(self):

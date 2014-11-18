@@ -4,5 +4,6 @@
         <file alias="scalable/menu.svg">icons/FlatIcon/scalable/actions/menu.svg</file>
         <file alias="scalable/left.svg">icons/FlatIcon/scalable/actions/left.svg</file>
         <file alias="scalable/right.svg">icons/FlatIcon/scalable/actions/right.svg</file>
+        <file alias="scalable/down.svg">icons/FlatIcon/scalable/actions/down.svg</file>
     </qresource>
 </RCC>

@@ -1,4 +1,33 @@
-#editor {
-  position: absolute;
+.CodeMirror {
+  position: absolute; height: 100%;
   top: 0; right: 0; bottom: 0; left: 0;
+  line-height: 1.3em;
+}
+
+.CodeMirror-cursor {
+  z-index: 4;
+}
+
+.editor-locked {
+  background-color: #ffe6b5;
+}
+
+.editor-done {
+  background-color: #dddddd;
+}
+
+.editor-error {
+  background-color: #ff9999;
+  text-decoration: underline;
+}
+
+.edit-point {
+  width: 16px; color: #999999;
+  white-space: nowrap;
+  vertical-align: middle;
+  text-align: center;
+}
+
+.CodeMirror-selectedtext {
+  background: transparent !important;
 }

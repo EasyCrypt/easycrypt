@@ -3,12 +3,17 @@
 <head>
   <title>editor</title>
 
+  <script src="../jquery/jquery.js" type="text/javascript"></script>
+  <script src="../jquery/jquery-format.js" type="text/javascript"></script>
+
+  <link rel="stylesheet" type="text/css" href="../codemirror/lib/codemirror.css" />
+  <script src="../codemirror/lib/codemirror.js" type="text/javascript"></script>
+  <script src="../codemirror/addon/search/searchcursor.js" type="text/javascript"></script>
+  <script src="../codemirror/addon/selection/mark-selection.js" type="text/javascript"></script>
+  <script src="../codemirror/addon/edit/matchbrackets.js" type="text/javascript"></script>
+
   <link rel="stylesheet" type="text/css" href="styles.css" />
-
-  <script src="../jquery/jquery.js" type="text/javascript" charset="utf-8"></script>
-  <script src="../ace/src/ace.js" type="text/javascript" charset="utf-8"></script>
-  <script src="../easycrypt/mode-easycrypt.js" type="text/javascript" charset="utf-8"></script>
-
+  <script src="mode-easycrypt.js" type="text/javascript"></script>
   <script src="editor.js" type="text/javascript" charset="utf-8"></script>
 
   <script>
@@ -21,5 +26,5 @@
      });
   </script>
 </head>
-<body><div id="editor"></div></body>
+<body><textarea id="editor"></textarea></body>
 </html>

@@ -6,14 +6,84 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>822</width>
-    <height>474</height>
+    <width>1131</width>
+    <height>629</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>EasyCrypt</string>
   </property>
-  <widget class="QWidget" name="centralwidget"/>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QVBoxLayout" name="verticalLayout">
+    <item>
+     <widget class="QSplitter" name="splitter_2">
+      <property name="orientation">
+       <enum>Qt::Vertical</enum>
+      </property>
+      <widget class="QSplitter" name="splitter">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <widget class="ECEditor" name="editor" native="true">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+          <horstretch>1</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+       </widget>
+       <widget class="QPlainTextEdit" name="proofenv">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+          <horstretch>2</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="font">
+         <font>
+          <family>Monospace</family>
+         </font>
+        </property>
+        <property name="tabChangesFocus">
+         <bool>true</bool>
+        </property>
+        <property name="undoRedoEnabled">
+         <bool>false</bool>
+        </property>
+        <property name="lineWrapMode">
+         <enum>QPlainTextEdit::NoWrap</enum>
+        </property>
+        <property name="readOnly">
+         <bool>true</bool>
+        </property>
+        <property name="plainText">
+         <string notr="true"/>
+        </property>
+       </widget>
+      </widget>
+      <widget class="QPlainTextEdit" name="messages">
+       <property name="font">
+        <font>
+         <family>Monospace</family>
+        </font>
+       </property>
+       <property name="tabChangesFocus">
+        <bool>true</bool>
+       </property>
+       <property name="undoRedoEnabled">
+        <bool>false</bool>
+       </property>
+       <property name="readOnly">
+        <bool>true</bool>
+       </property>
+       <property name="plainText">
+        <string notr="true"/>
+       </property>
+      </widget>
+     </widget>
+    </item>
+   </layout>
+  </widget>
   <widget class="QToolBar" name="menu">
    <property name="windowTitle">
     <string>toolBar</string>
@@ -56,6 +126,9 @@
    <property name="text">
     <string>Retract sentence...</string>
    </property>
+   <property name="shortcut">
+    <string>Ctrl+U</string>
+   </property>
   </action>
   <action name="action_ec_next">
    <property name="icon">
@@ -69,6 +142,9 @@
    <property name="toolTip">
     <string>Next sentence</string>
    </property>
+   <property name="shortcut">
+    <string>Ctrl+N</string>
+   </property>
   </action>
   <action name="action_find">
    <property name="text">
@@ -78,7 +154,29 @@
     <string>Ctrl+F</string>
    </property>
   </action>
+  <action name="action_ec_to_cursor">
+   <property name="icon">
+    <iconset theme="down"/>
+   </property>
+   <property name="text">
+    <string>Go to cursor...</string>
+   </property>
+   <property name="toolTip">
+    <string>Go to cursor</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Return</string>
+   </property>
+  </action>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>ECEditor</class>
+   <extends>QWidget</extends>
+   <header location="global">ec.widgets.editor</header>
+   <container>1</container>
+  </customwidget>
+ </customwidgets>
  <resources/>
  <connections/>
 </ui>

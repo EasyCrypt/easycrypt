@@ -205,9 +205,10 @@ let _ =
 
     | `Cli cliopts -> begin
         let terminal =
-          match cliopts.clio_emacs with
-          | true  -> lazy (EcTerminal.from_emacs ())
-          | false -> lazy (EcTerminal.from_tty ())
+          match (cliopts.clio_emacs, cliopts.clio_webui) with
+          | (true, false)  -> lazy (EcTerminal.from_emacs ())
+          | (false, true)  -> lazy (EcTerminal.from_webui ())
+          | (_, _) -> lazy (EcTerminal.from_tty ())
         in
           (cliopts.clio_provers, None, terminal)
     end
