@@ -48,6 +48,12 @@ apply set_ext=> x.
 by rewrite mem_dom get_empty mem_empty.
 qed.
 
+lemma empty_dom (m:('a,'b) map): dom m = FSet.empty => m = empty<:'a,'b>.
+proof.
+  move=> dom_empty; apply map_ext=> x.
+  smt.
+qed.
+
 (** Range *)
 op rng: ('a,'b) map -> 'b set.
 
@@ -117,10 +123,10 @@ proof.
 by rewrite /size dom_empty card_empty.
 qed.
 
-(* TODO: make sure we can prove
-           lemma size_leq m1 m2: m1 <= m2 => size m1 <= size m2.
-         This requires the (currently missing) card_leq lemma,
-         which might be provable by a stronger form of induction. *)
+lemma nosmt size_leq (m1 m2:('a,'b) map):
+  m1 <= m2 =>
+  size m1 <= size m2
+by [].
 
 (* rm *)
 op rm: 'a -> ('a,'b) map -> ('a,'b) map.
@@ -459,9 +465,8 @@ case (x = a).
      rewrite get_filter get_set_neq 1:neq_x_a // get_rm neq_x_a //= -get_filter.
 qed.
 
-(* TODO: Prove
-     lemma size_filter f m: size (filter f m) <= size m.
-   This is simple once we have size_leq. *)
+lemma size_filter f (m:('a,'b) map): size (filter<:'a,'b> f m) <= size m.
+proof. by apply size_leq; apply leq_filter. qed.
 
 (* eq_except *)
 pred eq_except (m1 m2:('a,'b) map) x = forall x',
@@ -528,6 +533,40 @@ op mapi: ('a -> 'b -> 'c) -> ('a,'b) map -> ('a,'c) map.
 
 axiom get_mapi (f:'a -> 'b -> 'c) (m:('a,'b) map) (x:'a):
   (mapi f m).[x] = omap (f x) m.[x].
+
+(** Lemmas that bind it all together **)
+lemma leq_card_rng_dom (m:('a,'b) map):
+  card (rng m) <= card (dom m).
+proof.
+  move: {-2}m (Logic.eq_refl (dom m)).
+  elim/set_ind (dom m)=> {m} [|x s x_notin_s ih m].
+    by move=> m /empty_dom ->; rewrite rng_empty dom_empty !card_empty.
+    move=> m_addx.
+    cut ->: m = (rm x m).[x <- oget m.[x]].
+      by apply map_ext=> x0; rewrite get_set; smt.
+    rewrite rng_set.
+    cut ->: rm x (rm x m) = (rm x m).
+      by apply map_ext=> x0; smt.
+    cut dom_rmxm: dom (rm x m) = s by smt.
+    case (mem (oget m.[x]) (rng (rm x m)))=> [mx_in_rmxm | mx_notin_rmxm].
+      rewrite card_add_in // dom_set card_add_nin dom_rmxm //.
+      cut: card (rng (rm x m)) <= card (dom (rm x m)); last smt.
+      by apply ih.
+      rewrite dom_set !card_add_nin ?dom_rmxm //.
+      cut: card (rng (rm x m)) <= card (dom (rm x m)); last smt.
+      by apply ih.
+qed.
+
+lemma endo_dom_rng (m:('a,'a) map):
+  (exists x, !mem x (dom m)) =>
+  exists x, !mem x (rng m).
+proof.
+  elim=> x x_notin_m.
+  cut: 0 < card (sub (add x (dom m)) (rng m)); last smt.
+  apply sub_card.
+  rewrite card_add_nin //.
+  smt.
+qed.    
 
 (** Miscellaneous higher-order stuff *)
 (* lam and lamo: turning maps into lambdas *)

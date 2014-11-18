@@ -450,6 +450,10 @@ op filter:('a -> bool) -> 'a set -> 'a set.
 axiom mem_filter x (p:('a -> bool)) (X:'a set):
   mem x (filter p X) <=> (mem x X /\ p x).
 
+lemma filter_filter_inter (P:'a -> bool) (X:'a set):
+  filter P X = filter (P /\ (fun x, mem x X)) X.
+proof. by apply set_ext=> x; rewrite !mem_filter; smt. qed.
+
 lemma filter_cpTrue (X:'a set):
   filter True X = X.
 proof strict.
@@ -635,8 +639,74 @@ case (a=x)=> ?.
       apply h2.
 qed.
 
-theory Product.
+lemma card_img (f:'a -> 'b) (s:'a set):
+  card (img f s) <= card s.
+proof.
+  elim/set_ind s=> [|x s x_notin_s ih].
+    by rewrite img_empty !card_empty.
+    rewrite img_add.
+    case (mem (f x) (img f s))=> [fx_in_fs | fx_notin_fs].
+      by rewrite card_add_in //; smt.
+      by rewrite !card_add_nin; smt.
+qed.
 
+(** sub **)
+op sub: 'a set -> 'a set -> 'a set.
+axiom mem_sub (A B:'a set) x:
+  mem x (sub A B) <=> (mem x A /\ !mem x B).
+
+lemma sub_empty (A:'a set): sub A empty = A.
+proof. by apply set_ext=> x; rewrite mem_sub mem_empty. qed.
+
+lemma sub_leq (A B:'a set): sub A B <= A.
+proof. by move=> x; rewrite mem_sub. qed.
+
+lemma sub_filter (A B:'a set):
+  sub A B = filter (!(fun x, mem x B)) A.
+proof. by apply set_ext=> x; rewrite mem_sub mem_filter. qed.
+
+lemma sub_inter (A B:'a set):
+  sub A B = sub A (inter A B).
+proof.
+  rewrite (sub_filter _ (inter A B)) filter_filter_inter.
+  rewrite sub_filter filter_filter_inter.
+  rewrite /Pred.([!]) /Pred.(/\).
+  congr; apply fun_ext=> x //=.
+  rewrite mem_inter.
+  smt.
+qed.
+
+lemma sub_add (A B:'a set) x:
+  sub A (add x B) = rm x (sub A B).
+proof. by apply set_ext=> x'; rewrite mem_rm !mem_sub mem_add; smt. qed.
+
+lemma card_sub_subset (A B:'a set):
+  B <= A =>
+  card (sub A B) = card A - card B.
+proof.
+  elim/set_ind B=> [|x s x_notin_s ih].
+    by rewrite sub_empty card_empty.
+    move=> leqsAB; rewrite sub_add card_add_nin // card_rm_in.
+      smt.
+    by rewrite ih; smt.
+qed.
+
+lemma card_sub (A B:'a set):
+  card (sub A B) = card A - (card (inter A B)).
+proof.
+  rewrite sub_inter card_sub_subset //.
+  by apply interGs.
+qed.
+
+lemma sub_card (A B:'a set):
+  card B < card A =>
+  0 < card (sub A B).
+proof.
+  rewrite card_sub interC=> leqcAcB.
+  smt.
+qed.
+
+theory Product.
  op ( ** ) (X:'a set) (Y:'b set) = 
    List.foldr (fun x p, 
       union p (List.foldr (fun y, add (x,y)) empty (elems Y)))
