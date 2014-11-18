@@ -73,7 +73,6 @@ module PRFi = {
       Adv^PRF_F(&m,D) = `|Pr[IND(PRFr,D) @ &m: res] - Pr[IND(PRFi,D) @ &m: res]| **)
 
 (** Useful lemmas **)
-(* TODO: complete *)
 lemma PRFr_init_ll: islossless PRFr.init.
 proof. by proc; auto; smt. qed.
 
