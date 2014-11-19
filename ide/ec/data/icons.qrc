@@ -1,9 +1,9 @@
 <RCC>
     <qresource prefix="/icons/FlatIcon">
         <file alias="index.theme">icons/FlatIcon/index.theme</file>
-        <file alias="scalable/menu.svg">icons/FlatIcon/scalable/actions/menu.svg</file>
-        <file alias="scalable/left.svg">icons/FlatIcon/scalable/actions/left.svg</file>
-        <file alias="scalable/right.svg">icons/FlatIcon/scalable/actions/right.svg</file>
-        <file alias="scalable/down.svg">icons/FlatIcon/scalable/actions/down.svg</file>
+        <file alias="32x32/menu.png">icons/FlatIcon/32x32/actions/menu.png</file>
+        <file alias="32x32/left.png">icons/FlatIcon/32x32/actions/left.png</file>
+        <file alias="32x32/right.png">icons/FlatIcon/32x32/actions/right.png</file>
+        <file alias="32x32/down.png">icons/FlatIcon/32x32/actions/down.png</file>
     </qresource>
 </RCC>

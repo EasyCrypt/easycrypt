@@ -2,11 +2,16 @@
 Name=FlatIcon
 Comment=Icon theme 
 Inherits=default
-Directories=scalable/actions
+Directories=scalable/actions,32x32/actions
 
 [scalable]
 Size=48
 Type=Scalable
 MinSize=1
 MaxSize=256
+Context=Actions
+
+[32x32]
+Size=32
+Type=Fixed
 Context=Actions

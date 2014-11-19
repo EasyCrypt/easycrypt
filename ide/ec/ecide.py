@@ -130,14 +130,17 @@ class MainWindow(QtWidgets.QMainWindow):
     @QtCore.pyqtSlot(name='on_action_quit_triggered')
     def _ui_quit(self):
         # FIXME: parenting problem with QWidgetAction
-        self.close()
+        self._exit()
 
     def event(self, event):
         if isinstance(event, QtGui.QCloseEvent):
+            self._exit()
+        return super().event(event)
+
+    def _exit(self):
             try: self._driver.close()
             except: pass
             sys.exit(0)
-        return super().event(event)
 
 # --------------------------------------------------------------------
 def _set_state_for_frozen():
