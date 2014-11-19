@@ -69,7 +69,7 @@ class MainWindow(QtWidgets.QMainWindow):
         )
 
         if resources.Resource.frozen:
-            ecoptions['cwd']  = os.path.dirname(sys.executable)
+            ecoptions['cwd']  = resources.Resource.ROOT
             ecoptions['why3'] = 'why3.conf'
 
         self._process = driver.ECDriver(parent=self, **ecoptions)
@@ -143,7 +143,7 @@ class MainWindow(QtWidgets.QMainWindow):
 def _set_state_for_frozen():
     def extend_env(name, value):
         os.environ[name] = '%s%s%s' % (value, os.pathsep, os.environ.get(name, ''))
-    root = os.path.dirname(sys.executable)
+    root = resources.Resource.ROOT
     extend_env('PATH'             , os.path.join(root, 'bin'))
     extend_env('LD_LIBRARY_PATH'  , os.path.join(root, 'lib'))
     extend_env('DYLD_LIBRARY_PATH', os.path.join(root, 'lib'))
@@ -157,6 +157,7 @@ def main(forbuild = False):
     res = resources.Resource.rcc('icons')
 
     sys.path.append(resources.Resource.ROOT)
+    sys.path.append(os.path.join(resources.Resource.ROOT, 'data'))
     __import__(os.path.splitext(os.path.basename(res))[0])
 
     if forbuild: return

@@ -3,13 +3,13 @@ import sys, os
 
 # --------------------------------------------------------------------
 class Resource(object):
-    ROOT      = os.path.join(os.path.dirname(__file__), 'data')
+    ROOT      = os.path.dirname(__file__)
     frozen    = getattr(sys, 'frozen', False)
     easycrypt = 'ec.native'
 
     @classmethod
     def get(cls, path):
-        return os.path.join(cls.ROOT, *path.split('/'))
+        return os.path.join(cls.ROOT, 'data', *path.split('/'))
 
     @classmethod
     def rcc(cls, name, compile_=True):
@@ -41,5 +41,5 @@ class Resource(object):
 
 # --------------------------------------------------------------------
 if Resource.frozen:
-    Resource.ROOT      = os.path.join(os.path.dirname(sys.executable), 'data')
+    Resource.ROOT      = os.path.dirname(os.path.realpath(sys.executable))
     Resource.easycrypt = 'easycrypt'
