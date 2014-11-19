@@ -5,9 +5,9 @@ OPAM ?= 4.01.0
 DEST ?= binaries
 
 # --------------------------------------------------------------------
-.PHONY: all
+.PHONY: linux mac
 
-all:
+linux:
 	rm -rf $(DEST)/*
 	cp -r etc/. $(DEST)
 	make -C .. DESTDIR=ide/$(DEST) PREFIX=/ install
@@ -27,3 +27,12 @@ all:
 	    $(DEST)/lib; \
 	done
 	./setup.py bdist
+
+# --------------------------------------------------------------------
+linux:
+	rm -rf $(DEST)/*
+	cp -r etc/. $(DEST)
+	make -C .. DESTDIR=ide/$(DEST) PREFIX=/ install
+	cp -r ../_tools/ocaml-$(OPAM)/opam/system/lib/why3/lib/.   $(DEST)/lib/
+	cp -r ../_tools/ocaml-$(OPAM)/opam/system/lib/why3/share/. $(DEST)/share/
+	./setup.py bdist_dmg
