@@ -406,7 +406,7 @@ module POSIX : PExec = struct
           for i = 0 to (Array.length pcs) - 1 do
             match pcs.(i) with
             | None -> ()
-            | Some (_prover, pc) ->
+            | Some (prover, pc) ->
                 if CP.prover_call_pid pc = pid then begin
                   pcs.(i) <- None;            (* DO IT FIRST *)
                   let result = CP.post_wait_call pc st () in
@@ -415,6 +415,12 @@ module POSIX : PExec = struct
                   | CP.Valid   -> status := Some true
                   | CP.Invalid -> status := Some false
                   | CP.Failure _ | CP.HighFailure ->
+                    notify |> oiter (fun notify -> notify `Warning (lazy (
+                      let buf = Buffer.create 0 in
+                      let fmt = Format.formatter_of_buffer buf in
+                      Format.fprintf fmt "prover %s exited with %a%!"
+                        prover CP.print_prover_answer answer;
+                      Buffer.contents buf)));
                     if not (Queue.is_empty pqueue) then run i (Queue.take pqueue)
                   | _ ->
                     if not (Queue.is_empty pqueue) then run i (Queue.take pqueue)
@@ -447,14 +453,20 @@ module Win32 : PExec = struct
   let execute_task ?(notify : notify option) (pi : prover_infos) task =
     let module CP = Call_provers in
 
-    let wait1 (_prover, pc) =
+    let wait1 (prover, pc) =
       let result = CP.wait_on_call pc () in
       let answer = result.CP.pr_answer in
 
       match answer with
       | CP.Valid   -> raise (Answer true)
       | CP.Invalid -> raise (Answer false)
-      | CP.Failure _ | CP.HighFailure -> ()
+      | CP.Failure _ | CP.HighFailure ->
+          notify |> oiter (fun notify -> notify `Warning (lazy (
+            let buf = Buffer.create 0 in
+            let fmt = Format.formatter_of_buffer buf in
+              Format.fprintf fmt "prover %s exited with %a%!"
+                prover CP.print_prover_answer answer;
+              Buffer.contents buf)))
       | _ -> ()
 
     in

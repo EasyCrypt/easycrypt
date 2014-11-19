@@ -52,6 +52,10 @@ val add_abs_mod :
 (* -------------------------------------------------------------------- *)
 exception CannotTranslate of string
 
+type notify   = EcProvers.notify
 type me_of_mt = EcIdent.t -> module_type -> mod_restr -> module_expr
 
-val check_goal : me_of_mt -> env -> prover_infos -> hints -> hyps * form -> bool
+val check_goal :
+     ?notify:notify -> me_of_mt -> env
+  -> prover_infos -> hints -> hyps * form
+  -> bool

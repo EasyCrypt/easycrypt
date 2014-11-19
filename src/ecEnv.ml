@@ -3152,4 +3152,6 @@ let check_goal (usehyps, db) pi (hyps, concl) =
           { ld with h_local = List.filter filter ld.h_local }
   in
   let ld = norm_l_decl env (ld, concl) in
-    EcWhy3.check_goal (Mod.me_of_mt env) env.env_w3 pi db ld
+    EcWhy3.check_goal
+      ~notify:(fun lvl (lazy s) -> notify env lvl "%s" s)
+      (Mod.me_of_mt env) env.env_w3 pi db ld
