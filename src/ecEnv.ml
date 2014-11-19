@@ -1418,9 +1418,7 @@ module Fun = struct
            if i <> spi || susp && args <> [] then
              assert false;
            if not susp && List.length args <> List.length params then
-             (Format.printf "args = %i; params = %i@." (List.length args)
-                (List.length params);
-             assert false);
+             assert false;
 
            if susp then
              o

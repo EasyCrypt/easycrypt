@@ -32,15 +32,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self._ui = uic.loadUiType(resources.Resource.ui('main'))[0]()
         self._ui.setupUi(self)
 
-        mmenu = QtWidgets.QMenu(self)
-        mmenu.addAction(self._ui.action_open)
-        mmenu.addSeparator()
-        mmenu.addAction(self._ui.action_find)
-        mmenu.addSeparator()
-        mmenu.addAction(self._ui.action_quit)
-
         baction = QtWidgets.QWidgetAction(self)
-        bmenu   = QtWidgets.QToolButton(self._ui.menu)
+        bmenu   = QtWidgets.QToolButton(self)
+        mmenu   = QtWidgets.QMenu(self)
 
         bmenu.setMenu(mmenu)
         bmenu.setPopupMode(QtWidgets.QToolButton.InstantPopup)
@@ -48,21 +42,37 @@ class MainWindow(QtWidgets.QMainWindow):
         bmenu.setStyleSheet('QToolButton::menu-indicator { image: none; }')
         baction.setDefaultWidget(bmenu)
 
-        self._ui.search = QtWidgets.QLineEdit(self)
-        self._ui.search.setPlaceholderText(self.tr('Search'))
-        self._ui.search.setFixedWidth(300)
-        self._ui.search.textChanged.connect(self._ui.editor.search)
+        #self._ui.search = QtWidgets.QLineEdit(self)
+        #self._ui.search.setPlaceholderText(self.tr('Search'))
+        #self._ui.search.setFixedWidth(300)
+        #self._ui.search.textChanged.connect(self._ui.editor.search)
+
+        mmenu.addAction(self._ui.action_open)
+        mmenu.addSeparator()
+        #mmenu.addAction(self._ui.action_find)
+        #mmenu.addSeparator()
+        mmenu.addAction(self._ui.action_quit)
 
         self._ui.menu.addAction(baction)
         self._ui.menu.addSeparator()
         self._ui.menu.addAction(self._ui.action_ec_previous)
         self._ui.menu.addAction(self._ui.action_ec_to_cursor)
         self._ui.menu.addAction(self._ui.action_ec_next)
-        self._ui.menu.addWidget(QTUtils.HWSpacer(1, self))
-        self._ui.menu.addWidget(self._ui.search)
+        #self._ui.menu.addWidget(QTUtils.HWSpacer(1, self))
+        #self._ui.menu.addWidget(self._ui.search)
         bmenu.setAutoRaise(False)
 
-        self._process = driver.ECDriver(parent=self)
+        ecoptions = dict(
+            cwd    = None,
+            binary = resources.Resource.easycrypt,
+            why3   = None,
+        )
+
+        if resources.Resource.frozen:
+            ecoptions['cwd']  = os.path.dirname(sys.executable)
+            ecoptions['why3'] = 'why3.conf'
+
+        self._process = driver.ECDriver(parent=self, **ecoptions)
         self._process.warning.connect(self._on_ec_warning)
         self._process.exited.connect(self._on_ec_exited)
         self._process.ecerror.connect(self._on_ec_error)
@@ -119,10 +129,30 @@ class MainWindow(QtWidgets.QMainWindow):
 
     @QtCore.pyqtSlot(name='on_action_quit_triggered')
     def _ui_quit(self):
+        # FIXME: parenting problem with QWidgetAction
         self.close()
+
+    def event(self, event):
+        if isinstance(event, QtGui.QCloseEvent):
+            try: self._driver.close()
+            except: pass
+            sys.exit(0)
+        return super().event(event)
+
+# --------------------------------------------------------------------
+def _set_state_for_frozen():
+    def extend_env(name, value):
+        os.environ[name] = '%s%s%s' % (value, os.pathsep, os.environ.get(name, ''))
+    root = os.path.dirname(sys.executable)
+    extend_env('PATH'             , os.path.join(root, 'bin'))
+    extend_env('LD_LIBRARY_PATH'  , os.path.join(root, 'lib'))
+    extend_env('DYLD_LIBRARY_PATH', os.path.join(root, 'lib'))
 
 # --------------------------------------------------------------------
 def main(forbuild = False):
+    if resources.Resource.frozen:
+        _set_state_for_frozen()
+    
     app = QtWidgets.QApplication(sys.argv)
     res = resources.Resource.rcc('icons')
 

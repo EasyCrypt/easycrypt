@@ -82,34 +82,32 @@ module Search = struct
     let env = EcScope.env scope in
     let all_path = EcEnv.Op.all (fun _ -> true) qs.pl_desc env in
     let ppe = EcPrinting.PPEnv.ofenv env in
+
     let do1 fmt (p, _) =
       let rec exists f =
         match f.EcFol.f_node with
         | EcFol.Fop(p', _) -> EcPath.p_equal p p' 
         | _ -> EcFol.form_exists exists f in
-(*      let exists f = 
-        Format.printf "start exists @.";
-        let r = exists f in
-        Format.printf "end exists@.";
-        r *)
-        
-          
 
       let doax pax ax = 
         match ax.EcDecl.ax_spec with
         | None -> ()
         | Some f -> 
-          if exists f then 
-            Format.fprintf fmt "%a@ " (EcPrinting.pp_axiom ppe) (pax,ax) 
-          else () in
-      EcEnv.Ax.iter doax env in
-    Format.fprintf fmt "@[<v>%a@]@."
-      (EcPrinting.pp_list "@ " do1) all_path;
+          if exists f then
+            Format.fprintf fmt "%a@ " (EcPrinting.pp_axiom ppe) (pax, ax)
+      in EcEnv.Ax.iter doax env
 
+    in Format.fprintf fmt "@[<v>%a@]@."(EcPrinting.pp_list "@ " do1) all_path
 end
 
 let process_search scope qs =
-  Search.search  Format.std_formatter scope qs
+  let buffer = Buffer.create 0 in
+  let fmt    = Format.formatter_of_buffer buffer in
+
+  Format.fprintf fmt "%a%!"
+    (fun fmt (scope, qs) -> Search.search fmt scope qs)
+    (scope, qs);
+  EcScope.notify scope `Info "%s" (Buffer.contents buffer)
 
 (* -------------------------------------------------------------------- *)
 module ObjectInfo = struct

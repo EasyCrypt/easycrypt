@@ -59,6 +59,7 @@ module Hints : sig
 end
 
 (* -------------------------------------------------------------------- *)
-val execute_task : prover_infos -> Why3.Task.task -> bool option
+type notify = EcGState.loglevel -> string Lazy.t -> unit
 
+val execute_task : ?notify:notify -> prover_infos -> Why3.Task.task -> bool option
 val get_w3_th : string list -> string -> Why3.Theory.theory

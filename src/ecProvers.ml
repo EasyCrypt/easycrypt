@@ -57,7 +57,6 @@ end = struct
   let to_string (v : version) =
     Printf.sprintf "%d.%d.%d.%s"
       v.v_major v.v_minor v.v_subminor v.v_extra
-      
 end
 
 module VP = Version
@@ -325,7 +324,9 @@ module Hints = struct
 end
 
 (* -------------------------------------------------------------------- *)
-let rec run_prover (pi : prover_infos) (prover : string) task =
+type notify = EcGState.loglevel -> string Lazy.t -> unit
+
+let rec run_prover ?(notify : notify option) (pi : prover_infos) (prover : string) task =
   try
     let { pr_config = pr; pr_driver = dr; } = get_prover prover in
     let pc =
@@ -349,13 +350,17 @@ let rec run_prover (pi : prover_infos) (prover : string) task =
       Some (prover, pc)
 
   with e ->
-    Format.printf "\nError when starting %s: %a" prover
-      EcPException.exn_printer e;
+    notify |> oiter (fun notify -> notify `Warning (lazy (
+      let buf = Buffer.create 0 in
+      let fmt = Format.formatter_of_buffer buf in
+      Format.fprintf fmt "error when starting `%s': %a%!"
+        prover EcPException.exn_printer e;
+      Buffer.contents buf)));
     None
 
 (* -------------------------------------------------------------------- *)
 module type PExec = sig
-  val execute_task : prover_infos -> Why3.Task.task -> bool option
+  val execute_task : ?notify:notify -> prover_infos -> Why3.Task.task -> bool option
 end
 
 (* -------------------------------------------------------------------- *)
@@ -369,14 +374,14 @@ module POSIX : PExec = struct
       done;
       EcUtils.oget !output
 
-  let execute_task (pi : prover_infos) task =
+  let execute_task ?(notify : notify option) (pi : prover_infos) task =
     let module CP = Call_provers in
 
     let pcs = Array.create pi.pr_maxprocs None in
 
     (* Run process, ignoring prover failing to start *)
     let run i prover =
-        run_prover pi prover task
+        run_prover ?notify pi prover task
           |> oiter (fun (prover, pc) -> pcs.(i) <- Some (prover, pc))
     in
 
@@ -401,7 +406,7 @@ module POSIX : PExec = struct
           for i = 0 to (Array.length pcs) - 1 do
             match pcs.(i) with
             | None -> ()
-            | Some (prover, pc) ->
+            | Some (_prover, pc) ->
                 if CP.prover_call_pid pc = pid then begin
                   pcs.(i) <- None;            (* DO IT FIRST *)
                   let result = CP.post_wait_call pc st () in
@@ -410,8 +415,6 @@ module POSIX : PExec = struct
                   | CP.Valid   -> status := Some true
                   | CP.Invalid -> status := Some false
                   | CP.Failure _ | CP.HighFailure ->
-                    Format.printf "\n[info] Warning: prover %s exited with %a\n%!"
-                      prover CP.print_prover_answer answer;
                     if not (Queue.is_empty pqueue) then run i (Queue.take pqueue)
                   | _ ->
                     if not (Queue.is_empty pqueue) then run i (Queue.take pqueue)
@@ -441,29 +444,27 @@ end
 module Win32 : PExec = struct
   exception Answer of bool
 
-  let execute_task (pi : prover_infos) task =
+  let execute_task ?(notify : notify option) (pi : prover_infos) task =
     let module CP = Call_provers in
 
-    let wait1 (prover, pc) =
+    let wait1 (_prover, pc) =
       let result = CP.wait_on_call pc () in
       let answer = result.CP.pr_answer in
 
       match answer with
       | CP.Valid   -> raise (Answer true)
       | CP.Invalid -> raise (Answer false)
-      | CP.Failure _ | CP.HighFailure ->
-          Format.printf "\n[info] Warning: prover %s exited with %a\n%!"
-          prover CP.print_prover_answer answer;
+      | CP.Failure _ | CP.HighFailure -> ()
       | _ -> ()
 
     in
 
     let do1 (prover : string) =
-      run_prover pi prover task |> oiter (fun (prover, pc) ->
+      run_prover ?notify pi prover task |> oiter (fun (prover, pc) ->
         try  wait1 (prover, pc)
         with e -> begin
           (try  Unix.kill (CP.prover_call_pid pc) Sys.sigkill
-	   with Unix.Unix_error _ -> ());
+	         with Unix.Unix_error _ -> ());
           raise e
         end)
      in

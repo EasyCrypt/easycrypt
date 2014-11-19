@@ -146,17 +146,11 @@
     <string>Ctrl+N</string>
    </property>
   </action>
-  <action name="action_find">
-   <property name="text">
-    <string>Find...</string>
-   </property>
-   <property name="shortcut">
-    <string>Ctrl+F</string>
-   </property>
-  </action>
   <action name="action_ec_to_cursor">
    <property name="icon">
-    <iconset theme="down"/>
+    <iconset theme="down">
+     <normaloff/>
+    </iconset>
    </property>
    <property name="text">
     <string>Go to cursor...</string>

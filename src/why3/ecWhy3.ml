@@ -921,10 +921,10 @@ let trans_glob env mp =
   match mp.EcPath.m_top with
   | `Local id -> 
     (try Mid.find id env.env_id with _ -> 
-      Format.printf "trans_glob %s@." (EcIdent.tostring id);
+      Format.eprintf "trans_glob %s@." (EcIdent.tostring id);
       assert false)
   | _ -> 
-    Format.printf "trans_glob %s@." (EcPath.m_tostring mp);
+    Format.eprintf "trans_glob %s@." (EcPath.m_tostring mp);
     assert false (* tglob should have been normalized *)
   
 let rec trans_ty env ty =
@@ -1013,7 +1013,7 @@ let trans_tydecl env path td =
 let trans_lv env lv =
   match Mid.find_opt lv env.env_id with
   | None ->
-      Printf.printf "cannot find %s\n%!" (EcIdent.tostring lv);
+      Printf.eprintf "cannot find %s\n%!" (EcIdent.tostring lv);
       assert false
   | Some x -> x
 

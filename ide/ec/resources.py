@@ -3,18 +3,20 @@ import sys, os
 
 # --------------------------------------------------------------------
 class Resource(object):
-    ROOT = os.path.join(os.path.dirname(__file__), 'data')
+    ROOT      = os.path.join(os.path.dirname(__file__), 'data')
+    frozen    = getattr(sys, 'frozen', False)
+    easycrypt = 'ec.native'
 
     @classmethod
     def get(cls, path):
         return os.path.join(cls.ROOT, *path.split('/'))
 
     @classmethod
-    def rcc(cls, name, compile=True):
+    def rcc(cls, name, compile_=True):
         rccname = cls.get('%srcc.py' % (name,))
         qrcname = cls.get('%s.qrc' % (name,))
 
-        if compile and not getattr(sys, 'frozen', False):
+        if compile_ and not cls.frozen:
             import subprocess as sp
 
             if os.path.exists(qrcname):
@@ -38,5 +40,6 @@ class Resource(object):
         return cls.get('web/templates/%s.html' % (name,))
 
 # --------------------------------------------------------------------
-if getattr(sys, 'frozen', False):
-    Resource.ROOT = os.path.join(os.path.dirname(sys.executable), 'data')
+if Resource.frozen:
+    Resource.ROOT      = os.path.join(os.path.dirname(sys.executable), 'data')
+    Resource.easycrypt = 'easycrypt'

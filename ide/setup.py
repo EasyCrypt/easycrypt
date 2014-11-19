@@ -8,7 +8,7 @@ base    = "Win32GUI" if sys.platform == "win32" else None
 thisdir = os.path.realpath(os.path.dirname(__file__))
 
 # --------------------------------------------------------------------
-data = [('ec/data/', 'data/')]
+data = [('ec/data/', 'data/'), ('binaries/', './')]
 
 # --------------------------------------------------------------------
 exe = setup.Executable(

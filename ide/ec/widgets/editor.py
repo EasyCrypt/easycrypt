@@ -50,7 +50,7 @@ class ECEditor(QtWidgets.QWidget):
         self._view     = QtWebKitWidgets.QWebView(self)
         self._editor   = None
         self._sopts    = {}
-        self._manager  = ECObjManager(self)
+        self._manager  = ECObjManager(self._view.page().mainFrame())
         self._driver   = None
 
         self._view.page().mainFrame().addToJavaScriptWindowObject('ecmanager', self._manager)
