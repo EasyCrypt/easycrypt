@@ -1,7 +1,7 @@
 # -*- Makefile -*-
 
 # --------------------------------------------------------------------
-OCAML    := $(shell ocamlbuild -which ocamlc 2>/dev/null)
+OCAML    := $(shell ocamlbuild -which ocamlc 2>/dev/null || echo false)
 CC       := gcc
 MACHINE  := $(shell $(OCAML) -ccopt -dumpmachine dummy.c 2>/dev/null)
 UNAME    := $(shell uname -s)
