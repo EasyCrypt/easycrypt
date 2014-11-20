@@ -472,13 +472,8 @@ module Win32 : PExec = struct
     in
 
     let do1 (prover : string) =
-      run_prover ?notify pi prover task |> oiter (fun (prover, pc) ->
-        try  wait1 (prover, pc)
-        with e -> begin
-          (try  Unix.kill (CP.prover_call_pid pc) Sys.sigkill
-	         with Unix.Unix_error _ -> ());
-          raise e
-        end)
+      run_prover ?notify pi prover task |>
+        oiter (fun (prover, pc) -> wait1 (prover, pc))
      in
 
      try  List.iter do1 pi.pr_provers; None
