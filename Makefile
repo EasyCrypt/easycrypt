@@ -77,9 +77,9 @@ endef
 install: ec.native uninstall
 	-@$(call check-for-staled-files)
 	$(INSTALL) -m 0755 -d $(DESTDIR)$(BINDIR)
-	$(INSTALL) -m 0755 -T ec.native $(DESTDIR)$(BINDIR)/easycrypt
+	$(INSTALL) -m 0755 -T ec.native $(DESTDIR)$(BINDIR)/easycrypt$(EXE)
 	$(INSTALL) -m 0755 -d $(DESTDIR)$(SYSDIR)
-	$(INSTALL) -m 0755 -T system/callprover $(DESTDIR)$(SYSDIR)/callprover
+	$(INSTALL) -m 0755 -T system/callprover$(EXE) $(DESTDIR)$(SYSDIR)/callprover$(EXE)
 	$(call install-theories,,$(THEORIES))
 	$(call install-theories,core,$(CORE))
 	$(call install-theories,prelude,$(PRELUDE))

@@ -6,7 +6,7 @@ DEST ?= easycrypt
 TAG  ?= $(shell date +"%Y-%m-%d")
 
 # --------------------------------------------------------------------
-.PHONY: default posix linux-32 linux-64 macos publish
+.PHONY: default base posix linux-32 linux-64 macos win32 publish
 .PHONY: export export-linux-32 export-linux-64 export-macos
 .PHONY: build-linux-32 build-linux-64 build-macos
 
@@ -15,10 +15,13 @@ default:
 	@echo "make [linux-32|linux-64|macos]"
 
 # --------------------------------------------------------------------
-posix:
+base:
 	rm -rf $(DEST) && mkdir $(DEST)
 	rsync -avt package/ $(DEST)/
 	make -C ../.. DESTDIR=ide/emacs-based/$(DEST) PREFIX=/ install
+
+# --------------------------------------------------------------------
+posix: base
 	rsync -avt ../../_tools/ocaml-$(OPAM)/opam/system/lib/why3/lib/   $(DEST)/lib/
 	rsync -avt ../../_tools/ocaml-$(OPAM)/opam/system/lib/why3/share/ $(DEST)/share/
 	mv $(DEST)/lib/why3/why3-cpulimit $(DEST)/bin/
@@ -38,6 +41,16 @@ macos: posix
 	rsync -avt extra/macos/ $(DEST)/share/
 	rsync -avt provers/macos/ $(DEST)/
 	/usr/local/bin/gtar --owner=0 --group=0 -czf easycrypt-$(TAG)-macos.tar.gz easycrypt
+
+# --------------------------------------------------------------------
+win32: base
+	rsync -avt /opt/wodi32/lib/why3   $(DEST)/lib/
+	rsync -avt /opt/wodi32/share/why3 $(DEST)/share/
+	mv $(DEST)/lib/why3/why3-cpulimit.exe $(DEST)/bin/
+	cp $(DEST)/etc/why3-win32.conf $(DEST)/etc/why3.conf
+	rsync -avt extra/win32/ $(DEST)/share/
+	rsync -avt provers/win32/ $(DEST)/
+	zip -r easycrypt-$(TAG)-win32.zip easycrypt/
 
 # --------------------------------------------------------------------
 export:

@@ -5,13 +5,9 @@ import sys, os
 
 # --------------------------------------------------------------------
 EMACS = dict(
-    darwin='share/Emacs.app/Contents/MacOS/Emacs',
+    darwin = 'share/Emacs.app/Contents/MacOS/Emacs',
+    win32  = 'share/emacs/bin/emacs.exe',
 )
-
-EMACS_CMDS = [
-    '(load-file "share/easycrypt/pg/emacs.rc")',
-    '(setq easycrypt-prog-name "easycrypt -emacs -why3 etc/why3.conf -reloc")',
-]
 
 # --------------------------------------------------------------------
 def _main():
@@ -21,8 +17,10 @@ def _main():
 
     if sys.platform == 'darwin':
         emacs = os.path.join(mydir, *EMACS['darwin'].split('/'))
+    if sys.platform == 'cygwin' or sys.platform.startswith('win'):
+        emacs = os.path.join(mydir, *EMACS['win32'].split('/'))
 
-    for cmd in EMACS_CMDS: args.extend(['--execute', cmd])
+    args.extend(['-l', 'share/easycrypt/pg/emacs.rc'])
     args.extend(['--no-init-file', '--no-site-file', '--debug-init'])
 
     print >>sys.stderr, 'running: %s' % (' '.join([emacs] + args))
