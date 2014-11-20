@@ -47,6 +47,7 @@ and ldr_options = {
 
 and glb_options = {
   o_why3     : string option;
+  o_reloc    : bool;
   o_ovrevict : string list;
   o_loader   : ldr_options;
 }
@@ -205,6 +206,7 @@ let parse spec argv =
 let specs = {
   xp_globals  = [
     `Spec  ("why3"    , `String, "why3 configuration file");
+    `Spec  ("reloc"   , `Flag  , "<for internal use>");
     `Spec  ("no-evict", `String, "Don't evict given prover");
 
     `Group "loader";
@@ -272,8 +274,9 @@ let ldr_options_of_values values =
 
 let glb_options_of_values values =
   { o_why3     = get_string  "why3"     values;
+    o_reloc    = get_flag    "reloc"    values;
     o_ovrevict = get_strings "no-evict" values;
-    o_loader   = ldr_options_of_values values; }
+    o_loader   = ldr_options_of_values  values; }
 
 let prv_options_of_values values =
   let provers =

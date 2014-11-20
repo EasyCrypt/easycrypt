@@ -1,0 +1,42 @@
+#! /usr/bin/env python
+
+# --------------------------------------------------------------------
+import sys, os
+
+# --------------------------------------------------------------------
+EMACS = {
+    'darwin': 'share/Applications/Emacs/Contents/MacOS/Emacs',
+}
+
+EMACS_CMDS = [
+    '(load-file "share/easycrypt/pg/emacs.rc")',
+    '(setq easycrypt-prog-name "easycrypt -emacs -why3 etc/why3.conf -reloc")',
+]
+
+# --------------------------------------------------------------------
+def _main():
+    mydir = os.path.realpath(os.path.dirname(__file__))
+    emacs = 'emacs'
+    args  = []
+
+    if sys.platform == 'darwin':
+        emacs = os.path.join(mydir, EMACS['darwnin'].split('/'))
+
+    for cmd in EMACS_CMDS: args.extend(['--execute', cmd])
+    args.extend(['--no-init-file', '--no-site-file', '--debug-init'])
+
+    print >>sys.stderr, 'running: %s' % (' '.join([emacs] + args))
+
+    os.chdir(mydir)
+    os.putenv('PATH', '%s%s%s' % (os.path.join(mydir, 'bin'), \
+                                  os.pathsep, \
+                                  os.environ.get('PATH', '')))
+    try:
+        os.execvp(emacs, [emacs] + args)
+    except OSError as e:
+        print >>sys.stderr, 'cannot run Emacs: %s' % (repr(e,))
+        sys.exit(1)
+
+# --------------------------------------------------------------------
+if __name__ == '__main__':
+    _main()

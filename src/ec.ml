@@ -157,6 +157,9 @@ let _ =
   (* Parse command line arguments *)
   let options = EcOptions.parse Sys.argv in
 
+  (* chrdir_$PATH if in reloc mode (FIXME / HACK) *)
+  if options.o_options.o_reloc then Sys.chdir (resource [".."; ".."]);
+
   (* Initialize why3 engine *)
   let why3conf =
     match options.o_options.o_why3 with
