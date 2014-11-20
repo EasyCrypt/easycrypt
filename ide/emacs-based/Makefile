@@ -34,7 +34,7 @@ linux-64: posix
 	tar --owner=0 --group=0 -czf easycrypt-$(TAG)-x64.tar.gz easycrypt
 
 # --------------------------------------------------------------------
-macos: linux
+macos: posix
 	rsync -avt extra/macos/ $(DEST)/share/
 	tar --owner=0 --group=0 -czf easycrypt-$(TAG)-macos.tar.gz easycrypt
 
@@ -75,8 +75,16 @@ build-linux-64: export-linux-64
 	scp debian-64.local:easycrypt/ide/emacs-based/easycrypt-$(TAG)-x64.tar.gz .
 
 # --------------------------------------------------------------------
+build-macos: export-macos
+	ssh macos.local 'set -e; cd easycrypt; \
+	  source ./scripts/activate-toolchain.sh; \
+	  make clean; git pull --rebase; make; \
+	  make TAG=$(TAG) -C ide/emacs-based macos'
+	scp macos.local:easycrypt/ide/emacs-based/easycrypt-$(TAG)-macos.tar.gz .
+
+# --------------------------------------------------------------------
 publish:
-	curl --user "$(USER)" --digest -T "easycrypt-$(TAG)-{x86,x64}.tar.gz" \
+	curl --user "$(USER)" --digest -T "easycrypt-$(TAG)-{x86,x64,macos}.tar.gz" \
 	  https://www.easycrypt.info/binaries/
 
 # --------------------------------------------------------------------
