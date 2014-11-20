@@ -42,7 +42,7 @@ macos: posix
 # --------------------------------------------------------------------
 export:
 	if [ ! -z "${ECHOST}" ]; then \
-	  rsync -avtRa --rsh=ssh \
+	  rsync -avtRa --rsh=ssh --delete \
 	    extra provers package/share/easycrypt/pg/ProofGeneral \
 	    ${ECHOST}; \
 	fi
@@ -61,7 +61,7 @@ export-macos:
 
 # --------------------------------------------------------------------
 build-linux-32: export-linux-32
-	ssh debian-32.local 'set -e; cd easycrypt; \
+	ssh -A debian-32.local 'set -e; cd easycrypt; \
 	  source ./scripts/activate-toolchain.sh; \
 	  make clean; git pull --rebase; make; \
 	  make TAG=$(TAG) -C ide/emacs-based linux-32'
@@ -69,7 +69,7 @@ build-linux-32: export-linux-32
 
 # --------------------------------------------------------------------
 build-linux-64: export-linux-64
-	ssh debian-64.local 'set -e; cd easycrypt; \
+	ssh -A debian-64.local 'set -e; cd easycrypt; \
 	  source ./scripts/activate-toolchain.sh; \
 	  make clean; git pull --rebase; make; \
 	  make TAG=$(TAG) -C ide/emacs-based linux-64'
@@ -77,7 +77,7 @@ build-linux-64: export-linux-64
 
 # --------------------------------------------------------------------
 build-macos: export-macos
-	ssh macos.local 'set -e; cd easycrypt; \
+	ssh -A macos.local 'set -e; cd easycrypt; \
 	  source ./scripts/activate-toolchain.sh; \
 	  make clean; git pull --rebase; make; \
 	  make TAG=$(TAG) -C ide/emacs-based macos'
