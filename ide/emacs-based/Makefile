@@ -4,11 +4,13 @@
 OPAM ?= 4.01.0
 DEST ?= easycrypt
 TAG  ?= $(shell date +"%Y-%m-%d")
+PUB  ?= x86,x64,macos
 
 # --------------------------------------------------------------------
-.PHONY: default base posix linux-32 linux-64 macos win32 publish
+.PHONY: default base posix linux-32 linux-64 macos win32
 .PHONY: export export-linux-32 export-linux-64 export-macos
 .PHONY: build-linux-32 build-linux-64 build-macos
+.PHONY: publish publish-win32
 
 # --------------------------------------------------------------------
 default:
@@ -98,7 +100,14 @@ build-macos: export-macos
 
 # --------------------------------------------------------------------
 publish:
-	curl --user "$(USER)" --digest -T "easycrypt-$(TAG)-{x86,x64,macos}.tar.gz" \
+	curl --progress-bar --verbose --user "$(USER)" --digest -T \
+	  "easycrypt-$(TAG)-{$(PUB)}.tar.gz" \
+	  https://www.easycrypt.info/binaries/
+
+# --------------------------------------------------------------------
+publish-win32:
+	curl --progress-bar --verbose --user "$(USER)" --digest -T \
+	  "easycrypt-$(TAG)-win32.zip" \
 	  https://www.easycrypt.info/binaries/
 
 # --------------------------------------------------------------------
