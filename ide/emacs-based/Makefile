@@ -36,7 +36,7 @@ linux-64: posix
 # --------------------------------------------------------------------
 macos: posix
 	rsync -avt extra/macos/ $(DEST)/share/
-	gtar --owner=0 --group=0 -czf easycrypt-$(TAG)-macos.tar.gz easycrypt
+	/usr/local/bin/gtar --owner=0 --group=0 -czf easycrypt-$(TAG)-macos.tar.gz easycrypt
 
 # --------------------------------------------------------------------
 export:
