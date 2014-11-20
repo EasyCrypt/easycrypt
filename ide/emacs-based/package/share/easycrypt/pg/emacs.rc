@@ -1,1 +1,3 @@
 (load-file "share/easycrypt/pg/ProofGeneral/generic/proof-site.el")
+(custom-set-variables
+  '(electric-indent-mode nil))
