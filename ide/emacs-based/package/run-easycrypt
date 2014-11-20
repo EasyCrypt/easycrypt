@@ -4,9 +4,9 @@
 import sys, os
 
 # --------------------------------------------------------------------
-EMACS = {
-    'darwin': 'share/Applications/Emacs/Contents/MacOS/Emacs',
-}
+EMACS = dict(
+    darwin='share/Emacs.app/Contents/MacOS/Emacs',
+)
 
 EMACS_CMDS = [
     '(load-file "share/easycrypt/pg/emacs.rc")',
@@ -20,7 +20,7 @@ def _main():
     args  = []
 
     if sys.platform == 'darwin':
-        emacs = os.path.join(mydir, EMACS['darwnin'].split('/'))
+        emacs = os.path.join(mydir, *EMACS['darwin'].split('/'))
 
     for cmd in EMACS_CMDS: args.extend(['--execute', cmd])
     args.extend(['--no-init-file', '--no-site-file', '--debug-init'])
