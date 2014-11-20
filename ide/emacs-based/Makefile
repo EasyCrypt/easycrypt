@@ -6,8 +6,9 @@ DEST ?= easycrypt
 TAG  ?= $(shell date +"%Y-%m-%d")
 
 # --------------------------------------------------------------------
-.PHONY: default posix linux-32 linux-64 macos
+.PHONY: default posix linux-32 linux-64 macos publish
 .PHONY: export export-linux-32 export-linux-64 export-macos
+.PHONY: build-linux-32 build-linux-64 build-macos
 
 # --------------------------------------------------------------------
 default:
@@ -56,6 +57,27 @@ export-linux-64:
 # --------------------------------------------------------------------
 export-macos:
 	$(MAKE) export ECHOST="macos.local:easycrypt/ide/emacs-based"
+
+# --------------------------------------------------------------------
+build-linux-32: export-linux-32
+	ssh debian-32.local 'set -e; cd easycrypt; \
+	  source ./scripts/activate-toolchain.sh; \
+	  make clean; git pull --rebase; make; \
+	  make TAG=$(TAG) -C ide/emacs-based linux-32'
+	scp debian-32.local:easycrypt/ide/emacs-based/easycrypt-$(TAG)-x86.tar.gz .
+
+# --------------------------------------------------------------------
+build-linux-64: export-linux-64
+	ssh debian-64.local 'set -e; cd easycrypt; \
+	  source ./scripts/activate-toolchain.sh; \
+	  make clean; git pull --rebase; make; \
+	  make TAG=$(TAG) -C ide/emacs-based linux-64'
+	scp debian-64.local:easycrypt/ide/emacs-based/easycrypt-$(TAG)-x64.tar.gz .
+
+# --------------------------------------------------------------------
+publish:
+	curl --user "$(USER)" --digest -T "easycrypt-$(TAG)-{x86,x64}.tar.gz" \
+	  https://www.easycrypt.info/binaries/
 
 # --------------------------------------------------------------------
 clean:
