@@ -186,6 +186,13 @@ by rewrite /size dom_rm=> x_m;
    rewrite card_rm_nin.
 qed.
 
+lemma rm_nin_id x (m:('a,'b) map): !mem x (dom m) => rm x m = m.
+proof.
+  move=> x_notin_m.
+  apply map_ext=> x'; rewrite get_rm.
+  smt.
+qed.
+
 (** We can now define writing operators *)
 (* set *)
 op "_.[_<-_]": ('a,'b) map -> 'a -> 'b -> ('a,'b) map.
