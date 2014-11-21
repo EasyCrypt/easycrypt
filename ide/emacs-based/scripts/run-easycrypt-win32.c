@@ -70,9 +70,9 @@ int wmain(int arc, LPWSTR argv[]) {
       DWORD res = GetModuleFileName(myself, myname, ARRAY_SIZE(myname));
 
       if (res > 0 || res < ARRAY_SIZE(myname)) {
-	_wsplitpath(myname, mydrive, mydir, NULL, NULL);
-	_wmakepath (myname, mydrive, mydir, NULL, NULL);
-	(void) SetCurrentDirectory(myname);
+          _wsplitpath(myname, mydrive, mydir, NULL, NULL);
+          _wmakepath (myname, mydrive, mydir, NULL, NULL);
+          (void) SetCurrentDirectory(myname);
       }
     }
 
