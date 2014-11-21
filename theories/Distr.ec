@@ -58,11 +58,10 @@ axiom uniform_unique (d d':'a distr):
   d = d'.
 
 (** Lemmas *)
-lemma witness_nzero p (d:'a distr):
-  0%r < mu d p =>
-  (exists x, p x).
-proof strict.
-by cut: p <> False => (exists x, p x); smt.
+lemma witness_nzero P (d:'a distr):
+  0%r < mu d P => (exists x, P x ).
+proof.
+  by cut: P <> False => (exists x, P x); smt.
 qed.
 
 lemma ew_eq (d d':'a distr):
@@ -141,14 +140,18 @@ cut ->: forall (p q:'a -> bool), (p /\ q) = !((!p) \/ (!q))
 by rewrite mu_not mu_or !mu_not mu_supp; smt.
 qed.
 
-lemma witness_support p (d:'a distr):
-  0%r < mu d p =>
-  (exists x, p x /\ in_supp x d).
+lemma witness_support P (d:'a distr):
+  0%r < mu d P <=> (exists x, P x /\ in_supp x d).
 proof.
-rewrite mu_support=> nzero.
-apply witness_nzero in nzero; case nzero=> x.
-rewrite /Pred.(/\) /support //= => p_supp.
-by exists x.
+split.
+  rewrite mu_support=> nzero.
+  apply witness_nzero in nzero; case nzero=> x.
+  rewrite /Pred.(/\) /support //= => p_supp.
+  by exists x.
+  move=> [] x [x_in_P x_in_d].
+  cut: mu d ((=) x) <= mu d P /\ 0%r < mu d ((=) x); last smt.
+  split; last by rewrite x_in_d.
+  by rewrite mu_sub // /Pred.(<=)=> x0 <<-.
 qed.
 
 lemma mu_sub_support (d:'a distr) (p q:('a -> bool)):
