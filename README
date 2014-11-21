@@ -146,10 +146,7 @@ installation as follows:
      base directory is) to C:/wodi32. For that, you may start a win32
      shell command as an administrator and type
 
-     $> mklink /D C:/wodi32 C:/cygwin 
-
-     Note that in windows everything is mirrored "/" vs "\" (both work), 
-     "Target" vs "Name" of link as first argument.
+     $> mklink /D C:\wodi32 C:\cygwin 
 
   4. Restart a fresh cygwin shell to get a working wodi
      environment. Type:
@@ -159,7 +156,7 @@ installation as follows:
   5. Find the wodi package manager in the start menu and install the
      following packages:
 
-       menhir, yojson, batteries, ocamlgraph, lalgtk2, lablgtk2-extras
+       menhir, yojson, batteries, ocamlgraph, zarith
 
   6. Install why3 0.83. Download why3 at:
        https://gforge.inria.fr/frs/download.php/33490/why3-0.83.tar.gz
