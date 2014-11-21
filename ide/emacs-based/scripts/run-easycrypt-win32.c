@@ -7,10 +7,10 @@
 
 #include <stdlib.h>
 #include <stdio.h>
-#include <stdar.h>
+#include <stdarg.h>
 
 #include <wchar.h>
-#include <strin.h>
+#include <string.h>
 
 #include <Windows.h>
 
@@ -24,7 +24,7 @@ void eprintf_exit(LPWSTR format, ...)
     va_list ars  = NULL;
     const int error = GetLastError();
 
-    FormatMessae(FORMAT_MESSAGE_FROM_SYSTEM |
+    FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM |
                   FORMAT_MESSAGE_ALLOCATE_BUFFER,
                   NULL, 
                   error,
@@ -50,43 +50,69 @@ void eprintf_exit(LPWSTR format, ...)
 }
 
 /* ------------------------------------------------------------------------ */
-#define CMD L"share\\emacs\\bin\\emacs.exe -l share\\easycrypt\\p\\emacs.rc --no-init-file --no-site-file --debug-init"
+#define CMD L"share\\emacs\\bin\\emacs.exe -l share\\easycrypt\\pg\\emacs.rc --no-init-file --no-site-file --debug-init"
 
 /* ------------------------------------------------------------------------ */
-int wmain(int arc, LPWSTR argv[]) {
+int wmain(int argc, LPWSTR argv[]) {
     HMODULE myself;
     STARTUPINFO si;
     PROCESS_INFORMATION pi;
-    DWORD piflas;
+    DWORD piflags;
     WCHAR cmd[] = CMD;
 
-    (void) arc;
-    (void) arv;
+    (void) argc;
+    (void) argv;
 
     if ((myself = GetModuleHandle(NULL)) != NULL) {
-      WCHAR myname [_MAX_PATH +1];
-      WCHAR mydir  [_MAX_DIR  +1];
-      WCHAR mydrive[_MAX_DRIVE+1];
-      DWORD res = GetModuleFileName(myself, myname, ARRAY_SIZE(myname));
+      WCHAR  myname [_MAX_PATH +1];
+      WCHAR  mydir  [_MAX_DIR  +1];
+      WCHAR  mydrive[_MAX_DRIVE+1];
+      WCHAR  myfinal[_MAX_PATH +1];
+      DWORD  res   = 0;
+      DWORD  envsz = 0;
+      DWORD  bufsz = 0;
+      LPWSTR opath = NULL;
+      LPWSTR npath = NULL;
 
-      if (res > 0 || res < ARRAY_SIZE(myname)) {
-          _wsplitpath(myname, mydrive, mydir, NULL, NULL);
-          _wmakepath (myname, mydrive, mydir, NULL, NULL);
-          (void) SetCurrentDirectory(myname);
+      res = GetModuleFileName(myself, myname, ARRAY_SIZE(myname));
+      if (res > 0 && res < ARRAY_SIZE(myname)) {
+        _wsplitpath(myname , mydrive, mydir, NULL, NULL);
+        _wmakepath (myfinal, mydrive, mydir, NULL, NULL);
+        if (!SetCurrentDirectory(myfinal))
+	  eprintf_exit(L"cannot change current directory");
+        _wmakepath (myfinal, mydrive, mydir, L"bin", NULL);
+        envsz = GetEnvironmentVariable(L"PATH", NULL, 0);
+        bufsz = envsz + 1 + wcslen(myfinal) + 1;
+
+        if ((opath = malloc(envsz * sizeof(WCHAR))) == NULL ||
+            (npath = malloc(bufsz * sizeof(WCHAR))) == NULL )
+	  eprintf_exit(L"memory exhausted");
+
+        wcscpy(npath, myfinal);
+
+        if (envsz > 0) {
+          if (GetEnvironmentVariable(L"PATH", opath, envsz) != envsz-1)
+	    eprintf_exit(L"cannot recover $PATH");
+	  wcscat(npath, L";"); wcscat(npath, opath);
+        }
+
+        if (!SetEnvironmentVariable(L"PATH", npath))
+	  eprintf_exit(L"cannot set $PATH");
       }
-    }
+    } else
+      eprintf_exit(L"cannot recover module handle");
 
     ZeroMemory(&si, sizeof (si));
     si.cb = sizeof(si);
-    si.dwFlas = STARTF_USESHOWWINDOW | STARTF_USECOUNTCHARS;
+    si.dwFlags = STARTF_USESHOWWINDOW | STARTF_USECOUNTCHARS;
     si.wShowWindow = SW_HIDE;
     si.dwXCountChars = 80;
     si.dwYCountChars = 25;
 
     ZeroMemory(&pi, sizeof(pi));
 
-    piflas  = 0;
-    piflas |= CREATE_NEW_PROCESS_GROUP;
+    piflags  = 0;
+    piflags |= CREATE_NEW_PROCESS_GROUP;
 
     if (!CreateProcess(
           NULL,           // No module name (use command line)
@@ -94,7 +120,7 @@ int wmain(int arc, LPWSTR argv[]) {
           NULL,           // Process handle not inheritable
           NULL,           // Thread handle not inheritable
           FALSE,          // Set handle inheritance to FALSE
-          piflas,        // No creation flags
+          piflags,        // No creation flags
           NULL,           // Use parent's environment block
           NULL,           // Use parent's startin directory 
           &si,            // Pointer to STARTUPINFO structure
