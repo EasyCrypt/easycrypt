@@ -12,6 +12,8 @@ PUB  ?= x86,x64,macos
 .PHONY: build-linux-32 build-linux-64 build-macos
 .PHONY: publish publish-win32
 
+RSYNC = rsync -avt --exclude .gitignore --exclude .DS_Store
+
 # --------------------------------------------------------------------
 default:
 	@echo "make [linux-32|linux-64|macos]"
@@ -19,39 +21,43 @@ default:
 # --------------------------------------------------------------------
 base:
 	rm -rf $(DEST) && mkdir $(DEST)
-	rsync -avt package/ $(DEST)/
+	$(RSYNC) package/ $(DEST)/
 	make -C ../.. DESTDIR=ide/emacs-based/$(DEST) PREFIX=/ install
 
 # --------------------------------------------------------------------
 posix: base
-	rsync -avt ../../_tools/ocaml-$(OPAM)/opam/system/lib/why3/lib/   $(DEST)/lib/
-	rsync -avt ../../_tools/ocaml-$(OPAM)/opam/system/lib/why3/share/ $(DEST)/share/
+	$(RSYNC) ../../_tools/ocaml-$(OPAM)/opam/system/lib/why3/lib/   $(DEST)/lib/
+	$(RSYNC) ../../_tools/ocaml-$(OPAM)/opam/system/lib/why3/share/ $(DEST)/share/
 	mv $(DEST)/lib/why3/why3-cpulimit $(DEST)/bin/
+	cp scripts/run-easycrypt $(DEST)/
 
 # --------------------------------------------------------------------
 linux-32: posix
-	rsync -avt provers/linux-x86/ $(DEST)/
+	$(RSYNC) provers/linux-x86/ $(DEST)/
 	tar --owner=0 --group=0 -czf easycrypt-$(TAG)-x86.tar.gz easycrypt
 
 # --------------------------------------------------------------------
 linux-64: posix
-	rsync -avt provers/linux-x64/ $(DEST)/
+	$(RSYNC) provers/linux-x64/ $(DEST)/
 	tar --owner=0 --group=0 -czf easycrypt-$(TAG)-x64.tar.gz easycrypt
 
 # --------------------------------------------------------------------
 macos: posix
-	rsync -avt extra/macos/ $(DEST)/share/
-	rsync -avt provers/macos/ $(DEST)/
+	$(RSYNC) extra/macos/ $(DEST)/share/
+	$(RSYNC) provers/macos/ $(DEST)/
 	/usr/local/bin/gtar --owner=0 --group=0 -czf easycrypt-$(TAG)-macos.tar.gz easycrypt
 
 # --------------------------------------------------------------------
 win32: base
-	rsync -avt /opt/wodi32/lib/why3   $(DEST)/lib/
-	rsync -avt /opt/wodi32/share/why3 $(DEST)/share/
+	cp scripts/run-easycrypt.bat $(DEST)/
+	i686-w64-mingw32-gcc -municode -mwindows -o $(DEST)/run-easycrypt.exe \
+	  scripts/run-easycrypt-win32.c
+	$(RSYNC) /opt/wodi32/lib/why3   $(DEST)/lib/
+	$(RSYNC) /opt/wodi32/share/why3 $(DEST)/share/
 	mv $(DEST)/lib/why3/why3-cpulimit.exe $(DEST)/bin/
 	cp $(DEST)/etc/why3-win32.conf $(DEST)/etc/why3.conf
-	rsync -avt extra/win32/ $(DEST)/share/
-	rsync -avt provers/win32/ $(DEST)/
+	$(RSYNC) extra/win32/ $(DEST)/share/
+	$(RSYNC) provers/win32/ $(DEST)/
 	zip -r easycrypt-$(TAG)-win32.zip easycrypt/
 
 # --------------------------------------------------------------------
