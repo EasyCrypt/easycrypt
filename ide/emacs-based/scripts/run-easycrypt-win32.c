@@ -50,7 +50,7 @@ void eprintf_exit(LPWSTR format, ...)
 }
 
 /* ------------------------------------------------------------------------ */
-#define CMD L"share\\emacs\\bin\\emacs.exe -l share\\easycrypt\\pg\\emacs.rc --no-init-file --no-site-file --debug-init"
+#define CMD L"share\\emacs\\bin\\runemacs.exe -l share\\easycrypt\\pg\\emacs.rc --no-init-file --no-site-file --debug-init"
 
 /* ------------------------------------------------------------------------ */
 int wmain(int argc, LPWSTR argv[]) {

@@ -50,8 +50,6 @@ macos: posix
 # --------------------------------------------------------------------
 win32: base
 	cp scripts/run-easycrypt.bat $(DEST)/
-	i686-w64-mingw32-gcc -municode -mwindows -o $(DEST)/run-easycrypt.exe \
-	  scripts/run-easycrypt-win32.c
 	$(RSYNC) /opt/wodi32/lib/why3   $(DEST)/lib/
 	$(RSYNC) /opt/wodi32/share/why3 $(DEST)/share/
 	mv $(DEST)/lib/why3/why3-cpulimit.exe $(DEST)/bin/
@@ -59,6 +57,9 @@ win32: base
 	$(RSYNC) extra/win32/ $(DEST)/share/
 	$(RSYNC) provers/win32/ $(DEST)/
 	zip -r easycrypt-$(TAG)-win32.zip easycrypt/
+
+#	i686-w64-mingw32-gcc -municode -mwindows -o $(DEST)/run-easycrypt.exe \
+#	  scripts/run-easycrypt-win32.c
 
 # --------------------------------------------------------------------
 export:
