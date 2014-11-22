@@ -31,10 +31,7 @@ find:src:*.mly
 find:src:*.mll
 
 # EasyCrypt theories
-theories/*.ec
-theories/prelude/*.ec
-theories/core/*.ec
-theories/realizations/*.ec
+find:theories:*.ec
 
 # EasyCrypt extraction support library
 find:extraction:*.ml

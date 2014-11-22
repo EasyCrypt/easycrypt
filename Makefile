@@ -10,16 +10,17 @@ ifeq ($(shell echo $$TERM), dumb)
 endif
 OCAMLBUILD := $(OCAMLBUILD_BIN) $(OCAMLBUILD_EXTRA)
 
-DESTDIR  ?=
-PREFIX   ?= /usr/local
-VERSION  ?= $(shell date '+%F')
-DISTDIR  := easycrypt-$(VERSION)
-THEORIES := $(wildcard theories/*.ec)
-REALIZED := $(wildcard theories/realizations/*.ec)
-PRELUDE  := $(wildcard theories/prelude/*.ec)
-CORE     := $(wildcard theories/core/*.ec)
-INSTALL  := scripts/install/install-sh
-PWD      := $(shell pwd)
+DESTDIR    ?=
+PREFIX     ?= /usr/local
+VERSION    ?= $(shell date '+%F')
+DISTDIR    := easycrypt-$(VERSION)
+THEORIES   := $(wildcard theories/*.ec)
+ENCRYPTION := $(wildcard theories/encryption/*.ec)
+REALIZED   := $(wildcard theories/realizations/*.ec)
+PRELUDE    := $(wildcard theories/prelude/*.ec)
+CORE       := $(wildcard theories/core/*.ec)
+INSTALL    := scripts/install/install-sh
+PWD        := $(shell pwd)
 
 include Makefile.system
 
@@ -84,6 +85,7 @@ install: ec.native uninstall
 	$(call install-theories,core,$(CORE))
 	$(call install-theories,prelude,$(PRELUDE))
 	$(call install-theories,realizations,$(REALIZED))
+	$(call install-theories,encryption,$(ENCRYPTION))
 
 define rmdir
 	-@if [ -d "$(1)" ]; then rmdir "$(1)"; fi
@@ -98,6 +100,7 @@ uninstall:
 	rm -f $(DESTDIR)$(BINDIR)/easycrypt
 	rm -f $(DESTDIR)$(SYSDIR)/callprover
 	$(call rmdir,$(DESTDIR)$(SYSDIR))
+	$(call uninstall-theories,encryption,$(ENCRYPTION))
 	$(call uninstall-theories,realizations,$(REALIZED))
 	$(call uninstall-theories,prelude,$(PRELUDE))
 	$(call uninstall-theories,core,$(CORE))
