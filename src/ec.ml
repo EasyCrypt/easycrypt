@@ -158,7 +158,14 @@ let _ =
   let options = EcOptions.parse Sys.argv in
 
   (* chrdir_$PATH if in reloc mode (FIXME / HACK) *)
-  if options.o_options.o_reloc then Sys.chdir (resource [".."; ".."]);
+  let relocdir =
+    match options.o_options.o_reloc with
+    | true ->
+      let pwd = Sys.getcwd () in
+        Sys.chdir (resource [".."; ".."]); Some pwd
+    | false ->
+        None
+  in
 
   (* Initialize why3 engine *)
   let why3conf =
@@ -224,8 +231,11 @@ let _ =
   in
 
   (match input with
-   | None -> EcCommands.addidir Filename.current_dir_name
-   | Some input -> EcCommands.addidir (Filename.dirname input));
+   | Some input -> EcCommands.addidir (Filename.dirname input)
+   | None ->
+       match relocdir with
+       | None     -> EcCommands.addidir Filename.current_dir_name
+       | Some pwd -> EcCommands.addidir pwd);
 
   (* Initialize global scope *)
   begin
