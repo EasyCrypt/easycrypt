@@ -15,22 +15,25 @@
   \begin{tsyntax}{call (_: I)}
   Uses invariant \tct{I} to infer a specification for use with
   \tct{tactic}.
-  %%
-  In \prhl, equivalent to
-  \tct{call (_: =$\{\Arg\}$ /\\ I ==> =$\{\Res\}$ /\\ I); first proc I.}
-  %%
-  In \phl and \hl, equivalent to
+
+  In \prhl, and if \tct{A} is the abstract module, \tct{call (_: I)}
+  is equivalent to
+  \tct{call (_: =$\{\Arg,glob A\}$ /\\ I ==> =$\{\Res,glob A\}$ /\\ I); first proc I.}
+
+  In \phl and \hl, \tct{call (_: I)} is equivalent to
   \tct{call (_: I ==> I); first proc I.}
   \end{tsyntax}
 
   \begin{tsyntax}{call (_: B, I)}
   On \prhl abstract procedures only.
-  Equivalent to \tct{call (_: $\neg$B /\\ =$\{\Arg\}$ /\\ I ==> $\neg$B => =$\{\Res\}$ /\\ I); first proc B I.}
+  If \tct{A} is the abstract module, \tct{call (_: B, I)} is equivalent to
+  \tct{call (_: $\neg$B /\\ =$\{\Arg,glob A\}$ /\\ I ==> $\neg$B => =$\{\Res, glob A\}$ /\\ I); first proc B I.}
   \end{tsyntax}
 
   \begin{tsyntax}{call (_: B, I, I')}
   On \prhl abstract procedures only.
-  Equivalent to \tct{call (_: $\neg$B /\\ =$\{\Arg\}$ /\\ I ==> if $\neg$B then =$\{\Res\}$ /\\ I else I')); first proc B I I'.}
+  If \tct{A} is the abstract module, \tct{call (_: B, I)} is equivalent to
+  \tct{call (_: $\neg$B /\\ =$\{\Arg,glob A\}$ /\\ I ==> if $\neg$B then =$\{\Res,glob A\}$ /\\ I else I')); first proc B I I'.}
   \end{tsyntax}
 
   \textbf{Note:} When using the invariant-based variants of
