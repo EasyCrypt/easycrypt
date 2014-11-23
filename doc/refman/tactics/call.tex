@@ -1,6 +1,41 @@
 % --------------------------------------------------------------------
 \begin{tactic}{call}
-  \begin{tsyntax}[empty]{call}
-  \fix{Missing description of call}.
+  All variants of the \tct{call} tactic implicitly make use of a frame
+  rule, based on a ``may modify'' analysis.
+
+  \begin{tsyntax}{call (_: P ==> Q)}
+  Compute the precondition of a procedure call using the given
+  specification for the procedure. As a side-goal, prove that the
+  procedure fulfills the given specification.
+
+  As with other tactics, the specification \tct{(_: P ==> Q)} can be
+  replaced with a lemma from which the specification is inferred.
   \end{tsyntax}
+
+  \begin{tsyntax}{call (_: I)}
+  Uses invariant \tct{I} to infer a specification for use with
+  \tct{tactic}.
+  %%
+  In \prhl, equivalent to
+  \tct{call (_: =$\{\Arg\}$ /\\ I ==> =$\{\Res\}$ /\\ I); first proc I.}
+  %%
+  In \phl and \hl, equivalent to
+  \tct{call (_: I ==> I); first proc I.}
+  \end{tsyntax}
+
+  \begin{tsyntax}{call (_: B, I)}
+  On \prhl abstract procedures only.
+  Equivalent to \tct{call (_: $\neg$B /\\ =$\{\Arg\}$ /\\ I ==> $\neg$B => =$\{\Res\}$ /\\ I); first proc B I.}
+  \end{tsyntax}
+
+  \begin{tsyntax}{call (_: B, I, I')}
+  On \prhl abstract procedures only.
+  Equivalent to \tct{call (_: $\neg$B /\\ =$\{\Arg\}$ /\\ I ==> if $\neg$B then =$\{\Res\}$ /\\ I else I')); first proc B I I'.}
+  \end{tsyntax}
+
+  \textbf{Note:} When using the invariant-based variants of
+  \tct{call}, error messages may be originating from the underlying
+  application of \rtactic{proc}. In particular, when using them to
+  deal with abstract procedure calls, the invariant \emph{should not}
+  refer to memory locations the abstract procedure may modify.
 \end{tactic}

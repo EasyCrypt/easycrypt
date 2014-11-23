@@ -43,5 +43,6 @@
   keywordstyle=[8]{\color{Red}},
   keywordstyle=[9]{\color{OliveGreen}},
   literate=
+    {==>}{$\Longrightarrow$}{1}
     {=>}{$\Rightarrow$}{1},
 }

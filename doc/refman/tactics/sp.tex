@@ -1,6 +1,20 @@
 % --------------------------------------------------------------------
 \begin{tactic}{sp}
-  \begin{tsyntax}[empty]{sp}
-  \fix{Missing description of sp}.
+  \begin{tsyntax}{sp}
+  Computes the strongest postcondition of a straightline deterministic
+  prefix of the program(s) that is implied by the current
+  precondition. \tct{sp} also consumes deterministic \tct{if}
+  statements (when both branches are deterministic straightline code
+  without procedure calls).
+  \end{tsyntax}
+
+  \begin{tsyntax}{sp $\ n_1$ $\ n_2$}
+  In \prhl, let \tct{sp} consume \emph{exactly} $n_1$ statements of
+  the left program and $n_2$ statements of the right program.
+  \end{tsyntax}
+
+  \begin{tsyntax}{sp $\ n$}
+  In \phl and \hl, let \tct{sp} consume \emph{exactly} $n$ statements
+  of the program.
   \end{tsyntax}
 \end{tactic}

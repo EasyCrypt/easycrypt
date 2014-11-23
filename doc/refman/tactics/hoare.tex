@@ -1,6 +1,21 @@
 % --------------------------------------------------------------------
 \begin{tactic}{hoare}
-  \begin{tsyntax}[empty]{hoare}
-  \fix{Missing description of hoare}.
+  \begin{tsyntax}{hoare <spec>}
+  Derives a null probability from a \hl judgement on the procedure
+  involved. \tct{hoare} can also be used to derive \phl judgments and
+  certain probability inequalities by automatically applying
+  \rtactic{conseq}.
+
+  \textbf{Examples:}
+  \begin{mathpar}
+    \inferrule%%
+      {\HL{\mathsf{true}}{f}{\neg Q}}%%
+      {\PR{f}{\vec{a}}{\mem{m}}{Q} = 0}%%
+      \quad\mbox{\parbox{200pt}{\tct{hoare}}} \\
+    \inferrule%%
+      {\HL{\mathsf{P}}{f}{\neg Q}}%%
+      {\pHL{P}{f}{Q}{\leq}{0}}%%
+      \quad\mbox{\parbox{200pt}{\tct{hoare}}}
+  \end{mathpar}
   \end{tsyntax}
 \end{tactic}

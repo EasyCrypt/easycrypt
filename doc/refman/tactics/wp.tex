@@ -1,6 +1,20 @@
 % --------------------------------------------------------------------
 \begin{tactic}{wp}
-  \begin{tsyntax}[empty]{wp}
-  \fix{Missing description of wp}.
+  \begin{tsyntax}{wp}
+  Computes the weakest precondition of a straightline deterministic
+  suffix of the program(s) that implies the current
+  postcondition. \tct{wp} also consumes deterministic \tct{if}
+  statements (when both branches are deterministic straightline code
+  without procedure calls).
+  \end{tsyntax}
+
+  \begin{tsyntax}{wp $\ n_1$ $\ n_2$}
+  In \prhl, let \tct{wp} consume \emph{exactly} $n_1$ statements of
+  the left program and $n_2$ statements of the right program.
+  \end{tsyntax}
+
+  \begin{tsyntax}{wp $\ n$}
+  In \phl and \hl, let \tct{wp} consume \emph{exactly} $n$ statements
+  of the program.
   \end{tsyntax}
 \end{tactic}

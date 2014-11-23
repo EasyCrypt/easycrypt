@@ -1,6 +1,35 @@
 % --------------------------------------------------------------------
 \begin{tactic}{proc}
-  \begin{tsyntax}[empty]{proc}
-  \fix{Missing description of proc}.
+  \begin{tsyntax}{proc}
+  Derive a specification for a \emph{concrete} procedure from a
+  specification on its code.
+  \end{tsyntax}
+
+  \begin{tsyntax}{proc I}
+  Derive a specification for an \emph{abstract} procedure from an
+  invariant on the oracles it may query.
+  \end{tsyntax}
+
+  \begin{tsyntax}{proc B I}
+  Derive a specification for an \emph{abstract} procedure from an
+  ``upto-failure'' invariant on the oracles it may query. The failure
+  event \tct{B} is evaluated in the right memory. The left oracles
+  must be lossless once the bad event occurs. The right oracles must
+  guarantee the stability of the failure event with probability 1.
+  \end{tsyntax}
+
+  \begin{tsyntax}{proc B I I'}
+  Similar to \tct{proc B I}, with an additional invariant once the bad
+  event occurs. This is particularly useful when additional facts
+  about the state need to be known to prove the losslessness and
+  stability conditions.
+  \end{tsyntax}
+
+  \begin{tsyntax}{proc*}
+  Derive a specification on procedures from a specification on a
+  program whose code consists in a call to that procedure. This tactic
+  is particularly useful in combination with \rtactic{inline} when
+  faced with a \prhl judgment where one of the procedures is concrete
+  and the other is abstract.
   \end{tsyntax}
 \end{tactic}

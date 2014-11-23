@@ -127,6 +127,11 @@ they operated on single instructions, their practical implementation
 automatically and implicitly applies tactic \rtactic{seq} to deal with
 context when necessary.
 
+For simple proofs, it is often enough to simply apply the program
+tactic corresponding to the last instruction in the program and let
+\tct{smt} deal with the verification condition once the program has
+been exhausted.
+
 \medskip
 
 \input{tactics/skip.tex}
