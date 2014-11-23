@@ -132,6 +132,13 @@ tactic corresponding to the last instruction in the program and let
 \tct{smt} deal with the verification condition once the program has
 been exhausted.
 
+Most of the program reasoning tactics discussed in this paragraph have
+two modes when used on \prhl proof obligations. Their default mode is
+to operate on both programs at once. When a side is specified (using
+\tct{<tactic>\{1\}} or \tct{<tactic>\{2\}}), a one-sided variant is
+used. Apart from the \rtactic{if} tactic, the one-sided variant is in
+fact a combination of the \phl tactic and \rtactic{conseq}.
+
 \medskip
 
 \input{tactics/skip.tex}

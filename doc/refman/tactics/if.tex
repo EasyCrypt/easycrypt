@@ -1,6 +1,13 @@
 % --------------------------------------------------------------------
 \begin{tactic}{if}
-  \begin{tsyntax}[empty]{if}
-  \fix{Missing description of if}.
+  \begin{tsyntax}{if}
+  Operates on the \emph{first} statement (instead of the last one). If
+  the first statement in the program is
+  %%
+  \tct{if (b) \{ $c_1$ \} else \{ $c_2$ \}},
+  %%
+  applying tactic \tct{if} is equivalent to
+  \tct{case b; [rcondt 1=> //= | rcondf 1=> //=]}
+  (see \rtactic{case}, \rtactic{rcondt}, \rtactic{rcondf}).
   \end{tsyntax}
 \end{tactic}
