@@ -9,7 +9,7 @@ open EcTypes
 open EcModules
 open EcFol
 open EcParsetree
-
+open EcEnv
 open EcCoreGoal
 open EcLowPhlGoal
 
@@ -61,12 +61,12 @@ module LowInternal = struct
         match var with
         | APVar (pv', ty) ->  begin
           match lv,new_ids with
-          | LvVar   (pv ,_), [new_id,_] when pv_equal pv pv' -> ALocal (new_id,ty)
+          | LvVar   (pv ,_), [new_id,_] when NormMp.pv_equal env pv pv' -> ALocal (new_id,ty)
           | LvVar   _      , _ -> var
           | LvTuple vs     , _ -> begin
               let aux = List.map2 (fun x y -> (fst x, fst y)) vs new_ids in
               try
-                let new_id = snd (List.find (pv_equal pv' |- fst) aux) in
+                let new_id = snd (List.find (NormMp.pv_equal env pv' |- fst) aux) in
                 ALocal (new_id, ty)
               with Not_found -> var
             end

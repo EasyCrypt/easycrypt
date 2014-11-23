@@ -2285,6 +2285,8 @@ module NormMp = struct
   let x_equal env f1 f2 = 
     EcPath.x_equal (norm_xfun env f1) (norm_xfun env f2)
 
+  let pv_equal env pv1 pv2 = 
+    EcTypes.pv_equal (norm_pvar env pv1) (norm_pvar env pv2)
 end
 
 (* -------------------------------------------------------------------- *)
