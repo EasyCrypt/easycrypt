@@ -1,6 +1,13 @@
 % --------------------------------------------------------------------
-\begin{tactic}{apply}
-  \begin{tsyntax}[empty]{apply}
-  \fix{Missing description of apply}.
+\begin{tactic}[apply (p : proof-term)]{apply}
+  \begin{tsyntax}[empty]{apply (p : proof-term)}
+   If \tct{p} is a proof-term for the pattern (formula)
+  \begin{center}
+    \tct{forall (x1 : t1) ... (xn : tn), A1 -> ... -> An -> B}
+  \end{center}
+  \noindent then \tct{apply} tries to match B with the current G. If the
+  match succeeds and leads to the full instantiation of the pattern,
+  then the goal is replaced, after instantiation, with the $n$ subgoals
+  \tct{A1, ..., An}.
   \end{tsyntax}
 \end{tactic}

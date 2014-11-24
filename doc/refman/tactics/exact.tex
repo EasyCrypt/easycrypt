@@ -1,6 +1,8 @@
 % --------------------------------------------------------------------
-\begin{tactic}{exact}
+\begin{tactic}{exact (p : proofterm)}
   \begin{tsyntax}[empty]{exact}
-  \fix{Missing description of exact}.
+  Equivalent to \tct{by apply (p : proofterm)}, i.e. apply the given
+  proof-term and the try to close the goals with \tct{trivial} - failing
+  if not all goals can be closed.
   \end{tsyntax}
 \end{tactic}

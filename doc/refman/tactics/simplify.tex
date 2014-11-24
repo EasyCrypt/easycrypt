@@ -1,6 +1,14 @@
 % --------------------------------------------------------------------
-\begin{tactic}{simplify}
+\begin{tactic}[simplify | simplify $\;x_1 \cdots x_n$ | simplify delta]{simplify}
   \begin{tsyntax}[empty]{simplify}
-  \fix{Missing description of simplify}.
+  Change the goal with its $\beta\iota\zeta\Lambda$-head normal-form, followed
+  by one step of parallel, strong $\delta$-reduction if \tct{delta} is given.
+  The $\delta$-reduction can be restricted to a set of defined symbols by
+  replacing \tct{delta} by a non-empty sequence of targeted symbols. You can
+  selectively change the goal with its $\beta$-head normal form
+  (resp. $\iota$, $\zeta$, $\Lambda$-head normal form) by using the tactic
+  \tct{beta} (resp. \tct{iota}, \tct{zeta}, \tct{logic}). These tactics can be
+  combined together, separated by spaces, to perform head reduction by any
+  combination of the rule sets.
   \end{tsyntax}
 \end{tactic}

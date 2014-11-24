@@ -1,6 +1,8 @@
 % --------------------------------------------------------------------
-\begin{tactic}{progress}
+\begin{tactic}[progress | progress $\;\tau$]{progress}
   \begin{tsyntax}[empty]{progress}
-  \fix{Missing description of progress}.
+  Break the goal into multiple \emph{simpler} ones by repeatedly applying
+  \tct{split}, \tct{subst} and \tct{move=>}. The tactic $\tau$ given to
+  \tct{progress} is tentatively applied after each step.
   \end{tsyntax}
 \end{tactic}

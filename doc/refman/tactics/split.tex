@@ -1,6 +1,15 @@
 % --------------------------------------------------------------------
 \begin{tactic}{split}
   \begin{tsyntax}[empty]{split}
-  \fix{Missing description of split}.
+  Break an intrinsically conjunctive goal into its component subgoals.
+  For instance, it can:
+  \begin{itemize}
+    \item close any goal that is convertible to \tct{true} or provable by \tct{reflexivity},
+    \item replace a logical equivalence by the direct and indirect implication,
+    \item replace a goal of the form \tct{f1 /\\ f2} by the two subgoals for \tct{f1} an
+          \tct{f2}. The same applies for a goal of the form \tct{f1 && f2},
+    \item replace an equality between $n$-tuples by $n$ equalities
+          on their components.
+  \end{itemize}
   \end{tsyntax}
 \end{tactic}

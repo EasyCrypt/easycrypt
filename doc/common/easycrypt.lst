@@ -44,5 +44,9 @@
   keywordstyle=[9]{\color{OliveGreen}},
   literate=
     {==>}{$\Longrightarrow$}{1}
-    {=>}{$\Rightarrow$}{1},
+    {=>}{$\Rightarrow$}{1}
+    {->}{$\rightarrow$}{1}
+    {<=>}{$\Leftrightarrow$}{1}
+    {/\\}{$\wedge$}{1}
+    {\\/}{$\vee$}{1}    
 }

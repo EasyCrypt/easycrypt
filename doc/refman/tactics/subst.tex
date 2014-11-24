@@ -1,6 +1,9 @@
 % --------------------------------------------------------------------
-\begin{tactic}{subst}
+\begin{tactic}[subst | subst x]{subst}
   \begin{tsyntax}[empty]{subst}
-  \fix{Missing description of subst}.
+  Search for the first equation of the form \tct{x = f} or \tct{f = x} in the context
+  and replace all the occurrences of \tct{x} by \tct{f} everywhere in the context and the
+  goal before clearing it. If no identifier is given, repeatedly apply the tactic to
+  all identifiers for which such an equation exists.
   \end{tsyntax}
 \end{tactic}
