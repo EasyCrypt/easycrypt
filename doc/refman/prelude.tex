@@ -44,7 +44,7 @@
  \IfStrEq{#1}{empty}{\relax}{\errmessage{invalid tsyntax mode: #1}}}}
 {\par\addvspace{.5\baselineskip}}
 
-\newcommand{\rtactic}[1]{\tct{#1} (p.~\pageref{tactic-#1})}
+\newcommand{\rtactic}[2][\empty]{\tct{#2} (p.~\pageref{tactic-\ifx\empty#1#2\else#1\fi})}
 
 %--------------------------------------------------------------------
 \usepackage{mathpartir}
