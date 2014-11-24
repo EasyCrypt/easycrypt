@@ -34,15 +34,16 @@ module LowInternal = struct
           (fun fmt ->
             let (s1, s2) =
               match mode with
-              | `RW -> "read" , "written"
-              | `WR -> "write", "read"
+              | `RW -> "reads" , "written"
+              | `WR -> "writes", "read"
+              | `WW -> "writes", "written"
             in
               Format.fprintf fmt
-                "the first statement can %s %a which can be %s by the second"
+                "the first statement %s %a which is %s by the second"
                 s1 (PV.pp env) d s2))
     in
       if not (PV.is_empty m2r1) then error `RW m2r1;
-      if not (PV.is_empty m1m2) then error `WR m1m2;
+      if not (PV.is_empty m1m2) then error `WW m1m2;
       if not (PV.is_empty m1r2) then error `WR m1r2
 
   let swap_stmt tc p1 p2 p3 s =
