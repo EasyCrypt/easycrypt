@@ -1,6 +1,109 @@
 % --------------------------------------------------------------------
 \section{Tactics}
 
+\EasyCrypt comes with a proof engine that allows to state and prove properties
+about programs written in the various languages.
+%
+Proofs are built interactively by applying tactics, that transform a
+current proof goal into a (possibly empty) set of subgoals such that the
+conjunction of the subgoals implies the original goal.
+%
+This process is repeated, starting from the theorem statement, up to the point
+where all the subgoals correspond to general axioms or premises of the theorem.
+
+In this chapter, we describe this proof engine in general before listing and
+describing the existing tactics for various fragments of \EasyCrypt's
+underlying logic.
+
+\section{The proof engine}
+
+The proof engine deals with judgments or goals of the form
+$\epsilon; \Gamma \vdash \phi$ where $\epsilon$ is the (global) environment,
+$\Gamma$ is the context (a set of local facts) and $\phi$ is the
+formula we want to prove. Here is an example of such a judgment:
+
+\begin{center}
+$\mathsf{Int}; x, y , z: \tint, x \le y \vdash x + z \le y + z$.
+\end{center}
+
+It states that in the environment ($\mathsf{Int}$) solely composed of the
+theory of integers, having three local variables $x, y, z$ of type
+$\mathsf{int}$ along with the fact $x \le y$ (the context $\Gamma$), we are
+interested in proving $x + z \le y + z$.
+
+\medskip
+
+On top on this, a set of deduction rules is given. They describe how one can
+derive a judgment $\epsilon; \Gamma \vdash \phi$ given that a set of prerequisites
+(or premises) are fulfilled. The general form of such a rule is given
+as follow:
+
+\begin{mathpar}
+ \inferrule{A_1 \cdots A_n}{\epsilon; \Gamma \vdash \phi}
+\end{mathpar}
+
+It has to be read as: \emph{given that $A_1 \cdots A_n$ are derivable, then
+so is $\epsilon, \Gamma \vdash \phi$}. We give three examples of such deduction
+rules:
+
+\begin{mathpar}
+ \inferrule[left=MP]
+         {\epsilon; \Gamma \vdash \phi_1 \quad
+          \epsilon; \Gamma \vdash \phi_1 \Rightarrow \phi_2}
+         {\epsilon; \Gamma \vdash \phi_2}
+ \quad\quad
+ \inferrule[left=$\Rightarrow$-I]
+         {\epsilon; \Gamma, \phi_1 \vdash \phi_2}
+         {\epsilon; \Gamma \vdash \phi_1 \Rightarrow \phi_2}
+ \quad\quad
+ \inferrule[left=Ax]{ }{\epsilon; \Gamma, \phi, \Delta \vdash \phi}
+\end{mathpar}
+
+The first, the \emph{modus ponens}, states that one can derive
+$\epsilon; \Gamma \vdash \phi_2$ given that $\epsilon; \Gamma \vdash \phi_1
+\Rightarrow \phi_2$ and $\epsilon; \Gamma \vdash \phi_1$ are derivable.
+%
+The next provides a way for deriving $\phi_1 \Rightarrow \phi_2$ from
+a derivation of $\phi_2$, but with a context augmented by $\phi_1$.
+%
+The last states that $\epsilon; \Gamma, \phi, \Delta \vdash \phi$ is derivable as-is.
+
+Combining these deduction rules, it is possible to build a tree rooted by
+a judgment $\epsilon; \Gamma \vdash \phi$ and with leaves composed of deduction
+rules with no premises (as the third one in the previous example). Such a
+tree forms a proof of $\epsilon; \Gamma \vdash \phi$.
+%
+For instance, Figure~\ref{fig:LJproof} gives a proof of
+%
+\[\epsilon; b_1, b_2 : \tbool \vdash (b_1 \Rightarrow b_2) \Rightarrow b_1 \Rightarrow b_2\]
+
+\begin{figure}
+  \begin{mathpar}
+    \inferrule
+      {\inferrule{ }{\epsilon; b_1, b_2 : \tbool, b_1 \Rightarrow b_2, b_1 \vdash b_1 \Rightarrow b_2} \quad
+       \inferrule{ }{\epsilon; b_1, b_2 : \tbool, b_1 \Rightarrow b_2, b_1 \vdash b_1}}
+      {\inferrule
+        {\epsilon; b_1, b_2 : \tbool, b_1 \Rightarrow b_2, b_1 \vdash b_2}
+        {\inferrule
+           {\epsilon; b_1, b_2 : \tbool, b_1 \Rightarrow b_2 \vdash b_1 \Rightarrow b_2}
+           {\epsilon; b_1, b_2 : \tbool \vdash (b_1 \Rightarrow b_2) \Rightarrow b_1 \Rightarrow b_2}}}
+  \end{mathpar}
+
+  \caption{\label{fig:LJproof} Proof tree of
+    $\epsilon; b_1, b_2 : \tbool \vdash
+        (b_1 \Rightarrow b_2) \Rightarrow b_1 \Rightarrow b_2$}
+\end{figure}
+
+The \EasyCrypt proof engine helps the user build such proofs. At each step
+of the proof building, the system presents to the user the set of goals
+that have to be proved. The user can then \emph{apply} a tactic to one of
+them, each tactic corresponding to a deduction rule. If the conclusion
+of the rule corresponding to the applied tactic matches the goal to which
+it is applied, the proof engine replaces it with the set of the
+premises of the applied rule - the subgoals. This application may generate
+no, one or several subgoals depending on the rule. This process is repeated
+iteratively, up to the point where no goals remain.
+
 \subsection{Ambient logic}
 
 \input{tactics/idtac.tex}
@@ -33,6 +136,87 @@
 \input{tactics/smt.tex}
 
 \input{tactics/admit.tex}
+
+\subsection{Tacticals}
+
+% Tactics can be combined together, composed and modified by
+% \define[tactical]{tacticals}. Tacticals do not correspond to any deduction rule
+% but make the proof process smoother, and sometimes permit the reuse of proofs
+% with similar patterns, but where the fine minutiae might differ.
+% 
+% \newcommand{\addTclTacticPlain}[2]{\addTacticPlain{#1}{#2}}
+% \newcommand{\addTclTacticIdx}[1]{\addTacticIdx{tactical}{#1}}
+% \newcommand{\addTclTactic}[2]{\addTactic{tactical}{#1}{#2}}
+% 
+% \warningbox{The precedence rules for tacticals may sometime appear
+% counterintuitive. They are currently not listed below in any particular order,
+% and this documentation does not currently describe the precendence rules.
+% We are working on improving this.}
+% 
+% %seq
+% \addTclTacticPlain{Tactics sequencing}{\ec{t1; t2}}
+% Execute \ec{t1} and then \ec{t2} on all the subgoals generated by
+% \ec{t1}.
+% 
+% %try
+% \addTclTacticPlain{Failure recovery}{\ec{try t}}
+% \addTclTacticIdx{try}
+% Execute the tactic \ec{t} if it succeeds; do noting if it fails.
+% 
+% \paragraph{Remark}
+% By default, \EasyCrypt proofs are run in \ec{strict} mode. In this mode,
+% \ec{smt} failures cannot be caught using \ec{try}. This allows \EasyCrypt
+% to always build the proof tree correctly, even in weak check mode, where
+% \ec{smt} calls are assumed to succeed. Inside a strict proof, weak check mode
+% can be turned on and off at will, allowing for the fast replay of proof
+% sections during development. In any event, we recommend \emph{never} using
+% \ec{try smt}: a little thought is much more cost-effective than a bunch of
+% \ec{smt}.
+% 
+% %repetition
+% \addTclTacticPlain{Tactics repetition}{\ec{do !t}}
+% \addTclTacticIdx{do}
+% Apply \ec{t} to the current goal, then repeatedly apply it to all subgoals,
+% stopping only when it fails. An error is produced it \ec{t} does not apply to
+% the current goal.
+% 
+% \paragraph{Variants}\strut\\
+% 
+% \noindent\begin{tabularx}{\textwidth}{@{}ll@{}}
+%  {\ec{do ?t}} & apply {\ec{t}} 0 or more times, until it fails\\
+%  {\ec{do n !t}} & apply {\ec{t}} with depth exactly {\ec{n}}\\
+%  {\ec{do n ?t}} & apply {\ec{t}} with depth at most {\ec{n}}
+% \end{tabularx}
+% 
+% \warningbox{In some cases, \ec{do ?t} may lead to non-termination for obvious
+% reasons. Please report any occurrence that seems abnormal.}
+% 
+% %selection
+% \addTclTacticPlain{Goal selection}{\ec{t1; first t2}}
+% \addTclTacticIdx{first}
+% \addTclTacticIdx{last}
+% Apply the tactic \ec{t1}, then apply \ec{t2} on the first subgoal
+% generated by \ec{t1}. An error is produced if no subgoals have been
+% generated by \ec{t1}.
+% 
+% \paragraph{Variants}\strut\\
+% 
+% \noindent\begin{tabularx}{\textwidth}{@{}ll@{}}
+%  {\ec{t1; first n t2}} & apply {\ec{t2}} on the first {\ec{n}} subgoals
+%    generated by {\ec{t1}}\\
+%  {\ec{t1; last t2}} & apply {\ec{t2}} on the last subgoal
+%    generated by {\ec{t1}}\\
+%  {\ec{t1; last n t2}} & apply {\ec{t2}} on the last {\ec{n}} subgoals
+%    generated by {\ec{t1}}\\
+%  {\ec{t; first n last}} & \parbox{200pt}{reorder the subgoals generated by {\ec{t}}, moving
+%    the first n to the end of the list}
+% \end{tabularx}
+% 
+% %closing
+% \addTclTacticPlain{Closing goals}{\ec{by t}}
+% \addTclTacticIdx{by}
+% Apply the tactic \ec{t} if all the subgoals it generates can be discharged by
+% \ec{simplify}, fail otherwise.
 
 \subsection{Program Logics}
 

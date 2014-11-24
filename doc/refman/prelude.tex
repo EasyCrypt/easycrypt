@@ -4,6 +4,9 @@
 \newcommand{\fix}[1]{\fxnote{#1}}
 
 % --------------------------------------------------------------------
+\usepackage{mathpartir}
+
+% --------------------------------------------------------------------
 \DeclareMathVersion{sans}
 \SetSymbolFont{operators}{sans}{OT1}{cmbr}{m}{n}
 \SetSymbolFont{letters}{sans}{OML}{cmbrm}{m}{it}
@@ -53,3 +56,7 @@
 %--------------------------------------------------------------------
 %% Miscellaneous local notations
 \newcommand{\invrel}[1]{#1^{-1}} %% Inverse relation
+
+%--------------------------------------------------------------------
+\newcommand{\tint}[0]{\ensuremath{\mathsf{int}}}
+\newcommand{\tbool}[0]{\ensuremath{\mathsf{bool}}}
