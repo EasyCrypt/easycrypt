@@ -252,9 +252,12 @@ let t_bdhoare_rnd_r tac_info tc =
       let sgoal4 =
         let bounded_distr = f_cmp (f_mu distr event) d4 in
         let post = f_anda bounded_distr (mk_event_cond event) in
-        f_forall_mems [bhs.bhs_m] (f_imp (f_not phi) post)
+        f_forall_mems [bhs.bhs_m] (f_imp (f_not phi) post) in
+      let sgoal5 =
+        let f_inbound x = f_anda (f_real_le f_r0 x) (f_real_le x f_r1) in
+        f_ands (List.map f_inbound [d1; d2; d3; d4])
       in
-      [bd_sgoal;sgoal1;sgoal2;sgoal3;sgoal4]
+      [bd_sgoal;sgoal1;sgoal2;sgoal3;sgoal4;sgoal5]
 
     | _, _ -> tc_error !!tc "invalid arguments"
   in
