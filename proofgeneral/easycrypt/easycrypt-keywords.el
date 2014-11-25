@@ -1,4 +1,4 @@
-; Generated on Sun Jul 13 10:20:00 2014
+; Generated on Tue Nov 25 11:15:00 2014
 
 (defvar easycrypt-bytac-keywords '(
   "exact"
@@ -21,6 +21,7 @@
   "realize"
   "proof"
   "qed"
+  "goal"
   "end"
   "import"
   "export"
@@ -40,6 +41,7 @@
   "class"
   "instance"
   "print"
+  "search"
   "why3"
   "as"
   "Pr"
