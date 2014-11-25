@@ -514,11 +514,9 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
               match ax.ax_kind with
               | `Lemma -> None
               | `Axiom ->
-                  match ovrds.evc_lemmas.ev_global with
+                  match Msym.find_opt x (ovrds.evc_lemmas.ev_bynames) with
                   | Some pt -> Some pt
-                  | None ->
-                      let map = ovrds.evc_lemmas.ev_bynames in
-                        Msym.find_opt x map
+                  | None -> ovrds.evc_lemmas.ev_global
             in
               match doproof with
               | None     -> (ax, proofs)
