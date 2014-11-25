@@ -224,6 +224,7 @@
 %token FWDS
 %token GENERALIZE
 %token GLOB
+%token GOAL
 %token HINT
 %token HOARE
 %token HYPOTHESIS
@@ -2537,6 +2538,7 @@ print:
 | MODULE      qs=qident          { Pr_mod  qs }
 | MODULE TYPE qs=qident          { Pr_mty  qs }
 | GLOB        qs=loc(mod_qident) { Pr_glob qs }
+| GOAL        n=int              { Pr_goal n  }
 
 prover_iconfig:
 | /* empty */     { (None   , None   ) }

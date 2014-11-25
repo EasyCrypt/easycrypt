@@ -690,6 +690,7 @@ type pprint =
   | Pr_mod  of pqsymbol
   | Pr_mty  of pqsymbol
   | Pr_glob of pmsymbol located
+  | Pr_goal of int
 
 (* -------------------------------------------------------------------- *)
 type renaming_kind =

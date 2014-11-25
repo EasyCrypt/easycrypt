@@ -250,6 +250,36 @@ let process_pr fmt scope p =
         us.EcEnv.us_pv
   end
 
+  | Pr_goal n -> begin
+      match EcScope.xgoal scope with
+      | None | Some { EcScope.puc_active = None} ->
+          EcScope.hierror "no active proof"
+
+      | Some { EcScope.puc_active = Some puc } -> begin
+          match puc.EcScope.puc_jdg with
+          | EcScope.PSNoCheck -> ()
+
+          | EcScope.PSCheck pf -> begin
+              let hds = EcCoreGoal.all_opened pf in
+              let sz  = List.length hds in
+              let ppe = EcPrinting.PPEnv.ofenv (EcScope.env scope) in
+
+              if n > sz then
+                EcScope.hierror "only %n goal(s) remaining" sz;
+              if n <= 0 then
+                EcScope.hierror "goal ID must be positive";
+              let penv = EcCoreGoal.proofenv_of_proof pf in
+              let goal = List.nth hds (n-1) in
+              let goal = EcCoreGoal.FApi.get_pregoal_by_id goal penv in
+              let goal = (EcEnv.LDecl.tohyps goal.EcCoreGoal.g_hyps,
+                          goal.EcCoreGoal.g_concl) in
+
+              Format.fprintf fmt "Printing Goal %d\n\n%!" n;
+              EcPrinting.pp_goal ppe fmt (sz, goal)
+          end
+      end
+  end
+
 (* -------------------------------------------------------------------- *)
 let process_print scope p =
   process_pr Format.std_formatter scope p

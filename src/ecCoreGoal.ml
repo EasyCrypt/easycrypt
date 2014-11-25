@@ -824,6 +824,10 @@ let proof_of_tcenv (tc : tcenv) =
     pr_opened = List.ocons fg rg; }
 
 (* -------------------------------------------------------------------- *)
+let proofenv_of_proof (pf : proof) =
+  pf.pr_env
+
+(* -------------------------------------------------------------------- *)
 let start (hyps : LDecl.hyps) (goal : form) =
   let uid = ID.gen () in
   let hid = ID.gen () in
@@ -842,6 +846,10 @@ let opened (pf : proof) =
   | [] -> None
   | hd :: _ -> Some (List.length pf.pr_opened,
                      FApi.get_pregoal_by_id hd pf.pr_env)
+
+(* -------------------------------------------------------------------- *)
+let all_opened (pf : proof) =
+  pf.pr_opened
 
 (* -------------------------------------------------------------------- *)
 let closed (pf : proof) = List.isempty pf.pr_opened

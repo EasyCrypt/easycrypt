@@ -136,6 +136,7 @@
     "realize"     , REALIZE    ;        (* KW: global *)
     "proof"       , PROOF      ;        (* KW: global *)
     "qed"         , QED        ;        (* KW: global *)
+    "goal"        , GOAL       ;        (* KW: global *)
     "end"         , END        ;        (* KW: global *)
     "import"      , IMPORT     ;        (* KW: global *)
     "export"      , EXPORT     ;        (* KW: global *)
