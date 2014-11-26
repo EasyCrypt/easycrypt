@@ -2196,16 +2196,16 @@ let trans_form_or_pattern env (ps, ue) pf tt =
 
         let check_mem loc me = 
           match EcEnv.Memory.byid me env with
-          | None -> tyerror loc env NoActiveMemory (* FIXME error message *)
+          | None -> tyerror loc env (UnknownMemName (0, EcIdent.name me))
           | Some _ -> ()
         in
 
         let qual (mq : pmsymbol option) (x : pqsymbol) =
           match mq with
-          | None -> x
-          | Some z ->
-              let (ys,y) = x.pl_desc in
-                { x with pl_desc = ((List.map (fun (ps,_) -> ps.pl_desc) z)@ys,y) }
+          | None    -> x
+          | Some qs ->
+              let (nm, name) = x.pl_desc in
+              { x with pl_desc = ((List.map (unloc |- fst) qs)@nm, name) }
         in
 
          let do1 = function
@@ -2217,13 +2217,13 @@ let trans_form_or_pattern env (ps, ue) pf tt =
 
           | GVglob gp ->
               let (mp, _) = trans_msymbol env gp in
-                check_mem gp.pl_loc EcFol.mleft;
-                check_mem gp.pl_loc EcFol.mright;
                 let x1 = f_glob mp EcFol.mleft in
                 let x2 = f_glob mp EcFol.mright in
                   unify_or_fail env ue gp.pl_loc ~expct:x1.f_ty x2.f_ty;
                   f_eq x1 x2
         in
+          check_mem f.pl_loc EcFol.mleft;
+          check_mem f.pl_loc EcFol.mright;
           EcFol.f_ands (List.map do1 xs)
 
     | PFapp ({pl_desc = PFident ({ pl_desc = name; pl_loc = loc }, tvi)}, pes) ->
