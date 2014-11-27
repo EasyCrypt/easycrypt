@@ -39,7 +39,7 @@ and pucflags = {
 }
 
 (* -------------------------------------------------------------------- *)
-val notify : scope -> EcGState.loglevel -> ('a, unit, string, unit) format4 -> 'a
+val notify : scope -> EcGState.loglevel -> ('a, Format.formatter, unit, unit) format4 -> 'a
 
 (* -------------------------------------------------------------------- *)
 val empty   : EcGState.gstate -> scope

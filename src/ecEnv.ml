@@ -186,10 +186,13 @@ let gstate (env : env) =
 
 (* -------------------------------------------------------------------- *)
 let notify (env : preenv) (lvl : EcGState.loglevel) msg =
-  Format.ksprintf
-    (fun msg ->
-      EcGState.notify lvl (lazy msg) (gstate env))
-    msg
+  let buf = Buffer.create 0 in
+  let fbuf = Format.formatter_of_buffer buf in
+  Format.kfprintf
+    (fun _ ->
+      Format.pp_print_flush fbuf ();
+      EcGState.notify lvl (lazy (Buffer.contents buf)) (gstate env))
+    fbuf msg
 
 (* -------------------------------------------------------------------- *)
 let empty_mc params = {
