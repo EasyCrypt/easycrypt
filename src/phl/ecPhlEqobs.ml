@@ -71,7 +71,12 @@ let init_sim env spec inv =
       List.pick 
         (fun (_,_,eqo' as t) -> if test t then Some eqo' else None) spec in
     match List.fpick [get test1; get test2; get test3] with
-    | None -> raise EqObsInError
+    | None -> 
+      let ppe = EcPrinting.PPEnv.ofenv env in
+      EcEnv.notify env `Warning 
+        "warning default specification for %a %a not given"
+        (EcPrinting.pp_funname ppe) fl (EcPrinting.pp_funname ppe) fr;
+      raise EqObsInError
     | Some eq -> eq in
   
   { sim_env  = env;
@@ -183,14 +188,16 @@ let rec s_eqobs_in_rev rsl rsr sim (eqo:Mpv2.t) =
   | _, ir::rsr when check_deadcode_i (fun lv -> check_not_r sim lv eqo) ir ->
     s_eqobs_in_rev rsl rsr sim eqo 
 
-  | [], _ | _, [] -> rsl, rsr, sim, eqo
-
   | il::rsl', ir::rsr' ->
     let o = 
       try Some (i_eqobs_in il ir sim eqo) with EqObsInError -> None in 
-    match o with
+    begin match o with
     | None -> rsl, rsr, sim, eqo
     | Some (sim, eqi) -> s_eqobs_in_rev rsl' rsr' sim eqi 
+    end
+
+  | _, _ -> rsl, rsr, sim, eqo
+
       
 and i_eqobs_in il ir sim (eqo:Mpv2.t) = 
   match il.i_node, ir.i_node with
@@ -441,7 +448,9 @@ let process_eqobs_inF info tc =
       with _ -> tc_error !!tc "cannot infer the set of equalities" in
   let eqo = Mpv2.remove env (pv_res fl) (pv_res fr) eqo in
   let sim = init_sim env spec inv in
-  let _, eqi = f_eqobs_in fl fr sim eqo in 
+  let _, eqi = 
+    try f_eqobs_in fl fr sim eqo 
+    with EqObsInError -> tc_error !!tc "not able to process" in
   let ef' = destr_equivF (mk_inv_spec2 env inv (fl, fr, eqi, eqo)) in
   (EcPhlConseq.t_equivF_conseq ef'.ef_pr ef'.ef_po @+ [
     t_logic_trivial;
