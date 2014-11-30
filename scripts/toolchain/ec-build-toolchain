@@ -7,6 +7,7 @@ set -e
 # --------------------------------------------------------------------
 : ${OVERSION=4.02.1}
 : ${EC_TOOLCHAIN_ROOT="${PWD}/_tools"}       # MUST BE ABSOLUTE
+: ${EC_JOBS=1}
 
 # --------------------------------------------------------------------
 PATCHES=ocaml-patches.diff
@@ -22,6 +23,8 @@ OCONFIG="${EC_TOOLCHAIN_ROOT}/${OCONFIG_BASE}"
 export OCAMLBREW_BASE=${EC_TOOLCHAIN_ROOT}
 export OCAMLBREW_FLAGS="-v ${OVERSION} -f"
 # export OCAMLBREW_FLAGS="-v ${OVERSION} -p ${PWD}/scripts/patches/${PATCHES} -f"
+export OCAMLBREW_JOBS=${EC_JOBS}
+export OPAMJOBS=${EC_JOBS}
 
 export OPAMROOT=${EC_TOOLCHAIN_ROOT}/ocaml-${OVERSION}/opam
 export OPAMFLAGS="--no-setup"
@@ -104,9 +107,8 @@ function build_opam {
 export PS1="(ec-tool) \${PS1}"
 export OCAMLFIND_CONF="${EC_TOOLCHAIN_ROOT}/ocaml-${OVERSION}/opam/system/lib/findlib.conf"
 export OPAMROOT="${OPAMROOT}"
+. ${OPAMROOT}/opam-init/variables.sh
 EOF
-
-    echo "eval \`${EC_TOOLCHAIN_ROOT}/ocaml-${OVERSION}/bin/opam config env\`" >>"${OCONFIG}"
 }
 
 ( set -e; cd "${EC_TOOLCHAIN_ROOT}"/ocaml-${OVERSION}/build && build_opam )
