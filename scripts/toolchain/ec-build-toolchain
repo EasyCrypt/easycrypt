@@ -5,25 +5,26 @@
 set -e
 
 # --------------------------------------------------------------------
-: ${OVERSION=4.01.0}
+: ${OVERSION=4.02.1}
 : ${EC_TOOLCHAIN_ROOT="${PWD}/_tools"}       # MUST BE ABSOLUTE
 
 # --------------------------------------------------------------------
 PATCHES=ocaml-patches.diff
 OBREW_URL=https://www.easycrypt.info/toolchain/ocamlbrew
 
-OPAM_VERSION=1.1.1
-OPAM_URL=http://www.ocamlpro.com/pub/opam-full-${OPAM_VERSION}.tar.gz
+OPAM_VERSION=1.2.0
+OPAM_URL=https://github.com/ocaml/opam/releases/download/${OPAM_VERSION}/opam-full-${OPAM_VERSION}.tar.gz
 ECOPAM_URL=https://www.easycrypt.info/opam-${OPAM_VERSION}
 
 OCONFIG_BASE="ocaml-${OVERSION}/etc/ocamlbrew.bashrc"
 OCONFIG="${EC_TOOLCHAIN_ROOT}/${OCONFIG_BASE}"
 
 export OCAMLBREW_BASE=${EC_TOOLCHAIN_ROOT}
-export OCAMLBREW_FLAGS="-v ${OVERSION} -p ${PWD}/scripts/patches/${PATCHES} -f"
+export OCAMLBREW_FLAGS="-v ${OVERSION} -f"
+# export OCAMLBREW_FLAGS="-v ${OVERSION} -p ${PWD}/scripts/patches/${PATCHES} -f"
 
 export OPAMROOT=${EC_TOOLCHAIN_ROOT}/ocaml-${OVERSION}/opam
-export OPAMFLAGS="--no-setup default ${ECOPAM_URL}"
+export OPAMFLAGS="--no-setup"
 
 unset OCAMLFIND_CONF
 unset OCAML_TOPLEVEL_PATH
@@ -94,9 +95,10 @@ function build_opam {
 
     cd opam-full-${OPAM_VERSION}
     ./configure --prefix="${EC_TOOLCHAIN_ROOT}/ocaml-${OVERSION}"
-    make && make install
+    make lib-ext && make && make install
 
     "${EC_TOOLCHAIN_ROOT}"/ocaml-${OVERSION}/bin/opam init ${OPAMFLAGS}
+    "${EC_TOOLCHAIN_ROOT}"/ocaml-${OVERSION}/bin/opam repository add ec ${ECOPAM_URL}
 
     cat >>"${OCONFIG}" <<-EOF
 export PS1="(ec-tool) \${PS1}"
