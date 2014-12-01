@@ -610,12 +610,13 @@ end
 module String = struct
   include String
 
-  let map f s =
-    let r = String.create (String.length s) in
-      for i = 0 to (String.length s) - 1 do
-        r.[i] <- f s.[i]
-      done;
-      r
+  let mapi f s =
+    let i = ref (-1) in
+    String.map (fun c -> incr i; f !i c) s
+
+  let init i f =
+    let s = String.make i '\000' in
+    mapi (fun i _ -> f i) s
 
   let startswith ptn subject =
     let rec doit i =

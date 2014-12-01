@@ -377,7 +377,7 @@ module POSIX : PExec = struct
   let execute_task ?(notify : notify option) (pi : prover_infos) task =
     let module CP = Call_provers in
 
-    let pcs = Array.create pi.pr_maxprocs None in
+    let pcs = Array.make pi.pr_maxprocs None in
 
     (* Run process, ignoring prover failing to start *)
     let run i prover =

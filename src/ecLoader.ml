@@ -67,18 +67,20 @@ let try_stat name =
   with Unix.Unix_error _ -> None
 
 (* -------------------------------------------------------------------- *)
-let norm_name name =
-  let name = String.copy name in
-    if String.length name > 0 then
-      name.[0] <- Char.lowercase name.[0];
-    name
+let norm_name (mode : [`Lower | `Upper]) name =
+  String.init
+    (String.length name)
+    (function
+     | 0 when mode = `Lower -> Char.lowercase name.[0]
+     | 0 when mode = `Upper -> Char.uppercase name.[0]
+     | i -> name.[i])
 
 (* -------------------------------------------------------------------- *)
 let check_case idir name (dev, ino) =
-  let name = norm_name name in
+  let name = norm_name `Lower name in
 
   let check1 tname =
-      match name = norm_name tname with
+      match name = norm_name `Lower tname with
       | false -> false
       | true  -> begin
           try
@@ -103,10 +105,8 @@ let locate ?(onlysys = false) (name : string) (ecl : ecloader) =
       | true  -> None
       | false ->
         let stat =
-          let oname = String.copy name in
-          let iname = String.copy name in
-            oname.[0] <- Char.uppercase oname.[0];
-            iname.[0] <- Char.lowercase iname.[0];
+          let oname = norm_name `Upper name in
+          let iname = norm_name `Lower name in
             List.fpick
               (List.map
                  (fun name ->

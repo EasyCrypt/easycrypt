@@ -264,7 +264,9 @@ end
 module String : sig
   include module type of String
 
-  val map : (char -> char) -> string -> string
+  val init : int -> (int -> char) -> string
+
+  val mapi : (int -> char -> char) -> string -> string
 
   val startswith : string -> string -> bool
 
