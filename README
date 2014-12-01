@@ -191,9 +191,15 @@ manager.
 Starting with opam 1.2.0, you can install all the needed depdendencies
 via the opam OCaml packages manager.
 
+  0. Optionally, switch to a dedicated compiler for EasyCrypt:
+
+     $> opam switch -A $OVERSION easycrypt
+
+     where $OVERSION is a valid OCaml version (e.g. 4.02.1)
+
   1. Add the EasyCrypt repository:
 
-     $> opam repository add ec https://ci.easycrypt.info/opam-1.2.0
+     $> opam repository add easycrypt https://ci.easycrypt.info/opam-1.2.0
      $> opam update
 
   2. Add the EasyCrypt meta-packages:
