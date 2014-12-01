@@ -18,7 +18,7 @@
 
   In \prhl, and if \ec{A} is the abstract module, \ec{call (_: I)}
   is equivalent to
-  \ec{call (_: =$\{\Arg,glob A\}$ /\\ I ==> =$\{\Res,glob A\}$ /\\ I); first proc I.}
+  \ec{call (_: =\{arg,glob A\} /\\ I ==> =\{res,glob A\} /\\ I); first proc I.}
 
   In \phl and \hl, \ec{call (_: I)} is equivalent to
   \ec{call (_: I ==> I); first proc I.}
@@ -27,13 +27,13 @@
   \begin{tsyntax}{call (_: B, I)}
   On \prhl abstract procedures only.
   If \ec{A} is the abstract module, \ec{call (_: B, I)} is equivalent to
-  \ec{call (_: $\neg$B /\\ =$\{\Arg,glob A\}$ /\\ I ==> $\neg$B => =$\{\Res, glob A\}$ /\\ I); first proc B I.}
+  \ec{call (_: !B /\\ =\{arg,glob A\} /\\ I ==> !B => =\{res, glob A\} /\\ I); first proc B I.}
   \end{tsyntax}
 
   \begin{tsyntax}{call (_: B, I, I')}
   On \prhl abstract procedures only.
   If \ec{A} is the abstract module, \ec{call (_: B, I)} is equivalent to
-  \ec{call (_: $\neg$B /\\ =$\{\Arg,glob A\}$ /\\ I ==> if $\neg$B then =$\{\Res,glob A\}$ /\\ I else I')); first proc B I I'.}
+  \ec{call (_: !B /\\ =\{arg,glob A\} /\\ I ==> if !B then =\{res,glob A\} /\\ I else I')); first proc B I I'.}
   \end{tsyntax}
 
   \textbf{Note:} When using the invariant-based variants of

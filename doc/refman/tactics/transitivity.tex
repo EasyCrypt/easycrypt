@@ -11,25 +11,25 @@
   \textbf{Examples:}
   \begin{mathpar}
   \inferrule%%
-    {\forall \mem{m_1}\ \mem{m_2}.\, \Rel{P}{\mem{m_1}}{\mem{m_2}} \Rightarrow
-        \exists \mem{m}.\, \Rel{P_1}{\mem{m_1}}{\mem{m}}
-                           \wedge \Rel{P_2}{\mem{m}}{\mem{m_2}} \\%
+    {\forall \mem{m_1}\ \mem{m_2}.\, \mem{m_1} \rel{P} \mem{m_2} \Rightarrow
+        \exists \mem{m}.\, \mem{m_1} \rel{P_1} \mem{m}
+                           \wedge \mem{m} \rel{P_2} \mem{m_2} \\%
      \forall \mem{m_1}\ \mem{m}\ \mem{m_2}.\,
-        \Rel{Q_1}{\mem{m_1}}{\mem{m}} \Rightarrow
-        \Rel{Q_2}{\mem{m}}{\mem{m_2}} \Rightarrow
-        \Rel{Q}{\mem{m_1}}{\mem{m_2}} \\%
+        \mem{m_1} \rel{Q_1} \mem{m} \Rightarrow
+        \mem{m}   \rel{Q_2} \mem{m_2} \Rightarrow
+        \mem{m_1} \rel{Q}   \mem{m_2} \\%
      \pRHL{P_1}{f_1}{f}{Q_1} \\%
      \pRHL{P_2}{f}{f_2}{Q_2}}%%
     {\pRHL{P}{f_1}{f_2}{Q}}%%
     \quad\mbox{(\prhl)\quad\parbox{200pt}{\ec{transitivity f ($P_1$ ==> $\ Q_1$) ($P_2$ ==> $\ Q_2$)}}} \\
   \inferrule%%
-    {\forall \mem{m_1}\ \mem{m_2}.\, \Rel{P}{\mem{m_1}}{\mem{m_2}} \Rightarrow
-        \exists \mem{m}.\, \Rel{P_1}{\mem{m_1}}{\mem{m}}
-                           \wedge \Rel{P_2}{\mem{m}}{\mem{m_2}} \\%
+    {\forall \mem{m_1}\ \mem{m_2}.\, \mem{m_1} \rel{P} \mem{m_2} \Rightarrow
+        \exists \mem{m}.\, \mem{m_1} \rel{P_1} \mem{m}
+                           \wedge \mem{m} \rel{P_2} \mem{m_2} \\%
      \forall \mem{m_1}\ \mem{m}\ \mem{m_2}.\,
-        \Rel{Q_1}{\mem{m_1}}{\mem{m}} \Rightarrow
-        \Rel{Q_2}{\mem{m}}{\mem{m_2}} \Rightarrow
-        \Rel{Q}{\mem{m_1}}{\mem{m_2}} \\%
+        \mem{m_1} \rel{Q_1} \mem{m} \Rightarrow
+        \mem{m}   \rel{Q_2} \mem{m_2} \Rightarrow
+        \mem{m_1} \rel{Q}   \mem{m_2} \\%
      \pRHL{P_1}{s_1}{s}{Q_1} \\%
      \pRHL{P_2}{s}{s_2}{Q_2}}%%
     {\pRHL{P}{s_1}{s_2}{Q}}%%

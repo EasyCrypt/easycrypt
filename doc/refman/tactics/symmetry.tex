@@ -4,12 +4,11 @@
   In \prhl, swaps the two programs, transforming the pre and
   postconditions by swapping the memories they refer to.
 
-  \textbf{Examples:}
-  \begin{mathpar}
-  \inferrule%%
-    {\pRHL{\invrel{P}}{c_2}{c_1}{\invrel{Q}}}%%
-    {\pRHL{P}{c_1}{c_2}{Q}}%%
-    \quad\mbox{(\prhl)\quad\parbox{200pt}{\ec{symmetry}}}
-  \end{mathpar}
+  \begin{cmathpar}
+    \texample[\prhl{}]
+      {\ec{symmetry}}
+      {\pRHL{P^{-1}}{c_2}{c_1}{Q^{-1}}}
+      {\pRHL{P}{c_1}{c_2}{Q}}
+  \end{cmathpar}
   \end{tsyntax}
 \end{tactic}

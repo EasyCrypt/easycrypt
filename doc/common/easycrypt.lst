@@ -28,9 +28,10 @@
     {<-}{{$\leftarrow\;$}}1
     {<=>}{{$\Leftrightarrow\;$}}1
     {=>}{{$\Rightarrow\;$}}1
-    {==>}{{$\Rrightarrow\;$}}1
+    {==>}{{$\pmb{\Longrightarrow}$}}1
     {\/\\}{{$\wedge\;$}}1
     {\\\/}{{$\vee\;$}}1
+    {!!}{{$\neg\,$}}1
     {phi}{{$\!\phi\,$}}1
     {phi1}{{$\!\phi_1$}}1
     {phi2}{{$\!\phi_2$}}1
@@ -50,6 +51,7 @@
 \lstdefinelanguage{easycrypt}{
   style=easycrypt-default,
   language=easycrypt-kw,
+  morekeywords=[1]{arg},
   morecomment=[n][\itshape]{(*}{*)},
   morecomment=[n][\bfseries]{(**}{*)},
 }

@@ -1,8 +1,59 @@
 % --------------------------------------------------------------------
+\usepackage{amsmath}
+
+\newcommand{\rel}[1]{\mathrel{#1}}
+
+% --------------------------------------------------------------------
+\newenvironment{tightcenter}{%
+  \setlength\topsep{0pt}
+  \setlength\parskip{0pt}
+  \begin{center}}
+{\end{center}}
+
+% --------------------------------------------------------------------
+% Acronyms, names, ...
+
+\usepackage{xspace}
+
+\def\EasyCrypt{\textsc{EasyCrypt}\xspace}
+\def\prhl{\textsc{prhl}\xspace}
+\def\phl{\textsc{phl}\xspace}
+\def\hl{\textsc{hl}\xspace}
+
+% --------------------------------------------------------------------
+% Inference rules
+\usepackage{mathpartir}
+
+\newenvironment{cmathpar}
+{\begin{tightcenter}\begin{mathpar}}
+{\end{mathpar}\end{tightcenter}}
+
+% --------------------------------------------------------------------
+% EasyCrypt listings
 \usepackage[final]{listings}
+
+\newcommand{\ensuretext}[1]{\ensuremath{\text{#1}}}
 
 \input{easycrypt.lst}
 \lstset{language=easycrypt}
 
 \def\ls{\lstinline}
-\def\ec#1{\lstinline[language=easycrypt,mathescape]"#1"}
+\def\ec#1{\lstinline[language=easycrypt]"#1"}
+
+\def\Arg{\ensuretext{\ec{arg}}}
+
+% --------------------------------------------------------------------
+% Typesetting judgments
+\newcommand{\pRHL}[4]{\{#1\}\; #2 \mathrel{\sim} #3\; \{#4\}}
+\newcommand{\pHL}[5]{\{#1\}\; #2\; \{#3\} \mathrel{#4} #5}
+\newcommand{\HL}[3]{\{#1\}\; #2\; \{#3\}}
+\newcommand{\PR}[4]{\mathbf{Pr} [#3, #1(#2) : #4]}
+
+\newcommand{\pRHLs}[4]{\ec{equiv [#2 ~ #3: #1 ==> #4]}}
+\newcommand{\pHLs}[5]{\ec{phoare [#2: #1 ==> #3] #4 #5}}
+\newcommand{\HLs}[3]{\ec{hoare [#2: #1 ==> #3]}}
+\newcommand{\PRs}[4]{\ec{Pr[#1(#2) @ &#3: #4]}}
+
+% --------------------------------------------------------------------
+\newcommand{\mem}[1]{#1}
+\newcommand{\inmem}[2]{#1\langle{#2}\rangle}

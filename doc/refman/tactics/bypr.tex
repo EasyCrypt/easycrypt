@@ -10,9 +10,9 @@
       {\forall \mem{m_1}, \mem{m_2}, a.\,
           r_1 = a \Rightarrow
           r_2 = a \Rightarrow
-          \Rel{Q}{\mem{m_1}}{\mem{m_2}} \\%
+          {\mem{m_1}} \rel{Q} {\mem{m_2}} \\%
        \forall \vec{a}_1, \vec{a}_2, \mem{m_1}, \mem{m_2}, a.\,
-          \Rel{P}{\mem{m_1}[\Arg\mapsto\vec{a}_1]}{\mem{m_2}[\Arg\mapsto\vec{a}_2]} \Rightarrow%
+         {\mem{m_1}[\Arg\mapsto\vec{a}_1]} \rel{P} {\mem{m_2}[\Arg\mapsto\vec{a}_2]} \Rightarrow%
          \PR{f_1}{\vec{a}_1}{\mem{m_1}}{a = r_1} = \PR{f_2}{\vec{a}_2}{\mem{m_2}}{a = r_2}} %%
       {\pRHL{P}{f_1}{f_2}{Q}}%%
       \quad\mbox{(\prhl)\quad\parbox{200pt}{\ec{bypr (r$_1$) (r$_2$)}}} \\

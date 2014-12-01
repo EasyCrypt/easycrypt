@@ -7,9 +7,6 @@
 \newcommand{\fix}[1]{\fxnote{#1}}
 
 % --------------------------------------------------------------------
-\usepackage{mathpartir}
-
-% --------------------------------------------------------------------
 \DeclareMathVersion{sans}
 \SetSymbolFont{operators}{sans}{OT1}{cmbr}{m}{n}
 \SetSymbolFont{letters}{sans}{OML}{cmbrm}{m}{it}
@@ -21,6 +18,7 @@
 
 %--------------------------------------------------------------------
 \usepackage{xstring}
+\usepackage{colortbl}
 
 \newcommand{\domark}{%
   \vbox to 0pt{\kern-\dp\strutbox \smash{\llap{$\circledcirc$\kern1em}} \vss}}
@@ -41,10 +39,16 @@
  \IfStrEq{#1}{empty}{\relax}{\errmessage{invalid tsyntax mode: #1}}}}
 {\par\addvspace{.5\baselineskip}}
 
+\newcommand{\texample}[4][]{%
+\begin{array}{@{}lr@{}}
+ \text{#2} & \text{\if\relax\detokenize{#1}\relax\else{\small [#1]}}\\
+ \arrayrulecolor{gray}\hline\\[-.5em]
+ \multicolumn{2}{c}{\hspace{.5cm}\inferrule*{#3}{#4}}
+\end{array}}
+
 \newcommand{\rtactic}[2][\empty]{\ec{#2} (p.~\pageref{tactic-\ifx\empty#1#2\else#1\fi})}
 
 %--------------------------------------------------------------------
-\usepackage{mathpartir}
 \usepackage{nicefrac}
 
 %--------------------------------------------------------------------

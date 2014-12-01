@@ -74,8 +74,8 @@ def _do_latex(keywords, options):
 
     for v in it.chain(*keywords.values()):
         print >>buffer, \
-            '\\def\\%(macro)s{\\text{\\ls[language=easycrypt,mathescape]"%(name)s"}}' % \
-            dict(macro = 'E%s' % v.replace('_', ''), name = v)
+            '\\def\\%(macro)s{\\ensuretext{\\ls[language=easycrypt]"%(name)s"}}' % \
+            dict(macro = v.capitalize().replace('_', ''), name = v)
 
     sys.stdout.write(buffer.getvalue())
 

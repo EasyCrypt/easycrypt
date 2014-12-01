@@ -248,7 +248,7 @@ value.
 In the following, given a relation $R$, we denote with $\invrel{R}$
 its inverse relation (that is,
 %%
-$\Rel{R}{m_1}{m_2} \Leftrightarrow \Rel{\invrel{R}}{m_2}{m_1}$).
+$m_1 \rel{R} m_2 \Leftrightarrow m_2 \rel{R^-1} m_1$).
 
 We denote with $\diamond^{\uparrow}$ the function defined by
 $$
@@ -263,8 +263,8 @@ $$
 Given a predicate $P$, we denote with $\inmem{P}{1}$
 (resp. $\inmem{P}{2}$) the relation defined by
 %%
-$\Rel{\inmem{P}{1}}{m_1}{m_2} \Leftrightarrow \Pred{P}{m_1}$
-(resp. $\Rel{\inmem{P}{2}}{m_1}{m_2} \Leftrightarrow \Pred{P}{m_2}$).
+$m_1 \rel{\inmem{P}{1}} m_2 \Leftrightarrow P~m_1$
+(resp. $m_1 \rel{\inmem{P}{2}} m_2 \Leftrightarrow P~m_2$).
 We lift logical connectors to predicates and relations over memories
 in the natural way.
 
