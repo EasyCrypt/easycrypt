@@ -2,12 +2,12 @@
 \begin{tactic}{byphoare}
   \begin{tsyntax}{byphoare [option]? <spec>}
   Derives a probability relation from a \phl judgement on the
-  procedure involved. \tct{<spec>} can include wildcards when the
+  procedure involved. \ec{<spec>} can include wildcards when the
   tactic should infer the pre or postcondition.
 
-  \textbf{Options:} By default, (\tct{eq} option) specification
+  \textbf{Options:} By default, (\ec{eq} option) specification
   inference attempts to infer a conjunction of equalities sufficient
-  to imply the desired relation. Passing the \tct{-eq} option
+  to imply the desired relation. Passing the \ec{-eq} option
   overrides this behaviour, instead using the trivial relation on
   events.
 
@@ -18,12 +18,12 @@
        \Pred{P}{m[\Arg\mapsto\vec{a}]} \\%
        \forall \mem{m'}.\,\Pred{Q}{m'} \Leftrightarrow \Pred{E}{m'}}%%
       {\PR{f}{\vec{a}}{\mem{m}}{E} = \delta}%%
-      \quad\mbox{\parbox{200pt}{\tct{byphoare (_: P ==> Q)}}} \\
+      \quad\mbox{\parbox{200pt}{\ec{byphoare (_: P ==> Q)}}} \\
   \end{mathpar}
   \end{tsyntax}
 
   \begin{tsyntax}{byphoare <lemma>}
-  Same as \tct{byphoare <spec>}, but the specification to use is
+  Same as \ec{byphoare <spec>}, but the specification to use is
   inferred from the lemma provided. Raises an error if the lemma does
   not refer to the expected procedure. Inference options have no
   effect in this setting.

@@ -4,10 +4,10 @@
   Operates on the \emph{first} statement (instead of the last one). If
   the first statement in the program is
   %%
-  \tct{if (b) \{ $c_1$ \} else \{ $c_2$ \}},
+  \ec{if (b) \{ $c_1$ \} else \{ $c_2$ \}},
   %%
-  applying tactic \tct{if} is equivalent to
-  \tct{case b; [rcondt 1=> //= | rcondf 1=> //=]}
+  applying tactic \ec{if} is equivalent to
+  \ec{case b; [rcondt 1=> //= | rcondf 1=> //=]}
   (see \rtactic[case-pl]{case}, \rtactic{rcondt}, \rtactic{rcondf}).
   \end{tsyntax}
 \end{tactic}

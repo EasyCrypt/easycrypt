@@ -3,10 +3,10 @@
   \begin{tsyntax}{transitivity c ($P_1$ ==> $\ Q_1$) ($P_2$ ==> $\ Q_2$)}
   In \prhl, applies the transitivity of program equivalence using the
   specified program and specifications. When the goal is a judgment on
-  procedures, \tct{c} should be a procedure. When the goal is a
-  judgment on statements, \tct{c} should be a statement, and the
+  procedures, \ec{c} should be a procedure. When the goal is a
+  judgment on statements, \ec{c} should be a statement, and the
   tactic then takes a side argument, used to decide the procedure
-  context under which local variables from \tct{c} are evaluated.
+  context under which local variables from \ec{c} are evaluated.
 
   \textbf{Examples:}
   \begin{mathpar}
@@ -21,7 +21,7 @@
      \pRHL{P_1}{f_1}{f}{Q_1} \\%
      \pRHL{P_2}{f}{f_2}{Q_2}}%%
     {\pRHL{P}{f_1}{f_2}{Q}}%%
-    \quad\mbox{(\prhl)\quad\parbox{200pt}{\tct{transitivity f ($P_1$ ==> $\ Q_1$) ($P_2$ ==> $\ Q_2$)}}} \\
+    \quad\mbox{(\prhl)\quad\parbox{200pt}{\ec{transitivity f ($P_1$ ==> $\ Q_1$) ($P_2$ ==> $\ Q_2$)}}} \\
   \inferrule%%
     {\forall \mem{m_1}\ \mem{m_2}.\, \Rel{P}{\mem{m_1}}{\mem{m_2}} \Rightarrow
         \exists \mem{m}.\, \Rel{P_1}{\mem{m_1}}{\mem{m}}
@@ -33,7 +33,7 @@
      \pRHL{P_1}{s_1}{s}{Q_1} \\%
      \pRHL{P_2}{s}{s_2}{Q_2}}%%
     {\pRHL{P}{s_1}{s_2}{Q}}%%
-    \quad\mbox{(\prhl)\quad\parbox{200pt}{\tct{transitivity$\{$1$\}$ $\ \{$ s $\ \}$ ($P_1$ ==> $\ Q_1$) ($P_2$ ==> $\ Q_2$)}}} \\
+    \quad\mbox{(\prhl)\quad\parbox{200pt}{\ec{transitivity$\{$1$\}$ $\ \{$ s $\ \}$ ($P_1$ ==> $\ Q_1$) ($P_2$ ==> $\ Q_2$)}}} \\
   \end{mathpar}
 
   \textbf{Note:} In practice, the existential quantification over

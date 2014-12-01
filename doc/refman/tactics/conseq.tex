@@ -3,7 +3,7 @@
   \begin{tsyntax}{conseq <spec>}
   Rule of consequence. Proves a specification by weakening of a
   stronger result. Any one of the specification places can be filled
-  with a wildcard \tct{_} to keep the value it contains in the current
+  with a wildcard \ec{_} to keep the value it contains in the current
   goal and trivially discharge the corresponding subgoal.
 
   \textbf{Examples:}
@@ -13,31 +13,31 @@
      Q \Rightarrow Q' \\%
      \pRHL{P}{c}{c'}{Q}}%%
     {\pRHL{P'}{c}{c'}{Q'}}%%
-    \quad\mbox{(\prhl)\quad\parbox{200pt}{\tct{conseq (_: P ==> Q)}}} \\
+    \quad\mbox{(\prhl)\quad\parbox{200pt}{\ec{conseq (_: P ==> Q)}}} \\
   \inferrule%%
     {Q \Rightarrow Q' \\%
      \pRHL{P'}{c}{c'}{Q}}%%
     {\pRHL{P'}{c}{c'}{Q'}}%%
-    \quad\mbox{(\prhl)\quad\parbox{200pt}{\tct{conseq (_: _ ==> Q)}}} \\
+    \quad\mbox{(\prhl)\quad\parbox{200pt}{\ec{conseq (_: _ ==> Q)}}} \\
   \inferrule%%
     {P' \Rightarrow \delta \mathrel{\diamond} \delta' \\%
      P' \Rightarrow P \\%
      Q \mathrel{\diamond^\uparrow} Q' \\%
      \pHL{P}{c}{Q}{\diamond}{\delta}}%%
     {\pHL{P'}{c}{Q'}{\diamond}{\delta'}}%%
-    \quad\mbox{(\phl)\quad\parbox{200pt}{\tct{conseq (_: P ==> Q: $\;\delta$)}}} \\
+    \quad\mbox{(\phl)\quad\parbox{200pt}{\ec{conseq (_: P ==> Q: $\;\delta$)}}} \\
   \inferrule%%
     {P' \Rightarrow P \\%
      Q \Rightarrow Q' \\%
      \HL{P}{c}{Q}}%%
     {\HL{P'}{c}{Q'}}%%
-    \quad\mbox{(\hl)\quad\parbox{200pt}{\tct{conseq (_: P ==> Q)}}} \\
+    \quad\mbox{(\hl)\quad\parbox{200pt}{\ec{conseq (_: P ==> Q)}}} \\
   \end{mathpar}
 
   \textbf{Note:} The \phl variant can also be used to strenghten the
   relation $\diamond$ into an equality by forcing the equality into
   the specification. For example, the following is a valid application
-  of \tct{conseq}.
+  of \ec{conseq}.
   \begin{mathpar}
     \inferrule%%
     {P' \Rightarrow \delta \mathrel{=} \delta' \\%
@@ -45,23 +45,23 @@
      Q \mathrel{\Leftrightarrow} Q' \\%
      \pHL{P}{c}{Q}{=}{\delta}}%%
     {\pHL{P'}{c}{Q'}{\leq}{\delta'}}%%
-    \quad\mbox{(\phl)\quad\parbox{200pt}{\tct{conseq (_: P ==> Q: $\;\mathop{=}\delta$)}}} \\
+    \quad\mbox{(\phl)\quad\parbox{200pt}{\ec{conseq (_: P ==> Q: $\;\mathop{=}\delta$)}}} \\
   \end{mathpar}  
   \end{tsyntax}
 
   \begin{tsyntax}{conseq <lemma>}
-  Only applies to judgments on procedures. Same as \tct{conseq
+  Only applies to judgments on procedures. Same as \ec{conseq
   <spec>}, but the specification to use is inferred from
   the lemma provided. Raises an error if the lemma does not refer to
-  the expected procedure(s). All variants of \tct{conseq} may take
+  the expected procedure(s). All variants of \ec{conseq} may take
   lemmas in place of explicit specifications with the same effect, in
   which case they must be applied to judgments on procedures.
   \end{tsyntax}
 
   \begin{tsyntax}{conseq* <spec>}
-  Same as \tct{conseq}, but the subgoal corresponding to the
+  Same as \ec{conseq}, but the subgoal corresponding to the
   postcondition is refined by a ``may modify'' analysis. All variants
-  of \tct{conseq} can be refined using the \tct{*}, with the same
+  of \ec{conseq} can be refined using the \ec{*}, with the same
   effect.
   \end{tsyntax}
 
@@ -79,7 +79,7 @@
      \HL{P_2}{c_2}{Q_2} \\%
      \pRHL{P}{c_1}{c_2}{Q}}%%
     {\pRHL{P'}{c_1}{c_2}{Q'}}%%
-    \quad\mbox{(\prhl)\quad\parbox{200pt}{\tct{conseq (_: P ==> Q) (_: P$_1$ ==> Q$_1$) (_: P$_2$ ==> Q$_2$)}}}
+    \quad\mbox{(\prhl)\quad\parbox{200pt}{\ec{conseq (_: P ==> Q) (_: P$_1$ ==> Q$_1$) (_: P$_2$ ==> Q$_2$)}}}
   \end{mathpar}
   \end{tsyntax}
 
@@ -101,13 +101,13 @@
      Q_1 \Rightarrow Q \\%
      \pHL{P_1}{c}{Q_1}{=}{1}}
     {\pRHL{P'}{c}{\Skip}{Q'}}%%
-    \quad\mbox{(\prhl)\quad\parbox{200pt}{\tct{conseq (_: P ==> Q) (_: P$_1$ ==> Q$_1$: =1$\%$r)}}} \\
+    \quad\mbox{(\prhl)\quad\parbox{200pt}{\ec{conseq (_: P ==> Q) (_: P$_1$ ==> Q$_1$: =1$\%$r)}}} \\
   \inferrule%%
     {P \Rightarrow P_2 \\%
      Q_2 \Rightarrow Q \\%
      \pHL{P_2}{c}{Q_2}{=}{1}}
     {\pRHL{P}{\Skip}{c}{Q}}%%
-    \quad\mbox{(\prhl)\quad\parbox{200pt}{\tct{conseq (_: _ ==> _) _ (_: P$_2$ ==> Q$_2$: =1$\%$r)}}}
+    \quad\mbox{(\prhl)\quad\parbox{200pt}{\ec{conseq (_: _ ==> _) _ (_: P$_2$ ==> Q$_2$: =1$\%$r)}}}
   \end{mathpar}
   \end{tsyntax}
 

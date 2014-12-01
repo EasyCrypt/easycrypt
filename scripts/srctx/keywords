@@ -1,13 +1,13 @@
 #! /usr/bin/env python
 
 # --------------------------------------------------------------------
-import sys, os, re, time, itertools as it
+import sys, os, re, time, errno, itertools as it, StringIO as sio
 
 # --------------------------------------------------------------------
 def _options():
     from optparse import OptionParser
 
-    parser = OptionParser(usage = 'Usage: %prog [options]')
+    parser = OptionParser(usage = 'Usage: %prog [options] <args...>')
 
     parser.add_option(
         '-m', '--mode',
@@ -16,13 +16,68 @@ def _options():
 
     (options, args) = parser.parse_args()
 
+    if options.mode not in ('raw', 'emacs', 'javascript', 'latex'):
+        parser.error("invalid mode: `%s'" % (options.mode,))
+
     if len(args) != 0:
         parser.error('this program does not take any argument')
 
-    if options.mode not in ('raw', 'emacs', 'javascript'):
-        parser.error("invalid mode: `%s'" % (options.mode,))
-
     return options
+
+# --------------------------------------------------------------------
+def _do_raw(keywords, options):
+    for k in sorted(keywords.keys()):
+        print "%s: %s" % (k, ", ".join(sorted(keywords[k])))
+
+# --------------------------------------------------------------------
+def _do_emacs(keywords, options):
+    print "; Generated on %s" % (time.ctime(),)
+    print
+    for k in sorted(keywords.keys()):
+        print "(defvar easycrypt-%s-keywords '(" % (k,)
+        for v in keywords[k]:
+            print "  \"%s\"" % (v,)
+        print "))"
+        print
+    print "(provide 'easycrypt-keywords)"
+
+# --------------------------------------------------------------------
+def _do_javascript(keywords, options):
+    print "// Generated on %s" % (time.ctime(),)
+    print 'var cKeywords = "%s"' % \
+            (' '.join(sorted(set(it.chain(*keywords.values())))))
+    print "// END"
+
+# --------------------------------------------------------------------
+def _do_latex(keywords, options):
+    buffer = sio.StringIO()
+
+    print >>buffer, "%% Generated on %s" % (time.ctime(),)
+    print >>buffer
+    print >>buffer, """\
+\\lstdefinelanguage{easycrypt-kw}{
+  morekeywords=[1]{%s},
+  morekeywords=[2]{%s},
+  morekeywords=[3]{%s},
+  morekeywords=[4]{%s},
+  morekeywords=[5]{%s},
+  morekeywords=[6]{%s},
+}
+""" % (
+    ','.join(keywords.get('prog'     , [])),
+    ','.join(keywords.get('global'   , [])),
+    ','.join(keywords.get('tactic'   , [])),
+    ','.join(keywords.get('tactical' , [])),
+    ','.join(keywords.get('bytac'    , [])),
+    ','.join(keywords.get('dangerous', [])),
+)
+
+    for v in it.chain(*keywords.values()):
+        print >>buffer, \
+            '\\def\\%(macro)s{\\text{\\ls[language=easycrypt,mathescape]"%(name)s"}}' % \
+            dict(macro = 'E%s' % v.replace('_', ''), name = v)
+
+    sys.stdout.write(buffer.getvalue())
 
 # --------------------------------------------------------------------
 def process():
@@ -36,26 +91,10 @@ def process():
         if mtch is not None:
             keywords.setdefault(mtch.group(3), []).append(mtch.group(1))
 
-    if options.mode == 'raw':
-        for k in sorted(keywords.keys()):
-            print "%s: %s" % (k, ", ".join(sorted(keywords[k])))
+    callback = '_do_%s' % (options.mode,)
+    callback = getattr(sys.modules[__name__], callback)
 
-    if options.mode == 'emacs':
-        print "; Generated on %s" % (time.ctime(),)
-        print
-        for k in sorted(keywords.keys()):
-            print "(defvar easycrypt-%s-keywords '(" % (k,)
-            for v in keywords[k]:
-                print "  \"%s\"" % (v,)
-            print "))"
-            print
-        print "(provide 'easycrypt-keywords)"
-
-    if options.mode == 'javascript':
-        print "// Generated on %s" % (time.ctime(),)
-        print 'var cKeywords = "%s"' % \
-                (' '.join(sorted(set(it.chain(*keywords.values())))))
-        print "// END"
+    callback(keywords, options)
 
 # --------------------------------------------------------------------
 if __name__ == '__main__':

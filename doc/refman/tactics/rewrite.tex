@@ -4,63 +4,63 @@
   Rewrite the rewrite-pattern $\pi_1 \cdots \pi_n$ from left to right,
   where the $\pi_i$ can be of the following form:
   \begin{itemize}
-  \item one of \tct{//}, \tct{/=}, \tct{//=},
+  \item one of \ec{//}, \ec{/=}, \ec{//=},
   \item a proof-term, or
-  \item a pattern prefixed by \tct{/} (slash).
+  \item a pattern prefixed by \ec{/} (slash).
   \end{itemize}
   The two last forms can be prefixed by a direction indicator (the sign
-  \tct{-}), followed by an occurrence selector (\tct{\{i1 ... in\}}),
+  \ec{-}), followed by an occurrence selector (\ec{\{i1 ... in\}}),
   followed (for proof-terms only) by a repetition marker
-  (\tct{!}, \tct{?}, \tct{n!} or \tct{n?}). All these prefixes are optional.
+  (\ec{!}, \ec{?}, \ec{n!} or \ec{n?}). All these prefixes are optional.
 
-  Depending on the form of $\pi$, \tct{rewrite $\;\pi$} does the following:
+  Depending on the form of $\pi$, \ec{rewrite $\;\pi$} does the following:
     \begin{itemize}
-    \item For \tct{//}, \tct{/=}, and \tct{//=}, see \tct{intros}.
-    \item If \tct{rw} is a proof-term for the pattern
+    \item For \ec{//}, \ec{/=}, and \ec{//=}, see \ec{intros}.
+    \item If \ec{rw} is a proof-term for the pattern
       \begin{center}
-	\tct{forall (x1 : t1) ... (xn : tn), A1 -> ... -> An -> f1 = f2}
+	\ec{forall (x1 : t1) ... (xn : tn), A1 -> ... -> An -> f1 = f2}
       \end{center}
-      \noindent then \tct{rewrite} searches for the first subterm of the goal
-      matching \tct{f1} and resulting in the full instantiation of the pattern.
+      \noindent then \ec{rewrite} searches for the first subterm of the goal
+      matching \ec{f1} and resulting in the full instantiation of the pattern.
       It then replaces, after instantiation of the pattern, all the occurrences
-      of \tct{f1} by \tct{f2} in the goal, and creates $n$ new subgoals for the
-      \tct{Ai}'s. If no subterms of the goal match \tct{f1} or if the pattern
+      of \ec{f1} by \ec{f2} in the goal, and creates $n$ new subgoals for the
+      \ec{Ai}'s. If no subterms of the goal match \ec{f1} or if the pattern
       cannot be fully instantiated by matching, the tactic fails.
-      The tactic works the same if the pattern ends by \tct{f1 <=> f2}. If the
-      direction indicator \tct{-} is given, \tct{rewrite} works in the reverse
-      direction, searching for a match of \tct{f2} and then replacing all
-      occurrences of \tct{f2} by \tct{f1}.
-    \item If \tct{rw} is a \tct{/}-prefixed pattern of the form \tct{(o p1 ... pn)},
-      with \tct{o} a defined symbol, then \tct{rewrite} searches for the first subterm
-      of the goal matching \tct{(o p1 ... pn)} and resulting in the full instantiation
+      The tactic works the same if the pattern ends by \ec{f1 <=> f2}. If the
+      direction indicator \ec{-} is given, \ec{rewrite} works in the reverse
+      direction, searching for a match of \ec{f2} and then replacing all
+      occurrences of \ec{f2} by \ec{f1}.
+    \item If \ec{rw} is a \ec{/}-prefixed pattern of the form \ec{(o p1 ... pn)},
+      with \ec{o} a defined symbol, then \ec{rewrite} searches for the first subterm
+      of the goal matching \ec{(o p1 ... pn)} and resulting in the full instantiation
       of the pattern. It then replaces, after instantiation of the pattern, all
-      the occurrences of \tct{(o p1 ... pn)} by the $\beta\delta$ head-normal form
-      of \tct{(o p1 ... pn)}, where the $\delta$-reduction is restricted to subterms
-      headed by the symbol \tct{o}. If no subterms of the goal match \tct{(o p1 ... pn)} or
+      the occurrences of \ec{(o p1 ... pn)} by the $\beta\delta$ head-normal form
+      of \ec{(o p1 ... pn)}, where the $\delta$-reduction is restricted to subterms
+      headed by the symbol \ec{o}. If no subterms of the goal match \ec{(o p1 ... pn)} or
       if the pattern cannot be fully instantiated by matching, the tactic fails. If the
-      direction indicator \tct{-} is given, \tct{rewrite} works in the reverse
+      direction indicator \ec{-} is given, \ec{rewrite} works in the reverse
       direction, searching for a match of the $\beta\delta_{\rm o}$ head-normal
-      of \tct{(o p1 ... pn)} and then replacing all occurrences of this head-normal
-      form with \tct{(o p1 ... pn)}.
+      of \ec{(o p1 ... pn)} and then replacing all occurrences of this head-normal
+      form with \ec{(o p1 ... pn)}.
     \end{itemize}
     
     \smallskip
     
-    The occurrence selector \tct{\{i1 ... in\}} restricts which occurrences
+    The occurrence selector \ec{\{i1 ... in\}} restricts which occurrences
     of the matching pattern are replaced in the goal. If given, only the
-    \tct{i1}-th, ..., \tct{in}-th ones are replaced (considering that the goal is
+    \ec{i1}-th, ..., \ec{in}-th ones are replaced (considering that the goal is
     traversed in DFS mode). Note that this selection applies after the matching has
     been done.
     
     \medskip
     
     Repetition markers allow the repetition of the same rewriting. For instance,
-    \tct{rewrite $\;\pi$} leads to \tct{do! rewrite $\;\pi$}. See \tct{do} for
+    \ec{rewrite $\;\pi$} leads to \ec{do! rewrite $\;\pi$}. See \ec{do} for
     more information.
     
     \medskip
 
-    Last, \tct{rewrite} \tct{rw}${}_1$ ... \tct{rw}${}_n$ is equivalent to
-    \tct{rewrite} \tct{rw}${}_1$; ...; \tct{rewrite} \tct{rw}${}_n$.
+    Last, \ec{rewrite} \ec{rw}${}_1$ ... \ec{rw}${}_n$ is equivalent to
+    \ec{rewrite} \ec{rw}${}_1$; ...; \ec{rewrite} \ec{rw}${}_n$.
   \end{tsyntax}
 \end{tactic}

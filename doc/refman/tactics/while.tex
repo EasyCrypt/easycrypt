@@ -2,17 +2,17 @@
 \begin{tactic}{while}
   \begin{tsyntax}{while I}
   In \prhl and \hl, as well as upper-bounding \phl judgments, performs
-  a weakest precondition computation over a loop using \tct{I} as
-  invariant. This generates two subgoals: one explaining that \tct{I}
+  a weakest precondition computation over a loop using \ec{I} as
+  invariant. This generates two subgoals: one explaining that \ec{I}
   is a valid loop invariant, and the other explaining that the
   invariant is initially true and that it is sufficient to establish
   the current postcondition.
   \end{tsyntax}
 
   \begin{tsyntax}{while I v}
-  Where \tct{v} is an integer-valued expression. In \phl, performs a
-  weakest precondition computation over a loop, using \tct{I} as
-  invariant and \tct{v} as a decreasing variant to prove
+  Where \ec{v} is an integer-valued expression. In \phl, performs a
+  weakest precondition computation over a loop, using \ec{I} as
+  invariant and \ec{v} as a decreasing variant to prove
   termination. In addition to the two invariant-related subgoals (see
   above), two subgoals regarding the variant are generated; one
   requiring that the variant be less than 0 exactly when the loop
@@ -20,7 +20,7 @@
   decreases strictly.
   \end{tsyntax}
 
-  \textbf{Note:} More complex variants of the \tct{while} tactic
+  \textbf{Note:} More complex variants of the \ec{while} tactic
   exist, useful in particular for dealing in \phl with loops whose
   termination is not variant-based. However, these advanced variants
   are currently undocumented.

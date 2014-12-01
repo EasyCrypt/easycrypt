@@ -1,26 +1,6 @@
-\lstdefinelanguage{easycrypt}{
-  style=easycrypt-default,
-  morekeywords=[1]{unit, bool, int, real, bitstring, array, list, matrix, word},
-  morekeywords=[2]{type, op, axiom, lemma, module, pred, const, declare},
-  morekeywords=[3]{var, proc},
-  morekeywords=[4]{while, if, else, elif},
-  morekeywords=[5]{theory, end, clone, import, export, as, with, section},
-  morekeywords=[6]{forall, exists, fun},
-  morekeywords=[7]{algebra, alias, apply, auto, beta, byequiv, byphoare,
-                   bypr, call, case, cfold, change, clear, congr, conseq,
-                   cut, delta, eager, elim, exfalso, fel, fieldeq, fission,
-                   fusion, generalize, idtac, inline, intros, iota, kill,
-                   left, logic, modpath, move, pose, pr_bounded, progress,
-                   rcondf, rcondt, rewrite, right, ringeq, rnd, rwnormal,
-                   seq, sim, simplify, skip, sp, split, splitwhile, subst,
-                   swap, symmetry, transitivity, trivial, unroll, wp, zeta},
-  morekeywords=[8]{by, done, assumption, exact, smt, reflexivity, admit},
-  morekeywords=[9]{do, expect, first, last, strict, try},
-  morecomment=[n][\itshape]{(*}{*)},
-  morecomment=[n][\bfseries]{(**}{*)}
-}
-
+% --------------------------------------------------------------------
 \lstdefinestyle{easycrypt-default}{
+  mathescape=true,
   columns=fullflexible,
   keepspaces=true,
   captionpos=b,
@@ -34,19 +14,42 @@
   basicstyle=\small\sffamily,
   identifierstyle={},
   keywordstyle=[1]{\color{OliveGreen}},
-  keywordstyle=[2]{\bfseries\color{Blue}},
-  keywordstyle=[3]{\bfseries},
-  keywordstyle=[4]{\bfseries},
-  keywordstyle=[5]{\bfseries\color{OliveGreen}},
-  keywordstyle=[6]{\itshape\color{Blue}},
-  keywordstyle=[7]{\color{Blue}},
-  keywordstyle=[8]{\color{Red}},
-  keywordstyle=[9]{\color{OliveGreen}},
+  keywordstyle=[2]{\bfseries},
+  keywordstyle=[3]{\color{Blue}},
+  keywordstyle=[4]{\bfseries\color{OliveGreen}},
+  keywordstyle=[5]{\color{Red}},
+  keywordstyle=[6]{\color{Red}},
   literate=
-    {==>}{$\Longrightarrow$}{1}
     {=>}{$\Rightarrow$}{1}
-    {->}{$\rightarrow$}{1}
-    {<=>}{$\Leftrightarrow$}{1}
-    {/\\}{$\wedge$}{1}
-    {\\/}{$\vee$}{1}    
+    {<=}{{$\mathrel{\leq}\;$}}1
+    {>=}{{$\mathrel{\geq}\;$}}1
+    {<>}{{$\mathrel{\neq}\;$}}1
+    {->}{{$\rightarrow\;$}}1
+    {<-}{{$\leftarrow\;$}}1
+    {<=>}{{$\Leftrightarrow\;$}}1
+    {=>}{{$\Rightarrow\;$}}1
+    {==>}{{$\Rrightarrow\;$}}1
+    {\/\\}{{$\wedge\;$}}1
+    {\\\/}{{$\vee\;$}}1
+    {phi}{{$\!\phi\,$}}1
+    {phi1}{{$\!\phi_1$}}1
+    {phi2}{{$\!\phi_2$}}1
+    {phi3}{{$\!\phi_3$}}1
+    {phin}{{$\!\phi_n$}}1
+    {psi}{{$\!\psi\,$}}1
+    {psi1}{{$\!\psi_1$}}1
+    {psi2}{{$\!\psi_2$}}1
+    {psi3}{{$\!\psi_3$}}1
+    {psin}{{$\!\psi_n$}}1
+}
+
+% --------------------------------------------------------------------
+\input{easycrypt-kw.lst}
+
+% --------------------------------------------------------------------
+\lstdefinelanguage{easycrypt}{
+  style=easycrypt-default,
+  language=easycrypt-kw,
+  morecomment=[n][\itshape]{(*}{*)},
+  morecomment=[n][\bfseries]{(**}{*)},
 }

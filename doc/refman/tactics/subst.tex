@@ -1,8 +1,8 @@
 % --------------------------------------------------------------------
 \begin{tactic}[subst | subst x]{subst}
   \begin{tsyntax}[empty]{subst}
-  Search for the first equation of the form \tct{x = f} or \tct{f = x} in the context
-  and replace all the occurrences of \tct{x} by \tct{f} everywhere in the context and the
+  Search for the first equation of the form \ec{x = f} or \ec{f = x} in the context
+  and replace all the occurrences of \ec{x} by \ec{f} everywhere in the context and the
   goal before clearing it. If no identifier is given, repeatedly apply the tactic to
   all identifiers for which such an equation exists.
   \end{tsyntax}

@@ -13,13 +13,13 @@
   \begin{tsyntax}{proc B I}
   Derive a specification for an \emph{abstract} procedure from an
   ``upto-failure'' invariant on the oracles it may query. The failure
-  event \tct{B} is evaluated in the right memory. The left oracles
+  event \ec{B} is evaluated in the right memory. The left oracles
   must be lossless once the bad event occurs. The right oracles must
   guarantee the stability of the failure event with probability 1.
   \end{tsyntax}
 
   \begin{tsyntax}{proc B I I'}
-  Similar to \tct{proc B I}, with an additional invariant once the bad
+  Similar to \ec{proc B I}, with an additional invariant once the bad
   event occurs. This is particularly useful when additional facts
   about the state need to be known to prove the losslessness and
   stability conditions.

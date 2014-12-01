@@ -1,6 +1,6 @@
 % --------------------------------------------------------------------
 \begin{tactic}{call}
-  All variants of the \tct{call} tactic implicitly make use of a frame
+  All variants of the \ec{call} tactic implicitly make use of a frame
   rule, based on a ``may modify'' analysis.
 
   \begin{tsyntax}{call (_: P ==> Q)}
@@ -8,36 +8,36 @@
   specification for the procedure. As a side-goal, prove that the
   procedure fulfills the given specification.
 
-  As with other tactics, the specification \tct{(_: P ==> Q)} can be
+  As with other tactics, the specification \ec{(_: P ==> Q)} can be
   replaced with a lemma from which the specification is inferred.
   \end{tsyntax}
 
   \begin{tsyntax}{call (_: I)}
-  Uses invariant \tct{I} to infer a specification for use with
-  \tct{tactic}.
+  Uses invariant \ec{I} to infer a specification for use with
+  \ec{tactic}.
 
-  In \prhl, and if \tct{A} is the abstract module, \tct{call (_: I)}
+  In \prhl, and if \ec{A} is the abstract module, \ec{call (_: I)}
   is equivalent to
-  \tct{call (_: =$\{\Arg,glob A\}$ /\\ I ==> =$\{\Res,glob A\}$ /\\ I); first proc I.}
+  \ec{call (_: =$\{\Arg,glob A\}$ /\\ I ==> =$\{\Res,glob A\}$ /\\ I); first proc I.}
 
-  In \phl and \hl, \tct{call (_: I)} is equivalent to
-  \tct{call (_: I ==> I); first proc I.}
+  In \phl and \hl, \ec{call (_: I)} is equivalent to
+  \ec{call (_: I ==> I); first proc I.}
   \end{tsyntax}
 
   \begin{tsyntax}{call (_: B, I)}
   On \prhl abstract procedures only.
-  If \tct{A} is the abstract module, \tct{call (_: B, I)} is equivalent to
-  \tct{call (_: $\neg$B /\\ =$\{\Arg,glob A\}$ /\\ I ==> $\neg$B => =$\{\Res, glob A\}$ /\\ I); first proc B I.}
+  If \ec{A} is the abstract module, \ec{call (_: B, I)} is equivalent to
+  \ec{call (_: $\neg$B /\\ =$\{\Arg,glob A\}$ /\\ I ==> $\neg$B => =$\{\Res, glob A\}$ /\\ I); first proc B I.}
   \end{tsyntax}
 
   \begin{tsyntax}{call (_: B, I, I')}
   On \prhl abstract procedures only.
-  If \tct{A} is the abstract module, \tct{call (_: B, I)} is equivalent to
-  \tct{call (_: $\neg$B /\\ =$\{\Arg,glob A\}$ /\\ I ==> if $\neg$B then =$\{\Res,glob A\}$ /\\ I else I')); first proc B I I'.}
+  If \ec{A} is the abstract module, \ec{call (_: B, I)} is equivalent to
+  \ec{call (_: $\neg$B /\\ =$\{\Arg,glob A\}$ /\\ I ==> if $\neg$B then =$\{\Res,glob A\}$ /\\ I else I')); first proc B I I'.}
   \end{tsyntax}
 
   \textbf{Note:} When using the invariant-based variants of
-  \tct{call}, error messages may be originating from the underlying
+  \ec{call}, error messages may be originating from the underlying
   application of \rtactic{proc}. In particular, when using them to
   deal with abstract procedure calls, the invariant \emph{should not}
   refer to memory locations the abstract procedure may modify.
