@@ -31,12 +31,13 @@ and cli_option = {
 }
 
 and prv_options = {
-  prvo_maxjobs  : int;
-  prvo_timeout  : int;
-  prvo_provers  : string list option;
-  pvro_checkall : bool;
-  pvro_weakchk  : bool;
-  pvro_profile  : bool;
+  prvo_maxjobs   : int;
+  prvo_timeout   : int;
+  prvo_cpufactor : int;
+  prvo_provers   : string list option;
+  pvro_checkall  : bool;
+  pvro_weakchk   : bool;
+  pvro_profile   : bool;
 }
 
 and ldr_options = {
@@ -231,6 +232,7 @@ let specs = {
       `Spec ("p"          , `String, "Add a prover to the set of provers");
       `Spec ("max-provers", `Int   , "Maximum number of prover running in the same time");
       `Spec ("timeout"    , `Int   , "Set the SMT timeout");
+      `Spec ("cpu-factor" , `Int   , "Set the timeout CPU factor");
       `Spec ("check-all"  , `Flag  , "Force checking all files");
       `Spec ("weak-check" , `Flag  , "Start prover in weak check mode");
       `Spec ("profile"    , `Flag  , "Collect some profiling informations")]);
@@ -283,12 +285,13 @@ let prv_options_of_values values =
     match get_strings "p" values with
     | [] -> None | provers -> Some provers
   in
-    { prvo_maxjobs  = odfl 4 (get_int "max-provers" values);
-      prvo_timeout  = odfl 3 (get_int "timeout" values);
-      prvo_provers  = provers;
-      pvro_checkall = get_flag "check-all" values;
-      pvro_weakchk  = get_flag "weak-check" values;
-      pvro_profile  = get_flag "profile" values; }
+    { prvo_maxjobs   = odfl 4 (get_int "max-provers" values);
+      prvo_timeout   = odfl 3 (get_int "timeout" values);
+      prvo_cpufactor = odfl 1 (get_int "cpu-factor" values);
+      prvo_provers   = provers;
+      pvro_checkall  = get_flag "check-all" values;
+      pvro_weakchk   = get_flag "weak-check" values;
+      pvro_profile   = get_flag "profile" values; }
 
 let cli_options_of_values values =
   { clio_emacs   = get_flag "emacs" values;

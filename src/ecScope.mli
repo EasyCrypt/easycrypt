@@ -158,10 +158,17 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Prover : sig
+  type options = {
+    po_timeout   : int option;
+    po_cpufactor : int option;
+    po_nprovers  : int option;
+    po_provers   : string list option;
+  }
+
   val process     : scope -> pprover_infos -> scope
   val set_wrapper : scope -> string option -> scope
   val set_all     : scope -> scope
-  val set_default : scope -> timeout:int -> nprovers:int -> string list option -> scope
+  val set_default : scope -> options -> scope
   val full_check  : scope -> scope
   val check_proof : scope -> bool -> scope
 end

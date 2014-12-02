@@ -240,12 +240,13 @@ let _ =
   (* Initialize global scope *)
   begin
     let checkmode = {
-      EcCommands.cm_checkall = prvopts.pvro_checkall;
-      EcCommands.cm_timeout  = prvopts.prvo_timeout;
-      EcCommands.cm_nprovers = prvopts.prvo_maxjobs;
-      EcCommands.cm_provers  = prvopts.prvo_provers;
-      EcCommands.cm_wrapper  = pwrapper;
-      EcCommands.cm_profile  = prvopts.pvro_profile;
+      EcCommands.cm_checkall  = prvopts.pvro_checkall;
+      EcCommands.cm_timeout   = prvopts.prvo_timeout;
+      EcCommands.cm_cpufactor = prvopts.prvo_cpufactor;
+      EcCommands.cm_nprovers  = prvopts.prvo_maxjobs;
+      EcCommands.cm_provers   = prvopts.prvo_provers;
+      EcCommands.cm_wrapper   = pwrapper;
+      EcCommands.cm_profile   = prvopts.pvro_profile;
     } in
 
     EcCommands.initialize ~boot:ldropts.ldro_boot ~checkmode

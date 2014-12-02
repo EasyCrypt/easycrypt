@@ -308,15 +308,17 @@ type pdeclare =
 
 (* -------------------------------------------------------------------- *)
 type pprover_infos = {
-  pprov_max   : int option;
-  pprov_time  : int option;
-  pprov_names : string located list option
+  pprov_max       : int option;
+  pprov_timeout   : int option;
+  pprov_cpufactor : int option;
+  pprov_names     : string located list option;
 }
 
 let empty_pprover = {
-  pprov_max   = None;
-  pprov_time  = None;
-  pprov_names = None;
+  pprov_max       = None;
+  pprov_timeout   = None;
+  pprov_cpufactor = None;
+  pprov_names     = None;
 }
 
 type 'a fpattern_kind =

@@ -240,6 +240,7 @@ type prover_infos = {
   pr_maxprocs  : int;
   pr_provers   : string list;
   pr_timelimit : int;
+  pr_cpufactor : int;
   pr_wrapper   : string option;
 }
 
@@ -247,6 +248,7 @@ let dft_prover_infos = {
   pr_maxprocs  = 3;
   pr_provers   = [];
   pr_timelimit = 3;
+  pr_cpufactor = 1;
   pr_wrapper   = None;
 }
 
@@ -338,7 +340,8 @@ let rec run_prover ?(notify : notify option) (pi : prover_infos) (prover : strin
       in
 
       let timelimit =
-        if pi.pr_timelimit <= 0 then None else Some pi.pr_timelimit in
+        let limit = pi.pr_timelimit * pi.pr_cpufactor in
+        if limit <= 0 then None else Some limit in
 
       let rec doit gcdone =
         try  Driver.prove_task ~command ?timelimit dr task ()

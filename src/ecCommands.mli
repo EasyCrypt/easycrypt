@@ -21,6 +21,7 @@ type notifier = EcGState.loglevel -> string Lazy.t -> unit
 type checkmode = {
   cm_checkall : bool;
   cm_timeout  : int;
+  cm_cpufactor: int;
   cm_nprovers : int;
   cm_provers  : string list option;
   cm_wrapper  : string option;

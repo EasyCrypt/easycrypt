@@ -561,21 +561,25 @@ let loadpath () =
 
 (* -------------------------------------------------------------------- *)
 type checkmode = {
-  cm_checkall : bool;
-  cm_timeout  : int;
-  cm_nprovers : int;
-  cm_provers  : string list option;
-  cm_wrapper  : string option;
-  cm_profile  : bool;
+  cm_checkall  : bool;
+  cm_timeout   : int;
+  cm_cpufactor : int;
+  cm_nprovers  : int;
+  cm_provers   : string list option;
+  cm_wrapper   : string option;
+  cm_profile   : bool;
 }
 
 let initial ~checkmode ~boot =
-  let checkall = checkmode.cm_checkall in
-  let timeout  = checkmode.cm_timeout  in
-  let nprovers = checkmode.cm_nprovers in
-  let provers  = checkmode.cm_provers  in
-  let wrapper  = checkmode.cm_wrapper  in
-  let profile  = checkmode.cm_profile  in
+  let checkall  = checkmode.cm_checkall  in
+  let wrapper   = checkmode.cm_wrapper   in
+  let profile   = checkmode.cm_profile   in
+  let poptions  = {
+    EcScope.Prover.po_timeout   = Some checkmode.cm_timeout;
+    EcScope.Prover.po_cpufactor = Some checkmode.cm_cpufactor;
+    EcScope.Prover.po_nprovers  = Some checkmode.cm_nprovers;
+    EcScope.Prover.po_provers   = checkmode.cm_provers;
+  } in
 
   let prelude = (mk_loc _dummy "Prelude", Some `Export) in
   let loader  = EcLoader.forsys loader in
@@ -591,7 +595,7 @@ let initial ~checkmode ~boot =
   in
 
   let scope = EcScope.Prover.set_wrapper scope wrapper in
-  let scope = EcScope.Prover.set_default scope ~timeout ~nprovers provers in
+  let scope = EcScope.Prover.set_default scope poptions in
   let scope = if checkall then EcScope.Prover.full_check scope else scope in
 
   scope

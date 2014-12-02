@@ -2551,16 +2551,20 @@ prover_iconfig:
 prover_info:
 | ic=prover_iconfig pl=plist1(loc(STRING), empty)?
     { let (m, t) = ic in
-        { pprov_max   = m;
-          pprov_time  = t;
-          pprov_names = pl; } }
+        { pprov_max       = m;
+          pprov_timeout   = t;
+          pprov_cpufactor = None;
+          pprov_names     = pl; } }
 
 gprover_info:
 | PROVER x=prover_info
     { x }
 
 | TIMEOUT t=uint
-    { { pprov_max = None; pprov_time = Some t; pprov_names = None } }
+    { { empty_pprover with pprov_timeout = Some t; } }
+
+| TIMEOUT STAR t=uint
+    { { empty_pprover with pprov_cpufactor = Some t; } }
 
 addrw:
 | HINT REWRITE p=lqident COLON l=lqident* {p,l}

@@ -313,6 +313,20 @@ let maybe_add_to_section scope item =
 module Prover = struct
   exception Unknown_prover of string
 
+  type options = {
+    po_timeout   : int option;
+    po_cpufactor : int option;
+    po_nprovers  : int option;
+    po_provers   : string list option;
+  }
+
+  let empty_options = {
+    po_timeout   = None;
+    po_cpufactor = None;
+    po_nprovers  = None;
+    po_provers   = None;
+  }
+
   let pp_error fmt exn =
     match exn with
     | Unknown_prover s ->
@@ -331,34 +345,37 @@ module Prover = struct
     let pi = { pi with EcProvers.pr_wrapper = wrapper } in
       { scope with sc_options = Prover_info.set scope.sc_options pi; }
 
-  let mk_prover_info scope maxprocs time ns =
-    let dft      = Prover_info.get scope.sc_options in
-    let time     = max 0 (odfl dft.EcProvers.pr_timelimit time) in
-    let provers  = odfl dft.EcProvers.pr_provers ns in
-    let maxprocs = odfl dft.EcProvers.pr_maxprocs maxprocs in
+  let mk_prover_info scope options =
+    let dft       = Prover_info.get scope.sc_options in
+    let timeout   = max 0 (odfl dft.EcProvers.pr_timelimit options.po_timeout) in
+    let cpufactor = max 0 (odfl dft.EcProvers.pr_cpufactor options.po_cpufactor) in
+    let maxprocs  = odfl dft.EcProvers.pr_maxprocs options.po_nprovers in
+    let provers   = odfl dft.EcProvers.pr_provers options.po_provers in
       { EcProvers.pr_maxprocs  = maxprocs;
         EcProvers.pr_provers   = provers;
-        EcProvers.pr_timelimit = time;
+        EcProvers.pr_timelimit = timeout;
+        EcProvers.pr_cpufactor = cpufactor;
         EcProvers.pr_wrapper   = dft.EcProvers.pr_wrapper; }
 
-  let set_prover_info scope max time ns =
-    let pi = mk_prover_info scope max time ns in
-      { scope with sc_options = Prover_info.set scope.sc_options pi }
+  let set_prover_info scope options =
+    let pi = mk_prover_info scope options in
+    { scope with sc_options = Prover_info.set scope.sc_options pi }
 
   let set_all scope =
     let provers =
       List.map
         (fun p -> p.EcProvers.pr_name)
         (EcProvers.known ~evicted:false) in
+    let options = { empty_options with po_provers = Some provers; } in
+    set_prover_info scope options
 
-    set_prover_info scope None None (Some provers)
-
-  let set_default scope ~timeout ~nprovers provers =
+  let set_default scope options =
     let provers =
-      match provers with
+      match options.po_provers with
       | None ->
          let provers = EcProvers.dft_prover_names in
-           List.filter EcProvers.is_prover_known provers
+         List.filter EcProvers.is_prover_known provers
+
       | Some provers ->
           List.iter
             (fun name ->
@@ -366,21 +383,29 @@ module Prover = struct
                 raise (Unknown_prover name)) provers;
           provers
     in
-      set_prover_info scope (Some nprovers) (Some timeout) (Some provers)
+
+    let options = { options with po_provers = Some provers } in
+    set_prover_info scope options
 
   let process scope pi =
-    let max  = pi.pprov_max in
-    let time = pi.pprov_time in
-    let ns   = pi.pprov_names in
-    let ns   = ns |> omap (List.map check_prover_name) in
-      set_prover_info scope max time ns
+    let options = {
+      po_timeout   = pi.pprov_timeout;
+      po_cpufactor = pi.pprov_cpufactor;
+      po_nprovers  = pi.pprov_max;
+      po_provers   = pi.pprov_names |> omap (List.map check_prover_name);
+    }
+
+    in set_prover_info scope options
 
   let mk_prover_info scope pi =
-    let max  = pi.pprov_max in
-    let time = pi.pprov_time in
-    let ns   = pi.pprov_names in
-    let ns   = ns |> omap (List.map check_prover_name) in
-      mk_prover_info scope max time ns
+    let options = {
+      po_timeout   = pi.pprov_timeout;
+      po_cpufactor = pi.pprov_cpufactor;
+      po_nprovers  = pi.pprov_max;
+      po_provers   = pi.pprov_names |> omap (List.map check_prover_name);
+    }
+
+    in mk_prover_info scope options
 
   let full_check scope =
     { scope with sc_options = Check_mode.full_check scope.sc_options }
