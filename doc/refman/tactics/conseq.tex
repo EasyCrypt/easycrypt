@@ -6,47 +6,42 @@
   with a wildcard \ec{_} to keep the value it contains in the current
   goal and trivially discharge the corresponding subgoal.
 
-  \textbf{Examples:}
-  \begin{mathpar}
-  \inferrule%%
-    {P' \Rightarrow P \\%
-     Q \Rightarrow Q' \\%
-     \pRHL{P}{c}{c'}{Q}}%%
-    {\pRHL{P'}{c}{c'}{Q'}}%%
-    \quad\mbox{(\prhl)\quad\parbox{200pt}{\ec{conseq (_: P ==> Q)}}} \\
-  \inferrule%%
-    {Q \Rightarrow Q' \\%
-     \pRHL{P'}{c}{c'}{Q}}%%
-    {\pRHL{P'}{c}{c'}{Q'}}%%
-    \quad\mbox{(\prhl)\quad\parbox{200pt}{\ec{conseq (_: _ ==> Q)}}} \\
-  \inferrule%%
-    {P' \Rightarrow \delta \mathrel{\diamond} \delta' \\%
-     P' \Rightarrow P \\%
-     Q \mathrel{\diamond^\uparrow} Q' \\%
-     \pHL{P}{c}{Q}{\diamond}{\delta}}%%
-    {\pHL{P'}{c}{Q'}{\diamond}{\delta'}}%%
-    \quad\mbox{(\phl)\quad\parbox{200pt}{\ec{conseq (_: P ==> Q: $\;\delta$)}}} \\
-  \inferrule%%
-    {P' \Rightarrow P \\%
-     Q \Rightarrow Q' \\%
-     \HL{P}{c}{Q}}%%
-    {\HL{P'}{c}{Q'}}%%
-    \quad\mbox{(\hl)\quad\parbox{200pt}{\ec{conseq (_: P ==> Q)}}} \\
-  \end{mathpar}
+  \paragraph{Examples:}\strut
+  
+  \begin{cmathpar}
+  \texample[\prhl{}]
+    {\ec{conseq (_: P ==> Q)}}
+    {P' \Rightarrow P \\ Q \Rightarrow Q' \\ \pRHL{P}{c}{c'}{Q}}
+    {\pRHL{P'}{c}{c'}{Q'}}
+
+  \texample[\phl{}]
+    {\ec{conseq (_: P ==> Q: $\;\delta$)}}
+    {P' \Rightarrow \delta \mathrel{\diamond} \delta' \\
+     P' \Rightarrow P \\
+     Q \mathrel{\diamond^\uparrow} Q' \\
+     \pHL{P}{c}{Q}{\diamond}{\delta}}
+    {\pHL{P'}{c}{Q'}{\diamond}{\delta'}}
+
+  \texample[\hl{}]
+    {\ec{conseq (_: P ==> Q)}}
+    {P' \Rightarrow P \\ Q \Rightarrow Q' \\ \HL{P}{c}{Q}}
+    {\HL{P'}{c}{Q'}}
+  \end{cmathpar}
 
   \textbf{Note:} The \phl variant can also be used to strenghten the
   relation $\diamond$ into an equality by forcing the equality into
   the specification. For example, the following is a valid application
   of \ec{conseq}.
-  \begin{mathpar}
-    \inferrule%%
-    {P' \Rightarrow \delta \mathrel{=} \delta' \\%
-     P' \Rightarrow P \\%
-     Q \mathrel{\Leftrightarrow} Q' \\%
-     \pHL{P}{c}{Q}{=}{\delta}}%%
-    {\pHL{P'}{c}{Q'}{\leq}{\delta'}}%%
-    \quad\mbox{(\phl)\quad\parbox{200pt}{\ec{conseq (_: P ==> Q: $\;\mathop{=}\delta$)}}} \\
-  \end{mathpar}  
+
+  \begin{cmathpar}
+  \texample[\phl{}]
+    {\ec{conseq (_: P ==> Q: =$\;\delta$)}}
+    {P' \Rightarrow \delta \mathrel{=} \delta' \\
+     P' \Rightarrow P \\
+     Q \mathrel{\Leftrightarrow} Q' \
+     \pHL{P}{c}{Q}{=}{\delta}}
+    {\pHL{P'}{c}{Q'}{\leq}{\delta'}}
+  \end{cmathpar}  
   \end{tsyntax}
 
   \begin{tsyntax}{conseq <lemma>}
@@ -70,17 +65,18 @@
   relational specification. Either one of the Hoare logic
   specifications can be replaced with a wildcard.
 
-  \textbf{Examples:}
-  \begin{mathpar}
-  \inferrule%%
-    {P' \Rightarrow P \wedge \inmem{P_1}{1} \wedge \inmem{P_2}{2} \\%
-     Q \wedge \inmem{Q_1}{1} \wedge \inmem{Q_2}{2} \Rightarrow Q' \\%
-     \HL{P_1}{c_1}{Q_1} \\%
-     \HL{P_2}{c_2}{Q_2} \\%
-     \pRHL{P}{c_1}{c_2}{Q}}%%
-    {\pRHL{P'}{c_1}{c_2}{Q'}}%%
-    \quad\mbox{(\prhl)\quad\parbox{200pt}{\ec{conseq (_: P ==> Q) (_: P$_1$ ==> Q$_1$) (_: P$_2$ ==> Q$_2$)}}}
-  \end{mathpar}
+  \paragraph{Examples:}\strut
+
+  \begin{cmathpar}
+  \texample[\prhl{}]
+    {\ec{conseq (_: P ==> Q) (_: P$_1$ ==> Q$_1$) (_: P$_2$ ==> Q$_2$)}}
+    {P' \Rightarrow P \wedge \inmem{P_1}{1} \wedge \inmem{P_2}{2} \\
+     Q \wedge \inmem{Q_1}{1} \wedge \inmem{Q_2}{2} \Rightarrow Q' \\
+     \HL{P_1}{c_1}{Q_1} \\
+     \HL{P_2}{c_2}{Q_2} \\
+     \pRHL{P}{c_1}{c_2}{Q}}
+    {\pRHL{P'}{c_1}{c_2}{Q'}}
+  \end{cmathpar}
   \end{tsyntax}
 
   \begin{tsyntax}{conseq <prhl> <phl> | conseq <prhl> _ <phl>}
@@ -92,25 +88,22 @@
   aspects. The general rule below can be understood more clearly when
   $P = P'$ and $Q = Q'$.
 
-  \textbf{Examples:}
-  \begin{mathpar}
-  \inferrule%%
-    {P' \Rightarrow P \\%
-     Q \Rightarrow Q' \\%
-     P \Rightarrow P_1 \\%
-     Q_1 \Rightarrow Q \\%
-     \pHL{P_1}{c}{Q_1}{=}{1}}
-    {\pRHL{P'}{c}{\Skip}{Q'}}%%
-    \quad\mbox{(\prhl)\quad\parbox{200pt}{\ec{conseq (_: P ==> Q) (_: P$_1$ ==> Q$_1$: =1$\%$r)}}} \\
-  \inferrule%%
-    {P \Rightarrow P_2 \\%
-     Q_2 \Rightarrow Q \\%
-     \pHL{P_2}{c}{Q_2}{=}{1}}
-    {\pRHL{P}{\Skip}{c}{Q}}%%
-    \quad\mbox{(\prhl)\quad\parbox{200pt}{\ec{conseq (_: _ ==> _) _ (_: P$_2$ ==> Q$_2$: =1$\%$r)}}}
-  \end{mathpar}
-  \end{tsyntax}
+  \paragraph{Examples:}\strut
 
+  \begin{cmathpar}
+  \texample[\prhl{}]
+    {\ec{conseq (_: P ==> Q) (_: P$_1$ ==> Q$_1$: =1\%r)}}
+    {P' \Rightarrow P   \\ Q   \Rightarrow Q' \\
+     P  \Rightarrow P_1 \\ Q_1 \Rightarrow Q  \\
+     \pHL{P_1}{c}{Q_1}{=}{1}}
+    {\pRHL{P'}{c}{\Skip}{Q'}}
+
+  \texample[\prhl{}]
+    {\ec{conseq (_: _ ==> _) _ (_: P$_2$ ==> Q$_2$: =1\%r)}}
+    {P \Rightarrow P_2 \\ Q_2 \Rightarrow Q \\ \pHL{P_2}{c}{Q_2}{=}{1}}
+    {\pRHL{P}{\Skip}{c}{Q}}
+  \end{cmathpar}
+  \end{tsyntax}
 
   \fix{Missing descriptions of any variants of conseq}?
 \end{tactic}

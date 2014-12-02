@@ -4,23 +4,26 @@
   Split the current \prhl, \phl or \hl goal by doing a case analysis
   in the precondition.
 
-  \textbf{Example:}
-  \begin{mathpar}
-    \inferrule%%
-      {\pRHL{P \wedge C}{c_1}{c_2}{Q} \\%
-       \pRHL{P \wedge \neg C}{c_1}{c_2}{Q}}%%
-      {\pRHL{P}{c_1}{c_2}{Q}}%%
-      \quad\mbox{(\prhl)\quad\parbox{200pt}{\ec{case C}}} \\%%
-    \inferrule%%
-      {\pHL{P \wedge C}{c}{Q}{\diamond}{\delta} \\%
-       \pHL{P \wedge \neg C}{c}{Q}{\diamond}{\delta}}%%
-      {\pHL{P}{c}{Q}{\diamond}{\delta}}%%
-      \quad\mbox{(\phl)\quad\parbox{200pt}{\ec{case C}}} \\%%
-    \inferrule%%
-      {\HL{P \wedge C}{c}{Q} \\%
-       \HL{P \wedge \neg C}{c}{Q}}%%
-      {\HL{P}{c}{Q}}%%
-      \quad\mbox{(\hl)\quad\parbox{200pt}{\ec{case C}}} \\%%
-  \end{mathpar}
+  \paragraph{Examples:}\strut
+
+  \begin{cmathpar}
+    \texample[\prhl{}]
+      {\ec{case C}}
+      {\pRHL{P \wedge C}{c_1}{c_2}{Q} \\
+       \pRHL{P \wedge \neg C}{c_1}{c_2}{Q}}
+      {\pRHL{P}{c_1}{c_2}{Q}}
+
+    \texample[\phl{}]
+      {\ec{case C}}
+      {\pHL{P \wedge C}{c}{Q}{\diamond}{\delta} \\
+       \pHL{P \wedge \neg C}{c}{Q}{\diamond}{\delta}}
+      {\pHL{P}{c}{Q}{\diamond}{\delta}}
+
+    \texample[\hl{}]
+      {\ec{case C}}
+      {\HL{P \wedge C}{c}{Q} \\
+       \HL{P \wedge \neg C}{c}{Q}}
+      {\HL{P}{c}{Q}}
+  \end{cmathpar}
   \end{tsyntax}
 \end{tactic}

@@ -11,15 +11,16 @@
   overrides this behaviour, instead using the trivial relation on
   events.
 
-  \textbf{Examples:}
-  \begin{mathpar}
-    \inferrule%%
-      {\pHL{P}{f}{Q}{=}{\delta} \\%
-       \Pred{P}{m[\Arg\mapsto\vec{a}]} \\%
-       \forall \mem{m'}.\,\Pred{Q}{m'} \Leftrightarrow \Pred{E}{m'}}%%
-      {\PR{f}{\vec{a}}{\mem{m}}{E} = \delta}%%
-      \quad\mbox{\parbox{200pt}{\ec{byphoare (_: P ==> Q)}}} \\
-  \end{mathpar}
+  \paragraph{Examples:}\strut
+
+  \begin{cmathpar}
+    \texample
+      {\ec{byphoare (_: P ==> Q)}}
+      {\pHL{P}{f}{Q}{=}{\delta} \\
+       P\ m[\Arg\mapsto\vec{a}] \\
+       \forall \mem{m'}.\, Q\ m' \Leftrightarrow E\ m'}
+      {\PR{f}{\vec{a}}{\mem{m}}{E} = \delta}
+  \end{cmathpar}
   \end{tsyntax}
 
   \begin{tsyntax}{byphoare <lemma>}

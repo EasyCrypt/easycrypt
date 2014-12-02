@@ -1,32 +1,33 @@
 % --------------------------------------------------------------------
 \begin{tactic}{seq}
-  \begin{tsyntax}{seq $\ n_1$ $\ n_2$: R}
+  \begin{tsyntax}{seq $\ n_1\ n_2$: R}
   Relational sequence rule.
 
-  \textbf{Examples:}
-  \begin{mathpar}
-  \inferrule%%
-    {\pRHL{P}{c_1}{c_2}{R}\\%%
-     \pRHL{R}{c_1'}{c_2'}{Q}}%%
-    {\pRHL{P}{c_1;c_1'}{c_2;c_2'}{Q}}%%
-    \quad\mbox{(\prhl)\quad\parbox{200pt}{\ec{seq $\ \left|c_1\right|$ $\ \left|c_2\right|$: R}}}\\%%
-  \end{mathpar}
+  \paragraph{Examples:}\strut
+  
+  \begin{cmathpar}
+  \texample[\prhl{}]
+    {\ec{seq $\ \left|c_1\right|\ \left|c_2\right|$: R}}
+    {\pRHL{P}{c_1}{c_2}{R} \\
+     \pRHL{R}{c_1'}{c_2'}{Q}}
+    {\pRHL{P}{c_1;c_1'}{c_2;c_2'}{Q}}
+  \end{cmathpar}
   \end{tsyntax}
 
   \begin{tsyntax}{seq $\ n$: R}
   Non-relational possibilistic sequence rule.
 
-  \textbf{Examples:}
-  \begin{mathpar}
-  \inferrule%%
-    {\HL{P}{c}{R}\\%%
-     \HL{R}{c'}{Q} }%%
-    {\HL{P}{c;c'}{Q}}%%
-    \quad\mbox{(\hl)\quad\parbox{200pt}{\ec{seq $\ \left|c\right|$: R}}}\\%%
-  \end{mathpar}
+  \paragraph{Examples:}\strut
+
+  \begin{cmathpar}
+  \texample[\hl{}]
+    {\ec{seq $\ \left|c\right|$: R}}
+    {\HL{P}{c}{R} \\ \HL{R}{c'}{Q}}
+    {\HL{P}{c;c'}{Q}}
+  \end{cmathpar}
   \end{tsyntax}
 
-  \begin{tsyntax}{seq $\ n$: R $\ \delta_1$ $\ \delta_2$ $\ \delta_3$ $\ \delta_4$ I}
+  \begin{tsyntax}{seq $\ n$: R $\ \delta_1\ \delta_2\ \delta_3\ \delta_4$ I}
   Non-relational probabilistic sequence rule. Argument \ec{I} is
   optional (and defaults to $\mathsf{true}$). When one of
   $(\delta_1,\delta_2)$ (resp. $(\delta_3,\delta_4)$) is 0, the other
@@ -35,26 +36,30 @@
   the $\delta$s are given, the following default values are used:
   $\delta_1 = 1$, $\delta_2 = \delta$, $\delta_3 = 0$.
 
-  \textbf{Examples:}
-  \begin{mathpar}
-  \inferrule%%
-    {\HL{P}{c}{I} \\%
-     \pHL{P}{c}{R}{\diamond}{\delta_1}  \\%
-     \pHL{R \wedge I}{c'}{Q}{\diamond}{\delta_2} \\%
-     \pHL{P}{c}{\neg R}{\diamond}{\delta_3} \\%
-     \pHL{\neg R \wedge I}{c'}{Q}{\diamond}{\delta_4} \\%
-     \delta_1 \delta_2 + \delta_3 \delta_4 \diamond \delta}%%
-    {\pHL{P}{c;c'}{Q}{\diamond}{\delta}}%%
-    \quad\mbox{(\phl)\quad\parbox{200pt}{\ec{seq $\ \left|c\right|$: R $\ \delta_1$ $\ \delta_2$ $\ \delta_3$ $\ \delta_4$ I}}}\\%%
-  \inferrule%%
-    {\HL{P}{c}{\mathsf{true}} \\%
-     \pHL{P}{c}{R}{\diamond}{\delta_1}  \\%
-     \pHL{R \wedge I}{c'}{Q}{\diamond}{\delta_2} \\%
-     \pHL{\neg R \wedge I}{c'}{Q}{\diamond}{0} \\%
-     \delta_1 \delta_2 \diamond \delta}%%
-    {\pHL{P}{c;c'}{Q}{\diamond}{\delta}}%%
-    \quad\mbox{(\phl)\quad\parbox{200pt}{\ec{seq $\ \left|c\right|$: R $\ \delta_1$ $\ \delta_2$ _ $0$}}}\\%%
-  \end{mathpar}
+  \paragraph{Examples:}\strut
+  
+  \begin{cmathpar}
+  \texample[\phl{}]
+    {\ec{seq $\ \left|c\right|$: R $\ \delta_1$ $\ \delta_2$ $\ \delta_3$ $\ \delta_4$ I}}
+    {\HL{P}{c}{I} \\
+     \pHL{P}{c}{R}{\diamond}{\delta_1}  \\
+     \pHL{R \wedge I}{c'}{Q}{\diamond}{\delta_2} \\
+     \pHL{P}{c}{\neg R}{\diamond}{\delta_3} \\
+     \pHL{\neg R \wedge I}{c'}{Q}{\diamond}{\delta_4} \\
+     \delta_1 \delta_2 + \delta_3 \delta_4 \diamond \delta}
+    {\pHL{P}{c;c'}{Q}{\diamond}{\delta}}
+  \end{cmathpar}
+
+  \begin{cmathpar}
+  \texample[\phl{}]
+    {\ec{seq $\ \left|c\right|$: R $\ \delta_1$ $\ \delta_2\ \_\ 0$}}
+    {\HL{P}{c}{\mathsf{true}} \\
+     \pHL{P}{c}{R}{\diamond}{\delta_1} \\\\
+     \pHL{R \wedge I}{c'}{Q}{\diamond}{\delta_2} \\
+     \pHL{\neg R \wedge I}{c'}{Q}{\diamond}{0} \\
+     \delta_1 \delta_2 \diamond \delta}
+    {\pHL{P}{c;c'}{Q}{\diamond}{\delta}}
+  \end{cmathpar}
 
   \textbf{Note:} Since most tactics implicitly apply the \rtactic{seq}
   rule, most \phl tactics take optional final arguments corresponding

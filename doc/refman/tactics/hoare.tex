@@ -6,16 +6,18 @@
   certain probability inequalities by automatically applying
   \rtactic{conseq}.
 
-  \textbf{Examples:}
-  \begin{mathpar}
-    \inferrule%%
-      {\HL{\mathsf{true}}{f}{\neg Q}}%%
-      {\PR{f}{\vec{a}}{\mem{m}}{Q} = 0}%%
-      \quad\mbox{\parbox{200pt}{\ec{hoare}}} \\
-    \inferrule%%
-      {\HL{\mathsf{P}}{f}{\neg Q}}%%
-      {\pHL{P}{f}{Q}{\leq}{0}}%%
-      \quad\mbox{\parbox{200pt}{\ec{hoare}}}
-  \end{mathpar}
+  \paragraph{Examples:}\strut
+
+  \begin{cmathpar}
+    \texample
+      {\ec{hoare}}
+      {\HL{\mathsf{true}}{f}{\neg Q}}
+      {\PR{f}{\vec{a}}{\mem{m}}{Q} = 0}
+
+    \texample
+      {\ec{hoare}}
+      {\HL{\mathsf{P}}{f}{\neg Q}}
+      {\pHL{P}{f}{Q}{\leq}{0}}
+  \end{cmathpar}
   \end{tsyntax}
 \end{tactic}

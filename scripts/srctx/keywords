@@ -72,7 +72,11 @@ def _do_latex(keywords, options):
     ','.join(keywords.get('dangerous', [])),
 )
 
+    NOCMD = ['beta', 'delta', 'iota', 'gamma', 'zeta']
+
     for v in it.chain(*keywords.values()):
+        if v in NOCMD:
+            continue
         print >>buffer, \
             '\\def\\%(macro)s{\\ensuretext{\\ls[language=easycrypt]"%(name)s"}}' % \
             dict(macro = v.capitalize().replace('_', ''), name = v)

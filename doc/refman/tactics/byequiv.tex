@@ -14,49 +14,65 @@
   overrides this behaviour, instead using the trivial relation on
   events.
 
-  \textbf{Examples:}
-  \begin{mathpar}
-    \inferrule%%
-      {\pRHL{P}{f_1}{f_2}{Q} \\%
-       {m_1[\Arg\mapsto\vec{a}_1]} \rel{P} {m_2[\Arg\mapsto\vec{a}_2]} \\%
-       Q \Rightarrow E_1\{1\}  \Leftrightarrow E_2\{2\}}%%
-      {\PR{f_1}{\vec{a}_1}{\mem{m_1}}{E_1} = \PR{f_2}{\vec{a}_2}{m_2}{E_2}}%%
-      \quad\mbox{\parbox{200pt}{\ec{byequiv (_: P ==> Q)}}} \\
-    \inferrule%%
-      {\pRHL{P}{f_1}{f_2}{Q} \\% 
-       {m_1[\Arg\mapsto\vec{a}_1]} \rel{P} {m_2[\Arg\mapsto\vec{a}_2]} \\%
-       Q \Rightarrow E_1\{1\}  \Rightarrow E_2\{2\}}%%
-      {\PR{f_1}{\vec{a}_1}{\mem{m_1}}{E_1} \leq \PR{f_2}{\vec{a}_2}{m_2}{E_2}}%%
-      \quad\mbox{\parbox{200pt}{\ec{byequiv (_: P ==> Q)}}} \\
-    \inferrule%%
-      {\pRHL{P}{f_1}{f_2}{Q} \\%
-       {m_1[\Arg\mapsto\vec{a}_1]} \rel{P} {m_2[\Arg\mapsto\vec{a}_2]} \\%
-       Q \Rightarrow E_2\{2\}  \Rightarrow E_1\{1\}} %%
-      {\PR{f_1}{\vec{a}_1}{\mem{m_1}}{E_1} \geq \PR{f_2}{\vec{a}_2}{m_2}{E_2}}%%
-      \quad\mbox{\parbox{200pt}{\ec{byequiv (_: P ==> Q)}}} \\
-    \inferrule%%
-      {\pRHL{P}{f_1}{f_2}{Q} \\% 
-       {m_1[\Arg\mapsto\vec{a}_1]} \rel{P} {m_2[\Arg\mapsto\vec{a}_2]} \\%
-       Q \Rightarrow \neg B_2\{2\} \Rightarrow E_1\{1\}  \Rightarrow E_2\{2\}}%%
+  \paragraph{Examples:}\strut
+
+  \begin{cmathpar}
+    \texample
+      {\ec{byequiv (_: P ==> Q)}}
+      {\pRHL{P}{f_1}{f_2}{Q} \\\\
+       {m_1[\Arg\mapsto\vec{a}_1]} \rel{P} {m_2[\Arg\mapsto\vec{a}_2]} \\
+       Q \Rightarrow E_1\{1\}  \Leftrightarrow E_2\{2\}}
+      {\PR{f_1}{\vec{a}_1}{\mem{m_1}}{E_1} = \PR{f_2}{\vec{a}_2}{m_2}{E_2}}
+  \end{cmathpar}
+
+  \begin{cmathpar}
+    \texample
+      {\ec{byequiv (_: P ==> Q)}}
+      {\pRHL{P}{f_1}{f_2}{Q} \\\\
+       {m_1[\Arg\mapsto\vec{a}_1]} \rel{P} {m_2[\Arg\mapsto\vec{a}_2]} \\
+       Q \Rightarrow E_1\{1\}  \Rightarrow E_2\{2\}}
+      {\PR{f_1}{\vec{a}_1}{\mem{m_1}}{E_1} \leq \PR{f_2}{\vec{a}_2}{m_2}{E_2}}
+  \end{cmathpar}
+
+  \begin{cmathpar}
+    \texample
+      {\ec{byequiv (_: P ==> Q)}}
+      {\pRHL{P}{f_1}{f_2}{Q} \\\\
+       {m_1[\Arg\mapsto\vec{a}_1]} \rel{P} {m_2[\Arg\mapsto\vec{a}_2]} \\
+       Q \Rightarrow E_2\{2\}  \Rightarrow E_1\{1\}}
+      {\PR{f_1}{\vec{a}_1}{\mem{m_1}}{E_1} \geq \PR{f_2}{\vec{a}_2}{m_2}{E_2}}
+  \end{cmathpar}
+
+  \begin{cmathpar}
+    \texample
+      {\ec{byequiv (_: P ==> Q)}}
+      {\pRHL{P}{f_1}{f_2}{Q} \\
+       {m_1[\Arg\mapsto\vec{a}_1]} \rel{P} {m_2[\Arg\mapsto\vec{a}_2]} \\
+       Q \Rightarrow \neg B_2\{2\} \Rightarrow E_1\{1\}  \Rightarrow E_2\{2\}}
       {\PR{f_1}{\vec{a}_1}{\mem{m_1}}{E_1}
        \leq \PR{f_2}{\vec{a}_2}{m_2}{E_2}
-          + \PR{f_2}{\vec{a}_2}{m_2}{B_2}}%% 
-      \quad\mbox{\parbox{200pt}{\ec{byequiv (_: P ==> Q)}}} \\
-    \inferrule%%
-      {\pRHL{P}{f_1}{f_2}{Q} \\% 
-       {m_1[\Arg\mapsto\vec{a}_1]} \rel{P} {m_2[\Arg\mapsto\vec{a}_2]} \\%
+          + \PR{f_2}{\vec{a}_2}{m_2}{B_2}}
+  \end{cmathpar}
+
+  \begin{cmathpar}
+    \texample
+      {\ec{byequiv (_: P ==> Q) : B$_1$}}
+      {\pRHL{P}{f_1}{f_2}{Q} \\
+       {m_1[\Arg\mapsto\vec{a}_1]} \rel{P} {m_2[\Arg\mapsto\vec{a}_2]} \\
        Q \Rightarrow
          (B_1\{1\} \Leftrightarrow B_2\{2\})
-         \wedge (\neg B_2\{2\} \Rightarrow E_1\{1\} \Leftrightarrow E_2\{2\})}%%
+         \wedge (\neg B_2\{2\} \Rightarrow E_1\{1\} \Leftrightarrow E_2\{2\})}
       {| \PR{f_1}{\vec{a}_1}{\mem{m_1}}{E_1} - \PR{f_2}{\vec{a}_2}{m_2}{E_2} |
-       \leq \PR{f_2}{\vec{a}_2}{m_2}{B_2}}%% 
-      \quad\mbox{\parbox{200pt}{\ec{byequiv (_: P ==> Q) : B$_1$}}} \\%%
-    \inferrule%%
-      {\pRHL{P}{f_1}{f_2}{E_1\{1\} \Leftrightarrow E_2\{2\}} \\%
-       {m_1[\Arg\mapsto\vec{a}_1]} \rel{P} {m_2[\Arg\mapsto\vec{a}_2]}}%%
-      {\PR{f_1}{\vec{a}_1}{\mem{m_1}}{E_1} = \PR{f_2}{\vec{a}_2}{m_2}{E_2}}%%
-      \quad\mbox{\parbox{200pt}{\ec{byequiv [-eq] (_: P ==> _)}}}
-  \end{mathpar}
+       \leq \PR{f_2}{\vec{a}_2}{m_2}{B_2}}
+  \end{cmathpar}
+
+  \begin{cmathpar}
+    \texample
+      {\ec{byequiv [-eq] (_: P ==> _)}}
+      {\pRHL{P}{f_1}{f_2}{E_1\{1\} \Leftrightarrow E_2\{2\}} \\
+       {m_1[\Arg\mapsto\vec{a}_1]} \rel{P} {m_2[\Arg\mapsto\vec{a}_2]}}
+      {\PR{f_1}{\vec{a}_1}{\mem{m_1}}{E_1} = \PR{f_2}{\vec{a}_2}{m_2}{E_2}}
+  \end{cmathpar}
  \end{tsyntax}
 
   \begin{tsyntax}{byequiv <lemma>}

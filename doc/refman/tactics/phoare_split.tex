@@ -5,51 +5,55 @@
   disjunction into three \phl judgments following the definition of
   the probability of a disjunction of events.
 
-  \textbf{Examples:}
-  \begin{mathpar}
-  \inferrule%%
-    {\delta_{A} + \delta_{B} - \delta_{AB} \diamond \delta \\%
-     \pHL{P}{c}{A}{\diamond}{\delta_{A}} \\%
-     \pHL{P}{c}{B}{\diamond}{\delta_{B}} \\%
-     \pHL{P}{c}{A \wedge B}{\invrel{\diamond}}{\delta_{AB}}}%%
-    {\pHL{P}{c}{A \vee B}{\diamond}{\delta}}%%
-    \quad\mbox{(\phl)\quad\parbox{200pt}{\ec{phoare split $\ \delta_{A}$ $\ \delta_{B}$ $\ \delta_{AB}$}}} \\%%
-  \inferrule%%
-    {\delta_{A} + \delta_{B} - \delta_{AB} \diamond \delta \\%
-     \pHL{P}{c}{A}{\diamond}{\delta_{A}} \\%
-     \pHL{P}{c}{B}{\diamond}{\delta_{B}} \\%
-     \pHL{P}{c}{A \vee B}{\invrel{\diamond}}{\delta_{AB}}}%%
-    {\pHL{P}{c}{A \wedge B}{\diamond}{\delta}}%%
-    \quad\mbox{(\phl)\quad\parbox{200pt}{\ec{phoare split $\ \delta_{A}$ $\ \delta_{B}$ $\ \delta_{AB}$}}} \\%%
-  \end{mathpar}
+  \paragraph{Examples:}\strut
+
+  \begin{cmathpar}
+  \texample[\phl{}]
+    {\ec{phoare split $\ \delta_{A}\ \delta_{B}\ \delta_{AB}$}}
+    {\delta_{A} + \delta_{B} - \delta_{AB} \diamond \delta \\
+     \pHL{P}{c}{A}{\diamond}{\delta_{A}} \\
+     \pHL{P}{c}{B}{\diamond}{\delta_{B}} \\
+     \pHL{P}{c}{A \wedge B}{\invrel{\diamond}}{\delta_{AB}}}
+    {\pHL{P}{c}{A \vee B}{\diamond}{\delta}}
+
+  \texample[\phl{}]
+    {\ec{phoare split $\ \delta_{A}\ \delta_{B}\ \delta_{AB}$}}
+    {\delta_{A} + \delta_{B} - \delta_{AB} \diamond \delta \\
+     \pHL{P}{c}{A}{\diamond}{\delta_{A}} \\
+     \pHL{P}{c}{B}{\diamond}{\delta_{B}} \\
+     \pHL{P}{c}{A \vee B}{\invrel{\diamond}}{\delta_{AB}}}
+    {\pHL{P}{c}{A \wedge B}{\diamond}{\delta}}
+  \end{cmathpar}
   \end{tsyntax}
 
   \begin{tsyntax}{phoare split $\ {!}$ $\ \delta_{\top}$ $\ \delta_{!}$}
   Splits a \phl judgment into two judgments whose postcondition are
   true and the negation of the original postcondition, respectively.
 
-  \textbf{Examples:}
-  \begin{mathpar}
-  \inferrule%%
-    {\delta_{\top} - \delta_{!} \diamond \delta \\%
-     \pHL{P}{c}{\mathsf{true}}{\diamond}{\delta_{\top}} \\%
-     \pHL{P}{c}{!Q}{\invrel{\diamond}}{\delta_{!}}}%%
-    {\pHL{P}{c}{Q}{\diamond}{\delta}}%%
-    \quad\mbox{(\phl)\quad\parbox{200pt}{\ec{phoare split $\ {!}$ $\ \delta_{\top}$ $\ \delta_{!}$}}} \\%%
-  \end{mathpar}
+  \paragraph{Examples:}\strut
+
+  \begin{cmathpar}
+  \texample[\phl{}]
+    {\ec{phoare split ! $\ \delta_{\top}\ \delta_{!}$}}
+    {\delta_{\top} - \delta_{!} \diamond \delta \\
+     \pHL{P}{c}{\mathsf{true}}{\diamond}{\delta_{\top}} \\
+     \pHL{P}{c}{!Q}{\invrel{\diamond}}{\delta_{!}}}
+    {\pHL{P}{c}{Q}{\diamond}{\delta}}
+  \end{cmathpar}
   \end{tsyntax}
 
   \begin{tsyntax}{phoare split $\delta_{A}$ $\delta_{!A}$: A}
   Splits a \phl judgment following an event $A$.
 
-  \textbf{Examples:}
-  \begin{mathpar}
-  \inferrule%%
-    {\delta_{A} + \delta_{!A} \diamond \delta \\%
-     \pHL{P}{c}{Q \wedge A}{\diamond}{\delta_{A}} \\%
-     \pHL{P}{c}{Q \wedge \neg A}{\diamond}{\delta_{!A}}}%%
-    {\pHL{P}{c}{Q}{\diamond}{\delta}}%%
-    \quad\mbox{(\phl)\quad\parbox{200pt}{\ec{phoare split $\ \delta_{A}$ $\ \delta_{!A}$: A}}} \\%%
-  \end{mathpar}
+  \paragraph{Examples:}\strut
+
+  \begin{cmathpar}
+  \texample[\phl{}]
+    {\ec{phoare split $\ \delta_{A}\ \delta_{!A}$: A}}
+    {\delta_{A} + \delta_{!A} \diamond \delta \\
+     \pHL{P}{c}{Q \wedge A}{\diamond}{\delta_{A}} \\
+     \pHL{P}{c}{Q \wedge \neg A}{\diamond}{\delta_{!A}}}
+    {\pHL{P}{c}{Q}{\diamond}{\delta}}
+  \end{cmathpar}
   \end{tsyntax}  
 \end{tactic}

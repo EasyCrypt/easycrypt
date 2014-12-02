@@ -4,28 +4,35 @@
   Derives a program judgment from a probability relation or an exact
   probability. Only applies to judgments on procedures.
 
-  \textbf{Examples:}
-  \begin{mathpar}
-    \inferrule%%
+  \paragraph{Examples:}\strut
+  
+  \begin{cmathpar}
+    \texample[\prhl{}]
+      {\ec{bypr (r$_1$) (r$_2$)}}
       {\forall \mem{m_1}, \mem{m_2}, a.\,
           r_1 = a \Rightarrow
           r_2 = a \Rightarrow
-          {\mem{m_1}} \rel{Q} {\mem{m_2}} \\%
+          {\mem{m_1}} \rel{Q} {\mem{m_2}} \\
        \forall \vec{a}_1, \vec{a}_2, \mem{m_1}, \mem{m_2}, a.\,
-         {\mem{m_1}[\Arg\mapsto\vec{a}_1]} \rel{P} {\mem{m_2}[\Arg\mapsto\vec{a}_2]} \Rightarrow%
-         \PR{f_1}{\vec{a}_1}{\mem{m_1}}{a = r_1} = \PR{f_2}{\vec{a}_2}{\mem{m_2}}{a = r_2}} %%
-      {\pRHL{P}{f_1}{f_2}{Q}}%%
-      \quad\mbox{(\prhl)\quad\parbox{200pt}{\ec{bypr (r$_1$) (r$_2$)}}} \\
-    \inferrule%%
-      {\forall \mem{m}, \vec{a}.\,\Pred{P}{m[\Arg\mapsto\vec{a}]} \Rightarrow
-          \PR{f}{\vec{a}}{m}{E} \mathrel{\diamond} \delta}%%
+         {\mem{m_1}[\Arg\mapsto\vec{a}_1]} \rel{P} {\mem{m_2}[\Arg\mapsto\vec{a}_2]} \Rightarrow \\
+         \PR{f_1}{\vec{a}_1}{\mem{m_1}}{a = r_1} = \PR{f_2}{\vec{a}_2}{\mem{m_2}}{a = r_2}}
+      {\pRHL{P}{f_1}{f_2}{Q}}
+  \end{cmathpar}
+
+  \begin{cmathpar}
+    \texample[\phl{}]
+      {\ec{bypr}}
+      {\forall \mem{m}, \vec{a}.\, P\ m[\Arg\mapsto\vec{a}] \Rightarrow
+          \PR{f}{\vec{a}}{m}{E} \mathrel{\diamond} \delta}
       {\pHL{P}{f}{E}{\diamond}{\delta}}
-      \quad\mbox{(\phl)\quad\parbox{200pt}{\ec{bypr}}} \\
-    \inferrule%%
-      {\forall \mem{m}, \vec{a}.\,\Pred{P}{m[\Arg\mapsto\vec{a}]} \Rightarrow
-          \PR{f}{\vec{a}}{m}{\neg E} \mathop{=}0$\%$r}%%
+  \end{cmathpar}
+
+  \begin{cmathpar}
+    \texample[\hl{}]
+      {\ec{bypr}}
+      {\forall \mem{m}, \vec{a}.\, P\ m[\Arg\mapsto\vec{a}] \Rightarrow
+          \PR{f}{\vec{a}}{m}{\neg E} \mathop{=}0\%r}
       {\HL{P}{f}{E}}
-      \quad\mbox{(\hl)\quad\parbox{200pt}{\ec{bypr}}} \\
-  \end{mathpar}
+  \end{cmathpar}
   \end{tsyntax}
 \end{tactic}

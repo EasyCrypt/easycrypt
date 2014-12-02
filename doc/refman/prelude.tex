@@ -1,5 +1,6 @@
 % --------------------------------------------------------------------
 \input{easycrypt-common.tex}
+\usepackage{nicefrac}
 
 % --------------------------------------------------------------------
 \usepackage[draft,silent,targetlayout=plain,layout=inline]{fixme}
@@ -17,6 +18,7 @@
 \SetSymbolFont{largesymbols}{sans}{OMX}{iwona}{m}{n}
 
 %--------------------------------------------------------------------
+\usepackage{xifthen}
 \usepackage{xstring}
 \usepackage{colortbl}
 
@@ -41,19 +43,16 @@
 
 \newcommand{\texample}[4][]{%
 \begin{array}{@{}lr@{}}
- \text{#2} & \text{\if\relax\detokenize{#1}\relax\else{\small [#1]}}\\
+ \text{#2} & \text{\ifthenelse{\isempty{#1}}{}{\small [#1]}}\\
  \arrayrulecolor{gray}\hline\\[-.5em]
  \multicolumn{2}{c}{\hspace{.5cm}\inferrule*{#3}{#4}}
 \end{array}}
 
 \newcommand{\rtactic}[2][\empty]{\ec{#2} (p.~\pageref{tactic-\ifx\empty#1#2\else#1\fi})}
 
-%--------------------------------------------------------------------
-\usepackage{nicefrac}
-
-%--------------------------------------------------------------------
-%% Miscellaneous local notations
-\newcommand{\invrel}[1]{#1^{-1}} %% Inverse relation
+% --------------------------------------------------------------------
+\newcommand{\inv}{^{-1}}
+\newcommand{\invrel}[1]{#1\inv}
 
 %--------------------------------------------------------------------
 \newcommand{\tint}[0]{\ensuremath{\mathsf{int}}}

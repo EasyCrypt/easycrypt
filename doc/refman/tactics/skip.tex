@@ -2,21 +2,24 @@
 \begin{tactic}{skip}
   \begin{tsyntax}{skip} Hoare logic rules for empty statement.
 
-  \textbf{Examples:} 
-  \begin{mathpar}
-  \inferrule%%
-    {P \Rightarrow Q }%%
-    {\pRHL{P}{\Skip}{\Skip}{Q}}%%
-    \quad\mbox{(\prhl)\quad\parbox{200pt}{\ec{skip}}} \\
-  \inferrule%%
-    {P \Rightarrow Q }%%
-    {\pHL{P'}{\Skip}{Q'}{\diamond}{1}}%%
-    \quad\mbox{(\phl)\quad\parbox{200pt}{\ec{skip}}} \\
-  \inferrule%%
-    {P \Rightarrow Q}%%
-    {\HL{P}{\Skip}{Q}}%%
-    \quad\mbox{(\hl)\quad\parbox{200pt}{\ec{skip}}} \\
-  \end{mathpar}
+  \paragraph{Examples:}\strut
+
+  \begin{cmathpar}
+  \texample[\hl{}]
+    {\ec{skip}}
+    {P \Rightarrow Q}
+    {\pRHL{P}{\Skip}{\Skip}{Q}}
+
+  \texample[\phl{}]
+    {\ec{skip}}
+    {P \Rightarrow Q}
+    {\pHL{P'}{\Skip}{Q'}{\diamond}{1}}
+
+  \texample[\hl{}]
+    {\ec{skip}}
+    {P \Rightarrow Q}
+    {\HL{P}{\Skip}{Q}}
+  \end{cmathpar}
 
   \textbf{Note:} Note that the \phl rule forces the bound of the goal
   to be 1. If you end up with an empty program and a bound other than
