@@ -32,7 +32,10 @@ SYSDIR := $(LIBDIR)/system
 # --------------------------------------------------------------------
 XUNITOUT ?= xunit.xml
 ECARGS   ?=
-CHECK     = scripts/testing/runtest --bin-args="$(ECARGS)" config/tests.config
+ECTOUT   ?= 3
+CHECK    := scripts/testing/runtest
+CHECK    += --bin-args="$(ECARGS)" --timeout="$(ECTOUT)"
+CHECK    += config/tests.config
 
 # --------------------------------------------------------------------
 .PHONY: all build byte native tests check check-xunit examples

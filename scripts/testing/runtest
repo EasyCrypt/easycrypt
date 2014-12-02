@@ -63,13 +63,26 @@ def _options():
         metavar = 'FILE',
         help    = 'dump result to FILE using xUnit format')
 
+    parser.add_option(
+        '', '--timeout',
+        action  = 'store',
+        default = None,
+        metavar = 'TIMEOUT',
+        type    = 'int',
+        help    = 'set the timeout option to pass to EasyCrypt')
+
     (cmdopt, args) = parser.parse_args()
 
     if len(args) < 1:
         parser.error('this program takes at least one argument')
 
+    if cmdopt.timeout:
+        if cmdopt.timeout <= 0:
+            parser.error('timeout must be positive')
+
     options = Object(scenarios = dict())
-    options.xunit = cmdopt.xunit
+    options.xunit   = cmdopt.xunit
+    options.timeout = cmdopt.timeout
 
     defaults = dict(args = '', exclude = '', okdirs = '', kodirs = '')
 
@@ -84,12 +97,23 @@ def _options():
         options.args.extend(itertools.chain.from_iterable( \
           x.split() for x in cmdopt.bin_args))
 
+    def _parse_timeout(x):
+        m = re.search(r'^(.*):(\d+)$', x)
+        if m is None:
+            parse.parseerror('invalid timeout: %s' % (x,))
+        return (m.group(1), int(m.group(2)))
+
     for test in [x for x in config.sections() if x.startswith('test-')]:
         scenario = Object()
         scenario.args    = config.get(test, 'args').split()
         scenario.okdirs  = config.get(test, 'okdirs')
         scenario.kodirs  = config.get(test, 'kodirs')
         scenario.exclude = config.get(test, 'exclude').split()
+        if config.has_option(test, 'timeout'):
+            scenario.timeout = config.get(test, 'timeout').split()
+            scenario.timeout = dict(map(_parse_timeout, scenario.timeout))
+        else:
+            scenario.timeout = dict()
         options.scenarios[test[5:]] = scenario
 
     for x in options.targets:
@@ -162,7 +186,14 @@ def _run_test(config, options):
 
     timestamp = time.time()
     try:
-        command = [options.bin] + options.args + config.args + [config.filename]
+        command = [options.bin] + options.args + config.args
+        if options.timeout:
+            timeout = options.timeout
+            if config.tfactor:
+                timeout *= config.tfactor
+            command.extend(['-timeout', str(timeout)])
+        command.extend([config.filename])
+
         logging.info('command: %r' % (command,))
         process = sp.Popen(command, stdout = sp.PIPE, stderr = sp.PIPE)
 
@@ -197,7 +228,7 @@ def _main():
         format = '%(asctime)-15s - %(levelname)s - %(message)s')
 
     # ------------------------------------------------------------------
-    def gather(obj):
+    def gather(obj, scenario):
         logging.debug("gathering scripts in `%s'" % (obj.src,))
         try:
             scripts = os.listdir(obj.src)
@@ -208,10 +239,12 @@ def _main():
         logging.debug("%.4d script(s) found in `%s'" % (len(scripts), obj.src))
 
         def config(filename):
+            fullname = os.path.normpath(os.path.join(obj.src, x))
             return Object(isvalid  = obj.valid,
                           group    = obj.src,
                           args     = obj.args,
-                          filename = os.path.normpath(os.path.join(obj.src, x)))
+                          tfactor  = scenario.timeout.get(fullname, None),
+                          filename = fullname)
 
         return [config(x) for x in scripts]
 
@@ -228,7 +261,7 @@ def _main():
         dirs.extend([Object(src = x, valid = False, args = scenario.args) \
                          for x in expand(scenario.kodirs)])
         dirs = [x for x in dirs if x.src not in scenario.exclude]
-        dirs = map(lambda x : gather(x), dirs)
+        dirs = map(lambda x : gather(x, scenario), dirs)
         return list(itertools.chain.from_iterable(dirs))
 
     def gatherall():
