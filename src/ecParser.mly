@@ -1571,7 +1571,7 @@ intro_pattern:
 | LLARROW
    { IPSubst `RtoL }
 
-| LBRACE xs=ident+ RBRACE
+| LBRACE xs=loc(intro_pattern_1_name)+ RBRACE
    { IPClear xs }
 
 | SLASHSLASH
@@ -1864,7 +1864,7 @@ logtactic:
 | MOVE COLON gp=genpattern+
    { Pgeneralize gp }
 
-| CLEAR l=ident+
+| CLEAR l=loc(intro_pattern_1_name)+
    { Pclear l }
 
 | CONGR
