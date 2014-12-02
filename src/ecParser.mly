@@ -2542,9 +2542,11 @@ print:
 | GOAL        n=int              { Pr_goal n  }
 
 prover_iconfig:
-| /* empty */     { (None   , None   ) }
-| i=uint          { (Some i , None   ) }
-| i1=uint i2=uint { (Some i1, Some i2) }
+| /* empty */        { (None  , None  ) }
+| i=uint
+| i=uint UNDERSCORE  { (Some i, None  ) }
+| UNDERSCORE j=uint  { (None  , Some j) }
+| i=uint j=uint      { (Some i, Some j) }
 
 prover_info:
 | ic=prover_iconfig pl=plist1(loc(STRING), empty)?
