@@ -14,11 +14,6 @@ DESTDIR    ?=
 PREFIX     ?= /usr/local
 VERSION    ?= $(shell date '+%F')
 DISTDIR    := easycrypt-$(VERSION)
-THEORIES   := $(wildcard theories/*.ec)
-ENCRYPTION := $(wildcard theories/encryption/*.ec)
-REALIZED   := $(wildcard theories/realizations/*.ec)
-PRELUDE    := $(wildcard theories/prelude/*.ec)
-CORE       := $(wildcard theories/core/*.ec)
 INSTALL    := scripts/install/install-sh
 PWD        := $(shell pwd)
 
@@ -73,42 +68,29 @@ define check-for-staled-files
 	fi
 endef
 
-define install-theories
-	$(INSTALL) -m 0755 -d $(DESTDIR)$(LIBDIR)/theories/$(1)
-	$(INSTALL) -m 0644 -t $(DESTDIR)$(LIBDIR)/theories/$(1) $(2)
-endef
-
 install: ec.native uninstall
 	-@$(call check-for-staled-files)
 	$(INSTALL) -m 0755 -d $(DESTDIR)$(BINDIR)
 	$(INSTALL) -m 0755 -T ec.native $(DESTDIR)$(BINDIR)/easycrypt$(EXE)
 	$(INSTALL) -m 0755 -d $(DESTDIR)$(SYSDIR)
 	$(INSTALL) -m 0755 -T system/callprover$(EXE) $(DESTDIR)$(SYSDIR)/callprover$(EXE)
-	$(call install-theories,,$(THEORIES))
-	$(call install-theories,core,$(CORE))
-	$(call install-theories,prelude,$(PRELUDE))
-	$(call install-theories,realizations,$(REALIZED))
-	$(call install-theories,encryption,$(ENCRYPTION))
+	for i in $$(find theories -type d); do \
+	  $(INSTALL) -m 0755 -d $(DESTDIR)$(LIBDIR)/$$i ';'; \
+	  $(INSTALL) -m 0644 -t $(DESTDIR)$(LIBDIR)/$$i $$i/*.ec; \
+	done
 
 define rmdir
 	-@if [ -d "$(1)" ]; then rmdir "$(1)"; fi
-endef
-
-define uninstall-theories
-	rm -f $(patsubst %,$(DESTDIR)$(LIBDIR)/%,$(2))
-	$(call rmdir,$(DESTDIR)$(LIBDIR)/theories/$(1))
 endef
 
 uninstall:
 	rm -f $(DESTDIR)$(BINDIR)/easycrypt
 	rm -f $(DESTDIR)$(SYSDIR)/callprover
 	$(call rmdir,$(DESTDIR)$(SYSDIR))
-	$(call uninstall-theories,encryption,$(ENCRYPTION))
-	$(call uninstall-theories,realizations,$(REALIZED))
-	$(call uninstall-theories,prelude,$(PRELUDE))
-	$(call uninstall-theories,core,$(CORE))
-	$(call uninstall-theories,,$(THEORIES))
-	$(call rmdir,$(DESTDIR)$(LIBDIR))
+	for i in $$(find theories -depth -type d); do \
+	  for j in $$i/*.ec; do rm -f $(DESTDIR)$(LIBDIR)/$$j; done; \
+	  rmdir $(DESTDIR)$(LIBDIR)/$$i 2>/dev/null || true; \
+	done
 
 uninstall-purge:
 	rm  -f $(DESTDIR)$(BINDIR)/easycrypt
