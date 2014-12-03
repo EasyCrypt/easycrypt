@@ -1,4 +1,9 @@
 % --------------------------------------------------------------------
+\newcommand{\dslash}{\mathbin{\mathsf{/\mkern-4mu/}}}
+\newcommand{\dslasheq}{\mathbin{\mathsf{/\mkern-4mu/\mkern-8mu=}}}
+\newcommand{\slasheq}{\mathbin{\mathsf{/\mkern-6mu=}}}
+
+% --------------------------------------------------------------------
 \lstdefinestyle{easycrypt-default}{
   mathescape=true,
   columns=fullflexible,
@@ -32,6 +37,9 @@
     {\/\\}{{$\wedge\;$}}1
     {\\\/}{{$\vee\;$}}1
     {!!}{{$\neg\,$}}1
+    {//=}{{$\dslasheq$}}1
+    {//}{{$\dslash$}}1
+    {/=}{{$\slasheq$}}1
     {phi}{{$\!\phi\,$}}1
     {phi1}{{$\!\phi_1$}}1
     {phi2}{{$\!\phi_2$}}1
