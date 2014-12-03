@@ -71,6 +71,13 @@ def _options():
         type    = 'int',
         help    = 'set the timeout option to pass to EasyCrypt')
 
+    parser.add_option(
+        '', '--weak-check',
+        action  = 'store_true',
+        default = False,
+        dest    = 'weakcheck',
+        help    = 'start EasyCrypt in weak-check mode')
+
     (cmdopt, args) = parser.parse_args()
 
     if len(args) < 1:
@@ -81,8 +88,9 @@ def _options():
             parser.error('timeout must be positive')
 
     options = Object(scenarios = dict())
-    options.xunit   = cmdopt.xunit
-    options.timeout = cmdopt.timeout
+    options.xunit     = cmdopt.xunit
+    options.timeout   = cmdopt.timeout
+    options.weakcheck = cmdopt.weakcheck
 
     defaults = dict(args = '', exclude = '', okdirs = '', kodirs = '')
 
@@ -187,6 +195,8 @@ def _run_test(config, options):
     timestamp = time.time()
     try:
         command = [options.bin] + options.args + config.args
+        if options.weakcheck:
+            command.append('-weak-check')
         if options.timeout:
             command.extend(['-timeout', str(options.timeout)])
         if config.tfactor:
