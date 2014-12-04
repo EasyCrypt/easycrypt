@@ -678,3 +678,4 @@ let xconv (mode : xconv) hyps =
   | `Eq      -> f_equal
   | `AlphaEq -> is_alpha_eq hyps
   | `Conv    -> is_conv hyps
+

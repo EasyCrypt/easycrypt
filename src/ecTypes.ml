@@ -937,8 +937,3 @@ let destr_tuple_var e =
   | Etuple es -> List.map destr_var es
   | _ -> assert false
 
-(* -------------------------------------------------------------------- *)
-let proj_distr_ty ty = match ty.ty_node with
-  | Tconstr(_,lty) when List.length lty = 1  -> 
-    List.hd lty
-  | _ -> assert false (* FIXME *)

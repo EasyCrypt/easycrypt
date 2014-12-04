@@ -103,7 +103,14 @@ let fop_mu      ty = f_op EcCoreLib.CI_Distr.p_mu      [ty] (toarrow [tdistr ty;
 
 let f_in_supp f1 f2 = f_app (fop_in_supp f1.f_ty) [f1; f2] tbool
 let f_mu_x    f1 f2 = f_app (fop_mu_x f2.f_ty) [f1; f2] treal
-let f_mu      f1 f2 = f_app (fop_mu (proj_distr_ty f1.f_ty)) [f1; f2] treal
+
+let proj_distr_ty env ty = 
+   match (EcEnv.Ty.hnorm ty env).ty_node with
+  | Tconstr(_,lty) when List.length lty = 1  -> 
+    List.hd lty
+  | _ -> assert false 
+
+let f_mu  env f1 f2 = f_app (fop_mu (proj_distr_ty env f1.f_ty)) [f1; f2] treal
 
 let fop_weight ty = f_op EcCoreLib.CI_Distr.p_weight [ty] (tfun (tdistr ty) treal) (* CORELIB *)
 let f_weight ty d = f_app (fop_weight ty) [d] treal

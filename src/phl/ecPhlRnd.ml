@@ -33,7 +33,7 @@ let wp_equiv_disj_rnd_r side tc =
 
   (* FIXME: exception when not rnds found *)
   let (lv, distr), s = tc1_last_rnd tc s in
-  let ty_distr = proj_distr_ty (e_ty distr) in
+  let ty_distr = proj_distr_ty env (e_ty distr) in
 
   let x_id = EcIdent.create (symbol_of_lv lv) in
   let x    = f_local x_id ty_distr in
@@ -56,8 +56,8 @@ let wp_equiv_rnd_r bij tc =
   let es = tc1_as_equivS tc in
   let (lvL, muL), sl' = tc1_last_rnd tc es.es_sl in
   let (lvR, muR), sr' = tc1_last_rnd tc es.es_sr in
-  let tyL = proj_distr_ty (e_ty muL) in
-  let tyR = proj_distr_ty (e_ty muR) in
+  let tyL = proj_distr_ty env (e_ty muL) in
+  let tyR = proj_distr_ty env (e_ty muR) in
   let xL_id = EcIdent.create (symbol_of_lv lvL ^ "L")
   and xR_id = EcIdent.create (symbol_of_lv lvR ^ "R") in
   let xL = f_local xL_id tyL in
@@ -111,7 +111,7 @@ let t_hoare_rnd_r tc =
   let env = FApi.tc1_env tc in
   let hs = tc1_as_hoareS tc in
   let (lv, distr), s = tc1_last_rnd tc hs.hs_s in
-  let ty_distr = proj_distr_ty (e_ty distr) in
+  let ty_distr = proj_distr_ty env (e_ty distr) in
   let x_id = EcIdent.create (symbol_of_lv lv) in
   let x = f_local x_id ty_distr in
   let distr = EcFol.form_of_expr (EcMemory.memory hs.hs_m) distr in
@@ -139,7 +139,7 @@ let t_bdhoare_rnd_r tac_info tc =
   let env = FApi.tc1_env tc in
   let bhs = tc1_as_bdhoareS tc in
   let (lv,distr),s = tc1_last_rnd tc bhs.bhs_s in
-  let ty_distr = proj_distr_ty (e_ty distr) in
+  let ty_distr = proj_distr_ty env (e_ty distr) in
   let distr = EcFol.form_of_expr (EcMemory.memory bhs.bhs_m) distr in
   let m = fst bhs.bhs_m in
   let mk_event_cond event =
@@ -199,7 +199,7 @@ let t_bdhoare_rnd_r tac_info tc =
         [concl]
       else
         let event = mk_event ty_distr in
-        let bounded_distr = f_real_le (f_mu distr event) bound in
+        let bounded_distr = f_real_le (f_mu env distr event) bound in
         let pre = f_and bhs.bhs_pr pre_bound in
         let post = f_anda bounded_distr (mk_event_cond event) in
         let concl = f_hoareS bhs.bhs_m pre s post in
@@ -209,13 +209,13 @@ let t_bdhoare_rnd_r tac_info tc =
       if is_post_indep then
         (* event is true *)
         let event = mk_event ty_distr in
-        let bounded_distr = f_eq (f_mu distr event) f_r1 in
+        let bounded_distr = f_eq (f_mu env distr event) f_r1 in
         let concl = f_bdHoareS_r
           {bhs with bhs_s=s; bhs_po=f_and bhs.bhs_po bounded_distr} in
         [concl]
       else
         let event = mk_event ty_distr in
-        let bounded_distr = f_cmp (f_mu distr event) bound in
+        let bounded_distr = f_cmp (f_mu env distr event) bound in
         let pre = f_and bhs.bhs_pr pre_bound in
         let post = f_anda bounded_distr (mk_event_cond event) in
         let concl = f_bdHoareS_r {bhs with bhs_s=s; bhs_pr=pre; bhs_po=post; bhs_bd=f_r1} in
@@ -223,7 +223,7 @@ let t_bdhoare_rnd_r tac_info tc =
         [concl]
     | PSingleRndParam event, FHle ->
         let event = event ty_distr in
-        let bounded_distr = f_real_le (f_mu distr event) bound in
+        let bounded_distr = f_real_le (f_mu env distr event) bound in
         let pre = f_and bhs.bhs_pr pre_bound in
         let post = f_anda bounded_distr (mk_event_cond event) in
         let concl = f_hoareS bhs.bhs_m pre s post in
@@ -231,7 +231,7 @@ let t_bdhoare_rnd_r tac_info tc =
         [concl]
     | PSingleRndParam event, _ ->
         let event = event ty_distr in
-        let bounded_distr = f_cmp (f_mu distr event) bound in
+        let bounded_distr = f_cmp (f_mu env distr event) bound in
         let pre = f_and bhs.bhs_pr pre_bound in
         let post = f_anda bounded_distr (mk_event_cond event) in
         let concl = f_bdHoareS_r {bhs with bhs_s=s; bhs_pr=pre; bhs_po=post; bhs_cmp=FHeq; bhs_bd=f_r1} in
@@ -244,13 +244,13 @@ let t_bdhoare_rnd_r tac_info tc =
       let bd_sgoal = f_cmp (f_real_add (f_real_mul d1 d2) (f_real_mul d3 d4)) bhs.bhs_bd in
       let sgoal1 = f_bdHoareS_r {bhs with bhs_s=s; bhs_po=phi; bhs_bd=d1} in
       let sgoal2 =
-        let bounded_distr = f_cmp (f_mu distr event) d2 in
+        let bounded_distr = f_cmp (f_mu env distr event) d2 in
         let post = f_anda bounded_distr (mk_event_cond event) in
         f_forall_mems [bhs.bhs_m] (f_imp phi post)
       in
       let sgoal3 = f_bdHoareS_r {bhs with bhs_s=s; bhs_po=f_not phi; bhs_bd=d3} in
       let sgoal4 =
-        let bounded_distr = f_cmp (f_mu distr event) d4 in
+        let bounded_distr = f_cmp (f_mu env distr event) d4 in
         let post = f_anda bounded_distr (mk_event_cond event) in
         f_forall_mems [bhs.bhs_m] (f_imp (f_not phi) post) in
       let sgoal5 =

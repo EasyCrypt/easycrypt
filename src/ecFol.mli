@@ -59,7 +59,7 @@ val fop_in_supp : EcTypes.ty -> form
 val fop_mu_x    : EcTypes.ty -> form
 
 val f_in_supp : form -> form -> form
-val f_mu      : form -> form -> form
+val f_mu      : EcEnv.env -> form -> form -> form
 val f_mu_x    : form -> form -> form
 val f_weight  : EcTypes.ty -> form -> form
 
@@ -109,6 +109,10 @@ val f_real_div_simpl : form -> form -> form
 
 (* -------------------------------------------------------------------- *)
 val destr_exists_prenex : form -> binding * form
+
+(* -------------------------------------------------------------------- *)
+(* projects 'a Distr type into 'a *)
+val proj_distr_ty : EcEnv.env -> ty -> ty
 
 (* -------------------------------------------------------------------- *)
 type op_kind = [
