@@ -81,23 +81,23 @@ let t_kill_r side cpos olen tc =
   t_code_transform side ~bdhoare:true cpos tr (t_zip kill_stmt) tc
 
 (* -------------------------------------------------------------------- *)
-let alias_stmt id (pf, _) me i =
+let alias_stmt env id (pf, _) me i =
   match i.i_node with
   | Srnd (lv, e) ->
       let id       = odfl "x" (omap EcLocation.unloc id) in
-      let ty       = e.e_ty in
+      let ty       = proj_distr_ty env e.e_ty in
       let id       = { v_name = id; v_type = ty; } in
       let (me, id) = fresh_pv me id in
       let pv       = pv_loc (EcMemory.xpath me) id in
-
-        (me, [i_rnd (LvVar (pv, ty), e); i_asgn (lv, e_var pv ty)])
+      (me, [i_rnd (LvVar (pv, ty), e); i_asgn (lv, e_var pv ty)])
 
   | _ ->
       tc_error pf "cannot create an alias for that kind of instruction"
 
 let t_alias_r side cpos id g =
+  let env = FApi.tc1_env g in
   let tr = fun side -> `Alias (side, cpos) in
-  t_code_transform side ~bdhoare:true cpos tr (t_fold (alias_stmt id)) g
+  t_code_transform side ~bdhoare:true cpos tr (t_fold (alias_stmt env id)) g
 
 (* -------------------------------------------------------------------- *)
 let set_stmt (fresh, id) e =
