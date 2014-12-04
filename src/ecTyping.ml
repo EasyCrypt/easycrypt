@@ -2074,24 +2074,27 @@ and translvalue ue (env : EcEnv.env) lvalue =
   | PLvMap (x, tvi, e) ->
       let tvi = tvi |> omap (transtvi env ue) in
       let codomty = UE.fresh ue in
-      let pv,xty = trans_pv env x in
+      let pv, xty = trans_pv env x in
       let e, ety = transexp env `InProc ue e in
-      let name =  ([],EcCoreLib.s_set) in
+      let name = ([], EcCoreLib.s_set) in
       let esig = [xty; ety; codomty] in
       let ops = select_exp_op env `InProc None name ue tvi esig in
 
       match ops with
       | [] ->
           let esig = Tuni.offun_dom (EcUnify.UniEnv.assubst ue) esig in
-            tyerror x.pl_loc env (UnknownVarOrOp (name, esig))
+          tyerror x.pl_loc env (UnknownVarOrOp (name, esig))
 
-      | [{ e_node = Eop (p, tys) }, _, subue, _] ->
+      | [{ e_node = Eop (p, tys) }, opty, subue, _] ->
+          let esig = Tuni.offun_dom (EcUnify.UniEnv.assubst ue) esig in
+          let esig = toarrow esig tunit in
           EcUnify.UniEnv.restore ~src:subue ~dst:ue;
+          unify_or_fail env ue x.pl_loc ~expct:esig opty;
           (LvMap ((p, tys), pv, e, xty), codomty)
 
-      | [_] ->                          (* FIXME: dubious *)
+      | [_] ->
           let esig = Tuni.offun_dom (EcUnify.UniEnv.assubst ue) esig in
-            tyerror x.pl_loc env (UnknownVarOrOp (name, esig))
+          tyerror x.pl_loc env (UnknownVarOrOp (name, esig))
 
       | _ ->
           let esig = Tuni.offun_dom (EcUnify.UniEnv.assubst ue) esig in
