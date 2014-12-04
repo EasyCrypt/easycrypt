@@ -2086,10 +2086,10 @@ and translvalue ue (env : EcEnv.env) lvalue =
           tyerror x.pl_loc env (UnknownVarOrOp (name, esig))
 
       | [{ e_node = Eop (p, tys) }, opty, subue, _] ->
-          let esig = Tuni.offun_dom (EcUnify.UniEnv.assubst ue) esig in
-          let esig = toarrow esig tunit in
           EcUnify.UniEnv.restore ~src:subue ~dst:ue;
-          unify_or_fail env ue x.pl_loc ~expct:esig opty;
+          let esig = Tuni.offun_dom (EcUnify.UniEnv.assubst ue) esig in
+          let esig = toarrow esig xty in
+          unify_or_fail env ue lvalue.pl_loc ~expct:esig opty;
           (LvMap ((p, tys), pv, e, xty), codomty)
 
       | [_] ->
