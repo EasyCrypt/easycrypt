@@ -197,6 +197,7 @@ and pmodule_decl = {
 
 (* -------------------------------------------------------------------- *)
 type ptyparams = (psymbol * pqsymbol list) list
+type ptydname  = (ptyparams * psymbol) located
 
 type ptydecl = {
   pty_name   : psymbol;

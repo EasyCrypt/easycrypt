@@ -1176,9 +1176,9 @@ module Ty = struct
   open EcDecl
   open EcTyping
 
-  module TT = EcTyping
-
-  type tydname = (ptyparams * psymbol) located
+  module TT  = EcTyping
+  module ELI = EcInductive
+  module EHI = EcHiInductive
 
   (* ------------------------------------------------------------------ *)
   let check_name_available scope x =
@@ -1526,7 +1526,7 @@ module Ty = struct
         failwith "unsupported"          (* FIXME *)
 
   (* ------------------------------------------------------------------ *)
-  let add_datatype (scope : scope) (tydname : tydname) dt =
+  let add_datatype (scope : scope) (tydname : ptydname) dt =
     let { pl_loc = loc; pl_desc = (tyvars, name); } = tydname in
 
     check_name_available scope name;
@@ -1659,64 +1659,21 @@ module Ty = struct
       bind scope (unloc name, tydecl)
 
   (* ------------------------------------------------------------------ *)
-  let add_record (scope : scope) (tydname : tydname) rt =
-    let { pl_loc = loc; pl_desc = (tyvars, name); } = tydname in
+  let add_record (scope : scope) (tydname : ptydname) rt =
+    let name = snd (unloc tydname) in
 
     check_name_available scope name;
 
-    (* Check type-parameters *)
-    let ue    = TT.transtyvars scope.sc_env (loc, Some tyvars) in
-    let tpath = EcPath.pqname (path scope) (unloc name) in
-
-    (* Check for duplicated field names *)
-    Msym.odup unloc (List.map fst rt)
-      |> oiter (fun (x, y) -> hierror ~loc:y.pl_loc
-                  "duplicated field name: `%s'" x.pl_desc);
-
-    (* Type-check field types *)
-    let fields =
-      let for1 (fname, fty) =
-        let fty = TT.transty TT.tp_tydecl (env scope) ue fty in
-          (unloc fname, fty)
-      in
-        rt |> List.map for1
-    in
-
-    let tparams = EcUnify.UniEnv.tparams ue in
-
-    (* Generate induction scheme *)
-    let scheme =
-      let targs  = List.map (tvar |- fst) tparams in
-      let recty  = tconstr tpath targs in
-      let recx   = fresh_id_of_ty recty in
-      let recfm  = EcFol.f_local recx recty in
-      let predty = tfun recty tbool in
-      let predx  = EcIdent.create "P" in
-      let pred   = EcFol.f_local predx predty in
-      let ctor   = EcPath.pqoname
-                     (EcPath.prefix tpath)
-                     (Printf.sprintf "mk_%s" (unloc name)) in
-      let ctor   = EcFol.f_op ctor targs (toarrow (List.map snd fields) recty) in
-      let prem   =
-        let ids  = List.map (fun (_, fty) -> (fresh_id_of_ty fty, fty)) fields in
-        let vars = List.map (fun (x, xty) -> EcFol.f_local x xty) ids in
-        let bds  = List.map (fun (x, xty) -> (x, EcFol.GTty xty)) ids in
-        let recv = EcFol.f_app ctor vars recty in
-          EcFol.f_forall bds (EcFol.f_app pred [recv] tbool) in
-      let form   = EcFol.f_app pred [recfm] tbool in
-      let form   = EcFol.f_forall [recx, EcFol.GTty recty] form in
-      let form   = EcFol.f_imp prem form in
-      let form   = EcFol.f_forall [predx, EcFol.GTty predty] form in
-        form
-    in
+    let record  = EHI.trans_record (env scope) tydname rt in
+    let scheme  = ELI.indsc_of_record record in
 
     (* Add final record to environment *)
-    let tparams = EcUnify.UniEnv.tparams ue in
     let tydecl  = {
-      tyd_params = tparams;
-      tyd_type   = `Record (scheme, fields);
+      tyd_params = record.ELI.rc_tparams;
+      tyd_type   = `Record (scheme, record.ELI.rc_fields);
     } in
-      bind scope (unloc name, tydecl)
+
+    bind scope (unloc name, tydecl)
 end
 
 (* -------------------------------------------------------------------- *)

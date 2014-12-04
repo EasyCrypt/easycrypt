@@ -134,7 +134,8 @@ let pp_modappl_error fmt error =
   | MAE_AccesSubModFunctor ->
       msg "cannot access a sub-module of a partially applied functor"
 
-let pp_tyerror fmt env error =
+let pp_tyerror env fmt error =
+  let env   = EcPrinting.PPEnv.ofenv env in
   let msg x = Format.fprintf fmt x in
   let pp_type fmt ty = EcPrinting.pp_type env fmt ty in
 
@@ -346,7 +347,7 @@ let () =
   let pp fmt exn =
     match exn with
     | TyError (_, env, e) ->
-        pp_tyerror fmt (EcPrinting.PPEnv.ofenv env) e
+        pp_tyerror env fmt e
     | _ -> raise exn
   in
     EcPException.register pp
