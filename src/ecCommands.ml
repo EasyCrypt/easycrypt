@@ -244,13 +244,13 @@ let process_pr fmt scope p =
   
       Format.fprintf fmt "Prog. variables [# = %d]:@."
         (Mx.cardinal us.EcEnv.us_pv);
-      Mx.iter (fun xp _ ->
+      List.iter (fun (xp,_) ->
         let pv = EcTypes.pv_glob xp in
         let ty = EcEnv.Var.by_xpath xp env in
         Format.fprintf fmt "  @[%a : %a@]@."
           (EcPrinting.pp_pv ppe) pv
           (EcPrinting.pp_type ppe) ty.EcEnv.vb_type)
-        us.EcEnv.us_pv
+        (List.rev (Mx.bindings us.EcEnv.us_pv))
   end
 
   | Pr_goal n -> begin
