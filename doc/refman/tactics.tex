@@ -153,7 +153,7 @@ the reuse of proofs with similar patterns, but where the fine minutiae might dif
 
 \begin{tactic}[try t]{failure recovery}
   \begin{tsyntax}[empty]{try t}
-  Execute the tactic \ec{t} if it succeeds; do noting if it fails.
+  Execute the tactic \ec{t} if it succeeds; do nothing if it fails.
 
   \paragraph{Remark}
   By default, \EasyCrypt proofs are run in \ec{strict} mode. In this mode,
@@ -254,11 +254,11 @@ $m_1 \rel{R} m_2 \Leftrightarrow m_2 \rel{R^-1} m_1$).
 
 We denote with $\diamond^{\uparrow}$ the function defined by
 $$
-\cdot^{\uparrow} =
-\left\{\begin{array}{l @{\quad\mapsto\quad} r}
-=    & \Leftrightarrow \\
-\leq & \Leftarrow      \\
-\geq & \Rightarrow
+\diamond^{\uparrow} =
+\left\{\begin{array}{l l}
+=    & \textit{if }\ \diamond = \Leftrightarrow \\
+\leq & \textit{if }\ \diamond = \Leftarrow      \\
+\geq & \textit{if }\ \diamond = \Rightarrow
 \end{array}\right.
 $$
 
