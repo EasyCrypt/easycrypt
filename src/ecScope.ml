@@ -1527,136 +1527,31 @@ module Ty = struct
 
   (* ------------------------------------------------------------------ *)
   let add_datatype (scope : scope) (tydname : ptydname) dt =
-    let { pl_loc = loc; pl_desc = (tyvars, name); } = tydname in
+    let name = snd (unloc tydname) in
 
     check_name_available scope name;
 
-    (* Check type-parameters / env0 is the env. augmented with an
-     * abstract type representing the currently processed datatype. *)
-    let ue    = TT.transtyvars scope.sc_env (loc, Some tyvars) in
-    let tpath = EcPath.pqname (path scope) (unloc name) in
-    let env0  =
-      let myself = {
-        tyd_params = EcUnify.UniEnv.tparams ue;
-        tyd_type   = `Abstract Sp.empty;
-      } in
-        EcEnv.Ty.bind (unloc name) myself scope.sc_env
-    in
+    let datatype = EHI.trans_datatype (env scope) tydname dt in
+    let ctors    = datatype.ELI.dt_ctors in
 
-    (* Check for duplicated constructor names *)
-    Msym.odup unloc (List.map fst dt)
-      |> oiter (fun (x, y) -> hierror ~loc:y.pl_loc
-                  "duplicated constructor name: `%s'" x.pl_desc);
-
-    (* Type-check constructor types *)
-    let ctors =
-      let for1 (cname, cty) =
-        let ue  = EcUnify.UniEnv.copy ue in
-        let cty = cty |> List.map (TT.transty TT.tp_tydecl env0 ue) in
-          (unloc cname, cty)
-      in
-        dt |> List.map for1
-    in
-
-    let tparams = EcUnify.UniEnv.tparams ue in
-
-    (* Check for the positivity condition / emptyness *)
-    let (schelim, schcase) =
-      let module E = struct exception Fail end in
-
-      let rec scheme1 p (pred, fac) ty =
-        let ty = EcEnv.Ty.hnorm ty env0 in
-          match ty.ty_node with
-          | Tglob   _ -> assert false
-          | Tunivar _ -> assert false
-          | Tvar    _ -> None
-
-          | Ttuple tys -> begin
-              let xs  = List.map (fun xty -> (fresh_id_of_ty xty, xty)) tys in
-              let sc1 = fun (x, xty) -> scheme1 p (pred, EcFol.f_local x xty) xty in
-                match List.pmap sc1 xs with
-                | []  -> None
-                | scs -> Some (EcFol.f_let (LTuple xs) fac (EcFol.f_ands scs))
-          end
-
-          | Tconstr (p', ts)  ->
-              if List.exists (occurs p) ts then raise E.Fail;
-              if not (EcPath.p_equal p p') then None else
-                Some (EcFol.f_app pred [fac] tbool)
-
-          | Tfun (ty1, ty2) ->
-              if occurs p ty1 then raise E.Fail;
-              let x = fresh_id_of_ty ty1 in
-                scheme1 p (pred, EcFol.f_app fac [EcFol.f_local x ty1] ty2) ty2
-                  |> omap (EcFol.f_forall [x, EcFol.GTty ty1])
-
-      and schemec mode (targs, p) pred (ctor, tys) =
-        let indty = tconstr p (List.map tvar targs) in
-        let ctor  = EcPath.pqname (path scope) ctor in
-        let ctor  = EcFol.f_op ctor (List.map tvar targs) indty in
-        let xs    = List.map (fun xty -> (fresh_id_of_ty xty, xty)) tys in
-        let cargs = List.map (fun (x, xty) -> EcFol.f_local x xty) xs in
-        let form  = EcFol.f_app pred [EcFol.f_app ctor cargs indty] tbool in
-        let form  =
-          match mode with
-          | `Case -> form
-
-          | `Elim ->
-              let sc1 = fun (x, xty) -> scheme1 p (pred, EcFol.f_local x xty) xty in
-              let scs = List.pmap sc1 xs in
-                (EcFol.f_imps scs form)
-        in
-
-        let form  =
-          let bds = List.map (fun (x, xty) -> (x, EcFol.GTty xty)) xs in
-            EcFol.f_forall bds form
-
-        in
-          form
-
-      and scheme mode (targs, p) ctors =
-        let indty  = tconstr p (List.map tvar targs) in
-        let indx   = fresh_id_of_ty indty in
-        let indfm  = EcFol.f_local indx indty in
-        let predty = tfun indty tbool in
-        let predx  = EcIdent.create "P" in
-        let pred   = EcFol.f_local predx predty in
-        let scs    = List.map (schemec mode (targs, p) pred) ctors in
-        let form   = EcFol.f_app pred [indfm] tbool in
-        let form   = EcFol.f_forall [indx, EcFol.GTty indty] form in
-        let form   = EcFol.f_imps scs form in
-        let form   = EcFol.f_forall [predx, EcFol.GTty predty] form in
-          form
-
-      and occurs p t =
-        let t = EcEnv.Ty.hnorm t env0 in
-          match t.ty_node with
-          | Tconstr (p', _) when EcPath.p_equal p p' -> true
-          | _ -> EcTypes.ty_sub_exists (occurs p) t
-
-      in
-        let (schelim, schcase) =
-          try
-            let schelim = scheme `Elim (List.map fst tparams, tpath) ctors in
-            let schcase = scheme `Case (List.map fst tparams, tpath) ctors in
-              (schelim, schcase)
-
-          with E.Fail ->
-            hierror ~loc "the datatype does not respect the positivity condition"
-        in
-          if List.for_all (fun (_, cty) -> List.exists (occurs tpath) cty) ctors then
-            hierror ~loc "this datatype is empty";
-          (schelim, schcase)
+    (* Generate schemes *)
+    let (indsc, casesc) =
+      try
+        let indsc    = ELI.indsc_of_datatype `Elim datatype in
+        let casesc   = ELI.indsc_of_datatype `Case datatype in
+        (indsc, casesc)
+      with ELI.NonPositive ->
+        EHI.dterror tydname.pl_loc (env scope) EHI.DTE_NonPositive
     in
 
     (* Add final datatype to environment *)
     let tydecl = {
-      tyd_params = tparams;
-      tyd_type   = `Datatype { tydt_ctors   = ctors;
-                               tydt_schcase = schcase;
-                               tydt_schelim = schelim; };
-    } in
-      bind scope (unloc name, tydecl)
+      tyd_params = datatype.ELI.dt_tparams;
+      tyd_type   = `Datatype { tydt_ctors   = ctors ;
+                               tydt_schcase = casesc;
+                               tydt_schelim = indsc ; }; }
+
+    in bind scope (unloc name, tydecl)
 
   (* ------------------------------------------------------------------ *)
   let add_record (scope : scope) (tydname : ptydname) rt =
@@ -1670,10 +1565,9 @@ module Ty = struct
     (* Add final record to environment *)
     let tydecl  = {
       tyd_params = record.ELI.rc_tparams;
-      tyd_type   = `Record (scheme, record.ELI.rc_fields);
-    } in
+      tyd_type   = `Record (scheme, record.ELI.rc_fields); }
 
-    bind scope (unloc name, tydecl)
+    in bind scope (unloc name, tydecl)
 end
 
 (* -------------------------------------------------------------------- *)

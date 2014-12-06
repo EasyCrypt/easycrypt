@@ -34,6 +34,7 @@ let rec toperror_of_exn ?gloc exn =
   match exn with
   | TyError    (loc, _, _) -> Some (loc, exn)
   | RcError    (loc, _, _) -> Some (loc, exn)
+  | DtError    (loc, _, _) -> Some (loc, exn)
   | ParseError (loc, _)    -> Some (loc, exn)
 
   | EcCoreGoal.TcError (_, _, _) ->
