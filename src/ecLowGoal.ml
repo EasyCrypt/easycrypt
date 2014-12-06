@@ -920,12 +920,17 @@ let t_elimT_ind ?reduce mode (tc : tcenv1) =
                          pt_args = []; } in
               (tc, pt)
 
+          | _ when EcReduction.EqTest.for_type env tbool ty ->
+              let pt = { pt_head = PTGlobal (LG.p_bool_elim, []);
+                         pt_args = []; } in
+              (tc, pt)
+
           | _ -> raise InvalidGoalShape
     in
       t_elimT_form pt (f_local id ty) tc
   in
 
-  let rec doit fp tc =
+  let doit fp tc =
     match sform_of_form fp with
     | SFquant (Lforall, (x, GTty ty), _) -> begin
         let hyps = FApi.tc1_hyps tc in

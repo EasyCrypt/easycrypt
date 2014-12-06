@@ -129,6 +129,7 @@ module CI_Logic : sig
   val p_cut_lemma     : path
   val p_unit_elim     : path
   val p_false_elim    : path
+  val p_bool_elim     : path
   val p_and_elim      : path
   val p_anda_elim     : path
   val p_and_proj_l    : path

@@ -118,6 +118,7 @@ module CI_Logic = struct
   let p_cut_lemma     = _Logic "cut_lemma"
   let p_unit_elim     = _Logic "unit_ind"
   let p_false_elim    = _Logic "falseE"
+  let p_bool_elim     = _Logic "bool_ind"
   let p_and_elim      = _Logic "andE"
   let p_anda_elim     = _Logic "andaE"
   let p_and_proj_l    = _Logic "andEl"

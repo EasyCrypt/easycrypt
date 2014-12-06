@@ -58,6 +58,11 @@ lemma nosmt unit_ind (P : unit -> bool):
   P tt => forall x, P x
 by [].
 
+(** bool *)
+lemma nosmt bool_ind (P : bool -> bool):
+  P true => P false => forall b, P b
+by [].
+
 (** and *)
 lemma nosmt andE : forall (a b c:bool), 
     (a => b => c) => (a /\ b) => c
