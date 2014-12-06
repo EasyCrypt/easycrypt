@@ -562,6 +562,13 @@ let process_mintros ?(cf = true) pis gs =
 
               let tc = t_or (t_elimT_ind `Case) t_elim in
               let tc = match mode with `One -> tc | `Full -> t_do `Maybe None tc in
+              let tc =
+                fun g ->
+                  try  tc g
+                  with InvalidGoalShape ->
+                    tc_error !!g "invalid intro-pattern: nothing to eliminate"
+              in     
+
               let gs =
                 match nointro && not cf with
                 | true when mode = `One -> onsub gs
