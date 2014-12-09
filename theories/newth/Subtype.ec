@@ -9,7 +9,7 @@ require import Fun.
 require import Option.
 
 (* -------------------------------------------------------------------- *)
-(* This module define the subtype [sT] of [T] defined as {x : T | P x}  *)
+(* This theory defines the subtype [sT] of [T] defined as {x : T | P x} *)
 (* where P is a predicate over T. This subtype is defined via an        *)
 (* axiomatization of an inversible partial projection from [T] to [sT]  *)
 (* that respects [P].                                                   *)
