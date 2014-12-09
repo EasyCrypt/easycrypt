@@ -158,6 +158,31 @@ let operator_as_fix (op : operator) =
   | _ -> assert false
 
 (* -------------------------------------------------------------------- *)
+let axiomatized_op ?(nosmt = false) path (tparams, bd) =
+  let axbd = EcCoreFol.form_of_expr EcCoreFol.mhr bd in
+  let axbd, axpm =
+    let bdpm = List.map fst tparams in
+    let axpm = List.map EcIdent.fresh bdpm in
+      (EcCoreFol.Fsubst.subst_tvar
+         (EcTypes.Tvar.init bdpm (List.map EcTypes.tvar axpm))
+         axbd,
+       List.combine axpm (List.map snd tparams))
+  in
+
+  let axspec =
+    EcCoreFol.f_eq
+      (EcCoreFol.f_op path
+         (List.map (EcTypes.tvar |- fst) axpm)
+         axbd.EcCoreFol.f_ty)
+      axbd
+  in
+
+  { ax_tparams = axpm;
+    ax_spec    = Some axspec;
+    ax_kind    = `Axiom;
+    ax_nosmt   = nosmt; }
+
+(* -------------------------------------------------------------------- *)
 type typeclass = {
   tc_prt : EcPath.path option;
   tc_ops : (EcIdent.t * EcTypes.ty) list;

@@ -100,6 +100,9 @@ type axiom = {
 }
 
 (* -------------------------------------------------------------------- *)
+val axiomatized_op : ?nosmt:bool -> EcPath.path -> (ty_params * expr) -> axiom
+
+(* -------------------------------------------------------------------- *)
 type typeclass = {
   tc_prt : EcPath.path option;
   tc_ops : (EcIdent.t * EcTypes.ty) list;
