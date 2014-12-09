@@ -1,4 +1,4 @@
-; Generated on Tue Nov 25 11:15:00 2014
+; Generated on Tue Dec  9 20:39:18 2014
 
 (defvar easycrypt-bytac-keywords '(
   "exact"
@@ -19,6 +19,7 @@
   "axiomatized"
   "lemma"
   "realize"
+  "choice"
   "proof"
   "qed"
   "goal"
