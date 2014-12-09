@@ -7,6 +7,7 @@
 open EcParsetree
 open EcLocation
 open EcSymbols
+open EcIdent
 open EcUtils
 open EcTypes
 open EcDecl
@@ -27,13 +28,28 @@ type dterror =
 | DTE_NonPositive
 | DTE_Empty
 
+type fxerror =
+| FXE_TypeError of EcTyping.tyerror
+| FXE_EmptyMatch
+| FXE_MatchParamsMixed
+| FXE_MatchParamsDup
+| FXE_MatchParamsUnk
+| FXE_MatchNonLinear
+| FXE_MatchDupBranches
+| FXE_MatchPartial
+| FXE_CtorUnk
+| FXE_CtorAmbiguous
+| FXE_CtorInvalidArity of (int * int)
+
 (* -------------------------------------------------------------------- *)
 exception RcError of EcLocation.t * EcEnv.env * rcerror
 exception DtError of EcLocation.t * EcEnv.env * dterror
+exception FxError of EcLocation.t * EcEnv.env * fxerror
 
 (* -------------------------------------------------------------------- *)
 let rcerror loc env e = raise (RcError (loc, env, e))
 let dterror loc env e = raise (DtError (loc, env, e))
+let fxerror loc env e = raise (FxError (loc, env, e))
 
 (* -------------------------------------------------------------------- *)
 let pp_rcerror env fmt error =
@@ -71,11 +87,50 @@ let pp_dterror env fmt error =
       msg "the datatype is empty"
 
 (* -------------------------------------------------------------------- *)
+let pp_fxerror env fmt error =
+  let msg x = Format.fprintf fmt x in
+
+  match error with
+  | FXE_TypeError ee ->
+      TT.pp_tyerror env fmt ee
+
+  | FXE_EmptyMatch ->
+      msg "this pattern matching has no branches"
+
+  | FXE_MatchParamsMixed ->
+      msg "this pattern matching matches on different parameters"
+
+  | FXE_MatchParamsDup ->
+      msg "this pattern matching matches a parameter twice"
+
+  | FXE_MatchParamsUnk ->
+      msg "this pattern matching matches an unbound parameter"
+
+  | FXE_MatchNonLinear ->
+      msg "this pattern is non-linear"
+
+  | FXE_MatchDupBranches ->
+      msg "this pattern matching contains duplicated branches"
+
+  | FXE_MatchPartial ->
+      msg "this pattern matching is non-exhaustive"
+
+  | FXE_CtorUnk ->
+      msg "unknown constructor name"
+
+  | FXE_CtorAmbiguous ->
+      msg "ambiguous constructor name"
+
+  | FXE_CtorInvalidArity _ ->
+      ()
+
+(* -------------------------------------------------------------------- *)
 let () =
   let pp fmt exn =
     match exn with
     | RcError (_, env, e) -> pp_rcerror env fmt e
     | DtError (_, env, e) -> pp_dterror env fmt e
+    | FxError (_, env, e) -> pp_fxerror env fmt e
     | _ -> raise exn
 
   in EcPException.register pp
@@ -153,3 +208,250 @@ let trans_datatype (env : EcEnv.env) (name : ptydname) (dt : pdatatype) =
   let tparams = EcUnify.UniEnv.tparams ue in
 
   { EI.dt_path = tpath; EI.dt_tparams = tparams; EI.dt_ctors = ctors; }
+
+(* -------------------------------------------------------------------- *)
+module CaseMap : sig
+  type t
+
+  type locals = (EcIdent.t * ty) list
+
+  val create  : EcPath.path list list -> t
+  val add     : (int * locals) list -> expr -> t -> bool
+  val resolve : t -> opbranches option
+end = struct
+  type locals = (EcIdent.t * ty) list
+
+  type t = [
+    | `Case of (EcPath.path * t) array
+    | `Leaf of (locals list * expr) option ref
+  ]
+
+  let rec create (inds : EcPath.path list list) =
+    match inds with
+    | [] -> `Leaf (ref None)
+    | ind :: inds ->
+        let ind = Array.of_list ind in
+          `Case (Array.map (fun x -> (x, create inds)) ind)
+
+  let add bs e (m : t) =
+    let r =
+      List.fold_left
+        (fun m (i, _) ->
+           match m with
+           | `Leaf _ -> assert false
+           | `Case t ->
+               assert (i >= 0 && i < Array.length t);
+               snd t.(i))
+        m bs
+    in
+      match r with
+      | `Case _ -> assert false
+      | `Leaf r -> begin
+          match !r with
+          | None   -> r := Some (List.map snd bs, e); true
+          | Some _ -> false
+      end
+
+  let resolve =
+    let module E = struct exception NotFull end in
+
+    let rec resolve_r m =
+      match m with
+      | `Case t ->
+          let for1 i =
+            let (cp, bs) = snd_map resolve_r t.(i) in
+              { opb_ctor = (cp, i); opb_sub = bs; }
+          in
+            OPB_Branch (Parray.init (Array.length t) for1)
+
+      | `Leaf r -> begin
+          match !r with
+          | None -> raise E.NotFull
+          | Some (x1, x2) -> OPB_Leaf (x1, x2)
+      end
+  in
+    fun m ->
+      try  Some (resolve_r m)
+      with E.NotFull -> None
+end
+
+(* -------------------------------------------------------------------- *)
+type matchfix_t =  {
+  mf_name     : ident;
+  mf_codom    : EcTypes.ty;
+  mf_args     : (ident * EcTypes.ty) list;
+  mf_recs     : int list;
+  mf_branches : EcDecl.opbranches;
+}
+
+(* -------------------------------------------------------------------- *)
+let trans_matchfix ?(close = true) env ue { pl_loc = loc; pl_desc = name } (bd, pty, pbs) =
+  let codom     = TT.transty TT.tp_relax env ue pty in
+  let env, args = TT.transbinding env ue bd in
+  let ty        = EcTypes.toarrow (List.map snd args) codom in
+  let opname    = EcIdent.create name in
+  let env       = EcEnv.Var.bind_local opname ty env in
+
+  let mpty, pbsmap =
+    let pbsmap =
+      List.map (fun x ->
+        let nms = (fun pop -> (unloc pop.pop_name, pop)) in
+        let nms = List.map nms x.pop_patterns in
+          (x.pop_body, Msym.of_list nms))
+        pbs
+    in
+      match List.map snd pbsmap with
+      | [] ->
+          fxerror loc env FXE_EmptyMatch
+
+      | nm :: nms ->
+          if not (List.for_all (Msym.set_equal nm) nms) then
+            fxerror loc env FXE_MatchParamsMixed;
+          let argsmap =
+            List.fold_lefti
+              (fun i m (x, xty) -> Msym.add (EcIdent.name x) (i, x, xty) m)
+              Msym.empty args
+          in
+
+          let _, mpty =
+            Msym.fold_left
+              (fun (seen, mpty) px _ ->
+                 if Msym.mem px seen then
+                   fxerror loc env FXE_MatchParamsDup;
+
+                 match Msym.find_opt px argsmap with
+                 | None -> fxerror loc env FXE_MatchParamsUnk
+                 | Some (i, x, xty) -> (Ssym.add px seen, (i, x, xty) :: mpty))
+              (Ssym.empty, []) nm
+          in
+            (mpty, pbsmap)
+  in
+
+  let branches =
+    let pbs =
+      let trans_b ((body, pbmap) : _ * pop_pattern Msym.t) =
+        let trans1 ((_, x, xty) : _ * EcIdent.t * ty) =
+          let pb     = oget (Msym.find_opt (EcIdent.name x) pbmap) in
+          let filter = fun op -> EcDecl.is_ctor op in
+          let cname  = fst pb.pop_pattern in
+          let tvi    = pb.pop_tvi |> omap (TT.transtvi env ue) in
+          let cts    = EcUnify.select_op ~filter tvi env (unloc cname) ue [] in
+
+          match cts with
+          | [] ->
+              fxerror cname.pl_loc env FXE_CtorUnk
+
+          | _ :: _ :: _ ->
+              fxerror cname.pl_loc env FXE_CtorAmbiguous
+
+          | [(cp, tvi), opty, subue] ->
+              let ctor = oget (EcEnv.Op.by_path_opt cp env) in
+              let (indp, ctoridx) = EcDecl.operator_as_ctor ctor in
+              let indty = oget (EcEnv.Ty.by_path_opt indp env) in
+              let ind = (EcDecl.tydecl_as_datatype indty).tydt_ctors in
+              let ctorsym, ctorty = List.nth ind ctoridx in
+
+              let args_exp = List.length ctorty in
+              let args_got = List.length (snd pb.pop_pattern) in
+
+              if args_exp <> args_got then
+                fxerror cname.pl_loc env (FXE_CtorInvalidArity (args_exp, args_got));
+
+              if not (List.uniq (List.map unloc (snd pb.pop_pattern))) then
+                fxerror cname.pl_loc env (FXE_MatchNonLinear);
+
+              EcUnify.UniEnv.restore ~src:subue ~dst:ue;
+
+              let ctorty =
+                let tvi = Some (EcUnify.TVIunamed tvi) in
+                  fst (EcUnify.UniEnv.opentys ue indty.tyd_params tvi ctorty) in
+              let pty = EcUnify.UniEnv.fresh ue in
+
+              (try  EcUnify.unify env ue (toarrow ctorty pty) opty
+               with EcUnify.UnificationFailure _ -> assert false);
+              TT.unify_or_fail env ue pb.pop_name.pl_loc pty xty;
+
+              let pvars = List.map (EcIdent.create |- unloc) (snd pb.pop_pattern) in
+              let pvars = List.combine pvars ctorty in
+
+                (pb, (indp, ind, (ctorsym, ctoridx)), pvars)
+        in
+
+        let ptns = List.map trans1 mpty in
+        let env  =
+          List.fold_left (fun env (_, _, pvars) ->
+            EcEnv.Var.bind_locals pvars env)
+            env ptns
+        in
+            (ptns, TT.transexpcast env `InOp ue codom body)
+      in
+        List.map trans_b pbsmap
+    in
+
+    let inds = (fun (_, (indp, ind, _), _) -> (indp, ind)) in
+    let inds = List.map inds (fst (oget (List.ohead pbs))) in
+    let inds =
+      List.map (fun (indp, ctors) ->
+        List.map
+          (fun (ctor, _) -> EcPath.pqoname (EcPath.prefix indp) ctor)
+          ctors)
+        inds
+    in
+
+    let casemap = CaseMap.create inds in
+
+    List.iter
+      (fun (ptns, be) ->
+         let ptns = List.map (fun (_, (_, _, (_, ctor)), pvars) ->
+           (ctor, pvars)) ptns
+         in
+           if not (CaseMap.add ptns be casemap) then
+             fxerror loc env FXE_MatchDupBranches)
+      pbs;
+
+    match CaseMap.resolve casemap with
+    | None   -> fxerror loc env FXE_MatchPartial
+    | Some x -> x
+
+  in
+
+  let aout =
+    if close then
+      let uni      = Tuni.offun (EcUnify.UniEnv.assubst ue) in
+      let tparams  = EcUnify.UniEnv.tparams ue in
+      let codom    = uni codom in
+      let opexpr   = EcPath.pqname (EcEnv.root env) name in
+      let opexpr   = e_op opexpr (List.map (tvar |- fst) tparams) codom in
+      let args     = List.map (snd_map uni) args in
+      let ebsubst  =
+        let lcmap = Mid.add opname opexpr e_subst_id.es_loc in
+        { e_subst_id with es_freshen = false; es_ty = uni; es_loc = lcmap; }
+      in
+    
+      let branches =
+        let rec uni_branches = function
+          | OPB_Leaf (locals, e) ->
+              OPB_Leaf (List.map (List.map (snd_map uni)) locals, e_subst ebsubst e)
+    
+          | OPB_Branch bs ->
+            let for1 b =
+              { opb_ctor = b.opb_ctor;
+                opb_sub  = uni_branches b.opb_sub; }
+            in
+              OPB_Branch (Parray.map for1 bs)
+        in
+          uni_branches branches
+  
+      in { mf_name     = opname;
+           mf_codom    = codom;
+           mf_args     = args;
+           mf_recs     = List.map proj3_1 mpty;
+           mf_branches = branches; }
+
+    else { mf_name     = opname;
+           mf_codom    = codom;
+           mf_args     = args;
+           mf_recs     = List.map proj3_1 mpty;
+           mf_branches = branches; }
+
+  in (ty, aout)
