@@ -1,6 +1,32 @@
 % --------------------------------------------------------------------
 \begin{tactic}{exists*}
-  \begin{tsyntax}[empty]{exists*}
+  \begin{tsyntax}[empty]{elim*}
+  Introduce an existential quantification over the value of a program
+  variable in the initial memory. This is particularly useful when
+  dealing with a procedure call using a lemma that refers to initial
+  values of arguments or state (using \rtactic{call}). Several program
+  variables can be treated simultaneously by providing them in a
+  comma-separated list.
+
+  \paragraph{Examples:}\strut
+
+  \begin{cmathpar}
+  \texample[\prhl{}]{\ec{exists* M.x\{1\}}}%%
+    {\pRHL{\exists x, x = \inmem{M.x}{1} \wedge P}{c_1}{c_2}{Q}}%%
+    {\pRHL{P}{c_1}{c_2}{Q}}
+
+  \texample[\prhl{}]{\ec{exists* M.x\{1\}, M.x\{2\}}}%%
+    {\pRHL{\exists x_1\ x_2, x1 = \inmem{M.x}{1} \wedge \inmem{M.x}{2} \wedge P}{c_1}{c_2}{Q}}%%
+    {\pRHL{P}{c_1}{c_2}{Q}}
+
+  \texample[\phl{}]{\ec{exists* M.x}}%%
+    {\pHL{\exists x, x = M.x \wedge P}{c}{Q}{\diamond}{\delta}}%%
+    {\pHL{P}{c}{Q}{\diamond}{\delta}}
+
+  \texample[\hl{}]{\ec{exists* M.x}}%%
+    {\HL{\exists x, x = M.x \wedge P}{c}{Q}}%%
+    {\HL{P}{c}{Q}}
+  \end{cmathpar}
 
   \end{tsyntax}
 \end{tactic}
