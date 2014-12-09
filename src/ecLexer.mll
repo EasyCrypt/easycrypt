@@ -134,6 +134,7 @@
     "axiomatized" , AXIOMATIZED;        (* KW: global *)
     "lemma"       , LEMMA      ;        (* KW: global *)
     "realize"     , REALIZE    ;        (* KW: global *)
+    "choice"      , CHOICE     ;        (* KW: global *)
     "proof"       , PROOF      ;        (* KW: global *)
     "qed"         , QED        ;        (* KW: global *)
     "goal"        , GOAL       ;        (* KW: global *)

@@ -56,6 +56,15 @@ val tc1_process_prhl_formula : tcenv1 -> pformula -> form
 val tc1_process_prhl_stmt : tcenv1 -> side -> pstmt -> stmt
 
 (* -------------------------------------------------------------------- *)
+exception NoMatch
+
+val lazy_destruct :
+     ?reduce:bool
+  -> EcEnv.LDecl.hyps
+  -> (form -> 'a)
+  -> (form -> 'a option)
+
+(* -------------------------------------------------------------------- *)
 type dproduct = [
   | `Imp    of form * form
   | `Forall of EcIdent.t * gty * form

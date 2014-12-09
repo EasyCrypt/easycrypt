@@ -64,6 +64,7 @@ end
 (* -------------------------------------------------------------------- *)
 module Op : sig
   val add : scope -> poperator located -> scope
+  val add_choiceop : scope -> pchoice located -> scope
 end
 
 (* -------------------------------------------------------------------- *)

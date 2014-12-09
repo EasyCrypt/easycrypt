@@ -178,6 +178,7 @@
 %token CEQ
 %token CFOLD
 %token CHANGE
+%token CHOICE
 %token CLASS
 %token CLEAR
 %token CLONE
@@ -1418,6 +1419,10 @@ predicate:
        pp_tyvars = tyvars;
        pp_def    = PPconcr(p,f); } }
 
+choice:
+| CHOICE x=lident WITH lx=qident
+   { { pc_name = x; pc_lemma = lx; } }
+
 (* -------------------------------------------------------------------- *)
 top_decl:
 | x=top_mod_decl { PDCL_Module x }
@@ -2590,13 +2595,15 @@ global_:
 | tycinstance      { Gtycinstance $1 }
 | operator         { Goperator    $1 }
 | predicate        { Gpredicate   $1 }
+| choice           { Gchoice      $1 }
 | axiom            { Gaxiom       $1 }
 | tactics_or_prf   { Gtactics     $1 }
 | realize          { Grealize     $1 }
 | gprover_info     { Gprover_info $1 }
+| addrw            { Gaddrw       $1 }
 
-| x=loc(QED)       { Gsave x.pl_loc }
-| PRINT p=print    { Gprint     p   }
+| x=loc(QED)        { Gsave x.pl_loc }
+| PRINT p=print     { Gprint     p   }
 | SEARCH qs=qoident { Gsearch    qs  }
 
 | PRAGMA x=lident  { Gpragma    x   }
@@ -2605,7 +2612,6 @@ global_:
 | PRAGMA MINUS x=lident { Goption (x, false) }
 
 | EXTRACTION i=extract_info { Gextract i }
-| addrw            { Gaddrw $1 }
 
 extract_info:
 | s=STRING? qs=plist1(toextract,COMMA) w=withextract { (s,qs,w) }
