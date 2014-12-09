@@ -1,0 +1,57 @@
+(* --------------------------------------------------------------------
+ * Copyright IMDEA Software Institute / INRIA - 2013, 2014
+ * -------------------------------------------------------------------- *)
+
+pragma +implicits.
+
+(* -------------------------------------------------------------------- *)
+require import Fun.
+
+(* -------------------------------------------------------------------- *)
+(* This theory defines the effective quotient [qT] obtained from [T]    *)
+(* via a representative/canonical surjecton pair of functions.          *)
+(* -------------------------------------------------------------------- *)
+theory Core.
+
+type T, qT.
+
+op repr : qT -> T.              (* representative selection *)
+op pi   : T  -> qT.             (* canonical surjection *)
+
+axiom reprK: cancel repr pi.
+
+op (==) (x y : T) = (pi x = pi y).
+
+(* -------------------------------------------------------------------- *)
+lemma piP (x : T): x == repr (pi x).
+proof. by rewrite /(==) reprK. qed.
+
+lemma quotW P: (forall y, P (pi y)) => forall x, P x.
+proof. by move=> Py x; rewrite -(reprK x); apply/Py. qed.
+
+lemma quotP P: (forall y, repr (pi y) = y => P (pi y)) => forall x, P x.
+proof. by move=> Py x; rewrite -(reprK x); apply/Py; rewrite reprK. qed.
+
+end Core.
+
+(* -------------------------------------------------------------------- *)
+(* This theory defines the effective quotient by an equivalence         *)
+(* relation. It is build on the former theory, using for [qT] the       *)
+(* elements of [T] that are stable by repr \o pi.                       *)
+(* -------------------------------------------------------------------- *)
+theory Equiv.
+
+type T.
+
+op eqv : T -> T -> bool.
+
+axiom eqv_refl : forall x, eqv x x.
+axiom eqv_sym  : forall x y, eqv x y => eqv y x.
+axiom eqv_trans: forall y x z, eqv x y => eqv y z => eqv x z.
+
+lemma eqv_choose (x : T): exists y, eqv x y.
+proof. by exists x; rewrite eqv_refl. qed.
+
+choice canon with eqv_choose.
+
+end Equiv.
