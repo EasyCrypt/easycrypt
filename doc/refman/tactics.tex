@@ -155,7 +155,7 @@ the reuse of proofs with similar patterns, but where the fine minutiae might dif
   \begin{tsyntax}[empty]{try t}
   Execute the tactic \ec{t} if it succeeds; do nothing if it fails.
 
-  \paragraph{Remark}
+  \paragraph{Remark.}
   By default, \EasyCrypt proofs are run in \ec{strict} mode. In this mode,
   \ec{smt} failures cannot be caught using \ec{try}. This allows \EasyCrypt
   to always build the proof tree correctly, even in weak check mode, where
@@ -163,7 +163,7 @@ the reuse of proofs with similar patterns, but where the fine minutiae might dif
   can be turned on and off at will, allowing for the fast replay of proof
   sections during development. In any event, we recommend \emph{never} using
   \ec{try smt}: a little thought is much more cost-effective than a bunch of
-  \ec{smt}.
+  \ec{smt} calls.
   \end{tsyntax}
 \end{tactic}
 
@@ -213,6 +213,7 @@ the reuse of proofs with similar patterns, but where the fine minutiae might dif
 
 \subsection{Program Logics}
 
+\paragraph{Preliminaries and Notations.}
 Judgments in the program logics may refer to procedures or
 statements. Whenever the context allows both, we use $c$ (or \ec{c})
 to denote programs, using $f$ (or \ec{f}) when only judgments on
@@ -250,7 +251,7 @@ value.
 In the following, given a relation $R$, we denote with $\invrel{R}$
 its inverse relation (that is,
 %%
-$m_1 \rel{R} m_2 \Leftrightarrow m_2 \rel{R^-1} m_1$).
+$m_1 \rel{R} m_2 \Leftrightarrow m_2 \rel{\invrel{R}} m_1$).
 
 We denote with $\diamond^{\uparrow}$ the function defined by
 $$
@@ -270,8 +271,22 @@ $m_1 \rel{\inmem{P}{1}} m_2 \Leftrightarrow P~m_1$
 We lift logical connectors to predicates and relations over memories
 in the natural way.
 
-TODO: define \ec{<spec>}, \ec{<lemma>}, \ec{<prhl>}, \ec{<phl>},
-\ec{<hl>}.
+When describing tactics, \ec{<prhl>} denotes a \prhl specification (of
+the form \ec{(_: P ==> Q)} with \ec{P} and \ec{Q} relations on
+memories), \ec{<phl>} denotes a \phl specification (of the form
+\ec{(_: P ==> Q: $\diamond\ \delta$)}, with \ec{P} and \ec{Q}
+predicates on memories, $\diamond$ a comparison operator and $\delta$
+a real-valued expression), and \ec{<hl>} denotes a \hl specification
+(of the form \ec{(_: P ==> Q)}, with \ec{P} and \ec{Q} predicates on
+memories).
+
+\paragraph{Structure of this Section.}
+There are three rough classes of program logic tactics: those that
+operate at the level of specifications, strenghtening, combining or
+splitting goals without modifying the program; those that actually
+reason about the program in Hoare logic style; and those that
+correspond to semantics-preserving program transformations or compiler
+optimizations. We discuss these three classes separately.
 
 \paragraph{Reasoning on Specifications}
 \input{tactics/symmetry.tex}

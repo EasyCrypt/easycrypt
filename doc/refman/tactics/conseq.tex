@@ -1,10 +1,10 @@
 % --------------------------------------------------------------------
 \begin{tactic}{conseq}
-  \begin{tsyntax}{conseq <spec>}
-  Rule of consequence. Proves a specification by weakening of a
-  stronger result. Any one of the specification places can be filled
-  with a wildcard \ec{_} to keep the value it contains in the current
-  goal and trivially discharge the corresponding subgoal.
+  \begin{tsyntax}{conseq (_: P ==> Q) | conseq (_: P ==> Q: $\delta$)}
+  Prove a program logic judgment by weakening a stronger result
+  (\emph{rule of consequence}). Any one of the specification places
+  can be filled with a wildcard (\ec{_}) to keep its current value and
+  trivially discharge the corresponding subgoal.
 
   \paragraph{Examples:}\strut
   
@@ -44,16 +44,16 @@
   \end{cmathpar}  
   \end{tsyntax}
 
-  \begin{tsyntax}{conseq <lemma>}
-  Only applies to judgments on procedures. Same as \ec{conseq
-  <spec>}, but the specification to use is inferred from
-  the lemma provided. Raises an error if the lemma does not refer to
-  the expected procedure(s). All variants of \ec{conseq} may take
+  \begin{tsyntax}{conseq H}
+  Only applies to judgments on procedures. Same as \ec{conseq} with a
+  specification, but the specification to use is inferred from the
+  lemma \ec{H} provided. Raises an error if the lemma does not refer
+  to the expected procedure(s). All variants of \ec{conseq} may take
   lemmas in place of explicit specifications with the same effect, in
   which case they must be applied to judgments on procedures.
   \end{tsyntax}
 
-  \begin{tsyntax}{conseq* <spec>}
+  \begin{tsyntax}{conseq*}
   Same as \ec{conseq}, but the subgoal corresponding to the
   postcondition is refined by a ``may modify'' analysis. All variants
   of \ec{conseq} can be refined using the \ec{*}, with the same
@@ -104,6 +104,4 @@
     {\pRHL{P}{\Skip}{c}{Q}}
   \end{cmathpar}
   \end{tsyntax}
-
-  \fix{Missing descriptions of any variants of conseq}?
 \end{tactic}

@@ -5,4 +5,10 @@
   and one for $\phi \Rightarrow G$ where $G$ is the current goal. Moreover,
   the intro-pattern \ec{$\iota$} is applied to the second subgoal.
   \end{tsyntax}
+
+  \begin{tsyntax}{cut $\;\iota$: $\;\phi$ by t}
+  Attempts to use \ec{t} to close the first subgoal (corresponding to
+  the cut formula $\phi$), and fails if impossible.
+  \fixme{Syntax should be Variant}
+  \end{tsyntax}
 \end{tactic}
