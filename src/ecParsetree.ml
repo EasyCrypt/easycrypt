@@ -514,7 +514,8 @@ type phltactic =
   | Pauto
 
 type trepeat = [`All | `Maybe] * int option
-type tfocus  = (int option * int option) * [`Include | `Exclude]
+type tfocus1 = (int option) pair
+type tfocus  = (tfocus1 list option) pair
 
 type rwarg = (tfocus located) option * rwarg1
 
@@ -626,11 +627,13 @@ and ptactic = {
 and ptactics = ptactic list
 
 and ptactic_chain =
-  | Psubtacs of ptactics
-  | Pfirst   of ptactic * int
-  | Plast    of ptactic * int
-  | Pexpect  of ptactic * int
-  | Protate  of [`Left | `Right] * int
+  | Psubtacs  of ptactics
+  | Pfsubtacs of (tfocus * ptactic) list * ptactic option
+  | Pfirst    of ptactic * int
+  | Plast     of ptactic * int
+  | Pexpect   of ptactic * int
+  | Pfocus    of ptactic * tfocus
+  | Protate   of [`Left | `Right] * int
 
 (* -------------------------------------------------------------------- *)
 type paxiom_kind =

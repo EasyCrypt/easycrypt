@@ -37,27 +37,36 @@ type ttenv = {
   tt_implicits : bool;
 }
 
-type engine  = ptactic_core -> FApi.backward
+type engine = ptactic_core -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
-type tfocus  = (int option * int option) * [`Include | `Exclude]
+type focus_t = EcParsetree.tfocus
 
-let process_tfocus tc focus =
-  let error () = tc_error !$tc "invalid focus" in
+let process_tfocus tc (focus : focus_t) : tfocus =
+  let count = FApi.tc_count tc in
 
   let check1 i =
-    if i >= 0 then begin
-      if i = 0 || i > FApi.tc_count tc then error ();
-      i-1
-    end else begin
-      if -i >= FApi.tc_count tc then error ();
-      i
-    end
+    let error () = tc_error !$tc "invalid focus index: %d" i in
+    if   i >= 0
+    then if not (0 < i && i <= count) then error () else i-1
+    else if -i > count then error () else count+i
   in
 
-  fst_map
-    (fun (i1, i2) -> (omap check1 i1, omap check1 i2))
-    focus
+  let checkfs fs =
+    List.fold_left
+      (fun rg (i1, i2) ->
+        let i1 = odfl min_int (omap check1 i1) in
+        let i2 = odfl max_int (omap check1 i2) in
+        if i1 <= i2 then ISet.add_range i1 i2 rg else rg)
+      ISet.empty fs
+  in
+
+  let posfs = omap checkfs (fst focus) in
+  let negfs = omap checkfs (snd focus) in
+
+  fun i ->
+       odfl true (posfs |> omap (ISet.mem i))
+    && odfl true (negfs |> omap (fun fc -> not (ISet.mem i fc)))
 
 (* -------------------------------------------------------------------- *)
 let process_assumption (tc : tcenv1) =

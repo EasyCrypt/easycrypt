@@ -274,20 +274,21 @@ module FApi : sig
 
   (* Tacticals *)
   type direction = [ `Left | `Right ]
-  type tfocus    = int option pair * [ `Exclude | `Include ]
+  type tfocus    = (int -> bool)
 
-  val t_focus    : backward -> tactical
-  val t_onall    : backward -> tactical
-  val t_onselect : tfocus -> ?ttout:backward -> backward -> tactical
-  val t_on1      : int -> ?ttout:backward -> backward -> tactical
-  val t_firsts   : backward -> int -> tactical
-  val t_lasts    : backward -> int -> tactical
-  val t_subfirsts: backward list -> tactical
-  val t_sublasts : backward list -> tactical
-  val t_first    : backward -> tactical
-  val t_last     : backward -> tactical
-  val t_rotate   : direction -> int -> tactical
-  val t_swap_goals: int -> int -> tactical
+  val t_focus      : backward -> tactical
+  val t_onall      : backward -> tactical
+  val t_onfsub     : (int -> backward option) -> tactical
+  val t_onselect   : tfocus -> ?ttout:backward -> backward -> tactical
+  val t_on1        : int -> ?ttout:backward -> backward -> tactical
+  val t_firsts     : backward -> int -> tactical
+  val t_lasts      : backward -> int -> tactical
+  val t_subfirsts  : backward list -> tactical
+  val t_sublasts   : backward list -> tactical
+  val t_first      : backward -> tactical
+  val t_last       : backward -> tactical
+  val t_rotate     : direction -> int -> tactical
+  val t_swap_goals : int -> int -> tactical
 
   val t_sub    : backward list -> tactical
 

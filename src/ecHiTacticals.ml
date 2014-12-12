@@ -197,6 +197,16 @@ and process_sub (ttenv : ttenv) tts tc =
   FApi.t_sub (List.map (process1 ttenv) tts) tc
 
 (* -------------------------------------------------------------------- *)
+and process_fsub (ttenv : ttenv) (ts, t) tc =
+  let ts = List.map (fst_map (process_tfocus tc)) ts in
+  let tx i =
+    ts 
+      |> List.findopt (fun (p, _) -> p i)
+      |> (function Some (_, t) -> Some t | _ -> t)
+      |> omap (process1 ttenv)
+  in FApi.t_onfsub tx tc
+
+(* -------------------------------------------------------------------- *)
 and process_expect (ttenv : ttenv) (t, n) tc =
   if FApi.tc_count tc <> n then
     tc_error !$tc "expecting exactly %d subgoal(s), got %d" n (FApi.tc_count tc);
@@ -204,9 +214,7 @@ and process_expect (ttenv : ttenv) (t, n) tc =
 
 (* -------------------------------------------------------------------- *)
 and process_firsts (ttenv : ttenv) (t, i) tc =
-  let count = FApi.tc_count tc in
-
-  if i > count then
+  if i > FApi.tc_count tc then
     tc_error !$tc "expecting at least %d subgoal(s)" i;
   FApi.t_firsts (process1 ttenv t) i tc
 
@@ -223,13 +231,20 @@ and process_rotate (_ttenv : ttenv) (d, i) tc =
   FApi.t_rotate d i tc
 
 (* -------------------------------------------------------------------- *)
+and process_focus (ttenv : ttenv) (t, p) tc =
+  let p = EcHiGoal.process_tfocus tc p in
+  FApi.t_onselect p (process1 ttenv t) tc
+
+(* -------------------------------------------------------------------- *)
 and process_chain (ttenv : ttenv) (t : ptactic_chain) (tc : tcenv) =
   match t with
-  | Psubtacs tactics -> process_sub    ttenv tactics tc
-  | Pfirst   (t, i)  -> process_firsts ttenv (t, i)  tc
-  | Plast    (t, i)  -> process_lasts  ttenv (t, i)  tc
-  | Protate  (d, i)  -> process_rotate ttenv (d, i)  tc
-  | Pexpect  (t, n)  -> process_expect ttenv (t, n)  tc
+  | Psubtacs  tactics -> process_sub    ttenv tactics tc
+  | Pfsubtacs (ts, t) -> process_fsub   ttenv (ts, t) tc
+  | Pfirst    (t, i)  -> process_firsts ttenv (t, i)  tc
+  | Plast     (t, i)  -> process_lasts  ttenv (t, i)  tc
+  | Protate   (d, i)  -> process_rotate ttenv (d, i)  tc
+  | Pexpect   (t, n)  -> process_expect ttenv (t, n)  tc
+  | Pfocus    (t, p)  -> process_focus  ttenv (t, p)  tc
 
 (* -------------------------------------------------------------------- *)
 and process_core (ttenv : ttenv) (t : ptactic_core) (tc : tcenv) =

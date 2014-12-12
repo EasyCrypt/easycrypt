@@ -469,7 +469,7 @@ module FApi = struct
   (* ------------------------------------------------------------------ *)
   (* Tacticals *)
   type direction = [ `Left | `Right ]
-  type tfocus    = int option pair * [ `Exclude | `Include ]
+  type tfocus    = (int -> bool)
 
   (* ------------------------------------------------------------------ *)
   let t_focus (tt : backward) (tc : tcenv) =
@@ -537,45 +537,35 @@ module FApi = struct
     tcenv_of_penv ~ctxt:tc.tce_tcenv.tce_ctxt handles pe
 
   (* ------------------------------------------------------------------ *)
-  let t_sub (ts : backward list) (tc : tcenv) =
-    let hds =
-      try List.combine (tc_opened tc) ts
-      with Invalid_argument _ -> raise InvalidGoalShape in
-
-    let do1 pe (hd, tt) =
-      let tc = tt (tcenv1_of_penv hd pe) in
+  let t_onfsub (tx : int -> backward option) (tc : tcenv) =
+    let do1 pe i hd =
+      let tt = odfl tcenv_of_tcenv1 (tx i) in
+      let tc = tt (tcenv1_of_penv hd !pe) in
       assert (tc.tce_tcenv.tce_ctxt = []);
-      (tc_penv tc, tc_opened tc)
+      pe := (tc_penv tc); tc_opened tc
     in
 
-    let (pe, ln) = List.map_fold do1 (tc_penv tc) hds in
+    let pe = ref (tc_penv tc) in
+    let ln = List.mapi (do1 pe) (tc_opened tc) in
 
-    tcenv_of_penv ~ctxt:tc.tce_tcenv.tce_ctxt (List.flatten ln) pe
+    tcenv_of_penv ~ctxt:tc.tce_tcenv.tce_ctxt (List.flatten ln) !pe
 
   (* ------------------------------------------------------------------ *)
-  let t_onselect ((from_, to_), mode) ?ttout (tt : backward) (tc : tcenv) =
-    let count = tc_count tc in
-    let ttout = ttout |> odfl tcenv_of_tcenv1 in
+  let t_sub (ts : backward list) (tc : tcenv) =
+    let ts = Array.of_list ts in
+    if Array.length ts <> tc_count tc then
+      raise InvalidGoalShape;
+    t_onfsub (fun i -> Some ts.(i)) tc
 
-    if count > 0 then
-      let of_neg_idx i = if i < 0 then max 0 (count + i) else i in
-      let from_ = clamp 0 (count-1) (of_neg_idx (odfl 0         from_)) in
-      let to_   = clamp 0 (count-1) (of_neg_idx (odfl (count-1) to_  )) in
-      let tx    =
-        List.init count
-          (fun i ->
-              match mode with
-              | `Include when i >= from_ && i <= to_ -> tt
-              | `Exclude when i <  from_ || i >  to_ -> tt
-              | _ -> ttout)
-      in
-        t_sub tx tc
-    else
-      tc
+  (* ------------------------------------------------------------------ *)
+  let t_onselect (test : tfocus) ?ttout (tt : backward) (tc : tcenv) =
+    if   tc_count tc > 0
+    then t_onfsub (fun i -> if test i then Some tt else ttout) tc
+    else tc
 
   (* ------------------------------------------------------------------ *)
   let t_on1 idx ?ttout tt (tc : tcenv) =
-    t_onselect ((Some idx, Some idx), `Include) ?ttout tt tc
+    t_onselect ((=) idx) ?ttout tt tc
 
   (* ------------------------------------------------------------------ *)
   let t_rotate (d : direction) (i : int) (tc : tcenv) =

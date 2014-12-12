@@ -26,6 +26,10 @@ type engine  = ptactic_core -> backward
 type cut_t    = intropattern * pformula * (ptactics located) option
 type cutdef_t = intropattern * pterm
 type apply_t  = EcParsetree.apply_info
+type focus_t  = EcParsetree.tfocus
+
+(* -------------------------------------------------------------------- *)
+val process_tfocus : tcenv -> focus_t -> tfocus
 
 (* -------------------------------------------------------------------- *)
 module LowApply : sig
@@ -68,7 +72,7 @@ val process_generalize  : genpattern list -> backward
 val process_clear       : psymbol list -> backward
 val process_smt         : ttenv -> smtinfo -> backward
 val process_apply       : implicits:bool -> apply_t -> backward
-val process_rewrite     : ttenv -> (tfocus located option * rwarg1) list -> backward
+val process_rewrite     : ttenv -> (focus_t located option * rwarg1) list -> backward
 val process_subst       : pformula list -> backward
 val process_cut         : engine -> cut_t -> backward
 val process_cutdef      : cutdef_t -> backward

@@ -130,6 +130,9 @@
 
   let mk_core_tactic t = { pt_core = t; pt_intros = []; }
 
+  let mk_tactic_of_tactics ts =
+    mk_core_tactic (mk_loc ts.pl_loc (Pseq (unloc ts)))
+
   let mk_topmod ~local (name, body) =
     { ptm_name  = name ;
       ptm_body  = body ;
@@ -1630,24 +1633,6 @@ pterm:
 | MINUS { `RtoL }
 | empty { `LtoR }
 
-%inline rwrgint:
-| i=loc(int) {
-    if i.pl_desc = 0 then
-      parse_error i.pl_loc (Some "focus-index cannot be 0");
-    i.pl_desc
-  }
-
-%inline rwrg:
-| i=rwrgint              { ((Some i, Some i), `Include) }
-| TILD i=rwrgint         { ((Some i, Some i), `Exclude) }
-| rg=rgrw_cp             { (rg, `Include) }
-| TILD rg=paren(rgrw_cp) { (rg, `Exclude) }
-
-%inline rgrw_cp:
-| i1=rwrgint DOTDOT i2=rwrgint { (Some i1, Some i2) }
-| i1=rwrgint DOTDOT            { (Some i1, None   ) }
-|        DOTDOT i2=rwrgint     { (None   , Some i2) }
-
 rwrepeat:
 | NOT             { (`All  , None  ) }
 | QUESTION        { (`Maybe, None  ) }
@@ -1696,8 +1681,11 @@ rwfpattern(F):
     { (s, f) }
 
 rwarg:
-| r=rwarg1 { (None, r) }
-| rg=loc(rwrg) COLON r=rwarg1 { (Some rg, r) }
+| r=rwarg1
+    { (None, r) }
+
+| rg=loc(tcfc) COLON r=rwarg1
+    { (Some rg, r) }
 
 genpattern:
 | l=sform_h %prec prec_tactic
@@ -2214,7 +2202,6 @@ fel_pred_specs:
 | LBRACKET assoc_ps = plist0(fel_pred_spec, SEMICOLON) RBRACKET
     {assoc_ps}
 
-
 eqobs_in_pos:
 | i1=uint i2=uint { i1, i2 }
 
@@ -2342,15 +2329,48 @@ tactic:
     { let loc = EcLocation.make $startpos $endpos in
         mk_core_tactic (mk_loc loc (Por (t1, t2))) }
 
+%inline tcfc_1:
+| i=loc(int) {
+    if i.pl_desc = 0 then
+      parse_error i.pl_loc (Some "focus-index must be positive");
+    i.pl_desc
+  }
+
+%inline tcfc_rg:
+| i1=tcfc_1                  { (Some i1, Some i1) }
+| i1=tcfc_1 DOTDOT i2=tcfc_1 { (Some i1, Some i2) }
+| i1=tcfc_1 DOTDOT           { (Some i1, None   ) }
+|           DOTDOT i2=tcfc_1 { (None   , Some i2) }
+
+%inline tcfc_set:
+| xs=plist1(tcfc_rg, COMMA) { xs }
+
+%inline tcfc:
+| s1=tcfc_set
+    { (Some s1, None) }
+
+| s1=tcfc_set? TILD s2=tcfc_set
+    { (s1, Some s2) }
+
 tactic_chain:
 | LBRACKET ts=plist1(loc(tactics0), PIPE) RBRACKET
     { Psubtacs (List.map mk_core_tactic ts) }
 
-| FIRST t=loc(tactics) { Pfirst (mk_core_tactic (mk_loc t.pl_loc (Pseq (unloc t))), 1) }
-| LAST  t=loc(tactics) { Plast  (mk_core_tactic (mk_loc t.pl_loc (Pseq (unloc t))), 1) }
+| LBRACKET ts=plist1(sep(tcfc, COLON, loc(tactics)), PIPE) RBRACKET
+    { let ts = List.map (snd_map mk_tactic_of_tactics) ts in
+      Pfsubtacs (ts, None) }
 
-| FIRST n=uint t=loc(tactics) { Pfirst (mk_core_tactic (mk_loc t.pl_loc (Pseq (unloc t))), n) }
-| LAST  n=uint t=loc(tactics) { Plast  (mk_core_tactic (mk_loc t.pl_loc (Pseq (unloc t))), n) }
+| LBRACKET
+    ts=plist1(sep(tcfc, COLON, loc(tactics)), PIPE) ELSE t=loc(tactics)
+  RBRACKET
+    { let ts = List.map (snd_map mk_tactic_of_tactics) ts in
+      Pfsubtacs (ts, Some (mk_tactic_of_tactics t)) }
+
+| FIRST t=loc(tactics) { Pfirst (mk_tactic_of_tactics t, 1) }
+| LAST  t=loc(tactics) { Plast  (mk_tactic_of_tactics t, 1) }
+
+| FIRST n=uint t=loc(tactics) { Pfirst (mk_tactic_of_tactics t, n) }
+| LAST  n=uint t=loc(tactics) { Plast  (mk_tactic_of_tactics t, n) }
 
 | FIRST LAST  { Protate (`Left , 1) }
 | LAST  FIRST { Protate (`Right, 1) }
@@ -2358,7 +2378,11 @@ tactic_chain:
 | FIRST n=uint LAST  { Protate (`Left , n) }
 | LAST  n=uint FIRST { Protate (`Right, n) }
 
-| EXPECT n=uint t=loc(tactics) { Pexpect (mk_core_tactic (mk_loc t.pl_loc (Pseq (unloc t))), n) }
+| EXPECT n=uint t=loc(tactics)
+    { Pexpect (mk_tactic_of_tactics t, n) }
+
+| fc=tcfc COLON t=tactic
+    { Pfocus (t, fc) }
 
 subtactic:
 | t=loc(tactic_chain)
@@ -2699,6 +2723,13 @@ __rlist1(X, S):                         (* left-recursive *)
 (* -------------------------------------------------------------------- *)
 %inline prefix(S, X):
 | S x=X { x }
+
+%inline sep(S1, X, S2):
+| x=S1 X y=S2 { (x, y) }
+
+%inline either(X, Y):
+| X {}
+| Y {}
 
 (* -------------------------------------------------------------------- *)
 %inline loc(X):

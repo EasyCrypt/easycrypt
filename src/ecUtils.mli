@@ -157,6 +157,11 @@ module Disposable : sig
 end
 
 (* -------------------------------------------------------------------- *)
+module ISet : sig
+  include module type of BatISet
+end
+
+(* -------------------------------------------------------------------- *)
 module List : sig
   include module type of List
 
