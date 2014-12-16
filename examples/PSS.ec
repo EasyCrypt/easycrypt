@@ -357,7 +357,7 @@ module UF_CMA = NM_CMA.
 (** Now we can set things up for the definition of PSS *)
 (* Setting up the random salts *)
 op k0:int.
-axiom leq0_k0: 0 <= k0.
+axiom leq0_k0: 0 < k0.
 
 type salt.
 op salt: salt distr.
@@ -373,7 +373,7 @@ op to_salt: bitstring -> salt = Salt.from_bits.
 
 (* Setting up H *)
 op kh:int.
-axiom leq0_kh: 0 <= kh.
+axiom leq0_kh: 0 < kh.
 
 type htag.
 op htag: htag distr.
@@ -730,8 +730,8 @@ proof.
         progress; rewrite /Pred.(/\) /= -fun_ext=> x1 /=; rewrite eq_iff; split.
           by move=> [-> x1_in_supp]; rewrite /f /finv simulK //; smt.
           by move=> [<- x1_in_supp]; rewrite /f /finv simul_invK //; smt.
-      rewrite invert; first smt.
-      rewrite invert; first smt.
+      rewrite invert 1:-supp_eq 1:/support //.
+      rewrite invert 1:-supp_eq 1:/support //.
       rewrite -!mu_support.
       apply challengeU; first smt.
         by cut:= H; rewrite -/(support _ _) supp_eq /support !challenge_valid /finv simul_inv_range //; smt.

@@ -133,7 +133,7 @@ lemma eq1_enc :
 proof.
  proc;inline RO.o.
  wp;rnd ((^) m{1}) ((^) m{1}).
- wp;rnd;skip;progress => //; smt.
+ wp;rnd;skip;progress => //; try (by algebra); smt.
 qed.
 
 module CPA2(S : Scheme, A_ : Adv) = {
