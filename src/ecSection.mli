@@ -41,6 +41,8 @@ val exit  : t -> locals * t
 val path  : t -> symbol option * path
 val opath : t -> (symbol option * path) option
 
+val topenv  : t -> EcEnv.env
+
 val locals  : t -> locals
 val olocals : t -> locals option
 

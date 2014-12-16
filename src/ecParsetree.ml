@@ -715,10 +715,11 @@ type w3_renaming =
 
 (* -------------------------------------------------------------------- *)
 type theory_cloning = {
-  pthc_base : pqsymbol;
-  pthc_name : psymbol option;
-  pthc_ext  : (pqsymbol * theory_override) list;
-  pthc_prf  : theory_cloning_proof list;
+  pthc_base  : pqsymbol;
+  pthc_name  : psymbol option;
+  pthc_ext   : (pqsymbol * theory_override) list;
+  pthc_prf   : theory_cloning_proof list;
+  pthc_local : bool;
 }
 
 and theory_cloning_proof = {
@@ -731,10 +732,11 @@ and theory_override =
 | PTHO_Type   of ty_override
 | PTHO_Op     of op_override
 | PTHO_Pred   of pr_override
-| PTHO_Theory of pqsymbol
+| PTHO_Theory of th_override
 
 and ty_override = psymbol list * pty * [`Alias | `Inline]
 and op_override = op_override_def * [`Alias | `Inline]
+and th_override = pqsymbol
 
 and op_override_def = {
   opov_tyvars : psymbol list option;

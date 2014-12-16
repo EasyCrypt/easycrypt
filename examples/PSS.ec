@@ -1,3 +1,4 @@
+timeout 0.
 (** This proof is naively adapted from
     "Making RSA-PSS secure against non-random faults"
     As such, it may contain some weird quirks that are

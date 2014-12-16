@@ -197,7 +197,6 @@ let rec s_eqobs_in_rev rsl rsr sim (eqo:Mpv2.t) =
     end
 
   | _, _ -> rsl, rsr, sim, eqo
-
       
 and i_eqobs_in il ir sim (eqo:Mpv2.t) = 
   match il.i_node, ir.i_node with

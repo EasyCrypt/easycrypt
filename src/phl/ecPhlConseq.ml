@@ -502,6 +502,7 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
     -> 
     let hs2 = pf_as_hoareS !!tc f2 in
     let tac = if notmod then t_bdHoareS_conseq_nm else t_bdHoareS_conseq in
+
     let m,hi,hh, h0 = 
       as_seq4 (LDecl.fresh_ids (FApi.tc1_hyps tc) ["&m";"_";"_";"_"]) in
     let pre    = f_and hs.bhs_pr hs2.hs_pr in
@@ -551,11 +552,6 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
     FApi.t_sub  
       [t_trivial; t_trivial; t_trivial; t_apply_r nf2; t_apply_r nf1] 
       tc
-
-                
-              
-
-
 
   (* ------------------------------------------------------------------ *)
   (* bdhoareF / bdhoareF / ⊥ / ⊥                                        *)
