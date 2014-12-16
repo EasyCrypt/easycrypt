@@ -28,4 +28,4 @@ theory V.
   end I.
 end V.
 
-clone T as W with theory U = V.
+clone T as W with theory U <- V.
