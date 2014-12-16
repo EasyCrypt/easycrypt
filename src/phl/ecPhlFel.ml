@@ -49,7 +49,7 @@ let rec callable_oracles_f env modv os f =
             else EcPath.Sx.add o s)
           EcPath.Sx.empty fdef.f_uses.us_calls in
 
-      let f_written = f_write ~except_fs:called_fs env f in
+      let f_written = f_write ~except:called_fs env f in
 
       if PV.indep env f_written modv then
         List.fold_left
@@ -110,7 +110,7 @@ let t_failure_event_r (at_pos, cntr, ash, q, f_event, pred_specs, inv) tc =
   let os         = callable_oracles_stmt env fv (stmt s_tl) in
 
   (* check that bad event is only modified in oracles *)
-  let written_except_os = s_write ~except_fs:os env (stmt s_tl) in
+  let written_except_os = s_write ~except:os env (stmt s_tl) in
 
   if not (PV.indep env written_except_os fv ) then
     tc_error_lazy !!tc (fun fmt ->

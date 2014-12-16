@@ -101,15 +101,34 @@ module PV : sig
 end
 
 (* -------------------------------------------------------------------- *)
-val s_write  : ?except_fs:EcPath.Sx.t -> env -> stmt -> PV.t
-val is_write : ?except_fs:EcPath.Sx.t -> env -> PV.t -> instr list -> PV.t
-val f_write  : ?except_fs:EcPath.Sx.t -> env -> EcPath.xpath -> PV.t
+type 'a pvaccess = env -> PV.t -> 'a -> PV.t
 
-val e_read   : env -> PV.t -> expr -> PV.t
-val s_read   : env -> stmt -> PV.t
-val is_read  : env -> PV.t -> instr list -> PV.t 
-val f_read   : env -> EcPath.xpath -> PV.t
+val i_write_r  : ?except:Sx.t -> instr      pvaccess
+val is_write_r : ?except:Sx.t -> instr list pvaccess
+val s_write_r  : ?except:Sx.t -> stmt       pvaccess
+val f_write_r  : ?except:Sx.t -> xpath      pvaccess
 
+val e_read_r   : expr       pvaccess
+val i_read_r   : instr      pvaccess
+val is_read_r  : instr list pvaccess
+val s_read_r   : stmt       pvaccess
+val f_read_r   : xpath      pvaccess
+
+(* -------------------------------------------------------------------- *)
+type 'a pvaccess0 = env -> 'a -> PV.t
+
+val i_write  : ?except:Sx.t -> instr      pvaccess0
+val is_write : ?except:Sx.t -> instr list pvaccess0
+val s_write  : ?except:Sx.t -> stmt       pvaccess0
+val f_write  : ?except:Sx.t -> xpath      pvaccess0
+
+val e_read  : expr       pvaccess0
+val i_read  : instr      pvaccess0
+val is_read : instr list pvaccess0
+val s_read  : stmt       pvaccess0
+val f_read  : xpath      pvaccess0
+
+(* -------------------------------------------------------------------- *)
 val while_info : env -> expr -> stmt -> EcBaseLogic.abs_uses
 
 (* -------------------------------------------------------------------- *)
@@ -154,25 +173,9 @@ module Mpv2 : sig
 
   val mem_pv_l : env -> prog_var -> t -> bool
   val mem_pv_r : env -> prog_var -> t -> bool
-
 end
 
 (* -------------------------------------------------------------------- *)
-
-
-(* -------------------------------------------------------------------- *)
-(*val eqobs_in :
-  EcEnv.env ->
-  ('log ->
-   EcPath.xpath -> EcPath.xpath -> Mpv2.t -> 'log * Mpv2.t * 'spec) ->
-  'log ->
-  EcModules.stmt ->
-  EcModules.stmt ->
-  Mpv2.t ->
-  PV.t * PV.t ->
-  EcModules.stmt * EcModules.stmt * ('log * 'spec list) * Mpv2.t *)
-
 val i_eqobs_in_refl : env -> instr -> PV.t -> PV.t
-val eqobs_inF_refl : env -> EcPath.xpath -> PV.t -> PV.t
-
+val eqobs_inF_refl  : env -> EcPath.xpath -> PV.t -> PV.t
 val check_module_in : env -> mpath -> module_type -> unit

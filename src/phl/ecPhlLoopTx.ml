@@ -33,15 +33,15 @@ let check_independence (pf, hyps) b init c1 c2 c3 =
       tc_error pf "independence check failed"
   in
 
-  let fv_b    = e_read   env PV.empty b    in
-  let rd_init = is_read  env PV.empty init in
-  let wr_init = is_write env PV.empty init in
-  let rd_c1   = is_read  env PV.empty c1   in
-  let rd_c2   = is_read  env PV.empty c2   in
-  let rd_c3   = is_read  env PV.empty c3   in
-  let wr_c1   = is_write env PV.empty c1   in
-  let wr_c2   = is_write env PV.empty c2   in
-  let wr_c3   = is_write env PV.empty c3   in
+  let fv_b    = e_read   env b    in
+  let rd_init = is_read  env init in
+  let wr_init = is_write env init in
+  let rd_c1   = is_read  env c1   in
+  let rd_c2   = is_read  env c2   in
+  let rd_c3   = is_read  env c3   in
+  let wr_c1   = is_write env c1   in
+  let wr_c2   = is_write env c2   in
+  let wr_c3   = is_write env c3   in
 
   check_disjoint rd_c1 wr_c2;
   check_disjoint rd_c2 wr_c1;

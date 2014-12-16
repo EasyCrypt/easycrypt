@@ -349,7 +349,7 @@ let t_eager_call_r fpre fpost tc =
   let swr = s_write env sr in
 
   let check_a e =
-    let er   = e_read env PV.empty e in
+    let er   = e_read env e in
     let diff = PV.interdep env swl er in
 
     if not (PV.is_empty diff) then
@@ -403,12 +403,12 @@ let eager pf env s s' inv eqIs eqXs c c' eqO =
   let rev st = List.rev st.s_node in
 
   let check_args args =
-    let read = List.fold_left (e_read env) PV.empty args in
+    let read = List.fold_left (e_read_r env) PV.empty args in
     if not (PV.indep env modi read) then raise EqObsInError in
 
   let check_swap_s i =
-    let m = is_write env PV.empty [i] in
-    let r = is_read env PV.empty [i] in
+    let m = is_write env [i] in
+    let r = is_read  env [i] in
     let t =
          PV.indep env m modi
       && PV.indep env m readi

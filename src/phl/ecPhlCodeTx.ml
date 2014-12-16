@@ -35,7 +35,7 @@ let t_kill_r side cpos olen tc =
     in
 
     (* FIXME [BG]: check the usage of po_rd *)
-    let ks_wr = is_write env PV.empty ks in
+    let ks_wr = is_write env ks in
     let po_rd = PV.fv env (fst me) po in
 
     let pp_of_name =
@@ -48,7 +48,7 @@ let t_kill_r side cpos olen tc =
 
     List.iteri
       (fun i is ->
-         let is_rd = is_read env PV.empty is in
+         let is_rd = is_read env is in
          let indp  = PV.interdep env ks_wr is_rd in
            match PV.pick indp with
            | None   -> ()
@@ -177,11 +177,11 @@ let cfold_stmt (pf, hyps) me olen zpr =
 
   List.iter
     (fun (_, _, e) ->
-        if e_fv e <> Mid.empty || e_read env PV.empty e <> PV.empty then
+        if e_fv e <> Mid.empty || e_read env e <> PV.empty then
           tc_error pf "right-values are not closed expression")
     asgn;
 
-  let wrs = is_write env EcPV.PV.empty tl1 in
+  let wrs = is_write env tl1 in
   let asg = List.fold_left
               (fun pv (x, ty, _) -> EcPV.PV.add env x ty pv)
               EcPV.PV.empty asgn

@@ -427,143 +427,183 @@ module PV = struct
     
 end
 
-
+(* -------------------------------------------------------------------- *)
 let get_abs_functor f = 
   let f = f.EcPath.x_top in
   match f.EcPath.m_top with
   | `Local _ -> EcPath.mpath (f.EcPath.m_top) []
   | _ -> assert false
 
+(* -------------------------------------------------------------------- *)
+type 'a pvaccess = env -> PV.t -> 'a -> PV.t
 
-(* computes the program variables occurring free in f with memory m *)
-
-let lp_write env w lp = 
-  let add w (pv,ty) = PV.add env pv ty w in
+(* -------------------------------------------------------------------- *)
+let lp_write_r env w lp = 
+  let add w (pv, ty) = PV.add env pv ty w in
   match lp with
-  | LvVar pvt -> add w pvt 
-  | LvTuple pvs -> List.fold_left add w pvs 
-  | LvMap ((_p,_tys),pv,_,ty) -> add w (pv,ty) 
+  | LvVar pv ->
+      add w pv
+  | LvTuple pvs ->
+      List.fold_left add w pvs 
+  | LvMap (_, pv, _, ty) ->
+      add w (pv, ty)
 
-let rec f_write ?(except_fs=Sx.empty) env w f =
-  let f = NormMp.norm_xfun env f in
+let rec f_write_r ?(except=Sx.empty) env w f =
+  let f    = NormMp.norm_xfun env f in
   let func = Fun.by_xpath f env in
+
+  let folder w o =
+    if Sx.mem o except then w else f_write_r ~except env w o in
+
   match func.f_def with
-  | FBalias _ -> assert false (* Normal form *)
+  | FBalias _ ->
+      (* [f] is in normal-form *)
+      assert false
+
   | FBabs oi ->
-    let mp = get_abs_functor f in
-    List.fold_left (fun w o -> 
-      if Sx.mem o except_fs then w 
-      else f_write ~except_fs env w o)
-      (PV.add_glob env mp w) oi.oi_calls
+      let mp = get_abs_functor f in
+      List.fold_left folder (PV.add_glob env mp w) oi.oi_calls
+
   | FBdef fdef ->
-    let add x w = 
-      let vb = Var.by_xpath x env in
-      PV.add env (pv_glob x) vb.vb_type w in
-    let w = EcPath.Sx.fold add fdef.f_uses.us_writes w in
-    let fwrite w f = 
-      if Sx.mem f except_fs then w else f_write ~except_fs env w f in
-    List.fold_left fwrite w fdef.f_uses.us_calls
+      let add x w = 
+        let vb = Var.by_xpath x env in
+        PV.add env (pv_glob x) vb.vb_type w in
+      List.fold_left folder
+        (EcPath.Sx.fold add fdef.f_uses.us_writes w )
+        fdef.f_uses.us_calls
 
-and is_write ?(except_fs=Sx.empty) env w s = 
-  List.fold_left (i_write ~except_fs env) w s
+and is_write_r ?(except=Sx.empty) env w s = 
+  List.fold_left (i_write_r ~except env) w s
 
-and s_write ?(except_fs=Sx.empty) env w s = 
-  is_write ~except_fs env w s.s_node
+and s_write_r ?(except=Sx.empty) env w s = 
+  is_write_r ~except env w s.s_node
 
-and i_write ?(except_fs=Sx.empty) env w i = 
+and i_write_r ?(except=Sx.empty) env w i = 
   match i.i_node with
-  | Sasgn (lp,_) -> lp_write env w lp
-  | Srnd (lp,_) -> lp_write env w lp
-  | Scall(lp,f,_) -> 
-    if Sx.mem f except_fs then w else 
-      let w  = match lp with None -> w | Some lp -> lp_write env w lp in    
-      f_write ~except_fs env w f 
-  | Sif (_,s1,s2) -> s_write ~except_fs env (s_write ~except_fs env w s1) s2
-  | Swhile (_,s) -> s_write ~except_fs env w s
-  | Sassert _ -> w 
-  | Sabstract id -> 
-    let us = AbsStmt.byid id env in 
-    let add_pv w (pv,ty) = PV.add env pv ty w in
-    let w = List.fold_left add_pv w us.EcBaseLogic.aus_writes in
-    List.fold_left (f_write ~except_fs env) w us.EcBaseLogic.aus_calls
-    
-let rec f_read env r f = 
-  let f = NormMp.norm_xfun env f in
-  let func = Fun.by_xpath f env in
-  match func.f_def with
-  | FBalias _ -> assert false (* Normal form *)
-  | FBabs oi ->
-    let mp = get_abs_functor f in
-    let r = if oi.oi_in then (PV.add_glob env mp r) else r in
-    List.fold_left (f_read env) r oi.oi_calls
-  | FBdef fdef ->
-    let add x r = 
-      let vb = Var.by_xpath x env in
-      PV.add env (pv_glob x) vb.vb_type r in
-    let r = EcPath.Sx.fold add fdef.f_uses.us_reads r in
-    List.fold_left (f_read env) r fdef.f_uses.us_calls
+  | Sasgn  (lp, _) -> lp_write_r env w lp
+  | Srnd   (lp, _) -> lp_write_r env w lp
+  | Sassert _      -> w 
 
-let rec e_read env r e = 
+  | Scall(lp,f,_) -> 
+    if Sx.mem f except then w else 
+      let w  = match lp with None -> w | Some lp -> lp_write_r env w lp in    
+      f_write_r ~except env w f 
+
+  | Sif (_, s1, s2) ->
+      List.fold_left (s_write_r ~except env) w [s1; s2]
+
+  | Swhile (_, s) ->
+      s_write_r ~except env w s
+
+  | Sabstract id -> 
+      let us = AbsStmt.byid id env in 
+      let add_pv w (pv,ty) = PV.add env pv ty w in
+      let w = List.fold_left add_pv w us.EcBaseLogic.aus_writes in
+      List.fold_left (f_write_r ~except env) w us.EcBaseLogic.aus_calls
+
+(* -------------------------------------------------------------------- *)
+let rec f_read_r env r f =
+  let f    = NormMp.norm_xfun env f in
+  let func = Fun.by_xpath f env in
+
+  match func.f_def with
+  | FBalias _ ->
+      (* [f] is in normal form *)
+      assert false
+
+  | FBabs oi ->
+      let mp = get_abs_functor f in
+      let r = if oi.oi_in then (PV.add_glob env mp r) else r in
+      List.fold_left (f_read_r env) r oi.oi_calls
+
+  | FBdef fdef ->
+      let add x r = 
+        let vb = Var.by_xpath x env in
+        PV.add env (pv_glob x) vb.vb_type r in
+      let r = EcPath.Sx.fold add fdef.f_uses.us_reads r in
+      List.fold_left (f_read_r env) r fdef.f_uses.us_calls
+
+let rec e_read_r env r e = 
   match e.e_node with
   | Evar pv -> PV.add env pv e.e_ty r
-  | _ -> e_fold (e_read env) r e
+  | _ -> e_fold (e_read_r env) r e
 
-let lp_read env r lp = 
+let lp_read_r env r lp = 
   match lp with
-  | LvVar _ -> r
-  | LvTuple _ -> r
-  | LvMap ((_,_),pv,e,ty) -> e_read env (PV.add env pv ty r) e
+  | LvVar _ | LvTuple _ ->
+      r
 
-let rec is_read env w s = List.fold_left (i_read env) w s
+  | LvMap (_, pv, e, ty) ->
+      e_read_r env (PV.add env pv ty r) e
 
-and s_read env w s = is_read env w s.s_node
+let rec is_read_r env w s =
+  List.fold_left (i_read_r env) w s
 
-and i_read env r i = 
+and s_read_r env w s =
+  is_read_r env w s.s_node
+
+and i_read_r env r i = 
   match i.i_node with
-  | Sasgn (lp,e) -> e_read env (lp_read env r lp) e
-  | Srnd (lp,e)  -> e_read env (lp_read env r lp) e 
-  | Scall(lp,f,es) -> 
-    let r = List.fold_left (e_read env) r es in
-    let r  = match lp with None -> r | Some lp -> lp_read env r lp in
-    f_read env r f 
-  | Sif (e,s1,s2) -> s_read env (s_read env (e_read env r e) s1) s2
-  | Swhile (e,s) -> s_read env (e_read env r e) s
-  | Sassert e -> e_read env r e
+  | Sasgn   (lp, e) -> e_read_r env (lp_read_r env r lp) e
+  | Srnd    (lp, e) -> e_read_r env (lp_read_r env r lp) e 
+  | Sassert e       -> e_read_r env r e
+
+  | Scall (lp, f, es) -> 
+      let r = List.fold_left (e_read_r env) r es in
+      let r = match lp with None -> r | Some lp -> lp_read_r env r lp in
+      f_read_r env r f 
+
+  | Sif (e, s1, s2) ->
+      List.fold_left (s_read_r env) (e_read_r env r e) [s1; s2]
+
+  | Swhile (e, s) ->
+      s_read_r env (e_read_r env r e) s
+
   | Sabstract id -> 
-    let us = AbsStmt.byid id env in 
-    let add_pv r (pv,ty) = PV.add env pv ty r in
-    let r = List.fold_left add_pv r us.EcBaseLogic.aus_reads in
-    List.fold_left (f_read env) r us.EcBaseLogic.aus_calls
+      let us = AbsStmt.byid id env in 
+      let add_pv r (pv,ty) = PV.add env pv ty r in
+      let r = List.fold_left add_pv r us.EcBaseLogic.aus_reads in
+      List.fold_left (f_read_r env) r us.EcBaseLogic.aus_calls
 
-let f_write ?(except_fs=Sx.empty) env f = f_write ~except_fs env PV.empty f
-let f_read  env f = f_read env PV.empty f
-let s_write ?(except_fs=Sx.empty) env s = s_write ~except_fs env PV.empty s
-let s_read  env s = s_read  env PV.empty s
+(* -------------------------------------------------------------------- *)
+type 'a pvaccess0 = env -> 'a -> PV.t
 
+let i_write  ?(except=Sx.empty) env i  = i_write_r  ~except env PV.empty i
+let is_write ?(except=Sx.empty) env is = is_write_r ~except env PV.empty is
+let s_write  ?(except=Sx.empty) env s  = s_write_r  ~except env PV.empty s
+let f_write  ?(except=Sx.empty) env f  = f_write_r  ~except env PV.empty f
+
+let e_read  env e  = e_read_r  env PV.empty e
+let i_read  env i  = i_read_r  env PV.empty i
+let is_read env is = is_read_r env PV.empty is
+let s_read  env s  = s_read_r  env PV.empty s
+let f_read  env f  = f_read_r  env PV.empty f
+
+(* -------------------------------------------------------------------- *)
 let while_info env e s = 
   let w = PV.empty in
-  let r = e_read env PV.empty e in
+  let r = e_read_r env PV.empty e in
   let c = Sx.empty in
   let rec i_info (w,r,c) i = 
     match i.i_node with
     | Sasgn(lp,e) | Srnd(lp,e) ->
-      let r = e_read env (lp_read env r lp) e in
-      let w = lp_write env w lp in
+      let r = e_read_r env (lp_read_r env r lp) e in
+      let w = lp_write_r env w lp in
       (w,r,c)
     | Sif(e,s1,s2) ->
-      let r = e_read env r e in
+      let r = e_read_r env r e in
       s_info (s_info (w,r,c) s1) s2
     | Swhile(e,s) ->
-      let r = e_read env r e in
+      let r = e_read_r env r e in
       s_info (w,r,c) s
     | Scall(lp,f,es) ->
-      let r = List.fold_left (e_read env) r es in
-      let r = match lp with None -> r | Some lp -> lp_read env r lp in
-      let w = match lp with None -> w | Some lp -> lp_write env w lp in
+      let r = List.fold_left (e_read_r env) r es in
+      let r = match lp with None -> r | Some lp -> lp_read_r env r lp in
+      let w = match lp with None -> w | Some lp -> lp_write_r env w lp in
       let f = NormMp.norm_xfun env f in
       (w,r,Sx.add f c)
     | Sassert e ->
-      (w,e_read env r e, c)
+      (w,e_read_r env r e, c)
     | Sabstract id ->
       let us = AbsStmt.byid id env in
       let add_pv x (pv,ty) = PV.add env pv ty x in 
