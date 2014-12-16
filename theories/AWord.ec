@@ -108,6 +108,19 @@ theory Univ.
     by rewrite -to_from from_to;smt.
   qed.
 
+  lemma card_univ: card univ = 2^length.
+  proof.
+    rewrite /univ. pose intv := Interval.interval _ _.
+    cut intv_card: card intv = 2^length by smt.
+    rewrite -intv_card eqz_leq; split; first smt.
+    cut ->: card intv = card (img to_int (img from_int intv)).
+      congr. apply set_ext. rewrite /FSet.(==) /intv.
+      move=> x. split.
+        by move=> hMemInt; rewrite !img_def; exists (from_int x); smt.
+      by rewrite img_def; move=> hMemImg; elim hMemImg => x0; rewrite !img_def; smt.
+    smt.
+  qed.
+
   require import ISet.
 
   lemma finite_univ : Finite.finite (ISet.univ <:word>).
