@@ -84,16 +84,18 @@ end CRing.
 theory CRingT.
   clone        Ring.
   clone        CRing with
-    theory Ring = Ring.
-  clone import RingT with
-    theory Ring = CRing.Ring.
+    theory Ring <- Ring.
+  clone        RingT with
+    theory Ring <- Ring.
+
   import Ring.
   import CRing.
+  import RingT.
 
   lemma mulrC (r1 r2 : ring):
     r1 * r2 = r2 * r1.
   proof strict.
-  by rewrite /RingT.Ring.( * ) -/CRing.Ring.( * ) mulrC.
+  by rewrite mulrC.
   qed.
 
   lemma mulrCA (r1 r2 r3 : ring):
@@ -124,25 +126,28 @@ end BRing.
 
 theory BRingT.
   clone        Ring.
-  clone import RingT with
-    theory Ring = Ring.
-  clone import BRing with
-    theory Ring = Ring.
+  clone        RingT with
+    theory Ring <- Ring.
+  clone        BRing with
+    theory Ring <- Ring.
+
   import Ring.
+  import RingT.
+  import BRing.
 
   lemma neg_is_id (r : ring):
     r + r = zero.
   proof strict.
   by rewrite -(addIr (r + r) (r + r) zero) //
-             -/Ring.( + ) (add0r (r + r)) -(mulrK r) -{1 2}mulrDadd -mulDradd 2!mulrK.
+             (add0r (r + r)) -(mulrK r) -{1 2}mulrDadd -mulDradd 2!mulrK.
   qed.
 
   lemma mulrC (r1 r2 : ring):
     r1 * r2 = r2 * r1.
   proof strict.
-  by rewrite -(addIr (r2 * r1) (r1 * r2) (r2 * r1)) // -/Ring.( + ) (neg_is_id (r2 * r1))
-             -(addIr r2 (r1 * r2 + r2 * r1) zero) // -/Ring.( + ) (add0r r2) addrA
-             -{4}(addrI r1 (r1 * r2 + (r2 * r1 + r2)) r2) // -/Ring.( + ) -addrA
+  by rewrite -(addIr (r2 * r1) (r1 * r2) (r2 * r1)) // (neg_is_id (r2 * r1))
+             -(addIr r2 (r1 * r2 + r2 * r1) zero) // (add0r r2) addrA
+             -{4}(addrI r1 (r1 * r2 + (r2 * r1 + r2)) r2) // -addrA
              -{1}(mulrK r1) -{3}(mulrK r2) -2!mulrDadd -mulDradd mulrK.
   qed.
 end BRingT.
