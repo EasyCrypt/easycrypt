@@ -580,46 +580,6 @@ let s_read  env s  = s_read_r  env PV.empty s
 let f_read  env f  = f_read_r  env PV.empty f
 
 (* -------------------------------------------------------------------- *)
-let while_info env e s = 
-  let w = PV.empty in
-  let r = e_read_r env PV.empty e in
-  let c = Sx.empty in
-  let rec i_info (w,r,c) i = 
-    match i.i_node with
-    | Sasgn(lp,e) | Srnd(lp,e) ->
-      let r = e_read_r env (lp_read_r env r lp) e in
-      let w = lp_write_r env w lp in
-      (w,r,c)
-    | Sif(e,s1,s2) ->
-      let r = e_read_r env r e in
-      s_info (s_info (w,r,c) s1) s2
-    | Swhile(e,s) ->
-      let r = e_read_r env r e in
-      s_info (w,r,c) s
-    | Scall(lp,f,es) ->
-      let r = List.fold_left (e_read_r env) r es in
-      let r = match lp with None -> r | Some lp -> lp_read_r env r lp in
-      let w = match lp with None -> w | Some lp -> lp_write_r env w lp in
-      let f = NormMp.norm_xfun env f in
-      (w,r,Sx.add f c)
-    | Sassert e ->
-      (w,e_read_r env r e, c)
-    | Sabstract id ->
-      let us = AbsStmt.byid id env in
-      let add_pv x (pv,ty) = PV.add env pv ty x in 
-      let w = List.fold_left add_pv w us.EcBaseLogic.aus_writes in
-      let r = List.fold_left add_pv r us.EcBaseLogic.aus_reads in
-      let c = 
-        List.fold_left (fun c f -> Sx.add f c) c us.EcBaseLogic.aus_calls in
-      (w,r,c)
-  and s_info info s = List.fold_left i_info info s.s_node in
-  let (w,r,c) = s_info (w,r,c) s in
-  { EcBaseLogic.aus_reads = fst (PV.elements r);
-    EcBaseLogic.aus_writes = fst (PV.elements w);
-    EcBaseLogic.aus_calls = Sx.elements c; }
-
-
-(* -------------------------------------------------------------------- *)
 exception EqObsInError
 
 module Mpv2 = struct 

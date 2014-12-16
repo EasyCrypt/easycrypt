@@ -13,7 +13,49 @@ open EcPV
 open EcCoreGoal
 open EcLowPhlGoal
 
+module Sx  = EcPath.Sx
 module TTC = EcProofTyping
+
+(* -------------------------------------------------------------------- *)
+let while_info env e s = 
+  let rec i_info (w,r,c) i = 
+    match i.i_node with
+    | Sasgn(lp, e) | Srnd(lp, e) ->
+        let r = e_read_r env (EcPV.lp_read_r env r lp) e in
+        let w = lp_write_r env w lp in
+        (w, r, c)
+
+    | Sif (e, s1, s2) ->
+        let r = e_read_r env r e in s_info (s_info (w, r, c) s1) s2
+
+    | Swhile(e,s) ->
+        let r = e_read_r env r e in s_info (w, r, c) s
+
+    | Scall(lp,f,es) ->
+        let r = List.fold_left (e_read_r env) r es in
+        let r = match lp with None -> r | Some lp -> lp_read_r  env r lp in
+        let w = match lp with None -> w | Some lp -> lp_write_r env w lp in
+        let f = EcEnv.NormMp.norm_xfun env f in
+        (w, r, Sx.add f c)
+  
+    | Sassert e ->
+        (w, e_read_r env r e, c)
+
+    | Sabstract id ->
+      let add_pv x (pv,ty) = PV.add env pv ty x in 
+      let us = EcEnv.AbsStmt.byid id env in
+      let w = List.fold_left add_pv w us.EcBaseLogic.aus_writes in
+      let r = List.fold_left add_pv r us.EcBaseLogic.aus_reads in
+      let c = List.fold_left (fun c f -> Sx.add f c) c us.EcBaseLogic.aus_calls in
+      (w, r, c)
+
+  and s_info info s = List.fold_left i_info info s.s_node in
+
+  let (w,r,c) = s_info (PV.empty, EcPV.e_read env e, Sx.empty) s in
+
+  { EcBaseLogic.aus_reads  = fst (PV.elements r);
+    EcBaseLogic.aus_writes = fst (PV.elements w);
+    EcBaseLogic.aus_calls  = Sx.elements c; }
 
 (* -------------------------------------------------------------------- *)
 let t_hoare_while_r inv tc =
@@ -82,7 +124,7 @@ let t_bdhoare_while_rev_r inv tc =
   let (lp_guard_exp, lp_body), rem_s = tc1_last_while tc bhs.bhs_s in
   let lp_guard = form_of_expr (EcMemory.memory mem) lp_guard_exp in
 
-  let w_u   = EcPV.while_info env lp_guard_exp lp_body in
+  let w_u   = while_info env lp_guard_exp lp_body in
   let w     = EcEnv.LDecl.fresh_id hyps "w" in
   let hyps' = EcEnv.LDecl.add_local w (EcBaseLogic.LD_abs_st w_u) hyps in
 
@@ -177,7 +219,7 @@ let t_bdhoare_while_rev_geq_r inv vrnt k eps tc =
   in
 
   (* 6. Out body *)
-  let w_u = EcPV.while_info env lp_guard_exp lp_body in
+  let w_u = while_info env lp_guard_exp lp_body in
   let w   = EcEnv.LDecl.fresh_id hyps "w" in
   let hyps' = EcEnv.LDecl.add_local w (EcBaseLogic.LD_abs_st w_u) hyps in
 

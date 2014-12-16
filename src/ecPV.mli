@@ -103,11 +103,13 @@ end
 (* -------------------------------------------------------------------- *)
 type 'a pvaccess = env -> PV.t -> 'a -> PV.t
 
+val lp_write_r :                 lvalue     pvaccess
 val i_write_r  : ?except:Sx.t -> instr      pvaccess
 val is_write_r : ?except:Sx.t -> instr list pvaccess
 val s_write_r  : ?except:Sx.t -> stmt       pvaccess
 val f_write_r  : ?except:Sx.t -> xpath      pvaccess
 
+val lp_read_r  : lvalue     pvaccess
 val e_read_r   : expr       pvaccess
 val i_read_r   : instr      pvaccess
 val is_read_r  : instr list pvaccess
@@ -127,9 +129,6 @@ val i_read  : instr      pvaccess0
 val is_read : instr list pvaccess0
 val s_read  : stmt       pvaccess0
 val f_read  : xpath      pvaccess0
-
-(* -------------------------------------------------------------------- *)
-val while_info : env -> expr -> stmt -> EcBaseLogic.abs_uses
 
 (* -------------------------------------------------------------------- *)
 exception EqObsInError
