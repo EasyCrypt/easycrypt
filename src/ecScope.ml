@@ -108,29 +108,33 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Check_mode = struct
-  exception Full_check    (* Disable: checkproof off, i.e. check everything *)
-  exception Check of bool (* true check proofs, false do not check *)
+  type mode = [`Off | `On | `Forced]
+
+  exception Check of mode
 
   let mode =
-    let default = Check true in
     let for_loading = function
-      | Check _ -> Check false
-      | exn     -> exn
-    in GenOptions.register { for_loading } default
+      | Check `Off    -> Check `Off
+      | Check `On     -> Check `Off
+      | Check `Forced -> Check `Forced
+      | exn           -> exn
+    in GenOptions.register { for_loading } (Check `On)
 
   let check options =
     match GenOptions.get options mode with
-    | Check b -> b
-    | _       -> true
+    | Check `On     -> true
+    | Check `Forced -> true
+    | Check `Off    -> false
+    | _ -> true
 
-  let check_proof options b =
+  let set_checkproof options b =
     match GenOptions.get options mode with
-    | Check b' when b <> b' ->
-        GenOptions.set options mode (Check b')
+    | Check `On  when not b -> GenOptions.set options mode (Check `Off)
+    | Check `Off when     b -> GenOptions.set options mode (Check `On )
     | _ -> options
 
-  let full_check options =
-    GenOptions.set options mode Full_check
+  let set_fullcheck options =
+    GenOptions.set options mode (Check `Forced)
 end
 
 (* -------------------------------------------------------------------- *)
@@ -408,10 +412,11 @@ module Prover = struct
     in mk_prover_info scope options
 
   let full_check scope =
-    { scope with sc_options = Check_mode.full_check scope.sc_options }
+    Printf.printf "\n\nfoo\n\n%!";
+    { scope with sc_options = Check_mode.set_fullcheck scope.sc_options }
 
   let check_proof scope b =
-    { scope with sc_options = Check_mode.check_proof scope.sc_options b }
+    { scope with sc_options = Check_mode.set_checkproof scope.sc_options b }
 end
 
 (* -------------------------------------------------------------------- *)
