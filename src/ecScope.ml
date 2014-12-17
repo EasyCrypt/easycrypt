@@ -412,7 +412,6 @@ module Prover = struct
     in mk_prover_info scope options
 
   let full_check scope =
-    Printf.printf "\n\nfoo\n\n%!";
     { scope with sc_options = Check_mode.set_fullcheck scope.sc_options }
 
   let check_proof scope b =
