@@ -4,6 +4,43 @@
 
 (* -------------------------------------------------------------------- *)
 require import Fun.
+require import Int.
+
+(* -------------------------------------------------------------------- *)
+(* FIXME: TO BE MOVED                                                   *)
+theory IterOp.
+  op iter ['a] : int -> ('a -> 'a) -> 'a -> 'a.
+
+  axiom iter0 ['a] n opr (x : 'a): n <= 0 => iter n opr x = x.
+  axiom iterS ['a] n opr (x : 'a): 0 <= n => iter (n+1) opr x = opr (iter n opr x).
+
+  op iteri ['a] : int -> (int -> 'a -> 'a) -> 'a -> 'a.
+
+  axiom iteri0 ['a] n opr (x : 'a): n <= 0 => iteri n opr x  = x.
+  axiom iteriS ['a] n opr (x : 'a): 0 <= n => iteri (n+1) opr x = opr n (iteri n opr x).
+
+  op iterop ['a] (n : int) opr (x z : 'a) : 'a =
+    let f = fun i y, if i <= 0 then x else opr x y in
+    iteri n f z.
+
+  lemma iterop0 ['a] (n : int) opr (x z : 'a): n <= 0 =>
+    iterop n opr x z = z.
+  proof. by move=> le0_n; rewrite /iterop /= iteri0. qed.
+
+  lemma iterop1 ['a] opr (x z : 'a): iterop 1 opr x z = x.
+  proof. admit. qed.
+
+  lemma iteropS ['a] (n : int) opr (x z : 'a): 0 <= n =>
+    iterop (n+1) opr x z = iter n (opr x) x.
+  proof.                        (* FIXME *)
+    rewrite /iterop; elim/Int.Induction.induction n=> //=.
+    + rewrite iter0 // (iteriS 0) //. admit.
+    + move=> i ge0_i ih; rewrite iteriS 1:smt /= ih -(iterS _ (opr x)) //.
+      by case (i+1 <= 0) => //; smt.
+  qed.
+end IterOp.
+
+import IterOp.
 
 (* -------------------------------------------------------------------- *)
 theory ZModule.
@@ -91,9 +128,27 @@ theory ZModule.
 
   lemma nosmt eqr_opp (x y : t): (- x = - y) <=> (x = y).
   proof.
-    move: (can_eq (fun z, -z) (fun z, -z) _ x y) => //=.
+    move: (can_eq (fun (z : t), -z) (fun (z : t), -z) _ x y) => //=.
     by move=> z /=; rewrite opprK.
   qed.
+
+  op intmul (x : t) (n : int) =
+    if n < 0
+    then -(iterop (-n) ZModule.(+) x zeror)
+    else  (iterop   n  ZModule.(+) x zeror).
+
+  lemma intmul0 (x : t): intmul x 0 = zeror.
+  proof. by rewrite /intmul /= iterop0. qed.
+
+  lemma intmul1 (x : t): intmul x 1 = x.
+  proof. by rewrite /intmul /= iterop1. qed.
+
+  lemma intmulN (x : t) (n : int): intmul x (-n) = -(intmul x n).
+  proof. by rewrite /intmul; case (n < 0); smt. qed.
+
+  lemma intmulS (x : t) (n : int): 0 <= n =>
+    intmul x (n+1) = x + intmul x n.
+  proof. by move=> ge0_n; rewrite /intmul; smt. qed.
 end ZModule.
 
 (* -------------------------------------------------------------------- *)
@@ -117,6 +172,20 @@ theory ComRing.
   lemma nosmt mulrDr (x y z : t):
     x * (y + z) = x * y + x * z.
   proof. by rewrite mulrC mulrDl !(mulrC _ x). qed.
+
+  op ofint n = intmul oner n.
+
+  lemma ofint0: ofint 0 = zeror.
+  proof. by apply/intmul0. qed.
+
+  lemma ofint1: ofint 1 = oner.
+  proof. by apply/intmul1. qed.
+
+  lemma ofintS (i : int): 0 <= i => ofint (i+1) = oner + ofint i.
+  proof. by apply/intmulS. qed.
+
+  lemma ofintN (i : int): ofint (-i) = - (ofint i).
+  proof. by apply/intmulN. qed.
 end ComRing.
 
 (* -------------------------------------------------------------------- *)
@@ -141,7 +210,10 @@ theory IDomain.
   clone export ComRing with type t <- t.
 
   axiom mulf_eq0:
-    forall (x y : t), x * y = zeror => x = zeror \/ y = zeror.
+    forall (x y : t), x * y = zeror <=> x = zeror \/ y = zeror.
+
+  lemma mulf_neq0 (x y : t): x <> zeror => y <> zeror => x * y <> zeror.
+  proof. by move=> nz_x nz_y; apply/not_def => /mulf_eq0; smt. qed.
 end IDomain.
 
 (* -------------------------------------------------------------------- *)
@@ -153,6 +225,25 @@ theory Field.
   op inv: t -> t.
 
   axiom mulVf: forall (x : t), x <> zeror => (inv x) * x = oner.
+
+  op ( / ) (x y : t) = x * (inv y) axiomatized by divrE.
+
+  op exp (x : t) (n : int) =
+    if n < 0
+    then inv (iterop (-n) IDomain.ComRing.( * ) x oner)
+    else iterop n IDomain.ComRing.( * ) x oner.
+
+  lemma expr0 x: exp x 0 = oner.
+  proof. by rewrite /exp /= iterop0. qed.
+
+  lemma expr1 x: exp x 1 = x.
+  proof. by rewrite /exp /= iterop1. qed.
+
+  lemma exprS (x : t) i: 0 <= i => exp x (i+1) = x * (exp x i).
+  proof. smt. qed.
+
+  lemma exprN (x : t) (i : int): exp x (-i) = inv (exp x i).
+  proof. admit. qed.
 end Field.
 
 (* --------------------------------------------------------------------- *)
