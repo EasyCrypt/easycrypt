@@ -37,8 +37,5 @@ let _ = dispatch begin function
        flag ["ocaml"; "pkg_threads"; "compile"] (S[A "-thread"]);
        flag ["ocaml"; "pkg_threads"; "link"] (S[A "-thread"]);
 
-       (* Lint switches *)
-       flag ["ocaml"; "lint"; "compile"] (S[A "-ppx"; A "../lint/ppx_lint.native"])
-
    | _ -> ()
 end

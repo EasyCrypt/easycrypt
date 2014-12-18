@@ -8,6 +8,10 @@ OCAMLBUILD_EXTRA = -classic-display
 ifeq ($(shell echo $$TERM), dumb)
  OCAMLBUILD_EXTRA += -classic-display
 endif
+ifeq ($(LINT),1)
+ OCAMLBUILD_EXTRA += -tag lint
+endif
+
 OCAMLBUILD := $(OCAMLBUILD_BIN) $(OCAMLBUILD_EXTRA)
 
 DESTDIR    ?=
