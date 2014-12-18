@@ -1548,6 +1548,7 @@ module Theory = struct
 
       | None ->
           let imported = enter (for_loading scope) name in
+          let imported = { imported with sc_env = EcEnv.astop imported.sc_env } in
           let thname   = imported.sc_name in
           let imported = loader imported in
           check_end_required imported thname;

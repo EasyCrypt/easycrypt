@@ -131,6 +131,7 @@ type env_norm = {
 
 (* -------------------------------------------------------------------- *)
 type preenv = {
+  env_top      : EcPath.path option;
   env_gstate   : EcGState.gstate;
   env_scope    : escope;
   env_current  : mc;
@@ -181,6 +182,10 @@ let xroot (env : env) =
   | _ -> None
 
 (* -------------------------------------------------------------------- *)
+let astop (env : env) =
+  { env with env_top = Some (root env); }
+
+(* -------------------------------------------------------------------- *)
 let gstate (env : env) =
   env.env_gstate
 
@@ -227,7 +232,8 @@ let empty gstate =
     let icomps = MMsym.add name (IPPath path) MMsym.empty in
     { (empty_mc None) with mc_components = icomps } in
 
-  { env_gstate   = gstate;
+  { env_top      = None;
+    env_gstate   = gstate;
     env_scope    = { ec_path = path; ec_scope = `Theory; };
     env_current  = env_current;
     env_comps    = Mip.singleton (IPPath path) (empty_mc None);
@@ -508,20 +514,24 @@ module MC = struct
     path_of_qn p1 (EcPath.tolist p2)
 
   let lookup_mc qn env =
-      match qn with
-      | [] -> Some env.env_current
+    match qn with
+    | [] -> Some env.env_current
 
-      | x :: qn ->
-          let p =
-            (MMsym.last x env.env_current.mc_components) |>
-              obind
-                (fun p ->
-                  match p, qn with
-                  | IPIdent _, [] -> Some p
-                  | IPIdent _, _  -> None
-                  | IPPath  p, _  -> Some (IPPath (path_of_qn p qn)))
-          in
-            p |> obind (fun p -> Mip.find_opt p env.env_comps)
+    | x :: qn when x = EcCoreLib.i_top && is_some env.env_top ->
+        let p = IPPath (path_of_qn (oget env.env_top) qn) in
+        Mip.find_opt p env.env_comps
+
+    | x :: qn ->
+        let p =
+          (MMsym.last x env.env_current.mc_components) |>
+            obind
+              (fun p ->
+                match p, qn with
+                | IPIdent _, [] -> Some p
+                | IPIdent _, _  -> None
+                | IPPath  p, _  -> Some (IPPath (path_of_qn p qn)))
+        in
+          p |> obind (fun p -> Mip.find_opt p env.env_comps)
 
   (* ------------------------------------------------------------------ *)
   let lookup proj (qn, x) env =
