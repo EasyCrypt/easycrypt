@@ -42,14 +42,15 @@ and pucflags = {
 val notify : scope -> EcGState.loglevel -> ('a, Format.formatter, unit, unit) format4 -> 'a
 
 (* -------------------------------------------------------------------- *)
-val empty   : EcGState.gstate -> scope
-val gstate  : scope -> EcGState.gstate
-val path    : scope -> EcPath.path
-val name    : scope -> symbol
-val env     : scope -> EcEnv.env
-val attop   : scope -> bool
-val goal    : scope -> proof_auc option
-val xgoal   : scope -> proof_uc option
+val empty  : EcGState.gstate -> scope
+val gstate : scope -> EcGState.gstate
+val freeze : scope -> scope
+val path   : scope -> EcPath.path
+val name   : scope -> symbol
+val env    : scope -> EcEnv.env
+val attop  : scope -> bool
+val goal   : scope -> proof_auc option
+val xgoal  : scope -> proof_uc option
 
 type topmode = [`InProof | `InActiveProof | `InTop]
 

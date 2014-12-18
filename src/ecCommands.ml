@@ -596,20 +596,13 @@ let initial ~checkmode ~boot =
   let loader  = EcLoader.forsys loader in
   let gstate  = EcGState.from_flags [("profile", profile)] in
   let scope   = EcScope.empty gstate in
-  let scope   =
-    if   boot
-    then scope
-    else
-      List.fold_left
-        (fun scope th -> process_th_require loader scope th)
-        scope [prelude]
-  in
+  let scope   = if boot then scope else process_th_require loader scope prelude in
 
   let scope = EcScope.Prover.set_wrapper scope wrapper in
   let scope = EcScope.Prover.set_default scope poptions in
   let scope = if checkall then EcScope.Prover.full_check scope else scope in
 
-  scope
+  EcScope.freeze scope
 
 (* -------------------------------------------------------------------- *)
 type context = {

@@ -200,6 +200,7 @@ type scope = {
   sc_name     : symbol;
   sc_env      : EcEnv.env;
   sc_top      : scope option;
+  sc_prelude  : EcEnv.env option;
   sc_loaded   : (EcEnv.ctheory_w3 * symbol list) Msym.t;
   sc_required : symbol list;
   sc_pr_uc    : proof_uc option;
@@ -213,6 +214,7 @@ let empty (gstate : EcGState.gstate) =
   { sc_name       = EcPath.basename (EcEnv.root env);
     sc_env        = env;
     sc_top        = None;
+    sc_prelude    = None;
     sc_loaded     = Msym.empty;
     sc_required   = [];
     sc_pr_uc      = None;
@@ -238,6 +240,12 @@ let env (scope : scope) =
 (* -------------------------------------------------------------------- *)
 let attop (scope : scope) =
   scope.sc_top = None
+
+(* -------------------------------------------------------------------- *)
+let freeze (scope : scope) =
+  assert (is_none scope.sc_prelude);
+  assert (attop scope);
+  { scope with sc_prelude = Some (env scope); }
 
 (* -------------------------------------------------------------------- *)
 let goal (scope : scope) =
@@ -278,14 +286,21 @@ end
 
 (* -------------------------------------------------------------------- *)
 let for_loading (scope : scope) =
-  let gstate = EcEnv.gstate scope.sc_env in
-  let gstate = EcGState.copy gstate in
+  let env =
+    match scope.sc_prelude with
+    | None     -> EcEnv.initial (EcGState.copy (EcEnv.gstate scope.sc_env))
+    | Some env -> EcEnv.copy env
+  in
 
-  EcGState.set_loglevel `Warning gstate;
-
-  { (empty gstate) with
-      sc_loaded  = scope.sc_loaded;
-      sc_options = GenOptions.for_loading scope.sc_options; }
+  { sc_name       = EcPath.basename (EcEnv.root env);
+    sc_env        = env;
+    sc_top        = None;
+    sc_prelude    = scope.sc_prelude;
+    sc_loaded     = scope.sc_loaded;
+    sc_required   = [];
+    sc_pr_uc      = None;
+    sc_options    = GenOptions.for_loading scope.sc_options;
+    sc_section    = EcSection.initial; }
 
 (* -------------------------------------------------------------------- *)
 let subscope (scope : scope) (name : symbol) =
@@ -294,12 +309,12 @@ let subscope (scope : scope) (name : symbol) =
   { sc_name       = name;
     sc_env        = env;
     sc_top        = Some scope;
+    sc_prelude    = scope.sc_prelude;
     sc_loaded     = scope.sc_loaded;
     sc_required   = scope.sc_required;
     sc_pr_uc      = None;
     sc_options    = GenOptions.for_subscope scope.sc_options;
-    sc_section    = scope.sc_section;
-  }
+    sc_section    = scope.sc_section; }
 
 (* -------------------------------------------------------------------- *)
 let maybe_add_to_section scope item =

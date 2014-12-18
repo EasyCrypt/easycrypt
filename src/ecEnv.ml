@@ -251,6 +251,10 @@ let empty gstate =
     env_norm     = ref empty_norm_cache; }
 
 (* -------------------------------------------------------------------- *)
+let copy (env : env) =
+  { env with env_gstate = EcGState.copy env.env_gstate }
+
+(* -------------------------------------------------------------------- *)
 type lookup_error = [
   | `XPath   of xpath
   | `MPath   of mpath
@@ -466,8 +470,7 @@ module MC = struct
     | IPPath  p           -> _params_of_path p env
     | IPIdent (_, None)   -> []
     | IPIdent (m, Some p) ->
-        if EcPath.prefix p <> None then
-          assert false;
+        assert (is_some (EcPath.prefix p));
         let mc = Mip.find_opt (IPIdent (m, None)) env.env_comps in
           [(oget mc).mc_parameters]
 
