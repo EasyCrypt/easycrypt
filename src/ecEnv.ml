@@ -470,7 +470,7 @@ module MC = struct
     | IPPath  p           -> _params_of_path p env
     | IPIdent (_, None)   -> []
     | IPIdent (m, Some p) ->
-        assert (is_some (EcPath.prefix p));
+        assert (is_none (EcPath.prefix p));
         let mc = Mip.find_opt (IPIdent (m, None)) env.env_comps in
           [(oget mc).mc_parameters]
 
