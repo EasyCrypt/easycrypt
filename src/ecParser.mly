@@ -305,6 +305,7 @@
 %token SAMPLE
 %token SEARCH
 %token SECTION
+%token SELF
 %token SEMICOLON
 %token SEQ
 %token SIM
@@ -402,11 +403,11 @@
 | nm=rlist1(UIDENT, DOT)
     { nm }
 
-| TOP
-    { [EcCoreLib.i_top] }
-
-| TOP DOT nm=rlist1(UIDENT, DOT)
+| TOP nm=rlist0(prefix(DOT, UIDENT), empty)
     { EcCoreLib.i_top :: nm }
+
+| SELF nm=rlist0(prefix(DOT, UIDENT), empty)
+    { EcCoreLib.i_self :: nm }
 
 _genqident(X):
 | x=X { ([], x) }

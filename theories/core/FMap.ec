@@ -329,7 +329,7 @@ axiom existb_exist (p:'a -> 'b -> bool) (m:('a,'b) map):
 lemma not_exist_all (p:'a -> 'b -> bool) (m:('a,'b) map):
   (!exist p m) = all (fun x y, !(p x y)) m.
 proof.
-by rewrite eq_iff /exist /Top.all; split; smt.
+by rewrite eq_iff /exist /Self.all; split; smt.
 qed.
 
 lemma not_existb_allb (p:'a -> 'b -> bool) (m:('a,'b) map):
@@ -447,7 +447,7 @@ by (rewrite dom_filter mem_filter).
 lemma leq_filter f (m:('a,'b) map):
   filter f m <= m.
 proof.
-by rewrite /Top.(<=)=> x x_in_f; rewrite get_filter;
+by rewrite /Self.(<=)=> x x_in_f; rewrite get_filter;
    cut:= mem_dom_filter f m x _; last intros=> [_ ->].
 qed.
 

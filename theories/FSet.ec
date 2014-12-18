@@ -504,7 +504,7 @@ proof.
   move=> x_in_s2; cut := add_destruct x s2 => /iffRL.
   move=> h; cut := h x_in_s2; case=> s2' [x_notin_s2' s2'E] {h}.
   rewrite s2'E card_add_nin //; cut: card s1 <= card s2'; last smt.
-  by apply/ih; move: subset; rewrite s2'E /Top.(<=); smt.
+  by apply/ih; move: subset; rewrite s2'E /Self.(<=); smt.
 qed.
 
 (* fold *)

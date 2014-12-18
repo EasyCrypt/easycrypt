@@ -41,7 +41,7 @@ by (intros=> X_leq_Y Y_leq_X; apply set_ext; smt).
 lemma leq_tran (X Y Z:'a set):
   X <= Y => Y <= Z => X <= Z.
 proof strict.
-by rewrite /Top.(<=); intros=> X_leq_Y Y_leq_Z x x_in_X;
+by rewrite /Self.(<=); intros=> X_leq_Y Y_leq_Z x x_in_X;
    apply Y_leq_Z=> //; apply X_leq_Y=> //.
 qed.
 

@@ -520,7 +520,7 @@ module MC = struct
     match qn with
     | [] -> Some env.env_current
 
-    | x :: qn when x = EcCoreLib.i_top && is_some env.env_top ->
+    | x :: qn when x = EcCoreLib.i_self && is_some env.env_top ->
         let p = IPPath (path_of_qn (oget env.env_top) qn) in
         Mip.find_opt p env.env_comps
 

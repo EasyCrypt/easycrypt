@@ -24,8 +24,9 @@ val s_dinter      : qsymbol
 val s_real_of_int : qsymbol
 
 (* -------------------------------------------------------------------- *)
-val i_top : symbol
-val p_top : path
+val i_top  : symbol
+val i_self : symbol
+val p_top  : path
 
 (* -------------------------------------------------------------------- *)
 val i_Pervasive : symbol

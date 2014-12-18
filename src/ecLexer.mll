@@ -173,6 +173,7 @@
     "pragma"      , PRAGMA     ;        (* KW: internal *)
 
     "Top"         , TOP        ;        (* KW: global *)
+    "Self"        , SELF       ;        (* KW: global *)
   ]
 
   let keywords = Hashtbl.create 97
