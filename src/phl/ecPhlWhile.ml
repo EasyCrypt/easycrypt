@@ -314,7 +314,7 @@ let t_equiv_while_r inv tc =
   let modir = s_write env cr in
   let post = generalize_mod env mr modir post in
   let post = generalize_mod env ml modil post in
-  let post = f_and_simpl inv post in
+  let post = f_and_simpl b_post post in
   let concl = f_equivS_r { es with es_sl = sl; es_sr = sr; es_po = post; } in
 
   FApi.xmutate1 tc `While [b_concl; concl]

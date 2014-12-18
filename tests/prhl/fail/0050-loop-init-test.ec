@@ -1,3 +1,5 @@
+require import Int.
+
 module U = {
   proc f1 () : int = {
     var y, x;
