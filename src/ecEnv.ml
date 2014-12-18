@@ -525,6 +525,7 @@ module MC = struct
         Mip.find_opt p env.env_comps
 
     | x :: qn ->
+        let x = if x = EcCoreLib.i_self then EcCoreLib.i_top else x in
         let p =
           (MMsym.last x env.env_current.mc_components) |>
             obind
