@@ -592,8 +592,11 @@ and process_full_pterm ?(implicits = false) pe pf =
 
     in
 
-    let isform = function PAFormula _ -> true | _ -> false in
-    if not (List.for_all isform pt.ptev_pt.pt_args) then pt else apply pt
+    let isform   = function PAFormula _ -> true | _ -> false in
+    let isglobal = function PTGlobal  _ -> true | _ -> false in
+
+    if List.for_all isform pt.ptev_pt.pt_args && isglobal pt.ptev_pt.pt_head
+    then apply pt else pt
 
   in process_pterm_args_app pt pf.fp_args
 
