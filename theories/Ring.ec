@@ -2,6 +2,8 @@
  * Copyright IMDEA Software Institute / INRIA - 2013, 2014
  * -------------------------------------------------------------------- *)
 
+pragma +implicits.
+
 (* -------------------------------------------------------------------- *)
 require import Fun.
 require import Int.
@@ -32,7 +34,7 @@ theory IterOp.
 
   lemma iteropS ['a] (n : int) opr (x z : 'a): 0 <= n =>
     iterop (n+1) opr x z = iter n (opr x) x.
-  proof.                        (* FIXME *)
+  proof.
     rewrite /iterop; elim n=> /=.
     + by rewrite iter0 // (iteriS 0).
     + move=> i ge0_i ih; rewrite iteriS 1:smt /= ih.
@@ -93,7 +95,7 @@ theory ZModule.
   proof. by move=> h; rewrite -(addrK x z) -h addrK. qed.
 
   lemma nosmt opprK (x : t): -(-x) = x.
-  proof. by apply (addIr (-x)); rewrite addNr addrN. qed.
+  proof. by apply @(addIr (-x)); rewrite addNr addrN. qed.
 
   lemma nosmt oppr0: -zeror = zeror.
   proof. by rewrite -(addr0 (-zeror)) addNr. qed.
@@ -105,9 +107,7 @@ theory ZModule.
   proof. by rewrite subrE /= add0r. qed.
 
   lemma nosmt opprD (x y : t): -(x + y) = -x + -y.
-  proof.
-    by apply (addrI (x + y)); rewrite addrA addrN addrAC addrK addrN.
-  qed.
+  proof. by apply @(addrI (x + y)); rewrite addrA addrN addrAC addrK addrN. qed.
 
   lemma nosmt opprB (x y : t): -(x - y) = y - x.
   proof. by rewrite subrE /= opprD opprK addrC. qed.
@@ -150,6 +150,21 @@ theory ZModule.
     intmul x (n+1) = x + intmul x n.
   proof. by move=> ge0_n; rewrite /intmul; smt. qed.
 end ZModule.
+
+(* -------------------------------------------------------------------- *)
+clone ZModule as IntZMod with
+  type t <- int,
+  op   zeror <- 0,
+  op   (+)   <- Int.( + ),
+  op   [-]   <- Int.([-]),
+  op   (-)   <- Int.( - )
+  proof *.
+
+realize addrA. by smt. qed.
+realize addrC. by smt. qed.
+realize add0r. by smt. qed.
+realize addNr. by smt. qed.
+realize subrE. by do 2! (apply/ExtEq.fun_ext=> _); smt. qed.
 
 (* -------------------------------------------------------------------- *)
 theory ComRing.
@@ -198,7 +213,7 @@ theory BoolRing.
 
   lemma nosmt addrK (x : t): x + x = zeror.
   proof.
-    apply (addrI (x + x)); rewrite addr0 -{1 2 3 4}mulrr.
+    apply @(addrI (x + x)); rewrite addr0 -{1 2 3 4}mulrr.
     by rewrite -mulrDr -mulrDl mulrr.
   qed.
 end BoolRing.
@@ -224,9 +239,37 @@ theory Field.
 
   op inv: t -> t.
 
+  axiom invf0: inv zeror = zeror.
   axiom mulVf: forall (x : t), x <> zeror => (inv x) * x = oner.
 
+  lemma mulfV (x : t): x <> zeror => x * (inv x) = oner.
+  proof. by move=> /mulVf <-; rewrite mulrC. qed.
+
   op ( / ) (x y : t) = x * (inv y) axiomatized by divrE.
+
+  lemma nosmt divrr (x : t): x <> zeror => x / x = oner.
+  proof. by move=> nz_x; rewrite divrE /= mulfV. qed.
+
+  lemma nosmt mulKr (x : t): x <> zeror => forall y, (inv x) * (x * y) = y.
+  proof. by move=> nz_y y; rewrite mulrA mulVf // mul1r. qed.
+
+  lemma nosmt mulrK (y : t): y <> zeror => forall x, (x * y) * (inv y) = x.
+  proof. by move=> nz_y x; rewrite -mulrA mulfV // mulr1. qed.
+
+  lemma nosmt mulVKr (x : t): x <> zeror => forall y, x * ((inv x) * y) = y.
+  proof. by move=> nz_x y; rewrite mulrA mulfV // mul1r. qed.
+
+  lemma nosmt mulrVK (y : t): y <> zeror => forall x, (x * (inv y)) * y = x.
+  proof. by move=> nz_y x; rewrite -mulrA mulVf // mulr1. qed.
+
+  lemma nosmt mulrI (x: t): x <> zeror => forall y z, x * y = x * z => y = z.
+  proof.                        (* FIXME *)
+    move=> nz_x y z;
+      apply @(can_inj (fun (y : t), x * y) (fun (y : t), inv x * y) _ y z);
+      apply @(mulKr _ nz_x).
+  qed.
+
+  axiom invK (x : t): inv (inv x) = x.
 
   op exp (x : t) (n : int) =
     if n < 0
@@ -243,7 +286,7 @@ theory Field.
   proof. smt. qed.
 
   lemma exprN (x : t) (i : int): exp x (-i) = inv (exp x i).
-  proof. admit. qed.
+  proof. by rewrite /exp /= IntZMod.opprK (fun_if inv) invK; smt. qed.
 end Field.
 
 (* --------------------------------------------------------------------- *)
