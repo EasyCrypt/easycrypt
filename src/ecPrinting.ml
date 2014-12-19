@@ -170,6 +170,13 @@ module PPEnv = struct
       then ([], EcPath.basename p)
       else p_shorten exists p
 
+  let ax_symb (ppe : t) p =
+    let exists sm =
+      try  EcPath.p_equal (EcEnv.Ax.lookup_path sm ppe.ppe_env) p
+      with EcEnv.LookupFailure _ -> false
+    in
+      p_shorten exists p
+
   let th_symb (ppe : t) p =
     let exists sm =
       try  EcPath.p_equal (EcEnv.Theory.lookup_path sm ppe.ppe_env) p
@@ -901,10 +908,6 @@ let pp_chained_orderings (ppe : PPEnv.t) t_ty pp_sub outer fmt (f, fs) =
           f fs))
 
 (* -------------------------------------------------------------------- *)
-let pp_opname (ppe : PPEnv.t) fmt (p : EcPath.path) =
-  EcSymbols.pp_qsymbol fmt (PPEnv.op_symb ppe p None)
-
-(* -------------------------------------------------------------------- *)
 let pp_locbind (ppe : PPEnv.t) (x, ty) =
   let tenv1  = PPEnv.add_local ppe x in
   let pp fmt =
@@ -1601,7 +1604,9 @@ let pp_opdecl_op (ppe : PPEnv.t) fmt (x, ts, ty, op) =
 let pp_opdecl ?(long=false) (ppe : PPEnv.t) fmt (x, op) =
   let pp_name fmt x = 
     if long then 
-      Format.fprintf fmt "(* %a *)@ " (pp_opname ppe) x in
+      let qs = PPEnv.op_symb ppe x None in
+      if fst qs <> [] then 
+      Format.fprintf fmt "(* %a *)@ " pp_opname qs in
   let pp_decl fmt op = 
     match op.op_kind with
     | OB_oper i -> pp_opdecl_op ppe fmt (x, op.op_tparams, op_ty op, i)
@@ -1609,26 +1614,42 @@ let pp_opdecl ?(long=false) (ppe : PPEnv.t) fmt (x, op) =
   Format.fprintf fmt "@[<v>%a%a@]" pp_name x pp_decl op
 
 (* -------------------------------------------------------------------- *)
+let pp_opname (ppe : PPEnv.t) fmt (p : EcPath.path) =
+  pp_opname fmt (PPEnv.op_symb ppe p None)
+
+(* -------------------------------------------------------------------- *)
 let string_of_axkind = function
   | `Axiom -> "axiom"
   | `Lemma -> "lemma"
 
-let pp_axiom (ppe : PPEnv.t) fmt (x, ax) =
+let pp_axiom ?(long=false) (ppe : PPEnv.t) fmt (x, ax) =
   let ppe = PPEnv.add_locals ppe (List.map fst ax.ax_tparams) in
   let basename = P.basename x in
 
   let pp_spec fmt =
     match ax.ax_spec with
     | None   -> pp_string fmt "<why3-imported>"
-    | Some f -> pp_form ppe fmt f
-
+    | Some f -> pp_form ppe fmt f 
   and pp_name fmt =
     match ax.ax_tparams with
-    | [] -> pp_string fmt basename
+    | [] -> Format.fprintf fmt "%s"    basename
     | ts -> Format.fprintf fmt "%s %a" basename (pp_tyvarannot ppe) ts
   in
+  
+  let pp_long fmt x = 
+     if long then 
+       let qs = PPEnv.ax_symb ppe x in
+       if fst qs <> [] then
+         Format.fprintf fmt "(* %a *)@ " EcSymbols.pp_qsymbol qs in
+  let pp_decl fmt () =
     Format.fprintf fmt "@[<hov 2>%s %t:@ %t.@]"
-      (string_of_axkind ax.ax_kind) pp_name pp_spec
+      (string_of_axkind ax.ax_kind) pp_name pp_spec in
+
+  Format.fprintf fmt "@[<v>%a%a@]" pp_long x pp_decl ()
+
+
+
+
 
 (* -------------------------------------------------------------------- *)
 type ppnode1 = [

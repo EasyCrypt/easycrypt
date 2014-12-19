@@ -37,7 +37,7 @@ val pp_tyname  : PPEnv.t -> EcPath.path pp
 
 val pp_typedecl : PPEnv.t -> (EcPath.path * EcDecl.tydecl                ) pp
 val pp_opdecl   : ?long:bool -> PPEnv.t -> (EcPath.path * EcDecl.operator) pp
-val pp_axiom    : PPEnv.t -> (EcPath.path * EcDecl.axiom                 ) pp
+val pp_axiom    : ?long:bool -> PPEnv.t -> (EcPath.path * EcDecl.axiom   ) pp
 val pp_theory   : PPEnv.t -> (EcPath.path * EcTheory.ctheory             ) pp
 val pp_modtype  : PPEnv.t -> (EcModules.module_type * EcModules.mod_restr) pp
 val pp_modexp   : PPEnv.t -> EcModules.module_expr                         pp

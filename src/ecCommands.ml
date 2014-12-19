@@ -155,13 +155,16 @@ module ObjectInfo = struct
 
   (* ------------------------------------------------------------------ *)
   let pr_op_r =
+    let get_ops qs env =
+      let l = EcEnv.Op.all (fun _ -> true) qs env in
+      if l = [] then raise NoObject;
+      l in
     { od_name    = "operators or predicates";
-      od_lookup  = EcEnv.Op.all (fun _ -> true) ;
+      od_lookup  = get_ops;
       od_printer = 
         fun ppe fmt l ->
-          let long = l <> [] in
           Format.fprintf fmt "@[<v>%a@]"
-            (EcPrinting.pp_list "@ " (EcPrinting.pp_opdecl ~long ppe)) l; }
+            (EcPrinting.pp_list "@ " (EcPrinting.pp_opdecl ~long:true ppe)) l; }
 
   let pr_op = pr_gen pr_op_r
 
@@ -175,9 +178,16 @@ module ObjectInfo = struct
 
   (* ------------------------------------------------------------------ *)
   let pr_ax_r =
+    let get_ops qs env =
+      let l = EcEnv.Ax.all (fun _ -> true) qs env in
+      if l = [] then raise NoObject;
+      l in
     { od_name    = "lemmas or axioms";
-      od_lookup  = EcEnv.Ax.lookup;
-      od_printer = EcPrinting.pp_axiom; }
+      od_lookup  = get_ops;
+      od_printer = 
+        fun ppe fmt l ->
+          Format.fprintf fmt "@[<v>%a@]"
+            (EcPrinting.pp_list "@ " (EcPrinting.pp_axiom ~long:true ppe)) l; }
 
   let pr_ax = pr_gen pr_ax_r
 
