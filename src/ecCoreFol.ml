@@ -874,14 +874,49 @@ let form_exists g f =
   | Ftuple   es           -> List.exists g es
   | Fproj    (e, _)       -> g e
 
-  | FhoareF   hf  -> g hf.hf_pr || g hf.hf_po
-  | FhoareS   hs  -> g hs.hs_pr || g hs.hs_po
+  | FhoareF   hf  -> g hf.hf_pr   || g hf.hf_po
+  | FhoareS   hs  -> g hs.hs_pr   || g hs.hs_po
   | FbdHoareF bhf -> g bhf.bhf_pr || g bhf.bhf_po
   | FbdHoareS bhs -> g bhs.bhs_pr || g bhs.bhs_po
-  | FequivF   ef  -> g ef.ef_pr || g ef.ef_po
-  | FequivS   es  -> g es.es_pr || g es.es_po
-  | FeagerF   eg  -> g eg.eg_pr || g eg.eg_po
+  | FequivF   ef  -> g ef.ef_pr   || g ef.ef_po
+  | FequivS   es  -> g es.es_pr   || g es.es_po
+  | FeagerF   eg  -> g eg.eg_pr   || g eg.eg_po
   | Fpr       pr  -> g pr.pr_args || g pr.pr_event
+
+(* -------------------------------------------------------------------- *)
+let form_forall g f =
+  match f.f_node with
+  | Fint     _
+  | Flocal   _
+  | Fpvar    _
+  | Fglob    _ 
+  | Fop      _ -> true
+
+  | Fquant   (_ , _ , f1) -> g f1
+  | Fif      (f1, f2, f3) -> g f1 && g f2 && g f3
+  | Flet     (_, f1, f2)  -> g f1 && g f2
+  | Fapp     (e, es)      -> List.for_all g (e :: es)
+  | Ftuple   es           -> List.for_all g es
+  | Fproj    (e, _)       -> g e
+
+  | FhoareF   hf  -> g hf.hf_pr   && g hf.hf_po
+  | FhoareS   hs  -> g hs.hs_pr   && g hs.hs_po
+  | FbdHoareF bhf -> g bhf.bhf_pr && g bhf.bhf_po
+  | FbdHoareS bhs -> g bhs.bhs_pr && g bhs.bhs_po
+  | FequivF   ef  -> g ef.ef_pr   && g ef.ef_po
+  | FequivS   es  -> g es.es_pr   && g es.es_po
+  | FeagerF   eg  -> g eg.eg_pr   && g eg.eg_po
+  | Fpr       pr  -> g pr.pr_args && g pr.pr_event
+
+let used_ops f = 
+  let ops = ref EcPath.Sp.empty in
+  let add p = ops := EcPath.Sp.add p !ops in
+  let rec aux f = 
+    match f.f_node with
+    | Fop(p,_) -> add p
+    | _ -> f_iter aux f in
+  aux f;
+  !ops
 
 (* -------------------------------------------------------------------- *)
 exception DestrError of string
