@@ -28,15 +28,15 @@ theory IterOp.
   proof. by move=> le0_n; rewrite /iterop /= iteri0. qed.
 
   lemma iterop1 ['a] opr (x z : 'a): iterop 1 opr x z = x.
-  proof. admit. qed.
+  proof. by rewrite /iterop /= (iteriS 0). qed.
 
   lemma iteropS ['a] (n : int) opr (x z : 'a): 0 <= n =>
     iterop (n+1) opr x z = iter n (opr x) x.
   proof.                        (* FIXME *)
-    rewrite /iterop; elim/Int.Induction.induction n=> //=.
-    + rewrite iter0 // (iteriS 0) //. admit.
-    + move=> i ge0_i ih; rewrite iteriS 1:smt /= ih -(iterS _ (opr x)) //.
-      by case (i+1 <= 0) => //; smt.
+    rewrite /iterop; elim n=> /=.
+    + by rewrite iter0 // (iteriS 0).
+    + move=> i ge0_i ih; rewrite iteriS 1:smt /= ih.
+      by rewrite -(iterS _ (opr x)) //; cut ->: ! (i+1 <= 0) by smt.
   qed.
 end IterOp.
 
