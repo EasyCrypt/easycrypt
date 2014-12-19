@@ -213,7 +213,7 @@ theory IDomain.
     forall (x y : t), x * y = zeror <=> x = zeror \/ y = zeror.
 
   lemma mulf_neq0 (x y : t): x <> zeror => y <> zeror => x * y <> zeror.
-  proof. by move=> nz_x nz_y; apply/not_def => /mulf_eq0; smt. qed.
+  proof. by move=> nz_x nz_y; apply/not_def; rewrite mulf_eq0; smt. qed.
 end IDomain.
 
 (* -------------------------------------------------------------------- *)
