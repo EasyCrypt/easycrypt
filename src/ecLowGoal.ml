@@ -942,7 +942,7 @@ let t_elimT_ind ?reduce mode (tc : tcenv1) =
         let id   = LDecl.fresh_id hyps (EcIdent.name x) in
   
         FApi.t_seqs
-          [t_intros_i_seq ~clear:false [id] (elim (id, ty));
+          [t_intros_i_seq ~clear:true [id] (elim (id, ty));
            t_simplify_with_info EcReduction.beta_red]
           tc
       end
