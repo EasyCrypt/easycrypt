@@ -2629,9 +2629,9 @@ global_:
 | gprover_info     { Gprover_info $1 }
 | addrw            { Gaddrw       $1 }
 
-| x=loc(QED)        { Gsave x.pl_loc }
-| PRINT p=print     { Gprint     p   }
-| SEARCH qs=qoident { Gsearch    qs  }
+| x=loc(QED)         { Gsave x.pl_loc }
+| PRINT p=print      { Gprint     p   }
+| SEARCH qs=qoident* { Gsearch   qs   }
 
 | PRAGMA x=lident  { Gpragma    x   }
 

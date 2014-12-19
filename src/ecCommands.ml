@@ -81,26 +81,35 @@ let () =
 
 (* -------------------------------------------------------------------- *)
 module Search = struct
-  let search fmt (scope : EcScope.scope) qs  =
+  let search fmt (scope : EcScope.scope) qs_s  =
     let env = EcScope.env scope in
-    let all_path = EcEnv.Op.all (fun _ -> true) qs.pl_desc env in
+    let do_op qs = 
+      let all_path = EcEnv.Op.all (fun _ -> true) qs.pl_desc env in
+      if all_path = [] then 
+        EcScope.hierror ~loc:qs.pl_loc 
+          "unknown operator %a" EcSymbols.pp_qsymbol qs.pl_desc;
+      let all_path = List.map fst all_path in
+      EcPath.Sp.of_list all_path in
+
+    let sps = List.map do_op qs_s in
+    
     let ppe = EcPrinting.PPEnv.ofenv env in
 
-    let do1 fmt (p, _) =
-      let rec exists f =
-        match f.EcFol.f_node with
-        | EcFol.Fop(p', _) -> EcPath.p_equal p p' 
-        | _ -> EcFol.form_exists exists f in
+    let test f = 
+      let ops = EcFol.used_ops f in
+      not (List.exists (EcPath.Sp.disjoint ops) sps) in 
 
-      let doax pax ax = 
-        match ax.EcDecl.ax_spec with
-        | None -> ()
-        | Some f -> 
-          if exists f then
-            Format.fprintf fmt "%a@ " (EcPrinting.pp_axiom ppe) (pax, ax)
-      in EcEnv.Ax.iter doax env
+    let doax pax ax = 
+      match ax.EcDecl.ax_spec with
+      | None -> ()
+      | Some f -> 
+        if test f then
+          Format.fprintf fmt "%a@ " (EcPrinting.pp_axiom ~long:true ppe) (pax, ax)
+    in 
+    Format.fprintf fmt "@[<v>";
+    EcEnv.Ax.iter doax env;
+    Format.fprintf fmt "@]@."
 
-    in Format.fprintf fmt "@[<v>%a@]@."(EcPrinting.pp_list "@ " do1) all_path
 end
 
 let process_search scope qs =
