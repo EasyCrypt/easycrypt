@@ -594,7 +594,7 @@ module FPosition = struct
               (f_app h a1 (toarrow (List.map f_ty a2) tp.f_ty), na)
         | _ -> (tp, -1)
       in
-        if EcReduction.is_alpha_eq hyps p tp then `Accept ti else `Continue
+      if EcReduction.is_conv hyps p tp then `Accept ti else `Continue
 
     in select ?o test target
 
