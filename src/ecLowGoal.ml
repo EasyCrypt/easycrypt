@@ -899,13 +899,13 @@ let pf_gen_tuple_elim ?witheq tys hyps pe =
 (* -------------------------------------------------------------------- *)
 let t_elimT_ind ?reduce mode (tc : tcenv1) =
   let elim (id, ty) tc =
-    let tc, pt =
+    let tc, pt, sk =
       let env, hyps, _ = FApi.tc1_eflat tc in
 
       match EcEnv.Ty.scheme_of_ty mode ty env with
       | Some (p, typ) ->
           let pt = { pt_head = PTGlobal (p, typ); pt_args = []; } in
-          (tc, pt)
+          (tc, pt, 0)
 
       | None ->
           match (EcEnv.Ty.hnorm ty env).ty_node with
@@ -913,21 +913,26 @@ let t_elimT_ind ?reduce mode (tc : tcenv1) =
               let indtc  = pf_gen_tuple_elim ~witheq:false tys hyps in
               let tc, hd = FApi.bwd1_of_fwd indtc tc in
               let pt     = { pt_head = PTHandle hd; pt_args = []; } in
-              (tc, pt)
+              (tc, pt, 0)
 
           | _ when EcReduction.EqTest.for_type env tunit ty ->
               let pt = { pt_head = PTGlobal (LG.p_unit_elim, []);
                          pt_args = []; } in
-              (tc, pt)
+              (tc, pt, 0)
+
+          | _ when EcReduction.EqTest.for_type env tint ty ->
+              let pt = { pt_head = PTGlobal (EcCoreLib.CI_Int.p_int_elim, []);
+                         pt_args = []; } in
+              (tc, pt, 1)
 
           | _ when EcReduction.EqTest.for_type env tbool ty ->
               let pt = { pt_head = PTGlobal (LG.p_bool_elim, []);
                          pt_args = []; } in
-              (tc, pt)
+              (tc, pt, 0)
 
           | _ -> raise InvalidGoalShape
     in
-      t_elimT_form pt (f_local id ty) tc
+      t_elimT_form ~sk pt (f_local id ty) tc
   in
 
   let doit fp tc =
@@ -937,7 +942,7 @@ let t_elimT_ind ?reduce mode (tc : tcenv1) =
         let id   = LDecl.fresh_id hyps (EcIdent.name x) in
   
         FApi.t_seqs
-          [t_intros_i_seq ~clear:true [id] (elim (id, ty));
+          [t_intros_i_seq ~clear:false [id] (elim (id, ty));
            t_simplify_with_info EcReduction.beta_red]
           tc
       end
