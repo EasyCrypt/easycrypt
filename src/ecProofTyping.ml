@@ -21,9 +21,14 @@ let unienv_of_hyps hyps =
 
 (* ------------------------------------------------------------------ *)
 let process_form_opt hyps pf oty =
-  let ue  = unienv_of_hyps hyps in
-  let ff  = EcTyping.trans_form_opt (LDecl.toenv hyps) ue pf oty in
+  try
+    let ue  = unienv_of_hyps hyps in
+    let ff  = EcTyping.trans_form_opt (LDecl.toenv hyps) ue pf oty in
     EcFol.Fsubst.uni (EcUnify.UniEnv.close ue) ff
+
+  with EcUnify.UninstanciateUni ->
+    EcTyping.tyerror pf.EcLocation.pl_loc
+      (LDecl.toenv hyps) EcTyping.FreeTypeVariables
 
 let process_form hyps pf ty =
   process_form_opt hyps pf (Some ty)

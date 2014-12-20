@@ -46,6 +46,7 @@ type mem_error =
 
 type tyerror =
 | UniVarNotAllowed
+| FreeTypeVariables
 | TypeVarNotAllowed
 | OnlyMonoTypeAllowed
 | UnboundTypeParameter   of symbol

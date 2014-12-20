@@ -56,6 +56,7 @@ type mem_error =
 
 type tyerror =
 | UniVarNotAllowed
+| FreeTypeVariables
 | TypeVarNotAllowed
 | OnlyMonoTypeAllowed
 | UnboundTypeParameter   of symbol
@@ -142,6 +143,9 @@ let pp_tyerror env fmt error =
   match error with
   | UniVarNotAllowed ->
       msg "type place holders not allowed"
+
+  | FreeTypeVariables ->
+      msg "this expression contains free type variables"
 
   | TypeVarNotAllowed ->
       msg "type variables not allowed"
