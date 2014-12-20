@@ -1479,7 +1479,7 @@ import_flag:
 | EXPORT { `Export }
 
 theory_require :
-| REQUIRE ip=import_flag? x=uident { (x, ip) }
+| REQUIRE ip=import_flag? x=uident+ { (x, ip) }
 
 theory_import: IMPORT x=uqident { x }
 theory_export: EXPORT x=uqident { x }

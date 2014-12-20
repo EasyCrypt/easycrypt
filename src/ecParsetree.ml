@@ -781,7 +781,7 @@ type global =
   | Gsearch      of pqsymbol list
   | GthOpen      of psymbol
   | GthClose     of psymbol
-  | GthRequire   of (psymbol * [`Import|`Export] option)
+  | GthRequire   of (psymbol list * [`Import|`Export] option)
   | GthImport    of pqsymbol
   | GthExport    of pqsymbol
   | GthClone     of (theory_cloning * [`Import|`Export] option)

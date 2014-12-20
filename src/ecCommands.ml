@@ -411,7 +411,7 @@ and process_th_close (scope : EcScope.scope) name =
   snd (EcScope.Theory.exit scope)
 
 (* -------------------------------------------------------------------- *)
-and process_th_require ld scope (x, io) =
+and process_th_require1 ld scope (x, io) =
   EcScope.check_state `InTop "theory require" scope;
 
   let name  = x.pl_desc in
@@ -441,6 +441,12 @@ and process_th_require ld scope (x, io) =
           | None         -> scope
           | Some `Export -> process_th_export scope ([], name)
           | Some `Import -> process_th_import scope ([], name)
+
+(* -------------------------------------------------------------------- *)
+and process_th_require ld scope (xs, io) =
+  List.fold_left
+    (fun scope x -> process_th_require1 ld scope (x, io))
+    scope xs
 
 (* -------------------------------------------------------------------- *)
 and process_th_import (scope : EcScope.scope) name =
@@ -615,7 +621,7 @@ let initial ~checkmode ~boot =
   let loader  = EcLoader.forsys loader in
   let gstate  = EcGState.from_flags [("profile", profile)] in
   let scope   = EcScope.empty gstate in
-  let scope   = if boot then scope else process_th_require loader scope prelude in
+  let scope   = if boot then scope else process_th_require1 loader scope prelude in
 
   let scope = EcScope.Prover.set_wrapper scope wrapper in
   let scope = EcScope.Prover.set_default scope poptions in
