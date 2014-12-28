@@ -31,7 +31,7 @@ SYSDIR := $(LIBDIR)/system
 # --------------------------------------------------------------------
 XUNITOUT ?= xunit.xml
 ECARGS   ?=
-ECTOUT   ?= 3
+ECTOUT   ?= 5
 CHECK    := scripts/testing/runtest
 CHECK    += --bin-args="$(ECARGS)" --timeout="$(ECTOUT)"
 CHECK    += config/tests.config
