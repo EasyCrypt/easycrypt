@@ -210,9 +210,8 @@ let fmdelta = { fm_delta = true ; }
 let f_match_core opts hyps (ue, ev) ~ptn subject =
   let ue  = EcUnify.UniEnv.copy ue in
   let ev  = ref ev in
-  let env = EcEnv.LDecl.toenv hyps in
 
-  let rec doit ((subst, mxs) as ilc) ptn subject =
+  let rec doit env ((subst, mxs) as ilc) ptn subject =
     try
       match ptn.f_node, subject.f_node with
       | Flocal x1, Flocal x2 when Mid.mem x1 mxs -> begin
@@ -254,8 +253,8 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
       | Fquant (b1, q1, f1), Fquant (b2, q2, f2)
           when b1 = b2 && List.length q1 = List.length q2
         ->
-        let (subst, mxs) = doit_bindings (subst, mxs) q1 q2 in
-          doit (subst, mxs) f1 f2
+        let (env, subst, mxs) = doit_bindings env (subst, mxs) q1 q2 in
+          doit env (subst, mxs) f1 f2
 
       | Fquant _, Fquant _ ->
           raise MatchFailure
@@ -265,28 +264,28 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
           let pv2 = EcEnv.NormMp.norm_pvar env pv2 in
             if not (EcTypes.pv_equal pv1 pv2) then
               raise MatchFailure;
-            doit_mem mxs m1 m2
+            doit_mem env mxs m1 m2
 
       | Fif (c1, t1, e1), Fif (c2, t2, e2) ->
-          List.iter2 (doit ilc) [c1; t1; e1] [c2; t2; e2]
+          List.iter2 (doit env ilc) [c1; t1; e1] [c2; t2; e2]
 
       | Fint i1, Fint i2 ->
           if i1 <> i2 then raise MatchFailure
 
       | Fapp (f1, fs1), Fapp (f2, fs2) ->
-          doit_args ilc (f1::fs1) (f2::fs2)
+          doit_args env ilc (f1::fs1) (f2::fs2)
 
       | Fglob (mp1, me1), Fglob (mp2, me2) ->
           let mp1 = EcEnv.NormMp.norm_mpath env mp1 in
           let mp2 = EcEnv.NormMp.norm_mpath env mp2 in
             if not (EcPath.m_equal mp1 mp2) then
               raise MatchFailure;
-            doit_mem mxs me1 me2
+            doit_mem env mxs me1 me2
 
       | Ftuple fs1, Ftuple fs2 ->
           if List.length fs1 <> List.length fs2 then
             raise MatchFailure;
-          List.iter2 (doit ilc) fs1 fs2
+          List.iter2 (doit env ilc) fs1 fs2
 
       | Fop (op1, tys1), Fop (op2, tys2) -> begin
           if not (EcPath.p_equal op1 op2) then
@@ -310,38 +309,38 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
               raise MatchFailure;
             try
               List.iter2 (EcUnify.unify env ue) tys1 tys2;
-              doit_args ilc args1 args2
+              doit_args env ilc args1 args2
             with EcUnify.UnificationFailure _ -> raise MatchFailure
           with MatchFailure ->
             if EcEnv.Op.reducible env op1 then
-              doit_reduce ((doit ilc)^~ subject) ptn.f_ty op1 tys1 args1
+              doit_reduce env ((doit env ilc)^~ subject) ptn.f_ty op1 tys1 args1
             else if EcEnv.Op.reducible env op2 then
-              doit_reduce (doit ilc ptn) subject.f_ty op2 tys2 args2
+              doit_reduce env (doit env ilc ptn) subject.f_ty op2 tys2 args2
             else
               raise MatchFailure
       end
 
       | (Fop (op1, tys1), args1), _ when EcEnv.Op.reducible env op1 ->
-          doit_reduce ((doit ilc)^~ subject) ptn.f_ty op1 tys1 args1
+          doit_reduce env ((doit env ilc)^~ subject) ptn.f_ty op1 tys1 args1
 
       | _, (Fop (op2, tys2), args2) when EcEnv.Op.reducible env op2 ->
-          doit_reduce (doit ilc ptn) subject.f_ty op2 tys2 args2
+          doit_reduce env (doit env ilc ptn) subject.f_ty op2 tys2 args2
 
       | _, _ -> raise MatchFailure
 
-  and doit_args ilc fs1 fs2 =
+  and doit_args env ilc fs1 fs2 =
     if List.length fs1 <> List.length fs2 then
       raise MatchFailure;
-    List.iter2 (doit ilc) fs1 fs2
+    List.iter2 (doit env ilc) fs1 fs2
 
-  and doit_reduce cb ty op tys f =
+  and doit_reduce env cb ty op tys f =
     let reduced =
       try  f_app (EcEnv.Op.reduce env op tys) f ty
       with NotReducible -> raise MatchFailure
     in
       cb (odfl reduced (EcReduction.h_red_opt EcReduction.beta_red hyps reduced))
 
-  and doit_mem mxs m1 m2 =
+  and doit_mem _env mxs m1 m2 =
     match EV.get m1 !ev.evm_mem with
     | None ->
         if not (EcMemory.mem_equal m1 m2) then
@@ -356,13 +355,13 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
         if not (EcMemory.mem_equal m1 m2) then
           raise MatchFailure
 
-  and doit_bindings (subst, mxs) q1 q2 =
-    let doit_binding (subst, mxs) (x1, gty1) (x2, gty2) =
+  and doit_bindings env (subst, mxs) q1 q2 =
+    let doit_binding (env, subst, mxs) (x1, gty1) (x2, gty2) =
       let gty2 = Fsubst.gty_subst subst gty2 in
 
       assert (not (Mid.mem x1 mxs) && not (Mid.mem x2 mxs));
 
-      let subst =
+      let env, subst =
         match gty1, gty2 with
         | GTty ty1, GTty ty2 ->
             begin
@@ -370,12 +369,17 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
               with EcUnify.UnificationFailure _ -> raise MatchFailure
             end;
 
-            if   id_equal x1 x2
-            then subst
-            else Fsubst.f_bind_local subst x2 (f_local x1 ty2)
+            let subst =
+              if   id_equal x1 x2
+              then subst
+              else Fsubst.f_bind_local subst x2 (f_local x1 ty2)
+
+            and env = EcEnv.Var.bind_local x1 ty1 env in
+
+            (env, subst)
 
         | GTmem None, GTmem None ->
-            subst
+            (env, subst)
 
         | GTmem (Some m1), GTmem (Some m2) ->
             let xp1 = EcMemory.lmt_xpath m1 in
@@ -396,9 +400,11 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
             then
               raise MatchFailure;
 
-            if   id_equal x1 x2
-            then subst
-            else Fsubst.f_bind_mem subst x2 x1
+            let subst =
+              if   id_equal x1 x2
+              then subst
+              else Fsubst.f_bind_mem subst x2 x1
+            in (env, subst)
 
         | GTmodty (p1, r1), GTmodty (p2, r2) ->
             if not (ModTy.mod_type_equiv env p1 p2) then
@@ -406,18 +412,24 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
             if not (NormMp.equal_restr env r1 r2) then
               raise MatchFailure;
 
-            if   id_equal x1 x2
-            then subst
-            else Fsubst.f_bind_mod subst x2 (EcPath.mident x1)
+            let subst =
+              if   id_equal x1 x2
+              then subst
+              else Fsubst.f_bind_mod subst x2 (EcPath.mident x1)
+
+            and env = EcEnv.Mod.bind_local x1 p1 r1 env in
+
+            (env, subst)
 
         | _, _ -> raise MatchFailure
       in
-        (subst, Mid.add x1 x2 mxs)
+        (env, subst, Mid.add x1 x2 mxs)
     in
-      List.fold_left2 doit_binding (subst, mxs) q1 q2
+      List.fold_left2 doit_binding (env, subst, mxs) q1 q2
 
   in
-    doit (Fsubst.f_subst_id, Mid.empty) ptn subject; (ue, !ev)
+    doit (EcEnv.LDecl.toenv hyps) (Fsubst.f_subst_id, Mid.empty) ptn subject;
+    (ue, !ev)
 
 let f_match opts hyps (ue, ev) ~ptn subject =
   let (ue, ev) = f_match_core opts hyps (ue, ev) ~ptn subject in

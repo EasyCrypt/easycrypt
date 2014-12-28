@@ -13,6 +13,9 @@ open EcModules
 type memory = EcMemory.memory
 
 module Mp = EcPath.Mp
+module Sp = EcPath.Sp
+module Sm = EcPath.Sm
+module Sx = EcPath.Sx
 
 (* -------------------------------------------------------------------- *)
 type gty =
@@ -1221,30 +1224,26 @@ module Fsubst = struct
           if xs == xs' then (s, lp) else (s, LRecord (p, xs'))
 
   let gty_subst s gty =
-    if is_subst_id s then gty
-    else match gty with
+    if is_subst_id s then gty else
+
+    match gty with
     | GTty ty ->
-      let ty' = s.fs_ty ty in
+        let ty' = s.fs_ty ty in
         if ty == ty' then gty else GTty ty'
 
-    | GTmodty(p, (rx, r)) ->
-      let sub = s.fs_sty.ts_mp in
-      let p'  = mty_subst s.fs_sty.ts_p sub p in
-      let xsub = EcPath.x_substm s.fs_sty.ts_p s.fs_mp in
-      let rx' =
-        EcPath.Sx.fold
-          (fun m rx' -> EcPath.Sx.add (xsub m) rx') rx
-          EcPath.Sx.empty in
-      let r'  =
-        EcPath.Sm.fold
-          (fun m r' -> EcPath.Sm.add (sub m) r') r
-          EcPath.Sm.empty
-      in
-        if p == p' && EcPath.Sx.equal rx rx' && EcPath.Sm.equal r r' then gty
-        else GTmodty(p', (rx', r'))
+    | GTmodty (p, (rx, r)) ->
+        let sub  = s.fs_sty.ts_mp in
+        let xsub = EcPath.x_substm s.fs_sty.ts_p s.fs_mp in
+        let p'   = mty_subst s.fs_sty.ts_p sub p in
+        let rx'  = Sx.fold (fun m rx' -> Sx.add (xsub m) rx') rx Sx.empty in
+        let r'   = Sm.fold (fun m r' -> Sm.add (sub m) r') r Sm.empty in
+
+        if   p == p' && Sx.equal rx rx' && Sm.equal r r'
+        then gty
+        else GTmodty (p', (rx', r'))
 
     | GTmem mt ->
-      let mt' = EcMemory.mt_substm s.fs_sty.ts_p s.fs_mp s.fs_ty mt in
+        let mt' = EcMemory.mt_substm s.fs_sty.ts_p s.fs_mp s.fs_ty mt in
         if mt == mt' then gty else GTmem mt'
 
   (* ------------------------------------------------------------------ *)
