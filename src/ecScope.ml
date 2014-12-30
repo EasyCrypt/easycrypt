@@ -874,8 +874,6 @@ module Op = struct
       | Some (`Exists (x, t, f)) ->
           ([], (x, t, f)) in
 
-    let destruct fp = fst_map List.rev (destruct fp) in
-
     let (args, (x, t, body)) = destruct (oget ax.ax_spec) in
 
     let opname = unloc c.pc_name in
