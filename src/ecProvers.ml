@@ -233,7 +233,7 @@ let is_prover_known name =
 
 (* -------------------------------------------------------------------- *)
 let get_w3_th dirname name =
-  Env.find_theory (Config.w3_env ()) dirname name
+  Env.read_theory (Config.w3_env ()) dirname name
 
 (* -------------------------------------------------------------------- *)
 type prover_infos = {

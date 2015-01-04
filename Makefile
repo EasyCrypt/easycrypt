@@ -188,4 +188,4 @@ provers:
 	  && opam remove  -y ec-provers \
 	  && opam install -y ec-provers \
 	  && rm -f _tools/why3.local.conf \
-	  && why3config --detect -C _tools/why3.local.conf
+	  && why3 config --detect -C _tools/why3.local.conf

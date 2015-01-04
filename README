@@ -5,7 +5,7 @@
 
    Available at http://caml.inria.fr/
 
- * Why3 (= 0.83)
+ * Why3 (= 0.85)
 
    Available at http://why3.lri.fr/
 
@@ -17,6 +17,8 @@
  * Menhir [http://gallium.inria.fr/~fpottier/menhir/]
 
  * Yojson [http://mjambon.com/yojson.html]
+
+ * OCaml Batteries Included [http://batteries.forge.ocamlcore.org/]
 
 * REQUIREMENTS (ProofGeneral Interface)
 ====================================================================
@@ -55,7 +57,7 @@ impossible to share the same configuration file among them. EasyCrypt,
 via the option -why3, allows you to load a Why3 configuration file
 from a custom location. For instance:
 
-  why3config --detect -C $EC_TOOLCHAIN_ROOT/why3.conf
+  why3 config --detect -C $EC_TOOLCHAIN_ROOT/why3.conf
   ./ec.native -why3 $EC_TOOLCHAIN_ROOT/why3.conf
 
 We also provide an automated way to install a set of core
@@ -98,7 +100,7 @@ impossible to share the same configuration file among them. EasyCrypt,
 via the option -why3, allows you to load a Why3 configuration file
 from a custom location. For instance:
 
-  why3config --detect -C $EC_TOOLCHAIN_ROOT/why3.conf
+  why3 config --detect -C $EC_TOOLCHAIN_ROOT/why3.conf
   ./ec.native -why3 $EC_TOOLCHAIN_ROOT/why3.conf
 
 We do NOT provide an automated way to install provers.
@@ -178,7 +180,7 @@ impossible to share the same configuration file among them. EasyCrypt,
 via the option -why3, allows you to load a Why3 configuration file
 from a custom location. For instance:
 
-  why3config --detect -C $EC_TOOLCHAIN_ROOT/why3.conf
+  why3 config --detect -C $EC_TOOLCHAIN_ROOT/why3.conf
   ./ec.native -why3 $EC_TOOLCHAIN_ROOT/why3.conf
 
 We do NOT provide an automated way to install provers. However, for a
@@ -214,7 +216,7 @@ impossible to share the same configuration file among them. EasyCrypt,
 via the option -why3, allows you to load a Why3 configuration file
 from a custom location. For instance:
 
-  why3config --detect -C $EC_TOOLCHAIN_ROOT/why3.conf
+  why3 config --detect -C $EC_TOOLCHAIN_ROOT/why3.conf
   ./ec.native -why3 $EC_TOOLCHAIN_ROOT/why3.conf
 
 * COMPILATION
