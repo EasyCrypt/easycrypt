@@ -1,5 +1,6 @@
 (* --------------------------------------------------------------------
- * Copyright IMDEA Software Institute / INRIA - 2013, 2014
+ * Copyright (c) - 2012-2015 - IMDEA Software Institute and INRIA
+ * Distributed under the terms of the CeCILL-C license
  * -------------------------------------------------------------------- *)
 
 (* Trapdoor one-way permutations *)

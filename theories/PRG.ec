@@ -1,3 +1,8 @@
+(* --------------------------------------------------------------------
+ * Copyright (c) - 2012-2015 - IMDEA Software Institute and INRIA
+ * Distributed under the terms of the CeCILL-C license
+ * -------------------------------------------------------------------- *)
+
 (*** A formalization of pseudo-random generators **)
 
 (** A stateful random generator for type output is a pair of
