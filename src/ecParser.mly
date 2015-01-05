@@ -1832,15 +1832,19 @@ dbhint:
   }
 
 %inline prod_form:
-  | f1=sform f2=sform   { Some f1, Some f2 }
-  | UNDERSCORE f2=sform { None   , Some f2 }
-  | f1=sform UNDERSCORE { Some f1, None    }
+| f1=sform f2=sform   { (Some f1, Some f2) }
+| UNDERSCORE f2=sform { (None   , Some f2) }
+| f1=sform UNDERSCORE { (Some f1, None   ) }
 
 app_bd_info:
-  | empty    { PAppNone }
-  | f=sform  { PAppSingle f }
-  | f=prod_form g=prod_form s=sform?
-             { PAppMult (s,fst f,snd f,fst g, snd g) }
+| empty
+    { PAppNone }
+
+| f=sform
+    { PAppSingle f }
+
+| f=prod_form g=prod_form s=sform?
+    { PAppMult (s, fst f, snd f, fst g, snd g) }
 
 logtactic:
 | REFLEX
@@ -1972,8 +1976,11 @@ eager_tac:
     { Peager (info, p) }
 
 form_or_double_form:
-| f=sform { Single f }
-| LPAREN UNDERSCORE COLON f1=form LONGARROW f2=form RPAREN { Double(f1,f2) }
+| f=sform
+    { Single f }
+
+| LPAREN UNDERSCORE COLON f1=form LONGARROW f2=form RPAREN
+    { Double (f1, f2) }
 
 code_pos:
 | i=uint { i }

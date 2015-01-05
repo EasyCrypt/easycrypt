@@ -141,7 +141,7 @@ let process_phl_bd_info dir bd_info tc =
 
   | PAppSingle f ->
       let hs = tc1_as_bdhoareS tc in
-      let f  = TTC.tc1_process_phl_formula tc f in
+      let f  = TTC.tc1_process_phl_form tc treal f in
       let f1, f2 =
         match dir with
         | Backs  -> (f_real_div hs.bhs_bd f, f)
@@ -217,7 +217,7 @@ let process_app (side, dir, k, phi, bd_info) tc =
       let (ra, f1, f2, f3, f4) = process_phl_bd_info dir bd_info tc in
       t_bdhoare_app i (ra, pia, f1, f2, f3, f4) tc
 
-  | Double(i,j), PAppNone when is_equivS concl ->
+  | Double (i, j), PAppNone when is_equivS concl ->
       let phi = TTC.tc1_process_prhl_formula tc (get_single phi) in
       t_equiv_app (i, j) phi tc
 
