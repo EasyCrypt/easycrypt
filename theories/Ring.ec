@@ -284,7 +284,12 @@ theory Field.
   proof. by rewrite /exp /= iterop1. qed.
 
   lemma exprS (x : t) i: 0 <= i => exp x (i+1) = x * (exp x i).
-  proof. smt. qed.
+  proof.                        (* FIXME *)
+    move=> ge0_i; rewrite /exp /=.
+    cut -> /=: i   < 0 = false by smt.
+    cut -> /=: i+1 < 0 = false by smt.
+    smt.
+  qed.
 
   lemma exprN (x : t) (i : int): exp x (-i) = inv (exp x i).
   proof. by rewrite /exp /= IntZMod.opprK (fun_if inv) invK; smt. qed.

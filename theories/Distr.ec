@@ -277,10 +277,9 @@ theory Dinter.
     i <= j => 
     mu (dinter i j) (fun x, i <= x <= j) = 1%r.
   proof strict.
-  by intros=> H;
-     rewrite -(mu_eq_support (dinter i j) True);
-       try apply fun_ext;
-     smt.
+    move=> h; rewrite -(mu_eq_support (dinter i j) True).
+      by apply/fun_ext=> x /=; smt.
+      by smt.
   qed.
 
   lemma dinterU (i j:int):
