@@ -626,12 +626,18 @@ and ptactic = {
 
 and ptactics = ptactic list
 
+and pexpect  = [
+  | `None
+  | `Tactic of ptactic
+  | `Chain  of ptactic_chain list located
+]
+
 and ptactic_chain =
   | Psubtacs  of ptactics
   | Pfsubtacs of (tfocus * ptactic) list * ptactic option
   | Pfirst    of ptactic * int
   | Plast     of ptactic * int
-  | Pexpect   of ptactic * int
+  | Pexpect   of pexpect * int
   | Pfocus    of ptactic * tfocus
   | Protate   of [`Left | `Right] * int
 

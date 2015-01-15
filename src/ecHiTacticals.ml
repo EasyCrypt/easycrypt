@@ -207,10 +207,14 @@ and process_fsub (ttenv : ttenv) (ts, t) tc =
   in FApi.t_onfsub tx tc
 
 (* -------------------------------------------------------------------- *)
-and process_expect (ttenv : ttenv) (t, n) tc =
+and process_expect (ttenv : ttenv) ((t : pexpect), n) tc =
   if FApi.tc_count tc <> n then
     tc_error !$tc "expecting exactly %d subgoal(s), got %d" n (FApi.tc_count tc);
-  FApi.t_onall (process1 ttenv t) tc
+
+  match t with
+  | `None     -> tc
+  | `Tactic t -> FApi.t_onall (process1 ttenv t) tc
+  | `Chain  t -> List.fold_left ((^~) (process_chain ttenv)) tc (unloc t)
 
 (* -------------------------------------------------------------------- *)
 and process_firsts (ttenv : ttenv) (t, i) tc =

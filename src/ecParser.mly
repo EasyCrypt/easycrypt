@@ -2386,8 +2386,14 @@ tactic_chain:
 | FIRST n=uint LAST  { Protate (`Left , n) }
 | LAST  n=uint FIRST { Protate (`Right, n) }
 
+| EXPECT n=uint
+    { Pexpect (`None, n) }
+
 | EXPECT n=uint t=loc(tactics)
-    { Pexpect (mk_tactic_of_tactics t, n) }
+    { Pexpect (`Tactic (mk_tactic_of_tactics t), n) }
+
+| EXPECT n=uint t=loc(paren(rlist1(tactic_chain, SEMICOLON)))
+    { Pexpect (`Chain t, n) }
 
 | fc=tcfc COLON t=tactic
     { Pfocus (t, fc) }
@@ -2399,13 +2405,12 @@ subtactic:
 | t=tactic
     { t }
 
-subtactics:
-| t=subtactic { [t] }
-| ts=subtactics SEMICOLON t=subtactic { t :: ts }
+%inline subtactics:
+| x=rlist1(subtactic, SEMICOLON) { x }
 
 tactics:
 | t=tactic %prec SEMICOLON { [t] }
-| t=tactic SEMICOLON ts=subtactics { t :: (List.rev ts) }
+| t=tactic SEMICOLON ts=subtactics { t :: ts }
 
 tactics0:
 | ts=tactics   { Pseq ts }
