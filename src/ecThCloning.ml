@@ -254,7 +254,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
                       let tya = List.map (fun a -> mk_loc l (PTvar a)) params in
                         mk_loc l (PFident (sym, Some (mk_loc l (TVIunamed tya))));
                   } in
-                    do1 ~cancrt:true (proofs, evc) (mk_loc l (xdth @ prefix, x), PTHO_Pred ovrd)
+                    do1 ~cancrt:true (proofs, evc) (mk_loc l (xdth @ prefix, x), PTHO_Pred (ovrd, `Inline))
 
               | CTh_axiom (x, ({ ax_spec = Some _ } as ax)) ->
                   (* FIXME: TC HOOK *)

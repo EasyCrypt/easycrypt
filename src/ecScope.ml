@@ -1832,15 +1832,13 @@ module Cloning = struct
                   let tparams = EcUnify.UniEnv.tparams ue in
                   let newop   = mk_op tparams ty (Some (OP_Plain body)) in
                     match opmode with
-                    | `Alias  ->
-                        (newop, subst, true)
+                    | `Alias -> (newop, subst, true)
   
                     (* FIXME: TC HOOK *)
                     | `Inline ->
-                        let subst =
-                          EcSubst.add_opdef subst (xpath x)  (List.map fst tparams, body)
-                        in
-                          (newop, subst, false)
+                        let subst1 = (List.map fst tparams, body) in
+                        let subst  = EcSubst.add_opdef subst (xpath x) subst1
+                        in  (newop, subst, false)
               in
   
               let (newtyvars, newty) = (newop.op_tparams, newop.op_ty) in
@@ -1859,14 +1857,14 @@ module Cloning = struct
             | None ->
                 (subst, ops, proofs, Op.bind scope (x, EcSubst.subst_op subst oopr))
   
-            | Some { pl_desc = prov; pl_loc = loc; } ->
+            | Some { pl_desc = (prov, prmode); pl_loc = loc; } ->
                 let (reftyvars, refty) =
                   let refpr = EcEnv.Op.by_path (xpath x) scope.sc_env in
                   let refpr = EcSubst.subst_op subst refpr in
                     (refpr.op_tparams, refpr.op_ty)
                 in
   
-                let newpr =
+                let (newpr, subst, alias) =
                    let tp = prov.prov_tyvars |> omap (List.map (fun tv -> (tv, []))) in
                    let ue = EcTyping.transtyvars scope.sc_env (loc, tp) in
                    let body =
@@ -1887,9 +1885,20 @@ module Cloning = struct
                    let uni     = EcUnify.UniEnv.close ue in
                    let body    = EcFol.Fsubst.uni uni body in
                    let tparams = EcUnify.UniEnv.tparams ue in
+                   let newpr   =
                      { op_tparams = tparams;
                        op_ty      = body.EcFol.f_ty;
-                       op_kind    = OB_pred (Some body); }
+                       op_kind    = OB_pred (Some body); } in
+
+                    match prmode with
+                    | `Alias -> (newpr, subst, true)
+  
+                    (* FIXME: TC HOOK *)
+                    | `Inline ->
+                        let subst1 = (List.map fst tparams, body) in
+                        let subst  = EcSubst.add_pddef subst (xpath x) subst1
+                        in (newpr, subst, false)
+
                 in
   
                 let (newtyvars, newty) = (newpr.op_tparams, newpr.op_ty) in
@@ -1899,7 +1908,7 @@ module Cloning = struct
                             (List.map fst newtyvars, newty))
                   then
                     clone_error scope.sc_env (CE_OpIncompatible (prefix, x));
-                  (subst, ops, proofs, Op.bind scope (x, newpr))
+                  (subst, ops, proofs, if alias then Op.bind scope (x, newpr) else scope)
           end
   
         | CTh_operator (x, oopd) ->

@@ -742,6 +742,7 @@ and theory_override =
 
 and ty_override = psymbol list * pty * [`Alias | `Inline]
 and op_override = op_override_def * [`Alias | `Inline]
+and pr_override = pr_override_def * [`Alias | `Inline]
 and th_override = pqsymbol
 
 and op_override_def = {
@@ -751,7 +752,7 @@ and op_override_def = {
   opov_body   : pexpr;
 }
 
-and pr_override = {
+and pr_override_def = {
   prov_tyvars : psymbol list option;
   prov_args   : ptybinding list;
   prov_body   : pformula;

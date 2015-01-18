@@ -2547,21 +2547,21 @@ clone_override:
      } in
        (x, PTHO_Op (ov, unloc mode)) }
 
-| PRED x=qoident tyvars=bracket(tident*)? p=ptybindings EQ f=form
+| PRED x=qoident tyvars=bracket(tident*)? p=ptybindings mode=loc(opclmode) f=form
    { let ov = {
        prov_tyvars = tyvars;
        prov_args   = p;
        prov_body   = f;
      } in
-       (x, PTHO_Pred ov) }
+       (x, PTHO_Pred (ov, unloc mode)) }
 
-| PRED x=qoident tyvars=bracket(tident*)? EQ f=form
+| PRED x=qoident tyvars=bracket(tident*)? mode=loc(opclmode) f=form
    { let ov = {
        prov_tyvars = tyvars;
        prov_args   = [];
        prov_body   = f;
      } in
-       (x, PTHO_Pred ov) }
+       (x, PTHO_Pred (ov, unloc mode)) }
 
 | THEORY x=uqident LARROW y=uqident
    { (x, PTHO_Theory y) }
