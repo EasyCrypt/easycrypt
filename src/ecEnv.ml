@@ -812,7 +812,7 @@ module MC = struct
           (fun s (x, xp, xty, _) ->
             let fop = EcCoreFol.f_op xp [tvar self] xty in
               Fsubst.f_bind_local s x fop)
-          (Fsubst.f_subst_init false Mid.empty tsubst Mp.empty)
+          (Fsubst.f_subst_init false Mid.empty tsubst Mp.empty Mp.empty)
           operators
       in
 

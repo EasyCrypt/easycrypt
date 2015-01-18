@@ -367,6 +367,7 @@ type f_subst = private {
   fs_sty     : ty_subst;
   fs_ty      : ty -> ty;
   fs_opdef   : (EcIdent.t list * expr) Mp.t;
+  fs_pddef   : (EcIdent.t list * form) Mp.t;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -374,8 +375,11 @@ module Fsubst : sig
   val f_subst_id  : f_subst
   val is_subst_id : f_subst -> bool
 
-  val f_subst_init :  bool -> mpath Mid.t -> ty_subst
-                   -> (EcIdent.t list * expr) Mp.t -> f_subst
+  val f_subst_init :
+       bool -> mpath Mid.t -> ty_subst
+    -> (EcIdent.t list * expr) Mp.t
+    -> (EcIdent.t list * form) Mp.t
+    -> f_subst
 
   val f_bind_local : f_subst -> EcIdent.t -> form -> f_subst
   val f_bind_mem   : f_subst -> EcIdent.t -> EcIdent.t -> f_subst

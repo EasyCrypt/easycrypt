@@ -91,7 +91,7 @@ type cptenv = CPTEnv of f_subst
 (* -------------------------------------------------------------------- *)
 let concretize_env pe =
   let tysubst  = { ty_subst_id with ts_u = EcUnify.UniEnv.close pe.pte_ue } in
-  let ftysubst = Fsubst.f_subst_init false Mid.empty tysubst EcPath.Mp.empty in
+  let ftysubst = Fsubst.f_subst_init false Mid.empty tysubst EcPath.Mp.empty EcPath.Mp.empty in
   let subst    = ftysubst in
 
   CPTEnv (

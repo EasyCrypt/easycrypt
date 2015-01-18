@@ -1128,6 +1128,7 @@ type f_subst = {
   fs_sty     : ty_subst;
   fs_ty      : ty -> ty;
   fs_opdef   : (EcIdent.t list * expr) Mp.t;
+  fs_pddef   : (EcIdent.t list * form) Mp.t;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -1140,6 +1141,7 @@ module Fsubst = struct
     fs_sty     = ty_subst_id;
     fs_ty      = ty_subst ty_subst_id;
     fs_opdef   = Mp.empty;
+    fs_pddef   = Mp.empty
   }
 
   let is_subst_id s =
@@ -1147,14 +1149,17 @@ module Fsubst = struct
     && is_ty_subst_id s.fs_sty
     && Mid.is_empty s.fs_loc
     && Mid.is_empty s.fs_mem
+    && Mp.is_empty  s.fs_opdef
+    && Mp.is_empty  s.fs_pddef
 
-  let f_subst_init freshen smp sty ops =
+  let f_subst_init freshen smp sty ops pds =
     { f_subst_id
         with fs_freshen = freshen;
              fs_mp    = smp;
              fs_sty   = sty;
              fs_ty    = ty_subst sty;
-             fs_opdef = ops; }
+             fs_opdef = ops;
+             fs_pddef = pds }
 
   (* ------------------------------------------------------------------ *)
   let f_bind_local s x t =
@@ -1297,11 +1302,23 @@ module Fsubst = struct
         let body = oget (Mp.find_opt p s.fs_opdef) in
           f_subst_op ty tys [] body
 
+    | Fop (p, tys) when Mp.mem p s.fs_pddef ->
+        let ty   = s.fs_ty fp.f_ty in
+        let tys  = List.Smart.map s.fs_ty tys in
+        let body = oget (Mp.find_opt p s.fs_pddef) in
+          f_subst_pd ty tys [] body
+
     | Fapp ({ f_node = Fop (p, tys) }, args) when Mp.mem p s.fs_opdef ->
         let ty   = s.fs_ty fp.f_ty in
         let tys  = List.Smart.map s.fs_ty tys in
         let body = oget (Mp.find_opt p s.fs_opdef) in
           f_subst_op ty tys (List.map (f_subst s) args) body
+
+    | Fapp ({ f_node = Fop (p, tys) }, args) when Mp.mem p s.fs_pddef ->
+        let ty   = s.fs_ty fp.f_ty in
+        let tys  = List.Smart.map s.fs_ty tys in
+        let body = oget (Mp.find_opt p s.fs_pddef) in
+          f_subst_pd ty tys (List.map (f_subst s) args) body
 
     | Fop (p, tys) ->
         let ty'  = s.fs_ty fp.f_ty in
@@ -1446,6 +1463,33 @@ module Fsubst = struct
 
     let sag = { f_subst_id with fs_loc = sag } in
       f_app (f_subst sag (form_of_expr mhr e)) args fty
+
+  and f_subst_pd fty tys args (tyids, f) =
+    (* FIXME: factor this out *)
+    (* FIXME: is fd_freshen value correct? *)
+
+    let f =
+      let sty = Tvar.init tyids tys in
+      let sty = ty_subst { ty_subst_id with ts_v = Mid.find_opt^~ sty; } in
+      let sty = { f_subst_id with
+                    fs_freshen = true;
+                    fs_ty      = sty ; } in
+        f_subst sty f
+    in
+
+    let (sag, args, f) =
+      match f.f_node with
+      | Fquant (Llambda, largs, lbody) when args <> [] ->
+          let largs1, largs2 = List.take_n (List.length args  ) largs in
+          let  args1,  args2 = List.take_n (List.length largs1)  args in
+            (Mid.of_list (List.combine (List.map fst largs1) args1),
+             args2, f_lambda largs2 lbody)
+
+      | _ -> (Mid.of_list [], args, f)
+    in
+
+    let sag = { f_subst_id with fs_loc = sag } in
+      f_app (f_subst sag f) args fty
 
   (* ------------------------------------------------------------------ *)
   let f_subst_local x t =
