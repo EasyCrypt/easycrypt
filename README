@@ -1,18 +1,20 @@
-* REQUIREMENTS
+Installing requirements
 ====================================================================
+
+EasyCrypt uses the following third-party tools/libraries:
 
  * OCaml (>= 4.02)
 
-   Available at http://caml.inria.fr/
+     Available at http://caml.inria.fr/
 
  * Why3 (= 0.85)
 
-   Available at http://why3.lri.fr/
+     Available at http://why3.lri.fr/
 
-   Why3 must be installed with a set a provers.
-   See [http://why3.lri.fr/#provers]
+     Why3 must be installed with a set a provers.
+     See [http://why3.lri.fr/#provers]
 
-   Why3 libraries must be installed (make byte && make install-lib)
+     Why3 libraries must be installed (make byte && make install-lib)
 
  * Menhir [http://gallium.inria.fr/~fpottier/menhir/]
 
@@ -20,19 +22,56 @@
 
  * OCaml Batteries Included [http://batteries.forge.ocamlcore.org/]
 
-* REQUIREMENTS (ProofGeneral Interface)
-====================================================================
 
- * GNU Emacs (>= 23.3)
+Installing requirements using OPAM (POSIX systems - preferred)
+--------------------------------------------------------------------
 
-   Available at http://www.gnu.org/software/emacs/
+Starting with opam 1.2.0, you can install all the needed depdendencies
+via the opam OCaml packages manager.
 
- * ProofGeneral 4.2
+  0. Optionally, switch to a dedicated compiler for EasyCrypt:
 
-   Available at http://proofgeneral.inf.ed.ac.uk/
+        $> opam switch -A $OVERSION easycrypt
 
-* LOCAL TOOLCHAIN (POSIX systems)
-====================================================================
+     where $OVERSION is a valid OCaml version (e.g. 4.02.1)
+
+  1. Add the EasyCrypt repository:
+
+        $> opam repository add easycrypt https://ci.easycrypt.info/opam-1.2.0
+        $> opam update
+        
+  2. Add the EasyCrypt meta-packages:
+
+        $> opam install ec-toolchain
+        $> opam install ec-provers
+
+Opam can be easily installed from source or via your packages manager:
+
+  * On Ubuntu and derivatives:
+  
+        $> add-apt-repository ppa:avsm/ppa
+        $> apt-get update
+        $> apt-get install ocaml ocaml-native-compilers camlp4-extra opam
+        
+  * On MacOSX using brew:
+
+        $> brew install ocaml opam
+
+    Note that you MacOSX does not include `/usr/local/{lib,include}` in the
+    system library/include path. Be sure to have the following environment
+    variables set while compiling the Easycrypt dependencies
+    
+        C_INCLUDE_PATH=/usr/local/include
+        LDFLAGS="-L/usr/local/lib"
+
+See [https://opam.ocaml.org/doc/Install.html] for how to install opam.
+See [https://opam.ocaml.org/doc/Usage.html] for how to initialize opam
+
+
+Installing requirements using a local toolchain
+--------------------------------------------------------------------
+
+### On POSIX systems
 
 You can install a local copy of OCaml and all the needed libraries by
 running [make toolchain]. You only need [curl] and the [gcc] compiler.
@@ -40,73 +79,52 @@ running [make toolchain]. You only need [curl] and the [gcc] compiler.
 By default, the destination directory is ${PWD}/_tools. You can change
 this by setting the $EC_TOOLCHAIN_ROOT variable, e.g.:
 
-  make EC_TOOLCHAIN_ROOT=/opt/ec-toolchain toolchain
+        $> make EC_TOOLCHAIN_ROOT=/opt/ec-toolchain toolchain
 
 Note that $EC_TOOLCHAIN_ROOT cannot contain spaces.
 
 The toolchain is not activated by default. You have to:
 
-  source ./scripts/activate-toolchain.sh
+        $> source ./scripts/activate-toolchain.sh
 
 This command has to be repeated each time you start a fresh terminal.
-
-Regarding the Why3 configuration file, easycrypt is using the default
-Why3 location, i.e. ~/.why3.conf, or _tools/why3.local.conf when it
-exists. If you have several versions of Why3 installed, it may be
-impossible to share the same configuration file among them. EasyCrypt,
-via the option -why3, allows you to load a Why3 configuration file
-from a custom location. For instance:
-
-  why3 config --detect -C $EC_TOOLCHAIN_ROOT/why3.conf
-  ./ec.native -why3 $EC_TOOLCHAIN_ROOT/why3.conf
 
 We also provide an automated way to install a set of core
 provers. After having installing the toolchain, type:
 
-  make provers
+        $> make provers
 
-This also create a configuration file for Why3 in
-_tools/why3.local.conf. This file is automatically loaded by EasyCrypt
-when started locally.
+This also create a configuration file for Why3 in _tools/why3.local.conf.
+This file is automatically loaded by EasyCrypt when started locally.
 
-* LOCAL TOOLCHAIN (cygwin)
-====================================================================
+
+### On Cygwin (POSIX over Win32)
 
 WARNING: the ocaml compiler currently shipped with cygwin64 is
 broken. You have to use the 32bits version of cygwin.
 
 First, install the following cygwin32 packages:
 
-  git,wget,unzip,make,m4,gcc-core,gcc-g++,libmpfr4,autoconf,flexdll,
-  libncurses-devel,curl,ocaml,ocaml-compiler-libs,patch,ncurses
+        git,wget,unzip,make,m4,gcc-core,gcc-g++,libmpfr4,autoconf,flexdll,
+        libncurses-devel,curl,ocaml,ocaml-compiler-libs,patch,ncurses
 
 By default, the destination directory is ${PWD}/_tools. You can change
 this by setting the $EC_TOOLCHAIN_ROOT variable, e.g.:
 
-  make EC_TOOLCHAIN_ROOT=/opt/ec-toolchain toolchain
+        $> make EC_TOOLCHAIN_ROOT=/opt/ec-toolchain toolchain
 
 Note that $EC_TOOLCHAIN_ROOT cannot contain spaces.
 
 The toolchain is not activated by default. You have to:
 
-  source ./scripts/activate-toolchain.sh
+        $> source ./scripts/activate-toolchain.sh
 
 This command has to be repeated each time you start a fresh terminal.
 
-Regarding the Why3 configuration file, easycrypt is using the default
-Why3 location, i.e. ~/.why3.conf, or _tools/why3.local.conf when it
-exists. If you have several versions of Why3 installed, it may be
-impossible to share the same configuration file among them. EasyCrypt,
-via the option -why3, allows you to load a Why3 configuration file
-from a custom location. For instance:
-
-  why3 config --detect -C $EC_TOOLCHAIN_ROOT/why3.conf
-  ./ec.native -why3 $EC_TOOLCHAIN_ROOT/why3.conf
-
 We do NOT provide an automated way to install provers.
 
-* LOCAL TOOLCHAIN (win32)
-====================================================================
+
+### On Win32
 
 WARNING: the instructions are given for the 32bit version of
 cygwin. Replace 32- by 64- if you are using the 64bit version.
@@ -135,35 +153,34 @@ installation as follows:
 
      The installer may require you to install some cygwin packages:
 
-       bash bzip2 coreutils cpio cygwin dash diffutils dos2unix file
-       findutils gawk getent grep gzip make mingw64-i686-gcc-core
-       mingw64-x86_64-gcc-core mintty patch sed tar xz
+        bash bzip2 coreutils cpio cygwin dash diffutils dos2unix file
+        findutils gawk getent grep gzip make mingw64-i686-gcc-core
+        mingw64-x86_64-gcc-core mintty patch sed tar xz
 
      For easing their installation, you can give the full list of
      cygwin packages to the cygwin setup.exe:
 
-       /path/to/cygwin/setup.exe -P <packages list>
+        /path/to/cygwin/setup.exe -P <packages list>
 
   3. Create a win32 symlink from C:/cygwin (or wherever your cygwin
      base directory is) to C:/wodi32. For that, you may start a win32
      shell command as an administrator and type
 
-     $> mklink /D C:\wodi32 C:\cygwin 
+       $> mklink /D C:\wodi32 C:\cygwin 
 
   4. Restart a fresh cygwin shell to get a working wodi
      environment. Type:
 
-     $> /opt/wodi32/lib/godi/winconfig.sh --add-startmenu-folder
+       $> /opt/wodi32/lib/godi/winconfig.sh --add-startmenu-folder
 
   5. Find the wodi package manager in the start menu and install the
      following packages:
 
        menhir, yojson, batteries, ocamlgraph, zarith
 
-  6. Install why3 0.83. Download why3 at:
-       https://gforge.inria.fr/frs/download.php/33490/why3-0.83.tar.gz
+  6. Install why3 0.85. Download why3 from [http://why3.lri.fr/]
 
-     Untar, go to the why3-0.83/ directory and type
+     Untar, go to the why3-0.85/ directory and type
 
        $> CC=i686-w64-mingw32-gcc.exe ./configure --prefix=C:/wodi32/opt/wodi32/ --disable-ide
        $> make opt byte
@@ -173,73 +190,64 @@ installation as follows:
 
        $> ocamlfind list | fgrep -w why3
 
-Regarding the Why3 configuration file, easycrypt is using the default
-Why3 location, i.e. ~/.why3.conf, or _tools/why3.local.conf when it
-exists. If you have several versions of Why3 installed, it may be
-impossible to share the same configuration file among them. EasyCrypt,
-via the option -why3, allows you to load a Why3 configuration file
-from a custom location. For instance:
-
-  why3 config --detect -C $EC_TOOLCHAIN_ROOT/why3.conf
-  ./ec.native -why3 $EC_TOOLCHAIN_ROOT/why3.conf
-
 We do NOT provide an automated way to install provers. However, for a
 first test, you may want to install alt-ergo form the wodi package
 manager.
 
-* LOCAL TOOLCHAIN (opam)
+
+Configuring Why3
 ====================================================================
 
-Starting with opam 1.2.0, you can install all the needed depdendencies
-via the opam OCaml packages manager.
+Before running EasyCrypt and after the installation/removal/update
+of an SMT prover, you need to (re)configure Why3.
 
-  0. Optionally, switch to a dedicated compiler for EasyCrypt:
+By EasyCrypt is using the default Why3 location, i.e. ~/.why3.conf,
+or _tools/why3.local.conf when it exists. If you have several versions
+of Why3 installed, it may be impossible to share the same configuration
+file among them. EasyCrypt via the option -why3, allows you to load a
+Why3 configuration file from a custom location. For instance:
 
-     $> opam switch -A $OVERSION easycrypt
+  why3 config --detect -C $WHY3CONF.conf
+  ./ec.native -why3 $WHY3CONF.conf
 
-     where $OVERSION is a valid OCaml version (e.g. 4.02.1)
 
-  1. Add the EasyCrypt repository:
-
-     $> opam repository add easycrypt https://ci.easycrypt.info/opam-1.2.0
-     $> opam update
-
-  2. Add the EasyCrypt meta-packages:
-
-     $> opam install ec-toolchain
-     $> opam install ec-provers
-
-Regarding the Why3 configuration file, easycrypt is using the default
-Why3 location, i.e. ~/.why3.conf, or _tools/why3.local.conf when it
-exists. If you have several versions of Why3 installed, it may be
-impossible to share the same configuration file among them. EasyCrypt,
-via the option -why3, allows you to load a Why3 configuration file
-from a custom location. For instance:
-
-  why3 config --detect -C $EC_TOOLCHAIN_ROOT/why3.conf
-  ./ec.native -why3 $EC_TOOLCHAIN_ROOT/why3.conf
-
-* COMPILATION
+Compilation
 ====================================================================
 
 The shell commands
 
-  make
-  make install
+        $> make
+        $> make install
 
 should build and install easycrypt.
 
 It is possible to change the installation prefix by setting the
 environment variable PREFIX:
 
-  make PREFIX=/my/prefix install
+        $> make PREFIX=/my/prefix install
 
-* INSTALLING THE PROOFGENERAL FRONT-END (local)
+
+Proof General Front-End
 ====================================================================
+
+Requirements
+--------------------------------------------------------------------
+
+ * GNU Emacs (>= 23.3)
+
+     Available at http://www.gnu.org/software/emacs/
+
+ * ProofGeneral 4.2
+
+     Available at http://proofgeneral.inf.ed.ac.uk/
+
+
+Installing locally
+--------------------------------------------------------------------
 
 You can install a local copy of ProofGeneral by running:
 
-  make -C proofgeneral local
+        $> make -C proofgeneral local
 
 This process is trying to find emacs in different places and then
 searches it in the $PATH. You can change this by setting the $EMACS
@@ -247,47 +255,46 @@ environment variable.
 
 To run this local copy, run [make pg].
 
-* INSTALLING THE PROOFGENERAL FRONT-END (system - manual)
-====================================================================
+Installing system-wide (manual installation)
+--------------------------------------------------------------------
 
 Add the following entry to <proof-general-home>/generic/proof-site.el
 in the definition of `proof-assistant-table-default':
 
-  (easycrypt "EasyCrypt" "ec")
+        (easycrypt "EasyCrypt" "ec")
 
 Copy the directory easycrypt/ to <proof-general-home>/
 
 If you have not done so, add the following line to your Emacs
 configuration file (typically ~/.emacs):
 
-  (load-file "<proof-general-home>/generic/proof-site.el")
+        (load-file "<proof-general-home>/generic/proof-site.el")
 
 If the EasyCrypt executable is not in your $PATH, set the path to the
 EasyCrypt executable by modifying the variable easycrypt-prog-name
 inside Emacs:
 
-  Proof-General
-    -> Advanced 
-      -> Customize 
-        -> EasyCrypt
-          -> EasyCrypt prog name
-
+        Proof-General
+          -> Advanced 
+            -> Customize 
+              -> EasyCrypt
+                -> EasyCrypt prog name
+    
 setting its value to:
 
-  "<path-to-easycrypt>/easycrypt -emacs"
+        "<path-to-easycrypt>/easycrypt -emacs"
 
-
-* INSTALLING THE PROOFGENERAL FRONT-END (system - automatic)
-====================================================================
+Installing system-wide (automatic installation)
+--------------------------------------------------------------------
 
 The manual process can be automatized by running:
 
-  make PGROOT=/path/to/proof-general-home install
+        $> make PGROOT=/path/to/proof-general-home install`
 
 along with
 
-  make PGROOT=/path/to/proof-general-home uninstall
+        $> make PGROOT=/path/to/proof-general-home uninstall
 
-for uninstall the EasyCrypt mode. If the EasyCrypt executable is not
+for uninstalling the EasyCrypt mode. If the EasyCrypt executable is not
 in your path, refer to the previous section to configure ProofGeneral
 properly.
