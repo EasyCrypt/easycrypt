@@ -231,6 +231,7 @@ and pformula_r =
   | PFint    of int
   | PFtuple  of pformula list
   | PFident  of pqsymbol * ptyannot option
+  | PFmem    of psymbol
   | PFside   of pformula * (int * symbol) located
   | PFapp    of pformula * pformula list
   | PFif     of pformula * pformula * pformula

@@ -95,6 +95,7 @@ type tyerror =
 | FunNotInModParam       of qsymbol
 | NoActiveMemory
 | PatternNotAllowed
+| MemNotAllowed
 | UnknownScope           of qsymbol
 
 exception TyError of EcLocation.t * EcEnv.env * tyerror
@@ -343,6 +344,9 @@ let pp_tyerror env fmt error =
 
   | PatternNotAllowed ->
       msg "pattern not allowed here"
+
+  | MemNotAllowed ->
+      msg "memory not allowed here"
 
   | UnknownScope sc ->
       msg "unknown scope: `%a'" pp_qsymbol sc
@@ -2139,6 +2143,8 @@ let trans_form_or_pattern env (ps, ue) pf tt =
         let ty = UE.fresh ue in
           ps := Mid.add x ty !ps; f_local x ty
     end
+
+    | PFmem _ -> tyerror f.pl_loc env MemNotAllowed
 
     | PFscope (popsc, f) ->
         let opsc = lookup_scope env popsc in

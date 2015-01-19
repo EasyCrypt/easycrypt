@@ -85,6 +85,7 @@ type tyerror =
 | FunNotInModParam       of qsymbol
 | NoActiveMemory
 | PatternNotAllowed
+| MemNotAllowed
 | UnknownScope           of qsymbol
 
 exception TymodCnvFailure of tymod_cnv_failure
