@@ -1563,7 +1563,7 @@ module Theory = struct
         hierror "cannot export an abstract theory"
 
     | Some (path, (_, `Concrete)) ->
-        { scope with sc_env = EcEnv.Theory.import path scope.sc_env }
+        { scope with sc_env = EcEnv.Theory.export path scope.sc_env }
 
   (* ------------------------------------------------------------------ *)
   let check_end_required scope thname =
