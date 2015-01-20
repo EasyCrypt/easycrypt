@@ -201,12 +201,14 @@ type prelude = {
   pr_required : symbol list;
 }
 
+type thloaded = (EcEnv.ctheory_w3 * EcTheory.thmode)
+
 type scope = {
   sc_name     : (symbol * EcTheory.thmode);
   sc_env      : EcEnv.env;
   sc_top      : scope option;
   sc_prelude  : prelude option;
-  sc_loaded   : (EcEnv.ctheory_w3 * symbol list) Msym.t;
+  sc_loaded   : (thloaded * symbol list) Msym.t;
   sc_required : symbol list;
   sc_pr_uc    : proof_uc option;
   sc_options  : GenOptions.options;
@@ -1463,12 +1465,12 @@ module Theory = struct
       scope
     else
       match Msym.find_opt id scope.sc_loaded with
-      | Some (rth, ids) ->
+      | Some ((rth, mode), ids) ->
           let scope = List.fold_right require_loaded ids scope in
-          let env   = EcEnv.Theory.require id rth scope.sc_env in
+          let env   = EcEnv.Theory.require ~mode id rth scope.sc_env in
             { scope with
-              sc_env = env;
-              sc_required = id :: scope.sc_required; }
+                sc_env      = env;
+                sc_required = id :: scope.sc_required; }
 
       | None -> assert false
 
@@ -1581,7 +1583,7 @@ module Theory = struct
         failwith msg
 
   (* -------------------------------------------------------------------- *)
-  let require (scope : scope) (name : symbol) loader =
+  let require (scope : scope) ((name, mode) : symbol * thmode) loader =
     assert (scope.sc_pr_uc = None);
 
     if required scope name then
@@ -1591,13 +1593,17 @@ module Theory = struct
       | Some _ -> require_loaded name scope
 
       | None ->
-          let imported = enter (for_loading scope) `Concrete name in
+          let imported = enter (for_loading scope) mode name in
           let imported = { imported with sc_env = EcEnv.astop imported.sc_env } in
           let thname   = fst imported.sc_name in
           let imported = loader imported in
+
           check_end_required imported thname;
-          let cthr, _, (name, _), imported = exit_r imported in
-          let scope = { scope with sc_loaded = Msym.add name cthr imported.sc_loaded; } in
+
+          let (cth, rqs), _, (name, _), imported = exit_r imported in
+          let scope = { scope with sc_loaded =
+              Msym.add name ((cth, mode), rqs) imported.sc_loaded; } in
+
           require_loaded name scope
 
   (* ------------------------------------------------------------------ *)

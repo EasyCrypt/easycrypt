@@ -134,7 +134,7 @@ module Theory : sig
    * loader [loader] in scope [scope]. [loader] is called on
    * the initial scope and is in charge of processing the required
    * theory. *)
-  val require : scope -> symbol -> (scope -> scope) -> scope
+  val require : scope -> (symbol * thmode) -> (scope -> scope) -> scope
 
   (* FIXME: DOC *)
   val import_w3 : scope -> string list -> string -> w3_renaming list -> scope

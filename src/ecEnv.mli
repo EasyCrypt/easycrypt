@@ -254,7 +254,7 @@ module Theory : sig
   val add  : path -> env -> env
   val bind : ?mode:thmode -> symbol -> ctheory_w3 -> env -> env
 
-  val require : symbol -> ctheory_w3 -> env -> env
+  val require : ?mode:thmode -> symbol -> ctheory_w3 -> env -> env
   val import  : path -> env -> env
   val export  : path -> env -> env
 

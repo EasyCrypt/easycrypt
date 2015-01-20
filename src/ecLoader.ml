@@ -13,6 +13,8 @@ type ecloader = {
   mutable ecl_idirs : ((bool * string) * idx_t) list;
 }
 
+type kind = [`Ec | `EcA]
+
 (* -------------------------------------------------------------------- *)
 let create () = { ecl_idirs = []; }
 
@@ -98,9 +100,13 @@ let locate ?(onlysys = false) (name : string) (ecl : ecloader) =
   if not (Str.string_match (Str.regexp "^[a-zA-Z0-9_]+$") name 0) then
     None
   else
-    let name = Printf.sprintf "%s.ec" name in
-  
-    let locate ((issys, idir), _) =
+    let locate kind ((issys, idir), _) =
+      let name =
+        match kind with
+        | `Ec  -> Printf.sprintf "%s.ec"  name
+        | `EcA -> Printf.sprintf "%s.eca" name
+      in
+
       match onlysys && not issys with
       | true  -> None
       | false ->
@@ -120,6 +126,13 @@ let locate ?(onlysys = false) (name : string) (ecl : ecloader) =
             let stat = (stat.Unix.st_dev, stat.Unix.st_ino) in
               if   not (check_case idir name stat)
               then None
-              else Some (Filename.concat idir name)
+              else Some (Filename.concat idir name, kind)
     in
-      List.pick locate ecl.ecl_idirs
+
+    match
+      List.prmap
+        (fun kind -> List.pick (locate kind) ecl.ecl_idirs)
+        [`Ec; `EcA]
+    with
+    | [x] -> Some x
+    | _   -> None

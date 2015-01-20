@@ -2803,18 +2803,21 @@ module Theory = struct
         cth3_theory = theory; }
 
   (* ------------------------------------------------------------------ *)
-  let require x cth env =
+  let require ?(mode = `Concrete) x cth env =
     let rootnm  = EcCoreLib.p_top in
     let thpath  = EcPath.pqname rootnm x in
 
     let env =
-      let (_, thmc), submcs =
-        MC.mc_of_ctheory_r rootnm (x, cth.cth3_theory)
-      in
-        MC.bind_submc env rootnm ((x, thmc), submcs)
+      match mode with
+      | `Concrete ->
+          let (_, thmc), submcs =
+            MC.mc_of_ctheory_r rootnm (x, cth.cth3_theory)
+          in MC.bind_submc env rootnm ((x, thmc), submcs)
+
+      | `Abstract -> env
     in
 
-    let th = (cth.cth3_theory, `Concrete) in
+    let th = (cth.cth3_theory, mode) in
 
     let topmc = Mip.find (IPPath rootnm) env.env_comps in
     let topmc = MC._up_theory false topmc x (IPPath thpath, th) in

@@ -419,7 +419,7 @@ and process_th_require1 ld scope (x, io) =
     | None ->
         EcScope.hierror "cannot locate theory `%s'" name
 
-    | Some filename ->
+    | Some (filename, kind) ->
         let dirname = Filename.dirname filename in
         let subld   = EcLoader.dup ld in
 
@@ -436,7 +436,9 @@ and process_th_require1 ld scope (x, io) =
             pragma := i_pragma; raise e
         in
 
-        let scope = EcScope.Theory.require scope name loader in
+        let kind = match kind with `Ec -> `Concrete | `EcA -> `Abstract in
+
+        let scope = EcScope.Theory.require scope (name, kind) loader in
           match io with
           | None         -> scope
           | Some `Export -> process_th_export scope ([], name)
