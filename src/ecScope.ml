@@ -1851,8 +1851,7 @@ module Cloning = struct
   
             | Some { pl_desc = (opov, opmode); pl_loc = loc; } ->
                 let (reftyvars, refty) =
-                  let refop = EcEnv.Op.by_path (xpath x) scope.sc_env in
-                  let refop = EcSubst.subst_op subst refop in
+                  let refop = EcSubst.subst_op subst oopd in
                     (refop.op_tparams, refop.op_ty)
                 in
   
@@ -1902,8 +1901,7 @@ module Cloning = struct
   
             | Some { pl_desc = (prov, prmode); pl_loc = loc; } ->
                 let (reftyvars, refty) =
-                  let refpr = EcEnv.Op.by_path (xpath x) scope.sc_env in
-                  let refpr = EcSubst.subst_op subst refpr in
+                  let refpr = EcSubst.subst_op subst oopr in
                     (refpr.op_tparams, refpr.op_ty)
                 in
   
