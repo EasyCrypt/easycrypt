@@ -178,6 +178,13 @@ let find_pr cth (nm, x) =
   in find_mc cth.cth_struct nm |> obind (List.pick test)
 
 (* -------------------------------------------------------------------- *)
+let find_ax cth (nm, x) =
+  let test = function
+    | CTh_axiom (xax, ax) when xax = x -> Some ax
+    | _ -> None
+  in find_mc cth.cth_struct nm |> obind (List.pick test)
+
+(* -------------------------------------------------------------------- *)
 let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
   let opath, (oth, othmode) =
     match EcEnv.Theory.lookup_opt ~mode:`All (unloc thcl.pthc_base) scenv with
@@ -341,15 +348,13 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
 
   let ovrds =
     let do1 evc prf =
-      let xpath name = EcPath.pappend opath (EcPath.fromqsymbol name) in
-
       match prf.pthp_mode with
       | `All name -> begin
           let (name, dname) =
             match name with
             | None -> ([], ([], "<current>"))
             | Some name ->
-                match EcEnv.Theory.by_path_opt (xpath (unloc name)) scenv with
+                match find_theory oth (unloc name) with
                 | None   -> clone_error scenv (CE_UnkOverride (OVK_Theory, unloc name))
                 | Some _ -> let (nm, name) = unloc name in (nm @ [name], (nm, name))
           in
@@ -369,8 +374,10 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
       | `Named name -> begin
           let name = unloc name in
 
-          match EcEnv.Ax.by_path_opt (xpath name) scenv with
-          | None -> clone_error scenv (CE_UnkOverride (OVK_Lemma, name))
+          match find_ax oth name with
+          | None ->
+              clone_error scenv (CE_UnkOverride (OVK_Lemma, name))
+
           | Some ax ->
 
               if ax.ax_kind <> `Axiom || ax.ax_spec = None then
