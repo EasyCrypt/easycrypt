@@ -838,7 +838,7 @@ let import_decls rn path env rb decls =
     | [], _, _ -> path, z
     | s::ls, Zenter id:: z, EcPath.Pqname(p,id') ->
         assert (s = id && sym_equal id id');
-        close [] ls p (Zdecl (Th_theory (id, accu)) :: z)
+        close [] ls p (Zdecl (Th_theory (id, (accu, `Concrete))) :: z)
     | _s::_ls, Zenter _id:: _z, _ -> assert false
     | _, Zdecl d::z, _ -> close (d::accu) ls path z
     | _, [], _ -> assert false in

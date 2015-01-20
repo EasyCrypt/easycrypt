@@ -22,6 +22,7 @@ type ovkind =
 | OVK_Lemma
 
 type clone_error =
+| CE_UnkTheory      of qsymbol
 | CE_DupOverride    of ovkind * qsymbol
 | CE_UnkOverride    of ovkind * qsymbol
 | CE_CrtOverride    of ovkind * qsymbol
@@ -55,6 +56,10 @@ let pp_clone_error fmt _env error =
   let msg x = Format.fprintf fmt x in
 
   match error with
+  | CE_UnkTheory name ->
+      msg "cannot find theory to clone: `%s'"
+        (string_of_qsymbol name)
+
   | CE_DupOverride (kd, x) ->
       msg "the %s `%s' is instantiate twice"
         (string_of_ovkind kd) (string_of_qsymbol x)
@@ -130,7 +135,12 @@ let rec evc_get (nm : symbol list) (evc : evclone) =
 
 (* -------------------------------------------------------------------- *)
 let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
-  let opath, oth = EcEnv.Theory.lookup (unloc thcl.pthc_base) scenv in
+  let opath, oth =
+    match EcEnv.Theory.lookup_opt ~mode:`All (unloc thcl.pthc_base) scenv with
+    | None   -> clone_error scenv (CE_UnkTheory (unloc thcl.pthc_base))
+    | Some x -> x
+  in
+
   let name = odfl (EcPath.basename opath) (thcl.pthc_name |> omap unloc) in
 
   let (genproofs, ovrds) =
@@ -199,8 +209,9 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
         | PTHO_Theory xsth ->
             let dth =
               match EcEnv.Theory.by_path_opt xpath scenv with
-              | None -> clone_error scenv (CE_UnkOverride (OVK_Theory, name))
-              | Some th -> th
+              | None | Some (_, `Abstract) ->
+                  clone_error scenv (CE_UnkOverride (OVK_Theory, name))
+              | Some (th, `Concrete) -> th
             in
 
             let sp =
@@ -273,7 +284,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
                     (pr :: proofs, evc)
                 else (proofs,evc)
 
-              | CTh_theory (x, dth) ->
+              | CTh_theory (x, (dth, `Concrete)) ->
                   List.fold_left (doit (prefix @ [x])) (proofs, evc) dth.cth_struct
 
               | CTh_export _ ->

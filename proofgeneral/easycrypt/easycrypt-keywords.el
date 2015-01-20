@@ -1,4 +1,4 @@
-; Generated on Tue Dec  9 20:39:18 2014
+; Generated on Tue Jan 20 15:48:44 2015
 
 (defvar easycrypt-bytac-keywords '(
   "exact"
@@ -37,6 +37,7 @@
   "pred"
   "require"
   "theory"
+  "abstract"
   "section"
   "type"
   "class"
@@ -52,6 +53,7 @@
   "timeout"
   "nolocals"
   "Top"
+  "Self"
 ))
 
 (defvar easycrypt-internal-keywords '(

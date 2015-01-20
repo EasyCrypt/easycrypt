@@ -2236,7 +2236,7 @@ and pp_moditem ppe fmt = function
 let pp_modexp ppe fmt me =
   Format.fprintf fmt "%a." (pp_modexp ppe) me
 
-let rec pp_theory ppe (fmt:Format.formatter) (path, cth) =
+let rec pp_theory ppe (fmt:Format.formatter) (path, (cth, mode)) =
   let basename = EcPath.basename path in
   let pp_clone fmt desc =
     match desc with
@@ -2245,9 +2245,16 @@ let rec pp_theory ppe (fmt:Format.formatter) (path, cth) =
       Format.fprintf fmt "(* clone %a as %s *)@,"
         EcSymbols.pp_qsymbol (PPEnv.th_symb ppe cthc.EcTheory.cthc_base)
         basename in
-  Format.fprintf fmt "@[<v>%atheory %s.@,  @[<v>%a@]@,end %s.@]"
+
+  let thkw =
+    match mode with
+    | `Abstract -> "abstract theory"
+    | `Concrete -> "theory"
+  in
+
+  Format.fprintf fmt "@[<v>%a%s %s.@,  @[<v>%a@]@,end %s.@]"
     pp_clone cth.EcTheory.cth_desc
-    basename
+    thkw basename
     (pp_list "@,@," (pp_th_item ppe path)) cth.EcTheory.cth_struct
     basename
 
@@ -2267,7 +2274,7 @@ let rec pp_theory ppe (fmt:Format.formatter) (path, cth) =
   | EcTheory.CTh_module me ->
       pp_modexp ppe fmt me
 
-  | EcTheory.CTh_theory(id,cth) ->
+  | EcTheory.CTh_theory (id, cth) ->
       pp_theory ppe fmt (EcPath.pqname p id, cth)
 
   | EcTheory.CTh_export p ->

@@ -180,7 +180,7 @@ module ObjectInfo = struct
   (* ------------------------------------------------------------------ *)
   let pr_th_r =
     { od_name    = "theories";
-      od_lookup  = EcEnv.Theory.lookup;
+      od_lookup  = EcEnv.Theory.lookup ~mode:`All;
       od_printer = EcPrinting.pp_theory; }
 
   let pr_th = pr_gen pr_th_r
@@ -397,17 +397,17 @@ and process_axiom (scope : EcScope.scope) (ax : paxiom located) =
     scope
 
 (* -------------------------------------------------------------------- *)
-and process_th_open (scope : EcScope.scope) name =
+and process_th_open (scope : EcScope.scope) (abs, name) =
   EcScope.check_state `InTop "theory" scope;
-  EcScope.Theory.enter scope name
+  EcScope.Theory.enter scope (if abs then `Abstract else `Concrete) name
 
 (* -------------------------------------------------------------------- *)
 and process_th_close (scope : EcScope.scope) name =
   EcScope.check_state `InTop "theory closing" scope;
-  if (EcScope.name scope) <> name then
+  if (fst (EcScope.name scope)) <> name then
     EcScope.hierror
       "active theory has name `%s', not `%s'"
-      (EcScope.name scope) name;
+      (fst (EcScope.name scope)) name;
   snd (EcScope.Theory.exit scope)
 
 (* -------------------------------------------------------------------- *)
@@ -557,7 +557,7 @@ and process (ld : EcLoader.ecloader) (scope : EcScope.scope) g =
       | Gpredicate   p    -> `Fct   (fun scope -> process_predicate  scope  (mk_loc loc p))
       | Gchoice      c    -> `Fct   (fun scope -> process_choice     scope  (mk_loc loc c))
       | Gaxiom       a    -> `Fct   (fun scope -> process_axiom      scope  (mk_loc loc a))
-      | GthOpen      name -> `Fct   (fun scope -> process_th_open    scope  name.pl_desc)
+      | GthOpen      name -> `Fct   (fun scope -> process_th_open    scope  (snd_map unloc name))
       | GthClose     name -> `Fct   (fun scope -> process_th_close   scope  name.pl_desc)
       | GthRequire   name -> `Fct   (fun scope -> process_th_require ld scope name)
       | GthImport    name -> `Fct   (fun scope -> process_th_import  scope  name.pl_desc)

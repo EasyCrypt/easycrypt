@@ -158,6 +158,7 @@
 
 %token <EcParsetree.codepos> CPOS
 
+%token ABSTRACT
 %token ADD
 %token ADMIT
 %token ALGNORM
@@ -1471,8 +1472,8 @@ axiom:
 (* -------------------------------------------------------------------- *)
 (* Theory interactive manipulation                                      *)
 
-theory_open  : THEORY  x=uident  { x }
-theory_close : END     x=uident  { x }
+theory_open  : b=boption(ABSTRACT) THEORY x=uident  { (b, x) }
+theory_close : END x=uident  { x }
 
 section_open  : SECTION     x=option(uident) { x }
 section_close : END SECTION x=option(uident) { x }
@@ -2236,12 +2237,6 @@ eqobs_in:
       sim_eqs = p; } 
 }
 
-(*eqobs_in:
-| empty                              { (None   , None   , None) }
-| COLON f3=sform                     { (None   , None   , Some f3)   }
-| f1=sform COLON f3=sform?           { (Some f1, None   , f3)   }
-| f1=sform f2=sform COLON f3=sform?  { (Some f1, Some f2, f3)   } *)
-
 pgoptionkw:
 | x=loc(SPLIT) { mk_loc x.pl_loc "split" }
 | x=loc(SUBST) { mk_loc x.pl_loc "subst" }
@@ -2449,25 +2444,39 @@ proofmodename:
 (* Theory cloning                                                       *)
 
 theory_clone:
-| local=boption(LOCAL) CLONE ip=import_flag? x=uqident cw=clone_with? cp=clone_proof?
+| local=boption(LOCAL) CLONE options=clone_opts?
+    ip=import_flag? x=uqident
+    cw=clone_with? cp=clone_proof?
+
    { let oth =
        { pthc_base  = x;
          pthc_name  = None;
          pthc_ext   = EcUtils.odfl [] cw;
          pthc_prf   = EcUtils.odfl [] cp;
+         pthc_opts  = odfl [] options;
          pthc_local = local; }
      in
        (oth, ip) }
 
-| local=boption(LOCAL) CLONE ip=import_flag? x=uqident AS y=uident cw=clone_with? cp=clone_proof?
+| local=boption(LOCAL) CLONE options=clone_opts?
+    ip=import_flag? x=uqident AS y=uident
+    cw=clone_with? cp=clone_proof?
+
    { let oth =
        { pthc_base  = x;
          pthc_name  = Some y;
          pthc_ext   = EcUtils.odfl [] cw;
          pthc_prf   = EcUtils.odfl [] cp;
+         pthc_opts  = odfl [] options;
          pthc_local = local; }
      in
        (oth, ip) }
+
+clone_opt:
+| b=boption(MINUS) ABSTRACT { (not b, `Abstract) }
+
+clone_opts:
+| xs=bracket(clone_opt+) { xs }
 
 clone_with:
 | WITH x=plist1(clone_override, COMMA) { x }

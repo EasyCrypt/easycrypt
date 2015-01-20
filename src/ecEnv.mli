@@ -242,17 +242,17 @@ type ctheory_w3
 val ctheory_of_ctheory_w3 : ctheory_w3 -> ctheory
 
 module Theory : sig
-  type t = ctheory
+  type t    = ctheory
+  type mode = [`All | thmode]
 
-  val by_path     : path -> env -> t
-  val by_path_opt : path -> env -> t option
-  val lookup      : qsymbol -> env -> path * t
-  val lookup_opt  : qsymbol -> env -> (path * t) option
-  val lookup_path : qsymbol -> env -> path
+  val by_path     : ?mode:mode -> path -> env -> (t * thmode)
+  val by_path_opt : ?mode:mode -> path -> env -> (t * thmode) option
+  val lookup      : ?mode:mode -> qsymbol -> env -> path * (t * thmode)
+  val lookup_opt  : ?mode:mode -> qsymbol -> env -> (path * (t * thmode)) option
+  val lookup_path : ?mode:mode -> qsymbol -> env -> path
 
-  val add : path -> env -> env
-
-  val bind  : symbol -> ctheory_w3 -> env -> env
+  val add  : path -> env -> env
+  val bind : ?mode:thmode -> symbol -> ctheory_w3 -> env -> env
 
   val require : symbol -> ctheory_w3 -> env -> env
   val import  : path -> env -> env

@@ -17,6 +17,7 @@ type ovkind =
 | OVK_Lemma
 
 type clone_error =
+| CE_UnkTheory      of qsymbol
 | CE_DupOverride    of ovkind * qsymbol
 | CE_UnkOverride    of ovkind * qsymbol
 | CE_CrtOverride    of ovkind * qsymbol
@@ -54,4 +55,4 @@ type axclone = {
 
 val clone :
      EcEnv.env -> theory_cloning
-  -> symbol * (EcPath.path * EcEnv.Theory.t) * evclone
+  -> symbol * (EcPath.path * (EcEnv.Theory.t * EcTheory.thmode)) * evclone

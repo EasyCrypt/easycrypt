@@ -486,8 +486,11 @@ and compile_expr env eenv vtymap lmap e =
     Oif(e1,e2,e3)
 
 let rec compile_theory env eenv p = 
-  let cth = Theory.by_path p env in
-  List.iter (compile_thitem env eenv p) cth.cth_struct 
+  match Theory.by_path p env with
+  | (cth, `Concrete) ->
+      List.iter (compile_thitem env eenv p) cth.cth_struct 
+  | _ ->
+      ()
 
 and compile_thitem env eenv p = function
   | CTh_type(s,_) -> ignore (compile_tyd env eenv (EcPath.pqname p s))
@@ -538,7 +541,7 @@ and finalize_item eenv p item r =
         decl :: r
       | _ -> r
       end
-  | CTh_theory (s,cth) -> 
+  | CTh_theory (s,(cth,`Concrete)) -> 
     let ps = EcPath.pqname p s in
     let items = finalize_items eenv ps cth.cth_struct in
     if items = [] then r
@@ -548,6 +551,7 @@ and finalize_item eenv p item r =
         odecl_name = { oname_path = EcPath.tolist p; oname_base = s };
         odecl_kind = ODKmod items; } in
       decl :: r
+  | CTh_theory (_,(_,`Abstract))
   | CTh_export _ | CTh_modtype _ | CTh_module _ 
   | CTh_axiom _ | CTh_instance _ | CTh_typeclass _ 
   | CTh_baserw _ |CTh_addrw _ -> r
@@ -602,8 +606,9 @@ and compile_dummy_item p ls r item =
         odecl_name = name;
         odecl_kind = ODKop ([], OOdef (Oint 0));
       } :: r
-  | CTh_theory (s,cth) ->
+  | CTh_theory (s,(cth,`Concrete)) ->
     compile_dummy_th (EcPath.pqname p s) (s::ls) cth :: r
+  | CTh_theory (_,(_,`Abstract))
   | CTh_export _ | CTh_modtype _ | CTh_module _ 
   | CTh_axiom _ | CTh_instance _ | CTh_typeclass _ 
   | CTh_baserw _|CTh_addrw _ -> r
@@ -651,7 +656,7 @@ and add_withty_p eenv p oname =
 
 and add_withth check env eenv qs oname = 
   try 
-    let (p,cth) = Theory.lookup (EcLocation.unloc qs) env in
+    let (p,(cth,_)) = Theory.lookup (EcLocation.unloc qs) env in
     let decl = compile_dummy_th p oname cth in
     ignore (uniq_decl ocaml_keyword decl);
     add_dummy_decl eenv decl

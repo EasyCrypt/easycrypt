@@ -456,8 +456,8 @@ let rec subst_theory_item (s : _subst) (item : theory_item) =
   | Th_module m ->
       Th_module (subst_module s m)
 
-  | Th_theory (x, th) ->
-      Th_theory (x, subst_theory s th)
+  | Th_theory (x, (th, thmode)) ->
+      Th_theory (x, (subst_theory s th, thmode))
 
   | Th_export p -> 
       Th_export (s.s_p p)
@@ -496,8 +496,8 @@ and subst_ctheory_item (s : _subst) (item : ctheory_item) =
   | CTh_module me ->
       CTh_module (subst_module s me)
 
-  | CTh_theory (x, cth) ->
-      CTh_theory (x, subst_ctheory s cth)
+  | CTh_theory (x, (cth, cthmode)) ->
+      CTh_theory (x, (subst_ctheory s cth, cthmode))
 
   | CTh_export p ->
       CTh_export (s.s_p p)

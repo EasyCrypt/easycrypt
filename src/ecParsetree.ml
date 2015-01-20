@@ -726,8 +726,15 @@ type theory_cloning = {
   pthc_name  : psymbol option;
   pthc_ext   : (pqsymbol * theory_override) list;
   pthc_prf   : theory_cloning_proof list;
+  pthc_opts  : theory_cloning_options;
   pthc_local : bool;
 }
+
+and theory_cloning_option =
+  [ `Abstract ]
+
+and theory_cloning_options =
+  (bool * theory_cloning_option) list
 
 and theory_cloning_proof = {
   pthp_mode   : [ `All   of pqsymbol option
@@ -787,7 +794,7 @@ type global =
   | Gaddrw       of (pqsymbol * pqsymbol list)
   | Gprint       of pprint
   | Gsearch      of pqsymbol list
-  | GthOpen      of psymbol
+  | GthOpen      of (bool * psymbol)
   | GthClose     of psymbol
   | GthRequire   of (psymbol list * [`Import|`Export] option)
   | GthImport    of pqsymbol

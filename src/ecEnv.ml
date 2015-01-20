@@ -98,7 +98,7 @@ type obj = [
   | `TypeDecl of EcDecl.tydecl
   | `Operator of EcDecl.operator
   | `Axiom    of EcDecl.axiom
-  | `Theory   of ctheory
+  | `Theory   of (ctheory * thmode)
 ]
 
 type mc = {
@@ -110,7 +110,7 @@ type mc = {
   mc_tydecls    : (ipath * EcDecl.tydecl) MMsym.t;
   mc_operators  : (ipath * EcDecl.operator) MMsym.t;
   mc_axioms     : (ipath * EcDecl.axiom) MMsym.t;
-  mc_theories   : (ipath * ctheory) MMsym.t;
+  mc_theories   : (ipath * (ctheory * thmode)) MMsym.t;
   mc_typeclasses: (ipath * typeclass) MMsym.t;
   mc_rwbase     : (ipath * path) MMsym.t; 
   mc_components : ipath MMsym.t;
@@ -992,10 +992,13 @@ module MC = struct
           let submcs = mc_of_module_r (expath subme.me_name, args, None) subme in
             (add2mc _up_mod subme.me_name subme mc, Some submcs)
 
-      | CTh_theory (xsubth, subth) ->
-          let submcs = mc_of_ctheory_r subscope (xsubth, subth) in
+      | CTh_theory (xsubth, ((items, `Concrete) as subth)) ->
+          let submcs = mc_of_ctheory_r subscope (xsubth, items) in
           let mc = _up_mc false mc (IPPath (expath xsubth)) in
             (add2mc _up_theory xsubth subth mc, Some submcs)
+
+      | CTh_theory (xsubth, ((_, `Abstract) as subth)) ->
+          (add2mc _up_theory xsubth subth mc, None)
 
       | CTh_typeclass (x, tc) ->
           (add2mc _up_typeclass x tc mc, None)
@@ -1015,8 +1018,10 @@ module MC = struct
     in
       ((x, mc), List.prmap (fun x -> x) submcs)
 
-  let mc_of_ctheory (env : env) (x : symbol) (th : ctheory) =
-    mc_of_ctheory_r (root env) (x, th)
+  let mc_of_ctheory (env : env) (x : symbol) ((th, thmode) : ctheory * thmode) =
+    match thmode with
+    | `Concrete -> Some (mc_of_ctheory_r (root env) (x, th))
+    | `Abstract -> None
 
   (* ------------------------------------------------------------------ *)
   let rec bind_submc env path ((name, mc), submcs) =
@@ -1044,15 +1049,12 @@ module MC = struct
             (Mip.add (IPPath path) mc env.env_comps); }
 
   and bind_theory x th env =
-    let (_, mc), submcs = mc_of_ctheory env x th in
-    let env = bind _up_theory x th env in
-    let env = bind_mc x mc env in
-    let env =
-      bind_submcs env
-        (EcPath.pqname (root env) x)
-        submcs
-    in
-      env
+    match mc_of_ctheory env x th with
+    | None -> bind _up_theory x th env
+    | Some ((_, mc), submcs) ->
+        let env = bind _up_theory x th env in
+        let env = bind_mc x mc env in
+        bind_submcs env (EcPath.pqname (root env) x) submcs
 
   and bind_mod x mod_ env =
     let (_, mc), submcs = mc_of_module env mod_ in
@@ -2577,7 +2579,8 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Theory = struct
-  type t = ctheory
+  type t    = ctheory
+  type mode = [`All | thmode]
 
   (* -------------------------------------------------------------------- *)
   let rec ctheory_of_theory =
@@ -2591,25 +2594,31 @@ module Theory = struct
     | Th_axiom     (x, ax)  -> CTh_axiom     (x, ax)
     | Th_modtype   (x, mt)  -> CTh_modtype   (x, mt)
     | Th_module    m        -> CTh_module    m
-    | Th_theory    (x, th)  -> CTh_theory    (x, ctheory_of_theory th)
     | Th_export    name     -> CTh_export    name
     | Th_typeclass name     -> CTh_typeclass name
     | Th_instance  (ty, cr) -> CTh_instance  (ty, cr)
     | Th_baserw    x        -> CTh_baserw x
     | Th_addrw     (b,l)    -> CTh_addrw     (b, l)
 
+    | Th_theory (x, (th, md)) ->
+        CTh_theory (x, (ctheory_of_theory th, md))
+
   (* ------------------------------------------------------------------ *)
   let enter name env =
     enter `Theory name env
 
   (* ------------------------------------------------------------------ *)
-  let by_path_opt (p : EcPath.path) (env : env) =
-    omap
-      check_not_suspended
-      (MC.by_path (fun mc -> mc.mc_theories) (IPPath p) env)
+  let by_path_opt ?(mode = `All)(p : EcPath.path) (env : env) =
+    let obj =
+      match MC.by_path (fun mc -> mc.mc_theories) (IPPath p) env, mode with
+      | (Some (_, (_, `Concrete))) as obj, (`All | `Concrete) -> obj
+      | (Some (_, (_, `Abstract))) as obj, (`All | `Abstract) -> obj
+      | _, _ -> None
 
-  let by_path (p : EcPath.path) (env : env) =
-    match by_path_opt p env with
+    in omap check_not_suspended obj
+
+  let by_path ?mode (p : EcPath.path) (env : env) =
+    match by_path_opt ?mode p env with
     | None -> lookup_error (`Path p)
     | Some obj -> obj
 
@@ -2617,14 +2626,17 @@ module Theory = struct
     let obj = by_path p env in
       MC.import_theory p obj env
 
-  let lookup qname (env : env) =
-    MC.lookup_theory qname env
+  let lookup ?(mode = `Concrete) qname (env : env) =
+    match MC.lookup_theory qname env, mode with
+    | (_, (_, `Concrete)) as obj, (`All | `Concrete) -> obj
+    | (_, (_, `Abstract)) as obj, (`All | `Abstract) -> obj
+    | _ -> lookup_error (`QSymbol qname)
 
-  let lookup_opt name env =
-    try_lf (fun () -> lookup name env)
+  let lookup_opt ?mode name env =
+    try_lf (fun () -> lookup ?mode name env)
 
-  let lookup_path name env =
-    fst (lookup name env)
+  let lookup_path ?mode name env =
+    fst (lookup ?mode name env)
 
   (* ------------------------------------------------------------------ *)
   let rec bind_instance_cth path inst cth =
@@ -2634,8 +2646,11 @@ module Theory = struct
     let xpath x = EcPath.pqname path x in
 
     match item with
-    | CTh_instance (ty, k)  -> TypeClass.bind_instance ty k inst
-    | CTh_theory   (x, cth) -> bind_instance_cth (xpath x) inst cth
+    | CTh_instance (ty, k) ->
+        TypeClass.bind_instance ty k inst
+
+    | CTh_theory (x, (cth, `Concrete)) ->
+        bind_instance_cth (xpath x) inst cth
 
     | CTh_type (x, tyd) -> begin
         match tyd.tyd_type with
@@ -2661,7 +2676,7 @@ module Theory = struct
     let xpath x = EcPath.pqname path x in
 
     match item with
-    | CTh_theory (x, cth) ->
+    | CTh_theory (x, (cth, `Concrete)) ->
         bind_tc_cth (xpath x) gr cth
 
     | CTh_typeclass (x, tc) -> begin
@@ -2679,38 +2694,42 @@ module Theory = struct
   and bind_br_cth_item path m item = 
     let xpath x = EcPath.pqname path x in
     match item with
-    | CTh_theory (x, cth) ->
-      bind_br_cth (xpath x) m cth
+    | CTh_theory (x, (cth, `Concrete)) ->
+        bind_br_cth (xpath x) m cth
+
     | CTh_baserw x ->
-      let ip = IPPath (xpath x) in
-      assert (not (Mip.mem ip m));
-      Mip.add ip Sp.empty m
-    | CTh_addrw(b,r) ->
-      let ip = IPPath b in
-      let add s = 
-        match s with
-        | None -> assert false
-        | Some s -> Some (List.fold_left (fun s r -> Sp.add r s) s r) in
-      Mip.change add ip m 
+        let ip = IPPath (xpath x) in
+        assert (not (Mip.mem ip m));
+        Mip.add ip Sp.empty m
+
+    | CTh_addrw (b, r) ->
+        let change = function
+        | None   -> assert false
+        | Some s -> Some (List.fold_left (fun s r -> Sp.add r s) s r)
+
+        in Mip.change change (IPPath b) m 
+
     | _ -> m
 
   (* ------------------------------------------------------------------ *)
-  let bind name cth env =
-    let env = MC.bind_theory name cth.cth3_theory env in
-    { env with
-        env_w3   = EcWhy3.rebind env.env_w3 cth.cth3_rebind;
-        env_rb   = List.rev_append cth.cth3_rebind env.env_rb;
-        env_item = (CTh_theory (name, cth.cth3_theory)) :: env.env_item;
-        env_tci  = bind_instance_cth
-                     (EcPath.pqname (root env) name)
-                     env.env_tci cth.cth3_theory;
-        env_tc   = bind_tc_cth
-                     (EcPath.pqname (root env) name)
-                     env.env_tc cth.cth3_theory; 
-        env_rwbase = bind_br_cth
-                       (EcPath.pqname (root env) name)
-                       env.env_rwbase cth.cth3_theory; 
-    }
+  let bind ?(mode = `Concrete) name cth env =
+    let th = (cth.cth3_theory, mode) in
+
+    let env = MC.bind_theory name th env in
+    let env = { env with env_item = (CTh_theory (name, th)) :: env.env_item } in
+
+    match mode with
+    | `Concrete ->
+        let thname     = EcPath.pqname (root env) name in
+        let env_w3     = EcWhy3.rebind env.env_w3 cth.cth3_rebind in
+        let env_rb     = List.rev_append cth.cth3_rebind env.env_rb in
+        let env_tci    = bind_instance_cth thname env.env_tci cth.cth3_theory in
+        let env_tc     = bind_tc_cth thname env.env_tc cth.cth3_theory in
+        let env_rwbase = bind_br_cth thname env.env_rwbase cth.cth3_theory in
+        { env with env_w3; env_rb; env_tci; env_tc; env_rwbase; }
+
+    | `Abstract ->
+        env
 
   (* ------------------------------------------------------------------ *)
   let rebind name cth env =
@@ -2739,12 +2758,15 @@ module Theory = struct
               env
 
         | CTh_export p ->
-            import env p (by_path p env)
+            import env p (fst (by_path ~mode:`Concrete p env))
 
-        | CTh_theory (x, th) ->
+        | CTh_theory (x, ((_, `Concrete) as th)) ->
             let env = MC.import_theory (xpath x) th env in
             let env = MC.import_mc (IPPath (xpath x)) env in
               env
+
+        | CTh_theory (x, ((_, `Abstract) as th)) ->
+            MC.import_theory (xpath x) th env
 
         | CTh_typeclass (x, tc) ->
             MC.import_typeclass (xpath x) tc env
@@ -2762,7 +2784,7 @@ module Theory = struct
         List.fold_left import_cth_item env cth.cth_struct
 
     in
-      import env path (by_path path env)
+      import env path (fst (by_path ~mode:`Concrete path env))
 
   (* ------------------------------------------------------------------ *)
   let export (path : EcPath.path) (env : env) =
@@ -2792,12 +2814,14 @@ module Theory = struct
         MC.bind_submc env rootnm ((x, thmc), submcs)
     in
 
+    let th = (cth.cth3_theory, `Concrete) in
+
     let topmc = Mip.find (IPPath rootnm) env.env_comps in
-    let topmc = MC._up_theory false topmc x (IPPath thpath, cth.cth3_theory) in
+    let topmc = MC._up_theory false topmc x (IPPath thpath, th) in
     let topmc = MC._up_mc false topmc (IPPath thpath) in
 
     let current = env.env_current in
-    let current = MC._up_theory true current x (IPPath thpath, cth.cth3_theory) in
+    let current = MC._up_theory true current x (IPPath thpath, th) in
     let current = MC._up_mc true current (IPPath thpath) in
 
     let comps = env.env_comps in
@@ -2833,8 +2857,10 @@ let import_w3 env th rd =
     | Th_type     (id, ty) -> Ty.rebind id ty env
     | Th_operator (id, op) -> Op.rebind id op env
     | Th_axiom    (id, ax) -> Ax.rebind id ax env
-    | Th_theory   (id, th) ->
-        Theory.rebind id (Theory.ctheory_of_theory th) env
+
+    | Th_theory   (id, (th, `Concrete)) ->
+        Theory.rebind id (Theory.ctheory_of_theory th, `Concrete) env
+
     | _ -> assert false
   in
 

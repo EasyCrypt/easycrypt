@@ -17,15 +17,15 @@ and theory_item =
   | Th_axiom     of (symbol * axiom)
   | Th_modtype   of (symbol * module_sig)
   | Th_module    of module_expr
-  | Th_theory    of (symbol * theory)
+  | Th_theory    of (symbol * (theory * thmode))
   | Th_export    of EcPath.path
   | Th_instance  of (ty_params * EcTypes.ty) * tcinstance
   | Th_typeclass of (symbol * typeclass)
   | Th_baserw    of symbol
   | Th_addrw     of EcPath.path * EcPath.path list
 
-and tcinstance =
-  [ `Ring of ring | `Field of field | `General of EcPath.path ]
+and tcinstance = [ `Ring of ring | `Field of field | `General of EcPath.path ]
+and thmode     = [ `Abstract | `Concrete ]
 
 (* -------------------------------------------------------------------- *)
 type ctheory = {
@@ -45,7 +45,7 @@ and ctheory_item =
   | CTh_axiom     of (symbol * axiom)
   | CTh_modtype   of (symbol * module_sig)
   | CTh_module    of module_expr
-  | CTh_theory    of (symbol * ctheory)
+  | CTh_theory    of (symbol * (ctheory * thmode))
   | CTh_export    of EcPath.path
   | CTh_instance  of (ty_params * EcTypes.ty) * tcinstance
   | CTh_typeclass of (symbol * typeclass)
