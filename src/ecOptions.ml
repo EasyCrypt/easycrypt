@@ -337,8 +337,9 @@ let parse argv =
     | _    -> List.exists (fun (x, _, _) -> x = args.(0)) specs.xp_commands
   in
 
-  let isec     = fun x -> String.endswith ".ec" x in
-  let necfiles = Array.fold_left (fun s n -> if isec  n then s+1 else s) 0 args in
+  let isec x = Str.string_match (Str.regexp ".*\\.eca?") x 0 in
+
+  let necfiles = Array.fold_left (fun s n -> if isec n then s+1 else s) 0 args in
   let ecommand =
     match hascmd with
     | true -> None
