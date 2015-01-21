@@ -328,7 +328,7 @@ let t_bdHoareS_conseq_conj ~add post post' tc =
   if not (f_equal hs.bhs_po postc) then
     tc_error !!tc "invalid post-condition";
   let concl1 = f_hoareS hs.bhs_m hs.bhs_pr hs.bhs_s post in
-  let concl2 = f_bdHoareS_r { hs with bhs_po = posth} in
+  let concl2 = f_bdHoareS_r { hs with bhs_po = posth } in
   FApi.xmutate1 tc `HlConseqBd [concl1; concl2]
 
 (* -------------------------------------------------------------------- *)
@@ -339,7 +339,7 @@ let t_bdHoareF_conseq_conj ~add post post' tc =
   if not (f_equal hs.bhf_po postc) then
     tc_error !!tc "invalid post-condition";
   let concl1 = f_hoareF hs.bhf_pr hs.bhf_f post in
-  let concl2 = f_bdHoareF_r { hs with bhf_po = posth} in
+  let concl2 = f_bdHoareF_r { hs with bhf_po = posth } in
   FApi.xmutate1 tc `HlConseqBd [concl1; concl2]
 
 (* -------------------------------------------------------------------- *)
@@ -404,9 +404,23 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
   let t_on1     = FApi.t_on1 ~ttout:t_trivial in
   let t_on1seq  = FApi.t_on1seq ~ttout:t_trivial in
 
+  let check_is_detbound who bound =
+    if not (EcFol.f_equal bound f_r1) then
+      tc_error_lazy !!tc (fun fmt ->
+        let who =
+          match who with
+          | `First  -> "first"
+          | `Second -> "second"
+          | `Third  -> "third"
+        in
+          Format.fprintf fmt
+            "the bound of the %s parameter should be exactly 1%%r"
+            who)
+  in
+
   let t_apply_r (pt, _f) tc =
     match pt with
-    | Some pt -> t_apply pt tc
+    | Some pt -> (try t_apply pt tc with InvalidGoalShape -> assert false)
     | None    -> EcPhlTAuto.t_hoare_true tc
   in
 
@@ -420,7 +434,7 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
     t_on1 2 (t_apply_r nf1) (tac hs.hs_pr hs.hs_po tc)
 
   (* ------------------------------------------------------------------ *)
-  (* hoareS/ hoareS / hoareS / ⊥                                       *)
+  (* hoareS / hoareS / hoareS / ⊥                                       *)
   | FhoareS _,
       Some ((_, { f_node = FhoareS hs }) as nf1),
       Some ((_, f2) as nf2),
@@ -440,6 +454,8 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
   (* hoareS / bdhoareS / ⊥ / ⊥                                          *)
   | FhoareS _, Some ((_, {f_node = FbdHoareS hs}) as nf1), None, None ->
     let tac = if notmod then t_bdHoareS_conseq_nm else t_bdHoareS_conseq in
+
+    check_is_detbound `First hs.bhs_bd;
 
     FApi.t_seq
       t_hoareS_conseq_bdhoare
@@ -475,6 +491,8 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
   (* hoareF / bdhoareF / ⊥ / ⊥                                            *)
   | FhoareF _, Some ((_, {f_node = FbdHoareF hs}) as nf1), None, None ->
     let tac = if notmod then t_bdHoareF_conseq_nm else t_bdHoareF_conseq in
+
+    check_is_detbound `First hs.bhf_bd;
 
     FApi.t_seq
       t_hoareF_conseq_bdhoare
@@ -549,6 +567,7 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
         ]) tc in
 
     let tc = FApi.t_swap_goals 1 1 (FApi.t_swap_goals 1 2 tc) in
+
     FApi.t_sub  
       [t_trivial; t_trivial; t_trivial; t_apply_r nf2; t_apply_r nf1] 
       tc
@@ -657,6 +676,7 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
       when is_bdHoareS f
     ->
     let tac = if notmod then t_equivS_conseq_nm else t_equivS_conseq in
+
     t_on1seq 2
       (tac es.es_pr es.es_po)
       (t_hi_conseq notmod None f2 None)
@@ -668,6 +688,7 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
       when is_bdHoareS f
     ->
     let tac = if notmod then t_equivS_conseq_nm else t_equivS_conseq in
+
     t_on1seq 2
       (tac es.es_pr es.es_po)
       (t_hi_conseq notmod None None f3)
@@ -693,7 +714,9 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
     let pre, post = subst1 hs.bhs_pr, subst1 hs.bhs_po in
     let tac = if notmod then t_equivS_conseq_nm else t_equivS_conseq in
 
-   t_on1seq 2
+    check_is_detbound `Second hs.bhs_bd;
+
+    t_on1seq 2
      (tac pre post)
      (FApi.t_seq
         (t_equivS_conseq_bd `Left hs.bhs_pr hs.bhs_po)
@@ -707,6 +730,8 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
     let hs = pf_as_bdhoareS !!tc f3 in
     let pre, post = subst2 hs.bhs_pr, subst2 hs.bhs_po in
     let tac = if notmod then t_equivS_conseq_nm else t_equivS_conseq in
+
+    check_is_detbound `Third hs.bhs_bd;
 
     t_on1seq 2
       (tac pre post)
