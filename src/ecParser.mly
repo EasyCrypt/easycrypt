@@ -216,7 +216,6 @@
 %token EXIST
 %token EXPECT
 %token EXPORT
-%token EXTRACTION
 %token FEL
 %token FIELD
 %token FINAL
@@ -2658,29 +2657,12 @@ global_:
 | PRAGMA ADD   x=lident { Goption (x, true ) }
 | PRAGMA MINUS x=lident { Goption (x, false) }
 
-| EXTRACTION i=extract_info { Gextract i }
-
 pragma_r:
 | x=LIDENT { x }
 | u=UIDENT COLON x=LIDENT { Printf.sprintf "%s:%s" u x }
 
 pragma:
 | x=loc(pragma_r) { x }
-
-extract_info:
-| s=STRING? qs=plist1(toextract,COMMA) w=withextract { (s,qs,w) }
-
-toextract:
-| OP q=qoident     {ExOp q}
-| TYPE q=qoident   {ExTy q}
-| THEORY q=qoident {ExTh q}
-
-withextract:
-| empty { [] }
-| WITH w=plist1(withextract1,COMMA) { w }
-
-withextract1:
-| p=toextract EQ s=STRING { p,s }
 
 stop:
 | EOF { }

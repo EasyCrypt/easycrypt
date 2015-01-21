@@ -571,10 +571,6 @@ and process_option (scope : EcScope.scope) (name, value) =
   | _ -> EcScope.hierror "unknown option: %s" (unloc name)
 
 (* -------------------------------------------------------------------- *)
-and process_extract scope todo =
-  EcScope.Extraction.process scope todo
-
-(* -------------------------------------------------------------------- *)
 and process_addrw scope todo =
   EcScope.BaseRw.process_addrw scope todo
 
@@ -612,7 +608,6 @@ and process (ld : EcLoader.ecloader) (scope : EcScope.scope) g =
       | Gsave        loc  -> `Fct   (fun scope -> process_save       scope  loc)
       | Gpragma      opt  -> `State (fun scope -> process_pragma     scope  opt)
       | Goption      opt  -> `Fct   (fun scope -> process_option     scope  opt)
-      | Gextract     todo -> `Fct   (fun scope -> process_extract    scope todo)
       | Gaddrw       hint -> `Fct   (fun scope -> process_addrw      scope hint)
     with
     | `Fct   f -> Some (f scope)

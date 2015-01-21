@@ -767,14 +767,6 @@ and pr_override_def = {
 }
 
 (* -------------------------------------------------------------------- *)
-type toextract =
- | ExOp of pqsymbol
- | ExTy of pqsymbol
- | ExTh of pqsymbol
-
-type withextract = toextract * string
-
-(* -------------------------------------------------------------------- *)
 type proofmode = {
   pm_strict : bool;
 }
@@ -809,7 +801,6 @@ type global =
   | Gsave        of EcLocation.t
   | Gpragma      of psymbol
   | Goption      of (psymbol * bool)
-  | Gextract     of (string option * toextract list * withextract list)
 
 type prog =
   | P_Prog of (global located) list * bool

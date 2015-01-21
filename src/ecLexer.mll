@@ -154,7 +154,6 @@
     "theory"      , THEORY     ;        (* KW: global *)
     "abstract"    , ABSTRACT   ;        (* KW: global *)
     "section"     , SECTION    ;        (* KW: global *)
-    "extraction"  , EXTRACTION ;
     "type"        , TYPE       ;        (* KW: global *)
     "class"       , CLASS      ;        (* KW: global *)
     "instance"    , INSTANCE   ;        (* KW: global *)

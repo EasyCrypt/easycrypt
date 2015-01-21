@@ -182,9 +182,3 @@ module Cloning : sig
    * theory name. *)
   val clone : scope -> Ax.mode -> theory_cloning -> symbol * scope
 end
-
-(* -------------------------------------------------------------------- *)
-module Extraction : sig
-  val process :
-    scope -> (string option * toextract list * withextract list) -> scope
-end
