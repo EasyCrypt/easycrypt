@@ -838,8 +838,12 @@ let opened (pf : proof) =
                      FApi.get_pregoal_by_id hd pf.pr_env)
 
 (* -------------------------------------------------------------------- *)
-let all_opened (pf : proof) =
+let all_hd_opened (pf : proof) =
   pf.pr_opened
+
+(* -------------------------------------------------------------------- *)
+let all_opened (pf : proof) =
+  pf.pr_opened |> List.map ((^~) FApi.get_pregoal_by_id pf.pr_env)
 
 (* -------------------------------------------------------------------- *)
 let closed (pf : proof) = List.isempty pf.pr_opened

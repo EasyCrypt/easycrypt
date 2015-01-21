@@ -151,7 +151,10 @@ val start : LDecl.hyps -> form -> proof
 val opened : proof -> (int * pregoal) option
 
 (* Return the list of opened goals - by handle *)
-val all_opened : proof -> handle list
+val all_hd_opened : proof -> handle list
+
+(* Return the list of opened goals - by pregoal *)
+val all_opened : proof -> pregoal list
 
 (* Check if a proof is done *)
 val closed : proof -> bool

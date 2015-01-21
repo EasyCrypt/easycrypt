@@ -153,7 +153,7 @@ let t_field r l (f1,f2) g =
 let pp_concl fmt g = 
   let env, hyps, concl = tc1_eflat g in
   let ppe = EcPrinting.PPEnv.ofenv env in
-  EcPrinting.pp_goal ppe fmt (1,(LDecl.tohyps hyps,concl))
+  EcPrinting.pp_goal ppe fmt ((LDecl.tohyps hyps,concl), `One 1)
 
 let pp_form fmt (f,g) = 
   let env = tc1_env g in

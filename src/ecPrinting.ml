@@ -2010,12 +2010,15 @@ let pp_equivS (ppe : PPEnv.t) fmt es =
     Format.fprintf fmt "%a%!" (pp_post ppe) es.es_po
 
 (* -------------------------------------------------------------------- *)
-let goalline = String.make 72 '-'
+type ppgoal = (EcBaseLogic.hyps * EcFol.form) * [
+  | `One of int
+  | `All of (EcBaseLogic.hyps * EcFol.form) list
+]
 
-let pp_goal (ppe : PPEnv.t) fmt (n, (hyps, concl)) =
-  let ppe = PPEnv.add_locals ppe (List.map fst hyps.EcBaseLogic.h_tvar) in
+module PPGoal = struct
+  let goalline = String.make 72 '-'
 
-  let pp_hyp ppe (id, k) =
+  let pre_pp_hyp ppe (id, k) =
     let ppe =
       match k with
       | EcBaseLogic.LD_mem (Some m) ->
@@ -2050,47 +2053,65 @@ let pp_goal (ppe : PPEnv.t) fmt (n, (hyps, concl)) =
             pp_form ppe fmt f
 
         | EcBaseLogic.LD_abs_st _ ->
-          Format.fprintf fmt "statement" (* FIXME *)
-    in
-    let pp fmt =
-      Format.fprintf fmt "%-.2s: @[<hov 2>%t@]@\n%!" (EcIdent.name id) dk
-    in
-      (ppe, pp)
+            Format.fprintf fmt "statement" (* FIXME *)
+
+    in (ppe, (id, dk))
+
+  let pp_goal1 ?(pphyps = true) ?(idx) (ppe : PPEnv.t) fmt (hyps, concl) =
+    let ppe = PPEnv.add_locals ppe (List.map fst hyps.EcBaseLogic.h_tvar) in
+    let ppe, pps = List.map_fold pre_pp_hyp ppe (List.rev hyps.EcBaseLogic.h_local) in
+
+    idx |> oiter (Format.fprintf fmt "Goal #%d@\n");
+
+    if pphyps then begin
+      begin
+        match hyps.EcBaseLogic.h_tvar with
+        | [] -> Format.fprintf fmt "Type variables: <none>@\n\n%!"
+        | tv ->
+            Format.fprintf fmt "Type variables: %a@\n\n%!"
+              (pp_list ", " (pp_tyvar_ctt ppe)) tv
+      end;
+      List.iter (fun (id, dk) ->
+        Format.fprintf fmt
+          "%-.2s: @[<hov 2>%t@]@\n%!" (EcIdent.name id) dk)
+        pps
+    end;
+
+    Format.fprintf fmt "%s@\n%!" goalline;
+
+    match concl.f_node with
+    | FbdHoareF hf -> pp_bdhoareF ppe fmt hf
+    | FbdHoareS hs -> pp_bdhoareS ppe fmt hs
+    | FhoareF hf   -> pp_hoareF   ppe fmt hf
+    | FhoareS hs   -> pp_hoareS   ppe fmt hs
+    | FequivF ef   -> pp_equivF   ppe fmt ef
+    | FequivS es   -> pp_equivS   ppe fmt es
+    | _ -> Format.fprintf fmt "%a@\n%!" (pp_form ppe) concl
+end
+  
+let pp_goal (ppe : PPEnv.t) fmt (g, extra) =
+  let n =
+    match extra with
+    | `One n  -> n
+    | `All gs -> 1 + List.length gs
   in
+
   begin
     match n with
     | 1 -> Format.fprintf fmt "Current goal@\n@\n%!"
     | _ -> Format.fprintf fmt "Current goal (remaining: %d)@\n@\n%!" n
   end;
+  
+  Format.printf "%a@." (PPGoal.pp_goal1 ppe) g;
 
-  begin
-    match hyps.EcBaseLogic.h_tvar with
-    | [] -> Format.fprintf fmt "Type variables: <none>@\n\n%!"
-    | tv ->
-      Format.fprintf fmt "Type variables: %a@\n\n%!"
-        (pp_list ", " (pp_tyvar_ctt ppe)) tv
-  end;
-
-    let ppe =
-      List.fold_left
-        (fun ppe lh ->
-           let (ppe, pp) = pp_hyp ppe lh in
-             pp fmt; ppe)
-        ppe (List.rev hyps.EcBaseLogic.h_local);
-    in
-
-    Format.fprintf fmt "%s@\n%!" goalline;
-
-    begin
-      match concl.f_node with
-      | FbdHoareF hf -> pp_bdhoareF ppe fmt hf
-      | FbdHoareS hs -> pp_bdhoareS ppe fmt hs
-      | FhoareF hf   -> pp_hoareF   ppe fmt hf
-      | FhoareS hs   -> pp_hoareS   ppe fmt hs
-      | FequivF ef   -> pp_equivF   ppe fmt ef
-      | FequivS es   -> pp_equivS   ppe fmt es
-      | _ -> Format.fprintf fmt "%a@\n%!" (pp_form ppe) concl
-    end
+  match extra with
+  | `One _  -> ()
+  | `All gs ->
+      Format.fprintf fmt "@\n@\n";
+      List.iteri (fun i g ->
+        Format.printf "@[<hov 2>@\n%a@]@."
+          (PPGoal.pp_goal1 ~pphyps:false ~idx:(i+2) ppe) g)
+        gs
 
 (* -------------------------------------------------------------------- *)
 let pp_mod_params ppe bms =

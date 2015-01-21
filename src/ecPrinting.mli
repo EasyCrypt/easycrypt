@@ -35,6 +35,7 @@ val pp_paren : 'a pp -> 'a pp
 
 val pp_list : ('a, 'b, 'c, 'd, 'd, 'a) format6 -> 'a pp -> 'a list pp
 
+(* -------------------------------------------------------------------- *)
 val pp_pv      : PPEnv.t -> prog_var pp
 val pp_local   : PPEnv.t -> ident pp
 val pp_opname  : PPEnv.t -> path pp
@@ -44,6 +45,12 @@ val pp_form    : PPEnv.t -> form pp
 val pp_type    : PPEnv.t -> ty pp
 val pp_tyname  : PPEnv.t -> path pp
 
+val pp_mem      : PPEnv.t -> EcIdent.t pp
+val pp_tyvar    : PPEnv.t -> ident pp
+val pp_tyunivar : PPEnv.t -> EcUid.uid pp
+val pp_path     : path pp
+
+(* -------------------------------------------------------------------- *)
 val pp_typedecl : PPEnv.t -> (path * tydecl                ) pp
 val pp_opdecl   : ?long:bool -> PPEnv.t -> (path * operator) pp
 val pp_axiom    : ?long:bool -> PPEnv.t -> (path * axiom   ) pp
@@ -52,14 +59,18 @@ val pp_modtype  : PPEnv.t -> (module_type * mod_restr      ) pp
 val pp_modexp   : PPEnv.t -> (module_expr                  ) pp
 val pp_modsig   : PPEnv.t -> (path * module_sig            ) pp
 
-val pp_mem : PPEnv.t -> EcIdent.t pp
-
-val pp_tyvar    : PPEnv.t -> ident pp
-val pp_tyunivar : PPEnv.t -> EcUid.uid pp
-val pp_path     : path pp
-
-val pp_equivS : PPEnv.t -> equivS pp
-val pp_goal   : PPEnv.t -> (int * (EcBaseLogic.hyps * EcFol.form)) pp
+(* -------------------------------------------------------------------- *)
+val pp_hoareS   : PPEnv.t -> hoareS  pp
+val pp_bdhoareS : PPEnv.t -> bdHoareS pp
+val pp_equivS   : PPEnv.t -> equivS  pp
 
 val pp_stmt  : PPEnv.t -> stmt pp 
 val pp_instr : PPEnv.t -> instr pp 
+
+(* -------------------------------------------------------------------- *)
+type ppgoal = (EcBaseLogic.hyps * EcFol.form) * [
+  | `One of int
+  | `All of (EcBaseLogic.hyps * EcFol.form) list
+]
+
+val pp_goal : PPEnv.t -> ppgoal pp

@@ -16,13 +16,21 @@ module Mx  = EcPath.Mx
 (* -------------------------------------------------------------------- *)
 type pragma = {
   pm_verbose : bool; (* true  => display goal after each command *)
+  pm_g_prall : bool; (* true  => display all open goals *)
   pm_check   : bool; (* false => don't check proof scripts *)
 }
 
-let pragma = ref { pm_verbose = true; pm_check = true; }
+let pragma = ref {
+  pm_verbose = true ;
+  pm_g_prall = false;
+  pm_check   = true ;
+}
 
 let pragma_verbose (b : bool) =
   pragma := { !pragma with pm_verbose = b; }
+
+let pragma_g_prall (b : bool) =
+  pragma := {!pragma with pm_g_prall = b; }
 
 let pragma_check (b : bool) =
   pragma := { !pragma with pm_check = b; }
@@ -32,6 +40,11 @@ module Pragmas = struct
   let verbose  = "verbose"
   let check    = "check"
   let nocheck  = "nocheck"
+
+  module Goals = struct
+    let printall = "Goals:printall"
+    let printone = "Goals:printone"
+  end
 end
 
 exception InvalidPragma of string
@@ -42,6 +55,8 @@ let apply_pragma (x : string) =
   | x when x = Pragmas.verbose        -> pragma_verbose true
   | x when x = Pragmas.nocheck        -> pragma_check   false
   | x when x = Pragmas.check          -> pragma_check   true
+  | x when x = Pragmas.Goals.printone -> pragma_g_prall false
+  | x when x = Pragmas.Goals.printall -> pragma_g_prall true
 
   | _ -> raise (InvalidPragma x)
 
@@ -300,7 +315,7 @@ let process_pr fmt scope p =
           | EcScope.PSNoCheck -> ()
 
           | EcScope.PSCheck pf -> begin
-              let hds = EcCoreGoal.all_opened pf in
+              let hds = EcCoreGoal.all_hd_opened pf in
               let sz  = List.length hds in
               let ppe = EcPrinting.PPEnv.ofenv (EcScope.env scope) in
 
@@ -315,7 +330,7 @@ let process_pr fmt scope p =
                           goal.EcCoreGoal.g_concl) in
 
               Format.fprintf fmt "Printing Goal %d\n\n%!" n;
-              EcPrinting.pp_goal ppe fmt (sz, goal)
+              EcPrinting.pp_goal ppe fmt (goal, `One sz)
           end
       end
   end
@@ -541,6 +556,9 @@ and process_pragma (scope : EcScope.scope) opt =
   | x when x = Pragmas.verbose        -> pragma_verbose true
   | x when x = Pragmas.nocheck        -> pragma_check   false
   | x when x = Pragmas.check          -> pragma_check   true
+  | x when x = Pragmas.Goals.printall -> pragma_g_prall true
+  | x when x = Pragmas.Goals.printone -> pragma_g_prall false
+
   | "noop"    -> ()
   | "compact" -> Gc.compact ()
   | "reset"   -> raise (Pragma `Reset)
@@ -731,7 +749,7 @@ let process (g : global located) : unit =
 module S = EcScope
 module L = EcBaseLogic
 
-let pp_current_goal stream =
+let pp_current_goal ?(all = false) stream =
   let scope = current () in
 
   match S.xgoal scope with
@@ -757,15 +775,22 @@ let pp_current_goal stream =
           match EcCoreGoal.opened pf with
           | None -> Format.fprintf stream "No more goals@\n%!"
 
-          | Some (n, { EcCoreGoal.g_hyps  = hyps;
-                       EcCoreGoal.g_concl = concl; })
-            ->
-              let g = EcEnv.LDecl.tohyps hyps, concl in
-                EcPrinting.pp_goal ppe stream (n, g)
+          | Some (n, g) ->
+              let get_hc { EcCoreGoal.g_hyps; EcCoreGoal.g_concl } =
+                (EcEnv.LDecl.tohyps g_hyps, g_concl)
+              in
+
+              if all then
+                let subgoals = EcCoreGoal.all_opened pf in
+                let subgoals = odfl [] (List.otail subgoals) in
+                let subgoals = List.map get_hc subgoals in
+                EcPrinting.pp_goal ppe stream (get_hc g, `All subgoals)
+              else
+                EcPrinting.pp_goal ppe stream (get_hc g, `One n)
       end
   end
 
 let pp_maybe_current_goal stream =
   match (!pragma).pm_verbose with
-  | true  -> pp_current_goal stream
+  | true  -> pp_current_goal ~all:(!pragma).pm_g_prall stream
   | false -> ()
