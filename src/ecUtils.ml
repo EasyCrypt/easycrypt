@@ -611,7 +611,7 @@ end
 
 (* -------------------------------------------------------------------- *)
 module String = struct
-  include String
+  include BatString
 
   let mapi f s =
     let i = ref (-1) in

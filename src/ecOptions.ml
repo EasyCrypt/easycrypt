@@ -35,9 +35,9 @@ and prv_options = {
   prvo_timeout   : int;
   prvo_cpufactor : int;
   prvo_provers   : string list option;
-  pvro_checkall  : bool;
-  pvro_weakchk   : bool;
-  pvro_profile   : bool;
+  prvo_pragmas   : string list;
+  prvo_checkall  : bool;
+  prvo_profile   : bool;
 }
 
 and ldr_options = {
@@ -234,7 +234,7 @@ let specs = {
       `Spec ("timeout"    , `Int   , "Set the SMT timeout");
       `Spec ("cpu-factor" , `Int   , "Set the timeout CPU factor");
       `Spec ("check-all"  , `Flag  , "Force checking all files");
-      `Spec ("weak-check" , `Flag  , "Start prover in weak check mode");
+      `Spec ("pragmas"    , `String, "Comma-separated list of pragmas");
       `Spec ("profile"    , `Flag  , "Collect some profiling informations")]);
 
     ("loader", "Options related to loader", [
@@ -250,6 +250,16 @@ let get_string name values =
   | None -> None
   | Some (`String x :: _) -> Some x
   | _ -> assert false
+
+let get_string_list name values : string list =
+  let split x =
+    let aout = List.map String.trim (String.nsplit x ",") in
+    List.filter ((<>) "") aout
+  in
+
+  List.flatten (List.map
+    (function `String x -> split x | _ -> assert false)
+    (odfl [] (Mstr.find_opt name values)))
 
 let get_flag name values =
   match Mstr.find_opt name values with
@@ -289,9 +299,9 @@ let prv_options_of_values values =
       prvo_timeout   = odfl 3 (get_int "timeout" values);
       prvo_cpufactor = odfl 1 (get_int "cpu-factor" values);
       prvo_provers   = provers;
-      pvro_checkall  = get_flag "check-all" values;
-      pvro_weakchk   = get_flag "weak-check" values;
-      pvro_profile   = get_flag "profile" values; }
+      prvo_pragmas   = get_string_list "pragmas" values;
+      prvo_checkall  = get_flag "check-all" values;
+      prvo_profile   = get_flag "profile" values; }
 
 let cli_options_of_values values =
   { clio_emacs   = get_flag "emacs" values;

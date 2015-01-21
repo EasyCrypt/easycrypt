@@ -2654,12 +2654,18 @@ global_:
 | PRINT p=print      { Gprint     p   }
 | SEARCH qs=qoident* { Gsearch   qs   }
 
-| PRAGMA x=lident  { Gpragma    x   }
-
+| PRAGMA       x=pragma { Gpragma x }
 | PRAGMA ADD   x=lident { Goption (x, true ) }
 | PRAGMA MINUS x=lident { Goption (x, false) }
 
 | EXTRACTION i=extract_info { Gextract i }
+
+pragma_r:
+| x=LIDENT { x }
+| u=UIDENT COLON x=LIDENT { Printf.sprintf "%s:%s" u x }
+
+pragma:
+| x=loc(pragma_r) { x }
 
 extract_info:
 | s=STRING? qs=plist1(toextract,COMMA) w=withextract { (s,qs,w) }

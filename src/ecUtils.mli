@@ -267,7 +267,7 @@ end
 
 (* -------------------------------------------------------------------- *)
 module String : sig
-  include module type of String
+  include module type of BatString
 
   val init : int -> (int -> char) -> string
 

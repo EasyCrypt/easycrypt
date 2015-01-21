@@ -240,20 +240,24 @@ let _ =
   (* Initialize global scope *)
   begin
     let checkmode = {
-      EcCommands.cm_checkall  = prvopts.pvro_checkall;
+      EcCommands.cm_checkall  = prvopts.prvo_checkall;
       EcCommands.cm_timeout   = prvopts.prvo_timeout;
       EcCommands.cm_cpufactor = prvopts.prvo_cpufactor;
       EcCommands.cm_nprovers  = prvopts.prvo_maxjobs;
       EcCommands.cm_provers   = prvopts.prvo_provers;
       EcCommands.cm_wrapper   = pwrapper;
-      EcCommands.cm_profile   = prvopts.pvro_profile;
+      EcCommands.cm_profile   = prvopts.prvo_profile;
     } in
 
     EcCommands.initialize ~boot:ldropts.ldro_boot ~checkmode
   end;
 
-  if prvopts.pvro_weakchk then
-    EcCommands.pragma_check false;
+  begin
+    try
+      List.iter EcCommands.apply_pragma prvopts.prvo_pragmas
+    with EcCommands.InvalidPragma x ->
+      (Printf.eprintf "invalid pragma: `%s'\n%!" x; exit 1)
+  end;
 
   (* Instantiate terminal *)
   let lazy terminal = terminal in

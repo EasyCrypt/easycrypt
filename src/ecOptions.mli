@@ -31,9 +31,9 @@ and prv_options = {
   prvo_timeout   : int;
   prvo_cpufactor : int;
   prvo_provers   : string list option;
-  pvro_checkall  : bool;
-  pvro_weakchk   : bool;
-  pvro_profile   : bool;
+  prvo_pragmas   : string list;
+  prvo_checkall  : bool;
+  prvo_profile   : bool;
 }
 
 and ldr_options = {

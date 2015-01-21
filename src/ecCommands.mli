@@ -47,3 +47,6 @@ val pp_maybe_current_goal : Format.formatter -> unit
 (* -------------------------------------------------------------------- *)
 val pragma_verbose : bool -> unit
 val pragma_check   : bool -> unit
+exception InvalidPragma of string
+
+val apply_pragma : string -> unit

@@ -27,6 +27,24 @@ let pragma_verbose (b : bool) =
 let pragma_check (b : bool) =
   pragma := { !pragma with pm_check = b; }
 
+module Pragmas = struct
+  let silent   = "silent"
+  let verbose  = "verbose"
+  let check    = "check"
+  let nocheck  = "nocheck"
+end
+
+exception InvalidPragma of string
+
+let apply_pragma (x : string) =
+  match x with
+  | x when x = Pragmas.silent         -> pragma_verbose false
+  | x when x = Pragmas.verbose        -> pragma_verbose true
+  | x when x = Pragmas.nocheck        -> pragma_check   false
+  | x when x = Pragmas.check          -> pragma_check   true
+
+  | _ -> raise (InvalidPragma x)
+
 (* -------------------------------------------------------------------- *)
 exception TopError of EcLocation.t * exn
 
@@ -511,7 +529,7 @@ and process_proverinfo scope pi =
 
 (* -------------------------------------------------------------------- *)
 and process_pragma (scope : EcScope.scope) opt =
-  let check mode =
+  let pragma_check mode =
     match EcScope.goal scope with
     | Some { EcScope.puc_mode = Some false } ->
         EcScope.hierror "pragma [check|nocheck] in non-strict proof script";
@@ -519,10 +537,10 @@ and process_pragma (scope : EcScope.scope) opt =
   in
 
   match unloc opt with
-  | "silent"  -> pragma_verbose false
-  | "verbose" -> pragma_verbose true
-  | "nocheck" -> check false
-  | "check"   -> check true
+  | x when x = Pragmas.silent         -> pragma_verbose false
+  | x when x = Pragmas.verbose        -> pragma_verbose true
+  | x when x = Pragmas.nocheck        -> pragma_check   false
+  | x when x = Pragmas.check          -> pragma_check   true
   | "noop"    -> ()
   | "compact" -> Gc.compact ()
   | "reset"   -> raise (Pragma `Reset)
