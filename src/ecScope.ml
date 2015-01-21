@@ -1498,7 +1498,7 @@ module Theory = struct
   let exit (scope : scope) =
     let rec add_restr1 section where env item : EcEnv.env =
       match item with 
-      | EcTheory.CTh_theory (name, (th, _)) ->
+      | EcTheory.CTh_theory (name, th) ->
           add_restr section (EcPath.pqname where name) th env
   
       | EcTheory.CTh_module me ->
@@ -1518,8 +1518,11 @@ module Theory = struct
   
       | _ -> env
   
-    and add_restr section where th env =
-      List.fold_left (add_restr1 section where) env th.EcTheory.cth_struct
+    and add_restr section where (th, thmode) env =
+      match thmode with
+      | `Abstract -> env
+      | `Concrete ->
+          List.fold_left (add_restr1 section where) env th.EcTheory.cth_struct
     in
 
     assert (scope.sc_pr_uc = None);
@@ -1529,7 +1532,7 @@ module Theory = struct
     let scope = { scope with sc_env =
         add_restr section
           (EcPath.pqname (path scope) name)
-          (EcEnv.ctheory_of_ctheory_w3 cth) scope.sc_env } in
+          (EcEnv.ctheory_of_ctheory_w3 cth, mode) scope.sc_env } in
 
     (name, scope)
 
