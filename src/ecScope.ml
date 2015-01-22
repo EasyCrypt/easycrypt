@@ -1783,6 +1783,16 @@ module Cloning = struct
   end
 
   (* ------------------------------------------------------------------ *)
+  type ovrenv = {
+    ovre_ovrd  : EcThCloning.evclone;
+    ovre_scope : ovrsc;
+  }
+
+  and ovrsc = {
+    ovrc_glproof : (ptactic_core option) option;
+  }
+
+  (* ------------------------------------------------------------------ *)
   let clone (scope : scope) mode (thcl : theory_cloning) =
     let module C = EcThCloning in
 
@@ -1802,6 +1812,8 @@ module Cloning = struct
     end;
 
     let (name, (opath, oth), ovrds) = C.clone scope.sc_env thcl in
+    let ovrds = { ovre_ovrd  = ovrds;
+                  ovre_scope = { ovrc_glproof = None}; } in
 
     let opts  = Options.merge Options.default thcl.pthc_opts in
     let cpath = EcEnv.root scope.sc_env in
@@ -1809,12 +1821,19 @@ module Cloning = struct
     let subst = EcSubst.add_path EcSubst.empty opath npath in
 
     let (proofs, scope) =
-      let rec ovr1 prefix ovrds (subst, ops, proofs, scope) item =
+      let rec ovr1 prefix (ovrds : ovrenv) (subst, ops, proofs, scope) item =
         let xpath x = EcPath.pappend opath (EcPath.fromqsymbol (prefix, x)) in
-  
+
+        let myovscope = {
+          ovrc_glproof =
+            (match ovrds.ovre_ovrd.evc_lemmas.ev_global with
+             | Some _ as x -> x
+             | _ -> ovrds.ovre_scope.ovrc_glproof);
+        } in
+
         match item with
         | CTh_type (x, otyd) -> begin
-            match Msym.find_opt x ovrds.evc_types with
+            match Msym.find_opt x ovrds.ovre_ovrd.evc_types with
             | None ->
                 let otyd = EcSubst.subst_tydecl subst otyd in
                   (subst, ops, proofs, Ty.bind scope (x, otyd))
@@ -1848,7 +1867,7 @@ module Cloning = struct
         end
   
         | CTh_operator (x, ({ op_kind = OB_oper None } as oopd)) -> begin
-            match Msym.find_opt x ovrds.evc_ops with
+            match Msym.find_opt x ovrds.ovre_ovrd.evc_ops with
             | None ->
                 (subst, ops, proofs, Op.bind scope (x, EcSubst.subst_op subst oopd))
   
@@ -1898,7 +1917,7 @@ module Cloning = struct
             end
   
         | CTh_operator (x, ({ op_kind = OB_pred None} as oopr)) -> begin
-            match Msym.find_opt x ovrds.evc_preds with
+            match Msym.find_opt x ovrds.ovre_ovrd.evc_preds with
             | None ->
                 (subst, ops, proofs, Op.bind scope (x, EcSubst.subst_op subst oopr))
   
@@ -1966,9 +1985,9 @@ module Cloning = struct
                 match ax.ax_kind with
                 | `Lemma -> None
                 | `Axiom ->
-                    match Msym.find_opt x (ovrds.evc_lemmas.ev_bynames) with
+                    match Msym.find_opt x (ovrds.ovre_ovrd.evc_lemmas.ev_bynames) with
                     | Some pt -> Some pt
-                    | None -> ovrds.evc_lemmas.ev_global
+                    | None -> myovscope.ovrc_glproof
               in
                 match doproof with
                 | None     -> (ax, proofs)
@@ -1993,8 +2012,10 @@ module Cloning = struct
               (subst, ops, proofs, Mod.bind scope thcl.pthc_local me)
   
         | CTh_theory (x, (cth, thmode)) -> begin
-            let subovrds = Msym.find_opt x ovrds.evc_ths in
+            let subovrds = Msym.find_opt x ovrds.ovre_ovrd.evc_ths in
             let subovrds = EcUtils.odfl evc_empty subovrds in
+            let subovrds = { ovre_ovrd  = subovrds;
+                             ovre_scope = myovscope; } in
             let (subst, ops, proofs, subscope) =
               let subscope = Theory.enter scope thmode x in
               let (subst, ops, proofs, subscope) =
