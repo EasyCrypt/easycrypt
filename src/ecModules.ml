@@ -214,7 +214,7 @@ let s_seq s1 s2 = stmt (s1.s_node @ s2.s_node)
 
 let rstmt s = stmt (List.rev s)
 
-let s_split n s = List.take_n n s.s_node
+let s_split n s = List.takedrop n s.s_node
 
 let destr_asgn i =
   match i.i_node with

@@ -283,7 +283,7 @@ let pp_tyerror env fmt error =
           myuvars
         in
 
-        if not (List.isempty myuvars) then begin
+        if not (List.is_empty myuvars) then begin
           Format.fprintf fmt "@\n    where@\n";
           List.iter (fun (uid, uidty) ->
             Format.fprintf fmt "      %a = %a@\n"
@@ -665,7 +665,7 @@ let transtyvars (env : EcEnv.env) (loc, tparams) =
   let tparams = tparams |> omap
     (fun tparams ->
         let for1 ({ pl_desc = x }, tc) = (EcIdent.create x, transtcs env tc) in
-          if not (List.uniq (List.map (unloc |- fst) tparams)) then
+          if not (List.is_unique (List.map (unloc |- fst) tparams)) then
             tyerror loc env DuplicatedTyVar;
           List.map for1 tparams)
   in
@@ -751,7 +751,7 @@ let rec check_sig_cnv mode (env:EcEnv.env) (sin:module_sig) (sout:module_sig) =
     and o_kind = tysig_item_kind o_item in
 
     let i_item =
-      List.findopt
+      List.ofind
         (fun i_item ->
              (tysig_item_name i_item) = o_name
           && (tysig_item_kind i_item) = o_kind)
@@ -910,7 +910,7 @@ let split_msymb (env : EcEnv.env) (msymb : pmsymbol located) =
   let (top, args, sm) = 
     try
       let (r, (x, args), sm) =
-        List.find_split (fun (_,args) -> args <> None) msymb.pl_desc
+        List.find_pivot (fun (_,args) -> args <> None) msymb.pl_desc
       in
         (List.rev_append r [x, None], args, sm)
     with Not_found ->
@@ -983,7 +983,7 @@ let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol located) =
       if List.length args > List.length params then
         tyerror loc env (InvalidModAppl MAE_WrongArgCount);
 
-      let params, remn = List.take_n (List.length args) params in
+      let params, remn = List.takedrop (List.length args) params in
 
       List.iter2
         (fun (_, p) (_, a) ->
@@ -1088,7 +1088,7 @@ let transpattern1 env ue (p : EcParsetree.plpattern) =
 
   | LPTuple xs ->
       let xs = unlocs xs in
-      if not (List.uniq xs) then
+      if not (List.is_unique xs) then
         tyerror p.pl_loc env NonLinearPattern
       else
         let xs     = List.map EcIdent.create xs in
@@ -1097,7 +1097,7 @@ let transpattern1 env ue (p : EcParsetree.plpattern) =
 
   | LPRecord fields ->
       let xs = List.map (unloc |- snd) fields in
-      if not (List.uniq xs) then
+      if not (List.is_unique xs) then
         tyerror p.pl_loc env NonLinearPattern;
 
       let fields =
@@ -1436,7 +1436,7 @@ let transexp (env : EcEnv.env) mode ue e =
             | Fpvar (x1, _) -> EcTypes.pv_equal vx (NormMp.norm_pvar env x1)
             | _ -> false in 
         let i = 
-          match List.findex find lf with
+          match List.oindex find lf with
           | None -> tyerror x.pl_loc env (UnknownProj (unloc x))
           | Some i -> i in
         e_proj sube i ty, ty
@@ -1585,7 +1585,7 @@ and transmodsig_body (env : EcEnv.env) (sa : Sm.t)
           List.map                          (* FIXME: continuation *)
             (fun (x, ty) -> { v_name = x.pl_desc; 
                               v_type = transty_for_decl env ty}) l in
-        if not (List.uniq (List.map fst l)) then
+        if not (List.is_unique (List.map fst l)) then
           raise (DuplicatedArgumentsName f);
         let tyarg = ttuple (List.map (fun vd -> vd.v_type) tyargs) in
         tyarg, Some tyargs
@@ -1634,7 +1634,7 @@ and transmodsig_body (env : EcEnv.env) (sa : Sm.t)
   let items = List.map transsig1 is in
   let names = List.map name_of_sigitem is in
 
-    if not (List.uniq names) then
+    if not (List.is_unique names) then
       raise DuplicatedSigItemName
     else
       items
@@ -2075,7 +2075,7 @@ and translvalue ue (env : EcEnv.env) lvalue =
 
   | PLvTuple xs -> 
       let xs = List.map (trans_pv env) xs in
-      if not (List.uniqf (EqTest.for_pv_norm env) (List.map fst xs)) then
+      if not (List.is_unique ~eq:(EqTest.for_pv_norm env) (List.map fst xs)) then
         tyerror lvalue.pl_loc env LvNonLinear;
       let ty = ttuple (List.map snd xs) in
       (LvTuple xs, ty)
@@ -2339,7 +2339,7 @@ let trans_form_or_pattern env (ps, ue) pf tt =
             | Fpvar (x1, _) -> EcTypes.pv_equal vx (NormMp.norm_pvar env x1)
             | _ -> false in 
         let i = 
-          match List.findex find lf with
+          match List.oindex find lf with
           | None -> tyerror x.pl_loc env (UnknownProj (unloc x))
           | Some i -> i in
         f_proj subf i ty

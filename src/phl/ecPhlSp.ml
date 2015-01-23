@@ -189,7 +189,7 @@ module LowInternal = struct
       let pre_f  = build_sp m bds assoc (f_and_simpl (f_not e_form) pre) in
       let stmt_t, (bds_t, assoc_t, pre_t) = sp_stmt m env (bds,assoc,pre_t) s1.s_node in
       let stmt_f, (bds_f, assoc_f, pre_f) = sp_stmt m env (bds,assoc,pre_f) s2.s_node in
-      if not (List.isempty stmt_t && List.isempty stmt_f) then raise No_sp;
+      if not (List.is_empty stmt_t && List.is_empty stmt_f) then raise No_sp;
       let sp_t = build_sp m bds_t assoc_t pre_t in
       let sp_f = build_sp m bds_f assoc_f pre_f in
       ([], [], f_or_simpl sp_t sp_f)
@@ -218,7 +218,7 @@ let t_sp_side pos tc =
   and as_double = function Double i -> i | _ -> assert false in
 
   let check_sp_progress ?side pos stmt =
-    if is_some pos && not (List.isempty stmt) then
+    if is_some pos && not (List.is_empty stmt) then
       tc_error_lazy !!tc (fun fmt ->
         let side = side |> (function
           | None          -> "remaining"

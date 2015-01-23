@@ -139,7 +139,7 @@ let find_mc =
     let test = function
       | CTh_theory (x, (sub, _)) when x = nm -> Some sub.cth_struct
       | _ -> None
-    in List.pick test cth
+    in List.opick test cth
   in
 
   let rec doit nm cth =
@@ -154,35 +154,35 @@ let find_type cth (nm, x) =
   let test = function
     | CTh_type (xty, ty) when xty = x -> Some ty
     | _ -> None
-  in find_mc cth.cth_struct nm |> obind (List.pick test)
+  in find_mc cth.cth_struct nm |> obind (List.opick test)
 
 (* -------------------------------------------------------------------- *)
 let find_theory cth (nm, x) =
   let test = function
     | CTh_theory (xth, th) when xth = x -> Some th
     | _ -> None
-  in find_mc cth.cth_struct nm |> obind (List.pick test)
+  in find_mc cth.cth_struct nm |> obind (List.opick test)
 
 (* -------------------------------------------------------------------- *)
 let find_op cth (nm, x) =
   let test = function
     | CTh_operator (xop, op) when xop = x && EcDecl.is_oper op -> Some op
     | _ -> None
-  in find_mc cth.cth_struct nm |> obind (List.pick test)
+  in find_mc cth.cth_struct nm |> obind (List.opick test)
 
 (* -------------------------------------------------------------------- *)
 let find_pr cth (nm, x) =
   let test = function
     | CTh_operator (xpr, pr) when xpr = x && EcDecl.is_pred pr -> Some pr
     | _ -> None
-  in find_mc cth.cth_struct nm |> obind (List.pick test)
+  in find_mc cth.cth_struct nm |> obind (List.opick test)
 
 (* -------------------------------------------------------------------- *)
 let find_ax cth (nm, x) =
   let test = function
     | CTh_axiom (xax, ax) when xax = x -> Some ax
     | _ -> None
-  in find_mc cth.cth_struct nm |> obind (List.pick test)
+  in find_mc cth.cth_struct nm |> obind (List.opick test)
 
 (* -------------------------------------------------------------------- *)
 let clone (scenv : EcEnv.env) (thcl : theory_cloning) =

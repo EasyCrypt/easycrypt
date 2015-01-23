@@ -677,7 +677,7 @@ let rootctxt (scope : EcScope.scope) =
 
 (* -------------------------------------------------------------------- *)
 let pop_context context =
-  assert (not (List.isempty context.ct_stack));
+  assert (not (List.is_empty context.ct_stack));
 
   { ct_level   = context.ct_level - 1;
     ct_root    = context.ct_root;

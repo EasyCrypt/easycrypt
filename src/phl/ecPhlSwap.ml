@@ -54,9 +54,9 @@ module LowInternal = struct
         Format.fprintf fmt
           "invalid position, 1 <= %i < %i <= %i <= %i"
           p1 p2 p3 len);
-    let hd ,tl = List.take_n (p1-1) s in
-    let s12,tl = List.take_n (p2-p1) tl in
-    let s23,tl = List.take_n (p3-p2+1) tl in
+    let hd ,tl = List.takedrop (p1-1) s in
+    let s12,tl = List.takedrop (p2-p1) tl in
+    let s23,tl = List.takedrop (p3-p2+1) tl in
       check_swap tc (stmt s12) (stmt s23);
       stmt (List.flatten [hd;s23;s12;tl])
 end

@@ -31,7 +31,7 @@ let t_kill_r side cpos olen tc =
             tc_error pf
               "cannot find %d consecutive instructions at given position"
               len;
-          List.take_n len zpr.Zpr.z_tail
+          List.takedrop len zpr.Zpr.z_tail
     in
 
     (* FIXME [BG]: check the usage of po_rd *)
@@ -166,7 +166,7 @@ let cfold_stmt (pf, hyps) me olen zpr =
     | Some olen ->
         if List.length tl < olen then
           tc_error pf "expecting at least %d instructions after assignment" olen;
-        List.take_n olen tl
+        List.takedrop olen tl
   in
 
   List.iter

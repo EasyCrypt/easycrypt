@@ -130,8 +130,8 @@ let locate ?(onlysys = false) (name : string) (ecl : ecloader) =
     in
 
     match
-      List.prmap
-        (fun kind -> List.pick (locate kind) ecl.ecl_idirs)
+      List.rev_pmap
+        (fun kind -> List.opick (locate kind) ecl.ecl_idirs)
         [`Ec; `EcA]
     with
     | [x] -> Some x

@@ -333,7 +333,7 @@ let process_delta (s, o, p) tc =
           let fp =
             match fp.f_node with
             | Fapp (h, hargs) when List.length hargs > na ->
-                let (a1, a2) = List.take_n na hargs in
+                let (a1, a2) = List.takedrop na hargs in
                   f_app h a1 (toarrow (List.map f_ty a2) fp.f_ty)
             | _ -> fp
           in
@@ -714,7 +714,7 @@ let process_generalize1 pattern (tc : tcenv1) =
     | `FPattern fp -> begin
         match fp.fp_kind with
         | FPNamed ({ pl_desc = ([], s) }, None)
-            when LDecl.has_symbol s hyps && List.isempty fp.fp_args
+            when LDecl.has_symbol s hyps && List.is_empty fp.fp_args
           ->
             let id = fst (LDecl.lookup s hyps) in
             t_generalize_hyp ~clear:true id tc

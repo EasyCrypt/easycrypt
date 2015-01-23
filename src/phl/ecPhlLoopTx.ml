@@ -62,7 +62,7 @@ let fission_stmt (il, (d1, d2)) (pf, hyps) me zpr =
     | { i_node = Swhile (b, sw) } :: tl -> begin
         if List.length zpr.Zpr.z_head < il then
           tc_error pf "while-loop is not headed by %d intructions" il;
-      let (init, hd) = List.take_n il zpr.Zpr.z_head in
+      let (init, hd) = List.takedrop il zpr.Zpr.z_head in
         (hd, init, b, sw, tl)
       end
     | _ -> tc_error pf "code position does not lead to a while-loop"
@@ -72,8 +72,8 @@ let fission_stmt (il, (d1, d2)) (pf, hyps) me zpr =
     tc_error pf "in loop fission, invalid offsets range";
 
   let (s1, s2, s3) =
-    let (s1, s2) = List.take_n (d1   ) sw.s_node in
-    let (s2, s3) = List.take_n (d2-d1) s2 in
+    let (s1, s2) = List.takedrop (d1   ) sw.s_node in
+    let (s2, s3) = List.takedrop (d2-d1) s2 in
       (s1, s2, s3)
   in
 
@@ -102,7 +102,7 @@ let fusion_stmt (il, (d1, d2)) (pf, hyps) me zpr =
     | { i_node = Swhile (b, sw) } :: tl -> begin
         if List.length zpr.Zpr.z_head < il then
           tc_error pf "1st while-loop is not headed by %d intruction(s)" il;
-      let (init, hd) = List.take_n il zpr.Zpr.z_head in
+      let (init, hd) = List.takedrop il zpr.Zpr.z_head in
         (hd, init, b, sw, tl)
       end
     | _ -> tc_error pf "code position does not lead to a while-loop"
@@ -111,7 +111,7 @@ let fusion_stmt (il, (d1, d2)) (pf, hyps) me zpr =
   let (init2, b2, sw2, tl) =
     if List.length tl < il then
       tc_error pf "1st first-loop is not followed by %d instruction(s)" il;
-    let (init2, tl) = List.take_n il tl in
+    let (init2, tl) = List.takedrop il tl in
       match tl with
       | { i_node = Swhile (b2, sw2) } :: tl -> (List.rev init2, b2, sw2, tl)
       | _ -> tc_error pf "cannot find the 2nd while-loop"
@@ -122,8 +122,8 @@ let fusion_stmt (il, (d1, d2)) (pf, hyps) me zpr =
   if d2 > List.length sw2.s_node then
     tc_error pf "in loop-fusion, body is less than %d instruction(s)" d2;
 
-  let (sw1, fini1) = List.take_n d1 sw1.s_node in
-  let (sw2, fini2) = List.take_n d2 sw2.s_node in
+  let (sw1, fini1) = List.takedrop d1 sw1.s_node in
+  let (sw2, fini2) = List.takedrop d2 sw2.s_node in
 
   (* FIXME: costly *)
   if not (EcReduction.EqTest.for_stmt_norm env (stmt init1) (stmt init2)) then

@@ -68,7 +68,7 @@ let init_sim env spec inv =
       | None, None -> check_eq eqo'
       | _, _ -> false in
     let get test () = 
-      List.pick 
+      List.opick 
         (fun (_,_,eqo' as t) -> if test t then Some eqo' else None) spec in
     match List.fpick [get test1; get test2; get test3] with
     | None -> 

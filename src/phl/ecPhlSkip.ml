@@ -18,7 +18,7 @@ module LowInternal = struct
   let t_hoare_skip_r tc =
     let hs = tc1_as_hoareS tc in
 
-    if not (List.isempty hs.hs_s.s_node) then
+    if not (List.is_empty hs.hs_s.s_node) then
       tc_error !!tc "instruction list is not empty";
 
     let concl = f_imp hs.hs_pr hs.hs_po in
@@ -32,7 +32,7 @@ module LowInternal = struct
   let t_bdhoare_skip_r_low tc =
     let bhs = tc1_as_bdhoareS tc in
 
-    if not (List.isempty bhs.bhs_s.s_node) then
+    if not (List.is_empty bhs.bhs_s.s_node) then
       tc_error !!tc ~who:"skip" "instruction list is not empty";
     if bhs.bhs_cmp <> FHeq && bhs.bhs_cmp <> FHge then
       tc_error !!tc ~who:"skip" "";
@@ -62,9 +62,9 @@ module LowInternal = struct
   let t_equiv_skip_r tc =
     let es = tc1_as_equivS tc in
 
-    if not (List.isempty es.es_sl.s_node) then
+    if not (List.is_empty es.es_sl.s_node) then
       tc_error !!tc ~who:"skip" "left instruction list is not empty";
-    if not (List.isempty es.es_sr.s_node) then
+    if not (List.is_empty es.es_sr.s_node) then
       tc_error !!tc ~who:"skip" "right instruction list is not empty";
 
     let concl = f_imp es.es_pr es.es_po in

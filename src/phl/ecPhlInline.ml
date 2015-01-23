@@ -142,7 +142,7 @@ module LowInternal = struct
       match sp with
       | [] -> me, s
       | (toskip, ip)::sp ->
-        let r, i, s = List.split_n toskip s in
+        let r, i, s = List.pivot_at toskip s in
         let me, si = inline_i me ip i in
         let me, s  = inline_s me sp s in
         (me, List.rev_append r (si @ s))
@@ -212,13 +212,13 @@ module HiInternal = struct
       | Sif(_, s1, s2) ->
           let sp1 = aux_s 0 s1.s_node in
           let sp2 = aux_s 0 s2.s_node in
-          if   List.isempty sp1 && List.isempty sp2
+          if   List.is_empty sp1 && List.is_empty sp2
           then None
           else Some (IPif (sp1, sp2))
 
       | Swhile(_, s) ->
           let sp = aux_s 0 s.s_node in
-          if List.isempty sp then None else Some (IPwhile (sp))
+          if List.is_empty sp then None else Some (IPwhile (sp))
 
       | _ -> None
 

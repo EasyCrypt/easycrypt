@@ -612,7 +612,7 @@ let rec import_w3_ty env tvm ty =
       with e ->
         if Ty.is_ts_tuple t then ttuple args
         else if Ty.ts_equal t Ty.ts_func then
-          let t1,t2 = List.hd2 args in
+          let t1,t2 = EcUtils.as_seq2 args in
           tfun t1 t2
         else if Ty.ts_equal t Ty.ts_pred then
           let t1,t2 = List.hd args, tbool in
@@ -701,7 +701,7 @@ let import_w3_term env tvm =
           if Term.is_fs_tuple f then f_tuple args
           else
             if Term.ls_equal f Term.fs_func_app then
-              let (a1, a2) = List.hd2 args in
+              let (a1, a2) = EcUtils.as_seq2 args in
                 f_app a1 [a2] codom
             else raise e
         end
@@ -978,7 +978,7 @@ let trans_tydecl env path td =
              let dom  = dom |> trans_ty env in
              let cls  = Term.create_lsymbol ~constr:ncs cid aty (Some dom) in
              let ocls = mk_highorder_func cls in
-               ((c, cls, ocls), (cls, List.create (List.length aty) None))
+               ((c, cls, ocls), (cls, List.make (List.length aty) None))
            in
              List.split (List.map for1 cs)
          in
@@ -1175,7 +1175,7 @@ let trans_app env p tys args =
   let nargs = List.length args in
   if arity = nargs then cast_app mk args targs
   else if arity < nargs then
-    let args1,args2 = List.take_n arity args in
+    let args1,args2 = List.takedrop arity args in
     apply_highorder (cast_app mk args1 targs) args2
   else (* arity > nargs *)
     let targs = List.map (odfl Ty.ty_bool) targs in

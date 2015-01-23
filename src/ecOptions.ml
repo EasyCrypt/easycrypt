@@ -156,7 +156,7 @@ let parse spec argv =
 
   let command = argv.(1) in
 
-  match List.findopt (fun (x, _, _) -> x = command) spec.xp_commands with
+  match List.ofind (fun (x, _, _) -> x = command) spec.xp_commands with
   | None -> raise (error "unknown command: %s" command);
   | Some (_, _, csp) -> begin
       let csp = List.flatten (List.map ccspec (spec.xp_globals @ csp)) in

@@ -125,7 +125,7 @@ let tc1_last_assert tc st = pf_last_assert !!tc st
 (* TODO: use in change pos *)
 
 let pf_pos_last_gen msg test pe s = 
-  match List.findex_last test s.s_node with
+  match List.orindex test s.s_node with
   | None -> tc_error pe "can not find the last %s instruction" msg
   | Some i -> i
 
@@ -304,7 +304,7 @@ let lv_subst m lv f =
 
 (* -------------------------------------------------------------------- *)
 let mk_let_of_lv_substs_nolet env (lets, f) =
-  if List.isempty lets then f 
+  if List.is_empty lets then f 
   else
     let s = 
       List.fold_left (fun s (lv,m,f1) ->
@@ -315,7 +315,7 @@ let mk_let_of_lv_substs_nolet env (lets, f) =
           List.fold_left2 (fun s (pv,_) f -> PVM.add env pv m f s) s vs fs
         | LvTuple vs, _ ->
           List.fold_lefti 
-            (fun i s (pv,ty) -> PVM.add env pv m (f_proj f i ty) s)
+            (fun s i (pv,ty) -> PVM.add env pv m (f_proj f i ty) s)
             s vs
         | LvMap _, _ -> assert false)  PVM.empty lets in
     PVM.subst env s f
@@ -338,7 +338,7 @@ let add_lv_subst env lv m s =
   | _ -> assert false
 
 let mk_let_of_lv_substs_let env (lets, f) =
-  if List.isempty lets then f 
+  if List.is_empty lets then f 
   else
     let accu,s = 
       List.fold_left (fun (accu,s) (lv,m,f1) ->
@@ -387,7 +387,7 @@ let mk_let_of_lv_substs_let env (lets, f) =
                 let lpx = LSymbol(x,ty) in
                 let fx = f_local x ty in
                 ((lpx,f1)::rlets,s), fx in
-            List.fold_lefti (fun i accus (_,ty as idt) ->
+            List.fold_lefti (fun accus i (_,ty as idt) ->
               add_id fv accus idt (f_proj fx i ty)) accus ids)
         ([],Fsubst.f_subst_id) fvlets in
     List.fold_left (fun f2 (lp,f1) -> f_let lp f1 f2) (Fsubst.f_subst s f) rlets

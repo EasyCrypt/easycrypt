@@ -37,7 +37,7 @@ module LowInternal = struct
     | Sif (e,s1,s2) ->
         let r1,letsf1 = wp_stmt onesided env m (List.rev s1.s_node) letsf in
         let r2,letsf2 = wp_stmt onesided env m (List.rev s2.s_node) letsf in
-        if List.isempty r1 && List.isempty r2 then begin
+        if List.is_empty r1 && List.is_empty r2 then begin
           let post1 = mk_let_of_lv_substs env letsf1 in
           let post2 = mk_let_of_lv_substs env letsf2 in
           let post  = f_if (form_of_expr m e) post1 post2 in
@@ -65,7 +65,7 @@ module TacInternal = struct
     match i with
     | None   -> List.length s.s_node - List.length rm
     | Some i ->
-        if not (List.isempty rm) then
+        if not (List.is_empty rm) then
           tc_error !!tc "remaining %i instruction(s)" (List.length rm);
         i
 

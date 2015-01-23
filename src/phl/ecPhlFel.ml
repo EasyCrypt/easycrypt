@@ -156,7 +156,7 @@ let t_failure_event_r (at_pos, cntr, ash, q, f_event, pred_specs, inv) tc =
     let old_b = f_local old_b_id tbool in
     let some_p =
       pred_specs
-        |> List.findopt (fun (o', _) -> o = o')
+        |> List.ofind (fun (o', _) -> o = o')
         |> omap snd
         |> odfl f_true
     in

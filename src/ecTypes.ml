@@ -882,8 +882,8 @@ and e_subst_op ety tys args (tyids, e) =
   let (sag, args, e) =
     match e.e_node with
     | Elam (largs, lbody) when args <> [] ->
-        let largs1, largs2 = List.take_n (List.length args  ) largs in
-        let  args1,  args2 = List.take_n (List.length largs1)  args in
+        let largs1, largs2 = List.takedrop (List.length args  ) largs in
+        let  args1,  args2 = List.takedrop (List.length largs1)  args in
           (Mid.of_list (List.combine (List.map fst largs1) args1),
            args2, e_lam largs2 lbody)
 

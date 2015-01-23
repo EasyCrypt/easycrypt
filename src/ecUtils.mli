@@ -157,112 +157,13 @@ module Disposable : sig
 end
 
 (* -------------------------------------------------------------------- *)
+module Os : sig
+  val listdir : string -> string list
+end
+
+(* -------------------------------------------------------------------- *)
 module ISet : sig
   include module type of BatISet
-end
-
-(* -------------------------------------------------------------------- *)
-module List : sig
-  include module type of List
-
-  val compare : 'a cmp -> 'a list cmp
-
-  val ocons : 'a option -> 'a list -> 'a list
-
-  val isempty : 'a list -> bool
-
-  val ohead : 'a list -> 'a option
-
-  val otail : 'a list -> 'a list option
-
-  val last : 'a list -> 'a
-
-  val olast : 'a list -> 'a option
-
-  val iteri : (int -> 'a -> 'b) -> 'a list -> unit
-
-  val iter2i : (int -> 'a -> 'b -> 'c) -> 'a list -> 'b list -> unit
-
-  val fusion : ('a -> 'a -> 'a) -> 'a list -> 'a list -> 'a list
-
-  val iter2o : ('a option -> 'b option -> 'c) -> 'a list -> 'b list -> unit
-
-  val findopt : ('a -> bool) -> 'a list -> 'a option
-
-  val findex : ('a -> bool) -> 'a list -> int option
-  
-  val findex_last : ('a -> bool) -> 'a list -> int option
-
-  val index :  'a -> 'a list -> int option
-
-  val uniqf : ('a -> 'a -> bool) -> 'a list -> bool
-
-  val uniq : 'a list -> bool
-
-  val take : int -> 'a list -> 'a list
-
-  val split_n : int -> 'a list -> 'a list * 'a * 'a list
-
-  val fold_lefti : (int -> 'a -> 'b -> 'a) -> 'a -> 'b list -> 'a
-
-  val filter2 : ('a -> 'b -> bool) -> 'a list -> 'b list -> 'a list * 'b list
-
-  val create : int -> 'a -> 'a list
-
-  val init : int -> (int -> 'a) -> 'a list
-
-  val find_split : ('a -> bool) -> 'a list -> 'a list * 'a * 'a list
-
-  val mapi : (int -> 'a -> 'b) -> 'a list -> 'b list
-
-  val map_fold : ('a -> 'b -> 'a * 'c) -> 'a -> 'b list -> 'a * 'c list
-
-  val map_fold2 : ('a -> 'b -> 'c -> 'a * 'd) -> 'a -> 'b list -> 'c list -> 'a * 'd list
-
-  val map_combine : ('a -> 'c) -> ('b -> 'd) -> 'a list -> 'b list -> ('c * 'd) list
-
-  val take_n : int -> 'a list -> 'a list * 'a list
-
-  val all2 : ('a -> 'b -> bool) -> 'a list -> 'b list -> bool
-
-  val hd2 : 'a list -> 'a * 'a
-
-  val pick : ('a -> 'b option) -> 'a list -> 'b option
-
-  val fpick : (unit -> 'a option) list -> 'a option
-
-  val assoc_eq : ('a -> 'a -> bool) -> 'a -> ('a * 'b) list -> 'b
-
-  val tryassoc_eq : ('a -> 'a -> bool) -> 'a -> ('a * 'b) list -> 'b option
-
-  val tryassoc : 'a -> ('a * 'b) list -> 'b option
-
-  val find_map : ('a -> 'b option) -> 'a list -> 'b
-
-  val pmap : ('a -> 'b option) -> 'a list -> 'b list
-
-  val prmap : ('a -> 'b option) -> 'a list -> 'b list
-
-  val sum : int list -> int
-
-  val min : 'a -> 'a list -> 'a
-
-  val max : 'a -> 'a list -> 'a
-
-  val rotate : [`Left|`Right] -> int -> 'a list -> int * 'a list
-
-  module Smart : sig
-    val map : ('a -> 'a) -> 'a list -> 'a list
-
-    val map_fold : ('a -> 'b -> 'a * 'b) -> 'a -> 'b list -> 'a * 'b list
-  end
-end
-
-(* -------------------------------------------------------------------- *)
-module Stream : sig
-  include module type of Stream with type 'a t = 'a Stream.t
-
-  val next_opt : 'a Stream.t -> 'a option
 end
 
 (* -------------------------------------------------------------------- *)
@@ -270,6 +171,48 @@ module String : sig
   include module type of BatString
 
   val split_lines : string -> string list
+end
+
+(* -------------------------------------------------------------------- *)
+module List : sig
+  include module type of BatList
+
+  module Smart : sig
+    val map      : ('a -> 'a) -> 'a list -> 'a list
+    val map_fold : ('a -> 'b -> 'a * 'b) -> 'a -> 'b list -> 'a * 'b list
+  end
+
+  (* Aliases to exception-less functions *)
+  val ocons   : 'a option -> 'a list -> 'a list
+  val ohead   : 'a list -> 'a option
+  val otail   : 'a list -> 'a list option
+  val olast   : 'a list -> 'a option
+  val ofind   : ('a -> bool) -> 'a list -> 'a option
+  val opick   : ('a -> 'b option) -> 'a list -> 'b option
+  val oindex  : ('a -> bool) -> 'a list -> int option
+  val orindex : ('a -> bool) -> 'a list -> int option
+
+  (* Functions working on 2 lists in parallel *)
+  module Parallel : sig
+    val iter2i    : (int -> 'a -> 'b -> 'c) -> 'a list -> 'b list -> unit
+    val iter2o    : ('a option -> 'b option -> 'c) -> 'a list -> 'b list -> unit
+    val filter2   : ('a -> 'b -> bool) -> 'a list -> 'b list -> 'a list * 'b list
+    val all2      : ('a -> 'b -> bool) -> 'a list -> 'b list -> bool
+    val map_fold2 : ('a -> 'b -> 'c -> 'a * 'd) -> 'a -> 'b list -> 'c list -> 'a * 'd list
+  end
+
+  include module type of Parallel
+
+  (*------------------------------------------------------------------ *)
+  val fusion     : ('a -> 'a -> 'a) -> 'a list -> 'a list -> 'a list
+  val is_unique  : ?eq:('a -> 'a -> bool) -> 'a list -> bool
+  val fpick      : (unit -> 'a option) list -> 'a option
+  val pivot_at   : int -> 'a list -> 'a list * 'a * 'a list
+  val find_pivot : ('a -> bool) -> 'a list -> 'a list * 'a * 'a list
+  val map_fold   : ('a -> 'b -> 'a * 'c) -> 'a -> 'b list -> 'a * 'c list
+  val pmap       : ('a -> 'b option) -> 'a list -> 'b list
+  val rev_pmap   : ('a -> 'b option) -> 'a list -> 'b list
+  val rotate     : [`Left|`Right] -> int -> 'a list -> int * 'a list
 end
 
 (* -------------------------------------------------------------------- *)
@@ -309,9 +252,4 @@ module Parray : sig
   val exists : ('a -> bool) -> 'a t -> bool
 
   val for_all : ('a -> bool) -> 'a t -> bool
-end
-
-(* -------------------------------------------------------------------- *)
-module Os : sig
-  val listdir : string -> string list
 end

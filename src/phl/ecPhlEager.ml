@@ -191,7 +191,7 @@ let t_eager_while_r h tc =
   let (e , c ), n  = pf_first_while !!tc wc  in
   let (e', c'), n' = pf_first_while !!tc wc' in
 
-  if not (List.isempty n.s_node && List.isempty n'.s_node) then
+  if not (List.is_empty n.s_node && List.is_empty n'.s_node) then
     tc_error !!tc "no statements should followed the while loops";
 
   let to_form eq =  Mpv2.to_form (fst eC.es_ml) (fst eC.es_mr) eq f_true in

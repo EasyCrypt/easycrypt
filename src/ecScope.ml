@@ -833,7 +833,7 @@ module Op = struct
     in
 
     let scope =
-      if not (List.isempty op.po_aliases) then begin
+      if not (List.is_empty op.po_aliases) then begin
         if not (EcUtils.is_none body) then
           hierror ~loc "multiple operator names are only allowed for abstract operators";
         let addnew scope name =

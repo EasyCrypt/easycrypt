@@ -53,7 +53,7 @@ let lossless_hyps env top sub =
   let calls =
     let name = EcPath.basename sub in
     let Tys_function (_, oi) =
-      oget (List.findopt
+      oget (List.ofind
         (fun (Tys_function(fs,_)) -> fs.fs_name = name)
         sig_.mis_body)
     in

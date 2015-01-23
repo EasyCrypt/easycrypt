@@ -941,7 +941,7 @@ let rec pp_locbinds ppe vs =
 let rec pp_expr_r (ppe : PPEnv.t) outer fmt e =
   let printers = [try_pp_expr_chained_orderings] in
 
-  match List.findopt (fun pp -> pp ppe outer fmt e) printers with
+  match List.ofind (fun pp -> pp ppe outer fmt e) printers with
   | Some _ -> ()
   | None   -> pp_expr_core_r ppe outer fmt e
 
@@ -1473,7 +1473,7 @@ and pp_form_r (ppe : PPEnv.t) outer fmt f =
      try_pp_lossless]
   in
 
-  match List.findopt (fun pp -> pp ppe outer fmt f) printers with
+  match List.ofind (fun pp -> pp ppe outer fmt f) printers with
   | Some _ -> ()
   | None   -> pp_form_core_r ppe outer fmt f
 

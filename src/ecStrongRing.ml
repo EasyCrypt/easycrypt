@@ -140,7 +140,7 @@ let t_field_neq r g =
         | _ -> None
         end
       | _ -> None in
-    let tacs = List.prmap can_app (EcEnv.LDecl.tohyps hyps).EcBaseLogic.h_local in
+    let tacs = List.rev_pmap can_app (EcEnv.LDecl.tohyps hyps).EcBaseLogic.h_local in
     t_try (t_seqs [
       (fun g -> !@ (t_change (f_imp (f_eq f1 f2) f_false) g));
       t_intros_i [h];

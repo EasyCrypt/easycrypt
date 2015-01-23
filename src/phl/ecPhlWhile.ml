@@ -165,7 +165,7 @@ let t_bdhoare_while_rev_geq_r inv vrnt k eps tc =
 
   let (lp_guard_exp, lp_body), rem_s = tc1_last_while tc bhs.bhs_s in
 
-  if not (List.isempty rem_s.s_node) then
+  if not (List.is_empty rem_s.s_node) then
     tc_error !!tc  "only single loop statements are accepted";
 
   let lp_guard = form_of_expr (EcMemory.memory mem) lp_guard_exp in

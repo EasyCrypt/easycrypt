@@ -386,7 +386,7 @@ let t_equivS_conseq_bd side pr po tc =
     | `Left  -> es.es_ml, es.es_sl, es.es_sr
     | `Right -> es.es_mr, es.es_sr, es.es_sl
   in
-  if not (List.isempty s'.s_node) then begin
+  if not (List.is_empty s'.s_node) then begin
     let side = side2str (negside side) in
     tc_error !!tc "%s statement should be empty" side
   end;

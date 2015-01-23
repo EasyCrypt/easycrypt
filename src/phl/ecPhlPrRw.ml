@@ -174,7 +174,7 @@ let t_pr_rewrite_low (s,dof) tc =
 
   let rwpt =
     { pt_head = PTCut lemma;
-      pt_args = List.create args (PASub None); } in
+      pt_args = List.make args (PASub None); } in
 
   FApi.t_first
     (t_pr_lemma lemma)

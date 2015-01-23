@@ -309,7 +309,7 @@ let trans_matchfix ?(close = true) env ue { pl_loc = loc; pl_desc = name } (bd, 
             fxerror loc env FXE_MatchParamsMixed;
           let argsmap =
             List.fold_lefti
-              (fun i m (x, xty) -> Msym.add (EcIdent.name x) (i, x, xty) m)
+              (fun m i (x, xty) -> Msym.add (EcIdent.name x) (i, x, xty) m)
               Msym.empty args
           in
 
@@ -357,7 +357,7 @@ let trans_matchfix ?(close = true) env ue { pl_loc = loc; pl_desc = name } (bd, 
               if args_exp <> args_got then
                 fxerror cname.pl_loc env (FXE_CtorInvalidArity (args_exp, args_got));
 
-              if not (List.uniq (List.map unloc (snd pb.pop_pattern))) then
+              if not (List.is_unique (List.map unloc (snd pb.pop_pattern))) then
                 fxerror cname.pl_loc env (FXE_MatchNonLinear);
 
               EcUnify.UniEnv.restore ~src:subue ~dst:ue;

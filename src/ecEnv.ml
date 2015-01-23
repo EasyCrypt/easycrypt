@@ -334,7 +334,7 @@ module MC = struct
     in
 
     try
-      let (l, a, r) = List.find_split (fun x -> x <> None) args in
+      let (l, a, r) = List.find_pivot (fun x -> x <> None) args in
         if not (List.for_all (fun x -> x = None) r) then
           assert false;
 
@@ -410,7 +410,7 @@ module MC = struct
 
     let (l, a, r) =
       try
-        List.find_split (fun x -> x <> None) args
+        List.find_pivot (fun x -> x <> None) args
       with Not_found ->
         (args, Some [], [])
     in
@@ -921,7 +921,7 @@ module MC = struct
            (if p2 = None then Some me.me_sig.mis_params else None))
         me.me_comps
     in
-      ((me.me_name, mc), List.prmap (fun x -> x) submcs)
+      ((me.me_name, mc), List.rev_pmap (fun x -> x) submcs)
 
   let mc_of_module (env : env) (me : module_expr) =
     match env.env_scope.ec_scope with
@@ -1016,7 +1016,7 @@ module MC = struct
     let (mc, submcs) =
       List.map_fold mc1_of_ctheory (empty_mc None) th.cth_struct
     in
-      ((x, mc), List.prmap (fun x -> x) submcs)
+      ((x, mc), List.rev_pmap identity submcs)
 
   let mc_of_ctheory (env : env) (x : symbol) ((th, thmode) : ctheory * thmode) =
     match thmode with
@@ -1497,8 +1497,7 @@ module Fun = struct
   let addproj_in_memenv mem l =
     let n = List.length l in
     List.fold_lefti
-      (fun i mem vd -> EcMemory.bind_proj i n vd.v_name vd.v_type mem) mem l
-
+      (fun mem i vd -> EcMemory.bind_proj i n vd.v_name vd.v_type mem) mem l
 
   let actmem_pre me path fun_ =
     let mem = EcMemory.empty_local me path in
@@ -1748,7 +1747,7 @@ module Mod = struct
       f s o
 
   let clearparams n sig_ =
-    let used, remaining = List.take_n n sig_.mis_params in
+    let used, remaining = List.takedrop n sig_.mis_params in
 
     let keepcall =
       let used = EcIdent.Sid.of_list (List.map fst used) in
@@ -1980,7 +1979,7 @@ module NormMp = struct
       | ME_Alias (arity,mp) ->
         let nargs = List.length args in
         if arity <= nargs then
-          let args, extra = List.take_n arity args in
+          let args, extra = List.takedrop arity args in
           let params = List.take arity me.me_sig.mis_params in
           let s =
             List.fold_left2
@@ -2982,9 +2981,9 @@ module LDecl = struct
     with _ -> error (UnknownSymbol s)
 
   let lookup_by_id id hyps =
-    try
-      List.assoc_eq EcIdent.id_equal id hyps.h_local
-    with _ -> error (UnknownIdent id)
+    match List.ofind (fun (id', _) -> id_equal id id') hyps.h_local with
+    | None -> error (UnknownIdent id)
+    | Some (_, x) -> x
 
   let get_hyp = function
     | (id, LD_hyp f) -> (id,f)

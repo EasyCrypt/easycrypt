@@ -342,7 +342,7 @@ let tt_apply (pt : proofterm) (tc : tcenv) =
 (* -------------------------------------------------------------------- *)
 let tt_apply_hyp (x : EcIdent.t) ?(args = []) ?(sk = 0) tc =
   let pt =
-    let args = (List.map paformula args) @ (List.create sk (PASub None)) in
+    let args = (List.map paformula args) @ (List.make sk (PASub None)) in
     { pt_head = PTLocal x; pt_args = args; } in
 
   tt_apply pt tc
@@ -350,7 +350,7 @@ let tt_apply_hyp (x : EcIdent.t) ?(args = []) ?(sk = 0) tc =
 (* -------------------------------------------------------------------- *)
 let tt_apply_s (p : path) tys ?(args = []) ?(sk = 0) tc =
   let pt =
-    let args = (List.map paformula args) @ (List.create sk (PASub None)) in
+    let args = (List.map paformula args) @ (List.make sk (PASub None)) in
     { pt_head = PTGlobal (p, tys); pt_args = args; } in
 
   tt_apply pt tc
@@ -358,7 +358,7 @@ let tt_apply_s (p : path) tys ?(args = []) ?(sk = 0) tc =
 (* -------------------------------------------------------------------- *)
 let tt_apply_hd (hd : handle) ?(args = []) ?(sk = 0) tc =
   let pt =
-    let args = (List.map paformula args) @ (List.create sk (PASub None)) in
+    let args = (List.map paformula args) @ (List.make sk (PASub None)) in
     { pt_head = PTHandle hd; pt_args = args; } in
 
   tt_apply pt tc
@@ -647,7 +647,7 @@ let t_elim_r ?(reduce = (`Full : lazyred)) txs tc =
         let sf1 = sform_of_form f1 in
 
         match
-          List.pick (fun tx ->
+          List.opick (fun tx ->
               try  Some (tx (f1, sf1) f2 tc)
               with TTC.NoMatch -> None)
             txs
@@ -855,8 +855,8 @@ let t_elimT_form (ind : proofterm) ?(sk = 0) (f : form) (tc : tcenv1) =
 
   let pf   = f_lambda [(x, GTty f.f_ty)] (snd (skip (Some sk) 0 pf)) in
   let args =
-    (PAFormula pf :: (List.create aa1 (PASub None)) @
-     PAFormula  f :: (List.create (aa2+aa3) (PASub None))) in
+    (PAFormula pf :: (List.make aa1 (PASub None)) @
+     PAFormula  f :: (List.make (aa2+aa3) (PASub None))) in
   let pt   = { ind with pt_args = ind.pt_args @ args; } in
 
   (* FIXME: put first goal last *)
@@ -1212,7 +1212,7 @@ let t_subst ?kind ?(clear = true) ?var ?tside ?eqid (tc : tcenv1) =
           let subst, check = LowSubst.build_subst env var f in
 
           let post, (id', _), pre =
-            try  List.find_split (id_equal id |- fst) (LDecl.tohyps hyps).h_local
+            try  List.find_pivot (id_equal id |- fst) (LDecl.tohyps hyps).h_local
             with Not_found -> assert false
           in
 

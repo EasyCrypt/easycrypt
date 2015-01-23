@@ -146,6 +146,9 @@ let pair_equal tx ty (x1, y1) (x2, y2) =
 let swap (x, y) = (y, x)
 
 (* -------------------------------------------------------------------- *)
+module Option = BatOption
+
+(* -------------------------------------------------------------------- *)
 let opt_equal (f : 'a -> 'a -> bool) o1 o2 =
   match o1, o2 with
   | Some x1, Some x2 -> f x1 x2
@@ -291,118 +294,133 @@ module ISet = BatISet
 
 (* -------------------------------------------------------------------- *)
 module List = struct
-  include List
+  include BatList
 
-  let rec compare f s1 s2 =
-    match s1, s2 with
-    | [], [] -> 0
-    | [], _  -> -1
-    | _ , [] -> 1
+  (* ------------------------------------------------------------------ *)
+  module Smart = struct
+    let rec map f xs =
+      match xs with
+      | [] -> []
+      | y :: ys ->
+          let z  = f y in
+          let zs = map f ys in
+          if y == z && ys == zs then xs else (z :: zs)
 
-    | x1::s1, x2::s2 ->
-        match f x1 x2 with
-        | 0 -> compare f s1 s2
-        | c -> c
+    let map_fold f a xs =
+      let r   = ref a in
+      let f x = let (a, x) = f !r x in r := a; x in
+      let xs  = map f xs in
+      (!r, xs)
+  end
 
-  let hd2 l =
-    match l with
-    | a::b::_ -> a,b
-    | _ -> assert false
+  (* ------------------------------------------------------------------ *)
+  let ohead = Exceptionless.hd
+  let otail = Exceptionless.tl
+  let olast = Exceptionless.last
+  let ofind = Exceptionless.find
+  let opick = Exceptionless.find_map
 
-  let ocons o l =
-    match o with
-    | None -> l
-    | Some e -> e :: l
+  let ocons o xs = match o with None -> xs | Some x -> x :: xs
 
-  let isempty xs = xs == []
+  (* ------------------------------------------------------------------ *)
+  let oindex (f : 'a -> bool) (xs : 'a list) : int option =
+    Exceptionless.findi (fun _ -> f) xs |> omap fst
 
-  let ohead (xs : 'a list) =
-    match xs with [] -> None | x :: _ -> Some x
+  let orindex (f : 'a -> bool) (xs : 'a list) : int option =
+    omap (fun i -> List.length xs - i - 1) (oindex f (List.rev xs))
 
-  let otail (xs : 'a list) =
-    match xs with [] -> None | _ :: xs -> Some xs
+  (* ------------------------------------------------------------------ *)
+  module Parallel = struct
+    let iter2i f xs ys =
+      let rec doit i = function
+        | [], [] -> ()
+        | x :: xs, y :: ys -> f i x y; doit (i + 1) (xs, ys)
+        | _, _ -> failwith "List.iter2i"
+      in doit 0 (xs, ys)
 
-  let min b xs = List.fold_left min b xs
-  let max b xs = List.fold_left max b xs
+    let rec filter2 f la lb =
+      match la, lb with
+      | [], [] -> [], []
+      | a :: la, b :: lb ->
+          let ((la, lb) as r) = filter2 f la lb in
+          if f a b then (a :: la, b :: lb) else r
+      | _, _ -> invalid_arg "List.filter2"
 
-  let rec olast = function
-    | []      -> None
-    | [x]     -> Some x
-    | _ :: xs -> olast xs
+    let map_fold2 f =
+      let rec doit a xs1 xs2 =
+        match xs1, xs2 with
+        | [], [] -> (a, [])
 
+        | x1 :: xs1, x2 :: xs2 ->
+            let (a, x ) = f a x1 x2 in
+            let (a, xs) = doit a xs1 xs2 in
+            (a, x :: xs)
+
+        | _, _ -> invalid_arg "List.map_fold2"
+
+      in fun a xs1 xs2 -> doit a xs1 xs2
+
+    let rec iter2o f xs ys =
+      match xs, ys with
+      | []   , []    -> ()
+      | x::xs, []    -> f (Some x) (None  ); iter2o f xs []
+      | []   , y::ys -> f (None  ) (Some y); iter2o f [] ys
+      | x::xs, y::ys -> f (Some x) (Some y); iter2o f xs ys
+
+    let all2 (f : 'a -> 'b -> bool) xs ys =
+      let rec all2 = function
+        | ([]     , []     ) -> true
+        | (x :: xs, y :: ys) -> (f x y) && (all2 (xs, ys))
+        | (_      , _      ) -> false
+      in all2 (xs, ys)
+  end
+
+  include Parallel
+
+  (* ------------------------------------------------------------------ *)
   let last (s : 'a list) =
-    match olast s with
+    match Exceptionless.last s with
     | None   -> failwith "List.last"
     | Some x -> x
 
-  let create n x =
-    let rec aux n xs =
-      if n <= 0 then xs else aux (n-1) (x::xs)
-    in
-      aux n []
-
-  let init n f =
-    let rec aux i =
-      if i = n then [] else
-        let v = f i in v :: aux (i+1)
-    in
-      if n < 0 then invalid_arg "List.init";
-      aux 0
-
-  let iteri f xs =
-    let rec doit i = function
-      | []      -> ()
-      | x :: xs -> f i x; doit (i + 1) xs
-    in
-      doit 0 xs
-
-  let iter2i f xs ys =
-    let rec doit i = function
-      | [], [] -> ()
-      | x :: xs, y :: ys -> f i x y; doit (i + 1) (xs, ys)
-      | _, _ -> failwith "List.iter2i"
-    in
-      doit 0 (xs, ys)
-
   let rec fusion f xs ys =
     match xs, ys with
-    | _ , [] -> xs
-    | [], _  -> ys
+    | zs, [] | [], zs  -> zs
+    | x :: xs, y :: ys -> let z = f x y in z :: (fusion f xs ys)
 
-    | x::xs, y::ys ->
-        let z = f x y in z :: (fusion f xs ys)
+  let pivot_at n l =
+    let rec aux r n l =
+      match n, l with
+      | _, [] -> raise Not_found
+      | 0, x::l -> r, x, l
+      | _, x::l -> aux (x::r) (n-1) l
+    in if n < 0 then invalid_arg "List.pivot_at"; aux [] n l
+
+  let find_pivot f xs =
+    let rec aux acc xs =
+      match xs with
+      | [] -> raise Not_found
+      | y :: ys -> if f y then acc, y, ys else aux (y::acc) ys
+    in aux [] xs
 
   let rec pmap (f : 'a -> 'b option) (xs : 'a list) =
     match xs with
     | []      -> []
     | x :: xs -> let v = f x in ocons v (pmap f xs)
 
-  let rec iter2o f xs ys =
-    match xs, ys with
-    | []   , []    -> ()
-    | x::xs, []    -> f (Some x) (None  ); iter2o f xs []
-    | []   , y::ys -> f (None  ) (Some y); iter2o f [] ys
-    | x::xs, y::ys -> f (Some x) (Some y); iter2o f xs ys
+  let rev_pmap (f : 'a -> 'b option) (xs : 'a list) =
+    let rec aux acc xs =
+      match xs with
+      | []      -> acc
+      | x :: xs -> aux (ocons (f x) acc) xs
+    in aux [] xs
 
-  let prmap f l =
-    let rec aux r l =
-      match l with
-      | [] -> r
-      | x::l -> aux (ocons (f x) r) l in
-    aux [] l
-
-  let findopt (f : 'a -> bool) (xs : 'a list) =
-    try  Some (List.find f xs)
-    with Not_found -> None
-
-  let rec pick (f : 'a -> 'b option) (xs : 'a list) =
-    match xs with
-      | []      -> None
-      | x :: xs -> begin
-        match f x with
-          | None        -> pick f xs
-          | Some _ as r -> r
-      end
+  let map_fold f a xs =
+    let a  = ref a in
+    let xs = List.map (fun b ->
+      let (a', b') = f !a b in a := a'; b')
+      xs
+    in (!a, xs)
 
   let rec fpick (xs : (unit -> 'a option) list) =
     match xs with
@@ -413,131 +431,10 @@ module List = struct
         | Some v -> Some v
     end
 
-  let findex (f : 'a -> bool) (xs : 'a list) : int option =
-    let rec index (i : int) = function
-      | [] -> None
-      | x :: xs -> if f x then Some i else index (i+1) xs
-    in
-      index 0 xs
-
-  let findex_last (f : 'a -> bool) (xs : 'a list) : int option =
-    omap (fun i -> List.length xs - i - 1) (findex f (List.rev xs))
-
-  let index (v : 'a) (xs : 'a list) : int option =
-    findex ((=) v) xs
-
-  let all2 (f : 'a -> 'b -> bool) xs ys =
-    let rec all2 = function
-      | ([]     , []     ) -> true
-      | (x :: xs, y :: ys) -> (f x y) && (all2 (xs, ys))
-      | (_      , _      ) -> false
-    in
-      all2 (xs, ys)
-
-  let rec uniqf (f : 'a -> 'a -> bool) (xs : 'a list) =
+  let rec is_unique ?(eq = (=)) (xs : 'a list) =
     match xs with
-      | []      -> true
-      | x :: xs -> (not (List.exists (f x) xs)) && (uniqf f xs)
-
-  let uniq l = uniqf (=) l
-
-  let assoc_eq eq (x : 'a) (xs : ('a * 'b) list) =
-    snd (List.find (fun (x',_) -> eq x x') xs)
-
-  let tryassoc_eq eq x xs =
-    try_nf (fun () -> assoc_eq eq x xs)
-
-  let tryassoc (x : 'a) (xs : ('a * 'b) list) =
-    tryassoc_eq (=) x xs
-
-  let rec find_map (p : 'a -> 'b option) (xs : 'a list) =
-    match xs with
-    | []      -> raise Not_found
-    | x :: xs ->
-        match p x with
-        | None   -> find_map p xs
-        | Some v -> v
-
-  let take_n (n : int) (xs : 'a list) =
-    let rec take n xs acc =
-      match n, xs with
-      | 0, _ | _, [] -> List.rev acc, xs
-      | _, x :: xs -> take (n-1) xs (x :: acc)
-    in
-    take n xs []
-
-  let take (n : int) (xs : 'a list) = fst (take_n n xs)
-
-  let split_n n l =
-    let rec aux r n l =
-      match n, l with
-      | _, [] -> raise Not_found
-      | 0, x::l -> r, x, l
-      | _, x::l -> aux (x::r) (n-1) l in
-    aux [] n l
-
-  let find_split f l =
-    let rec aux r l =
-      match l with
-      | [] -> raise Not_found
-      | x::l -> if f x then r, x, l else aux (x::r) l in
-    aux [] l
-
-  let mapi (f : int -> 'a -> 'b) =
-    let rec doit n xs =
-      match xs with
-      | [] -> []
-      | x :: xs -> let x = f n x in x :: (doit (n+1) xs)
-    in
-      fun (xs : 'a list) -> doit 0 xs
-
-  let map_fold (f : 'a -> 'b -> 'a * 'c) (a : 'a) (xs : 'b list) =
-    let a = ref a in
-    let f b =
-      let (a',c) = f !a b in
-      a := a'; c in
-    let l = List.map f xs in
-    !a, l
-
-  let map_fold2 (f : 'a -> 'b -> 'c -> 'a * 'd) (a : 'a) xs ys =
-    let a = ref a in
-    let f b c =
-      let (a',d) = f !a b c in
-      a := a'; d in
-    let l = List.map2 f xs ys in
-    !a, l
-
-  let map_combine
-      (f1  : 'a -> 'c) (f2  : 'b -> 'd)
-      (xs1 : 'a list ) (xs2 : 'b list )
-  =
-    let rec doit xs1 xs2 =
-      match xs1, xs2 with
-      | ([], []) -> []
-      | (x1 :: xs1, x2 :: xs2) ->
-        let y1, y2 = f1 x1, f2 x2 in
-        let ys = doit xs1 xs2 in
-          (y1, y2) :: ys
-      | (_, _) -> invalid_arg "List.map_combine"
-
-  in
-      doit xs1 xs2
-
-  let fold_lefti f a l =
-    let i = ref (-1) in
-    let f a e =  incr i; f !i a e in
-    List.fold_left f a l
-
-  let rec filter2 f la lb =
-    match la, lb with
-    | [], [] -> [], []
-    | a::la, b::lb ->
-        let (la,lb as r) = filter2 f la lb in
-        if f a b then a::la, b::lb
-        else r
-    | _, _ -> invalid_arg "List.filter2"
-
-  let sum xs = List.fold_left (+) 0 xs
+    | []      -> true
+    | x :: xs -> not (List.exists (eq x) xs) && (is_unique ~eq xs)
 
   let rotate (d : [`Left|`Right]) (i : int) (xs : 'a list) =
     if i < 0 then invalid_arg "List.rotate: [i < 0]";
@@ -546,24 +443,8 @@ module List = struct
     if i = 0 then (0, xs) else
 
     let mrev   = match d with `Left -> identity | `Right -> rev in
-    let hd, tl = take_n i (mrev xs) in
+    let hd, tl = takedrop i (mrev xs) in
     (i, mrev (tl @ hd))
-
-  module Smart = struct
-    let rec map f l =
-      match l with
-      | []    -> []
-      | x::xs ->
-        let x'  = f x in
-        let xs' = map f xs in
-          if x == x' && xs == xs' then l else x'::xs'
-
-    let map_fold f a xs =
-      let r = ref a in
-      let f x = let (a, x) = f !r x in r := a; x in
-      let xs = map f xs in
-        (!r, xs)
-  end
 end
 
 (* -------------------------------------------------------------------- *)
@@ -618,15 +499,6 @@ module String = struct
   let trim (s : string) =
     let aout = BatString.trim s in
     if s == aout then BatString.copy aout else s
-end
-
-(* -------------------------------------------------------------------- *)
-module Stream = struct
-  include Stream
-
-  let next_opt (stream : 'a Stream.t) =
-    try  Some (Stream.next stream)
-    with Stream.Failure -> None
 end
 
 (* -------------------------------------------------------------------- *)

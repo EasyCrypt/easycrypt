@@ -222,7 +222,7 @@ let pf_find_occurence (pt : pt_env) ~ptn subject =
     let tp =
       match tp.f_node with
       | Fapp (h, hargs) when List.length hargs > na ->
-          let (a1, a2) = List.take_n na hargs in
+          let (a1, a2) = List.takedrop na hargs in
             f_app h a1 (toarrow (List.map f_ty a2) tp.f_ty)
       | _ -> tp
     in

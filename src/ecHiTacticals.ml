@@ -201,7 +201,7 @@ and process_fsub (ttenv : ttenv) (ts, t) tc =
   let ts = List.map (fst_map (process_tfocus tc)) ts in
   let tx i =
     ts 
-      |> List.findopt (fun (p, _) -> p i)
+      |> List.ofind (fun (p, _) -> p i)
       |> (function Some (_, t) -> Some t | _ -> t)
       |> omap (process1 ttenv)
   in FApi.t_onfsub tx tc
