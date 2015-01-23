@@ -423,11 +423,10 @@ genqident(X):
 %inline lqident: x=genqident(LIDENT) { x }
 
 (* -------------------------------------------------------------------- *)
-%inline _oident:
+%inline _boident:
 | x=LIDENT        { x }
 | x=UIDENT        { x }
 | x=PUNIOP        { x }
-| x=paren(PUNIOP) { x }
 | x=PBINOP        { x }
 
 | paren(DCOLON)   { EcCoreLib.s_cons }
@@ -438,11 +437,16 @@ genqident(X):
     unloc x
   }
 
-%inline oident:
-| x=loc(_oident) { x }
+%inline _oident:
+| x=_boident      { x }
+| x=paren(PUNIOP) { x }
+
+
+%inline boident: x=loc(_boident) { x }
+%inline  oident: x=loc( _oident) { x }
 
 qoident:
-| x=oident
+| x=boident
     { pqsymb_of_psymb x }
 
 | xs=namespace DOT x=oident
@@ -2105,7 +2109,7 @@ phltactic:
 | UNROLL s=side? o=codepos
     { Punroll (s, o) }
 
-| SPLITWHILE s=side? o=codepos COLON c=expr
+| SPLITWHILE s=side? o=codepos COLON c=expr %prec prec_tactic
     { Psplitwhile (c, s, o) }
 
 | BYPHOARE info=fpattern(conseq)?
