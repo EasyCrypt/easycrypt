@@ -613,63 +613,11 @@ end
 module String = struct
   include BatString
 
-  let mapi f s =
-    let i = ref (-1) in
-    String.map (fun c -> incr i; f !i c) s
+  let split_lines = nsplit ~by:"\n"
 
-  let init i f =
-    let s = String.make i '\000' in
-    mapi (fun i _ -> f i) s
-
-  let startswith ptn subject =
-    let rec doit i =
-      if   i = String.length ptn
-      then true
-      else ptn.[i] = subject.[i] && doit (i+1)
-    in
-      if   String.length ptn > String.length subject
-      then false
-      else doit 0
-
-  let endswith ptn subject =
-    let rec doit off i =
-      if   i = String.length ptn
-      then true
-      else ptn.[i] = subject.[i+off] && doit off (i+1)
-    in
-      if   String.length ptn > String.length subject
-      then false
-      else doit (String.length subject - String.length ptn) 0
-
-  let slice ?first ?last (s : string) =
-    let first = odfl 0 first in
-    let last  = odfl (String.length s) last in
-      String.sub s first (last - first)
-
-  let split (c : char) (s : string) =
-    let rec split s acc =
-      match try_nf (fun () -> rindex s c) with
-      | None   -> if (s = "") then acc else (s :: acc)
-      | Some i ->
-          split
-            (slice ~first:0 ~last:i s)
-            ((slice ~first:(i+1) s) :: acc)
-    in
-      split s []
-
-  let splitlines = split '\n'
-
-  let isspace =
-    function
-    | ' ' | '\t' | '\r' | '\n' -> true
-    | _ -> false
-
-  let strip (s : string) =
-    let p1, p2 = ref 0, ref (String.length s) in
-
-    while !p1 < !p2 && isspace s.[!p1  ] do incr p1 done;
-    while !p1 < !p2 && isspace s.[!p2-1] do decr p2 done;
-    String.sub s !p1 (!p2 - !p1)
+  let trim (s : string) =
+    let aout = BatString.trim s in
+    if s == aout then BatString.copy aout else s
 end
 
 (* -------------------------------------------------------------------- *)

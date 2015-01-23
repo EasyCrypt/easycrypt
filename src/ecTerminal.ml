@@ -58,7 +58,7 @@ object(self)
     in
       List.iter
         (fun x -> Printf.printf "%s%s\n%!" prefix x)
-        (String.splitlines msg)
+        (String.split_lines msg)
 
   method next =
     begin
@@ -116,7 +116,7 @@ object
     ignore immediate;
     List.iter
       (fun x -> Printf.fprintf stderr "%s\n%!" x)
-      (String.splitlines msg)
+      (String.split_lines msg)
 
   method finish (status : status) =
     match status with

@@ -41,7 +41,7 @@ let rec addidir ?(system = false) ?(recursive = false) (idir : string) (ecl : ec
     let dirs = List.sort compare (List.filter isdir dirs) in
 
       List.iter (fun filename ->
-        if not (String.startswith "." filename) then
+        if not (String.starts_with filename ".") then
           let filename = Filename.concat idir filename in
             addidir ~system ~recursive filename ecl)
         dirs

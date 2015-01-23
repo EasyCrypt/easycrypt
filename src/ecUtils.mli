@@ -269,21 +269,7 @@ end
 module String : sig
   include module type of BatString
 
-  val init : int -> (int -> char) -> string
-
-  val mapi : (int -> char -> char) -> string -> string
-
-  val startswith : string -> string -> bool
-
-  val endswith : string -> string -> bool
-
-  val slice : ?first:int -> ?last:int -> string -> string
-
-  val split : char -> string -> string list
-
-  val splitlines : string -> string list
-
-  val strip : string -> string
+  val split_lines : string -> string list
 end
 
 (* -------------------------------------------------------------------- *)

@@ -89,7 +89,7 @@ let print_usage ?progname ?(out = stderr) ?msg specs =
     let specs = Arg.align (List.pmap for1 specs) in
       match hashelp with
       | true  -> specs
-      | false -> List.filter (fun (x, _, _) -> not (String.endswith "-help" x)) specs
+      | false -> List.filter (fun (x, _, _) -> not (String.ends_with x "-help")) specs
 
   and ccgroups specs =
     List.pmap (function `Group x -> Some x | _ -> None) specs

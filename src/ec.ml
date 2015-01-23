@@ -13,8 +13,8 @@ module T = EcTerminal
 let copyright =
   let sentences =
     List.flatten
-      [String.splitlines EcVersion.copyright;
-       String.splitlines EcVersion.license  ; ] in
+      [String.split_lines EcVersion.copyright;
+       String.split_lines EcVersion.license  ; ] in
 
   String.concat "\n"
     (List.map
