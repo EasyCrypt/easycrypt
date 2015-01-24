@@ -8,7 +8,7 @@ abstract theory Foo.
 end Foo.
 
 clone Foo as Goo with
-  type t <- int
+  type t <- unit
   proof I.* by smt.
 
 (* -------------------------------------------------------------------- *)
