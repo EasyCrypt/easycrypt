@@ -151,8 +151,8 @@ require import AlgTactic.
 instance ring with real
   op rzero = zero
   op rone  = one
-  op add   = ( + )
-  op opp   = ([-])
+  op add   = (+)
+  op opp   = [-]
   op mul   = ( * )
   op expr  = PowerInt.( ^ )
   op sub   = (-)
@@ -178,8 +178,8 @@ instance ring with real
 instance field with real
   op rzero = zero
   op rone  = one
-  op add   = ( + )
-  op opp   = ([-])
+  op add   = (+)
+  op opp   = [-]
   op mul   = ( * )
   op expr  = PowerInt.( ^ )
   op sub   = (-)

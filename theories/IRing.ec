@@ -9,8 +9,8 @@ require import Ring.
 instance ring with int
   op rzero = zeroz
   op rone  = onez
-  op add   = ( + )
-  op opp   = ([-])
+  op add   = (+)
+  op opp   = [-]
   op mul   = ( * )
   op expr  = ( ^ )
   op sub   = (-)
