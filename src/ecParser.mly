@@ -1599,17 +1599,17 @@ intro_pattern:
 | SLASHEQ
    { IPSimplify }
 
-| SLASH f=fpattern(form)
+| SLASH f=pterm
    { IPView f }
 
-fpattern_head(F):
+gpterm_head(F):
 | p=qident tvi=tvars_app?
    { FPNamed (p, tvi) }
 
 | LPAREN UNDERSCORE? COLON f=F RPAREN
    { FPCut f }
 
-fpattern_arg:
+gpterm_arg:
 | UNDERSCORE
     { EA_none }
 
@@ -1619,22 +1619,25 @@ fpattern_arg:
 | f=sform
     { EA_form f }
 
-| LPAREN COLON p=qident tvi=tvars_app? args=loc(fpattern_arg)* RPAREN
+| LPAREN COLON p=qident tvi=tvars_app? args=loc(gpterm_arg)* RPAREN
     { EA_proof (mk_pterm (FPNamed (p, tvi)) args) }
 
-fpattern(F):
-| hd=fpattern_head(F)
+gpterm(F):
+| hd=gpterm_head(F)
    { mk_pterm hd [] }
 
-| LPAREN hd=fpattern_head(F) args=loc(fpattern_arg)* RPAREN
+| LPAREN hd=gpterm_head(F) args=loc(gpterm_arg)* RPAREN
    { mk_pterm hd args }
 
-efpattern:
-| x=boption(AT) ff=fpattern(form)
-    { (if x then `Explicit else `Implicit), ff }
+%inline pterm:
+| pt=gpterm(form) { pt }
 
-pterm:
-| p=qident tvi=tvars_app? args=loc(fpattern_arg)*
+epterm:
+| x=boption(AT) pt=pterm
+    { (if x then `Explicit else `Implicit), pt }
+
+pcutdef:
+| p=qident tvi=tvars_app? args=loc(gpterm_arg)*
     { { ptcd_name = p; ptcd_tys = tvi; ptcd_args = args; } }
 
 %inline rwside:
@@ -1665,7 +1668,7 @@ rwarg1:
 | SLASHEQ
    { RWSimpl }
 
-| s=rwside r=rwrepeat? o=rwocc? fp=rwfpatterns(form)
+| s=rwside r=rwrepeat? o=rwocc? fp=rwpterms
    { RWRw (s, r, o |> omap (snd_map EcMaps.Sint.of_list), fp) }
 
 | s=rwside r=rwrepeat? o=rwocc? SLASH x=sform_h %prec prec_tactic
@@ -1677,15 +1680,15 @@ rwarg1:
 | SMT
    { RWSmt }
 
-rwfpatterns(F):
-| f=fpattern(F)
+rwpterms:
+| f=pterm
     { [(`LtoR, f)] }
 
-| LPAREN fs=rlist2(rwfpattern(F), COMMA) RPAREN
+| LPAREN fs=rlist2(rwpterm, COMMA) RPAREN
     { fs }
 
-rwfpattern(F):
-| s=rwside f=fpattern(F)
+rwpterm:
+| s=rwside f=pterm
     { (s, f) }
 
 rwarg:
@@ -1703,10 +1706,10 @@ genpattern:
     { `Form (Some (snd_map EcMaps.Sint.of_list o), l) }
 
 | LPAREN UNDERSCORE COLON f=form RPAREN
-    { `FPattern (mk_pterm (FPCut f) []) }
+    { `ProofTerm (mk_pterm (FPCut f) []) }
 
-| LPAREN LPAREN UNDERSCORE COLON f=form RPAREN args=loc(fpattern_arg)* RPAREN
-    { `FPattern (mk_pterm (FPCut f) args) }
+| LPAREN LPAREN UNDERSCORE COLON f=form RPAREN args=loc(gpterm_arg)* RPAREN
+    { `ProofTerm (mk_pterm (FPCut f) args) }
 
 simplify_arg:
 | DELTA l=qoident* { `Delta l }
@@ -1896,7 +1899,7 @@ logtactic:
 | ALGNORM
    { Palg_norm }
 
-| EXIST a=iplist1(loc(fpattern_arg), COMMA) %prec prec_below_comma
+| EXIST a=iplist1(loc(gpterm_arg), COMMA) %prec prec_below_comma
    { Pexists a }
 
 | LEFT
@@ -1911,19 +1914,19 @@ logtactic:
 | ELIM SLASH p=qident e=genpattern*
    { Pelim (e, Some p) }
 
-| APPLY e=efpattern
+| APPLY e=epterm
    { Papply (`Apply ([e], `Apply)) }
 
-| APPLY es=prefix(SLASH, efpattern)+
+| APPLY es=prefix(SLASH, epterm)+
    { Papply (`Apply (es, `Apply)) }
 
-| APPLY e=efpattern IN x=ident
+| APPLY e=epterm IN x=ident
    { Papply (`ApplyIn (e, x)) }
 
-| EXACT e=efpattern
+| EXACT e=epterm
    { Papply (`Apply ([e], `Exact)) }
 
-| EXACT es=prefix(SLASH, efpattern)+
+| EXACT es=prefix(SLASH, epterm)+
    { Papply (`Apply (es, `Exact)) }
 
 | l=simplify
@@ -1947,7 +1950,7 @@ logtactic:
 | CUT ip=intro_pattern* COLON p=form BY t=loc(tactics)
    { Pcut (ip, p, Some t) }
 
-| CUT ip=intro_pattern* CEQ fp=pterm
+| CUT ip=intro_pattern* CEQ fp=pcutdef
    { Pcutdef (ip, fp) }
 
 | POSE o=rwocc? x=ident CEQ p=form_h %prec prec_below_IMPL
@@ -1976,7 +1979,7 @@ eager_tac:
 | PROC i=eager_info f=sform
     { Peager_fun_abs (i, f) }
 
-| CALL info=fpattern(call_info)
+| CALL info=gpterm(call_info)
     { Peager_call info }
 
 | info=eager_info COLON p=sform
@@ -2046,7 +2049,7 @@ phltactic:
 | WHILE s=side? info=while_tac_info
     { Pwhile (s, info) }
 
-| CALL s=side? info=fpattern(call_info)
+| CALL s=side? info=gpterm(call_info)
     { Pcall (s, info) }
 
 | RCONDT s=side? i=uint
@@ -2115,37 +2118,37 @@ phltactic:
 | SPLITWHILE s=side? o=codepos COLON c=expr %prec prec_tactic
     { Psplitwhile (c, s, o) }
 
-| BYPHOARE info=fpattern(conseq)?
+| BYPHOARE info=gpterm(conseq)?
     { Pbydeno (`PHoare, (mk_rel_pterm info, true, None)) }
 
-| BYEQUIV eq=bracket(byequivopt)? info=fpattern(conseq)? 
+| BYEQUIV eq=bracket(byequivopt)? info=gpterm(conseq)? 
     { Pbydeno (`Equiv, (mk_rel_pterm info, odfl true eq, None)) }
 
-| BYEQUIV eq=bracket(byequivopt)? info=fpattern(conseq)? COLON bad1=sform
+| BYEQUIV eq=bracket(byequivopt)? info=gpterm(conseq)? COLON bad1=sform
     { Pbydeno (`Equiv, (mk_rel_pterm info, odfl true eq, Some bad1)) }
 
 | CONSEQ nm=STAR?
     { Pconseq (nm<>None, (None, None, None)) }
 
-| CONSEQ nm=STAR? info1=fpattern(conseq_bd)
+| CONSEQ nm=STAR? info1=gpterm(conseq_bd)
     { Pconseq (nm<>None, (Some info1, None, None)) }
 
-| CONSEQ nm=STAR? info1=fpattern(conseq_bd) info2=fpattern(conseq_bd) UNDERSCORE?
+| CONSEQ nm=STAR? info1=gpterm(conseq_bd) info2=gpterm(conseq_bd) UNDERSCORE?
     { Pconseq(nm<>None, (Some info1, Some info2, None)) }
 
-| CONSEQ nm=STAR? info1=fpattern(conseq_bd) UNDERSCORE info3=fpattern(conseq_bd)
+| CONSEQ nm=STAR? info1=gpterm(conseq_bd) UNDERSCORE info3=gpterm(conseq_bd)
     { Pconseq(nm<>None, (Some info1, None, Some info3)) }
 
 | CONSEQ nm=STAR?
-    info1=fpattern(conseq_bd)
-    info2=fpattern(conseq_bd)
-    info3=fpattern(conseq_bd)
+    info1=gpterm(conseq_bd)
+    info2=gpterm(conseq_bd)
+    info3=gpterm(conseq_bd)
       { Pconseq (nm<>None, (Some info1,Some info2,Some info3)) }
 
-| CONSEQ nm=STAR? UNDERSCORE info2=fpattern(conseq_bd) UNDERSCORE?
+| CONSEQ nm=STAR? UNDERSCORE info2=gpterm(conseq_bd) UNDERSCORE?
     { Pconseq(nm<>None, (None,Some info2, None)) }
 
-| CONSEQ nm=STAR? UNDERSCORE UNDERSCORE info3=fpattern(conseq_bd)
+| CONSEQ nm=STAR? UNDERSCORE UNDERSCORE info3=gpterm(conseq_bd)
     { Pconseq(nm<>None, (None,None,Some info3)) }
 
 | ELIM STAR

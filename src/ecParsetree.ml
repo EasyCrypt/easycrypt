@@ -567,7 +567,7 @@ and renaming = [
   `NoName | `FindName | `WithRename of string | `NoRename of string
 ]
 
-type genpattern = [`FPattern of ppterm | `Form of (rwocc * pformula)]
+type genpattern = [`ProofTerm of ppterm | `Form of (rwocc * pformula)]
 
 (* -------------------------------------------------------------------- *)
 type pdbmap1 = {

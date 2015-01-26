@@ -711,7 +711,7 @@ let process_generalize1 pattern (tc : tcenv1) =
 
     end
 
-    | `FPattern fp -> begin
+    | `ProofTerm fp -> begin
         match fp.fp_head with
         | FPNamed ({ pl_desc = ([], s) }, None)
             when LDecl.has_symbol s hyps && List.is_empty fp.fp_args
@@ -729,7 +729,7 @@ let process_generalize1 pattern (tc : tcenv1) =
   in
 
   match ffpattern_of_genpattern hyps pattern with
-  | Some ff -> onresolved (`FPattern ff)
+  | Some ff -> onresolved (`ProofTerm ff)
   | None    -> onresolved pattern
 
 (* -------------------------------------------------------------------- *)
