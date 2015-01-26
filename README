@@ -139,11 +139,11 @@ install both. However, you may already have a installation and
 cygwin. In that case, you can install wodi32 in your cygwin32
 installation as follows:
 
-  1. Download http://ml.ignorelist.com/wodi/6/wodi32.tar.xz
+  1. Download http://ml.ignorelist.com/wodi/8/wodi32.tar.xz
 
      The EasyCrypt webpage is hosting a copy of the archive:
 
-     https://www.easycrypt.info/wodi/wodi32-4.02-beta.tar.xz
+     https://www.easycrypt.info/wodi/wodi32-4.02.1.tar.xz
 
   2. Extract the archive. You will obtain a wodi32/ directory.
 
