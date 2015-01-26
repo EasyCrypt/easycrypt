@@ -46,8 +46,8 @@ val trans_pterm_arg_mem   : pt_env -> ?name:symbol -> ppt_arg located -> pt_ev_a
 (* Proof-terms typing *)
 val process_pterm_cut             : prcut:('a -> form) -> pt_env -> 'a ppt_head -> pt_ev
 val process_pterm                 : pt_env -> pformula ppt_head -> pt_ev
-val process_pterm_arg             : pt_ev  -> ppt_arg located -> pt_ev_arg
-val process_pterm_args_app        : pt_ev  -> ppt_arg located list -> pt_ev
+val process_pterm_arg             : ?implicits:bool -> pt_ev  -> ppt_arg located -> pt_ev_arg
+val process_pterm_args_app        : ?implicits:bool -> pt_ev  -> ppt_arg located list -> pt_ev
 val process_full_pterm_cut        : prcut:('a -> form) -> pt_env -> 'a gppterm -> pt_ev
 val process_full_pterm            : ?implicits:bool -> pt_env -> ppterm -> pt_ev
 val process_full_closed_pterm_cut : prcut:('a -> form) -> pt_env -> 'a gppterm -> proofterm * form

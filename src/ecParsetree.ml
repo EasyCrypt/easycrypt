@@ -335,12 +335,13 @@ type 'a ppt_head =
   | FPCut   of 'a
 
 type ppt_arg =
-  | EA_form of pformula
-  | EA_mem  of pmemory
   | EA_none
-  | EA_mod  of pmsymbol located
+  | EA_form  of pformula
+  | EA_mem   of pmemory
+  | EA_mod   of pmsymbol located
+  | EA_proof of pformula gppterm
 
-type 'a gppterm = {
+and 'a gppterm = {
   fp_head : 'a ppt_head;
   fp_args : ppt_arg located list
 }
@@ -385,7 +386,6 @@ type pipattern =
   | PtWhile of pspattern
 
 and pspattern = unit
-
 
 type call_info =
   | CI_spec of (pformula * pformula)

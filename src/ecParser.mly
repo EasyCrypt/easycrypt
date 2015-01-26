@@ -1619,6 +1619,9 @@ fpattern_arg:
 | f=sform
     { EA_form f }
 
+| LPAREN COLON p=qident tvi=tvars_app? args=loc(fpattern_arg)* RPAREN
+    { EA_proof (mk_pterm (FPNamed (p, tvi)) args) }
+
 fpattern(F):
 | hd=fpattern_head(F)
    { mk_pterm hd [] }

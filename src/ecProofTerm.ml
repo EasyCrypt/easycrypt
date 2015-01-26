@@ -386,7 +386,8 @@ and trans_pterm_arg_value pe ?name { pl_desc = arg } =
   let dfl () = Printf.sprintf "x%d" (EcUid.unique ()) in
 
   match arg with
-  | EA_mod _ | EA_mem _ -> tc_pterm_apperror pe.pte_pe `FormWanted
+  | EA_mod _ | EA_mem _ | EA_proof _ ->
+      tc_pterm_apperror pe.pte_pe `FormWanted
 
   | EA_none ->
       let aty = EcUnify.UniEnv.fresh pe.pte_ue in
@@ -405,7 +406,8 @@ and trans_pterm_arg_mod pe arg =
   let mp =
     match unloc arg with
     | EA_none    -> tc_pterm_apperror pe.pte_pe `CannotInferMod
-    | EA_mem _   -> tc_pterm_apperror pe.pte_pe `ModuleWanted
+    | EA_mem _
+    | EA_proof _ -> tc_pterm_apperror pe.pte_pe `ModuleWanted
     | EA_mod mp  -> mp
     | EA_form fp ->
       match pmsymbol_of_pform fp with
@@ -427,8 +429,8 @@ and trans_pterm_arg_mem pe ?name { pl_desc = arg } =
   | EA_form { pl_loc = lc; pl_desc = (PFmem m) } ->
       trans_pterm_arg_mem pe ?name (mk_loc lc (EA_mem m))
 
-  | EA_mod  _ -> tc_pterm_apperror pe.pte_pe `MemoryWanted
-  | EA_form _ -> tc_pterm_apperror pe.pte_pe `MemoryWanted
+  | EA_mod  _ | EA_proof _ | EA_form _ ->
+      tc_pterm_apperror pe.pte_pe `MemoryWanted
 
   | EA_none ->
       let x = EcIdent.create (ofdfl dfl name) in
@@ -441,7 +443,7 @@ and trans_pterm_arg_mem pe ?name { pl_desc = arg } =
         { ptea_env = pe; ptea_arg = PVAMemory mem; }
 
 (* ------------------------------------------------------------------ *)
-and process_pterm_arg ({ ptev_env = pe } as pt) arg =
+and process_pterm_arg ?implicits ({ ptev_env = pe } as pt) arg =
   match PT.destruct_product pe.pte_hy pt.ptev_ax with
   | None -> tc_pterm_apperror pe.pte_pe `NotFunctional
 
@@ -454,8 +456,12 @@ and process_pterm_arg ({ ptev_env = pe } as pt) arg =
           | None    -> tc_pterm_apperror pe.pte_pe `PTermWanted
           | Some fp ->
               { ptea_env = pe;
-                ptea_arg = PVASub (process_full_pterm pe fp); }
+                ptea_arg = PVASub (process_full_pterm ?implicits pe fp); }
       end
+
+      | EA_proof fp ->
+          { ptea_env = pe;
+            ptea_arg = PVASub (process_full_pterm ?implicits pe fp); }
 
       | _ ->
           tc_pterm_apperror pe.pte_pe `PTermWanted
@@ -571,12 +577,12 @@ and apply_pterm_to_holes n pt =
   EcUtils.iterop apply_pterm_to_hole n pt
 
 (* -------------------------------------------------------------------- *)
-and process_pterm_arg_app pt arg =
-  apply_pterm_to_arg pt (process_pterm_arg pt arg)
+and process_pterm_arg_app ?implicits pt arg =
+  apply_pterm_to_arg pt (process_pterm_arg ?implicits pt arg)
 
 (* -------------------------------------------------------------------- *)
-and process_pterm_args_app pt args =
-  List.fold_left process_pterm_arg_app pt args
+and process_pterm_args_app ?implicits pt args =
+  List.fold_left (process_pterm_arg_app ?implicits) pt args
 
 (* -------------------------------------------------------------------- *)
 and process_full_pterm ?(implicits = false) pe pf =
@@ -602,7 +608,7 @@ and process_full_pterm ?(implicits = false) pe pf =
     if List.for_all isform pt.ptev_pt.pt_args && isglobal pt.ptev_pt.pt_head
     then apply pt else pt
 
-  in process_pterm_args_app pt pf.fp_args
+  in process_pterm_args_app ~implicits pt pf.fp_args
 
 (* -------------------------------------------------------------------- *)
 let process_full_pterm_cut ~prcut pe pf =
