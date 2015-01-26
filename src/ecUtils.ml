@@ -504,17 +504,5 @@ end
 (* -------------------------------------------------------------------- *)
 module Os = struct
   let listdir (dir : string) =
-    let rec doit db acc =
-      match (try Some (Unix.readdir db) with End_of_file -> None) with
-      | None      -> List.rev acc
-      | Some name -> doit db (name :: acc)
-    in
-
-    let db = Unix.opendir dir in
-
-      try
-        let files = doit db [] in Unix.closedir db; files
-      with e ->
-        (try Unix.closedir db with Unix.Unix_error _ -> ());
-        raise e
+    BatEnum.fold (fun xs x -> x :: xs) [] (BatSys.files_of dir)
 end
