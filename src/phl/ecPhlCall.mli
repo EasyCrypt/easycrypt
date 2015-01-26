@@ -24,4 +24,4 @@ val t_equiv_call   : form -> form -> backward
 val t_equiv_call1  : side -> form -> form -> backward
 
 (* -------------------------------------------------------------------- *)
-val process_call : oside -> call_info fpattern -> backward
+val process_call : oside -> call_info gppterm -> backward

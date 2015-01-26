@@ -433,7 +433,7 @@ let rec process_rewrite1 ttenv ri tc =
           EcEnv.BaseRw.is_base p.pl_desc (FApi.tc1_env tc) in
 
         match pt with 
-        | { fp_kind = FPNamed (p, None); fp_args = []; } when is_baserw p tc ->
+        | { fp_head = FPNamed (p, None); fp_args = []; } when is_baserw p tc ->
 
           let env = FApi.tc1_env tc in
           let ls  = snd (EcEnv.BaseRw.lookup p.pl_desc env) in
@@ -712,7 +712,7 @@ let process_generalize1 pattern (tc : tcenv1) =
     end
 
     | `FPattern fp -> begin
-        match fp.fp_kind with
+        match fp.fp_head with
         | FPNamed ({ pl_desc = ([], s) }, None)
             when LDecl.has_symbol s hyps && List.is_empty fp.fp_args
           ->
@@ -872,7 +872,7 @@ let t_apply_prept pt tc =
   LowApply.t_apply_bwd_r (pt_of_prept tc pt) tc
 
 (* -------------------------------------------------------------------- *)
-let process_apply_bwd ~implicits mode (ff : ffpattern) (tc : tcenv1) =
+let process_apply_bwd ~implicits mode (ff : ppterm) (tc : tcenv1) =
   try
     let pt   = PT.tc1_process_full_pterm ~implicits tc ff in
     let aout = LowApply.t_apply_bwd_r pt tc in
@@ -981,11 +981,11 @@ let process_cut engine ((ip, phi, t) : cut_t) tc =
   in FApi.t_last (process_intros ip) tc
 
 (* -------------------------------------------------------------------- *)
-type cutdef_t = intropattern * pterm
+type cutdef_t = intropattern * pcutdef
 
 let process_cutdef (ip, pt) (tc : tcenv1) =
-  let pt = { fp_kind = FPNamed (pt.pt_name, pt.pt_tys);
-             fp_args = pt.EcParsetree.pt_args; } in
+  let pt = { fp_head = FPNamed (pt.ptcd_name, pt.ptcd_tys);
+             fp_args = pt.ptcd_args; } in
   let pt = PT.tc1_process_full_pterm tc pt in
 
   if not (PT.can_concretize pt.ptev_env) then
@@ -1083,7 +1083,7 @@ let process_elim (pe, qs) tc =
     match qs with
     | None    -> t_or (t_elimT_ind `Ind) t_elim tc
     | Some qs ->
-        let qs = { fp_kind = FPNamed (qs, None); fp_args = []; } in
+        let qs = { fp_head = FPNamed (qs, None); fp_args = []; } in
         process_elimT qs tc
   in
     try

@@ -22,7 +22,7 @@ val process_if      : backward
 val process_while   : eager_info -> backward
 val process_fun_def : backward
 val process_fun_abs : eager_info -> pformula -> backward
-val process_call    : call_info fpattern -> backward
+val process_call    : call_info gppterm -> backward
 val process_eager   : eager_info -> pformula -> backward
 
 (* -------------------------------------------------------------------- *)

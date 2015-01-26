@@ -39,27 +39,27 @@ and pt_ev_arg_r =
 | PVASub     of pt_ev
 
 (* Arguments typing *)
-val trans_pterm_arg_value : pt_env -> ?name:symbol -> fpattern_arg located -> pt_ev_arg
-val trans_pterm_arg_mod   : pt_env -> fpattern_arg located -> pt_ev_arg
-val trans_pterm_arg_mem   : pt_env -> ?name:symbol -> fpattern_arg located -> pt_ev_arg
+val trans_pterm_arg_value : pt_env -> ?name:symbol -> ppt_arg located -> pt_ev_arg
+val trans_pterm_arg_mod   : pt_env -> ppt_arg located -> pt_ev_arg
+val trans_pterm_arg_mem   : pt_env -> ?name:symbol -> ppt_arg located -> pt_ev_arg
 
 (* Proof-terms typing *)
-val process_pterm_cut             : prcut:('a -> form) -> pt_env -> 'a fpattern_kind -> pt_ev
-val process_pterm                 : pt_env -> pformula fpattern_kind -> pt_ev
-val process_pterm_arg             : pt_ev  -> fpattern_arg located -> pt_ev_arg
-val process_pterm_args_app        : pt_ev  -> fpattern_arg located list -> pt_ev
-val process_full_pterm_cut        : prcut:('a -> form) -> pt_env -> 'a fpattern -> pt_ev
-val process_full_pterm            : ?implicits:bool -> pt_env -> ffpattern -> pt_ev
-val process_full_closed_pterm_cut : prcut:('a -> form) -> pt_env -> 'a fpattern -> proofterm * form
-val process_full_closed_pterm     : pt_env -> ffpattern -> proofterm * form
+val process_pterm_cut             : prcut:('a -> form) -> pt_env -> 'a ppt_head -> pt_ev
+val process_pterm                 : pt_env -> pformula ppt_head -> pt_ev
+val process_pterm_arg             : pt_ev  -> ppt_arg located -> pt_ev_arg
+val process_pterm_args_app        : pt_ev  -> ppt_arg located list -> pt_ev
+val process_full_pterm_cut        : prcut:('a -> form) -> pt_env -> 'a gppterm -> pt_ev
+val process_full_pterm            : ?implicits:bool -> pt_env -> ppterm -> pt_ev
+val process_full_closed_pterm_cut : prcut:('a -> form) -> pt_env -> 'a gppterm -> proofterm * form
+val process_full_closed_pterm     : pt_env -> ppterm -> proofterm * form
 
 (* Proof-terms typing in backward tactics *)
-val tc1_process_pterm_cut             : prcut:('a -> form) -> tcenv1 -> 'a fpattern_kind -> pt_ev
-val tc1_process_pterm                 : tcenv1 -> pformula fpattern_kind -> pt_ev
-val tc1_process_full_pterm_cut        : prcut:('a -> form) -> tcenv1 -> 'a fpattern -> pt_ev
-val tc1_process_full_pterm            : ?implicits:bool -> tcenv1 -> ffpattern -> pt_ev
-val tc1_process_full_closed_pterm_cut : prcut:('a -> form) -> tcenv1 -> 'a fpattern -> proofterm * form
-val tc1_process_full_closed_pterm     : tcenv1 -> ffpattern -> proofterm * form
+val tc1_process_pterm_cut             : prcut:('a -> form) -> tcenv1 -> 'a ppt_head -> pt_ev
+val tc1_process_pterm                 : tcenv1 -> pformula ppt_head -> pt_ev
+val tc1_process_full_pterm_cut        : prcut:('a -> form) -> tcenv1 -> 'a gppterm -> pt_ev
+val tc1_process_full_pterm            : ?implicits:bool -> tcenv1 -> ppterm -> pt_ev
+val tc1_process_full_closed_pterm_cut : prcut:('a -> form) -> tcenv1 -> 'a gppterm -> proofterm * form
+val tc1_process_full_closed_pterm     : tcenv1 -> ppterm -> proofterm * form
 
 (* Proof-terms manipulation *)
 val check_pterm_arg      : pt_env -> EcIdent.t * gty -> form -> pt_ev_arg_r -> form * pt_arg
@@ -101,7 +101,7 @@ val pt_of_uglobal: proofenv -> LDecl.hyps -> EcPath.path -> pt_ev
 val pt_of_global_r : pt_env -> EcPath.path -> ty list -> pt_ev
 
 (* -------------------------------------------------------------------- *)
-val ffpattern_of_genpattern : LDecl.hyps -> genpattern -> ffpattern option
+val ffpattern_of_genpattern : LDecl.hyps -> genpattern -> ppterm option
 
 (* -------------------------------------------------------------------- *)
 type prept = [

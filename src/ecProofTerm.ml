@@ -313,7 +313,7 @@ let ffpattern_of_form hyps fp =
     | ({ pl_desc = PFident (p, tya) }, args) ->
         let hastyp = not (EcUtils.is_none tya) in
         if lookup_named_psymbol hyps ~hastyp (unloc p) <> None then
-          Some ({ fp_kind = FPNamed (p, tya);
+          Some ({ fp_head = FPNamed (p, tya);
                   fp_args = List.map ae_of_form args; })
         else
           None
@@ -580,7 +580,7 @@ and process_pterm_args_app pt args =
 
 (* -------------------------------------------------------------------- *)
 and process_full_pterm ?(implicits = false) pe pf =
-  let pt = process_pterm pe pf.fp_kind in
+  let pt = process_pterm pe pf.fp_head in
   let pt =
     match implicits with
     | false -> pt
@@ -606,12 +606,12 @@ and process_full_pterm ?(implicits = false) pe pf =
 
 (* -------------------------------------------------------------------- *)
 let process_full_pterm_cut ~prcut pe pf =
-  let pt = process_pterm_cut ~prcut pe pf.fp_kind in
+  let pt = process_pterm_cut ~prcut pe pf.fp_head in
     process_pterm_args_app pt pf.fp_args
 
 (* -------------------------------------------------------------------- *)
 let process_full_closed_pterm_cut ~prcut pe pf =
-  let pt = process_pterm_cut ~prcut pe pf.fp_kind in
+  let pt = process_pterm_cut ~prcut pe pf.fp_head in
   let pt = process_pterm_args_app pt pf.fp_args in
     (* FIXME: use core exception? *)
     if not (can_concretize pe) then
@@ -620,7 +620,7 @@ let process_full_closed_pterm_cut ~prcut pe pf =
 
 (* -------------------------------------------------------------------- *)
 let process_full_closed_pterm pe pf =
-  let pt = process_pterm pe pf.fp_kind in
+  let pt = process_pterm pe pf.fp_head in
   let pt = process_pterm_args_app pt pf.fp_args in
     (* FIXME: use core exception? *)
     if not (can_concretize pe) then
@@ -640,25 +640,25 @@ let tc1_process_pterm tc ff =
   process_pterm (ptenv_of_penv hyps pe) ff
 
 (* -------------------------------------------------------------------- *)
-let tc1_process_full_pterm_cut ~prcut (tc : tcenv1) (ff : 'a fpattern) =
+let tc1_process_full_pterm_cut ~prcut (tc : tcenv1) (ff : 'a gppterm) =
   let pe   = FApi.tc1_penv tc in
   let hyps = FApi.tc1_hyps tc in
   process_full_pterm_cut ~prcut (ptenv_of_penv hyps pe) ff
 
 (* -------------------------------------------------------------------- *)
-let tc1_process_full_pterm ?implicits (tc : tcenv1) (ff : ffpattern) =
+let tc1_process_full_pterm ?implicits (tc : tcenv1) (ff : ppterm) =
   let pe   = FApi.tc1_penv tc in
   let hyps = FApi.tc1_hyps tc in
   process_full_pterm ?implicits (ptenv_of_penv hyps pe) ff
 
 (* -------------------------------------------------------------------- *)
-let tc1_process_full_closed_pterm_cut ~prcut (tc : tcenv1) (ff : 'a fpattern) =
+let tc1_process_full_closed_pterm_cut ~prcut (tc : tcenv1) (ff : 'a gppterm) =
   let pe   = FApi.tc1_penv tc in
   let hyps = FApi.tc1_hyps tc in
   process_full_closed_pterm_cut ~prcut (ptenv_of_penv hyps pe) ff
 
 (* -------------------------------------------------------------------- *)
-let tc1_process_full_closed_pterm (tc : tcenv1) (ff : ffpattern) =
+let tc1_process_full_closed_pterm (tc : tcenv1) (ff : ppterm) =
   let pe   = FApi.tc1_penv tc in
   let hyps = FApi.tc1_hyps tc in
   process_full_closed_pterm (ptenv_of_penv hyps pe) ff

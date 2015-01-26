@@ -18,12 +18,4 @@ val t_failure_event :
   -> backward
 
 (* -------------------------------------------------------------------- *)
-type pfel_t =
-    pformula
-  * pformula
-  * pformula
-  * pformula
-  * (pgamepath * pformula) list
-  * pformula option
-
-val process_fel : int -> pfel_t -> backward
+val process_fel : int -> fel_info -> backward

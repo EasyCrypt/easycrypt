@@ -191,15 +191,7 @@ let t_failure_event at_pos cntr ash q f_event pred_specs inv tc =
   FApi.t_low1 "failure-event" t_failure_event_r infos tc
 
 (* -------------------------------------------------------------------- *)
-type pfel_t =
-    pformula
-  * pformula
-  * pformula
-  * pformula
-  * (pgamepath * pformula) list
-  * pformula option
-
-let process_fel at_pos ((cntr, ash, q, f_event, pred_specs, o_inv) : pfel_t) tc =
+let process_fel at_pos (infos : fel_info) tc =
   let env, hyps, concl = FApi.tc1_eflat tc in
 
   if EcEnv.Theory.by_path_opt EcCoreLib.CI_Sum.p_Sum env = None then 
@@ -214,12 +206,12 @@ let process_fel at_pos ((cntr, ash, q, f_event, pred_specs, o_inv) : pfel_t) tc 
     | _ -> tc_error !!tc "a goal of the form Pr[ _ ] <= _ is required"
   in
   let hyps    = fst (LDecl.hoareF f hyps) in
-  let cntr    = TTC.pf_process_form !!tc hyps tint cntr in
-  let ash     = TTC.pf_process_form !!tc hyps (tfun tint treal) ash in
-  let q       = TTC.pf_process_form !!tc hyps tint q in
-  let f_event = TTC.pf_process_form !!tc hyps tbool f_event in
+  let cntr    = TTC.pf_process_form !!tc hyps tint infos.pfel_cntr in
+  let ash     = TTC.pf_process_form !!tc hyps (tfun tint treal) infos.pfel_asg in
+  let q       = TTC.pf_process_form !!tc hyps tint infos.pfel_q in
+  let f_event = TTC.pf_process_form !!tc hyps tbool infos.pfel_event in
   let inv     =
-    o_inv
+    infos.pfel_inv
       |> omap (fun inv -> TTC.pf_process_form !!tc hyps tbool inv)
       |> odfl f_true
   in
@@ -231,6 +223,6 @@ let process_fel at_pos ((cntr, ash, q, f_event, pred_specs, o_inv) : pfel_t) tc 
       (f, TTC.pf_process_form !!tc penv tbool pre)
   in
 
-  let pred_specs = List.map process_pred pred_specs in
+  let pred_specs = List.map process_pred infos.pfel_specs in
 
   t_failure_event at_pos cntr ash q f_event pred_specs inv tc

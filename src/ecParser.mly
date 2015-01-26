@@ -124,8 +124,8 @@
 
   let simplify_red = [`Zeta; `Iota; `Beta; `Logic; `ModPath]
 
-  let mk_fpattern kind args =
-    { fp_kind = kind;
+  let mk_pterm head args =
+    { fp_head = head;
       fp_args = args; }
 
   let mk_core_tactic t = { pt_core = t; pt_intros = []; }
@@ -138,8 +138,8 @@
       ptm_body  = body ;
       ptm_local = local; }
 
-  let cfpattern info = 
-    odfl ({fp_kind = FPCut (None,None); fp_args = []}) info 
+  let mk_rel_pterm info = 
+    odfl ({ fp_head = FPCut (None, None); fp_args = []; }) info 
 %}
 
 %token <EcSymbols.symbol> LIDENT
@@ -1621,10 +1621,10 @@ fpattern_arg:
 
 fpattern(F):
 | hd=fpattern_head(F)
-   { mk_fpattern hd [] }
+   { mk_pterm hd [] }
 
 | LPAREN hd=fpattern_head(F) args=loc(fpattern_arg)* RPAREN
-   { mk_fpattern hd args }
+   { mk_pterm hd args }
 
 efpattern:
 | x=boption(AT) ff=fpattern(form)
@@ -1632,7 +1632,7 @@ efpattern:
 
 pterm:
 | p=qident tvi=tvars_app? args=loc(fpattern_arg)*
-    { { pt_name = p; pt_tys = tvi; pt_args = args; } }
+    { { ptcd_name = p; ptcd_tys = tvi; ptcd_args = args; } }
 
 %inline rwside:
 | MINUS { `RtoL }
@@ -1700,10 +1700,10 @@ genpattern:
     { `Form (Some (snd_map EcMaps.Sint.of_list o), l) }
 
 | LPAREN UNDERSCORE COLON f=form RPAREN
-    { `FPattern (mk_fpattern (FPCut f) []) }
+    { `FPattern (mk_pterm (FPCut f) []) }
 
 | LPAREN LPAREN UNDERSCORE COLON f=form RPAREN args=loc(fpattern_arg)* RPAREN
-    { `FPattern (mk_fpattern (FPCut f) args) }
+    { `FPattern (mk_pterm (FPCut f) args) }
 
 simplify_arg:
 | DELTA l=qoident* { `Delta l }
@@ -2113,25 +2113,25 @@ phltactic:
     { Psplitwhile (c, s, o) }
 
 | BYPHOARE info=fpattern(conseq)?
-    { Pbydeno (`PHoare, (cfpattern info, true, None)) }
+    { Pbydeno (`PHoare, (mk_rel_pterm info, true, None)) }
 
 | BYEQUIV eq=bracket(byequivopt)? info=fpattern(conseq)? 
-    { Pbydeno (`Equiv, (cfpattern info, odfl true eq, None)) }
+    { Pbydeno (`Equiv, (mk_rel_pterm info, odfl true eq, None)) }
 
 | BYEQUIV eq=bracket(byequivopt)? info=fpattern(conseq)? COLON bad1=sform
-    { Pbydeno (`Equiv, (cfpattern info, odfl true eq, Some bad1)) }
+    { Pbydeno (`Equiv, (mk_rel_pterm info, odfl true eq, Some bad1)) }
 
 | CONSEQ nm=STAR?
-    { Pconseq(nm<>None, (None,None,None)) }
+    { Pconseq (nm<>None, (None, None, None)) }
 
 | CONSEQ nm=STAR? info1=fpattern(conseq_bd)
-    { Pconseq (nm<>None, (Some info1,None,None)) }
+    { Pconseq (nm<>None, (Some info1, None, None)) }
 
 | CONSEQ nm=STAR? info1=fpattern(conseq_bd) info2=fpattern(conseq_bd) UNDERSCORE?
-    { Pconseq(nm<>None, (Some info1,Some info2, None)) }
+    { Pconseq(nm<>None, (Some info1, Some info2, None)) }
 
 | CONSEQ nm=STAR? info1=fpattern(conseq_bd) UNDERSCORE info3=fpattern(conseq_bd)
-    { Pconseq(nm<>None, (Some info1,None,Some info3)) }
+    { Pconseq(nm<>None, (Some info1, None, Some info3)) }
 
 | CONSEQ nm=STAR?
     info1=fpattern(conseq_bd)
@@ -2161,7 +2161,14 @@ phltactic:
     { PPr (Some (f1, f2)) }
 
 | FEL at_pos=uint cntr=sform delta=sform q=sform f_event=sform some_p=fel_pred_specs inv=sform?
-    { Pfel (at_pos,(cntr,delta,q,f_event,some_p,inv)) }
+    { let info = {
+        pfel_cntr  = cntr;
+        pfel_asg   = delta;
+        pfel_q     = q;
+        pfel_event = f_event;
+        pfel_specs = some_p;
+        pfel_inv   = inv;
+      } in Pfel (at_pos, info) }
 
 | SIM info=eqobs_in
     { Psim info }
@@ -2235,9 +2242,9 @@ eqobs_in_eqpost:
 
 eqobs_in:
 | pos=eqobs_in_pos? i=eqobs_in_eqinv p=eqobs_in_eqpost? {
-    { sim_pos = pos;
+    { sim_pos  = pos;
       sim_hint = i;
-      sim_eqs = p; } 
+      sim_eqs  = p; } 
 }
 
 pgoptionkw:

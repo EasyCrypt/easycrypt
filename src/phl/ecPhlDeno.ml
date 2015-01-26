@@ -530,9 +530,9 @@ let process_equiv_deno_bad2 info eq bad1 tc =
     t_last t_sub (t_rotate `Left 1 (t_equiv_deno_bad2 pre bad1 tc)) in
   t_rotate `Left !torotate gs
 (* -------------------------------------------------------------------- *)
-type denoff = ((pformula option) tuple2) fpattern * bool * pformula option
+type denoff = ((pformula option) tuple2) gppterm * bool * pformula option
 
-let process_deno mode (info,eq,bad1) g =
+let process_deno mode (info, eq, bad1) g =
   match mode with
   | `PHoare -> process_phoare_deno info g
   | `Equiv  -> 

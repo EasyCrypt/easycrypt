@@ -24,7 +24,7 @@ type engine  = ptactic_core -> backward
 
 (* -------------------------------------------------------------------- *)
 type cut_t    = intropattern * pformula * (ptactics located) option
-type cutdef_t = intropattern * pterm
+type cutdef_t = intropattern * pcutdef
 type apply_t  = EcParsetree.apply_info
 type focus_t  = EcParsetree.tfocus
 
@@ -81,7 +81,7 @@ val process_right       : backward
 val process_split       : backward
 val process_elim        : genpattern list * pqsymbol option -> backward
 val process_case        : genpattern list -> backward
-val process_exists      : fpattern_arg located list -> backward
+val process_exists      : ppt_arg located list -> backward
 val process_congr       : backward
 val process_trivial     : backward
 val process_change      : pformula -> backward
