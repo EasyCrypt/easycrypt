@@ -704,15 +704,25 @@ type ptycinstance = {
 (* -------------------------------------------------------------------- *)
 type ident_spec = psymbol list
 
-type inv = (pformula, (pformula * pformula) * pformula option) EcAstlogic.g_inv
+
+(* -------------------------------------------------------------------- *)
+type ('inv, 's) gphelper =
+  | Helper_inv   of 'inv
+  | Helper_eager of 's
+
+type ('p, 'bad) gpinv =
+  | Inv_global of 'p
+  | Inv_upto   of 'bad
+
+type pinv = (pformula, (pformula * pformula) * pformula option) gpinv
 
 type equiv_concl =
   | Aequiv_spec of (pformula * pformula) * (pexpr * pexpr) option
-  | Aequiv_inv  of inv
+  | Aequiv_inv  of pinv
 
-type auto_info = inv option * ident_spec
+type auto_info = pinv option * ident_spec
 
-type auto_eager = (auto_info, pstmt) EcAstlogic.helper
+type auto_eager = (auto_info, pstmt) gphelper
 
 type equiv = {
   eq_name  : psymbol          ;
