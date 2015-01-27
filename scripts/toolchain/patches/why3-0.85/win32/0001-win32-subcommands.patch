@@ -1,0 +1,27 @@
+diff -ru why3-0.85.orig/src/tools/main.ml why3-0.85/src/tools/main.ml
+--- why3-0.85.orig/src/tools/main.ml	2014-09-17 09:15:34.000000000 +0200
++++ why3-0.85/src/tools/main.ml	2015-01-27 16:06:51.978583400 +0100
+@@ -89,8 +89,21 @@
+   for i = 1 to Array.length Sys.argv - 1 do
+     if i <> !Arg.current then args := Sys.argv.(i) :: !args;
+   done;
+-  let scmd = "why3 " ^ sscmd in
+-  Unix.execv cmd (Array.of_list (scmd :: List.rev !args))
++  let scmd = "why3-" ^ sscmd in
++  try
++    let pid =
++      Unix.create_process cmd (Array.of_list (scmd :: List.rev !args))
++        Unix.stdin Unix.stdout Unix.stderr
++    in let rec wait () =
++      try
++        let (st, _) = Unix.waitpid [] pid in exit st
++      with Unix.Unix_error (err, _, _) when err = Unix.EINTR ->
++        wait ()
++    in wait ()
++  with Unix.Unix_error (err, _, _) -> begin
++      eprintf "error starting/waiting subcommand: %s\n%!" (Unix.error_message err);
++      exit 1
++  end
+ 
+ let () = try
+   let extra_help fmt () = extra_help fmt (available_commands ()) in
