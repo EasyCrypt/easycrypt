@@ -1,0 +1,12 @@
+diff -rNu why3-0.85.orig/src/core/trans.ml why3-0.85/src/core/trans.ml
+--- why3-0.85.orig/src/core/trans.ml	2014-09-17 09:15:34.000000000 +0200
++++ why3-0.85/src/core/trans.ml	2015-01-04 21:13:06.000000000 +0100
+@@ -47,7 +47,7 @@
+   let tag t = t.task_tag
+ end)
+ 
+-let store fn = let tr = Wtask.memoize_option 63 fn in fun t -> match t with
++let store fn = let tr = (* Wtask.memoize_option 63 *) fn in fun t -> match t with
+   | Some {task_decl = {td_node = Decl {d_node = Dprop (Pgoal,_,_)}}} -> fn t
+   | _ -> tr t
+ 

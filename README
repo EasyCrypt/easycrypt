@@ -137,7 +137,7 @@ First, install cygwin32 && wodi32 (a package manager for OCaml
 targetting win32). Wodi is coming with an automated installer that
 install both. However, you may already have a installation and
 cygwin. In that case, you can install wodi32 in your cygwin32
-installation as follows:
+installation as follows. Otherwise, jump directly to step 5.
 
   1. Download http://ml.ignorelist.com/wodi/8/wodi32.tar.xz
 
@@ -157,36 +157,53 @@ installation as follows:
         findutils gawk getent grep gzip make mingw64-i686-gcc-core
         mingw64-x86_64-gcc-core mintty patch sed tar xz
 
-     For easing their installation, you can give the full list of
-     cygwin packages to the cygwin setup.exe:
+     For easing their installation, you may want to use apt-cyg:
 
-        /path/to/cygwin/setup.exe -P <packages list>
+        $> lynx -source https://rawgit.com/transcode-open/apt-cyg/master/apt-cyg > /tmp/apt-cyg
+        $> install apt-cyg /bin && rm /tmp/apt-cyg
+        $> apt-cyg install <packages list>
 
-  3. Create a win32 symlink from C:/cygwin (or wherever your cygwin
+     See [https://github.com/transcode-open/apt-cyg] for more informations.
+
+  3. Some wodi packages expect to be installed in C:/wodi32.
+
+     Create a win32 symlink from C:/cygwin (or wherever your cygwin
      base directory is) to C:/wodi32. For that, you may start a win32
      shell command as an administrator and type
 
-       $> mklink /D C:\wodi32 C:\cygwin 
+       $> mklink /D C:\wodi32 C:\cygwin
 
   4. Restart a fresh cygwin shell to get a working wodi
      environment. Type:
 
        $> /opt/wodi32/lib/godi/winconfig.sh --add-startmenu-folder
 
-  5. Find the wodi package manager in the start menu and install the
-     following packages:
+  5. Install the following wodi packages:
 
-       menhir, yojson, batteries, ocamlgraph, zarith
+       godi-menhir godi-yojson godi-batteries godi-ocamlgraph godi-zarith godi-zip
+
+     Use either the wodi32 package manager (from the start menu), or the
+     CLI interface:
+
+       $> godi_add <packages list>
 
   6. Install why3 0.85. Download why3 from [http://why3.lri.fr/]
 
      Untar, go to the why3-0.85/ directory and type
 
-       $> CC=i686-w64-mingw32-gcc.exe ./configure --prefix=C:/wodi32/opt/wodi32/ --disable-ide
+       $> CC=i686-w64-mingw32-gcc.exe ./configure --prefix=C:/wodi32/opt/wodi32/ \
+            --disable-coq-tactic --disable-coq-libs --disable-pvs-libs \
+            --disable-ide --disable-bench
        $> make opt byte
        $> make install install-lib
 
-     You can check that why3 is correctly installed:
+     You may have to apply some patches before configuring/building
+     Why3. Check the following directories for patches:
+
+       scripts/toolchain/patches/why3-0.85
+       scripts/toolchain/patches/why3-0.85/win32
+
+     After installation, you can check that why3 is correctly installed:
 
        $> ocamlfind list | fgrep -w why3
 
