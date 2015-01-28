@@ -70,7 +70,11 @@ let rec toperror_of_exn ?gloc exn =
   | DtError    (loc, _, _) -> Some (loc, exn)
   | ParseError (loc, _)    -> Some (loc, exn)
 
-  | EcCoreGoal.TcError (_, _, _) ->
+  | EcCoreGoal.TcError (_, None, _) ->
+      Some (odfl _dummy gloc, exn)
+
+  | EcCoreGoal.TcError (_, Some { EcCoreGoal.plc_loc = loc }, _) ->
+      let gloc = if EcLocation.isdummy loc then gloc else Some loc in
       Some (odfl _dummy gloc, exn)
 
   | LocError (loc, e)    -> begin
