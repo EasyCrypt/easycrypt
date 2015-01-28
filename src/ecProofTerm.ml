@@ -320,7 +320,6 @@ let ffpattern_of_form hyps fp =
 
     | _ -> None
 
-
 let ffpattern_of_genpattern hyps (ge : genpattern) =
   match ge with
   | `ProofTerm pe     -> Some pe

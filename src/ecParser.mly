@@ -1610,14 +1610,13 @@ gpterm_head(F):
    { FPCut f }
 
 gpterm_arg:
-| UNDERSCORE
-    { EA_none }
-
 | LPAREN LTCOLON m=loc(mod_qident) RPAREN
     { EA_mod m }
 
-| f=sform
-    { EA_form f }
+| f=sform_h
+    { match unloc f with
+      | PFhole -> EA_none
+      | _      -> EA_form f }
 
 | LPAREN COLON p=qident tvi=tvars_app? args=loc(gpterm_arg)* RPAREN
     { EA_proof (mk_pterm (FPNamed (p, tvi)) args) }
