@@ -82,9 +82,12 @@ type rwproofterm = {
 (* -------------------------------------------------------------------- *)
 type location = {
   plc_parent : location option;
-  plc_name   : string;
+  plc_name   : string option;
   plc_loc    : EcLocation.t;
 }
+
+let mk_location ?parent ?name loc =
+  { plc_parent = parent; plc_name = name; plc_loc = loc; }
 
 exception TcError of bool * location option * string Lazy.t
 
@@ -151,10 +154,12 @@ and tcenv_ctxt1 = handle list
 let tc_error (_pe : proofenv) ?(catchable = true) ?loc ?who fmt =
   let buf  = Buffer.create 127 in
   let fbuf = Format.formatter_of_buffer buf in
+  let loc  = loc |> omap (fun loc -> mk_location loc) in
+    ignore (who : string option);       (* FIXME: remove? *)
     Format.kfprintf
       (fun _ ->
          Format.pp_print_flush fbuf ();
-         raise (TcError (catchable, None, lazy (Buffer.contents buf))))
+         raise (TcError (catchable, loc, lazy (Buffer.contents buf))))
       fbuf fmt
 
 (* -------------------------------------------------------------------- *)
@@ -176,7 +181,10 @@ let tc_error_lazy (_pe : proofenv) ?(catchable = true) ?loc ?who msg =
       Buffer.contents buf
   in
 
-  raise (TcError (catchable, None, lazy (getmsg ())))
+  let loc = loc |> omap (fun loc -> mk_location loc) in
+
+  ignore (who : string option);         (* FIXME: remove? *)
+  raise (TcError (catchable, loc, lazy (getmsg ())))
 
 (* -------------------------------------------------------------------- *)
 let tc_error_clear (pe : proofenv) ?catchable ?loc ?who err =
@@ -572,7 +580,7 @@ module FApi = struct
     let mrev = match d with `Left -> identity | `Right -> List.rev in
 
     match tc.tce_tcenv.tce_goal with
-    | None   -> tc
+    | None    -> tc
     | Some _g ->
         match List.rotate d (max i 0) (tc_opened tc) with
         | 0, _ -> tc

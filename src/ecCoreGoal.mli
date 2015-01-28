@@ -14,7 +14,7 @@ open EcEnv
 (* -------------------------------------------------------------------- *)
 type location = {
   plc_parent : location option;
-  plc_name   : string;
+  plc_name   : string option;
   plc_loc    : EcLocation.t;
 }
 
