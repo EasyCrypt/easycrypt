@@ -577,8 +577,6 @@ module FApi = struct
 
   (* ------------------------------------------------------------------ *)
   let t_rotate (d : direction) (i : int) (tc : tcenv) =
-    let mrev = match d with `Left -> identity | `Right -> List.rev in
-
     match tc.tce_tcenv.tce_goal with
     | None    -> tc
     | Some _g ->
