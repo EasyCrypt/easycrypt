@@ -567,7 +567,7 @@ and process (ld : EcLoader.ecloader) (scope : EcScope.scope) g =
       | GsctClose    name -> `Fct   (fun scope -> process_sct_close  scope  name)
       | GthW3        a    -> `Fct   (fun scope -> process_w3_import  scope  a)
       | Gprint       p    -> `Fct   (fun scope -> process_print      scope  p; scope)
-      | Gsearch      qs   -> `Fct   (fun scope -> process_search     scope qs ; scope)
+      | Gsearch      qs   -> `Fct   (fun scope -> process_search     scope  qs; scope)
       | Gtactics     t    -> `Fct   (fun scope -> process_tactics    scope  t)
       | Grealize     p    -> `Fct   (fun scope -> process_realize    scope  p)
       | Gprover_info pi   -> `Fct   (fun scope -> process_proverinfo scope  pi)

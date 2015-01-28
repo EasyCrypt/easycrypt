@@ -185,6 +185,5 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Search : sig
-  val search : scope -> pqsymbol list -> unit
+  val search : scope -> pformula list -> unit
 end
-

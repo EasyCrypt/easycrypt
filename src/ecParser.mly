@@ -2637,6 +2637,11 @@ gprover_info:
 addrw:
 | HINT REWRITE p=lqident COLON l=lqident* {p,l}
 
+
+(* -------------------------------------------------------------------- *)
+(* Search pattern                                                       *)
+%inline search: x=sform_h { x }
+
 (* -------------------------------------------------------------------- *)
 (* Global entries                                                       *)
 
@@ -2665,9 +2670,9 @@ global_:
 | gprover_info     { Gprover_info $1 }
 | addrw            { Gaddrw       $1 }
 
-| x=loc(QED)         { Gsave x.pl_loc }
-| PRINT p=print      { Gprint     p   }
-| SEARCH qs=qoident* { Gsearch   qs   }
+| x=loc(QED)       { Gsave x.pl_loc }
+| PRINT p=print    { Gprint     p   }
+| SEARCH x=search+ { Gsearch    x   }
 
 | PRAGMA       x=pragma { Gpragma x }
 | PRAGMA ADD   x=lident { Goption (x, true ) }

@@ -201,10 +201,12 @@ exception MatchFailure
 
 type fmoptions = {
   fm_delta : bool;
+  fm_conv  : bool;
 }
 
-let fmrigid = { fm_delta = false; }
-let fmdelta = { fm_delta = true ; }
+let fmsearch = { fm_delta = false; fm_conv = false; }
+let fmrigid  = { fm_delta = false; fm_conv = true ; }
+let fmdelta  = { fm_delta = true ; fm_conv = true ; }
 
 (* Rigid unification *)
 let f_match_core opts hyps (ue, ev) ~ptn subject =
@@ -295,9 +297,11 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
       end
 
       | _, _ ->
-        let subject = Fsubst.f_subst subst subject in
-          if not (EcReduction.is_conv hyps ptn subject) then
-            raise MatchFailure
+        if opts.fm_conv then begin
+          let subject = Fsubst.f_subst subst subject in
+            if not (EcReduction.is_conv hyps ptn subject) then
+              raise MatchFailure
+        end else raise MatchFailure
 
     with MatchFailure when opts.fm_delta ->
       match fst_map f_node (destr_app ptn),

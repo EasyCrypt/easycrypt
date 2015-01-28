@@ -822,7 +822,7 @@ type global =
   | Gtycinstance of ptycinstance
   | Gaddrw       of (pqsymbol * pqsymbol list)
   | Gprint       of pprint
-  | Gsearch      of pqsymbol list
+  | Gsearch      of pformula list
   | GthOpen      of (bool * psymbol)
   | GthClose     of psymbol
   | GthRequire   of (psymbol list * [`Import|`Export] option)

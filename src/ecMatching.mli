@@ -109,10 +109,12 @@ exception MatchFailure
 
 type fmoptions = {
   fm_delta : bool;
+  fm_conv  : bool;
 }
 
-val fmrigid : fmoptions
-val fmdelta : fmoptions
+val fmsearch : fmoptions
+val fmrigid  : fmoptions
+val fmdelta  : fmoptions
 
 val f_match_core :
      fmoptions
