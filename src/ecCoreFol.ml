@@ -911,15 +911,14 @@ let form_forall g f =
   | FeagerF   eg  -> g eg.eg_pr   && g eg.eg_po
   | Fpr       pr  -> g pr.pr_args && g pr.pr_event
 
-let used_ops f = 
-  let ops = ref EcPath.Sp.empty in
-  let add p = ops := EcPath.Sp.add p !ops in
-  let rec aux f = 
+(* -------------------------------------------------------------------- *)
+let f_ops f =
+  let aout = ref EcPath.Sp.empty in
+  let rec doit f = 
     match f.f_node with
-    | Fop(p,_) -> add p
-    | _ -> f_iter aux f in
-  aux f;
-  !ops
+    | Fop (p, _) -> aout := Sp.add p !aout
+    | _ -> f_iter doit f
+  in doit f; !aout
 
 (* -------------------------------------------------------------------- *)
 exception DestrError of string

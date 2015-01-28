@@ -2450,9 +2450,11 @@ module Op = struct
   let rebind name op env =
     MC.bind_operator name op env
 
-  let all filter (qname : qsymbol) (env : env) =
+  let all ?check (qname : qsymbol) (env : env) =
     let ops = MC.lookup_operators qname env in
-      List.filter (fun (_, op) -> filter op) ops
+    match check with
+    | None -> ops
+    | Some check -> List.filter (check |- snd) ops
 
   let reducible env p =
     try
@@ -2518,11 +2520,6 @@ module Ax = struct
 
   let lookup qname (env : env) =
     MC.lookup_axiom qname env
-
-  let all filter (qname : qsymbol) (env : env) =
-    let axs = MC.lookup_axioms qname env in
-    List.filter (fun (_, ax) -> filter ax) axs
-
     
   let lookup_opt name env =
     try_lf (fun () -> lookup name env)
@@ -2553,11 +2550,22 @@ module Ax = struct
           (EcTypes.Tvar.init (List.map fst ax.ax_tparams) tys) f
     | _ -> raise (LookupFailure (`Path p))
 
-  let iter f env = 
-    let on_ax _ (ip, ax) = match ip with IPPath p -> f p ax | _ -> () in
-    let iter_mc mc = MMsym.iter on_ax mc.mc_axioms in
-    Mip.iter (fun _ -> iter_mc) env.env_comps
-    
+  let all ?(check = fun _ -> true) ?name (env : env) =
+    match name with
+    | Some name ->
+        let axs = MC.lookup_axioms name env in
+        List.filter (fun (_, ax) -> check ax) axs
+
+    | None ->
+        Mip.fold (fun _ mc aout ->
+          MMsym.fold (fun _ axioms aout ->
+            List.fold_right (fun (ip, ax) aout ->
+              match ip with
+              | IPPath p -> if check ax then (p, ax) :: aout else aout
+              | _ -> aout)
+              axioms aout)
+            mc.mc_axioms aout)
+          env.env_comps []
 end
 
 (* -------------------------------------------------------------------- *)

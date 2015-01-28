@@ -156,12 +156,9 @@ module Ax : sig
   val add  : path -> env -> env
   val bind : symbol -> axiom -> env -> env
 
-  val all : (axiom -> bool) -> qsymbol -> env -> (path * t) list
+  val all : ?check:(axiom -> bool) -> ?name:qsymbol -> env -> (path * t) list
 
   val instanciate : path -> EcTypes.ty list -> env -> form
-
-  val iter : (path -> axiom -> unit) -> env -> unit
-
 end
 
 (* -------------------------------------------------------------------- *)
@@ -275,7 +272,7 @@ module Op : sig
   val add  : path -> env -> env
   val bind : symbol -> operator -> env -> env
 
-  val all : (operator -> bool) -> qsymbol -> env -> (path * t) list
+  val all : ?check:(operator -> bool) -> qsymbol -> env -> (path * t) list
 
   val reducible : env -> path -> bool
   val reduce    : env -> path -> ty list -> form

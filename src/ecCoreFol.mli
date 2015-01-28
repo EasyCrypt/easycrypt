@@ -135,6 +135,7 @@ val f_compare : form -> form -> int
 val f_hash    : form -> int
 val f_fv      : form -> int Mid.t
 val f_ty      : form -> EcTypes.ty
+val f_ops     : form -> Sp.t
 
 module Mf : Map.S with type key = form
 module Sf : Set.S with module M = Map.MakeBase(Mf)
@@ -150,9 +151,6 @@ val f_map : (EcTypes.ty -> EcTypes.ty) -> (form -> form) -> form -> form
 val f_iter: (form -> unit) -> form -> unit
 val form_exists: (form -> bool) -> form -> bool
 val form_forall: (form -> bool) -> form -> bool
-
-(* -------------------------------------------------------------------- *)
-val used_ops : form -> Sp.t
 
 (* -------------------------------------------------------------------- *)
 val gty_as_ty : gty -> EcTypes.ty

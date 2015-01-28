@@ -117,46 +117,8 @@ let () =
     EcPException.register pp
 
 (* -------------------------------------------------------------------- *)
-module Search = struct
-  let search fmt (scope : EcScope.scope) qs_s  =
-    let env = EcScope.env scope in
-    let do_op qs = 
-      let all_path = EcEnv.Op.all (fun _ -> true) qs.pl_desc env in
-      if all_path = [] then 
-        EcScope.hierror ~loc:qs.pl_loc 
-          "unknown operator %a" EcSymbols.pp_qsymbol qs.pl_desc;
-      let all_path = List.map fst all_path in
-      EcPath.Sp.of_list all_path in
-
-    let sps = List.map do_op qs_s in
-    
-    let ppe = EcPrinting.PPEnv.ofenv env in
-
-    let test f = 
-      let ops = EcFol.used_ops f in
-      not (List.exists (EcPath.Sp.disjoint ops) sps) in 
-
-    let doax pax ax = 
-      match ax.EcDecl.ax_spec with
-      | None -> ()
-      | Some f -> 
-        if test f then
-          Format.fprintf fmt "%a@ " (EcPrinting.pp_axiom ~long:true ppe) (pax, ax)
-    in 
-    Format.fprintf fmt "@[<v>";
-    EcEnv.Ax.iter doax env;
-    Format.fprintf fmt "@]@."
-
-end
-
 let process_search scope qs =
-  let buffer = Buffer.create 0 in
-  let fmt    = Format.formatter_of_buffer buffer in
-
-  Format.fprintf fmt "%a%!"
-    (fun fmt (scope, qs) -> Search.search fmt scope qs)
-    (scope, qs);
-  EcScope.notify scope `Info "%s" (Buffer.contents buffer)
+  EcScope.Search.search scope qs
 
 (* -------------------------------------------------------------------- *)
 module ObjectInfo = struct
@@ -202,7 +164,7 @@ module ObjectInfo = struct
   (* ------------------------------------------------------------------ *)
   let pr_op_r =
     let get_ops qs env =
-      let l = EcEnv.Op.all (fun _ -> true) qs env in
+      let l = EcEnv.Op.all qs env in
       if l = [] then raise NoObject;
       l in
     { od_name    = "operators or predicates";
@@ -225,7 +187,7 @@ module ObjectInfo = struct
   (* ------------------------------------------------------------------ *)
   let pr_ax_r =
     let get_ops qs env =
-      let l = EcEnv.Ax.all (fun _ -> true) qs env in
+      let l = EcEnv.Ax.all ~name:qs env in
       if l = [] then raise NoObject;
       l in
     { od_name    = "lemmas or axioms";

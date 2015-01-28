@@ -461,4 +461,4 @@ let select_op ?(filter = fun _ -> true) tvi env name ue psig =
     with E.Failure -> None
 
   in
-    List.pmap select (EcEnv.Op.all filter name env)
+    List.pmap select (EcEnv.Op.all ~check:filter name env)

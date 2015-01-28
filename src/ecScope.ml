@@ -2155,3 +2155,27 @@ module Cloning = struct
 
     (name, scope)
 end
+
+(* -------------------------------------------------------------------- *)
+module Search = struct
+  let search (scope : scope) qs =
+    let paths =
+      let do1 aout qs = 
+        match EcEnv.Op.all qs.pl_desc scope.sc_env with
+        | [] ->
+            hierror ~loc:qs.pl_loc "unknown operator: `%s'"
+              (EcSymbols.string_of_qsymbol qs.pl_desc)
+        | paths -> Sp.union aout (Sp.of_list (List.map fst paths))
+      in List.fold_left do1 Sp.empty qs in
+
+    let axioms = EcSearch.search scope.sc_env paths in
+
+    let buffer = Buffer.create 0 in
+    let fmt    = Format.formatter_of_buffer buffer in
+    let ppe    = EcPrinting.PPEnv.ofenv scope.sc_env in
+
+    List.iter (fun ax ->
+      Format.fprintf fmt "%a@\n" (EcPrinting.pp_axiom ~long:true ppe) ax)
+      axioms;
+    notify scope `Info "%s" (Buffer.contents buffer)
+end
