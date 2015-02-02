@@ -5,7 +5,7 @@ open EcTyping
 
 (* -------------------------------------------------------------------- *)
 type search = [
-  | `ByPath    of path
+  | `ByPath    of Sp.t
   | `ByPattern of ((ptnmap * EcUnify.unienv) * form)
 ]
 

@@ -2160,23 +2160,22 @@ end
 module Search = struct
   let search (scope : scope) qs =
     let paths =
-      let do1 aout fp =
+      let do1 fp =
         match unloc fp with
         | PFident (q, None) -> begin
             match EcEnv.Op.all q.pl_desc scope.sc_env with
             | [] ->
                 hierror ~loc:q.pl_loc "unknown operator: `%s'"
                   (EcSymbols.string_of_qsymbol q.pl_desc)
-            | paths -> (List.map (fun x -> `ByPath (fst x)) paths) @ aout
+            | paths -> `ByPath (Sp.of_list (List.map fst paths))
         end
 
         | _ ->
           let ps = ref Mid.empty in
           let ue = EcUnify.UniEnv.create None in
           let fp = EcTyping.trans_pattern scope.sc_env (ps, ue) fp in
-          (`ByPattern ((ps, ue), fp)) :: aout
-
-      in List.fold_left do1 [] qs in
+          `ByPattern ((ps, ue), fp)
+      in List.map do1 qs in
 
     let axioms = EcSearch.search scope.sc_env paths in
 
@@ -2185,7 +2184,7 @@ module Search = struct
     let ppe    = EcPrinting.PPEnv.ofenv scope.sc_env in
 
     List.iter (fun ax ->
-      Format.fprintf fmt "%a@\n" (EcPrinting.pp_axiom ~long:true ppe) ax)
+      Format.fprintf fmt "%a@." (EcPrinting.pp_axiom ~long:true ppe) ax)
       axioms;
     notify scope `Info "%s" (Buffer.contents buffer)
 end
