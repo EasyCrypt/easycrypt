@@ -13,12 +13,10 @@ open EcParsetree
 open EcTypes
 open EcDecl
 open EcModules
-open EcBigInt.Notations
 
 module Sid  = EcIdent.Sid
 module Mid  = EcIdent.Mid
 module MSym = EcSymbols.Msym
-module BI   = EcBigInt
 
 (* -------------------------------------------------------------------- *)
 type action = {
@@ -1376,15 +1374,12 @@ module Ty = struct
         match tci.pti_args with
         | None -> `Integer
         | Some (`Ring (c, p)) ->
-            if odfl false (c |> omap (fun c -> c <^ BI.of_int 2)) then
+            if odfl false (c |> omap (fun c -> c < 2)) then
               hierror "invalid coefficient modulus";
-            if odfl false (p |> omap (fun p -> p <^ BI.of_int 2)) then
+            if odfl false (p |> omap (fun p -> p < 2)) then
               hierror "invalid power modulus";
-            if      opt_equal BI.equal c (Some (BI.of_int 2))
-                 && opt_equal BI.equal p (Some (BI.of_int 2))
-            then `Boolean
-            else `Modulus (c, p)
-      in addring scope mode (kind, toptci)
+            if c = Some 2 && p = Some 2 then `Boolean else `Modulus (c, p)
+      in addring  scope mode (kind, toptci)
     end
 
     | ([], "field") -> addfield scope mode toptci

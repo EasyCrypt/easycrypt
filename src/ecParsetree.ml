@@ -4,7 +4,6 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-open EcBigInt
 open EcMaps
 open EcSymbols
 open EcLocation
@@ -77,7 +76,7 @@ type ptybinding  = psymbol list * pty
 and  ptybindings = ptybinding list
 
 and pexpr_r =
-  | PEint    of zint                              (* int. literal       *)
+  | PEint    of int                               (* int. literal       *)
   | PEident  of pqsymbol * ptyannot option        (* symbol             *)
   | PEapp    of pexpr * pexpr list                (* op. application    *)
   | PElet    of plpattern * pexpr_wty * pexpr     (* let binding        *)
@@ -229,7 +228,7 @@ type pformula  = pformula_r located
 
 and pformula_r =
   | PFhole
-  | PFint    of zint
+  | PFint    of int
   | PFtuple  of pformula list
   | PFident  of pqsymbol * ptyannot option
   | PFmem    of psymbol
@@ -699,7 +698,7 @@ type ptycinstance = {
   pti_type : (psymbol * pqsymbol list) list * pty;
   pti_ops  : (psymbol * (pty list * pqsymbol)) list;
   pti_axs  : (psymbol * ptactic_core) list;
-  pti_args : [`Ring of (zint option * zint option)] option;
+  pti_args : [`Ring of (int option * int option)] option;
 }
 
 (* -------------------------------------------------------------------- *)

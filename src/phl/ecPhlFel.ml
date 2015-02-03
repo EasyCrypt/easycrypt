@@ -121,7 +121,7 @@ let t_failure_event_r (at_pos, cntr, ash, q, f_event, pred_specs, inv) tc =
 
   (* subgoal on the bounds *)
   let bound_goal =
-    let intval = f_int_intval f_i0 (f_int_sub q f_i1) in
+    let intval = f_int_intval (f_int 0) (f_int_sub q (f_int 1)) in
     let v = f_int_sum ash intval treal in
     f_real_le v bd
   in
@@ -137,7 +137,7 @@ let t_failure_event_r (at_pos, cntr, ash, q, f_event, pred_specs, inv) tc =
 
   (* not fail and cntr=0 holds at designated program point *)
   let init_goal =
-    let p = f_and (f_not f_event) (f_eq cntr f_i0) in
+    let p = f_and (f_not f_event) (f_eq cntr (f_int 0)) in
     let p = f_and_simpl p inv in
     f_hoareS memenv f_true (stmt s_hd) p
   in
@@ -145,7 +145,7 @@ let t_failure_event_r (at_pos, cntr, ash, q, f_event, pred_specs, inv) tc =
   let oracle_goal o =
     let not_F_to_F_goal =
       let bound = f_app_simpl ash [cntr] treal in
-      let pre = f_and (f_int_le f_i0 cntr) (f_not f_event) in
+      let pre = f_and (f_int_le (f_int 0) cntr) (f_not f_event) in
       let pre = f_and_simpl pre inv in
       let post = f_event in
       f_bdHoareF pre o post FHle bound

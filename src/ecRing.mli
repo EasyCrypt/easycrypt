@@ -4,18 +4,18 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-open EcBigInt
 open EcMaps
+open Big_int
 
 (* -------------------------------------------------------------------- *)
 type pexpr =
-| PEc   of zint
+| PEc   of big_int 
 | PEX   of int
 | PEadd of pexpr * pexpr 
 | PEsub of pexpr * pexpr
 | PEmul of pexpr * pexpr
 | PEopp of pexpr 
-| PEpow of pexpr * zint
+| PEpow of pexpr * int
 
 val pexpr_eq : pexpr -> pexpr -> bool
 
@@ -26,15 +26,12 @@ val fv_pe : pexpr -> Sint.t
 type 'a cmp_sub = [`Eq | `Lt | `Gt of 'a]
 
 (* -------------------------------------------------------------------- *)
-exception Overflow
-
-(* -------------------------------------------------------------------- *)
 module type Coef = sig
   (* ------------------------------------------------------------------ *)
   type c 
 
-  val cofint : zint -> c
-  val ctoint : c -> zint
+  val cofint : big_int -> c
+  val ctoint : c -> big_int
 
   val c0   : c
   val c1   : c
@@ -48,8 +45,8 @@ module type Coef = sig
   (* ------------------------------------------------------------------ *)
   type p 
 
-  val pofint : zint -> p
-  val ptoint : p -> zint
+  val pofint : int -> p
+  val ptoint : p -> int 
 
   val padd : p -> p -> p
   val peq  : p -> p -> bool
@@ -63,8 +60,8 @@ module Cint  : Coef
 module Cbool : Coef
 
 module type ModVal = sig
-  val c : zint option
-  val p : zint option
+  val c : int option
+  val p : int option
 end
 
 module Cmod(M : ModVal) : Coef
@@ -83,7 +80,7 @@ module Bring : Rnorm
 module Make(C : Coef) : Rnorm
 
 (* -------------------------------------------------------------------- *)
-type c = zint
+type c = big_int
 
 val c0   : c
 val c1   : c

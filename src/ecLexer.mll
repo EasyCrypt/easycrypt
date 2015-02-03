@@ -7,8 +7,7 @@
   open EcUtils
   open EcParser
 
-  module BI = EcBigInt
-  module L  = EcLocation
+  module L = EcLocation
 
   exception LexicalError of L.t option * string
 
@@ -249,7 +248,7 @@ rule main = parse
   | uident as id { try [Hashtbl.find keywords id] with Not_found -> [UIDENT id] }
   | tident       { [TIDENT (Lexing.lexeme lexbuf)] }
   | mident       { [MIDENT (Lexing.lexeme lexbuf)] }
-  | uint         { [UINT (BI.of_string (Lexing.lexeme lexbuf))] }
+  | uint         { [UINT (int_of_string (Lexing.lexeme lexbuf))] }
   | "<<"         { [BACKS] }
   | ">>"         { [FWDS] }
 

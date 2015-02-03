@@ -18,8 +18,6 @@ open EcModules
 open EcTheory
 open EcWhy3Conv
 
-module BI = EcBigInt
-
 (* -------------------------------------------------------------------- *)
 module Mp   = EcPath.Mp
 module Mm   = EcPath.Mm
@@ -1340,8 +1338,7 @@ let trans_form env f =
         restore mid; res
 
     | Fint n ->
-        let n = BI.to_string n in
-        let n = Number.ConstInt(Number.int_const_dec n) in
+        let n = Number.ConstInt(Number.int_const_dec (string_of_int n)) in
         Term.t_const n
 
     | Flocal id -> trans_lv !env id

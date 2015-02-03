@@ -99,7 +99,7 @@ let t_bdhoare_while_r inv vrnt tc =
   let b_concl = f_forall_simpl [(k_id,GTty tint)] b_concl in
   (* the wp of the while *)
   let post = f_imps_simpl [f_not_simpl e; inv] bhs.bhs_po in
-  let term_condition = f_imps_simpl [inv;f_int_le vrnt f_i0] (f_not_simpl e) in
+  let term_condition = f_imps_simpl [inv;f_int_le vrnt (f_int 0)] (f_not_simpl e) in
   let post = f_and term_condition post in
   let modi = s_write env c in
   let post = generalize_mod env m modi post in
@@ -278,7 +278,7 @@ let t_equiv_while_disj_r side vrnt inv tc =
 
   (* 2. WP of the while *)
   let post = f_imps_simpl [f_not_simpl e; inv] es.es_po in
-  let term_condition = f_imps_simpl [inv;f_int_le vrnt f_i0] (f_not_simpl e) in
+  let term_condition = f_imps_simpl [inv;f_int_le vrnt (f_int 0)] (f_not_simpl e) in
   let post = f_and term_condition post in
   let modi = s_write env c in
   let post = generalize_mod env (EcMemory.memory m_side) modi post in

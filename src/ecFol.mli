@@ -4,7 +4,6 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-open EcBigInt
 open EcPath
 open EcTypes
 open EcModules
@@ -37,7 +36,7 @@ val f_int_lt  : form -> form -> form
 val f_int_sub : form -> form -> form
 
 (* soft-constructors - reals *)
-val f_rint : zint -> form
+val f_rint : int -> form
 val f_real_of_int : form -> form
 
 val f_r0 : form
@@ -148,7 +147,7 @@ val is_logical_op : path -> bool
  * structure of a formula via direct pattern matching *)
 
 type sform =
-  | SFint   of zint
+  | SFint   of int
   | SFlocal of EcIdent.t
   | SFpvar  of EcTypes.prog_var * memory
   | SFglob  of mpath * memory

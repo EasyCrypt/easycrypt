@@ -9,8 +9,6 @@ open EcIdent
 open EcPath
 open EcUid
 
-module BI = EcBigInt
-
 (* -------------------------------------------------------------------- *)
 type ty = {
   ty_node : ty_node;
@@ -451,7 +449,7 @@ type expr = {
 
 and expr_node =
   | Elam   of (EcIdent.t * ty) list * expr (* lambda expression *)
-  | Eint   of BI.zint                      (* int. literal          *)
+  | Eint   of int                          (* int. literal          *)
   | Elocal of EcIdent.t                    (* let-variables         *)
   | Evar   of prog_var                     (* module variable       *)
   | Eop    of EcPath.path * ty list        (* op apply to type args *)
@@ -514,7 +512,7 @@ module Hexpr = Why3.Hashcons.Make (struct
  
   let equal_node e1 e2 =
     match e1, e2 with
-    | Eint   i1, Eint   i2 -> BI.equal i1 i2
+    | Eint   i1, Eint   i2 -> i1 == i2
     | Elocal x1, Elocal x2 -> EcIdent.id_equal x1 x2 
     | Evar   x1, Evar   x2 -> pv_equal x1 x2
 
@@ -552,7 +550,7 @@ module Hexpr = Why3.Hashcons.Make (struct
 
   let hash e = 
     match e.e_node with
-    | Eint   i -> BI.hash i
+    | Eint   i -> Hashtbl.hash i
     | Elocal x -> Hashtbl.hash x
     | Evar   x -> pv_hash x
 

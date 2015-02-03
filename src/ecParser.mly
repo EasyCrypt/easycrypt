@@ -8,8 +8,6 @@
   open EcLocation
   open EcParsetree
 
-  module BI = EcBigInt
-
   let parse_error loc msg = raise (ParseError (loc, msg))
 
   let pqsymb_of_psymb (x : psymbol) : pqsymbol =
@@ -151,7 +149,7 @@
 %token <EcSymbols.symbol> PUNIOP
 %token <EcSymbols.symbol> PBINOP
 
-%token <EcBigInt.zint> UINT
+%token <int> UINT
 %token <string> STRING
 
 (* Tokens *)
@@ -400,17 +398,6 @@
 
 %inline uint: n=UINT { n }
 
-%inline word:
-| n=loc(UINT) {
-    try  BI.to_int (unloc n)
-    with BI.Overflow ->
-      parse_error (loc n) (Some "this literal is too large")
-  }
-
-%inline sword:
-|       n=word {  n }
-| MINUS n=word { -n }
-
 (* -------------------------------------------------------------------- *)
 %inline namespace:
 | nm=rlist1(UIDENT, DOT)
@@ -509,7 +496,7 @@ fident:
 (* -------------------------------------------------------------------- *)
 pside_:
 | x=LIDENT     { (0, Printf.sprintf "&%s" x) }
-| x=word       { (0, Printf.sprintf "&%d" x) }
+| x=UINT       { (0, Printf.sprintf "&%d" x) }
 | ADD x=pside_ { (1 + fst x, snd x) }
 
 pside:
@@ -602,7 +589,7 @@ sexpr_u:
 | e=sexpr DOTTICK x=qident
    { PEproj (e, x) }
 
-| e=sexpr DOTTICK n=loc(word)
+| e=sexpr DOTTICK n=loc(uint)
    { if n.pl_desc = 0 then
        parse_error n.pl_loc (Some "tuple projection start at 1");
      PEproji(e,n.pl_desc - 1) }
@@ -797,7 +784,7 @@ sform_u(P):
 | f=sform_r(P) DOTTICK x=qident
     { PFproj (f, x) }
 
-| f=sform_r(P) DOTTICK n=loc(word)
+| f=sform_r(P) DOTTICK n=loc(uint)
    { if n.pl_desc = 0 then
        parse_error n.pl_loc (Some "tuple projection start at 1");
      PFproji(f,n.pl_desc - 1) }
@@ -1659,12 +1646,12 @@ pcutdef:
 rwrepeat:
 | NOT             { (`All  , None  ) }
 | QUESTION        { (`Maybe, None  ) }
-| n=word NOT      { (`All  , Some n) }
-| n=word QUESTION { (`Maybe, Some n) }
+| n=uint NOT      { (`All  , Some n) }
+| n=uint QUESTION { (`Maybe, Some n) }
 
 rwocc:
-| LBRACE       x=word+ RBRACE { (`Inclusive, x) }
-| LBRACE MINUS x=word+ RBRACE { (`Exclusive, x) }
+| LBRACE       x=uint+ RBRACE { (`Inclusive, x) }
+| LBRACE MINUS x=uint+ RBRACE { (`Exclusive, x) }
 
 rwpr_arg:
 | i=ident        { (i, None) }
@@ -1764,15 +1751,12 @@ tac_dir:
 | empty { Backs }
 
 codepos:
-| i=word { (i, None) }
+| i=uint { (i, None) }
 | c=CPOS { c }
 
 code_position:
-| n=word
-    { Single n }
-
-| n1=word n2=word
-    { Double (n1, n2) }
+| n=uint          { Single n }
+| n1=uint n2=uint { Double (n1, n2) }
 
 while_tac_info :
 | inv=sform
@@ -1801,20 +1785,24 @@ swap_info:
 | s=side? p=swap_pos { s,p }
 
 swap_pos:
-| i1=word i2=word i3=word
+| i1=uint i2=uint i3=uint
     { SKbase (i1, i2, i3) }
 
-| p=sword
+| p=int
     { SKmove p }
 
-| i1=word p=sword
+| i1=uint p=int
     { SKmovei (i1, p) }
 
-| LBRACKET i1=word DOTDOT i2=word RBRACKET p=sword
+| LBRACKET i1=uint DOTDOT i2=uint RBRACKET p=int
     { SKmoveinter (i1, i2, p) }
 
+int:
+| n=uint { n }
+| loc(MINUS) n=uint { -n }
+
 side:
-| LBRACE n=word RBRACE {
+| LBRACE n=uint RBRACE {
    match n with
    | 1 -> `Left
    | 2 -> `Right
@@ -1824,7 +1812,7 @@ side:
  }
 
 occurences:
-| p=paren(word+) {
+| p=paren(uint+) {
     if List.mem 0 p then
       parse_error
         (EcLocation.make $startpos $endpos)
@@ -1975,7 +1963,7 @@ eager_info:
     { LE_todo (h, s1, s2, pr, po) }
 
 eager_tac:
-| SEQ n1=word n2=word i=eager_info COLON p=sform
+| SEQ n1=uint n2=uint i=eager_info COLON p=sform
     { Peager_seq (i,(n1,n2),p) }
 
 | IF
@@ -2004,7 +1992,7 @@ form_or_double_form:
     { Double (f1, f2) }
 
 code_pos:
-| i=word { i }
+| i=uint { i }
 
 code_pos_underscore:
 | UNDERSCORE { None }
@@ -2063,10 +2051,10 @@ phltactic:
 | CALL s=side? info=gpterm(call_info)
     { Pcall (s, info) }
 
-| RCONDT s=side? i=word
+| RCONDT s=side? i=uint
     { Prcond (s, true, i) }
 
-| RCONDF s=side? i=word
+| RCONDF s=side? i=uint
     { Prcond (s, false, i) }
 
 | IF opt=if_option
@@ -2075,7 +2063,7 @@ phltactic:
 | SWAP info=iplist1(loc(swap_info), COMMA) %prec prec_below_comma
     { Pswap info }
 
-| CFOLD s=side? c=codepos NOT n=word
+| CFOLD s=side? c=codepos NOT n=uint
     { Pcfold (s, c, Some n) }
 
 | CFOLD s=side? c=codepos
@@ -2093,7 +2081,7 @@ phltactic:
 | KILL s=side? o=codepos
     { Pkill (s, o, Some 1) }
 
-| KILL s=side? o=codepos NOT n=word
+| KILL s=side? o=codepos NOT n=uint
     { Pkill (s, o, Some n) }
 
 | KILL s=side? o=codepos NOT STAR
@@ -2111,16 +2099,16 @@ phltactic:
 | ALIAS s=side? o=codepos x=lident EQ e=expr
     { Pset (s, o, false, x,e) }
 
-| FISSION s=side? o=codepos AT d1=word COMMA d2=word
+| FISSION s=side? o=codepos AT d1=uint COMMA d2=uint
     { Pfission (s, o, (1, (d1, d2))) }
 
-| FISSION s=side? o=codepos NOT i=word AT d1=word COMMA d2=word
+| FISSION s=side? o=codepos NOT i=uint AT d1=uint COMMA d2=uint
     { Pfission (s, o, (i, (d1, d2))) }
 
-| FUSION s=side? o=codepos AT d1=word COMMA d2=word
+| FUSION s=side? o=codepos AT d1=uint COMMA d2=uint
     { Pfusion (s, o, (1, (d1, d2))) }
 
-| FUSION s=side? o=codepos NOT i=word AT d1=word COMMA d2=word
+| FUSION s=side? o=codepos NOT i=uint AT d1=uint COMMA d2=uint
     { Pfusion (s, o, (i, (d1, d2))) }
 
 | UNROLL s=side? o=codepos
@@ -2177,7 +2165,7 @@ phltactic:
 | BYPR f1=sform f2=sform
     { PPr (Some (f1, f2)) }
 
-| FEL at_pos=word cntr=sform delta=sform q=sform f_event=sform some_p=fel_pred_specs inv=sform?
+| FEL at_pos=uint cntr=sform delta=sform q=sform f_event=sform some_p=fel_pred_specs inv=sform?
     { let info = {
         pfel_cntr  = cntr;
         pfel_asg   = delta;
@@ -2239,7 +2227,7 @@ fel_pred_specs:
     {assoc_ps}
 
 eqobs_in_pos:
-| i1=word i2=word { i1, i2 }
+| i1=uint i2=uint { i1, i2 }
 
 eqobs_in_eqglob1:
 | LPAREN mp1= uoption(loc(fident)) TILD mp2= uoption(loc(fident)) COLON 
@@ -2312,10 +2300,10 @@ tactic_core_r:
 | DO t=tactic_core
    { Pdo ((`All, None), t) }
 
-| DO n=word? NOT t=tactic_core
+| DO n=uint? NOT t=tactic_core
    { Pdo ((`All, n), t) }
 
-| DO n=word? QUESTION t=tactic_core
+| DO n=uint? QUESTION t=tactic_core
    { Pdo ((`Maybe, n), t) }
 
 | LPAREN s=tactics RPAREN
@@ -2360,7 +2348,7 @@ tactic:
         mk_core_tactic (mk_loc loc (Por (t1, t2))) }
 
 %inline tcfc_1:
-| i=loc(sword) {
+| i=loc(int) {
     if i.pl_desc = 0 then
       parse_error i.pl_loc (Some "focus-index must be positive");
     i.pl_desc
@@ -2399,22 +2387,22 @@ tactic_chain:
 | FIRST t=loc(tactics) { Pfirst (mk_tactic_of_tactics t, 1) }
 | LAST  t=loc(tactics) { Plast  (mk_tactic_of_tactics t, 1) }
 
-| FIRST n=word t=loc(tactics) { Pfirst (mk_tactic_of_tactics t, n) }
-| LAST  n=word t=loc(tactics) { Plast  (mk_tactic_of_tactics t, n) }
+| FIRST n=uint t=loc(tactics) { Pfirst (mk_tactic_of_tactics t, n) }
+| LAST  n=uint t=loc(tactics) { Plast  (mk_tactic_of_tactics t, n) }
 
 | FIRST LAST  { Protate (`Left , 1) }
 | LAST  FIRST { Protate (`Right, 1) }
 
-| FIRST n=word LAST  { Protate (`Left , n) }
-| LAST  n=word FIRST { Protate (`Right, n) }
+| FIRST n=uint LAST  { Protate (`Left , n) }
+| LAST  n=uint FIRST { Protate (`Right, n) }
 
-| EXPECT n=word
+| EXPECT n=uint
     { Pexpect (`None, n) }
 
-| EXPECT n=word t=loc(tactics)
+| EXPECT n=uint t=loc(tactics)
     { Pexpect (`Tactic (mk_tactic_of_tactics t), n) }
 
-| EXPECT n=word t=loc(paren(rlist1(tactic_chain, SEMICOLON)))
+| EXPECT n=uint t=loc(paren(rlist1(tactic_chain, SEMICOLON)))
     { Pexpect (`Chain t, n) }
 
 | fc=tcfc COLON t=tactic
@@ -2619,14 +2607,14 @@ print:
 | MODULE      qs=qident          { Pr_mod  qs }
 | MODULE TYPE qs=qident          { Pr_mty  qs }
 | GLOB        qs=loc(mod_qident) { Pr_glob qs }
-| GOAL        n=sword            { Pr_goal n  }
+| GOAL        n=int              { Pr_goal n  }
 
 prover_iconfig:
 | /* empty */        { (None  , None  ) }
-| i=word
-| i=word UNDERSCORE  { (Some i, None  ) }
-| UNDERSCORE j=word  { (None  , Some j) }
-| i=word j=word      { (Some i, Some j) }
+| i=uint
+| i=uint UNDERSCORE  { (Some i, None  ) }
+| UNDERSCORE j=uint  { (None  , Some j) }
+| i=uint j=uint      { (Some i, Some j) }
 
 prover_info:
 | ic=prover_iconfig pl=plist1(loc(STRING), empty)?
@@ -2640,10 +2628,10 @@ gprover_info:
 | PROVER x=prover_info
     { x }
 
-| TIMEOUT t=word
+| TIMEOUT t=uint
     { { empty_pprover with pprov_timeout = Some t; } }
 
-| TIMEOUT STAR t=word
+| TIMEOUT STAR t=uint
     { { empty_pprover with pprov_cpufactor = Some t; } }
 
 addrw:
@@ -2708,7 +2696,7 @@ prog_r:
 | g=global { P_Prog ([g], false) }
 | stop     { P_Prog ([ ], true ) }
 
-| UNDO d=word FINAL
+| UNDO d=uint FINAL
    { P_Undo d }
 
 | error
