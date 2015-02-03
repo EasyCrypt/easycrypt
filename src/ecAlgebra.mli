@@ -27,9 +27,9 @@ val rone   : ring -> form
 val radd   : ring -> form -> form -> form
 val ropp   : ring -> form -> form
 val rmul   : ring -> form -> form -> form
-val rexp   : ring -> form -> int -> form
+val rexp   : ring -> form -> EcRing.c -> form
 val rsub   : ring -> form -> form -> form
-val rofint : ring -> int -> form
+val rofint : ring -> EcRing.c -> form
 
 (* -------------------------------------------------------------------- *)
 val fzero  : field -> form
@@ -37,11 +37,11 @@ val fone   : field -> form
 val fadd   : field -> form -> form -> form
 val fopp   : field -> form -> form
 val fmul   : field -> form -> form -> form
-val fexp   : field -> form -> int -> form
+val fexp   : field -> form -> EcRing.c -> form
 val fsub   : field -> form -> form -> form
 val finv   : field -> form -> form
 val fdiv   : field -> form -> form -> form
-val fofint : field -> int -> form
+val fofint : field -> EcRing.c -> form
 
 (* -------------------------------------------------------------------- *)
 val emb_rzero : ring  -> form

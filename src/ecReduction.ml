@@ -13,6 +13,8 @@ open EcFol
 open EcBaseLogic
 open EcEnv
 
+module BI = EcBigInt
+
 (* -------------------------------------------------------------------- *)
 exception IncompatibleType of env * (ty * ty)
 exception IncompatibleForm of env * (form * form)
@@ -120,7 +122,7 @@ module EqTest = struct
 
     and aux_r alpha e1 e2 =
       match e1.e_node, e2.e_node with
-      | Eint   i1, Eint   i2 -> i1 = i2
+      | Eint i1, Eint i2 -> BI.equal i1 i2
       | Elocal id1, Elocal id2 -> EcIdent.id_equal (find alpha id1) id2
       | Evar   p1, Evar   p2 -> for_pv_norm env p1 p2
       | Eop(o1,ty1), Eop(o2,ty2) ->

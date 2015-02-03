@@ -14,6 +14,10 @@ open EcEnv
 open EcRing
 open EcField
 
+module BI = EcBigInt
+
+open EcBigInt.Notations
+
 (* -------------------------------------------------------------------- *)
 module RState : sig
   type rstate
@@ -88,13 +92,20 @@ let ropp r e     =
   | None -> assert (r.r_kind = `Boolean); e
 
 let rmul r e1 e2 = rapp r r.r_mul [e1; e2]
-let rexp r e  i  = 
+
+let rexp r e i  = 
   match r.r_exp with
-  | Some r_exp -> rapp r r_exp [e; f_int i]
-  | None -> 
-    assert (1 <= i);
-    let rec aux exp i = if i = 1 then exp else aux (rmul r exp e) (i-1) in
-    aux e i
+  | Some r_exp ->
+      rapp r r_exp [e; f_int i]
+
+  | None ->
+      let rec aux exp i =
+        if BI.equal i BI.one then exp else
+          let x = aux exp (BI.rshift i 1) in
+          match BI.parity i with
+          | `Even -> rmul r x x
+          | `Odd  -> rmul r exp (rmul r x x)
+      in assert (BI.one <=^ i); aux e i
 
 let rsub r e1 e2 =
   match r.r_sub with
@@ -106,11 +117,17 @@ let rofint r i =
   | `Direct  -> f_int i
   | `Embed p -> rapp r p [f_int i]
   | `Default ->
-    let one = rone r in
-    let rec aux i = if i = 1 then one else radd r (aux (i-1)) one in
-    if i = 0 then rzero r
-    else if 1 <= i then aux i
-    else ropp r (aux (-i))
+      let rec aux i =
+        if BI.equal i BI.one then rone r else
+          let x = aux (BI.rshift i 1) in
+          match BI.parity i with
+          | `Even -> radd r x x 
+          | `Odd  -> radd r (rone r) (radd r x x)
+      in
+        match BI.sign i with
+        | n when n > 0 -> aux i
+        | n when n < 0 -> ropp r (aux (~^ i))
+        | _ -> rzero r
 
 (* -------------------------------------------------------------------- *)
 let fzero  f = rzero  f.f_ring
@@ -130,9 +147,8 @@ let fdiv f e1 e2 =
   | Some p -> rapp f.f_ring p [e1; e2]
 
 (* -------------------------------------------------------------------- *)
-let emb_rzero r = rofint r 0
-
-let emb_rone r = rofint r 1
+let emb_rzero r = rofint r BI.zero
+let emb_rone  r = rofint r BI.one
 
 let emb_fzero r = emb_rzero r.f_ring
 let emb_fone  r = emb_rone  r.f_ring
@@ -194,7 +210,7 @@ let toring hyps ((r, cr) : cring) (rmap : RState.rstate) (form : form) =
           | `Mul , [arg1; arg2] -> PEmul (doit arg1, doit arg2)
           | `Exp , [arg1; arg2] -> begin
             match arg2.f_node with
-            | Fint n when n >= 0 -> PEpow (doit arg1, n)
+            | Fint n -> PEpow (doit arg1, n)
             | _ -> abstract form
           end
           | `OfInt, [arg1] -> of_int arg1
@@ -202,7 +218,7 @@ let toring hyps ((r, cr) : cring) (rmap : RState.rstate) (form : form) =
           | _, _ -> abstract form
         end
     end
-    | Fint i when r.r_embed = `Direct -> PEc (Big_int.big_int_of_int i)
+    | Fint i when r.r_embed = `Direct -> PEc i
     | _ -> abstract form
 
   and of_int f =
@@ -212,7 +228,7 @@ let toring hyps ((r, cr) : cring) (rmap : RState.rstate) (form : form) =
       | `Embed p -> abstract (rapp r p [f])
     in
       match f.f_node with
-      | Fint n -> PEc (Big_int.big_int_of_int n)
+      | Fint n -> PEc n
       | Fapp ({f_node = Fop (p,_)}, [a1; a2]) -> begin
           match op_kind p with
           | Some `Int_add -> PEadd (of_int a1, of_int a2)
@@ -220,7 +236,7 @@ let toring hyps ((r, cr) : cring) (rmap : RState.rstate) (form : form) =
           | Some `Int_mul -> PEmul (of_int a1, of_int a2)
           | Some `Int_pow -> begin
               match a2.f_node with
-              | Fint n when 0 <= n -> PEpow (of_int a1, n)
+              | Fint n when 0 <= BI.sign n -> PEpow (of_int a1, n)
               | _ -> abstract ()
           end
           | _ -> abstract ()
@@ -268,7 +284,7 @@ let tofield hyps ((r, cr) : cfield) (rmap : RState.rstate) (form : form) =
           | _, _ -> abstract form
         end
     end
-    | Fint i when r.f_ring.r_embed = `Direct -> FEc (Big_int.big_int_of_int i)
+    | Fint i when r.f_ring.r_embed = `Direct -> FEc i
     | _ -> abstract form
 
   and of_int f =
@@ -279,7 +295,7 @@ let tofield hyps ((r, cr) : cfield) (rmap : RState.rstate) (form : form) =
     in
 
     match f.f_node with
-    | Fint n -> FEc (Big_int.big_int_of_int n)
+    | Fint n -> FEc n
     | Fapp ({f_node = Fop (p,_)}, [a1; a2]) -> begin
         match op_kind p with
         | Some `Int_add -> FEadd (of_int a1, of_int a2)
@@ -287,7 +303,7 @@ let tofield hyps ((r, cr) : cfield) (rmap : RState.rstate) (form : form) =
         | Some `Int_mul -> FEmul (of_int a1, of_int a2)
         | Some `Int_pow -> begin
           match a2.f_node with
-          | Fint n when 0 <= n -> FEpow (of_int a1, n)
+          | Fint n when 0 <= BI.sign n -> FEpow (of_int a1, n)
           | _ -> abstract ()
           end
         | _ -> abstract ()
@@ -306,7 +322,7 @@ let tofield hyps ((r, cr) : cfield) (rmap : RState.rstate) (form : form) =
 (* -------------------------------------------------------------------- *)
 let rec ofring (r:ring) (rmap:RState.rstate) (e:pexpr) : form = 
   match e with
-  | PEc c -> rofint r (Big_int.int_of_big_int c)
+  | PEc c -> rofint r c
   | PEX idx -> oget (RState.get idx rmap)
   | PEadd(p1,p2) -> radd r (ofring r rmap p1) (ofring r rmap p2)
   | PEsub(p1,p2) -> rsub r (ofring r rmap p1) (ofring r rmap p2)
@@ -377,7 +393,7 @@ let field_eq hyps (cr : cfield) (eqs : eq list) (f1 : form) (f2 : form) =
 (* -------------------------------------------------------------------- *)
 let rec offield (r:field) (rmap:RState.rstate) (e:fexpr) : form = 
   match e with
-  | FEc c        -> fofint r (Big_int.int_of_big_int c)
+  | FEc c        -> fofint r c
   | FEX idx      -> oget (RState.get idx rmap)
   | FEadd(p1,p2) -> fadd r (offield r rmap p1) (offield r rmap p2)
   | FEsub(p1,p2) -> fsub r (offield r rmap p1) (offield r rmap p2)
