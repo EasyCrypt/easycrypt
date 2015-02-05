@@ -42,7 +42,21 @@ and pt_ev_arg_r =
 | PVASub     of pt_ev
 
 (* -------------------------------------------------------------------- *)
-let tc_pterm_apperror pe ?loc kind =
+type apperror = [
+  | `FormWanted
+  | `MemoryWanted
+  | `ModuleWanted
+  | `PTermWanted
+  | `CannotInferMod
+  | `NotFunctional
+  | `InvalidArgForm
+  | `InvalidArgMod
+  | `InvalidArgProof    of form
+  | `InvalidArgModRestr of EcTyping.restriction_error
+]
+
+(* -------------------------------------------------------------------- *)
+let tc_pterm_apperror pte ?loc (kind : apperror) =
   let msg fmt =
     match kind with
     | `FormWanted      -> Format.fprintf fmt "%s" "expecting a formula"
@@ -52,15 +66,20 @@ let tc_pterm_apperror pe ?loc kind =
     | `CannotInferMod  -> Format.fprintf fmt "%s" "cannot infer module arguments"
     | `NotFunctional   -> Format.fprintf fmt "%s" "too many argument"
     | `InvalidArgForm  -> Format.fprintf fmt "%s" "invalid argument (incompatible type)"
-    | `InvalidArgProof -> Format.fprintf fmt "%s" "invalid proof-term argument"
     | `InvalidArgMod   -> Format.fprintf fmt "%s" "invalid argument (incompatible module type)"
 
-    | `InvalidArgModRestr (env, e) ->
+    | `InvalidArgProof wt ->
+        let ppe = EcPrinting.PPEnv.ofenv (LDecl.toenv pte.pte_hy) in
+        Format.fprintf fmt
+          "invalid proof-term argument for: @[%a@]"
+          (EcPrinting.pp_form ppe) wt
+
+    | `InvalidArgModRestr e ->
          Format.fprintf fmt "%a"
-           (EcTyping.pp_restriction_error env)
+           (EcTyping.pp_restriction_error (LDecl.toenv pte.pte_hy))
            e
   in
-    EcCoreGoal.tc_error_lazy pe ?loc msg
+    EcCoreGoal.tc_error_lazy pte.pte_pe ?loc msg
 
 (* -------------------------------------------------------------------- *)
 let ptenv pe hyps (ue, ev) =
@@ -183,7 +202,7 @@ let pt_of_uglobal pf hyps p =
 
 (* -------------------------------------------------------------------- *)
 let pattern_form ?name hyps ~ptn subject =
-  let dfl () = Printf.sprintf "x%d" (EcUid.unique ()) in
+  let dfl () = Printf.sprintf "?%d" (EcUid.unique ()) in
 
   let x    = EcIdent.create (ofdfl dfl name) in
   let fx   = EcFol.f_local x ptn.f_ty in
@@ -382,11 +401,11 @@ let rec trans_pterm_arg_impl pe f =
 
 (* ------------------------------------------------------------------ *)
 and trans_pterm_arg_value pe ?name { pl_desc = arg; pl_loc = loc; } =
-  let dfl () = Printf.sprintf "x%d" (EcUid.unique ()) in
+  let dfl () = Printf.sprintf "?%d" (EcUid.unique ()) in
 
   match arg with
   | EA_mod _ | EA_mem _ | EA_proof _ ->
-      tc_pterm_apperror ~loc pe.pte_pe `FormWanted
+      tc_pterm_apperror ~loc pe `FormWanted
 
   | EA_none ->
       let aty = EcUnify.UniEnv.fresh pe.pte_ue in
@@ -404,13 +423,13 @@ and trans_pterm_arg_value pe ?name { pl_desc = arg; pl_loc = loc; } =
 and trans_pterm_arg_mod pe { pl_desc = arg; pl_loc = loc; } =
   let mp =
     match arg with
-    | EA_none    -> tc_pterm_apperror ~loc pe.pte_pe `CannotInferMod
+    | EA_none    -> tc_pterm_apperror ~loc pe `CannotInferMod
     | EA_mem _
-    | EA_proof _ -> tc_pterm_apperror ~loc pe.pte_pe `ModuleWanted
+    | EA_proof _ -> tc_pterm_apperror ~loc pe `ModuleWanted
     | EA_mod mp  -> mp
     | EA_form fp ->
       match pmsymbol_of_pform fp with
-      | None    -> tc_pterm_apperror ~loc pe.pte_pe `ModuleWanted
+      | None    -> tc_pterm_apperror ~loc pe `ModuleWanted
       | Some mp -> mk_loc loc mp
   in
 
@@ -429,7 +448,7 @@ and trans_pterm_arg_mem pe ?name { pl_desc = arg; pl_loc = loc; } =
       trans_pterm_arg_mem pe ?name (mk_loc lc (EA_mem m))
 
   | EA_mod  _ | EA_proof _ | EA_form _ ->
-      tc_pterm_apperror ~loc pe.pte_pe `MemoryWanted
+      tc_pterm_apperror ~loc pe `MemoryWanted
 
   | EA_none ->
       let x = EcIdent.create (ofdfl dfl name) in
@@ -446,7 +465,7 @@ and process_pterm_arg
     ?implicits ({ ptev_env = pe } as pt) ({ pl_loc = loc; } as arg)
 =
   match PT.destruct_product pe.pte_hy pt.ptev_ax with
-  | None -> tc_pterm_apperror ~loc pe.pte_pe `NotFunctional
+  | None -> tc_pterm_apperror ~loc pe `NotFunctional
 
   | Some (`Imp (f, _)) -> begin
       match unloc arg with
@@ -454,7 +473,7 @@ and process_pterm_arg
 
       | EA_form fp -> begin
           match ffpattern_of_form pe.pte_hy fp with
-          | None    -> tc_pterm_apperror ~loc pe.pte_pe `PTermWanted
+          | None    -> tc_pterm_apperror ~loc pe `PTermWanted
           | Some fp ->
               { ptea_env = pe;
                 ptea_arg = PVASub (process_full_pterm ?implicits pe fp); }
@@ -465,7 +484,7 @@ and process_pterm_arg
             ptea_arg = PVASub (process_full_pterm ?implicits pe fp); }
 
       | _ ->
-          tc_pterm_apperror ~loc pe.pte_pe `PTermWanted
+          tc_pterm_apperror ~loc pe `PTermWanted
   end
 
   | Some (`Forall (x, xty, _)) -> begin
@@ -488,7 +507,7 @@ and dfl_arg_for_mod   pe   arg = ofdfl (fun () -> (hole_for_mod   pe  ).ptea_arg
 and dfl_arg_for_value pe   arg = ofdfl (fun () -> (hole_for_value pe  ).ptea_arg) arg
 
 (* -------------------------------------------------------------------- *)
-and check_pterm_oarg pe (x, xty) f arg = (* FIXME: loc *)
+and check_pterm_oarg pe (x, xty) f arg =
   let env = LDecl.toenv (pe.pte_hy) in
 
   match xty with
@@ -499,15 +518,15 @@ and check_pterm_oarg pe (x, xty) f arg = (* FIXME: loc *)
           pf_unify pe xty arg.f_ty;
           (Fsubst.f_subst_local x arg f, PAFormula arg)
         with EcUnify.UnificationFailure _ ->
-          tc_pterm_apperror pe.pte_pe `InvalidArgForm
+          tc_pterm_apperror pe `InvalidArgForm
       end
-      | _ -> tc_pterm_apperror pe.pte_pe `FormWanted
+      | _ -> tc_pterm_apperror pe `FormWanted
   end
 
   | GTmem _ -> begin
       match dfl_arg_for_mem pe arg with
       | PVAMemory arg -> (Fsubst.f_subst_mem x arg f, PAMemory arg)
-      | _ -> tc_pterm_apperror pe.pte_pe `MemoryWanted
+      | _ -> tc_pterm_apperror pe `MemoryWanted
   end
 
   | GTmodty (emt, restr) -> begin
@@ -519,11 +538,11 @@ and check_pterm_oarg pe (x, xty) f arg = (* FIXME: loc *)
           (Fsubst.f_subst_mod x mp f, PAModule (mp, mt))
         with
         | EcTyping.TymodCnvFailure _ ->
-            tc_pterm_apperror pe.pte_pe `InvalidArgMod
+            tc_pterm_apperror pe `InvalidArgMod
         | EcTyping.RestrictionError e ->
-            tc_pterm_apperror pe.pte_pe (`InvalidArgModRestr (env, e))
+            tc_pterm_apperror pe (`InvalidArgModRestr e)
       end
-      | _ -> tc_pterm_apperror pe.pte_pe `ModuleWanted
+      | _ -> tc_pterm_apperror pe `ModuleWanted
   end
 
 (* -------------------------------------------------------------------- *)
@@ -537,7 +556,7 @@ and apply_pterm_to_oarg ?loc ({ ptev_env = pe; ptev_pt = rawpt; } as pt) oarg =
   let oarg = oarg |> omap (fun arg -> arg.ptea_arg) in
 
   match PT.destruct_product pe.pte_hy pt.ptev_ax with
-  | None   -> tc_pterm_apperror ?loc pe.pte_pe `NotFunctional
+  | None   -> tc_pterm_apperror ?loc pe `NotFunctional
   | Some t ->
       let (newax, newarg) =
         match t with
@@ -548,9 +567,9 @@ and apply_pterm_to_oarg ?loc ({ ptev_env = pe; ptev_pt = rawpt; } as pt) oarg =
                 pf_form_match pe ~ptn:f1 arg.ptev_ax;
                 (f2, PASub (Some arg.ptev_pt))
               with EcMatching.MatchFailure ->
-                tc_pterm_apperror ?loc pe.pte_pe `InvalidArgProof
+                tc_pterm_apperror ?loc pe (`InvalidArgProof f1)
             end
-            | _ -> tc_pterm_apperror ?loc pe.pte_pe `PTermWanted
+            | _ -> tc_pterm_apperror ?loc pe `PTermWanted
         end
 
         | `Forall (x, xty, f) ->
@@ -593,7 +612,7 @@ and process_full_pterm ?(implicits = false) pe pf =
     | false -> pt
     | true  ->
       let rec apply ({ ptev_pt = pt; ptev_env = env; } as pe) =
-        match PT.destruct_product env.pte_hy pe.ptev_ax with
+        match PT.destruct_product ~reduce:false env.pte_hy pe.ptev_ax with
         | Some (`Forall (x, xty, f)) ->
             let (newax, newarg) = check_pterm_oarg env (x, xty) f None in
             let pt = { pt with pt_args = pt.pt_args @ [newarg] } in

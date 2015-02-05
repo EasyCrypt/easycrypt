@@ -203,24 +203,24 @@ type dproduct = [
   | `Forall of EcIdent.t * gty * form
 ]
 
-let destruct_product hyps fp : dproduct option =
+let destruct_product ?(reduce = true) hyps fp : dproduct option =
   let doit fp =
     match EcFol.sform_of_form fp with
     | SFquant (Lforall, (x, t), lazy f) -> `Forall (x, t, f)
     | SFimp (f1, f2) -> `Imp (f1, f2)
     | _ -> raise NoMatch
   in
-    lazy_destruct ~reduce:true hyps doit fp
+    lazy_destruct ~reduce hyps doit fp
 
 (* -------------------------------------------------------------------- *)
 type dexists = [
   | `Exists of EcIdent.t * gty * form
 ]
 
-let destruct_exists hyps fp : dexists option =
+let destruct_exists ?(reduce = true) hyps fp : dexists option =
   let doit fp =
     match EcFol.sform_of_form fp with
     | SFquant (Lexists, (x, t), lazy f) -> `Exists (x, t, f)
     | _ -> raise NoMatch
   in
-    lazy_destruct ~reduce:true hyps doit fp
+    lazy_destruct ~reduce hyps doit fp

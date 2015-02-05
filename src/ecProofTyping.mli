@@ -74,8 +74,8 @@ type dexists = [
   | `Exists of EcIdent.t * gty * form
 ]
 
-val destruct_product : EcEnv.LDecl.hyps -> form -> dproduct option
-val destruct_exists  : EcEnv.LDecl.hyps -> form -> dexists  option
+val destruct_product: ?reduce:bool -> EcEnv.LDecl.hyps -> form -> dproduct option
+val destruct_exists : ?reduce:bool -> EcEnv.LDecl.hyps -> form -> dexists  option
 
 (* -------------------------------------------------------------------- *)
 exception NoMatch

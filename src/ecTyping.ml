@@ -2139,7 +2139,7 @@ let trans_form_or_pattern env (ps, ue) pf tt =
       match ps with
       | None    -> tyerror f.pl_loc env PatternNotAllowed
       | Some ps ->
-        let x  = EcIdent.create "_p" in
+        let x  = EcIdent.create (Printf.sprintf "?%d" (EcUid.unique ())) in
         let ty = UE.fresh ue in
           ps := Mid.add x ty !ps; f_local x ty
     end
