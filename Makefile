@@ -29,12 +29,13 @@ LIBDIR := $(PREFIX)/lib/easycrypt
 SYSDIR := $(LIBDIR)/system
 
 # --------------------------------------------------------------------
-XUNITOUT ?= xunit.xml
-ECARGS   ?=
-ECTOUT   ?= 5
-CHECK    := scripts/testing/runtest
-CHECK    += --bin-args="$(ECARGS)" --timeout="$(ECTOUT)"
-CHECK    += config/tests.config
+XUNITOUT  ?= xunit.xml
+ECARGS    ?=
+ECTOUT    ?= 5
+CHECK     := scripts/testing/runtest
+CHECK     += --bin-args="$(ECARGS)" --timeout="$(ECTOUT)"
+CHECK     += config/tests.config
+CHECKCATS ?= prelude core theories encryption newth realized
 
 # --------------------------------------------------------------------
 .PHONY: all build byte native tests check check-xunit examples
@@ -105,17 +106,11 @@ tests: check
 examples:
 	$(CHECK) examples
 
-fullcheck: ec.native
-	$(CHECK) prelude core theories realized examples unit
-
 check: ec.native
-	$(CHECK) prelude theories realized unit
+	$(CHECK) $(CHECKCATS)
 
 check-xunit: ec.native
-	$(CHECK) --xunit="$(XUNITOUT)" prelude core theories realized unit
-
-checklibs: ec.native
-	$(CHECK) --xunit=libresults.xml prelude core theories realized
+	$(CHECK) --xunit="$(XUNITOUT)" $(CHECKCATS)
 
 clean:
 	$(OCAMLBUILD) -clean
