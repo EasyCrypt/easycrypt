@@ -166,6 +166,7 @@ let destr_rdivint f =
 
 let norm_real_int_div n1 n2 =
   if BI.sign n2 = 0 then f_real_div (f_rint n1) (f_rint n2) else
+  if BI.sign n1 = 0 then f_r0 else
 
   let n1, n2 =
     match BI.gcd n1 n2 with
