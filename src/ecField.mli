@@ -5,10 +5,11 @@
 
 (* -------------------------------------------------------------------- *)
 open EcRing
+open EcBigInt
 
 (* -------------------------------------------------------------------- *)
 type fexpr =
-| FEc   of Big_int.big_int
+| FEc   of c
 | FEX   of int
 | FEadd of fexpr * fexpr
 | FEsub of fexpr * fexpr
@@ -16,7 +17,7 @@ type fexpr =
 | FEopp of fexpr
 | FEinv of fexpr
 | FEdiv of fexpr * fexpr
-| FEpow of fexpr * int
+| FEpow of fexpr * zint
 
 type linear = (pexpr * pexpr * (pexpr list))
 

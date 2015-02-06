@@ -5,6 +5,7 @@
 
 (* -------------------------------------------------------------------- *)
 open EcUtils
+open EcBigInt
 open EcPath
 open EcTypes
 open EcCoreFol
@@ -113,7 +114,7 @@ type typeclass = {
 type rkind = [
   | `Boolean
   | `Integer
-  | `Modulus of int option * int option
+  | `Modulus of (zint option) pair
 ]
 
 type ring = {

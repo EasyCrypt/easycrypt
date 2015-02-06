@@ -14,6 +14,7 @@ open EcFol
 
 module P  = EcPath
 module EP = EcParser
+module BI = EcBigInt
 
 module Ssym = EcSymbols.Ssym
 module Msym = EcSymbols.Msym
@@ -995,7 +996,7 @@ and try_pp_expr_chained_orderings (ppe : PPEnv.t) outer fmt e =
 and pp_expr_core_r (ppe : PPEnv.t) outer fmt (e : expr) =
   match e.e_node with
   | Eint i ->
-      Format.fprintf fmt "%d" i
+      Format.fprintf fmt "%a" BI.pp_print i
 
   | Evar x ->
       pp_pv ppe fmt x
@@ -1322,7 +1323,7 @@ and try_pp_lossless (ppe : PPEnv.t) outer fmt f =
 and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
   match f.f_node with
   | Fint n ->
-      Format.fprintf fmt "%d" n
+      Format.fprintf fmt "%a" BI.pp_print n
 
   | Flocal id ->
       pp_local ppe fmt id

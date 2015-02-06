@@ -4,6 +4,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
+open EcBigInt
 open EcMaps
 open EcSymbols
 open EcUid
@@ -156,7 +157,7 @@ type expr = private {
 
 and expr_node =
   | Elam   of (EcIdent.t * ty) list * expr (* lambda expression     *)
-  | Eint   of int                          (* int. literal          *)
+  | Eint   of zint                         (* int. literal          *)
   | Elocal of EcIdent.t                    (* let-variables         *)
   | Evar   of prog_var                     (* module variable       *)
   | Eop    of EcPath.path * ty list        (* op apply to type args *)
@@ -177,7 +178,7 @@ val e_ty      : expr -> ty
 
 (* -------------------------------------------------------------------- *)
 val e_tt       : expr
-val e_int      : int -> expr
+val e_int      : zint -> expr
 val e_local    : EcIdent.t -> ty -> expr
 val e_var      : prog_var -> ty -> expr
 val e_op       : EcPath.path -> ty list -> ty -> expr

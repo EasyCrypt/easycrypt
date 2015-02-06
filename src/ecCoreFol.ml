@@ -12,10 +12,13 @@ open EcModules
 
 type memory = EcMemory.memory
 
+module BI = EcBigInt
 module Mp = EcPath.Mp
 module Sp = EcPath.Sp
 module Sm = EcPath.Sm
 module Sx = EcPath.Sx
+
+open EcBigInt.Notations
 
 (* -------------------------------------------------------------------- *)
 type gty =
@@ -47,7 +50,7 @@ and f_node =
   | Fquant  of quantif * binding * form
   | Fif     of form * form * form
   | Flet    of lpattern * form * form
-  | Fint    of int
+  | Fint    of BI.zint
   | Flocal  of EcIdent.t
   | Fpvar   of EcTypes.prog_var * memory
   | Fglob   of EcPath.mpath     * memory
@@ -302,7 +305,7 @@ module Hsform = Why3.Hashcons.Make (struct
         lp_equal lp1 lp2 && f_equal e1 e2 && f_equal f1 f2
 
     | Fint i1, Fint i2 ->
-        i1 = i2
+        BI.equal i1 i2
 
     | Flocal id1, Flocal id2 ->
         EcIdent.id_equal id1 id2
@@ -636,13 +639,13 @@ let f_int_sub f1 f2 = f_app fop_int_sub [f1; f2] tint
 let f_int_mul f1 f2 = f_app fop_int_mul [f1; f2] tint
 let f_int_pow f1 f2 = f_app fop_int_pow [f1; f2] tint
   
-let rec f_int n  =
-  match n with
-  | _ when 0 <= n -> mk_form (Fint n) tint
-  | _             -> f_int_opp (f_int (-n))
+let rec f_int (n : BI.zint) =
+  match BI.sign n with
+  | s when 0 <= s -> mk_form (Fint n) tint
+  | _             -> f_int_opp (f_int (~^ n))
 
-let f_i0 = f_int 0
-let f_i1 = f_int 1
+let f_i0 = f_int BI.zero
+let f_i1 = f_int BI.one
 
 (* -------------------------------------------------------------------- *)
 module FSmart = struct
@@ -1015,7 +1018,10 @@ let destr_programS side f =
 let destr_int f =
   match f.f_node with
   | Fint n -> n
-  | Fapp(op,[{f_node = Fint n}]) when f_equal op fop_int_opp -> -n
+
+  | Fapp (op, [{f_node = Fint n}]) when f_equal op fop_int_opp ->
+      BI.neg n
+
   | _ -> destr_error "destr_int"
 
 (* -------------------------------------------------------------------- *)
