@@ -37,6 +37,15 @@ let _ = dispatch begin function
        flag ["ocaml"; "pkg_threads"; "compile"] (S[A "-thread"]);
        flag ["ocaml"; "pkg_threads"; "link"] (S[A "-thread"]);
 
+       (* Bisect *)
+       flag ["ocaml"; "compile" ;  "bisect"] & S[A"-package"; A"bisect"];
+       flag ["ocaml"; "compile" ;  "bisect"] & S[A"-syntax" ; A"camlp4o"];
+       flag ["ocaml"; "compile" ;  "bisect"] & S[A"-syntax" ; A"bisect_pp"];
+       flag ["ocaml"; "ocamldep";  "bisect"] & S[A"-package"; A"bisect"];
+       flag ["ocaml"; "ocamldep";  "bisect"] & S[A"-syntax" ; A"camlp4o"];
+       flag ["ocaml"; "ocamldep";  "bisect"] & S[A"-syntax" ; A"bisect_pp"];
+       flag ["ocaml"; "link"    ;  "bisect"] & S[A"-package"; A"bisect"];
+
        (* Lint switches *)
        flag ["ocaml"; "lint"; "compile"] (S[A "-ppx"; A "../lint/ppx_lint.native"])
 
