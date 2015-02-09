@@ -32,10 +32,10 @@
 
   let opdef_of_opbody ty b =
     match b with
-    | None                  -> PO_abstr ty
-    | Some (args, `Expr e ) -> PO_concr (args, ty, e)
-    | Some (args, `Case bs) -> PO_case  (args, ty, bs)
-    | Some (args, `Reft rt) -> PO_reft  (args, ty, rt)
+    | None            -> PO_abstr ty
+    | Some (`Expr e ) -> PO_concr (ty, e)
+    | Some (`Case bs) -> PO_case  (ty, bs)
+    | Some (`Reft rt) -> PO_reft  (ty, rt)
 
   let lqident_of_fident (nm, name) =
     let module E = struct exception Invalid end in
@@ -1369,6 +1369,18 @@ operator:
       po_name    = List.hd x;
       po_aliases = List.tl x;
       po_tyvars  = tyvars;
+      po_args    = [];
+      po_def     = opdef_of_opbody sty None;
+      po_ax      = None;
+      po_nosmt   = snd k; } }
+
+| k=op_or_const x=plist1(oident, COMMA) tyvars=tyvars_decl?
+    args=ptybindings COLON sty=loc(type_exp)
+  { { po_kind    = fst k;
+      po_name    = List.hd x;
+      po_aliases = List.tl x;
+      po_tyvars  = tyvars;
+      po_args    = args;
       po_def     = opdef_of_opbody sty None;
       po_ax      = None;
       po_nosmt   = snd k; } }
@@ -1379,17 +1391,19 @@ operator:
       po_name    = List.hd x;
       po_aliases = List.tl x;
       po_tyvars  = tyvars;
-      po_def     = opdef_of_opbody sty (Some ([], `Reft (rname, reft)));
+      po_args    = [];
+      po_def     = opdef_of_opbody sty (Some (`Reft (rname, reft)));
       po_ax      = None;
       po_nosmt   = snd k; } }
 
 | k=op_or_const x=plist1(oident, COMMA) tyvars=tyvars_decl?
-    p=ptybindings COLON LBRACE sty=loc(type_exp) PIPE reft=form RBRACE AS rname=ident
+    args=ptybindings COLON LBRACE sty=loc(type_exp) PIPE reft=form RBRACE AS rname=ident
   { { po_kind    = fst k;
       po_name    = List.hd x;
       po_aliases = List.tl x;
       po_tyvars  = tyvars;
-      po_def     = opdef_of_opbody sty (Some (p, `Reft (rname, reft)));
+      po_args    = args;
+      po_def     = opdef_of_opbody sty (Some (`Reft (rname, reft)));
       po_ax      = None;
       po_nosmt   = snd k; } }
 
@@ -1399,7 +1413,8 @@ operator:
       po_name    = List.hd x;
       po_aliases = List.tl x;
       po_tyvars  = tyvars;
-      po_def     = opdef_of_opbody sty (Some ([], b));
+      po_args    = [];
+      po_def     = opdef_of_opbody sty (Some b);
       po_ax      = opax;
       po_nosmt   = snd k; } }
 
@@ -1409,27 +1424,30 @@ operator:
       po_name    = List.hd x;
       po_aliases = List.tl x;
       po_tyvars  = tyvars;
-      po_def     = opdef_of_opbody (mk_loc eq.pl_loc PTunivar) (Some ([], b));
+      po_args    = [];
+      po_def     = opdef_of_opbody (mk_loc eq.pl_loc PTunivar) (Some b);
       po_ax      = opax;
       po_nosmt   = snd k; } }
 
-| k=op_or_const x=plist1(oident, COMMA) tyvars=tyvars_decl? p=ptybindings
+| k=op_or_const x=plist1(oident, COMMA) tyvars=tyvars_decl? args=ptybindings
     eq=loc(EQ) b=opbody opax=opax?
   { { po_kind    = fst k;
       po_name    = List.hd x;
       po_aliases = List.tl x;
       po_tyvars  = tyvars;
-      po_def     = opdef_of_opbody (mk_loc eq.pl_loc PTunivar) (Some (p, b));
+      po_args    = args;
+      po_def     = opdef_of_opbody (mk_loc eq.pl_loc PTunivar) (Some b);
       po_ax      = opax;
       po_nosmt   = snd k; } }
 
-| k=op_or_const x=plist1(oident, COMMA) tyvars=tyvars_decl? p=ptybindings
+| k=op_or_const x=plist1(oident, COMMA) tyvars=tyvars_decl? args=ptybindings
     COLON codom=loc(type_exp) EQ b=opbody opax=opax?
   { { po_kind    = fst k;
       po_name    = List.hd x;
       po_aliases = List.tl x;
       po_tyvars  = tyvars;
-      po_def     = opdef_of_opbody codom (Some (p, b));
+      po_args    = args;
+      po_def     = opdef_of_opbody codom (Some b);
       po_ax      = opax;
       po_nosmt   = snd k; } }
 

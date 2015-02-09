@@ -271,9 +271,9 @@ let rec pf_ident f =
 (* -------------------------------------------------------------------- *)
 type pop_def =
   | PO_abstr of pty
-  | PO_concr of ptybindings * pty * pexpr
-  | PO_case  of ptybindings * pty * pop_branch list
-  | PO_reft  of ptybindings * pty * (psymbol * pformula)
+  | PO_concr of pty * pexpr
+  | PO_case  of pty * pop_branch list
+  | PO_reft  of pty * (psymbol * pformula)
 
 and pop_branch = {
   pop_patterns : pop_pattern list;
@@ -291,6 +291,7 @@ type poperator = {
   po_name   : psymbol;
   po_aliases: psymbol list;
   po_tyvars : (psymbol * pqsymbol list) list option;
+  po_args   : ptybindings;
   po_def    : pop_def;
   po_ax     : psymbol option;
   po_nosmt  : bool;
