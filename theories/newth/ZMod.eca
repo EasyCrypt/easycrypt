@@ -1,0 +1,38 @@
+(* -------------------------------------------------------------------- *)
+require import Fun Int.
+require (*--*) Subtype.
+
+(* -------------------------------------------------------------------- *)
+(* This abstract theory provides the construction of the ring Z/pZ.     *)
+(* The structure is also equipped with a (finite) field structure when  *)
+(* the modulus is an actual prime.                                      *)
+(* -------------------------------------------------------------------- *)
+const p : { int | 2 <= p } as le2_p.
+
+(* -------------------------------------------------------------------- *)
+type zmod.
+
+clone Subtype as Sub with
+  type T <- int, type sT <- zmod,
+  pred P (x : int) <- 0 <= x < p.
+
+(* -------------------------------------------------------------------- *)
+op inzmod (z : int)  = Sub.insubd (z %% p).
+op asint  (z : zmod) = Sub.val z.
+
+lemma inzmodK (z : int): asint (inzmod z) = z %% p.
+proof. smt. qed.
+
+(* -------------------------------------------------------------------- *)
+op lift1 (f : int -> int) =
+  fun (z : zmod), inzmod (f (asint z)).
+
+op lift2 (f : int -> int -> int) =
+  fun (z1 z2 : zmod), inzmod (f (asint z1) (asint z2)).
+
+(* -------------------------------------------------------------------- *)
+op zero = inzmod 0.
+op one  = inzmod 1.
+op opp  = lift1 Int.([-]).
+op add  = lift2 Int.( + ).
+op mul  = lift2 Int.( * ).
