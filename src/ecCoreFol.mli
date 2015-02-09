@@ -23,6 +23,10 @@ type gty =
   | GTmodty of module_type * mod_restr
   | GTmem   of EcMemory.memtype
 
+val gtty    : EcTypes.ty -> gty
+val gtmodty : module_type -> mod_restr -> gty
+val gtmem   : EcMemory.memtype -> gty
+
 val gty_equal : gty  -> gty -> bool
 val gty_fv    : gty -> int Mid.t
 

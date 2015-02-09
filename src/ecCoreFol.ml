@@ -160,6 +160,15 @@ let gty_fv = function
     EcPath.Sx.fold (fun xp fv -> EcPath.x_fv fv xp) rx fv
   | GTmem mt -> EcMemory.mt_fv mt
 
+let gtty (ty : EcTypes.ty) =
+  GTty ty
+
+let gtmodty (mt : module_type) (mr : mod_restr) =
+  GTmodty (mt, mr)
+
+let gtmem (mt : EcMemory.memtype) =
+  GTmem mt
+
 (*-------------------------------------------------------------------- *)
 let b_equal (b1 : binding) (b2 : binding) =
   let b1_equal (x1, ty1) (x2, ty2) =
@@ -1305,7 +1314,7 @@ module Fsubst = struct
         let ty   = s.fs_ty fp.f_ty in
         let tys  = List.Smart.map s.fs_ty tys in
         let body = oget (Mp.find_opt p s.fs_opdef) in
-          f_subst_op ty tys [] body
+          f_subst_op s.fs_freshen ty tys [] body
 
     | Fop (p, tys) when Mp.mem p s.fs_pddef ->
         let ty   = s.fs_ty fp.f_ty in
@@ -1317,7 +1326,7 @@ module Fsubst = struct
         let ty   = s.fs_ty fp.f_ty in
         let tys  = List.Smart.map s.fs_ty tys in
         let body = oget (Mp.find_opt p s.fs_opdef) in
-          f_subst_op ty tys (List.map (f_subst s) args) body
+          f_subst_op s.fs_freshen ty tys (List.map (f_subst s) args) body
 
     | Fapp ({ f_node = Fop (p, tys) }, args) when Mp.mem p s.fs_pddef ->
         let ty   = s.fs_ty fp.f_ty in
@@ -1441,17 +1450,14 @@ module Fsubst = struct
 
     | _ -> f_map s.fs_ty (f_subst s) fp
 
-  and f_subst_op fty tys args (tyids, e) =
+  and f_subst_op freshen fty tys args (tyids, e) =
     (* FIXME: factor this out *)
-    (* FIXME: is es_freshen value correct? *)
     (* FIXME: is [mhr] good as a default? *)
 
     let e =
       let sty = Tvar.init tyids tys in
       let sty = ty_subst { ty_subst_id with ts_v = Mid.find_opt^~ sty; } in
-      let sty = { e_subst_id with
-                    es_freshen = true;
-                    es_ty      = sty ; } in
+      let sty = { e_subst_id with es_freshen = freshen; es_ty = sty ; } in
         e_subst sty e
     in
 

@@ -760,10 +760,10 @@ module Op = struct
     let op = op.pl_desc and loc = op.pl_loc in
     let ue = TT.transtyvars scope.sc_env (loc, op.po_tyvars) in
 
-    let (ty, body) =
+    let (ty, body, refts) =
       match op.po_def with
       | PO_abstr pty ->
-          (TT.transty TT.tp_relax scope.sc_env ue pty, `Abstract)
+          (TT.transty TT.tp_relax scope.sc_env ue pty, `Abstract, [])
 
       | PO_concr (bd, pty, pe) ->
           let env     = scope.sc_env in
@@ -771,12 +771,25 @@ module Op = struct
           let env, xs = TT.transbinding env ue bd in
           let body    = TT.transexpcast env `InOp ue codom pe in
           let lam     = EcTypes.e_lam xs body in
-            (lam.EcTypes.e_ty, `Plain lam)
+            (lam.EcTypes.e_ty, `Plain lam, [])
 
-      | PO_case (bd, pty, pbs) ->
+      | PO_case (bd, pty, pbs) -> begin
           let name = { pl_loc = loc; pl_desc = unloc op.po_name } in
           match EHI.trans_matchfix (env scope) ue name (bd, pty, pbs) with
-          | (ty, opinfo) -> (ty, `Fix opinfo)
+          | (ty, opinfo) -> (ty, `Fix opinfo, [])
+      end
+
+      | PO_reft (bd, pty, (rname, reft)) ->
+          let env      = scope.sc_env in
+          let codom    = TT.transty TT.tp_relax env ue pty in
+          let _env, xs = TT.transbinding env ue bd in
+          let opty     = EcTypes.toarrow (List.map snd xs) codom in
+          let tparams  = EcUnify.UniEnv.tparams ue in
+          let opabs    = EcDecl.mk_op [] codom None in
+          let openv    = EcEnv.Op.bind (unloc op.po_name) opabs env in
+          let openv    = EcEnv.Var.bind_locals xs openv in
+          let reft     = TT.trans_prop openv ue reft in
+            (opty, `Abstract, [(rname, xs, reft, codom)])
     in
 
     if not (EcUnify.UniEnv.closed ue) then
@@ -799,7 +812,8 @@ module Op = struct
 
     in
 
-    let tyop = EcDecl.mk_op tparams ty body in
+    let tyop   = EcDecl.mk_op tparams ty body in
+    let opname = EcPath.pqname (EcEnv.root (env scope)) (unloc op.po_name) in
 
     if op.po_nosmt && (is_none op.po_ax) then
       hierror ~loc "[nosmt] is only supported for axiomatized operators";
@@ -835,9 +849,39 @@ module Op = struct
     in
 
     let scope =
+      List.fold_left (fun scope (rname, xs, ax, codom) ->
+          let ax = f_forall (List.map (snd_map gtty) xs) ax in
+          let ax =
+            let opargs  = List.map (fun (x, xty) -> e_local x xty) xs in
+            let opapp   = List.map (tvar |- fst) tparams in
+            let opapp   = e_app (e_op opname opapp ty) opargs codom in
+            let tyuni   = { ty_subst_id with ts_u = EcUnify.UniEnv.close ue } in
+            let subst   = Mp.singleton opname ([], opapp) in
+            let subst   = Fsubst.f_subst_init false Mid.empty tyuni subst Mp.empty in
+            Fsubst.f_subst subst ax
+          in
+
+          let ax, axpm =
+            let bdpm = List.map fst tparams in
+            let axpm = List.map EcIdent.fresh bdpm in
+              (EcCoreFol.Fsubst.subst_tvar
+                 (EcTypes.Tvar.init bdpm (List.map EcTypes.tvar axpm))
+                 ax,
+               List.combine axpm (List.map snd tparams)) in
+          let ax =
+            { ax_tparams = axpm;
+              ax_spec    = Some ax;
+              ax_kind    = `Axiom;
+              ax_nosmt   = false; }
+          in Ax.bind scope false (unloc rname, ax))
+        scope refts
+    in
+
+    let scope =
       if not (List.is_empty op.po_aliases) then begin
-        if not (EcUtils.is_none body) then
-          hierror ~loc "multiple operator names are only allowed for abstract operators";
+        if not (EcUtils.is_none body) || not (List.is_empty refts) then
+          hierror ~loc
+            "multiple names are only allowed for non-refined abstract operators";
         let addnew scope name =
           let nparams = List.map (fst_map EcIdent.fresh) tparams in
           let subst = Tvar.init

@@ -273,6 +273,7 @@ type pop_def =
   | PO_abstr of pty
   | PO_concr of ptybindings * pty * pexpr
   | PO_case  of ptybindings * pty * pop_branch list
+  | PO_reft  of ptybindings * pty * (psymbol * pformula)
 
 and pop_branch = {
   pop_patterns : pop_pattern list;
