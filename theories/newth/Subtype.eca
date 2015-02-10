@@ -67,3 +67,22 @@ proof. by rewrite /insubd; case (insubP x) => [[u] [->] [->]|[-> ->]]. qed.
 
 lemma insubdK (x : T): P x => val (insubd x) = x.
 proof. by move=> Px; rewrite val_insubd Px. qed.
+
+(* -------------------------------------------------------------------- *)
+theory Lift.
+  op lift1 (f : T -> T) =
+    fun (z : sT), insubd (f (val z)).
+
+  op lift2 (f : T -> T -> T) =
+    fun (z1 z2 : sT), insubd (f (val z1) (val z2)).
+
+  lemma lift1E (f : T -> T):
+       (forall x, P x => P (f x))
+    => forall x, val (lift1 f x) = f (val x).
+  proof. by move=> h x; rewrite /lift1 insubdK ?h ?valP. qed.
+
+  lemma lift2E (f : T -> T -> T):
+       (forall x y, P x => P y => P (f x y))
+    => forall x y, val (lift2 f x y) = f (val x) (val y).
+  proof. by move=> h x y; rewrite /lift2 insubdK ?h ?valP. qed.
+end Lift.
