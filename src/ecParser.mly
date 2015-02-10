@@ -2329,8 +2329,20 @@ pgoption:
           (Some ("invalid option: " ^ (unloc x)))
   }
 
-pgoptions:
-| xs=bracket(pgoption+) { xs }
+%inline pgoptions:
+| AT? xs=bracket(pgoption+) { xs }
+
+caseoption:
+| b=boption(MINUS) x=lident {
+    match unloc x with
+    | "ambient" -> (not b, `Ambient)
+    | _ ->
+       parse_error x.pl_loc
+         (Some ("invalid option: " ^ (unloc x)))
+  }
+
+%inline caseoptions:
+| AT xs=bracket(caseoption+) { xs }
 
 tactic_core_r:
 | IDTAC
@@ -2363,8 +2375,8 @@ tactic_core_r:
 | ADMIT
    { Padmit }
 
-| CASE gp=genpattern*
-   { Pcase gp }
+| CASE opts=caseoptions? gp=genpattern*
+   { Pcase (odfl [] opts, gp) }
 
 | PROGRESS opts=pgoptions? t=tactic_core? {
     Pprogress (odfl [] opts, t)

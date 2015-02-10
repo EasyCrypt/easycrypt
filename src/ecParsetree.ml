@@ -596,6 +596,10 @@ type ppgoption = [
 type ppgoptions = (bool * ppgoption) list
 
 (* -------------------------------------------------------------------- *)
+type pcaseoption  = [ `Ambient ]
+type pcaseoptions = (bool * pcaseoption) list
+
+(* -------------------------------------------------------------------- *)
 type apply_info = [
   | `ApplyIn of eppterm * psymbol
   | `Apply   of eppterm list * [`Apply|`Exact]
@@ -637,7 +641,7 @@ and ptactic_core_r =
   | Pby         of (ptactics) option
   | Por         of ptactic * ptactic
   | Pseq        of ptactics
-  | Pcase       of genpattern list
+  | Pcase       of (pcaseoptions * genpattern list)
   | Plogic      of logtactic
   | PPhl        of phltactic
   | Pprogress   of ppgoptions * ptactic_core option

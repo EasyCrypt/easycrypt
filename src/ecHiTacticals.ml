@@ -16,6 +16,26 @@ open EcHiGoal
 module TTC = EcProofTyping
 
 (* -------------------------------------------------------------------- *)
+type caseoption = {
+  cod_ambient : bool;
+}
+
+module CaseOptions = struct
+  let default = { cod_ambient = false; }
+
+  let merged1 opts (b, x) =
+    match x with
+    | `Ambient -> { opts with cod_ambient  = b; }
+
+  let merge1 opts ((b, x) : bool * EcParsetree.pcaseoption) =
+    match x with
+    | `Ambient -> { opts with cod_ambient = b; }
+
+  let merge opts (specs : EcParsetree.pcaseoptions) =
+    List.fold_left merge1 opts specs
+end
+
+(* -------------------------------------------------------------------- *)
 let rec process1_debug (_ttenv : ttenv) (tc : tcenv1) =
   FApi.tcenv_of_tcenv1 tc
 
@@ -49,7 +69,9 @@ and process1_idtac (_ : ttenv) (msg : string option) (tc : tcenv1) =
   EcLowGoal.t_id tc
 
 (* -------------------------------------------------------------------- *)
-and process1_case (_ : ttenv) gp (tc : tcenv1) =
+and process1_case (_ : ttenv) (opts, gp) (tc : tcenv1) =
+  let opts = CaseOptions.merge CaseOptions.default opts in
+
   let form_of_gp () =
     match gp with
     | [`Form (occ, pf)] -> begin
@@ -61,11 +83,11 @@ and process1_case (_ : ttenv) gp (tc : tcenv1) =
     | _ -> tc_error !!tc "must give exactly one boolean formula"
   in
     match (FApi.tc1_goal tc).f_node with
-    | FbdHoareS _ | FhoareS _ ->
+    | FbdHoareS _ | FhoareS _ when not opts.cod_ambient ->
         let fp = TTC.tc1_process_phl_formula tc (form_of_gp ()) in
         EcPhlCase.t_hl_case fp tc
 
-    | FequivS _ ->
+    | FequivS _ when not opts.cod_ambient ->
         let fp = TTC.tc1_process_prhl_formula tc (form_of_gp ()) in
         EcPhlCase.t_equiv_case fp tc
 
