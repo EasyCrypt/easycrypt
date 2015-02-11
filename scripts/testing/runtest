@@ -71,13 +71,6 @@ def _options():
         type    = 'int',
         help    = 'set the timeout option to pass to EasyCrypt')
 
-    parser.add_option(
-        '', '--weak-check',
-        action  = 'store_true',
-        default = False,
-        dest    = 'weakcheck',
-        help    = 'start EasyCrypt in weak-check mode')
-
     (cmdopt, args) = parser.parse_args()
 
     if len(args) < 1:
@@ -90,7 +83,6 @@ def _options():
     options = Object(scenarios = dict())
     options.xunit     = cmdopt.xunit
     options.timeout   = cmdopt.timeout
-    options.weakcheck = cmdopt.weakcheck
 
     defaults = dict(args = '', exclude = '', okdirs = '', kodirs = '')
 
@@ -117,11 +109,6 @@ def _options():
         scenario.okdirs  = config.get(test, 'okdirs')
         scenario.kodirs  = config.get(test, 'kodirs')
         scenario.exclude = config.get(test, 'exclude').split()
-        if config.has_option(test, 'cpufactor'):
-            scenario.cpufactor = config.get(test, 'cpufactor').split()
-            scenario.cpufactor = dict(map(_parse_timeout, scenario.cpufactor))
-        else:
-            scenario.cpufactor = dict()
         options.scenarios[test[5:]] = scenario
 
     for x in options.targets:
@@ -195,12 +182,8 @@ def _run_test(config, options):
     timestamp = time.time()
     try:
         command = [options.bin] + options.args + config.args
-        if options.weakcheck:
-            command.append('-weak-check')
         if options.timeout:
             command.extend(['-timeout', str(options.timeout)])
-        if config.tfactor:
-            command.extend(['-cpu-factor', str(config.tfactor)])
         command.extend([config.filename])
 
         logging.info('command: %r' % (command,))
@@ -252,7 +235,6 @@ def _main():
             return Object(isvalid  = obj.valid,
                           group    = obj.src,
                           args     = obj.args,
-                          tfactor  = scenario.cpufactor.get(fullname, None),
                           filename = fullname)
 
         return [config(x) for x in scripts]
