@@ -36,7 +36,7 @@ ECJOBS    ?= 1
 CHECK     := scripts/testing/runtest
 CHECK     += --bin-args="$(ECARGS)" --timeout="$(ECTOUT)" --jobs="$(ECJOBS)"
 CHECK     += config/tests.config
-CHECKCATS ?= prelude core theories encryption newth realized
+CHECKCATS ?= prelude core theories encryption newth realized unit
 
 # --------------------------------------------------------------------
 .PHONY: all build byte native tests check check-xunit examples
