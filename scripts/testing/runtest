@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 
 # --------------------------------------------------------------------
 import sys, os, errno, re, glob, shutil, itertools, logging
@@ -44,7 +44,7 @@ def rcolor(txt, b):
 
 # --------------------------------------------------------------------
 def _options():
-    import ConfigParser as cp
+    import configparser as cp
     from optparse import OptionParser
 
     parser = OptionParser()
@@ -71,6 +71,14 @@ def _options():
         type    = 'int',
         help    = 'set the timeout option to pass to EasyCrypt')
 
+    parser.add_option(
+        '', '--jobs',
+        action  = 'store',
+        default = 1,
+        metavar = 'JOBS',
+        type    = 'int',
+        help    = 'number of maximum parallel test jobs')
+
     (cmdopt, args) = parser.parse_args()
 
     if len(args) < 1:
@@ -80,9 +88,17 @@ def _options():
         if cmdopt.timeout <= 0:
             parser.error('timeout must be positive')
 
+    if cmdopt.jobs <= 0:
+        parse.error('jobs must be positive')
+
+    if cmdopt.jobs > 1:
+        if sys.version_info < (3, 2, 0):
+            parse.error('incompatible options: python <3.2 && jobs >1')
+
     options = Object(scenarios = dict())
-    options.xunit     = cmdopt.xunit
-    options.timeout   = cmdopt.timeout
+    options.xunit   = cmdopt.xunit
+    options.timeout = cmdopt.timeout
+    options.jobs    = cmdopt.jobs
 
     defaults = dict(args = '', exclude = '', okdirs = '', kodirs = '')
 
@@ -195,7 +211,7 @@ def _run_test(config, options):
         finally:
             try   : sp.kill()
             except: pass
-    except OSError, e:
+    except OSError as e:
         logging.error("cannot run `%s': %s" % (options.bin, e))
         exit (1)
     timestamp = time.time() - timestamp
@@ -214,24 +230,28 @@ def _main():
     # ------------------------------------------------------------------
     options = _options()
 
+    logfmt = '%(asctime)-15s - %(levelname)s - %(message)s'
+    if options.jobs > 1:
+        logfmt = '%s %s' % ('[%(threadName)s]', logfmt)
+        
     logging.basicConfig(
         stream = sys.stderr,
         level  = logging.DEBUG,
-        format = '%(asctime)-15s - %(levelname)s - %(message)s')
+        format = logfmt)
 
     # ------------------------------------------------------------------
     def gather(obj, scenario):
         logging.debug("gathering scripts in `%s'" % (obj.src,))
         try:
             scripts = os.listdir(obj.src)
-        except OSError, e:
+        except OSError as e:
             logging.warning("cannot scan `%s': %s" % (obj.src, e))
             return []
         scripts = sorted([x for x in scripts if x.endswith('.ec')])
         logging.debug("%.4d script(s) found in `%s'" % (len(scripts), obj.src))
 
         def config(filename):
-            fullname = os.path.normpath(os.path.join(obj.src, x))
+            fullname = os.path.normpath(os.path.join(obj.src, filename))
             return Object(isvalid  = obj.valid,
                           group    = obj.src,
                           args     = obj.args,
@@ -271,8 +291,17 @@ def _main():
     mainconfig.hostname  = socket.gethostname()
     mainconfig.timestamp = datetime.datetime.utcnow()
 
-    for config in allscripts:
-        result.append(_run_test(config, options))
+    if options.jobs > 1:
+        import concurrent.futures as futures
+
+    if options.jobs > 1:
+        with futures.ThreadPoolExecutor(options.jobs) as executor:
+            result = list(executor.map(
+                lambda config : _run_test(config, options),
+                allscripts))
+    else:
+        for config in allscripts:
+            result.append(_run_test(config, options))
 
     errors = [x for x in result if not x.success]
     nerrs  = len(errors)

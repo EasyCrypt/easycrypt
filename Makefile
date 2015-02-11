@@ -32,8 +32,9 @@ SYSDIR := $(LIBDIR)/system
 XUNITOUT  ?= xunit.xml
 ECARGS    ?=
 ECTOUT    ?= 5
+ECJOBS    ?= 1
 CHECK     := scripts/testing/runtest
-CHECK     += --bin-args="$(ECARGS)" --timeout="$(ECTOUT)"
+CHECK     += --bin-args="$(ECARGS)" --timeout="$(ECTOUT)" --jobs="$(ECJOBS)"
 CHECK     += config/tests.config
 CHECKCATS ?= prelude core theories encryption newth realized
 
