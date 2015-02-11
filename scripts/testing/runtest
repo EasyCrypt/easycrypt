@@ -144,7 +144,7 @@ def _xunit_dump(config, results):
         grouped.setdefault(result.config.group, []).append(result)
 
     root = E.Element('testsuites')
-    for gname, group in grouped.iteritems():
+    for gname, group in grouped.items():
         ok = [x for x in group if     x.success]
         ko = [x for x in group if not x.success]
 
@@ -286,7 +286,6 @@ def _main():
 
     # --------------------------------------------------------------------
     mainconfig = Object()
-    result = []
 
     mainconfig.hostname  = socket.gethostname()
     mainconfig.timestamp = datetime.datetime.utcnow()
@@ -300,6 +299,7 @@ def _main():
                 lambda config : _run_test(config, options),
                 allscripts))
     else:
+        result = []
         for config in allscripts:
             result.append(_run_test(config, options))
 
@@ -315,7 +315,8 @@ def _main():
         logging.critical("some tests did NOT pass")
 
     if options.xunit is not None:
-        open(options.xunit, 'wb').write(_xunit_dump(mainconfig, result))
+        open(options.xunit, 'wb') \
+            .write(bytes(_xunit_dump(mainconfig, result), 'utf-8'))
 
     exit (2 if errors else 0)
 
