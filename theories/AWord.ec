@@ -47,7 +47,6 @@ qed.
 
 (** View bitstring as a ring *)
 require (*--*) Ring.
-(*---*) import Ring.BoolRing.
 
 instance bring with word
   op rzero = zeros
