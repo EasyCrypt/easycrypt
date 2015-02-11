@@ -1,6 +1,6 @@
 (* -------------------------------------------------------------------- *)
-require import Fun Int.
-require (*--*) Subtype.
+require import Fun Int IntDiv.
+require (*--*) Subtype Ring.
 
 (* -------------------------------------------------------------------- *)
 (* This abstract theory provides the construction of the ring Z/pZ.     *)
@@ -23,16 +23,80 @@ op asint  (z : zmod) = Sub.val z.
 lemma inzmodK (z : int): asint (inzmod z) = z %% p.
 proof. smt. qed.
 
-(* -------------------------------------------------------------------- *)
-op lift1 (f : int -> int) =
-  fun (z : zmod), inzmod (f (asint z)).
-
-op lift2 (f : int -> int -> int) =
-  fun (z1 z2 : zmod), inzmod (f (asint z1) (asint z2)).
+lemma asint_inj: injective asint by apply/Sub.val_inj.
 
 (* -------------------------------------------------------------------- *)
-op zero = inzmod 0.
-op one  = inzmod 1.
-op opp  = lift1 Int.([-]).
-op add  = lift2 Int.( + ).
-op mul  = lift2 Int.( * ).
+op zero      = inzmod 0.
+op one       = inzmod 1.
+op [ - ] x   = inzmod (- asint x).
+op ( + ) x y = inzmod (asint x + asint y).
+op ( * ) x y = inzmod (asint x * asint y).
+
+(* -------------------------------------------------------------------- *)
+lemma zeroE: asint Top.zero = 0.
+proof. by rewrite /zero inzmodK mod0z. qed.
+
+lemma oneE: asint Top.one = 1.
+proof. by rewrite /one inzmodK modz_small; smt. qed.
+
+lemma oppE (x : zmod): asint (-x) = (- (asint x)) %% p.
+proof. by rewrite /[-] /inzmod /asint /= Sub.insubdK; smt. qed.
+
+lemma addE (x y : zmod): asint (x + y) = (asint x + asint y) %% p.
+proof. by rewrite /(+) /inzmod /asint /= Sub.insubdK; smt. qed.
+
+lemma mulE (x y : zmod): asint (x * y) = (asint x * asint y) %% p.
+proof. rewrite /( * ) /inzmod /asint /= Sub.insubdK; smt. qed.
+
+(* -------------------------------------------------------------------- *)
+theory ZModule.
+  lemma addrA (x y z : zmod): x + (y + z) = (x + y) + z.
+  proof. by apply/asint_inj; rewrite !addE modzDl modzDr addzA. qed.
+
+  lemma addrC (x y : zmod): x + y = y + x.
+  proof. by apply/asint_inj; rewrite !addE addzC. qed.
+
+  lemma add0r (x : zmod): Top.zero + x = x.
+  proof. by apply/asint_inj; rewrite !(addE, zeroE) add0z smt. qed.
+
+  lemma addNr (x : zmod): (-x) + x = Top.zero.
+  proof.
+    apply/asint_inj; rewrite !(zeroE, addE, oppE).
+    by rewrite modzDl addNz mod0z.
+  qed.
+end ZModule.
+
+(* -------------------------------------------------------------------- *)
+clone Ring.ZModule as ZModpZMod with
+  type t     <- zmod,
+  op   zeror <- Top.zero,
+  op   (+)   <- Top.( + ),
+  op   [-]   <- Top.([-]),
+  op   (-)   <- fun (x y : zmod), x + (-y)
+  proof *.
+
+realize addrA. proof. by apply/ZModule.addrA. qed.
+realize addrC. proof. by apply/ZModule.addrC. qed.
+realize add0r. proof. by apply/ZModule.add0r. qed.
+realize addNr. proof. by apply/ZModule.addNr. qed.
+realize subrE. proof. by []. qed.
+
+(* -------------------------------------------------------------------- *)
+theory ComRing.
+  lemma oner_neq0 : Top.one <> Top.zero by smt.
+
+  lemma mulrA (x y z : zmod): x * (y * z) = (x * y) * z.
+  proof. by apply/asint_inj; rewrite !mulE modzMl modzMr mulzA. qed.
+
+  lemma mulrC (x y : zmod): x * y = y * x.
+  proof. by apply/asint_inj; rewrite !mulE mulzC. qed.
+
+  lemma mul1r (x : zmod): Top.one * x = x.
+  proof. by apply/asint_inj; rewrite !(mulE, oneE) mul1z smt. qed.
+
+  lemma mulrDl (x y z : zmod): (x + y) * z = (x * z) + (y * z).
+  proof.
+    apply/asint_inj; rewrite !(addE, mulE).
+    by rewrite !(modzMl, modzMr, modzDl, modzDr) mulzDl.
+  qed.
+end ComRing.
