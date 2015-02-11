@@ -33,10 +33,10 @@ op ( + ) x y = inzmod (asint x + asint y).
 op ( * ) x y = inzmod (asint x * asint y).
 
 (* -------------------------------------------------------------------- *)
-lemma zeroE: asint Top.zero = 0.
+lemma zeroE: asint Self.zero = 0.
 proof. by rewrite /zero inzmodK mod0z. qed.
 
-lemma oneE: asint Top.one = 1.
+lemma oneE: asint Self.one = 1.
 proof. by rewrite /one inzmodK modz_small; smt. qed.
 
 lemma oppE (x : zmod): asint (-x) = (- (asint x)) %% p.
@@ -56,10 +56,10 @@ theory ZModule.
   lemma addrC (x y : zmod): x + y = y + x.
   proof. by apply/asint_inj; rewrite !addE addzC. qed.
 
-  lemma add0r (x : zmod): Top.zero + x = x.
+  lemma add0r (x : zmod): Self.zero + x = x.
   proof. by apply/asint_inj; rewrite !(addE, zeroE) add0z smt. qed.
 
-  lemma addNr (x : zmod): (-x) + x = Top.zero.
+  lemma addNr (x : zmod): (-x) + x = Self.zero.
   proof.
     apply/asint_inj; rewrite !(zeroE, addE, oppE).
     by rewrite modzDl addNz mod0z.
@@ -69,9 +69,9 @@ end ZModule.
 (* -------------------------------------------------------------------- *)
 clone Ring.ZModule as ZModpZMod with
   type t     <- zmod,
-  op   zeror <- Top.zero,
-  op   (+)   <- Top.( + ),
-  op   [-]   <- Top.([-]),
+  op   zeror <- Self.zero,
+  op   (+)   <- Self.( + ),
+  op   [-]   <- Self.([-]),
   op   (-)   <- fun (x y : zmod), x + (-y)
   proof *.
 
@@ -83,7 +83,7 @@ realize subrE. proof. by []. qed.
 
 (* -------------------------------------------------------------------- *)
 theory ComRing.
-  lemma oner_neq0 : Top.one <> Top.zero by smt.
+  lemma oner_neq0 : Self.one <> Self.zero by smt.
 
   lemma mulrA (x y z : zmod): x * (y * z) = (x * y) * z.
   proof. by apply/asint_inj; rewrite !mulE modzMl modzMr mulzA. qed.
@@ -91,7 +91,7 @@ theory ComRing.
   lemma mulrC (x y : zmod): x * y = y * x.
   proof. by apply/asint_inj; rewrite !mulE mulzC. qed.
 
-  lemma mul1r (x : zmod): Top.one * x = x.
+  lemma mul1r (x : zmod): Self.one * x = x.
   proof. by apply/asint_inj; rewrite !(mulE, oneE) mul1z smt. qed.
 
   lemma mulrDl (x y z : zmod): (x + y) * z = (x * z) + (y * z).
