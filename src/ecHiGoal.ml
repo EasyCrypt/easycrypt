@@ -294,9 +294,12 @@ let process_delta (s, o, p) tc =
   | PFident ({ pl_desc = ([], x) }, None)
       when s = `LtoR && EcUtils.is_none o ->
 
-    let check = fun p -> sym_equal (EcPath.basename p) x in
+    let check_op = fun p -> sym_equal (EcPath.basename p) x in
+    let check_id = fun y -> sym_equal (EcIdent.name y) x in
     let concl = EcReduction.simplify
-      { EcReduction.no_red with EcReduction.delta_p = check }
+      { EcReduction.no_red with
+          EcReduction.delta_p = check_op;
+          EcReduction.delta_h = check_id; }
       hyps concl
 
     in FApi.tcenv_of_tcenv1 (t_change concl tc)
