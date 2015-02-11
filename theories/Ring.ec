@@ -168,7 +168,7 @@ realize addNr. by smt. qed.
 realize subrE. by do 2! (apply/ExtEq.fun_ext=> _); smt. qed.
 
 (* -------------------------------------------------------------------- *)
-theory abstract ComRing.
+abstract theory ComRing.
   type t.
 
   clone export ZModule with type t <- t.
@@ -205,7 +205,7 @@ theory abstract ComRing.
 end ComRing.
 
 (* -------------------------------------------------------------------- *)
-theory abstract BoolRing.
+abstract theory BoolRing.
   type t.
 
   clone export ComRing with type t <- t.
@@ -220,7 +220,7 @@ theory abstract BoolRing.
 end BoolRing.
 
 (* -------------------------------------------------------------------- *)
-theory abstract IDomain.
+abstract theory IDomain.
   type t.
 
   clone export ComRing with type t <- t.
@@ -233,7 +233,7 @@ theory abstract IDomain.
 end IDomain.
 
 (* -------------------------------------------------------------------- *)
-theory abstract Field.
+abstract theory Field.
   type t.
 
   clone export IDomain with type t <- t.
