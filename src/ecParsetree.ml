@@ -542,16 +542,17 @@ type tfocus  = (tfocus1 list option) pair
 type rwarg = (tfocus located) option * rwarg1
 
 and rwarg1 =
-  | RWDelta of (rwside * trepeat option * rwocc * pformula)
-  | RWRw    of (rwside * trepeat option * rwocc * (rwside * ppterm) list)
+  | RWDelta of (rwoptions * pformula)
+  | RWRw    of (rwoptions * (rwside * ppterm) list)
   | RWPr    of (psymbol * pformula option)
   | RWDone  of bool
   | RWSimpl
   | RWSmt
 
-and rwside = [`LtoR | `RtoL]
-and rwocc  = (rwocci * Sint.t) option
-and rwocci = [`Inclusive | `Exclusive]
+and rwoptions = rwside * trepeat option * rwocc
+and rwside    = [`LtoR | `RtoL]
+and rwocc     = (rwocci * Sint.t) option
+and rwocci    = [`Inclusive | `Exclusive]
 
 (* -------------------------------------------------------------------- *)
 type intropattern1 =

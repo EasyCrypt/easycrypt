@@ -187,8 +187,8 @@ end
 (* -------------------------------------------------------------------- *)
 type reduction_info = {
   beta    : bool;
-  delta_p : Sp.t option;
-  delta_h : Sid.t option;
+  delta_p : (path  -> bool);
+  delta_h : (ident -> bool);
   zeta    : bool;
   iota    : bool;
   logic   : bool;
@@ -197,8 +197,8 @@ type reduction_info = {
 
 let full_red = {
   beta    = true;
-  delta_p = None;
-  delta_h = None;
+  delta_p = EcUtils.predT;
+  delta_h = EcUtils.predT;
   zeta    = true;
   iota    = true;
   logic   = true;
@@ -207,30 +207,31 @@ let full_red = {
 
 let no_red = {
   beta    = false;
-  delta_p = Some Sp.empty;
-  delta_h = Some Sid.empty;
+  delta_p = EcUtils.pred0;
+  delta_h = EcUtils.pred0;
   zeta    = false;
   iota    = false;
   logic   = false;
   modpath = false;
 }
 
-let beta_red = { no_red with beta = true }
-let betaiota_red = { no_red with beta = true; iota = true }
+let beta_red     = { no_red with beta = true; }
+let betaiota_red = { no_red with beta = true; iota = true; }
+
 let nodelta =
-  { full_red with delta_h = Some Mid.empty;
-    delta_p = Some EcPath.Mp.empty }
+  { full_red with
+      delta_h = EcUtils.pred0;
+      delta_p = EcUtils.pred0; }
+
 let reduce_local ri hyps x  =
-  match ri.delta_h with
-  | None -> LDecl.reduce_var x hyps
-  | Some s when Sid.mem x s -> LDecl.reduce_var x hyps
-  | _ -> raise NotReducible
+  if   ri.delta_h x
+  then LDecl.reduce_var x hyps
+  else raise NotReducible
 
 let reduce_op ri env p tys =
-  match ri.delta_p with
-  | None -> Op.reduce env p tys
-  | Some s when Sp.mem p s -> Op.reduce env p tys
-  | _ -> raise NotReducible
+  if   ri.delta_p p
+  then Op.reduce env p tys
+  else raise NotReducible
 
 let is_record env f =
   match EcFol.destr_app f with

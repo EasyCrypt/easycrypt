@@ -20,9 +20,9 @@ open EcCoreGoal
 open EcCoreGoal.FApi
 open EcLowGoal
 
-module Sid = EcIdent.Sid
-module Mid = EcIdent.Mid
-module Sp  = EcPath.Sp
+module Sid  = EcIdent.Sid
+module Mid  = EcIdent.Mid
+module Sp   = EcPath.Sp
 
 module ER  = EcReduction
 module PT  = EcProofTerm
@@ -114,8 +114,8 @@ let process_simplify ri (tc : tcenv1) =
   let delta_p, delta_h =
     ri.pdelta
       |> omap (List.fold_left do1 (Sp.empty, Sid.empty))
-      |> omap (fun (x, y) -> (Some x, Some y))
-      |> odfl (None, None)
+      |> omap (fun (x, y) -> (Sp.mem^~ x, Sid.mem^~ y))
+      |> odfl (predT, predT)
   in
 
   let ri = {
@@ -290,6 +290,20 @@ let process_rewrite1_core (s, o) pt tc =
 let process_delta (s, o, p) tc =
   let env, hyps, concl = FApi.tc1_eflat tc in
 
+  match unloc p with
+  | PFident ({ pl_desc = ([], x) }, None)
+      when s = `LtoR && EcUtils.is_none o ->
+
+    let check = fun p -> sym_equal (EcPath.basename p) x in
+    let concl = EcReduction.simplify
+      { EcReduction.no_red with EcReduction.delta_p = check }
+      hyps concl
+
+    in FApi.tcenv_of_tcenv1 (t_change concl tc)
+
+  | _ ->
+
+  (* Continue with matching based unfolding *)
   let (ptenv, p) =
     let (ps, ue), p = TTC.tc1_process_pattern tc p in
     let ev = MEV.of_idents (Mid.keys ps) `Form in
@@ -413,7 +427,7 @@ let rec process_rewrite1 ttenv ri tc =
   | RWSimpl ->
       t_simplify ~delta:false tc
 
-  | RWDelta (s, r, o, p) -> begin
+  | RWDelta ((s, r, o), p) -> begin
       let do1 tc = process_delta (s, o, p) tc in
 
       match r with
@@ -421,7 +435,7 @@ let rec process_rewrite1 ttenv ri tc =
       | Some (b, n) -> t_do b n do1 tc
   end
 
-  | RWRw ((s : rwside), r, o, pts) -> begin
+  | RWRw (((s : rwside), r, o), pts) -> begin
       let do1 ((subs : rwside), pt) tc =
         let theside =
           match s, subs with

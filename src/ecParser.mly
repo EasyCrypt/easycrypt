@@ -1720,10 +1720,10 @@ rwarg1:
    { RWSimpl }
 
 | s=rwside r=rwrepeat? o=rwocc? fp=rwpterms
-   { RWRw (s, r, o |> omap (snd_map EcMaps.Sint.of_list), fp) }
+   { RWRw ((s, r, o |> omap (snd_map EcMaps.Sint.of_list)), fp) }
 
 | s=rwside r=rwrepeat? o=rwocc? SLASH x=sform_h %prec prec_tactic
-   { RWDelta (s, r, o |> omap (snd_map EcMaps.Sint.of_list), x); }
+   { RWDelta ((s, r, o |> omap (snd_map EcMaps.Sint.of_list)), x); }
 
 | PR s=bracket(rwpr_arg)
    { RWPr s }

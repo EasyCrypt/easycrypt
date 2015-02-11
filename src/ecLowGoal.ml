@@ -1138,18 +1138,18 @@ module LowSubst = struct
 
     (* Substitution of logical variables *)
     | Some ((`Local x, f) as aout) ->
-      let f = simplify { no_red with delta_h = None } hyps f in
+      let f = simplify { no_red with delta_h = predT } hyps f in
       if Mid.mem x f.f_fv then None else Some aout
 
     (* Substitution of program variables *)
     | Some ((`PVar (pv, m), f) as aout) ->
-        let f  = simplify { no_red with delta_h = None } hyps f in
+        let f  = simplify { no_red with delta_h = predT } hyps f in
         let fv = EcPV.PV.fv env m f in
         if EcPV.PV.mem_pv env pv fv then None else Some aout
 
     (* Substitution of globs *)
     | Some ((`Glob (mp, m), f) as aout) ->
-        let f  = simplify { no_red with delta_h = None } hyps f in
+        let f  = simplify { no_red with delta_h = predT } hyps f in
         let fv = EcPV.PV.fv env m f in
         if EcPV.PV.mem_glob env mp fv then None else Some aout
 

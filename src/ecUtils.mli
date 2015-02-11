@@ -20,6 +20,9 @@ val try_finally : (unit -> 'a) -> (unit -> unit) -> 'a
 (* -------------------------------------------------------------------- *)
 val identity : 'a -> 'a
 
+val pred0: 'a -> bool
+val predT: 'a -> bool
+
 val (^~) : ('a -> 'b -> 'c) -> ('b -> 'a -> 'c)
 val (-|) : ('a -> 'b) -> ('c -> 'a) -> 'c -> 'b
 val (|-) : ('a -> 'b) -> ('c -> 'a) -> 'c -> 'b

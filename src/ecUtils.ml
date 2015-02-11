@@ -36,6 +36,9 @@ let try_finally (body : unit -> 'a) (cleanup : unit -> unit) =
 
 let identity x = x
 
+let pred0 (_ : 'a) = false
+let predT (_ : 'a) = true
+
 let (^~) f = fun x y -> f y x
 
 let (-|) f g = fun x -> f (g x)

@@ -29,12 +29,12 @@ val is_alpha_eq : LDecl.hyps -> form -> form -> bool
 (* -------------------------------------------------------------------- *)
 type reduction_info = {
   beta    : bool;
-  delta_p : Sp.t option;          (* None means all *)
-  delta_h : Sid.t option;         (* None means all *)
-  zeta    : bool;                 (* reduce let  *)
-  iota    : bool;                 (* reduce case *)
-  logic   : bool;                 (* perform logical simplification *)
-  modpath : bool;                 (* reduce module path *)
+  delta_p : (path  -> bool); (* None means all *)
+  delta_h : (ident -> bool); (* None means all *)
+  zeta    : bool;            (* reduce let  *)
+  iota    : bool;            (* reduce case *)
+  logic   : bool;            (* perform logical simplification *)
+  modpath : bool;            (* reduce module path *)
 }
 
 val full_red     : reduction_info

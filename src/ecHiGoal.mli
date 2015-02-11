@@ -72,6 +72,7 @@ val process_generalize  : genpattern list -> backward
 val process_clear       : psymbol list -> backward
 val process_smt         : ttenv -> smtinfo -> backward
 val process_apply       : implicits:bool -> apply_t -> backward
+val process_delta       : (rwside * EcMatching.occ option * pformula) -> backward
 val process_rewrite     : ttenv -> (focus_t located option * rwarg1) list -> backward
 val process_subst       : pformula list -> backward
 val process_cut         : engine -> cut_t -> backward
