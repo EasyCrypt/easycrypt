@@ -17,13 +17,13 @@ module Mx  = EcPath.Mx
 type pragma = {
   pm_verbose : bool; (* true  => display goal after each command *)
   pm_g_prall : bool; (* true  => display all open goals *)
-  pm_check   : bool; (* false => don't check proof scripts *)
+  pm_check   : [`Check | `WeakCheck | `Report];
 }
 
 let pragma = ref {
-  pm_verbose = true ;
-  pm_g_prall = false;
-  pm_check   = true ;
+  pm_verbose = true  ;
+  pm_g_prall = false ;
+  pm_check   = `Check;
 }
 
 let pragma_verbose (b : bool) =
@@ -32,14 +32,18 @@ let pragma_verbose (b : bool) =
 let pragma_g_prall (b : bool) =
   pragma := {!pragma with pm_g_prall = b; }
 
-let pragma_check (b : bool) =
-  pragma := { !pragma with pm_check = b; }
+let pragma_check mode =
+  pragma := { !pragma with pm_check = mode; }
 
 module Pragmas = struct
-  let silent   = "silent"
-  let verbose  = "verbose"
-  let check    = "check"
-  let nocheck  = "nocheck"
+  let silent     = "silent"
+  let verbose    = "verbose"
+
+  module Proofs = struct
+    let check  = "Proofs:check"
+    let weak   = "Proofs:weak"
+    let report = "Proofs:report"
+  end
 
   module Goals = struct
     let printall = "Goals:printall"
@@ -53,8 +57,9 @@ let apply_pragma (x : string) =
   match x with
   | x when x = Pragmas.silent         -> pragma_verbose false
   | x when x = Pragmas.verbose        -> pragma_verbose true
-  | x when x = Pragmas.nocheck        -> pragma_check   false
-  | x when x = Pragmas.check          -> pragma_check   true
+  | x when x = Pragmas.Proofs.check   -> pragma_check   `Check
+  | x when x = Pragmas.Proofs.weak    -> pragma_check   `WeakCheck
+  | x when x = Pragmas.Proofs.report  -> pragma_check   `Report
   | x when x = Pragmas.Goals.printone -> pragma_g_prall false
   | x when x = Pragmas.Goals.printall -> pragma_g_prall true
 
@@ -337,9 +342,7 @@ and process_typeclass (scope : EcScope.scope) (tcd : ptypeclass located) =
 (* -------------------------------------------------------------------- *)
 and process_tycinst (scope : EcScope.scope) (tci : ptycinstance located) =
   EcScope.check_state `InTop "type class instance" scope;
-  let mode = if (!pragma).pm_check then `Check else `WeakCheck in
-  let scope = EcScope.Ty.add_instance scope mode tci in
-    scope
+  EcScope.Ty.add_instance scope (!pragma).pm_check tci
 
 (* -------------------------------------------------------------------- *)
 and process_module (scope : EcScope.scope) m =
@@ -386,8 +389,7 @@ and process_choice (scope : EcScope.scope) (c : pchoice located) =
 (* -------------------------------------------------------------------- *)
 and process_axiom (scope : EcScope.scope) (ax : paxiom located) =
   EcScope.check_state `InTop "axiom" scope;
-  let mode = if (!pragma).pm_check then `Check else `WeakCheck in
-  let (name, scope) = EcScope.Ax.add scope mode ax in
+  let (name, scope) = EcScope.Ax.add scope (!pragma).pm_check ax in
     name |> EcUtils.oiter
       (fun x ->
          match (unloc ax).pa_kind with
@@ -462,8 +464,7 @@ and process_th_export (scope : EcScope.scope) name =
 (* -------------------------------------------------------------------- *)
 and process_th_clone (scope : EcScope.scope) (thcl, io) =
   EcScope.check_state `InTop "theory cloning" scope;
-  let mode = if (!pragma).pm_check then `Check else `WeakCheck in
-  let (name, scope) = EcScope.Cloning.clone scope mode thcl in
+  let (name, scope) = EcScope.Cloning.clone scope (!pragma).pm_check thcl in
     match io with
     | None         -> scope
     | Some `Export -> process_th_export scope ([], name)
@@ -486,8 +487,7 @@ and process_sct_close (scope : EcScope.scope) name =
 
 (* -------------------------------------------------------------------- *)
 and process_tactics (scope : EcScope.scope) t =
-  let mode = if (!pragma.pm_check) then `Check else `WeakCheck in
-
+  let mode = !pragma.pm_check in
   match t with
   | `Actual t  -> EcScope.Tactics.process scope mode t
   | `Proof  pm -> EcScope.Tactics.proof   scope mode pm.pm_strict
@@ -513,15 +513,16 @@ and process_pragma (scope : EcScope.scope) opt =
   let pragma_check mode =
     match EcScope.goal scope with
     | Some { EcScope.puc_mode = Some false } ->
-        EcScope.hierror "pragma [check|nocheck] in non-strict proof script";
+        EcScope.hierror "pragma [Proofs:*] in non-strict proof script";
     | _ -> pragma_check mode
   in
 
   match unloc opt with
   | x when x = Pragmas.silent         -> pragma_verbose false
   | x when x = Pragmas.verbose        -> pragma_verbose true
-  | x when x = Pragmas.nocheck        -> pragma_check   false
-  | x when x = Pragmas.check          -> pragma_check   true
+  | x when x = Pragmas.Proofs.weak    -> pragma_check   `WeakCheck
+  | x when x = Pragmas.Proofs.check   -> pragma_check   `Check
+  | x when x = Pragmas.Proofs.report  -> pragma_check   `Report
   | x when x = Pragmas.Goals.printall -> pragma_g_prall true
   | x when x = Pragmas.Goals.printone -> pragma_g_prall false
 
@@ -681,8 +682,9 @@ let uuid () : int =
 (* -------------------------------------------------------------------- *)
 let mode () : string =
   match (!pragma).pm_check with
-  | true  -> "check"
-  | false -> "nocheck"
+  | `Check     -> "check"
+  | `WeakCheck -> "weakcheck"
+  | `Report    -> "report"
 
 (* -------------------------------------------------------------------- *)
 let undo (olduuid : int) =

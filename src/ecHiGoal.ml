@@ -33,7 +33,7 @@ module LG  = EcCoreLib.CI_Logic
 (* -------------------------------------------------------------------- *)
 type ttenv = {
   tt_provers   : EcParsetree.pprover_infos -> EcProvers.prover_infos;
-  tt_smtmode   : [`Admit | `Strict | `Standard];
+  tt_smtmode   : [`Admit | `Strict | `Standard | `Report];
   tt_implicits : bool;
 }
 
@@ -164,15 +164,20 @@ let process_dbhint pf env db =
 (* -------------------------------------------------------------------- *)
 type smtinfo = pdbhint option * pprover_infos
 
-let process_smt (ttenv : ttenv) (db, pi) (tc : tcenv1) =
+let process_smt ?loc (ttenv : ttenv) (db, pi) (tc : tcenv1) =
   let env = FApi.tc1_env tc in
   let db  = process_dbhint !!tc env db in
   let pi  = ttenv.tt_provers pi in
 
   match ttenv.tt_smtmode with
-  | `Admit    -> t_admit tc
-  | `Standard -> t_seq (t_simplify ~delta:false) (t_smt ~strict:false db pi) tc
-  | `Strict   -> t_seq (t_simplify ~delta:false) (t_smt ~strict:true  db pi) tc
+  | `Admit ->
+      t_admit tc
+
+  | (`Standard | `Strict) as mode ->
+      t_seq (t_simplify ~delta:false) (t_smt ~mode db pi) tc
+
+  | `Report ->
+      t_seq (t_simplify ~delta:false) (t_smt ~mode:(`Report loc) db pi) tc
 
 (* -------------------------------------------------------------------- *)
 let process_clear symbols tc =
@@ -422,7 +427,7 @@ let process_delta (s, o, p) tc =
 
 (* -------------------------------------------------------------------- *)
 let rec process_rewrite1 ttenv ri tc =
-  match ri with
+  match unloc ri with
   | RWDone b ->
       let tt = if b then t_simplify ~delta:false else t_id in
       FApi.t_seq tt process_trivial tc
@@ -475,7 +480,7 @@ let rec process_rewrite1 ttenv ri tc =
   | RWPr (x,f) -> EcPhlPrRw.t_pr_rewrite (unloc x, f) tc
 
   | RWSmt ->
-      process_smt ttenv (None, empty_pprover) tc
+      process_smt ~loc:ri.pl_loc ttenv (None, empty_pprover) tc
 
 (* -------------------------------------------------------------------- *)
 let process_rewrite ttenv ri tc =

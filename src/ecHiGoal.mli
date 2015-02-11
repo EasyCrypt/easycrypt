@@ -15,7 +15,7 @@ open EcProofTerm
 (* -------------------------------------------------------------------- *)
 type ttenv = {
   tt_provers   : EcParsetree.pprover_infos -> EcProvers.prover_infos;
-  tt_smtmode   : [`Admit | `Strict | `Standard];
+  tt_smtmode   : [`Admit | `Strict | `Standard | `Report];
   tt_implicits : bool;
 }
 
@@ -70,10 +70,10 @@ val process_intros      : ?cf:bool -> intropattern -> backward
 val process_mintros     : ?cf:bool -> intropattern -> tactical
 val process_generalize  : genpattern list -> backward
 val process_clear       : psymbol list -> backward
-val process_smt         : ttenv -> smtinfo -> backward
+val process_smt         : ?loc:EcLocation.t -> ttenv -> smtinfo -> backward
 val process_apply       : implicits:bool -> apply_t -> backward
 val process_delta       : (rwside * EcMatching.occ option * pformula) -> backward
-val process_rewrite     : ttenv -> (focus_t located option * rwarg1) list -> backward
+val process_rewrite     : ttenv -> rwarg list -> backward
 val process_subst       : pformula list -> backward
 val process_cut         : engine -> cut_t -> backward
 val process_cutdef      : cutdef_t -> backward

@@ -8,7 +8,7 @@ open EcMaps
 
 (* -------------------------------------------------------------------- *)
 type nid_t    = EcUid.uid
-type loglevel = [`Debug | `Info | `Warning]
+type loglevel = [`Debug | `Info | `Warning | `Critical]
 
 type notifier = {
   nt_id : nid_t;
@@ -64,18 +64,21 @@ let set_loglevel (lvl : loglevel) (gs : gstate) =
   gs.gs_loglevel <- lvl
 
 (* -------------------------------------------------------------------- *)
-let accept_log ~level ~wanted =
-  match level, wanted with
-  | `Debug  , (`Debug | `Info | `Warning) -> true
-  | `Info   , (         `Info | `Warning) -> true
-  | `Warning, (                 `Warning) -> true
-  | _       , _                           -> false
+let int_of_loglevel = function
+  | `Debug    -> 0
+  | `Info     -> 1
+  | `Warning  -> 2
+  | `Critical -> 3
+
+let accept_log ~(level:loglevel) ~(wanted:loglevel) =
+  int_of_loglevel level <= int_of_loglevel wanted
 
 (* -------------------------------------------------------------------- *)
 let string_of_loglevel = function
-  | `Debug   -> "debug"
-  | `Info    -> "info"
-  | `Warning -> "warning"
+  | `Debug    -> "debug"
+  | `Info     -> "info"
+  | `Warning  -> "warning"
+  | `Critical -> "critical"
 
 (* -------------------------------------------------------------------- *)
 let notify (lvl : loglevel) (msg : string Lazy.t) (gs : gstate) =

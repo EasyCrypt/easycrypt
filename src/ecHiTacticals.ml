@@ -59,8 +59,7 @@ and process1_try (ttenv : ttenv) (t : ptactic_core) (tc : tcenv1) =
 
 (* -------------------------------------------------------------------- *)
 and process1_admit (_ : ttenv) (tc : tcenv1) =
-  (* FIXME: use notifier *)
-  EcFortune.pick () |> oiter (fun msg -> Printf.printf "[W] %s\n%!" msg);
+  EcFortune.pick () |> oiter (EcEnv.notify (FApi.tc1_env tc) `Warning "%s");
   EcLowGoal.t_admit tc
 
 (* -------------------------------------------------------------------- *)
@@ -115,14 +114,14 @@ and process1_seq (ttenv : ttenv) (ts : ptactic list) (tc : tcenv1) =
   aux ts (tcenv_of_tcenv1 tc)
 
 (* -------------------------------------------------------------------- *)
-and process1_logic (ttenv : ttenv) (t : logtactic) (tc : tcenv1) =
+and process1_logic (ttenv : ttenv) (t : logtactic located) (tc : tcenv1) =
   let engine = process1_core ttenv in
 
   let tx =
-    match t with
+    match unloc t with
     | Preflexivity      -> process_reflexivity
     | Passumption       -> process_assumption
-    | Psmt pi           -> process_smt ttenv pi
+    | Psmt pi           -> process_smt ~loc:(loc t) ttenv pi
     | Pintro pi         -> process_intros pi
     | Psplit            -> process_split
     | Pfield st         -> process_algebra `Solve `Field st
@@ -150,9 +149,9 @@ and process1_logic (ttenv : ttenv) (t : logtactic) (tc : tcenv1) =
     tx tc
 
 (* -------------------------------------------------------------------- *)
-and process1_phl (_ : ttenv) (t : phltactic) (tc : tcenv1) =
+and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
   let (tx : tcenv1 -> tcenv) =
-    match t with
+    match unloc t with
     | Pfun `Def                 -> EcPhlFun.process_fun_def
     | Pfun (`Abs f)             -> EcPhlFun.process_fun_abs f
     | Pfun (`Upto info)         -> EcPhlFun.process_fun_upto info
@@ -273,13 +272,13 @@ and process_chain (ttenv : ttenv) (t : ptactic_chain) (tc : tcenv) =
   | Pfocus    (t, p)  -> process_focus  ttenv (t, p)  tc
 
 (* -------------------------------------------------------------------- *)
-and process_core (ttenv : ttenv) (t : ptactic_core) (tc : tcenv) =
+and process_core (ttenv : ttenv) ({ pl_loc = loc } as t : ptactic_core) (tc : tcenv) =
   let tactic =
     match unloc t with
     | Pidtac    msg         -> `One (process1_idtac    ttenv msg)
     | Padmit                -> `One (process1_admit    ttenv)
-    | Plogic    t           -> `One (process1_logic    ttenv t)
-    | PPhl      t           -> `One (process1_phl      ttenv t)
+    | Plogic    t           -> `One (process1_logic    ttenv (mk_loc loc t))
+    | PPhl      t           -> `One (process1_phl      ttenv (mk_loc loc t))
     | Pby       t           -> `One (process1_by       ttenv t)
     | Pdo       ((b, n), t) -> `One (process1_do       ttenv (b, n) t)
     | Ptry      t           -> `One (process1_try      ttenv t)

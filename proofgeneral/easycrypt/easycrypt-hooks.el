@@ -10,8 +10,8 @@
   (interactive)
   (cond
      (easycrypt-proof-weak-mode
-        (proof-shell-invisible-cmd-get-result "pragma check"))
-     (t (proof-shell-invisible-cmd-get-result "pragma nocheck")))
+        (proof-shell-invisible-cmd-get-result "pragma Proofs:check"))
+     (t (proof-shell-invisible-cmd-get-result "pragma Proofs:weak")))
   (if
       (eq 'error proof-shell-last-output-kind)
       (message "Failed to set proof mode")))
@@ -34,7 +34,7 @@
   (let ((lastprompt (or s (error "no prompt"))))
      (when (string-match "\\[\\([0-9]+\\)|\\(\\sw+\\)\\]" lastprompt)
            (list (string-to-number (match-string 1 lastprompt))
-                 (if (equal (match-string 2 lastprompt) "nocheck") t nil)))))
+                 (if (equal (match-string 2 lastprompt) "weakcheck") t nil)))))
 
 (defun easycrypt-last-prompt-info-safe ()
   "Take from `proof-shell-last-prompt' the last information in the prompt."

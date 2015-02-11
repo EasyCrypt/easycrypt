@@ -1743,10 +1743,10 @@ rwpterm:
     { (s, f) }
 
 rwarg:
-| r=rwarg1
+| r=loc(rwarg1)
     { (None, r) }
 
-| rg=loc(tcfc) COLON r=rwarg1
+| rg=loc(tcfc) COLON r=loc(rwarg1)
     { (Some rg, r) }
 
 genpattern:

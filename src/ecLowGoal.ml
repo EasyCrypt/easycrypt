@@ -1508,9 +1508,22 @@ let t_congr (f1, f2) (args, ty) tc =
   doit (List.rev args) ty tc
 
 (* -------------------------------------------------------------------- *)
-let t_smt ~strict hints pi tc =
+type smtmode = [`Standard | `Strict | `Report of EcLocation.t option]
+
+(* -------------------------------------------------------------------- *)
+let t_smt ~(mode:smtmode) hints pi tc =
   let error () =
-    tc_error !!tc ~catchable:(not strict) "cannot prove goal" in
+    match mode with
+    | `Standard ->
+        tc_error !!tc ~catchable:true  "cannot prove goal"
+    | `Strict ->
+        tc_error !!tc ~catchable:false "cannot prove goal (strict)"
+    | `Report loc ->
+        EcEnv.notify (FApi.tc1_env tc) `Critical
+          "%s: smt call failed"
+          (loc |> omap EcLocation.tostring |> odfl "unknown");
+        t_admit tc
+  in
 
   let (_, concl) as goal = FApi.tc1_flat tc in
 

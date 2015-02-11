@@ -23,7 +23,7 @@ val setflag : string -> bool -> gstate -> unit
 
 (* --------------------------------------------------------------------- *)
 type nid_t
-type loglevel = [`Debug | `Info | `Warning]
+type loglevel = [`Debug | `Info | `Warning | `Critical]
 
 val string_of_loglevel : loglevel -> string
 

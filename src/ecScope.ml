@@ -501,7 +501,10 @@ module Tactics = struct
           | _         , `WeakCheck ->  hierror "cannot weak-check a non-strict proof script"
           | Some true , `Check     -> `Strict
           | Some false, `Check     -> `Standard
-          | _         , `Check     -> `Strict
+          | None      , `Check     -> `Strict
+          | Some true , `Report    -> `Report
+          | Some false, `Report    -> `Standard
+          | None      , `Report    -> `Report
         in
 
         let ttenv = {
@@ -528,7 +531,7 @@ module Ax = struct
 
   module TT = EcTyping
 
-  type mode = [`WeakCheck | `Check]
+  type mode = [`WeakCheck | `Check | `Report]
 
   (* ------------------------------------------------------------------ *)
   let bind (scope : scope) local ((x, ax) : _ * axiom) =
@@ -573,7 +576,7 @@ module Ax = struct
       { scope with sc_pr_uc = Some puc }
 
   (* ------------------------------------------------------------------ *)
-  let rec add_r (scope : scope) mode (ax : paxiom located) =
+  let rec add_r (scope : scope) (mode : mode) (ax : paxiom located) =
     assert (scope.sc_pr_uc = None);
 
     let loc = ax.pl_loc and ax = ax.pl_desc in
@@ -702,7 +705,7 @@ module Ax = struct
       (Some pac.puc_name, scope)
 
   (* ------------------------------------------------------------------ *)
-  let add (scope : scope) mode (ax : paxiom located) =
+  let add (scope : scope) (mode : mode) (ax : paxiom located) =
     add_r scope mode ax
 
   (* ------------------------------------------------------------------ *)

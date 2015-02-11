@@ -75,7 +75,7 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Ax : sig
-  type mode = [`WeakCheck | `Check]
+  type mode = [`WeakCheck | `Check | `Report]
 
   val add  : scope -> mode -> paxiom located -> string option * scope
   val save : scope -> EcLocation.t -> string option * scope

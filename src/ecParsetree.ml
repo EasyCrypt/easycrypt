@@ -539,7 +539,7 @@ type trepeat = [`All | `Maybe] * int option
 type tfocus1 = (int option) pair
 type tfocus  = (tfocus1 list option) pair
 
-type rwarg = (tfocus located) option * rwarg1
+type rwarg = (tfocus located) option * rwarg1 located
 
 and rwarg1 =
   | RWDelta of (rwoptions * pformula)

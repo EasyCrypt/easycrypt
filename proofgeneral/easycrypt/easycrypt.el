@@ -172,12 +172,12 @@
 (defun easycrypt-cmode-check ()
   "Set EasyCrypt in check mode."
   (interactive)
-  (proof-shell-invisible-command "pragma check."))
+  (proof-shell-invisible-command "pragma Proofs:check."))
 
 (defun easycrypt-cmode-weak-check ()
   "Set EasyCrypt in weak-check mode."
   (interactive)
-  (proof-shell-invisible-command "pragma nocheck."))
+  (proof-shell-invisible-command "pragma Proofs:weak."))
 
 ;; --------------------------------------------------------------------
 ;; 3-window pane layout hack

@@ -45,9 +45,9 @@ val pp_current_goal : ?all:bool -> Format.formatter -> unit
 val pp_maybe_current_goal : Format.formatter -> unit
 
 (* -------------------------------------------------------------------- *)
-val pragma_verbose  : bool -> unit
-val pragma_check    : bool -> unit
-val pragma_g_prall  : bool -> unit
+val pragma_verbose : bool -> unit
+val pragma_g_prall : bool -> unit
+val pragma_check   : EcScope.Ax.mode -> unit
 
 exception InvalidPragma of string
 

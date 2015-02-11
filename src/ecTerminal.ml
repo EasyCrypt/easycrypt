@@ -53,7 +53,7 @@ object(self)
   method private _notice (lvl, msg) =
     let prefix =
       match lvl with
-      | `Debug | `Warning -> "[W]"
+      | `Debug | `Warning | `Critical -> "[W]"
       | `Info -> ""
     in
       List.iter
