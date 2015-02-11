@@ -376,7 +376,12 @@ let rec h_red ri env hyps f =
         if pv_equal pv pv' then raise NotReducible else f_pvar pv' f.f_ty m
 
     (* δ-reduction *)
-  | Fop (p, tys) -> reduce_op ri env p tys
+  | Fop (p, tys) ->
+      reduce_op ri env p tys
+
+  | Fapp ({ f_node = Fop (p, tys) }, args) when ri.delta_p p ->
+      let op = reduce_op ri env p tys in
+      f_app_simpl op args f.f_ty
 
     (* logical reduction *)
   | Fapp ({f_node = Fop (p, _); } as fo, args) when ri.logic && is_logical_op p ->
