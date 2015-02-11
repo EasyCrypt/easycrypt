@@ -375,16 +375,8 @@ let rec h_red ri env hyps f =
       let pv' = EcEnv.NormMp.norm_pvar env pv in
         if pv_equal pv pv' then raise NotReducible else f_pvar pv' f.f_ty m
 
-    (* δ-reduction *)
-  | Fop (p, tys) ->
-      reduce_op ri env p tys
-
-  | Fapp ({ f_node = Fop (p, tys) }, args) when ri.delta_p p ->
-      let op = reduce_op ri env p tys in
-      f_app_simpl op args f.f_ty
-
     (* logical reduction *)
-  | Fapp ({f_node = Fop (p, _); } as fo, args) when ri.logic && is_logical_op p ->
+  | Fapp ({f_node = Fop (p, tys); } as fo, args) when ri.logic && is_logical_op p ->
       let f' =
         match op_kind p, args with
         | Some (`Not      ), [f1]    -> f_not_simpl f1
@@ -420,11 +412,25 @@ let rec h_red ri env hyps f =
 
             | _ -> fallback ()
         end
-        | _  -> f
+
+        | _ when ri.delta_p p ->
+            let op = reduce_op ri env p tys in
+            f_app_simpl op args f.f_ty
+
+        | _ -> f
       in
         if   f_equal f f'
         then f_app fo (h_red_args ri env hyps args) f.f_ty
         else f'
+
+    (* δ-reduction *)
+  | Fop (p, tys) ->
+      reduce_op ri env p tys
+
+    (* δ-reduction *)
+  | Fapp ({ f_node = Fop (p, tys) }, args) when ri.delta_p p ->
+      let op = reduce_op ri env p tys in
+      f_app_simpl op args f.f_ty
 
     (* contextual rule - let *)
   | Flet (lp, f1, f2) -> f_let lp (h_red ri env hyps f1) f2
