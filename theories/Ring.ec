@@ -46,7 +46,7 @@ end IterOp.
 import IterOp.
 
 (* -------------------------------------------------------------------- *)
-theory ZModule.
+abstract theory ZModule.
   type t.
 
   op zeror : t.
@@ -168,7 +168,7 @@ realize addNr. by smt. qed.
 realize subrE. by do 2! (apply/ExtEq.fun_ext=> _); smt. qed.
 
 (* -------------------------------------------------------------------- *)
-theory ComRing.
+theory abstract ComRing.
   type t.
 
   clone export ZModule with type t <- t.
@@ -205,7 +205,7 @@ theory ComRing.
 end ComRing.
 
 (* -------------------------------------------------------------------- *)
-theory BoolRing.
+theory abstract BoolRing.
   type t.
 
   clone export ComRing with type t <- t.
@@ -220,7 +220,7 @@ theory BoolRing.
 end BoolRing.
 
 (* -------------------------------------------------------------------- *)
-theory IDomain.
+theory abstract IDomain.
   type t.
 
   clone export ComRing with type t <- t.
@@ -233,7 +233,7 @@ theory IDomain.
 end IDomain.
 
 (* -------------------------------------------------------------------- *)
-theory Field.
+theory abstract Field.
   type t.
 
   clone export IDomain with type t <- t.
@@ -298,5 +298,5 @@ end Field.
 (* --------------------------------------------------------------------- *)
 (* Rewrite database for algebra tactic                                   *)
 
-hint rewrite rw_algebra : .
+hint rewrite rw_algebra  : .
 hint rewrite inj_algebra : .
