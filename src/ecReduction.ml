@@ -249,6 +249,10 @@ let rec h_red ri env hyps f =
   | Flocal x -> reduce_local ri hyps x
 
     (* ζ-reduction *)
+  | Fapp ({ f_node = Flocal x }, args) ->
+      f_app_simpl (reduce_local ri hyps x) args f.f_ty
+
+    (* ζ-reduction *)
   | Flet (LSymbol(x,_), e1, e2) when ri.zeta ->
       let s = Fsubst.f_bind_local Fsubst.f_subst_id x e1 in
         Fsubst.f_subst s e2
