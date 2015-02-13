@@ -168,9 +168,12 @@ let t_id (tc : tcenv1) =
 (* -------------------------------------------------------------------- *)
 let t_change (fp : form) (tc : tcenv1) =
   let hyps, concl = FApi.tc1_flat tc in
-  if not (EcReduction.is_conv hyps fp concl) then
-    raise InvalidGoalShape;
-  FApi.mutate1 tc (fun hd -> VConv (hd, Sid.empty)) fp
+
+  if concl == fp then tc else begin
+    if not (EcReduction.is_conv hyps fp concl) then
+      raise InvalidGoalShape;
+    FApi.mutate1 tc (fun hd -> VConv (hd, Sid.empty)) fp
+  end
 
 (* -------------------------------------------------------------------- *)
 let t_simplify_with_info (ri : reduction_info) (tc : tcenv1) =
