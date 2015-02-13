@@ -677,15 +677,19 @@ let h_red_opt ri hyps f = h_red_opt ri (LDecl.toenv hyps) hyps f
 
 let rec simplify ri hyps f =
   let f' = try h_red ri hyps f with NotReducible -> f in
-  if f == f' then simplify_rec ri hyps f
-       (*f_map (fun ty -> ty) (simplify ri hyps) f*)
+  if   f == f'
+  then simplify_rec ri hyps f
   else simplify ri hyps f'
 
 and simplify_rec ri hyps f =
   match f.f_node with
-  | Fapp({f_node = Fop _} as fo, args) -> 
-    let f' = f_app fo (List.map (simplify ri hyps) args) f.f_ty in
-    (try h_red ri hyps f' with NotReducible -> f')
+  | Fapp ({ f_node = Fop _ } as fo, args) -> 
+      let args' = List.map (simplify ri hyps) args in
+      let app1  = (fo, args , f.f_ty) in
+      let app2  = (fo, args', f.f_ty) in
+      let f'    =  EcFol.FSmart.f_app (f, app1) app2 in
+      (try h_red ri hyps f' with NotReducible -> f')
+
   | _ -> f_map (fun ty -> ty) (simplify ri hyps) f
 
 (* -------------------------------------------------------------------- *)
