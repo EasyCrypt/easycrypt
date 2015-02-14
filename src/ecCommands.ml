@@ -634,34 +634,40 @@ type context = {
   ct_level   : int;
   ct_current : EcScope.scope;
   ct_root    : EcScope.scope;
-  ct_stack   : EcScope.scope list;
+  ct_stack   : (EcScope.scope list) option;
 }
 
 let context = ref (None : context option)
 
-let rootctxt (scope : EcScope.scope) =
-  { ct_level = 0; ct_current = scope; ct_root = scope; ct_stack = []; }
+let rootctxt ?(undo = true) (scope : EcScope.scope) =
+  { ct_level   = 0;
+    ct_current = scope;
+    ct_root    = scope;
+    ct_stack   = if undo then Some [] else None; }
 
 (* -------------------------------------------------------------------- *)
 let pop_context context =
-  assert (not (List.is_empty context.ct_stack));
-
-  { ct_level   = context.ct_level - 1;
-    ct_root    = context.ct_root;
-    ct_current = List.hd context.ct_stack;
-    ct_stack   = List.tl context.ct_stack; }
+  match context.ct_stack with
+  | None -> EcScope.hierror "undo stack disabled"
+  | Some stack ->
+      assert (not (List.is_empty stack));
+      { ct_level   = context.ct_level - 1;
+        ct_root    = context.ct_root;
+        ct_current = List.hd stack;
+        ct_stack   = Some (List.tl stack); }
 
 (* -------------------------------------------------------------------- *)
 let push_context scope context =
   { ct_level   = context.ct_level + 1;
     ct_root    = context.ct_root;
     ct_current = scope;
-    ct_stack   = context.ct_current :: context.ct_stack; }
+    ct_stack   = context.ct_stack
+      |> omap (fun st -> context.ct_current :: st); }
 
 (* -------------------------------------------------------------------- *)
-let initialize ~boot ~checkmode =
+let initialize ~undo ~boot ~checkmode =
   assert (!context = None);
-  context := Some (rootctxt (initial ~checkmode ~boot))
+  context := Some (rootctxt ~undo (initial ~checkmode ~boot))
 
 (* -------------------------------------------------------------------- *)
 type notifier = EcGState.loglevel -> string Lazy.t -> unit

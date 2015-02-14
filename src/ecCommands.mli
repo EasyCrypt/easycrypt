@@ -28,7 +28,7 @@ type checkmode = {
   cm_profile  : bool;
 }
 
-val initialize  : boot:bool -> checkmode:checkmode -> unit
+val initialize  : undo:bool -> boot:bool -> checkmode:checkmode -> unit
 val current     : unit -> EcScope.scope
 val addnotifier : notifier -> unit
 
