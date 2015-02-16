@@ -306,7 +306,7 @@ Installing system-wide (automatic installation)
 
 The manual process can be automatized by running:
 
-        $> make PGROOT=/path/to/proof-general-home install`
+        $> make PGROOT=/path/to/proof-general-home install
 
 along with
 
