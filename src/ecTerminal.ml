@@ -237,17 +237,19 @@ object(self)
 
     if sz >= 0 && doprg then begin
       tick <- (tick + 1) mod (String.length ticks);
-      Format.eprintf "[%c] [%.4d] %.1f %% (%.1f%s / [frag %.1f%s])\r%!"
+      Printf.eprintf "[%c] [%.4d] %.1f %% (%.1f%s / [frag %.1f%s])\r%!"
         ticks.[tick] lineno
         (100. *. ((float_of_int position) /. (float_of_int sz)))
         mem memst unu unust
     end
 
-  method private _clear_update =
-    let fmt = "[*] [----] ---.- (------.-?B% - [---- ------.-?B%])" in
-      if sz >= 0 && doprg then
-        Format.eprintf "%*s\r%!" (String.length fmt) "";
-      doprg <- false
+  method private _clear_update ?(erase = true) ~final () =
+    if erase then begin
+      let fmt = "[*] [----] ---.- (------.-?B% - [---- ------.-?B%])" in
+        if sz >= 0 && doprg then
+          Printf.eprintf "%*s\r%!" (String.length fmt) ""
+    end else Printf.eprintf "\n%!";
+    doprg <- not final
 
   method interactive = false
 
@@ -262,16 +264,17 @@ object(self)
     if EcGState.accept_log ~level:`Warning ~wanted:lvl then
       let prefix = EcGState.string_of_loglevel lvl in
 
-      self#_clear_update;
-      Printf.printf "[%.7s] [%s:%d] %s\n%!"
-        prefix name (fst (loc.EcLocation.loc_end)) msg
+      self#_clear_update ~final:false ();
+      Printf.eprintf "[%.7s] [%s:%d] %s\n%!"
+        prefix name (fst (loc.EcLocation.loc_end)) msg;
+      self#_update_progress
 
   method finish (status : status) =
     match status with
     | `ST_Ok -> ()
 
     | `ST_Failure e -> begin
-        self#_clear_update;
+        self#_clear_update ~erase:false ~final:true ();
         match e with
         | EcCommands.TopError (loc, e) ->
             Format.eprintf "%s: %a\n%!"
@@ -284,7 +287,7 @@ object(self)
       end
 
   method finalize =
-    self#_clear_update;
+    self#_clear_update ~final:true ();
     EcIo.finalize iparser;
 
   initializer begin
