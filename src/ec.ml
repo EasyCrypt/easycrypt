@@ -293,9 +293,11 @@ let _ =
                    let loc = p.EcLocation.pl_loc in
                      try  EcCommands.process p
                      with e -> begin
-                       if not (EcTerminal.interactive terminal) then
-                         Printf.fprintf stderr "%t\n%!" Printexc.print_backtrace;
-                     raise (EcCommands.toperror_of_exn ~gloc:loc e)
+                       if Printexc.backtrace_status () then begin
+                         if not (EcTerminal.interactive terminal) then
+                           Printf.fprintf stderr "%t\n%!" Printexc.print_backtrace
+                       end;
+                       raise (EcCommands.toperror_of_exn ~gloc:loc e)
                    end)
                 commands
 
