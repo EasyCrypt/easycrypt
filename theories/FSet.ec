@@ -818,6 +818,10 @@ proof.
  by rewrite Heq;apply add_add_comm.
 qed.
 
+lemma union_interval (i j k:int) : i <= j <= k => 
+  union (interval i j) (interval (j + 1) k) = Interval.interval i k.
+proof. by move=> H;apply set_ext=> x;smt. qed.
+
 lemma card_interval_max x y: card (interval x y) = max (y - x + 1) 0.
 proof.
   case (x <= y);last smt.
