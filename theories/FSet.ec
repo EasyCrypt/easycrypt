@@ -452,6 +452,25 @@ by apply set_ext=> x; rewrite mem_inter; split=> //;
     apply absurd=> _; apply mem_empty.
 qed.
 
+lemma inter_add (x:'a) A B:
+  inter (add x A) (add x B) = add x (inter A B).
+proof.
+  by apply set_ext=> y; rewrite !(mem_add, mem_inter);smt.
+qed.
+
+lemma card_union_inter (A B : 'a set) : card (union A B) = card A + card B - card (inter A B).
+proof.
+  move: A B.
+  elim /set_ind;first by smt.
+  move=> x s Hx Hr B.  
+  rewrite union_add.
+  case (mem x B)=> HB.
+  + rewrite -(add_rm_in x B) // unionC union_add inter_add -add_in_id 1:smt !card_add_nin;smt.
+  rewrite (_: inter (add x s) B = inter s B).
+  + apply set_ext => y;rewrite !(mem_add, mem_inter);smt.
+  by rewrite !card_add_nin;smt.
+qed.
+
 (** all *)
 op all:('a -> bool) -> 'a set -> bool.
 axiom all_def (p:('a -> bool)) (X:'a set):
@@ -467,9 +486,16 @@ op filter:('a -> bool) -> 'a set -> 'a set.
 axiom mem_filter x (p:('a -> bool)) (X:'a set):
   mem x (filter p X) <=> (mem x X /\ p x).
 
+lemma filter_add (x:'a) s p: filter p (add x s) = if p x then add x (filter p s) else filter p s.
+proof.
+  by apply set_ext=> y;case (p x);rewrite !(mem_filter, mem_add);smt.
+qed.
+
 lemma filter_filter_inter (P:'a -> bool) (X:'a set):
   filter P X = filter (P /\ (fun x, mem x X)) X.
-proof. by apply set_ext=> x; rewrite !mem_filter; smt. qed.
+proof.
+  by apply set_ext=> x; rewrite !mem_filter; smt.
+qed.
 
 lemma filter_cpTrue (X:'a set):
   filter True X = X.
