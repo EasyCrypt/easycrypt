@@ -308,6 +308,13 @@ lemma set_set_neq (m:('a,'b) map) x x' y y':
   m.[x <- y].[x' <- y'] = m.[x' <- y'].[x <- y]
 by (rewrite -neqF set_set=> ->).
 
+lemma set_same (x:'a) (m:('a,'b)map):
+   mem x (dom m) =>
+   m.[x <- oget m.[x]] = m.
+proof.
+  by move=> Hm; apply map_ext; smt.
+qed.
+
 (* all and allb *)
 pred all (p:'a -> 'b -> bool) (m:('a,'b) map) = forall x,
   mem x (dom m) =>
