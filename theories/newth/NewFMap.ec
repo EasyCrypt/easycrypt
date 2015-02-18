@@ -36,6 +36,30 @@ proof.
   by elim xs=> //= x xs IH [-> //= | /IH ->].
 qed.
 
+lemma mem_snd_mem (xs : ('a * 'b) list) (ab : 'a * 'b):
+  mem xs ab => mem (snd xs) ab.`2.
+proof.
+  by elim xs=> //= x xs IH [-> //= | /IH ->].
+qed.
+
+lemma mem_fst_ex_snd (xs : ('a * 'b) list) (x : 'a):
+  mem (fst xs) x <=> (exists y, mem xs (x,y)).
+proof.
+  split; last by move=> [] y /mem_fst_mem.
+  elim xs=> //= [[a b]] xs IH /= [].
+    by move=> -> /=; exists b.
+  by move=> /IH [] y xy_in_xs; exists y; right.
+qed.
+
+lemma mem_snd_ex_fst (xs : ('a * 'b) list) (y : 'b):
+  mem (snd xs) y <=> (exists x, mem xs (x,y)).
+proof.
+  split; last by move=> [] x /mem_snd_mem.
+  elim xs=> //= [[a b]] xs IH /= [].
+    by move=> -> /=; exists a.
+  by move=> /IH [] x xy_in_xs; exists x; right.
+qed.
+
 lemma uniq_fst_uniq_fst (xs : ('a * 'b) list):
   uniq_fst xs =>
   uniq (fst xs).
@@ -146,8 +170,30 @@ qed.
 op dom (m : ('a,'b) fmap) = NewFSet.oflist (fst (elems m))
   axiomatized by domE.
 
+lemma in_dom (m: ('a,'b) fmap) (a : 'a):
+  mem (dom m) a <=> m.[a] <> None.
+proof.
+  rewrite domE getE /= mem_oflist.
+  split.
+    rewrite mem_fst_ex_snd=> [] b.
+    by rewrite mem_get_uniq 1:uniq_keys // => ->.
+  by rewrite get_mem=> /mem_fst_mem.
+qed.
+
+(* -------------------------------------------------------------------- *)
 op rng (m : ('a,'b) fmap) = NewFSet.oflist (snd (elems m))
   axiomatized by rngE.
 
+lemma in_rng (m: ('a,'b) fmap) (b : 'b):
+  mem (rng m) b <=> (exists a, m.[a] = Some b).
+proof.
+  rewrite rngE getE /= mem_oflist.
+  split.
+    rewrite mem_snd_ex_fst=> [] a.
+    by rewrite mem_get_uniq 1:uniq_keys // => a_in_m; exists a.
+  by move=> [] a; rewrite -mem_get_uniq 1:uniq_keys // => /mem_snd_mem.
+qed.
+
+(* -------------------------------------------------------------------- *)
 op size (m : ('a,'b) fmap) = card (dom m)
   axiomatized by sizeE.
