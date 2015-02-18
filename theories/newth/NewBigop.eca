@@ -3,8 +3,10 @@
  * Distributed under the terms of the CeCILL-C license
  * -------------------------------------------------------------------- *)
 
+pragma +implicits.
+
 (* -------------------------------------------------------------------- *)
-require import Fun Int IntExtra NewList.
+require import Fun Pred Int IntExtra NewList.
 require (*--*) NewMonoid.
 
 (* -------------------------------------------------------------------- *)
@@ -21,6 +23,40 @@ lemma big_nil (P : 'a -> bool) (F : 'a -> t): sum P F [] = idm.
 proof. by []. qed.
 
 (* -------------------------------------------------------------------- *)
-lemma big_cons (P : 'a -> bool) (F : 'a -> t) x xs:
-  sum P F (x :: xs) = if P x then F x + sum P F xs else sum P F xs.
-proof. by rewrite {1}/sum /= (fun_if (map F)); case (P x). qed.
+lemma big_cons (P : 'a -> bool) (F : 'a -> t) x s:
+  sum P F (x :: s) = if P x then F x + sum P F s else sum P F s.
+proof. by rewrite {1}/sum /= @(fun_if (map F)); case (P x). qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt big_map ['a 'b] (h : 'b -> 'a) (P : 'a -> bool) F s:
+  sum P F (map h s) = sum (comp P h) (comp F h) s.
+proof. by elim s => // x s; rewrite map_cons !big_cons=> ->. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma big_filter (P : 'a -> bool) F s:
+  sum P F s = sum predT F (filter P s).
+proof. by elim s => //= x s; case (P x)=> //; rewrite !big_cons=> -> ->. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma eq_bigl (P1 P2 : 'a -> bool) (F : 'a -> t) s:
+     (forall i, P1 i <=> P2 i)
+  => sum P1 F s = sum P2 F s.
+proof. by move=> h; rewrite /sum (eq_filter h). qed.
+
+(* -------------------------------------------------------------------- *)
+lemma eq_bigr (P : 'a -> bool) (F1 F2 : 'a -> t) s:
+     (forall i, P i => F1 i = F2 i)
+  => sum P F1 s = sum P F2 s.
+proof.                          (* FIXME: big_rec2 *)
+  move=> eqF; elim s=> // x s; rewrite !big_cons=> <-.
+  by case (P x)=> // /eqF <-.
+qed.
+
+(* -------------------------------------------------------------------- *)
+(* FIXME: move=> /eq_bigl leads to an invalid goal *)
+lemma nosmt eq_big (P1 P2 : 'a -> bool) (F1 F2 : 'a -> t) s:
+     (forall i, P1 i <=> P2 i)
+  => (forall i, P1 i => F1 i = F2 i)
+  => sum P1 F1 s = sum P2 F2 s.
+proof. by move=> eqP eqF; rewrite -(eq_bigl eqP); apply/eq_bigr. qed.
+  
