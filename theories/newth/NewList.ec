@@ -78,6 +78,17 @@ lemma rcons_cat (x : 'a) s1 s2 : rcons (s1 ++ s2) x = s1 ++ rcons s2 x.
 proof. by rewrite -!cats1 catA. qed.
 
 (* -------------------------------------------------------------------- *)
+(*                   rcons / induction principle                        *)
+(* -------------------------------------------------------------------- *)
+lemma nosmt last_ind (p : 'a list -> bool):
+  p [] => (forall s x, p s => p (rcons s x)) => forall s, p s.
+proof.
+  move=> Hnil Hlast s; rewrite -(cat0s s).
+  elim s [] Hnil => [|x s2 IHs] s1 Hs1; first by rewrite cats0.
+  by rewrite -cat_rcons (IHs (rcons s1 x)) // Hlast.
+qed.
+
+(* -------------------------------------------------------------------- *)
 (*                        Sequence indexing                             *)
 (* -------------------------------------------------------------------- *)
 op nth x (xs : 'a list) n : 'a =
@@ -962,6 +973,23 @@ lemma foldr_map ['a 'b 'c] (f : 'a -> 'b -> 'b) (h : 'c -> 'a) z0 s:
   foldr f z0 (map h s) = foldr (fun x z, f (h x) z) z0 s.
 proof. by elim s => //= x s ->. qed.
 
+op foldl (f : 'b -> 'a -> 'b) z0 xs =
+  with xs = "[]"      => z0
+  with xs = (::) y ys => foldl f (f z0 y) ys.
+
+lemma foldl_rev (f : 'b -> 'a -> 'b) z0 s:
+  foldl f z0 (rev s) = foldr (fun x z => f z x) z0 s.
+proof.
+  elim/last_ind s z0 => [|s x ih] z0 /=; 1: by rewrite rev_nil.
+  by rewrite rev_rcons -cats1 foldr_cat -ih.
+qed.
+
+lemma foldl_cat (f : 'b -> 'a -> 'b) z0 s1 s2:
+  foldl f z0 (s1 ++ s2) = foldl f (foldl f z0 s1) s2.
+proof.
+  by rewrite -(revK (s1 ++ s2)) foldl_rev rev_cat foldr_cat -!foldl_rev !revK.
+qed.
+
 (* -------------------------------------------------------------------- *)
 (*                            Flattening                                *)
 (* -------------------------------------------------------------------- *)
@@ -1024,17 +1052,6 @@ proof. by rewrite sortE /=; apply InsertSort.perm_sort. qed.
 lemma sort_sorted (e : 'a -> 'a -> bool) s:
   (forall (x y : 'a), e x y \/ e y x) => sorted e (sort e s).
 proof. by rewrite sortE /=; apply InsertSort.sort_sorted. qed.
-
-(* -------------------------------------------------------------------- *)
-(*                   rcons / induction principle                        *)
-(* -------------------------------------------------------------------- *)
-lemma last_ind (p : 'a list -> bool):
-  p [] => (forall s x, p s => p (rcons s x)) => forall s, p s.
-proof.
-  move=> Hnil Hlast s; rewrite -(cat0s s).
-  elim s [] Hnil => [|x s2 IHs] s1 Hs1; first by rewrite cats0.
-  by rewrite -cat_rcons (IHs (rcons s1 x)) // Hlast.
-qed.
 
 (* -------------------------------------------------------------------- *)
 (*                          Order lifting                               *)
