@@ -427,6 +427,10 @@ let process_delta (s, o, p) tc =
 
 (* -------------------------------------------------------------------- *)
 let rec process_rewrite1 ttenv ri tc =
+  let implicits = function
+  | `Implicit -> ttenv.tt_implicits
+  | `Explicit -> false in
+
   match unloc ri with
   | RWDone b ->
       let tt = if b then t_simplify ~delta:false else t_id in
@@ -444,7 +448,7 @@ let rec process_rewrite1 ttenv ri tc =
   end
 
   | RWRw (((s : rwside), r, o), pts) -> begin
-      let do1 ((subs : rwside), pt) tc =
+      let do1 ((subs : rwside), (mode, pt)) tc =
         let theside =
           match s, subs with
           | `LtoR, _     -> (subs  :> rwside)
@@ -455,20 +459,21 @@ let rec process_rewrite1 ttenv ri tc =
           EcEnv.BaseRw.is_base p.pl_desc (FApi.tc1_env tc) in
 
         match pt with 
-        | { fp_head = FPNamed (p, None); fp_args = []; } when is_baserw p tc ->
-
+        | { fp_head = FPNamed (p, None); fp_args = []; }
+              when mode = `Implicit && is_baserw p tc
+        ->
           let env = FApi.tc1_env tc in
           let ls  = snd (EcEnv.BaseRw.lookup p.pl_desc env) in
           let ls  = EcPath.Sp.elements ls in
 
-          let do1 lemma tc = 
+          let do1 lemma tc =
             let pt = PT.pt_of_uglobal !!tc (FApi.tc1_hyps tc) lemma in
               process_rewrite1_core (theside, o) pt tc in
             t_ors (List.map do1 ls) tc
 
         | _ ->
-          let pt = PT.tc1_process_full_pterm tc pt in
-            process_rewrite1_core (theside, o) pt tc in
+          let pt = PT.tc1_process_full_pterm ~implicits:(implicits mode) tc pt in
+             process_rewrite1_core (theside, o) pt tc in
 
       let doall tc = t_ors (List.map do1 pts) tc in
 

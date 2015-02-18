@@ -1685,8 +1685,8 @@ gpterm(F):
 %inline pterm:
 | pt=gpterm(form) { pt }
 
-epterm:
-| x=boption(AT) pt=pterm
+%inline epterm:
+| x=iboption(AT) pt=pterm
     { (if x then `Explicit else `Implicit), pt }
 
 pcutdef:
@@ -1734,11 +1734,11 @@ rwarg1:
    { RWSmt }
 
 rwpterms:
-| f=pterm
+| f=epterm
     { [(`LtoR, f)] }
 
 | LPAREN fs=rlist2(rwpterm, COMMA) RPAREN
-    { fs }
+    { List.map (snd_map (fun f -> (`Implicit, f))) fs }
 
 rwpterm:
 | s=rwside f=pterm
@@ -2838,6 +2838,10 @@ __rlist1(X, S):                         (* left-recursive *)
   }
 
 (* -------------------------------------------------------------------- *)
+%inline iboption(X):
+| X { true  }
+|   { false }
+
 %inline uoption(X):
 | x=X { Some x }
 | UNDERSCORE { None }

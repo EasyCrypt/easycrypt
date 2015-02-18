@@ -543,7 +543,7 @@ type rwarg = (tfocus located) option * rwarg1 located
 
 and rwarg1 =
   | RWDelta of (rwoptions * pformula)
-  | RWRw    of (rwoptions * (rwside * ppterm) list)
+  | RWRw    of (rwoptions * (rwside * eppterm) list)
   | RWPr    of (psymbol * pformula option)
   | RWDone  of bool
   | RWSimpl
