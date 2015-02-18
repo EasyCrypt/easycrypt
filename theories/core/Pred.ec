@@ -30,11 +30,11 @@ lemma nosmt subpred_eqP (p1 p2 : 'a -> bool):
 proof. smt. qed.
 
 (** Lifting boolean operators to predicates *)
-op pred1  ['a] (c : 'a) = fun (x : 'a), c = x.
+op pred1  ['a] (c : 'a) = fun (x : 'a), x = c.
 op predT  ['a] = fun (x : 'a), true.
 op pred0  ['a] = fun (x : 'a), false.
 op predC  ['a] (P : 'a -> bool) = fun (x : 'a), ! (P x).
-op predC1 ['a] (c : 'a) = fun (x : 'a), c <> x.
+op predC1 ['a] (c : 'a) = fun (x : 'a), x <> c.
 op predD1 ['a] (P : 'a -> bool) (c : 'a) = fun (x : 'a), c <> x /\ P x.
 
 op True   = fun (x:'a), true.

@@ -6,7 +6,7 @@
 pragma +implicits.
 
 (* -------------------------------------------------------------------- *)
-require import Fun Pred Int IntExtra NewList.
+require import Fun Pred Pair Int IntExtra NewList.
 require (*--*) NewMonoid.
 
 (* -------------------------------------------------------------------- *)
@@ -28,13 +28,34 @@ lemma big_cons (P : 'a -> bool) (F : 'a -> t) x s:
 proof. by rewrite {1}/sum /= @(fun_if (map F)); case (P x). qed.
 
 (* -------------------------------------------------------------------- *)
+lemma big_const (P : 'a -> bool) x s:
+  sum P (fun i => x) s = iter (count P s) ((+) x) idm.
+proof.
+  elim s=> [|y s ih]; 1: by rewrite iter0.
+  rewrite big_cons /= ih; case (P y) => //.
+  by rewrite addzC iterS // count_ge0.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma big_seq1 (F : 'a -> t) x: sum predT F [x] = F x.
+proof. by rewrite big_cons big_nil addm0. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma big_mkcond (P : 'a -> bool) (F : 'a -> t) s:
+  sum P F s = sum predT (fun i => if P i then F i else idm) s.
+proof.
+  elim s=> // x s ih; rewrite !big_cons -ih /predT /=.
+  by case (P x)=> //; rewrite add0m.
+qed.
+
+(* -------------------------------------------------------------------- *)
 lemma nosmt big_map ['a 'b] (h : 'b -> 'a) (P : 'a -> bool) F s:
   sum P F (map h s) = sum (comp P h) (comp F h) s.
 proof. by elim s => // x s; rewrite map_cons !big_cons=> ->. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma big_filter (P : 'a -> bool) F s:
-  sum P F s = sum predT F (filter P s).
+  sum predT F (filter P s) = sum P F s.
 proof. by elim s => //= x s; case (P x)=> //; rewrite !big_cons=> -> ->. qed.
 
 (* -------------------------------------------------------------------- *)
@@ -59,4 +80,24 @@ lemma nosmt eq_big (P1 P2 : 'a -> bool) (F1 F2 : 'a -> t) s:
   => (forall i, P1 i => F1 i = F2 i)
   => sum P1 F1 s = sum P2 F2 s.
 proof. by move=> eqP eqF; rewrite -(eq_bigl eqP); apply/eq_bigr. qed.
-  
+
+(* -------------------------------------------------------------------- *)
+lemma eq_big_perm (P : 'a -> bool) (F : 'a -> t) s1 s2:
+  perm_eq s1 s2 => sum P F s1 = sum P F s2.
+proof. admit. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt big_rem (P : 'a -> bool) (F : 'a -> t) s x: mem s x =>
+  sum P F s = (if P x then F x else idm) + sum P F (rem x s).
+proof.
+  move=> /perm_to_rem /(eq_big_perm P F) ->.
+  by rewrite !@(big_mkcond P) big_cons.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma bigD1 (F : 'a -> t) s x: mem s x => uniq s =>
+  sum predT F s = F x + sum (predC1 x) F s.
+proof.
+  move=> /(big_rem predT F)-> /(rem_filter x)->.
+  by rewrite big_filter.
+qed.

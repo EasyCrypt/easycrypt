@@ -273,6 +273,9 @@ proof. by rewrite all_count count_pred0 eq_sym. qed.
 lemma all_predT (s : 'a list): all predT s.
 proof. by rewrite all_count count_predT. qed.
 
+lemma all_predC p (s : 'a list): all (predC p) s = ! has p s.
+proof. by elim s => //= x s ->; rewrite /predC; case (p x). qed.
+
 lemma eq_filter p1 p2 (s : 'a list):
   (forall x, p1 x <=> p2 x) => filter p1 s = filter p2 s.
 proof. by move=> h; elim s=> //= x l; rewrite h => ->. qed.
@@ -739,6 +742,16 @@ lemma rev_uniq (s : 'a list): uniq (rev s) <=> uniq s.
 proof.
   elim s => /=; [by rewrite rev_nil | move=> x s IHs].
   by rewrite rev_cons -cats1 cat_uniq IHs /= mem_rev.
+qed.
+
+lemma rem_filter x (s : 'a list): uniq s =>
+  rem x s = filter (predC1 x) s.
+proof.
+  elim s => //= y s ih [y_notin_s /ih->]; rewrite {2}/predC1.
+  case (y = x)=> //= <-; apply/eq_sym/all_filterP.
+  (* FIXME: non genuine unification failure *)
+     cut := all_predC (fun z => z = y) s => ->.
+  by cut := has_pred1 y => ->.
 qed.
 
 (* -------------------------------------------------------------------- *)
