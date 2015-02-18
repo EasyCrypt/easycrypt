@@ -920,6 +920,13 @@ lemma map_rev (f : 'a -> 'b) s:
   map f (rev s) = rev (map f s).
 proof. elim s; first by rewrite rev_nil. smt. qed.
 
+lemma perm_eq_map (f : 'a -> 'b) (s1 s2 : 'a list):
+  perm_eq s1 s2 => perm_eq (map f s1) (map f s2).
+proof.
+  move=> h; apply/perm_eqP=> p; rewrite !count_map.
+  by apply/perm_eqP.
+qed.
+
 (* -------------------------------------------------------------------- *)
 (*                          Index sequence                              *)
 (* -------------------------------------------------------------------- *)
