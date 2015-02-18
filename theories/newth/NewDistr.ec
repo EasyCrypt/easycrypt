@@ -1,5 +1,5 @@
 (* -------------------------------------------------------------------- *)
-require import Bool Option Fun Distr Int Real NewList Ring.
+require import Bool Option Fun Distr Int IntExtra Real NewList Ring.
 (*---*) import IterOp.
 
 (* -------------------------------------------------------------------- *)

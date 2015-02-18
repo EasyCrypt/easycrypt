@@ -31,11 +31,11 @@ abstract theory ZModule.
 
   lemma nosmt addrCA (x y z : t):
     x + (y + z) = y + (x + z).
-  proof. by rewrite !addrA (addrC x y). qed.
+  proof. by rewrite !addrA @(addrC x y). qed.
 
   lemma nosmt addrAC (x y z : t):
     (x + y) + z = (x + z) + y.
-  proof. by rewrite -!addrA (addrC y z). qed.
+  proof. by rewrite -!addrA @(addrC y z). qed.
 
   lemma nosmt subrr (x : t): x - x = zeror.
   proof. by rewrite subrE /= addrN. qed.
@@ -53,16 +53,16 @@ abstract theory ZModule.
   proof. by rewrite -addrA addNr addr0. qed.
 
   lemma nosmt addrI (x y z : t): x + y = x + z => y = z.
-  proof. by move=> h; rewrite -(addKr x z) -h addKr. qed.
+  proof. by move=> h; rewrite -@(addKr x z) -h addKr. qed.
 
   lemma nosmt addIr (x y z : t): y + x = z + x => y = z.
-  proof. by move=> h; rewrite -(addrK x z) -h addrK. qed.
+  proof. by move=> h; rewrite -@(addrK x z) -h addrK. qed.
 
   lemma nosmt opprK (x : t): -(-x) = x.
   proof. by apply @(addIr (-x)); rewrite addNr addrN. qed.
 
   lemma nosmt oppr0: -zeror = zeror.
-  proof. by rewrite -(addr0 (-zeror)) addNr. qed.
+  proof. by rewrite -@(addr0 (-zeror)) addNr. qed.
 
   lemma nosmt subr0 (x : t): x - zeror = x.
   proof. by rewrite subrE /= oppr0 addr0. qed.
@@ -88,7 +88,7 @@ abstract theory ZModule.
   proof. by rewrite subr_eq add0r. qed.
 
   lemma nosmt addr_eq0 (x y : t): (x + y = zeror) <=> (x = -y).
-  proof. by rewrite -(subr_eq0 x) subrE /= opprK. qed.
+  proof. by rewrite -@(subr_eq0 x) subrE /= opprK. qed.
 
   lemma nosmt eqr_opp (x y : t): (- x = - y) <=> (x = y).
   proof.
@@ -150,7 +150,7 @@ abstract theory ComRing.
 
   lemma nosmt mulrDr (x y z : t):
     x * (y + z) = x * y + x * z.
-  proof. by rewrite mulrC mulrDl !(mulrC _ x). qed.
+  proof. by rewrite mulrC mulrDl !@(mulrC _ x). qed.
 
   op ofint n = intmul oner n.
 
@@ -255,7 +255,7 @@ abstract theory Field.
   qed.
 
   lemma exprN (x : t) (i : int): exp x (-i) = inv (exp x i).
-  proof. by rewrite /exp /= IntZMod.opprK (fun_if inv) invK; smt. qed.
+  proof. by rewrite /exp /= IntZMod.opprK @(fun_if inv) invK; smt. qed.
 end Field.
 
 (* --------------------------------------------------------------------- *)
