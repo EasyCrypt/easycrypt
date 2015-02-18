@@ -100,6 +100,37 @@ theory Induction.
     apply (induction (fun i, forall k, 0 <= k <= i => p k) _ _ i); smt.
   qed.
 
+  lemma nosmt natind (p : int -> bool):
+       (forall n, n <= 0 => p n)
+    => (forall n, 0 <= n => p n => p (n+1))
+    => forall n, p n.
+  proof.
+    move=> h0 hS n; case (n < 0); 1: smt.
+    by rewrite -lezNgt; elim/induction n; smt.
+  qed.
+
+  lemma nosmt natcase (p : int -> bool):
+       (forall n, n <= 0 => p n)
+    => (forall n, 0 <= n => p (n+1))
+    => forall n, p n.
+  proof. smt. qed.
+
+  lemma nosmt ge0ind (p : int -> bool):
+       (forall n, n < 0 => p n)
+    => p 0
+    => (forall n, 0 <= n => p n => p (n+1))
+    => forall n, p n.
+  proof.
+    move=> hN h0 hS n; case (n < 0); 1: by move=> /hN.
+    by rewrite -lezNgt; elim/induction n.
+  qed.
+
+  lemma nosmt ge0case (p : int -> bool):
+       (forall n, n < 0 => p n)
+    => p 0
+    => (forall n, 0 <= n => p (n+1))
+    => forall n, p n.
+  proof. smt. qed.
 end Induction.
 
 (* Fold operator *)
