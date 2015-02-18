@@ -1,18 +1,22 @@
 # -*- Makefile -*-
 
 # --------------------------------------------------------------------
-OCAMLBUILD_BIN   = ocamlbuild -use-ocamlfind
-OCAMLBUILD_EXTRA = -classic-display
+OCAMLBUILD_JOBS  ?= 1
+OCAMLBUILD_BIN   ?= ocamlbuild
+OCAMLBUILD_EXTRA ?= 
+OCAMLBUILD_OPTS  := -use-ocamlfind -j $(OCAMLBUILD_JOBS)
+OCAMLBUILD_OPTS  += -classic-display
 
 # In Emacs, use classic display to enable error jumping.
 ifeq ($(shell echo $$TERM), dumb)
- OCAMLBUILD_EXTRA += -classic-display
+ OCAMLBUILD_OPTS += -classic-display
 endif
 ifeq ($(LINT),1)
- OCAMLBUILD_EXTRA += -tag lint
+ OCAMLBUILD_OPTS += -tag lint
 endif
+OCAMLBUILD_OPTS += $(OCAMLBUILD_EXTRA)
 
-OCAMLBUILD := $(OCAMLBUILD_BIN) $(OCAMLBUILD_EXTRA)
+OCAMLBUILD := $(OCAMLBUILD_BIN) $(OCAMLBUILD_OPTS)
 
 DESTDIR    ?=
 PREFIX     ?= /usr/local
