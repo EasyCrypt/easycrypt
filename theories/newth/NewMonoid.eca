@@ -1,0 +1,47 @@
+(* --------------------------------------------------------------------
+ * Copyright (c) - 2012-2015 - IMDEA Software Institute and INRIA
+ * Distributed under the terms of the CeCILL-C license
+ * -------------------------------------------------------------------- *)
+
+require import Fun Int IntExtra.
+
+(* -------------------------------------------------------------------- *)
+type t.
+
+op idm : t.
+op (+) : t -> t -> t.
+
+theory Axioms.
+  axiom addmA: associative Self.(+).
+  axiom addmC: commutative Self.(+).
+  axiom add0m: left_id idm Self.(+).
+end Axioms.
+
+(* -------------------------------------------------------------------- *)
+lemma addmA: associative Self.(+).
+proof. by apply/Axioms.addmA. qed.
+
+lemma addmC: commutative Self.(+).
+proof. by apply/Axioms.addmC. qed.
+
+lemma add0m: left_id idm Self.(+).
+proof. by apply/Axioms.add0m. qed.
+
+lemma addm0: right_id idm Self.(+).
+proof. by move=> x; rewrite addmC add0m. qed.
+
+lemma addmCA: left_commutative Self.(+).
+proof. by move=> x y z; rewrite !addmA (addmC x). qed.
+
+lemma addmAC: right_commutative Self.(+).
+proof. by move=> x y z; rewrite -!addmA (addmC y). qed.
+
+lemma addmACA: interchange Self.(+) Self.(+).
+proof. by move=> x y z t; rewrite -!addmA (addmCA y). qed.
+
+lemma iteropE n x: iterop n Self.(+) x idm = iter n ((+) x) idm.
+proof.
+  elim/Induction.natcase n => [n le0_n|n ge0_n].
+  + by rewrite ?(iter0, iterop0).
+  + by rewrite iterSr // addm0 iteropS.
+qed.
