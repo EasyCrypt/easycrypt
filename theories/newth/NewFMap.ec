@@ -10,6 +10,11 @@ require import Int.
 require import NewList.
 require import NewFSet.
 
+op reduce (xs : ('a * 'b) list) : ('a * 'b) list =
+  foldl (fun aout (kv : 'a * 'b) =>
+    if mem [] kv.`1 then aout else kv :: aout)
+  [] xs.
+
 (* TODO: this may be of more general interest and may benefit from a
          move to NewList, or a separate PairList theory. *)
 op fst (xs : ('a * 'b) list) =
