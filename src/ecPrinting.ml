@@ -1041,7 +1041,7 @@ and pp_expr_core_r (ppe : PPEnv.t) outer fmt (e : expr) =
   | Elam (vardecls, e) ->
       let (subppe, pp) = pp_locbinds ppe vardecls in
       let pp fmt () =
-        Format.fprintf fmt "@[<hov 2>fun %t,@ %a@]"
+        Format.fprintf fmt "@[<hov 2>fun %t =>@ %a@]"
           pp (pp_expr_r subppe (fst outer, (min_op_prec, `NonAssoc))) e
       in
         maybe_paren outer (fst outer, e_bin_prio_lambda) pp fmt ()
@@ -1349,8 +1349,15 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
   | Fquant (q, bd, f) ->
       let (subppe, pp) = pp_bindings ppe bd in
       let pp fmt () =
-        Format.fprintf fmt "@[<hov 2>%s %t,@ %a@]"
-          (string_of_quant q) pp (pp_form subppe) f in
+        match q with
+        | Llambda ->
+          Format.fprintf fmt "@[<hov 2>%s %t =>@ %a@]"
+            (string_of_quant q) pp
+            (pp_form subppe) f
+        | _ ->
+          Format.fprintf fmt "@[<hov 2>%s %t,@ %a@]"
+            (string_of_quant q) pp
+            (pp_form subppe) f in
       maybe_paren outer (fst outer, e_bin_prio_lambda) pp fmt ()
 
   | Fif (b, f1, f2) ->

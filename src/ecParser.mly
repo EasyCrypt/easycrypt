@@ -692,6 +692,7 @@ expr_u:
       let loc = EcLocation.make $startpos $endpos in
         PEapp (mk_loc loc id, [e]) }
 
+| FUN pd=ptybindings IMPL  e=expr
 | FUN pd=ptybindings COMMA e=expr { PElambda (pd, e) }
 
 expr_field:
@@ -912,6 +913,7 @@ form_u(P):
 | FORALL pd=pgtybindings COMMA e=form_r(P) { PFforall (pd, e) }
 | EXIST  pd=pgtybindings COMMA e=form_r(P) { PFexists (pd, e) }
 | FUN    pd=ptybindings  COMMA e=form_r(P) { PFlambda (pd, e) }
+| FUN    pd=ptybindings  IMPL  e=form_r(P) { PFlambda (pd, e) }
 
 | r=loc(RBOOL) TILD e=sform_r(P)
     { let id  = PFident (mk_loc r.pl_loc EcCoreLib.s_dbitstring, None) in
