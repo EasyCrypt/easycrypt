@@ -1,0 +1,26 @@
+(* --------------------------------------------------------------------
+ * Copyright (c) - 2012-2015 - IMDEA Software Institute and INRIA
+ * Distributed under the terms of the CeCILL-C license
+ * -------------------------------------------------------------------- *)
+
+(* -------------------------------------------------------------------- *)
+require import Fun Int IntExtra NewList.
+require (*--*) NewMonoid.
+
+(* -------------------------------------------------------------------- *)
+type t.
+
+clone export NewMonoid as Support with type t <- t.
+
+(* -------------------------------------------------------------------- *)
+op sum (P : 'a -> bool) (F : 'a -> t) (r : 'a list) =
+  foldr Support.(+) idm (map F (filter P r)).
+
+(* -------------------------------------------------------------------- *)
+lemma big_nil (P : 'a -> bool) (F : 'a -> t): sum P F [] = idm.
+proof. by []. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma big_cons (P : 'a -> bool) (F : 'a -> t) x xs:
+  sum P F (x :: xs) = if P x then F x + sum P F xs else sum P F xs.
+proof. by rewrite {1}/sum /= (fun_if (map F)); case (P x). qed.
