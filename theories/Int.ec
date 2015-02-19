@@ -220,6 +220,15 @@ export EuclDiv.
 theory Extrema.
   op min (a b:int) = if (a < b) then a else b.
 
+  lemma nosmt minC a b : min a b = min b a
+  by [].
+
+  lemma nosmt min_lel a b : a <= b => min a b = a
+  by [].
+
+  lemma nosmt min_ler a b : a <= b => min b a = a
+  by [].
+
   lemma nosmt min_is_lb a b:
     min a b <= a /\
     min a b <= b
@@ -250,6 +259,15 @@ theory Extrema.
     min a b = if (a < b) then a else b. *)
 
   op max (a b:int) = if (a < b) then b else a.
+
+  lemma nosmt maxC a b : max a b = max b a
+  by [].
+
+  lemma nosmt max_lel a b : a <= b => max b a = b
+  by [].
+
+  lemma nosmt max_ler a b : a <= b => max a b = b
+  by [].
 
   lemma nosmt max_is_ub a b:
     a <= max a b /\
