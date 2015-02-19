@@ -12,9 +12,9 @@ op idm : t.
 op (+) : t -> t -> t.
 
 theory Axioms.
-  axiom addmA: associative Self.(+).
-  axiom addmC: commutative Self.(+).
-  axiom add0m: left_id idm Self.(+).
+  axiom nosmt addmA: associative Self.(+).
+  axiom nosmt addmC: commutative Self.(+).
+  axiom nosmt add0m: left_id idm Self.(+).
 end Axioms.
 
 (* -------------------------------------------------------------------- *)
