@@ -506,20 +506,39 @@ let process_view pe tc =
     exception NoTopAssumption
   end in
 
+  let destruct hyps fp =
+    let doit fp =
+      match EcFol.sform_of_form fp with
+      | SFquant (Lforall, (x, t), lazy f) -> `Forall (x, t, f)
+      | SFimp (f1, f2) -> `Imp (f1, f2)
+      | SFiff (f1, f2) -> `Iff (f1, f2)
+      | _ -> raise EcProofTyping.NoMatch
+    in
+      EcProofTyping.lazy_destruct hyps doit fp
+  in
+
   let rec instantiate fp ids pte =
     let hyps = pte.PT.ptev_env.PT.pte_hy in
 
-    match TTC.destruct_product hyps pte.PT.ptev_ax with
+    match destruct hyps pte.PT.ptev_ax with
     | None -> raise E.NoInstance
 
     | Some (`Forall (x, xty, _)) ->
         instantiate fp ((x, xty) :: ids) (PT.apply_pterm_to_hole pte)
 
-    | Some (`Imp (f1, f2)) ->
+    | Some (`Imp (f1, f2)) -> begin
         try
           PT.pf_form_match ~mode:fmdelta pte.PT.ptev_env ~ptn:f1 fp;
-          (pte, ids, f2)
+          (pte, ids, f2, `None)
         with MatchFailure -> raise E.NoInstance
+    end
+
+    | Some (`Iff (f1, f2)) -> begin
+        try
+          PT.pf_form_match ~mode:fmdelta pte.PT.ptev_env ~ptn:f1 fp;
+          (pte, ids, f2, `IffLR (f1, f2))
+        with MatchFailure -> raise E.NoInstance
+    end
   in
 
   try
@@ -533,7 +552,7 @@ let process_view pe tc =
         let pte    = PT.tc1_process_full_pterm tc pe in
         let inargs = List.length pte.PT.ptev_pt.pt_args in
 
-        let (pte, ids, cutf) = instantiate f1 [] pte in
+        let (pte, ids, cutf, view) = instantiate f1 [] pte in
 
         let evm  = !(pte.PT.ptev_env.PT.pte_ev) in
         let args = List.drop inargs pte.PT.ptev_pt.pt_args in
@@ -584,6 +603,17 @@ let process_view pe tc =
           let tc = EcLowGoal.t_intros_i_1 intros tc in
 
           List.iter2 (for1 pte.PT.ptev_env.PT.pte_ev) ids intros;
+
+          let pte =
+            match view with
+            | `None -> pte
+            | `IffLR (f1, f2) ->
+                let vpte = PT.pt_of_global_r pte.PT.ptev_env LG.p_iff_lr [] in
+                let vpte = PT.apply_pterm_to_arg_r vpte (PVAFormula f1) in
+                let vpte = PT.apply_pterm_to_arg_r vpte (PVAFormula f2) in
+                let vpte = PT.apply_pterm_to_arg_r vpte (PVASub pte) in
+                vpte
+          in
 
           let pt = fst (PT.concretize (PT.apply_pterm_to_hole pte)) in
 
