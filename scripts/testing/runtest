@@ -1,4 +1,4 @@
-#! /usr/bin/env python3
+#! /usr/bin/env python
 
 # --------------------------------------------------------------------
 import sys, os, errno, re, glob, shutil, itertools, logging
@@ -44,7 +44,7 @@ def rcolor(txt, b):
 
 # --------------------------------------------------------------------
 def _options():
-    import configparser as cp
+    import ConfigParser as cp
     from optparse import OptionParser
 
     parser = OptionParser()
@@ -90,10 +90,6 @@ def _options():
 
     if cmdopt.jobs <= 0:
         parse.error('jobs must be positive')
-
-    if cmdopt.jobs > 1:
-        if sys.version_info < (3, 2, 0):
-            parse.error('incompatible options: python <3.2 && jobs >1')
 
     options = Object(scenarios = dict())
     options.xunit   = cmdopt.xunit
@@ -187,7 +183,8 @@ def _xunit_dump(config, results):
 
         root.append(node)
 
-    xml = str(E.tostring(root, method = 'xml', encoding = 'utf-8'), 'utf-8')
+    xml = E.tostring(root, method = 'xml', encoding = 'utf-8')
+    xml = unicode(xml, 'utf-8')
     return '<?xml version="1.0" encoding="utf-8"?>%s\n' % (xml,)
 
 # --------------------------------------------------------------------
@@ -316,7 +313,7 @@ def _main():
 
     if options.xunit is not None:
         open(options.xunit, 'wb')\
-            .write(bytes(_xunit_dump(mainconfig, result), 'utf-8'))
+            .write(_xunit_dump(mainconfig, result).encode('utf-8'))
 
     exit (2 if errors else 0)
 
