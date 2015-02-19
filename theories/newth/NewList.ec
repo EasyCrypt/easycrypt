@@ -29,6 +29,17 @@ lemma size_eq0 (s : 'a list): (size s = 0) <=> (s = []).
 proof. by case s => //=; smt. qed.
 
 (* -------------------------------------------------------------------- *)
+op behead (xs : 'a list) =
+  with xs = "[]" => []
+  with xs = (::) y ys => ys.
+
+lemma behead_nil: behead [<:'a>] = [].
+proof. by []. qed.
+
+lemma behead_cons (x : 'a) xs: behead (x :: xs) = xs.
+proof. by []. qed.
+
+(* -------------------------------------------------------------------- *)
 (*                    Sequence catenation "cat"                         *)
 (* -------------------------------------------------------------------- *)
 op (++) (s1 s2 : 'a list) =
@@ -650,6 +661,32 @@ qed.
 (* -------------------------------------------------------------------- *)
 op insert (x : 'a) (s : 'a list) (n : int) =
   take n s ++ x :: drop n s.
+
+op trim (xs : 'a list) (n : int) =
+  take n xs ++ (drop (n+1) xs).
+
+(* -------------------------------------------------------------------- *)
+lemma trim_neg (xs : 'a list) (n : int): n < 0 => trim xs n = xs.
+proof. smt. qed.
+
+lemma size_trim (xs : 'a list) (n : int): 0 <= n < size xs =>
+  size (trim xs n) = size xs - 1.
+proof. smt. qed.
+
+lemma trim_head (x : 'a) (xs : 'a list):
+  trim (x :: xs) 0 = xs.
+proof. smt. qed.
+
+lemma trim_tail (x : 'a) (xs : 'a list) (n : int): 0 <= n =>
+  trim (x :: xs) (n+1) = x :: trim xs n.
+proof. smt. qed.
+
+lemma trim_cat (xs ys : 'a list) (n : int): n < size (xs ++ ys) =>
+  trim (xs ++ ys) n =
+    if   n < size xs
+    then (trim xs n) ++ ys
+    else xs ++ trim ys (n - size xs).
+proof. by rewrite size_cat smt. qed.
 
 (* -------------------------------------------------------------------- *)
 (*                        Sequence reversal                             *)
