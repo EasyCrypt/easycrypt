@@ -349,7 +349,7 @@ op index (x : 'a) = find (pred1 x).
 
 lemma index_cons x y (s : 'a list):
   index x (y :: s) = if x = y then 0 else index x s + 1.
-proof. by []. qed.
+proof. by rewrite (eq_sym x y). qed.
 
 lemma index_ge0 x (s : 'a list): 0 <= index x s.
 proof. by rewrite /index find_ge0. qed.
@@ -363,7 +363,7 @@ proof. by rewrite -has_pred1 has_find. qed.
 lemma nth_index z0 x (s : 'a list): mem s x => nth z0 s (index x s) = x.
 proof.
   rewrite -has_pred1 => h; apply (nth_find z0 (pred1 x)) in h.
-  by move: h; rewrite /pred1 => {2}->.
+  by move: h; rewrite /pred1 => {2}<-.
 qed.
 
 lemma index_cat x (s1 s2 : 'a list):
