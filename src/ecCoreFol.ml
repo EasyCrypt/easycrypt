@@ -469,7 +469,19 @@ module Hsform = Why3.Hashcons.Make (struct
 end)
 
 (* -------------------------------------------------------------------- *)
-let gty_as_ty = function GTty ty -> ty | _ -> assert false
+let gty_as_ty =
+  function GTty ty -> ty | _ -> assert false
+
+let gty_as_mem =
+  function GTmem m -> m  | _ -> assert false
+
+let gty_as_mod =
+  function GTmodty (mt, mr) -> (mt, mr) | _ -> assert false
+
+let kind_of_gty = function
+  | GTty    _ -> `Form
+  | GTmem   _ -> `Mem
+  | GTmodty _ -> `Mod
 
 (* -------------------------------------------------------------------- *)
 let hoarecmp_opp cmp =

@@ -72,6 +72,8 @@ module EV : sig
   val of_idents : ident list -> 'a evmap
 
   val add    : ident -> 'a evmap -> 'a evmap
+  val mem    : ident -> 'a evmap -> bool
+  val isset  : ident -> 'a evmap -> bool
   val set    : ident -> 'a -> 'a evmap -> 'a evmap
   val get    : ident -> 'a evmap -> [`Unset | `Set of 'a] option
   val doget  : ident -> 'a evmap -> 'a
@@ -100,6 +102,10 @@ module MEV : sig
   val of_idents : ident list -> kind -> mevmap
 
   val add    : ident -> kind -> mevmap -> mevmap
+  val mem    : ident -> kind -> mevmap -> bool
+  val isset  : ident -> kind -> mevmap -> bool
+  val set    : ident -> item -> mevmap -> mevmap
+  val get    : ident -> kind -> mevmap -> [`Unset | `Set of item] option
   val filled : mevmap -> bool
   val fold   : (ident -> item -> 'a -> 'a) -> mevmap -> 'a -> 'a
 end

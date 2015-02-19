@@ -747,7 +747,9 @@ qed.
 lemma rem_filter x (s : 'a list): uniq s =>
   rem x s = filter (predC1 x) s.
 proof.
-  elim s => //= y s ih [y_notin_s /ih->]; rewrite {2}/predC1.
+  elim s => //= y s ih [y_notin_s /ih].
+
+ rewrite {2}/predC1.
   case (y = x)=> //= <-; apply/eq_sym/all_filterP.
   (* FIXME: non genuine unification failure *)
      cut := all_predC (fun z => z = y) s => ->.

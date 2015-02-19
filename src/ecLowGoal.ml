@@ -162,6 +162,14 @@ let t_fail (tc : tcenv1) =
   tc_error !!tc ~who:"fail" "explicit call to [fail]"
 
 (* -------------------------------------------------------------------- *)
+let t_close ?who (t : FApi.backward) (tc : tcenv1) =
+  let tc = t tc in
+
+  if not (FApi.tc_done tc) then
+    tc_error !$tc ?who "expecting a closed goal";
+  tc
+
+(* -------------------------------------------------------------------- *)
 let t_id (tc : tcenv1) =
   FApi.tcenv_of_tcenv1 tc
 

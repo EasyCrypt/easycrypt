@@ -120,6 +120,9 @@ module EV = struct
     let map = Mid.change chg x m.ev_map in
     { ev_map = map; ev_unset = m.ev_unset + 1; }
 
+  let mem (x : ident) (m : 'a evmap) =
+    EcUtils.is_some (Mid.find_opt x m.ev_map)
+
   let set (x : ident) (v : 'a) (m : 'a evmap) =
     let chg = function
       | None | Some (Some _) -> assert false
@@ -132,6 +135,11 @@ module EV = struct
     | None          -> None
     | Some None     -> Some `Unset
     | Some (Some a) -> Some (`Set a)
+
+  let isset (x : ident) (m : 'a evmap) =
+    match get x m with
+    | Some (`Set _) -> true
+    | _ -> false
 
   let doget (x : ident) (m : 'a evmap) =
     match get x m with
@@ -174,15 +182,41 @@ module MEV = struct
 
   let of_idents ids k =
     match k with
-    | `Form -> { empty with evm_form = EV.of_idents ids; }
-    | `Mem  -> { empty with evm_mem  = EV.of_idents ids; }
-    | `Mod  -> { empty with evm_mod  = EV.of_idents ids; }
+    | `Form -> { empty with evm_form = EV.of_idents ids }
+    | `Mem  -> { empty with evm_mem  = EV.of_idents ids }
+    | `Mod  -> { empty with evm_mod  = EV.of_idents ids }
 
   let add x k m =
     match k with
     | `Form -> { m with evm_form = EV.add x m.evm_form }
     | `Mem  -> { m with evm_mem  = EV.add x m.evm_mem  }
     | `Mod  -> { m with evm_mod  = EV.add x m.evm_mod  }
+
+  let mem x k m =
+    match k with
+    | `Form -> EV.mem x m.evm_form
+    | `Mem  -> EV.mem x m.evm_mem
+    | `Mod  -> EV.mem x m.evm_mod
+
+  let set x v m =
+    match v with
+    | `Form v -> { m with evm_form = EV.set x v m.evm_form }
+    | `Mem  v -> { m with evm_mem  = EV.set x v m.evm_mem  }
+    | `Mod  v -> { m with evm_mod  = EV.set x v m.evm_mod  }
+
+  let get x k m =
+    let tx f = function `Unset -> `Unset | `Set x -> `Set (f x) in
+
+    match k with
+    | `Form -> omap (tx (fun x -> `Form x)) (EV.get x m.evm_form)
+    | `Mem  -> omap (tx (fun x -> `Mem  x)) (EV.get x m.evm_mem )
+    | `Mod  -> omap (tx (fun x -> `Mod  x)) (EV.get x m.evm_mod )
+
+  let isset x k m =
+    match k with
+    | `Form -> EV.isset x m.evm_form
+    | `Mem  -> EV.isset x m.evm_mem
+    | `Mod  -> EV.isset x m.evm_mod
 
   let filled m =
        EV.filled m.evm_form

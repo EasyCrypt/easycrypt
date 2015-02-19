@@ -70,21 +70,36 @@ lemma eq_bigr (P : 'a -> bool) (F1 F2 : 'a -> t) s:
   => sum P F1 s = sum P F2 s.
 proof.                          (* FIXME: big_rec2 *)
   move=> eqF; elim s=> // x s; rewrite !big_cons=> <-.
-  by case (P x)=> // /eqF <-.
+  case (P x)=> //. admit.
+(*
+move=> /eqF.
+admit.
+
+
+ /eqF <-.*)
 qed.
 
 (* -------------------------------------------------------------------- *)
-(* FIXME: move=> /eq_bigl leads to an invalid goal *)
 lemma nosmt eq_big (P1 P2 : 'a -> bool) (F1 F2 : 'a -> t) s:
      (forall i, P1 i <=> P2 i)
   => (forall i, P1 i => F1 i = F2 i)
   => sum P1 F1 s = sum P2 F2 s.
-proof. by move=> eqP eqF; rewrite -(eq_bigl eqP); apply/eq_bigr. qed.
+proof.
+  print eq_bigl.
+  move=> /eq_bigl.
+move=> F' s'.
+apply @(eq_bigl P1 P2 F' s' h).
+
+
+ by move=> eqP eqF; rewrite -(eq_bigl eqP); apply/eq_bigr. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma eq_big_perm (P : 'a -> bool) (F : 'a -> t) s1 s2:
   perm_eq s1 s2 => sum P F s1 = sum P F s2.
-proof. admit. qed.
+proof.
+  move=> /perm_eqP.y
+
+ admit. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt big_rem (P : 'a -> bool) (F : 'a -> t) s x: mem s x =>

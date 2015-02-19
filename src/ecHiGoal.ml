@@ -497,8 +497,113 @@ let process_rewrite ttenv ri tc =
     in
       tx (process_rewrite1 ttenv ri) tc
   in
-
   List.fold_left do1 (tcenv_of_tcenv1 tc) ri
+
+(* -------------------------------------------------------------------- *)
+let process_view pe tc =
+  let module E = struct
+    exception NoInstance
+    exception NoTopAssumption
+  end in
+
+  let rec instantiate fp ids pte =
+    let hyps = pte.PT.ptev_env.PT.pte_hy in
+
+    match TTC.destruct_product hyps pte.PT.ptev_ax with
+    | None -> raise E.NoInstance
+
+    | Some (`Forall (x, xty, _)) ->
+        instantiate fp ((x, xty) :: ids) (PT.apply_pterm_to_hole pte)
+
+    | Some (`Imp (f1, f2)) ->
+        try
+          PT.pf_form_match ~mode:fmdelta pte.PT.ptev_env ~ptn:f1 fp;
+          (pte, ids, f2)
+        with MatchFailure -> raise E.NoInstance
+  in
+
+  try
+    match TTC.destruct_product (tc1_hyps tc) (FApi.tc1_goal tc) with
+    | None | Some (`Forall _) -> raise E.NoTopAssumption
+
+    | Some (`Imp (f1, _)) ->
+        let top    = LDecl.fresh_id (tc1_hyps tc) "h" in
+        let tc     = t_intros_i_1 [top] tc in
+        let hyps   = tc1_hyps tc in
+        let pte    = PT.tc1_process_full_pterm tc pe in
+        let inargs = List.length pte.PT.ptev_pt.pt_args in
+
+        let (pte, ids, cutf) = instantiate f1 [] pte in
+
+        let evm  = !(pte.PT.ptev_env.PT.pte_ev) in
+        let args = List.drop inargs pte.PT.ptev_pt.pt_args in
+        let args = List.combine (List.rev ids) args in
+
+        let ids =
+          let for1 ((_, ty) as idty, arg) =
+            match ty, arg with
+            | GTty _, PAFormula { f_node = Flocal x } when MEV.mem x `Form evm ->
+                if MEV.isset x `Form evm then None else Some (x, idty)
+
+            | GTmem _, PAMemory x when MEV.mem x `Mem evm ->
+                if MEV.isset x `Mem evm then None else Some (x, idty)
+
+            | _, _ -> assert false
+
+          in List.pmap for1 args
+        in
+
+        let cutf =
+          let ptenv = PT.copy pte.PT.ptev_env in
+
+          let for1 evm (x, idty) =
+            match idty with
+            | id, GTty    ty -> evm := MEV.set x (`Form (f_local id ty)) !evm
+            | id, GTmem   _  -> evm := MEV.set x (`Mem id) !evm
+            | _ , GTmodty _  -> assert false
+          in
+
+          List.iter (for1 ptenv.PT.pte_ev) ids;
+          PT.concretize_e_form
+            (PT.concretize_env ptenv)
+            (f_forall (List.map snd ids) cutf)
+        in
+
+        let discharge tc =
+          let intros = List.map (EcIdent.name |- fst |- snd) ids in
+          let intros = LDecl.fresh_ids hyps intros in
+
+          let for1 evm (x, idty) id =
+            match idty with
+            | _, GTty   ty -> evm := MEV.set x (`Form (f_local id ty)) !evm
+            | _, GTmem   _ -> evm := MEV.set x (`Mem id) !evm
+            | _, GTmodty _ -> assert false
+
+          in
+
+          let tc = EcLowGoal.t_intros_i_1 intros tc in
+
+          List.iter2 (for1 pte.PT.ptev_env.PT.pte_ev) ids intros;
+
+          let pt = fst (PT.concretize (PT.apply_pterm_to_hole pte)) in
+
+          FApi.t_seq
+            (EcLowGoal.t_apply pt)
+            (EcLowGoal.t_apply_hyp top)
+            tc
+        in
+
+        FApi.t_internal
+          (FApi.t_seqsub (EcLowGoal.t_cut cutf)
+             [EcLowGoal.t_close ~who:"view" discharge;
+              EcLowGoal.t_clear top])
+          tc
+
+  with
+  | E.NoInstance ->
+      tc_error !!tc "cannot apply view"
+  | E.NoTopAssumption ->
+      tc_error !!tc "no top assumption"
 
 (* -------------------------------------------------------------------- *)
 let process_mintros ?(cf = true) pis gs =
@@ -628,47 +733,7 @@ let process_mintros ?(cf = true) pis gs =
                 (false, t_onall t gs)
 
           | `View pe ->
-              let on1 tc =
-                let module E = struct exception NoInstance end in
-
-                let hyps = tc1_hyps tc in
-                let pte  = PT.tc1_process_full_pterm tc pe in
-  
-                let rec instantiate fp pte =
-                  match TTC.destruct_product hyps pte.PT.ptev_ax with
-                  | None -> raise E.NoInstance
-  
-                  | Some (`Forall _) ->
-                      instantiate fp (PT.apply_pterm_to_hole pte)
-  
-                  | Some (`Imp (f1, f2)) ->
-                      try
-                        PT.pf_form_match ~mode:fmdelta pte.PT.ptev_env ~ptn:f1 fp;
-                        (pte, f2)
-                      with MatchFailure -> raise E.NoInstance
-                in
-
-                try
-                  match TTC.destruct_product hyps (FApi.tc1_goal tc) with
-                  | None | Some (`Forall _) -> raise E.NoInstance
-
-                  | Some (`Imp (f1, f2)) ->
-                      let (pte, cutf) = instantiate f1 pte in
-                      let cutf = PT.concretize_form pte.PT.ptev_env cutf in
-                      let pt = fst (PT.concretize pte) in
-                      let pt = { pt with
-                                  pt_head = PTGlobal (LG.p_imp_trans, []);
-                                  pt_args = [PAFormula f1       ;
-                                             PAFormula cutf     ;
-                                             PAFormula f2       ;
-                                             PASub     (Some pt);
-                                             PASub     None     ]; } in
-                      EcLowGoal.t_apply pt tc
-  
-                with E.NoInstance ->
-                  tc_error !!tc "cannot apply view"
-              in
-                (false, t_onall on1 gs)
+              (false, t_onall (process_view pe) gs)
 
           | `Subst d ->
               let t tc =
