@@ -1918,11 +1918,8 @@ logtactic:
 | GENERALIZE l=genpattern+
    { Pgeneralize l }
 
-| MOVE
-   { Pgeneralize [] }
-
-| MOVE COLON gp=genpattern+
-   { Pgeneralize gp }
+| MOVE vw=prefix(SLASH, pterm)* gp=option(prefix(COLON, genpattern+))
+   { Pmove (vw, odfl [] gp) }
 
 | CLEAR l=loc(intro_pattern_1_name)+
    { Pclear l }

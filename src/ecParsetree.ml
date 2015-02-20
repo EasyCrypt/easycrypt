@@ -625,6 +625,7 @@ type logtactic =
   | Papply      of apply_info
   | Pcut        of (intropattern * pformula * ptactics located option)
   | Pcutdef     of (intropattern * pcutdef)
+  | Pmove       of (ppterm list * genpattern list)
   | Pgeneralize of genpattern list
   | Pclear      of psymbol list
   | Prewrite    of rwarg list

@@ -500,7 +500,7 @@ let process_rewrite ttenv ri tc =
   List.fold_left do1 (tcenv_of_tcenv1 tc) ri
 
 (* -------------------------------------------------------------------- *)
-let process_view pe tc =
+let process_view1 pe tc =
   let module E = struct
     exception NoInstance
     exception NoTopAssumption
@@ -636,6 +636,11 @@ let process_view pe tc =
       tc_error !!tc "no top assumption"
 
 (* -------------------------------------------------------------------- *)
+let process_view pes tc =
+  let views = List.map (t_last |- process_view1) pes in
+  List.fold_left (fun tc tt -> tt tc) (FApi.tcenv_of_tcenv1 tc) views
+
+(* -------------------------------------------------------------------- *)
 let process_mintros ?(cf = true) pis gs =
   let mk_intro ids tc =
     t_intros (snd (List.map_fold (fun (hyps, form) s ->
@@ -763,7 +768,7 @@ let process_mintros ?(cf = true) pis gs =
                 (false, t_onall t gs)
 
           | `View pe ->
-              (false, t_onall (process_view pe) gs)
+              (false, t_onall (process_view1 pe) gs)
 
           | `Subst d ->
               let t tc =
@@ -860,6 +865,10 @@ let process_generalize patterns (tc : tcenv1) =
     FApi.t_seqs (List.rev_map process_generalize1 patterns) tc
   with EcCoreGoal.ClearError err ->
     tc_error_clear !!tc err
+
+(* -------------------------------------------------------------------- *)
+let process_move views patterns (tc : tcenv1) =
+  t_seq (process_generalize patterns) (process_view views) tc
 
 (* -------------------------------------------------------------------- *)
 let process_pose xsym o p (tc : tcenv1) =
