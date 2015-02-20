@@ -20,22 +20,31 @@ by [].
 lemma nosmt addzA (x y z : int): x + (y + z) = (x + y) + z
 by [].
 
-lemma nosmt addzC (x y   : int): x + y = y + x
+lemma nosmt addzC (x y : int): x + y = y + x
 by [].
 
-lemma nosmt add0z (x     : int): 0 + x = x
+lemma nosmt add0z (x : int): 0 + x = x
 by [].
 
-lemma nosmt addNz (x     : int): (-x) + x = 0
+lemma nosmt addNz (x : int): (-x) + x = 0
+by [].
+
+lemma nosmt addzCA (x y z : int): x + (y + z) = y + (x + z)
+by [].
+
+lemma nosmt addIz (x1 x2 y : int): x1 + y = x2 + y => x1 = x2
+by [].
+
+lemma nosmt addzI (x1 x2 y : int): y + x1 = y + x2 => x1 = x2
 by [].
 
 lemma nosmt mulzA  (x y z : int): x * (y * z) = (x * y) * z
 by [].
 
-lemma nosmt mulzC  (x y   : int): x * y = y * x
+lemma nosmt mulzC  (x y : int): x * y = y * x
 by [].
 
-lemma nosmt mul1z  (x     : int): 1 * x = x
+lemma nosmt mul1z  (x : int): 1 * x = x
 by [].
 
 lemma nosmt mulzDl (x y z : int): (x + y) * z = x * z + y * z
