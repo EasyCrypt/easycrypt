@@ -266,6 +266,9 @@ proof. elim s; smt. qed.
 lemma has_nil p : has p [<:'a>] <=> false.
 proof. by []. qed.
 
+lemma size_filter p (s : 'a list): size (filter p s) = count p s.
+proof. by elim: s => //= x s; case: (p x) => _ ->. qed.
+
 lemma has_count p (s : 'a list): has p s <=> (0 < count p s).
 proof. by elim s => //= x s -> /=; case (p x); smt. qed.
 

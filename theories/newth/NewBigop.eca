@@ -81,6 +81,27 @@ lemma nosmt eq_big (P1 P2 : 'a -> bool) (F1 F2 : 'a -> t) s:
 proof. by move=> /eq_bigl <- /eq_bigr <-. qed.
 
 (* -------------------------------------------------------------------- *)
+lemma big0_eq (P : 'a -> bool) s: sum P (fun i => idm) s = idm.
+proof.
+  rewrite big_const; elim/Induction.natind: (count _ _) => n.
+    by move/iter0<:t> => ->.
+    by move/iterS<:t> => -> ->; rewrite addm0.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma big0 (P : 'a -> bool) F s: (forall i, P i => F i = idm) =>
+  sum P F s = idm.
+proof. by move=> h; rewrite -@(big0_eq P s); apply/eq_bigr. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma big_hasC (P : 'a -> bool) (F : 'a -> t) s: !has P s =>
+  sum P F s = idm.
+proof.
+  rewrite -big_filter has_count -size_filter.
+  by rewrite ltz_def size_ge0 /= => /size_eq0 ->.
+qed.
+
+(* -------------------------------------------------------------------- *)
 lemma big_cat (P : 'a -> bool) (F : 'a -> t) s1 s2:
   sum P F (s1 ++ s2) = sum P F s1 + sum P F s2.
 proof.
@@ -88,7 +109,17 @@ proof.
     by rewrite @(big_nil P F) add0m.
   by rewrite !big_cons /(predT i) /= ih addmA.
 qed.
+
+(* -------------------------------------------------------------------- *)
+lemma big_catl (P : 'a -> bool) (F : 'a -> t) s1 s2: !has P s2 =>
+  sum P F (s1 ++ s2) = sum P F s1.
+proof. by rewrite big_cat => /big_hasC ->; rewrite addm0. qed.
   
+(* -------------------------------------------------------------------- *)
+lemma big_catr (P : 'a -> bool) (F : 'a -> t) s1 s2: !has P s1 =>
+  sum P F (s1 ++ s2) = sum P F s2.
+proof. by rewrite big_cat => /big_hasC ->; rewrite add0m. qed.
+
 (* -------------------------------------------------------------------- *)
 lemma eq_big_perm (P : 'a -> bool) (F : 'a -> t) s1 s2:
   perm_eq s1 s2 => sum P F s1 = sum P F s2.
