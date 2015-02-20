@@ -1,4 +1,4 @@
-; Generated on Wed Jan 21 15:50:40 2015
+; Generated on Fri Feb 20 10:15:12 2015
 
 (defvar easycrypt-bytac-keywords '(
   "exact"
@@ -102,6 +102,7 @@
   "intros"
   "pose"
   "cut"
+  "have"
   "elim"
   "clear"
   "apply"

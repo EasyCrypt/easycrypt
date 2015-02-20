@@ -232,6 +232,7 @@
 %token GENERALIZE
 %token GLOB
 %token GOAL
+%token HAVE
 %token HINT
 %token HOARE
 %token HYPOTHESIS
@@ -1993,13 +1994,13 @@ logtactic:
 | SUBST l=sform*
    { Psubst l }
 
-| CUT ip=intro_pattern* COLON p=form %prec prec_below_IMPL
+| ior_(CUT, HAVE) ip=intro_pattern* COLON p=form %prec prec_below_IMPL
    { Pcut (ip, p, None) }
 
-| CUT ip=intro_pattern* COLON p=form BY t=loc(tactics)
+| ior_(CUT, HAVE) ip=intro_pattern* COLON p=form BY t=loc(tactics)
    { Pcut (ip, p, Some t) }
 
-| CUT ip=intro_pattern* CEQ fp=pcutdef
+| ior_(CUT, HAVE) ip=intro_pattern* CEQ fp=pcutdef
    { Pcutdef (ip, fp) }
 
 | POSE o=rwocc? x=ident CEQ p=form_h %prec prec_below_IMPL
@@ -2842,3 +2843,8 @@ __rlist1(X, S):                         (* left-recursive *)
 %inline uoption(X):
 | x=X { Some x }
 | UNDERSCORE { None }
+
+(* -------------------------------------------------------------------- *)
+%inline ior_(X, Y):
+| x=X { `Left  x }
+| y=Y { `Right y }
