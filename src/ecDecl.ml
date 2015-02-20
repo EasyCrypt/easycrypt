@@ -5,6 +5,7 @@
 
 (* -------------------------------------------------------------------- *)
 open EcUtils
+open EcCoreFol
 
 module Sp = EcPath.Sp
 module TC = EcTypeClass
@@ -159,7 +160,7 @@ let operator_as_fix (op : operator) =
   | _ -> assert false
 
 (* -------------------------------------------------------------------- *)
-let axiomatized_op ?(nosmt = false) path (tparams, bd) =
+let axiomatized_op ?(nargs = 0) ?(nosmt = false) path (tparams, bd) =
   let axbd = EcCoreFol.form_of_expr EcCoreFol.mhr bd in
   let axbd, axpm =
     let bdpm = List.map fst tparams in
@@ -170,13 +171,19 @@ let axiomatized_op ?(nosmt = false) path (tparams, bd) =
        List.combine axpm (List.map snd tparams))
   in
 
-  let axspec =
-    EcCoreFol.f_eq
-      (EcCoreFol.f_op path
-         (List.map (EcTypes.tvar |- fst) axpm)
-         axbd.EcCoreFol.f_ty)
-      axbd
+  let args, axbd =
+    match axbd.f_node with
+    | Fquant (Llambda, bds, axbd) ->
+        let bds, flam = List.split_at nargs bds in
+        (bds, f_lambda flam axbd)
+    | _ -> [], axbd
   in
+
+  let opargs = List.map (fun (x, ty) -> f_local x (gty_as_ty ty)) args in
+  let tyargs = List.map (EcTypes.tvar |- fst) axpm in
+  let op     = f_op path tyargs axbd.EcCoreFol.f_ty in
+  let op     = f_app op opargs axbd.f_ty in
+  let axspec = f_forall args (f_eq op axbd) in
 
   { ax_tparams = axpm;
     ax_spec    = Some axspec;

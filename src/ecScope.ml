@@ -844,7 +844,10 @@ module Op = struct
           match tyop.op_kind with
           | OB_oper (Some (OP_Plain bd)) ->
               let path  = EcPath.pqname (path scope) (unloc op.po_name) in
-              let axop  = EcDecl.axiomatized_op ~nosmt:op.po_nosmt path (tyop.op_tparams, bd) in
+              let axop  =
+                let nosmt = op.po_nosmt in
+                let nargs = List.sum (List.map (List.length |- fst) op.po_args) in
+                  EcDecl.axiomatized_op ~nargs  ~nosmt path (tyop.op_tparams, bd) in
               let tyop  = { tyop with op_kind = OB_oper None; } in
               let scope = bind scope (unloc op.po_name, tyop) in
               Ax.bind scope false (unloc ax, axop)

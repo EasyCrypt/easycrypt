@@ -101,7 +101,12 @@ type axiom = {
 }
 
 (* -------------------------------------------------------------------- *)
-val axiomatized_op : ?nosmt:bool -> EcPath.path -> (ty_params * expr) -> axiom
+val axiomatized_op :
+     ?nargs: int
+  -> ?nosmt:bool
+  -> EcPath.path
+  -> (ty_params * expr)
+  -> axiom
 
 (* -------------------------------------------------------------------- *)
 type typeclass = {
