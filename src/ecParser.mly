@@ -1957,22 +1957,22 @@ logtactic:
 | RIGHT
     { Pright }
 
-| ELIM e=genpattern*
+| ELIM COLON? e=genpattern*
    { Pelim (e, None) }
 
-| ELIM SLASH p=qident e=genpattern*
+| ELIM SLASH p=qident COLON? e=genpattern*
    { Pelim (e, Some p) }
 
-| APPLY e=epterm
+| APPLY COLON? e=epterm
    { Papply (`Apply ([e], `Apply)) }
 
 | APPLY es=prefix(SLASH, epterm)+
    { Papply (`Apply (es, `Apply)) }
 
-| APPLY e=epterm IN x=ident
+| APPLY COLON? e=epterm IN x=ident
    { Papply (`ApplyIn (e, x)) }
 
-| EXACT e=epterm
+| EXACT COLON? e=epterm
    { Papply (`Apply ([e], `Exact)) }
 
 | EXACT es=prefix(SLASH, epterm)+
@@ -2374,7 +2374,7 @@ tactic_core_r:
 | ADMIT
    { Padmit }
 
-| CASE opts=caseoptions? gp=genpattern*
+| CASE COLON? opts=caseoptions? gp=genpattern*
    { Pcase (odfl [] opts, gp) }
 
 | PROGRESS opts=pgoptions? t=tactic_core? {
