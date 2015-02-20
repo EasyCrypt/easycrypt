@@ -1020,50 +1020,47 @@ theory Iota.
   axiom iota0 i n : n <= 0 => iota_ i n = [].
   axiom iotaS i n : 0 <= n => iota_ i (n+1) = i :: iota_ (i+1) n.
 
-  lemma size_iota m n : size (iota_ m n) = max 0 n.
+  lemma size_iota m n: size (iota_ m n) = max 0 n.
   proof. 
-    move:m;case (0 <= n).
-    + elim n => [ | n Hn Hrec] m;1:by rewrite iota0.
-      by rewrite iotaS // max_ler;smt. 
-    by move=> Hlt m;rewrite iota0 1:smt max_lel //;smt.
+    elim/Induction.natind: n m => [n hn|n hn ih] m.
+      by rewrite iota0 // max_lel.
+    rewrite iotaS //= ih max_ler // smt.
   qed.
  
   lemma iota_add m n1 n2 : 0 <= n1 => 0 <= n2 =>
      iota_ m (n1 + n2) = iota_ m n1 ++ iota_ (m + n1) n2.
   proof.
-    move=> Hn1 Hn2; elim n1 Hn1 m => //= [|n1 Hn1 Hrec] m; rewrite ?addn0 //.
-    + by rewrite (iota0 m 0) //.
-    rewrite (_: n1+1+n2 = n1+n2+1) 1:smt !iotaS 1:smt // Hrec;smt.   
+    move=> ge0_n1 ge0_n2; elim n1 ge0_n1 m => /= [|n1 ge0_n1 ih] m.
+      by rewrite (iota0 m 0).
+    by rewrite addzAC !iotaS // 1:smt ih addzAC addzA.
   qed.
  
-  lemma iota_addl m1 m2 n : iota_ (m1 + m2) n = map ((+) m1) (iota_ m2 n).
+  lemma nth_iota m n i: 0 <= i < n => nth 0 (iota_ m n) i = m + i.
   proof.
-    case (0 <= n)=> Hn.
-    + elim n Hn m2 => /= [| n Hn Hrec] m2;1:by rewrite !iota0 //.
-      by rewrite !iotaS // map_cons -addzA Hrec.
-    by rewrite !iota0 //;smt.
+    case=> ge0_i lt_in; rewrite (_ : n = i + ((n-i-1)+1)) 1:smt.
+    rewrite iota_add // 1:smt nth_cat size_iota max_ler //=.
+    by rewrite iotaS // smt.
   qed.
- 
-  lemma nth_iota m n i : 0 <= i < n => nth 0 (iota_ m n) i = m + i.
+
+  lemma iota_addl m1 m2 n: iota_ (m1 + m2) n = map ((+) m1) (iota_ m2 n).
   proof.
-    move=> [Hi Hj]; rewrite (_: n = i + ((n - i - 1) + 1)) 1:smt iota_add // 1:smt. 
-    rewrite nth_cat size_iota max_ler //= iotaS smt.
+    elim/Induction.natind: n m2 => [n hn|n hn ih] m2; 1: by rewrite !iota0.
+    by rewrite !iotaS // map_cons -addzA ih.
   qed.
  
   lemma mem_iota m n i : mem (iota_ m n) i <=> (m <= i /\ i < m + n).
   proof.
-    case (0 <= n)=> Hn;2:by rewrite iota0;smt.
-    elim n Hn m => [|n Hn Hrec] /= m;1:by rewrite iota0 //; smt.
-    rewrite iotaS // in_cons Hrec;smt.
+    elim/Induction.natind: n m => [n hn|n hn ih] m.
+      by rewrite iota0 // smt.  
+    by rewrite iotaS // in_cons ih smt.
   qed.
 
   lemma iota_uniq m n : uniq (iota_ m n).
   proof.
-    case (0 <= n)=> Hn;2:by rewrite iota0;smt.
-    elim n Hn m => [| n Hn Hrec] m; 1:by rewrite iota0;smt.
-    rewrite iotaS // cons_uniq mem_iota Hrec /=;smt.
+    elim/Induction.natind: n m => [n hn|n hn ih] m.
+      by rewrite iota0.
+    by rewrite iotaS // cons_uniq mem_iota ih // smt.
   qed.
-
 end Iota.
 
 export Iota.

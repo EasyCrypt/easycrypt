@@ -32,6 +32,9 @@ by [].
 lemma nosmt addzCA (x y z : int): x + (y + z) = y + (x + z)
 by [].
 
+lemma nosmt addzAC (x y z : int): (x + y) + z = (x + z) + y
+by [].
+
 lemma nosmt addIz (x1 x2 y : int): x1 + y = x2 + y => x1 = x2
 by [].
 
