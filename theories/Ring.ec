@@ -259,6 +259,46 @@ abstract theory Field.
 end Field.
 
 (* --------------------------------------------------------------------- *)
+theory Additive.
+  type t1, t2.
+
+  clone import Ring.ZModule as ZM1 with type t <- t1.
+  clone import Ring.ZModule as ZM2 with type t <- t2.
+
+  pred additive (f : t1 -> t2) =
+    forall (x y : t1), f (x - y) = f x - f y.
+
+  op f : { t1 -> t2 | additive f } as f_is_additive.
+
+  lemma raddf0: f ZM1.zeror = ZM2.zeror.
+  proof. by rewrite -ZM1.subr0 f_is_additive ZM2.subrr. qed.
+
+  lemma raddfB (x y : t1): f (x - y) = f x - f y.
+  proof. by apply/f_is_additive. qed.
+
+  lemma raddfN (x : t1): f (- x) = - (f x).
+  proof. by rewrite -ZM1.sub0r raddfB raddf0 ZM2.sub0r. qed.
+
+  lemma raddfD (x y : t1): f (x + y) = f x + f y.
+  proof.
+    rewrite -{1}(ZM1.opprK y) -ZM1.subrE raddfB raddfN.
+    by rewrite ZM2.subrE ZM2.opprK.
+  qed.
+end Additive.
+
+(* --------------------------------------------------------------------- *)
+theory Multiplicative.
+  type t1, t2.
+
+  clone import Ring.ComRing as ZM1 with type t <- t1.
+  clone import Ring.ComRing as ZM2 with type t <- t2.
+
+  pred multiplicative (f : t1 -> t2) =
+       f ZM1.oner = ZM2.oner
+    /\ forall (x y : t1), f (x * y) = f x * f y.
+end Multiplicative.
+
+(* --------------------------------------------------------------------- *)
 (* Rewrite database for algebra tactic                                   *)
 
 hint rewrite rw_algebra  : .
