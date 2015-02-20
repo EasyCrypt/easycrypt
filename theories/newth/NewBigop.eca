@@ -3,6 +3,9 @@
  * Distributed under the terms of the CeCILL-C license
  * -------------------------------------------------------------------- *)
 
+(* This API has been mostly inspired from the [bigop] library of the
+ * ssreflect Coq extension. *)
+
 pragma +implicits.
 
 (* -------------------------------------------------------------------- *)
@@ -28,6 +31,16 @@ lemma big_cons (P : 'a -> bool) (F : 'a -> t) x s:
 proof. by rewrite {1}/sum /= @(fun_if (map F)); case (P x). qed.
 
 (* -------------------------------------------------------------------- *)
+lemma nosmt big_map ['a 'b] (h : 'b -> 'a) (P : 'a -> bool) F s:
+  sum P F (map h s) = sum (comp P h) (comp F h) s.
+proof. by elim: s => // x s; rewrite map_cons !big_cons=> ->. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt big_nth x0 (P : 'a -> bool) (F : 'a -> t) s:
+  sum P F s = sum (comp P (nth x0 s)) (comp F (nth x0 s)) (iota_ 0 (size s)).
+proof. by rewrite -{1}@(mkseq_nth x0 s) /mkseq big_map. qed.
+
+(* -------------------------------------------------------------------- *)
 lemma big_const (P : 'a -> bool) x s:
   sum P (fun i => x) s = iter (count P s) ((+) x) idm.
 proof.
@@ -47,11 +60,6 @@ proof.
   elim: s=> // x s ih; rewrite !big_cons -ih /predT /=.
   by case (P x)=> //; rewrite add0m.
 qed.
-
-(* -------------------------------------------------------------------- *)
-lemma nosmt big_map ['a 'b] (h : 'b -> 'a) (P : 'a -> bool) F s:
-  sum P F (map h s) = sum (comp P h) (comp F h) s.
-proof. by elim: s => // x s; rewrite map_cons !big_cons=> ->. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma big_filter (P : 'a -> bool) F s:
@@ -102,6 +110,15 @@ proof.
 qed.
 
 (* -------------------------------------------------------------------- *)
+lemma big_pred0_eq (F : 'a -> t) s: sum pred0 F s = idm.
+proof. by rewrite big_hasC // has_pred0. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma big_pred0 (P : 'a -> bool) (F : 'a -> t) s:
+  (forall i, P i <=> false) => sum P F s = idm.
+proof. by move=> h; rewrite -@(big_pred0_eq F s); apply/eq_bigl. qed.
+
+(* -------------------------------------------------------------------- *)
 lemma big_cat (P : 'a -> bool) (F : 'a -> t) s1 s2:
   sum P F (s1 ++ s2) = sum P F s1 + sum P F s2.
 proof.
@@ -142,6 +159,28 @@ proof.
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma bigD1 (F : 'a -> t) s x: mem s x => uniq s =>
+lemma nosmt bigD1 (F : 'a -> t) s x: mem s x => uniq s =>
   sum predT F s = F x + sum (predC1 x) F s.
 proof. by move=> /big_rem-> /rem_filter->; rewrite big_filter. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma big_split (P : 'a -> bool) (F1 F2 : 'a -> t) s:
+  sum P (fun i => F1 i + F2 i) s = sum P F1 s + sum P F2 s.
+proof.
+  elim: s=> /= [|x s ih]; 1: by rewrite !big_nil addm0.
+  rewrite !big_cons ih; case: (P x) => // _.
+  by rewrite addmCA -!addmA addmCA.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt bigID (P : 'a -> bool) (F : 'a -> t) (a : 'a -> bool) s:
+  sum P F s = sum (P /\ a) F s + sum (P /\ !a) F s.
+proof.
+  rewrite !@(big_mkcond _ F) -big_split /(/\) /[!].
+  by apply/eq_bigr => i _ /=; case: (a i); rewrite ?addm0 ?add0m.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt big_reindex (P : 'a -> bool) (F : 'a -> t) (f f' : 'a -> 'a) s:
+  cancel f' f => sum P F s = sum (comp P f) (comp F f) (map f' s).
+proof. by move=> bij_ff'; rewrite -big_map -map_comp id_map. qed.

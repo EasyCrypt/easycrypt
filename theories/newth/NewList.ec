@@ -3,14 +3,11 @@
  * Distributed under the terms of the CeCILL-C license
  * -------------------------------------------------------------------- *)
 
-(* This API has been imported from the [seq] library of the ssreflect
- * library that is (c) Copyright Microsoft Corporation and Inria. *)
+(* This API has been mostly inspired from the [seq] library of the
+ * ssreflect Coq extension. *)
 
 (* -------------------------------------------------------------------- *)
-require import Fun.
-require import Pred.
-require import Option.
-require import Int.
+require import Fun Pred Option Int.
 
 (* -------------------------------------------------------------------- *)
 type 'a list = [
@@ -945,6 +942,16 @@ proof. by elim s1 => [|x s1 IHs] //=; rewrite IHs. qed.
 
 lemma size_map (f : 'a -> 'b) s: size (map f s) = size s.
 proof. by elim s => [// | x s /= ->]. qed.
+
+lemma map_comp (f1 : 'b -> 'c) (f2 : 'a -> 'b) s:
+  map (comp f1 f2) s = map f1 (map f2 s).
+proof. by elim: s => //= x s ->. qed.
+
+lemma map_id (s : 'a list): map id s = s.
+proof. by elim: s => //= x s ->. qed.
+
+lemma id_map f (s : 'a list): (forall x, f x = x) => map f s = s.
+proof. by move=> h; rewrite -{2}@(map_id s); apply/eq_map. qed.
 
 lemma nth_map x1 x2 (f : 'a -> 'b) n s:
   0 <= n < size s => nth x2 (map f s) n = f (nth x1 s n).
