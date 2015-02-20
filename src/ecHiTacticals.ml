@@ -299,6 +299,7 @@ and process (ttenv : ttenv) (t : ptactic) (tc : tcenv) =
     | Plogic Pintro _
     | Plogic (Prewrite _)
     | Plogic (Pgeneralize _ )
+    | Plogic (Pmove _)
     | Pidtac _ -> true
     | _ -> false
   in
