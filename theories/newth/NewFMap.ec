@@ -20,6 +20,16 @@ lemma perm_eq_uniq_map (f : 'a -> 'b)  (s1 s2 : 'a list):
   perm_eq s1 s2 => uniq (map f s1) <=> uniq (map f s2).
 proof. by move=> /(perm_eq_map f) /perm_eq_uniq ->. qed.
 
+lemma uniq_perm_eq_map (s1 s2 : ('a * 'b) list) (f: 'a * 'b -> 'c):
+  uniq (map f s1) =>
+  uniq (map f s2) =>
+  (forall (x : 'a * 'b), mem s1 x <=> mem s2 x) =>
+  perm_eq s1 s2.
+proof.
+  move=> Us1 Us2 eq12; rewrite /perm_eq allP => x _ /=.
+  by rewrite !count_uniq_mem 3:eq12 //; apply @(uniq_map_uniq _ f).
+qed.
+
 (* TODO: this may be of more general interest and may benefit from a
          move to NewList, or a separate PairList theory. *)
 lemma mem_fst_ex_snd (xs : ('a * 'b) list) (x : 'a):
@@ -38,68 +48,65 @@ proof.
   by move=> [x] xs_in_xs; exists (x,y).
 qed.
 
-op reduce_witness (xs : ('a * 'b) list): 'a list * ('a * 'b) list =
-  foldl (fun (aout : 'a list * ('a * 'b) list) (kv : 'a * 'b) =>
-           if mem aout.`1 kv.`1 then aout else (rcons aout.`1 kv.`1,rcons aout.`2 kv))
-        ([],[]) xs.
-
-lemma mem_reduce_witness (xs : ('a * 'b) list):
-   mem (reduce_witness xs).`1 = mem (map fst xs).
-proof.
-  rewrite /reduce_witness -{1}@(revK xs) foldl_rev.
-  rewrite -{2}@(cats0 xs).
-  cut: [<:'a>] = map fst [<:'a*'b>] by done.
-  move: [<:'a>] [<:'a*'b>]; elim xs=> //=.
-    by rewrite /rev //= => acc acc'.
-  move=> x xs IH a a' H.
-  rewrite /rev /= catrevE foldr_cat /= /=.
-  case (mem a x.`1).
-    rewrite (IH a a' _) // => x1_in_a.
-    subst a; apply fun_ext=> x'.
-    rewrite in_cons map_cat mem_cat; case (x' = fst x)=> //=.
-    by move=> ->; rewrite x1_in_a.
-  cut ->:= IH (rcons a x.`1) (rcons a' x) _.
-    by rewrite map_rcons -H.
-  move=> x1_notin_a; apply fun_ext=> x'.
-  rewrite !(in_cons,map_cat,mem_cat,map_rcons,mem_rcons).
-  smt. (* Parce que je le vaux bien. *)
-qed.
-
-lemma reduce_witness_projs (xs : ('a * 'b) list):
-  map fst (reduce_witness xs).`2 = (reduce_witness xs).`1.
-proof.
-  rewrite /reduce_witness.
-  cut: map fst (([<:'a>],[<:'a*'b>]).`2) = ([<:'a>],[<:'a*'b>]).`1 by done.
-  elim xs [<:'a>] [<:'a*'b>]=> //= x xs IH a a' a_eq_fa'.
-  case (mem a x.`1)=> //=.
-    by rewrite (IH a a' a_eq_fa').
-  cut -> //:= IH (rcons a x.`1) (rcons a' x) _.
-  by rewrite map_rcons a_eq_fa'.
-qed.  
-
 op reduce (xs : ('a * 'b) list): ('a * 'b) list =
-  (reduce_witness xs).`2.
+  foldl (fun aout (kv : 'a * 'b) =>
+           if mem (map fst aout) kv.`1 then aout else rcons aout kv)
+        [] xs.
 
 lemma mem_fst_reduce (xs : ('a * 'b) list):
   mem (map fst (reduce xs)) = mem (map fst xs).
 proof.
-  rewrite /reduce -@(mem_reduce_witness xs).
-  by cut ->:= reduce_witness_projs xs. (* Why not rewrite? BECAUSE IT DOES NOT WORK! :) *)
+  rewrite /reduce -{2}@(cats0 xs).
+  move: [<:'a*'b>]; elim xs=> //= x xs IH acc.
+  case (mem (map fst acc) x.`1)=> //= H.
+    apply fun_ext=> a; rewrite IH {2}/fst in_cons map_cat mem_cat.
+    by case (a = x.`1)=> [->> //= | //=]; rewrite H.
+  apply fun_ext=> a; rewrite IH !(in_cons,map_cat,map_rcons,mem_cat,mem_rcons) {2 4}/fst /=; smt. (* sic *)
 qed.
 
 lemma uniq_fst_reduce (xs : ('a * 'b) list): uniq (map fst (reduce xs)).
 proof.
-  admit. (** TODO: Adapt this proof to using reduce **)
+  rewrite /reduce.
+  cut: uniq (map fst [<:'a*'b>]) by done.
+  move: [<:'a*'b>]; elim xs=> //= x xs IH acc uniq_fst_acc.
+  case (mem (map fst acc) x.`1).
+    by rewrite (IH acc).
+  move=> x1_notin_map_fst_acc.
+  by rewrite IH 1:map_rcons 1:rcons_uniq {2}/fst.
 qed.
 
-lemma uniq_perm_eq_map (s1 s2 : ('a * 'b) list) (f: 'a * 'b -> 'c):
-  uniq (map f s1) =>
-  uniq (map f s2) =>
-  (forall (x : 'a * 'b), mem s1 x <=> mem s2 x) =>
-  perm_eq s1 s2.
+lemma reduce_uniq_fst (xs : ('a * 'b) list):
+  uniq (map fst xs) =>
+  reduce xs = xs.
 proof.
-  move=> Us1 Us2 eq12; rewrite /perm_eq allP => x _ /=.
-  by rewrite !count_uniq_mem 3:eq12 //; apply @(uniq_map_uniq _ f).
+  rewrite /reduce -{1 3}cat0s.
+  move: [<:'a*'b>]; elim xs=> //=.
+    by move=> acc; rewrite cats0.
+  move=> x xs IH acc uniq_faccxxs.
+  (* We could apply IH on the ite expression, but we'd eventually need
+     to prove that one of the branches is stupid anyway. *)
+  case (mem (map fst acc) x.`1)=> [x1_in_acc | x1_notin_acc].
+    by rewrite IH //; move: uniq_faccxxs;
+       rewrite !map_cat map_cons !cat_uniq /= x1_in_acc.
+  by rewrite IH cat_rcons.
+qed.
+
+lemma reducess (xs : ('a * 'b) list): reduce (reduce xs) = reduce xs.
+proof. by rewrite reduce_uniq_fst 1:uniq_fst_reduce. qed.
+
+lemma mem_reduce_head (xs : ('a * 'b) list) a b: mem (reduce ((a,b)::xs)) (a,b).
+proof.
+  rewrite /reduce /=.
+  cut: !mem [] (a,b) by done.
+  move: [<:'a*'b>]; elim xs=> //= x xs IH acc ab_notin_acc.
+  rewrite {2}/fst /=.
+  case (x.`1 = a)=> //=.
+    by rewrite IH.
+  move=> x1_neq_a.
+  case (mem (map fst acc) x.`1)=> //=.
+    by rewrite IH.
+  rewrite IH //.
+  by rewrite mem_rcons in_cons eq_sym; move: x x1_neq_a=> [] /= x1 x2 ->.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -131,33 +138,43 @@ op map0 ['a,'b] = Self.oflist [<:'a * 'b>]
 
 (* -------------------------------------------------------------------- *)
 (* In PairList? *)
-op get (xs : ('a * 'b) list) (a : 'a) =
-  with xs = "[]"      => None
-  with xs = (::) x xs => if a = x.`1
-                         then Some x.`2
-                         else get xs a.
+op find (xs : ('a * 'b) list) (a : 'a) =
+  omap snd (onth xs (index a (map fst xs))).
 
-lemma mem_get_uniq (xs : ('a * 'b) list) (a : 'a) (b : 'b):
-  uniq (map fst xs) =>
-  mem xs (a,b) <=> get xs a = Some b.
+lemma find_mem (xs : ('a * 'b) list) (x : 'a):
+  find xs x <> None <=> mem xs (x,oget (find xs x)).
 proof.
-  (** This feels larger than necessary **)
-  elim xs=> //= [[a' b']] xs IH /= [].
-  move=> a'_notin_fstxs uniq_xs; split.
-    case=> [[-> ->] // | H].
-    cut: mem (map fst xs) a
-      by rewrite -has_pred1 has_map hasP; exists (a,b).
-    move: a'_notin_fstxs; rewrite {2}/fst //=.
-    by case (a = a')=> //= [-> -> // | _ _ _]; rewrite -IH.
-  case (a = a')=> //= [_ /someI // | ].
-  by rewrite -IH.
+  elim xs=> //= [[a b]] xs IH /=.
+  case (x = a)=> //= [<<- | a_neq_r].
+    by rewrite /find map_cons index_head onth_nth_map @(nth_map witness) /= 1:smt.
+  rewrite /find map_cons index_cons {1}/fst /= a_neq_r /=.
+  rewrite (_: index x (map fst xs) + 1 <> 0) //= 1:smt.
+  by rewrite (_: forall x, x + 1 - 1 = x) 1:smt.
 qed.
 
-lemma get_mem (xs : ('a * 'b) list) (x : 'a):
-  get xs x <> None <=> mem xs (x,oget (get xs x)).
-proof. by elim xs=> //= [[a b]] xs IH /=; case (x = a). qed.
+lemma mem_find_uniq (xs : ('a * 'b) list) (a : 'a) (b : 'b):
+  uniq (map fst xs) =>
+  mem xs (a,b) <=> find xs a = Some b.
+proof.
+  (** This feels larger than necessary **)
+  elim xs=> //= [[a' b']] xs IH /= [] a'_notin_fstxs /IH {IH} IH.
+  case (a = a')=> [->> /= | /= a_neq_a'].
+    case (b = b')=> //= [->> | ].
+      by rewrite /find map_cons index_head.
+    rewrite /Self.find /snd map_cons index_head /= //=.
+    move=> b_neq_b'; split.
+      move=> a'b_in_xs; move: a'_notin_fstxs; rewrite {2}/fst /=.
+      rewrite -has_pred1 has_map hasP.
+      cut /= H /H {H} H := for_ex (fun x => !(mem xs x /\ preim fst (pred1 a') x)).
+      by cut := H (a',b); rewrite a'b_in_xs.
+    by move=> /someI ->>; move: b_neq_b'; rewrite -not_def.
+  rewrite /find map_cons index_cons {1}/fst /= a_neq_a' /=.
+  rewrite (_: index a (map fst xs) + 1 <> 0) //= 1:smt.
+  rewrite (_: forall x, x + 1 - 1 = x) //= 1:smt.
+  by rewrite -/(Self.find _ _) IH.
+qed.
 
-op "_.[_]" (m : ('a,'b) fmap) (x : 'a) = get (elems m) x
+op "_.[_]" (m : ('a,'b) fmap) (x : 'a) = find (elems m) x
   axiomatized by getE.
 
 lemma mapP (m1 m2 : ('a,'b) fmap):
@@ -166,19 +183,25 @@ proof.
   split=> // H; apply fmap_eq; apply uniq_perm_eq;
     first 2 by apply @(uniq_map_uniq _ fst); apply uniq_keys.
   move: H; rewrite getE /= => H [a b].
-  by rewrite !mem_get_uniq 1..2:uniq_keys // H.
+  by rewrite !mem_find_uniq 1..2:uniq_keys // H.
 qed.
 
 (* -------------------------------------------------------------------- *)
-op set (xs : ('a * 'b) list) (a : 'a) (b : 'b) =
-  with xs = "[]"      => [(a,b)]
-  with xs = (::) x xs => if a = x.`1
-                         then (a,b)::xs
-                         else x::(set xs a b).
-
 op "_.[_<-_]" (m : ('a,'b) fmap) (a : 'a) (b : 'b) =
-  Self.oflist (set (elems m) a b)
+  Self.oflist (reduce ((a,b)::elems m))
 axiomatized by setE.
+
+lemma get_set (m : ('a,'b) fmap) (a : 'a) (b : 'b):
+  m.[a <- b].[a] = Some b.
+proof.
+  rewrite getE /=.
+  print mem_find_uniq.
+  cut <- := mem_find_uniq(elems m.[a <- b]) a b _.
+    by apply uniq_keys.
+  rewrite setE /=.
+  rewrite -@(perm_eq_mem (reduce ((a,b)::elems m))) 1:-{1}reducess 1:oflistK //.
+  apply mem_reduce_head.
+qed.
 
 (* -------------------------------------------------------------------- *)
 op dom (m : ('a,'b) fmap) = NewFSet.oflist (map fst (elems m))
@@ -190,8 +213,8 @@ proof.
   rewrite domE getE /= mem_oflist.
   split.
     rewrite mem_fst_ex_snd=> [] b.
-    by rewrite mem_get_uniq 1:uniq_keys // => ->.
-  by rewrite get_mem=> H; rewrite -has_pred1 has_map hasP; exists (a,oget (get (elems m) a)).
+    by rewrite mem_find_uniq 1:uniq_keys // => ->.
+  by rewrite find_mem=> H; rewrite -has_pred1 has_map hasP; exists (a,oget (find (elems m) a)).
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -204,8 +227,8 @@ proof.
   rewrite rngE getE /= mem_oflist.
   split.
     rewrite mem_snd_ex_fst=> [] a.
-    by rewrite mem_get_uniq 1:uniq_keys // => a_in_m; exists a.
-  by move=> [] a; rewrite -mem_get_uniq 1:uniq_keys // => H; rewrite -has_pred1 has_map hasP; exists (a,b).
+    by rewrite mem_find_uniq 1:uniq_keys // => a_in_m; exists a.
+  by move=> [] a; rewrite -mem_find_uniq 1:uniq_keys // => H; rewrite -has_pred1 has_map hasP; exists (a,b).
 qed.
 
 (* -------------------------------------------------------------------- *)
