@@ -83,7 +83,11 @@ proof. by move=> /eq_bigl <- /eq_bigr <-. qed.
 (* -------------------------------------------------------------------- *)
 lemma big_cat (P : 'a -> bool) (F : 'a -> t) s1 s2:
   sum P F (s1 ++ s2) = sum P F s1 + sum P F s2.
-proof. admit. qed.
+proof.
+  rewrite !@(big_mkcond P); elim: s1 => /= [|i s1 ih].
+    by rewrite @(big_nil P F) add0m.
+  by rewrite !big_cons /(predT i) /= ih addmA.
+qed.
   
 (* -------------------------------------------------------------------- *)
 lemma eq_big_perm (P : 'a -> bool) (F : 'a -> t) s1 s2:
@@ -97,7 +101,7 @@ proof.
   rewrite big_cat !big_cons /(predT i) /=.
   rewrite addmCA; congr; rewrite -big_cat; apply/ih1=> a.
   by have := eq_s12 a; rewrite !count_cat /= addzCA => /addzI.
-qed.  
+qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt big_rem (P : 'a -> bool) (F : 'a -> t) s x: mem s x =>
