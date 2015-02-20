@@ -31,7 +31,7 @@ proof. by rewrite {1}/sum /= @(fun_if (map F)); case (P x). qed.
 lemma big_const (P : 'a -> bool) x s:
   sum P (fun i => x) s = iter (count P s) ((+) x) idm.
 proof.
-  elim s=> [|y s ih]; 1: by rewrite iter0.
+  elim: s=> [|y s ih]; 1: by rewrite iter0.
   rewrite big_cons /= ih; case (P y) => //.
   by rewrite addzC iterS // count_ge0.
 qed.
@@ -44,19 +44,19 @@ proof. by rewrite big_cons big_nil addm0. qed.
 lemma big_mkcond (P : 'a -> bool) (F : 'a -> t) s:
   sum P F s = sum predT (fun i => if P i then F i else idm) s.
 proof.
-  elim s=> // x s ih; rewrite !big_cons -ih /predT /=.
+  elim: s=> // x s ih; rewrite !big_cons -ih /predT /=.
   by case (P x)=> //; rewrite add0m.
 qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt big_map ['a 'b] (h : 'b -> 'a) (P : 'a -> bool) F s:
   sum P F (map h s) = sum (comp P h) (comp F h) s.
-proof. by elim s => // x s; rewrite map_cons !big_cons=> ->. qed.
+proof. by elim: s => // x s; rewrite map_cons !big_cons=> ->. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma big_filter (P : 'a -> bool) F s:
   sum predT F (filter P s) = sum P F s.
-proof. by elim s => //= x s; case (P x)=> //; rewrite !big_cons=> -> ->. qed.
+proof. by elim: s => //= x s; case (P x)=> //; rewrite !big_cons=> -> ->. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma eq_bigl (P1 P2 : 'a -> bool) (F : 'a -> t) s:
@@ -69,7 +69,7 @@ lemma eq_bigr (P : 'a -> bool) (F1 F2 : 'a -> t) s:
      (forall i, P i => F1 i = F2 i)
   => sum P F1 s = sum P F2 s.
 proof.                          (* FIXME: big_rec2 *)
-  move=> eqF; elim s=> // x s; rewrite !big_cons=> <-.
+  move=> eqF; elim: s=> // x s; rewrite !big_cons=> <-.
   by case (P x)=> // /eqF <-.
 qed.
 
@@ -81,15 +81,29 @@ lemma nosmt eq_big (P1 P2 : 'a -> bool) (F1 F2 : 'a -> t) s:
 proof. by move=> /eq_bigl <- /eq_bigr <-. qed.
 
 (* -------------------------------------------------------------------- *)
+lemma big_cat (P : 'a -> bool) (F : 'a -> t) s1 s2:
+  sum P F (s1 ++ s2) = sum P F s1 + sum P F s2.
+proof. admit. qed.
+  
+(* -------------------------------------------------------------------- *)
 lemma eq_big_perm (P : 'a -> bool) (F : 'a -> t) s1 s2:
   perm_eq s1 s2 => sum P F s1 = sum P F s2.
-proof. admit. qed.
+proof.
+  move=> /perm_eqP; rewrite !@(big_mkcond P).
+  elim s1 s2 => [|i s1 ih1] s2 eq_s12.
+    by case s2 eq_s12 => // i s2 h; cut := h (pred1 i); smt.
+  cut r2i: mem s2 i by rewrite -has_pred1 has_count -eq_s12 smt.
+  have/splitPr [s3 s4] ->> := r2i.
+  rewrite big_cat !big_cons /(predT i) /=.
+  rewrite addmCA; congr; rewrite -big_cat; apply/ih1=> a.
+  by have := eq_s12 a; rewrite !count_cat /= addzCA => /addzI.
+qed.  
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt big_rem (P : 'a -> bool) (F : 'a -> t) s x: mem s x =>
   sum P F s = (if P x then F x else idm) + sum P F (rem x s).
 proof.
-  by move=> /perm_to_rem /eq_big_perm ->; rewrite !@(big_mkcond P) big_cons.
+  by move/perm_to_rem/eq_big_perm=> ->; rewrite !@(big_mkcond P) big_cons.
 qed.
 
 (* -------------------------------------------------------------------- *)

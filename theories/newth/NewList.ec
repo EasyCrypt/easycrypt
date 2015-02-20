@@ -422,6 +422,13 @@ lemma drop_size_cat n (s1 s2 : 'a list):
   size s1 = n => drop n (s1 ++ s2) = s2.
 proof. by move=> <-; rewrite drop_cat subzz ltzz drop0. qed.
 
+lemma drop_nth (z0 : 'a) n s: 0 <= n < size s =>
+  drop n s = nth z0 s n :: drop (n+1) s.
+proof.
+  elim: s n=> [|x s ih] n []; 1: by elim: n => [|n _] hn //=; 1: smt.
+  by elim: n => [|n ge0_n _] /=; rewrite ?drop0 //= smt.
+qed.
+
 op take n (xs : 'a list) =
   with xs = "[]"      => []
   with xs = (::) y ys =>
@@ -457,6 +464,13 @@ lemma take_size_cat n (s1 s2 : 'a list):
   size s1 = n => take n (s1 ++ s2) = s1.
 proof. by move=> <-; rewrite take_cat subzz ltzz take0 cats0. qed.
 
+lemma take_nth (z0 : 'a) n s: 0 <= n < size s =>
+  take (n+1) s = rcons (take n s) (nth z0 s n).
+proof.
+  elim: s n=> [|x s ih] n []; 1: by elim: n => [|n _] hn //=; 1: smt.
+  by elim: n => [|n ge0_n _] /=; rewrite ?take0 //= smt.
+qed.
+
 lemma cat_take_drop n (s : 'a list): take n s ++ drop n s = s.
 proof. by elim s n; smt. qed.
 
@@ -472,6 +486,16 @@ lemma nth_take (x0 : 'a) n s i:
 proof.
   move=> n_ge0 i_ge0; case (n < size s) => [lt_n_s|le_s_n]; last smt.
   rewrite -{2}(cat_take_drop n s) nth_cat size_take //; smt.
+qed.
+
+lemma splitPr (xs : 'a list) (x : 'a): mem xs x =>
+  exists s1, exists s2, xs = s1 ++ x :: s2.
+proof.
+  move=> x_in_xs; pose i := index x xs.
+  have lt_ip: i < size xs by rewrite /i index_mem.
+  exists (take i xs); exists (drop (i+1) xs).
+  rewrite -{1}@(cat_take_drop i) -@(nth_index x x xs) //.
+  by rewrite -drop_nth // index_ge0 lt_ip.
 qed.
 
 (* -------------------------------------------------------------------- *)
