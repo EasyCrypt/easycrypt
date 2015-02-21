@@ -112,6 +112,7 @@ uninstall:
 uninstall-purge:
 	rm  -f $(DESTDIR)$(BINDIR)/easycrypt
 	rm -rf $(DESTDIR)$(LIBDIR)
+	rm -rf $(DESTDIR)$(SHRDIR)
 
 tests: check
 
