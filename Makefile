@@ -30,6 +30,7 @@ include Makefile.system
 # --------------------------------------------------------------------
 BINDIR := $(PREFIX)/bin
 LIBDIR := $(PREFIX)/lib/easycrypt
+SHRDIR := $(PREFIX)/share/easycrypt
 SYSDIR := $(LIBDIR)/system
 
 # --------------------------------------------------------------------
@@ -88,6 +89,9 @@ install: ec.native uninstall
 	  $(INSTALL) -m 0755 -d $(DESTDIR)$(LIBDIR)/$$i ';'; \
 	  $(INSTALL) -m 0644 -t $(DESTDIR)$(LIBDIR)/$$i $$i/*.ec*; \
 	done
+	$(INSTALL) -m 0755 -d $(DESTDIR)$(SHRDIR)
+	$(INSTALL) -m 0755 -d $(DESTDIR)$(SHRDIR)/emacs
+	$(INSTALL) -m 0644 -t $(DESTDIR)$(SHRDIR)/emacs proofgeneral/easycrypt/*.el
 
 define rmdir
 	-@if [ -d "$(1)" ]; then rmdir "$(1)"; fi
@@ -101,6 +105,9 @@ uninstall:
 	  for j in $$i/*.ec*; do rm -f $(DESTDIR)$(LIBDIR)/$$j; done; \
 	  rmdir $(DESTDIR)$(LIBDIR)/$$i 2>/dev/null || true; \
 	done
+	rm -f $(DESTDIR)$(SHRDIR)/emacs/*.el
+	$(call rmdir,$(DESTDIR)$(SHRDIR)/emacs)
+	$(call rmdir,$(DESTDIR)$(SHRDIR))
 
 uninstall-purge:
 	rm  -f $(DESTDIR)$(BINDIR)/easycrypt
