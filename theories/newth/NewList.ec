@@ -933,6 +933,17 @@ lemma eq_map (f1 f2 : 'a -> 'b):
   => forall s, map f1 s = map f2 s.
 proof. by move=> Ef; elim=> //= x s ->; rewrite Ef. qed.
 
+lemma mapP ['a 'b] (f : 'a -> 'b) s y:
+  mem (map f s) y <=> (exists x, mem s x /\ y = f x).
+proof.
+  elim: s => [|x s ih] //=; case: (y = f x)=> //=.
+    by move=> ->; exists x.
+  move=> ne_yfx; split; 1: move/ih.
+    by case=> x' [hx' ->]; exists x'; rewrite hx'.
+  case=> x' [h ->>]; case: h; 1: by move=> ->>; move: ne_yfx.
+  by move=> x'_in_s; apply/ih; exists x'.
+qed.
+
 lemma map_cons (f : 'a -> 'b) x s: map f (x :: s) = f x :: map f s.
 proof. by []. qed.
 

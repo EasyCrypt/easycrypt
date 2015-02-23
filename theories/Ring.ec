@@ -74,7 +74,7 @@ abstract theory ZModule.
   proof. by apply @(addrI (x + y)); rewrite addrA addrN addrAC addrK addrN. qed.
 
   lemma nosmt opprB (x y : t): -(x - y) = y - x.
-  proof. by rewrite subrE /= opprD opprK addrC. qed.
+  proof. by rewrite !subrE opprD opprK addrC. qed.
 
   lemma nosmt subr_eq (x y z : t):
     (x - z = y) <=> (x = y + z).
@@ -128,7 +128,7 @@ realize addrA. by smt. qed.
 realize addrC. by smt. qed.
 realize add0r. by smt. qed.
 realize addNr. by smt. qed.
-realize subrE. by do 2! (apply/ExtEq.fun_ext=> _); smt. qed.
+realize subrE. by smt. qed.
 
 (* -------------------------------------------------------------------- *)
 abstract theory ComRing.
@@ -262,8 +262,8 @@ end Field.
 theory Additive.
   type t1, t2.
 
-  clone import Ring.ZModule as ZM1 with type t <- t1.
-  clone import Ring.ZModule as ZM2 with type t <- t2.
+  clone import Self.ZModule as ZM1 with type t <- t1.
+  clone import Self.ZModule as ZM2 with type t <- t2.
 
   pred additive (f : t1 -> t2) =
     forall (x y : t1), f (x - y) = f x - f y.
@@ -281,7 +281,7 @@ theory Additive.
 
   lemma raddfD (x y : t1): f (x + y) = f x + f y.
   proof.
-    rewrite -{1}(ZM1.opprK y) -ZM1.subrE raddfB raddfN.
+    rewrite -{1}@(ZM1.opprK y) -ZM1.subrE raddfB raddfN.
     by rewrite ZM2.subrE ZM2.opprK.
   qed.
 end Additive.
@@ -290,8 +290,8 @@ end Additive.
 theory Multiplicative.
   type t1, t2.
 
-  clone import Ring.ComRing as ZM1 with type t <- t1.
-  clone import Ring.ComRing as ZM2 with type t <- t2.
+  clone import Self.ComRing as ZM1 with type t <- t1.
+  clone import Self.ComRing as ZM2 with type t <- t2.
 
   pred multiplicative (f : t1 -> t2) =
        f ZM1.oner = ZM2.oner

@@ -61,7 +61,9 @@ op coefp n = fun p, coeff p n.
 
 (* -------------------------------------------------------------------- *)
 lemma poly_eqP p q: (forall x, coeff p x = coeff q x) <=> p = q.
-proof. by rewrite coeffE /=; split => [| ->] // h; apply poly_eq. qed.
+proof.
+  by split=> [| ->] // h; apply/poly_eq=> x; have := h x; rewrite !coeffE.
+qed.
 
 (* -------------------------------------------------------------------- *)
 op polyC (c : R) = ofseq [c].

@@ -257,6 +257,9 @@ lemma nosmt imp_trans (a b c : bool):
   (a => b) => (b => c) => (a => c)
 by [].
 
+lemma iffP p q r: (r <=> q) => (p => q) => (q => p) => r <=> p
+by [].
+
 (** equality *)
 lemma nosmt eq_refl  : forall (x:'a), x = x by [].
 lemma nosmt eq_sym   : forall (x y : 'a), x = y <=> y = x by [].

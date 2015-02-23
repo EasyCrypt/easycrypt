@@ -180,10 +180,10 @@ op "_.[_]" (m : ('a,'b) fmap) (x : 'a) = find (elems m) x
 lemma mapP (m1 m2 : ('a,'b) fmap):
   (m1 = m2) <=> (forall x, m1.[x] = m2.[x]).
 proof.
-  split=> // H; apply fmap_eq; apply uniq_perm_eq;
+  split=> // h; apply fmap_eq; apply uniq_perm_eq;
     first 2 by apply @(uniq_map_uniq _ fst); apply uniq_keys.
-  move: H; rewrite getE /= => H [a b].
-  by rewrite !mem_find_uniq 1..2:uniq_keys // H.
+  case=> x y; move: (h x); rewrite !getE => {h} h.
+  by rewrite !mem_find_uniq 1..2:uniq_keys // h.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -224,11 +224,11 @@ op rng (m : ('a,'b) fmap) = NewFSet.oflist (map snd (elems m))
 lemma in_rng (m: ('a,'b) fmap) (b : 'b):
   mem (rng m) b <=> (exists a, m.[a] = Some b).
 proof.
-  rewrite rngE getE /= mem_oflist.
-  split.
-    rewrite mem_snd_ex_fst=> [] a.
-    by rewrite mem_find_uniq 1:uniq_keys // => a_in_m; exists a.
-  by move=> [] a; rewrite -mem_find_uniq 1:uniq_keys // => H; rewrite -has_pred1 has_map hasP; exists (a,b).
+  rewrite rngE mem_oflist; split.
+    move/NewList.mapP=> [] [x y] [h ->]; exists x.
+    by rewrite getE -mem_find_uniq // uniq_keys.
+  case=> x; rewrite getE -mem_find_uniq ?uniq_keys // => h.
+  by apply/NewList.mapP; exists (x, b).
 qed.
 
 (* -------------------------------------------------------------------- *)

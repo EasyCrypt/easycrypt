@@ -46,8 +46,8 @@ qed.
 lemma setP (s1 s2 : 'a fset):
   (s1 = s2) <=> (forall x, mem s1 x <=> mem s2 x).
 proof.
-  split => [-> // | h]; apply fset_eq; rewrite uniq_perm_eq;
-    by rewrite 1?uniq_elems; move: h; rewrite memE /=.
+  by split=> [-> | h] //; apply/fset_eq; rewrite uniq_perm_eq;
+    rewrite 1?uniq_elems // => x; move: (h x); rewrite !memE.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -72,15 +72,15 @@ proof. by move=> x; rewrite set1E /= mem_oflist. qed.
 
 lemma in_setU (s1 s2 : 'a fset):
   forall x, mem (setU s1 s2) x <=> mem s1 x \/ mem s2 x.
-proof. by move=> x; rewrite setUE /= mem_oflist mem_cat memE. qed.
+proof. by move=> x; rewrite setUE mem_oflist mem_cat !memE. qed.
 
 lemma in_setI (s1 s2 : 'a fset):
   forall x, mem (setI s1 s2) x <=> mem s1 x /\ mem s2 x.
-proof. by move=> x; rewrite setIE /= mem_oflist mem_filter memE. qed.
+proof. by move=> x; rewrite setIE mem_oflist mem_filter !memE. qed.
 
 lemma in_setD (s1 s2 : 'a fset):
   forall x, mem (setD s1 s2) x <=> mem s1 x /\ !mem s2 x.
-proof. by move=> x; rewrite setDE /= mem_oflist mem_filter memE. qed.
+proof. by move=> x; rewrite setDE mem_oflist mem_filter /predC !memE. qed.
 
 (* -------------------------------------------------------------------- *)
 pred (<=) (s1 s2 : 'a fset) = mem s1 <= mem s2.
