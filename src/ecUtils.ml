@@ -439,6 +439,9 @@ module List = struct
     | []      -> true
     | x :: xs -> not (List.exists (eq x) xs) && (is_unique ~eq xs)
 
+  let sum  xs = List.fold_left (+)  0  xs
+  let sumf xs = List.fold_left (+.) 0. xs
+
   let rotate (d : [`Left|`Right]) (i : int) (xs : 'a list) =
     if i < 0 then invalid_arg "List.rotate: [i < 0]";
     let i = i mod List.length xs in
