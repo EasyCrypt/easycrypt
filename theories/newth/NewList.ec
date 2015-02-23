@@ -1065,6 +1065,17 @@ proof.
     by exists x. by exists (x, y).
 qed.
 
+lemma nth_index_map (z0 : 'a) (f : 'a -> 'b) (s : 'a list) x:
+     (forall x y, mem s x => mem s y => f x = f y => x = y)
+  => mem s x => nth z0 s (index (f x) (map f s)) = x.
+proof.
+  elim: s => //= y s ih inj_f s_x; rewrite index_cons.
+  case: (f x = f y) => eqf /=; 1: by apply/eq_sym/inj_f.
+  move: s_x eqf; case: (x = y)=> //= ne_xy s_x _.
+  rewrite addz1_neq0 1:index_ge0 //= addAzN ih //.
+  by move=> x' y' s_x' s_y'; apply/inj_f; rewrite ?(s_x', s_y').
+qed.
+
 (* -------------------------------------------------------------------- *)
 (*                          Index sequence                              *)
 (* -------------------------------------------------------------------- *)
@@ -1118,6 +1129,46 @@ theory Iota.
 end Iota.
 
 export Iota.
+
+(* -------------------------------------------------------------------- *)
+(*                        Association lists                             *)
+(* -------------------------------------------------------------------- *)
+op assoc (xs : ('a * 'b) list) (a : 'a) =
+  omap snd (onth xs (index a (map fst xs))).
+
+lemma assoc_nil a: assoc [<:'a * 'b>] a = None.
+proof. by []. qed.
+
+lemma assoc_cons x y s a:
+    assoc<:'a, 'b> ((x, y) :: s) a
+  = if a = x then Some y else assoc s a.
+proof.
+  rewrite /assoc /= index_cons {1 3}/fst /=; case: (a = x)=> //=.
+  by move=> _; rewrite addAzN addz1_neq0 // index_ge0.
+qed.
+
+lemma assoc_head x y s: assoc<:'a, 'b> ((x, y) :: s) x = Some y.
+proof. by rewrite assoc_cons. qed.
+
+lemma mem_assoc_uniq (s : ('a * 'b) list) (a : 'a) (b : 'b):
+  uniq (map fst s) => mem s (a, b) <=> assoc s a = Some b.
+proof.
+  elim: s => //= [[x y]] s ih; rewrite eq_sym => [x_notin_1s uq_1s] /=.
+  case: (x = a) => [->> |] /=; 1: rewrite assoc_head /=.
+    by apply/eq_iff/orb_idr=> /(map_f fst); rewrite x_notin_1s.
+  by move=> ne_xa; rewrite assoc_cons ih // @(eq_sym a) ne_xa.
+qed.
+
+lemma assocP (s : ('a * 'b) list) (x : 'a):
+     (  mem (map fst s) x /\ assoc s x = Some (oget (assoc s x)))
+  \/ (! mem (map fst s) x /\ assoc s x = None).
+proof.
+  rewrite /assoc onth_nth_map; case: (mem (map fst s) x)=> /=.
+    move=> s_x; rewrite @(nth_map witness) //.
+    by rewrite -@(size_map fst) index_mem index_ge0.
+  move=> x_notin_s; rewrite nth_default //.
+  by rewrite lezNgt size_map -@(size_map fst) index_mem.
+qed.
 
 (* -------------------------------------------------------------------- *)
 (*         Sequence from a function computing from indexes              *)
@@ -1180,6 +1231,17 @@ qed.
 (*                            Flattening                                *)
 (* -------------------------------------------------------------------- *)
 op flatten ['a] = foldr (++) [<:'a>].
+
+(* -------------------------------------------------------------------- *)
+(*                               EqIn                                   *)
+(* -------------------------------------------------------------------- *)
+lemma eq_in_filter p1 p2 (s : 'a list):
+     (forall x, mem s x => p1 x <=> p2 x)
+  => filter p1 s = filter p2 s.
+proof.
+  elim: s => //= x s ih eq_p; rewrite eq_p // ih //.
+  by move=> x' x'_in_s; apply/eq_p; rewrite x'_in_s.
+qed.
 
 (* -------------------------------------------------------------------- *)
 (*                         Sequence sorting                             *)
