@@ -423,7 +423,7 @@ let rec f_eq_simpl f1 f2 =
            f_equal op2 f_op_real_of_int
     -> f_false
 
-  | Fop(op1, []) ,Fop (op2, []) when
+  | Fop (op1, []), Fop (op2, []) when
          (EcPath.p_equal op1 EcCoreLib.CI_Bool.p_true  &&
           EcPath.p_equal op2 EcCoreLib.CI_Bool.p_false  )
       || (EcPath.p_equal op2 EcCoreLib.CI_Bool.p_true  &&

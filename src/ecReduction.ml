@@ -402,9 +402,8 @@ let rec h_red ri env hyps f =
         | Some (`Real_mul ), [f1;f2] -> f_real_mul_simpl f1 f2
         | Some (`Real_div ), [f1;f2] -> f_real_div_simpl f1 f2
         | Some (`Eq       ), [f1;f2] -> begin
-            let fallback () = f_eq_simpl f1 f2 in
-            match (fst (destr_app f1)).f_node, (fst (destr_app f2)).f_node with
-            | Fop (p1, _), Fop (p2, _)
+            match fst_map f_node (destr_app f1), fst_map f_node (destr_app f2) with
+            | (Fop (p1, _), args1), (Fop (p2, _), args2)
                 when EcEnv.Op.is_dtype_ctor env p1
                   && EcEnv.Op.is_dtype_ctor env p2 ->
 
@@ -412,9 +411,11 @@ let rec h_red ri env hyps f =
                   let idx = EcEnv.Op.by_path p env in
                     snd (EcDecl.operator_as_ctor idx)
                 in
-                  if idx p1 <> idx p2 then f_false else fallback ()
+                  if   idx p1 <> idx p2
+                  then f_false
+                  else f_ands (List.map2 f_eq args1 args2)
 
-            | _ -> fallback ()
+            | _ -> f_eq_simpl f1 f2
         end
 
         | _ when ri.delta_p p ->
