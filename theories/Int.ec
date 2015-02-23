@@ -14,6 +14,9 @@ op int_of_bool (b : bool) = if b then 1 else 0.
 op zeroz = 0.
 op onez  = 1.
 
+lemma nosmt addz1_neq0 (i : int): 0 <= i => i+1 <> 0
+by [].
+
 lemma nosmt onez_neq0 : 1 <> 0 
 by [].
 
@@ -39,6 +42,9 @@ lemma nosmt addIz (x1 x2 y : int): x1 + y = x2 + y => x1 = x2
 by [].
 
 lemma nosmt addzI (x1 x2 y : int): y + x1 = y + x2 => x1 = x2
+by [].
+
+lemma nosmt addAzN (x y : int): (x + y) - y = x
 by [].
 
 lemma nosmt mulzA  (x y z : int): x * (y * z) = (x * y) * z
