@@ -33,6 +33,7 @@ lemma nosmt eqT : forall (x:bool), (x = true) <=> x by [].
 lemma nosmt neqF : forall (x:bool), (x = false) <=> !x by [].
 
 lemma nosmt not_def: forall (x:bool), (x => false) <=> !x by [].
+lemma nosmt negP: forall (x:bool), (x => false) <=> !x by [].
 lemma nosmt nnot: forall (x:bool), (!(!x)) = x by [].
 
 lemma nosmt negbTE: forall (x:bool), !x => (x => false) by [].
@@ -101,6 +102,15 @@ lemma nosmt andF : forall (b : bool),
   (b /\ false) = false
 by [].
 
+lemma andb_idl (a b : bool) : (b => a) <=> (a /\ b) = b.
+proof. smt. qed.
+lemma andb_idr (a b : bool) : (a => b) <=> (a /\ b) = a.
+proof. smt. qed.
+lemma andb_id2l (a b c : bool) : (a => b = c) <=> (a /\ b) = (a /\ c).
+proof. smt. qed.
+lemma andb_id2r (a b c : bool) : (b => a = c) <=> (a /\ b) = (c /\ b).
+proof. smt. qed.
+
 (** or *)
 lemma nosmt orE : forall (a b c:bool), 
     (a => c) => (b => c) => (a \/ b) => c
@@ -130,6 +140,15 @@ lemma nosmt orTb (b : bool): (true  \/ b) = true  by [].
 lemma nosmt orFb (b : bool): (false \/ b) = b     by [].
 lemma nosmt orbT (b : bool): (b \/ true ) = true  by [].
 lemma nosmt orbF (b : bool): (b \/ false) = b     by [].
+
+lemma orb_idl (a b : bool) : (a => b) <=> (a \/ b) = b.
+proof. smt. qed.
+lemma orb_idr (a b : bool) : (b => a) <=> (a \/ b) = a.
+proof. smt. qed.
+lemma orb_id2l (a b c : bool) : (! a => b = c) <=> (a \/ b) = (a \/ c).
+proof. smt. qed.
+lemma orb_id2r (a b c : bool) : (! b => a = c) <=> (a \/ b) = (c \/ b).
+proof. smt. qed.
 
 (** Distributivity and/or *)
 lemma nosmt orDand : forall (a b c : bool),
