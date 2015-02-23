@@ -398,13 +398,20 @@ let f_if_simpl f1 f2 f3 =
 
 let f_imps_simpl = List.fold_right f_imp_simpl
 
-let f_iff_simpl f1 f2 =
-  if f_equal f1 f2 then f_true
-  else if is_true f1 then f2
-  else if is_false f1 then f_not_simpl f2
-  else if is_true f2 then f1
-  else if is_false f2 then f_not_simpl f1
-  else f_iff f1 f2
+let rec f_iff_simpl f1 f2 =
+       if f_equal  f1 f2 then f_true
+  else if is_true  f1    then f2
+  else if is_false f1    then f_not_simpl f2
+  else if is_true  f2    then f1
+  else if is_false f2    then f_not_simpl f1
+  else
+    match f1.f_node, f2.f_node with
+    | Fapp ({f_node = Fop (op1, [])}, [f1]),
+      Fapp ({f_node = Fop (op2, [])}, [f2]) when
+        (EcPath.p_equal op1 EcCoreLib.CI_Bool.p_not &&
+         EcPath.p_equal op2 EcCoreLib.CI_Bool.p_not)
+        -> f_iff_simpl f1 f2
+    | _ -> f_iff f1 f2
 
 let rec f_eq_simpl f1 f2 =
   if f_equal f1 f2 then f_true
