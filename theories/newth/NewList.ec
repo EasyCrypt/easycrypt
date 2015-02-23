@@ -7,7 +7,7 @@
  * ssreflect Coq extension. *)
 
 (* -------------------------------------------------------------------- *)
-require import Fun Pred Option Int.
+require import Fun Pred Option Pair Int.
 
 (* -------------------------------------------------------------------- *)
 type 'a list = [
@@ -165,6 +165,10 @@ proof. by []. qed.
 
 lemma mem_head (x : 'a) s: mem (x :: s) x.
 proof. by []. qed.
+
+lemma mem_behead (s : 'a list):
+  forall x, mem (behead s) x => mem s x.
+proof. by move=> x; case: s => //= y s ->. qed.
 
 lemma mem_seq1 (x y : 'a): mem [y] x <=> (x = y).
 proof. by []. qed.
@@ -815,6 +819,10 @@ proof.
   by cut := has_pred1 y => ->.
 qed.
 
+lemma index_uniq z0 i (s : 'a list):
+  0 <= i < size s => uniq s => index (nth z0 s i) s = i.
+proof. by elim: s i; smt. qed.
+
 (* -------------------------------------------------------------------- *)
 (*                       Removing duplicates                            *)
 (* -------------------------------------------------------------------- *)
@@ -933,6 +941,9 @@ lemma eq_map (f1 f2 : 'a -> 'b):
   => forall s, map f1 s = map f2 s.
 proof. by move=> Ef; elim=> //= x s ->; rewrite Ef. qed.
 
+lemma map_f (f : 'a -> 'b) s x: mem s x => mem (map f s) (f x).
+proof. by elim: s => [|y s ih] //=; case=> [| /ih] ->. qed.
+
 lemma mapP ['a 'b] (f : 'a -> 'b) s y:
   mem (map f s) y <=> (exists x, mem s x /\ y = f x).
 proof.
@@ -942,6 +953,13 @@ proof.
     by case=> x' [hx' ->]; exists x'; rewrite hx'.
   case=> x' [h ->>]; case: h; 1: by move=> ->>; move: ne_yfx.
   by move=> x'_in_s; apply/ih; exists x'.
+qed.
+
+lemma uniq_map (f : 'a -> 'b) (s : 'a list):
+  uniq (map f s) => uniq s.
+proof.
+  elim: s=> //= x s ih [x1_notin_fs /ih] -> /=.
+  by apply/not_def=> /(map_f f).
 qed.
 
 lemma map_cons (f : 'a -> 'b) x s: map f (x :: s) = f x :: map f s.
@@ -1020,6 +1038,31 @@ lemma perm_eq_map (f : 'a -> 'b) (s1 s2 : 'a list):
 proof.
   move=> h; apply/perm_eqP=> p; rewrite !count_map.
   by apply/perm_eqP.
+qed.
+
+lemma map_inj_in_uniq (f : 'a -> 'b) s:
+     (forall x y, mem s x => mem s y => f x = f y => x = y)
+  => uniq (map f s) <=> uniq s.
+proof.
+  elim: s => // x s ih injf /=; rewrite ih /=.
+    by move=> x' y' sx' sy'; apply/injf=> /=; rewrite ?(sx', sy').
+  case: (uniq s) => //= uniq_s; split=> h; 2: by apply/map_f.
+  move/mapP: h => [x'] [x'_in_s eq_fxx']; rewrite @(injf x x') //.
+  by rewrite mem_behead.
+qed.
+
+lemma mem_map_fst (xs : ('a * 'b) list) (x : 'a):
+  mem (map fst xs) x <=> (exists y, mem xs (x,y)).
+proof.
+  rewrite @(mapP fst); split; case=> [[x' y] [h ->]|y h].
+    by exists y. by exists (x, y).
+qed.
+
+lemma mem_map_snd (xs : ('a * 'b) list) (y : 'b):
+  mem (map snd xs) y <=> (exists x, mem xs (x,y)).
+proof.
+  rewrite @(mapP snd); split; case=> [[x y'] [h ->]|x h].
+    by exists x. by exists (x, y).
 qed.
 
 (* -------------------------------------------------------------------- *)

@@ -7,47 +7,18 @@ require import Fun Pred Option Pair Int NewList NewFSet.
 
 pragma +implicits.
 
-(** Even more general (to NewList?) **)
-lemma uniq_map_uniq (xs : 'a list) (f : 'a -> 'c):
-  uniq (map f xs) => uniq xs.
-proof.
-  elim xs=> //= x xs IH [] x1_notin_fxs /IH -> /=.
-  rewrite -not_def=> x_in_xs; move: x1_notin_fxs=> //=. (* This is a weird way of contraposing *)
-  by rewrite -has_pred1 has_map hasP; exists x.
-qed.
-
+(* -------------------------------------------------------------------- *)
 lemma perm_eq_uniq_map (f : 'a -> 'b)  (s1 s2 : 'a list):
   perm_eq s1 s2 => uniq (map f s1) <=> uniq (map f s2).
 proof. by move=> /(perm_eq_map f) /perm_eq_uniq ->. qed.
 
 lemma uniq_perm_eq_map (s1 s2 : ('a * 'b) list) (f: 'a * 'b -> 'c):
-  uniq (map f s1) =>
-  uniq (map f s2) =>
-  (forall (x : 'a * 'b), mem s1 x <=> mem s2 x) =>
-  perm_eq s1 s2.
-proof.
-  move=> Us1 Us2 eq12; rewrite /perm_eq allP => x _ /=.
-  by rewrite !count_uniq_mem 3:eq12 //; apply @(uniq_map_uniq _ f).
-qed.
+     uniq (map f s1) => uniq (map f s2)
+  => (forall (x : 'a * 'b), mem s1 x <=> mem s2 x)
+  => perm_eq s1 s2.
+proof. by move=> /uniq_map h1 /uniq_map h2 /(uniq_perm_eq _ _ h1 h2). qed.
 
-(* TODO: this may be of more general interest and may benefit from a
-         move to NewList, or a separate PairList theory. *)
-lemma mem_fst_ex_snd (xs : ('a * 'b) list) (x : 'a):
-  mem (map fst xs) x <=> (exists y, mem xs (x,y)).
-proof.
-  rewrite -has_pred1 has_map hasP /preim/fst/pred1; split.
-    by move=> [[a b]] /= [x0_in_xs ->>]; exists b.
-  by move=> [y] xs_in_xs; exists (x,y).
-qed.
-
-lemma mem_snd_ex_fst (xs : ('a * 'b) list) (y : 'b):
-  mem (map snd xs) y <=> (exists x, mem xs (x,y)).
-proof.
-  rewrite -has_pred1 has_map hasP /preim/snd/pred1; split.
-    by move=> [[a b]] /= [x0_in_xs ->>]; exists a.
-  by move=> [x] xs_in_xs; exists (x,y).
-qed.
-
+(* -------------------------------------------------------------------- *)
 op reduce (xs : ('a * 'b) list): ('a * 'b) list =
   foldl (fun aout (kv : 'a * 'b) =>
            if mem (map fst aout) kv.`1 then aout else rcons aout kv)
@@ -142,7 +113,7 @@ op find (xs : ('a * 'b) list) (a : 'a) =
   omap snd (onth xs (index a (map fst xs))).
 
 lemma find_mem (xs : ('a * 'b) list) (x : 'a):
-  find xs x <> None <=> mem xs (x,oget (find xs x)).
+  find xs x <> None <=> mem xs (x, oget (find xs x)).
 proof.
   elim xs=> //= [[a b]] xs IH /=.
   case (x = a)=> //= [<<- | a_neq_r].
@@ -153,8 +124,7 @@ proof.
 qed.
 
 lemma mem_find_uniq (xs : ('a * 'b) list) (a : 'a) (b : 'b):
-  uniq (map fst xs) =>
-  mem xs (a,b) <=> find xs a = Some b.
+  uniq (map fst xs) => mem xs (a,b) <=> find xs a = Some b.
 proof.
   (** This feels larger than necessary **)
   elim xs=> //= [[a' b']] xs IH /= [] a'_notin_fstxs /IH {IH} IH.
@@ -174,6 +144,7 @@ proof.
   by rewrite -/(Self.find _ _) IH.
 qed.
 
+(* -------------------------------------------------------------------- *)
 op "_.[_]" (m : ('a,'b) fmap) (x : 'a) = find (elems m) x
   axiomatized by getE.
 
@@ -181,7 +152,7 @@ lemma mapP (m1 m2 : ('a,'b) fmap):
   (m1 = m2) <=> (forall x, m1.[x] = m2.[x]).
 proof.
   split=> // h; apply fmap_eq; apply uniq_perm_eq;
-    first 2 by apply @(uniq_map_uniq _ fst); apply uniq_keys.
+    first 2 by apply @(uniq_map fst); apply uniq_keys.
   case=> x y; move: (h x); rewrite !getE => {h} h.
   by rewrite !mem_find_uniq 1..2:uniq_keys // h.
 qed.
@@ -212,7 +183,7 @@ lemma in_dom (m: ('a,'b) fmap) (a : 'a):
 proof.
   rewrite domE getE /= mem_oflist.
   split.
-    rewrite mem_fst_ex_snd=> [] b.
+    rewrite mem_map_fst=> [] b.
     by rewrite mem_find_uniq 1:uniq_keys // => ->.
   by rewrite find_mem=> H; rewrite -has_pred1 has_map hasP; exists (a,oget (find (elems m) a)).
 qed.
