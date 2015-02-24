@@ -135,7 +135,10 @@ axiom fmap_eq (s1 s2 : ('a,'b) fmap):
   (perm_eq (elems s1) (elems s2)) => (s1 = s2).
 
 (* -------------------------------------------------------------------- *)
-op map0 ['a,'b] = Self.oflist [<:'a * 'b>] axiomatized by map0E.
+lemma fmapW (p : ('a, 'b) fmap -> bool):
+     (forall m, uniq (map fst m) => p (Self.oflist m))
+  => forall m, p m.
+proof. by move=> ih m; rewrite -elemsK; apply/ih/uniq_keys. qed.
 
 (* -------------------------------------------------------------------- *)
 op "_.[_]" (m : ('a,'b) fmap) (x : 'a) = assoc (elems m) x
@@ -164,6 +167,12 @@ op "_.[_<-_]" (m : ('a, 'b) fmap) (a : 'a) (b : 'b) =
   axiomatized by setE.
 
 (* -------------------------------------------------------------------- *)
+op map0 ['a,'b] = Self.oflist [<:'a * 'b>] axiomatized by map0E.
+
+lemma get0 x: (map0<:'a, 'b>).[x] = None.
+proof. by rewrite map0E get_oflist. qed.
+
+(* -------------------------------------------------------------------- *)
 lemma get_set (m : ('a, 'b) fmap) (a : 'a) (b : 'b):
   m.[a <- b].[a] = Some b.
 proof. by rewrite setE get_oflist assoc_reduce assoc_head. qed.
@@ -181,6 +190,16 @@ proof.
   by move/perm_eq_mem=> ->; apply/dom_reduce.
 qed.
 
+lemma mem_domE (m : ('a, 'b) fmap) x:
+  mem (dom m) x <=> mem (map fst (elems m)) x.
+proof.
+  elim/fmapW: m=> m _; rewrite dom_oflist; apply/perm_eq_mem.
+  by apply/perm_eq_map; rewrite -{1}@(reduce_reduced m) // oflistK.
+qed.
+
+lemma dom0: dom map0<:'a, 'b> = set0.
+proof. by apply/setP=> x; rewrite map0E dom_oflist in_set0. qed.
+
 (* -------------------------------------------------------------------- *)
 op rng ['a 'b] (m : ('a, 'b) fmap) = 
   NewFSet.oflist (map snd (elems m))
@@ -197,5 +216,14 @@ proof.
 qed.
 
 (* -------------------------------------------------------------------- *)
-op size (m : ('a,'b) fmap) = card (dom m)
+op (+) (m1 m2 : ('a, 'b) fmap)
+  = Self.oflist (elems m2 ++ elems m1)
+  axiomatized by joinE.
+
+lemma get_join (m1 m2 : ('a, 'b) fmap) x:
+  (m1 + m2).[x] = if mem (dom m2) x then m2.[x] else m1.[x].
+proof. by rewrite joinE get_oflist mem_domE assoc_cat -!getE. qed.
+
+(* -------------------------------------------------------------------- *)
+op size (m : ('a, 'b) fmap) = card (dom m)
   axiomatized by sizeE.

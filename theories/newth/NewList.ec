@@ -1173,6 +1173,14 @@ qed.
 lemma assoc_head x y s: assoc<:'a, 'b> ((x, y) :: s) x = Some y.
 proof. by rewrite assoc_cons. qed.
 
+lemma assoc_cat (s1 s2 : ('a * 'b) list) x:
+    assoc (s1 ++ s2) x
+  = if mem (map fst s1) x then assoc s1 x else assoc s2 x.
+proof.
+  elim: s1 => /= [|[x' y'] s ih] //; rewrite !assoc_cons /=.
+  by rewrite /(fst _) /=; case: (x = x').
+qed.
+
 lemma mem_assoc_uniq (s : ('a * 'b) list) (a : 'a) (b : 'b):
   uniq (map fst s) => mem s (a, b) <=> assoc s a = Some b.
 proof.
