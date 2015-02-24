@@ -172,10 +172,26 @@ op map0 ['a,'b] = Self.oflist [<:'a * 'b>] axiomatized by map0E.
 lemma get0 x: (map0<:'a, 'b>).[x] = None.
 proof. by rewrite map0E get_oflist. qed.
 
+lemma get_eq0 (m : ('a,'b) fmap):
+  (forall x, m.[x] = None) => m = map0.
+proof. by move=> h; apply fmapP=> x; rewrite h get0. qed.
+
 (* -------------------------------------------------------------------- *)
-lemma get_set (m : ('a, 'b) fmap) (a : 'a) (b : 'b):
+lemma get_set (m : ('a, 'b) fmap) (a : 'a) (b : 'b) (x : 'a):
+  m.[a <- b].[x] = if x = a then Some b else m.[x].
+proof.
+  rewrite setE get_oflist assoc_reduce assoc_cons getE;
+    by case (x = a).
+qed.
+
+lemma get_set_eq (m : ('a, 'b) fmap) (a : 'a) (b : 'b):
   m.[a <- b].[a] = Some b.
-proof. by rewrite setE get_oflist assoc_reduce assoc_head. qed.
+proof. by rewrite get_set. qed.
+
+lemma get_set_neq (a : 'a) (b : 'b) (m : ('a, 'b) fmap) (x : 'a):
+  x <> a =>
+  m.[a <- b].[x] = m.[x].
+proof. by rewrite get_set=> ->. qed.
 
 (* -------------------------------------------------------------------- *)
 op dom ['a 'b] (m : ('a, 'b) fmap) =
@@ -192,27 +208,77 @@ qed.
 
 lemma mem_domE (m : ('a, 'b) fmap) x:
   mem (dom m) x <=> mem (map fst (elems m)) x.
+proof. by rewrite domE mem_oflist. qed.
+
+lemma in_dom (m : ('a, 'b) fmap) x:
+  mem (dom m) x <=> m.[x] <> None.
 proof.
-  elim/fmapW: m=> m _; rewrite dom_oflist; apply/perm_eq_mem.
-  by apply/perm_eq_map; rewrite -{1}@(reduce_reduced m) // oflistK.
+  rewrite mem_domE getE;
+    by have [[-> [y [_ ->]]] | [-> ->]] := assocP (elems m) x.
+qed.
+
+lemma fmap_domP (m1 m2 : ('a, 'b) fmap):
+  (m1 = m2) <=>    (forall x, mem (dom m1) x = mem (dom m2) x)
+                /\ (forall x, mem (dom m1) x => m1.[x] = m2.[x]).
+proof.
+  split=> // [[]] eq_dom eq_on_dom.
+  apply fmapP=> x; case (mem (dom m1) x)=> h.
+    by apply eq_on_dom.
+  have := h; move: h; rewrite {2}eq_dom !in_dom /=.
+  by move=> -> ->.
 qed.
 
 lemma dom0: dom map0<:'a, 'b> = set0.
 proof. by apply/setP=> x; rewrite map0E dom_oflist in_set0. qed.
+
+lemma dom_eq0 (m : ('a,'b) fmap):
+  dom m = set0 => m = map0.
+proof.
+  move=> eq_dom; apply fmap_domP; rewrite eq_dom dom0 //= => x;
+    by rewrite in_set0.
+qed.
+
+lemma dom_set (m : ('a, 'b) fmap) (a : 'a) (b : 'b):
+  forall x, mem (dom m.[a <- b]) x <=> mem (setU (dom m) (set1 a)) x.
+proof.
+  move=> x; rewrite in_setU in_set1 !in_dom get_set;
+    by case (x = a).
+qed.
+
+lemma dom_set_eq (m : ('a, 'b) fmap) (a : 'a) (b : 'b):
+  mem (dom m.[a <- b]) a.
+proof. by rewrite dom_set in_setU in_set1. qed.
+
+lemma dom_set_neq (m : ('a, 'b) fmap) (a : 'a) (b : 'b) (x : 'a):
+  x <> a =>
+  mem (dom m.[a <- b]) x <=> mem (dom m) x.
+proof. by rewrite dom_set in_setU in_set1=> ->. qed.
 
 (* -------------------------------------------------------------------- *)
 op rng ['a 'b] (m : ('a, 'b) fmap) = 
   NewFSet.oflist (map snd (elems m))
   axiomatized by rngE.
 
+lemma mem_rngE (m : ('a, 'b) fmap) y:
+  mem (rng m) y <=> mem (map snd (elems m)) y.
+proof. by rewrite rngE mem_oflist. qed.
+
 lemma in_rng (m: ('a,'b) fmap) (b : 'b):
   mem (rng m) b <=> (exists a, m.[a] = Some b).
 proof.
-  rewrite rngE mem_oflist; split.
+  rewrite mem_rngE; split.
     move/NewList.mapP=> [] [x y] [h ->]; exists x.
     by rewrite getE -mem_assoc_uniq // uniq_keys.
   case=> x; rewrite getE -mem_assoc_uniq ?uniq_keys // => h.
   by apply/NewList.mapP; exists (x, b).
+qed.
+
+lemma rng0: rng map0<:'a, 'b> = set0.
+proof.
+  apply/setP=> x; rewrite in_set0 //= in_rng.
+  (* FIXME: here, higher-order pattern-matching would help *)
+  have //= -> // x' := nexists (fun (a:'a), map0.[a] = Some x).
+  by rewrite get0.
 qed.
 
 (* -------------------------------------------------------------------- *)
