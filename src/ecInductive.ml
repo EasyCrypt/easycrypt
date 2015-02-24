@@ -113,10 +113,10 @@ let indsc_of_datatype ?normty (mode : indmode) (dt : datatype) =
 
   and schemec mode (targs, p) pred (ctor, tys) =
     let indty = tconstr p (List.map tvar targs) in
-    let ctor  = EcPath.pqoname (EcPath.prefix tpath) ctor in
-    let ctor  = EcFol.f_op ctor (List.map tvar targs) indty in
     let xs    = List.map (fun xty -> (fresh_id_of_ty xty, xty)) tys in
     let cargs = List.map (fun (x, xty) -> EcFol.f_local x xty) xs in
+    let ctor  = EcPath.pqoname (EcPath.prefix tpath) ctor in
+    let ctor  = EcFol.f_op ctor (List.map tvar targs) (toarrow tys indty) in
     let form  = EcFol.f_app pred [EcFol.f_app ctor cargs indty] tbool in
     let form  =
       match mode with
