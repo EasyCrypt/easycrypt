@@ -491,11 +491,14 @@ let hoarecmp_opp cmp =
   | FHge -> FHle
 
 (* -------------------------------------------------------------------- *)
-let mk_form node ty =  Hsform.hashcons
-    { f_node = node;
-      f_ty   = ty;
-      f_fv   = Mid.empty;
-      f_tag  = -1; }
+let mk_form node ty =
+  let aout =
+    Hsform.hashcons
+      { f_node = node;
+        f_ty   = ty;
+        f_fv   = Mid.empty;
+        f_tag  = -1; }
+  in assert (EcTypes.ty_equal ty aout.f_ty); aout
 
 let f_node { f_node = form } = form
 
@@ -503,10 +506,15 @@ let f_node { f_node = form } = form
 let f_op x tys ty = mk_form (Fop (x, tys)) ty
 
 let f_app f args ty =
-  match args, f.f_node with
-  | [], _              -> f
-  | _ , Fapp(f',args') -> mk_form (Fapp (f', args'@args)) ty
-  | _ , _              -> mk_form (Fapp (f , args)) ty
+  let f, args' =
+    match f.f_node with
+    | Fapp (f, args') -> (f, args')
+    | _ -> (f, [])
+  in let args' = args' @ args in
+
+  if List.is_empty args' then begin
+    (*if ty_equal ty f.f_ty then f else mk_form f.f_node ty *) f
+  end else mk_form (Fapp (f, args')) ty
 
 (* -------------------------------------------------------------------- *)
 let f_local  x ty   = mk_form (Flocal x) ty
@@ -1059,7 +1067,6 @@ let is_op_eq       p = EcPath.p_equal EcCoreLib.CI_Bool.p_eq  p
 
 (* -------------------------------------------------------------------- *)
 let destr_app   = function { f_node = Fapp (f, fs) } -> (f, fs) | f -> (f, [])
-
 let destr_tuple = function { f_node = Ftuple fs } -> fs | _ -> destr_error "tuple"
 let destr_local = function { f_node = Flocal id } -> id | _ -> destr_error "local"
 
