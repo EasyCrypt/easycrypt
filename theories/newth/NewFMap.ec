@@ -36,10 +36,35 @@ op reduce (xs : ('a * 'b) list): ('a * 'b) list =
 lemma reduce_nil: reduce [<:'a * 'b>] = [].
 proof. by []. qed.
 
+lemma nosmt reduce_cat (r s : ('a * 'b) list):
+    foldl augment r s
+  = r ++ filter (comp (predC (mem (map fst r))) fst) (foldl augment [] s).
+proof.
+  rewrite -@(revK s) !foldl_rev; pose f := fun x z => augment z x.
+  elim/last_ind: s r => /=.
+    by move=> r; rewrite !rev_nil /= cats0.
+  move=> s [x y] ih r; rewrite !rev_rcons /= ih => {ih}.
+  rewrite {1}/f {1}/augment map_cat mem_cat /=.
+  pose t1 := map fst _; pose t2 := map fst _.
+  case: (mem t1 x \/ mem t2 x) => //; last first.
+    rewrite -nor => [t1_x t2_x]; rewrite rcons_cat; congr.
+    rewrite {2}/f /augment /=; pose t := map fst _.
+    case: (mem t x) => h; last first.
+      by rewrite filter_rcons /= /comp /predC t1_x.
+    have: mem t2 x; rewrite // /t2 /comp.
+    have <- := filter_map<:'a, 'a * 'b> fst (predC (mem t1)).
+    by rewrite mem_filter /predC t1_x.
+  case=> h; congr; rewrite {2}/f /augment /=; last first.
+    move: h; rewrite /t2 => /mapP [z] [h ->>].
+    by move: h; rewrite mem_filter => [_ /(map_f fst) ->].
+  case: (NewList.mem _ _) => //=; rewrite filter_rcons.
+  by rewrite /comp /predC h.
+qed.
+
 lemma reduce_cons (x : 'a) (y : 'b) s:
     reduce ((x, y) :: s)
   = (x, y) :: filter (comp (predC1 x) fst) (reduce s).
-proof. admit. qed.
+proof. by rewrite {1}/reduce /= augment_nil reduce_cat cat1s. qed.
 
 lemma assoc_reduce (s : ('a * 'b) list):
   forall x, assoc (reduce s) x = assoc s x.

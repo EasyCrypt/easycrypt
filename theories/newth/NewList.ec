@@ -328,6 +328,14 @@ proof. by apply all_filterP; apply filter_all. qed.
 lemma filter_cat p (s1 s2 : 'a list): filter p (s1 ++ s2) = filter p s1 ++ filter p s2.
 proof. by elim s1 => //= x s1 ->; case (p x). qed.
 
+lemma filter_cons p x (s : 'a list):
+  filter p (x :: s) = if p x then x :: filter p s else filter p s.
+proof. by case: (p x)=> ->. qed.
+
+lemma filter_rcons p x (s : 'a list):
+  filter p (rcons s x) = if p x then rcons (filter p s) x else filter p s.
+proof. by rewrite -!cats1 filter_cat; case: (p x)=> -> /=; rewrite ?cats0. qed.
+
 lemma count_cat p (s1 s2 : 'a list): count p (s1 ++ s2) = count p s1 + count p s2.
 proof. by rewrite !count_filter filter_cat size_cat. qed.
 
@@ -766,6 +774,21 @@ proof.
   move=> x; elim s; first by rewrite rev_nil.
   by move=> y s IHs; rewrite rev_cons mem_rcons /= IHs.
 qed.
+
+lemma filter_rev p (s : 'a list): filter p (rev s) = rev (filter p s).
+proof.
+  elim: s => /= [|x s ih]; rewrite ?rev_nil // fun_if.
+  by rewrite !rev_cons filter_rcons ih.
+qed.
+
+lemma count_rev p (s : 'a list): count p (rev s) = count p s.
+proof. by rewrite -!size_filter filter_rev size_rev. qed.
+
+lemma has_rev p (s : 'a list): has p (rev s) = has p s.
+proof. by rewrite !has_count count_rev. qed.
+
+lemma all_rev p (s : 'a list): all p (rev s) = all p s.
+proof. by rewrite !all_count count_rev size_rev. qed.
 
 (* -------------------------------------------------------------------- *)
 (*                        Duplicate-freenes                             *)
