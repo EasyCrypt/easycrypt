@@ -98,7 +98,6 @@ lemma reduce_reduced (s : ('a * 'b) list):
 proof.
   elim: s => [|[x y] s ih]; 1: by rewrite reduce_nil.
   rewrite reduce_cons /= {2}/fst /= => [x_notin_s /ih ->].
-  (* FIXME: here, `congr` generates an invalid proof term *)
   rewrite @(eq_in_filter _ predT) ?filter_predT /predT //=.
   case=> x' y' /(map_f fst) x'_in_s; apply/negP => <<-.
   by move: x_notin_s.
