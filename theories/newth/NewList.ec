@@ -1160,14 +1160,34 @@ proof.
 qed.
 
 lemma assocP (s : ('a * 'b) list) (x : 'a):
-     (  mem (map fst s) x /\ assoc s x = Some (oget (assoc s x)))
+     (  mem (map fst s) x /\ exists y, mem s (x, y) /\ assoc s x = Some y)
   \/ (! mem (map fst s) x /\ assoc s x = None).
 proof.
-  rewrite /assoc onth_nth_map; case: (mem (map fst s) x)=> /=.
-    move=> s_x; rewrite @(nth_map witness) //.
-    by rewrite -@(size_map fst) index_mem index_ge0.
-  move=> x_notin_s; rewrite nth_default //.
-  by rewrite lezNgt size_map -@(size_map fst) index_mem.
+  elim: s=> //=; case=> x' y' s ih; rewrite /(fst (x', _)) /=.
+  case: (x = x') => /= [<<- |]; 1: by exists y'; rewrite assoc_cons.
+  by rewrite assoc_cons => ->.
+qed.
+
+lemma perm_eq_assoc (s1 s2 : ('a * 'b) list) x:
+     uniq (map fst s2)
+  => perm_eq s1 s2 => assoc s1 x = assoc s2 x.
+proof.
+  move=> uq_s1 peq_s1s2.
+  case: (assocP s1 x); last first.
+    case=> Ns1_x ->; case: (assocP s2 x); 2: by case=> _ <-.
+    by have/perm_eq_mem <- := perm_eq_map fst _ _ peq_s1s2.
+  case=> s1_x [y1 [s1_xy1 ->]]; apply/eq_sym.
+  by rewrite -mem_assoc_uniq //; apply/(perm_eq_mem peq_s1s2).
+qed.
+
+lemma assoc_filter (p : 'a -> bool) (s : ('a * 'b) list) x:
+  (p x) => assoc (filter (comp p fst) s) x = assoc s x.
+proof.
+  move=> px; elim: s=> //=; case=> x' y' s ih.
+  rewrite assoc_cons; case: (x = x') => [<<- |].
+    by rewrite {1}/comp {1}/fst /= px /= assoc_cons.
+  move=> ne_xx'; case: (comp _ _ _)=> //=.
+  by rewrite assoc_cons ne_xx' /= ih.
 qed.
 
 (* -------------------------------------------------------------------- *)
