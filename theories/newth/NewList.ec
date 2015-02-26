@@ -1212,13 +1212,17 @@ proof.
 qed.
 
 lemma assoc_filter (p : 'a -> bool) (s : ('a * 'b) list) x:
-  (p x) => assoc (filter (comp p fst) s) x = assoc s x.
+  assoc (filter (comp p fst) s) x = if (p x) then assoc s x else None.
 proof.
-  move=> px; elim: s=> //=; case=> x' y' s ih.
+  elim: s=> //=.
+    by rewrite assoc_nil.
+  move=> [x' y'] s ih.
   rewrite assoc_cons; case: (x = x') => [<<- |].
-    by rewrite {1}/comp {1}/fst /= px /= assoc_cons.
+    rewrite {1}/comp {1}/fst /=; case (p x).
+      by rewrite assoc_cons.
+    by rewrite ih=> ->.
   move=> ne_xx'; case: (comp _ _ _)=> //=.
-  by rewrite assoc_cons ne_xx' /= ih.
+  by rewrite assoc_cons ne_xx' /=.
 qed.
 
 (* -------------------------------------------------------------------- *)
