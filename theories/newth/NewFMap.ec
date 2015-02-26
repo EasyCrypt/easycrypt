@@ -71,7 +71,7 @@ lemma assoc_reduce (s : ('a * 'b) list):
 proof. 
   move=> x; elim: s => //; case=> x' y' s ih.
   rewrite reduce_cons !assoc_cons; case: (x = x')=> //.
-  by move=> ne_xx'; rewrite assoc_filter.
+  by move=> ne_xx'; rewrite assoc_filter /predC1 ne_xx'.
 qed.
 
 lemma dom_reduce (s : ('a * 'b) list):
@@ -187,10 +187,21 @@ lemma get_set_eq (m : ('a, 'b) fmap) (a : 'a) (b : 'b):
   m.[a <- b].[a] = Some b.
 proof. by rewrite get_set. qed.
 
-lemma get_set_neq (a : 'a) (b : 'b) (m : ('a, 'b) fmap) (x : 'a):
-  x <> a =>
-  m.[a <- b].[x] = m.[x].
-proof. by rewrite get_set=> ->. qed.
+(* -------------------------------------------------------------------- *)
+op rm (m : ('a, 'b) fmap) (a : 'a) =
+  Self.oflist (filter (comp (predC1 a) fst) (elems m))
+  axiomatized by rmE.
+
+lemma get_rm (m : ('a, 'b) fmap) (a : 'a):
+  forall x, (rm m a).[x] = if x = a then None else m.[x].
+proof.
+  move=> x; rewrite rmE get_oflist; case (x = a)=> [->> | ].
+    by rewrite assoc_filter.
+  by rewrite assoc_filter /predC1 getE=> ->.
+qed.
+
+lemma get_rm_eq (m : ('a,'b) fmap) (a : 'a): (rm m a).[a] = None.
+proof. by rewrite get_rm. qed.
 
 (* -------------------------------------------------------------------- *)
 op dom ['a 'b] (m : ('a, 'b) fmap) =
@@ -248,10 +259,14 @@ lemma dom_set_eq (m : ('a, 'b) fmap) (a : 'a) (b : 'b):
   mem (dom m.[a <- b]) a.
 proof. by rewrite dom_set in_setU in_set1. qed.
 
-lemma dom_set_neq (m : ('a, 'b) fmap) (a : 'a) (b : 'b) (x : 'a):
-  x <> a =>
-  mem (dom m.[a <- b]) x <=> mem (dom m) x.
-proof. by rewrite dom_set in_setU in_set1=> ->. qed.
+lemma dom_rm (m : ('a, 'b) fmap) (a : 'a):
+  forall x, mem (dom (rm m a)) x <=> mem (setD (dom m) (set1 a)) x.
+proof.
+  by move=> x; rewrite in_setD in_set1 !in_dom get_rm; case (x = a).
+qed.
+
+lemma dom_rm_eq (m : ('a, 'b) fmap) (a : 'a): !mem (dom (rm m a)) a.
+proof. by rewrite dom_rm in_setD in_set1. qed.
 
 (* -------------------------------------------------------------------- *)
 op rng ['a 'b] (m : ('a, 'b) fmap) = 
@@ -279,6 +294,24 @@ proof.
   have //= -> // x' := nexists (fun (a:'a), map0.[a] = Some x).
   by rewrite get0.
 qed.
+
+lemma rng_set (m : ('a, 'b) fmap) (a : 'a) (b : 'b):
+  forall y, mem (rng m.[a<-b]) y <=> mem (setU (rng (rm m a)) (set1 b)) y.
+proof.
+  move=> y; rewrite in_setU in_set1 !in_rng; split=> [[] x |].
+    rewrite get_set; case (x = a)=> [->> /= <<- |].
+      by right.
+    by move=> ne_xa mx_y; left; exists x; rewrite get_rm ne_xa /=.
+  rewrite orbC -ora_or=> [->> | ].
+    by exists a; rewrite get_set_eq.
+  move=> ne_yb [] x; rewrite get_rm.
+  case (x = a)=> //= ne_xa <-.
+  by exists x; rewrite get_set ne_xa.
+qed.
+
+lemma rng_set_eq (m : ('a, 'b) fmap) (a : 'a) (b : 'b):
+  mem (rng m.[a<-b]) b.
+proof. by rewrite rng_set in_setU in_set1. qed.
 
 (* -------------------------------------------------------------------- *)
 op (+) (m1 m2 : ('a, 'b) fmap)
