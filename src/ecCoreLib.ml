@@ -76,23 +76,7 @@ module CI_Real = struct
   let p_real_lt     = _Real "<"
   let p_real_ge     = _Real ">="
   let p_rle_ge_sym  = _Real "le_ge_sym"
-
-  module NewReal = struct
-    let i_NewReal = "NewRealCore"
-    let p_NewReal = EcPath.pqname p_top i_Real
-  end
-
-  open NewReal
-
-  let p_real_of_ints = [
-    List.fold_left EcPath.pqname p_Real    ["FromInt"; "from_int"];
-    List.fold_left EcPath.pqname p_NewReal ["FromInt"; "from_int"];
-  ]
-
-  let p_dfl_real_of_int = List.hd p_real_of_ints
-
-  let is_real_of_int (p : EcPath.path) =
-    List.exists (EcPath.p_equal p) p_real_of_ints
+  let p_real_of_int = List.fold_left EcPath.pqname p_Real ["FromInt"; "from_int"]
 end
 
 (* -------------------------------------------------------------------- *)
@@ -191,6 +175,7 @@ let is_mixfix_op =
   fun op -> List.mem op ops
 
 (* -------------------------------------------------------------------- *)
+let s_real_of_int = EcPath.toqsymbol CI_Real.p_real_of_int
 let s_dbool       = EcPath.toqsymbol CI_Distr.p_dbool
 let s_dbitstring  = EcPath.toqsymbol CI_Distr.p_dbitstring
 let s_dinter      = EcPath.toqsymbol CI_Distr.p_dinter

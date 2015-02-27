@@ -50,7 +50,7 @@ let f_eqglob mp1 m1 mp2 m2 =
   f_eq (f_glob mp1 m1) (f_glob mp2 m2)
 
 (* -------------------------------------------------------------------- *)
-let f_op_real_of_int = f_op EcCoreLib.CI_Real.p_dfl_real_of_int [] (tfun tint treal) (* CORELIB *)
+let f_op_real_of_int = f_op EcCoreLib.CI_Real.p_real_of_int [] (tfun tint treal) (* CORELIB *)
 let f_real_of_int f  = f_app f_op_real_of_int [f] treal
 let f_rint n         = f_real_of_int (f_int n)
 
