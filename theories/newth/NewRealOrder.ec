@@ -1,5 +1,6 @@
 (* -------------------------------------------------------------------- *)
-require import NewIntCore NewRealCore.
+(* require import NewIntCore NewRealCore. *)
+require import Int Real.        (* FIXME: to be removed *)
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt ler_norm_add (x y : real):
