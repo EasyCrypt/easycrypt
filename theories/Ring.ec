@@ -16,10 +16,10 @@ abstract theory ZModule.
   op ( + ) : t -> t -> t.
   op [ - ] : t -> t.
 
-  axiom addrA: forall (x y z : t), x + (y + z) = (x + y) + z.
-  axiom addrC: forall (x y   : t), x + y = y + x.
-  axiom add0r: forall (x     : t), zeror + x = x.
-  axiom addNr: forall (x     : t), (-x) + x = zeror.
+  axiom nosmt addrA: forall (x y z : t), x + (y + z) = (x + y) + z.
+  axiom nosmt addrC: forall (x y   : t), x + y = y + x.
+  axiom nosmt add0r: forall (x     : t), zeror + x = x.
+  axiom nosmt addNr: forall (x     : t), (-x) + x = zeror.
 
   op ( - ) (x y : t) = x + -y axiomatized by subrE.
 
@@ -139,11 +139,11 @@ abstract theory ComRing.
   op oner  : t.
   op ( * ) : t -> t -> t.
 
-  axiom oner_neq0 : oner <> zeror.
-  axiom mulrA     : forall (x y z : t), x * (y * z) = (x * y) * z.
-  axiom mulrC     : forall (x y   : t), x * y = y * x.
-  axiom mul1r     : forall (x     : t), oner * x = x.
-  axiom mulrDl    : forall (x y z : t), (x + y) * z = (x * z) + (y * z).
+  axiom nosmt oner_neq0 : oner <> zeror.
+  axiom nosmt mulrA     : forall (x y z : t), x * (y * z) = (x * y) * z.
+  axiom nosmt mulrC     : forall (x y   : t), x * y = y * x.
+  axiom nosmt mul1r     : forall (x     : t), oner * x = x.
+  axiom nosmt mulrDl    : forall (x y z : t), (x + y) * z = (x * z) + (y * z).
 
   lemma nosmt mulr1 (x : t): x * oner = x.
   proof. by rewrite mulrC mul1r. qed.
@@ -233,7 +233,7 @@ abstract theory Field.
       apply @(mulKr _ nz_x).
   qed.
 
-  axiom invK (x : t): inv (inv x) = x.
+  axiom invrK (x : t): inv (inv x) = x.
 
   op exp (x : t) (n : int) =
     if n < 0
@@ -259,7 +259,7 @@ abstract theory Field.
 end Field.
 
 (* --------------------------------------------------------------------- *)
-theory Additive.
+abstract theory Additive.
   type t1, t2.
 
   clone import Self.ZModule as ZM1 with type t <- t1.
@@ -287,7 +287,7 @@ theory Additive.
 end Additive.
 
 (* --------------------------------------------------------------------- *)
-theory Multiplicative.
+abstract theory Multiplicative.
   type t1, t2.
 
   clone import Self.ComRing as ZM1 with type t <- t1.
