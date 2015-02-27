@@ -833,7 +833,7 @@ let pp_opapp (ppe : PPEnv.t) t_ty pp_sub outer fmt (pred, op, tvi, es) =
         in
           Some pp
 
-    | [e] when qs = EcCoreLib.s_real_of_int ->
+    | [e] when EcCoreLib.CI_Real.is_real_of_int op ->
         let pp fmt () =
           Format.fprintf fmt "%a%%r"
             (pp_sub ppe (fst outer, (max_op_prec, `NonAssoc))) e

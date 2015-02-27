@@ -18,10 +18,9 @@ val s_abs  : symbol
 
 val is_mixfix_op : symbol -> bool
 
-val s_dbool       : qsymbol
-val s_dbitstring  : qsymbol
-val s_dinter      : qsymbol
-val s_real_of_int : qsymbol
+val s_dbool      : qsymbol
+val s_dbitstring : qsymbol
+val s_dinter     : qsymbol
 
 (* -------------------------------------------------------------------- *)
 val i_top  : symbol
@@ -90,7 +89,9 @@ module CI_Real : sig
   val p_real_lt     : path
   val p_real_ge     : path
   val p_rle_ge_sym  : path
-  val p_real_of_int : path
+
+  val p_dfl_real_of_int : path
+  val is_real_of_int    : path -> bool
 end
 
 (* -------------------------------------------------------------------- *)
