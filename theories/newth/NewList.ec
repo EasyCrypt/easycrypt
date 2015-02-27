@@ -26,6 +26,36 @@ lemma size_eq0 (s : 'a list): (size s = 0) <=> (s = []).
 proof. by case s => //=; smt. qed.
 
 (* -------------------------------------------------------------------- *)
+op head (z0 : 'a) (s : 'a list) =
+  with s = "[]"     => z0
+  with s = (::) x s => x.
+
+lemma head_nil (z0 : 'a): head z0 [] = z0.
+proof. by []. qed.
+
+lemma head_cons (z0 : 'a) x s: head z0 (x :: s) = x.
+proof. by []. qed.
+
+(* -------------------------------------------------------------------- *)
+op ohead (s : 'a list) =
+  with s = "[]"     => None
+  with s = (::) x s => Some x.
+
+lemma ohead_nil: ohead [<:'a>] = None.
+proof. by []. qed.
+
+lemma ohead_cons (x : 'a) s: ohead (x :: s) = Some x.
+proof. by []. qed.
+
+lemma head_ohead z0 (s : 'a list):
+  head z0 s = odflt z0 (ohead s).
+proof. by case: s. qed.
+
+lemma ohead_head z0 (s : 'a list): s <> [] =>
+  ohead s = Some (head z0 s).
+proof. by case: s. qed.
+
+(* -------------------------------------------------------------------- *)
 op behead (xs : 'a list) =
   with xs = "[]" => []
   with xs = (::) y ys => ys.
