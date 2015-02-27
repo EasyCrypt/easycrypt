@@ -835,8 +835,8 @@ type global =
   | GthOpen      of (bool * psymbol)
   | GthClose     of psymbol
   | GthRequire   of (psymbol list * [`Import|`Export] option)
-  | GthImport    of pqsymbol
-  | GthExport    of pqsymbol
+  | GthImport    of pqsymbol list
+  | GthExport    of pqsymbol list
   | GthClone     of (theory_cloning * [`Import|`Export] option)
   | GthW3        of (string list * string * w3_renaming list)
   | GsctOpen     of psymbol option

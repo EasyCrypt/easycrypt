@@ -442,8 +442,8 @@ and process_th_require1 ld scope (x, io) =
         let scope = EcScope.Theory.require scope (name, kind) loader in
           match io with
           | None         -> scope
-          | Some `Export -> process_th_export scope ([], name)
-          | Some `Import -> process_th_import scope ([], name)
+          | Some `Export -> EcScope.Theory.export scope ([], name)
+          | Some `Import -> EcScope.Theory.import scope ([], name)
 
 (* -------------------------------------------------------------------- *)
 and process_th_require ld scope (xs, io) =
@@ -452,14 +452,14 @@ and process_th_require ld scope (xs, io) =
     scope xs
 
 (* -------------------------------------------------------------------- *)
-and process_th_import (scope : EcScope.scope) name =
+and process_th_import (scope : EcScope.scope) (names : pqsymbol list) =
   EcScope.check_state `InTop "theory import" scope;
-  EcScope.Theory.import scope name
+  List.fold_left EcScope.Theory.import scope (List.map unloc names)
 
 (* -------------------------------------------------------------------- *)
-and process_th_export (scope : EcScope.scope) name =
+and process_th_export (scope : EcScope.scope) (names : pqsymbol list) =
   EcScope.check_state `InTop "theory export" scope;
-  EcScope.Theory.export scope name
+  List.fold_left EcScope.Theory.export scope (List.map unloc names)
 
 (* -------------------------------------------------------------------- *)
 and process_th_clone (scope : EcScope.scope) (thcl, io) =
@@ -467,8 +467,8 @@ and process_th_clone (scope : EcScope.scope) (thcl, io) =
   let (name, scope) = EcScope.Cloning.clone scope (!pragma).pm_check thcl in
     match io with
     | None         -> scope
-    | Some `Export -> process_th_export scope ([], name)
-    | Some `Import -> process_th_import scope ([], name)
+    | Some `Export -> EcScope.Theory.export scope ([], name)
+    | Some `Import -> EcScope.Theory.import scope ([], name)
 
 (* -------------------------------------------------------------------- *)
 and process_w3_import (scope : EcScope.scope) (p, f, r) =
@@ -561,8 +561,8 @@ and process (ld : EcLoader.ecloader) (scope : EcScope.scope) g =
       | GthOpen      name -> `Fct   (fun scope -> process_th_open    scope  (snd_map unloc name))
       | GthClose     name -> `Fct   (fun scope -> process_th_close   scope  name.pl_desc)
       | GthRequire   name -> `Fct   (fun scope -> process_th_require ld scope name)
-      | GthImport    name -> `Fct   (fun scope -> process_th_import  scope  name.pl_desc)
-      | GthExport    name -> `Fct   (fun scope -> process_th_export  scope  name.pl_desc)
+      | GthImport    name -> `Fct   (fun scope -> process_th_import  scope  name)
+      | GthExport    name -> `Fct   (fun scope -> process_th_export  scope  name)
       | GthClone     thcl -> `Fct   (fun scope -> process_th_clone   scope  thcl)
       | GsctOpen     name -> `Fct   (fun scope -> process_sct_open   scope  name)
       | GsctClose    name -> `Fct   (fun scope -> process_sct_close  scope  name)

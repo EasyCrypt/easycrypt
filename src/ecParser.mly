@@ -1543,8 +1543,8 @@ import_flag:
 theory_require :
 | REQUIRE ip=import_flag? x=uident+ { (x, ip) }
 
-theory_import: IMPORT x=uqident { x }
-theory_export: EXPORT x=uqident { x }
+theory_import: IMPORT xs=uqident* { xs }
+theory_export: EXPORT xs=uqident* { xs }
 
 theory_w3:
 | IMPORT WHY3 path=string_list r=plist0(renaming,SEMICOLON)
