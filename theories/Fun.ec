@@ -73,12 +73,12 @@ theory Injections.
     forall x, oapp h x (g x) = x.
 
   lemma nosmt can_pcan (f:'a -> 'b) g: cancel f g => pcancel f (fun y, Some (g y)).
-  proof. by move=> fK x //=; congr; rewrite fK. qed.
+  proof. by move=> fK x //=; rewrite fK. qed.
 
   lemma nosmt pcan_inj (f:'a -> 'b) g: pcancel f g => injective f.
   proof.
     move=> fK x y h; apply (congr1 g) in h.
-    by generalize h; rewrite !fK; apply someI.
+    by generalize h; rewrite !fK.
   qed.
 
   lemma nosmt can_inj (f : 'a -> 'b) g: cancel f g => injective f.

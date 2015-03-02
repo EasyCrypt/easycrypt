@@ -517,7 +517,7 @@ lemma eq_except_set2 (m1 m2:('a,'b) map) x x' y1 y2:
 proof.
   move=> m1_eqe_m2_x; split.
     case (x = x')=> //= x_neq_x' eqe_set2.
-    by cut:= eqe_set2 x' _=> //; rewrite !get_set_eq; apply someI.
+    by cut:= eqe_set2 x' _=> //; rewrite !get_set_eq.
   move=> [<- | <-] x0 x_neq_x0.
     by rewrite !get_set_neq //; apply m1_eqe_m2_x.
     by rewrite !get_set; case (x' = x0)=> //= _; apply m1_eqe_m2_x.
