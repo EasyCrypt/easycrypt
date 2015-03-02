@@ -261,8 +261,7 @@ lemma find_cor (p:'a -> bool) (xs:'a list) (a:'a):
 proof.
   move: a; elim xs=> //= x xs IH a.
   case (p x)=> //=.
-    by move=> px /someI <-.
-    by move=> _ /IH [] -> ->.
+  by move=> _ /IH [] -> ->.
 qed.
 
 (** filter *)
@@ -416,7 +415,7 @@ lemma mem_ex_nth (e:'a) (xs:'a list):
   exists (n:int), 0 <= n < length xs /\ nth xs n = Some e.
 proof strict.
 elim xs=> //= x xs IH [x_e | e_in_xs].
-  by exists 0; split=> //=; [smt|rewrite x_e].
+  by exists 0; split=> //=; smt.
   by apply IH in e_in_xs; elim e_in_xs=> n [n_bnd nth_e];
      exists (n + 1); smt.
 qed.

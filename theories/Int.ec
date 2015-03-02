@@ -44,6 +44,12 @@ by [].
 lemma nosmt addzI (x1 x2 y : int): y + x1 = y + x2 => x1 = x2
 by [].
 
+lemma nosmt oppzK (x : int): -(-x) = x
+by [].
+
+lemma nosmt oppz0: -0 = 0
+by[].
+
 lemma nosmt addAzN (x y : int): (x + y) - y = x
 by [].
 
