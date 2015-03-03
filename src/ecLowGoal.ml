@@ -298,8 +298,6 @@ let t_intros (ids : ident mloc list) (tc : tcenv1) =
   let tc  = FApi.tcenv_of_tcenv1 tc in
   let sbt = Fsubst.f_subst_id in
   let (hyps, concl), sbt = List.fold_left intro1 (FApi.tc_flat tc, sbt) ids in
-  let ppe = EcPrinting.PPEnv.ofenv (FApi.tc_env tc) in
-  Format.eprintf "[W]%a\n@." (EcPrinting.pp_form ppe) concl;
   let concl = Fsubst.f_subst sbt concl in
   let (tc, hd) = FApi.newgoal tc ~hyps concl in
   FApi.close tc (VIntros (hd, List.map tg_val ids))
