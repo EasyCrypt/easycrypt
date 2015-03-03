@@ -393,6 +393,16 @@ proof.
   by have:= le_p_p' x (oget m.[x]) _.
 qed.
 
+lemma has_all (m : ('a, 'b) fmap) (p : 'a -> 'b -> bool):
+  has p m <=> !all (fun x y, !p x y) m.
+proof.
+  rewrite hasP allP; split.
+    move=> [x] [x_in_m p_x]; rewrite -not_def=> h.
+    by have := h x x_in_m.
+  apply absurd=> /=.
+  smt. (* no higher-order pattern-matching *)
+qed.
+
 (* -------------------------------------------------------------------- *)
 op (+) (m1 m2 : ('a, 'b) fmap) = Self.oflist (elems m2 ++ elems m1)
   axiomatized by joinE.
@@ -424,42 +434,55 @@ op find (p : 'a -> 'b -> bool) (m : ('a, 'b) fmap) =
   onth (map fst (elems m)) (find (fun (x : 'a * 'b), p x.`1 x.`2) (elems m))
   axiomatized by findE.
 
-(** The following are inspired from lemmas on NewList.find.
-    I'm not sure they are sufficient for maps. Proving these currently
-    requires breaking the has abstraction, which seems less
-    than optimal. **)
+
+(** The following are inspired from lemmas on NewList.find. findP is a
+ full characterization, but a more usable interface may be useful. **)
+lemma find_none (p : 'a -> 'b -> bool) (m : ('a, 'b) fmap):
+  has p m <=> find p m <> None.
+proof.
+  rewrite hasE /= findE NewList.has_find; split.
+    by move=> h; rewrite @(onth_nth witness) 1:smt.
+  by apply absurd=> h; rewrite onth_nth_map -map_comp nth_default 1:size_map 1:lezNgt.
+qed.
+
+lemma findP (p : 'a -> 'b -> bool) (m : ('a, 'b) fmap):
+     (exists x, find p m = Some x /\ mem (dom m) x /\ p x (oget m.[x]))
+  \/ (find p m = None /\ forall x, mem (dom m) x => !p x (oget m.[x])).
+proof.
+  case (has p m)=> [has_p | all_not_p].
+    left; have:= has_p. rewrite hasE has_find.
+    have := find_ge0 (fun (x : 'a * 'b) => p x.`1 x.`2) (elems m).
+    pose i := find _ (elems m).
+    move=> le0_i lt_i_sizem.
+    exists (nth witness (map fst (elems m)) i).
+    split.
+      by rewrite findE -/i @(onth_nth witness) 1:size_map.
+    split.
+      by rewrite mem_domE -index_mem index_uniq 1,3:size_map 2:uniq_keys.
+    have /= := nth_find witness (fun (x : 'a * 'b) => p (fst x) (snd x)) (elems m) _.
+      by rewrite -hasE.
+    rewrite -/i -@(nth_map _ witness) //.
+    smt. (* laziness. FIXME: we need lemmas connecting 'assoc' with 'index', 'nth' and 'map snd' *)
+  right.
+  have:= all_not_p; rewrite has_all /= allP /= => h.
+  by split=> //; move: all_not_p; rewrite find_none.
+qed.
+
 lemma get_find (p : 'a -> 'b -> bool) (m : ('a, 'b) fmap):
   has p m => p (oget (find p m)) (oget m.[oget (find p m)]).
-proof. admit. qed.
+proof. by rewrite find_none; have:= findP p m; case (find p m). qed.
 
 lemma has_find (p : 'a -> 'b -> bool) (m : ('a, 'b) fmap):
   has p m <=> exists x, find p m  = Some x /\ mem (dom m) x.
 proof.
-  split.  
-    rewrite hasE findE has_find.
-    pose i := find (fun (x : 'a * 'b) => p x.`1 x.`2) (elems m).
-    move=> le_i_size.
-    exists (nth witness (map fst (elems m)) i).
-    rewrite onth_nth_map @(nth_map witness) 1:smt //=.
-    by rewrite mem_domE; smt. (* laziness... I'm actually surprised it goes through *)
-  rewrite findE; move=> [x].
-  admit.
-qed.
-
-lemma find_none (p : 'a -> 'b -> bool) (m : ('a, 'b) fmap):
-  !has p m <=> find p m = None.
-proof.
-  rewrite hasE /= findE.
-  rewrite NewList.has_find.
-  split.
-    by move=> h; rewrite onth_nth_map -map_comp nth_default 1:size_map 1:lezNgt.
-  by apply absurd=> /= h; rewrite @(onth_nth witness) 1:smt.
+  rewrite find_none; have:= findP p m; case (find p m)=> //=.
+  by move=> x [x'] [eq_x_x' [x'_in_m _]]; exists x'.
 qed.
 
 lemma find_some (p:'a -> 'b -> bool) m x:
   find p m = Some x =>
   mem (dom m) x /\ p x (oget m.[x]).
-proof. admit. qed.
+proof. by have:= findP p m; case (find p m)=> //=. qed.
 
 (* -------------------------------------------------------------------- *)
 op size (m : ('a, 'b) fmap) = card (dom m)
