@@ -374,9 +374,27 @@ proof.
   by apply h; rewrite mem_domE mem_map_fst; exists b.
 qed.
 
+lemma has_le p' (m : ('a, 'b) fmap) (p : 'a -> 'b -> bool):
+  (forall x y, mem (dom m) x /\ p x y => mem (dom m) x /\ p' x y) =>
+  has p  m =>
+  has p' m.
+proof.
+  move=> le_p_p'.
+  by rewrite !hasP=> [x] /le_p_p' [p'_x x_in_m]; exists x.
+qed.
+
+lemma all_le p' (m : ('a, 'b) fmap) (p : 'a -> 'b -> bool):
+  (forall x y, mem (dom m) x /\ p x y => mem (dom m) x /\ p' x y) =>
+  all p  m =>
+  all p' m.
+proof.
+  move=> le_p_p'.
+  rewrite !allP=> h x x_in_m; have /h p_x:= x_in_m.
+  by have:= le_p_p' x (oget m.[x]) _.
+qed.
+
 (* -------------------------------------------------------------------- *)
-op (+) (m1 m2 : ('a, 'b) fmap)
-  = Self.oflist (elems m2 ++ elems m1)
+op (+) (m1 m2 : ('a, 'b) fmap) = Self.oflist (elems m2 ++ elems m1)
   axiomatized by joinE.
 
 lemma get_join (m1 m2 : ('a, 'b) fmap) x:
@@ -390,24 +408,16 @@ proof.
 qed.
 
 lemma has_join (p : 'a -> 'b -> bool) (m1 m2 : ('a, 'b) fmap):
-  has p (m1 + m2) => has p m1 \/ has p m2.
+  has p (m1 + m2) <=> has (fun x y => p x y /\ !mem (dom m2) x) m1 \/ has p m2.
 proof.
-  rewrite !hasP=> [x].
-  rewrite get_join dom_join in_setU; case (mem (dom m2) x)=> //=.
-    by move=> x_in_m2 p_x_m2x; right; exists x.
-  by move=> h {h} [x_in_m1 p_x_m1x]; left; exists x.
-qed.
-
-lemma has_last_join (m1 m2 : ('a, 'b) fmap) (p : 'a -> 'b -> bool):
-  has p m2 => has p (m1 + m2).
-proof.
-  rewrite !hasP=> [x] [x_in_m2 p_x_m2x].
+  rewrite !hasP; split=> [[x] | [[x] | [x] [x_in_m2 p_x]]].
+    rewrite get_join dom_join in_setU; case (mem (dom m2) x)=> //=.
+      by move=> x_in_m2 p_x_m2x; right; exists x.
+    by move=> x_notin_m2 [x_in_m1 p_x_m1x]; left; exists x.
+  move=> /= [x_in_m2 [p_x x_notin_m2]];
+  by exists x; rewrite dom_join get_join in_setU x_notin_m2.
   by exists x; rewrite dom_join get_join in_setU x_in_m2.
 qed.
-
-lemma has_join_precise (p : 'a -> 'b -> bool) (m1 m2 : ('a, 'b) fmap):
-  has p (m1 + m2) <=> has p m2 \/ has (fun x (y : 'b) => p x y /\ !mem (dom m2) x) m1.
-proof. admit. qed.
 
 (* -------------------------------------------------------------------- *)
 op find (p : 'a -> 'b -> bool) (m : ('a, 'b) fmap) =
@@ -415,14 +425,26 @@ op find (p : 'a -> 'b -> bool) (m : ('a, 'b) fmap) =
   axiomatized by findE.
 
 (** The following are inspired from lemmas on NewList.find.
-    I'm not sure they are sufficient for maps. **)
+    I'm not sure they are sufficient for maps. Proving these currently
+    requires breaking the has abstraction, which seems less
+    than optimal. **)
 lemma get_find (p : 'a -> 'b -> bool) (m : ('a, 'b) fmap):
   has p m => p (oget (find p m)) (oget m.[oget (find p m)]).
 proof. admit. qed.
 
 lemma has_find (p : 'a -> 'b -> bool) (m : ('a, 'b) fmap):
-  has p m <=> mem (dom m) (oget (find p m)).
-proof. admit. qed.
+  has p m <=> exists x, find p m  = Some x /\ mem (dom m) x.
+proof.
+  split.  
+    rewrite hasE findE has_find.
+    pose i := find (fun (x : 'a * 'b) => p x.`1 x.`2) (elems m).
+    move=> le_i_size.
+    exists (nth witness (map fst (elems m)) i).
+    rewrite onth_nth_map @(nth_map witness) 1:smt //=.
+    by rewrite mem_domE; smt. (* laziness... I'm actually surprised it goes through *)
+  rewrite findE; move=> [x].
+  admit.
+qed.
 
 lemma find_none (p : 'a -> 'b -> bool) (m : ('a, 'b) fmap):
   !has p m <=> find p m = None.

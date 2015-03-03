@@ -334,8 +334,8 @@ lemma eq_has p1 p2 (s : 'a list):
 proof. by move=> h; rewrite !has_count (eq_count _ p2). qed.
 
 lemma eq_all p1 p2 (s : 'a list):
-  (forall x, p1 x <=> p2 x) => has p1 s <=> has p2 s.
-proof. by move=> h; rewrite !has_count (eq_count _ p2). qed.
+  (forall x, p1 x <=> p2 x) => all p1 s <=> all p2 s.
+proof. by move=> h; rewrite !all_count (eq_count _ p2). qed.
 
 lemma has_sym (s1 s2 : 'a list): has (mem s1) s2 <=> has (mem s2) s1.
 proof. smt. qed.
