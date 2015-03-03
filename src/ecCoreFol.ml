@@ -31,7 +31,8 @@ type quantif =
   | Lexists
   | Llambda
 
-type binding = (EcIdent.t * gty) list
+type binding  = (EcIdent.t * gty)
+type bindings = binding list
 
 let mhr    = EcIdent.create "&hr"
 let mleft  = EcIdent.create "&1"
@@ -47,7 +48,7 @@ type form = {
 }
 
 and f_node =
-  | Fquant  of quantif * binding * form
+  | Fquant  of quantif * bindings * form
   | Fif     of form * form * form
   | Flet    of lpattern * form * form
   | Fint    of BI.zint
@@ -170,13 +171,13 @@ let gtmem (mt : EcMemory.memtype) =
   GTmem mt
 
 (*-------------------------------------------------------------------- *)
-let b_equal (b1 : binding) (b2 : binding) =
+let b_equal (b1 : bindings) (b2 : bindings) =
   let b1_equal (x1, ty1) (x2, ty2) =
     EcIdent.id_equal x1 x2 && gty_equal ty1 ty2
   in
     List.all2 b1_equal b1 b2
 
-let b_hash (bs : binding) =
+let b_hash (bs : bindings) =
   let b1_hash (x, ty) =
     Why3.Hashcons.combine (EcIdent.tag x) (gty_hash ty)
   in
@@ -680,7 +681,7 @@ let f_i1 = f_int BI.one
 module FSmart = struct
   type a_local = EcIdent.t * ty
   type a_pvar  = prog_var * ty * memory
-  type a_quant = quantif * binding * form
+  type a_quant = quantif * bindings * form
   type a_if    = form tuple3
   type a_let   = lpattern * form * form
   type a_op    = EcPath.path * ty list * ty
@@ -1180,19 +1181,20 @@ module Fsubst = struct
   let is_subst_id s =
        s.fs_freshen = false
     && is_ty_subst_id s.fs_sty
-    && Mid.is_empty s.fs_loc
-    && Mid.is_empty s.fs_mem
-    && Mp.is_empty  s.fs_opdef
-    && Mp.is_empty  s.fs_pddef
+    && Mid.is_empty   s.fs_loc
+    && Mid.is_empty   s.fs_mem
+    && Mp.is_empty    s.fs_opdef
+    && Mp.is_empty    s.fs_pddef
 
-  let f_subst_init freshen smp sty ops pds =
+  let f_subst_init ?freshen ?mods ?sty ?opdef ?prdef () =
+    let sty = odfl ty_subst_id sty in
     { f_subst_id
-        with fs_freshen = freshen;
-             fs_mp    = smp;
-             fs_sty   = sty;
-             fs_ty    = ty_subst sty;
-             fs_opdef = ops;
-             fs_pddef = pds }
+        with fs_freshen = odfl false freshen;
+             fs_mp      = odfl Mid.empty mods;
+             fs_sty     = sty;
+             fs_ty      = ty_subst sty;
+             fs_opdef   = odfl Mp.empty opdef;
+             fs_pddef   = odfl Mp.empty prdef; }
 
   (* ------------------------------------------------------------------ *)
   let f_bind_local s x t =

@@ -184,7 +184,7 @@ module Mod : sig
   val add_restr_to_locals : mod_restr -> env -> env
 
   (* Only bind module, ie no memory and no local variable *)
-  val add_mod_binding : binding -> env -> env
+  val add_mod_binding : bindings -> env -> env
 
   val add : mpath -> env -> env
 end

@@ -104,7 +104,9 @@ let e_subst_of_subst (s:_subst) =
     es_loc     = Mid.empty; }
 
 let f_subst_of_subst (s:_subst) = 
-  Fsubst.f_subst_init true s.s_s.sb_modules s.s_sty s.s_op s.s_pd
+  Fsubst.f_subst_init
+    ~freshen:true ~mods:s.s_s.sb_modules ~sty:s.s_sty
+    ~opdef:s.s_op ~prdef:s.s_pd ()
 
 (* -------------------------------------------------------------------- *)
 let subst_form (s : _subst) =

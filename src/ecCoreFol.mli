@@ -35,8 +35,8 @@ type quantif =
   | Lexists
   | Llambda
 
-type binding = (EcIdent.t * gty) list
-
+type binding  = (EcIdent.t * gty)
+type bindings = binding list
 type hoarecmp = FHle | FHeq | FHge
 
 type form = private {
@@ -47,7 +47,7 @@ type form = private {
 }
 
 and f_node =
-  | Fquant  of quantif * binding * form
+  | Fquant  of quantif * bindings * form
   | Fif     of form * form * form
   | Flet    of lpattern * form * form
   | Fint    of zint
@@ -178,10 +178,10 @@ val f_proj   : form -> int -> EcTypes.ty -> form
 val f_if     : form -> form -> form -> form
 val f_let    : EcTypes.lpattern -> form -> form -> form
 val f_let1   : EcIdent.t -> form -> form -> form
-val f_quant  : quantif -> binding -> form -> form
-val f_exists : binding -> form -> form
-val f_forall : binding -> form -> form
-val f_lambda : binding -> form -> form
+val f_quant  : quantif -> bindings -> form -> form
+val f_exists : bindings -> form -> form
+val f_forall : bindings -> form -> form
+val f_lambda : bindings -> form -> form
 
 val f_forall_mems : (EcIdent.t * memtype) list -> form -> form
 
@@ -271,7 +271,7 @@ val f_int_pow  : form -> form -> form
 module FSmart : sig
   type a_local  = EcIdent.t * ty
   type a_pvar   = prog_var * ty * memory
-  type a_quant  = quantif * binding * form
+  type a_quant  = quantif * bindings * form
   type a_if     = form tuple3
   type a_let    = lpattern * form * form
   type a_op     = path * ty list * ty
@@ -322,10 +322,10 @@ val destr_eq_or_iff : form -> form * form
 val destr_let       : form -> lpattern * form * form
 val destr_let1      : form -> EcIdent.t * ty * form * form
 val destr_forall1   : form -> EcIdent.t * gty * form
-val destr_forall    : form -> binding * form
-val decompose_forall: form -> binding * form
+val destr_forall    : form -> bindings * form
+val decompose_forall: form -> bindings * form
 val destr_exists1   : form -> EcIdent.t * gty * form
-val destr_exists    : form -> binding * form
+val destr_exists    : form -> bindings * form
 val destr_equivF    : form -> equivF
 val destr_equivS    : form -> equivS
 val destr_eagerF    : form -> eagerF
@@ -382,10 +382,12 @@ module Fsubst : sig
   val is_subst_id : f_subst -> bool
 
   val f_subst_init :
-       bool -> mpath Mid.t -> ty_subst
-    -> (EcIdent.t list * expr) Mp.t
-    -> (EcIdent.t list * form) Mp.t
-    -> f_subst
+       ?freshen:bool
+    -> ?mods:mpath Mid.t
+    -> ?sty:ty_subst
+    -> ?opdef:(EcIdent.t list * expr) Mp.t
+    -> ?prdef:(EcIdent.t list * form) Mp.t
+    -> unit -> f_subst
 
   val f_bind_local : f_subst -> EcIdent.t -> form -> f_subst
   val f_bind_mem   : f_subst -> EcIdent.t -> EcIdent.t -> f_subst
@@ -400,6 +402,9 @@ module Fsubst : sig
 
   val uni : (EcUid.uid -> ty option) -> form -> form
   val subst_tvar : EcTypes.ty EcIdent.Mid.t -> form -> form
+
+  val add_binding  : f_subst -> binding  -> f_subst * binding
+  val add_bindings : f_subst -> bindings -> f_subst * bindings
 
   val subst_locals : form Mid.t -> form -> form
 end

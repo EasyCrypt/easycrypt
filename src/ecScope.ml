@@ -865,7 +865,7 @@ module Op = struct
             let opapp   = e_app (e_op opname opapp ty) opargs codom in
             let tyuni   = { ty_subst_id with ts_u = EcUnify.UniEnv.close ue } in
             let subst   = Mp.singleton opname ([], opapp) in
-            let subst   = Fsubst.f_subst_init false Mid.empty tyuni subst Mp.empty in
+            let subst   = Fsubst.f_subst_init ~sty:tyuni ~opdef:subst () in
             Fsubst.f_subst subst ax
           in
 

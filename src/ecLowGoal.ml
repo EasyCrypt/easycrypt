@@ -298,6 +298,8 @@ let t_intros (ids : ident mloc list) (tc : tcenv1) =
   let tc  = FApi.tcenv_of_tcenv1 tc in
   let sbt = Fsubst.f_subst_id in
   let (hyps, concl), sbt = List.fold_left intro1 (FApi.tc_flat tc, sbt) ids in
+  let ppe = EcPrinting.PPEnv.ofenv (FApi.tc_env tc) in
+  Format.eprintf "[W]%a\n@." (EcPrinting.pp_form ppe) concl;
   let concl = Fsubst.f_subst sbt concl in
   let (tc, hd) = FApi.newgoal tc ~hyps concl in
   FApi.close tc (VIntros (hd, List.map tg_val ids))
@@ -792,8 +794,10 @@ let t_elim_eq_tuple goal = t_elim_r [t_elim_eq_tuple_r] goal
 let t_elim_exists_r ((f, _) : form * sform) concl tc =
   match f.f_node with
   | Fquant (Lexists, bd, body) ->
-      let newc = f_forall bd (f_imp body concl) in
-      let tc   = FApi.mutate1 tc (fun hd -> VExtern (`Exists, [hd])) newc in
+      let subst = Fsubst.f_subst_init ~freshen:true () in
+      let subst, bd = Fsubst.add_bindings subst bd in
+      let newc  = f_forall bd (f_imp (Fsubst.f_subst subst body) concl) in
+      let tc    = FApi.mutate1 tc (fun hd -> VExtern (`Exists, [hd])) newc in
       FApi.tcenv_of_tcenv1 tc
   | _ -> raise TTC.NoMatch
 

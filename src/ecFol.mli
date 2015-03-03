@@ -76,11 +76,11 @@ val f_if_simpl   : form -> form -> form -> form
 val f_let_simpl  : EcTypes.lpattern -> form -> form -> form
 val f_lets_simpl : (EcTypes.lpattern * form) list -> form -> form
 
-val f_forall_simpl  : binding -> form -> form
-val f_exists_simpl  : binding -> form -> form
-val f_quant_simpl   : quantif -> binding -> form -> form
+val f_forall_simpl  : bindings -> form -> form
+val f_exists_simpl  : bindings -> form -> form
+val f_quant_simpl   : quantif -> bindings -> form -> form
 val f_app_simpl     : form -> form list -> EcTypes.ty -> form
-val f_betared_simpl : binding -> form -> form list -> EcTypes.ty -> form
+val f_betared_simpl : bindings -> form -> form list -> EcTypes.ty -> form
 
 val f_not_simpl  : form -> form
 val f_and_simpl  : form -> form -> form
@@ -109,7 +109,7 @@ val f_real_mul_simpl : form -> form -> form
 val f_real_div_simpl : form -> form -> form
 
 (* -------------------------------------------------------------------- *)
-val destr_exists_prenex : form -> binding * form
+val destr_exists_prenex : form -> bindings * form
 
 (* -------------------------------------------------------------------- *)
 (* projects 'a Distr type into 'a *)
