@@ -101,9 +101,19 @@ def _options():
     config = cp.SafeConfigParser(defaults)
     config.read(args[0])
 
+    def resolve_targets(names):
+        targets = []
+        for name in names:
+            if name.startswith('!'):
+                targets = filter(lambda x : x != name[1:], targets)
+            else:
+                if name not in targets:
+                    targets.append(name)
+        return targets
+
     options.bin     = config.get('default', 'bin')
     options.args    = config.get('default', 'args').split()
-    options.targets = args[1:]
+    options.targets = resolve_targets(args[1:])
 
     if cmdopt.bin_args:
         options.args.extend(itertools.chain.from_iterable( \

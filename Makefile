@@ -41,10 +41,10 @@ ECJOBS    ?= 1
 CHECK     := scripts/testing/runtest
 CHECK     += --bin-args="$(ECARGS)" --timeout="$(ECTOUT)" --jobs="$(ECJOBS)"
 CHECK     += config/tests.config
-CHECKCATS ?= prelude core theories encryption newth realized unit
+CHECKCATS ?= prelude core theories encryption newth realized
 
 # --------------------------------------------------------------------
-.PHONY: all build byte native tests check check-xunit examples
+.PHONY: all build byte native tests check weak-check check-xunit examples
 .PHONY: clean install uninstall uninstall-purge dist distcheck
 .PHONY: callprover pg toolchain update-toolchain provers
 .PHONY: %.ml %.mli %.inferred.mli
@@ -121,6 +121,9 @@ examples:
 
 check: ec.native
 	$(CHECK) $(CHECKCATS)
+
+weak-check: ec.native
+	$(CHECK) --bin-args="-pragmas Proofs:weak" $(CHECKCATS) '!unit'
 
 check-xunit: ec.native
 	$(CHECK) --xunit="$(XUNITOUT)" $(CHECKCATS)
