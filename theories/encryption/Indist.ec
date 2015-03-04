@@ -248,14 +248,13 @@ section.
          Pr[INDR(O,A).main() @ &m :  res /\ p (glob A) (glob O) C.c /\
                                   C.c <= q]).
   proof -strict.
-    cut := Hybrid (Orcl2(O)) A' _ _ _ _ _ &m (fun ga go c b, b /\ p ga go c).
+    cut := Hybrid (Orcl2(O)) A' _ _ _ _ &m (fun ga go c b, b /\ p ga go c).
       by proc;call losslessL.
       by proc;call losslessO.
       by proc;call losslessO.
       intros Ob LR Hlr Hl Ho1 Ho2;proc.
       by call (losslessA (<:A'(Ob,LR).O) (<:A'(Ob,LR).LR') _ _ _) => //;proc;
         [call Hlr | call Hl | call Ho1].
-      apply q_pos.
     zeta beta => H.
     cut -> : Pr[INDL(O, B(A)).main() @ &m :
                  res /\ p (glob A) (glob O) LRB.l /\ LRB.l <= q /\ C.c <= 1] =

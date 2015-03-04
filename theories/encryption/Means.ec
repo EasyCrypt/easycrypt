@@ -47,8 +47,8 @@ proc; seq 1 : (v = x) (mu_x d v) pr 1%r 0%r ((glob A)=(glob A){m})=> //.
   call (_: (glob A) = (glob A){m} /\ x = v ==> 
            ev v (glob A) res) => //.
   simplify pr; bypr => &m' eqGlob.
-  by byequiv (_: ={glob A, x} ==> ={res, glob A}) => //; proc true. 
-  by conseq* (_: _ ==> false)=> //.
+  by byequiv (_: ={glob A, x} ==> ={res, glob A}) => //; proc true.
+  by hoare; rewrite /fst /snd /=; call (_: true); auto; progress; rewrite eq_sym H.
 qed.
 
 lemma introOrs (A <: Worker) &m (ev:input -> glob A -> output -> bool):

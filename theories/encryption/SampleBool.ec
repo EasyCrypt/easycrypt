@@ -22,7 +22,7 @@ theory MeansBool.
      Pr[Rand(A).main() @ &m : p (fst res) (glob A) (snd res)] = 
      1%r/2%r*(Pr[A.work(true) @ &m : p true (glob A) res] + 
                 Pr[A.work(false) @ &m : p false (glob A) res]).
-  proof -strict.
+  proof.
     cut Hcr: forall x, 
              mem x (create (support {0,1})) <=>
              mem x (add true (add false (FSet.empty)%FSet)).
@@ -36,7 +36,8 @@ theory MeansBool.
     rewrite Mrplus.sum_add;first smt.
     rewrite Mrplus.sum_add;first smt.
     rewrite Mrplus.sum_empty /= !Bool.Dbool.mu_x_def.
-    by cut Hd: 2%r <> Real.zero by smt; fieldeq.
+    cut Hd: 2%r <> 0%r by smt.
+    by algebra.
   qed.
 
 end MeansBool.

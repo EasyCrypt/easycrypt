@@ -141,7 +141,7 @@ module ToAdv(A:AdvCPA, O:Orcl,LR:LR) = {
   proc main() : bool = {
     var pk:pkey;
     var b':bool;
-    pk = O.leaks(());
+    pk = O.leaks();
     b' =A.main(pk);
     return b';
   }
@@ -206,8 +206,8 @@ section.
     intros <-;congr.
       byequiv (_: ={glob S,glob A} ==> ={res,glob H.LRB} /\ K.c{1} = H.C.c{2}) => //.
       proc.
-      inline INDR(ToOrcl(S), Ind.B(ToAdv(A))).A.main H.C.init CPAR(S, B(S,A)).A.main
-        Ind.B(ToAdv(A), ToOrcl(S), OrclR(ToOrcl(S))).A.main.
+      inline INDL(ToOrcl(S), Ind.B(ToAdv(A))).A.main H.C.init CPAL(S, B(S,A)).A.main
+        Ind.B(ToAdv(A), ToOrcl(S), OrclL(ToOrcl(S))).A.main.
       wp.
       call (_: ={glob S,glob H.LRB, K.pk} /\ K.c{1} = H.C.c{2}).
         proc;wp.
@@ -221,8 +221,8 @@ section.
       by call (_:true);wp;rnd;wp.
     byequiv (_: ={glob S,glob A} ==> ={res,glob H.LRB} /\ K.c{1} = H.C.c{2}) => //.
     proc.
-    inline INDL(ToOrcl(S), Ind.B(ToAdv(A))).A.main H.C.init CPAL(S, B(S,A)).A.main
-      Ind.B(ToAdv(A), ToOrcl(S), OrclL(ToOrcl(S))).A.main.
+    inline INDR(ToOrcl(S), Ind.B(ToAdv(A))).A.main H.C.init CPAR(S, B(S,A)).A.main
+      Ind.B(ToAdv(A), ToOrcl(S), OrclR(ToOrcl(S))).A.main.
     wp.
     call (_: ={glob S,glob H.LRB, K.pk} /\ K.c{1} = H.C.c{2}).
       proc;wp.
@@ -236,4 +236,4 @@ section.
     by call (_:true);wp;rnd;wp.
   qed.
 
-end section. 
+end section.
