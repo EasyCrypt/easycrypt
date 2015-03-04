@@ -134,7 +134,7 @@ realize subrE. by smt. qed.
 abstract theory ComRing.
   type t.
 
-  clone export ZModule with type t <- t.
+  clone include ZModule with type t <- t.
 
   op oner  : t.
   op ( * ) : t -> t -> t.
@@ -171,11 +171,11 @@ end ComRing.
 abstract theory BoolRing.
   type t.
 
-  clone export ComRing with type t <- t.
+  clone include ComRing with type t <- t.
 
   axiom mulrr : forall (x : t), x * x = x.
 
-  lemma nosmt addrK (x : t): x + x = zeror.
+  lemma nosmt addrr (x : t): x + x = zeror.
   proof.
     apply @(addrI (x + x)); rewrite addr0 -{1 2 3 4}mulrr.
     by rewrite -mulrDr -mulrDl mulrr.
@@ -186,7 +186,7 @@ end BoolRing.
 abstract theory IDomain.
   type t.
 
-  clone export ComRing with type t <- t.
+  clone include ComRing with type t <- t.
 
   axiom mulf_eq0:
     forall (x y : t), x * y = zeror <=> x = zeror \/ y = zeror.
@@ -199,7 +199,7 @@ end IDomain.
 abstract theory Field.
   type t.
 
-  clone export IDomain with type t <- t.
+  clone include IDomain with type t <- t.
 
   op inv: t -> t.
 
@@ -237,8 +237,8 @@ abstract theory Field.
 
   op exp (x : t) (n : int) =
     if n < 0
-    then inv (iterop (-n) IDomain.ComRing.( * ) x oner)
-    else iterop n IDomain.ComRing.( * ) x oner.
+    then inv (iterop (-n) Field.( * ) x oner)
+    else iterop n Field.( * ) x oner.
 
   lemma expr0 x: exp x 0 = oner.
   proof. by rewrite /exp /= iterop0. qed.
