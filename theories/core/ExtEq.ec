@@ -10,9 +10,9 @@
    to SMT whenever possible. *)
 pred (==) (f g:'a -> 'b) = forall x, f x = g x.
 
-lemma nosmt eq_refl (X:'a -> 'b):     X == X by [].
-lemma nosmt eq_symm (X Y:'a -> 'b):   X == Y => Y == X by [].
-lemma nosmt eq_tran (X Y Z:'a -> 'b): X == Y => Y == Z => X == Z by [].
+lemma nosmt frefl  (X:'a -> 'b):     X == X by [].
+lemma nosmt fsym   (X Y:'a -> 'b):   X == Y => Y == X by [].
+lemma nosmt ftrans (X Y Z:'a -> 'b): X == Y => Y == Z => X == Z by [].
 
 axiom fun_ext (f g:'a -> 'b): f == g <=> f = g.
 
