@@ -1,4 +1,4 @@
-; Generated on Fri Feb 20 10:15:12 2015
+; Generated on Wed Mar  4 14:39:24 2015
 
 (defvar easycrypt-bytac-keywords '(
   "exact"
@@ -26,6 +26,7 @@
   "end"
   "import"
   "export"
+  "include"
   "local"
   "declare"
   "hint"

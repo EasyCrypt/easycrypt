@@ -462,13 +462,9 @@ and process_th_export (scope : EcScope.scope) (names : pqsymbol list) =
   List.fold_left EcScope.Theory.export scope (List.map unloc names)
 
 (* -------------------------------------------------------------------- *)
-and process_th_clone (scope : EcScope.scope) (thcl, io) =
+and process_th_clone (scope : EcScope.scope) thcl =
   EcScope.check_state `InTop "theory cloning" scope;
-  let (name, scope) = EcScope.Cloning.clone scope (!pragma).pm_check thcl in
-    match io with
-    | None         -> scope
-    | Some `Export -> EcScope.Theory.export scope ([], name)
-    | Some `Import -> EcScope.Theory.import scope ([], name)
+  EcScope.Cloning.clone scope (!pragma).pm_check thcl
 
 (* -------------------------------------------------------------------- *)
 and process_w3_import (scope : EcScope.scope) (p, f, r) =

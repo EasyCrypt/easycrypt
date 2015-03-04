@@ -768,12 +768,13 @@ type w3_renaming =
 
 (* -------------------------------------------------------------------- *)
 type theory_cloning = {
-  pthc_base  : pqsymbol;
-  pthc_name  : psymbol option;
-  pthc_ext   : (pqsymbol * theory_override) list;
-  pthc_prf   : theory_cloning_proof list;
-  pthc_opts  : theory_cloning_options;
-  pthc_local : bool;
+  pthc_base   : pqsymbol;
+  pthc_name   : psymbol option;
+  pthc_ext    : (pqsymbol * theory_override) list;
+  pthc_prf    : theory_cloning_proof list;
+  pthc_opts   : theory_cloning_options;
+  pthc_local  : bool;
+  pthc_import : [`Export | `Import | `Include] option;
 }
 
 and theory_cloning_option =
@@ -837,7 +838,7 @@ type global =
   | GthRequire   of (psymbol list * [`Import|`Export] option)
   | GthImport    of pqsymbol list
   | GthExport    of pqsymbol list
-  | GthClone     of (theory_cloning * [`Import|`Export] option)
+  | GthClone     of theory_cloning
   | GthW3        of (string list * string * w3_renaming list)
   | GsctOpen     of psymbol option
   | GsctClose    of psymbol option

@@ -176,11 +176,7 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Cloning : sig
-  (* [clone scope (src, dst)] finds and clones theory [src] in
-   * scope [scope]. Cloned theory name is [dst] if not None. If
-   * [dst] is None, the basename of [src] is used as the cloned
-   * theory name. *)
-  val clone : scope -> Ax.mode -> theory_cloning -> symbol * scope
+  val clone : scope -> Ax.mode -> theory_cloning -> scope
 end
 
 (* -------------------------------------------------------------------- *)

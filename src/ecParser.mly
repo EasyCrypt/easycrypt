@@ -243,6 +243,7 @@
 %token IMPORT
 %token IMPOSSIBLE
 %token IN
+%token INCLUDE
 %token INLINE
 %token INSTANCE
 %token INTROS
@@ -2523,32 +2524,33 @@ proofmodename:
 
 theory_clone:
 | local=boption(LOCAL) CLONE options=clone_opts?
-    ip=import_flag? x=uqident
+    ip=clone_import? x=uqident
     cw=clone_with? cp=clone_proof?
 
-   { let oth =
-       { pthc_base  = x;
-         pthc_name  = None;
-         pthc_ext   = EcUtils.odfl [] cw;
-         pthc_prf   = EcUtils.odfl [] cp;
-         pthc_opts  = odfl [] options;
-         pthc_local = local; }
-     in
-       (oth, ip) }
+   { { pthc_base   = x;
+       pthc_name   = None;
+       pthc_ext    = EcUtils.odfl [] cw;
+       pthc_prf    = EcUtils.odfl [] cp;
+       pthc_opts   = odfl [] options;
+       pthc_local  = local;
+       pthc_import = ip; } }
 
 | local=boption(LOCAL) CLONE options=clone_opts?
-    ip=import_flag? x=uqident AS y=uident
+    ip=clone_import? x=uqident AS y=uident
     cw=clone_with? cp=clone_proof?
 
-   { let oth =
-       { pthc_base  = x;
-         pthc_name  = Some y;
-         pthc_ext   = EcUtils.odfl [] cw;
-         pthc_prf   = EcUtils.odfl [] cp;
-         pthc_opts  = odfl [] options;
-         pthc_local = local; }
-     in
-       (oth, ip) }
+   { { pthc_base   = x;
+       pthc_name   = Some y;
+       pthc_ext    = EcUtils.odfl [] cw;
+       pthc_prf    = EcUtils.odfl [] cp;
+       pthc_opts   = odfl [] options;
+       pthc_local  = local;
+       pthc_import = ip; } }
+
+clone_import:
+| EXPORT  { `Export  }
+| IMPORT  { `Import  }
+| INCLUDE { `Include }
 
 clone_opt:
 | b=boption(MINUS) ABSTRACT { (not b, `Abstract) }

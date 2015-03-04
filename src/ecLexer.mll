@@ -143,6 +143,7 @@
     "end"         , END        ;        (* KW: global *)
     "import"      , IMPORT     ;        (* KW: global *)
     "export"      , EXPORT     ;        (* KW: global *)
+    "include"     , INCLUDE    ;        (* KW: global *)
     "local"       , LOCAL      ;        (* KW: global *)
     "declare"     , DECLARE    ;        (* KW: global *)
     "hint"        , HINT       ;        (* KW: global *)

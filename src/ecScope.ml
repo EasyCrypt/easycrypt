@@ -1871,10 +1871,16 @@ module Cloning = struct
     let (name, (opath, oth), ovrds) = C.clone scope.sc_env thcl in
     let ovrds = { ovre_ovrd  = ovrds;
                   ovre_scope = { ovrc_glproof = None}; } in
-
+    let incl  = thcl.pthc_import = Some `Include in
     let opts  = Options.merge Options.default thcl.pthc_opts in
+
+    if thcl.pthc_import = Some `Include && opts.clo_abstract then
+      hierror "cannot include an abstract theory";
+    if thcl.pthc_import = Some `Include && EcUtils.is_some thcl.pthc_name then
+      hierror "cannot give an alias to an included clone";
+
     let cpath = EcEnv.root scope.sc_env in
-    let npath = EcPath.pqname cpath name in
+    let npath = if incl then cpath else EcPath.pqname cpath name in
     let subst = EcSubst.add_path EcSubst.empty opath npath in
 
     let (proofs, scope) =
@@ -2178,13 +2184,13 @@ module Cloning = struct
   
       in
         let mode  = if opts.clo_abstract then `Abstract else `Concrete in
-        let scope = Theory.enter scope mode name in
+        let scope = if incl then scope else Theory.enter scope mode name in
         let _, _, proofs, scope =
           List.fold_left (ovr1 [] ovrds)
             (subst, Mp.empty, [], scope)
             (fst oth).cth_struct
         in
-          (List.rev proofs, snd (Theory.exit scope))
+          (List.rev proofs, if incl then scope else snd (Theory.exit scope))
     in
 
     let proofs = List.pmap (fun axc ->
@@ -2210,7 +2216,13 @@ module Cloning = struct
 
     let scope = Ax.add_for_cloning scope proofs in
 
-    (name, scope)
+    thcl.pthc_import |> ofold (fun flag scope ->
+      match flag with
+      | `Import  -> { scope with sc_env = EcEnv.Theory.import npath scope.sc_env; }
+      | `Export  -> { scope with sc_env = EcEnv.Theory.export npath scope.sc_env; }
+      | `Include -> scope)
+      scope
+
 end
 
 (* -------------------------------------------------------------------- *)
