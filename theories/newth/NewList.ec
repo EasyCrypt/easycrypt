@@ -1238,7 +1238,7 @@ proof.
     case=> Ns1_x ->; case: (assocP s2 x); 2: by case=> _ <-.
     by have/perm_eq_mem <- := perm_eq_map fst _ _ peq_s1s2.
   case=> s1_x [y1 [s1_xy1 ->]]; apply/eq_sym.
-  by rewrite -mem_assoc_uniq //; apply/(perm_eq_mem peq_s1s2).
+  by rewrite -mem_assoc_uniq //; apply/(perm_eq_mem _ _ peq_s1s2).
 qed.
 
 lemma assoc_filter (p : 'a -> bool) (s : ('a * 'b) list) x:

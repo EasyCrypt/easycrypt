@@ -255,7 +255,7 @@ abstract theory Field.
   qed.
 
   lemma exprN (x : t) (i : int): exp x (-i) = inv (exp x i).
-  proof. by rewrite /exp /= IntZMod.opprK @(fun_if inv) invK; smt. qed.
+  proof. by rewrite /exp /= IntZMod.opprK @(fun_if inv) invrK; smt. qed.
 end Field.
 
 (* --------------------------------------------------------------------- *)
