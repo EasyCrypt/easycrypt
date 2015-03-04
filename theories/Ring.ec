@@ -108,11 +108,17 @@ abstract theory ZModule.
   proof. by rewrite /intmul /= iterop1. qed.
 
   lemma intmulN (x : t) (n : int): intmul x (-n) = -(intmul x n).
-  proof. by rewrite /intmul; case (n < 0); smt. qed.
+  proof.
+    case: (n = 0)=> [-> |nz_n]; 1: by rewrite oppz0 intmul0 oppr0.
+    rewrite /intmul; have ->: -n < 0 <=> !(n < 0) by smt.
+    by case: (n < 0)=> //= _; rewrite ?(opprK, oppzK).
+  qed.
 
   lemma intmulS (x : t) (n : int): 0 <= n =>
     intmul x (n+1) = x + intmul x n.
-  proof. by move=> ge0_n; rewrite /intmul; smt. qed.
+  proof.
+    by elim: n=> /= [|i ge0_i ih]; 2: smt; rewrite intmul0 intmul1 addr0.
+  qed.
 end ZModule.
 
 (* -------------------------------------------------------------------- *)
@@ -236,7 +242,7 @@ abstract theory Field.
   axiom invrK (x : t): inv (inv x) = x.
 
   op exp (x : t) (n : int) =
-    if n < 0
+    if   n < 0
     then inv (iterop (-n) Field.( * ) x oner)
     else iterop n Field.( * ) x oner.
 
@@ -247,15 +253,12 @@ abstract theory Field.
   proof. by rewrite /exp /= iterop1. qed.
 
   lemma exprS (x : t) i: 0 <= i => exp x (i+1) = x * (exp x i).
-  proof.                        (* FIXME *)
-    move=> ge0_i; rewrite /exp /=.
-    cut -> /=: i   < 0 = false by smt.
-    cut -> /=: i+1 < 0 = false by smt.
-    smt.
+  proof.
+    by elim: i=> /= [|i ge0_i ih]; 2: smt; rewrite expr0 expr1 mulr1.
   qed.
 
   lemma exprN (x : t) (i : int): exp x (-i) = inv (exp x i).
-  proof. by rewrite /exp /= IntZMod.opprK @(fun_if inv) invrK; smt. qed.
+  proof. case: (i = 0)=> [-> | nz_i]; smt. qed.
 end Field.
 
 (* --------------------------------------------------------------------- *)
