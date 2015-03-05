@@ -216,6 +216,10 @@ qed.
 lemma get_rm_eq (m : ('a,'b) fmap) (a : 'a): (rm m a).[a] = None.
 proof. by rewrite get_rm. qed.
 
+lemma rm_rm (m : ('a, 'b) fmap) (a : 'a):
+  rm (rm m a) a = rm m a.
+proof. by rewrite fmapP; move=> x; rewrite !get_rm; case (x = a). qed.
+
 (* -------------------------------------------------------------------- *)
 op dom ['a 'b] (m : ('a, 'b) fmap) =
   NewFSet.oflist (map fst (elems m))
@@ -462,7 +466,7 @@ proof.
     have /= := nth_find witness (fun (x : 'a * 'b) => p (fst x) (snd x)) (elems m) _.
       by rewrite -hasE.
     rewrite -/i -@(nth_map _ witness) //.
-    smt. (* laziness. FIXME: we need lemmas connecting 'assoc' with 'index', 'nth' and 'map snd' *)
+    smt 3 6. (* laziness. FIXME: we need lemmas connecting 'assoc' with 'index', 'nth' and 'map snd' *)
   right.
   have:= all_not_p; rewrite has_all /= allP /= => h.
   by split=> //; move: all_not_p; rewrite find_none.
@@ -483,6 +487,63 @@ lemma find_some (p:'a -> 'b -> bool) m x:
   find p m = Some x =>
   mem (dom m) x /\ p x (oget m.[x]).
 proof. by have:= findP p m; case (find p m)=> //=. qed.
+
+(* -------------------------------------------------------------------- *)
+op eq_except (m1 m2 : ('a, 'b) fmap) x = rm m1 x = rm m2 x
+  axiomatized by eq_exceptE.
+
+lemma eq_except_refl (m : ('a, 'b) fmap) x: eq_except m m x.
+proof. by rewrite eq_exceptE. qed.
+
+lemma eq_except_sym (m1 m2 : ('a, 'b) fmap) x:
+  eq_except m1 m2 x <=> eq_except m2 m1 x.
+proof. by rewrite eq_exceptE eq_sym -eq_exceptE. qed.
+
+lemma eq_except_trans (m2 m1 m3 : ('a, 'b) fmap) x:
+  eq_except m1 m2 x =>
+  eq_except m2 m3 x =>
+  eq_except m1 m3 x.
+proof. by rewrite !eq_exceptE; apply eq_trans. qed.
+
+lemma eq_exceptP (m1 m2 : ('a, 'b) fmap) a:
+  eq_except m1 m2 a <=>
+  (forall x, x <> a => m1.[x] = m2.[x]).
+proof.
+  rewrite eq_exceptE fmapP; split=> h x.
+    by move=> ne_x_a; have:= h x; rewrite !get_rm ne_x_a.
+  by rewrite !get_rm; case (x = a)=> //= /h.
+qed.
+
+lemma set_eq_except x b (m : ('a, 'b) fmap):
+  eq_except m.[x <- b] m x.
+proof. by rewrite eq_exceptP=> x'; rewrite !get_set=> ->. qed.
+
+lemma set2_eq_except x b b' (m : ('a, 'b) fmap):
+  eq_except m.[x <- b] m.[x <- b'] x.
+proof. by rewrite eq_exceptP=> x'; rewrite !get_set=> ->. qed.
+
+lemma eq_except_set a b (m1 m2 : ('a, 'b) fmap) x:
+  eq_except m1 m2 x =>
+  eq_except m1.[a <- b] m2.[a <- b] x.
+proof.
+  rewrite !eq_exceptP=> h x' ne_x'_x.
+  rewrite !get_set; case (x' = a)=> //= _.
+  by apply h.
+qed.
+
+lemma eq_except_set_eq (m1 m2 : ('a, 'b) fmap) x:
+  mem (dom m1) x =>
+  eq_except m1 m2 x =>
+  m1 = m2.[x <- oget m1.[x]].
+proof.
+  rewrite eq_exceptP fmapP; move=> x_in_m1 eqe x'.
+  rewrite !get_set /oget; case (x' = x).
+    by move=> ->>; move: x_in_m1; rewrite in_dom; case (m1.[x]).
+  by apply eqe.
+qed.
+
+lemma rm_eq_except (m : ('a, 'b) fmap) x: eq_except (rm m x) m x.
+proof. by rewrite eq_exceptE rm_rm. qed.
 
 (* -------------------------------------------------------------------- *)
 op size (m : ('a, 'b) fmap) = card (dom m)
