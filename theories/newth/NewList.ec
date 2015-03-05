@@ -524,10 +524,10 @@ proof.
 qed.
 
 lemma nth_take (x0 : 'a) n s i:
-  0 <= n => 0 <= i => nth x0 (drop n s) i = nth x0 s (n + i).
+  0 <= n => i < n => nth x0 (take n s) i = nth x0 s i.
 proof.
   move=> n_ge0 i_ge0; case (n < size s) => [lt_n_s|le_s_n]; last smt.
-  rewrite -{2}(cat_take_drop n s) nth_cat size_take //; smt.
+  by rewrite -{2}(cat_take_drop n s) nth_cat size_take //; smt.
 qed.
 
 lemma splitPr (xs : 'a list) (x : 'a): mem xs x =>
