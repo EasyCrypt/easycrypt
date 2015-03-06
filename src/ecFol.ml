@@ -280,42 +280,36 @@ let rec f_let_simpl lp f1 f2 =
         let fx = f_local x ty in
         let tu = f_tuple (List.mapi (fun i (_,ty') -> f_proj fx i ty') ids) in
         f_let_simpl lpx f1 (f_let_simpl lp tu f2)
-(*
-        let check (id, _) = Mid.find_opt id (f_fv f2) = None in
-          if List.for_all check ids then f2 else f_let lp f1 f2 *)
     end
 
   | LRecord (_, ids) ->
-      (* TODO B : PY this should be simplified if possible *)
       let check (id, _) =
-        match id with
-        | None -> true
-        | Some id -> Mid.find_opt id (f_fv f2) = None
-      in
-        if List.for_all check ids then f2 else f_let lp f1 f2
+        id |> omap (fun id -> not (Mid.mem id (f_fv f2))) |> odfl true
+      in if List.for_all check ids then f2 else f_let lp f1 f2
 
 let f_lets_simpl =
   (* FIXME : optimize this *)
   List.fold_right (fun (lp,f1) f2 -> f_let_simpl lp f1 f2)
 
 let rec f_app_simpl f args ty =
-  if args = [] then f
-  else match f.f_node,args with
-    | Fquant (Llambda, bds,f), args ->
-      f_betared_simpl Fsubst.f_subst_id bds f args ty
-    | Fapp(f',args'),_ -> mk_form (Fapp(f', args'@args)) ty
-    | _ -> mk_form (Fapp(f,args)) ty
+  f_betared (f_app f args ty)
 
-and f_betared_simpl subst bds f args ty =
-  match bds, args with
-  | (x,GTty _)::bds, arg :: args ->
-    f_betared_simpl (Fsubst.f_bind_local subst x arg) bds f args ty
-  | (_,_)::_, _ :: _ -> assert false
-  | _, [] -> f_lambda bds (Fsubst.f_subst subst f)
-  | [], _ -> f_app_simpl (Fsubst.f_subst subst f) args ty
+and f_betared f =
+  let tx fo fp = if f_equal fo fp || can_betared fo then fp else f_betared fp in
 
-let f_betared_simpl bds f args ty =
-  f_betared_simpl Fsubst.f_subst_id bds f args ty
+  match f.f_node with
+  | Fapp ({ f_node = Fquant (Llambda, bds, body)}, args) ->
+      let (bds1, bds2), (args1, args2) = List.prefix2 bds args in
+      let bind  = fun subst (x, _) arg -> Fsubst.f_bind_local subst x arg in
+      let subst = Fsubst.f_subst_id in
+      let subst = List.fold_left2 bind subst bds1 args1 in
+      f_app (f_quant Llambda bds2 (Fsubst.f_subst ~tx subst body)) args2 f.f_ty
+  | _ -> f
+
+and can_betared f =
+  match f.f_node with
+  | Fapp ({ f_node = Fquant (Llambda, _, _)}, _) -> true
+  | _ -> false
 
 let f_forall_simpl b f =
   let b = List.filter (fun (id,_) -> Mid.mem id (f_fv f)) b in

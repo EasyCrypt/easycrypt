@@ -202,6 +202,7 @@ module List : sig
     val filter2   : ('a -> 'b -> bool) -> 'a list -> 'b list -> 'a list * 'b list
     val all2      : ('a -> 'b -> bool) -> 'a list -> 'b list -> bool
     val map_fold2 : ('a -> 'b -> 'c -> 'a * 'd) -> 'a -> 'b list -> 'c list -> 'a * 'd list
+    val prefix2   : 'a list -> 'b list -> ('a list * 'a list) * ('b list * 'b list)
   end
 
   include module type of Parallel

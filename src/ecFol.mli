@@ -71,16 +71,17 @@ val f_identity : ?name:EcSymbols.symbol -> EcTypes.ty -> form
 (* WARNING : this function should be use only in a context ensuring
  * that the quantified variables can be instanciated *)
 
+val f_betared : form -> form
+
 val f_proj_simpl : form -> int -> EcTypes.ty -> form
 val f_if_simpl   : form -> form -> form -> form
 val f_let_simpl  : EcTypes.lpattern -> form -> form -> form
 val f_lets_simpl : (EcTypes.lpattern * form) list -> form -> form
 
-val f_forall_simpl  : bindings -> form -> form
-val f_exists_simpl  : bindings -> form -> form
-val f_quant_simpl   : quantif -> bindings -> form -> form
-val f_app_simpl     : form -> form list -> EcTypes.ty -> form
-val f_betared_simpl : bindings -> form -> form list -> EcTypes.ty -> form
+val f_forall_simpl : bindings -> form -> form
+val f_exists_simpl : bindings -> form -> form
+val f_quant_simpl  : quantif -> bindings -> form -> form
+val f_app_simpl    : form -> form list -> EcTypes.ty -> form
 
 val f_not_simpl  : form -> form
 val f_and_simpl  : form -> form -> form

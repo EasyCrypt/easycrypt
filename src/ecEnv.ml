@@ -2476,8 +2476,10 @@ module Op = struct
     let op = oget (by_path_opt p env) in
     let f  =
       match op.op_kind with
-      | OB_oper (Some (OP_Plain e)) -> EcCoreFol.form_of_expr EcCoreFol.mhr e
-      | OB_pred (Some idsf) -> idsf
+      | OB_oper (Some (OP_Plain e)) ->
+          form_of_expr EcCoreFol.mhr e
+      | OB_pred (Some idsf) ->
+          idsf
       | _ -> raise NotReducible
     in
       EcCoreFol.Fsubst.subst_tvar

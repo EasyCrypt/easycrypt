@@ -394,7 +394,7 @@ module Fsubst : sig
   val f_bind_mod   : f_subst -> EcIdent.t -> mpath -> f_subst
 
   val gty_subst : f_subst -> gty -> gty
-  val f_subst   : f_subst -> form -> form
+  val f_subst   : ?tx:(form -> form -> form) -> f_subst -> form -> form
 
   val f_subst_local : EcIdent.t -> form -> form -> form
   val f_subst_mem   : EcIdent.t -> EcIdent.t -> form -> form

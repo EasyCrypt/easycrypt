@@ -376,6 +376,13 @@ module List = struct
         | (x :: xs, y :: ys) -> (f x y) && (all2 (xs, ys))
         | (_      , _      ) -> false
       in all2 (xs, ys)
+
+    let prefix2 =
+      let rec prefix2 (r1, r2) xs ys =
+        match xs, ys with
+        | [], _ | _, [] -> (List.rev r1, xs), (List.rev r2, ys)
+        | x::xs, y::ys  -> prefix2 (x::r1, y::r2) xs ys
+      in fun xs ys -> prefix2 ([], []) xs ys
   end
 
   include Parallel

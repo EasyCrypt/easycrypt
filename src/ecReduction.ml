@@ -242,8 +242,8 @@ let is_record env f =
 let rec h_red ri env hyps f =
   match f.f_node with
     (* β-reduction *)
-  | Fapp ({ f_node = Fquant (Llambda, bds, body)}, args) when ri.beta ->
-      f_betared_simpl bds body args f.f_ty
+  | Fapp ({ f_node = Fquant (Llambda, _, _)}, _) when ri.beta ->
+      f_betared f
 
     (* ζ-reduction *)
   | Flocal x -> reduce_local ri hyps x
