@@ -207,6 +207,7 @@ module List : sig
   include module type of Parallel
 
   (*------------------------------------------------------------------ *)
+  val mbfilter   : ('a -> bool) -> 'a list -> 'a list
   val fusion     : ('a -> 'a -> 'a) -> 'a list -> 'a list -> 'a list
   val is_unique  : ?eq:('a -> 'a -> bool) -> 'a list -> bool
   val fpick      : (unit -> 'a option) list -> 'a option

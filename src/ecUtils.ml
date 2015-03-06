@@ -386,6 +386,9 @@ module List = struct
     | None   -> failwith "List.last"
     | Some x -> x
 
+  let mbfilter (p : 'a -> bool) (s : 'a list) =
+    match s with [] | [_] -> s | _ -> List.filter p s
+
   let rec fusion f xs ys =
     match xs, ys with
     | zs, [] | [], zs  -> zs

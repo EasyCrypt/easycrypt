@@ -532,39 +532,33 @@ let gen_select_op
   let fop    (op, ty, ue) = (ctor.ct_op    (op, ty), ty, ue, (`Op op :> opmatch)) in
   let flc    (lc, ty, ue) = (ctor.ct_lc    (lc, ty), ty, ue, (`Lc lc :> opmatch)) in
 
-  let filter =
+  let ue_filter =
     match mode with
     | `Expr _ -> fun op -> not (EcDecl.is_pred op)
     | `Form   -> fun _  -> true
+  in
+
+  let by_scope opsc ((p, _), _, _) =
+    EcPath.p_equal opsc (oget (EcPath.prefix p))
+
+  and by_current ((p, _), _, _) =
+    EcPath.isprefix (oget (EcPath.prefix p)) (EcEnv.root env)
+
+  and by_tc ((p, _), _, _) =
+    match oget (EcEnv.Op.by_path_opt p env) with
+    | { op_kind = OB_oper (Some OP_TC) } -> false
+    | _ -> true
+
   in
 
   match (if tvi = None then select_local env name else None) with
   | Some (id, ty) -> [ flc (id, ty, ue) ]
 
   | None ->
-      let ops = EcUnify.select_op ~filter tvi env name ue psig in
-      let ops =
-        match ops, opsc with
-        | _ :: _ :: _, Some opsc ->
-            List.filter
-              (fun ((p, _), _, _) ->
-                  EcPath.p_equal opsc (oget (EcPath.prefix p)))
-              ops
-        | _, _ -> ops
-      in
-
-      let ops =
-        match
-          List.filter
-            (fun ((p, _), _, _) ->
-               match oget (EcEnv.Op.by_path_opt p env) with
-               | { op_kind = OB_oper (Some OP_TC) } -> false
-               | _ -> true)
-            ops
-        with
-        | []   -> ops
-        | notc -> notc
-      in
+      let ops = EcUnify.select_op ~filter:ue_filter tvi env name ue psig in
+      let ops = opsc |> ofold (fun opsc -> List.mbfilter (by_scope opsc)) ops in
+      let ops = List.mbfilter by_current ops in
+      let ops = match List.mbfilter by_tc ops with [] -> ops | ops -> ops in
 
       let me, pvs =
         match mode with
