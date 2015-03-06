@@ -564,7 +564,7 @@ and apply_pterm_to_oarg ?loc ({ ptev_env = pe; ptev_pt = rawpt; } as pt) oarg =
             match dfl_arg_for_impl pe f1 oarg with
             | PVASub arg -> begin
               try
-                pf_form_match pe ~ptn:f1 arg.ptev_ax;
+                pf_form_match ~mode:EcMatching.fmdelta pe ~ptn:f1 arg.ptev_ax;
                 (f2, PASub (Some arg.ptev_pt))
               with EcMatching.MatchFailure ->
                 tc_pterm_apperror ?loc pe (`InvalidArgProof f1)
@@ -625,7 +625,9 @@ and process_full_pterm ?(implicits = false) pe pf =
     let isform   = function PAFormula _ -> true | _ -> false in
     let isglobal = function PTGlobal  _ -> true | _ -> false in
 
-    if List.for_all isform pt.ptev_pt.pt_args && isglobal pt.ptev_pt.pt_head
+    if    List.for_all isform pt.ptev_pt.pt_args
+       && not (List.is_empty pf.fp_args)
+       && isglobal pt.ptev_pt.pt_head
     then apply pt else pt
 
   in process_pterm_args_app ~implicits pt pf.fp_args
