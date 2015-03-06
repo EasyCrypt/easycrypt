@@ -38,7 +38,7 @@ proof. by []. qed.
 
 lemma nosmt reduce_cat (r s : ('a * 'b) list):
     foldl augment r s
-  = r ++ filter (comp (predC (mem (map fst r))) fst) (foldl augment [] s).
+  = r ++ filter (predC (mem (map fst r)) \o fst) (foldl augment [] s).
 proof.
   rewrite -@(revK s) !foldl_rev; pose f := fun x z => augment z x.
   elim/last_ind: s r => /=.
@@ -50,20 +50,20 @@ proof.
     rewrite -nor => [t1_x t2_x]; rewrite rcons_cat; congr.
     rewrite {2}/f /augment /=; pose t := map fst _.
     case: (mem t x) => h; last first.
-      by rewrite filter_rcons /= /comp /predC t1_x.
-    have: mem t2 x; rewrite // /t2 /comp.
+      by rewrite filter_rcons /= /(\o) /predC t1_x.
+    have: mem t2 x; rewrite // /t2 /(\o).
     have <- := filter_map<:'a, 'a * 'b> fst (predC (mem t1)).
     by rewrite mem_filter /predC t1_x.
   case=> h; congr; rewrite {2}/f /augment /=; last first.
     move: h; rewrite /t2 => /mapP [z] [h ->>].
     by move: h; rewrite mem_filter => [_ /(map_f fst) ->].
   case: (NewList.mem _ _) => //=; rewrite filter_rcons.
-  by rewrite /comp /predC h.
+  by rewrite /(\o) /predC h.
 qed.
 
 lemma reduce_cons (x : 'a) (y : 'b) s:
     reduce ((x, y) :: s)
-  = (x, y) :: filter (comp (predC1 x) fst) (reduce s).
+  = (x, y) :: filter (predC1 x \o fst) (reduce s).
 proof. by rewrite {1}/reduce /= augment_nil reduce_cat cat1s. qed.
 
 lemma assoc_reduce (s : ('a * 'b) list):
@@ -79,7 +79,7 @@ lemma dom_reduce (s : ('a * 'b) list):
 proof.
   move=> x; elim: s => [|[x' y] s ih] /=; 1: by rewrite reduce_nil.
   rewrite reduce_cons /=; apply/eq_iff/orb_id2l.
-  rewrite {1}/fst /comp /= => ne_xx'.
+  rewrite {1}/fst /(\o) /= => ne_xx'.
   have <- := filter_map fst<:'a, 'b> (predC1 x').
   by rewrite mem_filter /predC1 ne_xx' /= ih.
 qed.
@@ -89,7 +89,7 @@ proof.
   elim: s => [|[x y] s ih]; 1: by rewrite reduce_nil.
   rewrite reduce_cons /= {3}/fst /=; split.
     by apply/negP=> /mapP [[x' y']]; rewrite mem_filter=> [* h1 h2 ->>].
-  rewrite /comp; have <- := filter_map fst<:'a, 'b> (predC1 x).
+  rewrite /(\o); have <- := filter_map fst<:'a, 'b> (predC1 x).
   by rewrite filter_uniq.
 qed.
 
@@ -202,7 +202,7 @@ proof. by move=> a; rewrite set_set. qed.
 
 (* -------------------------------------------------------------------- *)
 op rm (m : ('a, 'b) fmap) (a : 'a) =
-  Self.oflist (filter (comp (predC1 a) fst) (elems m))
+  Self.oflist (filter (predC1 a \o fst) (elems m))
   axiomatized by rmE.
 
 lemma get_rm (m : ('a, 'b) fmap) (a : 'a):

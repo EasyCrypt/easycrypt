@@ -16,50 +16,48 @@ abstract theory ZModule.
   op ( + ) : t -> t -> t.
   op [ - ] : t -> t.
 
-  axiom nosmt addrA: forall (x y z : t), x + (y + z) = (x + y) + z.
-  axiom nosmt addrC: forall (x y   : t), x + y = y + x.
-  axiom nosmt add0r: forall (x     : t), zeror + x = x.
-  axiom nosmt addNr: forall (x     : t), (-x) + x = zeror.
+  axiom nosmt addrA: associative   (+).
+  axiom nosmt addrC: commutative   (+).
+  axiom nosmt add0r: left_id zeror (+).
+  axiom nosmt addNr: left_inverse  zeror [-] (+).
 
   op ( - ) (x y : t) = x + -y axiomatized by subrE.
 
-  lemma nosmt addr0 (x : t): x + zeror = x.
-  proof. by rewrite addrC add0r. qed.
+  lemma nosmt addr0: right_id zeror (+).
+  proof. by move=> x; rewrite addrC add0r. qed.
 
-  lemma nosmt addrN (x : t): x + (-x) = zeror.
-  proof. by rewrite addrC addNr. qed.
+  lemma nosmt addrN: right_inverse zeror [-] (+).
+  proof. by move=> x; rewrite addrC addNr. qed.
 
-  lemma nosmt addrCA (x y z : t):
-    x + (y + z) = y + (x + z).
-  proof. by rewrite !addrA @(addrC x y). qed.
+  lemma nosmt addrCA: left_commutative (+).
+  proof. by move=> x y z; rewrite !addrA @(addrC x y). qed.
 
-  lemma nosmt addrAC (x y z : t):
-    (x + y) + z = (x + z) + y.
-  proof. by rewrite -!addrA @(addrC y z). qed.
+  lemma nosmt addrAC: right_commutative (+).
+  proof. by move=> x y z; rewrite -!addrA @(addrC y z). qed.
 
   lemma nosmt subrr (x : t): x - x = zeror.
   proof. by rewrite subrE /= addrN. qed.
 
-  lemma nosmt addKr (x y : t): -x + (x + y) = y.
-  proof. by rewrite addrA addNr add0r. qed.
+  lemma nosmt addKr: left_loop [-] (+).
+  proof. by move=> x y; rewrite addrA addNr add0r. qed.
 
-  lemma nosmt addNKr (x y : t): x + (-x + y) = y.
-  proof. by rewrite addrA addrN add0r. qed.
+  lemma nosmt addNKr: rev_left_loop [-] (+).
+  proof. by move=> x y; rewrite addrA addrN add0r. qed.
 
-  lemma nosmt addrK (y x : t): (x + y) + -y = x.
-  proof. by rewrite -addrA addrN addr0. qed.
+  lemma nosmt addrK: right_loop [-] (+).
+  proof. by move=> x y; rewrite -addrA addrN addr0. qed.
 
-  lemma nosmt addrNK (x y : t): (x + -y) + y = x.
-  proof. by rewrite -addrA addNr addr0. qed.
+  lemma nosmt addrNK: rev_right_loop [-] (+).
+  proof. by move=> x y; rewrite -addrA addNr addr0. qed.
 
-  lemma nosmt addrI (x y z : t): x + y = x + z => y = z.
-  proof. by move=> h; rewrite -@(addKr x z) -h addKr. qed.
+  lemma nosmt addrI: right_injective (+).
+  proof. by move=> x y z h; rewrite -@(addKr x z) -h addKr. qed.
 
-  lemma nosmt addIr (x y z : t): y + x = z + x => y = z.
-  proof. by move=> h; rewrite -@(addrK x z) -h addrK. qed.
+  lemma nosmt addIr: left_injective (+).
+  proof. by move=> x y z h; rewrite -@(addrK x z) -h addrK. qed.
 
-  lemma nosmt opprK (x : t): -(-x) = x.
-  proof. by apply @(addIr (-x)); rewrite addNr addrN. qed.
+  lemma nosmt opprK: involutive [-].
+  proof. by move=> x; apply @(addIr (-x)); rewrite addNr addrN. qed.
 
   lemma nosmt oppr0: -zeror = zeror.
   proof. by rewrite -@(addr0 (-zeror)) addNr. qed.
@@ -142,21 +140,123 @@ abstract theory ComRing.
 
   clone include ZModule with type t <- t.
 
-  op oner  : t.
-  op ( * ) : t -> t -> t.
+  op   oner  : t.
+  op   ( * ) : t -> t -> t.
+  op   invr  : t -> t.
+  pred unit  : t.
+
+  op ( / ) (x y : t) = x * (invr y) axiomatized by divrE.
 
   axiom nosmt oner_neq0 : oner <> zeror.
-  axiom nosmt mulrA     : forall (x y z : t), x * (y * z) = (x * y) * z.
-  axiom nosmt mulrC     : forall (x y   : t), x * y = y * x.
-  axiom nosmt mul1r     : forall (x     : t), oner * x = x.
-  axiom nosmt mulrDl    : forall (x y z : t), (x + y) * z = (x * z) + (y * z).
+  axiom nosmt mulrA     : associative ( * ).
+  axiom nosmt mulrC     : commutative ( * ).
+  axiom nosmt mul1r     : left_id oner ( * ).
+  axiom nosmt mulrDl    : left_distributive ( * ) (+).
+  axiom nosmt mulVr     : left_inverse_in unit oner invr ( * ).
+  axiom nosmt unitP     : forall (x y : t), y * x = oner => unit x.
+  axiom nosmt unitout   : forall (x : t), !unit x => invr x = x.
 
-  lemma nosmt mulr1 (x : t): x * oner = x.
-  proof. by rewrite mulrC mul1r. qed.
+  lemma nosmt mulr1: right_id oner ( * ).
+  proof. by move=> x; rewrite mulrC mul1r. qed.
 
-  lemma nosmt mulrDr (x y z : t):
-    x * (y + z) = x * y + x * z.
-  proof. by rewrite mulrC mulrDl !@(mulrC _ x). qed.
+  lemma nosmt mulrDr: right_distributive ( * ) (+).
+  proof. by move=> x y z; rewrite mulrC mulrDl !@(mulrC _ x). qed.
+
+  lemma nosmt mul0r: left_zero zeror ( * ).
+  proof. by move=> x; apply: @(addIr (oner * x)); rewrite -mulrDl !add0r mul1r. qed.
+
+  lemma nosmt mulr0: right_zero zeror ( * ).
+  proof. by move=> x; apply: @(addIr (x * oner)); rewrite -mulrDr !add0r mulr1. qed.
+
+  lemma nosmt mulrN (x y : t): x * (- y) = - (x * y).
+  proof. by apply: @(addrI (x * y)); rewrite -mulrDr !addrN mulr0. qed.
+
+  lemma nosmt mulNr (x y : t): (- x) * y = - (x * y).
+  proof. by apply: @(addrI (x * y)); rewrite -mulrDl !addrN mul0r. qed.
+
+  lemma nosmt mulrNN (x y : t): (- x) * (- y) = x * y.
+  proof. by rewrite mulrN mulNr opprK. qed.
+
+  lemma nosmt mulN1r (x : t): (-oner) * x = -x.
+  proof. by rewrite mulNr mul1r. qed.
+
+  lemma nosmt mulrN1 x: x * -oner = -x.
+  proof. by rewrite mulrN mulr1. qed.
+
+  lemma nosmt mulrV: right_inverse_in unit oner invr ( * ).
+  proof. by move=> x /mulVr; rewrite mulrC. qed.
+
+  lemma nosmt divrr (x : t): unit x => x / x = oner.
+  proof. by rewrite divrE => /mulrV. qed.
+
+  lemma nosmt invr_out (x : t): !unit x => invr x = x.
+  proof. by apply/unitout. qed.
+
+  lemma nosmt unitrP (x : t): unit x <=> (exists y, y * x = oner).
+  proof. by split=> [/mulVr<- |]; [exists (invr x) | case=> y /unitP]. qed.
+
+  lemma nosmt mulKr: left_loop_in unit invr ( * ).
+  proof. by move=> x un_x y; rewrite mulrA mulVr // mul1r. qed.
+
+  lemma nosmt mulrK: right_loop_in unit invr ( * ).
+  proof. by move=> y un_y x; rewrite -mulrA mulrV // mulr1. qed.
+
+  lemma nosmt mulVKr: rev_left_loop_in unit invr ( * ).
+  proof. by move=> x un_x y; rewrite mulrA mulrV // mul1r. qed.
+
+  lemma nosmt mulrVK: rev_right_loop_in unit invr ( * ).
+  proof. by move=> y nz_y x; rewrite -mulrA mulVr // mulr1. qed.
+
+  (* FIXME: have := can_inj _ _ (mulKr _ Ux) *)
+  lemma nosmt mulrI: right_injective_in unit ( * ).
+  proof. by move=> x Ux; have /can_inj h := mulKr _ Ux. qed.
+
+  lemma nosmt mulIr: left_injective_in unit ( * ).
+  proof. by move=> x /mulrI h y1 y2; rewrite !@(mulrC _ x) => /h. qed.
+
+  lemma nosmt unitrE (x : t): unit x <=> (x / x = oner).
+  proof.
+    split=> [Ux|xx1]; 1: by apply/divrr.
+    by apply/unitrP; exists (invr x); rewrite mulrC -divrE.
+  qed.
+
+  lemma invrK: involutive invr.
+  proof.
+    move=> x; case: (unit x)=> Ux; 2: by rewrite !invr_out.
+    rewrite -(mulrK _ Ux (invr (invr x))) -mulrA.
+    rewrite @(mulrC x) mulKr //; apply/unitrP.
+    by exists x; rewrite mulrV.
+  qed.
+
+  lemma nosmt invr_inj: injective invr.
+  proof. by apply: (can_inj invrK). qed.
+
+  lemma nosmt unitrV x: unit (invr x) <=> unit x.
+  proof. by rewrite !unitrE !divrE invrK mulrC. qed.
+
+  lemma nosmt unitr1: unit oner.
+  proof. by apply/unitrP; exists oner; rewrite mulr1. qed.
+
+  lemma invr1: invr oner = oner.
+  proof. by rewrite -{2}(mulVr _ unitr1) mulr1. qed.
+
+  lemma div1r x: oner / x = invr x.
+  proof. by rewrite divrE mul1r. qed.
+
+  lemma divr1 x: x / oner = x.
+  proof. by rewrite divrE invr1 mulr1. qed.
+
+  lemma nosmt unitr0: !unit zeror.
+  proof. by apply/negP=> /unitrP [y]; rewrite mulr0 eq_sym oner_neq0. qed.
+
+  lemma invr0: invr zeror = zeror.
+  proof. by rewrite invr_out ?unitr0. qed.
+
+  lemma nosmt unitrN1: unit (-oner).
+  proof. by apply/unitrP; exists (-oner); rewrite mulrNN mulr1. qed.
+
+  lemma nosmt invrN1: invr (-oner) = -oner.
+  proof. by rewrite -{2}(divrr unitrN1) divrE mulN1r opprK. qed.
 
   op ofint n = intmul oner n.
 
@@ -171,6 +271,25 @@ abstract theory ComRing.
 
   lemma ofintN (i : int): ofint (-i) = - (ofint i).
   proof. by apply/intmulN. qed.
+
+  op exp (x : t) (n : int) =
+    if   n < 0
+    then invr (iterop (-n) ComRing.( * ) x oner)
+    else iterop n ComRing.( * ) x oner.
+
+  lemma expr0 x: exp x 0 = oner.
+  proof. by rewrite /exp /= iterop0. qed.
+
+  lemma expr1 x: exp x 1 = x.
+  proof. by rewrite /exp /= iterop1. qed.
+
+  lemma exprS (x : t) i: 0 <= i => exp x (i+1) = x * (exp x i).
+  proof.
+    by elim: i=> /= [|i ge0_i ih]; 2: smt; rewrite expr0 expr1 mulr1.
+  qed.
+
+  lemma exprN (x : t) (i : int): exp x (-i) = invr (exp x i).
+  proof. case: (i = 0); smt. qed.
 end ComRing.
 
 (* -------------------------------------------------------------------- *)
@@ -199,66 +318,28 @@ abstract theory IDomain.
 
   lemma mulf_neq0 (x y : t): x <> zeror => y <> zeror => x * y <> zeror.
   proof. by move=> nz_x nz_y; apply/not_def; rewrite mulf_eq0; smt. qed.
+
+  lemma mulfI (x : t): x <> zeror => injective (( * ) x).
+  proof. admit. qed.
+
+  lemma mulIf x: x <> zeror => injective (fun y => y * x).
+  proof. by move=> nz_x y z; rewrite -!@(mulrC x); exact: mulfI. qed.
 end IDomain.
 
 (* -------------------------------------------------------------------- *)
 abstract theory Field.
   type t.
 
-  clone include IDomain with type t <- t.
+  clone include IDomain with type t <- t, pred unit (x : t) <- x <> zeror.
 
-  op inv: t -> t.
+  lemma mulfV (x : t): x <> zeror => x * (invr x) = oner.
+  proof. by apply/mulrV. qed.
 
-  axiom invf0: inv zeror = zeror.
-  axiom mulVf: forall (x : t), x <> zeror => (inv x) * x = oner.
+  lemma mulVf (x : t): x <> zeror => (invr x) * x = oner.
+  proof. by apply/mulVr. qed.
 
-  lemma mulfV (x : t): x <> zeror => x * (inv x) = oner.
-  proof. by move=> /mulVf <-; rewrite mulrC. qed.
-
-  op ( / ) (x y : t) = x * (inv y) axiomatized by divrE.
-
-  lemma nosmt divrr (x : t): x <> zeror => x / x = oner.
-  proof. by move=> nz_x; rewrite divrE /= mulfV. qed.
-
-  lemma nosmt mulKr (x : t): x <> zeror => forall y, (inv x) * (x * y) = y.
-  proof. by move=> nz_y y; rewrite mulrA mulVf // mul1r. qed.
-
-  lemma nosmt mulrK (y : t): y <> zeror => forall x, (x * y) * (inv y) = x.
-  proof. by move=> nz_y x; rewrite -mulrA mulfV // mulr1. qed.
-
-  lemma nosmt mulVKr (x : t): x <> zeror => forall y, x * ((inv x) * y) = y.
-  proof. by move=> nz_x y; rewrite mulrA mulfV // mul1r. qed.
-
-  lemma nosmt mulrVK (y : t): y <> zeror => forall x, (x * (inv y)) * y = x.
-  proof. by move=> nz_y x; rewrite -mulrA mulVf // mulr1. qed.
-
-  lemma nosmt mulrI (x: t): x <> zeror => forall y z, x * y = x * z => y = z.
-  proof.                        (* FIXME *)
-    move=> nz_x y z;
-      apply @(can_inj (fun (y : t), x * y) (fun (y : t), inv x * y) _ y z);
-      apply @(mulKr _ nz_x).
-  qed.
-
-  axiom invrK (x : t): inv (inv x) = x.
-
-  op exp (x : t) (n : int) =
-    if   n < 0
-    then inv (iterop (-n) Field.( * ) x oner)
-    else iterop n Field.( * ) x oner.
-
-  lemma expr0 x: exp x 0 = oner.
-  proof. by rewrite /exp /= iterop0. qed.
-
-  lemma expr1 x: exp x 1 = x.
-  proof. by rewrite /exp /= iterop1. qed.
-
-  lemma exprS (x : t) i: 0 <= i => exp x (i+1) = x * (exp x i).
-  proof.
-    by elim: i=> /= [|i ge0_i ih]; 2: smt; rewrite expr0 expr1 mulr1.
-  qed.
-
-  lemma exprN (x : t) (i : int): exp x (-i) = inv (exp x i).
-  proof. case: (i = 0)=> [-> | nz_i]; smt. qed.
+  lemma nosmt divff (x : t): x <> zeror => x / x = oner.
+  proof. by apply/divrr. qed.
 end Field.
 
 (* --------------------------------------------------------------------- *)

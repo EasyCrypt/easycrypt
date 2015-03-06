@@ -55,6 +55,10 @@ lemma nosmt contra  (c b : bool) : (c  =>  b) => !b => !c by [].
 lemma nosmt contraL (c b : bool) : ( c => !b) =>  b => !c by [].
 lemma nosmt contraR (c b : bool) : (!c =>  b) => !b =>  c by [].
 
+lemma nosmt contraNneq (b : bool) (x y : 'a):
+  (x = y => b) => !b => x <> y
+by [].
+
 (** unit *)
 lemma nosmt unit_ind (P : unit -> bool):
   P tt => forall x, P x

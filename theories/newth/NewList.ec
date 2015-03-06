@@ -1026,7 +1026,7 @@ lemma size_map (f : 'a -> 'b) s: size (map f s) = size s.
 proof. by elim s => [// | x s /= ->]. qed.
 
 lemma map_comp (f1 : 'b -> 'c) (f2 : 'a -> 'b) s:
-  map (comp f1 f2) s = map f1 (map f2 s).
+  map (f1 \o f2) s = map f1 (map f2 s).
 proof. by elim: s => //= x s ->. qed.
 
 lemma map_id (s : 'a list): map id s = s.
@@ -1242,17 +1242,13 @@ proof.
 qed.
 
 lemma assoc_filter (p : 'a -> bool) (s : ('a * 'b) list) x:
-  assoc (filter (comp p fst) s) x = if (p x) then assoc s x else None.
+  assoc (filter (p \o fst) s) x = if (p x) then assoc s x else None.
 proof.
-  elim: s=> //=.
-    by rewrite assoc_nil.
-  move=> [x' y'] s ih.
-  rewrite assoc_cons; case: (x = x') => [<<- |].
-    rewrite {1}/comp {1}/fst /=; case (p x).
-      by rewrite assoc_cons.
-    by rewrite ih=> ->.
-  move=> ne_xx'; case: (comp _ _ _)=> //=.
-  by rewrite assoc_cons ne_xx' /=.
+  elim: s=> //= [|[x' y'] s ih]; 1: by rewrite assoc_nil.
+  rewrite assoc_cons; case: (x = x') => [<<- |ne_xx'].
+    rewrite {1}/(\o) {1}/fst /=; case (p x).
+    by rewrite assoc_cons. by rewrite ih=> ->.
+  by case: ((\o) _ _ _)=> //=; rewrite assoc_cons ne_xx'.
 qed.
 
 (* -------------------------------------------------------------------- *)
