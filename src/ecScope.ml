@@ -1884,7 +1884,7 @@ module Cloning = struct
     let subst = EcSubst.add_path EcSubst.empty opath npath in
 
     let (proofs, scope) =
-      let rec ovr1 prefix (ovrds : ovrenv) (subst, ops, proofs, scope) item =
+      let rec ovr1 prefix abstract (ovrds : ovrenv) (subst, ops, proofs, scope) item =
         let xpath x = EcPath.pappend opath (EcPath.fromqsymbol (prefix, x)) in
 
         let myovscope = {
@@ -2044,6 +2044,7 @@ module Cloning = struct
         | CTh_axiom (x, ax) -> begin
             let ax = EcSubst.subst_ax subst ax in
             let (ax, proofs) =
+              if abstract then (ax, proofs) else
               let doproof =
                 match ax.ax_kind with
                 | `Lemma -> None
@@ -2081,9 +2082,10 @@ module Cloning = struct
                              ovre_scope = myovscope; } in
             let (subst, ops, proofs, subscope) =
               let subscope = Theory.enter scope thmode x in
+              let abstract = abstract || (thmode = `Abstract) in
               let (subst, ops, proofs, subscope) =
                 List.fold_left
-                  (ovr1 (prefix @ [x]) subovrds)
+                  (ovr1 (prefix @ [x]) abstract subovrds)
                   (subst, ops, proofs, subscope) cth.cth_struct
               in
                 (subst, ops, proofs, snd (Theory.exit subscope))
@@ -2186,7 +2188,7 @@ module Cloning = struct
         let mode  = if opts.clo_abstract then `Abstract else `Concrete in
         let scope = if incl then scope else Theory.enter scope mode name in
         let _, _, proofs, scope =
-          List.fold_left (ovr1 [] ovrds)
+          List.fold_left (ovr1 [] opts.clo_abstract ovrds)
             (subst, Mp.empty, [], scope)
             (fst oth).cth_struct
         in
