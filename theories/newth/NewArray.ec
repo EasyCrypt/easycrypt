@@ -13,7 +13,8 @@ op "_.[_]": 'a array -> int -> 'a = nth witness
   axiomatized by getE.
 
 lemma arrayP (a1 a2 : 'a array):
-  (a1 = a2) <=> size a1 = size a2 /\ (forall i, 0 <= i < size a2 => a1.[i] = a2.[i]).
+  (a1 = a2) <=>
+  size a1 = size a2 /\ (forall i, 0 <= i < size a2 => a1.[i] = a2.[i]).
 proof.
   split=> [-> //= | []].
   elim a2 a1=> /=.
@@ -28,6 +29,7 @@ proof.
   by rewrite getE /= addz1_neq0 //= addAzN.
 qed.
 
+(* -------------------------------------------------------------------- *)
 op "_.[_<-_]" (xs : 'a array) (n : int) (a : 'a) =
   with xs = "[]"      => []
   with xs = (::) x xs => if   n = 0
@@ -82,4 +84,77 @@ proof.
   rewrite -nand -ltzNge /= @(ltzNge _ (size xs)) /= => [n'_lt0 | lt_n'_xs].
     by rewrite getE !nth_neg //; case (0 <= n < size xs)=> //=; smt.
   by rewrite getE !nth_default ?size_set //; case (0 <= n < size xs)=> //=; smt.
+qed.
+
+lemma set_set (xs : 'a array) (n n' : int) (x x' : 'a):
+  forall i,
+    xs.[n <- x].[n' <- x'].[i] =
+      if   n = n'
+      then xs.[n' <- x'].[i]
+      else xs.[n' <- x'].[n <- x].[i].
+proof.
+  case (n = n')=> [->> /= |].
+    move=> i; rewrite !get_set; case (i = n')=> //=.
+    by rewrite size_set; case (0 <= n' < size xs).
+  move=> ne_n_n' i; case (i = n')=> [->> /= {i} |].
+    by rewrite !get_set /= @(eq_sym n') ne_n_n' /= size_set.
+  move=> ne_i_n'; case (i = n)=> [->> /= {i} |].
+    by rewrite !get_set /= ne_n_n' /= size_set.
+  by move=> ne_i_n; rewrite !get_set ne_i_n ne_i_n'.
+qed.
+
+lemma set_set_eq (xs : 'a array) (n : int) (x x' : 'a):
+  forall i, xs.[n <- x].[n <- x'].[i] = xs.[n <- x'].[i].
+proof. by move=> i; rewrite set_set. qed.
+
+(* -------------------------------------------------------------------- *)
+op make (l : int) (x : 'a) = mkseq (fun i => x) l
+  axiomatized by makeE.
+
+lemma size_make l (x:'x):
+  size (make l x) = max 0 l.
+proof. by rewrite makeE; apply size_mkseq. qed.
+
+lemma get_make l (x:'x) i:
+  0 <= i < l => (make l x).[i] = x. (* FIXME *)
+proof. by rewrite makeE getE; apply @(nth_mkseq _ (fun i => x)). qed.
+
+(* -------------------------------------------------------------------- *)
+op init (l : int) (f : int -> 'a) = mkseq f l
+  axiomatized by initE.
+
+lemma size_init l (f:int -> 'x):
+  size (init l f) = max 0 l.
+proof. by rewrite initE; apply size_mkseq. qed.
+
+lemma get_init l (f:int -> 'x) i:
+  0 <= i < l => (init l f).[i] = f i.
+proof. by rewrite initE getE; apply nth_mkseq. qed.
+
+lemma make_init n (a:'a) : init n (fun x => a) = make n a.
+proof.
+  rewrite arrayP size_init size_make /=.
+  by move=> i le0_i_ltn; rewrite get_init 1:smt get_make 1:smt.
+qed.
+
+(* -------------------------------------------------------------------- *)
+op sub (xs : 'x array) (s : int) (l : int) = take l (drop s xs)
+  axiomatized by subE.
+
+lemma size_sub (xs:'x array) (s l:int):
+  0 <= s => 0 <= l => s + l <= size xs =>
+  size (sub xs s l) = l.
+proof.
+  move=> le0_s le0_l le_sl_xs.
+  rewrite subE size_take // size_drop //.
+  smt.
+qed.
+
+lemma get_sub (xs:'x array) (s l i:int):
+  0 <= s => 0 <= l => s + l <= size xs =>
+  0 <= i < l =>
+  (sub xs s l).[i] = xs.[i + s].
+proof.
+  move=> le0_s le0_l le_sl_xs [le0_i lt_i_l].
+  by rewrite subE getE nth_take 3:nth_drop // addzC.
 qed.
