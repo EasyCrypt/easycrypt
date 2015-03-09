@@ -100,7 +100,7 @@ theory BigComoid.
        f I  = I
     => (forall (x y : comoid), f (x * y) = f x * f y)
     => forall r P (F : 'a -> comoid),
-         f (big r P F) = big r P (comp f F).
+         f (big r P F) = big r P (f \o F).
   proof.
     (* FIX: should be a consequence of big_morph *)
     move=> fI fM; elim=> //= i r IHr P F; rewrite !big_cons.
@@ -111,7 +111,7 @@ theory BigComoid.
   (*                    Mapping, filtering, ...                           *)
   (* -------------------------------------------------------------------- *)
   lemma nosmt big_map (h : 'b -> 'a) r P F:
-    big (map h r) P F = big r (comp P h) (comp F h).
+    big (map h r) P F = big r (P \o h) (F \o h).
   proof. by elim r => //= x s IHs; rewrite !big_cons IHs. qed.
 
   lemma nosmt big_nth x0 (r : 'a list) P F:
