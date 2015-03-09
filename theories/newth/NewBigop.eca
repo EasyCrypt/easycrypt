@@ -32,12 +32,12 @@ proof. by rewrite {1}/sum /= @(fun_if (map F)); case (P x). qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt big_map ['a 'b] (h : 'b -> 'a) (P : 'a -> bool) F s:
-  sum P F (map h s) = sum (comp P h) (comp F h) s.
+  sum P F (map h s) = sum (P \o h) (F \o h) s.
 proof. by elim: s => // x s; rewrite map_cons !big_cons=> ->. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt big_nth x0 (P : 'a -> bool) (F : 'a -> t) s:
-  sum P F s = sum (comp P (nth x0 s)) (comp F (nth x0 s)) (iota_ 0 (size s)).
+  sum P F s = sum (P \o (nth x0 s)) (F \o (nth x0 s)) (iota_ 0 (size s)).
 proof. by rewrite -{1}@(mkseq_nth x0 s) /mkseq big_map. qed.
 
 (* -------------------------------------------------------------------- *)
@@ -182,5 +182,5 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt big_reindex (P : 'a -> bool) (F : 'a -> t) (f f' : 'a -> 'a) s:
-  cancel f' f => sum P F s = sum (comp P f) (comp F f) (map f' s).
+  cancel f' f => sum P F s = sum (P \o f) (F \o f) (map f' s).
 proof. by move=> bij_ff'; rewrite -big_map -map_comp id_map. qed.
