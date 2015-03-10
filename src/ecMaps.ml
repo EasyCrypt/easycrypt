@@ -89,12 +89,24 @@ module Int = struct
   type t = int
   let compare = (Pervasives.compare : t -> t -> int)
   let equal   = ((=) : t -> t -> bool)
-  let hash    = (fun (x : int) -> x)
+  let hash    = (fun (x : t) -> x)
 end
 
 module Mint = Map.Make(Int)
 module Sint = Set.MakeOfMap(Mint)
 module Hint = EHashtbl.Make(Int)
+
+(* --------------------------------------------------------------------*)
+module DInt = struct
+  type t = int * int
+  let compare = (Pervasives.compare : t -> t -> int)
+  let equal   = ((=) : t -> t -> bool)
+  let hash    = (fun (x : t) -> Hashtbl.hash x)
+end
+
+module Mdint = Map.Make(DInt)
+module Sdint = Set.MakeOfMap(Mdint)
+module Hdint = EHashtbl.Make(DInt)
 
 (* --------------------------------------------------------------------*)
 module Mstr = Map.Make(String)

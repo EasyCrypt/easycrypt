@@ -302,6 +302,8 @@ module Ty : sig
 
   val scheme_of_ty :
     [`Ind | `Case] -> EcTypes.ty -> env -> (path * EcTypes.ty list) option
+
+  val signature : env -> ty -> ty list * ty
 end
 
 (* -------------------------------------------------------------------- *)

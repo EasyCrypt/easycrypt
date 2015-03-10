@@ -72,6 +72,8 @@ module CI_Int : sig
   val p_int_pow : path
   val p_int_le  : path
   val p_int_lt  : path
+  val p_int_ge  : path
+  val p_int_gt  : path
 end
 
 (* -------------------------------------------------------------------- *)
@@ -84,11 +86,13 @@ module CI_Real : sig
   val p_real_add    : path
   val p_real_sub    : path
   val p_real_mul    : path
+  val p_real_inv    : path
   val p_real_div    : path
   val p_real_pow    : path
   val p_real_le     : path
   val p_real_lt     : path
   val p_real_ge     : path
+  val p_real_gt     : path
   val p_rle_ge_sym  : path
   val p_real_of_int : path
 end

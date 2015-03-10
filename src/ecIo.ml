@@ -25,7 +25,7 @@ let parserfun = fun () ->
     MenhirLib.Convert.Simplified.traditional2revised EcParser.prog
 
 type parser_t =
-  (P.token * L.position * L.position, EcParsetree.prog EcLocation.located)
+  (P.token * L.position * L.position, EcParsetree.prog)
     MenhirLib.Convert.revised
 
 (* -------------------------------------------------------------------- *)

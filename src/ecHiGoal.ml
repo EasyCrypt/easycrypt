@@ -32,9 +32,10 @@ module LG  = EcCoreLib.CI_Logic
 
 (* -------------------------------------------------------------------- *)
 type ttenv = {
-  tt_provers   : EcParsetree.pprover_infos -> EcProvers.prover_infos;
-  tt_smtmode   : [`Admit | `Strict | `Standard | `Report];
-  tt_implicits : bool;
+  tt_provers    : EcParsetree.pprover_infos -> EcProvers.prover_infos;
+  tt_smtmode    : [`Admit | `Strict | `Standard | `Report];
+  tt_smtversion : [`Lazy | `Full];
+  tt_implicits  : bool;
 }
 
 type engine = ptactic_core -> FApi.backward
@@ -162,22 +163,34 @@ let process_dbhint pf env db =
         (not db.pht_nolocals, hints)
 
 (* -------------------------------------------------------------------- *)
-type smtinfo = pdbhint option * pprover_infos
+type smtinfo    = pdbhint option * pprover_infos
+type smtversion = EcLowGoal.smtversion
 
-let process_smt ?loc (ttenv : ttenv) (db, pi) (tc : tcenv1) =
+let process_smt_version (pe : proofenv) x =
+  match unloc x with
+  | "lazy" -> `Lazy
+  | "full" -> `Full
+  | _ ->
+      tc_error pe ~loc:x.pl_loc
+        "invalid smt variant: %s" (unloc x)
+
+let process_smt ?loc ?version (ttenv : ttenv) (db, pi) (tc : tcenv1) =
   let env = FApi.tc1_env tc in
   let db  = process_dbhint !!tc env db in
   let pi  = ttenv.tt_provers pi in
+  let vr  = version |> omap (process_smt_version !!tc) in
+  let vr  = odfl ttenv.tt_smtversion vr in
+  let smt = (fun ~mode -> t_smt ~mode ~version:vr db pi) in
 
   match ttenv.tt_smtmode with
   | `Admit ->
       t_admit tc
 
   | (`Standard | `Strict) as mode ->
-      t_seq (t_simplify ~delta:false) (t_smt ~mode db pi) tc
+      t_seq (t_simplify ~delta:false) (smt ~mode) tc
 
   | `Report ->
-      t_seq (t_simplify ~delta:false) (t_smt ~mode:(`Report loc) db pi) tc
+      t_seq (t_simplify ~delta:false) (smt ~mode:(`Report loc)) tc
 
 (* -------------------------------------------------------------------- *)
 let process_clear symbols tc =

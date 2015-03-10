@@ -7,7 +7,8 @@
 open EcUtils
 open EcOptions
 
-module T = EcTerminal
+module EP = EcParsetree
+module T  = EcTerminal
 
 (* -------------------------------------------------------------------- *)
 let copyright =
@@ -286,12 +287,12 @@ let _ =
       try
         begin
           match EcLocation.unloc (EcTerminal.next terminal) with
-          | EcParsetree.P_Prog (commands, locterm) ->
+          | EP.P_Prog (commands, locterm) ->
               terminate := locterm;
               List.iter
                 (fun p ->
-                   let loc = p.EcLocation.pl_loc in
-                     try  EcCommands.process p
+                   let loc = p.EP.gl_action.EcLocation.pl_loc in
+                     try  EcCommands.process ~timed:p.EP.gl_timed p.EP.gl_action
                      with e -> begin
                        if Printexc.backtrace_status () then begin
                          if not (EcTerminal.interactive terminal) then
@@ -301,7 +302,7 @@ let _ =
                    end)
                 commands
 
-          | EcParsetree.P_Undo i ->
+          | EP.P_Undo i ->
               EcCommands.undo i
         end;
         EcTerminal.finish `ST_Ok terminal;

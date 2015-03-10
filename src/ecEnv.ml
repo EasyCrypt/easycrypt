@@ -1371,6 +1371,13 @@ module Ty = struct
     | Tconstr (p, tys) when defined p env -> hnorm (unfold p tys env) env
     | _ -> ty
 
+  let signature env =
+    let rec doit acc ty =
+      match (hnorm ty env).ty_node with
+      | Tfun (dom, codom) -> doit (dom::acc) codom
+      | _ -> (List.rev acc, ty)
+    in fun ty -> doit [] ty
+
   let scheme_of_ty mode (ty : ty) (env : env) =
     let ty = hnorm ty env in
       match ty.ty_node with

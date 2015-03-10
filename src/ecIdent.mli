@@ -31,6 +31,7 @@ val id_hash : t -> int
 (* -------------------------------------------------------------------- *)
 module Mid : Map.S with type key = t
 module Sid : Set.S with module M = Map.MakeBase(Mid)
+module Hid : EcMaps.EHashtbl.S with type key = ident
 
 (* -------------------------------------------------------------------- *)
 val fv_singleton : ident -> int Mid.t

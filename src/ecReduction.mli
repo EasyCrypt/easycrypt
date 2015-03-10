@@ -22,6 +22,10 @@ module EqTest : sig
   val for_instr_norm : instr    eqtest
   val for_stmt_norm  : stmt     eqtest
   val for_expr_norm  : expr     eqtest
+
+  val is_unit : env -> ty -> bool
+  val is_bool : env -> ty -> bool
+  val is_int  : env -> ty -> bool
 end
 
 val is_alpha_eq : LDecl.hyps -> form -> form -> bool

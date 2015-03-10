@@ -26,13 +26,14 @@ let id_compare i1 i2 = i2.id_tag - i1.id_tag
 let id_hash id = id.id_tag
 
 (* -------------------------------------------------------------------- *)
-module IdComparable = struct
-  type t = ident
-  let compare = id_compare
-end
+module Collection = MakeMSH(struct
+  type t   = ident
+  let  tag = fun (x : ident) -> x.id_tag
+end)
 
-module Mid = Map.Make(IdComparable)
-module Sid = Set.MakeOfMap(Mid)
+module Sid = Collection.S
+module Mid = Collection.M
+module Hid = Collection.H
 
 (* -------------------------------------------------------------------- *)
 let fv_singleton x = Mid.singleton x 1

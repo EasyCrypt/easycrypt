@@ -20,7 +20,7 @@ type loglevel = EcGState.loglevel
 class type terminal =
 object
   method interactive : bool
-  method next        : EcParsetree.prog LC.located
+  method next        : EcParsetree.prog
   method notice      : immediate:bool -> loglevel -> string -> unit
   method finish      : status -> unit
   method finalize    : unit

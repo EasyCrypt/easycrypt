@@ -34,6 +34,12 @@ let try_finally (body : unit -> 'a) (cleanup : unit -> unit) =
   in
     cleanup (); aout
 
+let timed f x =
+  let t1   = Unix.gettimeofday () in
+  let aout = f x in
+  let t2   = Unix.gettimeofday () in
+  (t2 -. t1, aout)
+
 let identity x = x
 
 let pred0 (_ : 'a) = false

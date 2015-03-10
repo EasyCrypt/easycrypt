@@ -1521,10 +1521,11 @@ let t_congr (f1, f2) (args, ty) tc =
   doit (List.rev args) ty tc
 
 (* -------------------------------------------------------------------- *)
-type smtmode = [`Standard | `Strict | `Report of EcLocation.t option]
+type smtmode    = [`Standard | `Strict | `Report of EcLocation.t option]
+type smtversion = [`Lazy | `Full]
 
 (* -------------------------------------------------------------------- *)
-let t_smt ~(mode:smtmode) hints pi tc =
+let t_smt ~(mode:smtmode) ~(version:smtversion) hints pi tc =
   let error () =
     match mode with
     | `Standard ->
@@ -1538,17 +1539,28 @@ let t_smt ~(mode:smtmode) hints pi tc =
         t_admit tc
   in
 
-  let (_, concl) as goal = FApi.tc1_flat tc in
+  match version with
+  | `Full -> begin
+      let (_, concl) as goal = FApi.tc1_flat tc in
+    
+      match concl.f_node with
+      | FequivF   _  | FequivS   _
+      | FhoareF   _  | FhoareS   _
+      | FbdHoareF _  | FbdHoareS _ -> error ()
+    
+      | _ ->
+          try
+            if EcEnv.check_goal hints pi goal then
+              FApi.xmutate1 tc `Smt []
+            else error ()
+          with EcWhy3.CannotTranslate _ ->
+            error ()
+  end
 
-  match concl.f_node with
-  | FequivF   _  | FequivS   _
-  | FhoareF   _  | FhoareS   _
-  | FbdHoareF _  | FbdHoareS _ -> error ()
+  | `Lazy ->
+      let env, hyps, concl = FApi.tc1_eflat tc in
+      let notify = (fun lvl (lazy s) -> EcEnv.notify env lvl "%s" s) in
 
-  | _ ->
-      try
-        if EcEnv.check_goal hints pi goal then
-          FApi.xmutate1 tc `Smt []
-        else error ()
-      with EcWhy3.CannotTranslate _ ->
-        error ()
+      if   EcSmt.check ~notify pi hyps concl
+      then FApi.xmutate1 tc `Smt []
+      else error ()

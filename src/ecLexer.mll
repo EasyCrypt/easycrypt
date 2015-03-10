@@ -171,6 +171,7 @@
     "timeout"     , TIMEOUT    ;        (* KW: global *)
     "nolocals"    , NOLOCALS   ;        (* KW: global *)
 
+    "time"        , TIME       ;        (* KW: internal *)
     "undo"        , UNDO       ;        (* KW: internal *)
     "debug"       , DEBUG      ;        (* KW: internal *)
     "pragma"      , PRAGMA     ;        (* KW: internal *)

@@ -610,7 +610,7 @@ type apply_info = [
 type logtactic =
   | Preflexivity
   | Passumption
-  | Psmt        of (pdbhint option * pprover_infos)
+  | Psmt        of (pdbhint option * pprover_infos * psymbol option)
   | Pintro      of intropattern
   | Psplit
   | Pfield	    of psymbol list
@@ -819,7 +819,7 @@ type proofmode = {
 }
 
 (* -------------------------------------------------------------------- *)
-type global =
+type global_action =
   | Gdeclare     of pdeclare
   | Gmodule      of pmodule_def
   | Ginterface   of (psymbol * pmodule_sig)
@@ -849,6 +849,13 @@ type global =
   | Gpragma      of psymbol
   | Goption      of (psymbol * bool)
 
-type prog =
-  | P_Prog of (global located) list * bool
+type global = {
+  gl_action : global_action located;
+  gl_timed  : bool;
+}
+
+type prog_r =
+  | P_Prog of global list * bool
   | P_Undo of int
+
+type prog = prog_r located

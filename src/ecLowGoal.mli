@@ -218,6 +218,12 @@ val t_progress :
 val t_congr : form pair -> form pair list * ty -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
-type smtmode = [`Standard | `Strict | `Report of EcLocation.t option]
+type smtmode    = [`Standard | `Strict | `Report of EcLocation.t option]
+type smtversion = [`Lazy | `Full]
 
-val t_smt : mode:smtmode -> bool * hints -> prover_infos -> FApi.backward
+val t_smt:
+    mode:smtmode
+ -> version:smtversion
+ -> bool * hints
+ -> prover_infos
+ -> FApi.backward

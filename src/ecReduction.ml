@@ -82,6 +82,11 @@ module EqTest = struct
     | _, _ -> false
 
   (* ------------------------------------------------------------------ *)
+  let is_unit env ty = for_type env tunit ty
+  let is_bool env ty = for_type env tbool ty
+  let is_int  env ty = for_type env tint  ty
+
+  (* ------------------------------------------------------------------ *)
   let for_type_exn env t1 t2 =
     if not (for_type env t1 t2) then
       raise (IncompatibleType (env, (t1, t2)))

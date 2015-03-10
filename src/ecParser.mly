@@ -333,6 +333,7 @@
 %token THEORY
 %token TICKPIPE
 %token TILD
+%token TIME
 %token TIMEOUT
 %token TOP
 %token TRANSITIVITY
@@ -382,8 +383,8 @@
 
 %nonassoc prec_tactic
 
-%type <EcParsetree.global EcLocation.located> global
-%type <EcParsetree.prog   EcLocation.located> prog
+%type <EcParsetree.global> global
+%type <EcParsetree.prog  > prog
 
 %start prog global
 %%
@@ -1932,8 +1933,8 @@ logtactic:
 | TRIVIAL
    { Ptrivial }
 
-| SMT db=dbhint pi=prover_info
-   { Psmt (Some db, pi) }
+| SMT v=option(prefix(COLON, lident)) db=dbhint pi=prover_info
+   { Psmt (Some db, pi, v) }
 
 | INTROS a=intro_pattern*
    { Pintro a }
@@ -2710,7 +2711,7 @@ addrw:
 (* -------------------------------------------------------------------- *)
 (* Global entries                                                       *)
 
-global_:
+global_action:
 | theory_open      { GthOpen      $1 }
 | theory_close     { GthClose     $1 }
 | theory_require   { GthRequire   $1 }
@@ -2740,8 +2741,8 @@ global_:
 | SEARCH x=search+ { Gsearch    x   }
 
 | PRAGMA       x=pragma { Gpragma x }
-| PRAGMA ADD   x=lident { Goption (x, true ) }
-| PRAGMA MINUS x=lident { Goption (x, false) }
+| PRAGMA ADD   x=pragma { Goption (x, true ) }
+| PRAGMA MINUS x=pragma { Goption (x, false) }
 
 pragma_r:
 | x=LIDENT { x }
@@ -2755,7 +2756,8 @@ stop:
 | DROP DOT { }
 
 global:
-| g=loc(global_) FINAL { g }
+| tm=boption(TIME) g=loc(global_action) FINAL
+  { { gl_action = g; gl_timed = tm; } }
 
 prog_r:
 | g=global { P_Prog ([g], false) }

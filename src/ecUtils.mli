@@ -17,6 +17,8 @@ val try_nf : (unit -> 'a) -> 'a option
 
 val try_finally : (unit -> 'a) -> (unit -> unit) -> 'a
 
+val timed : ('a -> 'b) -> 'a -> float * 'b
+
 (* -------------------------------------------------------------------- *)
 val identity : 'a -> 'a
 

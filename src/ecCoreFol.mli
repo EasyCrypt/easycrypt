@@ -324,6 +324,9 @@ val destr_let1      : form -> EcIdent.t * ty * form * form
 val destr_forall1   : form -> EcIdent.t * gty * form
 val destr_forall    : form -> bindings * form
 val decompose_forall: form -> bindings * form
+val decompose_lambda: form -> bindings * form
+val destr_lambda    : form -> bindings * form
+
 val destr_exists1   : form -> EcIdent.t * gty * form
 val destr_exists    : form -> bindings * form
 val destr_equivF    : form -> equivF

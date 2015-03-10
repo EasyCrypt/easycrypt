@@ -974,6 +974,16 @@ let decompose_forall f =
   | Fquant(Lforall,bd,p) -> bd, p
   | _ -> [], f
 
+let destr_lambda f =
+  match f.f_node with
+  | Fquant(Llambda,bd,p) -> bd, p
+  | _ -> destr_error "lambda"
+
+let decompose_lambda f =
+  match f.f_node with
+  | Fquant(Llambda,bd,p) -> bd, p
+  | _ -> [], f
+
 let destr_exists1 f =
   match f.f_node with
   | Fquant(Lexists,(x,t)::bd,p) -> x,t,f_exists bd p

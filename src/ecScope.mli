@@ -60,6 +60,9 @@ val check_state : topmode -> string -> scope -> unit
 module Options : sig
   val set_implicits : scope -> bool -> scope
   val get_implicits : scope -> bool
+
+  val set_smtversion : scope -> EcHiGoal.smtversion -> scope
+  val get_smtversion : scope -> EcHiGoal.smtversion
 end
 
 (* -------------------------------------------------------------------- *)

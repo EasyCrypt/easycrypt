@@ -121,7 +121,7 @@ and process1_logic (ttenv : ttenv) (t : logtactic located) (tc : tcenv1) =
     match unloc t with
     | Preflexivity      -> process_reflexivity
     | Passumption       -> process_assumption
-    | Psmt pi           -> process_smt ~loc:(loc t) ttenv pi
+    | Psmt (db, pi, v)  -> process_smt ~loc:(loc t) ?version:v ttenv (db, pi)
     | Pintro pi         -> process_intros pi
     | Psplit            -> process_split
     | Pfield st         -> process_algebra `Solve `Field st

@@ -175,6 +175,26 @@ module Implicits = struct
 end
 
 (* -------------------------------------------------------------------- *)
+module SmtVersion = struct
+  exception SmtVersion of EcHiGoal.smtversion
+
+  let implicits =
+    let default = SmtVersion `Full in
+    let for_loading = function
+      | SmtVersion _ -> default
+      | exn          -> exn
+    in GenOptions.register { for_loading } default
+
+  let set options value =
+    GenOptions.set options implicits (SmtVersion value)
+
+  let get options =
+    match GenOptions.get options implicits with
+    | SmtVersion value -> value
+    | _ -> assert false
+end
+
+(* -------------------------------------------------------------------- *)
 type proof_uc = {
   puc_active : proof_auc option;
   puc_cont   : proof_ctxt list * (EcEnv.env option);
@@ -295,6 +315,12 @@ module Options = struct
 
   let set_implicits scope value =
     { scope with sc_options = Implicits.set scope.sc_options value }
+
+  let get_smtversion scope =
+    SmtVersion.get scope.sc_options
+
+  let set_smtversion scope value =
+    { scope with sc_options = SmtVersion.set scope.sc_options value }
 end
 
 (* -------------------------------------------------------------------- *)
@@ -508,9 +534,10 @@ module Tactics = struct
         in
 
         let ttenv = {
-          EcHiGoal.tt_provers   = pi scope;
-          EcHiGoal.tt_smtmode   = htmode;
-          EcHiGoal.tt_implicits = Options.get_implicits scope; } in
+          EcHiGoal.tt_provers    = pi scope;
+          EcHiGoal.tt_smtmode    = htmode;
+          EcHiGoal.tt_implicits  = Options.get_implicits  scope;
+          EcHiGoal.tt_smtversion = Options.get_smtversion scope; } in
 
         let juc   = TTC.process ttenv tac juc in
         let pac   = { pac with puc_jdg = PSCheck juc } in
@@ -645,7 +672,7 @@ module Ax = struct
           match tc with
           | Some tc -> tc
           | None    ->
-              let dtc = Plogic (Psmt (None, empty_pprover)) in
+              let dtc = Plogic (Psmt (None, empty_pprover, None)) in
               let dtc = { pl_loc = loc; pl_desc = dtc } in
               let dtc = { pt_core = dtc; pt_intros = []; } in
                 dtc
