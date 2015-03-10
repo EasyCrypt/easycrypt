@@ -320,7 +320,10 @@ abstract theory IDomain.
   proof. by move=> nz_x nz_y; apply/not_def; rewrite mulf_eq0; smt. qed.
 
   lemma mulfI (x : t): x <> zeror => injective (( * ) x).
-  proof. admit. qed.
+  proof.
+    move=> ne0_x y y'; rewrite -(opprK (x * y')) -mulrN -addr_eq0.
+    by rewrite -mulrDr mulf_eq0 ne0_x /= addr_eq0 opprK.
+  qed.
 
   lemma mulIf x: x <> zeror => injective (fun y => y * x).
   proof. by move=> nz_x y z; rewrite -!@(mulrC x); exact: mulfI. qed.
