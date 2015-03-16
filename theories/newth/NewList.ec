@@ -1396,3 +1396,108 @@ lemma lex_total (e : 'a -> 'a -> bool):
      (forall x y, e x y \/ e y x)
   => (forall s1 s2, lex e s1 s2 \/ lex e s2 s1).
 proof. by move=> h; elim=> [|x1 s1 IHs1] [|x2 s2] //=; smt. qed.
+
+(* -------------------------------------------------------------------- *)
+(*                          Array Notations                             *)
+(* -------------------------------------------------------------------- *)
+theory Array.
+  op "_.[_]" (s : 'a list) (n : int) = nth witness s n
+    axiomatized by getE.
+
+  op "_.[_<-_]" (s : 'a list) (n : int) (x : 'a) =
+    with s = "[]"     => []
+    with s = (::) a s => if n = 0 then x::s else a::(s.[n - 1 <- x]).
+
+  op mapi (n : int) (f : int -> 'a -> 'b) (s : 'a list) =
+    with s = "[]"     => []
+    with s = (::) x s => (f n x)::(mapi (n + 1) f s).
+
+  lemma nosmt arrayP (a1 a2 : 'a list):
+    (a1 = a2) <=>
+    (size a1 = size a2 /\ (forall i, 0 <= i < size a2 => a1.[i] = a2.[i])).
+  proof.
+    split=> [-> //= | []].
+    elim a2 a1=> /= [a1| x xs ih [//= | //= x' xs' /addzI eq_sizes h]].
+      by rewrite size_eq0=> ->.
+      by rewrite eq_sym addzC addz1_neq0 1:size_ge0.
+    split.
+      by have //= := h 0 _; rewrite ?getE //= -lez_add1r lez_addl size_ge0.
+    apply ih=> //.
+    move=> i [le0_i lti_lenxs]; have:= h (i + 1) _.
+      smt. (* side conditions... *)
+    by rewrite !getE /= addz1_neq0 //= addAzN.
+  qed.
+
+  lemma size_set (xs : 'a list) (n : int) (a : 'a):
+    size xs.[n <- a] = size xs.
+  proof. by elim xs n => //= x xs ih n; case (n = 0)=> //=; rewrite ih. qed.
+
+  lemma set_out (n : int) (a : 'a) (xs : 'a list):
+    n < 0 \/ size xs <= n =>
+    xs.[n <- a] = xs.
+  proof.
+    elim xs n=> //= x xs ih n.
+    move=> h; have -> /=: n <> 0 by smt.
+    case {-1}(n < 0) (eq_refl (n < 0)) h=> //= [lt0_n | ].
+      by apply ih; left; smt.
+    rewrite neqF ltzNge /= => le0_n lt_xs_n.
+    by apply ih; right; smt.
+  qed.
+
+  lemma nth_set (n n': int) (a : 'a) (xs : 'a list):
+    0 <= n  < size xs =>
+    xs.[n <- a].[n'] = if n' = n then a else xs.[n'].
+  proof.
+    move=> n_bounds.
+    rewrite !getE; elim xs n n_bounds n'=> //=.
+      smt.
+    move=> x xs ih n n_bounds n'.
+    case (n = 0)=> //= [->> | ].
+      by case (n' = 0).
+    case (n' = 0)=> //= [->> | ne0_n' ne0_n].
+      by rewrite eq_sym=> ->.
+    by rewrite ih 1..2:smt.
+  qed.
+
+  lemma get_set (xs : 'a list) (n n' : int) (x : 'a):
+    xs.[n <- x].[n'] =
+      if   (0 <= n < size xs /\ n' = n)
+      then x
+      else xs.[n'].
+  proof.
+    case (0 <= n < size xs)=> //= [| n_cond].
+      by apply nth_set.
+    by rewrite set_out 1:smt.
+  qed.
+
+  lemma set_set (xs : 'a list) (n n' : int) (x x' : 'a):
+    forall i,
+      xs.[n <- x].[n' <- x'].[i] =
+        if   n = n'
+        then xs.[n' <- x'].[i]
+        else xs.[n' <- x'].[n <- x].[i].
+  proof.
+    case (n = n')=> [->> /= |].
+      move=> i; rewrite !get_set; case (i = n')=> //=.
+      by rewrite size_set; case (0 <= n' < size xs).
+    move=> ne_n_n' i; case (i = n')=> [->> /= {i} |].
+      by rewrite !get_set /= @(eq_sym n') ne_n_n' /= size_set.
+    move=> ne_i_n'; case (i = n)=> [->> /= {i} |].
+      by rewrite !get_set /= ne_n_n' /= size_set.
+    by move=> ne_i_n; rewrite !get_set ne_i_n ne_i_n'.
+  qed.
+
+  lemma set_set_eq (xs : 'a list) (n : int) (x x' : 'a):
+    forall i, xs.[n <- x].[n <- x'].[i] = xs.[n <- x'].[i].
+  proof. by move=> i; rewrite set_set. qed.
+
+  lemma get_mapi (f : int -> 'a -> 'b) (xs : 'a list) (n i : int):
+    0 <= n < size xs =>
+    (mapi i f xs).[n] = f (n + i) xs.[n].
+  proof.
+    rewrite !getE; elim xs i n=> //=; 1:smt.
+    move=> x xs ih i n n_bnd; case (n = 0)=> //= _.
+    have ->: n + i = (n - 1) + (i + 1) by smt.
+    by apply ih; smt.
+  qed.
+end Array.

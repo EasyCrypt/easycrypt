@@ -706,3 +706,5 @@ proof.
     by move: x_in_m1; rewrite in_dom; case (m1.[x]).
   by rewrite -in_set1; apply eqe.
 qed.
+
+(** TODO: lots of lemmas *)
