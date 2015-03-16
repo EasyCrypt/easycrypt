@@ -1,7 +1,8 @@
 % --------------------------------------------------------------------
 \begin{tactic}[clear $\;x_1 \cdots x_n$]{clear}
   \begin{tsyntax}[empty]{clear}
-  Clear the local variables and hypotheses $x_1 \cdots x_n$ from the 
-  local context. Fail if the remaining ones depend on the cleared ones.
+  Clear the local variables and hypotheses $x_1 \cdots x_n$ from the
+  local context. Fail if any remaining hypotheses depend on any of the
+  $x_i$.
   \end{tsyntax}
 \end{tactic}

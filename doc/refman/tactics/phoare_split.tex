@@ -1,6 +1,6 @@
 % --------------------------------------------------------------------
 \begin{tactic}{phoare split}
-  \begin{tsyntax}{phoare split $\delta_{A}$ $\delta_{B}$ $\delta_{AB}$}
+  \begin{tsyntax}{phoare split $\ \delta_{A}$ $\ \delta_{B}$ $\ \delta_{AB}$}
   Splits a \phl judgment whose postcondition is a conjunction or
   disjunction into three \phl judgments following the definition of
   the probability of a disjunction of events.
@@ -9,7 +9,7 @@
 
   \begin{cmathpar}
   \texample[\phl{}]
-    {\ec{phoare split $\ \delta_{A}\ \delta_{B}\ \delta_{AB}$}}
+    {\ec{phoare split $\ \delta_{A}$ $\ \delta_{B}$ $\ \delta_{AB}$}}
     {\delta_{A} + \delta_{B} - \delta_{AB} \diamond \delta \\
      \pHL{P}{c}{A}{\diamond}{\delta_{A}} \\
      \pHL{P}{c}{B}{\diamond}{\delta_{B}} \\
@@ -17,7 +17,7 @@
     {\pHL{P}{c}{A \vee B}{\diamond}{\delta}}
 
   \texample[\phl{}]
-    {\ec{phoare split $\ \delta_{A}\ \delta_{B}\ \delta_{AB}$}}
+    {\ec{phoare split $\ \delta_{A}$ $\ \delta_{B}$ $\ \delta_{AB}$}}
     {\delta_{A} + \delta_{B} - \delta_{AB} \diamond \delta \\
      \pHL{P}{c}{A}{\diamond}{\delta_{A}} \\
      \pHL{P}{c}{B}{\diamond}{\delta_{B}} \\
@@ -34,7 +34,7 @@
 
   \begin{cmathpar}
   \texample[\phl{}]
-    {\ec{phoare split ! $\ \delta_{\top}\ \delta_{!}$}}
+    {\ec{phoare split ! $\ \delta_{\top}$ $\ \delta_{!}$}}
     {\delta_{\top} - \delta_{!} \diamond \delta \\
      \pHL{P}{c}{\mathsf{true}}{\diamond}{\delta_{\top}} \\
      \pHL{P}{c}{!Q}{\invrel{\diamond}}{\delta_{!}}}
@@ -42,14 +42,14 @@
   \end{cmathpar}
   \end{tsyntax}
 
-  \begin{tsyntax}{phoare split $\delta_{A}$ $\delta_{!A}$: A}
+  \begin{tsyntax}{phoare split $\ \delta_{A}$ $\ \delta_{!A}$: A}
   Splits a \phl judgment following an event $A$.
 
   \paragraph{Examples:}\strut
 
   \begin{cmathpar}
   \texample[\phl{}]
-    {\ec{phoare split $\ \delta_{A}\ \delta_{!A}$: A}}
+    {\ec{phoare split $\ \delta_{A}$ $\ \delta_{!A}$: A}}
     {\delta_{A} + \delta_{!A} \diamond \delta \\
      \pHL{P}{c}{Q \wedge A}{\diamond}{\delta_{A}} \\
      \pHL{P}{c}{Q \wedge \neg A}{\diamond}{\delta_{!A}}}

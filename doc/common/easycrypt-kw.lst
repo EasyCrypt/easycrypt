@@ -3,7 +3,7 @@
 \lstdefinelanguage{easycrypt-kw}{
   morekeywords=[1]{forall,exists,fun,glob,let,in,var,proc,if,then,else,elif,while,assert,return,res,equiv,hoare,phoare,islossless},
   morekeywords=[2]{axiom,hypothesis,axiomatized,lemma,realize,proof,qed,goal,end,import,export,local,declare,hint,nosmt,module,of,const,op,pred,require,theory,section,type,class,instance,print,search,why3,as,Pr,clone,with,prover,timeout,nolocals,Top},
-  morekeywords=[3]{beta,iota,zeta,logic,delta,simplify,congr,change,split,left,right,generalize,case,intros,pose,cut,elim,clear,apply,rewrite,rwnormal,subst,progress,trivial,auto,idtac,move,modpath,fieldeq,ringeq,algebra,transitivity,symmetry,seq,wp,sp,sim,skip,call,rcondt,rcondf,swap,cfold,rnd,pr_bounded,bypr,byphoare,byequiv,fel,conseq,exfalso,inline,alias,fission,fusion,unroll,splitwhile,kill,eager},
+  morekeywords=[3]{beta,iota,zeta,logic,delta,simplify,congr,change,split,left,right,generalize,case,intros,pose,have,cut,elim,clear,apply,rewrite,rwnormal,subst,progress,trivial,auto,idtac,move,modpath,fieldeq,ringeq,algebra,transitivity,symmetry,seq,wp,sp,sim,skip,call,rcondt,rcondf,swap,cfold,rnd,pr_bounded,bypr,byphoare,byequiv,fel,conseq,exfalso,inline,alias,fission,fusion,unroll,splitwhile,kill,eager},
   morekeywords=[4]{try,first,last,do,strict,expect},
   morekeywords=[5]{exact,assumption,smt,by,reflexivity,done},
   morekeywords=[6]{admit},
