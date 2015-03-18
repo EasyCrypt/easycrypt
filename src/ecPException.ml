@@ -11,8 +11,8 @@ let exn_printers = (Stack.create () : exn_printer Stack.t)
 
 (* -------------------------------------------------------------------- *)
 let core_printer fmt exn =
-  Format.fprintf fmt "anomaly: %s, please report"
-    (Printexc.to_string exn)
+  Format.fprintf fmt "anomaly: %s, please report to: @\n@." (Printexc.to_string exn);
+  Format.fprintf fmt "anomaly: \t%s@\n@." EcVersion.url
 
 (* -------------------------------------------------------------------- *)
 let () = Stack.push core_printer exn_printers
