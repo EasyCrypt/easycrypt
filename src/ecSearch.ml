@@ -64,7 +64,7 @@ let match_ (env : EcEnv.env) (search : search list) f =
 
 (* -------------------------------------------------------------------- *)
 let search (env : EcEnv.env) (search : search list) =
-  let check ax =
+  let check _ ax =
     match ax.EcDecl.ax_spec with
     | None   -> false
     | Some f -> match_ env search f

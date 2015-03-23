@@ -932,9 +932,120 @@ let trans_axiom genv (p,ax) =
     add_axiom (genv,lenv) (preid_p p) f
   | _ -> ()
 
-let select_add_axioms genv paths =
+type ax_info = {
+  ax_name : path;
+  ax_symb : Sp.t;
+} 
+
+let add_frequency ftab ax = 
+  let add1 p = 
+    let n = Hp.find_def ftab 0 p in
+    Hp.replace ftab p (n+1) in
+  let rec add f =
+    match f.f_node with
+    | Fop(p,_) -> add1 p
+    | Fquant   (_ , _ , f1) -> add f1
+    | Fif      (f1, f2, f3) -> add f1;add f2; add f3
+    | Flet     (_, f1, f2)  -> add f1;add f2
+    | Fapp     (e, es)      -> List.iter add (e :: es)
+    | Ftuple   es           -> List.iter add es
+    | Fproj    (e, _)       -> add e
+    | _ -> () in
+  oiter add ax.ax_spec 
+
+let init_frequency all = 
+  let ftab = Hp.create 0 in
+  List.iter (fun (_,ax) -> add_frequency ftab ax) all;
+  ftab 
+  
+
+
+type relevant_info = {
+  ri_p : float;            
+  ri_c : float;
+  ri_wanted_ax   : Sp.t;         (* wanted axiom   *)
+  ri_unwanted_ax : Sp.t;         (* unwanted axiom *)
+  ri_unwanted_op : Sp.t;         (* do not take into account *)
+  ri_max_axioms  : int;          (* maximun number of axioms  *)
+}
+
+let relevant_clause env ri rs = 
+  (* [toadd] the initial list of axiom to be added *)
+  if ri.ri_max_axioms <= Sp.cardinal ri.ri_wanted_ax then 
+      Sp.fold 
+        (fun path toadd -> (path, EcEnv.Ax.by_path path env) :: toadd)
+        ri.ri_wanted_ax [] 
+
+  else
+    (* Initialisation *)
+    (* [all] the list of all axioms, not unwanted and can be send to smt *)
+    let init_select p ax = 
+      not ax.ax_nosmt &&
+        not (Sp.mem p ri.ri_unwanted_ax) in
+    let all = EcEnv.Ax.all ~check:init_select env in
+
+    (* [ftab] frequency table number of occurency of operators *)
+    let ftab = init_frequency all in
+
+    (* [other] the list of all axioms names and their set of used operators 
+             (excepted unwanted operators). Do not include toadd. *)
+    let toadd, other = 
+      let add_ax (toadd, other as toot) (p, ax as pax) = 
+        match ax.ax_spec with
+        | None -> toot 
+        | Some f -> 
+          let used = Sp.diff (f_ops f) ri.ri_unwanted_op in
+          let paxu = pax, used in
+          if Sp.mem p ri.ri_wanted_ax then paxu::toadd, other
+          else toadd, paxu :: other in
+      List.fold_left add_ax ([],[]) all in
+
+    (* [symbols_of ax] return the set of operator used in ax *)
+    let symbols_of (_,s) = s in
+    let frequency_function freq = 1. +. log1p (float_of_int freq) in
+    let update_rs toadd rs rel =
+      List.fold_left (fun (toadd,rs) ax -> 
+        (fst ax :: toadd, Sp.union (symbols_of ax) rs)) (toadd,rs) rel in
+      
+    let clause_mark p rs (other: ((EcPath.path * EcDecl.axiom) * Sp.t) list)  =
+      let rel = ref [] in
+      let newo = ref [] in
+      let do1 ax = 
+        let cs = symbols_of ax in
+        let r  = Sp.inter cs rs in
+        let ir = Sp.diff cs r in
+        let weight path m = 
+          let freq = Hp.find ftab path in
+          let w = frequency_function freq in
+          m +. w in
+        let m = Sp.fold weight r 0. in
+        let m = m /. (m +. float_of_int (Sp.cardinal ir)) in
+        if p <= m then rel := ax :: !rel else newo := ax :: !newo in
+      List.iter do1 other;
+      !rel, !newo in
+    
+    let rec aux toadd rs p other = 
+      if ri.ri_max_axioms <= List.length toadd then toadd
+      else
+        let rel, other = clause_mark p rs other  in
+        if rel = [] then toadd 
+        else
+          let toadd, rs = update_rs toadd rs rel in
+          let p = p +. (1. -. p) /. ri.ri_c in
+          aux toadd rs p other in
+
+    let rs = Sp.diff rs ri.ri_unwanted_op in
+    let toadd, rs = update_rs [] rs toadd in
+    aux toadd rs ri.ri_p other 
+   
+(*let select_add_axioms genv paths =
   let toadd = EcSearch.search genv.te_env [`ByPath paths] in
+  List.iter (trans_axiom genv) toadd *)
+
+let select_add_axioms genv ri rs =
+  let toadd = relevant_clause genv.te_env ri rs in
   List.iter (trans_axiom genv) toadd
+
 
 (* -------------------------------------------------------------------- *)
 let f_ops_hyp paths (_,ld) = 
@@ -1006,8 +1117,18 @@ let check ?notify pi (hyps : LDecl.hyps) (concl : form) =
   let pr    = WDecl.create_prsymbol (WIdent.id_fresh "goal") in
   let decl  = WDecl.create_prop_decl WDecl.Pgoal pr wterm in
   (* Hypothesis selection *) 
-  let paths = f_ops_goal (LDecl.tohyps hyps).h_local concl in
-  select_add_axioms tenv (Sp.diff paths unwanted_ops);
+  let rs = f_ops_goal (LDecl.tohyps hyps).h_local concl in
+  (* ri_p and ri_c are selected using the paper 
+  "Lightweight Relevance Filtering for Machine-Generated Resolution Problems" *)
+  let ri = {
+    ri_p           = 0.6; 
+    ri_c           = 2.4;
+    ri_wanted_ax   = Sp.empty;
+    ri_unwanted_ax = Sp.empty;
+    ri_unwanted_op = unwanted_ops;
+    ri_max_axioms  = max_int;
+  } in
+  select_add_axioms tenv ri rs;
   (* Add conclusion *)
   let task  = WTask.add_decl tenv.te_task decl in
 

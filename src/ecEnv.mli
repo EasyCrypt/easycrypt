@@ -156,7 +156,8 @@ module Ax : sig
   val add  : path -> env -> env
   val bind : symbol -> axiom -> env -> env
 
-  val all : ?check:(axiom -> bool) -> ?name:qsymbol -> env -> (path * t) list
+  val all : 
+    ?check:(path -> axiom -> bool) -> ?name:qsymbol -> env -> (path * t) list
 
   val instanciate : path -> EcTypes.ty list -> env -> form
 end

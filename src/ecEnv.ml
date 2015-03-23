@@ -2559,18 +2559,18 @@ module Ax = struct
           (EcTypes.Tvar.init (List.map fst ax.ax_tparams) tys) f
     | _ -> raise (LookupFailure (`Path p))
 
-  let all ?(check = fun _ -> true) ?name (env : env) =
+  let all ?(check = fun _ _ -> true) ?name (env : env) =
     match name with
     | Some name ->
         let axs = MC.lookup_axioms name env in
-        List.filter (fun (_, ax) -> check ax) axs
+        List.filter (fun (p, ax) -> check p ax) axs
 
     | None ->
         Mip.fold (fun _ mc aout ->
           MMsym.fold (fun _ axioms aout ->
             List.fold_right (fun (ip, ax) aout ->
               match ip with
-              | IPPath p -> if check ax then (p, ax) :: aout else aout
+              | IPPath p -> if check p ax then (p, ax) :: aout else aout
               | _ -> aout)
               axioms aout)
             mc.mc_axioms aout)
