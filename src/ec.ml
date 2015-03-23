@@ -15,8 +15,11 @@ let copyright =
   let sentences =
     List.flatten
       [String.split_lines EcVersion.copyright;
-       String.split_lines EcVersion.license  ; ] in
-
+       String.split_lines EcVersion.License.engine;
+       ["Standard Library (theories/**/*.ec): "];
+       List.map (Printf.sprintf "\t%s")
+         (String.split_lines EcVersion.License.stdlib); ]
+  in
   String.concat "\n"
     (List.map
        (fun s -> Printf.sprintf ">> %s" s)

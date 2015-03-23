@@ -1,6 +1,6 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012-2015 - IMDEA Software Institute and INRIA
- * Distributed under the terms of the CeCILL-C license
+ * Distributed under the terms of the CeCILL-B licence.
  * -------------------------------------------------------------------- *)
 
 (* This API has been mostly inspired from the [seq] library of the

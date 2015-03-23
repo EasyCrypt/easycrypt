@@ -5,5 +5,9 @@
 
 (* -------------------------------------------------------------------- *)
 val copyright : string
-val license   : string
 val url       : string
+
+module License : sig
+  val engine : string
+  val stdlib : string
+end
