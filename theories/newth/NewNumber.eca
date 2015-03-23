@@ -67,639 +67,621 @@ proof. (* FIXME: -(inj_eq (mulfI n1_nz)) *)
   by rewrite -normrM !mulr1.
 qed.
 
-(*
+lemma ltr01: zeror < oner.
+proof. by rewrite ltr_def oner_neq0 ler01. qed.
+
+lemma ltrW (x y : t): x < y => x <= y.
+proof. by rewrite ltr_def. qed.
+
 lemma nosmt lerr (x : t): x <= x.
-proof.
-
-
+proof. admit. qed.
 
 lemma nosmt ltrr (x : t):
-  !(x < x)
-by smt.
-
-lemma nosmt ltrW (x y : t):
-  x < y => x <= y
-by smt.
+  !(x < x).
+proof. admit. qed.
 
 lemma nosmt ltr_neqAle (x y : t):
-  (x < y) <=> (x <> y) /\ (x <= y)
-by smt.
+  (x < y) <=> (x <> y) /\ (x <= y).
+proof. admit. qed.
 
 lemma nosmt ler_eqVlt (x y : t):
-  (x <= y) <=> (x = y) \/ (x < y)
-by smt.
+  (x <= y) <=> (x = y) \/ (x < y).
+proof. admit. qed.
 
 lemma nosmt lt0r (x : t):
-  (0%r < x) <=> (x <> 0%r) /\ (0%r <= x)
-by smt.
+  (zeror < x) <=> (x <> zeror) /\ (zeror <= x).
+proof. admit. qed.
 
 lemma nosmt le0r (x : t):
-  (0%r <= x) <=> (x = 0%r) \/ (0%r < x)
-by smt.
+  (zeror <= x) <=> (x = zeror) \/ (zeror < x).
+proof. admit. qed.
 
 lemma nosmt lt0r_neq0 (x : t):
-  0%r < x => (x <> 0%r)
-by smt.
+  zeror < x => (x <> zeror).
+proof. admit. qed.
 
 lemma nosmt ltr0_neq0 (x : t):
-  0%r < x => (x <> 0%r)
-by smt.
+  zeror < x => (x <> zeror).
+proof. admit. qed.
 
 lemma nosmt gtr_eqF (x y : t):
-  y < x => (x <> y)
-by smt.
+  y < x => (x <> y).
+proof. admit. qed.
 
 lemma nosmt ltr_eqF (x y : t):
-  x < y => (x <> y)
-by smt.
+  x < y => (x <> y).
+proof. admit. qed.
 
 lemma nosmt pmulr_rgt0 (x y : t):
-  0%r < x => (0%r < x * y) <=> (0%r < y)
-by smt.
+  zeror < x => (zeror < x * y) <=> (zeror < y).
+proof. admit. qed.
 
 lemma nosmt pmulr_rge0 (x y : t):
-  0%r < x => (0%r <= x * y) <=> (0%r <= y)
-by smt.
-
-lemma nosmt ler01:
-  0%r <= 1%r 
-by smt.
-
-lemma nosmt ltr01:
-  0%r < 1%r 
-by smt.
+  zeror < x => (zeror <= x * y) <=> (zeror <= y).
+proof. admit. qed.
 
 lemma nosmt normr_idP (x : t):
-  (`|x| = x) <=> (0%r <= x)
-by smt.
+  (`|x| = x) <=> (zeror <= x).
+proof. admit. qed.
 
 lemma nosmt ger0_norm (x : t):
-  0%r <= x => `|x| = x
-by smt.
+  zeror <= x => `|x| = x.
+proof. admit. qed.
 
 lemma nosmt normr0:
-  `|0%r| = 0%r
-by smt.
+  `|zeror| = zeror.
+proof. admit. qed.
 
 lemma nosmt normr1:
-  `|1%r| = 1%r
-by smt.
+  `|oner| = oner.
+proof. admit. qed.
 
 lemma nosmt normr0P (x : t):
-  (`|x| = 0%r) <=> (x = 0%r)
-by smt.
+  (`|x| = zeror) <=> (x = zeror).
+proof. admit. qed.
 
 lemma nosmt normrN1:
-  `|-1%r| = 1%r
-by smt.
+  `|-oner| = oner.
+proof. admit. qed.
 
 lemma nosmt normrN (x : t):
-  `|- x| = `|x|
-by smt.
+  `|- x| = `|x|.
+proof. admit. qed.
 
 lemma nosmt distrC (x y : t):
-  `|x - y| = `|y - x|
-by smt.
+  `|x - y| = `|y - x|.
+proof. admit. qed.
 
 lemma nosmt ler0_def (x : t):
-  (x <= 0%r) <=> (`|x| = - x)
-by smt.
+  (x <= zeror) <=> (`|x| = - x).
+proof. admit. qed.
 
 lemma nosmt normr_id (x : t):
-  `| `|x| | = `|x|
-by smt.
+  `| `|x| | = `|x|.
+proof. admit. qed.
 
 lemma nosmt normr_ge0 (x : t):
-  0%r <= `|x|
-by smt.
+  zeror <= `|x|.
+proof. admit. qed.
 
 lemma nosmt ler0_norm (x : t):
-  x <= 0%r => `|x| = - x
-by smt.
+  x <= zeror => `|x| = - x.
+proof. admit. qed.
 
 lemma nosmt gtr0_norm (x : t):
-  0%r < x => `|x| = x
-by smt.
+  zeror < x => `|x| = x.
+proof. admit. qed.
 
 lemma nosmt ltr0_norm (x : t):
-  x < 0%r => `|x| = - x
-by smt.
-
-lemma nosmt subr_ge0 (x y : t):
-  (0%r <= y - x) = (x <= y)
-by smt.
+  x < zeror => `|x| = - x.
+proof. admit. qed.
 
 lemma nosmt subr_gt0 (x y : t):
-  (0%r < y - x) <=> (x < y)
-by smt.
+  (zeror < y - x) <=> (x < y).
+proof. admit. qed.
 
 lemma nosmt subr_le0 (x y : t):
-  (y - x <= 0%r) <=> (y <= x)
-by smt.
+  (y - x <= zeror) <=> (y <= x).
+proof. admit. qed.
 
 lemma nosmt subr_lt0 (x y : t):
-  (y - x < 0%r) <=> (y < x)
-by smt.
+  (y - x < zeror) <=> (y < x).
+proof. admit. qed.
 
 lemma nosmt ler_asym (x y : t):
-  x <= y <= x => x = y
-by smt.
+  x <= y <= x => x = y.
+proof. admit. qed.
 
 lemma nosmt eqr_le (x y : t):
-  (x = y) <=> (x <= y <= x)
-by smt.
+  (x = y) <=> (x <= y <= x).
+proof. admit. qed.
 
 lemma nosmt ltr_trans (y x z : t):
-  x < y => y < z => x < z
-by smt.
+  x < y => y < z => x < z.
+proof. admit. qed.
 
 lemma nosmt ler_lt_trans (y x z : t):
-  x <= y => y < z => x < z
-by smt.
+  x <= y => y < z => x < z.
+proof. admit. qed.
 
 lemma nosmt ltr_le_trans (y x z : t):
-  x < y => y <= z => x < z
-by smt.
+  x < y => y <= z => x < z.
+proof. admit. qed.
 
 lemma nosmt ler_trans (y x z : t):
-  x <= y => y <= z => x <= z
-by smt.
+  x <= y => y <= z => x <= z.
+proof. admit. qed.
 
 lemma nosmt addr_ge0 (x y : t):
-  0%r <= x => 0%r <= y => 0%r <= x + y
-by smt.
+  zeror <= x => zeror <= y => zeror <= x + y.
+proof. admit. qed.
 
 lemma nosmt ltr_asym (x y : t):
-  ! (x < y < x)
-by smt.
+  ! (x < y < x).
+proof. admit. qed.
 
 lemma nosmt ltr_le_asym (x y : t):
-  ! (x < y <= x)
-by smt.
+  ! (x < y <= x).
+proof. admit. qed.
 
 lemma nosmt ler_lt_asym (x y : t):
-  ! (x <= y < x)
-by smt.
+  ! (x <= y < x).
+proof. admit. qed.
 
 lemma nosmt ltr_geF (x y : t):
-  x < y => ! (y <= x)
-by smt.
+  x < y => ! (y <= x).
+proof. admit. qed.
 
 lemma nosmt ler_gtF (x y : t):
-  x <= y => ! (y < x)
-by smt.
+  x <= y => ! (y < x).
+proof. admit. qed.
 
 lemma nosmt ltr_gtF (x y : t):
-  x < y => ! (y < x)
-by smt.
+  x < y => ! (y < x).
+proof. admit. qed.
 
 lemma nosmt normr_le0 (x : t):
-  (`|x| <= 0%r) <=> (x = 0%r)
-by smt.
+  (`|x| <= zeror) <=> (x = zeror).
+proof. admit. qed.
 
 lemma nosmt normr_lt0 (x : t):
-  ! (`|x| < 0%r)
-by smt.
+  ! (`|x| < zeror).
+proof. admit. qed.
 
 lemma nosmt normr_gt0 (x : t):
-  (0%r < `|x|) <=> (x <> 0%r)
-by smt.
+  (zeror < `|x|) <=> (x <> zeror).
+proof. admit. qed.
 
 lemma nosmt ler_oppr (x y : t):
-  (x <= - y) <=> (y <= - x)
-by smt.
+  (x <= - y) <=> (y <= - x).
+proof. admit. qed.
 
 lemma nosmt ltr_oppr (x y : t):
-  (x < - y) <=> (y < - x)
-by smt.
+  (x < - y) <=> (y < - x).
+proof. admit. qed.
 
 lemma nosmt ler_oppl (x y : t):
-  (- x <= y) <=> (- y <= x)
-by smt.
+  (- x <= y) <=> (- y <= x).
+proof. admit. qed.
 
 lemma nosmt ltr_oppl (x y : t):
-  (- x < y) <=> (- y < x)
-by smt.
-
-lemma nosmt oppr_ge0 (x : t):
-  (0%r <= - x) <=> (x <= 0%r)
-by smt.
+  (- x < y) <=> (- y < x).
+proof. admit. qed.
 
 lemma nosmt oppr_gt0 (x : t):
-  (0%r < - x) <=> (x < 0%r)
-by smt.
+  (zeror < - x) <=> (x < zeror).
+proof. admit. qed.
 
 lemma nosmt oppr_le0 (x : t):
-  (- x <= 0%r) <=> (0%r <= x)
-by smt.
+  (- x <= zeror) <=> (zeror <= x).
+proof. admit. qed.
 
 lemma nosmt oppr_lt0 (x : t):
-  (- x < 0%r) <=> (0%r < x)
-by smt.
+  (- x < zeror) <=> (zeror < x).
+proof. admit. qed.
 
 lemma nosmt ler_leVge (x y : t):
-  x <= 0%r => y <= 0%r => (x <= y) \/ (y <= x)
-by smt.
+  x <= zeror => y <= zeror => (x <= y) \/ (y <= x).
+proof. admit. qed.
 
 lemma nosmt ltr_add2r (z x y : t):
-  (x + z < y + z) <=> (x < y)
-by smt.
+  (x + z < y + z) <=> (x < y).
+proof. admit. qed.
 
 lemma nosmt ltr_add2l (z x y : t):
-  (z + x < z + y) <=> (x < y)
-by smt.
+  (z + x < z + y) <=> (x < y).
+proof. admit. qed.
 
 lemma nosmt ler_add (x y z t : t):
-  x <= y => z <= t => x + z <= y + t
-by smt.
+  x <= y => z <= t => x + z <= y + t.
+proof. admit. qed.
 
 lemma nosmt ler_lt_add (x y z t : t):
-  x <= y => z < t => x + z < y + t
-by smt.
+  x <= y => z < t => x + z < y + t.
+proof. admit. qed.
 
 lemma nosmt ltr_le_add (x y z t : t):
-  x < y => z <= t => x + z < y + t
-by smt.
+  x < y => z <= t => x + z < y + t.
+proof. admit. qed.
 
 lemma nosmt ltr_add (x y z t : t):
-  x < y => z < t => x + z < y + t
-by smt.
+  x < y => z < t => x + z < y + t.
+proof. admit. qed.
 
 lemma nosmt ler_sub (x y z t : t):
-  x <= y => t <= z => x - z <= y - t
-by smt.
+  x <= y => t <= z => x - z <= y - t.
+proof. admit. qed.
 
 lemma nosmt ler_lt_sub (x y z t : t):
-  x <= y => t < z => x - z < y - t
-by smt.
+  x <= y => t < z => x - z < y - t.
+proof. admit. qed.
 
 lemma nosmt ltr_le_sub (x y z t : t):
-  x < y => t <= z => x - z < y - t
-by smt.
+  x < y => t <= z => x - z < y - t.
+proof. admit. qed.
 
 lemma nosmt ltr_sub (x y z t : t):
-  x < y => t < z => x - z < y - t
-by smt.
+  x < y => t < z => x - z < y - t.
+proof. admit. qed.
 
 lemma nosmt ler_subl_addr (x y z : t):
-  (x - y <= z) <=> (x <= z + y)
-by smt.
+  (x - y <= z) <=> (x <= z + y).
+proof. admit. qed.
 
 lemma nosmt ltr_subl_addr (x y z : t):
-  (x - y < z) <=> (x < z + y)
-by smt.
+  (x - y < z) <=> (x < z + y).
+proof. admit. qed.
 
 lemma nosmt ler_subr_addr (x y z : t):
-  (x <= y - z) <=> (x + z <= y)
-by smt.
+  (x <= y - z) <=> (x + z <= y).
+proof. admit. qed.
 
 lemma nosmt ltr_subr_addr (x y z : t):
-  (x < y - z) <=> (x + z < y)
-by smt.
+  (x < y - z) <=> (x + z < y).
+proof. admit. qed.
 
 lemma nosmt ler_subl_addl (x y z : t):
-  (x - y <= z) <=> (x <= y + z)
-by smt.
+  (x - y <= z) <=> (x <= y + z).
+proof. admit. qed.
 
 lemma nosmt ltr_subl_addl (x y z : t):
-  (x - y < z) <=> (x < y + z)
-by smt.
+  (x - y < z) <=> (x < y + z).
+proof. admit. qed.
 
 lemma nosmt ler_subr_addl (x y z : t):
-  (x <= y - z) <=> (z + x <= y)
-by smt.
+  (x <= y - z) <=> (z + x <= y).
+proof. admit. qed.
 
 lemma nosmt ltr_subr_addl (x y z : t):
-  (x < y - z) <=> (z + x < y)
-by smt.
+  (x < y - z) <=> (z + x < y).
+proof. admit. qed.
 
 lemma nosmt ler_addl (x y : t):
-  (x <= x + y) <=> (0%r <= y)
-by smt.
+  (x <= x + y) <=> (zeror <= y).
+proof. admit. qed.
 
 lemma nosmt ltr_addl (x y : t):
-  (x < x + y) <=> (0%r < y)
-by smt.
+  (x < x + y) <=> (zeror < y).
+proof. admit. qed.
 
 lemma nosmt ler_addr (x y : t):
-  (x <= y + x) <=> (0%r <= y)
-by smt.
+  (x <= y + x) <=> (zeror <= y).
+proof. admit. qed.
 
 lemma nosmt ltr_addr (x y : t):
-  (x < y + x) <=> (0%r < y)
-by smt.
+  (x < y + x) <=> (zeror < y).
+proof. admit. qed.
 
 lemma nosmt ger_addl (x y : t):
-  (x + y <= x) <=> (y <= 0%r)
-by smt.
+  (x + y <= x) <=> (y <= zeror).
+proof. admit. qed.
 
 lemma nosmt gtr_addl (x y : t):
-  (x + y < x) <=> (y < 0%r)
-by smt.
+  (x + y < x) <=> (y < zeror).
+proof. admit. qed.
 
 lemma nosmt ger_addr (x y : t):
-  (y + x <= x) <=> (y <= 0%r)
-by smt.
+  (y + x <= x) <=> (y <= zeror).
+proof. admit. qed.
 
 lemma nosmt gtr_addr (x y : t):
-  (y + x < x) <=> (y < 0%r)
-by smt.
+  (y + x < x) <=> (y < zeror).
+proof. admit. qed.
 
 lemma nosmt ler_paddl (y x z : t):
-  0%r <= x => y <= z => y <= x + z
-by smt.
+  zeror <= x => y <= z => y <= x + z.
+proof. admit. qed.
 
 lemma nosmt ltr_paddl (y x z : t):
-  0%r <= x => y < z => y < x + z
-by smt.
+  zeror <= x => y < z => y < x + z.
+proof. admit. qed.
 
 lemma nosmt ltr_spaddl (y x z : t):
-  0%r < x => y <= z => y < x + z
-by smt.
+  zeror < x => y <= z => y < x + z.
+proof. admit. qed.
 
 lemma nosmt ltr_spsaddl (y x z : t):
-  0%r < x => y < z => y < x + z
-by smt.
+  zeror < x => y < z => y < x + z.
+proof. admit. qed.
 
 lemma nosmt ler_naddl (y x z : t):
-  x <= 0%r => y <= z => x + y <= z
-by smt.
+  x <= zeror => y <= z => x + y <= z.
+proof. admit. qed.
 
 lemma nosmt ltr_naddl (y x z : t):
-  x <= 0%r => y < z => x + y < z
-by smt.
+  x <= zeror => y < z => x + y < z.
+proof. admit. qed.
 
 lemma nosmt ltr_snaddl (y x z : t):
-  x < 0%r => y <= z => x + y < z
-by smt.
+  x < zeror => y <= z => x + y < z.
+proof. admit. qed.
 
 lemma nosmt ltr_snsaddl (y x z : t):
-  x < 0%r => y < z => x + y < z
-by smt.
+  x < zeror => y < z => x + y < z.
+proof. admit. qed.
 
 lemma nosmt ler_paddr (y x z : t):
-  0%r <= x => y <= z => y <= z + x
-by smt.
+  zeror <= x => y <= z => y <= z + x.
+proof. admit. qed.
 
 lemma nosmt ltr_paddr (y x z : t):
-  0%r <= x => y < z => y < z + x
-by smt.
+  zeror <= x => y < z => y < z + x.
+proof. admit. qed.
 
 lemma nosmt ltr_spaddr (y x z : t):
-  0%r < x => y <= z => y < z + x
-by smt.
+  zeror < x => y <= z => y < z + x.
+proof. admit. qed.
 
 lemma nosmt ltr_spsaddr (y x z : t):
-  0%r < x => y < z => y < z + x
-by smt.
+  zeror < x => y < z => y < z + x.
+proof. admit. qed.
 
 lemma nosmt ler_naddr (y x z : t):
-  x <= 0%r => y <= z => y + x <= z
-by smt.
+  x <= zeror => y <= z => y + x <= z.
+proof. admit. qed.
 
 lemma nosmt ltr_naddr (y x z : t):
-  x <= 0%r => y < z => y + x < z
-by smt.
+  x <= zeror => y < z => y + x < z.
+proof. admit. qed.
 
 lemma nosmt ltr_snaddr (y x z : t):
-  x < 0%r => y <= z => y + x < z
-by smt.
+  x < zeror => y <= z => y + x < z.
+proof. admit. qed.
 
 lemma nosmt ltr_snsaddr (y x z : t):
-  x < 0%r => y < z => y + x < z
-by smt.
+  x < zeror => y < z => y + x < z.
+proof. admit. qed.
 
 lemma nosmt paddr_eq0 (x y : t):
-  0%r <= x => 0%r <= y => (x + y = 0%r) <=> (x = 0%r) /\ (y = 0%r)
-by smt.
+  zeror <= x => zeror <= y => (x + y = zeror) <=> (x = zeror) /\ (y = zeror).
+proof. admit. qed.
 
 lemma nosmt naddr_eq0 (x y : t):
-  x <= 0%r => y <= 0%r => (x + y = 0%r) <=> (x = 0%r) /\ (y = 0%r)
-by smt.
+  x <= zeror => y <= zeror => (x + y = zeror) <=> (x = zeror) /\ (y = zeror).
+proof. admit. qed.
 
 lemma nosmt addr_ss_eq0 (x y : t):
-        (0%r <= x  ) /\ (0%r <= y  )
-     \/ (x   <= 0%r) /\ (y   <= 0%r)
-  => (x + y = 0%r) <=> (x = 0%r) /\ (y = 0%r)
-by smt.
+        (zeror <= x    ) /\ (zeror <= y    )
+     \/ (x     <= zeror) /\ (y     <= zeror)
+  => (x + y = zeror) <=> (x = zeror) /\ (y = zeror).
+proof. admit. qed.
 
 lemma nosmt ler_pmul (x1 y1 x2 y2 : t):
-  0%r <= x1 => 0%r <= x2 => x1 <= y1 => x2 <= y2 => x1 * x2 <= y1 * y2
-by smt.
+  zeror <= x1 => zeror <= x2 => x1 <= y1 => x2 <= y2 => x1 * x2 <= y1 * y2.
+proof. admit. qed.
 
 lemma nosmt ltr_pmul (x1 y1 x2 y2 : t):
-  0%r <= x1 => 0%r <= x2 => x1 < y1 => x2 < y2 => x1 * x2 < y1 * y2
-by smt.
+  zeror <= x1 => zeror <= x2 => x1 < y1 => x2 < y2 => x1 * x2 < y1 * y2.
+proof. admit. qed.
 
 lemma nosmt ltrN10:
-  -1%r < 0%r 
-by smt.
+  -oner < zeror.
+proof. admit. qed.
 
 lemma nosmt lerN10:
-  -1%r <= 0%r 
-by smt.
+  -oner <= zeror.
+proof. admit. qed.
 
 lemma nosmt ltr0N1:
-  !(0%r < -1%r)
-by smt.
+  !(zeror < -oner).
+proof. admit. qed.
 
 lemma nosmt ler0N1:
-  !(0%r <= -1%r)
-by smt.
+  !(zeror <= -oner).
+proof. admit. qed.
 
 lemma nosmt pmulr_rlt0 (x y : t):
-  0%r < x => (x * y < 0%r) <=> (y < 0%r)
-by smt.
+  zeror < x => (x * y < zeror) <=> (y < zeror).
+proof. admit. qed.
 
 lemma nosmt pmulr_rle0 (x y : t):
-  0%r < x => (x * y <= 0%r) <=> (y <= 0%r)
-by smt.
+  zeror < x => (x * y <= zeror) <=> (y <= zeror).
+proof. admit. qed.
 
 lemma nosmt pmulr_lgt0 (x y : t):
-  0%r < x => (0%r < y * x) <=> (0%r < y)
-by smt.
+  zeror < x => (zeror < y * x) <=> (zeror < y).
+proof. admit. qed.
 
 lemma nosmt pmulr_lge0 (x y : t):
-  0%r < x => (0%r <= y * x) <=> (0%r <= y)
-by smt.
+  zeror < x => (zeror <= y * x) <=> (zeror <= y).
+proof. admit. qed.
 
 lemma nosmt pmulr_llt0 (x y : t):
-  0%r < x => (y * x < 0%r) <=> (y < 0%r)
-by smt.
+  zeror < x => (y * x < zeror) <=> (y < zeror).
+proof. admit. qed.
 
 lemma nosmt pmulr_lle0 (x y : t):
-  0%r < x => (y * x <= 0%r) <=> (y <= 0%r)
-by smt.
+  zeror < x => (y * x <= zeror) <=> (y <= zeror).
+proof. admit. qed.
 
 lemma nosmt nmulr_rgt0 (x y : t):
-  x < 0%r => (0%r < x * y) <=> (y < 0%r)
-by smt.
+  x < zeror => (zeror < x * y) <=> (y < zeror).
+proof. admit. qed.
 
 lemma nosmt nmulr_rge0 (x y : t):
-  x < 0%r => (0%r <= x * y) <=> (y <= 0%r)
-by smt.
+  x < zeror => (zeror <= x * y) <=> (y <= zeror).
+proof. admit. qed.
 
 lemma nosmt nmulr_rlt0 (x y : t):
-  x < 0%r => (x * y < 0%r) <=> (0%r < y)
-by smt.
+  x < zeror => (x * y < zeror) <=> (zeror < y).
+proof. admit. qed.
 
 lemma nosmt nmulr_rle0 (x y : t):
-  x < 0%r => (x * y <= 0%r) <=> (0%r <= y)
-by smt.
+  x < zeror => (x * y <= zeror) <=> (zeror <= y).
+proof. admit. qed.
 
 lemma nosmt nmulr_lgt0 (x y : t):
-  x < 0%r => (0%r < y * x) <=> (y < 0%r)
-by smt.
+  x < zeror => (zeror < y * x) <=> (y < zeror).
+proof. admit. qed.
 
 lemma nosmt nmulr_lge0 (x y : t):
-  x < 0%r => (0%r <= y * x) <=> (y <= 0%r)
-by smt.
+  x < zeror => (zeror <= y * x) <=> (y <= zeror).
+proof. admit. qed.
 
 lemma nosmt nmulr_llt0 (x y : t):
-  x < 0%r => (y * x < 0%r) <=> (0%r < y)
-by smt.
+  x < zeror => (y * x < zeror) <=> (zeror < y).
+proof. admit. qed.
 
 lemma nosmt nmulr_lle0 (x y : t):
-  x < 0%r => (y * x <= 0%r) <=> (0%r <= y)
-by smt.
+  x < zeror => (y * x <= zeror) <=> (zeror <= y).
+proof. admit. qed.
 
 lemma nosmt mulr_ge0 (x y : t):
-  0%r <= x => 0%r <= y => 0%r <= x * y
-by smt.
+  zeror <= x => zeror <= y => zeror <= x * y.
+proof. admit. qed.
 
 lemma nosmt mulr_le0 (x y : t):
-  x <= 0%r => y <= 0%r => 0%r <= x * y
-by smt.
+  x <= zeror => y <= zeror => zeror <= x * y.
+proof. admit. qed.
 
 lemma nosmt mulr_ge0_le0 (x y : t):
-  0%r <= x => y <= 0%r => x * y <= 0%r
-by smt.
+  zeror <= x => y <= zeror => x * y <= zeror.
+proof. admit. qed.
 
 lemma nosmt mulr_le0_ge0 (x y : t):
-  x <= 0%r => 0%r <= y => x * y <= 0%r
-by smt.
+  x <= zeror => zeror <= y => x * y <= zeror.
+proof. admit. qed.
 
 lemma nosmt mulr_gt0 (x y : t):
-  0%r < x => 0%r < y => 0%r < x * y
-by smt.
+  zeror < x => zeror < y => zeror < x * y.
+proof. admit. qed.
 
 lemma nosmt ger_pmull (x y : t):
-  0%r < y => (x * y <= y) <=> (x <= 1%r)
-by smt.
+  zeror < y => (x * y <= y) <=> (x <= oner).
+proof. admit. qed.
 
 lemma nosmt gtr_pmull (x y : t):
-  0%r < y => (x * y < y) <=> (x < 1%r)
-by smt.
+  zeror < y => (x * y < y) <=> (x < oner).
+proof. admit. qed.
 
 lemma nosmt ger_pmulr (x y : t):
-  0%r < y => (y * x <= y) <=> (x <= 1%r)
-by smt.
+  zeror < y => (y * x <= y) <=> (x <= oner).
+proof. admit. qed.
 
 lemma nosmt gtr_pmulr (x y : t):
-  0%r < y => (y * x < y) <=> (x < 1%r)
-by smt.
+  zeror < y => (y * x < y) <=> (x < oner).
+proof. admit. qed.
 
 lemma nosmt ler_nmull (x y : t):
-  y < 0%r => (y <= x * y) <=> (x <= 1%r)
-by smt.
+  y < zeror => (y <= x * y) <=> (x <= oner).
+proof. admit. qed.
 
 lemma nosmt ltr_nmull (x y : t):
-  y < 0%r => (y < x * y) <=> (x < 1%r)
-by smt.
+  y < zeror => (y < x * y) <=> (x < oner).
+proof. admit. qed.
 
 lemma nosmt ler_nmulr (x y : t):
-  y < 0%r => (y <= y * x) <=> (x <= 1%r)
-by smt.
+  y < zeror => (y <= y * x) <=> (x <= oner).
+proof. admit. qed.
 
 lemma nosmt ltr_nmulr (x y : t):
-  y < 0%r => (y < y * x) <=> (x < 1%r)
-by smt.
+  y < zeror => (y < y * x) <=> (x < oner).
+proof. admit. qed.
 
 lemma nosmt ler_pimull (x y : t):
-  0%r <= y => x <= 1%r => x * y <= y
-by smt.
+  zeror <= y => x <= oner => x * y <= y.
+proof. admit. qed.
 
 lemma nosmt ler_nimull (x y : t):
-  y <= 0%r => x <= 1%r => y <= x * y
-by smt.
+  y <= zeror => x <= oner => y <= x * y.
+proof. admit. qed.
 
 lemma nosmt ler_pimulr (x y : t):
-  0%r <= y => x <= 1%r => y * x <= y
-by smt.
+  zeror <= y => x <= oner => y * x <= y.
+proof. admit. qed.
 
 lemma nosmt ler_nimulr (x y : t):
-  y <= 0%r => x <= 1%r => y <= y * x
-by smt.
+  y <= zeror => x <= oner => y <= y * x.
+proof. admit. qed.
 
 lemma nosmt mulr_ile1 (x y : t):
-  0%r <= x => 0%r <= y => x <= 1%r => y <= 1%r => x * y <= 1%r
-by smt.
+  zeror <= x => zeror <= y => x <= oner => y <= oner => x * y <= oner.
+proof. admit. qed.
 
 lemma nosmt mulr_ilt1 (x y : t):
-  0%r <= x => 0%r <= y => x < 1%r => y < 1%r => x * y < 1%r
-by smt.
+  zeror <= x => zeror <= y => x < oner => y < oner => x * y < oner.
+proof. admit. qed.
 
 lemma nosmt invr_gt0 (x : t):
-  (0%r < inv x) <=> (0%r < x)
-by smt.
+  (zeror < invr x) <=> (zeror < x).
+proof. admit. qed.
 
 lemma nosmt invr_ge0 (x : t):
-  (0%r <= inv x) <=> (0%r <= x)
-by smt.
+  (zeror <= invr x) <=> (zeror <= x).
+proof. admit. qed.
 
 lemma nosmt invr_lt0 (x : t):
-  (inv x < 0%r) <=> (x < 0%r)
-by smt.
+  (invr x < zeror) <=> (x < zeror).
+proof. admit. qed.
 
-lemma nosmt invr_le0 (x : t):
-  (inv x <= 0%r) <=> (x <= 0%r)
-by smt.
+lemma nosmt invrr_le0 (x : t):
+  (invr x <= zeror) <=> (x <= zeror).
+proof. admit. qed.
 
 lemma nosmt divr_ge0 (x y : t):
-  0%r <= x => 0%r <= y => 0%r <= x / y
-by smt.
+  zeror <= x => zeror <= y => zeror <= x / y.
+proof. admit. qed.
 
 lemma nosmt divr_gt0 (x y : t):
-  0%r < x => 0%r < y => 0%r < x / y
-by smt.
+  zeror < x => zeror < y => zeror < x / y.
+proof. admit. qed.
 
 lemma nosmt ler_norm_sub (x y : t):
-  `|x - y| <= `|x| + `|y|
-by smt.
+  `|x - y| <= `|x| + `|y|.
+proof. admit. qed.
 
 lemma nosmt ler_dist_add (z x y : t):
-  `|x - y| <= `|x - z| + `|z - y|
-by smt.
+  `|x - y| <= `|x - z| + `|z - y|.
+proof. admit. qed.
 
 lemma nosmt ler_sub_norm_add (x y : t):
-  `|x| - `|y| <= `|x + y|
-by smt.
+  `|x| - `|y| <= `|x + y|.
+proof. admit. qed.
 
 lemma nosmt ler_sub_dist (x y : t):
-  `|x| - `|y| <= `|x - y|
-by smt.
+  `|x| - `|y| <= `|x - y|.
+proof. admit. qed.
 
 lemma nosmt ler_dist_dist (x y : t):
-  `| `|x| - `|y| | <= `|x - y|
-by smt.
+  `| `|x| - `|y| | <= `|x - y|.
+proof. admit. qed.
 
 lemma nosmt ler_dist_norm_add (x y : t):
-  `| `|x| - `|y| | <= `|x + y|
-by smt.
+  `| `|x| - `|y| | <= `|x + y|.
+proof. admit. qed.
 
 lemma nosmt ler_nnorml (x y : t):
-  y < 0%r => ! (`|x| <= y)
-by smt.
+  y < zeror => ! (`|x| <= y).
+proof. admit. qed.
 
 lemma nosmt ltr_nnorml (x y : t):
-  y <= 0%r => ! (`|x| < y)
-by smt.
+  y <= zeror => ! (`|x| < y).
+proof. admit. qed.
 
 lemma nosmt eqr_norm_id (x : t):
-  (`|x| = x) <=> (0%r <= x)
-by smt.
+  (`|x| = x) <=> (zeror <= x).
+proof. admit. qed.
 
 lemma nosmt eqr_normN (x : t):
-  (`|x| = - x) <=> (x <= 0%r)
-by smt.
-*)
+  (`|x| = - x) <=> (x <= zeror).
+proof. admit. qed.
