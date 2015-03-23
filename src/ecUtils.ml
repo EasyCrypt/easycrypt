@@ -525,6 +525,9 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Os = struct
+  let getenv (name : string) =
+    try Some (Sys.getenv name) with Not_found -> None
+
   let listdir (dir : string) =
     BatEnum.fold (fun xs x -> x :: xs) [] (BatSys.files_of dir)
 end

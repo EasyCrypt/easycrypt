@@ -163,6 +163,7 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Os : sig
+  val getenv  : string -> string option
   val listdir : string -> string list
 end
 
