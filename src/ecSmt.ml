@@ -1235,7 +1235,7 @@ let check ?notify pi (hyps : LDecl.hyps) (concl : form) =
   (* Add conclusion *)
   let task  = WTask.add_decl tenv.te_task decl in
 
-  begin
+  if EcUtils.is_some (Os.getenv "EC_SMT_DEBUG") then begin
     let stream = open_out "task.why" in
     EcUtils.try_finally
       (fun () -> Format.fprintf
@@ -1243,6 +1243,5 @@ let check ?notify pi (hyps : LDecl.hyps) (concl : form) =
         "%a@." Why3.Pretty.print_task task)
       (fun () -> close_out stream)
   end;
-  let ft, aout = EcUtils.timed (EcProvers.execute_task ?notify pi) task in
 
-  Printf.eprintf "[W]SAT: %f\n%!" ft; (aout = Some true)
+  EcProvers.execute_task ?notify pi task = Some true
