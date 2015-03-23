@@ -120,21 +120,6 @@ abstract theory ZModule.
 end ZModule.
 
 (* -------------------------------------------------------------------- *)
-clone ZModule as IntZMod with
-  type t <- int,
-  op   zeror <- 0,
-  op   (+)   <- Int.( + ),
-  op   [-]   <- Int.([-]),
-  op   (-)   <- Int.( - )
-  proof *.
-
-realize addrA. by smt. qed.
-realize addrC. by smt. qed.
-realize add0r. by smt. qed.
-realize addNr. by smt. qed.
-realize subrE. by smt. qed.
-
-(* -------------------------------------------------------------------- *)
 abstract theory ComRing.
   type t.
 
@@ -390,3 +375,17 @@ end Multiplicative.
 
 hint rewrite rw_algebra  : .
 hint rewrite inj_algebra : .
+
+(* -------------------------------------------------------------------- *)
+clone IDomain as IntID with
+  type t <- int,
+  pred unit (z : int) <- (z = 1 \/ z = -1),
+  op   zeror <- 0,
+  op   oner  <- 1,
+  op   ( + ) <- Int.( + ),
+  op   [ - ] <- Int.([-]),
+  op   ( - ) <- Int.( - ),
+  op   ( * ) <- Int.( * ),
+  op   ( / ) <- Int.( * ),
+  op   invr  <- (fun (z : int) => z)
+  proof * by smt:lazy.
