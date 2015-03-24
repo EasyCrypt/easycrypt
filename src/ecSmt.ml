@@ -323,6 +323,14 @@ and trans_tydecl genv (p, tydecl) =
   ts
 
 (* -------------------------------------------------------------------- *)
+let rm_mp_args mp = 
+  EcPath.mpath mp.EcPath.m_top []
+
+let rm_xp_args xp = 
+  let mp = rm_mp_args xp.EcPath.x_top in
+  EcPath.xpath mp xp.EcPath.x_sub
+
+(* -------------------------------------------------------------------- *)
 let trans_binding genv lenv (x, xty) =
   let wty = 
     match xty with
@@ -491,7 +499,7 @@ let rec trans_form ((genv, lenv) as env : tenv * lenv) (fp : form) =
 
       in WTerm.t_app_infer (trans_proj genv (n, i)) [wtfp]
       
-  | Fpvar(pv,mem) -> trans_pvar env pv mem
+  | Fpvar(pv,mem) -> trans_pvar env pv fp.f_ty mem 
 
   | Fglob (m,mem) -> trans_glob env m mem
 
@@ -589,13 +597,15 @@ and trans_proj genv (n, i) =
   with Not_found -> create_proj genv (n, i)
 
 (* -------------------------------------------------------------------- *)
-and trans_pvar ((genv,_) as env) pv mem = 
-  let xp = (NormMp.norm_pvar genv.te_env pv).pv_name in
+and trans_pvar ((genv,_) as env) pv ty mem = 
+  let pv = NormMp.norm_pvar genv.te_env pv in
+  let xp = 
+    if is_loc pv then pv.pv_name 
+    else rm_xp_args pv.pv_name in 
   let ls = 
     match Hx.find_opt genv.te_xpath xp with
     | Some ls -> ls
     | None -> 
-      let ty = (Var.by_xpath xp genv.te_env).vb_type in
       let ty = Some (trans_ty env ty) in
       let pid = preid_xp xp in
       let ls = WTerm.create_lsymbol pid [ty_mem] ty in
@@ -1132,10 +1142,15 @@ let relevant_clause env ri rs =
     let rs = Sp.diff rs ri.ri_unwanted_op in
     let toadd, rs = update_rs [] rs toadd in
     aux toadd rs ri.ri_p other 
+   
+(*let select_add_axioms genv ri rs =
+  let rs = Sp.diff rs ri.ri_unwanted_op in
+  let toadd = EcSearch.search genv.te_env [`ByPath rs] in
+  List.iter (trans_axiom genv) toadd  *)
 
 let select_add_axioms genv ri rs =
   let toadd = relevant_clause genv.te_env ri rs in
-  List.iter (trans_axiom genv) toadd
+  List.iter (trans_axiom genv) toadd 
 
 (* -------------------------------------------------------------------- *)
 let f_ops_hyp paths (_,ld) = 
