@@ -47,9 +47,9 @@ type w3op = {
 }
 
 type w3absmod = {
-  w3am_ty  : WTy.ty;
-(*  w3am_mod : WTerm.lsymbol; *)
+  w3am_ty : WTy.ty;
 }
+
 (* -------------------------------------------------------------------- *)
 type tenv = {
   (*---*) te_env        : EcEnv.env;
@@ -207,7 +207,6 @@ let ty_distr t = WTy.ty_app ts_distr [t]
 let ty_mem_distr = ty_distr ty_mem
 
 (* -------------------------------------------------------------------- *)
-
 let mk_tglob genv mp = 
   assert (mp.EcPath.m_args = []);
   let id = EcPath.mget_ident mp in 
@@ -336,6 +335,10 @@ let trans_binding genv lenv (x, xty) =
 (* -------------------------------------------------------------------- *)
 let trans_bindings genv lenv bds =
   List.map_fold (trans_binding genv) lenv bds
+
+(* -------------------------------------------------------------------- *)
+let trans_lvars genv lenv bds =
+  trans_bindings genv lenv (List.map (snd_map gtty) bds) 
 
 (* -------------------------------------------------------------------- *)
 (* build the higher-order symbol and add the corresponding axiom.       *)
@@ -601,6 +604,7 @@ and trans_pvar ((genv,_) as env) pv mem =
       ls in
   WTerm.t_app_infer ls [trans_mem env mem]
 
+(* -------------------------------------------------------------------- *)
 and trans_glob ((genv,_) as env) mp mem = 
   let f = NormMp.norm_glob genv.te_env mem mp in
   match f.f_node with
@@ -625,12 +629,14 @@ and trans_glob ((genv,_) as env) mp mem =
     apply_wop genv w3op [] [wmem]
   | _ -> trans_form env f
 
+(* -------------------------------------------------------------------- *)
 and trans_mem (genv,lenv) mem =  
   match Hid.find_opt genv.te_lc mem with
   | Some w3op -> apply_wop genv w3op [] []
   | None      ->
     WTerm.t_var (oget (Mid.find_opt mem lenv.le_lv))
 
+(* -------------------------------------------------------------------- *)
 and trans_pr ((genv,lenv) as env) {pr_mem; pr_fun; pr_args; pr_event} = 
   let wmem = trans_mem env pr_mem in 
   let warg = trans_form_b env pr_args in
@@ -685,12 +691,93 @@ and trans_body (genv, lenv) wdom wcodom topbody =
       let lenv, params = trans_bindings genv lenv bds in
       params, trans_form (genv, lenv) body
     else
-      let preid = WIdent.id_fresh "x" in
+      let preid  = WIdent.id_fresh "x" in
       let params = List.map (WTerm.create_vsymbol preid) wdom in
       let args   = List.map WTerm.t_var params in 
       params, trans_app (genv, lenv) topbody args in
   let body = cast_arg body wcodom in 
-  params, body
+  let body = 
+    match wcodom, body.WTerm.t_ty with
+    | None  , Some _ -> force_prop body
+    | Some _, None   -> force_bool body
+    | _, _ -> body
+
+  in (params, body)
+
+(*
+(* -------------------------------------------------------------------- *)
+and trans_fix (genv, lenv) wdom wcodom (p, o) =
+  let (lenv, vs) = trans_lvars genv lenv o.opf_args in
+
+  let pid     = preid_p p in
+  let ls      = WTerm.create_lsymbol pid wdom wcodom in
+  let pterm   = List.map (List.nth vs) (fst o.opf_struct) in
+  let ptermty = List.map (fun x -> x.WTerm.vs_ty) pterm in
+  let ptermc  = List.length ptermty in
+
+  let w3op = { 
+    w3op_fo = (fun args tres -> WTerm.t_app ls args tres);
+    w3op_ta = instantiate vs ls.WTerm.ls_args ls.WTerm.ls_value;
+    w3op_ho = `HO_TODO (name, wdom, wcodom);
+  } in
+
+
+  let ops = env.env_op in
+  let env = { env with env_op = Mp.add path (ls, ls, wparams) env.env_op; } in
+
+  let ((env, rb), ptns) =
+    let rec compile ((env, rb), ptns) (ctors, m) =
+      match m with
+      | OPB_Branch bs ->
+          Parray.fold_left
+            (fun ((env, rb), ptns) b ->
+              let cl = proj3_1 (oget (Mp.find_opt (fst b.opb_ctor) env.env_op)) in
+                compile ((env, rb), ptns) (cl :: ctors, b.opb_sub))
+            ((env, rb), ptns) bs
+
+      | OPB_Leaf (locals, e) ->
+          let ctors = List.rev ctors in
+          let env, vs =
+            List.map_fold
+              (fun env locals ->
+                 let ids, sig_   = List.split locals in
+                 let sig_        = List.map (trans_ty env) sig_ in
+                   add_ids env ids sig_)
+              env locals
+          in
+
+          let env, rb1, e = trans_form env (EcCoreFol.form_of_expr EcCoreFol.mhr e) in
+
+          let ptn =
+            let for1 (cl, vs) pty =
+              let ptn = List.map Term.pat_var vs in
+              let ptn = Term.pat_app cl ptn pty in
+                ptn
+            in
+              try  List.map2 for1 (List.combine ctors vs) ptermty
+              with Failure _ -> assert false
+          in
+
+          let ptn =
+            if   ptermc > 1
+            then Term.pat_app (Term.fs_tuple ptermc) ptn (Ty.ty_tuple ptermty)
+            else oget (List.ohead ptn)
+          in
+            ((env, rb1@rb), (ptn, e)::ptns)
+    in
+      compile ((env, []), []) ([], o.opf_branches)
+  in
+
+  let ptns = List.rev ptns in
+  let ptns = List.map (fun (p, e) -> Term.t_close_branch p (force_bool e)) ptns in
+  let mtch =
+    if   ptermc > 1
+    then Term.t_tuple (List.map Term.t_var pterm)
+    else Term.t_var (oget (List.ohead pterm)) in
+  let body = Term.t_case mtch ptns in
+
+  ({ env with env_op = ops; }, rb, ls, Some (vs, body))
+    *)
 
 (* -------------------------------------------------------------------- *)
 and create_op ?(body = false) (genv : tenv) p =
@@ -709,17 +796,23 @@ and create_op ?(body = false) (genv : tenv) p =
     | Some (ls, th) -> (load_wtheory genv th; ls)
 
     | None ->
-      let ls   = WTerm.create_lsymbol (preid_p p) wdom wcodom in
+      let ls = WTerm.create_lsymbol (preid_p p) wdom wcodom in
       let decl =
         match body, op.op_kind with
         | true, OB_oper (Some (OP_Plain body)) ->
             let body = EcFol.form_of_expr EcFol.mhr body in
             let wparams, wbody = trans_body (genv, lenv) wdom wcodom body in
             WDecl.create_logic_decl [WDecl.make_ls_defn ls wparams wbody]
+
+(*
+        | true, OB_oper (Some (OP_Fix body)) ->
+            let wparams, wbody = trans_fix (genv, lenv) (wparams, wdom, wcodom) ls body in
+            WDecl.create_logic_decl [WDecl.make_ls_defn ls wparams wbody]
+*)
     
         | true, OB_pred (Some body) ->
-          let wparams, wbody = trans_body (genv, lenv) wdom None body in
-          WDecl.create_logic_decl [WDecl.make_ls_defn ls wparams wbody]
+            let wparams, wbody = trans_body (genv, lenv) wdom None body in
+            WDecl.create_logic_decl [WDecl.make_ls_defn ls wparams wbody]
           
         | _, _ -> WDecl.create_param_decl ls
 
@@ -731,7 +824,6 @@ and create_op ?(body = false) (genv : tenv) p =
     w3op_ta = instantiate wparams ls.WTerm.ls_args ls.WTerm.ls_value;
     w3op_ho = `HO_TODO (name, wdom, wcodom);
   } in
-
 
   Hp.add genv.te_op p w3op; w3op
 
@@ -812,6 +904,19 @@ let trans_hyp ((genv, _) as env) (x, ty) =
   | LD_modty  _ -> ()
 
   | LD_abs_st _ -> ()
+
+(* -------------------------------------------------------------------- *)
+let lenv_of_hyps genv (hyps : hyps) : lenv =
+  let lenv = fst (lenv_of_tparams_for_hyp genv hyps.h_tvar) in
+  List.iter (trans_hyp (genv, lenv)) (List.rev hyps.h_local); lenv
+
+(* -------------------------------------------------------------------- *)
+let trans_axiom genv (p, ax) = 
+  match ax.ax_spec with
+  | Some f when not ax.ax_nosmt ->
+      let lenv = fst (lenv_of_tparams ax.ax_tparams) in    
+      add_axiom (genv, lenv) (preid_p p) f
+  | _ -> ()
 
 (* -------------------------------------------------------------------- *)
 let mk_pred1 f l _ = f (as_seq1 l)
@@ -918,47 +1023,37 @@ let add_core_bindings (env : tenv) =
   (* Add modules stuff *)
   env.te_task <- WTask.add_ty_decl env.te_task ts_mem
 
-
 (* -------------------------------------------------------------------- *)
-let lenv_of_hyps genv (hyps : hyps) : lenv =
-  let lenv = fst (lenv_of_tparams_for_hyp genv hyps.h_tvar) in
-  List.iter (trans_hyp (genv, lenv)) (List.rev hyps.h_local); lenv
-
-(* -------------------------------------------------------------------- *)
-let trans_axiom genv (p,ax) = 
-  match ax.ax_spec with
-  | Some f when not ax.ax_nosmt ->
-    let lenv = fst (lenv_of_tparams ax.ax_tparams) in    
-    add_axiom (genv,lenv) (preid_p p) f
-  | _ -> ()
+(* See "Lightweight Relevance Filtering for Machine-Generated           *)
+(* Resolution Problems" for a description of axioms selection.          *)
 
 type ax_info = {
   ax_name : path;
   ax_symb : Sp.t;
 } 
 
-let add_frequency ftab ax = 
-  let add1 p = 
-    let n = Hp.find_def ftab 0 p in
-    Hp.replace ftab p (n+1) in
-  let rec add f =
-    match f.f_node with
-    | Fop(p,_) -> add1 p
-    | Fquant   (_ , _ , f1) -> add f1
-    | Fif      (f1, f2, f3) -> add f1;add f2; add f3
-    | Flet     (_, f1, f2)  -> add f1;add f2
-    | Fapp     (e, es)      -> List.iter add (e :: es)
-    | Ftuple   es           -> List.iter add es
-    | Fproj    (e, _)       -> add e
-    | _ -> () in
-  oiter add ax.ax_spec 
-
-let init_frequency all = 
-  let ftab = Hp.create 0 in
-  List.iter (fun (_,ax) -> add_frequency ftab ax) all;
-  ftab 
+module Frequency = struct
+  let add ftab ax = 
+    let add1 p = 
+      let n = Hp.find_def ftab 0 p in
+      Hp.replace ftab p (n+1) in
+    let rec add f =
+      match f.f_node with
+      | Fop(p,_) -> add1 p
+      | Fquant   (_ , _ , f1) -> add f1
+      | Fif      (f1, f2, f3) -> add f1;add f2; add f3
+      | Flet     (_, f1, f2)  -> add f1;add f2
+      | Fapp     (e, es)      -> List.iter add (e :: es)
+      | Ftuple   es           -> List.iter add es
+      | Fproj    (e, _)       -> add e
+      | _ -> () in
+    oiter add ax.ax_spec 
   
-
+  let init all = 
+    let ftab = Hp.create 0 in
+    List.iter (fun (_,ax) -> add ftab ax) all;
+    ftab 
+end
 
 type relevant_info = {
   ri_p : float;            
@@ -985,7 +1080,7 @@ let relevant_clause env ri rs =
     let all = EcEnv.Ax.all ~check:init_select env in
 
     (* [ftab] frequency table number of occurency of operators *)
-    let ftab = init_frequency all in
+    let ftab = Frequency.init all in
 
     (* [other] the list of all axioms names and their set of used operators 
              (excepted unwanted operators). Do not include toadd. *)
@@ -1037,15 +1132,10 @@ let relevant_clause env ri rs =
     let rs = Sp.diff rs ri.ri_unwanted_op in
     let toadd, rs = update_rs [] rs toadd in
     aux toadd rs ri.ri_p other 
-   
-(*let select_add_axioms genv paths =
-  let toadd = EcSearch.search genv.te_env [`ByPath paths] in
-  List.iter (trans_axiom genv) toadd *)
 
 let select_add_axioms genv ri rs =
   let toadd = relevant_clause genv.te_env ri rs in
   List.iter (trans_axiom genv) toadd
-
 
 (* -------------------------------------------------------------------- *)
 let f_ops_hyp paths (_,ld) = 
@@ -1118,8 +1208,6 @@ let check ?notify pi (hyps : LDecl.hyps) (concl : form) =
   let decl  = WDecl.create_prop_decl WDecl.Pgoal pr wterm in
   (* Hypothesis selection *) 
   let rs = f_ops_goal (LDecl.tohyps hyps).h_local concl in
-  (* ri_p and ri_c are selected using the paper 
-  "Lightweight Relevance Filtering for Machine-Generated Resolution Problems" *)
   let ri = {
     ri_p           = 0.6; 
     ri_c           = 2.4;
