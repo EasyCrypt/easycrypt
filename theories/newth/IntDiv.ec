@@ -3,6 +3,8 @@
  * Distributed under the terms of the CeCILL-B licence.
  * -------------------------------------------------------------------- *)
 
+pragma +Smt:lazy.
+
 (* -------------------------------------------------------------------- *)
 require import Fun Int Ring. import Ring.IntID.
 
@@ -13,8 +15,17 @@ op (%/) : int -> int -> int.
 axiom nosmt edivzP (m d : int):
   m = (m %/ d) * m + (m %% d) /\ (d <> 0 => 0 <= m %% d < `|d|).
 
-axiom modz0 m: m %% 0 = m.
 axiom divz0 m: m %/ 0 = 0.
+axiom modz0 m: m %% 0 = m.
+
+(* -------------------------------------------------------------------- *)
+lemma edivzW (P : int -> int -> bool):
+  (forall m d q r,
+        m = (m %/ d) * m + (m %% d)
+     => (d <> 0 => 0 <= m %% d < `|d|)
+     => P q r)
+  => forall m d, P (m %/ d) (m %% d).
+proof. by move=> h m d; case: (edivzP m d)=> mE lt_mod; apply/(h m d). qed.
 
 (* -------------------------------------------------------------------- *)
 lemma divz_eq (m d : int): m = (m %/ d) * m + (m %% d).
@@ -28,11 +39,18 @@ lemma div0z d: 0 %% d = 0.
 proof. by move: (divz_eq 0 d)=> /= <-. qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt divz_small m d: 0 <= m < d => m %/ d = 0.
+lemma edivn_eq d q r: 0 <= r < d => (q * d + r) %/ d = q.
 proof. admit. qed.
 
-lemma nosmt modz_small m d: 0 <= m < d => m %% d = m.
+lemma emodn_eq d q r: 0 <= r < d => (q * d + r) %% d = r.
 proof. admit. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt divz_small m d: 0 <= m < d => m %/ d = 0.
+proof. by move=> /edivn_eq /(_ 0). qed.
+
+lemma nosmt modz_small m d: 0 <= m < d => m %% d = m.
+proof. by move/emodn_eq /(_ 0). qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt modzDl z1 z2 m: (z1 %% m + z2) %% m = (z1 + z2) %% m by admit.
