@@ -1666,6 +1666,13 @@ gpterm_head(F):
 | LPAREN UNDERSCORE? COLON f=F RPAREN
    { FPCut f }
 
+gpoterm_head(F):
+| x=gpterm_head(F?)
+    { x }
+
+| UNDERSCORE
+    { FPCut None }
+
 gpterm_arg:
 | LPAREN LTCOLON m=loc(mod_qident) RPAREN
     { EA_mod m }
@@ -1685,8 +1692,15 @@ gpterm(F):
 | LPAREN hd=gpterm_head(F) args=loc(gpterm_arg)* RPAREN
    { mk_pterm hd args }
 
+gpoterm(F):
+| hd=gpoterm_head(F)
+   { mk_pterm hd [] }
+
+| LPAREN hd=gpoterm_head(F) args=loc(gpterm_arg)* RPAREN
+   { mk_pterm hd args }
+
 %inline pterm:
-| pt=gpterm(form) { pt }
+| pt=gpoterm(form) { pt }
 
 %inline epterm:
 | x=iboption(AT) pt=pterm
@@ -1762,10 +1776,10 @@ genpattern:
     { `Form (Some (snd_map EcMaps.Sint.of_list o), l) }
 
 | LPAREN UNDERSCORE COLON f=form RPAREN
-    { `ProofTerm (mk_pterm (FPCut f) []) }
+    { `ProofTerm (mk_pterm (FPCut (Some f)) []) }
 
 | LPAREN LPAREN UNDERSCORE COLON f=form RPAREN args=loc(gpterm_arg)* RPAREN
-    { `ProofTerm (mk_pterm (FPCut f) args) }
+    { `ProofTerm (mk_pterm (FPCut (Some f)) args) }
 
 simplify_arg:
 | DELTA l=qoident* { `Delta l }

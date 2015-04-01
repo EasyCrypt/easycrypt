@@ -342,14 +342,14 @@ type ppt_arg =
   | EA_form  of pformula
   | EA_mem   of pmemory
   | EA_mod   of pmsymbol located
-  | EA_proof of pformula gppterm
+  | EA_proof of (pformula option) gppterm
 
 and 'a gppterm = {
   fp_head : 'a ppt_head;
   fp_args : ppt_arg located list
 }
 
-type ppterm  = pformula gppterm
+type ppterm  = (pformula option) gppterm
 type eppterm = [`Implicit | `Explicit] * ppterm
 
 type pcutdef = {

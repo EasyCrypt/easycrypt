@@ -47,6 +47,7 @@ type apperror = [
   | `MemoryWanted
   | `ModuleWanted
   | `PTermWanted
+  | `CannotInfer
   | `CannotInferMod
   | `NotFunctional
   | `InvalidArgForm
@@ -63,6 +64,7 @@ let tc_pterm_apperror pte ?loc (kind : apperror) =
     | `MemoryWanted    -> Format.fprintf fmt "%s" "expecting a memory"
     | `ModuleWanted    -> Format.fprintf fmt "%s" "expecting a module expression"
     | `PTermWanted     -> Format.fprintf fmt "%s" "expecting a proof-term"
+    | `CannotInfer     -> Format.fprintf fmt "%s" "cannot infer this place-holder"
     | `CannotInferMod  -> Format.fprintf fmt "%s" "cannot infer module arguments"
     | `NotFunctional   -> Format.fprintf fmt "%s" "too many argument"
     | `InvalidArgForm  -> Format.fprintf fmt "%s" "invalid argument (incompatible type)"
@@ -316,7 +318,7 @@ let lookup_named_psymbol (hyps : LDecl.hyps) ~hastyp fp =
  * formula with holes by annotating it with an empty {} occurences
  * selector *)
 
-let ffpattern_of_form hyps fp =
+let ffpattern_of_form hyps fp : ppterm option =
   let rec destr_app fp =
     match unloc fp with
     | PFtuple [fp] -> destr_app fp
@@ -390,8 +392,11 @@ let process_pterm_cut ~prcut pe pt =
 
 (* ------------------------------------------------------------------ *)
 let process_pterm pe pt =
-  let prcut = PT.pf_process_formula pe.pte_pe pe.pte_hy in
-  process_pterm_cut prcut pe pt
+  let prcut fp =
+    match fp with
+    | None    -> tc_pterm_apperror pe `CannotInfer
+    | Some fp -> PT.pf_process_formula pe.pte_pe pe.pte_hy fp
+  in process_pterm_cut prcut pe pt
 
 (* ------------------------------------------------------------------ *)
 let rec trans_pterm_arg_impl pe f =

@@ -558,6 +558,21 @@ let process_view1 pe tc =
     match TTC.destruct_product (tc1_hyps tc) (FApi.tc1_goal tc) with
     | None | Some (`Forall _) -> raise E.NoTopAssumption
 
+    | Some (`Imp (_, _)) when pe.fp_head = FPCut None ->
+        let hyps = FApi.tc1_hyps tc in
+        let hid  = LDecl.fresh_id hyps "h" in
+        let hqs  = mk_loc _dummy ([], EcIdent.name hid) in
+        let pe   = { pe with fp_head = FPNamed (hqs, None) } in
+
+        t_intros_i_seq ~clear:true [hid]
+          (fun tc ->
+            let pe = PT.tc1_process_full_pterm tc pe in
+
+            if not (PT.can_concretize pe.PT.ptev_env) then
+              tc_error !!tc "cannot infer all placeholders";
+              let pt, ax = PT.concretize pe in t_cutdef pt ax tc)
+          tc
+
     | Some (`Imp (f1, _)) ->
         let top    = LDecl.fresh_id (tc1_hyps tc) "h" in
         let tc     = t_intros_i_1 [top] tc in
