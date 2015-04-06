@@ -143,9 +143,6 @@ module Theory : sig
    * the initial scope and is in charge of processing the required
    * theory. *)
   val require : scope -> (symbol * thmode) -> (scope -> scope) -> scope
-
-  (* FIXME: DOC *)
-  val import_w3 : scope -> string list -> string -> w3_renaming list -> scope
 end
 
 (* -------------------------------------------------------------------- *)
@@ -168,14 +165,14 @@ module Prover : sig
     po_nprovers   : int option;
     po_provers    : string list option * (include_exclude * string) list;
     po_verbose    : int option;
-    po_version    : [`Lazy | `Full] option;
     pl_all        : bool option;
     pl_max        : int option;
     pl_iterate    : bool option;
     pl_wanted     : EcProvers.hints option;
     pl_unwanted   : EcProvers.hints option;
   }
- val empty_options : smt_options
+
+  val empty_options : smt_options
 
   val process     : scope -> pprover_infos -> scope 
   val set_wrapper : scope -> string option -> scope

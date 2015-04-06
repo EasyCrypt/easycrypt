@@ -32,9 +32,9 @@ module LG  = EcCoreLib.CI_Logic
 
 (* -------------------------------------------------------------------- *)
 type ttenv = {
-  tt_provers    : EcParsetree.pprover_infos -> EcProvers.prover_infos;
-  tt_smtmode    : [`Admit | `Strict | `Standard | `Report];
-  tt_implicits  : bool;
+  tt_provers   : EcParsetree.pprover_infos -> EcProvers.prover_infos;
+  tt_smtmode   : [`Admit | `Strict | `Standard | `Report];
+  tt_implicits : bool;
 }
 
 type engine = ptactic_core -> FApi.backward

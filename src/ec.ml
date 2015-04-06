@@ -251,7 +251,6 @@ let _ =
       EcCommands.cm_provers   = prvopts.prvo_provers;
       EcCommands.cm_wrapper   = pwrapper;
       EcCommands.cm_profile   = prvopts.prvo_profile;
-      EcCommands.cm_oldsmt    = prvopts.prvo_oldsmt;
       EcCommands.cm_iterate   = prvopts.prvo_iterate;
     } in
 

@@ -164,7 +164,6 @@
     "instance"    , INSTANCE   ;        (* KW: global *)
     "print"       , PRINT      ;        (* KW: global *)
     "search"      , SEARCH     ;        (* KW: global *)
-    "why3"        , WHY3       ;        (* KW: global *)
     "as"          , AS         ;        (* KW: global *)
     "Pr"          , PR         ;        (* KW: global *)
     "clone"       , CLONE      ;        (* KW: global *)

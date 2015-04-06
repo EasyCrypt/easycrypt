@@ -409,11 +409,6 @@ and process_th_clone (scope : EcScope.scope) thcl =
   EcScope.Cloning.clone scope (!pragma).pm_check thcl
 
 (* -------------------------------------------------------------------- *)
-and process_w3_import (scope : EcScope.scope) (p, f, r) =
-  EcScope.check_state `InTop "why3 import" scope;
-  EcScope.Theory.import_w3 scope p f r
-
-(* -------------------------------------------------------------------- *)
 and process_sct_open (scope : EcScope.scope) name =
   EcScope.check_state `InTop "section opening" scope;
   EcScope.Section.enter scope name
@@ -506,7 +501,6 @@ and process (ld : EcLoader.ecloader) (scope : EcScope.scope) g =
       | GthClone     thcl -> `Fct   (fun scope -> process_th_clone   scope  thcl)
       | GsctOpen     name -> `Fct   (fun scope -> process_sct_open   scope  name)
       | GsctClose    name -> `Fct   (fun scope -> process_sct_close  scope  name)
-      | GthW3        a    -> `Fct   (fun scope -> process_w3_import  scope  a)
       | Gprint       p    -> `Fct   (fun scope -> process_print      scope  p; scope)
       | Gsearch      qs   -> `Fct   (fun scope -> process_search     scope  qs; scope)
       | Gtactics     t    -> `Fct   (fun scope -> process_tactics    scope  t)
@@ -545,7 +539,6 @@ type checkmode = {
   cm_provers   : string list option;
   cm_wrapper   : string option;
   cm_profile   : bool;
-  cm_oldsmt    : bool;
   cm_iterate   : bool;
 }
 
@@ -558,8 +551,6 @@ let initial ~checkmode ~boot =
     EcScope.Prover.po_cpufactor = Some checkmode.cm_cpufactor;
     EcScope.Prover.po_nprovers  = Some checkmode.cm_nprovers;
     EcScope.Prover.po_provers   = (checkmode.cm_provers, []);
-    EcScope.Prover.po_version   = 
-      if checkmode.cm_oldsmt then Some `Full else Some `Lazy;
     EcScope.Prover.pl_iterate   = Some (checkmode.cm_iterate);
   } in
 

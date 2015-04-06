@@ -314,7 +314,6 @@ type prover_infos = {
   pr_cpufactor : int;
   pr_wrapper   : string option;
   pr_verbose   : int;
-  pr_version   : [`Lazy | `Full];
   pr_all       : bool;
   pr_max       : int;
   pr_iterate   : bool;
@@ -330,7 +329,6 @@ let dft_prover_infos = {
   pr_cpufactor = 1;
   pr_wrapper   = None;
   pr_verbose   = 0;
-  pr_version   = `Lazy;
   pr_all       = false;
   pr_iterate   = false;
   pr_max       = 50;
@@ -339,7 +337,6 @@ let dft_prover_infos = {
 }
 
 let dft_prover_names = ["Z3"; "CVC4"; "Alt-Ergo"; "Eprover"; "Yices"]
-
 
 (* -------------------------------------------------------------------- *)
 type notify = EcGState.loglevel -> string Lazy.t -> unit

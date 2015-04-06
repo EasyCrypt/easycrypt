@@ -30,15 +30,6 @@ type 'a suspension = {
 }
 
 (* -------------------------------------------------------------------- *)
-type ctheory_w3 = {
-  cth3_rebind : EcWhy3.rebinding;
-  cth3_theory : ctheory;
-}
-
-let ctheory_of_ctheory_w3 (cth : ctheory_w3) =
-  cth.cth3_theory
-
-(* -------------------------------------------------------------------- *)
 let check_not_suspended (params, obj) =
   if not (List.for_all (fun x -> x = None) params) then
     assert false;
@@ -144,8 +135,6 @@ type preenv = {
   env_tc       : TC.graph;
   env_rwbase   : Sp.t Mip.t;
   env_modlcs   : Sid.t;                 (* declared modules *)
-  env_w3       : EcWhy3.env;
-  env_rb       : EcWhy3.rebinding;      (* in reverse order *)
   env_item     : ctheory_item list;     (* in reverse order *)
   env_norm     : env_norm ref;
 }
@@ -245,8 +234,6 @@ let empty gstate =
     env_tc       = TC.Graph.empty;
     env_rwbase   = Mip.empty;
     env_modlcs   = Sid.empty;
-    env_w3       = EcWhy3.empty;
-    env_rb       = [];
     env_item     = [];
     env_norm     = ref empty_norm_cache; }
 
@@ -1109,7 +1096,6 @@ let enter mode (name : symbol) (env : env) =
       let env = MC.bind_mc name (empty_mc None) env in
         { env with
             env_scope = { ec_path = path; ec_scope = `Theory; };
-            env_rb    = [];
             env_item  = []; }
 
   | `Module [], `Module mpath ->
@@ -1117,7 +1103,6 @@ let enter mode (name : symbol) (env : env) =
       let env   = MC.bind_mc name (empty_mc None) env in
         { env with
             env_scope = { ec_path = path; ec_scope = `Module mpath; };
-            env_rb    = [];
             env_item  = []; }
 
   | `Module params, `Theory ->
@@ -1126,7 +1111,6 @@ let enter mode (name : symbol) (env : env) =
       let env    = MC.bind_mc name (empty_mc (Some params)) env in
         { env with
             env_scope = { ec_path = path; ec_scope = `Module mpath; };
-            env_rb    = [];
             env_item  = []; }
 
   | `Fun, `Module mpath ->
@@ -1134,7 +1118,6 @@ let enter mode (name : symbol) (env : env) =
       let env   = MC.bind_mc name (empty_mc None) env in (* FIXME: remove *)
         { env with
             env_scope = { ec_path = path; ec_scope = `Fun xpath; };
-            env_rb    = [];
             env_item  = []; }
 
   | _, _ ->
@@ -1419,15 +1402,8 @@ module Ty = struct
     | _ -> env
 
   let bind name ty env =
-    let env = rebind name ty env in
-    let (w3, rb) =
-        EcWhy3.add_ty env.env_w3
-          (EcPath.pqname (root env) name) ty
-    in
-      { env with
-          env_w3   = w3;
-          env_rb   = rb @ env.env_rb;
-          env_item = CTh_type (name, ty) :: env.env_item; }
+    { (rebind name ty env) with
+         env_item = CTh_type (name, ty) :: env.env_item; }
 end
 
 (* -------------------------------------------------------------------- *)
@@ -1843,18 +1819,9 @@ module Mod = struct
     fst (lookup name env)
 
   let bind name me env =
-    assert (me.me_name = name);
-    let env = MC.bind_mod name me env in
-    let (w3, rb) =
-      EcWhy3.add_mod_exp env.env_w3
-          (EcPath.pqname (root env) name) me
-    in
-      { env with
-        env_w3   = w3;
-        env_rb   = rb @ env.env_rb;
-        env_item = CTh_module me :: env.env_item;
-        env_norm = ref !(env.env_norm);
-      }
+    { (MC.bind_mod name me env) with
+          env_item = CTh_module me :: env.env_item;
+          env_norm = ref !(env.env_norm); }
 
   let me_of_mt env name modty restr =
     let modsig =
@@ -1893,11 +1860,8 @@ module Mod = struct
       env
 
   let declare_local id modty restr env =
-    let env = bind_local id modty restr env in
-    let w3  = EcWhy3.add_abs_mod (me_of_mt env) env.env_w3 id modty restr in
-      { env with
-          env_w3     = w3;
-          env_modlcs = Sid.add id env.env_modlcs; }
+    { (bind_local id modty restr env) with
+        env_modlcs = Sid.add id env.env_modlcs; }
 
   let add_restr_to_locals restr env =
 
@@ -2441,15 +2405,9 @@ module Op = struct
 
   let bind name op env =
     let env = MC.bind_operator name op env in
-    let op = NormMp.norm_op env op in
-    let (w3, rb) =
-        EcWhy3.add_op env.env_w3
-          (EcPath.pqname (root env) name) op
-    in
-      { env with
-          env_w3   = w3;
-          env_rb   = rb @ env.env_rb;
-          env_item = CTh_operator(name, op) :: env.env_item; }
+    let op  = NormMp.norm_op env op in
+    { env with
+        env_item = CTh_operator(name, op) :: env.env_item; }
 
   (* This version does not create a Why3 binding. *)
   let bind_logical name op env =
@@ -2541,16 +2499,7 @@ module Ax = struct
 
   let bind name ax env =
     let env = MC.bind_axiom name ax env in
-    let env = { env with env_item = CTh_axiom (name, ax) :: env.env_item } in
-
-    match ax.ax_nosmt with
-    | true  -> env
-    | false ->
-        let (w3, rb) =
-          EcWhy3.add_ax env.env_w3
-            (EcPath.pqname (root env) name)
-            (NormMp.norm_ax env ax) in
-        { env with env_w3 = w3; env_rb = rb @ env.env_rb; }
+    { env with env_item = CTh_axiom (name, ax) :: env.env_item }
 
   let rebind name ax env =
     MC.bind_axiom name ax env
@@ -2746,7 +2695,7 @@ module Theory = struct
 
   (* ------------------------------------------------------------------ *)
   let bind ?(mode = `Concrete) name cth env =
-    let th = (cth.cth3_theory, mode) in
+    let th = (cth, mode) in
 
     let env = MC.bind_theory name th env in
     let env = { env with env_item = (CTh_theory (name, th)) :: env.env_item } in
@@ -2754,12 +2703,10 @@ module Theory = struct
     match mode with
     | `Concrete ->
         let thname     = EcPath.pqname (root env) name in
-        let env_w3     = EcWhy3.rebind env.env_w3 cth.cth3_rebind in
-        let env_rb     = List.rev_append cth.cth3_rebind env.env_rb in
-        let env_tci    = bind_instance_cth thname env.env_tci cth.cth3_theory in
-        let env_tc     = bind_tc_cth thname env.env_tc cth.cth3_theory in
-        let env_rwbase = bind_br_cth thname env.env_rwbase cth.cth3_theory in
-        { env with env_w3; env_rb; env_tci; env_tc; env_rwbase; }
+        let env_tci    = bind_instance_cth thname env.env_tci cth in
+        let env_tc     = bind_tc_cth thname env.env_tc cth in
+        let env_rwbase = bind_br_cth thname env.env_rwbase cth in
+        { env with env_tci; env_tc; env_rwbase; }
 
     | `Abstract ->
         env
@@ -2826,13 +2773,8 @@ module Theory = struct
 
   (* ------------------------------------------------------------------ *)
   let close env =
-    let theory =
-      let items = List.rev env.env_item in
-        { cth_desc   = CTh_struct items;
-          cth_struct = items; }
-    in
-      { cth3_rebind = List.rev env.env_rb;
-        cth3_theory = theory; }
+    let items = List.rev env.env_item in
+    { cth_desc = CTh_struct items; cth_struct = items; }
 
   (* ------------------------------------------------------------------ *)
   let require ?(mode = `Concrete) x cth env =
@@ -2843,13 +2785,13 @@ module Theory = struct
       match mode with
       | `Concrete ->
           let (_, thmc), submcs =
-            MC.mc_of_ctheory_r rootnm (x, cth.cth3_theory)
+            MC.mc_of_ctheory_r rootnm (x, cth)
           in MC.bind_submc env rootnm ((x, thmc), submcs)
 
       | `Abstract -> env
     in
 
-    let th = (cth.cth3_theory, mode) in
+    let th = (cth, mode) in
 
     let topmc = Mip.find (IPPath rootnm) env.env_comps in
     let topmc = MC._up_theory false topmc x (IPPath thpath, th) in
@@ -2862,92 +2804,16 @@ module Theory = struct
     let comps = env.env_comps in
     let comps = Mip.add (IPPath rootnm) topmc comps in
 
-    let env =
-      { env with
-          env_current = current;
-          env_comps   = comps;
-          env_w3      = EcWhy3.rebind env.env_w3 cth.cth3_rebind; }
-    in
-       { env with
-           env_tci = bind_instance_cth thpath env.env_tci cth.cth3_theory;
-           env_tc  = bind_tc_cth thpath env.env_tc cth.cth3_theory;
-           env_rwbase = bind_br_cth thpath env.env_rwbase cth.cth3_theory; 
-       }
+    let env = { env with env_current = current; env_comps = comps; } in
+
+    { env with
+        env_tci    = bind_instance_cth thpath env.env_tci cth;
+        env_tc     = bind_tc_cth thpath env.env_tc cth;
+        env_rwbase = bind_br_cth thpath env.env_rwbase cth; }
 end
 
 (* -------------------------------------------------------------------- *)
-let import_w3 env th rd =
-  let lth, rbi = EcWhy3.import_w3 env.env_w3 (root env) th rd in
-  let cth = List.map Theory.ctheory_item_of_theory_item lth in
-
-  let env = {
-    env with
-      env_w3   = EcWhy3.rebind env.env_w3 [rbi];
-      env_rb   = rbi :: env.env_rb;
-      env_item = List.rev_append cth env.env_item;
-  }
-  in
-
-  let add env = function
-    | Th_type     (id, ty) -> Ty.rebind id ty env
-    | Th_operator (id, op) -> Op.rebind id op env
-    | Th_axiom    (id, ax) -> Ax.rebind id ax env
-
-    | Th_theory   (id, (th, `Concrete)) ->
-        Theory.rebind id (Theory.ctheory_of_theory th, `Concrete) env
-
-    | _ -> assert false
-  in
-
-  let env = List.fold_left add env lth in
-    (env, cth)
-
-(* -------------------------------------------------------------------- *)
-let import_w3_dir env dir name rd =
-  let th = EcProvers.get_w3_th dir name in
-    import_w3 env th rd
-
-(* -------------------------------------------------------------------- *)
-let initial gstate =
-  let env0 = empty gstate in
-  let env = enter `Theory EcCoreLib.i_Pervasive env0 in
-  let unit_rn =
-    let tunit = Why3.Ty.ts_tuple 0 in
-    let nunit = tunit.Why3.Ty.ts_name.Why3.Ident.id_string in
-    let tt = Why3.Term.fs_tuple 0 in
-    let ntt = tt.Why3.Term.ls_name.Why3.Ident.id_string in
-    [ [nunit],EcWhy3.RDts, EcPath.basename EcCoreLib.CI_Unit.p_unit;
-      [ntt], EcWhy3.RDls, EcPath.basename EcCoreLib.CI_Unit.p_tt
-    ]  in
-  let env, _ = import_w3 env (Why3.Theory.tuple_theory 0) unit_rn in
-  let bool_rn = [
-    ["bool"] , EcWhy3.RDts, EcPath.basename EcCoreLib.CI_Bool.p_bool;
-    ["True"] , EcWhy3.RDls, EcPath.basename EcCoreLib.CI_Bool.p_true;
-    ["False"], EcWhy3.RDls, EcPath.basename EcCoreLib.CI_Bool.p_false ] in
-  let env, _ = import_w3 env Why3.Theory.bool_theory bool_rn in
-  let builtin_rn = [
-    ["int"]    , EcWhy3.RDts, EcPath.basename EcCoreLib.CI_Int .p_int;
-    ["real"]   , EcWhy3.RDts, EcPath.basename EcCoreLib.CI_Real.p_real;
-    ["infix ="], EcWhy3.RDls, EcPath.basename EcCoreLib.CI_Bool.p_eq
-  ] in
-  let env, _ = import_w3 env Why3.Theory.builtin_theory builtin_rn in
-  let add_bool sign env path =
-    let ty = EcTypes.toarrow sign EcTypes.tbool in
-    Op.bind_logical (EcPath.basename path)
-      (mk_op [] ty None) env in
-  let env = add_bool [EcTypes.tbool] env EcCoreLib.CI_Bool.p_not in
-  let env = List.fold_left (add_bool [EcTypes.tbool;EcTypes.tbool]) env
-      [EcCoreLib.CI_Bool.p_and;EcCoreLib.CI_Bool.p_anda;
-       EcCoreLib.CI_Bool.p_or;EcCoreLib.CI_Bool.p_ora;
-       EcCoreLib.CI_Bool.p_imp; EcCoreLib.CI_Bool.p_iff] in
- let distr_rn = [
-    ["distr"], EcWhy3.RDts, EcPath.basename EcCoreLib.CI_Distr.p_distr;
-  ] in
-  let env, _ = import_w3 env EcWhy3.distr_theory distr_rn in
-  let cth = Theory.close env in
-  let env1 = Theory.bind EcCoreLib.i_Pervasive cth env0 in
-  let env1 = Theory.import EcCoreLib.p_Pervasive env1 in
-  env1
+let initial gstate = empty gstate
 
 (* -------------------------------------------------------------------- *)
 type ebinding = [
@@ -3269,27 +3135,3 @@ module LDecl = struct
   let inv_memenv1 lenv =
     { lenv with le_env = Fun.inv_memenv1 lenv.le_env }
 end
-
-(* -------------------------------------------------------------------- *)
-let norm_l_decl env (hyps, concl) =
-  let norm = NormMp.norm_form env in
-  let onh (x,lk) =
-    match lk with
-    (* TODO : we should also normalize type, they can contain (glob A) *)
-    | LD_var (ty,o) -> x, LD_var (ty, o |> omap norm)
-    | LD_mem _ -> x, lk
-    | LD_modty _ -> x, lk
-    | LD_hyp f -> x, LD_hyp (norm f)
-    | LD_abs_st _ -> x, lk in
-  let concl = norm concl in
-  let lhyps = List.map onh hyps.h_local in
-    ({ hyps with h_local = lhyps }, concl)
-
-let check_goal pi (hyps, concl) =
-  let env = LDecl.toenv hyps in
-  let ld  = LDecl.tohyps hyps in
-
-  let ld = norm_l_decl env (ld, concl) in
-    EcWhy3.check_goal
-      ~notify:(fun lvl (lazy s) -> notify env lvl "%s" s)
-      (Mod.me_of_mt env) env.env_w3 pi ld

@@ -38,7 +38,6 @@ type prover_infos = {
   pr_cpufactor : int;
   pr_wrapper   : string option;
   pr_verbose   : int;
-  pr_version   : [`Lazy | `Full];
   pr_all       : bool;
   pr_max       : int;
   pr_iterate   : bool;

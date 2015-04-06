@@ -499,7 +499,6 @@
 %token UNROLL
 %token VAR
 %token WHILE
-%token WHY3
 %token WITH
 %token WP
 %token ZETA
@@ -1621,21 +1620,6 @@ theory_require :
 
 theory_import: IMPORT xs=uqident* { xs }
 theory_export: EXPORT xs=uqident* { xs }
-
-theory_w3:
-| IMPORT WHY3 path=string_list r=plist0(renaming,SEMICOLON)
-    {
-      let l = List.rev path in
-      let th = List.hd l in
-      let path = List.rev (List.tl l) in
-      path,th,r }
-
-renaming:
-| TYPE  l=string_list AS s=STRING { l, RNty, s }
-| OP    l=string_list AS s=STRING { l, RNop, s }
-| AXIOM l=string_list AS s=STRING { l, RNpr, s }
-
-%inline string_list: l=plist1(STRING,empty) { l }
 
 (* -------------------------------------------------------------------- *)
 (* pattern selection (tactics)                                          *)
@@ -2829,7 +2813,6 @@ global_action:
 | theory_import    { GthImport    $1 }
 | theory_export    { GthExport    $1 }
 | theory_clone     { GthClone     $1 }
-| theory_w3        { GthW3        $1 }
 | section_open     { GsctOpen     $1 }
 | section_close    { GsctClose    $1 }
 | top_decl         { Gdeclare     $1 }

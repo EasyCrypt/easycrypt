@@ -289,7 +289,7 @@ type prelude = {
   pr_required : symbol list;
 }
 
-type thloaded = (EcEnv.ctheory_w3 * EcTheory.thmode)
+type thloaded = (EcTheory.ctheory * EcTheory.thmode)
 
 type scope = {
   sc_name     : (symbol * EcTheory.thmode);
@@ -377,7 +377,6 @@ module Options = struct
 
   let set_implicits scope value =
     { scope with sc_options = Implicits.set scope.sc_options value }
-
 end
 
 (* -------------------------------------------------------------------- *)
@@ -437,37 +436,39 @@ module Prover = struct
   let process_dbhint env db =
     let add hints x =
       let nf kind p =
-        hierror  ~loc:p.pl_loc "cannot find %s `%s'"
-            kind (string_of_qsymbol (unloc p))
+        hierror
+          ~loc:p.pl_loc "cannot find %s `%s'"
+          (match kind with `Lemma -> "lemma" | `Theory -> "theory")
+          (string_of_qsymbol (unloc p))
       in
       
       let addm hints hflag p =
         match EcEnv.Theory.lookup_opt (unloc p) env with
-        | None -> nf "theory" p
+        | None -> nf `Theory p
         | Some (p, _) -> EcProvers.Hints.addm p hflag hints
           
       and add1 hints hflag p =
         match EcEnv.Ax.lookup_opt (unloc p) env with
-        | None -> nf "lemma" p
+        | None -> nf `Lemma p
         | Some (p, _) -> EcProvers.Hints.add1 p hflag hints
       in
+
       match x.pht_kind with
       | `Theory -> addm hints x.pht_flag x.pht_name
       | `Lemma  -> add1 hints x.pht_flag x.pht_name
         
     in
-    (* PY:CHECK !!!!!!!!!!!!!!!!! *)
     let hints = EcProvers.Hints.empty in
     let hints = List.fold_left add hints db in
     hints
-        
+
+  (* -------------------------------------------------------------------- *)
   type smt_options = {
     po_timeout    : int option;
     po_cpufactor  : int option;
     po_nprovers   : int option;
     po_provers    : string list option * (include_exclude * string) list;
     po_verbose    : int option;
-    po_version    : [`Lazy | `Full] option;
     pl_all        : bool option;
     pl_max        : int option;
     pl_iterate    : bool option;
@@ -475,13 +476,13 @@ module Prover = struct
     pl_unwanted   : EcProvers.hints option;
   }
 
+  (* -------------------------------------------------------------------- *)
   let empty_options = {
     po_timeout   = None;
     po_cpufactor = None;
     po_nprovers  = None;
-    po_provers   = None, [];
+    po_provers   = (None, []);
     po_verbose   = None;
-    po_version   = None;
     pl_all       = None;
     pl_max       = None;
     pl_iterate   = None;
@@ -489,6 +490,7 @@ module Prover = struct
     pl_unwanted  = None;
   }
 
+  (* -------------------------------------------------------------------- *)
   let process_prover_option env ppr = 
     let provers = 
       match ppr.pprov_names with
@@ -509,7 +511,6 @@ module Prover = struct
       po_nprovers  = ppr.pprov_max;
       po_provers   = provers;
       po_verbose   = verbose;
-      po_version   = ppr.pprov_version;
       pl_all       = ppr.plem_all;
       pl_max       = omap (odfl max_int) ppr.plem_max; 
       pl_iterate   = ppr.plem_iterate;
@@ -517,14 +518,16 @@ module Prover = struct
       pl_unwanted  = omap (process_dbhint env) ppr.plem_unwanted;
     }
 
+  (* -------------------------------------------------------------------- *)
   let mk_prover_info scope options =
     let open EcProvers in
+
     let dft          = Prover_info.get scope.sc_options in
     let pr_maxprocs  = odfl dft.pr_maxprocs options.po_nprovers in
     let pr_timelimit = max 0 (odfl dft.pr_timelimit options.po_timeout) in
     let pr_cpufactor = max 0 (odfl dft.pr_cpufactor options.po_cpufactor) in
     let pr_verbose   = max 0 (odfl dft.pr_verbose options.po_verbose) in
-    let pr_version   = odfl dft.pr_version options.po_version in
+    let pr_wrapper   = dft.pr_wrapper in
     let pr_all       = odfl dft.pr_all options.pl_all in
     let pr_max       = odfl dft.pr_max options.pl_max in
     let pr_iterate   = odfl dft.pr_iterate options.pl_iterate in
@@ -532,49 +535,53 @@ module Prover = struct
     let pr_unwanted  = odfl dft.pr_unwanted options.pl_unwanted in
     let pr_provers   = 
       let l = odfl dft.pr_provers (fst options.po_provers) in
-      let do_ar l (k,p) = 
+      let do_ar l (k, p) = 
         match k with
         | `Exclude -> List.remove_all l p 
-        | `Include -> if List.exists ((=) p) l then l else p::l in
-      List.fold_left do_ar l (snd options.po_provers) in
-    
+        | `Include -> if List.exists ((=) p) l then l else p::l
+      in List.fold_left do_ar l (snd options.po_provers) in
 
     { pr_maxprocs; pr_provers; pr_timelimit; pr_cpufactor;
-      pr_wrapper =  dft.pr_wrapper; 
-      pr_verbose; pr_version;
-      pr_all; pr_max; pr_iterate; pr_wanted; pr_unwanted }
+      pr_wrapper ; pr_verbose; pr_all      ; pr_max      ;
+      pr_iterate ; pr_wanted ; pr_unwanted }
 
+  (* -------------------------------------------------------------------- *)
   let set_wrapper scope wrapper =
     let pi = Prover_info.get scope.sc_options in
     let pi = { pi with EcProvers.pr_wrapper = wrapper } in
     { scope with sc_options = Prover_info.set scope.sc_options pi; }
 
+  (* -------------------------------------------------------------------- *)
   let do_prover_info scope ppr = 
     let options = process_prover_option scope.sc_env ppr in
     mk_prover_info scope options
-
        
+  (* -------------------------------------------------------------------- *)
   let process scope ppr = 
     let pi = do_prover_info scope ppr in
     { scope with sc_options = Prover_info.set scope.sc_options pi }
 
+  (* -------------------------------------------------------------------- *)
   let set_default scope options = 
     let provers = match fst options.po_provers with
       | None   -> 
         let provers = EcProvers.dft_prover_names in
         List.filter EcProvers.is_prover_known provers
+
       | Some l -> 
         List.iter 
           (fun name -> if not (EcProvers.is_prover_known name) then
-              hierror "Unknown prover %s" name) l; l in
+              hierror "unknown prover %s" name) l; l in
     let options = 
       { options with po_provers = (Some provers, snd options.po_provers) } in
     let pi = mk_prover_info scope options in
     { scope with sc_options = Prover_info.set scope.sc_options pi }
  
+  (* -------------------------------------------------------------------- *)
   let full_check scope =
     { scope with sc_options = Check_mode.set_fullcheck scope.sc_options }
 
+  (* -------------------------------------------------------------------- *)
   let check_proof scope b =
     { scope with sc_options = Check_mode.set_checkproof scope.sc_options b }
 end
@@ -640,7 +647,7 @@ module Tactics = struct
         let ttenv = {
           EcHiGoal.tt_provers    = pi scope;
           EcHiGoal.tt_smtmode    = htmode;
-          EcHiGoal.tt_implicits  = Options.get_implicits  scope; } in
+          EcHiGoal.tt_implicits  = Options.get_implicits scope; } in
 
         let juc   = TTC.process ttenv tac juc in
         let pac   = { pac with puc_jdg = PSCheck juc } in
@@ -1632,9 +1639,7 @@ module Theory = struct
     assert (scope.sc_pr_uc = None);
     let scope =
       { scope with sc_env = EcEnv.Theory.bind ~mode x cth scope.sc_env; }
-    in
-      maybe_add_to_section scope
-        (EcTheory.CTh_theory (x, (EcEnv.ctheory_of_ctheory_w3 cth, mode)))
+    in maybe_add_to_section scope (EcTheory.CTh_theory (x, (cth, mode)))
 
   (* ------------------------------------------------------------------ *)
   let required (scope : scope) (name : symbol) =
@@ -1718,10 +1723,9 @@ module Theory = struct
     let scope = bind scope (name, (cth, mode)) in
     let scope = { scope with sc_env =
         add_restr section
-          (EcPath.pqname (path scope) name)
-          (EcEnv.ctheory_of_ctheory_w3 cth, mode) scope.sc_env } in
+          (EcPath.pqname (path scope) name) (cth, mode) scope.sc_env }
 
-    (name, scope)
+    in (name, scope)
 
   (* ------------------------------------------------------------------ *)
   let bump_prelude (scope : scope) =
@@ -1807,27 +1811,6 @@ module Theory = struct
           | _ ->
               raise (ImportError (None, name, e))
         end
-
-  (* ------------------------------------------------------------------ *)
-  let import_w3 scope dir file renaming =
-    assert (scope.sc_pr_uc = None);
-
-    if EcSection.in_section scope.sc_section then
-      hierror "cannot import a Why3 theory while a section is active";
-
-    let mk_renaming (l,k,s) =
-      let k =
-        match k with
-        | RNty -> EcWhy3.RDts
-        | RNop -> EcWhy3.RDls
-        | RNpr -> EcWhy3.RDpr
-      in
-        (l, k, s)
-    in
-
-    let renaming = List.map mk_renaming renaming in
-    let env      = fst (EcEnv.import_w3_dir scope.sc_env dir file renaming) in
-      { scope with sc_env = env }
 end
 
 (* -------------------------------------------------------------------- *)

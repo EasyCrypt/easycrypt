@@ -862,7 +862,6 @@ type global_action =
   | GthImport    of pqsymbol list
   | GthExport    of pqsymbol list
   | GthClone     of theory_cloning
-  | GthW3        of (string list * string * w3_renaming list)
   | GsctOpen     of psymbol option
   | GsctClose    of psymbol option
   | Grealize     of pqsymbol
