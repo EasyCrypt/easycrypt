@@ -246,6 +246,22 @@ let iterop (op : 'a -> 'a) (n : int) (x : 'a) =
   doit n x
 
 (* -------------------------------------------------------------------- *)
+module OneShot : sig
+  type t
+
+  val mk  : (unit -> unit) -> t
+  val now : t -> unit
+end = struct
+  type t = unit Lazy.t
+
+  let mk (f : unit -> unit) : t =
+    Lazy.from_fun f
+
+  let now (susp : t) : unit =
+    Lazy.force susp
+end
+
+(* -------------------------------------------------------------------- *)
 module Counter : sig
   type t
 
