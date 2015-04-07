@@ -59,7 +59,7 @@ lemma insubP (x : T):           (* We need inductive predicates *)
 proof.                          (* this proof script is awful *)
   case (P x)=> [Px | /insubN -> //]; left.
   move: Px => /insubT; case {-2}(insub x) (eq_refl (insub x))=> //.
-  by move=> /= u eq_insub eqx; exists u => /=; move: eqx => /someI ->.
+  by move=> /= u eq_insub eqx; exists u => /=; move: eqx => ->.
 qed.
 
 lemma val_insubd x: val (insubd x) = if P x then x else val witness.
