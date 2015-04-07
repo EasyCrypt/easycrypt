@@ -3,6 +3,7 @@
  * Distributed under the terms of the CeCILL-C license
  * -------------------------------------------------------------------- *)
 
+(* -------------------------------------------------------------------- *)
 {
   open EcUtils
   open EcParser
@@ -21,6 +22,7 @@
   let unterminated_string () =
     raise (LexicalError (None, "unterminated string"))
 
+  (* ------------------------------------------------------------------ *)
   let _keywords = [                     (* see [keywords.py] *)
     "admit"       , ADMIT      ;        (* KW: dangerous *)
 
@@ -180,13 +182,87 @@
     "Self"        , SELF       ;        (* KW: global *)
   ]
 
-  let keywords = Hashtbl.create 97
+  (* ------------------------------------------------------------------ *)
+  let _operators = [
+    (":"  , (COLON       , true ));
+    ("//" , (SLASHSLASH  , true ));
+    ("/=" , (SLASHEQ     , true ));
+    ("//=", (SLASHSLASHEQ, true ));
+    ("=>" , (IMPL        , true ));
+    ("|"  , (PIPE        , true ));
+    (":=" , (CEQ         , true ));
+    ("/"  , (SLASH       , true ));
+    ("<-" , (LARROW      , false));
+    ("->" , (RARROW      , false));
+    ("<<-", (LLARROW     , false));
+    ("->>", (RRARROW     , false));
+    ("!"  , (NOT         , false));
+    ("&"  , (AMP         , false));
+    ("&&" , (ANDA        , false));
+    ("/\\", (AND         , false));
+    ("||" , (ORA         , false));
+    ("\\/", (OR          , false));
+    ("<=>", (IFF         , false));
+    ("%"  , (PCENT       , false));
+    ("+"  , (ADD         , false));
+    ("-"  , (MINUS       , false));
+    ("*"  , (STAR        , false));
+    ("<<" , (BACKS       , false));
+    (">>" , (FWDS        , false));
+    ("<:" , (LTCOLON     , false));
+    ("==>", (LONGARROW   , false));
+    ("="  , (EQ          , false));
+    ("<>" , (NE          , false));
+    (">"  , (GT          , false));
+    ("<"  , (LT          , false));
+    (">=" , (GE          , false));
+    ("<=" , (LE          , false));
+  ]
 
-  let _ =
-    List.iter
-      (fun (x, y) -> Hashtbl.add keywords x y)
-      _keywords
+  (* ------------------------------------------------------------------ *)
+  let keywords =
+    let table = Hashtbl.create 0 in
+    List.iter (curry (Hashtbl.add table)) _keywords; table
 
+  (* ------------------------------------------------------------------ *)
+  let operators =
+    let table = Hashtbl.create 0 in
+    List.iter (curry (Hashtbl.add table)) _operators; table
+
+  let opre =
+    let ops = List.map fst (List.filter (snd |- snd) _operators) in
+    let ops = List.ksort ~key:(String.length) ~cmp:compare ~rev:true ops in
+    let ops = String.join "\\|" (List.map Regexp.quote ops) in
+    let ops = Printf.sprintf "\\(%s\\)" ops in
+    Regexp.regexp ops
+
+  (* ------------------------------------------------------------------ *)
+  let lex_operators (op : string) =
+    let baseop (op : string) =
+      try  fst (Hashtbl.find operators op)
+      with Not_found ->
+        if   Regexp.string_match (Regexp.regexp "^:+$") op 0
+        then ROP4 op else begin
+          if   Regexp.string_match (Regexp.regexp "^[/%]+$") op 0
+          then LOP3 op else raise Not_found
+        end
+    in
+      try  [baseop op]
+      with Not_found ->
+
+      List.map (function
+        | Regexp.Delim op -> fst (Hashtbl.find operators op)
+        | Regexp.Text  op ->
+          try  baseop op
+          with Not_found ->
+            match op.[0] with
+            | '=' | '<' | '>' -> LOP1 op
+            | '+' | '-'       -> LOP2 op
+            | '*' | '/' | '%' -> LOP3 op
+            | _               -> LOP4 op)
+        (Regexp.full_split opre op)
+
+  (* ------------------------------------------------------------------ *)
   exception InvalidCodePosition
 
   let cposition_of_string =
@@ -223,26 +299,13 @@ let uident = upper ichar*
 let tident = '\'' lident
 let mident = '&'  (lident | uint)
 
-let op_char_1     = ['=' '<' '>']
-let op_char_2     = ['+' '-']
-let op_char_3_r   = ['*' '%' '\\']
-let op_char_3     = op_char_3_r | '/'
-let op_char_4_r   = ['$' '&' '^' '|' '#']
-let op_char_4     = op_char_4_r | '@'
-let op_char_34    = op_char_3 | op_char_4
-let op_char_234   = op_char_2 | op_char_34
-let op_char_1234  = op_char_1 | op_char_234
-let op_char_34_r  = op_char_4_r | op_char_3_r
-let op_char_234_r = op_char_2   | op_char_34_r
+let opchar = ['=' '<' '>' '+' '-' '*' '/' '\\' '%' '&' '^' '|' ':']
 
-let op1 = op_char_1234* op_char_1 op_char_1234*
-let op2 = op_char_2 | op_char_2 op_char_234_r op_char_234*
-let op3 = op_char_34* op_char_3 op_char_34*
-let op4 = (op_char_4 op_char_4_r*) | ("::" ':'+)
+let sop = opchar+
 let nop = '\\' ichar+
 
-let uniop = '!' | op2 | nop
-let binop = op1 | op2 | op3 | op4 | nop
+let uniop = sop | nop | '!'
+let binop = sop | nop
 
 (* -------------------------------------------------------------------- *)
 rule main = parse
@@ -253,8 +316,6 @@ rule main = parse
   | tident       { [TIDENT (Lexing.lexeme lexbuf)] }
   | mident       { [MIDENT (Lexing.lexeme lexbuf)] }
   | uint         { [UINT (BI.of_string (Lexing.lexeme lexbuf))] }
-  | "<<"         { [BACKS] }
-  | ">>"         { [FWDS] }
 
   | "(*" binop "*)" { main lexbuf }
   | '(' blank* (binop as s) blank* ')' { [PBINOP s] }
@@ -263,27 +324,12 @@ rule main = parse
   | "(*" { comment lexbuf; main lexbuf }
   | "\"" { [STRING (Buffer.contents (string (Buffer.create 0) lexbuf))] }
 
-  (* boolean operators *)
-  | '!'   { [NOT ] }
-  | "&&"  { [ANDA] }
-  | "/\\" { [AND ] }
-  | "||"  { [ORA ] }
-  | "\\/" { [OR  ] }
-  | "=>"  { [IMPL] }
-  | "<=>" { [IFF ] }
-
   (* string symbols *)
-  | "<-"    { [LARROW   ] }
-  | "->"    { [RARROW   ] }
-  | "<<-"   { [LLARROW  ] }
-  | "->>"   { [RRARROW  ] }
   | ".."    { [DOTDOT   ] }
   | ".["    { [DLBRACKET] }
   | ".`"    { [DOTTICK  ] }
-  | ":="    { [CEQ      ] }
-  | "::"    { [DCOLON   ] }
-  | "%r"    { [FROM_INT ] }
   | "{0,1}" { [RBOOL    ] }
+  | "%r"    { [FROM_INT ] }
 
   (* position *)
   | (digit+ ['.' '?'])+ digit+ {
@@ -298,43 +344,24 @@ rule main = parse
   | '}'   { [RBRACE    ] }
   | '['   { [LBRACKET  ] }
   | ']'   { [RBRACKET  ] }
-  | "<:"  { [LTCOLON   ] }
   | ','   { [COMMA     ] }
   | ';'   { [SEMICOLON ] }
-  | ':'   { [COLON     ] }
   | '?'   { [QUESTION  ] }
-  | '%'   { [PCENT     ] }
-  | "*"   { [STAR      ] }
-  | "/"   { [SLASH     ] }
   | "$"   { [SAMPLE    ] }
-  | "|"   { [PIPE      ] }
-  | "`|"  { [TICKPIPE  ] }
-  | "@"   { [AT        ] }
   | "~"   { [TILD      ] }
+  | "!"   { [NOT       ] }
+  | "@"   { [AT        ] }
   | "{|"  { [LPBRACE   ] }
   | "|}"  { [RPBRACE   ] }
-  | "==>" { [LONGARROW ] }
+  | "`|"  { [TICKPIPE  ] }
 
-  (* equality / ordering *)
-  | "="   { [EQ] }
-  | "<>"  { [NE] }
-  | ">"   { [GT] }
-  | "<"   { [LT] }
-  | ">="  { [GE] }
-  | "<="  { [LE] }
+  (* operators *)
+  | nop as x { [NOP x] }
 
-  | "-"   { [MINUS] }
-  | "+"   { [ADD  ] }
-
-  | "//"  { [SLASHSLASH  ] }
-  | "/="  { [SLASHEQ     ] }
-  | "//=" { [SLASHSLASHEQ] }
-
-  | nop as s  { [NOP s] }
-  | op1 as s  { [OP1 s] }
-  | op2 as s  { [OP2 s] }
-  | op3 as s  { [OP3 s] }
-  | op4 as s  { [OP4 s] }
+  | opchar as op {
+      let op = operator (Buffer.from_char op) lexbuf in
+      lex_operators (Buffer.contents op)
+    }
 
   (* end of sentence / stream *)
   | '.' (eof | blank | newline as r) {
@@ -364,3 +391,6 @@ and string buf = parse
   | newline       { Buffer.add_string buf (Lexing.lexeme lexbuf); string buf lexbuf }
   | _ as c        { Buffer.add_char buf c   ; string buf lexbuf }
   | eof           { unterminated_string () }
+
+and operator buf = parse
+  | opchar* as x { Buffer.add_string buf x; buf }

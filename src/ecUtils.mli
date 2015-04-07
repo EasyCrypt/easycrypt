@@ -180,6 +180,19 @@ module String : sig
 end
 
 (* -------------------------------------------------------------------- *)
+module Buffer : sig
+  include module type of BatBuffer
+
+  val from_string : ?size:int -> string -> t
+  val from_char   : ?size:int -> char -> t
+end
+
+(* -------------------------------------------------------------------- *)
+module Regexp : sig
+  include module type of Str
+end
+
+(* -------------------------------------------------------------------- *)
 module List : sig
   include module type of BatList
 
@@ -221,6 +234,13 @@ module List : sig
   val pmap       : ('a -> 'b option) -> 'a list -> 'b list
   val rev_pmap   : ('a -> 'b option) -> 'a list -> 'b list
   val rotate     : [`Left|`Right] -> int -> 'a list -> int * 'a list
+
+  (* ------------------------------------------------------------------ *)
+  val ksort:
+        ?stable:bool -> ?rev:bool
+     -> key:('a -> 'b)
+     -> cmp:('b -> 'b -> int) 
+     -> 'a list -> 'a list
 end
 
 (* -------------------------------------------------------------------- *)

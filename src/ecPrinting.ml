@@ -527,11 +527,14 @@ let e_bin_prio_or     = (20, `Infix `Right)
 let e_bin_prio_and    = (25, `Infix `Right)
 let e_bin_prio_eq     = (27, `Infix `NonAssoc)
 let e_bin_prio_order  = (29, `NonAssoc)
-let e_bin_prio_op1    = (30, `Infix `Left)
-let e_bin_prio_op2    = (40, `Infix `Left)
-let e_bin_prio_op3    = (50, `Infix `Left)
-let e_bin_prio_op4    = (60, `Infix `Left)
-let e_bin_prio_op5    = (70, `Infix `Right)
+let e_bin_prio_lop1   = (30, `Infix `Left )
+let e_bin_prio_rop1   = (31, `Infix `Right)
+let e_bin_prio_lop2   = (40, `Infix `Left )
+let e_bin_prio_rop2   = (41, `Infix `Right)
+let e_bin_prio_lop3   = (50, `Infix `Left )
+let e_bin_prio_rop3   = (51, `Infix `Right)
+let e_bin_prio_lop4   = (60, `Infix `Left )
+let e_bin_prio_rop4   = (61, `Infix `Right)
 
 let e_uni_prio_not    = 26
 let e_uni_prio_lsless = 10000
@@ -557,16 +560,19 @@ let priority_of_binop name =
   | Some EP.GE     -> Some e_bin_prio_order
   | Some EP.LT     -> Some e_bin_prio_order
   | Some EP.LE     -> Some e_bin_prio_order
-  | Some EP.OP1 _  -> Some e_bin_prio_op1
-  | Some EP.OP2 _  -> Some e_bin_prio_op2
-  | Some EP.ADD    -> Some e_bin_prio_op2
-  | Some EP.MINUS  -> Some e_bin_prio_op2
-  | Some EP.OP3 _  -> Some e_bin_prio_op3
-  | Some EP.STAR   -> Some e_bin_prio_op3
-  | Some EP.SLASH  -> Some e_bin_prio_op3
-  | Some EP.OP4 _  -> Some e_bin_prio_op4
-  | Some EP.AT     -> Some e_bin_prio_op4
-  | Some EP.DCOLON -> Some e_bin_prio_op5
+  | Some EP.LOP1 _ -> Some e_bin_prio_lop1
+  | Some EP.ROP1 _ -> Some e_bin_prio_rop1
+  | Some EP.LOP2 _ -> Some e_bin_prio_lop2
+  | Some EP.ROP2 _ -> Some e_bin_prio_rop2
+  | Some EP.ADD    -> Some e_bin_prio_lop2
+  | Some EP.MINUS  -> Some e_bin_prio_lop2
+  | Some EP.LOP3 _ -> Some e_bin_prio_lop3
+  | Some EP.ROP3 _ -> Some e_bin_prio_rop3
+  | Some EP.STAR   -> Some e_bin_prio_lop3
+  | Some EP.SLASH  -> Some e_bin_prio_lop3
+  | Some EP.LOP4 _ -> Some e_bin_prio_lop4
+  | Some EP.ROP4 _ -> Some e_bin_prio_rop4
+  | Some EP.AT     -> Some e_bin_prio_lop4
   | Some EP.NOP _  -> Some e_bin_prio_nop
 
   | _ -> None
@@ -735,10 +741,10 @@ let pp_opapp (ppe : PPEnv.t) t_ty pp_sub outer fmt (pred, op, tvi, es) =
         | x, [e1; e2] when x = EcCoreLib.s_cons ->
             let pp fmt =
               Format.fprintf fmt "%a :: %a"
-                (pp_sub ppe (inm, (e_bin_prio_op5, `Left ))) e1
-                (pp_sub ppe (inm, (e_bin_prio_op5, `Right))) e2
+                (pp_sub ppe (inm, (e_bin_prio_rop4, `Left ))) e1
+                (pp_sub ppe (inm, (e_bin_prio_rop4, `Right))) e2
             in
-              (pp, e_bin_prio_op4)
+              (pp, e_bin_prio_lop4)
   
         | x, [e] when x = EcCoreLib.s_abs ->
             let pp fmt =
