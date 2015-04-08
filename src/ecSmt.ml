@@ -819,6 +819,10 @@ and create_op ?(body = false) (genv : tenv) p =
     then None
     else Some (trans_ty (genv, lenv) codom) in
 
+  (* FIXME: this is a ack for constructor, when the constructor is translate
+     before its type, should we do something for other like projection ... *)
+  try Hp.find genv.te_op p with Not_found -> 
+
   let known, ls =
     match Hp.find_opt genv.te_known_w3 p with
     | Some (ls, th) ->
