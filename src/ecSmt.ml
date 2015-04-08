@@ -1066,6 +1066,46 @@ let add_core_bindings (env : tenv) =
   env.te_task <- WTask.add_ty_decl env.te_task ts_mem
 
 (* -------------------------------------------------------------------- *)
+
+let unwanted_ops = 
+  Sp.of_list [
+    CI_Unit.p_tt;
+
+    CI_Bool.p_true;
+    CI_Bool.p_false;
+
+    CI_Bool.p_not;
+    CI_Bool.p_anda;
+    CI_Bool.p_and;
+    CI_Bool.p_ora;
+    CI_Bool.p_or;
+    CI_Bool.p_imp;
+    CI_Bool.p_iff;
+    CI_Bool.p_eq;
+
+    CI_Int.p_int_opp;
+    CI_Int.p_int_add;
+    CI_Int.p_int_sub;
+    CI_Int.p_int_mul;
+    CI_Int.p_int_le;
+    CI_Int.p_int_lt;
+    CI_Int.p_int_ge;
+    CI_Int.p_int_gt;
+
+    CI_Real.p_real_opp;
+    CI_Real.p_real_add;
+    CI_Real.p_real_sub;
+    CI_Real.p_real_mul;
+    CI_Real.p_real_inv;
+    CI_Real.p_real_div;
+    CI_Real.p_real_of_int;
+    CI_Real.p_real_le;
+    CI_Real.p_real_lt;
+    CI_Real.p_real_ge;
+    CI_Real.p_real_gt;
+  ]
+
+(* -------------------------------------------------------------------- *)
 (* See "Lightweight Relevance Filtering for Machine-Generated           *)
 (* Resolution Problems" for a description of axioms selection.          *)
 
@@ -1079,6 +1119,7 @@ module Frequency = struct
   (* -------------------------------------------------------------------- *)
   type relevant = Sp.t * Sx.t
 
+  let r_empty = Sp.empty, Sx.empty
   let r_union (sp1,sf1) (sp2,sf2) = Sp.union sp1 sp2, Sx.union sf1 sf2 
   let r_inter (sp1,sf1) (sp2,sf2) = Sp.inter sp1 sp2, Sx.inter sf1 sf2 
   let r_diff  (sp1,sf1) (sp2,sf2) = Sp.diff  sp1 sp2, Sx.diff sf1 sf2 
@@ -1133,18 +1174,35 @@ module Frequency = struct
   let f_ops_goal unwanted_op hyps concl = 
     f_ops_hyps unwanted_op (f_ops unwanted_op concl) hyps
 
+  let f_ops_oper unwanted_op env p rs =
+    match EcEnv.Op.by_path_opt p env with
+    | Some {op_kind = OB_pred (Some f) } -> 
+      r_union rs (f_ops unwanted_op f)
+    | Some {op_kind = OB_oper (Some (OP_Plain e)) } -> 
+      r_union rs (f_ops unwanted_op (form_of_expr mhr e))
+    | Some {op_kind = OB_oper (Some (OP_Fix e)) } ->
+      let rec aux rs = function
+        | OPB_Leaf (_, e) -> r_union rs (f_ops unwanted_op (form_of_expr mhr e))
+        | OPB_Branch bs -> Parray.fold_left (fun rs b -> aux rs b.opb_sub) rs bs
+      in
+      aux rs e.opf_branches
+    | _ -> rs
 
   (* -------------------------------------------------------------------- *)
-  type frequency = int Hp.t * int Hx.t
+  type frequency = { 
+    f_unwanted_op : Sp.t;
+    f_tabp : int Hp.t;
+    f_tabf : int Hx.t;
+  }
 
-  let add unwanted_op ftabp ftabf ax = 
+  let add fr ax = 
     let addp p = 
-      if not (Sp.mem p unwanted_op) then
-        let n = Hp.find_def ftabp 0 p in
-        Hp.replace ftabp p (n+1) in
+      if not (Sp.mem p fr.f_unwanted_op) then
+        let n = Hp.find_def fr.f_tabp 0 p in
+        Hp.replace fr.f_tabp p (n+1) in
     let addx f = 
-      let n = Hx.find_def ftabf 0 f in
-      Hx.replace ftabf f (n+1);
+      let n = Hx.find_def fr.f_tabf 0 f in
+      Hx.replace fr.f_tabf f (n+1);
       addp CI_Distr.p_mu in
     
     let rec add f =
@@ -1159,144 +1217,109 @@ module Frequency = struct
       | Fpr      pr           -> addx pr.pr_fun;add pr.pr_event;add pr.pr_args
       | _ -> () in
     oiter add ax.ax_spec 
+
+  let create unwanted_op : frequency =
+    { f_unwanted_op = unwanted_op;
+      f_tabp        = Hp.create 0;
+      f_tabf        = Hx.create 0 }
   
   let init unwanted_op all : frequency = 
-    let ftabp = Hp.create 0 in
-    let ftabf = Hx.create 0 in
-    List.iter (fun (_,ax) -> add unwanted_op ftabp ftabf ax) all;
-    ftabp, ftabf 
+    let fr = create unwanted_op in
+    List.iter (fun (_,ax) -> add fr ax) all;
+    fr
 
-  let frequency (ftabp,ftabf) = function
-    | `OP p   -> Hp.find_def ftabp 0 p
-    | `PROC f -> Hx.find_def ftabf 0 f
+  let frequency fr = function
+    | `OP p   -> Hp.find_def fr.f_tabp 0 p
+    | `PROC f -> Hx.find_def fr.f_tabf 0 f
 
 end
 
-type relevant_info = {
+(*type relevant_info = {
   ri_p : float;            
   ri_c : float;
   ri_wanted_ax   : Sp.t;         (* wanted axiom   *)
-  ri_unwanted_ax : Sp.t;         (* unwanted axiom *)
+  ri_unwanted_ax : path -> bool; (* unwanted axiom *)
   ri_unwanted_op : Sp.t;         (* do not take into account *)
   ri_max_axioms  : int;          (* maximun number of axioms  *)
-}
+} *)
 
-let relevant_clause env ri rs = 
-  (* [toadd] the initial list of axiom to be added *)
-  if ri.ri_max_axioms <= Sp.cardinal ri.ri_wanted_ax then 
-      Sp.fold 
-        (fun path toadd -> (path, EcEnv.Ax.by_path path env) :: toadd)
-        ri.ri_wanted_ax [] 
-
-  else
-    (* Initialisation *)
-    (* [all] the list of all axioms, not unwanted and can be send to smt *)
-    let init_select p ax = 
-      not ax.ax_nosmt && not (Sp.mem p ri.ri_unwanted_ax) in
-    let all = EcEnv.Ax.all ~check:init_select env in
+let relevant_clause env pi rs = 
+  let open EcProvers in 
+  if pi.pr_all then 
+    let init_select _p ax = not ax.ax_nosmt in
+    EcEnv.Ax.all ~check:init_select env
+  else 
+    let ri_p           = 0.6 in
+    let ri_c           = 2.4 in
+    let unwanted_ax p  = Hints.mem p pi.pr_unwanted in
+    let wanted_ax   p  = Hints.mem p pi.pr_wanted in
 
     (* [ftab] frequency table number of occurency of operators *)
-    let ftab = Frequency.init ri.ri_unwanted_op all in
+    let fr = Frequency.create unwanted_ops in
+    let rel = ref [] in
+    let other = ref [] in
+    let add ax l = l := ax :: !l in
+    let do1 p ax = 
+      if not ax.ax_nosmt && not (unwanted_ax p) then begin
+        Frequency.add fr ax;
+        let used = 
+          omap_dfl (Frequency.f_ops unwanted_ops) 
+            Frequency.r_empty ax.ax_spec in
+        let paxu = (p,ax), used in
+        if wanted_ax p then add paxu rel else add paxu other
+      end in
+    EcEnv.Ax.iter do1 env;
 
-    (* [other] the list of all axioms names and their set of used operators 
-             (excepted unwanted operators). Do not include toadd. *)
-    let toadd, other = 
-      let add_ax (toadd, other as toot) (p, ax as pax) = 
-        match ax.ax_spec with
-        | None -> toot 
-        | Some f -> 
-          let used = Frequency.f_ops ri.ri_unwanted_op f in
-          let paxu = pax, used in
-          if Sp.mem p ri.ri_wanted_ax then paxu::toadd, other
-          else toadd, paxu :: other in
-      List.fold_left add_ax ([],[]) all in
-
-    (* [symbols_of ax] return the set of operator used in ax *)
-    let symbols_of (_,s) = s in
-    let frequency_function freq = 1. +. log1p (float_of_int freq) in
-    let update_rs toadd rs rel =
-      List.fold_left (fun (toadd,rs) ax -> 
-        (fst ax :: toadd, Frequency.r_union (symbols_of ax) rs)) (toadd,rs) rel in
+    if pi.pr_max <= List.length !rel then
+      List.rev_map (fun (pax,_) -> pax) !rel
+    else 
+      (* [symbols_of ax] return the set of operator used in ax *)
+      let symbols_of (_,s) = s in
+      let frequency_function freq = 1. +. log1p (float_of_int freq) in
+      let toadd = ref [] in
+      let update_rs rs0 rs1 rel =
+        let rs = 
+          List.fold_left (fun rs ax -> 
+            add (fst ax) toadd; Frequency.r_union (symbols_of ax) rs) rs1 rel in
+        let new_rs = fst (Frequency.r_diff rs1 rs0) in
+        Sp.fold (Frequency.f_ops_oper unwanted_ops env) new_rs rs in
       
-    let clause_mark p rs other =
-      let rel = ref [] in
-      let newo = ref [] in
-      let do1 ax = 
-        let cs = symbols_of ax in
-        let r  = Frequency.r_inter cs rs in
-        let ir = Frequency.r_diff cs r in
-        let weight path m = 
-          let freq = Frequency.frequency ftab path in
-          let w = frequency_function freq in
-          m +. w in
-        let m = Frequency.r_fold weight r 0. in
-        let m = m /. (m +. float_of_int (Frequency.r_card ir)) in
-        if p <= m then rel := ax :: !rel else newo := ax :: !newo in
-      List.iter do1 other;
-      !rel, !newo in
-    
-    let rec aux toadd rs p other = 
-      if ri.ri_max_axioms <= List.length toadd then toadd
-      else
-        let rel, other = clause_mark p rs other  in
-        if rel = [] then toadd 
+      let clause_mark p rs other =
+        let rel = ref [] in
+        let newo = ref [] in
+        let do1 ax = 
+          let cs = symbols_of ax in
+          let r  = Frequency.r_inter cs rs in
+          let ir = Frequency.r_diff cs r in
+          let weight path m = 
+            let freq = Frequency.frequency fr path in
+            let w = frequency_function freq in
+            m +. w in
+          let m = Frequency.r_fold weight r 0. in
+          let m = m /. (m +. float_of_int (Frequency.r_card ir)) in
+          if p <= m then rel := ax :: !rel else newo := ax :: !newo in
+        List.iter do1 other;
+        !rel, !newo in
+      
+      let rec aux rs0 rs1 p other = 
+        if pi.pr_max <= List.length !toadd then ()
         else
-          let toadd, rs = update_rs toadd rs rel in
-          let p = p +. (1. -. p) /. ri.ri_c in
-          aux toadd rs p other in
+          let rel, other = clause_mark p rs1 other  in
+          if rel = [] then ()
+          else
+            let rs2 = update_rs rs0 rs1 rel in
+            let p = p +. (1. -. p) /. ri_c in
+            aux rs1 rs2 p other in
 
-(*    let rs = Sp.diff rs ri.ri_unwanted_op in *)
-    let toadd, rs = update_rs [] rs toadd in
-    aux toadd rs ri.ri_p other 
-   
-(*let select_add_axioms genv ri rs =
-  let rs = Sp.diff rs ri.ri_unwanted_op in
-  let toadd = EcSearch.search genv.te_env [`ByPath rs] in
-  List.iter (trans_axiom genv) toadd  *)
+      let rs1 = update_rs Frequency.r_empty rs !rel in
+      aux rs rs1 ri_p !other; 
+      !toadd
 
-let select_add_axioms genv ri rs =
-  let toadd = relevant_clause genv.te_env ri rs in
+let select_add_axioms genv pi rs =
+  let toadd = relevant_clause genv.te_env pi rs in
   List.iter (trans_axiom genv) toadd 
 
-(* -------------------------------------------------------------------- *)
 
-let unwanted_ops = 
-  Sp.of_list [
-    CI_Unit.p_tt;
-
-    CI_Bool.p_true;
-    CI_Bool.p_false;
-
-    CI_Bool.p_not;
-    CI_Bool.p_anda;
-    CI_Bool.p_and;
-    CI_Bool.p_ora;
-    CI_Bool.p_or;
-    CI_Bool.p_imp;
-    CI_Bool.p_iff;
-    CI_Bool.p_eq;
-
-    CI_Int.p_int_opp;
-    CI_Int.p_int_add;
-    CI_Int.p_int_sub;
-    CI_Int.p_int_mul;
-    CI_Int.p_int_le;
-    CI_Int.p_int_lt;
-    CI_Int.p_int_ge;
-    CI_Int.p_int_gt;
-
-    CI_Real.p_real_opp;
-    CI_Real.p_real_add;
-    CI_Real.p_real_sub;
-    CI_Real.p_real_mul;
-    CI_Real.p_real_inv;
-    CI_Real.p_real_div;
-    CI_Real.p_real_of_int;
-    CI_Real.p_real_le;
-    CI_Real.p_real_lt;
-    CI_Real.p_real_ge;
-    CI_Real.p_real_gt;
-  ]
 
 (* -------------------------------------------------------------------- *)
 let check ?notify pi (hyps : LDecl.hyps) (concl : form) =
@@ -1310,28 +1333,30 @@ let check ?notify pi (hyps : LDecl.hyps) (concl : form) =
     let task  = WTask.use_export task distr_theory in
     let known = Lazy.force core_theories in
     let tenv  = empty_tenv (LDecl.toenv hyps) task known in
-    let ()    = add_core_bindings tenv in
-    let lenv  = lenv_of_hyps tenv (LDecl.tohyps hyps) in
-    let wterm = trans_form (tenv, lenv) concl in
-    let pr    = WDecl.create_prsymbol (WIdent.id_fresh "goal") in
-    let decl  = WDecl.create_prop_decl WDecl.Pgoal pr wterm in
-  (* Hypothesis selection *) 
-    let rs =
-      Frequency.f_ops_goal unwanted_ops (LDecl.tohyps hyps).h_local concl in
-    let ri = {
-      ri_p           = 0.6; 
-      ri_c           = 2.4;
-      ri_wanted_ax   = Sp.empty;
-      ri_unwanted_ax = Sp.empty;
-      ri_unwanted_op = unwanted_ops;
-      ri_max_axioms  = pi.EcProvers.pr_max;
-    } in
-    select_add_axioms tenv ri rs;
-    (* Add conclusion *)
-    WTask.add_decl tenv.te_task decl) () in
+    try 
+      let ()    = add_core_bindings tenv in
+      let lenv  = lenv_of_hyps tenv (LDecl.tohyps hyps) in
+      let wterm = trans_form (tenv, lenv) concl in
+      let pr    = WDecl.create_prsymbol (WIdent.id_fresh "goal") in
+      let decl  = WDecl.create_prop_decl WDecl.Pgoal pr wterm in
+      (* Hypothesis selection *) 
+      let rs =
+        Frequency.f_ops_goal unwanted_ops (LDecl.tohyps hyps).h_local concl in
+      select_add_axioms tenv pi rs;
+      (* Add conclusion *)
+      WTask.add_decl tenv.te_task decl
+    with e -> 
+      let stream = open_out "task.why" in
+      EcUtils.try_finally
+        (fun () -> Format.fprintf
+          (Format.formatter_of_out_channel stream)
+          "%a@." Why3.Pretty.print_task tenv.te_task)
+        (fun () -> close_out stream);
+      raise e
+  ) () in
 
-(*  if 2 <= pi.EcProvers.pr_verbose then
-    Printf.eprintf "[W]SMT translation: %f\n%!" tt; *)
+  if 2 <= pi.EcProvers.pr_verbose then
+    Printf.eprintf "[W]SMT translation: %f\n%!" tt; 
 
   if 3 <= pi.EcProvers.pr_verbose || 
     EcUtils.is_some (Os.getenv "EC_SMT_DEBUG") then begin 
@@ -1346,8 +1371,8 @@ let check ?notify pi (hyps : LDecl.hyps) (concl : form) =
   let (tp,res) = 
     EcUtils.timed (fun task -> 
        EcProvers.execute_task ?notify pi task = Some true) task in
-(*  if 1 <= pi.EcProvers.pr_verbose then
+  if 1 <= pi.EcProvers.pr_verbose then
     Printf.eprintf "[W]SMT proved: %f\n%!" tp;
-  res *)
+  res 
   
  
