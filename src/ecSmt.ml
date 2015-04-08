@@ -1297,42 +1297,53 @@ let unwanted_ops =
 (* -------------------------------------------------------------------- *)
 let check ?notify pi (hyps : LDecl.hyps) (concl : form) =
   (try Unix.unlink "task.why" with Unix.Unix_error _ -> ());
-
-  let task  = (None : WTask.task) in
-  let task  = WTask.use_export task WTheory.builtin_theory in
-  let task  = WTask.use_export task (WTheory.tuple_theory 0) in
-  let task  = WTask.use_export task WTheory.bool_theory in
-  let task  = WTask.use_export task WTheory.highord_theory in
-  let task  = WTask.use_export task distr_theory in
-  let known = Lazy.force core_theories in
-  let tenv  = empty_tenv (LDecl.toenv hyps) task known in
-  let ()    = add_core_bindings tenv in
-  let lenv  = lenv_of_hyps tenv (LDecl.tohyps hyps) in
-  let wterm = trans_form (tenv, lenv) concl in
-  let pr    = WDecl.create_prsymbol (WIdent.id_fresh "goal") in
-  let decl  = WDecl.create_prop_decl WDecl.Pgoal pr wterm in
+  let (tt, task) = EcUtils.timed (fun () ->
+    let task  = (None : WTask.task) in
+    let task  = WTask.use_export task WTheory.builtin_theory in
+    let task  = WTask.use_export task (WTheory.tuple_theory 0) in
+    let task  = WTask.use_export task WTheory.bool_theory in
+    let task  = WTask.use_export task WTheory.highord_theory in
+    let task  = WTask.use_export task distr_theory in
+    let known = Lazy.force core_theories in
+    let tenv  = empty_tenv (LDecl.toenv hyps) task known in
+    let ()    = add_core_bindings tenv in
+    let lenv  = lenv_of_hyps tenv (LDecl.tohyps hyps) in
+    let wterm = trans_form (tenv, lenv) concl in
+    let pr    = WDecl.create_prsymbol (WIdent.id_fresh "goal") in
+    let decl  = WDecl.create_prop_decl WDecl.Pgoal pr wterm in
   (* Hypothesis selection *) 
-  let rs =
-    Frequency.f_ops_goal unwanted_ops (LDecl.tohyps hyps).h_local concl in
-  let ri = {
-    ri_p           = 0.6; 
-    ri_c           = 2.4;
-    ri_wanted_ax   = Sp.empty;
-    ri_unwanted_ax = Sp.empty;
-    ri_unwanted_op = unwanted_ops;
-    ri_max_axioms  = max_int;
-  } in
-  select_add_axioms tenv ri rs;
-  (* Add conclusion *)
-  let task  = WTask.add_decl tenv.te_task decl in
+    let rs =
+      Frequency.f_ops_goal unwanted_ops (LDecl.tohyps hyps).h_local concl in
+    let ri = {
+      ri_p           = 0.6; 
+      ri_c           = 2.4;
+      ri_wanted_ax   = Sp.empty;
+      ri_unwanted_ax = Sp.empty;
+      ri_unwanted_op = unwanted_ops;
+      ri_max_axioms  = pi.EcProvers.pr_max;
+    } in
+    select_add_axioms tenv ri rs;
+    (* Add conclusion *)
+    WTask.add_decl tenv.te_task decl) () in
 
-  if EcUtils.is_some (Os.getenv "EC_SMT_DEBUG") then begin
+(*  if 2 <= pi.EcProvers.pr_verbose then
+    Printf.eprintf "[W]SMT translation: %f\n%!" tt; *)
+
+  if 3 <= pi.EcProvers.pr_verbose || 
+    EcUtils.is_some (Os.getenv "EC_SMT_DEBUG") then begin 
     let stream = open_out "task.why" in
     EcUtils.try_finally
       (fun () -> Format.fprintf
         (Format.formatter_of_out_channel stream)
         "%a@." Why3.Pretty.print_task task)
       (fun () -> close_out stream)
-  end;
+  end; 
 
-  EcProvers.execute_task ?notify pi task = Some true
+  let (tp,res) = 
+    EcUtils.timed (fun task -> 
+       EcProvers.execute_task ?notify pi task = Some true) task in
+(*  if 1 <= pi.EcProvers.pr_verbose then
+    Printf.eprintf "[W]SMT proved: %f\n%!" tp;
+  res *)
+  
+ 
