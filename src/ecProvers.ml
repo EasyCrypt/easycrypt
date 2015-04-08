@@ -236,25 +236,6 @@ let get_w3_th dirname name =
   Env.read_theory (Config.w3_env ()) dirname name
 
 (* -------------------------------------------------------------------- *)
-type prover_infos = {
-  pr_maxprocs  : int;
-  pr_provers   : string list;
-  pr_timelimit : int;
-  pr_cpufactor : int;
-  pr_wrapper   : string option;
-}
-
-let dft_prover_infos = {
-  pr_maxprocs  = 3;
-  pr_provers   = [];
-  pr_timelimit = 3;
-  pr_cpufactor = 1;
-  pr_wrapper   = None;
-}
-
-let dft_prover_names = ["Z3"; "CVC4"; "Alt-Ergo"; "Eprover"; "Yices"]
-
-(* -------------------------------------------------------------------- *)
 type hflag = [ `Include | `Exclude ]
 type xflag = [ hflag | `Inherit ]
 
@@ -324,6 +305,39 @@ module Hints = struct
       | Some `Include -> true
       | Some `Exclude -> false
 end
+
+(* -------------------------------------------------------------------- *)
+type prover_infos = {
+  pr_maxprocs  : int;
+  pr_provers   : string list;
+  pr_timelimit : int;
+  pr_cpufactor : int;
+  pr_wrapper   : string option;
+  pr_verbose   : int;
+  pr_version   : [`Lazy | `Full];
+  pr_all       : bool;
+  pr_max       : int;
+  pr_wanted    : hints;
+  pr_unwanted  : hints;
+}
+
+
+let dft_prover_infos = {
+  pr_maxprocs  = 3;
+  pr_provers   = [];
+  pr_timelimit = 3;
+  pr_cpufactor = 1;
+  pr_wrapper   = None;
+  pr_verbose   = 0;
+  pr_version   = `Lazy;
+  pr_all       = false;
+  pr_max       = 50;
+  pr_wanted    = Hints.empty;
+  pr_unwanted  = Hints.empty;
+}
+
+let dft_prover_names = ["Z3"; "CVC4"; "Alt-Ergo"; "Eprover"; "Yices"]
+
 
 (* -------------------------------------------------------------------- *)
 type notify = EcGState.loglevel -> string Lazy.t -> unit

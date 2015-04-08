@@ -533,9 +533,6 @@ and process_option (scope : EcScope.scope) (name, value) =
   | "implicits" ->
       EcScope.Options.set_implicits scope value
 
-  | "Smt:lazy" ->
-      EcScope.Options.set_smtversion scope (if value then `Lazy else `Full)
-
   | _ -> EcScope.hierror "unknown option: %s" (unloc name)
 
 (* -------------------------------------------------------------------- *)
@@ -611,11 +608,11 @@ let initial ~checkmode ~boot =
   let checkall  = checkmode.cm_checkall  in
   let wrapper   = checkmode.cm_wrapper   in
   let profile   = checkmode.cm_profile   in
-  let poptions  = {
+  let poptions  = { EcScope.Prover.empty_options with
     EcScope.Prover.po_timeout   = Some checkmode.cm_timeout;
     EcScope.Prover.po_cpufactor = Some checkmode.cm_cpufactor;
     EcScope.Prover.po_nprovers  = Some checkmode.cm_nprovers;
-    EcScope.Prover.po_provers   = checkmode.cm_provers;
+    EcScope.Prover.po_provers   = (checkmode.cm_provers, []);
   } in
 
   let prelude = (mk_loc _dummy "Prelude", Some `Export) in

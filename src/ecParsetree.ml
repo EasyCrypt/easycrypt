@@ -318,21 +318,6 @@ type pdeclare =
 | PDCL_Module of pmodule_decl
 
 (* -------------------------------------------------------------------- *)
-type pprover_infos = {
-  pprov_max       : int option;
-  pprov_timeout   : int option;
-  pprov_cpufactor : int option;
-  pprov_names     : string located list option;
-}
-
-let empty_pprover = {
-  pprov_max       = None;
-  pprov_timeout   = None;
-  pprov_cpufactor = None;
-  pprov_names     = None;
-}
-
-(* -------------------------------------------------------------------- *)
 type 'a ppt_head =
   | FPNamed of pqsymbol * ptyannot option
   | FPCut   of 'a
@@ -535,6 +520,56 @@ type phltactic =
   | Pauto
 
 (* -------------------------------------------------------------------- *)
+type include_exclude = [ `Include | `Exclude ]
+type pdbmap1 = {
+  pht_flag : include_exclude;
+  pht_kind : [ `Theory  | `Lemma   ];
+  pht_name : pqsymbol;
+}
+
+and pdbhint = {
+  pht_nolocals : bool;
+  pht_map : pdbmap1 list;
+}
+
+(* -------------------------------------------------------------------- *)
+type pprover_list = {
+  pp_use_only : string located list;
+  pp_add_rm   : (include_exclude * string located) list;
+}
+
+let empty_pprover_list = {
+  pp_use_only = [];
+  pp_add_rm   = [];
+} 
+
+type pprover_infos = {
+  pprov_max       : int option;
+  pprov_timeout   : int option;
+  pprov_cpufactor : int option;
+  pprov_names     : pprover_list option; 
+  pprov_verbose   : int option option;
+  pprov_version   : [`Lazy | `Full] option;
+  plem_all        : bool option;
+  plem_max        : int option option;
+  plem_wanted     : pdbhint option;
+  plem_unwanted   : pdbhint option;
+}
+
+let empty_pprover = {
+  pprov_max       = None;
+  pprov_timeout   = None;
+  pprov_cpufactor = None;
+  pprov_names     = None;
+  pprov_verbose   = None;
+  pprov_version   = None;
+  plem_all        = None;
+  plem_max        = None;
+  plem_wanted     = None;
+  plem_unwanted   = None;
+}
+
+(* -------------------------------------------------------------------- *)
 type trepeat = [`All | `Maybe] * int option
 type tfocus1 = (int option) pair
 type tfocus  = (tfocus1 list option) pair
@@ -547,7 +582,7 @@ and rwarg1 =
   | RWPr    of (psymbol * pformula option)
   | RWDone  of bool
   | RWSimpl
-  | RWSmt
+  | RWSmt   of pprover_infos
 
 and rwoptions = rwside * trepeat option * rwocc
 and rwside    = [`LtoR | `RtoL]
@@ -573,17 +608,6 @@ and renaming = [
 
 type genpattern = [`ProofTerm of ppterm | `Form of (rwocc * pformula)]
 
-(* -------------------------------------------------------------------- *)
-type pdbmap1 = {
-  pht_flag : [ `Include | `Exclude ];
-  pht_kind : [ `Theory  | `Lemma   ];
-  pht_name : pqsymbol;
-}
-
-and pdbhint = {
-  pht_nolocals : bool;
-  pht_map : pdbmap1 list;
-}
 
 (* -------------------------------------------------------------------- *)
 type ppgoption = [
@@ -610,11 +634,11 @@ type apply_info = [
 type logtactic =
   | Preflexivity
   | Passumption
-  | Psmt        of (pdbhint option * pprover_infos * psymbol option)
+  | Psmt        of pprover_infos 
   | Pintro      of intropattern
   | Psplit
-  | Pfield	    of psymbol list
-  | Pring 	    of psymbol list
+  | Pfield      of psymbol list
+  | Pring       of psymbol list
   | Palg_norm  
   | Pexists     of ppt_arg located list
   | Pleft

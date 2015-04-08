@@ -175,26 +175,6 @@ module Implicits = struct
 end
 
 (* -------------------------------------------------------------------- *)
-module SmtVersion = struct
-  exception SmtVersion of EcHiGoal.smtversion
-
-  let implicits =
-    let default = SmtVersion `Full in
-    let for_loading = function
-      | SmtVersion _ -> default
-      | exn          -> exn
-    in GenOptions.register { for_loading } default
-
-  let set options value =
-    GenOptions.set options implicits (SmtVersion value)
-
-  let get options =
-    match GenOptions.get options implicits with
-    | SmtVersion value -> value
-    | _ -> assert false
-end
-
-(* -------------------------------------------------------------------- *)
 type proof_uc = {
   puc_active : proof_auc option;
   puc_cont   : proof_ctxt list * (EcEnv.env option);
@@ -316,11 +296,6 @@ module Options = struct
   let set_implicits scope value =
     { scope with sc_options = Implicits.set scope.sc_options value }
 
-  let get_smtversion scope =
-    SmtVersion.get scope.sc_options
-
-  let set_smtversion scope value =
-    { scope with sc_options = SmtVersion.set scope.sc_options value }
 end
 
 (* -------------------------------------------------------------------- *)
@@ -372,102 +347,151 @@ let maybe_add_to_section scope item =
 
 (* -------------------------------------------------------------------- *)
 module Prover = struct
-  exception Unknown_prover of string
 
-  type options = {
-    po_timeout   : int option;
-    po_cpufactor : int option;
-    po_nprovers  : int option;
-    po_provers   : string list option;
+  let all_provers () = 
+    List.map
+      (fun p -> p.EcProvers.pr_name)
+      (EcProvers.known ~evicted:false) 
+
+  let check_prover_name { pl_desc = name; pl_loc = loc } =
+    if not (EcProvers.is_prover_known name) then
+      hierror ~loc "Unknown prover %s" name;
+    name
+
+  (* -------------------------------------------------------------------- *)
+  let process_dbhint env db =
+    let add hints x =
+      let nf kind p =
+        hierror  ~loc:p.pl_loc "cannot find %s `%s'"
+            kind (string_of_qsymbol (unloc p))
+      in
+      
+      let addm hints hflag p =
+        match EcEnv.Theory.lookup_opt (unloc p) env with
+        | None -> nf "theory" p
+        | Some (p, _) -> EcProvers.Hints.addm p hflag hints
+          
+      and add1 hints hflag p =
+        match EcEnv.Ax.lookup_opt (unloc p) env with
+        | None -> nf "lemma" p
+        | Some (p, _) -> EcProvers.Hints.add1 p hflag hints
+      in
+      match x.pht_kind with
+      | `Theory -> addm hints x.pht_flag x.pht_name
+      | `Lemma  -> add1 hints x.pht_flag x.pht_name
+        
+    in
+    (* PY:CHECK !!!!!!!!!!!!!!!!! *)
+    let hints = EcProvers.Hints.empty in
+    let hints = List.fold_left add hints db.pht_map in
+    hints
+        
+  type smt_options = {
+    po_timeout    : int option;
+    po_cpufactor  : int option;
+    po_nprovers   : int option;
+    po_provers    : string list option * (include_exclude * string) list;
+    po_verbose    : int option;
+    po_version    : [`Lazy | `Full] option;
+    pl_all        : bool option;
+    pl_max        : int option;
+    pl_wanted     : EcProvers.hints option;
+    pl_unwanted   : EcProvers.hints option;
   }
 
   let empty_options = {
     po_timeout   = None;
     po_cpufactor = None;
     po_nprovers  = None;
-    po_provers   = None;
+    po_provers   = None, [];
+    po_verbose   = None;
+    po_version   = None;
+    pl_all       = None;
+    pl_max       = None;
+    pl_wanted    = None;
+    pl_unwanted  = None;
   }
 
-  let pp_error fmt exn =
-    match exn with
-    | Unknown_prover s ->
-        Format.fprintf fmt "Unknown prover %s" s
-    | _ -> raise exn
+  let process_prover_option env ppr = 
+    let provers = 
+      match ppr.pprov_names with
+      | None -> None, []
+      | Some pl ->
+        let do_uo s = 
+          if s.pl_desc = "ALL" then all_provers ()
+          else [check_prover_name s] in
+        let uo = 
+          if pl.pp_use_only = [] then None
+          else Some (List.flatten (List.map do_uo pl.pp_use_only)) in
+        let do_ar (k,s) = k, check_prover_name s in
+        uo, List.map do_ar pl.pp_add_rm in
+    let verbose = omap (odfl 1) ppr.pprov_verbose in
+    {
+      po_timeout   = ppr.pprov_timeout;
+      po_cpufactor = ppr.pprov_cpufactor;
+      po_nprovers  = ppr.pprov_max;
+      po_provers   = provers;
+      po_verbose   = verbose;
+      po_version   = ppr.pprov_version;
+      pl_all       = ppr.plem_all;
+      pl_max       = omap (odfl max_int) ppr.plem_max; 
+      pl_wanted    = omap (process_dbhint env) ppr.plem_wanted;
+      pl_unwanted  = omap (process_dbhint env) ppr.plem_unwanted;
+    }
 
-  let _ = EcPException.register pp_error
+  let mk_prover_info scope options =
+    let open EcProvers in
+    let dft          = Prover_info.get scope.sc_options in
+    let pr_maxprocs  = odfl dft.pr_maxprocs options.po_nprovers in
+    let pr_timelimit = max 0 (odfl dft.pr_timelimit options.po_timeout) in
+    let pr_cpufactor = max 0 (odfl dft.pr_cpufactor options.po_cpufactor) in
+    let pr_verbose   = max 0 (odfl dft.pr_verbose options.po_verbose) in
+    let pr_version   = odfl dft.pr_version options.po_version in
+    let pr_all       = odfl dft.pr_all options.pl_all in
+    let pr_max       = odfl dft.pr_max options.pl_max in
+    let pr_wanted    = odfl dft.pr_wanted options.pl_wanted in
+    let pr_unwanted  = odfl dft.pr_unwanted options.pl_unwanted in
+    let pr_provers   = 
+      let l = odfl dft.pr_provers (fst options.po_provers) in
+      let do_ar l (k,p) = 
+        match k with
+        | `Exclude -> List.remove_all l p 
+        | `Include -> if List.exists ((=) p) l then l else p::l in
+      List.fold_left do_ar l (snd options.po_provers) in
 
-  let check_prover_name { pl_desc = name; pl_loc = loc } =
-    if not (EcProvers.is_prover_known name) then
-      EcLocation.locate_error loc (Unknown_prover name);
-    name
+    { pr_maxprocs; pr_provers; pr_timelimit; pr_cpufactor;
+      pr_wrapper =  dft.pr_wrapper; 
+      pr_verbose; pr_version;
+      pr_all; pr_max; pr_wanted; pr_unwanted }
 
   let set_wrapper scope wrapper =
     let pi = Prover_info.get scope.sc_options in
     let pi = { pi with EcProvers.pr_wrapper = wrapper } in
-      { scope with sc_options = Prover_info.set scope.sc_options pi; }
+    { scope with sc_options = Prover_info.set scope.sc_options pi; }
 
-  let mk_prover_info scope options =
-    let dft       = Prover_info.get scope.sc_options in
-    let timeout   = max 0 (odfl dft.EcProvers.pr_timelimit options.po_timeout) in
-    let cpufactor = max 0 (odfl dft.EcProvers.pr_cpufactor options.po_cpufactor) in
-    let maxprocs  = odfl dft.EcProvers.pr_maxprocs options.po_nprovers in
-    let provers   = odfl dft.EcProvers.pr_provers options.po_provers in
-      { EcProvers.pr_maxprocs  = maxprocs;
-        EcProvers.pr_provers   = provers;
-        EcProvers.pr_timelimit = timeout;
-        EcProvers.pr_cpufactor = cpufactor;
-        EcProvers.pr_wrapper   = dft.EcProvers.pr_wrapper; }
+  let do_prover_info scope ppr = 
+    let options = process_prover_option scope.sc_env ppr in
+    mk_prover_info scope options
 
-  let set_prover_info scope options =
-    let pi = mk_prover_info scope options in
+       
+  let process scope ppr = 
+    let pi = do_prover_info scope ppr in
     { scope with sc_options = Prover_info.set scope.sc_options pi }
 
-  let set_all scope =
-    let provers =
-      List.map
-        (fun p -> p.EcProvers.pr_name)
-        (EcProvers.known ~evicted:false) in
-    let options = { empty_options with po_provers = Some provers; } in
-    set_prover_info scope options
-
-  let set_default scope options =
-    let provers =
-      match options.po_provers with
-      | None ->
-         let provers = EcProvers.dft_prover_names in
-         List.filter EcProvers.is_prover_known provers
-
-      | Some provers ->
-          List.iter
-            (fun name ->
-              if not (EcProvers.is_prover_known name) then
-                raise (Unknown_prover name)) provers;
-          provers
-    in
-
-    let options = { options with po_provers = Some provers } in
-    set_prover_info scope options
-
-  let process scope pi =
-    let options = {
-      po_timeout   = pi.pprov_timeout;
-      po_cpufactor = pi.pprov_cpufactor;
-      po_nprovers  = pi.pprov_max;
-      po_provers   = pi.pprov_names |> omap (List.map check_prover_name);
-    }
-
-    in set_prover_info scope options
-
-  let mk_prover_info scope pi =
-    let options = {
-      po_timeout   = pi.pprov_timeout;
-      po_cpufactor = pi.pprov_cpufactor;
-      po_nprovers  = pi.pprov_max;
-      po_provers   = pi.pprov_names |> omap (List.map check_prover_name);
-    }
-
-    in mk_prover_info scope options
-
+  let set_default scope options = 
+    let provers = match fst options.po_provers with
+      | None   -> 
+        let provers = EcProvers.dft_prover_names in
+        List.filter EcProvers.is_prover_known provers
+      | Some l -> 
+        List.iter 
+          (fun name -> if not (EcProvers.is_prover_known name) then
+              hierror "Unknown prover %s" name) l; l in
+    let options = 
+      { options with po_provers = (Some provers, snd options.po_provers) } in
+    let pi = mk_prover_info scope options in
+    { scope with sc_options = Prover_info.set scope.sc_options pi }
+ 
   let full_check scope =
     { scope with sc_options = Check_mode.set_fullcheck scope.sc_options }
 
@@ -477,7 +501,7 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Tactics = struct
-  let pi scope pi = Prover.mk_prover_info scope pi
+  let pi scope pi = Prover.do_prover_info scope pi
 
   let proof (scope : scope) mode (strict : bool) =
     check_state `InActiveProof "proof script" scope;
@@ -536,8 +560,7 @@ module Tactics = struct
         let ttenv = {
           EcHiGoal.tt_provers    = pi scope;
           EcHiGoal.tt_smtmode    = htmode;
-          EcHiGoal.tt_implicits  = Options.get_implicits  scope;
-          EcHiGoal.tt_smtversion = Options.get_smtversion scope; } in
+          EcHiGoal.tt_implicits  = Options.get_implicits  scope; } in
 
         let juc   = TTC.process ttenv tac juc in
         let pac   = { pac with puc_jdg = PSCheck juc } in
@@ -672,7 +695,7 @@ module Ax = struct
           match tc with
           | Some tc -> tc
           | None    ->
-              let dtc = Plogic (Psmt (None, empty_pprover, None)) in
+              let dtc = Plogic (Psmt empty_pprover) in
               let dtc = { pl_loc = loc; pl_desc = dtc } in
               let dtc = { pt_core = dtc; pt_intros = []; } in
                 dtc

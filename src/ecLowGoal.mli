@@ -223,7 +223,5 @@ type smtversion = [`Lazy | `Full]
 
 val t_smt:
     mode:smtmode
- -> version:smtversion
- -> bool * hints
  -> prover_infos
  -> FApi.backward

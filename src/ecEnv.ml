@@ -3214,17 +3214,11 @@ let norm_l_decl env (hyps, concl) =
   let lhyps = List.map onh hyps.h_local in
     ({ hyps with h_local = lhyps }, concl)
 
-let check_goal (usehyps, db) pi (hyps, concl) =
+let check_goal pi (hyps, concl) =
   let env = LDecl.toenv hyps in
   let ld  = LDecl.tohyps hyps in
-  let ld  =
-    match usehyps with
-    | true  -> ld
-    | false ->
-        let filter = function (_, LD_hyp _) -> false | _ -> true in
-          { ld with h_local = List.filter filter ld.h_local }
-  in
+
   let ld = norm_l_decl env (ld, concl) in
     EcWhy3.check_goal
       ~notify:(fun lvl (lazy s) -> notify env lvl "%s" s)
-      (Mod.me_of_mt env) env.env_w3 pi db ld
+      (Mod.me_of_mt env) env.env_w3 pi ld

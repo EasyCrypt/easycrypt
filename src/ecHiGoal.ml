@@ -34,7 +34,6 @@ module LG  = EcCoreLib.CI_Logic
 type ttenv = {
   tt_provers    : EcParsetree.pprover_infos -> EcProvers.prover_infos;
   tt_smtmode    : [`Admit | `Strict | `Standard | `Report];
-  tt_smtversion : [`Lazy | `Full];
   tt_implicits  : bool;
 }
 
@@ -132,65 +131,19 @@ let process_simplify ri (tc : tcenv1) =
     t_simplify_with_info ri tc
 
 (* -------------------------------------------------------------------- *)
-let process_dbhint pf env db =
-  let add hints x =
-    let nf kind p =
-      tc_error_lazy pf ~loc:p.pl_loc (fun fmt ->
-        Format.fprintf fmt "cannot find %s `%s'"
-          kind (string_of_qsymbol (unloc p)))
-    in
 
-    let addm hints hflag p =
-      match EcEnv.Theory.lookup_opt (unloc p) env with
-      | None -> nf "theory" p
-      | Some (p, _) -> EcProvers.Hints.addm p hflag hints
-
-    and add1 hints hflag p =
-      match EcEnv.Ax.lookup_opt (unloc p) env with
-      | None -> nf "lemma" p
-      | Some (p, _) -> EcProvers.Hints.add1 p hflag hints
-    in
-      match x.pht_kind with
-      | `Theory -> addm hints x.pht_flag x.pht_name
-      | `Lemma  -> add1 hints x.pht_flag x.pht_name
-
-  in
-    match db with
-    | None    -> (true, EcProvers.Hints.full)
-    | Some db ->
-      let hints = EcProvers.Hints.full in
-      let hints = List.fold_left add hints db.pht_map in
-        (not db.pht_nolocals, hints)
-
-(* -------------------------------------------------------------------- *)
-type smtinfo    = pdbhint option * pprover_infos
-type smtversion = EcLowGoal.smtversion
-
-let process_smt_version (pe : proofenv) x =
-  match unloc x with
-  | "lazy" -> `Lazy
-  | "full" -> `Full
-  | _ ->
-      tc_error pe ~loc:x.pl_loc
-        "invalid smt variant: %s" (unloc x)
-
-let process_smt ?loc ?version (ttenv : ttenv) (db, pi) (tc : tcenv1) =
-  let env = FApi.tc1_env tc in
-  let db  = process_dbhint !!tc env db in
+let process_smt ?loc (ttenv : ttenv) pi (tc : tcenv1) =
   let pi  = ttenv.tt_provers pi in
-  let vr  = version |> omap (process_smt_version !!tc) in
-  let vr  = odfl ttenv.tt_smtversion vr in
-  let smt = (fun ~mode -> t_smt ~mode ~version:vr db pi) in
 
   match ttenv.tt_smtmode with
   | `Admit ->
       t_admit tc
 
   | (`Standard | `Strict) as mode ->
-      t_seq (t_simplify ~delta:false) (smt ~mode) tc
+      t_seq (t_simplify ~delta:false) (t_smt ~mode pi) tc
 
   | `Report ->
-      t_seq (t_simplify ~delta:false) (smt ~mode:(`Report loc)) tc
+      t_seq (t_simplify ~delta:false) (t_smt ~mode:(`Report loc) pi) tc
 
 (* -------------------------------------------------------------------- *)
 let process_clear symbols tc =
@@ -497,8 +450,8 @@ let rec process_rewrite1 ttenv ri tc =
 
   | RWPr (x,f) -> EcPhlPrRw.t_pr_rewrite (unloc x, f) tc
 
-  | RWSmt ->
-      process_smt ~loc:ri.pl_loc ttenv (None, empty_pprover) tc
+  | RWSmt info ->
+      process_smt ~loc:ri.pl_loc ttenv info tc
 
 (* -------------------------------------------------------------------- *)
 let process_rewrite ttenv ri tc =

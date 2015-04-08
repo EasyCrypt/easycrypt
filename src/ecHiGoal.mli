@@ -16,12 +16,9 @@ open EcProofTerm
 type ttenv = {
   tt_provers    : EcParsetree.pprover_infos -> EcProvers.prover_infos;
   tt_smtmode    : [`Admit | `Strict | `Standard | `Report];
-  tt_smtversion : [`Lazy | `Full];
   tt_implicits  : bool;
 }
 
-type smtinfo    = pdbhint option * pprover_infos
-type smtversion = EcLowGoal.smtversion
 type engine     = ptactic_core -> backward
 
 (* -------------------------------------------------------------------- *)
@@ -73,7 +70,7 @@ val process_mintros     : ?cf:bool -> intropattern -> tactical
 val process_generalize  : genpattern list -> backward
 val process_move        : ppterm list -> genpattern list -> backward
 val process_clear       : psymbol list -> backward
-val process_smt         : ?loc:EcLocation.t -> ?version:psymbol -> ttenv -> smtinfo -> backward
+val process_smt         : ?loc:EcLocation.t -> ttenv -> pprover_infos -> backward
 val process_apply       : implicits:bool -> apply_t -> backward
 val process_delta       : (rwside * EcMatching.occ option * pformula) -> backward
 val process_rewrite     : ttenv -> rwarg list -> backward

@@ -143,6 +143,107 @@
 
   let mk_rel_pterm info = 
     odfl ({ fp_head = FPCut (None, None); fp_args = []; }) info 
+
+  let full_string s = s
+    
+  let mk_pi_option s o = 
+    let s = full_string s in
+    let error s kind =
+      let msg = "= <" ^ kind ^ "> excepted after "^ unloc s in
+      parse_error s.pl_loc (Some msg) in 
+    let check_int s o = 
+      match o with
+      | Some (`INT n) -> n
+      | _ -> error s "int" in
+    let check_oint s o = 
+      match o with
+      | Some (`INT n)  -> Some n
+      | None           -> None
+      | _              ->
+        let msg = "= <int> or no option excepted after "^ unloc s in
+        parse_error s.pl_loc (Some msg) in
+
+    let check_dbhint s o = 
+      match o with
+      | Some (`DBHINT d) -> (d:pdbhint)
+      | _ -> error s "dbhint" in
+    let check_prover s o = 
+      match o with
+      | Some (`PROVER d) -> d
+      | _ -> error s "prover" in
+    let check_none s o = 
+      match o with
+      | None -> ()
+      | _ -> 
+        let msg = "= no option excepted after "^ unloc s in
+        parse_error s.pl_loc (Some msg) in
+    match unloc s with
+    | "all"            -> check_none s o; (`ALL)
+    | "timeout"        -> `TIMEOUT        (check_int s o)
+    | "maxprovers"     -> `MAXPROVERS     (check_int s o)
+    | "maxlemmas"      -> `MAXLEMMAS      (check_oint s o)
+     
+    | "wantedlemmas"   -> `WANTEDLEMMAS   (check_dbhint s o)
+    | "unwantedlemmas" -> `UNWANTEDLEMMAS (check_dbhint s o)
+    | "prover"         -> `PROVER         (check_prover s o)
+    | "verbose"        -> `VERBOSE        (check_oint s o)
+    | "lazy"           -> `VERSION        (check_none s o; `Lazy)
+    | "full"           -> `VERSION        (check_none s o; `Full)         
+    | _                ->  
+      parse_error s.pl_loc (Some ("invalid option: " ^ (unloc s)))
+
+  let mk_smt_info os = 
+    let mprovers = ref None in
+    let timeout  = ref None in
+    let pnames   = ref None in
+    let all      = ref None in
+    let mlemmas  = ref None in
+    let wanted   = ref None in
+    let unwanted = ref None in
+    let verbose  = ref None in
+    let version  = ref None in
+    let add_prover (k,p) = 
+      let r = odfl empty_pprover_list !pnames in
+      pnames := Some  
+        (match k with
+        | `Only    -> { r with pp_use_only =            p :: r.pp_use_only } 
+        | `Include -> { r with pp_add_rm   = (`Include,p) :: r.pp_add_rm }
+        | `Exclude -> { r with pp_add_rm   = (`Exclude,p) :: r.pp_add_rm }) in
+      
+    let do1 o  = 
+      match o with
+      | `ALL              -> all      := Some true
+      | `TIMEOUT        n -> timeout  := Some n
+      | `MAXPROVERS     n -> mprovers := Some n
+      | `MAXLEMMAS      n -> mlemmas  := Some n
+      | `WANTEDLEMMAS   d -> wanted   := Some d 
+      | `UNWANTEDLEMMAS d -> unwanted := Some d
+      | `PROVER         p -> add_prover p 
+      | `VERBOSE        v -> verbose  := Some v
+      | `VERSION        v -> version  := Some v
+    in
+
+
+    List.iter do1 os;
+
+    oiter 
+      (fun r -> pnames := Some { r with pp_add_rm = List.rev r.pp_add_rm })
+      !pnames;
+
+    { 
+      pprov_max       = !mprovers;
+      pprov_timeout   = !timeout;
+      pprov_cpufactor =  None;
+      pprov_names     = !pnames;
+      pprov_verbose   = !verbose;
+      pprov_version   = !version;
+      plem_all        = !all;
+      plem_max        = !mlemmas;
+      plem_wanted     = !wanted;
+      plem_unwanted   = !unwanted;
+    }
+
+
 %}
 
 %token <EcSymbols.symbol> LIDENT
@@ -286,6 +387,7 @@
 %token PROGRESS
 %token PROOF
 %token PROVER
+%token TIMEOUT
 %token QED
 %token QUESTION
 %token RARROW
@@ -334,7 +436,6 @@
 %token TICKPIPE
 %token TILD
 %token TIME
-%token TIMEOUT
 %token TOP
 %token TRANSITIVITY
 %token TRIVIAL
@@ -1734,7 +1835,10 @@ rwarg1:
    { RWPr s }
 
 | SMT
-   { RWSmt }
+   { RWSmt (mk_smt_info []) }
+
+| LBRACKET SMT pi=smt_info RBRACKET
+   { RWSmt pi }
 
 rwpterms:
 | f=epterm
@@ -1877,8 +1981,8 @@ occurences:
   }
 
 dbmap1:
-| f=dbmap_flag? x=dbmap_target {
-    { pht_flag = odfl `Include f;
+| f=dbmap_flag x=dbmap_target {
+    { pht_flag = (*odfl `Include*) f;
       pht_kind = (fst x);
       pht_name = (snd x); }
   }
@@ -1892,8 +1996,11 @@ dbmap_target:
 | x=qident { (`Lemma, x) }
 
 dbhint:
-| nl=boption(NOLOCALS) m=dbmap1* {
-    { pht_nolocals = nl; pht_map = m; }
+| NOLOCALS m=dbmap1* {
+    { pht_nolocals = true; pht_map = m; }
+  }
+| m=dbmap1+ {
+    { pht_nolocals = false; pht_map = m; }
   }
 
 %inline prod_form:
@@ -1933,8 +2040,8 @@ logtactic:
 | TRIVIAL
    { Ptrivial }
 
-| SMT v=option(prefix(COLON, lident)) db=dbhint pi=prover_info
-   { Psmt (Some db, pi, v) }
+| SMT pi=smt_info
+   { Psmt pi }
 
 | INTROS a=intro_pattern*
    { Pintro a }
@@ -2675,24 +2782,29 @@ print:
 | GLOB        qs=loc(mod_qident) { Pr_glob qs }
 | GOAL        n=sword            { Pr_goal n  }
 
-prover_iconfig:
-| /* empty */        { (None  , None  ) }
-| i=word
-| i=word UNDERSCORE  { (Some i, None  ) }
-| UNDERSCORE j=word  { (None  , Some j) }
-| i=word j=word      { (Some i, Some j) }
+smt_info:
+| li=smt_info1* { mk_smt_info li}
 
-prover_info:
-| ic=prover_iconfig pl=plist1(loc(STRING), empty)?
-    { let (m, t) = ic in
-        { pprov_max       = m;
-          pprov_timeout   = t;
-          pprov_cpufactor = None;
-          pprov_names     = pl; } }
+smt_info1:
+| t=word                                  { `TIMEOUT t               }
+| TIMEOUT EQ t=word                       { `TIMEOUT t               }
+| p=prover_kind                           { `PROVER p                }
+| PROVER EQ p=prover_kind                 { `PROVER p                }
+| x=lident                                { mk_pi_option x None      }
+| o=lident EQ po=smt_option               { mk_pi_option o (Some po) } 
+
+prover_kind:
+| l=loc(STRING)                    { `Only   , l }
+| COLON ADD l=loc(STRING)          { `Include, l } (* durty *)
+| COLON MINUS l=loc(STRING)        { `Exclude, l } (* durty *)
+
+%inline smt_option:
+| n=word                       { `INT n    }
+| d=dbhint                     { `DBHINT d }
+| p=prover_kind                { `PROVER p }
 
 gprover_info:
-| PROVER x=prover_info
-    { x }
+| PROVER x=smt_info { x }
 
 | TIMEOUT t=word
     { { empty_pprover with pprov_timeout = Some t; } }
