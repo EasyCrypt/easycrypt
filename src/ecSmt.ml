@@ -139,6 +139,13 @@ module Cast = struct
     if w1.WTerm.t_ty = None then w1, force_prop w2
     else if w2.WTerm.t_ty = None then prop_of_bool w1, w2
     else w1, w2
+
+  let merges lw = 
+    if List.exists (fun (_,w) -> is_none w.WTerm.t_ty) lw then
+      List.map (fun (p,w) -> p, force_prop w) lw
+    else lw
+    
+    
 end
 
 (* -------------------------------------------------------------------- *)
@@ -763,6 +770,7 @@ and trans_fix (genv, lenv) o =
           let ctors = List.rev ctors in
           let lenv, cvs = List.map_fold (trans_lvars genv) lenv locals in
           let fe = EcCoreFol.form_of_expr EcCoreFol.mhr e in
+          
           let we = trans_form (genv, lenv) fe in
 
           let ptn =
@@ -784,9 +792,10 @@ and trans_fix (genv, lenv) o =
     in compile [] ([], o.opf_branches)
   in
 
+  let ptns = Cast.merges ptns in
   let ptns =
     List.rev_map
-      (fun (p, e) -> WTerm.t_close_branch p (Cast.force_bool e))
+      (fun (p, e) -> WTerm.t_close_branch p e)
       ptns in
 
   let mtch =
@@ -838,10 +847,11 @@ and create_op ?(body = false) (genv : tenv) p =
           WDecl.create_logic_decl [WDecl.make_ls_defn ls wparams wbody]
 
       | true, OB_oper (Some (OP_Fix body)) ->
-          OneShot.now register;
-          let wparams, wbody = trans_fix (genv, lenv) body in
-          WDecl.create_logic_decl [WDecl.make_ls_defn ls wparams wbody]
-  
+        OneShot.now register;
+        let wparams, wbody = trans_fix (genv, lenv) body in
+        let wbody = cast_arg wbody ls.WTerm.ls_value in
+        WDecl.create_logic_decl [WDecl.make_ls_defn ls wparams wbody]
+   
       | true, OB_pred (Some body) ->
           let wparams, wbody = trans_body (genv, lenv) wdom None body in
           WDecl.create_logic_decl [WDecl.make_ls_defn ls wparams wbody]
