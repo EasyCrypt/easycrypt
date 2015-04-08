@@ -1793,9 +1793,13 @@ gpterm(F):
 | x=iboption(AT) pt=pterm
     { (if x then `Explicit else `Implicit), pt }
 
-pcutdef:
+pcutdef1:
 | p=qident tvi=tvars_app? args=loc(gpterm_arg)*
     { { ptcd_name = p; ptcd_tys = tvi; ptcd_args = args; } }
+
+pcutdef:
+| cd=pcutdef1               { cd }
+| LPAREN cd=pcutdef1 RPAREN { cd }
 
 %inline rwside:
 | MINUS { `RtoL }
