@@ -2559,6 +2559,20 @@ module Ax = struct
           (EcTypes.Tvar.init (List.map fst ax.ax_tparams) tys) f
     | _ -> raise (LookupFailure (`Path p))
 
+  let iter ?name f (env : env) =
+    match name with
+    | Some name ->
+      let axs = MC.lookup_axioms name env in
+      List.iter (fun (p,ax) -> f p ax) axs 
+
+    | None ->
+        Mip.iter 
+          (fun _ mc -> MMsym.iter 
+            (fun _ (ip, ax) ->
+              match ip with IPPath p -> f p ax | _ -> ()) 
+            mc.mc_axioms)
+          env.env_comps
+
   let all ?(check = fun _ _ -> true) ?name (env : env) =
     match name with
     | Some name ->

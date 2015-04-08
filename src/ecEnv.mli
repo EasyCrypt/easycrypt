@@ -155,6 +155,8 @@ module Ax : sig
   val add  : path -> env -> env
   val bind : symbol -> axiom -> env -> env
 
+  val iter : ?name:qsymbol -> (path -> axiom -> unit) -> env -> unit 
+
   val all : 
     ?check:(path -> axiom -> bool) -> ?name:qsymbol -> env -> (path * t) list
 
