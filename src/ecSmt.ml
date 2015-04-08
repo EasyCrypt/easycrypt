@@ -135,17 +135,25 @@ module Cast = struct
   let force_bool t =
     if is_none t.WTerm.t_ty then bool_of_prop t else t
 
-  let merge w1 w2 =
+  let merge_if w1 w2 =
     if w1.WTerm.t_ty = None then w1, force_prop w2
     else if w2.WTerm.t_ty = None then prop_of_bool w1, w2
     else w1, w2
 
-  let merges lw = 
+  let merge_branches lw = 
     if List.exists (fun (_,w) -> is_none w.WTerm.t_ty) lw then
       List.map (fun (p,w) -> p, force_prop w) lw
     else lw
     
-    
+  let arg a ty =
+    match a.WTerm.t_ty, ty with
+    | None  , None   -> a
+    | None  , Some _ -> force_bool a
+    | Some _, None   -> force_prop a
+    | Some _, Some _ -> a
+      
+  let app mk args targs tres = mk (List.map2 arg args targs) tres
+
 end
 
 (* -------------------------------------------------------------------- *)
@@ -411,14 +419,6 @@ let w3op_ho_lsymbol genv wop =
       wop.w3op_ho <- `HO_DONE ls; ls
 
 (* -------------------------------------------------------------------- *)
-let cast_arg a ty =
-  match a.WTerm.t_ty, ty with
-  | None  , None   -> a
-  | None  , Some _ -> Cast.force_bool a
-  | Some _, None   -> Cast.force_prop a
-  | Some _, Some _ -> a
-
-let cast_app mk args targs tres = mk (List.map2 cast_arg args targs) tres
 
 let rec highorder_type targs tres =
   match targs with
@@ -433,14 +433,14 @@ let apply_wop genv wop tys args =
   let arity = List.length targs in
   let nargs = List.length args in
   
-  if nargs = arity then cast_app (w3op_fo wop) args targs tres
+  if nargs = arity then Cast.app (w3op_fo wop) args targs tres
   else if nargs < arity then
     let fty = highorder_type targs tres in
     let ls' = w3op_ho_lsymbol genv wop in
     apply_highorder (WTerm.fs_app ls' [] fty) args 
   else (* arity < nargs : too many arguments *) 
     let args1,args2 = List.takedrop arity args in
-    apply_highorder (cast_app (w3op_fo wop) args1 targs tres) args2
+    apply_highorder (Cast.app (w3op_fo wop) args1 targs tres) args2
 
 (* -------------------------------------------------------------------- *)   
 let trans_lambda genv wvs wbody = 
@@ -566,7 +566,7 @@ and trans_app  ((genv, lenv) as env : tenv * lenv) (f : form) args =
       let wb = trans_form env fb in
       let wt = trans_app env ft args in
       let wf = trans_app env ff args in
-      let wt, wf = Cast.merge wt wf in
+      let wt, wf = Cast.merge_if wt wf in
       WTerm.t_if_simp (Cast.force_prop wb) wt wf 
       
   | Fapp (f, args') ->
@@ -739,7 +739,7 @@ and trans_body (genv, lenv) wdom wcodom topbody =
       let params = List.map (WTerm.create_vsymbol preid) wdom in
       let args   = List.map WTerm.t_var params in 
       params, trans_app (genv, lenv) topbody args in
-  let body = cast_arg body wcodom in 
+  let body = Cast.arg body wcodom in 
   let body = 
     match wcodom, body.WTerm.t_ty with
     | None  , Some _ -> Cast.force_prop body
@@ -792,7 +792,7 @@ and trans_fix (genv, lenv) o =
     in compile [] ([], o.opf_branches)
   in
 
-  let ptns = Cast.merges ptns in
+  let ptns = Cast.merge_branches ptns in
   let ptns =
     List.rev_map
       (fun (p, e) -> WTerm.t_close_branch p e)
@@ -849,7 +849,7 @@ and create_op ?(body = false) (genv : tenv) p =
       | true, OB_oper (Some (OP_Fix body)) ->
         OneShot.now register;
         let wparams, wbody = trans_fix (genv, lenv) body in
-        let wbody = cast_arg wbody ls.WTerm.ls_value in
+        let wbody = Cast.arg wbody ls.WTerm.ls_value in
         WDecl.create_logic_decl [WDecl.make_ls_defn ls wparams wbody]
    
       | true, OB_pred (Some body) ->
