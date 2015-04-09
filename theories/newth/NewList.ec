@@ -1436,12 +1436,12 @@ theory Array.
     n < 0 \/ size xs <= n =>
     xs.[n <- a] = xs.
   proof.
-    elim xs n=> //= x xs ih n.
-    move=> h; have -> /=: n <> 0 by smt.
+    elim xs n=> //= x xs ih n; smt.
+(*    move=> h; have -> /=: n <> 0 by smt.
     case {-1}(n < 0) (eq_refl (n < 0)) h=> //= [lt0_n | ].
       by apply ih; left; smt.
     rewrite neqF ltzNge /= => le0_n lt_xs_n.
-    by apply ih; right; smt.
+    by apply ih; right; smt. *)
   qed.
 
   lemma nth_set (n n': int) (a : 'a) (xs : 'a list):
@@ -1449,34 +1449,37 @@ theory Array.
     xs.[n <- a].[n'] = if n' = n then a else xs.[n'].
   proof.
     move=> n_bounds.
-    rewrite !getE; elim xs n n_bounds n'=> //=.
-      smt.
+    rewrite !getE; elim xs n n_bounds n'=> //=;smt.
+(*      smt.
     move=> x xs ih n n_bounds n'.
     case (n = 0)=> //= [->> | ].
       by case (n' = 0).
     case (n' = 0)=> //= [->> | ne0_n' ne0_n].
       by rewrite eq_sym=> ->.
-    by rewrite ih 1..2:smt.
-  qed.
+    by rewrite ih 1..2:smt. *)
+  qed. 
 
   lemma get_set (xs : 'a list) (n n' : int) (x : 'a):
     xs.[n <- x].[n'] =
       if   (0 <= n < size xs /\ n' = n)
       then x
-      else xs.[n'].
-  proof.
+      else xs.[n']
+  by [].
+
+(*  proof.
     case (0 <= n < size xs)=> //= [| n_cond].
       by apply nth_set.
     by rewrite set_out 1:smt.
-  qed.
+  qed. *)
 
   lemma set_set (xs : 'a list) (n n' : int) (x x' : 'a):
     forall i,
       xs.[n <- x].[n' <- x'].[i] =
         if   n = n'
         then xs.[n' <- x'].[i]
-        else xs.[n' <- x'].[n <- x].[i].
-  proof.
+        else xs.[n' <- x'].[n <- x].[i]
+   by [].
+(*  proof. 
     case (n = n')=> [->> /= |].
       move=> i; rewrite !get_set; case (i = n')=> //=.
       by rewrite size_set; case (0 <= n' < size xs).
@@ -1484,8 +1487,8 @@ theory Array.
       by rewrite !get_set /= @(eq_sym n') ne_n_n' /= size_set.
     move=> ne_i_n'; case (i = n)=> [->> /= {i} |].
       by rewrite !get_set /= ne_n_n' /= size_set.
-    by move=> ne_i_n; rewrite !get_set ne_i_n ne_i_n'.
-  qed.
+    by move=> ne_i_n; rewrite !get_set ne_i_n ne_i_n'. *)
+  qed. *)
 
   lemma set_set_eq (xs : 'a list) (n : int) (x x' : 'a):
     forall i, xs.[n <- x].[n <- x'].[i] = xs.[n <- x'].[i].
@@ -1494,10 +1497,6 @@ theory Array.
   lemma get_mapi (f : int -> 'a -> 'b) (xs : 'a list) (n i : int):
     0 <= n < size xs =>
     (mapi i f xs).[n] = f (n + i) xs.[n].
-  proof.
-    rewrite !getE; elim xs i n=> //=; 1:smt.
-    move=> x xs ih i n n_bnd; case (n = 0)=> //= _.
-    have ->: n + i = (n - 1) + (i + 1) by smt.
-    by apply ih; smt.
-  qed.
+  proof. by rewrite !getE; elim xs i n=> //=;smt. qed.
+
 end Array.
