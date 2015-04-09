@@ -164,6 +164,17 @@ let load_wtuple genv n =
   let th = WTheory.tuple_theory n in
   load_wtheory genv th
 
+let wty_tuple genv ts = 
+  load_wtuple genv (List.length ts);
+  WTy.ty_tuple ts
+
+let wt_tuple genv args = 
+  load_wtuple genv (List.length args);
+  WTerm.t_tuple args
+
+let wfs_tuple genv nargs = 
+  load_wtuple genv nargs;
+  WTerm.fs_tuple nargs
 (* -------------------------------------------------------------------- *)
 let trans_tv lenv id = oget (Mid.find_opt id lenv.le_tv)
 
@@ -265,9 +276,7 @@ let rec trans_ty ((genv, lenv) as env) ty =
   | Tunivar _ -> assert false
   | Tvar    x -> trans_tv lenv x
 
-  | Ttuple  ts-> 
-      load_wtuple genv (List.length ts);
-      WTy.ty_tuple (trans_tys env ts)
+  | Ttuple  ts-> wty_tuple genv (trans_tys env ts)
 
   | Tconstr (p, tys) ->
       let id = trans_pty genv p in
@@ -518,9 +527,7 @@ let rec trans_form ((genv, lenv) as env : tenv * lenv) (fp : form) =
       trans_app env f (List.map (trans_form env) args)
     
   | Ftuple args -> 
-      let args = List.map (trans_form_b env) args in
-      load_wtuple genv (List.length args);
-      WTerm.t_tuple args
+      wt_tuple genv (List.map (trans_form_b env) args)
       
   | Fproj (tfp, i) ->
       let wtfp = trans_form env tfp in
@@ -610,9 +617,8 @@ and trans_letbinding (genv, lenv) (lp, f1, f2) args =
       let ids  = List.map (snd_map gtty) ids in
       let nids = List.length ids in
       let lenv, vs = trans_bindings genv lenv ids in
-      load_wtuple genv nids;
       let pat =
-        WTerm.pat_app (WTerm.fs_tuple nids)
+        WTerm.pat_app (wfs_tuple genv nids)
           (List.map WTerm.pat_var vs) (WTerm.t_type w1) in
       let w2 = trans_app (genv, lenv) f2 args in
       let br = WTerm.t_close_branch pat w2 in
@@ -789,7 +795,7 @@ and trans_fix (genv, lenv) o =
 
           let ptn =
             if   ptermc > 1
-            then WTerm.pat_app (WTerm.fs_tuple ptermc) ptn (WTy.ty_tuple ptermty)
+            then WTerm.pat_app (wfs_tuple genv ptermc) ptn (wty_tuple genv ptermty)
             else oget (List.ohead ptn)
           in (ptn, we) :: ptns
 
@@ -804,7 +810,7 @@ and trans_fix (genv, lenv) o =
 
   let mtch =
     if   ptermc > 1
-    then WTerm.t_tuple (List.map WTerm.t_var pterm)
+    then wt_tuple genv (List.map WTerm.t_var pterm)
     else WTerm.t_var (oget (List.ohead pterm)) in
 
   let body = WTerm.t_case mtch ptns in
@@ -877,12 +883,12 @@ and create_op ?(body = false) (genv : tenv) p =
 and create_proj genv (n, i) =
   let tvs  = Array.init n (fun _ -> WTy.create_tvsymbol (WIdent.id_fresh "a")) in
   let ts   = Array.map WTy.ty_var tvs in
-  let tt   = WTy.ty_tuple (Array.to_list ts) in
+  let tt   = wty_tuple genv (Array.to_list ts) in
   let ti   = ts.(i) in
   let vi   = WTerm.create_vsymbol (WIdent.id_fresh "v") ti in
   let pat  = Array.map WTerm.pat_wild ts in
   let pat  = pat.(i) <- WTerm.pat_var vi; Array.to_list pat in
-  let br   = WTerm.pat_app (WTerm.fs_tuple n) pat tt in
+  let br   = WTerm.pat_app (wfs_tuple genv n) pat tt in
   let br   = WTerm.t_close_branch br (WTerm.t_var vi) in
   let va   = WTerm.create_vsymbol (WIdent.id_fresh "x") tt in
   let body = WTerm.t_case (WTerm.t_var va) [br] in
