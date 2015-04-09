@@ -656,17 +656,25 @@ and trans_letbinding (genv, lenv) (lp, f1, f2) args =
       w_t_let vs w1 w2
 
   | LTuple ids -> 
-      let ids  = List.map (snd_map gtty) ids in
-      let nids = List.length ids in
-      let lenv, vs = trans_bindings genv lenv ids in
-      let pat =
-        WTerm.pat_app (wfs_tuple genv nids)
-          (List.map WTerm.pat_var vs) (WTerm.t_type w1) in
-      let w2 = trans_app (genv, lenv) f2 args in
-      let br = WTerm.t_close_branch pat w2 in
-      WTerm.t_case w1 [br]
+    let nids = List.length ids in
+    let lenv, vs = trans_lvars genv lenv ids in
+    let pat =
+      WTerm.pat_app (wfs_tuple genv nids)
+        (List.map WTerm.pat_var vs) (WTerm.t_type w1) in
+    let w2 = trans_app (genv, lenv) f2 args in
+    let br = WTerm.t_close_branch pat w2 in
+    WTerm.t_case w1 [br]
 
-  | LRecord _ -> assert false
+  | LRecord (p,ids) -> 
+  (*  ignore (trans_ty (genv,lenv) f1.f_ty); *)
+    let p = EI.record_ctor_path p in
+    let ids = List.map (fst_map (ofdfl (fun _ -> EcIdent.create "_"))) ids in
+    let lenv, vs = trans_lvars genv lenv ids in
+    let ls = w3op_as_ldecl (trans_op genv p).w3op_fo in
+    let pat = WTerm.pat_app ls (List.map WTerm.pat_var vs) (WTerm.t_type w1) in
+    let w2 = trans_app (genv,lenv) f2 args in
+    let br = WTerm.t_close_branch pat w2 in
+    WTerm.t_case w1 [br]
 
 (* -------------------------------------------------------------------- *)
 and trans_op (genv:tenv) p =
