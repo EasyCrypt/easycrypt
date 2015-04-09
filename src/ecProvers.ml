@@ -317,6 +317,7 @@ type prover_infos = {
   pr_version   : [`Lazy | `Full];
   pr_all       : bool;
   pr_max       : int;
+  pr_iterate   : bool;
   pr_wanted    : hints;
   pr_unwanted  : hints;
 }
@@ -331,6 +332,7 @@ let dft_prover_infos = {
   pr_verbose   = 0;
   pr_version   = `Lazy;
   pr_all       = false;
+  pr_iterate   = false;
   pr_max       = 50;
   pr_wanted    = Hints.empty;
   pr_unwanted  = Hints.empty;

@@ -383,7 +383,7 @@ module Prover = struct
     in
     (* PY:CHECK !!!!!!!!!!!!!!!!! *)
     let hints = EcProvers.Hints.empty in
-    let hints = List.fold_left add hints db.pht_map in
+    let hints = List.fold_left add hints db in
     hints
         
   type smt_options = {
@@ -395,6 +395,7 @@ module Prover = struct
     po_version    : [`Lazy | `Full] option;
     pl_all        : bool option;
     pl_max        : int option;
+    pl_iterate    : bool option;
     pl_wanted     : EcProvers.hints option;
     pl_unwanted   : EcProvers.hints option;
   }
@@ -408,6 +409,7 @@ module Prover = struct
     po_version   = None;
     pl_all       = None;
     pl_max       = None;
+    pl_iterate   = None;
     pl_wanted    = None;
     pl_unwanted  = None;
   }
@@ -435,6 +437,7 @@ module Prover = struct
       po_version   = ppr.pprov_version;
       pl_all       = ppr.plem_all;
       pl_max       = omap (odfl max_int) ppr.plem_max; 
+      pl_iterate   = ppr.plem_iterate;
       pl_wanted    = omap (process_dbhint env) ppr.plem_wanted;
       pl_unwanted  = omap (process_dbhint env) ppr.plem_unwanted;
     }
@@ -449,6 +452,7 @@ module Prover = struct
     let pr_version   = odfl dft.pr_version options.po_version in
     let pr_all       = odfl dft.pr_all options.pl_all in
     let pr_max       = odfl dft.pr_max options.pl_max in
+    let pr_iterate   = odfl dft.pr_iterate options.pl_iterate in
     let pr_wanted    = odfl dft.pr_wanted options.pl_wanted in
     let pr_unwanted  = odfl dft.pr_unwanted options.pl_unwanted in
     let pr_provers   = 
@@ -458,11 +462,12 @@ module Prover = struct
         | `Exclude -> List.remove_all l p 
         | `Include -> if List.exists ((=) p) l then l else p::l in
       List.fold_left do_ar l (snd options.po_provers) in
+    
 
     { pr_maxprocs; pr_provers; pr_timelimit; pr_cpufactor;
       pr_wrapper =  dft.pr_wrapper; 
       pr_verbose; pr_version;
-      pr_all; pr_max; pr_wanted; pr_unwanted }
+      pr_all; pr_max; pr_iterate; pr_wanted; pr_unwanted }
 
   let set_wrapper scope wrapper =
     let pi = Prover_info.get scope.sc_options in

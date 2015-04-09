@@ -527,10 +527,7 @@ type pdbmap1 = {
   pht_name : pqsymbol;
 }
 
-and pdbhint = {
-  pht_nolocals : bool;
-  pht_map : pdbmap1 list;
-}
+and pdbhint = pdbmap1 list
 
 (* -------------------------------------------------------------------- *)
 type pprover_list = {
@@ -552,6 +549,7 @@ type pprover_infos = {
   pprov_version   : [`Lazy | `Full] option;
   plem_all        : bool option;
   plem_max        : int option option;
+  plem_iterate    : bool option;
   plem_wanted     : pdbhint option;
   plem_unwanted   : pdbhint option;
 }
@@ -565,6 +563,7 @@ let empty_pprover = {
   pprov_version   = None;
   plem_all        = None;
   plem_max        = None;
+  plem_iterate    = None;
   plem_wanted     = None;
   plem_unwanted   = None;
 }

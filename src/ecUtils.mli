@@ -185,6 +185,9 @@ module String : sig
   include module type of BatString
 
   val split_lines : string -> string list
+
+  (* [matched_string tomatch s] return the sublist of tomatch which match s *)
+  val matched_string : string list -> string -> string list
 end
 
 (* -------------------------------------------------------------------- *)

@@ -144,10 +144,25 @@
   let mk_rel_pterm info = 
     odfl ({ fp_head = FPCut (None, None); fp_args = []; }) info 
 
-  let full_string s = s
+  let full_string tomatch = 
+    let match_string = String.matched_string tomatch in
+    fun s ->
+    match match_string s.pl_desc with
+    | []   -> parse_error s.pl_loc (Some ("invalid option: " ^ (unloc s)))
+    | [s'] -> mk_loc s.pl_loc s'
+    | ls   -> 
+      let msg = "can not establish option " ^ (unloc s) ^ 
+                " did you mean " ^
+                String.concat " or " ls in
+      parse_error s.pl_loc (Some msg) 
+
+  let select_pi_option = 
+    full_string [ "all"; "timeout"; "maxprovers"; "maxlemmas";
+                  "wantedlemmas"; "unwantedlemmas"; 
+                  "prover"; "verbose"; "lazy"; "full"; "iterate" ]
     
   let mk_pi_option s o = 
-    let s = full_string s in
+    let s = select_pi_option s in
     let error s kind =
       let msg = "= <" ^ kind ^ "> excepted after "^ unloc s in
       parse_error s.pl_loc (Some msg) in 
@@ -188,9 +203,9 @@
     | "prover"         -> `PROVER         (check_prover s o)
     | "verbose"        -> `VERBOSE        (check_oint s o)
     | "lazy"           -> `VERSION        (check_none s o; `Lazy)
-    | "full"           -> `VERSION        (check_none s o; `Full)         
-    | _                ->  
-      parse_error s.pl_loc (Some ("invalid option: " ^ (unloc s)))
+    | "full"           -> `VERSION        (check_none s o; `Full)
+    | "iterate"        -> check_none s o; (`ITERATE)
+    | _                ->  assert false
 
   let mk_smt_info os = 
     let mprovers = ref None in
@@ -202,6 +217,7 @@
     let unwanted = ref None in
     let verbose  = ref None in
     let version  = ref None in
+    let iterate  = ref None in
     let add_prover (k,p) = 
       let r = odfl empty_pprover_list !pnames in
       pnames := Some  
@@ -218,9 +234,10 @@
       | `MAXLEMMAS      n -> mlemmas  := Some n
       | `WANTEDLEMMAS   d -> wanted   := Some d 
       | `UNWANTEDLEMMAS d -> unwanted := Some d
-      | `PROVER         p -> add_prover p 
+      | `PROVER         p -> List.iter add_prover p 
       | `VERBOSE        v -> verbose  := Some v
       | `VERSION        v -> version  := Some v
+      | `ITERATE          -> iterate  := Some true
     in
 
 
@@ -239,6 +256,7 @@
       pprov_version   = !version;
       plem_all        = !all;
       plem_max        = !mlemmas;
+      plem_iterate    = !iterate;
       plem_wanted     = !wanted;
       plem_unwanted   = !unwanted;
     }
@@ -369,7 +387,6 @@
 %token MODULE
 %token MOVE
 %token NE
-%token NOLOCALS
 %token NOSMT
 %token NOT
 %token OF
@@ -1985,8 +2002,8 @@ occurences:
   }
 
 dbmap1:
-| f=dbmap_flag x=dbmap_target {
-    { pht_flag = (*odfl `Include*) f;
+| f=dbmap_flag? x=dbmap_target {
+    { pht_flag = odfl `Include f;
       pht_kind = (fst x);
       pht_name = (snd x); }
   }
@@ -2000,13 +2017,8 @@ dbmap_target:
 | x=qident { (`Lemma, x) }
 
 dbhint:
-| NOLOCALS m=dbmap1* {
-    { pht_nolocals = true; pht_map = m; }
-  }
-| m=dbmap1+ {
-    { pht_nolocals = false; pht_map = m; }
-  }
-
+| m=dbmap1+ { m }
+  
 %inline prod_form:
 | f1=sform f2=sform   { (Some f1, Some f2) }
 | UNDERSCORE f2=sform { (None   , Some f2) }
@@ -2790,17 +2802,20 @@ smt_info:
 | li=smt_info1* { mk_smt_info li}
 
 smt_info1:
-| t=word                                  { `TIMEOUT t               }
+| t=word                                  { `MAXLEMMAS (Some t)      }
 | TIMEOUT EQ t=word                       { `TIMEOUT t               }
 | p=prover_kind                           { `PROVER p                }
 | PROVER EQ p=prover_kind                 { `PROVER p                }
 | x=lident                                { mk_pi_option x None      }
 | o=lident EQ po=smt_option               { mk_pi_option o (Some po) } 
 
+prover_kind1:
+| l=loc(STRING)              { `Only   , l }
+| ADD l=loc(STRING)          { `Include, l } 
+| MINUS l=loc(STRING)        { `Exclude, l } 
+
 prover_kind:
-| l=loc(STRING)                    { `Only   , l }
-| COLON ADD l=loc(STRING)          { `Include, l } (* durty *)
-| COLON MINUS l=loc(STRING)        { `Exclude, l } (* durty *)
+| LBRACKET lp=prover_kind1* RBRACKET { lp }
 
 %inline smt_option:
 | n=word                       { `INT n    }

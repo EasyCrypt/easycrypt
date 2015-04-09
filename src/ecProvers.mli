@@ -41,6 +41,7 @@ type prover_infos = {
   pr_version   : [`Lazy | `Full];
   pr_all       : bool;
   pr_max       : int;
+  pr_iterate   : bool;
   pr_wanted    : hints;
   pr_unwanted  : hints;
 }

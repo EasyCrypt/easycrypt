@@ -537,6 +537,22 @@ module String = struct
   let trim (s : string) =
     let aout = BatString.trim s in
     if s == aout then BatString.copy aout else s
+
+  (* [matched_string tomatch s] return the sublist of tomatch which match s *)
+  let matched_string tomatch = 
+    let matched = List.map (fun s -> s, 0) tomatch in
+    let rec aux matched i s = 
+      if i = length s || matched = [] then List.map fst matched 
+      else
+        let c = s.[i] in
+        let do1 (tomatch,k) = 
+          try Some (tomatch, index_from tomatch k c + 1)
+          with Invalid_argument _ 
+          | Not_found -> None in
+        let matched = List.filter_map do1 matched in
+        aux matched (i+1) s in
+    aux matched 0
+
 end
 
 (* -------------------------------------------------------------------- *)

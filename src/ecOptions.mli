@@ -34,6 +34,7 @@ and prv_options = {
   prvo_pragmas   : string list;
   prvo_checkall  : bool;
   prvo_profile   : bool;
+  prvo_oldsmt    : bool;
 }
 
 and ldr_options = {

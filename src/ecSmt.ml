@@ -1010,6 +1010,7 @@ let core_theories = [
       (CI_Real.p_real_add, "infix +" );
       (CI_Real.p_real_sub, "infix -" );
       (CI_Real.p_real_mul, "inv"     );
+      (CI_Real.p_real_div, "infix /" );
       (CI_Real.p_real_mul, "infix *" );
       (CI_Real.p_real_lt , "infix <" );  
       (CI_Real.p_real_le , "infix <=");  
@@ -1022,7 +1023,7 @@ let core_theories = [
 
 let core_theories = Lazy.from_fun (fun () ->
   let add_core_theory tbl (thname, operators) =
-    let theory = curry EcProvers.get_w3_th thname in
+    let theory = curry P.get_w3_th thname in
     let namesp = theory.WTheory.th_export in
     List.iter (fun (p, name) ->
       Hp.add tbl p (WTheory.ns_find_ls namesp [name], theory))
@@ -1324,15 +1325,24 @@ let select_add_axioms genv pi rs =
 (* -------------------------------------------------------------------- *)
 let check ?notify pi (hyps : LDecl.hyps) (concl : form) =
   (try Unix.unlink "task.why" with Unix.Unix_error _ -> ());
+  let out_task task = 
+    let stream = open_out "task.why" in
+    EcUtils.try_finally
+      (fun () -> Format.fprintf
+        (Format.formatter_of_out_channel stream)
+        "%a@." Why3.Pretty.print_task task)
+      (fun () -> close_out stream) in
+
+  let task  = (None : WTask.task) in
+  let task  = WTask.use_export task WTheory.builtin_theory in
+  let task  = WTask.use_export task (WTheory.tuple_theory 0) in
+  let task  = WTask.use_export task WTheory.bool_theory in
+  let task  = WTask.use_export task WTheory.highord_theory in
+  let task  = WTask.use_export task distr_theory in
+  let known = Lazy.force core_theories in
+  let tenv  = empty_tenv (LDecl.toenv hyps) task known in
+
   let (tt, task) = EcUtils.timed (fun () ->
-    let task  = (None : WTask.task) in
-    let task  = WTask.use_export task WTheory.builtin_theory in
-    let task  = WTask.use_export task (WTheory.tuple_theory 0) in
-    let task  = WTask.use_export task WTheory.bool_theory in
-    let task  = WTask.use_export task WTheory.highord_theory in
-    let task  = WTask.use_export task distr_theory in
-    let known = Lazy.force core_theories in
-    let tenv  = empty_tenv (LDecl.toenv hyps) task known in
     try 
       let ()    = add_core_bindings tenv in
       let lenv  = lenv_of_hyps tenv (LDecl.tohyps hyps) in
@@ -1345,28 +1355,12 @@ let check ?notify pi (hyps : LDecl.hyps) (concl : form) =
       select_add_axioms tenv pi rs;
       (* Add conclusion *)
       WTask.add_decl tenv.te_task decl
-    with e -> 
-      let stream = open_out "task.why" in
-      EcUtils.try_finally
-        (fun () -> Format.fprintf
-          (Format.formatter_of_out_channel stream)
-          "%a@." Why3.Pretty.print_task tenv.te_task)
-        (fun () -> close_out stream);
-      raise e
-  ) () in
+    with e -> out_task tenv.te_task;raise e) () in
 
-  if 2 <= pi.EcProvers.pr_verbose then
-    Printf.eprintf "[W]SMT translation: %f\n%!" tt; 
+  if 2 <= pi.P.pr_verbose then Printf.eprintf "[W]SMT translation: %f\n%!" tt; 
 
-  if 3 <= pi.EcProvers.pr_verbose || 
-    EcUtils.is_some (Os.getenv "EC_SMT_DEBUG") then begin 
-    let stream = open_out "task.why" in
-    EcUtils.try_finally
-      (fun () -> Format.fprintf
-        (Format.formatter_of_out_channel stream)
-        "%a@." Why3.Pretty.print_task task)
-      (fun () -> close_out stream)
-  end; 
+  if 3 <= pi.P.pr_verbose || is_some (Os.getenv "EC_SMT_DEBUG") then 
+    out_task task;
 
   let (tp,res) = 
     EcUtils.timed (fun task -> 

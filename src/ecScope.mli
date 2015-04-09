@@ -164,6 +164,7 @@ module Prover : sig
     po_version    : [`Lazy | `Full] option;
     pl_all        : bool option;
     pl_max        : int option;
+    pl_iterate    : bool option;
     pl_wanted     : EcProvers.hints option;
     pl_unwanted   : EcProvers.hints option;
   }
