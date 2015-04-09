@@ -26,6 +26,8 @@ type checkmode = {
   cm_provers  : string list option;
   cm_wrapper  : string option;
   cm_profile  : bool;
+  cm_oldsmt   : bool;
+  cm_iterate  : bool;
 }
 
 val initialize  : undo:bool -> boot:bool -> checkmode:checkmode -> unit

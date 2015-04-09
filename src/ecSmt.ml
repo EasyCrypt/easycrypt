@@ -367,12 +367,13 @@ let rm_xp_args xp =
   EcPath.xpath mp xp.EcPath.x_sub
 
 (* -------------------------------------------------------------------- *)
+exception CanNotTranslate
 let trans_binding genv lenv (x, xty) =
   let wty = 
     match xty with
     | GTty ty -> trans_ty (genv, lenv) ty
     | GTmem _ -> ty_mem
-    | _ -> assert false in
+    | _ -> raise CanNotTranslate in
   let wvs = WTerm.create_vsymbol (preid x) wty in
   ({ lenv with le_lv = Mid.add x wvs lenv.le_lv }, wvs)
 
@@ -486,13 +487,16 @@ let trans_lambda genv wvs wbody =
 let rec trans_form ((genv, lenv) as env : tenv * lenv) (fp : form) =
   match fp.f_node with
   | Fquant (qt, bds, body) ->
-      let lenv, wbds = trans_bindings genv lenv bds in
-      let wbody = trans_form (genv,lenv) body in
-      (match qt with
-      | Lforall -> WTerm.t_forall_close wbds [] (Cast.force_prop wbody)
-      | Lexists -> WTerm.t_exists_close wbds [] (Cast.force_prop wbody)
-      | Llambda -> trans_lambda genv wbds wbody)
-      
+    begin 
+      try 
+        let lenv, wbds = trans_bindings genv lenv bds in
+        let wbody = trans_form (genv,lenv) body in
+        (match qt with
+        | Lforall -> WTerm.t_forall_close wbds [] (Cast.force_prop wbody)
+        | Lexists -> WTerm.t_exists_close wbds [] (Cast.force_prop wbody)
+        | Llambda -> trans_lambda genv wbds wbody)
+      with CanNotTranslate -> trans_gen env fp
+    end
   | Fint n ->
       let n = BI.to_string n in
       let n = Why3.Number.ConstInt (Why3.Number.int_const_dec n) in
@@ -598,7 +602,7 @@ and trans_letbinding (genv, lenv) (lp, f1, f2) args =
   let w1 = trans_form_b (genv, lenv) f1 in
   match lp with
   | LSymbol (id, ty) ->
-      let lenv, vs = trans_binding genv lenv (id,GTty ty) in
+      let lenv, vs = trans_binding genv lenv (id,gtty ty) in
       let w2 = trans_app (genv,lenv) f2 args in
       w_t_let vs w1 w2
 
@@ -1466,8 +1470,16 @@ let check ?notify pi (hyps : LDecl.hyps) (concl : form) =
             ri.ri_max <- max_int;
             ri.ri_p   <- 0.;
             ri.toadd  <- [];
-            let _other = relevant_clause ri other in
-            ri.toadd <> [] && execute_task ri.toadd = Some true
+            let other = relevant_clause ri other in
+            if ri.toadd = [] then 
+              let toadd = List.map fst other in
+              execute_task toadd = Some true
+            else
+              let res = execute_task ri.toadd in
+              if res <> None then oget res
+              else 
+                let toadd = List.map fst other in
+                execute_task toadd = Some true
           end else begin 
             ri.ri_max <- ml;
             ri.toadd  <- [];

@@ -105,7 +105,7 @@ theory Univ.
   lemma mem_univ w: mem w univ.
   proof.
     rewrite /univ img_def; exists (to_int w);rewrite to_from Interval.mem_interval/=.
-    by rewrite -to_from from_to;smt.
+    rewrite -to_from from_to; smt all.
   qed.
 
   lemma card_univ: card univ = 2^length.

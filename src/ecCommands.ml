@@ -602,6 +602,8 @@ type checkmode = {
   cm_provers   : string list option;
   cm_wrapper   : string option;
   cm_profile   : bool;
+  cm_oldsmt    : bool;
+  cm_iterate   : bool;
 }
 
 let initial ~checkmode ~boot =
@@ -613,6 +615,9 @@ let initial ~checkmode ~boot =
     EcScope.Prover.po_cpufactor = Some checkmode.cm_cpufactor;
     EcScope.Prover.po_nprovers  = Some checkmode.cm_nprovers;
     EcScope.Prover.po_provers   = (checkmode.cm_provers, []);
+    EcScope.Prover.po_version   = 
+      if checkmode.cm_oldsmt then Some `Full else Some `Lazy;
+    EcScope.Prover.pl_iterate   = Some (checkmode.cm_iterate);
   } in
 
   let prelude = (mk_loc _dummy "Prelude", Some `Export) in

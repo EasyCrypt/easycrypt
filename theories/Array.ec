@@ -483,7 +483,7 @@ by smt.
 lemma take_drop (xs:'a array) (l:int):
   0 <= l <= length xs =>
   (take l xs || drop l xs) = xs
-by smt.
+by smt iter.
 
 (* init_dep: init, but using a function that may depend
    on the rest of the array! *)
@@ -642,7 +642,7 @@ theory Darray.
     weight (darray len d) = 1%r.
   proof strict.
   intros leq0_len H; rewrite (weight_d d len) // H.
-  smt "Alt-Ergo".
+  smt full ["Alt-Ergo"].
   qed.
 
   (* if len is negative, then uniformity is easy to prove.
