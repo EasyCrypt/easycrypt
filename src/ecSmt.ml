@@ -1478,7 +1478,8 @@ let check ?notify pi (hyps : LDecl.hyps) (concl : form) =
 
   (* perform stuff *)
   if pi.P.pr_all then
-    let init_select _p ax = not ax.ax_nosmt in
+    let init_select p ax = 
+      not ax.ax_nosmt && not (P.Hints.mem p pi.P.pr_unwanted) in
     execute_task (EcEnv.Ax.all ~check:init_select env) = Some true
   else
     let rs    = Frequency.f_ops_goal unwanted_ops hyps.h_local concl in
