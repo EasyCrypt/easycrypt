@@ -65,7 +65,6 @@ type tenv = {
   (*---*) te_lc         : w3op Hid.t;
   mutable te_lam        : WTerm.term Mta.t;
   (*---*) te_gen        : WTerm.term Hf.t;
-  (*---*) te_proj       : WTerm.lsymbol Hdint.t;
   (*---*) te_xpath      : WTerm.lsymbol Hx.t; (* proc and var *)
   (*---*) te_absmod     : w3absmod Hid.t;     (* abstract module *)
 }
@@ -79,7 +78,6 @@ let empty_tenv env task known =
     te_lc         = Hid.create 0; 
     te_lam        = Mta.empty;
     te_gen        = Hf.create 0;
-    te_proj       = Hdint.create 0;
     te_xpath      = Hx.create 0;
     te_absmod     = Hid.create 0;
   }
@@ -160,21 +158,75 @@ end
 let load_wtheory genv th = 
   genv.te_task <- WTask.use_export genv.te_task th
 
-let load_wtuple genv n = 
-  let th = WTheory.tuple_theory n in
-  load_wtheory genv th
+(* -------------------------------------------------------------------- *)
+(* Create why3 tuple theory with projector                              *)
 
-let wty_tuple genv ts = 
-  load_wtuple genv (List.length ts);
-  WTy.ty_tuple ts
+module Tuples = struct 
 
-let wt_tuple genv args = 
-  load_wtuple genv (List.length args);
-  WTerm.t_tuple args
+  let ts = Hint.memo 17 (fun n ->
+    let vl = ref [] in
+    for _i = 1 to n do 
+      vl := WTy.create_tvsymbol (WIdent.id_fresh "a") :: !vl done;
+    WTy.create_tysymbol (WIdent.id_fresh ("tuple" ^ string_of_int n)) !vl None)
+
+  let proj = Hdint.memo 17 (fun (n,k) -> 
+    assert (0 <= k && k < n);
+    let ts = ts n in
+    let opaque = WTy.Stv.of_list ts.WTy.ts_args in
+    let tl = List.map WTy.ty_var ts.WTy.ts_args in
+    let ta = WTy.ty_app ts tl in
+    let tr = List.nth tl k in
+    let id = 
+      WIdent.id_fresh ("proj" ^ string_of_int n ^ "_" ^ string_of_int k) in
+    WTerm.create_fsymbol ~opaque id [ta] tr)
+
+  let fs = Hint.memo 17 (fun n ->
+    let ts = ts n in
+    let opaque = WTy.Stv.of_list ts.WTy.ts_args in
+    let tl = List.map WTy.ty_var ts.WTy.ts_args in
+    let ty = WTy.ty_app ts tl in
+    let id = WIdent.id_fresh ("Tuple" ^ string_of_int n) in
+    WTerm.create_fsymbol ~opaque ~constr:1 id tl ty)
+
+  let theory = Hint.memo 17 (fun n ->
+    let ts = ts n and fs = fs n in
+    let pl = List.mapi (fun i _ -> Some (proj (n, i))) ts.WTy.ts_args in
+    let uc = 
+      WTheory.create_theory ~path:["Easycrypt"] 
+        (WIdent.id_fresh ("Tuple" ^ string_of_int n))  in
+    let uc = WTheory.add_data_decl uc [ts, [fs,pl]] in
+    WTheory.close_theory uc)
+
+end 
+
+let load_tuple genv n = 
+  load_wtheory genv (Tuples.theory n)
+
+let wty_tuple genv targs = 
+  let len = List.length targs in
+  load_tuple genv len;
+  WTy.ty_app (Tuples.ts len) targs
 
 let wfs_tuple genv nargs = 
-  load_wtuple genv nargs;
-  WTerm.fs_tuple nargs
+  load_tuple genv nargs;
+  Tuples.fs nargs
+
+let wt_tuple genv args = 
+  let len = List.length args in
+  load_tuple genv len;
+  let ty = WTy.ty_app (Tuples.ts len) (List.map WTerm.t_type args) in
+  WTerm.fs_app (Tuples.fs len) args ty
+
+let wproj_tuple genv arg i = 
+  let wty  = oget (arg.WTerm.t_ty) in
+  let n = 
+    match wty.WTy.ty_node with
+    | WTy.Tyapp (_, targs) -> List.length targs
+    | _ -> assert false in
+  load_tuple genv n;
+  let fs = Tuples.proj (n,i) in
+  WTerm.t_app_infer fs [arg]
+  
 (* -------------------------------------------------------------------- *)
 let trans_tv lenv id = oget (Mid.find_opt id lenv.le_tv)
 
@@ -523,21 +575,11 @@ let rec trans_form ((genv, lenv) as env : tenv * lenv) (fp : form) =
     let n = Why3.Number.ConstReal (Why3.Number.real_const_dec n "" None) in
     WTerm.t_const n
       
-  | Fapp (f, args) ->
-      trans_app env f (List.map (trans_form env) args)
+  | Fapp (f,args) -> trans_app env f (List.map (trans_form env) args)
     
-  | Ftuple args -> 
-      wt_tuple genv (List.map (trans_form_b env) args)
+  | Ftuple args   -> wt_tuple genv (List.map (trans_form_b env) args)
       
-  | Fproj (tfp, i) ->
-      let wtfp = trans_form env tfp in
-      let wty  = oget (wtfp.WTerm.t_ty) in
-      let n    = 
-        match wty.WTy.ty_node with
-        | WTy.Tyapp (_, targs) -> List.length targs
-        | _ -> assert false
-
-      in WTerm.t_app_infer (trans_proj genv (n, i)) [wtfp]
+  | Fproj (tfp,i) -> wproj_tuple genv (trans_form env tfp) i
       
   | Fpvar(pv,mem) -> trans_pvar env pv fp.f_ty mem 
 
@@ -629,11 +671,6 @@ and trans_letbinding (genv, lenv) (lp, f1, f2) args =
 (* -------------------------------------------------------------------- *)
 and trans_op (genv:tenv) p =
   try Hp.find genv.te_op p with Not_found -> create_op ~body:true genv p
-
-(* -------------------------------------------------------------------- *)
-and trans_proj genv (n, i) =
-  try  Hdint.find genv.te_proj (n, i)
-  with Not_found -> create_proj genv (n, i)
 
 (* -------------------------------------------------------------------- *)
 and trans_pvar ((genv, _) as env) pv ty mem = 
@@ -878,27 +915,6 @@ and create_op ?(body = false) (genv : tenv) p =
   end;
 
   w3op
-
-(* -------------------------------------------------------------------- *)
-and create_proj genv (n, i) =
-  let tvs  = Array.init n (fun _ -> WTy.create_tvsymbol (WIdent.id_fresh "a")) in
-  let ts   = Array.map WTy.ty_var tvs in
-  let tt   = wty_tuple genv (Array.to_list ts) in
-  let ti   = ts.(i) in
-  let vi   = WTerm.create_vsymbol (WIdent.id_fresh "v") ti in
-  let pat  = Array.map WTerm.pat_wild ts in
-  let pat  = pat.(i) <- WTerm.pat_var vi; Array.to_list pat in
-  let br   = WTerm.pat_app (wfs_tuple genv n) pat tt in
-  let br   = WTerm.t_close_branch br (WTerm.t_var vi) in
-  let va   = WTerm.create_vsymbol (WIdent.id_fresh "x") tt in
-  let body = WTerm.t_case (WTerm.t_var va) [br] in
-  let s    = Format.sprintf "proj%i_%i" n i in
-  let ls   = WTerm.create_lsymbol (WIdent.id_fresh s) [tt] (Some ti) in
-  let decl = WDecl.create_logic_decl [WDecl.make_ls_defn ls [va] body] in
-
-  Hdint.add genv.te_proj (n, i) ls;
-  genv.te_task <- WTask.add_decl genv.te_task decl;
-  ls
 
 (* -------------------------------------------------------------------- *)
 let add_axiom ((genv, _) as env) preid form = 
