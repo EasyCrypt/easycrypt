@@ -1235,14 +1235,99 @@ module Frequency = struct
 
 end
 
-(*type relevant_info = {
-  ri_p : float;            
-  ri_c : float;
-  ri_wanted_ax   : Sp.t;         (* wanted axiom   *)
-  ri_unwanted_ax : path -> bool; (* unwanted axiom *)
-  ri_unwanted_op : Sp.t;         (* do not take into account *)
-  ri_max_axioms  : int;          (* maximun number of axioms  *)
-} *)
+type relevant_info = {
+  (*---*) ri_env : EcEnv.env;
+  mutable ri_p   : float;            
+  (*---*) ri_c   : float;
+  (*---*) ri_fr  : Frequency.frequency;
+  mutable ri_max : int;                   (* maximun number of axioms  *)
+  mutable toadd  : (path * axiom) list;
+  mutable rs0    : Frequency.relevant;
+  mutable rs1    : Frequency.relevant;
+}
+
+let push_ax ri ax = 
+  ri.ri_max <- ri.ri_max - 1;
+  ri.toadd  <- ax::ri.toadd
+
+let update_rs ri rel =
+  let doax rs (ax, ars) = push_ax ri ax;  Frequency.r_union rs ars in
+  let rs = List.fold_left doax ri.rs1 rel in
+  let new_s = fst (Frequency.r_diff ri.rs1 ri.rs0) in
+  let rs = Sp.fold (Frequency.f_ops_oper unwanted_ops ri.ri_env) new_s rs in
+  ri.rs0 <- ri.rs1;
+  ri.rs1 <- rs 
+
+let init_relevant env pi rs =
+  let unwanted_ax p  = P.Hints.mem p pi.P.pr_unwanted in
+  let wanted_ax   p  = P.Hints.mem p pi.P.pr_wanted in
+  (* [ftab] frequency table number of occurency of operators *)
+  let fr = Frequency.create unwanted_ops in
+  let rel = ref [] in
+  let other = ref [] in
+  let push e r = r := e :: !r in
+  let do1 p ax = 
+    let wanted = wanted_ax p in
+    if wanted || (not ax.ax_nosmt && not (unwanted_ax p)) then begin
+      Frequency.add fr ax;
+      let used = 
+        omap_dfl (Frequency.f_ops unwanted_ops) 
+          Frequency.r_empty ax.ax_spec in
+      let paxu = (p,ax), used in
+      if wanted then push paxu rel else push paxu other
+    end in
+  EcEnv.Ax.iter do1 env;
+  let ri = {
+    ri_env = env;
+    ri_p   = 0.6;
+    ri_c   = 2.4;
+    ri_fr  = fr;
+    ri_max = pi.P.pr_max;
+    toadd  = [];
+    rs0    = Frequency.r_empty;
+    rs1    = rs; } in
+  update_rs ri !rel;
+  ri, !other
+
+let relevant_clause ri other =
+  let symbols_of (_,s) = s in
+  let frequency_function freq = 1. +. log1p (float_of_int freq) in
+
+  let clause_mark p other =
+    let rel = ref [] in
+    let newo = ref [] in
+    let do1 ax = 
+      let cs = symbols_of ax in
+      let r  = Frequency.r_inter cs ri.rs1 in
+      let ir = Frequency.r_diff cs r in
+      let weight path m = 
+        let freq = Frequency.frequency ri.ri_fr path in
+        let w = frequency_function freq in
+        m +. w in
+      let m = Frequency.r_fold weight r 0. in
+      let m = m /. (m +. float_of_int (Frequency.r_card ir)) in
+      if p <= m then rel := ax :: !rel else newo := ax :: !newo in
+    List.iter do1 other;
+    !rel, !newo in
+      
+  let rec aux p other = 
+    if ri.ri_max <= 0 then other
+    else
+      let rel, other = clause_mark p other in
+      if rel = [] then other
+      else 
+        let p = p +. (1. -. p) /. ri.ri_c in
+        update_rs ri rel;
+        aux p other in
+  let other = aux ri.ri_p other in
+  other
+
+
+  
+(*  
+  
+  
+
 
 let relevant_clause env pi rs = 
   let open EcProvers in 
@@ -1320,6 +1405,7 @@ let select_add_axioms genv pi rs =
   let toadd = relevant_clause genv.te_env pi rs in
   List.iter (trans_axiom genv) toadd 
 
+*)
 
 
 (* -------------------------------------------------------------------- *)
@@ -1333,6 +1419,8 @@ let check ?notify pi (hyps : LDecl.hyps) (concl : form) =
         "%a@." Why3.Pretty.print_task task)
       (fun () -> close_out stream) in
 
+  let env   = LDecl.toenv hyps in
+  let hyps  = LDecl.tohyps hyps in
   let task  = (None : WTask.task) in
   let task  = WTask.use_export task WTheory.builtin_theory in
   let task  = WTask.use_export task (WTheory.tuple_theory 0) in
@@ -1340,33 +1428,79 @@ let check ?notify pi (hyps : LDecl.hyps) (concl : form) =
   let task  = WTask.use_export task WTheory.highord_theory in
   let task  = WTask.use_export task distr_theory in
   let known = Lazy.force core_theories in
-  let tenv  = empty_tenv (LDecl.toenv hyps) task known in
+  let tenv  = empty_tenv env task known in
+  let ()    = add_core_bindings tenv in
+  let lenv  = lenv_of_hyps tenv hyps in
+  let wterm = trans_form (tenv, lenv) concl in
+  let pr    = WDecl.create_prsymbol (WIdent.id_fresh "goal") in
+  let decl  = WDecl.create_prop_decl WDecl.Pgoal pr wterm in
+  let execute_task toadd = 
+    List.iter (trans_axiom tenv) toadd;
+    let task = WTask.add_decl tenv.te_task decl in
+    let (tp,res) = EcUtils.timed (P.execute_task ?notify pi) task in
+    if 1 <= pi.P.pr_verbose then
+      Printf.eprintf "[W]SMT finished : %f\n%!" tp;
+    res in
 
-  let (tt, task) = EcUtils.timed (fun () ->
-    try 
-      let ()    = add_core_bindings tenv in
-      let lenv  = lenv_of_hyps tenv (LDecl.tohyps hyps) in
-      let wterm = trans_form (tenv, lenv) concl in
-      let pr    = WDecl.create_prsymbol (WIdent.id_fresh "goal") in
-      let decl  = WDecl.create_prop_decl WDecl.Pgoal pr wterm in
+  (* perform stuff *)
+  if pi.P.pr_all then
+    let init_select _p ax = not ax.ax_nosmt in
+    execute_task (EcEnv.Ax.all ~check:init_select env) = Some true
+  else
+    let rs    = Frequency.f_ops_goal unwanted_ops hyps.h_local concl in
+    let ri, other = init_relevant env pi rs in
+    if not pi.P.pr_iterate then 
+      let _other = relevant_clause ri other in
+      execute_task ri.toadd = Some true
+    else 
+      let other, res =
+        if ri.toadd = [] then 
+          let other = relevant_clause ri other in
+          other, execute_task ri.toadd 
+        else other, execute_task ri.toadd in
+      if res <> None then oget res
+      else
+        let rec aux ml other i =
+(*          Format.eprintf "EcSmt.iterate %i@." i; *)
+          if i = 0 then begin
+            ri.ri_max <- max_int;
+            ri.ri_p   <- 0.;
+            ri.toadd  <- [];
+            let _other = relevant_clause ri other in
+            ri.toadd <> [] && execute_task ri.toadd = Some true
+          end else begin 
+            ri.ri_max <- ml;
+            ri.toadd  <- [];
+            let other = relevant_clause ri other in
+            let ml = min (ml+ml+30) max_int in
+            let i  = i - 1 in
+            if ri.toadd = [] then aux ml other i
+            else 
+              let res = execute_task ri.toadd in
+              if res = None then aux ml other i 
+              else oget res
+          end in
+        aux pi.P.pr_max other 4
+
+        
+        
+          
+
+(*    let (tt, task) = EcUtils.timed (fun () ->
+      try
       (* Hypothesis selection *) 
-      let rs =
-        Frequency.f_ops_goal unwanted_ops (LDecl.tohyps hyps).h_local concl in
-      select_add_axioms tenv pi rs;
+        let _other = relevant_clause ri other in
+        List.iter (trans_axiom tenv) ri.toadd;
       (* Add conclusion *)
-      WTask.add_decl tenv.te_task decl
-    with e -> out_task tenv.te_task;raise e) () in
+        WTask.add_decl tenv.te_task decl
+      with e -> out_task tenv.te_task;raise e) () in
+    execute_task ri.
 
   if 2 <= pi.P.pr_verbose then Printf.eprintf "[W]SMT translation: %f\n%!" tt; 
 
   if 3 <= pi.P.pr_verbose || is_some (Os.getenv "EC_SMT_DEBUG") then 
-    out_task task;
+    out_task task; *)
 
-  let (tp,res) = 
-    EcUtils.timed (fun task -> 
-       EcProvers.execute_task ?notify pi task = Some true) task in
-  if 1 <= pi.EcProvers.pr_verbose then
-    Printf.eprintf "[W]SMT proved: %f\n%!" tp;
-  res 
+ 
   
  

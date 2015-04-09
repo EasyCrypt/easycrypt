@@ -39,6 +39,7 @@ and prv_options = {
   prvo_checkall  : bool;
   prvo_profile   : bool;
   prvo_oldsmt    : bool;
+  prvo_iterate   : bool;
 }
 
 and ldr_options = {
@@ -237,7 +238,8 @@ let specs = {
       `Spec ("check-all"  , `Flag  , "Force checking all files");
       `Spec ("pragmas"    , `String, "Comma-separated list of pragmas");
       `Spec ("profile"    , `Flag  , "Collect some profiling informations");
-      `Spec ("old-smt"    , `Flag  , "Force to use old version of smt")
+      `Spec ("old-smt"    , `Flag  , "Force to use old version of smt");
+      `Spec ("iterate"    , `Flag  , "Force to iterate smt call");
     ]);
        
 
@@ -307,6 +309,7 @@ let prv_options_of_values values =
       prvo_checkall  = get_flag "check-all" values;
       prvo_profile   = get_flag "profile" values;
       prvo_oldsmt    = get_flag "old-smt" values;
+      prvo_iterate   = get_flag "iterate" values;
     }
 
 let cli_options_of_values values =

@@ -577,7 +577,7 @@ lemma endo_dom_rng (m:('a,'a) map):
   exists x, !mem x (rng m).
 proof.
   elim=> x x_notin_m.
-  cut: 0 < card (sub (add x (dom m)) (rng m)); last smt.
+  cut: 0 < card (sub (add x (dom m)) (rng m)); last smt ml=100.
   apply sub_card.
   rewrite card_add_nin //.
   smt.
