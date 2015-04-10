@@ -1118,7 +1118,7 @@ let unwanted_ops =
     CI_Bool.p_iff;
     CI_Bool.p_eq;
 
-    CI_Int.p_int_opp;
+(*    CI_Int.p_int_opp;
     CI_Int.p_int_add;
     CI_Int.p_int_sub;
     CI_Int.p_int_mul;
@@ -1137,7 +1137,7 @@ let unwanted_ops =
     CI_Real.p_real_le;
     CI_Real.p_real_lt;
     CI_Real.p_real_ge;
-    CI_Real.p_real_gt;
+    CI_Real.p_real_gt; *)
   ]
 
 (* -------------------------------------------------------------------- *)
