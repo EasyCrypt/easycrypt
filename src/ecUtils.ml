@@ -483,6 +483,19 @@ module List = struct
     let mrev   = match d with `Left -> identity | `Right -> rev in
     let hd, tl = takedrop i (mrev xs) in
     (i, mrev (tl @ hd))
+
+  let min_cmp lt l = 
+    match l with
+    | [] -> raise (Invalid_argument "List.min_cmp") 
+    | x::l ->
+      let min = ref x in
+      List.iter (fun x -> if lt x !min then min := x) l;
+      !min
+
+  let is_singleton l = 
+    match l with
+    | [_] -> true
+    |  _  -> false
 end
 
 (* -------------------------------------------------------------------- *)
@@ -538,10 +551,12 @@ module String = struct
     let aout = BatString.trim s in
     if s == aout then BatString.copy aout else s
 
+  let rev (s:string) = init (length s) (fun i -> s.[length s - 1 - i]) 
+
   (* [matched_string tomatch s] return the sublist of tomatch which match s *)
-  let matched_string tomatch = 
+  let all_matched tomatch s = 
     let matched = List.map (fun s -> s, 0) tomatch in
-    let rec aux matched i s = 
+    let rec aux matched i = 
       if i = length s || matched = [] then List.map fst matched 
       else
         let c = s.[i] in
@@ -550,8 +565,38 @@ module String = struct
           with Invalid_argument _ 
           | Not_found -> None in
         let matched = List.filter_map do1 matched in
-        aux matched (i+1) s in
+        aux matched (i+1) in
     aux matched 0
+
+  let first_matched tomatch s =
+    let matched = List.map (fun s -> s, 0) tomatch in
+    let rec aux matched i = 
+      if i = length s || matched = [] then List.map fst matched 
+      else
+        let c = s.[i] in
+        let do1 (tomatch,k) = 
+          try Some (tomatch, index_from tomatch k c + 1)
+          with Invalid_argument _ 
+          | Not_found -> None in
+        let matched = List.filter_map do1 matched in
+        let lt x y = snd x < snd y in
+        let min = List.min_cmp lt matched in
+        let oge x y = if snd y <= snd x then Some y else None in
+        let matched = List.filter_map (oge min) matched in
+        if List.is_singleton matched then List.map fst matched
+        else aux matched (i+1) in
+    try aux matched 0
+    with Invalid_argument "List.min_cmp" -> []
+
+  let last_matched tomatch s = first_matched (List.map rev tomatch) (rev s)
+
+  let matched_string tomatch s = 
+    let matched = all_matched tomatch s in
+    if List.is_singleton matched then matched
+    else
+      let matched = first_matched matched s in
+      if List.is_singleton matched then matched
+      else last_matched matched s
 
 end
 

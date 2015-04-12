@@ -1160,7 +1160,7 @@ theory Iota.
     by rewrite iotaS // smt.
   qed.
 
-  lemma iota_addl m1 m2 n: iota_ (m1 + m2) n = map ((+) m1) (iota_ m2 n).
+  lemma iota_addl (m1 m2:int) n: iota_ (m1 + m2) n = map ((+) m1) (iota_ m2 n).
   proof.
     elim/Induction.natind: n m2 => [n hn|n hn ih] m2; 1: by rewrite !iota0.
     by rewrite !iotaS // map_cons -addzA ih.
@@ -1488,7 +1488,6 @@ theory Array.
     move=> ne_i_n'; case (i = n)=> [->> /= {i} |].
       by rewrite !get_set /= ne_n_n' /= size_set.
     by move=> ne_i_n; rewrite !get_set ne_i_n ne_i_n'. *)
-  qed. *)
 
   lemma set_set_eq (xs : 'a list) (n : int) (x x' : 'a):
     forall i, xs.[n <- x].[n <- x'].[i] = xs.[n <- x'].[i].
