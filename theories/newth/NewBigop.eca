@@ -36,6 +36,48 @@ lemma nosmt big_map ['a 'b] (h : 'b -> 'a) (P : 'a -> bool) F s:
 proof. by elim: s => // x s; rewrite map_cons !big_cons=> ->. qed.
 
 (* -------------------------------------------------------------------- *)
+lemma nosmt big_comp ['a] (h : t -> t) (P : 'a -> bool) F s:
+  h idm = idm => morphism_2 h Support.(+) Support.(+) =>
+  h (sum P F s) = sum P (h \o F) s.
+proof. 
+  move=> Hidm Hh;elim: s => // x s; rewrite !big_cons => <-.
+  by rewrite /(\o) -Hh;case (P x) => //.
+qed.
+
+lemma nosmt big_Dl ['a] (h : t -> t -> t) (P : 'a -> bool) F s t:
+   left_zero idm h => 
+   left_distributive h Support.(+) =>
+   h (sum P F s) t = sum P (fun a => h (F a) t) s.
+proof.
+  move=> Hlz HDl.
+  cut /= -> := big_comp (fun t1 => h t1 t) P F s _ _=> //=.
+  + by apply Hlz.
+  move=> t1 t2; apply (HDl t1 t2 t).
+qed.
+
+lemma nosmt big_Dr ['a] (h:t -> t -> t) (P:'a -> bool) F s t:
+   right_zero idm h => 
+   right_distributive h Support.(+) =>
+   h t (sum P F s) = sum P (fun a => h t (F a)) s.
+proof.
+  move=> Hrz HDr.
+  by cut /= -> := big_comp (h t) P F s _ _=> //=;[apply Hrz|apply (HDr t)]. 
+qed.
+
+lemma nosmt big_D ['a 'b] (h : t -> t -> t) (P1 : 'a -> bool) F1 s1
+                                             (P2 : 'b -> bool) F2 s2:
+   commutative h =>
+   left_zero idm h => 
+   left_distributive h Support.(+) =>
+   h (sum P1 F1 s1) (sum P2 F2 s2) =
+     sum P1 (fun a1 => sum P2 (fun a2 => h (F1 a1) (F2 a2)) s2) s1.
+proof.
+  move=> Hc Hlz HDl.
+  rewrite big_Dl => //; congr;apply fun_ext=> a1.
+  rewrite big_Dr //;smt.
+qed.
+
+(* -------------------------------------------------------------------- *)
 lemma nosmt big_nth x0 (P : 'a -> bool) (F : 'a -> t) s:
   sum P F s = sum (P \o (nth x0 s)) (F \o (nth x0 s)) (iota_ 0 (size s)).
 proof. by rewrite -{1}@(mkseq_nth x0 s) /mkseq big_map. qed.
