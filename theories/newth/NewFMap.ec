@@ -3,7 +3,8 @@
  * Distributed under the terms of the CeCILL-B licence.
  * -------------------------------------------------------------------- *)
 
-require import Fun Pred Option Pair Int NewList NewFSet.
+require import Fun Pred Pair Int NewList.
+require export Option NewFSet.
 pragma +implicits.
 
 (* -------------------------------------------------------------------- *)
