@@ -97,6 +97,12 @@ proof.
   by rewrite setP !subsetE; rewrite (subpred_eqP (mem A) (mem B)).
 qed.
 
+(* -------------------------------------------------------------------- *)
+lemma nosmt cards0: card set0<:'a> = 0.
+proof. by rewrite cardE set0E -(perm_eq_size (undup [])) 1:oflistK. qed.
+
+lemma nosmt card_ge0 (A : 'a fset) : Int.(<=) 0 (card A).
+proof. by rewrite cardE size_ge0. qed.
 
 (* -------------------------------------------------------------------- *)
 (* All the following proofs should be translated automagically          *)
