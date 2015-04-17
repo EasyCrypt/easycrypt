@@ -1,0 +1,103 @@
+(* --------------------------------------------------------------------
+ * Copyright (c) - 2012-2015 - IMDEA Software Institute and INRIA
+ * Distributed under the terms of the CeCILL-B licence.
+ * -------------------------------------------------------------------- *)
+
+(* -------------------------------------------------------------------- *)
+require import Fun Bool Int NewList.
+require (*ab*) FinType NewWord.
+
+pragma +implicits.
+pragma +Smt:lazy.
+
+(* -------------------------------------------------------------------- *)
+clone include NewWord with
+  type Alphabet.t    <- bool,
+  op   Alphabet.elts <- [true;false]
+proof Alphabet.* by smt.
+
+(* -------------------------------------------------------------------- *)
+op zerow: word = mkword (fun i => false)
+  axiomatized by zerowE.
+
+lemma sel_zerow i: 0 <= i < l => zerow.[i] = false.
+proof. by move=> i_bnd; rewrite zerowE sel_mkword. qed.
+
+op onew: word  = mkword (fun i => true )
+  axiomatized by onewE.
+
+lemma sel_onew i: 0 <= i < l => onew.[i] = true.
+proof. by move=> i_bnd; rewrite onewE sel_mkword. qed.
+
+op (^) (w1 w2 : word): word = map2 (^^) w1 w2
+  axiomatized by xorwE.
+
+lemma xorwP w1 w2 i: 0 <= i < l =>
+  (w1 ^ w2).[i] = w1.[i] ^^ w2.[i].
+proof. by rewrite xorwE; apply/sel_map2. qed.
+
+op andw (w1 w2:word): word = map2 (/\) w1 w2
+  axiomatized by andwE.
+
+lemma andwP (w1 w2:word) i: 0 <= i < l =>
+  (andw w1 w2).[i] = (w1.[i] /\ w2.[i]).
+proof. by rewrite andwE; apply/sel_map2. qed.
+
+op negw (w : word): word = map [!] w
+  axiomatized by negwE.
+
+lemma negwP (w:word) i: 0 <= i < l =>
+  (negw w).[i] = !w.[i].
+proof. by rewrite negwE; apply/sel_map. qed.
+
+op oppw (w : word): word = w.
+
+(* -------------------------------------------------------------------- *)
+lemma non_trivial: onew <> zerow
+by smt:full.
+
+lemma xorw0: right_id zerow (^).
+proof. by move=> w; apply/wordP; smt. qed.
+
+lemma xorwA: associative (^).
+proof. by move=> w1 w2 w3; apply/wordP; smt. qed.
+
+lemma xorwC: commutative (^).
+proof. by move=> w1 w2; apply/wordP; smt. qed.
+
+lemma xorwK: right_loop (fun x => x) (^).
+proof. by move=> y x; apply/wordP; smt. qed.
+
+lemma andw1: right_id onew andw.
+proof. by move=> w; apply/wordP; smt:full. qed. (* BUG -- Should be `smt` *)
+
+lemma andwA: associative andw.
+proof. by move=> w1 w2 w3; apply/wordP; smt:full. qed. (* BUG -- Should be `smt` *)
+
+lemma andwC: commutative andw.
+proof. by move=> w1 w2; apply/wordP; smt:full. qed. (* BUG -- Should be `smt` *)
+
+lemma andwDl: left_distributive andw (^).
+proof. by move=> w1 w2 w3; apply/wordP; smt:full. qed. (* BUG -- Should be `smt` *)
+
+lemma andwK: idempotent andw.
+proof. by move=> x; apply/wordP; smt:full. qed.
+
+instance bring with word
+  op rzero = zerow
+  op rone  = onew
+  op add   = Self.(   ^  )
+  op mul   = andw
+  op opp   = oppw
+
+  proof oner_neq0 by apply non_trivial
+  proof addr0     by apply xorw0
+  proof addrA     by (move=> w1 w2 w3; rewrite xorwA)
+  proof addrC     by apply xorwC
+  proof addrK     by smt
+  proof mulr1     by apply andw1
+  proof mulrA     by (move=> w1 w2 w3; rewrite andwA)
+  proof mulrC     by apply andwC
+  proof mulrDl    by smt:full
+  proof mulrK     by apply andwK
+  proof oppr_id   by trivial.

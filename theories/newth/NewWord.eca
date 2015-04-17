@@ -1,0 +1,142 @@
+(* --------------------------------------------------------------------
+ * Copyright (c) - 2012-2015 - IMDEA Software Institute and INRIA
+ * Distributed under the terms of the CeCILL-B licence.
+ * -------------------------------------------------------------------- *)
+
+(* -------------------------------------------------------------------- *)
+require import Option Pred Fun Int Real NewList.
+require (*ab*) FinType Subtype.
+
+pragma +Smt:lazy.
+
+(* -------------------------------------------------------------------- *)
+clone import FinType as Alphabet.
+
+op l : {int | 0 < l} as gt0_l.
+
+type word.
+
+clone include Subtype with
+  type T    <- t list,
+  type sT   <- word,
+  pred P xs <- size xs = l.
+
+(* -------------------------------------------------------------------- *)
+op "_.[_]" (w : word) (i : int): t = Array."_.[_]" (val w) i
+  axiomatized by selE.
+
+op "_.[_<-_]" w i x = insubd (Array."_.[_<-_]" (val w) i x)
+  axiomatized by updE.
+
+lemma wordP (w1 w2 : word):
+      w1 = w2
+  <=> forall (i:int), 0 <= i < l => w1.[i] = w2.[i].
+proof.
+  split=> //= h.
+  by apply/val_inj/Array.arrayP; rewrite !valP //= => i /h; rewrite !selE.
+qed.
+
+lemma sel_upd (w : word) (x : t) (i j : int):
+    w.[i <- x].[j]
+  = if 0 <= i < l /\ j = i then x else w.[j].
+proof.
+  rewrite !selE updE val_insubd Array.size_set valP /= -(valP w).
+  exact Array.get_set.
+qed.
+
+lemma upd_out (n : int) (a : t) (w : word):
+  n < 0 \/ l <= n =>
+  w.[n <- a] = w.
+proof.
+  move=> n_out_of_bounds; apply/wordP=> i i_in_bounds.
+  by rewrite sel_upd; smt.
+qed.
+
+lemma upd_upd (w : word) (n n' : int) (x x' : t):
+  forall i,
+       w.[n <- x].[n' <- x'].[i]
+    =  if   n = n'
+       then w.[n' <- x'].[i]
+       else w.[n' <- x'].[n <- x].[i].
+proof.
+  case (n = n')=> [->> /= |].
+    move=> i; rewrite !sel_upd; case (i = n')=> //=.
+    by case (0 <= n' < l).
+  move=> ne_n_n' i; case (i = n')=> [->> /= {i} |].
+    by rewrite !sel_upd /= @(eq_sym n') ne_n_n'.
+  move=> ne_i_n'; case (i = n)=> [->> /= {i} |].
+    by rewrite !sel_upd /= ne_n_n'.
+  by move=> ne_i_n; rewrite !sel_upd ne_i_n ne_i_n'.
+qed.
+
+lemma upd_upd_eq (w : word) (n : int) (x x' : t):
+  forall i, w.[n <- x].[n <- x'].[i] = w.[n <- x'].[i].
+proof. by move=> i; rewrite upd_upd. qed.
+
+(* -------------------------------------------------------------------- *)
+op mkword f: word = insubd (mkseq f l)
+  axiomatized by mkwordE.
+
+lemma sel_mkword f i: 0 <= i < l => (mkword f).[i] = f i.
+proof.
+  by move=> i_bnd; rewrite mkwordE selE val_insubd size_mkseq; smt.
+qed.
+
+(* -------------------------------------------------------------------- *)
+op map (f: t -> t) (w : word): word = insubd (map f (val w))
+  axiomatized by mapE.
+
+lemma sel_map f w i: 0 <= i < l => (map f w).[i] = f w.[i].
+proof.
+  move=> i_bnd; rewrite mapE !selE val_insubd size_map valP /=.
+  by rewrite !Array.getE; apply/nth_map; rewrite valP.
+qed.
+
+(* -------------------------------------------------------------------- *)
+op map2 (f: t -> t -> t) (w1 w2 : word): word =
+  mkword (fun i => f w1.[i] w2.[i])
+  axiomatized by map2E.
+
+lemma sel_map2 f w1 w2 i: 0 <= i < l =>
+  (map2 f w1 w2).[i] = f w1.[i] w2.[i].
+proof. by move=> i_in_bounds; rewrite map2E sel_mkword. qed.
+
+(* -------------------------------------------------------------------- *)
+(** TODO: Prove that the resulting type is finite. This can be done by
+    defining the encoding function into int and prove that it is
+    upper-bounded by `(size elts)^l`. **)
+clone include FinType with
+  type t    <- word
+(*op   elts <- map (from_int) (_iota 0 (Alphabet.cardinality)^l)
+proof * by smt *).
+
+axiom word_card: cardinality = Alphabet.cardinality^l.
+
+(* -------------------------------------------------------------------- *)
+(** TODO: Figure out what cloning support is needed to allow this to
+    be defined in a separate file whilst permitting gradual
+    specification. **)
+theory DWord.
+  op dword : word distr. (* uniform distribution on finiteness witness *)
+
+  (** This then becomes a lemma **)
+  axiom muP p: mu dword p = (size (filter p elts))%r/cardinality%r.
+
+  lemma muxP w: mu dword (pred1 w) = 1%r/cardinality%r.
+  proof.
+    by rewrite muP size_filter count_uniq_mem 1:elts_uniq// elts_univ.
+  qed.
+
+  lemma dword_ll: mu dword predT = 1%r.
+  proof.
+    rewrite muP filter_predT /cardinality.
+    have: 0 < size elts.
+      apply/(absurd true)=> //.
+      rewrite -lezNgt=> le0_size /=.
+      have:= elts_univ witness.
+      have ->: elts = []
+        by apply/size_eq0; smt.
+      by rewrite in_nil.
+    smt:full.
+  qed.
+end DWord.
