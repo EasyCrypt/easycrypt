@@ -129,11 +129,11 @@ theory BigComoid.
   qed.
 
   lemma nosmt big_filter_cond r P1 P2 (F : 'a -> comoid):
-    big (filter P1 r) P2 F = big r (P1 /\ P2) F.
+    big (filter P1 r) P2 F = big r (predI P1 P2) F.
   proof.
     rewrite -big_filter -(big_filter r); congr=> //.
     rewrite -filter_predI; apply eq_filter=> x.
-    by rewrite !And_and andC.
+    by rewrite /predI andC.
   qed.
 
   lemma nosmt big_hasC r P (F : 'a -> comoid):

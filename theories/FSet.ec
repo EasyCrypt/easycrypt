@@ -492,28 +492,28 @@ proof.
 qed.
 
 lemma filter_filter_inter (P:'a -> bool) (X:'a set):
-  filter P X = filter (P /\ (fun x, mem x X)) X.
+  filter P X = filter (predI P (fun x, mem x X)) X.
 proof.
   by apply set_ext=> x; rewrite !mem_filter; smt.
 qed.
 
 lemma filter_cpTrue (X:'a set):
-  filter True X = X.
+  filter predT X = X.
 proof.
 by apply set_ext=> x; rewrite mem_filter.
 qed.
 
 lemma filter_cpEq_in (x:'a) (X:'a set):
-  mem x X => filter ((=) x) X = single x.
+  mem x X => filter (pred1 x) X = single x.
 proof.
 intros=> x_in_X; apply set_ext=> x';
 rewrite mem_filter; case (x = x').
   by intros=> <-; simplify; split=> _ //; apply mem_single_eq.
-  by rewrite eq_sym => x_x'; simplify; apply mem_single_neq.
+  by rewrite eq_sym; move=> x'_x; rewrite x'_x /= mem_single_neq.
 qed.
 
 lemma card_filter_cpEq (x:'a) (X:'a set):
-  mem x X => card (filter ((=) x) X) = 1.
+  mem x X => card (filter (pred1 x) X) = 1.
 proof.
 by intros=> x_in_X; rewrite filter_cpEq_in ?card_single.
 qed.
@@ -705,7 +705,7 @@ lemma sub_leq (A B:'a set): sub A B <= A.
 proof. by move=> x; rewrite mem_sub. qed.
 
 lemma sub_filter (A B:'a set):
-  sub A B = filter (!(fun x, mem x B)) A.
+  sub A B = filter (predC (fun x, mem x B)) A.
 proof. by apply set_ext=> x; rewrite mem_sub mem_filter. qed.
 
 lemma sub_inter (A B:'a set):
@@ -713,7 +713,7 @@ lemma sub_inter (A B:'a set):
 proof.
   rewrite (sub_filter _ (inter A B)) filter_filter_inter.
   rewrite sub_filter filter_filter_inter.
-  rewrite /Pred.([!]) /Pred.(/\).
+  rewrite /predC /predI.
   congr; apply fun_ext=> x //=.
   rewrite mem_inter.
   smt.
@@ -865,18 +865,18 @@ lemma mu_cpMem_le (s:'a set): forall (d:'a distr) (bd:real),
 proof.
   elim/set_ind s.
     intros d bd Hmu_x.
-    rewrite (mu_eq d _ Pred.False).
-      by intros x;rewrite /cpMem /False /= neqF;apply mem_empty.
+    rewrite (mu_eq d _ pred0).
+      by intros x;rewrite neqF;apply mem_empty.
     by rewrite mu_false card_empty //.
   intros x s Hnmem IH d bd Hmu_x.
   rewrite (_: (card (add x s))%r * bd = 
           bd + (card s)%r * bd).
     by rewrite card_add_nin //=; smt.
-  rewrite (mu_eq d _ (((=) x) \/ (cpMem s))).
-    by intros z;rewrite /cpMem /Pred.(\/) mem_add -orbC (eq_sym z).
+  rewrite (mu_eq d _ (predU (pred1 x) (cpMem s))).
+    by intros z;rewrite /cpMem mem_add orbC.
   rewrite mu_disjoint.
-   by rewrite /Pred.(/\) /Pred.(\/) /False /cpMem => z /=;smt.
-  (cut ->: (mu d ((=) x) = mu_x d x)) => //.
+   by rewrite /predI /predU /cpMem => z /=;smt.
+  (cut ->: (mu d (pred1 x) = mu_x d x)) => //.
   apply addleM.
     by apply Hmu_x; first rewrite mem_add.   
   by apply (IH _ bd) => //;intros z Hz;apply Hmu_x;rewrite mem_add;left.
@@ -888,18 +888,18 @@ lemma mu_cpMem_ge (s:'a set): forall (d:'a distr) (bd:real),
 proof.
   elim/set_ind s.
     intros d bd Hmu_x.
-    rewrite (mu_eq d _ False).
+    rewrite (mu_eq d _ pred0).
       by intros x;rewrite /cpMem /False /= neqF;apply mem_empty.
     by rewrite -le_ge mu_false card_empty //.
   intros x s Hnmem IH d bd Hmu_x.
   rewrite (_: (card (add x s))%r * bd = 
           bd + (card s)%r * bd);
     first by rewrite card_add_nin //=; smt.
-  rewrite (mu_eq d _ (((=) x) \/ (cpMem s))).
-    by intros z;rewrite /cpMem /Pred.(\/) mem_add -orbC (eq_sym z).
+  rewrite (mu_eq d _ (predU (pred1 x) (cpMem s))).
+    by intros z;rewrite /cpMem /predU mem_add -orbC (eq_sym z).
   rewrite mu_disjoint.
-   by rewrite /Pred.(/\) /Pred.(\/) /False /cpMem => z /=;smt.
-  (cut ->: (mu d ((=) x) = mu_x d x)) => //.
+   by rewrite /predI /predU /pred0 /cpMem => z /=;smt.
+  (cut ->: (mu d (pred1 x) = mu_x d x)) => //.
   apply addgeM.
     by apply Hmu_x; first rewrite mem_add.   
   by apply (IH _ bd) => //;intros z Hz;apply Hmu_x;rewrite mem_add;left.
@@ -937,7 +937,7 @@ lemma mu_Lmem_le_length (l:'a list) (d:'a distr) (bd:real):
   mu d (fun x, List.mem x l) <= (length l)%r * bd. 
 proof.
   elim/list_case l.
-    intros=> _ //=; rewrite (mu_eq _ _ False).
+    intros=> _ //=; rewrite (mu_eq _ _ pred0).
       by intros=> x; rewrite /False //=.
     by rewrite mu_false.
   intros x l0 Hmu.
@@ -1029,8 +1029,8 @@ theory Dinter_uni.
     mu (dinter i j) (fun x, i <= x <= j) = 1%r.
   proof.
   by intros=> H;
-     rewrite -(mu_eq_support (dinter i j) True);
-     try (apply fun_ext; rewrite /Pred.(/\)); smt.
+     rewrite -(mu_eq_support (dinter i j) predT);
+     try (apply fun_ext; rewrite /predI); smt.
   qed.
 end Dinter_uni.
 

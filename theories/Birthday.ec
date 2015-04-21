@@ -19,7 +19,7 @@ axiom lt0q: 0 < q.
 type T.
 
 op uT: T distr.
-axiom uT_ll: mu uT True = 1%r.
+axiom uT_ll: mu uT predT = 1%r.
 axiom uT_uf: isuniform uT.
 axiom uT_fu (x:T): in_supp x uT.
 
@@ -125,8 +125,8 @@ section.
       proc; sp; if=> //; last by (hoare; auto; smt).
       wp; rnd (fun x, mem x Sample.l); skip=> //=.
       progress.
-        cut:= FSet.mu_Lmem_le_length (Sample.l{hr}) uT (mu uT ((=) witness)) _.
-        move=> x _; rewrite /mu_x; cut: mu uT ((=) x) = mu uT ((=) witness); last smt.
+        cut:= FSet.mu_Lmem_le_length (Sample.l{hr}) uT (mu uT (pred1 witness)) _.
+        move=> x _; rewrite /mu_x; cut: mu uT (pred1 x) = mu uT (pred1 witness); last smt.
         by apply uT_uf; apply uT_fu.
         by rewrite -/List."`|_|"; smt.
         by move: H4; rewrite unique_cons H0.
@@ -247,8 +247,8 @@ section.
       proc; sp; if=> //; last by (hoare; auto; smt).
       wp; rnd (fun x, mem x Sample.l); skip=> //=.
       progress.
-        cut:= FSet.mu_Lmem_le_length (Sample.l{hr}) uT (mu uT ((=) witness)) _.
-        move=> x _; rewrite /mu_x; cut: mu uT ((=) x) = mu uT ((=) witness); last smt.
+        cut:= FSet.mu_Lmem_le_length (Sample.l{hr}) uT (mu uT (pred1 witness)) _.
+        move=> x _; rewrite /mu_x; cut: mu uT (pred1 x) = mu uT (pred1 witness); last smt.
         by apply uT_uf; apply uT_fu.
         by rewrite -/List."`|_|"; smt.
         by move: H4; rewrite unique_cons H0.

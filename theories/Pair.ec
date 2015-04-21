@@ -36,7 +36,7 @@ theory Dprod.
      mu_x (d1 * d2) p = mu_x d1 (fst p) * mu_x d2 (snd p).
   proof strict.
   do 3!rewrite /mu_x; rewrite -mu_def.
-  by apply mu_eq => x;smt.
+  by apply mu_eq; rewrite pred1E => x;smt.
   qed.
 
   lemma supp_def (d1:'a distr) (d2:'b distr) p:
@@ -94,12 +94,12 @@ theory Dprod.
      cut ->: Pr[S.sample() @ &m1: a = res] = mu (d1*d2) ((=) a).
       byphoare (_: true ==> a = res)=> //.
       by proc; rnd; skip; rewrite eqL.
-     apply eq_sym; cut := mu_x_def d1 d2 a. rewrite /mu_x => ->.
+     apply eq_sym; cut := mu_x_def d1 d2 a. rewrite /mu_x pred1E=> ->.
      elim /tuple2_ind a => a a1 a2 _;rewrite /fst /snd /=.
      byphoare (_: true ==>  a1 = res.`1 /\ a2 = res.`2) => //;last by smt.
      proc; seq 1 : (a1 = r1) (mu_x d1 a1) (mu_x d2 a2) _ 0%r true => //.
-       by rnd ((=) a1);auto.
-       by rnd ((=) a2);auto.
+       by rnd ((=) a1); auto; rewrite -(pred1E a1).
+       by rnd ((=) a2); auto; rewrite -(pred1E a2).
      hoare;auto;smt.
     qed.
 

@@ -275,9 +275,9 @@ lemma filter_predT (s : 'a list): filter predT s = s.
 proof. by elim s => //= x s ->. qed.
 
 lemma filter_predI (p1 p2 : 'a -> bool) (s : 'a list):
-  filter (p1 /\ p2) s = filter p1 (filter p2 s).
+  filter (predI p1 p2) s = filter p1 (filter p2 s).
 proof.
-  elim s => //= x s IHs; rewrite IHs /Pred.(/\).
+  elim s => //= x s IHs; rewrite IHs /predI.
   by case (p2 x) => //=; case (p1 x) => //=.
 qed.
 

@@ -216,10 +216,11 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt bigID (P : 'a -> bool) (F : 'a -> t) (a : 'a -> bool) s:
-  sum P F s = sum (P /\ a) F s + sum (P /\ !a) F s.
+  sum P F s = sum (predI P a) F s + sum (predI P (predC a)) F s.
 proof.
   rewrite !@(big_mkcond _ F) -big_split /(/\) /[!].
-  by apply/eq_bigr => i _ /=; case: (a i); rewrite ?addm0 ?add0m.
+  apply/eq_bigr => i _ /=.
+  by rewrite /predI /predC; case: (a i); rewrite ?addm0 ?add0m.
 qed.
 
 (* -------------------------------------------------------------------- *)

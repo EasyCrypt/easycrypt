@@ -373,16 +373,16 @@ qed.
 
 pred cpOrs (X:(('a -> bool)) set) (x:'a) = Mbor.sum (fun (P:('a -> bool)), P x) X.
 
-lemma cpOrs0 : cpOrs (empty <:('a -> bool)>) = False.
+lemma cpOrs0 : cpOrs (empty <:('a -> bool)>) = pred0.
 proof -strict.
   by apply fun_ext => y;rewrite /cpOrs Mbor.sum_empty.
 qed.
 
 lemma cpOrs_add s (p:('a -> bool)) : 
-  cpOrs (FSet.add p s) = (p \/ (cpOrs s)).
+  cpOrs (FSet.add p s) = (predU p (cpOrs s)).
 proof -strict.
   apply fun_ext => y.
-  rewrite /cpOrs /Pred.(\/) /= !or_exists eq_iff;split=> /=.
+  rewrite /cpOrs /predU /= !or_exists eq_iff;split=> /=.
     intros [x ];rewrite FSet.mem_add => [ [ ] H H0];first by right;exists x.
     by left;rewrite -H.
   intros [H | [x [H1 H2]]];first by exists p;rewrite FSet.mem_add.
@@ -396,7 +396,7 @@ proof strict.
   elim/set_ind X.
     by intros disj;rewrite Mrplus.sum_empty cpOrs0 mu_false.
   intros f X f_nin_X IH disj; rewrite Mrplus.sum_add // cpOrs_add mu_disjoint.
-    rewrite /Pred.(/\) /False=> x' /=;
+    rewrite /predI /pred0=> x' /=;
       rewrite -not_def=> [f_x']; generalize f_nin_X disj .
     rewrite /cpOrs or_exists => Hnm Hd [p [Hp]] /=.
     by apply (Hd f p) => //; smt.
@@ -417,7 +417,7 @@ proof strict.
   pose sup := ISet.Finite.toFSet (ISet.create (support d)).
   pose is  := img (fun x y, p x /\ x = y) sup.
   rewrite mu_support (mu_eq d _ (cpOrs is)).
-    intros y;rewrite /Pred.(/\) /is /cpOrs /= or_exists eq_iff;split.
+    intros y;rewrite /predI /is /cpOrs /= or_exists eq_iff;split.
       intros [H1 H2];exists ((fun x0 y0, p x0 /\ x0 = y0) y);split => //.
       by apply mem_img;rewrite /sup ISet.Finite.mem_toFSet // ISet.mem_create.
     intros [p' []].
@@ -430,9 +430,9 @@ proof strict.
     by rewrite img_empty !Mrplus.sum_empty.
   intros x s Hnm Hrec;rewrite FSet.img_add Mrplus.sum_add0.
     rewrite img_def /= => [x0 [H1 H2]].
-    by rewrite (mu_eq d _ False) //;smt.
+    by rewrite (mu_eq d _ pred0) //;smt.
   rewrite Mrplus.sum_add // -Hrec /=; congr => //.
   rewrite /charfun /mu_x;case (p x) => //= Hp.
-    by apply mu_eq.       
+    by apply mu_eq; rewrite pred1E.
   by rewrite -(mu_false d);apply mu_eq.
 qed.

@@ -73,7 +73,7 @@ theory Lazy.
   proof. by proc; wp. qed.
 
   lemma RO_o_ll:
-    (forall x, mu (dsample x) True = 1%r) =>
+    (forall x, mu (dsample x) predT = 1%r) =>
     islossless RO.o.
   proof. by intros=> dsampleL; proc; auto; smt. qed.
 
@@ -138,7 +138,7 @@ theory Eager.
 
   lemma RO_init_ll:
     finite univ<:from> =>
-    (forall x, mu (dsample x) True = 1%r) =>
+    (forall x, mu (dsample x) predT = 1%r) =>
     islossless RO.init.
   proof.
     move=> fType dsampleL; proc.
@@ -237,7 +237,7 @@ theory LazyEager.
 
     local lemma IND_Lazy:
       finite univ<:from> =>
-      (forall x, mu (dsample x) True = 1%r) =>
+      (forall x, mu (dsample x) predT = 1%r) =>
       equiv [IND(Lazy.RO,D).main ~ IND_Lazy.main: ={glob D} ==> ={res}].
     proof.
       move=> fromF dsampleL; proc; seq 2 2: (={b}).
@@ -289,7 +289,7 @@ theory LazyEager.
 
     local lemma eager_query:
       finite univ<:from> =>
-      (forall x, mu (dsample x) True = 1%r) =>
+      (forall x, mu (dsample x) predT = 1%r) =>
       eager [IND_Eager.resample(); ,
                  IND_Eager.H.o ~ IND_Lazy.H.o,
              IND_Lazy.resample();:
@@ -364,7 +364,7 @@ theory LazyEager.
 
     local lemma eager_aux:
       finite univ<:from> =>
-      (forall x, mu (dsample x) True = 1%r) =>
+      (forall x, mu (dsample x) predT = 1%r) =>
       equiv [IND_Lazy.main ~ IND_Eager.main: ={glob D} ==> ={res}].
     proof.
       move=> fromF dsampleL; proc; inline IND_Lazy.H.init.
@@ -381,7 +381,7 @@ theory LazyEager.
 
     local lemma IND_Eager:
       finite univ<:from> =>
-      (forall x, mu (dsample x) True = 1%r) =>
+      (forall x, mu (dsample x) predT = 1%r) =>
       equiv [IND_Eager.main ~ IND(Eager.RO,D).main: ={glob D} ==> ={res}].
     proof.
       move=> fromF dsampleL; proc.
@@ -397,7 +397,7 @@ theory LazyEager.
 
     lemma eagerRO:
       finite univ<:from> =>
-      (forall x, mu (dsample x) True = 1%r) =>
+      (forall x, mu (dsample x) predT = 1%r) =>
       equiv [IND(Lazy.RO,D).main ~ IND(Eager.RO,D).main: ={glob D} ==> ={res}].
     proof.
       move=> fromF dsampleL; bypr (res{1}) (res{2})=> // &1 &2 a eq_D.
@@ -612,7 +612,7 @@ theory ROM_BadCall.
   type to.
 
   op dsample: from -> to distr.
-  axiom dsampleL x: mu (dsample x) True = 1%r.
+  axiom dsampleL x: mu (dsample x) predT = 1%r.
 
   op qH:int.
 
@@ -832,7 +832,7 @@ theory ROM_Bad.
   type to.
 
   op dsample: from -> to distr.
-  axiom dsampleL x: mu (dsample x) True = 1%r.
+  axiom dsampleL x: mu (dsample x) predT = 1%r.
 
   op qH:int.
   axiom qH_pos: 0 < qH.

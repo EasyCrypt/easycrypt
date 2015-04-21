@@ -582,7 +582,7 @@ theory Darray.
   proof strict.
   rewrite /mu_x=> len_neg; case (x = empty).
     by intros=> ->; rewrite mu_neg.
-    by rewrite mu_neg // /charfun -neqF=> ->.
+    by rewrite mu_neg// /charfun pred1E=> ->.
   qed.
 
   lemma supp_neg (len:int) (d:'a distr) (x:'a array):

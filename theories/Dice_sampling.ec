@@ -70,7 +70,7 @@ theory GenDice.
           seq 2 : (k = r0) bd 1%r 1%r 0%r (r0 = r /\ i = i0) => //.
             by wp;rnd => //.
             wp;rnd;skip;progress => //. 
-            rewrite /bd /mu_x;apply mu_eq => w' //.
+            by rewrite /bd /mu_x pred1E; apply mu_eq => w' //.
             by conseq * Hw; progress => //; rewrite Htk.
           by hoare; conseq* (_: _ ==> true)=> //; smt.
         (* bounding pr : ! k = r0 /\ k = r *)
@@ -116,7 +116,8 @@ theory GenDice.
   proof.
     intros i0 k &m; byphoare (_: i0 = i ==> k = res) => //;proc.
     rnd;skip;progress.
-    by apply (mu_eq (d' i{hr}) (fun (x:t'), k = x) ((=) k)).
+    apply/(mu_eq (d' i{hr}) (fun x => k = x) (pred1 k)).
+    by rewrite pred1E.
   qed.
 
   equiv Sample_RsampleW (f : t' -> t) (finv : t -> t') : 

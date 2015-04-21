@@ -249,9 +249,9 @@ proof.
 qed.
 
 lemma find_nin (p:'a -> bool) (xs:'a list):
-  all (!p) xs <=> find p xs = None.
+  all (predC p) xs <=> find p xs = None.
 proof.
-  rewrite -allb_all /Pred.([!]); elim xs=> //= x xs IH.
+  rewrite -allb_all /predC; elim xs=> //= x xs IH.
   by case (p x).
 qed.
 

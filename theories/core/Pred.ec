@@ -5,82 +5,116 @@
 
 require export ExtEq.
 
+pragma +Smt:lazy.
+
 (*** Working with predicates *)
-(** Inclusion order *)
-pred (<=) (p q:'a -> bool) =
+(** Lifting boolean operators to predicates *)
+op pred0  ['a] = fun (x : 'a) => false.
+op predT  ['a] = fun (x : 'a) => true.
+op predI  ['a] = fun (p1 p2 : 'a -> bool) x => p1 x /\ p2 x.
+op predU  ['a] = fun (p1 p2 : 'a -> bool) x => p1 x \/ p2 x.
+op predC  ['a] = fun (p : 'a -> bool) x => ! (p x).
+op predD  ['a] = fun (p1 p2 : 'a -> bool) x => !p2 x /\ p1 x.
+
+op pred1  ['a] = fun (c x : 'a) => x = c.
+op predU1 ['a] = fun (c : 'a) (p : 'a -> bool) (x : 'a) => x = c \/ p x.
+op predC1 ['a] = fun (c : 'a) (x : 'a) => x <> c.
+op predD1 ['a] = fun (p : 'a -> bool) (c : 'a) (x : 'a) => x <> c /\ p x.
+
+(** Relations **) (* TODO: Should relation stuff be pushed out into a separate file? *)
+op relU   ['a,'b] = fun (r1 r2 : 'a -> 'b -> bool) x y => r1 x y \/ r2 x y.
+
+(** Subpredicate *)
+pred (<=) (p q:'a -> bool) = (* subpred *)
   forall a, p a => q a.
 
-pred (< ) (p q:'a -> bool) =
+pred (< ) (p q:'a -> bool) = (* proper *)
   p <= q /\ !(q <= p).
 
-lemma nosmt leq_refl (X Y:'a -> bool):
-  X = Y => X <= Y
+(* Lemmas on inclusion *)
+lemma nosmt subpred_eqP (p1 p2 : 'a -> bool):
+  (forall x, p1 x <=> p2 x) <=> (p1 <= p2 /\ p2 <= p1)
 by [].
 
-lemma nosmt leq_asym (X Y:'a -> bool):
+lemma nosmt subpred_refl (X : 'a -> bool): X <= X
+by [].
+
+lemma nosmt subpred_asym (X Y:'a -> bool):
   X <= Y => Y <= X => X = Y
 by (rewrite -fun_ext; smt).
 
-lemma nosmt leq_tran (X Y Z:'a -> bool):
+lemma nosmt subpred_trans (X Y Z:'a -> bool):
   X <= Y => Y <= Z => X <= Z
 by [].
 
-lemma nosmt subpred_eqP (p1 p2 : 'a -> bool):
-  (forall x, p1 x <=> p2 x) <=> (p1 <= p2 /\ p2 <= p1).
-proof. smt. qed.
+(** Subrelation *)
+pred subrel (r1 r2 : 'a -> 'b -> bool) = forall x y, r1 x y => r2 x y.
 
-(** Lifting boolean operators to predicates *)
-op pred1  ['a] (c : 'a) = fun (x : 'a), x = c.
-op predT  ['a] = fun (x : 'a), true.
-op pred0  ['a] = fun (x : 'a), false.
-op predC  ['a] (P : 'a -> bool) = fun (x : 'a), ! (P x).
-op predC1 ['a] (c : 'a) = fun (x : 'a), x <> c.
-op predD1 ['a] (P : 'a -> bool) (c : 'a) = fun (x : 'a), x <> c /\ P x.
+(* Lemmas on relation inclusion *)
+lemma nosmt subrel_eqP (r1 r2 : 'a -> 'b -> bool):
+  (forall x y, r1 x y <=> r2 x y) <=> (subrel r1 r2 /\ subrel r2 r1)
+by [].
 
-op True   = fun (x:'a), true.
-op False  = fun (x:'a), false.
+lemma nosmt subrel_refl (r : 'a -> 'b -> bool): subrel r r
+by [].
 
-op [!]  (P:'a -> bool)  : 'a -> bool = fun x, !P x.
-op (/\) (P Q:'a -> bool): 'a -> bool = fun x, P x /\ Q x.
-op (\/) (P Q:'a -> bool): 'a -> bool = fun x, P x \/ Q x.
-
-(** Lemmas *)
-(* True *)
-lemma True_true (x:'a): True x by done.
-
-lemma True_unique (p:'a -> bool): (forall x, p x) => p = True.
-proof strict.
-by rewrite -fun_ext=> px x; rewrite px.
+lemma nosmt subrel_asym (r1 r2 : 'a -> 'b -> bool):
+  subrel r1 r2 => subrel r2 r1 => r1 = r2.
+proof.
+  move=> subrel_r1_r2 subrel_r2_r1.
+  (* Binary Extensional Equality *)
+  apply/fun_ext=> x.
+  apply/fun_ext=> y.
+  smt.
 qed.
 
-(* False *)
-lemma False_false (x:'a): !False x by [].
+lemma nosmt subrel_trans (r2 r1 r3 : 'a -> 'b -> bool):
+  subrel r1 r2 => subrel r2 r3 => subrel r1 r3
+by [].
 
-lemma False_unique (p:'a -> bool): (forall x, !p x) => p = False.
-proof strict.
-by rewrite -fun_ext=> px x; rewrite /False neqF px.
-qed.
+(** Lemmas **)
+(* The 'P' lemmas are not useful in our case. *)
+lemma pred1E (c : 'a) : pred1 c = ((=) c).
+proof. by apply fun_ext=> x; rewrite (eq_sym c). qed.
 
-(* Not *)
-lemma Not_not (p:'a -> bool) x: (!p) x <=> !p x by [].
+lemma predU1l (x y : 'a) b : x = y => (x = y) \/ b
+by [].
 
-(* And *)
-lemma And_and (p q:'a -> bool) x: (p /\ q) x <=> (p x /\ q x) by [].
+lemma predU1r (x y : 'a) b : b => (x = y) \/ b
+by [].
 
-lemma And_leq_l (p q:'a -> bool): (p /\ q) <= p by [].
+lemma eqVneq (x y : 'a) : x = y \/ x <> y
+by [].
 
-lemma And_leq_r (p q:'a -> bool): (p /\ q) <= q by [].
+lemma predIC (p1 p2 : 'a -> bool) : predI p1 p2 = predI p2 p1.
+proof. by apply fun_ext=> x; rewrite /predI andC. qed.
 
-(* Or *)
-lemma Or_or (p q:'a -> bool) x: (p \/ q) x <=> (p x \/ q x) by [].
+lemma predCpredI (p : 'a -> bool) : predI (predC p) p = pred0.
+proof. by apply fun_ext=> x /=; case (p x); delta=> ->. qed. (* delta *)
 
-lemma Or_geq_l (p q:'a -> bool): p <= (p \/ q) by [].
+lemma predCpredU (p : 'a -> bool) : predU (predC p) p = predT.
+proof. by apply fun_ext=> x /=; case (p x); delta=> ->. qed. (* delta *)
 
-lemma Or_geq_r (p q:'a -> bool): q <= (p \/ q) by [].
+lemma nosmt subpredUl (p1 p2 : 'a -> bool):
+  p1 <= predU p1 p2
+by [].
 
-(* Lifting useful results on booleans to predicates *)
-lemma Excluded_Middle (p:'a -> bool): ((!p) \/ p) = True
-by (apply fun_ext; smt).
+lemma nosmt subpredUr (p1 p2 : 'a -> bool):
+  p2 <= predU p1 p2
+by [].
 
-lemma Sound (p:'a -> bool): ((!p) /\ p) = False
-by (apply fun_ext; smt).
+lemma nosmt predIsubpredl (p1 p2 : 'a -> bool):
+  predI p1 p2 <= p1
+by [].
+
+lemma nosmt predIsubpredr (p1 p2 : 'a -> bool):
+  predI p1 p2 <= p2
+by [].
+
+lemma nosmt subrelUl (r1 r2 : 'a -> 'b -> bool):
+  subrel r1 (relU r1 r2)
+by [].
+
+lemma nosmt subrelUr (r1 r2 : 'a -> 'b -> bool):
+  subrel r2 (relU r1 r2)
+by [].
