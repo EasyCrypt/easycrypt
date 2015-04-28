@@ -550,6 +550,7 @@ let check_alpha_equal ri hyps f1 f2 =
   let check_xp env subst xp1 xp2 =
     let xp2 = EcPath.x_substm subst.fs_sty.ts_p subst.fs_mp xp2 in
     ensure (EqTest.for_xp_norm env xp1 xp2) in
+
   let check_s env s s1 s2 =
     let es = e_subst_init s.fs_freshen s.fs_sty.ts_p s.fs_ty Mp.empty s.fs_mp in
     let s2 = EcModules.s_subst es s2 in
@@ -689,12 +690,39 @@ let rec simplify ri hyps f =
 
 and simplify_rec ri hyps f =
   match f.f_node with
+
   | Fapp ({ f_node = Fop _ } as fo, args) -> 
       let args' = List.map (simplify ri hyps) args in
       let app1  = (fo, args , f.f_ty) in
       let app2  = (fo, args', f.f_ty) in
       let f'    =  EcFol.FSmart.f_app (f, app1) app2 in
       (try h_red ri hyps f' with NotReducible -> f')
+
+  | Fapp({f_node = Fop _} as fo, args) -> 
+      let f' = f_app fo (List.map (simplify ri hyps) args) f.f_ty in
+      (try h_red ri hyps f' with NotReducible -> f')
+
+  | FhoareF hf when ri.modpath -> 
+      let hf_f = EcEnv.NormMp.norm_xfun (LDecl.toenv hyps) hf.hf_f in
+      f_map (fun ty -> ty) (simplify ri hyps) (f_hoareF_r { hf with hf_f })
+
+  | FbdHoareF hf when ri.modpath ->
+      let bhf_f = EcEnv.NormMp.norm_xfun (LDecl.toenv hyps) hf.bhf_f in
+      f_map (fun ty -> ty) (simplify ri hyps) (f_bdHoareF_r { hf with bhf_f })
+
+  | FequivF ef when ri.modpath -> 
+      let ef_fl = EcEnv.NormMp.norm_xfun (LDecl.toenv hyps) ef.ef_fl in
+      let ef_fr = EcEnv.NormMp.norm_xfun (LDecl.toenv hyps) ef.ef_fr in
+      f_map (fun ty -> ty) (simplify ri hyps) (f_equivF_r { ef with ef_fl; ef_fr; })
+
+  | FeagerF eg when ri.modpath ->
+      let eg_fl = EcEnv.NormMp.norm_xfun (LDecl.toenv hyps) eg.eg_fl in
+      let eg_fr = EcEnv.NormMp.norm_xfun (LDecl.toenv hyps) eg.eg_fr in
+      f_map (fun ty -> ty) (simplify ri hyps) (f_eagerF_r { eg with eg_fl ; eg_fr; })
+
+  | Fpr pr  when ri.modpath -> 
+      let pr_fun = EcEnv.NormMp.norm_xfun (LDecl.toenv hyps) pr.pr_fun } in
+      f_map (fun ty -> ty) (simplify ri hyps) (f_pr_r { pr with pr_fun })
 
   | _ -> f_map (fun ty -> ty) (simplify ri hyps) f
 
