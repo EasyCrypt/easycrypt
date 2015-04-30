@@ -4,6 +4,14 @@
 import sys, os, re, time, errno, itertools as it, StringIO as sio
 
 # --------------------------------------------------------------------
+MODES = dict(
+    raw        = False,
+    emacs      = False,
+    javascript = False,
+    latex      = False,
+    template   = True )
+
+# --------------------------------------------------------------------
 def _options():
     from optparse import OptionParser
 
@@ -12,12 +20,25 @@ def _options():
     parser.add_option(
         '-m', '--mode',
         default = 'raw',
-        help    = 'output mode (raw|emacs|javascript)')
+        help    = 'output mode (%s)' % '|'.join(MODES.keys()))
 
     (options, args) = parser.parse_args()
+    if ':' in options.mode:
+        options.mode = tuple(options.mode.split(':', 1))
+    else:
+        options.mode = (options.mode, None)
 
-    if options.mode not in ('raw', 'emacs', 'javascript', 'latex'):
-        parser.error("invalid mode: `%s'" % (options.mode,))
+    options.template = options.mode[1]
+    options.mode     = options.mode[0]
+
+    if options.mode not in MODES:
+        parser.error("invalid mode: `%s'" % (options.mode[0],))
+
+    if MODES[options.mode] is not (options.template is not None):
+        if MODES[options.mode]:
+            parser.error("this mode expects an argument")
+        else:
+            parser.error("this mode does not expect an argument")
 
     if len(args) != 0:
         parser.error('this program does not take any argument')
@@ -47,6 +68,17 @@ def _do_javascript(keywords, options):
     print 'var cKeywords = "%s"' % \
             (' '.join(sorted(set(it.chain(*keywords.values())))))
     print "// END"
+
+# --------------------------------------------------------------------
+def _do_template(keywords, options, template):
+    def _sub(m):
+        return '|'.join(sorted(keywords.get(m.group(1), [])))
+
+    with open(template, 'r') as stream:
+        template = stream.read()
+    template = re.sub(r'\$([a-zA-Z]+)', _sub, template)
+
+    sys.stdout.write(template)
 
 # --------------------------------------------------------------------
 def _do_latex(keywords, options):
@@ -97,8 +129,9 @@ def process():
 
     callback = '_do_%s' % (options.mode,)
     callback = getattr(sys.modules[__name__], callback)
+    args     = [] if options.template is None else [options.template]
 
-    callback(keywords, options)
+    callback(keywords, options, *args)
 
 # --------------------------------------------------------------------
 if __name__ == '__main__':
