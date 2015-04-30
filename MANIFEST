@@ -1,7 +1,7 @@
 Makefile
 Makefile.system
 MANIFEST
-README
+README.md
 COPYRIGHT
 
 # ocamlbuild configuration
