@@ -65,6 +65,7 @@ Opam can be easily installed from source or via your packages manager:
         LDFLAGS="-L/usr/local/lib"
 
 See [https://opam.ocaml.org/doc/Install.html] for how to install opam.
+
 See [https://opam.ocaml.org/doc/Usage.html] for how to initialize opam
 
 
