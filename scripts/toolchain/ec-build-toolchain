@@ -15,7 +15,7 @@ OBREW_URL=https://www.easycrypt.info/toolchain/ocamlbrew
 
 OPAM_VERSION=1.2.0
 OPAM_URL=https://github.com/ocaml/opam/releases/download/${OPAM_VERSION}/opam-full-${OPAM_VERSION}.tar.gz
-ECOPAM_URL=https://www.easycrypt.info/opam-${OPAM_VERSION}
+ECOPAM_URL=git://github.com/EasyCrypt/opam.git
 
 OCONFIG_BASE="ocaml-${OVERSION}/etc/ocamlbrew.bashrc"
 OCONFIG="${EC_TOOLCHAIN_ROOT}/${OCONFIG_BASE}"

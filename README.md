@@ -37,7 +37,7 @@ via the opam OCaml packages manager.
 
   1. Add the EasyCrypt repository:
 
-        $> opam repository add easycrypt https://ci.easycrypt.info/opam-1.2.0
+        $> opam repository add easycrypt git://github.com/EasyCrypt/opam.git
         $> opam update
         
   2. Add the EasyCrypt meta-packages:
