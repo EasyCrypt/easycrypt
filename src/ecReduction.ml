@@ -606,7 +606,7 @@ let check_alpha_equal ri hyps f1 f2 =
     | FhoareS hs1, FhoareS hs2 ->
       check_s env subst hs1.hs_s hs2.hs_s;
       (* FIXME should check the memenv *)
-      aux env subst hs1.hs_pr hs1.hs_pr;
+      aux env subst hs1.hs_pr hs2.hs_pr;
       aux env subst hs1.hs_po hs2.hs_po
 
     | FbdHoareF hf1, FbdHoareF hf2 ->
