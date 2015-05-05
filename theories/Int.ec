@@ -65,6 +65,9 @@ by [].
 lemma nosmt mulzDl (x y z : int): (x + y) * z = x * z + y * z
 by [].
 
+lemma subzE (x y : int): x - y = x + (- y)
+by [].
+
 (** Number theory *)
 (* TODO: I merged in some stray bits from NewList and this may appear to be in whatever order... it is. *)
 

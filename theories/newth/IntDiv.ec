@@ -9,7 +9,10 @@ pragma +Smt:lazy.
 require import Fun Int Ring. import Ring.IntID.
 
 (* -------------------------------------------------------------------- *)
-op (%%) : int -> int -> int.
+
+(* FIXME: re-add when old Int.ec is cleaned up *)
+(* op (%%) : int -> int -> int. *)
+
 op (%/) : int -> int -> int.
 
 axiom nosmt edivzP (m d : int):
@@ -56,5 +59,10 @@ proof. by move/emodn_eq /(_ 0). qed.
 lemma nosmt modzDl z1 z2 m: (z1 %% m + z2) %% m = (z1 + z2) %% m by admit.
 lemma nosmt modzDr z1 z2 m: (z1 + z2 %% m) %% m = (z1 + z2) %% m by admit.
 
-lemma nosmt modzMl z1 z2 m: ((z1 %% m) * z2) %% m = (z1 * z2) %% m by admit.
-lemma nosmt modzMr z1 z2 m: (z1 * (z2 %% m)) %% m = (z1 * z2) %% m by admit.
+lemma nosmt modzMml z1 z2 m: ((z1 %% m) * z2) %% m = (z1 * z2) %% m by admit.
+lemma nosmt modzMmr z1 z2 m: (z1 * (z2 %% m)) %% m = (z1 * z2) %% m by admit.
+
+lemma nosmt modzMl p d: (p * d) %% d = 0 by admit.
+lemma nosmt modzMr p d: (d * p) %% d = 0 by admit.
+
+lemma nosmt modzNm z m: (- (z %% m)) %% m = (-z) %% m by admit.

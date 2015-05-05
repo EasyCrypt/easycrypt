@@ -86,7 +86,7 @@ theory ComRing.
   lemma oner_neq0 : Self.one <> Self.zero by smt.
 
   lemma mulrA (x y z : zmod): x * (y * z) = (x * y) * z.
-  proof. by apply/asint_inj; rewrite !mulE modzMl modzMr mulzA. qed.
+  proof. by apply/asint_inj; rewrite !mulE modzMml modzMmr mulzA. qed.
 
   lemma mulrC (x y : zmod): x * y = y * x.
   proof. by apply/asint_inj; rewrite !mulE mulzC. qed.
@@ -97,6 +97,23 @@ theory ComRing.
   lemma mulrDl (x y z : zmod): (x + y) * z = (x * z) + (y * z).
   proof.
     apply/asint_inj; rewrite !(addE, mulE).
-    by rewrite !(modzMl, modzMr, modzDl, modzDr) mulzDl.
+    by rewrite !(modzMml, modzMmr, modzDl, modzDr) mulzDl.
   qed.
 end ComRing.
+
+(* -------------------------------------------------------------------- *)
+lemma inzmodAddHom (a, b : int):
+  inzmod (a + b) = inzmod a + inzmod b.
+proof. by apply/asint_inj; rewrite addE !inzmodK modzDr modzDl. qed.
+
+lemma inzmodMulHom (a, b : int):
+  inzmod (a * b) = inzmod a * inzmod b.
+proof. by apply/asint_inj; rewrite mulE !inzmodK modzMmr modzMml. qed.
+
+lemma inzmodOppHom (n:int):
+  inzmod (Int.([-]) n) = -( inzmod n).
+proof. by apply/asint_inj; rewrite oppE !inzmodK modzNm. qed.
+
+lemma inzmodMinusHom (a, b : int):
+  inzmod (a - b) = inzmod a + (- inzmod b).
+proof. by rewrite subzE inzmodAddHom inzmodOppHom. qed.
