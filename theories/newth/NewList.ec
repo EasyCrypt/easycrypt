@@ -69,6 +69,12 @@ lemma behead_cons (x : 'a) xs: behead (x :: xs) = xs.
 proof. by []. qed.
 
 (* -------------------------------------------------------------------- *)
+lemma head_behead (xs : 'a list) z0:
+  xs <> [] =>
+  (head z0 xs) :: (behead xs) = xs.
+proof. by elim xs. qed.
+
+(* -------------------------------------------------------------------- *)
 (*                    Sequence catenation "cat"                         *)
 (* -------------------------------------------------------------------- *)
 op (++) (s1 s2 : 'a list) =
@@ -201,6 +207,14 @@ proof. by []. qed.
 lemma mem_behead (s : 'a list):
   forall x, mem (behead s) x => mem s x.
 proof. by move=> x; case: s => //= y s ->. qed.
+
+lemma mem_head_behead z0 (s : 'a list):
+  s <> [] =>
+  forall x, (x = (head z0 s) \/ mem (behead s) x) <=> mem s x.
+proof.
+  move=>/head_behead h; rewrite -(h z0) head_cons behead_cons.
+  by move=> x; rewrite in_cons.
+qed.
 
 lemma mem_seq1 (x y : 'a): mem [y] x <=> (x = y).
 proof. by []. qed.
