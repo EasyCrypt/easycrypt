@@ -26,6 +26,20 @@ lemma econgr1 ['a 'b] (f g : 'a -> 'b) x y: f == g => x = y => f x = g y.
 proof. by move/fun_ext=> -> ->. qed.
 
 (* -------------------------------------------------------------------- *)
+pred (===) (f g : 'a -> 'b -> 'c) = forall x y, f x y = g x y.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt f2refl  (f     : 'a -> 'b -> 'c): f === f by [].
+lemma nosmt f2sym   (f g   : 'a -> 'b -> 'c): f === g => g === f by [].
+lemma nosmt f2trans (f g h : 'a -> 'b -> 'c): f === g => g === h => f === h by [].
+
+lemma rel_ext (f g : 'a -> 'b -> 'c) : f = g <=> f === g.
+proof.
+  split=> //= fg; apply/fun_ext=>x; apply/fun_ext=>y.
+  by rewrite fg.
+qed.
+
+(* -------------------------------------------------------------------- *)
 lemma eqL (x:'a): (fun y => x = y) = (=) x.
 proof. by apply fun_ext. qed.
 
