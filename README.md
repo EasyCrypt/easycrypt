@@ -127,6 +127,9 @@ We do NOT provide an automated way to install provers.
 
 ### On Win32
 
+WARNING: wodi is no more maintained. We are thinking on a new
+way of installing EasyCrypt requirements on Windows.
+
 WARNING: the instructions are given for the 32bit version of
 cygwin. Replace 32- by 64- if you are using the 64bit version.
 
