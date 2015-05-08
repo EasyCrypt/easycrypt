@@ -9,6 +9,8 @@
 (* -------------------------------------------------------------------- *)
 require import Fun Pred Option Pair Int.
 
+pragma +Smt:lazy.
+
 (* -------------------------------------------------------------------- *)
 type 'a list = [
   | "[]"
@@ -546,7 +548,7 @@ qed.
 op rot n (s : 'a list) = drop n s ++ take n s.
 
 lemma rot0 (s : 'a list): rot 0 s = s.
-proof. smt. qed.
+proof. smt:full. qed.
 
 lemma rot_neg n (s : 'a list): n < 0 => rot n s = s.
 proof. by move=> lt0_n; rewrite /rot !(drop_neg, take_neg) // cats0. qed.
@@ -574,7 +576,7 @@ qed.
 op rotr n (s : 'a list) = rot (size s - n) s.
 
 lemma rotK n: cancel<:'a list, 'a list> (rot n) (rotr n).
-proof. smt. qed.
+proof. smt:full. qed.
 
 lemma rot_inj n (s1 s2 : 'a list): rot n s1 = rot n s2 => s1 = s2.
 proof. by apply (can_inj (rot n) (rotr n)); apply rotK. qed.
@@ -733,7 +735,7 @@ op trim (xs : 'a list) (n : int) =
 
 (* -------------------------------------------------------------------- *)
 lemma trim_neg (xs : 'a list) (n : int): n < 0 => trim xs n = xs.
-proof. smt. qed.
+proof. smt:full. qed.
 
 lemma size_trim (xs : 'a list) (n : int): 0 <= n < size xs =>
   size (trim xs n) = size xs - 1.
@@ -741,7 +743,7 @@ proof. smt. qed.
 
 lemma trim_head (x : 'a) (xs : 'a list):
   trim (x :: xs) 0 = xs.
-proof. smt. qed.
+proof. smt:full. qed.
 
 lemma trim_tail (x : 'a) (xs : 'a list) (n : int): 0 <= n =>
   trim (x :: xs) (n+1) = x :: trim xs n.
@@ -1029,7 +1031,7 @@ lemma map_comp (f1 : 'b -> 'c) (f2 : 'a -> 'b) s:
   map (f1 \o f2) s = map f1 (map f2 s).
 proof. by elim: s => //= x s ->. qed.
 
-lemma map_id (s : 'a list): map id s = s.
+lemma map_id (s : 'a list): map idfun s = s.
 proof. by elim: s => //= x s ->. qed.
 
 lemma id_map f (s : 'a list): (forall x, f x = x) => map f s = s.
@@ -1449,14 +1451,14 @@ theory Array.
     xs.[n <- a].[n'] = if n' = n then a else xs.[n'].
   proof.
     move=> n_bounds.
-    rewrite !getE; elim xs n n_bounds n'=> //=;smt.
-(*      smt.
+    rewrite !getE; elim xs n n_bounds n'=> //=.
+      smt.
     move=> x xs ih n n_bounds n'.
     case (n = 0)=> //= [->> | ].
       by case (n' = 0).
     case (n' = 0)=> //= [->> | ne0_n' ne0_n].
       by rewrite eq_sym=> ->.
-    by rewrite ih 1..2:smt. *)
+    by rewrite ih 1..2:smt.
   qed. 
 
   lemma get_set (xs : 'a list) (n n' : int) (x : 'a):
@@ -1466,12 +1468,6 @@ theory Array.
       else xs.[n']
   by [].
 
-(*  proof.
-    case (0 <= n < size xs)=> //= [| n_cond].
-      by apply nth_set.
-    by rewrite set_out 1:smt.
-  qed. *)
-
   lemma set_set (xs : 'a list) (n n' : int) (x x' : 'a):
     forall i,
       xs.[n <- x].[n' <- x'].[i] =
@@ -1479,15 +1475,6 @@ theory Array.
         then xs.[n' <- x'].[i]
         else xs.[n' <- x'].[n <- x].[i]
    by [].
-(*  proof. 
-    case (n = n')=> [->> /= |].
-      move=> i; rewrite !get_set; case (i = n')=> //=.
-      by rewrite size_set; case (0 <= n' < size xs).
-    move=> ne_n_n' i; case (i = n')=> [->> /= {i} |].
-      by rewrite !get_set /= @(eq_sym n') ne_n_n' /= size_set.
-    move=> ne_i_n'; case (i = n)=> [->> /= {i} |].
-      by rewrite !get_set /= ne_n_n' /= size_set.
-    by move=> ne_i_n; rewrite !get_set ne_i_n ne_i_n'. *)
 
   lemma set_set_eq (xs : 'a list) (n : int) (x x' : 'a):
     forall i, xs.[n <- x].[n <- x'].[i] = xs.[n <- x'].[i].
@@ -1497,5 +1484,4 @@ theory Array.
     0 <= n < size xs =>
     (mapi i f xs).[n] = f (n + i) xs.[n].
   proof. by rewrite !getE; elim xs i n=> //=;smt. qed.
-
 end Array.

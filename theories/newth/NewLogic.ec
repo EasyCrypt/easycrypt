@@ -12,19 +12,13 @@ pragma +implicits.
 pragma +Smt:lazy.
 
 (* -------------------------------------------------------------------- *)
-op (^) b1 b2 = if b1 then !b2 else b2.
+(* These should be declared as externals (SMT-LIB knows them)
+   external (\x): bool -> bool -> bool.
+   external ite : bool -> bool -> bool -> bool. *)
 
-(* These are apparently known to EC for some reason... They should not?
-   op (&&) b1 b2 = if b1 then b2 else false.
-   op (||) b1 b2 = if b1 then true else b2.  *)
-
-(* -------------------------------------------------------------------- *)
-(* Lemmas for trivial. *)
-lemma is_true_true : true
-by[].
-
-lemma not_false_is_true : !false
-by [].
+op (&&) b1 b2 = if b1 then b2 else false.
+op (||) b1 b2 = if b1 then true else b2.
+op (^) b1 b2  = if b1 then !b2 else b2.
 
 (* -------------------------------------------------------------------- *)
 (* Negation lemmas. *)
@@ -33,7 +27,7 @@ lemma negbTE b : !b => b = false by [].
 lemma negbF b  : b => !b = false by [].
 lemma negbFE b : !b = false => b by [].
 lemma negbK    : involutive [!]  by case. (* FIXME: by []: "Not a formula: x1" *)
-lemma negbNE b : !!b => b by [].
+lemma negbNE b : !!b => b        by [].
 
 lemma negb_inj : injective [!]      by exact: (can_inj negbK).
 lemma negbLR b c : b = !c => !b = c by [].
@@ -208,8 +202,8 @@ lemma addbAC : right_commutative (^)          by do 3!case.
 lemma addbACA : interchange (^) (^)           by do 4!case.
 lemma andb_addl : left_distributive (/\) (^)  by do 3!case.
 lemma andb_addr : right_distributive (/\) (^) by do 3!case.
-lemma addKb : left_loop id (^)                by do 2!case.
-lemma addbK : right_loop id (^)               by do 2!case.
+lemma addKb : left_loop idfun (^)             by do 2!case.
+lemma addbK : right_loop idfun (^)            by do 2!case.
 lemma addIb : left_injective (^)              by do 3!case.
 lemma addbI : right_injective (^)             by do 3!case.
 
@@ -228,20 +222,10 @@ lemma andabP b1 b2 : b1 && b2 <=> b1 /\ b2 by [].
 lemma orabP  b1 b2 : b1 || b2 <=> b1 \/ b2 by [].
 
 lemma andab_andb : (&&) = (/\).
-proof.
-  (* FIXME: We **really** need binary extension *)
-  apply/ExtEq.fun_ext=>b1.
-  apply/ExtEq.fun_ext=>b2.
-  by rewrite andabP.
-qed.
+proof. by apply/ExtEq.rel_ext=> x y; rewrite andabP. qed.
 
 lemma orab_orb : (||) = (\/).
-proof.
-  (* FIXME: We **really** need binary extension *)
-  apply/ExtEq.fun_ext=>b1.
-  apply/ExtEq.fun_ext=>b2.
-  by rewrite orabP.
-qed.
+proof. by apply/ExtEq.rel_ext=> x y; rewrite orabP. qed.
 
 (* -------------------------------------------------------------------- *)
 (* Pred? *)
