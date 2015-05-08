@@ -18,13 +18,13 @@ lemma nosmt addz1_neq0 (i : int): 0 <= i => i+1 <> 0
 by smt full.
 
 lemma nosmt onez_neq0 : 1 <> 0 
-by [].
+by smt full.
 
 lemma nosmt addzA (x y z : int): x + (y + z) = (x + y) + z
-by [].
+by smt full.
 
 lemma nosmt addzC (x y : int): x + y = y + x
-by [].
+by smt full.
 
 lemma nosmt add0z (x : int): 0 + x = x
 by smt full.
@@ -33,16 +33,16 @@ lemma nosmt addNz (x : int): (-x) + x = 0
 by smt full.
 
 lemma nosmt addzCA (x y z : int): x + (y + z) = y + (x + z)
-by [].
+by smt full.
 
 lemma nosmt addzAC (x y z : int): (x + y) + z = (x + z) + y
-by [].
+by smt full.
 
 lemma nosmt addIz (x1 x2 y : int): x1 + y = x2 + y => x1 = x2
-by [].
+by smt full.
 
 lemma nosmt addzI (x1 x2 y : int): y + x1 = y + x2 => x1 = x2
-by [].
+by smt full.
 
 lemma nosmt oppzK (x : int): -(-x) = x
 by smt full.
@@ -54,16 +54,16 @@ lemma nosmt addAzN (x y : int): (x + y) - y = x
 by smt full.
 
 lemma nosmt mulzA  (x y z : int): x * (y * z) = (x * y) * z
-by [].
+by smt full.
 
 lemma nosmt mulzC  (x y : int): x * y = y * x
-by [].
+by smt full.
 
 lemma nosmt mul1z  (x : int): 1 * x = x
 by smt full.
 
 lemma nosmt mulzDl (x y z : int): (x + y) * z = x * z + y * z
-by [].
+by smt full.
 
 lemma subzE (x y : int): x - y = x + (- y)
 by smt full.
@@ -83,7 +83,7 @@ lemma nosmt norm_eq0     (x   : int): `|x| = 0 => x = 0
 by smt full.
 
 lemma nosmt gez_leVge    (x y : int): 0 <= x => 0 <= y => x <= y \/ y <= x
-by [].
+by smt full.
 
 lemma nosmt normzM       (x y : int): `|x * y| = `|x| * `|y|
 by smt full.
@@ -108,7 +108,7 @@ lemma nosmt gtz_lt (x y : int): (x >  y) <=> (y <  x) by smt full.
 lemma nosmt neq_ltz (x y : int): (x <> y) <=> (x < y \/ y < x) by smt full.
 lemma nosmt eqz_leq (x y : int): (x = y) <=> (x <= y /\ y <= x) by [].
 
-lemma nosmt lez_addl (x y z : int): (x + y <= x + z) <=> (y <= z) by [].
+lemma nosmt lez_addl (x y z : int): (x + y <= x + z) <=> (y <= z) by smt full.
 
 lemma nosmt lez_add1r (x y : int): (1 + x <= y) = (x < y) by smt full.
 
@@ -167,7 +167,7 @@ op fold : ('a -> 'a) -> 'a -> int -> 'a.
 axiom foldle0 p (f : 'a -> 'a) a: p <= 0 => fold f a p = a.
 
 lemma fold0 (f : 'a -> 'a) a: fold f a 0 = a
-by [].
+by smt full.
 
 axiom foldS (f : 'a -> 'a) a n: 0 <= n => fold f a (n+1) = f (fold f a n).
 
@@ -176,7 +176,7 @@ by smt full.
 
 lemma fold_add (f : 'a -> 'a) a n1 n2 : 0 <= n1 => 0 <= n2 =>
    fold f (fold f a n2) n1 = fold f a (n1 + n2).
-proof. elim /Induction.induction n1; smt full. qed.
+proof. elim/Induction.induction n1; smt full. qed.
 
 (* Power *)
 
@@ -184,13 +184,13 @@ op ( ^ ) (x:int) (p:int) = fold (( * ) x) 1 p
 axiomatized by powE.
 
 lemma nosmt powNeg p x: p <= 0 => x ^ p = 1
-by [].
+by smt full.
 
 lemma pow0 x: x ^ 0 = 1
 by smt full.
 
 lemma powS p x: 0 <= p => x ^ (p+1) = x * x ^ p
-by [].
+by smt full.
 
 lemma pow_add z p1 p2: 0 <= p1 => 0 <= p2 => z^p1 * z^p2 = z^(p1+p2).
 proof. 
@@ -293,7 +293,7 @@ theory Extrema.
 
   lemma nosmt max_is_extremum a b:
     max a b = a \/ max a b = b
-  by [].
+  by smt full.
 end Extrema.
 export Extrema.
 

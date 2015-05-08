@@ -5,8 +5,6 @@
 
 require export ExtEq.
 
-pragma +Smt:lazy.
-
 (*** Working with predicates *)
 (** Lifting boolean operators to predicates *)
 op pred0  ['a] = fun (x : 'a) => false.

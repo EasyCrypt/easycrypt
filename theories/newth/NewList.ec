@@ -9,8 +9,6 @@
 (* -------------------------------------------------------------------- *)
 require import Fun Pred Option Pair Int.
 
-pragma +Smt:lazy.
-
 (* -------------------------------------------------------------------- *)
 type 'a list = [
   | "[]"
@@ -212,7 +210,7 @@ lemma mem_head_behead z0 (s : 'a list):
   s <> [] =>
   forall x, (x = (head z0 s) \/ mem (behead s) x) <=> mem s x.
 proof.
-  move=>/head_behead h; rewrite -(h z0) head_cons behead_cons.
+  move=> /head_behead h; rewrite -(h z0) head_cons behead_cons.
   by move=> x; rewrite in_cons.
 qed.
 
@@ -562,7 +560,7 @@ qed.
 op rot n (s : 'a list) = drop n s ++ take n s.
 
 lemma rot0 (s : 'a list): rot 0 s = s.
-proof. smt:full. qed.
+proof. smt. qed.
 
 lemma rot_neg n (s : 'a list): n < 0 => rot n s = s.
 proof. by move=> lt0_n; rewrite /rot !(drop_neg, take_neg) // cats0. qed.
@@ -590,7 +588,7 @@ qed.
 op rotr n (s : 'a list) = rot (size s - n) s.
 
 lemma rotK n: cancel<:'a list, 'a list> (rot n) (rotr n).
-proof. smt:full. qed.
+proof. smt. qed.
 
 lemma rot_inj n (s1 s2 : 'a list): rot n s1 = rot n s2 => s1 = s2.
 proof. by apply (can_inj (rot n) (rotr n)); apply rotK. qed.
@@ -749,7 +747,7 @@ op trim (xs : 'a list) (n : int) =
 
 (* -------------------------------------------------------------------- *)
 lemma trim_neg (xs : 'a list) (n : int): n < 0 => trim xs n = xs.
-proof. smt:full. qed.
+proof. smt. qed.
 
 lemma size_trim (xs : 'a list) (n : int): 0 <= n < size xs =>
   size (trim xs n) = size xs - 1.
@@ -757,7 +755,7 @@ proof. smt. qed.
 
 lemma trim_head (x : 'a) (xs : 'a list):
   trim (x :: xs) 0 = xs.
-proof. smt:full. qed.
+proof. smt. qed.
 
 lemma trim_tail (x : 'a) (xs : 'a list) (n : int): 0 <= n =>
   trim (x :: xs) (n+1) = x :: trim xs n.

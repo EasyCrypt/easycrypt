@@ -62,7 +62,7 @@ axiom uniform_unique (d d':'a distr):
 lemma witness_nzero P (d:'a distr):
   0%r < mu d P => (exists x, P x ).
 proof.
-  by cut: P <> pred0 => (exists x, P x); smt.
+  by cut: P <> pred0 => (exists x, P x); smt full.
 qed.
 
 lemma ew_eq (d d':'a distr):
@@ -126,7 +126,7 @@ qed.
 lemma mu_split (d:'a distr) (p q:('a -> bool)):
   mu d p = mu d (predI p q) + mu d (predI p (predC q)).
 proof.
-rewrite -mu_disjoint; first smt:lazy.
+rewrite -mu_disjoint; first smt.
 by apply mu_eq=> x; rewrite /predI /predC /predU !(andC (p x)) orDandN.
 qed.
 
@@ -199,7 +199,7 @@ theory Dempty.
   by intros weight_0; rewrite -(pw_eq<:'a> d dempty); smt.
   qed.
 
-  lemma demptyU: isuniform dempty<:'a> by [].
+  lemma demptyU: isuniform dempty<:'a> by smt full.
 end Dempty.
 
 (** Point distribution *)

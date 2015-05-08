@@ -84,7 +84,7 @@ lemma mulrMle (x y z:real):
   from_int 0 <= z =>
   x <= y =>
   x * z <= y * z
-by [].
+by smt full.
 
 lemma mulrM (x y z:real):
   from_int 0 < z =>
@@ -99,7 +99,7 @@ by smt full.
 
 lemma nosmt addleM : forall (x1 x2 y1 y2:real),
    x1 <= x2 => y1 <= y2 => x1 + y1 <= x2 + y2 
-by [].
+by smt full.
 
 lemma nosmt addgeM : forall (x1 x2 y1 y2:real),
    x1 >= x2 => y1 >= y2 => x1 + y1 >= x2 + y2 
@@ -111,7 +111,7 @@ by smt.
 
 lemma real_le_trans: forall (a b c:real), 
  a <= b => b <= c => a <= c
-by [].
+by smt full.
 
 lemma nosmt le_ge : forall (x y:real), (x <= y) <=> (y >= x)
 by smt full.
@@ -123,7 +123,7 @@ lemma nosmt eq_le_ge : forall (x y:real), (x = y) <=> (x <= y /\ x >= y)
 by smt full.
 
 lemma nosmt eq_le: forall (x y:real), x = y => x <= y
-by [].
+by smt full.
 
 lemma nosmt inv_le (x y:real): from_int 0 < x => from_int 0 < y => y <= x => inv x <= inv y.
 proof.
@@ -143,7 +143,6 @@ theory Exp.
 
 end Exp.
 export Exp.
-
 
 require import Ring.
 require import AlgTactic.
@@ -219,18 +218,18 @@ lemma nosmt upto2_abs (x1 x2 x3 x4 x5:real):
 
 lemma nosmt upto2_notbad (ev1 ev2 bad1 bad2:bool) :
   ((bad1 <=> bad2) /\ (!bad2 => (ev1 <=> ev2))) =>
-  ((ev1 /\ !bad1) <=> (ev2 /\ !bad2)) by [].
+  ((ev1 /\ !bad1) <=> (ev2 /\ !bad2)) by smt full.
 
 lemma nosmt upto2_imp_bad (ev1 ev2 bad1 bad2:bool) :
   ((bad1 <=> bad2) /\ (!bad2 => (ev1 <=> ev2))) =>
-  (ev1 /\ bad1) => bad2 by [].
+  (ev1 /\ bad1) => bad2 by smt full.
 
 lemma nosmt upto_bad_false (ev bad2:bool) :
-  !((ev /\ !bad2) /\ bad2) by [].
+  !((ev /\ !bad2) /\ bad2) by smt full.
 
 lemma nosmt upto_bad_or (ev1 ev2 bad2:bool) :
    (!bad2 => ev1 => ev2) => ev1 =>
-    ev2 /\ !bad2 \/ bad2 by [].
+    ev2 /\ !bad2 \/ bad2 by smt full.
 
 lemma nosmt upto_bad_sub (ev bad:bool) :
   ev /\ ! bad => ev by [].

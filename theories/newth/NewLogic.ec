@@ -9,7 +9,6 @@
 require import Fun.
 
 pragma +implicits.
-pragma +Smt:lazy.
 
 (* -------------------------------------------------------------------- *)
 (* These should be declared as externals (SMT-LIB knows them)
@@ -194,7 +193,7 @@ by [].
 
 lemma addFb : left_id false (^)               by case.
 lemma addbF : right_id false (^)              by case.
-lemma addbb : self_inverse false (^)          by [].
+lemma addbb : self_inverse false (^)          by case.
 lemma addbC : commutative (^)                 by do 2!case.
 lemma addbA : associative (^)                 by do 3!case.
 lemma addbCA : left_commutative (^)           by do 3!case.
