@@ -1,0 +1,42 @@
+(* --------------------------------------------------------------------
+ * Copyright (c) - 2012-2015 - IMDEA Software Institute and INRIA
+ * Distributed under the terms of the CeCILL-B licence.
+ * -------------------------------------------------------------------- *)
+
+require import Distr NewFMap.
+require (*--*) NewROM.
+
+clone include NewROM.
+
+module RO:Oracle = {
+  var m:(from, to) fmap
+
+  proc init():unit = {
+    m = map0;
+  }
+  
+  proc o(x:from):to = {
+    var y;
+
+    y = $dsample x;
+    if (!mem (dom m) x) m.[x] = y;
+    return oget (m.[x]);
+  }
+}.
+
+lemma RO_init_ll: islossless RO.init.
+proof. by proc; wp. qed.
+
+lemma RO_o_ll:
+  (forall x, mu (dsample x) predT = 1%r) =>
+  islossless RO.o.
+proof. by move=> dsampleL; proc; auto; smt. qed.
+
+equiv RO_init_eq: RO.init ~ RO.init: true ==> ={glob RO}
+by sim.
+
+equiv RO_o_eq: RO.o ~ RO.o: ={glob RO, x} ==> ={glob RO, res}
+by sim.
+
+hoare dom_RO_o d x': RO.o: x = x' /\ dom RO.m = d ==> dom RO.m = setU d (set1 x').
+proof. proc; auto; progress; rewrite setP; smt. qed.
