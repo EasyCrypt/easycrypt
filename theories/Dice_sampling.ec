@@ -18,7 +18,7 @@ theory GenDice.
   (* The distribution is on some type t *)
   type t.
   op d : input -> t distr.
-  axiom dU i: valid i => isuniform (d i).
+  axiom dU i: valid i => is_subuniform (d i).
 
   (* And the test is represented both as a predicate and as a set *)
   op test : input -> t -> bool.

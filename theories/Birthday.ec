@@ -19,9 +19,7 @@ axiom lt0q: 0 < q.
 type T.
 
 op uT: T distr.
-axiom uT_ll: mu uT predT = 1%r.
-axiom uT_uf: isuniform uT.
-axiom uT_fu (x:T): in_supp x uT.
+axiom uT_ufT: is_uniform_over uT predT.
 
 (** A module that samples in uT on queries to s **)
 module Sample = {
@@ -77,7 +75,7 @@ section.
     hoare.
     phoare split ! 1%r 1%r=> //=.
       conseq* (A_ll Sample _).
-        by proc; auto=> //=; apply uT_ll.
+        by proc; auto=> //=; rewrite -/predT; smt. (* FIXME: -delta *)
     by bypr=> &m l_empty; rewrite (A_bounded &m l_empty).
   qed.
 
@@ -105,8 +103,8 @@ section.
     call (_: !`|Sample.l| <= q, ={Sample.l})=> //=.
       exact A_ll.
       by proc; sp; if{1}=> //=; auto; smt.
-      by move=> &2 bad; proc; sp; if=> //=; auto; smt.
-      by proc; auto; smt.
+      by move=> &2 bad; proc; sp; if=> //=; auto; rewrite -/predT; smt. (* FIXME: -delta *)
+      by proc; auto; rewrite -/predT; smt. (* FIXME: -delta *)
     by inline *; auto; smt.
   qed.
 
@@ -127,7 +125,8 @@ section.
       progress.
         cut:= FSet.mu_Lmem_le_length (Sample.l{hr}) uT (mu uT (pred1 witness)) _.
         move=> x _; rewrite /mu_x; cut: mu uT (pred1 x) = mu uT (pred1 witness); last smt.
-        by apply uT_uf; apply uT_fu.
+        have [uT_fu [_ uT_suf]]:= uT_ufT.
+        by apply uT_suf; apply uT_fu.
         by rewrite -/List."`|_|"; smt.
         by move: H4; rewrite unique_cons H0.
       by progress; proc; rcondt 2; auto; smt.
@@ -249,7 +248,8 @@ section.
       progress.
         cut:= FSet.mu_Lmem_le_length (Sample.l{hr}) uT (mu uT (pred1 witness)) _.
         move=> x _; rewrite /mu_x; cut: mu uT (pred1 x) = mu uT (pred1 witness); last smt.
-        by apply uT_uf; apply uT_fu.
+        have [uT_fu [_ uT_suf]]:= uT_ufT.
+        by apply uT_suf; apply uT_fu.
         by rewrite -/List."`|_|"; smt.
         by move: H4; rewrite unique_cons H0.
       by progress; proc; rcondt 2; auto; smt.

@@ -30,7 +30,7 @@ axiom challengeL pk:
 
 axiom challengeU pk:
   valid_pkey pk =>
-  isuniform (challenge pk).
+  is_subuniform (challenge pk).
 
 (** Concrete definitions *)
 op f: pkey -> t -> t.

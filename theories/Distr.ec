@@ -19,10 +19,26 @@ op in_supp x (d:'a distr) : bool = 0%r < mu_x d x.
 
 op support (d:'a distr) x = in_supp x d.
 
-pred isuniform (d:'a distr) = forall (x y:'a),
-  in_supp x d =>
-  in_supp y d =>
-  mu_x d x = mu_x d y.
+pred is_lossless (d : 'a distr) = mu d predT = 1%r.
+
+pred is_full (d : 'a distr) = forall x, support d x.
+
+pred is_subuniform (d : 'a distr) = forall (x y:'a),
+  support d x =>
+  support d y =>
+  mu d (pred1 x) = mu d (pred1 y).
+
+pred is_uniform (d : 'a distr) =
+     is_lossless d
+  /\ is_subuniform d.
+
+pred is_subuniform_over (d : 'a distr) (p : 'a -> bool) =
+     (forall x, support d x <=> p x)
+  /\ is_subuniform d.
+
+pred is_uniform_over (d : 'a distr) (p : 'a -> bool) =
+     (forall x, support d x <=> p x)
+  /\ is_uniform d.
 
 (** Point-wise equality *)
 pred (==)(d d':'a distr) =
@@ -52,10 +68,9 @@ axiom pw_eq (d d':'a distr):
   d == d' <=> d = d'.
 
 axiom uniform_unique (d d':'a distr):
-  mu d predT = mu d' predT =>
   support d = support d' =>
-  isuniform d  =>
-  isuniform d' =>
+  is_uniform d  =>
+  is_uniform d' =>
   d = d'.
 
 (** Lemmas *)
@@ -199,7 +214,7 @@ theory Dempty.
   by intros weight_0; rewrite -(pw_eq<:'a> d dempty); smt.
   qed.
 
-  lemma demptyU: isuniform dempty<:'a> by smt full.
+  lemma demptyU: is_subuniform dempty<:'a> by smt full.
 end Dempty.
 
 (** Point distribution *)
@@ -238,7 +253,7 @@ theory Dunit.
   by [].
 
   lemma dunitU (x:'a):
-    isuniform (dunit x)
+    is_uniform (dunit x)
   by [].
 end Dunit.
 
@@ -281,8 +296,8 @@ theory Dinter.
   qed.
 
   lemma dinterU (i j:int):
-    isuniform (dinter i j)
-  by [].
+    is_subuniform (dinter i j)
+  by admit.
 end Dinter.
 
 (** Normalization of a sub-distribution *)
@@ -311,7 +326,7 @@ theory Dscale.
   qed.  
 
   lemma dscaleU (d:'a distr):
-    isuniform d => isuniform (dscale d)
+    mu d predT <> 0%r => is_subuniform d => is_uniform (dscale d)
   by [].
 end Dscale.
 
