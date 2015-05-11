@@ -1,0 +1,53 @@
+require import Bool Option NewFMap.
+
+type key, plain, cipher.
+
+op dkey: key distr.
+
+module type SKE = {
+  proc keygen(): key
+  proc enc(k: key, p: plain): cipher option
+  proc dec(k: key, c: cipher): plain option
+}.
+
+module Correctness (S : SKE) = {
+  proc main(p: plain): bool = {
+    var k, c, p';
+    var b = false;
+
+    k = S.keygen();
+    c = S.enc(k, p);
+    if (c <> None) {
+      p' = S.dec(k, oget c);
+      b  = (p' = Some p);
+    }
+    return b;
+  }
+}.
+
+module Wrap (S : SKE) = {
+  var k  : key
+  var dqs: cipher fset
+  var log: (cipher, plain) fmap
+
+  proc init(): unit = { k = S.keygen(); }
+
+  proc enc(p: plain): cipher option = {
+    var c;
+
+    c = S.enc(k, p);
+    if (c <> None)
+      log.[oget c] = p;
+    return c;
+  }
+
+  proc dec(c: cipher): plain option = {
+    var p;
+
+    p = S.dec(k, c);
+    dqs = setU dqs (set1 c);
+    if (p <> None)
+      log.[c] = oget p;
+    return p;
+  }
+}.
