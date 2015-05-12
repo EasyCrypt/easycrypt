@@ -721,7 +721,7 @@ and simplify_rec ri hyps f =
       f_map (fun ty -> ty) (simplify ri hyps) (f_eagerF_r { eg with eg_fl ; eg_fr; })
 
   | Fpr pr  when ri.modpath -> 
-      let pr_fun = EcEnv.NormMp.norm_xfun (LDecl.toenv hyps) pr.pr_fun } in
+      let pr_fun = EcEnv.NormMp.norm_xfun (LDecl.toenv hyps) pr.pr_fun in
       f_map (fun ty -> ty) (simplify ri hyps) (f_pr_r { pr with pr_fun })
 
   | _ -> f_map (fun ty -> ty) (simplify ri hyps) f
