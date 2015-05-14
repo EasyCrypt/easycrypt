@@ -22,7 +22,6 @@ and cmp_option = {
 
 and cli_option = {
   clio_emacs   : bool;
-  clio_webui   : bool;
   clio_provers : prv_options;
 }
 

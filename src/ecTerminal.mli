@@ -24,4 +24,3 @@ val finalize    : terminal -> unit
 val from_channel : name:string -> in_channel -> terminal
 val from_tty     : unit -> terminal
 val from_emacs   : unit -> terminal
-val from_webui   : unit -> terminal
