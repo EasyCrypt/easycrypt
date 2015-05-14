@@ -1,4 +1,0 @@
-Django==1.6.2
-django-crispy-forms==1.4.0
-tornado==3.2.2
-wsgiref==0.1.2

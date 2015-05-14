@@ -1,9 +1,0 @@
-<RCC>
-    <qresource prefix="/icons/FlatIcon">
-        <file alias="index.theme">icons/FlatIcon/index.theme</file>
-        <file alias="32x32/menu.png">icons/FlatIcon/32x32/actions/menu.png</file>
-        <file alias="32x32/left.png">icons/FlatIcon/32x32/actions/left.png</file>
-        <file alias="32x32/right.png">icons/FlatIcon/32x32/actions/right.png</file>
-        <file alias="32x32/down.png">icons/FlatIcon/32x32/actions/down.png</file>
-    </qresource>
-</RCC>
