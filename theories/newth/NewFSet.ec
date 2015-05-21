@@ -28,6 +28,19 @@ qed.
 axiom fset_eq (s1 s2 : 'a fset):
   (perm_eq (elems s1) (elems s2)) => (s1 = s2).
 
+lemma oflist_perm_eq (s1 s2 : 'a list):
+  perm_eq s1 s2 =>
+  oflist s1 = oflist s2.
+proof.
+  move=> h; apply/fset_eq.
+  apply/(perm_eq_trans (undup s1)).
+  + by apply/perm_eq_sym/oflistK.
+  apply/(perm_eq_trans (undup s2)); first last.
+  + by apply/oflistK.
+  apply/uniq_perm_eq; 1..2:apply/undup_uniq.
+  by move=> x; rewrite !mem_undup; apply/perm_eq_mem.
+qed.
+
 (* -------------------------------------------------------------------- *)
 op card ['a] (s : 'a fset) = size (elems s) axiomatized by cardE.
 
@@ -69,6 +82,12 @@ proof. by move=> x; rewrite set0E mem_oflist. qed.
 
 lemma in_set1 z: forall x, mem (set1<:'a> z) x <=> x = z.
 proof. by move=> x; rewrite set1E /= mem_oflist. qed.
+
+lemma elems_set1 (x : 'a) : elems (set1 x) = [x].
+proof.
+  rewrite set1E; apply/perm_eq_small/perm_eq_sym=> //=.
+  by rewrite -{1}(undup_id [x]) ?oflistK.
+qed.
 
 lemma in_setU (s1 s2 : 'a fset):
   forall x, mem (setU s1 s2) x <=> mem s1 x \/ mem s2 x.
@@ -113,6 +132,22 @@ proof. by rewrite cardE set0E -(perm_eq_size (undup [])) 1:oflistK. qed.
 
 lemma nosmt card_ge0 (A : 'a fset) : Int.(<=) 0 (card A).
 proof. by rewrite cardE size_ge0. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt fset_ind (p : 'a fset -> bool):
+  p set0 =>
+  (forall x s, p s => p (setU s (set1 x))) =>
+  (forall s, p s).
+proof.
+  move=> p0 pa s; rewrite -elemsK.
+  elim (elems s) (uniq_elems s)=> {s}.
+    by rewrite -set0E.
+  move=> x s ih /cons_uniq [] x_notin_s uniq_s.
+  have /(pa x) := ih _=> //; rewrite setUE.
+  rewrite elems_set1 (oflist_perm_eq (elems (oflist s) ++ [x]) (x::s)) //.
+  apply/perm_catCl=> /=; apply/perm_cons/perm_eq_sym.
+  by rewrite -{1}(undup_id s _) // oflistK.
+qed.
 
 (* -------------------------------------------------------------------- *)
 (* All the following proofs should be translated automagically          *)
