@@ -2559,18 +2559,32 @@ module Ax = struct
           (EcTypes.Tvar.init (List.map fst ax.ax_tparams) tys) f
     | _ -> raise (LookupFailure (`Path p))
 
-  let all ?(check = fun _ -> true) ?name (env : env) =
+  let iter ?name f (env : env) =
+    match name with
+    | Some name ->
+      let axs = MC.lookup_axioms name env in
+      List.iter (fun (p,ax) -> f p ax) axs 
+
+    | None ->
+        Mip.iter 
+          (fun _ mc -> MMsym.iter 
+            (fun _ (ip, ax) ->
+              match ip with IPPath p -> f p ax | _ -> ()) 
+            mc.mc_axioms)
+          env.env_comps
+
+  let all ?(check = fun _ _ -> true) ?name (env : env) =
     match name with
     | Some name ->
         let axs = MC.lookup_axioms name env in
-        List.filter (fun (_, ax) -> check ax) axs
+        List.filter (fun (p, ax) -> check p ax) axs
 
     | None ->
         Mip.fold (fun _ mc aout ->
           MMsym.fold (fun _ axioms aout ->
             List.fold_right (fun (ip, ax) aout ->
               match ip with
-              | IPPath p -> if check ax then (p, ax) :: aout else aout
+              | IPPath p -> if check p ax then (p, ax) :: aout else aout
               | _ -> aout)
               axioms aout)
             mc.mc_axioms aout)
@@ -3214,17 +3228,11 @@ let norm_l_decl env (hyps, concl) =
   let lhyps = List.map onh hyps.h_local in
     ({ hyps with h_local = lhyps }, concl)
 
-let check_goal (usehyps, db) pi (hyps, concl) =
+let check_goal pi (hyps, concl) =
   let env = LDecl.toenv hyps in
   let ld  = LDecl.tohyps hyps in
-  let ld  =
-    match usehyps with
-    | true  -> ld
-    | false ->
-        let filter = function (_, LD_hyp _) -> false | _ -> true in
-          { ld with h_local = List.filter filter ld.h_local }
-  in
+
   let ld = norm_l_decl env (ld, concl) in
     EcWhy3.check_goal
       ~notify:(fun lvl (lazy s) -> notify env lvl "%s" s)
-      (Mod.me_of_mt env) env.env_w3 pi db ld
+      (Mod.me_of_mt env) env.env_w3 pi ld

@@ -7,6 +7,20 @@
 open EcPath
 
 (* -------------------------------------------------------------------- *)
+type hflag = [ `Include | `Exclude ]
+type hints
+
+module Hints : sig
+  val empty : hints
+  val full  : hints
+
+  val add1 : path -> hflag -> hints -> hints
+  val addm : path -> hflag -> hints -> hints
+
+  val mem : path -> hints -> bool
+end
+
+(* -------------------------------------------------------------------- *)
 type prover_eviction = [
   | `Inconsistent
 ]
@@ -23,6 +37,13 @@ type prover_infos = {
   pr_timelimit : int;
   pr_cpufactor : int;
   pr_wrapper   : string option;
+  pr_verbose   : int;
+  pr_version   : [`Lazy | `Full];
+  pr_all       : bool;
+  pr_max       : int;
+  pr_iterate   : bool;
+  pr_wanted    : hints;
+  pr_unwanted  : hints;
 }
 
 val dft_prover_infos : prover_infos
@@ -44,20 +65,6 @@ val initialize :
      ?ovrevict:string list
   -> ?why3conf:string
   -> unit -> unit
-
-(* -------------------------------------------------------------------- *)
-type hflag = [ `Include | `Exclude ]
-type hints
-
-module Hints : sig
-  val empty : hints
-  val full  : hints
-
-  val add1 : path -> hflag -> hints -> hints
-  val addm : path -> hflag -> hints -> hints
-
-  val mem : path -> hints -> bool
-end
 
 (* -------------------------------------------------------------------- *)
 type notify = EcGState.loglevel -> string Lazy.t -> unit

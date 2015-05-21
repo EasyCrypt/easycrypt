@@ -1525,7 +1525,7 @@ type smtmode    = [`Standard | `Strict | `Report of EcLocation.t option]
 type smtversion = [`Lazy | `Full]
 
 (* -------------------------------------------------------------------- *)
-let t_smt ~(mode:smtmode) ~(version:smtversion) hints pi tc =
+let t_smt ~(mode:smtmode) pi tc =
   let error () =
     match mode with
     | `Standard ->
@@ -1539,7 +1539,7 @@ let t_smt ~(mode:smtmode) ~(version:smtversion) hints pi tc =
         t_admit tc
   in
 
-  match version with
+  match pi.EcProvers.pr_version with
   | `Full -> begin
       let (_, concl) as goal = FApi.tc1_flat tc in
     
@@ -1550,7 +1550,7 @@ let t_smt ~(mode:smtmode) ~(version:smtversion) hints pi tc =
     
       | _ ->
           try
-            if EcEnv.check_goal hints pi goal then
+            if EcEnv.check_goal pi goal then
               FApi.xmutate1 tc `Smt []
             else error ()
           with EcWhy3.CannotTranslate _ ->

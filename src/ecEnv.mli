@@ -12,7 +12,6 @@ open EcDecl
 open EcCoreFol
 open EcModules
 open EcTheory
-open EcProvers
 
 (* -------------------------------------------------------------------- *)
 type 'a suspension = {
@@ -156,7 +155,10 @@ module Ax : sig
   val add  : path -> env -> env
   val bind : symbol -> axiom -> env -> env
 
-  val all : ?check:(axiom -> bool) -> ?name:qsymbol -> env -> (path * t) list
+  val iter : ?name:qsymbol -> (path -> axiom -> unit) -> env -> unit 
+
+  val all : 
+    ?check:(path -> axiom -> bool) -> ?name:qsymbol -> env -> (path * t) list
 
   val instanciate : path -> EcTypes.ty list -> env -> form
 end
@@ -418,4 +420,4 @@ module LDecl : sig
 end
 
 (* -------------------------------------------------------------------- *)
-val check_goal : bool * hints -> EcProvers.prover_infos -> LDecl.hyps * form -> bool
+val check_goal : EcProvers.prover_infos -> LDecl.hyps * form -> bool

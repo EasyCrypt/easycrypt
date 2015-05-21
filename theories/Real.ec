@@ -21,7 +21,7 @@ theory Triangle.
 
   lemma triangular_inequality (x y z:real):
      `| x-y | <= `| x-z |  + `| y-z |
-  by [].
+  by smt full.
 
 end Triangle.
 
@@ -30,10 +30,10 @@ theory FromInt.
   import why3 "real" "FromInt".
   lemma from_intM (a b:int):
     (from_int a < from_int b) <=> (a < b)%Int
-  by (split; smt).
+  by (split; smt full).
 
   lemma from_intMle : forall (a b : int), from_int a <= from_int b <=> a <= b
-  by [].
+  by smt full.
 
 end FromInt.
 export FromInt.
@@ -60,25 +60,25 @@ export Square.
 
 lemma nosmt inv_def (x:real):
   inv x = from_int 1 / x
-by [].
+by smt full.
 
 lemma nosmt sign_inv (x:real):
   from_int 0 < x =>
   from_int 0 < inv x
-by [].
+by smt full.
 
 lemma real_lt_trans (a b c:real):
  a < b => b <= c => a < c
-by [].
+by smt full.
 
 lemma div_def (x y:real):
   y <> from_int 0 =>
   x / y = x * (from_int 1 / y)
-by [].
+by smt full.
 
 lemma mul_div (x:real):
   x <> from_int 0 => x / x = from_int 1
-by [].
+by smt full.
 
 lemma mulrMle (x y z:real):
   from_int 0 <= z =>
@@ -90,12 +90,12 @@ lemma mulrM (x y z:real):
   from_int 0 < z =>
   x < y =>
   x * z < y * z
-by [].
+by smt full.
 
 lemma mul_compat_le (z x y:real):
   from_int 0 < z =>
   (x * z <= y * z <=> x <= y)
-by [].
+by smt full.
 
 lemma nosmt addleM : forall (x1 x2 y1 y2:real),
    x1 <= x2 => y1 <= y2 => x1 + y1 <= x2 + y2 
@@ -103,7 +103,7 @@ by [].
 
 lemma nosmt addgeM : forall (x1 x2 y1 y2:real),
    x1 >= x2 => y1 >= y2 => x1 + y1 >= x2 + y2 
-by [].
+by smt full.
 
 lemma real_abs_sum : forall (a b c:real),
  a = b + c => `|a| <= `|b| + `|c|
@@ -114,13 +114,13 @@ lemma real_le_trans: forall (a b c:real),
 by [].
 
 lemma nosmt le_ge : forall (x y:real), (x <= y) <=> (y >= x)
-by [].
+by smt full.
 
 lemma nosmt le_ge_sym : forall (x y:real), (x <= y) => (y >= x)
 by (intros x y;rewrite le_ge).
 
 lemma nosmt eq_le_ge : forall (x y:real), (x = y) <=> (x <= y /\ x >= y)
-by [].
+by smt full.
 
 lemma nosmt eq_le: forall (x y:real), x = y => x <= y
 by [].
@@ -158,22 +158,22 @@ instance ring with real
   op sub   = (-)
   op ofint = FromInt.from_int
 
-  proof oner_neq0 by smt
-  proof addr0     by smt
-  proof addrA     by smt
-  proof addrC     by smt
-  proof addrN     by smt
-  proof mulr1     by smt
-  proof mulrA     by smt
-  proof mulrC     by smt
-  proof mulrDl    by smt
-  proof expr0     by smt
-  proof exprS     by smt
-  proof subrE     by smt
-  proof ofint0    by smt
-  proof ofint1    by smt
-  proof ofintS    by smt
-  proof ofintN    by smt.
+  proof oner_neq0 by smt full
+  proof addr0     by smt full
+  proof addrA     by smt full
+  proof addrC     by smt full
+  proof addrN     by smt full
+  proof mulr1     by smt full
+  proof mulrA     by smt full
+  proof mulrC     by smt full
+  proof mulrDl    by smt full
+  proof expr0     by smt full
+  proof exprS     by smt full
+  proof subrE     by smt full
+  proof ofint0    by smt full
+  proof ofint1    by smt full
+  proof ofintS    by smt full
+  proof ofintN    by smt full.
 
 instance field with real
   op rzero = zero
@@ -187,25 +187,25 @@ instance field with real
   op inv   = inv
   op div   = (/)
 
-  proof oner_neq0 by smt
-  proof addr0     by smt
-  proof addrA     by smt
-  proof addrC     by smt
-  proof addrN     by smt
-  proof mulr1     by smt
-  proof mulrA     by smt
-  proof mulrC     by smt
-  proof mulrDl    by smt
-  proof mulrV     by smt
-  proof expr0     by smt
-  proof exprS     by smt
-  proof exprN     by smt
-  proof subrE     by smt
-  proof divrE     by smt
-  proof ofint0    by smt
-  proof ofint1    by smt
-  proof ofintS    by smt
-  proof ofintN    by smt.
+  proof oner_neq0 by smt full
+  proof addr0     by smt full
+  proof addrA     by smt full
+  proof addrC     by smt full
+  proof addrN     by smt full
+  proof mulr1     by smt full
+  proof mulrA     by smt full
+  proof mulrC     by smt full
+  proof mulrDl    by smt full
+  proof mulrV     by smt full
+  proof expr0     by smt full
+  proof exprS     by smt full
+  proof exprN     by smt full
+  proof subrE     by smt full
+  proof divrE     by smt full
+  proof ofint0    by smt full
+  proof ofint1    by smt full
+  proof ofintS    by smt full
+  proof ofintN    by smt full.
 
 (* WARNING Lemmas used by tactics : 
    eq_le addleM real_le_trans and the following lemmas *)
@@ -215,7 +215,7 @@ lemma nosmt upto2_abs (x1 x2 x3 x4 x5:real):
    x1 <= x5 => 
    x3 <= x5 => 
    x2 = x4 =>
-   `|x1 + x2 - (x3 + x4)| <= x5 by [].
+   `|x1 + x2 - (x3 + x4)| <= x5 by smt full.
 
 lemma nosmt upto2_notbad (ev1 ev2 bad1 bad2:bool) :
   ((bad1 <=> bad2) /\ (!bad2 => (ev1 <=> ev2))) =>
@@ -234,4 +234,3 @@ lemma nosmt upto_bad_or (ev1 ev2 bad2:bool) :
 
 lemma nosmt upto_bad_sub (ev bad:bool) :
   ev /\ ! bad => ev by [].
-

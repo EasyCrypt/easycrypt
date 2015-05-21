@@ -61,8 +61,6 @@ module Options : sig
   val set_implicits : scope -> bool -> scope
   val get_implicits : scope -> bool
 
-  val set_smtversion : scope -> EcHiGoal.smtversion -> scope
-  val get_smtversion : scope -> EcHiGoal.smtversion
 end
 
 (* -------------------------------------------------------------------- *)
@@ -157,17 +155,25 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Prover : sig
-  type options = {
-    po_timeout   : int option;
-    po_cpufactor : int option;
-    po_nprovers  : int option;
-    po_provers   : string list option;
+ type smt_options = {
+    po_timeout    : int option;
+    po_cpufactor  : int option;
+    po_nprovers   : int option;
+    po_provers    : string list option * (include_exclude * string) list;
+    po_verbose    : int option;
+    po_version    : [`Lazy | `Full] option;
+    pl_all        : bool option;
+    pl_max        : int option;
+    pl_iterate    : bool option;
+    pl_wanted     : EcProvers.hints option;
+    pl_unwanted   : EcProvers.hints option;
   }
+ val empty_options : smt_options
 
-  val process     : scope -> pprover_infos -> scope
+  val process     : scope -> pprover_infos -> scope 
   val set_wrapper : scope -> string option -> scope
-  val set_all     : scope -> scope
-  val set_default : scope -> options -> scope
+
+  val set_default : scope -> smt_options -> scope 
   val full_check  : scope -> scope
   val check_proof : scope -> bool -> scope
 end

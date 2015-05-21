@@ -3,8 +3,6 @@
  * Distributed under the terms of the CeCILL-B licence.
  * -------------------------------------------------------------------- *)
 
-pragma +Smt:lazy.
-
 (* -------------------------------------------------------------------- *)
 require import Fun Int Ring. import Ring.IntID.
 

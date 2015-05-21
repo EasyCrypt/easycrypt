@@ -48,6 +48,6 @@ proof -strict.
   case (Pr[A.main() @ &m : res] <= 1%r / 2%r) => Hle.
     cut h1 := HP &m (Neg_main(A)).
     cut h2 := Neg_A_Pr_minus A &m _; first by trivial.
-    by pose r := _ - _; cut ->: `|r| = -r; smt.
-  by cut h := HP &m A; smt.
+    by pose r := _ - _; cut ->: `|r| = -r; smt full.
+  by cut h := HP &m A; smt full.
 qed.

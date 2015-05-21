@@ -143,6 +143,14 @@ val notag  : 'a -> ('a, 'b) tagged
 val iterop: ('a -> 'a) -> int -> 'a -> 'a
 
 (* -------------------------------------------------------------------- *)
+module OneShot : sig
+  type t
+
+  val mk  : (unit -> unit) -> t
+  val now : t -> unit
+end
+
+(* -------------------------------------------------------------------- *)
 module Counter : sig
   type t
 
@@ -177,6 +185,9 @@ module String : sig
   include module type of BatString
 
   val split_lines : string -> string list
+
+  (* [matched_string tomatch s] return the sublist of tomatch which match s *)
+  val matched_string : string list -> string -> string list
 end
 
 (* -------------------------------------------------------------------- *)

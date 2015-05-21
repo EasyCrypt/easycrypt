@@ -1717,7 +1717,7 @@ let filter_task w3env hints task =
   else filter_task_r w3env hints task
 
 (* -------------------------------------------------------------------- *)
-let check_goal ?notify me_of_mt env pi hints (hyps, concl) =
+let check_goal ?notify me_of_mt env pi (hyps, concl) =
   let env = ref env in
   let trans_tv id = env := trans_tv !env id in
 
@@ -1764,5 +1764,5 @@ let check_goal ?notify me_of_mt env pi hints (hyps, concl) =
   List.iter trans_tv (List.map fst hyps.h_tvar);
   List.iter trans_hyp (List.rev hyps.h_local);
   let env, _, concl = trans_form !env concl in
-  let task = filter_task env hints env.logic_task in
-    check_w3_formula ?notify pi task (force_prop concl)
+  let task = env.logic_task in 
+  check_w3_formula ?notify pi task (force_prop concl)

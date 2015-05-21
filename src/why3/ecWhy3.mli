@@ -57,5 +57,5 @@ type me_of_mt = EcIdent.t -> module_type -> mod_restr -> module_expr
 
 val check_goal :
      ?notify:notify -> me_of_mt -> env
-  -> prover_infos -> hints -> hyps * form
+  -> prover_infos -> hyps * form
   -> bool

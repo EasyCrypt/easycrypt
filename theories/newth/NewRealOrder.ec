@@ -30,7 +30,7 @@ by smt.
 
 lemma nosmt ler_def (x y : real):
   (x <= y) <=> (`|y - x| = y - x)
-by smt.
+by smt full.
 
 lemma nosmt ltr_def (x y : real):
   (x < y) <=> (y <> x) /\ (x <= y)
@@ -98,7 +98,7 @@ by smt.
 
 lemma nosmt normr_idP (x : real):
   (`|x| = x) <=> (0%r <= x)
-by smt.
+by smt full.
 
 lemma nosmt ger0_norm (x : real):
   0%r <= x => `|x| = x
@@ -130,7 +130,7 @@ by smt.
 
 lemma nosmt ler0_def (x : real):
   (x <= 0%r) <=> (`|x| = - x)
-by smt.
+by smt full.
 
 lemma nosmt normr_id (x : real):
   `| `|x| | = `|x|
@@ -138,11 +138,11 @@ by smt.
 
 lemma nosmt normr_ge0 (x : real):
   0%r <= `|x|
-by smt.
+by smt full.
 
 lemma nosmt ler0_norm (x : real):
   x <= 0%r => `|x| = - x
-by smt.
+by smt full.
 
 lemma nosmt gtr0_norm (x : real):
   0%r < x => `|x| = x
@@ -222,15 +222,15 @@ by smt.
 
 lemma nosmt normr_le0 (x : real):
   (`|x| <= 0%r) <=> (x = 0%r)
-by smt.
+by smt full.
 
 lemma nosmt normr_lt0 (x : real):
   ! (`|x| < 0%r)
-by smt.
+by smt full.
 
 lemma nosmt normr_gt0 (x : real):
   (0%r < `|x|) <=> (x <> 0%r)
-by smt.
+by smt full.
 
 lemma nosmt ler_oppr (x y : real):
   (x <= - y) <=> (y <= - x)
@@ -452,11 +452,11 @@ by smt.
 
 lemma nosmt ler_pmul (x1 y1 x2 y2 : real):
   0%r <= x1 => 0%r <= x2 => x1 <= y1 => x2 <= y2 => x1 * x2 <= y1 * y2
-by smt.
+by admit. (* Connection to SMT-LIB *)
 
 lemma nosmt ltr_pmul (x1 y1 x2 y2 : real):
   0%r <= x1 => 0%r <= x2 => x1 < y1 => x2 < y2 => x1 * x2 < y1 * y2
-by smt.
+by smt full.
 
 lemma nosmt ltrN10:
   -1%r < 0%r 
@@ -556,7 +556,7 @@ by smt.
 
 lemma nosmt gtr_pmull (x y : real):
   0%r < y => (x * y < y) <=> (x < 1%r)
-by smt.
+by smt full.
 
 lemma nosmt ger_pmulr (x y : real):
   0%r < y => (y * x <= y) <=> (x <= 1%r)
@@ -564,7 +564,7 @@ by smt.
 
 lemma nosmt gtr_pmulr (x y : real):
   0%r < y => (y * x < y) <=> (x < 1%r)
-by smt.
+by smt full.
 
 lemma nosmt ler_nmull (x y : real):
   y < 0%r => (y <= x * y) <=> (x <= 1%r)
@@ -608,23 +608,23 @@ by smt.
 
 lemma nosmt invr_gt0 (x : real):
   (0%r < inv x) <=> (0%r < x)
-by smt.
+by admit. (* Connection with SMT-LIB *)
 
 lemma nosmt invr_ge0 (x : real):
   (0%r <= inv x) <=> (0%r <= x)
-by smt.
+by admit. (* Connection with SMT-LIB *)
 
 lemma nosmt invr_lt0 (x : real):
   (inv x < 0%r) <=> (x < 0%r)
-by smt.
+by admit. (* Connection with SMT-LIB *)
 
 lemma nosmt invr_le0 (x : real):
   (inv x <= 0%r) <=> (x <= 0%r)
-by smt.
+by admit. (* Connection with SMT-LIB *)
 
 lemma nosmt divr_ge0 (x y : real):
   0%r <= x => 0%r <= y => 0%r <= x / y
-by smt.
+by admit. (* Connection with SMT-LIB *)
 
 lemma nosmt divr_gt0 (x y : real):
   0%r < x => 0%r < y => 0%r < x / y
@@ -656,16 +656,16 @@ by smt.
 
 lemma nosmt ler_nnorml (x y : real):
   y < 0%r => ! (`|x| <= y)
-by smt.
+by admit. (* Connection with SMT-LIB *)
 
 lemma nosmt ltr_nnorml (x y : real):
   y <= 0%r => ! (`|x| < y)
-by smt.
+by admit. (* Connection with SMT-LIB *)
 
 lemma nosmt eqr_norm_id (x : real):
   (`|x| = x) <=> (0%r <= x)
-by smt.
+by admit. (* Connection with SMT-LIB *)
 
 lemma nosmt eqr_normN (x : real):
   (`|x| = - x) <=> (x <= 0%r)
-by smt.
+by admit. (* Connection with SMT-LIB *)

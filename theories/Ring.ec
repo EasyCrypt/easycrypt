@@ -388,4 +388,4 @@ clone IDomain as IntID with
   op   ( * ) <- Int.( * ),
   op   ( / ) <- Int.( * ),
   op   invr  <- (fun (z : int) => z)
-  proof * by smt:lazy.
+  proof * by smt.
