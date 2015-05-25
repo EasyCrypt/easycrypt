@@ -9,12 +9,6 @@ _tags
 myocamlbuild.ml
 config/tests.config
 
-# documentation
-doc/userman/Makefile
-doc/userman/*.sty
-doc/userman/*.bib
-doc/userman/*.tex
-
 # proofgeneral
 proofgeneral/Makefile
 proofgeneral/proof-site.patch
