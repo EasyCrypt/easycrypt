@@ -20,8 +20,8 @@ pred preim ['a 'b] (f : 'a -> 'b) p x = p (f x).
 op eta (f : 'a -> 'b) = fun x => f x
   axiomatized by etaE.
 
-lemma etaP (f : 'a -> 'b): eta f == f
-by [].
+lemma nosmt etaP (f : 'a -> 'b): eta f = f.
+proof. by apply/fun_ext; rewrite etaE. qed.
 
 (* -------------------------------------------------------------------- *)
 op (\o) ['a 'b 'c] (g : 'b -> 'c) (f : 'a -> 'b) =
