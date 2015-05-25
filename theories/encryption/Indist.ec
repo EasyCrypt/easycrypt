@@ -116,7 +116,7 @@ section.
       Pr[INDR(O,A).main() @ &m : res /\ p (glob A) (glob O) C.c])/2%r.
   proof strict.
    cut := Sample_bool WA &m 
-     (fun (g:glob WA), let (b,c,go,ga) = g in p ga go c) => /= H.
+     (fun (g:glob WA), let (b,c,ga,go) = g in p ga go c) => /= H.
    cut -> : Pr[INDb(O, A).main() @ &m : res /\ p (glob A) (glob O) C.c] =
     Pr[MB.M.Rand(WA).main() @ &m : fst res = snd res /\ p (glob A) (glob O) C.c].
      byequiv (_: ={glob A,glob O} ==> ={glob A,glob O, C.c} /\

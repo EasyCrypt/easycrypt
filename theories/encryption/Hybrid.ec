@@ -343,7 +343,7 @@ section.
       by intros x Hx;rewrite Dinter.mu_x_def_in //;smt.
     pose ev := 
       fun (_j:int) (g:glob W(L(Ob))) (r:outputA),
-        let (l,l0,ge,ga) = g in p ga ge l r /\ l <= q.
+        let (l,l0,ga,ge) = g in p ga ge l r /\ l <= q.
     cut := M.Mean_uni (W(L(Ob))) &m ev (1%r/q%r) _ _ => //; simplify ev => ->.
     cut := M.Mean_uni (W(R(Ob))) &m ev (1%r/q%r) _ _ => //; simplify ev => ->.
     cut -> : Finite.toFSet (create (support [0..q - 1])) = Interval.interval 0 (q-1).
@@ -360,11 +360,12 @@ section.
       by rewrite Interval.mem_interval;smt.
     cut Hq : q%r <> 0%r by smt.
     fieldeq => //.
-    rewrite -(Mrplus.sum_comp (( * ) (-1)%r)) //;first intros x y;ringeq.
     rewrite (Mrplus_inter_shift 0 (q - 1 - 1) (-1)) /=.
-    cut -> : q - 1 - 1 - -1 = q - 1; first by smt.
-    rewrite Mrplus.sum_add2.
-    rewrite (Mrplus.NatMul.sum_const 0%r) /Mrplus.NatMul.( * ) /=;last ringeq.
+    have ->: q - 1 - 1 - -1 = q - 1 by smt.
+    rewrite -(Mrplus.sum_comp (( * ) (-q%r))) 1..2:smt.
+    rewrite -(Mrplus.sum_comp (( * ) (q%r))) 1..2:smt.
+    rewrite Mrplus.sum_add2 /=.
+    rewrite (Mrplus.NatMul.sum_const 0%r) /Mrplus.NatMul.( * ) //=.
     intros x; rewrite Interval.mem_interval => Hx.
     cut := WLR_shift &m x p' _ => //;simplify p' => ->.
       (* cut -> : x + -1 = x - 1     BUG *) 
