@@ -4,11 +4,7 @@
  * -------------------------------------------------------------------- *)
 
 (*** A formalization of pseudo-random functions **)
-require import Int.
-require import Real.
-require import Distr.
-require import FSet.
-require import FMap.
+require import Int Real Distr FSet FMap.
 
 (** A PRF is a family of functions F from domain D to finite range R
     indexed by a keyspace K equipped with a distribution dK. *)
@@ -19,7 +15,7 @@ type R.
 type K.
 
 op dK: K distr.
-axiom dK_ll: mu dK predT = 1%r.
+axiom dK_ll: is_lossless dK.
 
 op F:K -> D -> R.
 
@@ -33,7 +29,7 @@ module PRFr = {
 (** Security is expressed with respect to the Random Function defined
     by some distribution on (a subset of) R. *)
 op dR:R distr.
-axiom dR_ll: mu dR predT = 1%r.
+axiom dR_ll: is_lossless dR.
 
 module type PRF = {
   proc init(): unit
