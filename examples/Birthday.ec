@@ -1,22 +1,16 @@
-require import Option.
-require import Int.
-require import Real.
-require import Distr.
-require import List.
-require (*--*) Sum.
+require import Option Int List Real Distr Sum.
 (*---*) import Monoid.
 
 (** A non-negative integer q **)
-op q:int.
-axiom lt0q: 0 < q.
+op q : { int | 0 < q } as lt0q.
 
 (** A type T equipped with its full uniform distribution **)
 type T.
 
-op uT: T distr.
-axiom uT_ll: mu uT True = 1%r.
-axiom uT_uf: isuniform uT.
-axiom uT_fu: support uT = True.
+op uT: { T distr | is_uniform_over uT predT } as uT_uf_fu.
+lemma uT_ll: is_lossless uT by [].
+lemma uT_uf: is_subuniform uT by [].
+lemma uT_fu: is_full uT by [].
 
 (** A module that samples in uT on queries to s **)
 module Sample = {
@@ -107,9 +101,9 @@ section.
 
   local lemma pr_BSample &m:
     Pr[Exp(BSample,A).main() @ &m: `|Sample.l| <= q /\ !unique Sample.l]
-    <= (q^2)%r * mu uT ((=) witness).
+    <= (q^2)%r * mu uT (pred1 witness).
   proof.
-    fel 1 `|Sample.l| (fun x, q%r * mu uT ((=) witness)) q (!unique Sample.l) [BSample.s: (`|Sample.l| < q)]=> //.
+    fel 1 `|Sample.l| (fun x, q%r * mu uT (pred1 witness)) q (!unique Sample.l) [BSample.s: (`|Sample.l| < q)]=> //.
       (* Oh man ! *)
       rewrite Sum.int_sum_const //= /Sum.intval FSet.Interval.card_interval_max.
       cut ->: max (q - 1 - 0 + 1) 0 = q by smt.
@@ -120,10 +114,10 @@ section.
       proc; sp; if=> //; last by (hoare; auto; smt).
       wp; rnd (fun x, mem x Sample.l); skip=> //=.
       progress.
-        cut:= FSet.mu_Lmem_le_length (Sample.l{hr}) uT (mu uT ((=) witness)) _.
-        move=> x _; rewrite /mu_x; cut: mu uT ((=) x) = mu uT ((=) witness); last smt.
-        by apply uT_uf; rewrite -/(support _ _) uT_fu //=.
-        by rewrite -/List."`|_|"; smt.
+        cut:= FSet.mu_Lmem_le_length (Sample.l{hr}) uT (mu uT (pred1 witness)) _.
+        move=> x _; rewrite /mu_x; cut: mu uT (pred1 x) = mu uT (pred1 witness); last smt.
+        by apply/uT_uf; apply/uT_fu.
+        smt.
         by move: H4; rewrite unique_cons H0.
       by progress; proc; rcondt 2; auto; smt.
       by progress; proc; rcondf 2; auto.
@@ -131,7 +125,7 @@ section.
 
   lemma pr_collision &m:
     Pr[Exp(Sample,A).main() @ &m: !unique Sample.l]
-    <= (q^2)%r * mu uT ((=) witness).
+    <= (q^2)%r * mu uT (pred1 witness).
   proof.
     cut ->: Pr[Exp(Sample,A).main() @ &m: !unique Sample.l]
             = Pr[Exp(BSample,A).main() @ &m: `|Sample.l| <= q /\ !unique Sample.l].
