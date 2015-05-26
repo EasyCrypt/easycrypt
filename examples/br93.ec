@@ -1,4 +1,3 @@
-require import ROM.
 require import Array.
 require import FMap.
 require import FSet.
@@ -6,8 +5,8 @@ require import Int.
 require import Distr.
 require import Bool.
 require import Real.
-require import AWord.
-
+require (*--*) AWord.
+require (*--*) ROM.
 
 op k : int. (* size of message *)
 op l : int. (* size of randmness *)
@@ -41,7 +40,7 @@ axiom finvof : forall(pk : pkey, sk : skey, x : randomness),
 axiom fofinv : forall(pk : pkey, sk : skey, x : randomness),
  in_supp (pk,sk) keypairs => f pk (finv sk x) = x.
 
-axiom keypair_lossless : mu keypairs True = 1%r.
+axiom keypair_lossless : mu keypairs predT = 1%r.
 
 op uniform : plaintext distr = Plaintext.Dword.dword.
 op uniform_rand : randomness distr = Randomness.Dword.dword.
@@ -194,13 +193,13 @@ proof.
   progress;by smt.
 qed.
 
-lemma foo1 : forall (b:bool), mu {0,1} ((=) b) = 1%r / 2%r.
+lemma foo1 : forall (b:bool), mu {0,1} (pred1 b) = 1%r / 2%r.
 proof. intros b; apply (Bool.Dbool.mu_x_def b). qed. 
 
-lemma foo2 : mu uniform_rand True = 1%r.
+lemma foo2 : mu uniform_rand predT = 1%r.
 proof. apply Randomness.Dword.lossless. qed.
 
-lemma foo3 : mu uniform True = 1%r.
+lemma foo3 : mu uniform predT = 1%r.
 proof. apply Plaintext.Dword.lossless. qed.
 
 lemma prob1_1 : 
@@ -209,21 +208,21 @@ proof.
  intros &m.
  byphoare (_ : true ==> res); trivial.
    proc.
-   rnd ((=) b').
+   rnd (pred1 b').
    conseq ( _ : ==> true).
-    progress;apply foo1.
+    rewrite {2}pred1E; progress; apply foo1.
    call ( _ :true). 
    intros => O Hll;apply (lossless2 O) => //.
 
     apply lossless_ARO_o.   
-   inline CPA2(BR2,A).SO.enc;do 2! (wp;rnd (True));wp.
+   inline CPA2(BR2,A).SO.enc;do 2! (wp;rnd predT);wp.
    conseq ( _ : ==> true).
      rewrite foo2; rewrite foo3;progress.
    call (_ : true).
    intros => O Hll;apply (lossless1 O) => //.
      apply lossless_ARO_o.  
    inline CPA2(BR2,A).SO.kg.
-   wp;rnd (True);wp.
+   wp;rnd predT;wp.
    conseq ( _ : ==> true).
      progress;apply keypair_lossless. 
    call lossless_ARO_init;skip;trivial.

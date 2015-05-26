@@ -1,5 +1,4 @@
-require import Real.
-require import Distr.
+require import Real Distr.
 
 op max (x y:real) = if x <= y then y else x.
 
@@ -18,7 +17,6 @@ module type Exp = {
   proc main(): t
 }.
 
-(* This would be really easy if we had generalized "rewrite Pr" (with the ability to instantiate parameters) *)
 lemma Pr_split (G <: Exp) (Mem <: Mem) (A: (glob Mem) -> t -> bool) (F: (glob Mem) -> t -> bool) &m:
   Pr[G.main() @ &m: A (glob Mem) res /\ F (glob Mem) res]
   + Pr[G.main() @ &m: A (glob Mem) res /\ !F (glob Mem) res]
@@ -45,7 +43,8 @@ proof.
   rewrite -(Pr_split G1 Mem A F &m) -(Pr_split G2 Mem B F &m)=> ->.
   cut ->: forall (x y z:real), x + y - (z + y) = x - z by smt.
   apply (Trans _ (max Pr[G1.main() @ &m: A (glob Mem) res /\ F (glob Mem) res]
-                      Pr[G2.main() @ &m: B (glob Mem) res /\ F (glob Mem) res])); first smt.
+                      Pr[G2.main() @ &m: B (glob Mem) res /\ F (glob Mem) res]));
+    first smt full.
   cut H: forall (x y x' y':real), x <= x' => y <= y' => max x y <= max x' y' by smt.
   apply H.
     rewrite -(Pr_split G1 Mem F A &m) andC; smt.

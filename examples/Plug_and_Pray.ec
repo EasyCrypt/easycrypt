@@ -1,8 +1,5 @@
-require import Distr.
-require import Real.
-require import Int.
+require import Pair Int Real Distr.
 (*---*) import EuclDiv.
-require import Pair.
 
 (* 
   TODO:
@@ -65,7 +62,7 @@ proof.
               x = if 0 <= psi (glob G){hr} o{hr} < bound
                     then psi (glob G){hr} o{hr}
                     else 0)
-            = ((=)  (if 0 <= psi (glob G){hr} o{hr} < bound
+            = (pred1  (if 0 <= psi (glob G){hr} o{hr} < bound
                        then psi (glob G){hr} o{hr}
                        else 0)).
       by apply fun_ext=> x //=; rewrite H /= (eq_sym x).

@@ -1,9 +1,4 @@
-require import Int.
-require import Real.
-require import Distr.
-require import List.
-require import FMap.
-require import FSet.
+require import Int List Real FSet FMap Distr.
 require (*--*) Monoid.
 (*---*) import Monoid.Miplus.
 
@@ -12,17 +7,16 @@ require (*--*) Monoid.
     and a type for its actual output. *)
 type seed.
 
-op dseed: seed distr.
-axiom dseedL: mu dseed True = 1%r.
-axiom dseedU: isuniform dseed.
-axiom dseedF (x:seed): in_supp x dseed.
+op dseed: { seed distr | is_uniform_over dseed predT } as dseed_uf_fu.
+lemma dseed_ll:  is_lossless dseed by [].
+lemma dseed_suf: is_subuniform dseed by [].
+lemma dseed_fu:  is_full dseed by [].
 
 op pr_dseed = mu_x dseed witness.
 
 type output.
 
-op dout: output distr.
-axiom doutL: mu dout True = 1%r.
+op dout: { output distr | is_lossless dout } as dout_ll.
 
 (** We use a PRF that, on input a seed, produces a seed and an output... *)
 module type PRF = {
@@ -109,7 +103,7 @@ module F = {
 
 lemma FfL: islossless F.f.
 proof.
-by proc; wp; do!rnd (True);
+by proc; wp; do!rnd predT;
    skip; smt.
 qed.
 
@@ -154,7 +148,7 @@ module Psample = {
 }.
 
 lemma PsampleprgL: islossless Psample.prg.
-proof. by proc; wp; do 2!rnd (True); skip; smt. qed.
+proof. by proc; wp; do 2!rnd predT; skip; smt. qed.
 
 (** In preparation of the eager/lazy reasoning step *)
 (* Again, note that none of these have their own state.
@@ -266,7 +260,7 @@ section.
     by move: H6; rewrite notBad=> [logP_unique contradiction]; smt.
     (* Plog.prg is lossless when Bad holds *)
     by intros=> _ _; proc; inline F.f;
-       wp; do 2!rnd (True); wp;
+       wp; do 2!rnd predT; wp;
        skip; smt.
     (* Psample.prg preserves bad *)
     move=> _ //=; proc.
@@ -296,8 +290,8 @@ section.
   proof.
   proc.
   while (true) (n - length P.logP);
-    first by intros=> z; wp; rnd (True); skip; smt.
-  by rnd (True); wp; skip; smt.
+    first by intros=> z; wp; rnd predT; skip; smt.
+  by rnd predT; wp; skip; smt.
   qed.
 
   local module Exp'A = Exp'(A).
@@ -500,15 +494,15 @@ section.
       by wp; rnd=> //.
       wp; rnd; skip; progress.
       generalize H2; rewrite !FromInt.Add Mul_distr_r /Bad -nor=> //= [Hu Hf].
-      apply (Real.Trans _ (mu dseed ((fun x, mem x (dom F.m{hr}))
-                                  \/ (fun x, mem x P.logP{hr}))));
-        first by apply mu_sub=> x /=; rewrite /Pred.(\/); smt.
+      apply (Real.Trans _ (mu dseed (predU (fun x, mem x (dom F.m{hr}))
+                                           (fun x, mem x P.logP{hr}))));
+        first by apply mu_sub=> x /=; smt.
       apply mu_or_le.
         rewrite (mu_eq _ _ (cpMem (dom F.m{hr})));
           first by intros x; rewrite /= /cpMem; smt.
         apply (Real.Trans _ ((card (dom F.m{hr}))%r * pr_dseed)).
           apply mu_cpMem_le=> x _.
-            by rewrite (dseedU x witness) 3:/pr_dseed // dseedF.
+            by rewrite (dseed_suf x witness) 3:/pr_dseed // dseed_fu.
             by apply CompatOrderMult; smt.
         by apply mu_Lmem_le_length; smt.
         conseq Hw; progress=> //.
