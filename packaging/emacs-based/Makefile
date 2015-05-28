@@ -1,122 +1,17 @@
 # -*- Makefile -*-
 
 # --------------------------------------------------------------------
-OPAM ?= 4.01.0
-DEST ?= easycrypt
-TAG  ?= $(shell date +"%Y-%m-%d")
-PUB  ?= x86,x64,macos
-
-# --------------------------------------------------------------------
-.PHONY: default base posix linux-32 linux-64 macos win32
-.PHONY: export export-linux-32 export-linux-64 export-macos
-.PHONY: build-linux-32 build-linux-64 build-macos
-.PHONY: publish publish-win32
-
-RSYNC = rsync -avt --exclude .gitignore --exclude .DS_Store
+.PHONY: default linux macos clean
 
 # --------------------------------------------------------------------
 default:
-	@echo "make [linux-32|linux-64|macos]"
+	@echo "make [linux|macos]"
 
-# --------------------------------------------------------------------
-base:
-	rm -rf $(DEST) && mkdir $(DEST)
-	$(RSYNC) package/ $(DEST)/
-	make -C ../.. DESTDIR=ide/emacs-based/$(DEST) PREFIX=/ install
+linux:
+	scripts/build-linux.sh
 
-# --------------------------------------------------------------------
-posix: base
-	$(RSYNC) ../../_tools/ocaml-$(OPAM)/opam/system/lib/why3/lib/   $(DEST)/lib/
-	$(RSYNC) ../../_tools/ocaml-$(OPAM)/opam/system/lib/why3/share/ $(DEST)/share/
-	mv $(DEST)/lib/why3/why3-cpulimit $(DEST)/bin/
-	cp scripts/run-easycrypt $(DEST)/
+macos:
+	@echo "not implemented yet" >&2 && false
 
-# --------------------------------------------------------------------
-linux-32: posix
-	$(RSYNC) provers/linux-x86/ $(DEST)/
-	tar --owner=0 --group=0 -czf easycrypt-$(TAG)-x86.tar.gz easycrypt
-
-# --------------------------------------------------------------------
-linux-64: posix
-	$(RSYNC) provers/linux-x64/ $(DEST)/
-	tar --owner=0 --group=0 -czf easycrypt-$(TAG)-x64.tar.gz easycrypt
-
-# --------------------------------------------------------------------
-macos: posix
-	$(RSYNC) extra/macos/ $(DEST)/share/
-	$(RSYNC) provers/macos/ $(DEST)/
-	/usr/local/bin/gtar --owner=0 --group=0 -czf easycrypt-$(TAG)-macos.tar.gz easycrypt
-
-# --------------------------------------------------------------------
-win32: base
-	cp scripts/run-easycrypt.bat $(DEST)/
-	$(RSYNC) /opt/wodi32/lib/why3   $(DEST)/lib/
-	$(RSYNC) /opt/wodi32/share/why3 $(DEST)/share/
-	mv $(DEST)/lib/why3/why3-cpulimit.exe $(DEST)/bin/
-	cp $(DEST)/etc/why3-win32.conf $(DEST)/etc/why3.conf
-	$(RSYNC) extra/win32/ $(DEST)/share/
-	$(RSYNC) provers/win32/ $(DEST)/
-	zip -r easycrypt-$(TAG)-win32.zip easycrypt/
-
-#	i686-w64-mingw32-gcc -municode -mwindows -o $(DEST)/run-easycrypt.exe \
-#	  scripts/run-easycrypt-win32.c
-
-# --------------------------------------------------------------------
-export:
-	if [ ! -z "${ECHOST}" ]; then \
-	  rsync -avtRa --rsh=ssh --delete \
-	    extra provers package/share/easycrypt/pg/ProofGeneral \
-	    ${ECHOST}; \
-	fi
-
-# --------------------------------------------------------------------
-export-linux-32:
-	$(MAKE) export ECHOST="debian-32.local:easycrypt/ide/emacs-based"
-
-# --------------------------------------------------------------------
-export-linux-64:
-	$(MAKE) export ECHOST="debian-64.local:easycrypt/ide/emacs-based"
-
-# --------------------------------------------------------------------
-export-macos:
-	$(MAKE) export ECHOST="macos.local:easycrypt/ide/emacs-based"
-
-# --------------------------------------------------------------------
-build-linux-32: export-linux-32
-	ssh -A debian-32.local 'set -e; cd easycrypt; \
-	  source ./scripts/activate-toolchain.sh; \
-	  make clean; git pull --rebase; make; \
-	  make TAG=$(TAG) -C ide/emacs-based linux-32'
-	scp debian-32.local:easycrypt/ide/emacs-based/easycrypt-$(TAG)-x86.tar.gz .
-
-# --------------------------------------------------------------------
-build-linux-64: export-linux-64
-	ssh -A debian-64.local 'set -e; cd easycrypt; \
-	  source ./scripts/activate-toolchain.sh; \
-	  make clean; git pull --rebase; make; \
-	  make TAG=$(TAG) -C ide/emacs-based linux-64'
-	scp debian-64.local:easycrypt/ide/emacs-based/easycrypt-$(TAG)-x64.tar.gz .
-
-# --------------------------------------------------------------------
-build-macos: export-macos
-	ssh -A macos.local 'set -e; cd easycrypt; \
-	  source ./scripts/activate-toolchain.sh; \
-	  make clean; git pull --rebase; make; \
-	  make TAG=$(TAG) -C ide/emacs-based macos'
-	scp macos.local:easycrypt/ide/emacs-based/easycrypt-$(TAG)-macos.tar.gz .
-
-# --------------------------------------------------------------------
-publish:
-	curl --progress-bar --verbose --user "$(USER)" --digest -T \
-	  "easycrypt-$(TAG)-{$(PUB)}.tar.gz" \
-	  https://www.easycrypt.info/binaries/
-
-# --------------------------------------------------------------------
-publish-win32:
-	curl --progress-bar --verbose --user "$(USER)" --digest -T \
-	  "easycrypt-$(TAG)-win32.zip" \
-	  https://www.easycrypt.info/binaries/
-
-# --------------------------------------------------------------------
 clean:
-	rm -rf $(DEST)
+	rm -rf _build
