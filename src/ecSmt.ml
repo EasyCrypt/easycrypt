@@ -1356,10 +1356,11 @@ let relevant_clause ri other =
   in aux ri.ri_p other
 
 (* -------------------------------------------------------------------- *)
+let cnt = Counter.create ()
+
 let check ?notify pi (hyps : LDecl.hyps) (concl : form) =
-  (try Unix.unlink "task.why" with Unix.Unix_error _ -> ());
-  let out_task task = 
-    let stream = open_out "task.why" in
+  let out_task filename task =
+    let stream = open_out filename in
     EcUtils.try_finally
       (fun () -> Format.fprintf
         (Format.formatter_of_out_channel stream)
@@ -1382,9 +1383,14 @@ let check ?notify pi (hyps : LDecl.hyps) (concl : form) =
   let pr    = WDecl.create_prsymbol (WIdent.id_fresh "goal") in
   let decl  = WDecl.create_prop_decl WDecl.Pgoal pr wterm in
 
-  let execute_task toadd = 
+  let execute_task toadd =
     List.iter (trans_axiom tenv) toadd;
     let task = WTask.add_decl tenv.te_task decl in
+    let tkid = Counter.next cnt in
+
+    (Os.getenv "EC_WHY3" |> oiter (fun filename ->
+      let filename = Printf.sprintf "%.4d-%s" tkid filename in
+      out_task filename task));
     let (tp, res) = EcUtils.timed (P.execute_task ?notify pi) task in
 
     if 1 <= pi.P.pr_verbose then
