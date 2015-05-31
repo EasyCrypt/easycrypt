@@ -11,7 +11,7 @@ linux:
 	scripts/build-linux.sh
 
 macos:
-	@echo "not implemented yet" >&2 && false
+	scripts/build-macos.sh
 
 clean:
 	rm -rf _build
