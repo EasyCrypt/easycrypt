@@ -1101,7 +1101,6 @@ let add_core_bindings (env : tenv) =
   env.te_task <- WTask.add_ty_decl env.te_task ts_mem
 
 (* -------------------------------------------------------------------- *)
-
 let unwanted_ops = 
   Sp.of_list [
     CI_Unit.p_tt;
@@ -1352,101 +1351,16 @@ let relevant_clause ri other =
       else 
         let p = p +. (1. -. p) /. ri.ri_c in
         update_rs ri rel;
-        aux p other in
-  let other = aux ri.ri_p other in
-  other
+        aux p other
 
-
-  
-(*  
-  
-  
-
-
-let relevant_clause env pi rs = 
-  let open EcProvers in 
-  if pi.pr_all then 
-    let init_select _p ax = not ax.ax_nosmt in
-    EcEnv.Ax.all ~check:init_select env
-  else 
-    let ri_p           = 0.6 in
-    let ri_c           = 2.4 in
-    let unwanted_ax p  = Hints.mem p pi.pr_unwanted in
-    let wanted_ax   p  = Hints.mem p pi.pr_wanted in
-
-    (* [ftab] frequency table number of occurency of operators *)
-    let fr = Frequency.create unwanted_ops in
-    let rel = ref [] in
-    let other = ref [] in
-    let add ax l = l := ax :: !l in
-    let do1 p ax = 
-      if not ax.ax_nosmt && not (unwanted_ax p) then begin
-        Frequency.add fr ax;
-        let used = 
-          omap_dfl (Frequency.f_ops unwanted_ops) 
-            Frequency.r_empty ax.ax_spec in
-        let paxu = (p,ax), used in
-        if wanted_ax p then add paxu rel else add paxu other
-      end in
-    EcEnv.Ax.iter do1 env;
-
-    if pi.pr_max <= List.length !rel then
-      List.rev_map (fun (pax,_) -> pax) !rel
-    else 
-      (* [symbols_of ax] return the set of operator used in ax *)
-      let symbols_of (_,s) = s in
-      let frequency_function freq = 1. +. log1p (float_of_int freq) in
-      let toadd = ref [] in
-      let update_rs rs0 rs1 rel =
-        let rs = 
-          List.fold_left (fun rs ax -> 
-            add (fst ax) toadd; Frequency.r_union (symbols_of ax) rs) rs1 rel in
-        let new_rs = fst (Frequency.r_diff rs1 rs0) in
-        Sp.fold (Frequency.f_ops_oper unwanted_ops env) new_rs rs in
-      
-      let clause_mark p rs other =
-        let rel = ref [] in
-        let newo = ref [] in
-        let do1 ax = 
-          let cs = symbols_of ax in
-          let r  = Frequency.r_inter cs rs in
-          let ir = Frequency.r_diff cs r in
-          let weight path m = 
-            let freq = Frequency.frequency fr path in
-            let w = frequency_function freq in
-            m +. w in
-          let m = Frequency.r_fold weight r 0. in
-          let m = m /. (m +. float_of_int (Frequency.r_card ir)) in
-          if p <= m then rel := ax :: !rel else newo := ax :: !newo in
-        List.iter do1 other;
-        !rel, !newo in
-      
-      let rec aux rs0 rs1 p other = 
-        if pi.pr_max <= List.length !toadd then ()
-        else
-          let rel, other = clause_mark p rs1 other  in
-          if rel = [] then ()
-          else
-            let rs2 = update_rs rs0 rs1 rel in
-            let p = p +. (1. -. p) /. ri_c in
-            aux rs1 rs2 p other in
-
-      let rs1 = update_rs Frequency.r_empty rs !rel in
-      aux rs rs1 ri_p !other; 
-      !toadd
-
-let select_add_axioms genv pi rs =
-  let toadd = relevant_clause genv.te_env pi rs in
-  List.iter (trans_axiom genv) toadd 
-
-*)
-
+  in aux ri.ri_p other
 
 (* -------------------------------------------------------------------- *)
+let cnt = Counter.create ()
+
 let check ?notify pi (hyps : LDecl.hyps) (concl : form) =
-  (try Unix.unlink "task.why" with Unix.Unix_error _ -> ());
-  let out_task task = 
-    let stream = open_out "task.why" in
+  let out_task filename task =
+    let stream = open_out filename in
     EcUtils.try_finally
       (fun () -> Format.fprintf
         (Format.formatter_of_out_channel stream)
@@ -1468,59 +1382,63 @@ let check ?notify pi (hyps : LDecl.hyps) (concl : form) =
   let wterm = Cast.force_prop (trans_form (tenv, lenv) concl) in
   let pr    = WDecl.create_prsymbol (WIdent.id_fresh "goal") in
   let decl  = WDecl.create_prop_decl WDecl.Pgoal pr wterm in
-  let execute_task toadd = 
+
+  let execute_task toadd =
     List.iter (trans_axiom tenv) toadd;
     let task = WTask.add_decl tenv.te_task decl in
-    let (tp,res) = EcUtils.timed (P.execute_task ?notify pi) task in
-    if 1 <= pi.P.pr_verbose then
-      Printf.eprintf "[W]SMT finished : %f\n%!" tp;
-    res in
+    let tkid = Counter.next cnt in
 
-  (* perform stuff *)
+    (Os.getenv "EC_WHY3" |> oiter (fun filename ->
+      let filename = Printf.sprintf "%.4d-%s" tkid filename in
+      out_task filename task));
+    let (tp, res) = EcUtils.timed (P.execute_task ?notify pi) task in
+
+    if 1 <= pi.P.pr_verbose then
+      notify |> oiter (fun notify -> notify `Warning (lazy (
+        Printf.sprintf "SMT done: %.5f\n%!" tp)));
+    res in
+  
   if pi.P.pr_all then
     let init_select p ax = 
       not ax.ax_nosmt && not (P.Hints.mem p pi.P.pr_unwanted) in
-    execute_task (EcEnv.Ax.all ~check:init_select env) = Some true
+    (execute_task (EcEnv.Ax.all ~check:init_select env) = Some true)
   else
-    let rs    = Frequency.f_ops_goal unwanted_ops hyps.h_local concl in
+    let rs = Frequency.f_ops_goal unwanted_ops hyps.h_local concl in
     let ri, other = init_relevant env pi rs in
-    if not pi.P.pr_iterate then 
-      let _other = relevant_clause ri other in
-      execute_task ri.toadd = Some true
-    else 
+    if not pi.P.pr_iterate then begin
+      ignore (relevant_clause ri other);
+      (execute_task ri.toadd = Some true)
+    end else
       let other, res =
-        if ri.toadd = [] then 
+        if List.is_empty ri.toadd then 
           let other = relevant_clause ri other in
           other, execute_task ri.toadd 
         else other, execute_task ri.toadd in
-      if res <> None then oget res
-      else
+
+      match res with Some res -> res | None -> 
         let rec aux ml other i =
-(*          Format.eprintf "EcSmt.iterate %i@." i; *)
-          if i = 0 then begin
+          if i <= 0 then begin
             ri.ri_max <- max_int;
             ri.ri_p   <- 0.;
             ri.toadd  <- [];
             let other = relevant_clause ri other in
-            if ri.toadd = [] then 
-              let toadd = List.map fst other in
-              execute_task toadd = Some true
+            if List.is_empty ri.toadd then 
+              (execute_task (List.fst other) = Some true)
             else
-              let res = execute_task ri.toadd in
-              if res <> None then oget res
-              else 
-                let toadd = List.map fst other in
-                execute_task toadd = Some true
+              match execute_task ri.toadd with
+              | None -> (execute_task (List.fst other) = Some true)
+              | Some res -> res
           end else begin 
             ri.ri_max <- ml;
             ri.toadd  <- [];
             let other = relevant_clause ri other in
-            let ml = min (ml+ml+30) max_int in
-            let i  = i - 1 in
-            if ri.toadd = [] then aux ml other i
+            let ml = min (2*ml+30) max_int in
+            if   List.is_empty ri.toadd
+            then aux ml other (i-1)
             else 
-              let res = execute_task ri.toadd in
-              if res = None then aux ml other i 
-              else oget res
-          end in
-        aux pi.P.pr_max other 4
+              match execute_task ri.toadd with
+              | None -> aux ml other (i-1)
+              | Some res -> res
+          end
+
+        in aux pi.P.pr_max other 4

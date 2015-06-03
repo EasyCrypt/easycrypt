@@ -505,6 +505,10 @@ module List = struct
     match l with
     | [_] -> true
     |  _  -> false
+
+  (* ------------------------------------------------------------------ *)
+  let fst xs = List.map fst xs
+  let snd xs = List.map snd xs
 end
 
 (* -------------------------------------------------------------------- *)

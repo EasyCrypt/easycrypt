@@ -235,6 +235,9 @@ module List : sig
   include module type of Parallel
 
   (*------------------------------------------------------------------ *)
+  val fst : ('a * 'b) list -> 'a list
+  val snd : ('a * 'b) list -> 'b list
+
   val mbfilter   : ('a -> bool) -> 'a list -> 'a list
   val fusion     : ('a -> 'a -> 'a) -> 'a list -> 'a list -> 'a list
   val is_unique  : ?eq:('a -> 'a -> bool) -> 'a list -> bool
