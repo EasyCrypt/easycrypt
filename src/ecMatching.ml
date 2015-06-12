@@ -253,8 +253,6 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
   in
 
   let rec doit env ((subst, mxs) as ilc) ptn subject =
-    let ppe = EcPrinting.PPEnv.ofenv env in
-
     try
       match ptn.f_node, subject.f_node with
       | Flocal x1, Flocal x2 when Mid.mem x1 mxs -> begin
