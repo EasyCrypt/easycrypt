@@ -308,8 +308,14 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
       | Fint i1, Fint i2 ->
           if i1 <> i2 then raise MatchFailure
 
-      | Fapp (f1, fs1), Fapp (f2, fs2) ->
-          doit_args env ilc (f1::fs1) (f2::fs2)
+      | Fapp (f1, fs1), Fapp (f2, fs2) -> begin
+          try doit_args env ilc (f1::fs1) (f2::fs2)
+          with MatchFailure when opts.fm_conv  ->
+            let rptn = f_betared ptn in
+            if   ptn.f_tag <> rptn.f_tag
+            then doit env ilc rptn subject
+            else raise MatchFailure
+      end
 
       | Fglob (mp1, me1), Fglob (mp2, me2) ->
           let mp1 = EcEnv.NormMp.norm_mpath env mp1 in
