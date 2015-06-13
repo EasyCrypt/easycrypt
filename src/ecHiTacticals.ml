@@ -99,9 +99,12 @@ and process1_progress (ttenv : ttenv) options t (tc : tcenv1) =
   let options =
     EcLowGoal.PGOptions.merge
       EcLowGoal.PGOptions.default
-      options
+      options in
 
-  in EcLowGoal.t_progress ~options t tc
+  FApi.t_seq
+    EcPhlAuto.t_trivial
+    (EcLowGoal.t_progress ~options t)
+    tc
 
 (* -------------------------------------------------------------------- *)
 and process1_seq (ttenv : ttenv) (ts : ptactic list) (tc : tcenv1) =
