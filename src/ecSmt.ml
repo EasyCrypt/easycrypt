@@ -481,7 +481,6 @@ let w3op_ho_lsymbol genv wop =
       wop.w3op_ho <- `HO_DONE ls; ls
 
 (* -------------------------------------------------------------------- *)
-
 let rec highorder_type targs tres =
   match targs with
   | [] -> odfl WTy.ty_bool tres
@@ -874,8 +873,9 @@ and create_op ?(body = false) (genv : tenv) p =
     then None
     else Some (trans_ty (genv, lenv) codom) in
 
-  (* FIXME: this is a ack for constructor, when the constructor is translate
-     before its type, should we do something for other like projection ... *)
+  (* FIXME: this is a ack for constructor, when the constructor is
+   * translated before its type. Should the same be done for some
+   * other kinds of operators, like projections? *)
   try Hp.find genv.te_op p with Not_found -> 
 
   let known, ls =
@@ -995,18 +995,18 @@ let trans_axiom genv (p, ax) =
   | _ -> ()
 
 (* -------------------------------------------------------------------- *)
-let mk_pred1 f l _ = f (as_seq1 l)
-let mk_pred2 f l _ = curry f (as_seq2 l)
+let mk_predb1 f l _ = f (Cast.prop_of_bool (as_seq1 l))
+let mk_predb2 f l _ = curry f (t2_map Cast.prop_of_bool (as_seq2 l))
 
 let mk_true  = fun _ _ -> WTerm.t_true
 let mk_false = fun _ _ -> WTerm.t_false
-let mk_not   = mk_pred1 WTerm.t_not
-let mk_anda  = mk_pred2 WTerm.t_and_asym
-let mk_and   = mk_pred2 WTerm.t_and
-let mk_ora   = mk_pred2 WTerm.t_or_asym
-let mk_or    = mk_pred2 WTerm.t_or
-let mk_imp   = mk_pred2 WTerm.t_implies
-let mk_iff   = mk_pred2 WTerm.t_iff
+let mk_not   = mk_predb1 WTerm.t_not
+let mk_anda  = mk_predb2 WTerm.t_and_asym
+let mk_and   = mk_predb2 WTerm.t_and
+let mk_ora   = mk_predb2 WTerm.t_or_asym
+let mk_or    = mk_predb2 WTerm.t_or
+let mk_imp   = mk_predb2 WTerm.t_implies
+let mk_iff   = mk_predb2 WTerm.t_iff
 
 let core_types = [
   (CI_Unit.p_unit, WTy.ts_tuple 0);
