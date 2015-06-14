@@ -698,10 +698,6 @@ and simplify_rec ri hyps f =
       let f'    =  EcFol.FSmart.f_app (f, app1) app2 in
       (try h_red ri hyps f' with NotReducible -> f')
 
-  | Fapp({f_node = Fop _} as fo, args) -> 
-      let f' = f_app fo (List.map (simplify ri hyps) args) f.f_ty in
-      (try h_red ri hyps f' with NotReducible -> f')
-
   | FhoareF hf when ri.modpath -> 
       let hf_f = EcEnv.NormMp.norm_xfun (LDecl.toenv hyps) hf.hf_f in
       f_map (fun ty -> ty) (simplify ri hyps) (f_hoareF_r { hf with hf_f })
