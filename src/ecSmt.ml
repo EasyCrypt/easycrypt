@@ -995,8 +995,8 @@ let trans_axiom genv (p, ax) =
   | _ -> ()
 
 (* -------------------------------------------------------------------- *)
-let mk_predb1 f l _ = f (Cast.prop_of_bool (as_seq1 l))
-let mk_predb2 f l _ = curry f (t2_map Cast.prop_of_bool (as_seq2 l))
+let mk_predb1 f l _ = f (Cast.force_prop (as_seq1 l))
+let mk_predb2 f l _ = curry f (t2_map Cast.force_prop (as_seq2 l))
 
 let mk_true  = fun _ _ -> WTerm.t_true
 let mk_false = fun _ _ -> WTerm.t_false
