@@ -500,13 +500,11 @@ module List = struct
     let sort = if stable then List.stable_sort else List.sort in
     sort cmp xs
 
-  let min_cmp lt l = 
-    match l with
-    | [] -> raise (Invalid_argument "List.min_cmp") 
-    | x::l ->
-      let min = ref x in
-      List.iter (fun x -> if lt x !min then min := x) l;
-      !min
+  let min ?(cmp = Pervasives.compare) s = 
+    reduce (fun x y -> if cmp x y < 0 then x else y) s
+
+  let max ?(cmp = Pervasives.compare) s = 
+    reduce (fun x y -> if cmp x y > 0 then x else y) s
 
   let is_singleton l = 
     match l with
@@ -573,51 +571,55 @@ module String = struct
 
   let rev (s:string) = init (length s) (fun i -> s.[length s - 1 - i]) 
 
-  (* [matched_string tomatch s] return the sublist of tomatch which match s *)
-  let all_matched tomatch s = 
-    let matched = List.map (fun s -> s, 0) tomatch in
-    let rec aux matched i = 
-      if i = length s || matched = [] then List.map fst matched 
-      else
-        let c = s.[i] in
-        let do1 (tomatch,k) = 
-          try Some (tomatch, index_from tomatch k c + 1)
-          with Invalid_argument _ 
-          | Not_found -> None in
-        let matched = List.filter_map do1 matched in
-        aux matched (i+1) in
-    aux matched 0
+  (* ------------------------------------------------------------------ *)
+  module OptionMatching = struct
+    let all_matching tomatch s = 
+      let matched = List.map (fun s -> (s, 0)) tomatch in
 
-  let first_matched tomatch s =
-    let matched = List.map (fun s -> s, 0) tomatch in
-    let rec aux matched i = 
-      if i = length s || matched = [] then List.map fst matched 
-      else
-        let c = s.[i] in
-        let do1 (tomatch,k) = 
-          try Some (tomatch, index_from tomatch k c + 1)
-          with Invalid_argument _ 
-          | Not_found -> None in
-        let matched = List.filter_map do1 matched in
-        let lt x y = snd x < snd y in
-        let min = List.min_cmp lt matched in
-        let oge x y = if snd y <= snd x then Some y else None in
-        let matched = List.filter_map (oge min) matched in
-        if List.is_singleton matched then List.map fst matched
-        else aux matched (i+1) in
-    try aux matched 0
-    with Invalid_argument "List.min_cmp" -> []
+      let rec aux matched i = 
+        if   i = length s || List.is_empty matched
+        then List.map fst matched 
+        else
+          let c = s.[i] in
+          let do1 (tomatch, k) = 
+            try Some (tomatch, index_from tomatch k c + 1)
+            with Invalid_argument _ | Not_found -> None
+          in aux (List.filter_map do1 matched) (i+1)
+      in aux matched 0
 
-  let last_matched tomatch s = first_matched (List.map rev tomatch) (rev s)
+    let first_matching tomatch s =
+      let matched = List.map (fun s -> (s, 0)) tomatch in
+      let rec aux matched i = 
+        if   i = length s || List.is_empty matched
+        then List.map fst matched 
+        else
+          let do1 (tomatch,k) = 
+            try Some (tomatch, index_from tomatch k s.[i] + 1)
+            with Invalid_argument _ | Not_found -> None in
 
-  let matched_string tomatch s = 
-    let matched = all_matched tomatch s in
-    if List.is_singleton matched then matched
-    else
-      let matched = first_matched matched s in
-      if List.is_singleton matched then matched
-      else last_matched matched s
+          let matched = List.filter_map do1 matched in
 
+          if List.is_empty matched then [] else begin
+            let min = snd (List.min ~cmp:(fun (_, x) (_, y) -> x - y) matched) in
+            let oge = fun x -> if snd x <= min then Some x else None in
+            let matched = List.filter_map oge matched in
+  
+            if   List.is_singleton matched
+            then List.map fst matched
+            else aux matched (i+1)
+          end
+
+      in aux matched 0
+
+    let last_matching tomatch s =
+      first_matching (List.map rev tomatch) (rev s)
+  end
+
+  let option_matching tomatch s = 
+    match OptionMatching.all_matching tomatch s with
+    | [s] -> [s] | matched ->
+    match OptionMatching.first_matching matched s with
+    | [s] -> [s] | matched -> OptionMatching.last_matching matched s
 end
 
 (* -------------------------------------------------------------------- *)
