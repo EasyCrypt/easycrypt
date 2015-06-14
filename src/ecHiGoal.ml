@@ -807,8 +807,12 @@ let process_generalize1 pattern (tc : tcenv1) =
 
           let name =
             match EcParsetree.pf_ident pf with
-            | None   -> EcIdent.create "x"
-            | Some x -> EcIdent.create x
+            | None ->
+                EcIdent.create "x"
+            | Some x when EcIo.is_sym_ident x ->
+                EcIdent.create x
+            | Some _ ->
+                EcIdent.create (EcTypes.symbol_of_ty p.f_ty)
           in
 
           let name, newconcl = FPosition.topattern ~x:name cpos concl in
