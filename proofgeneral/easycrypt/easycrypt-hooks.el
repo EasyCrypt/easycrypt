@@ -46,7 +46,7 @@
      ;; infos = prompt infos of the very last prompt
      ;; sp    = last locked span, which we want to fill with prompt infos
      (let ((sp    (if proof-script-buffer (proof-last-locked-span)))
-           (infos (or (easycrypt-last-prompt-info-safe) '(0 t))))
+           (infos (or (easycrypt-last-prompt-info-safe) '(0 nil))))
 
        (unless (or (not sp) (easycrypt-get-span-statenum sp))
          (easycrypt-set-span-statenum sp easycrypt-last-but-one-statenum))
