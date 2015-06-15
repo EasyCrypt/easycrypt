@@ -564,6 +564,10 @@ let process_view1 pe tc =
           in
 
           List.iter (for1 ptenv.PT.pte_ev) ids;
+
+          if not (PT.can_concretize ptenv) then
+            tc_error !!tc "cannot infer all type variables";
+
           PT.concretize_e_form
             (PT.concretize_env ptenv)
             (f_forall (List.map snd ids) cutf)
