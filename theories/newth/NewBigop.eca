@@ -184,6 +184,13 @@ lemma big_catr (P : 'a -> bool) (F : 'a -> t) s1 s2: !has P s1 =>
 proof. by rewrite big_cat => /big_hasC ->; rewrite add0m. qed.
 
 (* -------------------------------------------------------------------- *)
+lemma big_rcons (P : 'a -> bool) (F : 'a -> t) s x:
+  big P F (rcons s x) = if P x then big P F s + F x else big P F s.
+proof.
+  by rewrite -cats1 big_cat big_cons big_nil; case: (P x); rewrite !addm0.
+qed.
+
+(* -------------------------------------------------------------------- *)
 lemma eq_big_perm (P : 'a -> bool) (F : 'a -> t) s1 s2:
   perm_eq s1 s2 => big P F s1 = big P F s2.
 proof.
