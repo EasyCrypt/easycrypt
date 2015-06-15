@@ -1982,7 +1982,7 @@ dbmap1:
 | x=qident     { (`Lemma , x) }
 
 dbhint:
-| m=dbmap          { [m] }
+| m=dbmap1         { [m] }
 | m=paren(dbmap1+) {  m  }
   
 %inline prod_form:
