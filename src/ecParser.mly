@@ -1968,22 +1968,22 @@ occurences:
   }
 
 dbmap1:
-| f=dbmap_flag? x=dbmap_target {
-    { pht_flag = odfl `Include f;
-      pht_kind = (fst x);
-      pht_name = (snd x); }
-  }
+| f=dbmap_flag? x=dbmap_target
+    { { pht_flag = odfl `Include f;
+        pht_kind = (fst x);
+        pht_name = (snd x); } }
 
-dbmap_flag:
+%inline dbmap_flag:
 | ADD   { `Include }
 | MINUS { `Exclude }
 
-dbmap_target:
+%inline dbmap_target:
 | AT x=uqident { (`Theory, x) }
-| x=qident { (`Lemma, x) }
+| x=qident     { (`Lemma , x) }
 
 dbhint:
-| m=dbmap1+ { m }
+| m=dbmap          { [m] }
+| m=paren(dbmap1+) {  m  }
   
 %inline prod_form:
 | f1=sform f2=sform   { (Some f1, Some f2) }
