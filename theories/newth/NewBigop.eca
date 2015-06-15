@@ -18,27 +18,27 @@ type t.
 clone export NewMonoid as Support with type t <- t.
 
 (* -------------------------------------------------------------------- *)
-op sum (P : 'a -> bool) (F : 'a -> t) (r : 'a list) =
+op big (P : 'a -> bool) (F : 'a -> t) (r : 'a list) =
   foldr Support.(+) idm (map F (filter P r)).
 
 (* -------------------------------------------------------------------- *)
-lemma big_nil (P : 'a -> bool) (F : 'a -> t): sum P F [] = idm.
+lemma big_nil (P : 'a -> bool) (F : 'a -> t): big P F [] = idm.
 proof. by []. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma big_cons (P : 'a -> bool) (F : 'a -> t) x s:
-  sum P F (x :: s) = if P x then F x + sum P F s else sum P F s.
-proof. by rewrite {1}/sum /= @(fun_if (map F)); case (P x). qed.
+  big P F (x :: s) = if P x then F x + big P F s else big P F s.
+proof. by rewrite {1}/big /= @(fun_if (map F)); case (P x). qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt big_map ['a 'b] (h : 'b -> 'a) (P : 'a -> bool) F s:
-  sum P F (map h s) = sum (P \o h) (F \o h) s.
+  big P F (map h s) = big (P \o h) (F \o h) s.
 proof. by elim: s => // x s; rewrite map_cons !big_cons=> ->. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt big_comp ['a] (h : t -> t) (P : 'a -> bool) F s:
   h idm = idm => morphism_2 h Support.(+) Support.(+) =>
-  h (sum P F s) = sum P (h \o F) s.
+  h (big P F s) = big P (h \o F) s.
 proof. 
   move=> Hidm Hh;elim: s => // x s; rewrite !big_cons => <-.
   by rewrite /(\o) -Hh;case (P x) => //.
@@ -47,7 +47,7 @@ qed.
 lemma nosmt big_Dl ['a] (h : t -> t -> t) (P : 'a -> bool) F s t:
    left_zero idm h => 
    left_distributive h Support.(+) =>
-   h (sum P F s) t = sum P (fun a => h (F a) t) s.
+   h (big P F s) t = big P (fun a => h (F a) t) s.
 proof.
   move=> Hlz HDl.
   cut /= -> := big_comp (fun t1 => h t1 t) P F s _ _=> //=.
@@ -58,7 +58,7 @@ qed.
 lemma nosmt big_Dr ['a] (h:t -> t -> t) (P:'a -> bool) F s t:
    right_zero idm h => 
    right_distributive h Support.(+) =>
-   h t (sum P F s) = sum P (fun a => h t (F a)) s.
+   h t (big P F s) = big P (fun a => h t (F a)) s.
 proof.
   move=> Hrz HDr.
   by cut /= -> := big_comp (h t) P F s _ _=> //=;[apply Hrz|apply (HDr t)]. 
@@ -69,8 +69,8 @@ lemma nosmt big_D ['a 'b] (h : t -> t -> t) (P1 : 'a -> bool) F1 s1
    commutative h =>
    left_zero idm h => 
    left_distributive h Support.(+) =>
-   h (sum P1 F1 s1) (sum P2 F2 s2) =
-     sum P1 (fun a1 => sum P2 (fun a2 => h (F1 a1) (F2 a2)) s2) s1.
+   h (big P1 F1 s1) (big P2 F2 s2) =
+     big P1 (fun a1 => big P2 (fun a2 => h (F1 a1) (F2 a2)) s2) s1.
 proof.
   move=> Hc Hlz HDl.
   rewrite big_Dl => //; congr;apply fun_ext=> a1.
@@ -79,12 +79,12 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt big_nth x0 (P : 'a -> bool) (F : 'a -> t) s:
-  sum P F s = sum (P \o (nth x0 s)) (F \o (nth x0 s)) (iota_ 0 (size s)).
+  big P F s = big (P \o (nth x0 s)) (F \o (nth x0 s)) (iota_ 0 (size s)).
 proof. by rewrite -{1}@(mkseq_nth x0 s) /mkseq big_map. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma big_const (P : 'a -> bool) x s:
-  sum P (fun i => x) s = iter (count P s) ((+) x) idm.
+  big P (fun i => x) s = iter (count P s) ((+) x) idm.
 proof.
   elim: s=> [|y s ih]; 1: by rewrite iter0.
   rewrite big_cons /= ih; case (P y) => //.
@@ -92,12 +92,12 @@ proof.
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma big_seq1 (F : 'a -> t) x: sum predT F [x] = F x.
+lemma big_seq1 (F : 'a -> t) x: big predT F [x] = F x.
 proof. by rewrite big_cons big_nil addm0. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma big_mkcond (P : 'a -> bool) (F : 'a -> t) s:
-  sum P F s = sum predT (fun i => if P i then F i else idm) s.
+  big P F s = big predT (fun i => if P i then F i else idm) s.
 proof.
   elim: s=> // x s ih; rewrite !big_cons -ih /predT /=.
   by case (P x)=> //; rewrite add0m.
@@ -105,19 +105,19 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 lemma big_filter (P : 'a -> bool) F s:
-  sum predT F (filter P s) = sum P F s.
+  big predT F (filter P s) = big P F s.
 proof. by elim: s => //= x s; case (P x)=> //; rewrite !big_cons=> -> ->. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma eq_bigl (P1 P2 : 'a -> bool) (F : 'a -> t) s:
      (forall i, P1 i <=> P2 i)
-  => sum P1 F s = sum P2 F s.
-proof. by move=> h; rewrite /sum (eq_filter h). qed.
+  => big P1 F s = big P2 F s.
+proof. by move=> h; rewrite /big (eq_filter h). qed.
 
 (* -------------------------------------------------------------------- *)
 lemma eq_bigr (P : 'a -> bool) (F1 F2 : 'a -> t) s:
      (forall i, P i => F1 i = F2 i)
-  => sum P F1 s = sum P F2 s.
+  => big P F1 s = big P F2 s.
 proof.                          (* FIXME: big_rec2 *)
   move=> eqF; elim: s=> // x s; rewrite !big_cons=> <-.
   by case (P x)=> // /eqF <-.
@@ -127,11 +127,11 @@ qed.
 lemma nosmt eq_big (P1 P2 : 'a -> bool) (F1 F2 : 'a -> t) s:
      (forall i, P1 i <=> P2 i)
   => (forall i, P1 i => F1 i = F2 i)
-  => sum P1 F1 s = sum P2 F2 s.
+  => big P1 F1 s = big P2 F2 s.
 proof. by move=> /eq_bigl <- /eq_bigr <-. qed.
 
 (* -------------------------------------------------------------------- *)
-lemma big0_eq (P : 'a -> bool) s: sum P (fun i => idm) s = idm.
+lemma big0_eq (P : 'a -> bool) s: big P (fun i => idm) s = idm.
 proof.
   rewrite big_const; elim/Induction.natind: (count _ _) => n.
     by move/iter0<:t> => ->.
@@ -140,29 +140,29 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 lemma big0 (P : 'a -> bool) F s: (forall i, P i => F i = idm) =>
-  sum P F s = idm.
+  big P F s = idm.
 proof. by move=> h; rewrite -@(big0_eq P s); apply/eq_bigr. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma big_hasC (P : 'a -> bool) (F : 'a -> t) s: !has P s =>
-  sum P F s = idm.
+  big P F s = idm.
 proof.
   rewrite -big_filter has_count -size_filter.
   by rewrite ltz_def size_ge0 /= => /size_eq0 ->.
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma big_pred0_eq (F : 'a -> t) s: sum pred0 F s = idm.
+lemma big_pred0_eq (F : 'a -> t) s: big pred0 F s = idm.
 proof. by rewrite big_hasC // has_pred0. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma big_pred0 (P : 'a -> bool) (F : 'a -> t) s:
-  (forall i, P i <=> false) => sum P F s = idm.
+  (forall i, P i <=> false) => big P F s = idm.
 proof. by move=> h; rewrite -@(big_pred0_eq F s); apply/eq_bigl. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma big_cat (P : 'a -> bool) (F : 'a -> t) s1 s2:
-  sum P F (s1 ++ s2) = sum P F s1 + sum P F s2.
+  big P F (s1 ++ s2) = big P F s1 + big P F s2.
 proof.
   rewrite !@(big_mkcond P); elim: s1 => /= [|i s1 ih].
     by rewrite @(big_nil P F) add0m.
@@ -171,17 +171,17 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 lemma big_catl (P : 'a -> bool) (F : 'a -> t) s1 s2: !has P s2 =>
-  sum P F (s1 ++ s2) = sum P F s1.
+  big P F (s1 ++ s2) = big P F s1.
 proof. by rewrite big_cat => /big_hasC ->; rewrite addm0. qed.
   
 (* -------------------------------------------------------------------- *)
 lemma big_catr (P : 'a -> bool) (F : 'a -> t) s1 s2: !has P s1 =>
-  sum P F (s1 ++ s2) = sum P F s2.
+  big P F (s1 ++ s2) = big P F s2.
 proof. by rewrite big_cat => /big_hasC ->; rewrite add0m. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma eq_big_perm (P : 'a -> bool) (F : 'a -> t) s1 s2:
-  perm_eq s1 s2 => sum P F s1 = sum P F s2.
+  perm_eq s1 s2 => big P F s1 = big P F s2.
 proof.
   move=> /perm_eqP; rewrite !@(big_mkcond P).
   elim s1 s2 => [|i s1 ih1] s2 eq_s12.
@@ -195,19 +195,19 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt big_rem (P : 'a -> bool) (F : 'a -> t) s x: mem s x =>
-  sum P F s = (if P x then F x else idm) + sum P F (rem x s).
+  big P F s = (if P x then F x else idm) + big P F (rem x s).
 proof.
   by move/perm_to_rem/eq_big_perm=> ->; rewrite !@(big_mkcond P) big_cons.
 qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt bigD1 (F : 'a -> t) s x: mem s x => uniq s =>
-  sum predT F s = F x + sum (predC1 x) F s.
+  big predT F s = F x + big (predC1 x) F s.
 proof. by move=> /big_rem-> /rem_filter->; rewrite big_filter. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma big_split (P : 'a -> bool) (F1 F2 : 'a -> t) s:
-  sum P (fun i => F1 i + F2 i) s = sum P F1 s + sum P F2 s.
+  big P (fun i => F1 i + F2 i) s = big P F1 s + big P F2 s.
 proof.
   elim: s=> /= [|x s ih]; 1: by rewrite !big_nil addm0.
   rewrite !big_cons ih; case: (P x) => // _.
@@ -216,7 +216,7 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt bigID (P : 'a -> bool) (F : 'a -> t) (a : 'a -> bool) s:
-  sum P F s = sum (predI P a) F s + sum (predI P (predC a)) F s.
+  big P F s = big (P /\ a) F s + big (P /\ !a) F s.
 proof.
   rewrite !@(big_mkcond _ F) -big_split /(/\) /[!].
   apply/eq_bigr => i _ /=.
@@ -225,5 +225,5 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt big_reindex (P : 'a -> bool) (F : 'a -> t) (f f' : 'a -> 'a) s:
-  cancel f' f => sum P F s = sum (P \o f) (F \o f) (map f' s).
+  cancel f' f => big P F s = big (P \o f) (F \o f) (map f' s).
 proof. by move=> bij_ff'; rewrite -big_map -map_comp id_map. qed.
