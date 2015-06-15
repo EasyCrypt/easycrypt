@@ -85,12 +85,22 @@ module PPEnv = struct
 
   let add_local ?(force = false) ppe =
     fun id ->
+      let addu =
+        let id = EcIdent.name id in
+        if String.length id > 0 then
+          let c = id.[String.length id - 1] in
+          c >= '0' && c <= '9'
+        else
+          false
+      in
+
       let name = ref (EcIdent.name id) in
       let i    = ref 0 in
 
         if not force then
           while inuse ppe !name do
-            name := Printf.sprintf "%s%d" (EcIdent.name id) !i;
+            name := Printf.sprintf "%s%s%d"
+              (EcIdent.name id) (if addu then "_" else "") !i;
             incr i
           done;
 
@@ -1535,7 +1545,8 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
         (pp_form_r ppe (fst outer, (max_op_prec,`NonAssoc))) hs.bhs_bd
 
   | Fpr pr->
-      let ppe = PPEnv.create_and_push_mem ppe ~active:true (EcFol.mhr, pr.pr_fun) in
+      let spe = PPEnv.create_and_push_mem ppe ~active:true (EcFol.mhr, pr.pr_fun) in
+      let spe = PPEnv.add_local spe pr.pr_mem in
       Format.fprintf fmt "Pr[@[%a@[%t@] @@ %a :@ %a@]]"
         (pp_funname ppe) pr.pr_fun
         (match pr.pr_args.f_node with
@@ -1545,8 +1556,8 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
              (fun fmt -> pp_string fmt "()")
          | _ ->
              (fun fmt -> Format.fprintf fmt "(%a)" (pp_form ppe) pr.pr_args))
-        (pp_local ppe) pr.pr_mem
-        (pp_form ppe) pr.pr_event
+        (pp_local spe) pr.pr_mem
+        (pp_form spe) pr.pr_event
 
 and pp_form_r (ppe : PPEnv.t) outer fmt f =
   let printers =
