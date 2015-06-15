@@ -227,7 +227,7 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt bigID (P : 'a -> bool) (F : 'a -> t) (a : 'a -> bool) s:
-  big P F s = big (P /\ a) F s + big (P /\ !a) F s.
+  big P F s = big (predI P a) F s + big (predI P (predC a)) F s.
 proof.
   rewrite !@(big_mkcond _ F) -big_split /(/\) /[!].
   apply/eq_bigr => i _ /=.
