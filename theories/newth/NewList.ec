@@ -1205,6 +1205,45 @@ end Iota.
 export Iota.
 
 (* -------------------------------------------------------------------- *)
+theory Range.
+  op range (m n : int) = iota_ m (n - m).
+
+  import Ring.IntID.
+
+  lemma range_geq (m n : int): n <= m => range m n = [].
+  proof. smt. qed.
+
+  lemma range_ltn (m n : int): m < n =>
+    range m n = m :: range (m+1) n.
+  proof. smt. qed.
+
+  lemma range_add (m n a : int):
+    range (m+a) (n+a) = map (Int.(+) a) (range m n).
+  proof. by rewrite /range addrC iota_addl; congr; smt. qed.
+
+  lemma range_addl (m n a : int):
+    range (m+a) n = map (Int.(+) a) (range m (n-a)).
+  proof. by rewrite -{1}(addrNK a n) -subrE range_add. qed.
+
+  lemma range_addr (m n a : int):
+    range m (n+a) = map (Int.(+) a) (range (m-a) n).
+  proof. by rewrite -{1}(addrNK a m) -subrE range_add. qed.
+
+  lemma range_cat (n m p : int): m <= n => n <= p =>
+    range m p = range m n ++ range n p.
+  proof. admit. qed.
+
+  lemma mem_range (m n i: int):
+    (mem (range m n) i) <=> (m <= i < n).
+  proof.
+    rewrite /range mem_iota; case: (m <= i)=> //=.
+    by rewrite subrE addrCA addrN addr0.
+  qed.
+end Range.
+
+export Range.
+
+(* -------------------------------------------------------------------- *)
 (*                        Association lists                             *)
 (* -------------------------------------------------------------------- *)
 op assoc (xs : ('a * 'b) list) (a : 'a) =
