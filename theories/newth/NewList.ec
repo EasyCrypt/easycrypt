@@ -1152,6 +1152,9 @@ theory Iota.
   axiom iota0 i n : n <= 0 => iota_ i n = [].
   axiom iotaS i n : 0 <= n => iota_ i (n+1) = i :: iota_ (i+1) n.
 
+  lemma iota1 i : iota_ i 1 = [i].
+  proof. by rewrite (iotaS i 0) // iota0. qed.
+
   lemma size_iota m n: size (iota_ m n) = max 0 n.
   proof. 
     elim/Induction.natind: n m => [n hn|n hn ih] m.
@@ -1167,6 +1170,10 @@ theory Iota.
     by rewrite addzAC !iotaS // 1:smt ih addzAC addzA.
   qed.
  
+  lemma iotaSr i n : 0 <= n =>
+    iota_ i (n+1) = rcons (iota_ i n) (i+n).
+  proof. by move=> ge0_n; rewrite iota_add // iota1 cats1. qed.
+
   lemma nth_iota m n i: 0 <= i < n => nth 0 (iota_ m n) i = m + i.
   proof.
     case=> ge0_i lt_in; rewrite (_ : n = i + ((n-i-1)+1)) 1:smt.
