@@ -14,6 +14,14 @@ exception HiScopeError of EcLocation.t option * string
 val hierror : ?loc:EcLocation.t -> ('a, Format.formatter, unit, 'b) format4 -> 'a
 
 (* -------------------------------------------------------------------- *)
+exception ImportError of EcLocation.t option * symbol * exn
+
+(* -------------------------------------------------------------------- *)
+exception TopError of EcLocation.t * exn
+
+val toperror_of_exn : ?gloc:EcLocation.t -> exn -> exn
+
+(* -------------------------------------------------------------------- *)
 type scope
 
 type proof_uc = {
@@ -60,7 +68,6 @@ val check_state : topmode -> string -> scope -> unit
 module Options : sig
   val set_implicits : scope -> bool -> scope
   val get_implicits : scope -> bool
-
 end
 
 (* -------------------------------------------------------------------- *)

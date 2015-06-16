@@ -86,7 +86,7 @@ object(self)
     | `ST_Failure e ->
         let (loc, e) =
           match e with
-          | EcCommands.TopError (loc, e) -> (loc, e)
+          | EcScope.TopError (loc, e) -> (loc, e)
           | _ -> (LC._dummy, e)
         in
           Format.fprintf Format.err_formatter
@@ -213,7 +213,7 @@ object(self)
     | `ST_Failure e -> begin
         let (subloc, e) =
           match e with
-          | EcCommands.TopError (loc, e) -> (Some loc, e)
+          | EcScope.TopError (loc, e) -> (Some loc, e)
           | _ -> (None, e) in
         let msg = String.strip (EcPException.tostring e) in
 

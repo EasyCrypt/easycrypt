@@ -13,6 +13,8 @@ open EcParsetree
 open EcTypes
 open EcDecl
 open EcModules
+open EcTyping
+open EcHiInductive
 open EcBigInt.Notations
 
 module Sid  = EcIdent.Sid
@@ -49,6 +51,90 @@ let hierror ?loc fmt =
          Format.pp_print_flush bfmt ();
          raise (HiScopeError (loc, Buffer.contents buf)))
       bfmt fmt
+
+(* -------------------------------------------------------------------- *)
+exception ImportError of EcLocation.t option * symbol * exn
+
+let is_import_error = function ImportError _ -> true | _ -> false
+
+let pp_import_error fmt exn =
+  match exn with
+  | ImportError (None, name, e) ->
+      Format.fprintf fmt "In external theory %s [<unknown> location]:@\n%a"
+        name EcPException.exn_printer e
+
+  | ImportError (Some l, name, e) when is_import_error e ->
+      Format.fprintf fmt "In external theory %s [%s]:@\n%a"
+        name (EcLocation.tostring l)
+        EcPException.exn_printer e
+
+  | ImportError (Some l, name, e) ->
+      Format.fprintf fmt "In external theory %s [%s]:@\n@\n%a"
+        name (EcLocation.tostring l)
+        EcPException.exn_printer e
+
+  | _ -> raise exn
+
+let _ = EcPException.register pp_import_error
+
+(* -------------------------------------------------------------------- *)
+exception TopError of EcLocation.t * exn
+
+let rec toperror_of_exn_r ?gloc exn =
+  match exn with
+  | TyError    (loc, _, _) -> Some (loc, exn)
+  | RcError    (loc, _, _) -> Some (loc, exn)
+  | DtError    (loc, _, _) -> Some (loc, exn)
+  | ParseError (loc, _)    -> Some (loc, exn)
+
+  | EcCoreGoal.TcError (_, None, _) ->
+      Some (odfl _dummy gloc, exn)
+
+  | EcCoreGoal.TcError (_, Some { EcCoreGoal.plc_loc = loc }, _) ->
+      let gloc = if EcLocation.isdummy loc then gloc else Some loc in
+      Some (odfl _dummy gloc, exn)
+
+  | LocError (loc, e)    -> begin
+      let gloc = if EcLocation.isdummy loc then gloc else Some loc in
+      match toperror_of_exn_r ?gloc e with
+      | None -> Some (loc, e)
+      | Some (loc, e) -> Some (loc, e)
+    end
+
+  | ImportError _ ->
+      Some (odfl _dummy gloc, exn)
+
+  | TopError (loc, e) ->
+      let gloc = if EcLocation.isdummy loc then gloc else Some loc in
+      toperror_of_exn_r ?gloc e
+
+  | HiScopeError (loc, msg) ->
+      let gloc =
+        match loc with
+        | None     -> gloc
+        | Some loc -> if EcLocation.isdummy loc then gloc else Some loc
+      in
+        Some (odfl _dummy gloc, HiScopeError (None, msg))
+
+  | _ -> None
+
+let toperror_of_exn ?gloc exn =
+  match toperror_of_exn_r ?gloc exn with
+  | Some (loc, exn) -> TopError (loc, exn)
+  | None            -> exn
+
+let pp_toperror fmt loc exn =
+  Format.fprintf fmt "%s: %a"
+    (EcLocation.tostring loc)
+    EcPException.exn_printer exn
+
+let () =
+  let pp fmt exn =
+    match exn with
+    | TopError (loc, exn) -> pp_toperror fmt loc exn
+    | _ -> raise exn
+  in
+    EcPException.register pp
 
 (* -------------------------------------------------------------------- *)
 module type IOptions = sig
@@ -1683,19 +1769,11 @@ module Theory = struct
   (* ------------------------------------------------------------------ *)
   let check_end_required scope thname =
     if fst scope.sc_name <> thname then
-      begin
-        let msg =
-          Printf.sprintf
-            "end-of-file while processing external theory %s %s"
-            (fst scope.sc_name) thname in
-        failwith msg
-      end;
+      hierror "end-of-file while processing external theory %s %s"
+        (fst scope.sc_name) thname;
     if scope.sc_pr_uc <> None then
-      let msg =
-        Printf.sprintf
-          "end-of-file while processing proof %s" (fst scope.sc_name)
-      in
-        failwith msg
+      hierror
+        "end-of-file while processing proof %s" (fst scope.sc_name)
 
   (* -------------------------------------------------------------------- *)
   let require (scope : scope) ((name, mode) : symbol * thmode) loader =
@@ -1708,6 +1786,7 @@ module Theory = struct
       | Some _ -> require_loaded name scope
 
       | None ->
+        try
           let imported = enter (for_loading scope) mode name in
           let imported = { imported with sc_env = EcEnv.astop imported.sc_env } in
           let thname   = fst imported.sc_name in
@@ -1720,6 +1799,14 @@ module Theory = struct
               Msym.add name ((cth, mode), rqs) imported.sc_loaded; } in
 
           require_loaded name scope
+
+        with e -> begin
+          match toperror_of_exn_r e with
+          | Some (l, e) when not (EcLocation.isdummy l) ->
+              raise (ImportError (Some l, name, e))
+          | _ ->
+              raise (ImportError (None, name, e))
+        end
 
   (* ------------------------------------------------------------------ *)
   let import_w3 scope dir file renaming =

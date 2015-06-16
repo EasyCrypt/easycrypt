@@ -7,8 +7,6 @@
 open EcUtils
 open EcLocation
 open EcParsetree
-open EcTyping
-open EcHiInductive
 
 module Sid = EcIdent.Sid
 module Mx  = EcPath.Mx
@@ -64,62 +62,6 @@ let apply_pragma (x : string) =
   | x when x = Pragmas.Goals.printall -> pragma_g_prall true
 
   | _ -> raise (InvalidPragma x)
-
-(* -------------------------------------------------------------------- *)
-exception TopError of EcLocation.t * exn
-
-let rec toperror_of_exn ?gloc exn =
-  match exn with
-  | TyError    (loc, _, _) -> Some (loc, exn)
-  | RcError    (loc, _, _) -> Some (loc, exn)
-  | DtError    (loc, _, _) -> Some (loc, exn)
-  | ParseError (loc, _)    -> Some (loc, exn)
-
-  | EcCoreGoal.TcError (_, None, _) ->
-      Some (odfl _dummy gloc, exn)
-
-  | EcCoreGoal.TcError (_, Some { EcCoreGoal.plc_loc = loc }, _) ->
-      let gloc = if EcLocation.isdummy loc then gloc else Some loc in
-      Some (odfl _dummy gloc, exn)
-
-  | LocError (loc, e)    -> begin
-      let gloc = if EcLocation.isdummy loc then gloc else Some loc in
-      match toperror_of_exn ?gloc e with
-      | None -> Some (loc, e)
-      | Some (loc, e) -> Some (loc, e)
-    end
-
-  | TopError (loc, e) ->
-      let gloc = if EcLocation.isdummy loc then gloc else Some loc in
-        Some (odfl _dummy gloc, e)
-
-  | EcScope.HiScopeError (loc, msg) ->
-      let gloc =
-        match loc with
-        | None     -> gloc
-        | Some loc -> if EcLocation.isdummy loc then gloc else Some loc
-      in
-        Some (odfl _dummy gloc, EcScope.HiScopeError (None, msg))
-
-  | _ -> None
-
-let toperror_of_exn ?gloc exn =
-  match toperror_of_exn ?gloc exn with
-  | Some (loc, exn) -> TopError (loc, exn)
-  | None            -> exn
-
-let pp_toperror fmt loc exn =
-  Format.fprintf fmt "%s: %a"
-    (EcLocation.tostring loc)
-    EcPException.exn_printer exn
-
-let () =
-  let pp fmt exn =
-    match exn with
-    | TopError (loc, exn) -> pp_toperror fmt loc exn
-    | _ -> raise exn
-  in
-    EcPException.register pp
 
 (* -------------------------------------------------------------------- *)
 let process_search scope qs =
@@ -582,7 +524,8 @@ and process (ld : EcLoader.ecloader) (scope : EcScope.scope) g =
 
 (* -------------------------------------------------------------------- *)
 and process_internal ld scope g =
-  odfl scope (process ld scope g.gl_action)
+  try  odfl scope (process ld scope g.gl_action)
+  with e -> raise (EcScope.toperror_of_exn ~gloc:(loc g.gl_action) e)
 
 (* -------------------------------------------------------------------- *)
 let loader = EcLoader.create ()

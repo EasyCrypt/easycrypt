@@ -303,7 +303,7 @@ let _ =
                          if not (EcTerminal.interactive terminal) then
                            Printf.fprintf stderr "%t\n%!" Printexc.print_backtrace
                        end;
-                       raise (EcCommands.toperror_of_exn ~gloc:loc e)
+                       raise (EcScope.toperror_of_exn ~gloc:loc e)
                    end)
                 commands
 
@@ -314,7 +314,7 @@ let _ =
         if !terminate then (EcTerminal.finalize terminal; exit 0);
       with e -> begin
         EcTerminal.finish
-          (`ST_Failure (EcCommands.toperror_of_exn e))
+          (`ST_Failure (EcScope.toperror_of_exn e))
           terminal;
         if not (EcTerminal.interactive terminal) then
           exit 1
