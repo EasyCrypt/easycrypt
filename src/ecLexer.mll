@@ -353,6 +353,8 @@ rule main = parse
   | "{|"  { [LPBRACE   ] }
   | "|}"  { [RPBRACE   ] }
   | "`|"  { [TICKPIPE  ] }
+  | "<$"  { [LESAMPLE  ] }
+  | "<@"  { [LEAT      ] }
 
   (* operators *)
   | nop as x { [NOP x] }
