@@ -234,12 +234,38 @@ let pf_form_match (pt : pt_env) ?mode ~ptn subject =
       raise exn
 
 (* -------------------------------------------------------------------- *)
-let pf_find_occurence (pt : pt_env) ~ptn subject =
+let pf_find_occurence (pt : pt_env) ?(keyed = false) ~ptn subject =
   let module E = struct exception MatchFound end in
 
   let na = List.length (snd (EcFol.destr_app ptn)) in
 
+  let kmatch key tp =
+    match key, (fst (destr_app tp)).f_node with
+    | `NoKey , _           -> true
+    | `Path p, Fop (p', _) -> EcPath.p_equal p p'
+    | `Path _, _           -> false
+    | `Var  x, Flocal x'   -> id_equal x x'
+    | `Var  _, _           -> false
+  in
+
+  let keycheck tp key =
+    not keyed || kmatch key tp || Mid.is_empty tp.f_fv
+  in
+
+  (* Extract key from pattern *)
+  let key =
+    match (fst (destr_app ptn)).f_node with
+    | Fop (p, _) -> `Path p
+    | Flocal x   ->
+        if   is_none (EcMatching.MEV.get x `Form !(pt.pte_ev))
+        then `Var x
+        else `NoKey
+    | _ -> `NoKey
+  in
+
   let trymatch bds tp =
+    if not (keycheck tp key) then `Continue else
+
     let tp =
       match tp.f_node with
       | Fapp (h, hargs) when List.length hargs > na ->

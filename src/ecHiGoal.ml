@@ -200,7 +200,7 @@ module LowRewrite = struct
 
     let fp = match s with `LtoR -> f1 | `RtoL -> f2 in
 
-    (try  PT.pf_find_occurence pt.PT.ptev_env ~ptn:fp concl
+    (try  PT.pf_find_occurence ~keyed:true pt.PT.ptev_env ~ptn:fp concl
      with EcMatching.MatchFailure -> raise (RewriteError LRW_NothingToRewrite));
 
     if not (PT.can_concretize pt.PT.ptev_env) then
