@@ -295,12 +295,15 @@ let t_intros (ids : ident mloc list) (tc : tcenv1) =
         | Some concl -> intro1 ((hyps, concl), sbt) id
   in
 
-  let tc  = FApi.tcenv_of_tcenv1 tc in
-  let sbt = Fsubst.f_subst_id in
-  let (hyps, concl), sbt = List.fold_left intro1 (FApi.tc_flat tc, sbt) ids in
-  let concl = Fsubst.f_subst sbt concl in
-  let (tc, hd) = FApi.newgoal tc ~hyps concl in
-  FApi.close tc (VIntros (hd, List.map tg_val ids))
+  let tc = FApi.tcenv_of_tcenv1 tc in
+
+  if List.is_empty ids then tc else begin
+    let sbt = Fsubst.f_subst_id in
+    let (hyps, concl), sbt = List.fold_left intro1 (FApi.tc_flat tc, sbt) ids in
+    let concl = Fsubst.f_subst sbt concl in
+    let (tc, hd) = FApi.newgoal tc ~hyps concl in
+    FApi.close tc (VIntros (hd, List.map tg_val ids))
+  end
 
 (* -------------------------------------------------------------------- *)
 type iname  = [`Symbol of symbol      | `Ident of EcIdent.t     ]
