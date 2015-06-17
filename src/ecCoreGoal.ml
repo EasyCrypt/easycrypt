@@ -63,9 +63,21 @@ and pt_arg =
 | PASub     of proofterm option
 
 (* -------------------------------------------------------------------- *)
-let paformula x = PAFormula x
-let pamemory  x = PAMemory  x
-let pamodule  x = PAModule  x
+let is_ptcut    = function PTCut    _ -> true | _ -> false
+let is_pthandle = function PTHandle _ -> true | _ -> false
+let is_ptlocal  = function PTLocal  _ -> true | _ -> false
+let is_ptglobal = function PTGlobal _ -> true | _ -> false
+
+(* -------------------------------------------------------------------- *)
+let is_paformula = function PAFormula _ -> true | _ -> false
+let is_pamemory  = function PAMemory  _ -> true | _ -> false
+let is_pamodule  = function PAModule  _ -> true | _ -> false
+let is_pasub     = function PASub     _ -> true | _ -> false
+
+(* -------------------------------------------------------------------- *)
+let paformula = fun x -> PAFormula x
+let pamemory  = fun x -> PAMemory  x
+let pamodule  = fun x -> PAModule  x
 
 let paglobal p tys =
   PASub (Some { pt_head = PTGlobal (p, tys); pt_args = []; })

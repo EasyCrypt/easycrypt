@@ -437,9 +437,28 @@ let rec process_rewrite1 ttenv ri tc =
               process_rewrite1_core (theside, o) pt tc in
             t_ors (List.map do1 ls) tc
 
+        | { fp_head = FPNamed (p, None); fp_args = []; }
+              when mode = `Implicit
+        ->
+          let env = FApi.tc1_env tc in
+          let pt  = PT.tc1_process_full_pterm ~implicits:(implicits mode) tc pt in
+
+          if    is_ptglobal pt.PT.ptev_pt.pt_head
+             && List.is_empty pt.PT.ptev_pt.pt_args
+          then begin
+            let ls = EcEnv.Ax.all ~name:(unloc p) env in
+
+            let do1 (lemma, _) tc =
+              let pt = PT.pt_of_uglobal !!tc (FApi.tc1_hyps tc) lemma in
+                process_rewrite1_core (theside, o) pt tc in
+              t_ors (List.map do1 ls) tc
+          end else
+            process_rewrite1_core (theside, o) pt tc
+
         | _ ->
           let pt = PT.tc1_process_full_pterm ~implicits:(implicits mode) tc pt in
-             process_rewrite1_core (theside, o) pt tc in
+          process_rewrite1_core (theside, o) pt tc
+        in
 
       let doall tc = t_ors (List.map do1 pts) tc in
 

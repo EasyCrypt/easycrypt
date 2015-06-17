@@ -335,7 +335,6 @@ let lookup_named_psymbol (hyps : LDecl.hyps) ~hastyp fp =
         Some (`Global p, (ax.EcDecl.ax_tparams, fp))
     | _ -> None
 
-
 (* -------------------------------------------------------------------- *)
 (* Try to extract a ffpattern parse-tree from a genpattern parse-tree.
  * This allows to mix proof-terms and formulas/values in tactic

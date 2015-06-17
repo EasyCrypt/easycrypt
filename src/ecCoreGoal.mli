@@ -70,6 +70,18 @@ and pt_arg =
 | PAModule  of (EcPath.mpath * EcModules.module_sig)
 | PASub     of proofterm option
 
+(* -------------------------------------------------------------------- *)
+val is_ptcut    : pt_head -> bool
+val is_pthandle : pt_head -> bool
+val is_ptlocal  : pt_head -> bool
+val is_ptglobal : pt_head -> bool
+
+(* -------------------------------------------------------------------- *)
+val is_paformula : pt_arg -> bool
+val is_pamemory  : pt_arg -> bool
+val is_pamodule  : pt_arg -> bool
+val is_pasub     : pt_arg -> bool
+
 val paformula : EcFol.form -> pt_arg
 val pamemory  : EcMemory.memory -> pt_arg
 val pamodule  : EcPath.mpath * EcModules.module_sig -> pt_arg
