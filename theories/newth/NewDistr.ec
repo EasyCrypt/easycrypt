@@ -30,7 +30,7 @@ end SeriesConvergence.
 (* -------------------------------------------------------------------- *)
 theory SeriesSum.
   op partial (s : int -> real) (n : int) : real =
-    sum predT s (iota_ 0 n).
+    big predT s (iota_ 0 n).
 
   pred converge (s : int -> real) (x : real) =
     SeriesConvergence.converge (partial s) x.
