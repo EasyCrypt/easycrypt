@@ -1858,7 +1858,7 @@ let c_split ?width pp x =
     Str.split (Str.regexp "\\(\r?\n\\)+") (Buffer.contents buf)
 
 let pp_i_asgn (ppe : PPEnv.t) fmt (lv, e) =
-  Format.fprintf fmt "%a =@ %a"
+  Format.fprintf fmt "%a <-@ %a"
     (pp_lvalue ppe) lv (pp_expr ppe) e
 
 let pp_i_assert (ppe : PPEnv.t) fmt e =
@@ -1872,13 +1872,13 @@ let pp_i_call (ppe : PPEnv.t) fmt (lv, xp, args) =
         (pp_list ",@ " (pp_expr ppe)) args
 
   | Some lv ->
-      Format.fprintf fmt "@[<hov 2>%a =@ %a(%a)@]"
+      Format.fprintf fmt "@[<hov 2>%a <@@@ %a(%a)@]"
         (pp_lvalue ppe) lv
         (pp_funname ppe) xp
         (pp_list ",@ " (pp_expr ppe)) args
 
 let pp_i_rnd (ppe : PPEnv.t) fmt (lv, e) =
-  Format.fprintf fmt "%a =$@ @[<hov 2>%a@]"
+  Format.fprintf fmt "%a <$@ @[<hov 2>%a@]"
     (pp_lvalue ppe) lv (pp_expr ppe) e
 
 let pp_i_if (ppe : PPEnv.t) fmt e =
