@@ -1,0 +1,45 @@
+(* --------------------------------------------------------------------
+ * Copyright (c) - 2012-2015 - IMDEA Software Institute and INRIA
+ * Distributed under the terms of the CeCILL-C license
+ * -------------------------------------------------------------------- *)
+
+pragma +implicits.
+
+(* -------------------------------------------------------------------- *)
+require import Fun Pred Pair Int IntExtra NewList Ring.
+require (*--*) NewBigop.
+
+import Ring.IntID.
+
+(* -------------------------------------------------------------------- *)
+type t.
+
+clone import Ring.ZModule as ZM with type t <- t.
+
+clone NewBigop as Sum with
+  type t <- t,
+  op   Support.idm <- ZM.zeror,
+  op   Support.(+) <- ZM.(+)
+
+  proof Support.*.
+
+realize Support.Axioms.addmA. by apply/addrA. qed.
+realize Support.Axioms.addmC. by apply/addrC. qed.
+realize Support.Axioms.add0m. by apply/add0r. qed.
+
+export Sum.
+
+(* -------------------------------------------------------------------- *)
+lemma sumrD P F1 F2 (r : 'a list):
+  (big P F1 r) + (big P F2 r) = big P (fun x => F1 x + F2 x) r.
+proof. by rewrite big_split. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma sumrN P F (r : 'a list):
+  - (big P F r) = (big P (fun x => -(F x)) r).
+proof. by apply/(big_endo oppr0 opprD). qed.
+
+(* -------------------------------------------------------------------- *)
+lemma sumrB P F1 F2 (r : 'a list):
+  (big P F1 r) - (big P F2 r) = big P (fun x => F1 x - F2 x) r.
+proof. by rewrite subrE sumrN sumrD; apply/eq_bigr=> /= x; rewrite subrE. qed.
