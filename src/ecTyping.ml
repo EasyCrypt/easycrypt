@@ -2017,8 +2017,7 @@ and transinstr (env : EcEnv.env) ue (i : pinstr) =
       i_rnd (lvalue, rvalue)
 
   | PScall (None, name, args) ->
-      let (fpath, args, rty) = transcall name (unloc args) in
-      unify_or_fail env ue i.pl_loc ~expct:tunit rty;
+      let (fpath, args, _rty) = transcall name (unloc args) in
       i_call (None, fpath, args)
 
   | PScall (Some lvalue, name, args) ->

@@ -120,7 +120,8 @@ module LowInternal = struct
 
       let resasgn =
         match fdef.f_ret with
-        | None   -> None
+        | None -> None
+        | Some _ when is_none lv -> None
         | Some r -> Some (i_asgn (oget lv, LowSubst.esubst subst r)) in
 
       me, prelude @ body.s_node @ (otolist resasgn) in
