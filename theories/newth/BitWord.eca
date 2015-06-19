@@ -8,7 +8,6 @@ require import Fun Bool Int NewList.
 require (*ab*) FinType NewWord.
 
 pragma +implicits.
-pragma +Smt:lazy.
 
 (* -------------------------------------------------------------------- *)
 clone include NewWord with
@@ -54,7 +53,7 @@ op oppw (w : word): word = w.
 
 (* -------------------------------------------------------------------- *)
 lemma non_trivial: onew <> zerow
-by smt:full.
+by smt full.
 
 lemma xorw0: right_id zerow (^).
 proof. by move=> w; apply/wordP; smt. qed.
@@ -69,19 +68,19 @@ lemma xorwK: right_loop (fun x => x) (^).
 proof. by move=> y x; apply/wordP; smt. qed.
 
 lemma andw1: right_id onew andw.
-proof. by move=> w; apply/wordP; smt:full. qed. (* BUG -- Should be `smt` *)
+proof. by move=> w; apply/wordP; smt. qed.
 
 lemma andwA: associative andw.
-proof. by move=> w1 w2 w3; apply/wordP; smt:full. qed. (* BUG -- Should be `smt` *)
+proof. by move=> w1 w2 w3; apply/wordP; smt. qed.
 
 lemma andwC: commutative andw.
-proof. by move=> w1 w2; apply/wordP; smt:full. qed. (* BUG -- Should be `smt` *)
+proof. by move=> w1 w2; apply/wordP; smt. qed.
 
 lemma andwDl: left_distributive andw (^).
-proof. by move=> w1 w2 w3; apply/wordP; smt:full. qed. (* BUG -- Should be `smt` *)
+proof. by move=> w1 w2 w3; apply/wordP; smt. qed.
 
 lemma andwK: idempotent andw.
-proof. by move=> x; apply/wordP; smt:full. qed.
+proof. by move=> x; apply/wordP; smt. qed.
 
 instance bring with word
   op rzero = zerow
@@ -98,6 +97,6 @@ instance bring with word
   proof mulr1     by apply andw1
   proof mulrA     by (move=> w1 w2 w3; rewrite andwA)
   proof mulrC     by apply andwC
-  proof mulrDl    by smt:full
+  proof mulrDl    by smt
   proof mulrK     by apply andwK
   proof oppr_id   by trivial.

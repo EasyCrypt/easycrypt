@@ -7,8 +7,6 @@
 require import Option Pred Fun Int Real NewList.
 require (*ab*) FinType Subtype.
 
-pragma +Smt:lazy.
-
 (* -------------------------------------------------------------------- *)
 clone import FinType as Alphabet.
 
@@ -137,6 +135,6 @@ theory DWord.
       have ->: elts = []
         by apply/size_eq0; smt.
       by rewrite in_nil.
-    smt:full.
+    smt full.
   qed.
 end DWord.
