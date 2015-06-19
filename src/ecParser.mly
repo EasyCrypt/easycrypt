@@ -1187,10 +1187,10 @@ loc_decl_r:
 | VAR x=loc(loc_decl_names) COLON ty=loc(type_exp)
     { { pfl_names = x; pfl_type = Some ty; pfl_init = None; } }
 
-| VAR x=loc(loc_decl_names) COLON ty=loc(type_exp) EQ e=expr
+| VAR x=loc(loc_decl_names) COLON ty=loc(type_exp) either(EQ, LARROW) e=expr
     { { pfl_names = x; pfl_type = Some ty; pfl_init = Some e; } }
 
-| VAR x=loc(loc_decl_names) EQ e=expr
+| VAR x=loc(loc_decl_names) either(EQ, LARROW) e=expr
     { { pfl_names = x; pfl_type = None; pfl_init = Some e; } }
 
 loc_decl:
