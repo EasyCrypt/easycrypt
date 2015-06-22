@@ -29,8 +29,8 @@ theory FromInt.
   require import Int.
   import why3 "real" "FromInt".
   lemma from_intM (a b:int):
-    (from_int a < from_int b) <=> (a < b)%Int
-  by (split; smt full).
+    (from_int a < from_int b) <=> (a < b)%Int.
+  proof. by split; smt full. qed.
 
   lemma from_intMle : forall (a b : int), from_int a <= from_int b <=> a <= b
   by smt full.
@@ -84,7 +84,7 @@ lemma mulrMle (x y z:real):
   from_int 0 <= z =>
   x <= y =>
   x * z <= y * z
-by smt full.
+by smt.
 
 lemma mulrM (x y z:real):
   from_int 0 < z =>
@@ -99,7 +99,7 @@ by smt full.
 
 lemma nosmt addleM : forall (x1 x2 y1 y2:real),
    x1 <= x2 => y1 <= y2 => x1 + y1 <= x2 + y2 
-by smt full.
+by smt.
 
 lemma nosmt addgeM : forall (x1 x2 y1 y2:real),
    x1 >= x2 => y1 >= y2 => x1 + y1 >= x2 + y2 
@@ -111,19 +111,19 @@ by smt.
 
 lemma real_le_trans: forall (a b c:real), 
  a <= b => b <= c => a <= c
-by smt full.
+by smt.
 
 lemma nosmt le_ge : forall (x y:real), (x <= y) <=> (y >= x)
 by smt full.
 
-lemma nosmt le_ge_sym : forall (x y:real), (x <= y) => (y >= x)
-by (intros x y;rewrite le_ge).
+lemma nosmt le_ge_sym : forall (x y:real), (x <= y) => (y >= x).
+proof. by move=> x y; rewrite le_ge. qed.
 
 lemma nosmt eq_le_ge : forall (x y:real), (x = y) <=> (x <= y /\ x >= y)
 by smt full.
 
 lemma nosmt eq_le: forall (x y:real), x = y => x <= y
-by smt full.
+by smt.
 
 lemma nosmt inv_le (x y:real): from_int 0 < x => from_int 0 < y => y <= x => inv x <= inv y.
 proof.
@@ -157,22 +157,22 @@ instance ring with real
   op sub   = (-)
   op ofint = FromInt.from_int
 
-  proof oner_neq0 by smt full
-  proof addr0     by smt full
-  proof addrA     by smt full
-  proof addrC     by smt full
-  proof addrN     by smt full
-  proof mulr1     by smt full
-  proof mulrA     by smt full
-  proof mulrC     by smt full
-  proof mulrDl    by smt full
+  proof oner_neq0 by smt
+  proof addr0     by smt
+  proof addrA     by smt
+  proof addrC     by smt
+  proof addrN     by smt
+  proof mulr1     by smt
+  proof mulrA     by smt
+  proof mulrC     by smt
+  proof mulrDl    by smt
   proof expr0     by smt full
   proof exprS     by smt full
   proof subrE     by smt full
-  proof ofint0    by smt full
-  proof ofint1    by smt full
+  proof ofint0    by smt
+  proof ofint1    by smt
   proof ofintS    by smt full
-  proof ofintN    by smt full.
+  proof ofintN    by smt.
 
 instance field with real
   op rzero = zero
@@ -186,25 +186,25 @@ instance field with real
   op inv   = inv
   op div   = (/)
 
-  proof oner_neq0 by smt full
-  proof addr0     by smt full
-  proof addrA     by smt full
-  proof addrC     by smt full
-  proof addrN     by smt full
-  proof mulr1     by smt full
-  proof mulrA     by smt full
-  proof mulrC     by smt full
-  proof mulrDl    by smt full
-  proof mulrV     by smt full
+  proof oner_neq0 by smt
+  proof addr0     by smt
+  proof addrA     by smt
+  proof addrC     by smt
+  proof addrN     by smt
+  proof mulr1     by smt
+  proof mulrA     by smt
+  proof mulrC     by smt
+  proof mulrDl    by smt
+  proof mulrV     by smt
   proof expr0     by smt full
   proof exprS     by smt full
-  proof exprN     by smt full
+  proof exprN     by smt
   proof subrE     by smt full
   proof divrE     by smt full
-  proof ofint0    by smt full
-  proof ofint1    by smt full
+  proof ofint0    by smt
+  proof ofint1    by smt
   proof ofintS    by smt full
-  proof ofintN    by smt full.
+  proof ofintN    by smt.
 
 (* WARNING Lemmas used by tactics : 
    eq_le addleM real_le_trans and the following lemmas *)
@@ -218,18 +218,18 @@ lemma nosmt upto2_abs (x1 x2 x3 x4 x5:real):
 
 lemma nosmt upto2_notbad (ev1 ev2 bad1 bad2:bool) :
   ((bad1 <=> bad2) /\ (!bad2 => (ev1 <=> ev2))) =>
-  ((ev1 /\ !bad1) <=> (ev2 /\ !bad2)) by smt full.
+  ((ev1 /\ !bad1) <=> (ev2 /\ !bad2)) by smt.
 
 lemma nosmt upto2_imp_bad (ev1 ev2 bad1 bad2:bool) :
   ((bad1 <=> bad2) /\ (!bad2 => (ev1 <=> ev2))) =>
-  (ev1 /\ bad1) => bad2 by smt full.
+  (ev1 /\ bad1) => bad2 by smt.
 
 lemma nosmt upto_bad_false (ev bad2:bool) :
-  !((ev /\ !bad2) /\ bad2) by smt full.
+  !((ev /\ !bad2) /\ bad2) by smt.
 
 lemma nosmt upto_bad_or (ev1 ev2 bad2:bool) :
    (!bad2 => ev1 => ev2) => ev1 =>
-    ev2 /\ !bad2 \/ bad2 by smt full.
+    ev2 /\ !bad2 \/ bad2 by smt.
 
 lemma nosmt upto_bad_sub (ev bad:bool) :
   ev /\ ! bad => ev by [].

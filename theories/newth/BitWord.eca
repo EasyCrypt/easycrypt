@@ -53,7 +53,7 @@ op oppw (w : word): word = w.
 
 (* -------------------------------------------------------------------- *)
 lemma non_trivial: onew <> zerow
-by smt full.
+by smt all.
 
 lemma xorw0: right_id zerow (^).
 proof. by move=> w; apply/wordP; smt. qed.

@@ -135,6 +135,6 @@ theory DWord.
       have ->: elts = []
         by apply/size_eq0; smt.
       by rewrite in_nil.
-    smt full.
+    smt.
   qed.
 end DWord.

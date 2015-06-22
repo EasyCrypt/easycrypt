@@ -98,7 +98,7 @@ by smt.
 
 lemma nosmt normr_idP (x : real):
   (`|x| = x) <=> (0%r <= x)
-by smt full.
+by smt all.
 
 lemma nosmt ger0_norm (x : real):
   0%r <= x => `|x| = x
@@ -130,7 +130,7 @@ by smt.
 
 lemma nosmt ler0_def (x : real):
   (x <= 0%r) <=> (`|x| = - x)
-by smt full.
+by smt all.
 
 lemma nosmt normr_id (x : real):
   `| `|x| | = `|x|
@@ -138,11 +138,11 @@ by smt.
 
 lemma nosmt normr_ge0 (x : real):
   0%r <= `|x|
-by smt full.
+by smt all.
 
 lemma nosmt ler0_norm (x : real):
   x <= 0%r => `|x| = - x
-by smt full.
+by smt all.
 
 lemma nosmt gtr0_norm (x : real):
   0%r < x => `|x| = x
@@ -222,15 +222,15 @@ by smt.
 
 lemma nosmt normr_le0 (x : real):
   (`|x| <= 0%r) <=> (x = 0%r)
-by smt full.
+by smt all.
 
 lemma nosmt normr_lt0 (x : real):
   ! (`|x| < 0%r)
-by smt full.
+by smt.
 
 lemma nosmt normr_gt0 (x : real):
   (0%r < `|x|) <=> (x <> 0%r)
-by smt full.
+by smt all.
 
 lemma nosmt ler_oppr (x y : real):
   (x <= - y) <=> (y <= - x)
@@ -556,7 +556,7 @@ by smt.
 
 lemma nosmt gtr_pmull (x y : real):
   0%r < y => (x * y < y) <=> (x < 1%r)
-by smt full.
+by smt all.
 
 lemma nosmt ger_pmulr (x y : real):
   0%r < y => (y * x <= y) <=> (x <= 1%r)
@@ -564,7 +564,7 @@ by smt.
 
 lemma nosmt gtr_pmulr (x y : real):
   0%r < y => (y * x < y) <=> (x < 1%r)
-by smt full.
+by smt all.
 
 lemma nosmt ler_nmull (x y : real):
   y < 0%r => (y <= x * y) <=> (x <= 1%r)

@@ -18,13 +18,13 @@ lemma nosmt addz1_neq0 (i : int): 0 <= i => i+1 <> 0
 by smt full.
 
 lemma nosmt onez_neq0 : 1 <> 0 
-by smt full.
+by smt.
 
 lemma nosmt addzA (x y z : int): x + (y + z) = (x + y) + z
-by smt full.
+by smt.
 
 lemma nosmt addzC (x y : int): x + y = y + x
-by smt full.
+by smt.
 
 lemma nosmt add0z (x : int): 0 + x = x
 by smt full.
@@ -33,16 +33,16 @@ lemma nosmt addNz (x : int): (-x) + x = 0
 by smt full.
 
 lemma nosmt addzCA (x y z : int): x + (y + z) = y + (x + z)
-by smt full.
+by smt.
 
 lemma nosmt addzAC (x y z : int): (x + y) + z = (x + z) + y
-by smt full.
+by smt.
 
 lemma nosmt addIz (x1 x2 y : int): x1 + y = x2 + y => x1 = x2
-by smt full.
+by smt.
 
 lemma nosmt addzI (x1 x2 y : int): y + x1 = y + x2 => x1 = x2
-by smt full.
+by smt.
 
 lemma nosmt oppzK (x : int): -(-x) = x
 by smt full.
@@ -54,16 +54,16 @@ lemma nosmt addAzN (x y : int): (x + y) - y = x
 by smt full.
 
 lemma nosmt mulzA  (x y z : int): x * (y * z) = (x * y) * z
-by smt full.
+by smt.
 
 lemma nosmt mulzC  (x y : int): x * y = y * x
-by smt full.
+by smt.
 
 lemma nosmt mul1z  (x : int): 1 * x = x
 by smt full.
 
 lemma nosmt mulzDl (x y z : int): (x + y) * z = x * z + y * z
-by smt full.
+by smt.
 
 lemma subzE (x y : int): x - y = x + (- y)
 by smt full.
@@ -83,7 +83,7 @@ lemma nosmt norm_eq0     (x   : int): `|x| = 0 => x = 0
 by smt full.
 
 lemma nosmt gez_leVge    (x y : int): 0 <= x => 0 <= y => x <= y \/ y <= x
-by smt full.
+by smt.
 
 lemma nosmt normzM       (x y : int): `|x * y| = `|x| * `|y|
 by smt full.
@@ -108,7 +108,7 @@ lemma nosmt gtz_lt (x y : int): (x >  y) <=> (y <  x) by smt full.
 lemma nosmt neq_ltz (x y : int): (x <> y) <=> (x < y \/ y < x) by smt full.
 lemma nosmt eqz_leq (x y : int): (x = y) <=> (x <= y /\ y <= x) by [].
 
-lemma nosmt lez_addl (x y z : int): (x + y <= x + z) <=> (y <= z) by smt full.
+lemma nosmt lez_addl (x y z : int): (x + y <= x + z) <=> (y <= z) by smt.
 
 lemma nosmt lez_add1r (x y : int): (1 + x <= y) = (x < y) by smt full.
 
@@ -124,7 +124,7 @@ theory Induction.
     (forall i, 0 <= i => p i).
   proof strict.
     intros hyp i iVal.
-    apply (induction (fun i, forall k, 0 <= k <= i => p k) _ _ i); smt full.
+    apply (induction (fun i, forall k, 0 <= k <= i => p k) _ _ i); 1..2:(smt full); smt.
   qed.
 
   lemma nosmt natind (p : int -> bool):
@@ -167,7 +167,7 @@ op fold : ('a -> 'a) -> 'a -> int -> 'a.
 axiom foldle0 p (f : 'a -> 'a) a: p <= 0 => fold f a p = a.
 
 lemma fold0 (f : 'a -> 'a) a: fold f a 0 = a
-by smt full.
+by smt.
 
 axiom foldS (f : 'a -> 'a) a n: 0 <= n => fold f a (n+1) = f (fold f a n).
 
@@ -184,13 +184,13 @@ op ( ^ ) (x:int) (p:int) = fold (( * ) x) 1 p
 axiomatized by powE.
 
 lemma nosmt powNeg p x: p <= 0 => x ^ p = 1
-by smt full.
+by smt.
 
 lemma pow0 x: x ^ 0 = 1
-by smt full.
+by smt all.
 
 lemma powS p x: 0 <= p => x ^ (p+1) = x * x ^ p
-by smt full.
+by smt.
 
 lemma pow_add z p1 p2: 0 <= p1 => 0 <= p2 => z^p1 * z^p2 = z^(p1+p2).
 proof. 
@@ -211,7 +211,9 @@ qed.
 lemma pow_Mle (x y:int): 0 <= x <= y => 2^x <= 2^y.
 proof.
   intros [leq0_x leqx_y]; cut leq0_y: 0 <= y by smt.
-  move: leqx_y; elim /Induction.induction y leq0_y; smt full.
+  move: leqx_y; elim /Induction.induction y leq0_y.
+    smt.
+  smt full.
 qed.
 
 (* Diveucl *)
@@ -238,7 +240,9 @@ theory EuclDiv.
   proof -strict. 
     intros m d Hd Hm.
     apply (Trans _ (0/%d));last apply ediv_Mle;smt.
-    elim (ediv_unique 0 d 0 0 _ _ _) => //; smt full.
+    elim (ediv_unique 0 d 0 0 _ _ _) => //; 1..2:smt full.
+      smt all.
+    smt.
   qed.
 end EuclDiv.
 
@@ -264,11 +268,11 @@ theory Extrema.
   lemma nosmt min_is_glb x a b:
     x <= a => x <= b =>
     x <= min a b
-  by smt full.
+  by smt.
 
   lemma nosmt min_is_extremum a b:
     min a b = a \/ min a b = b
-  by smt full.
+  by smt.
 
   op max (a b:int) = if (a < b) then b else a.
 
@@ -289,11 +293,11 @@ theory Extrema.
   lemma nosmt max_is_lub x a b:
     a <= x => b <= x =>
     max a b <= x
-  by smt full.
+  by smt.
 
   lemma nosmt max_is_extremum a b:
     max a b = a \/ max a b = b
-  by smt full.
+  by smt.
 end Extrema.
 export Extrema.
 
@@ -328,9 +332,12 @@ theory ForLoop.
   elim/Induction.induction n; first smt full.
   intros=> n ge0_n IH _ st i j.
   case (n = 0); first intros=> -> h.
-    by (cut ->: j = i+1 by smt full); rewrite range_ind ?range_base; smt full.
+    cut ->: j = i+1 by smt full.
+    rewrite range_ind ?range_base; 2..4:smt.
+    smt full.
   intros=> nz_n eq_iBj_Sn; rewrite range_ind; first by smt full.
-  (rewrite IH; first 2 smt full); congr => //.
+  rewrite IH; [smt full|smt|].
+  congr => //.
   by rewrite -range_ind; first smt full.
   qed.
 
@@ -340,9 +347,10 @@ theory ForLoop.
      (b /\ forall k, i <= k < j => p k).
   proof.
   case (i < j)=> i_j; last smt full.
-  pose n := j - i; cut ->: j = n + i by smt full.
-  cut: 0 <= n by smt full. elim/Induction.induction n;first by smt full.
-  intros i0 Hi0 Hrec;rewrite range_ind_lazy;smt full.
+  pose n := j - i; cut ->: j = n + i by smt.
+  cut: 0 <= n by smt full.
+  elim/Induction.induction n;first by smt full.
+  intros i0 Hi0 Hrec;rewrite range_ind_lazy; smt full.
   qed.
 
   (* General result on restricting the range *)
@@ -351,7 +359,7 @@ theory ForLoop.
     ForLoop.range i j base (fun k a, if i <= k < j then f k a else a) = ForLoop.range i j base f.
   proof.
   intros=> h; case (0 = j - i)=> h2; first smt full.
-  pose k:= j - i - 1; cut {1 3}->: j = k + i + 1 by smt full.
+  pose k:= j - i - 1; cut {1 3}->: j = k + i + 1 by smt.
   cut: k < j - i by smt full. cut: 0 <= k by smt full.
   by elim/Induction.induction k; smt full.
   qed.

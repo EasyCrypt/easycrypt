@@ -77,7 +77,9 @@ axiom uniform_unique (d d':'a distr):
 lemma witness_nzero P (d:'a distr):
   0%r < mu d P => (exists x, P x ).
 proof.
-  by cut: P <> pred0 => (exists x, P x); smt full.
+  cut: P <> pred0 => (exists x, P x).
+    smt full.
+  smt.
 qed.
 
 lemma ew_eq (d d':'a distr):
@@ -157,15 +159,14 @@ qed.
 lemma witness_support P (d:'a distr):
   0%r < mu d P <=> (exists x, P x /\ in_supp x d).
 proof.
-split.
+split=> [|[] x [x_in_P x_in_d]].
   rewrite mu_support=> nzero.
   apply witness_nzero in nzero; case nzero=> x.
-  rewrite /predI /support //= => p_supp.
+  rewrite /predI //= => p_supp.
   by exists x.
-  move=> [] x [x_in_P x_in_d].
-  cut: mu d (pred1 x) <= mu d P /\ 0%r < mu d (pred1 x); last smt.
-  split; last by rewrite x_in_d.
-  by rewrite mu_sub // /Pred.(<=) /pred1 => x0 <<-.
+cut: mu d (pred1 x) <= mu d P /\ 0%r < mu d (pred1 x); last smt.
+split=> [|//=].
+by rewrite mu_sub // /Pred.(<=) /pred1 => x0 <<-.
 qed.
 
 lemma mu_sub_support (d:'a distr) (p q:('a -> bool)):
@@ -214,7 +215,7 @@ theory Dempty.
   by intros weight_0; rewrite -(pw_eq<:'a> d dempty); smt.
   qed.
 
-  lemma demptyU: is_subuniform dempty<:'a> by smt full.
+  lemma demptyU: is_subuniform dempty<:'a> by smt.
 end Dempty.
 
 (** Point distribution *)
