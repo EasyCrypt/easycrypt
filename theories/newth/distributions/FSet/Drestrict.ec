@@ -1,5 +1,14 @@
-require import Real NewFSet Distr.
+(* --------------------------------------------------------------------
+ * Copyright (c) - 2012-2015 - IMDEA Software Institute and INRIA
+ * Distributed under the terms of the CeCILL-B licence.
+ * -------------------------------------------------------------------- *)
 
+(* -------------------------------------------------------------------- *)
+require import Int Real Distr NewFSet.
+
+pragma +implicits.
+
+(* -------------------------------------------------------------------- *)
 op drestr: 'a distr -> 'a fset -> 'a distr.
 
 axiom supp_def (x:'a) d X:
