@@ -142,9 +142,8 @@ proof. by rewrite -{1}@(mkseq_nth x0 s) /mkseq big_map. qed.
 lemma nosmt big_const (P : 'a -> bool) x s:
   big P (fun i => x) s = iter (count P s) ((+) x) idm.
 proof.
-  elim: s=> [|y s ih]; 1: by rewrite iter0.
-  rewrite big_cons /= ih; case (P y) => //.
-  by rewrite addzC iterS // count_ge0.
+  elim: s=> [|y s ih]; [by rewrite iter0 | rewrite big_cons /=].
+  by rewrite ih; case (P y) => //; rewrite addzC iterS // count_ge0.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -178,6 +177,11 @@ proof.                          (* FIXME: big_rec2 *)
   move=> eqF; elim: s=> // x s; rewrite !big_cons=> <-.
   by case (P x)=> // /eqF <-.
 qed.
+
+(* -------------------------------------------------------------------- *)
+lemma big_andbC (P Q : 'a -> bool) F s:
+  big (fun x => P x /\ Q x) F s = big (fun x => Q x /\ P x) F s.
+proof. by apply/eq_bigl=> i. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt eq_big (P1 P2 : 'a -> bool) (F1 F2 : 'a -> t) s:
@@ -314,6 +318,24 @@ lemma nosmt eq_big_seq (F1 F2 : 'a -> t) s:
      (forall x, mem s x => F1 x = F2 x)
   => big predT F1 s = big predT F2 s.
 proof. by move=> eqF; rewrite !big_seq; apply/eq_bigr. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma big1_eq (P : 'a -> bool) s: big P (fun x => idm) s = idm.
+proof.
+  rewrite big_const; elim/Induction.natind: (count _ _)=> n.
+    by move/iter0<:t> => ->.
+  by move/iterS<:t> => -> ->; rewrite addm0.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma big1 (P : 'a -> bool) F s:
+  (forall i, P i => F i = idm) => big P F s = idm.
+proof. by move/eq_bigr=> ->; apply/big1_eq. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma big1_seq (P : 'a -> bool) F s:
+  (forall i, P i /\ (mem s i) => F i = idm) => big P F s = idm.
+proof. by move=> eqF1; rewrite big_seq_cond big_andbC big1. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt big_int_cond m n P F:

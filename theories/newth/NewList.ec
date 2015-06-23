@@ -1143,6 +1143,15 @@ proof.
   by move=> x' y' s_x' s_y'; apply/inj_f; rewrite ?(s_x', s_y').
 qed.
 
+
+(* -------------------------------------------------------------------- *)
+(*                         Partial mapping                              *)
+(* -------------------------------------------------------------------- *)
+op pmap ['a 'b] (f : 'a -> 'b option) (s : 'a list) =
+  with s = "[]"     => []
+  with s = (::) x s =>
+    if f x = None then pmap f s else oget (f x) :: pmap f s.
+
 (* -------------------------------------------------------------------- *)
 (*                          Index sequence                              *)
 (* -------------------------------------------------------------------- *)
@@ -1239,6 +1248,12 @@ theory Range.
     rewrite /range mem_iota; case: (m <= i)=> //=.
     by rewrite subrE addrCA addrN addr0.
   qed.
+
+  lemma range_uniq m n: uniq (range m n).
+  proof. by apply/iota_uniq. qed.
+
+  lemma size_range m n: size (range m n) = max 0 (n - m).
+  proof. by apply/size_iota. qed.
 end Range.
 
 export Range.
