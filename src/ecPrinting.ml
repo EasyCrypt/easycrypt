@@ -2254,7 +2254,7 @@ let pp_pvdecl ppe fmt v =
 let pp_funsig ppe fmt (oi_in, fs) =
   match fs.fs_anames with
   | None ->
-    Format.fprintf fmt "@[<hov 2>proc%s %s %a :@ %a@]"
+    Format.fprintf fmt "@[<hov 2>proc%s %s (%a) :@ %a@]"
       (if oi_in then "" else " *")
       fs.fs_name (pp_type ppe) fs.fs_arg (pp_type ppe) fs.fs_ret
   | Some params ->
