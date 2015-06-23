@@ -4,94 +4,11 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Bool Option Fun Distr Int IntExtra Real NewRealOrder NewList.
-(*---*) import IterOp.
-require (*--*) NewBigop.
+require import Bool Option Fun Distr Int IntExtra Real RealExtra.
+require import StdRing StdOrder StdBigop RealSeq RealSeries NewList.
+(*---*) import IterOp BRA RealOrder.
 
 pragma +implicits.
-
-(* -------------------------------------------------------------------- *)
-clone import NewBigop as RSum with
-  type t <- real,
-  op Support.idm <- 0%r,
-  op Support.(+) <- Real.(+).
-
-(* -------------------------------------------------------------------- *)
-theory Sequence.
-  pred convergeto (s : int -> real) (x : real) =
-    forall epsilon, 0%r <= epsilon => exists N,
-      forall n, (N <= n)%Int => `|s n - x| < epsilon.
-
-  pred converge (s : int -> real) =
-    exists l, convergeto s l.
-
-  pred bounded_by (s : int -> real) (M : real) =
-    exists N, forall n, (N <= n)%Int => `|s n| <= M.
-
-  pred bounded (s : int -> real) =
-    exists M, bounded_by s M.
-
-  pred monotone (s : int -> real) =
-    forall n, 0 <= n => s n <= s (n+1).
-
-  lemma monotoneP (s : int -> real):
-    monotone s <=> (forall m n, 0 <= m <= n => s m <= s n).
-  proof. admit. qed.
-
-  lemma uniq_cnv s x y: convergeto s x => convergeto s y => x = y.
-  proof. admit. qed.
-
-  lemma eq_cnv s1 s2 l:
-       (exists N, forall n, (N <= n)%Int => s1 n = s2 n)
-    => convergeto s1 l => convergeto s2 l.
-  proof. admit. qed.
-
-  lemma le_cnv s1 s2 l1 l2:
-       (exists N, forall n, (N <= n)%Int => (s1 n <= s2 n)%Real)
-    => convergeto s1 l1 => convergeto s2 l2 => l1 <= l2.
-  proof. admit. qed.
-
-  lemma cnvC c: convergeto (fun x => c) c.
-  proof. admit. qed.
-
-  lemma cnvD s1 s2 l1 l2: convergeto s1 l1 => convergeto s2 l2 =>
-    convergeto (fun x => s1 x + s2 x) (l1 + l2).
-  proof. admit. qed.
-
-  lemma cnvB s l: convergeto s l => convergeto (fun x => -(s x)) (-l).
-  proof. admit. qed.
-
-  lemma cnvM s1 s2 l1 l2: convergeto s1 l1 => convergeto s2 l2 =>
-    convergeto (fun x => s1 x * s2 x) (l1 * l2).
-  proof. admit. qed.
-
-  lemma cnvZ c s l: convergeto s l => convergeto (fun x => c * s x) l.
-  proof. admit. qed.
-
-  lemma cnvM_bounded s1 s2: convergeto s1 0%r => bounded s2 => 
-    convergeto (fun x => s1 x * s2 x) 0%r.
-  proof. admit. qed.
-
-  lemma cnv_bounded s: bounded s => monotone s => exists l, convergeto s l.
-  proof. admit. qed.
-end Sequence.
-
-import Sequence.
-
-(* -------------------------------------------------------------------- *)
-op lim (s : int -> real) : real.
-
-axiom limP (s : int -> real): converge s <=> convergeto s (lim s).
-axiom lim_Ncnv (s : int -> real): ! converge s => lim s = 0%r.
-
-(* -------------------------------------------------------------------- *)
-theory Series.
-  op partial (s : int -> real) (n : int) : real =
-    bigi predT s 0 n.
-
-  pred convergeto (s : int -> real) (x : real) =
-    Sequence.convergeto (partial s) x.
-end Series.
 
 (* -------------------------------------------------------------------- *)
 pred countable ['a] (E : 'a -> bool) =
@@ -99,82 +16,61 @@ pred countable ['a] (E : 'a -> bool) =
     forall x, E x => exists i, C i = Some x.
 
 (* -------------------------------------------------------------------- *)
-op lub (E : real -> bool) : real.
+type 'a distr.
 
-pred nonempty (E : real -> bool) =
-  exists x, E x.
+op mu : 'a distr -> ('a -> real).
+op mk : ('a -> real) -> 'a distr.
 
-pred ub (E : real -> bool) (z : real) =
-  forall y, E y => y <= z.
+pred isdistr (m : 'a -> real) =
+     (forall x, 0%r <= m x)
+  /\ (forall s, uniq s => BRA.big predT m s <= 1%r)
+  /\ (countable (fun x => m x <> 0%r)).
 
-pred has_ub  (E : real -> bool) = nonempty (ub E).
-pred has_lub (E : real -> bool) = nonempty E /\ has_ub E.
+axiom distrW (P : 'a distr -> bool):
+  (forall m, isdistr m => P (mk m)) => forall d, P d.
 
-axiom lub_upper_bound (E : real -> bool): has_lub E => 
-  forall x, E x => x <= lub E.
+axiom muK (m : 'a -> real): isdistr m => mu (mk m) = m.
+axiom mkK (d : 'a distr): mk (mu d) = d.
 
-axiom lub_adherent (E : real -> bool): has_lub E =>
-  forall eps, 0%r < eps =>
-    exists e, E e /\ (lub E - eps) < e.
+lemma ge0_mu ['a] (d : 'a distr) (x : 'a):
+  0%r <= mu d x.
+proof. by move: d x; elim/distrW=> m dm; rewrite muK //; case: dm. qed.
 
-(* -------------------------------------------------------------------- *)
-theory NewDistr.
-  type 'a distr.
+lemma le1_mu ['a] (d : 'a distr) (x : 'a):
+  forall (s : 'a list), uniq s => BRA.big predT (mu d) s <= 1%r.
+proof. by move: d x; elim/distrW=> m dm; rewrite muK //; case: dm. qed.      
 
-  op mu : 'a distr -> ('a -> real).
-  op mk : ('a -> real) -> 'a distr.
+lemma countable_mu ['a] (d : 'a distr):
+  countable (fun x => mu d x <> 0%r).
+proof. by move: d; elim/distrW=> m dm; rewrite muK //; case: dm. qed.
 
-  pred isdistr (m : 'a -> real) =
-       (forall x, 0%r <= m x)
-    /\ (forall s, uniq s => RSum.big predT m s <= 1%r)
-    /\ (countable (fun x => m x <> 0%r)).
+lemma eq_distr (d1 d2 : 'a distr):
+  (d1 = d2) <=> (forall x, mu d1 x = mu d2 x).
+proof.
+  split=> [->//|eq_mu]; rewrite -@(mkK d1) -@(mkK d2).
+  by congr; apply/fun_ext.
+qed.
 
-  axiom distrW (P : 'a distr -> bool):
-    (forall m, isdistr m => P (mk m)) => forall d, P d.
+op prS ['a] (E : 'a -> bool) (d : 'a distr) = fun (x : real) =>
+  existsb (fun (s : 'a list) => uniq s /\ x = BRA.big E (mu d) s).
 
-  axiom muK (m : 'a -> real): isdistr m => mu (mk m) = m.
-  axiom mkK (d : 'a distr): mk (mu d) = d.
+lemma prSP ['a] (E : 'a -> bool) (d : 'a distr) (x : real):
+  prS E d x <=> exists s, uniq s /\ x = BRA.big E (mu d) s.
+proof. split; first by move/existsbP. by move=> h; apply/existsbP. qed.
+  
+op pr ['a] (E : 'a -> bool) (d : 'a distr) = lub (prS E d).
 
-  lemma ge0_mu ['a] (d : 'a distr) (x : 'a):
-    0%r <= mu d x.
-  proof. by move: d x; elim/distrW=> m dm; rewrite muK //; case: dm. qed.
+lemma prE ['a] (E : 'a -> bool) (d : 'a distr):
+  forall (s : int -> 'a option),
+       (forall i j x, s i = Some x => s j = Some x => i = j)
+    => (forall x, mu d x <> 0%r => exists i, 0 <= i /\ s i = Some x)
+    => pr E d = lim (fun n => BRA.big E (mu d) (pmap s (range 0 n))).
+proof. admit. qed.
 
-  lemma le1_mu ['a] (d : 'a distr) (x : 'a):
-    forall (s : 'a list), uniq s => RSum.big predT (mu d) s <= 1%r.
-  proof. by move: d x; elim/distrW=> m dm; rewrite muK //; case: dm. qed.      
-
-  lemma countable_mu ['a] (d : 'a distr):
-    countable (fun x => mu d x <> 0%r).
-  proof. by move: d; elim/distrW=> m dm; rewrite muK //; case: dm. qed.      
-
-  lemma eq_distr (d1 d2 : 'a distr):
-    (d1 = d2) <=> (forall x, mu d1 x = mu d2 x).
-  proof.
-    split=> [->//|eq_mu]; rewrite -@(mkK d1) -@(mkK d2).
-    by congr; apply/fun_ext.
-  qed.
-
-  op prS ['a] (E : 'a -> bool) (d : 'a distr) :
-    { real -> bool | forall x, prS x <=>
-        exists (s : 'a list), uniq s /\ x = RSum.big E (mu d) s }
-    as prSP.
-
-  op pr ['a] (E : 'a -> bool) (d : 'a distr) = lub (prS E d).
-
-  lemma prE ['a] (E : 'a -> bool) (d : 'a distr):
-    forall (s : int -> 'a option),
-         (forall i j x, s i = Some x => s j = Some x => i = j)
-      => (forall x, mu d x <> 0%r => exists i, 0 <= i /\ s i = Some x)
-      => pr E d = lim (fun n => big E (mu d) (pmap s (range 0 n))).
-  proof. admit. qed.
-
-  lemma prE_fin ['a] (E : 'a -> bool) (s : 'a list) (d : 'a distr): uniq s =>
-        (forall x, mu d x <> 0%r => mem s x)
-     => pr E d = RSum.big E (mu d) s.
-  proof. admit. qed.
-end NewDistr.
-
-import NewDistr.
+lemma prE_fin ['a] (E : 'a -> bool) (s : 'a list) (d : 'a distr): uniq s =>
+      (forall x, mu d x <> 0%r => mem s x)
+   => pr E d = BRA.big E (mu d) s.
+proof. admit. qed.
 
 (* --------------------------------------------------------------------- *)
 theory MUnit.
@@ -194,7 +90,7 @@ theory MUnit.
     by exists 0.
   qed.
 
-  op dunit ['a] (x : 'a) = NewDistr.mk (munit x).
+  op dunit ['a] (x : 'a) = mk (munit x).
 
   (* FIXME: [rewrite /dunit] should not be necessary *)
   lemma dunit1E ['a] (x y : 'a):
@@ -229,14 +125,10 @@ theory MUniform.
       rewrite /F big_const big1.
         by rewrite /muniform /predC; move=> x [_ ->].
       admit. (* FIXME: extend Ring with natmul *)
-    exists (fun i => nth None (map Some (undup s)) i).
-    rewrite /muniform => x; case: (mem s x) => // x_in_s _.
-    exists (index x (undup s)); rewrite @(nth_map x).
-      by rewrite index_ge0 index_mem mem_undup.
-    by rewrite nth_index ?mem_undup.
+    admit.
   qed.
 
-  op duniform ['a] (s : 'a list) = NewDistr.mk (muniform s).
+  op duniform ['a] (s : 'a list) = mk (muniform s).
 
   lemma duniform1E ['a] (s : 'a list) x:
     mu (duniform s) x = if mem s x then 1%r / (size (undup s))%r else 0%r.
