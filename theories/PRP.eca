@@ -12,81 +12,188 @@ require import FSet.
 (*---*) import Dexcepted.
 require import FMap.
 
-(** A PRP is a family of permutations F on domain D indexed by a
-    keyspace K equipped with a distribution dK. *)
+(** A PRP is a family of permutations P on domain D indexed by a
+    keyspace K equipped with a distribution dK. For simplicity of use,
+    we require the inverse permutative to be provided explicitly. **)
 type D.
-
 type K.
 
 op dK: K distr.
 axiom dK_ll: mu dK predT = 1%r.
 
-op P:K -> D -> D.
+op P   : K -> D -> D.
+op Pinv: K -> D -> D.
 
-axiom bijective_P k:
-  support dK k =>
-  bijective (P k).
+axiom bijectiveP k:
+  support dK k
+  =>    cancel (P k) (Pinv k)
+     /\ cancel (Pinv k) (P k).
 
-(** The Real PRP is defined as follows *)
-module PRPr = {
-  var k:K
-  proc init(): unit = { k = $dK; }
-  proc f(x:D): D = { return P k x; }
-}.
+theory Weak_PRP.
+  module type PRP = {
+    proc init(): unit
+    proc f(x:D): D
+  }.
 
-(** Security is expressed with respect to the Random Permutation defined
-    by some distribution on D. *)
-op dD:D distr.
-axiom dD_ll: mu dD predT = 1%r.
+  (** The Real PRP is defined as follows *)
+  module PRPr = {
+    var k:K
+    proc init(): unit = { k = $dK; }
+    proc f(x:D): D = { return P k x; }
+  }.
 
-module type PRP = {
-  proc init(): unit
-  proc f(x:D): D
-}.
+  (** Security is expressed with respect to the Random Permutation defined
+      by some distribution on D. **)
+  op dD:D distr.
+  axiom dD_ll: mu dD predT = 1%r.
 
-module type PRPA = {
-  proc f(x:D): D
-}.
+  module type PRPA = {
+    proc f(x:D): D
+  }.
 
-module type Distinguisher(F:PRPA) = {
-  proc distinguish(): bool
-}.
+  module type Distinguisher(F:PRPA) = {
+    proc distinguish(): bool
+  }.
 
-module IND (P:PRP,D:Distinguisher) = {
-  module D = D(P)
+  module IND (P:PRP,D:Distinguisher) = {
+    module D = D(P)
 
-  proc main(): bool = {
-    var b;
+    proc main(): bool = {
+      var b;
 
-    P.init();
-    b = D.distinguish();
-    return b;
-  }
-}.
+      P.init();
+      b = D.distinguish();
+      return b;
+    }
+  }.
 
-module PRPi = {
-  var m:(D,D) map
+  module PRPi = {
+    var m:(D,D) map
 
-  proc init(): unit = { m = FMap.empty; }
+    proc init(): unit = { m = FMap.empty; }
 
-  proc f(x:D): D = {
-    if (!mem x (dom m)) m.[x] = $dD \ (rng m);
-    return (oget m.[x]);
-  }
-}.
+    proc f(x:D): D = {
+      if (!mem x (dom m)) m.[x] = $dD \ (rng m);
+      return (oget m.[x]);
+    }
+  }.
 
-(*** TODO: define notations ***)
-(** Advantage of a distinguisher against a PRP oracle P:
-      Adv^PRP_P(&m,D) = `|Pr[IND(P,D) @ &m: res] - Pr[IND(PRPi,D) @ &m: res]| **)
-(** Advantage of a distinguisher against **the** PRP operator P:
-      Adv^PRP_P(&m,D) = `|Pr[IND(PRPr,D) @ &m: res] - Pr[IND(PRPi,D) @ &m: res]| **)
+  (*** TODO: define notations ***)
+  (** Advantage of a distinguisher against a PRP oracle P:
+        Adv^PRP_P(&m,D) = `|Pr[IND(P,D) @ &m: res] - Pr[IND(PRPi,D) @ &m: res]| **)
+  (** Advantage of a distinguisher against **the** PRP operator P:
+        Adv^PRP_P(&m,D) = `|Pr[IND(PRPr,D) @ &m: res] - Pr[IND(PRPi,D) @ &m: res]| **)
 
-(** Useful lemmas **)
-lemma PRPr_init_ll: islossless PRPr.init.
-proof. by proc; auto; smt. qed.
+  (** Useful lemmas **)
+  lemma PRPr_init_ll: islossless PRPr.init.
+  proof. by proc; auto; smt. qed.
 
-lemma PRPr_f_ll: islossless PRPr.f.
-proof. by proc. qed.
+  lemma PRPr_f_ll: islossless PRPr.f.
+  proof. by proc. qed.
+end Weak_PRP.
 
+theory Strong_PRP.
+  module type PRP = {
+    proc init()   : unit
+    proc f(x:D)   : D
+    proc finv(x:D): D
+  }.
 
-(*** TODO: define strong PRP ***)
+  (** The Real PRP is defined as follows *)
+  module PRPr = {
+    var k:K
+    proc init(): unit = { k = $dK; }
+    proc f(x:D): D    = { return P k x; }
+    proc finv(x:D): D = { return Pinv k x; }
+  }.
+
+  (** Security is expressed with respect to the Random Permutation defined
+      by some distribution on D. **)
+  op dD:D distr.
+  axiom dD_ll: mu dD predT = 1%r.
+
+  module type PRPA = {
+    proc f(x:D)   : D
+    proc finv(x:D): D
+  }.
+
+  module type Distinguisher(F:PRPA) = {
+    proc distinguish(): bool
+  }.
+
+  module IND (P:PRP,D:Distinguisher) = {
+    module D = D(P)
+
+    proc main(): bool = {
+      var b;
+
+      P.init();
+      b = D.distinguish();
+      return b;
+    }
+  }.
+
+  module PRPi = {
+    var m   : (D,D) map
+    var minv: (D,D) map
+
+    proc init(): unit = {
+      m    <- FMap.empty;
+      minv <- FMap.empty;
+    }
+
+    proc f(x:D): D = {
+      var y;
+
+      if (!mem x (dom m)) {
+        y        <$ dD \ (dom minv);
+        m.[x]    <- y;
+        minv.[y] <- x;
+      }
+      return (oget m.[x]);
+    }
+
+    proc finv(x:D): D = {
+      var y;
+
+      if (!mem x (dom minv)) {
+        y        <$ dD \ (dom m);
+        minv.[x] <- y;
+        m.[y]    <- x;
+      }
+      return (oget minv.[x]);
+    }
+  }.
+
+  (*** TODO: define notations ***)
+  (** Advantage of a distinguisher against a PRP oracle P:
+        Adv^PRP_P(&m,D) = `|Pr[IND(P,D) @ &m: res] - Pr[IND(PRPi,D) @ &m: res]| **)
+  (** Advantage of a distinguisher against **the** PRP operator P:
+        Adv^PRP_P(&m,D) = `|Pr[IND(PRPr,D) @ &m: res] - Pr[IND(PRPi,D) @ &m: res]| **)
+
+  (** Useful lemmas **)
+  lemma PRPr_init_ll: islossless PRPr.init.
+  proof. by proc; auto; smt. qed.
+
+  lemma PRPr_f_ll: islossless PRPr.f.
+  proof. by proc. qed.
+
+  lemma PRPr_finv_ll: islossless PRPr.finv.
+  proof. by proc. qed.
+end Strong_PRP.
+
+theory Strong_Weak.
+  module Strong_Distinguisher(D : Weak_PRP.Distinguisher, P : Strong_PRP.PRPA) = {
+    module P' = {
+      proc f            = P.f
+    }
+
+    proc distinguish = D(P').distinguish
+  }.
+
+  lemma Strong_Weak (P <: Strong_PRP.PRP)
+                    (D <: Weak_PRP.Distinguisher { P }) &m:
+    Pr[Weak_PRP.IND(P,D).main() @ &m: res]
+    = Pr[Strong_PRP.IND(P,Strong_Distinguisher(D)).main() @ &m: res].
+  proof. by byequiv=> //=; proc; sim. qed.
+end Strong_Weak.
