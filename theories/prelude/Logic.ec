@@ -290,6 +290,16 @@ lemma nosmt eq_trans : forall (x y z : 'a), x = y => y = z => x = z by [].
 
 lemma nosmt eq_sym_imp : forall (x y : 'a), x = y => y = x by [].
 
+(* -------------------------------------------------------------------- *)
+op existsb ['a]: ('a -> bool) -> bool.
+op forallb ['a]: ('a -> bool) -> bool.
+
+axiom existsbP ['a] (P : 'a -> bool):
+  (existsb P) <=> (exists x, P x).
+
+axiom forallbP ['a] (P : 'a -> bool):
+  (forallb P) <=> (forall x, P x).
+
 (** tuples *) 
 lemma nosmt tuple2_ind : 
   forall 
