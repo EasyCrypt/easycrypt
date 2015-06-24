@@ -736,6 +736,16 @@ proof.
   by rewrite h; smt.
 qed.
 
+lemma mem_rem (x : 'a) (s : 'a list):
+  forall y, mem (rem x s) y => mem s y.
+proof.
+  move=> y; elim: s=> [|z s ih] //=; case: (z = x).
+    by move=> _ ->. by move=> _ [-> | /ih ->].
+qed.
+
+lemma all_rem p (x : 'a) (s : 'a list): all p s => all p (rem x s).
+proof. by move=> /allP h; apply/allP=> y /mem_rem /h. qed.
+
 (* -------------------------------------------------------------------- *)
 (*                        Element insertion                             *)
 (* -------------------------------------------------------------------- *)
