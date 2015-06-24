@@ -237,6 +237,9 @@ lemma mem_rcons s (y : 'a):
   forall x, mem (rcons s y) x = mem (y :: s) x.
 proof. by move=> x; rewrite -cats1 /= !mem_cat /= orbC. qed.
 
+lemma mem_nth (x0 : 'a) s n : 0 <= n < size s => mem s (nth x0 s n).
+proof. by elim: s n => [|x s ih] //= n; smt. qed.
+
 (* -------------------------------------------------------------------- *)
 (*                  find, filter, count, has, all                       *)
 (* -------------------------------------------------------------------- *)
