@@ -139,8 +139,7 @@ fel 2 Experiment.WO.cO g  qO (Experiment.WO.bad)
 by inline Experiment(O2, Adv).WO.init; call hinit2; wp.
  proc.
  sp 2; if => //; wp; last first.
-  hoare; progress; first smt.
-  by skip; progress.
+  by hoare; 1:smt.
 
 swap 1 1; wp.
 exists* Experiment.WO.cO.

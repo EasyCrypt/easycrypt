@@ -509,7 +509,7 @@ proof.
 intros=> x_in_X; apply set_ext=> x';
 rewrite mem_filter; case (x = x').
   by intros=> <-; simplify; split=> _ //; apply mem_single_eq.
-  by rewrite eq_sym; move=> x'_x; rewrite x'_x /= mem_single_neq.
+  by rewrite eq_sym /pred1; move=> x'_x; rewrite x'_x /= mem_single_neq.
 qed.
 
 lemma card_filter_cpEq (x:'a) (X:'a set):
@@ -785,10 +785,10 @@ axiom interval_pos (x y:int): x <= y => interval x y = add y (interval x (y-1)).
 
 lemma mem_interval (x y a:int): (mem a (interval x y)) <=> (x <= a <= y).
 proof.
-  case (x <= y)=> x_le_y;last smt.
+  case (x <= y)=> x_le_y;last smt all.
   cut ->: y = (y - x + 1) - 1 + x by smt.
   cut: 0 <= (y - x + 1) by smt.
-  elim/Int.Induction.induction (y - x + 1); first smt.
+  elim/Int.Induction.induction (y - x + 1); first smt all.
   intros j j_pos IH.
   rewrite interval_pos; first smt.
   rewrite mem_add.

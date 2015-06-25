@@ -64,7 +64,7 @@ theory Dprod.
      is_uniform d1 => is_uniform d2 => is_uniform (d1 * d2).
   proof strict.
     move=> [Hd1_supp Hd1_suf] [Hd2_supp Hd2_suf]; split; [smt|move=> x y].
-    rewrite /support !supp_def -!/(mu_x _ _) !mu_x_def=> [Hx1 Hx2] [Hy1 Hy2].
+    rewrite /support !supp_def -!/(mu_x _ _) !mu_x_def /mu_x=> [Hx1 Hx2] [Hy1 Hy2].
     by rewrite (Hd1_suf (fst x) (fst y)) // (Hd2_suf (snd x) (snd y)).
   qed.
 
@@ -96,7 +96,7 @@ theory Dprod.
       byphoare (_: true ==> a = res)=> //.
       by proc; rnd; skip; rewrite eqL.
      apply eq_sym; cut := mu_x_def d1 d2 a. rewrite /mu_x pred1E=> ->.
-     elim /tuple2_ind a => a a1 a2 _;rewrite /fst /snd /=.
+     elim a=> a1 a2; rewrite /fst /snd /=.
      byphoare (_: true ==>  a1 = res.`1 /\ a2 = res.`2) => //;last by smt.
      proc; seq 1 : (a1 = r1) (mu_x d1 a1) (mu_x d2 a2) _ 0%r true => //.
        by rnd ((=) a1); auto; rewrite -(pred1E a1).
