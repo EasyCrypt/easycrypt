@@ -241,29 +241,6 @@ let _ =
        | None     -> EcCommands.addidir Filename.current_dir_name
        | Some pwd -> EcCommands.addidir pwd);
 
-  (* Initialize global scope *)
-  begin
-    let checkmode = {
-      EcCommands.cm_checkall  = prvopts.prvo_checkall;
-      EcCommands.cm_timeout   = prvopts.prvo_timeout;
-      EcCommands.cm_cpufactor = prvopts.prvo_cpufactor;
-      EcCommands.cm_nprovers  = prvopts.prvo_maxjobs;
-      EcCommands.cm_provers   = prvopts.prvo_provers;
-      EcCommands.cm_wrapper   = pwrapper;
-      EcCommands.cm_profile   = prvopts.prvo_profile;
-      EcCommands.cm_iterate   = prvopts.prvo_iterate;
-    } in
-
-    EcCommands.initialize ~undo:interactive ~boot:ldropts.ldro_boot ~checkmode
-  end;
-
-  begin
-    try
-      List.iter EcCommands.apply_pragma prvopts.prvo_pragmas
-    with EcCommands.InvalidPragma x ->
-      (Printf.eprintf "invalid pragma: `%s'\n%!" x; exit 1)
-  end;
-
   (* Instantiate terminal *)
   let lazy terminal = terminal in
 
@@ -278,17 +255,39 @@ let _ =
     EcTerminal.notice ~immediate:true `Warning copyright terminal;
 
   try
-    begin
-      let notifier (lvl : EcGState.loglevel) (lazy msg) =
-        EcTerminal.notice ~immediate:true lvl msg terminal
-      in EcCommands.addnotifier notifier
-    end;
-
     (* Interaction loop *)
+    let first = ref true  in
+
     while true do
       let terminate = ref false in
 
       try
+        if !first then begin
+          (* Initialize global scope *)
+          let checkmode = {
+            EcCommands.cm_checkall  = prvopts.prvo_checkall;
+            EcCommands.cm_timeout   = prvopts.prvo_timeout;
+            EcCommands.cm_cpufactor = prvopts.prvo_cpufactor;
+            EcCommands.cm_nprovers  = prvopts.prvo_maxjobs;
+            EcCommands.cm_provers   = prvopts.prvo_provers;
+            EcCommands.cm_wrapper   = pwrapper;
+            EcCommands.cm_profile   = prvopts.prvo_profile;
+            EcCommands.cm_iterate   = prvopts.prvo_iterate;
+          } in
+
+          EcCommands.initialize ~undo:interactive ~boot:ldropts.ldro_boot ~checkmode;
+          (try
+             List.iter EcCommands.apply_pragma prvopts.prvo_pragmas
+           with EcCommands.InvalidPragma x ->
+             EcScope.hierror "invalid pragma: `%s'\n%!" x);
+
+          let notifier (lvl : EcGState.loglevel) (lazy msg) =
+            EcTerminal.notice ~immediate:true lvl msg terminal
+          in EcCommands.addnotifier notifier;
+
+          first := false
+        end;
+
         begin
           match EcLocation.unloc (EcTerminal.next terminal) with
           | EP.P_Prog (commands, locterm) ->
@@ -315,7 +314,7 @@ let _ =
         EcTerminal.finish
           (`ST_Failure (EcScope.toperror_of_exn e))
           terminal;
-        if not (EcTerminal.interactive terminal) then
+        if !first || not (EcTerminal.interactive terminal) then
           exit 1
       end
     done
