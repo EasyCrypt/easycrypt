@@ -163,7 +163,7 @@ let rec concretize ({ ptev_env = pe } as pt) =
 (* -------------------------------------------------------------------- *)
 let pt_of_hyp pf hyps x =
   let ptenv = ptenv_of_penv hyps pf in
-  let ax    = LDecl.lookup_hyp_by_id x hyps in
+  let ax    = LDecl.hyp_by_id x hyps in
 
   { ptev_env = ptenv;
     ptev_pt  = { pt_head = PTLocal x; pt_args = []; };
@@ -325,8 +325,8 @@ let rec pmsymbol_of_pform fp : pmsymbol option =
 (* ------------------------------------------------------------------ *)
 let lookup_named_psymbol (hyps : LDecl.hyps) ~hastyp fp =
   match fp with
-  | ([], x) when LDecl.has_hyp x hyps && not hastyp ->
-      let (x, fp) = LDecl.lookup_hyp x hyps in
+  | ([], x) when LDecl.hyp_exists x hyps && not hastyp ->
+      let (x, fp) = LDecl.hyp_by_name x hyps in
         Some (`Local x, ([], fp))
 
   | _ ->

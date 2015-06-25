@@ -399,7 +399,7 @@ let t_equivS_conseq_bd side pr po tc =
 
 (* -------------------------------------------------------------------- *)
 let rec t_hi_conseq notmod f1 f2 f3 tc =
-  let t_trivial = [t_simplify ~delta:false; t_split; t_fail] in
+  let t_trivial = [t_simplify ?target:None ~delta:false; t_split; t_fail] in
   let t_trivial = FApi.t_try (FApi.t_seqs t_trivial) in
   let t_on1     = FApi.t_on1 ~ttout:t_trivial in
   let t_on1seq  = FApi.t_on1seq ~ttout:t_trivial in

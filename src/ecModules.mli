@@ -161,7 +161,13 @@ type function_ = {
 }
 
 (* -------------------------------------------------------------------- *)
+type abs_uses = {
+  aus_calls  : EcPath.xpath list;
+  aus_reads  : (prog_var * ty) list;
+  aus_writes : (prog_var * ty) list;
+}
 
+(* -------------------------------------------------------------------- *)
 type mod_restr = EcPath.Sx.t * EcPath.Sm.t
 
 val mr_equal : mod_restr -> mod_restr -> bool

@@ -101,8 +101,8 @@ let process_simplify ri (tc : tcenv1) =
 
   let do1 (sop, sid) ps =
     match ps.pl_desc with
-    | ([], s) when LDecl.has_symbol s hyps ->
-        let id = fst (LDecl.lookup s hyps) in
+    | ([], s) when LDecl.has_name s hyps ->
+        let id = fst (LDecl.by_name s hyps) in
         (sop, Sid.add id sid)
 
     | qs ->
@@ -131,7 +131,6 @@ let process_simplify ri (tc : tcenv1) =
     t_simplify_with_info ri tc
 
 (* -------------------------------------------------------------------- *)
-
 let process_smt ?loc (ttenv : ttenv) pi (tc : tcenv1) =
   let pi  = ttenv.tt_provers pi in
 
@@ -150,9 +149,9 @@ let process_clear symbols tc =
   let hyps = FApi.tc1_hyps tc in
 
   let toid s =
-    if not (LDecl.has_symbol (unloc s) hyps) then
+    if not (LDecl.has_name (unloc s) hyps) then
       tc_lookup_error !!tc ~loc:s.pl_loc `Local ([], unloc s);
-    fst (LDecl.lookup (unloc s) hyps)
+    fst (LDecl.by_name (unloc s) hyps)
   in
 
   try  t_clears (List.map toid symbols) tc
@@ -168,9 +167,10 @@ module LowRewrite = struct
 
   exception RewriteError of error
 
-  let rec find_rewrite_pattern (dir : rwside) hyps pt =
-    let env = LDecl.toenv hyps in
-    let ax  = pt.PT.ptev_ax in
+  let rec find_rewrite_pattern (dir : rwside) pt =
+    let hyps = pt.PT.ptev_env.PT.pte_hy in
+    let env  = LDecl.toenv hyps in
+    let ax   = pt.PT.ptev_ax in
 
     match EcFol.sform_of_form ax with
     | EcFol.SFeq  (f1, f2) -> (pt, (f1, f2))
@@ -190,17 +190,17 @@ module LowRewrite = struct
           else raise (RewriteError LRW_NotAnEquation)
       | Some _ ->
           let pt = EcProofTerm.apply_pterm_to_hole pt in
-          find_rewrite_pattern dir hyps pt
+          find_rewrite_pattern dir pt
     end
 
-  let t_rewrite_r (s, o) pt tc =
-    let hyps, concl = FApi.tc1_flat tc in
+  let t_rewrite_r ?target (s, o) pt tc =
+    let hyps, tgfp = FApi.tc1_flat ?target tc in
 
-    let (pt, (f1, f2)) = find_rewrite_pattern s hyps pt in
+    let (pt, (f1, f2)) = find_rewrite_pattern s pt in
 
     let fp = match s with `LtoR -> f1 | `RtoL -> f2 in
 
-    (try  PT.pf_find_occurence ~keyed:true pt.PT.ptev_env ~ptn:fp concl
+    (try  PT.pf_find_occurence ~keyed:true pt.PT.ptev_env ~ptn:fp tgfp
      with EcMatching.MatchFailure -> raise (RewriteError LRW_NothingToRewrite));
 
     if not (PT.can_concretize pt.PT.ptev_env) then
@@ -209,18 +209,20 @@ module LowRewrite = struct
     let fp   = PT.concretize_form pt.PT.ptev_env fp in
     let pt   = fst (PT.concretize pt) in
     let cpos =
-      try  FPosition.select_form hyps o fp concl
+      try  FPosition.select_form hyps o fp tgfp
       with InvalidOccurence -> raise (RewriteError (LRW_InvalidOccurence))
     in
 
-    EcLowGoal.t_rewrite pt (s, Some cpos) tc
+    EcLowGoal.t_rewrite ?target pt (s, Some cpos) tc
 
-  let t_rewrite (s, o) pt (tc : tcenv1) =
-    let hyps   = FApi.tc1_hyps tc in
+  let t_rewrite ?target (s, o) pt (tc : tcenv1) =
+    let hyps   = FApi.tc1_hyps ?target tc in
     let pt, ax = LowApply.check `Elim pt (`Hyps (hyps, !!tc)) in
     let ptenv  = ptenv_of_penv hyps !!tc in
 
-    t_rewrite_r (s, o) { ptev_env = ptenv; ptev_pt = pt; ptev_ax = ax; } tc
+    t_rewrite_r ?target (s, o)
+      { ptev_env = ptenv; ptev_pt = pt; ptev_ax = ax; }
+      tc
 
   let t_autorewrite lemmas (tc : tcenv1) =
     let pts =
@@ -242,9 +244,9 @@ let t_rewrite_prept info pt tc =
   LowRewrite.t_rewrite_r info (pt_of_prept tc pt) tc
 
 (* -------------------------------------------------------------------- *)
-let process_rewrite1_core (s, o) pt tc =
+let process_rewrite1_core ?target (s, o) pt tc =
   try
-    LowRewrite.t_rewrite_r (s, o) pt tc
+    LowRewrite.t_rewrite_r ?target (s, o) pt tc
   with
   | LowRewrite.RewriteError e ->
       match e with
@@ -258,8 +260,14 @@ let process_rewrite1_core (s, o) pt tc =
           tc_error !!tc "cannot infer all placeholders"
 
 (* -------------------------------------------------------------------- *)
-let process_delta (s, o, p) tc =
+let process_delta ?target (s, o, p) tc =
   let env, hyps, concl = FApi.tc1_eflat tc in
+
+  let idtg, target =
+    match target with
+    | None   -> (None, concl)
+    | Some h -> fst_map some (LDecl.hyp_by_name (unloc h) hyps)
+  in
 
   match unloc p with
   | PFident ({ pl_desc = ([], x) }, None)
@@ -267,13 +275,13 @@ let process_delta (s, o, p) tc =
 
     let check_op = fun p -> sym_equal (EcPath.basename p) x in
     let check_id = fun y -> sym_equal (EcIdent.name y) x in
-    let concl = EcReduction.simplify
+    let target = EcReduction.simplify
       { EcReduction.no_red with
           EcReduction.delta_p = check_op;
           EcReduction.delta_h = check_id; }
-      hyps concl
+      hyps target
 
-    in FApi.tcenv_of_tcenv1 (t_change concl tc)
+    in FApi.tcenv_of_tcenv1 (t_change ?target:idtg target tc)
 
   | _ ->
 
@@ -298,8 +306,8 @@ let process_delta (s, o, p) tc =
             tc_error !!tc "the operator is not transparent"
     end
 
-  | SFlocal x when LDecl.reducible_var x hyps ->
-      ([], [], LDecl.reduce_var x hyps, [])
+  | SFlocal x when LDecl.can_unfold x hyps ->
+      ([], [], LDecl.unfold x hyps, [])
 
   | _ -> tc_error !!tc "not headed by an operator/predicate"
 
@@ -310,7 +318,7 @@ let process_delta (s, o, p) tc =
   match s with
   | `LtoR -> begin
     let matches =
-      try  PT.pf_find_occurence ptenv ~ptn:p concl; true
+      try  PT.pf_find_occurence ptenv ~ptn:p target; true
       with EcMatching.MatchFailure -> false
     in
 
@@ -329,12 +337,12 @@ let process_delta (s, o, p) tc =
             then `Accept (-1)
             else `Continue
         in
-          try  FPosition.select ?o test concl
+          try  FPosition.select ?o test target
           with InvalidOccurence ->
             tc_error !!tc "invalid occurences selector"
       in
 
-      let concl =
+      let target =
         FPosition.map cpos
           (fun topfp ->
             let (fp, args) = EcFol.destr_app topfp in
@@ -346,20 +354,20 @@ let process_delta (s, o, p) tc =
               let body  = EcFol.Fsubst.subst_tvar subst body in
               let body  = f_app body args topfp.f_ty in
                 try  EcReduction.h_red EcReduction.beta_red hyps body
-                with EcBaseLogic.NotReducible -> body
+                with EcEnv.NotReducible -> body
             end
 
             | SFlocal _ -> begin
                 assert (tparams = []);
                 let body = f_app body args topfp.f_ty in
                   try  EcReduction.h_red EcReduction.beta_red hyps body
-                  with EcBaseLogic.NotReducible -> body
+                  with EcEnv.NotReducible -> body
             end
 
             | _ -> assert false)
-          concl
+          target
       in
-        FApi.tcenv_of_tcenv1 (t_change concl tc)
+        FApi.tcenv_of_tcenv1 (t_change ?target:idtg target tc)
     end else t_id tc
   end
 
@@ -370,11 +378,11 @@ let process_delta (s, o, p) tc =
       let body  = EcFol.Fsubst.subst_tvar subst body in
       let fp    = f_app body args p.f_ty in
         try  EcReduction.h_red EcReduction.beta_red hyps fp
-        with EcBaseLogic.NotReducible -> fp
+        with EcEnv.NotReducible -> fp
     in
 
     let matches =
-      try  PT.pf_find_occurence ptenv ~ptn:fp concl; true
+      try  PT.pf_find_occurence ptenv ~ptn:fp target; true
       with EcMatching.MatchFailure -> false
     in
 
@@ -382,31 +390,33 @@ let process_delta (s, o, p) tc =
       let p    = concretize_form ptenv p  in
       let fp   = concretize_form ptenv fp in
       let cpos =
-        try  FPosition.select_form hyps o fp concl
+        try  FPosition.select_form hyps o fp target
         with InvalidOccurence ->
           tc_error !!tc "invalid occurences selector"
       in
 
-      let concl = FPosition.map cpos (fun _ -> p)  concl in
-        FApi.tcenv_of_tcenv1 (t_change concl tc)
+      let target = FPosition.map cpos (fun _ -> p) target in
+        FApi.tcenv_of_tcenv1 (t_change ?target:idtg target tc)
     end else t_id tc
 
 (* -------------------------------------------------------------------- *)
-let rec process_rewrite1 ttenv ri tc =
+let rec process_rewrite1 ttenv ?target ri tc =
   let implicits = function
   | `Implicit -> ttenv.tt_implicits
   | `Explicit -> false in
 
   match unloc ri with
   | RWDone b ->
-      let tt = if b then t_simplify ~delta:false else t_id in
+      let tt = if b then t_simplify ?target:None ~delta:false else t_id in
       FApi.t_seq tt process_trivial tc
 
   | RWSimpl ->
-      t_simplify ~delta:false tc
+      let hyps   = FApi.tc1_hyps tc in
+      let target = target |> omap (fst |- LDecl.hyp_by_name^~ hyps |- unloc) in
+      t_simplify ?target ~delta:false tc
 
   | RWDelta ((s, r, o), p) -> begin
-      let do1 tc = process_delta (s, o, p) tc in
+      let do1 tc = process_delta ?target (s, o, p) tc in
 
       match r with
       | None -> do1 tc
@@ -415,6 +425,10 @@ let rec process_rewrite1 ttenv ri tc =
 
   | RWRw (((s : rwside), r, o), pts) -> begin
       let do1 ((subs : rwside), (mode, pt)) tc =
+        let hyps   = FApi.tc1_hyps tc in
+        let target = target |> omap (fst |- LDecl.hyp_by_name^~ hyps |- unloc) in
+        let hyps   = FApi.tc1_hyps ?target tc in
+
         let theside =
           match s, subs with
           | `LtoR, _     -> (subs  :> rwside)
@@ -433,8 +447,8 @@ let rec process_rewrite1 ttenv ri tc =
           let ls  = EcPath.Sp.elements ls in
 
           let do1 lemma tc =
-            let pt = PT.pt_of_uglobal !!tc (FApi.tc1_hyps tc) lemma in
-              process_rewrite1_core (theside, o) pt tc in
+            let pt = PT.pt_of_uglobal !!tc hyps lemma in
+              process_rewrite1_core ?target (theside, o) pt tc in
             t_ors (List.map do1 ls) tc
 
         | { fp_head = FPNamed (p, None); fp_args = []; }
@@ -449,15 +463,15 @@ let rec process_rewrite1 ttenv ri tc =
             let ls = EcEnv.Ax.all ~name:(unloc p) env in
 
             let do1 (lemma, _) tc =
-              let pt = PT.pt_of_uglobal !!tc (FApi.tc1_hyps tc) lemma in
-                process_rewrite1_core (theside, o) pt tc in
+              let pt = PT.pt_of_uglobal !!tc hyps lemma in
+                process_rewrite1_core ?target (theside, o) pt tc in
               t_ors (List.map do1 ls) tc
           end else
-            process_rewrite1_core (theside, o) pt tc
+            process_rewrite1_core ?target (theside, o) pt tc
 
         | _ ->
           let pt = PT.tc1_process_full_pterm ~implicits:(implicits mode) tc pt in
-          process_rewrite1_core (theside, o) pt tc
+          process_rewrite1_core ?target (theside, o) pt tc
         in
 
       let doall tc = t_ors (List.map do1 pts) tc in
@@ -467,22 +481,31 @@ let rec process_rewrite1 ttenv ri tc =
       | Some (b, n) -> t_do b n doall tc
   end
 
-  | RWPr (x,f) -> EcPhlPrRw.t_pr_rewrite (unloc x, f) tc
+  | RWPr (x, f) -> begin
+      if EcUtils.is_some target then
+        tc_error !!tc "cannot rewrite Pr[] in local assumptions";
+      EcPhlPrRw.t_pr_rewrite (unloc x, f) tc
+  end
 
   | RWSmt info ->
       process_smt ~loc:ri.pl_loc ttenv info tc
 
 (* -------------------------------------------------------------------- *)
-let process_rewrite ttenv ri tc =
-  let do1 tc (fc, ri) =
-    let tx =
-      match fc |> omap ((process_tfocus tc) |- unloc) with
-      | None    -> FApi.t_onall
-      | Some fc -> (fun tc -> FApi.t_onselect fc tc)
+let process_rewrite ttenv ?target ri tc =
+  let do1 tc gi (fc, ri) =
+    let ngoals = FApi.tc_count tc in
+    let dorw   = fun i tc ->
+      if   gi = 0 || (i+1) = ngoals
+      then process_rewrite1 ttenv ?target ri tc
+      else process_rewrite1 ttenv ri tc
     in
-      tx (process_rewrite1 ttenv ri) tc
+
+    match fc |> omap ((process_tfocus tc) |- unloc) with
+    | None    -> FApi.t_onalli dorw tc
+    | Some fc -> FApi.t_onselecti fc dorw tc
+
   in
-  List.fold_left do1 (tcenv_of_tcenv1 tc) ri
+  List.fold_lefti do1 (tcenv_of_tcenv1 tc) ri
 
 (* -------------------------------------------------------------------- *)
 let process_view1 pe tc =
@@ -807,9 +830,9 @@ let process_generalize1 pattern (tc : tcenv1) =
     | `Form (occ, pf) -> begin
         match pf.pl_desc with
         | PFident ({pl_desc = ([], s)}, None)
-            when occ = None && LDecl.has_symbol s hyps
+            when occ = None && LDecl.has_name s hyps
           ->
-            let id = fst (LDecl.lookup s hyps) in
+            let id = fst (LDecl.by_name s hyps) in
             t_generalize_hyp ~clear:true id tc
 
         | _ ->
@@ -849,9 +872,9 @@ let process_generalize1 pattern (tc : tcenv1) =
     | `ProofTerm fp -> begin
         match fp.fp_head with
         | FPNamed ({ pl_desc = ([], s) }, None)
-            when LDecl.has_symbol s hyps && List.is_empty fp.fp_args
+            when LDecl.has_name s hyps && List.is_empty fp.fp_args
           ->
-            let id = fst (LDecl.lookup s hyps) in
+            let id = fst (LDecl.by_name s hyps) in
             t_generalize_hyp ~clear:true id tc
 
         | _ ->
@@ -1033,10 +1056,10 @@ let process_apply_fwd ~implicits (pe, hyp) tc =
 
   let hyps = FApi.tc1_hyps tc in
 
-  if not (LDecl.has_hyp (unloc hyp) hyps) then
+  if not (LDecl.hyp_exists (unloc hyp) hyps) then
     tc_error !!tc "unknown hypothesis: %s" (unloc hyp);
 
-  let hyp, fp = LDecl.lookup_hyp (unloc hyp) hyps in
+  let hyp, fp = LDecl.hyp_by_name (unloc hyp) hyps in
   let pte = PT.tc1_process_full_pterm ~implicits tc pe in
 
   let rec instantiate pte =
@@ -1330,10 +1353,10 @@ let process_algebra mode kind eqs (tc : tcenv1) =
 
   let eqs =
     let eq1 { pl_desc = x } =
-      match LDecl.has_hyp x hyps with
+      match LDecl.hyp_exists x hyps with
       | false -> tacuerror "cannot find equation referenced by `%s'" x
       | true  -> begin
-        match sform_of_form (snd (LDecl.lookup_hyp x hyps)) with
+        match sform_of_form (snd (LDecl.hyp_by_name x hyps)) with
         | SFeq (f1, f2) ->
             if not (EcReduction.EqTest.for_type env ty f1.f_ty) then
               tacuerror "assumption `%s' is not an equation over the right type" x;

@@ -418,6 +418,13 @@ type function_ = {
 }
 
 (* -------------------------------------------------------------------- *)
+type abs_uses = {
+  aus_calls  : EcPath.xpath list;
+  aus_reads  : (EcTypes.prog_var * EcTypes.ty) list;
+  aus_writes : (EcTypes.prog_var * EcTypes.ty) list;
+}
+
+(* -------------------------------------------------------------------- *)
 type mod_restr = EcPath.Sx.t * EcPath.Sm.t
 
 let mr_equal (rx1,r1) (rx2,r2) =

@@ -31,7 +31,7 @@ let pf_destr_eqobsS pf env f =
 
 (* -------------------------------------------------------------------- *)
 let pf_hSS pf hyps h =
-  let tH = LDecl.lookup_hyp_by_id h hyps in
+  let tH = LDecl.hyp_by_id h hyps in
   (tH, pf_destr_eqobsS pf (LDecl.toenv hyps) tH)
 
 (* -------------------------------------------------------------------- *)
@@ -599,7 +599,7 @@ let process_info info tc =
 
   match info with
   | EcParsetree.LE_done h ->
-      (t_id tc, fst (LDecl.lookup_hyp (unloc h) hyps))
+      (t_id tc, fst (LDecl.hyp_by_name (unloc h) hyps))
 
   | EcParsetree.LE_todo (h, s1, s2, eqIs, eqXs) ->
       let es    = tc1_as_equivS tc in

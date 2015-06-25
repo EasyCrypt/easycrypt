@@ -16,7 +16,6 @@ open EcEnv
 open EcTypes
 open EcModules
 open EcFol
-open EcBaseLogic
 
 (* -------------------------------------------------------------------- *)
 module Zipper = struct
@@ -807,7 +806,5 @@ module FPosition = struct
   (* ------------------------------------------------------------------ *)
   let topattern ?x (p : ptnpos) (f : form) =
     let x = match x with None -> EcIdent.create "_p" | Some x -> x in
-    let tx fp = f_local x fp.f_ty in
-
-      (x, map p tx f)
+    let tx fp = f_local x fp.f_ty in (x, map p tx f)
 end

@@ -41,11 +41,11 @@ val t_logic_trivial    : FApi.backward
 val t_trivial          : FApi.backward option -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
-val t_simplify : ?delta:bool -> FApi.backward
-val t_simplify_with_info : reduction_info -> FApi.backward
+val t_simplify : ?target:ident -> ?delta:bool -> FApi.backward
+val t_simplify_with_info : ?target:ident -> reduction_info -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
-val t_change : form -> tcenv1 -> tcenv1
+val t_change : ?target:ident -> form -> tcenv1 -> tcenv1
 
 (* -------------------------------------------------------------------- *)
 val t_reflex       : ?reduce:lazyred -> FApi.backward
@@ -54,7 +54,10 @@ val t_symmetry     : ?reduce:lazyred -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
 module LowApply : sig
-  type ckenv = [`Tc of rtcenv | `Hyps of EcEnv.LDecl.hyps * proofenv]
+  type ckenv = [
+    | `Tc   of rtcenv * ident option
+    | `Hyps of EcEnv.LDecl.hyps * proofenv
+  ]
 
   val check : [`Elim | `Intro] -> proofterm -> ckenv -> proofterm * form
 end
@@ -153,7 +156,7 @@ val empty_subst_kind : subst_kind
 
 type rwspec = [`LtoR|`RtoL] * ptnpos option
 
-val t_rewrite     : proofterm -> rwspec -> FApi.backward
+val t_rewrite     : ?target:ident -> proofterm -> rwspec -> FApi.backward
 val t_rewrite_hyp : EcIdent.t -> rwspec -> FApi.backward
 
 type tside = [`All | `LtoR | `RtoL]

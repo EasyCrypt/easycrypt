@@ -90,7 +90,7 @@ val palocal   : EcIdent.t -> pt_arg
 
 (* -------------------------------------------------------------------- *)
 (* EasyCrypt rewrite proof-term:                                        *)
-(*  rwpt := pt * position list                                          *)
+(*  rwpt := pt * position list * local hyp                              *)
 (*    <pt>: equality-proof term                                         *)
 (*                                                                      *)
 (*  position := EcMatching.ptnpos - pattern position                    *)
@@ -98,6 +98,7 @@ val palocal   : EcIdent.t -> pt_arg
 type rwproofterm = {
   rpt_proof : proofterm;
   rpt_occrs : EcMatching.ptnpos option;
+  rpt_lc    : ident option;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -140,6 +141,7 @@ type validation =
 | VAdmit                             (* admit *)
 | VIntros  of (handle * idents)      (* intros *)
 | VConv    of (handle * Sid.t)       (* weakening + conversion *)
+| VLConv   of (handle * ident)       (* hypothesis conversion *)
 | VRewrite of (handle * rwproofterm) (* rewrite *)
 | VApply   of proofterm              (* modus ponens *)
 
@@ -210,9 +212,10 @@ module FApi : sig
 
   exception InvalidStateException of string
 
-  type forward  = proofenv -> proofenv * handle
-  type backward = tcenv1 -> tcenv
-  type tactical = tcenv -> tcenv
+  type forward   = proofenv -> proofenv * handle
+  type backward  = tcenv1 -> tcenv
+  type ibackward = int -> backward
+  type tactical  = tcenv -> tcenv
 
   val tcenv_of_tcenv1 : tcenv1 -> tcenv
   val as_tcenv1 : tcenv -> tcenv1
@@ -265,18 +268,18 @@ module FApi : sig
   (* Accessors for focused goal parts (tcenv) *)
   val tc_handle  : tcenv -> handle
   val tc_penv    : tcenv -> proofenv
-  val tc_flat    : tcenv -> LDecl.hyps * form
-  val tc_eflat   : tcenv -> env * LDecl.hyps * form
-  val tc_hyps    : tcenv -> LDecl.hyps
   val tc_goal    : tcenv -> form
   val tc_env     : tcenv -> EcEnv.env
+  val tc_flat    : ?target:ident -> tcenv -> LDecl.hyps * form
+  val tc_eflat   : ?target:ident -> tcenv -> env * LDecl.hyps * form
+  val tc_hyps    : ?target:ident -> tcenv -> LDecl.hyps
 
   (* Accessors for focused goal parts (tcenv1) *)
   val tc1_handle : tcenv1 -> handle
   val tc1_penv   : tcenv1 -> proofenv
-  val tc1_flat   : tcenv1 -> LDecl.hyps * form
-  val tc1_eflat  : tcenv1 -> env * LDecl.hyps * form
-  val tc1_hyps   : tcenv1 -> LDecl.hyps
+  val tc1_flat   : ?target:ident -> tcenv1 -> LDecl.hyps * form
+  val tc1_eflat  : ?target:ident -> tcenv1 -> env * LDecl.hyps * form
+  val tc1_hyps   : ?target:ident -> tcenv1 -> LDecl.hyps
   val tc1_goal   : tcenv1 -> form
   val tc1_env    : tcenv1 -> EcEnv.env
 
@@ -292,8 +295,10 @@ module FApi : sig
   type tfocus    = (int -> bool)
 
   val t_focus      : backward -> tactical
+  val t_onalli     : (int -> backward) -> tactical
   val t_onall      : backward -> tactical
   val t_onfsub     : (int -> backward option) -> tactical
+  val t_onselecti  : tfocus -> ?ttout:ibackward -> ibackward -> tactical
   val t_onselect   : tfocus -> ?ttout:backward -> backward -> tactical
   val t_on1        : int -> ?ttout:backward -> backward -> tactical
   val t_firsts     : backward -> int -> tactical
@@ -353,9 +358,9 @@ module RApi : sig
 
   (* Accessors for focused goal parts (rtcenv) *)
   val tc_penv  : rtcenv -> proofenv
-  val tc_flat  : rtcenv -> LDecl.hyps * form
-  val tc_eflat : rtcenv -> env * LDecl.hyps * form
-  val tc_hyps  : rtcenv -> LDecl.hyps
+  val tc_flat  : ?target:ident -> rtcenv -> LDecl.hyps * form
+  val tc_eflat : ?target:ident -> rtcenv -> env * LDecl.hyps * form
+  val tc_hyps  : ?target:ident -> rtcenv -> LDecl.hyps
   val tc_goal  : rtcenv -> form
   val tc_env   : rtcenv -> env
 

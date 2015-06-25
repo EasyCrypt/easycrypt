@@ -10,7 +10,6 @@ open EcPath
 open EcTypes
 open EcModules
 open EcFol
-open EcBaseLogic
 open EcEnv
 
 module BI = EcBigInt
@@ -230,7 +229,7 @@ let nodelta =
 
 let reduce_local ri hyps x  =
   if   ri.delta_h x
-  then LDecl.reduce_var x hyps
+  then LDecl.unfold x hyps
   else raise NotReducible
 
 let reduce_op ri env p tys =

@@ -89,6 +89,7 @@ let palocal x =
 type rwproofterm = {
   rpt_proof : proofterm;
   rpt_occrs : EcMatching.ptnpos option;
+  rpt_lc    : ident option;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -142,6 +143,7 @@ and validation =
 | VAdmit                             (* admit *)
 | VIntros  of (handle * idents)      (* intros *)
 | VConv    of (handle * Sid.t)       (* weakening + conversion *)
+| VLConv   of (handle * ident)       (* hypothesis conversion *)
 | VRewrite of (handle * rwproofterm) (* rewrite *)
 | VApply   of proofterm              (* modus ponens *)
 
@@ -234,9 +236,10 @@ let reloc _ f x = f x                   (* FIXME *)
 
 (* -------------------------------------------------------------------- *)
 module FApi = struct
-  type forward  = proofenv -> proofenv * handle
-  type backward = tcenv1 -> tcenv
-  type tactical = tcenv -> tcenv
+  type forward   = proofenv -> proofenv * handle
+  type backward  = tcenv1 -> tcenv
+  type ibackward = int -> backward
+  type tactical  = tcenv -> tcenv
 
   exception InvalidStateException of string
 
@@ -331,28 +334,34 @@ module FApi = struct
     (tc1_current tc).g_uid
 
   (* ------------------------------------------------------------------ *)
-  let tc1_flat (tc : tcenv1) =
-    let { g_hyps; g_concl } = tc1_current tc in (g_hyps, g_concl)
+  let tc1_flat ?target (tc : tcenv1) =
+    let { g_hyps; g_concl } = tc1_current tc in
+    match target with
+    | None   -> (g_hyps, g_concl)
+    | Some h -> (LDecl.local_hyps h g_hyps, LDecl.hyp_by_id h g_hyps)
 
   (* ------------------------------------------------------------------ *)
-  let tc1_eflat (tc : tcenv1) =
-    let (hyps, concl) = tc1_flat tc in
-      (LDecl.toenv hyps, hyps, concl)
+  let tc1_eflat ?target (tc : tcenv1) =
+    let (hyps, concl) = tc1_flat ?target tc in
+    (LDecl.toenv hyps, hyps, concl)
+
+  (* ------------------------------------------------------------------ *)
+  let tc1_hyps ?target (tc : tcenv1) = fst (tc1_flat ?target tc)
 
   (* ------------------------------------------------------------------ *)
   let tc1_penv (tc : tcenv1) = tc.tce_penv
-  let tc1_hyps (tc : tcenv1) = fst (tc1_flat tc)
   let tc1_goal (tc : tcenv1) = snd (tc1_flat tc)
   let tc1_env  (tc : tcenv1) = LDecl.toenv (tc1_hyps tc)
 
   (* ------------------------------------------------------------------ *)
   let tc_handle (tc : tcenv) = tc1_handle tc.tce_tcenv
-  let tc_flat   (tc : tcenv) = tc1_flat   tc.tce_tcenv
-  let tc_eflat  (tc : tcenv) = tc1_eflat  tc.tce_tcenv
   let tc_penv   (tc : tcenv) = tc1_penv   tc.tce_tcenv
-  let tc_hyps   (tc : tcenv) = tc1_hyps   tc.tce_tcenv
   let tc_goal   (tc : tcenv) = tc1_goal   tc.tce_tcenv
   let tc_env    (tc : tcenv) = tc1_env    tc.tce_tcenv
+
+  let tc_flat   ?target (tc : tcenv) = tc1_flat  ?target tc.tce_tcenv
+  let tc_eflat  ?target (tc : tcenv) = tc1_eflat ?target tc.tce_tcenv
+  let tc_hyps   ?target (tc : tcenv) = tc1_hyps  ?target tc.tce_tcenv
 
   (* ------------------------------------------------------------------ *)
   let tc_opened (tc : tcenv) =
@@ -496,12 +505,16 @@ module FApi = struct
     tc_up (tt (tc_down tc))
 
   (* ------------------------------------------------------------------ *)
-  let on_sub1_goals (tt : backward) (hds : handle list) (pe : proofenv) =
-    let do1 pe hd =
-      let tc = tt (tcenv1_of_penv hd pe) in
+  let on_sub1i_goals (tt : int -> backward) (hds : handle list) (pe : proofenv) =
+    let do1 i pe hd =
+      let tc = tt i (tcenv1_of_penv hd pe) in
       assert (tc.tce_tcenv.tce_ctxt = []);
       (tc_penv tc, tc_opened tc) in
-    List.map_fold do1 pe hds
+    List.mapi_fold do1 pe hds
+
+  (* ------------------------------------------------------------------ *)
+  let on_sub1_goals (tt : backward) (hds : handle list) (pe : proofenv) =
+    on_sub1i_goals (fun (_ : int) -> tt) hds pe
 
   (* ------------------------------------------------------------------ *)
   let on_sub_goals (tt : backward list) (hds : handle list) (pe : proofenv) =
@@ -512,11 +525,15 @@ module FApi = struct
     List.map_fold2 do1 pe tt hds
 
   (* ------------------------------------------------------------------ *)
-  let t_onall (tt : backward) (tc : tcenv) =
+  let t_onalli (tt : ibackward) (tc : tcenv) =
     let pe      = tc.tce_tcenv.tce_penv in
-    let pe, ln  = on_sub1_goals tt (tc_opened tc) pe in
+    let pe, ln  = on_sub1i_goals tt (tc_opened tc) pe in
     let ln      = List.flatten ln in
     tcenv_of_penv ~ctxt:tc.tce_tcenv.tce_ctxt ln pe
+
+  (* ------------------------------------------------------------------ *)
+  let t_onall (tt : backward) (tc : tcenv) =
+    t_onalli (fun (_ : int) -> tt) tc
 
   (* ------------------------------------------------------------------ *)
   let t_firsts (tt : backward) (i : int) (tc : tcenv) =
@@ -578,10 +595,19 @@ module FApi = struct
     t_onfsub (fun i -> Some ts.(i)) tc
 
   (* ------------------------------------------------------------------ *)
-  let t_onselect (test : tfocus) ?ttout (tt : backward) (tc : tcenv) =
+  let t_onselecti (test : tfocus) ?ttout (tt : ibackward) (tc : tcenv) =
+    let ttout i = ttout |> omap (fun ttout -> ttout i) in
+
     if   tc_count tc > 0
-    then t_onfsub (fun i -> if test i then Some tt else ttout) tc
+    then t_onfsub (fun i -> if test i then Some (tt i) else ttout i) tc
     else tc
+
+  (* ------------------------------------------------------------------ *)
+  let t_onselect (test : tfocus) ?ttout (tt : backward) (tc : tcenv) =
+    t_onselecti test
+      ?ttout:(ttout |> omap (fun ttout (_ : int) -> ttout))
+      (fun (_ : int) -> tt)
+      tc
 
   (* ------------------------------------------------------------------ *)
   let t_on1 idx ?ttout tt (tc : tcenv) =
@@ -802,11 +828,12 @@ module RApi = struct
 
   (* ------------------------------------------------------------------ *)
   let tc_penv  (tc : rtcenv) = FApi.tc_penv  !tc
-  let tc_flat  (tc : rtcenv) = FApi.tc_flat  !tc
-  let tc_eflat (tc : rtcenv) = FApi.tc_eflat !tc
   let tc_goal  (tc : rtcenv) = FApi.tc_goal  !tc
-  let tc_hyps  (tc : rtcenv) = FApi.tc_hyps  !tc
   let tc_env   (tc : rtcenv) = FApi.tc_env   !tc
+
+  let tc_flat  ?target (tc : rtcenv) = FApi.tc_flat  ?target !tc
+  let tc_eflat ?target (tc : rtcenv) = FApi.tc_eflat ?target !tc
+  let tc_hyps  ?target (tc : rtcenv) = FApi.tc_hyps  ?target !tc
 end
 
 type rproofenv = RApi.rproofenv

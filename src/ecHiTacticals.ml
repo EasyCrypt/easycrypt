@@ -142,7 +142,7 @@ and process1_logic (ttenv : ttenv) (t : logtactic located) (tc : tcenv1) =
     | Pgeneralize l     -> process_generalize l
     | Pmove (v, l)      -> process_move v l
     | Pclear l          -> process_clear l
-    | Prewrite ri       -> process_rewrite ttenv ri
+    | Prewrite (ri, x)  -> process_rewrite ttenv ?target:x ri
     | Psubst   ri       -> process_subst ri
     | Psimplify ri      -> process_simplify ri
     | Pchange pf        -> process_change pf

@@ -457,12 +457,15 @@ module List = struct
       | x :: xs -> aux (ocons (f x) acc) xs
     in aux [] xs
 
-  let map_fold f a xs =
+  let mapi_fold f a xs =
     let a  = ref a in
-    let xs = List.map (fun b ->
-      let (a', b') = f !a b in a := a'; b')
+    let xs = List.mapi (fun i b ->
+      let (a', b') = f i !a b in a := a'; b')
       xs
     in (!a, xs)
+
+  let map_fold f a xs =
+    mapi_fold (fun (_ : int) x -> f x) a xs
 
   let rec fpick (xs : (unit -> 'a option) list) =
     match xs with

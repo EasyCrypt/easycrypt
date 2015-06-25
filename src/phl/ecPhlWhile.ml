@@ -44,18 +44,18 @@ let while_info env e s =
     | Sabstract id ->
       let add_pv x (pv,ty) = PV.add env pv ty x in 
       let us = EcEnv.AbsStmt.byid id env in
-      let w = List.fold_left add_pv w us.EcBaseLogic.aus_writes in
-      let r = List.fold_left add_pv r us.EcBaseLogic.aus_reads in
-      let c = List.fold_left (fun c f -> Sx.add f c) c us.EcBaseLogic.aus_calls in
+      let w = List.fold_left add_pv w us.EcModules.aus_writes in
+      let r = List.fold_left add_pv r us.EcModules.aus_reads in
+      let c = List.fold_left (fun c f -> Sx.add f c) c us.EcModules.aus_calls in
       (w, r, c)
 
   and s_info info s = List.fold_left i_info info s.s_node in
 
   let (w,r,c) = s_info (PV.empty, EcPV.e_read env e, Sx.empty) s in
 
-  { EcBaseLogic.aus_reads  = fst (PV.elements r);
-    EcBaseLogic.aus_writes = fst (PV.elements w);
-    EcBaseLogic.aus_calls  = Sx.elements c; }
+  { EcModules.aus_reads  = fst (PV.elements r);
+    EcModules.aus_writes = fst (PV.elements w);
+    EcModules.aus_calls  = Sx.elements c; }
 
 (* -------------------------------------------------------------------- *)
 let t_hoare_while_r inv tc =

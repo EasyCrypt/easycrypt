@@ -2081,7 +2081,10 @@ logtactic:
    { Pchange f }
 
 | REWRITE a=rwarg+
-   { Prewrite a }
+   { Prewrite (a, None) }
+
+| REWRITE a=rwarg+ IN x=lident
+   { Prewrite (a, Some x) }
 
 | RWNORMAL f=sform WITH ps=qident+
    { Prwnormal (f, ps) }

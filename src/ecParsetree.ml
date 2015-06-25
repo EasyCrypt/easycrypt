@@ -651,7 +651,7 @@ type logtactic =
   | Pmove       of (ppterm list * genpattern list)
   | Pgeneralize of genpattern list
   | Pclear      of psymbol list
-  | Prewrite    of rwarg list
+  | Prewrite    of (rwarg list * psymbol option)
   | Prwnormal   of pformula * pqsymbol list
   | Psubst      of pformula list
   | Psimplify   of preduction

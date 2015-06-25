@@ -10,9 +10,9 @@ open EcParsetree
 open EcIdent
 open EcTypes
 open EcModules
-open EcEnv
 open EcFol
 open EcUnify
+open EcEnv
 
 (* -------------------------------------------------------------------- *)
 module Zipper : sig

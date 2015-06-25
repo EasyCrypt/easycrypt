@@ -8,7 +8,6 @@ open EcSymbols
 open EcModules
 open EcProvers
 open EcCoreFol
-open EcBaseLogic
 
 (* -------------------------------------------------------------------- *)
 type env
@@ -57,5 +56,5 @@ type me_of_mt = EcIdent.t -> module_type -> mod_restr -> module_expr
 
 val check_goal :
      ?notify:notify -> me_of_mt -> env
-  -> prover_infos -> hyps * form
+  -> prover_infos -> EcBaseLogic.hyps * form
   -> bool

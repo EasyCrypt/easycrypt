@@ -7,7 +7,6 @@
 open EcLocation
 open EcParsetree
 open EcFol
-open EcEnv
 open EcCoreGoal
 open EcCoreGoal.FApi
 open EcProofTerm
@@ -47,12 +46,12 @@ module LowRewrite : sig
   exception RewriteError of error
 
   val find_rewrite_pattern:
-    rwside -> LDecl.hyps -> pt_ev -> pt_ev * (form * form)
+    rwside -> pt_ev -> pt_ev * (form * form)
 
-  val t_rewrite_r:
+  val t_rewrite_r: ?target:EcIdent.t ->
     rwside * EcMatching.occ option -> pt_ev -> backward
 
-  val t_rewrite:
+  val t_rewrite:?target:EcIdent.t ->
     rwside * EcMatching.occ option -> proofterm -> backward
 
   val t_autorewrite: EcPath.path list -> backward
@@ -72,8 +71,8 @@ val process_move        : ppterm list -> genpattern list -> backward
 val process_clear       : psymbol list -> backward
 val process_smt         : ?loc:EcLocation.t -> ttenv -> pprover_infos -> backward
 val process_apply       : implicits:bool -> apply_t -> backward
-val process_delta       : (rwside * EcMatching.occ option * pformula) -> backward
-val process_rewrite     : ttenv -> rwarg list -> backward
+val process_delta       : ?target:psymbol -> (rwside * EcMatching.occ option * pformula) -> backward
+val process_rewrite     : ttenv -> ?target:psymbol -> rwarg list -> backward
 val process_subst       : pformula list -> backward
 val process_cut         : engine -> cut_t -> backward
 val process_cutdef      : cutdef_t -> backward

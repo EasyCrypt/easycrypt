@@ -251,6 +251,7 @@ module List : sig
   val pivot_at   : int -> 'a list -> 'a list * 'a * 'a list
   val find_pivot : ('a -> bool) -> 'a list -> 'a list * 'a * 'a list
   val map_fold   : ('a -> 'b -> 'a * 'c) -> 'a -> 'b list -> 'a * 'c list
+  val mapi_fold  : (int -> 'a -> 'b -> 'a * 'c) -> 'a -> 'b list -> 'a * 'c list
   val pmap       : ('a -> 'b option) -> 'a list -> 'b list
   val rev_pmap   : ('a -> 'b option) -> 'a list -> 'b list
   val rotate     : [`Left|`Right] -> int -> 'a list -> int * 'a list

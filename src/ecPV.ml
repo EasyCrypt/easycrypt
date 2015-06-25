@@ -498,8 +498,8 @@ and i_write_r ?(except=Sx.empty) env w i =
   | Sabstract id -> 
       let us = AbsStmt.byid id env in 
       let add_pv w (pv,ty) = PV.add env pv ty w in
-      let w = List.fold_left add_pv w us.EcBaseLogic.aus_writes in
-      List.fold_left (f_write_r ~except env) w us.EcBaseLogic.aus_calls
+      let w = List.fold_left add_pv w us.EcModules.aus_writes in
+      List.fold_left (f_write_r ~except env) w us.EcModules.aus_calls
 
 (* -------------------------------------------------------------------- *)
 let rec f_read_r env r f =
@@ -562,8 +562,8 @@ and i_read_r env r i =
   | Sabstract id -> 
       let us = AbsStmt.byid id env in 
       let add_pv r (pv,ty) = PV.add env pv ty r in
-      let r = List.fold_left add_pv r us.EcBaseLogic.aus_reads in
-      List.fold_left (f_read_r env) r us.EcBaseLogic.aus_calls
+      let r = List.fold_left add_pv r us.EcModules.aus_reads in
+      List.fold_left (f_read_r env) r us.EcModules.aus_calls
 
 (* -------------------------------------------------------------------- *)
 type 'a pvaccess0 = env -> 'a -> PV.t
