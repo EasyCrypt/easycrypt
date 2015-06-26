@@ -1161,15 +1161,21 @@ let process_cutdef (ip, pt) (tc : tcenv1) =
 
 (* -------------------------------------------------------------------- *)
 let process_left (tc : tcenv1) =
-  EcLowGoal.t_left tc
+  try  EcLowGoal.t_left tc
+  with InvalidGoalShape ->
+    tc_error !!tc "cannot apply `left` on that goal"
 
 (* -------------------------------------------------------------------- *)
 let process_right (tc : tcenv1) =
-  EcLowGoal.t_right tc
+  try  EcLowGoal.t_right tc
+  with InvalidGoalShape ->
+    tc_error !!tc "cannot apply `right` on that goal"
 
 (* -------------------------------------------------------------------- *)
 let process_split (tc : tcenv1) =
-  EcLowGoal.t_split tc
+  try  EcLowGoal.t_split tc
+  with InvalidGoalShape ->
+    tc_error !!tc "cannot apply `split` on that goal"
 
 (* -------------------------------------------------------------------- *)
 let process_elimT qs tc =
