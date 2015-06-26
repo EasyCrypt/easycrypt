@@ -167,7 +167,7 @@ by [].
 lemma nosmt toofint (x:int): 0 <= x => x < q => toint (ofint x) = x.
 proof.
   intros Hp Hlt;rewrite toofint_mod.
-  by cut H:= ediv_unique x q 0 x _; smt.
+  smt all.
 qed.
 
 lemma nosmt ofint1_: ofint 1 = F.one 

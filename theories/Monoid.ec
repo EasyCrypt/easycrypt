@@ -265,23 +265,19 @@ theory Miplus.
     op NatMul.( * ) <- Int.( * )
     proof Base.* by smt, NatMul.* by smt.
 
-  import Int. import EuclDiv. 
+  import Int.
   op sum_n i j = sum_ij i j (fun (n:int), n).
 
   lemma sum_n_0k (k:int) : 0 <= k => sum_n 0 k = (k*(k + 1))/%2.
   proof -strict.
     rewrite /sum_n;elim /Int.Induction.induction k.
-      rewrite sum_ij_eq => /=.
-      by elim (ediv_unique 0 2 0 0 _ _ _) => //; smt.
+      by rewrite sum_ij_eq => /=; smt all.
     intros k Hk Hrec;rewrite sum_ij_le_r;first smt.
     cut -> : k + 1 - 1 = k;first smt.
     rewrite Hrec /=.
-    elim (ediv_unique ((k + 1) * (k + 1 + 1)) 2 (k * (k + 1) /% 2 + (k + 1)) 0 _ _ _) => //.
-    cut -> : (k + 1) * (k + 1 + 1) = k * (k+1) + 2*(k+1) by smt.
-    elim (ediv_spec (k*(k+1)) 2 _) => //.
-    intros _ {1}->.
-    cut -> : k * (k + 1) %% 2 = 0;last smt.
-    elim (ediv_spec k 2 _) => //;smt.
+    have ->: (k + 1) * (k + 1 + 1) = k * (k + 1) + 2 * (k + 1) by smt.
+    rewrite (CommutativeGroup.Comm.Comm (k * (k + 1))) Div_mult 1:smt.
+    by rewrite (CommutativeGroup.Comm.Comm).
   qed.
 
  lemma sum_n_ii (k:int): sum_n k k = k
@@ -314,7 +310,7 @@ import FSet.Interval.
  lemma sumn_pos (i j:int) : 0 <= i => 0 <= sum_n i j.
  proof -strict.
    case (i <= j) => Hle Hp.
-     rewrite sumn_ij => //;smt.
+     rewrite sumn_ij => //;smt all.
    by rewrite /sum_n sum_ij_gt; first smt.
  qed.
 

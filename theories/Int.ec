@@ -8,26 +8,22 @@
   op "prefix -" as "[-]".
 *)
 (** Begin Import **)
-op zero : int.
-op one  : int.
-op (<)  : int -> int -> bool.
-op (>)  : int -> int -> bool.
-op (<=) : int -> int -> bool.
-op (+)  : int -> int -> int.
-op [-]  : int -> int.
-op ( * ): int -> int -> int.
+  op zero : int = 0.
+  op one  : int = 1.
+  op (<)  : int -> int -> bool.
+  op (>)  (x y:int) = y < x.
+  op (<=) (x y:int) = x < y \/ x = y.
+  op (+)  : int -> int -> int.
+  op [-]  : int -> int.
+  op ( * ): int -> int -> int.
 
-theory CommutativeGroup.
+  theory CommutativeGroup.
     axiom Assoc: forall (x y z : int), x + y + z = x + (y + z).
-    
     axiom Unit_def_l: forall (x : int), zero + x = x.
-    
     axiom Unit_def_r: forall (x : int), x + zero = x.
-    
     axiom Inv_def_l: forall (x : int), -x + x = zero.
-    
     axiom Inv_def_r: forall (x : int), x + -x = zero.
-    
+
     theory Comm.
       axiom Comm: forall (x y : int), x + y = y + x.
     end Comm.
@@ -37,10 +33,13 @@ theory CommutativeGroup.
     axiom Assoc: forall (x y z : int), x * y * z = x * (y * z).
   end Assoc.
 
+  axiom Mul_distr_l:
+    forall (x y z : int), x * (y + z) = x * y + x * z.
+
   axiom Mul_distr_r:
     forall (x y z : int), (y + z) * x = y * x + z * x.
   
-  op (-) : int -> int -> int.
+  op (-) (x y:int) = x + -y.
   
   theory Comm.
     axiom Comm: forall (x y : int), x * y = y * x.
@@ -50,7 +49,7 @@ theory CommutativeGroup.
   
   axiom NonTrivialRing: zero <> one.
   
-  op (>=) : int -> int -> bool.
+  op (>=) (x y:int) = y <= x.
   
   axiom Refl: forall (x : int), x <= x.
   
@@ -75,7 +74,6 @@ theory CommutativeGroup.
 op int_of_bool (b : bool) = if b then 1 else 0.
   
 (* Group operation *)
-
 op zeroz = 0.
 op onez  = 1.
 
@@ -287,12 +285,12 @@ import why3 "int" "EuclideanDivision"
   op "div" as "/%";
   op "mod" as "%%".
 *)
-(** Begine Import **)
+(** Begin Import **)
   op (/%) : int -> int -> int.
   
   op (%%) : int -> int -> int.
-  
-  axiom Div_mod: forall (x y:int), y <> zero => x = y * x /% y + x %% y.
+
+  axiom Div_mod: forall (x y:int), y <> zero => x = y * (x /% y) + (x %% y).
   
   axiom Div_bound: forall (x y:int), x >= zero /\ y > zero => zero <= x /% y <= x.
   
@@ -304,49 +302,22 @@ import why3 "int" "EuclideanDivision"
   
   axiom Div_inf: forall (x y:int), zero <= x < y => x /% y = zero.
   
-  axiom Div_inf_neg: forall (x y:int), zero < x <= y => -x /% y = -one.
-  
+  axiom Div_inf_neg: forall (x y:int), zero < x <= y => (-x) /% y = -one.
+
   axiom Mod_0: forall (y:int), y > one => 0 %% y = 0.
   
   axiom Div_1_left: forall (y:int), y > one => one /% y = zero.
   
-  axiom Div_minus1_left: forall (y:int), y > one => -one /% y = -one.
+  axiom Div_minus1_left: forall (y:int), y > one => (-one) /% y = -one.
   
   axiom Mod_1_left: forall (y:int), y > one => one %% y = 1.
   
-  axiom Mod_minus1_left: forall (y:int), y > one => -one %% y = y - one.
+  axiom Mod_minus1_left: forall (y:int), y > one => (-one) %% y = y - one.
   
   axiom Div_mult: forall (x y z:int), x > zero => (x * y + z) /% x = y + z /% x.
   
   axiom Mod_mult: forall (x y z:int), x > zero => (x * y + z) %% x = z %% x.
 (** End Import **)
-
-theory EuclDiv.
-
-  axiom ediv_spec m d:
-    d <> 0 =>
-    0 <= m %% d < `|d| /\
-    m = (m /% d) * d + (m %% d).
-
-  axiom ediv_unique m d q r:
-    d <> 0 =>
-    0 <= r < `|d| =>
-    m = q * d + r =>
-    q = m /% d /\ r = m %% d.
-
-  axiom ediv_Mle : forall (m1 m2 d:int), 0 < d => m1 <= m2 => m1/%d <= m2/%d.
-
-  lemma ediv_pos : forall m d, 0 < d => 0 <= m => 0 <= m /%d.
-  proof -strict. 
-    intros m d Hd Hm.
-    apply (Trans _ (0/%d));last apply ediv_Mle;smt.
-    elim (ediv_unique 0 d 0 0 _ _ _) => //; 1..2:smt full.
-      smt all.
-    smt.
-  qed.
-end EuclDiv.
-
-export EuclDiv.
 
 theory Extrema.
   op min (a b:int) = if (a < b) then a else b.

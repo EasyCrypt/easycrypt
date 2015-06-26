@@ -90,12 +90,7 @@ axiom from_to i: to_int (from_int i) = i %% 2^length.
 lemma from_to_bound i:
    0 <= i < 2^length =>
    to_int (from_int i) = i.
-proof -strict.
- rewrite from_to.
- intros H.
- elim (EuclDiv.ediv_unique i (2^length) 0 i _ _ _) => //;first 2 smt.
- by intros _ <-.
-qed.
+proof. by rewrite from_to; smt all. qed.
 
 (** univ *)
 
