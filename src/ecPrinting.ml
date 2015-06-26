@@ -1557,8 +1557,7 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
         (pp_form_r ppe (fst outer, (max_op_prec,`NonAssoc))) hs.bhs_bd
 
   | Fpr pr->
-      let spe = PPEnv.create_and_push_mem ppe ~active:true (EcFol.mhr, pr.pr_fun) in
-      let spe = PPEnv.add_local spe pr.pr_mem in
+      let ppe = PPEnv.create_and_push_mem ppe ~active:true (EcFol.mhr, pr.pr_fun) in
       Format.fprintf fmt "Pr[@[%a@[%t@] @@ %a :@ %a@]]"
         (pp_funname ppe) pr.pr_fun
         (match pr.pr_args.f_node with
@@ -1568,8 +1567,8 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
              (fun fmt -> pp_string fmt "()")
          | _ ->
              (fun fmt -> Format.fprintf fmt "(%a)" (pp_form ppe) pr.pr_args))
-        (pp_local spe) pr.pr_mem
-        (pp_form spe) pr.pr_event
+        (pp_local ppe) pr.pr_mem
+        (pp_form ppe) pr.pr_event
 
 and pp_form_r (ppe : PPEnv.t) outer fmt f =
   let printers =
