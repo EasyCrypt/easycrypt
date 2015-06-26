@@ -1,0 +1,17 @@
+S src
+S src/phl
+S src/system
+S src/why3
+
+B _build/src
+B _build/src/phl
+B _build/src/system
+B _build/src/why3
+
+PKG batteries
+PKG menhirLib
+PKG why3
+PKG zarith
+
+FLG -rectypes
+FLG -w Y -w Z -w -23 -w +28 -w +33
