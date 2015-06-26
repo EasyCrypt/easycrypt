@@ -16,9 +16,9 @@ require Int.
   
   op (<) : real -> real -> bool.
   
-  op (>) : real -> real -> bool.
+  op (>) (x y:real) = y < x.
   
-  op (<=) : real -> real -> bool.
+  op (<=) (x y:real) = x < y \/ x = y.
   
   op (+) : real -> real -> real.
   
@@ -50,7 +50,7 @@ require Int.
   
   axiom Mul_distr_r: forall (x y z : real), (y + z) * x = y * x + z * x.
   
-  op (-) : real -> real -> real.
+  op (-) (x y:real) = x + (-y).
   
   theory Comm.
     axiom Comm: forall (x y : real), x * y = y * x.
@@ -111,7 +111,7 @@ theory Abs.
 *)
   (* unset triangular_inequality *)
 (** Begin Import **)
-    op "`|_|" : real -> real.
+    op "`|_|" (x:real) = if x >= zero then x else -x.
     
     axiom Abs_le: forall (x y : real), `|x| <= y <=> -y <= x /\ x <= y.
     
