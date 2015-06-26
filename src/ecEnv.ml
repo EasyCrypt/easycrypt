@@ -3097,7 +3097,7 @@ module LDecl = struct
 
   let has_name ?(dep = false) s hyps =
     let test (id, k) =
-      EcIdent.name id = s && (not dep || has_inld s k)
+      EcIdent.name id = s || (dep && has_inld s k)
     in List.exists test hyps.h_local
 
   (* ------------------------------------------------------------------ *)
@@ -3133,8 +3133,8 @@ module LDecl = struct
       else
         let rec aux n =
           let s = Printf.sprintf "%s%d" s n in
-          if has_name ~dep:true s hyps then aux (n+1) else s in
-        aux 0
+          if has_name ~dep:true s hyps then aux (n+1) else s
+        in aux 0
 
     in EcIdent.create s
 
