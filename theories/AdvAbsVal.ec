@@ -43,11 +43,11 @@ lemma abs_val :
     (forall &m (A<:Adv), P (Pr[A.main() @ &m : res] - 1%r/2%r)) =>
     forall &m (A<:Adv), islossless A.main => 
       P (`|Pr[A.main() @ &m : res] - 1%r/2%r| ).
-proof -strict.
+proof.
   move=> P HP &m A Hl.
   case (Pr[A.main() @ &m : res] <= 1%r / 2%r) => Hle.
     cut h1 := HP &m (Neg_main(A)).
     cut h2 := Neg_A_Pr_minus A &m _; first by trivial.
-    by pose r := _ - _; cut ->: `|r| = -r; smt full.
-  by cut h := HP &m A; smt full.
+    smt.
+  by cut h := HP &m A; smt.
 qed.
