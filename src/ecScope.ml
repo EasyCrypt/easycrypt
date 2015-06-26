@@ -295,7 +295,7 @@ type scope = {
   sc_name     : (symbol * EcTheory.thmode);
   sc_env      : EcEnv.env;
   sc_top      : scope option;
-  sc_prelude  : prelude option;
+  sc_prelude  : ([`Frozen | `InPrelude] * prelude);
   sc_loaded   : (thloaded * symbol list) Msym.t;
   sc_required : symbol list;
   sc_pr_uc    : proof_uc option;
@@ -309,7 +309,7 @@ let empty (gstate : EcGState.gstate) =
   { sc_name       = (EcPath.basename (EcEnv.root env), `Concrete);
     sc_env        = env;
     sc_top        = None;
-    sc_prelude    = None;
+    sc_prelude    = (`InPrelude, { pr_env = env; pr_required = []; });
     sc_loaded     = Msym.empty;
     sc_required   = [];
     sc_pr_uc      = None;
@@ -337,14 +337,10 @@ let attop (scope : scope) =
   scope.sc_top = None
 
 (* -------------------------------------------------------------------- *)
-let prelude_of_scope (scope : scope) =
-  { pr_env      = scope.sc_env;
-    pr_required = scope.sc_required; }
-
-(* -------------------------------------------------------------------- *)
 let freeze (scope : scope) =
-  assert (is_none scope.sc_prelude && attop scope);
-  { scope with sc_prelude = Some (prelude_of_scope scope); }
+  match scope.sc_prelude with
+  | `Frozen   , _  -> assert false
+  | `InPrelude, pr -> { scope with sc_prelude = (`Frozen, pr) }
 
 (* -------------------------------------------------------------------- *)
 let goal (scope : scope) =
@@ -386,14 +382,7 @@ end
 
 (* -------------------------------------------------------------------- *)
 let for_loading (scope : scope) =
-  let pr =
-    match scope.sc_prelude with
-    | Some pr -> pr
-    | None    ->
-        let gs  = (EcEnv.gstate scope.sc_env) in
-        let env = EcEnv.initial (EcGState.copy gs) in
-        { pr_env = env; pr_required = []; }
-  in
+  let pr = snd (scope.sc_prelude) in
 
   { sc_name       = (EcPath.basename (EcEnv.root pr.pr_env), `Concrete);
     sc_env        = pr.pr_env;
@@ -1735,6 +1724,15 @@ module Theory = struct
     (name, scope)
 
   (* ------------------------------------------------------------------ *)
+  let bump_prelude (scope : scope) =
+    match scope.sc_prelude with
+    | `InPrelude, _ ->
+         { scope with sc_prelude = (`InPrelude,
+             { pr_env      = scope.sc_env;
+               pr_required = scope.sc_required; }) }
+    | _ -> scope
+
+  (* ------------------------------------------------------------------ *)
   let import (scope : scope) (name : qsymbol) =
     assert (scope.sc_pr_uc = None);
 
@@ -1748,7 +1746,8 @@ module Theory = struct
         hierror "cannot import an abstract theory"
 
     | Some (path, (_, `Concrete)) ->
-        { scope with sc_env = EcEnv.Theory.import path scope.sc_env }
+        bump_prelude
+          { scope with sc_env = EcEnv.Theory.import path scope.sc_env }
 
   (* ------------------------------------------------------------------ *)
   let export (scope : scope) (name : qsymbol) =
@@ -1764,7 +1763,8 @@ module Theory = struct
         hierror "cannot export an abstract theory"
 
     | Some (path, (_, `Concrete)) ->
-        { scope with sc_env = EcEnv.Theory.export path scope.sc_env }
+        bump_prelude
+          { scope with sc_env = EcEnv.Theory.export path scope.sc_env }
 
   (* ------------------------------------------------------------------ *)
   let check_end_required scope thname =
@@ -1798,7 +1798,7 @@ module Theory = struct
           let scope = { scope with sc_loaded =
               Msym.add name ((cth, mode), rqs) imported.sc_loaded; } in
 
-          require_loaded name scope
+          bump_prelude (require_loaded name scope)
 
         with e -> begin
           match toperror_of_exn_r e with
