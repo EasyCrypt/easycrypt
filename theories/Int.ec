@@ -3,10 +3,6 @@
  * Distributed under the terms of the CeCILL-B licence.
  * -------------------------------------------------------------------- *)
 
-(*
-  import why3 "int" "Int"
-  op "prefix -" as "[-]".
-*)
 (** Begin Import **)
   op zero : int = 0.
   op one  : int = 1.
@@ -280,11 +276,6 @@ proof.
 qed.
 
 (* Diveucl *)
-(*
-import why3 "int" "EuclideanDivision"
-  op "div" as "/%";
-  op "mod" as "%%".
-*)
 (** Begin Import **)
   op (/%) : int -> int -> int.
   
