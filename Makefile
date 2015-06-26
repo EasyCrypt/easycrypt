@@ -5,7 +5,6 @@ OCAMLBUILD_JOBS  ?= 1
 OCAMLBUILD_BIN   ?= ocamlbuild
 OCAMLBUILD_EXTRA ?= 
 OCAMLBUILD_OPTS  := -use-ocamlfind -j $(OCAMLBUILD_JOBS)
-OCAMLBUILD_OPTS  += -classic-display
 
 # In Emacs, use classic display to enable error jumping.
 ifeq ($(shell echo $$TERM), dumb)
