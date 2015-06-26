@@ -20,7 +20,7 @@ op g1 = g ^ F.zero.
 axiom gpow_log (a:group): g ^ (log a) = a.
 axiom log_gpow x : log (g ^ x) = x.
 
-lemma nosmt log_bij x y: x = y <=> log x = log y by [].
+lemma nosmt log_bij x y: x = y <=> log x = log y by smt full.
 lemma nosmt pow_bij (x y:F.t): x = y <=> g^x =g^y by [].
 
 

@@ -78,7 +78,9 @@ lemma witness_nzero P (d:'a distr):
   0%r < mu d P => (exists x, P x ).
 proof.
   cut: P <> pred0 => (exists x, P x).
-    smt full.
+    apply absurd=> /=.
+    have -> h: (!exists (x:'a), P x) = forall (x:'a), !P x by smt.
+    by apply fun_ext=> x; rewrite h.
   smt.
 qed.
 

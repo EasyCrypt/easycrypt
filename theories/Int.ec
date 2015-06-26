@@ -3,8 +3,73 @@
  * Distributed under the terms of the CeCILL-B licence.
  * -------------------------------------------------------------------- *)
 
-import why3 "int" "Int"
+(*
+  import why3 "int" "Int"
   op "prefix -" as "[-]".
+*)
+(** Begin Import **)
+op zero : int.
+op one  : int.
+op (<)  : int -> int -> bool.
+op (>)  : int -> int -> bool.
+op (<=) : int -> int -> bool.
+op (+)  : int -> int -> int.
+op [-]  : int -> int.
+op ( * ): int -> int -> int.
+
+theory CommutativeGroup.
+    axiom Assoc: forall (x y z : int), x + y + z = x + (y + z).
+    
+    axiom Unit_def_l: forall (x : int), zero + x = x.
+    
+    axiom Unit_def_r: forall (x : int), x + zero = x.
+    
+    axiom Inv_def_l: forall (x : int), -x + x = zero.
+    
+    axiom Inv_def_r: forall (x : int), x + -x = zero.
+    
+    theory Comm.
+      axiom Comm: forall (x y : int), x + y = y + x.
+    end Comm.
+  end CommutativeGroup.
+  
+  theory Assoc.
+    axiom Assoc: forall (x y z : int), x * y * z = x * (y * z).
+  end Assoc.
+
+  axiom Mul_distr_r:
+    forall (x y z : int), (y + z) * x = y * x + z * x.
+  
+  op (-) : int -> int -> int.
+  
+  theory Comm.
+    axiom Comm: forall (x y : int), x * y = y * x.
+  end Comm.
+  
+  axiom Unitary: forall (x : int), one * x = x.
+  
+  axiom NonTrivialRing: zero <> one.
+  
+  op (>=) : int -> int -> bool.
+  
+  axiom Refl: forall (x : int), x <= x.
+  
+  axiom Trans:
+    forall (x y z : int), x <= y => y <= z => x <= z.
+  
+  axiom Antisymm: forall (x y : int), x <= y => y <= x => x = y.
+  
+  axiom Total: forall (x y : int), x <= y \/ y <= x.
+  
+  axiom ZeroLessOne: zero <= one.
+  
+  axiom CompatOrderAdd:
+    forall (x y z : int), x <= y => x + z <= y + z.
+  
+  axiom CompatOrderMult:
+    forall (x y z : int),
+      x <= y => zero <= z => x * z <= y * z.
+(** End Import **)
 
 (* Random thing *)
 op int_of_bool (b : bool) = if b then 1 else 0.
@@ -217,9 +282,44 @@ proof.
 qed.
 
 (* Diveucl *)
+(*
 import why3 "int" "EuclideanDivision"
   op "div" as "/%";
   op "mod" as "%%".
+*)
+(** Begine Import **)
+  op (/%) : int -> int -> int.
+  
+  op (%%) : int -> int -> int.
+  
+  axiom Div_mod: forall (x y:int), y <> zero => x = y * x /% y + x %% y.
+  
+  axiom Div_bound: forall (x y:int), x >= zero /\ y > zero => zero <= x /% y <= x.
+  
+  axiom Mod_bound: forall (x y:int), y <> zero => zero <= x %% y < `|y|.
+  
+  axiom Mod_1: forall (x:int), x %% one = zero.
+  
+  axiom Div_1: forall (x:int), x /% one = x.
+  
+  axiom Div_inf: forall (x y:int), zero <= x < y => x /% y = zero.
+  
+  axiom Div_inf_neg: forall (x y:int), zero < x <= y => -x /% y = -one.
+  
+  axiom Mod_0: forall (y:int), y > one => 0 %% y = 0.
+  
+  axiom Div_1_left: forall (y:int), y > one => one /% y = zero.
+  
+  axiom Div_minus1_left: forall (y:int), y > one => -one /% y = -one.
+  
+  axiom Mod_1_left: forall (y:int), y > one => one %% y = 1.
+  
+  axiom Mod_minus1_left: forall (y:int), y > one => -one %% y = y - one.
+  
+  axiom Div_mult: forall (x y z:int), x > zero => (x * y + z) /% x = y + z /% x.
+  
+  axiom Mod_mult: forall (x y z:int), x > zero => (x * y + z) %% x = z %% x.
+(** End Import **)
 
 theory EuclDiv.
 
