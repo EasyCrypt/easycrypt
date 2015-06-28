@@ -8,8 +8,9 @@ require import Int Real.
 require (*--*) Ring.
 
 (* -------------------------------------------------------------------- *)
-axiom invr0: inv 0%r = 0%r.
 axiom divr0: forall x, x / 0%r = 0%r.
+lemma invr0: inv 0%r = 0%r.
+proof. by rewrite -{2}(divr0 1%r) inv_def. qed.
 
 (* -------------------------------------------------------------------- *)
 clone Ring.Field as RField with
@@ -23,3 +24,26 @@ clone Ring.Field as RField with
   op   ( / ) <- Real.( / ),
   op   invr  <- Real.inv
   proof * by smt.
+
+(* -------------------------------------------------------------------- *)
+instance ring with int
+  op rzero = Int.zero
+  op rone  = Int.one
+  op add   = Int.(+)
+  op opp   = Int.([-])
+  op mul   = Int.( * )
+  op expr  = Int.( ^ )
+  op sub   = Int.(-)
+
+  proof oner_neq0 by smt
+  proof addr0     by smt
+  proof addrA     by smt
+  proof addrC     by smt
+  proof addrN     by smt
+  proof mulr1     by smt
+  proof mulrA     by smt
+  proof mulrC     by smt
+  proof mulrDl    by smt
+  proof expr0     by smt 
+  proof exprS     by smt
+  proof subrE     by smt.
