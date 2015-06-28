@@ -299,3 +299,8 @@ axiom existsbP ['a] (P : 'a -> bool):
 
 axiom forallbP ['a] (P : 'a -> bool):
   (forallb P) <=> (forall x, P x).
+
+(* -------------------------------------------------------------------- *)
+axiom nosmt funchoice ['a 'b] (P : 'a -> 'b -> bool):
+     (forall x, exists y, P x y)
+  => (exists f, forall x, P x (f x)).
