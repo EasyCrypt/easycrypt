@@ -139,7 +139,7 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt big_nth x0 (P : 'a -> bool) (F : 'a -> t) s:
-  big P F s = big (P \o (nth x0 s)) (F \o (nth x0 s)) (iota_ 0 (size s)).
+  big P F s = bigi (P \o (nth x0 s)) (F \o (nth x0 s)) 0 (size s).
 proof. by rewrite -{1}@(mkseq_nth x0 s) /mkseq big_map. qed.
 
 (* -------------------------------------------------------------------- *)
