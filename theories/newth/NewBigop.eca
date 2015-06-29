@@ -91,7 +91,7 @@ lemma nosmt big_map ['a 'b] (h : 'b -> 'a) (P : 'a -> bool) F s:
   big P F (map h s) = big (P \o h) (F \o h) s.
 proof. by elim: s => // x s; rewrite map_cons !big_cons=> ->. qed.
 
-lemma nosmt big_mapT ['a 'b] (h : 'b -> 'a) F s:
+lemma nosmt big_mapT ['a 'b] (h : 'b -> 'a) F s: (* -> big_map_predT *)
   big predT F (map h s) = big predT (F \o h) s.
 proof. by rewrite big_map. qed.
 
@@ -329,9 +329,9 @@ lemma nosmt congr_big_seq (P1 P2: 'a -> bool) (F1 F2 : 'a -> t) s:
      (forall x, mem s x => P1 x => P2 x => F1 x = F2 x)
   => big P1 F1 s = big P2 F2 s.
 proof. 
-  move=> eqP eqH;rewrite big_mkcond eq_sym big_mkcond eq_sym.
-  apply eq_big_seq=> x Hx /=;rewrite eqP //. 
-  by case (P2 x) => // HP2;apply eqH => //;rewrite eqP.
+  move=> eqP eqH; rewrite big_mkcond eq_sym big_mkcond eq_sym.
+  apply/eq_big_seq=> x x_in_s /=; rewrite eqP //.
+  by case (P2 x)=> // P2x; rewrite eqH // eqP.
 qed.
 
 (* -------------------------------------------------------------------- *)

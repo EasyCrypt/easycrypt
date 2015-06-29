@@ -1016,10 +1016,9 @@ op map (f : 'a -> 'b) xs =
   with xs = "[]"      => []
   with xs = (::) y ys => (f y) :: (map f ys).
 
-
 lemma eq_in_map (f1 f2 : 'a -> 'b) (s : 'a list) :
   (forall x, mem s x => f1 x = f2 x) <=> map f1 s = map f2 s.
-proof. elim s => //= x s <-;smt. qed.
+proof. elim: s => //= x s <-; smt. qed.
 
 lemma eq_map (f1 f2 : 'a -> 'b):
      (forall x, f1 x = f2 x)
@@ -1244,8 +1243,7 @@ theory Range.
     range m n = m :: range (m+1) n.
   proof. smt. qed.
 
-  lemma rangeS (m:int):
-    range m (m+1) = [m].
+  lemma rangeS (m : int): range m (m+1) = [m].
   proof. by rewrite range_ltn 1:smt range_geq. qed.
 
   lemma range_add (m n a : int):
@@ -1263,8 +1261,8 @@ theory Range.
   lemma range_cat (n m p : int): m <= n => n <= p =>
     range m p = range m n ++ range n p.
   proof. 
-    rewrite /range (_: p - m = n - m + (p - n)) 1:smt=> Hm Hn. 
-    rewrite iota_add; smt. 
+    rewrite /range (_: p - m = n - m + (p - n)) 1:smt.
+    by move=> le_mn le_np; rewrite iota_add; smt.
   qed.
 
   lemma mem_range (m n i: int):
@@ -1280,9 +1278,9 @@ theory Range.
   lemma size_range m n: size (range m n) = max 0 (n - m).
   proof. by apply/size_iota. qed.
 
-  lemma nth_range  (i p k w : int) : 0 <= i < p - k => nth w (range k p) i = k + i.
+  lemma nth_range  (i p k w : int):
+    0 <= i < p - k => nth w (range k p) i = k + i.
   proof. by apply/nth_iota. qed.
-
 end Range.
 
 export Range.
