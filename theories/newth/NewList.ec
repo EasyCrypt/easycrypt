@@ -1016,6 +1016,11 @@ op map (f : 'a -> 'b) xs =
   with xs = "[]"      => []
   with xs = (::) y ys => (f y) :: (map f ys).
 
+
+lemma eq_in_map (f1 f2 : 'a -> 'b) (s : 'a list) :
+  (forall x, mem s x => f1 x = f2 x) <=> map f1 s = map f2 s.
+proof. elim s => //= x s <-;smt. qed.
+
 lemma eq_map (f1 f2 : 'a -> 'b):
      (forall x, f1 x = f2 x)
   => forall s, map f1 s = map f2 s.
