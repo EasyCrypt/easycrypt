@@ -91,7 +91,7 @@ lemma nosmt big_map ['a 'b] (h : 'b -> 'a) (P : 'a -> bool) F s:
   big P F (map h s) = big (P \o h) (F \o h) s.
 proof. by elim: s => // x s; rewrite map_cons !big_cons=> ->. qed.
 
-lemma nosmt big_mapT ['a 'b] (h : 'b -> 'a) (P : 'a -> bool) F s:
+lemma nosmt big_mapT ['a 'b] (h : 'b -> 'a) F s:
   big predT F (map h s) = big predT (F \o h) s.
 proof. by rewrite big_map. qed.
 
