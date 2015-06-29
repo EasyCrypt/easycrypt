@@ -254,7 +254,7 @@ def _main():
         except OSError as e:
             logging.warning("cannot scan `%s': %s" % (obj.src, e))
             return []
-        scripts = sorted([x for x in scripts if x.endswith('.ec')])
+        scripts = sorted([x for x in scripts if x.endswith('.ec') or x.endswith('.eca')])
         logging.debug("%.4d script(s) found in `%s'" % (len(scripts), obj.src))
 
         def config(filename):
