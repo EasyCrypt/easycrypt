@@ -19,32 +19,50 @@ axiom dK_ll: is_lossless dK.
 
 op F:K -> D -> R.
 
-(** The Real PRF is defined as follows *)
-module PRFr = {
-  var k:K
-  proc init(): unit = { k = $dK; }
-  proc f(x:D): R = { return F k x; }
+module type PRF = {
+  proc keygen()   : K
+  proc f(k:K,x:D) : R
 }.
 
-(** Security is expressed with respect to the Random Function defined
-    by some distribution on (a subset of) R. *)
+(** The Real PRF is defined as follows *)
+module PRFr = {
+  proc keygen(): K = {
+    var k;
+
+    k <$ dK;
+    return k;
+  }
+
+  proc f(k:K,x:D): R = { return F k x; }
+}.
+
+(** PRF-security is expressed as indistinguishability from a truly
+    random function (defined by some distribution dR) when the key is
+    sampled from dK **)
 op dR:R distr.
 axiom dR_ll: is_lossless dR.
 
-module type PRF = {
+module type PRF_Oracles = {
+  proc f(x:D): R
+}.
+
+module type Distinguisher(F:PRF_Oracles) = {
+  proc distinguish(): bool
+}.
+
+module type PRF_Hiding = {
   proc init(): unit
   proc f(x:D): R
 }.
 
-module type PRFA = {
-  proc f(x:D): R
+module PRF_Wrap (F:PRF) = {
+  var k:K
+
+  proc init(): unit = { k <$ dK; }
+  proc f(x:D): R    = { return F k x; }
 }.
 
-module type Distinguisher(F:PRFA) = {
-  proc distinguish(): bool
-}.
-
-module IND (F:PRF,D:Distinguisher) = {
+module IND (F:PRF_Hiding,D:Distinguisher) = {
   module D = D(F)
 
   proc main(): bool = {
@@ -68,13 +86,13 @@ module PRFi = {
 }.
 
 (* TODO: define notations *)
-(** Advantage of a distinguisher against a PRF oracle F:
-      Adv^PRF_F(&m,D) = `|Pr[IND(F,D) @ &m: res] - Pr[IND(PRFi,D) @ &m: res]| **)
+(** Advantage of a distinguisher against a PRF F:
+      Adv^PRF_F(&m,D) = `|Pr[IND(Wrap_PRF(F),D) @ &m: res] - Pr[IND(PRFi,D) @ &m: res]| **)
 (** Advantage of a distinguisher against **the** PRF operator F:
-      Adv^PRF_F(&m,D) = `|Pr[IND(PRFr,D) @ &m: res] - Pr[IND(PRFi,D) @ &m: res]| **)
+      Adv^PRF_F(&m,D) = `|Pr[IND(Wrap_PRF(PRFr),D) @ &m: res] - Pr[IND(PRFi,D) @ &m: res]| **)
 
 (** Useful lemmas **)
-lemma PRFr_init_ll: islossless PRFr.init.
+lemma PRFr_keygen_ll: islossless PRFr.keygen.
 proof. by proc; auto; smt. qed.
 
 lemma PRFr_f_ll: islossless PRFr.f.
