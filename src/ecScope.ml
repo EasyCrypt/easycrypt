@@ -1928,26 +1928,24 @@ module Cloning = struct
   open EcThCloning
 
   (* -------------------------------------------------------------------- *)
-  exception Incompatible
-  (* FIXME: improve error message ... *)
+
+  exception Incompatible of incompatible
+
   let ty_compatible env (rtyvars, rty) (ntyvars, nty) =
-    if List.length rtyvars <> List.length ntyvars then
-      raise Incompatible;
+    let rlen = List.length rtyvars and nlen = List.length ntyvars in
+    if rlen <> nlen then
+      raise (Incompatible (NotSameNumberOfTyParam(rlen,nlen)));
     let s =
       EcIdent.Mid.of_list
         (List.map2
            (fun a1 a2 -> (a2, EcTypes.tvar a1))
            rtyvars ntyvars)
     in
-  
+    
     let nty = EcTypes.Tvar.subst s nty in
-      if not (EcReduction.EqTest.for_type env rty nty) then
-        raise Incompatible
+    if not (EcReduction.EqTest.for_type env rty nty) then
+      raise (Incompatible (DifferentType(rty,nty)))
   
-  let ty_compatible env t1 t2 =
-    try  ty_compatible env t1 t2; true
-    with Incompatible -> false
-
   (* ------------------------------------------------------------------ *)
   type options = {
     clo_abstract : bool;
@@ -2057,7 +2055,8 @@ module Cloning = struct
         | CTh_operator (x, ({ op_kind = OB_oper None } as oopd)) -> begin
             match Msym.find_opt x ovrds.ovre_ovrd.evc_ops with
             | None ->
-                (subst, ops, proofs, Op.bind scope (x, EcSubst.subst_op subst oopd))
+                (subst, ops, proofs, 
+                 Op.bind scope (x, EcSubst.subst_op subst oopd))
   
             | Some { pl_desc = (opov, opmode); pl_loc = loc; } ->
                 let (reftyvars, refty) =
@@ -2091,18 +2090,23 @@ module Cloning = struct
                         let subst1 = (List.map fst tparams, body) in
                         let subst  = EcSubst.add_opdef subst (xpath x) subst1
                         in  (newop, subst, false)
-              in
+                in
   
-              let (newtyvars, newty) = (newop.op_tparams, newop.op_ty) in
-                (* FIXME: TC HOOK *)
-                if not (ty_compatible scope.sc_env
-                          (List.map fst reftyvars, refty)
-                          (List.map fst newtyvars, newty))
-                then
-                  clone_error scope.sc_env (CE_OpIncompatible (prefix, x));
-                let ops = Mp.add (EcPath.fromqsymbol (prefix, x)) (newop, alias) ops in
-                  (subst, ops, proofs, if alias then Op.bind scope (x, newop) else scope)
-            end
+                let (newtyvars, newty) = (newop.op_tparams, newop.op_ty) in
+              (* FIXME: TC HOOK *)
+                begin 
+                  try ty_compatible scope.sc_env
+                        (List.map fst reftyvars, refty)
+                        (List.map fst newtyvars, newty)
+                  with Incompatible err ->
+                    clone_error scope.sc_env 
+                      (CE_OpIncompatible((prefix,x), err))
+                end;
+                let ops = 
+                  Mp.add (EcPath.fromqsymbol (prefix, x)) (newop, alias) ops in
+                (subst, ops, proofs, 
+                 if alias then Op.bind scope (x, newop) else scope)
+        end
   
         | CTh_operator (x, ({ op_kind = OB_pred None} as oopr)) -> begin
             match Msym.find_opt x ovrds.ovre_ovrd.evc_preds with
@@ -2130,7 +2134,10 @@ module Cloning = struct
                    if reftyvars = [] then begin
                      try  EcUnify.unify scope.sc_env ue refty body.EcFol.f_ty
                      with EcUnify.UnificationFailure _ ->
-                       clone_error scope.sc_env (CE_OpIncompatible (prefix, x))
+                       clone_error scope.sc_env 
+                         (CE_OpIncompatible 
+                            ((prefix, x),
+                             DifferentType(refty, body.EcFol.f_ty)))
                    end;
   
                    let uni     = EcUnify.UniEnv.close ue in
@@ -2154,13 +2161,18 @@ module Cloning = struct
   
                 let (newtyvars, newty) = (newpr.op_tparams, newpr.op_ty) in
                   (* FIXME: TC HOOK *)
-                  if not (ty_compatible scope.sc_env
-                            (List.map fst reftyvars, refty)
-                            (List.map fst newtyvars, newty))
-                  then
-                    clone_error scope.sc_env (CE_OpIncompatible (prefix, x));
-                  (subst, ops, proofs, if alias then Op.bind scope (x, newpr) else scope)
-          end
+                begin 
+                  try 
+                    ty_compatible scope.sc_env
+                      (List.map fst reftyvars, refty)
+                      (List.map fst newtyvars, newty) 
+                  with Incompatible err -> 
+                    clone_error scope.sc_env 
+                      (CE_OpIncompatible((prefix, x), err))
+                end;
+                (subst, ops, proofs, 
+                 if alias then Op.bind scope (x, newpr) else scope)
+        end
   
         | CTh_operator (x, oopd) ->
             let oopd = EcSubst.subst_op subst oopd in

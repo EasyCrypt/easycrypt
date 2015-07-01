@@ -9,6 +9,10 @@ open EcSymbols
 open EcParsetree
 
 (* -------------------------------------------------------------------- *)
+type incompatible =
+| NotSameNumberOfTyParam of int * int 
+| DifferentType of EcTypes.ty * EcTypes.ty
+
 type ovkind =
 | OVK_Type
 | OVK_Operator
@@ -22,8 +26,8 @@ type clone_error =
 | CE_UnkOverride    of ovkind * qsymbol
 | CE_CrtOverride    of ovkind * qsymbol
 | CE_TypeArgMism    of ovkind * qsymbol
-| CE_OpIncompatible of qsymbol
-| CE_PrIncompatible of qsymbol
+| CE_OpIncompatible of qsymbol * incompatible
+| CE_PrIncompatible of qsymbol * incompatible
 
 exception CloneError of EcEnv.env * clone_error
 

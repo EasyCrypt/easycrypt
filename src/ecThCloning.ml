@@ -14,6 +14,10 @@ open EcTheory
 module Mp = EcPath.Mp
 
 (* ------------------------------------------------------------------ *)
+type incompatible =
+| NotSameNumberOfTyParam of int * int 
+| DifferentType of EcTypes.ty * EcTypes.ty
+
 type ovkind =
 | OVK_Type
 | OVK_Operator
@@ -27,8 +31,8 @@ type clone_error =
 | CE_UnkOverride    of ovkind * qsymbol
 | CE_CrtOverride    of ovkind * qsymbol
 | CE_TypeArgMism    of ovkind * qsymbol
-| CE_OpIncompatible of qsymbol
-| CE_PrIncompatible of qsymbol
+| CE_OpIncompatible of qsymbol * incompatible
+| CE_PrIncompatible of qsymbol * incompatible
 
 exception CloneError of EcEnv.env * clone_error
 
@@ -52,7 +56,16 @@ type axclone = {
 }
 
 (* -------------------------------------------------------------------- *)
-let pp_clone_error fmt _env error =
+
+let pp_incompatible env fmt = function
+  | NotSameNumberOfTyParam(exp, got) ->
+    Format.fprintf fmt "contains %i type parameter instead of %i" got exp
+  | DifferentType(exp,got) ->
+    let ppe = EcPrinting.PPEnv.ofenv env in
+    Format.fprintf fmt "has type %a instead of %a" 
+      (EcPrinting.pp_type ppe) got  (EcPrinting.pp_type ppe) exp
+
+let pp_clone_error fmt env error =
   let msg x = Format.fprintf fmt x in
 
   match error with
@@ -76,13 +89,13 @@ let pp_clone_error fmt _env error =
       msg "type argument mismatch for %s `%s'"
         (string_of_ovkind kd) (string_of_qsymbol x)
 
-  | CE_OpIncompatible x ->
-      msg "operator `%s' body is not compatible with its declaration"
-        (string_of_qsymbol x)
+  | CE_OpIncompatible (x,err) ->
+      msg "operator `%s' body %a"
+        (string_of_qsymbol x) (pp_incompatible env) err
 
-  | CE_PrIncompatible x ->
-      msg "predicate `%s' body is not compatible with its declaration"
-        (string_of_qsymbol x)
+  | CE_PrIncompatible (x,err) ->
+      msg "predicate `%s' body %a"
+        (string_of_qsymbol x) (pp_incompatible env) err
 
 let () =
   let pp fmt exn =
