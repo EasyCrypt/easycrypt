@@ -1929,14 +1929,14 @@ module Cloning = struct
 
   (* -------------------------------------------------------------------- *)
   exception Incompatible
-  
+  (* FIXME: improve error message ... *)
   let ty_compatible env (rtyvars, rty) (ntyvars, nty) =
     if List.length rtyvars <> List.length ntyvars then
       raise Incompatible;
     let s =
       EcIdent.Mid.of_list
         (List.map2
-           (fun a1 a2 -> (a1, EcTypes.tvar a2))
+           (fun a1 a2 -> (a2, EcTypes.tvar a1))
            rtyvars ntyvars)
     in
   
