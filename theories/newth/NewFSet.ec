@@ -4,7 +4,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Pred NewLogic NewList.
+require import Pred Int NewLogic NewList.
 
 (* -------------------------------------------------------------------- *)
 (* Finite sets are abstractely represented as the quotient by [perm_eq] *)
@@ -124,13 +124,6 @@ proof. by []. qed.
 (* -------------------------------------------------------------------- *)
 lemma nosmt eqEsubset (A B : 'a fset) : (A = B) <=> (A <= B) /\ (B <= A).
 proof. by rewrite fsetP !subsetE; rewrite subpred_eqP. qed.
-
-(* -------------------------------------------------------------------- *)
-lemma nosmt cards0: card fset0<:'a> = 0.
-proof. by rewrite cardE set0E -(perm_eq_size (undup [])) 1:oflistK. qed.
-
-lemma nosmt card_ge0 (A : 'a fset) : Int.(<=) 0 (card A).
-proof. by rewrite cardE size_ge0. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt fset_ind (p : 'a fset -> bool):
@@ -279,3 +272,48 @@ proof. by rewrite fsetDUl fsetDv fsetU0. qed.
 
 lemma fsetDKv (A B : 'a fset) : (A `&` B) `\` B = fset0.
 proof. by rewrite fsetDIl fsetDv fsetI0. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt fcards0: card fset0<:'a> = 0.
+proof. by rewrite cardE set0E -(perm_eq_size (undup [])) 1:oflistK. qed.
+
+lemma nosmt fcard_ge0 (A : 'a fset) : Int.(<=) 0 (card A).
+proof. by rewrite cardE size_ge0. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt fcardUI_indep (A B : 'a fset) : A `&` B = fset0 =>
+  card (A `|` B) = card A + card B.
+proof.
+  move/fsetP=> h; rewrite setUE !cardE; pose s := _ ++ _.
+  have <- := perm_eq_size _ _ (oflistK s). (* FIXME *)
+  rewrite undup_id /s 2:size_cat // cat_uniq ?uniq_elems /=.
+  rewrite -implybF => /hasP [x [Bx Ax]]; have := h x.
+  by rewrite in_fsetI in_fset0 !memE Bx Ax.
+qed.
+
+lemma fcardUI (A B : 'a fset) :
+  card (A `|` B) + card (A `&` B) = card A + card B.
+proof.
+  rewrite -(fsetID (A `|` B) A) fsetUK (fsetUC A B) fsetDK.
+  rewrite fcardUI_indep.
+    by rewrite fsetIDA fsetDIl fsetDv fset0I.
+  by rewrite addzAC fsetIC -addzA -fcardUI_indep ?fsetID ?fsetII.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt fcardU (A B : 'a fset) :
+  card (A `|` B) = card A + card B - card (A `&` B).
+proof. by rewrite -fcardUI smt. qed.
+
+lemma nosmt fcardI (A B : 'a fset) :
+  card (A `&` B) = card A + card B - card (A `|` B).
+proof. by rewrite -fcardUI smt. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma fcardID (A B : 'a fset) :
+  card (A `&` B) + card (A `\` B) = card A.
+proof. by rewrite -fcardUI_indep ?fsetID // fsetII. qed.
+
+lemma nosmt fcardD (A B : 'a fset) :
+  card (A `\` B) = card A - card (A `&` B).
+proof. by rewrite -(fcardID A B) smt. qed.

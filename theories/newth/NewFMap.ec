@@ -550,39 +550,39 @@ lemma rem_rem (a : 'a) (m : ('a, 'b) fmap):
   rem a (rem a m) = rem a m.
 proof. by rewrite fmapP=> x; rewrite !remP; case (x = a). qed.
 
-lemma dom0: dom map0<:'a, 'b> = set0.
-proof. by apply/setP=> x; rewrite map0E dom_oflist in_set0. qed.
+lemma dom0: dom map0<:'a, 'b> = fset0.
+proof. by apply/fsetP=> x; rewrite map0E dom_oflist in_fset0. qed.
 
 lemma dom_eq0 (m : ('a,'b) fmap):
-  dom m = set0 => m = map0.
+  dom m = fset0 => m = map0.
 proof.
   move=> eq_dom; apply fmap_domP; rewrite eq_dom dom0 //= => x;
-    by rewrite in_set0.
+    by rewrite in_fset0.
 qed.
 
 lemma domP (m : ('a, 'b) fmap) (a : 'a) (b : 'b):
-  forall x, mem (dom m.[a <- b]) x <=> mem (dom m `|` set1 a) x.
+  forall x, mem (dom m.[a <- b]) x <=> mem (dom m `|` fset1 a) x.
 proof.
-  move=> x; rewrite in_setU in_set1 !in_dom getP;
+  move=> x; rewrite in_fsetU in_fset1 !in_dom getP;
     by case (x = a).
 qed.
 
 lemma domP_eq (m : ('a, 'b) fmap) (a : 'a) (b : 'b):
   mem (dom m.[a <- b]) a.
-proof. by rewrite domP in_setU in_set1. qed.
+proof. by rewrite domP in_fsetU in_fset1. qed.
 
 lemma dom_rem (a : 'a) (m : ('a, 'b) fmap):
-  forall x, mem (dom (rem a m)) x <=> mem (dom m `\` set1 a) x.
+  forall x, mem (dom (rem a m)) x <=> mem (dom m `\` fset1 a) x.
 proof.
-  by move=> x; rewrite in_setD in_set1 !in_dom remP; case (x = a).
+  by move=> x; rewrite in_fsetD in_fset1 !in_dom remP; case (x = a).
 qed.
 
 lemma dom_rem_eq (a : 'a) (m : ('a, 'b) fmap): !mem (dom (rem a m)) a.
-proof. by rewrite dom_rem in_setD in_set1. qed.
+proof. by rewrite dom_rem in_fsetD in_fset1. qed.
 
-lemma rng0: rng map0<:'a, 'b> = set0.
+lemma rng0: rng map0<:'a, 'b> = fset0.
 proof.
-  apply/setP=> x; rewrite in_set0 //= in_rng.
+  apply/fsetP=> x; rewrite in_fset0 //= in_rng.
   (* FIXME: here, higher-order pattern-matching would help *)
   (* FIXME: or rewriting under quantifiers *)
   have //= -> // x' := nexists (fun (a:'a), map0.[a] = Some x).
@@ -591,9 +591,9 @@ qed.
 
 lemma rng_set (m : ('a, 'b) fmap) (a : 'a) (b : 'b): forall y,
       mem (rng m.[a<-b]) y
-  <=> mem (rng (rem a m) `|` set1 b) y.
+  <=> mem (rng (rem a m) `|` fset1 b) y.
 proof.
-  move=> y; rewrite in_setU in_set1 !in_rng; split=> [[] x |].
+  move=> y; rewrite in_fsetU in_fset1 !in_rng; split=> [[] x |].
     rewrite getP; case (x = a)=> [->> /= <<- |ne_xa mx_y]; [right=> // |left].
     by exists x; rewrite remP ne_xa /=.
   rewrite orbC -ora_or=> [->> | ].
@@ -605,7 +605,7 @@ qed.
 
 lemma rng_set_eq (m : ('a, 'b) fmap) (a : 'a) (b : 'b):
   mem (rng m.[a<-b]) b.
-proof. by rewrite rng_set in_setU in_set1. qed.
+proof. by rewrite rng_set in_fsetU in_fset1. qed.
 
 lemma rng_rm (a : 'a) (m : ('a, 'b) fmap) (b : 'b):
   mem (rng (rem a m)) b <=> (exists x, x <> a /\ m.[x] = Some b).
@@ -619,19 +619,19 @@ qed.
 lemma dom_join (m1 m2 : ('a, 'b) fmap):
   forall x, mem (dom (m1 + m2)) x <=> mem (dom m1 `|` dom m2) x.
 proof.
-  by move=> x; rewrite in_setU !in_dom joinP in_dom; case (m2.[x]).
+  by move=> x; rewrite in_fsetU !in_dom joinP in_dom; case (m2.[x]).
 qed.
 
 lemma has_join (p : 'a -> 'b -> bool) (m1 m2 : ('a, 'b) fmap):
   has p (m1 + m2) <=> has (fun x y => p x y /\ !mem (dom m2) x) m1 \/ has p m2.
 proof.
   rewrite !hasP; split=> [[x]|].
-    rewrite joinP dom_join in_setU.
+    rewrite joinP dom_join in_fsetU.
     by case (mem (dom m2) x)=> //=
          [x_in_m2 p_x_m2x|x_notin_m2 [x_in_m1 p_x_m1x]];
          [right|left]; exists x.
   by move=> [[x] [_ [p_x h]]|[x] [h p_x]];
-     exists x; rewrite dom_join joinP in_setU h.
+     exists x; rewrite dom_join joinP in_fsetU h.
 qed.
 
 lemma get_find (p : 'a -> 'b -> bool) (m : ('a, 'b) fmap):
@@ -690,22 +690,22 @@ lemma filter_eq_except (m : ('a, 'b) fmap) (X : 'a fset):
 proof. by rewrite eq_exceptE filter_filter. qed.
 
 lemma set_eq_except x b (m : ('a, 'b) fmap):
-  eq_except m.[x <- b] m (set1 x).
-proof. by rewrite eq_exceptP=> x'; rewrite in_set1 !getP=> ->. qed.
+  eq_except m.[x <- b] m (fset1 x).
+proof. by rewrite eq_exceptP=> x'; rewrite in_fset1 !getP=> ->. qed.
 
 lemma set2_eq_except x b b' (m : ('a, 'b) fmap):
-  eq_except m.[x <- b] m.[x <- b'] (set1 x).
-proof. by rewrite eq_exceptP=> x'; rewrite in_set1 !getP=> ->. qed.
+  eq_except m.[x <- b] m.[x <- b'] (fset1 x).
+proof. by rewrite eq_exceptP=> x'; rewrite in_fset1 !getP=> ->. qed.
 
 lemma eq_except_set_eq (m1 m2 : ('a, 'b) fmap) x:
   mem (dom m1) x =>
-  eq_except m1 m2 (set1 x) =>
+  eq_except m1 m2 (fset1 x) =>
   m1 = m2.[x <- oget m1.[x]].
 proof.
   rewrite eq_exceptP fmapP=> x_in_m1 eqe x'.
   rewrite !getP /oget; case (x' = x)=> [->> |].
     by move: x_in_m1; rewrite in_dom; case (m1.[x]).
-  by rewrite -in_set1; apply eqe.
+  by rewrite -in_fset1; apply eqe.
 qed.
 
 (** TODO: lots of lemmas *)
