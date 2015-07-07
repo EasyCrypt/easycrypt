@@ -234,6 +234,14 @@
     let ops = Printf.sprintf "\\(%s\\)" ops in
     Regexp.regexp ops
 
+  (* ----------------------------------------------------------------- *)
+  let lex_std_op ?name op =
+    match op.[0] with
+    | '=' | '<' | '>'       -> LOP1 (name |> odfl op)
+    | '+' | '-' | '|'       -> LOP2 (name |> odfl op)
+    | '*' | '/' | '&' | '%' -> LOP3 (name |> odfl op)
+    | _                     -> LOP4 (name |> odfl op)
+
   (* ------------------------------------------------------------------ *)
   let lex_operators (op : string) =
     let baseop (op : string) =
@@ -247,18 +255,16 @@
     in
       try  [baseop op]
       with Not_found ->
+        List.map (function
+          | Regexp.Delim op -> fst (Hashtbl.find operators op)
+          | Regexp.Text  op ->
+              try baseop op with Not_found -> lex_std_op op)
+          (Regexp.full_split opre op)
 
-      List.map (function
-        | Regexp.Delim op -> fst (Hashtbl.find operators op)
-        | Regexp.Text  op ->
-          try  baseop op
-          with Not_found ->
-            match op.[0] with
-            | '=' | '<' | '>' -> LOP1 op
-            | '+' | '-'       -> LOP2 op
-            | '*' | '/' | '%' -> LOP3 op
-            | _               -> LOP4 op)
-        (Regexp.full_split opre op)
+  (* ------------------------------------------------------------------ *)
+  let lex_tick_operator (op : string) =
+    let name = Printf.sprintf "`%s`" op in
+    lex_std_op ~name op
 
   (* ------------------------------------------------------------------ *)
   exception InvalidCodePosition
@@ -299,7 +305,7 @@ let mident = '&'  (lident | uint)
 
 let opchar = ['=' '<' '>' '+' '-' '*' '/' '\\' '%' '&' '^' '|' ':']
 
-let sop = opchar+
+let sop = opchar+ | '`' opchar+ '`'
 let nop = '\\' ichar+
 
 let uniop = nop | ['-' '+']+ | '!'
@@ -357,6 +363,10 @@ rule main = parse
 
   (* operators *)
   | nop as x { [NOP x] }
+
+  | '`' (opchar+ as op) '`' {
+      [lex_tick_operator op]
+    }
 
   | opchar as op {
       let op = operator (Buffer.from_char op) lexbuf in
