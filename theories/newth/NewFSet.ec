@@ -28,17 +28,16 @@ qed.
 axiom fset_eq (s1 s2 : 'a fset):
   (perm_eq (elems s1) (elems s2)) => (s1 = s2).
 
+(* -------------------------------------------------------------------- *)
 lemma oflist_perm_eq (s1 s2 : 'a list):
-  perm_eq s1 s2 =>
-  oflist s1 = oflist s2.
+  perm_eq s1 s2 => oflist s1 = oflist s2.
 proof.
-  move=> h; apply/fset_eq.
-  apply/(perm_eq_trans (undup s1)).
-  + by apply/perm_eq_sym/oflistK.
-  apply/(perm_eq_trans (undup s2)); first last.
-  + by apply/oflistK.
-  apply/uniq_perm_eq; 1..2:apply/undup_uniq.
-  by move=> x; rewrite !mem_undup; apply/perm_eq_mem.
+  (* FIXME: named cuts for h1/h2 should not be necessary *)
+  move=> peq_s1s2; apply/fset_eq; apply/uniq_perm_eq.
+    by apply/uniq_elems. by apply/uniq_elems.
+  move=> x; have h1 := oflistK s1; have h2 := oflistK s2.
+  rewrite -(perm_eq_mem _ _ h1) -(perm_eq_mem _ _ h2).
+  by rewrite !mem_undup; apply/perm_eq_mem.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -140,8 +139,7 @@ lemma nosmt fset_ind (p : 'a fset -> bool):
   (forall s, p s).
 proof.
   move=> p0 pa s; rewrite -elemsK.
-  elim (elems s) (uniq_elems s)=> {s}.
-    by rewrite -set0E.
+  elim (elems s) (uniq_elems s)=> {s}; 1: by rewrite -set0E.
   move=> x s ih /cons_uniq [] x_notin_s uniq_s.
   have /(pa x) := ih _=> //; rewrite setUE.
   rewrite elems_fset1 (oflist_perm_eq (elems (oflist s) ++ [x]) (x::s)) //.
