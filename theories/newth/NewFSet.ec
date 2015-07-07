@@ -67,13 +67,13 @@ qed.
 op set0 ['a] = oflist [<:'a>] axiomatized by set0E.
 op set1 ['a] (z : 'a) = oflist [z] axiomatized by set1E.
 
-op setU ['a] (s1 s2 : 'a fset) = oflist (elems s1 ++ elems s2)
+op (`|`) ['a] (s1 s2 : 'a fset) = oflist (elems s1 ++ elems s2)
   axiomatized by setUE.
 
-op setI ['a] (s1 s2 : 'a fset) = oflist (filter (mem s2) (elems s1))
+op (`&`) ['a] (s1 s2 : 'a fset) = oflist (filter (mem s2) (elems s1))
   axiomatized by setIE.
 
-op setD ['a] (s1 s2 : 'a fset) = oflist (filter (predC (mem s2)) (elems s1))
+op (`\`) ['a] (s1 s2 : 'a fset) = oflist (filter (predC (mem s2)) (elems s1))
   axiomatized by setDE.
 
 (* -------------------------------------------------------------------- *)
@@ -90,15 +90,15 @@ proof.
 qed.
 
 lemma in_setU (s1 s2 : 'a fset):
-  forall x, mem (setU s1 s2) x <=> mem s1 x \/ mem s2 x.
+  forall x, mem (s1 `|` s2) x <=> mem s1 x \/ mem s2 x.
 proof. by move=> x; rewrite setUE mem_oflist mem_cat !memE. qed.
 
 lemma in_setI (s1 s2 : 'a fset):
-  forall x, mem (setI s1 s2) x <=> mem s1 x /\ mem s2 x.
+  forall x, mem (s1 `&` s2) x <=> mem s1 x /\ mem s2 x.
 proof. by move=> x; rewrite setIE mem_oflist mem_filter !memE. qed.
 
 lemma in_setD (s1 s2 : 'a fset):
-  forall x, mem (setD s1 s2) x <=> mem s1 x /\ !mem s2 x.
+  forall x, mem (s1 `\` s2) x <=> mem s1 x /\ !mem s2 x.
 proof. by move=> x; rewrite setDE mem_oflist mem_filter /predC !memE. qed.
 
 (* -------------------------------------------------------------------- *)
@@ -136,7 +136,7 @@ proof. by rewrite cardE size_ge0. qed.
 (* -------------------------------------------------------------------- *)
 lemma nosmt fset_ind (p : 'a fset -> bool):
   p set0 =>
-  (forall x s, p s => p (setU s (set1 x))) =>
+  (forall x s, p s => p (s `|` (set1 x))) =>
   (forall s, p s).
 proof.
   move=> p0 pa s; rewrite -elemsK.

@@ -561,7 +561,7 @@ proof.
 qed.
 
 lemma domP (m : ('a, 'b) fmap) (a : 'a) (b : 'b):
-  forall x, mem (dom m.[a <- b]) x <=> mem (setU (dom m) (set1 a)) x.
+  forall x, mem (dom m.[a <- b]) x <=> mem (dom m `|` set1 a) x.
 proof.
   move=> x; rewrite in_setU in_set1 !in_dom getP;
     by case (x = a).
@@ -572,7 +572,7 @@ lemma domP_eq (m : ('a, 'b) fmap) (a : 'a) (b : 'b):
 proof. by rewrite domP in_setU in_set1. qed.
 
 lemma dom_rem (a : 'a) (m : ('a, 'b) fmap):
-  forall x, mem (dom (rem a m)) x <=> mem (setD (dom m) (set1 a)) x.
+  forall x, mem (dom (rem a m)) x <=> mem (dom m `\` set1 a) x.
 proof.
   by move=> x; rewrite in_setD in_set1 !in_dom remP; case (x = a).
 qed.
@@ -591,7 +591,7 @@ qed.
 
 lemma rng_set (m : ('a, 'b) fmap) (a : 'a) (b : 'b): forall y,
       mem (rng m.[a<-b]) y
-  <=> mem (setU (rng (rem a m)) (set1 b)) y.
+  <=> mem (rng (rem a m) `|` set1 b) y.
 proof.
   move=> y; rewrite in_setU in_set1 !in_rng; split=> [[] x |].
     rewrite getP; case (x = a)=> [->> /= <<- |ne_xa mx_y]; [right=> // |left].
@@ -617,7 +617,7 @@ proof.
 qed.
 
 lemma dom_join (m1 m2 : ('a, 'b) fmap):
-  forall x, mem (dom (m1 + m2)) x <=> mem (setU (dom m1) (dom m2)) x.
+  forall x, mem (dom (m1 + m2)) x <=> mem (dom m1 `|` dom m2) x.
 proof.
   by move=> x; rewrite in_setU !in_dom joinP in_dom; case (m2.[x]).
 qed.
