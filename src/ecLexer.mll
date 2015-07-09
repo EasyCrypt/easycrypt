@@ -323,7 +323,14 @@ rule main = parse
 
   | "(*" binop "*)" { main lexbuf }
   | '(' blank* (binop as s) blank* ')' { [PBINOP s] }
-  | '[' blank* (uniop as s) blank* ']' { [PUNIOP (Printf.sprintf "[%s]" s)] }
+
+  | '[' blank* (uniop as s) blank* ']' {
+      let name = Printf.sprintf "[%s]" s in
+      try
+        let (tk, ok) = Hashtbl.find operators s in
+          if ok then [LBRACKET; tk; RBRACKET] else [PUNIOP name]
+      with Not_found -> [PUNIOP name]
+  }
 
   | "(*" { comment lexbuf; main lexbuf }
   | "\"" { [STRING (Buffer.contents (string (Buffer.create 0) lexbuf))] }
