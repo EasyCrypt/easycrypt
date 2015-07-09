@@ -218,7 +218,10 @@ lemma nosmt set_append_right (xs0 xs1:'x array) (i:int) v:
  (xs0 || xs1).[i <- v] = (xs0 || xs1.[i - length xs0 <- v])
 by smt.
 
-axiom make_append (a:'a) (l1 l2:int) : make (l1 + l2) a = (make l1 a || make l2 a).
+lemma make_append (a:'a) (l1 l2:int):
+  0 <= l1 => 0 <= l2 => make (l1 + l2) a = (make l1 a || make l2 a).
+proof. move=> le0_l1 le0_l2; apply/array_ext; smt. qed.
+
 (* sub *)
 op sub: 'x array -> int -> int -> 'x array.
 
