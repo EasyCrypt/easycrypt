@@ -26,13 +26,13 @@ theory RField.
     op   invr  <- Real.inv
     proof * by smt.
   
-  lemma ofintR (i : int): ofint i = i%r.
+  lemma nosmt ofintR (i : int): ofint i = i%r.
   proof.
     have h: forall i, 0 <= i => ofint i = i%r; 2: smt.
     move=> {i}; elim/Induction.natind; smt.
   qed.
 
-  lemma double_half (x : real) : x / 2%r + x / 2%r = x.
+  lemma nosmt double_half (x : real) : x / 2%r + x / 2%r = x.
   proof.
     rewrite -ofintR divrE -mulrDl -mulr2z -mulrA -divrE.
     by rewrite divff // ofintR.
