@@ -274,6 +274,10 @@ lemma nosmt fun_if2: forall (f:'a -> 'b -> 'c) b x1 x2 x,
   f (if b then x1 else x2) x = (if b then f x1 x else f x2 x)
 by [].
 
+lemma nosmt if_same b (x : 'a):
+  (if b then x else x) = x
+by [].
+
 lemma nosmt imp   : forall (x y : bool), (x => y) <=> ((!x)\/y) by [].
 
 lemma nosmt imp_trans (a b c : bool):
