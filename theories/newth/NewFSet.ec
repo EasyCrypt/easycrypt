@@ -4,7 +4,8 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Pred Int NewLogic NewList.
+require import Pred Int NewLogic NewList StdRing StdOrder.
+(*---*) import IntOrder.
 
 (* -------------------------------------------------------------------- *)
 (* Finite sets are abstractely represented as the quotient by [perm_eq] *)
@@ -117,13 +118,13 @@ proof. by move=> x; rewrite filterE mem_oflist mem_filter memE. qed.
 pred (<=) (s1 s2 : 'a fset) = mem s1 <= mem s2.
 pred (< ) (s1 s2 : 'a fset) = mem s1 <  mem s2.
 
-lemma nosmt subsetE (s1 s2 : 'a fset):
+lemma nosmt subsetP (s1 s2 : 'a fset):
   (s1 <= s2) <=> (mem s1 <= mem s2).
 proof. by []. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt eqEsubset (A B : 'a fset) : (A = B) <=> (A <= B) /\ (B <= A).
-proof. by rewrite fsetP !subsetE; rewrite subpred_eqP. qed.
+proof. by rewrite fsetP !subsetP; rewrite subpred_eqP. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt fset_ind (p : 'a fset -> bool):
@@ -274,10 +275,17 @@ lemma fsetDKv (A B : 'a fset) : (A `&` B) `\` B = fset0.
 proof. by rewrite fsetDIl fsetDv fsetI0. qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt fcards0: card fset0<:'a> = 0.
+lemma subsetIl (A B : 'a fset) : (A `&` B) <= A.
+proof. by apply/subsetP=> x; rewrite inE; case. qed.
+
+lemma subsetIr (A B : 'a fset) : (A `&` B) <= B.
+proof. by apply/subsetP=> x; rewrite inE; case. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma fcards0: card fset0<:'a> = 0.
 proof. by rewrite cardE set0E -(perm_eq_size (undup [])) 1:oflistK. qed.
 
-lemma nosmt fcard_ge0 (A : 'a fset) : Int.(<=) 0 (card A).
+lemma fcard_ge0 (A : 'a fset) : 0 <= card A.
 proof. by rewrite cardE size_ge0. qed.
 
 (* -------------------------------------------------------------------- *)
@@ -317,3 +325,13 @@ proof. by rewrite -fcardUI_indep ?fsetID // fsetII. qed.
 lemma nosmt fcardD (A B : 'a fset) :
   card (A `\` B) = card A - card (A `&` B).
 proof. by rewrite -(fcardID A B) smt. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma subset_leq_fcard (A B : 'a fset) :
+  A <= B => card A <= card B.
+proof.
+  move=> /subsetP le_AB; rewrite -(fcardID B A).
+  have ->: B `&` A = A; 1: apply/fsetP=> x.
+    by rewrite in_fsetI andb_idl //; apply/le_AB.
+  by apply/ler_addl; apply/fcard_ge0.
+qed.
