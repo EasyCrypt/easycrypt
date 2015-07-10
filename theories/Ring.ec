@@ -115,8 +115,12 @@ abstract theory ZModule.
   lemma intmulS (x : t) (n : int): 0 <= n =>
     intmul x (n+1) = x + intmul x n.
   proof.
-    by elim: n=> /= [|i ge0_i ih]; 2: smt; rewrite intmul0 intmul1 addr0.
+    elim: n=> /= [|i ge0_i ih]; 2: smt.
+    by rewrite intmul0 intmul1 addr0.
   qed.
+
+  lemma intmul2 (x : t): intmul x 2 = x + x.
+  proof. by rewrite /intmul /= @(iteropS 1) // @(iterS 0) // iter0. qed.
 end ZModule.
 
 (* -------------------------------------------------------------------- *)
@@ -256,6 +260,15 @@ abstract theory ComRing.
 
   lemma ofintN (i : int): ofint (-i) = - (ofint i).
   proof. by apply/intmulN. qed.
+
+  lemma mulr0z x: x * ofint 0 = zeror.
+  proof. by rewrite ofint0 mulr0. qed.
+
+  lemma mulr1z x : x * ofint 1 = x.
+  proof. by rewrite ofint1 mulr1. qed.
+
+  lemma mulr2z x : x * ofint 2 = x + x.
+  proof. by rewrite /ofint intmul2 mulrDr mulr1. qed.
 
   op exp (x : t) (n : int) =
     if   n < 0

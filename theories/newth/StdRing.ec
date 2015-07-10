@@ -13,17 +13,25 @@ lemma invr0: inv 0%r = 0%r.
 proof. by rewrite -{2}(divr0 1%r) inv_def. qed.
 
 (* -------------------------------------------------------------------- *)
-clone Ring.Field as RField with
-  type t <- real,
-  op   zeror <- 0%r,
-  op   oner  <- 1%r,
-  op   ( + ) <- Real.( + ),
-  op   [ - ] <- Real.([-]),
-  op   ( - ) <- Real.( - ),
-  op   ( * ) <- Real.( * ),
-  op   ( / ) <- Real.( / ),
-  op   invr  <- Real.inv
-  proof * by smt.
+theory RField.
+  clone include Ring.Field with
+    type t <- real,
+    op   zeror <- 0%r,
+    op   oner  <- 1%r,
+    op   ( + ) <- Real.( + ),
+    op   [ - ] <- Real.([-]),
+    op   ( - ) <- Real.( - ),
+    op   ( * ) <- Real.( * ),
+    op   ( / ) <- Real.( / ),
+    op   invr  <- Real.inv
+    proof * by smt.
+  
+  lemma ofintR (i : int): ofint i = i%r.
+  proof.
+    have h: forall i, 0 <= i => ofint i = i%r; 2: smt.
+    move=> {i}; elim/Induction.natind; smt.
+  qed.
+end RField.
 
 (* -------------------------------------------------------------------- *)
 instance ring with int
