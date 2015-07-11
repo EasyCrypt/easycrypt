@@ -2737,7 +2737,14 @@ clone_override:
    { (x, PTHO_Theory y) }
 
 realize:
-| REALIZE x=qident { x }
+| REALIZE x=qident
+    {  { pr_name = x; pr_proof = None; } }
+
+| REALIZE x=qident BY t=tactics
+    {  { pr_name = x; pr_proof = Some (Some t); } }
+
+| REALIZE x=qident BY bracket(empty)
+    {  { pr_name = x; pr_proof = Some None; } }
 
 (* -------------------------------------------------------------------- *)
 (* Printing                                                             *)
@@ -2826,7 +2833,7 @@ global_action:
 | choice           { Gchoice      $1 }
 | axiom            { Gaxiom       $1 }
 | tactics_or_prf   { Gtactics     $1 }
-| realize          { Grealize     $1 }
+| x=loc(realize)   { Grealize     x  }
 | gprover_info     { Gprover_info $1 }
 | addrw            { Gaddrw       $1 }
 

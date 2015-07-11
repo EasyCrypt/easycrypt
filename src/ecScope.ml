@@ -771,32 +771,16 @@ module Ax = struct
     | PILemma ->
         let scope = start_lemma scope pucflags check (unloc ax.pa_name) axd in
         let scope = Tactics.process_core false `Check scope [tintro] in
-          None, scope
+        None, scope
 
     | PLemma tc ->
-        let scope = start_lemma scope pucflags check (unloc ax.pa_name) axd in
-        let scope = Tactics.process_core false `Check scope [tintro] in
-        let scope = Tactics.proof scope mode (if tc = None then true else false) in
-
-        let tc =
-          match tc with
-          | Some tc -> tc
-          | None    ->
-              let dtc = Plogic (Psmt empty_pprover) in
-              let dtc = { pl_loc = loc; pl_desc = dtc } in
-              let dtc = { pt_core = dtc; pt_intros = []; } in
-              [dtc]
-        in
-
-        let tc = { pl_loc = loc; pl_desc = Pby (Some tc) } in
-        let tc = { pt_core = tc; pt_intros = []; } in
-
-        let scope = Tactics.process_r false mode scope [tc] in
-          save scope loc
+        start_lemma_with_proof scope
+          (Some tintro) pucflags (mode, mk_loc loc tc) check
+          (unloc ax.pa_name) axd
 
     | PAxiom _ ->
-          Some (unloc ax.pa_name),
-          bind scope (snd pucflags).puc_local (unloc ax.pa_name, axd)
+        Some (unloc ax.pa_name),
+        bind scope (snd pucflags).puc_local (unloc ax.pa_name, axd)
 
   (* ------------------------------------------------------------------ *)
   and add_for_cloning (scope : scope) proofs =
@@ -842,14 +826,42 @@ module Ax = struct
       (Some pac.puc_name, scope)
 
   (* ------------------------------------------------------------------ *)
+  and start_lemma_with_proof scope tintro pucflags (mode, tc) check name axd =
+    let { pl_loc = loc; pl_desc = tc } = tc in
+
+    let scope = start_lemma scope pucflags check name axd in
+    let scope =
+      match tintro with
+      | None -> scope
+      | Some tintro -> Tactics.process_core false `Check scope [tintro] in
+    let scope = Tactics.proof scope mode (if tc = None then true else false) in
+
+    let tc =
+      match tc with
+      | Some tc -> tc
+      | None    ->
+          let dtc = Plogic (Psmt empty_pprover) in
+          let dtc = { pl_loc = loc; pl_desc = dtc } in
+          let dtc = { pt_core = dtc; pt_intros = []; } in
+          [dtc]
+    in
+
+    let tc = { pl_loc = loc; pl_desc = Pby (Some tc) } in
+    let tc = { pt_core = tc; pt_intros = []; } in
+
+    let scope = Tactics.process_r false mode scope [tc] in
+    save scope loc
+
+  (* ------------------------------------------------------------------ *)
   let add (scope : scope) (mode : mode) (ax : paxiom located) =
     add_r scope mode ax
 
   (* ------------------------------------------------------------------ *)
-  let activate (scope : scope) (qn : pqsymbol) =
+  let realize (scope : scope) (mode : mode) (rl : prealize located) =
     check_state `InProof "activate" scope;
 
-    let qn = EcPath.fromqsymbol (unloc qn) in
+    let loc = rl.pl_loc and rl = rl.pl_desc in
+    let qn  = EcPath.fromqsymbol (unloc rl.pr_name) in
 
     let puc = oget scope.sc_pr_uc in
     let _ =
@@ -858,7 +870,7 @@ module Ax = struct
       | None -> ()
     in
 
-    let (((x, ax), _, axenv), proofs) =
+    let (((axname, ax), _, axenv), proofs) =
       let rec doit past proofs =
         match proofs with
         | [] -> hierror "no such lemma: `%s'" (EcPath.tostring qn)
@@ -874,9 +886,15 @@ module Ax = struct
     let check    = Check_mode.check scope.sc_options in
 
     let scope = { scope with sc_env = axenv } in
-    let scope = start_lemma scope pucflags check x ax in
 
-      scope
+    match rl.pr_proof with
+    | None ->
+        None, start_lemma scope pucflags check axname ax 
+
+    | Some tc ->
+        start_lemma_with_proof scope
+          None pucflags (mode, mk_loc loc tc) check
+          axname ax
 end
 
 (* -------------------------------------------------------------------- *)

@@ -433,8 +433,12 @@ and process_save (scope : EcScope.scope) loc =
     scope
 
 (* -------------------------------------------------------------------- *)
-and process_realize (scope : EcScope.scope) name =
-  EcScope.Ax.activate scope name
+and process_realize (scope : EcScope.scope) pr =
+  let mode = !pragma.pm_check in
+  let (name, scope) = EcScope.Ax.realize scope mode pr in
+    name |> EcUtils.oiter
+      (fun x -> EcScope.notify scope `Info "added lemma: `%s'" x);
+    scope
 
 (* -------------------------------------------------------------------- *)
 and process_proverinfo scope pi =

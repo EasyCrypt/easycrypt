@@ -718,6 +718,12 @@ type paxiom = {
 }
 
 (* -------------------------------------------------------------------- *)
+type prealize = {
+  pr_name  : pqsymbol;
+  pr_proof : (ptactics option) option;
+}
+
+(* -------------------------------------------------------------------- *)
 type ptypeclass = {
   ptc_name : psymbol;
   ptc_inth : pqsymbol option;
@@ -864,7 +870,7 @@ type global_action =
   | GthClone     of theory_cloning
   | GsctOpen     of psymbol option
   | GsctClose    of psymbol option
-  | Grealize     of pqsymbol
+  | Grealize     of prealize located
   | Gtactics     of [`Proof of proofmode | `Actual of ptactic list]
   | Gprover_info of pprover_infos
   | Gsave        of EcLocation.t

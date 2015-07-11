@@ -85,10 +85,9 @@ end
 module Ax : sig
   type mode = [`WeakCheck | `Check | `Report]
 
-  val add  : scope -> mode -> paxiom located -> string option * scope
-  val save : scope -> EcLocation.t -> string option * scope
-
-  val activate : scope -> EcParsetree.pqsymbol -> scope
+  val add     : scope -> mode -> paxiom located -> symbol option * scope
+  val save    : scope -> EcLocation.t -> string option * scope
+  val realize : scope -> mode -> prealize located -> symbol option * scope
 end
 
 (* -------------------------------------------------------------------- *)
