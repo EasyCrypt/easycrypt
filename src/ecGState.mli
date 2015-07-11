@@ -26,6 +26,7 @@ type nid_t
 type loglevel = [`Debug | `Info | `Warning | `Critical]
 
 val string_of_loglevel : loglevel -> string
+val max_loglevel : loglevel -> loglevel -> loglevel
 
 val accept_log   : level:loglevel -> wanted:loglevel -> bool
 val add_notifier : (loglevel -> string Lazy.t -> unit) -> gstate -> nid_t

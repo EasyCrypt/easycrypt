@@ -81,6 +81,12 @@ let string_of_loglevel = function
   | `Critical -> "critical"
 
 (* -------------------------------------------------------------------- *)
+let max_loglevel x1 x2 =
+  let i1 = int_of_loglevel x1 in
+  let i2 = int_of_loglevel x2 in
+  if i1 < i2 then x2 else x1
+
+(* -------------------------------------------------------------------- *)
 let notify (lvl : loglevel) (msg : string Lazy.t) (gs : gstate) =
   let do1 (notifier : notifier) =
     try  notifier.nt_cb lvl msg

@@ -381,10 +381,16 @@ end
 
 (* -------------------------------------------------------------------- *)
 let for_loading (scope : scope) =
-  let pr = snd (scope.sc_prelude) in
+  let pr  = snd (scope.sc_prelude) in
+  let env = EcEnv.copy pr.pr_env in
+  let lg  = EcGState.loglevel (EcEnv.gstate env) in
+
+  EcGState.set_loglevel
+    (EcGState.max_loglevel `Warning lg)
+    (EcEnv.gstate env);
 
   { sc_name       = (EcPath.basename (EcEnv.root pr.pr_env), `Concrete);
-    sc_env        = pr.pr_env;
+    sc_env        = env;
     sc_top        = None;
     sc_prelude    = scope.sc_prelude;
     sc_loaded     = scope.sc_loaded;
