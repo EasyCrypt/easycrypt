@@ -419,6 +419,12 @@ let rec h_red ri env hyps f =
                   then f_false
                   else f_ands (List.map2 f_eq args1 args2)
 
+            | (_, []), (_, [])
+                when EqTest.for_type env f1.f_ty EcTypes.tunit
+                  && EqTest.for_type env f2.f_ty EcTypes.tunit ->
+
+                f_true
+
             | _ -> f_eq_simpl f1 f2
         end
 
