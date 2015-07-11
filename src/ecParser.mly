@@ -1585,7 +1585,7 @@ nosmt:
 axiom_tc:
 | /* empty */       { PILemma }
 | BY bracket(empty) { PLemma None }
-| BY t=tactic       { PLemma (Some t) }
+| BY t=tactics      { PLemma (Some t) }
 
 axiom:
 | l=local AXIOM o=nosmt d=lemma_decl

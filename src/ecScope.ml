@@ -785,10 +785,10 @@ module Ax = struct
               let dtc = Plogic (Psmt empty_pprover) in
               let dtc = { pl_loc = loc; pl_desc = dtc } in
               let dtc = { pt_core = dtc; pt_intros = []; } in
-                dtc
+              [dtc]
         in
 
-        let tc = { pl_loc = loc; pl_desc = Pby (Some [tc]) } in
+        let tc = { pl_loc = loc; pl_desc = Pby (Some tc) } in
         let tc = { pt_core = tc; pt_intros = []; } in
 
         let scope = Tactics.process_r false mode scope [tc] in
