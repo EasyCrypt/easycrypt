@@ -138,10 +138,16 @@ let ttuple lt    =
 let toarrow dom ty = 
   List.fold_right tfun dom ty
 
-let flatten_ty (ty : ty) =
-  match ty with
-  | { ty_node = Ttuple tys } -> tys
-  | _ -> [ty]
+(* -------------------------------------------------------------------- *)
+let tytuple_flat (ty : ty) =
+  match ty.ty_node with Ttuple tys -> tys | _ -> [ty]
+
+let rec tyfun_flat (ty : ty) =
+  match ty.ty_node with
+  | Tfun (t1, t2) ->
+      let dom, codom = tyfun_flat t2 in (t1 :: dom, codom)
+  | _ ->
+      ([], ty)
 
 (* -------------------------------------------------------------------- *)
 module TySmart = struct

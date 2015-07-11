@@ -1644,8 +1644,16 @@ let pp_opdecl_pr (ppe : PPEnv.t) fmt (x, ts, ty, op) =
 
   let pp_body fmt =
     match op with
-    | None ->
-        Format.fprintf fmt " : %a" (pp_type ppe) ty
+    | None -> begin
+        match fst (tyfun_flat ty) with
+        | [] ->
+           Format.fprintf fmt ""
+        | [ty] ->
+           Format.fprintf fmt " : %a" (pp_type ppe) ty
+        | dom ->
+            Format.fprintf fmt " : (%a)"
+              (pp_list ",@ " (pp_type ppe)) dom
+    end
 
     | Some f ->
         let ((subppe, pp_vds), f) =
