@@ -15,6 +15,7 @@ open EcFol
 module P  = EcPath
 module EP = EcParser
 module BI = EcBigInt
+module EI = EcInductive
 
 module Ssym = EcSymbols.Ssym
 module Msym = EcSymbols.Msym
@@ -1697,21 +1698,50 @@ let pp_opdecl_op (ppe : PPEnv.t) fmt (x, ts, ty, op) =
 
     | Some (OP_Constr (indp, i)) ->
         Format.fprintf fmt
-          " =@ %d-th constructor of %a" (i+1) (pp_tyname ppe) indp
+          "=@ %d-th constructor of %a" (i+1) (pp_tyname ppe) indp
 
     | Some (OP_Record recp) ->
         Format.fprintf fmt
-          " =@ record constructor of %a" (pp_tyname ppe) recp
+          "=@ record constructor of %a" (pp_tyname ppe) recp
 
     | Some (OP_Proj (rp, i, _)) ->
         Format.fprintf fmt
-          " =@ %d-th projection of %a" (i+1) (pp_tyname ppe) rp
+          "=@ %d-th projection of %a" (i+1) (pp_tyname ppe) rp
 
-    | Some (OP_Fix _) ->
-        Format.fprintf fmt " = <match-fix>"
+    | Some (OP_Fix fix) ->
+        let (subppe, pp_vds) = pp_locbinds ppe fix.opf_args in
+
+        let pp_branch fmt br =
+          Format.fprintf fmt "with ";
+          let brppe =
+            List.fold_left (fun brppe br1 ->
+              let ctor  = br1.EI.br1_case.EI.cs1_ctor in
+              let vars  = List.map fst br1.EI.br1_case.EI.cs1_vars in
+              let brppe = List.fold_left PPEnv.add_local brppe vars in
+
+              (match vars with
+              | [] ->
+                  Format.fprintf fmt "%a = %a"
+                    (pp_local subppe) br1.EI.br1_target
+                    pp_opname (PPEnv.op_symb ppe ctor None)
+
+              | _ ->
+                  Format.fprintf fmt "%a = %a %a"
+                    (pp_local subppe) br1.EI.br1_target
+                    pp_opname (PPEnv.op_symb ppe ctor None)
+                    (pp_list " " (pp_local ppe)) vars);
+              brppe)
+              subppe br.EI.br_branches
+          in
+          Format.fprintf fmt " => @[%a@]" (pp_expr brppe) br.EI.br_body in
+
+        let cfix = EcInductive.collate_matchfix fix in
+
+        Format.fprintf fmt "%t = @\n%a" pp_vds
+          (pp_list "@\n" pp_branch) cfix
 
     | Some (OP_TC) ->
-        Format.fprintf fmt " = <type-class-operator>"
+        Format.fprintf fmt "= <type-class-operator>"
   in
 
   match ts with

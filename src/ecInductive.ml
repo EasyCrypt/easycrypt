@@ -155,3 +155,48 @@ let indsc_of_datatype ?normty (mode : indmode) (dt : datatype) =
     | _ -> EcTypes.ty_sub_exists (occurs p) t
 
   in scheme mode (List.map fst dt.dt_tparams, tpath) dt.dt_ctors
+
+(* -------------------------------------------------------------------- *)
+type case1 = {
+  cs1_ctor : EcPath.path;
+  cs1_vars : (EcIdent.t * EcTypes.ty) list;
+}
+
+type branch1 = {
+  br1_target : EcIdent.t;
+  br1_case   : case1;
+}
+
+type branch = {
+  br_branches : branch1 list;
+  br_body     : expr;
+}
+
+type opfix = branch list
+
+(* -------------------------------------------------------------------- *)
+let collate_matchfix (fix : EcDecl.opfix) : opfix =
+  let names = List.map
+    (fun i -> fst (List.nth fix.opf_args i))
+    (fst fix.opf_struct) in
+
+  let rec collate ctors branches =
+    match branches with
+    | OPB_Leaf (vars, body) ->
+        let branches =
+          List.map2
+            (fun br1_case br1_target -> { br1_target; br1_case; })
+            (List.map2
+               (fun cs1_ctor cs1_vars -> { cs1_ctor; cs1_vars; })
+               ctors vars)
+            names
+        in [{ br_branches = branches; br_body = body }]
+
+    | OPB_Branch br ->
+        let aout =
+          List.map
+            (fun br1 -> collate (fst br1.opb_ctor :: ctors) br1.opb_sub)
+            (Parray.to_list br)
+        in List.flatten aout
+
+  in collate [] fix.opf_branches

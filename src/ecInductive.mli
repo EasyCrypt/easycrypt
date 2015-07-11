@@ -48,3 +48,24 @@ val datatype_ind_path : [`Elim|`Case] -> path   -> path
 exception NonPositive
 
 val indsc_of_datatype : ?normty:(ty -> ty) -> [`Elim|`Case] -> datatype -> form
+
+(* -------------------------------------------------------------------- *)
+type case1 = {
+  cs1_ctor : EcPath.path;
+  cs1_vars : (EcIdent.t * EcTypes.ty) list;
+}
+
+type branch1 = {
+  br1_target : EcIdent.t;
+  br1_case   : case1;
+}
+
+type branch = {
+  br_branches : branch1 list;
+  br_body     : expr;
+}
+
+type opfix = branch list
+
+(* -------------------------------------------------------------------- *)
+val collate_matchfix  : EcDecl.opfix -> opfix
