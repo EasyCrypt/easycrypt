@@ -1356,6 +1356,31 @@ let relevant_clause ri other =
   in aux ri.ri_p other
 
 (* -------------------------------------------------------------------- *)
+let create_global_task () =
+  let task  = (None : WTask.task) in
+  let task  = WTask.use_export task WTheory.builtin_theory in
+  let task  = WTask.use_export task (WTheory.tuple_theory 0) in
+  let task  = WTask.use_export task WTheory.bool_theory in
+  let task  = WTask.use_export task WTheory.highord_theory in
+  let task  = WTask.use_export task distr_theory in
+  task
+
+(* -------------------------------------------------------------------- *)
+let dump_why3 (env : EcEnv.env) (filename : string) =
+  let known = Lazy.force core_theories in
+  let tenv  = empty_tenv env (create_global_task ()) known in
+  let ()    = add_core_bindings tenv in
+
+  List.iter (trans_axiom tenv) (EcEnv.Ax.all env);
+
+  let stream = open_out filename in
+    EcUtils.try_finally
+      (fun () -> Format.fprintf
+        (Format.formatter_of_out_channel stream)
+        "%a@." Why3.Pretty.print_task tenv.te_task)
+      (fun () -> close_out stream)
+
+(* -------------------------------------------------------------------- *)
 let cnt = Counter.create ()
 
 let check ?notify pi (hyps : LDecl.hyps) (concl : form) =
@@ -1369,12 +1394,7 @@ let check ?notify pi (hyps : LDecl.hyps) (concl : form) =
 
   let env   = LDecl.toenv hyps in
   let hyps  = LDecl.tohyps hyps in
-  let task  = (None : WTask.task) in
-  let task  = WTask.use_export task WTheory.builtin_theory in
-  let task  = WTask.use_export task (WTheory.tuple_theory 0) in
-  let task  = WTask.use_export task WTheory.bool_theory in
-  let task  = WTask.use_export task WTheory.highord_theory in
-  let task  = WTask.use_export task distr_theory in
+  let task  = create_global_task () in
   let known = Lazy.force core_theories in
   let tenv  = empty_tenv env task known in
   let ()    = add_core_bindings tenv in

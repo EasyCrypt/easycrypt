@@ -65,6 +65,9 @@ type topmode = [`InProof | `InActiveProof | `InTop]
 val check_state : topmode -> string -> scope -> unit
 
 (* -------------------------------------------------------------------- *)
+val dump_why3 : scope -> string -> unit
+
+(* -------------------------------------------------------------------- *)
 module Options : sig
   val set_implicits : scope -> bool -> scope
   val get_implicits : scope -> bool

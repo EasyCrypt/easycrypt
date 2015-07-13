@@ -351,6 +351,17 @@ let xgoal (scope : scope) =
   scope.sc_pr_uc
 
 (* -------------------------------------------------------------------- *)
+let dump_why3 (scope : scope) (filename : string) =
+  try  EcSmt.dump_why3 scope.sc_env filename
+  with
+  | Sys_error msg ->
+      hierror "cannot dump to `%s`: system error: %s"
+        filename msg
+  | Unix.Unix_error (e, _, _) ->
+      hierror "cannot dump to `%s`: system error: %s"
+        filename (Unix.error_message e)
+
+(* -------------------------------------------------------------------- *)
 type topmode = [`InProof | `InActiveProof | `InTop]
 
 let check_state (mode : topmode) action (scope : scope) =

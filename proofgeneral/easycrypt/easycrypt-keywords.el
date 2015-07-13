@@ -1,4 +1,4 @@
-; Generated on Mon Jun 29 10:53:16 2015
+; Generated on Mon Jul 13 12:27:30 2015
 
 (defvar easycrypt-bytac-keywords '(
   "exact"
@@ -51,6 +51,7 @@
   "with"
   "prover"
   "timeout"
+  "why3"
   "Top"
   "Self"
 ))

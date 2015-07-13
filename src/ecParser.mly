@@ -499,6 +499,7 @@
 %token UNROLL
 %token VAR
 %token WHILE
+%token WHY3
 %token WITH
 %token WP
 %token ZETA
@@ -2840,6 +2841,7 @@ global_action:
 | x=loc(QED)       { Gsave x.pl_loc }
 | PRINT p=print    { Gprint     p   }
 | SEARCH x=search+ { Gsearch    x   }
+| WHY3 x=STRING    { GdumpWhy3  x   }
 
 | PRAGMA       x=pragma { Gpragma x }
 | PRAGMA ADD   x=pragma { Goption (x, true ) }

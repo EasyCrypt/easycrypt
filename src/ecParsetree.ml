@@ -876,6 +876,7 @@ type global_action =
   | Gsave        of EcLocation.t
   | Gpragma      of psymbol
   | Goption      of (psymbol * bool)
+  | GdumpWhy3    of string
 
 type global = {
   gl_action : global_action located;
