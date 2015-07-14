@@ -2302,7 +2302,7 @@ let pp_funsig ppe fmt (oi_in, fs) =
 
 let pp_orclinfo ppe fmt oi =
   Format.fprintf fmt "{%a}"
-    (pp_list ",@ " (pp_funname ppe)) oi.oi_calls
+    (pp_list "@ " (pp_funname ppe)) oi.oi_calls
 
 let pp_sigitem ppe fmt (Tys_function(fs,oi)) =
   Format.fprintf fmt "@[<hov 2>%a@ %a@]"
