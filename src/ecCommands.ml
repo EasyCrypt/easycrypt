@@ -64,6 +64,76 @@ let apply_pragma (x : string) =
   | _ -> raise (InvalidPragma x)
 
 (* -------------------------------------------------------------------- *)
+module Loader : sig
+  type loader
+
+  type kind  = EcLoader.kind
+  type idx_t = EcLoader.idx_t
+
+  val create  : unit   -> loader
+  val forsys  : loader -> loader
+  val dup     : loader -> loader
+
+  val addidir : ?system:bool -> ?recursive:bool -> string -> loader -> unit
+  val aslist  : loader -> ((bool * string) * idx_t) list
+  val locate  : ?onlysys:bool -> string -> loader -> (string * kind) option
+
+  val push      : string -> loader -> unit
+  val pop       : loader -> string option
+  val context   : loader -> string list
+  val incontext : string -> loader -> bool
+end = struct
+  type loader = {
+    (*---*) ld_core  : EcLoader.ecloader;
+    mutable ld_stack : string list;
+  }
+
+  type kind  = EcLoader.kind
+  type idx_t = EcLoader.idx_t
+
+  module Path = BatPathGen.OfString
+
+  let norm p =
+    try  Path.s (Path.normalize_in_tree (Path.p p))
+    with Path.Malformed_path -> p
+
+  let create () =
+    { ld_core  = EcLoader.create ();
+      ld_stack = []; }
+
+  let forsys (ld : loader) =
+    { ld_core  = EcLoader.forsys ld.ld_core;
+      ld_stack = ld.ld_stack; }
+
+  let dup (ld : loader) =
+    { ld_core  = EcLoader.dup ld.ld_core;
+      ld_stack = ld.ld_stack; }
+
+  let addidir ?system ?recursive (path : string) (ld : loader) =
+    EcLoader.addidir ?system ?recursive path ld.ld_core
+
+  let aslist (ld : loader) =
+    EcLoader.aslist ld.ld_core
+
+  let locate ?onlysys (path : string) (ld : loader) =
+    EcLoader.locate ?onlysys path ld.ld_core
+
+  let push (p : string) (ld : loader) =
+    ld.ld_stack <- norm p :: ld.ld_stack
+
+  let pop (ld : loader) =
+    match ld.ld_stack with
+    | [] -> None
+    | p :: tl -> ld.ld_stack <- tl; Some p
+
+  let context (ld : loader) =
+    ld.ld_stack
+
+  let incontext (p : string) (ld : loader) =
+    List.mem (norm p) ld.ld_stack
+end
+
+(* -------------------------------------------------------------------- *)
 let process_search scope qs =
   EcScope.Search.search scope qs
 
@@ -250,15 +320,19 @@ and process_th_require1 ld scope (x, io) =
   EcScope.check_state `InTop "theory require" scope;
 
   let name  = x.pl_desc in
-    match EcLoader.locate name ld with
+    match Loader.locate name ld with
     | None ->
         EcScope.hierror "cannot locate theory `%s'" name
 
     | Some (filename, kind) ->
-        let dirname = Filename.dirname filename in
-        let subld   = EcLoader.dup ld in
+        if Loader.incontext filename ld then
+          EcScope.hierror "circular requires involving `%s'" name;
 
-        EcLoader.addidir dirname subld;
+        let dirname = Filename.dirname filename in
+        let subld   = Loader.dup ld in
+
+        Loader.push    filename subld;
+        Loader.addidir dirname  subld;
 
         let loader iscope =
           let i_pragma = !pragma in
@@ -377,7 +451,7 @@ and process_dump_why3 scope filename =
   EcScope.dump_why3 scope filename; scope
 
 (* -------------------------------------------------------------------- *)
-and process (ld : EcLoader.ecloader) (scope : EcScope.scope) g =
+and process (ld : Loader.loader) (scope : EcScope.scope) g =
   let loc = g.pl_loc in
 
   let scope =
@@ -423,13 +497,13 @@ and process_internal ld scope g =
   with e -> raise (EcScope.toperror_of_exn ~gloc:(loc g.gl_action) e)
 
 (* -------------------------------------------------------------------- *)
-let loader = EcLoader.create ()
+let loader = Loader.create ()
 
 let addidir ?system ?recursive (idir : string) =
-  EcLoader.addidir ?system ?recursive idir loader
+  Loader.addidir ?system ?recursive idir loader
 
 let loadpath () =
-  List.map fst (EcLoader.aslist loader)
+  List.map fst (Loader.aslist loader)
 
 (* -------------------------------------------------------------------- *)
 type checkmode = {
@@ -457,7 +531,7 @@ let initial ~checkmode ~boot =
 
   let perv    = (mk_loc _dummy EcCoreLib.i_Pervasive, Some `Export) in
   let prelude = (mk_loc _dummy "Prelude", Some `Export) in
-  let loader  = EcLoader.forsys loader in
+  let loader  = Loader.forsys loader in
   let gstate  = EcGState.from_flags [("profile", profile)] in
   let scope   = EcScope.empty gstate in
   let scope   = process_th_require1 loader scope perv in
