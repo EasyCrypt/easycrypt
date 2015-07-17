@@ -555,21 +555,25 @@ let gen_select_op
   | Some (id, ty) -> [ flc (id, ty, ue) ]
 
   | None ->
-      let ops = EcUnify.select_op ~filter:ue_filter tvi env name ue psig in
-      let ops = opsc |> ofold (fun opsc -> List.mbfilter (by_scope opsc)) ops in
-      let ops = List.mbfilter by_current ops in
-      let ops = match List.mbfilter by_tc ops with [] -> ops | ops -> ops in
+      let ops () =
+        let ops = EcUnify.select_op ~filter:ue_filter tvi env name ue psig in
+        let ops = opsc |> ofold (fun opsc -> List.mbfilter (by_scope opsc)) ops in
+        let ops = List.mbfilter by_current ops in
+        let ops = match List.mbfilter by_tc ops with [] -> ops | ops -> ops in
+        (List.map fop ops)
 
-      let me, pvs =
-        match mode with
-        | `Expr `InOp ->
-            (None, [])
-        | `Expr `InProc | `Form ->
-            match EcEnv.Memory.get_active env, actonly with
-            | None, true -> (None, [])
-            | me  , _    -> (  me, select_pv env me name ue tvi psig)
+      and pvs () =
+        let me, pvs =
+          match EcEnv.Memory.get_active env, actonly with
+          | None, true -> (None, [])
+          | me  , _    -> (  me, select_pv env me name ue tvi psig)
+        in List.map (fpv me) pvs
       in
-        (List.map (fpv me) pvs) @ (List.map fop ops)
+
+      match mode with
+      | `Expr `InOp   -> ops ()
+      | `Form         -> pvs () @ ops ()
+      | `Expr `InProc -> (match pvs () with [] -> ops () | pvs -> pvs)
 
 (* -------------------------------------------------------------------- *)
 let select_exp_op env mode opsc name ue tvi psig =
