@@ -68,116 +68,59 @@ let process_search scope qs =
   EcScope.Search.search scope qs
 
 (* -------------------------------------------------------------------- *)
-module ObjectInfo = struct
-  exception NoObject
+module HiPrinting = struct
+  let pr_glob fmt env pm =
+    let ppe = EcPrinting.PPEnv.ofenv env in
+    let (p, _) = EcTyping.trans_msymbol env pm in
+    let us = EcEnv.NormMp.mod_use env p in
 
-  (* ------------------------------------------------------------------ *)
-  type 'a objdump = {
-    od_name    : string;
-    od_lookup  : EcSymbols.qsymbol -> EcEnv.env -> 'a;
-    od_printer : EcPrinting.PPEnv.t -> Format.formatter -> 'a -> unit;
-  }
+    Format.fprintf fmt "Globals [# = %d]:@."
+      (Sid.cardinal us.EcEnv.us_gl);
+    Sid.iter (fun id ->
+      Format.fprintf fmt "  %s@." (EcIdent.name id))
+      us.EcEnv.us_gl;
 
-  (* -------------------------------------------------------------------- *)
-  let pr_gen_r ?(prcat = false) dumper = fun fmt env qs ->
-    try
-      let ppe = EcPrinting.PPEnv.ofenv env in
-      let obj = dumper.od_lookup qs env in
-      if prcat then
-        Format.fprintf fmt "* In [%s]:@\n@." dumper.od_name;
-      Format.fprintf fmt "%a@\n@." (dumper.od_printer ppe) obj
+    Format.fprintf fmt "@.";
 
-    with EcEnv.LookupFailure _ -> raise NoObject
+    Format.fprintf fmt "Prog. variables [# = %d]:@."
+      (Mx.cardinal us.EcEnv.us_pv);
+    List.iter (fun (xp,_) ->
+      let pv = EcTypes.pv_glob xp in
+      let ty = EcEnv.Var.by_xpath xp env in
+      Format.fprintf fmt "  @[%a : %a@]@."
+        (EcPrinting.pp_pv ppe) pv
+        (EcPrinting.pp_type ppe) ty.EcEnv.vb_type)
+      (List.rev (Mx.bindings us.EcEnv.us_pv))
 
-  (* -------------------------------------------------------------------- *)
-  let pr_gen dumper =
-    let theprinter = pr_gen_r dumper in
 
-    fun fmt env qs ->
-      try
-        theprinter fmt env qs
-      with NoObject ->
-        Format.fprintf fmt
-          "no such object in the category [%s]@." dumper.od_name
+  let pr_goal fmt scope n =
+    match EcScope.xgoal scope with
+    | None | Some { EcScope.puc_active = None} ->
+        EcScope.hierror "no active proof"
 
-  (* ------------------------------------------------------------------ *)
-  let pr_ty_r =
-    { od_name    = "type declarations";
-      od_lookup  = EcEnv.Ty.lookup;
-      od_printer = EcPrinting.pp_typedecl; }
+    | Some { EcScope.puc_active = Some puc } -> begin
+        match puc.EcScope.puc_jdg with
+        | EcScope.PSNoCheck -> ()
 
-  let pr_ty = pr_gen pr_ty_r
+        | EcScope.PSCheck pf -> begin
+            let hds = EcCoreGoal.all_hd_opened pf in
+            let sz  = List.length hds in
+            let ppe = EcPrinting.PPEnv.ofenv (EcScope.env scope) in
 
-  (* ------------------------------------------------------------------ *)
-  let pr_op_r =
-    let get_ops qs env =
-      let l = EcEnv.Op.all qs env in
-      if l = [] then raise NoObject;
-      l in
-    { od_name    = "operators or predicates";
-      od_lookup  = get_ops;
-      od_printer = 
-        fun ppe fmt l ->
-          Format.fprintf fmt "@[<v>%a@]"
-            (EcPrinting.pp_list "@ " (EcPrinting.pp_opdecl ~long:true ppe)) l; }
+            if n > sz then
+              EcScope.hierror "only %n goal(s) remaining" sz;
+            if n <= 0 then
+              EcScope.hierror "goal ID must be positive";
+            let penv = EcCoreGoal.proofenv_of_proof pf in
+            let goal = List.nth hds (n-1) in
+            let goal = EcCoreGoal.FApi.get_pregoal_by_id goal penv in
+            let goal = (EcEnv.LDecl.tohyps goal.EcCoreGoal.g_hyps,
+                        goal.EcCoreGoal.g_concl) in
 
-  let pr_op = pr_gen pr_op_r
-
-  (* ------------------------------------------------------------------ *)
-  let pr_th_r =
-    { od_name    = "theories";
-      od_lookup  = EcEnv.Theory.lookup ~mode:`All;
-      od_printer = EcPrinting.pp_theory; }
-
-  let pr_th = pr_gen pr_th_r
-
-  (* ------------------------------------------------------------------ *)
-  let pr_ax_r =
-    let get_ops qs env =
-      let l = EcEnv.Ax.all ~name:qs env in
-      if l = [] then raise NoObject;
-      l in
-    { od_name    = "lemmas or axioms";
-      od_lookup  = get_ops;
-      od_printer = 
-        fun ppe fmt l ->
-          Format.fprintf fmt "@[<v>%a@]"
-            (EcPrinting.pp_list "@ " (EcPrinting.pp_axiom ~long:true ppe)) l; }
-
-  let pr_ax = pr_gen pr_ax_r
-
-  (* ------------------------------------------------------------------ *)
-  let pr_mod_r =
-    { od_name    = "modules";
-      od_lookup  = EcEnv.Mod.lookup;
-      od_printer = (fun ppe fmt (_, me) -> EcPrinting.pp_modexp ppe fmt me); }
-
-  let pr_mod = pr_gen pr_mod_r
-
-  (* ------------------------------------------------------------------ *)
-  let pr_mty_r =
-    { od_name    = "module types";
-      od_lookup  = EcEnv.ModTy.lookup;
-      od_printer = EcPrinting.pp_modsig; }
-
-  let pr_mty = pr_gen pr_mty_r
-
-  (* ------------------------------------------------------------------ *)
-  let pr_any fmt env qs =
-    let printers = [pr_gen_r ~prcat:true pr_ty_r ;
-                    pr_gen_r ~prcat:true pr_op_r ;
-                    pr_gen_r ~prcat:true pr_th_r ;
-                    pr_gen_r ~prcat:true pr_ax_r ;
-                    pr_gen_r ~prcat:true pr_mod_r;
-                    pr_gen_r ~prcat:true pr_mty_r; ] in
-
-    let ok = ref (List.length printers) in
-
-    List.iter
-      (fun f -> try f fmt env qs with NoObject -> decr ok)
-      printers;
-    if !ok = 0 then
-      Format.fprintf fmt "%s@." "no such object in any category"
+            Format.fprintf fmt "Printing Goal %d\n\n%!" n;
+            EcPrinting.pp_goal ppe fmt (goal, `One sz)
+        end
+    end
 end
 
 (* -------------------------------------------------------------------- *)
@@ -185,68 +128,17 @@ let process_pr fmt scope p =
   let env = EcScope.env scope in
 
   match p with
-  | Pr_ty   qs -> ObjectInfo.pr_ty  fmt env qs.pl_desc
-  | Pr_op   qs -> ObjectInfo.pr_op  fmt env qs.pl_desc
-  | Pr_pr   qs -> ObjectInfo.pr_op  fmt env qs.pl_desc
-  | Pr_th   qs -> ObjectInfo.pr_th  fmt env qs.pl_desc
-  | Pr_ax   qs -> ObjectInfo.pr_ax  fmt env qs.pl_desc
-  | Pr_mod  qs -> ObjectInfo.pr_mod fmt env qs.pl_desc
-  | Pr_mty  qs -> ObjectInfo.pr_mty fmt env qs.pl_desc
-  | Pr_any  qs -> ObjectInfo.pr_any fmt env qs.pl_desc
+  | Pr_ty   qs -> EcPrinting.ObjectInfo.pr_ty   fmt env   qs.pl_desc
+  | Pr_op   qs -> EcPrinting.ObjectInfo.pr_op   fmt env   qs.pl_desc
+  | Pr_pr   qs -> EcPrinting.ObjectInfo.pr_op   fmt env   qs.pl_desc
+  | Pr_th   qs -> EcPrinting.ObjectInfo.pr_th   fmt env   qs.pl_desc
+  | Pr_ax   qs -> EcPrinting.ObjectInfo.pr_ax   fmt env   qs.pl_desc
+  | Pr_mod  qs -> EcPrinting.ObjectInfo.pr_mod  fmt env   qs.pl_desc
+  | Pr_mty  qs -> EcPrinting.ObjectInfo.pr_mty  fmt env   qs.pl_desc
+  | Pr_any  qs -> EcPrinting.ObjectInfo.pr_any  fmt env   qs.pl_desc
 
-  | Pr_glob pm -> begin
-      let ppe = EcPrinting.PPEnv.ofenv env in
-      let (p, _) = EcTyping.trans_msymbol env pm in
-      let us = EcEnv.NormMp.mod_use env p in
-  
-      Format.fprintf fmt "Globals [# = %d]:@."
-        (Sid.cardinal us.EcEnv.us_gl);
-      Sid.iter (fun id ->
-        Format.fprintf fmt "  %s@." (EcIdent.name id))
-        us.EcEnv.us_gl;
-  
-      Format.fprintf fmt "@.";
-  
-      Format.fprintf fmt "Prog. variables [# = %d]:@."
-        (Mx.cardinal us.EcEnv.us_pv);
-      List.iter (fun (xp,_) ->
-        let pv = EcTypes.pv_glob xp in
-        let ty = EcEnv.Var.by_xpath xp env in
-        Format.fprintf fmt "  @[%a : %a@]@."
-          (EcPrinting.pp_pv ppe) pv
-          (EcPrinting.pp_type ppe) ty.EcEnv.vb_type)
-        (List.rev (Mx.bindings us.EcEnv.us_pv))
-  end
-
-  | Pr_goal n -> begin
-      match EcScope.xgoal scope with
-      | None | Some { EcScope.puc_active = None} ->
-          EcScope.hierror "no active proof"
-
-      | Some { EcScope.puc_active = Some puc } -> begin
-          match puc.EcScope.puc_jdg with
-          | EcScope.PSNoCheck -> ()
-
-          | EcScope.PSCheck pf -> begin
-              let hds = EcCoreGoal.all_hd_opened pf in
-              let sz  = List.length hds in
-              let ppe = EcPrinting.PPEnv.ofenv (EcScope.env scope) in
-
-              if n > sz then
-                EcScope.hierror "only %n goal(s) remaining" sz;
-              if n <= 0 then
-                EcScope.hierror "goal ID must be positive";
-              let penv = EcCoreGoal.proofenv_of_proof pf in
-              let goal = List.nth hds (n-1) in
-              let goal = EcCoreGoal.FApi.get_pregoal_by_id goal penv in
-              let goal = (EcEnv.LDecl.tohyps goal.EcCoreGoal.g_hyps,
-                          goal.EcCoreGoal.g_concl) in
-
-              Format.fprintf fmt "Printing Goal %d\n\n%!" n;
-              EcPrinting.pp_goal ppe fmt (goal, `One sz)
-          end
-      end
-  end
+  | Pr_glob pm -> HiPrinting.pr_glob fmt env pm
+  | Pr_goal n  -> HiPrinting.pr_goal fmt scope n
 
 (* -------------------------------------------------------------------- *)
 let process_print scope p =

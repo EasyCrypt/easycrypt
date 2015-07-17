@@ -5,6 +5,7 @@
 
 (* -------------------------------------------------------------------- *)
 open EcIdent
+open EcSymbols
 open EcPath
 open EcTypes
 open EcFol
@@ -74,3 +75,14 @@ type ppgoal = (EcBaseLogic.hyps * EcFol.form) * [
 ]
 
 val pp_goal : PPEnv.t -> ppgoal pp
+
+(* -------------------------------------------------------------------- *)
+module ObjectInfo : sig
+  val pr_ty  : Format.formatter -> EcEnv.env -> qsymbol -> unit
+  val pr_op  : Format.formatter -> EcEnv.env -> qsymbol -> unit
+  val pr_th  : Format.formatter -> EcEnv.env -> qsymbol -> unit
+  val pr_ax  : Format.formatter -> EcEnv.env -> qsymbol -> unit
+  val pr_mod : Format.formatter -> EcEnv.env -> qsymbol -> unit
+  val pr_mty : Format.formatter -> EcEnv.env -> qsymbol -> unit
+  val pr_any : Format.formatter -> EcEnv.env -> qsymbol -> unit
+end

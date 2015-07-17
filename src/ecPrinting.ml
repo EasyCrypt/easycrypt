@@ -2515,4 +2515,117 @@ let rec pp_theory ppe (fmt:Format.formatter) (path, (cth, mode)) =
   | EcTheory.CTh_addrw (p,l) ->
       Format.fprintf fmt "hint rewrite %a : %a."
         pp_path p (pp_list "@ " pp_path) l
-      
+
+
+(* -------------------------------------------------------------------- *)
+module ObjectInfo = struct
+  exception NoObject
+
+  (* ------------------------------------------------------------------ *)
+  type 'a objdump = {
+    od_name    : string;
+    od_lookup  : EcSymbols.qsymbol -> EcEnv.env -> 'a;
+    od_printer : PPEnv.t -> Format.formatter -> 'a -> unit;
+  }
+
+  (* -------------------------------------------------------------------- *)
+  let pr_gen_r ?(prcat = false) dumper = fun fmt env qs ->
+    try
+      let ppe = PPEnv.ofenv env in
+      let obj = dumper.od_lookup qs env in
+      if prcat then
+        Format.fprintf fmt "* In [%s]:@\n@." dumper.od_name;
+      Format.fprintf fmt "%a@\n@." (dumper.od_printer ppe) obj
+
+    with EcEnv.LookupFailure _ -> raise NoObject
+
+  (* -------------------------------------------------------------------- *)
+  let pr_gen dumper =
+    let theprinter = pr_gen_r dumper in
+
+    fun fmt env qs ->
+      try
+        theprinter fmt env qs
+      with NoObject ->
+        Format.fprintf fmt
+          "no such object in the category [%s]@." dumper.od_name
+
+  (* ------------------------------------------------------------------ *)
+  let pr_ty_r =
+    { od_name    = "type declarations";
+      od_lookup  = EcEnv.Ty.lookup;
+      od_printer = pp_typedecl; }
+
+  let pr_ty = pr_gen pr_ty_r
+
+  (* ------------------------------------------------------------------ *)
+  let pr_op_r =
+    let get_ops qs env =
+      let l = EcEnv.Op.all qs env in
+      if l = [] then raise NoObject;
+      l in
+    { od_name    = "operators or predicates";
+      od_lookup  = get_ops;
+      od_printer = 
+        fun ppe fmt l ->
+          Format.fprintf fmt "@[<v>%a@]"
+            (pp_list "@ " (pp_opdecl ~long:true ppe)) l; }
+
+  let pr_op = pr_gen pr_op_r
+
+  (* ------------------------------------------------------------------ *)
+  let pr_th_r =
+    { od_name    = "theories";
+      od_lookup  = EcEnv.Theory.lookup ~mode:`All;
+      od_printer = pp_theory; }
+
+  let pr_th = pr_gen pr_th_r
+
+  (* ------------------------------------------------------------------ *)
+  let pr_ax_r =
+    let get_ops qs env =
+      let l = EcEnv.Ax.all ~name:qs env in
+      if l = [] then raise NoObject;
+      l in
+    { od_name    = "lemmas or axioms";
+      od_lookup  = get_ops;
+      od_printer = 
+        fun ppe fmt l ->
+          Format.fprintf fmt "@[<v>%a@]"
+            (pp_list "@ " (pp_axiom ~long:true ppe)) l; }
+
+  let pr_ax = pr_gen pr_ax_r
+
+  (* ------------------------------------------------------------------ *)
+  let pr_mod_r =
+    { od_name    = "modules";
+      od_lookup  = EcEnv.Mod.lookup;
+      od_printer = (fun ppe fmt (_, me) -> pp_modexp ppe fmt me); }
+
+  let pr_mod = pr_gen pr_mod_r
+
+  (* ------------------------------------------------------------------ *)
+  let pr_mty_r =
+    { od_name    = "module types";
+      od_lookup  = EcEnv.ModTy.lookup;
+      od_printer = pp_modsig; }
+
+  let pr_mty = pr_gen pr_mty_r
+
+  (* ------------------------------------------------------------------ *)
+  let pr_any fmt env qs =
+    let printers = [pr_gen_r ~prcat:true pr_ty_r ;
+                    pr_gen_r ~prcat:true pr_op_r ;
+                    pr_gen_r ~prcat:true pr_th_r ;
+                    pr_gen_r ~prcat:true pr_ax_r ;
+                    pr_gen_r ~prcat:true pr_mod_r;
+                    pr_gen_r ~prcat:true pr_mty_r; ] in
+
+    let ok = ref (List.length printers) in
+
+    List.iter
+      (fun f -> try f fmt env qs with NoObject -> decr ok)
+      printers;
+    if !ok = 0 then
+      Format.fprintf fmt "%s@." "no such object in any category"
+end
