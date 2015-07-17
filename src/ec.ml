@@ -255,6 +255,8 @@ let _ =
     EcTerminal.notice ~immediate:true `Warning copyright terminal;
 
   try
+    let () = Sys.catch_break true in
+
     (* Interaction loop *)
     let first = ref true  in
 

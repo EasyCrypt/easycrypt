@@ -116,6 +116,9 @@ let rec toperror_of_exn_r ?gloc exn =
       in
         Some (odfl _dummy gloc, HiScopeError (None, msg))
 
+  | Sys.Break ->
+      Some (odfl _dummy gloc, HiScopeError (None, "interrupted"))
+
   | _ -> None
 
 let toperror_of_exn ?gloc exn =
