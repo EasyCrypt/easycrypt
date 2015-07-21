@@ -258,36 +258,42 @@ let _ =
     let () = Sys.catch_break true in
 
     (* Interaction loop *)
-    let first = ref true  in
+    let first = ref `Init in
 
     while true do
       let terminate = ref false in
 
       try
-        if !first then begin
-          (* Initialize global scope *)
-          let checkmode = {
-            EcCommands.cm_checkall  = prvopts.prvo_checkall;
-            EcCommands.cm_timeout   = prvopts.prvo_timeout;
-            EcCommands.cm_cpufactor = prvopts.prvo_cpufactor;
-            EcCommands.cm_nprovers  = prvopts.prvo_maxjobs;
-            EcCommands.cm_provers   = prvopts.prvo_provers;
-            EcCommands.cm_wrapper   = pwrapper;
-            EcCommands.cm_profile   = prvopts.prvo_profile;
-            EcCommands.cm_iterate   = prvopts.prvo_iterate;
-          } in
+        begin match !first with
+        | `Init | `Restart ->
+            let restart = (!first = `Restart) in
 
-          EcCommands.initialize ~undo:interactive ~boot:ldropts.ldro_boot ~checkmode;
-          (try
-             List.iter EcCommands.apply_pragma prvopts.prvo_pragmas
-           with EcCommands.InvalidPragma x ->
-             EcScope.hierror "invalid pragma: `%s'\n%!" x);
+            (* Initialize global scope *)
+            let checkmode = {
+              EcCommands.cm_checkall  = prvopts.prvo_checkall;
+              EcCommands.cm_timeout   = prvopts.prvo_timeout;
+              EcCommands.cm_cpufactor = prvopts.prvo_cpufactor;
+              EcCommands.cm_nprovers  = prvopts.prvo_maxjobs;
+              EcCommands.cm_provers   = prvopts.prvo_provers;
+              EcCommands.cm_wrapper   = pwrapper;
+              EcCommands.cm_profile   = prvopts.prvo_profile;
+              EcCommands.cm_iterate   = prvopts.prvo_iterate;
+            } in
+  
+            EcCommands.initialize ~restart
+              ~undo:interactive ~boot:ldropts.ldro_boot ~checkmode;
+            (try
+               List.iter EcCommands.apply_pragma prvopts.prvo_pragmas
+             with EcCommands.InvalidPragma x ->
+               EcScope.hierror "invalid pragma: `%s'\n%!" x);
+  
+            let notifier (lvl : EcGState.loglevel) (lazy msg) =
+              EcTerminal.notice ~immediate:true lvl msg terminal
+            in EcCommands.addnotifier notifier;
 
-          let notifier (lvl : EcGState.loglevel) (lazy msg) =
-            EcTerminal.notice ~immediate:true lvl msg terminal
-          in EcCommands.addnotifier notifier;
+            first := `Loop
 
-          first := false
+        | `Loop -> ()
         end;
 
         begin
@@ -298,7 +304,10 @@ let _ =
                 (fun p ->
                    let loc = p.EP.gl_action.EcLocation.pl_loc in
                      try  EcCommands.process ~timed:p.EP.gl_timed p.EP.gl_action
-                     with e -> begin
+                     with
+                     | EcCommands.Restart ->
+                         raise EcCommands.Restart
+                     | e -> begin
                        if Printexc.backtrace_status () then begin
                          if not (EcTerminal.interactive terminal) then
                            Printf.fprintf stderr "%t\n%!" Printexc.print_backtrace
@@ -312,13 +321,17 @@ let _ =
         end;
         EcTerminal.finish `ST_Ok terminal;
         if !terminate then (EcTerminal.finalize terminal; exit 0);
-      with e -> begin
-        EcTerminal.finish
-          (`ST_Failure (EcScope.toperror_of_exn e))
-          terminal;
-        if !first || not (EcTerminal.interactive terminal) then
-          exit 1
-      end
+      with
+      | EcCommands.Restart ->
+          first := `Restart
+
+      | e -> begin
+          EcTerminal.finish
+            (`ST_Failure (EcScope.toperror_of_exn e))
+            terminal;
+          if (!first = `Init) || not (EcTerminal.interactive terminal) then
+            exit 1
+        end
     done
   with e ->
     (try EcTerminal.finalize terminal with _ -> ());

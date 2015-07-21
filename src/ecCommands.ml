@@ -12,17 +12,22 @@ module Sid = EcIdent.Sid
 module Mx  = EcPath.Mx
 
 (* -------------------------------------------------------------------- *)
+exception Restart
+
+(* -------------------------------------------------------------------- *)
 type pragma = {
   pm_verbose : bool; (* true  => display goal after each command *)
   pm_g_prall : bool; (* true  => display all open goals *)
   pm_check   : [`Check | `WeakCheck | `Report];
 }
 
-let pragma = ref {
+let dpragma = {
   pm_verbose = true  ;
   pm_g_prall = false ;
   pm_check   = `Check;
 }
+
+let pragma = ref dpragma
 
 let pragma_verbose (b : bool) =
   pragma := { !pragma with pm_verbose = b; }
@@ -215,7 +220,7 @@ let process_print scope p =
   process_pr Format.std_formatter scope p
 
 (* -------------------------------------------------------------------- *)
-exception Pragma of [`Reset]
+exception Pragma of [`Reset | `Restart]
 
 (* -------------------------------------------------------------------- *)
 let rec process_type (scope : EcScope.scope) (tyd : ptydecl located) =
@@ -432,6 +437,7 @@ and process_pragma (scope : EcScope.scope) opt =
   | "noop"    -> ()
   | "compact" -> Gc.compact ()
   | "reset"   -> raise (Pragma `Reset)
+  | "restart" -> raise (Pragma `Restart)
   | _         -> ()
 
 (* -------------------------------------------------------------------- *)
@@ -579,8 +585,9 @@ let push_context scope context =
       |> omap (fun st -> context.ct_current :: st); }
 
 (* -------------------------------------------------------------------- *)
-let initialize ~undo ~boot ~checkmode =
-  assert (!context = None);
+let initialize ~restart ~undo ~boot ~checkmode =
+  assert (restart || EcUtils.is_none !context);
+  if restart then pragma := dpragma;
   context := Some (rootctxt ~undo (initial ~checkmode ~boot))
 
 (* -------------------------------------------------------------------- *)
@@ -628,8 +635,9 @@ let process ?(timed = false) (g : global_action located) : unit =
     oscope |> oiter (fun scope -> context := Some (push_context scope current));
     if tdelta >= 0. then
       EcScope.notify scope `Info "time: %f" tdelta
-  with Pragma `Reset ->
-    reset ()
+  with
+  | Pragma `Reset   -> reset ()
+  | Pragma `Restart -> raise Restart
 
 (* -------------------------------------------------------------------- *)
 module S = EcScope

@@ -7,6 +7,9 @@
 open EcLocation
 
 (* -------------------------------------------------------------------- *)
+exception Restart
+
+(* -------------------------------------------------------------------- *)
 val addidir  : ?system:bool -> ?recursive:bool -> string -> unit
 val loadpath : unit -> (bool * string) list
 
@@ -24,7 +27,13 @@ type checkmode = {
   cm_iterate  : bool;
 }
 
-val initialize  : undo:bool -> boot:bool -> checkmode:checkmode -> unit
+val initialize  :
+     restart:bool
+  -> undo:bool
+  -> boot:bool
+  -> checkmode:checkmode
+  -> unit
+
 val current     : unit -> EcScope.scope
 val addnotifier : notifier -> unit
 
