@@ -210,16 +210,21 @@ exception InvalidSplit of int * int * int
 
 let s_split_i i s =
   let len = List.length s.s_node in
-    if i < 1 || len < i then
+    if i <= -len || len < i then
       raise (InvalidSplit (i, 1, len));
-    let (hd, tl) = EcModules.s_split (i-1) s in
-    (hd, List.hd tl, List.tl tl)
+    let (hd, tl) =
+      if   0 <= i
+      then EcModules.s_split (i-1) s
+      else EcModules.s_split (len+i-1) s
+    in (hd, List.hd tl, List.tl tl)
 
 let s_split i s =
   let len = List.length s.s_node in
-    if i < 0 || len < i then
+    if i < -len || len < i then
       raise (InvalidSplit (i, 0, len));
-    EcModules.s_split i s
+    if   0 <= i
+    then EcModules.s_split i s
+    else EcModules.s_split (len+i) s
 
 let s_split_o i s =
   match i with

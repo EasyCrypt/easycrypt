@@ -1892,10 +1892,10 @@ codepos:
 | c=CPOS { c }
 
 code_position:
-| n=word
+| n=sword
     { Single n }
 
-| n1=word n2=word
+| n1=sword n2=sword
     { Double (n1, n2) }
 
 while_tac_info :
