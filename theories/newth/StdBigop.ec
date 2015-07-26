@@ -4,37 +4,38 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require NewBigop.
+require import Int Real.
+require (*--*) NewBigop NewBigalg.
 
 (* -------------------------------------------------------------------- *)
-require import Int.
-
-clone NewBigop as BIA with
+clone NewBigalg as BIA with
   type t <- int,
-  op Support.idm <- 0,
-  op Support.(+) <- Int.( + )
-  proof Support.Axioms.* by (delta; smt).
+  op ZM.zeror <- 0,
+  op ZM.( + ) <- Int.(+),
+  op ZM.( - ) <- Int.(-),
+  op ZM.([-]) <- Int.([-])
+  proof ZM.* by smt.
 
 clone NewBigop as BIM with
   type t <- int,
   op Support.idm <- 1,
   op Support.(+) <- Int.( * )
-  proof Support.Axioms.* by (delta; smt).
+  proof Support.Axioms.* by smt.
 
 (* -------------------------------------------------------------------- *)
-require import Real.
-
-clone NewBigop as BRA with
+clone NewBigalg as BRA with
   type t <- real,
-  op Support.idm <- 0%r,
-  op Support.(+) <- Real.( + )
-  proof Support.Axioms.* by (delta; smt).
+  op ZM.zeror <- 0%r,
+  op ZM.( + ) <- Real.(+),
+  op ZM.( - ) <- Real.(-),
+  op ZM.([-]) <- Real.([-])
+  proof ZM.* by smt.
 
 clone NewBigop as BRM with
   type t <- real,
   op Support.idm <- 1%r,
   op Support.(+) <- Real.( * )
-  proof Support.Axioms.* by (delta; smt).
+  proof Support.Axioms.* by smt.
 
 (* -------------------------------------------------------------------- *)
 require import Bool.

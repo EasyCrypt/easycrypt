@@ -16,7 +16,7 @@ type t.
 
 clone import Ring.ZModule as ZM with type t <- t.
 
-clone NewBigop as Sum with
+clone include NewBigop with
   type t <- t,
   op   Support.idm <- ZM.zeror,
   op   Support.(+) <- ZM.(+)
@@ -26,8 +26,6 @@ clone NewBigop as Sum with
 realize Support.Axioms.addmA. by apply/addrA. qed.
 realize Support.Axioms.addmC. by apply/addrC. qed.
 realize Support.Axioms.add0m. by apply/add0r. qed.
-
-export Sum.
 
 (* -------------------------------------------------------------------- *)
 lemma sumrD P F1 F2 (r : 'a list):
