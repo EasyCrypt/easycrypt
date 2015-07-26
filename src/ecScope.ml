@@ -87,6 +87,9 @@ let rec toperror_of_exn_r ?gloc exn =
   | DtError    (loc, _, _) -> Some (loc, exn)
   | ParseError (loc, _)    -> Some (loc, exn)
 
+  | EcLexer.LexicalError (loc, _) ->
+      Some (odfl (odfl _dummy gloc) loc, exn)
+
   | EcCoreGoal.TcError (_, None, _) ->
       Some (odfl _dummy gloc, exn)
 

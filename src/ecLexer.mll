@@ -11,8 +11,21 @@
   module BI = EcBigInt
   module L  = EcLocation
 
+  (* ------------------------------------------------------------------ *)
   exception LexicalError of L.t option * string
 
+  let pp_lex_error fmt msg =
+    Format.fprintf fmt "parse error: %s" msg
+
+  let () =
+    let pp fmt exn =
+      match exn with
+      | LexicalError (_, msg) -> pp_lex_error fmt msg
+      | _ -> raise exn
+    in
+      EcPException.register pp
+
+  (* ------------------------------------------------------------------ *)
   let lex_error lexbuf msg =
     raise (LexicalError (Some (L.of_lexbuf lexbuf), msg))
 
@@ -392,7 +405,11 @@ rule main = parse
 
   | eof { [EOF] }
 
-  |  _ as c  { lex_error lexbuf ("illegal character: " ^ String.make 1 c) }
+  (* errors *)
+
+  | '\'' uident     { lex_error lexbuf "type variables must be low-identifiers" }
+  | ['\'' '`'] as c { lex_error lexbuf (Printf.sprintf "illegal use of character: %c" c) }
+  |  _         as c { lex_error lexbuf (Printf.sprintf "illegal character: %c" c) }
 
 and comment = parse
   | "*)"        { () }
