@@ -16,8 +16,8 @@ type 'a list = [
 ].
 
 op size (xs : 'a list) =
-  with xs = "[]"      => 0
-  with xs = (::) y ys => 1 + (size ys).
+  with xs = []      => 0
+  with xs = y :: ys => 1 + (size ys).
 
 lemma size_ge0 (s : 'a list): 0 <= size s.
 proof. by elim s => //= x s; smt. qed.
@@ -27,8 +27,8 @@ proof. by case s => //=; smt. qed.
 
 (* -------------------------------------------------------------------- *)
 op head (z0 : 'a) (s : 'a list) =
-  with s = "[]"     => z0
-  with s = (::) x s => x.
+  with s = []     => z0
+  with s = x :: s => x.
 
 lemma head_nil (z0 : 'a): head z0 [] = z0.
 proof. by []. qed.
@@ -38,8 +38,8 @@ proof. by []. qed.
 
 (* -------------------------------------------------------------------- *)
 op ohead (s : 'a list) =
-  with s = "[]"     => None
-  with s = (::) x s => Some x.
+  with s = []     => None
+  with s = x :: s => Some x.
 
 lemma ohead_nil: ohead [<:'a>] = None.
 proof. by []. qed.
@@ -57,8 +57,8 @@ proof. by case: s. qed.
 
 (* -------------------------------------------------------------------- *)
 op behead (xs : 'a list) =
-  with xs = "[]" => []
-  with xs = (::) y ys => ys.
+  with xs = []      => []
+  with xs = y :: ys => ys.
 
 lemma behead_nil: behead [<:'a>] = [].
 proof. by []. qed.
@@ -76,16 +76,16 @@ proof. by elim xs. qed.
 (*                    Sequence catenation "cat"                         *)
 (* -------------------------------------------------------------------- *)
 op (++) (s1 s2 : 'a list) =
-  with s1 = "[]"      => s2
-  with s1 = (::) x s1 => x :: (s1 ++ s2).
+  with s1 = []      => s2
+  with s1 = x :: s1 => x :: (s1 ++ s2).
 
 op rcons (s : 'a list) (z : 'a) =
-  with s = "[]"      => [z]
-  with s = (::) x s' => x :: (rcons s' z).
+  with s = []      => [z]
+  with s = x :: s' => x :: (rcons s' z).
 
 op last_ (x : 'a) s =
-  with s = "[]"      => x
-  with s = (::) y ys => last_ y ys.
+  with s = []      => x
+  with s = y :: ys => last_ y ys.
 
 lemma cat0s (s : 'a list): [] ++ s = s.
 proof. by []. qed.
@@ -136,12 +136,12 @@ qed.
 (*                        Sequence indexing                             *)
 (* -------------------------------------------------------------------- *)
 op nth x (xs : 'a list) n : 'a =
-  with xs = "[]"      => x
-  with xs = (::) y ys => if n = 0 then y else (nth x ys (n-1)).
+  with xs = []      => x
+  with xs = y :: ys => if n = 0 then y else (nth x ys (n-1)).
 
 op onth (xs : 'a list) n : 'a option =
-  with xs = "[]"      => None
-  with xs = (::) y ys =>  if n = 0 then Some y else (onth ys (n-1)).
+  with xs = []      => None
+  with xs = y :: ys =>  if n = 0 then Some y else (onth ys (n-1)).
 
 lemma nth_onth (z : 'a) xs n: nth z xs n = odflt z (onth xs n).
 proof. by elim xs n => //=; smt. qed.
@@ -187,8 +187,8 @@ qed.
 (*                       Sequence membership                            *)
 (* -------------------------------------------------------------------- *)
 op mem (s : 'a list) (z : 'a) =
-  with s = "[]"      => false
-  with s = (::) x s' => (z = x) \/ mem s' z.
+  with s = []      => false
+  with s = x :: s' => (z = x) \/ mem s' z.
 
 lemma in_nil (x : 'a): mem [] x = false.
 proof. by []. qed.
@@ -244,16 +244,16 @@ proof. by elim: s n => [|x s ih] //= n; smt. qed.
 (*                  find, filter, count, has, all                       *)
 (* -------------------------------------------------------------------- *)
 op find ['a] (p : 'a -> bool) s =
-  with s = "[]"      => 0
-  with s = (::) x s' => if p x then 0 else find p s' + 1.
+  with s = []      => 0
+  with s = x :: s' => if p x then 0 else find p s' + 1.
 
 op count ['a] (p : 'a -> bool) xs =
-  with xs = "[]"      => 0
-  with xs = (::) y ys => (int_of_bool (p y)) + (count p ys).
+  with xs = []      => 0
+  with xs = y :: ys => (int_of_bool (p y)) + (count p ys).
 
 op filter (p : 'a -> bool) xs =
-  with xs = "[]"      => []
-  with xs = (::) y ys => if p y then y :: filter p ys else filter p ys.
+  with xs = []      => []
+  with xs = y :: ys => if p y then y :: filter p ys else filter p ys.
 
 lemma count_ge0 (p : 'a -> bool) s: 0 <= count p s.
 proof. by elim s=> //= x s; smt. qed.
@@ -262,12 +262,12 @@ lemma count_size p (s : 'a list): count p s <= size s.
 proof. by elim s => //= x s; smt. qed.
 
 op has (p : 'a -> bool) xs =
-  with xs = "[]"      => false
-  with xs = (::) y ys => (p y) \/ (has p ys).
+  with xs = []      => false
+  with xs = y :: ys => (p y) \/ (has p ys).
 
 op all (p : 'a -> bool) xs =
-  with xs = "[]"      => true
-  with xs = (::) y ys => (p y) /\ (all p ys).
+  with xs = []      => true
+  with xs = y :: ys => (p y) /\ (all p ys).
 
 lemma hasP p (s : 'a list): has p s <=> (exists x, mem s x /\ p x).
 proof.
@@ -447,8 +447,8 @@ proof. by []. qed.
 (*                            drop, take                                *)
 (* -------------------------------------------------------------------- *)
 op drop n (xs : 'a list) =
-  with xs = "[]"      => []
-  with xs = (::) y ys =>
+  with xs = []      => []
+  with xs = y :: ys =>
     if n <= 0 then xs else drop (n-1) ys.
 
 lemma drop0 (s : 'a list): drop 0 s = s.
@@ -489,8 +489,8 @@ proof.
 qed.
 
 op take n (xs : 'a list) =
-  with xs = "[]"      => []
-  with xs = (::) y ys =>
+  with xs = []      => []
+  with xs = y :: ys =>
     if n <= 0 then [] else y :: take (n-1) ys.
 
 lemma take0 (s : 'a list): take 0 s = [].
@@ -715,8 +715,8 @@ qed.
 (*                         Element removal                              *)
 (* -------------------------------------------------------------------- *)
 op rem (z : 'a) s =
-  with s = "[]"      => []
-  with s = (::) x s' => if x = z then s' else x :: (rem z s').
+  with s = []      => []
+  with s = x :: s' => if x = z then s' else x :: (rem z s').
 
 lemma rem_id (z : 'a) s: ! mem s z => rem z s = s.
 proof.
@@ -785,8 +785,8 @@ proof. by rewrite size_cat smt. qed.
 (*                        Sequence reversal                             *)
 (* -------------------------------------------------------------------- *)
 op catrev (s1 s2 : 'a list) =
-  with s1 = "[]"      => s2
-  with s1 = (::) x s1 => catrev s1 (x :: s2).
+  with s1 = []      => s2
+  with s1 = x :: s1 => catrev s1 (x :: s2).
 
 op rev (s : 'a list) = catrev s [].
 
@@ -851,8 +851,8 @@ proof. by rewrite !all_count count_rev size_rev. qed.
 (*                        Duplicate-freenes                             *)
 (* -------------------------------------------------------------------- *)
 op uniq (s : 'a list) =
-  with s = "[]"      => true
-  with s = (::) x s' => !(mem s' x) /\ uniq s'.
+  with s = []      => true
+  with s = x :: s' => !(mem s' x) /\ uniq s'.
 
 lemma cons_uniq (x : 'a) s:
   uniq (x :: s) <=> (!mem s x) /\ uniq s.
@@ -907,8 +907,8 @@ proof. by elim: s i; smt. qed.
 (*                       Removing duplicates                            *)
 (* -------------------------------------------------------------------- *)
 op undup (s : 'a list) =
-  with s = "[]"      => []
-  with s = (::) x s' => if mem s' x then undup s' else x :: undup s'.
+  with s = []      => []
+  with s = x :: s' => if mem s' x then undup s' else x :: undup s'.
 
 lemma size_undup (s : 'a list): size (undup s) <= size s.
 proof. by elim s => //= x s IHs; smt. qed.
@@ -1013,8 +1013,8 @@ qed.
 (*                             Mapping                                  *)
 (* -------------------------------------------------------------------- *)
 op map (f : 'a -> 'b) xs =
-  with xs = "[]"      => []
-  with xs = (::) y ys => (f y) :: (map f ys).
+  with xs = []      => []
+  with xs = y :: ys => (f y) :: (map f ys).
 
 lemma eq_in_map (f1 f2 : 'a -> 'b) (s : 'a list) :
   (forall x, mem s x => f1 x = f2 x) <=> map f1 s = map f2 s.
@@ -1165,8 +1165,8 @@ qed.
 (*                         Partial mapping                              *)
 (* -------------------------------------------------------------------- *)
 op pmap ['a 'b] (f : 'a -> 'b option) (s : 'a list) =
-  with s = "[]"     => []
-  with s = (::) x s =>
+  with s = []     => []
+  with s = x :: s =>
     if f x = None then pmap f s else oget (f x) :: pmap f s.
 
 (* -------------------------------------------------------------------- *)
@@ -1382,8 +1382,8 @@ qed.
 (*                         Sequence folding                             *)
 (* -------------------------------------------------------------------- *)
 op foldr (f : 'a -> 'b -> 'b) z0 xs =
-  with xs = "[]"      => z0
-  with xs = (::) y ys => f y (foldr f z0 ys).
+  with xs = []      => z0
+  with xs = y :: ys => f y (foldr f z0 ys).
 
 lemma foldr_cat (f : 'a -> 'b -> 'b) z0 s1 s2:
   foldr f z0 (s1 ++ s2) = foldr f (foldr f z0 s2) s1.
@@ -1394,8 +1394,8 @@ lemma foldr_map ['a 'b 'c] (f : 'a -> 'b -> 'b) (h : 'c -> 'a) z0 s:
 proof. by elim s => //= x s ->. qed.
 
 op foldl (f : 'b -> 'a -> 'b) z0 xs =
-  with xs = "[]"      => z0
-  with xs = (::) y ys => foldl f (f z0 y) ys.
+  with xs = []      => z0
+  with xs = y :: ys => foldl f (f z0 y) ys.
 
 lemma foldl_rev (f : 'b -> 'a -> 'b) z0 s:
   foldl f z0 (rev s) = foldr (fun x z => f z x) z0 s.
@@ -1430,21 +1430,21 @@ qed.
 (*                         Sequence sorting                             *)
 (* -------------------------------------------------------------------- *)
 op path (e : 'a -> 'a -> bool) (x : 'a) (p : 'a list) : bool =
-  with p = "[]"      => true
-  with p = (::) y p' => e x y /\ path e y p'.
+  with p = []      => true
+  with p = y :: p' => e x y /\ path e y p'.
 
 op sorted (e : 'a -> 'a -> bool) (xs : 'a list) =
-  with xs = "[]"      => true
-  with xs = (::) y ys => path e y ys.
+  with xs = []      => true
+  with xs = y :: ys => path e y ys.
 
 theory InsertSort.
   op insert (e : 'a -> 'a -> bool) (x : 'a) (s : 'a list) =
-    with s = "[]"      => [x]
-    with s = (::) y s' => if e x y then x :: s else y :: (insert e x s').
+    with s = []      => [x]
+    with s = y :: s' => if e x y then x :: s else y :: (insert e x s').
 
   op sort (e : 'a -> 'a -> bool) (s : 'a list) =
-    with s = "[]"      => []
-    with s = (::) x s' => insert e x (sort e s').
+    with s = []      => []
+    with s = x :: s' => insert e x (sort e s').
 
   lemma nosmt perm_insert (e : 'a -> 'a -> bool) x s:
     perm_eq (x :: s) (insert e x s).
@@ -1488,10 +1488,10 @@ proof. by rewrite sortE /=; apply InsertSort.sort_sorted. qed.
 (*                          Order lifting                               *)
 (* -------------------------------------------------------------------- *)
 op lex (e : 'a -> 'a -> bool) s1 s2 =
-  with s1 = "[]"      , s2 = "[]"       => true
-  with s1 = "[]"      , s2 = (::) y2 s2 => true
-  with s1 = (::) y1 s1, s2 = "[]"       => false
-  with s1 = (::) y1 s1, s2 = (::) y2 s2 =>
+  with s1 = []      , s2 = []       => true
+  with s1 = []      , s2 = y2 :: s2 => true
+  with s1 = y1 :: s1, s2 = []       => false
+  with s1 = y1 :: s1, s2 = y2 :: s2 =>
     if e y1 y2 then if e y2 y1 then lex e s1 s1 else true else false.
 
 lemma lex_total (e : 'a -> 'a -> bool):
@@ -1507,12 +1507,12 @@ theory Array.
     axiomatized by getE.
 
   op "_.[_<-_]" (s : 'a list) (n : int) (x : 'a) =
-    with s = "[]"     => []
-    with s = (::) a s => if n = 0 then x::s else a::(s.[n - 1 <- x]).
+    with s = []     => []
+    with s = a :: s => if n = 0 then x::s else a::(s.[n - 1 <- x]).
 
   op mapi (n : int) (f : int -> 'a -> 'b) (s : 'a list) =
-    with s = "[]"     => []
-    with s = (::) x s => (f n x)::(mapi (n + 1) f s).
+    with s = []     => []
+    with s = x :: s => (f n x)::(mapi (n + 1) f s).
 
   lemma nosmt arrayP (a1 a2 : 'a list):
     (a1 = a2) <=>

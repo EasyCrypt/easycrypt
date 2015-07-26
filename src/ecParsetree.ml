@@ -282,8 +282,7 @@ and pop_branch = {
 
 and pop_pattern = {
   pop_name    : psymbol;
-  pop_tvi     : ptyannot option;
-  pop_pattern : pqsymbol * psymbol list;
+  pop_pattern : (pqsymbol * ptyannot option) * psymbol list;
 }
 
 type poperator = {

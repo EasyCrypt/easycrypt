@@ -333,9 +333,9 @@ let trans_matchfix ?(close = true) env ue { pl_loc = loc; pl_desc = name } (bd, 
         let trans1 ((_, x, xty) : _ * EcIdent.t * ty) =
           let pb     = oget (Msym.find_opt (EcIdent.name x) pbmap) in
           let filter = fun op -> EcDecl.is_ctor op in
-          let cname  = fst pb.pop_pattern in
-          let tvi    = pb.pop_tvi |> omap (TT.transtvi env ue) in
-          let cts    = EcUnify.select_op ~filter tvi env (unloc cname) ue [] in
+          let cname, tvi = fst pb.pop_pattern in
+          let tvi = tvi |> omap (TT.transtvi env ue) in
+          let cts = EcUnify.select_op ~filter tvi env (unloc cname) ue [] in
 
           match cts with
           | [] ->
