@@ -543,7 +543,10 @@
 %type <EcParsetree.global> global
 %type <EcParsetree.prog  > prog
 
-%start prog global
+%type <unit> is_uniop
+%type <unit> is_binop
+
+%start prog global is_uniop is_binop
 %%
 
 (* -------------------------------------------------------------------- *)
@@ -652,6 +655,7 @@ fident:
 
 %inline uniop:
 | x=NOP { Printf.sprintf "[%s]" x }
+| NOT   { "[!]" }
 | ADD   { "[+]" }
 | MINUS { "[-]" }
 
@@ -677,6 +681,10 @@ fident:
 | op=sbinop { op    }
 | IMPL      { "=>"  }
 | IFF       { "<=>" }
+
+(* -------------------------------------------------------------------- *)
+is_binop: binop EOF {}
+is_uniop: uniop EOF {}
 
 (* -------------------------------------------------------------------- *)
 pside_:
@@ -784,9 +792,6 @@ expr_u:
 
 | e=sexpr args=sexpr+
     { PEapp (e, args) }
-
-| op=loc(NOT) ti=tvars_app? e=expr
-    { peapp_symb op.pl_loc "[!]" ti [e] }
 
 | op=loc(uniop) ti=tvars_app? e=expr
     { peapp_symb op.pl_loc op.pl_desc ti [e] }
@@ -955,9 +960,6 @@ form_u(P):
 | e=sform_u(P) { e }
 
 | e=sform_r(P) args=sform_r(P)+ { PFapp (e, args) }
-
-| op=loc(NOT) ti=tvars_app? e=form_r(P)
-    { pfapp_symb  op.pl_loc "[!]" ti [e] }
 
 | op=loc(uniop) ti=tvars_app? e=form_r(P)
    { pfapp_symb op.pl_loc op.pl_desc ti [e] }

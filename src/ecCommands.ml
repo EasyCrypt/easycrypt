@@ -216,6 +216,15 @@ let process_pr fmt scope p =
   | Pr_goal n  -> HiPrinting.pr_goal fmt scope n
 
 (* -------------------------------------------------------------------- *)
+let check_opname_validity (scope : EcScope.scope) (x : string) =
+  if EcIo.is_binop x = `Invalid then
+    EcScope.notify scope `Warning
+      "operator `%s' cannot be used in prefix mode" x;
+  if EcIo.is_uniop x = `Invalid then
+    EcScope.notify scope `Warning
+      "operator `%s' cannot be used in infix mode" x
+
+(* -------------------------------------------------------------------- *)
 let process_print scope p =
   process_pr Format.std_formatter scope p
 
@@ -277,7 +286,8 @@ and process_operator (scope : EcScope.scope) (op : poperator located) =
   let scope = EcScope.Op.add scope op in
     List.iter
       (fun { pl_desc = name } ->
-        EcScope.notify scope `Info "added operator: `%s'" name)
+        EcScope.notify scope `Info "added operator: `%s'" name;
+        check_opname_validity scope name)
       (op.pl_desc.po_name :: op.pl_desc.po_aliases);
     scope
 
@@ -286,6 +296,7 @@ and process_predicate (scope : EcScope.scope) (p : ppredicate located) =
   EcScope.check_state `InTop "predicate" scope;
   let scope = EcScope.Pred.add scope p in
     EcScope.notify scope `Info "added predicate: `%s'" (unloc p.pl_desc.pp_name);
+    check_opname_validity scope (unloc p.pl_desc.pp_name);
     scope
 
 (* -------------------------------------------------------------------- *)
