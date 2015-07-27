@@ -5,7 +5,7 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require export ExtEq.
+require export ExtEq Fun.
 
 (*** Working with predicates *)
 (** Lifting boolean operators to predicates *)
@@ -73,7 +73,6 @@ lemma nosmt subrel_trans (r2 r1 r3 : 'a -> 'b -> bool):
 by [].
 
 (** Lemmas **)
-(* The 'P' lemmas are not useful in our case. *)
 lemma pred1E (c : 'a) : pred1 c = ((=) c).
 proof. by apply fun_ext=> x; rewrite (eq_sym c). qed.
 
@@ -118,3 +117,6 @@ by [].
 lemma nosmt subrelUr (r1 r2 : 'a -> 'b -> bool):
   subrel r2 (relU r1 r2)
 by [].
+
+lemma nosmt predTofV (f : 'a -> 'b): predT \o f = predT.
+proof. by apply/fun_ext=> x. qed.
