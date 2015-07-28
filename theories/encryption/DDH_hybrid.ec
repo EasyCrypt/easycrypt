@@ -23,8 +23,8 @@ import H.
 module DDHl = {
   proc orcl () : group * group * group = {
     var x, y: gf_q;
-    x = $ Dgf_q.dgf_q;
-    y = $ Dgf_q.dgf_q;
+    x <$ Dgf_q.dgf_q;
+    y <$ Dgf_q.dgf_q;
     return (g^x, g^y, g^(x * y));
   }
 }.
@@ -32,46 +32,46 @@ module DDHl = {
 module DDHr = {
   proc orcl () : group * group * group = {
     var x, y, z: gf_q;
-    x = $ Dgf_q.dgf_q;
-    y = $ Dgf_q.dgf_q;
-    z = $ Dgf_q.dgf_q;
+    x <$ Dgf_q.dgf_q;
+    y <$ Dgf_q.dgf_q;
+    z <$ Dgf_q.dgf_q;
     return (g^x, g^y, g^z);
   }
 }.
 
 module DDHb : H.Orclb = {
   proc leaks () : unit = { }
-  proc orcl1 = DDHl.orcl
-  proc orcl2 = DDHr.orcl
+  proc orclL = DDHl.orcl
+  proc orclR = DDHr.orcl
 }.
 
 lemma islossless_leaks : islossless DDHb.leaks.
 proof. proc;auto. qed.
 
-lemma islossless_orcl1 : islossless DDHb.orcl1.
+lemma islossless_orcl1 : islossless DDHb.orclL.
 proof. proc;auto;progress;smt. qed.
 
-lemma islossless_orcl2 : islossless DDHb.orcl2.
+lemma islossless_orcl2 : islossless DDHb.orclR.
 proof. proc;auto;progress;smt. qed.
 
 section.
 
-  declare module A : H.OrclbAdv{C,LRB,DDHb}. 
+  declare module A : H.AdvOrclb{Count,HybOrcl,DDHb}.
 
   axiom losslessA : forall (Ob0 <: Orclb{A}) (LR <: Orcl{A}),
     islossless LR.orcl =>
     islossless Ob0.leaks =>
-    islossless Ob0.orcl1 =>
-    islossless Ob0.orcl2 => islossless A(Ob0, LR).main.
+    islossless Ob0.orclL =>
+    islossless Ob0.orclR => islossless A(Ob0, LR).main.
  
   lemma Hybrid:
     forall &m,
-      Pr[Ln(DDHb, B(A)).main() @ &m : (res /\ LRB.l <= n) /\ C.c <= 1 ] -
-      Pr[Rn(DDHb, B(A)).main() @ &m : (res /\ LRB.l <= n) /\ C.c <= 1 ] = 
+      Pr[Ln(DDHb, HybGame(A)).main() @ &m : (res /\ HybOrcl.l <= n) /\ Count.c <= 1 ] -
+      Pr[Rn(DDHb, HybGame(A)).main() @ &m : (res /\ HybOrcl.l <= n) /\ Count.c <= 1 ] = 
       1%r / n%r *
-       (Pr[Ln(DDHb, A).main() @ &m : (res /\ C.c <= n) ] -
-        Pr[Rn(DDHb, A).main() @ &m :  (res /\ C.c <= n) ]).
-  proof. 
+       (Pr[Ln(DDHb, A).main() @ &m : (res /\ Count.c <= n) ] -
+        Pr[Rn(DDHb, A).main() @ &m : (res /\ Count.c <= n) ]).
+  proof.
    intros &m.
    apply (H.Hybrid (<:DDHb) (<:A) _ _ _ _ &m 
        (fun (ga:glob A) (gb:glob DDHb) (c:int) (r:bool), r)).

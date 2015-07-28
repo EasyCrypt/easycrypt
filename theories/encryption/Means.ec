@@ -26,8 +26,8 @@ module Rand (W:Worker) = {
     var x : input;
     var r : output;
 
-    x = $d;
-    r = W.work(x);
+    x <$ d;
+    r <@ W.work(x);
     return (x,r);
   }
 }.
@@ -36,7 +36,7 @@ lemma prCond (A <: Worker) &m (v:input)
              (ev:input -> glob A -> output -> bool):
     Pr[Rand(A).main() @ &m: ev v (glob A) (snd res) /\ v = fst res] =
       (mu_x d v) * Pr[A.work(v) @ &m : ev v (glob A) res].
-proof strict.
+proof.
 byphoare (_: (glob A) = (glob A){m} ==> 
                  ev (fst res) (glob A) (snd res) /\ fst res = v) => //.
 pose pr := Pr[A.work(v) @ &m: ev v (glob A) res];
@@ -57,7 +57,7 @@ lemma introOrs (A <: Worker) &m (ev:input -> glob A -> output -> bool):
   Pr[Rand(A).main() @ &m: ev (fst res) (glob A) (snd res)] =
    Pr[Rand(A).main() @ &m:
         cpOrs (img (fun v r, ev v (glob A) (snd r) /\ v = fst r) sup) res].
-proof strict.
+proof.
 intros=> Fsup sup.
 byequiv (_: ={glob A} ==> ={glob A, res} /\ in_supp (fst res{1}) d)=> //;
   first by proc; call (_: true); rnd.
@@ -78,7 +78,7 @@ lemma Mean (A <: Worker) &m (ev:input -> glob A -> output -> bool):
    Mrplus.sum
      (fun (v:input), mu_x d v * Pr[A.work(v)@ &m:ev v (glob A) res]) 
      sup.
-proof strict.
+proof.
 intros=> Fsup /=.
 cut:= introOrs A &m ev _=> //= ->.
 elim/set_ind (Finite.toFSet (create (support d))).
@@ -108,7 +108,7 @@ lemma Mean_uni (A<:Worker) &m (ev:input -> glob A -> output -> bool) r:
    let sup = Finite.toFSet (create (support d)) in
    Pr[Rand(A).main()@ &m: ev (fst res) (glob A) (snd res)] =
      r * Mrplus.sum (fun (v:input), Pr[A.work(v)@ &m:ev v (glob A) res]) sup.
-proof -strict.
+proof.
   intros Hd Hfin /=.
   cut := Mean A &m ev => /= -> //.
   cut := Mrplus.sum_comp (( * ) r) (fun (v:input), Pr[A.work(v)@ &m:ev v (glob A) res]) => /= <-.

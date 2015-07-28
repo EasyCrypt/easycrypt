@@ -126,7 +126,7 @@ clone import Indist as Ind with
 
 module ToOrcl (S:Scheme) = {
   proc leaks (il:unit) : pkey = {
-    (K.pk, K.sk) = S.kg();
+    (K.pk, K.sk) <@ S.kg();
     return K.pk;
   }
   proc orcl (m:plaintext) : ciphertext = {
@@ -141,62 +141,62 @@ module ToAdv(A:AdvCPA, O:Orcl,LR:LR) = {
   proc main() : bool = {
     var pk:pkey;
     var b':bool;
-    pk = O.leaks();
-    b' =A.main(pk);
+    pk <@ O.leaks();
+    b' <@ A.main(pk);
     return b';
   }
 }.
 
 module B (S:Scheme, A:AdvCPA, LR:LR) = {
-  module A = A(LRB2(ToOrcl(S),LR))
+  module A = A(HybOrcl2(ToOrcl(S),LR))
   proc main(pk:pkey) : bool = {
     var b':bool;
-    H.LRB.l0 = $[0..H.q-1];
-    H.LRB.l  = 0;
-    b' = A.main(pk);
+    H.HybOrcl.l0 <$ [0..H.q-1];
+    H.HybOrcl.l <- 0;
+    b' <@ A.main(pk);
     return b';
   }
 }.
 
 section.
 
-  declare module S:Scheme {K, H.C, H.LRB}. 
+  declare module S:Scheme {K, H.Count, H.HybOrcl}.
     (* Normaly I would like to locally 
        clone Indist in the section, in that case
        restrictions at least on H.c are not needed.
        But LRB and B are used so we need to do it 
      *) 
 
-  declare module A:AdvCPA {K,H.C,H.LRB,S}.
+  declare module A:AdvCPA {K,H.Count,H.HybOrcl,S}.
 
   axiom Lkg  : islossless S.kg.
   axiom Lenc : islossless S.enc. 
   axiom La   : forall (LR<:LR{A}), islossless LR.orcl => islossless A(LR).main.
 
   lemma CPA1_CPAn &m : 0 < H.q => 
-    Pr[CPAL(S,B(S,A)).main() @ &m : res /\ H.LRB.l <= H.q /\ K.c <= 1] - 
-    Pr[CPAR(S,B(S,A)).main() @ &m : res /\ H.LRB.l <= H.q /\ K.c <= 1] =
+    Pr[CPAL(S,B(S,A)).main() @ &m : res /\ H.HybOrcl.l <= H.q /\ K.c <= 1] - 
+    Pr[CPAR(S,B(S,A)).main() @ &m : res /\ H.HybOrcl.l <= H.q /\ K.c <= 1] =
     1%r/H.q%r * (Pr[CPAL(S,A).main() @ &m : res /\ K.c <= H.q] -
                  Pr[CPAR(S,A).main() @ &m : res /\ K.c <= H.q]).
-  proof -strict.
+  proof.
     intros Hq.
     cut -> : Pr[CPAL(S, A).main() @ &m : res /\ K.c <= H.q] =
-             Pr[INDL(ToOrcl(S),ToAdv(A)).main() @ &m : res /\ H.C.c <= H.q].
+             Pr[INDL(ToOrcl(S),ToAdv(A)).main() @ &m : res /\ H.Count.c <= H.q].
       byequiv (_ : ={glob A, glob S} ==>
-                        ={res,glob A, glob S, K.pk} /\ K.c{1} = H.C.c{2}) => //.
+                        ={res,glob A, glob S, K.pk} /\ K.c{1} = H.Count.c{2}) => //.
       proc. 
-      inline INDL(ToOrcl(S), ToAdv(A)).A.main H.C.init  ToOrcl(S).leaks.
-      wp;call (_: ={glob S, K.pk} /\ K.c{1} = H.C.c{2}).
-        by proc;inline ToOrcl(S).orcl H.C.incr;wp;call (_:true);wp.
+      inline INDL(ToOrcl(S), ToAdv(A)).A.main H.Count.init  ToOrcl(S).leaks.
+      wp;call (_: ={glob S, K.pk} /\ K.c{1} = H.Count.c{2}).
+        by proc;inline ToOrcl(S).orcl H.Count.incr;wp;call (_:true);wp.
       by wp;call (_:true);wp.
     cut -> : Pr[CPAR(S, A).main() @ &m : res /\ K.c <= H.q] =
-             Pr[INDR(ToOrcl(S),ToAdv(A)).main() @ &m : res /\ H.C.c <= H.q].          
+             Pr[INDR(ToOrcl(S),ToAdv(A)).main() @ &m : res /\ H.Count.c <= H.q].
       byequiv (_ : ={glob A, glob S} ==>
-                        ={res,glob A, glob S, K.pk} /\ K.c{1} = H.C.c{2}) => //.
+                        ={res,glob A, glob S, K.pk} /\ K.c{1} = H.Count.c{2}) => //.
       proc. 
-      inline INDR(ToOrcl(S), ToAdv(A)).A.main H.C.init  ToOrcl(S).leaks.
-      wp;call (_: ={glob S, K.pk} /\ K.c{1} = H.C.c{2}).
-        by proc;inline ToOrcl(S).orcl H.C.incr;wp;call (_:true);wp.
+      inline INDR(ToOrcl(S), ToAdv(A)).A.main H.Count.init  ToOrcl(S).leaks.
+      wp;call (_: ={glob S, K.pk} /\ K.c{1} = H.Count.c{2}).
+        by proc;inline ToOrcl(S).orcl H.Count.incr;wp;call (_:true);wp.
       by wp;call (_:true);wp.
     cut := IND1_INDn (ToOrcl(S)) (ToAdv(A)) _ _ _ _ &m (fun ga go c, true) => //=.
       by proc;call Lkg.
@@ -204,33 +204,33 @@ section.
       intros O LR Llr Ll Lo;proc;call (La LR _) => //.
       by call Ll.
     intros <-;congr.
-      byequiv (_: ={glob S,glob A} ==> ={res,glob H.LRB} /\ K.c{1} = H.C.c{2}) => //.
+      byequiv (_: ={glob S,glob A} ==> ={res,glob H.HybOrcl} /\ K.c{1} = H.Count.c{2}) => //.
       proc.
-      inline INDL(ToOrcl(S), Ind.B(ToAdv(A))).A.main H.C.init CPAL(S, B(S,A)).A.main
-        Ind.B(ToAdv(A), ToOrcl(S), OrclL(ToOrcl(S))).A.main.
+      inline INDL(ToOrcl(S), Ind.HybGame2(ToAdv(A))).A.main H.Count.init CPAL(S, B(S,A)).A.main
+        Ind.HybGame2(ToAdv(A), ToOrcl(S), OrclL(ToOrcl(S))).A.main.
       wp.
-      call (_: ={glob S,glob H.LRB, K.pk} /\ K.c{1} = H.C.c{2}).
+      call (_: ={glob S,glob H.HybOrcl, K.pk} /\ K.c{1} = H.Count.c{2}).
         proc;wp.
         if => //.
           by call (_: ={glob S, K.pk});first sim.
         if => //.
-          call (_: ={glob S, K.pk} /\ K.c{1} = H.C.c{2}) => //.
-          by inline ToOrcl(S).orcl H.C.incr;wp;call (_: true);wp.
+          call (_: ={glob S, K.pk} /\ K.c{1} = H.Count.c{2}) => //.
+          by inline ToOrcl(S).orcl H.Count.incr;wp;call (_: true);wp.
         by call (_: ={glob S, K.pk});first sim.
       swap{1} [4..5] -2;inline ToOrcl(S).leaks;wp.
       by call (_:true);wp;rnd;wp.
-    byequiv (_: ={glob S,glob A} ==> ={res,glob H.LRB} /\ K.c{1} = H.C.c{2}) => //.
+    byequiv (_: ={glob S,glob A} ==> ={res,glob H.HybOrcl} /\ K.c{1} = H.Count.c{2}) => //.
     proc.
-    inline INDR(ToOrcl(S), Ind.B(ToAdv(A))).A.main H.C.init CPAR(S, B(S,A)).A.main
-      Ind.B(ToAdv(A), ToOrcl(S), OrclR(ToOrcl(S))).A.main.
+    inline INDR(ToOrcl(S), Ind.HybGame2(ToAdv(A))).A.main H.Count.init CPAR(S, B(S,A)).A.main
+      Ind.HybGame2(ToAdv(A), ToOrcl(S), OrclR(ToOrcl(S))).A.main.
     wp.
-    call (_: ={glob S,glob H.LRB, K.pk} /\ K.c{1} = H.C.c{2}).
+    call (_: ={glob S,glob H.HybOrcl, K.pk} /\ K.c{1} = H.Count.c{2}).
       proc;wp.
       if => //.
         by call (_: ={glob S, K.pk});first sim.
       if => //.
-        call (_: ={glob S, K.pk} /\ K.c{1} = H.C.c{2}) => //.
-        by inline ToOrcl(S).orcl H.C.incr;wp;call (_: true);wp.
+        call (_: ={glob S, K.pk} /\ K.c{1} = H.Count.c{2}) => //.
+        by inline ToOrcl(S).orcl H.Count.incr;wp;call (_: true);wp.
       by call (_: ={glob S, K.pk});first sim.
     swap{1} [4..5] -2;inline ToOrcl(S).leaks;wp.
     by call (_:true);wp;rnd;wp.
