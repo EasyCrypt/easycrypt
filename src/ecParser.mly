@@ -1617,8 +1617,8 @@ axiom_tc:
 | BY t=tactics      { PLemma (Some t) }
 
 axiom:
-| l=local AXIOM o=nosmt d=lemma_decl
-    { mk_axiom ~local:l ~nosmt:o d PAxiom }
+| l=local AXIOM ids=bracket(ident+)? o=nosmt d=lemma_decl
+    { mk_axiom ~local:l ~nosmt:o d (PAxiom (odfl [] ids)) }
 
 | l=local LEMMA o=nosmt d=lemma_decl ao=axiom_tc
     { mk_axiom ~local:l ~nosmt:o d ao }
@@ -2669,17 +2669,20 @@ clone_with:
 | WITH x=plist1(clone_override, COMMA) { x }
 
 clone_lemma_base:
-| STAR     { `All }
-| x=_ident { `Named x }
+| STAR x=bracket(ident+)?
+    { `All (odfl [] x) }
+
+| x=_ident
+    { `Named x }
 
 clone_lemma_1_core:
 | l=genqident(clone_lemma_base) {
     match unloc l with
-    | (xs, `Named x) -> `Named (mk_loc l.pl_loc (xs, x))
-    | (xs, `All    ) -> begin
+    | (xs, `Named x ) -> `Named (mk_loc l.pl_loc (xs, x))
+    | (xs, `All tags) -> begin
       match List.rev xs with
-      | []      -> `All None
-      | x :: xs -> `All (Some (mk_loc l.pl_loc (List.rev xs, x)))
+      | []      -> `All (None, tags)
+      | x :: xs -> `All (Some (mk_loc l.pl_loc (List.rev xs, x)), tags)
     end
   }
 

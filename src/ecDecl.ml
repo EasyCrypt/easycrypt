@@ -7,9 +7,10 @@
 open EcUtils
 open EcCoreFol
 
-module Sp = EcPath.Sp
-module TC = EcTypeClass
-module BI = EcBigInt
+module Sp   = EcPath.Sp
+module TC   = EcTypeClass
+module BI   = EcBigInt
+module Ssym = EcSymbols.Ssym
 
 (* -------------------------------------------------------------------- *)
 type ty_param  = EcIdent.t * EcPath.Sp.t
@@ -83,7 +84,7 @@ type operator = {
 }
 
 (* -------------------------------------------------------------------- *)
-type axiom_kind = [`Axiom | `Lemma]
+type axiom_kind = [`Axiom of Ssym.t | `Lemma]
 
 type axiom = {
   ax_tparams : ty_params;
@@ -91,6 +92,9 @@ type axiom = {
   ax_kind    : axiom_kind;
   ax_nosmt   : bool;
 }
+
+let is_axiom (x : axiom_kind) = match x with `Axiom _ -> true | _ -> false
+let is_lemma (x : axiom_kind) = match x with `Lemma   -> true | _ -> false
 
 (* -------------------------------------------------------------------- *)
 let op_ty op = op.op_ty
@@ -187,7 +191,7 @@ let axiomatized_op ?(nargs = 0) ?(nosmt = false) path (tparams, bd) =
 
   { ax_tparams = axpm;
     ax_spec    = Some axspec;
-    ax_kind    = `Axiom;
+    ax_kind    = `Axiom Ssym.empty;
     ax_nosmt   = nosmt; }
 
 (* -------------------------------------------------------------------- *)

@@ -692,7 +692,7 @@ module MC = struct
               let scname = Printf.sprintf "%s_%s" x name in
                 (scname, { ax_tparams = tyd.tyd_params;
                            ax_spec    = Some scheme;
-                           ax_kind    = `Axiom;
+                           ax_kind    = `Axiom Ssym.empty;
                            ax_nosmt   = true; })
             in
               (do1 schelim "ind", do1 schcase "case")
@@ -727,7 +727,7 @@ module MC = struct
             let scname = Printf.sprintf "%s_ind" x in
               (scname, { ax_tparams = tyd.tyd_params;
                          ax_spec    = Some scheme;
-                         ax_kind    = `Axiom;
+                         ax_kind    = `Axiom Ssym.empty;
                          ax_nosmt   = true; })
           in
 
@@ -812,7 +812,7 @@ module MC = struct
             let ax = Fsubst.f_subst fsubst ax in
               (x, { ax_tparams = [(self, Sp.singleton mypath)];
                     ax_spec    = Some ax;
-                    ax_kind    = `Axiom;
+                    ax_kind    = `Axiom Ssym.empty;
                     ax_nosmt   = true; }))
           tc.tc_axs
       in

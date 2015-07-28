@@ -5,6 +5,7 @@
 
 (* -------------------------------------------------------------------- *)
 open EcUtils
+open EcSymbols
 open EcBigInt
 open EcPath
 open EcTypes
@@ -91,7 +92,7 @@ val operator_as_proj : operator -> EcPath.path * int * int
 val operator_as_fix  : operator -> opfix
 
 (* -------------------------------------------------------------------- *)
-type axiom_kind = [`Axiom | `Lemma]
+type axiom_kind = [`Axiom of Ssym.t | `Lemma]
 
 type axiom = {
   ax_tparams : ty_params;
@@ -99,6 +100,10 @@ type axiom = {
   ax_kind    : axiom_kind;
   ax_nosmt   : bool;
 }
+
+(* -------------------------------------------------------------------- *)
+val is_axiom : axiom_kind -> bool
+val is_lemma : axiom_kind -> bool
 
 (* -------------------------------------------------------------------- *)
 val axiomatized_op :

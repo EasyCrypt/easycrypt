@@ -56,7 +56,6 @@ type axclone = {
 }
 
 (* -------------------------------------------------------------------- *)
-
 let pp_incompatible env fmt = function
   | NotSameNumberOfTyParam(exp, got) ->
     Format.fprintf fmt "contains %i type parameter instead of %i" got exp
@@ -115,12 +114,12 @@ type evclone = {
 }
 
 and evlemma = {
-  ev_global  : (ptactic_core option) option;
+  ev_global  : (ptactic_core option * Ssym.t option) list;
   ev_bynames : (ptactic_core option) Msym.t;
 }
 
 let evc_empty =
-  let evl = { ev_global = None; ev_bynames = Msym.empty; } in
+  let evl = { ev_global = []; ev_bynames = Msym.empty; } in
     { evc_types  = Msym.empty;
       evc_ops    = Msym.empty;
       evc_preds  = Msym.empty;
@@ -331,7 +330,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
 
              | CTh_axiom (x, ({ ax_spec = Some _ } as ax)) ->
                  (* FIXME: TC HOOK *)
-               if ax.ax_kind = `Axiom then
+               if is_axiom ax.ax_kind then
                  let params = List.map (EcIdent.name |- fst) ax.ax_tparams in
                  let params = List.map (mk_loc l) params in
                  let params = List.map (fun a -> mk_loc l (PTvar a)) params in
@@ -362,24 +361,24 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
   let ovrds =
     let do1 evc prf =
       match prf.pthp_mode with
-      | `All name -> begin
-          let (name, dname) =
+      | `All (name, tags) -> begin
+          let tags =
+            if   List.is_empty tags then None
+            else Some (Ssym.of_list (List.map unloc tags)) in
+          let name =
             match name with
-            | None -> ([], ([], "<current>"))
+            | None -> []
             | Some name ->
                 match find_theory oth (unloc name) with
-                | None   -> clone_error scenv (CE_UnkOverride (OVK_Theory, unloc name))
-                | Some _ -> let (nm, name) = unloc name in (nm @ [name], (nm, name))
+                | None   -> clone_error scenv (CE_UnkOverride (OVK_Lemma, unloc name))
+                | Some _ -> let (nm, name) = unloc name in nm @ [name]
           in
 
           let update1 evc =
-            match evc.evc_lemmas.ev_global with
-            | Some (Some _) ->
-                clone_error scenv (CE_DupOverride (OVK_Theory, dname))
-            | _ ->
-                let evl = evc.evc_lemmas in
-                let evl = { evl with ev_global = Some prf.pthp_tactic } in
-                  { evc with evc_lemmas = evl }
+            let evl = evc.evc_lemmas in
+            let evl = {
+              evl with ev_global = evl.ev_global @ [(prf.pthp_tactic, tags)]
+            } in { evc with evc_lemmas = evl }
           in
             evc_update update1 name evc
       end
@@ -392,8 +391,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
               clone_error scenv (CE_UnkOverride (OVK_Lemma, name))
 
           | Some ax ->
-
-              if ax.ax_kind <> `Axiom || ax.ax_spec = None then
+              if not (is_axiom ax.ax_kind) || ax.ax_spec = None then
                 clone_error scenv (CE_CrtOverride (OVK_Lemma, name));
 
               let update1 evc =
@@ -408,8 +406,8 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
               in
                 evc_update update1 (fst name) evc
       end
-    in
-      List.fold_left do1 ovrds (genproofs @ thcl.pthc_prf)
+
+    in List.fold_left do1 ovrds (genproofs @ thcl.pthc_prf)
   in
 
   (name, (opath, (oth, othmode)), ovrds)

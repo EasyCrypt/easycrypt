@@ -702,7 +702,7 @@ and ptactic_chain =
 
 (* -------------------------------------------------------------------- *)
 type paxiom_kind =
-| PAxiom
+| PAxiom of psymbol list
 | PLemma of ptactics option
 | PILemma
 
@@ -812,8 +812,10 @@ and theory_cloning_options =
   (bool * theory_cloning_option) list
 
 and theory_cloning_proof = {
-  pthp_mode   : [ `All   of pqsymbol option
-                | `Named of pqsymbol];
+  pthp_mode   : [
+    | `All   of (pqsymbol option * psymbol list)
+    | `Named of pqsymbol
+  ];
   pthp_tactic : ptactic_core option;
 }
 

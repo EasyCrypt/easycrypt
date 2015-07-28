@@ -43,7 +43,7 @@ type evclone = {
 }
 
 and evlemma = {
-  ev_global  : (ptactic_core option) option;
+  ev_global  : (ptactic_core option * Ssym.t option) list;
   ev_bynames : (ptactic_core option) Msym.t;
 }
 

@@ -1786,8 +1786,12 @@ let pp_opname (ppe : PPEnv.t) fmt (p : EcPath.path) =
 
 (* -------------------------------------------------------------------- *)
 let string_of_axkind = function
-  | `Axiom -> "axiom"
-  | `Lemma -> "lemma"
+  | `Axiom _ -> "axiom"
+  | `Lemma   -> "lemma"
+
+let tags_of_axkind = function
+  | `Axiom x -> List.sort sym_compare (Ssym.elements x)
+  | `Lemma   -> []
 
 let pp_axiom ?(long=false) (ppe : PPEnv.t) fmt (x, ax) =
   let ppe = PPEnv.add_locals ppe (List.map fst ax.ax_tparams) in
@@ -1797,10 +1801,16 @@ let pp_axiom ?(long=false) (ppe : PPEnv.t) fmt (x, ax) =
     match ax.ax_spec with
     | None   -> pp_string fmt "<why3-imported>"
     | Some f -> pp_form ppe fmt f 
+
   and pp_name fmt =
     match ax.ax_tparams with
     | [] -> Format.fprintf fmt "%s"    basename
     | ts -> Format.fprintf fmt "%s %a" basename (pp_tyvarannot ppe) ts
+
+  and pp_tags fmt =
+    let tags = tags_of_axkind ax.ax_kind in
+    if not (List.is_empty tags) then
+      Format.fprintf fmt "[@[%a@]]" (pp_list "@ " pp_symbol) tags
   in
   
   let pp_long fmt x = 
@@ -1809,14 +1819,10 @@ let pp_axiom ?(long=false) (ppe : PPEnv.t) fmt (x, ax) =
        if fst qs <> [] then
          Format.fprintf fmt "(* %a *)@ " EcSymbols.pp_qsymbol qs in
   let pp_decl fmt () =
-    Format.fprintf fmt "@[<hov 2>%s %t:@ %t.@]"
-      (string_of_axkind ax.ax_kind) pp_name pp_spec in
+    Format.fprintf fmt "@[<hov 2>%s %t %t:@ %t.@]"
+      (string_of_axkind ax.ax_kind) pp_tags pp_name pp_spec in
 
   Format.fprintf fmt "@[<v>%a%a@]" pp_long x pp_decl ()
-
-
-
-
 
 (* -------------------------------------------------------------------- *)
 type ppnode1 = [
