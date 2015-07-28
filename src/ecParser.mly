@@ -1562,9 +1562,6 @@ opptn(BOP):
       ((pqsymb_of_symb loc EcCoreLib.s_nil, tvi), [])
   }
 
-| op=loc(NOT) tvi=tvars_app? x=ident
-    { ((pqsymb_of_symb op.pl_loc "[!]", tvi), [x]) }
-
 | op=loc(uniop) tvi=tvars_app? x=ident
     { ((pqsymb_of_symb op.pl_loc op.pl_desc, tvi), [x]) }
 
