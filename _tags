@@ -15,6 +15,6 @@ true : bin_annot
 <src/system>     : include
 
 # --------------------------------------------------------------------
-<src/*.{ml,mli}>      : package(batteries, menhirLib, why3, zarith)
-<src/*/*.{ml,mli}>    : package(batteries, menhirLib, why3, zarith)
-<src/*.{native,byte}> : package(batteries, menhirLib, why3, zarith)
+<src/*.{ml,mli}>      : package(batteries, menhirLib, why3, zarith, pcre)
+<src/*/*.{ml,mli}>    : package(batteries, menhirLib, why3, zarith, pcre)
+<src/*.{native,byte}> : package(batteries, menhirLib, why3, zarith, pcre)

@@ -827,9 +827,8 @@ let pp_opapp
       | Some bopprio ->
           let opprio = (bopprio, `Prefix) in
           let opname =
-            match Str.string_match (Str.regexp "^\\[.+\\]$") opname 0 with
-            | true  -> String.sub opname 1 (String.length opname - 2)
-            | false -> opname in
+            try  Pcre.get_substring (Pcre.exec ~pat:"^\\[(.+)\\]$" opname) 1
+            with Not_found -> opname in
           let pp fmt =
             Format.fprintf fmt "@[%s%s%a@]" opname
               (if is_trm e then "" else " ")
@@ -1915,7 +1914,7 @@ let c_split ?width pp x =
         width |> oiter (Format.pp_set_margin fmt);
         Format.fprintf fmt "@[<hov 2>%a@]@." pp x
     end;
-    Str.split (Str.regexp "\\(\r?\n\\)+") (Buffer.contents buf)
+    Pcre.split ~pat:"(?:\r?\n)+" (Buffer.contents buf)
 
 let pp_i_asgn (ppe : PPEnv.t) fmt (lv, e) =
   Format.fprintf fmt "%a <-@ %a"

@@ -28,9 +28,9 @@ module Filename = struct
     match Sys.os_type with "Win32" -> ';' | _ -> ':'
 
   let paths_of_string s =
-    let re = String.make 1 path_sep in
-    let re = Str.regexp ((Str.quote re) ^ "+") in
-    Str.split re s
+    let rex = String.make 1 path_sep in
+    let rex = Pcre.regexp ((Pcre.quote rex) ^ "+") in
+    Pcre.split ~rex s
 end
 
 (* -------------------------------------------------------------------- *)

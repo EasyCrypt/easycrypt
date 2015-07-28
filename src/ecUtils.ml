@@ -639,11 +639,6 @@ module Buffer = struct
 end
 
 (* -------------------------------------------------------------------- *)
-module Regexp = struct
-  include Str
-end
-
-(* -------------------------------------------------------------------- *)
 module Os = struct
   let getenv (name : string) =
     try Some (Sys.getenv name) with Not_found -> None

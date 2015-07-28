@@ -200,9 +200,8 @@ let is_uniop (x : string) =
   | Some (EcParser.PUNIOP x) -> begin
     try
       let x =
-        match Str.string_match (Str.regexp "^\\[.+\\]$") x 0 with
-        | true  -> String.sub x 1 (String.length x - 2)
-        | false -> x
+        try  Pcre.get_substring (Pcre.exec ~pat:"^\\[(.+)\\]$" x) 1
+        with Not_found -> x
       in
 
       let parse  = isuniop_fun () in
