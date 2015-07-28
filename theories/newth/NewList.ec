@@ -111,6 +111,18 @@ proof. by elim s1=> // x s1 /= ->; smt. qed.
 lemma last_cons (x y : 'a) (s : 'a list): last_ x (y :: s) = last_ y s.
 proof. by []. qed.
 
+lemma last_cat (x : 'a) (s1 s2 : 'a list):
+  last_ x (s1 ++ s2) = last_ (last_ x s1) s2.
+proof. by elim s1 x=> //= x s1 ->. qed.
+
+lemma last_rcons (x y : 'a) (s : 'a list): last_ x (rcons s y) = y.
+proof. by elim s x=> //= x s ->. qed.
+
+lemma last_nonempty (x1 x2 : 'a) (s : 'a list):
+  s <> [] =>
+  last_ x1 s = last_ x2 s.
+proof. by case s. qed.
+
 lemma size_rcons s (x : 'a):
   size (rcons s x) = (size s) + 1.
 proof. by rewrite -cats1 size_cat /=. qed.
@@ -1225,6 +1237,14 @@ theory Iota.
     elim/Induction.natind: n m => [n hn|n hn ih] m.
       by rewrite iota0.
     by rewrite iotaS // cons_uniq mem_iota ih // smt.
+  qed.
+
+  lemma last_iota k m n:
+    last_ k (Iota.iota_ m n) = if n <= 0 then k else m + n - 1.
+  proof.
+    elim/Induction.natind: n m k => [n hn|n hn ih] m k.
+      by rewrite iota0 hn.
+    by rewrite iotaS //= ih smt.
   qed.
 end Iota.
 
