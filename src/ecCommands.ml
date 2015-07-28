@@ -313,8 +313,8 @@ and process_axiom (scope : EcScope.scope) (ax : paxiom located) =
     name |> EcUtils.oiter
       (fun x ->
          match (unloc ax).pa_kind with
-         | PAxiom _ -> EcScope.notify scope `Info "added axiom: `%s'" x
-         | _        -> EcScope.notify scope `Info "added lemma: `%s'" x);
+         | PAxiom -> EcScope.notify scope `Info "added axiom: `%s'" x
+         | _      -> EcScope.notify scope `Info "added lemma: `%s'" x);
     scope
 
 (* -------------------------------------------------------------------- *)

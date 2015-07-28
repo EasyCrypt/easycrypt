@@ -388,7 +388,6 @@
 %token HAVE
 %token HINT
 %token HOARE
-%token HYPOTHESIS
 %token IDTAC
 %token IF
 %token IFF
@@ -1619,10 +1618,7 @@ axiom_tc:
 
 axiom:
 | l=local AXIOM o=nosmt d=lemma_decl
-    { mk_axiom ~local:l ~nosmt:o d (PAxiom `Axiom) }
-
-| l=local HYPOTHESIS o=nosmt d=lemma_decl
-    { mk_axiom ~local:l ~nosmt:o d (PAxiom `Hypothesis) }
+    { mk_axiom ~local:l ~nosmt:o d PAxiom }
 
 | l=local LEMMA o=nosmt d=lemma_decl ao=axiom_tc
     { mk_axiom ~local:l ~nosmt:o d ao }
