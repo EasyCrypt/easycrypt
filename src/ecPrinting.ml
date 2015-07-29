@@ -1611,13 +1611,16 @@ let pp_typedecl (ppe : PPEnv.t) fmt (x, tyd) =
         Format.fprintf fmt "type %a %s" (pp_tyvar ppe) tx name
 
     | txs ->
-        Format.fprintf fmt "type (%a) %s"
+        Format.fprintf fmt "type %a %s"
           (pp_paren (pp_list ",@ " (pp_tyvar ppe))) txs name
 
   and pp_body fmt =
     match tyd.tyd_type with
     | `Abstract _ -> ()                (* FIXME: TC HOOK *)
-    | `Concrete ty -> Format.fprintf fmt " =@ %a" (pp_type ppe) ty
+
+    | `Concrete ty ->
+        Format.fprintf fmt " =@ %a" (pp_type ppe) ty
+
     | `Datatype { tydt_ctors = cs } ->
         let pp_ctor fmt (c, cty) =
           match cty with
