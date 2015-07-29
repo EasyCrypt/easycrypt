@@ -175,7 +175,7 @@ let s_abs  = "`|_|"
 
 (* -------------------------------------------------------------------- *)
 let is_mixfix_op =
-  let ops = [s_get; s_set; s_nil; s_cons; s_abs] in
+  let ops = [s_get; s_set; s_nil; s_abs] in
   fun op -> List.mem op ops
 
 (* -------------------------------------------------------------------- *)

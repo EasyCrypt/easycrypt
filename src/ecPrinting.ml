@@ -659,6 +659,9 @@ let rec pp_type_r ppe outer fmt ty =
 let pp_type ppe fmt ty =
   pp_type_r ppe (min_op_prec, `NonAssoc) fmt ty
 
+let pp_stype ppe fmt ty =
+  pp_type_r ppe ((1 + fst t_prio_tpl, `NonAssoc), `NonAssoc) fmt ty
+
 (* -------------------------------------------------------------------- *)
 let pp_if3 (ppe : PPEnv.t) pp_sub outer fmt (b, e1, e2) =
   let pp fmt (b, e1, e2)=
@@ -734,7 +737,9 @@ let pp_app (ppe : PPEnv.t) (pp_first, pp_sub) outer fmt (e, args) =
 (* -------------------------------------------------------------------- *)
 let pp_opname fmt (nm, op) =
   let op =
-    if is_binop op then begin
+    if EcCoreLib.is_mixfix_op op then
+      Printf.sprintf "\"%s\"" op
+    else if is_binop op then begin
       if op.[0] = '*' || op.[String.length op - 1] = '*'
       then Format.sprintf "( %s )" op
       else Format.sprintf "(%s)" op
@@ -1624,11 +1629,14 @@ let pp_typedecl (ppe : PPEnv.t) fmt (x, tyd) =
     | `Datatype { tydt_ctors = cs } ->
         let pp_ctor fmt (c, cty) =
           match cty with
-          | [] -> Format.fprintf fmt "%s" c
-          | _  -> Format.fprintf fmt "%s of @[<hov 2>%a@]"
-                    c (pp_list " *@ " (pp_type ppe)) cty
+          | [] ->
+            Format.fprintf fmt "%a" pp_opname ([], c)
+          | _  ->
+            Format.fprintf fmt "%a of @[<hov 2>%a@]"
+              pp_opname ([], c) (pp_list " &@ " (pp_stype ppe)) cty
         in
           Format.fprintf fmt " =@ [@[<hov 2>%a@]]" (pp_list " |@ " pp_ctor) cs
+
     | `Record (_, fields) ->
         let pp_field fmt (f, fty) =
           Format.fprintf fmt "%s: @[<hov 2>%a@]" f (pp_type ppe) fty
