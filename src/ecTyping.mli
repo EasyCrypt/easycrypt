@@ -66,7 +66,6 @@ type tyerror =
 | NonLinearPattern
 | LvNonLinear
 | NonUnitFunWithoutReturn
-| UnitFunWithReturn
 | TypeMismatch           of (ty * ty) * (ty * ty)
 | TypeClassMismatch
 | TypeModMismatch        of tymod_cnv_failure

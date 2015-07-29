@@ -76,7 +76,6 @@ type tyerror =
 | NonLinearPattern
 | LvNonLinear
 | NonUnitFunWithoutReturn
-| UnitFunWithReturn
 | TypeMismatch           of (ty * ty) * (ty * ty)
 | TypeClassMismatch
 | TypeModMismatch        of tymod_cnv_failure
@@ -209,9 +208,6 @@ let pp_tyerror env fmt error =
 
   | NonUnitFunWithoutReturn ->
       msg "This function must return a value"
-
-  | UnitFunWithReturn ->
-      msg "This void function cannot return a value"
 
   | TypeMismatch ((ty1, ty2), _) ->
       msg "This expression has type@\n";
@@ -1933,12 +1929,8 @@ and transbody ue symbols (env : EcEnv.env) retty pbody =
 
     | Some pe ->
         let (e, ety) = transexp !env `InProc ue pe in
-          try
-            EcUnify.unify !env ue tunit retty;
-            tyerror loc !env UnitFunWithReturn
-          with EcUnify.UnificationFailure _ ->
-            unify_or_fail !env ue pe.pl_loc ~expct:retty ety;
-            Some e
+        unify_or_fail !env ue pe.pl_loc ~expct:retty ety;
+        Some e
   in
     if not (UE.closed ue) then
       tyerror loc !env OnlyMonoTypeAllowed;
