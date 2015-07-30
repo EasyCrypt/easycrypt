@@ -83,9 +83,9 @@ op rcons (s : 'a list) (z : 'a) =
   with s = []      => [z]
   with s = x :: s' => x :: (rcons s' z).
 
-op last_ (x : 'a) s =
+op last (x : 'a) s =
   with s = []      => x
-  with s = y :: ys => last_ y ys.
+  with s = y :: ys => last y ys.
 
 lemma cat0s (s : 'a list): [] ++ s = s.
 proof. by []. qed.
@@ -108,19 +108,19 @@ proof. by elim s1=> //= x s1 ->. qed.
 lemma size_cat (s1 s2 : 'a list): size (s1 ++ s2) = size s1 + size s2.
 proof. by elim s1=> // x s1 /= ->; smt. qed.
 
-lemma last_cons (x y : 'a) (s : 'a list): last_ x (y :: s) = last_ y s.
+lemma lastcons (x y : 'a) (s : 'a list): last x (y :: s) = last y s.
 proof. by []. qed.
 
-lemma last_cat (x : 'a) (s1 s2 : 'a list):
-  last_ x (s1 ++ s2) = last_ (last_ x s1) s2.
+lemma lastcat (x : 'a) (s1 s2 : 'a list):
+  last x (s1 ++ s2) = last (last x s1) s2.
 proof. by elim s1 x=> //= x s1 ->. qed.
 
-lemma last_rcons (x y : 'a) (s : 'a list): last_ x (rcons s y) = y.
+lemma lastrcons (x y : 'a) (s : 'a list): last x (rcons s y) = y.
 proof. by elim s x=> //= x s ->. qed.
 
-lemma last_nonempty (x1 x2 : 'a) (s : 'a list):
+lemma lastnonempty (x1 x2 : 'a) (s : 'a list):
   s <> [] =>
-  last_ x1 s = last_ x2 s.
+  last x1 s = last x2 s.
 proof. by case s. qed.
 
 lemma size_rcons s (x : 'a):
@@ -1090,7 +1090,7 @@ lemma map_rcons (f : 'a -> 'b) s x:
 proof. by rewrite -!cats1 map_cat. qed.
 
 lemma last_map (f : 'a -> 'b) s x:
-  last_ (f x) (map f s) = f (last_ x s).
+  last (f x) (map f s) = f (last x s).
 proof. by elim s x => //= x s ->. qed.
 
 lemma filter_map (f : 'a -> 'b) p s:
@@ -1240,7 +1240,7 @@ theory Iota.
   qed.
 
   lemma last_iota k m n:
-    last_ k (Iota.iota_ m n) = if n <= 0 then k else m + n - 1.
+    last k (Iota.iota_ m n) = if n <= 0 then k else m + n - 1.
   proof.
     elim/Induction.natind: n m k => [n hn|n hn ih] m k.
       by rewrite iota0 hn.
