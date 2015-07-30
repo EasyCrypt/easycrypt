@@ -21,7 +21,8 @@ EasyCrypt uses the following third-party tools/libraries:
  * Yojson [http://mjambon.com/yojson.html]
 
  * OCaml Batteries Included [http://batteries.forge.ocamlcore.org/]
-
+ 
+ * OCaml PCRE (>= 7) [https://github.com/mmottl/pcre-ocaml]
 
 Installing requirements using OPAM (POSIX systems - preferred)
 --------------------------------------------------------------------
@@ -184,7 +185,8 @@ installation as follows. Otherwise, jump directly to step 5.
 
   5. Install the following wodi packages:
 
-       godi-menhir godi-yojson godi-batteries godi-ocamlgraph godi-zarith godi-zip
+       godi-menhir godi-yojson godi-batteries godi-ocamlgraph godi-zarith
+       godi-zip godi-pcre
 
      Use either the wodi32 package manager (from the start menu), or the
      CLI interface:
