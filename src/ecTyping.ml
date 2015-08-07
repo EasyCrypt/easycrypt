@@ -1687,7 +1687,7 @@ and transstruct ~attop (env : EcEnv.env) (x : symbol) (st : pstructure located) 
       (fun (env, acc) item ->
         let newitems = transstruct1 env item in
         let env = EcEnv.bindall (List.map tydecl1 newitems) env in
-        (env, List.rev_append acc newitems))
+        (env, acc @ newitems))
       (env0, []) st.ps_body
   in
   let items = List.map snd items in
