@@ -407,9 +407,9 @@ type function_def = {
 }
 
 type function_body =
-| FBdef of function_def
+| FBdef   of function_def
 | FBalias of xpath
-| FBabs of oracle_info
+| FBabs   of oracle_info
 
 type function_ = {
   f_name   : symbol;

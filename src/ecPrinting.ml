@@ -268,8 +268,8 @@ module PPEnv = struct
 
     let isfunctor =
       List.all2 EcPath.m_equal
-	(List.map (fun (x, _) -> EcPath.mident x) mty.mt_params)
-	mty.mt_args
+	      (List.map (fun (x, _) -> EcPath.mident x) mty.mt_params)
+	      mty.mt_args
     in
 
     let msymb =
@@ -346,6 +346,10 @@ let rec pp_list sep pp fmt xs =
     | []      -> ()
     | [x]     -> Format.fprintf fmt "%a" pp x
     | x :: xs -> Format.fprintf fmt "%a%(%)%a" pp x sep pp_list xs
+
+(* -------------------------------------------------------------------- *)
+let pp_option pp fmt x =
+  match x with None -> () | Some x -> pp fmt x
 
 (* -------------------------------------------------------------------- *)
 let pp_enclose ~pre ~post pp fmt x =
@@ -2324,14 +2328,15 @@ let pp_pvdecl ppe fmt v =
 let pp_funsig ppe fmt (oi_in, fs) =
   match fs.fs_anames with
   | None ->
-    Format.fprintf fmt "@[<hov 2>proc%s %s (%a) :@ %a@]"
-      (if oi_in then "" else " *")
-      fs.fs_name (pp_type ppe) fs.fs_arg (pp_type ppe) fs.fs_ret
+      Format.fprintf fmt "@[<hov 2>proc%s %s (%a) :@ %a@]"
+        (if oi_in then "" else " *")
+        fs.fs_name (pp_type ppe) fs.fs_arg (pp_type ppe) fs.fs_ret
+
   | Some params ->
-    Format.fprintf fmt "@[<hov 2>proc%s %s(%a) :@ %a@]"
-      (if oi_in then "" else " *") fs.fs_name
-      (pp_list ", " (pp_pvdecl ppe)) params
-      (pp_type ppe) fs.fs_ret
+      Format.fprintf fmt "@[<hov 2>proc%s %s(%a) :@ %a@]"
+        (if oi_in then "" else " *") fs.fs_name
+        (pp_list ", " (pp_pvdecl ppe)) params
+        (pp_type ppe) fs.fs_ret
 
 let pp_orclinfo ppe fmt oi =
   Format.fprintf fmt "{%a}"
@@ -2347,14 +2352,14 @@ let pp_modsig ppe fmt (p,ms) =
     (EcPath.basename p) pp
     (pp_list "@,@," (pp_sigitem ppe)) ms.mis_body
 
-let rec pp_instr (ppe : PPEnv.t) fmt i =
+let rec pp_instr_r (ppe : PPEnv.t) fmt i =
   match i.i_node with
   | Sasgn (lv, e) ->
-    Format.fprintf fmt "@[<hov 2>%a <-@ @[%a@]@]"
+    Format.fprintf fmt "@[<hov 2>%a <-@ @[%a@]@];"
       (pp_lvalue ppe) lv (pp_expr ppe) e
 
   | Srnd (lv, e) ->
-    Format.fprintf fmt "@[<hov 2>%a <$@ @[$%a@]"
+    Format.fprintf fmt "@[<hov 2>%a <$@ @[$%a@];"
       (pp_lvalue ppe) lv (pp_expr ppe) e
 
   | Scall (None, xp, args) ->
@@ -2363,39 +2368,40 @@ let rec pp_instr (ppe : PPEnv.t) fmt i =
       (pp_list ",@ " (pp_expr ppe)) args
 
   | Scall (Some lv, xp, args) ->
-    Format.fprintf fmt "@[<hov 2>%a <@@@ %a(@[%a@]);@]"
+    Format.fprintf fmt "@[<hov 2>%a <@@@ %a(@[%a@])@];"
       (pp_lvalue ppe) lv
       (pp_funname ppe) xp
       (pp_list ",@ " (pp_expr ppe)) args
 
   | Sassert e ->
-    Format.fprintf fmt "@[<hov 2>assert %a;@]"
+    Format.fprintf fmt "@[<hov 2>assert %a@];"
       (pp_expr ppe) e
 
   | Swhile (e, s) ->
     Format.fprintf fmt "@[<v>while (@[%a@])%a@]"
-      (pp_expr ppe) e
-      (pp_block ppe) s
+      (pp_expr ppe) e (pp_block ppe) s
 
   | Sif (e, s1, s2) ->
     let pp_else ppe fmt s =
-      if s.s_node = [] then ()
-      else
-        if List.length s1.s_node = 1 then
-          Format.fprintf fmt "@,else %a" (pp_block ppe) s
-        else Format.fprintf fmt "@ else %a" (pp_block ppe) s in
-    Format.fprintf fmt "@[<v>if (@[%a@])%a%a@]"
-      (pp_expr ppe) e
-      (pp_block ppe) s1
-      (pp_else ppe) s2
+      match s.s_node with
+      | []  -> ()
+      | [_] -> Format.fprintf fmt "@,else %a" (pp_block ppe) s
+      | _   -> Format.fprintf fmt "@ else %a" (pp_block ppe) s
+    in
+      Format.fprintf fmt "@[<v>if (@[%a@]) %a%a@]"
+      (pp_expr ppe) e (pp_block ppe) s1 (pp_else ppe) s2
+
   | Sabstract id ->
     Format.fprintf fmt "%s" (EcIdent.name id)
 
+and pp_instr ppe fmt i =
+  Format.fprintf fmt "%a" (pp_instr_r ppe) i
+
 and pp_block ppe fmt s =
   match s.s_node with
-  | [] -> Format.fprintf fmt "{}"
+  | []  -> Format.fprintf fmt "{}"
   | [i] -> Format.fprintf fmt "@;<1 2>%a" (pp_instr ppe) i
-  | _ -> Format.fprintf fmt " {@,  @[<v>%a@]@,}" (pp_stmt ppe) s
+  | _   -> Format.fprintf fmt "{@,  @[<v>%a@]@,}" (pp_stmt ppe) s
 
 and pp_stmt ppe fmt s =
   pp_list "@," (pp_instr ppe) fmt s.s_node
@@ -2415,26 +2421,42 @@ and pp_modbody ppe fmt = function
     Format.fprintf fmt "@,%a" (pp_modtype ppe) (mt,restr)
 
 and pp_moditem ppe fmt = function
-  | MI_Module me -> pp_modexp ppe fmt me
-  | MI_Variable v -> Format.fprintf fmt "@[<hov 2>var %a@]" (pp_pvdecl ppe) v
+  | MI_Module me ->
+      pp_modexp ppe fmt me
+
+  | MI_Variable v ->
+      Format.fprintf fmt "@[<hov 2>var %a@]" (pp_pvdecl ppe) v
+
   | MI_Function f ->
+    let pp_item ppe fmt = function
+      | `Var pv ->
+          Format.fprintf fmt "@[<hov 2>var %a;@]" (pp_pvdecl ppe) pv
+      | `Instr i ->
+          Format.fprintf fmt "%a" (pp_instr ppe) i
+      | `Return e ->
+          Format.fprintf fmt "@[<hov 2>return@ @[%a@];@]" (pp_expr ppe) e
+    in
+
     let pp_fundef ppe fmt = function
       | FBdef def ->
-        Format.fprintf fmt "{@,  @[<v>%a@,%a@,%a@]@,}"
-          (pp_list "@," (fun fmt->Format.fprintf fmt "@[<hov 2>var %a@]" (pp_pvdecl ppe)))
-          def.f_locals
-          (pp_stmt ppe) def.f_body (* FIXME ppe should add the memory *)
-          (fun fmt o -> if o = None then () else
-              Format.fprintf fmt "@[<hov 2>return@ @[%a@];@]"
-                (pp_expr ppe) (oget o))
-          def.f_ret
-      | FBalias g ->
-        Format.fprintf fmt "%a" (pp_funname ppe) g
+        let vars = List.map (fun x -> `Var    x) def.f_locals in
+        let stmt = List.map (fun x -> `Instr  x) def.f_body.s_node in
+        let ret  = List.map (fun x -> `Return x) (otolist def.f_ret) in
+        let all  = List.filter (fun x -> not (List.is_empty x)) [vars; stmt; ret] in
 
-      | _ -> Format.fprintf fmt "?ABSTRACT?" in
+        if List.is_empty all then Format.fprintf fmt "{}" else
+          Format.fprintf fmt "{@,  @[<v>%a@]@,}"
+            (pp_list "@,@," (pp_list "@," (pp_item ppe))) all;
+
+      | FBalias g ->
+          Format.fprintf fmt "%a" (pp_funname ppe) g
+
+      | FBabs _ ->
+          Format.fprintf fmt "?ABSTRACT?"
+    in
 
     Format.fprintf fmt "@[<v>%a = %a@]"
-      (pp_funsig ppe) (false, f.f_sig)
+      (pp_funsig ppe) (true, f.f_sig)
       (pp_fundef ppe) f.f_def
 
 let pp_modexp ppe fmt me =
