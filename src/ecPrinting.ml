@@ -539,7 +539,6 @@ let e_bin_prio_lambda = ( 5, `Prefix)
 let e_bin_prio_impl   = (10, `Infix `Right)
 let e_bin_prio_iff    = (12, `NonAssoc)
 let e_bin_prio_if     = (15, `Prefix)
-let e_bin_prio_if3    = (17, `Infix `NonAssoc)
 let e_bin_prio_letin  = (18, `Prefix)
 let e_bin_prio_nop    = (19, `Infix `Left)
 let e_bin_prio_or     = (20, `Infix `Right)
@@ -554,6 +553,7 @@ let e_bin_prio_lop3   = (50, `Infix `Left )
 let e_bin_prio_rop3   = (51, `Infix `Right)
 let e_bin_prio_lop4   = (60, `Infix `Left )
 let e_bin_prio_rop4   = (61, `Infix `Right)
+let e_bin_prio_if3    = e_bin_prio_lop2
 
 let e_uni_prio_not    = 26
 let e_uni_prio_lsless = 10000
