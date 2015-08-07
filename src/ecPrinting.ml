@@ -430,6 +430,7 @@ let msymbol_of_pv (ppe : PPEnv.t) p =
         @ (List.map (fun nm1 -> (nm1, [])) nm)
         @ [(x, [])]
 
+(* -------------------------------------------------------------------- *)
 let pp_pv ppe fmt p =
   EcSymbols.pp_msymbol fmt (msymbol_of_pv ppe p)
 
@@ -2406,25 +2407,27 @@ and pp_block ppe fmt s =
 and pp_stmt ppe fmt s =
   pp_list "@," (pp_instr ppe) fmt s.s_node
 
-let rec pp_modexp ppe fmt me =
+let rec pp_modexp ppe fmt (p, me) =
   let (ppe, pp) = pp_mod_params ppe me.me_sig.mis_params in
   Format.fprintf fmt "@[<v>module %s%t = %a@]"
-    me.me_name pp (pp_modbody ppe) me.me_body
+    me.me_name pp (pp_modbody ppe) (p, me.me_body)
 
-and pp_modbody ppe fmt = function
+and pp_modbody ppe fmt (p, body) =
+  match body with
   | ME_Alias (_, mp) ->
       Format.fprintf fmt "%a" (pp_topmod ppe) mp
 
   | ME_Structure ms ->
       Format.fprintf fmt "{@,  @[<v>%a@]@,}"
-        (pp_list "@,@," (pp_moditem ppe)) ms.ms_body
+        (pp_list "@,@," (fun fmt i -> pp_moditem ppe fmt (p, i))) ms.ms_body
 
   | ME_Decl (mt, restr) ->
       Format.fprintf fmt "%a" (pp_modtype ppe) (mt, restr)
 
-and pp_moditem ppe fmt = function
+and pp_moditem ppe fmt (p, i) =
+  match i with
   | MI_Module me ->
-      pp_modexp ppe fmt me
+      pp_modexp ppe fmt (EcPath.mqname p me.me_name, me)
 
   | MI_Variable v ->
       Format.fprintf fmt "@[<hov 2>var %a@]" (pp_pvdecl ppe) v
@@ -2441,6 +2444,8 @@ and pp_moditem ppe fmt = function
 
     let pp_fundef ppe fmt = function
       | FBdef def ->
+        let xp   = EcPath.xpath_fun p f.f_name in
+        let ppe  = PPEnv.create_and_push_mem ppe ~active:true (EcFol.mhr, xp) in
         let vars = List.map (fun x -> `Var    x) def.f_locals in
         let stmt = List.map (fun x -> `Instr  x) def.f_body.s_node in
         let ret  = List.map (fun x -> `Return x) (otolist def.f_ret) in
@@ -2461,10 +2466,14 @@ and pp_moditem ppe fmt = function
       (pp_funsig ppe) (true, f.f_sig)
       (pp_fundef ppe) f.f_def
 
-let pp_modexp ppe fmt me =
-  Format.fprintf fmt "%a." (pp_modexp ppe) me
+let pp_modexp ppe fmt (mp, me) =
+  Format.fprintf fmt "%a." (pp_modexp ppe) (mp, me)
 
-let rec pp_theory ppe (fmt:Format.formatter) (path, (cth, mode)) =
+let pp_modexp_top ppe fmt (p, me) =
+  let mp = EcPath.mpath_crt p [] (Some (EcPath.psymbol me.me_name)) in
+  pp_modexp ppe fmt (mp, me)
+
+let rec pp_theory ppe (fmt : Format.formatter) (path, (cth, mode)) =
   let basename = EcPath.basename path in
   let pp_clone fmt desc =
     match desc with
@@ -2500,7 +2509,7 @@ let rec pp_theory ppe (fmt:Format.formatter) (path, (cth, mode)) =
       pp_modsig ppe fmt (EcPath.pqname p id, ms)
 
   | EcTheory.CTh_module me ->
-      pp_modexp ppe fmt me
+      pp_modexp_top ppe fmt (p, me)
 
   | EcTheory.CTh_theory (id, cth) ->
       pp_theory ppe fmt (EcPath.pqname p id, cth)
@@ -2657,7 +2666,7 @@ module ObjectInfo = struct
   let pr_mod_r =
     { od_name    = "modules";
       od_lookup  = EcEnv.Mod.lookup;
-      od_printer = (fun ppe fmt (_, me) -> pp_modexp ppe fmt me); }
+      od_printer = (fun ppe fmt (p, me) -> pp_modexp ppe fmt (p, me)); }
 
   let pr_mod = pr_gen pr_mod_r
 
