@@ -538,7 +538,7 @@ let gen_select_op
     EcPath.p_equal opsc (oget (EcPath.prefix p))
 
   and by_current ((p, _), _, _) =
-    EcPath.isprefix (oget (EcPath.prefix p)) (EcEnv.root env)
+    EcPath.isprefix (EcEnv.root env) (oget (EcPath.prefix p))
 
   and by_tc ((p, _), _, _) =
     match oget (EcEnv.Op.by_path_opt p env) with
@@ -554,7 +554,7 @@ let gen_select_op
       let ops () =
         let ops = EcUnify.select_op ~filter:ue_filter tvi env name ue psig in
         let ops = opsc |> ofold (fun opsc -> List.mbfilter (by_scope opsc)) ops in
-        let ops = List.mbfilter by_current ops in
+        let ops = match List.mbfilter by_current ops with [] -> ops | ops -> ops in
         let ops = match List.mbfilter by_tc ops with [] -> ops | ops -> ops in
         (List.map fop ops)
 
