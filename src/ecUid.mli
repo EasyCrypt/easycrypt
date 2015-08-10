@@ -30,6 +30,7 @@ module NameGen : sig
   type t
 
   val ofint  : int -> string
+  val bulk   : ?fmt:(string -> string) -> int -> string list
   val create : unit -> t
   val get    : t -> uid -> string
 end

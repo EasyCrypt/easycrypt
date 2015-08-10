@@ -14,6 +14,7 @@ open EcCoreFol
 (* -------------------------------------------------------------------- *)
 type ty_param  = EcIdent.t * EcPath.Sp.t
 type ty_params = ty_param list
+type ty_pctor  = [ `Int of int | `Named of ty_params ]
 
 type tydecl = {
   tyd_params : ty_params;
@@ -37,6 +38,10 @@ val tydecl_as_concrete : tydecl -> EcTypes.ty
 val tydecl_as_abstract : tydecl -> Sp.t
 val tydecl_as_datatype : tydecl -> ty_dtype
 val tydecl_as_record   : tydecl -> form * (EcSymbols.symbol * EcTypes.ty) list
+
+val abs_tydecl : ?tc:Sp.t -> ?params:ty_pctor -> unit -> tydecl
+
+val ty_instanciate : ty_params -> ty list -> ty -> ty
 
 (* -------------------------------------------------------------------- *)
 type locals = EcIdent.t list

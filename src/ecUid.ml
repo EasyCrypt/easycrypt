@@ -76,4 +76,7 @@ module NameGen = struct
       let s = ofint (Counter.next map.ng_counter) in
         map.ng_map <- Muid.add id s map.ng_map;
         s
+
+  let bulk ?(fmt = (fun (x : string) -> x)) (n : int) =
+    List.init n (fun i -> fmt (ofint i))
 end

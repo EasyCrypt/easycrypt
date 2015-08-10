@@ -5,6 +5,7 @@
 
 (* -------------------------------------------------------------------- *)
 open EcUtils
+open EcTypes
 open EcCoreFol
 
 module Sp   = EcPath.Sp
@@ -15,6 +16,7 @@ module Ssym = EcSymbols.Ssym
 (* -------------------------------------------------------------------- *)
 type ty_param  = EcIdent.t * EcPath.Sp.t
 type ty_params = ty_param list
+type ty_pctor  = [ `Int of int | `Named of ty_params ]
 
 type tydecl = {
   tyd_params : ty_params;
@@ -45,6 +47,26 @@ let tydecl_as_datatype (td : tydecl) =
 
 let tydecl_as_record (td : tydecl) =
   match td.tyd_type with `Record x -> x | _ -> assert false
+
+(* -------------------------------------------------------------------- *)
+let abs_tydecl ?(tc = Sp.empty) ?(params = `Int 0) () =
+  let params =
+    match params with
+    | `Named params ->
+        params
+    | `Int n ->
+        let fmt = fun x -> Printf.sprintf "'%s" x in
+        List.map
+          (fun x -> (EcIdent.create x, Sp.empty))
+          (EcUid.NameGen.bulk ~fmt n)
+  in
+
+  { tyd_params = params; tyd_type = `Abstract tc; }
+
+(* -------------------------------------------------------------------- *)
+let ty_instanciate (params : ty_params) (args : ty list) (ty : ty) =
+  let subst = EcTypes.Tvar.init (List.map fst params) args in
+  EcTypes.Tvar.subst subst ty
 
 (* -------------------------------------------------------------------- *)
 type locals = EcIdent.t list 

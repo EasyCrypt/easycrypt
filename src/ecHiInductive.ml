@@ -20,6 +20,7 @@ type rcerror =
 | RCE_TypeError        of TT.tyerror
 | RCE_DuplicatedField  of symbol
 | RCE_InvalidFieldType of symbol * TT.tyerror
+| RCE_Empty
 
 type dterror =
 | DTE_TypeError       of TT.tyerror
@@ -65,6 +66,9 @@ let pp_rcerror env fmt error =
   | RCE_InvalidFieldType (name, ee) ->
       msg "invalid field type: `%s`: %a'" name (TT.pp_tyerror env) ee
 
+  | RCE_Empty ->
+      msg "this record type is empty"
+
 (* -------------------------------------------------------------------- *)
 let pp_dterror env fmt error =
   let msg x = Format.fprintf fmt x in
@@ -84,7 +88,7 @@ let pp_dterror env fmt error =
       msg "the datatype does not respect the positivity condition"
 
   | DTE_Empty ->
-      msg "the datatype is empty"
+      msg "the datatype may be empty"
 
 (* -------------------------------------------------------------------- *)
 let pp_fxerror env fmt error =
@@ -147,6 +151,10 @@ let trans_record (env : EcEnv.env) (name : ptydname) (rc : precord) =
   Msym.odup unloc (List.map fst rc) |> oiter (fun (x, y) ->
     rcerror y.pl_loc env (RCE_DuplicatedField x.pl_desc));
 
+  (* Check for emptyness *)
+  if List.is_empty rc then
+    rcerror loc env RCE_Empty;
+
   (* Type-check field types *)
   let fields =
     let for1 (fname, fty) =
@@ -179,6 +187,8 @@ let trans_datatype (env : EcEnv.env) (name : ptydname) (dt : pdatatype) =
       EcEnv.Ty.bind (unloc name) myself env
   in
 
+  let tparams = EcUnify.UniEnv.tparams ue in
+
   (* Check for duplicated constructor names *)
   Msym.odup unloc (List.map fst dt) |> oiter (fun (x, y) ->
     dterror y.pl_loc env (DTE_DuplicatedCtor x.pl_desc));
@@ -195,17 +205,50 @@ let trans_datatype (env : EcEnv.env) (name : ptydname) (dt : pdatatype) =
 
   (* Check for emptyness *)
   begin
-    let rec occurs p ty =
-      match (EcEnv.Ty.hnorm ty env0).ty_node with
-      | Tconstr (p', _) when EcPath.p_equal p p' -> true
-      | _ -> EcTypes.ty_sub_exists (occurs p) ty
+    let rec isempty_n (ctors : (ty list) list) =
+      List.for_all isempty_1 ctors
+
+    and isempty_1 (ctor : ty list) =
+      List.exists isempty ctor
+
+    and isempty (ty : ty) =
+      match ty.ty_node with
+      | Tglob   _ -> false
+      | Tvar    _ -> false
+      | Tunivar _ -> false
+
+      | Ttuple tys      -> List.exists isempty tys
+      | Tfun   (t1, t2) -> List.exists isempty [t1; t2]
+
+      | Tconstr (p, args) ->
+          isempty_dtype (args, p)
+
+    and isempty_dtype (targs, tname) =
+      if EcPath.p_equal tname tpath then true else
+
+      let tdecl = EcEnv.Ty.by_path_opt tname env0
+        |> ofdfl (EcDecl.abs_tydecl ~params:(`Named tparams)) in
+      let tyinst () =
+        fun ty -> ty_instanciate tdecl.tyd_params targs ty in
+
+      match tdecl.tyd_type with
+      | `Abstract _ ->
+          List.exists isempty (targs)
+
+      | `Concrete ty ->
+          isempty_1 [tyinst () ty]
+
+      | `Record (_, fields) ->
+          isempty_1 (List.map (tyinst () |- snd) fields)
+
+      | `Datatype dt ->
+          isempty_n (List.map (List.map (tyinst ()) |- snd) dt.tydt_ctors)
 
     in
-    if List.for_all (fun (_, cty) -> List.exists (occurs tpath) cty) ctors then
+
+    if isempty_n (List.map snd ctors) then
       dterror loc env DTE_Empty;
   end;
-
-  let tparams = EcUnify.UniEnv.tparams ue in
 
   { EI.dt_path = tpath; EI.dt_tparams = tparams; EI.dt_ctors = ctors; }
 

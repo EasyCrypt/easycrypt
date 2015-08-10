@@ -15,6 +15,7 @@ type rcerror =
 | RCE_TypeError        of EcTyping.tyerror
 | RCE_DuplicatedField  of symbol
 | RCE_InvalidFieldType of symbol * EcTyping.tyerror
+| RCE_Empty
 
 type dterror =
 | DTE_TypeError       of EcTyping.tyerror
