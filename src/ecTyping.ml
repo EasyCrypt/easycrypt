@@ -538,7 +538,7 @@ let gen_select_op
     EcPath.p_equal opsc (oget (EcPath.prefix p))
 
   and by_current ((p, _), _, _) =
-    EcPath.isprefix (EcEnv.root env) (oget (EcPath.prefix p))
+    EcPath.isprefix (oget (EcPath.prefix p)) (EcEnv.root env)
 
   and by_tc ((p, _), _, _) =
     match oget (EcEnv.Op.by_path_opt p env) with
