@@ -14,11 +14,14 @@ open EcTypes
  * - m  is the map to be updated
  * - x  is the index to update
  * - ty is the type of the value [m] *)
+type lvmap = 
+    (EcPath.path * EcTypes.ty list)
+  *  EcTypes.prog_var * EcTypes.expr * EcTypes.ty
+
 type lvalue =
   | LvVar   of (EcTypes.prog_var * EcTypes.ty)
   | LvTuple of (EcTypes.prog_var * EcTypes.ty) list
-  | LvMap   of (EcPath.path * EcTypes.ty list) *
-                  EcTypes.prog_var * EcTypes.expr * EcTypes.ty
+  | LvMap   of lvmap
 
 val lv_equal : lvalue -> lvalue -> bool
 val symbol_of_lv : lvalue -> symbol
@@ -60,18 +63,16 @@ val s_fv      : stmt -> int EcIdent.Mid.t
 val s_subst   : e_subst -> stmt -> stmt
 
 (* -------------------------------------------------------------------- *)
-val i_asgn    : lvalue * expr -> instr
-val i_rnd     : lvalue * expr -> instr
-val i_call    : lvalue option * xpath * expr list -> instr
-val i_if      : expr * stmt * stmt -> instr
-val i_while   : expr * stmt -> instr
-val i_assert  : expr -> instr
+val i_asgn     : lvalue * expr -> instr
+val i_rnd      : lvalue * expr -> instr
+val i_call     : lvalue option * xpath * expr list -> instr
+val i_if       : expr * stmt * stmt -> instr
+val i_while    : expr * stmt -> instr
+val i_assert   : expr -> instr
 val i_abstract : EcIdent.t -> instr
+val s_seq      : stmt -> stmt -> stmt
 
-val s_seq     : stmt -> stmt -> stmt
-
-val stmt : instr list -> stmt
-(* [rstmt l] is stmt (List.rev l) *)
+val stmt  : instr list -> stmt
 val rstmt : instr list -> stmt
 
 val s_split : int -> stmt -> instr list * instr list
