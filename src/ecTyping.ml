@@ -2121,7 +2121,36 @@ let trans_topmsymbol env gp =
   mp
 
 (* -------------------------------------------------------------------- *)
+module PFS : sig
+  type pfstate
+
+  val create : unit -> pfstate
+
+  val set_memused : pfstate -> unit
+  val get_memused : pfstate -> bool
+  val new_memused : ('a -> 'b) -> pfstate -> 'a -> bool * 'b
+end = struct
+  type pfstate = { mutable pfa_memused : bool; }
+
+  let create () = { pfa_memused = true; }
+
+  let set_memused state =
+    state.pfa_memused <- true
+
+  let get_memused state =
+    state.pfa_memused
+
+  let new_memused f state x =
+    let old  = state.pfa_memused in
+    let aout = (state.pfa_memused <- false; f x) in
+    let new_ = state.pfa_memused in
+    state.pfa_memused <- old; (new_, aout)
+end
+
+(* -------------------------------------------------------------------- *)
 let trans_form_or_pattern env (ps, ue) pf tt =
+  let state = PFS.create () in
+
   let rec transf_r opsc env f =
     let transf = transf_r opsc in
 
@@ -2142,13 +2171,12 @@ let trans_form_or_pattern env (ps, ue) pf tt =
           transf_r (Some opsc) env f
 
     | PFglob gp ->
-        let (mp,_) = trans_msymbol env gp in
+        let mp = fst (trans_msymbol env gp) in
         let me =  
           match EcEnv.Memory.current env with
           | None -> tyerror f.pl_loc env NoActiveMemory
           | Some me -> EcMemory.memory me
-        in
-          f_glob mp me
+        in PFS.set_memused state; f_glob mp me
       
     | PFint n ->
         f_int n
@@ -2168,8 +2196,10 @@ let trans_form_or_pattern env (ps, ue) pf tt =
         | [] ->
             tyerror loc env (UnknownVarOrOp (name, []))
 
-        | [op, _, subue, _] ->
+        | [op, _, subue, _] -> begin
+            if is_pvar op then PFS.set_memused state;
             EcUnify.UniEnv.restore ~src:subue ~dst:ue; op
+        end
 
         | _ ->
             let matches = List.map (fun (_, _, subue, m) -> (m, subue)) ops in
@@ -2183,7 +2213,19 @@ let trans_form_or_pattern env (ps, ue) pf tt =
           | None -> tyerror sloc env (UnknownMemName (gen, side))
           | Some me -> EcMemory.memory me
         in
-          transf (EcEnv.Memory.set_active me env) f
+
+        let used, aout =
+          PFS.new_memused 
+            (transf (EcEnv.Memory.set_active me env))
+            state f
+        in
+        if not used then begin
+          let ppe = EcPrinting.PPEnv.ofenv env in
+          EcEnv.notify ~immediate:false env `Warning
+            "unused memory `%s', while typing %a"
+            side (EcPrinting.pp_form ppe) aout
+        end;
+        aout
       end
 
     | PFeqveq (xs, om) ->
@@ -2305,37 +2347,45 @@ let trans_form_or_pattern env (ps, ue) pf tt =
 
     | PFproj (subf, x) -> begin
       let subf = transf env subf in
+
       match select_proj env opsc (unloc x) ue None subf.f_ty with
       | [] -> 
         let ty = Tuni.offun (EcUnify.UniEnv.assubst ue) subf.f_ty in
-        let me = EcFol.mhr in
-        let mp = 
-          match ty.ty_node with
-          | Tglob mp -> mp 
-          | _ -> tyerror x.pl_loc env (UnknownProj (unloc x)) in
-        let f = NormMp.norm_glob env me mp in
-        let lf = 
-          match f.f_node with
-          | Ftuple l -> l 
-          | _ -> tyerror x.pl_loc env (UnknownProj (unloc x)) in
-        let vx,ty =
-          match EcEnv.Var.lookup_progvar_opt ~side:me (unloc x) env with
-          | None -> tyerror x.pl_loc env (UnknownVarOrOp (unloc x, []))
-          | Some (x1, ty) -> 
-              match x1 with
-              | `Var x -> NormMp.norm_pvar env x, ty 
-              | _ -> tyerror x.pl_loc env (UnknownVarOrOp (unloc x, [])) in 
-        let find f1 =
-           match f1.f_node with
-            | Fpvar (x1, _) -> EcTypes.pv_equal vx (NormMp.norm_pvar env x1)
-            | _ -> false in 
+        let lf =
+          let mp = 
+            match ty.ty_node with
+            | Tglob mp -> mp
+            | _ -> tyerror x.pl_loc env (UnknownProj (unloc x)) in
+
+          match NormMp.norm_glob env EcFol.mhr mp with
+          | { f_node = Ftuple xs } -> xs
+          | _ -> tyerror x.pl_loc env (UnknownProj (unloc x))
+        in
+
+        let (vx, ty) =
+          match EcEnv.Var.lookup_progvar_opt ~side:EcFol.mhr (unloc x) env with
+          | None ->
+              tyerror x.pl_loc env (UnknownVarOrOp (unloc x, []))
+          | Some (`Var x, ty) ->
+              (NormMp.norm_pvar env x, ty)
+          | Some (_, _) ->
+              tyerror x.pl_loc env (UnknownVarOrOp (unloc x, [])) in
+
+        let find = function
+          | { f_node = Fpvar (x, _) } ->
+              EcTypes.pv_equal vx (NormMp.norm_pvar env x)
+          | _ -> false in
+
         let i = 
           match List.oindex find lf with
-          | None -> tyerror x.pl_loc env (UnknownProj (unloc x))
-          | Some i -> i in
-        f_proj subf i ty
+          | None   -> tyerror x.pl_loc env (UnknownProj (unloc x))
+          | Some i -> i
 
-      | _::_::_ -> tyerror x.pl_loc env (AmbiguousProj (unloc x))
+        in f_proj subf i ty
+
+      | _ :: _ :: _ ->
+          tyerror x.pl_loc env (AmbiguousProj (unloc x))
+
       | [(op, tvi), pty, subue] ->
         EcUnify.UniEnv.restore ~src:subue ~dst:ue;
         let rty = EcUnify.UniEnv.fresh ue in
@@ -2344,14 +2394,14 @@ let trans_form_or_pattern env (ps, ue) pf tt =
         f_app (f_op op tvi pty) [subf] rty
     end
 
-    | PFproji (subf, i) -> begin
-      let subf' = transf env subf in
-      let ty = Tuni.offun (EcUnify.UniEnv.assubst ue) subf'.f_ty in
+    | PFproji (psubf, i) -> begin
+      let subf = transf env psubf in
+      let ty   = Tuni.offun (EcUnify.UniEnv.assubst ue) subf.f_ty in
       match (EcEnv.Ty.hnorm ty env).ty_node with
       | Ttuple l when i < List.length l ->
-        let ty = List.nth l i in
-        f_proj subf' i ty
-      | _ -> tyerror subf.pl_loc env (AmbiguousProji(i,ty))
+          f_proj subf i (List.nth l i)
+      | _ ->
+          tyerror psubf.pl_loc env (AmbiguousProji (i, ty))
     end
 
     | PFprob (gp, args, m, event) ->
@@ -2442,8 +2492,9 @@ let trans_form_or_pattern env (ps, ue) pf tt =
             let env = EcEnv.Memory.push (EcMemory.abstract x) env in
             env, (x, ty) in
           List.map_fold add1 env xs in
+
     let env, bd = List.map_fold trans1 env decl in
-    env, List.flatten bd
+    (env, List.flatten bd)
   in
 
   let f = transf_r None env pf in

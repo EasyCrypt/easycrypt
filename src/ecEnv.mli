@@ -39,7 +39,9 @@ val gstate : env -> EcGState.gstate
 val copy   : env -> env
 
 (* -------------------------------------------------------------------- *)
-val notify : env -> EcGState.loglevel -> ('a, Format.formatter, unit, unit) format4 -> 'a
+val notify :
+     ?immediate:bool -> env -> EcGState.loglevel
+  -> ('a, Format.formatter, unit, unit) format4 -> 'a
 
 (* -------------------------------------------------------------------- *)
 type lookup_error = [

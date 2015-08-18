@@ -1082,6 +1082,7 @@ let is_op_eq       p = EcPath.p_equal EcCoreLib.CI_Bool.p_eq  p
 let destr_app   = function { f_node = Fapp (f, fs) } -> (f, fs) | f -> (f, [])
 let destr_tuple = function { f_node = Ftuple fs } -> fs | _ -> destr_error "tuple"
 let destr_local = function { f_node = Flocal id } -> id | _ -> destr_error "local"
+let destr_pvar  = function { f_node = Fpvar (pv, m) } -> (pv, m) | _ -> destr_error "pvar"
 
 let _destr1 ~name pred form =
   match destr_app form with
@@ -1130,6 +1131,7 @@ let is_true      f = f_equal f f_true
 let is_false     f = f_equal f f_false
 let is_tuple     f = is_from_destr destr_tuple     f
 let is_local     f = is_from_destr destr_local     f
+let is_pvar      f = is_from_destr destr_pvar      f
 let is_and       f = is_from_destr destr_and       f
 let is_or        f = is_from_destr destr_or        f
 let is_not       f = is_from_destr destr_not       f

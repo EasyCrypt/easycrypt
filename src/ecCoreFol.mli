@@ -307,6 +307,7 @@ val destr_error : string -> 'a
 
 (* -------------------------------------------------------------------- *)
 val destr_local     : form -> EcIdent.t
+val destr_pvar      : form -> prog_var * memory
 val destr_tuple     : form -> form list
 val destr_app       : form -> form * form list
 val destr_not       : form -> form
@@ -354,6 +355,7 @@ val is_exists    : form -> bool
 val is_let       : form -> bool
 val is_eq        : form -> bool
 val is_local     : form -> bool
+val is_pvar      : form -> bool
 val is_equivF    : form -> bool
 val is_equivS    : form -> bool
 val is_eagerF    : form -> bool
