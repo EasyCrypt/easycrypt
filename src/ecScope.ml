@@ -1229,11 +1229,28 @@ module Mod = struct
       | None -> ()
       | Some locals ->
           if EcSection.module_use_local_or_abs m locals then
-            hierror "this module use local/abstracts modules and must be declared as local";
-
+            hierror
+              "this module uses local/abstracts modules and
+               must be declared as local";
     end;
 
-      bind scope ptm.ptm_local m
+    let ur = EcModules.get_uninit_read_of_module (path scope) m in
+
+    if not (List.is_empty ur) then begin
+      let ppe = EcPrinting.PPEnv.ofenv (env scope) in
+      let pp fmt (xp, names) =
+        Format.fprintf fmt "  - %a -> [%a]"
+          (EcPrinting.pp_funname ppe) xp
+          (EcPrinting.pp_list ", " pp_symbol)
+          (List.map EcPath.xbasename (Sx.elements names))
+      in
+
+      notify scope `Warning
+        "these procedures may use uninitialized local variables:@\n@[<v>%a@]"
+        (EcPrinting.pp_list "@," pp) ur
+    end;
+
+    bind scope ptm.ptm_local m
 
   let declare (scope : scope) m =
     if not (EcSection.in_section scope.sc_section) then

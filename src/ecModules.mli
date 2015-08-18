@@ -14,18 +14,16 @@ open EcTypes
  * - m  is the map to be updated
  * - x  is the index to update
  * - ty is the type of the value [m] *)
-type lvmap = 
-    (EcPath.path * EcTypes.ty list)
-  *  EcTypes.prog_var * EcTypes.expr * EcTypes.ty
+type lvmap = (path * ty list) *  prog_var * expr * ty
 
 type lvalue =
-  | LvVar   of (EcTypes.prog_var * EcTypes.ty)
-  | LvTuple of (EcTypes.prog_var * EcTypes.ty) list
+  | LvVar   of (prog_var * ty)
+  | LvTuple of (prog_var * ty) list
   | LvMap   of lvmap
 
-val lv_equal : lvalue -> lvalue -> bool
+val lv_equal     : lvalue -> lvalue -> bool
 val symbol_of_lv : lvalue -> symbol
-val ty_of_lv : lvalue -> EcTypes.ty
+val ty_of_lv     : lvalue -> EcTypes.ty
 
 (* --------------------------------------------------------------------- *)
 type instr = private {
@@ -35,12 +33,12 @@ type instr = private {
 }
 
 and instr_node =
-  | Sasgn     of lvalue * EcTypes.expr
-  | Srnd      of lvalue * EcTypes.expr
-  | Scall     of lvalue option * EcPath.xpath * EcTypes.expr list
-  | Sif       of EcTypes.expr * stmt * stmt
-  | Swhile    of EcTypes.expr * stmt
-  | Sassert   of EcTypes.expr
+  | Sasgn     of lvalue * expr
+  | Srnd      of lvalue * expr
+  | Scall     of lvalue option * xpath * expr list
+  | Sif       of expr * stmt * stmt
+  | Swhile    of expr * stmt
+  | Sassert   of expr
   | Sabstract of EcIdent.t
 
 and stmt = private {
@@ -93,11 +91,18 @@ val is_while  : instr -> bool
 val is_assert : instr -> bool 
 
 (* -------------------------------------------------------------------- *)
+val get_uninit_read : stmt -> Sx.t
+
+(* -------------------------------------------------------------------- *)
 type variable = {
   v_name : symbol;
   v_type : EcTypes.ty;
 }
 
+val v_name : variable -> symbol
+val v_type : variable -> EcTypes.ty
+
+(* -------------------------------------------------------------------- *)
 type funsig = {
   fs_name   : symbol;
   fs_arg    : EcTypes.ty;
@@ -173,6 +178,7 @@ type mod_restr = EcPath.Sx.t * EcPath.Sm.t
 
 val mr_equal : mod_restr -> mod_restr -> bool
 
+(* -------------------------------------------------------------------- *)
 type module_expr = {
   me_name  : symbol;
   me_body  : module_body;
@@ -214,3 +220,7 @@ val mty_subst : (path -> path) -> (mpath -> mpath) -> module_type -> module_type
 
 val mty_equal : module_type -> module_type -> bool
 val mty_hash  : module_type -> int
+
+(* -------------------------------------------------------------------- *)
+val get_uninit_read_of_fun : xpath -> function_ -> Sx.t
+val get_uninit_read_of_module : path -> module_expr -> (xpath * Sx.t) list

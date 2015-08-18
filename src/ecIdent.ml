@@ -37,7 +37,7 @@ module Hid = Collection.H
 
 (* -------------------------------------------------------------------- *)
 let fv_singleton x = Mid.singleton x 1
-let fv_union m1 m2 = Mid.union (fun _ m n -> Some(m+n)) m1 m2
+let fv_union m1 m2 = Mid.union (fun _ m n -> Some (m+n)) m1 m2
 let fv_diff m1 m2  = Mid.diff (fun _ _ _ -> None) m1 m2
 let fv_add x m     = Mid.change (fun x -> Some ((odfl 0 x) + 1)) x m
 

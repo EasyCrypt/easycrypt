@@ -53,7 +53,24 @@ module Map = struct
   struct include M end
 end
 
-module Set = Why3.Extset
+module Set = struct
+  module type OrderedType = Why3.Extset.OrderedType
+
+  module type S = sig
+    include Why3.Extset.S
+
+    val big_union : t list -> t
+  end
+
+  module MakeOfMap(M : Why3.Extmap.S) : S with module M = M = struct
+    include Why3.Extset.MakeOfMap(M)
+
+    let big_union (xs : t list) : t =
+      List.fold_left union empty xs
+  end
+
+  module Make(Ord : OrderedType) = MakeOfMap(Map.Make(Ord))
+end
 
 module EHashtbl = struct
   module type S = sig

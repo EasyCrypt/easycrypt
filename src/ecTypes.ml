@@ -356,16 +356,16 @@ let pv_hash v =
     (if v.pv_kind = PVglob then 1 else 0)
 
 let pv_compare v1 v2 = 
-  let r = EcPath.x_compare v1.pv_name v2.pv_name in
-  if r = 0 then Pervasives.compare v1.pv_kind v2.pv_kind
-  else r 
+  match EcPath.x_compare v1.pv_name v2.pv_name with
+  | 0 -> Pervasives.compare v1.pv_kind v2.pv_kind
+  | r -> r
 
 let pv_compare_p v1 v2 =
-  let r = EcPath.x_compare_na v1.pv_name v2.pv_name in
-  if r = 0 then Pervasives.compare v1.pv_kind v2.pv_kind 
-  else r
+  match EcPath.x_compare_na v1.pv_name v2.pv_name with 
+  | 0 -> Pervasives.compare v1.pv_kind v2.pv_kind 
+  | r -> r
 
-let is_loc v = match v.pv_kind with PVloc -> true | _ -> false
+let is_loc  v = match v.pv_kind with PVloc  -> true | _ -> false
 let is_glob v = match v.pv_kind with PVglob -> true | _ -> false
   
 let symbol_of_pv pv = 
@@ -384,25 +384,25 @@ let string_of_pvar (p : prog_var) =
  * contain the path of the function. *)
     
 let pv_loc f s = 
-  { pv_name = EcPath.xqname f s;
-    pv_kind = PVloc }
+  { pv_name = EcPath.xqname f s; pv_kind = PVloc }
 
-let pv_arg (f:EcPath.xpath) = pv_loc f "arg"
-let pv_res (f:EcPath.xpath) = pv_loc f "res"
+let pv_arg (f : EcPath.xpath) = pv_loc f "arg"
+let pv_res (f : EcPath.xpath) = pv_loc f "res"
 
 let xp_glob x = 
   let top = x.EcPath.x_top in
-  if top.EcPath.m_args = [] then x
-  else 
-    let ntop = EcPath.mpath top.m_top [] in (* remove the functor argument *)
+  if top.EcPath.m_args = [] then x else 
+    (* remove the functor argument *)
+    let ntop = EcPath.mpath top.m_top [] in
     EcPath.xpath ntop x.EcPath.x_sub 
 
 let pv_glob x =
   { pv_name = xp_glob x; pv_kind = PVglob }
 
-let pv x k = 
-  if k = PVglob then pv_glob x 
-  else { pv_name = x; pv_kind = k }
+let pv x k =
+  match k with
+  | PVglob -> pv_glob x
+  | PVloc  -> { pv_name = x; pv_kind = k }
 
 let pv_subst m_subst px = 
   let mp' = m_subst px.pv_name in
@@ -478,13 +478,13 @@ let e_ty e    = e.e_ty
 
 (* -------------------------------------------------------------------- *)
 let lp_fv = function
-  | LSymbol (id,_) ->
+  | LSymbol (id, _) ->
       Sid.singleton id
 
   | LTuple ids -> 
       List.fold_left (fun s (id, _) -> Sid.add id s) Sid.empty ids
 
-  | LRecord (_,ids) ->
+  | LRecord (_, ids) ->
       List.fold_left
         (fun s (id, _) -> ofold Sid.add s id)
         Sid.empty ids
@@ -493,21 +493,20 @@ let pv_fv pv = EcPath.x_fv Mid.empty pv.pv_name
 
 let fv_node e =
   let union ex =
-    List.fold_left (fun s e -> fv_union s (ex e)) Mid.empty in
+    List.fold_left (fun s e -> fv_union s (ex e)) Mid.empty
+  in
 
   match e with
   | Eint _            -> Mid.empty
   | Eop (_, tys)      -> union (fun a -> a.ty_fv) tys
-  | Evar v            -> pv_fv v 
+  | Evar v            -> pv_fv v
   | Elocal id         -> fv_singleton id 
   | Eapp (e, es)      -> union e_fv (e :: es)
   | Elet (lp, e1, e2) -> fv_union (e_fv e1) (fv_diff (e_fv e2) (lp_fv lp))
   | Etuple es         -> union e_fv es
   | Eif (e1, e2, e3)  -> union e_fv [e1; e2; e3]
-  | Elam (b, e)       -> List.fold_left
-                           (fun s (id, _) -> Mid.remove id s)
-                           (e_fv e) b
-  | Eproj(e,_)        -> e_fv e
+  | Elam (b, e)       -> List.fold_left (fun s (id, _) -> Mid.remove id s) (e_fv e) b
+  | Eproj (e, _)      -> e_fv e
 
 (* -------------------------------------------------------------------- *)
 module Hexpr = Why3.Hashcons.Make (struct 

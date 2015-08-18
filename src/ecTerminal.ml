@@ -57,8 +57,10 @@ object(self)
       | `Debug | `Warning | `Critical -> "[W]"
       | `Info -> ""
     in
-      List.iter
-        (fun x -> Printf.printf "%s%s\n%!" prefix x)
+      List.iteri
+        (fun i x ->
+          Printf.printf "%s%s%s\n%!"
+          prefix (if i = 0 then "+ " else "| ") x)
         (String.split_lines msg)
 
   method next =
