@@ -45,7 +45,7 @@ CHECKCATS ?= prelude core theories encryption newth realized
 # --------------------------------------------------------------------
 .PHONY: all build byte native tests check weak-check check-xunit examples
 .PHONY: clean install uninstall uninstall-purge dist distcheck
-.PHONY: callprover pg toolchain update-toolchain provers
+.PHONY: callprover pg toolchain update-toolchain provers license
 .PHONY: %.ml %.mli %.inferred.mli
 
 all: build
@@ -126,6 +126,10 @@ weak-check: ec.native
 
 check-xunit: ec.native
 	$(CHECK) --xunit="$(XUNITOUT)" $(CHECKCATS)
+
+license:
+	scripts/srctx/license COPYRIGHT.yaml \
+	  src/*.ml src/*/*.ml* theories/*.ec theories/*/*.ec
 
 clean:
 	$(OCAMLBUILD) -clean

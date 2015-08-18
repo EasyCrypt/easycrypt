@@ -1,6 +1,8 @@
 (* --------------------------------------------------------------------
- * Copyright (c) - 2012-2015 - IMDEA Software Institute and INRIA
- * Distributed under the terms of the CeCILL-C license
+ * Copyright (c) - 2012--2015 - IMDEA Software Institute
+ * Copyright (c) - 2012--2015 - Inria
+ * 
+ * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
 type zint = Z.t

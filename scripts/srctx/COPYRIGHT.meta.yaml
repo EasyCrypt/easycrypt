@@ -1,0 +1,30 @@
+root:
+  type: dict
+  kids:
+    entities:
+      type: mapofstrings
+      required: true
+    copyrights:
+      type: listofdicts
+      required: true
+      kids:
+        pattern:
+          type: listofstrings
+          required: true
+        style:
+          type: string
+          values: ["coq", "ocaml", "ec"]
+          required: true
+        copyrights:
+          type: listofdicts
+          required: true
+          kids:
+            date:
+              type: string
+              required: true
+            who:
+              type: string
+              required: true
+        license:
+          type: string
+          require: false
