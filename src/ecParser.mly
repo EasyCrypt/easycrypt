@@ -1233,10 +1233,10 @@ fun_def_body:
     }
 
 fun_decl:
-| x=lident pd=param_decl COLON ty=loc(type_exp)
-    { { pfd_name     = x   ;
-        pfd_tyargs   = pd  ;
-        pfd_tyresult = ty  ;
+| x=lident pd=param_decl ty=prefix(COLON, loc(type_exp))?
+    { { pfd_name     = x;
+        pfd_tyargs   = pd;
+        pfd_tyresult = odfl (mk_loc x.pl_loc PTunivar) ty;
         pfd_uses     = (true, None); }
     }
 
