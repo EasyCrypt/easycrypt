@@ -1682,8 +1682,8 @@ let pp_opdecl_pr (ppe : PPEnv.t) fmt (x, ts, ty, op) =
         | [ty] ->
            Format.fprintf fmt " : %a" (pp_type ppe) ty
         | dom ->
-            Format.fprintf fmt " : (%a)"
-              (pp_list ",@ " (pp_type ppe)) dom
+            Format.fprintf fmt " : %a"
+              (pp_list " &@ " (pp_stype ppe)) dom
     end
 
     | Some f ->

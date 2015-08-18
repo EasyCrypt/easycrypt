@@ -1446,12 +1446,12 @@ tyci_ax:
 (* -------------------------------------------------------------------- *)
 (* Operator definitions                                                 *)
 
-op_tydom:
-| LPAREN RPAREN
-    { [  ] }
-
-| ty=loc(simpl_type_exp)
+pred_tydom:
+| ty=loc(type_exp)
    { [ty] }
+
+| tys=plist2(loc(simpl_type_exp), AMP)
+   { tys }
 
 | tys=paren(plist2(loc(type_exp), COMMA))
    { tys  }
@@ -1597,7 +1597,7 @@ predicate:
        pp_tyvars = None;
        pp_def    = PPabstr []; } }
 
-| PRED x = oident tyvars=tyvars_decl? COLON sty = op_tydom
+| PRED x = oident tyvars=tyvars_decl? COLON sty = pred_tydom
    { { pp_name   = x;
        pp_tyvars = tyvars;
        pp_def    = PPabstr sty; } }
