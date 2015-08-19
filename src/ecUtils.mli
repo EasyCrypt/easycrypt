@@ -194,6 +194,22 @@ module String : sig
 end
 
 (* -------------------------------------------------------------------- *)
+module IO : sig
+  include module type of BatIO
+end
+
+(* -------------------------------------------------------------------- *)
+module File : sig
+  include module type of BatFile
+
+  val read_from_file :
+    offset:int -> length:int -> string -> string
+
+  val write_to_file :
+    output:string -> string -> unit
+end
+
+(* -------------------------------------------------------------------- *)
 module Buffer : sig
   include module type of BatBuffer
 

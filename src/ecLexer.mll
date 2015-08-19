@@ -183,6 +183,7 @@
     "prover"      , PROVER     ;        (* KW: global *)
     "timeout"     , TIMEOUT    ;        (* KW: global *)
     "why3"        , WHY3       ;        (* KW: global *)
+    "dump"        , DUMP       ;        (* KW: global *)
 
     "time"        , TIME       ;        (* KW: internal *)
     "undo"        , UNDO       ;        (* KW: internal *)

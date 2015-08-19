@@ -628,6 +628,39 @@ module String = struct
 end
 
 (* -------------------------------------------------------------------- *)
+module IO = BatIO
+
+(* -------------------------------------------------------------------- *)
+module File = struct
+  include BatFile
+
+  let read_from_file ~offset ~length source =
+    try
+      let input = Pervasives.open_in_bin source in
+      try_finally
+        (fun () ->
+          Pervasives.seek_in input offset;
+          Pervasives.really_input_string input length)
+        (fun () -> Pervasives.close_in input)
+    with
+    | End_of_file
+    | Invalid_argument _
+    | Sys_error _ -> invalid_arg "File.read_from_file"
+
+  let write_to_file ~output data =
+    try
+      let output = Pervasives.open_out_bin output in
+      try_finally
+        (fun () ->
+          Pervasives.output_string output data;
+          Pervasives.flush output)
+        (fun () -> Pervasives.close_out output)
+    with
+    | Invalid_argument _
+    | Sys_error _ -> invalid_arg "File.write_to_file"
+end
+
+(* -------------------------------------------------------------------- *)
 module Buffer = struct
   include BatBuffer
 

@@ -378,7 +378,7 @@ let trans_matchfix ?(close = true) env ue { pl_loc = loc; pl_desc = name } (bd, 
         let trans1 ((_, x, xty) : _ * EcIdent.t * ty) =
           let pb     = oget (Msym.find_opt (EcIdent.name x) pbmap) in
           let filter = fun op -> EcDecl.is_ctor op in
-          let cname, tvi = fst pb.pop_pattern in
+          let PPApp ((cname, tvi), cargs) = pb.pop_pattern in
           let tvi = tvi |> omap (TT.transtvi env ue) in
           let cts = EcUnify.select_op ~filter tvi env (unloc cname) ue [] in
 
@@ -397,12 +397,12 @@ let trans_matchfix ?(close = true) env ue { pl_loc = loc; pl_desc = name } (bd, 
               let ctorsym, ctorty = List.nth ind ctoridx in
 
               let args_exp = List.length ctorty in
-              let args_got = List.length (snd pb.pop_pattern) in
+              let args_got = List.length cargs in
 
               if args_exp <> args_got then
                 fxerror cname.pl_loc env (FXE_CtorInvalidArity (args_exp, args_got));
 
-              if not (List.is_unique (List.map unloc (snd pb.pop_pattern))) then
+              if not (List.is_unique (List.map unloc cargs)) then
                 fxerror cname.pl_loc env (FXE_MatchNonLinear);
 
               EcUnify.UniEnv.restore ~src:subue ~dst:ue;
@@ -416,10 +416,10 @@ let trans_matchfix ?(close = true) env ue { pl_loc = loc; pl_desc = name } (bd, 
                with EcUnify.UnificationFailure _ -> assert false);
               TT.unify_or_fail env ue pb.pop_name.pl_loc pty xty;
 
-              let pvars = List.map (EcIdent.create |- unloc) (snd pb.pop_pattern) in
+              let pvars = List.map (EcIdent.create |- unloc) cargs in
               let pvars = List.combine pvars ctorty in
 
-                (pb, (indp, ind, (ctorsym, ctoridx)), pvars)
+              (pb, (indp, ind, (ctorsym, ctoridx)), pvars)
         in
 
         let ptns = List.map trans1 mpty in

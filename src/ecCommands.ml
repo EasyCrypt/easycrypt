@@ -470,6 +470,19 @@ and process_dump_why3 scope filename =
   EcScope.dump_why3 scope filename; scope
 
 (* -------------------------------------------------------------------- *)
+and process_dump scope (source, tc) =
+  let input, (p1, p2) = source.tcd_source in
+
+  let scope  = process_tactics scope (`Actual tc) in
+  let tactic =
+    try  File.read_from_file ~offset:p1 ~length:(p2-p1) input
+    with Invalid_argument _ -> "(* failed to read back script *)" in
+
+  let ecfname = Printf.sprintf "%s.ec" source.tcd_output in
+
+  File.write_to_file ~output:ecfname tactic; scope
+
+(* -------------------------------------------------------------------- *)
 and process (ld : Loader.loader) (scope : EcScope.scope) g =
   let loc = g.pl_loc in
 
@@ -497,6 +510,7 @@ and process (ld : Loader.loader) (scope : EcScope.scope) g =
       | Gprint       p    -> `Fct   (fun scope -> process_print      scope  p; scope)
       | Gsearch      qs   -> `Fct   (fun scope -> process_search     scope  qs; scope)
       | Gtactics     t    -> `Fct   (fun scope -> process_tactics    scope  t)
+      | Gtcdump      info -> `Fct   (fun scope -> process_dump       scope  info)
       | Grealize     p    -> `Fct   (fun scope -> process_realize    scope  p)
       | Gprover_info pi   -> `Fct   (fun scope -> process_proverinfo scope  pi)
       | Gsave        loc  -> `Fct   (fun scope -> process_save       scope  loc)
