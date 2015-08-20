@@ -510,6 +510,9 @@ and process_dump scope (source, tc) =
             (fun () ->
               let fbuf = Format.formatter_of_out_channel output in
               let ppe  = EcPrinting.PPEnv.ofenv (EcEnv.LDecl.toenv hyps) in
+
+              source.tcd_width |> oiter (Format.pp_set_margin fbuf);
+
               Format.fprintf fbuf "%a@." (EcPrinting.pp_goal ppe)
                 ((EcEnv.LDecl.tohyps hyps, concl), `One index))
             (fun () -> close_out output)

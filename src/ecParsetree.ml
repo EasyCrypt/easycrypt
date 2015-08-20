@@ -857,6 +857,7 @@ type proofmode = {
 (* -------------------------------------------------------------------- *)
 type tcdump = {
   tcd_source : string * (int * int);
+  tcd_width  : int option;
   tcd_output : string;
 }
 

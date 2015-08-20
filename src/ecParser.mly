@@ -2661,9 +2661,10 @@ tcd_toptactic:
   }
 
 tactic_dump:
-| DUMP aout=STRING t=paren(tcd_toptactic)
+| DUMP aout=STRING wd=word? t=paren(tcd_toptactic)
   {  let infos = {
       tcd_source = fst t;
+      tcd_width  = wd;
       tcd_output = aout;
     } in (infos, snd t) }
 
