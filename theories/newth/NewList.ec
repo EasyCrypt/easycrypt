@@ -949,8 +949,7 @@ proof.                          (* FIXME: test case for views *)
   case=> s2x; rewrite allP => ss12; cut := rot_to s2 x _ => //.
   case=> i s3 def_s2; rewrite -(size_rot i s2) def_s2 /= lez_addl.
   apply IHs => // y s1y; cut := ss12 y _ => //.
-  rewrite -(mem_rot i) def_s2 in_cons; case=> // eq_xy.
-  by move: s1y not_s1x; rewrite eq_xy => ->.
+  by rewrite -(mem_rot i) def_s2; case.
 qed.
 
 lemma leq_size_uniq (s1 s2 : 'a list):
