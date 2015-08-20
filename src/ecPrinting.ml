@@ -2288,18 +2288,19 @@ let pp_goal (ppe : PPEnv.t) fmt (g, extra) =
 
   begin
     match n with
+    | _ when n < 0 -> ()
     | 1 -> Format.fprintf fmt "Current goal@\n@\n%!"
     | _ -> Format.fprintf fmt "Current goal (remaining: %d)@\n@\n%!" n
   end;
   
-  Format.fprintf fmt "%a@." (PPGoal.pp_goal1 ppe) g;
+  Format.fprintf fmt "%a@?" (PPGoal.pp_goal1 ppe) g;
 
   match extra with
   | `One _  -> ()
   | `All gs ->
-      Format.fprintf fmt "@\n@\n";
+      Format.fprintf fmt "@\n";
       List.iteri (fun i g ->
-        Format.fprintf fmt "@[<hov 2>@\n%a@]@."
+        Format.fprintf fmt "@\n@[<hov 2>@\n%a@]@?"
           (PPGoal.pp_goal1 ~pphyps:false ~idx:(i+2) ppe) g)
         gs
 

@@ -498,11 +498,10 @@ and process_dump scope (source, tc) =
       List.map
         (fun hd -> EcCoreGoal.FApi.get_pregoal_by_id hd penv)
         (hd :: hds) in
-    let ngoals = List.length hds in
 
     List.iteri (fun i { g_hyps = hyps; g_concl = concl; } ->
         let ecfname = Printf.sprintf "%s.%d.ec" source.tcd_output i in
-        let index   = if i = 0 then 1 else ngoals in
+
         try
           let output  = open_out_bin ecfname in
     
@@ -513,8 +512,8 @@ and process_dump scope (source, tc) =
 
               source.tcd_width |> oiter (Format.pp_set_margin fbuf);
 
-              Format.fprintf fbuf "%a@." (EcPrinting.pp_goal ppe)
-                ((EcEnv.LDecl.tohyps hyps, concl), `One index))
+              Format.fprintf fbuf "%a@?" (EcPrinting.pp_goal ppe)
+                ((EcEnv.LDecl.tohyps hyps, concl), `One (-1)))
             (fun () -> close_out output)
         with Sys_error _ -> wrerror ecfname)
       goals);
