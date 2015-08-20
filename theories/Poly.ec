@@ -31,7 +31,7 @@ op norm (s : R list) = rev (norm_r (rev s)).
 axiom ofseqK p: ofseq (toseq p) = p.
 axiom toseqK s: toseq (ofseq s) = norm s.
 
-axiom toseq_last p: last_ oner (toseq p) <> zeror.
+axiom toseq_last p: last oner (toseq p) <> zeror.
 
 axiom poly_eq p q:
   (forall x, nth zeror (toseq p) x = nth zeror (toseq q) x) => p = q.
