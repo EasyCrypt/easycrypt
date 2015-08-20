@@ -8,6 +8,6 @@ module F(X : I) = {
 module M(X : I) = {
   proc g() : unit = {
     var x;
-    x <- F(X).f();
+    x <@ F(X).f();
   }
 }.

@@ -1,6 +1,6 @@
 type 'a list.
 op "[]" ['a] : 'a list.
-op "_::_" ['a] : 'a -> 'a list -> 'a list.
+op (::) ['a] : 'a -> 'a list -> 'a list.
 
 op foo  x l = x :: <:'a=int> l.
 op foo1 x l = x :: <:int> l.

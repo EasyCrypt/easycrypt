@@ -65,7 +65,7 @@ lemma test_eqM'M' &m (A<:Adv{M,M'}) :
     Pr[M'(A).main(0) @ &m : res /\ M'.x = 1] = 
     Pr[M'(A).main(0) @ &m : res /\ M'.x = 1]. 
 proof.
-  byequiv (: ) => //. 
+  byequiv => //. 
   proc;call (_: true);auto.
 qed.
 
