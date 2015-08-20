@@ -15,7 +15,7 @@ type R.
 type K.
 
 op dK: K distr.
-axiom dK_ll: mu dK True = 1%r.
+axiom dK_ll: mu dK predT = 1%r.
 
 op F:K -> D -> R.
 
@@ -29,7 +29,7 @@ module PRFr = {
 (** Security is expressed with respect to the Random Function defined
     by some distribution on (a subset of) R. *)
 op dR:R distr.
-axiom dR_ll: mu dR True = 1%r.
+axiom dR_ll: mu dR predT = 1%r.
 
 module type PRF = {
   proc init(): unit

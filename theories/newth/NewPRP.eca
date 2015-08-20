@@ -14,7 +14,7 @@ type D.
 type K.
 
 op dK: K distr.
-axiom dK_ll: mu dK True = 1%r.
+axiom dK_ll: mu dK predT = 1%r.
 
 op P:K -> D -> D.
 
@@ -32,7 +32,7 @@ module PRPr = {
 (** Security is expressed with respect to the Random Permutation defined
     by some distribution on D. *)
 op dD:D distr.
-axiom dD_ll: mu dD True = 1%r.
+axiom dD_ll: mu dD predT = 1%r.
 
 module type PRP = {
   proc init(): unit
