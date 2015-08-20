@@ -345,7 +345,7 @@ lemma find_none (p : 'a -> 'b -> bool) (m : ('a, 'b) fmap):
   has p m <=> find p m <> None.
 proof.
   rewrite hasE /= findE NewList.has_find; split=> [h|].
-    by rewrite @(onth_nth witness) 1:smt.
+    by rewrite @(onth_nth witness) 1:find_ge0/= 1:size_map.
   by apply absurd=> h; rewrite onth_nth_map -map_comp nth_default 1:size_map 1:lezNgt.
 qed.
 
@@ -366,7 +366,8 @@ proof.
     have /= := nth_find witness (fun (x : 'a * 'b) => p (fst x) (snd x)) (elems m) _.
       by rewrite -hasE.
     rewrite -/i -@(nth_map _ witness) //.
-    smt 3 6. (* laziness. FIXME: we need lemmas connecting 'assoc' with 'index', 'nth' and 'map snd' *)
+    rewrite getE /assoc oget_omap_some 1:smt.
+    smt. (* laziness. FIXME: we need lemmas connecting 'assoc' with 'index', 'nth' and 'map snd' *)
   right.
   have:= all_not_p; rewrite has_all /= allP /= => h.
   by split=> //; move: all_not_p; rewrite find_none.
