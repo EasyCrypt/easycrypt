@@ -444,10 +444,7 @@ qed.
 
 lemma dom_filter_fst f (m:('a,'b) map):
   dom (filter (fun x y, f x) m) = filter f (dom m).
-proof.
-  cut:= dom_filter (fun x (y:'b), f x) m => //= ->.
-  by congr=> //=; apply ExtEq.fun_ext.
-qed.
+proof. by apply/(dom_filter (fun x (y : 'b) => f x)). qed.
 
 lemma mem_dom_filter f (m:('a,'b) map) x:
   mem x (dom (filter f m)) =>
