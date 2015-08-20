@@ -37,7 +37,8 @@ XUNITOUT  ?= xunit.xml
 ECARGS    ?=
 ECTOUT    ?= 5
 ECJOBS    ?= 1
-CHECK     := scripts/testing/runtest
+CHECKPY   ?=
+CHECK     := $(CHECKPY) scripts/testing/runtest
 CHECK     += --bin-args="$(ECARGS)" --timeout="$(ECTOUT)" --jobs="$(ECJOBS)"
 CHECK     += config/tests.config
 CHECKCATS ?= prelude core theories encryption newth realized
