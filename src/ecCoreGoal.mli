@@ -262,8 +262,9 @@ module FApi : sig
     -> proofenv * handle
 
   (* Check if a tcenv is closed (no focused goal *)
-  val tc_done  : tcenv -> bool
-  val tc_count : tcenv -> int
+  val tc_done   : tcenv -> bool
+  val tc_count  : tcenv -> int
+  val tc_opened : tcenv -> handle list
 
   (* Accessors for focused goal parts (tcenv) *)
   val tc_handle  : tcenv -> handle

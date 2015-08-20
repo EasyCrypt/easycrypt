@@ -406,7 +406,7 @@ and process_sct_close (scope : EcScope.scope) name =
 and process_tactics (scope : EcScope.scope) t =
   let mode = !pragma.pm_check in
   match t with
-  | `Actual t  -> EcScope.Tactics.process scope mode t
+  | `Actual t  -> snd (EcScope.Tactics.process scope mode t)
   | `Proof  pm -> EcScope.Tactics.proof   scope mode pm.pm_strict
 
 (* -------------------------------------------------------------------- *)
@@ -471,16 +471,52 @@ and process_dump_why3 scope filename =
 
 (* -------------------------------------------------------------------- *)
 and process_dump scope (source, tc) =
+  let open EcCoreGoal in
+
   let input, (p1, p2) = source.tcd_source in
 
-  let scope  = process_tactics scope (`Actual tc) in
+  let goals, scope  =
+    let mode = !pragma.pm_check in
+     EcScope.Tactics.process scope mode tc
+  in
+
+  let wrerror fname =
+    EcScope.notify scope `Warning "cannot write `%s'" fname in
+
   let tactic =
     try  File.read_from_file ~offset:p1 ~length:(p2-p1) input
     with Invalid_argument _ -> "(* failed to read back script *)" in
+  let tactic = Printf.sprintf "%s\n" (String.strip tactic) in
 
   let ecfname = Printf.sprintf "%s.ec" source.tcd_output in
 
-  File.write_to_file ~output:ecfname tactic; scope
+  (try  File.write_to_file ~output:ecfname tactic
+   with Invalid_argument _ -> wrerror ecfname);
+
+  goals |> oiter (fun (penv, (hd, hds)) ->
+    let goals =
+      List.map
+        (fun hd -> EcCoreGoal.FApi.get_pregoal_by_id hd penv)
+        (hd :: hds) in
+    let ngoals = List.length hds in
+
+    List.iteri (fun i { g_hyps = hyps; g_concl = concl; } ->
+        let ecfname = Printf.sprintf "%s.%d.ec" source.tcd_output i in
+        let index   = if i = 0 then 1 else ngoals in
+        try
+          let output  = open_out_bin ecfname in
+    
+          try_finally
+            (fun () ->
+              let fbuf = Format.formatter_of_out_channel output in
+              let ppe  = EcPrinting.PPEnv.ofenv (EcEnv.LDecl.toenv hyps) in
+              Format.fprintf fbuf "%a@." (EcPrinting.pp_goal ppe)
+                ((EcEnv.LDecl.tohyps hyps, concl), `One index))
+            (fun () -> close_out output)
+        with Sys_error _ -> wrerror ecfname)
+      goals);
+
+  scope
 
 (* -------------------------------------------------------------------- *)
 and process (ld : Loader.loader) (scope : EcScope.scope) g =

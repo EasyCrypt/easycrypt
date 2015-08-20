@@ -10,4 +10,4 @@ open EcHiGoal
 
 (* -------------------------------------------------------------------- *)
 val process1 : ttenv -> ptactic -> FApi.backward
-val process  : ttenv -> ptactic list -> proof -> proof
+val process  : ttenv -> ptactic list -> proof -> (handle * handle list) * proof

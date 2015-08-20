@@ -2648,19 +2648,24 @@ proofmodename:
 | STRICT { `Strict }
 
 (* -------------------------------------------------------------------- *)
-tactic_dump:
-| DUMP aout=STRING t=paren(toptactic)
-  { let l1 = $startpos(t) in
+tcd_toptactic:
+| t=toptactic {
+    let l1 = $startpos(t) in
     let l2 = $endpos(t) in
 
     if l1.L.pos_fname <> l2.L.pos_fname then
       parse_error
         (EcLocation.make $startpos $endpos)
         (Some "<dump> command cannot span multiple files");
-    let infos = {
-      tcd_source = (l1.L.pos_fname, (l1.L.pos_cnum, l2.L.pos_cnum));
+    ((l1.L.pos_fname, (l1.L.pos_cnum, l2.L.pos_cnum)), t)
+  }
+
+tactic_dump:
+| DUMP aout=STRING t=paren(tcd_toptactic)
+  {  let infos = {
+      tcd_source = fst t;
       tcd_output = aout;
-    } in (infos, t) }
+    } in (infos, snd t) }
 
 (* -------------------------------------------------------------------- *)
 (* Theory cloning                                                       *)

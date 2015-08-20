@@ -155,7 +155,11 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Tactics : sig
-  val process : scope -> Ax.mode -> ptactic list -> scope
+  open EcCoreGoal
+
+  type prinfos = proofenv * (handle * handle list)
+
+  val process : scope -> Ax.mode -> ptactic list -> prinfos option * scope
   val proof   : scope -> Ax.mode -> bool -> scope
 end
 

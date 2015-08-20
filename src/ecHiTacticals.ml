@@ -323,5 +323,8 @@ and process1 (ttenv : ttenv) (t : ptactic) (tc : tcenv1) =
 
 (* -------------------------------------------------------------------- *)
 let process (ttenv : ttenv) (t : ptactic list) (pf : proof) =
-  let tc = tcenv1_of_proof pf in
-  proof_of_tcenv (process1_seq ttenv t tc)
+  let tc  = tcenv1_of_proof pf in
+  let hd  = FApi.tc1_handle tc in
+  let tc  = process1_seq ttenv t tc in
+  let hds = FApi.tc_opened tc in
+  ((hd, hds), proof_of_tcenv tc)
