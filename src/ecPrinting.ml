@@ -2206,7 +2206,7 @@ type ppgoal = (EcBaseLogic.hyps * EcFol.form) * [
 ]
 
 module PPGoal = struct
-  let goalline = String.make 72 '-'
+  let goalline i = String.make i '-'
 
   let pre_pp_hyp ppe (id, k) =
     let ppe =
@@ -2267,7 +2267,10 @@ module PPGoal = struct
         pps
     end;
 
-    Format.fprintf fmt "%s@\n%!" goalline;
+    let glsz = (Format.pp_get_margin fmt ()) - 6 in
+    let glsz = max glsz 2 in
+
+    Format.fprintf fmt "%s@\n%!" (goalline glsz);
 
     match concl.f_node with
     | FbdHoareF hf -> pp_bdhoareF ppe fmt hf
