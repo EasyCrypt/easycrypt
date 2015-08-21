@@ -441,7 +441,6 @@
 %token PROGRESS
 %token PROOF
 %token PROVER
-%token TIMEOUT
 %token QED
 %token QUESTION
 %token RARROW
@@ -452,6 +451,7 @@
 %token RCONDT
 %token REALIZE
 %token REFLEX
+%token RENAME
 %token REQUIRE
 %token RES
 %token RETURN
@@ -490,6 +490,7 @@
 %token TICKPIPE
 %token TILD
 %token TIME
+%token TIMEOUT
 %token TOP
 %token TRANSITIVITY
 %token TRIVIAL
@@ -553,13 +554,13 @@
 (* -------------------------------------------------------------------- *)
 _lident:
 | x=LIDENT { x }
+| DUMP     { "dump"   }
+| EXPECT   { "expect" }
 | FIRST    { "first"  }
 | LAST     { "last"   }
 | LEFT     { "left"   }
 | RIGHT    { "right"  }
 | STRICT   { "strict" }
-| EXPECT   { "expect" }
-| DUMP     { "dump"   }
 
 %inline _uident:
 | x=UIDENT { x }
@@ -2674,24 +2675,26 @@ tactic_dump:
 theory_clone:
 | local=boption(LOCAL) CLONE options=clone_opts?
     ip=clone_import? x=uqident
-    cw=clone_with? cp=clone_proof?
+    cw=clone_with? cp=clone_proof? cr=clone_rename?
 
    { { pthc_base   = x;
        pthc_name   = None;
        pthc_ext    = EcUtils.odfl [] cw;
        pthc_prf    = EcUtils.odfl [] cp;
+       pthc_rnm    = EcUtils.odfl [] cr;
        pthc_opts   = odfl [] options;
        pthc_local  = local;
        pthc_import = ip; } }
 
 | local=boption(LOCAL) CLONE options=clone_opts?
     ip=clone_import? x=uqident AS y=uident
-    cw=clone_with? cp=clone_proof?
+    cw=clone_with? cp=clone_proof? cr=clone_rename?
 
    { { pthc_base   = x;
        pthc_name   = Some y;
        pthc_ext    = EcUtils.odfl [] cw;
        pthc_prf    = EcUtils.odfl [] cp;
+       pthc_rnm    = EcUtils.odfl [] cr;
        pthc_opts   = odfl [] options;
        pthc_local  = local;
        pthc_import = ip; } }
@@ -2744,6 +2747,21 @@ clone_lemma:
 
 clone_proof:
 | PROOF x=clone_lemma { List.rev x }
+
+clone_rename_kind:
+| TYPE        { `Type   }
+| OP          { `Op     }
+| PRED        { `Pred   }
+| LEMMA       { `Lemma  }
+| MODULE      { `Module }
+| MODULE TYPE { `ModType }
+
+clone_rename_1:
+| k=bracket(plist1(clone_rename_kind, COMMA))? r1=loc(STRING) AS r2=loc(STRING)
+    { (odfl [] k, (r1, r2)) }
+
+clone_rename:
+| RENAME rnm=clone_rename_1+ { rnm }
 
 opclmode:
 | EQ     { `Alias }

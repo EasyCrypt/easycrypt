@@ -28,6 +28,7 @@ type clone_error =
 | CE_TypeArgMism    of ovkind * qsymbol
 | CE_OpIncompatible of qsymbol * incompatible
 | CE_PrIncompatible of qsymbol * incompatible
+| CE_InvalidRE      of string
 
 exception CloneError of EcEnv.env * clone_error
 
@@ -57,6 +58,32 @@ type axclone = {
   axc_tac   : EcParsetree.ptactic_core option;
 }
 
-val clone :
-     EcEnv.env -> theory_cloning
-  -> symbol * (EcPath.path * (EcEnv.Theory.t * EcTheory.thmode)) * evclone
+(* -------------------------------------------------------------------- *)
+type clone = {
+  cl_name   : symbol;
+  cl_theory : EcPath.path * (EcEnv.Theory.t * EcTheory.thmode);
+  cl_clone  : evclone;
+  cl_rename : renaming list;
+}
+
+and renaming_kind = [
+  | `All
+  | `Selected of rk_categories
+]
+
+and renaming =
+  renaming_kind * (Pcre.regexp * Pcre.substitution)
+
+and rk_categories = {
+  rkc_lemmas  : bool;
+  rkc_ops     : bool;
+  rkc_preds   : bool;
+  rkc_types   : bool;
+  rkc_module  : bool;
+  rkc_modtype : bool;
+}
+
+(* -------------------------------------------------------------------- *)
+val rename : renaming -> theory_renaming_kind * string -> string option
+
+val clone : EcEnv.env -> theory_cloning -> clone

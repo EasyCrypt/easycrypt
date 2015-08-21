@@ -806,10 +806,17 @@ type theory_cloning = {
   pthc_name   : psymbol option;
   pthc_ext    : (pqsymbol * theory_override) list;
   pthc_prf    : theory_cloning_proof list;
+  pthc_rnm    : theory_renaming list;
   pthc_opts   : theory_cloning_options;
   pthc_local  : bool;
   pthc_import : [`Export | `Import | `Include] option;
 }
+
+and theory_renaming_kind =
+  [ `Lemma | `Op | `Pred | `Type | `Module | `ModType ]
+
+and theory_renaming =
+  (theory_renaming_kind list * string located pair)
 
 and theory_cloning_option =
   [ `Abstract ]

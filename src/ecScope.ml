@@ -2063,7 +2063,13 @@ module Cloning = struct
         hierror "cannot do a local clone outside of a section"
     end;
 
-    let (name, (opath, oth), ovrds) = C.clone scope.sc_env thcl in
+    let { cl_name   = name;
+          cl_theory = (opath, oth);
+          cl_clone  = ovrds;
+          cl_rename = rnms; }
+  
+        = C.clone scope.sc_env thcl in
+
     let ovrds = { ovre_ovrd  = ovrds;
                   ovre_scope = { ovrc_glproof = []}; } in
     let incl  = thcl.pthc_import = Some `Include in
@@ -2082,6 +2088,20 @@ module Cloning = struct
       let rec ovr1 prefix abstract (ovrds : ovrenv) (subst, ops, proofs, scope) item =
         let xpath x = EcPath.pappend opath (EcPath.fromqsymbol (prefix, x)) in
 
+        let rename subst (kind, name) =
+          try
+            let newname =
+              List.find_map
+                (fun rnm -> EcThCloning.rename rnm (kind, name))
+                rnms in
+            let subst =
+              EcSubst.add_path subst ~src:(xpath name)
+                ~dst:(EcPath.pqname npath newname)
+            in (subst, newname)
+
+          with Not_found -> (subst, name)
+        in
+
         let myovscope = {
           ovrc_glproof =
             if List.is_empty ovrds.ovre_ovrd.evc_lemmas.ev_global then
@@ -2095,7 +2115,8 @@ module Cloning = struct
             match Msym.find_opt x ovrds.ovre_ovrd.evc_types with
             | None ->
                 let otyd = EcSubst.subst_tydecl subst otyd in
-                  (subst, ops, proofs, Ty.bind scope (x, otyd))
+                let subst, x = rename subst (`Type, x) in
+                (subst, ops, proofs, Ty.bind scope (x, otyd))
   
             | Some { pl_desc = (nargs, ntyd, mode) } -> begin
               (* Already checked:
@@ -2112,24 +2133,23 @@ module Cloning = struct
                 | `Alias ->
                     let binding =
                       { tyd_params = nargs;
-                        tyd_type   = `Concrete ntyd; }
-                    in
-                      (subst, ops, proofs, Ty.bind scope (x, binding))
+                        tyd_type   = `Concrete ntyd; } in
+                    let subst, x = rename subst (`Type, x) in
+                    (subst, ops, proofs, Ty.bind scope (x, binding))
   
                 | `Inline ->
                     let subst =
                       (* FIXME: TC HOOK *)
                       EcSubst.add_tydef subst (xpath x) (List.map fst nargs, ntyd)
-                    in
-                      (subst, ops, proofs, scope)
+                    in (subst, ops, proofs, scope)
             end
         end
   
         | CTh_operator (x, ({ op_kind = OB_oper None } as oopd)) -> begin
             match Msym.find_opt x ovrds.ovre_ovrd.evc_ops with
             | None ->
-                (subst, ops, proofs, 
-                 Op.bind scope (x, EcSubst.subst_op subst oopd))
+                let (subst, x) = rename subst (`Op, x) in
+                (subst, ops, proofs, Op.bind scope (x, EcSubst.subst_op subst oopd))
   
             | Some { pl_desc = (opov, opmode); pl_loc = loc; } ->
                 let (reftyvars, refty) =
@@ -2137,7 +2157,7 @@ module Cloning = struct
                     (refop.op_tparams, refop.op_ty)
                 in
   
-                let (newop, subst, alias) =
+                let (newop, subst, x, alias) =
                   let tp = opov.opov_tyvars |> omap (List.map (fun tv -> (tv, []))) in
                   let ue = EcTyping.transtyvars scope.sc_env (loc, tp) in
                   let tp = EcTyping.tp_relax in
@@ -2156,24 +2176,25 @@ module Cloning = struct
                   let tparams = EcUnify.UniEnv.tparams ue in
                   let newop   = mk_op tparams ty (Some (OP_Plain body)) in
                     match opmode with
-                    | `Alias -> (newop, subst, true)
+                    | `Alias ->
+                      let subst, x = rename subst (`Op, x) in
+                      (newop, subst, x, true)
   
                     (* FIXME: TC HOOK *)
                     | `Inline ->
                         let subst1 = (List.map fst tparams, body) in
                         let subst  = EcSubst.add_opdef subst (xpath x) subst1
-                        in  (newop, subst, false)
+                        in  (newop, subst, x, false)
                 in
   
                 let (newtyvars, newty) = (newop.op_tparams, newop.op_ty) in
-              (* FIXME: TC HOOK *)
-                begin 
+                (* FIXME: TC HOOK *)
+                begin
                   try ty_compatible scope.sc_env
                         (List.map fst reftyvars, refty)
                         (List.map fst newtyvars, newty)
                   with Incompatible err ->
-                    clone_error scope.sc_env 
-                      (CE_OpIncompatible((prefix,x), err))
+                    clone_error scope.sc_env (CE_OpIncompatible((prefix, x), err))
                 end;
                 let ops = 
                   Mp.add (EcPath.fromqsymbol (prefix, x)) (newop, alias) ops in
@@ -2184,6 +2205,7 @@ module Cloning = struct
         | CTh_operator (x, ({ op_kind = OB_pred None} as oopr)) -> begin
             match Msym.find_opt x ovrds.ovre_ovrd.evc_preds with
             | None ->
+                let subst, x = rename subst (`Pred, x) in
                 (subst, ops, proofs, Op.bind scope (x, EcSubst.subst_op subst oopr))
   
             | Some { pl_desc = (prov, prmode); pl_loc = loc; } ->
@@ -2192,7 +2214,7 @@ module Cloning = struct
                     (refpr.op_tparams, refpr.op_ty)
                 in
   
-                let (newpr, subst, alias) =
+                let (newpr, subst, x, alias) =
                    let tp = prov.prov_tyvars |> omap (List.map (fun tv -> (tv, []))) in
                    let ue = EcTyping.transtyvars scope.sc_env (loc, tp) in
                    let body =
@@ -2222,18 +2244,20 @@ module Cloning = struct
                        op_kind    = OB_pred (Some body); } in
 
                     match prmode with
-                    | `Alias -> (newpr, subst, true)
+                    | `Alias ->
+                      let subst, x = rename subst (`Pred, x) in
+                      (newpr, subst, x, true)
   
                     (* FIXME: TC HOOK *)
                     | `Inline ->
                         let subst1 = (List.map fst tparams, body) in
                         let subst  = EcSubst.add_pddef subst (xpath x) subst1
-                        in (newpr, subst, false)
+                        in (newpr, subst, x, false)
 
                 in
   
                 let (newtyvars, newty) = (newpr.op_tparams, newpr.op_ty) in
-                  (* FIXME: TC HOOK *)
+                (* FIXME: TC HOOK *)
                 begin 
                   try 
                     ty_compatible scope.sc_env
@@ -2248,10 +2272,13 @@ module Cloning = struct
         end
   
         | CTh_operator (x, oopd) ->
+            let kind = (if is_pred oopd then `Pred else `Op) in
+            let subst, x = rename subst (kind, x) in
             let oopd = EcSubst.subst_op subst oopd in
               (subst, ops, proofs, Op.bind scope (x, oopd))
   
         | CTh_axiom (x, ax) -> begin
+            let subst, x = rename subst (`Lemma, x) in
             let ax = EcSubst.subst_ax subst ax in
             let (ax, proofs) =
               if abstract then (ax, proofs) else
@@ -2283,12 +2310,15 @@ module Cloning = struct
         end
   
         | CTh_modtype (x, modty) ->
+            let subst, x = rename subst (`ModType, x) in
             let modty = EcSubst.subst_modsig subst modty in
-              (subst, ops, proofs, ModType.bind scope (x, modty))
+            (subst, ops, proofs, ModType.bind scope (x, modty))
   
         | CTh_module me ->
+            let subst, name = rename subst (`Module, me.me_name) in
             let me = EcSubst.subst_module subst me in
-              (subst, ops, proofs, Mod.bind scope thcl.pthc_local me)
+            let me = { me with me_name = name } in
+            (subst, ops, proofs, Mod.bind scope thcl.pthc_local me)
   
         | CTh_theory (x, (cth, thmode)) -> begin
             let subovrds = Msym.find_opt x ovrds.ovre_ovrd.evc_ths in
@@ -2400,14 +2430,17 @@ module Cloning = struct
             (subst, ops, proofs, scope)
   
       in
-        let mode  = if opts.clo_abstract then `Abstract else `Concrete in
-        let scope = if incl then scope else Theory.enter scope mode name in
-        let _, _, proofs, scope =
-          List.fold_left (ovr1 [] opts.clo_abstract ovrds)
-            (subst, Mp.empty, [], scope)
-            (fst oth).cth_struct
-        in
-          (List.rev proofs, if incl then scope else snd (Theory.exit scope))
+        try
+          let mode  = if opts.clo_abstract then `Abstract else `Concrete in
+          let scope = if incl then scope else Theory.enter scope mode name in
+          let _, _, proofs, scope =
+            List.fold_left (ovr1 [] opts.clo_abstract ovrds)
+              (subst, Mp.empty, [], scope)
+              (fst oth).cth_struct
+          in
+            (List.rev proofs, if incl then scope else snd (Theory.exit scope))
+        with EcEnv.DuplicatedBinding x ->
+          hierror "name clash for `%s': check your renamings" x
     in
 
     let proofs = List.pmap (fun axc ->

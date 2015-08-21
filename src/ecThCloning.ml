@@ -35,6 +35,7 @@ type clone_error =
 | CE_TypeArgMism    of ovkind * qsymbol
 | CE_OpIncompatible of qsymbol * incompatible
 | CE_PrIncompatible of qsymbol * incompatible
+| CE_InvalidRE      of string
 
 exception CloneError of EcEnv.env * clone_error
 
@@ -90,13 +91,16 @@ let pp_clone_error fmt env error =
       msg "type argument mismatch for %s `%s'"
         (string_of_ovkind kd) (string_of_qsymbol x)
 
-  | CE_OpIncompatible (x,err) ->
+  | CE_OpIncompatible (x, err) ->
       msg "operator `%s' body %a"
         (string_of_qsymbol x) (pp_incompatible env) err
 
-  | CE_PrIncompatible (x,err) ->
+  | CE_PrIncompatible (x, err) ->
       msg "predicate `%s' body %a"
         (string_of_qsymbol x) (pp_incompatible env) err
+
+  | CE_InvalidRE x ->
+      msg "invalid regexp: `%s'" x
 
 let () =
   let pp fmt exn =
@@ -120,6 +124,7 @@ and evlemma = {
   ev_bynames : (ptactic_core option) Msym.t;
 }
 
+(*-------------------------------------------------------------------- *)
 let evc_empty =
   let evl = { ev_global = []; ev_bynames = Msym.empty; } in
     { evc_types  = Msym.empty;
@@ -197,6 +202,50 @@ let find_ax cth (nm, x) =
     | CTh_axiom (xax, ax) when xax = x -> Some ax
     | _ -> None
   in find_mc cth.cth_struct nm |> obind (List.opick test)
+
+(* -------------------------------------------------------------------- *)
+type clone = {
+  cl_name   : symbol;
+  cl_theory : EcPath.path * (EcEnv.Theory.t * EcTheory.thmode);
+  cl_clone  : evclone;
+  cl_rename : renaming list;
+}
+
+and renaming_kind = [
+  | `All
+  | `Selected of rk_categories
+]
+
+and renaming =
+  renaming_kind * (Pcre.regexp * Pcre.substitution)
+
+and rk_categories = {
+  rkc_lemmas  : bool;
+  rkc_ops     : bool;
+  rkc_preds   : bool;
+  rkc_types   : bool;
+  rkc_module  : bool;
+  rkc_modtype : bool;
+}
+
+(* -------------------------------------------------------------------- *)
+let rename ((rk, (rex, itempl)) : renaming) (k, x) =
+  let selected =
+    match rk, k with
+    | `All, _ -> true
+    | `Selected { rkc_lemmas  = true }, `Lemma   -> true
+    | `Selected { rkc_ops     = true }, `Op      -> true
+    | `Selected { rkc_preds   = true }, `Pred    -> true
+    | `Selected { rkc_types   = true }, `Type    -> true
+    | `Selected { rkc_module  = true }, `Module  -> true
+    | `Selected { rkc_modtype = true }, `ModType -> true
+    | _, _ -> false in
+
+  let newx =
+    try  if selected then Pcre.replace ~rex ~itempl x else x
+    with Failure _ -> x in
+
+  if x = newx then None else Some newx
 
 (* -------------------------------------------------------------------- *)
 let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
@@ -412,4 +461,45 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
     in List.fold_left do1 ovrds (genproofs @ thcl.pthc_prf)
   in
 
-  (name, (opath, (oth, othmode)), ovrds)
+  let rename =
+    let rename1 (k, (r1, r2)) : renaming =
+      let e1 =
+        try  Pcre.regexp (unloc r1)
+        with Pcre.Error _ -> clone_error scenv (CE_InvalidRE (unloc r1)) in
+      let e2 =
+        try  Pcre.subst (unloc r2)
+        with Pcre.Error _ -> clone_error scenv (CE_InvalidRE (unloc r2)) in
+
+      Array.iter
+        (fun m ->
+          if Pcre.pmatch ~pat:"^0+$" m.(1) then
+            clone_error scenv (CE_InvalidRE (unloc r2)))
+        (try  Pcre.extract_all ~pat:"\\$([0-9]+)" (unloc r2)
+         with Not_found -> [||]);
+
+      let k =
+        if List.is_empty k then `All else
+
+          let update rk = function
+            | `Lemma   -> { rk with rkc_lemmas  = true; }
+            | `Type    -> { rk with rkc_types   = true; }
+            | `Op      -> { rk with rkc_ops     = true; }
+            | `Pred    -> { rk with rkc_preds   = true; }
+            | `Module  -> { rk with rkc_module  = true; }
+            | `ModType -> { rk with rkc_modtype = true; } in
+
+          let init = {
+            rkc_lemmas  = false; rkc_types   = false; rkc_ops     = false;
+            rkc_preds   = false; rkc_module  = false; rkc_modtype = false; } in
+
+          `Selected (List.fold_left update init k)
+
+      in (k, (e1, e2))
+
+    in List.map rename1 thcl.pthc_rnm
+  in
+
+  { cl_name   = name;
+    cl_theory = (opath, (oth, othmode));
+    cl_clone  = ovrds;
+    cl_rename = rename; }
