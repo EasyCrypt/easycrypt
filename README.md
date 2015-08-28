@@ -7,7 +7,7 @@ EasyCrypt uses the following third-party tools/libraries:
 
      Available at http://caml.inria.fr/
 
- * Why3 (= 0.85)
+ * Why3 (>= 0.85)
 
      Available at http://why3.lri.fr/
 
