@@ -775,6 +775,9 @@ let process_mintros ?(cf = true) pis gs =
     | IPRw x :: pis ->
         collect (`Rw x :: maybe_core ()) [] pis
 
+    | IPDelta ((s, o), x) :: pis ->
+        collect (`Delta ((s, o), x) :: maybe_core ()) [] pis
+
     | IPView x :: pis ->
         collect (`View x :: maybe_core ()) [] pis
 
@@ -836,6 +839,9 @@ let process_mintros ?(cf = true) pis gs =
       process_rewrite1_core (s, o) pt tc
     in t_seqs [t_intros_i [h]; rwt; t_clear h] tc
 
+  and intro1_unfold (_ : ST.state) (s, o) p tc =
+    process_delta (s, o, p) tc
+
   and intro1_view (_ : ST.state) pe tc =
     process_view1 pe tc
 
@@ -868,6 +874,9 @@ let process_mintros ?(cf = true) pis gs =
   
         | `Rw (o, s) ->
             (false, t_onall (intro1_rw st (o, s)) gs)
+
+        | `Delta ((o, s), p) ->
+            (nointro, t_onall (intro1_unfold st (o, s) p) gs)
   
         | `View pe ->
             (false, t_onall (intro1_view st pe) gs)

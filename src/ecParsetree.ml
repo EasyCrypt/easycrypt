@@ -595,13 +595,14 @@ and rwocci    = [`Inclusive | `Exclusive]
 
 (* -------------------------------------------------------------------- *)
 type intropattern1 =
-  | IPCore  of renaming located
-  | IPCase  of ([`One|`Full] * intropattern list)
-  | IPView  of ppterm
-  | IPRw    of (rwocc * rwside)
-  | IPSubst of rwside
-  | IPClear of psymbol list
-  | IPDone  of bool
+  | IPCore   of renaming located
+  | IPCase   of ([`One|`Full] * intropattern list)
+  | IPView   of ppterm
+  | IPRw     of (rwocc * rwside)
+  | IPDelta  of ((rwside * rwocc) * pformula)
+  | IPSubst  of rwside
+  | IPClear  of psymbol list
+  | IPDone   of bool
   | IPSimplify
 
 and intropattern = intropattern1 list

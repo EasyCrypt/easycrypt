@@ -1768,6 +1768,9 @@ intro_pattern:
 | SLASH f=pterm
    { IPView f }
 
+| s=rwside o=rwocc? AT SLASH x=sform_h
+   { IPDelta ((s, o |> omap (snd_map EcMaps.Sint.of_list)), x) }
+
 gpterm_head(F):
 | p=qident tvi=tvars_app?
    { FPNamed (p, tvi) }
