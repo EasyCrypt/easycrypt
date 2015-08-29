@@ -186,8 +186,15 @@ val t_intros_i_seq : ?clear:bool -> ident list -> FApi.backward -> FApi.backward
 val t_intros_s_seq : inames -> FApi.backward -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
-val t_generalize_hyps : ?clear:bool -> EcIdent.t list -> FApi.backward
-val t_generalize_hyp  : ?clear:bool -> EcIdent.t -> FApi.backward
+val t_generalize_hyps :
+     ?clear:bool -> ?missing:bool
+  -> ?naming:(ident -> symbol option)
+  -> EcIdent.t list -> FApi.backward
+
+val t_generalize_hyp  :
+     ?clear:bool -> ?missing:bool
+  -> ?naming:(ident -> symbol option)
+  -> EcIdent.t -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
 val t_clear  : ident -> FApi.backward

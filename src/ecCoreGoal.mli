@@ -296,6 +296,7 @@ module FApi : sig
   type tfocus    = (int -> bool)
 
   val t_focus      : backward -> tactical
+  val t_map        : (tcenv1 -> 'a * tcenv) -> tcenv -> 'a list * tcenv
   val t_onalli     : (int -> backward) -> tactical
   val t_onall      : backward -> tactical
   val t_onfsub     : (int -> backward option) -> tactical
@@ -312,6 +313,7 @@ module FApi : sig
   val t_swap_goals : int -> int -> tactical
 
   val t_sub    : backward list -> tactical
+  val t_submap : (tcenv1 -> 'a * tcenv) list -> tcenv -> 'a list * tcenv
 
   val t_seq    : backward -> backward -> backward
   val t_seqs   : backward list -> backward

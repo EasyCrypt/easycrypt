@@ -607,7 +607,11 @@ type intropattern1 =
 and intropattern = intropattern1 list
 
 and renaming = [
-  `NoName | `FindName | `WithRename of string | `NoRename of string
+  | `NoName
+  | `FindName
+  | `Temp
+  | `WithRename of string
+  | `NoRename of string
 ]
 
 type genpattern = [`ProofTerm of ppterm | `Form of (rwocc * pformula)]

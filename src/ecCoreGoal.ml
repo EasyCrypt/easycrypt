@@ -519,6 +519,21 @@ module FApi = struct
     on_sub1i_goals (fun (_ : int) -> tt) hds pe
 
   (* ------------------------------------------------------------------ *)
+  let on_sub1i_map_goals
+    (tt : int -> tcenv1 -> 'a * tcenv) (hds : handle list) (pe : proofenv)
+  =
+    let do1 i pe hd =
+      let data, tc = tt i (tcenv1_of_penv hd pe) in
+      assert (tc.tce_tcenv.tce_ctxt = []);
+      (tc_penv tc, (tc_opened tc, data)) in
+    List.mapi_fold do1 pe hds
+
+  (* ------------------------------------------------------------------ *)
+  let on_sub1_map_goals
+    (tt : tcenv1 -> 'a * tcenv) (hds : handle list) (pe : proofenv)
+  = on_sub1i_map_goals (fun (_ : int) -> tt) hds pe
+
+  (* ------------------------------------------------------------------ *)
   let on_sub_goals (tt : backward list) (hds : handle list) (pe : proofenv) =
     let do1 pe tt hd =
       let tc = tt (tcenv1_of_penv hd pe) in
@@ -537,6 +552,13 @@ module FApi = struct
   let t_onall (tt : backward) (tc : tcenv) =
     t_onalli (fun (_ : int) -> tt) tc
 
+  (* ------------------------------------------------------------------ *)
+  let t_map (tt : tcenv1 -> 'a * tcenv) (tc : tcenv) =
+    let pe      = tc.tce_tcenv.tce_penv in
+    let pe, ln  = on_sub1_map_goals tt (tc_opened tc) pe in
+    let ln, dt  = fst_map List.flatten (List.split ln) in
+    (dt, tcenv_of_penv ~ctxt:tc.tce_tcenv.tce_ctxt ln pe)
+    
   (* ------------------------------------------------------------------ *)
   let t_firsts (tt : backward) (i : int) (tc : tcenv) =
     if i < 0 then invalid_arg "EcCoreGoal.firsts";
@@ -590,11 +612,31 @@ module FApi = struct
     tcenv_of_penv ~ctxt:tc.tce_tcenv.tce_ctxt (List.flatten ln) !pe
 
   (* ------------------------------------------------------------------ *)
+  let t_onfsub_map (tx : int -> tcenv1 -> 'a * tcenv) (tc : tcenv) =
+    let do1 pe i hd =
+      let data, tc = tx i (tcenv1_of_penv hd !pe) in
+      assert (tc.tce_tcenv.tce_ctxt = []);
+      pe := (tc_penv tc); (tc_opened tc, data)
+    in
+
+    let pe = ref (tc_penv tc) in
+    let ln, data = List.split (List.mapi (do1 pe) (tc_opened tc)) in
+
+    (data, tcenv_of_penv ~ctxt:tc.tce_tcenv.tce_ctxt (List.flatten ln) !pe)
+
+  (* ------------------------------------------------------------------ *)
   let t_sub (ts : backward list) (tc : tcenv) =
     let ts = Array.of_list ts in
     if Array.length ts <> tc_count tc then
       raise InvalidGoalShape;
     t_onfsub (fun i -> Some ts.(i)) tc
+
+  (* -------------------------------------------------------------------- *)
+  let t_submap (ts : (tcenv1 -> 'a * tcenv) list) (tc : tcenv) =
+    let ts = Array.of_list ts in
+    if Array.length ts <> tc_count tc then
+      raise InvalidGoalShape;
+    t_onfsub_map (fun i -> ts.(i)) tc
 
   (* ------------------------------------------------------------------ *)
   let t_onselecti (test : tfocus) ?ttout (tt : ibackward) (tc : tcenv) =

@@ -675,32 +675,75 @@ let process_view pes tc =
   List.fold_left (fun tc tt -> tt tc) (FApi.tcenv_of_tcenv1 tc) views
 
 (* -------------------------------------------------------------------- *)
-let process_mintros ?(cf = true) pis gs =
-  let mk_intro ids tc =
-    t_intros (snd (List.map_fold (fun (hyps, form) s ->
-      let rec destruct fp =
-        match EcFol.sform_of_form fp with
-        | SFquant (Lforall, (x, _)  , lazy fp) -> (EcIdent.name x, fp)
-        | SFlet   (LSymbol (x, _), _, fp)      -> (EcIdent.name x, fp)
-        | SFimp   (_                , fp)      -> ("H", fp)
-        | _ -> begin
-          match EcReduction.h_red_opt EcReduction.full_red hyps fp with
-          | None   -> ("_", f_true)
-          | Some f -> destruct f
-        end
-      in
-      let name, form = destruct form in
-      let id =
-        lmap (function
-        | `NoName       -> EcIdent.create "_"
-        | `FindName     -> LDecl.fresh_id hyps name
-        | `NoRename s   -> EcIdent.create s
-        | `WithRename s -> LDecl.fresh_id hyps s) s
-      in
+module IntroState : sig
+  type state
 
-      let hyps = LDecl.add_local id.pl_desc (LD_var (tbool, None)) hyps in
-        (hyps, form), Tagged (unloc id, Some id.pl_loc))
-      (FApi.tc1_flat tc) ids)) tc
+  val create  : unit  -> state
+  val push    : ?name:symbol -> EcIdent.t -> state -> unit
+  val listing : state -> EcIdent.t list
+  val naming  : state -> (EcIdent.t -> symbol option)
+end = struct
+  type state = {
+    mutable torev  : EcIdent.t list;
+    mutable naming : symbol option Mid.t;
+  }
+
+  let create () =
+    { torev = []; naming = Mid.empty; }
+
+  let push ?name id st =
+    let map =
+      Mid.change (function
+      | None   -> Some name
+      | Some _ -> assert false)
+      id st.naming
+    in
+      st.torev  <- id :: st.torev;
+      st.naming <- map
+
+  let listing (st : state) =
+    st.torev
+
+  let naming (st : state) (x : EcIdent.t) =
+    Mid.find_opt x st.naming |> odfl None
+end
+
+let process_mintros ?(cf = true) pis gs =
+  let module ST = IntroState in
+
+  let mk_intro ids (hyps, form) =
+    let (_, torev), ids =
+        List.map_fold (fun ((hyps, form), torev) s ->
+        let rec destruct fp =
+          match EcFol.sform_of_form fp with
+          | SFquant (Lforall, (x, _)  , lazy fp) ->
+              let name = EcIdent.name x in (name, Some name, fp)
+          | SFlet (LSymbol (x, _), _, fp) ->
+              let name = EcIdent.name x in (name, Some name, fp)
+          | SFimp (_, fp) ->
+              ("H", None, fp)
+          | _ -> begin
+            match EcReduction.h_red_opt EcReduction.full_red hyps fp with
+            | None   -> ("_", None, f_true)
+            | Some f -> destruct f
+          end
+        in
+        let name, revname, form = destruct form in
+        let revert, id =
+          match unloc s with
+          | `NoName       -> false, EcIdent.create "_"
+          | `Temp         -> true , EcIdent.create "_"
+          | `FindName     -> false, LDecl.fresh_id hyps name
+          | `NoRename s   -> false, EcIdent.create s
+          | `WithRename s -> false, LDecl.fresh_id hyps s in
+  
+        let id    = mk_loc s.pl_loc id in
+        let hyps  = LDecl.add_local id.pl_desc (LD_var (tbool, None)) hyps in
+        let torev = if revert then (unloc id, revname) :: torev else torev in
+          ((hyps, form), torev), Tagged (unloc id, Some id.pl_loc))
+        ((hyps, form), []) ids
+
+    in (torev, ids)
   in
 
   let rec collect acc core pis =
@@ -739,90 +782,113 @@ let process_mintros ?(cf = true) pis gs =
         collect (`Subst x :: maybe_core ()) [] pis
   in
 
-  let rec dointro nointro pis (gs : tcenv) =
-    let (_, gs) =
-      List.fold_left
-        (fun (nointro, gs) ip ->
-          match ip with
-          | `Core ids ->
-              (false, t_onall (mk_intro ids) gs)
+  let rec intro1_core (st : ST.state) ids (tc : tcenv1) =
+    let torev, ids = mk_intro ids (FApi.tc1_flat tc) in
+    List.iter (fun (id, name) -> ST.push ?name id st) torev;
+    t_intros ids tc
 
-          | `Done b   ->
-              let t =
-                let t_trivial = EcPhlAuto.t_trivial in
-                match b with
-                | true  -> t_seq (t_simplify ~delta:false) t_trivial
-                | false -> t_trivial
-              in
-                (nointro, t_onall t gs)
+  and intro1_done (_ : ST.state) (simplify : bool) (tc : tcenv1) =
+    let t =
+      let t_trivial = EcPhlAuto.t_trivial in
+        match simplify with
+        | true  -> t_seq (t_simplify ~delta:false) t_trivial
+        | false -> t_trivial
+    in t tc
 
-          | `Simpl ->
-              (nointro, t_onall (t_simplify ~delta:false) gs)
+  and intro1_simplify (_ : ST.state) tc =
+    t_simplify ~delta:false tc
 
-          | `Clear xs ->
-              (nointro, t_onall (process_clear xs) gs)
+  and intro1_clear (_ : ST.state) xs tc =
+    process_clear xs tc
 
-          | `Case (mode, pis) ->
-              let onsub gs =
-                if FApi.tc_count gs <> List.length pis then
-                  tc_error !$gs
-                    "not the right number of intro-patterns (got %d, expecting %d)"
-                    (List.length pis) (FApi.tc_count gs);
-                t_sub (List.map (dointro1 false) pis) gs in
-
-              let tc = t_or (t_elimT_ind `Case) t_elim in
-              let tc = match mode with `One -> tc | `Full -> t_do `Maybe None tc in
-              let tc =
-                fun g ->
-                  try  tc g
-                  with InvalidGoalShape ->
-                    tc_error !!g "invalid intro-pattern: nothing to eliminate"
-              in     
-
-              let gs =
-                match nointro && not cf with
-                | true when mode = `One -> onsub gs
-                | _ -> begin
-                    match pis with
-                    | [] -> t_onall tc gs
-                    | _  -> t_onall (fun gs -> onsub (tc gs)) gs
-                end
-              in
-                (false, gs)
-
-          | `Rw (o, s) ->
-              let t tc =
-                let h = EcIdent.create "_" in
-                let rwt tc =
-                  let pt = PT.pt_of_hyp !!tc (FApi.tc1_hyps tc) h in
-                  process_rewrite1_core (s, o) pt tc
-                in
-                  t_seqs [t_intros_i [h]; rwt; t_clear h] tc
-              in
-                (false, t_onall t gs)
-
-          | `View pe ->
-              (false, t_onall (process_view1 pe) gs)
-
-          | `Subst d ->
-              let t tc =
-                try
-                  t_intros_i_seq ~clear:true [EcIdent.create "_"]
-                    (EcLowGoal.t_subst ~clear:false ~tside:(d :> tside))
-                    tc
-                with InvalidGoalShape ->
-                  tc_error !!tc "nothing to substitute"
-              in
-                (false, t_onall t gs))
-
-        (nointro, gs) pis
+  and intro1_case (st : ST.state) nointro (mode, pis) gs =
+    let onsub gs =
+      if FApi.tc_count gs <> List.length pis then
+        tc_error !$gs
+          "not the right number of intro-patterns (got %d, expecting %d)"
+          (List.length pis) (FApi.tc_count gs);
+      t_sub (List.map (dointro1 st false) pis) gs
     in
-      gs
 
-  and dointro1 nointro pis tc =
-    dointro nointro pis (FApi.tcenv_of_tcenv1 tc) in
+    let tc = t_or (t_elimT_ind `Case) t_elim in
+    let tc = match mode with `One -> tc | `Full -> t_do `Maybe None tc in
+    let tc =
+      fun g ->
+        try  tc g
+        with InvalidGoalShape ->
+          tc_error !!g "invalid intro-pattern: nothing to eliminate"
+    in     
 
-    dointro true (List.rev (collect [] [] pis)) gs
+    match nointro && not cf with
+    | true when mode = `One ->
+        onsub gs
+
+    | _ -> begin
+        match pis with
+        | [] -> t_onall tc gs
+        | _  -> t_onall (fun gs -> onsub (tc gs)) gs
+    end
+
+  and intro1_rw (_ : ST.state) (o, s) tc =
+    let h = EcIdent.create "_" in
+    let rwt tc =
+      let pt = PT.pt_of_hyp !!tc (FApi.tc1_hyps tc) h in
+      process_rewrite1_core (s, o) pt tc
+    in t_seqs [t_intros_i [h]; rwt; t_clear h] tc
+
+  and intro1_view (_ : ST.state) pe tc =
+    process_view1 pe tc
+
+  and intro1_subst (_ : ST.state) d (tc : tcenv1) =
+    try
+      t_intros_i_seq ~clear:true [EcIdent.create "_"]
+        (EcLowGoal.t_subst ~clear:false ~tside:(d :> tside))
+        tc
+    with InvalidGoalShape ->
+      tc_error !!tc "nothing to substitute"
+
+  and dointro (st : ST.state) nointro pis (gs : tcenv) =
+    match pis with [] -> gs | pi :: pis ->
+      let nointro, gs =
+        match pi with
+        | `Core ids ->
+            (false, t_onall (intro1_core st ids) gs)
+  
+        | `Done b ->
+            (nointro, t_onall (intro1_done st b) gs)
+  
+        | `Simpl ->
+            (nointro, t_onall (intro1_simplify st) gs)
+  
+        | `Clear xs ->
+            (nointro, t_onall (intro1_clear st xs) gs)
+  
+        | `Case (mode, pis) ->
+            (false, intro1_case st nointro (mode, pis) gs)
+  
+        | `Rw (o, s) ->
+            (false, t_onall (intro1_rw st (o, s)) gs)
+  
+        | `View pe ->
+            (false, t_onall (intro1_view st pe) gs)
+  
+        | `Subst d ->
+            (false, t_onall (intro1_subst st d) gs)
+
+      in dointro st nointro pis gs
+
+  and dointro1 st nointro pis tc =
+    dointro st nointro pis (FApi.tcenv_of_tcenv1 tc) in
+
+  let st = ST.create () in
+  let gs = dointro st true (List.rev (collect [] [] pis)) gs in
+  let tr = List.rev (ST.listing st) in
+
+  t_onall (fun tc ->
+    t_generalize_hyps
+      ~clear:true ~missing:true ~naming:(ST.naming st)
+      tr tc)
+    gs
 
 (* -------------------------------------------------------------------- *)
 let process_intros ?cf pis tc =

@@ -424,41 +424,53 @@ let t_apply_hd (hd : handle) ?args ?sk tc =
   tt_apply_hd hd ?args ?sk (FApi.tcenv_of_tcenv1 tc)
 
 (* -------------------------------------------------------------------- *)
-let t_generalize_hyps ?(clear = false) ids tc =
+let t_generalize_hyps ?(clear = false) ?(missing = false) ?naming ids tc =
   let env, hyps, concl = FApi.tc1_eflat tc in
 
+  let fresh x =
+    match naming with
+    | None   -> EcIdent.fresh x
+    | Some f ->
+      match f x with
+      | None   -> EcIdent.fresh x
+      | Some x -> EcIdent.create x
+  in
+
   let rec for1 (s, bds, args) id =
-    match LDecl.ld_subst s (LDecl.by_id id hyps) with
-    | LD_var (ty, _) ->
-        let x    = EcIdent.fresh id in
-        let s    = Fsubst.f_bind_local s id (f_local x ty) in
-        let bds  = `Forall (x, GTty ty) :: bds in
-        let args = PAFormula (f_local id ty) :: args in
+    try
+      match LDecl.ld_subst s (LDecl.by_id id hyps) with
+      | LD_var (ty, _) ->
+          let x    = fresh id in
+          let s    = Fsubst.f_bind_local s id (f_local x ty) in
+          let bds  = `Forall (x, GTty ty) :: bds in
+          let args = PAFormula (f_local id ty) :: args in
+          (s, bds, args)
+
+      | LD_mem mt ->
+        let x    = fresh id in
+        let s    = Fsubst.f_bind_mem s id x in
+        let bds  = `Forall (x, GTmem mt) :: bds in
+        let args = PAMemory id :: args in
         (s, bds, args)
 
-    | LD_mem mt ->
-      let x    = EcIdent.fresh id in
-      let s    = Fsubst.f_bind_mem s id x in
-      let bds  = `Forall (x, GTmem mt) :: bds in
-      let args = PAMemory id :: args in
-      (s, bds, args)
+      | LD_modty (mt,r) ->
+        let x    = fresh id in
+        let s    = Fsubst.f_bind_mod s id (EcPath.mident x) in
+        let mp   = EcPath.mident id in
+        let sig_ = (EcEnv.Mod.by_mpath mp env).EcModules.me_sig in
+        let bds  = `Forall (x, GTmodty (mt, r)) :: bds in
+        let args = PAModule (mp, sig_) :: args in
+        (s, bds, args)
 
-    | LD_modty (mt,r) ->
-      let x    = EcIdent.fresh id in
-      let s    = Fsubst.f_bind_mod s id (EcPath.mident x) in
-      let mp   = EcPath.mident id in
-      let sig_ = (EcEnv.Mod.by_mpath mp env).EcModules.me_sig in
-      let bds  = `Forall (x, GTmodty (mt, r)) :: bds in
-      let args = PAModule (mp, sig_) :: args in
-      (s, bds, args)
-
-    | LD_hyp f ->
+      | LD_hyp f ->
         let bds  = `Imp f :: bds in
         let args = palocal id :: args in
         (s, bds, args)
 
-    | LD_abs_st _ ->
-        raise InvalidGoalShape
+      | LD_abs_st _ ->
+          raise InvalidGoalShape
+
+    with LDecl.LdeclError _ when missing -> (s, bds, args)
 
   in
 
@@ -478,8 +490,8 @@ let t_generalize_hyps ?(clear = false) ids tc =
 
   if clear then FApi.t_onall (t_clears ids) tc else tc
 
-let t_generalize_hyp ?clear id tc =
-  t_generalize_hyps ?clear [id] tc
+let t_generalize_hyp ?clear ?missing ?naming id tc =
+  t_generalize_hyps ?clear ?missing ?naming [id] tc
 
 (* -------------------------------------------------------------------- *)
 module LowAssumption = struct
