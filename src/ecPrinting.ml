@@ -590,7 +590,7 @@ let priority_of_binop name =
   | Some EP.ROP1 _ -> Some e_bin_prio_rop1
   | Some EP.LOP2 _ -> Some e_bin_prio_lop2
   | Some EP.ROP2 _ -> Some e_bin_prio_rop2
-  | Some EP.ADD    -> Some e_bin_prio_lop2
+  | Some EP.PLUS   -> Some e_bin_prio_lop2
   | Some EP.MINUS  -> Some e_bin_prio_lop2
   | Some EP.LOP3 _ -> Some e_bin_prio_lop3
   | Some EP.ROP3 _ -> Some e_bin_prio_rop3

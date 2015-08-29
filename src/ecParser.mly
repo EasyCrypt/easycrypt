@@ -316,7 +316,6 @@
 %token <EcParsetree.codepos> CPOS
 
 %token ABSTRACT
-%token ADD
 %token ADMIT
 %token ALGNORM
 %token ALIAS
@@ -431,6 +430,7 @@
 %token PCENT
 %token PHOARE
 %token PIPE
+%token PLUS
 %token POSE
 %token PR
 %token PRAGMA
@@ -528,7 +528,7 @@
 %left  LOP1
 %right ROP1
 %right QUESTION
-%left  LOP2 MINUS ADD
+%left  LOP2 MINUS PLUS
 %right ROP2
 %right RARROW
 %left  LOP3 STAR SLASH
@@ -677,12 +677,12 @@ fident:
 %inline uniop:
 | x=NOP { Printf.sprintf "[%s]" x }
 | NOT   { "[!]" }
-| ADD   { "[+]" }
+| PLUS  { "[+]" }
 | MINUS { "[-]" }
 
 %inline sbinop:
 | EQ    { "="   }
-| ADD   { "+"   }
+| PLUS  { "+"   }
 | MINUS { "-"   }
 | STAR  { "*"   }
 | SLASH { "/"   }
@@ -709,9 +709,9 @@ is_uniop: uniop EOF {}
 
 (* -------------------------------------------------------------------- *)
 pside_:
-| x=_lident    { (0, Printf.sprintf "&%s" x) }
-| x=word       { (0, Printf.sprintf "&%d" x) }
-| ADD x=pside_ { (1 + fst x, snd x) }
+| x=_lident     { (0, Printf.sprintf "&%s" x) }
+| x=word        { (0, Printf.sprintf "&%d" x) }
+| PLUS x=pside_ { (1 + fst x, snd x) }
 
 pside:
 | x=brace(pside_) { x }
@@ -2010,7 +2010,7 @@ dbmap1:
         pht_name = (snd x); } }
 
 %inline dbmap_flag:
-| ADD   { `Include }
+| PLUS  { `Include }
 | MINUS { `Exclude }
 
 %inline dbmap_target:
@@ -2620,7 +2620,7 @@ tactics0:
 | x=loc(empty) { Pseq [mk_core_tactic (mk_loc x.pl_loc (Pidtac None))] }
 
 toptactic:
-| ADD   t=tactics { t }
+| PLUS  t=tactics { t }
 | STAR  t=tactics { t }
 | MINUS t=tactics { t }
 |       t=tactics { t }
@@ -2872,7 +2872,7 @@ smt_info1:
 
 prover_kind1:
 | l=loc(STRING)       { `Only   , l }
-| ADD l=loc(STRING)   { `Include, l } 
+| PLUS  l=loc(STRING) { `Include, l } 
 | MINUS l=loc(STRING) { `Exclude, l } 
 
 prover_kind:
@@ -2933,7 +2933,7 @@ global_action:
 | WHY3 x=STRING    { GdumpWhy3  x   }
 
 | PRAGMA       x=pragma { Gpragma x }
-| PRAGMA ADD   x=pragma { Goption (x, true ) }
+| PRAGMA PLUS  x=pragma { Goption (x, true ) }
 | PRAGMA MINUS x=pragma { Goption (x, false) }
 
 pragma_r:

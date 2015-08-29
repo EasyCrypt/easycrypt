@@ -217,7 +217,7 @@
     ("\\/", (OR          , false));
     ("<=>", (IFF         , false));
     ("%"  , (PCENT       , false));
-    ("+"  , (ADD         , false));
+    ("+"  , (PLUS        , false));
     ("-"  , (MINUS       , false));
     ("*"  , (STAR        , false));
     ("<<" , (BACKS       , false));
