@@ -895,7 +895,7 @@ let process_mintros ?(cf = true) pis gs =
 
   t_onall (fun tc ->
     t_generalize_hyps
-      ~clear:`Yes ~missing:true ~naming:(ST.naming st)
+      ~clear:`Try ~missing:true ~naming:(ST.naming st)
       tr tc)
     gs
 
