@@ -904,7 +904,7 @@ let process_mintros ?(cf = true) pis gs =
 
   let st = ST.create () in
   let gs = dointro st true (List.rev (collect [] [] pis)) gs in
-  let tr = List.rev (ST.listing st) in
+  let tr = ST.listing st in
 
   t_onall (fun tc ->
     t_generalize_hyps
