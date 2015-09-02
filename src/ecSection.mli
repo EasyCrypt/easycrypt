@@ -8,6 +8,7 @@ open EcSymbols
 open EcIdent
 open EcPath
 open EcFol
+open EcDecl
 open EcModules
 
 type locals
@@ -20,7 +21,10 @@ val is_local : [`Lemma | `Module] -> path -> locals -> bool
 val is_mp_local : mpath -> locals -> bool
 
 val form_use_local : form  -> locals -> bool
+
 val module_use_local_or_abs : module_expr -> locals -> bool
+val opdecl_use_local_or_abs : operator    -> locals -> bool
+val tydecl_use_local_or_abs : tydecl      -> locals -> bool
 
 val abstracts : locals -> (EcIdent.t * (module_type * mod_restr)) list * Sid.t
 

@@ -946,6 +946,13 @@ module Op = struct
 
   let bind (scope : scope) ((x, op) : _ * operator) =
     assert (scope.sc_pr_uc = None);
+
+    (match EcSection.olocals scope.sc_section with
+     | None -> ()
+     | Some locals ->
+        if EcSection.opdecl_use_local_or_abs op locals then
+          hierror "operators cannot use local/abstracts modules");
+
     let scope = { scope with sc_env = EcEnv.Op.bind x op scope.sc_env } in
     let scope = maybe_add_to_section scope (EcTheory.CTh_operator (x, op)) in
       scope
@@ -1318,6 +1325,13 @@ module Ty = struct
   (* ------------------------------------------------------------------ *)
   let bind (scope : scope) ((x, tydecl) : (_ * tydecl)) =
     assert (scope.sc_pr_uc = None);
+
+    (match EcSection.olocals scope.sc_section with
+     | None -> ()
+     | Some locals ->
+        if EcSection.tydecl_use_local_or_abs tydecl locals then
+          hierror "types cannot use local/abstracts modules");
+
     let scope = { scope with sc_env = EcEnv.Ty.bind x tydecl scope.sc_env; } in
     let scope = maybe_add_to_section scope (EcTheory.CTh_type (x, tydecl)) in
       scope
