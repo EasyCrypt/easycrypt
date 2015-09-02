@@ -552,7 +552,11 @@ let process_view1 pe tc =
         try
           PT.pf_form_match ~mode:fmdelta pte.PT.ptev_env ~ptn:f1 fp;
           (pte, ids, f2, `IffLR (f1, f2))
-        with MatchFailure -> raise E.NoInstance
+        with MatchFailure -> try 
+          PT.pf_form_match ~mode:fmdelta pte.PT.ptev_env ~ptn:f2 fp;
+          (pte, ids, f1, `IffRL (f1, f2))
+        with MatchFailure ->
+          raise E.NoInstance
     end
   in
 
@@ -641,12 +645,21 @@ let process_view1 pe tc =
           let pte =
             match view with
             | `None -> pte
+
             | `IffLR (f1, f2) ->
                 let vpte = PT.pt_of_global_r pte.PT.ptev_env LG.p_iff_lr [] in
                 let vpte = PT.apply_pterm_to_arg_r vpte (PVAFormula f1) in
                 let vpte = PT.apply_pterm_to_arg_r vpte (PVAFormula f2) in
                 let vpte = PT.apply_pterm_to_arg_r vpte (PVASub pte) in
                 vpte
+
+            | `IffRL (f1, f2) ->
+                let vpte = PT.pt_of_global_r pte.PT.ptev_env LG.p_iff_rl [] in
+                let vpte = PT.apply_pterm_to_arg_r vpte (PVAFormula f1) in
+                let vpte = PT.apply_pterm_to_arg_r vpte (PVAFormula f2) in
+                let vpte = PT.apply_pterm_to_arg_r vpte (PVASub pte) in
+                vpte
+
           in
 
           let pt = fst (PT.concretize (PT.apply_pterm_to_hole pte)) in
