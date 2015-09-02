@@ -221,16 +221,19 @@ let t_simplify ?target ?(delta=true) (tc : tcenv1) =
   t_simplify_with_info ?target ri tc
 
 (* -------------------------------------------------------------------- *)
-let t_clears xs tc =
+let t_clears ?(leniant = false) xs tc =
   let (hyps, concl) = FApi.tc1_flat tc in
 
-  if not (Mid.set_disjoint xs concl.f_fv) then
-    let ids () = Sid.elements (Mid.set_inter xs concl.f_fv) in
-    raise (ClearError (lazy (`ClearInGoal (ids ()))))
-  else
-
+  let xs =
+    if not (Mid.set_disjoint xs concl.f_fv) then
+      if leniant then Mid.set_diff xs concl.f_fv else
+      let ids () = Sid.elements (Mid.set_inter xs concl.f_fv) in
+      raise (ClearError (lazy (`ClearInGoal (ids ()))))
+    else xs
+  in
+      
   let hyps =
-    try  LDecl.clear xs hyps
+    try  LDecl.clear ~leniant xs hyps
     with LDecl.LdeclError (LDecl.CannotClear (id1, id2)) ->
       raise (ClearError (lazy (`ClearDep (id1, id2))))
   in
@@ -238,12 +241,12 @@ let t_clears xs tc =
   FApi.mutate (!@tc) (fun hd -> VConv (hd, xs)) ~hyps concl
 
 (* -------------------------------------------------------------------- *)
-let t_clear x tc =
-  t_clears (Sid.singleton x) tc
+let t_clear ?leniant x tc =
+  t_clears ?leniant (Sid.singleton x) tc
 
 (* -------------------------------------------------------------------- *)
-let t_clears xs tc =
-  t_clears (Sid.of_list xs) tc
+let t_clears ?leniant xs tc =
+  t_clears ?leniant (Sid.of_list xs) tc
 
 (* -------------------------------------------------------------------- *)
 module LowIntro = struct
@@ -424,7 +427,7 @@ let t_apply_hd (hd : handle) ?args ?sk tc =
   tt_apply_hd hd ?args ?sk (FApi.tcenv_of_tcenv1 tc)
 
 (* -------------------------------------------------------------------- *)
-let t_generalize_hyps ?(clear = false) ?(missing = false) ?naming ids tc =
+let t_generalize_hyps ?(clear = `No) ?(missing = false) ?naming ids tc =
   let env, hyps, concl = FApi.tc1_eflat tc in
 
   let fresh x =
@@ -487,8 +490,13 @@ let t_generalize_hyps ?(clear = false) ?(missing = false) ?naming ids tc =
 
   let pt = { pt_head = PTCut ff; pt_args = List.rev args; } in
   let tc = t_apply pt tc in
+  let ct =
+    match clear with
+    | `No  -> None
+    | `Yes -> Some (t_clears ~leniant:false ids)
+    | `Try -> Some (t_clears ~leniant:true  ids)
 
-  if clear then FApi.t_onall (t_clears ids) tc else tc
+  in ct |> omap (fun ct -> FApi.t_onall ct tc) |> odfl tc
 
 let t_generalize_hyp ?clear ?missing ?naming id tc =
   t_generalize_hyps ?clear ?missing ?naming [id] tc

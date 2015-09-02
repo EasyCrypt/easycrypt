@@ -414,7 +414,7 @@ module LDecl : sig
   val fresh_id  : hyps -> symbol -> EcIdent.t
   val fresh_ids : hyps -> symbol list -> EcIdent.t list
 
-  val clear : EcIdent.Sid.t -> hyps -> hyps
+  val clear : ?leniant:bool -> EcIdent.Sid.t -> hyps -> hyps
 
   val push_all    : memenv list -> hyps -> hyps
   val push_active : memenv -> hyps -> hyps

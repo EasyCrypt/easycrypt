@@ -895,7 +895,7 @@ let process_mintros ?(cf = true) pis gs =
 
   t_onall (fun tc ->
     t_generalize_hyps
-      ~clear:true ~missing:true ~naming:(ST.naming st)
+      ~clear:`Yes ~missing:true ~naming:(ST.naming st)
       tr tc)
     gs
 
@@ -915,7 +915,7 @@ let process_generalize1 pattern (tc : tcenv1) =
             when occ = None && LDecl.has_name s hyps
           ->
             let id = fst (LDecl.by_name s hyps) in
-            t_generalize_hyp ~clear:true id tc
+            t_generalize_hyp ~clear:`Yes id tc
 
         | _ ->
           let (ptenv, p) =
@@ -957,7 +957,7 @@ let process_generalize1 pattern (tc : tcenv1) =
             when LDecl.has_name s hyps && List.is_empty fp.fp_args
           ->
             let id = fst (LDecl.by_name s hyps) in
-            t_generalize_hyp ~clear:true id tc
+            t_generalize_hyp ~clear:`Yes id tc
 
         | _ ->
           let pt = PT.tc1_process_full_pterm tc fp in

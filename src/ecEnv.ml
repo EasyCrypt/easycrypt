@@ -3050,18 +3050,27 @@ module LDecl = struct
       le_hyps = { h_tvar = tparams; h_local = locals; }; }
 
   (* ------------------------------------------------------------------ *)
-  let clear ids hyps =
-    let check (id, lk) =
-      if   EcIdent.Sid.mem id ids
-      then false
-      else
-        let fv = ld_fv lk in
-        if   Mid.set_disjoint ids fv
-        then true
-        else let inter = Mid.set_inter ids fv in
-             error (CannotClear (Sid.choose inter, id)) in
+  let clear ?(leniant = false) ids hyps =
+    let rec filter ids hyps =
+      match hyps with [] -> [] | ((id, lk) as bd) :: hyps ->
 
-    let locals = List.filter check hyps.le_hyps.h_local in
+      let ids, bd =
+        if EcIdent.Sid.mem id ids then (ids, None) else
+
+        let fv = ld_fv lk in
+
+        if Mid.set_disjoint ids fv then
+          (ids, Some bd)
+        else
+          if leniant then
+            (Mid.set_diff ids fv, Some bd)
+          else
+            let inter = Mid.set_inter ids fv in
+            error (CannotClear (Sid.choose inter, id))
+      in List.ocons bd (filter ids hyps)
+    in
+
+    let locals = filter ids hyps.le_hyps.h_local in
 
     init hyps.le_init ~locals hyps.le_hyps.h_tvar
 

@@ -187,18 +187,18 @@ val t_intros_s_seq : inames -> FApi.backward -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
 val t_generalize_hyps :
-     ?clear:bool -> ?missing:bool
+     ?clear:[`Yes|`No|`Try] -> ?missing:bool
   -> ?naming:(ident -> symbol option)
   -> EcIdent.t list -> FApi.backward
 
 val t_generalize_hyp  :
-     ?clear:bool -> ?missing:bool
+     ?clear:[`Yes|`No|`Try] -> ?missing:bool
   -> ?naming:(ident -> symbol option)
   -> EcIdent.t -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
-val t_clear  : ident -> FApi.backward
-val t_clears : ident list -> FApi.backward
+val t_clear  : ?leniant:bool -> ident -> FApi.backward
+val t_clears : ?leniant:bool -> ident list -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
 type pgoptions =  {
