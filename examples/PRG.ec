@@ -282,7 +282,7 @@ section.
     by sim.
     (* Psample.prg ~ PrgI.prg *)
     by proc; wp; rnd; rnd{1}; wp; skip; smt.
-  conseq* (_: _ ==> ={glob A, glob F})=> //.
+  conseq (_: _ ==> ={glob A, glob F})=> //.
   by inline *; auto; smt.
   qed.
 
@@ -308,7 +308,7 @@ section.
     (* no sampling ~ presampling *)
     sim; inline Resample.resample Psample.init F.init.
     rcondf{2} 7;
-      first by intros=> _; rnd; wp; conseq (_: _ ==> true) => //.
+      first by intros=> _; rnd; wp; conseq [-frame] (_: _ ==> true) => //.
     by wp; rnd; wp; rnd{2} (True); wp; skip; smt.
     (* presampling ~ postsampling *)
     seq 2 2: (={glob A, glob F, glob Plog}); first by sim.
@@ -323,7 +323,7 @@ section.
       swap{1} 4 3. swap{1} 4 2. swap{2} 2 4.
       sim.
       splitwhile {2} 5 : (length P.logP < n - 1).
-      conseq* (_ : _ ==> ={P.logP})=> //.
+      conseq (_ : _ ==> ={P.logP})=> //.
       seq 3 5: (={P.logP} /\ (length P.logP = n - 1){2}).
         while (={P.logP} /\ n{2} = n{1} + 1 /\ length P.logP{1} <= n{1});
           first by wp; rnd; skip; progress; smt.
@@ -462,7 +462,7 @@ section.
          (n = length logP /\ n <= qP /\ P.logP = [] /\
           card (dom F.m) <= qF)=> //.
     by rnd; wp.
-  conseq (_:_: <= (if Bad P.logP F.m then 1%r else 
+  conseq [-frame] (_:_: <= (if Bad P.logP F.m then 1%r else 
                   ((sum_n (qF + length P.logP) (qF + n - 1))%r * pr_dseed))).
     progress; cut ->: Bad [] F.m{hr} = false by smt.
     rewrite //=; apply CompatOrderMult=> //; last smt.
@@ -485,7 +485,7 @@ section.
     intros Hw.
     exists* P.logP, F.m, n; elim* => logPw m n0.
     case (Bad P.logP F.m).
-      by conseq* ( _ : _ : <= (1%r))=> //; smt.
+      by conseq ( _ : _ : <= (1%r))=> //; smt.
     seq 2: (Bad P.logP F.m) 
            ((qF + length logPw)%r * pr_dseed) 1%r
            1%r ((sum_n (qF + (length logPw + 1)) (qF + n - 1))%r * pr_dseed)
@@ -505,7 +505,7 @@ section.
             by rewrite (dseed_suf x witness) 3:/pr_dseed // dseed_fu.
             by apply CompatOrderMult; smt.
         by apply mu_Lmem_le_length; smt.
-        conseq Hw; progress=> //.
+        conseq [-frame] Hw; progress=> //.
         generalize H1; rewrite -neqF=> -> //=.
         cut ->: 1 + length logPw = length logPw + 1 by smt.
         done.

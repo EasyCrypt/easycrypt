@@ -65,7 +65,7 @@ section.
   proof.
     hoare.
     phoare split ! 1%r 1%r=> //=.
-      conseq* (A_ll Sample _).
+      conseq (A_ll Sample _).
         by proc; auto=> //=; apply uT_ll.
     by bypr=> &m l_empty; rewrite (A_bounded &m l_empty).
   qed.
@@ -88,7 +88,7 @@ section.
   proof.
     symmetry.
     proc.
-    conseq* (_: ={glob A} ==> `|Sample.l|{2} <= q => ={Sample.l}) _ (_: true ==> `|Sample.l| <= q); first 2 smt.
+    conseq (_: ={glob A} ==> `|Sample.l|{2} <= q => ={Sample.l}) _ (_: true ==> `|Sample.l| <= q); first 2 smt.
       call hl_A_bounded.
       by inline*; auto; smt.
     call (_: !`|Sample.l| <= q, ={Sample.l})=> //=.
@@ -130,7 +130,7 @@ section.
     cut ->: Pr[Exp(Sample,A).main() @ &m: !unique Sample.l]
             = Pr[Exp(BSample,A).main() @ &m: `|Sample.l| <= q /\ !unique Sample.l].
       byequiv (_: ={glob A} ==> ={Sample.l} /\ `|Sample.l|{2} <= q)=> //=.
-      conseq* eq_Sample_BSample _ (_: _ ==> `|Sample.l| <= q)=> //=.
+      conseq eq_Sample_BSample _ (_: _ ==> `|Sample.l| <= q)=> //=.
         proc.
         call (_: `|Sample.l| <= q).
           by proc; sp; if=> //=; auto; smt.

@@ -60,7 +60,7 @@ theory GenDice.
       cut d_uni : forall x, in_supp x (d i0) => mu_x (d i0) x = bd.
          by intros x Hx;rewrite /bd; apply dU => //; apply test_in_supp.
       cut Hdiff: bdt <> (Real.zero)%Real by smt.
-      conseq (_:i=i0 ==> k = r : = (if test i r then charfun ((=) k) r else 1%r / bdt)) => //;
+      conseq [-frame] (_:i=i0 ==> k = r : = (if test i r then charfun ((=) k) r else 1%r / bdt)) => //;
         first by smt.
       while (i0=i) (if test i r then 0 else 1) 1 (bdt * bd) => //; first 2 smt.
         intros Hw; alias 2 r0 = r.
@@ -73,14 +73,14 @@ theory GenDice.
             by wp;rnd => //.
             wp;rnd;skip;progress => //. 
             by rewrite /bd /mu_x pred1E; apply mu_eq => w' //.
-            by conseq * Hw; progress => //; rewrite Htk.
-          by hoare; conseq* (_: _ ==> true)=> //; smt.
+            by conseq Hw; progress => //; rewrite Htk.
+          by hoare; conseq (_: _ ==> true)=> //; smt.
         (* bounding pr : ! k = r0 /\ k = r *)
        seq 2 : (test i r0) _ 0%r (1%r - bdt*bd) (1%r/bdt) 
                            (i0 = i /\ test i k /\ r0 = r) => //.
          by wp;rnd.
-         case (k = r0);first by conseq * (_ : _ ==> false) => //.
-         conseq * Hw;progress => //.
+         case (k = r0);first by conseq (_ : _ ==> false) => //.
+         conseq Hw;progress => //.
          by rewrite H0 //= /charfun (_: (k = r{hr}) = false) 1:neqF //.
          phoare split ! 1%r (bdt*bd);wp;rnd => //.
           skip; progress=> //.
@@ -88,10 +88,10 @@ theory GenDice.
             by intros x ; rewrite /= -test_sub_supp.
           apply (mu_cpMem (sub_supp i{hr}) (d i{hr}) bd _) => x Hx.
           by apply d_uni; apply test_in_supp=> //; rewrite -test_sub_supp.
-        by conseq * Hw => //; smt.         
-        by conseq * (_ : _ ==> true) => //;rnd;skip;progress=> //; smt.
+        by conseq Hw => //; smt.         
+        by conseq (_ : _ ==> true) => //;rnd;skip;progress=> //; smt.
       split; first by cut: 0%r < bd; smt.
-      intros z;conseq * (_ : _ ==>  mem r (sub_supp i)); first smt.
+      intros z;conseq (_ : _ ==>  mem r (sub_supp i)); first smt.
       rnd;skip;progress => //.
       rewrite -(mu_eq (d i{hr}) (cpMem (sub_supp i{hr}))) => //.
       rewrite (mu_cpMem (sub_supp i{hr}) (d i{hr}) bd) => // x Hx.

@@ -4,7 +4,7 @@ module M = {
 
 lemma foo : hoare [M.f : true ==> false].
 proof -strict.
-  conseq ( _: true ==> true).
+  conseq [-frame] ( _: true ==> true).
   smt.
   smt.
   admit.

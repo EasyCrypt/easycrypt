@@ -56,7 +56,7 @@ proof -strict.
         (={M.m,x,b} /\ b{1} ==> ={M.m}) => //.
     intros &m1 &m2 [[H1 [H2 H3]] H4];subst.
     exists M.m{m2}, b{m2}, x{m2} => //.
-  conseq (_ : ={M.m,b,x} ==> ={M.m,b,x} /\ !b{1}) => //.
+  conseq [-frame] (_ : ={M.m,b,x} ==> ={M.m,b,x} /\ !b{1}) => //.
     eager while 
       (h: if (b) w = $[0..10]; else w = 0; ~ if (b) w = $[0..10]; else w = 0; :
         ={b} ==> ={w}).

@@ -27,7 +27,7 @@ proof -strict.
    rnd => //.   
   swap{1} 1; seq 1 1 : (={x}).
     wp => //.
-    conseq * H => //.
+    conseq H => //.
   eager seq 1 1 H : (={M.w,y});first 2 (wp;rnd;wp => //).
     wp => //.
   sim.  

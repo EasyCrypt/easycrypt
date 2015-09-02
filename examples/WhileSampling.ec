@@ -29,6 +29,6 @@ proof.
   by rnd;skip;smt.
   by rnd;skip;smt. 
   split;[apply pr_ntest |  intros z].
-  conseq * (_ : true ==> (predC test) r);first smt.
+  conseq (_ : true ==> (predC test) r);first smt.
  rnd;skip;progress;apply mu_sub => x //.
 qed.

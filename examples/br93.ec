@@ -234,7 +234,7 @@ section.
       (* Left oracle is lossless *)
       move=> &2 _; exact/lossless_ARO_o.
       (* Right oracle is lossless and preserves bad once set *)
-      move=> &1. proc. inline *. wp. rnd. wp. skip. smt. (* or use conseq... *)
+      move=> &1. proc. inline *. wp. rnd. wp. skip. smt. (* or use conseq [-frame]... *)
     (* We return to the main game *)
     inline CPA(BR,A).SO.enc CPA(BR1,A).SO.enc.
     inline RO.o.
@@ -364,7 +364,7 @@ section.
     byequiv => //=.
     proc; inline *; wp.
     (* simplify postcondition to no longer have find *)
-    conseq
+    conseq [-frame]
       (_ : _ ==>
            support keypairs (pk0{2}, sk{2}) /\
            BR2.r{1} = OW.r{2} /\ Log.qs{1} = Log.qs{2} /\

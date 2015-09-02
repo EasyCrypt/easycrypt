@@ -102,7 +102,7 @@ fel 1 (length O.s) (fun x, (x%r)*bd) qO O.bad [O.o : (length O.s < qO /\ x=x)].
 
   (** pr of setting bad *)
   proc.
-  if;[|conseq (_ : _ : = 0%r);[smt|hoare;wp; skip; smt]]. 
+  if;[|conseq [-frame] (_ : _ : = 0%r);[smt|hoare;wp; skip; smt]]. 
   wp.
   simplify.
   rnd (fun z, mem z O.s).

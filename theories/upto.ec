@@ -146,7 +146,7 @@ by inline Experiment(O2, Adv).WO.init; call hinit2; wp.
 swap 1 1; wp.
 exists* Experiment.WO.cO.
 elim* => cO.
-conseq (_ : _ : (g cO)).
+conseq [-frame] (_ : _ : (g cO)).
 progress.
 exists* Experiment.WO.bad.
 elim* => b.

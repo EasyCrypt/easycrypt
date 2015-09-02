@@ -170,9 +170,9 @@ section.
         inline{1} OrclCount(L(Ob)).orcl Count.incr.
         by wp;call Oborcl1;wp;skip;progress => //;smt.
       by call Oborcl2;skip;progress => //; smt.
-      by conseq* Obleaks.
-      by conseq* Oborcl1.
-      by conseq* Oborcl2.
+      by conseq Obleaks.
+      by conseq Oborcl1.
+      by conseq Oborcl2.
     swap{1} 1 2;inline{1} Count.init.
     by wp;rnd;wp;skip;progress => //;smt.
   qed.
@@ -192,9 +192,9 @@ section.
         inline{1} OrclCount(R(Ob)).orcl Count.incr.
         by wp;call Oborcl2;wp;skip;progress => //;smt.
       by call Oborcl2;skip;progress => //; smt.
-      by conseq * Obleaks.
-      by conseq * Oborcl1.
-      by conseq * Oborcl2.
+      by conseq Obleaks.
+      by conseq Oborcl1.
+      by conseq Oborcl2.
     swap{1} 1 2;inline{1} Count.init.
     by wp;rnd;wp;skip;progress => //;smt.
   qed.
@@ -228,17 +228,17 @@ section.
       rcondt 1; first by skip;smt.
       by wp;call losslessOb1;skip;smt.
       by intros &m1;proc;inline Count.incr;wp;call losslessOb1;wp;skip;smt.
-      by conseq * Obleaks.
-      intros &m2 _;conseq * losslessL.
-      intros &m1; conseq * losslessL.
+      by conseq Obleaks.
+      intros &m2 _;conseq losslessL.
+      intros &m1; conseq losslessL.
 
-      by conseq * Oborcl1.
-      intros &m2 _;conseq * losslessOb1.
-      intros &m1; conseq * losslessOb1.
+      by conseq Oborcl1.
+      intros &m2 _;conseq losslessOb1.
+      intros &m1; conseq losslessOb1.
 
-      by conseq * Oborcl2.
-      intros &m2 _;conseq * losslessOb2.
-      intros &m1; conseq * losslessOb2.
+      by conseq Oborcl2.
+      intros &m2 _;conseq losslessOb2.
+      intros &m1; conseq losslessOb2.
 
     by inline{2} Count.init;wp;skip;smt.
   qed.
@@ -267,17 +267,17 @@ section.
       by wp;call losslessOb1;skip; smt.
       intros &m1;proc;inline Count.incr;wp;call losslessOb2;wp;skip;smt.
 
-      by conseq * Obleaks.
-      intros &m2 _;conseq * losslessL.
-      intros &m1; conseq * losslessL.
+      by conseq Obleaks.
+      intros &m2 _;conseq losslessL.
+      intros &m1; conseq losslessL.
 
-      by conseq * Oborcl1.
-      intros &m2 _;conseq * losslessOb1.
-      intros &m1; conseq * losslessOb1.
+      by conseq Oborcl1.
+      intros &m2 _;conseq losslessOb1.
+      intros &m1; conseq losslessOb1.
 
-      by conseq * Oborcl2.
-      intros &m2 _;conseq * losslessOb2.
-      intros &m1; conseq * losslessOb2.
+      by conseq Oborcl2.
+      intros &m2 _;conseq losslessOb2.
+      intros &m1; conseq losslessOb2.
 
     by inline{2} Count.init;wp;skip;smt.
   qed.
@@ -297,9 +297,9 @@ section.
        [intros &m0;skip;smt | wp;call Oborcl1;wp].
       rcondf{2} 1;first by intros &m0;skip;smt.
       by if{2};wp;call Oborcl2;wp.
-      by conseq * Obleaks.
-      by conseq * Oborcl1.
-      by conseq * Oborcl2.
+      by conseq Obleaks.
+      by conseq Oborcl1.
+      by conseq Oborcl2.
     by wp.
   qed.
 
@@ -398,13 +398,13 @@ section.
      ={glob A, glob Ob} ==>
      ={glob A, glob Ob, glob HybOrcl, res} /\ Count.c{2} = HybOrcl.l{2} /\ Count.c{2} <= q.
   proof.
-    conseq (_:  ={glob A, glob Ob} ==>  ={glob A, glob Ob, glob HybOrcl, res}) _ 
+    conseq [-frame] (_:  ={glob A, glob Ob} ==>  ={glob A, glob Ob, glob HybOrcl, res}) _ 
            (_:true ==> Count.c = HybOrcl.l /\ Count.c <= q).
-     conseq (_:true ==> Count.c = HybOrcl.l) (_: true ==> Count.c <= q).
+     conseq [-frame] (_:true ==> Count.c = HybOrcl.l) (_: true ==> Count.c <= q).
        proc; call (A_call (<:HybOrcl(Ob,L(Ob)))) => //.
      proc;inline *;wp;call (_ : Count.c = HybOrcl.l).
-     proc;inline *;wp; by conseq * (_: _ ==> true) => //.
-     conseq * (_: _ ==> true) => //. conseq * (_: _ ==> true) => //. conseq * (_: _ ==> true) => //. 
+     proc;inline *;wp; by conseq (_: _ ==> true) => //.
+     conseq (_: _ ==> true) => //. conseq (_: _ ==> true) => //. conseq (_: _ ==> true) => //. 
      by wp.
     proc;inline Al.main;wp. call (_: ={glob Ob, glob HybOrcl}).
     proc;inline *;wp. sp;if => //. call (_:true) => //.
@@ -417,13 +417,13 @@ section.
      ={glob A, glob Ob} ==>
      ={glob A, glob Ob, glob HybOrcl, res} /\ Count.c{2} = HybOrcl.l{2} /\ Count.c{2} <= q.
   proof.
-    conseq (_:  ={glob A, glob Ob} ==>  ={glob A, glob Ob, glob HybOrcl, res}) _ 
+    conseq [-frame] (_:  ={glob A, glob Ob} ==>  ={glob A, glob Ob, glob HybOrcl, res}) _ 
            (_:true ==> Count.c = HybOrcl.l /\ Count.c <= q).
-     conseq (_:true ==> Count.c = HybOrcl.l) (_: true ==> Count.c <= q).
+     conseq [-frame] (_:true ==> Count.c = HybOrcl.l) (_: true ==> Count.c <= q).
        proc; call (A_call (<:HybOrcl(Ob,R(Ob)))) => //.
      proc;inline *;wp;call (_ : Count.c = HybOrcl.l).
-     proc;inline *;wp; by conseq * (_: _ ==> true) => //.
-     conseq * (_: _ ==> true) => //. conseq * (_: _ ==> true) => //. conseq * (_: _ ==> true) => //. 
+     proc;inline *;wp; by conseq (_: _ ==> true) => //.
+     conseq (_: _ ==> true) => //. conseq (_: _ ==> true) => //. conseq (_: _ ==> true) => //. 
      by wp.
     proc;inline Ar.main;wp. call (_: ={glob Ob, glob HybOrcl}).
     proc;inline *;wp. sp;if => //. call (_:true) => //.
@@ -474,14 +474,14 @@ section.
               Pr[Ln(Ob,A).main() @ &m : p' (glob A) (glob Ob) Count.c res].
        byequiv (_ : ={glob A, glob Ob} ==> ={glob A, glob Ob, Count.c, res} /\ Count.c{1} <= q) => //;
          last by rewrite /p'.
-       conseq (_:  ={glob A, glob Ob} ==> ={glob A, glob Ob, Count.c, res}) (_ : true ==> Count.c <= q);
+       conseq [-frame] (_:  ={glob A, glob Ob} ==> ={glob A, glob Ob, Count.c, res}) (_ : true ==> Count.c <= q);
          last by sim;  proc (={Count.c}).
        apply (A_call (<:L(Ob))).
      cut -> : Pr[Rn(Ob,A).main() @ &m : p  (glob A) (glob Ob) Count.c res] =
               Pr[Rn(Ob,A).main() @ &m : p' (glob A) (glob Ob) Count.c res].
        byequiv (_ : ={glob A, glob Ob} ==> ={glob A, glob Ob, Count.c, res} /\ Count.c{1} <= q) => //;
          last by rewrite /p'.
-       conseq (_:  ={glob A, glob Ob} ==> ={glob A, glob Ob, Count.c, res}) (_ : true ==> Count.c <= q);
+       conseq [-frame] (_:  ={glob A, glob Ob} ==> ={glob A, glob Ob, Count.c, res}) (_ : true ==> Count.c <= q);
          last by sim;  proc (={Count.c}).
        apply (A_call (<:R(Ob))).
      rewrite (Pr_Bl &m p) (Pr_Br &m p).
@@ -495,9 +495,9 @@ section.
         proc. inline *;wp. 
         if => //. call (_: ={glob HybOrcl});auto; smt.
         if => //. wp;call (_: ={glob HybOrcl});auto; smt. call (_: ={glob HybOrcl});auto; smt.
-       conseq * (_: _ ==> ={res,glob Ob}) => //. sim.
-       conseq * (_: _ ==> ={res,glob Ob}) => //. sim.
-       conseq * (_: _ ==> ={res,glob Ob}) => //. sim.
+       conseq (_: _ ==> ={res,glob Ob}) => //. sim.
+       conseq (_: _ ==> ={res,glob Ob}) => //. sim.
+       conseq (_: _ ==> ={res,glob Ob}) => //. sim.
        auto;progress;smt.
      byequiv (_ : ={glob A, glob Ob} ==> ={glob A, glob Ob, glob HybOrcl, res} /\ Count.c{2} <= 1) => //.
        proc;inline *;wp.
@@ -505,9 +505,9 @@ section.
         proc. inline *;wp. 
         if => //. call (_: ={glob HybOrcl});auto; smt.
         if => //. wp;call (_: ={glob HybOrcl});auto; smt. call (_: ={glob HybOrcl});auto; smt.
-       conseq * (_: _ ==> ={res,glob Ob}) => //. sim.
-       conseq * (_: _ ==> ={res,glob Ob}) => //. sim.
-       conseq * (_: _ ==> ={res,glob Ob}) => //. sim.
+       conseq (_: _ ==> ={res,glob Ob}) => //. sim.
+       conseq (_: _ ==> ={res,glob Ob}) => //. sim.
+       conseq (_: _ ==> ={res,glob Ob}) => //. sim.
        auto;progress;smt.
     qed.
 

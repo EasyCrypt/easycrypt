@@ -42,7 +42,7 @@ proof.
 byphoare (_: (glob A) = (glob A){m} ==> 
                  ev (fst res) (glob A) (snd res) /\ fst res = v) => //.
 pose pr := Pr[A.work(v) @ &m: ev v (glob A) res];
-conseq* (_: _: = (mu_x d v * pr)). (* WEIRD! *)
+conseq (_: _: = (mu_x d v * pr)). (* WEIRD! *)
 proc; seq 1 : (v = x) (mu_x d v) pr 1%r 0%r ((glob A)=(glob A){m})=> //.
   by rnd.
   by rnd; skip; progress; rewrite /mu_x pred1E; apply/mu_eq.

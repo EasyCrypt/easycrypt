@@ -714,7 +714,7 @@ theory ROM_BadCall.
             by apply Da2L.
             by proc; inline RO.o; auto; smt.
             by progress; apply (Log_o_ll RO); apply (RO_o_ll _); smt.
-            progress; exists* G1'.x; elim* => x; conseq* (Log_o_ll RO _) (Log_o_stable RO x)=> //.
+            progress; exists* G1'.x; elim* => x; conseq (Log_o_ll RO _) (Log_o_stable RO x)=> //.
             by apply (RO_o_ll _); smt.
           inline RO.o; auto.
           call (_: ={glob Log, glob RO} /\ Log.qs{2} = dom RO.m{2}).
@@ -810,7 +810,7 @@ theory ROM_BadCall.
             by apply Da2L.
             by proc; inline Bound(RO).LO.o RO.o; sp; if=> //; auto; smt.
             by progress; apply (Bound_o_ll RO); apply (RO_o_ll _); smt.
-            progress; exists* G1'.x; elim* => x; conseq* (Bound_o_ll RO _) (Bound_o_stable RO x)=> //.
+            progress; exists* G1'.x; elim* => x; conseq (Bound_o_ll RO _) (Bound_o_stable RO x)=> //.
             by apply (RO_o_ll _); smt.
           inline RO.o; auto.
           call (_: ={glob Log, glob RO} /\ Log.qs{2} = dom RO.m{2}).
@@ -899,11 +899,11 @@ theory ROM_Bad.
             by progress; proc; sp; if=> //; wp; call O1_o_ll.
             by progress; proc; sp; if=> //; wp;
                call (_: bad (glob O2) ==> bad (glob O2));
-                 first by conseq* O2_o_ll bad_preserved.
+                 first by conseq O2_o_ll bad_preserved.
           call (_: true ==> ={glob Bound} /\ Phi (glob O1){1} (glob O2){2} /\ !bad (glob O2){2}).
             proc; inline Bound(O1).init Bound(O2).init; wp.
             by call (_: true ==> Phi (glob O1){1} (glob O2){2} /\ !bad (glob O2){2});
-                 first conseq* eq_init _ badinit=> //.
+                 first conseq eq_init _ badinit=> //.
           by skip; smt.
         by rewrite Pr [mu_or]; smt.
       cut: Pr[Experiment(O2,D).main() @ &m: bad (glob O2)] <= qH%r * eps.

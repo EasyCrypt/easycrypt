@@ -169,7 +169,7 @@ theory VonNeumann.
         cut ltp1: 0%r < (1%r - p) by smt.
         smt.
       move=> z.
-      conseq* (_: true ==> b <> b')=> //=.
+      conseq (_: true ==> b <> b')=> //=.
         by progress; rewrite H.
       seq  1: b p (1%r - p) (1%r - p) p=> //.
         by rnd; skip=> //=; rewrite biased_def.

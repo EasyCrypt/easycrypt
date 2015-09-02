@@ -170,7 +170,7 @@ theory EnfPen.
       intros=> &m1 //=; bypr; intros=> &m0 bad.
         cut: 1%r <= Pr[Count(O).f(x{m0}) @ &m0: bound < Counter.c]; last smt.
         cut lbnd: phoare[Count(O).f: Counter.c = Counter.c{m0} ==> Counter.c = Counter.c{m0} + 1] >= 1%r;
-          first by conseq (CountO_fC O Counter.c{m0} _); apply O_fL.
+          first by conseq [-frame] (CountO_fC O Counter.c{m0} _); apply O_fL.
         by byphoare lbnd=> //; smt.
     by inline Counter.init; wp; skip; smt.
     qed.
@@ -279,7 +279,7 @@ theory BndPen.
       progress; bypr; intros=> &m0 bad.
       cut: 1%r <= Pr[Count(O).f(x{m0}) @ &m0: bound < Counter.c]; last smt.
       cut lbnd: phoare[Count(O).f: Counter.c = Counter.c{m0} ==> Counter.c = Counter.c{m0} + 1] >= 1%r;
-        first by conseq (CountO_fC O Counter.c{m0} _); first apply O_fL.
+        first by conseq [-frame] (CountO_fC O Counter.c{m0} _); first apply O_fL.
       by byphoare lbnd; last smt.
     inline Counter.init; wp.
     by skip; smt.

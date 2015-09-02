@@ -177,7 +177,7 @@ section Security.
      Pr[Gb.main()@ &m : res] = 1%r/2%r.
   proof.
     byphoare => //;proc.
-    rnd => /=. conseq (_:_ ==> true).
+    rnd => /=. conseq [-frame] (_:_ ==> true).
     progress; rewrite -(Bool.Dbool.mu_x_def b'{hr}) /Distr.mu_x. 
     by apply Distr.mu_eq => x.
     call Ag_l;auto;call Ac_l;auto;progress;smt. 

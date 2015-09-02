@@ -4,6 +4,6 @@ module M = {
 
 lemma foo : hoare [M.f : false ==> true].
 proof -strict.
-  conseq ( _: true ==> false).
+  conseq [-frame] ( _: true ==> false).
   admit.
 qed.

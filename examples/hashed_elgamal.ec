@@ -301,7 +301,7 @@ section.
   proof.
     byphoare (_: true ==> _)=> //.
     proc; rnd ((=) b')=> //=.
-    conseq* (_: _ ==> true); first smt.
+    conseq (_: _ ==> true); first smt.
     call (_: true)=> //=.
       by apply guessL.
       by proc; sp; if=> //; wp; call (RO_o_ll _); first smt.

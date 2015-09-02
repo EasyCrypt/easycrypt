@@ -149,7 +149,7 @@ theory Set_CDH.
              by 1/n. *)
       seq  1: (mem (g ^ (SCDH'.x * SCDH'.y)) s /\ card s <= n) p (1%r/n%r) _ 0%r => //. 
         (* The first part is dealt with by equivalence with SCDH. *)
-        conseq (_: _: =p). (* strengthening >= into = for simplicity*)
+        conseq [-frame] (_: _: =p). (* strengthening >= into = for simplicity*)
           call (_: (glob A) = (glob A){m}  ==> mem (g^(SCDH'.x * SCDH'.y)) res /\ card res <= n)=> //.
             bypr; progress; rewrite /p.
             byequiv (_: )=> //.

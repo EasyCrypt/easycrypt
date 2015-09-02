@@ -115,7 +115,7 @@ lemma CCA_implies_CPA (S <: Scheme {INDCPA}) (A <: Adv_INDCPA {S, INDCPA}) &m:
 proof strict.
 byequiv (_: ={glob A} ==> ={res})=> //; proc.
 call{2} (_: Wrap.qs = [] ==> !res); first by proc; skip; smt.
-conseq (_: _ ==> Wrap.qs{2} = [] /\ (b = b'){1} = (b = b'){2}); first smt.
+conseq [-frame] (_: _ ==> Wrap.qs{2} = [] /\ (b = b'){1} = (b = b'){2}); first smt.
 call (_: ={glob Wrap, glob S} /\ Wrap.qs{2} = []);
   first by proc; call (_: true).
 call (_: ={glob Wrap, glob S});

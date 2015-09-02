@@ -13,7 +13,7 @@ module M = {
 }.
 
 lemma foo : phoare [M.f : false ==> res] = (1%r/2%r).
-  conseq ( _: true ==> res=true).
+  conseq [-frame] ( _: true ==> res=true).
   smt.
   smt.
   proc.
@@ -29,7 +29,7 @@ module M2 = {
 }.
 
 lemma foo2 : phoare [M2.f : true ==> false] <= 1%r.
-  conseq ( _: true ==> res<=2).
+  conseq [-frame] ( _: true ==> res<=2).
   smt.
   smt.
   proc.
@@ -38,7 +38,7 @@ lemma foo2 : phoare [M2.f : true ==> false] <= 1%r.
 qed.
 
 lemma foo3 : phoare [M2.f : true ==> true] >= (1%r/2%r).
-  conseq ( _: true ==> res=2).
+  conseq [-frame] ( _: true ==> res=2).
   smt.
   smt.
   proc.
@@ -52,7 +52,7 @@ lemma foo3 : phoare [M2.f : true ==> true] >= (1%r/2%r).
 qed.
 
 lemma bug_15920 : phoare [M2.f : true ==> false] <= 1%r.
-  conseq ( _: true ==> _).
+  conseq [-frame] ( _: true ==> _).
   smt.
   proc.
   pr_bounded. 

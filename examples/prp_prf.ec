@@ -204,7 +204,7 @@ proof.
    delta Block.length; by smt.
 
    hoare;if;[rnd;wp |];skip;by smt.
-   conseq (_: _: 0%r); last by hoare.
+   conseq [-frame] (_: _: 0%r); last by hoare.
      move=> _ _.
      cut H: forall x y, 0%r <= x => 0%r < y => 0%r <= x * y by smt.
      by apply H; [| rewrite -inv_def sign_inv]; smt.

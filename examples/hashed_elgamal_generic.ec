@@ -244,7 +244,7 @@ section.
     byequiv (_: ={glob A} ==> ={res})=> //.
     proc.
     inline OnBound.G0(D,RO).D.a1 OnBound.G0(D,RO).D.a2; wp.
-    conseq* (_: _ ==> ={b'} /\ b{1} = D.b{2})=> //.
+    conseq (_: _ ==> ={b'} /\ b{1} = D.b{2})=> //.
     by inline H.hash; sim.
   qed.
 
@@ -253,7 +253,7 @@ section.
     byequiv (_: ={glob A} ==> ={res})=> //.
     proc.
     inline OnBound.G1(D,RO).D.a1 OnBound.G1(D,RO).D.a2; wp.
-    conseq* (_: _ ==> ={b'} /\ b{1} = D.b{2})=> //.
+    conseq (_: _ ==> ={b'} /\ b{1} = D.b{2})=> //.
     by inline H.hash; sim.
   qed.
 
@@ -262,7 +262,7 @@ section.
     byequiv (_: ={glob A} ==> ={res})=> //.
     proc.
     inline OnBound.G2(D,RO).D.a1 OnBound.G2(D,RO).D.a2; wp.
-    conseq* (_: _ ==> ={glob Log, b'} /\ b{1} = D.b{2} /\ G2.gxy{1} = x{2})=> //.
+    conseq (_: _ ==> ={glob Log, b'} /\ b{1} = D.b{2} /\ G2.gxy{1} = x{2})=> //.
     by inline H.hash; sim.
   qed.
 

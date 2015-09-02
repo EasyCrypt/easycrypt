@@ -36,7 +36,7 @@ proof -strict.
  proc.
  seq 1 1 : (b{1} = b'{2}).
   sim.
- conseq (_: _ ==> b{1} = b'{2} /\ ={M.w}) => //.
+ conseq [-frame] (_: _ ==> b{1} = b'{2} /\ ={M.w}) => //.
  eager if.
   trivial.
   intros &m0 b1;wp;rnd => //.

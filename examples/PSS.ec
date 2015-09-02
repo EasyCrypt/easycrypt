@@ -1279,14 +1279,14 @@ section.
     case ((mem x (dom Ht.RO.m)){1}).
       rcondf{1} 2; first by progress; rnd.
       rcondf{2} 2; first by progress; rnd; skip; progress; rewrite -(hmap_preq_dom Ht.RO.m{m}).
-      conseq* (_: _ ==> hmap_preq H.m{1} Hmap.m{2}).
+      conseq (_: _ ==> hmap_preq H.m{1} Hmap.m{2}).
         progress.
         rewrite H; cut: mem (m,r){2} (dom Hmap.m{2}) by rewrite -(hmap_preq_dom Ht.RO.m{1}).
         by rewrite mem_dom; case (Hmap.m.[(m,r)]{2}).
       by rnd.
       rcondt{1} 2; first by progress ;rnd.
       rcondt{2} 2; first by progress; rnd; skip; progress; rewrite -(hmap_preq_dom Ht.RO.m{m}).
-      conseq* (_: _ ==> mem (m,r){2} (dom Hmap.m){2} /\ hmap_preq H.m{1} Hmap.m{2}).
+      conseq (_: _ ==> mem (m,r){2} (dom Hmap.m){2} /\ hmap_preq H.m{1} Hmap.m{2}).
         progress.
         by rewrite H2; cut:= H1; rewrite mem_dom; case (m_R.[(m,r)]{2}).
       wp; rnd; skip; progress.
@@ -1685,11 +1685,11 @@ section.
         (* G *)
         by proc; auto.
         (* Hv *)
-        by conseq* (_: ={glob Hmap, m, r} ==> ={glob Hmap, res})=> //; sim.
+        by conseq (_: ={glob Hmap, m, r} ==> ={glob Hmap, res})=> //; sim.
       call (_: ={ks} ==> ={glob Hmap}); first by sim.
       by rnd; skip; smt.
     call (_: true ==> ={glob Ge} /\ forall x, mem x (dom Ge.m){1}).
-      by conseq* (Gt.Eager.RO_init_eq _) (Gt.Eager.RO_init_full _); last 2 apply htag_finite.
+      by conseq (Gt.Eager.RO_init_eq _) (Gt.Eager.RO_init_full _); last 2 apply htag_finite.
     by skip; smt.
   qed.
 
@@ -1697,7 +1697,7 @@ section.
     Gt.Eager.Types.IND(Ge,D(Ga,H0'1e)).main ~ Gt.Eager.Types.IND(G,D(Ga,H0'1e)).main: ={glob D(Ga,H0'1e)} ==> ={res}.
   proof.
     symmetry.
-    conseq* (_: ={glob D(Ga,H0'1e)} ==> ={res}).
+    conseq (_: ={glob D(Ga,H0'1e)} ==> ={res}).
       done.
       smt. (* should be trivial but substitution sucks *)
     apply (Gt.eagerRO (D(Ga,H0'1e)) _ _).
@@ -1770,7 +1770,7 @@ section.
              Hmap.m{1} = FMap.empty /\
              G.m{1} = FMap.empty ==>
              ={res})=> //; proc.
-    conseq* (_: _ ==> ={y, w, w', rs, m, s, Mem.pk, Mem.qs})=> //.
+    conseq (_: _ ==> ={y, w, w', rs, m, s, Mem.pk, Mem.qs})=> //.
     sim.
     seq 1 1: (={glob A, glob Hmap, glob G, glob Mem, ks} /\
               Hmap.m{1} = FMap.empty /\
@@ -1906,7 +1906,7 @@ section.
               (H0'2.badh = (mem (m,r) (dom Hmap.m) /\ ! c = Adv)){2});
       first by auto; smt.
     case (H0'2.badg{2} \/ H0'2.badh{2}).
-      conseq * (_ : _ ==> true)=> //.
+      conseq (_ : _ ==> true)=> //.
       by wp; rnd{2}; inline G.o; if{1}; wp; [ | sp; if{1}]; auto; progress; expect 3 smt.
     case ((mem (m,r) (dom Hmap.m)){1}).
       rcondf{1} 1=> //; rcondf{2} 3; first by auto; smt.
@@ -1914,7 +1914,7 @@ section.
       by inline G.o; auto; smt.
     rcondt{1} 1=> //; rcondt{2} 3; first by auto; smt.
     inline *; swap{1} 3 -2.
-    case (mem w{2} (dom Gmap.m{2})); first by conseq * (_: _ ==> true); auto; smt.
+    case (mem w{2} (dom Gmap.m{2})); first by conseq (_: _ ==> true); auto; smt.
     rcondt{2} 3; first by auto; smt.
     rcondt{1} 4. 
       auto;progress.
@@ -1935,7 +1935,7 @@ section.
     intros=> Ga_main_ll; proc.
     call (_: (H0'2.badg \/ H0'2.badh), ={glob Hmap} /\ G.m{1} = FMap.map fst Gmap.m{2}).
       (* H *)
-      by conseq* GameG0'1_0'2_H; smt.
+      by conseq GameG0'1_0'2_H; smt.
       progress; proc; seq 1: true=> //;
         first by auto; smt.
       if=> //.
@@ -1944,14 +1944,14 @@ section.
         by call (Gt.Lazy.RO_o_ll _); first apply gtagL.
       by progress; proc; auto; smt.
       (* G *)
-      conseq * (_ : _ ==> ={res} /\ G.m{1} = map fst Gmap.m{2})=> //.
+      conseq (_ : _ ==> ={res} /\ G.m{1} = map fst Gmap.m{2})=> //.
       proc. 
         seq 1 1 : (x{1} = w{2} /\ y{1} = g{2} /\ G.m{1} = map fst Gmap.m{2});first by auto.
         if.
           by progress [-split]; rewrite !mem_dom get_map; smt.
           by auto; smt.
           by auto; smt.
-      by move=> _ _; conseq* (Gt.Lazy.RO_o_ll _); apply gtagL.
+      by move=> _ _; conseq (Gt.Lazy.RO_o_ll _); apply gtagL.
       by move=> _ /=; proc; auto; smt.
       (* Hv *)
       by proc; auto.
@@ -2079,7 +2079,7 @@ section.
         rewrite -/(cpMem _) (mu_cpMem _ _ (1%r / (2^kh)%r)); first smt. 
         cut ->: forall x, x * (1%r / (2^kh)%r) = x / (2^kh)%r by smt. 
         by apply (_: forall (x y z:real), x <= y => 0%r < z => x / z <= y / z); smt.
-(*-*) by hoare; conseq * (_ : _ ==> true) => //; smt.
+(*-*) by hoare; conseq (_ : _ ==> true) => //; smt.
 (*-*) by progress; proc; rcondt 1; auto; smt.
 (*-*) by progress; proc; rcondf 1; auto; smt.
   qed.
@@ -2471,9 +2471,9 @@ section.
         by proc; auto; smt.
       by skip; smt.
     call (_: ={glob Gmap, glob Hmap} /\ invertible Hmem.pk{2} Hmem.xstar{2}).
-      by conseq* Game1_1'1_H.
-      by conseq* (_: _ ==> ={glob Gmap, res}); last sim.
-      by conseq* (_: _ ==> ={res}); last sim.
+      by conseq Game1_1'1_H.
+      by conseq (_: _ ==> ={glob Gmap, res}); last sim.
+      by conseq (_: _ ==> ={res}); last sim.
     by inline *; auto.
   qed.
 
@@ -2535,7 +2535,7 @@ section.
                  a = res)=> //.
     proc; elim/tuple2_ind a=> a w0 st0 a_def.
     wp 2.
-    conseq* (_: _ ==>
+    conseq (_: _ ==>
                 z  = os2ip (to_signature (zeros 1 || from_htag w0 || from_gtag st0)))
             (_: _ ==> 0 <= z < 2^(k-1)) => //;first by (auto;smt).
       progress; rewrite /from_htag /to_htag /from_gtag /to_gtag /from_signature 
@@ -2578,7 +2578,7 @@ section.
              Hmem.ystar{2} = rsap Hmem.pk{2} Hmem.xstar{2} /\
              rsap_dom Hmem.pk{2} Hmem.xstar{2} /\
              valid_keys (Hmem.pk,Hmem.sk){2}).
-      by conseq* Game1'1_1'2_H.
+      by conseq Game1'1_1'2_H.
       by proc; auto.
       by proc; auto.
     by inline*; auto; smt.
@@ -2622,8 +2622,8 @@ section.
     call (_: ={glob Hmem, glob Gmap} /\
              Hmem.ystar{2} = rsap Hmem.pk{2} Hmem.xstar{2} /\
              hmap_peq Hmap.m{1} Hmap.m{2}).
-      by conseq* Game1'2_2_H.
-      by conseq* (_: _ ==> ={glob Gmap, res})=> //; sim.
+      by conseq Game1'2_2_H.
+      by conseq (_: _ ==> ={glob Gmap, res})=> //; sim.
       by proc; auto; smt.
     inline GenH1(SampleU).init H2.init.
     call Hmap_init.
@@ -3004,7 +3004,7 @@ section.
     proc.
     inline Gen1(GAdv3,H3'1,G1).GA.main.
     inline H3'1.v G1.o; auto.
-    conseq* (_: _ ==> ={H3'1.bad} /\ Mem.cH{2} <= qH); first smt.
+    conseq (_: _ ==> ={H3'1.bad} /\ Mem.cH{2} <= qH); first smt.
     call (_: ={glob H3'1, glob Gmap, glob Mem} /\
              Mem.cH{2} <= qH /\
              support keypairs (Hmem.pk,Hmem.sk){1} /\
@@ -3217,7 +3217,7 @@ section.
         by move=> y Hy; rewrite /bd; apply challengeU=> //; smt.
       cut Hdiff: bdt <> (Real.zero)%Real by smt.
       sp.
-      conseq (_: (pk,sk,b,x){hr} = (pk',sk',b',x') /\ !0 <= z < 2^(k - 1) ==>
+      conseq [-frame] (_: (pk,sk,b,x){hr} = (pk',sk',b',x') /\ !0 <= z < 2^(k - 1) ==>
                  u = simul_inv pk' sk' b' x' r': = (if 0 <= z < 2^(k - 1)
                                                       then charfun ((=) (simul_inv pk' sk' b' x' r')) u
                                                       else 1%r / bdt)) => //;
@@ -3250,17 +3250,17 @@ section.
                 by progress; rewrite simulK //; smt.
                 by progress; rewrite simul_invK //; smt.
             by rewrite /bd /mu_x; apply challengeU; smt.
-            conseq* Hw; progress=> //.
+            conseq Hw; progress=> //.
             cut ->: 0 <= z{hr} < 2^(k - 1) by smt.
             by rewrite /charfun.
-            hoare; conseq* (_: _ ==> true) => //. 
+            hoare; conseq (_: _ ==> true) => //. 
             by progress;rewrite -nand;left.
           seq 3: (0 <= z0 < 2^(k - 1)) _ 0%r (1%r - bdt * bd) (1%r/bdt)
                  ((pk,sk,b,x) = (pk',sk',b',x') /\ 0 <= r' < 2^(k - 1) /\ z0 = z /\
                   simul_inv pk' sk' b' x' z = u)=> //.
             by auto; progress; rewrite simulK //; smt.
-            case (r' = z0); first by conseq* (_: _ ==> false).
-            conseq* Hw; progress=> //.
+            case (r' = z0); first by conseq (_: _ ==> false).
+            conseq Hw; progress=> //.
             cut ->: 0 <= z{hr} < 2^(k - 1) by smt.
             rewrite /= /charfun.
             cut simul_inj: (simul_inv pk sk b x r' = simul_inv pk sk b x z => r' = z){hr}.
@@ -3272,8 +3272,8 @@ section.
               by skip; smt.
               skip; progress; rewrite /bdt /bd {2}/challenge Dinter.mu_x_def_in; first smt.
               by rewrite mu_challenge_in_pim //; smt.
-            by conseq * Hw => //; smt.         
-          by conseq * (_: _ ==> true)=> //; auto; smt.
+            by conseq Hw => //; smt.         
+          by conseq (_: _ ==> true)=> //; auto; smt.
       progress; first smt.
       wp; rnd; skip; progress.
         cut ->: 0 <= z{hr} < 2^(k - 1) = false by smt.
@@ -3434,7 +3434,7 @@ section.
         cut ->: forall x y, x / y = x * 1%r/y by smt.
         cut pos_mul: forall x y, 0%r < x => 0%r < y => 0%r < x * y by smt.
         by apply (pos_mul ((2^(k-1))%r) (1%r/(p_n Hmem.pk{hr})%r)); smt.
-      move=> z; conseq* (_: _: =((2^(k - 1))%r/(p_n Hmem.pk)%r)).
+      move=> z; conseq (_: _: =((2^(k - 1))%r/(p_n Hmem.pk)%r)).
       wp; rnd; skip; progress.
       move: H2; rewrite -neqF=> -> //=.
       cut ->: (fun x, (if !0 <= (if c{hr} = Adv
@@ -3585,7 +3585,7 @@ section.
       by auto; smt.
     case (b{1}); first by rcondf{1} 1; auto; smt.
     (** Reduce to proving termination of the remainder of the loop *)
-    wp; conseq* (_: valid_keys (Hmem.pk,Hmem.sk){1} /\
+    wp; conseq (_: valid_keys (Hmem.pk,Hmem.sk){1} /\
                     rsap_dom Hmem.pk{1} Hmem.xstar{1} /\
                     (c{1} = Adv => invertible Hmem.pk{1} Hmem.xstar{1}) /\
                     Hmem.ystar{1} = rsap Hmem.pk{1} Hmem.xstar{1} ==> true)
@@ -3616,7 +3616,7 @@ section.
         cut pos_mul: forall x y, 0%r < x => 0%r < y => 0%r < x * y by smt.
         apply (pos_mul ((2^(k-1))%r) (1%r/(p_n Hmem.pk{1})%r)); first smt.
         smt.
-        move=> z; conseq* (_: _: =((2^(k - 1))%r/(p_n Hmem.pk)%r)).
+        move=> z; conseq (_: _: =((2^(k - 1))%r/(p_n Hmem.pk)%r)).
         wp; rnd; skip; progress.
         move: H2; rewrite -neqF=> -> //=.
         cut ->: (fun x, (if !0 <= (if c{1} = Adv
@@ -3758,7 +3758,7 @@ section.
   proof.
     proc;inline *;sp;rcondt{2} 1; first by intros _;skip;progress.
     if => //;last by auto.
-    wp 3 3; conseq * (_: _ ==> ={ho,glob Hmap, glob Gmap, H3'3.bad}) => //;sim.
+    wp 3 3; conseq (_: _ ==> ={ho,glob Hmap, glob Gmap, H3'3.bad}) => //;sim.
   qed.
 
   local lemma Game3'3_3'3bad &m: 
@@ -3809,7 +3809,7 @@ section.
       proc;sp;if;last by hoare.
       if;last by hoare;auto.
       wp => /=;simplify.
-      conseq * (_: _ ==> !b : <= (1%r/(2^(k0+1-i))%r))
+      conseq (_: _ ==> !b : <= (1%r/(2^(k0+1-i))%r))
                (_: _ ==> (0 <= z < 2 ^ (k - 1) /\ (c <> Adv \/ invertible Hmem.pk u)) <=> b)=> //.
         by while (0 <= z < 2 ^ (k - 1) => b); auto;smt.
         by progress; rewrite -not_def=> /H11.
@@ -3839,7 +3839,7 @@ section.
          rewrite {2} (_:2 = 2^1); first by rewrite (_: 1 = 0 + 1) // powS // pow0. 
          rewrite (_:(2 ^ (k - 1))%r * (2 ^ 1)%r = (2 ^ (k - 1) * 2 ^ 1)%r); first smt.
          by rewrite pow_add //;smt.
-         by conseq * Hrec => //;smt.
+         by conseq Hrec => //;smt.
          rcondf 1 => //;first by auto;smt. 
          by hoare.
        progress. 
@@ -3849,7 +3849,7 @@ section.
          smt.
        by rewrite pow_add //;smt.
        by skip;smt. 
-       by intros c;proc;sp;rcondt 1 => //;wp;conseq * (_ : _ ==> true)=> //;smt.
+       by intros c;proc;sp;rcondt 1 => //;wp;conseq (_ : _ ==> true)=> //;smt.
     by intros b c;proc;sp;rcondf 1.
   qed.
   (* end of computation *)
@@ -4760,7 +4760,7 @@ section.
           to_gtag (sub (from_signature (i2osp y)) (1 + kh) kg) /\
          mem (m,i2osp u) Mem.qs{1})).
   proof.
-    conseq* (_: ={Hmem.pk, Gmap.m, w} ==> ={Gmap.m, res}) (GInv w0)=> //.
+    conseq (_: ={Hmem.pk, Gmap.m, w} ==> ={Gmap.m, res}) (GInv w0)=> //.
     by sim.
   qed.
 
@@ -4872,12 +4872,12 @@ section.
                         to_gtag (sub (from_signature (i2osp y)) (1 + kh) kg) /\
                        mem (m,i2osp u) Mem.qs{1}))).
         (* Sign... we combine hoare invariant and a "simple" relational equivalence *)
-        by conseq* SignEq SignInv=> //.
+        by conseq SignEq SignInv=> //.
         (* Ga *)
         proc; sp; if=> //; last by wp.
         by exists* w{1}; elim* => w0; wp; call (G_LocalG w0).
         (* Ha *)
-        by conseq* HaEq HaInv=> //.
+        by conseq HaEq HaInv=> //.
       by inline*; auto; progress; smt.
       (* After the adversary call...
          We know the invariant, and we know that (m,s){1} and (m,s){2} are equal *)

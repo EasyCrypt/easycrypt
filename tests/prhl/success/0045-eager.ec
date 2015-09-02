@@ -97,16 +97,16 @@ section.
   eager proc.
   case (!mem x{1} (dom ROe.m{1})).
    rcondt{1} 3.
-     intros &m;conseq * (_ : _ ==> true) => //.
+     intros &m;conseq (_ : _ ==> true) => //.
    rcondt{2} 2.
-     intros &m;conseq * (_ : _ ==> true) => //.
+     intros &m;conseq (_ : _ ==> true) => //.
    wp;case (x{1} = ROe.xs{1}).
     rnd{1};rnd => //.
     rnd;rnd{1};skip;progress => //;smt.
   rcondf{1} 3.
-    intros &m;conseq * (_ : _ ==> true) => //.
+    intros &m;conseq (_ : _ ==> true) => //.
   rcondf{2} 2.
-    intros &m;conseq * (_ : _ ==> true) => //.
+    intros &m;conseq (_ : _ ==> true) => //.
   sim;rnd{1} => //.
   proc;sim.
 qed.

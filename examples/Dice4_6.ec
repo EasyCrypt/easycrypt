@@ -66,7 +66,7 @@ proof.
   transitivity D4_6.RsampleW.sample (r{2} = 5 ==> res{1} = finv res{2})
       (r{1} = 5 ==> res{2} = res{1}) => //.
     by move=> _ _ _;exists ((),5).
-    conseq (D4_6.Sample_RsampleW f finv) => //.
+    conseq [-frame] (D4_6.Sample_RsampleW f finv) => //.
     move=> &m1 &m2 -> /=; split; first by smt.
     split; first by rewrite /D4_6.valid.
     split; first by rewrite Dinter.weight_def.

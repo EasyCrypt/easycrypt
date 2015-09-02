@@ -284,15 +284,15 @@ lemma Pr4_aux (A<:Adv) :
    bd_hoare [G2(A).main : true ==> res] = (1%r / 2%r).
 proof.
   intros Ha1 Ha2;fun.
-  rnd ((=) b'); conseq  (_ : ==> true) .
+  rnd ((=) b'); conseq [-frame]  (_ : ==> true) .
     intros &m;progress.
     by apply (Dbool.mu_x_def (b'{m})).
   call Ha2.
   cut H1 : mu [0..Int.(-) q 1] Fun.cpTrue = 1%r by smt.
-  wp; rnd Fun.cpTrue; conseq (_ : _ ==> true) => //.
+  wp; rnd Fun.cpTrue; conseq [-frame] (_ : _ ==> true) => //.
   call Ha1.
-  wp; rnd Fun.cpTrue; conseq (_ : _ ==> true) => //.
-  by rnd Fun.cpTrue; conseq (_ : _ ==> true).
+  wp; rnd Fun.cpTrue; conseq [-frame] (_ : _ ==> true) => //.
+  by rnd Fun.cpTrue; conseq [-frame] (_ : _ ==> true).
 save.
 
 lemma Pr4 (A<:Adv) &m : 

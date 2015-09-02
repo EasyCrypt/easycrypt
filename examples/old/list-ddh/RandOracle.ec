@@ -180,7 +180,7 @@ theory RandOracle.
                       (={x,xs,FRO.m} ==> ={result,FRO.m})
                       (={x, xs,FRO.m} ==> ={result,FRO.m}) => //.
          intros &m1 &m2 H;exists FRO.m{m2}, x{m2}, xs{m2}; generalize H => //.    
-         eqobs_in;rnd{2};conseq (_ : _ ==> ={x,FRO.m});[ progress;smt | eqobs_in].
+         eqobs_in;rnd{2};conseq [-frame] (_ : _ ==> ={x,FRO.m});[ progress;smt | eqobs_in].
          wp;symmetry. 
          eager while (h1:y0 = $dsample; ~ y0 = $dsample; : true ==> ={y0}) => //; first eqobs_in.
          swap{2} 5 -4. swap 4 -2.
@@ -234,7 +234,7 @@ theory RandOracle.
     mu dsample cpTrue = 1%r =>
     equiv [ G(LRO,UF).main ~ G(FRO,UF).main : ={x} ==> ={res} ].
   proof strict.
-    intros Hsample;symmetry. conseq (_ : ={x} ==> ={res}) => //.
+    intros Hsample;symmetry. conseq [-frame] (_ : ={x} ==> ={res}) => //.
     apply (Fixed_Lazy_dh_equiv UF _) => //.
   qed.
 end RandOracle.
