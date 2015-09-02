@@ -1107,6 +1107,12 @@ module Op = struct
     let _, ax = EcEnv.Ax.lookup (unloc c.pc_lemma) (env scope) in
     let hyps  = EcEnv.LDecl.init (env scope) ax.ax_tparams in
 
+    (match EcSection.olocals scope.sc_section with
+     | None -> ()
+     | Some locals ->
+        if EcSection.form_use_local_or_abs (oget ax.ax_spec) locals then
+          hierror "choice formula cannot use local/abstracts modules");
+
     let rec destruct fp =
       let destruct1 fp =
         match EcFol.sform_of_form fp with

@@ -309,6 +309,11 @@ let form_use_local f lc =
   with UseLocal -> true
 
 (* -------------------------------------------------------------------- *)
+let form_use_local_or_abs f lc =
+  try  on_mpath_form (check_use_local_or_abs lc) f; false
+  with UseLocal -> true
+
+(* -------------------------------------------------------------------- *)
 let module_use_local_or_abs m lc =
   try  on_mpath_module (check_use_local_or_abs lc) m; false
   with UseLocal -> true

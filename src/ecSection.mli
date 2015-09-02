@@ -22,6 +22,7 @@ val is_mp_local : mpath -> locals -> bool
 
 val form_use_local : form  -> locals -> bool
 
+val form_use_local_or_abs   : form        -> locals -> bool
 val module_use_local_or_abs : module_expr -> locals -> bool
 val opdecl_use_local_or_abs : operator    -> locals -> bool
 val tydecl_use_local_or_abs : tydecl      -> locals -> bool
