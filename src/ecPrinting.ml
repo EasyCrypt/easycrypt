@@ -86,7 +86,7 @@ module PPEnv = struct
       || (EcEnv.Var.lookup_progvar_opt ([], name) env <> None)
       || (in_memories name)
 
-  let add_local ?(force = false) ppe =
+  let add_local_r ?gen ?(force = false) ppe =
     fun id ->
       let addu =
         let id = EcIdent.name id in
@@ -97,14 +97,24 @@ module PPEnv = struct
           false
       in
 
-      let name = ref (EcIdent.name id) in
-      let i    = ref 0 in
+      let usergen, gen =
+        match gen with
+        | None ->
+            (false, fun i ->
+              Printf.sprintf "%s%s%d"
+                (EcIdent.name id) (if addu then "_" else "") i)
+
+        | Some gen ->
+            (true, fun i -> gen i)
+      in
+
+      let first = ref true in
+      let name  = ref (EcIdent.name id) in
+      let i     = ref 0 in
 
         if not force then
-          while inuse ppe !name do
-            name := Printf.sprintf "%s%s%d"
-              (EcIdent.name id) (if addu then "_" else "") !i;
-            incr i
+          while (usergen && !first) || (inuse ppe !name) do
+            first := false; name := gen !i; incr i
           done;
 
       let ppe =
@@ -112,7 +122,10 @@ module PPEnv = struct
             ppe_inuse  = Ssym.add !name ppe.ppe_inuse;
             ppe_locals = Mid.add id !name ppe.ppe_locals; }
       in
-        ppe
+        (!name, ppe)
+
+  let add_local ?gen ?force ppe id =
+    snd (add_local_r ?gen ?force ppe id)
 
   let add_locals ?force ppe xs = List.fold_left (add_local ?force) ppe xs
 
@@ -2215,8 +2228,13 @@ module PPGoal = struct
           let ppe = PPEnv.add_local ~force:true ppe id in
           PPEnv.create_and_push_mem ppe (id, EcMemory.lmt_xpath m)
 
-      | EcBaseLogic.LD_modty (p,_) ->
+      | EcBaseLogic.LD_modty (p, _) ->
           PPEnv.add_mods ~force:true ppe [id] p
+
+      | EcBaseLogic.LD_var _ when EcIdent.name id = "_" ->
+          PPEnv.add_local
+            ~gen:(fun d -> Printf.sprintf "_~%d" (d+1))
+            ~force:false ppe id
 
       | _ -> PPEnv.add_local ~force:true ppe id
 
@@ -2263,7 +2281,8 @@ module PPGoal = struct
       end;
       List.iter (fun (id, dk) ->
         Format.fprintf fmt
-          "%-.2s: @[<hov 2>%t@]@\n%!" (EcIdent.name id) dk)
+          "%-.2s: @[<hov 2>%t@]@\n%!"
+          (PPEnv.local_symb ppe id) dk)
         pps
     end;
 
