@@ -2313,29 +2313,29 @@ phltactic:
 | BYEQUIV eq=bracket(byequivopt)? info=gpterm(conseq)? COLON bad1=sform
     { Pbydeno (`Equiv, (mk_rel_pterm info, odfl true eq, Some bad1)) }
 
-| CONSEQ cq=cqoptions
-    { Pconseq (cq, (None, None, None)) }
+| CONSEQ cq=cqoptions?
+    { Pconseq (odfl [] cq, (None, None, None)) }
 
-| CONSEQ cq=cqoptions info1=gpterm(conseq_bd)
-    { Pconseq (cq, (Some info1, None, None)) }
+| CONSEQ cq=cqoptions? info1=gpterm(conseq_bd)
+    { Pconseq (odfl [] cq, (Some info1, None, None)) }
 
-| CONSEQ cq=cqoptions info1=gpterm(conseq_bd) info2=gpterm(conseq_bd) UNDERSCORE?
-    { Pconseq(cq, (Some info1, Some info2, None)) }
+| CONSEQ cq=cqoptions? info1=gpterm(conseq_bd) info2=gpterm(conseq_bd) UNDERSCORE?
+    { Pconseq (odfl [] cq, (Some info1, Some info2, None)) }
 
-| CONSEQ cq=cqoptions info1=gpterm(conseq_bd) UNDERSCORE info3=gpterm(conseq_bd)
-    { Pconseq(cq, (Some info1, None, Some info3)) }
+| CONSEQ cq=cqoptions? info1=gpterm(conseq_bd) UNDERSCORE info3=gpterm(conseq_bd)
+    { Pconseq (odfl [] cq, (Some info1, None, Some info3)) }
 
-| CONSEQ cq=cqoptions
+| CONSEQ cq=cqoptions?
     info1=gpterm(conseq_bd)
     info2=gpterm(conseq_bd)
     info3=gpterm(conseq_bd)
-      { Pconseq (cq, (Some info1,Some info2,Some info3)) }
+      { Pconseq (odfl [] cq, (Some info1,Some info2,Some info3)) }
 
-| CONSEQ cq=cqoptions UNDERSCORE info2=gpterm(conseq_bd) UNDERSCORE?
-    { Pconseq(cq, (None,Some info2, None)) }
+| CONSEQ cq=cqoptions? UNDERSCORE info2=gpterm(conseq_bd) UNDERSCORE?
+    { Pconseq (odfl [] cq, (None,Some info2, None)) }
 
-| CONSEQ cq=cqoptions UNDERSCORE UNDERSCORE info3=gpterm(conseq_bd)
-    { Pconseq(cq, (None,None,Some info3)) }
+| CONSEQ cq=cqoptions? UNDERSCORE UNDERSCORE info3=gpterm(conseq_bd)
+    { Pconseq (odfl [] cq, (None,None,Some info3)) }
 
 | ELIM STAR
     { Phrex_elim }
