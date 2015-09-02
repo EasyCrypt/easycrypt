@@ -474,6 +474,10 @@ type sim_info = {
 }
 
 (* -------------------------------------------------------------------- *)
+type pcqoption  = [ `Frame ]
+type pcqoptions = (bool * pcqoption) list
+
+(* -------------------------------------------------------------------- *)
 type phltactic =
   | Pskip
   | Pfun           of fun_info
@@ -495,7 +499,7 @@ type phltactic =
   | Prnd           of oside * (pformula, pformula option, pformula) rnd_tac_info
   | Palias         of (oside * codepos * psymbol option)
   | Pset           of (oside * codepos * bool * psymbol * pexpr)
-  | Pconseq        of (bool * (conseq_ppterm option tuple3))
+  | Pconseq        of (pcqoptions * (conseq_ppterm option tuple3))
   | Phrex_elim
   | Phrex_intro    of pformula list
   | Pexfalso

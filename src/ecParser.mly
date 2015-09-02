@@ -2313,29 +2313,29 @@ phltactic:
 | BYEQUIV eq=bracket(byequivopt)? info=gpterm(conseq)? COLON bad1=sform
     { Pbydeno (`Equiv, (mk_rel_pterm info, odfl true eq, Some bad1)) }
 
-| CONSEQ nm=STAR?
-    { Pconseq (nm<>None, (None, None, None)) }
+| CONSEQ cq=cqoptions
+    { Pconseq (cq, (None, None, None)) }
 
-| CONSEQ nm=STAR? info1=gpterm(conseq_bd)
-    { Pconseq (nm<>None, (Some info1, None, None)) }
+| CONSEQ cq=cqoptions info1=gpterm(conseq_bd)
+    { Pconseq (cq, (Some info1, None, None)) }
 
-| CONSEQ nm=STAR? info1=gpterm(conseq_bd) info2=gpterm(conseq_bd) UNDERSCORE?
-    { Pconseq(nm<>None, (Some info1, Some info2, None)) }
+| CONSEQ cq=cqoptions info1=gpterm(conseq_bd) info2=gpterm(conseq_bd) UNDERSCORE?
+    { Pconseq(cq, (Some info1, Some info2, None)) }
 
-| CONSEQ nm=STAR? info1=gpterm(conseq_bd) UNDERSCORE info3=gpterm(conseq_bd)
-    { Pconseq(nm<>None, (Some info1, None, Some info3)) }
+| CONSEQ cq=cqoptions info1=gpterm(conseq_bd) UNDERSCORE info3=gpterm(conseq_bd)
+    { Pconseq(cq, (Some info1, None, Some info3)) }
 
-| CONSEQ nm=STAR?
+| CONSEQ cq=cqoptions
     info1=gpterm(conseq_bd)
     info2=gpterm(conseq_bd)
     info3=gpterm(conseq_bd)
-      { Pconseq (nm<>None, (Some info1,Some info2,Some info3)) }
+      { Pconseq (cq, (Some info1,Some info2,Some info3)) }
 
-| CONSEQ nm=STAR? UNDERSCORE info2=gpterm(conseq_bd) UNDERSCORE?
-    { Pconseq(nm<>None, (None,Some info2, None)) }
+| CONSEQ cq=cqoptions UNDERSCORE info2=gpterm(conseq_bd) UNDERSCORE?
+    { Pconseq(cq, (None,Some info2, None)) }
 
-| CONSEQ nm=STAR? UNDERSCORE UNDERSCORE info3=gpterm(conseq_bd)
-    { Pconseq(nm<>None, (None,None,Some info3)) }
+| CONSEQ cq=cqoptions UNDERSCORE UNDERSCORE info3=gpterm(conseq_bd)
+    { Pconseq(cq, (None,None,Some info3)) }
 
 | ELIM STAR
     { Phrex_elim }
@@ -2467,6 +2467,21 @@ pgoption:
 
 %inline pgoptions:
 | AT? xs=bracket(pgoption+) { xs }
+
+cqoptionkw:
+| x=lident { x }
+
+cqoption:
+| b=boption(MINUS) x=cqoptionkw {
+    match unloc x with
+    | "frame" -> (not b, `Frame)
+    | _ ->
+        parse_error x.pl_loc
+          (Some ("invalid option: " ^ (unloc x)))
+  }
+
+%inline cqoptions:
+| xs=bracket(cqoption+) { xs }
 
 caseoption:
 | b=boption(MINUS) x=lident {

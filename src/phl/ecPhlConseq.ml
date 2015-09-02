@@ -951,3 +951,38 @@ let process_bd_equiv side (pr, po) tc =
   let info = Some { fp_head = info; fp_args = []; } in
   let info2, info3 = sideif side (info, None) (None, info) in
   process_conseq true (None, info2, info3) tc
+
+(* -------------------------------------------------------------------- *)
+type pgoptions =  {
+  pgo_split  : bool;
+  pgo_solve  : bool;
+  pgo_subst  : bool;
+  pgo_disjct : bool;
+  pgo_delta  : pgo_delta;
+}
+
+and pgo_delta = {
+  pgod_case  : bool;
+  pgod_split : bool;
+}
+
+(* -------------------------------------------------------------------- *)
+type cqpotions = {
+  cqo_frame : bool;
+}
+
+module CQOptions = struct
+  let default = { cqo_frame = true; }
+
+  let merge1 opts ((b, x) : bool * EcParsetree.pcqoption) =
+    match x with
+    | `Frame -> { opts with cqo_frame = b; }
+
+  let merge opts (specs : EcParsetree.pcqoptions) =
+    List.fold_left merge1 opts specs
+end
+
+(* -------------------------------------------------------------------- *)
+let process_conseq_opt cqopt infos tc =
+  let cqopt = CQOptions.merge CQOptions.default cqopt in
+  process_conseq cqopt.cqo_frame infos tc
