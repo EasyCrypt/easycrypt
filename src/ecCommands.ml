@@ -486,7 +486,7 @@ and process_dump scope (source, tc) =
   let tactic =
     try  File.read_from_file ~offset:p1 ~length:(p2-p1) input
     with Invalid_argument _ -> "(* failed to read back script *)" in
-  let tactic = Printf.sprintf "%s\n" (String.strip tactic) in
+  let tactic = Printf.sprintf "%s.\n" (String.strip tactic) in
 
   let ecfname = Printf.sprintf "%s.ec" source.tcd_output in
 
