@@ -2484,14 +2484,15 @@ module Cloning = struct
       proofs
     in
 
-    let scope = Ax.add_for_cloning scope proofs in
+    let scope =
+      thcl.pthc_import |> ofold (fun flag scope ->
+        match flag with
+        | `Import  -> { scope with sc_env = EcEnv.Theory.import npath scope.sc_env; }
+        | `Export  -> { scope with sc_env = EcEnv.Theory.export npath scope.sc_env; }
+        | `Include -> scope)
+        scope
 
-    thcl.pthc_import |> ofold (fun flag scope ->
-      match flag with
-      | `Import  -> { scope with sc_env = EcEnv.Theory.import npath scope.sc_env; }
-      | `Export  -> { scope with sc_env = EcEnv.Theory.export npath scope.sc_env; }
-      | `Include -> scope)
-      scope
+    in Ax.add_for_cloning scope proofs
 
 end
 
