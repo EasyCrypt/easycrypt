@@ -1848,9 +1848,13 @@ let pp_axiom ?(long=false) (ppe : PPEnv.t) fmt (x, ax) =
        let qs = PPEnv.ax_symb ppe x in
        if fst qs <> [] then
          Format.fprintf fmt "(* %a *)@ " EcSymbols.pp_qsymbol qs in
+
   let pp_decl fmt () =
-    Format.fprintf fmt "@[<hov 2>%s %t %t:@ %t.@]"
-      (string_of_axkind ax.ax_kind) pp_tags pp_name pp_spec in
+    Format.fprintf fmt "@[<hov 2>%a %t %t:@ %t.@]"
+      (pp_list " " pp_string)
+      (  [string_of_axkind ax.ax_kind]
+       @ (if ax.ax_nosmt then ["nosmt"] else []))
+      pp_tags pp_name pp_spec in
 
   Format.fprintf fmt "@[<v>%a%a@]" pp_long x pp_decl ()
 
