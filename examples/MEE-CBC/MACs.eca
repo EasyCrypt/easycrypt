@@ -1,0 +1,114 @@
+require import FSet.
+
+(* Theory: Message Authentication Codes and their properties *)
+type mK, msg, tag.
+
+(* A MAC scheme is a triple of algorithms *)
+module type MAC_Scheme = {
+  proc keygen()                  : mK
+  proc tag(k:mK, m:msg)          : tag
+  proc verify(k:mK, m:msg, t:tag): bool
+}.
+
+module type CMA_Oracles = {
+  proc tag(m:msg)          : tag
+  proc verify(m:msg, t:tag): bool
+}.
+
+module type CMA_Adversary (O : CMA_Oracles) = {
+  proc forge(): unit
+}.
+
+theory WUF_CMA.
+  (* Definitions for WUF-CMA security *)
+  module WUF_Wrap (S : MAC_Scheme): CMA_Oracles = {
+    var k  : mK
+    var s  : msg set
+    var win: bool
+
+    proc init(): unit = {
+      k   <@ S.keygen();
+      s   <- empty;
+      win <- false;
+    }
+
+    proc tag(m:msg): tag = {
+      var t;
+
+      t <@ S.tag(k,m);
+      s <- add m s;
+      return t;
+    }
+
+    proc verify(m:msg, t:tag): bool = {
+      var b;
+
+      b   <@ S.verify(k,m,t);
+      win <- win \/ (b /\ !mem m s);
+      return b;
+    }
+  }.
+
+  module WUF_CMA (S : MAC_Scheme, A : CMA_Adversary) = {
+    module O = WUF_Wrap(S)
+    module A = A(O)
+
+    proc main(): bool = {
+      O.init();
+      A.forge();
+      return O.win;
+    }
+  }.
+
+  (* A MAC scheme M : MAC_Scheme is said to be WUF-CMA
+     secure whenever, for all "efficient" CMA adversary A , the
+     following quantity is "small":
+       Adv^{WUF-CMA}_{M}(A) = Pr[WUF_CMA(M,A).main: res] *)
+end WUF_CMA.
+
+theory SUF_CMA.
+  (* Definitions for SUF-CMA security *)
+  module SUF_Wrap (S : MAC_Scheme): CMA_Oracles = {
+    var k  : mK
+    var s  : (msg * tag) set
+    var win: bool
+
+    proc init(): unit = {
+      k   <@ S.keygen();
+      s   <- empty;
+      win <- false;
+    }
+
+    proc tag(m:msg): tag = {
+      var t;
+
+      t <@ S.tag(k,m);
+      s <- add (m,t) s;
+      return t;
+    }
+
+    proc verify(m:msg, t:tag): bool = {
+      var b;
+
+      b   <@ S.verify(k,m,t);
+      win <- win \/ (b /\ !mem (m,t) s);
+      return b;
+    }
+  }.
+
+  module SUF_CMA (S : MAC_Scheme, A : CMA_Adversary) = {
+    module O = SUF_Wrap(S)
+    module A = A(O)
+
+    proc main(): bool = {
+      O.init();
+      A.forge();
+      return O.win;
+    }
+  }.
+
+  (* A MAC scheme M : MAC_Scheme is said to be SUF-CMA
+     secure whenever, for all "efficient" CMA adversary A , the
+     following quantity is "small":
+       Adv^{SUF-CMA}_{M}(A) = Pr[SUF_CMA(M,A).main: res] *)
+end SUF_CMA.

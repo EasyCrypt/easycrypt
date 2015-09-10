@@ -1,0 +1,102 @@
+require import Option Real Distr.
+require (*--*) SKE_INDR.
+
+type key, ptxt, ctxt.
+type msg.
+
+type leaks_m, leaks_p.
+op leak_m: msg  -> leaks_m.
+op leak_p: ptxt -> leaks_p.
+
+op dC_m: leaks_m -> ctxt distr.
+axiom dC_m_ll l: is_lossless (dC_m l).
+
+op dC_p: leaks_p -> ctxt distr.
+axiom dC_p_ll l: is_lossless (dC_p l).
+
+op pad  : msg -> ptxt.
+op unpad: ptxt -> msg option.
+
+axiom pcan_pad m: unpad (pad m) = Some m.
+axiom leak_pad m: dC_m (leak_m m) = dC_p (leak_p (pad m)).
+
+clone SKE_INDR as Core with
+  type eK    <- key,
+  type ptxt  <- ptxt,
+  type ctxt  <- ctxt,
+  type leaks <- leaks_p,
+  (* We want something more precise than this: the padding may hide
+     some information about the actual plaintext... *)
+  op   leak  <- leak_p,
+  op   dC    <- dC_p
+proof * by smt.
+
+clone import SKE_INDR as PtE with
+  type eK    <- key,
+  type ptxt  <- msg,
+  type ctxt  <- ctxt,
+  type leaks <- leaks_m,
+  op   leak  <- leak_m,
+  op   dC    <- dC_m
+proof * by smt.
+import RCPA.
+
+module PadThenEncrypt (S:Core.Enc_Scheme): Enc_Scheme = {
+  proc keygen = S.keygen
+
+  proc enc(k:key,m:msg): ctxt = {
+    var c;
+
+    c = S.enc(k,pad m);
+    return c;
+  }
+
+  proc dec(k:key,c:ctxt): msg option = {
+    var p;
+
+    p = S.dec(k,c);
+    return obind unpad p;
+  }
+}.
+
+module RCPAa (A:RCPA_Adversary,O:Core.RCPA.RCPA_Oracles) = {
+  module S = {
+    proc enc(m:msg): ctxt = {
+      var c;
+
+      c  <@ O.enc(pad m);
+      return c;
+    }
+  }
+
+  proc distinguish = A(S).distinguish
+}.
+
+section RCPA.
+  declare module S : Core.Enc_Scheme { RCPA_Wrap, Core.RCPA.RCPA_Wrap }.
+  declare module A : RCPA_Adversary  { RCPA_Wrap, Core.RCPA.RCPA_Wrap, S }.
+
+  local lemma PtE_Ideal &m:
+    Pr[INDR_CPA(Ideal,A).main() @ &m: res]
+    = Pr[Core.RCPA.INDR_CPA(Core.RCPA.Ideal,RCPAa(A)).main() @ &m: res].
+  proof.
+    byequiv=> //=; proc.
+    call (_: true).
+      by proc; inline *; auto; smt.
+    by call (_: true).
+  qed.
+
+  lemma RCPA_preservation &m:
+    `|Pr[INDR_CPA(PadThenEncrypt(S),A).main() @ &m: res]
+      - Pr[INDR_CPA(Ideal,A).main() @ &m: res]|
+    = `|Pr[Core.RCPA.INDR_CPA(S,RCPAa(A)).main() @ &m: res]
+        - Pr[Core.RCPA.INDR_CPA(Core.RCPA.Ideal,RCPAa(A)).main() @ &m: res]|.
+  proof.
+    rewrite (PtE_Ideal &m); do !congr.
+    byequiv=> //=; proc; inline *.
+    call (_:    ={glob S}
+             /\ ={k}(RCPA_Wrap,Core.RCPA.RCPA_Wrap)).
+      by proc; inline *; wp; call (_: true); auto; smt.
+    by call (_: true).
+  qed.
+end section RCPA.

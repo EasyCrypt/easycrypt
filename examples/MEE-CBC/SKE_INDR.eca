@@ -1,0 +1,185 @@
+require import Option Int Real Distr.
+
+(** Given types for keys, plaintexts  and ciphertexts **)
+type eK, ptxt, ctxt.
+
+(** and a leakage function (modelling the information about the
+    plaintext that can be inferred from the ciphertext) **)
+type leaks.
+op leak: ptxt -> leaks.
+
+(* and a distribution on ciphertexts parameterized by leaks, used to
+   specify security *)
+op dC: leaks -> ctxt distr.
+axiom dC_ll p: is_lossless (dC p).
+
+(* An encryption scheme is a triple of algorithm *)
+module type Enc_Scheme = {
+  proc keygen()         : eK
+  proc enc(k:eK, p:ptxt): ctxt
+  proc dec(k:eK, c:ctxt): ptxt option
+}.
+
+theory RCPA. (* IND$-CPA *)
+  module type RCPA_Oracles = {
+    proc enc(p:ptxt): ctxt
+  }.
+
+  module type RCPA_Adversary(O : RCPA_Oracles) = {
+    proc distinguish() : bool
+  }.
+
+  module RCPA_Wrap (S : Enc_Scheme): RCPA_Oracles = {
+    var k: eK
+
+    proc enc(p:ptxt): ctxt = {
+      var c;
+
+      c <@ S.enc(k,p);
+      return c;
+    }
+  }.
+
+  module INDR_CPA (S:Enc_Scheme, A:RCPA_Adversary) = {
+    proc main(): bool = {
+      var b;
+
+      RCPA_Wrap.k <@ S.keygen();
+      b           <@ A(RCPA_Wrap(S)).distinguish();
+      return b;
+    }
+  }.
+
+  module Ideal = {
+    proc keygen(): eK = { return witness; }
+
+    proc enc(k:eK,p:ptxt): ctxt = {
+      var r;
+
+      r <$ dC (leak p);
+      return r;
+    }
+
+    proc dec(k:eK,p:ctxt): ptxt option = {
+      return None;
+    }
+  }.
+
+  (** An encryption scheme S is IND$-CPA secure if, for all
+   *  "reasonable" adversary A, the following quantity is "small":
+   *
+   *    Adv^{IND$-CPA}_{S}(A,&m)
+   *    = `|Pr[INDR_CPA(S,A).main() @ &m: res]
+   *        - Pr[INDR_CPA(Ideal,A).main() @ &m: res]|
+  **)
+end RCPA.
+
+theory PTXT.
+  require import FSet.
+
+  (* Definitions for INT-PTXT security *)
+  module type PTXT_Oracles = {
+    proc enc(p:ptxt)   : ctxt
+    proc verify(c:ctxt): bool
+  }.
+
+  module type PTXT_Adversary (O : PTXT_Oracles) = {
+    proc forge(): unit
+  }.
+
+  module PTXT_Wrap (S : Enc_Scheme): PTXT_Oracles = {
+    var k  : eK
+    var s  : ptxt set
+    var win: bool
+
+    proc init(): unit = {
+      k   <@ S.keygen();
+      s   <- empty;
+      win <- false;
+    }
+
+    proc enc(p:ptxt): ctxt = {
+      var c;
+
+      c <@ S.enc(k,p);
+      s <- add p s;
+      return c;
+    }
+
+    proc verify(c:ctxt): bool = {
+      var p;
+
+      p   <@ S.dec(k,c);
+      win <- win \/ (p <> None /\ !mem (oget p) s);
+      return (p <> None);
+    }
+  }.
+
+  module INT_PTXT (S : Enc_Scheme, A : PTXT_Adversary) = {
+    proc main(): bool = {
+      PTXT_Wrap(S).init();
+      A(PTXT_Wrap(S)).forge();
+      return PTXT_Wrap.win;
+    }
+  }.
+
+  (* An encryption scheme E : Enc_Scheme is said to be INT-PTXT
+     secure whenever, for all "efficient" PTXT adversary A, the
+     following quantity is "small":
+       Adv^{INT-PTXT}_{E}(A) = Pr[INT_PTXT(E,A).main: res] *)
+end PTXT.
+
+theory CTXT.
+  require import FSet.
+
+  (* Definitions for INT-CTXT security *)
+  module type CTXT_Oracles = {
+    proc enc(p:ptxt)   : ctxt
+    proc verify(c:ctxt): bool
+  }.
+
+  module type CTXT_Adversary (O : CTXT_Oracles) = {
+    proc forge(): unit
+  }.
+
+  module CTXT_Wrap (S : Enc_Scheme): CTXT_Oracles = {
+    var k  : eK
+    var s  : ctxt set
+    var win: bool
+
+    proc init(): unit = {
+      k   <@ S.keygen();
+      s   <- empty;
+      win <- false;
+    }
+
+    proc enc(p:ptxt): ctxt = {
+      var c;
+
+      c <@ S.enc(k,p);
+      s <- add c s;
+      return c;
+    }
+
+    proc verify(c:ctxt): bool = {
+      var p;
+
+      p   <@ S.dec(k,c);
+      win <- win \/ (p <> None /\ !mem c s);
+      return (p <> None);
+    }
+  }.
+
+  module INT_CTXT (S : Enc_Scheme, A : CTXT_Adversary) = {
+    proc main(): bool = {
+      CTXT_Wrap(S).init();
+      A(CTXT_Wrap(S)).forge();
+      return CTXT_Wrap.win;
+    }
+  }.
+
+  (* An encryption scheme E : Enc_Scheme is said to be INT-CTXT
+     secure whenever, for all "efficient" CTXT adversary A , the
+     following quantity is "small":
+       Adv^{INT-CTXT}_{E}(A) = Pr[INT_CTXT(E,A).main: res] *)
+end CTXT.

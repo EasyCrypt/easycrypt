@@ -1,0 +1,410 @@
+require import Pred Option Bool Int Real FSet Distr.
+
+type eK, ptxt, ctxt.
+
+type leaks.
+op leak: ptxt -> leaks.
+
+(* An encryption scheme is a triple of algorithm *)
+module type Enc_Scheme = {
+  proc keygen()         : eK
+  proc enc(k:eK, p:ptxt): ctxt
+  proc dec(k:eK, c:ctxt): ptxt option
+}.
+
+theory CPA.
+  (* Definitions for IND-CPA security *)
+  module type CPA_Oracles = {
+    proc lr(p0:ptxt,p1:ptxt): ctxt
+  }.
+
+  module type CPA_Adversary (O : CPA_Oracles) = {
+    proc distinguish(): bool
+  }.
+
+  module CPA_Wrap (S : Enc_Scheme): CPA_Oracles = {
+    var k: eK
+    var b: bool
+
+    proc init(): unit = {
+      k <@ S.keygen();
+      b <$ {0,1};
+    }
+
+    proc lr(p0,p1:ptxt): ctxt = {
+      var p;
+      var c <- witness;
+
+      if (leak p0 = leak p1) {
+        p <- if b then p1 else p0;
+        c <@ S.enc(k,p);
+      }
+      return c;
+    }
+  }.
+
+  module IND_CPA (S : Enc_Scheme, A : CPA_Adversary) = {
+    proc main(): bool = {
+      var b;
+
+           CPA_Wrap(S).init();
+      b <@ A(CPA_Wrap(S)).distinguish();
+      return (b = CPA_Wrap.b);
+    }
+  }.
+
+  (* An encryption scheme E : Enc_Scheme is said to be IND-CPA
+     secure whenever, for all "efficient" CPA adversary A , the
+     following quantity is "small":
+       Adv^{CPA}_{E}(A) = 2 * Pr[IND_CPA(E,A).main: res] - 1 *)
+end CPA.
+
+theory CCA.
+  (* Definitions for IND-CCA security *)
+  module type CCA_Oracles = {
+    proc lr(p0:ptxt, p1:ptxt): ctxt
+    proc dec(c:ctxt)         : ptxt option
+  }.
+
+  module type CCA_Adversary (O : CCA_Oracles) = {
+    proc distinguish(): bool
+  }.
+
+  module CCA_Wrap (S : Enc_Scheme): CCA_Oracles = {
+    var k: eK
+    var s: ctxt set
+    var b: bool
+
+    proc init(): unit = {
+      k <@ S.keygen();
+      s <- empty;
+      b <$ {0,1};
+    }
+
+    proc lr(p0, p1:ptxt): ctxt = {
+      var p;
+      var c <- witness;
+
+      if (leak p0 = leak p1) {
+        p <- if b then p1 else p0;
+        c <@ S.enc(k,p);
+        s <- add c s;
+      }
+      return c;
+    }
+
+    proc dec(c:ctxt): ptxt option = {
+      var p = None;
+
+      if (!mem c s)
+        p <@ S.dec(k,c);
+      return p;
+    }
+  }.
+
+  module IND_CCA (S : Enc_Scheme, A : CCA_Adversary) = {
+    proc main(): bool = {
+      var b;
+
+           CCA_Wrap(S).init();
+      b <@ A(CCA_Wrap(S)).distinguish();
+      return (b = CCA_Wrap.b);
+    }
+  }.
+
+  (* An encryption scheme E : Enc_Scheme is said to be IND-CPA
+     secure whenever, for all "efficient" CCA adversary A , the
+     following quantity is "small":
+       Adv^{CCA}_{E}(A) = 2 * Pr[IND_CCA(E,A).main: res] - 1 *)
+end CCA.
+
+theory PTXT.
+  (* Definitions for INT-PTXT security *)
+  module type PTXT_Oracles = {
+    proc enc(p:ptxt)   : ctxt
+    proc verify(c:ctxt): bool
+  }.
+
+  module type PTXT_Adversary (O : PTXT_Oracles) = {
+    proc forge(): unit
+  }.
+
+  module PTXT_Wrap (S : Enc_Scheme): PTXT_Oracles = {
+    var k  : eK
+    var s  : ptxt set
+    var win: bool
+
+    proc init(): unit = {
+      k   <@ S.keygen();
+      s   <- empty;
+      win <- false;
+    }
+
+    proc enc(p:ptxt): ctxt = {
+      var c;
+
+      c <@ S.enc(k,p);
+      s <- add p s;
+      return c;
+    }
+
+    proc verify(c:ctxt): bool = {
+      var p;
+
+      p   <@ S.dec(k,c);
+      win <- win \/ (p <> None /\ !mem (oget p) s);
+      return (p <> None);
+    }
+  }.
+
+  module INT_PTXT (S : Enc_Scheme, A : PTXT_Adversary) = {
+    proc main(): bool = {
+      PTXT_Wrap(S).init();
+      A(PTXT_Wrap(S)).forge();
+      return PTXT_Wrap.win;
+    }
+  }.
+
+  (* An encryption scheme E : Enc_Scheme is said to be INT-PTXT
+     secure whenever, for all "efficient" PTXT adversary A, the
+     following quantity is "small":
+       Adv^{PTXT}_{E}(A) = Pr[INT_PTXT(E,A).main: res] *)
+end PTXT.
+
+theory CTXT.
+  (* Definitions for INT-CTXT security *)
+  module type CTXT_Oracles = {
+    proc enc(p:ptxt)   : ctxt
+    proc verify(c:ctxt): bool
+  }.
+
+  module type CTXT_Adversary (O : CTXT_Oracles) = {
+    proc forge(): unit
+  }.
+
+  module CTXT_Wrap (S : Enc_Scheme): CTXT_Oracles = {
+    var k  : eK
+    var s  : ctxt set
+    var win: bool
+
+    proc init(): unit = {
+      k   <@ S.keygen();
+      s   <- empty;
+      win <- false;
+    }
+
+    proc enc(p:ptxt): ctxt = {
+      var c;
+
+      c <@ S.enc(k,p);
+      s <- add c s;
+      return c;
+    }
+
+    proc verify(c:ctxt): bool = {
+      var p;
+
+      p   <@ S.dec(k,c);
+      win <- win \/ (p <> None /\ !mem c s);
+      return (p <> None);
+    }
+  }.
+
+  module INT_CTXT (S : Enc_Scheme, A : CTXT_Adversary) = {
+    proc main(): bool = {
+      CTXT_Wrap(S).init();
+      A(CTXT_Wrap(S)).forge();
+      return CTXT_Wrap.win;
+    }
+  }.
+
+  (* An encryption scheme E : Enc_Scheme is said to be INT-CTXT
+     secure whenever, for all "efficient" CTXT adversary A , the
+     following quantity is "small":
+       Adv^{CTXT}_{E}(A) = Pr[INT_CTXT(E,A).main: res] *)
+end CTXT.
+
+(** A generic result about Secret Key Encryption: if E is IND-CPA
+    and INT-CTXT then E is IND-CCA **)
+theory CPA_CTXT_CCA.
+  import CPA CTXT CCA.
+
+  (* The CCA adversary against E is used to produce either CTXT
+     forgeries (when a fresh decryption query succeeds) or a CPA
+     distinguisher (once forgeries are dropped)                  *)
+  module CTXTa(A:CCA_Adversary, O:CTXT_Oracles) = {
+    var b:bool
+
+    module Sim : CCA_Oracles = {
+      proc lr(p0, p1:ptxt): ctxt = {
+        var p;
+        var c <- witness;
+
+        if (leak p0 = leak p1) {
+          p <- if b then p1 else p0;
+          c <@ O.enc(p);
+        }
+        return c;
+      }
+
+      proc dec(c:ctxt): ptxt option = {
+        var b;
+
+        b <@ O.verify(c);
+        return None;
+      }
+    }
+
+    proc forge(): unit = {
+      b <$ {0,1};
+           A(Sim).distinguish();
+    }
+  }.
+
+  module CPAa(A:CCA_Adversary, O:CPA_Oracles) = {
+    module Sim : CCA_Oracles = {
+      proc lr = O.lr
+      proc dec(c:ctxt): ptxt option = { return None; }
+    }
+
+    proc distinguish = A(Sim).distinguish
+  }.
+
+  section CCA.
+    declare module E : Enc_Scheme    { CTXTa, CPA_Wrap, CTXT_Wrap, CCA_Wrap }.
+    declare module A : CCA_Adversary { CTXTa, CPA_Wrap, CTXT_Wrap, CCA_Wrap, E }.
+
+    (* Up to bad requires losslessness *)
+    axiom E_keygen_ll: islossless E.keygen.
+    axiom E_enc_ll   : islossless E.enc.
+    axiom E_dec_ll   : islossless E.dec.
+
+    axiom A_distinguish_ll (O <: CCA_Oracles { A }):
+      islossless O.lr =>
+      islossless O.dec =>
+      islossless A(O).distinguish.
+
+    (* In addition, we need to know that the decryption oracle does
+       not modify the encryption oracle's state (weaker) *)
+    axiom dec_nomod ge: hoare [E.dec: (glob E) = ge ==> (glob E) = ge].
+
+    local phoare dec_nomod_ph ge: [E.dec: (glob E) = ge ==> (glob E) = ge] =1%r.
+    proof. by conseq E_dec_ll (dec_nomod ge). qed.
+
+    local module G1 = {
+      var bad: bool
+      var k  : eK
+      var s  : ctxt set
+      var b  : bool
+
+      module O' = {
+        proc init(): unit = {
+          k   <@ E.keygen();
+          s   <- empty;
+          b   <$ {0,1};
+          bad <- false;
+        }
+
+        proc lr(p0, p1:ptxt): ctxt = {
+          var p;
+          var c <- witness;
+
+          if (leak p0 = leak p1) {
+            p <- if b then p1 else p0;
+            c <@ E.enc(k,p);
+            s <- add c s;
+          }
+          return c;
+        }
+
+        proc dec(c:ctxt): ptxt option = {
+          var p = None;
+
+          if (!mem c s)
+            p <@ E.dec(k,c);
+          if (p <> None)
+            bad <- true;
+          return None;
+        }
+      }
+
+      proc main(): bool = {
+        var b';
+              O'.init();
+        b' <@ A(O').distinguish();
+        return (b' = b);
+      }
+    }.
+
+    local lemma CCA_G1_bad &m:
+      Pr[IND_CCA(E,A).main() @ &m: res]
+      <= Pr[G1.main() @ &m: res]
+         + Pr[G1.main() @ &m: G1.bad].
+    proof.
+      byequiv (_: ={glob E, glob A} ==> _)=> //=.
+      proc; inline *.
+      call (_: G1.bad,
+                  ={glob E}
+               /\ ={k, s, b}(CCA_Wrap,G1)).
+        exact/A_distinguish_ll.
+        (* encryption *)
+        proc; sp; if=> //=; wp; call (_: true); auto.
+        by move=> &2 bad; proc; sp; if=> //=; wp; call E_enc_ll; auto.
+        by move=> &1; proc; sp; if=> //=; wp; call E_enc_ll; auto.
+        (* decryption *)
+        by proc; inline *; wp; sp; if=> //=; call (_: true).
+        by move=> &2 bad; proc; wp; sp; if=> //=; call E_dec_ll.
+        by move=> &1; proc=> //=; inline *; wp; sp; if=> //=; call E_dec_ll.
+      wp; rnd.
+      wp; call (_: true).
+      by auto; smt.
+    qed.
+
+    local lemma G1_CPA &m:
+      Pr[G1.main() @ &m: res]
+      = Pr[IND_CPA(E,CPAa(A)).main() @ &m: res].
+    proof.
+      byequiv (_: ={glob E, glob A} ==> _)=> //=.
+      proc; inline *.
+      call (_:    ={glob E}
+               /\ ={k, b}(G1,CPA_Wrap)).
+        by sim.
+        proc; inline *; wp; sp.
+        if{1}=> //=.
+        exists* (glob E){1}; elim* => ge.
+        by call{1} (dec_nomod_ph ge).
+      wp; rnd.
+      by wp; call (_: true).
+    qed.
+
+    local lemma G1_bad_CTXT &m:
+      Pr[G1.main() @ &m: G1.bad]
+      = Pr[INT_CTXT(E,CTXTa(A)).main() @ &m: res].
+    proof.
+      byequiv=> //=.
+      proc; inline *.
+      call (_:    ={glob E}
+               /\ ={k, s}(G1,CTXT_Wrap)
+               /\ G1.b{1} = CTXTa.b{2}
+               /\ G1.bad{1} = CTXT_Wrap.win{2}).
+        by proc; inline *; sp; if=> //=; wp; call (_: true); auto.
+        proc; inline *; wp; sp; if{1}=> //=.
+          by call (_: true); skip; smt.
+          exists* (glob E){2}; elim* => ge.
+          by call{2} (dec_nomod_ph ge); skip; smt.
+      wp; rnd.
+      by wp; call (_: true).
+    qed.
+
+    (* Adv^{CCA}_{E}(A)
+       <= Adv^{CPA}_{E}(CPAa(A))
+          + 2 * Adv^{CTXT}_{E}(CTXTAa(A)) *)
+    lemma CCA_security &m:
+      2%r * Pr[IND_CCA(E,A).main() @ &m: res] - 1%r
+      <= 2%r * Pr[IND_CPA(E,CPAa(A)).main() @ &m: res] - 1%r
+         + 2%r * Pr[INT_CTXT(E,CTXTa(A)).main() @ &m: res].
+     proof. by rewrite -(G1_bad_CTXT &m) -(G1_CPA &m); smt. qed.
+  end section CCA.
+
+  print CCA_security.
+end CPA_CTXT_CCA.

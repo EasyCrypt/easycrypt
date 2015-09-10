@@ -1,0 +1,87 @@
+require import Option Distr.
+(*...*) import Dapply.
+require (*--*) SKE.
+
+type key, ptxt, ctxt.
+type msg.
+
+type leaks.
+op leak: msg -> leaks.
+
+op pad  : msg -> ptxt distr.
+op unpad: ptxt -> msg option.
+
+axiom pad_ll    m  : is_lossless (pad m).
+axiom pcan_pad  p m: unpad p = Some m <=> support (pad m) p.
+
+clone import SKE as Core with
+  type eK             <- key,
+  type ptxt           <- ptxt,
+  type ctxt           <- ctxt,
+  type leaks          <- leaks,
+  op   leak  (p:ptxt) <- oapp leak witness (unpad p) (* We want something more precise than this: the padding may hide some information about the actual plaintext... *)
+proof * by smt.
+
+clone import SKE as PtE with
+  type eK    <- key,
+  type ptxt  <- msg,
+  type ctxt  <- ctxt,
+  type leaks <- leaks,
+  op   leak  <- leak
+proof * by smt.
+
+module PadThenEncrypt (S:Core.Enc_Scheme): PtE.Enc_Scheme = {
+  proc keygen = S.keygen
+
+  proc enc(k:key,p:msg): ctxt = {
+    var c, p';
+
+    p' <$ pad p;
+    c = S.enc(k,p');
+    return c;
+  }
+
+  proc dec(k:key,c:ctxt): msg option = {
+    var p;
+
+    p = S.dec(k,c);
+    return obind unpad p;
+  }
+}.
+
+module B (A:PtE.CPA.CPA_Adversary,O:Core.CPA.CPA_Oracles) = {
+  module S = {
+    proc lr(p0 p1:msg): ctxt = {
+      var c, p0', p1';
+
+      p0' <$ pad p0;
+      p1' <$ pad p1;
+      c <@ O.lr(p0',p1');
+      return c;
+    }
+  }
+
+  proc distinguish = A(S).distinguish
+}.
+
+lemma PtE_security (S <: Core.Enc_Scheme       { Core.CPA.CPA_Wrap, PtE.CPA.CPA_Wrap })
+                   (A <: PtE.CPA.CPA_Adversary { Core.CPA.CPA_Wrap, PtE.CPA.CPA_Wrap, S })
+                   &m:
+  Pr[PtE.CPA.IND_CPA(PadThenEncrypt(S),A).main() @ &m: res]
+  = Pr[Core.CPA.IND_CPA(S,B(A)).main() @ &m: res].
+proof.
+  byequiv (_: ={glob S, glob A} ==> ={res})=> //=.
+  proc.
+  inline *.
+  call (_:    ={glob S}
+           /\ ={b,k}(CPA.CPA_Wrap,Core.CPA.CPA_Wrap)).
+    proc; inline *; case ((leak p0 <> leak p1){1}).
+      rcondf{1} 2; 1:by auto.
+      rcondf{2} 6; 1:by auto; smt.
+      by auto; smt.
+    rcondt{1} 2; 1:by auto.
+    rcondt{2} 6; 1:by auto; smt.
+    by case (CPA.CPA_Wrap.b{1}); [|swap{2} 1 1]; wp; call (_: true); auto; smt.
+  wp; rnd.
+  by wp; call (_: true).
+qed.
