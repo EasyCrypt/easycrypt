@@ -57,15 +57,19 @@ module LowInternal = struct
   let isALocal = function ALocal _ -> true | _ -> false
 
   (* ------------------------------------------------------------------ *)
-  let rec sp_asgn mem env lv e (bds,assoc,pre) =
+  let rec sp_asgn mem env lv e (bds, assoc, pre) =
     let subst_in_assoc lv new_id_exp new_ids ((ass : assignables), f) =
       let replace_assignable var =
         match var with
         | APVar (pv', ty) ->  begin
           match lv,new_ids with
-          | LvVar   (pv ,_), [new_id,_] when NormMp.pv_equal env pv pv' -> ALocal (new_id,ty)
-          | LvVar   _      , _ -> var
-          | LvTuple vs     , _ -> begin
+          | LvVar (pv ,_), [new_id,_] when NormMp.pv_equal env pv pv' ->
+              ALocal (new_id,ty)
+
+          | LvVar _, _ ->
+              var
+
+          | LvTuple vs, _ -> begin
               let aux = List.map2 (fun x y -> (fst x, fst y)) vs new_ids in
               try
                 let new_id = snd (List.find (NormMp.pv_equal env pv' |- fst) aux) in
@@ -81,28 +85,31 @@ module LowInternal = struct
          (ass, f)
     in
 
-    let rec simplify_assoc (assoc, bds) =
+    let rec simplify_assoc (assoc, bds, pre) =
       match assoc with
-      | [] -> ([], bds)
+      | [] ->
+          ([], bds, pre)
+
       | (ass, f) :: assoc ->
-          let assoc, bds = simplify_assoc (assoc, bds) in
+          let assoc, bds, pre = simplify_assoc (assoc, bds, pre) in
 
           let destr_ass =
             try  List.combine (List.map in_seq1 ass) (destr_tuple f)
             with Invalid_argument _ | DestrError _ -> [(ass, f)]
           in
 
-          let do_subst_or_accum (assoc, bds) (a, f) =
+          let do_subst_or_accum (assoc, bds, pre) (a, f) =
           match a with
           | [ALocal (id, _)] ->
               let subst = EcFol.Fsubst.f_subst_id in
               let subst = EcFol.Fsubst.f_bind_local subst id f in
-              (List.map    (snd_map (EcFol.Fsubst.f_subst subst)) assoc,
-               List.filter ((<>) id |- fst) bds)
+              (List.map (snd_map (EcFol.Fsubst.f_subst subst)) assoc,
+               List.filter ((<>) id |- fst) bds,
+               EcFol.Fsubst.f_subst subst pre)
 
-          | _ -> ((a, f) :: assoc, bds)
+          | _ -> ((a, f) :: assoc, bds, pre)
         in
-        List.fold_left do_subst_or_accum (assoc, bds) destr_ass
+        List.fold_left do_subst_or_accum (assoc, bds, pre) destr_ass
     in
 
     let for_lvars vs =
@@ -111,7 +118,7 @@ module LowInternal = struct
         let newids  = List.map (fst_map fresh) vs in
         let bds     = newids @ bds in
         let astuple = f_tuple (List.map (curry f_local) newids) in
-        let pre     = subst_form_lv env mem lv astuple pre  in
+        let pre     = subst_form_lv env mem lv astuple pre in
         let e_form  = EcFol.form_of_expr mem e in
         let e_form  = subst_form_lv env mem lv astuple e_form in
 
@@ -119,7 +126,7 @@ module LowInternal = struct
              (List.map (fun x -> APVar x) vs, e_form)
           :: (List.map (subst_in_assoc lv astuple newids) assoc) in
 
-        let assoc, bds = simplify_assoc (List.rev assoc, bds) in
+        let assoc, bds, pre = simplify_assoc (List.rev assoc, bds, pre) in
 
         (bds, List.rev assoc, pre)
     in
@@ -159,7 +166,7 @@ module LowInternal = struct
         let assoc   = List.map (snd_map (EcFol.Fsubst.f_subst subst)) assoc in
         (assoc, f)
 
-      with Not_found -> (assoc,f)
+      with Not_found -> (assoc, f)
     in
 
     let assoc, pre = List.fold_left rem_ex (assoc, pre) bds in
@@ -171,30 +178,32 @@ module LowInternal = struct
     EcFol.f_exists_simpl (List.map (snd_map (fun t -> GTty t)) bds) pre
 
   (* ------------------------------------------------------------------ *)
-  let rec sp_stmt m env (bds,assoc,pre) stmt =
+  let rec sp_stmt m env (bds, assoc, pre) stmt =
     match stmt with
-    | []      -> ([], (bds, assoc, pre))
+    | [] ->
+        ([], (bds, assoc, pre))
+
     | i :: is ->
-      try
-        let (bds, assoc, pre) = sp_instr m env (bds, assoc, pre) i in
-        sp_stmt m env (bds,assoc,pre) is
-      with No_sp ->
-        stmt, (bds,assoc,pre)
+        try
+          let (bds, assoc, pre) = sp_instr m env (bds, assoc, pre) i in
+          sp_stmt m env (bds,assoc,pre) is
+        with No_sp ->
+          (stmt, (bds, assoc, pre))
 
   and sp_instr m env (bds,assoc,pre) instr = match instr.i_node with
     | Sasgn (lv, e) ->
         sp_asgn m env lv e (bds, assoc, pre)
 
     | Sif (e, s1, s2) ->
-      let e_form = EcFol.form_of_expr m e in
-      let pre_t  = build_sp m bds assoc (f_and_simpl e_form pre) in
-      let pre_f  = build_sp m bds assoc (f_and_simpl (f_not e_form) pre) in
-      let stmt_t, (bds_t, assoc_t, pre_t) = sp_stmt m env (bds,assoc,pre_t) s1.s_node in
-      let stmt_f, (bds_f, assoc_f, pre_f) = sp_stmt m env (bds,assoc,pre_f) s2.s_node in
-      if not (List.is_empty stmt_t && List.is_empty stmt_f) then raise No_sp;
-      let sp_t = build_sp m bds_t assoc_t pre_t in
-      let sp_f = build_sp m bds_f assoc_f pre_f in
-      ([], [], f_or_simpl sp_t sp_f)
+        let e_form = EcFol.form_of_expr m e in
+        let pre_t  = build_sp m bds assoc (f_and_simpl e_form pre) in
+        let pre_f  = build_sp m bds assoc (f_and_simpl (f_not e_form) pre) in
+        let stmt_t, (bds_t, assoc_t, pre_t) = sp_stmt m env (bds, assoc, pre_t) s1.s_node in
+        let stmt_f, (bds_f, assoc_f, pre_f) = sp_stmt m env (bds, assoc, pre_f) s2.s_node in
+        if not (List.is_empty stmt_t && List.is_empty stmt_f) then raise No_sp;
+        let sp_t = build_sp m bds_t assoc_t pre_t in
+        let sp_f = build_sp m bds_f assoc_f pre_f in
+        ([], [], f_or_simpl sp_t sp_f)
 
     | _ -> raise No_sp
 
