@@ -2189,7 +2189,7 @@ let trans_form_or_pattern env (ps, ue) pf tt =
           | fs  -> f_tuple fs
     end
 
-    | PFident ({ pl_desc = name;pl_loc = loc }, tvi) -> 
+    | PFident ({ pl_desc = name; pl_loc = loc }, tvi) -> 
         let tvi = tvi |> omap (transtvi env ue) in
         let ops = select_form_op env opsc name ue tvi [] in
         begin match ops with
@@ -2197,7 +2197,12 @@ let trans_form_or_pattern env (ps, ue) pf tt =
             tyerror loc env (UnknownVarOrOp (name, []))
 
         | [op, _, subue, _] -> begin
-            if is_pvar op then PFS.set_memused state;
+            let inmem =
+              match op.f_node with
+              | Fpvar _ | Fproj ({ f_node = Fpvar _ }, _) -> true
+              | _ -> false in
+
+            if inmem then PFS.set_memused state;
             EcUnify.UniEnv.restore ~src:subue ~dst:ue; op
         end
 
