@@ -28,17 +28,12 @@ opam repository add easycrypt git://github.com/EasyCrypt/opam.git
 opam update
 
 # --------------------------------------------------------------------
-# Build EasyCrypt
+# Build EasyCrypt & Provers
 
 git clone --depth=1 https://github.com/EasyCrypt/easycrypt.git
 
-opam install -v -y ec-toolchain
+opam install -v -y ec-toolchain ec-provers
 make -C easycrypt
-
-# --------------------------------------------------------------------
-# Build provers
-
-opam install -v -y ec-provers
 
 # --------------------------------------------------------------------
 # Create package
