@@ -19,8 +19,9 @@ mkdir _build && cd _build
 # Build OPAM
 
 export OPAMROOT="${PWD}/_opam"
-export OPAMJOBS=2
+export OPAMJOBS=${OPAMJOBS:-2}
 export OCAMLBUILD_JOBS=${OPAMJOBS}
+export ECNAME=${ECNAME:-$(date +'%d-%m-%Y')}
 
 opam init -n
 eval `opam config env`
@@ -95,4 +96,4 @@ ldd package/easycrypt/bin/* | fgrep '=>' | \
 
 # --------------------------------------------------------------------
 BZIP2=-9 tar -C package --owner=0 --group=0 -cjf \
-    easycrypt-$(date +'%d-%m-%Y').tbz2 easycrypt
+    "easycrypt-${ECNAME}.tbz2" easycrypt
