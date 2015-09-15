@@ -468,8 +468,6 @@ section RCPA.
   qed.
 end section RCPA.
 
-print RCPA_security.
-
 (* From the PRP and a PTXT adversary against MtE, we construct a WUF-CMA adversary against the MAC *)
 module CMAa (P : PRP, A : PTXT_Adversary, M : CMA_Oracles) = {
   var ek: eK
@@ -635,4 +633,3 @@ section PTXT.
   qed.
 end section PTXT.
 
-print PTXT_security.

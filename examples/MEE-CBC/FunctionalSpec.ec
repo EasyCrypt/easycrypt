@@ -560,7 +560,7 @@ proof.
         (size (pad _p (hmac_sha256 _mk _p)) - i).
     by auto; smt.
   wp=> //=.
-  conseq* (_: _ ==> s :: mee_enc AES hmac_sha256 _ek _mk s _p = _c)=> //=.
+  conseq (_: _ ==> s :: mee_enc AES hmac_sha256 _ek _mk s _p = _c)=> //=.
     move=> &m [->>] ->> iv //=; split=> [[[le0_size _] h]|<<-].
       have -> //=:= h (iv :: mee_enc AES hmac_sha256 _ek _mk iv _p)
                       (nth witness (iv :: mee_enc AES hmac_sha256 _ek _mk iv _p)
@@ -583,7 +583,7 @@ phoare mee_decrypt_correct _mk _ek _c:
                                       ==> res = mee_dec AESi hmac_sha256 _ek _mk (head witness _c) (behead _c)]
   =1%r.
 proof.
-  conseq* (_: true ==> true) (_: _ ==> _)=> //=.
+  conseq (_: true ==> true) (_: _ ==> _)=> //=.
     proc; inline MAC.verify PRPa.PRPr.finv; wp.
     while (   0 <= i <= size c
            /\ ek = _ek

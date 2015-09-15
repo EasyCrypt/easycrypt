@@ -405,6 +405,4 @@ theory CPA_CTXT_CCA.
          + 2%r * Pr[INT_CTXT(E,CTXTa(A)).main() @ &m: res].
      proof. by rewrite -(G1_bad_CTXT &m) -(G1_CPA &m); smt. qed.
   end section CCA.
-
-  print CCA_security.
 end CPA_CTXT_CCA.

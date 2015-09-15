@@ -459,8 +459,6 @@ theory EtM.
         = 2%r * Pr[SKEa.RCPA.INDR_CPA(E,RCPAa(M,A)).main() @ &m: res] - 1%r.
       proof. by rewrite (RCPA_prob &m). qed.
     end section RCPA.
-
-    print RCPA_preservation.
   end RCPA_SUF_RCPA.
 
   (** We then prove that if E is IND$-CPA and M is SUF-CMA then EtM(E,M) is INT-CTXT **)
