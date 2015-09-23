@@ -68,7 +68,12 @@ val check_state : topmode -> string -> scope -> unit
 val dump_why3 : scope -> string -> unit
 
 (* -------------------------------------------------------------------- *)
+exception UnknownFlag of string
+
 module Options : sig
+  val set : scope -> string -> bool -> scope
+  val get : scope -> string -> bool
+
   val set_implicits : scope -> bool -> scope
   val get_implicits : scope -> bool
 end

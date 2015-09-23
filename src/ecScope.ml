@@ -25,11 +25,6 @@ module MSym = EcSymbols.Msym
 module BI   = EcBigInt
 
 (* -------------------------------------------------------------------- *)
-type action = {
-  for_loading  : exn -> exn;
-}
-
-(* -------------------------------------------------------------------- *)
 exception HiScopeError of EcLocation.t option * string
 
 let pp_hi_scope_error fmt exn =
@@ -145,127 +140,143 @@ let () =
     EcPException.register pp
 
 (* -------------------------------------------------------------------- *)
+type goption = ..
+
 module type IOptions = sig
-  type option
-
-  val register          : action -> exn -> option
-  val register_identity : exn -> option
-
+  type oid
   type options
 
-  val init         : unit -> options
-  val get          : options -> option -> exn
-  val set          : options -> option -> exn -> options
+  type action = { for_loading : goption -> goption; }
+
+  val register     : ?action:action -> goption -> oid
+  val freeze       : unit -> options
+  val get          : options -> oid -> goption
+  val set          : options -> oid -> goption -> options
   val for_loading  : options -> options
   val for_subscope : options -> options
 end
 
 (* -------------------------------------------------------------------- *)
 module GenOptions : IOptions = struct
-  type option = int
+  type action  = { for_loading : goption -> goption; }
+  type oid     = EcUid.uid
+  type options = (action * goption) EcUid.Muid.t
 
-  type options = (action * exn) Mint.t
+  let options : options ref =
+    ref EcUid.Muid.empty
 
-  let known_options : options ref = ref Mint.empty
+  let identity = { for_loading = (fun x -> x); }
 
-  let identity = {
-    for_loading = (fun x -> x);
-  }
+  let register ?(action = identity) goption =
+    let oid = EcUid.unique () in
+    options := EcUid.Muid.add oid (action, goption) !options; oid
 
-  let count = ref 0
-  let initialized = ref false
+  let freeze () =
+    !options
 
-  let register action exn =
-    if !initialized then assert false;
-    let opt = !count in
-    incr count;
-    known_options := Mint.add opt (action,exn) !known_options;
-    opt
+  let get (options : options) (oid : oid) =
+    snd (oget (EcUid.Muid.find_opt oid options))
 
-  let register_identity = register identity
-
-  let init () =
-    initialized := true;
-    !known_options
-
-  let get options opt =
-    snd (Mint.find opt options)
-
-  let set options opt exn =
-    Mint.change
-      (function None -> assert false | Some(act,_) -> Some (act, exn))
-      opt options
+  let set (options : options) (oid : oid) (goption : goption) =
+    EcUid.Muid.change (fun k -> Some (fst (oget k), goption)) oid options
 
   let for_loading options =
-    Mint.map (fun (act, exn) -> act, act.for_loading exn) options
+    EcUid.Muid.map (fun (act, exn) -> act, act.for_loading exn) options
 
-  let for_subscope options = options
+  let for_subscope options =
+    options
 end
 
 (* -------------------------------------------------------------------- *)
 module Check_mode = struct
   type mode = [`Off | `On | `Forced]
 
-  exception Check of mode
+  type goption += Check of mode
 
-  let mode =
+  let oid =
     let for_loading = function
       | Check `Off    -> Check `Off
       | Check `On     -> Check `Off
       | Check `Forced -> Check `Forced
       | exn           -> exn
-    in GenOptions.register { for_loading } (Check `On)
+    in GenOptions.register ~action:({ GenOptions.for_loading }) (Check `On)
 
   let check options =
-    match GenOptions.get options mode with
+    match GenOptions.get options oid with
     | Check `On     -> true
     | Check `Forced -> true
     | Check `Off    -> false
     | _ -> true
 
   let set_checkproof options b =
-    match GenOptions.get options mode with
-    | Check `On  when not b -> GenOptions.set options mode (Check `Off)
-    | Check `Off when     b -> GenOptions.set options mode (Check `On )
+    match GenOptions.get options oid with
+    | Check `On  when not b -> GenOptions.set options oid (Check `Off)
+    | Check `Off when     b -> GenOptions.set options oid (Check `On )
     | _ -> options
 
   let set_fullcheck options =
-    GenOptions.set options mode (Check `Forced)
+    GenOptions.set options oid (Check `Forced)
 end
 
 (* -------------------------------------------------------------------- *)
 module Prover_info = struct
-  exception PI of EcProvers.prover_infos
+  type goption += PI of EcProvers.prover_infos
 
-  let npi = GenOptions.register_identity (PI EcProvers.dft_prover_infos)
+  let oid = GenOptions.register (PI EcProvers.dft_prover_infos)
 
   let set options pi =
-    GenOptions.set options npi (PI pi)
+    GenOptions.set options oid (PI pi)
 
   let get options =
-    match GenOptions.get options npi with
+    match GenOptions.get options oid with
     | PI pi -> pi
     | _     -> assert false
 end
 
 (* -------------------------------------------------------------------- *)
-module Implicits = struct
-  exception Implicits of bool
+module KnownFlags = struct
+  let implicits = "implicits"
 
-  let implicits =
-    let default = Implicits false in
+  let flags = [
+    (implicits, false);
+  ]
+end
+
+exception UnknownFlag of string
+
+module Flags : sig
+  open GenOptions
+
+  val get : options -> string -> bool
+  val set : options -> string -> bool -> options
+end = struct
+  type flags    = bool Mstr.t
+  type goption += Flags of flags
+
+  exception UnknownFlag of string
+
+  let asflags = function Flags m -> m | _ -> assert false
+
+  let oid = 
+    let default = Mstr.of_list KnownFlags.flags in
     let for_loading = function
-      | Implicits _ -> Implicits false
-      | exn         -> exn
-    in GenOptions.register { for_loading } default
+      | Flags _ -> Flags default
+      | exn -> exn
+    in GenOptions.register ~action:{ GenOptions.for_loading } (Flags default)
 
-  let set options value =
-    GenOptions.set options implicits (Implicits value)
+  let get options name =
+    let flags = asflags (GenOptions.get options oid) in
+    oget ~exn:(UnknownFlag name) (Mstr.find_opt name flags)
 
-  let get options =
-    match GenOptions.get options implicits with
-    | Implicits value -> value
-    | _ -> assert false
+  let set options name value =
+    let flags = asflags (GenOptions.get options oid) in
+    let flags =
+      Mstr.change (fun x ->
+        ignore (oget ~exn:(UnknownFlag name) x : bool);
+        Some value)
+      name flags in
+
+    GenOptions.set options oid (Flags flags)
 end
 
 (* -------------------------------------------------------------------- *)
@@ -321,7 +332,7 @@ let empty (gstate : EcGState.gstate) =
     sc_loaded     = Msym.empty;
     sc_required   = [];
     sc_pr_uc      = None;
-    sc_options    = GenOptions.init ();
+    sc_options    = GenOptions.freeze ();
     sc_section    = EcSection.initial; }
 
 (* -------------------------------------------------------------------- *)
@@ -391,11 +402,18 @@ let notify (scope : scope) (lvl : EcGState.loglevel) =
 
 (* -------------------------------------------------------------------- *)
 module Options = struct
+  let get scope name =
+    Flags.get scope.sc_options name
+
+  let set scope name value =
+    { scope with sc_options =
+        Flags.set scope.sc_options name value }
+    
   let get_implicits scope =
-    Implicits.get scope.sc_options
+    get scope KnownFlags.implicits
 
   let set_implicits scope value =
-    { scope with sc_options = Implicits.set scope.sc_options value }
+    set scope KnownFlags.implicits value
 end
 
 (* -------------------------------------------------------------------- *)

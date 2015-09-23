@@ -124,7 +124,7 @@ val ofold      : ('a -> 'b -> 'b) -> 'b -> 'a option -> 'b
 val omap       : ('a -> 'b) -> 'a option -> 'b option
 val odfl       : 'a -> 'a option -> 'a
 val ofdfl      : (unit -> 'a) -> 'a option -> 'a
-val oget       : 'a option -> 'a
+val oget       : ?exn:exn -> 'a option -> 'a
 val oall2      : ('a -> 'b -> bool) -> 'a option -> 'b option -> bool
 val otolist    : 'a option -> 'a list
 val ocompare   : 'a cmp -> 'a option cmp
