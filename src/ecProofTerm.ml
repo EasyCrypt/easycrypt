@@ -434,6 +434,7 @@ let rec trans_pterm_arg_impl pe f =
 (* ------------------------------------------------------------------ *)
 and trans_pterm_arg_value pe ?name { pl_desc = arg; pl_loc = loc; } =
   let dfl () = Printf.sprintf "?%d" (EcUid.unique ()) in
+  let name = name |> omap (Printf.sprintf "?%s") in
 
   match arg with
   | EA_mod _ | EA_mem _ | EA_proof _ ->

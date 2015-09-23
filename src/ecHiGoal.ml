@@ -1130,8 +1130,9 @@ let t_apply_prept pt tc =
 
 (* -------------------------------------------------------------------- *)
 let process_apply_bwd ~implicits mode (ff : ppterm) (tc : tcenv1) =
+  let pt = PT.tc1_process_full_pterm ~implicits tc ff in
+
   try
-    let pt   = PT.tc1_process_full_pterm ~implicits tc ff in
     let aout = LowApply.t_apply_bwd_r pt tc in
 
     match mode with
@@ -1143,7 +1144,12 @@ let process_apply_bwd ~implicits mode (ff : ppterm) (tc : tcenv1) =
         aout
 
   with LowApply.NoInstance ->
-    tc_error !!tc "cannot apply lemma"
+    tc_error_lazy !!tc
+      (fun fmt ->
+        let ppe = EcPrinting.PPEnv.ofenv (FApi.tc1_env tc) in
+        Format.fprintf fmt "cannot apply the given proof-term for:\n\n%!";
+        Format.fprintf fmt
+          "  @[%a@]" (EcPrinting.pp_form ppe) pt.PT.ptev_ax)
 
 (* -------------------------------------------------------------------- *)
 let process_apply_fwd ~implicits (pe, hyp) tc =
@@ -1157,21 +1163,21 @@ let process_apply_fwd ~implicits (pe, hyp) tc =
   let hyp, fp = LDecl.hyp_by_name (unloc hyp) hyps in
   let pte = PT.tc1_process_full_pterm ~implicits tc pe in
 
-  let rec instantiate pte =
-    match TTC.destruct_product hyps pte.PT.ptev_ax with
-    | None -> raise E.NoInstance
-
-    | Some (`Forall _) ->
-        instantiate (PT.apply_pterm_to_hole pte)
-
-    | Some (`Imp (f1, f2)) ->
-        try
-          PT.pf_form_match ~mode:fmdelta pte.PT.ptev_env ~ptn:f1 fp;
-          (pte, f2)
-        with MatchFailure -> raise E.NoInstance
-  in
-
   try
+    let rec instantiate pte =
+      match TTC.destruct_product hyps pte.PT.ptev_ax with
+      | None -> raise E.NoInstance
+
+      | Some (`Forall _) ->
+          instantiate (PT.apply_pterm_to_hole pte)
+
+      | Some (`Imp (f1, f2)) ->
+          try
+            PT.pf_form_match ~mode:fmdelta pte.PT.ptev_env ~ptn:f1 fp;
+            (pte, f2)
+          with MatchFailure -> raise E.NoInstance
+    in
+
     let (pte, cutf) = instantiate pte in
     let pt = fst (PT.concretize pte) in
     let pt = { pt with pt_args = pt.pt_args @ [palocal hyp]; } in
@@ -1182,7 +1188,14 @@ let process_apply_fwd ~implicits (pe, hyp) tc =
       (t_cutdef pt cutf tc)
 
   with E.NoInstance ->
-    tc_error !!tc "cannot apply lemma"
+    tc_error_lazy !!tc
+      (fun fmt ->
+        let ppe = EcPrinting.PPEnv.ofenv (FApi.tc1_env tc) in
+        Format.fprintf fmt
+          "cannot apply (in %a) the given proof-term for:\n\n%!"
+          (EcPrinting.pp_local ppe) hyp;
+        Format.fprintf fmt
+          "  @[%a@]" (EcPrinting.pp_form ppe) pte.PT.ptev_ax)
 
 (* -------------------------------------------------------------------- *)
 type apply_t = EcParsetree.apply_info
