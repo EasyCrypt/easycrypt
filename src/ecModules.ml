@@ -443,15 +443,15 @@ module Uninit = struct    (* FIXME: generalize this for use in ecPV *)
     let rec e_pv tx sx e =
       match e.e_node with
       | Evar pv ->
-          if tx pv then Sx.add pv.pv_name sx else sx
+          if tx pv then Sx.add (xastrip pv.pv_name) sx else sx
       | _ ->
-        e_fold (e_pv tx) sx e
+          e_fold (e_pv tx) sx e
     in fun tx e -> e_pv tx Sx.empty e
 end
 
 let rec lv_get_uninit_read (w : Sx.t) (lv : lvalue) =
   let sx_of_pv pv =
-    if is_loc pv then Sx.singleton pv.pv_name else Sx.empty
+    if is_loc pv then Sx.singleton (xastrip pv.pv_name) else Sx.empty
   in
 
   match lv with
@@ -478,9 +478,9 @@ and s_get_uninit_read (w : Sx.t) (s : stmt) =
 and i_get_uninit_read (w : Sx.t) (i : instr) =
   match i.i_node with
   | Sasgn (lv, e) | Srnd (lv, e) ->
-      let    r1 = Sx.diff (Uninit.e_pv is_loc e) w in
-      let w, r2 = lv_get_uninit_read w lv in
-      (w, Sx.union r1 r2)
+      let     r1 = Sx.diff (Uninit.e_pv is_loc e) w in
+      let w2, r2 = lv_get_uninit_read w lv in
+      (Sx.union w w2, Sx.union r1 r2)
 
   | Scall (olv, _, args) ->
       let r1    = Sx.diff (Sx.big_union (List.map (Uninit.e_pv is_loc) args)) w in
@@ -661,9 +661,8 @@ let get_uninit_read_of_fun (fp : xpath) (f : function_) =
   | FBdef fd ->
       let w =
         let toloc { v_name = x } = (EcTypes.pv_loc fp x).pv_name in
-        let w = f.f_sig.fs_anames |> odfl [] in
-        let w = (EcTypes.pv_arg fp).pv_name :: List.map toloc w in
-        Sx.of_list w
+        let w = List.map toloc (f.f_sig.fs_anames |> odfl []) in
+        Sx.of_list (List.map xastrip w)
       in
 
       let w, r  = s_get_uninit_read w fd.f_body in
