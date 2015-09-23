@@ -202,6 +202,8 @@ let mqname mp x =
   | `Concrete(top,Some sub) -> mpath_crt top mp.m_args (Some (pqname sub x))
   | _ -> assert false
   
+let mastrip mp = { mp with m_args = [] }
+
 let m_apply mp args = 
   let args' = mp.m_args in
   mpath mp.m_top (args'@args) 
@@ -293,9 +295,9 @@ let x_fv fv xp = m_fv fv xp.x_top
 
 let xpath_fun mp f = xpath mp (psymbol f)
 let xqname x s = xpath x.x_top (pqname x.x_sub s)
-
+let xastrip x = { x with x_top = mastrip x.x_top }
 let xbasename xp = basename xp.x_sub
-  
+
 (* -------------------------------------------------------------------- *)
 let rec m_tostring (m : mpath) = 
   let top, sub = 

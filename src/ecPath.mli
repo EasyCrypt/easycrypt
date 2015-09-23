@@ -61,6 +61,7 @@ and mpath_top =
 val mpath     : mpath_top -> mpath list -> mpath
 val mpath_abs : ident -> mpath list -> mpath
 val mqname    : mpath -> symbol -> mpath
+val mastrip   : mpath -> mpath
 
 val mident    : ident -> mpath
 val mpath_crt : path -> mpath list -> path option -> mpath
@@ -88,6 +89,7 @@ type xpath = private {
 val xpath     : mpath -> path -> xpath
 val xpath_fun : mpath -> symbol -> xpath
 val xqname    : xpath -> symbol -> xpath
+val xastrip   : xpath -> xpath
 
 val x_equal   : xpath -> xpath -> bool
 val x_compare : xpath -> xpath -> int

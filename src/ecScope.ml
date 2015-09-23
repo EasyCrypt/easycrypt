@@ -1298,7 +1298,7 @@ module Mod = struct
       let ppe = EcPrinting.PPEnv.ofenv (env scope) in
       let pp fmt (xp, names) =
         Format.fprintf fmt "  - %a -> [%a]"
-          (EcPrinting.pp_funname ppe) xp
+          (EcPrinting.pp_funname ppe) (xastrip xp)
           (EcPrinting.pp_list ", " pp_symbol)
           (List.map EcPath.xbasename (Sx.elements names))
       in
