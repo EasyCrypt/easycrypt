@@ -104,8 +104,10 @@
     "idtac"       , IDTAC      ;        (* KW: tactic *)
     "move"        , MOVE       ;        (* KW: tactic *)
     "modpath"     , MODPATH    ;        (* KW: tactic *)
-    "fieldeq"     , FIELD      ;        (* KW: tactic *)
-    "ringeq"      , RING       ;        (* KW: tactic *)
+    "field"       , FIELD `Raw ;        (* KW: tactic *)
+    "fieldeq"     , FIELD `Eq  ;        (* KW: tactic *)
+    "ring"        , RING `Raw  ;        (* KW: tactic *)
+    "ringeq"      , RING `Eq   ;        (* KW: tactic *)
     "algebra"     , ALGNORM    ;        (* KW: tactic *)
 
     "exact"       , EXACT      ;        (* KW: bytac *)

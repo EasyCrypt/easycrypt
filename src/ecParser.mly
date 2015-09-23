@@ -315,6 +315,9 @@
 
 %token <EcParsetree.codepos> CPOS
 
+%token<[`Raw|`Eq]> RING
+%token<[`Raw|`Eq]> FIELD
+
 %token ABSTRACT
 %token ADMIT
 %token ALGNORM
@@ -374,7 +377,6 @@
 %token EXPECT
 %token EXPORT
 %token FEL
-%token FIELD
 %token FINAL
 %token FIRST
 %token FISSION
@@ -457,7 +459,6 @@
 %token RETURN
 %token REWRITE
 %token RIGHT
-%token RING
 %token RND
 %token RPAREN
 %token RPBRACE
@@ -561,6 +562,9 @@ _lident:
 | LEFT     { "left"   }
 | RIGHT    { "right"  }
 | STRICT   { "strict" }
+
+| x=RING  { match x with `Eq -> "ringeq"  | `Raw -> "ring"  }
+| x=FIELD { match x with `Eq -> "fieldeq" | `Raw -> "field" }
 
 %inline _uident:
 | x=UIDENT { x }
