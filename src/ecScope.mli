@@ -30,16 +30,18 @@ type proof_uc = {
 }
 
 and proof_auc = {
-  puc_name   : string;
+  puc_name   : symbol option;
   puc_mode   : bool option;
   puc_jdg    : proof_state;
   puc_flags  : pucflags;
   puc_crt    : EcDecl.axiom;
 }
 
-and proof_ctxt = (symbol * EcDecl.axiom) * EcPath.path * EcEnv.env
+and proof_ctxt =
+  (symbol option * EcDecl.axiom) * EcPath.path * EcEnv.env
 
-and proof_state = PSNoCheck | PSCheck of EcCoreGoal.proof
+and proof_state =
+  PSNoCheck | PSCheck of EcCoreGoal.proof
 
 and pucflags = {
   puc_nosmt : bool;

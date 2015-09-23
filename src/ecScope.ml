@@ -286,16 +286,18 @@ type proof_uc = {
 }
 
 and proof_auc = {
-  puc_name   : string;
+  puc_name   : symbol option;
   puc_mode   : bool option;
   puc_jdg    : proof_state;
   puc_flags  : pucflags;
   puc_crt    : EcDecl.axiom;
 }
 
-and proof_ctxt = (symbol * EcDecl.axiom) * EcPath.path * EcEnv.env
+and proof_ctxt =
+  (symbol option * EcDecl.axiom) * EcPath.path * EcEnv.env
 
-and proof_state = PSNoCheck | PSCheck of EcCoreGoal.proof
+and proof_state =
+  PSNoCheck | PSCheck of EcCoreGoal.proof
 
 and pucflags = {
   puc_nosmt : bool;
@@ -743,7 +745,7 @@ module Ax = struct
       scope
 
   (* ------------------------------------------------------------------ *)
-  let start_lemma scope (cont, axflags) check name axd =
+  let start_lemma scope (cont, axflags) check ?name axd =
     let puc =
       match check with
       | false -> PSNoCheck
@@ -824,21 +826,21 @@ module Ax = struct
 
     match ax.pa_kind with
     | PILemma ->
-        let scope = start_lemma scope pucflags check (unloc ax.pa_name) axd in
+        let scope = start_lemma scope ~name:(unloc ax.pa_name) pucflags check axd in
         let scope = Tactics.process_core false `Check scope [tintro] in
         None, scope
 
     | PLemma tc ->
         start_lemma_with_proof scope
           (Some tintro) pucflags (mode, mk_loc loc tc) check
-          (unloc ax.pa_name) axd
+          ~name:(unloc ax.pa_name) axd
 
     | PAxiom _ ->
         Some (unloc ax.pa_name),
         bind scope (snd pucflags).puc_local (unloc ax.pa_name, axd)
 
   (* ------------------------------------------------------------------ *)
-  and add_for_cloning (scope : scope) proofs =
+  and add_defer (scope : scope) proofs =
     match proofs with
     | [] -> scope
     | _  ->
@@ -874,17 +876,21 @@ module Ax = struct
 
     let scope =
       match snd puc.puc_cont with
-      | Some e -> { scope with sc_env = e }
-      | None   -> bind scope pac.puc_flags.puc_local (pac.puc_name, pac.puc_crt)
-    in
+      | Some e ->
+          { scope with sc_env = e }
 
-      (Some pac.puc_name, scope)
+      | None ->
+          let bind name scope =
+            bind scope pac.puc_flags.puc_local (name, pac.puc_crt)
+          in pac.puc_name |> ofold bind scope
+
+    in (pac.puc_name, scope)
 
   (* ------------------------------------------------------------------ *)
-  and start_lemma_with_proof scope tintro pucflags (mode, tc) check name axd =
+  and start_lemma_with_proof scope tintro pucflags (mode, tc) check ?name axd =
     let { pl_loc = loc; pl_desc = tc } = tc in
 
-    let scope = start_lemma scope pucflags check name axd in
+    let scope = start_lemma scope pucflags check ?name axd in
     let scope =
       match tintro with
       | None -> scope
@@ -944,12 +950,12 @@ module Ax = struct
 
     match rl.pr_proof with
     | None ->
-        None, start_lemma scope pucflags check axname ax 
+        None, start_lemma scope pucflags check ?name:axname ax 
 
     | Some tc ->
         start_lemma_with_proof scope
           None pucflags (mode, mk_loc loc tc) check
-          axname ax
+          ?name:axname ax
 end
 
 (* -------------------------------------------------------------------- *)
@@ -1522,13 +1528,20 @@ module Ty = struct
           if Sstr.mem (unloc x) m then
             hierror ~loc:(x.pl_loc) "duplicated axiom name: `%s'" (unloc x);
           (Sstr.add (unloc x) m, (unloc x, t, Mstr.find (unloc x) rmap)))
-        Sstr.empty axs
-    in
-      List.iter
-        (fun (x, _) ->
+        Sstr.empty axs in
+
+    let interactive =
+      List.pmap
+        (fun (x, req) ->
            if not (Mstr.mem x symbs) then
-             hierror "no proof for axiom `%s'" x)
-        reqs;
+             let ax = {
+               ax_tparams = [];
+               ax_spec    = Some req;
+               ax_kind    = `Lemma;
+               ax_nosmt   = true;
+             } in Some ((None, ax), EcPath.psymbol x, scope.sc_env)
+           else None)
+        reqs in
       List.iter
         (fun (x, pt, f) ->
           let x  = "$" ^ x in
@@ -1545,11 +1558,12 @@ module Ty = struct
           let check    = Check_mode.check scope.sc_options in
 
           let escope = scope in
-          let escope = Ax.start_lemma escope pucflags check x ax in
+          let escope = Ax.start_lemma escope pucflags check ~name:x ax in
           let escope = Tactics.proof escope mode true in
           let escope = snd (Tactics.process_r false mode escope [t]) in
             ignore (Ax.save escope pt.pl_loc))
-        axs
+        axs;
+      interactive
 
   (* ------------------------------------------------------------------ *)
   let p_zmod    = EcPath.fromqsymbol ([EcCoreLib.i_top; "Ring"; "ZModule"], "zmodule")
@@ -1587,12 +1601,15 @@ module Ty = struct
     let symbols = check_tci_operators scope.sc_env ty tci.pti_ops symbols in
     let cr      = ring_of_symmap scope.sc_env (snd ty) kind symbols in
     let axioms  = EcAlgTactic.ring_axioms scope.sc_env cr in
-      check_tci_axioms scope mode tci.pti_axs axioms;
+    let inter   = check_tci_axioms scope mode tci.pti_axs axioms in
+    let scope   =
       { scope with sc_env =
           List.fold_left
             (fun env p -> EcEnv.TypeClass.add_instance ty (`General p) env)
             (EcEnv.Algebra.add_ring (snd ty) cr scope.sc_env)
             [p_zmod; p_ring; p_idomain] }
+
+    in Ax.add_defer scope inter
 
   (* ------------------------------------------------------------------ *)
   let field_of_symmap env ty symbols =
@@ -1614,12 +1631,15 @@ module Ty = struct
     let symbols = check_tci_operators scope.sc_env ty tci.pti_ops symbols in
     let cr      = field_of_symmap scope.sc_env (snd ty) symbols in
     let axioms  = EcAlgTactic.field_axioms scope.sc_env cr in
-      check_tci_axioms scope mode tci.pti_axs axioms;
+    let inter   = check_tci_axioms scope mode tci.pti_axs axioms; in
+    let scope   =
       { scope with sc_env =
           List.fold_left
             (fun env p -> EcEnv.TypeClass.add_instance ty (`General p) env)
             (EcEnv.Algebra.add_field (snd ty) cr scope.sc_env)
             [p_zmod; p_ring; p_idomain; p_field] }
+
+    in Ax.add_defer scope inter
 
   (* ------------------------------------------------------------------ *)
   let symbols_of_tc (_env : EcEnv.env) ty (tcp, tc) =
@@ -2483,7 +2503,9 @@ module Cloning = struct
 
     let proofs = List.pmap (fun axc ->
       match axc.C.axc_tac with
-      | None -> Some (axc.C.axc_axiom, axc.C.axc_path, axc.C.axc_env)
+      | None ->
+          Some (fst_map some axc.C.axc_axiom, axc.C.axc_path, axc.C.axc_env)
+
       | Some pt ->
           let t = { pt_core = pt; pt_intros = []; } in
           let t = { pl_loc = pt.pl_loc; pl_desc = Pby (Some [t]); } in
@@ -2495,7 +2517,7 @@ module Cloning = struct
           let check    = Check_mode.check scope.sc_options in
 
           let escope = { scope with sc_env = axc.C.axc_env; } in
-          let escope = Ax.start_lemma escope pucflags check x ax in
+          let escope = Ax.start_lemma escope pucflags check ~name:x ax in
           let escope = Tactics.proof escope mode true in
           let escope = snd (Tactics.process_r false mode escope [t]) in
             ignore (Ax.save escope pt.pl_loc); None)
@@ -2510,7 +2532,7 @@ module Cloning = struct
         | `Include -> scope)
         scope
 
-    in Ax.add_for_cloning scope proofs
+    in Ax.add_defer scope proofs
 
 end
 

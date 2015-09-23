@@ -1445,7 +1445,8 @@ tyci_op:
     { (x, (tvi, tg)) }
 
 tyci_ax:
-| PROOF x=ident BY tg=tactic_core { (x, tg) }
+| PROOF x=ident BY tg=tactic_core
+    { (x, tg) }
 
 (* -------------------------------------------------------------------- *)
 (* Operator definitions                                                 *)
