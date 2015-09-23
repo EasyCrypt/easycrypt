@@ -1,4 +1,4 @@
-; Generated on Mon Aug 24 10:24:49 2015
+; Generated on Wed Sep 23 12:50:36 2015
 
 (defvar easycrypt-bytac-keywords '(
   "exact"
@@ -117,7 +117,9 @@
   "idtac"
   "move"
   "modpath"
+  "field"
   "fieldeq"
+  "ring"
   "ringeq"
   "algebra"
   "transitivity"
