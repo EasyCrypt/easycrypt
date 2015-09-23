@@ -27,7 +27,7 @@ EasyCrypt uses the following third-party tools/libraries:
 Installing requirements using OPAM (POSIX systems - preferred)
 --------------------------------------------------------------------
 
-Starting with opam 1.2.0, you can install all the needed depdendencies
+Starting with opam 1.2.0, you can install all the needed dependencies
 via the opam OCaml packages manager.
 
   0. Optionally, switch to a dedicated compiler for EasyCrypt:
