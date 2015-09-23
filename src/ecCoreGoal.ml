@@ -95,29 +95,6 @@ type rwproofterm = {
 }
 
 (* -------------------------------------------------------------------- *)
-type location = {
-  plc_parent : location option;
-  plc_name   : string option;
-  plc_loc    : EcLocation.t;
-}
-
-let mk_location ?parent ?name loc =
-  { plc_parent = parent; plc_name = name; plc_loc = loc; }
-
-exception TcError of bool * location option * string Lazy.t
-
-let pp_tc_error fmt (lazy msg) =
-  Format.fprintf fmt "%s\n%!" msg
-
-let () =
-  let pp fmt exn =
-    match exn with
-    | TcError (_, _, msg) -> pp_tc_error fmt msg
-    | _ -> raise exn
-  in
-    EcPException.register pp
-
-(* -------------------------------------------------------------------- *)
 type proof = {
   pr_env    : proofenv;
   pr_opened : handle list;
@@ -167,7 +144,66 @@ and tcenv_ctxt  = tcenv_ctxt1 list
 and tcenv_ctxt1 = handle list
 
 (* -------------------------------------------------------------------- *)
-let tc_error (_pe : proofenv) ?(catchable = true) ?loc ?who fmt =
+type location = {
+  plc_parent : location option;
+  plc_name   : string option;
+  plc_loc    : EcLocation.t;
+}
+
+type tcerror =  {
+  tc_catchable : bool;
+  tc_proofenv  : proofenv option;
+  tc_location  : location option;
+  tc_message   : string Lazy.t;
+  tc_reloced   : (EcSymbols.symbol * bool) option;
+}
+
+let mk_location ?parent ?name loc =
+  { plc_parent = parent; plc_name = name; plc_loc = loc; }
+
+let mk_tcerror ?(catchable = true) ?penv ?loc msg =
+  { tc_catchable = catchable;
+    tc_proofenv  = penv;
+    tc_location  = loc;
+    tc_message   = msg;
+    tc_reloced   = None; }
+
+exception TcError of tcerror
+
+let pp_tc_error fmt ({ tc_message = lazy msg } as error) =
+  let pname, penv =
+    match error.tc_reloced with
+    | Some (name, ppgoal) ->
+        (Some name, if ppgoal then error.tc_proofenv else None)
+    | None -> (None, None)
+  in
+
+  let pp_penv penv =
+    let goal = oget (ID.Map.find_opt penv.pr_main penv.pr_goals) in
+    let goal = goal.g_goal in
+    let ppe = EcPrinting.PPEnv.ofenv (LDecl.toenv goal.g_hyps) in
+
+    Format.fprintf fmt "\nInitial goal was:\n\n%!";
+    Format.fprintf fmt "%a\n%!"
+      (EcPrinting.pp_goal ppe)
+      ((LDecl.tohyps goal.g_hyps, goal.g_concl), `One (-1))
+
+  in
+
+  pname |> oiter (Format.fprintf fmt "In proving `%s':\n\n%!");
+  Format.fprintf fmt "%s\n%!" msg;
+  penv |> oiter pp_penv
+
+let () =
+  let pp fmt exn =
+    match exn with
+    | TcError error -> pp_tc_error fmt error
+    | _ -> raise exn
+  in
+    EcPException.register pp
+
+(* -------------------------------------------------------------------- *)
+let tc_error (penv : proofenv) ?(catchable = true) ?loc ?who fmt =
   let buf  = Buffer.create 127 in
   let fbuf = Format.formatter_of_buffer buf in
   let loc  = loc |> omap (fun loc -> mk_location loc) in
@@ -175,7 +211,9 @@ let tc_error (_pe : proofenv) ?(catchable = true) ?loc ?who fmt =
     Format.kfprintf
       (fun _ ->
          Format.pp_print_flush fbuf ();
-         raise (TcError (catchable, loc, lazy (Buffer.contents buf))))
+         let error = lazy (Buffer.contents buf) in
+         let error = mk_tcerror ~catchable ~penv ?loc error in
+         raise (TcError error))
       fbuf fmt
 
 (* -------------------------------------------------------------------- *)
@@ -185,11 +223,12 @@ let tacuerror ?(catchable = true) fmt =
     Format.kfprintf
       (fun _ ->
          Format.pp_print_flush fbuf ();
-         raise (TcError (catchable, None, lazy (Buffer.contents buf))))
+         let error = lazy (Buffer.contents buf) in
+         raise (TcError (mk_tcerror ~catchable error)))
       fbuf fmt
 
 (* -------------------------------------------------------------------- *)
-let tc_error_lazy (_pe : proofenv) ?(catchable = true) ?loc ?who msg =
+let tc_error_lazy (penv : proofenv) ?(catchable = true) ?loc ?who msg =
   let getmsg () =
     let buf  = Buffer.create 127 in
     let fbuf = Format.formatter_of_buffer buf in
@@ -200,7 +239,7 @@ let tc_error_lazy (_pe : proofenv) ?(catchable = true) ?loc ?who msg =
   let loc = loc |> omap (fun loc -> mk_location loc) in
 
   ignore (who : string option);         (* FIXME: remove? *)
-  raise (TcError (catchable, loc, lazy (getmsg ())))
+  raise (TcError (mk_tcerror ~catchable ~penv ?loc (lazy (getmsg ()))))
 
 (* -------------------------------------------------------------------- *)
 let tc_error_clear (pe : proofenv) ?catchable ?loc ?who err =
@@ -713,11 +752,11 @@ module FApi = struct
   (* ------------------------------------------------------------------ *)
   let t_try_base tt tc =
     let rec is_user_error = function
-      | EcTyping.TyError  _   -> true
-      | TcError  (true, _, _) -> true
-      | InvalidGoalShape      -> true
-      | ClearError _          -> true
-      | LocError (_, e)       -> is_user_error e
+      | EcTyping.TyError  _ -> true
+      | InvalidGoalShape    -> true
+      | ClearError _        -> true
+      | LocError (_, e)     -> is_user_error e
+      | TcError tc          -> tc.tc_catchable
       | _ -> false
     in
 

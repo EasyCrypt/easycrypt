@@ -12,15 +12,6 @@ open EcFol
 open EcEnv
 
 (* -------------------------------------------------------------------- *)
-type location = {
-  plc_parent : location option;
-  plc_name   : string option;
-  plc_loc    : EcLocation.t;
-}
-
-exception TcError of bool * location option * string Lazy.t
-
-(* -------------------------------------------------------------------- *)
 exception InvalidGoalShape
 
 (* -------------------------------------------------------------------- *)
@@ -147,6 +138,23 @@ type validation =
 
   (* external (hl/phl/prhl/...) proof-node *)
 | VExtern  : 'a * handle list -> validation
+
+(* -------------------------------------------------------------------- *)
+type location = {
+  plc_parent : location option;
+  plc_name   : string option;
+  plc_loc    : EcLocation.t;
+}
+
+type tcerror =  {
+  tc_catchable : bool;
+  tc_proofenv  : proofenv option;
+  tc_location  : location option;
+  tc_message   : string Lazy.t;
+  tc_reloced   : (symbol * bool) option;
+}
+
+exception TcError of tcerror
 
 (* -------------------------------------------------------------------- *)
 val tcenv1_of_proof   : proof  -> tcenv1

@@ -87,10 +87,11 @@ let rec toperror_of_exn_r ?gloc exn =
   | EcLexer.LexicalError (loc, _) ->
       Some (odfl (odfl _dummy gloc) loc, exn)
 
-  | EcCoreGoal.TcError (_, None, _) ->
+  | EcCoreGoal.TcError { EcCoreGoal.tc_location = None } ->
       Some (odfl _dummy gloc, exn)
 
-  | EcCoreGoal.TcError (_, Some { EcCoreGoal.plc_loc = loc }, _) ->
+  | EcCoreGoal.TcError
+      { EcCoreGoal.tc_location = Some { EcCoreGoal.plc_loc = loc } } ->
       let gloc = if EcLocation.isdummy loc then gloc else Some loc in
       Some (odfl _dummy gloc, exn)
 
@@ -659,7 +660,7 @@ module Tactics = struct
       in
         { scope with sc_pr_uc = Some { (oget scope.sc_pr_uc) with puc_active = Some pac; } }
 
-  let process_r mark mode (scope : scope) (tac : ptactic list) =
+  let process_r ?reloc mark mode (scope : scope) (tac : ptactic list) =
     check_state `InProof "proof script" scope;
 
     let scope =
@@ -698,7 +699,17 @@ module Tactics = struct
           EcHiGoal.tt_smtmode    = htmode;
           EcHiGoal.tt_implicits  = Options.get_implicits scope; } in
 
-        let hds, juc = TTC.process ttenv tac juc in
+        let (hds, juc) =
+          try  TTC.process ttenv tac juc
+          with EcCoreGoal.TcError tcerror ->
+            let tcerror =
+              ofold
+                (fun reloc error ->
+                  { error with EcCoreGoal.tc_reloced = Some (reloc, true) })
+                tcerror reloc
+            in raise (EcCoreGoal.TcError tcerror)
+        in
+
         let penv = EcCoreGoal.proofenv_of_proof juc in
 
         let pac = { pac with puc_jdg = PSCheck juc } in
@@ -1560,7 +1571,7 @@ module Ty = struct
           let escope = scope in
           let escope = Ax.start_lemma escope pucflags check ~name:x ax in
           let escope = Tactics.proof escope mode true in
-          let escope = snd (Tactics.process_r false mode escope [t]) in
+          let escope = snd (Tactics.process_r ~reloc:x false mode escope [t]) in
             ignore (Ax.save escope pt.pl_loc))
         axs;
       interactive
@@ -2519,7 +2530,7 @@ module Cloning = struct
           let escope = { scope with sc_env = axc.C.axc_env; } in
           let escope = Ax.start_lemma escope pucflags check ~name:x ax in
           let escope = Tactics.proof escope mode true in
-          let escope = snd (Tactics.process_r false mode escope [t]) in
+          let escope = snd (Tactics.process_r ~reloc:x false mode escope [t]) in
             ignore (Ax.save escope pt.pl_loc); None)
       proofs
     in
