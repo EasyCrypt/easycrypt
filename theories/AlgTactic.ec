@@ -8,14 +8,14 @@
 (* -------------------------------------------------------------------- *)
 (* Axioms on the ring structure [0, 1, +, -, *]
  * - 0 != 1
- * - forall x y z, (x + y) + z = x + (y + z)
+ * - forall x y z, x + (y + z) = (x + y) + z
  * - forall x y, x + y = y + z
  * - forall x, x + 0 = x
  * - forall x, x + (-x) = 0
- * - forall x y z, (x * y) * z = x * (y * z)
+ * - forall x y z, x * (y * z) = (x * y) * z
  * - forall x, x * 1 = x
  * - forall x y, x * y = y * z
- * - forall x y z, x * (y + z) = x * y + x * z
+ * - forall x y z, (x + y) * z = x * z + y * z
  *
  * Ring structures must come with an integer exponentation symbol (^)
  * - forall x, x^0 = 1
@@ -25,7 +25,7 @@
  *   (optional for the [int] type)
  * - 0%:R = 0
  * - 1%:R = 1
- * - forall n, 0 <= n -> (n+1)%:R = n%:R + 1
+ * - forall n, 0 <= n -> (n+1)%:R = 1 + n%:R
  * - forall n, (-n)%:R = - n%:R
  *
  * If an explicit symbol (-) is given for the subtraction:
@@ -71,7 +71,7 @@ theory Requires.
     forall (x : domain), add x rzero = x.
 
   axiom nosmt addrA:
-    forall (x y z : domain), add (add x y) z = add x (add y z).
+    forall (x y z : domain), add x (add y z) = add (add x y) z.
 
   axiom nosmt addrC:
     forall (x y : domain), add x y = add y x.
@@ -90,14 +90,14 @@ theory Requires.
     forall (x : domain), mul x rone = x.
 
   axiom nosmt mulrA:
-    forall (x y z : domain), mul (mul x y) z = mul x (mul y z).
+    forall (x y z : domain), mul x (mul y z) = mul (mul x y) z.
 
   axiom nosmt mulrC:
     forall (x y : domain), mul x y = mul y x.
 
   axiom nosmt mulrDl:
-    forall (x y z: domain), mul x (add y z) = add (mul x y) (mul x z).
-   
+    forall (x y z: domain), mul (add x y) z = add (mul x z) (mul y z).
+
   (* For boolean ring *)
   axiom nosmt mulrK:
     forall (x:domain), mul x x = x.
@@ -113,7 +113,7 @@ theory Requires.
   axiom nosmt ofint1: ofint 1 = rone. (* This is a consequence of ofint0, ofintS *)
 
   axiom nosmt ofintS:
-    forall (n : int), 0 <= n => ofint (n+1) = add (ofint n) rone.
+    forall (n : int), 0 <= n => ofint (n+1) = add rone (ofint n).
 
   axiom nosmt ofintN:
     forall (n : int), ofint (-n) = opp (ofint n).

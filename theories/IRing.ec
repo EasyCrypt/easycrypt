@@ -5,9 +5,11 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
+(* -------------------------------------------------------------------- *)
 require export Int.
-require import AlgTactic.
-require import Ring.
+require import Ring AlgTactic.
+
+(* -------------------------------------------------------------------- *)
 instance ring with int
   op rzero = zeroz
   op rone  = onez
