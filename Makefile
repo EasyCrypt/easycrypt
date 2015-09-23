@@ -46,7 +46,8 @@ CHECKCATS ?= prelude core theories encryption newth realized
 # --------------------------------------------------------------------
 .PHONY: all build byte native tests check weak-check check-xunit examples
 .PHONY: clean install uninstall uninstall-purge dist distcheck
-.PHONY: callprover pg toolchain update-toolchain provers license
+.PHONY: callprover toolchain update-toolchain provers license
+.PHONY: pg pg-keywords
 .PHONY: %.ml %.mli %.inferred.mli
 
 all: build
@@ -180,6 +181,18 @@ pg:
 	    echo "Toolchain activation failed" >&2; \
 	  fi; \
 	fi; $(MAKE) -C proofgeneral run-local
+
+pg-keywords:
+	@if git status --porcelain | grep -v '^??' >/dev/null; then \
+	  echo '[E] git working copy is in a dirty state' >&2; \
+	  echo '[E] (or the `git` command failed)' >&2; \
+    exit 1; \
+  fi
+	$(MAKE) -C proofgeneral keywords
+	git add -- proofgeneral/easycrypt/easycrypt-keywords.el
+	if git status --porcelain -- $(OUTDIR) | grep -v '^??' >/dev/null; then \
+    git commit -m 'PG keywords updated'; \
+	fi
 
 # --------------------------------------------------------------------
 toolchain:
