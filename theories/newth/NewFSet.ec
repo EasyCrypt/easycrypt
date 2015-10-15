@@ -6,7 +6,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Pred Int NewLogic NewList StdRing StdOrder.
+require import Pred Int NewLogic List StdRing StdOrder.
 (*---*) import IntOrder.
 
 (* -------------------------------------------------------------------- *)

@@ -4,7 +4,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Fun Bool Int NewList.
+require import Fun Bool Int List.
 require (*ab*) FinType NewWord.
 
 pragma +implicits.

@@ -70,9 +70,9 @@ module Exp(S:Sampler,A:Adv) = {
 section.
   declare module A:Adv {Sample}.
   axiom A_ll (S <: ASampler {A}): islossless S.s => islossless A(S).a.
-  axiom A_bounded &m: `|Sample.l|{m} = 0 => Pr[A(Sample).a() @ &m: `|Sample.l| <= q] = 1%r.
+  axiom A_bounded &m: size Sample.l{m} = 0 => Pr[A(Sample).a() @ &m: size Sample.l <= q] = 1%r.
 
-  local hoare hl_A_bounded: A(Sample).a: `|Sample.l| = 0 ==> `|Sample.l| <= q.
+  local hoare hl_A_bounded: A(Sample).a: size Sample.l = 0 ==> size Sample.l <= q.
   proof.
     hoare.
     phoare split ! 1%r 1%r=> //=.
@@ -87,7 +87,7 @@ section.
     proc s(): T = {
       var r = witness;
 
-      if (`|Sample.l| < q) {
+      if (size Sample.l < q) {
         r = $uT;
         Sample.l = r::Sample.l;
       }
@@ -99,10 +99,10 @@ section.
   proof.
     symmetry.
     proc.
-    conseq (_: ={glob A} ==> `|Sample.l|{2} <= q => ={Sample.l}) _ (_: true ==> `|Sample.l| <= q); first 2 smt.
+    conseq (_: ={glob A} ==> size Sample.l{2} <= q => ={Sample.l}) _ (_: true ==> size Sample.l <= q); first 2 smt.
       call hl_A_bounded.
       by inline*; auto; smt.
-    call (_: !`|Sample.l| <= q, ={Sample.l})=> //=.
+    call (_: !size Sample.l <= q, ={Sample.l})=> //=.
       exact A_ll.
       by proc; sp; if{1}=> //=; auto; smt.
       by move=> &2 bad; proc; sp; if=> //=; auto; rewrite -/predT; smt. (* FIXME: -delta *)
@@ -111,10 +111,10 @@ section.
   qed.
 
   local lemma pr_BSample &m:
-    Pr[Exp(BSample,A).main() @ &m: `|Sample.l| <= q /\ !unique Sample.l]
+    Pr[Exp(BSample,A).main() @ &m: size Sample.l <= q /\ !uniq Sample.l]
     <= (q^2)%r * mu uT ((=) witness).
   proof.
-    fel 1 `|Sample.l| (fun x, q%r * mu uT ((=) witness)) q (!unique Sample.l) [BSample.s: (`|Sample.l| < q)]=> //.
+    fel 1 (size Sample.l) (fun x, q%r * mu uT ((=) witness)) q (!uniq Sample.l) [BSample.s: (size Sample.l < q)]=> //.
       (* We love real arithmetic... NOT *)
       rewrite Sum.int_sum_const //= /Sum.intval FSet.Interval.card_interval_max.
       cut ->: max (q - 1 - 0 + 1) 0 = q by smt.
@@ -123,28 +123,28 @@ section.
       by rewrite (_: q^1 = q) // (_: 1 = 0 + 1) 1:// powS // pow0.
       by inline*; auto; smt.
       proc; sp; if=> //; last by (hoare; auto; smt).
-      wp; rnd (fun x, mem x Sample.l); skip=> //=.
+      wp; rnd (mem Sample.l); skip=> //=.
       progress.
         cut:= FSet.mu_Lmem_le_length (Sample.l{hr}) uT (mu uT (pred1 witness)) _.
         move=> x _; rewrite /mu_x; cut: mu uT (pred1 x) = mu uT (pred1 witness); last smt.
         have [uT_fu [_ uT_suf]]:= uT_ufT.
         by apply uT_suf; apply uT_fu.
-        by rewrite -/List."`|_|"; smt.
-        by move: H4; rewrite unique_cons H0.
+        by smt.
+        by move: H4; rewrite H0.
       by progress; proc; rcondt 2; auto; smt.
       by progress; proc; rcondf 2; auto.
   qed.
 
   lemma pr_collision &m:
-    Pr[Exp(Sample,A).main() @ &m: !unique Sample.l]
+    Pr[Exp(Sample,A).main() @ &m: !uniq Sample.l]
     <= (q^2)%r * mu uT ((=) witness).
   proof.
-    cut ->: Pr[Exp(Sample,A).main() @ &m: !unique Sample.l]
-            = Pr[Exp(BSample,A).main() @ &m: `|Sample.l| <= q /\ !unique Sample.l].
-      byequiv (_: ={glob A} ==> ={Sample.l} /\ `|Sample.l|{2} <= q)=> //=.
-      conseq eq_Sample_BSample _ (_: _ ==> `|Sample.l| <= q)=> //=.
+    cut ->: Pr[Exp(Sample,A).main() @ &m: !uniq Sample.l]
+            = Pr[Exp(BSample,A).main() @ &m: size Sample.l <= q /\ !uniq Sample.l].
+      byequiv (_: ={glob A} ==> ={Sample.l} /\ size Sample.l{2} <= q)=> //=.
+      conseq eq_Sample_BSample _ (_: _ ==> size Sample.l <= q)=> //=.
         proc.
-        call (_: `|Sample.l| <= q).
+        call (_: size Sample.l <= q).
           by proc; sp; if=> //=; auto; smt.
         by inline *; auto; smt.
     by apply (pr_BSample &m).
@@ -212,7 +212,7 @@ section.
     proc s(): T = {
       var r = witness;
 
-      if (`|Sample.l| < q) {
+      if (size Sample.l < q) {
         r = $uT;
         Sample.l = r::Sample.l;
       }
@@ -228,16 +228,16 @@ section.
     + by progress; exists (glob A){2}, Sample.l{1}.
     + exact (PushBound Sample A).
     proc; inline*.
-    call (_: ={glob Sample} /\ Bounder.c{1} = `|Sample.l{1}|).
+    call (_: ={glob Sample} /\ Bounder.c{1} = size Sample.l{1}).
       by proc; sp; if=> //; inline Sample.s; auto; smt.
     by auto.
   qed.
 
   local lemma pr_BSample &m:
-    Pr[Exp(BSample,A).main() @ &m: `|Sample.l| <= q /\ !unique Sample.l]
+    Pr[Exp(BSample,A).main() @ &m: size Sample.l <= q /\ !uniq Sample.l]
     <= (q^2)%r * mu uT ((=) witness).
   proof.
-    fel 1 `|Sample.l| (fun x, q%r * mu uT ((=) witness)) q (!unique Sample.l) [BSample.s: (`|Sample.l| < q)]=> //.
+    fel 1 (size Sample.l) (fun x, q%r * mu uT ((=) witness)) q (!uniq Sample.l) [BSample.s: (size Sample.l < q)]=> //.
       (* We love real arithmetic... NOT *)
       rewrite Sum.int_sum_const //= /Sum.intval FSet.Interval.card_interval_max.
       cut ->: max (q - 1 - 0 + 1) 0 = q by smt.
@@ -246,28 +246,28 @@ section.
       by rewrite (_: q^1 = q) // (_: 1 = 0 + 1) 1:// powS // pow0.
       by inline*; auto; smt.
       proc; sp; if=> //; last by (hoare; auto; smt).
-      wp; rnd (fun x, mem x Sample.l); skip=> //=.
+      wp; rnd (mem Sample.l); skip=> //=.
       progress.
         cut:= FSet.mu_Lmem_le_length (Sample.l{hr}) uT (mu uT (pred1 witness)) _.
         move=> x _; rewrite /mu_x; cut: mu uT (pred1 x) = mu uT (pred1 witness); last smt.
         have [uT_fu [_ uT_suf]]:= uT_ufT.
         by apply uT_suf; apply uT_fu.
-        by rewrite -/List."`|_|"; smt.
-        by move: H4; rewrite unique_cons H0.
+        by smt.
+        by move: H4; rewrite H0.
       by progress; proc; rcondt 2; auto; smt.
       by progress; proc; rcondf 2; auto.
   qed.
 
   lemma pr_collision_bounded_oracles &m:
-    Pr[Exp(Bounder(Sample),A).main() @ &m: !unique Sample.l]
+    Pr[Exp(Bounder(Sample),A).main() @ &m: !uniq Sample.l]
     <= (q^2)%r * mu uT ((=) witness).
   proof.
-    cut ->: Pr[Exp(Bounder(Sample),A).main() @ &m: !unique Sample.l]
-            = Pr[Exp(BSample,A).main() @ &m: `|Sample.l| <= q /\ !unique Sample.l].
-      byequiv (_: ={glob A} ==> ={Sample.l} /\ `|Sample.l|{2} <= q)=> //=.
-      conseq eq_Sample_BSample _ (_: _ ==> `|Sample.l| <= q)=> //=.
+    cut ->: Pr[Exp(Bounder(Sample),A).main() @ &m: !uniq Sample.l]
+            = Pr[Exp(BSample,A).main() @ &m: size Sample.l <= q /\ !uniq Sample.l].
+      byequiv (_: ={glob A} ==> ={Sample.l} /\ size Sample.l{2} <= q)=> //=.
+      conseq eq_Sample_BSample _ (_: _ ==> size Sample.l <= q)=> //=.
         proc.
-        call (_: `|Sample.l| <= q).
+        call (_: size Sample.l <= q).
           by proc; sp; if=> //=; auto; smt.
         by inline *; auto; smt.
     by apply (pr_BSample &m).

@@ -7,7 +7,7 @@
 
 (* -------------------------------------------------------------------- *)
 require import Bool Option Fun Distr Int IntExtra Real RealExtra.
-require import StdRing StdOrder StdBigop NewList Array.
+require import StdRing StdOrder StdBigop List Array.
 (*---*) import IterOp BRA IntOrder.
 
 pragma +implicits.

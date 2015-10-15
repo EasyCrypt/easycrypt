@@ -1,4 +1,4 @@
-require import Option Pair Int NewList Distr Real.
+require import Option Pair Int List Distr Real.
 require (*--*) NewBigop.
 
 op dlist: 'a distr -> int -> 'a list distr.

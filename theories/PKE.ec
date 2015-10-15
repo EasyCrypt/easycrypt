@@ -62,7 +62,7 @@ module CCA (S:Scheme, A:Adversary) = {
   proc dec(c:ciphertext) : plaintext option = {
     var m : plaintext option;
 
-    if (length log < qD && (guess => c <> cstar)) {
+    if (size log < qD && (guess => c <> cstar)) {
       log = c :: log;
       m = S.dec(sk, c);
     }

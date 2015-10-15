@@ -9,7 +9,7 @@
 require import Fun.
 require import Pred.
 require import Int.
-require import NewList.
+require import List.
 require (*--*) Ring.
 
 (* -------------------------------------------------------------------- *)

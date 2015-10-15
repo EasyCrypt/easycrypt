@@ -5,8 +5,7 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import Fun Pred Pair Int NewList.
-require export Option NewFSet.
+require import Fun Pred Option Pair Int List NewFSet.
 pragma +implicits.
 
 (* -------------------------------------------------------------------- *)
@@ -59,7 +58,7 @@ proof.
   case=> h; congr; rewrite {2}/f /augment /=; last first.
     move: h; rewrite /t2 => /mapP [z] [h ->>].
     by move: h; rewrite mem_filter => [_ /(map_f fst) ->].
-  case: (NewList.mem _ _) => //=; rewrite filter_rcons.
+  case: (List.mem _ _) => //=; rewrite filter_rcons.
   by rewrite /(\o) /predC h.
 qed.
 
@@ -254,15 +253,15 @@ lemma in_rng (m: ('a,'b) fmap) (b : 'b):
   mem (rng m) b <=> (exists a, m.[a] = Some b).
 proof.
   rewrite mem_rngE; split.
-    move/NewList.mapP=> [] [x y] [h ->]; exists x.
+    move/List.mapP=> [] [x y] [h ->]; exists x.
     by rewrite getE -mem_assoc_uniq 1:uniq_keys.
   case=> x; rewrite getE -mem_assoc_uniq ?uniq_keys // => h.
-  by apply/NewList.mapP; exists (x, b).
+  by apply/List.mapP; exists (x, b).
 qed.
 
 (* -------------------------------------------------------------------- *)
 op has (p : 'a -> 'b -> bool) (m : ('a, 'b) fmap) =
-  NewList.has (fun (x : 'a * 'b), p x.`1 x.`2) (elems m)
+  List.has (fun (x : 'a * 'b), p x.`1 x.`2) (elems m)
   axiomatized by hasE.
 
 lemma hasP p (m : ('a, 'b) fmap):
@@ -290,7 +289,7 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 op all (p : 'a -> 'b -> bool) (m : ('a, 'b) fmap) =
-  NewList.all (fun (x : 'a * 'b), p x.`1 x.`2) (elems m)
+  List.all (fun (x : 'a * 'b), p x.`1 x.`2) (elems m)
   axiomatized by allE.
 
 lemma allP p (m : ('a, 'b) fmap):
@@ -344,7 +343,7 @@ op find (p : 'a -> 'b -> bool) (m : ('a, 'b) fmap) =
 lemma find_none (p : 'a -> 'b -> bool) (m : ('a, 'b) fmap):
   has p m <=> find p m <> None.
 proof.
-  rewrite hasE /= findE NewList.has_find; split=> [h|].
+  rewrite hasE /= findE List.has_find; split=> [h|].
     by rewrite @(onth_nth witness) 1:find_ge0/= 1:size_map.
   by apply absurd=> h; rewrite onth_nth_map -map_comp nth_default 1:size_map 1:lezNgt.
 qed.

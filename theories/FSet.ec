@@ -5,45 +5,43 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
+require import Option.
 require import Int.
 require import Pred.
 require import List.
-(*---*) import PermutationLists.
+require import Distr.
 
 type 'a set.
 
 (** We use a list of elements as core specification *)
 op elems:'a set -> 'a list.
-axiom unique_elems (X:'a set): unique (elems X).
+axiom unique_elems (X:'a set): uniq (elems X).
 
 (** mem *)
 op mem:'a -> 'a set -> bool.
-axiom mem_def (x:'a) (X:'a set):
-  mem x (elems X) <=> mem x X.
+axiom mem_def (X:'a set) (x:'a):
+  mem (elems X) x <=> mem x X.
 
 op cpMem(X:'a set): ('a -> bool) = fun x, mem x X.
 
 lemma nosmt count_mem (x:'a) (X:'a set):
-  (count x (elems X) = 1) <=> mem x X
+  (count (pred1 x) (elems X) = 1) <=> mem x X
 by [].
 
 lemma nosmt count_nmem (x:'a) (X:'a set):
-  (count x (elems X) = 0) <=> !mem x X
+  (count (pred1 x) (elems X) = 0) <=> !mem x X
 by [].
 
 lemma nosmt count_set (x:'a) (X:'a set):
-  (count x (elems X) = 1) \/ (count x (elems X) = 0)
+  (count (pred1 x) (elems X) = 1) \/ (count (pred1 x) (elems X) = 0)
 by [].
 
 (** Equality *)
 pred (==) (X1 X2:'a set) = forall x, mem x X1 <=> mem x X2.
 
 lemma perm_eq (X Y:'a set):
-  (elems X <-> elems Y) => X == Y.
-proof.
-by intros=> X_Y; delta (==) beta=> x;
-   rewrite -2!count_mem X_Y //.
-qed.
+  perm_eq (elems X) (elems Y) => X == Y.
+proof. by move=> /perm_eqP X_Y x; rewrite -2!count_mem X_Y. qed.
 
 (* Extension is an equivalence relation *)
 lemma nosmt eq_refl (X:'a set): X == X by trivial.
@@ -90,8 +88,8 @@ axiom mem_empty (x:'a): !(mem x empty).
 
 lemma elems_empty: elems<:'a> empty = [].
 proof.
-by rewrite -nmem_nil=> x; rewrite -List.count_mem nnot;
-   apply Logic.eq_sym; rewrite count_nmem; apply mem_empty.
+  apply/mem_eq0/fun_ext=> x.
+  by rewrite mem_def /pred0 mem_empty.
 qed.
 
 lemma empty_elems_nil (X:'a set):
@@ -136,14 +134,13 @@ qed.
 (** pick *)
 op pick:'a set -> 'a.
 axiom pick_def (X:'a set):
-  pick X = hd (elems X).
+  pick X = head witness (elems X).
 
 lemma mem_pick (X:'a set):
   X <> empty => mem (pick X) X.
 proof.
   rewrite empty_elems_nil pick_def -mem_def.
   elim/list_ind (elems X) => // x l _ _.
-  by rewrite hd_cons.
 qed.
 
 lemma pick_single (x:'a):
@@ -171,13 +168,16 @@ lemma nosmt elems_add_in (x:'a) (X:'a set):
 by [].
 
 lemma elems_add_nin (x:'a) (X:'a set):
-  !mem x X => elems (add x X) <-> x::(elems X).
+  !mem x X => perm_eq (elems (add x X)) (x::(elems X)).
 proof.
-rewrite -count_nmem=> x_nin_X x' //=; case (x = x')=> /=.
-  by intros=> <-; rewrite x_nin_X /= count_mem mem_add; right.
-  intros=> x_neq_x'; elim (count_set x' X).
-    by intros=> x'_in_X; rewrite x'_in_X; generalize x'_in_X; rewrite 2!count_mem mem_add=> x'_in_X; left.
-    by intros=> x'_nin_X; rewrite x'_nin_X; generalize x'_nin_X; rewrite 2!count_nmem mem_add=> x'_in_X; smt.
+  rewrite -count_nmem=> x_notin_X.
+  apply/perm_eqE=> x0; case (x = x0)=> //= [->>|x_neq_x0].
+    by rewrite x_notin_X /= count_mem mem_add.
+  elim (count_set x0 X)=> [x0_in_X|x0_notin_X].
+    rewrite x0_in_X {2}/pred1 x_neq_x0 /int_of_bool /=; move: x0_in_X.
+    by rewrite 2!count_mem mem_add=> ->.
+    rewrite x0_notin_X {2}/pred1 x_neq_x0 /int_of_bool /=; move: x0_notin_X.
+    by rewrite 2!count_nmem mem_add=> ->; smt.
 qed.
 
 lemma add_add_comm (a b:'a) s:
@@ -227,18 +227,14 @@ by apply set_ext=> x'; rewrite !mem_rm !andA (andC (x' <> y)) //.
 qed.
 
 lemma elems_rm (x:'a) (X:'a set):
-  elems (rm x X) <-> rm x (elems X).
-proof.
-intros=> x'; elim (count_set x' (rm x X))=> x'_rmX.
-  by rewrite x'_rmX; generalize x'_rmX; rewrite count_mem mem_rm=> [x'_in_X x'_neq_x];
-     apply eq_sym; rewrite count_rm_neq ?count_mem //; smt.
-  rewrite x'_rmX; generalize x'_rmX; rewrite count_nmem mem_rm -nand /=; intros=> [x'_nin_X | x_eq_x'].
-    apply eq_sym; case (x = x').
-      by intros=> ->; rewrite count_rm_nin ?mem_def // count_nmem.
-      by intros=> x_neq_x'; rewrite count_rm_neq // count_nmem.
-    subst x'; apply eq_sym; case (mem x X)=> x_X.
-      by rewrite count_rm_in ?mem_def //; cut ->: (count x (elems X)) = 1 by (by rewrite count_mem)=> //=.
-      by rewrite count_rm_nin ?mem_def //; rewrite count_nmem.
+  perm_eq (elems (rm x X)) (rem x (elems X)).
+proof. (* TODO: cleanup *)
+apply/perm_eqE=> x'; elim (count_set x' (rm x X))=> [x'_in_remX|x'_notin_remX].
+  rewrite x'_in_remX; move: x'_in_remX; rewrite count_mem mem_rm=> [x'_in_X x'_neq_x].
+  by apply/eq_sym; smt.
+  rewrite x'_notin_remX; move: x'_notin_remX; rewrite count_nmem mem_rm -nand /= => [x'_notin_X | x_eq_x'].
+    smt.
+  smt.
 qed.
 
 lemma nosmt rm_leq (x:'a) (X:'a set): rm x X <= X by [].
@@ -263,8 +259,8 @@ lemma add_rm_in (x:'a) (X:'a set):
   mem x X => add x (rm x X) = X.
 proof.
 intros=> x_in_X; apply set_ext; apply perm_eq;
-apply (perm_trans (x::(elems (rm x X)))); first apply elems_add_nin; apply mem_rm_eq.
-apply (perm_trans (x::(rm x (elems X)))); first apply perm_cons; apply elems_rm.
+apply (perm_eq_trans (x::(elems (rm x X)))); first apply elems_add_nin; apply mem_rm_eq.
+apply (perm_eq_trans (x::(rem x (elems X)))); first apply perm_cons; apply elems_rm.
 smt.
 qed.
 
@@ -300,7 +296,7 @@ qed.
 (** card *)
 op card:'a set -> int.
 axiom card_def (X:'a set):
-  card X = length (elems X).
+  card X = size (elems X).
 
 lemma nosmt card_empty: card empty<:'a> = 0 by [].
 
@@ -318,7 +314,7 @@ lemma card_add_nin (x:'a) (X:'a set):
   !(mem x X) => card (add x X) = card X + 1.
 proof.
 intros=> x_nin_X;
-rewrite 2!card_def (perm_length (elems (add x X)) (x::(elems X))).
+rewrite 2!card_def (perm_eq_size (elems (add x X)) (x::(elems X))).
   by apply elems_add_nin.
   by smt.
 qed.
@@ -350,14 +346,14 @@ lemma of_list_cons (a:'a) l : of_list (a::l) = add a (of_list l).
    by rewrite /of_list.
 qed.
 
-lemma mem_of_list (x:'a) l : List.mem x l = mem x (of_list l).
+lemma mem_of_list (x:'a) l : List.mem l x = mem x (of_list l).
 proof.
  rewrite /of_list;elim/list_ind l=> //=; first smt.
  intros=> y xs //=;smt.
 qed.
 
 lemma card_of_list (l:'a list) :
-   card (of_list l) <= List.length l.
+   card (of_list l) <= size l.
 proof.
   rewrite /of_list;elim/list_ind l.
    by rewrite //= card_empty.
@@ -413,12 +409,12 @@ qed.
 lemma union_of_list (s1 s2:'a list):
   union (of_list s1) (of_list s2) = of_list (s1++s2).
 proof.
-  by apply set_ext=> x; rewrite mem_union -!mem_of_list mem_app.
+  by apply set_ext=> x; rewrite mem_union -!mem_of_list mem_cat.
 qed.
 
 lemma card_union (x y:'a set): card (union x y) <= card x + card y.
 proof.
-  by rewrite !card_def -length_app; smt.
+  by rewrite !card_def -size_cat; smt.
 qed.  
 
 (** inter *)
@@ -572,13 +568,13 @@ intros=> s s_nempty IH.
 cut [x xs elems_decomp]: exists x xs, elems s = x::xs.
   case (elems s = []).
     by apply absurd=> _; rewrite -elems_empty elems_eq.
-    by intros=> elems_nempty; exists (hd (elems s)); exists (tl (elems s)); apply cons_hd_tl.
-cut xval: pick s = x by rewrite pick_def elems_decomp hd_cons.
+    by move=> elems_nempty; exists (head witness (elems s)); exists (behead (elems s)); rewrite head_behead.
+cut xval: pick s = x by rewrite pick_def elems_decomp head_cons.
 subst x.
 rewrite elems_decomp fold_rm_pick //= IH //.
 congr => //.
-apply fold_permC; first assumption.
-rewrite (_:xs = rm (pick s) (elems s)) 1:elems_decomp 1:rm_cons //=.
+apply foldr_permC; first assumption.
+rewrite (_:xs = rem (pick s) (elems s)) 1:elems_decomp //=.
 apply elems_rm.
 qed.
 
@@ -590,7 +586,7 @@ intros=> C M.
 rewrite !fold_set_list; first 2 assumption.
 rewrite (foldC x f z (elems xs)); first assumption.
 rewrite mem_def //.
-rewrite (fold_permC f z (elems (rm x xs)) (rm x (elems xs))) //.
+rewrite (foldr_permC f z (elems (rm x xs)) (rem x (elems xs))) //.
 apply elems_rm.
 qed.
 
@@ -760,7 +756,7 @@ theory Product.
  lemma mem_prod (X:'a set) (Y:'b set) (p:'a*'b):
     (mem p.`1 X /\ mem p.`2 Y) <=> mem p (X ** Y).
  proof.
-   rewrite /( ** ) -mem_def -(mem_def p.`2).
+   rewrite /( ** ) -mem_def -mem_def.
    move:(elems X);elim; simplify; first by smt.
    intros x lX Hrec;rewrite mem_union -Hrec => {Hrec}.
    by move:(elems Y);elim;simplify;smt.
@@ -917,8 +913,8 @@ proof.
 qed.
 
 lemma mu_Lmem_card (l:'a list) (d:'a distr) (bd:real):
-  (forall (x : 'a), List.mem x l => mu_x d x = bd) =>
-  mu d (fun x, List.mem x l) = (card (of_list l))%r * bd. 
+  (forall (x : 'a), mem l x => mu_x d x = bd) =>
+  mu d (List.mem l) = (card (of_list l))%r * bd. 
 proof.  
   intros Hmu; rewrite (mu_eq _ _ (cpMem (of_list l))). 
     by intros x;rewrite /cpMem => /=; apply mem_of_list.
@@ -926,8 +922,8 @@ proof.
 qed.
 
 lemma mu_Lmem_le_card (l:'a list) (d:'a distr) (bd:real):
-  (forall (x : 'a), List.mem x l => mu_x d x <= bd) =>
-  mu d (fun x, List.mem x l) <= (card (of_list l))%r * bd. 
+  (forall (x : 'a), mem l x => mu_x d x <= bd) =>
+  mu d (List.mem l) <= (card (of_list l))%r * bd. 
 proof.  
   intros Hmu; rewrite (mu_eq _ _ (cpMem (of_list l))). 
     by intros x;rewrite /cpMem => /=; apply mem_of_list.
@@ -935,8 +931,8 @@ proof.
 qed.
 
 lemma mu_Lmem_le_length (l:'a list) (d:'a distr) (bd:real):
-  (forall (x : 'a), List.mem x l => mu_x d x <= bd) =>
-  mu d (fun x, List.mem x l) <= (length l)%r * bd. 
+  (forall (x : 'a), mem l x => mu_x d x <= bd) =>
+  mu d (List.mem l) <= (size l)%r * bd. 
 proof.
   elim/list_case l.
     intros=> _ //=; rewrite (mu_eq _ _ pred0).

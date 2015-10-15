@@ -117,9 +117,7 @@ qed.
 op size (m:('a,'b) map) = card (dom m).
 
 lemma nosmt size_nneg (m:('a,'b) map): 0 <= size m.
-proof.
-by rewrite /size card_def List.length_nneg.
-qed.
+proof. by rewrite /size card_def List.size_ge0. qed.
 
 lemma nosmt size_empty: size empty<:'a,'b> = 0.
 proof.

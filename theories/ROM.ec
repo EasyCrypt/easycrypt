@@ -493,7 +493,7 @@ theory ListLog.
   proof. by move=> O_oL; proc; call O_oL; wp. qed.
 
   lemma Log_o_stable (O <: Oracle {Log}) q:
-    islossless O.o => phoare[Log(O).o: mem q Log.qs ==> mem q Log.qs] = 1%r.
+    islossless O.o => phoare[Log(O).o: mem Log.qs q ==> mem Log.qs q] = 1%r.
   proof. by move=> O_o_ll; proc; call O_o_ll; auto; progress; right. qed.
 
   module Bound(O:Oracle) = {
@@ -506,7 +506,7 @@ theory ListLog.
     proc o(x:from): to = {
       var r = witness;
 
-      if (length Log.qs < qH) {
+      if (size Log.qs < qH) {
         r = O.o(x);
       }
       return r;

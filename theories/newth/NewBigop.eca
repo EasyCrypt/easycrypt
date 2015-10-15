@@ -9,7 +9,7 @@
 pragma +implicits.
 
 (* -------------------------------------------------------------------- *)
-require import Fun Pred Pair Int IntExtra NewList Ring.
+require import Fun Pred Pair Int IntExtra List Ring.
 require (*--*) NewMonoid.
 
 import Ring.IntID.

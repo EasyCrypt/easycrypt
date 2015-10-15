@@ -65,7 +65,7 @@ module Wrap (S:Scheme) = {
   }
 
   proc queried_challenge(c:ciphertext): bool = {
-    return mem c qs;
+    return mem qs c;
   }
 }.
 

@@ -1,4 +1,4 @@
-require import Fun Pred Option Int NewList ABitstring Distr.
+require import Fun Pred Option Int List ABitstring Distr.
 require (*--*) AWord MAC_then_Pad_then_CBC.
 
 (** A type for octets and its structure **)

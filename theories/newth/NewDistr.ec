@@ -7,7 +7,7 @@
 
 (* -------------------------------------------------------------------- *)
 require import Bool Option Fun Distr Int IntExtra Real RealExtra.
-require import StdRing StdOrder StdBigop RealSeq RealSeries NewList.
+require import StdRing StdOrder StdBigop RealSeq RealSeries List.
 (*---*) import IterOp BRA RealOrder.
 
 pragma +implicits.
