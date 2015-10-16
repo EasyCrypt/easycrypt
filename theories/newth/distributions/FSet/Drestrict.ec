@@ -4,7 +4,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Int Real Distr NewFSet.
+require import Int Real Distr FSet.
 
 pragma +implicits.
 

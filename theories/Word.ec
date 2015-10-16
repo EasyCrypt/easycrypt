@@ -113,6 +113,7 @@ axiom from_to_int w:
 require import Real.
 require import Distr.
 require import FSet.
+require (*--*) Mu_mem.
 
 (* Uniform distribution on fixed-length words *)
 theory Dword.
@@ -127,15 +128,15 @@ theory Dword.
   rewrite /in_supp mu_x_def; smt.
   qed.
 
-  lemma mu_cpMemw (s : word set):
-    mu dword (cpMem s) = (card s)%r *( 1%r / (2^length)%r).
-  proof strict.
-  rewrite (mu_cpMem _ _ (1%r / (2^length)%r))=> //.
-  intros x; rewrite mu_x_def; smt.
+  lemma mu_cpMemw (s : word fset):
+    mu dword (mem s) = (card s)%r *( 1%r / (2^length)%r).
+  proof.
+    rewrite (Mu_mem.mu_mem s dword (1%r/(2^length)%r)) //.
+    by move=> x _; rewrite -/(mu_x _ _) mu_x_def.
   qed.
 
-  import FSet.Dexcepted.  
-  lemma restrwL (X : word set):
+  require import Dexcepted.  
+  lemma restrwL (X : word fset):
     FSet.card X < 2^length =>
     weight (dword \ X) = 1%r.
   proof strict.

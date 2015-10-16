@@ -4,7 +4,7 @@
  * -------------------------------------------------------------------- *)
 
 (*** A formalization of pseudo-random functions **)
-require import Option Int Real Distr NewFSet NewFMap.
+require import Option Int Real Distr FSet NewFMap.
 
 (** A PRF is a family of functions F from domain D to finite range R
     indexed by a keyspace K equipped with a distribution dK. *)

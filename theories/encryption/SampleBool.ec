@@ -6,8 +6,8 @@
  * -------------------------------------------------------------------- *)
 
 require import Real.
+require import Finite List.
 require import FSet.
-require import ISet.
 require import Pair.
 require import Distr.
 require import Monoid.
@@ -25,18 +25,14 @@ theory MeansBool.
      1%r/2%r*(Pr[A.work(true) @ &m : p true (glob A) res] + 
                 Pr[A.work(false) @ &m : p false (glob A) res]).
   proof.
-    cut Hcr: forall x, 
-             mem x (create (support {0,1})) <=>
-             mem x (add true (add false (FSet.empty)%FSet)).
-      by intros=> x; rewrite !FSet.mem_add; case x=> //=; smt.
-    cut Hf : Finite.finite (create (support {0,1})).
-      by exists (FSet.add true (FSet.add false FSet.empty)) => x;apply Hcr.
+    cut Hf : is_finite (support {0,1})
+      by exists ([true;false]) => x; smt.
     cut := Mean A &m p => /= -> //.
-    cut -> : Finite.toFSet (create (support {0,1})) = 
-             (FSet.add true (FSet.add false FSet.empty)).
-    by apply FSet.set_ext => x; rewrite Finite.mem_toFSet //;apply Hcr.
-    rewrite Mrplus.sum_add;first smt.
-    rewrite Mrplus.sum_add;first smt.
+    cut -> : oflist (to_seq (support {0,1}))
+             = (fset0 `|` fset1 true `|` fset1 false).
+      by apply/fsetP=> x; rewrite !inE mem_oflist mem_to_seq//; smt.
+    rewrite Mrplus.sum_add /=;first smt.
+    rewrite Mrplus.sum_add /=;first smt.
     rewrite Mrplus.sum_empty /= !Bool.Dbool.mu_x_def.
     cut Hd: 2%r <> 0%r by smt.
     by algebra.

@@ -106,7 +106,7 @@ end
 (* -------------------------------------------------------------------- *)
 module CI_FSet = struct
   let p_FSet = EcPath.pqname p_top "FSet"
-  let p_fset = EcPath.pqname p_FSet "set"
+  let p_fset = EcPath.pqname p_FSet "fset"
 end
 
 (* -------------------------------------------------------------------- *)

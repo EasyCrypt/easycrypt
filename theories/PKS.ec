@@ -39,20 +39,20 @@ theory EF_CMA.
   (* A wrapper providing oracles for existential
      unforgeability from a PKS scheme. *)
   module Wrap(S:Scheme): Oracles = {
-    var qs: message set
+    var qs: message fset
     var pk: pkey
     var sk: skey
 
     proc init(): pkey = {
       S.init();
-      qs = empty;
+      qs = fset0;
       (pk,sk) = S.keygen();
       return pk;
     }
 
     proc sign(m:message): signature = {
       var s:signature;
-      qs = add m qs;
+      qs = qs `|` fset1 m;
       s = S.sign(sk,m);
       return s;
     }
@@ -64,7 +64,7 @@ theory EF_CMA.
     }
 
     proc fresh(m:message): bool = {
-      return !mem m qs;
+      return !mem qs m;
     }
 
     proc queries(): int = {
@@ -102,13 +102,13 @@ theory NM_CMA.
   (* A wrapper providing oracles for
      non-malleability from a PKS scheme. *)
   module Wrap(S:Scheme): Oracles = {
-    var qs: (message * signature) set
+    var qs: (message * signature) fset
     var pk: pkey
     var sk: skey
 
     proc init(): pkey = {
       S.init();
-      qs = empty;
+      qs = fset0;
       (pk,sk) = S.keygen();
       return pk;
     }
@@ -116,7 +116,7 @@ theory NM_CMA.
     proc sign(m:message): signature = {
       var s:signature;
       s = S.sign(sk,m);
-      qs = add (m,s) qs;
+      qs = qs `|` fset1 (m,s);
       return s;
     }
 
@@ -127,7 +127,7 @@ theory NM_CMA.
     }
 
     proc fresh(m:message,s:signature): bool = {
-      return !mem (m,s) qs;
+      return !mem qs (m,s);
     }
 
     proc queries(): int = {

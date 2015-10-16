@@ -24,11 +24,11 @@ module type Oracles = {
 }.
 
 module Wrap(S:Scheme) = {
-  var qs:message set
+  var qs:message fset
   var k:key
 
   proc init(): unit = {
-    qs = empty;
+    qs = fset0;
     S.init();
     k = S.keygen();
   }
@@ -36,7 +36,7 @@ module Wrap(S:Scheme) = {
   proc mac(m:message): tag = {
     var r:tag;
 
-    qs = add m qs;
+    qs = qs `|` fset1 m;
     r = S.mac(k,m);
     return r;
   }
@@ -49,7 +49,7 @@ module Wrap(S:Scheme) = {
   }
 
   proc fresh(m:message): bool = {
-    return (!mem m qs);
+    return (!mem qs m);
   }
 }.
 

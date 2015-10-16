@@ -8,7 +8,7 @@
 require import Int.
 require import Real.
 require import FSet.
-require import ISet.
+require import Finite.
 require import Pair.
 require import Distr.
 require import Monoid.

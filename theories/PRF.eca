@@ -80,7 +80,7 @@ module PRFi = {
   proc init(): unit = { m = FMap.empty; }
 
   proc f (x:D): R = {
-    if (!mem x (dom m)) m.[x] = $dR;
+    if (!mem (dom m) x) m.[x] = $dR;
     return (oget m.[x]);
   }
 }.

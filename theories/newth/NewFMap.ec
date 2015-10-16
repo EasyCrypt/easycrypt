@@ -5,7 +5,7 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import Fun Pred Option Pair Int List NewFSet.
+require import Fun Pred Option Pair Int List FSet.
 pragma +implicits.
 
 (* -------------------------------------------------------------------- *)
@@ -207,7 +207,7 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 op dom ['a 'b] (m : ('a, 'b) fmap) =
-  NewFSet.oflist (map fst (elems m))
+  FSet.oflist (map fst (elems m))
   axiomatized by domE.
 
 lemma dom_oflist (s : ('a * 'b) list):
@@ -242,7 +242,7 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 op rng ['a 'b] (m : ('a, 'b) fmap) = 
-  NewFSet.oflist (map snd (elems m))
+  FSet.oflist (map snd (elems m))
   axiomatized by rngE.
 
 lemma mem_rngE (m : ('a, 'b) fmap) y:

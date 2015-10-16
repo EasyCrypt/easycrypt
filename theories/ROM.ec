@@ -66,7 +66,7 @@ theory Lazy.
     proc o(x:from):to = {
       var y:to;
       y = $dsample x;
-      if (!mem x (dom m)) m.[x] = y;
+      if (!mem (dom m) x) m.[x] = y;
       return oget (m.[x]);
     }
   }.
@@ -85,13 +85,12 @@ theory Lazy.
   equiv RO_o_eq: RO.o ~ RO.o: ={glob RO, x} ==> ={glob RO, res}
   by sim.
 
-  hoare dom_RO_o d x': RO.o: x = x' /\ dom RO.m = d ==> dom RO.m = add x' d.
+  hoare dom_RO_o d x': RO.o: x = x' /\ dom RO.m = d ==> dom RO.m = d `|` fset1 x'.
   proof. by proc; auto; smt. qed.
 end Lazy.
 
 theory Eager.
-  require import ISet.
-  (*---*) import Finite.
+  require import Finite.
   require import FSet.
 
   type from.
@@ -109,17 +108,17 @@ theory Eager.
 
     proc init(): unit = {
       var y:to;
-      var work:from set;
+      var work:from fset;
       var f:from;
 
       m = FMap.empty;
-      work = toFSet univ;
-      while (work <> FSet.empty)
+      work = oflist (to_seq predT);
+      while (work <> fset0)
       {
         f = pick work;
         y = $dsample f;
         m.[f] = y;
-        work = rm f work;
+        work = work `\` fset1 f;
       }
     }
 
@@ -129,17 +128,17 @@ theory Eager.
   }.
 
   lemma RO_init_full:
-    finite univ<:from> =>
-    hoare [RO.init: true ==> forall x, mem x (dom RO.m)].
+    is_finite predT<:from> =>
+    hoare [RO.init: true ==> forall x, FSet.mem (dom RO.m) x].
   proof.
     move=> fType; proc.
-    while (forall x, mem x work \/ mem x (dom RO.m)).
+    while (forall x, FSet.mem work x \/ mem (dom RO.m) x).
       by auto; smt.
     by auto; smt.
   qed.
 
   lemma RO_init_ll:
-    finite univ<:from> =>
+    is_finite predT<:from> =>
     (forall x, mu (dsample x) predT = 1%r) =>
     islossless RO.init.
   proof.
@@ -152,7 +151,7 @@ theory Eager.
   proof. by proc; wp. qed.
 
   lemma RO_init_eq:
-    finite univ<:from> =>
+    is_finite predT<:from> =>
     equiv [RO.init ~ RO.init: true ==> ={glob RO}].
   proof. by move=> fType; proc; while (={glob RO, work}); auto. qed.
 
@@ -160,14 +159,13 @@ theory Eager.
   by sim.
 
   lemma dom_RO_init x:
-    finite univ<:from> =>
-    hoare [RO.init: true ==> mem x (dom RO.m)].
-  proof. by move=> fType; proc; while (forall x, !mem x work => mem x (dom RO.m)); auto; smt. qed.
+    is_finite predT<:from> =>
+    hoare [RO.init: true ==> FSet.mem (dom RO.m) x].
+  proof. by move=> fType; proc; while (forall x, !FSet.mem work x => mem (dom RO.m) x); auto; smt. qed.
 end Eager.
 
 theory LazyEager.
-  require import ISet.
-  (*---*) import Finite.
+  require import Finite.
   require import FSet.
 
   type from.
@@ -204,23 +202,23 @@ theory LazyEager.
         proc o(x:from):to = {
           var y:to;
           y = $dsample x;
-          if (!mem x (dom m)) m.[x] = y;
+          if (!FSet.mem (dom m) x) m.[x] = y;
           return oget (m.[x]);
         }
       }
 
       proc resample(): unit = {
-        var work:from set;
+        var work:from fset;
         var f:from;
         var y,y0:to;
 
-        work = toFSet univ;
-        while (work <> FSet.empty)
+        work = oflist (to_seq predT);
+        while (work <> fset0)
         {
           f = pick work;
           y = $dsample f;
-          if (!mem f (dom H.m)) H.m.[f] = y;
-          work = rm f work;
+          if (!FSet.mem (dom H.m) f) H.m.[f] = y;
+          work = work `\` fset1 f;
         }
       }
 
@@ -238,7 +236,7 @@ theory LazyEager.
     }.
 
     local lemma IND_Lazy:
-      finite univ<:from> =>
+      is_finite predT<:from> =>
       (forall x, mu (dsample x) predT = 1%r) =>
       equiv [IND(Lazy.RO,D).main ~ IND_Lazy.main: ={glob D} ==> ={res}].
     proof.
@@ -262,17 +260,17 @@ theory LazyEager.
       }
 
       proc resample(): unit = {
-        var work:from set;
+        var work:from fset;
         var f:from;
         var y,y0:to;
 
-        work = toFSet univ;
-        while (work <> FSet.empty)
+        work = oflist (to_seq predT);
+        while (work <> fset0)
         {
           f = pick work;
           y = $dsample f;
-          if (!mem f (dom H.m)) H.m.[f] = y;
-          work = rm f work;
+          if (!FSet.mem (dom H.m) f) H.m.[f] = y;
+          work = work `\` fset1 f;
         }
       }
 
@@ -290,7 +288,7 @@ theory LazyEager.
     }.
 
     local lemma eager_query:
-      finite univ<:from> =>
+      is_finite predT<:from> =>
       (forall x, mu (dsample x) predT = 1%r) =>
       eager [IND_Eager.resample(); ,
                  IND_Eager.H.o ~ IND_Lazy.H.o,
@@ -302,32 +300,32 @@ theory LazyEager.
       inline IND_Eager.resample IND_Lazy.resample; swap{2} 4 -3.
       seq 1 1: (={x,work} /\
                 IND_Eager.H.m{1} = IND_Lazy.H.m{2} /\
-                mem x{1} work{1});
+                mem work{1} x{1});
         first by auto; smt.
-      case (!mem x{2} (dom IND_Lazy.H.m{2})); [rcondt{2} 2; first by auto |
+      case (!mem (dom IND_Lazy.H.m{2}) x{2}); [rcondt{2} 2; first by auto |
                                             rcondf{2} 2; first by auto].
         transitivity{1} {y0 = $dsample x;
-                         while (work <> FSet.empty) {
+                         while (work <> fset0) {
                            f = pick work;
                            y = $dsample f;
-                           if (!mem f (dom IND_Eager.H.m))
+                           if (!mem (dom IND_Eager.H.m) f)
                              IND_Eager.H.m.[f] = if f = x then y0 else y;
-                           work = rm f work;
+                           work = work `\` fset1 f;
                          }
                          result = oget IND_Eager.H.m.[x]; }
                          (={x,work,IND_Eager.H.m} ==> ={result,IND_Eager.H.m})
                          ((={x,work} /\
                           IND_Eager.H.m{1} = IND_Lazy.H.m{2} /\
-                          mem x{1} work{1}) /\
-                          !mem x{2} (dom IND_Lazy.H.m{2}) ==>
+                          mem work{1} x{1}) /\
+                          !mem (dom IND_Lazy.H.m{2}) x{2} ==>
                           ={result} /\ IND_Eager.H.m{1} = IND_Lazy.H.m{2}) => //.
           by move=> &1 &2 H; exists IND_Lazy.H.m{2}, x{2}, work{2}; generalize H.
-        transitivity{1} {while (work <> FSet.empty) {
+        transitivity{1} {while (work <> fset0) {
                            f = pick work;
                            y = $dsample f;
-                           if (!mem f (dom IND_Eager.H.m))
+                           if (!mem (dom IND_Eager.H.m) f)
                              IND_Eager.H.m.[f] = y;
-                           work = rm f work;
+                           work = work `\` fset1 f;
                          }
                          y0 = $dsample x;
                          result = oget IND_Eager.H.m.[x]; }
@@ -344,9 +342,9 @@ theory LazyEager.
           by sim.
 
         wp; while (={x, work} /\
-                   (!mem x work => mem x (dom IND_Eager.H.m)){1} /\
+                   (!mem work x => mem (dom IND_Eager.H.m) x){1} /\
                    IND_Lazy.H.m.[x]{2} = Some y0{1} /\
-                   if (mem x (dom IND_Eager.H.m)){1}
+                   if (mem (dom IND_Eager.H.m) x){1}
                    then IND_Eager.H.m{1} = IND_Lazy.H.m{2}
                    else eq_except IND_Eager.H.m{1} IND_Lazy.H.m{2} x{1}).
           (* "expect 12 (move)" is used for catching changes in tactic behaviour early *)
@@ -358,14 +356,14 @@ theory LazyEager.
 
       wp; while (={x,work} /\
                  IND_Eager.H.m{1} = IND_Lazy.H.m{2} /\
-                 mem x{2} (dom IND_Lazy.H.m{2}) /\
+                 mem (dom IND_Lazy.H.m{2}) x{2} /\
                  oget IND_Eager.H.m.[x]{1} = result{2}).
          by auto; smt.
       by auto; smt.
     qed.
 
     local lemma eager_aux:
-      finite univ<:from> =>
+      is_finite predT<:from> =>
       (forall x, mu (dsample x) predT = 1%r) =>
       equiv [IND_Lazy.main ~ IND_Eager.main: ={glob D} ==> ={res}].
     proof.
@@ -382,23 +380,23 @@ theory LazyEager.
     qed.
 
     local lemma IND_Eager:
-      finite univ<:from> =>
+      is_finite predT<:from> =>
       (forall x, mu (dsample x) predT = 1%r) =>
       equiv [IND_Eager.main ~ IND(Eager.RO,D).main: ={glob D} ==> ={res}].
     proof.
       move=> fromF dsampleL; proc.
-      call (_: (forall x, mem x (dom IND_Eager.H.m{1})) /\ IND_Eager.H.m{1} = Eager.RO.m{2});
+      call (_: (forall x, FSet.mem (dom IND_Eager.H.m{1}) x) /\ IND_Eager.H.m{1} = Eager.RO.m{2});
         first by proc; skip; smt.
       inline RO.init IND_Eager.resample.
       while (={work} /\
-             (forall x, !mem x (dom IND_Eager.H.m{1}) <=>
-                        mem x work{1}) /\ IND_Eager.H.m{1} = Eager.RO.m{2}).
+             (forall x, !FSet.mem (dom IND_Eager.H.m{1}) x <=>
+                        mem work{1} x) /\ IND_Eager.H.m{1} = Eager.RO.m{2}).
         by auto; progress; smt.
       by auto; smt.
     qed.
 
     lemma eagerRO:
-      finite univ<:from> =>
+      is_finite predT<:from> =>
       (forall x, mu (dsample x) predT = 1%r) =>
       equiv [IND(Lazy.RO,D).main ~ IND(Eager.RO,D).main: ={glob D} ==> ={res}].
     proof.
@@ -531,18 +529,18 @@ theory SetLog.
     op dsample <- dsample.
 
   module Log(O:Oracle) = {
-    var qs:from set
+    var qs:from fset
 
     proc init(): unit = {
       O.init();
-      qs = FSet.empty;
+      qs = fset0;
     }
 
     proc o(x:from): to = {
       var r;
 
       r  = O.o(x);
-      qs = add x qs;
+      qs = qs `|` fset1 x;
       return r;
     }
   }.
@@ -553,7 +551,7 @@ theory SetLog.
   lemma Log_o_ll (O <: Oracle): islossless O.o => islossless Log(O).o.
   proof. by move=> O_o_ll; proc; wp; call O_o_ll; wp. qed.
 
-  hoare Log_o_stable (O <: Oracle {Log}) x: Log(O).o: mem x Log.qs ==> mem x Log.qs.
+  hoare Log_o_stable (O <: Oracle {Log}) x: Log(O).o: mem Log.qs x ==> mem Log.qs x.
   proof. by proc; wp; call (_: true); skip; smt. qed.
 
   hoare Log_o_Dom: Log(RO).o: Log.qs = dom RO.m ==> Log.qs = dom RO.m.
@@ -580,7 +578,7 @@ theory SetLog.
   lemma Bound_o_ll (O <: Oracle {Log}): islossless O.o => islossless Bound(O).o.
   proof. by move=> O_o_ll; proc; sp; if=> //; wp; call (Log_o_ll O _). qed.
 
-  hoare Bound_o_stable (O <: Oracle {Log}) x: Bound(O).o: mem x Log.qs ==> mem x Log.qs.
+  hoare Bound_o_stable (O <: Oracle {Log}) x: Bound(O).o: mem Log.qs x ==> mem Log.qs x.
   proof. by proc; sp; if=> //; wp; call (Log_o_stable O x). qed.
 
   equiv Log_Bound (O <: Oracle {Log}) (D <: Dist {O,Log}):
@@ -591,7 +589,9 @@ theory SetLog.
       proc*; inline Log(Bound(O)).o Bound(O).o Bound(O).LO.o.
       sp; if; first smt.
         by wp; call (_: true); auto; smt.
-        by auto; smt.
+      auto; progress.
+        by apply/(Trans _ _ _ H)/subset_leq_fcard; smt.
+        smt.
     by inline *; wp; call (_: true).
   qed.
 end SetLog.
@@ -668,7 +668,7 @@ theory ROM_BadCall.
         x = D.a1();
         y = $dsample x;
         b = D.a2(y);
-        return mem x Log.qs;
+        return mem Log.qs x;
       }
     }.
 
@@ -696,18 +696,18 @@ theory ROM_BadCall.
       lemma ROM_BadCall &m:
         Pr[G0(D,RO).main() @ &m: res] <= Pr[G1(D,RO).main() @ &m: res] + Pr[G2(D,RO).main() @ &m: res].
       proof.
-        cut ->: Pr[G2(D,RO).main() @ &m: res] = Pr[G1'(D,RO).main() @ &m: mem G1'.x Log.qs].
-          byequiv (_: ={glob D} ==> res{1} = (mem G1'.x Log.qs){2})=> //.
+        cut ->: Pr[G2(D,RO).main() @ &m: res] = Pr[G1'(D,RO).main() @ &m: mem Log.qs G1'.x].
+          byequiv (_: ={glob D} ==> res{1} = (mem Log.qs G1'.x){2})=> //.
           proc.
           call (_: ={glob Log, glob RO}); first by sim.
           rnd; call (_: ={glob Log, glob RO}); first by sim.
           by inline *; wp.
         cut ->: Pr[G1(D,RO).main() @ &m: res] = Pr[G1'(D,RO).main() @ &m: res].
           by byequiv (_: ={glob D} ==> ={res}); first by sim.
-        cut: Pr[G0(D,RO).main() @ &m: res] <= Pr[G1'(D,RO).main() @ &m: res \/ mem G1'.x Log.qs].
-          byequiv (_: ={glob D} ==> !mem G1'.x{2} Log.qs{2} => ={res})=> //; last smt.
+        cut: Pr[G0(D,RO).main() @ &m: res] <= Pr[G1'(D,RO).main() @ &m: res \/ mem Log.qs G1'.x].
+          byequiv (_: ={glob D} ==> !mem Log.qs{2} G1'.x{2} => ={res})=> //; last smt.
           proc.
-          call (_: mem G1'.x Log.qs,
+          call (_: mem Log.qs G1'.x,
                    ={glob Log} /\
                    Log.qs{2} = dom RO.m{2} /\
                    eq_except RO.m{1} RO.m{2} G1'.x{2}).
@@ -764,7 +764,7 @@ theory ROM_BadCall.
         x = D.a1();
         y = $dsample x;
         b = D.a2(y);
-        return mem x Log.qs;
+        return mem Log.qs x;
       }
     }.
 
@@ -792,18 +792,18 @@ theory ROM_BadCall.
       lemma ROM_BadCall &m:
         Pr[G0(D,RO).main() @ &m: res] <= Pr[G1(D,RO).main() @ &m: res] + Pr[G2(D,RO).main() @ &m: res].
       proof.
-        cut ->: Pr[G2(D,RO).main() @ &m: res] = Pr[G1'(D,RO).main() @ &m: mem G1'.x Log.qs].
-          byequiv (_: ={glob D} ==> res{1} = (mem G1'.x Log.qs){2})=> //.
+        cut ->: Pr[G2(D,RO).main() @ &m: res] = Pr[G1'(D,RO).main() @ &m: mem Log.qs G1'.x].
+          byequiv (_: ={glob D} ==> res{1} = (mem Log.qs G1'.x){2})=> //.
           proc.
           call (_: ={glob Log, glob RO}); first by sim.
           rnd; call (_: ={glob Log, glob RO}); first by sim.
           by inline *; wp.
         cut ->: Pr[G1(D,RO).main() @ &m: res] = Pr[G1'(D,RO).main() @ &m: res].
           by byequiv (_: ={glob D} ==> ={res}); first by sim.
-        cut: Pr[G0(D,RO).main() @ &m: res] <= Pr[G1'(D,RO).main() @ &m: res \/ mem G1'.x Log.qs].
-          byequiv (_: ={glob D} ==> !mem G1'.x{2} Log.qs{2} => ={res})=> //; last smt.
+        cut: Pr[G0(D,RO).main() @ &m: res] <= Pr[G1'(D,RO).main() @ &m: res \/ mem Log.qs G1'.x].
+          byequiv (_: ={glob D} ==> !mem Log.qs{2} G1'.x{2} => ={res})=> //; last smt.
           proc.
-          call (_: mem G1'.x Log.qs,
+          call (_: mem Log.qs G1'.x,
                    ={glob Log} /\
                    Log.qs{2} = dom RO.m{2} /\
                    eq_except RO.m{1} RO.m{2} G1'.x{2}).
@@ -917,7 +917,7 @@ theory ROM_Bad.
             by proc*; inline Bound(O2).init; wp; call (_: true); skip; smt.
           done.
         fel 1 Bound.c (fun x, eps) qH (bad (glob O2)) [Bound(O2).o: (Bound.c < qH)]=> //.
-          smt.
+          by rewrite Sum.int_sum_const //= Sum.intval_card_0 smt.
           by call (_: true ==> !bad (glob O2) /\ Bound.c = 0);
             first proc; wp; call badinit.
           proc; sp; if=> //; last by hoare.

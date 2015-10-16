@@ -8,7 +8,7 @@
 require import Int.
 require import Real.
 require import FSet.
-require import ISet.
+require import Finite.
 require import Pair.
 require import Distr.
 require import Monoid.
@@ -305,15 +305,15 @@ section.
 
   (* TODO : move this *)
   lemma Mrplus_inter_shift (i j k:int) f: 
-    Mrplus.sum f (Interval.interval i j) = 
-    Mrplus.sum (fun l, f (l + k)) (Interval.interval (i-k) (j-k)).
-  proof.
+      Mrplus.sum f (oflist (List.Iota.iota_ i (j - i + 1))) = 
+      Mrplus.sum (fun l, f (l + k)) (oflist (List.Iota.iota_ (i-k) (j - i + 1))).
+  proof strict.
     rewrite (Mrplus.sum_chind f (fun l, l - k) (fun l, l + k)) /=;first smt.
     congr => //.   
-    apply FSet.set_ext => x.
-    rewrite img_def Interval.mem_interval;split.
-      intros [y];rewrite Interval.mem_interval;smt.
-    intros Hx;exists (x+k);rewrite Interval.mem_interval;smt.
+    apply FSet.fsetP => x.
+    rewrite imageP !mem_oflist !List.Iota.mem_iota; split.
+      intros [y];rewrite !mem_oflist !List.Iota.mem_iota;smt.
+    intros Hx;exists (x+k);rewrite !mem_oflist !List.Iota.mem_iota;smt.
   qed.
 
   lemma Hybrid &m (p:glob A -> glob Ob -> int -> outputA -> bool):
@@ -326,10 +326,10 @@ section.
   proof.
     intros p';rewrite (GLB_WL &m p') (GRB_WR &m p').
     simplify p'; rewrite -(WL0_GLA &m p) -(WRq_GRA &m p).
-    cut Hint : Finite.(==) (create (support [0..q - 1])) (Interval.interval 0 (q - 1)).
-      by intros x;rewrite mem_create Interval.mem_interval /support Dinter.supp_def.
-    cut Hfin: Finite.finite (create (support [0..q - 1])).
-      by exists (Interval.interval 0 (q-1)).
+    cut Hint : forall x, support [0..q - 1] x <=> mem (oflist (List.Iota.iota_ 0 q)) x.
+      by move=> x; rewrite !mem_oflist !List.Iota.mem_iota /support Dinter.supp_def; smt.
+    cut Hfin: is_finite (support [0..q - 1]).
+      by exists (List.Iota.iota_ 0 q); smt.
     cut Huni : forall (x : int), in_supp x [0..q - 1] => mu_x [0..q - 1] x = 1%r / q%r.
       by intros x Hx;rewrite Dinter.mu_x_def_in //;smt.
     pose ev := 
@@ -337,26 +337,29 @@ section.
         let (l,l0,ga,ge) = g in p ga ge l r /\ l <= q.
     cut := M.Mean_uni (HybGameFixed(L(Ob))) &m ev (1%r/q%r) _ _ => //; simplify ev => ->.
     cut := M.Mean_uni (HybGameFixed(R(Ob))) &m ev (1%r/q%r) _ _ => //; simplify ev => ->.
-    cut -> : Finite.toFSet (create (support [0..q - 1])) = Interval.interval 0 (q-1).
-      apply FSet.set_ext => x.
-      by rewrite Interval.mem_interval Finite.mem_toFSet //
-           mem_create /support Dinter.supp_def.
-    rewrite {1}Interval.interval_addl; first by smt.
-    rewrite (Interval.interval_pos 0 (q-1));first by smt.
+    cut -> : oflist (to_seq (support [0..q - 1])) = oflist (List.Iota.iota_ 0 q).
+      by apply FSet.fsetP => x; rewrite !mem_oflist mem_to_seq// smt.
+    (* BUG type are not normalized in ev => assert failure in ecWhy *)      
+    clear ev.
+    cut {1}->: oflist (List.Iota.iota_ 0 q) = oflist (List.Iota.iota_ 1 (q - 1)) `|` fset1 0.
+      by apply/fsetP=> x; rewrite !inE !mem_oflist !List.Iota.mem_iota; smt.
+    cut ->: oflist (List.Iota.iota_ 0 q) = oflist (List.Iota.iota_ 0 (q - 1)) `|` fset1 (q - 1).
+      by apply/fsetP=> x; rewrite !inE !mem_oflist !List.Iota.mem_iota; smt.
     rewrite Mrplus.sum_add /=.
-      by rewrite Interval.mem_interval.
+      by rewrite mem_oflist List.Iota.mem_iota.
     rewrite Mrplus.sum_add /=.
-      by rewrite Interval.mem_interval;smt.
+      by rewrite mem_oflist List.Iota.mem_iota.
     cut Hq : q%r <> 0%r by smt.
     fieldeq => //.
+    cut ->: q - 1 = q - 1 - 1 - 0 + 1 by smt.
     rewrite (Mrplus_inter_shift 0 (q - 1 - 1) (-1)) /=.
-    have ->: q - 1 - 1 - -1 = q - 1 by smt.
+    have ->: q - 1 - 1 + 1 = q - 1 by smt.
     rewrite -(Mrplus.sum_comp (( * ) (-q%r))) 1..2:smt.
     rewrite -(Mrplus.sum_comp (( * ) (q%r))) 1..2:smt.
     rewrite Mrplus.sum_add2 /=.
     rewrite (Mrplus.NatMul.sum_const 0%r) /Mrplus.NatMul.( * ) //=.
-    intros x; rewrite Interval.mem_interval => Hx.
-    cut := WLR_shift &m x p' _ => //;simplify p' => ->.
+    move=> x; rewrite mem_oflist List.Iota.mem_iota=> Hx.
+    cut:= WLR_shift &m x p' _; 1:smt. simplify p'=> ->.
     by smt.
   qed.
 

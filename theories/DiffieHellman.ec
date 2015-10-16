@@ -5,10 +5,8 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import Int.
-require import Real.
-require import FSet.
-
+require import FSet Int Real.
+require (*  *) Duni.
 require (*  *) CyclicGroup.
 
 clone export CyclicGroup as G.
@@ -70,7 +68,7 @@ theory Set_CDH.
   const n: int.
 
   module type Adversary = {
-    proc solve(gx:group, gy:group): group set
+    proc solve(gx:group, gy:group): group fset
   }.
 
   module SCDH (B:Adversary) = {
@@ -80,7 +78,7 @@ theory Set_CDH.
       x = $FDistr.dt;
       y = $FDistr.dt;
       s = B.solve(g ^ x, g ^ y);
-      return (mem (g ^ (x * y)) s /\ card s <= n);
+      return (mem s (g ^ (x * y)) /\ card s <= n);
     }
   }.
 
@@ -89,7 +87,7 @@ theory Set_CDH.
       var s, x;
 
       s = A.solve(gx, gy);
-      x = $Duni.duni s;
+      x = $Duni.dU s;
       return x;
     }
   }.
@@ -101,7 +99,7 @@ theory Set_CDH.
     local module SCDH' = {
       var x, y: F.t
 
-      proc aux(): group set = {
+      proc aux(): group fset = {
         var s;
 
         x = $FDistr.dt;
@@ -114,7 +112,7 @@ theory Set_CDH.
         var z, s;
 
         s = aux();
-        z = $Duni.duni s;
+        z = $Duni.dU s;
         return z = g ^ (x * y);
       }
     }.
@@ -147,20 +145,20 @@ theory Set_CDH.
            - the probability that s contains g^(x*y) and that |s| <= n is Pr[SCDH(A).main() @ &m: res], and
            - when s contains g^(x*y), the probability of sampling that one element uniformly in s is bounded
              by 1/n. *)
-      seq  1: (mem (g ^ (SCDH'.x * SCDH'.y)) s /\ card s <= n) p (1%r/n%r) _ 0%r => //. 
+      seq  1: (mem s (g ^ (SCDH'.x * SCDH'.y)) /\ card s <= n) p (1%r/n%r) _ 0%r => //. 
         (* The first part is dealt with by equivalence with SCDH. *)
-        conseq [-frame] (_: _: =p). (* strengthening >= into = for simplicity*)
-          call (_: (glob A) = (glob A){m}  ==> mem (g^(SCDH'.x * SCDH'.y)) res /\ card res <= n)=> //.
+        conseq (_: _: =p). (* strengthening >= into = for simplicity*)
+          call (_: (glob A) = (glob A){m}  ==> mem res (g^(SCDH'.x * SCDH'.y)) /\ card res <= n)=> //.
             bypr; progress; rewrite /p.
             byequiv (_: )=> //.
             by proc *; inline *; wp; call (_: true); auto.
       (* The second part is just arithmetic, but smt needs some help. *)
-      rnd ((=) (g^(SCDH'.x * SCDH'.y))).
+      rnd (Pred.pred1 (g^(SCDH'.x * SCDH'.y))).
       skip; progress.
-      rewrite Duni.mu_def; first smt.
-      cut ->: card (filter ((=) (g^(SCDH'.x * SCDH'.y))) s){hr} = 1 by smt.
-      cut H1: 0 < card s{hr} by smt.
-      by rewrite -!Real.inv_def inv_le; smt.
+        rewrite Duni.mu_dU filter_pred1 H /= fcard1.
+        cut H1: 0 < card s{hr} by smt.
+        by rewrite -!Real.inv_def inv_le; smt.
+        smt.
     qed.  
   end section.
 

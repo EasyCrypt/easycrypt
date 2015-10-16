@@ -33,7 +33,7 @@ theory MultiUser.
   }.
 
   module Wrap(S:Scheme) = {
-    var qs:message set
+    var qs:message fset
     var ks:key array
     var b:bool
     var auth:bool
@@ -50,7 +50,7 @@ theory MultiUser.
     }
 
     proc init(): unit = {
-      qs = FSet.empty;
+      qs = fset0;
       auth = false;
       S.init();
       b = ${0,1};
@@ -63,7 +63,7 @@ theory MultiUser.
 
       if (0 <= i < users)
       {
-        qs = add m0 (add m1 qs);
+        qs = qs `|` (fset1 m0) `|` (fset1 m1);
         c = S.send(ks.[i],b ? m1 : m0);
         r = Some c;
       }
@@ -79,7 +79,7 @@ theory MultiUser.
       if (0 <= i < users)
       {
         r = S.recv(ks.[i],c);
-        if (r <> None /\ !mem (oget r) qs)
+        if (r <> None /\ !mem qs (oget r))
           auth = true;
       }
       else

@@ -4,7 +4,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Int Real Distr NewList NewFSet.
+require import Int Real Distr List FSet.
 
 pragma +implicits.
 
@@ -28,16 +28,16 @@ proof.
 qed.
 
 lemma dU_ll (X : 'a fset):
-  X <> set0 <=> mu (dU X) predT = 1%r.
+  X <> fset0 <=> mu (dU X) predT = 1%r.
 proof.
   rewrite mu_dU.
   have ->: filter predT X = X
     by rewrite filterE filter_predT elemsK.
-  by case (X = set0)=> //=; smt full.
+  by case (X = fset0)=> //=; smt full.
 qed.
 
 lemma support_dU (X : 'a fset) x:
-  X <> set0 =>
+  X <> fset0 =>
   support (dU X) x <=> mem X x.
 proof.
   (* Dealing with the stupid notation mismatches *)

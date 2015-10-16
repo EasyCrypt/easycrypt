@@ -9,6 +9,7 @@ require import Distr.
 require import Int.
 require import Real.
 require import FSet.
+require (*--*) Mu_mem.
 
 theory GenDice.
   (* The distribution and test can be parameterized by some input *)
@@ -24,10 +25,10 @@ theory GenDice.
 
   (* And the test is represented both as a predicate and as a set *)
   op test : input -> t -> bool.
-  op sub_supp : input -> t set.
+  op sub_supp : input -> t fset.
   axiom test_sub_supp i x:
     valid i =>
-    mem x (sub_supp i) <=> test i x.
+    mem (sub_supp i) x <=> test i x.
 
   axiom test_in_supp i x:
     valid i =>
@@ -59,8 +60,9 @@ theory GenDice.
       pose bd := mu_x (d i0) k.
       cut d_uni : forall x, in_supp x (d i0) => mu_x (d i0) x = bd.
          by intros x Hx;rewrite /bd; apply dU => //; apply test_in_supp.
-      cut Hdiff: bdt <> (Real.zero)%Real by smt.
-      conseq [-frame] (_:i=i0 ==> k = r : = (if test i r then charfun ((=) k) r else 1%r / bdt)) => //;
+      cut Hdiff: bdt <> 0%r.
+        by have h: mem (sub_supp i0) k; smt.
+      conseq (_:i=i0 ==> k = r : = (if test i r then charfun ((=) k) r else 1%r / bdt)) => //;
         first by smt.
       while (i0=i) (if test i r then 0 else 1) 1 (bdt * bd) => //; first 2 smt.
         intros Hw; alias 2 r0 = r.
@@ -84,17 +86,17 @@ theory GenDice.
          by rewrite H0 //= /charfun (_: (k = r{hr}) = false) 1:neqF //.
          phoare split ! 1%r (bdt*bd);wp;rnd => //.
           skip; progress=> //.
-          rewrite -(mu_eq (d i{hr}) (cpMem (sub_supp i{hr}))).
+          rewrite -(mu_eq (d i{hr}) (mem (sub_supp i{hr}))).
             by intros x ; rewrite /= -test_sub_supp.
-          apply (mu_cpMem (sub_supp i{hr}) (d i{hr}) bd _) => x Hx.
+          apply (Mu_mem.mu_mem (sub_supp i{hr}) (d i{hr}) bd _) => x Hx.
           by apply d_uni; apply test_in_supp=> //; rewrite -test_sub_supp.
         by conseq Hw => //; smt.         
         by conseq (_ : _ ==> true) => //;rnd;skip;progress=> //; smt.
       split; first by cut: 0%r < bd; smt.
-      intros z;conseq (_ : _ ==>  mem r (sub_supp i)); first smt.
+      intros z;conseq (_ : _ ==>  mem (sub_supp i) r); first smt.
       rnd;skip;progress => //.
-      rewrite -(mu_eq (d i{hr}) (cpMem (sub_supp i{hr}))) => //.
-      rewrite (mu_cpMem (sub_supp i{hr}) (d i{hr}) bd) => // x Hx.
+      rewrite -(mu_eq (d i{hr}) (mem (sub_supp i{hr}))) => //.
+      rewrite (Mu_mem.mu_mem (sub_supp i{hr}) (d i{hr}) bd) => // x Hx.
       by apply d_uni; apply test_in_supp=> //; rewrite -test_sub_supp.
     (* case ! test i0 k *)
     hoare; while (!test i k); first rnd => //.

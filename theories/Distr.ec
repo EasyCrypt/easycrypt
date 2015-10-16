@@ -301,8 +301,11 @@ theory Dinter.
   qed.
 
   lemma dinterU (i j:int):
-    is_subuniform (dinter i j)
-  by admit.
+    is_subuniform (dinter i j).
+  proof.
+    move=> x y x_in_supp y_in_supp.
+    by rewrite -!/(mu_x _ _) !mu_x_def_in.
+  qed.
 end Dinter.
 
 (** Normalization of a sub-distribution *)

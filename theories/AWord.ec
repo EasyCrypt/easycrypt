@@ -6,7 +6,7 @@
  * -------------------------------------------------------------------- *)
 
 require Int.
-require import FSet.
+require import Finite FSet.
 
 type word.
 
@@ -97,37 +97,42 @@ proof. by rewrite from_to; smt all. qed.
 (** univ *)
 
 theory Univ.
-  op univ = FSet.img from_int (Interval.interval 0  (2^length -1)).
+  (** Keeping this for now so as not to break the interface. Everything should be a list instead... **)
+  op univ = image from_int (oflist (List.Iota.iota_ 0  (2^length))).
 
-  lemma mem_univ w: mem w univ.
+  lemma mem_univ w: mem univ w.
   proof.
-    rewrite /univ img_def; exists (to_int w);rewrite to_from Interval.mem_interval/=.
-    rewrite -to_from from_to; smt all.
+    rewrite /univ imageP; exists (to_int w); rewrite to_from mem_oflist List.Iota.mem_iota /=.
+    smt.
   qed.
 
   lemma card_univ: card univ = 2^length.
   proof.
-    rewrite /univ. pose intv := Interval.interval _ _.
-    cut intv_card: card intv = 2^length by smt.
-    rewrite -intv_card eqz_leq; split; first smt.
-    cut ->: card intv = card (img to_int (img from_int intv)).
-      congr. apply set_ext. rewrite /FSet.(==) /intv.
-      move=> x. split.
-        by move=> hMemInt; rewrite !img_def; exists (from_int x); smt.
-      by rewrite img_def; move=> hMemImg; elim hMemImg => x0; rewrite !img_def; smt.
-    smt.
+    rewrite /univ cardE imageE.
+    rewrite -(List.perm_eq_size (List.map from_int (elems (oflist (List.Iota.iota_ 0 (2^length)))))).
+      rewrite -{1}(List.undup_id (List.map from_int (elems (oflist (List.Iota.iota_ 0 (2^length)))))).
+        rewrite List.map_inj_in_uniq 2:uniq_elems // => x y.
+        rewrite -!memE !mem_oflist !List.Iota.mem_iota /= => [le0_x lt_x_2length] [le0_y lt_y_2length] eq_from.
+        by rewrite -(from_to_bound x _) // -(from_to_bound y) // eq_from.
+      exact/oflistK.
+    rewrite List.size_map -(List.perm_eq_size (List.Iota.iota_ 0 (2^length))).
+      rewrite -{1}(List.undup_id (List.Iota.iota_ 0 (2^length))) 1:List.Iota.iota_uniq//.
+      exact/oflistK.
+    by rewrite List.Iota.size_iota; smt. (* excuse the non-linear integer arithmetic *)
   qed.
 
-  require import ISet.
-
-  lemma finite_univ : Finite.finite (ISet.univ <:word>).
-  proof. by exists Univ.univ => x;rewrite ISet.mem_univ Univ.mem_univ. qed.
-
+  lemma finite_univ : is_finite (Pred.predT <:word>).
+  proof.
+    exists (List.map from_int (List.Iota.iota_ 0 (2^length))); split=> [|x].
+      by rewrite List.map_inj_in_uniq 2:List.Iota.iota_uniq// => x y; smt.
+    rewrite List.mapP; exists (to_int x)=> //=.
+    by rewrite List.Iota.mem_iota /=; smt.
+  qed.
 end Univ.
  
 theory Dword.
-  require import Distr.
-  require import Real.
+  require import Real Distr.
+  require (*--*) Mu_mem.
 
   op dword: word distr.
   axiom mu_x_def w: mu_x dword w = 1%r/(2^length)%r.
@@ -139,13 +144,14 @@ theory Dword.
   qed.
 
   lemma mu_cpMemw X:
-    mu dword (cpMem X) = (card X)%r / (2^length)%r.
-  proof -strict.
-  by rewrite (mu_cpMem _ _ (1%r/(2^length)%r))=> // x;
-     rewrite mu_x_def.
+    mu dword (mem X) = (card X)%r / (2^length)%r.
+  proof.
+    rewrite (Mu_mem.mu_mem X dword (1%r/(2^length)%r)) //.
+    by move=> x _; rewrite -/(mu_x _ _) mu_x_def.
   qed.
 
-  import FSet.Dexcepted.
+  require import Dexcepted.
+
   lemma lossless_restrw X:
     card X < 2^length =>
     weight (dword \ X) = 1%r.

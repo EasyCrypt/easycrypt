@@ -12,6 +12,7 @@ require import Distr.
 require import List.
 require (*--*) Sum.
 (*---*) import Monoid.
+require (*--*) Mu_mem.
 
 (** A non-negative integer q **)
 op q:int.
@@ -115,9 +116,7 @@ section.
     <= (q^2)%r * mu uT ((=) witness).
   proof.
     fel 1 (size Sample.l) (fun x, q%r * mu uT ((=) witness)) q (!uniq Sample.l) [BSample.s: (size Sample.l < q)]=> //.
-      (* We love real arithmetic... NOT *)
-      rewrite Sum.int_sum_const //= /Sum.intval FSet.Interval.card_interval_max.
-      cut ->: max (q - 1 - 0 + 1) 0 = q by smt.
+     rewrite Sum.int_sum_const //= Sum.intval_card_0 1:smt /=.
       cut ->: q^2 = q * q; last by smt.
       rewrite (_: 2 = 1 + 1) // -Int.pow_add //.
       by rewrite (_: q^1 = q) // (_: 1 = 0 + 1) 1:// powS // pow0.
@@ -125,7 +124,7 @@ section.
       proc; sp; if=> //; last by (hoare; auto; smt).
       wp; rnd (mem Sample.l); skip=> //=.
       progress.
-        cut:= FSet.mu_Lmem_le_length (Sample.l{hr}) uT (mu uT (pred1 witness)) _.
+        have:= Mu_mem.mu_mem_le_size (Sample.l{hr}) uT (mu uT (pred1 witness)) _.
         move=> x _; rewrite /mu_x; cut: mu uT (pred1 x) = mu uT (pred1 witness); last smt.
         have [uT_fu [_ uT_suf]]:= uT_ufT.
         by apply uT_suf; apply uT_fu.
@@ -238,9 +237,7 @@ section.
     <= (q^2)%r * mu uT ((=) witness).
   proof.
     fel 1 (size Sample.l) (fun x, q%r * mu uT ((=) witness)) q (!uniq Sample.l) [BSample.s: (size Sample.l < q)]=> //.
-      (* We love real arithmetic... NOT *)
-      rewrite Sum.int_sum_const //= /Sum.intval FSet.Interval.card_interval_max.
-      cut ->: max (q - 1 - 0 + 1) 0 = q by smt.
+      rewrite Sum.int_sum_const //= Sum.intval_card_0 1:smt /=.
       cut ->: q^2 = q * q; last by smt.
       rewrite (_: 2 = 1 + 1) // -Int.pow_add //.
       by rewrite (_: q^1 = q) // (_: 1 = 0 + 1) 1:// powS // pow0.
@@ -248,7 +245,7 @@ section.
       proc; sp; if=> //; last by (hoare; auto; smt).
       wp; rnd (mem Sample.l); skip=> //=.
       progress.
-        cut:= FSet.mu_Lmem_le_length (Sample.l{hr}) uT (mu uT (pred1 witness)) _.
+        have:= Mu_mem.mu_mem_le_size (Sample.l{hr}) uT (mu uT (pred1 witness)) _.
         move=> x _; rewrite /mu_x; cut: mu uT (pred1 x) = mu uT (pred1 witness); last smt.
         have [uT_fu [_ uT_suf]]:= uT_ufT.
         by apply uT_suf; apply uT_fu.
