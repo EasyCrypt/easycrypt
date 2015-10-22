@@ -1,0 +1,49 @@
+require export Fun Pred.
+require import Real Distr.
+require (*--*) NewPRP.
+
+(** Instantiate the PRP module types **)
+type K, D.
+
+clone import NewPRP as PRPt with
+  type K <- K,
+  type D <- D
+proof * by smt.
+
+(** Instantiate the Ideal Random Permutation **)
+op dK: K distr.
+axiom dK_ll: mu dK predT = 1%r.
+
+op dD:D distr.
+axiom dD_ll: mu dD predT = 1%r.
+
+(** Instantiate the Real PRP *)
+op P : K -> D -> D.
+op Pi: K -> D -> D.
+
+axiom bijective_P k:
+  support dK k =>
+     cancel (P k) (Pi k)
+  /\ cancel (Pi k) (P k).
+
+(** Turn it into a module **)
+module PRPr: PRP = {
+  proc kgen(): K = {
+    var k;
+
+    k <$ dK;
+    return k;
+  }
+
+  proc f(k:K, x:D) : D = { return P k x; }
+
+  proc fi(k:K, x:D): D = { return Pi k x; }
+}.
+
+(** And give it an Oracle interface **)
+module PRPr_Wrapped: PRP_Oracles = {
+  var k:K
+  proc init(): unit = { k = $dK; }
+  proc f(x:D): D = { return P k x; }
+  proc fi(x:D): D = { return Pi k x; }
+}.

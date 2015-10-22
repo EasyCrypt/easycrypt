@@ -1,0 +1,48 @@
+require import FSet FMap Distr.
+require import Dexcepted.
+require (*--*) NewPRP.
+
+type K, D.
+
+clone import NewPRP as PRPt with
+  type K <- K,
+  type D <- D
+proof * by smt.
+
+op dK: K distr.
+axiom dK_ll: mu dK predT = 1%r.
+
+op dD: D distr.
+axiom dD_ll: mu dD predT = 1%r.
+
+module RandomPermutation: PRP_Oracles = {
+  var m : (D,D) fmap
+  var mi: (D,D) fmap
+
+  proc init(): unit = {
+    m  <- fmap0;
+    mi <- fmap0;
+  }
+
+  proc f(x:D): D = {
+    var y;
+
+    if (!mem (dom m) x) {
+      y      <$ dD \ (rng m);
+      m.[x]  <- y;
+      mi.[y] <- x;
+    }
+    return (oget m.[x]);
+  }
+
+  proc fi(y:D): D = {
+    var x;
+
+    if (!mem (dom mi) y) {
+      x      <$ dD \ (rng mi);
+      mi.[y] <- x;
+      m.[x]  <- y;
+    }
+    return (oget mi.[y]);
+  }
+}.
