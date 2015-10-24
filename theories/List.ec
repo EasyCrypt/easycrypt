@@ -1471,6 +1471,38 @@ proof. by move=> fAC /perm_to_rem peq; rewrite @(foldr_perm f z _ _ fAC peq). qe
 (* -------------------------------------------------------------------- *)
 op flatten ['a] = foldr (++) [<:'a>].
 
+lemma flatten_nil : flatten [<:'a list>] = [].
+proof. by []. qed.
+
+lemma flatten_cons (x : 'a list) s :
+  flatten (x :: s) = x ++ flatten s.
+proof. by []. qed.
+    
+lemma flatten_cat (s1 s2 : 'a list list):
+  flatten (s1 ++ s2) = flatten s1 ++ flatten s2.
+proof.
+  elim: s1=> /= [|x s1 ih]; first by rewrite flatten_nil.
+  by rewrite !flatten_cons ih catA.
+qed.
+
+lemma flattenP (A : 'a list list) x :
+  (exists s, mem A s /\ mem s x) <=> (mem (flatten A) x).
+proof.
+  elim: A=> /= [|w A ih]; first by rewrite flatten_nil in_nil.
+  rewrite flatten_cons mem_cat; case: (mem w x)=> /=.
+    by move=> h; exists w; rewrite h.
+  move=> x_notin_w; rewrite -ih; split; case=> t [].
+    by case=> [->|hA] h //; exists t.
+  by move=> hA h; exists t; rewrite hA.
+qed.
+
+lemma flatten_mapP (A : 'a -> 'b list) s y :
+  (exists x, mem s x /\ mem (A x) y) <=> (mem (flatten (map A s)) y).
+proof.
+rewrite -flattenP; split; case=> [x [sx]|s' [/mapP[x [sx ->]]]] Axy.
+  by exists (A x); rewrite map_f. by exists x.
+qed.
+
 (* -------------------------------------------------------------------- *)
 (*                               EqIn                                   *)
 (* -------------------------------------------------------------------- *)
