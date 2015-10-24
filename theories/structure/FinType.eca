@@ -4,7 +4,8 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Int List.
+require import Int List StdOrder.
+import StdOrder.IntOrder.
 
 (* -------------------------------------------------------------------- *)
 type t.
@@ -18,10 +19,35 @@ axiom enumP : forall x, mem enum x.
 axiom enum_uniq : uniq enum.
 
 (* -------------------------------------------------------------------- *)
+theory WordN.
+op cross1 (x : 'a) (s : 'a list list) =
+  map (fun w => x :: w) s.
+
+op cross (s : 'a list) (a : 'a list list) =
+  flatten (map (fun x => cross1 x a) s).
+end WordN.
+
+import WordN.
+
 op wordn (n : int) : t list list =
-  foldr (fun i s =>
-    flatten (map (fun x => map (fun y => x :: y) s) enum))
-  [[]] (iota_ 0 n).
+  foldl (fun s i => cross enum s) [[]] (iota_ 0 n).
+
+lemma wordn0 n : n <= 0 => wordn n = [[]].
+proof. by move=> le0_n; rewrite /wordn iota0. qed.
+
+lemma wordnS n : 0 <= n => wordn (n + 1) = cross enum (wordn n).
+proof. by move=> geo_0; rewrite /wordn iotaSr //= -cats1 foldl_cat. qed.
+    
+(* -------------------------------------------------------------------- *)
+lemma wordn_size i : all (fun x => size x = max 0 i) (wordn i).
+proof.
+apply/allP=> w; case: (lezWP 0 i); last first.
+  by move=> _ le0_i; rewrite wordn0 // mem_seq1 ?max_lel.
+move=> ge0_i; rewrite max_ler //; elim/Induction.induction: i ge0_i w.
+  by rewrite wordn0.
+move=> i ge0_i ih w; rewrite wordnS // => /flatten_mapP /=.
+by case=> x [_ /mapP] [s [/ih h ->]] /=; rewrite h addzC.
+qed.
 
 lemma size_wordn i : size (wordn i) = card ^ (max 0 i).
 proof. admit. qed.
