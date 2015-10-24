@@ -1409,6 +1409,9 @@ proof.
   by move=> i Hi; rewrite nth_mkseq //; smt.
 qed.
 
+lemma mkseq0 (f : int -> 'a) : mkseq f 0 = [].
+proof. by rewrite /mkseq iota0. qed.
+
 (* -------------------------------------------------------------------- *)
 (*                         Sequence folding                             *)
 (* -------------------------------------------------------------------- *)
