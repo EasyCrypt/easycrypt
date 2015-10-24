@@ -1,0 +1,33 @@
+(* --------------------------------------------------------------------
+ * Copyright (c) - 2012-2015 - IMDEA Software Institute and INRIA
+ * Distributed under the terms of the CeCILL-B licence.
+ * -------------------------------------------------------------------- *)
+
+(* -------------------------------------------------------------------- *)
+require import Int List.
+
+(* -------------------------------------------------------------------- *)
+type t.
+
+op enum : t list.
+
+op card : int = size enum.
+
+axiom enumP : forall x, mem enum x.
+
+axiom enum_uniq : uniq enum.
+
+(* -------------------------------------------------------------------- *)
+op wordn (n : int) : t list list =
+  foldr (fun i s =>
+    flatten (map (fun x => map (fun y => x :: y) s) enum))
+  [[]] (iota_ 0 n).
+
+lemma size_wordn i : size (wordn i) = card ^ (max 0 i).
+proof. admit. qed.
+
+lemma uniq_wordn i : uniq (wordn i).
+proof. admit. qed.
+
+lemma wordnP i s : mem (wordn i) s <=> size s = max 0 i.
+proof. admit. qed.
