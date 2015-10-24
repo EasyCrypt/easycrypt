@@ -10,7 +10,8 @@ require import StdRing Int Real.
 require (*--*) NewNumber.
 
 (* -------------------------------------------------------------------- *)
-clone NewNumber as IntOrder
+theory IntOrder.
+clone include NewNumber
   with type t <- int,
 
   (* FIXME: should use theory substitution *)
@@ -30,6 +31,10 @@ clone NewNumber as IntOrder
 
   proof Domain.* by smt, Axioms.* by smt.
 
+lemma lezWP (z1 z2 : int) : (z1 <= z2) || (z2 <= z1).
+proof. by case: (z1 <= z2)=> //=; rewrite -ltzNge => /ltrW. qed.
+end IntOrder.
+  
 (* -------------------------------------------------------------------- *)
 clone NewNumber as RealOrder
   with type t <- real,
