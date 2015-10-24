@@ -229,6 +229,15 @@ lemma orab_orb : (||) = (\/).
 proof. by apply/ExtEq.rel_ext=> x y; rewrite orabP. qed.
 
 (* -------------------------------------------------------------------- *)
+lemma exists_orl (P : bool) (Q : 'a -> bool) :
+  (P \/ (exists (x : 'a), Q x)) <=> exists (x : 'a), (P \/ Q x).
+proof. by case: P. qed.
+
+lemma exists_orr (P : bool) (Q : 'a -> bool) :
+  ((exists (x : 'a), Q x) \/ P) <=> exists (x : 'a), (Q x \/ P).
+proof. by case: P. qed.
+
+(* -------------------------------------------------------------------- *)
 (* Pred? *)
 (* Rel?  *)
 
