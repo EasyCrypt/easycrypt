@@ -121,6 +121,10 @@ abstract theory ZModule.
     by rewrite intmul0 intmul1 addr0.
   qed.
 
+  lemma intmulpE z c : 0 <= c =>
+    intmul z c = iterop c ZModule.(+) z zeror.
+  proof. by rewrite /intmul lezNgt => ->. qed.
+  
   lemma intmul2 (x : t): intmul x 2 = x + x.
   proof. by rewrite /intmul /= @(iteropS 1) // @(iterS 0) // iter0. qed.
 end ZModule.
@@ -392,7 +396,8 @@ hint rewrite rw_algebra  : .
 hint rewrite inj_algebra : .
 
 (* -------------------------------------------------------------------- *)
-clone IDomain as IntID with
+theory IntID.
+clone include IDomain with
   type t <- int,
   pred unit (z : int) <- (z = 1 \/ z = -1),
   op   zeror <- 0,
@@ -404,3 +409,13 @@ clone IDomain as IntID with
   op   ( / ) <- Int.( * ),
   op   invr  <- (fun (z : int) => z)
   proof * by smt.
+
+lemma intmulz z c : intmul z c = z * c.
+proof.
+have h: forall cp, 0 <= cp => intmul z cp = z * cp.
+  elim/Induction.induction=> /= [|cp ge0_cp ih].
+    by rewrite intmul0.
+  by rewrite intmulS // ih mulrDr /= addrC.
+by case: (c < 0); 1: rewrite -opprK intmulN opprK; smt.
+qed.
+end IntID.
