@@ -308,10 +308,14 @@ let process_delta ?target (s, o, p) tc =
             tc_error !!tc "the operator is not transparent"
     end
 
-  | SFlocal x when LDecl.can_unfold x hyps ->
-      ([], [], LDecl.unfold x hyps, [])
+    | SFlocal x when LDecl.can_unfold x hyps ->
+        ([], [], LDecl.unfold x hyps, [])
 
-  | _ -> tc_error !!tc "not headed by an operator/predicate"
+    | SFother { f_node = Fapp ({ f_node = Flocal x }, args) }
+        when LDecl.can_unfold x hyps ->
+        ([], [], LDecl.unfold x hyps, args)
+
+    | _ -> tc_error !!tc "not headed by an operator/predicate"
 
   in
 
