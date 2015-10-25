@@ -1515,8 +1515,15 @@ op sumz (sz : int list) = foldr (+) 0 sz.
 lemma size_flatten (ss : 'a list list) :
   size (flatten ss) = sumz (map size ss).
 proof.
-elim: ss=> [|s ss ih] /=; first by rewrite flatten_nil.
-by rewrite flatten_cons size_cat /sumz /= ih.
+  elim: ss=> [|s ss ih] /=; first by rewrite flatten_nil.
+  by rewrite flatten_cons size_cat /sumz /= ih.
+qed.
+
+lemma count_flatten (p : 'a -> bool) (ss : 'a list list) :
+  count p (flatten ss) = sumz (map (count p) ss).
+proof.
+  elim: ss=> [|s ss ih] /=; first by rewrite flatten_nil.
+  by rewrite flatten_cons count_cat /sumz /= ih.
 qed.
 
 (* -------------------------------------------------------------------- *)
