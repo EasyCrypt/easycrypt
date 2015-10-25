@@ -4,7 +4,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Int List StdOrder.
+require import Fun Int IntExtra List StdOrder StdBigop.
 import StdOrder.IntOrder.
 
 (* -------------------------------------------------------------------- *)
@@ -49,11 +49,35 @@ move=> i ge0_i ih w; rewrite wordnS // => /flatten_mapP /=.
 by case=> x [_ /mapP] [s [/ih h ->]] /=; rewrite h addzC.
 qed.
 
+(* -------------------------------------------------------------------- *)
 lemma size_wordn i : size (wordn i) = card ^ (max 0 i).
-proof. admit. qed.
+proof.
+case: (lezWP 0 i)=> [le|_ le]; last first.
+  by rewrite max_lel ?wordn0 //= pow0.
+rewrite max_ler //; elim/Induction.induction: i le.
+  by rewrite wordn0 // pow0.
+move=> i le0_i ih; rewrite wordnS // size_flatten /=.
+rewrite -map_comp (eq_map _ (fun x => card^i)).
+  by move=> x /=; rewrite /(\o) size_map.
+rewrite BIA.sumzE BIA.big_map /(\o) /predT /=.
+by rewrite BIA.big_constz count_predT -/card mulzC powS.
+qed.
 
+(* -------------------------------------------------------------------- *)
 lemma uniq_wordn i : uniq (wordn i).
 proof. admit. qed.
 
+(* -------------------------------------------------------------------- *)
 lemma wordnP i s : mem (wordn i) s <=> size s = max 0 i.
-proof. admit. qed.
+proof.
+split; first by move: s; apply/allP/wordn_size.
+case: (lezWP 0 i)=> [ge0_i|_ le0_i]; last first.
+  by rewrite max_lel ?wordn0 // => /size_eq0.
+rewrite max_ler //; elim/Induction.induction: i ge0_i s.
+  by move=> s /size_eq0; rewrite wordn0.
+move=> i geo_i ih [//= /eq_sym|]; first by rewrite addz1_neq0.
+move=> x s /=; rewrite addzC => /addIz /ih {ih} si.
+rewrite wordnS //; pose f := fun x => cross1 x (wordn i).
+apply/flattenP=> /=; exists (f x); rewrite -/f.
+by rewrite (map_f f) ?enumP /f //=; apply/mapP; exists s.
+qed.
