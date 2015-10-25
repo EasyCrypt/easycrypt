@@ -33,7 +33,7 @@ opam update
 
 git clone --depth=1 https://github.com/EasyCrypt/easycrypt.git
 
-opam install -v -y ec-toolchain ec-provers
+opam install -v -y ec-toolchain.20150923 ec-provers.20150209
 make -C easycrypt
 
 # --------------------------------------------------------------------
