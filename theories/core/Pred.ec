@@ -85,6 +85,9 @@ by [].
 lemma eqVneq (x y : 'a) : x = y \/ x <> y
 by [].
 
+lemma predT_comp ['a 'b] (p : 'a -> 'b) : predT \o p = predT.
+proof. by []. qed.
+
 lemma predIC (p1 p2 : 'a -> bool) : predI p1 p2 = predI p2 p1.
 proof. by apply fun_ext=> x; rewrite /predI andC. qed.
 
