@@ -1063,6 +1063,13 @@ proof.
   by move=> x'_in_s; apply/ih; exists x'.
 qed.
 
+lemma mem_map ['a 'b] (f : 'a -> 'b) : injective f =>
+  forall s x, (mem (map f s) (f x)) <=> (mem s x).
+proof.
+move=> inj_f s x; split=> [/mapP|].
+  by case=> y [_ /inj_f]. by apply/map_f.
+qed.
+
 lemma uniq_map (f : 'a -> 'b) (s : 'a list):
   uniq (map f s) => uniq s.
 proof.
@@ -1501,6 +1508,15 @@ lemma flatten_mapP (A : 'a -> 'b list) s y :
 proof.
 rewrite -flattenP; split; case=> [x [sx]|s' [/mapP[x [sx ->]]]] Axy.
   by exists (A x); rewrite map_f. by exists x.
+qed.
+
+op sumz (sz : int list) = foldr (+) 0 sz.
+
+lemma size_flatten (ss : 'a list list) :
+  size (flatten ss) = sumz (map size ss).
+proof.
+elim: ss=> [|s ss ih] /=; first by rewrite flatten_nil.
+by rewrite flatten_cons size_cat /sumz /= ih.
 qed.
 
 (* -------------------------------------------------------------------- *)
