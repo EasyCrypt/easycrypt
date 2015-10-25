@@ -6,17 +6,29 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Int Real.
+require import Pred Int IntExtra Real Ring List.
 require (*--*) NewBigop NewBigalg.
 
 (* -------------------------------------------------------------------- *)
-clone NewBigalg as BIA with
+theory BIA.
+clone include NewBigalg with
   type t <- int,
   op ZM.zeror <- 0,
   op ZM.( + ) <- Int.(+),
   op ZM.( - ) <- Int.(-),
   op ZM.([-]) <- Int.([-])
   proof ZM.* by smt.
+
+  lemma nosmt sumzE ss : sumz ss = BIA.big predT (fun x => x) ss.
+  proof. by elim: ss=> [|s ss ih] //=; rewrite BIA.big_cons -ih. qed.
+      
+  lemma nosmt big_constz (P : 'a -> bool) x s:
+    big P (fun i => x) s = x * (count P s).
+  proof.
+    rewrite big_const -Support.iteropE -IntID.intmulpE.
+    by apply/count_ge0. by rewrite IntID.intmulz mulzC.
+  qed.  
+end BIA.
 
 clone NewBigop as BIM with
   type t <- int,

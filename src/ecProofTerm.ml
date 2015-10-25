@@ -265,6 +265,11 @@ let pf_find_occurence (pt : pt_env) ?(keyed = false) ~ptn subject =
     | _ -> `NoKey
   in
 
+  let mode =
+    if   key = `NoKey
+    then EcMatching.fmrigid
+    else EcMatching.fmdelta in
+
   let trymatch bds tp =
     if not (keycheck tp key) then `Continue else
 
@@ -280,7 +285,7 @@ let pf_find_occurence (pt : pt_env) ?(keyed = false) ~ptn subject =
       if not (Mid.set_disjoint bds tp.f_fv) then
         `Continue
       else begin
-        pf_form_match pt ~ptn tp;
+        pf_form_match ~mode pt ~ptn tp;
         raise E.MatchFound
       end
     with EcMatching.MatchFailure -> `Continue
