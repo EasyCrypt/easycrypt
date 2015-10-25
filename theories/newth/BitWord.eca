@@ -12,7 +12,7 @@ pragma +implicits.
 (* -------------------------------------------------------------------- *)
 clone include NewWord with
   type Alphabet.t    <- bool,
-  op   Alphabet.elts <- [true;false]
+  op   Alphabet.enum <- [true;false]
 proof Alphabet.* by smt.
 
 (* -------------------------------------------------------------------- *)

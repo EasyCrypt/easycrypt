@@ -102,13 +102,11 @@ proof. by move=> i_in_bounds; rewrite map2E sel_mkword. qed.
 (* -------------------------------------------------------------------- *)
 (** TODO: Prove that the resulting type is finite. This can be done by
     defining the encoding function into int and prove that it is
-    upper-bounded by `(size elts)^l`. **)
+    upper-bounded by `(size enum)^l`. **)
 clone include FinType with
-  type t    <- word
-(*op   elts <- map (from_int) (_iota 0 (Alphabet.cardinality)^l)
-proof * by smt *).
+  type t    <- word.
 
-axiom word_card: cardinality = Alphabet.cardinality^l.
+axiom word_card: card = Alphabet.card^l.
 
 (* -------------------------------------------------------------------- *)
 (** TODO: Figure out what cloning support is needed to allow this to
@@ -118,21 +116,21 @@ theory DWord.
   op dword : word distr. (* uniform distribution on finiteness witness *)
 
   (** This then becomes a lemma **)
-  axiom muP p: mu dword p = (size (filter p elts))%r/cardinality%r.
+  axiom muP p: mu dword p = (size (filter p enum))%r/card%r.
 
-  lemma muxP w: mu dword (pred1 w) = 1%r/cardinality%r.
+  lemma muxP w: mu dword (pred1 w) = 1%r/card%r.
   proof.
-    by rewrite muP size_filter count_uniq_mem 1:elts_uniq// elts_univ.
+    by rewrite muP size_filter count_uniq_mem 1:enum_uniq// enumP.
   qed.
 
   lemma dword_ll: mu dword predT = 1%r.
   proof.
-    rewrite muP filter_predT /cardinality.
-    have: 0 < size elts.
+    rewrite muP filter_predT /card.
+    have: 0 < size enum.
       apply/(absurd true)=> //.
       rewrite -lezNgt=> le0_size /=.
-      have:= elts_univ witness.
-      have ->: elts = []
+      have:= enumP witness.
+      have ->: enum = []
         by apply/size_eq0; smt.
       by rewrite in_nil.
     smt.
