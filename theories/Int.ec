@@ -70,7 +70,15 @@
 
 (* Random thing *)
 op int_of_bool (b : bool) = if b then 1 else 0.
-  
+
+lemma int_of_bool0 (b : bool):
+  int_of_bool b = 0 <=> !b.
+proof. by case b. qed.
+
+lemma int_of_bool1 (b : bool):
+  int_of_bool b = 1 <=> b.
+proof. by case b. qed.
+
 (* Group operation *)
 op zeroz = 0.
 op onez  = 1.
