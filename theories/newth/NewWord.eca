@@ -5,7 +5,7 @@
 
 (* -------------------------------------------------------------------- *)
 require import Option Pred Fun Int Real List.
-require (*ab*) FinType Subtype.
+require (*ab*) FinType Subtype Tuple.
 
 (* -------------------------------------------------------------------- *)
 clone import FinType as Alphabet.
@@ -100,11 +100,24 @@ lemma sel_map2 f w1 w2 i: 0 <= i < l =>
 proof. by move=> i_in_bounds; rewrite map2E sel_mkword. qed.
 
 (* -------------------------------------------------------------------- *)
-(** TODO: Prove that the resulting type is finite. This can be done by
-    defining the encoding function into int and prove that it is
-    upper-bounded by `(size enum)^l`. **)
+clone Tuple as Witness with
+  type t            <- t,
+    op Support.enum <- enum
+proof * by exact/enum_spec.
+
 clone include FinType with
-  type t    <- word.
+  type t    <- word,
+    op enum <- map (odflt witness \o insub) (Witness.wordn l)
+proof *.
+  realize enum_spec.
+  move=> x; have <- := Witness.word_spec l (val x) _.
+    by rewrite valP /max gt0_l.
+  rewrite count_map; apply/eq_mem_count.
+  move=> w; rewrite /preim /(\o) /pred1 /=.
+  rewrite Witness.wordnP /max gt0_l /= => h.
+  have [[x'] [_ [-> <-]]|]:= insubP w; last by rewrite h.
+  by split; 2:exact/val_inj.
+  qed.
 
 axiom word_card: card = Alphabet.card^l.
 
