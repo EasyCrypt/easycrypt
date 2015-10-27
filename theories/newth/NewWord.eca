@@ -107,7 +107,7 @@ proof * by exact/enum_spec.
 
 clone include FinType with
   type t    <- word,
-    op enum <- map (odflt witness \o insub) (Witness.wordn l)
+    op enum = map (odflt witness \o insub) (Witness.wordn l)
 proof *.
   realize enum_spec.
   move=> x; have <- := Witness.word_spec l (val x) _.
