@@ -460,8 +460,8 @@ let rec lv_get_uninit_read (w : Sx.t) (lv : lvalue) =
       (w, Sx.empty)
 
   | LvTuple xs ->
-      let w = List.map (sx_of_pv |- fst) xs in
-      (Sx.big_union w, Sx.empty)
+      let w' = List.map (sx_of_pv |- fst) xs in
+      (Sx.big_union (w :: w'), Sx.empty)
 
   | LvMap (_, x, e, _) ->
       let r = Sx.diff (Uninit.e_pv is_loc e) w in
