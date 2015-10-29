@@ -139,30 +139,39 @@ lemma non_trivial: 0 < card
 by [].
 
 (* -------------------------------------------------------------------- *)
-(** TODO: Figure out what cloning support is needed to allow this to
-    be defined in a separate file whilst permitting gradual
-    specification. **)
 theory DWord.
-  op dword : word distr. (* uniform distribution on finiteness witness *)
+  require import Distr FSet Duni.
 
-  (** This then becomes a lemma **)
-  axiom muP p: mu dword p = (size (filter p enum))%r/card%r.
+  op dword : word distr = dU (FSet.oflist enum)
+    axiomatized by dwordE.
+
+  (** FIXME: This currently pokes holes through the abstraction, so we
+             can't simply let the user deal with it. Once a better
+             solution is found, remove this Dword subtheory from the
+             library and let the user define the distribution directly
+             as "dU enum", which would be the "list as multiset"
+             distribution. **)
+  lemma muP p: mu dword p = (size (filter p enum))%r/card%r.
+  proof.
+  rewrite dwordE mu_dU /Self.card !cardE.
+  have <-:= perm_eq_size enum (elems (oflist enum)) _.
+    by rewrite -{1}(undup_id enum) 1:enum_uniq// oflistK.
+  have <- //=:= perm_eq_size (filter p enum) (elems (filter p (oflist enum))).
+  rewrite filterE; apply (perm_eq_trans (filter p (elems (oflist enum)))).
+    apply/perm_eq_filter.
+    by rewrite -{1}(undup_id enum) 1:enum_uniq// oflistK.
+  pose s:= filter p (elems (oflist enum)).
+  by rewrite -{1}(undup_id s) /s 1:filter_uniq 1:uniq_elems// oflistK.
+  qed.
 
   lemma muxP w: mu dword (pred1 w) = 1%r/card%r.
   proof.
-    by rewrite muP size_filter count_uniq_mem 1:enum_uniq// enumP.
+  by rewrite muP size_filter count_uniq_mem 1:enum_uniq// enumP.
   qed.
 
+  lemma supportP w: support dword w.
+  proof. rewrite /support /in_supp /mu_x muxP smt. qed.
+
   lemma dword_ll: mu dword predT = 1%r.
-  proof.
-    rewrite muP filter_predT /card.
-    have: 0 < size enum.
-      apply/(absurd true)=> //.
-      rewrite -lezNgt=> le0_size /=.
-      have:= enumP witness.
-      have ->: enum = []
-        by apply/size_eq0; smt.
-      by rewrite in_nil.
-    smt.
-  qed.
+  proof. rewrite muP filter_predT -/card StdRing.RField.divrr // smt. qed.
 end DWord.
