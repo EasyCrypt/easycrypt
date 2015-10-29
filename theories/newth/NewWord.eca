@@ -112,7 +112,7 @@ proof *.
   realize enum_spec.
   move=> x; have <- := Witness.word_spec l (val x) _.
     by rewrite valP /max gt0_l.
-  rewrite count_map; apply/eq_mem_count.
+  rewrite count_map; apply/eq_in_count.
   move=> w; rewrite /preim /(\o) /pred1 /=.
   rewrite Witness.wordnP /max gt0_l /= => h.
   have [[x'] [_ [-> <-]]|]:= insubP w; last by rewrite h.
