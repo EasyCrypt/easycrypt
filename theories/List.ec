@@ -303,6 +303,9 @@ proof.
   by move=> y y_in_s; apply h; right.
 qed.
 
+lemma size_filter p (s : 'a list): size (filter p s) = count p s.
+proof. by elim: s => //= x s; case: (p x) => _ ->. qed.
+
 lemma filter_pred0 (s : 'a list): filter pred0 s = [].
 proof. by elim s. qed.
 
@@ -316,14 +319,15 @@ proof.
   by case (p2 x) => //=; case (p1 x) => //=.
 qed.
 
-lemma count_filter p (s : 'a list): count p s = size (filter p s).
-proof. by elim s => //= x s ->; case (p x). qed.
+lemma count_filter p1 p2 (s : 'a list):
+  count p1 (filter p2 s) = count (predI p1 p2) s.
+proof. by rewrite -!size_filter filter_predI. qed.
 
 lemma count_pred0 (s : 'a list): count pred0 s = 0.
-proof. by rewrite count_filter filter_pred0. qed.
+proof. by rewrite -size_filter filter_pred0. qed.
 
 lemma count_predT (s : 'a list): count predT s = size s.
-proof. by rewrite count_filter filter_predT. qed.
+proof. by rewrite -size_filter filter_predT. qed.
 
 lemma count_predC p (s : 'a list):
   count p s + count (predC p) s = size s.
@@ -331,9 +335,6 @@ proof. elim s; smt. qed.
 
 lemma has_nil p : has p [<:'a>] <=> false.
 proof. by []. qed.
-
-lemma size_filter p (s : 'a list): size (filter p s) = count p s.
-proof. by elim: s => //= x s; case: (p x) => _ ->. qed.
 
 lemma has_count p (s : 'a list): has p s <=> (0 < count p s).
 proof. by elim s => //= x s -> /=; case (p x); smt. qed.
@@ -362,7 +363,7 @@ proof. by move=> h; elim s=> //= x l; rewrite h=> ->. qed.
 
 lemma eq_count p1 p2 (s : 'a list):
   (forall x, p1 x <=> p2 x) => count p1 s = count p2 s.
-proof. by move=> h; rewrite !count_filter (eq_filter _ p2). qed.
+proof. by move=> h; rewrite -!size_filter (eq_filter _ p2). qed.
 
 lemma eq_has p1 p2 (s : 'a list):
   (forall x, p1 x <=> p2 x) => has p1 s <=> has p2 s.
@@ -402,7 +403,7 @@ lemma filter_rcons p x (s : 'a list):
 proof. by rewrite -!cats1 filter_cat; case: (p x)=> -> /=; rewrite ?cats0. qed.
 
 lemma count_cat p (s1 s2 : 'a list): count p (s1 ++ s2) = count p s1 + count p s2.
-proof. by rewrite !count_filter filter_cat size_cat. qed.
+proof. by rewrite -!size_filter filter_cat size_cat. qed.
 
 lemma has_cat p (s1 s2 : 'a list): has p (s1 ++ s2) <=> has p s1 \/ has p s2.
 proof. by elim s1 => //= x s1 IHs; rewrite IHs; smt. qed.
@@ -646,8 +647,8 @@ proof.
   rewrite neq_ltz ltzNge count_ge0 /=; rewrite -has_count hasP.
   case=> x [s12x a_x]; pose a' := predD1 a x.
   cut cnt_a': forall s, count a s = count (pred1 x) s + count a' s.
-    move=> s; rewrite count_filter -(count_predC (pred1 x)).
-    rewrite  2!count_filter -!filter_predI -!count_filter.
+    move=> s; rewrite -size_filter -(count_predC (pred1 x)).
+    rewrite  -2!size_filter -!filter_predI !size_filter.
     by congr; apply eq_count => y; delta.
   by rewrite !cnt_a' (eq_cnt1 x) // (IHi a') //; smt.
 qed.
@@ -727,6 +728,14 @@ proof.
   case s2 => [|x []] //=; first last; last 2 smt.
   case s1 => [|y []] //=; last smt.
   by move=> h; cut := h x => /= ->.
+qed.
+
+lemma perm_eq_filter (p : 'a -> bool) (s1 s2 : 'a list):
+  perm_eq s1 s2 => perm_eq (filter p s1) (filter p s2).
+proof.
+  rewrite !perm_eqP=> peq_s1_s2 p'.
+  rewrite -!size_filter -!filter_predI !size_filter.
+  exact/peq_s1_s2.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -1539,7 +1548,7 @@ qed.
 
 lemma eq_in_count (p1 p2 : 'a -> bool) (s : 'a list):
   (forall x, mem s x => p1 x <=> p2 x) => count p1 s = count p2 s.
-proof. by move=> h; rewrite !count_filter (eq_in_filter _ p2). qed.
+proof. by move=> h; rewrite -!size_filter (eq_in_filter _ p2). qed.
 
 lemma eq_in_has (p1 p2 : 'a -> bool) (s : 'a list):
   (forall x, mem s x => p1 x <=> p2 x) => has p1 s <=> has p2 s.
