@@ -135,7 +135,7 @@ rewrite /card /enum size_map Witness.size_wordn /Witness.Support.card.
 by rewrite /max gt0_l.
 qed.
 
-lemma non_trivial: 0 < card
+lemma non_empty: 0 < card
 by [].
 
 (* -------------------------------------------------------------------- *)

@@ -535,12 +535,15 @@ lemma leq_card_rng_dom (m:('a,'b) map):
 proof.
   elim/fset_ind (dom m) {-2}m (Logic.eq_refl (dom m))=> {m} [|x s x_notin_s ih m dom_m].
     by move=> m /empty_dom ->; rewrite rng_empty dom_empty !fcards0.
-    cut ->: m = (rm x m).[x <- oget m.[x]].
-      by apply map_ext=> x0; rewrite get_set; smt.
-    rewrite rng_set.
-    cut ->: rm x (rm x m) = (rm x m).
-      by apply map_ext=> x0; smt.
-    by case (mem (dom m) x); smt.
+  cut ->: m = (rm x m).[x <- oget m.[x]].
+    by apply map_ext=> x0; rewrite get_set; smt.
+  rewrite rng_set.
+  cut ->: rm x (rm x m) = (rm x m).
+    by apply map_ext=> x0; smt.
+  have:= ih (rm x m) _.
+    apply/fsetP=> x'; rewrite dom_rm dom_m in_fsetD in_fsetU !in_fset1.
+    by case (x' = x).
+  smt.
 qed.
 
 lemma endo_dom_rng (m:('a,'a) map):

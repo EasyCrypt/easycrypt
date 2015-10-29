@@ -129,7 +129,10 @@ elim/fset_ind {1 3 4}s.
   move=> x s' x_notin_s' ih leq_s'_s.
   rewrite sum_add// ih 1:smt.
   rewrite imageU image1 sum_add /=.
-    by rewrite imageP; smt. (* de Morgan + injectivity of g *)
+    rewrite imageP -negP=> [a] [a_in_s' ga_eq_gx].
+    have:= pcan_g'_g a _. smt.
+    have:= pcan_g'_g x _. smt.
+    by rewrite ga_eq_gx=> -> ->>.
   rewrite pcan_g'_g //=.
   by apply/leq_s'_s; rewrite in_fsetU in_fset1.
 qed.
@@ -289,9 +292,13 @@ theory Miplus.
  qed.
 
  lemma sumn_pos (i j:int) : 0 <= i => 0 <= sum_n i j.
- proof -strict.
+ proof.
    case (i <= j) => Hle Hp.
-     rewrite sumn_ij => //;smt all.
+     rewrite sumn_ij=> //.
+     have h: 0 <= (j - i) * (j - i + 1) by smt.
+     have: 0 <= (j - i) * (j - i + 1) /% 2 by smt.
+     have: 0 <= i * (j - i + 1) by smt.
+     smt.
    by rewrite /sum_n sum_ij_gt; first smt.
  qed.
 

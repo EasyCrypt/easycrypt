@@ -113,9 +113,9 @@ section.
 
   local lemma pr_BSample &m:
     Pr[Exp(BSample,A).main() @ &m: size Sample.l <= q /\ !uniq Sample.l]
-    <= (q^2)%r * mu uT ((=) witness).
+    <= (q^2)%r * mu uT (pred1 witness).
   proof.
-    fel 1 (size Sample.l) (fun x, q%r * mu uT ((=) witness)) q (!uniq Sample.l) [BSample.s: (size Sample.l < q)]=> //.
+    fel 1 (size Sample.l) (fun x, q%r * mu uT (pred1 witness)) q (!uniq Sample.l) [BSample.s: (size Sample.l < q)]=> //.
      rewrite Sum.int_sum_const //= Sum.intval_card_0 1:smt /=.
       cut ->: q^2 = q * q; last by smt.
       rewrite (_: 2 = 1 + 1) // -Int.pow_add //.
@@ -125,10 +125,11 @@ section.
       wp; rnd (mem Sample.l); skip=> //=.
       progress.
         have:= Mu_mem.mu_mem_le_size (Sample.l{hr}) uT (mu uT (pred1 witness)) _.
-        move=> x _; rewrite /mu_x; cut: mu uT (pred1 x) = mu uT (pred1 witness); last smt.
-        have [uT_fu [_ uT_suf]]:= uT_ufT.
-        by apply uT_suf; apply uT_fu.
-        by smt.
+          move=> x _; rewrite /mu_x; cut: mu uT (pred1 x) = mu uT (pred1 witness); last smt.
+          have [uT_fu [_ uT_suf]]:= uT_ufT.
+          by apply uT_suf; apply uT_fu.
+        move /(Trans _ ((size Sample.l{hr})%r * mu uT (pred1 witness)))=> -> //=.
+        by apply/mulrMle; smt.
         by move: H4; rewrite H0.
       by progress; proc; rcondt 2; auto; smt.
       by progress; proc; rcondf 2; auto.
@@ -136,7 +137,7 @@ section.
 
   lemma pr_collision &m:
     Pr[Exp(Sample,A).main() @ &m: !uniq Sample.l]
-    <= (q^2)%r * mu uT ((=) witness).
+    <= (q^2)%r * mu uT (pred1 witness).
   proof.
     cut ->: Pr[Exp(Sample,A).main() @ &m: !uniq Sample.l]
             = Pr[Exp(BSample,A).main() @ &m: size Sample.l <= q /\ !uniq Sample.l].
@@ -234,9 +235,9 @@ section.
 
   local lemma pr_BSample &m:
     Pr[Exp(BSample,A).main() @ &m: size Sample.l <= q /\ !uniq Sample.l]
-    <= (q^2)%r * mu uT ((=) witness).
+    <= (q^2)%r * mu uT (pred1 witness).
   proof.
-    fel 1 (size Sample.l) (fun x, q%r * mu uT ((=) witness)) q (!uniq Sample.l) [BSample.s: (size Sample.l < q)]=> //.
+    fel 1 (size Sample.l) (fun x, q%r * mu uT (pred1 witness)) q (!uniq Sample.l) [BSample.s: (size Sample.l < q)]=> //.
       rewrite Sum.int_sum_const //= Sum.intval_card_0 1:smt /=.
       cut ->: q^2 = q * q; last by smt.
       rewrite (_: 2 = 1 + 1) // -Int.pow_add //.
@@ -246,10 +247,11 @@ section.
       wp; rnd (mem Sample.l); skip=> //=.
       progress.
         have:= Mu_mem.mu_mem_le_size (Sample.l{hr}) uT (mu uT (pred1 witness)) _.
-        move=> x _; rewrite /mu_x; cut: mu uT (pred1 x) = mu uT (pred1 witness); last smt.
-        have [uT_fu [_ uT_suf]]:= uT_ufT.
-        by apply uT_suf; apply uT_fu.
-        by smt.
+          move=> x _; rewrite /mu_x; cut: mu uT (pred1 x) = mu uT (pred1 witness); last smt.
+          have [uT_fu [_ uT_suf]]:= uT_ufT.
+          by apply uT_suf; apply uT_fu.
+        move /(Trans _ ((size Sample.l{hr})%r * mu uT (pred1 witness)))=> -> //=.
+        by apply/mulrMle; smt.
         by move: H4; rewrite H0.
       by progress; proc; rcondt 2; auto; smt.
       by progress; proc; rcondf 2; auto.
@@ -257,7 +259,7 @@ section.
 
   lemma pr_collision_bounded_oracles &m:
     Pr[Exp(Bounder(Sample),A).main() @ &m: !uniq Sample.l]
-    <= (q^2)%r * mu uT ((=) witness).
+    <= (q^2)%r * mu uT (pred1 witness).
   proof.
     cut ->: Pr[Exp(Bounder(Sample),A).main() @ &m: !uniq Sample.l]
             = Pr[Exp(BSample,A).main() @ &m: size Sample.l <= q /\ !uniq Sample.l].

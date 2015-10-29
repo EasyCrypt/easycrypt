@@ -304,7 +304,7 @@ theory Dinter.
     is_subuniform (dinter i j).
   proof.
     move=> x y x_in_supp y_in_supp.
-    by rewrite -!/(mu_x _ _) !mu_x_def_in.
+    by rewrite -/(mu_x _ x) -/(mu_x _ y) !mu_x_def_in.
   qed.
 end Dinter.
 
