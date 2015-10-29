@@ -221,7 +221,7 @@ let t_simplify ?target ?(delta=true) (tc : tcenv1) =
   t_simplify_with_info ?target ri tc
 
 (* -------------------------------------------------------------------- *)
-let t_clears ?(leniant = false) xs tc =
+let t_clears1 ?(leniant = false) xs tc =
   let (hyps, concl) = FApi.tc1_flat tc in
 
   let xs =
@@ -231,22 +231,32 @@ let t_clears ?(leniant = false) xs tc =
       raise (ClearError (lazy (`ClearInGoal (ids ()))))
     else xs
   in
-      
+
+  if Sid.is_empty xs then tc else
+
   let hyps =
     try  LDecl.clear ~leniant xs hyps
     with LDecl.LdeclError (LDecl.CannotClear (id1, id2)) ->
       raise (ClearError (lazy (`ClearDep (id1, id2))))
   in
 
-  FApi.mutate (!@tc) (fun hd -> VConv (hd, xs)) ~hyps concl
+  FApi.mutate1 tc (fun hd -> VConv (hd, xs)) ~hyps concl
+
+(* -------------------------------------------------------------------- *)
+let t_clear1 ?leniant x tc =
+  t_clears1 ?leniant (Sid.singleton x) tc
 
 (* -------------------------------------------------------------------- *)
 let t_clear ?leniant x tc =
-  t_clears ?leniant (Sid.singleton x) tc
+  FApi.tcenv_of_tcenv1 (t_clears1 ?leniant (Sid.singleton x) tc)
+
+(* -------------------------------------------------------------------- *)
+let t_clears1 ?leniant xs tc =
+  t_clears1 ?leniant (Sid.of_list xs) tc
 
 (* -------------------------------------------------------------------- *)
 let t_clears ?leniant xs tc =
-  t_clears ?leniant (Sid.of_list xs) tc
+  FApi.tcenv_of_tcenv1 (t_clears1 ?leniant xs tc)
 
 (* -------------------------------------------------------------------- *)
 module LowIntro = struct
@@ -427,7 +437,9 @@ let t_apply_hd (hd : handle) ?args ?sk tc =
   tt_apply_hd hd ?args ?sk (FApi.tcenv_of_tcenv1 tc)
 
 (* -------------------------------------------------------------------- *)
-let t_generalize_hyps ?(clear = `No) ?(missing = false) ?naming ids tc =
+type genclear = [`Clear | `TryClear | `NoClear]
+
+let t_generalize_hyps_x ?(missing = false) ?naming ids tc =
   let env, hyps, concl = FApi.tc1_eflat tc in
 
   let fresh x =
@@ -439,22 +451,29 @@ let t_generalize_hyps ?(clear = `No) ?(missing = false) ?naming ids tc =
       | Some x -> EcIdent.create x
   in
 
-  let rec for1 (s, bds, args) id =
+  let rec for1 (s, bds, args, cls) (clid, id) =
     try
+      let cls =
+        match clid with
+        | `TryClear -> (true , id) :: cls
+        | `Clear    -> (false, id) :: cls
+        | `NoClear  -> cls
+      in
+
       match LDecl.ld_subst s (LDecl.by_id id hyps) with
       | LD_var (ty, _) ->
           let x    = fresh id in
           let s    = Fsubst.f_bind_local s id (f_local x ty) in
           let bds  = `Forall (x, GTty ty) :: bds in
           let args = PAFormula (f_local id ty) :: args in
-          (s, bds, args)
+          (s, bds, args, cls)
 
       | LD_mem mt ->
         let x    = fresh id in
         let s    = Fsubst.f_bind_mem s id x in
         let bds  = `Forall (x, GTmem mt) :: bds in
         let args = PAMemory id :: args in
-        (s, bds, args)
+        (s, bds, args, cls)
 
       | LD_modty (mt,r) ->
         let x    = fresh id in
@@ -463,22 +482,25 @@ let t_generalize_hyps ?(clear = `No) ?(missing = false) ?naming ids tc =
         let sig_ = (EcEnv.Mod.by_mpath mp env).EcModules.me_sig in
         let bds  = `Forall (x, GTmodty (mt, r)) :: bds in
         let args = PAModule (mp, sig_) :: args in
-        (s, bds, args)
+        (s, bds, args, cls)
 
       | LD_hyp f ->
         let bds  = `Imp f :: bds in
         let args = palocal id :: args in
-        (s, bds, args)
+        (s, bds, args, cls)
 
       | LD_abs_st _ ->
           raise InvalidGoalShape
 
-    with LDecl.LdeclError _ when missing -> (s, bds, args)
+    with LDecl.LdeclError _ when missing -> (s, bds, args, cls)
 
   in
 
-  let (s, bds, args) = (Fsubst.f_subst_id, [], []) in
-  let (s, bds, args) = List.fold_left for1 (s, bds, args) ids in
+  let (s, bds, args, cls) = (Fsubst.f_subst_id, [], [], []) in
+  let (s, bds, args, cls) = List.fold_left for1 (s, bds, args, cls) ids in
+
+  let cltry, cldo = List.partition fst cls in
+  let cltry, cldo = (List.map snd cltry, List.map snd cldo) in
 
   let ff =
     List.fold_left
@@ -490,13 +512,20 @@ let t_generalize_hyps ?(clear = `No) ?(missing = false) ?naming ids tc =
 
   let pt = { pt_head = PTCut ff; pt_args = List.rev args; } in
   let tc = t_apply pt tc in
-  let ct =
-    match clear with
-    | `No  -> None
-    | `Yes -> Some (t_clears ~leniant:false ids)
-    | `Try -> Some (t_clears ~leniant:true  ids)
+  let ct = fun tc -> tc
+    |> t_clears1 ~leniant:true  cltry
+    |> t_clears1 ~leniant:false cldo
+    |> FApi.tcenv_of_tcenv1
 
-  in ct |> omap (fun ct -> FApi.t_onall ct tc) |> odfl tc
+  in FApi.t_onall ct tc
+
+let t_generalize_hyps ?(clear = `No) ?missing ?naming ids tc =
+  let ids =
+    match clear with
+    | `Yes -> List.map (fun x -> (`Clear   , x)) ids
+    | `Try -> List.map (fun x -> (`TryClear, x)) ids
+    | `No  -> List.map (fun x -> (`NoClear , x)) ids
+  in t_generalize_hyps_x ?missing ?naming ids tc
 
 let t_generalize_hyp ?clear ?missing ?naming id tc =
   t_generalize_hyps ?clear ?missing ?naming [id] tc

@@ -1734,8 +1734,8 @@ intro_pattern_1:
 | STAR        { `Full }
 
 intro_pattern:
-| x=loc(intro_pattern_1)
-   { IPCore x }
+| dup=boption(TILD) x=loc(intro_pattern_1)
+   { IPCore (dup, x) }
 
 | LBRACKET mode=icasemode RBRACKET
    { IPCase (mode, []) }

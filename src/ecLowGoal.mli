@@ -186,6 +186,14 @@ val t_intros_i_seq : ?clear:bool -> ident list -> FApi.backward -> FApi.backward
 val t_intros_s_seq : inames -> FApi.backward -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
+type genclear = [`Clear | `TryClear | `NoClear]
+
+val t_generalize_hyps_x :
+     ?missing:bool
+  -> ?naming:(ident -> symbol option)
+  -> (genclear * EcIdent.t) list
+  -> FApi.backward
+
 val t_generalize_hyps :
      ?clear:[`Yes|`No|`Try] -> ?missing:bool
   -> ?naming:(ident -> symbol option)
@@ -197,6 +205,9 @@ val t_generalize_hyp  :
   -> EcIdent.t -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
+val t_clear1  : ?leniant:bool -> ident -> tcenv1 -> tcenv1
+val t_clears1 : ?leniant:bool -> ident list -> tcenv1 -> tcenv1
+
 val t_clear  : ?leniant:bool -> ident -> FApi.backward
 val t_clears : ?leniant:bool -> ident list -> FApi.backward
 

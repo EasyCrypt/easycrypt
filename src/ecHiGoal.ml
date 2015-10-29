@@ -694,28 +694,35 @@ let process_view pes tc =
 (* -------------------------------------------------------------------- *)
 module IntroState : sig
   type state
+  type action = [ `Revert | `Dup ]
 
-  val create  : unit  -> state
-  val push    : ?name:symbol -> EcIdent.t -> state -> unit
-  val listing : state -> EcIdent.t list
+  val create  : unit -> state
+  val push    : ?name:symbol -> action -> EcIdent.t -> state -> unit
+  val listing : state -> (genclear * EcIdent.t) list
   val naming  : state -> (EcIdent.t -> symbol option)
 end = struct
   type state = {
-    mutable torev  : EcIdent.t list;
+    mutable torev  : (genclear * EcIdent.t) list;
     mutable naming : symbol option Mid.t;
   }
+
+  and action = [ `Revert | `Dup ]
 
   let create () =
     { torev = []; naming = Mid.empty; }
 
-  let push ?name id st =
+  let push ?name action id st =
     let map =
       Mid.change (function
       | None   -> Some name
       | Some _ -> assert false)
       id st.naming
+    and action =
+      match action with
+      | `Revert -> `TryClear
+      | `Dup    -> `NoClear
     in
-      st.torev  <- id :: st.torev;
+      st.torev  <- (action, id) :: st.torev;
       st.naming <- map
 
   let listing (st : state) =
@@ -730,7 +737,7 @@ let process_mintros ?(cf = true) pis gs =
 
   let mk_intro ids (hyps, form) =
     let (_, torev), ids =
-        List.map_fold (fun ((hyps, form), torev) s ->
+        List.map_fold (fun ((hyps, form), torev) (dup, s) ->
         let rec destruct fp =
           match EcFol.sform_of_form fp with
           | SFquant (Lforall, (x, _)  , lazy fp) ->
@@ -753,10 +760,21 @@ let process_mintros ?(cf = true) pis gs =
           | `FindName     -> false, LDecl.fresh_id hyps name
           | `NoRename s   -> false, EcIdent.create s
           | `WithRename s -> false, LDecl.fresh_id hyps s in
-  
-        let id    = mk_loc s.pl_loc id in
-        let hyps  = LDecl.add_local id.pl_desc (LD_var (tbool, None)) hyps in
-        let torev = if revert then (unloc id, revname) :: torev else torev in
+
+        let id     = mk_loc s.pl_loc id in
+        let hyps   = LDecl.add_local id.pl_desc (LD_var (tbool, None)) hyps in
+        let torev  =
+          match
+            match revert, dup with
+            | true, _ -> Some `Revert
+            | _, true -> Some `Dup
+            | _, _    -> None
+          with
+          | Some action ->
+               (action, unloc id, revname) :: torev
+          | None ->
+               torev
+        in
           ((hyps, form), torev), Tagged (unloc id, Some id.pl_loc))
         ((hyps, form), []) ids
 
@@ -804,7 +822,7 @@ let process_mintros ?(cf = true) pis gs =
 
   let rec intro1_core (st : ST.state) ids (tc : tcenv1) =
     let torev, ids = mk_intro ids (FApi.tc1_flat tc) in
-    List.iter (fun (id, name) -> ST.push ?name id st) torev;
+    List.iter (fun (act, id, name) -> ST.push ?name act id st) torev;
     t_intros ids tc
 
   and intro1_done (_ : ST.state) (simplify : bool) (tc : tcenv1) =
@@ -911,8 +929,8 @@ let process_mintros ?(cf = true) pis gs =
   let tr = ST.listing st in
 
   t_onall (fun tc ->
-    t_generalize_hyps
-      ~clear:`Try ~missing:true ~naming:(ST.naming st)
+    t_generalize_hyps_x
+      ~missing:true ~naming:(ST.naming st)
       tr tc)
     gs
 
