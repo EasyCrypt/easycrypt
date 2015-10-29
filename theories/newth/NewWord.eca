@@ -30,25 +30,35 @@ lemma wordP (w1 w2 : word):
       w1 = w2
   <=> forall (i:int), 0 <= i < l => w1.[i] = w2.[i].
 proof.
-  split=> //= h.
-  by apply/val_inj/Array.arrayP; rewrite !valP //= => i /h; rewrite !selE.
+split=> //= h.
+by apply/val_inj/Array.arrayP; rewrite !valP /= => i /h; rewrite !selE.
 qed.
 
 lemma sel_upd (w : word) (x : t) (i j : int):
     w.[i <- x].[j]
   = if 0 <= i < l /\ j = i then x else w.[j].
 proof.
-  rewrite !selE updE val_insubd Array.size_set valP /= -(valP w).
-  exact Array.get_set.
+rewrite !selE updE val_insubd Array.size_set valP /= -(valP w).
+exact Array.get_set.
 qed.
 
 lemma upd_out (n : int) (a : t) (w : word):
-  n < 0 \/ l <= n =>
+  !(0 <= n < l) =>
   w.[n <- a] = w.
 proof.
-  move=> n_out_of_bounds; apply/wordP=> i i_in_bounds.
-  by rewrite sel_upd; smt.
+move=> n_out_of_bounds; apply/wordP=> i i_in_bounds.
+by rewrite sel_upd n_out_of_bounds.
 qed.
+
+lemma upd_neg (n : int) (a : t) (w : word):
+  n < 0 =>
+  w.[n <- a] = w.
+proof. by rewrite ltzNge=> gt0_n; rewrite upd_out 1:gt0_n. qed.
+
+lemma upd_gt_l (n : int) (a : t) (w : word):
+  l <= n =>
+  w.[n <- a] = w.
+proof. by rewrite lezNgt=> lel_n; rewrite upd_out 1:lel_n. qed.
 
 lemma upd_upd (w : word) (n n' : int) (x x' : t):
   forall i,
@@ -57,19 +67,19 @@ lemma upd_upd (w : word) (n n' : int) (x x' : t):
        then w.[n' <- x'].[i]
        else w.[n' <- x'].[n <- x].[i].
 proof.
-  case (n = n')=> [->> /= |].
-    move=> i; rewrite !sel_upd; case (i = n')=> //=.
-    by case (0 <= n' < l).
-  move=> ne_n_n' i; case (i = n')=> [->> /= {i} |].
-    by rewrite !sel_upd /= @(eq_sym n') ne_n_n'.
-  move=> ne_i_n'; case (i = n)=> [->> /= {i} |].
-    by rewrite !sel_upd /= ne_n_n'.
-  by move=> ne_i_n; rewrite !sel_upd ne_i_n ne_i_n'.
+case (n = n')=> [->> /= |].
+  move=> i; rewrite !sel_upd; case (i = n')=> //=.
+  by case (0 <= n' < l).
+move=> ne_n_n' i; case (i = n')=> [->> /= {i} |].
+  by rewrite !sel_upd /= @(eq_sym n') ne_n_n'.
+move=> ne_i_n'; case (i = n)=> [->> /= {i} |].
+  by rewrite !sel_upd /= ne_n_n'.
+by move=> ne_i_n; rewrite !sel_upd ne_i_n ne_i_n'.
 qed.
 
-lemma upd_upd_eq (w : word) (n : int) (x x' : t):
-  forall i, w.[n <- x].[n <- x'].[i] = w.[n <- x'].[i].
-proof. by move=> i; rewrite upd_upd. qed.
+lemma upd_upd_eq (w : word) (n : int) (x x' : t) i:
+  w.[n <- x].[n <- x'].[i] = w.[n <- x'].[i].
+proof. by rewrite upd_upd. qed.
 
 (* -------------------------------------------------------------------- *)
 op mkword f: word = insubd (mkseq f l)
@@ -77,7 +87,7 @@ op mkword f: word = insubd (mkseq f l)
 
 lemma sel_mkword f i: 0 <= i < l => (mkword f).[i] = f i.
 proof.
-  by move=> i_bnd; rewrite mkwordE selE val_insubd size_mkseq; smt.
+by move=> i_bnd; rewrite mkwordE selE val_insubd size_mkseq; smt.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -86,8 +96,8 @@ op map (f: t -> t) (w : word): word = insubd (map f (val w))
 
 lemma sel_map f w i: 0 <= i < l => (map f w).[i] = f w.[i].
 proof.
-  move=> i_bnd; rewrite mapE !selE val_insubd size_map valP /=.
-  by rewrite !Array.getE; apply/nth_map; rewrite valP.
+move=> i_bnd; rewrite mapE !selE val_insubd size_map valP /=.
+by rewrite !Array.getE; apply/nth_map; rewrite valP.
 qed.
 
 (* -------------------------------------------------------------------- *)
