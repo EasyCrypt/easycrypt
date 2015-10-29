@@ -129,7 +129,14 @@ proof *.
   by split; 2:exact/val_inj.
   qed.
 
-axiom word_card: card = Alphabet.card^l.
+lemma word_card: card = Alphabet.card^l.
+proof.
+rewrite /card /enum size_map Witness.size_wordn /Witness.Support.card.
+by rewrite /max gt0_l.
+qed.
+
+lemma non_trivial: 0 < card
+by [].
 
 (* -------------------------------------------------------------------- *)
 (** TODO: Figure out what cloning support is needed to allow this to
