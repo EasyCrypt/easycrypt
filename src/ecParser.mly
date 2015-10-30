@@ -388,6 +388,7 @@
 %token GENERALIZE
 %token GLOB
 %token GOAL
+%token HAT
 %token HAVE
 %token HINT
 %token HOARE
@@ -534,7 +535,7 @@
 %right RARROW
 %left  LOP3 STAR SLASH
 %right ROP3
-%left  LOP4 AT AMP
+%left  LOP4 AT AMP HAT
 %right ROP4
 
 %nonassoc LBRACE
@@ -696,6 +697,7 @@ fident:
 | AND   { "/\\" }
 | ANDA  { "&&"  }
 | AMP   { "&"   }
+| HAT   { "^"   }
 
 | x=LOP1 | x=LOP2 | x=LOP3 | x=LOP4
 | x=ROP1 | x=ROP2 | x=ROP3 | x=ROP4
@@ -1708,25 +1710,32 @@ tselect:
 (* -------------------------------------------------------------------- *)
 (* tactic                                                               *)
 
-intro_pattern_1_name:
+ipcore_name:
 | s=_lident { s }
 | s=_uident { s }
 | s=_mident { s }
 
-intro_pattern_1:
+ipcore:
+| PLUS
+   { `Temp None }
+
+| TILD ip=ipcore_renaming
+   { `Temp (Some ip) }
+
+| ip=ipcore_renaming
+   { `Renaming ip }
+
+ipcore_renaming:
 | UNDERSCORE
    { `NoName }
-
-| PLUS
-   { `Temp }
 
 | QUESTION
    { `FindName }
 
-| s=intro_pattern_1_name
+| s=ipcore_name
    { `NoRename s }
 
-| s=intro_pattern_1_name NOT
+| s=ipcore_name NOT
    { `WithRename s }
 
 %inline icasemode:
@@ -1734,8 +1743,11 @@ intro_pattern_1:
 | STAR        { `Full }
 
 intro_pattern:
-| dup=boption(TILD) x=loc(intro_pattern_1)
-   { IPCore (dup, x) }
+| x=loc(ipcore)
+   { IPCore x }
+
+| HAT x=loc(ipcore_renaming)
+   { IPDup x }
 
 | LBRACKET mode=icasemode RBRACKET
    { IPCase (mode, []) }
@@ -1758,7 +1770,7 @@ intro_pattern:
 | LLARROW
    { IPSubst `RtoL }
 
-| LBRACE xs=loc(intro_pattern_1_name)+ RBRACE
+| LBRACE xs=loc(ipcore_name)+ RBRACE
    { IPClear xs }
 
 | SLASHSLASH
@@ -2063,7 +2075,7 @@ logtactic:
 | MOVE vw=prefix(SLASH, pterm)* gp=option(prefix(COLON, genpattern+))
    { Pmove (vw, odfl [] gp) }
 
-| CLEAR l=loc(intro_pattern_1_name)+
+| CLEAR l=loc(ipcore_name)+
    { Pclear l }
 
 | CONGR

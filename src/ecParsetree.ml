@@ -599,7 +599,8 @@ and rwocci    = [`Inclusive | `Exclusive]
 
 (* -------------------------------------------------------------------- *)
 type intropattern1 =
-  | IPCore   of (bool * renaming located)
+  | IPCore   of ipcore located
+  | IPDup    of renaming located
   | IPCase   of ([`One|`Full] * intropattern list)
   | IPView   of ppterm
   | IPRw     of (rwocc * rwside)
@@ -612,16 +613,20 @@ type intropattern1 =
 
 and intropattern = intropattern1 list
 
+and ipcore = [
+  | `Temp     of renaming option
+  | `Renaming of renaming
+  ]
+
 and renaming = [
   | `NoName
   | `FindName
-  | `Temp
   | `WithRename of string
-  | `NoRename of string
+  | `NoRename   of string
 ]
 
-type genpattern = [`ProofTerm of ppterm | `Form of (rwocc * pformula)]
-
+type genpattern =
+  [ `ProofTerm of ppterm | `Form of (rwocc * pformula) ]
 
 (* -------------------------------------------------------------------- *)
 type ppgoption = [

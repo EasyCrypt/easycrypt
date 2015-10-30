@@ -212,6 +212,7 @@
     ("<<-", (LLARROW     , false));
     ("->>", (RRARROW     , false));
     ("!"  , (NOT         , false));
+    ("^"  , (HAT         , false));
     ("&"  , (AMP         , false));
     ("&&" , (ANDA        , false));
     ("/\\", (AND         , false));

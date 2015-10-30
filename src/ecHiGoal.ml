@@ -742,7 +742,7 @@ let rec process_mintros ?(cf = true) pis gs =
 
   let mk_intro ids (hyps, form) =
     let (_, torev), ids =
-        List.map_fold (fun ((hyps, form), torev) (dup, s) ->
+        List.map_fold (fun ((hyps, form), torev) s ->
         let rec destruct fp =
           match EcFol.sform_of_form fp with
           | SFquant (Lforall, (x, _)  , lazy fp) ->
@@ -759,28 +759,26 @@ let rec process_mintros ?(cf = true) pis gs =
         in
         let name, revname, form = destruct form in
         let revert, id =
-          match unloc s with
-          | `NoName       -> false, EcIdent.create "_"
-          | `Temp         -> true , EcIdent.create "_"
-          | `FindName     -> false, LDecl.fresh_id hyps name
-          | `NoRename s   -> false, EcIdent.create s
-          | `WithRename s -> false, LDecl.fresh_id hyps s in
+          let id_of_renaming = function
+            | `NoName       -> EcIdent.create "_"
+            | `FindName     -> LDecl.fresh_id hyps name
+            | `NoRename s   -> EcIdent.create s
+            | `WithRename s -> LDecl.fresh_id hyps s
+          in
+            match unloc s with
+            | `Temp None     -> Some false, EcIdent.create "_"
+            | `Temp (Some s) -> Some true , id_of_renaming s
+            | `Renaming s    -> None      , id_of_renaming s
+        in
 
         let id     = mk_loc s.pl_loc id in
         let hyps   = LDecl.add_local id.pl_desc (LD_var (tbool, None)) hyps in
-        let torev  =
-          match
-            match revert, dup with
-            | true, _ -> Some `Revert
-            | _, true -> Some `Dup
-            | _, _    -> None
-          with
-          | Some action ->
-               (action, unloc id, revname) :: torev
-          | None ->
-               torev
-        in
-          ((hyps, form), torev), Tagged (unloc id, Some id.pl_loc))
+        let revert = revert |> omap (fun b -> if b then `Dup else `Revert) in
+        let torev  = revert
+          |> omap (fun b -> (b, unloc id, revname) :: torev)
+          |> odfl torev
+        in ((hyps, form), torev), Tagged (unloc id, Some id.pl_loc))
+
         ((hyps, form), []) ids
 
     in (torev, ids)
@@ -802,6 +800,9 @@ let rec process_mintros ?(cf = true) pis gs =
 
     | IPCore x :: pis ->
         collect intl acc (x :: core) pis
+
+    | IPDup x :: pis ->
+        collect intl (`Dup x :: maybe_core ()) [] pis
 
     | IPDone b :: pis ->
         collect intl (`Done b :: maybe_core ()) [] pis
@@ -835,6 +836,17 @@ let rec process_mintros ?(cf = true) pis gs =
     let torev, ids = mk_intro ids (FApi.tc1_flat tc) in
     List.iter (fun (act, id, name) -> ST.push ?name act id st) torev;
     t_intros ids tc
+
+  and intro1_dup (st : ST.state) id (tc : tcenv1) =
+    let id = mk_loc id.pl_loc (`Temp (Some (unloc id))) in
+    let torev, ids = mk_intro [id] (FApi.tc1_flat tc) in
+    let subst = ST.create () in
+    List.iter (fun (act, id, name) -> ST.push ?name act id subst) torev;
+    t_onall (fun tc ->
+      t_generalize_hyps_x
+        ~missing:true ~naming:(ST.naming st)
+        (ST.listing subst) tc)
+      (t_intros ids tc)
 
   and intro1_done (_ : ST.state) (simplify : bool) (tc : tcenv1) =
     let t =
@@ -905,6 +917,9 @@ let rec process_mintros ?(cf = true) pis gs =
         match pi with
         | `Core ids ->
             (false, t_onall (intro1_core st ids) gs)
+
+        | `Dup id ->
+            (false, t_onall (intro1_dup st id) gs)
   
         | `Done b ->
             (nointro, t_onall (intro1_done st b) gs)
@@ -939,12 +954,11 @@ let rec process_mintros ?(cf = true) pis gs =
     let st = ST.create () in
     let ip, pis = collect pis in
     let gs = dointro st true (List.rev ip) gs in
-    let tr = ST.listing st in
     let gs =
       t_onall (fun tc ->
         t_generalize_hyps_x
           ~missing:true ~naming:(ST.naming st)
-          tr tc)
+          (ST.listing st) tc)
         gs in
 
     if List.is_empty pis then gs else
