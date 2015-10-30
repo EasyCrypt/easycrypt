@@ -608,6 +608,7 @@ type intropattern1 =
   | IPClear  of psymbol list
   | IPDone   of bool
   | IPSimplify
+  | IPBreak
 
 and intropattern = intropattern1 list
 

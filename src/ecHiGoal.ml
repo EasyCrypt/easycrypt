@@ -732,7 +732,12 @@ end = struct
     Mid.find_opt x st.naming |> odfl None
 end
 
-let process_mintros ?(cf = true) pis gs =
+(* -------------------------------------------------------------------- *)
+exception IntroCollect of [
+  `InternalBreak
+]
+
+let rec process_mintros ?(cf = true) pis gs =
   let module ST = IntroState in
 
   let mk_intro ids (hyps, form) =
@@ -781,7 +786,7 @@ let process_mintros ?(cf = true) pis gs =
     in (torev, ids)
   in
 
-  let rec collect acc core pis =
+  let rec collect intl acc core pis =
     let maybe_core () =
       match core with
       | [] -> acc
@@ -789,36 +794,42 @@ let process_mintros ?(cf = true) pis gs =
     in
 
     match pis with
-    | [] -> maybe_core ()
+    | [] -> (maybe_core (), [])
+
+    | IPBreak :: pis ->
+       if intl then raise (IntroCollect `InternalBreak);
+       (maybe_core (), pis)
 
     | IPCore x :: pis ->
-        collect acc (x :: core) pis
+        collect intl acc (x :: core) pis
 
     | IPDone b :: pis ->
-        collect (`Done b :: maybe_core ()) [] pis
+        collect intl (`Done b :: maybe_core ()) [] pis
 
     | IPSimplify :: pis ->
-        collect (`Simpl :: maybe_core ()) [] pis
+        collect intl (`Simpl :: maybe_core ()) [] pis
 
     | IPClear xs :: pis ->
-        collect (`Clear xs :: maybe_core ()) [] pis
+        collect intl (`Clear xs :: maybe_core ()) [] pis
 
     | IPCase (mode, x) :: pis ->
-        let x = List.map (List.rev -| collect [] []) x in
-          collect (`Case (mode, x) :: maybe_core ()) [] pis
+        let x = List.map (List.rev -| fst -| collect true [] []) x in
+        collect intl (`Case (mode, x) :: maybe_core ()) [] pis
 
     | IPRw x :: pis ->
-        collect (`Rw x :: maybe_core ()) [] pis
+        collect intl (`Rw x :: maybe_core ()) [] pis
 
     | IPDelta ((s, o), x) :: pis ->
-        collect (`Delta ((s, o), x) :: maybe_core ()) [] pis
+        collect intl (`Delta ((s, o), x) :: maybe_core ()) [] pis
 
     | IPView x :: pis ->
-        collect (`View x :: maybe_core ()) [] pis
+        collect intl (`View x :: maybe_core ()) [] pis
 
     | IPSubst x :: pis ->
-        collect (`Subst x :: maybe_core ()) [] pis
+        collect intl (`Subst x :: maybe_core ()) [] pis
   in
+
+  let collect pis = collect false [] [] pis in
 
   let rec intro1_core (st : ST.state) ids (tc : tcenv1) =
     let torev, ids = mk_intro ids (FApi.tc1_flat tc) in
@@ -924,15 +935,27 @@ let process_mintros ?(cf = true) pis gs =
   and dointro1 st nointro pis tc =
     dointro st nointro pis (FApi.tcenv_of_tcenv1 tc) in
 
-  let st = ST.create () in
-  let gs = dointro st true (List.rev (collect [] [] pis)) gs in
-  let tr = ST.listing st in
+  try
+    let st = ST.create () in
+    let ip, pis = collect pis in
+    let gs = dointro st true (List.rev ip) gs in
+    let tr = ST.listing st in
+    let gs =
+      t_onall (fun tc ->
+        t_generalize_hyps_x
+          ~missing:true ~naming:(ST.naming st)
+          tr tc)
+        gs in
 
-  t_onall (fun tc ->
-    t_generalize_hyps_x
-      ~missing:true ~naming:(ST.naming st)
-      tr tc)
-    gs
+    if List.is_empty pis then gs else
+      gs |> t_onall (fun tc ->
+        process_mintros ~cf:true pis (FApi.tcenv_of_tcenv1 tc))
+
+  with IntroCollect e -> begin
+    match e with
+    | `InternalBreak ->
+         tc_error !$gs "cannot use internal break in intro-patterns"
+  end
 
 (* -------------------------------------------------------------------- *)
 let process_intros ?cf pis tc =
