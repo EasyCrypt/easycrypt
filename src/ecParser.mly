@@ -342,7 +342,6 @@
 %token CEQ
 %token CFOLD
 %token CHANGE
-%token CHOICE
 %token CLASS
 %token CLEAR
 %token CLONE
@@ -1620,10 +1619,6 @@ predicate:
    { { pp_name   = x;
        pp_tyvars = tyvars;
        pp_def    = PPconcr(p,f); } }
-
-choice:
-| CHOICE x=lident WITH lx=qident
-   { { pc_name = x; pc_lemma = lx; } }
 
 (* -------------------------------------------------------------------- *)
 top_decl:
@@ -2963,7 +2958,6 @@ global_action:
 | tycinstance      { Gtycinstance $1 }
 | operator         { Goperator    $1 }
 | predicate        { Gpredicate   $1 }
-| choice           { Gchoice      $1 }
 | axiom            { Gaxiom       $1 }
 | tactics_or_prf   { Gtactics     $1 }
 | tactic_dump      { Gtcdump      $1 }

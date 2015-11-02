@@ -315,12 +315,6 @@ type ppredicate = {
 }
 
 (* -------------------------------------------------------------------- *)
-type pchoice = {
-  pc_name  : psymbol;
-  pc_lemma : pqsymbol;
-}
-
-(* -------------------------------------------------------------------- *)
 type pdeclare =
 | PDCL_Module of pmodule_decl
 
@@ -891,7 +885,6 @@ type global_action =
   | Gmodule      of pmodule_def
   | Ginterface   of (psymbol * pmodule_sig)
   | Goperator    of poperator
-  | Gchoice      of pchoice
   | Gpredicate   of ppredicate
   | Gaxiom       of paxiom
   | Gtype        of ptydecl list

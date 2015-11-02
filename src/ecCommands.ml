@@ -302,13 +302,6 @@ and process_predicate (scope : EcScope.scope) (p : ppredicate located) =
     scope
 
 (* -------------------------------------------------------------------- *)
-and process_choice (scope : EcScope.scope) (c : pchoice located) =
-  EcScope.check_state `InTop "choice" scope;
-  let scope = EcScope.Op.add_choiceop scope c in
-    EcScope.notify scope `Info "added choice operator: `%s'" (unloc c.pl_desc.pc_name);
-    scope                                 (* FIXME *)
-
-(* -------------------------------------------------------------------- *)
 and process_axiom (scope : EcScope.scope) (ax : paxiom located) =
   EcScope.check_state `InTop "axiom" scope;
   let (name, scope) = EcScope.Ax.add scope (!pragma).pm_check ax in
@@ -533,7 +526,6 @@ and process (ld : Loader.loader) (scope : EcScope.scope) g =
       | Ginterface   i    -> `Fct   (fun scope -> process_interface  scope  i)
       | Goperator    o    -> `Fct   (fun scope -> process_operator   scope  (mk_loc loc o))
       | Gpredicate   p    -> `Fct   (fun scope -> process_predicate  scope  (mk_loc loc p))
-      | Gchoice      c    -> `Fct   (fun scope -> process_choice     scope  (mk_loc loc c))
       | Gaxiom       a    -> `Fct   (fun scope -> process_axiom      scope  (mk_loc loc a))
       | GthOpen      name -> `Fct   (fun scope -> process_th_open    scope  (snd_map unloc name))
       | GthClose     name -> `Fct   (fun scope -> process_th_close   scope  name.pl_desc)

@@ -1136,67 +1136,6 @@ module Op = struct
       end else scope
 
     in scope
-
-  let add_choiceop (scope : scope) (c : pchoice located) =
-    let { pl_loc = loc; pl_desc = c } = c in
-    let _, ax = EcEnv.Ax.lookup (unloc c.pc_lemma) (env scope) in
-    let hyps  = EcEnv.LDecl.init (env scope) ax.ax_tparams in
-
-    (match EcSection.olocals scope.sc_section with
-     | None -> ()
-     | Some locals ->
-        if EcSection.form_use_local_or_abs (oget ax.ax_spec) locals then
-          hierror "choice formula cannot use local/abstracts modules");
-
-    let rec destruct fp =
-      let destruct1 fp =
-        match EcFol.sform_of_form fp with
-        | SFquant (Lforall, (x, GTty t), lazy f) ->
-            `Forall (x, t, f)
-        | SFquant (Lexists, (x, GTty t), lazy f) ->
-            `Exists (x, t, f)
-        | _ -> raise TTC.NoMatch
-      in
-
-      match TTC.lazy_destruct ~reduce:true hyps destruct1 fp with
-      | None ->
-          hierror ~loc
-            "`%s' does not have the right form"
-            (string_of_qsymbol (unloc c.pc_lemma))
-
-      | Some (`Forall (x, t, f)) ->
-          fst_map (fun tl -> (x, t) :: tl) (destruct f)
-
-      | Some (`Exists (x, t, f)) ->
-          ([], (x, t, f)) in
-
-    let (args, (x, t, body)) = destruct (oget ax.ax_spec) in
-
-    let opname = unloc c.pc_name in
-    let axname = Printf.sprintf "%sE" opname in
-
-    let tvars = List.map (tvar |- fst) ax.ax_tparams in
-    let opty  = EcTypes.toarrow (List.map snd args) t in
-
-    let spec = f_op (EcPath.pqname (path scope) opname) tvars t in
-    let spec = f_app spec (List.map (fun (x, ty) -> f_local x ty) args) t in
-    let spec = Fsubst.f_subst_local x spec body in
-    let spec = f_forall (List.map (snd_map (fun ty -> GTty ty)) args) spec in
-
-    (* FIXME: refresh ? *)
-    let op = { op_tparams = ax.ax_tparams;
-               op_ty      = opty;
-               op_kind    = OB_oper None; }
-
-    and ax = { ax_tparams = ax.ax_tparams;
-               ax_spec    = Some spec;
-               ax_kind    = `Lemma;
-               ax_nosmt   = false; } in
-
-    let scope = bind scope (opname, op) in
-    let scope = Ax.bind scope false (axname, ax) in
-
-    scope
 end
 
 (* -------------------------------------------------------------------- *)
