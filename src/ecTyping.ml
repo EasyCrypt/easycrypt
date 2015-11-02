@@ -1388,15 +1388,23 @@ let transexp (env : EcEnv.env) mode ue e =
         unify_or_fail env ue pe2.pl_loc ~expct:ty1   ty2;
         (e_if c e1 e2, ty1)
 
+    | PEforall (xs, pe) ->
+        let env, xs = transbinding env ue xs in
+        let e, ety = transexp env pe in
+        unify_or_fail env ue pe.pl_loc ~expct:tbool ety;
+        (e_forall xs e, tbool)
+
+    | PEexists (xs, pe) ->
+        let env, xs = transbinding env ue xs in
+        let e, ety = transexp env pe in
+        unify_or_fail env ue pe.pl_loc ~expct:tbool ety;
+        (e_exists xs e, tbool)
+
     | PElambda (bd, pe) ->
         let env, xs = transbinding env ue bd in
         let e, ty = transexp env pe in
-        let ty =
-          List.fold_right
-            (fun (_, xty) ty -> EcTypes.tfun xty ty)
-            xs ty
-        in
-          (e_lam xs e, ty)
+        let ty = toarrow (List.map snd xs) ty in
+        (e_lam xs e, ty)
 
     | PErecord fields ->
         let (ctor, fields, (rtvi, reccty)) =

@@ -157,6 +157,7 @@ type expr = private {
 }
 
 and expr_node =
+  | Equant of equantif * ebindings * expr  (* forall/exists         *)
   | Elam   of (EcIdent.t * ty) list * expr (* lambda expression     *)
   | Eint   of zint                         (* int. literal          *)
   | Elocal of EcIdent.t                    (* let-variables         *)
@@ -168,7 +169,14 @@ and expr_node =
   | Eif    of expr * expr * expr           (* _ ? _ : _             *)
   | Eproj  of expr * int                   (* projection of a tuple *)
 
+and equantif  = [ `EForall | `EExists ]
+and ebinding  = EcIdent.t * ty
+and ebindings = ebinding list
+
 type closure = (EcIdent.t * ty) list * expr
+
+(* -------------------------------------------------------------------- *)
+val qt_equal : equantif -> equantif -> bool
 
 (* -------------------------------------------------------------------- *)
 val e_equal   : expr -> expr -> bool
@@ -188,6 +196,9 @@ val e_let      : lpattern -> expr -> expr -> expr
 val e_tuple    : expr list -> expr
 val e_if       : expr -> expr -> expr -> expr
 val e_lam      : (EcIdent.t * ty) list -> expr -> expr
+val e_quantif  : equantif -> ebindings -> expr -> expr
+val e_forall   : ebindings -> expr -> expr
+val e_exists   : ebindings -> expr -> expr
 val e_proj     : expr -> int -> ty -> expr
 
 val is_var     : expr -> bool

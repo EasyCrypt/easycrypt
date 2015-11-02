@@ -1167,6 +1167,15 @@ and pp_expr_core_r (ppe : PPEnv.t) outer fmt (e : expr) =
       in
         maybe_paren outer (fst outer, e_bin_prio_lambda) pp fmt ()
 
+  | Equant (qt, vardecls, e) ->
+      let (subppe, pp) = pp_locbinds ppe vardecls in
+      let pp fmt () =
+        Format.fprintf fmt "@[<hov 2>%s %t,@ %a@]"
+          (match qt with `EForall -> "forall" | `EExists -> "exists")
+          pp (pp_expr_r subppe (fst outer, (min_op_prec, `NonAssoc))) e
+      in
+        maybe_paren outer (fst outer, e_bin_prio_lambda) pp fmt ()
+
 and pp_expr ppe fmt e =
   pp_expr_r ppe ([], (min_op_prec, `NonAssoc)) fmt e
 

@@ -908,7 +908,10 @@ module Mpv2 = struct
     match e1.e_node, e2.e_node with
     | Elam(ids1,e1), Elam(ids2,e2) ->
       let local = enter_local env local ids1 ids2 in
-      add_eqs env local eqs e1 e2 
+      add_eqs env local eqs e1 e2
+    | Equant(qt1,bds1,e1), Equant(qt2,bds2,e2) when qt_equal qt1 qt2 ->
+      let local = enter_local env local bds1 bds2 in
+      add_eqs env local eqs e1 e2
     | Eint i1, Eint i2 when i1 = i2 -> eqs 
     | Elocal x1, Elocal x2 when 
         opt_equal EcIdent.id_equal (Some x1) (Mid.find_opt x2 local) -> eqs 

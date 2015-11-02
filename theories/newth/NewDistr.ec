@@ -54,11 +54,11 @@ proof.
 qed.
 
 op prS ['a] (E : 'a -> bool) (d : 'a distr) = fun (x : real) =>
-  existsb (fun (s : 'a list) => uniq s /\ x = BRA.big E (mu d) s).
+  exists (s : 'a list), uniq s /\ x = BRA.big E (mu d) s.
 
 lemma prSP ['a] (E : 'a -> bool) (d : 'a distr) (x : real):
   prS E d x <=> exists s, uniq s /\ x = BRA.big E (mu d) s.
-proof. split; first by move/existsbP. by move=> h; apply/existsbP. qed.
+proof. by rewrite /prS. qed.
   
 op pr ['a] (E : 'a -> bool) (d : 'a distr) = lub (prS E d).
 

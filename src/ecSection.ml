@@ -88,6 +88,7 @@ let rec on_mpath_expr cb (e : expr) =
     | Eint   _            -> ()
     | Elocal _            -> ()
     | Elam   (bds, e)     -> on_mpath_bindings cb bds; cbrec e
+    | Equant (_, bds, e)  -> on_mpath_bindings cb bds; cbrec e
     | Evar   pv           -> on_mpath_pv cb pv
     | Elet   (lp, e1, e2) -> on_mpath_lp cb lp; List.iter cbrec [e1; e2]
     | Etuple es           -> List.iter cbrec es

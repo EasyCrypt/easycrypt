@@ -853,6 +853,9 @@ expr_u:
 | FUN pd=ptybindings IMPL  e=expr
 | FUN pd=ptybindings COMMA e=expr { PElambda (pd, e) }
 
+| FORALL pd=ptybindings COMMA e=expr { PEforall (pd, e) }
+| EXIST  pd=ptybindings COMMA e=expr { PEexists (pd, e) }
+
 expr_field:
 | x=qident EQ e=expr
     { { rf_name = x ; rf_tvi = None; rf_value = e; } }

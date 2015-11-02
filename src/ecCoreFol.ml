@@ -1156,20 +1156,53 @@ let is_pr        f = is_from_destr destr_pr        f
 let is_eq_or_iff f = (is_eq f) || (is_iff f)
 
 (* -------------------------------------------------------------------- *)
-let rec form_of_expr mem (e: expr) =
+let quantif_of_equantif (qt : equantif) =
+  match qt with
+  | `EForall -> Lforall
+  | `EExists -> Lexists
+
+(* -------------------------------------------------------------------- *)
+let rec form_of_expr mem (e : expr) =
   match e.e_node with
-  | Eint n -> f_int n
-  | Elocal id -> f_local id e.e_ty
-  | Evar pv -> f_pvar pv e.e_ty mem
-  | Eop (op,tys) -> f_op op tys e.e_ty
-  | Eapp (ef,es) -> f_app (form_of_expr mem ef) (List.map (form_of_expr mem) es) e.e_ty
-  | Elet (lpt,e1,e2) -> f_let lpt (form_of_expr mem e1) (form_of_expr mem e2)
-  | Etuple es -> f_tuple (List.map (form_of_expr mem) es)
-  | Eproj(e1,i) -> f_proj (form_of_expr mem e1) i e.e_ty
-  | Eif (e1,e2,e3) ->
-      f_if (form_of_expr mem e1) (form_of_expr mem e2) (form_of_expr mem e3)
-  | Elam(b,e) ->
-    f_lambda (List.map (fun (x,ty) -> (x,GTty ty)) b) (form_of_expr mem e)
+  | Eint n ->
+     f_int n
+
+  | Elocal id ->
+     f_local id e.e_ty
+
+  | Evar pv ->
+     f_pvar pv e.e_ty mem
+
+  | Eop (op, tys) ->
+     f_op op tys e.e_ty
+
+  | Eapp (ef, es) ->
+     f_app (form_of_expr mem ef) (List.map (form_of_expr mem) es) e.e_ty
+
+  | Elet (lpt, e1, e2) ->
+     f_let lpt (form_of_expr mem e1) (form_of_expr mem e2)
+
+  | Etuple es ->
+     f_tuple (List.map (form_of_expr mem) es)
+
+  | Eproj (e1, i) ->
+     f_proj (form_of_expr mem e1) i e.e_ty
+
+  | Eif (e1, e2, e3) ->
+     let e1 = form_of_expr mem e1 in
+     let e2 = form_of_expr mem e2 in
+     let e3 = form_of_expr mem e3 in
+     f_if e1 e2 e3
+
+  | Elam (b, e) ->
+     f_lambda
+       (List.map (fun (x, ty) -> (x, GTty ty)) b)
+       (form_of_expr mem e)
+
+  | Equant (qt, b, e) ->
+     let b = List.map (fun (x, ty) -> (x, GTty ty)) b in
+     let e = form_of_expr mem e in
+     f_quant (quantif_of_equantif qt) b e
 
 (* -------------------------------------------------------------------- *)
 type f_subst = {
