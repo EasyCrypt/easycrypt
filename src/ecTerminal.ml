@@ -108,7 +108,7 @@ let from_emacs () = new from_emacs ()
 (* -------------------------------------------------------------------- *)
 class from_tty () : terminal =
 object
-  val iparser  = EcIo.from_channel ~name:"<tty>" stdin
+  val iparser = EcIo.from_channel ~name:"<tty>" stdin
 
   method interactive = true
 
@@ -148,8 +148,7 @@ object(self)
   val mutable loc   = LC._dummy
   val mutable doprg =
     (Sys.os_type = "Unix") &&
-    (Unix.isatty (Unix.descr_of_out_channel stdout))
-
+    (Unix.isatty (Unix.descr_of_out_channel stderr))
 
   method private _update_progress =
     let lineno   = fst (loc.LC.loc_end) in
@@ -184,7 +183,7 @@ object(self)
         if sz >= 0 && doprg then
           Printf.eprintf "%*s\r%!" (String.length fmt) ""
     end else Printf.eprintf "\n%!";
-    doprg <- not final
+    doprg <- doprg && not final
 
   method private _notice ?subloc ~immediate (lvl : loglevel) (msg : string) =
     let (_ : unit) = ignore immediate in

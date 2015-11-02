@@ -37,11 +37,14 @@ XUNITOUT  ?= xunit.xml
 ECARGS    ?=
 ECTOUT    ?= 5
 ECJOBS    ?= 1
+ECEXTRA   ?=
+ECPROVERS ?= Alt-Ergo Z3 Eprover
 CHECKPY   ?=
 CHECK     := $(CHECKPY) scripts/testing/runtest
-CHECK     += --bin-args="$(ECARGS)" --timeout="$(ECTOUT)" --jobs="$(ECJOBS)"
-CHECK     += config/tests.config
-CHECKCATS ?= prelude core theories encryption newth realized
+CHECK     += --bin-args="$(ECARGS)" --bin-args="$(ECPROVERS:%=-p %)"
+CHECK     += --timeout="$(ECTOUT)" --jobs="$(ECJOBS)"
+CHECK     += $(ECEXTRA) config/tests.config
+CHECKCATS ?= prelude stdlib
 
 # --------------------------------------------------------------------
 .PHONY: all build byte native tests check weak-check check-xunit examples

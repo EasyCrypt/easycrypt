@@ -2,7 +2,7 @@
 
 # --------------------------------------------------------------------
 import sys, os, errno, re, glob, shutil, itertools, logging
-import subprocess as sp, time, datetime, socket
+import subprocess as sp, time, datetime, socket, cStringIO as sio
 
 # --------------------------------------------------------------------
 class Object(object):
@@ -79,6 +79,12 @@ def _options():
         type    = 'int',
         help    = 'number of maximum parallel test jobs')
 
+    parser.add_option(
+        '', '--pretty',
+        action  = 'store_true',
+        default = False,
+        help    = 'prettify XML xUnit')
+
     (cmdopt, args) = parser.parse_args()
 
     if len(args) < 1:
@@ -95,6 +101,7 @@ def _options():
     options.xunit   = cmdopt.xunit
     options.timeout = cmdopt.timeout
     options.jobs    = cmdopt.jobs
+    options.pretty  = cmdopt.pretty
 
     defaults = dict(args = '', exclude = '', okdirs = '', kodirs = '')
 
@@ -140,8 +147,13 @@ def _options():
     return options
 
 # --------------------------------------------------------------------
-def _xunit_dump(config, results):
+def _xunit_dump(config, results, pretty=False):
     import xml.etree.ElementTree as E
+
+    try:
+        import lxml, lxml.etree
+    except ImportError:
+        lxml = None
 
     totaltime = sum([x.time for x in results])
     grouped   = dict()
@@ -179,13 +191,18 @@ def _xunit_dump(config, results):
                 name      = name,
                 classname = classname,
                 time      = "%.3f" % (result.time,))
+            longmsg  = result.stderr.strip('\r\n')
+            shortmsg = \
+                      'invalid-exit-status (should-pass: %r)' % \
+                      (result.config.isvalid,)
+            if longmsg:
+                shortmsg = [shortmsg] + longmsg.splitlines()[-20:]
+                shortmsg = '\n'.join(shortmsg)
             if not result.success:
                 rnode.append(E.Element('failure',
-                        message = \
-                            'invalid-exit-status (should-pass: %r)' % \
-                                (result.config.isvalid,),
+                        message = shortmsg,
                         type = 'should-pass: %r' % (result.config.isvalid,),))
-                rnode.text = result.stderr
+                rnode.text = longmsg
             node.append(rnode)
 
         node.append(E.Element("system-out"))
@@ -195,7 +212,15 @@ def _xunit_dump(config, results):
 
     xml = E.tostring(root, method = 'xml', encoding = 'utf-8')
     xml = unicode(xml, 'utf-8')
-    return '<?xml version="1.0" encoding="utf-8"?>%s\n' % (xml,)
+    xml = '<?xml version="1.0" encoding="utf-8"?>%s\n' % (xml,)
+
+    if not pretty or lxml is None:
+        return xml
+
+    parser = lxml.etree.XMLParser(remove_blank_text=True)
+    tree   = lxml.etree.parse(sio.StringIO(xml), parser)
+
+    return lxml.etree.tostring(tree, pretty_print=True)
 
 # --------------------------------------------------------------------
 def _run_test(config, options):
@@ -270,7 +295,8 @@ def _main():
         def expand(dirs):
             dirs = re.split(r'\s+', dirs)
             dirs = [glob.glob(x) for x in dirs]
-            dirs = list(itertools.chain.from_iterable(dirs))
+            dirs = itertools.chain.from_iterable(dirs)
+            dirs = [x for x in dirs if os.path.isdir(x)]
             return dirs
 
         dirs = []
@@ -323,7 +349,8 @@ def _main():
 
     if options.xunit is not None:
         open(options.xunit, 'wb')\
-            .write(_xunit_dump(mainconfig, result).encode('utf-8'))
+            .write(_xunit_dump(mainconfig, result, options.pretty) \
+                   .encode('utf-8'))
 
     exit (2 if errors else 0)
 
