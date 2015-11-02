@@ -8,13 +8,13 @@
 (* -------------------------------------------------------------------- *)
 require import Bool Option Fun Distr Int IntExtra Real RealExtra.
 require import StdRing StdOrder StdBigop List Array.
-(*---*) import IterOp BRA IntOrder.
+(*---*) import IterOp BRA RField RealOrder.
 
 pragma +implicits.
 
 (* -------------------------------------------------------------------- *)
 op convergeto (s : int -> real) (x : real) =
-  forall epsilon, 0%r <= epsilon => exists N,
+  forall epsilon, 0%r < epsilon => exists N,
     forall n, (N <= n)%Int => `|s n - x| < epsilon.
 
 op converge (s : int -> real) =
@@ -35,12 +35,26 @@ lemma monotoneP (s : int -> real):
 proof. admit. qed.
 
 lemma uniq_cnv s x y: convergeto s x => convergeto s y => x = y.
-proof. admit. qed.
+proof.
+move=> lim_sx lim_sy; case: (x = y)=> // ne_xy.
+pose e := `|x - y| / 2%r; have gt0e: 0%r < e.
+  by rewrite /e divr_gt0 ?(normr_gt0, subr_eq0).
+case: (lim_sx _ gt0e) => {lim_sx} Nx lim_sx.
+case: (lim_sy _ gt0e) => {lim_sy} Ny lim_sy.
+case: (max_is_ub Nx Ny); (pose N := max _ _).
+move=> /lim_sx {lim_sx} lim_sx /lim_sy {lim_sy} lim_sy.
+have := ltr_add _ _ _ _ lim_sx lim_sy; rewrite ltrNge.
+by rewrite /e double_half @(distrC (s N)) ler_dist_add.
+qed.
 
 lemma eq_cnv s1 s2 l:
      (exists N, forall n, (N <= n)%Int => s1 n = s2 n)
   => convergeto s1 l => convergeto s2 l.
-proof. admit. qed.
+proof.
+case=> N eq_s lim_s1 e gt0_e; case: (lim_s1 _ gt0_e).
+move=> Ns lim_s1N; exists (max N Ns)=> n /geq_max [leN leNs].
+by rewrite -eq_s // lim_s1N.
+qed.
 
 lemma le_cnv s1 s2 l1 l2:
      (exists N, forall n, (N <= n)%Int => (s1 n <= s2 n)%Real)

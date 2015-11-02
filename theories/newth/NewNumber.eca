@@ -73,6 +73,10 @@ proof. by rewrite ltr_def oner_neq0 ler01. qed.
 lemma ltrW (x y : t): x < y => x <= y.
 proof. by rewrite ltr_def. qed.
 
+lemma nosmt ltrNge (x y : t):
+  (x < y) <=> !(y <= x).
+proof. admit. qed.
+
 lemma nosmt lerr (x : t): x <= x.
 proof. admit. qed.
 
