@@ -357,6 +357,15 @@ theory Extrema.
   lemma nosmt max_ler a b : a <= b => max a b = b
   by smt full.
 
+  lemma leq_maxl m n : m <= max m n
+  by smt full.
+
+  lemma leq_maxr m n : n <= max m n
+  by smt full.
+
+  lemma geq_max m n1 n2 : (max n1 n2 <= m) <=> (n1 <= m) /\ (n2 <= m)
+  by smt full.
+
   lemma nosmt max_is_ub a b:
     a <= max a b /\
     b <= max a b
