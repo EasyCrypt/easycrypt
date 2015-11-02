@@ -13,20 +13,20 @@ require import StdRing StdOrder StdBigop List Array.
 pragma +implicits.
 
 (* -------------------------------------------------------------------- *)
-pred convergeto (s : int -> real) (x : real) =
+op convergeto (s : int -> real) (x : real) =
   forall epsilon, 0%r <= epsilon => exists N,
     forall n, (N <= n)%Int => `|s n - x| < epsilon.
 
-pred converge (s : int -> real) =
+op converge (s : int -> real) =
   exists l, convergeto s l.
 
-pred bounded_by (s : int -> real) (M : real) =
+op bounded_by (s : int -> real) (M : real) =
   exists N, forall n, (N <= n)%Int => `|s n| <= M.
 
-pred bounded (s : int -> real) =
+op bounded (s : int -> real) =
   exists M, bounded_by s M.
 
-pred monotone (s : int -> real) =
+op monotone (s : int -> real) =
   forall n, 0 <= n => s n <= s (n+1).
 
 (* -------------------------------------------------------------------- *)
@@ -67,9 +67,16 @@ proof. admit. qed.
 lemma cnvM_bounded s1 s2: convergeto s1 0%r => bounded s2 => 
   convergeto (fun x => s1 x * s2 x) 0%r.
 proof. admit. qed.
+  
+(* -------------------------------------------------------------------- *)
+op lim (s : int -> real) =
+  choiceb (fun l => convergeto s l) 0%r.
 
 (* -------------------------------------------------------------------- *)
-op lim (s : int -> real) : real.
+lemma limP (s : int -> real):
+  converge s <=> convergeto s (lim s).
+proof. by split=> [/choicebP /(_ 0%r)|lims]; last exists (lim s). qed.
 
-axiom limP (s : int -> real): converge s <=> convergeto s (lim s).
-axiom lim_Ncnv (s : int -> real): ! converge s => lim s = 0%r.
+lemma lim_Ncnv (s : int -> real):
+  ! converge s => lim s = 0%r.
+proof. by move=> h; apply/choiceb_dfl/for_ex. qed.
