@@ -1158,6 +1158,7 @@ let is_eq_or_iff f = (is_eq f) || (is_iff f)
 (* -------------------------------------------------------------------- *)
 let quantif_of_equantif (qt : equantif) =
   match qt with
+  | `ELambda -> Llambda
   | `EForall -> Lforall
   | `EExists -> Lexists
 
@@ -1193,11 +1194,6 @@ let rec form_of_expr mem (e : expr) =
      let e2 = form_of_expr mem e2 in
      let e3 = form_of_expr mem e3 in
      f_if e1 e2 e3
-
-  | Elam (b, e) ->
-     f_lambda
-       (List.map (fun (x, ty) -> (x, GTty ty)) b)
-       (form_of_expr mem e)
 
   | Equant (qt, b, e) ->
      let b = List.map (fun (x, ty) -> (x, GTty ty)) b in
@@ -1530,7 +1526,7 @@ module Fsubst = struct
 
     let (sag, args, e) =
       match e.e_node with
-      | Elam (largs, lbody) when args <> [] ->
+      | Equant (`ELambda, largs, lbody) when args <> [] ->
           let largs1, largs2 = List.takedrop (List.length args  ) largs in
           let  args1,  args2 = List.takedrop (List.length largs1)  args in
             (Mid.of_list (List.combine (List.map fst largs1) args1),

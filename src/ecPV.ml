@@ -906,9 +906,6 @@ module Mpv2 = struct
    equality of e1 and e2 *)
   let rec add_eqs env local eqs e1 e2 =
     match e1.e_node, e2.e_node with
-    | Elam(ids1,e1), Elam(ids2,e2) ->
-      let local = enter_local env local ids1 ids2 in
-      add_eqs env local eqs e1 e2
     | Equant(qt1,bds1,e1), Equant(qt2,bds2,e2) when qt_equal qt1 qt2 ->
       let local = enter_local env local bds1 bds2 in
       add_eqs env local eqs e1 e2

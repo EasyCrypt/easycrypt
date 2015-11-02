@@ -157,19 +157,18 @@ type expr = private {
 }
 
 and expr_node =
-  | Equant of equantif * ebindings * expr  (* forall/exists         *)
-  | Elam   of (EcIdent.t * ty) list * expr (* lambda expression     *)
   | Eint   of zint                         (* int. literal          *)
   | Elocal of EcIdent.t                    (* let-variables         *)
   | Evar   of prog_var                     (* module variable       *)
   | Eop    of EcPath.path * ty list        (* op apply to type args *)
   | Eapp   of expr * expr list             (* op. application       *)
+  | Equant of equantif * ebindings * expr  (* fun/forall/exists     *)
   | Elet   of lpattern * expr * expr       (* let binding           *)
   | Etuple of expr list                    (* tuple constructor     *)
   | Eif    of expr * expr * expr           (* _ ? _ : _             *)
   | Eproj  of expr * int                   (* projection of a tuple *)
 
-and equantif  = [ `EForall | `EExists ]
+and equantif  = [ `ELambda | `EForall | `EExists ]
 and ebinding  = EcIdent.t * ty
 and ebindings = ebinding list
 

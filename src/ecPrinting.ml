@@ -1159,7 +1159,7 @@ and pp_expr_core_r (ppe : PPEnv.t) outer fmt (e : expr) =
   | Elet (pt, e1, e2) ->
       pp_let ppe pp_expr_r outer fmt (pt, e1, e2)
 
-  | Elam (vardecls, e) ->
+  | Equant (`ELambda, vardecls, e) ->
       let (subppe, pp) = pp_locbinds ppe vardecls in
       let pp fmt () =
         Format.fprintf fmt "@[<hov 2>fun %t =>@ %a@]"
@@ -1167,7 +1167,7 @@ and pp_expr_core_r (ppe : PPEnv.t) outer fmt (e : expr) =
       in
         maybe_paren outer (fst outer, e_bin_prio_lambda) pp fmt ()
 
-  | Equant (qt, vardecls, e) ->
+  | Equant ((`EForall | `EExists) as qt, vardecls, e) ->
       let (subppe, pp) = pp_locbinds ppe vardecls in
       let pp fmt () =
         Format.fprintf fmt "@[<hov 2>%s %t,@ %a@]"
@@ -1741,7 +1741,7 @@ let pp_opdecl_op (ppe : PPEnv.t) fmt (x, ts, ty, op) =
         let ((subppe, pp_vds), e) =
           let (vds, e) =
             match e.e_node with
-            | Elam (vds, e) -> (vds, e)
+            | Equant (`ELambda, vds, e) -> (vds, e)
             | _ -> ([], e) in
 
           (pp_locbinds ppe vds, e)

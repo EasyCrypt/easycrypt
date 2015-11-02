@@ -458,19 +458,18 @@ type expr = {
 }
 
 and expr_node =
-  | Equant of equantif * ebindings * expr  (* forall/exists         *)
-  | Elam   of (EcIdent.t * ty) list * expr (* lambda expression     *)
   | Eint   of BI.zint                      (* int. literal          *)
   | Elocal of EcIdent.t                    (* let-variables         *)
   | Evar   of prog_var                     (* module variable       *)
   | Eop    of EcPath.path * ty list        (* op apply to type args *)
   | Eapp   of expr * expr list             (* op. application       *)
+  | Equant of equantif * ebindings * expr  (* fun/forall/exists     *)
   | Elet   of lpattern * expr * expr       (* let binding           *)
   | Etuple of expr list                    (* tuple constructor     *)
   | Eif    of expr * expr * expr           (* _ ? _ : _             *)
   | Eproj  of expr * int                   (* projection of a tuple *)
 
-and equantif  = [ `EForall | `EExists ]
+and equantif  = [ `ELambda | `EForall | `EExists ]
 and ebinding  = EcIdent.t * ty
 and ebindings = ebinding list
 
@@ -512,7 +511,6 @@ let fv_node e =
   | Elet (lp, e1, e2) -> fv_union (e_fv e1) (fv_diff (e_fv e2) (lp_fv lp))
   | Etuple es         -> union e_fv es
   | Eif (e1, e2, e3)  -> union e_fv [e1; e2; e3]
-  | Elam (b, e)
   | Equant (_, b, e)  -> List.fold_left (fun s (id, _) -> Mid.remove id s) (e_fv e) b
   | Eproj (e, _)      -> e_fv e
 
@@ -551,9 +549,6 @@ module Hexpr = Why3.Hashcons.Make (struct
 
     | Eif (c1, e1, f1), Eif (c2, e2, f2) ->
         (e_equal c1 c2) && (e_equal e1 e2) && (e_equal f1 f2)
-
-    | Elam(b1, e1), Elam(b2, e2) ->
-        e_equal e1 e2 && b_equal b1 b2
 
     | Equant (q1, b1, e1), Equant (q2, b2, e2) ->
         qt_equal q1 q2 && e_equal e1 e2 && b_equal b1 b2
@@ -597,9 +592,6 @@ module Hexpr = Why3.Hashcons.Make (struct
         Why3.Hashcons.combine2
           (e_hash c) (e_hash e1) (e_hash e2)
 
-    | Elam (b, e) ->
-        Why3.Hashcons.combine (e_hash e) (b_hash b) 
-
     | Equant (q, b, e) ->
         Why3.Hashcons.combine2 (qt_hash q) (e_hash e) (b_hash b)
 
@@ -630,28 +622,24 @@ let e_tuple = fun es ->
 let e_if    = fun c e1 e2 -> mk_expr (Eif (c, e1, e2)) e2.e_ty
 let e_proj  = fun e i ty -> mk_expr (Eproj(e,i)) ty
 
-let e_lam b e =
-  if List.is_empty b then e else 
-
-  let b, e = 
-    match e.e_node with
-    | Elam (b', e) -> (b@b', e)
-    | _ -> b, e
-
-  in mk_expr (Elam (b, e)) (toarrow (List.map snd b) e.e_ty)
-
 let e_quantif q b e =
   if List.is_empty b then e else
 
   let b, e = 
     match e.e_node with
     | Equant (q', b', e) when qt_equal q q' -> (b@b', e)
-    | _ -> b, e
+    | _ -> b, e in
 
-  in mk_expr (Equant (q, b, e)) tbool
+  let ty =
+    match q with
+    | `ELambda -> toarrow (List.map snd b) e.e_ty
+    | `EForall | `EExists -> tbool
+
+  in mk_expr (Equant (q, b, e)) ty
 
 let e_forall b e = e_quantif `EForall b e
 let e_exists b e = e_quantif `EExists b e
+let e_lam    b e = e_quantif `ELambda b e
 
 let e_app x args ty = 
   if args = [] then x 
@@ -753,14 +741,6 @@ let e_map fty fe e =
       let e3' = fe e3 in
         ExprSmart.e_if (e, (e1, e2, e3)) (e1', e2', e3')
 
-  | Elam (b, bd) ->
-      let dop (x, ty as xty) =
-        let ty' = fty ty in
-          if ty == ty' then xty else (x, ty') in
-      let b'  = List.Smart.map dop b in
-      let bd' = fe bd in
-      ExprSmart.e_lam (e, (b, bd)) (b', bd')
-
   | Equant (q, b, bd) ->
       let dop (x, ty as xty) =
         let ty' = fty ty in
@@ -780,7 +760,6 @@ let rec e_fold fe state e =
   | Etuple es             -> List.fold_left fe state es
   | Eproj(e,_)            -> fe state e
   | Eif (e1, e2, e3)      -> List.fold_left fe state [e1; e2; e3]
-  | Elam (_, e1)          -> fe state e1
   | Equant (_, _, e1)     -> fe state e1
 
 module MSHe = EcMaps.MakeMSH(struct type t = expr let tag e = e.e_tag end)
@@ -914,11 +893,6 @@ let rec e_subst (s: e_subst) e =
       let e2' = e_subst s e2 in
         ExprSmart.e_let (e, (lp, e1, e2)) (lp', e1', e2')
 
-  | Elam (b, e1) ->
-      let s, b' = add_locals s b in
-      let e1' = e_subst s e1 in
-        ExprSmart.e_lam (e, (b, e1)) (b', e1')
-
   | Equant (q, b, e1) ->
       let s, b' = add_locals s b in
       let e1' = e_subst s e1 in
@@ -941,7 +915,7 @@ and e_subst_op ety tys args (tyids, e) =
 
   let (sag, args, e) =
     match e.e_node with
-    | Elam (largs, lbody) when args <> [] ->
+    | Equant (`ELambda, largs, lbody) when args <> [] ->
         let largs1, largs2 = List.takedrop (List.length args  ) largs in
         let  args1,  args2 = List.takedrop (List.length largs1)  args in
           (Mid.of_list (List.combine (List.map fst largs1) args1),
