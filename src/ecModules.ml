@@ -244,7 +244,17 @@ let i_if       (c, s1, s2)  = mk_instr (Sif (c, s1, s2))
 let i_while    (c, s)       = mk_instr (Swhile (c, s))
 let i_assert   e            = mk_instr (Sassert e)
 let i_abstract id           = mk_instr (Sabstract id)
+
 let s_seq      s1 s2        = stmt (s1.s_node @ s2.s_node)
+let s_empty                 = stmt []
+
+let s_asgn     arg = stmt [i_asgn arg]
+let s_rnd      arg = stmt [i_rnd arg]
+let s_call     arg = stmt [i_call arg]
+let s_if       arg = stmt [i_if arg]
+let s_while    arg = stmt [i_while arg]
+let s_assert   arg = stmt [i_assert arg]
+let s_abstract arg = stmt [i_abstract arg]
 
 let s_split n s = List.takedrop n s.s_node
 
