@@ -647,7 +647,7 @@ theory Darray.
     weight (darray len d) = 1%r.
   proof strict.
   intros leq0_len H; rewrite (weight_d d len) // H.
-  smt full ["Alt-Ergo"].
+  smt full.
   qed.
 
   (* if len is negative, then uniformity is easy to prove.
