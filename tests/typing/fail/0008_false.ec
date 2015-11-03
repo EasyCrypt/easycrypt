@@ -1,1 +1,0 @@
-lemma L : false by [].

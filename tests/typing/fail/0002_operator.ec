@@ -1,1 +1,0 @@
-op toto [] : 'a -> bool.

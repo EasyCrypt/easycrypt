@@ -1,2 +1,0 @@
-theory T.
-end T.
