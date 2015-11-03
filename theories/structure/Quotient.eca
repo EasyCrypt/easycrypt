@@ -53,6 +53,5 @@ axiom eqv_trans: forall y x z, eqv x y => eqv y z => eqv x z.
 lemma eqv_choose (x : T): exists y, eqv x y.
 proof. by exists x; rewrite eqv_refl. qed.
 
-choice canon with eqv_choose.
-
+op canon (x : T) = choiceb (fun y => eqv x y) x.
 end Equiv.
