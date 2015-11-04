@@ -163,6 +163,15 @@ abstract theory ComRing.
   lemma nosmt mulr1: right_id oner ( * ).
   proof. by move=> x; rewrite mulrC mul1r. qed.
 
+  lemma nosmt mulrCA: left_commutative ( * ).
+  proof. by move=> x y z; rewrite !mulrA @(mulrC x y). qed.
+
+  lemma nosmt mulrAC: right_commutative ( * ).
+  proof. by move=> x y z; rewrite -!mulrA @(mulrC y z). qed.
+
+  lemma nosmt mulrACA: interchange ( * ) ( * ).
+  proof. by move=> x y z t; rewrite -!mulrA (mulrCA y). qed.
+
   lemma nosmt mulrDr: right_distributive ( * ) (+).
   proof. by move=> x y z; rewrite mulrC mulrDl !@(mulrC _ x). qed.
 

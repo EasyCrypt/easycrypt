@@ -472,10 +472,16 @@ lemma nosmt addr_ss_eq0 (x y : t):
   => (x + y = zeror) <=> (x = zeror) /\ (y = zeror).
 proof. admit. qed.
 
-lemma ler_pmul2l x : zeror < x => forall y z, (y <= z) <=> (x * y <= x * z).
+lemma nosmt ler_pmul2l x : zeror < x => forall y z, (y <= z) <=> (x * y <= x * z).
 proof. admit. qed.
 
-lemma ler_pmul2r x : zeror < x => forall y z, (y <= z) <=> (y * x <= z * x).
+lemma nosmt ler_pmul2r x : zeror < x => forall y z, (y <= z) <=> (y * x <= z * x).
+proof. admit. qed.
+
+lemma nosmt ltr_pmul2l x : zeror < x => forall y z, (y < z) <=> (x * y < x * z).
+proof. admit. qed.
+
+lemma nosmt ltr_pmul2r x : zeror < x => forall y z, (y < z) <=> (y * x < z * x).
 proof. admit. qed.
 
 lemma nosmt ler_pmul (x1 y1 x2 y2 : t):
