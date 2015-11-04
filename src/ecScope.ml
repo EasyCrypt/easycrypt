@@ -254,8 +254,6 @@ end = struct
   type flags    = bool Mstr.t
   type goption += Flags of flags
 
-  exception UnknownFlag of string
-
   let asflags = function Flags m -> m | _ -> assert false
 
   let oid = 
