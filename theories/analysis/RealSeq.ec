@@ -88,11 +88,18 @@ move=> cnv e /cnv [N {cnv} cnv]; exists N => n /cnv h.
 by rewrite subrE -opprD normrN -subrE.
 qed.
 
+lemma cnvZ c s l: convergeto s l => convergeto (fun x => c * s x) (c * l).
+proof.
+move=> cnv e gt0e; case: (c = 0%r) => [->|nz_c].
+  by exists 0 => n _ /=; rewrite normr0.
+have: 0%r < e / `|c| by rewrite divr_gt0 // normr_gt0.
+move/cnv=> [N {cnv} cnv]; exists N => n /cnv.
+rewrite -mulrBr normrM @(ltr_pmul2l `|c|) ?normr_gt0 //.
+by rewrite divrE mulrCA mulrV 1:normr0P.
+qed.
+
 lemma cnvM s1 s2 l1 l2: convergeto s1 l1 => convergeto s2 l2 =>
   convergeto (fun x => s1 x * s2 x) (l1 * l2).
-proof. admit. qed.
-
-lemma cnvZ c s l: convergeto s l => convergeto (fun x => c * s x) l.
 proof. admit. qed.
 
 lemma cnvM_bounded s1 s2: convergeto s1 0%r => bounded s2 => 
