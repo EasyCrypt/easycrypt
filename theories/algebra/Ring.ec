@@ -37,6 +37,9 @@ abstract theory ZModule.
   lemma nosmt addrAC: right_commutative (+).
   proof. by move=> x y z; rewrite -!addrA @(addrC y z). qed.
 
+  lemma nosmt addrACA: interchange (+) (+).
+  proof. by move=> x y z t; rewrite -!addrA (addrCA y). qed.
+
   lemma nosmt subrr (x : t): x - x = zeror.
   proof. by rewrite subrE /= addrN. qed.
 
@@ -75,6 +78,9 @@ abstract theory ZModule.
 
   lemma nosmt opprB (x y : t): -(x - y) = y - x.
   proof. by rewrite !subrE opprD opprK addrC. qed.
+
+  lemma nosmt subrACA: interchange (-) (+).
+  proof. by move=> x y z t; rewrite !subrE addrACA opprD. qed.
 
   lemma nosmt subr_eq (x y z : t):
     (x - z = y) <=> (x = y + z).
@@ -177,6 +183,12 @@ abstract theory ComRing.
 
   lemma nosmt mulrN1 x: x * -oner = -x.
   proof. by rewrite mulrN mulr1. qed.
+
+  lemma nosmt mulrBl: left_distributive ( * ) (-).
+  proof. by move=> x y z; rewrite !subrE mulrDl !mulNr. qed.
+
+  lemma nosmt mulrBr: right_distributive ( * ) (-).
+  proof. by move=> x y z; rewrite !subrE mulrDr !mulrN. qed.
 
   lemma nosmt mulrV: right_inverse_in unit oner invr ( * ).
   proof. by move=> x /mulVr; rewrite mulrC. qed.
