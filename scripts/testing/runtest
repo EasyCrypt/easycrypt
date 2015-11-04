@@ -279,11 +279,11 @@ def _main():
         except OSError as e:
             logging.warning("cannot scan `%s': %s" % (obj.src, e))
             return []
-        scripts = sorted([x for x in scripts if x.endswith('.ec') or x.endswith('.eca')])
+        scripts = sorted([x for x in scripts if re.search(r'\.eca?$', x)])
         logging.debug("%.4d script(s) found in `%s'" % (len(scripts), obj.src))
 
         def config(filename):
-            fullname = os.path.normpath(os.path.join(obj.src, filename))
+            fullname = os.path.join(obj.src, filename)
             return Object(isvalid  = obj.valid,
                           group    = obj.src,
                           args     = obj.args,
@@ -293,11 +293,18 @@ def _main():
 
     def gather_for_scenario(scenario):
         def expand(dirs):
-            dirs = re.split(r'\s+', dirs)
-            dirs = [glob.glob(x) for x in dirs]
-            dirs = itertools.chain.from_iterable(dirs)
-            dirs = [x for x in dirs if os.path.isdir(x)]
-            return dirs
+            def for1(x):
+                rec  = x.startswith('!')
+                x    = x[1:] if rec else x
+                aout = []
+
+                for root, dnames, _ in os.walk(x):
+                    aout.extend([os.path.join(root, x) for x in dnames])
+                    if not rec: break
+                return aout
+
+            dirs = [for1(x) for x in re.split(r'\s+', dirs)]
+            return list(itertools.chain.from_iterable(dirs))
 
         dirs = []
         dirs.extend([Object(src = x, valid = True , args = scenario.args) \
