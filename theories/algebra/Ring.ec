@@ -55,6 +55,9 @@ abstract theory ZModule.
   lemma nosmt addrNK: rev_right_loop [-] (+).
   proof. by move=> x y; rewrite -addrA addNr addr0. qed.
 
+  lemma nosmt subrK x y: (x - y) + y = x.
+  proof. by rewrite subrE addrNK. qed.
+
   lemma nosmt addrI: right_injective (+).
   proof. by move=> x y z h; rewrite -@(addKr x z) -h addKr. qed.
 

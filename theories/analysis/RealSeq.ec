@@ -7,8 +7,8 @@
 
 (* -------------------------------------------------------------------- *)
 require import Bool Option Fun Distr Int IntExtra Real RealExtra.
-require import StdRing StdOrder StdBigop List Array.
-(*---*) import IterOp BRA RField RealOrder.
+require import Ring StdRing StdOrder StdBigop List Array.
+(*---*) import IterOp BRA IntID RField IntOrder RealOrder.
 
 pragma +implicits.
 
@@ -32,7 +32,13 @@ op monotone (s : int -> real) =
 (* -------------------------------------------------------------------- *)
 lemma monotoneP (s : int -> real):
   monotone s <=> (forall m n, 0 <= m <= n => s m <= s n).
-proof. admit. qed.
+proof.
+split=> [h m n|h n]; last first.
+  by move=> ge0n; apply/h; rewrite ge0n ler_addl.
+case=> ge0m; rewrite -IntOrder.subr_ge0 -{2}@(IntID.subrK n m).
+rewrite addrC; elim/Induction.induction: (n - m)=> //.
+by move=> i ge0i ih; rewrite addrA (ler_trans ih) // h ?addr_ge0.
+qed.
 
 lemma uniq_cnv s x y: convergeto s x => convergeto s y => x = y.
 proof.
