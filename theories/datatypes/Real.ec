@@ -163,6 +163,9 @@ theory FromInt.
     (from_int a < from_int b) <=> (a < b)%Int.
   proof. by split; smt full. qed.
 
+  lemma from_intMeq : forall (a b : int), from_int a = from_int b <=> a = b
+  by smt full.
+
   lemma from_intMle : forall (a b : int), from_int a <= from_int b <=> a <= b
   by smt full.
 

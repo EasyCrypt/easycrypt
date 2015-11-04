@@ -6,168 +6,173 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Bool Option Fun Distr Int IntExtra Real RealExtra.
-require import StdRing StdOrder StdBigop RealSeq RealSeries List.
-(*---*) import IterOp BRA RealOrder.
+require import Option Pred Fun List Int IntExtra Real RealExtra.
+require import StdRing StdOrder StdBigop Discrete RealSeq RealSeries.
+(*---*) import IterOp BRA IntOrder RealOrder RField.
+require (*--*) FinType.
 
 pragma +implicits.
 
 (* -------------------------------------------------------------------- *)
-pred countable ['a] (E : 'a -> bool) =
-  exists (C : int -> 'a option),
-    forall x, E x => exists i, C i = Some x.
-
-(* -------------------------------------------------------------------- *)
 type 'a distr.
 
-op mu : 'a distr -> ('a -> real).
-op mk : ('a -> real) -> 'a distr.
+op mu_x : 'a distr -> ('a -> real).
+op mk   : ('a -> real) -> 'a distr.
 
-pred isdistr (m : 'a -> real) =
+op isdistr (m : 'a -> real) =
      (forall x, 0%r <= m x)
-  /\ (forall s, uniq s => BRA.big predT m s <= 1%r)
-  /\ (countable (fun x => m x <> 0%r)).
+  /\ (forall s, uniq s => BRA.big predT m s <= 1%r).
 
 axiom distrW (P : 'a distr -> bool):
   (forall m, isdistr m => P (mk m)) => forall d, P d.
 
-axiom muK (m : 'a -> real): isdistr m => mu (mk m) = m.
-axiom mkK (d : 'a distr): mk (mu d) = d.
+axiom muK (m : 'a -> real): isdistr m => mu_x (mk m) = m.
+axiom mkK (d : 'a distr): mk (mu_x d) = d.
 
 lemma ge0_mu ['a] (d : 'a distr) (x : 'a):
-  0%r <= mu d x.
-proof. by move: d x; elim/distrW=> m dm; rewrite muK //; case: dm. qed.
+  0%r <= mu_x d x.
+proof. by elim/distrW: d x => m dm; rewrite muK //; case: dm. qed.
 
 lemma le1_mu ['a] (d : 'a distr) (x : 'a):
-  forall (s : 'a list), uniq s => BRA.big predT (mu d) s <= 1%r.
-proof. by move: d x; elim/distrW=> m dm; rewrite muK //; case: dm. qed.      
+  forall (s : 'a list), uniq s => BRA.big predT (mu_x d) s <= 1%r.
+proof. by elim/distrW: d x => m dm; rewrite muK //; case: dm. qed.      
+
+lemma summable_mu ['a] (d : 'a distr) : summable (mu_x d).
+proof. admit. qed.
 
 lemma countable_mu ['a] (d : 'a distr):
-  countable (fun x => mu d x <> 0%r).
-proof. by move: d; elim/distrW=> m dm; rewrite muK //; case: dm. qed.
-
-lemma eq_distr (d1 d2 : 'a distr):
-  (d1 = d2) <=> (forall x, mu d1 x = mu d2 x).
+  countable (fun x => mu_x d x <> 0%r).
 proof.
-  split=> [->//|eq_mu]; rewrite -@(mkK d1) -@(mkK d2).
-  by congr; apply/fun_ext.
+elim/distrW: d => m ^dt_m [ge0m le1m]; apply/sbl_countable.
+exists 1%r=> s uq_s; rewrite @(eq_bigr _ _ m); last by apply/le1m.
+by move=> i _ /=; rewrite muK // ger0_norm // ge0m.
 qed.
 
-op prS ['a] (E : 'a -> bool) (d : 'a distr) = fun (x : real) =>
-  exists (s : 'a list), uniq s /\ x = BRA.big E (mu d) s.
+lemma eq_distr (d1 d2 : 'a distr):
+  (d1 = d2) <=> (forall x, mu_x d1 x = mu_x d2 x).
+proof.
+split=> [->//|eq_mu]; rewrite -@(mkK d1) -@(mkK d2).
+by congr; apply/fun_ext.
+qed.
 
-lemma prSP ['a] (E : 'a -> bool) (d : 'a distr) (x : real):
-  prS E d x <=> exists s, uniq s /\ x = BRA.big E (mu d) s.
-proof. by rewrite /prS. qed.
-  
-op pr ['a] (E : 'a -> bool) (d : 'a distr) = lub (prS E d).
+(* -------------------------------------------------------------------- *)
+op mu ['a] (d : 'a distr) (E : 'a -> bool) =
+  sum (fun x => if E x then mu_x d x else 0%r).
 
-lemma prE ['a] (E : 'a -> bool) (d : 'a distr):
-  forall (s : int -> 'a option),
-       (forall i j x, s i = Some x => s j = Some x => i = j)
-    => (forall x, mu d x <> 0%r => exists i, 0 <= i /\ s i = Some x)
-    => pr E d = lim (fun n => BRA.big E (mu d) (pmap s (range 0 n))).
+(* -------------------------------------------------------------------- *)
+theory MRat.
+op mrat ['a] (s : 'a list) =
+  fun x => (count (pred1 x) s)%r / (size s)%r.
+
+lemma isdistr_drat (s : 'a list) : isdistr (mrat s).
+proof.
+rewrite /mrat; split=> /= [x|J uq_J].
+  by rewrite divr_ge0 // from_intMle ?(count_ge0, size_ge0).
+admit.
+qed.
+
+op drat ['a] (s : 'a list) = mk (mrat s).
+
+lemma dratE ['a] (s : 'a list) (x : 'a):
+  mu_x (drat s) x = (count (pred1 x) s)%r / (size s)%r.
+proof. by rewrite muK // isdistr_drat. qed.
+
+lemma prratE ['a] (s : 'a list) (E : 'a -> bool) :
+  mu (drat s) E = (count E s)%r / (size s)%r.
+proof.
+rewrite /mu @(sumE_fin _ (undup s)) ?undup_uniq //=.
+  move=> x; case: (E x)=> _ //; rewrite dratE.
+  rewrite divrE mulf_eq0 -nor mem_undup from_intMeq => [+ _].
+  by rewrite -lt0n ?count_ge0 // -has_count has_pred1.
+pose F := fun x => (count (pred1 x) s)%r / (size s)%r.
+rewrite -big_mkcond @(eq_bigr _ _ F) /F /= => {F}.
+  by move=> i _; rewrite dratE.
+rewrite -size_filter. admit.
+qed.
+
+lemma eq_dratP ['a] (s1 s2 : 'a list) :
+  (perm_eq s1 s2) <=> (drat s1 = drat s2).
 proof. admit. qed.
-
-lemma prE_fin ['a] (E : 'a -> bool) (s : 'a list) (d : 'a distr): uniq s =>
-      (forall x, mu d x <> 0%r => mem s x)
-   => pr E d = BRA.big E (mu d) s.
-proof. admit. qed.
+end MRat.
 
 (* --------------------------------------------------------------------- *)
 theory MUnit.
-  op munit ['a] (x : 'a) =
-    fun y => if x = y then 1%r else 0%r.
+op dunit ['a] (x : 'a) = MRat.drat [x].
 
-  lemma isdistr (x : 'a): isdistr (munit x).
-  proof.
-    do! split=> [y|s uq_s|]; 1: by rewrite /munit; case: (x = y).
-      case: (mem s x) => [|x_notin_s]; last first.
-        rewrite big1_seq // /munit => y [_].
-        by apply/absurd; case: (x = y).
-      move/bigD1=> -> //; rewrite /munit /= big1_seq //=.
-      by move=> y; rewrite /predC1 eq_sym => [->].
-    exists (fun i => if i = 0 then Some x else None).
-    move=> y; rewrite /munit; case: (x = y)=> // <- _.
-    by exists 0.
-  qed.
+lemma dunit1E ['a] (x y : 'a):
+  mu_x (dunit x) y = if x = y then 1%r else 0%r.
+proof. by rewrite MRat.dratE /= /pred1; case: (x = y). qed.
 
-  op dunit ['a] (x : 'a) = mk (munit x).
+lemma dunit1xx ['a] (x : 'a): mu_x (dunit x) x = 1%r.
+proof. by rewrite dunit1E. qed.
 
-  (* FIXME: [rewrite /dunit] should not be necessary *)
-  lemma dunit1E ['a] (x y : 'a):
-    mu (dunit x) y = if x = y then 1%r else 0%r.
-  proof. by rewrite /dunit muK // isdistr. qed.
-
-  lemma dunit1xx ['a] (x : 'a): mu (dunit x) x = 1%r.
-  proof. by rewrite dunit1E. qed.
-
-  lemma dunitE ['a] (E : 'a -> bool) (x : 'a):
-    pr E (dunit x) = if E x then 1%r else 0%r.
-  proof.
-    rewrite @(prE_fin E [x]) //.
-      by move=> y; rewrite dunit1E; case: (x = y).
-    by rewrite big_mkcond big_seq1 /= dunit1xx.
-  qed.
+lemma dunitE ['a] (E : 'a -> bool) (x : 'a):
+  mu (dunit x) E = if E x then 1%r else 0%r.
+proof. by rewrite MRat.prratE /=; case: (E x). qed.
 end MUnit.
 
 (* -------------------------------------------------------------------- *)
 theory MUniform.
-  op muniform ['a] (s : 'a list) =
-    fun x => if mem s x then 1%r / (size (undup s))%r else 0%r.
+op duniform ['a] (s : 'a list) = MRat.drat (undup s).
 
-  lemma isdistr (s : 'a list): isdistr (muniform s).
-  proof.
-    pose m := size (undup s); do! split=> [y|r uq_r|].
-    + rewrite /muniform; case: (mem _ _) => //=.
-      by apply/divr_ge0=> //; rewrite from_intMle size_ge0.
-    + pose F := fun (x : 'a) => 1%r / m%r.
-      rewrite @(bigID _ _ (mem s)) @(eq_bigr _ _ F).
-        by rewrite /muniform; move=> x [_ ->].
-      rewrite /F big_const big1.
-        by rewrite /muniform /predC; move=> x [_ ->].
-      admit. (* FIXME: extend Ring with natmul *)
-    admit.
-  qed.
+lemma duniform1E ['a] (s : 'a list) x :
+  mu_x (duniform s) x = if mem s x then 1%r / (size (undup s))%r else 0%r.
+proof.
+rewrite MRat.dratE count_uniq_mem ?undup_uniq // mem_undup.
+by case: (mem s x)=> //=; rewrite divrE mul0r.
+qed.
 
-  op duniform ['a] (s : 'a list) = mk (muniform s).
+lemma eq_duniformP ['a] (s1 s2 : 'a list) :
+     (forall x, mem s1 x <=> mem s2 x)
+ <=> (duniform s1 = duniform s2).
+proof.
+rewrite -MRat.eq_dratP; split=> h.
+  apply/uniq_perm_eq; rewrite ?undup_uniq=> //.
+  by move=> x; rewrite !mem_undup; apply/h.
+move=> x; rewrite -@(mem_undup s1) -@(mem_undup s2).
+by apply/perm_eq_mem.
+qed.
 
-  lemma duniform1E ['a] (s : 'a list) x:
-    mu (duniform s) x = if mem s x then 1%r / (size (undup s))%r else 0%r.
-  proof. by rewrite /duniform muK ?isdistr. qed.
-
-  lemma eq_duniformP ['a] (s1 s2 : 'a list):
-        (forall x, mem s1 x <=> mem s2 x)
-     => (duniform s1 = duniform s2).
-  proof.
-    rewrite eq_distr => h x; rewrite !duniform1E -h.
-    case: (mem _ _)=> //=; rewrite -@(perm_eq_size (undup s2)) //.
-      rewrite uniq_perm_eq ?undup_uniq //.
-    by move=> y; rewrite !mem_undup h.
-  qed.
-
-  lemma duniformE ['a] (E : 'a -> bool) (s : 'a list):
-    let n = 1%r / (size (undup s))%r in
-    pr E (duniform s) = (count E s)%r * n.
-  proof.
-    rewrite @(prE_fin E (undup s)) ?undup_uniq //.
-      by move=> x; rewrite duniform1E mem_undup; case: (mem _ _).
-    admit.
-  qed.
+lemma duniformE ['a] (E : 'a -> bool) (s : 'a list) :
+  mu (duniform s) E = (count E (undup s))%r / (size (undup s))%r.
+proof. apply/MRat.prratE. qed.
 end MUniform.
-
-import MUniform.
 
 (* -------------------------------------------------------------------- *)
 theory MIntUniform.
-  op drange (m n : int) = MUniform.duniform (range m n).
+op drange (m n : int) = MUniform.duniform (range m n).
 
-  lemma drangeE (m n x : int):
-    mu (drange m n) x = if m <= x < n then 1%r / (n - m)%r else 0%r.
-  proof. admit. qed.
-(*
-    rewrite /drange duniformE ?range_uniq // mem_range.
-    case: (m <= x < n)=> //; case=> le_mx lt_xn.
-    by rewrite size_range max_ler 1:smt.
-*)
+lemma drange1E (m n x : int):
+  mu_x (drange m n) x = if m <= x < n then 1%r / (n - m)%r else 0%r.
+proof.
+rewrite MUniform.duniform1E mem_range undup_id 1:range_uniq //.
+rewrite size_range; case: (m <= x < n) => // -[le_mx lt_xn].
+rewrite max_ler // IntOrder.subr_ge0 IntOrder.ltrW //.
+by apply (IntOrder.ler_lt_trans le_mx).
+qed.
+
+lemma drangeE (E : int -> bool) (m n : int) :
+  mu (drange m n) E = (count E (range m n))%r / (n - m)%r.
+proof.
+rewrite MUniform.duniformE undup_id 1:range_uniq //.
+rewrite size_range; case: (lezWP n m) => [le_nm|le_mn].
+  by rewrite max_lel // 1:subr_le0 // range_geq // !divrE.
+by rewrite max_ler // subr_ge0 ltrW // ltzNge.
+qed.
 end MIntUniform.
+
+(* -------------------------------------------------------------------- *)
+abstract theory MFinite.
+type t.
+
+clone import FinType as Support with type t <- t.
+
+op duniform : t distr = MUniform.duniform enum.
+
+lemma duniform1E (x : t) : mu_x duniform x = 1%r / (size enum)%r.
+proof. by rewrite MUniform.duniform1E enumP /= undup_id // enum_uniq. qed.
+
+lemma duniformE (E : t -> bool) :
+  mu duniform E = (count E enum)%r / (size enum)%r.
+proof. by rewrite MUniform.duniformE ?undup_id // enum_uniq. qed.
+end MFinite.
