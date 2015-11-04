@@ -62,14 +62,25 @@ lemma le_cnv s1 s2 l1 l2:
 proof. admit. qed.
 
 lemma cnvC c: convergeto (fun x => c) c.
-proof. admit. qed.
+proof. by move=> e gt0e; exists 0 => n _; rewrite subrr normr0. qed.
 
 lemma cnvD s1 s2 l1 l2: convergeto s1 l1 => convergeto s2 l2 =>
   convergeto (fun x => s1 x + s2 x) (l1 + l2).
-proof. admit. qed.
+proof.
+move=> cnv1 cnv2 e gt0e; have gt0e2: 0%r < e/2%r by rewrite divr_gt0.
+case: (cnv1 _ gt0e2)=> N1 c1; case: (cnv2 _ gt0e2)=> N2 c2.
+exists (max N1 N2) => n /geq_max [le_N1n le_N2n].
+pose x := `|s1 n - l1| + `|s2 n - l2|.
+apply @(ler_lt_trans x); rewrite /x => {x}.
+  by rewrite subrACA; apply/ler_norm_add.
+by rewrite -@(double_half e) ltr_add ?(c1, c2).
+qed.
 
-lemma cnvB s l: convergeto s l => convergeto (fun x => -(s x)) (-l).
-proof. admit. qed.
+lemma cnvN s l: convergeto s l => convergeto (fun x => -(s x)) (-l).
+proof.
+move=> cnv e /cnv [N {cnv} cnv]; exists N => n /cnv h.
+by rewrite subrE -opprD normrN -subrE.
+qed.
 
 lemma cnvM s1 s2 l1 l2: convergeto s1 l1 => convergeto s2 l2 =>
   convergeto (fun x => s1 x * s2 x) (l1 * l2).
