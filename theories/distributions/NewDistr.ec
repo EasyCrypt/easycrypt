@@ -33,20 +33,20 @@ lemma ge0_mu ['a] (d : 'a distr) (x : 'a):
   0%r <= mu_x d x.
 proof. by elim/distrW: d x => m dm; rewrite muK //; case: dm. qed.
 
-lemma le1_mu ['a] (d : 'a distr) (x : 'a):
+lemma le1_mu ['a] (d : 'a distr) :
   forall (s : 'a list), uniq s => BRA.big predT (mu_x d) s <= 1%r.
-proof. by elim/distrW: d x => m dm; rewrite muK //; case: dm. qed.      
+proof. by elim/distrW: d => m dm; rewrite muK //; case: dm. qed.      
 
 lemma summable_mu ['a] (d : 'a distr) : summable (mu_x d).
-proof. admit. qed.
+proof.
+exists 1%r=> s eq_s; rewrite @(eq_bigr _ _ (mu_x d)) => /=.
+  by move=> i _; rewrite ger0_norm // ge0_mu.
+by apply/le1_mu.
+qed.
 
 lemma countable_mu ['a] (d : 'a distr):
   countable (fun x => mu_x d x <> 0%r).
-proof.
-elim/distrW: d => m ^dt_m [ge0m le1m]; apply/sbl_countable.
-exists 1%r=> s uq_s; rewrite @(eq_bigr _ _ m); last by apply/le1m.
-by move=> i _ /=; rewrite muK // ger0_norm // ge0m.
-qed.
+proof. by apply/sbl_countable/summable_mu. qed.
 
 lemma eq_distr (d1 d2 : 'a distr):
   (d1 = d2) <=> (forall x, mu_x d1 x = mu_x d2 x).
