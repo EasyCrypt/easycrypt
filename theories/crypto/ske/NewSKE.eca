@@ -1,4 +1,4 @@
-require import Bool Option NewFMap.
+require import Bool Option FSet NewFMap.
 
 type key, plain, cipher.
 
@@ -45,7 +45,7 @@ module Wrap (S : SKE) = {
     var p;
 
     p = S.dec(k, c);
-    dqs = setU dqs (set1 c);
+    dqs = dqs `|` (fset1 c);
     if (p <> None)
       log.[c] = oget p;
     return p;

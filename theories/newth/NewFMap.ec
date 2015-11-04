@@ -338,7 +338,7 @@ op find (p : 'a -> 'b -> bool) (m : ('a, 'b) fmap) =
   onth (map fst (elems m)) (find (fun (x : 'a * 'b), p x.`1 x.`2) (elems m))
   axiomatized by findE.
 
-(** The following are inspired from lemmas on NewList.find. findP is a
+(** The following are inspired from lemmas on List.find. findP is a
     total characterization, but a more usable interface may be useful. **)
 lemma find_none (p : 'a -> 'b -> bool) (m : ('a, 'b) fmap):
   has p m <=> find p m <> None.

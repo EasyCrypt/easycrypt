@@ -7,11 +7,11 @@
 
 (* -------------------------------------------------------------------- *)
 require import StdRing Int Real.
-require (*--*) NewNumber.
+require (*--*) Number.
 
 (* -------------------------------------------------------------------- *)
 theory IntOrder.
-clone include NewNumber
+clone include Number
   with type t <- int,
 
   (* FIXME: should use theory substitution *)
@@ -36,7 +36,7 @@ proof. by case: (z1 <= z2)=> //=; rewrite -ltzNge => /ltrW. qed.
 end IntOrder.
   
 (* -------------------------------------------------------------------- *)
-clone NewNumber as RealOrder
+clone Number as RealOrder
   with type t <- real,
 
   (* FIXME: should use theory substitution *)

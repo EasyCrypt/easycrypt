@@ -10,14 +10,14 @@ pragma +implicits.
 
 (* -------------------------------------------------------------------- *)
 require import Fun Pred Pair Int IntExtra List Ring.
-require (*--*) NewMonoid.
+require (*--*) Monoid.
 
 import Ring.IntID.
 
 (* -------------------------------------------------------------------- *)
 type t.
 
-clone export NewMonoid as Support with type t <- t.
+clone export Monoid as Support with type t <- t.
 
 (* -------------------------------------------------------------------- *)
 op big (P : 'a -> bool) (F : 'a -> t) (r : 'a list) =

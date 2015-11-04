@@ -1,4 +1,4 @@
-require import Option Fun Pred Real NewDistr NewList.
+require import Option Fun Pred Real Distr List.
 (*
   (* FIXME: Countability witness for type bool... *)
   op elts = [true;false].

@@ -5,7 +5,7 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import Pair Monoid Finite Int Real FSet Distr.
+require import Pair OldMonoid Finite Int Real FSet Distr.
 
 type input.
 type output.

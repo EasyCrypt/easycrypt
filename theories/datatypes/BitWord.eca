@@ -5,12 +5,12 @@
 
 (* -------------------------------------------------------------------- *)
 require import Fun Bool Int List.
-require (*ab*) FinType NewWord.
+require (*--*) FinType Word.
 
 pragma +implicits.
 
 (* -------------------------------------------------------------------- *)
-clone include NewWord with
+clone include Word with
   type Alphabet.t    <- bool,
   op   Alphabet.enum <- [true;false]
 proof Alphabet.* by smt.

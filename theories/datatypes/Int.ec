@@ -138,7 +138,7 @@ lemma subzE (x y : int): x - y = x + (- y)
 by smt full.
 
 (** Number theory *)
-(* TODO: I merged in some stray bits from NewList and this may appear to be in whatever order... it is. *)
+(* TODO: I merged in some stray bits from List and this may appear to be in whatever order... it is. *)
 
 op "`|_|" (x:int) = (0 <= x) ? x : -x.
 

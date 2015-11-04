@@ -1,4 +1,4 @@
-require import Bool Option NewFSet.
+require import Bool Option FSet.
 require (*--*) NewSKE.
 
 clone include NewSKE.

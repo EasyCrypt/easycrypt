@@ -11,7 +11,7 @@ require import Real.
 require import Distr.
 require import List.
 require (*--*) Sum.
-(*---*) import Monoid.
+(*---*) import OldMonoid.
 require (*--*) Mu_mem.
 
 (** A non-negative integer q **)

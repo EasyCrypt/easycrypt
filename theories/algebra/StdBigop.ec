@@ -7,11 +7,11 @@
 
 (* -------------------------------------------------------------------- *)
 require import Pred Int IntExtra Real Ring List.
-require (*--*) NewBigop NewBigalg.
+require (*--*) Bigop Bigalg.
 
 (* -------------------------------------------------------------------- *)
 theory BIA.
-clone include NewBigalg with
+clone include Bigalg with
   type t <- int,
   op ZM.zeror <- 0,
   op ZM.( + ) <- Int.(+),
@@ -30,14 +30,14 @@ clone include NewBigalg with
   qed.  
 end BIA.
 
-clone NewBigop as BIM with
+clone Bigop as BIM with
   type t <- int,
   op Support.idm <- 1,
   op Support.(+) <- Int.( * )
   proof Support.Axioms.* by smt.
 
 (* -------------------------------------------------------------------- *)
-clone NewBigalg as BRA with
+clone Bigalg as BRA with
   type t <- real,
   op ZM.zeror <- 0%r,
   op ZM.( + ) <- Real.(+),
@@ -45,7 +45,7 @@ clone NewBigalg as BRA with
   op ZM.([-]) <- Real.([-])
   proof ZM.* by smt.
 
-clone NewBigop as BRM with
+clone Bigop as BRM with
   type t <- real,
   op Support.idm <- 1%r,
   op Support.(+) <- Real.( * )
@@ -54,19 +54,19 @@ clone NewBigop as BRM with
 (* -------------------------------------------------------------------- *)
 require import Bool.
 
-clone NewBigop as BBA with
+clone Bigop as BBA with
   type t <- bool,
   op Support.idm <- false,
   op Support.(+) <- Bool.( ^^ )
   proof Support.Axioms.* by (delta; smt).  
 
-clone NewBigop as BBM with
+clone Bigop as BBM with
   type t <- bool,
   op Support.idm <- true,
   op Support.(+) <- Pervasive.( /\ )
   proof Support.Axioms.* by (delta; smt).  
 
-clone NewBigop as BBO with
+clone Bigop as BBO with
   type t <- bool,
   op Support.idm <- false,
   op Support.(+) <- Pervasive.( || )

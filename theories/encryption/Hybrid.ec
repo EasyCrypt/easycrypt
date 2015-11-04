@@ -11,7 +11,7 @@ require import FSet.
 require import Finite.
 require import Pair.
 require import Distr.
-require import Monoid.
+require import OldMonoid.
 require Means.
 
 type input.

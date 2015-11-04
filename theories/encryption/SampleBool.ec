@@ -10,7 +10,7 @@ require import Finite List.
 require import FSet.
 require import Pair.
 require import Distr.
-require import Monoid.
+require import OldMonoid.
 
 require Means.
 

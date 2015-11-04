@@ -1,5 +1,5 @@
-require import Option Pair Int NewList Distr Real.
-require (*--*) NewBigop.
+require import Option Pair Int List Distr Real.
+require (*--*) Bigop.
 
 op dlist (d : 'a distr) (n : int): 'a list distr =
   Int.fold (fun d' => Dapply.dapply (fun (xy : 'a * 'a list) => xy.`1 :: xy.`2) (Dprod.( * ) d d')) (Dunit.dunit []) n
@@ -47,7 +47,8 @@ proof.
   move=> le0_n; move: le0_n xs.
   elim/Induction.induction n =>[|n le0_n ih xs]; 1:smt.
   rewrite dlistS // /support Dapply.supp_def; split.
-    by move=> [[x xs'] /= [->]]; rewrite Dprod.supp_def /fst /snd /= -!/(support _ _) ih; smt.
+    move=> [[x xs'] /= [->]]; rewrite Dprod.supp_def /fst /snd /=.
+    rewrite -!/(support _ xs') ih; smt.
     case xs=> [|x xs /= [len_n [x_in_d all_in_d]]]; 1:smt.
     by exists (x,xs)=> //=; rewrite Dprod.supp_def /fst/ snd /= smt.
 qed.
@@ -66,7 +67,7 @@ proof.
   by rewrite (Dprod.mu_def (fun x0 => x0 = x) (fun x0 => x0 = xs)).
 qed.
 
-clone import NewBigop as Prod with
+clone import Bigop as Prod with
   type t <- real,
   op   Support.idm <- 1%r,
   op   Support.(+) <- Real.( * )

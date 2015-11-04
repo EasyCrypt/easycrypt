@@ -3,7 +3,7 @@
  * Distributed under the terms of the CeCILL-B licence.
  * -------------------------------------------------------------------- *)
 
-require import Distr NewList NewFMap.
+require import Option Distr List FSet NewFMap.
 require (*--*) FinType NewROM.
 
 clone include NewROM.
@@ -19,7 +19,7 @@ module RO: Oracle = {
     var f : from;
 
     m = map0;
-    work = elts;
+    work = enum;
     while (work <> []) {
       f = head witness work;
       y = $dsample f;
@@ -38,7 +38,7 @@ proof.
   proc.
   while (forall x, mem work x \/ mem (dom RO.m) x).
     auto; progress.
-    rewrite domP in_setU in_set1.
+    rewrite domP in_fsetU in_fset1.
     case: (H x)=> [| -> //=].
     by rewrite -(mem_head_behead witness)// =>[-> | ->].
   by auto; smt.
@@ -67,4 +67,4 @@ equiv RO_o_eq: RO.o ~ RO.o: ={glob RO, x} ==> ={glob RO, res}
 by sim.
 
 hoare dom_RO_init x: RO.init: true ==> mem (dom RO.m) x.
-proof. by conseq* RO_init_full=> //= m ->. qed.
+proof. by conseq RO_init_full=> //= m ->. qed.

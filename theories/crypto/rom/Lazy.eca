@@ -3,7 +3,7 @@
  * Distributed under the terms of the CeCILL-B licence.
  * -------------------------------------------------------------------- *)
 
-require import Distr NewFMap.
+require import Option Distr FSet NewFMap.
 require (*--*) NewROM.
 
 clone include NewROM.
@@ -38,5 +38,5 @@ by sim.
 equiv RO_o_eq: RO.o ~ RO.o: ={glob RO, x} ==> ={glob RO, res}
 by sim.
 
-hoare dom_RO_o d x': RO.o: x = x' /\ dom RO.m = d ==> dom RO.m = setU d (set1 x').
-proof. proc; auto; progress; rewrite setP; smt. qed.
+hoare dom_RO_o d x': RO.o: x = x' /\ dom RO.m = d ==> dom RO.m = d `|` (fset1 x').
+proof. proc; auto; progress; rewrite fsetP; smt. qed.

@@ -1,4 +1,4 @@
-require import FSet FMap Distr.
+require import Option FSet NewFMap Distr.
 require import Dexcepted.
 require (*--*) NewPRP.
 
@@ -15,13 +15,13 @@ axiom dK_ll: mu dK predT = 1%r.
 op dD: D distr.
 axiom dD_ll: mu dD predT = 1%r.
 
-module RandomPermutation: PRP_Oracles = {
+module RandomPermutation (* : PRP_Oracles *) = {
   var m : (D,D) fmap
   var mi: (D,D) fmap
 
   proc init(): unit = {
-    m  <- fmap0;
-    mi <- fmap0;
+    m  <- map0;
+    mi <- map0;
   }
 
   proc f(x:D): D = {
