@@ -1133,7 +1133,6 @@ exception MEError of meerror
 
 (* -------------------------------------------------------------------- *)
 module Memory = struct
-
   let all env =
     MMsym.fold (fun _ l all -> List.rev_append l all) env.env_memories []
 
@@ -1148,10 +1147,8 @@ module Memory = struct
       | []     -> None
       | m :: _ -> Some m
 
-  let lookup (g : int) (me : symbol) (env : env) =
-    let mems = MMsym.all me env.env_memories in
-      try  Some (List.nth mems g)
-      with Invalid_argument _ -> None
+  let lookup (me : symbol) (env : env) =
+    MMsym.last me env.env_memories
 
   let set_active (me : memory) (env : env) =
     match byid me env with

@@ -88,7 +88,7 @@ type tyerror =
 | UnknownTyModName       of qsymbol
 | UnknownFunName         of qsymbol
 | UnknownModVar          of qsymbol
-| UnknownMemName         of int * symbol
+| UnknownMemName         of symbol
 | InvalidFunAppl         of funapp_error
 | InvalidModAppl         of modapp_error
 | InvalidModType         of modtyp_error
@@ -315,8 +315,8 @@ let pp_tyerror env fmt error =
   | UnknownModVar x ->
       msg "unknown module-level variable: %a" pp_qsymbol x
 
-  | UnknownMemName (g, m) ->
-      msg "unknown memory: %s[g=%d]" m g
+  | UnknownMemName m ->
+      msg "unknown memory: %s" m
 
   | InvalidFunAppl FAE_WrongArgCount ->
       msg "invalid function application: wrong number of arguments"
@@ -2111,9 +2111,9 @@ and translvalue ue (env : EcEnv.env) lvalue =
 
 (* -------------------------------------------------------------------- *)
 let transmem env m =
-  match EcEnv.Memory.lookup 0 (unloc m) env with
+  match EcEnv.Memory.lookup (unloc m) env with
   | None ->
-      tyerror m.pl_loc env (UnknownMemName (0, unloc m))
+      tyerror m.pl_loc env (UnknownMemName (unloc m))
       
   | Some me ->
 (*      if (EcMemory.memtype me) <> None then
@@ -2220,10 +2220,10 @@ let trans_form_or_pattern env (ps, ue) pf tt =
         end
 
     | PFside (f, side) -> begin
-        let (sloc, (gen, side)) = (side.pl_loc, unloc side) in
+        let (sloc, side) = (side.pl_loc, unloc side) in
         let me =
-          match EcEnv.Memory.lookup gen side env with
-          | None -> tyerror sloc env (UnknownMemName (gen, side))
+          match EcEnv.Memory.lookup side env with
+          | None -> tyerror sloc env (UnknownMemName side)
           | Some me -> EcMemory.memory me
         in
 
@@ -2256,7 +2256,7 @@ let trans_form_or_pattern env (ps, ue) pf tt =
 
         let check_mem loc me = 
           match EcEnv.Memory.byid me env with
-          | None -> tyerror loc env (UnknownMemName (0, EcIdent.name me))
+          | None -> tyerror loc env (UnknownMemName (EcIdent.name me))
           | Some _ -> ()
         in
 

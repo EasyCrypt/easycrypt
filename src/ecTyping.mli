@@ -76,7 +76,7 @@ type tyerror =
 | UnknownTyModName       of qsymbol
 | UnknownFunName         of qsymbol
 | UnknownModVar          of qsymbol
-| UnknownMemName         of int * symbol
+| UnknownMemName         of symbol
 | InvalidFunAppl         of funapp_error
 | InvalidModAppl         of modapp_error
 | InvalidModType         of modtyp_error
