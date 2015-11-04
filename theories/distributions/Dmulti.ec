@@ -1,3 +1,10 @@
+(* --------------------------------------------------------------------
+ * Copyright (c) - 2012--2015 - IMDEA Software Institute
+ * Copyright (c) - 2012--2015 - Inria
+ * 
+ * Distributed under the terms of the CeCILL-B-V1 license
+ * -------------------------------------------------------------------- *)
+
 (** Uniform distributions over a list of elements with multiplicity. **)
 (* This should be replaced with a NewDistr when we switch. *)
 require import Fun Pred Int Real List Distr.
