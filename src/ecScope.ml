@@ -2151,7 +2151,7 @@ module Cloning = struct
             end
         end
   
-        | CTh_operator (x, ({ op_kind = OB_oper None } as oopd)) -> begin
+        | CTh_operator (x, ({ op_kind = OB_oper _ } as oopd)) -> begin
             match Msym.find_opt x ovrds.ovre_ovrd.evc_ops with
             | None ->
                 let (subst, x) = rename subst (`Op, x) in
@@ -2208,7 +2208,7 @@ module Cloning = struct
                  if alias then Op.bind scope (x, newop) else scope)
         end
   
-        | CTh_operator (x, ({ op_kind = OB_pred None} as oopr)) -> begin
+        | CTh_operator (x, ({ op_kind = OB_pred _} as oopr)) -> begin
             match Msym.find_opt x ovrds.ovre_ovrd.evc_preds with
             | None ->
                 let subst, x = rename subst (`Pred, x) in
@@ -2276,12 +2276,6 @@ module Cloning = struct
                 (subst, ops, proofs, 
                  if alias then Op.bind scope (x, newpr) else scope)
         end
-  
-        | CTh_operator (x, oopd) ->
-            let kind = (if is_pred oopd then `Pred else `Op) in
-            let subst, x = rename subst (kind, x) in
-            let oopd = EcSubst.subst_op subst oopd in
-              (subst, ops, proofs, Op.bind scope (x, oopd))
   
         | CTh_axiom (x, ax) -> begin
             let subst, x = rename subst (`Lemma, x) in

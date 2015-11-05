@@ -84,7 +84,7 @@ let pp_clone_error fmt env error =
         (string_of_ovkind kd) (string_of_qsymbol x)
 
   | CE_CrtOverride (kd, x) ->
-      msg "cannot instantiate the _concrete_ %s `%s'"
+      msg "cannot instantiate the _concrete_ %s `%s' / they may be not convertible"
         (string_of_ovkind kd) (string_of_qsymbol x)
 
   | CE_TypeArgMism (kd, x) ->
@@ -285,8 +285,8 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
            | None
            | Some { op_kind = OB_pred _ } ->
                clone_error scenv (CE_UnkOverride (OVK_Operator, name));
-           | Some { op_kind = OB_oper (Some _) } when not cancrt ->
-               clone_error scenv (CE_CrtOverride (OVK_Operator, name));
+           | Some { op_kind = OB_oper (Some _) } ->
+               (* FIXME: check convertibility *) ()
            | _ -> ()
          end;
          let evc =
