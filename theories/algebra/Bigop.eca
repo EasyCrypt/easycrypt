@@ -106,39 +106,6 @@ proof.
   by rewrite /(\o) -Hh;case (P x) => //.
 qed.
 
-lemma nosmt big_Dl ['a] (h : t -> t -> t) (P : 'a -> bool) F s t:
-   left_zero idm h => 
-   left_distributive h Support.(+) =>
-   h (big P F s) t = big P (fun a => h (F a) t) s.
-proof.
-  move=> Hlz HDl.
-  cut /= -> := big_comp (fun t1 => h t1 t) P F s _ _=> //=.
-  + by apply Hlz.
-  move=> t1 t2; apply (HDl t1 t2 t).
-qed.
-
-lemma nosmt big_Dr ['a] (h:t -> t -> t) (P:'a -> bool) F s t:
-   right_zero idm h => 
-   right_distributive h Support.(+) =>
-   h t (big P F s) = big P (fun a => h t (F a)) s.
-proof.
-  move=> Hrz HDr.
-  by cut /= -> := big_comp (h t) P F s _ _=> //=;[apply Hrz|apply (HDr t)]. 
-qed.
-
-lemma nosmt big_D ['a 'b] (h : t -> t -> t) (P1 : 'a -> bool) F1 s1
-                                             (P2 : 'b -> bool) F2 s2:
-   commutative h =>
-   left_zero idm h => 
-   left_distributive h Support.(+) =>
-   h (big P1 F1 s1) (big P2 F2 s2) =
-     big P1 (fun a1 => big P2 (fun a2 => h (F1 a1) (F2 a2)) s2) s1.
-proof.
-  move=> Hc Hlz HDl.
-  rewrite big_Dl => //; congr;apply fun_ext=> a1.
-  rewrite big_Dr //;smt.
-qed.
-
 (* -------------------------------------------------------------------- *)
 lemma nosmt big_nth x0 (P : 'a -> bool) (F : 'a -> t) s:
   big P F s = bigi (P \o (nth x0 s)) (F \o (nth x0 s)) 0 (size s).
@@ -182,6 +149,41 @@ lemma nosmt eq_bigr (P : 'a -> bool) (F1 F2 : 'a -> t) s:
 proof.                          (* FIXME: big_rec2 *)
   move=> eqF; elim: s=> // x s; rewrite !big_cons=> <-.
   by case (P x)=> // /eqF <-.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt big_distrl ['a] (op_ : t -> t -> t) (P : 'a -> bool) F s t:
+     left_zero idm op_
+  => left_distributive op_ Support.(+)
+  => op_ (big P F s) t = big P (fun a => op_ (F a) t) s.
+proof.
+  move=> mulm1 mulmDl; pose G := fun x => op_ x t.
+  move: (big_comp G P) => @/G /= -> //.
+    by rewrite mulm1. by move=> t1 t2; rewrite mulmDl.
+qed.
+
+lemma nosmt big_distrr ['a] (op_ : t -> t -> t) (P : 'a -> bool) F s t:
+      right_zero idm op_
+   => right_distributive op_ Support.(+)
+   => op_ t (big P F s) = big P (fun a => op_ t (F a)) s.
+proof.
+  move=> mul1m mulmDr; pose G := fun x => op_ t x.
+  move: (big_comp G P) => @/G /= -> //.
+    by rewrite mul1m. by move=> t1 t2; rewrite mulmDr.
+qed.
+
+lemma nosmt big_distr ['a 'b] (op_ : t -> t -> t)
+  (P1 : 'a -> bool) (P2 : 'b -> bool) F1 s1 F2 s2 :
+     commutative op_
+  => left_zero idm op_
+  => left_distributive op_ Support.(+)
+  => op_ (big P1 F1 s1) (big P2 F2 s2) =
+     big P1 (fun a1 => big P2 (fun a2 => op_ (F1 a1) (F2 a2)) s2) s1.
+proof.
+  move=> mulmC mulm1 mulmDl; rewrite big_distrl //.
+  apply/eq_bigr=> i _ /=; rewrite big_distrr //.
+    by move=> x; rewrite mulmC mulm1.
+  by move=> x y z; rewrite !(mulmC x) mulmDl.
 qed.
 
 (* -------------------------------------------------------------------- *)

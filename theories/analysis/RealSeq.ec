@@ -8,7 +8,7 @@
 (* -------------------------------------------------------------------- *)
 require import Bool Option Fun Distr Int IntExtra Real RealExtra.
 require import Ring StdRing StdOrder StdBigop List Array.
-(*---*) import IterOp BRA IntID RField IntOrder RealOrder.
+(*---*) import IterOp Bigreal.BAdd IntID RField IntOrder RealOrder.
 
 pragma +implicits.
 

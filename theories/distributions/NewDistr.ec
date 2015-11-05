@@ -8,7 +8,8 @@
 (* -------------------------------------------------------------------- *)
 require import Option Pred Fun List Int IntExtra Real RealExtra.
 require import StdRing StdOrder StdBigop Discrete RealSeq RealSeries.
-(*---*) import IterOp BRA IntOrder RealOrder RField.
+(*---*) import IterOp Bigint Bigreal Bigreal.BAdd.
+(*---*) import IntOrder RealOrder RField.
 require (*--*) FinType.
 
 pragma +implicits.
@@ -21,7 +22,7 @@ op mk   : ('a -> real) -> 'a distr.
 
 op isdistr (m : 'a -> real) =
      (forall x, 0%r <= m x)
-  /\ (forall s, uniq s => BRA.big predT m s <= 1%r).
+  /\ (forall s, uniq s => big predT m s <= 1%r).
 
 axiom distrW (P : 'a distr -> bool):
   (forall m, isdistr m => P (mk m)) => forall d, P d.
@@ -34,7 +35,7 @@ lemma ge0_mu ['a] (d : 'a distr) (x : 'a):
 proof. by elim/distrW: d x => m dm; rewrite muK //; case: dm. qed.
 
 lemma le1_mu ['a] (d : 'a distr) :
-  forall (s : 'a list), uniq s => BRA.big predT (mu_x d) s <= 1%r.
+  forall (s : 'a list), uniq s => big predT (mu_x d) s <= 1%r.
 proof. by elim/distrW: d => m dm; rewrite muK //; case: dm. qed.      
 
 lemma summable_mu ['a] (d : 'a distr) : summable (mu_x d).
@@ -68,7 +69,7 @@ lemma isdistr_drat (s : 'a list) : isdistr (mrat s).
 proof.
 rewrite /mrat; split=> /= [x|J uq_J].
   by rewrite divr_ge0 // from_intMle ?(count_ge0, size_ge0).
-admit.
+rewrite -divr_suml -sumr_ofint. admit.
 qed.
 
 op drat ['a] (s : 'a list) = mk (mrat s).
@@ -87,7 +88,7 @@ rewrite /mu @(sumE_fin _ (undup s)) ?undup_uniq //=.
 pose F := fun x => (count (pred1 x) s)%r / (size s)%r.
 rewrite -big_mkcond @(eq_bigr _ _ F) /F /= => {F}.
   by move=> i _; rewrite dratE.
-rewrite -size_filter. admit.
+by rewrite -size_filter -divr_suml -sumr_ofint big_count.
 qed.
 
 lemma eq_dratP ['a] (s1 s2 : 'a list) :

@@ -7,7 +7,7 @@
 
 (* -------------------------------------------------------------------- *)
 require import Fun Pred ExtEq Int IntExtra List StdOrder StdBigop.
-(*---*) import StdOrder.IntOrder.
+(*---*) import StdOrder.IntOrder StdBigop.Bigint.BAdd.
 require (*--*) FinType.
 
 (* -------------------------------------------------------------------- *)
@@ -56,8 +56,8 @@ rewrite max_ler //; elim/Induction.induction: i le.
 move=> i le0_i ih; rewrite wordnS // size_flatten /=.
 rewrite -map_comp (eq_map _ (fun x => card^i)).
   by move=> x /=; rewrite /(\o) size_map.
-rewrite BIA.sumzE BIA.big_map /(\o) /predT /=.
-by rewrite BIA.big_constz count_predT -/card mulzC powS.
+rewrite Bigint.sumzE big_map /(\o) /predT /=.
+by rewrite Bigint.big_constz count_predT -/card mulzC powS.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -85,8 +85,8 @@ rewrite max_ler //; elim/Induction.induction: i le s.
   by move=> s /size_eq0; rewrite wordn0.
 move=> i ge0_i ih []; first by move/eq_sym; rewrite addz1_neq0.
 move=> x s /=; rewrite addzC => /addIz sz_s.
-rewrite wordnS // count_flatten BIA.sumzE BIA.big_map.
-rewrite predT_comp /(\o) (BIA.bigD1 _ _ (cross1 x (wordn i))) /=.
+rewrite wordnS // count_flatten Bigint.sumzE big_map.
+rewrite predT_comp /(\o) (bigD1 _ _ (cross1 x (wordn i))) /=.
 + by apply/mapP; exists x; rewrite enumP.
 + admit.
 admit.
