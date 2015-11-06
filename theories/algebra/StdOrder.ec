@@ -30,9 +30,6 @@ clone include Number
   op   ( <  ) <- Int.(< )
 
   proof Domain.* by smt, Axioms.* by smt.
-
-lemma lezWP (z1 z2 : int) : (z1 <= z2) || (z2 <= z1).
-proof. by case: (z1 <= z2)=> //=; rewrite -ltzNge => /ltrW. qed.
 end IntOrder.
   
 (* -------------------------------------------------------------------- *)

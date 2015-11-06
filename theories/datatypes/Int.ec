@@ -138,8 +138,6 @@ lemma subzE (x y : int): x - y = x + (- y)
 by smt full.
 
 (** Number theory *)
-(* TODO: I merged in some stray bits from List and this may appear to be in whatever order... it is. *)
-
 op "`|_|" (x:int) = (0 <= x) ? x : -x.
 
 lemma nosmt lez_norm_add (x y : int): `|x + y| <= `|x| + `|y|
@@ -177,9 +175,27 @@ lemma nosmt gtz_lt (x y : int): (x >  y) <=> (y <  x) by smt full.
 lemma nosmt neq_ltz (x y : int): (x <> y) <=> (x < y \/ y < x) by smt full.
 lemma nosmt eqz_leq (x y : int): (x = y) <=> (x <= y /\ y <= x) by [].
 
-lemma nosmt lez_addl (x y z : int): (x + y <= x + z) <=> (y <= z) by smt.
+lemma nosmt lez_add2l (x y z : int): (x + y <= x + z) <=> (y <= z) by smt.
+lemma nosmt lez_add2r (x y z : int): (y + x <= z + x) <=> (y <= z) by smt.
+
+lemma nosmt lez_addl (x y : int) : (x <= x + y) = (0 <= y) by smt.
+lemma nosmt lez_addr (x y : int) : (x <= y + x) = (0 <= y) by smt.
+
+lemma nosmt addz_ge0 (x y : int) : 0 <= x => 0 <= y => 0 <= x + y by smt.
 
 lemma nosmt lez_add1r (x y : int): (1 + x <= y) = (x < y) by smt full.
+
+lemma nosmt subz_ge0 x y : (0 <= y - x) = (x <= y) by smt.
+lemma nosmt subz_gt0 x y : (0 < y - x) = (x < y) by smt.
+lemma nosmt subz_le0 x y : (y - x <= 0) = (y <= x) by smt.
+lemma nosmt subz_lt0  x y : (y - x < 0) = (y < x) by smt.
+
+lemma nosmt oppz_ge0 x : (0 <= - x) = (x <= 0) by smt.
+lemma nosmt oppz_gt0 x : (0 < - x) = (x < 0) by smt.
+lemma nosmt oppz_le0 x : (- x <= 0) = (0 <= x) by smt.
+lemma nosmt oppz_lt0 x : (- x < 0) = (0 < x) by smt.
+
+lemma lezWP (z1 z2 : int) : (z1 <= z2) || (z2 <= z1) by smt.
 
 theory Induction.
 

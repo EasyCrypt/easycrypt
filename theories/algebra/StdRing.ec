@@ -36,7 +36,7 @@ theory RField.
 
   lemma nosmt double_half (x : real) : x / 2%r + x / 2%r = x.
   proof.
-    rewrite -ofintR divrE -mulrDl -mulr2z -mulrA -divrE.
+    rewrite -ofintR divrE -mulrDl -mul1r2z -mulrA -divrE.
     by rewrite divff // ofintR.
   qed.
 end RField.

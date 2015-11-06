@@ -967,7 +967,7 @@ proof.                          (* FIXME: test case for views *)
     by move=> s2 /=; rewrite size_ge0.
   move=> x s1 IHs s2 [not_s1x Us1]; rewrite -(allP (mem s2)) /=.
   case=> s2x; rewrite allP => ss12; cut := rot_to s2 x _ => //.
-  case=> i s3 def_s2; rewrite -(size_rot i s2) def_s2 /= lez_addl.
+  case=> i s3 def_s2; rewrite -(size_rot i s2) def_s2 /= lez_add2l.
   apply IHs => // y s1y; cut := ss12 y _ => //.
   by rewrite -(mem_rot i) def_s2; case.
 qed.
@@ -979,7 +979,7 @@ proof.
   move=> Us1x; cut [not_s1x Us1] := Us1x; rewrite -(allP (mem s2)).  
   case=> s2x; rewrite allP => ss12 le_s21.
   cut := rot_to s2 x _ => //; case=> {s2x} i s3 def_s2.
-  move: le_s21; rewrite -(rot_uniq i) -(size_rot i) def_s2 /= lez_addl => le_s31.
+  move: le_s21; rewrite -(rot_uniq i) -(size_rot i) def_s2 /= lez_add2l => le_s31.
   cut ss13: forall y, mem s1 y => mem s3 y.
     move=> y s1y; cut := ss12 y _ => //.
     by rewrite -(mem_rot i) def_s2 in_cons; case=> // eq_yx.
@@ -1655,7 +1655,7 @@ theory Array.
       by rewrite size_eq0=> ->.
       by rewrite eq_sym addzC addz1_neq0 1:size_ge0.
     split.
-      by have //= := h 0 _; rewrite ?getE //= -lez_add1r lez_addl size_ge0.
+      by have //= := h 0 _; rewrite ?getE //= -lez_add1r lez_add2l size_ge0.
     apply ih=> //.
     move=> i [le0_i lti_lenxs]; have:= h (i + 1) _.
       smt. (* side conditions... *)

@@ -9,6 +9,7 @@ pragma +implicits.
 
 (* -------------------------------------------------------------------- *)
 require import Fun Int IntExtra.
+require (*--*) Monoid.
 
 (* -------------------------------------------------------------------- *)
 abstract theory ZModule.
@@ -22,6 +23,16 @@ abstract theory ZModule.
   axiom nosmt addrC: commutative   (+).
   axiom nosmt add0r: left_id zeror (+).
   axiom nosmt addNr: left_inverse  zeror [-] (+).
+
+  clone Monoid as AddMonoid with
+    type t   <- t,
+      op idm <- zeror,
+      op (+) <- (+)
+    proof *.
+
+  realize Axioms.addmA by apply/addrA.
+  realize Axioms.addmC by apply/addrC.
+  realize Axioms.add0m by apply/add0r.
 
   op ( - ) (x y : t) = x + -y axiomatized by subrE.
 
@@ -110,32 +121,32 @@ abstract theory ZModule.
     then -(iterop (-n) ZModule.(+) x zeror)
     else  (iterop   n  ZModule.(+) x zeror).
 
-  lemma intmul0 (x : t): intmul x 0 = zeror.
-  proof. by rewrite /intmul /= iterop0. qed.
-
-  lemma intmul1 (x : t): intmul x 1 = x.
-  proof. by rewrite /intmul /= iterop1. qed.
-
-  lemma intmulN (x : t) (n : int): intmul x (-n) = -(intmul x n).
-  proof.
-    case: (n = 0)=> [-> |nz_n]; 1: by rewrite oppz0 intmul0 oppr0.
-    rewrite /intmul; have ->: -n < 0 <=> !(n < 0) by smt.
-    by case: (n < 0)=> //= _; rewrite ?(opprK, oppzK).
-  qed.
-
-  lemma intmulS (x : t) (n : int): 0 <= n =>
-    intmul x (n+1) = x + intmul x n.
-  proof.
-    elim: n=> /= [|i ge0_i ih]; 2: smt.
-    by rewrite intmul0 intmul1 addr0.
-  qed.
-
   lemma intmulpE z c : 0 <= c =>
     intmul z c = iterop c ZModule.(+) z zeror.
   proof. by rewrite /intmul lezNgt => ->. qed.
-  
-  lemma intmul2 (x : t): intmul x 2 = x + x.
+
+  lemma mulr0z (x : t): intmul x 0 = zeror.
+  proof. by rewrite /intmul /= iterop0. qed.
+
+  lemma mulr1z (x : t): intmul x 1 = x.
+  proof. by rewrite /intmul /= iterop1. qed.
+
+  lemma mulr2z (x : t): intmul x 2 = x + x.
   proof. by rewrite /intmul /= @(iteropS 1) // @(iterS 0) // iter0. qed.
+
+  lemma mulrNz (x : t) (n : int): intmul x (-n) = -(intmul x n).
+  proof.
+    case: (n = 0)=> [->|nz_c]; first by rewrite oppz0 mulr0z oppr0.
+    rewrite /intmul oppz_lt0 oppzK ltz_def nz_c lezNgt /=.
+    by case: (n < 0); rewrite ?opprK.
+  qed.
+
+  lemma mulrS (x : t) (n : int): 0 <= n =>
+    intmul x (n+1) = x + intmul x n.
+  proof.
+    move=> ge0n; rewrite !intmulpE 1:addz_ge0 //.
+    by rewrite !AddMonoid.iteropE iterS.
+  qed.
 end ZModule.
 
 (* -------------------------------------------------------------------- *)
@@ -159,6 +170,16 @@ abstract theory ComRing.
   axiom nosmt mulVr     : left_inverse_in unit oner invr ( * ).
   axiom nosmt unitP     : forall (x y : t), y * x = oner => unit x.
   axiom nosmt unitout   : forall (x : t), !unit x => invr x = x.
+
+  clone Monoid as MulMonoid with
+    type t     <- t,
+      op idm   <- oner,
+      op ( + ) <- ( * )
+    proof *.
+
+  realize Axioms.addmA by apply/mulrA.
+  realize Axioms.addmC by apply/mulrC.
+  realize Axioms.add0m by apply/mul1r.
 
   lemma nosmt mulr1: right_id oner ( * ).
   proof. by move=> x; rewrite mulrC mul1r. qed.
@@ -202,6 +223,30 @@ abstract theory ComRing.
   lemma nosmt mulrBr: right_distributive ( * ) (-).
   proof. by move=> x y z; rewrite !subrE mulrDr !mulrN. qed.
 
+  lemma mulrnAl x y n : 0 <= n => (intmul x n) * y = intmul (x * y) n.
+  proof.
+    elim: n => [|n ge0n ih]; rewrite !(mulr0z, mulrS) ?mul0r //.
+    by rewrite mulrDl ih.
+  qed.
+
+  lemma mulrnAr x y n : 0 <= n => x * (intmul y n) = intmul (x * y) n.
+  proof.
+    elim: n => [|n ge0n ih]; rewrite !(mulr0z, mulrS) ?mulr0 //.
+    by rewrite mulrDr ih.
+  qed.
+
+  lemma mulrzAl x y z : (intmul x z) * y = intmul (x * y) z.
+  proof.
+    case: (lezWP 0 z)=> [|_] le; first by rewrite mulrnAl.
+    by rewrite -oppzK mulrNz mulNr mulrnAl -?mulrNz // oppz_ge0.
+  qed.
+
+  lemma mulrzAr x y z : x * (intmul y z) = intmul (x * y) z.
+  proof.
+    case: (lezWP 0 z)=> [|_] le; first by rewrite mulrnAr.
+    by rewrite -oppzK mulrNz mulrN mulrnAr -?mulrNz // oppz_ge0.
+  qed.
+
   lemma nosmt mulrV: right_inverse_in unit oner invr ( * ).
   proof. by move=> x /mulVr; rewrite mulrC. qed.
 
@@ -226,7 +271,6 @@ abstract theory ComRing.
   lemma nosmt mulrVK: rev_right_loop_in unit invr ( * ).
   proof. by move=> y nz_y x; rewrite -mulrA mulVr // mulr1. qed.
 
-  (* FIXME: have := can_inj _ _ (mulKr _ Ux) *)
   lemma nosmt mulrI: right_injective_in unit ( * ).
   proof. by move=> x Ux; have /can_inj h := mulKr _ Ux. qed.
 
@@ -280,25 +324,31 @@ abstract theory ComRing.
   op ofint n = intmul oner n.
 
   lemma ofint0: ofint 0 = zeror.
-  proof. by apply/intmul0. qed.
+  proof. by apply/mulr0z. qed.
 
   lemma ofint1: ofint 1 = oner.
-  proof. by apply/intmul1. qed.
+  proof. by apply/mulr1z. qed.
 
   lemma ofintS (i : int): 0 <= i => ofint (i+1) = oner + ofint i.
-  proof. by apply/intmulS. qed.
+  proof. by apply/mulrS. qed.
 
   lemma ofintN (i : int): ofint (-i) = - (ofint i).
-  proof. by apply/intmulN. qed.
+  proof. by apply/mulrNz. qed.
 
-  lemma mulr0z x: x * ofint 0 = zeror.
+  lemma mul1r0z x: x * ofint 0 = zeror.
   proof. by rewrite ofint0 mulr0. qed.
 
-  lemma mulr1z x : x * ofint 1 = x.
+  lemma mul1r1z x : x * ofint 1 = x.
   proof. by rewrite ofint1 mulr1. qed.
 
-  lemma mulr2z x : x * ofint 2 = x + x.
-  proof. by rewrite /ofint intmul2 mulrDr mulr1. qed.
+  lemma mul1r2z x : x * ofint 2 = x + x.
+  proof. by rewrite /ofint mulr2z mulrDr mulr1. qed.
+
+  lemma mulr_intl x z : (ofint z) * x = intmul x z.
+  proof. by rewrite mulrzAl mul1r. qed.
+
+  lemma mulr_intr x z : x * (ofint z) = intmul x z.
+  proof. by rewrite mulrzAr mulr1. qed.
 
   op exp (x : t) (n : int) =
     if   n < 0
@@ -313,7 +363,8 @@ abstract theory ComRing.
 
   lemma exprS (x : t) i: 0 <= i => exp x (i+1) = x * (exp x i).
   proof.
-    by elim: i=> /= [|i ge0_i ih]; 2: smt; rewrite expr0 expr1 mulr1.
+    move=> ge0i; rewrite /exp !ltzNge ge0i addz_ge0 //=.
+    by rewrite !MulMonoid.iteropE iterS.
   qed.
 
   lemma exprN (x : t) (i : int): exp x (-i) = invr (exp x i).
@@ -438,8 +489,11 @@ lemma intmulz z c : intmul z c = z * c.
 proof.
 have h: forall cp, 0 <= cp => intmul z cp = z * cp.
   elim/Induction.induction=> /= [|cp ge0_cp ih].
-    by rewrite intmul0.
-  by rewrite intmulS // ih mulrDr /= addrC.
-by case: (c < 0); 1: rewrite -opprK intmulN opprK; smt.
+    by rewrite mulr0z.
+  by rewrite mulrS // ih mulrDr /= addrC.
+case: (c < 0); 1: rewrite -opprK mulrNz opprK; smt.
 qed.
 end IntID.
+
+
+

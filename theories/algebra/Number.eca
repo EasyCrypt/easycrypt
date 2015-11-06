@@ -62,11 +62,10 @@ lemma oppr_ge0 (x : t): (zeror <= -x) <=> (x <= zeror).
 proof. by rewrite -sub0r subr_ge0. qed.
 
 lemma ler01: zeror <= oner.
-proof. (* FIXME: -(inj_eq (mulfI n1_nz)) *)
-  have n1_nz: `|oner| <> zeror.
-    by apply/(contraNneq _ oner_neq0) => /normr0_eq0->.
-  rewrite ger0_def; have /inj_eq <- := mulfI _ n1_nz.
-  by rewrite -normrM !mulr1.
+proof.                        (* FIXME: anomaly with (inj_eq mulfI) *)
+have n1_nz: `|oner| <> zeror by apply/(contraNneq _ oner_neq0) => /normr0_eq0->.
+rewrite ger0_def; have /inj_eq <- := mulfI _ n1_nz.
+by rewrite -normrM !mulr1.
 qed.
 
 lemma ltr01: zeror < oner.
@@ -80,123 +79,165 @@ lemma nosmt ltrNge (x y : t):
 proof. admit. qed.
 
 lemma nosmt lerr (x : t): x <= x.
-proof. admit. qed.
+proof.
+have n2: `|ofint 2| = (ofint 2).
+  rewrite -ger0_def @(ofintS 1) // ofint1 ltrW //.
+  by rewrite addr_gt0 ?ltr01.
+rewrite ler_def subrr -(inj_eq (addrI `|zeror|)) /= addr0.
+by rewrite -mulr2z -mulr_intr -n2 -normrM mul0r.
+qed.
 
-lemma nosmt ltrr (x : t):
-  !(x < x).
-proof. admit. qed.
+lemma nosmt ltrr (x : t): !(x < x).
+proof. by rewrite ltr_def. qed.
 
 lemma nosmt ltr_neqAle (x y : t):
   (x < y) <=> (x <> y) /\ (x <= y).
-proof. admit. qed.
+proof. by rewrite ltr_def eq_sym. qed.
 
 lemma nosmt ler_eqVlt (x y : t):
   (x <= y) <=> (x = y) \/ (x < y).
-proof. admit. qed.
+proof. by rewrite ltr_neqAle; case: (x = y)=> // ->; rewrite lerr. qed.
 
 lemma nosmt lt0r (x : t):
   (zeror < x) <=> (x <> zeror) /\ (zeror <= x).
-proof. admit. qed.
+proof. by rewrite ltr_def. qed.
 
 lemma nosmt le0r (x : t):
   (zeror <= x) <=> (x = zeror) \/ (zeror < x).
-proof. admit. qed.
+proof. by rewrite ler_eqVlt eq_sym. qed.
+
+lemma nosmt addr_ge0 (x y : t):
+  zeror <= x => zeror <= y => zeror <= x + y.
+proof.
+rewrite le0r; case=> [->|gt0x]; rewrite ?add0r // le0r.
+by case=> [->|gt0y]; rewrite ltrW ?addr0 ?addr_gt0.
+qed.
 
 lemma nosmt lt0r_neq0 (x : t):
   zeror < x => (x <> zeror).
-proof. admit. qed.
+proof. by rewrite lt0r; case (_ = _). qed.
 
 lemma nosmt ltr0_neq0 (x : t):
   zeror < x => (x <> zeror).
-proof. admit. qed.
+proof. by rewrite lt0r; case: (_ = _). qed.
 
 lemma nosmt gtr_eqF (x y : t):
   y < x => (x <> y).
-proof. admit. qed.
+proof. by rewrite ltr_def => []. qed.
 
 lemma nosmt ltr_eqF (x y : t):
   x < y => (x <> y).
-proof. admit. qed.
+proof. by rewrite eq_sym=> /gtr_eqF ->. qed.
+
+lemma ler0n n : 0 <= n => zeror <= ofint n.
+proof.
+elim: n => [|n ih h]; first by rewrite mulr0z lerr.
+by rewrite ofintS // addr_ge0 // ?ler01.
+qed.
+
+lemma ltr0Sn n : 0 <= n => zeror < ofint (n + 1).
+proof.
+elim: n=> /= [|n ge0n ih]; first by rewrite ofint1 ltr01.
+by rewrite ofintS // ?(addz_ge0, addr_gt0) // ltr01.
+qed.
+
+lemma ltr0n n : 0 <= n => (zeror < ofint n) = (0 < n).
+proof.
+elim: n => [|n ge0n _]; first by rewrite mulr0z ltrr.
+by rewrite ltr0Sn // ltz_def addz_ge0 ?addz1_neq0.
+qed.
+
+lemma pnatr_eq0 n : 0 <= n => (ofint n = zeror) <=> (n = 0).
+proof.
+elim: n => [|n ge0n _]; rewrite ?mulr0z // gtr_eqF.
+  by rewrite ltr0Sn. by rewrite addz1_neq0.
+qed.
 
 lemma nosmt pmulr_rgt0 (x y : t):
   zeror < x => (zeror < x * y) <=> (zeror < y).
-proof. admit. qed.
+proof.
+rewrite !ltr_def !ger0_def normrM mulf_eq0 -nor.
+by case=> ^nz_x -> -> /=; have /inj_eq -> := mulfI _ nz_x.
+qed.
 
 lemma nosmt pmulr_rge0 (x y : t):
   zeror < x => (zeror <= x * y) <=> (zeror <= y).
-proof. admit. qed.
+proof.
+rewrite !le0r mulf_eq0; case: (y = _) => //= ^lt0x.
+by move/lt0r_neq0=> -> /=; apply/pmulr_rgt0.
+qed.
 
-lemma nosmt normr_idP (x : t):
-  (`|x| = x) <=> (zeror <= x).
-proof. admit. qed.
+lemma nosmt normr_idP (x : t): (`|x| = x) <=> (zeror <= x).
+proof. by rewrite ger0_def. qed.
 
-lemma nosmt ger0_norm (x : t):
-  zeror <= x => `|x| = x.
-proof. admit. qed.
+lemma nosmt ger0_norm (x : t): zeror <= x => `|x| = x.
+proof. by apply/normr_idP. qed.
 
-lemma nosmt normr0:
-  `|zeror| = zeror.
-proof. admit. qed.
+lemma nosmt normr0: `|zeror| = zeror.
+proof. by apply/ger0_norm/lerr. qed.
 
-lemma nosmt normr1:
-  `|oner| = oner.
-proof. admit. qed.
+lemma nosmt normr1: `|oner| = oner.
+proof. by apply/ger0_norm/ler01. qed.
 
-lemma nosmt normr0P (x : t):
-  (`|x| = zeror) <=> (x = zeror).
-proof. admit. qed.
+lemma nosmt normr0P (x : t): (`|x| = zeror) <=> (x = zeror).
+proof. by split=> [/normr0_eq0|->] //; rewrite normr0. qed.
 
-lemma nosmt normrN1:
-  `|-oner| = oner.
-proof. admit. qed.
+lemma nosmt normrN1: `|-oner| = oner.
+proof.
+(*
+have: `|-1| ^+ 2 == 1 :> R by rewrite -normrX -signr_odd normr1.
+rewrite sqrf_eq1 => /orP[/eqP //|]; rewrite -ger0_def le0r oppr_eq0 oner_eq0.
+by move/(addr_gt0 ltr01); rewrite subrr ltrr.
+*)
+admitted.
 
-lemma nosmt normrN (x : t):
-  `|- x| = `|x|.
-proof. admit. qed.
+lemma nosmt normrN (x : t): `|- x| = `|x|.
+proof. by rewrite -mulN1r normrM normrN1 mul1r. qed.
 
-lemma nosmt distrC (x y : t):
-  `|x - y| = `|y - x|.
-proof. admit. qed.
+lemma nosmt distrC (x y : t): `|x - y| = `|y - x|.
+proof. by rewrite -opprB normrN. qed.
 
-lemma nosmt ler0_def (x : t):
-  (x <= zeror) <=> (`|x| = - x).
-proof. admit. qed.
+lemma nosmt ler0_def (x : t): (x <= zeror) <=> (`|x| = - x).
+proof. by rewrite ler_def sub0r normrN. qed.
 
-lemma nosmt normr_id (x : t):
-  `| `|x| | = `|x|.
-proof. admit. qed.
+lemma nosmt normr_id (x : t): `| `|x| | = `|x|.
+proof.
+(*
+have nz2: 2%:R != 0 :> R by rewrite pnatr_eq0.
+apply: (mulfI nz2); rewrite -{1}normr_nat -normrM mulr_natl mulr2n ger0_norm //.
+by rewrite -{2}normrN -normr0 -(subrr x) ler_norm_add.
+*)
+admitted.
 
-lemma nosmt normr_ge0 (x : t):
-  zeror <= `|x|.
-proof. admit. qed.
+lemma nosmt normr_ge0 (x : t): zeror <= `|x|.
+proof. by rewrite ger0_def normr_id. qed.
 
-lemma nosmt ler0_norm (x : t):
-  x <= zeror => `|x| = - x.
-proof. admit. qed.
+lemma nosmt ler0_norm (x : t): x <= zeror => `|x| = - x.
+proof.
+move=> x_le0; rewrite eq_sym -@(ger0_norm (-x)).
+  by rewrite oppr_ge0. by rewrite normrN.
+qed.
 
-lemma nosmt gtr0_norm (x : t):
-  zeror < x => `|x| = x.
-proof. admit. qed.
+lemma nosmt gtr0_norm (x : t): zeror < x => `|x| = x.
+proof. by move/ltrW/ger0_norm. qed.
 
-lemma nosmt ltr0_norm (x : t):
-  x < zeror => `|x| = - x.
-proof. admit. qed.
+lemma nosmt ltr0_norm (x : t): x < zeror => `|x| = - x.
+proof. by move/ltrW/ler0_norm. qed.
 
-lemma nosmt subr_gt0 (x y : t):
-  (zeror < y - x) <=> (x < y).
-proof. admit. qed.
+lemma nosmt subr_gt0 (x y : t): (zeror < y - x) <=> (x < y).
+proof. by rewrite !ltr_def subr_eq0 subr_ge0. qed.
 
-lemma nosmt subr_le0 (x y : t):
-  (y - x <= zeror) <=> (y <= x).
-proof. admit. qed.
+lemma nosmt subr_le0 (x y : t): (y - x <= zeror) <=> (y <= x).
+proof. by rewrite -subr_ge0 subrE opprB add0r subr_ge0. qed.
 
-lemma nosmt subr_lt0 (x y : t):
-  (y - x < zeror) <=> (y < x).
-proof. admit. qed.
+lemma nosmt subr_lt0 (x y : t): (y - x < zeror) <=> (y < x).
+proof. by rewrite -subr_gt0 subrE opprB add0r subr_gt0. qed.
 
-lemma nosmt ler_asym (x y : t):
-  x <= y <= x => x = y.
-proof. admit. qed.
+lemma nosmt ler_asym (x y : t): x <= y <= x => x = y.
+proof.
+rewrite !ler_def distrC -opprB -addr_eq0 => [->].
+by rewrite -mulr2z -mulr_intl mulf_eq0 subr_eq0 pnatr_eq0.
+qed.
 
 lemma nosmt eqr_le (x y : t):
   (x = y) <=> (x <= y <= x).
@@ -216,10 +257,6 @@ proof. admit. qed.
 
 lemma nosmt ler_trans (y x z : t):
   x <= y => y <= z => x <= z.
-proof. admit. qed.
-
-lemma nosmt addr_ge0 (x y : t):
-  zeror <= x => zeror <= y => zeror <= x + y.
 proof. admit. qed.
 
 lemma nosmt ltr_asym (x y : t):
