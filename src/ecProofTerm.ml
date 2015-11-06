@@ -113,21 +113,7 @@ type cptenv = CPTEnv of f_subst
 
 (* -------------------------------------------------------------------- *)
 let concretize_env pe =
-  let tysubst  = { ty_subst_id with ts_u = EcUnify.UniEnv.close pe.pte_ue } in
-  let ftysubst = Fsubst.f_subst_init ~sty:tysubst () in
-  let subst    = ftysubst in
-
-  CPTEnv (
-    EcMatching.MEV.fold
-      (fun x v s ->
-        match v with
-        | `Form f ->
-            Fsubst.f_bind_local s x (Fsubst.f_subst ftysubst f)
-        | `Mem m ->
-            Fsubst.f_bind_mem s x m
-        | `Mod m ->
-            Fsubst.f_bind_mod s x m)
-      !(pe.pte_ev) subst)
+  CPTEnv (EcMatching.MEV.assubst pe.pte_ue !(pe.pte_ev))
 
 (* -------------------------------------------------------------------- *)
 let concretize_e_form (CPTEnv subst) f =
