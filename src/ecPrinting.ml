@@ -612,6 +612,7 @@ let priority_of_binop name =
   | Some EP.LOP4 _ -> Some e_bin_prio_lop4
   | Some EP.ROP4 _ -> Some e_bin_prio_rop4
   | Some EP.AT     -> Some e_bin_prio_lop4
+  | Some EP.HAT    -> Some e_bin_prio_lop4
   | Some EP.NOP _  -> Some e_bin_prio_nop
 
   | _ -> None
