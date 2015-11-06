@@ -40,6 +40,7 @@
   (* ------------------------------------------------------------------ *)
   let _keywords = [                     (* see [keywords.py] *)
     "admit"       , ADMIT      ;        (* KW: dangerous *)
+    "admitted"    , ADMITTED   ;        (* KW: dangerous *)
 
     "forall"      , FORALL     ;        (* KW: prog *)
     "exists"      , EXIST      ;        (* KW: prog *)
@@ -156,6 +157,7 @@
     "realize"     , REALIZE    ;        (* KW: global *)
     "proof"       , PROOF      ;        (* KW: global *)
     "qed"         , QED        ;        (* KW: global *)
+    "abort"       , ABORT      ;        (* KW: global *)
     "goal"        , GOAL       ;        (* KW: global *)
     "end"         , END        ;        (* KW: global *)
     "import"      , IMPORT     ;        (* KW: global *)

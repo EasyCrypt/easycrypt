@@ -175,7 +175,7 @@ module HiPrinting = struct
     | None | Some { EcScope.puc_active = None} ->
         EcScope.hierror "no active proof"
 
-    | Some { EcScope.puc_active = Some puc } -> begin
+    | Some { EcScope.puc_active = Some (puc, _) } -> begin
         match puc.EcScope.puc_jdg with
         | EcScope.PSNoCheck -> ()
 
@@ -403,9 +403,14 @@ and process_tactics (scope : EcScope.scope) t =
   | `Proof  pm -> EcScope.Tactics.proof   scope mode pm.pm_strict
 
 (* -------------------------------------------------------------------- *)
-and process_save (scope : EcScope.scope) loc =
-  let (name, scope) = EcScope.Ax.save scope loc in
-    name |> EcUtils.oiter
+and process_save (scope : EcScope.scope) ed =
+  let (oname, scope) =
+    match unloc ed with
+    | `Qed   -> EcScope.Ax.save  scope
+    | `Admit -> EcScope.Ax.admit scope
+    | `Abort -> (None, EcScope.Ax.abort scope)
+  in
+    oname |> EcUtils.oiter
       (fun x -> EcScope.notify scope `Info "added lemma: `%s'" x);
     scope
 
@@ -541,7 +546,7 @@ and process (ld : Loader.loader) (scope : EcScope.scope) g =
       | Gtcdump      info -> `Fct   (fun scope -> process_dump       scope  info)
       | Grealize     p    -> `Fct   (fun scope -> process_realize    scope  p)
       | Gprover_info pi   -> `Fct   (fun scope -> process_proverinfo scope  pi)
-      | Gsave        loc  -> `Fct   (fun scope -> process_save       scope  loc)
+      | Gsave        ed   -> `Fct   (fun scope -> process_save       scope  ed)
       | Gpragma      opt  -> `State (fun scope -> process_pragma     scope  opt)
       | Goption      opt  -> `Fct   (fun scope -> process_option     scope  opt)
       | Gaddrw       hint -> `Fct   (fun scope -> process_addrw      scope hint)
@@ -714,7 +719,7 @@ let pp_current_goal ?(all = false) stream =
              (EcPrinting.pp_form ppe) (oget ax.EcDecl.ax_spec))
         (fst ct)
 
-  | Some { S.puc_active = Some puc } -> begin
+  | Some { S.puc_active = Some (puc, _) } -> begin
       match puc.S.puc_jdg with
       | S.PSNoCheck -> ()
 

@@ -27,8 +27,9 @@ val toperror_of_exn : ?gloc:EcLocation.t -> exn -> exn
 type scope
 
 type proof_uc = {
-  puc_active : proof_auc option;
+  puc_active : (proof_auc * proof_ctxt option) option;
   puc_cont   : proof_ctxt list * (EcEnv.env option);
+  puc_init   : EcEnv.env;
 }
 
 and proof_auc = {
@@ -97,7 +98,9 @@ module Ax : sig
   type mode = [`WeakCheck | `Check | `Report]
 
   val add     : scope -> mode -> paxiom located -> symbol option * scope
-  val save    : scope -> EcLocation.t -> string option * scope
+  val save    : scope -> string option * scope
+  val admit   : scope -> string option * scope
+  val abort   : scope -> scope
   val realize : scope -> mode -> prealize located -> symbol option * scope
 end
 
