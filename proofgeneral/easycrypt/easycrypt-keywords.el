@@ -1,4 +1,4 @@
-; Generated on Wed Sep 23 12:50:36 2015
+; Generated on Fri Nov  6 09:58:58 2015
 
 (defvar easycrypt-bytac-keywords '(
   "exact"
@@ -11,6 +11,7 @@
 
 (defvar easycrypt-dangerous-keywords '(
   "admit"
+  "admitted"
 ))
 
 (defvar easycrypt-global-keywords '(
@@ -18,9 +19,9 @@
   "axiomatized"
   "lemma"
   "realize"
-  "choice"
   "proof"
   "qed"
+  "abort"
   "goal"
   "end"
   "import"
