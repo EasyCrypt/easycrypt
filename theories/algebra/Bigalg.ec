@@ -116,6 +116,8 @@ type t.
 
 clone import Number as Num with type t <- t.
 
+import Num.Domain.
+
 clone include BigComRing with
   type t <- t,
   pred CR.unit   <- Num.Domain.unit,
@@ -147,4 +149,36 @@ realize CR.mulrDl    . proof. by apply/Num.Domain.mulrDl. qed.
 realize CR.mulVr     . proof. by apply/Num.Domain.mulVr. qed.
 realize CR.unitP     . proof. by apply/Num.Domain.unitP. qed.
 realize CR.unitout   . proof. by apply/Num.Domain.unitout. qed.
+
+lemma ler_sum (P : 'a -> bool) (F1 F2 :'a -> t) s:
+     (forall a, P a => F1 a <= F2 a)
+  => (BAdd.big P F1 s <= BAdd.big P F2 s).
+proof.
+apply: @(BAdd.big_ind2 (fun (x y : t) => x <= y)) => //=.
+  by apply/ler_add. by apply/lerr.
+qed.
+
+lemma sumr_ge0 (P : 'a -> bool) (F : 'a -> t) s:
+     (forall a, P a => zeror <= F a)
+  => zeror <= BAdd.big P F s.
+proof.
+move=> h; apply: @(BAdd.big_ind (fun x => zeror <= x)) => //=.
+  by apply/addr_ge0. by apply/lerr.
+qed.
+
+lemma ler_sum_seq (P : 'a -> bool) (F1 F2 :'a -> t) s:
+     (forall a, mem s a => P a => F1 a <= F2 a)
+  => (BAdd.big P F1 s <= BAdd.big P F2 s).
+proof.
+move=> h; rewrite !@(BAdd.big_seq_cond P).
+by rewrite ler_sum=> //= x []; apply/h.
+qed.
+
+lemma sumr_ge0_seq (P : 'a -> bool) (F : 'a -> t) s:
+     (forall a, mem s a => P a => zeror <= F a)
+  => zeror <= BAdd.big P F s.
+proof.
+move=> h; rewrite !@(BAdd.big_seq_cond P).
+by rewrite sumr_ge0=> //= x []; apply/h.
+qed.
 end BigOrder.
