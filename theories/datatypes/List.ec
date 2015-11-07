@@ -9,7 +9,7 @@
  * ssreflect Coq extension. *)
 
 (* -------------------------------------------------------------------- *)
-require import Fun Pred Option Pair Int.
+require import Fun Pred Option Pair Int IntExtra.
 
 (* -------------------------------------------------------------------- *)
 type 'a list = [
@@ -73,6 +73,16 @@ lemma head_behead (xs : 'a list) z0:
   xs <> [] =>
   (head z0 xs) :: (behead xs) = xs.
 proof. by elim xs. qed.
+
+(* -------------------------------------------------------------------- *)
+op nseq (n : int) (x : 'a) = iter n ((::) x) [].
+
+lemma size_nseq n (x : 'a) : size (nseq n x) = max 0 n.
+proof.
+elim/Induction.natind: n => [n le0n|n ge0n ih] @/nseq.
+  by rewrite iter0 // max_lel.
+by rewrite iterS //= ih !max_ler 1?addzC // addz_ge0.
+qed.
 
 (* -------------------------------------------------------------------- *)
 (*                    Sequence catenation "cat"                         *)
@@ -1530,6 +1540,13 @@ proof.
   elim: ss=> [|s ss ih] /=; first by rewrite flatten_nil.
   by rewrite flatten_cons count_cat /sumz /= ih.
 qed.
+
+(* ==================================================================== *)
+lemma nosmt perm_undup_count (s : 'a list) :
+  perm_eq
+    (flatten (map (fun x => nseq (count (pred1 x) s) x) (undup s)))
+    s.
+proof. admit. qed.
 
 (* -------------------------------------------------------------------- *)
 (*                               EqIn                                   *)

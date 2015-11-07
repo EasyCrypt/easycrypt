@@ -6,10 +6,31 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Int Fun.
+require import Int Fun Pred.
 require Ring.
 
 pragma +implicits.
+
+(* -------------------------------------------------------------------- *)
+pred homo2 ['a 'b] (op_ : 'a -> 'b) (aR : 'a rel) (rR : 'b rel) =
+  forall x y, aR x y => rR (op_ x) (op_ y).
+
+pred mono2 ['a 'b] (op_ : 'a -> 'b) (aR : 'a rel) (rR : 'b rel) =
+  forall x y, rR (op_ x) (op_ y) <=> aR x y.
+
+lemma mono2W f (aR : 'a rel) (rR : 'b rel) :
+  mono2 f aR rR => homo2 f aR rR.
+proof. by move=> + x y - ->. qed.
+
+lemma monoLR ['a 'b] f g (aR : 'a rel) (rR : 'b rel) :
+  cancel g f => mono2 f aR rR => forall x y,
+    rR (f x) y <=> aR x (g y).
+proof. by move=> can_gf mf x y; rewrite -{1}can_gf mf. qed.
+
+lemma monoRL ['a 'b] f g (aR : 'a rel) (rR : 'b rel) :
+  cancel g f => mono2 f aR rR => forall x y,
+    rR x (f y) <=> aR (g x) y.
+proof. by move=> can_gf mf x y; rewrite -{1}can_gf mf. qed.
 
 (* -------------------------------------------------------------------- *)
 type t.
@@ -287,8 +308,35 @@ proof. by rewrite ltr_neqAle normr_le0 normr0P; case: (_ = _). qed.
 lemma nosmt normr_gt0 (x : t): (zeror < `|x|) <=> (x <> zeror).
 proof. by rewrite ltr_def normr0P normr_ge0; case: (_ = _). qed.
 
+(* -------------------------------------------------------------------- *)
+lemma mono_inj f : mono2 f (<=) (<=) => injective f.
+proof. by move=> mf x y; rewrite eqr_le !mf -eqr_le. qed.
+
+lemma nmono_inj f : mono2 f (fun y x => x <= y) (<=) => injective f.
+proof. by move=> mf x y; rewrite eqr_le !mf -eqr_le. qed.
+
+lemma lerW_mono f : mono2 f (<=) (<=) => mono2 f (<) (<).
+proof.
+move=> mf x y; rewrite !ltr_neqAle mf.
+by rewrite inj_eq //; apply/mono_inj.
+qed.
+
+lemma lerW_nmono f : mono2 f (fun y x => x <= y) (<=) =>
+  mono2 f (fun y x => x < y) (<).
+proof.
+move=> mf x y; rewrite !ltr_neqAle mf eq_sym.
+by rewrite inj_eq //; apply/nmono_inj.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma ler_opp2 (x y : t): (-x <= -y) <=> (y <= x).
+proof. by rewrite -subr_ge0 subrE opprK addrC -subrE subr_ge0. qed.
+
+lemma ltr_opp2 (x y : t): (-x < -y) <=> (y < x).
+proof. by rewrite lerW_nmono //; apply/ler_opp2. qed.
+
 lemma nosmt ler_oppr (x y : t): (x <= - y) <=> (y <= - x).
-proof. admit. qed.
+proof. by rewrite (monoRL opprK ler_opp2). qed.
 
 lemma nosmt ltr_oppr (x y : t):
   (x < - y) <=> (y < - x).

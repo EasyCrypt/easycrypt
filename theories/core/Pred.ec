@@ -5,7 +5,11 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
+(* -------------------------------------------------------------------- *)
 require export ExtEq Fun.
+
+(* -------------------------------------------------------------------- *)
+type 'a rel = 'a -> 'a -> bool.
 
 (*** Working with predicates *)
 (** Lifting boolean operators to predicates *)
