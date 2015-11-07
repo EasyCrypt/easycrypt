@@ -8,13 +8,13 @@
 pragma +implicits.
 
 (* -------------------------------------------------------------------- *)
-require import Fun Pred Pair Int IntExtra List Ring.
-require (*--*) Bigop.
+require import Fun Pred Pair Int IntExtra List.
+require (*--*) Bigop Ring Number.
 
 import Ring.IntID.
 
 (* -------------------------------------------------------------------- *)
-abstract theory ZModule.
+abstract theory BigZModule.
 type t.
 
 clone import Ring.ZModule as ZM with type t <- t.
@@ -49,17 +49,17 @@ proof. by rewrite subrE sumrN sumrD; apply/eq_bigr=> /= x; rewrite subrE. qed.
 lemma nosmt sumr_const (P : 'a -> bool) x s:
   big P (fun i => x) s = intmul x (count P s).
 proof. by rewrite big_const intmulpE 1:count_ge0 // -iteropE. qed.
-end ZModule.
+end BigZModule.
 
 (* -------------------------------------------------------------------- *)
-abstract theory ComRing.
+abstract theory BigComRing.
 type t.
 
 clone import Ring.ComRing as CR with type t <- t.
 
 (* -------------------------------------------------------------------- *)
 theory BAdd.
-clone include Self.ZModule with
+clone include BigZModule with
   type t <- t,
     op ZM.zeror  <- CR.zeror,
     op ZM.( + )  <- CR.( + ),
@@ -108,4 +108,43 @@ realize Support.Axioms.addmA. by apply/mulrA. qed.
 realize Support.Axioms.addmC. by apply/mulrC. qed.
 realize Support.Axioms.add0m. by apply/mul1r. qed.
 end BMul.
-end ComRing.
+end BigComRing.
+
+(* -------------------------------------------------------------------- *)
+abstract theory BigOrder.
+type t.
+
+clone import Number as Num with type t <- t.
+
+clone include BigComRing with
+  type t <- t,
+  pred CR.unit   <- Num.Domain.unit,
+    op CR.zeror  <- Num.Domain.zeror,
+    op CR.oner   <- Num.Domain.oner,
+    op CR.( + )  <- Num.Domain.( + ),
+    op CR.([-])  <- Num.Domain.([-]),
+    op CR.( - )  <- Num.Domain.( - ),
+    op CR.( * )  <- Num.Domain.( * ),
+    op CR.invr   <- Num.Domain.invr,
+    op CR.( / )  <- Num.Domain.( / ),
+    op CR.intmul <- Num.Domain.intmul,
+    op CR.ofint  <- Num.Domain.ofint,
+    op CR.exp    <- Num.Domain.exp
+
+    proof *.
+
+realize CR.addrA     . proof. by apply/Num.Domain.addrA. qed.
+realize CR.addrC     . proof. by apply/Num.Domain.addrC. qed.
+realize CR.add0r     . proof. by apply/Num.Domain.add0r. qed.
+realize CR.addNr     . proof. by apply/Num.Domain.addNr. qed.
+realize CR.subrE     . proof. by apply/Num.Domain.subrE. qed.
+realize CR.divrE     . proof. by apply/Num.Domain.divrE. qed.
+realize CR.oner_neq0 . proof. by apply/Num.Domain.oner_neq0. qed.
+realize CR.mulrA     . proof. by apply/Num.Domain.mulrA. qed.
+realize CR.mulrC     . proof. by apply/Num.Domain.mulrC. qed.
+realize CR.mul1r     . proof. by apply/Num.Domain.mul1r. qed.
+realize CR.mulrDl    . proof. by apply/Num.Domain.mulrDl. qed.
+realize CR.mulVr     . proof. by apply/Num.Domain.mulVr. qed.
+realize CR.unitP     . proof. by apply/Num.Domain.unitP. qed.
+realize CR.unitout   . proof. by apply/Num.Domain.unitout. qed.
+end BigOrder.

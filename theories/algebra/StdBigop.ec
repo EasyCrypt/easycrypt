@@ -11,21 +11,25 @@ require (*--*) Bigop Bigalg.
 
 (* -------------------------------------------------------------------- *)
 theory Bigint.
-clone include Bigalg.ComRing with
+clone include Bigalg.BigOrder with
   type t <- int,
-  pred CR.unit (z : int) <- (z = 1 \/ z = -1),
-    op CR.zeror  <- 0,
-    op CR.oner   <- 1,
-    op CR.( + )  <- Int.( + ),
-    op CR.( - )  <- Int.( - ),
-    op CR.([-])  <- Int.([-]),
-    op CR.( * )  <- Int.( * ),
-    op CR.invr   <- (fun (z : int) => z),
-    op CR.intmul <- IntID.intmul,
-    op CR.ofint  <- IntID.ofint,
-    op CR.exp    <- IntID.exp
+  pred Num.Domain.unit (z : int) <- (z = 1 \/ z = -1),
+    op Num.Domain.zeror  <- 0,
+    op Num.Domain.oner   <- 1,
+    op Num.Domain.( + )  <- Int.( + ),
+    op Num.Domain.( - )  <- Int.( - ),
+    op Num.Domain.([-])  <- Int.([-]),
+    op Num.Domain.( * )  <- Int.( * ),
+    op Num.Domain.invr   <- (fun (z : int) => z),
+    op Num.Domain.intmul <- IntID.intmul,
+    op Num.Domain.ofint  <- IntID.ofint,
+    op Num.Domain.exp    <- IntID.exp,
 
-    proof CR.* by smt.
+    op Num."`|_|" <- Int."`|_|",
+    op Num.( <= ) <- Int.(<=),
+    op Num.( <  ) <- Int.(< )
+
+    proof Num.Domain.* by smt, Num.Axioms.* by smt.
 
 lemma nosmt sumzE ss : sumz ss = BAdd.big predT (fun x => x) ss.
 proof. by elim: ss=> [|s ss ih] //=; rewrite BAdd.big_cons -ih. qed.
@@ -42,22 +46,26 @@ end Bigint.
 
 (* -------------------------------------------------------------------- *)
 theory Bigreal.
-clone include Bigalg.ComRing with
+clone include Bigalg.BigOrder with
   type t <- real,
-  pred CR.unit (z : real) <- (z <> 0%r),
-    op CR.zeror  <- 0%r,
-    op CR.oner   <- 1%r,
-    op CR.( + )  <- Real.( + ),
-    op CR.( - )  <- Real.( - ),
-    op CR.([-])  <- Real.([-]),
-    op CR.( * )  <- Real.( * ),
-    op CR.invr   <- Real.inv,
-    op CR.( / )  <- Real.( / ),
-    op CR.intmul <- RField.intmul,
-    op CR.ofint  <- RField.ofint,
-    op CR.exp    <- RField.exp
+  pred Num.Domain.unit (z : real) <- (z <> 0%r),
+    op Num.Domain.zeror  <- 0%r,
+    op Num.Domain.oner   <- 1%r,
+    op Num.Domain.( + )  <- Real.( + ),
+    op Num.Domain.( - )  <- Real.( - ),
+    op Num.Domain.([-])  <- Real.([-]),
+    op Num.Domain.( * )  <- Real.( * ),
+    op Num.Domain.invr   <- Real.inv,
+    op Num.Domain.( / )  <- Real.( / ),
+    op Num.Domain.intmul <- RField.intmul,
+    op Num.Domain.ofint  <- RField.ofint,
+    op Num.Domain.exp    <- RField.exp,
 
-    proof CR.* by smt.
+    op Num."`|_|" <- Real.Abs."`|_|",
+    op Num.( <= ) <- Real.(<=),
+    op Num.( <  ) <- Real.(< )
+
+    proof Num.Domain.* by smt, Num.Axioms.* by smt.
 
 import Bigint.BAdd Bigint.BMul BAdd BMul.
 
