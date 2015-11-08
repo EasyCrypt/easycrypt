@@ -437,118 +437,124 @@ lemma nosmt ltr_subr_addr (x y z : t):
   (x < y - z) <=> (x + z < y).
 proof. admit. qed.
 
+hint rewrite ler_sub_addr  : ler_subl_addr ler_subr_addr.
+hint rewrite ltr_sub_addr  : ltr_subl_addr ltr_subr_addr.
+hint rewrite lter_sub_addr : ler_subl_addr ler_subr_addr.
+hint rewrite lter_sub_addr : ltr_subl_addr ltr_subr_addr.
+
 lemma nosmt ler_subl_addl (x y z : t):
   (x - y <= z) <=> (x <= y + z).
-proof. admit. qed.
+proof. by rewrite lter_sub_addr addrC. qed.
 
 lemma nosmt ltr_subl_addl (x y z : t):
   (x - y < z) <=> (x < y + z).
-proof. admit. qed.
+proof. by rewrite lter_sub_addr addrC. qed.
 
 lemma nosmt ler_subr_addl (x y z : t):
   (x <= y - z) <=> (z + x <= y).
-proof. admit. qed.
+proof. by rewrite lter_sub_addr addrC. qed.
 
 lemma nosmt ltr_subr_addl (x y z : t):
   (x < y - z) <=> (z + x < y).
-proof. admit. qed.
+proof. by rewrite lter_sub_addr addrC. qed.
 
-lemma nosmt ler_addl (x y : t):
-  (x <= x + y) <=> (zeror <= y).
-proof. admit. qed.
+hint rewrite ler_sub_addl  : ler_subl_addl ler_subr_addl.
+hint rewrite ltr_sub_addl  : ltr_subl_addl ltr_subr_addl.
+hint rewrite lter_sub_addl : ler_subl_addl ler_subr_addl.
+hint rewrite lter_sub_addl : ltr_subl_addl ltr_subr_addl.
 
-lemma nosmt ltr_addl (x y : t):
-  (x < x + y) <=> (zeror < y).
-proof. admit. qed.
+lemma nosmt ler_addl (x y : t): (x <= x + y) <=> (zeror <= y).
+proof. by rewrite -{1}@(addr0 x) lter_add2. qed.
 
-lemma nosmt ler_addr (x y : t):
-  (x <= y + x) <=> (zeror <= y).
-proof. admit. qed.
+lemma nosmt ltr_addl (x y : t): (x < x + y) <=> (zeror < y).
+proof. by rewrite -{1}@(addr0 x) lter_add2. qed.
 
-lemma nosmt ltr_addr (x y : t):
-  (x < y + x) <=> (zeror < y).
-proof. admit. qed.
+lemma nosmt ler_addr (x y : t): (x <= y + x) <=> (zeror <= y).
+proof. by rewrite -{1}@(add0r x) lter_add2. qed.
 
-lemma nosmt ger_addl (x y : t):
-  (x + y <= x) <=> (y <= zeror).
-proof. admit. qed.
+lemma nosmt ltr_addr (x y : t): (x < y + x) <=> (zeror < y).
+proof. by rewrite -{1}@(add0r x) lter_add2. qed.
 
-lemma nosmt gtr_addl (x y : t):
-  (x + y < x) <=> (y < zeror).
-proof. admit. qed.
+lemma nosmt ger_addl (x y : t): (x + y <= x) <=> (y <= zeror).
+proof. by rewrite -{2}@(addr0 x) lter_add2. qed.
 
-lemma nosmt ger_addr (x y : t):
-  (y + x <= x) <=> (y <= zeror).
-proof. admit. qed.
+lemma nosmt gtr_addl (x y : t): (x + y < x) <=> (y < zeror).
+proof. by rewrite -{2}@(addr0 x) lter_add2. qed.
 
-lemma nosmt gtr_addr (x y : t):
-  (y + x < x) <=> (y < zeror).
-proof. admit. qed.
+lemma nosmt ger_addr (x y : t): (y + x <= x) <=> (y <= zeror).
+proof. by rewrite -{2}@(add0r x) lter_add2. qed.
+
+lemma nosmt gtr_addr (x y : t): (y + x < x) <=> (y < zeror).
+proof. by rewrite -{2}@(add0r x) lter_add2. qed.
+
+hint rewrite cpr_add : ler_addl ler_addr ger_addl ger_addl.
+hint rewrite cpr_add : ltr_addl ltr_addr gtr_addl gtr_addl.
 
 lemma nosmt ler_paddl (y x z : t):
   zeror <= x => y <= z => y <= x + z.
-proof. admit. qed.
+proof. by move=> ??; rewrite -@(add0r y) ler_add. qed.
 
 lemma nosmt ltr_paddl (y x z : t):
   zeror <= x => y < z => y < x + z.
-proof. admit. qed.
+proof. by move=> ??; rewrite -@(add0r y) ler_lt_add. qed.
 
 lemma nosmt ltr_spaddl (y x z : t):
   zeror < x => y <= z => y < x + z.
-proof. admit. qed.
+proof. by move=> ??; rewrite -@(add0r y) ltr_le_add. qed.
 
 lemma nosmt ltr_spsaddl (y x z : t):
   zeror < x => y < z => y < x + z.
-proof. admit. qed.
+proof. by move=> ??; rewrite -@(add0r y) ltr_add. qed.
 
 lemma nosmt ler_naddl (y x z : t):
   x <= zeror => y <= z => x + y <= z.
-proof. admit. qed.
+proof. by move=> ??; rewrite -@(add0r z) ler_add. qed.
 
 lemma nosmt ltr_naddl (y x z : t):
   x <= zeror => y < z => x + y < z.
-proof. admit. qed.
+proof. by move=> ??; rewrite -@(add0r z) ler_lt_add. qed.
 
 lemma nosmt ltr_snaddl (y x z : t):
   x < zeror => y <= z => x + y < z.
-proof. admit. qed.
+proof. by move=> ??; rewrite -@(add0r z) ltr_le_add. qed.
 
 lemma nosmt ltr_snsaddl (y x z : t):
   x < zeror => y < z => x + y < z.
-proof. admit. qed.
+proof. by move=> ??; rewrite -@(add0r z) ltr_add. qed.
 
 lemma nosmt ler_paddr (y x z : t):
   zeror <= x => y <= z => y <= z + x.
-proof. admit. qed.
+proof. by move=> ??; rewrite @(addrC _ x) ler_paddl. qed.
 
 lemma nosmt ltr_paddr (y x z : t):
   zeror <= x => y < z => y < z + x.
-proof. admit. qed.
+proof. by move=> ??; rewrite @(addrC _ x) ltr_paddl. qed.
 
 lemma nosmt ltr_spaddr (y x z : t):
   zeror < x => y <= z => y < z + x.
-proof. admit. qed.
+proof. by move=> ??; rewrite @(addrC _ x) ltr_spaddl. qed.
 
 lemma nosmt ltr_spsaddr (y x z : t):
   zeror < x => y < z => y < z + x.
-proof. admit. qed.
+proof. by move=> ??; rewrite @(addrC _ x) ltr_spsaddl. qed.
 
 lemma nosmt ler_naddr (y x z : t):
   x <= zeror => y <= z => y + x <= z.
-proof. admit. qed.
+proof. by move=> ??; rewrite @(addrC _ x) ler_naddl. qed.
 
 lemma nosmt ltr_naddr (y x z : t):
   x <= zeror => y < z => y + x < z.
-proof. admit. qed.
+proof. by move=> ??; rewrite @(addrC _ x) ltr_naddl. qed.
 
 lemma nosmt ltr_snaddr (y x z : t):
   x < zeror => y <= z => y + x < z.
-proof. admit. qed.
+proof. by move=> ??; rewrite @(addrC _ x) ltr_snaddl. qed.
 
 lemma nosmt ltr_snsaddr (y x z : t):
   x < zeror => y < z => y + x < z.
-proof. admit. qed.
+proof. by move=> ??; rewrite @(addrC _ x) ltr_snsaddl. qed.
 
+(* -------------------------------------------------------------------- *)
 lemma nosmt paddr_eq0 (x y : t):
   zeror <= x => zeror <= y => (x + y = zeror) <=> (x = zeror) /\ (y = zeror).
 proof. admit. qed.
@@ -563,6 +569,7 @@ lemma nosmt addr_ss_eq0 (x y : t):
   => (x + y = zeror) <=> (x = zeror) /\ (y = zeror).
 proof. admit. qed.
 
+(* -------------------------------------------------------------------- *)
 lemma nosmt ler_pmul2l x : zeror < x => forall y z, (y <= z) <=> (x * y <= x * z).
 proof. admit. qed.
 
@@ -586,6 +593,7 @@ proof. admit. qed.
 lemma nosmt ltrNge (x y : t): (x < y) <=> !(y <= x).
 proof. admit. qed.
 
+(* -------------------------------------------------------------------- *)
 lemma nosmt ltrN10: -oner < zeror.
 proof. by rewrite oppr_lt0 ltr01. qed.
 
