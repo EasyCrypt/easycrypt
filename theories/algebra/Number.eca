@@ -617,7 +617,7 @@ lemma nosmt ler_wpmul2l x :
 proof. admit. qed.
 
 lemma nosmt ler_wpmul2r x :
-  zeror <= x => forall y z, y <= z => y * z <= z * x.
+  zeror <= x => forall y z, y <= z => y * x <= z * x.
 proof. admit. qed.
 
 lemma nosmt ler_wnmul2l x :
@@ -715,80 +715,125 @@ proof. by move=> x_lt0; rewrite mulrC nmulr_rle0. qed.
 
 lemma nosmt mulr_ge0 (x y : t):
   zeror <= x => zeror <= y => zeror <= x * y.
-proof. admit. qed.
+proof. by move=> x_ge0 y_ge0; rewrite -(mulr0 x) ler_wpmul2l. qed.
 
 lemma nosmt mulr_le0 (x y : t):
   x <= zeror => y <= zeror => zeror <= x * y.
-proof. admit. qed.
+proof. by move=> x_le0 y_le0; rewrite -(mulr0 x) ler_wnmul2l. qed.
 
 lemma nosmt mulr_ge0_le0 (x y : t):
   zeror <= x => y <= zeror => x * y <= zeror.
-proof. admit. qed.
+proof. by move=> x_le0 y_le0; rewrite -(mulr0 x) ler_wpmul2l. qed.
 
 lemma nosmt mulr_le0_ge0 (x y : t):
   x <= zeror => zeror <= y => x * y <= zeror.
-proof. admit. qed.
+proof. by move=> x_le0 y_le0; rewrite -(mulr0 x) ler_wnmul2l. qed.
 
 lemma nosmt mulr_gt0 (x y : t):
   zeror < x => zeror < y => zeror < x * y.
 proof. by move=> x_gt0 y_gt0; rewrite pmulr_rgt0. qed.
 
-lemma nosmt ger_pmull (x y : t):
-  zeror < y => (x * y <= y) <=> (x <= oner).
-proof. admit. qed.
+(* -------------------------------------------------------------------- *)
+lemma nosmt ger_pmull x y : zeror < y => (x * y <= y) <=> (x <= oner).
+proof. by move=> hy; rewrite -{2}(mul1r y) -ler_pmul2r. qed.
 
-lemma nosmt gtr_pmull (x y : t):
-  zeror < y => (x * y < y) <=> (x < oner).
-proof. admit. qed.
+lemma nosmt gtr_pmull x y : zeror < y => (x * y < y) <=> (x < oner).
+proof. by move=> hy; rewrite -{2}(mul1r y) -ltr_pmul2r. qed.
 
-lemma nosmt ger_pmulr (x y : t):
-  zeror < y => (y * x <= y) <=> (x <= oner).
-proof. admit. qed.
+lemma nosmt ger_pmulr x y : zeror < y => (y * x <= y) <=> (x <= oner).
+proof. by move=> hy; rewrite -{2}(mulr1 y) ler_pmul2l. qed.
 
-lemma nosmt gtr_pmulr (x y : t):
-  zeror < y => (y * x < y) <=> (x < oner).
-proof. admit. qed.
+lemma nosmt gtr_pmulr x y : zeror < y => (y * x < y) <=> (x < oner).
+proof. by move=> hy; rewrite -{2}(mulr1 y); rewrite ltr_pmul2l. qed.
 
-lemma nosmt ler_nmull (x y : t):
-  y < zeror => (y <= x * y) <=> (x <= oner).
-proof. admit. qed.
+lemma nosmt ler_pmull x y : zeror < y => (y <= x * y) <=> (oner <= x).
+proof. by move=> hy; rewrite -{1}(mul1r y) -ler_pmul2r. qed.
 
-lemma nosmt ltr_nmull (x y : t):
-  y < zeror => (y < x * y) <=> (x < oner).
-proof. admit. qed.
+lemma nosmt ltr_pmull x y : zeror < y => (y < x * y) <=>(oner < x).
+proof. by move=> hy; rewrite -{1}(mul1r y) -ltr_pmul2r. qed.
 
-lemma nosmt ler_nmulr (x y : t):
-  y < zeror => (y <= y * x) <=> (x <= oner).
-proof. admit. qed.
+lemma nosmt ler_pmulr x y : zeror < y => (y <= y * x) <=>(oner <= x).
+proof. by move=> hy; rewrite -{1}(mulr1 y) ler_pmul2l. qed.
 
-lemma nosmt ltr_nmulr (x y : t):
-  y < zeror => (y < y * x) <=> (x < oner).
-proof. admit. qed.
+lemma nosmt ltr_pmulr x y : zeror < y => (y < y * x) <=>(oner < x).
+proof. by move=> hy; rewrite -{1}(mulr1 y) ltr_pmul2l. qed.
 
-lemma nosmt ler_pimull (x y : t):
-  zeror <= y => x <= oner => x * y <= y.
-proof. admit. qed.
+lemma nosmt ger_nmull x y : y < zeror => (x * y <= y) = (oner <= x).
+proof. by move=> hy; rewrite -{2}(mul1r y)ler_nmul2r. qed.
 
-lemma nosmt ler_nimull (x y : t):
-  y <= zeror => x <= oner => y <= x * y.
-proof. admit. qed.
+lemma nosmt gtr_nmull x y : y < zeror => (x * y < y) = (oner < x).
+proof. by move=> hy; rewrite -{2}(mul1r y) ltr_nmul2r. qed.
 
-lemma nosmt ler_pimulr (x y : t):
-  zeror <= y => x <= oner => y * x <= y.
-proof. admit. qed.
+lemma nosmt ger_nmulr x y : y < zeror => (y * x <= y) = (oner <= x).
+proof. by move=> hy; rewrite -{2}(mulr1 y) ler_nmul2l. qed.
 
-lemma nosmt ler_nimulr (x y : t):
-  y <= zeror => x <= oner => y <= y * x.
-proof. admit. qed.
+lemma nosmt gtr_nmulr x y : y < zeror => (y * x < y) = (oner < x).
+proof. by move=> hy; rewrite -{2}(mulr1 y) ltr_nmul2l. qed.
 
+lemma nosmt ler_nmull x y : y < zeror => (y <= x * y) <=> (x <= oner).
+proof. by move=> hy; rewrite -{1}(mul1r y) ler_nmul2r. qed.
+
+lemma nosmt ltr_nmull x y : y < zeror => (y < x * y) <=> (x < oner).
+proof. by move=> hy; rewrite -{1}(mul1r y) ltr_nmul2r. qed.
+
+lemma nosmt ler_nmulr x y : y < zeror => (y <= y * x) <=> (x <= oner).
+proof. by move=> hy; rewrite -{1}(mulr1 y) ler_nmul2l. qed.
+
+lemma nosmt ltr_nmulr x y : y < zeror => (y < y * x) <=> (x < oner).
+proof. by move=> hy; rewrite -{1}(mulr1 y) ltr_nmul2l. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma ler_pemull x y : zeror <= y => oner <= x => y <= x * y.
+proof. by move=> hy hx; rewrite -{1}(mul1r y) ler_wpmul2r. qed.
+
+lemma ler_nemull x y : y <= zeror => oner <= x => x * y <= y.
+proof. by move=> hy hx; rewrite -{2}(mul1r y) ler_wnmul2r. qed.
+
+lemma ler_pemulr x y : zeror <= y => oner <= x => y <= y * x.
+proof. by move=> hy hx; rewrite -{1}(mulr1 y) ler_wpmul2l. qed.
+
+lemma ler_nemulr x y : y <= zeror => oner <= x => y * x <= y.
+proof. by move=> hy hx; rewrite -{2}(mulr1 y) ler_wnmul2l. qed.
+
+lemma nosmt ler_pimull x y : zeror <= y => x <= oner => x * y <= y.
+proof. by move=> hy hx; rewrite -{2}(mul1r y) ler_wpmul2r. qed.
+
+lemma nosmt ler_nimull x y : y <= zeror => x <= oner => y <= x * y.
+proof. by move=> hy hx; rewrite -{1}(mul1r y) ler_wnmul2r. qed.
+
+lemma nosmt ler_pimulr x y : zeror <= y => x <= oner => y * x <= y.
+proof. by move=> hy hx; rewrite -{2}(mulr1 y) ler_wpmul2l. qed.
+
+lemma nosmt ler_nimulr x y : y <= zeror => x <= oner => y <= y * x.
+proof. by move=> hx hy; rewrite -{1}(mulr1 y) ler_wnmul2l. qed.
+
+(* -------------------------------------------------------------------- *)
 lemma nosmt mulr_ile1 (x y : t):
   zeror <= x => zeror <= y => x <= oner => y <= oner => x * y <= oner.
-proof. admit. qed.
+proof. by move=> ????; rewrite @(ler_trans y) ?ler_pimull. qed.
 
 lemma nosmt mulr_ilt1 (x y : t):
   zeror <= x => zeror <= y => x < oner => y < oner => x * y < oner.
-proof. admit. qed.
+proof. by move=> ????; rewrite @(ler_lt_trans y) ?ler_pimull // ?ltrW. qed.
 
+hint rewrite mulr_ilte1 : mulr_ile1 mulr_ilt1.
+hint rewrite mulr_cp1   : mulr_ile1 mulr_ilt1.
+
+(* -------------------------------------------------------------------- *)
+lemma mulr_ege1 x y : oner <= x => oner <= y => oner <= x * y.
+proof.
+by move=> le1x le1y; rewrite @(ler_trans y) ?ler_pemull // (ler_trans ler01).
+qed.
+
+lemma mulr_egt1 x y : oner < x => oner < y => oner < x * y.
+proof.
+by move=> le1x lt1y; rewrite @(ltr_trans y) // ltr_pmull // (ltr_trans ltr01).
+qed.
+
+hint rewrite mulr_egte1 : mulr_ege1  mulr_egt1.
+hint rewrite mulr_cp1   : mulr_ege1  mulr_egt1.
+
+(* -------------------------------------------------------------------- *)
 lemma nosmt invr_gt0 (x : t):
   (zeror < invr x) <=> (zeror < x).
 proof. admit. qed.
