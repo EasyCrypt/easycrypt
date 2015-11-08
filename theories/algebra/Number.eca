@@ -570,18 +570,65 @@ lemma nosmt addr_ss_eq0 (x y : t):
 proof. admit. qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt ler_pmul2l x : zeror < x => forall y z, (y <= z) <=> (x * y <= x * z).
+lemma nosmt ler_pmul2l x :
+  zeror < x => forall y z, (x * y <= x * z) <=> (y <= z).
+proof.
+move=> x_gt0 y z /=; rewrite -subr_ge0 -mulrBr.
+by rewrite pmulr_rge0 // subr_ge0.
+qed.
+
+lemma nosmt ltr_pmul2l x :
+  zeror < x => forall y z, (x * y < x * z) <=> (y < z).
 proof. admit. qed.
+
+hint rewrite lter_pmul2l : ler_pmul2l ltr_pmul2l.
 
 lemma nosmt ler_pmul2r x : zeror < x => forall y z, (y <= z) <=> (y * x <= z * x).
-proof. admit. qed.
-
-lemma nosmt ltr_pmul2l x : zeror < x => forall y z, (y < z) <=> (x * y < x * z).
-proof. admit. qed.
+proof. by move=> x_gt0 y z /=; rewrite !@(mulrC _ x) ler_pmul2l. qed.
 
 lemma nosmt ltr_pmul2r x : zeror < x => forall y z, (y < z) <=> (y * x < z * x).
 proof. admit. qed.
 
+hint rewrite lter_pmul2r : ler_pmul2r ltr_pmul2r.
+
+lemma nosmt ler_nmul2l x :
+  x < zeror => forall y z, (x * z <= x * y) <=> (y <= z).
+proof. by move=> x_lt0 y z /=; rewrite -ler_opp2 -!mulNr ler_pmul2l ?oppr_gt0. qed.
+
+lemma nosmt ltr_nmul2l x :
+  x < zeror => forall y z, (x * z < x * y) <=> (y < z).
+proof. admit. qed.
+
+hint rewrite lter_nmul2l : ler_nmul2l ltr_nmul2l.
+
+lemma nosmt ler_nmul2r x :
+  x < zeror => forall y z, (z * x <= y * x) <=> (y <= z).
+proof. by move=> x_lt0 y z /=; rewrite !@(mulrC _ x) ler_nmul2l. qed.
+
+lemma nosmt ltr_nmul2r x :
+  x < zeror => forall y z, (z * x < y * x) <=> (y < z).
+proof. admit. qed.
+
+hint rewrite lter_nmul2r : ler_nmul2r ltr_nmul2r.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt ler_wpmul2l x :
+  zeror <= x => forall y z, y <= z => x * y <= x * z.
+proof. admit. qed.
+
+lemma nosmt ler_wpmul2r x :
+  zeror <= x => forall y z, y <= z => y * z <= z * x.
+proof. admit. qed.
+
+lemma nosmt ler_wnmul2l x :
+  x <= zeror => forall y z, z <= y => x * y <= x * z.
+proof. admit. qed.
+
+lemma nosmt ler_wnmul2r x :
+  x <= zeror => forall y z, z <= y => y * x <= z * x.
+proof. admit. qed.
+
+(* -------------------------------------------------------------------- *)
 lemma nosmt ler_pmul (x1 y1 x2 y2 : t):
   zeror <= x1 => zeror <= x2 => x1 <= y1 => x2 <= y2 => x1 * x2 <= y1 * y2.
 proof. admit. qed.
