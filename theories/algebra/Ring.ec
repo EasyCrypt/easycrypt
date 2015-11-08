@@ -283,7 +283,7 @@ abstract theory ComRing.
     by apply/unitrP; exists (invr x); rewrite mulrC -divrE.
   qed.
 
-  lemma invrK: involutive invr.
+  lemma nosmt invrK: involutive invr.
   proof.
     move=> x; case: (unit x)=> Ux; 2: by rewrite !invr_out.
     rewrite -(mulrK _ Ux (invr (invr x))) -mulrA.
@@ -300,19 +300,19 @@ abstract theory ComRing.
   lemma nosmt unitr1: unit oner.
   proof. by apply/unitrP; exists oner; rewrite mulr1. qed.
 
-  lemma invr1: invr oner = oner.
+  lemma nosmt invr1: invr oner = oner.
   proof. by rewrite -{2}(mulVr _ unitr1) mulr1. qed.
 
-  lemma div1r x: oner / x = invr x.
+  lemma nosmt div1r x: oner / x = invr x.
   proof. by rewrite divrE mul1r. qed.
 
-  lemma divr1 x: x / oner = x.
+  lemma nosmt divr1 x: x / oner = x.
   proof. by rewrite divrE invr1 mulr1. qed.
 
   lemma nosmt unitr0: !unit zeror.
   proof. by apply/negP=> /unitrP [y]; rewrite mulr0 eq_sym oner_neq0. qed.
 
-  lemma invr0: invr zeror = zeror.
+  lemma nosmt invr0: invr zeror = zeror.
   proof. by rewrite invr_out ?unitr0. qed.
 
   lemma nosmt unitrN1: unit (-oner).
@@ -320,6 +320,21 @@ abstract theory ComRing.
 
   lemma nosmt invrN1: invr (-oner) = -oner.
   proof. by rewrite -{2}(divrr unitrN1) divrE mulN1r opprK. qed.
+
+  lemma nosmt invrN (x : t) : invr (- x) = - (invr x).
+  proof. admitted.
+
+  lemma nosmt invr_neq0 x : x <> zeror => invr x <> zeror.
+  proof.
+    move=> nx0; case: (unit x)=> Ux; last by rewrite invr_out ?Ux.
+    by apply/negP=> x'0; move: Ux; rewrite -unitrV x'0 unitr0.
+  qed.
+
+  lemma nosmt invr_eq0 x : (invr x = zeror) <=> (x = zeror).
+  proof. admitted.
+
+  lemma nosmt invr_eq1 x : (invr x = oner) <=> (x = oner).
+  proof. admitted.
 
   op ofint n = intmul oner n.
 
