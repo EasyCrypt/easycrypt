@@ -157,8 +157,12 @@ val  full_subst_kind : subst_kind
 val empty_subst_kind : subst_kind
 
 type rwspec = [`LtoR|`RtoL] * ptnpos option
+type rwmode = [`Bool | `Eq]
 
-val t_rewrite     : ?target:ident -> proofterm -> rwspec -> FApi.backward
+val t_rewrite     :
+     ?target:ident -> ?mode:rwmode
+  -> proofterm -> rwspec -> FApi.backward
+
 val t_rewrite_hyp : EcIdent.t -> rwspec -> FApi.backward
 
 type tside = [`All | `LtoR | `RtoL]

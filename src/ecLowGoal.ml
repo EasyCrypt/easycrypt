@@ -1093,23 +1093,29 @@ let t_split ?(closeonly = false) ?reduce (tc : tcenv1) =
 
 (* -------------------------------------------------------------------- *)
 type rwspec = [`LtoR|`RtoL] * ptnpos option
+type rwmode = [`Bool | `Eq]
 
 (* -------------------------------------------------------------------- *)
-let t_rewrite ?target (pt : proofterm) (s, pos) (tc : tcenv1) =
+let t_rewrite
+  ?target ?(mode : rwmode option) (pt : proofterm) (s, pos) (tc : tcenv1)
+=
   let tc           = RApi.rtcenv_of_tcenv1 tc in
   let (hyps, tgfp) = RApi.tc_flat ?target tc in
   let env          = LDecl.toenv hyps in
   let (pt, ax)     = LowApply.check `Elim pt (`Tc (tc, target)) in
 
   let (left, right) =
-    match sform_of_form ax with
-    | SFeq  (f1, f2) -> (f1, f2)
-    | SFiff (f1, f2) -> (f1, f2)
+    let doit ax =
+      match sform_of_form ax, mode with
+      | SFeq  (f1, f2), (None | Some `Eq) -> (f1, f2)
+      | SFiff (f1, f2), (None | Some `Eq) -> (f1, f2)
 
-    | _ when s = `LtoR && ER.EqTest.for_type env ax.f_ty tbool ->
-        (ax, f_true)
+      | _, (None | Some `Bool) when
+          s = `LtoR && ER.EqTest.for_type env ax.f_ty tbool
+          -> (ax, f_true)
 
-    | _ -> raise InvalidProofTerm
+      | _ -> raise TTC.NoMatch
+    in oget ~exn:InvalidProofTerm (TTC.lazy_destruct hyps doit ax)
   in
 
   let (left, right) =
@@ -1152,7 +1158,7 @@ let t_rewrite ?target (pt : proofterm) (s, pos) (tc : tcenv1) =
 (* -------------------------------------------------------------------- *)
 let t_rewrite_hyp (id : EcIdent.t) pos (tc : tcenv1) =
   let pt = { pt_head = PTLocal id; pt_args = []; } in
-  t_rewrite pt pos tc
+  t_rewrite ?mode:None pt pos tc
 
 (* -------------------------------------------------------------------- *)
 type vsubst = [

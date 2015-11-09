@@ -169,57 +169,82 @@ module LowRewrite = struct
 
   exception RewriteError of error
 
-  let rec find_rewrite_pattern (dir : rwside) pt =
+  let rec find_rewrite_patterns (dir : rwside) pt =
     let hyps = pt.PT.ptev_env.PT.pte_hy in
     let env  = LDecl.toenv hyps in
     let ax   = pt.PT.ptev_ax in
 
-    match EcFol.sform_of_form ax with
-    | EcFol.SFeq  (f1, f2) -> (pt, (f1, f2))
-    | EcFol.SFiff (f1, f2) -> (pt, (f1, f2))
+    let base ax =
+      match EcFol.sform_of_form ax with
+      | EcFol.SFeq  (f1, f2) -> Some (pt, `Eq, (f1, f2))
+      | EcFol.SFiff (f1, f2) -> Some (pt, `Eq, (f1, f2))
+  
+      | EcFol.SFnot f ->
+          let pt' = pt_of_global_r pt.ptev_env LG.p_negeqF [] in
+          let pt' = apply_pterm_to_arg_r pt' (PVAFormula f) in
+          let pt' = apply_pterm_to_arg_r pt' (PVASub pt) in
+          Some (pt', `Eq, (f, f_false))
 
-    | EcFol.SFnot f ->
-        let pt' = pt_of_global_r pt.ptev_env LG.p_negeqF [] in
-        let pt' = apply_pterm_to_arg_r pt' (PVAFormula f) in
-        let pt' = apply_pterm_to_arg_r pt' (PVASub pt) in
-        (pt', (f, f_false))
+      | _ -> None
+    in
+
+    match base ax with
+    | Some x -> [x]
 
     | _ -> begin
-      match TTC.destruct_product hyps ax with
-      | None ->
-          if   dir = `LtoR && ER.EqTest.for_type env ax.f_ty tbool
-          then (pt, (ax, f_true))
-          else raise (RewriteError LRW_NotAnEquation)
-      | Some _ ->
-          let pt = EcProofTerm.apply_pterm_to_hole pt in
-          find_rewrite_pattern dir pt
-    end
+        match TTC.destruct_product hyps ax with
+        | None ->
+            let pt1 =
+              if   dir = `LtoR && ER.EqTest.for_type env ax.f_ty tbool
+              then Some (pt, `Bool, (ax, f_true))
+              else None
+            and pt2 = obind base
+              (EcReduction.h_red_opt EcReduction.full_red hyps ax)
+            in (otolist pt1) @ (otolist pt2)
+
+        | Some _ ->
+            let pt = EcProofTerm.apply_pterm_to_hole pt in
+            find_rewrite_patterns dir pt
+      end
 
   let t_rewrite_r ?target (s, o) pt tc =
     let hyps, tgfp = FApi.tc1_flat ?target tc in
 
-    let (pt, (f1, f2)) = find_rewrite_pattern s pt in
-
-    let fp = match s with `LtoR -> f1 | `RtoL -> f2 in
-
-    (try
-        PT.pf_find_occurence ~keyed:true pt.PT.ptev_env ~ptn:fp tgfp
-     with EcMatching.MatchFailure ->
-       try  PT.pf_find_occurence ~keyed:false pt.PT.ptev_env ~ptn:fp tgfp
+    let for1 (pt, mode, (f1, f2)) =
+      let fp = match s with `LtoR -> f1 | `RtoL -> f2 in
+  
+      (try
+          PT.pf_find_occurence ~keyed:true pt.PT.ptev_env ~ptn:fp tgfp
        with EcMatching.MatchFailure ->
-         raise (RewriteError LRW_NothingToRewrite));
+         try  PT.pf_find_occurence ~keyed:false pt.PT.ptev_env ~ptn:fp tgfp
+         with EcMatching.MatchFailure ->
+           raise (RewriteError LRW_NothingToRewrite));
+  
+      if not (PT.can_concretize pt.PT.ptev_env) then
+        raise (RewriteError LRW_CannotInfer);
+  
+      let fp   = PT.concretize_form pt.PT.ptev_env fp in
+      let pt   = fst (PT.concretize pt) in
+      let cpos =
+        try  FPosition.select_form hyps o fp tgfp
+        with InvalidOccurence -> raise (RewriteError (LRW_InvalidOccurence))
+      in
+  
+      EcLowGoal.t_rewrite ?target ~mode pt (s, Some cpos) tc in
 
-    if not (PT.can_concretize pt.PT.ptev_env) then
-      raise (RewriteError LRW_CannotInfer);
+    let rec do_first = function
+      | [] -> raise (RewriteError LRW_NothingToRewrite)
 
-    let fp   = PT.concretize_form pt.PT.ptev_env fp in
-    let pt   = fst (PT.concretize pt) in
-    let cpos =
-      try  FPosition.select_form hyps o fp tgfp
-      with InvalidOccurence -> raise (RewriteError (LRW_InvalidOccurence))
-    in
+      | (pt, mode, (f1, f2)) :: pts ->
+           try  for1 (pt, mode, (f1, f2))
+           with RewriteError (LRW_NothingToRewrite) ->
+             do_first pts in
 
-    EcLowGoal.t_rewrite ?target pt (s, Some cpos) tc
+    let pts = find_rewrite_patterns s pt in
+
+    if List.is_empty pts then
+      raise (RewriteError LRW_NotAnEquation);
+    do_first pts
 
   let t_rewrite ?target (s, o) pt (tc : tcenv1) =
     let hyps   = FApi.tc1_hyps ?target tc in

@@ -39,6 +39,8 @@ end
 
 (* -------------------------------------------------------------------- *)
 module LowRewrite : sig
+  open EcLowGoal
+
   type error =
   | LRW_NotAnEquation
   | LRW_NothingToRewrite
@@ -47,8 +49,8 @@ module LowRewrite : sig
 
   exception RewriteError of error
 
-  val find_rewrite_pattern:
-    rwside -> pt_ev -> pt_ev * (form * form)
+  val find_rewrite_patterns:
+    rwside -> pt_ev -> (pt_ev * rwmode * (form * form)) list
 
   val t_rewrite_r: ?target:EcIdent.t ->
     rwside * EcMatching.occ option -> pt_ev -> backward
