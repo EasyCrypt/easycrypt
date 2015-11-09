@@ -284,7 +284,7 @@ Installing system-wide (manual installation)
 Add the following entry to <proof-general-home>/generic/proof-site.el
 in the definition of `proof-assistant-table-default':
 
-        (easycrypt "EasyCrypt" "ec")
+        (easycrypt "EasyCrypt" "ec" ".*\\.eca?")
 
 Copy the directory easycrypt/ to <proof-general-home>/
 
