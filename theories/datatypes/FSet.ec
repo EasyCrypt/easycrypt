@@ -159,7 +159,7 @@ proof. by []. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt eqEsubset (A B : 'a fset) : (A = B) <=> (A <= B) /\ (B <= A).
-proof. by rewrite fsetP !subsetP; rewrite subpred_eqP. qed.
+proof. by rewrite fsetP 2!subsetP subpred_eqP. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt fset_ind (p : 'a fset -> bool):

@@ -94,7 +94,7 @@ move=> cnv e gt0e; case: (c = 0%r) => [->|nz_c].
   by exists 0 => n _ /=; rewrite normr0.
 have: 0%r < e / `|c| by rewrite divr_gt0 // normr_gt0.
 move/cnv=> [N {cnv} cnv]; exists N => n /cnv.
-rewrite -mulrBr normrM @(ltr_pmul2l `|c|) ?normr_gt0 //.
+rewrite -mulrBr normrM -@(ltr_pmul2l `|c|) ?normr_gt0 //.
 by rewrite divrE mulrCA mulrV 1:normr0P.
 qed.
 
