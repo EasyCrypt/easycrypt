@@ -849,10 +849,10 @@ let rec process_mintros ?(cf = true) pis gs =
           | IPSubst x  -> `Subst x
       
           | IPCase (mode, x) ->
-              let subcollect = List.rev |- fst |- collect true [] [] in
+              let subcollect = List.rev -| fst -| collect true [] [] in
               `Case (mode, List.map subcollect x)
   
-        in collect intl (mk_loc ploc ip :: acc) core pis  
+        in collect intl (mk_loc ploc ip :: maybe_core ()) [] pis  
   
       with
       | CollectBreak  -> (maybe_core (), pis)
