@@ -798,7 +798,7 @@ module Ax = struct
 
     let tintro =
       List.map
-        (fun x -> IPCore (mk_loc x.pl_loc (`Renaming (`NoRename x.pl_desc))))
+        (lmap (fun x -> IPCore (`Renaming (`NoRename x))))
         tintro in
     let tintro = mk_loc loc (Plogic (Pintro tintro)) in
 

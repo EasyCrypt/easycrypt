@@ -766,6 +766,9 @@ exception IntroCollect of [
   `InternalBreak
 ]
 
+exception CollectBreak
+exception CollectCore of ipcore located
+
 let rec process_mintros ?(cf = true) pis gs =
   let module ST = IntroState in
 
@@ -815,48 +818,42 @@ let rec process_mintros ?(cf = true) pis gs =
 
   let rec collect intl acc core pis =
     let maybe_core () =
+      let loc = EcLocation.mergeall (List.map loc core) in
       match core with
       | [] -> acc
-      | _  -> `Core (List.rev core) :: acc
+      | _  -> mk_loc loc (`Core (List.rev core)) :: acc
     in
 
     match pis with
     | [] -> (maybe_core (), [])
+    | { pl_loc = ploc } as pi :: pis ->
+      try
+        let ip =
+          match unloc pi with
+          | IPBreak ->
+             if intl then raise (IntroCollect `InternalBreak);
+             raise CollectBreak
+      
+          | IPCore x   -> raise (CollectCore (mk_loc (loc pi) x))
+          | IPDup  x   -> `Dup (mk_loc (loc pi) x)
+          | IPDone x   -> `Done x
+          | IPSimplify -> `Simpl
+          | IPClear xs -> `Clear xs
+          | IPRw    x  -> `Rw x
+          | IPDelta x  -> `Delta x
+          | IPView x   -> `View x
+          | IPSubst x  -> `Subst x
+      
+          | IPCase (mode, x) ->
+              let subcollect = List.rev |- fst |- collect true [] [] in
+              `Case (mode, List.map subcollect x)
+  
+        in collect intl (mk_loc ploc ip :: acc) core pis  
+  
+      with
+      | CollectBreak  -> (maybe_core (), pis)
+      | CollectCore x -> collect intl acc (x :: core) pis
 
-    | IPBreak :: pis ->
-       if intl then raise (IntroCollect `InternalBreak);
-       (maybe_core (), pis)
-
-    | IPCore x :: pis ->
-        collect intl acc (x :: core) pis
-
-    | IPDup x :: pis ->
-        collect intl (`Dup x :: maybe_core ()) [] pis
-
-    | IPDone b :: pis ->
-        collect intl (`Done b :: maybe_core ()) [] pis
-
-    | IPSimplify :: pis ->
-        collect intl (`Simpl :: maybe_core ()) [] pis
-
-    | IPClear xs :: pis ->
-        collect intl (`Clear xs :: maybe_core ()) [] pis
-
-    | IPCase (mode, x) :: pis ->
-        let x = List.map (List.rev -| fst -| collect true [] []) x in
-        collect intl (`Case (mode, x) :: maybe_core ()) [] pis
-
-    | IPRw x :: pis ->
-        collect intl (`Rw x :: maybe_core ()) [] pis
-
-    | IPDelta ((s, o), x) :: pis ->
-        collect intl (`Delta ((s, o), x) :: maybe_core ()) [] pis
-
-    | IPView x :: pis ->
-        collect intl (`View x :: maybe_core ()) [] pis
-
-    | IPSubst x :: pis ->
-        collect intl (`Subst x :: maybe_core ()) [] pis
   in
 
   let collect pis = collect false [] [] pis in
@@ -941,38 +938,40 @@ let rec process_mintros ?(cf = true) pis gs =
       tc_error !!tc "nothing to substitute"
 
   and dointro (st : ST.state) nointro pis (gs : tcenv) =
-    match pis with [] -> gs | pi :: pis ->
+    match pis with [] -> gs | { pl_desc = pi; pl_loc = ploc } :: pis ->
       let nointro, gs =
+        let rl x = EcCoreGoal.reloc ploc x in
+
         match pi with
         | `Core ids ->
-            (false, t_onall (intro1_core st ids) gs)
+            (false, rl (t_onall (intro1_core st ids)) gs)
 
         | `Dup id ->
-            (false, t_onall (intro1_dup st id) gs)
+            (false, rl (t_onall (intro1_dup st id)) gs)
   
         | `Done b ->
-            (nointro, t_onall (intro1_done st b) gs)
+            (nointro, rl (t_onall (intro1_done st b)) gs)
   
         | `Simpl ->
-            (nointro, t_onall (intro1_simplify st) gs)
+            (nointro, rl (t_onall (intro1_simplify st)) gs)
   
         | `Clear xs ->
-            (nointro, t_onall (intro1_clear st xs) gs)
+            (nointro, rl (t_onall ((intro1_clear st xs))) gs)
   
         | `Case (mode, pis) ->
-            (false, intro1_case st nointro (mode, pis) gs)
+            (false, rl (intro1_case st nointro (mode, pis)) gs)
   
         | `Rw (o, s) ->
-            (false, t_onall (intro1_rw st (o, s)) gs)
+            (false, rl (t_onall (intro1_rw st (o, s))) gs)
 
         | `Delta ((o, s), p) ->
-            (nointro, t_onall (intro1_unfold st (o, s) p) gs)
+            (nointro, rl (t_onall (intro1_unfold st (o, s) p)) gs)
   
         | `View pe ->
-            (false, t_onall (intro1_view st pe) gs)
+            (false, rl (t_onall (intro1_view st pe)) gs)
   
         | `Subst d ->
-            (false, t_onall (intro1_subst st d) gs)
+            (false, rl (t_onall (intro1_subst st d)) gs)
 
       in dointro st nointro pis gs
 

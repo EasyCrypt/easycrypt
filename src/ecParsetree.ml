@@ -595,8 +595,8 @@ and rwocci    = [`Inclusive | `Exclusive]
 
 (* -------------------------------------------------------------------- *)
 type intropattern1 =
-  | IPCore   of ipcore located
-  | IPDup    of renaming located
+  | IPCore   of ipcore
+  | IPDup    of renaming
   | IPCase   of ([`One|`Full] * intropattern list)
   | IPView   of ppterm
   | IPRw     of (rwocc * rwside)
@@ -607,7 +607,7 @@ type intropattern1 =
   | IPSimplify
   | IPBreak
 
-and intropattern = intropattern1 list
+and intropattern = (intropattern1 located) list
 
 and ipcore = [
   | `Temp     of renaming option

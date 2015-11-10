@@ -1752,19 +1752,19 @@ ipcore_renaming:
 | STAR        { `Full }
 
 intro_pattern:
-| x=loc(ipcore)
+| x=ipcore
    { IPCore x }
 
-| HAT x=loc(ipcore_renaming)
+| HAT x=ipcore_renaming
    { IPDup x }
 
 | LBRACKET mode=icasemode RBRACKET
    { IPCase (mode, []) }
 
-| LBRACKET mode=icasemode ip=intro_pattern+ RBRACKET
+| LBRACKET mode=icasemode ip=loc(intro_pattern)+ RBRACKET
    { IPCase (mode, [ip]) }
 
-| LBRACKET mode=icasemode ip=plist2(intro_pattern*, PIPE) RBRACKET
+| LBRACKET mode=icasemode ip=plist2(loc(intro_pattern)*, PIPE) RBRACKET
    { IPCase (mode, ip) }
 
 | o=rwocc? RARROW
@@ -2096,7 +2096,7 @@ logtactic:
 | SMT pi=smt_info
    { Psmt pi }
 
-| INTROS a=intro_pattern*
+| INTROS a=loc(intro_pattern)*
    { Pintro a }
 
 | SPLIT
@@ -2159,13 +2159,13 @@ logtactic:
 | SUBST l=sform*
    { Psubst l }
 
-| ior_(CUT, HAVE) ip=intro_pattern* COLON p=form %prec prec_below_IMPL
+| ior_(CUT, HAVE) ip=loc(intro_pattern)* COLON p=form %prec prec_below_IMPL
    { Pcut (ip, p, None) }
 
-| ior_(CUT, HAVE) ip=intro_pattern* COLON p=form BY t=loc(tactics)
+| ior_(CUT, HAVE) ip=loc(intro_pattern)* COLON p=form BY t=loc(tactics)
    { Pcut (ip, p, Some t) }
 
-| ior_(CUT, HAVE) ip=intro_pattern* CEQ fp=pcutdef
+| ior_(CUT, HAVE) ip=loc(intro_pattern)* CEQ fp=pcutdef
    { Pcutdef (ip, fp) }
 
 | POSE o=rwocc? x=ident CEQ p=form_h %prec prec_below_IMPL
@@ -2579,7 +2579,7 @@ tactic_ip:
 | t=tactic_core %prec prec_below_IMPL
     { mk_core_tactic t }
 
-| t=tactic_core IMPL ip=intro_pattern+
+| t=tactic_core IMPL ip=loc(intro_pattern)+
     { { pt_core = t; pt_intros = ip; } }
 
 tactic:

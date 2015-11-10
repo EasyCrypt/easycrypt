@@ -273,7 +273,11 @@ let tc_lookup_error pe ?loc ?who kind qs =
         (EcSymbols.string_of_qsymbol qs))
 
 (* -------------------------------------------------------------------- *)
-let reloc _ f x = f x                   (* FIXME *)
+let reloc t f x =
+  try  (f x)
+  with TcError exn when is_none exn.tc_location ->
+    let t = { plc_parent = None; plc_name = None; plc_loc = t } in
+    raise (TcError { exn with tc_location = Some t })
 
 (* -------------------------------------------------------------------- *)
 module FApi = struct
