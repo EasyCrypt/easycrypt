@@ -207,19 +207,6 @@ lemma nosmt congr_big r1 r2 P1 P2 (F1 F2 : 'a -> t):
 proof. by move=> <-; apply/eq_big. qed.
 
 (* -------------------------------------------------------------------- *)
-lemma big0_eq (P : 'a -> bool) s: big P (fun i => idm) s = idm.
-proof.
-  rewrite big_const; elim/Induction.natind: (count _ _) => n.
-    by move/iter0<:t> => ->.
-    by move/iterS<:t> => -> ->; rewrite addm0.
-qed.
-
-(* -------------------------------------------------------------------- *)
-lemma big0 (P : 'a -> bool) F s: (forall i, P i => F i = idm) =>
-  big P F s = idm.
-proof. by move=> h; rewrite -@(big0_eq P s); apply/eq_bigr. qed.
-
-(* -------------------------------------------------------------------- *)
 lemma big_hasC (P : 'a -> bool) (F : 'a -> t) s: !has P s =>
   big P F s = idm.
 proof.
@@ -339,16 +326,6 @@ proof.
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma exchange_big (P1 : 'a -> bool) (P2 : 'b -> bool) F s1 s2:
-   big P1 (fun a => big P2 (F a) s2) s1 =
-   big P2 (fun b => big P1 (fun a => F a b) s1) s2.
-proof.
-  elim: s1 s2 => [|a s1 ih] s2; first by rewrite big_nil big0_eq.
-  rewrite big_cons ih; case: (P1 a)=> h; rewrite -?big_split;
-    by apply/eq_bigr=> x _ /=; rewrite big_cons h.
-qed.
-
-(* -------------------------------------------------------------------- *)
 lemma big1_eq (P : 'a -> bool) s: big P (fun x => idm) s = idm.
 proof.
   rewrite big_const; elim/Induction.natind: (count _ _)=> n.
@@ -365,6 +342,16 @@ proof. by move/eq_bigr=> ->; apply/big1_eq. qed.
 lemma big1_seq (P : 'a -> bool) F s:
   (forall i, P i /\ (mem s i) => F i = idm) => big P F s = idm.
 proof. by move=> eqF1; rewrite big_seq_cond big_andbC big1. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt exchange_big (P1 : 'a -> bool) (P2 : 'b -> bool) F s1 s2:
+   big P1 (fun a => big P2 (F a) s2) s1 =
+   big P2 (fun b => big P1 (fun a => F a b) s1) s2.
+proof.
+  elim: s1 s2 => [|a s1 ih] s2; first by rewrite big_nil big1_eq.
+  rewrite big_cons ih; case: (P1 a)=> h; rewrite -?big_split;
+    by apply/eq_bigr=> x _ /=; rewrite big_cons h.
+qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt big_int_cond m n P F:
