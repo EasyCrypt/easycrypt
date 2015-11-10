@@ -377,7 +377,8 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
                      let tya = List.map (fun a -> mk_loc l (PTvar a)) params in
                        mk_loc l (PFident (sym, Some (mk_loc l (TVIunamed tya))));
                  } in
-                   do1 ~cancrt:true (proofs, evc) (mk_loc l (xdth @ prefix, x), PTHO_Pred (ovrd, `Inline))
+                   do1 ~cancrt:true (proofs, evc)
+                       (mk_loc l (xdth @ prefix, x), PTHO_Pred (ovrd, `Inline))
 
              | CTh_axiom (x, ({ ax_spec = Some _ } as ax)) ->
                  (* FIXME: TC HOOK *)
@@ -388,7 +389,8 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
 
                  let tc = FPNamed (mk_loc l (xsth @ prefix, x),
                                    Some (mk_loc l (TVIunamed params))) in
-                 let tc = Papply (`Apply ([`Explicit, { fp_head = tc; fp_args = []}], `Exact)) in
+                 let tc = { fp_mode = `Explicit; fp_head = tc; fp_args = []; } in
+                 let tc = Papply (`Apply ([tc], `Exact)) in
                  let tc = mk_loc l (Plogic tc) in
                  let pr = { pthp_mode   = `Named (mk_loc l (xdth @ prefix, x));
                             pthp_tactic = Some tc }

@@ -127,8 +127,9 @@
 
   let simplify_red = [`Zeta; `Iota; `Beta; `Logic; `ModPath]
 
-  let mk_pterm head args =
-    { fp_head = head;
+  let mk_pterm explicit head args =
+    { fp_mode = if explicit then `Explicit else `Implicit;
+      fp_head = head;
       fp_args = args; }
 
   let mk_core_tactic t = { pt_core = t; pt_intros = []; }
@@ -142,7 +143,9 @@
       ptm_local = local; }
 
   let mk_rel_pterm info = 
-    odfl ({ fp_head = FPCut (None, None); fp_args = []; }) info 
+    odfl ({ fp_mode = `Implicit;
+            fp_head = FPCut (None, None);
+            fp_args = []; }) info 
 
   (* ------------------------------------------------------------------ *)
   type prover =
@@ -1801,18 +1804,18 @@ intro_pattern:
    { IPBreak }
 
 gpterm_head(F):
-| p=qident tvi=tvars_app?
-   { FPNamed (p, tvi) }
+| exp=iboption(AT) p=qident tvi=tvars_app?
+   { (exp, FPNamed (p, tvi)) }
 
-| LPAREN UNDERSCORE? COLON f=F RPAREN
-   { FPCut f }
+| LPAREN exp=iboption(AT) UNDERSCORE? COLON f=F RPAREN
+   { (exp, FPCut f) }
 
 gpoterm_head(F):
 | x=gpterm_head(F?)
     { x }
 
 | UNDERSCORE
-    { FPCut None }
+    { (false, FPCut None) }
 
 gpterm_arg:
 | LPAREN LTCOLON m=loc(mod_qident) RPAREN
@@ -1823,29 +1826,27 @@ gpterm_arg:
       | PFhole -> EA_none
       | _      -> EA_form f }
 
-| LPAREN COLON p=qident tvi=tvars_app? args=loc(gpterm_arg)* RPAREN
-    { EA_proof (mk_pterm (FPNamed (p, tvi)) args) }
+| LPAREN COLON
+    exp=iboption(AT) p=qident tvi=tvars_app? args=loc(gpterm_arg)*
+  RPAREN
+    { EA_proof (mk_pterm exp (FPNamed (p, tvi)) args) }
 
 gpterm(F):
 | hd=gpterm_head(F)
-   { mk_pterm hd [] }
+   { mk_pterm (fst hd) (snd hd) [] }
 
 | LPAREN hd=gpterm_head(F) args=loc(gpterm_arg)* RPAREN
-   { mk_pterm hd args }
+   { mk_pterm (fst hd) (snd hd) args }
 
 gpoterm(F):
 | hd=gpoterm_head(F)
-   { mk_pterm hd [] }
+   { mk_pterm (fst hd) (snd hd) [] }
 
 | LPAREN hd=gpoterm_head(F) args=loc(gpterm_arg)* RPAREN
-   { mk_pterm hd args }
+   { mk_pterm (fst hd) (snd hd) args }
 
 %inline pterm:
 | pt=gpoterm(form) { pt }
-
-%inline epterm:
-| x=iboption(AT) pt=pterm
-    { (if x then `Explicit else `Implicit), pt }
 
 pcutdef1:
 | p=qident tvi=tvars_app? args=loc(gpterm_arg)*
@@ -1899,11 +1900,11 @@ rwarg1:
    { RWSmt pi }
 
 rwpterms:
-| f=epterm
+| f=pterm
     { [(`LtoR, f)] }
 
 | LPAREN fs=rlist2(rwpterm, COMMA) RPAREN
-    { List.map (snd_map (fun f -> (`Implicit, f))) fs }
+    { fs }
 
 rwpterm:
 | s=rwside f=pterm
@@ -1923,11 +1924,14 @@ genpattern:
 | o=rwocc l=sform_h %prec prec_tactic
     { `Form (Some (snd_map EcMaps.Sint.of_list o), l) }
 
-| LPAREN UNDERSCORE COLON f=form RPAREN
-    { `ProofTerm (mk_pterm (FPCut (Some f)) []) }
+| LPAREN exp=iboption(AT) UNDERSCORE COLON f=form RPAREN
+    { `ProofTerm (mk_pterm exp (FPCut (Some f)) []) }
 
-| LPAREN LPAREN UNDERSCORE COLON f=form RPAREN args=loc(gpterm_arg)* RPAREN
-    { `ProofTerm (mk_pterm (FPCut (Some f)) args) }
+| LPAREN LPAREN
+    exp=iboption(AT) UNDERSCORE COLON f=form RPAREN
+    args=loc(gpterm_arg)*
+  RPAREN
+    { `ProofTerm (mk_pterm exp (FPCut (Some f)) args) }
 
 simplify_arg:
 | DELTA l=qoident* { `Delta l }
@@ -2126,19 +2130,19 @@ logtactic:
 | ELIM SLASH p=qident COLON? e=genpattern*
    { Pelim (e, Some p) }
 
-| APPLY COLON? e=epterm
+| APPLY COLON? e=pterm
    { Papply (`Apply ([e], `Apply)) }
 
-| APPLY es=prefix(SLASH, epterm)+
+| APPLY es=prefix(SLASH, pterm)+
    { Papply (`Apply (es, `Apply)) }
 
-| APPLY COLON? e=epterm IN x=ident
+| APPLY COLON? e=pterm IN x=ident
    { Papply (`ApplyIn (e, x)) }
 
-| EXACT COLON? e=epterm
+| EXACT COLON? e=pterm
    { Papply (`Apply ([e], `Exact)) }
 
-| EXACT es=prefix(SLASH, epterm)+
+| EXACT es=prefix(SLASH, pterm)+
    { Papply (`Apply (es, `Exact)) }
 
 | l=simplify

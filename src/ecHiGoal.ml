@@ -436,9 +436,7 @@ let process_delta ?target (s, o, p) tc =
 
 (* -------------------------------------------------------------------- *)
 let rec process_rewrite1_r ttenv ?target ri tc =
-  let implicits = function
-  | `Implicit -> ttenv.tt_implicits
-  | `Explicit -> false in
+  let implicits = ttenv.tt_implicits in
 
   match unloc ri with
   | RWDone b ->
@@ -459,7 +457,7 @@ let rec process_rewrite1_r ttenv ?target ri tc =
   end
 
   | RWRw (((s : rwside), r, o), pts) -> begin
-      let do1 ((subs : rwside), (mode, pt)) tc =
+      let do1 ((subs : rwside), pt) tc =
         let hyps   = FApi.tc1_hyps tc in
         let target = target |> omap (fst |- LDecl.hyp_by_name^~ hyps |- unloc) in
         let hyps   = FApi.tc1_hyps ?target tc in
@@ -475,7 +473,7 @@ let rec process_rewrite1_r ttenv ?target ri tc =
 
         match pt with 
         | { fp_head = FPNamed (p, None); fp_args = []; }
-              when mode = `Implicit && is_baserw p tc
+              when pt.fp_mode = `Implicit && is_baserw p tc
         ->
           let env = FApi.tc1_env tc in
           let ls  = snd (EcEnv.BaseRw.lookup p.pl_desc env) in
@@ -487,11 +485,11 @@ let rec process_rewrite1_r ttenv ?target ri tc =
             t_ors (List.map do1 ls) tc
 
         | { fp_head = FPNamed (p, None); fp_args = []; }
-              when mode = `Implicit
+              when pt.fp_mode = `Implicit
         ->
           let env = FApi.tc1_env tc in
           let pt  =
-            PT.process_full_pterm ~implicits:(implicits mode)
+            PT.process_full_pterm ~implicits
               (PT.ptenv_of_penv hyps !!tc) pt
           in
 
@@ -509,7 +507,7 @@ let rec process_rewrite1_r ttenv ?target ri tc =
 
         | _ ->
           let pt =
-            PT.process_full_pterm ~implicits:(implicits mode)
+            PT.process_full_pterm ~implicits
               (PT.ptenv_of_penv hyps !!tc) pt
           in process_rewrite1_core ?target (theside, o) pt tc
         in
@@ -1292,18 +1290,13 @@ let process_apply_fwd ~implicits (pe, hyp) tc =
 type apply_t = EcParsetree.apply_info
 
 let process_apply ~implicits (infos : apply_t) tc =
-  let implicits = function
-    | `Implicit -> implicits
-    | `Explicit -> false
-  in
-
   match infos with
-  | `ApplyIn ((mode, pe), tg) ->
-      process_apply_fwd ~implicits:(implicits mode) (pe, tg) tc
+  | `ApplyIn (pe, tg) ->
+      process_apply_fwd ~implicits (pe, tg) tc
 
   | `Apply (pe, mode) ->
-      let for1 tc (mode, pe) =
-        t_last (process_apply_bwd ~implicits:(implicits mode) `Apply pe) tc in
+      let for1 tc pe =
+        t_last (process_apply_bwd ~implicits `Apply pe) tc in
       let tc = List.fold_left for1 (tcenv_of_tcenv1 tc) pe in
       if mode = `Exact then t_onall process_done tc else tc
 
@@ -1345,8 +1338,12 @@ let process_cut engine ((ip, phi, t) : cut_t) tc =
 type cutdef_t = intropattern * pcutdef
 
 let process_cutdef (ip, pt) (tc : tcenv1) =
-  let pt = { fp_head = FPNamed (pt.ptcd_name, pt.ptcd_tys);
-             fp_args = pt.ptcd_args; } in
+  let pt = { 
+      fp_mode = `Implicit;
+      fp_head = FPNamed (pt.ptcd_name, pt.ptcd_tys);
+      fp_args = pt.ptcd_args;
+  } in
+
   let pt = PT.tc1_process_full_pterm tc pt in
 
   if not (PT.can_concretize pt.ptev_env) then
@@ -1450,8 +1447,11 @@ let process_elim (pe, qs) tc =
     match qs with
     | None    -> t_or (t_elimT_ind `Ind) t_elim tc
     | Some qs ->
-        let qs = { fp_head = FPNamed (qs, None); fp_args = []; } in
-        process_elimT qs tc
+        let qs = {
+            fp_mode = `Implicit;
+            fp_head = FPNamed (qs, None);
+            fp_args = [];
+        } in process_elimT qs tc
   in
     try
       FApi.t_last doelim (process_generalize pe tc)

@@ -360,7 +360,8 @@ let ffpattern_of_form hyps fp : ppterm option =
     | ({ pl_desc = PFident (p, tya) }, args) ->
         let hastyp = not (EcUtils.is_none tya) in
         if lookup_named_psymbol hyps ~hastyp (unloc p) <> None then
-          Some ({ fp_head = FPNamed (p, tya);
+          Some ({ fp_mode = `Implicit;
+                  fp_head = FPNamed (p, tya);
                   fp_args = List.map ae_of_form args; })
         else
           None
@@ -409,7 +410,7 @@ let process_pterm_cut ~prcut pe pt =
         | _ -> assert false
     end
 
-  | FPCut fp -> let fp = prcut fp in (PTCut fp, fp)
+    | FPCut fp -> let fp = prcut fp in (PTCut fp, fp)
   in
 
   let pt = { pt_head = pt; pt_args = []; } in
@@ -640,7 +641,7 @@ and process_pterm_args_app ?implicits pt args =
 and process_full_pterm ?(implicits = false) pe pf =
   let pt = process_pterm pe pf.fp_head in
   let pt =
-    match implicits with
+    match implicits && (pf.fp_mode = `Implicit) with
     | false -> pt
     | true  ->
       let rec apply ({ ptev_pt = pt; ptev_env = env; } as pe) =

@@ -948,7 +948,7 @@ let process_conseq notmod (info1, info2, info3) tc =
 (* -------------------------------------------------------------------- *)
 let process_bd_equiv side (pr, po) tc =
   let info = FPCut ((Some pr, Some po), None) in
-  let info = Some { fp_head = info; fp_args = []; } in
+  let info = Some { fp_mode = `Implicit; fp_head = info; fp_args = []; } in
   let info2, info3 = sideif side (info, None) (None, info) in
   process_conseq true (None, info2, info3) tc
 

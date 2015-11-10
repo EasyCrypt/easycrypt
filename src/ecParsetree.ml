@@ -331,12 +331,12 @@ type ppt_arg =
   | EA_proof of (pformula option) gppterm
 
 and 'a gppterm = {
+  fp_mode : [`Implicit | `Explicit];
   fp_head : 'a ppt_head;
   fp_args : ppt_arg located list
 }
 
 type ppterm  = (pformula option) gppterm
-type eppterm = [`Implicit | `Explicit] * ppterm
 
 type pcutdef = {
   ptcd_name : pqsymbol;
@@ -582,7 +582,7 @@ type rwarg = (tfocus located) option * rwarg1 located
 
 and rwarg1 =
   | RWDelta of (rwoptions * pformula)
-  | RWRw    of (rwoptions * (rwside * eppterm) list)
+  | RWRw    of (rwoptions * (rwside * ppterm) list)
   | RWPr    of (psymbol * pformula option)
   | RWDone  of bool
   | RWSimpl
@@ -641,8 +641,8 @@ type pcaseoptions = (bool * pcaseoption) list
 
 (* -------------------------------------------------------------------- *)
 type apply_info = [
-  | `ApplyIn of eppterm * psymbol
-  | `Apply   of eppterm list * [`Apply|`Exact]
+  | `ApplyIn of ppterm * psymbol
+  | `Apply   of ppterm list * [`Apply|`Exact]
 ]
 
 (* -------------------------------------------------------------------- *)
