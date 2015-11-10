@@ -215,13 +215,13 @@ module LowRewrite = struct
   
       (try
           PT.pf_find_occurence ~keyed:true pt.PT.ptev_env ~ptn:fp tgfp
-       with EcMatching.MatchFailure ->
+       with PT.FindOccFailure _ ->
          try  PT.pf_find_occurence ~keyed:false pt.PT.ptev_env ~ptn:fp tgfp
-         with EcMatching.MatchFailure ->
-           raise (RewriteError LRW_NothingToRewrite));
-  
-      if not (PT.can_concretize pt.PT.ptev_env) then
-        raise (RewriteError LRW_CannotInfer);
+         with
+         | PT.FindOccFailure `MatchFailure ->
+             raise (RewriteError LRW_NothingToRewrite)
+         | PT.FindOccFailure `IncompleteMatch ->
+             raise (RewriteError LRW_CannotInfer));
   
       let fp   = PT.concretize_form pt.PT.ptev_env fp in
       let pt   = fst (PT.concretize pt) in
@@ -354,7 +354,7 @@ let process_delta ?target (s, o, p) tc =
   | `LtoR -> begin
     let matches =
       try  PT.pf_find_occurence ptenv ~ptn:p target; true
-      with EcMatching.MatchFailure -> false
+      with PT.FindOccFailure _ -> false
     in
 
     if matches then begin
@@ -418,7 +418,7 @@ let process_delta ?target (s, o, p) tc =
 
     let matches =
       try  PT.pf_find_occurence ptenv ~ptn:fp target; true
-      with EcMatching.MatchFailure -> false
+      with PT.FindOccFailure _ -> false
     in
 
     if matches then begin
@@ -1029,7 +1029,7 @@ let process_generalize1 pattern (tc : tcenv1) =
           in
 
           (try  PT.pf_find_occurence ptenv ~ptn:p concl
-           with EcMatching.MatchFailure -> tc_error !!tc "cannot find an occurence");
+           with PT.FindOccFailure _ -> tc_error !!tc "cannot find an occurence");
 
           let p    = PT.concretize_form ptenv p in
           let cpos =
@@ -1099,14 +1099,14 @@ let process_pose xsym o p (tc : tcenv1) =
 
   let dopat =
     try  PT.pf_find_occurence ptenv ~ptn:p concl; true
-    with MatchFailure ->
+    with PT.FindOccFailure _ ->
       if not (PT.can_concretize ptenv) then
         if not (EcMatching.MEV.filled !(ptenv.PT.pte_ev)) then
           tc_error !!tc "cannot find an occurence"
         else
           tc_error !!tc "%s - %s"
             "cannot find an occurence"
-            "instanciate type variables manually"
+            "instantiate type variables manually"
       else
         false
   in

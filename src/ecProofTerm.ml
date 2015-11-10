@@ -222,6 +222,8 @@ let pf_form_match (pt : pt_env) ?mode ~ptn subject =
       raise exn
 
 (* -------------------------------------------------------------------- *)
+exception FindOccFailure of [`MatchFailure | `IncompleteMatch]
+
 let pf_find_occurence (pt : pt_env) ?(keyed = false) ~ptn subject =
   let module E = struct exception MatchFound end in
 
@@ -277,10 +279,16 @@ let pf_find_occurence (pt : pt_env) ?(keyed = false) ~ptn subject =
     with EcMatching.MatchFailure -> `Continue
   in
 
+  let (ue, pe) = (EcUnify.UniEnv.copy pt.pte_ue, !(pt.pte_ev)) in
+
   try
     ignore (EcMatching.FPosition.select trymatch subject);
-    raise EcMatching.MatchFailure
-  with E.MatchFound -> ()
+    raise (FindOccFailure `MatchFailure)
+  with E.MatchFound ->
+    if not (can_concretize pt) then begin
+      EcUnify.UniEnv.restore ~dst:pt.pte_ue ~src:ue; pt.pte_ev := pe;
+      raise (FindOccFailure `IncompleteMatch)
+    end
 
 (* -------------------------------------------------------------------- *)
 let pf_unify (pt : pt_env) ty1 ty2 =
