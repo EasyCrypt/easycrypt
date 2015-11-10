@@ -41,7 +41,7 @@ lemma nosmt reduce_cat (r s : ('a * 'b) list):
     foldl augment r s
   = r ++ filter (predC (mem (map fst r)) \o fst) (foldl augment [] s).
 proof.
-  rewrite -@(revK s) !foldl_rev; pose f := fun x z => augment z x.
+  rewrite -(@revK s) !foldl_rev; pose f := fun x z => augment z x.
   elim/last_ind: s r => /=.
     by move=> r; rewrite !rev_nil /= cats0.
   move=> s [x y] ih r; rewrite !rev_rcons /= ih => {ih}.
@@ -99,7 +99,7 @@ lemma reduce_reduced (s : ('a * 'b) list):
 proof.
   elim: s => [|[x y] s ih]; 1: by rewrite reduce_nil.
   rewrite reduce_cons /= {2}/fst /= => [x_notin_s /ih ->].
-  rewrite @(eq_in_filter _ predT) ?filter_predT /predT //=.
+  rewrite (@eq_in_filter _ predT) ?filter_predT /predT //=.
   case=> x' y' /(map_f fst) x'_in_s; apply/negP => <<-.
   by move: x_notin_s.
 qed.
@@ -126,7 +126,7 @@ axiom oflistK (s : ('a * 'b) list): perm_eq (reduce s) (elems (Self.oflist s)).
 lemma uniq_keys (m : ('a, 'b) fmap): uniq (map fst (elems m)).
 proof.
   rewrite -elemsK; move: (elems m) => {m} m.
-  apply @(perm_eq_uniq (map fst (reduce m)) _).
+  apply (@perm_eq_uniq (map fst (reduce m)) _).
     by apply perm_eq_map; apply oflistK.
   by apply reduced_reduce.
 qed.
@@ -147,7 +147,7 @@ op "_.[_]" (m : ('a,'b) fmap) (x : 'a) = assoc (elems m) x
 lemma get_oflist (s : ('a * 'b) list):
   forall x, (Self.oflist s).[x] = assoc s x.
 proof.
-  move=> x; rewrite getE; rewrite -@(assoc_reduce s).
+  move=> x; rewrite getE; rewrite -(@assoc_reduce s).
   apply/eq_sym/perm_eq_assoc; 1: by apply/uniq_keys.
   by apply/oflistK.
 qed.
@@ -156,7 +156,7 @@ lemma fmapP (m1 m2 : ('a,'b) fmap):
   (m1 = m2) <=> (forall x, m1.[x] = m2.[x]).
 proof.
   split=> // h; apply fmap_eq; apply uniq_perm_eq;
-    1..2: by apply/ @(uniq_map fst)/uniq_keys.
+    1..2: by apply/ (@uniq_map fst)/uniq_keys.
   case=> x y; move: (h x); rewrite !getE => {h} h.
   by rewrite !mem_assoc_uniq ?uniq_keys // h.
 qed.
@@ -299,7 +299,7 @@ proof.
   rewrite allE allP; split=> [h a|h [a b] /= ab_in_m].
     rewrite mem_domE mem_map_fst=> [b] ab_in_m.
     have:= ab_in_m; rewrite mem_assoc_uniq 1:uniq_keys // -getE /oget => -> /=.
-    by apply @(h (a,b)).
+    by apply (@h (a,b)).
   rewrite (_: b = oget m.[a]).
     by move: ab_in_m; rewrite mem_assoc_uniq 1:uniq_keys // getE /oget=> ->.
   by apply h; rewrite mem_domE mem_map_fst; exists b.
@@ -344,7 +344,7 @@ lemma find_none (p : 'a -> 'b -> bool) (m : ('a, 'b) fmap):
   has p m <=> find p m <> None.
 proof.
   rewrite hasE /= findE List.has_find; split=> [h|].
-    by rewrite @(onth_nth witness) 1:find_ge0/= 1:size_map.
+    by rewrite (@onth_nth witness) 1:find_ge0/= 1:size_map.
   by apply absurd=> h; rewrite onth_nth_map -map_comp nth_default 1:size_map 1:lezNgt.
 qed.
 
@@ -359,12 +359,12 @@ proof.
     move=> le0_i lt_i_sizem.
     exists (nth witness (map fst (elems m)) i).
     split.
-      by rewrite findE -/i @(onth_nth witness) 1:size_map.
+      by rewrite findE -/i (@onth_nth witness) 1:size_map.
     split.
       by rewrite mem_domE -index_mem index_uniq 1,3:size_map 2:uniq_keys.
     have /= := nth_find witness (fun (x : 'a * 'b) => p (fst x) (snd x)) (elems m) _.
       by rewrite -hasE.
-    rewrite -/i -@(nth_map _ witness) //.
+    rewrite -/i -(@nth_map _ witness) //.
     rewrite getE /assoc oget_omap_some 1:smt.
     smt. (* laziness. FIXME: we need lemmas connecting 'assoc' with 'index', 'nth' and 'map snd' *)
   right.
@@ -397,10 +397,10 @@ proof.
   (* FIXME: curry-uncurry should probably go into Pair for some chosen arities *)
   rewrite filterE; pose P:= fun (x : 'a * 'b) => p x.`1 x.`2.
   (* FIXME: why does the following not work?
-      `apply (perm_eq_trans _ @(oflistK (filter P (elems m)))).' *)
+      `apply (perm_eq_trans _ (@oflistK (filter P (elems m)))).' *)
   (* Alternative: have h:= oflistK (filter P (elems m)); apply (perm_eq_trans _ h). *)
-  apply @(perm_eq_trans _ (filter P (elems m)) _ _ (oflistK (filter P (elems m)))).
-  rewrite -{1}@(reduce_reduced (filter P (elems m))) 2:perm_eq_refl //.
+  apply (@perm_eq_trans _ (filter P (elems m)) _ _ (:@oflistK (filter P (elems m)))).
+  rewrite -{1}(@reduce_reduced (filter P (elems m))) 2:perm_eq_refl //.
   by apply/uniq_map_filter/uniq_keys.
 qed.
 
@@ -461,8 +461,8 @@ lemma perm_eq_elems_map (m : ('a, 'b) fmap) (f : 'a -> 'b -> 'c):
           (elems (map f m)).
 proof.
   pose F := fun (x : 'a * 'b) => (x.`1,f x.`1 x.`2).
-  apply @(perm_eq_trans (reduce (map F (elems m)))).
-    rewrite -{1}@(reduce_reduced (map F (elems m))) 2:perm_eq_refl //.
+  apply (@perm_eq_trans (reduce (map F (elems m)))).
+    rewrite -{1}(@reduce_reduced (map F (elems m))) 2:perm_eq_refl //.
     have ->: forall s, map fst (map F s) = map fst s by elim.
     exact/uniq_keys.
   by rewrite mapE; apply/oflistK.

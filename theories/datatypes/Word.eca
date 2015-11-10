@@ -73,7 +73,7 @@ case (n = n')=> [->> /= |].
   move=> i; rewrite !sel_upd; case (i = n')=> //=.
   by case (0 <= n' < l).
 move=> ne_n_n' i; case (i = n')=> [->> /= {i} |].
-  by rewrite !sel_upd /= @(eq_sym n') ne_n_n'.
+  by rewrite !sel_upd /= (@eq_sym n') ne_n_n'.
 move=> ne_i_n'; case (i = n)=> [->> /= {i} |].
   by rewrite !sel_upd /= ne_n_n'.
 by move=> ne_i_n; rewrite !sel_upd ne_i_n ne_i_n'.

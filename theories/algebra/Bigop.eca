@@ -36,7 +36,7 @@ proof. by []. qed.
 (* -------------------------------------------------------------------- *)
 lemma big_cons (P : 'a -> bool) (F : 'a -> t) x s:
   big P F (x :: s) = if P x then F x + big P F s else big P F s.
-proof. by rewrite {1}/big /= @(fun_if (map F)); case (P x). qed.
+proof. by rewrite {1}/big /= (@fun_if (map F)); case (P x). qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt big_rec (K : t -> bool) r P (F : 'a -> t):
@@ -109,7 +109,7 @@ qed.
 (* -------------------------------------------------------------------- *)
 lemma nosmt big_nth x0 (P : 'a -> bool) (F : 'a -> t) s:
   big P F s = bigi (P \o (nth x0 s)) (F \o (nth x0 s)) 0 (size s).
-proof. by rewrite -{1}@(mkseq_nth x0 s) /mkseq big_map. qed.
+proof. by rewrite -{1}(@mkseq_nth x0 s) /mkseq big_map. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt big_const (P : 'a -> bool) x s:
@@ -221,14 +221,14 @@ proof. by rewrite big_hasC // has_pred0. qed.
 (* -------------------------------------------------------------------- *)
 lemma big_pred0 (P : 'a -> bool) (F : 'a -> t) s:
   (forall i, P i <=> false) => big P F s = idm.
-proof. by move=> h; rewrite -@(big_pred0_eq F s); apply/eq_bigl. qed.
+proof. by move=> h; rewrite -(@big_pred0_eq F s); apply/eq_bigl. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma big_cat (P : 'a -> bool) (F : 'a -> t) s1 s2:
   big P F (s1 ++ s2) = big P F s1 + big P F s2.
 proof.
-  rewrite !@(big_mkcond P); elim: s1 => /= [|i s1 ih].
-    by rewrite @(big_nil P F) add0m.
+  rewrite !(@big_mkcond P); elim: s1 => /= [|i s1 ih].
+    by rewrite (@big_nil P F) add0m.
   by rewrite !big_cons /(predT i) /= ih addmA.
 qed.
 
@@ -253,7 +253,7 @@ qed.
 lemma nosmt eq_big_perm (P : 'a -> bool) (F : 'a -> t) s1 s2:
   perm_eq s1 s2 => big P F s1 = big P F s2.
 proof.
-  move=> /perm_eqP; rewrite !@(big_mkcond P).
+  move=> /perm_eqP; rewrite !(@big_mkcond P).
   elim s1 s2 => [|i s1 ih1] s2 eq_s12.
     by case s2 eq_s12 => // i s2 h; cut := h (pred1 i); smt.
   cut r2i: mem s2 i by rewrite -has_pred1 has_count -eq_s12 smt.
@@ -267,7 +267,7 @@ qed.
 lemma nosmt big_rem (P : 'a -> bool) (F : 'a -> t) s x: mem s x =>
   big P F s = (if P x then F x else idm) + big P F (rem x s).
 proof.
-  by move/perm_to_rem/eq_big_perm=> ->; rewrite !@(big_mkcond P) big_cons.
+  by move/perm_to_rem/eq_big_perm=> ->; rewrite !(@big_mkcond P) big_cons.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -288,7 +288,7 @@ qed.
 lemma nosmt bigID (P : 'a -> bool) (F : 'a -> t) (a : 'a -> bool) s:
   big P F s = big (predI P a) F s + big (predI P (predC a)) F s.
 proof.
-  rewrite !@(big_mkcond _ F) -big_split /(/\) /[!].
+  rewrite !(@big_mkcond _ F) -big_split /(/\) /[!].
   apply/eq_bigr => i _ /=.
   by rewrite /predI /predC; case: (a i); rewrite ?addm0 ?add0m.
 qed.
@@ -301,7 +301,7 @@ proof. by move=> bij_ff'; rewrite -big_map -map_comp id_map. qed.
 (* -------------------------------------------------------------------- *)
 lemma nosmt big_seq_cond (P : 'a -> bool) (F : 'a -> t) s:
   big P F s = big (fun i => mem s i /\ P i) F s.
-proof. by rewrite -!@(big_filter _ _ s); congr; apply/eq_in_filter. qed.
+proof. by rewrite -!(@big_filter _ _ s); congr; apply/eq_in_filter. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt big_seq (F : 'a -> t) s:
@@ -370,7 +370,7 @@ lemma nosmt congr_big_int (m1 n1 m2 n2 : int) P1 P2 F1 F2:
     => (forall i, P1 i /\ (m1 <= i < n2) => F1 i = F2 i)
     => bigi P1 F1 m1 n1 = bigi P2 F2 m2 n2.
 proof.
-  move=> <- <- eqP12 eqF12; rewrite /bigi big_seq_cond @(big_seq_cond P2).
+  move=> <- <- eqP12 eqF12; rewrite /bigi big_seq_cond (@big_seq_cond P2).
   by apply/eq_big=> i /=; rewrite mem_range smt.
 qed.
 
@@ -426,4 +426,4 @@ qed.
 (* -------------------------------------------------------------------- *)
 lemma nosmt big_int_recr (n m : int) F: m <= n =>
   bigi predT F m (n+1) = bigi predT F m n + F n.
-proof. by move=> lemn; rewrite @(big_cat_int n) ?big_int1 // smt. qed.
+proof. by move=> lemn; rewrite (@big_cat_int n) ?big_int1 // smt. qed.

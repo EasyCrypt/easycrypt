@@ -582,7 +582,7 @@ proof.
   move=> x_in_xs; pose i := index x xs.
   have lt_ip: i < size xs by rewrite /i index_mem.
   exists (take i xs); exists (drop (i+1) xs).
-  rewrite -{1}@(cat_take_drop i) -@(nth_index x x xs) //.
+  rewrite -{1}(@cat_take_drop i) -(@nth_index x x xs) //.
   by rewrite -drop_nth // index_ge0 lt_ip.
 qed.
 
@@ -1110,7 +1110,7 @@ lemma map_id (s : 'a list): map idfun s = s.
 proof. by elim: s => //= x s ->. qed.
 
 lemma id_map f (s : 'a list): (forall x, f x = x) => map f s = s.
-proof. by move=> h; rewrite -{2}@(map_id s); apply/eq_map. qed.
+proof. by move=> h; rewrite -{2}(@map_id s); apply/eq_map. qed.
 
 lemma nth_map x1 x2 (f : 'a -> 'b) n s:
   0 <= n < size s => nth x2 (map f s) n = f (nth x1 s n).
@@ -1177,21 +1177,21 @@ proof.
   elim: s => // x s ih injf /=; rewrite ih /=.
     by move=> x' y' sx' sy'; apply/injf=> /=; rewrite ?(sx', sy').
   case: (uniq s) => //= uniq_s; split=> h; 2: by apply/map_f.
-  move/mapP: h => [x'] [x'_in_s eq_fxx']; rewrite @(injf x x') //.
+  move/mapP: h => [x'] [x'_in_s eq_fxx']; rewrite (@injf x x') //.
   by rewrite mem_behead.
 qed.
 
 lemma mem_map_fst (xs : ('a * 'b) list) (x : 'a):
   mem (map fst xs) x <=> (exists y, mem xs (x,y)).
 proof.
-  rewrite @(mapP fst); split; case=> [[x' y] [h ->]|y h].
+  rewrite (@mapP fst); split; case=> [[x' y] [h ->]|y h].
     by exists y. by exists (x, y).
 qed.
 
 lemma mem_map_snd (xs : ('a * 'b) list) (y : 'b):
   mem (map snd xs) y <=> (exists x, mem xs (x,y)).
 proof.
-  rewrite @(mapP snd); split; case=> [[x y'] [h ->]|x h].
+  rewrite (@mapP snd); split; case=> [[x y'] [h ->]|x h].
     by exists x. by exists (x, y).
 qed.
 
@@ -1372,7 +1372,7 @@ proof.
   elim: s => //= [[x y]] s ih; rewrite eq_sym => [x_notin_1s uq_1s] /=.
   case: (x = a) => [->> |] /=; 1: rewrite assoc_head /=.
     by apply/eq_iff/orb_idr=> /(map_f fst); rewrite x_notin_1s.
-  by move=> ne_xa; rewrite assoc_cons ih // @(eq_sym a) ne_xa.
+  by move=> ne_xa; rewrite assoc_cons ih // (@eq_sym a) ne_xa.
 qed.
 
 lemma assocP (s : ('a * 'b) list) (x : 'a):
@@ -1475,7 +1475,7 @@ proof.
     by case s2 eq_s12 => // i s2 h; cut := h (pred1 i); smt.
   cut r2i: mem s2 i by rewrite -has_pred1 has_count -eq_s12 smt.
   have/splitPr {r2i} [s3 s4] ->> := r2i; rewrite foldr_cat /=.
-  rewrite @(ih1 (s3 ++ s4)); 1: move=> p.
+  rewrite (@ih1 (s3 ++ s4)); 1: move=> p.
     have /= := eq_s12 p; rewrite !count_cat /=.
     by rewrite addzCA => /addzI.
   rewrite foldr_cat => {eq_s12}; elim: s3 => [|x s3 ih2] //.
@@ -1486,7 +1486,7 @@ lemma foldr_rem (x : 'a) (f : 'a -> 'b -> 'b) (z : 'b) (s : 'a list):
      (forall a b X, f a (f b X) = f b (f a X))
   => mem s x
   => foldr f z s = f x (foldr f z (rem x s)).
-proof. by move=> fAC /perm_to_rem peq; rewrite @(foldr_perm f z _ _ fAC peq). qed.
+proof. by move=> fAC /perm_to_rem peq; rewrite (@foldr_perm f z _ _ fAC peq). qed.
 
 (* -------------------------------------------------------------------- *)
 (*                            Flattening                                *)

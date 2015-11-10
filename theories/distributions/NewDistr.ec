@@ -40,7 +40,7 @@ proof. by elim/distrW: d => m dm; rewrite muK //; case: dm. qed.
 
 lemma summable_mu ['a] (d : 'a distr) : summable (mu_x d).
 proof.
-exists 1%r=> s eq_s; rewrite @(eq_bigr _ _ (mu_x d)) => /=.
+exists 1%r=> s eq_s; rewrite (@eq_bigr _ _ (mu_x d)) => /=.
   by move=> i _; rewrite ger0_norm // ge0_mu.
 by apply/le1_mu.
 qed.
@@ -52,7 +52,7 @@ proof. by apply/sbl_countable/summable_mu. qed.
 lemma eq_distr (d1 d2 : 'a distr):
   (d1 = d2) <=> (forall x, mu_x d1 x = mu_x d2 x).
 proof.
-split=> [->//|eq_mu]; rewrite -@(mkK d1) -@(mkK d2).
+split=> [->//|eq_mu]; rewrite -(@mkK d1) -(@mkK d2).
 by congr; apply/fun_ext.
 qed.
 
@@ -81,12 +81,12 @@ proof. by rewrite muK // isdistr_drat. qed.
 lemma prratE ['a] (s : 'a list) (E : 'a -> bool) :
   mu (drat s) E = (count E s)%r / (size s)%r.
 proof.
-rewrite /mu @(sumE_fin _ (undup s)) ?undup_uniq //=.
+rewrite /mu (@sumE_fin _ (undup s)) ?undup_uniq //=.
   move=> x; case: (E x)=> _ //; rewrite dratE.
   rewrite divrE mulf_eq0 -nor mem_undup from_intMeq => [+ _].
   by rewrite -lt0n ?count_ge0 // -has_count has_pred1.
 pose F := fun x => (count (pred1 x) s)%r / (size s)%r.
-rewrite -big_mkcond @(eq_bigr _ _ F) /F /= => {F}.
+rewrite -big_mkcond (@eq_bigr _ _ F) /F /= => {F}.
   by move=> i _; rewrite dratE.
 by rewrite -size_filter -divr_suml -sumr_ofint big_count.
 qed.
@@ -130,7 +130,7 @@ proof.
 rewrite -MRat.eq_dratP; split=> h.
   apply/uniq_perm_eq; rewrite ?undup_uniq=> //.
   by move=> x; rewrite !mem_undup; apply/h.
-move=> x; rewrite -@(mem_undup s1) -@(mem_undup s2).
+move=> x; rewrite -(@mem_undup s1) -(@mem_undup s2).
 by apply/perm_eq_mem.
 qed.
 

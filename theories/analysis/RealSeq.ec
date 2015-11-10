@@ -35,7 +35,7 @@ lemma monotoneP (s : int -> real):
 proof.
 split=> [h m n|h n]; last first.
   by move=> ge0n; apply/h; rewrite ge0n ler_addl.
-case=> ge0m; rewrite -IntOrder.subr_ge0 -{2}@(IntID.subrK n m).
+case=> ge0m; rewrite -IntOrder.subr_ge0 -{2}(@IntID.subrK n m).
 rewrite addrC; elim/Induction.induction: (n - m)=> //.
 by move=> i ge0i ih; rewrite addrA (ler_trans ih) // h ?addr_ge0.
 qed.
@@ -50,7 +50,7 @@ case: (lim_sy _ gt0e) => {lim_sy} Ny lim_sy.
 case: (max_is_ub Nx Ny); (pose N := max _ _).
 move=> /lim_sx {lim_sx} lim_sx /lim_sy {lim_sy} lim_sy.
 have := ltr_add _ _ _ _ lim_sx lim_sy; rewrite ltrNge.
-by rewrite /e double_half @(distrC (s N)) ler_dist_add.
+by rewrite /e double_half (@distrC (s N)) ler_dist_add.
 qed.
 
 lemma eq_cnv s1 s2 l:
@@ -77,9 +77,9 @@ move=> cnv1 cnv2 e gt0e; have gt0e2: 0%r < e/2%r by rewrite divr_gt0.
 case: (cnv1 _ gt0e2)=> N1 c1; case: (cnv2 _ gt0e2)=> N2 c2.
 exists (max N1 N2) => n /geq_max [le_N1n le_N2n].
 pose x := `|s1 n - l1| + `|s2 n - l2|.
-apply @(ler_lt_trans x); rewrite /x => {x}.
+apply (@ler_lt_trans x); rewrite /x => {x}.
   by rewrite subrACA; apply/ler_norm_add.
-by rewrite -@(double_half e) ltr_add ?(c1, c2).
+by rewrite -(@double_half e) ltr_add ?(c1, c2).
 qed.
 
 lemma cnvN s l: convergeto s l => convergeto (fun x => -(s x)) (-l).
@@ -94,7 +94,7 @@ move=> cnv e gt0e; case: (c = 0%r) => [->|nz_c].
   by exists 0 => n _ /=; rewrite normr0.
 have: 0%r < e / `|c| by rewrite divr_gt0 // normr_gt0.
 move/cnv=> [N {cnv} cnv]; exists N => n /cnv.
-rewrite -mulrBr normrM -@(ltr_pmul2l `|c|) ?normr_gt0 //.
+rewrite -mulrBr normrM -(@ltr_pmul2l `|c|) ?normr_gt0 //.
 by rewrite divrE mulrCA mulrV 1:normr0P.
 qed.
 
