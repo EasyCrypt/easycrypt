@@ -435,7 +435,7 @@ let process_delta ?target (s, o, p) tc =
     end else t_id tc
 
 (* -------------------------------------------------------------------- *)
-let rec process_rewrite1 ttenv ?target ri tc =
+let rec process_rewrite1_r ttenv ?target ri tc =
   let implicits = function
   | `Implicit -> ttenv.tt_implicits
   | `Explicit -> false in
@@ -529,6 +529,10 @@ let rec process_rewrite1 ttenv ?target ri tc =
 
   | RWSmt info ->
       process_smt ~loc:ri.pl_loc ttenv info tc
+
+(* -------------------------------------------------------------------- *)
+let rec process_rewrite1 ttenv ?target ri tc =
+  EcCoreGoal.reloc (loc ri) (process_rewrite1_r ttenv ?target ri) tc
 
 (* -------------------------------------------------------------------- *)
 let process_rewrite ttenv ?target ri tc =

@@ -95,8 +95,8 @@ object(self)
         in
           Format.fprintf Format.err_formatter
             "[error-%d-%d]%s\n%!"
-            (max 0 (loc.LC.loc_bchar - startpos - 1))
-            (max 0 (loc.LC.loc_echar - startpos - 1))
+            (max 0 (loc.LC.loc_bchar - startpos))
+            (max 0 (loc.LC.loc_echar - startpos))
             (EcPException.tostring e)
 
   method finalize =
