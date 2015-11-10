@@ -294,13 +294,12 @@ def _main():
     def gather_for_scenario(scenario):
         def expand(dirs):
             def for1(x):
-                rec  = x.startswith('!')
-                x    = x[1:] if rec else x
                 aout = []
-
-                for root, dnames, _ in os.walk(x):
-                    aout.extend([os.path.join(root, x) for x in dnames])
-                    if not rec: break
+                if x.startswith('!'):
+                    for root, dnames, _ in os.walk(x[1:]):
+                        aout.extend([os.path.join(root, x) for x in dnames])
+                else:
+                    aout.extend(glob.glob(x))
                 return aout
 
             dirs = [for1(x) for x in re.split(r'\s+', dirs)]
