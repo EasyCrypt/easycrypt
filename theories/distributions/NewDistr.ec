@@ -8,7 +8,7 @@
 (* -------------------------------------------------------------------- *)
 require import Option Pred Fun List Int IntExtra Real RealExtra.
 require import StdRing StdOrder StdBigop Discrete RealSeq RealSeries.
-(*---*) import IterOp Bigint Bigreal Bigreal.BAdd.
+(*---*) import IterOp Bigint Bigreal Bigreal.BRA.
 (*---*) import IntOrder RealOrder RField.
 require (*--*) FinType.
 

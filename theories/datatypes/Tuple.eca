@@ -7,7 +7,7 @@
 
 (* -------------------------------------------------------------------- *)
 require import Fun Pred ExtEq Int IntExtra List StdOrder StdBigop.
-(*---*) import StdOrder.IntOrder StdBigop.Bigint.BAdd.
+(*---*) import StdOrder.IntOrder StdBigop.Bigint.BIA.
 require (*--*) FinType.
 
 (* -------------------------------------------------------------------- *)

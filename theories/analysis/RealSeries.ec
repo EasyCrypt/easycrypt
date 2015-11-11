@@ -8,7 +8,7 @@
 (* -------------------------------------------------------------------- *)
 require import Bool Option Fun Distr Int IntExtra Real RealExtra.
 require import StdRing StdOrder StdBigop Discrete List RealSeq.
-(*---*) import IterOp Bigreal.BAdd.
+(*---*) import IterOp Bigreal.BRA.
 
 pragma +implicits.
 

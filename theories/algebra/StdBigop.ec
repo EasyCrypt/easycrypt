@@ -29,17 +29,20 @@ clone include Bigalg.BigOrder with
     op Num.( <= ) <- Int.(<=),
     op Num.( <  ) <- Int.(< )
 
-    proof Num.Domain.* by smt, Num.Axioms.* by smt.
+    proof Num.Domain.* by smt, Num.Axioms.* by smt
 
-lemma nosmt sumzE ss : sumz ss = BAdd.big predT (fun x => x) ss.
-proof. by elim: ss=> [|s ss ih] //=; rewrite BAdd.big_cons -ih. qed.
+    rename [theory] "BAdd" as "BIA"
+           [theory] "BMul" as "BIM".
+
+lemma nosmt sumzE ss : sumz ss = BIA.big predT (fun x => x) ss.
+proof. by elim: ss=> [|s ss ih] //=; rewrite BIA.big_cons -ih. qed.
       
 lemma nosmt big_constz (P : 'a -> bool) x s:
-  BAdd.big P (fun i => x) s = x * (count P s).
-proof. by rewrite BAdd.sumr_const -IntID.intmulz. qed.
+  BIA.big P (fun i => x) s = x * (count P s).
+proof. by rewrite BIA.sumr_const -IntID.intmulz. qed.
 
 lemma nosmt big_count (P : 'a -> bool) s:
-    BAdd.big P (fun (x : 'a) => count (pred1 x) s) (undup s)
+    BIA.big P (fun (x : 'a) => count (pred1 x) s) (undup s)
   = size (filter P s).
 proof. admit. qed.
 end Bigint.
@@ -65,19 +68,22 @@ clone include Bigalg.BigOrder with
     op Num.( <= ) <- Real.(<=),
     op Num.( <  ) <- Real.(< )
 
-    proof Num.Domain.* by smt, Num.Axioms.* by smt.
+    proof Num.Domain.* by smt, Num.Axioms.* by smt
 
-import Bigint.BAdd Bigint.BMul BAdd BMul.
+    rename [theory] "BAdd" as "BRA"
+           [theory] "BMul" as "BRM".
+
+import Bigint.BIA Bigint.BIM BRA BRM. 
 
 lemma sumr_ofint (P : 'a -> bool) F s :
-  (Bigint.BAdd.big P F s)%r = (BAdd.big P (fun i => (F i)%r) s).
+  (Bigint.BIA.big P F s)%r = (BRA.big P (fun i => (F i)%r) s).
 proof.
 elim: s => [//|x s ih]; rewrite !big_cons; case: (P x)=> // _.
 by rewrite FromInt.Add ih.
 qed.
 
 lemma prodr_ofint (P : 'a -> bool) F s :
-  (Bigint.BMul.big P F s)%r = (BMul.big P (fun i => (F i)%r) s).
+  (Bigint.BIM.big P F s)%r = (BRM.big P (fun i => (F i)%r) s).
 proof.
 elim: s => [//|x s ih]; rewrite !big_cons; case: (P x)=> // _.
 by rewrite FromInt.Mul ih.
