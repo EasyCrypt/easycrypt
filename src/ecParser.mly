@@ -2803,12 +2803,13 @@ clone_proof:
 | PROOF x=clone_lemma { List.rev x }
 
 clone_rename_kind:
-| TYPE        { `Type   }
-| OP          { `Op     }
-| PRED        { `Pred   }
-| LEMMA       { `Lemma  }
-| MODULE      { `Module }
+| TYPE        { `Type    }
+| OP          { `Op      }
+| PRED        { `Pred    }
+| LEMMA       { `Lemma   }
+| MODULE      { `Module  }
 | MODULE TYPE { `ModType }
+| THEORY      { `Theory  }
 
 clone_rename_1:
 | k=bracket(plist1(clone_rename_kind, COMMA))? r1=loc(STRING) AS r2=loc(STRING)

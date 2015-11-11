@@ -2361,6 +2361,7 @@ module Cloning = struct
             (subst, ops, proofs, Mod.bind scope thcl.pthc_local me)
   
         | CTh_theory (x, (cth, thmode)) -> begin
+            let (subst, x) = rename subst (`Theory, x) in
             let subovrds = Msym.find_opt x ovrds.ovre_ovrd.evc_ths in
             let subovrds = EcUtils.odfl evc_empty subovrds in
             let subovrds = { ovre_ovrd  = subovrds;

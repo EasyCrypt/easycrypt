@@ -83,6 +83,7 @@ and rk_categories = {
   rkc_types   : bool;
   rkc_module  : bool;
   rkc_modtype : bool;
+  rkc_theory  : bool;
 }
 
 (* -------------------------------------------------------------------- *)

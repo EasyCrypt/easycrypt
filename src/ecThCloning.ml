@@ -226,6 +226,7 @@ and rk_categories = {
   rkc_types   : bool;
   rkc_module  : bool;
   rkc_modtype : bool;
+  rkc_theory  : bool;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -239,6 +240,7 @@ let rename ((rk, (rex, itempl)) : renaming) (k, x) =
     | `Selected { rkc_types   = true }, `Type    -> true
     | `Selected { rkc_module  = true }, `Module  -> true
     | `Selected { rkc_modtype = true }, `ModType -> true
+    | `Selected { rkc_theory  = true }, `Theory  -> true
     | _, _ -> false in
 
   let newx =
@@ -488,11 +490,13 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
             | `Op      -> { rk with rkc_ops     = true; }
             | `Pred    -> { rk with rkc_preds   = true; }
             | `Module  -> { rk with rkc_module  = true; }
-            | `ModType -> { rk with rkc_modtype = true; } in
+            | `ModType -> { rk with rkc_modtype = true; }
+            | `Theory  -> { rk with rkc_theory  = true; } in
 
           let init = {
             rkc_lemmas  = false; rkc_types   = false; rkc_ops     = false;
-            rkc_preds   = false; rkc_module  = false; rkc_modtype = false; } in
+            rkc_preds   = false; rkc_module  = false; rkc_modtype = false;
+            rkc_theory  = false; } in
 
           `Selected (List.fold_left update init k)
 
