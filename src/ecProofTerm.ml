@@ -194,13 +194,17 @@ let pt_of_uglobal pf hyps p =
 let get_implicits (hyps : LDecl.hyps) (f : form) : bool list =
   let rec doit acc f =
     match PT.destruct_product hyps f with
-    | Some (`Forall (_, GTty _, f)) ->
-        doit (true :: acc) f
+    | Some (`Forall (x, GTty _, f)) ->
+        doit (`Var x :: acc) f
     | Some (`Forall (_, _, f)) ->
-        doit (false :: acc) f
+        doit (`Direct false :: acc) f
     | Some (`Imp (_, f)) ->
-        doit (false :: acc) f
-    | _ -> List.rev acc
+        doit (`Direct false :: acc) f
+    | _ ->
+       List.rev_map (function
+         | `Var    x -> Mid.mem x f.f_fv
+         | `Direct b -> b)
+         acc
   in doit [] f
 
 (* -------------------------------------------------------------------- *)
