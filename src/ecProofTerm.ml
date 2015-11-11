@@ -191,6 +191,19 @@ let pt_of_uglobal pf hyps p =
     ptev_ax  = ax; }
 
 (* -------------------------------------------------------------------- *)
+let get_implicits (hyps : LDecl.hyps) (f : form) : bool list =
+  let rec doit acc f =
+    match PT.destruct_product hyps f with
+    | Some (`Forall (_, GTty _, f)) ->
+        doit (true :: acc) f
+    | Some (`Forall (_, _, f)) ->
+        doit (false :: acc) f
+    | Some (`Imp (_, f)) ->
+        doit (false :: acc) f
+    | _ -> List.rev acc
+  in doit [] f
+
+(* -------------------------------------------------------------------- *)
 let pattern_form ?name hyps ~ptn subject =
   let dfl () = Printf.sprintf "?%d" (EcUid.unique ()) in
 
@@ -630,50 +643,51 @@ and apply_pterm_to_holes ?loc n pt =
   EcUtils.iterop (apply_pterm_to_hole ?loc) n pt
 
 (* -------------------------------------------------------------------- *)
-and process_pterm_arg_app ?implicits pt ({ pl_loc = loc } as arg) =
-  apply_pterm_to_arg ~loc pt (process_pterm_arg ?implicits pt arg)
-
-(* -------------------------------------------------------------------- *)
-and process_pterm_args_app ?implicits pt args =
-  List.fold_left (process_pterm_arg_app ?implicits) pt args
-
-(* -------------------------------------------------------------------- *)
-and process_full_pterm ?(implicits = false) pe pf =
-  let pt = process_pterm pe pf.fp_head in
-  let pt =
-    match implicits && (pf.fp_mode = `Implicit) with
-    | false -> pt
-    | true  ->
-      let rec apply ({ ptev_pt = pt; ptev_env = env; } as pe) =
+and process_implicits ip ({ ptev_pt = pt; ptev_env = env; } as pe) =
+  match ip with
+  | [] -> ([], pe)
+  | b :: ip ->
+      if not b then ((b :: ip), pe) else
         match PT.destruct_product ~reduce:false env.pte_hy pe.ptev_ax with
         | Some (`Forall (x, xty, f)) ->
             let (newax, newarg) = check_pterm_oarg env (x, xty) f None in
             let pt = { pt with pt_args = pt.pt_args @ [newarg] } in
             let pe = { pe with ptev_ax = newax; ptev_pt = pt } in
-            apply pe
-        | _ -> pe
+            process_implicits ip pe
+        | _ -> ((b :: ip), pe)
 
-    in
+(* -------------------------------------------------------------------- *)
+and process_pterm_arg_app ?implicits ?(ip = []) pt ({ pl_loc = loc } as arg) =
+  let ip, pt = process_implicits ip pt in
+  let ip = odfl [] (List.otail ip) in
+  (apply_pterm_to_arg ~loc pt (process_pterm_arg ?implicits pt arg), ip)
 
-    let isform   = function PAFormula _ -> true | _ -> false in
-    let isglobal = function PTGlobal  _ -> true | _ -> false in
+(* -------------------------------------------------------------------- *)
+and process_pterm_args_app ?implicits ?(ip = []) pt args =
+  List.fold_left
+    (fun (pt, ip) arg ->
+       process_pterm_arg_app ?implicits ~ip pt arg)
+    (pt, ip) args
 
-    if    List.for_all isform pt.ptev_pt.pt_args
-       && not (List.is_empty pf.fp_args)
-       && isglobal pt.ptev_pt.pt_head
-    then apply pt else pt
-
-  in process_pterm_args_app ~implicits pt pf.fp_args
+(* -------------------------------------------------------------------- *)
+and process_full_pterm ?(implicits = false) pe pf =
+  let pt = process_pterm pe pf.fp_head in
+  if List.is_empty pf.fp_args then pt else
+    let ip =
+      match implicits && pf.fp_mode = `Implicit with
+      | true  -> get_implicits pt.ptev_env.pte_hy pt.ptev_ax
+      | false -> []
+    in fst (process_pterm_args_app ~implicits ~ip pt pf.fp_args)
 
 (* -------------------------------------------------------------------- *)
 let process_full_pterm_cut ~prcut pe pf =
   let pt = process_pterm_cut ~prcut pe pf.fp_head in
-    process_pterm_args_app pt pf.fp_args
+  fst (process_pterm_args_app pt pf.fp_args)
 
 (* -------------------------------------------------------------------- *)
 let process_full_closed_pterm_cut ~prcut pe pf =
   let pt = process_pterm_cut ~prcut pe pf.fp_head in
-  let pt = process_pterm_args_app pt pf.fp_args in
+  let pt = fst (process_pterm_args_app pt pf.fp_args) in
     (* FIXME: use core exception? *)
     if not (can_concretize pe) then
       tc_error pe.pte_pe "cannot infer all placeholders";
@@ -682,7 +696,7 @@ let process_full_closed_pterm_cut ~prcut pe pf =
 (* -------------------------------------------------------------------- *)
 let process_full_closed_pterm pe pf =
   let pt = process_pterm pe pf.fp_head in
-  let pt = process_pterm_args_app pt pf.fp_args in
+  let pt = fst (process_pterm_args_app pt pf.fp_args) in
     (* FIXME: use core exception? *)
     if not (can_concretize pe) then
       tc_error pe.pte_pe "cannot infer all placeholders";
