@@ -50,7 +50,7 @@ op insubd (x : T) = odflt witness (insub x).
 
 (* -------------------------------------------------------------------- *)
 lemma val_inj: injective val.
-proof. by apply/(pcan_inj valK). qed.
+proof. by apply/(pcan_inj _ _ valK). qed.
 
 lemma valKd: cancel val insubd.
 proof. by move=> u; rewrite /insubd valK. qed.

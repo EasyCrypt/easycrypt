@@ -84,7 +84,7 @@ proof. by rewrite -sub0r subr_ge0. qed.
 
 lemma ler01: zeror <= oner.
 proof.                        (* FIXME: anomaly with (inj_eq mulfI) *)
-have n1_nz: `|oner| <> zeror by apply/(contraNneq _ oner_neq0) => /normr0_eq0->.
+have n1_nz: `|oner| <> zeror by apply/(contraNneq _ _ oner_neq0) => /normr0_eq0->.
 rewrite ger0_def; have /inj_eq <- := mulfI _ n1_nz.
 by rewrite -normrM !mulr1.
 qed.
@@ -827,12 +827,12 @@ hint rewrite mulr_cp1   : mulr_ile1 mulr_ilt1.
 (* -------------------------------------------------------------------- *)
 lemma mulr_ege1 x y : oner <= x => oner <= y => oner <= x * y.
 proof.
-by move=> le1x le1y; rewrite (@ler_trans y) ?ler_pemull // (ler_trans ler01).
+by move=> le1x le1y; rewrite (@ler_trans y) ?ler_pemull // (ler_trans _ ler01).
 qed.
 
 lemma mulr_egt1 x y : oner < x => oner < y => oner < x * y.
 proof.
-by move=> le1x lt1y; rewrite (@ltr_trans y) // ltr_pmull // (ltr_trans ltr01).
+by move=> le1x lt1y; rewrite (@ltr_trans y) // ltr_pmull // (ltr_trans _ ltr01).
 qed.
 
 hint rewrite mulr_egte1 : mulr_ege1  mulr_egt1.
@@ -887,10 +887,10 @@ lemma nosmt ler_dist_norm_add (x y : t):
 proof. by rewrite -(@opprK y) normrN -subrE ler_dist_dist. qed.
 
 lemma nosmt ler_nnorml (x y : t): y < zeror => ! (`|x| <= y).
-proof. by move=> y_lt0; rewrite ltr_geF // (ltr_le_trans y_lt0) ?normr_ge0. qed.
+proof. by move=> y_lt0; rewrite ltr_geF // (ltr_le_trans _ y_lt0) ?normr_ge0. qed.
 
 lemma nosmt ltr_nnorml (x y : t): y <= zeror => ! (`|x| < y).
-proof. by move=> y_le0; rewrite ler_gtF // (ler_trans y_le0) ?normr_ge0. qed.
+proof. by move=> y_le0; rewrite ler_gtF // (ler_trans _ y_le0) ?normr_ge0. qed.
 
 lemma nosmt eqr_norm_id (x : t): (`|x| = x) <=> (zeror <= x).
 proof. by rewrite ger0_def. qed.

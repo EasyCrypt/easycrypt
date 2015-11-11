@@ -149,7 +149,7 @@ proof.
 rewrite MUniform.duniform1E mem_range undup_id 1:range_uniq //.
 rewrite size_range; case: (m <= x < n) => // -[le_mx lt_xn].
 rewrite max_ler // IntOrder.subr_ge0 IntOrder.ltrW //.
-by apply (IntOrder.ler_lt_trans le_mx).
+by apply (IntOrder.ler_lt_trans _ le_mx).
 qed.
 
 lemma drangeE (E : int -> bool) (m n : int) :

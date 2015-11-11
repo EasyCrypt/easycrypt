@@ -292,7 +292,7 @@ abstract theory ComRing.
   qed.
 
   lemma nosmt invr_inj: injective invr.
-  proof. by apply: (can_inj invrK). qed.
+  proof. by apply: (can_inj _ _ invrK). qed.
 
   lemma nosmt unitrV x: unit (invr x) <=> unit x.
   proof. by rewrite !unitrE !divrE invrK mulrC. qed.

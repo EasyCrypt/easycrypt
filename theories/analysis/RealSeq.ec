@@ -37,7 +37,7 @@ split=> [h m n|h n]; last first.
   by move=> ge0n; apply/h; rewrite ge0n ler_addl.
 case=> ge0m; rewrite -IntOrder.subr_ge0 -{2}(@IntID.subrK n m).
 rewrite addrC; elim/Induction.induction: (n - m)=> //.
-by move=> i ge0i ih; rewrite addrA (ler_trans ih) // h ?addr_ge0.
+by move=> i ge0i ih; rewrite addrA (ler_trans _ ih) // h ?addr_ge0.
 qed.
 
 lemma uniq_cnv s x y: convergeto s x => convergeto s y => x = y.
