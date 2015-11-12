@@ -307,40 +307,6 @@ proof.
   by rewrite (Inverse x _); smt.
 qed.
 
-theory Exp.
-(*
-  import why3 "real" "ExpLog"
-    op "exp" as "exp".
-*)
-(** Begin Import **)
-    op exp : real -> real.
-    
-    axiom Exp_zero: exp zero = one.
-    
-    axiom Exp_sum: forall (x y : real), exp (x + y) = exp x * exp y.
-    
-    op e : real.
-    
-    op log : real -> real.
-    
-    axiom Log_one: log one = zero.
-    
-    axiom Log_mul: forall (x y:real), x > zero /\ y > zero => log (x * y) = log x + log y.
-    
-    axiom Log_exp: forall (x : real), log (exp x) = x.
-    
-    axiom Exp_log: forall (x:real), x > zero => exp (log x) = x.
-    
-    op log2 : real -> real.
-    
-    op log10 : real -> real.
-(** End Import **)
-  axiom exp_zero : exp (from_int 0) = from_int 1.
-  axiom exp_monotonous : forall (x y:real) , x<=y => exp x <= exp y.
-
-end Exp.
-export Exp.
-
 (* Injection of bool into real *)
 op b2r (b:bool) = if b then 1%r else 0%r.
 
