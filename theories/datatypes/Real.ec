@@ -200,6 +200,9 @@ theory PowerInt.
   axiom pow_inv_pos :
     forall (x : real) (n : int), Int.(<=) 0 n => x ^ (Int.([-]) n) = inv (x ^ n).
 
+  axiom nosmt pow_inv :
+    forall (x : real) (n : int), x ^ (Int.([-]) n) = inv (x ^ n).
+
   axiom pow_div_den (a b:int):
     Int.(<=) a b =>
     from_int (Int.(^) 2 a) / from_int (Int.(^) 2 b)
