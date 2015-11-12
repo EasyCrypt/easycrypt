@@ -15,6 +15,8 @@ axiom ln_le0   : forall x, x <= 0%r => ln x = 0%r.
 axiom lnK  : forall x, ln (exp x) = x.
 axiom expK : forall x, 0%r < x => exp (ln x) = x.
 
+axiom nosmt le1Dx_exp (x : real): 0%r <= x => 1%r+x <= exp x.
+
 op log (a : real) = fun x => ln x / ln a.
 
 op log10 x = log 10%r x.
@@ -122,8 +124,18 @@ by rewrite rpow0r; case: (n = 0%r).
 qed.
 
 (* -------------------------------------------------------------------- *)
+lemma rpowN (x n : real) : 0%r <= x => x^(-n) = inv (x ^ n).
+proof.
+rewrite ler_eqVlt=> [<-|]; first rewrite !rpow0r oppr_eq0.
+  by case: (n = 0%r); rewrite !(invr0, invr1).
+by move=> gt0x; rewrite !rpowE // mulNr expN.
+qed.
+
 lemma rpowD (x n m : real) : 0%r < x => x^(n + m) = x^n * x^m.
 proof. by move=> gt0x; rewrite !rpowE // mulrDl expD. qed.
+
+lemma rpowB (x n m : real) : 0%r < x => x^(n - m) = x^n / x^m.
+proof. by move=> gt0x; rewrite subrE divrE !(rpowN, rpowD) // ltrW. qed.
 
 lemma rpowM (x n m : real) : 0%r < x => x^(n * m) = (x ^ n) ^ m.
 proof. by move=> gt0x; rewrite !rpowE ?exp_gt0 // lnK mulrCA mulrA. qed.
@@ -142,8 +154,21 @@ lemma rpowMVr (x y n : real):
   0%r < x => 0%r < y => (x/y)^n = x^n/y^n.
 proof. by move=> gt0x gt0y; rewrite !divrE rpowMr ?invr_gt0 // rpowVr. qed.
 
+lemma rpow_nat x n : 0 <= n => 0%r <= x => x^(n%r) = x^n.
+proof.
+elim: n=> [|n ge0n ih] ge0x; first by rewrite Power_0 -FromInt.One rpow0.
+rewrite Power_s /(>=) // FromInt.Add; move: ge0x.
+rewrite ler_eqVlt=> [<-|]; first rewrite (mul0r 0%r).
+  by rewrite rpow0r -FromInt.Add from_intMeq addz1_neq0.
+by move=> gt0x; rewrite rpowD // rpow1 // mulrC ih 1:ltrW.
+qed.
+
 lemma rpow_int x n : 0%r <= x => x^(n%r) = x^n.
-proof. admit. qed.
+proof.
+move=> ge0x; case: (lezWP 0 n)=> [/rpow_nat ->|_] //.
+move=> le0n; rewrite -(opprK n%r) rpowN // -FromInt.Neg.
+by rewrite rpow_nat // ?oppz_ge0 // pow_inv invrK.
+qed.
 
 (* -------------------------------------------------------------------- *)
 lemma rpowe_gt0 (x : real): 0%r < e^x.
@@ -183,8 +208,9 @@ rewrite !rpowE 1,2:(ltr_le_trans 1%r) // exp_mono.
 by apply/ler_wpmul2r=> //; apply/ln_ge0.
 qed.
 
+(* -------------------------------------------------------------------- *)
 lemma nosmt le1Dx_rpowe (x : real): 0%r <= x => 1%r+x <= e^x.
-proof. admitted.
+proof. by rewrite rpoweE; apply/le1Dx_exp. qed.
 
 (* -------------------------------------------------------------------- *)
 require import StdBigop.
