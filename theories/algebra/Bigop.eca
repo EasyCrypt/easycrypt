@@ -20,6 +20,7 @@ import Ring.IntID.
 type t.
 
 clone export Monoid as Support with type t <- t.
+clear [Support.*].
 
 (* -------------------------------------------------------------------- *)
 op big (P : 'a -> bool) (F : 'a -> t) (r : 'a list) =

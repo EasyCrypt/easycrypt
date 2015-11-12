@@ -36,6 +36,7 @@ proof. by move=> can_gf mf x y; rewrite -{1}can_gf mf. qed.
 type t.
 
 clone import Ring.IDomain as Domain with type t <- t.
+clear [Domain.*].
 
 op "`|_|" : t -> t.
 op ( <= ) : t -> t -> bool.

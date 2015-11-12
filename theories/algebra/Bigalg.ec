@@ -18,6 +18,7 @@ abstract theory BigZModule.
 type t.
 
 clone import Ring.ZModule as ZM with type t <- t.
+clear [ZM.*].
 
 clone include Bigop with
   type t <- t,
@@ -48,7 +49,7 @@ proof. by rewrite subrE sumrN sumrD; apply/eq_bigr=> /= x; rewrite subrE. qed.
 (* -------------------------------------------------------------------- *)
 lemma nosmt sumr_const (P : 'a -> bool) x s:
   big P (fun i => x) s = intmul x (count P s).
-proof. by rewrite big_const intmulpE 1:count_ge0 // -iteropE. qed.
+proof. by rewrite big_const intmulpE 1:count_ge0 // -ZM.AddMonoid.iteropE. qed.
 end BigZModule.
 
 (* -------------------------------------------------------------------- *)
@@ -56,6 +57,7 @@ abstract theory BigComRing.
 type t.
 
 clone import Ring.ComRing as CR with type t <- t.
+clear [CR.*].
 
 (* -------------------------------------------------------------------- *)
 theory BAdd.
@@ -115,6 +117,7 @@ abstract theory BigOrder.
 type t.
 
 clone import Number as Num with type t <- t.
+clear [Num.*].
 
 import Num.Domain.
 
