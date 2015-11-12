@@ -1318,6 +1318,13 @@ theory Range.
     by move=> le_mn le_np; rewrite iota_add; smt.
   qed.
 
+  lemma rangeSr (n m:int): n <= m =>
+    range n (m+1) = rcons (range n m) m.
+  proof.
+    move=> le_nk; rewrite -cats1 (range_cat m) ?rangeS //.
+      by rewrite lez_addl.
+  qed.
+
   lemma mem_range (m n i: int):
     (mem (range m n) i) <=> (m <= i < n).
   proof.

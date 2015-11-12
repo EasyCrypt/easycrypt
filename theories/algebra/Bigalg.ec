@@ -177,6 +177,15 @@ move=> h; apply: (@BMul.big_ind (fun x => zeror <= x)) => //=.
   by apply/mulr_ge0. by apply/ler01.
 qed.
 
+lemma nosmt ler_prod (P : 'a -> bool) (F1 F2 :'a -> t) s:
+     (forall a, P a => zeror <= F1 a <= F2 a)
+  => (BMul.big P F1 s <= BMul.big P F2 s).
+proof.
+move=> h; elim: s => [|x s ih]; first by rewrite !BMul.big_nil lerr.
+rewrite !BMul.big_cons; case: (P x)=> // /h [ge0F1x leF12x].
+by apply/ler_pmul=> //; apply/prodr_ge0=> a /h [].
+qed.
+
 lemma nosmt ler_sum_seq (P : 'a -> bool) (F1 F2 :'a -> t) s:
      (forall a, mem s a => P a => F1 a <= F2 a)
   => (BAdd.big P F1 s <= BAdd.big P F2 s).
@@ -199,5 +208,13 @@ lemma nosmt prodr_ge0_seq (P : 'a -> bool) F s:
 proof.
 move=> h; rewrite !(@BMul.big_seq_cond P).
 by rewrite prodr_ge0=> //= x []; apply/h.
+qed.
+
+lemma nosmt ler_prod_seq (P : 'a -> bool) (F1 F2 :'a -> t) s:
+     (forall a, mem s a => P a => zeror <= F1 a <= F2 a)
+  => (BMul.big P F1 s <= BMul.big P F2 s).
+proof.
+move=> h; rewrite !(@BMul.big_seq_cond P).
+by rewrite ler_prod=> //= x []; apply/h.
 qed.
 end BigOrder.

@@ -88,25 +88,54 @@ proof.
 elim: s => [//|x s ih]; rewrite !big_cons; case: (P x)=> // _.
 by rewrite FromInt.Mul ih.
 qed.
+
+lemma sumr_const (P : 'a -> bool) (x : real) (s : 'a list):
+  BRA.big P (fun (i : 'a) => x) s = (count P s)%r * x.
+proof. by rewrite sumr_const RField.intmulr RField.mulrC. qed.
 end Bigreal.
 
 (* -------------------------------------------------------------------- *)
 require import Bool.
 
+(* -------------------------------------------------------------------- *)
 clone Bigop as BBA with
   type t <- bool,
   op Support.idm <- false,
   op Support.(+) <- Bool.( ^^ )
   proof Support.Axioms.* by (delta; smt).  
 
-clone Bigop as BBM with
+(* -------------------------------------------------------------------- *)
+theory BBM.
+clone include Bigop with
   type t <- bool,
   op Support.idm <- true,
   op Support.(+) <- Pervasive.( /\ )
   proof Support.Axioms.* by (delta; smt).  
 
-clone Bigop as BBO with
+lemma bigP (P : 'a -> bool) (s : 'a list):
+  big predT P s <=> (forall a, mem s a => P a).
+proof.
+elim: s => [|x s ih] //=; rewrite !big_cons {1}/predT /=.
+rewrite ih; split=> [[Px h] y [->|/h]|h] //.
+  by split=> [|y sy]; apply/h; rewrite ?sy.
+qed.
+end BBM.
+
+(* -------------------------------------------------------------------- *)
+theory BBO.
+clone include Bigop with
   type t <- bool,
   op Support.idm <- false,
   op Support.(+) <- Pervasive.( || )
   proof Support.Axioms.* by (delta; smt).  
+
+lemma bigP (P : 'a -> bool) (s : 'a list):
+  big predT P s <=> (exists a, mem s a /\ P a).
+proof.
+elim: s => [|x s ih] //=; rewrite big_cons /predT /=.
+rewrite ih; case: (P x)=> Px /=; first by exists x.
+have h: forall y, P y => y <> x by move=> y Py; apply/negP=> ->>.
+split; case=> y [sy ^Py /h ne_yx]; exists y.
+  by rewrite ne_yx. by case: sy.
+qed.
+end BBO.

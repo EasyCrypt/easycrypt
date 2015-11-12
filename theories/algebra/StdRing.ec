@@ -34,6 +34,17 @@ theory RField.
     move=> {i}; elim/Induction.natind; smt.
   qed.
 
+  lemma intmulr x c : intmul x c = x * c%r.
+  proof.
+    have h: forall cp, 0 <= cp => intmul x cp = x * cp%r.
+      elim/Induction.induction=> /= [|cp ge0_cp ih].
+        by rewrite mulr0z.
+      by rewrite mulrS // ih FromInt.Add mulrDr mulr1 addrC.
+    case: (lezWP c 0) => [le0c|_ /h //].
+    rewrite -{2}(@oppzK c) FromInt.Neg mulrN -h 1:smt.
+    by rewrite mulrNz opprK.
+  qed.
+
   lemma nosmt double_half (x : real) : x / 2%r + x / 2%r = x.
   proof.
     rewrite -ofintR divrE -mulrDl -mul1r2z -mulrA -divrE.
