@@ -341,6 +341,9 @@ theory Exp.
 end Exp.
 export Exp.
 
+(* Injection of bool into real *)
+op b2r (b:bool) = if b then 1%r else 0%r.
+
 require import Ring.
 require import AlgTactic.
 
