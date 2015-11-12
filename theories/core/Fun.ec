@@ -178,6 +178,10 @@ proof. by apply can_inj. qed.
 lemma nosmt inv_bij (f:'a -> 'a): involutive f => bijective f.
 proof. by move=> invf; exists f. qed.
 
+lemma nosmt inv_eq ['a] (f : 'a -> 'a) :
+  involutive f => forall x y, (f x = y) <=> (x = f y).
+proof. by move=> fK; apply/can2_eq. qed.
+
 (* -------------------------------------------------------------------- *)
 pred left_inverse (e:'a) (inv:'a -> 'a) (o:'a -> 'a -> 'a) =
   forall (x:'a), o (inv x) x = e.

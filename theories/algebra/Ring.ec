@@ -81,6 +81,9 @@ abstract theory ZModule.
   lemma nosmt oppr0: -zeror = zeror.
   proof. by rewrite -(@addr0 (-zeror)) addNr. qed.
 
+  lemma oppr_eq0 x : (- x = zeror) <=> (x = zeror).
+  proof. by rewrite (inv_eq opprK) oppr0. qed.
+
   lemma nosmt subr0 (x : t): x - zeror = x.
   proof. by rewrite subrE /= oppr0 addr0. qed.
 
