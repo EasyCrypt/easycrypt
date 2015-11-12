@@ -15,10 +15,16 @@ require (*--*) FinType.
 pragma +implicits.
 
 (* -------------------------------------------------------------------- *)
-type 'a distr.
+(* We currently bind old distr/mu_x et al to the new constructs         *)
+require export Distr.
 
-op mu_x : 'a distr -> ('a -> real).
-op mk   : ('a -> real) -> 'a distr.
+type 'a distr = 'a Pervasive.distr.
+
+axiom muE ['a] (d : 'a distr) (E : 'a -> bool):
+  mu d E = sum (fun x => if E x then mu_x d x else 0%r).
+
+(* -------------------------------------------------------------------- *)
+op mk : ('a -> real) -> 'a distr.
 
 op isdistr (m : 'a -> real) =
      (forall x, 0%r <= m x)
@@ -57,10 +63,6 @@ by congr; apply/fun_ext.
 qed.
 
 (* -------------------------------------------------------------------- *)
-op mu ['a] (d : 'a distr) (E : 'a -> bool) =
-  sum (fun x => if E x then mu_x d x else 0%r).
-
-(* -------------------------------------------------------------------- *)
 theory MRat.
 op mrat ['a] (s : 'a list) =
   fun x => (count (pred1 x) s)%r / (size s)%r.
@@ -81,7 +83,7 @@ proof. by rewrite muK // isdistr_drat. qed.
 lemma prratE ['a] (s : 'a list) (E : 'a -> bool) :
   mu (drat s) E = (count E s)%r / (size s)%r.
 proof.
-rewrite /mu (@sumE_fin _ (undup s)) ?undup_uniq //=.
+rewrite muE (@sumE_fin _ (undup s)) ?undup_uniq //=.
   move=> x; case: (E x)=> _ //; rewrite dratE.
   rewrite divrE mulf_eq0 -nor mem_undup from_intMeq => [+ _].
   by rewrite -lt0n ?count_ge0 // -has_count has_pred1.
