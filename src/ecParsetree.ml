@@ -883,6 +883,9 @@ type tcdump = {
 type save = [ `Qed | `Admit | `Abort ]
 
 (* -------------------------------------------------------------------- *)
+type theory_clear = (pqsymbol option) list
+
+(* -------------------------------------------------------------------- *)
 type global_action =
   | Gdeclare     of pdeclare
   | Gmodule      of pmodule_def
@@ -897,7 +900,8 @@ type global_action =
   | Gprint       of pprint
   | Gsearch      of pformula list
   | GthOpen      of (bool * psymbol)
-  | GthClose     of psymbol
+  | GthClose     of (theory_clear * psymbol)
+  | GthClear     of theory_clear
   | GthRequire   of (psymbol list * [`Import|`Export] option)
   | GthImport    of pqsymbol list
   | GthExport    of pqsymbol list

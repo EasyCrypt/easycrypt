@@ -1672,8 +1672,27 @@ proofend:
 (* -------------------------------------------------------------------- *)
 (* Theory interactive manipulation                                      *)
 
-theory_open  : b=boption(ABSTRACT) THEORY x=uident  { (b, x) }
-theory_close : END x=uident  { x }
+theory_clear_item1:
+| l=genqident(STAR) {
+    match List.rev (fst (unloc l)) with
+    | [] -> None
+    | x :: xs -> Some (mk_loc (loc l) (List.rev xs, x))
+  }
+
+theory_clear_items:
+| xs=theory_clear_item1* { xs }
+
+theory_open:
+| b=boption(ABSTRACT) THEORY x=uident
+    { (b, x) }
+
+theory_close:
+| END xs=bracket(theory_clear_items)? x=uident
+    { (odfl [] xs, x) }
+
+theory_clear:
+| CLEAR xs=bracket(theory_clear_items)
+    { xs }
 
 section_open  : SECTION     x=option(uident) { x }
 section_close : END SECTION x=option(uident) { x }
@@ -2964,6 +2983,7 @@ global_action:
 | theory_import    { GthImport    $1 }
 | theory_export    { GthExport    $1 }
 | theory_clone     { GthClone     $1 }
+| theory_clear     { GthClear     $1 }
 | section_open     { GsctOpen     $1 }
 | section_close    { GsctClose    $1 }
 | top_decl         { Gdeclare     $1 }

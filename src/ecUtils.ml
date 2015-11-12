@@ -220,6 +220,12 @@ let oall2 f x y =
   | None  , None   -> true
   | _     , _      -> false
 
+let oeq f o1 o2 =
+  match o1, o2 with
+  | None   , None    -> true
+  | Some x1, Some x2 -> f x1 x2
+  | _      , _       -> false
+
 let ocompare f o1 o2 =
   match o1, o2 with
   | None   , None    -> 0

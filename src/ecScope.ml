@@ -319,6 +319,7 @@ type scope = {
   sc_prelude  : ([`Frozen | `InPrelude] * prelude);
   sc_loaded   : (thloaded * symbol list) Msym.t;
   sc_required : symbol list;
+  sc_clears   : path option list;
   sc_pr_uc    : proof_uc option;
   sc_options  : GenOptions.options;
   sc_section  : EcSection.t;
@@ -333,6 +334,7 @@ let empty (gstate : EcGState.gstate) =
     sc_prelude    = (`InPrelude, { pr_env = env; pr_required = []; });
     sc_loaded     = Msym.empty;
     sc_required   = [];
+    sc_clears     = [];
     sc_pr_uc      = None;
     sc_options    = GenOptions.freeze ();
     sc_section    = EcSection.initial; }
@@ -434,6 +436,7 @@ let for_loading (scope : scope) =
     sc_prelude    = scope.sc_prelude;
     sc_loaded     = scope.sc_loaded;
     sc_required   = pr.pr_required;
+    sc_clears     = [];
     sc_pr_uc      = None;
     sc_options    = GenOptions.for_loading scope.sc_options;
     sc_section    = EcSection.initial; }
@@ -448,6 +451,7 @@ let subscope (scope : scope) (mode : EcTheory.thmode) (name : symbol) =
     sc_prelude    = scope.sc_prelude;
     sc_loaded     = scope.sc_loaded;
     sc_required   = scope.sc_required;
+    sc_clears     = [];
     sc_pr_uc      = None;
     sc_options    = GenOptions.for_subscope scope.sc_options;
     sc_section    = scope.sc_section; }
@@ -1784,6 +1788,18 @@ module Theory = struct
 
       | None -> assert false
 
+  (* ------------------------------------------------------------------ *)
+  let add_clears clears scope =
+    let clears =
+      let for1 { pl_loc = loc; pl_desc = (xs, x) as q} =
+        let xp = EcEnv.root (env scope) in
+        let xp = EcPath.pqname (EcPath.extend xp xs) x in
+        if is_none (EcEnv.Theory.by_path_opt xp (env scope)) then
+          hierror ~loc "unknown theory: `%s`" (string_of_qsymbol q);
+        xp
+      in List.map (omap for1) clears
+    in { scope with sc_clears = scope.sc_clears @ clears }
+
   (* -------------------------------------------------------------------- *)
   let exit_r (scope : scope) =
     match scope.sc_top with
@@ -1796,7 +1812,8 @@ module Theory = struct
               if p_equal sp (EcEnv.root scope.sc_env) then
                 hierror "cannot close a theory with active sections";
         end;
-        let cth      = EcEnv.Theory.close scope.sc_env in
+        let clears   = scope.sc_clears in
+        let cth      = EcEnv.Theory.close ~clears scope.sc_env in
         let loaded   = scope.sc_loaded in
         let section  = scope.sc_section in
         let required = scope.sc_required in
@@ -1805,7 +1822,7 @@ module Theory = struct
         ((cth, required), section, scope.sc_name, sup)
 
   (* ------------------------------------------------------------------ *)
-  let exit (scope : scope) =
+  let exit ?(clears =[]) (scope : scope) =
     let rec add_restr1 section where env item : EcEnv.env =
       match item with 
       | EcTheory.CTh_theory (name, th) ->
@@ -1836,7 +1853,9 @@ module Theory = struct
     in
 
     assert (scope.sc_pr_uc = None);
-    let ((cth, required), section, (name, mode), scope) = exit_r scope in
+
+    let cth = exit_r (add_clears clears scope) in
+    let ((cth, required), section, (name, mode), scope) = cth in
     let scope = List.fold_right require_loaded required scope in
     let scope = bind scope (name, (cth, mode)) in
     let scope = { scope with sc_env =

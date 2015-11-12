@@ -2771,8 +2771,35 @@ module Theory = struct
     { env with env_item = CTh_export path :: env.env_item }
 
   (* ------------------------------------------------------------------ *)
-  let close env =
+  let rec filter clears root items =
+    List.pmap (filter1 clears root) items
+
+  and filter1 clears root =
+    let inclear = List.exists (oeq EcPath.p_equal (Some root)) clears in
+    function
+    | CTh_axiom (_, { ax_kind = `Lemma }) when inclear ->
+        None
+
+    | CTh_baserw _ | CTh_addrw _ when inclear ->
+        None
+
+    | CTh_theory (x, (cth, mode)) ->
+        let isempty = List.is_empty cth.cth_struct in
+        let items = filter clears (EcPath.pqname root x) cth.cth_struct in
+
+        if not isempty && List.is_empty items then None else
+          Some (CTh_theory (x, ({ cth with cth_struct = items }, mode)))
+
+    | _ as item -> Some item
+
+  (* ------------------------------------------------------------------ *)
+  let close ?(clears = []) env =
     let items = List.rev env.env_item in
+    let items =
+      if   List.is_empty clears
+      then items
+      else filter clears (root env) items in
+
     { cth_desc = CTh_struct items; cth_struct = items; }
 
   (* ------------------------------------------------------------------ *)

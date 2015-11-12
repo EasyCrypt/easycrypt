@@ -318,13 +318,19 @@ and process_th_open (scope : EcScope.scope) (abs, name) =
   EcScope.Theory.enter scope (if abs then `Abstract else `Concrete) name
 
 (* -------------------------------------------------------------------- *)
-and process_th_close (scope : EcScope.scope) name =
+and process_th_close (scope : EcScope.scope) (clears, name) =
+  let name = unloc name in
   EcScope.check_state `InTop "theory closing" scope;
   if (fst (EcScope.name scope)) <> name then
     EcScope.hierror
       "active theory has name `%s', not `%s'"
       (fst (EcScope.name scope)) name;
-  snd (EcScope.Theory.exit scope)
+  snd (EcScope.Theory.exit ~clears scope)
+
+(* -------------------------------------------------------------------- *)
+and process_th_clear (scope : EcScope.scope) clears =
+  EcScope.check_state `InTop "theory clear" scope;
+  EcScope.Theory.add_clears clears scope
 
 (* -------------------------------------------------------------------- *)
 and process_th_require1 ld scope (x, io) =
@@ -533,7 +539,8 @@ and process (ld : Loader.loader) (scope : EcScope.scope) g =
       | Gpredicate   p    -> `Fct   (fun scope -> process_predicate  scope  (mk_loc loc p))
       | Gaxiom       a    -> `Fct   (fun scope -> process_axiom      scope  (mk_loc loc a))
       | GthOpen      name -> `Fct   (fun scope -> process_th_open    scope  (snd_map unloc name))
-      | GthClose     name -> `Fct   (fun scope -> process_th_close   scope  name.pl_desc)
+      | GthClose     info -> `Fct   (fun scope -> process_th_close   scope  info)
+      | GthClear     info -> `Fct   (fun scope -> process_th_clear   scope  info)
       | GthRequire   name -> `Fct   (fun scope -> process_th_require ld scope name)
       | GthImport    name -> `Fct   (fun scope -> process_th_import  scope  name)
       | GthExport    name -> `Fct   (fun scope -> process_th_export  scope  name)

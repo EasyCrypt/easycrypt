@@ -262,7 +262,7 @@ module Theory : sig
   val export  : path -> env -> env
 
   val enter : symbol -> env -> env
-  val close : env -> ctheory
+  val close : ?clears:(path option) list -> env -> ctheory
 end
 
 (* -------------------------------------------------------------------- *)

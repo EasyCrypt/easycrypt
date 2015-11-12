@@ -139,7 +139,7 @@ module Theory : sig
 
   (* [exit scope] close and finalize the top-most theory and returns
    * its name. Raises [TopScope] if [scope] has not super scope. *)
-  val exit  : scope -> symbol * scope
+  val exit  : ?clears:(pqsymbol option) list -> scope -> symbol * scope
 
   (* [import scope name] find and import theory [name] in scope
    * [scope]. Raise [LookupFailure] if theory [name] cannot be
@@ -156,6 +156,8 @@ module Theory : sig
    * the initial scope and is in charge of processing the required
    * theory. *)
   val require : scope -> (symbol * thmode) -> (scope -> scope) -> scope
+
+  val add_clears : (pqsymbol option) list -> scope -> scope
 end
 
 (* -------------------------------------------------------------------- *)
