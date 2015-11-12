@@ -6,8 +6,10 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Pred Int IntExtra Real Ring List StdRing.
+require import Pred Int IntExtra Real RealExtra Ring List.
+require import StdRing StdOrder.
 require (*--*) Bigop Bigalg.
+(*---*) import IntID IntOrder.
 
 (* -------------------------------------------------------------------- *)
 theory Bigint.
@@ -46,6 +48,8 @@ lemma nosmt big_count (P : 'a -> bool) s:
   = size (filter P s).
 proof. admit. qed.
 end Bigint.
+
+import Bigint.
 
 (* -------------------------------------------------------------------- *)
 theory Bigreal.
@@ -94,6 +98,8 @@ lemma sumr_const (P : 'a -> bool) (x : real) (s : 'a list):
 proof. by rewrite sumr_const RField.intmulr RField.mulrC. qed.
 end Bigreal.
 
+import Bigreal.
+
 (* -------------------------------------------------------------------- *)
 require import Bool.
 
@@ -137,5 +143,22 @@ rewrite ih; case: (P x)=> Px /=; first by exists x.
 have h: forall y, P y => y <> x by move=> y Py; apply/negP=> ->>.
 split; case=> y [sy ^Py /h ne_yx]; exists y.
   by rewrite ne_yx. by case: sy.
+qed.
+
+lemma nosmt b2i_big (P1 P2 : 'a -> bool) (s : 'a list) :
+   b2i (big P1 P2 s) <= BIA.big P1 (fun i => b2i (P2 i)) s.
+proof. 
+elim: s => [|x s ih] //=; rewrite big_cons BIA.big_cons.
+case: (P1 x)=> //= P1x; rewrite ora_or b2i_or.
+rewrite subrE -addrA ler_add2l -subrE ler_subl_addr ler_paddr //.
+by rewrite -b2i_and b2i_ge0.
+qed.
+
+lemma nosmt b2r_big (P1 P2 : 'a -> bool) (s : 'a list) :
+  b2r (big P1 P2 s) <= BRA.big P1 (fun i => b2r (P2 i)) s.
+proof.
+rewrite b2rE (BRA.eq_bigr _ _ (fun i => (b2i (P2 i))%r)).
+  by move=> x _ /=; rewrite b2rE.
+by rewrite -sumr_ofint FromInt.from_intMle b2i_big.
 qed.
 end BBO.

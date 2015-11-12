@@ -6,9 +6,17 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
+require import Int IntExtra.
 require export Real.
 
 pragma +implicits.
+
+(* -------------------------------------------------------------------- *)
+lemma b2rE (b : bool): b2r b = (b2i b)%r.
+proof. by case: b. qed.
+
+lemma le_b2r (b1 b2 : bool): (b1 => b2) <=> b2r b1 <= b2r b2.
+proof. by rewrite !b2rE FromInt.from_intMle -le_b2i. qed.
 
 (* -------------------------------------------------------------------- *)
 op lub (E : real -> bool) : real.
