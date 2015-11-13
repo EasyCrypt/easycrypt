@@ -46,9 +46,6 @@ val f_r0 : form
 val f_r1 : form
 
 (* soft-constructor - numbers *)
-val f_int_intval : form -> form -> form
-val f_int_sum    : form -> form -> EcTypes.ty -> form
-
 val f_real_le : form -> form -> form
 val f_real_lt : form -> form -> form
 

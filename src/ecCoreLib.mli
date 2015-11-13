@@ -116,20 +116,6 @@ module CI_Distr : sig
 end
 
 (* -------------------------------------------------------------------- *)
-module CI_FSet : sig
-  val p_FSet : path
-  val p_fset : path
-end
-
-(* -------------------------------------------------------------------- *)
-module CI_Sum : sig
-  val p_Sum : path
-
-  val p_int_intval : path
-  val p_int_sum    : path
-end
-
-(* -------------------------------------------------------------------- *)
 module CI_Logic : sig
   val i_Logic  : symbol
   val p_Logic  : path

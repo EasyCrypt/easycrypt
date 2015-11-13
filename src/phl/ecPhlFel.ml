@@ -20,6 +20,25 @@ open EcCoreGoal
 module TTC = EcProofTyping
 
 (* -------------------------------------------------------------------- *)
+module IFEL : sig
+  val loaded : env -> bool
+  val felsum : form -> (form * form) -> form
+end = struct
+  let i_Fel = "FelTactic"
+  let p_Fel = EcPath.pqname EcCoreLib.p_top i_Fel
+
+  let p_felsum =
+    let op = EcPath.pqname p_Fel "felsum" in
+    f_op op [] (toarrow [tfun tint treal; tint; tint] treal)
+
+  let loaded (env : env) =
+    is_some (EcEnv.Theory.by_path_opt p_Fel env)
+
+  let felsum f (n, m) =
+    f_app p_felsum [f; n; m] treal
+end
+
+(* -------------------------------------------------------------------- *)
 let rec callable_oracles_f env modv os f =
   let f'   = NormMp.norm_xfun env f in
   let func = Fun.by_xpath f' env in
@@ -123,8 +142,7 @@ let t_failure_event_r (at_pos, cntr, ash, q, f_event, pred_specs, inv) tc =
 
   (* subgoal on the bounds *)
   let bound_goal =
-    let intval = f_int_intval f_i0 (f_int_sub q f_i1) in
-    let v = f_int_sum ash intval treal in
+    let v = IFEL.felsum ash (f_i0, f_int_sub q f_i1) in
     f_real_le v bd
   in
 
@@ -196,9 +214,8 @@ let t_failure_event at_pos cntr ash q f_event pred_specs inv tc =
 let process_fel at_pos (infos : fel_info) tc =
   let env, hyps, concl = FApi.tc1_eflat tc in
 
-  if EcEnv.Theory.by_path_opt EcCoreLib.CI_Sum.p_Sum env = None then 
-    tacuerror "fel tactic cannot be used when theory Sum is not loaded";
-
+  if not (IFEL.loaded env) then 
+    tacuerror "fel: load the `FelTactic' theory first";
 
   let f = match concl.f_node with
     | Fapp ({ f_node = Fop (op, _) }, [pr; _])

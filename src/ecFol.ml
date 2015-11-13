@@ -68,30 +68,17 @@ let destr_rint f =
   | _ -> destr_error "destr_rint"
 
 (* -------------------------------------------------------------------- *)
-let tfset ty = tconstr EcCoreLib.CI_FSet.p_fset [ty] (* CORELIB *)
-
-let fop_int_le     = f_op EcCoreLib.CI_Int .p_int_le    [] (tfun tint  (tfun tint tbool))        (* CORELIB *)
-let fop_int_lt     = f_op EcCoreLib.CI_Int .p_int_lt    [] (tfun tint  (tfun tint tbool))        (* CORELIB *)
-let fop_real_le    = f_op EcCoreLib.CI_Real.p_real_le   [] (tfun treal (tfun treal tbool))       (* CORELIB *)
-let fop_real_lt    = f_op EcCoreLib.CI_Real.p_real_lt   [] (tfun treal (tfun treal tbool))       (* CORELIB *)
-let fop_real_add   = f_op EcCoreLib.CI_Real.p_real_add  [] (tfun treal (tfun treal treal))       (* CORELIB *)
-let fop_real_sub   = f_op EcCoreLib.CI_Real.p_real_sub  [] (tfun treal (tfun treal treal))       (* CORELIB *)
-let fop_real_mul   = f_op EcCoreLib.CI_Real.p_real_mul  [] (tfun treal (tfun treal treal))       (* CORELIB *)
-let fop_real_div   = f_op EcCoreLib.CI_Real.p_real_div  [] (tfun treal (tfun treal treal))       (* CORELIB *)
-let fop_int_intval = f_op EcCoreLib.CI_Sum .p_int_intval [] (tfun tint (tfun tint (tfset tint))) (* CORELIB *)
+let fop_int_le     = f_op EcCoreLib.CI_Int .p_int_le    [] (toarrow [tint ; tint ] tbool)
+let fop_int_lt     = f_op EcCoreLib.CI_Int .p_int_lt    [] (toarrow [tint ; tint ] tbool)
+let fop_real_le    = f_op EcCoreLib.CI_Real.p_real_le   [] (toarrow [treal; treal] tbool)
+let fop_real_lt    = f_op EcCoreLib.CI_Real.p_real_lt   [] (toarrow [treal; treal] tbool)
+let fop_real_add   = f_op EcCoreLib.CI_Real.p_real_add  [] (toarrow [treal; treal] treal)
+let fop_real_sub   = f_op EcCoreLib.CI_Real.p_real_sub  [] (toarrow [treal; treal] treal)
+let fop_real_mul   = f_op EcCoreLib.CI_Real.p_real_mul  [] (toarrow [treal; treal] treal)
+let fop_real_div   = f_op EcCoreLib.CI_Real.p_real_div  [] (toarrow [treal; treal] treal)
 
 let f_int_le f1 f2 = f_app fop_int_le [f1; f2] tbool
 let f_int_lt f1 f2 = f_app fop_int_lt [f1; f2] tbool
-
-let f_int_intval k1 k2 =
-  f_app fop_int_intval [k1;k2] (tfset tint)
-
-(* -------------------------------------------------------------------- *)
-let fop_int_sum =                       (* CORELIB *)
-  f_op EcCoreLib.CI_Sum.p_int_sum [] (tfun (tfun tint treal) (tfun (tfset tint) treal))
-
-let f_int_sum op intval ty =
-  f_app fop_int_sum [op;intval] ty
 
 (* -------------------------------------------------------------------- *)
 let f_real_le  f1 f2 = f_app fop_real_le  [f1; f2] tbool

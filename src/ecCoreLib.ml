@@ -104,21 +104,6 @@ module CI_Distr = struct
 end
 
 (* -------------------------------------------------------------------- *)
-module CI_FSet = struct
-  let p_FSet = EcPath.pqname p_top "FSet"
-  let p_fset = EcPath.pqname p_FSet "fset"
-end
-
-(* -------------------------------------------------------------------- *)
-module CI_Sum = struct
-  let p_Sum = EcPath.pqname p_top "Sum"
-  let _Sum  = fun x -> EcPath.pqname p_Sum x
-
-  let p_int_intval = _Sum "intval"
-  let p_int_sum    = _Sum "int_sum"
-end
-
-(* -------------------------------------------------------------------- *)
 module CI_Logic = struct
   let i_Logic  = "Logic"
   let p_Logic  = EcPath.pqname p_top i_Logic
