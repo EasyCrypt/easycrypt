@@ -18,6 +18,9 @@ proof. by case: b. qed.
 lemma le_b2r (b1 b2 : bool): (b1 => b2) <=> b2r b1 <= b2r b2.
 proof. by rewrite !b2rE FromInt.from_intMle -le_b2i. qed.
 
+lemma b2r_ge0 (b : bool): 0%r <= b2r b.
+proof. by case: b. qed.
+
 (* -------------------------------------------------------------------- *)
 op lub (E : real -> bool) : real.
 
