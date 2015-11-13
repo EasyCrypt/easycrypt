@@ -5,14 +5,11 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import Option.
-require import Int.
-require import Real.
-require import Distr.
-require import List.
-require (*--*) Sum.
-(*---*) import OldMonoid.
+(* -------------------------------------------------------------------- *)
+require import Option Int IntExtra Real RealExtra Distr List.
 require (*--*) Mu_mem.
+require import Ring StdRing StdOrder StdBigop FelTactic.
+(*---*) import RField RealOrder.
 
 (** A non-negative integer q **)
 op q:int.
@@ -116,10 +113,11 @@ section.
     <= (q^2)%r * mu uT (pred1 witness).
   proof.
     fel 1 (size Sample.l) (fun x, q%r * mu uT (pred1 witness)) q (!uniq Sample.l) [BSample.s: (size Sample.l < q)]=> //.
-     rewrite Sum.int_sum_const //= Sum.intval_card_0 1:smt /=.
-      cut ->: q^2 = q * q; last by smt.
-      rewrite (_: 2 = 1 + 1) // -Int.pow_add //.
-      by rewrite (_: q^1 = q) // (_: 1 = 0 + 1) 1:// powS // pow0.
+      rewrite Bigreal.sumr_const count_predT size_range /=.
+      rewrite max_ler 1:smt mulrA ler_wpmul2r 1:smt //.
+      have ->: q^2 = q * q by smt.
+      rewrite FromInt.Mul ler_wpmul2r 1:ltrW // ?from_intM ?lt0q //.
+      by rewrite from_intMle // smt.
       by inline*; auto; smt.
       proc; sp; if=> //; last by (hoare; auto; smt).
       wp; rnd (mem Sample.l); skip=> //=.
@@ -238,10 +236,12 @@ section.
     <= (q^2)%r * mu uT (pred1 witness).
   proof.
     fel 1 (size Sample.l) (fun x, q%r * mu uT (pred1 witness)) q (!uniq Sample.l) [BSample.s: (size Sample.l < q)]=> //.
-      rewrite Sum.int_sum_const //= Sum.intval_card_0 1:smt /=.
-      cut ->: q^2 = q * q; last by smt.
-      rewrite (_: 2 = 1 + 1) // -Int.pow_add //.
-      by rewrite (_: q^1 = q) // (_: 1 = 0 + 1) 1:// powS // pow0.
+      rewrite Bigreal.sumr_const count_predT size_range /=.
+      rewrite max_ler 1:smt mulrA ler_wpmul2r 1:smt //.
+      have ->: q^2 = q * q by smt.
+      rewrite FromInt.Mul ler_wpmul2r 1:ltrW // ?from_intM ?lt0q //.
+      by rewrite from_intMle // smt.
+
       by inline*; auto; smt.
       proc; sp; if=> //; last by (hoare; auto; smt).
       wp; rnd (mem Sample.l); skip=> //=.

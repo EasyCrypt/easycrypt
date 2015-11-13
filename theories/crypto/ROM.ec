@@ -5,9 +5,12 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import FMap.
-require import Distr.
+(* -------------------------------------------------------------------- *)
+require import Fun Int IntExtra Real RealExtra.
+require import Finite List FSet FMap Distr.
+require import StdRing StdBigop FelTactic.
 
+(* -------------------------------------------------------------------- *)
 theory Types.
   type from.
   type to.
@@ -37,15 +40,14 @@ theory Types.
       var b:bool;
 
       H.init();
-      b = D.distinguish();
+      b <@ D.distinguish();
       return b;
     }
   }.
 end Types.
 
+(* -------------------------------------------------------------------- *)
 theory Lazy.
-  require import FSet.
-
   type from.
   type to.
 
@@ -60,12 +62,12 @@ theory Lazy.
     var m:(from, to) map
 
     proc init():unit = {
-      m = FMap.empty;
+      m <- FMap.empty;
     }
   
     proc o(x:from):to = {
       var y:to;
-      y = $dsample x;
+      y <$ dsample x;
       if (!mem (dom m) x) m.[x] = y;
       return oget (m.[x]);
     }
@@ -77,22 +79,20 @@ theory Lazy.
   lemma RO_o_ll:
     (forall x, mu (dsample x) predT = 1%r) =>
     islossless RO.o.
-  proof. by intros=> dsampleL; proc; auto; smt. qed.
+  proof. by move=> dsampleL; proc; auto; smt. qed.
 
-  equiv RO_init_eq: RO.init ~ RO.init: true ==> ={glob RO}
-  by sim.
+  equiv RO_init_eq: RO.init ~ RO.init: true ==> ={glob RO}.
+  proof. by sim. qed.
 
-  equiv RO_o_eq: RO.o ~ RO.o: ={glob RO, x} ==> ={glob RO, res}
-  by sim.
+  equiv RO_o_eq: RO.o ~ RO.o: ={glob RO, x} ==> ={glob RO, res}.
+  proof. by sim. qed.
 
   hoare dom_RO_o d x': RO.o: x = x' /\ dom RO.m = d ==> dom RO.m = d `|` fset1 x'.
   proof. by proc; auto; smt. qed.
 end Lazy.
 
+(* -------------------------------------------------------------------- *)
 theory Eager.
-  require import Finite.
-  require import FSet.
-
   type from.
   type to.
 
@@ -111,14 +111,14 @@ theory Eager.
       var work:from fset;
       var f:from;
 
-      m = FMap.empty;
-      work = oflist (to_seq predT);
+      m    <- FMap.empty;
+      work <- oflist (to_seq predT);
       while (work <> fset0)
       {
-        f = pick work;
-        y = $dsample f;
-        m.[f] = y;
-        work = work `\` fset1 f;
+        f     <- pick work;
+        y     <$ dsample f;
+        m.[f] <- y;
+        work  <- work `\` fset1 f;
       }
     }
 
@@ -143,8 +143,7 @@ theory Eager.
     islossless RO.init.
   proof.
     move=> fType dsampleL; proc.
-    while (true) (card work);
-    by auto; smt.
+    by while (true) (card work); auto; smt.
   qed.
 
   lemma RO_o_ll: islossless RO.o.
@@ -155,19 +154,20 @@ theory Eager.
     equiv [RO.init ~ RO.init: true ==> ={glob RO}].
   proof. by move=> fType; proc; while (={glob RO, work}); auto. qed.
 
-  equiv RO_o_eq: RO.o ~ RO.o: ={glob RO, x} ==> ={glob RO, res}
-  by sim.
+  equiv RO_o_eq: RO.o ~ RO.o: ={glob RO, x} ==> ={glob RO, res}.
+  proof. by sim. qed.
 
   lemma dom_RO_init x:
     is_finite predT<:from> =>
     hoare [RO.init: true ==> FSet.mem (dom RO.m) x].
-  proof. by move=> fType; proc; while (forall x, !FSet.mem work x => mem (dom RO.m) x); auto; smt. qed.
+  proof.
+    move=> fType; proc; while (forall x, !FSet.mem work x => mem (dom RO.m) x);
+      by auto; smt.
+  qed.
 end Eager.
 
+(* -------------------------------------------------------------------- *)
 theory LazyEager.
-  require import Finite.
-  require import FSet.
-
   type from.
   type to.
 
@@ -193,32 +193,32 @@ theory LazyEager.
 
     local module IND_Lazy = {
       module H:Oracle = {
-        var m:(from, to) map
+        var m : (from, to) map
 
         proc init():unit = {
-          m = FMap.empty;
+          m <- FMap.empty;
         }
 
         proc o(x:from):to = {
           var y:to;
-          y = $dsample x;
+          y <$ dsample x;
           if (!FSet.mem (dom m) x) m.[x] = y;
           return oget (m.[x]);
         }
       }
 
       proc resample(): unit = {
-        var work:from fset;
-        var f:from;
-        var y,y0:to;
+        var work : from fset;
+        var f : from;
+        var y, y0 : to;
 
-        work = oflist (to_seq predT);
+        work <- oflist (to_seq predT);
         while (work <> fset0)
         {
-          f = pick work;
-          y = $dsample f;
+          f <- pick work;
+          y <$ dsample f;
           if (!FSet.mem (dom H.m) f) H.m.[f] = y;
-          work = work `\` fset1 f;
+          work <- work `\` fset1 f;
         }
       }
 
@@ -228,7 +228,7 @@ theory LazyEager.
         var b:bool;
 
         H.init();
-        b = D.distinguish();
+        b <@ D.distinguish();
         resample();
 
         return b;
@@ -236,17 +236,15 @@ theory LazyEager.
     }.
 
     local lemma IND_Lazy:
-      is_finite predT<:from> =>
-      (forall x, mu (dsample x) predT = 1%r) =>
-      equiv [IND(Lazy.RO,D).main ~ IND_Lazy.main: ={glob D} ==> ={res}].
+         is_finite predT<:from>
+      => (forall x, mu (dsample x) predT = 1%r)
+      => equiv [IND(Lazy.RO,D).main ~ IND_Lazy.main: ={glob D} ==> ={res}].
     proof.
       move=> fromF dsampleL; proc; seq 2 2: (={b}).
-        call (_: Lazy.RO.m{1} = IND_Lazy.H.m{2}); first by sim.
-        by call (_: ={glob D} ==> Lazy.RO.m{1} = IND_Lazy.H.m{2});
-          first by proc; wp.
-      inline IND_Lazy.resample;
-      while{2} (true) (card work{2});
-        first by auto; smt.
+      + call (_: Lazy.RO.m{1} = IND_Lazy.H.m{2}); first by sim.
+        by call (_: ={glob D} ==> Lazy.RO.m{1} = IND_Lazy.H.m{2})=> //; proc; wp.
+      inline IND_Lazy.resample; while{2} (true) (card work{2}).
+        by auto; smt.
       by auto; smt.
     qed.
 
@@ -264,11 +262,11 @@ theory LazyEager.
         var f:from;
         var y,y0:to;
 
-        work = oflist (to_seq predT);
+        work <- oflist (to_seq predT);
         while (work <> fset0)
         {
-          f = pick work;
-          y = $dsample f;
+          f <- pick work;
+          y <$ dsample f;
           if (!FSet.mem (dom H.m) f) H.m.[f] = y;
           work = work `\` fset1 f;
         }
@@ -279,9 +277,9 @@ theory LazyEager.
       proc main(): bool = {
         var b:bool;
 
-        H.m = FMap.empty;
+        H.m <- FMap.empty;
         resample();
-        b = D.distinguish();
+        b <@ D.distinguish();
 
         return b;
       }
@@ -302,40 +300,43 @@ theory LazyEager.
                 IND_Eager.H.m{1} = IND_Lazy.H.m{2} /\
                 mem work{1} x{1});
         first by auto; smt.
-      case (!mem (dom IND_Lazy.H.m{2}) x{2}); [rcondt{2} 2; first by auto |
-                                            rcondf{2} 2; first by auto].
-        transitivity{1} {y0 = $dsample x;
-                         while (work <> fset0) {
-                           f = pick work;
-                           y = $dsample f;
-                           if (!mem (dom IND_Eager.H.m) f)
-                             IND_Eager.H.m.[f] = if f = x then y0 else y;
-                           work = work `\` fset1 f;
-                         }
-                         result = oget IND_Eager.H.m.[x]; }
-                         (={x,work,IND_Eager.H.m} ==> ={result,IND_Eager.H.m})
-                         ((={x,work} /\
-                          IND_Eager.H.m{1} = IND_Lazy.H.m{2} /\
-                          mem work{1} x{1}) /\
-                          !mem (dom IND_Lazy.H.m{2}) x{2} ==>
-                          ={result} /\ IND_Eager.H.m{1} = IND_Lazy.H.m{2}) => //.
-          by move=> &1 &2 H; exists IND_Lazy.H.m{2}, x{2}, work{2}; generalize H.
-        transitivity{1} {while (work <> fset0) {
-                           f = pick work;
-                           y = $dsample f;
-                           if (!mem (dom IND_Eager.H.m) f)
-                             IND_Eager.H.m.[f] = y;
-                           work = work `\` fset1 f;
-                         }
-                         y0 = $dsample x;
-                         result = oget IND_Eager.H.m.[x]; }
-                         (={x,work,IND_Eager.H.m} ==> ={result,IND_Eager.H.m})
-                         (={x,work,IND_Eager.H.m} ==> ={result,IND_Eager.H.m})=> //.
-          by move=> &1 &2 H; exists IND_Eager.H.m{2}, x{2}, work{2}; generalize H.
-        by sim; rnd{2}; sim : (={x,IND_Eager.H.m}); smt.
+      case (!mem (dom IND_Lazy.H.m{2}) x{2});
+        [rcondt{2} 2; first by auto | rcondf{2} 2; first by auto].
+        transitivity{1} {
+          y0 <$ dsample x;
+          while (work <> fset0) {
+            f <- pick work;
+            y <$ dsample f;
+            if (!mem (dom IND_Eager.H.m) f)
+              IND_Eager.H.m.[f] <- if f = x then y0 else y;
+            work <- work `\` fset1 f;
+          }
+          result <- oget IND_Eager.H.m.[x];
+        }
+        (={x, work, IND_Eager.H.m} ==> ={result,IND_Eager.H.m})
+        ((={x,work} /\ IND_Eager.H.m{1} = IND_Lazy.H.m{2} /\  mem work{1} x{1})
+          /\ !mem (dom IND_Lazy.H.m{2}) x{2} ==>
+            ={result} /\ IND_Eager.H.m{1} = IND_Lazy.H.m{2}) => //.
+        by move=> &1 &2 H; exists IND_Lazy.H.m{2}, x{2}, work{2}; move: H.
+        transitivity{1} {
+          while (work <> fset0) {
+            f <- pick work;
+            y <$ dsample f;
+            if (!mem (dom IND_Eager.H.m) f)
+              IND_Eager.H.m.[f] <- y;
+              work <- work `\` fset1 f;
+            }
+            y0 <$ dsample x;
+            result <- oget IND_Eager.H.m.[x];
+         }
+         (={x,work,IND_Eager.H.m} ==> ={result,IND_Eager.H.m})
+         (={x,work,IND_Eager.H.m} ==> ={result,IND_Eager.H.m})=> //.
+          by move=> &1 &2 H; exists IND_Eager.H.m{2}, x{2}, work{2}; move: H.
+        by sim; rnd{2}; sim: (={x,IND_Eager.H.m}); smt.
 
-        wp; symmetry.
-        eager while (H:y0 = $dsample x; ~ y0 = $dsample x; : ={x} ==> ={y0})=> //; first by rnd.
+        wp; symmetry; eager
+          while (H:y0 = $dsample x; ~ y0 = $dsample x; : ={x} ==> ={y0})=> //;
+          first by rnd.
           swap{2} 5 -4; swap [2..3] -1; case ((x = pick work){1}).
             by wp; rnd{2}; rnd; rnd{1}; wp; skip; smt.
             by auto; smt.
@@ -347,10 +348,9 @@ theory LazyEager.
                    if (mem (dom IND_Eager.H.m) x){1}
                    then IND_Eager.H.m{1} = IND_Lazy.H.m{2}
                    else eq_except IND_Eager.H.m{1} IND_Lazy.H.m{2} x{1}).
-          (* "expect 12 (move)" is used for catching changes in tactic behaviour early *)
-          auto; (progress; expect 12 move); last 2 first; first 11 smt.
+          auto; (progress; expect 12 idtac); last 2 first; first 11 smt.
           case ((pick work = x){2})=> pick_x; last smt.
-          subst x{2}; generalize H7 H1; rewrite -neqF /eq_except=> -> /= eq_exc.
+          subst x{2}; move: H7 H1; rewrite -neqF /eq_except=> -> /= eq_exc.
           by apply map_ext=> x0; case (pick work{2} = x0); smt.
         by auto; smt.
 
@@ -410,9 +410,8 @@ theory LazyEager.
   end section.
 end LazyEager.
 
+(* -------------------------------------------------------------------- *)
 theory BoundedCall.
-  require import Int.
-
   type from.
   type to.
 
@@ -430,15 +429,15 @@ theory BoundedCall.
 
     proc init(): unit = {
       O.init();
-      c = 0;
+      c <- 0;
     }
 
     proc o(x:from): to = {
-      var r = witness;
+      var r <- witness;
 
       if (c < qH) {
-        r = O.o(x);
-        c = c + 1;
+        r <- O.o(x);
+        c <- c + 1;
       }
       return r;
     }
@@ -451,10 +450,8 @@ theory BoundedCall.
   proof. by move=> O_o_ll; proc; sp; if=> //; wp; call O_o_ll. qed.
 end BoundedCall.
 
+(* -------------------------------------------------------------------- *)
 theory ListLog.
-  require import Int.
-  require import List.
-
   type from.
   type to.
 
@@ -512,10 +509,8 @@ theory ListLog.
   }.
 end ListLog.
 
+(* -------------------------------------------------------------------- *)
 theory SetLog.
-  require import Int.
-  require import FSet.
-
   type from.
   type to.
 
@@ -590,12 +585,13 @@ theory SetLog.
       sp; if; first smt.
         by wp; call (_: true); auto; smt.
       auto; progress.
-        by apply/(Trans _ _ _ H)/subset_leq_fcard; smt.
+        by apply/(Int.Trans _ _ _ H)/subset_leq_fcard; smt.
         smt.
     by inline *; wp; call (_: true).
   qed.
 end SetLog.
 
+(* -------------------------------------------------------------------- *)
 theory ROM_BadCall.
   (** A generic argument allowing us to replace a single random
       oracle query with freshly sampled randomness. We then bound
@@ -606,9 +602,6 @@ theory ROM_BadCall.
         1) express the result on Log(O);
         2) and use it on Bound(O)...
       HOW? *)
-  require import Int.
-  require import Real.
-  require import FSet.
 
   type from.
   type to.
@@ -826,10 +819,6 @@ theory ROM_Bad.
   (** This theory (and its final result FEL_ROM) abstracts away from the
       Failure Event Lemma for Random Oracles, allowing it to be used at
       a high-level of abstraction, without worrying about fel internals. *)
-  require import Int.
-  require import Real.
-  require import Sum. (* for the FEL tactic *)
-
   type from.
   type to.
 
@@ -917,7 +906,8 @@ theory ROM_Bad.
             by proc*; inline Bound(O2).init; wp; call (_: true); skip; smt.
           done.
         fel 1 Bound.c (fun x, eps) qH (bad (glob O2)) [Bound(O2).o: (Bound.c < qH)]=> //.
-          by rewrite Sum.int_sum_const //= Sum.intval_card_0 smt.
+          rewrite Bigreal.sumr_const count_predT size_range /=.
+          by move: qH_pos; smt ml=0.
           by call (_: true ==> !bad (glob O2) /\ Bound.c = 0);
             first proc; wp; call badinit.
           proc; sp; if=> //; last by hoare.
@@ -928,132 +918,3 @@ theory ROM_Bad.
     qed.
   end section.
 end ROM_Bad.
-
-(*
-theory Wrappers.
-  clone import Types.
-  clone Lazy with
-    type from = from,
-    type to = to,
-    op dsample = dsample.
-
-  module type WRO = {
-    proc init(qO:int): unit {}
-    proc o(x:from): to
-  }.
-
-  module IND_b(H:WRO,D:Dist) = {
-    module D = D(H)
-
-    proc main(qO:int): bool = {
-      var b:bool;
-      H.init(qO);
-      b = D.distinguish();
-      return b;
-    }
-  }.
-
-  (** Budget-cutting wrapper *)
-  require import Int.
-  module Count(H:Oracle) = {
-    var qO:int
-    var qs:int
-
-    proc init(qO:int): unit = {
-      H.init();
-      Count.qO = qO;
-      qs = 0;
-    }
-
-    proc o(x:from): to = {
-      var r:to;
-      if (qs < qO)
-      {
-        qs = qs + 1;
-        r = H.o(x);
-      }
-      return r;
-    }
-  }.
-
-  import FSet.
-  import ISet.Finite.
-  lemma bound qO' (D <: Dist {Lazy.RO,Count}):
-    0 < qO' =>
-    (forall x, mu (dsample x) cpTrue = 1%r) =>
-    (forall (H <: ARO {D}), islossless H.o => islossless D(H).distinguish) =>
-    equiv [ IND(Lazy.RO,D).main ~ IND_b(Count(Lazy.RO),D).main:
-              qO{2} = qO' ==>
-              (Count.qs{2} < qO' =>
-                 ={res} /\
-                 size Lazy.RO.m{1} <= Count.qs{2}) ].
-  proof strict.
-  intros=> lt0_qO dsampleL DL; proc.
-  call (_: Count.qO <= Count.qs,
-           ={glob Lazy.RO} /\
-           Count.qO{2} = qO' /\
-           size Lazy.RO.m{1} <= Count.qs{2}).
-    (* H *)
-    proc; rcondt{2} 1; first intros=> &m; skip; progress=> //; smt.
-      inline Lazy.RO.o; wp; rnd; wp; skip; progress=> //; last smt.
-        by rewrite /size dom_set card_add_nin -/(in_dom _ _); last smt.
-    by intros=> _ _; apply Lazy.lossless_o.
-    by intros=> _; proc; if=> //; inline Lazy.RO.o; wp; rnd; wp; skip; smt.
-  inline Count(Lazy.RO).init; wp; call (_: true ==> ={glob Lazy.RO} /\ dom Lazy.RO.m{1} = FSet.empty)=> //;
-    first by proc; wp; skip; progress=> //; smt.
-  wp; skip; cut H1: ISet.empty<:from> == FSet.empty by smt; progress=> //.
-    by rewrite /size H card_empty.
-    by cut [eq_res _]:= H2 _; first smt.
-    by cut [_ [_ [fdom _]]]:= H2 _; first smt.
-  qed.
-
-(*
-  (** Query-tracking wrapper *)
-  require import Int.
-  module Index(H:Oracle) = {
-    var qs:(int,from) map
-    var qc:int
-
-    fun init(): unit = {
-      H.init();
-      qs = FMap.Core.empty;
-      qc = 0;
-    }
-
-    fun o(x:from): to = {
-      var r:to;
-      if (!in_rng x qs)
-      {
-        qs.[qc] = x;
-        qc = qc + 1;
-      }
-      r = H.o(x);
-      return r;
-    }
-  }.
-*)
-  (** Query-numbering wrapper *)
-  module Number(H:Oracle) = {
-    var qs:(from,int) map
-    var qc:int
-
-    proc init(): unit = {
-      H.init();
-      qs = FMap.empty;
-      qc = 0;
-    }
-
-    proc o(x:from): to = {
-      var r:to;
-      if (!in_dom x qs)
-      {
-        qs.[x] = qc;
-        qc = qc + 1;
-      }
-      r = H.o(x);
-      return r;
-    }
-  }.
-end Wrappers.
-*)
-
