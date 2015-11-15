@@ -6,7 +6,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Int.
+require import Option Int.
 
 (* -------------------------------------------------------------------- *)
 lemma lt0n n : (0 <= n) => (0 < n <=> n <> 0).
@@ -35,18 +35,29 @@ proof. by case: b. qed.
 
 (* -------------------------------------------------------------------- *)
 theory IterOp.
-  op iter ['a] : int -> ('a -> 'a) -> 'a -> 'a.
-
-  axiom iter0 ['a] n opr (x : 'a): n <= 0 => iter n opr x = x.
-  axiom iterS ['a] n opr (x : 'a): 0 <= n => iter (n+1) opr x = opr (iter n opr x).
-
-  lemma iterSr n opr (x : 'a): 0 <= n => iter (n + 1) opr x = iter n opr (opr x).
-  proof. by elim/Induction.induction n; smt. qed.
-
   op iteri ['a] : int -> (int -> 'a -> 'a) -> 'a -> 'a.
 
-  axiom iteri0 ['a] n opr (x : 'a): n <= 0 => iteri n opr x  = x.
-  axiom iteriS ['a] n opr (x : 'a): 0 <= n => iteri (n+1) opr x = opr n (iteri n opr x).
+  axiom iteri0 ['a] n opr (x : 'a):
+    n <= 0 => iteri n opr x  = x.
+
+  axiom iteriS ['a] n opr (x : 'a):
+    0 <= n => iteri (n+1) opr x = opr n (iteri n opr x).
+
+  op iter ['a] n f x0 = iteri<:'a> n (fun i => f) x0.
+
+  lemma iter0 ['a] n opr (x : 'a): n <= 0 => iter n opr x = x.
+  proof. by move/iteri0<:'a>=> @/iter ->. qed.
+
+  lemma iterS ['a] n opr (x : 'a): 0 <= n =>
+    iter (n+1) opr x = opr (iter n opr x).
+  proof. by move/iteriS<:'a>=> @/iter ->. qed.
+
+  lemma iterSr n opr (x : 'a):
+    0 <= n => iter (n + 1) opr x = iter n opr (opr x).
+  proof.
+    elim: n=> /=; first by rewrite (iterS 0) ?iter0.
+    by move=> n geo0 ih; rewrite iterS 2:ih ?iterS // addz_ge0.
+  qed.
 
   op iterop ['a] (n : int) opr (x z : 'a) : 'a =
     let f = fun i y, if i <= 0 then x else opr x y in
@@ -62,10 +73,9 @@ theory IterOp.
   lemma iteropS ['a] (n : int) opr (x z : 'a): 0 <= n =>
     iterop (n+1) opr x z = iter n (opr x) x.
   proof.
-    rewrite /iterop; elim n=> /=.
-    + by rewrite iter0 // (iteriS 0).
-    + move=> i ge0_i ih; rewrite iteriS 1:smt /= ih.
-      by rewrite -(iterS _ (opr x)) //; cut ->: ! (i+1 <= 0) by smt.
+    rewrite /iterop; elim: n=> /=; first by rewrite iter0 ?(iteriS 0).
+    move=> n ge0_n /= ih; rewrite iteriS 1:addz_ge0 //= ih.
+    by rewrite {1}addzC lez_add1r ltzNge ge0_n /= iterS.
   qed.
 end IterOp.
 
