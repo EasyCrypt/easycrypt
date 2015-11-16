@@ -181,6 +181,34 @@
   (proof-shell-invisible-command "pragma Proofs:weak."))
 
 ;; --------------------------------------------------------------------
+(defun easycrypt-ask-do (do)
+  (let* ((cmd))
+    (setq cmd (read-string (format "Term for `%s': " do)))
+    (proof-shell-ready-prover)
+    (proof-shell-invisible-command (format " %s %s . " do cmd))))
+
+;; --------------------------------------------------------------------
+(defun easycrypt-Print ()
+  "Ask for a term and print its type."
+  (interactive)
+  (easycrypt-ask-do "print"))
+
+;; --------------------------------------------------------------------
+(defun easycrypt-Check ()
+  (easycrypt-Print))
+
+;; --------------------------------------------------------------------
+;; Key bindings
+
+(define-key easycrypt-keymap "\C-p" 'easycrypt-Print)
+(define-key easycrypt-goals-mode-map "\C-c\C-a\C-p" 'easycrypt-Print)
+(define-key easycrypt-response-mode-map "\C-c\C-a\C-p" 'easycrypt-Print)
+
+(define-key easycrypt-keymap "\C-c" 'easycrypt-Check)
+(define-key easycrypt-goals-mode-map "\C-c\C-a\C-c" 'easycrypt-Check)
+(define-key easycrypt-response-mode-map "\C-c\C-a\C-c" 'easycrypt-Check)
+
+;; --------------------------------------------------------------------
 ;; 3-window pane layout hack
 (add-hook
   'proof-activate-scripting-hook
