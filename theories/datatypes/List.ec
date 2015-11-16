@@ -184,6 +184,12 @@ qed.
 lemma nth_neg (x0 : 'a) s n: n < 0 => nth x0 s n = x0.
 proof. elim s n => //=; smt. qed.
 
+lemma nth_out (x0 : 'a) s n: ! (0 <= n < size s) => nth x0 s n = x0.
+proof.
+rewrite anda_and -nand; case; rewrite (lezNgt, ltzNge) /=.
+  by apply/nth_neg. by apply/nth_default.
+qed.
+
 lemma nth_cat (x0 : 'a) s1 s2 n:
   nth x0 (s1 ++ s2) n = if n < size s1 then nth x0 s1 n else nth x0 s2 (n - size s1).
 proof.

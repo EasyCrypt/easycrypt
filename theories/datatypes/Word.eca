@@ -22,28 +22,39 @@ clone include Subtype with
   pred P xs <- size xs = l.
 
 (* -------------------------------------------------------------------- *)
-op "_.[_]" (w : word) (i : int): t = Array."_.[_]" (val w) i
-  axiomatized by selE.
+op "_.[_]" (w : word) (i : int): t =
+  nth witness (val w) i
+axiomatized by selE.
 
-op "_.[_<-_]" w i x = insubd (Array."_.[_<-_]" (val w) i x)
-  axiomatized by updE.
+op "_.[_<-_]" (w : word) (i : int) (x : t) : word =
+  insubd (map
+    (fun j => if i = j then x else w.[j])
+    (range 0 (size (val w))))
+axiomatized by updE.
 
+(* -------------------------------------------------------------------- *)
 lemma wordP (w1 w2 : word):
-      w1 = w2
-  <=> forall (i:int), 0 <= i < l => w1.[i] = w2.[i].
+  w1 = w2 <=> forall i, 0 <= i < l => w1.[i] = w2.[i].
 proof.
-split=> //= h.
-by apply/val_inj/Array.arrayP; rewrite !valP /= => i /h; rewrite !selE.
+split=> // ih; apply/val_inj/(eq_from_nth witness); rewrite !valP //.
+by move=> i ?; rewrite -!selE ih.
 qed.
 
+(* -------------------------------------------------------------------- *)
 lemma sel_upd (w : word) (x : t) (i j : int):
-    w.[i <- x].[j]
-  = if 0 <= i < l /\ j = i then x else w.[j].
+  w.[i <- x].[j] = if 0 <= i < l /\ j = i then x else w.[j].
 proof.
-rewrite !selE updE val_insubd Array.size_set valP /= -(valP w).
-exact Array.get_set.
+rewrite !(selE, updE) val_insubd size_map size_range /=.
+have rgl: size (range 0 l) = l by rewrite size_range max_ler ?ltzW ?gt0_l.
+rewrite max_ler ?size_ge0 2:valP //=; case: (0 <= j < l); last first.
+  move=> h; rewrite !nth_out ?valP 1:size_map 1:rgl //.
+  by case: (j = i) => [->>|] //=; rewrite h.
+move=> lt_jl; rewrite (nth_map witness) ?valP ?rgl //.
+rewrite nth_range //= (eq_sym i j); case: (j = i) => [->>|_] /=.
+  by rewrite lt_jl. by rewrite selE.
 qed.
 
+(* -------------------------------------------------------------------- *)
 lemma upd_out (n : int) (a : t) (w : word):
   !(0 <= n < l) =>
   w.[n <- a] = w.
@@ -52,16 +63,19 @@ move=> n_out_of_bounds; apply/wordP=> i i_in_bounds.
 by rewrite sel_upd n_out_of_bounds.
 qed.
 
+(* -------------------------------------------------------------------- *)
 lemma upd_neg (n : int) (a : t) (w : word):
   n < 0 =>
   w.[n <- a] = w.
 proof. by rewrite ltzNge=> gt0_n; rewrite upd_out 1:gt0_n. qed.
 
+(* -------------------------------------------------------------------- *)
 lemma upd_gt_l (n : int) (a : t) (w : word):
   l <= n =>
   w.[n <- a] = w.
 proof. by rewrite lezNgt=> lel_n; rewrite upd_out 1:lel_n. qed.
 
+(* -------------------------------------------------------------------- *)
 lemma upd_upd (w : word) (n n' : int) (x x' : t):
   forall i,
        w.[n <- x].[n' <- x'].[i]
@@ -79,6 +93,7 @@ move=> ne_i_n'; case (i = n)=> [->> /= {i} |].
 by move=> ne_i_n; rewrite !sel_upd ne_i_n ne_i_n'.
 qed.
 
+(* -------------------------------------------------------------------- *)
 lemma upd_upd_eq (w : word) (n : int) (x x' : t) i:
   w.[n <- x].[n <- x'].[i] = w.[n <- x'].[i].
 proof. by rewrite upd_upd. qed.
@@ -99,7 +114,7 @@ op map (f: t -> t) (w : word): word = insubd (map f (val w))
 lemma sel_map f w i: 0 <= i < l => (map f w).[i] = f w.[i].
 proof.
 move=> i_bnd; rewrite mapE !selE val_insubd size_map valP /=.
-by rewrite !Array.getE; apply/nth_map; rewrite valP.
+by apply/nth_map; rewrite valP.
 qed.
 
 (* -------------------------------------------------------------------- *)
