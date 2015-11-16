@@ -160,7 +160,7 @@ proof.
   cut ->: int_sum (fun x, x%r * (1%r/(2^l)%r)) (intval 0 (n - 1))
           = int_sum (fun x, x%r) (intval 0 (n - 1)) * (1%r/(2^l)%r).
     rewrite /int_sum /intval.
-    move: leq0_n; elim/Induction.induction n.
+    move: leq0_n; elim n.
       cut ->: Interval.interval 0 (0 - 1) = FSet.empty by smt.
       by rewrite !Monoid.Mrplus.sum_empty; smt.
       move=> n leq0_n IH; cut ->: n + 1 - 1 = n by smt.
@@ -171,7 +171,7 @@ proof.
       smt.
   cut ->: int_sum (fun x, x%r) (intval 0 (n - 1)) = (n - 1)%r * n%r / 2%r.
     rewrite /int_sum /intval.
-    move: leq0_n; elim/Induction.induction n.
+    move: leq0_n; elim n.
       cut ->: Interval.interval 0 (0 - 1) = FSet.empty by smt.
       by rewrite !Monoid.Mrplus.sum_empty; smt.
       move=> n leq0_n IH; cut ->: n + 1 - 1 = n by smt.

@@ -585,7 +585,7 @@ theory SetLog.
       sp; if; first smt.
         by wp; call (_: true); auto; smt.
       auto; progress.
-        by apply/(Int.Trans _ _ _ H)/subset_leq_fcard; smt.
+        by apply/(lez_trans _ _ _ H)/subset_leq_fcard; smt.
         smt.
     by inline *; wp; call (_: true).
   qed.

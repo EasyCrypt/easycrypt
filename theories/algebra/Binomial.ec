@@ -37,7 +37,7 @@ proof. by move=> @/bin ->. qed.
 
 lemma bin0 (n : int) : 0 <= n => bin n 0 = 1.
 proof.
-move=> ge0_n; rewrite binp //; elim/Induction.natind: n ge0_n=> n h.
+move=> ge0_n; rewrite binp //; elim/natind: n ge0_n=> n h.
   by rewrite iter0. by move=> ih; rewrite iterS.
 qed.
 

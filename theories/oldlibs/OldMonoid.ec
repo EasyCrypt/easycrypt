@@ -157,7 +157,7 @@ op sum_ij (i j : int) (f:int -> t)  =
   sum f (oflist (iota_ i (j - i + 1))).
 
 lemma sum_ij_gt (i j:int) f : 
-  i > j => sum_ij i j f = Z.
+  j < i => sum_ij i j f = Z.
 proof -strict.
   by move=> gt_i_j; rewrite /sum_ij iota0 1:smt -set0E sum_empty.
 qed.
@@ -256,7 +256,7 @@ theory Miplus.
 
   lemma sum_n_0k (k:int) : 0 <= k => sum_n 0 k = (k*(k + 1))/%2.
   proof -strict.
-    rewrite /sum_n;elim /Int.Induction.induction k.
+    rewrite /sum_n;elim k.
       by rewrite sum_ij_eq => /=; smt all.
     intros k Hk Hrec;rewrite sum_ij_le_r;first smt.
     cut -> : k + 1 - 1 = k;first smt.
@@ -280,7 +280,7 @@ theory Miplus.
  proof -strict.
    intros Hle;rewrite {1} (_: j=i+(j-i));first smt.
    cut: 0 <= (j-i) by smt.
-   elim/Int.Induction.induction (j-i)=> //=.
+   elim (j-i)=> //=.
      by rewrite !sum_n_ii.
    intros {j Hle} j Hj; rewrite -CommutativeGroup.Assoc sum_n_ij1;smt.
  qed.
@@ -335,7 +335,7 @@ import Real.
 lemma NatMul_mul : forall (n:int) (r:real), 0 <= n => 
     Mrplus.NatMul.( * ) n r = n%r * r.
 proof.    
-  move => n r;elim /Int.Induction.induction n;smt.
+  move => n r;elim n;smt.
 qed.
 
 require import FSet.

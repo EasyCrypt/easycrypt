@@ -5,7 +5,7 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import Option Distr List FSet NewFMap.
+require import Option Int Distr List FSet NewFMap.
 require (*--*) FinType Eager Lazy.
 
 clone include NewROM.
@@ -82,7 +82,7 @@ section.
         move: (work{hr}) H=> {H1 v H0 &hr dsampleL}.
         by case=> //=; smt.
     auto; progress.
-    by rewrite -size_eq0; apply/Int.Antisymm/size_ge0.
+    by rewrite -size_eq0; apply/lez_anti; rewrite size_ge0.
   qed.
 
   local module IND_Eager = {

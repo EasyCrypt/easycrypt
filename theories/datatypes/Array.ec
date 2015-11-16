@@ -426,7 +426,7 @@ lemma array_ind_snoc (p:'x array -> bool):
 proof strict.
 intros=> p0 prec xs.
 cut h : (forall n, 0 <= n => forall xs, length xs = n => p xs).
-  elim/Induction.induction => //; first smt.
+  elim => //; first smt.
   intros=> i ipos hrec xs' hlen.
   cut ->: xs' = (sub xs' 0 i):::xs'.[i] by (apply array_ext; smt).
   apply prec.

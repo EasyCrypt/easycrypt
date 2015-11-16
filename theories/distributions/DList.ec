@@ -37,7 +37,7 @@ lemma dlist_ll (d : 'a distr) n:
 proof.
   move=> d_ll; case (0 <= n); first last.
     by move=> lt0_n; rewrite dlist0 smt.
-  elim/Induction.induction n=> [|n le0_n ih].
+  elim n=> [|n le0_n ih].
     by rewrite dlist0 // smt.
   rewrite dlistS // /is_lossless -/(weight _) Dapply.lossless Dprod.lossless !/weight -!/(is_lossless _) //.
 qed.
@@ -52,7 +52,7 @@ lemma dlist_support_ge0 (d : 'a distr) n xs:
   support (dlist d n) xs <=> size xs = n /\ all (support d) xs.
 proof.
   move=> le0_n; move: le0_n xs.
-  elim/Induction.induction n =>[|n le0_n ih xs]; 1:smt.
+  elim n =>[|n le0_n ih xs]; 1:smt.
   rewrite dlistS // /support Dapply.supp_def; split.
     move=> [[x xs'] /= [->]]; rewrite Dprod.supp_def /fst /snd /=.
     rewrite -!/(support _ xs') ih; smt.
@@ -69,7 +69,7 @@ lemma mux_dlistS (d : 'a distr) x xs:
   mu (dlist d (size (x::xs))) (pred1 (x::xs)) =
     mu d (pred1 x) * mu (dlist d (size xs)) (pred1 xs).
 proof.
-  rewrite /= Int.CommutativeGroup.Comm.Comm dlistS 1:smt.
+  rewrite /= addzC dlistS 1:smt.
   rewrite -/(mu_x _ _) Dapply.mu_x_def /preim /pred1 /=.
   by rewrite (Dprod.mu_def (fun x0 => x0 = x) (fun x0 => x0 = xs)).
 qed.
@@ -183,7 +183,7 @@ abstract theory Program.
       by inline *; rcondf{2} 4; auto; smt.
     have {h} h: 0 <= _n by smt.
     call (_: _n = n{1} /\ ={n} ==> ={res})=> //=.
-    elim/Induction.induction _n h=> //= [|_n le0_n ih].
+    elim _n h=> //= [|_n le0_n ih].
       by proc; rcondf{2} 3; auto; smt.
     case (_n = 0)=> h.
       proc.

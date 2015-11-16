@@ -182,9 +182,9 @@ theory PowerInt.
     
     axiom Power_0: forall (x:real), x ^ (Int.zero) = one.
     
-    axiom Power_s: forall (x:real) (n:int), Int.(>=) n Int.zero => x ^ (Int.(+) n Int.one) = x * x ^ n.
+    axiom Power_s: forall (x:real) (n:int), Int.(<=) Int.zero n => x ^ (Int.(+) n Int.one) = x * x ^ n.
     
-    axiom Power_s_alt: forall (x:real) (n:int), Int.(>) n Int.zero => x ^ n = x * x ^ (Int.(-) n Int.one).
+    axiom Power_s_alt: forall (x:real) (n:int), Int.(<) Int.zero n => x ^ n = x * x ^ (Int.(-) n Int.one).
     
     axiom Power_1: forall (x:real), x ^ Int.one = x.
     
@@ -311,7 +311,8 @@ proof.
 qed.
 
 (* Injection of bool into real *)
-op b2r (b:bool) = if b then 1%r else 0%r.
+op b2r (b:bool) =
+  if b then FromInt.from_int 1 else FromInt.from_int 0.
 
 require import Ring.
 require import AlgTactic.

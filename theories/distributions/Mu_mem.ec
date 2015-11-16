@@ -15,7 +15,7 @@ proof.
     by rewrite (mu_eq d _ pred0) 2:mu_false 2:fcards0 // => x; rewrite inE.
   rewrite fcardUI_indep 1:fsetP 2:fcard1.
     by move=> x0; rewrite !inE; split=> [[h ->>]|].
-  rewrite Int.CommutativeGroup.Comm.Comm Add Mul_distr_r /=.
+  rewrite addzC Add Mul_distr_r /=.
   rewrite (mu_eq d _ (predU (pred1 x) (mem s))).
     by move=> z; rewrite !inE orbC.
   rewrite mu_disjoint.
@@ -32,7 +32,7 @@ proof.
     by rewrite (mu_eq d _ pred0) 2:mu_false 2:fcards0 2:-le_ge // => x; rewrite inE.
   rewrite fcardUI_indep 1:fsetP 2:fcard1.
     by move=> x0; rewrite !inE; split=> [[h ->>]|].
-  rewrite Int.CommutativeGroup.Comm.Comm Add Mul_distr_r /=.
+  rewrite addzC Add Mul_distr_r /=.
   rewrite (mu_eq d _ (predU (pred1 x) (mem s))).
     by move=> z; rewrite !inE orbC.
   rewrite mu_disjoint.

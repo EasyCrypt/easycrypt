@@ -48,9 +48,7 @@ module CI_Int = struct
 
   let _Int = fun x -> EcPath.pqname p_Int x
 
-  let p_int_elim =
-    List.fold_left EcPath.pqname p_Int ["Induction"; "induction"]
-
+  let p_int_elim = _Int "intind"
   let p_int_opp = _Int "[-]"
   let p_int_add = _Int "+"
   let p_int_sub = _Int "-"

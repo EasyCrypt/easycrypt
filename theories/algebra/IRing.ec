@@ -11,8 +11,8 @@ require import Ring AlgTactic.
 
 (* -------------------------------------------------------------------- *)
 instance ring with int
-  op rzero = zeroz
-  op rone  = onez
+  op rzero = zero
+  op rone  = one
   op add   = (+)
   op opp   = [-]
   op mul   = ( * )

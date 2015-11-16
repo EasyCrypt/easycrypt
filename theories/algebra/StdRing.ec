@@ -31,13 +31,13 @@ theory RField.
   lemma nosmt ofintR (i : int): ofint i = i%r.
   proof.
     have h: forall i, 0 <= i => ofint i = i%r; 2: smt.
-    move=> {i}; elim/Induction.natind; smt.
+    move=> {i}; elim/natind; smt.
   qed.
 
   lemma intmulr x c : intmul x c = x * c%r.
   proof.
     have h: forall cp, 0 <= cp => intmul x cp = x * cp%r.
-      elim/Induction.induction=> /= [|cp ge0_cp ih].
+      elim=> /= [|cp ge0_cp ih].
         by rewrite mulr0z.
       by rewrite mulrS // ih FromInt.Add mulrDr mulr1 addrC.
     case: (lezWP c 0) => [le0c|_ /h //].

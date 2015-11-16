@@ -43,7 +43,7 @@ proof. by move=> x y z t; rewrite -!addmA (addmCA y). qed.
 
 lemma iteropE n x: iterop n Self.(+) x idm = iter n ((+) x) idm.
 proof.
-  elim/Induction.natcase n => [n le0_n|n ge0_n].
+  elim/natcase n => [n le0_n|n ge0_n].
   + by rewrite ?(iter0, iterop0).
   + by rewrite iterSr // addm0 iteropS.
 qed.

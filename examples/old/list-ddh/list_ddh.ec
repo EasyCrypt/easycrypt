@@ -711,7 +711,7 @@ lemma A(A <: LDDH_DISTINGUISHER {FRO_random,LDDH_Hyb2,Dist,LDDH_Hyb,RO_dh_real.L
                   - Pr[ DDH_distr_random(Dist(A)).main(j) @ &m : res ] |).
 proof strict.
 intros=> &m.
-apply (Int.Induction.induction
+apply (Int.induction
          (lambda i, 
             `|  Pr[ LDDH_Hyb(A).main(0) @ &m: res ]
               - Pr[ LDDH_Hyb(A).main(i) @ &m: res ] |

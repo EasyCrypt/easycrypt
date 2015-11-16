@@ -329,7 +329,7 @@ qed.
 (* -------------------------------------------------------------------- *)
 lemma big1_eq (P : 'a -> bool) s: big P (fun x => idm) s = idm.
 proof.
-  rewrite big_const; elim/Induction.natind: (count _ _)=> n.
+  rewrite big_const; elim/natind: (count _ _)=> n.
     by move/iter0<:t> => ->.
   by move/iterS<:t> => -> ->; rewrite addm0.
 qed.

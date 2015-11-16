@@ -6,7 +6,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Int Real Distr List FSet.
+require import Int IntExtra Real Distr List FSet.
 
 pragma +implicits.
 
@@ -19,7 +19,7 @@ axiom mu_dU (X : 'a fset) e:
   = (card (filter e X))%r/(card X)%r.
 
 lemma mux_dU (X : 'a fset) x:
-  mu (dU X) (pred1 x) = (int_of_bool (mem X x))%r/(card X)%r.
+  mu (dU X) (pred1 x) = (b2i (mem X x))%r/(card X)%r.
 proof.
   (* TODO: Reinforce the filter and card abstractions to avoid
      having to poke holes in it *)
@@ -45,5 +45,5 @@ proof.
   (* Dealing with the stupid notation mismatches *)
   rewrite /support /in_supp /mu_x.
   (* Actually doing the proof *)
-  by rewrite mux_dU /int_of_bool; case (mem X x); smt.
+  by rewrite mux_dU /b2i; case (mem X x); smt.
 qed.

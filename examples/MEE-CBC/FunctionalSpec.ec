@@ -63,7 +63,7 @@ lemma size_bits2os (bs : bitstring):
 proof.
   move: {-1}(`|bs| /% 8) (eq_refl (`|bs| /% 8))=> n len_bs.
   have le0_n: 0 <= n by smt.
-  elim/Induction.induction n le0_n bs len_bs=> [bs bs_is_octets bs_is_empty
+  elim n le0_n bs len_bs=> [bs bs_is_octets bs_is_empty
                                                |n le0_n ih bs bs_is_nonempty bs_is_octets].
     by rewrite bits2os0 1:smt.
   rewrite bits2osS 1:smt //=.
@@ -94,7 +94,7 @@ proof.
   rewrite -(Octet.length_to_bits o); split.
     by rewrite sub_app_fst Octet.can_from_to.
     rewrite h_len {2}Octet.length_to_bits Mul_distr_l //=.
-    rewrite addzC StdOrder.IntOrder.Domain.subrE -addzA Ring.IntID.addrN addzC add0z.
+    rewrite addzC StdOrder.IntOrder.Domain.subrE addzA Ring.IntID.addrN addzC add0z.
     by rewrite -length_os2bits sub_app_snd.
 qed.
 
@@ -104,7 +104,7 @@ lemma os2bitsK (bs : bitstring):
 proof.
   move: {-1}(`|bs| /% 8) (eq_refl (`|bs| /% 8))=> n len_bs.
   have le0_n: 0 <= n by smt.
-  elim/Induction.induction n le0_n bs len_bs=> [|n le0_n ih bs len_bs good_length].
+  elim n le0_n bs len_bs=> [|n le0_n ih bs len_bs good_length].
     smt.
   have h_len: `|sub bs 8 (`|bs| - 8)| = `|bs| - 8.
     by rewrite length_sub // 1,2:smt.
@@ -129,7 +129,7 @@ lemma size_bits2bs (bs : bitstring):
 proof.
   move: {-1}(`|bs| /% 128) (eq_refl (`|bs| /% 128))=> n len_bs.
   have le0_n: 0 <= n by smt.
-  elim/Induction.induction n le0_n bs len_bs=> [bs bs_is_octets bs_is_empty
+  elim n le0_n bs len_bs=> [bs bs_is_octets bs_is_empty
                                                |n le0_n ih bs bs_is_nonempty bs_is_octets].
     by rewrite bits2bs0 1:smt.
   rewrite bits2bsS 1:smt //=.
@@ -160,7 +160,7 @@ proof.
   rewrite -(Block.length_to_bits b); split.
     by rewrite sub_app_fst Block.can_from_to.
     rewrite h_len {2}Block.length_to_bits Mul_distr_l //=.
-    rewrite addzC StdOrder.IntOrder.Domain.subrE -addzA Ring.IntID.addrN addzC add0z.
+    rewrite addzC StdOrder.IntOrder.Domain.subrE addzA Ring.IntID.addrN addzC add0z.
     by rewrite -length_bs2bits sub_app_snd.
 qed.
 
@@ -170,7 +170,7 @@ lemma bs2bitsK (bs : bitstring):
 proof.
   move: {-1}(`|bs| /% 128) (eq_refl (`|bs| /% 128))=> n len_bs.
   have le0_n: 0 <= n by smt.
-  elim/Induction.induction n le0_n bs len_bs=> [|n le0_n ih bs len_bs good_length].
+  elim n le0_n bs len_bs=> [|n le0_n ih bs len_bs good_length].
     smt.
   have h_len: `|sub bs 128 (`|bs| - 128)| = `|bs| - 128.
     by rewrite length_sub // 1,2:smt.
@@ -379,7 +379,7 @@ op unpad (bs : block list) =
 (* Proofs for instantiation *)
 lemma (* TODO: move *) mod_sub_mod x y: 0 < y => (x - x %% y) %% y = 0.
 proof.
-  move=> lt0_y; rewrite {1}(Div_mod x y) 1:smt Ring.IntID.subrE -addzA Ring.IntID.addrN.
+  move=> lt0_y; rewrite {1}(Div_mod x y) 1:smt Ring.IntID.subrE addzA Ring.IntID.addrN.
   by rewrite Mod_mult smt.
 qed.
 
@@ -414,7 +414,7 @@ proof.
   rewrite /pad /= size_os2bs 1:padded_is_blocks// size_padded.
   have ->: (48 + (size m - size m %% 16)) /% 16
            = (16 * 3 + (size m - size m %% 16)) /% 16  by smt.
-  rewrite Div_mult 1:smt {1}(Div_mod (size m) 16) 1:smt Ring.IntID.subrE -addzA Ring.IntID.addrN.
+  rewrite Div_mult 1:smt {1}(Div_mod (size m) 16) 1:smt Ring.IntID.subrE addzA Ring.IntID.addrN.
   rewrite Div_mult 1:smt addzC -!addzA /= -{2}(add0z 3).
   by congr; congr; smt.
 qed.

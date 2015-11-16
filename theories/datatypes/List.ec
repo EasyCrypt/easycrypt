@@ -79,7 +79,7 @@ op nseq (n : int) (x : 'a) = iter n ((::) x) [].
 
 lemma size_nseq n (x : 'a) : size (nseq n x) = max 0 n.
 proof.
-elim/Induction.natind: n => [n le0n|n ge0n ih] @/nseq.
+elim/natind: n => [n le0n|n ge0n ih] @/nseq.
   by rewrite iter0 // max_lel.
 by rewrite iterS //= ih !max_ler 1?addzC // addz_ge0.
 qed.
@@ -277,7 +277,7 @@ op find ['a] (p : 'a -> bool) s =
 
 op count ['a] (p : 'a -> bool) xs =
   with xs = []      => 0
-  with xs = y :: ys => (int_of_bool (p y)) + (count p ys).
+  with xs = y :: ys => (b2i (p y)) + (count p ys).
 
 op filter (p : 'a -> bool) xs =
   with xs = []      => []
@@ -651,7 +651,7 @@ proof.
   (* FIX: negative occurence selector *)
   cut {ltzSz} := ltzSz (count a (s1 ++ s2)); move: {1 3 4}a.
   pose x := _ + 1; cut : 0 <= x by smt. move: x => {a}.
-  elim/Int.Induction.induction; first by smt.
+  elim; first by smt.
   move=> i i_ge0 IHi a le_ai; case (count a (s1 ++ s2) = 0).
     by rewrite count_cat; smt.
   rewrite neq_ltz ltzNge count_ge0 /=; rewrite -has_count hasP.
@@ -967,7 +967,7 @@ lemma undup_id (s : 'a list): uniq s => undup s = s.
 proof. by elim s => //= x s IHs; smt. qed.
 
 lemma count_uniq_mem s (x : 'a):
-  uniq s => count (pred1 x) s = int_of_bool (mem s x).
+  uniq s => count (pred1 x) s = b2i (mem s x).
 proof. elim s; smt. qed.
 
 lemma uniq_leq_size (s1 s2 : 'a list):
@@ -1044,7 +1044,7 @@ proof.
 qed.
 
 lemma count_mem_uniq (s : 'a list):
-  (forall x, count (pred1 x) s = int_of_bool (mem s x)) => uniq s.
+  (forall x, count (pred1 x) s = b2i (mem s x)) => uniq s.
 proof.
   move=> count1_s; cut Uus := undup_uniq s.
   apply (perm_eq_uniq (undup s)); last by apply undup_uniq.
@@ -1202,7 +1202,7 @@ proof.
   elim: s => //= y s ih inj_f s_x; rewrite index_cons.
   case: (f x = f y) => eqf /=; 1: by apply/eq_sym/inj_f.
   move: s_x eqf; case: (x = y)=> //= ne_xy s_x _.
-  rewrite addz1_neq0 1:index_ge0 //= addAzN ih //.
+  rewrite addz1_neq0 1:index_ge0 //= subzE -addzA /= ih //.
   by move=> x' y' s_x' s_y'; apply/inj_f; rewrite ?(s_x', s_y').
 qed.
 
@@ -1228,7 +1228,7 @@ theory Iota.
 
   lemma size_iota m n: size (iota_ m n) = max 0 n.
   proof. 
-    elim/Induction.natind: n m => [n hn|n hn ih] m.
+    elim/natind: n m => [n hn|n hn ih] m.
       by rewrite iota0 // max_lel.
     rewrite iotaS //= ih max_ler // smt.
   qed.
@@ -1254,20 +1254,20 @@ theory Iota.
 
   lemma iota_addl (m1 m2:int) n: iota_ (m1 + m2) n = map ((+) m1) (iota_ m2 n).
   proof.
-    elim/Induction.natind: n m2 => [n hn|n hn ih] m2; 1: by rewrite !iota0.
+    elim/natind: n m2 => [n hn|n hn ih] m2; 1: by rewrite !iota0.
     by rewrite !iotaS // map_cons -addzA ih.
   qed.
  
   lemma mem_iota m n i : mem (iota_ m n) i <=> (m <= i /\ i < m + n).
   proof.
-    elim/Induction.natind: n m => [n hn|n hn ih] m.
+    elim/natind: n m => [n hn|n hn ih] m.
       by rewrite iota0 // smt.  
     by rewrite iotaS // in_cons ih smt.
   qed.
 
   lemma iota_uniq m n : uniq (iota_ m n).
   proof.
-    elim/Induction.natind: n m => [n hn|n hn ih] m.
+    elim/natind: n m => [n hn|n hn ih] m.
       by rewrite iota0.
     by rewrite iotaS // cons_uniq mem_iota ih // smt.
   qed.
@@ -1275,7 +1275,7 @@ theory Iota.
   lemma last_iota k m n:
     last k (Iota.iota_ m n) = if n <= 0 then k else m + n - 1.
   proof.
-    elim/Induction.natind: n m k => [n hn|n hn ih] m k.
+    elim/natind: n m k => [n hn|n hn ih] m k.
       by rewrite iota0 hn.
     by rewrite iotaS //= ih smt.
   qed.
@@ -1359,7 +1359,7 @@ lemma assoc_cons x y s a:
   = if a = x then Some y else assoc s a.
 proof.
   rewrite /assoc /= index_cons {1 3}/fst /=; case: (a = x)=> //=.
-  by move=> _; rewrite addAzN addz1_neq0 // index_ge0.
+  by move=> _; rewrite subzE -addzA /=addz1_neq0 // index_ge0.
 qed.
 
 lemma assoc_head x y s: assoc<:'a, 'b> ((x, y) :: s) x = Some y.
@@ -1683,7 +1683,7 @@ theory Array.
     apply ih=> //.
     move=> i [le0_i lti_lenxs]; have:= h (i + 1) _.
       smt. (* side conditions... *)
-    by rewrite !getE /= addz1_neq0 //= addAzN.
+    by rewrite !getE /= addz1_neq0 //= subzE -addzA.
   qed.
 
   lemma size_set (xs : 'a list) (n : int) (a : 'a):

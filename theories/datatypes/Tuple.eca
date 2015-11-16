@@ -40,7 +40,7 @@ lemma wordn_size i : all (fun x => size x = max 0 i) (wordn i).
 proof.
 apply/allP=> w; case: (lezWP 0 i); last first.
   by move=> _ le0_i; rewrite wordn0 // mem_seq1 ?max_lel.
-move=> ge0_i; rewrite max_ler //; elim/Induction.induction: i ge0_i w.
+move=> ge0_i; rewrite max_ler //; elim: i ge0_i w.
   by rewrite wordn0.
 move=> i ge0_i ih w; rewrite wordnS // => /flatten_mapP /=.
 by case=> x [_ /mapP] [s [/ih h ->]] /=; rewrite h addzC.
@@ -51,7 +51,7 @@ lemma size_wordn i : size (wordn i) = card ^ (max 0 i).
 proof.
 case: (lezWP 0 i)=> [le|_ le]; last first.
   by rewrite max_lel ?wordn0 //= pow0.
-rewrite max_ler //; elim/Induction.induction: i le.
+rewrite max_ler //; elim: i le.
   by rewrite wordn0 // pow0.
 move=> i le0_i ih; rewrite wordnS // size_flatten /=.
 rewrite -map_comp (eq_map _ (fun x => card^i)).
@@ -66,7 +66,7 @@ proof.
 split; first by move: s; apply/allP/wordn_size.
 case: (lezWP 0 i)=> [ge0_i|_ le0_i]; last first.
   by rewrite max_lel ?wordn0 // => /size_eq0.
-rewrite max_ler //; elim/Induction.induction: i ge0_i s.
+rewrite max_ler //; elim: i ge0_i s.
   by move=> s /size_eq0; rewrite wordn0.
 move=> i geo_i ih [//= /eq_sym|]; first by rewrite addz1_neq0.
 move=> x s /=; rewrite addzC => /addIz /ih {ih} si.
@@ -81,7 +81,7 @@ lemma word_spec i (s : t list) : size s = max 0 i =>
 proof.
 case: (lezWP 0 i)=> [le|_ le]; first last.
   by rewrite max_lel ?wordn0 // => /size_eq0.
-rewrite max_ler //; elim/Induction.induction: i le s.
+rewrite max_ler //; elim: i le s.
   by move=> s /size_eq0; rewrite wordn0.
 move=> i ge0_i ih []; first by move/eq_sym; rewrite addz1_neq0.
 move=> x s /=; rewrite addzC => /addIz sz_s.

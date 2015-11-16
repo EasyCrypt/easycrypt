@@ -506,7 +506,7 @@ clone include IDomain with
 lemma intmulz z c : intmul z c = z * c.
 proof.
 have h: forall cp, 0 <= cp => intmul z cp = z * cp.
-  elim/Induction.induction=> /= [|cp ge0_cp ih].
+  elim=> /= [|cp ge0_cp ih].
     by rewrite mulr0z.
   by rewrite mulrS // ih mulrDr /= addrC.
 case: (c < 0); 1: rewrite -opprK mulrNz opprK; smt.
