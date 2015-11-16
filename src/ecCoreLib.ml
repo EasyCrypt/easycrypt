@@ -56,8 +56,6 @@ module CI_Int = struct
   let p_int_pow = _Int "^"
   let p_int_le  = _Int "<="
   let p_int_lt  = _Int "<"
-  let p_int_ge  = _Int ">="
-  let p_int_gt  = _Int ">"
 end
 
 (* -------------------------------------------------------------------- *)
@@ -77,8 +75,6 @@ module CI_Real = struct
   let p_real_pow    = List.fold_left EcPath.pqname p_Real ["PowerInt"; "^"]
   let p_real_le     = _Real "<="
   let p_real_lt     = _Real "<"
-  let p_real_ge     = _Real ">="
-  let p_real_gt     = _Real ">"
   let p_rle_ge_sym  = _Real "le_ge_sym"
   let p_real_of_int = List.fold_left EcPath.pqname p_Real ["FromInt"; "from_int"]
 end

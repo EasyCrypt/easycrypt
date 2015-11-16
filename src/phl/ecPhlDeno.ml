@@ -67,8 +67,8 @@ let t_phoare_deno_r pre post tc =
   let concl = FApi.tc1_goal tc in
 
   match concl.f_node with
-  | Fapp ({f_node = Fop (op, _)}, [bd; f])
-      when EcPath.p_equal op EcCoreLib.CI_Real.p_real_ge ->
+  | Fapp ({f_node = Fop (op, _)}, [f; bd])
+      when EcPath.p_equal op EcCoreLib.CI_Real.p_real_le ->
     (t_apply_prept
        (`App(`UG EcCoreLib.CI_Real.p_rle_ge_sym, [`F f; `F bd; `H_])) @!
        t_core_phoare_deno pre post) tc
@@ -98,12 +98,13 @@ let t_equiv_deno_r pre post tc =
     match concl.f_node with
     | Fapp({f_node = Fop(op,_)}, [f1;f2]) when is_pr f1 && is_pr f2 &&
         (EcPath.p_equal op EcCoreLib.CI_Bool.p_eq ||
-           EcPath.p_equal op EcCoreLib.CI_Real.p_real_le ||
-           EcPath.p_equal op EcCoreLib.CI_Real.p_real_ge) ->
+         EcPath.p_equal op EcCoreLib.CI_Real.p_real_le) ->
       let cmp =
-        if EcPath.p_equal op EcCoreLib.CI_Bool.p_eq then `Eq
-        else if EcPath.p_equal op EcCoreLib.CI_Real.p_real_le then `Le else `Ge in
-      cmp, f1, f2
+        match op with
+        | _ when EcPath.p_equal op EcCoreLib.CI_Bool.p_eq -> `Eq
+        | _ when EcPath.p_equal op EcCoreLib.CI_Real.p_real_le -> `Le
+        | _ -> assert false
+      in cmp, f1, f2
 
     | _ -> tc_error !!tc "invalid goal shape"
 
@@ -160,13 +161,6 @@ let process_phoare_deno info tc =
         ->
              if is_pr f1 then (FHle, f1, f2) (* f1 <= f2 *)
         else if is_pr f2 then (FHge, f2, f1) (* f2 >= f1 *)
-        else error ()
-
-      | Fapp ({f_node = Fop (op, _)}, [f1; f2])
-          when EcPath.p_equal op EcCoreLib.CI_Real.p_real_ge
-        ->
-             if is_pr f1 then (FHge, f1, f2) (* f1 >= f2 *)
-        else if is_pr f2 then (FHle, f2, f1) (* f2 <= f1 *)
         else error ()
 
       | _ -> error ()
@@ -413,11 +407,13 @@ let process_equiv_deno1 info eq tc =
       | None ->
         let evl = Fsubst.f_subst_mem mhr mleft evl in
         let evr = Fsubst.f_subst_mem mhr mright evr in
-        if EcPath.p_equal op EcCoreLib.CI_Bool.p_eq then 
-          post_iff eq env evl evr
-        else if EcPath.p_equal op EcCoreLib.CI_Real.p_real_le then f_imp evl evr
-        else if EcPath.p_equal op EcCoreLib.CI_Real.p_real_ge then f_imp evr evl
-        else tc_error !!tc "not able to reconize a comparison operator" in
+        match op with
+        | _ when EcPath.p_equal op EcCoreLib.CI_Bool.p_eq ->
+           post_iff eq env evl evr
+        | _ when EcPath.p_equal op EcCoreLib.CI_Real.p_real_le ->
+           f_imp evl evr
+        | _ ->
+           tc_error !!tc "not able to reconize a comparison operator" in
 
     let pre = process_pre tc hyps prl prr pre post in
   

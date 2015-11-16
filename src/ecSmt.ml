@@ -1042,9 +1042,7 @@ let core_theories = [
       (CI_Int.p_int_sub, "infix -" );
       (CI_Int.p_int_mul, "infix *" );
       (CI_Int.p_int_lt , "infix <" );  
-      (CI_Int.p_int_le , "infix <=");  
-      (CI_Int.p_int_gt , "infix >" );  
-      (CI_Int.p_int_ge , "infix >=")]);
+      (CI_Int.p_int_le , "infix <=")]);
 
   ((["real"], "Real"),
      [(CI_Real.p_real_opp, "prefix -");
@@ -1054,9 +1052,7 @@ let core_theories = [
       (CI_Real.p_real_div, "infix /" );
       (CI_Real.p_real_mul, "infix *" );
       (CI_Real.p_real_lt , "infix <" );  
-      (CI_Real.p_real_le , "infix <=");  
-      (CI_Real.p_real_gt , "infix >" );  
-      (CI_Real.p_real_ge , "infix >=")]);
+      (CI_Real.p_real_le , "infix <=")]);
 
   ((["real"], "FromInt"),
      [(CI_Real.p_real_of_int, "from_int")]);
