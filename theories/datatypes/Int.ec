@@ -195,7 +195,8 @@ lemma nosmt oppz_gt0 x : (0 < - x) = (x < 0) by smt.
 lemma nosmt oppz_le0 x : (- x <= 0) = (0 <= x) by smt.
 lemma nosmt oppz_lt0 x : (- x < 0) = (0 < x) by smt.
 
-lemma lezWP (z1 z2 : int) : (z1 <= z2) || (z2 <= z1) by smt.
+lemma nosmt lezWP (z1 z2 : int) : (z1 <= z2) || (z2 <= z1) by smt.
+lemma nosmt ltzW (z1 z2 : int) : (z1 < z2) => (z1 <= z2) by smt.
 
 theory Induction.
 
@@ -245,6 +246,7 @@ theory Induction.
   proof. smt full. qed.
 end Induction.
 
+(* -------------------------------------------------------------------- *)
 (* Fold operator *)
 
 op fold : ('a -> 'a) -> 'a -> int -> 'a.
@@ -263,6 +265,7 @@ lemma fold_add (f : 'a -> 'a) a n1 n2 : 0 <= n1 => 0 <= n2 =>
    fold f (fold f a n2) n1 = fold f a (n1 + n2).
 proof. elim/Induction.induction n1; smt full. qed.
 
+(* -------------------------------------------------------------------- *)
 (* Power *)
 
 op ( ^ ) (x:int) (p:int) = fold (( * ) x) 1 p
@@ -301,6 +304,7 @@ proof.
   smt full.
 qed.
 
+(* -------------------------------------------------------------------- *)
 (* Diveucl *)
 (** Begin Import **)
   op (/%) : int -> int -> int.
@@ -398,6 +402,7 @@ theory Extrema.
 end Extrema.
 export Extrema.
 
+(* -------------------------------------------------------------------- *)
 lemma mulMle : forall (x1 x2 y1 y2:int),
    0 <= x1 <= x2 => 0 <= y1 <= y2 => x1 * y1 <= x2 * y2.
 proof.
@@ -406,61 +411,3 @@ proof.
  rewrite ?(Comm.Comm x1) CompatOrderMult; smt full.
  apply CompatOrderMult; smt full.
 qed.
-
-theory ForLoop.
-  op range: int -> int -> 'a -> (int -> 'a -> 'a) -> 'a.
-
-  axiom range_base i j (st:'a) f:
-    j <= i =>
-    range i j st f = st.
-
-  axiom range_ind i j (st:'a) f:
-    i < j =>
-    range i j st f = range (i + 1) j (f i st) f.
-
-  lemma range_ind_lazy i j (st:'a) f:
-    i < j =>
-    range i j st f = f (j - 1) (range i (j - 1) st f).
-  proof.
-  intros=> h; cut {h}: 0 < j-i by smt full.    (* missing gt0_subr *)
-  move: {-1}(j-i) (eq_refl (j - i))=> n.
-  move=> eq_iBj_n gt0_n; generalize i j eq_iBj_n.
-  cut ge0_n: 0 <= n by smt full. generalize ge0_n gt0_n st.
-  elim/Induction.induction n; first smt full.
-  intros=> n ge0_n IH _ st i j.
-  case (n = 0); first intros=> -> h.
-    cut ->: j = i+1 by smt full.
-    rewrite range_ind ?range_base; 2..4:smt.
-    smt full.
-  intros=> nz_n eq_iBj_Sn; rewrite range_ind; first by smt full.
-  rewrite IH; [smt full|smt|].
-  congr => //.
-  by rewrite -range_ind; first smt full.
-  qed.
-
-  (* General result on boolean accumulation *)
-  lemma rangeb_forall i j p b:
-    ForLoop.range i j b (fun k b, b /\ p k) =
-     (b /\ forall k, i <= k < j => p k).
-  proof.
-  case (i < j)=> i_j; last smt full.
-  pose n := j - i; cut ->: j = n + i by smt.
-  cut: 0 <= n by smt full.
-  elim/Induction.induction n;first by smt full.
-  intros i0 Hi0 Hrec;rewrite range_ind_lazy; smt full.
-  qed.
-
-  (* General result on restricting the range *)
-  lemma range_restr (i j:int) (base:'a) f:
-    0 <= j - i =>
-    ForLoop.range i j base (fun k a, if i <= k < j then f k a else a) = ForLoop.range i j base f.
-  proof.
-  intros=> h; case (0 = j - i)=> h2; first smt full.
-  pose k:= j - i - 1; cut {1 3}->: j = k + i + 1 by smt.
-  cut: k < j - i by smt full. cut: 0 <= k by smt full.
-  by elim/Induction.induction k; smt full.
-  qed.
-
-  axiom range_add i j1 j2 (a:'a) f : 0 <= j1 => 0 <= j2 => i <= j1 =>
-    range i (j1 + j2) a f = range (i+j1) (j1 + j2) (range i j1 a f) f.
-end ForLoop.

@@ -19,9 +19,7 @@
  *
  *)
 
-require import Logic.
-require import Int.
-require Fun. (* For reasoning about higher-order operators *)
+require import Logic Fun Int IntExtra.
 
 (*********************************)
 (*             Core              *)
@@ -498,7 +496,7 @@ axiom init_dep_def (xs:'x array) (size:int) (f:int -> 'x array -> 'x):
   init_dep xs size f =
     let r = make (length xs + size) xs.[0] in (* creates the space *)
     let r = blit r 0 xs 0 (length xs) in      (* copies the initial value in *)
-    ForLoop.range 0 size r (fun i r, r.[i + length xs <- f i r]). (* extends using f *)
+    iteri size (fun i r => r.[i + length xs <- f i r]) r.
 
 (* all: this is computable because all arrays are finite *)
 op all: ('x -> bool) -> 'x array -> bool.
@@ -542,27 +540,6 @@ lemma alli_true p (xs:'x array):
 proof strict.
 by rewrite alli_def=> p_true i i_bnd;
    apply p_true.
-qed.
-
-(* note: I'm not sure this is the most useful formulation of this lemma. Check use cases. *)
-(* overall, I feel that the general rangeb_forall is more useful *)
-lemma range_alli i j p (xs:'x array):
-  0 <= i < j < length xs =>
-  ForLoop.range i j true (fun k b, b /\ p k xs.[k]) <=>
-   alli (fun k, p (k + i)) (sub xs i (j - i)).
-proof strict.
-intros=> i_j_bnd.
-cut ->: (fun k b, b /\ p k xs.[k]) =
-         (fun k b, b /\ (fun k, p k xs.[k]) k) by smt.
-rewrite ForLoop.rangeb_forall //=.
-rewrite alli_def length_sub; first 3 smt.
-split.
-  intros=> all_ij k k_bnd; rewrite get_sub=> //=; first 3 smt.
-  by apply all_ij; smt.
-  intros=> //= all_ij k k_bnd; rewrite {2}(_: k = k - i + i); first smt.
-  rewrite -(get_sub xs i (j - i) (k - i)); first 4 smt.
-  pose k':= k - i; cut ->: k = k' + i by smt.
-  by apply all_ij; smt.
 qed.
 
 (* TODO *)
