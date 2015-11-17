@@ -228,10 +228,13 @@ let _ =
     end
 
     | `Compile cmpopts -> begin
-        let input = cmpopts.cmpo_input in
-        let terminal = lazy (EcTerminal.from_channel ~name:input (open_in input)) in
-        ({cmpopts.cmpo_provers with prvo_iterate = true}, 
-         Some input, terminal, false)
+        let name     = cmpopts.cmpo_input in
+        let gcstats  = cmpopts.cmpo_gcstats in
+        let terminal =
+          lazy (EcTerminal.from_channel ~name ~gcstats (open_in name))
+        in
+          ({cmpopts.cmpo_provers with prvo_iterate = true}, 
+           Some name, terminal, false)
     end
   in
 

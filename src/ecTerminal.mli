@@ -23,6 +23,6 @@ val finish      : status -> terminal -> unit
 val finalize    : terminal -> unit
 
 (* -------------------------------------------------------------------- *)
-val from_channel : name:string -> in_channel -> terminal
+val from_channel : ?gcstats:bool -> name:string -> in_channel -> terminal
 val from_tty     : unit -> terminal
 val from_emacs   : unit -> terminal

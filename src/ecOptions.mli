@@ -20,6 +20,7 @@ and options = {
 and cmp_option = {
   cmpo_input   : string;
   cmpo_provers : prv_options;
+  cmpo_gcstats : bool;
 }
 
 and cli_option = {
