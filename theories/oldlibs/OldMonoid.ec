@@ -262,8 +262,8 @@ theory Miplus.
     cut -> : k + 1 - 1 = k;first smt.
     rewrite Hrec /=.
     have ->: (k + 1) * (k + 1 + 1) = k * (k + 1) + 2 * (k + 1) by smt.
-    rewrite (CommutativeGroup.Comm.Comm (k * (k + 1))) Div_mult 1:smt.
-    by rewrite (CommutativeGroup.Comm.Comm).
+    rewrite (addzC (k * (k + 1))) Div_mult 1:smt.
+    by rewrite addzC.
   qed.
 
  lemma sum_n_ii (k:int): sum_n k k = k

@@ -386,7 +386,11 @@ abstract theory ComRing.
   qed.
 
   lemma exprN (x : t) (i : int): exp x (-i) = invr (exp x i).
-  proof. case: (i = 0); smt. qed.
+  proof.
+    case: (i = 0) => [->|]; first by rewrite oppz0 expr0 invr1.
+    rewrite /exp oppz_lt0 ltzNge lez_eqVlt oppzK=> -> /=.
+    by case: (_ < _)=> //=; rewrite invrK.
+  qed.
 end ComRing.
 
 (* -------------------------------------------------------------------- *)

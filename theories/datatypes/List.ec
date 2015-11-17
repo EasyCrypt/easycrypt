@@ -822,7 +822,7 @@ lemma trim_cat (xs ys : 'a list) (n : int): n < size (xs ++ ys) =>
     if   n < size xs
     then (trim xs n) ++ ys
     else xs ++ trim ys (n - size xs).
-proof. by rewrite size_cat smt. qed.
+proof. by rewrite size_cat /trim; smt. qed.
 
 (* -------------------------------------------------------------------- *)
 (*                        Sequence reversal                             *)

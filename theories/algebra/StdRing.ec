@@ -30,8 +30,10 @@ theory RField.
   
   lemma nosmt ofintR (i : int): ofint i = i%r.
   proof.
-    have h: forall i, 0 <= i => ofint i = i%r; 2: smt.
-    move=> {i}; elim/natind; smt.
+    have h: forall i, 0 <= i => ofint i = i%r.
+      elim=> [|j j_ge0 ih] //=; first by rewrite ofint0.
+      by rewrite ofintS // FromInt.Add ih addrC.
+    elim/natind: i; smt.
   qed.
 
   lemma intmulr x c : intmul x c = x * c%r.
@@ -56,11 +58,11 @@ end RField.
 instance ring with int
   op rzero = Int.zero
   op rone  = Int.one
-  op add   = Int.(+)
+  op add   = Int.( + )
   op opp   = Int.([-])
   op mul   = Int.( * )
   op expr  = Int.( ^ )
-  op sub   = Int.(-)
+  op sub   = Int.( - )
 
   proof oner_neq0 by smt
   proof addr0     by smt

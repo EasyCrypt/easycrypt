@@ -22,6 +22,7 @@ clone include Bigalg.BigOrder with
     op Num.Domain.( - )  <- Int.( - ),
     op Num.Domain.([-])  <- Int.([-]),
     op Num.Domain.( * )  <- Int.( * ),
+    op Num.Domain.( / )  <- Int.( * ),
     op Num.Domain.invr   <- (fun (z : int) => z),
     op Num.Domain.intmul <- IntID.intmul,
     op Num.Domain.ofint  <- IntID.ofint,

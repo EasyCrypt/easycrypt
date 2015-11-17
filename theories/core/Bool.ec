@@ -42,5 +42,6 @@ theory Dbool.
   by rewrite /mu_x mu_def /charfun; smt.
   qed.
 
-  lemma lossless: weight dbool = 1%r by [].
+  lemma lossless: weight dbool = 1%r.
+  proof. by rewrite mu_def. qed.
 end Dbool.

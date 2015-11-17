@@ -30,7 +30,7 @@ lemma negbFE b : !b = false => b by [].
 lemma negbK    : involutive [!]  by case. (* FIXME: by []: "Not a formula: x1" *)
 lemma negbNE b : !!b => b        by [].
 
-lemma negb_inj : injective [!]      by exact: (can_inj negbK).
+lemma negb_inj : injective [!]      by exact: (can_inj _ _ negbK).
 lemma negbLR b c : b = !c => !b = c by [].
 lemma negbRL b c : !b = c => b = !c by [].
 
