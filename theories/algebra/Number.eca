@@ -6,7 +6,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Int Fun Pred.
+require import Fun Pred Int IntExtra.
 require (*--*) Ring.
 
 pragma +implicits.
@@ -207,8 +207,31 @@ proof. by move=> n_0ge; rewrite ger0_norm // ler0n. qed.
 lemma nosmt normr0P (x : t): (`|x| = zeror) <=> (x = zeror).
 proof. by split=> [/normr0_eq0|->] //; rewrite normr0. qed.
 
+lemma nosmt normr_unit : forall x, unit x => unit `|x|.
+proof.
+move=> x /unitrP [y yx]; apply/unitrP; exists `|y|.
+by rewrite -normrM yx normr1.
+qed.
+
+lemma nosmt normrV : forall x, unit x => `|invr x| = invr `|x|.
+proof.
+move=>x ux; apply/(@mulrI `|x|); first by apply/normr_unit.
+by rewrite -normrM !mulrV ?normr_unit // normr1.
+qed.
+
+lemma nosmt normrX_nat n x : 0 <= n => `|exp x n| = exp `|x| n.
+proof.
+elim: n=> [|n ge0_n ih]; first by rewrite !expr0 normr1.
+by rewrite !exprS //= normrM ih.
+qed.
+
 lemma nosmt normrN1: `|-oner| = oner.
-proof. admit. qed.
+proof.
+have: exp `|-oner| 2 = oner.
+  by rewrite -normrX_nat -1?signr_odd // odd2 expr0 normr1.
+rewrite sqrf_eq1=> [->//|]; rewrite -ger0_def le0r oppr_eq0.
+by rewrite oner_neq0 /= => /(addr_gt0 _ _ ltr01); rewrite addrN ltrr.
+qed.
 
 lemma nosmt normrN (x : t): `|- x| = `|x|.
 proof. by rewrite -mulN1r normrM normrN1 mul1r. qed.

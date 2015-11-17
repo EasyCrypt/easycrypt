@@ -52,6 +52,12 @@ theory IterOp.
     iter (n+1) opr x = opr (iter n opr x).
   proof. by move/iteriS<:'a>=> @/iter ->. qed.
 
+  lemma iter1 ['a] opr (x : 'a): iter 1 opr x = opr x.
+  proof. by rewrite (@iterS 0) // iter0. qed.
+
+  lemma iter2 ['a] opr (x : 'a): iter 2 opr x = opr (opr x).
+  proof. by rewrite (@iterS 1) // iter1. qed.
+
   lemma iterSr n opr (x : 'a):
     0 <= n => iter (n + 1) opr x = iter n opr (opr x).
   proof.
@@ -80,3 +86,13 @@ theory IterOp.
 end IterOp.
 
 export IterOp.
+
+(* -------------------------------------------------------------------- *)
+op odd (z : int) = iter z [!] false.
+
+lemma odd0 : !odd 0. proof. by rewrite iter0. qed.
+lemma odd1 :  odd 1. proof. by rewrite iter1. qed.
+lemma odd2 : !odd 2. proof. by rewrite iter2. qed.
+
+lemma oddS z : 0 <= z => odd (z + 1) = !(odd z).
+proof. by move/iterS<:bool>=> ->. qed.

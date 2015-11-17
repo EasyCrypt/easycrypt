@@ -385,11 +385,27 @@ abstract theory ComRing.
     by rewrite !MulMonoid.iteropE iterS.
   qed.
 
+  lemma expr2 x: exp x 2 = x * x.
+  proof. by rewrite (@exprS _ 1) // expr1. qed.
+
   lemma exprN (x : t) (i : int): exp x (-i) = invr (exp x i).
   proof.
     case: (i = 0) => [->|]; first by rewrite oppz0 expr0 invr1.
     rewrite /exp oppz_lt0 ltzNge lez_eqVlt oppzK=> -> /=.
     by case: (_ < _)=> //=; rewrite invrK.
+  qed.
+
+  lemma signr_odd n : 0 <= n => exp (-oner) (b2i (odd n)) = exp (-oner) n.
+  proof.
+    elim: n => [|n ge0_nih]; first by rewrite odd0 expr0.
+    rewrite !(iterS, oddS) // exprS // -/(odd _) => <-.
+    by case: (odd _); rewrite /b2i /= !(expr0, expr1) mulN1r ?opprK.
+  qed.
+
+  lemma subr_sqr_1 x : exp x 2 - oner = (x - oner) * (x + oner).
+  proof.
+  rewrite mulrBl mulrDr !(mulr1, mul1r) !subrE expr2 -addrA.
+  by congr; rewrite opprD addrA addrN add0r.
   qed.
 end ComRing.
 
@@ -428,6 +444,9 @@ abstract theory IDomain.
 
   lemma mulIf x: x <> zeror => injective (fun y => y * x).
   proof. by move=> nz_x y z; rewrite -!(@mulrC x); exact: mulfI. qed.
+
+  lemma sqrf_eq1 x : (exp x 2 = oner) <=> (x = oner \/ x = -oner).
+  proof. by rewrite -subr_eq0 subr_sqr_1 mulf_eq0 subr_eq0 addr_eq0. qed.
 end IDomain.
 
 (* -------------------------------------------------------------------- *)
