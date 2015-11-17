@@ -33,13 +33,13 @@ let t_core_phoare_deno pre post tc =
         when is_pr f && EcPath.p_equal op EcCoreLib.CI_Real.p_real_le ->
       (FHle, f, bd, fun ev -> f_imp_simpl ev post)
 
+    | Fapp ({f_node = Fop (op, _)}, [bd; f])
+        when is_pr f && EcPath.p_equal op EcCoreLib.CI_Real.p_real_le ->
+      (FHge, f, bd, fun ev -> f_imp_simpl post ev)
+
     | Fapp ({f_node = Fop (op, _)}, [f; bd])
         when is_pr f && EcPath.p_equal op EcCoreLib.CI_Bool.p_eq ->
       (FHeq, f, bd, f_iff_simpl post)
-
-    | Fapp ({f_node = Fop (op, _)}, [bd; f])
-        when is_pr f && EcPath.p_equal op EcCoreLib.CI_Real.p_real_le ->
-      (FHge, f, bd, f_imp_simpl post)
 
     | _ -> tc_error !!tc "invalid goal shape"
   in
@@ -67,12 +67,6 @@ let t_phoare_deno_r pre post tc =
   let concl = FApi.tc1_goal tc in
 
   match concl.f_node with
-  | Fapp ({f_node = Fop (op, _)}, [f; bd])
-      when EcPath.p_equal op EcCoreLib.CI_Real.p_real_le ->
-    (t_apply_prept
-       (`App(`UG EcCoreLib.CI_Real.p_rle_ge_sym, [`F f; `F bd; `H_])) @!
-       t_core_phoare_deno pre post) tc
-
   | Fapp ({f_node = Fop (op, _)}, [f; _bd])
       when EcPath.p_equal op EcCoreLib.CI_Bool.p_eq && not (is_pr f) ->
     (t_symmetry @! t_core_phoare_deno pre post) tc

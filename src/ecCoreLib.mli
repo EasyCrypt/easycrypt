@@ -91,7 +91,6 @@ module CI_Real : sig
   val p_real_pow    : path
   val p_real_le     : path
   val p_real_lt     : path
-  val p_rle_ge_sym  : path
   val p_real_of_int : path
 end
 
