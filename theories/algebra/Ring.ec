@@ -512,6 +512,3 @@ have h: forall cp, 0 <= cp => intmul z cp = z * cp.
 case: (c < 0); 1: rewrite -opprK mulrNz opprK; smt.
 qed.
 end IntID.
-
-
-
