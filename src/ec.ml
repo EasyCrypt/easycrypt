@@ -259,7 +259,7 @@ let _ =
     EcTerminal.notice ~immediate:true `Warning copyright terminal;
 
   try
-    let () = Sys.catch_break true in
+    if EcTerminal.interactive terminal then Sys.catch_break true;
 
     (* Interaction loop *)
     let first = ref `Init in
