@@ -324,8 +324,37 @@ abstract theory ComRing.
   lemma nosmt invrN1: invr (-oner) = -oner.
   proof. by rewrite -{2}(divrr unitrN1) divrE mulN1r opprK. qed.
 
+  lemma nosmt unitrMl x y : unit y => (unit (x * y) <=> unit x).
+  proof.                        (* FIXME: wlog *)
+    move=> uy; case: (unit x)=> /=; last first.
+      apply/contra=> uxy; apply/unitrP; exists (y * invr (x * y)).
+      apply/(mulrI (invr y)); first by rewrite unitrV.
+      rewrite !mulrA mulVr // mul1r; apply/(mulIr y)=> //.
+      by rewrite -mulrA mulVr // mulr1 mulVr.
+    move=> ux; apply/unitrP; exists (invr y * invr x).
+    by rewrite -!mulrA mulKr // mulVr.
+  qed.
+
+  lemma nosmt unitrMr x y : unit x => (unit (x * y) <=> unit y).
+  proof.
+    move=> ux; split=> [uxy|uy]; last by rewrite unitrMl.
+    by rewrite -(mulKr _ ux y) unitrMl ?unitrV.
+  qed.
+
+  lemma nosmt unitrN x : unit (-x) <=> unit x.
+  proof. by rewrite -mulN1r unitrMr // unitrN1. qed.
+
+  lemma nosmt invrM x y : unit x => unit y => invr (x * y) = invr y * invr x.
+  proof.
+    move=> Ux Uy; have Uxy: unit (x * y) by rewrite unitrMl.
+    by apply: (mulrI _ Uxy); rewrite mulrV ?mulrA ?mulrK ?mulrV.
+  qed.
+
   lemma nosmt invrN (x : t) : invr (- x) = - (invr x).
-  proof. admitted.
+  proof.
+    case: (unit x) => ux; last by rewrite !invr_out ?unitrN.
+    by rewrite -mulN1r invrM ?unitrN1 // invrN1 mulrN1.
+  qed.
 
   lemma nosmt invr_neq0 x : x <> zeror => invr x <> zeror.
   proof.
@@ -334,10 +363,10 @@ abstract theory ComRing.
   qed.
 
   lemma nosmt invr_eq0 x : (invr x = zeror) <=> (x = zeror).
-  proof. admitted.
+  proof. by apply/iff_negb; split=> /invr_neq0; rewrite ?invrK. qed.
 
   lemma nosmt invr_eq1 x : (invr x = oner) <=> (x = oner).
-  proof. admitted.
+  proof. by rewrite (inv_eq invrK) invr1. qed.
 
   op ofint n = intmul oner n.
 

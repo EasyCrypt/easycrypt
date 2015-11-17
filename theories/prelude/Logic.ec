@@ -41,6 +41,9 @@ lemma nosmt nnot: forall (x:bool), (!(!x)) = x by [].
 lemma nosmt negbTE: forall (x:bool), !x => (x => false) by [].
 lemma nosmt negeqF: forall (x:bool), !x => (x =  false) by [].
 
+lemma negb_inj : forall b1 b2, !b1 = !b2 => b1 = b2 by [].
+lemma iff_negb : forall b1 b2, (!b1 <=> !b2) <=> (b1 <=> b2) by [].
+
 lemma nosmt nand: forall (a b:bool), (!a) \/ (!b) <=> !(a /\ b) by [].
 lemma nosmt nor : forall (a b:bool), (!a) /\ (!b) <=> !(a \/ b) by [].
 
