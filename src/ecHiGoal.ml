@@ -172,7 +172,8 @@ module LowRewrite = struct
   let rec find_rewrite_patterns (dir : rwside) pt =
     let hyps = pt.PT.ptev_env.PT.pte_hy in
     let env  = LDecl.toenv hyps in
-    let ax   = pt.PT.ptev_ax in
+    let pt   = { pt with ptev_ax = snd (PT.concretize pt) } in
+    let ax   = pt.ptev_ax in
 
     let base ax =
       match EcFol.sform_of_form ax with

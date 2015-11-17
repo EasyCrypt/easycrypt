@@ -318,8 +318,12 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
           | Some (`Set a) -> begin
               let ssbj = Fsubst.f_subst subst subject in
 
-              if not (EcReduction.is_conv hyps ssbj a) then
-                failure ();
+              if not (EcReduction.is_conv hyps ssbj a) then begin
+                let ssbj = Fsubst.f_subst (MEV.assubst ue !ev) ssbj in
+                if not (EcReduction.is_conv hyps ssbj a) then
+                  failure ();
+                end;
+
               try  EcUnify.unify env ue ptn.f_ty subject.f_ty
               with EcUnify.UnificationFailure _ -> failure ()
           end
