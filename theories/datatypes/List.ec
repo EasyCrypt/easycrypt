@@ -89,6 +89,15 @@ elim/natind: n => [n le0n|n ge0n ih] @/nseq.
 by rewrite iterS //= ih !max_ler 1?addzC // addz_ge0.
 qed.
 
+lemma nseq0 (x : 'a): nseq 0 x = [].
+proof. by rewrite iter0. qed.
+
+lemma nseq0_le n (x : 'a) : n <= 0 => nseq n x = [].
+proof. by move=> le0_n; rewrite iter0. qed.
+
+lemma nseqS n (x : 'a) : 0 <= n => nseq (n+1) x = x :: nseq n x.
+proof. by move=> le0_n; rewrite iterS. qed.
+
 (* -------------------------------------------------------------------- *)
 (*                    Sequence catenation "cat"                         *)
 (* -------------------------------------------------------------------- *)
@@ -467,6 +476,13 @@ proof. elim s1; smt. qed.
 lemma nth_find z0 p (s : 'a list): has p s => p (nth z0 s (find p s)).
 proof. elim s; smt. qed.
 
+lemma filter_pred1 x (s : 'a list) :
+  filter (pred1 x) s = nseq (count (pred1 x) s) x.
+proof.
+elim: s=> /= @/pred1 [|y s ih]; first by rewrite nseq0.
+by case: (y = x)=> //; rewrite addzC nseqS ?count_ge0.
+qed.
+
 (* -------------------------------------------------------------------- *)
 (*                              Lookup                                  *)
 (* -------------------------------------------------------------------- *)
@@ -772,6 +788,14 @@ proof.
   rewrite !perm_eqP=> peq_s1_s2 p'.
   rewrite -!size_filter -!filter_predI !size_filter.
   exact/peq_s1_s2.
+qed.
+
+lemma perm_filterC (p : 'a -> bool) s :
+  perm_eq (filter p s ++ filter (predC p) s) s.
+proof.
+elim: s => //= x s ih; case: (p x)=> @/predC -> //=;
+  last rewrite /= -cat1s catA perm_catCA /=.
+by rewrite perm_cons. by rewrite perm_cons.
 qed.
 
 (* -------------------------------------------------------------------- *)
