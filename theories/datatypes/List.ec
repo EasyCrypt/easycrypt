@@ -28,6 +28,11 @@ lemma size_eq0 (s : 'a list): (size s = 0) <=> (s = []).
 proof. by case s => //=; smt. qed.
 
 (* -------------------------------------------------------------------- *)
+lemma eqseq_cons (x1 x2 : 'a) (s1 s2 : 'a list) :
+  (x1 :: s1 = x2 :: s2) <=> (x1 = x2) /\ (s1 = s2).
+proof. by []. qed.
+
+(* -------------------------------------------------------------------- *)
 op head (z0 : 'a) (s : 'a list) =
   with s = []     => z0
   with s = x :: s => x.
@@ -119,6 +124,13 @@ proof. by elim s1=> //= x s1 ->. qed.
 
 lemma size_cat (s1 s2 : 'a list): size (s1 ++ s2) = size s1 + size s2.
 proof. by elim s1=> // x s1 /= ->; smt. qed.
+
+lemma eqseq_cat (s1 s2 s3 s4 : 'a list) : size s1 = size s2 =>
+  (s1 ++ s3 = s2 ++ s4) <=> (s1 = s2) /\ (s3 = s4).
+proof.
+elim: s1 s2 => [|x1 s1 ih] [|x2 s2] //=; rewrite ?(addz_neq0, size_ge0) //.
+by move/addzI/ih=> ->.
+qed.
 
 lemma lastcons (x y : 'a) (s : 'a list): last x (y :: s) = last y s.
 proof. by []. qed.
@@ -308,6 +320,14 @@ proof.
   elim s => //= y s IHs; case (p y) => py.
     by rewrite orTb /=; exists y; smt.
   by rewrite orFb IHs; split; elim=> x []; smt.
+qed.
+
+lemma hasPn (p : 'a -> bool) s :
+  !has p s <=> (forall x, mem s x => !p x).
+proof.
+split=> [h x sx|h]; first apply: (contra _ _ _ h).
+  by move=> px; apply/hasP; exists x.
+by apply/negP=> /hasP [x [] /h].
 qed.
 
 lemma allP p (s : 'a list):
