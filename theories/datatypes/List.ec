@@ -234,6 +234,17 @@ proof.                        (* BUG: CHECKING IS TOO LONG *)
   cut := h (i+1); smt.
 qed.
 
+lemma nth_nseq w i n (a:'a): 0 <= i < n => nth w (nseq n a) i = a.
+proof.                        (* BUG: PROOF IS TOO LONG *)
+case=> ge0_i ^lt_in /ltzW le_in; have/lez_trans/(_ _ le_in) := ge0_i.
+move=> {le_in} ge0_n; elim: n ge0_n i ge0_i lt_in => [|n ge0_n ih].
+  by move=> i ge0_i; rewrite ltz_def eqz_leq ge0_i /= => [].
+move=> i; rewrite iterS //; elim/natcase: i.
+  move=> i le0_i ge0_i; have ->//: i = 0 by rewrite eqz_leq.
+move=> i ge0_i _; rewrite ltz_add2r /= => /(ih _ ge0_i).
+by rewrite addz_neq0 //= subzE -addzA /= => ->.
+qed.
+
 (* -------------------------------------------------------------------- *)
 (*                       Sequence membership                            *)
 (* -------------------------------------------------------------------- *)

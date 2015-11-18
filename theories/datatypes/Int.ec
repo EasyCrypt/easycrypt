@@ -36,6 +36,7 @@ proof. by []. qed.
 (* -------------------------------------------------------------------- *)
 axiom nosmt lezz      : forall x, x <= x.
 axiom nosmt lez_trans : forall y x z, x <= y => y <= z => x <= z.
+axiom nosmt ltz_trans : forall y x z, x < y => y < z => x < z.
 axiom nosmt lez_anti  : forall (x y : int), x <= y <= x => x = y.
 axiom nosmt lez01     : 0 <= 1.
 axiom nosmt lez_total : forall x y, x <= y \/ y <= x.
@@ -74,8 +75,14 @@ axiom nosmt eqz_leq (x y : int): (x = y) <=> (x <= y /\ y <= x).
 axiom nosmt lez_add2l (x y z : int): (x + y <= x + z) <=> (y <= z).
 axiom nosmt lez_add2r (x y z : int): (y + x <= z + x) <=> (y <= z).
 
+axiom nosmt ltz_add2l (x y z : int): (x + y <  x + z) <=> (y < z).
+axiom nosmt ltz_add2r (x y z : int): (y + x <  z + x) <=> (y < z).
+
 axiom nosmt lez_addl (x y : int) : (x <= x + y) = (0 <= y).
 axiom nosmt lez_addr (x y : int) : (x <= y + x) = (0 <= y).
+
+axiom nosmt ltz_addl (x y : int) : (x < x + y) = (0 < y).
+axiom nosmt ltz_addr (x y : int) : (x < y + x) = (0 < y).
 
 axiom nosmt addz_ge0 (x y : int) : 0 <= x => 0 <= y => 0 <= x + y.
 

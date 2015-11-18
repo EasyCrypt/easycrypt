@@ -36,6 +36,12 @@ proof. by case: b. qed.
 lemma b2i_le1 b: b2i b <= 1.
 proof. by case: b. qed.
 
+lemma b2i_eq1 b : b2i b = 1 <=> b.
+proof. by case: b. qed.
+
+lemma b2i_eq0 b : b2i b = 0 <=> !b.
+proof. by case: b. qed.
+
 (* -------------------------------------------------------------------- *)
 theory IterOp.
   op iteri ['a] : int -> (int -> 'a -> 'a) -> 'a -> 'a.
@@ -45,6 +51,15 @@ theory IterOp.
 
   axiom iteriS ['a] n opr (x : 'a):
     0 <= n => iteri (n+1) opr x = opr n (iteri n opr x).
+
+  lemma eq_iteri (f1 f2 : int -> 'a -> 'a) k a:
+       (forall i a, 0 <= i < k => f1 i a = f2 i a)
+    => iteri k f1 a = iteri k f2 a.
+  proof.
+  elim/natind: k=> [n le0_n|n ge0_n ih] h; first by rewrite !iteri0.
+  rewrite !iteriS // h 1:ltz_addl ?ih // => i b [ge0_i lt_in].
+  by apply/h; rewrite ge0_i (ltz_trans n) // ltz_addl.
+  qed.
 
   op iter ['a] n f x0 = iteri<:'a> n (fun i => f) x0.
 
