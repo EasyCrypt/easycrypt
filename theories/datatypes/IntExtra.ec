@@ -12,6 +12,9 @@ require import Option Int.
 lemma lt0n n : (0 <= n) => (0 < n <=> n <> 0).
 proof. by rewrite ltz_def => ->. qed.
 
+lemma eqn0Ngt n : (0 <= n) => (n = 0) <=> !(0 < n).
+proof. by rewrite eq_sym lez_eqVlt -ora_or => [<-|?->]. qed.
+
 (* -------------------------------------------------------------------- *)
 op b2i (b : bool) = b ? 1 : 0.
 

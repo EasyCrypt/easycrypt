@@ -94,7 +94,12 @@ axiom nosmt oppz_lt0 x : (- x < 0) = (0 < x).
 axiom nosmt lezWP (z1 z2 : int) : (z1 <= z2) || (z2 <= z1).
 axiom nosmt ltzW (z1 z2 : int) : (z1 < z2) => (z1 <= z2).
 
-axiom nosmt addz1_neq0 (i : int): 0 <= i => i+1 <> 0.
+axiom nosmt addz1_neq0 (i : int) : 0 <= i => i+1 <> 0.
+axiom nosmt add1z_neq0 (i : int) : 0 <= i => 1+i <> 0.
+axiom nosmt addz1_neqC0 (i : int): 0 <= i => 0 <> i+1.
+axiom nosmt add1z_neqC0 (i : int): 0 <= i => 0 <> 1+i.
+
+hint rewrite addz_neq0 : addz1_neq0 add1z_neq0 addz1_neqC0 add1z_neqC0.
 
 axiom nosmt lez_eqVlt : forall x y, (x <= y) <=> ((x = y) \/ (x < y)).
 
