@@ -39,6 +39,10 @@ lemma big_cons (P : 'a -> bool) (F : 'a -> t) x s:
   big P F (x :: s) = if P x then F x + big P F s else big P F s.
 proof. by rewrite {1}/big /= (@fun_if (map F)); case (P x). qed.
 
+lemma big_consT (F : 'a -> t) x s:
+  big predT F (x :: s) = F x + big predT F s.
+proof. by apply/big_cons. qed.
+
 (* -------------------------------------------------------------------- *)
 lemma nosmt big_rec (K : t -> bool) r P (F : 'a -> t):
   K idm => (forall i x, P i => K x => K (F i + x)) => K (big P F r).
@@ -352,6 +356,15 @@ proof.
   elim: s1 s2 => [|a s1 ih] s2; first by rewrite big_nil big1_eq.
   rewrite big_cons ih; case: (P1 a)=> h; rewrite -?big_split;
     by apply/eq_bigr=> x _ /=; rewrite big_cons h.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt big_allpairs f F s t:
+    big predT F (allpairs<:'a, 'b, 'c> f s t)
+  = big predT (fun x => big predT (fun y => F (f x y)) t) s.
+proof.
+elim: s t => [|x s ih] t //=; first by rewrite big_nil.
+by rewrite allpairs_consl big_cat ih big_consT big_map.
 qed.
 
 (* -------------------------------------------------------------------- *)
