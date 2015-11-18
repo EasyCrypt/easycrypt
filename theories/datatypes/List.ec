@@ -1671,7 +1671,17 @@ lemma perm_eq_allpairs f s1 s2 t1 t2 :
   perm_eq s1 s2 => perm_eq t1 t2 => perm_eq
     (allpairs<:'a, 'b, 'c> f s1 t1)
     (allpairs<:'a, 'b, 'c> f s2 t2).
-proof. admit. qed.
+proof.
+move=> @/allpairs eqs eqt; elim: s1 s2 eqs => [|x s1 ih] s2 /= eq_s12.
+  by have ->//: s2 = [] by apply/perm_eq_small/perm_eq_sym.
+have/perm_eq_mem/(_ x) := eq_s12; rewrite mem_head /=.
+move/splitPr => [s3 s4] ->>; move: eq_s12.
+rewrite -{1}(cat1s x s4) {1}catA perm_eq_sym perm_catCA /=.
+rewrite perm_cons perm_eq_sym=> /ih /= /(perm_cat2l (map (f x) t1)).
+move/perm_eq_trans; apply; elim: s3 => [|y s3 {ih} ih] /=.
+  by apply/perm_cat2r/perm_eq_map.
+by rewrite catA perm_catCA -catA; apply/perm_cat2l/ih.
+qed.
 
 (* -------------------------------------------------------------------- *)
 (*                         Sequence sorting                             *)
