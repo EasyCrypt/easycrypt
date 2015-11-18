@@ -1288,6 +1288,20 @@ let process_apply_fwd ~implicits (pe, hyp) tc =
           "  @[%a@]" (EcPrinting.pp_form ppe) pte.PT.ptev_ax)
 
 (* -------------------------------------------------------------------- *)
+let process_apply_top tc =
+  let hyps, concl = FApi.tc1_flat tc in
+
+  match TTC.destruct_product hyps concl with
+  | Some (`Imp _) ->
+     let h = LDecl.fresh_id hyps "h" in
+
+     EcLowGoal.t_intros_i_seq ~clear:true [h]
+       (LowApply.t_apply_bwd { pt_head = PTLocal h; pt_args = []} )
+       tc
+
+  | _ -> tc_error !!tc "no top assumption"
+
+(* -------------------------------------------------------------------- *)
 type apply_t = EcParsetree.apply_info
 
 let process_apply ~implicits (infos : apply_t) tc =
@@ -1299,6 +1313,10 @@ let process_apply ~implicits (infos : apply_t) tc =
       let for1 tc pe =
         t_last (process_apply_bwd ~implicits `Apply pe) tc in
       let tc = List.fold_left for1 (tcenv_of_tcenv1 tc) pe in
+      if mode = `Exact then t_onall process_done tc else tc
+
+  | `Top mode ->
+      let tc = process_apply_top tc in
       if mode = `Exact then t_onall process_done tc else tc
 
 (* -------------------------------------------------------------------- *)
