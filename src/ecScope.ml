@@ -2559,7 +2559,12 @@ module Search = struct
           `ByPattern ((ps, ue), fp)
       in List.map do1 qs in
 
+    let relevant =
+      let get_path r = function `ByPath s -> Sp.union r s | _ -> r in
+      List.fold_left get_path Sp.empty paths in
+ 
     let axioms = EcSearch.search scope.sc_env paths in
+    let axioms = EcSearch.sort relevant axioms in 
 
     let buffer = Buffer.create 0 in
     let fmt    = Format.formatter_of_buffer buffer in

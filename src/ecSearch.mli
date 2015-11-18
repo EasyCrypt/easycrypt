@@ -20,3 +20,4 @@ type search = [
 ]
 
 val search : EcEnv.env -> search list -> (path * EcDecl.axiom) list
+val sort : Sp.t -> (path * EcDecl.axiom) list -> (path * EcDecl.axiom) list
