@@ -108,7 +108,7 @@ by case=> x [+ @/pred1 ->>]; rewrite wordnP sz.
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt word_spec_cat i j (s : t list) : 0 <= i => 0 <= j =>
+lemma nosmt word_spec_cat i j : 0 <= i => 0 <= j =>
   perm_eq (wordn (i + j)) (allpairs (++) (wordn i) (wordn j)).
 proof.
 move=> ge0_i ge0_j; apply/uniq_perm_eq; first by apply/uniq_wordn.
