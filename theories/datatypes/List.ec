@@ -888,6 +888,15 @@ proof. by rewrite -cats1 rev_cat /rev /=. qed.
 lemma revK (s : 'a list): rev (rev s) = s.
 proof. by elim s; smt. qed.
 
+lemma rev_inj : injective rev<:'a>.
+proof. by move=> s1 s2 /(congr1 rev); rewrite !revK. qed.
+
+lemma catsI (s t1 t2 : 'a list): s ++ t1 = s ++ t2 => t1 = t2.
+proof. by move=> h; have /eqseq_cat /= <-: size s = size s by done. qed.
+
+lemma catIs (s1 s2 t : 'a list): s1 ++ t = s2 ++ t => s1 = s2.
+proof. by move/(congr1 rev); rewrite !rev_cat => /catsI /rev_inj. qed.
+
 lemma mem_rev (s : 'a list):
   forall x, mem (rev s) x = mem s x.
 proof.
