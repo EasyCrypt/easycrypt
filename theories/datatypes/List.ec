@@ -1513,15 +1513,14 @@ lemma foldr_perm (f : 'a -> 'b -> 'b) (z : 'b) (s1 s2 : 'a list):
   => perm_eq s1 s2
   => foldr f z s1 = foldr f z s2.
 proof.
-  move=> fAC /perm_eqP; elim: s1 s2 => [|i s1 ih1] s2 eq_s12.
-    by case s2 eq_s12 => // i s2 h; cut := h (pred1 i); smt.
-  cut r2i: mem s2 i by rewrite -has_pred1 has_count -eq_s12 smt.
-  have/splitPr {r2i} [s3 s4] ->> := r2i; rewrite foldr_cat /=.
-  rewrite (@ih1 (s3 ++ s4)); 1: move=> p.
-    have /= := eq_s12 p; rewrite !count_cat /=.
-    by rewrite addzCA => /addzI.
-  rewrite foldr_cat => {eq_s12}; elim: s3 => [|x s3 ih2] //.
-  by rewrite /= fAC ih2.
+move=> fgAC; elim: s1 s2 => [|i s1 ih] s2 eq_s12 /=.
+  have ->//: s2 = [] by apply/perm_eq_small/perm_eq_sym.
+have/perm_eq_mem/(_ i) := eq_s12; rewrite mem_head /=.
+move/splitPr => [s3 s4] ->>; rewrite foldr_cat /=.
+move: eq_s12; rewrite -(cat1s i s4) catA perm_eq_sym.
+rewrite perm_catCA /= perm_cons perm_eq_sym => /ih ->.
+rewrite foldr_cat; elim: s3 => [|x s3 {ih} ih] //=.
+by rewrite fgAC ih.
 qed.
 
 lemma foldr_rem (x : 'a) (f : 'a -> 'b -> 'b) (z : 'b) (s : 'a list):
