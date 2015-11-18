@@ -1609,6 +1609,47 @@ lemma eq_in_all p1 p2 (s : 'a list):
 proof. by move=> h; rewrite !all_count (eq_in_count _ p2). qed.
 
 (* -------------------------------------------------------------------- *)
+(*                            All pairs                                 *)
+(* -------------------------------------------------------------------- *)
+op allpairs ['a 'b 'c] (f : 'a -> 'b -> 'c) s t =
+  foldr (fun x => (++) (map (f x) t)) [] s.
+
+lemma size_allpairs ['a 'b 'c] f s t :
+  size (allpairs<:'a, 'b, 'c> f s t) = size s * size t.
+proof.
+elim: s => @/allpairs //= x s ih.
+  by rewrite size_cat size_map ih mulzDl.
+qed.
+
+lemma allpairsP f s t z :
+      (mem (allpairs<:'a, 'b, 'c> f s t) z)
+  <=> (exists (p : _ * _), mem s p.`1 /\  mem t p.`2 /\ z = f p.`1 p.`2).
+proof.
+elim: s => @/allpairs //= x s ih; rewrite mem_cat.
+case: (mem (map (f x) t) z)=> [/mapP[y [ty ->]]|] /=; 1: by exists (x, y).
+move=> Nfxz; rewrite ih; split=> [|] [] [x' y'] /=.
+  by case=> [sx'] [sy'] ->>; exists (x', y') => //=; rewrite sx' sy'.
+case=> + [ty'] ->> -[<<-|sx']; last by exists (x', y').
+by move: Nfxz; rewrite (@map_f (f x')).
+qed.
+
+lemma allpairs_uniq ['a 'b 'c] (f : 'a -> 'b -> 'c) s t :
+     uniq s => uniq t
+  => (forall x1 x2 y1 y2,
+           mem s x1 => mem s x2 => mem t y1 => mem t y2
+        => f x1 y1 = f x2 y2 => (x1 = x2 /\ y1 = y2))
+  => uniq (allpairs f s t).
+proof.
+move=> uqs uqt inj_f; have: all (mem s) s by apply/allP.
+elim: {-2}s uqs => @/allpairs //= x s1 ih [s1x' uqs1] [sx1 ss1].
+rewrite cat_uniq ih //= map_inj_in_uniq ?uqt //=.
+  by move=> y1 y2 ty1 ty2 eqf; have: (x = x) /\ (y1 = y2) by apply/inj_f.
+apply/hasPn=> ? /allpairsP[z [s1z [] tz ->]]; apply/negP=> /mapP.
+case=> y [ty Dy]; have [<<- _] //: (z.`1 = x) /\ (z.`2 = y).
+by apply/inj_f=> //; move/allP/(_ z.`1 s1z): ss1.
+qed.
+
+(* -------------------------------------------------------------------- *)
 (*                         Sequence sorting                             *)
 (* -------------------------------------------------------------------- *)
 op path (e : 'a -> 'a -> bool) (x : 'a) (p : 'a list) : bool =
