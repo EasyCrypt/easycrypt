@@ -1614,6 +1614,16 @@ proof. by move=> h; rewrite !all_count (eq_in_count _ p2). qed.
 op allpairs ['a 'b 'c] (f : 'a -> 'b -> 'c) s t =
   foldr (fun x => (++) (map (f x) t)) [] s.
 
+lemma allpairs0l f t : allpairs<:'a, 'b, 'c> f [] t = [].
+proof. by []. qed.
+
+lemma allpairs0r f s : allpairs<:'a, 'b, 'c> f s [] = [].
+proof. by elim: s. qed.
+
+lemma allpairs_consl f x s t :
+ allpairs<:'a, 'b, 'c> f (x :: s) t = map (f x) t ++ allpairs f s t.
+proof. by []. qed.
+
 lemma size_allpairs ['a 'b 'c] f s t :
   size (allpairs<:'a, 'b, 'c> f s t) = size s * size t.
 proof.
