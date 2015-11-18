@@ -1659,6 +1659,12 @@ case=> y [ty Dy]; have [<<- _] //: (z.`1 = x) /\ (z.`2 = y).
 by apply/inj_f=> //; move/allP/(_ z.`1 s1z): ss1.
 qed.
 
+lemma perm_eq_allpairs f s1 s2 t1 t2 :
+  perm_eq s1 s2 => perm_eq t1 t2 => perm_eq
+    (allpairs<:'a, 'b, 'c> f s1 t1)
+    (allpairs<:'a, 'b, 'c> f s2 t2).
+proof. admit. qed.
+
 (* -------------------------------------------------------------------- *)
 (*                         Sequence sorting                             *)
 (* -------------------------------------------------------------------- *)
