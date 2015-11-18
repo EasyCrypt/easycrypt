@@ -708,6 +708,10 @@ qed.
 lemma perm_eq_refl (s : 'a list): perm_eq s s.
 proof. by apply perm_eqP. qed.
 
+lemma perm_eq_refl_eq (s1 s2 : 'a list):
+  s1 = s2 => perm_eq s1 s2.
+proof. by move=> ->; apply/perm_eq_refl. qed.
+
 lemma perm_eq_sym (s1 s2 : 'a list): perm_eq s1 s2 <=> perm_eq s2 s1.
 proof. by rewrite !perm_eqP; smt. qed.
 
@@ -1554,6 +1558,34 @@ lemma foldr_rem (x : 'a) (f : 'a -> 'b -> 'b) (z : 'b) (s : 'a list):
 proof. by move=> fAC /perm_to_rem peq; rewrite (@foldr_perm f z _ _ fAC peq). qed.
 
 (* -------------------------------------------------------------------- *)
+(*                               EqIn                                   *)
+(* -------------------------------------------------------------------- *)
+lemma eq_in_map (f1 f2 : 'a -> 'b) (s : 'a list):
+  (forall x, mem s x => f1 x = f2 x) <=> map f1 s = map f2 s.
+proof. elim: s => //= x s <-; smt. qed.
+
+lemma eq_in_filter p1 p2 (s : 'a list):
+     (forall x, mem s x => p1 x <=> p2 x)
+  => filter p1 s = filter p2 s.
+proof.
+  elim: s => //= x s ih eq_p; rewrite eq_p // ih //.
+  by move=> x' x'_in_s; apply/eq_p; rewrite x'_in_s.
+qed.
+
+lemma eq_in_count (p1 p2 : 'a -> bool) (s : 'a list):
+  (forall x, mem s x => p1 x <=> p2 x) => count p1 s = count p2 s.
+proof. by move=> h; rewrite -!size_filter (eq_in_filter _ p2). qed.
+
+lemma eq_in_has (p1 p2 : 'a -> bool) (s : 'a list):
+  (forall x, mem s x => p1 x <=> p2 x) => has p1 s <=> has p2 s.
+proof. by move=> h; rewrite !has_count (eq_in_count _ p2). qed.
+
+lemma eq_in_all p1 p2 (s : 'a list):
+  (forall x, mem s x => p1 x <=> p2 x) => all p1 s <=> all p2 s.
+proof. by move=> h; rewrite !all_count (eq_in_count _ p2). qed.
+
+
+(* -------------------------------------------------------------------- *)
 (*                            Flattening                                *)
 (* -------------------------------------------------------------------- *)
 op flatten ['a] = foldr (++) [<:'a>].
@@ -1606,39 +1638,28 @@ proof.
   by rewrite flatten_cons count_cat /sumz /= ih.
 qed.
 
-(* ==================================================================== *)
 lemma nosmt perm_undup_count (s : 'a list) :
   perm_eq
     (flatten (map (fun x => nseq (count (pred1 x) s) x) (undup s)))
     s.
-proof. admit. qed.
-
-(* -------------------------------------------------------------------- *)
-(*                               EqIn                                   *)
-(* -------------------------------------------------------------------- *)
-lemma eq_in_map (f1 f2 : 'a -> 'b) (s : 'a list):
-  (forall x, mem s x => f1 x = f2 x) <=> map f1 s = map f2 s.
-proof. elim: s => //= x s <-; smt. qed.
-
-lemma eq_in_filter p1 p2 (s : 'a list):
-     (forall x, mem s x => p1 x <=> p2 x)
-  => filter p1 s = filter p2 s.
 proof.
-  elim: s => //= x s ih eq_p; rewrite eq_p // ih //.
-  by move=> x' x'_in_s; apply/eq_p; rewrite x'_in_s.
+move: {-1}(undup s) (perm_eq_refl (undup s))=> t.
+elim: t s => [|x t ih] s eqs.
+  have ->: s = []; last by apply/perm_eq_refl.
+  by apply/mem_eq0=> a; rewrite -mem_undup (perm_eq_mem _ _ eqs).
+pose s' := filter (predC1 x) s; have/perm_eq_uniq := eqs.
+rewrite undup_uniq cons_uniq /= => [tx uqt]; have {ih} := ih s' _.
+  apply/uniq_perm_eq=> //; first by apply/undup_uniq.
+  move=> y; have/perm_eq_mem/(_ y) := eqs; rewrite !mem_undup /=.
+  by rewrite /s' mem_filter /predC1; case: (y = x).
+move/perm_cat2l/(_ (filter (pred1 x) s))/perm_eq_trans => @/s'.
+move/(_ _ (perm_filterC (pred1 x) s)); rewrite filter_pred1.
+rewrite flatten_cons => /perm_eqlP; rewrite perm_eq_sym=> <-.
+apply/perm_cat2l/perm_eq_refl_eq; congr; apply/eq_in_map.
+move=> a ta /=; case: (x = a)=> [->>//|] ne_xa.
+congr; rewrite count_filter; apply/eq_count.
+by move=> b; apply/eq_iff/andb_idr=> -> @/predC1; rewrite eq_sym.
 qed.
-
-lemma eq_in_count (p1 p2 : 'a -> bool) (s : 'a list):
-  (forall x, mem s x => p1 x <=> p2 x) => count p1 s = count p2 s.
-proof. by move=> h; rewrite -!size_filter (eq_in_filter _ p2). qed.
-
-lemma eq_in_has (p1 p2 : 'a -> bool) (s : 'a list):
-  (forall x, mem s x => p1 x <=> p2 x) => has p1 s <=> has p2 s.
-proof. by move=> h; rewrite !has_count (eq_in_count _ p2). qed.
-
-lemma eq_in_all p1 p2 (s : 'a list):
-  (forall x, mem s x => p1 x <=> p2 x) => all p1 s <=> all p2 s.
-proof. by move=> h; rewrite !all_count (eq_in_count _ p2). qed.
 
 (* -------------------------------------------------------------------- *)
 (*                            All pairs                                 *)
