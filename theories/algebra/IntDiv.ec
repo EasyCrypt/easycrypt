@@ -6,7 +6,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Fun Int Ring. import Ring.IntID.
+require import Fun Int IntExtra Ring. import Ring.IntID.
 
 (* -------------------------------------------------------------------- *)
 
@@ -54,6 +54,10 @@ proof. by move=> /edivn_eq /(_ 0). qed.
 
 lemma nosmt modz_small m d: 0 <= m < d => m %% d = m.
 proof. by move/emodn_eq /(_ 0). qed.
+
+(* -------------------------------------------------------------------- *)
+lemma b2i_mod2 b : b2i b %% 2 = b2i b.
+proof. by rewrite modz_small //; case: b. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt ltz_pmod m d : 0 < d => m %% d < d by admit.
