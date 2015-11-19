@@ -1345,6 +1345,9 @@ theory Iota.
     by rewrite iotaS // in_cons ih smt.
   qed.
 
+  lemma mema_iota m n i : mem (iota_ m n) i <=> (m <= i < m + n).
+  proof. by rewrite mem_iota anda_and. qed.
+
   lemma iota_uniq m n : uniq (iota_ m n).
   proof.
     elim/natind: n m => [n hn|n hn ih] m.
@@ -1528,6 +1531,13 @@ qed.
 lemma mkseq0 (f : int -> 'a) : mkseq f 0 = [].
 proof. by rewrite /mkseq iota0. qed.
 
+lemma mkseq0_le f n : n <= 0 => mkseq<:'a> f n = [].
+proof. by move=> ge0_n @/mkseq; rewrite iota0. qed.
+
+lemma mkseqS f n : 0 <= n =>
+  mkseq<:'a> f (n + 1) = rcons (mkseq f n) (f n).
+proof. by move=> ge0_n; rewrite /mkseq iotaSr //= map_rcons. qed.
+
 (* -------------------------------------------------------------------- *)
 (*                         Sequence folding                             *)
 (* -------------------------------------------------------------------- *)
@@ -1608,6 +1618,10 @@ lemma eq_in_all p1 p2 (s : 'a list):
   (forall x, mem s x => p1 x <=> p2 x) => all p1 s <=> all p2 s.
 proof. by move=> h; rewrite !all_count (eq_in_count _ p2). qed.
 
+lemma eq_in_mkseq (f1 f2 : int -> 'a) n:
+     (forall i, 0 <= i < n => f1 i = f2 i)
+  => mkseq f1 n = mkseq f2 n.
+proof. by move=> h; rewrite -eq_in_map=> x /mema_iota /h. qed.
 
 (* -------------------------------------------------------------------- *)
 (*                            Flattening                                *)
