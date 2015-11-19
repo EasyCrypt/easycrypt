@@ -179,6 +179,9 @@ by smt.
 lemma pow0 x: x ^ 0 = 1
 by smt all.
 
+lemma pow1 (n:int): n ^ 1 = n
+by smt all.
+
 lemma powS p x: 0 <= p => x ^ (p+1) = x * x ^ p
 by smt.
 

@@ -117,3 +117,75 @@ lemma odd2 : !odd 2. proof. by rewrite iter2. qed.
 
 lemma oddS z : 0 <= z => odd (z + 1) = !(odd z).
 proof. by move/iterS<:bool>=> ->. qed.
+
+(* -------------------------------------------------------------------- *)
+(* FIXME: should be supersed by IntDiv                                  *)
+lemma nosmt mod_mul_mod n p i: n <> 0 => 0 < p => (i %% (n*p)) %% p = i %% p.
+proof.
+(*
+  move=> Hn Hp;rewrite {2}(Div_mod i (n*p));1:smt ml=0. 
+  rewrite mulzC mulzA Mod_mult //.
+*)
+admitted.
+
+lemma nosmt mod_mod i p: 0 < p => (i%%p) %% p = i%%p.
+proof. (* by move=> Hp;apply (mod_mul_mod 1 p i). *) admitted.
+
+lemma nosmt mod_pow2_mod n p i: 0 <= n <= p => i %% 2^p %% 2^n = i %% 2^n.
+proof.
+(*
+  move=> Hb;rewrite (_:p = (p - n) + n);1:ring.
+  by rewrite -pow_add 1,2:[smt ml=0] mod_mul_mod //;1:apply gtr_eqF;apply powPos.
+*)
+admitted.
+
+lemma nosmt mod_pow2_split i n p : 0 <= p <= n =>
+   i = (i/%2^n)*2^n + ((i%%2^n)/%2^p)*2^p + i%%2^p.
+proof.
+(*
+  cut Hn := gtr_eqF _ _ (powPos 2 n _) => //. 
+  cut Hp := gtr_eqF _ _ (powPos 2 p _) => //.
+  move=> Hb;rewrite {1}(Div_mod i (2^n))// {1}(Div_mod (i%%2^n) (2^p))//.
+  rewrite mod_pow2_mod //;ring.
+*)
+admitted.
+
+lemma nosmt div_Mle x y p: 0 <= x <= y => 0 < p => x/%p <= y/%p.
+proof.
+(*
+  move=> [H0x Hxy]; cut : 0 <= y - x by smt ml=0.
+  cut {2}->: y = x + (y - x) by ring.
+  move:(y-x)=> {Hxy y} y Hy Hp. cut Hneq:= gtr_eqF _ _ Hp.
+  rewrite {2}(Div_mod x p) // (Div_mod y p) // .
+  cut ->: p * (x /% p) + x %% p + (p * (y /% p) + y %% p) =
+          p * (x/%p + y/%p) + (x%%p + y%%p) by ring.
+  rewrite Div_mult //; move: Mod_bound Div_bound;smt ml=0.
+*)
+admitted.
+  
+lemma nosmt mod_pow2_div i n p:
+  0 <= i => 0 <= p <= n => (i %% 2^n) /% 2^p = (i /% 2^p) %% 2^(n-p).
+proof.
+(*
+  move=> Hi ^Hb [H0p Hpn]. cut Hn := powPos 2 n _ => //; cut Hp:= powPos 2 p _ => //.
+  rewrite {2}(mod_pow2_split _ _ _ Hb).
+  cut -> : i /% 2 ^ n * 2 ^ n + i %% 2 ^ n /% 2 ^ p * 2 ^ p =
+           2^p * ( 2 ^ (n-p) * (i /% 2 ^ n)  + i %% 2 ^ n /% 2 ^ p).
+  + rewrite {2}(_:n = (n-p)+p) 2:-pow_add;1,4:(by ring);smt ml= 0.
+  rewrite Div_mult // (Div_inf (i%%2^p)) /Int.zero /=.
+  + rewrite -{3}(ger0_norm (2^p));1:by apply ltzW.
+    by apply /Mod_bound/gtr_eqF.
+  rewrite Mod_mult 1:powPos // (mod_small (i %% 2 ^ n /% 2 ^ p)) //.
+  split;1:by move:Mod_bound Div_bound;smt ml=0.
+  move=> _;cut := div_Mle (i %% 2 ^ n) (2^n) (2^p) _ _ => //.
+  + move:Mod_bound;smt ml=0.
+  cut {2}->: n = p+(n-p) by ring.
+  rewrite -pow_add // 1:[smt ml=0] (Div_mult _ (2^(n - p)) 0 Hp).
+  rewrite (Div_inf 0) /Int.zero //= ler_eqVlt=> [Heq | //] .
+  cut Hp0 := gtr_eqF _ _ Hp.
+  move:(Div_mod (i%%2^n) (2^p) Hp0). 
+  move:(Mod_bound i (2^n) _). by apply gtr_eqF.
+  move:(Mod_bound  (i %% 2^n) (2^p) Hp0). 
+  rewrite Heq pow_add //;smt ml=0.
+*)
+admitted.
