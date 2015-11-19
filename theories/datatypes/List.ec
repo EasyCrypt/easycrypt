@@ -1126,6 +1126,12 @@ proof.
   by rewrite (count_uniq_mem (undup s) x) ?undup_uniq // mem_undup.
 qed.
 
+lemma undup_nilp (s : 'a list) : (undup s = []) <=> (s = []).
+proof.
+split=> [|->] // /(congr1 mem) h; rewrite mem_eq0 // => x.
+by rewrite -mem_undup h.
+qed.
+
 (* -------------------------------------------------------------------- *)
 (*                             Mapping                                  *)
 (* -------------------------------------------------------------------- *)
@@ -1503,7 +1509,14 @@ proof. by move=> Efg n; apply eq_map. qed.
 lemma nth_mkseq x0 (f : int -> 'a) n i:
   0 <= i < n => nth x0 (mkseq f n) i = f i.
 proof.
-  by move=> Hi; rewrite /mkseq (nth_map 0) ?nth_iota ?size_iota; smt.
+by move=> lt_in; rewrite /mkseq (nth_map 0) ?nth_iota ?size_iota [smt ml=0].
+qed.
+
+lemma nth_mkseq_if x0 (f : int -> 'a) n i:
+  nth x0 (mkseq f n) i = if 0 <= i < n then f i else x0.
+proof.
+case: (0 <= i < n)=> [/(nth_mkseq x0) ->//|h]; rewrite nth_out //.
+rewrite size_mkseq /max; case: (0 < n)=> // _; smt ml=0.
 qed.
 
 lemma mkseq_nth (x0 : 'a) s: mkseq (nth x0 s) (size s) = s.
