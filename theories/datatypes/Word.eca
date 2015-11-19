@@ -20,8 +20,9 @@ type word.
 
 op mkword : t list -> word.
 op ofword : word -> t list.
+op dchar  : t.
 
-op wordw = nseq n witness<:t>.
+op wordw = nseq n dchar.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt size_wordw: size wordw = n.
@@ -47,7 +48,7 @@ proof. by apply/(can_inj _ _ mkwordK). qed.
 
 (* -------------------------------------------------------------------- *)
 op "_.[_]" (w : word) (i : int): t =
-  nth witness (ofword w) i
+  nth dchar (ofword w) i
 axiomatized by getE.
 
 op "_.[_<-_]" (w : word) (i : int) (x : t) : word =
@@ -58,7 +59,7 @@ axiomatized by setE.
 lemma wordP (w1 w2 : word):
   w1 = w2 <=> forall i, 0 <= i < n => w1.[i] = w2.[i].
 proof.
-split=> // ih; apply/ofword_inj/(eq_from_nth witness); rewrite ?size_word //.
+split=> // ih; apply/ofword_inj/(eq_from_nth dchar); rewrite ?size_word //.
 by move=> i ?; rewrite -!getE ih.
 qed.
 
@@ -130,11 +131,15 @@ proof. by rewrite set_set_if. qed.
 (* -------------------------------------------------------------------- *)
 op offun f: word = mkword (mkseq f n).
 
-lemma offunE f i: 0 <= i < n => (offun f).[i] = f i.
+lemma offunifE f i: 
+  (offun f).[i] = if 0 <= i < n then f i else dchar.
 proof.
-move=> lt_in; rewrite getE ofwordK 2:nth_mkseq //.
+rewrite getE ofwordK 2:nth_mkseq_if //.
 by rewrite size_mkseq // max_ler ?ge0_n.
 qed.
+
+lemma offunE f i: 0 <= i < n => (offun f).[i] = f i.
+proof. by move=> lt_in; rewrite offunifE lt_in. qed.
 
 (* -------------------------------------------------------------------- *)
 op map (f : t -> t) (w : word) : word = mkword (map f (ofword w)).
