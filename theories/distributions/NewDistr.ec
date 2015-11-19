@@ -96,6 +96,13 @@ qed.
 lemma eq_dratP ['a] (s1 s2 : 'a list) :
   (perm_eq s1 s2) <=> (drat s1 = drat s2).
 proof. admit. qed.
+
+lemma drat_ll ['a] (s : 'a list) :
+  s <> [] => mu (drat s) predT = 1%r.
+proof.
+move=> nz_s; rewrite prratE count_predT divrr //.
+by rewrite from_intMeq size_eq0.
+qed.
 end MRat.
 
 (* --------------------------------------------------------------------- *)
@@ -112,6 +119,9 @@ proof. by rewrite dunit1E. qed.
 lemma dunitE ['a] (E : 'a -> bool) (x : 'a):
   mu (dunit x) E = if E x then 1%r else 0%r.
 proof. by rewrite MRat.prratE /=; case: (E x). qed.
+
+lemma dunit_ll ['a] (x : 'a): mu (dunit x) predT = 1%r.
+proof. by apply/MRat.drat_ll. qed.
 end MUnit.
 
 (* -------------------------------------------------------------------- *)
@@ -139,6 +149,10 @@ qed.
 lemma duniformE ['a] (E : 'a -> bool) (s : 'a list) :
   mu (duniform s) E = (count E (undup s))%r / (size (undup s))%r.
 proof. apply/MRat.prratE. qed.
+
+lemma duniform_ll (s : 'a list) :
+  s <> [] => mu (duniform s) predT = 1%r.
+proof. by move=> nz_s; apply/MRat.drat_ll; rewrite undup_nilp. qed.
 end MUniform.
 
 (* -------------------------------------------------------------------- *)
