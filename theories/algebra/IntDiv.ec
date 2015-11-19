@@ -56,6 +56,11 @@ lemma nosmt modz_small m d: 0 <= m < d => m %% d = m.
 proof. by move/emodn_eq /(_ 0). qed.
 
 (* -------------------------------------------------------------------- *)
+lemma nosmt ltz_pmod m d : 0 < d => m %% d < d by admit.
+lemma nosmt modz_ge0 m d : d <> 0 => 0 <= m %% d by admit.
+lemma nosmt modz_mod m d : m %% d %% d = m %% d by admit.
+
+(* -------------------------------------------------------------------- *)
 lemma nosmt modzDl z1 z2 m: (z1 %% m + z2) %% m = (z1 + z2) %% m by admit.
 lemma nosmt modzDr z1 z2 m: (z1 + z2 %% m) %% m = (z1 + z2) %% m by admit.
 
@@ -66,3 +71,5 @@ lemma nosmt modzMl p d: (p * d) %% d = 0 by admit.
 lemma nosmt modzMr p d: (d * p) %% d = 0 by admit.
 
 lemma nosmt modzNm z m: (- (z %% m)) %% m = (-z) %% m by admit.
+
+lemma nosmt modzMDl p m d : (p * d + m) %% d = m %% d by admit.
