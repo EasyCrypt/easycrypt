@@ -6,7 +6,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Pred Int List.
+require import Option Pred Int IntExtra List.
 
 (* -------------------------------------------------------------------- *)
 type t.
@@ -26,3 +26,9 @@ qed.
 
 lemma enum_uniq : uniq enum.
 proof. by apply/count_mem_uniq=> x; rewrite enumP enum_spec. qed.
+
+lemma card_gt0 : 0 < card.
+proof.
+rewrite /card; have: mem enum witness by rewrite enumP.
+by case: enum=> //= x s _; rewrite addzC ltzS size_ge0.
+qed.
