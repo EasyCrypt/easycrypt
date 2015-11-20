@@ -51,6 +51,23 @@ by have/perm_eqrE <- := eq_st; apply/perm_cons/perm_eq_sym/perm_to_rem.
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma allpermsP (s t : 'a list) :
-  mem (allperms s) t <=> perm_eq s t.
+lemma nosmt uniq_allperms_r n (s : 'a list) : uniq (allperms_r n s).
+proof.
+elim: n s => //= _ n ih s; apply/uniq_flatten_map/undup_uniq.
+  by move=> x /=; apply/map_inj_in_uniq/ih => a b _ _ [].
+move=> x y; rewrite !mem_undup => sx sy /= /hasP[t].
+by case=> /mapP[t1] [st1 ->] /mapP[t2] [st2 [->]].
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma allpermsP (s t : 'a list) : mem (allperms s) t <=> perm_eq s t.
 proof. by apply/allperms_rP; rewrite size_nseq max_ler ?size_ge0. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma uniq_allperms (s : 'a list) : uniq (allperms s).
+proof. by apply/uniq_allperms_r. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma allperms_spec (s t : 'a list) :
+  count (pred1 t) (allperms s) = b2i (perm_eq s t).
+proof. by rewrite count_uniq_mem 1:uniq_allperms // allpermsP. qed.

@@ -1706,6 +1706,20 @@ congr; rewrite count_filter; apply/eq_count.
 by move=> b; apply/eq_iff/andb_idr=> -> @/predC1; rewrite eq_sym.
 qed.
 
+lemma nosmt uniq_flatten_map (f : 'a -> 'b list) s:
+  (forall x, uniq (f x)) =>
+  (forall x y, mem s x => mem s y => has (mem (f x)) (f y) => x = y) =>
+  uniq s => uniq (flatten (map f s)).
+proof.
+move=> uqf; elim: s => /= [|x s ih inj_f [Nsx uqs]].
+  by rewrite flatten_nil.
+rewrite flatten_cons cat_uniq; rewrite uqf ih //=.
+  by move=> a b sa sb; apply/inj_f; rewrite (sa, sb).
+apply/negP=> /hasP [a] [/flatten_mapP] [b] [sb] fba fxa.
+have ->>//: x = b; apply/inj_f=> //; first by rewrite sb.
+by apply/hasP; exists a.
+qed.
+
 (* -------------------------------------------------------------------- *)
 (*                            All pairs                                 *)
 (* -------------------------------------------------------------------- *)
