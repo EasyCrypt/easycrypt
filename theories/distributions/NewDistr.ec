@@ -36,24 +36,27 @@ axiom distrW (P : 'a distr -> bool):
 axiom muK (m : 'a -> real): isdistr m => mu_x (mk m) = m.
 axiom mkK (d : 'a distr): mk (mu_x d) = d.
 
-lemma ge0_mu ['a] (d : 'a distr) (x : 'a):
+lemma ge0_mu_x ['a] (d : 'a distr) (x : 'a):
   0%r <= mu_x d x.
 proof. by elim/distrW: d x => m dm; rewrite muK //; case: dm. qed.
 
-lemma le1_mu ['a] (d : 'a distr) :
+lemma le1_mu_x ['a] (d : 'a distr) :
   forall (s : 'a list), uniq s => big predT (mu_x d) s <= 1%r.
 proof. by elim/distrW: d => m dm; rewrite muK //; case: dm. qed.      
 
-lemma summable_mu ['a] (d : 'a distr) : summable (mu_x d).
+lemma summable_mu_x ['a] (d : 'a distr) : summable (mu_x d).
 proof.
 exists 1%r=> s eq_s; rewrite (@eq_bigr _ _ (mu_x d)) => /=.
-  by move=> i _; rewrite ger0_norm // ge0_mu.
-by apply/le1_mu.
+  by move=> i _; rewrite ger0_norm // ge0_mu_x.
+by apply/le1_mu_x.
 qed.
+
+lemma ge0_weight ['a] (d : 'a distr) : 0%r <= weight d.
+proof. admit. qed.
 
 lemma countable_mu ['a] (d : 'a distr):
   countable (fun x => mu_x d x <> 0%r).
-proof. by apply/sbl_countable/summable_mu. qed.
+proof. by apply/sbl_countable/summable_mu_x. qed.
 
 lemma eq_distr (d1 d2 : 'a distr):
   (d1 = d2) <=> (forall x, mu_x d1 x = mu_x d2 x).
@@ -61,6 +64,25 @@ proof.
 split=> [->//|eq_mu]; rewrite -(@mkK d1) -(@mkK d2).
 by congr; apply/fun_ext.
 qed.
+
+(* -------------------------------------------------------------------- *)
+op mnull ['a] = fun  (x : 'a) => 0%r.
+op dnull ['a] = mk mnull<:'a>.
+
+lemma isdistr_mnull ['a] : isdistr mnull<:'a>.
+proof. by split=> //= s _; rewrite Bigreal.sumr_const mulr0. qed.
+
+lemma dnull1E ['a] : forall x, mu_x dnull<:'a> x = 0%r.
+proof. by move=> x; rewrite muK //; apply/isdistr_mnull. qed.
+
+lemma dnullE ['a] (E : 'a -> bool) : mu dnull<:'a> E = 0%r.
+proof.
+rewrite muE.
+
+ admit. qed.
+
+lemma weight_dnumm ['a] : weight dnull<:'a> = 0%r.
+proof. by apply/dnullE. qed.
 
 (* -------------------------------------------------------------------- *)
 theory MRat.
@@ -177,6 +199,39 @@ rewrite size_range; case: (lezWP n m) => [le_nm|le_mn].
 by rewrite max_ler // subr_ge0 ltrW // ltzNge.
 qed.
 end MIntUniform.
+
+(* -------------------------------------------------------------------- *)
+op mlet ['a 'b] (f : 'a -> 'b distr) (d : 'a distr) =
+  fun (y : 'b) => sum<:'a> (fun x => mu_x d x * mu_x (f x) y).
+
+op dlet ['a 'b] (f : 'a -> 'b distr) (d : 'a distr) =
+  mk (mlet f d).
+
+lemma isdisrtr_mlet ['a 'b] (f : 'a -> 'b distr) (d : 'a distr) :
+  isdistr (mlet f d).
+proof. admit. qed.
+
+(* -------------------------------------------------------------------- *)
+op dprod ['a 'b] (d1 : 'a distr) (d2 : 'b distr) =
+  dlet (fun x => d2) d1.
+
+(* -------------------------------------------------------------------- *)
+op mscale ['a] (d : 'a distr) =
+  fun x => mu_x d x / weight d.
+
+op dscale ['a] (d : 'a distr) =
+  mk (mscale d).
+
+lemma isdistr_mscale (d : 'a distr) : isdistr (mscale d).
+proof.
+split=> @/mscale [x|s uqs].
+  by rewrite divr_ge0 1:ge0_mu_x // ge0_weight.
+rewrite -divr_suml; apply/(@ler_trans (weight d / weight d)).
+  rewrite 2!divrE ler_wpmul2r // ?invr_ge0 ?ge0_weight //.
+  admit.
+have := ge0_weight d; rewrite ler_eqVlt => [<-|gt0_iw].
+  by rewrite divr0. by rewrite divrr // gtr_eqF.
+qed.
 
 (* -------------------------------------------------------------------- *)
 abstract theory MFinite.

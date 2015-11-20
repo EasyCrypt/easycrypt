@@ -924,6 +924,25 @@ lemma nosmt divr_gt0 x y : zeror < x => zeror < y => zeror < x / y.
 proof. by move=> x_gt0 y_gt0; rewrite divrE pmulr_rgt0 ?invr_gt0. qed.
 
 (* -------------------------------------------------------------------- *)
+lemma invr_gt1 x : unit x => zeror < x => (oner < invr x) <=> (x < oner).
+proof. admit. qed.
+
+lemma invr_ge1 x : unit x => zeror < x => (oner <= invr x) <=> (x <= oner).
+proof. admit. qed.
+
+hint rewrite invr_gte1 : invr_ge1 invr_gt1.
+hint rewrite invr_cp1  : invr_ge1 invr_gt1.
+
+lemma invr_le1 x : unit x => zeror < x => (invr x <= oner) <=> (oner <= x).
+proof. admit. qed.
+
+lemma invr_lt1 x : unit x => zeror < x => (invr x < oner) <=> (oner < x).
+proof. admit. qed.
+
+hint rewrite invr_lte1 : invr_le1 invr_lt1.
+hint rewrite invr_cp1  : invr_le1 invr_lt1.
+
+(* -------------------------------------------------------------------- *)
 lemma nosmt ler_norm_sub (x y : t):
   `|x - y| <= `|x| + `|y|.
 proof. by rewrite subrE -(@normrN y) ler_norm_add. qed.
