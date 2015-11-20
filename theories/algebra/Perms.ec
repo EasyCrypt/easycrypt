@@ -25,7 +25,7 @@ proof.
 elim: n s t => [s t /size_eq0 ->|_ n ih s t] //=.
   split=> [->|]; first by apply/perm_eq_refl.
   by move/perm_eq_sym; apply/perm_eq_small.
-case: s ih=> [|x s] ih; first by rewrite addz_neq0 ?size_ge0.
+case: s=> [|x s]; first by rewrite addz_neq0 ?size_ge0.
 (pose s' := undup _)=> /=; move/addrI=> eq_sz; split.
   move/flatten_mapP=> [y] [s'y] /= /mapP [t'] [+ ->>].
   case: (x = y)=> [<<-|]; first by rewrite ih // perm_cons.
@@ -71,3 +71,33 @@ proof. by apply/uniq_allperms_r. qed.
 lemma allperms_spec (s t : 'a list) :
   count (pred1 t) (allperms s) = b2i (perm_eq s t).
 proof. by rewrite count_uniq_mem 1:uniq_allperms // allpermsP. qed.
+
+(* -------------------------------------------------------------------- *)
+require import StdBigop.
+(*---*) import Bigint Bigint.BIM Bigint.BIA.
+
+(* -------------------------------------------------------------------- *)
+lemma size_allperms_uniq_r n (s : 'a list) : size s = size n => uniq s =>
+  size (allperms_r n s) = fact (size s).
+proof.
+elim: n s => /= [|_ n ih] s; 1: by move/size_eq0=> -> /=; rewrite fact0.
+case: s=> [|x s]; first by rewrite addz_neq0 ?size_ge0.
+(pose s' := undup _)=> /=; move/addrI=> eq_sz [Nsz uqs].
+rewrite (addrC 1) factS ?size_ge0 // -ih //.
+rewrite size_flatten sumzE -map_comp; pose F := _ \o _.
+rewrite /s' undup_id //= big_consT /= {1}/F /(\o) /=.
+rewrite size_map /= mulrDl /= addrC; congr.
+have: forall y, mem s y => F y = size (allperms_r n s).
+  move=> y sy @/F @/(\o); rewrite size_map; case: (x = y)=> //.
+  move=> ne_xy; rewrite !ih //= ?size_rem //.
+    by rewrite subrE addrCA.
+    by rewrite rem_uniq //=; apply/negP=> /mem_rem.
+  by rewrite addrC subrE -addrA.
+move/eq_in_map=> ->; rewrite big_map predT_comp /(\o) /=.
+by rewrite sumr_const intmulz count_predT mulrC.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma size_allperms_uniq (s : 'a list) :
+  uniq s => size (allperms s) = fact (size s).
+proof. by apply/size_allperms_uniq_r; rewrite size_nseq max_ler ?size_ge0. qed.
