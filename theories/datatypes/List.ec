@@ -742,6 +742,13 @@ lemma perm_eqlE (s1 s2 : 'a list):
   perm_eq s1 s2 => forall s, perm_eq s1 s <=> perm_eq s2 s.
 proof. by move=> h; apply perm_eqlP. qed.
 
+lemma  perm_eqrE ['a]:
+  forall (s1 s2 : 'a list),
+    perm_eq s1 s2 => forall (s : 'a list), perm_eq s s1 <=> perm_eq s s2.
+proof.
+by move=> s1 s2 h s; rewrite !(perm_eq_sym s); move/perm_eqlE: h=> ->.
+qed.
+
 lemma perm_catC (s1 s2 : 'a list): perm_eq (s1 ++ s2) (s2 ++ s1).
 proof. by rewrite !perm_eqP => p; rewrite !count_cat; smt. qed.
 

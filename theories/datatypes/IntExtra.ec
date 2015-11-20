@@ -18,6 +18,9 @@ proof. by rewrite eq_sym lez_eqVlt -ora_or => [<-|?->]. qed.
 lemma ltzS m n : (m < n+1) = (m <= n).
 proof. by rewrite -lez_add1r addzC lez_add2r. qed.
 
+lemma leqn0 n : 0 <= n => (n <= 0) <=> (n = 0).
+proof. by rewrite eqz_leq => ->. qed.
+
 (* -------------------------------------------------------------------- *)
 op b2i (b : bool) = b ? 1 : 0.
 
