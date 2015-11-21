@@ -159,6 +159,95 @@ let process_clear symbols tc =
   try  t_clears (List.map toid symbols) tc
   with ClearError err -> tc_error_clear !!tc err
 
+
+(* -------------------------------------------------------------------- *)
+module LowApply = struct
+  exception NoInstance
+
+  let t_apply_bwd_r pt (tc : tcenv1) =
+    let (hyps, concl) = FApi.tc1_flat tc in
+
+    let rec instantiate canview istop pt =
+      match istop && PT.can_concretize pt.PT.ptev_env with
+      | true ->
+          let ax = PT.concretize_form pt.PT.ptev_env pt.PT.ptev_ax in
+          if   EcReduction.is_conv hyps ax concl
+          then pt
+          else instantiate canview false pt
+
+      | false -> begin
+          try
+            PT.pf_form_match ~mode:fmdelta pt.PT.ptev_env ~ptn:pt.PT.ptev_ax concl;
+            if not (PT.can_concretize pt.PT.ptev_env) then
+              raise NoInstance;
+            pt
+          with EcMatching.MatchFailure ->
+            match TTC.destruct_product hyps pt.PT.ptev_ax with
+            | Some _ ->
+                (* FIXME: add internal marker *)
+                instantiate canview false (PT.apply_pterm_to_hole pt)
+
+            | None when not canview ->
+                raise NoInstance
+
+            | None ->
+                let forview (p, fs) =
+                  (* Current proof-term is view argument *)
+                  (* Copy PT environment to set a back-track point *)
+                  let argpt = { pt with ptev_env = PT.copy pt.ptev_env } in
+                  let argpt = { ptea_env = argpt.ptev_env;
+                                ptea_arg = PVASub argpt; } in
+
+                  (* Type-check view - FIXME: the current API is perfectible *)
+                  let viewpt =
+                    { pt_head = PTGlobal (p, []);
+                      pt_args = List.map (fun f -> PAFormula f) fs; } in
+                  let viewpt, ax = LowApply.check `Elim viewpt (`Hyps (hyps, !!tc)) in
+
+                  (* Apply view to its actual arguments *)
+                  let viewpt = apply_pterm_to_arg
+                      { ptev_env = argpt.ptea_env;
+                        ptev_pt  = viewpt;
+                        ptev_ax  = ax; }
+                      argpt
+                  in
+                  try  Some (instantiate false true viewpt)
+                  with NoInstance -> None
+                in
+
+                let views =
+                  match sform_of_form pt.PT.ptev_ax with
+                  | SFiff (f1, f2) ->
+                      [(LG.p_iff_lr, [f1; f2]);
+                       (LG.p_iff_rl, [f1; f2])]
+
+                  | SFnot f1 ->
+                      [(LG.p_negbTE, [f1])]
+
+                  | _ -> []
+                in
+
+                try  List.find_map forview views
+                with Not_found -> raise NoInstance
+      end
+    in
+
+    let pt = instantiate true true pt in
+    let pt = fst (PT.concretize pt) in
+
+    EcLowGoal.t_apply pt tc
+
+  let t_apply_bwd pt (tc : tcenv1) =
+    let hyps   = FApi.tc1_hyps tc in
+    let pt, ax = LowApply.check `Elim pt (`Hyps (hyps, !!tc)) in
+    let ptenv  = ptenv_of_penv hyps !!tc in
+
+    t_apply_bwd_r { ptev_env = ptenv; ptev_pt = pt; ptev_ax = ax; } tc
+end
+
+let t_apply_prept pt tc = 
+  LowApply.t_apply_bwd_r (pt_of_prept tc pt) tc
+
 (* -------------------------------------------------------------------- *)
 module LowRewrite = struct
   type error =
@@ -249,7 +338,7 @@ module LowRewrite = struct
 
   let t_rewrite ?target (s, o) pt (tc : tcenv1) =
     let hyps   = FApi.tc1_hyps ?target tc in
-    let pt, ax = LowApply.check `Elim pt (`Hyps (hyps, !!tc)) in
+    let pt, ax = EcLowGoal.LowApply.check `Elim pt (`Hyps (hyps, !!tc)) in
     let ptenv  = ptenv_of_penv hyps !!tc in
 
     t_rewrite_r ?target (s, o)
@@ -274,6 +363,90 @@ end
 
 let t_rewrite_prept info pt tc = 
   LowRewrite.t_rewrite_r info (pt_of_prept tc pt) tc
+
+
+(* -------------------------------------------------------------------- *)
+let process_apply_bwd ~implicits mode (ff : ppterm) (tc : tcenv1) =
+  let pt = PT.tc1_process_full_pterm ~implicits tc ff in
+
+  try
+    let aout = LowApply.t_apply_bwd_r pt tc in
+
+    match mode with
+    | `Apply -> aout
+    | `Exact ->
+        let aout = FApi.t_onall process_trivial aout in
+        if not (FApi.tc_done aout) then
+          tc_error !!tc "cannot close goal";
+        aout
+
+  with LowApply.NoInstance ->
+    tc_error_lazy !!tc
+      (fun fmt ->
+        let ppe = EcPrinting.PPEnv.ofenv (FApi.tc1_env tc) in
+        Format.fprintf fmt "cannot apply the given proof-term for:\n\n%!";
+        Format.fprintf fmt
+          "  @[%a@]" (EcPrinting.pp_form ppe) pt.PT.ptev_ax)
+
+(* -------------------------------------------------------------------- *)
+let process_apply_fwd ~implicits (pe, hyp) tc =
+  let module E = struct exception NoInstance end in
+
+  let hyps = FApi.tc1_hyps tc in
+
+  if not (LDecl.hyp_exists (unloc hyp) hyps) then
+    tc_error !!tc "unknown hypothesis: %s" (unloc hyp);
+
+  let hyp, fp = LDecl.hyp_by_name (unloc hyp) hyps in
+  let pte = PT.tc1_process_full_pterm ~implicits tc pe in
+
+  try
+    let rec instantiate pte =
+      match TTC.destruct_product hyps pte.PT.ptev_ax with
+      | None -> raise E.NoInstance
+
+      | Some (`Forall _) ->
+          instantiate (PT.apply_pterm_to_hole pte)
+
+      | Some (`Imp (f1, f2)) ->
+          try
+            PT.pf_form_match ~mode:fmdelta pte.PT.ptev_env ~ptn:f1 fp;
+            (pte, f2)
+          with MatchFailure -> raise E.NoInstance
+    in
+
+    let (pte, cutf) = instantiate pte in
+    let pt = fst (PT.concretize pte) in
+    let pt = { pt with pt_args = pt.pt_args @ [palocal hyp]; } in
+    let cutf = PT.concretize_form pte.PT.ptev_env cutf in
+
+    FApi.t_last
+      (FApi.t_seq (t_clear hyp) (t_intros_i [hyp]))
+      (t_cutdef pt cutf tc)
+
+  with E.NoInstance ->
+    tc_error_lazy !!tc
+      (fun fmt ->
+        let ppe = EcPrinting.PPEnv.ofenv (FApi.tc1_env tc) in
+        Format.fprintf fmt
+          "cannot apply (in %a) the given proof-term for:\n\n%!"
+          (EcPrinting.pp_local ppe) hyp;
+        Format.fprintf fmt
+          "  @[%a@]" (EcPrinting.pp_form ppe) pte.PT.ptev_ax)
+
+(* -------------------------------------------------------------------- *)
+let process_apply_top tc =
+  let hyps, concl = FApi.tc1_flat tc in
+
+  match TTC.destruct_product hyps concl with
+  | Some (`Imp _) ->
+     let h = LDecl.fresh_id hyps "h" in
+
+     EcLowGoal.t_intros_i_seq ~clear:true [h]
+       (LowApply.t_apply_bwd { pt_head = PTLocal h; pt_args = []} )
+       tc
+
+  | _ -> tc_error !!tc "no top assumption"
 
 (* -------------------------------------------------------------------- *)
 let process_rewrite1_core ?target (s, o) pt tc =
@@ -528,6 +701,13 @@ let rec process_rewrite1_r ttenv ?target ri tc =
 
   | RWSmt info ->
       process_smt ~loc:ri.pl_loc ttenv info tc
+
+  | RWApp fp -> begin
+      let implicits = ttenv.tt_implicits in
+      match target with
+      | None -> process_apply_bwd ~implicits `Apply fp tc
+      | Some target -> process_apply_fwd ~implicits (fp, target) tc
+    end
 
 (* -------------------------------------------------------------------- *)
 let rec process_rewrite1 ttenv ?target ri tc =
@@ -1129,177 +1309,6 @@ let process_pose xsym o p (tc : tcenv1) =
   FApi.t_seq
     (fun tc -> tcenv_of_tcenv1 (t_change letin tc))
     (t_intros [Tagged (x, Some xsym.pl_loc)]) tc
-
-(* -------------------------------------------------------------------- *)
-module LowApply = struct
-  exception NoInstance
-
-  let t_apply_bwd_r pt (tc : tcenv1) =
-    let (hyps, concl) = FApi.tc1_flat tc in
-
-    let rec instantiate canview istop pt =
-      match istop && PT.can_concretize pt.PT.ptev_env with
-      | true ->
-          let ax = PT.concretize_form pt.PT.ptev_env pt.PT.ptev_ax in
-          if   EcReduction.is_conv hyps ax concl
-          then pt
-          else instantiate canview false pt
-
-      | false -> begin
-          try
-            PT.pf_form_match ~mode:fmdelta pt.PT.ptev_env ~ptn:pt.PT.ptev_ax concl;
-            if not (PT.can_concretize pt.PT.ptev_env) then
-              raise NoInstance;
-            pt
-          with EcMatching.MatchFailure ->
-            match TTC.destruct_product hyps pt.PT.ptev_ax with
-            | Some _ ->
-                (* FIXME: add internal marker *)
-                instantiate canview false (PT.apply_pterm_to_hole pt)
-
-            | None when not canview ->
-                raise NoInstance
-
-            | None ->
-                let forview (p, fs) =
-                  (* Current proof-term is view argument *)
-                  (* Copy PT environment to set a back-track point *)
-                  let argpt = { pt with ptev_env = PT.copy pt.ptev_env } in
-                  let argpt = { ptea_env = argpt.ptev_env;
-                                ptea_arg = PVASub argpt; } in
-
-                  (* Type-check view - FIXME: the current API is perfectible *)
-                  let viewpt =
-                    { pt_head = PTGlobal (p, []);
-                      pt_args = List.map (fun f -> PAFormula f) fs; } in
-                  let viewpt, ax = LowApply.check `Elim viewpt (`Hyps (hyps, !!tc)) in
-
-                  (* Apply view to its actual arguments *)
-                  let viewpt = apply_pterm_to_arg
-                      { ptev_env = argpt.ptea_env;
-                        ptev_pt  = viewpt;
-                        ptev_ax  = ax; }
-                      argpt
-                  in
-                  try  Some (instantiate false true viewpt)
-                  with NoInstance -> None
-                in
-
-                let views =
-                  match sform_of_form pt.PT.ptev_ax with
-                  | SFiff (f1, f2) ->
-                      [(LG.p_iff_lr, [f1; f2]);
-                       (LG.p_iff_rl, [f1; f2])]
-
-                  | SFnot f1 ->
-                      [(LG.p_negbTE, [f1])]
-
-                  | _ -> []
-                in
-
-                try  List.find_map forview views
-                with Not_found -> raise NoInstance
-      end
-    in
-
-    let pt = instantiate true true pt in
-    let pt = fst (PT.concretize pt) in
-
-    EcLowGoal.t_apply pt tc
-
-  let t_apply_bwd pt (tc : tcenv1) =
-    let hyps   = FApi.tc1_hyps tc in
-    let pt, ax = LowApply.check `Elim pt (`Hyps (hyps, !!tc)) in
-    let ptenv  = ptenv_of_penv hyps !!tc in
-
-    t_apply_bwd_r { ptev_env = ptenv; ptev_pt = pt; ptev_ax = ax; } tc
-end
-
-let t_apply_prept pt tc = 
-  LowApply.t_apply_bwd_r (pt_of_prept tc pt) tc
-
-(* -------------------------------------------------------------------- *)
-let process_apply_bwd ~implicits mode (ff : ppterm) (tc : tcenv1) =
-  let pt = PT.tc1_process_full_pterm ~implicits tc ff in
-
-  try
-    let aout = LowApply.t_apply_bwd_r pt tc in
-
-    match mode with
-    | `Apply -> aout
-    | `Exact ->
-        let aout = FApi.t_onall process_trivial aout in
-        if not (FApi.tc_done aout) then
-          tc_error !!tc "cannot close goal";
-        aout
-
-  with LowApply.NoInstance ->
-    tc_error_lazy !!tc
-      (fun fmt ->
-        let ppe = EcPrinting.PPEnv.ofenv (FApi.tc1_env tc) in
-        Format.fprintf fmt "cannot apply the given proof-term for:\n\n%!";
-        Format.fprintf fmt
-          "  @[%a@]" (EcPrinting.pp_form ppe) pt.PT.ptev_ax)
-
-(* -------------------------------------------------------------------- *)
-let process_apply_fwd ~implicits (pe, hyp) tc =
-  let module E = struct exception NoInstance end in
-
-  let hyps = FApi.tc1_hyps tc in
-
-  if not (LDecl.hyp_exists (unloc hyp) hyps) then
-    tc_error !!tc "unknown hypothesis: %s" (unloc hyp);
-
-  let hyp, fp = LDecl.hyp_by_name (unloc hyp) hyps in
-  let pte = PT.tc1_process_full_pterm ~implicits tc pe in
-
-  try
-    let rec instantiate pte =
-      match TTC.destruct_product hyps pte.PT.ptev_ax with
-      | None -> raise E.NoInstance
-
-      | Some (`Forall _) ->
-          instantiate (PT.apply_pterm_to_hole pte)
-
-      | Some (`Imp (f1, f2)) ->
-          try
-            PT.pf_form_match ~mode:fmdelta pte.PT.ptev_env ~ptn:f1 fp;
-            (pte, f2)
-          with MatchFailure -> raise E.NoInstance
-    in
-
-    let (pte, cutf) = instantiate pte in
-    let pt = fst (PT.concretize pte) in
-    let pt = { pt with pt_args = pt.pt_args @ [palocal hyp]; } in
-    let cutf = PT.concretize_form pte.PT.ptev_env cutf in
-
-    FApi.t_last
-      (FApi.t_seq (t_clear hyp) (t_intros_i [hyp]))
-      (t_cutdef pt cutf tc)
-
-  with E.NoInstance ->
-    tc_error_lazy !!tc
-      (fun fmt ->
-        let ppe = EcPrinting.PPEnv.ofenv (FApi.tc1_env tc) in
-        Format.fprintf fmt
-          "cannot apply (in %a) the given proof-term for:\n\n%!"
-          (EcPrinting.pp_local ppe) hyp;
-        Format.fprintf fmt
-          "  @[%a@]" (EcPrinting.pp_form ppe) pte.PT.ptev_ax)
-
-(* -------------------------------------------------------------------- *)
-let process_apply_top tc =
-  let hyps, concl = FApi.tc1_flat tc in
-
-  match TTC.destruct_product hyps concl with
-  | Some (`Imp _) ->
-     let h = LDecl.fresh_id hyps "h" in
-
-     EcLowGoal.t_intros_i_seq ~clear:true [h]
-       (LowApply.t_apply_bwd { pt_head = PTLocal h; pt_args = []} )
-       tc
-
-  | _ -> tc_error !!tc "no top assumption"
 
 (* -------------------------------------------------------------------- *)
 type apply_t = EcParsetree.apply_info

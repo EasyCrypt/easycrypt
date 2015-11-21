@@ -581,12 +581,13 @@ type tfocus  = (tfocus1 list option) pair
 type rwarg = (tfocus located) option * rwarg1 located
 
 and rwarg1 =
+  | RWSimpl
   | RWDelta of (rwoptions * pformula)
   | RWRw    of (rwoptions * (rwside * ppterm) list)
   | RWPr    of (psymbol * pformula option)
   | RWDone  of bool
-  | RWSimpl
   | RWSmt   of pprover_infos
+  | RWApp   of ppterm
 
 and rwoptions = rwside * trepeat option * rwocc
 and rwside    = [`LtoR | `RtoL]
