@@ -58,7 +58,7 @@ proof. rewrite /( * ) /inzmod /asint /= Sub.insubdK; smt. qed.
 (* -------------------------------------------------------------------- *)
 theory ZModule.
   lemma addrA (x y z : zmod): x + (y + z) = (x + y) + z.
-  proof. by apply/asint_inj; rewrite !addE modzDl modzDr addzA. qed.
+  proof. by apply/asint_inj; rewrite !addE modzDml modzDmr addzA. qed.
 
   lemma addrC (x y : zmod): x + y = y + x.
   proof. by apply/asint_inj; rewrite !addE addzC. qed.
@@ -69,7 +69,7 @@ theory ZModule.
   lemma addNr (x : zmod): (-x) + x = Self.zero.
   proof.
     apply/asint_inj; rewrite !(zeroE, addE, oppE).
-    by rewrite modzDl addNz mod0z.
+    by rewrite modzDml addNz mod0z.
   qed.
 end ZModule.
 
@@ -104,14 +104,14 @@ theory ComRing.
   lemma mulrDl (x y z : zmod): (x + y) * z = (x * z) + (y * z).
   proof.
     apply/asint_inj; rewrite !(addE, mulE).
-    by rewrite !(modzMml, modzMmr, modzDl, modzDr) mulzDl.
+    by rewrite !(modzMml, modzMmr, modzDml, modzDmr) mulzDl.
   qed.
 end ComRing.
 
 (* -------------------------------------------------------------------- *)
 lemma inzmodD (a b : int):
   inzmod (a + b) = inzmod a + inzmod b.
-proof. by apply/asint_inj; rewrite addE !inzmodK modzDr modzDl. qed.
+proof. by apply/asint_inj; rewrite addE !inzmodK modzDmr modzDml. qed.
 
 lemma inzmodM (a b : int):
   inzmod (a * b) = inzmod a * inzmod b.

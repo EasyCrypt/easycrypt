@@ -5,7 +5,7 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require Int.
+require import Int IntDiv.
 require import Finite FSet.
 
 type word.
@@ -53,7 +53,7 @@ require (*--*) Ring.
 instance bring with word
   op rzero = zeros
   op rone  = ones
-  op add   = (   ^  )
+  op add   = Self.( ^ )
   op mul   = land
   op opp   = lopp
 

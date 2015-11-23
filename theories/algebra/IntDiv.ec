@@ -27,22 +27,19 @@ by move=> ->> /=; move: eq; rewrite subrr normr0P subr_eq0.
 qed.
 
 (* -------------------------------------------------------------------- *)
-
-(* FIXME: re-add when old Int.ec is cleaned up *)
-(* op (%%) : int -> int -> int. *)
-
-op (%/) : int -> int -> int.
+op (/%) : int -> int -> int.
+op (%%) : int -> int -> int.
 
 axiom nosmt edivzP (m d : int):
-  m = (m %/ d) * d + (m %% d) /\ (d <> 0 => 0 <= m %% d < `|d|).
+  m = (m /% d) * d + (m %% d) /\ (d <> 0 => 0 <= m %% d < `|d|).
 
-axiom divz0 m: m %/ 0 = 0.
+axiom divz0 m: m /% 0 = 0.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt euclideUl d q r m :
-     q * d + r = (m %/ d) * d + (m %% d)
+     q * d + r = (m /% d) * d + (m %% d)
   => 0 <= r < `|d|
-  => q = m %/ d /\ r = m %% d.
+  => q = m /% d /\ r = m %% d.
 proof.
 case: (d = 0) => [->|]; first by rewrite ler_lt_asym.
 move=> nz_d eq le_rd; apply/(@euclideU d)=> //.
@@ -61,15 +58,15 @@ by case: (edivzP m d)=> _ /(_ nz_d) [].
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt ltz_mod m d : d <> 0 => m %% d < `|d|.
+lemma ltz_mod m d : d <> 0 => m %% d < `|d|.
 proof. by move=> gt0_d; case: (edivzP m d) => _ /(_ _) //; rewrite gtr_eqF. qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt ltz_pmod m d : 0 < d => m %% d < d.
+lemma ltz_pmod m d : 0 < d => m %% d < d.
 proof. by move=> ^h /ltr0_neq0 /ltz_mod/(_ m); rewrite gtr0_norm. qed.
 
 (* -------------------------------------------------------------------- *)
-lemma div0z d: 0 %/ d = 0.
+lemma div0z d: 0 /% d = 0.
 proof.
 case: (d = 0) => [->|nz_d]; first by rewrite divz0.
 have /= := euclideUl d 0 0 0; rewrite normr_gt0 nz_d /=.
@@ -81,16 +78,16 @@ lemma mod0z d: 0 %% d = 0.
 proof. by case: (edivzP 0 d); rewrite div0z /= eq_sym. qed.
 
 (* -------------------------------------------------------------------- *)
-lemma divz_eq (m d : int): m = (m %/ d) * d + (m %% d).
+lemma divz_eq (m d : int): m = (m /% d) * d + (m %% d).
 proof. by case: (edivzP m d). qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt modzN (m d : int): m %% (-d) = m %% d.
+lemma modzN (m d : int): m %% (-d) = m %% d.
 proof.
 case: (d = 0) => [->|nz_d]; first by rewrite oppr0.
 have [+ _] := edivzP m (-d); have [+ _] := edivzP m d.
 move=> {1}->; rewrite mulrN -mulNr => /eq_sym eq.
-have := euclideUl d (- (m %/ -d)) (m %% -d) m.
+have := euclideUl d (- (m /% -d)) (m %% -d) m.
 rewrite modz_ge0 1:oppr_eq0 //= -normrN ltz_mod 1:oppr_eq0 //=.
 by move/(_ eq) => [].
 qed.
@@ -103,7 +100,7 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 lemma edivz_eq d q r:
-  0 <= r < `|d| => (q * d + r) %/ d = q.
+  0 <= r < `|d| => (q * d + r) /% d = q.
 proof.
 move=> lt_rd; have [+ _] := (edivzP (q * d + r) d).
 by move/euclideUl/(_ lt_rd)=> [<-].
@@ -117,11 +114,15 @@ by move/euclideUl/(_ lt_rd)=> [_ <-].
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt divz_small m d: 0 <= m < `|d| => m %/ d = 0.
+lemma divz_small m d: 0 <= m < `|d| => m /% d = 0.
 proof. by move=> /edivz_eq /(_ 0). qed.
 
-lemma nosmt modz_small m d: 0 <= m < `|d| => m %% d = m.
+lemma modz_small m d: 0 <= m < `|d| => m %% d = m.
 proof. by move=> /emodz_eq /(_ 0). qed.
+
+(* -------------------------------------------------------------------- *)
+lemma modz1 x : x %% 1 = 0.
+proof. by have /= := ltz_pmod x 1; rewrite (@ltzS _ 0) leqn0 1:modz_ge0. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma b2i_mod2 b : b2i b %% 2 = b2i b.
@@ -136,11 +137,11 @@ rewrite -!(modz_abs _ d) modz_small // normr_id ltz_pmod.
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma modzE m d : m %% d = m - (m %/ d) * d.
+lemma modzE m d : m %% d = m - (m /% d) * d.
 proof. by have [+ _] - {2}-> := edivzP m d; rewrite subrE addrAC addrN. qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt divzMDl q m d : d <> 0 => (q * d + m) %/ d = q + (m %/ d).
+lemma nosmt divzMDl q m d : d <> 0 => (q * d + m) /% d = q + (m /% d).
 proof.
 move=> nz_d; have [+ /(_ nz_d) lt_md] - {1}-> := edivzP m d.
 by rewrite addrA -mulrDl edivz_eq.
@@ -155,33 +156,108 @@ by rewrite addrN /= -subrE -modzE.
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt modzDl m d : (d + m) %% d = m %% d.
+lemma modzDl m d : (d + m) %% d = m %% d.
 proof. by rewrite -{1}(@mul1r d) modzMDl. qed.
 
-lemma nosmt modzDr m d : (m + d) %% d = m %% d.
+lemma modzDr m d : (m + d) %% d = m %% d.
 proof. by rewrite addrC modzDl. qed.
 
-lemma nosmt modzz d : d %% d = 0.
+lemma modzz d : d %% d = 0.
 proof. by rewrite -{1}(@addr0 d) modzDl mod0z. qed.
 
-lemma nosmt modzMl p d : (p * d) %% d = 0.
+lemma modzMl p d : (p * d) %% d = 0.
 proof. by rewrite -(@addr0 (p*d)) modzMDl mod0z. qed.
 
-lemma nosmt modzMr p d : (d * p) %% d = 0.
+lemma modzMr p d : (d * p) %% d = 0.
 proof. by rewrite mulrC modzMl. qed.
 
-lemma nosmt modzDml m n d : (m %% d + n) %% d = (m + n) %% d.
+lemma modzDml m n d : (m %% d + n) %% d = (m + n) %% d.
 proof. by rewrite {2}(divz_eq m d) -addrA modzMDl. qed.
 
-lemma nosmt modzDmr m n d : (m + n %% d) %% d = (m + n) %% d.
+lemma modzDmr m n d : (m + n %% d) %% d = (m + n) %% d.
 proof. by rewrite !(addrC m) modzDml. qed.
 
 lemma nosmt modzDm m n d : (m %% d + n %% d) %% d = (m + n) %% d.
 proof. by rewrite modzDml modzDmr. qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt modzMml m n d : ((m %% d) * n) %% d = (m * n) %% d.
+lemma modzMml m n d : ((m %% d) * n) %% d = (m * n) %% d.
 proof. by rewrite {2}(divz_eq m d) mulrDl mulrAC modzMDl. qed.
 
 lemma modzMmr m n d : (m * (n %% d)) %% d = (m * n) %% d.
 proof. by rewrite !(mulrC m) modzMml. qed.
+
+lemma modzNm m d : (- (m %% d)) %% d = (- m) %% d.
+proof. by rewrite -mulN1r modzMmr mulN1r. qed.
+
+(* -------------------------------------------------------------------- *)
+(* FIXME: should be supersed by IntDiv                                  *)
+lemma nosmt mod_mul_mod n p i: n <> 0 => 0 < p => (i %% (n*p)) %% p = i %% p.
+proof.
+(*
+  move=> Hn Hp;rewrite {2}(Div_mod i (n*p));1:smt ml=0. 
+  rewrite mulzC mulzA Mod_mult //.
+*)
+admitted.
+
+lemma nosmt mod_mod i p: 0 < p => (i%%p) %% p = i%%p.
+proof. (* by move=> Hp;apply (mod_mul_mod 1 p i). *) admitted.
+
+lemma nosmt mod_pow2_mod n p i: 0 <= n <= p => i %% 2^p %% 2^n = i %% 2^n.
+proof.
+(*
+  move=> Hb;rewrite (_:p = (p - n) + n);1:ring.
+  by rewrite -pow_add 1,2:[smt ml=0] mod_mul_mod //;1:apply gtr_eqF;apply powPos.
+*)
+admitted.
+
+lemma nosmt mod_pow2_split i n p : 0 <= p <= n =>
+   i = (i/%2^n)*2^n + ((i%%2^n)/%2^p)*2^p + i%%2^p.
+proof.
+(*
+  cut Hn := gtr_eqF _ _ (powPos 2 n _) => //. 
+  cut Hp := gtr_eqF _ _ (powPos 2 p _) => //.
+  move=> Hb;rewrite {1}(Div_mod i (2^n))// {1}(Div_mod (i%%2^n) (2^p))//.
+  rewrite mod_pow2_mod //;ring.
+*)
+admitted.
+
+lemma nosmt div_Mle x y p: 0 <= x <= y => 0 < p => x/%p <= y/%p.
+proof.
+(*
+  move=> [H0x Hxy]; cut : 0 <= y - x by smt ml=0.
+  cut {2}->: y = x + (y - x) by ring.
+  move:(y-x)=> {Hxy y} y Hy Hp. cut Hneq:= gtr_eqF _ _ Hp.
+  rewrite {2}(Div_mod x p) // (Div_mod y p) // .
+  cut ->: p * (x /% p) + x %% p + (p * (y /% p) + y %% p) =
+          p * (x/%p + y/%p) + (x%%p + y%%p) by ring.
+  rewrite Div_mult //; move: Mod_bound Div_bound;smt ml=0.
+*)
+admitted.
+  
+lemma nosmt mod_pow2_div i n p:
+  0 <= i => 0 <= p <= n => (i %% 2^n) /% 2^p = (i /% 2^p) %% 2^(n-p).
+proof.
+(*
+  move=> Hi ^Hb [H0p Hpn]. cut Hn := powPos 2 n _ => //; cut Hp:= powPos 2 p _ => //.
+  rewrite {2}(mod_pow2_split _ _ _ Hb).
+  cut -> : i /% 2 ^ n * 2 ^ n + i %% 2 ^ n /% 2 ^ p * 2 ^ p =
+           2^p * ( 2 ^ (n-p) * (i /% 2 ^ n)  + i %% 2 ^ n /% 2 ^ p).
+  + rewrite {2}(_:n = (n-p)+p) 2:-pow_add;1,4:(by ring);smt ml= 0.
+  rewrite Div_mult // (Div_inf (i%%2^p)) /Int.zero /=.
+  + rewrite -{3}(ger0_norm (2^p));1:by apply ltzW.
+    by apply /Mod_bound/gtr_eqF.
+  rewrite Mod_mult 1:powPos // (mod_small (i %% 2 ^ n /% 2 ^ p)) //.
+  split;1:by move:Mod_bound Div_bound;smt ml=0.
+  move=> _;cut := div_Mle (i %% 2 ^ n) (2^n) (2^p) _ _ => //.
+  + move:Mod_bound;smt ml=0.
+  cut {2}->: n = p+(n-p) by ring.
+  rewrite -pow_add // 1:[smt ml=0] (Div_mult _ (2^(n - p)) 0 Hp).
+  rewrite (Div_inf 0) /Int.zero //= ler_eqVlt=> [Heq | //] .
+  cut Hp0 := gtr_eqF _ _ Hp.
+  move:(Div_mod (i%%2^n) (2^p) Hp0). 
+  move:(Mod_bound i (2^n) _). by apply gtr_eqF.
+  move:(Mod_bound  (i %% 2^n) (2^p) Hp0). 
+  rewrite Heq pow_add //;smt ml=0.
+*)
+admitted.

@@ -212,37 +212,6 @@ qed.
 (* -------------------------------------------------------------------- *)
 (* Diveucl *)
 (** Begin Import **)
-  op (/%) : int -> int -> int.
-  
-  op (%%) : int -> int -> int.
-
-  axiom Div_mod: forall (x y:int), y <> zero => x = y * (x /% y) + (x %% y).
-  
-  axiom Div_bound: forall (x y:int), zero <= x /\ zero < y => zero <= x /% y <= x.
-  
-  axiom Mod_bound: forall (x y:int), y <> zero => zero <= x %% y < `|y|.
-  
-  axiom Mod_1: forall (x:int), x %% one = zero.
-  
-  axiom Div_1: forall (x:int), x /% one = x.
-  
-  axiom Div_inf: forall (x y:int), zero <= x < y => x /% y = zero.
-  
-  axiom Div_inf_neg: forall (x y:int), zero < x <= y => (-x) /% y = -one.
-
-  axiom Mod_0: forall (y:int), one < y => 0 %% y = 0.
-  
-  axiom Div_1_left: forall (y:int), one < y => one /% y = zero.
-  
-  axiom Div_minus1_left: forall (y:int), one < y => (-one) /% y = -one.
-  
-  axiom Mod_1_left: forall (y:int), one < y => one %% y = 1.
-  
-  axiom Mod_minus1_left: forall (y:int), one < y => (-one) %% y = y - one.
-  
-  axiom Div_mult: forall (x y z:int), zero < x => (x * y + z) /% x = y + z /% x.
-  
-  axiom Mod_mult: forall (x y z:int), zero < x => (x * y + z) %% x = z %% x.
 (** End Import **)
 
 theory Extrema.

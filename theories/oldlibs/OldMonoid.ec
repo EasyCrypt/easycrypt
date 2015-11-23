@@ -150,8 +150,8 @@ elim/fset_ind {1 3 4}s.
   by rewrite fsetU0 sum_add// addmC => ->; rewrite addmZ ih 1:smt.
 qed.
 
-require import Int.
-        import List.Iota.
+require import Int IntDiv.
+import List.Iota.
 
 op sum_ij (i j : int) (f:int -> t)  = 
   sum f (oflist (iota_ i (j - i + 1))).
@@ -241,8 +241,9 @@ clone Comoid as Mbor with
    op NatMul.( * ) = fun (n:int) (b:bool), n <> 0 /\ b
    proof Base.* by smt, NatMul.* by smt.
 
-(* For int *)
+require import IntDiv.
 
+(* For int *)
 theory Miplus.
   clone export Comoid as Miplus with
     type Base.t     <- int,

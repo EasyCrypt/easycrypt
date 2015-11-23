@@ -5,7 +5,7 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require Int.
+require Int IntDiv.
 
 
   (* prime fields GF(q) for q prime *)
@@ -61,7 +61,7 @@ theory F.
   import Int.
   axiom toint_bounded (x:t): 0 <= toint x < q.
   axiom oftoint (x:t): ofint (toint x) = x.
-  axiom toofint_mod (x:int): toint (ofint x) = Int.(%%) x q. 
+  axiom toofint_mod (x:int): toint (ofint x) = IntDiv.(%%) x q. 
 end F.
 export F.
 

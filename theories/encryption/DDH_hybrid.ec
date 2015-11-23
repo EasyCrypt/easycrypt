@@ -6,7 +6,7 @@
  * -------------------------------------------------------------------- *)
 
 require import Real.
-require import Int.
+require import Int IntDiv.
 require import Prime_field.
 require import Cyclic_group_prime.
 
