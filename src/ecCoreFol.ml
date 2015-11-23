@@ -52,6 +52,7 @@ type form = {
 and f_node =
   | Fquant  of quantif * bindings * form
   | Fif     of form * form * form
+  | Fmatch  of form * form list * ty
   | Flet    of lpattern * form * form
   | Fint    of BI.zint
   | Flocal  of EcIdent.t
@@ -313,6 +314,10 @@ module Hsform = Why3.Hashcons.Make (struct
     | Fif(b1,t1,f1), Fif(b2,t2,f2) ->
         f_equal b1 b2 && f_equal t1 t2 && f_equal f1 f2
 
+    | Fmatch(b1,es1,ty1), Fmatch(b2,es2,ty2) ->
+           List.all2 f_equal (b1::es1) (b2::es2)
+        && ty_equal ty1 ty2
+
     | Flet(lp1,e1,f1), Flet(lp2,e2,f2) ->
         lp_equal lp1 lp2 && f_equal e1 e2 && f_equal f1 f2
 
@@ -363,6 +368,11 @@ module Hsform = Why3.Hashcons.Make (struct
     | Fif(b, t, f) ->
         Why3.Hashcons.combine2 (f_hash b) (f_hash t) (f_hash f)
 
+    | Fmatch (f, fs, ty) ->
+        Why3.Hashcons.combine_list f_hash
+          (Why3.Hashcons.combine (f_hash f) (ty_hash ty))
+          fs
+
     | Flet(lp, e, f) ->
         Why3.Hashcons.combine2 (lp_hash lp) (f_hash e) (f_hash f)
 
@@ -404,15 +414,16 @@ module Hsform = Why3.Hashcons.Make (struct
     in
 
     match f with
-    | Fint _           -> Mid.empty
-    | Fop (_, tys)     -> union (fun a -> a.ty_fv) tys
-    | Fpvar (pv,m)     -> EcPath.x_fv (fv_add m Mid.empty) pv.pv_name
-    | Fglob (mp,m)     -> EcPath.m_fv (fv_add m Mid.empty) mp
-    | Flocal id        -> fv_singleton id
-    | Fapp (f, args)   -> union f_fv (f :: args)
-    | Ftuple args      -> union f_fv args
-    | Fproj(e,_)       -> f_fv e
-    | Fif (f1, f2, f3) -> union f_fv [f1; f2; f3]
+    | Fint _             -> Mid.empty
+    | Fop (_, tys)       -> union (fun a -> a.ty_fv) tys
+    | Fpvar (pv,m)       -> EcPath.x_fv (fv_add m Mid.empty) pv.pv_name
+    | Fglob (mp,m)       -> EcPath.m_fv (fv_add m Mid.empty) mp
+    | Flocal id          -> fv_singleton id
+    | Fapp (f, args)     -> union f_fv (f :: args)
+    | Ftuple args        -> union f_fv args
+    | Fproj(e, _)        -> f_fv e
+    | Fif (f1, f2, f3)   -> union f_fv [f1; f2; f3]
+    | Fmatch (b, fs, ty) -> fv_union ty.ty_fv (union f_fv (b :: fs))
 
     | Fquant(_, b, f) ->
       let do1 (id, ty) fv = fv_union (gty_fv ty) (Mid.remove id fv) in
@@ -555,6 +566,7 @@ let f_quant q b f =
 
 let f_proj   f  i  ty = mk_form (Fproj(f, i)) ty
 let f_if     f1 f2 f3 = mk_form (Fif (f1, f2, f3)) f2.f_ty
+let f_match  b  fs ty = mk_form (Fmatch (b, fs, ty)) ty
 let f_let    q  f1 f2 = mk_form (Flet (q, f1, f2)) f2.f_ty (* FIXME rename binding *)
 let f_let1   x  f1 f2 = f_let (LSymbol (x, f1.f_ty)) f1 f2
 let f_exists b  f     = f_quant Lexists b f
@@ -685,6 +697,7 @@ module FSmart = struct
   type a_pvar  = prog_var * ty * memory
   type a_quant = quantif * bindings * form
   type a_if    = form tuple3
+  type a_match = form * form list * ty
   type a_let   = lpattern * form * form
   type a_op    = EcPath.path * ty list * ty
   type a_tuple = form list
@@ -716,6 +729,11 @@ module FSmart = struct
     if   c == c' && f1 == f1' && f2 == f2'
     then fp
     else f_if c' f1' f2'
+
+  let f_match (fp, (b, fs, ty)) (b', fs', ty') =
+    if   b == b' && fs == fs' && ty == ty'
+    then fp
+    else f_match b' fs' ty'
 
   let f_let (fp, (lp, f1, f2)) (lp', f1', f2') =
     if   lp == lp' && f1 == f1' && f2 == f2'
@@ -789,6 +807,9 @@ let f_map gt g fp =
 
   | Fif (f1, f2, f3) ->
       FSmart.f_if (fp, (f1, f2, f3)) (g f1, g f2, g f3)
+
+  | Fmatch (b, fs, ty) ->
+      FSmart.f_match (fp, (b, fs, ty)) (g b, List.map g fs, gt ty)
 
   | Flet (lp, f1, f2) ->
       FSmart.f_let (fp, (lp, f1, f2)) (lp, g f1, g f2)
@@ -882,6 +903,7 @@ let f_iter g f =
 
   | Fquant   (_ , _ , f1) -> g f1
   | Fif      (f1, f2, f3) -> g f1;g f2; g f3
+  | Fmatch   (b, fs, _)   -> List.iter g (b :: fs)
   | Flet     (_, f1, f2)  -> g f1;g f2
   | Fapp     (e, es)      -> List.iter g (e :: es)
   | Ftuple   es           -> List.iter g es
@@ -907,6 +929,7 @@ let form_exists g f =
 
   | Fquant   (_ , _ , f1) -> g f1
   | Fif      (f1, f2, f3) -> g f1 || g f2 || g f3
+  | Fmatch   (b, fs, _)   -> List.exists g (b :: fs)
   | Flet     (_, f1, f2)  -> g f1 || g f2
   | Fapp     (e, es)      -> List.exists g (e :: es)
   | Ftuple   es           -> List.exists g es
@@ -932,6 +955,7 @@ let form_forall g f =
 
   | Fquant   (_ , _ , f1) -> g f1
   | Fif      (f1, f2, f3) -> g f1 && g f2 && g f3
+  | Fmatch   (b, fs, _)   -> List.for_all g (b :: fs)
   | Flet     (_, f1, f2)  -> g f1 && g f2
   | Fapp     (e, es)      -> List.for_all g (e :: es)
   | Ftuple   es           -> List.for_all g es
@@ -1194,6 +1218,11 @@ let rec form_of_expr mem (e : expr) =
      let e2 = form_of_expr mem e2 in
      let e3 = form_of_expr mem e3 in
      f_if e1 e2 e3
+
+  | Ematch (b, fs, ty) ->
+     let b'  = form_of_expr mem b in
+     let fs' = List.map (form_of_expr mem) fs in
+     f_match b' fs' ty
 
   | Equant (qt, b, e) ->
      let b = List.map (fun (x, ty) -> (x, GTty ty)) b in

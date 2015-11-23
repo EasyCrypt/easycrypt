@@ -168,6 +168,7 @@ and expr_node =
   | Elet   of lpattern * expr * expr       (* let binding           *)
   | Etuple of expr list                    (* tuple constructor     *)
   | Eif    of expr * expr * expr           (* _ ? _ : _             *)
+  | Ematch of expr * expr list * ty        (* match _ with _        *)
   | Eproj  of expr * int                   (* projection of a tuple *)
 
 and equantif  = [ `ELambda | `EForall | `EExists ]
@@ -196,6 +197,7 @@ val e_app      : expr -> expr list -> ty -> expr
 val e_let      : lpattern -> expr -> expr -> expr
 val e_tuple    : expr list -> expr
 val e_if       : expr -> expr -> expr -> expr
+val e_match    : expr -> expr list -> ty -> expr
 val e_lam      : (EcIdent.t * ty) list -> expr -> expr
 val e_quantif  : equantif -> ebindings -> expr -> expr
 val e_forall   : ebindings -> expr -> expr

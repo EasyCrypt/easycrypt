@@ -94,6 +94,7 @@ let rec on_mpath_expr cb (e : expr) =
     | Eop    (_, tys)     -> List.iter (on_mpath_ty cb) tys
     | Eapp   (e, es)      -> List.iter cbrec (e :: es)
     | Eif    (c, e1, e2)  -> List.iter cbrec [c; e1; e2]
+    | Ematch (e, es, ty)  -> on_mpath_ty cb ty; List.iter cbrec (e :: es)
     | Eproj  (e, _)       -> cbrec e
 
   in on_mpath_ty cb e.e_ty; fornode ()
@@ -176,6 +177,7 @@ let rec on_mpath_form cb (f : EcFol.form) =
     | EcFol.Flocal    _            -> ()
     | EcFol.Fquant    (_, b, f)    -> on_mpath_gbindings cb b; cbrec f
     | EcFol.Fif       (f1, f2, f3) -> List.iter cbrec [f1; f2; f3]
+    | EcFol.Fmatch    (b, fs, ty)  -> on_mpath_ty cb ty; List.iter cbrec (b :: fs)
     | EcFol.Flet      (lp, f1, f2) -> on_mpath_lp cb lp; List.iter cbrec [f1; f2]
     | EcFol.Fop       (_, tys)     -> List.iter (on_mpath_ty cb) tys
     | EcFol.Fapp      (f, fs)      -> List.iter cbrec (f :: fs)

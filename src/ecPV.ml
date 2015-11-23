@@ -323,7 +323,8 @@ module PV = struct
         let env = Mod.add_mod_binding b env in
         let fv1 = aux env fv f1 in
         remove b fv1 
-      | Fif(f1,f2,f3) -> aux env (aux env (aux env fv f1) f2) f3
+      | Fif(f1,f2,f3) -> List.fold_left (aux env) fv [f1;f2;f3]
+      | Fmatch(b,bs,_) -> List.fold_left (aux env) fv (b::bs)
       | Flet(_,f1,f2) -> aux env (aux env fv f1) f2
       | Fpvar(x,m') -> 
         if EcIdent.id_equal m m' then add env x f.f_ty fv else fv
@@ -799,6 +800,10 @@ module Mpv2 = struct
         add_eq local eqs f1 f2
       | Fif(e1,t1,f1), Fif(e2,t2,f2) -> 
         List.fold_left2 (add_eq local) eqs [e1;t1;f1] [e2;t2;f2]
+      | Fmatch(b1,fs1,ty1), Fmatch(b2,fs2,ty2) when
+             EcReduction.EqTest.for_type env ty1 ty2
+          && EcReduction.EqTest.for_type env b1.f_ty b2.f_ty
+        -> List.fold_left2 (add_eq local) eqs (b1::fs1) (b2::fs2)
       | Flet(lp1,e1,f1), Flet(lp2,e2,f2) ->
         let eqs = add_eq local eqs e1 e2 in
         let local = enter_local env local (lp_bind lp1) (lp_bind lp2) in
@@ -841,6 +846,8 @@ module Mpv2 = struct
         aux local eqs f1
       | Fif(e1,t1,f1) ->
         List.fold_left (aux local) eqs [e1;t1;f1]
+      | Fmatch(b1,fs1,_) ->
+        List.fold_left (aux local) eqs (b1::fs1)
       | Flet(lp1,e1,f1) ->
         let eqs = aux local eqs e1 in
         let local = 
@@ -932,6 +939,10 @@ module Mpv2 = struct
       add_eqs env local eqs es1 es2
     | Eif(e1,t1,f1), Eif(e2,t2,f2) ->
       List.fold_left2 (add_eqs env local) eqs [e1;t1;f1] [e2;t2;f2]
+    | Ematch(b1,es1,ty1), Ematch(b2,es2,ty2)
+      when EcReduction.EqTest.for_type env ty1 ty2
+        && EcReduction.EqTest.for_type env b1.e_ty b2.e_ty ->
+      List.fold_left2 (add_eqs env local) eqs (b1::es1) (b2::es2)
     | _, _ -> raise EqObsInError
       
   let add_eqs env e1 e2 eqs =  add_eqs env Mid.empty eqs e1 e2 

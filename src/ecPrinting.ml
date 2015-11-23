@@ -1132,6 +1132,9 @@ and pp_expr_core_r (ppe : PPEnv.t) outer fmt (e : expr) =
   | Eif (c, e1, e2) ->
       pp_if3 ppe pp_expr_r outer fmt (c, e1, e2)
 
+  | Ematch _ ->
+      Format.fprintf fmt "%s" "no-syntax-yet"
+
   | Etuple es ->
       pp_tuple `ForTuple ppe pp_expr_r (fst outer) fmt es
 
@@ -1506,6 +1509,9 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
 
   | Fif (b, f1, f2) ->
       pp_if_form ppe pp_form_r outer fmt (b, f1, f2)
+
+  | Fmatch _ ->
+      Format.fprintf fmt "%s" "no-syntax-yet"
 
   | Flet (lp, f1, f2) ->
       pp_let ppe pp_form_r outer fmt (lp, f1, f2)

@@ -143,6 +143,9 @@ module EqTest = struct
       | Etuple args1, Etuple args2 -> List.all2 (aux alpha) args1 args2
       | Eif (a1,b1,c1), Eif(a2,b2,c2) ->
           aux alpha a1 a2 && aux alpha b1 b2 && aux alpha c1 c2
+      | Ematch (e1,es1,ty1), Ematch(e2,es2,ty2) ->
+             for_type env ty1 ty2
+          && List.all2 (aux alpha) (e1::es1) (e2::es2)
       | _, _ -> false
     in
       fun e1 e2 -> aux Mid.empty e1 e2

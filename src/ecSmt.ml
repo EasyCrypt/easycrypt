@@ -570,6 +570,7 @@ let rec trans_form ((genv, lenv) as env : tenv * lenv) (fp : form) =
       WTerm.t_const n
       
   | Fif    _ -> trans_app env fp []
+  | Fmatch _ -> trans_app env fp []
   | Flet   _ -> trans_app env fp []
   | Flocal _ -> trans_app env fp []
   | Fop    _ -> trans_app env fp []
@@ -627,6 +628,9 @@ and trans_app  ((genv, lenv) as env : tenv * lenv) (f : form) args =
       let wf = trans_app env ff args in
       let wt, wf = Cast.merge_if wt wf in
       WTerm.t_if_simp (Cast.force_prop wb) wt wf 
+
+  | Fmatch _ ->
+       failwith "not implemented yet"
       
   | Fapp (f, args') ->
       let args' = List.map (trans_form env) args' in
@@ -1178,8 +1182,9 @@ module Frequency = struct
       | Fop (p,_) -> 
         if not (Sp.mem p unwanted_op) then sp := Sp.add p !sp
       | Fquant (_ , _ , f1) -> doit f1
-      | Fif      (f1, f2, f3) -> doit f1;doit f2; doit f3
-      | Flet     (_, f1, f2)  -> doit f1;doit f2
+      | Fif      (f1, f2, f3) -> List.iter doit [f1; f2; f3]
+      | Fmatch   (b, fs, _)   -> List.iter doit (b :: fs)
+      | Flet     (_, f1, f2)  -> List.iter doit [f1; f2]
       | Fapp     (e, es)      -> List.iter doit (e :: es)
       | Ftuple   es           -> List.iter doit es
       | Fproj    (e, _)       -> doit e
@@ -1246,8 +1251,9 @@ module Frequency = struct
       match f.f_node with
       | Fop      (p,_)        -> addp p
       | Fquant   (_ , _ , f1) -> add f1
-      | Fif      (f1, f2, f3) -> add f1;add f2; add f3
-      | Flet     (_, f1, f2)  -> add f1;add f2
+      | Fif      (f1, f2, f3) -> List.iter add [f1; f2; f3]
+      | Fmatch   (b, fs, _)   -> List.iter add (b :: fs)
+      | Flet     (_, f1, f2)  -> List.iter add [f1; f2]
       | Fapp     (e, es)      -> List.iter add (e :: es)
       | Ftuple   es           -> List.iter add es
       | Fproj    (e, _)       -> add e

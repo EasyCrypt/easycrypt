@@ -467,6 +467,7 @@ and expr_node =
   | Elet   of lpattern * expr * expr       (* let binding           *)
   | Etuple of expr list                    (* tuple constructor     *)
   | Eif    of expr * expr * expr           (* _ ? _ : _             *)
+  | Ematch of expr * expr list * ty        (* match _ with _        *)
   | Eproj  of expr * int                   (* projection of a tuple *)
 
 and equantif  = [ `ELambda | `EForall | `EExists ]
@@ -511,6 +512,7 @@ let fv_node e =
   | Elet (lp, e1, e2) -> fv_union (e_fv e1) (fv_diff (e_fv e2) (lp_fv lp))
   | Etuple es         -> union e_fv es
   | Eif (e1, e2, e3)  -> union e_fv [e1; e2; e3]
+  | Ematch (e, es, _) -> union e_fv (e :: es)
   | Equant (_, b, e)  -> List.fold_left (fun s (id, _) -> Mid.remove id s) (e_fv e) b
   | Eproj (e, _)      -> e_fv e
 
@@ -549,6 +551,10 @@ module Hexpr = Why3.Hashcons.Make (struct
 
     | Eif (c1, e1, f1), Eif (c2, e2, f2) ->
         (e_equal c1 c2) && (e_equal e1 e2) && (e_equal f1 f2)
+
+    | Ematch (e1, es1, ty1), Ematch (e2, es2, ty2) ->
+           List.all2 e_equal (e1 :: es1) (e2 :: es2)
+        && ty_equal ty1 ty2
 
     | Equant (q1, b1, e1), Equant (q2, b2, e2) ->
         qt_equal q1 q2 && e_equal e1 e2 && b_equal b1 b2
@@ -592,6 +598,11 @@ module Hexpr = Why3.Hashcons.Make (struct
         Why3.Hashcons.combine2
           (e_hash c) (e_hash e1) (e_hash e2)
 
+    | Ematch (e, es, ty) ->
+        Why3.Hashcons.combine_list e_hash
+          (Why3.Hashcons.combine (e_hash e) (ty_hash ty))
+          es
+
     | Equant (q, b, e) ->
         Why3.Hashcons.combine2 (qt_hash q) (e_hash e) (b_hash b)
 
@@ -620,6 +631,7 @@ let e_tuple = fun es ->
   | _   -> mk_expr (Etuple es) (ttuple (List.map e_ty es))
 
 let e_if    = fun c e1 e2 -> mk_expr (Eif (c, e1, e2)) e2.e_ty
+let e_match = fun e es ty -> mk_expr (Ematch (e, es, ty)) ty
 let e_proj  = fun e i ty -> mk_expr (Eproj(e,i)) ty
 
 let e_quantif q b e =
@@ -687,13 +699,20 @@ module ExprSmart = struct
   let e_tuple (e, es) es' =
     if es == es' then e else e_tuple es'
 
-  let e_proj (e,e1,i) (e1',ty') =
-    if e1 == e1' && e.e_ty == ty' then e else e_proj e1' i ty'
+  let e_proj (e, e1, i) (e1', ty') =
+    if   e1 == e1' && e.e_ty == ty'
+    then e
+    else e_proj e1' i ty'
 
   let e_if (e, (e1, e2, e3)) (e1', e2', e3') =
     if   e1 == e1' && e2 == e2' && e3 == e3'
     then e
     else e_if e1' e2' e3'
+
+  let e_match (e, (b, es, ty)) (b', es', ty') =
+    if   b == b' && es == es' && ty == ty'
+    then e
+    else e_match b es ty
 
   let e_lam (e, (b, body)) (b', body') =
     if   b == b' && body == body'
@@ -730,16 +749,22 @@ let e_map fty fe e =
       let le' = List.Smart.map fe le in
         ExprSmart.e_tuple (e, le) le'
 
-  | Eproj(e1,i) ->
+  | Eproj (e1, i) ->
       let e' = fe e1 in
       let ty = fty e.e_ty in
       ExprSmart.e_proj (e,e1,i) (e',ty)
 
-  | Eif (e1, e2, e3)      -> 
+  | Eif (e1, e2, e3) -> 
       let e1' = fe e1 in
       let e2' = fe e2 in 
       let e3' = fe e3 in
-        ExprSmart.e_if (e, (e1, e2, e3)) (e1', e2', e3')
+      ExprSmart.e_if (e, (e1, e2, e3)) (e1', e2', e3')
+
+  | Ematch (b, es, ty) ->
+      let ty' = fty ty in
+      let b'  = fe b in
+      let es' = List.Smart.map fe es in
+      ExprSmart.e_match (e, (b, es, ty)) (b', es', ty')
 
   | Equant (q, b, bd) ->
       let dop (x, ty as xty) =
@@ -760,6 +785,7 @@ let rec e_fold fe state e =
   | Etuple es             -> List.fold_left fe state es
   | Eproj(e,_)            -> fe state e
   | Eif (e1, e2, e3)      -> List.fold_left fe state [e1; e2; e3]
+  | Ematch (e, es, _)     -> List.fold_left fe state (e :: es)
   | Equant (_, _, e1)     -> fe state e1
 
 module MSHe = EcMaps.MakeMSH(struct type t = expr let tag e = e.e_tag end)

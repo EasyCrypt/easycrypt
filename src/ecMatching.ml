@@ -407,6 +407,14 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
       | Fif (c1, t1, e1), Fif (c2, t2, e2) ->
           List.iter2 (doit env ilc) [c1; t1; e1] [c2; t2; e2]
 
+      | Fmatch (b1, fs1, ty1), Fmatch (b2, fs2, ty2) -> begin
+          (try  EcUnify.unify env ue ty1 ty2
+           with EcUnify.UnificationFailure _ -> failure ());
+          if List.length fs1 <> List.length fs2 then
+            failure ();
+          List.iter2 (doit env ilc) (b1 :: fs1) (b2 :: fs2)
+        end
+
       | Fint i1, Fint i2 ->
           if i1 <> i2 then failure ();
 
@@ -657,6 +665,9 @@ module FPosition = struct
           | Fapp   (f, fs)     -> doit pos (`WithCtxt (ctxt, f :: fs))
           | Ftuple fs          -> doit pos (`WithCtxt (ctxt, fs))
 
+          | Fmatch (b, fs, _) ->
+               doit pos (`WithCtxt (ctxt, b :: fs))
+
           | Fquant (_, b, f) ->
               let xs   = List.pmap (function (x, GTty _) -> Some x | _ -> None) b in
               let ctxt = List.fold_left ((^~) Sid.add) ctxt xs in
@@ -766,29 +777,33 @@ module FPosition = struct
 
           | Fquant (q, b, f) ->
               let f' = as_seq1 (doit p [f]) in
-                FSmart.f_quant (fp, (q, b, f)) (q, b, f')
+              FSmart.f_quant (fp, (q, b, f)) (q, b, f')
 
           | Fif (c, f1, f2)  ->
               let (c', f1', f2') = as_seq3 (doit p [c; f1; f2]) in
-                FSmart.f_if (fp, (c, f1, f2)) (c', f1', f2')
+              FSmart.f_if (fp, (c, f1, f2)) (c', f1', f2')
+
+          | Fmatch (b, fs, ty) ->
+              let bfs = doit p (b :: fs) in
+              FSmart.f_match (fp, (b, fs, ty)) (List.hd bfs, List.tl bfs, ty)
 
           | Fapp (f, fs) -> begin
               match doit p (f :: fs) with
               | [] -> assert false
               | f' :: fs' ->
-                  FSmart.f_app (fp, (f, fs, fp.f_ty)) (f', fs', fp.f_ty)
+                FSmart.f_app (fp, (f, fs, fp.f_ty)) (f', fs', fp.f_ty)
           end
 
           | Ftuple fs ->
               let fs' = doit p fs in
-                FSmart.f_tuple (fp, fs) fs'
+              FSmart.f_tuple (fp, fs) fs'
 
           | Fproj (f, i) ->
               FSmart.f_proj (fp, (f, fp.f_ty)) (as_seq1 (doit p [f]), fp.f_ty) i
 
           | Flet (lv, f1, f2) ->
               let (f1', f2') = as_seq2 (doit p [f1; f2]) in
-                FSmart.f_let (fp, (lv, f1, f2)) (lv, f1', f2')
+              FSmart.f_let (fp, (lv, f1, f2)) (lv, f1', f2')
 
           | Fpr pr ->
               let (args', event') = as_seq2 (doit p [pr.pr_args; pr.pr_event]) in

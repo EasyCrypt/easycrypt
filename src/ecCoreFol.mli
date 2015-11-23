@@ -51,6 +51,7 @@ type form = private {
 and f_node =
   | Fquant  of quantif * bindings * form
   | Fif     of form * form * form
+  | Fmatch  of form * form list * ty
   | Flet    of lpattern * form * form
   | Fint    of zint
   | Flocal  of EcIdent.t
@@ -275,6 +276,7 @@ module FSmart : sig
   type a_pvar   = prog_var * ty * memory
   type a_quant  = quantif * bindings * form
   type a_if     = form tuple3
+  type a_match  = form * form list * ty
   type a_let    = lpattern * form * form
   type a_op     = path * ty list * ty
   type a_tuple  = form list
@@ -286,6 +288,7 @@ module FSmart : sig
   val f_pvar     : (form * a_pvar   ) -> a_pvar    -> form
   val f_quant    : (form * a_quant  ) -> a_quant   -> form
   val f_if       : (form * a_if     ) -> a_if      -> form
+  val f_match    : (form * a_match  ) -> a_match   -> form
   val f_let      : (form * a_let    ) -> a_let     -> form
   val f_op       : (form * a_op     ) -> a_op      -> form
   val f_tuple    : (form * a_tuple  ) -> a_tuple   -> form
