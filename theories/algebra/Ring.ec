@@ -114,9 +114,16 @@ abstract theory ZModule.
   proof. by rewrite -(@subr_eq0 x) subrE /= opprK. qed.
 
   lemma nosmt eqr_opp (x y : t): (- x = - y) <=> (x = y).
+  proof. by apply/(@can_eq _ _ opprK x y). qed.
+
+  lemma eqr_oppLR x y : (- x = y) <=> (x = - y).
+  proof. by apply/(@inv_eq _ opprK x y). qed.
+
+  lemma nosmt eqr_sub (x y z t : t) :
+    (x - y = z - t) <=> (x + t = z + y).
   proof.
-    move: (can_eq (fun (z : t), -z) (fun (z : t), -z) _ x y) => //=.
-    by move=> z /=; rewrite opprK.
+    rewrite -{1}(addrK t x) -{1}(addrK y z) 2!subrE -!addrA.
+    by rewrite (addrC (-t)) !addrA; split=> [/addIr /addIr|->//].
   qed.
 
   op intmul (x : t) (n : int) =

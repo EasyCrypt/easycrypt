@@ -991,3 +991,34 @@ proof. by rewrite ger0_def. qed.
 
 lemma nosmt eqr_normN (x : t): (`|x| = - x) <=> (x <= zeror).
 proof. by rewrite ler0_def. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma ler_norm x : x <= `|x|.
+proof.
+case: (zeror <= x); first by move/ger0_norm=> ->; apply/lerr.
+move/ltrNge=> /ltrW ^h /ler0_norm ->; apply/(ler_trans zeror)=> //.
+by rewrite oppr_ge0.
+qed.
+
+lemma eqr_norml x y : (`|x| = y) <=> ((x = y) \/ (x = -y)) /\ (zeror <= y).
+proof. admit. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt ler_norml x y : (`|x| <= y) <=> (- y <= x <= y).
+proof.
+have h: forall z, zeror <= z => (z <= y) <=> (- y <= z <= y).
+  move=> z ge0_z; case: (z <= y)=> //= le_zy; apply/(ler_trans zeror)=> //.
+  by rewrite oppr_le0 (ler_trans z).
+case: (zeror <= x) => [^ge0_x /h|/ltrNge/ltrW ge0_x]; first by rewrite ger0_norm.
+rewrite -(opprK x) normrN ler_opp2 anda_and andC ler_oppl h.
+  by rewrite normr_ge0. by rewrite ger0_norm // oppr_ge0.
+qed.
+
+lemma nosmt ltr_normr x y : (x < `|y|) <=> (x < y) \/ (x < - y).
+proof. by rewrite ltrNge ler_norml anda_and -nand -!ltrNge ltr_oppr orbC. qed.
+
+lemma nosmt ler_normr x y : (x <= `|y|) <=> (x <= y) \/ (x <= - y).
+proof. admit. qed.
+
+lemma nosmt ltr_norml x y : (`|x| < y) <=> (- y < x < y).
+proof. by rewrite ltrNge ler_normr -nor -!ltrNge ltr_oppl andC -anda_and. qed.
