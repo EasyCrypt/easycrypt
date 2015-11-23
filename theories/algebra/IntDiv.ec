@@ -42,18 +42,20 @@ lemma div0z d: 0 %% d = 0.
 proof. by move: (divz_eq 0 d)=> /= <-. qed.
 
 (* -------------------------------------------------------------------- *)
+(*
 lemma edivn_eq d q r: 0 <= r < d => (q * d + r) %/ d = q.
 proof. admit. qed.
 
 lemma emodn_eq d q r: 0 <= r < d => (q * d + r) %% d = r.
 proof. admit. qed.
+*)
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt divz_small m d: 0 <= m < d => m %/ d = 0.
-proof. by move=> /edivn_eq /(_ 0). qed.
+proof. admitted. (* by move=> /edivn_eq /(_ 0). qed. *)
 
 lemma nosmt modz_small m d: 0 <= m < d => m %% d = m.
-proof. by move/emodn_eq /(_ 0). qed.
+proof. admitted. (* by move/emodn_eq /(_ 0). qed. *)
 
 (* -------------------------------------------------------------------- *)
 lemma b2i_mod2 b : b2i b %% 2 = b2i b.
