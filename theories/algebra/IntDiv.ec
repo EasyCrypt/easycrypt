@@ -16,13 +16,10 @@ require import Fun Int IntExtra Ring.
 
 op (%/) : int -> int -> int.
 
-op sign (x : int) = exp (-1) (b2i (x < 0)).
-
 axiom nosmt edivzP (m d : int):
   m = (m %/ d) * d + (m %% d) /\ (d <> 0 => 0 <= m %% d < `|d|).
 
-axiom sign_divz m d : sign (m %/ d) = sign m * sign d.
-axiom divz0 m: m %/ 0 = m.
+axiom divz0 m: m %/ 0 = 0.
 
 (* -------------------------------------------------------------------- *)
 lemma modz0 m: m %% 0 = m.
@@ -34,24 +31,27 @@ proof. by case: (edivzP m d). qed.
 
 (* -------------------------------------------------------------------- *)
 lemma mod0z d: 0 %% d = 0.
-proof. admit. qed.
+proof.
+
+
+ admit. qed.
 
 lemma div0z d: 0 %/ d = 0.
 proof. admit. qed.
 
 (* -------------------------------------------------------------------- *)
-lemma edivn_eq d q r: 0 <= r < d => (q * d + r) %/ d = q.
+lemma edivn_eq d q r: 0 <= r < `|d| => (q * d + r) %/ d = q.
 proof. admit. qed.
 
-lemma emodn_eq d q r: 0 <= r < d => (q * d + r) %% d = r.
+lemma emodn_eq d q r: 0 <= r < `|d| => (q * d + r) %% d = r.
 proof. admit. qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt divz_small m d: 0 <= m < d => m %/ d = 0.
+lemma nosmt divz_small m d: 0 <= m < `|d| => m %/ d = 0.
 proof. by move=> /edivn_eq /(_ 0). qed.
 
 lemma nosmt modz_small m d: 0 <= m < d => m %% d = m.
-proof. by move/emodn_eq /(_ 0). qed.
+proof. admit. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma b2i_mod2 b : b2i b %% 2 = b2i b.
