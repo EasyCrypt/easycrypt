@@ -6,8 +6,8 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Fun Int IntExtra Ring.
-(*---*) import Ring.IntID.
+require import Fun Int IntExtra Ring StdOrder.
+(*---*) import Ring.IntID IntOrder.
 
 (* -------------------------------------------------------------------- *)
 
@@ -30,13 +30,38 @@ lemma divz_eq (m d : int): m = (m %/ d) * d + (m %% d).
 proof. by case: (edivzP m d). qed.
 
 (* -------------------------------------------------------------------- *)
-lemma mod0z d: 0 %% d = 0.
+lemma nosmt modzN (m d : int): m %% (-d) = m %% d.
+proof. admit. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt modzNm z m: (- (z %% m)) %% m = (-z) %% m.
+proof. admit. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt modz_abs (m d : int): m %% `|d| = m %% d.
 proof.
+by case: (d < 0) => [/ltr0_norm|/lerNgt /ger0_norm] ->; rewrite ?modzN.
+qed.
 
+(* -------------------------------------------------------------------- *)
+lemma modz_ge0 m d : d <> 0 => 0 <= m %% d.
+proof.
+case: (d = 0) => [->|nz_d /=]; first by rewrite modz0.
+by case: (edivzP m d)=> _ /(_ nz_d) [].
+qed.
 
- admit. qed.
+(* -------------------------------------------------------------------- *)
+lemma nosmt ltz_pmod m d : 0 < d => m %% d < d.
+proof.
+move=> gt0_d; case: (edivzP m d) => _; rewrite gtr0_norm //.
+by move/(_ _)=> //; rewrite gtr_eqF.
+qed.
 
+(* -------------------------------------------------------------------- *)
 lemma div0z d: 0 %/ d = 0.
+proof. admit. qed.
+
+lemma mod0z d: 0 %% d = 0.
 proof. admit. qed.
 
 (* -------------------------------------------------------------------- *)
@@ -58,9 +83,12 @@ lemma b2i_mod2 b : b2i b %% 2 = b2i b.
 proof. by rewrite modz_small //; case: b. qed.
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt ltz_pmod m d : 0 < d => m %% d < d by admit.
-lemma nosmt modz_ge0 m d : d <> 0 => 0 <= m %% d by admit.
-lemma nosmt modz_mod m d : m %% d %% d = m %% d by admit.
+lemma nosmt modz_mod m d : m %% d %% d = m %% d.
+proof.
+case: (d = 0) => [->|nz_d]; first by rewrite modz0.
+rewrite -!(modz_abs _ d) modz_small // ltz_pmod ?normr_gt0 //=.
+by rewrite modz_ge0 // normr0P.
+qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt modzDl z1 z2 m: (z1 %% m + z2) %% m = (z1 + z2) %% m by admit.
@@ -71,7 +99,5 @@ lemma nosmt modzMmr z1 z2 m: (z1 * (z2 %% m)) %% m = (z1 * z2) %% m by admit.
 
 lemma nosmt modzMl p d: (p * d) %% d = 0 by admit.
 lemma nosmt modzMr p d: (d * p) %% d = 0 by admit.
-
-lemma nosmt modzNm z m: (- (z %% m)) %% m = (-z) %% m by admit.
 
 lemma nosmt modzMDl p m d : (p * d + m) %% d = m %% d by admit.
