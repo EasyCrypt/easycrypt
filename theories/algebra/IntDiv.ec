@@ -304,6 +304,18 @@ lemma nosmt dvdz_trans n d m : d %| n => n %| m => d %| m.
 proof. by move=> dv_dn /dvdzP[q ->]; apply/dvdz_mull. qed.
 
 (* -------------------------------------------------------------------- *)
+lemma dvdzD d m1 m2 : d %| m1 => d %| m2 => d %| (m1 + m2).
+proof.
+by move=> /dvdzP[q1 ->] /dvdzP[q2 ->]; rewrite -mulrDl dvdz_mull dvdzz.
+qed.
+
+lemma dvdzN d m : d %| m => d %| -m.
+proof. by move/dvdzP=> [q ->]; rewrite -mulNr dvdz_mull dvdzz. qed.
+
+lemma dvdzB d m1 m2 : d %| m1 => d %| m2 => d %| (m1 - m2).
+proof. by move=> h1 h2; rewrite subrE; apply/dvdzD/dvdzN. qed.
+
+(* -------------------------------------------------------------------- *)
 lemma dvdz_eq d m : (d %| m) <=> (m %/ d * d = m).
 proof. by rewrite dvdzE modzE subr_eq0 eq_sym. qed.
 
@@ -321,21 +333,71 @@ by move/dvdz_eq: dv_qp=> {2}<-; rewrite mulrA modzMDr.
 qed.
 
 (* -------------------------------------------------------------------- *)
+lemma nosmt divzK d m : d %| m => m %/ d * d = m.
+proof. by move/dvdz_eq. qed.
+
+lemma lez_floor m d : d <> 0 => m %/ d * d <= m.
+proof. by rewrite -subr_ge0 -modzE; apply/modz_ge0. qed.
+
+lemma ltz_ceil m d : 0 < d => m < (m %/ d + 1) * d.
+proof.
+by move=> d_gt0; rewrite mulrDl mul1r -ltr_subl_addl -modzE ltz_pmod.
+qed.
+
+lemma nosmt ltz_divLR m n d : 0 < d => (m %/ d < n) <=> (m < n * d).
+proof.
+move=> d_gt0; split.
+  rewrite -lez_add1r addrC -(ler_pmul2r _ d_gt0).
+  by apply/ltr_le_trans/ltz_ceil.
+rewrite -(ltr_pmul2r _ d_gt0 _ n) //; apply/ler_lt_trans.
+by apply/lez_floor; rewrite gtr_eqF.
+qed.
+
+lemma nosmt lez_divRL m n d : 0 < d => (m <= n %/ d) = (m * d <= n).
+proof. by move=> d_gt0; rewrite !lerNgt ltz_divLR. qed.
+
+lemma nosmt lez_divLR d m n : 0 < d => d %| m => (m %/ d <= n) <=> (m <= n * d).
+proof. by move=> /ler_pmul2r <- /divzK->. qed.
+
+lemma nosmt ltz_divRL d m n : 0 < d => d %| m => (n < m %/ d) <=> (n * d < m).
+proof. by move=> /ltr_pmul2r <- /divzK->. qed.
+
+lemma nosmt eqz_div d m n : d <> 0 => d %| m => (n = m %/ d) <=> (n * d = m).
+proof. by move=> /mulIf/inj_eq <- /divzK->. qed.
+
+lemma nosmt eqz_mul d m n : d <> 0 => d %| m => (m = n * d) <=> (m %/ d = n).
+proof. by move=> d_gt0 dv_d_m; rewrite eq_sym -eqz_div // eq_sym. qed.
+
+(*
+lemma nosmt lez_div m d : `|m %/ d| <= `|m|.
+proof.
+move: d; have wlog: forall d, 0 < d => `|m %/ d| <= `|m|; last first.
+  move=> d; case: (0 < d) => [/wlog//|/lerNgt /ler_eqVlt [->|]].
+    by rewrite divz0 normr0 normr_ge0.
+  by move=> lt0_d; rewrite -(opprK d) divzN normrN wlog oppr_gt0.
+admit. qed.
+*)
+ 
+lemma nosmt leq_div2r d m n :
+  m <= n => 0 <= d => m %/ d <= n %/ d.
+proof.
+move=> le_mn /ler_eqVlt [<-|gt0_d]; first by rewrite !divz0.
+by rewrite lez_divRL // (ler_trans m) -?leq_divRL // lez_floor gtr_eqF.
+qed.
+
+(* -------------------------------------------------------------------- *)
 (* FIXME: should be supersed by IntDiv                                  *)
 lemma nosmt modz_dvd_pow n p i k:
   0 <= n <= p => i %% k^p %% k^n = i %% k^n.
 proof. by move=> le_np; apply/modz_dvd/dvdz_exp2l. qed.
 
 lemma nosmt modz_pow2_split n p i k : 0 <= p <= n =>
-   i = (i %/ k^n) * k^n + ((i %% k^n) %/ k^p) * k^p + i %% k^p.
+   i = i %/ k^n * k^n + (i %% k^n %/ k^p) * k^p + i %% k^p.
 proof.
 move=> lt_pn; rewrite {1}(divz_eq i (k^n)); rewrite -addrA; congr.
 by rewrite {1}(divz_eq (i %% k^n) (k^p)) modz_dvd_pow.
 qed.
 
-lemma nosmt leq_div2r d m n : 0 <= m <= n => m %/ d <= n %/ d.
-proof. admit. qed.
-  
 lemma nosmt modz_pow2_div n p i: 0 <= i => 0 <= p <= n =>
   (i %% 2^n) %/ 2^p = (i %/ 2^p) %% 2^(n-p).
 proof. admit. qed.
