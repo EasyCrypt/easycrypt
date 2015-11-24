@@ -142,6 +142,11 @@ lemma nosmt big_filter (P : 'a -> bool) F s:
 proof. by elim: s => //= x s; case (P x)=> //; rewrite !big_cons=> -> ->. qed.
 
 (* -------------------------------------------------------------------- *)
+lemma big_filter_cond (P1 P2 : 'a -> bool) F s:
+  big P2 F (filter P1 s) = big (predI P1 P2) F s.
+proof. by rewrite -big_filter -(@big_filter _ _ s) predIC filter_predI. qed.
+
+(* -------------------------------------------------------------------- *)
 lemma nosmt eq_bigl (P1 P2 : 'a -> bool) (F : 'a -> t) s:
      (forall i, P1 i <=> P2 i)
   => big P1 F s = big P2 F s.
@@ -269,6 +274,16 @@ proof.
 qed.
 
 (* -------------------------------------------------------------------- *)
+lemma nosmt big_seq_cond (P : 'a -> bool) (F : 'a -> t) s:
+  big P F s = big (fun i => mem s i /\ P i) F s.
+proof. by rewrite -!(@big_filter _ _ s); congr; apply/eq_in_filter. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt big_seq (F : 'a -> t) s:
+  big predT F s = big (fun i => mem s i) F s.
+proof. by rewrite big_seq_cond; apply/eq_bigl. qed.
+
+(* -------------------------------------------------------------------- *)
 lemma nosmt big_rem (P : 'a -> bool) (F : 'a -> t) s x: mem s x =>
   big P F s = (if P x then F x else idm) + big P F (rem x s).
 proof.
@@ -279,6 +294,24 @@ qed.
 lemma nosmt bigD1 (F : 'a -> t) s x: mem s x => uniq s =>
   big predT F s = F x + big (predC1 x) F s.
 proof. by move=> /big_rem-> /rem_filter->; rewrite big_filter. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt bigD1_cond P (F : 'a -> t) s x: P x => mem s x => uniq s =>
+  big P F s = F x + big (predI P (predC1 x)) F s.
+proof.
+move=> Px sx uqs; rewrite -big_filter (@bigD1 _ _ x) ?big_filter_cond //.
+  by rewrite mem_filter Px. by rewrite filter_uniq.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt bigD1_cond_if P (F : 'a -> t) s x: uniq s => big P F s =
+  (if mem s x /\ P x then F x else idm) + big (predI P (predC1 x)) F s.
+proof.
+case: (mem s x /\ P x) => [[Px sx]|Nsx]; rewrite ?add0m /=.
+  by apply/bigD1_cond.
+move=> uqs; rewrite big_seq_cond eq_sym big_seq_cond; apply/eq_bigl=> i /=.
+by case: (i = x) => @/predC1 @/predI [->>|].
+qed.
 
 (* -------------------------------------------------------------------- *)
 lemma big_split (P : 'a -> bool) (F1 F2 : 'a -> t) s:
@@ -302,16 +335,6 @@ qed.
 lemma nosmt big_reindex (P : 'a -> bool) (F : 'a -> t) (f f' : 'a -> 'a) s:
   cancel f' f => big P F s = big (P \o f) (F \o f) (map f' s).
 proof. by move=> bij_ff'; rewrite -big_map -map_comp id_map. qed.
-
-(* -------------------------------------------------------------------- *)
-lemma nosmt big_seq_cond (P : 'a -> bool) (F : 'a -> t) s:
-  big P F s = big (fun i => mem s i /\ P i) F s.
-proof. by rewrite -!(@big_filter _ _ s); congr; apply/eq_in_filter. qed.
-
-(* -------------------------------------------------------------------- *)
-lemma nosmt big_seq (F : 'a -> t) s:
-  big predT F s = big (fun i => mem s i) F s.
-proof. by rewrite big_seq_cond; apply/eq_bigl. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt eq_big_seq (F1 F2 : 'a -> t) s:
