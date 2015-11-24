@@ -53,13 +53,21 @@ have := ltr_add _ _ _ _ lim_sx lim_sy; rewrite ltrNge.
 by rewrite /e double_half (@distrC (s N)) ler_dist_add.
 qed.
 
-lemma eq_cnv s1 s2 l:
-     (exists N, forall n, (N <= n)%Int => s1 n = s2 n)
+lemma eq_cnv N s1 s2 l:
+     (forall n, (N <= n)%Int => s1 n = s2 n)
   => convergeto s1 l => convergeto s2 l.
 proof.
-case=> N eq_s lim_s1 e gt0_e; case: (lim_s1 _ gt0_e).
+move=> eq_s lim_s1 e gt0_e; case: (lim_s1 _ gt0_e).
 move=> Ns lim_s1N; exists (max N Ns)=> n /geq_max [leN leNs].
 by rewrite -eq_s // lim_s1N.
+qed.
+
+lemma eq_cnvP N s1 s2 l:
+     (forall n, (N <= n)%Int => s1 n = s2 n)
+  => convergeto s1 l <=> convergeto s2 l.
+proof.
+move=> eq; split; apply/(eq_cnv N)=> // n leNn.
+by rewrite eq_sym eq.
 qed.
 
 lemma le_cnv s1 s2 l1 l2:
@@ -118,3 +126,9 @@ proof. by split=> [/choicebP /(_ 0%r)|lims]; last exists (lim s). qed.
 lemma lim_Ncnv (s : int -> real):
   ! converge s => lim s = 0%r.
 proof. by move=> h; apply/choiceb_dfl/for_ex. qed.
+
+lemma lim_eq (N : int) (s1 s2 : int -> real):
+     (forall n, N <= n => s1 n = s2 n)
+  => lim s1 = lim s2.
+proof. admit. qed.
+  

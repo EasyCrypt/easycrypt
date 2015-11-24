@@ -24,14 +24,14 @@ proof. by case: b. qed.
 (* -------------------------------------------------------------------- *)
 op lub (E : real -> bool) : real.
 
-pred nonempty (E : real -> bool) =
+op nonempty (E : real -> bool) =
   exists x, E x.
 
-pred ub (E : real -> bool) (z : real) =
+op ub (E : real -> bool) (z : real) =
   forall y, E y => y <= z.
 
-pred has_ub  (E : real -> bool) = nonempty (ub E).
-pred has_lub (E : real -> bool) = nonempty E /\ has_ub E.
+op has_ub  (E : real -> bool) = nonempty (ub E).
+op has_lub (E : real -> bool) = nonempty E /\ has_ub E.
 
 axiom lub_upper_bound (E : real -> bool): has_lub E => 
   forall x, E x => x <= lub E.

@@ -1301,6 +1301,10 @@ op pmap ['a 'b] (f : 'a -> 'b option) (s : 'a list) =
   with s = x :: s =>
     if f x = None then pmap f s else oget (f x) :: pmap f s.
 
+lemma map_pK ['a 'b] (f : 'a -> 'b option) g :
+  pcancel g f => cancel (map g) (pmap f).
+proof. by move=> gK; elim=> //= x s ->; rewrite gK. qed.
+
 (* -------------------------------------------------------------------- *)
 (*                          Index sequence                              *)
 (* -------------------------------------------------------------------- *)
