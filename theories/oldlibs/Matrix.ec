@@ -135,7 +135,7 @@ op to_array: 'a matrix -> 'a Array.array.
 
 axiom to_array_length: forall (M:'a matrix),
   fst (size M) = 1 =>
-  Array.length (to_array M) = snd (size M).
+  Array.size (to_array M) = snd (size M).
 
 axiom to_array_get: forall (M:'a matrix) i,
   fst (size M) = 1 =>
@@ -147,7 +147,7 @@ op row: 'a matrix -> int -> 'a Array.array.
 
 axiom row_length: forall (M:'a matrix) j,
   0 <= j => j < snd (size M) =>
-  Array.length (row M j) = fst (size M).
+  Array.size (row M j) = fst (size M).
 
 axiom row_get: forall (M:'a matrix) j i,
   0 <= j => j < snd (size M) =>
@@ -159,7 +159,7 @@ op column: 'a matrix -> int -> 'a Array.array.
 
 axiom column_length: forall (M:'a matrix) i,
   0 <= i => i < fst (size M) =>
-  Array.length (column M i) = snd (size M).
+  Array.size (column M i) = snd (size M).
 
 axiom column_get: forall (M:'a matrix) i j,
   0 <= i => i < fst (size M) =>
@@ -170,9 +170,9 @@ lemma column_transpose_row: forall (M:'a matrix) i,
   0 <= i => i < snd (size M) =>
   row M i = column (transpose M) i.
 proof -strict.
-intros M i i_0 i_bound; apply Array.array_ext.
-cut ext_eq: (Array.length (row M i) = fst (size M) /\
-             Array.length (column (transpose M) i) = fst (size M) /\
+intros M i i_0 i_bound; apply Array.arrayP.
+cut ext_eq: (Array.size (row M i) = fst (size M) /\
+             Array.size (column (transpose M) i) = fst (size M) /\
              forall j, 0 <= j => j < fst (size M) =>
                Array."_.[_]" (row M i) j = M.[(j,i)] /\
                Array."_.[_]" (column (transpose M) i) j = (transpose M).[(i,j)] /\
