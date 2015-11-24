@@ -19,7 +19,7 @@ axiom nosmt edivzP (m d : int):
 axiom divz0 m: m %/ 0 = 0.
 
 (* -------------------------------------------------------------------- *)
-op (%|) (m d : int) = (m %% d = 0).
+op (%|) (m d : int) = (d %% m = 0).
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt euclideU d q q' r r':
@@ -234,17 +234,70 @@ proof. by rewrite {2}(divz_eq m d) mulrDl mulrAC modzMDl. qed.
 lemma modzMmr m n d : (m * (n %% d)) %% d = (m * n) %% d.
 proof. by rewrite !(mulrC m) modzMml. qed.
 
+lemma modzMm m n d : ((m %% d) * (n %% d)) %% d = (m * n) %% d.
+proof. by rewrite modzMml modzMmr. qed.
+
 lemma modzNm m d : (- (m %% d)) %% d = (- m) %% d.
 proof. by rewrite -mulN1r modzMmr mulN1r. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt mulz_modr p m d : 0 < p => p * (m %% d) = (p * m) %% (p * d).
-proof.
-by move=> p_gt0; rewrite !modzE mulrBr; congr; rewrite divzMpl // mulrCA.
-qed.
+proof. by move=> p_gt0; rewrite !modzE mulrBr divzMpl // mulrCA. qed.
 
 lemma nosmt mulz_modl p m d : 0 < p => (m %% d) * p = (m * p) %% (d * p).
 proof. by rewrite -!(mulrC p); apply/mulz_modr. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt dvdzE d m : d %| m <=> (m %% d = 0).
+proof. by []. qed.
+
+lemma dvdz0 d : d %| 0.
+proof. by rewrite dvdzE mod0z. qed.
+
+lemma dvd0z m : 0 %| m <=> m = 0.
+proof. by rewrite dvdzE modz0. qed.
+
+lemma dvd1z m : 1 %| m.
+proof. by rewrite dvdzE modz1. qed.
+
+lemma dvdz1 d : d %| 1 <=> `|d| = 1.
+proof.                        (* FIXME: test-case for case analysis *)
+move: d; have wlog: forall d, 0 <= d => d %| 1 <=> `|d| = 1; first last.
+  move=> d; case: (0 <= d) => [/wlog//|/ltrNge/ltrW le0_d].
+  by rewrite -{1}(opprK d) dvdzE modzN wlog ?normrN // oppr_ge0.
+move=> d; case: (1 < d) => [lt1_d ge0_d|/lerNgt].
+  have lt1_nd: 1 < `|d| by apply/(ltr_le_trans d)/ler_norm.
+  by rewrite dvdzE modz_small /= ?gtr_eqF.
+rewrite ler_eqVlt=> [->|]; first by rewrite dvd1z.
+rewrite (@ltzS _ 0) => le0d ge0d; have ->: d = 0.
+  by rewrite eqr_le le0d ge0d.
+by rewrite normr0 /= dvdzE modz0.
+qed.
+
+lemma dvdzz m : m %| m.
+proof. by rewrite dvdzE modzz. qed.
+
+lemma nosmt dvdzP d m : (d %| m) <=> (exists q, m = q * d).
+proof.
+rewrite dvdzE; split=> [|[q->]]; last by rewrite modzMl.
+by move=> eq; exists (m %/ d); rewrite {1}(divz_eq m d) eq.
+qed.
+
+lemma dvdz_mull d m n : d %| n => d %| m * n.
+proof. by move/dvdzP=> [q ->]; rewrite dvdzE mulrA modzMl. qed.
+
+lemma dvdz_mulr d m n : d %| m => d %| m * n.
+proof. by move=> d_m; rewrite mulrC dvdz_mull. qed.
+
+lemma nosmt dvdz_mul d1 d2 m1 m2 :
+  d1 %| m1 => d2 %| m2 => d1 * d2 %| m1 * m2.
+proof.
+move=> /dvdzP[q1 ->] /dvdzP[q2 ->].
+by rewrite mulrCA -mulrA 2?dvdz_mull dvdzz.
+qed.
+
+lemma nosmt dvdz_trans n d m : d %| n => n %| m => d %| m.
+proof. by move=> dv_dn /dvdzP[q ->]; apply/dvdz_mull. qed.
 
 (* -------------------------------------------------------------------- *)
 (* FIXME: should be supersed by IntDiv                                  *)
