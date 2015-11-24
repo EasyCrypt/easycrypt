@@ -391,7 +391,7 @@ lemma nosmt modz_dvd_pow n p i k:
   0 <= n <= p => i %% k^p %% k^n = i %% k^n.
 proof. by move=> le_np; apply/modz_dvd/dvdz_exp2l. qed.
 
-lemma nosmt modz_pow2_split n p i k : 0 <= p <= n =>
+lemma nosmt modz_pow_split n p i k : 0 <= p <= n =>
    i = i %/ k^n * k^n + (i %% k^n %/ k^p) * k^p + i %% k^p.
 proof.
 move=> lt_pn; rewrite {1}(divz_eq i (k^n)); rewrite -addrA; congr.

@@ -41,8 +41,8 @@ proof.
 move=> ge0_i ge0_j eq; apply/eq_in_mkseq=> k [ge0_k lt_kN] /=.
 move/(congr1 (fun z => z %/ 2^k)): eq => /=.
 have ge0_N: 0 <= N by apply/(ler_trans _ ge0_k)/ltrW.
-rewrite !mod_pow2_div // ?ge0_k ?ltrW //.
-move/(congr1 (fun z => z %% 2^1))=> /=; rewrite !mod_pow2_mod /=;
+rewrite !modz_pow2_div // ?ge0_k ?ltrW //.
+move/(congr1 (fun z => z %% 2^1))=> /=; rewrite !modz_dvd_pow /=;
   first 2 by (rewrite ler_subr_addr lez_add1r).
 by rewrite !pow1 => ->.
 qed.
