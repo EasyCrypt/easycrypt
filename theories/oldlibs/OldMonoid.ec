@@ -255,7 +255,7 @@ theory Miplus.
   import Int.
   op sum_n i j = sum_ij i j (fun (n:int), n).
 
-  lemma sum_n_0k (k:int) : 0 <= k => sum_n 0 k = (k*(k + 1))/%2.
+  lemma sum_n_0k (k:int) : 0 <= k => sum_n 0 k = (k*(k + 1))%/2.
   proof -strict.
     rewrite /sum_n;elim k.
       by rewrite sum_ij_eq => /=; smt all.
@@ -287,7 +287,7 @@ theory Miplus.
  qed.
 
  lemma sumn_ij (i j:int) : i <= j =>
-   sum_n i j = i*((j - i)+1) + (j-i)*(j-i+1)/%2.
+   sum_n i j = i*((j - i)+1) + (j-i)*(j-i+1)%/2.
  proof -strict.
    intros Hle; rewrite sumn_ij_aux //;smt.
  qed.
@@ -297,7 +297,7 @@ theory Miplus.
    case (i <= j) => Hle Hp.
      rewrite sumn_ij=> //.
      have h: 0 <= (j - i) * (j - i + 1) by smt.
-     have: 0 <= (j - i) * (j - i + 1) /% 2 by smt.
+     have: 0 <= (j - i) * (j - i + 1) %/ 2 by smt.
      have: 0 <= i * (j - i + 1) by smt.
      smt.
    by rewrite /sum_n sum_ij_gt; first smt.
