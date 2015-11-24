@@ -270,8 +270,9 @@
       with Not_found ->
         if   Pcre.pmatch ~pat:"^:+$" op
         then ROP4 op else begin
-          if   Pcre.pmatch ~pat:"^[/%]+$" op
-          then LOP3 op else raise Not_found
+          if   Pcre.pmatch ~pat:"^%+.$" op
+          then lex_std_op ~name:op (String.make 1 op.[String.length op -1])
+          else raise Not_found
         end
     in
       try  [baseop op]
