@@ -296,6 +296,7 @@ def _main():
             def for1(x):
                 aout = []
                 if x.startswith('!'):
+                    aout.append(x[1:])
                     for root, dnames, _ in os.walk(x[1:]):
                         aout.extend([os.path.join(root, x) for x in dnames])
                 else:
