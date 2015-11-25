@@ -888,7 +888,19 @@ lemma trim_cat (xs ys : 'a list) (n : int): n < size (xs ++ ys) =>
     if   n < size xs
     then (trim xs n) ++ ys
     else xs ++ trim ys (n - size xs).
-proof. by rewrite size_cat /trim; smt. qed.
+proof.
+rewrite size_cat /trim take_cat drop_cat.
+case: (n + 1 < size xs)=> [lt_n1_sx|/lezNgt].
+  have ->: (n < size xs) by smt. (* n + 1 < size xs => n < size xs *)
+  by rewrite catA.
+case: (n < size xs)=> /=; last first.
+  by rewrite catA subzE addzAC -2!subzE.
+rewrite -lez_add1r addzC=> h h'.
+have {h h'} sx_eq_n1:= lez_anti (size xs) (n + 1) _=> //.
+rewrite sx_eq_n1 subzE Ring.IntID.opprD subzE.
+rewrite (addzC (-n)) addzA -(addzA _ _ (-1)) -subzE /=.
+by rewrite drop0 -sx_eq_n1 drop_size cats0.
+qed.
 
 (* -------------------------------------------------------------------- *)
 (*                        Sequence reversal                             *)
