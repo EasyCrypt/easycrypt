@@ -46,13 +46,13 @@ proof. by rewrite offunifE; case: (_ <= _ < _). qed.
 lemma xorwE w1 w2 i: (w1 +^ w2).[i] = w1.[i] ^^ w2.[i].
 proof.
 rewrite offunifE /= anda_and; apply/andb_idl.
-by case: (0 <= i < n) => // h; rewrite !getE !nth_out ?size_word.
+by case: (0 <= i < n)=> // h; rewrite !getE h.
 qed.
 
 lemma andwE (w1 w2:word) i: (andw w1 w2).[i] = (w1.[i] /\ w2.[i]).
 proof.
 rewrite offunifE /= anda_and; apply/andb_idl.
-by case: (0 <= i < n) => // h; rewrite !getE !nth_out ?size_word.
+by case: (0 <= i < n) => // h; rewrite !getE h.
 qed.
 
 lemma invwE (w:word) i: 0 <= i < n =>

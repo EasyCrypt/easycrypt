@@ -57,14 +57,20 @@ lemma nosmt get_default (arr : 'a array) (i : int):
 proof. rewrite getE sizeE; apply/nth_default. qed.
 
 lemma nosmt arrayP (arr1 arr2 : 'a array):
-  (   size arr1 = size arr2
-   /\ (forall i, 0 <= i < size arr1 => arr1.[i] = arr2.[i]))
-  <=> arr1 = arr2.
+  arr1 = arr2 <=>
+  (size arr1 = size arr2
+   /\ (forall i, 0 <= i < size arr1 => arr1.[i] = arr2.[i])).
 proof.
-split=> [[size_eq eq_get]|->//].
+split=> [//|[size_eq eq_get]].
 apply/ofarray_inj/(eq_from_nth witness)=> [|i]; rewrite -!sizeE//.
 + by rewrite -!getE=> /eq_get.
 qed.
+
+lemma nosmt eq_from_get (arr1 arr2 : 'a array):
+  size arr1 = size arr2 =>
+  (forall i, 0 <= i < size arr1 => arr1.[i] = arr2.[i]) =>
+  arr1 = arr2.
+proof. by move=> eq_size eq_get; apply/arrayP. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma get_set_if (arr : 'a array) (x : 'a) (i j : int):
@@ -159,3 +165,6 @@ proof.
 elim/arrayW: arr => arr; rewrite size_mkarray !getE !ofarrayK.
 by apply/nth_map.
 qed.
+
+lemma size_map (f : 'a -> 'b) arr: size (map f arr) = size arr.
+proof. by rewrite size_mkarray size_map sizeE. qed.
