@@ -365,8 +365,11 @@ proof.
     have /= := nth_find witness (fun (x : 'a * 'b) => p (fst x) (snd x)) (elems m) _.
       by rewrite -hasE.
     rewrite -/i -(@nth_map _ witness) //.
-    rewrite getE /assoc oget_omap_some 1:smt.
-    smt. (* laziness. FIXME: we need lemmas connecting 'assoc' with 'index', 'nth' and 'map snd' *)
+    rewrite getE /assoc.
+    rewrite (@index_uniq witness i (map fst (elems m))).
+    + by rewrite size_map.
+    + exact/uniq_keys.
+    by rewrite (@onth_nth witness) //.
   right.
   have:= all_not_p; rewrite has_all /= allP /= => h.
   by split=> //; move: all_not_p; rewrite find_none.
