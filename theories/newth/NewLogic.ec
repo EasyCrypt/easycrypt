@@ -229,6 +229,50 @@ lemma orab_orb : (||) = (\/).
 proof. by apply/ExtEq.rel_ext=> x y; rewrite orabP. qed.
 
 (* -------------------------------------------------------------------- *)
+lemma forall_orl (P : bool) (Q : 'a -> bool) :
+  (P \/ (forall (x : 'a), Q x)) <=> forall (x : 'a), (P \/ Q x).
+proof. by case: P. qed.
+
+lemma forall_orr (P : bool) (Q : 'a -> bool) :
+  ((forall (x : 'a), Q x) \/ P) <=> forall (x : 'a), (Q x \/ P).
+proof. by case: P. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma forall_andl (P : bool) (Q : 'a -> bool) :
+  (P /\ (forall (x : 'a), Q x)) <=> forall (x : 'a), (P /\ Q x).
+proof. by case: P. qed.
+
+lemma forall_andr (P : bool) (Q : 'a -> bool) :
+  ((forall (x : 'a), Q x) /\ P) <=> forall (x : 'a), (Q x /\ P).
+proof. by case: P. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma forall_eq (P P' : 'a -> bool) :
+  (forall x, P x = P' x) =>
+  (forall (x : 'a), P x) <=> (forall (x : 'a), P' x).
+proof. by move=> /ExtEq.fun_ext ->. qed.
+
+lemma forall_eq_in (P : 'a -> bool) (Q Q' : 'a -> bool) :
+  (forall x, P x => (Q x = Q' x)) =>
+  (forall (x : 'a), P x => Q x) <=> (forall (x : 'a), P x => Q' x).
+proof.
+(* FIXME? Why is exact/eq_Q needed? *)
+by move=> eq_Q; apply/forall_eq=> x /=; case (P x)=> //; exact/eq_Q.
+qed.
+
+lemma forall_iff (P P' : 'a -> bool) :
+  (forall x, P x <=> P' x) =>
+  (forall (x : 'a), P x) <=> (forall (x : 'a), P' x).
+proof. by move=> eq_P; split=> h x; have /eq_P:= h x. qed.
+
+lemma forall_iff_in (P : 'a -> bool) (Q Q' : 'a -> bool) :
+  (forall x, P x => (Q x <=> Q' x)) =>
+  (forall (x : 'a), P x => Q x) <=> (forall (x : 'a), P x => Q' x).
+proof.
+by move=> eq_Q; apply/forall_iff=> x /=; case (P x)=> //; exact/eq_Q.
+qed.
+
+(* -------------------------------------------------------------------- *)
 lemma exists_orl (P : bool) (Q : 'a -> bool) :
   (P \/ (exists (x : 'a), Q x)) <=> exists (x : 'a), (P \/ Q x).
 proof. by case: P. qed.
@@ -236,6 +280,40 @@ proof. by case: P. qed.
 lemma exists_orr (P : bool) (Q : 'a -> bool) :
   ((exists (x : 'a), Q x) \/ P) <=> exists (x : 'a), (Q x \/ P).
 proof. by case: P. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma exists_andl (P : bool) (Q : 'a -> bool) :
+  (P /\ (exists (x : 'a), Q x)) <=> exists (x : 'a), (P /\ Q x).
+proof. by case: P. qed.
+
+lemma exists_andr (P : bool) (Q : 'a -> bool) :
+  ((exists (x : 'a), Q x) /\ P) <=> exists (x : 'a), (Q x /\ P).
+proof. by case: P. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma exists_eq (P P' : 'a -> bool) :
+  (forall x, P x = P' x) =>
+  (exists (x : 'a), P x) <=> (exists (x : 'a), P' x).
+proof. by move=> /ExtEq.fun_ext ->. qed.
+
+lemma exists_eq_in (P : 'a -> bool) (Q Q' : 'a -> bool) :
+  (forall x, P x => (Q x = Q' x)) =>
+  (exists (x : 'a), P x /\ Q x) <=> (exists (x : 'a), P x /\ Q' x).
+proof.
+by move=> eq_Q; apply/exists_eq=> x /=; case (P x)=> //; exact/eq_Q.
+qed.
+
+lemma exists_iff (P P' : 'a -> bool) :
+  (forall x, P x <=> P' x) =>
+  (exists (x : 'a), P x) <=> (exists (x : 'a), P' x).
+proof. by move=> eq_P; split; move=> [a] /eq_P h; exists a. qed.
+
+lemma exists_iff_in (P : 'a -> bool) (Q Q' : 'a -> bool) :
+  (forall x, P x => (Q x <=> Q' x)) =>
+  (exists (x : 'a), P x /\ Q x) <=> (exists (x : 'a), P x /\ Q' x).
+proof.
+by move=> eq_Q; apply/exists_iff=> x /=; case (P x)=> //; exact/eq_Q.
+qed.
 
 (* -------------------------------------------------------------------- *)
 (* Pred? *)
