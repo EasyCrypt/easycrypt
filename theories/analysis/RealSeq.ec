@@ -131,4 +131,15 @@ lemma lim_eq (N : int) (s1 s2 : int -> real):
      (forall n, N <= n => s1 n = s2 n)
   => lim s1 = lim s2.
 proof. admit. qed.
-  
+
+(* -------------------------------------------------------------------- *)
+lemma limC_eq_from (N : int) c (s : int -> real) :
+   (forall n, N <= n => s n = c) => lim s = c.
+proof. admit. qed.
+
+lemma limC_eq c (s : int -> real) :
+ (forall n, 0 <= n => s n = c) => lim s = c.
+proof. by apply/limC_eq_from. qed.
+
+lemma limC c : lim (fun x => c) = c.
+proof. by apply/limC_eq. qed.
