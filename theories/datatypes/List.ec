@@ -1305,6 +1305,24 @@ lemma map_pK ['a 'b] (f : 'a -> 'b option) g :
   pcancel g f => cancel (map g) (pmap f).
 proof. by move=> gK; elim=> //= x s ->; rewrite gK. qed.
 
+lemma pmap_map ['a 'b] (f : 'a -> 'b option) s:
+  pmap f s = map oget (filter (predC1 None) (map f s)).
+proof. by elim: s => //= x s ih; case: (f x) => @/predC1. qed.
+
+lemma pmap_cat ['a 'b] (f : 'a -> 'b option) s1 s2:
+  pmap f (s1 ++ s2) = pmap f s1 ++ pmap f s2.
+proof. by rewrite !pmap_map !(map_cat, filter_cat). qed.
+
+lemma pmap_none ['a 'b] s : pmap (fun (i : 'a) => None<:'b>) s = [].
+proof. by elim: s. qed.
+
+lemma pmap_some ['a 'b] (f : 'a -> 'b) s:
+  pmap (fun x => Some (f x)) s = map f s.
+proof.
+rewrite pmap_map filter_map -!map_comp.
+by rewrite -(@eq_filter predT) ?filter_predT.
+qed.
+
 (* -------------------------------------------------------------------- *)
 (*                          Index sequence                              *)
 (* -------------------------------------------------------------------- *)
@@ -1438,6 +1456,16 @@ theory Range.
 end Range.
 
 export Range.
+
+(* -------------------------------------------------------------------- *)
+lemma map_nth_range (x0 : 'a) s:
+  map (fun i => nth x0 s i) (range 0 (size s)) = s.
+proof.
+apply/(@eq_from_nth x0)=> [|i]; rewrite ?size_map.
+  by rewrite size_range /= max_ler ?size_ge0.
+move=> le_is; rewrite (@nth_map i) //= nth_range //=.
+by move: le_is; rewrite size_range max_ler /= ?size_ge0.
+qed.
 
 (* -------------------------------------------------------------------- *)
 (*                        Association lists                             *)
@@ -1609,6 +1637,11 @@ lemma eq_in_map (f1 f2 : 'a -> 'b) (s : 'a list):
   (forall x, mem s x => f1 x = f2 x) <=> map f1 s = map f2 s.
 proof. elim: s => //= x s <-; smt. qed.
 
+lemma eq_in_pmap ['a 'b] (f1 f2 : 'a -> 'b option) s:
+     (forall x, mem s x => f1 x = f2 x)
+  => pmap f1 s = pmap f2 s.
+proof. by move=> eq; rewrite !pmap_map; do 2!congr; apply/eq_in_map. qed.
+
 lemma eq_in_filter p1 p2 (s : 'a list):
      (forall x, mem s x => p1 x <=> p2 x)
   => filter p1 s = filter p2 s.
@@ -1616,6 +1649,14 @@ proof.
   elim: s => //= x s ih eq_p; rewrite eq_p // ih //.
   by move=> x' x'_in_s; apply/eq_p; rewrite x'_in_s.
 qed.
+
+lemma eq_in_filter_predT (P : 'a -> bool) s:
+  (forall x, mem s x => P x) => filter P s = s.
+proof. by move=> Ps; rewrite (@eq_in_filter P predT) ?filter_predT. qed.
+
+lemma eq_in_filter_pred0 (P : 'a -> bool) s:
+  (forall x, mem s x => !P x) => filter P s = [].
+proof. by move=> Ps; rewrite (@eq_in_filter P pred0) ?filter_pred0. qed.
 
 lemma eq_in_count (p1 p2 : 'a -> bool) (s : 'a list):
   (forall x, mem s x => p1 x <=> p2 x) => count p1 s = count p2 s.
