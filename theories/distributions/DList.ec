@@ -190,8 +190,16 @@ abstract theory Program.
       rcondt{2} 3; 1:by auto; smt.
       rcondf{2} 6; 1:by auto; smt.
       wp; rnd (fun x => head witness x) (fun x => [x]).
-      auto; progress; 2,3:smt.
-      by rewrite h /= /mu_x mux_dlist// /= big_cons /predT/= big_nil smt.
+      auto; progress; subst _n=> /=.
+      + rewrite (dlistS _ 0) // dlist0 // Dapply.mu_x_def /preim /pred1 /=.
+        rewrite (Dprod.mu_def (pred1 rR) (pred1 []) d (Dunit.dunit [])).
+        by rewrite Dunit.mu_x_def.
+      + move: H0; rewrite (dlistS _ 0) // dlist0 // Dapply.supp_def /preim /pred1 /=.
+        move=> [[x xs]] /= [->] /=.
+        by rewrite Dprod.supp_def.
+      + move: H0; rewrite (dlistS _ 0) // dlist0 // Dapply.supp_def /preim /pred1 /=.
+        move=> [[x xs]] /= [->] /=.
+        by rewrite Dprod.supp_def /fst /snd /= Dunit.supp_def.
     transitivity SampleCons.sample
                  (={n} /\ 0 < n{1} ==> ={res})
                  (_n + 1 = n{1} /\ ={n} /\ 0 < n{1} ==> ={res})=> //=; 1:smt.
