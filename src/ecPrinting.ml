@@ -1194,7 +1194,7 @@ let pp_lvalue (ppe : PPEnv.t) fmt lv =
         (pp_paren (pp_list ",@ " (pp_pv ppe))) (List.map fst ps)
 
   | LvMap (_, x, e, _) ->
-      Format.fprintf fmt "%a[%a]"
+      Format.fprintf fmt "%a.[%a]"
         (pp_pv ppe) x (pp_expr ppe) e
 
 (* -------------------------------------------------------------------- *)
