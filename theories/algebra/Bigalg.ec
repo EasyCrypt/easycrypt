@@ -116,7 +116,7 @@ end BigComRing.
 abstract theory BigOrder.
 type t.
 
-clone import Number as Num with type t <- t.
+clone import Number.RealDomain as Num with type t <- t.
 clear [Num.*].
 
 import Num.Domain.

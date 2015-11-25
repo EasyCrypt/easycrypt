@@ -11,7 +11,7 @@ require (*--*) Number.
 
 (* -------------------------------------------------------------------- *)
 theory IntOrder.
-clone include Number
+clone include Number.RealDomain
   with type t <- int,
 
   pred Domain.unit (z : int) <- (z = 1 \/ z = -1),
@@ -35,21 +35,20 @@ clone include Number
 end IntOrder.
   
 (* -------------------------------------------------------------------- *)
-clone Number as RealOrder
+clone Number.RealField as RealOrder
   with type t <- real,
 
-  pred Domain.unit (z : real) <- (z <> 0%r),
-  op   Domain.zeror  <- 0%r,
-  op   Domain.oner   <- 1%r,
-  op   Domain.( + )  <- Real.( + ),
-  op   Domain.([-])  <- Real.([-]),
-  op   Domain.( - )  <- Real.( - ),
-  op   Domain.( * )  <- Real.( * ),
-  op   Domain.( / )  <- Real.( / ),
-  op   Domain.invr   <- Real.inv,
-  op   Domain.intmul <- RField.intmul,
-  op   Domain.ofint  <- RField.ofint,
-  op   Domain.exp    <- RField.exp,
+  op   Field.zeror  <- 0%r,
+  op   Field.oner   <- 1%r,
+  op   Field.( + )  <- Real.( + ),
+  op   Field.([-])  <- Real.([-]),
+  op   Field.( - )  <- Real.( - ),
+  op   Field.( * )  <- Real.( * ),
+  op   Field.( / )  <- Real.( / ),
+  op   Field.invr   <- Real.inv,
+  op   Field.intmul <- RField.intmul,
+  op   Field.ofint  <- RField.ofint,
+  op   Field.exp    <- RField.exp,
 
   op   "`|_|" <- Real.Abs."`|_|",
   op   ( <= ) <- Real.(<=),
