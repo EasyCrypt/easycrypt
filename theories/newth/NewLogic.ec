@@ -17,8 +17,8 @@ pragma +implicits.
    external (\x): bool -> bool -> bool.
    external ite : bool -> bool -> bool -> bool. *)
 
-op (&&) b1 b2 = if b1 then b2 else false.
-op (||) b1 b2 = if b1 then true else b2.
+(* op (&&) b1 b2 = if b1 then b2 else false. *)
+(* op (||) b1 b2 = if b1 then true else b2. *)
 op (^) b1 b2  = if b1 then !b2 else b2.
 
 (* -------------------------------------------------------------------- *)
