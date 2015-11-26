@@ -5,6 +5,7 @@ _build
 *.exe
 *.pyc
 *.pyo
+.vagrant
 /local
 /why3
 /_tools
