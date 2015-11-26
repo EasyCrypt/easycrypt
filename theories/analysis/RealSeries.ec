@@ -31,6 +31,9 @@ axiom sbl_countable (s : 'a -> real) :
   summable s => countable (fun i => s i <> 0%r).
 
 (* -------------------------------------------------------------------- *)
+op support ['a] (s : 'a -> real) = fun x => s x <> 0%r.
+
+(* -------------------------------------------------------------------- *)
 lemma nosmt summable0: summable (fun (x:'a) => 0%r).
 proof. by exists 0%r=> J uqJ; rewrite Bigreal.sumr_const normr0. qed.
 
@@ -51,6 +54,11 @@ have /ler_add /(_ _ _ (leM2 J _)) := leM1 _ uqJ => // le.
 apply/(ler_trans _ _ le); rewrite -big_split /=; apply/ler_sum.
 by move=> a _ /=; apply/ler_norm_add.
 qed.
+
+(* -------------------------------------------------------------------- *)
+lemma eq_summable (s1 s2 : 'a -> real):
+  (forall x, s1 x = s2 x) =>  summable s1 <=> summable s2.
+proof. by move=> /fun_ext ->. qed.
 
 (* -------------------------------------------------------------------- *)
 op pos (s : 'a -> real) = fun i => if s i < 0%r then 0%r else `|s i|.
@@ -125,11 +133,29 @@ lemma nosmt sum_sbl (s : 'a -> real) : summable s =>
 proof. by move=> @/sum ->. qed.
 
 (* -------------------------------------------------------------------- *)
+lemma nosmt sum_Nsbl (s : 'a -> real) : !summable s => sum s = 0%r.
+proof. by move=> @/sum ->. qed.
+
+(* -------------------------------------------------------------------- *)
 axiom nosmt sumE (s : 'a -> real) :
   forall (J : int -> 'a option),
-       (forall i j x, J i = Some x => J j = Some x => i = j)
-    => (forall x, s x <> 0%r => exists i, 0 <= i /\ J i = Some x)
+       enumerate J (support s)
+    => summable s
     => sum s = lim (fun n => big predT s (pmap J (range 0 n))).
+
+(* -------------------------------------------------------------------- *)
+(*
+lemma sum_cnvto (s : 'a -> real) :
+  forall (J : int -> 'a option),
+  enumerate J (support S)
+*)
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt sum_to_enum (s : 'a -> real) : summable s =>
+  exists (J : int -> 'a option), enumerate J (support s).
+proof.
+by move/sbl_countable/countableP=> [C] /= [inj_C suppC]; exists C; split.
+qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt sumE_fin ['a] (s : 'a -> real) (J : 'a list) :
@@ -137,7 +163,7 @@ lemma nosmt sumE_fin ['a] (s : 'a -> real) (J : 'a list) :
   => (forall x, s x <> 0%r => mem J x)
   => sum s = big predT s J.
 proof.
-move=> uqJ sJ; rewrite (@sumE _ (fun i => nth None (map Some J) i)).
+move=> uqJ sJ; rewrite (@sumE _ (nth None (map Some J))); 1: split.
 + move=> i j x /=; pose n := size J; case: (0 <= i < n); last first.
     by move=> Nrg_i; rewrite nth_out ?size_map.
   case: (0 <= j < n); last by move=> Nrg_j _ _; rewrite nth_out ?size_map.
@@ -145,6 +171,7 @@ move=> uqJ sJ; rewrite (@sumE _ (fun i => nth None (map Some J) i)).
   by move/(congr1 (fun x => index x J))=> /=; rewrite !index_uniq.
 + move=> x /sJ sx; exists (index x J); rewrite ?index_ge0 /=.
   by rewrite (@nth_map x) /= 1:index_ge0 1:index_mem // nth_index.
++ admit.
 apply/(@limC_eq_from (size J)) => n ge_Jn /=.
 rewrite (@range_cat (size J)) 1:size_ge0 // pmap_cat big_cat.
 rewrite addrC -(@eq_in_pmap (fun i => None)) ?pmap_none ?big_nil /=.
@@ -181,4 +208,21 @@ move=> le_s12 sbl1 sbl2; rewrite !sum_sbl // ler_sub.
   by rewrite !ger0_norm ?pos_ge0 ler_pos.
 apply/ler_psum/summable_neg/sbl1=> x.
 by rewrite !ger0_norm ?neg_ge0 ler_neg.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt eq_sum (s1 s2 : 'a -> real) :
+  (forall x, s1 x = s2 x) => sum s1 = sum s2.
+proof. by move/fun_ext=> ->. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt sumD s1 s2 : summable s1 => summable s2 =>
+  sum<:'a> (fun x => s1 x + s2 x) = sum s1 + sum s2.
+proof.
+move=> cv1 cv2; pose s := fun x => s1 x + s2 x.
+have cvs: summable s by move=> @/s; apply/summableD.
+have /sum_to_enum[J1 cJ1] := cv1; have /sum_to_enum[J2 cj2] := cv2.
+have /sum_to_enum[Js cJs] := cvs; pose J := cunions [Js; J1; J2].
+rewrite (@sumE s J) -1:(@sumE s1 J) -1:(@sumE s2 J) //; 1..3: admit.
+admit.
 qed.

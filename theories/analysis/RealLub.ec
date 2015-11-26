@@ -13,6 +13,14 @@ require import StdRing StdOrder.
 pragma +implicits.
 
 (* -------------------------------------------------------------------- *)
+lemma eq_lub (E1 E2 : real -> bool) :
+  (forall x, E1 x <=> E2 x) => lub E1 = lub E2.
+proof.
+move=> eqE; have /fun_ext ->//: forall x, E1 x = E2 x.
+by move=> x; apply/eq_iff/eqE.
+qed.
+
+(* -------------------------------------------------------------------- *)
 lemma nosmt ler_lub (E1 E2 : real -> bool) :
      (forall x, E1 x => exists y, E2 y /\ x <= y)
   => has_lub E2 => nonempty E1 => lub E1 <= lub E2.
