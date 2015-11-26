@@ -120,6 +120,19 @@ proof. by move=> x; rewrite setDE mem_oflist mem_filter /predC !memE. qed.
 hint rewrite inE : in_fset0 in_fset1 in_fsetU in_fsetI in_fsetD.
 
 (* -------------------------------------------------------------------- *)
+lemma in_fsetU1 (s : 'a fset) x:
+  forall x', mem (s `|` fset1 x) x' <=> mem s x' \/ x' = x.
+proof. by move=> x'; rewrite in_fsetU in_fset1. qed.
+
+lemma in_fsetI1 (s : 'a fset) x:
+  forall x', mem (s `&` fset1 x) x' <=> mem s x /\ x' = x.
+proof. by move=> x'; rewrite in_fsetI in_fset1. qed.
+
+lemma in_fsetD1 (s : 'a fset) x:
+  forall x', mem (s `\` fset1 x) x' <=> mem s x' /\ x' <> x.
+proof. by move=> x'; rewrite in_fsetD in_fset1. qed.
+
+(* -------------------------------------------------------------------- *)
 op filter ['a] (p : 'a -> bool) (s : 'a fset) =
   oflist (filter p (elems s))
   axiomatized by filterE.
@@ -469,10 +482,37 @@ proof.
      exists x'; rewrite in_fsetU x'_in_X.
 qed.
 
+lemma nosmt imageI (f : 'a -> 'b) (A B : 'a fset):
+  image f (A `&` B) <= image f A `&` image f B.
+proof.
+  move=> x; rewrite !inE !imageP=> [a].
+  rewrite !inE=> [[a_in_A a_in_B] <-].
+  by split; exists a.
+qed.
+
+lemma nosmt imageD (f : 'a -> 'b) (A B : 'a fset):
+  image f A `\` image f B <= image f (A `\` B).
+proof.
+  move=> x; rewrite !inE !imageP=> [[a] [a_in_A <-]].
+  move=> h; exists a; rewrite !inE a_in_A /= -negP=> a_in_B.
+  by move: h=> /=; exists a.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt fcard_image_leq (f : 'a -> 'b) (A : 'a fset):
+  card (image f A) <= card A.
+proof.
+  elim/fset_ind: A=> [|x A x_notin_A ih]; 1: by rewrite image0 !fcards0.
+  rewrite imageU image1 (lez_trans (card (image f A) + 1)).
+    by rewrite fcardU fcard1 subzE ler_naddr 1:oppr_le0 1:fcard_ge0.
+  rewrite fcardU fsetI1 x_notin_A fcards0 fcard1 subzE oppz0 addz0.
+  by rewrite ler_add2r.
+qed.
+
 (* -------------------------------------------------------------------- *)
 op product (A : 'a fset) (B : 'b fset): ('a * 'b) fset =
   oflist (flatten (map (fun a => map (fun b => (a,b)) (elems B)) (elems A)))
-  axiomatized by productE.
+axiomatized by productE.
 
 lemma productP (A : 'a fset) (B : 'b fset) (a : 'a) (b : 'b):
   mem (product A B) (a,b) <=> mem A a /\ mem B b.
