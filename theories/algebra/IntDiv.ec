@@ -132,6 +132,14 @@ lemma modz_small m d: 0 <= m < `|d| => m %% d = m.
 proof. by move=> /emodz_eq /(_ 0). qed.
 
 (* -------------------------------------------------------------------- *)
+lemma divz_eq0 m d : 0 < d => (0 <= m < d) <=> (m %/ d = 0).
+proof. move=> gt0_d; split=> [[ge0_m lt_md]|].
+  by rewrite divz_small ?ge0_m //= ltr_normr lt_md.
+move=> eq0; rewrite (divz_eq m d) eq0 /=.
+by rewrite modz_ge0 ?ltz_pmod ?gtr_eqF.
+qed.
+
+(* -------------------------------------------------------------------- *)
 lemma b2i_mod2 b : b2i b %% 2 = b2i b.
 proof. by rewrite modz_small //; case: b. qed.
 
@@ -148,11 +156,19 @@ lemma modzE m d : m %% d = m - (m %/ d) * d.
 proof. by have [+ _] - {2}-> := edivzP m d; rewrite subrE addrAC addrN. qed.
 
 (* -------------------------------------------------------------------- *)
+lemma divzE m d : m %/ d * d = m - m %% d.
+proof. by rewrite modzE; ring. qed.
+
+(* -------------------------------------------------------------------- *)
 lemma nosmt divzMDl q m d : d <> 0 => (q * d + m) %/ d = q + (m %/ d).
 proof.
 move=> nz_d; have [+ /(_ nz_d) lt_md] - {1}-> := edivzP m d.
 by rewrite addrA -mulrDl edivz_eq.
 qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt divzMDr q m d : d <> 0 => (m + q * d) %/ d = q + (m %/ d).
+proof. by move=> nz_d; rewrite (@addrC m); apply/divzMDl. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt modzMDl p m d : (p * d + m) %% d = m %% d.
@@ -333,6 +349,15 @@ by move/dvdz_eq: dv_qp=> {2}<-; rewrite mulrA modzMDr.
 qed.
 
 (* -------------------------------------------------------------------- *)
+lemma divNz (m d : int) :
+  0 < m => 0 < d => (-m) %/ d = - ((m-1) %/ d + 1).
+proof. admit. qed.
+
+lemma modNz m d : 0 < m => 0 < d =>
+  (-m) %% d = d - 1 - (m - 1) %% d.
+proof. by move=> gt0_m gt0_d; rewrite !modzE !divNz //; ring. qed.
+
+(* -------------------------------------------------------------------- *)
 lemma nosmt divzK d m : d %| m => m %/ d * d = m.
 proof. by move/dvdz_eq. qed.
 
@@ -353,7 +378,7 @@ rewrite -(ltr_pmul2r _ d_gt0 _ n) //; apply/ler_lt_trans.
 by apply/lez_floor; rewrite gtr_eqF.
 qed.
 
-lemma nosmt lez_divRL m n d : 0 < d => (m <= n %/ d) = (m * d <= n).
+lemma nosmt lez_divRL m n d : 0 < d => (m <= n %/ d) <=> (m * d <= n).
 proof. by move=> d_gt0; rewrite !lerNgt ltz_divLR. qed.
 
 lemma nosmt lez_divLR d m n : 0 < d => d %| m => (m %/ d <= n) <=> (m <= n * d).
@@ -383,6 +408,12 @@ lemma nosmt leq_div2r d m n :
 proof.
 move=> le_mn /ler_eqVlt [<-|gt0_d]; first by rewrite !divz0.
 by rewrite lez_divRL // (ler_trans m) -?leq_divRL // lez_floor gtr_eqF.
+qed.
+
+lemma divz_ge0 m d : 0 < d => (0 <= m %/ d) <=> (0 <= m).
+proof.
+move=> gt0_d; case: (0 <= m)=> /= [ge0_m|].
+  by rewrite lez_divRL. by rewrite -!ltrNge ltz_divLR.
 qed.
 
 (* -------------------------------------------------------------------- *)

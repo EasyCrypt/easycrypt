@@ -43,6 +43,7 @@ axiom nosmt lez_total : forall x y, x <= y \/ y <= x.
 
 (* -------------------------------------------------------------------- *)
 axiom nosmt subzz (z : int): z - z = 0.
+axiom nosmt subz0 (z : int): z - 0 = z.
 
 axiom nosmt oppzK: forall (x  : int), -(-x) = x.
 axiom nosmt oppz0: -0 = 0.
@@ -52,6 +53,8 @@ axiom nosmt addzAC (x y z : int): (x + y) + z = (x + z) + y.
 
 axiom nosmt addzI  (x y z : int): x + y = x + z => y = z.
 axiom nosmt addIz  (x y z : int): y + x = z + x => y = z.
+
+axiom nosmt subz_add2r (x y z : int): (x + z) - (y + z) = x - y.
 
 axiom nosmt lez_norm_add (x y : int): `|x + y| <= `|x| + `|y|.
 
@@ -109,6 +112,8 @@ axiom nosmt add1z_neqC0 (i : int): 0 <= i => 0 <> 1+i.
 hint rewrite addz_neq0 : addz1_neq0 add1z_neq0 addz1_neqC0 add1z_neqC0.
 
 axiom nosmt lez_eqVlt : forall x y, (x <= y) <=> ((x = y) \/ (x < y)).
+
+axiom nosmt lez_lt_asym x y : !(x <= y < x).
 
 (* -------------------------------------------------------------------- *)
 axiom nosmt intind (p:int -> bool):

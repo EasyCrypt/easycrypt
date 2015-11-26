@@ -63,6 +63,9 @@ abstract theory ZModule.
   lemma nosmt addrK: right_loop [-] (+).
   proof. by move=> x y; rewrite -addrA addrN addr0. qed.
 
+  lemma addrK_sub (x y : t): x + y - y = x.
+  proof. by rewrite subrE addrK. qed.
+
   lemma nosmt addrNK: rev_right_loop [-] (+).
   proof. by move=> x y; rewrite -addrA addNr addr0. qed.
 
@@ -119,12 +122,14 @@ abstract theory ZModule.
   lemma eqr_oppLR x y : (- x = y) <=> (x = - y).
   proof. by apply/(@inv_eq _ opprK x y). qed.
 
-  lemma nosmt eqr_sub (x y z t : t) :
-    (x - y = z - t) <=> (x + t = z + y).
+  lemma nosmt eqr_sub (x y z t : t) : (x - y = z - t) <=> (x + t = z + y).
   proof.
-    rewrite -{1}(addrK t x) -{1}(addrK y z) 2!subrE -!addrA.
-    by rewrite (addrC (-t)) !addrA; split=> [/addIr /addIr|->//].
+  rewrite -{1}(addrK t x) -{1}(addrK y z) 2!subrE -!addrA.
+  by rewrite (addrC (-t)) !addrA; split=> [/addIr /addIr|->//].
   qed.
+
+  lemma subr_add2r (z x y : t): (x + z) - (y + z) = x - y.
+  proof. by rewrite subrE opprD addrACA addrN addr0 subrE. qed.
 
   op intmul (x : t) (n : int) =
     if n < 0

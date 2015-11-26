@@ -80,25 +80,6 @@ lemma head_behead (xs : 'a list) z0:
 proof. by elim xs. qed.
 
 (* -------------------------------------------------------------------- *)
-op nseq (n : int) (x : 'a) = iter n ((::) x) [].
-
-lemma size_nseq n (x : 'a) : size (nseq n x) = max 0 n.
-proof.
-elim/natind: n => [n le0n|n ge0n ih] @/nseq.
-  by rewrite iter0 // max_lel.
-by rewrite iterS //= ih !max_ler 1?addzC // addz_ge0.
-qed.
-
-lemma nseq0 (x : 'a): nseq 0 x = [].
-proof. by rewrite iter0. qed.
-
-lemma nseq0_le n (x : 'a) : n <= 0 => nseq n x = [].
-proof. by move=> le0_n; rewrite iter0. qed.
-
-lemma nseqS n (x : 'a) : 0 <= n => nseq (n+1) x = x :: nseq n x.
-proof. by move=> le0_n; rewrite iterS. qed.
-
-(* -------------------------------------------------------------------- *)
 (*                    Sequence catenation "cat"                         *)
 (* -------------------------------------------------------------------- *)
 op (++) (s1 s2 : 'a list) =
@@ -166,6 +147,10 @@ proof. by rewrite -cats1 -catA. qed.
 lemma rcons_cat (x : 'a) s1 s2 : rcons (s1 ++ s2) x = s1 ++ rcons s2 x.
 proof. by rewrite -!cats1 catA. qed.
 
+lemma behead_cat ['a] (s1 s2 : 'a list): s1 <> [] =>
+  behead (s1 ++ s2) = behead s1 ++ s2.
+proof. by case: s1. qed.
+
 (* -------------------------------------------------------------------- *)
 (*                   rcons / induction principle                        *)
 (* -------------------------------------------------------------------- *)
@@ -175,6 +160,36 @@ proof.
   move=> Hnil Hlast s; rewrite -(cat0s s).
   elim s [] Hnil => [|x s2 IHs] s1 Hs1; first by rewrite cats0.
   by rewrite -cat_rcons (IHs (rcons s1 x)) // Hlast.
+qed.
+
+(* -------------------------------------------------------------------- *)
+(*                               nseq                                   *)
+(* -------------------------------------------------------------------- *)
+op nseq (n : int) (x : 'a) = iter n ((::) x) [].
+
+lemma size_nseq n (x : 'a) : size (nseq n x) = max 0 n.
+proof.
+elim/natind: n => [n le0n|n ge0n ih] @/nseq.
+  by rewrite iter0 // max_lel.
+by rewrite iterS //= ih !max_ler 1?addzC // addz_ge0.
+qed.
+
+lemma nseq0 (x : 'a): nseq 0 x = [].
+proof. by rewrite iter0. qed.
+
+lemma nseq0_le n (x : 'a) : n <= 0 => nseq n x = [].
+proof. by move=> le0_n; rewrite iter0. qed.
+
+lemma nseq1 (x : 'a) : nseq 1 x = [x].
+proof. by rewrite iter1. qed.
+
+lemma nseqS n (x : 'a) : 0 <= n => nseq (n+1) x = x :: nseq n x.
+proof. by move=> le0_n; rewrite iterS. qed.
+
+lemma nseqSr n (x : 'a): 0 <= n => nseq (n+1) x = rcons (nseq n x) x.
+proof.
+elim: n=> /= [|i ge0_i ih]; first by rewrite nseq0 nseq1.
+by rewrite nseqS ?addz_ge0 // {1}ih nseqS.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -234,7 +249,7 @@ proof.                        (* BUG: CHECKING IS TOO LONG *)
   cut := h (i+1); smt.
 qed.
 
-lemma nth_nseq w i n (a:'a): 0 <= i < n => nth w (nseq n a) i = a.
+lemma nth_nseq w i n (a : 'a): 0 <= i < n => nth w (nseq n a) i = a.
 proof.                        (* BUG: PROOF IS TOO LONG *)
 case=> ge0_i ^lt_in /ltzW le_in; have/lez_trans/(_ _ le_in) := ge0_i.
 move=> {le_in} ge0_n; elim: n ge0_n i ge0_i lt_in => [|n ge0_n ih].
@@ -243,6 +258,14 @@ move=> i; rewrite iterS //; elim/natcase: i.
   move=> i le0_i ge0_i; have ->//: i = 0 by rewrite eqz_leq.
 move=> i ge0_i _; rewrite ltz_add2r /= => /(ih _ ge0_i).
 by rewrite addz_neq0 //= subzE -addzA /= => ->.
+qed.
+
+lemma nth_nseq_if w i n (a : 'a):
+  nth w (nseq n a) i = if 0 <= i < n then a else w.
+proof.
+case: (0 <= i < n) => [/(@nth_nseq w)->//|le].
+rewrite nth_out // size_nseq /max; case: (0 < n)=> //.
+by rewrite lez_lt_asym.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -493,6 +516,21 @@ proof.
 elim: s=> /= @/pred1 [|y s ih]; first by rewrite nseq0.
 by case: (y = x)=> //; rewrite addzC nseqS ?count_ge0.
 qed.
+
+lemma has_nseq a n (x : 'a) : has a (nseq n x) <=> (0 < n) /\ a x.
+proof.
+elim/natind: n => /= [n ^le0_n /lezNgt->|n ge0_n]; 1: by rewrite nseq0_le.
+by rewrite nseqS //= => ->; case: (a x) => //=; rewrite ltzS.
+qed.
+
+lemma all_nseq a n (x : 'a) : all a (nseq n x) <=> n <= 0 \/ a x.
+proof.
+elim/natind: n => /= [n ^le0_n ->|n ge0_n]; 1: by rewrite nseq0_le.
+by rewrite nseqS //= => ->; case: (a x) => //=; rewrite lezNgt ltzS ge0_n.
+qed.
+
+lemma mem_nseq n (x y: 'a): mem (nseq n x) y = (0 < n /\ x = y).
+proof. by rewrite -has_pred1 has_nseq. qed.
 
 (* -------------------------------------------------------------------- *)
 (*                              Lookup                                  *)
@@ -976,6 +1014,12 @@ proof. by rewrite !has_count count_rev. qed.
 
 lemma all_rev p (s : 'a list): all p (rev s) = all p s.
 proof. by rewrite !all_count count_rev size_rev. qed.
+
+lemma rev_nseq n (x : 'a): rev (nseq n x) = nseq n x.
+proof.
+elim/natind: n => [n /nseq0_le<:'a> ->//|n ge0_n].
+by rewrite {1}nseqS ?nseqSr // rev_cons => ->.
+qed.
 
 (* -------------------------------------------------------------------- *)
 (*                        Duplicate-freenes                             *)

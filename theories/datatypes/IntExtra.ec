@@ -15,11 +15,14 @@ proof. by rewrite ltz_def => ->. qed.
 lemma eqn0Ngt n : (0 <= n) => (n = 0) <=> !(0 < n).
 proof. by rewrite eq_sym lez_eqVlt -ora_or => [<-|?->]. qed.
 
-lemma ltzS m n : (m < n+1) = (m <= n).
+lemma ltzS m n : (m < n+1) <=> (m <= n).
 proof. by rewrite -lez_add1r addzC lez_add2r. qed.
 
 lemma leqn0 n : 0 <= n => (n <= 0) <=> (n = 0).
 proof. by rewrite eqz_leq => ->. qed.
+
+lemma ltzE m n : (m < n) <=> (m+1 <= n).
+proof. by rewrite -(ltz_add2r 1) ltzS. qed.
 
 (* -------------------------------------------------------------------- *)
 op b2i (b : bool) = b ? 1 : 0.
