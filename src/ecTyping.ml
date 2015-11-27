@@ -570,7 +570,7 @@ let gen_select_op
 
       match mode with
       | `Expr `InOp   -> ops ()
-      | `Form         -> pvs () @ ops ()
+      | `Form         -> (match pvs () with [] -> ops () | pvs -> pvs)
       | `Expr `InProc -> (match pvs () with [] -> ops () | pvs -> pvs)
 
 (* -------------------------------------------------------------------- *)
