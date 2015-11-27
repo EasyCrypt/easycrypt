@@ -24,6 +24,12 @@ proof. by rewrite eqz_leq => ->. qed.
 lemma ltzE m n : (m < n) <=> (m+1 <= n).
 proof. by rewrite -(ltz_add2r 1) ltzS. qed.
 
+lemma ltz1 m : (m < 1) <=> (m <= 0).
+proof. by rewrite -(ltzS m 0). qed.
+
+lemma ltn1 m : 0 <= m => (m < 1) <=> (m = 0).
+proof. by rewrite ltz1 eqz_leq => ->. qed.
+
 (* -------------------------------------------------------------------- *)
 op b2i (b : bool) = b ? 1 : 0.
 

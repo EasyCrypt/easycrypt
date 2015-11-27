@@ -140,8 +140,15 @@ by rewrite modz_ge0 ?ltz_pmod ?gtr_eqF.
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma b2i_mod2 b : b2i b %% 2 = b2i b.
+lemma mod2_b2i b : b2i b %% 2 = b2i b.
 proof. by rewrite modz_small //; case: b. qed.
+
+lemma b2i_mod2 i : b2i (i %% 2 <> 0) = i %% 2.
+proof.
+case: (i %% 2 = 0) => [->//|nz_iM2]; rewrite b2i1.
+have: 0 <= i %% 2 < 2 by rewrite modz_ge0 // ltz_pmod.
+by rewrite ler_eqVlt eq_sym nz_iM2 /= (@ltzS _ 1) ltzE -eqr_le.
+qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt modz_mod m d : m %% d %% d = m %% d.
