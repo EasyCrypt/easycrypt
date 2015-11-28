@@ -573,9 +573,9 @@ proof. by rewrite /index find_cat has_pred1. qed.
 lemma index_head x (s : 'a list): index x (x :: s) = 0.
 proof. by []. qed.
 
-lemma before_index (x0 : 'a) p s i :
-  0 <= i < find p s => ! p (nth x0 s i).
-proof. exact/before_find. qed.
+lemma before_index (x0 : 'a) x s i :
+  0 <= i < index x s => nth x0 s i <> x.
+proof. by move/(@before_find x0). qed.
 
 (* -------------------------------------------------------------------- *)
 (*                            drop, take                                *)
