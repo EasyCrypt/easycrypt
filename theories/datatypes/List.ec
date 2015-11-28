@@ -510,6 +510,16 @@ proof. elim s1; smt. qed.
 lemma nth_find z0 p (s : 'a list): has p s => p (nth z0 s (find p s)).
 proof. elim s; smt. qed.
 
+lemma before_find (x0 : 'a) p s i :
+  0 <= i < find p s => ! p (nth x0 s i).
+proof.
+elim: s i => /= [|x s ih] i; 1: by rewrite lez_lt_asym.
+case: (p x)=> //= px; rewrite ?lez_lt_asym //.
+rewrite lez_eqVlt eq_sym; case: (i = 0) => [<-//|_] /=.
+rewrite {1 2}(_ : i = (i + -1)+1) 1:-addzA // -subzE.
+by rewrite ltz_add2r ltzS => /ih.
+qed.
+
 lemma filter_pred1 x (s : 'a list) :
   filter (pred1 x) s = nseq (count (pred1 x) s) x.
 proof.
@@ -562,6 +572,10 @@ proof. by rewrite /index find_cat has_pred1. qed.
 
 lemma index_head x (s : 'a list): index x (x :: s) = 0.
 proof. by []. qed.
+
+lemma before_index (x0 : 'a) p s i :
+  0 <= i < find p s => ! p (nth x0 s i).
+proof. exact/before_find. qed.
 
 (* -------------------------------------------------------------------- *)
 (*                            drop, take                                *)
