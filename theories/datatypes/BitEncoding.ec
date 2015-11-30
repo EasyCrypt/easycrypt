@@ -6,7 +6,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Fun Pred Bool Int IntExtra IntDiv List Ring.
+require import Option Fun Pred Bool Int IntExtra IntDiv List Ring.
 require import StdRing StdOrder StdBigop.
 require (*--*) FinType Word.
 (*---*) import IntID IntOrder Bigint Bigint.BIA.
@@ -14,6 +14,8 @@ require (*--*) FinType Word.
 pragma +implicits.
 
 (* -------------------------------------------------------------------- *)
+theory BS2Int.
+
 op bs2int (s : bool list) =
   BIA.bigi predT (fun i => 2^i * b2i (nth false s i)) 0 (size s).
 
@@ -26,7 +28,7 @@ proof. by apply/size_mkseq. qed.
 lemma bs2int_nil : bs2int [] = 0.
 proof. by rewrite BIA.big_geq. qed.
 
-lemma bs2int_rcons b (s : bool list):
+lemma nosmt bs2int_rcons b (s : bool list):
   bs2int (rcons s b) = (bs2int s) + 2^(size s) * (b2i b).
 proof.
 rewrite /bs2int size_rcons BIA.big_int_recr ?size_ge0 //=.
@@ -48,11 +50,11 @@ move/ltrNge => @/max ^gt0_N ->/= i lt_in.
 by rewrite nth_nseq ?nth_mkseq //= div0z mod0z.
 qed.
 
-lemma int2bsS N i : 0 <= N =>
+lemma nosmt int2bsS N i : 0 <= N =>
   int2bs (N + 1) i = rcons (int2bs N i) ((i %/ 2^N) %% 2 <> 0).
 proof. by apply/mkseqS. qed.
 
-lemma bs2int_eq N i j: 0 <= i => 0 <= j => i %% 2^N = j %% 2^N =>
+lemma nosmt bs2int_eq N i j: 0 <= i => 0 <= j => i %% 2^N = j %% 2^N =>
   int2bs N i = int2bs N j.
 proof.
 move=> ge0_i ge0_j eq; apply/eq_in_mkseq=> k [ge0_k lt_kN] /=.
@@ -64,7 +66,7 @@ move/(congr1 (fun z => z %% 2^1))=> /=; rewrite !modz_dvd_pow /=;
 by rewrite !pow1 => ->.
 qed.
 
-lemma bs2int_mod N i : 0 <= i => int2bs N (i %% 2^N) = int2bs N i.
+lemma nosmt bs2int_mod N i : 0 <= i => int2bs N (i %% 2^N) = int2bs N i.
 proof.
 move=> ge0_i; apply/bs2int_eq=> //; last by rewrite modz_mod.
 by rewrite modz_ge0 // -lt0n ?ltrW // powPos.
@@ -112,3 +114,85 @@ rewrite powS // -ltz_divLR ?powPos // => lt.
 rewrite -{1}(@modz_small (i %/ 2^n) 2) ?ger0_norm ?b2i_mod2 //.
 by rewrite lt /= divz_ge0 ?powPos.
 qed.
+end BS2Int.
+
+(* -------------------------------------------------------------------- *)
+theory BitChunking.
+op chunk r (bs : 'a list) =
+  mkseq (fun i => take r (drop (r * i) bs)) (size bs %/ r).
+
+lemma nosmt nth_flatten x0 n (bs : 'a list list) i :
+     all (fun s => size s = n) bs
+  => nth x0 (flatten bs) i = nth x0 (nth [] bs (i %/ n)) (i %% n).
+proof.
+case: (n <= 0) => [ge0_n|/ltrNge gt0_n] /allP /= eqz.
+  have bsE: bs = nseq (size bs) [].
+    elim: bs eqz => /= [|b bs ih eqz]; 1: by rewrite nseq0.
+    rewrite addrC nseqS ?size_ge0 -ih /=.
+      by move=> x bsx; apply/eqz; rewrite bsx.
+    by rewrite -size_eq0 -leqn0 ?size_ge0 eqz.
+  rewrite {2}bsE nth_nseq_if if_same /=.
+  rewrite bsE; elim/natind: (size bs)=> [m le0_m|m ge0_m ih];
+    by rewrite ?nseqS // nseq0_le // flatten_nil.
+case: (i < 0)=> [lt0_i|/lerNgt ge0_i].
+  rewrite nth_neg // (@nth_neg []) // ltrNge.
+  by rewrite divz_ge0 // -ltrNge.
+elim: bs i ge0_i eqz => [|b bs ih] i ge0_i eqz /=.
+  by rewrite flatten_nil.
+have /(_ b) /= := eqz; rewrite flatten_cons nth_cat => ->.
+have <-: (i < n) <=> (i %/ n = 0) by rewrite -divz_eq0 // ge0_i.
+case: (i < n) => [lt_in|/lerNgt le_ni]; 2: rewrite ih ?subr_ge0 //.
++ by rewrite modz_small // ge0_i ltr_normr ?lt_in.
++ by move=> x bx; have := eqz x; apply; rewrite /= bx.
+rewrite subrE -mulN1r modzMDr subrE; congr.
+case: (n = 0)=> [^zn ->/=|nz_n]; 2: by rewrite divzMDr 1?addrC.
+rewrite divz0 /= eq_sym nth_neg ?oppr_lt0 // => {ih}; move: eqz.
+by case: bs => // c bs /(_ c) /=; rewrite zn size_eq0 => ->.
+qed.
+
+lemma size_chunk r (bs : 'a list) : 0 < r =>
+  size (chunk r bs) = size bs %/ r.
+proof.
+move=> gt0_r; rewrite size_mkseq max_ler //.
+by rewrite divz_ge0 ?gt0_r ?size_ge0.
+qed.
+
+lemma in_chunk_size r (bs : 'a list) b: 0 < r =>
+  mem (chunk r bs) b => size b = r.
+proof.
+move=> gt0_r /mapP [i] [] /mem_iota /= [ge0_i ^lt_is +] ->.
+rewrite ltzE -(@ler_pmul2r r) 1:gt0_r divzE mulrDl mul1r.
+rewrite -ler_subr_addr 2!subrE addrAC -2!subrE.
+move/ler_trans/(_ (size bs - r) _); 1: rewrite subrE.
+  by rewrite ler_naddr // oppr_le0 modz_ge0 gtr_eqF ?gt0_r.
+rewrite (mulrC i) ler_subr_addl -ler_subr_addr => ler.
+have ge0_r: 0 <= r by apply/ltrW/gt0_r.
+rewrite size_take ?ge0_r size_drop // 1:mulr_ge0 ?ge0_r //.
+rewrite max_ler 1:subr_ge0 1:-subr_ge0 1:(ler_trans r) ?ge0_r //.
+by move/ler_eqVlt: ler=> [<-|->].
+qed.
+
+lemma size_flatten_chunk r (bs : 'a list) : 0 < r =>
+  size (flatten (chunk r bs)) = (size bs) %/ r * r.
+proof.
+move=> gt0_r; rewrite size_flatten sumzE big_map.
+pose F := fun (x : 'a list) => r; rewrite predT_comp /(\o) /= big_seq.
+rewrite (@eq_bigr _ _ F) /F /=; first by move=> i; apply/in_chunk_size.
+by rewrite -big_seq big_constz count_predT size_chunk // mulrC.
+qed.
+
+lemma chunkK r (bs : 'a list) : 0 < r =>
+  r %| size bs => flatten (chunk r bs) = bs.
+proof.
+move=> gt0_r dvd_d_bs; apply/(eq_from_nth witness)=> [|i].
+  by rewrite size_flatten_chunk // divzK.
+rewrite size_flatten_chunk ?divzK // => [ge0_i lt_ibs].
+rewrite (@nth_flatten witness r); 1: apply/allP=> s.
+by move/(@in_chunk_size _ _ _ gt0_r).
+rewrite nth_mkseq /= 1:divz_ge0 ?ge0_i ?ltz_divRL ?gt0_r //.
+  by apply/(@ler_lt_trans i)=> //; rewrite lez_floor gtr_eqF ?gt0_r.
+rewrite nth_take ?ltz_pmod 1:ltrW ?gt0_r nth_drop; last 2 first.
+  by rewrite modz_ge0 ?gtr_eqF ?gt0_r. by rewrite (@mulrC r) -divz_eq.
+by rewrite mulr_ge0 1:ltrW ?gt0_r // divz_ge0 // gt0_r.
+qed.
+end BitChunking.
