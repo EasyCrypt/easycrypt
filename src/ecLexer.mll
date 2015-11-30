@@ -205,7 +205,9 @@
     (":"  , (COLON       , true ));
     ("//" , (SLASHSLASH  , true ));
     ("/=" , (SLASHEQ     , true ));
+    ("/#" , (SLASHSHARP  , true ));
     ("//=", (SLASHSLASHEQ, true ));
+    ("/#=", (SLASHSHARPEQ, true ));
     ("=>" , (IMPL        , true ));
     ("|"  , (PIPE        , true ));
     (":=" , (CEQ         , true ));
@@ -328,7 +330,7 @@ let uident = upper ichar*
 let tident = '\'' lident
 let mident = '&'  (lident | uint)
 
-let opchar = ['=' '<' '>' '+' '-' '*' '/' '\\' '%' '&' '^' '|' ':']
+let opchar = ['=' '<' '>' '+' '-' '*' '/' '\\' '%' '&' '^' '|' ':' '#']
 
 let sop = opchar+ | '`' opchar+ '`'
 let nop = '\\' ichar+

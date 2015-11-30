@@ -134,7 +134,7 @@ let process_simplify ri (tc : tcenv1) =
 
 (* -------------------------------------------------------------------- *)
 let process_smt ?loc (ttenv : ttenv) pi (tc : tcenv1) =
-  let pi  = ttenv.tt_provers pi in
+  let pi = ttenv.tt_provers pi in
 
   match ttenv.tt_smtmode with
   | `Admit ->
@@ -704,8 +704,9 @@ let rec process_rewrite1_r ttenv ?target ri tc =
       EcPhlPrRw.t_pr_rewrite (unloc x, f) tc
   end
 
-  | RWSmt info ->
-      process_smt ~loc:ri.pl_loc ttenv info tc
+  | RWSmt (info, b) ->
+      let tt = if b then t_simplify ?target:None ~delta:false else t_id in
+      FApi.t_seq tt (process_smt ~loc:ri.pl_loc ttenv info) tc
 
   | RWApp fp -> begin
       let implicits = ttenv.tt_implicits in

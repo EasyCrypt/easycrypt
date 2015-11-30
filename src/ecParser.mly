@@ -482,6 +482,8 @@
 %token SIMPLIFY
 %token SKIP
 %token SLASH
+%token SLASHSHARP
+%token SLASHSHARPEQ
 %token SLASHEQ
 %token SLASHSLASH
 %token SLASHSLASHEQ
@@ -1915,10 +1917,16 @@ rwpr_arg:
 
 rwarg1:
 | SLASHSLASH
-    { RWDone false }
+   { RWDone false }
 
 | SLASHSLASHEQ
-    { RWDone true }
+   { RWDone true }
+
+| SLASHSHARP
+   { RWSmt ({ (SMT.mk_smt_option []) with plem_max = Some (Some 0) }, false) }
+
+| SLASHSHARPEQ
+   { RWSmt ({ (SMT.mk_smt_option []) with plem_max = Some (Some 0) }, true) }
 
 | SLASHEQ
    { RWSimpl }
@@ -1933,10 +1941,10 @@ rwarg1:
    { RWPr s }
 
 | SMT
-   { RWSmt (SMT.mk_smt_option []) }
+   { RWSmt (SMT.mk_smt_option [], false) }
 
 | LBRACKET SMT pi=smt_info RBRACKET
-   { RWSmt pi }
+   { RWSmt (pi, false) }
 
 | AMP f=pterm
    { RWApp f }

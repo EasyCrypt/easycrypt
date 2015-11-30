@@ -586,7 +586,7 @@ and rwarg1 =
   | RWRw    of (rwoptions * (rwside * ppterm) list)
   | RWPr    of (psymbol * pformula option)
   | RWDone  of bool
-  | RWSmt   of pprover_infos
+  | RWSmt   of (pprover_infos * bool)
   | RWApp   of ppterm
 
 and rwoptions = rwside * trepeat option * rwocc
