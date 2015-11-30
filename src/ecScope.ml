@@ -2068,20 +2068,17 @@ module Cloning = struct
 
   exception Incompatible of incompatible
 
-  let ty_compatible env (rtyvars, rty) (ntyvars, nty) =
+  let ty_compatible env ue (rtyvars, rty) (ntyvars, nty) =
     let rlen = List.length rtyvars and nlen = List.length ntyvars in
     if rlen <> nlen then
       raise (Incompatible (NotSameNumberOfTyParam(rlen,nlen)));
-    let s =
-      EcIdent.Mid.of_list
-        (List.map2
-           (fun a1 a2 -> (a2, EcTypes.tvar a1))
-           rtyvars ntyvars)
-    in
-    
-    let nty = EcTypes.Tvar.subst s nty in
-    if not (EcReduction.EqTest.for_type env rty nty) then
-      raise (Incompatible (DifferentType(rty,nty)))
+
+    let subst = Tvar.init rtyvars (List.map tvar ntyvars) in
+    let rty   = Tvar.subst subst rty in
+
+    try  EcUnify.unify env ue rty nty
+    with EcUnify.UnificationFailure _ ->
+      raise (Incompatible (DifferentType (rty, nty)))
   
   (* ------------------------------------------------------------------ *)
   type options = {
@@ -2236,14 +2233,14 @@ module Cloning = struct
                     (lam.EcTypes.e_ty, lam)
                   in
 
-                  (try
-                    let tsubst = List.map (tvar |- fst) (EcUnify.UniEnv.tparams ue) in
-                    let tsubst = Tvar.init (List.map fst reftyvars) tsubst in
-                    let refty  = Tvar.subst tsubst refty in
-                    EcUnify.unify scope.sc_env ue refty ty
-                   with EcUnify.UnificationFailure _ ->
-                      clone_error scope.sc_env 
-                        (CE_OpIncompatible ((prefix, x), DifferentType (refty, ty))));
+                  (* FIXME: TC HOOK *)
+                  begin
+                    try ty_compatible scope.sc_env ue
+                        (List.map fst reftyvars, refty)
+                        (List.map fst (EcUnify.UniEnv.tparams ue), ty)
+                    with Incompatible err ->
+                      clone_error scope.sc_env (CE_OpIncompatible((prefix, x), err))
+                  end;
 
                   if not (EcUnify.UniEnv.closed ue) then
                     hierror ~loc "this operator body contains free type variables";
@@ -2265,15 +2262,6 @@ module Cloning = struct
                         in  (newop, subst, x, false)
                 in
   
-                let (newtyvars, newty) = (newop.op_tparams, newop.op_ty) in
-                (* FIXME: TC HOOK *)
-                begin
-                  try ty_compatible scope.sc_env
-                        (List.map fst reftyvars, refty)
-                        (List.map fst newtyvars, newty)
-                  with Incompatible err ->
-                    clone_error scope.sc_env (CE_OpIncompatible((prefix, x), err))
-                end;
                 let ops = 
                   Mp.add (EcPath.fromqsymbol (prefix, x)) (newop, alias) ops in
                 (subst, ops, proofs, 
@@ -2304,14 +2292,16 @@ module Cloning = struct
                      lam
                    in
   
-                  (try
-                    let tsubst = List.map (tvar |- fst) (EcUnify.UniEnv.tparams ue) in
-                    let tsubst = Tvar.init (List.map fst reftyvars) tsubst in
-                    let refty  = Tvar.subst tsubst refty in
-                    EcUnify.unify scope.sc_env ue refty body.EcFol.f_ty
-                   with EcUnify.UnificationFailure _ ->
-                      clone_error scope.sc_env 
-                        (CE_OpIncompatible ((prefix, x), DifferentType (refty, body.EcFol.f_ty))));
+                  (* FIXME: TC HOOK *)
+                   begin 
+                     try 
+                       ty_compatible scope.sc_env ue
+                         (List.map fst reftyvars, refty)
+                         (List.map fst (EcUnify.UniEnv.tparams ue), body.EcFol.f_ty) 
+                     with Incompatible err -> 
+                       clone_error scope.sc_env 
+                         (CE_OpIncompatible((prefix, x), err))
+                   end;
 
                    if not (EcUnify.UniEnv.closed ue) then
                      hierror ~loc "this predicate body contains free type variables";
@@ -2337,17 +2327,6 @@ module Cloning = struct
 
                 in
   
-                let (newtyvars, newty) = (newpr.op_tparams, newpr.op_ty) in
-                (* FIXME: TC HOOK *)
-                begin 
-                  try 
-                    ty_compatible scope.sc_env
-                      (List.map fst reftyvars, refty)
-                      (List.map fst newtyvars, newty) 
-                  with Incompatible err -> 
-                    clone_error scope.sc_env 
-                      (CE_OpIncompatible((prefix, x), err))
-                end;
                 (subst, ops, proofs, 
                  if alias then Op.bind scope (x, newpr) else scope)
         end
