@@ -2219,7 +2219,7 @@ module Cloning = struct
             | Some { pl_desc = (opov, opmode); pl_loc = loc; } ->
                 let (reftyvars, refty) =
                   let refop = EcSubst.subst_op subst oopd in
-                    (refop.op_tparams, refop.op_ty)
+                  (refop.op_tparams, refop.op_ty)
                 in
   
                 let (newop, subst, x, alias) =
@@ -2232,8 +2232,21 @@ module Cloning = struct
                     let env, xs = EcTyping.transbinding env ue opov.opov_args in
                     let body    = EcTyping.transexpcast env `InOp ue codom opov.opov_body in
                     let lam     = EcTypes.e_lam xs body in
-                      (lam.EcTypes.e_ty, lam)
+
+                    (lam.EcTypes.e_ty, lam)
                   in
+
+                  (try
+                    let tsubst = List.map (tvar |- fst) (EcUnify.UniEnv.tparams ue) in
+                    let tsubst = Tvar.init (List.map fst reftyvars) tsubst in
+                    let refty  = Tvar.subst tsubst refty in
+                    EcUnify.unify scope.sc_env ue refty ty
+                   with EcUnify.UnificationFailure _ ->
+                      clone_error scope.sc_env 
+                        (CE_OpIncompatible ((prefix, x), DifferentType (refty, ty))));
+
+                  if not (EcUnify.UniEnv.closed ue) then
+                    hierror ~loc "this operator body contains free type variables";
   
                   let uni     = EcTypes.Tuni.offun (EcUnify.UniEnv.close ue) in
                   let body    = body |> EcTypes.e_mapty uni in
@@ -2288,17 +2301,20 @@ module Cloning = struct
                      let body    = EcTyping.trans_form_opt env ue prov.prov_body None in
                      let xs      = List.map (fun (x, ty) -> x, EcFol.GTty ty) xs in
                      let lam     = EcFol.f_lambda xs body in
-                       lam
+                     lam
                    in
   
-                   if reftyvars = [] then begin
-                     try  EcUnify.unify scope.sc_env ue refty body.EcFol.f_ty
-                     with EcUnify.UnificationFailure _ ->
-                       clone_error scope.sc_env 
-                         (CE_OpIncompatible 
-                            ((prefix, x),
-                             DifferentType(refty, body.EcFol.f_ty)))
-                   end;
+                  (try
+                    let tsubst = List.map (tvar |- fst) (EcUnify.UniEnv.tparams ue) in
+                    let tsubst = Tvar.init (List.map fst reftyvars) tsubst in
+                    let refty  = Tvar.subst tsubst refty in
+                    EcUnify.unify scope.sc_env ue refty body.EcFol.f_ty
+                   with EcUnify.UnificationFailure _ ->
+                      clone_error scope.sc_env 
+                        (CE_OpIncompatible ((prefix, x), DifferentType (refty, body.EcFol.f_ty))));
+
+                   if not (EcUnify.UniEnv.closed ue) then
+                     hierror ~loc "this predicate body contains free type variables";
   
                    let uni     = EcUnify.UniEnv.close ue in
                    let body    = EcFol.Fsubst.uni uni body in
