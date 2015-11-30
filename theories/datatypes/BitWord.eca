@@ -19,7 +19,11 @@ clone include Word with
   op   Alphabet.enum <- [true; false],
   op   n <- n,
   op   dchar <- false
-proof Alphabet.* by case, ge0_n by apply/ltzW/gt0_n.
+
+proof Alphabet.* by case, ge0_n by apply/ltzW/gt0_n
+
+rename [op] "oflist"  as "bits2w"
+       [op] "tolist"  as "w2bits".
 
 (* -------------------------------------------------------------------- *)
 op zerow: word = offun (fun i => false).

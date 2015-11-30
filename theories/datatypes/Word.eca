@@ -22,17 +22,21 @@ op mkword : t array -> word.
 op ofword : word -> t array.
 op dchar  : t.
 
-op wordw = offun (fun i => dchar) n.
+op wordw = Array.offun (fun i => dchar) n.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt size_wordw: size wordw = n.
 proof. by rewrite size_offun max_ler ?ge0_n. qed.
 
-axiom nosmt mkwordK    : cancel ofword mkword.
-axiom nosmt ofwordK    : forall (s : t array), size s =  n =>
-  ofword (mkword s) = s.
-axiom nosmt mkword_out : forall (s : t array), size s <> n =>
-  ofword (mkword s) = wordw.
+axiom nosmt mkwordK : cancel ofword mkword.
+
+axiom nosmt ofwordK :
+  forall (s : t array), size s = n =>
+    ofword (mkword s) = s.
+
+axiom nosmt mkword_out :
+  forall (s : t array), size s <> n =>
+    ofword (mkword s) = wordw.
 
 lemma nosmt size_word : forall w, size (ofword w) = n.
 proof.
@@ -47,6 +51,19 @@ proof. by move=> ih n; rewrite -mkwordK; apply/ih/size_word. qed.
 
 lemma nosmt ofword_inj : injective ofword.
 proof. by apply/(can_inj _ _ mkwordK). qed.
+
+(* -------------------------------------------------------------------- *)
+op oflist (s : t list) = mkword (Array.mkarray s).
+op tolist (w : word) = Array.ofarray (ofword w).
+
+lemma oflistK : cancel tolist oflist.
+proof. by move=> w @/tolist @/oflist; rewrite mkarrayK mkwordK. qed.
+
+lemma tolistK (s : t list) : size s = n => tolist (oflist s) = s.
+proof.
+move=> eq_sn @/tolist @/oflist; rewrite ofwordK ?ofarrayK //.
+by rewrite size_mkarray.
+qed.
 
 (* -------------------------------------------------------------------- *)
 op "_.[_]" (w : word) (i : int): t =
@@ -171,10 +188,10 @@ lemma word_card: card = Alphabet.card^n.
 proof. by rewrite size_map Enum.size_wordn max_ler ?ge0_n. qed.
 
 (* -------------------------------------------------------------------- *)
-theory Wordw.
-import MUniform.
+op dword : word distr = MUniform.duniform words.
 
-op dword : word distr = duniform words.
+theory DWord.
+import MUniform.
 
 lemma muP p: mu dword p = (count p words)%r / (Alphabet.card^n)%r.
 proof. by rewrite duniformE !undup_id ?enum_uniq // -word_card. qed.
@@ -193,4 +210,4 @@ proof.
 apply/duniform_ll; apply/negP=> zw; move: (enumP witness).
 by rewrite zw.
 qed.
-end Wordw.
+end DWord.
