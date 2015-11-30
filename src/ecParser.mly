@@ -886,20 +886,38 @@ expr_chained_orderings:
               (peapp_symb op.pl_loc (unloc op) ti [le; e2])],
          e2) }
 
-%inline pty_varty:
-| x=ident+
-   { let loc = EcLocation.make $startpos $endpos in
-       (x, mk_loc loc PTunivar) }
+(* -------------------------------------------------------------------- *)
+bdident_:
+| x=ident    { Some x }
+| UNDERSCORE { None }
 
-| x=ident+ COLON ty=loc(type_exp)
+%inline bdident:
+| x=loc(bdident_) { x }
+
+pty_varty:
+| x=loc(bdident+)
+   { (unloc x, mk_loc (loc x) PTunivar) }
+
+| x=bdident+ COLON ty=loc(type_exp)
    { (x, ty) }
 
-ptybinding1:
-| LPAREN bds=plist1(pty_varty, COMMA) RPAREN { bds }
-| x=ident { [[x], mk_loc x.pl_loc PTunivar] }
+%inline ptybinding1:
+| LPAREN bds=plist1(pty_varty, COMMA) RPAREN
+    { bds }
+
+| x=loc(bdident)
+   { [[unloc x], mk_loc (loc x) PTunivar] }
 
 ptybindings:
-| x=ptybinding1+ { List.flatten x }
+| x=ptybinding1+
+    { List.flatten x }
+
+| x=bdident+ COLON ty=loc(type_exp)
+   { [x, ty] }
+
+ptybindings_decl:
+| x=ptybinding1+
+    { List.flatten x }
 
 (* -------------------------------------------------------------------- *)
 (* Formulas                                                             *)
@@ -1095,13 +1113,14 @@ eager_body(P):
     { PFeagerF (pre, (s1, mp1, mp2,s2), post) }
 
 pgtybinding1:
-| x=ptybinding1 { List.map (fun (xs,ty) -> xs, PGTY_Type ty) x }
+| x=ptybinding1
+    { List.map (fun (xs, ty) -> (xs, PGTY_Type ty)) x }
 
 | LPAREN x=uident LTCOLON mi=mod_type_restr RPAREN
-    { [[x], PGTY_ModTy mi] }
+    { [[mk_loc (loc x) (Some x)], PGTY_ModTy mi] }
 
 | pn=mident
-    { [[pn], PGTY_Mem] }
+    { [[mk_loc (loc pn) (Some pn)], PGTY_Mem] }
 
 pgtybindings:
 | x=pgtybinding1+ { List.flatten x }
@@ -1498,7 +1517,7 @@ operator:
       po_nosmt   = snd k; } }
 
 | k=op_or_const x=plist1(oident, COMMA) tyvars=tyvars_decl?
-    args=ptybindings COLON sty=loc(type_exp)
+    args=ptybindings_decl COLON sty=loc(type_exp)
   { { po_kind    = fst k;
       po_name    = List.hd x;
       po_aliases = List.tl x;
@@ -1520,7 +1539,8 @@ operator:
       po_nosmt   = snd k; } }
 
 | k=op_or_const x=plist1(oident, COMMA) tyvars=tyvars_decl?
-    args=ptybindings COLON LBRACE sty=loc(type_exp) PIPE reft=form RBRACE AS rname=ident
+    args=ptybindings_decl COLON LBRACE sty=loc(type_exp) PIPE reft=form
+    RBRACE AS rname=ident
   { { po_kind    = fst k;
       po_name    = List.hd x;
       po_aliases = List.tl x;
@@ -1552,7 +1572,7 @@ operator:
       po_ax      = opax;
       po_nosmt   = snd k; } }
 
-| k=op_or_const x=plist1(oident, COMMA) tyvars=tyvars_decl? args=ptybindings
+| k=op_or_const x=plist1(oident, COMMA) tyvars=tyvars_decl? args=ptybindings_decl
     eq=loc(EQ) b=opbody opax=opax?
   { { po_kind    = fst k;
       po_name    = List.hd x;
@@ -1563,7 +1583,7 @@ operator:
       po_ax      = opax;
       po_nosmt   = snd k; } }
 
-| k=op_or_const x=plist1(oident, COMMA) tyvars=tyvars_decl? args=ptybindings
+| k=op_or_const x=plist1(oident, COMMA) tyvars=tyvars_decl? args=ptybindings_decl
     COLON codom=loc(type_exp) EQ b=opbody opax=opax?
   { { po_kind    = fst k;
       po_name    = List.hd x;

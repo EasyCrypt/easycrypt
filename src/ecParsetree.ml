@@ -75,7 +75,7 @@ type plpattern_r =
 
 and plpattern = plpattern_r located
 
-type ptybinding  = psymbol list * pty
+type ptybinding  = (psymbol option) located list * pty
 and  ptybindings = ptybinding list
 
 and pexpr_r =
@@ -258,7 +258,7 @@ and pformula_r =
   | PFprob     of pgamepath * (pformula list) * pmemory * pformula
   | PFBDhoareF of pformula * pgamepath * pformula * phoarecmp * pformula
 
-and pgtybinding  = psymbol list * pgty
+and pgtybinding  = (psymbol option) located list * pgty
 and pgtybindings = pgtybinding list
 
 and pgty =

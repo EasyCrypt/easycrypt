@@ -794,16 +794,16 @@ module Ax = struct
 
     let (pconcl, tintro) =
       match ax.pa_vars with
-      | None    -> (ax.pa_formula, [])
+      | None ->
+          (ax.pa_formula, [])
       | Some vs ->
-          let pconcl = { pl_loc = loc; pl_desc = PFforall (vs, ax.pa_formula) } in
-            (pconcl, List.flatten (List.map fst vs))
+          let pconcl = mk_loc loc (PFforall (vs, ax.pa_formula)) in
+          (pconcl, List.flatten (List.map fst vs))
     in
 
     let tintro =
-      List.map
-        (lmap (fun x -> IPCore (`Renaming (`NoRename x))))
-        tintro in
+      let ip x = x |> omap (fun x -> `NoRename (unloc x)) |> odfl `NoName in
+      List.map (lmap (fun x -> IPCore (`Renaming (ip x)))) tintro in
     let tintro = mk_loc loc (Plogic (Pintro tintro)) in
 
     let concl = TT.trans_prop scope.sc_env ue pconcl in

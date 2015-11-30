@@ -208,6 +208,9 @@ let odfl (d : 'a) (x : 'a option) =
 let ofdfl (d : unit -> 'a) (x : 'a option) =
   match x with None -> d () | Some x -> x
 
+let oif (test : 'a -> bool) (x : 'a option) =
+  match x with None -> false | Some x -> test x
+
 let oget ?exn (x : 'a option) =
   match x, exn with
   | None  , None     -> assert false
