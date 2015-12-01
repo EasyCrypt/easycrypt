@@ -112,14 +112,13 @@ let t_auto_r tc =
 let t_auto = FApi.t_low0 "auto" t_auto_r
 
 (* -------------------------------------------------------------------- *)
-let t_trivial_r tc =
+let t_phl_trivial_r tc =
   let subtc =
     FApi.t_ors [ EcPhlTAuto.t_hoare_true;
                  EcPhlTAuto.t_core_exfalso;
                  EcPhlPr.t_prbounded false;
                  EcPhlSkip.t_skip ]
-  in
-    EcLowGoal.t_trivial (Some (FApi.t_try subtc)) tc
+  in FApi.t_try subtc tc
 
 (* -------------------------------------------------------------------- *)
-let t_trivial = FApi.t_low0 "trivial" t_trivial_r
+let t_phl_trivial = FApi.t_low0 "phl-trivial" t_phl_trivial_r

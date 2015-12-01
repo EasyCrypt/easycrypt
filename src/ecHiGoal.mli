@@ -33,8 +33,10 @@ val process_tfocus : tcenv -> focus_t -> tfocus
 
 (* -------------------------------------------------------------------- *)
 module LowApply : sig
-  val t_apply_bwd_r : pt_ev -> backward
-  val t_apply_bwd   : proofterm -> backward
+  open EcMatching
+
+  val t_apply_bwd_r : ?mode:fmoptions -> ?canview:bool -> pt_ev -> backward
+  val t_apply_bwd   : ?mode:fmoptions -> ?canview:bool -> proofterm -> backward
 end
 
 (* -------------------------------------------------------------------- *)

@@ -104,7 +104,7 @@ and process1_progress (ttenv : ttenv) options t (tc : tcenv1) =
       options in
 
   FApi.t_seq
-    EcPhlAuto.t_trivial
+    EcHiGoal.process_trivial
     (EcLowGoal.t_progress ~options t)
     tc
 

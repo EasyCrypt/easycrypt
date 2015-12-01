@@ -81,18 +81,6 @@ let process_reflexivity (tc : tcenv1) =
     tc_error !!tc "cannot prove goal by reflexivity"
 
 (* -------------------------------------------------------------------- *)
-let process_trivial (tc : tcenv1) =
-  EcPhlAuto.t_trivial tc
-
-(* -------------------------------------------------------------------- *)
-let process_done tc =
-  let tc = process_trivial tc in
-
-  if not (FApi.tc_done tc) then
-    tc_error (FApi.tc_penv tc) "[by]: cannot close goals";
-  tc
-
-(* -------------------------------------------------------------------- *)
 let process_change fp (tc : tcenv1) =
   let fp = TTC.tc1_process_formula tc fp in
   FApi.tcenv_of_tcenv1 (t_change fp tc)
@@ -166,7 +154,7 @@ module LowApply = struct
 
   exception NoInstance of (reason * pt_env * (form * form))
 
-  let t_apply_bwd_r pt (tc : tcenv1) =
+  let t_apply_bwd_r ?(mode = fmdelta) ?(canview = true) pt (tc : tcenv1) =
     let ((hyps, concl), pterr) = (FApi.tc1_flat tc, PT.copy pt.ptev_env) in
 
     let noinstance reason =
@@ -182,7 +170,7 @@ module LowApply = struct
 
       | false -> begin
           try
-            PT.pf_form_match ~mode:fmdelta pt.PT.ptev_env ~ptn:pt.PT.ptev_ax concl;
+            PT.pf_form_match ~mode pt.PT.ptev_env ~ptn:pt.PT.ptev_ax concl;
             if not (PT.can_concretize pt.PT.ptev_env) then
               noinstance `IncompleteInference;
             pt
@@ -237,17 +225,17 @@ module LowApply = struct
       end
     in
 
-    let pt = instantiate true true pt in
+    let pt = instantiate canview true pt in
     let pt = fst (PT.concretize pt) in
 
     EcLowGoal.t_apply pt tc
 
-  let t_apply_bwd pt (tc : tcenv1) =
+  let t_apply_bwd ?mode ?canview pt (tc : tcenv1) =
     let hyps   = FApi.tc1_hyps tc in
     let pt, ax = LowApply.check `Elim pt (`Hyps (hyps, !!tc)) in
     let ptenv  = ptenv_of_penv hyps !!tc in
-
-    t_apply_bwd_r { ptev_env = ptenv; ptev_pt = pt; ptev_ax = ax; } tc
+    let pt     = { ptev_env = ptenv; ptev_pt = pt; ptev_ax = ax; } in
+    t_apply_bwd_r ?mode ?canview pt tc
 
   let pf_apply_error pe (reason, pt, (src, _dst)) =
     tc_error_lazy pe
@@ -372,14 +360,44 @@ module LowRewrite = struct
       let pt = { pt with PT.ptev_env = PT.copy pt.ptev_env } in
         try  t_rewrite_r (`LtoR, None) pt tc
         with RewriteError _ -> raise InvalidGoalShape
-    in
-
-      t_do_r ~focus:0 `Maybe None (t_ors (List.map try1 pts)) !@tc
+    in t_do_r ~focus:0 `Maybe None (t_ors (List.map try1 pts)) !@tc
 end
 
 let t_rewrite_prept info pt tc = 
   LowRewrite.t_rewrite_r info (pt_of_prept tc pt) tc
 
+(* -------------------------------------------------------------------- *)
+let process_auto (tc : tcenv1) =
+  let module E = struct exception Done of tcenv end in
+
+  let for1 (p : EcPath.path) tc =
+    let pt = PT.pt_of_uglobal !!tc (FApi.tc1_hyps tc) p in
+    FApi.t_seqs
+      [LowApply.t_apply_bwd_r ~mode:fmrigid ~canview:false pt;
+       EcLowGoal.t_trivial; EcLowGoal.t_fail]
+      tc
+  in
+
+  try
+    Sp.iter
+      (fun p -> raise (E.Done (t_try (for1 p) tc)))
+      (EcEnv.Auto.get (FApi.tc1_env tc));
+    t_id tc
+
+  with E.Done tc -> tc
+
+(* -------------------------------------------------------------------- *)
+let process_trivial (tc : tcenv1) =
+  let subtc = t_seqs [EcPhlAuto.t_phl_trivial; process_auto] in
+  EcLowGoal.t_trivial ~subtc tc
+
+(* -------------------------------------------------------------------- *)
+let process_done tc =
+  let tc = process_trivial tc in
+
+  if not (FApi.tc_done tc) then
+    tc_error (FApi.tc_penv tc) "[by]: cannot close goals";
+  tc
 
 (* -------------------------------------------------------------------- *)
 let process_apply_bwd ~implicits mode (ff : ppterm) (tc : tcenv1) =
@@ -1080,10 +1098,9 @@ let rec process_mintros ?(cf = true) pis gs =
 
   and intro1_done (_ : ST.state) (simplify : bool) (tc : tcenv1) =
     let t =
-      let t_trivial = EcPhlAuto.t_trivial in
-        match simplify with
-        | true  -> t_seq (t_simplify ~delta:false) t_trivial
-        | false -> t_trivial
+      match simplify with
+      | true  -> t_seq (t_simplify ~delta:false) process_trivial
+      | false -> process_trivial
     in t tc
 
   and intro1_simplify (_ : ST.state) tc =

@@ -136,6 +136,7 @@ type preenv = {
   env_tci      : ((ty_params * ty) * tcinstance) list;
   env_tc       : TC.graph;
   env_rwbase   : Sp.t Mip.t;
+  env_atbase   : Sp.t;
   env_modlcs   : Sid.t;                 (* declared modules *)
   env_item     : ctheory_item list;     (* in reverse order *)
   env_norm     : env_norm ref;
@@ -235,6 +236,7 @@ let empty gstate =
     env_tci      = [];
     env_tc       = TC.Graph.empty;
     env_rwbase   = Mip.empty;
+    env_atbase   = Sp.empty;
     env_modlcs   = Sid.empty;
     env_item     = [];
     env_norm     = ref empty_norm_cache; }
@@ -829,8 +831,6 @@ module MC = struct
           (fun mc (x, ax) ->
             _up_axiom candup mc x (IPPath (xpath x), ax))
           mc axioms
-
-
     in
       mc
 
@@ -998,11 +998,8 @@ module MC = struct
       | CTh_baserw x ->
           (add2mc _up_rwbase x (expath x) mc, None)
   
-      | CTh_addrw _ -> (mc, None)
-
-      | CTh_export _ -> (mc, None)
-
-      | CTh_instance _ -> (mc, None)
+      | CTh_export _ | CTh_addrw _ | CTh_instance _ | CTh_auto _ ->
+          (mc, None)
     in
 
     let (mc, submcs) =
@@ -1267,13 +1264,11 @@ end
 
 (* -------------------------------------------------------------------- *)
 module BaseRw = struct
-  type t = Sp.t 
-    
-  let by_path_opt (p: EcPath.path) (env:env) = 
+  let by_path_opt (p : EcPath.path) (env : env) = 
     let ip = IPPath p in
     Mip.find_opt ip env.env_rwbase
 
-  let by_path (p:EcPath.path) env = 
+  let by_path (p : EcPath.path) env = 
     match by_path_opt p env with
     | None -> lookup_error (`Path p)
     | Some obj -> obj
@@ -1290,25 +1285,36 @@ module BaseRw = struct
     | None -> false
     | Some _ -> true
 
-  let bind name env = 
-    let p = EcPath.pqname (root env) name in
+  let add name env = 
+    let p   = EcPath.pqname (root env) name in
     let env = MC.bind_rwbase name p env in
-    let ip = IPPath p in
+    let ip  = IPPath p in
     { env with 
-      env_rwbase = Mip.add ip Sp.empty env.env_rwbase;
-      env_item   = CTh_baserw name :: env.env_item
-    }
+        env_rwbase = Mip.add ip Sp.empty env.env_rwbase;
+        env_item   = CTh_baserw name :: env.env_item; }
 
-  let bind_addrw p l env =
+  let addto p l env =
     { env with
-      env_rwbase = 
-        Mip.change 
-          (omap (fun s -> List.fold_left (fun s r -> Sp.add r s) s l)) 
-          (IPPath p)
-          env.env_rwbase;
-      env_item = CTh_addrw(p,l) :: env.env_item
-    }
+        env_rwbase = 
+          Mip.change 
+            (omap (fun s -> List.fold_left (fun s r -> Sp.add r s) s l)) 
+            (IPPath p) env.env_rwbase;
+        env_item = CTh_addrw (p, l) :: env.env_item; }
     
+end
+
+(* -------------------------------------------------------------------- *)
+module Auto = struct
+  let add (ps : Sp.t) (env : env) =
+    { env with
+        env_atbase = Sp.union env.env_atbase ps;
+        env_item   = CTh_auto ps :: env.env_item; }
+    
+  let add1 (p : path) (env : env) =
+    add (Sp.singleton p) env
+
+  let get (env : env) =
+    env.env_atbase
 end
 
 (* -------------------------------------------------------------------- *)
@@ -2579,7 +2585,8 @@ module Theory = struct
     | Th_typeclass name     -> CTh_typeclass name
     | Th_instance  (ty, cr) -> CTh_instance  (ty, cr)
     | Th_baserw    x        -> CTh_baserw x
-    | Th_addrw     (b,l)    -> CTh_addrw     (b, l)
+    | Th_addrw     (b, l)   -> CTh_addrw     (b, l)
+    | Th_auto      ps       -> CTh_auto      ps
 
     | Th_theory (x, (th, md)) ->
         CTh_theory (x, (ctheory_of_theory th, md))
@@ -2650,47 +2657,55 @@ module Theory = struct
     | _ -> inst
 
   (* ------------------------------------------------------------------ *)
-  let rec bind_tc_cth path gr cth =
-    List.fold_left (bind_tc_cth_item path) gr cth.cth_struct
+  let rec bind_base_cth tx path base cth =
+    List.fold_left (bind_base_cth_item tx path) base cth.cth_struct
 
-  and bind_tc_cth_item path gr item =
+  and bind_base_cth_item tx path base item =
     let xpath x = EcPath.pqname path x in
 
     match item with
     | CTh_theory (x, (cth, `Concrete)) ->
-        bind_tc_cth (xpath x) gr cth
-
-    | CTh_typeclass (x, tc) -> begin
-        match tc.tc_prt with
-        | None     -> gr
-        | Some prt -> TC.Graph.add ~src:(xpath x) ~dst:prt gr
-    end
-
-    | _ -> gr
+        bind_base_cth tx (xpath x) base cth
+    | CTh_theory _ ->
+        base
+    | _ -> odfl base (tx path base item)
 
   (* ------------------------------------------------------------------ *)
-  let rec bind_br_cth path m cth =
-    List.fold_left (bind_br_cth_item path) m cth.cth_struct
+  let bind_tc_cth =
+    let for1 path base = function
+      | CTh_typeclass (x, tc) ->
+          tc.tc_prt |> omap (fun prt ->
+            let src = EcPath.pqname path x in
+            TC.Graph.add ~src ~dst:prt base)
+      | _ -> None
 
-  and bind_br_cth_item path m item = 
-    let xpath x = EcPath.pqname path x in
-    match item with
-    | CTh_theory (x, (cth, `Concrete)) ->
-        bind_br_cth (xpath x) m cth
+    in bind_base_cth for1
 
-    | CTh_baserw x ->
-        let ip = IPPath (xpath x) in
-        assert (not (Mip.mem ip m));
-        Mip.add ip Sp.empty m
+  (* ------------------------------------------------------------------ *)
+  let bind_br_cth =
+    let for1 path base = function
+      | CTh_baserw x ->
+         let ip = IPPath (EcPath.pqname path x) in
+         assert (not (Mip.mem ip base));
+         Some (Mip.add ip Sp.empty base)
 
-    | CTh_addrw (b, r) ->
-        let change = function
-        | None   -> assert false
-        | Some s -> Some (List.fold_left (fun s r -> Sp.add r s) s r)
+      | CTh_addrw (b, r) ->
+         let change = function
+           | None   -> assert false
+           | Some s -> Some (List.fold_left (fun s r -> Sp.add r s) s r)
 
-        in Mip.change change (IPPath b) m 
+         in Some (Mip.change change (IPPath b) base)
 
-    | _ -> m
+      | _ -> None
+
+    in bind_base_cth for1
+
+  (* ------------------------------------------------------------------ *)
+  let bind_at_cth =
+    let for1 _path _base = function
+      | _ -> None
+
+    in bind_base_cth for1
 
   (* ------------------------------------------------------------------ *)
   let bind ?(mode = `Concrete) name cth env =
@@ -2705,7 +2720,8 @@ module Theory = struct
         let env_tci    = bind_instance_cth thname env.env_tci cth in
         let env_tc     = bind_tc_cth thname env.env_tc cth in
         let env_rwbase = bind_br_cth thname env.env_rwbase cth in
-        { env with env_tci; env_tc; env_rwbase; }
+        let env_atbase = bind_at_cth thname env.env_atbase cth in
+        { env with env_tci; env_tc; env_rwbase; env_atbase; }
 
     | `Abstract ->
         env
@@ -2753,10 +2769,7 @@ module Theory = struct
         | CTh_baserw x ->
             MC.import_rwbase (xpath x) env
 
-        | CTh_addrw _ ->
-            env
-
-        | CTh_instance _ ->
+        | CTh_addrw _ | CTh_instance _ | CTh_auto _ ->
             env
 
       in
@@ -2835,7 +2848,8 @@ module Theory = struct
     { env with
         env_tci    = bind_instance_cth thpath env.env_tci cth;
         env_tc     = bind_tc_cth thpath env.env_tc cth;
-        env_rwbase = bind_br_cth thpath env.env_rwbase cth; }
+        env_rwbase = bind_br_cth thpath env.env_rwbase cth;
+        env_atbase = bind_at_cth thpath env.env_atbase cth; }
 end
 
 (* -------------------------------------------------------------------- *)

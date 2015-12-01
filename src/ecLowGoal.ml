@@ -1582,11 +1582,12 @@ let t_logic_trivial (tc : tcenv1) =
   in FApi.t_internal (FApi.t_try (FApi.t_seqs seqs)) tc
 
 (* -------------------------------------------------------------------- *)
-let t_trivial (ott : FApi.backward option) (tc : tcenv1) =
+let t_trivial ?(subtc : FApi.backward option) (tc : tcenv1) =
   let tryassum  = FApi.t_try (t_assumption `Conv) in
   let tprogress = t_progress t_id in
-  let subtc     = ott |> odfl t_id in
-  let seqs      = [tryassum; tprogress; tryassum; subtc; t_logic_trivial; t_fail] in
+  let subtc     = subtc |> odfl t_id in
+  let seqs      =
+    [tryassum; tprogress; tryassum; subtc; t_logic_trivial; t_fail] in
 
   FApi.t_internal (FApi.t_try (FApi.t_seqs seqs)) tc
 

@@ -464,8 +464,12 @@ and process_option (scope : EcScope.scope) (name, value) =
     EcScope.hierror "unknown option: %s" (unloc name)
 
 (* -------------------------------------------------------------------- *)
-and process_addrw scope todo =
-  EcScope.BaseRw.process_addrw scope todo
+and process_addrw scope baserw =
+  EcScope.Auto.addrw scope baserw
+
+(* -------------------------------------------------------------------- *)
+and process_addat scope base =
+  EcScope.Auto.addat scope base
 
 (* -------------------------------------------------------------------- *)
 and process_dump_why3 scope filename =
@@ -557,6 +561,7 @@ and process (ld : Loader.loader) (scope : EcScope.scope) g =
       | Gpragma      opt  -> `State (fun scope -> process_pragma     scope  opt)
       | Goption      opt  -> `Fct   (fun scope -> process_option     scope  opt)
       | Gaddrw       hint -> `Fct   (fun scope -> process_addrw      scope hint)
+      | Gaddat       hint -> `Fct   (fun scope -> process_addat      scope hint)
       | GdumpWhy3    file -> `Fct   (fun scope -> process_dump_why3  scope file)
     with
     | `Fct   f -> Some (f scope)

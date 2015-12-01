@@ -32,7 +32,7 @@ let t_hoare_bd_hoare tc =
     else
       FApi.t_seqsub
         (t_bdHoareF_conseq_bd FHeq f_r0)
-        [FApi.t_try EcPhlAuto.t_trivial; t_hoare_of_bdhoareF]
+        [FApi.t_try EcHiGoal.process_trivial; t_hoare_of_bdhoareF]
         tc
 
   | FbdHoareS bhs ->
@@ -41,7 +41,7 @@ let t_hoare_bd_hoare tc =
     else
       FApi.t_seqsub
         (t_bdHoareS_conseq_bd FHeq f_r0)
-        [FApi.t_try EcPhlAuto.t_trivial; t_hoare_of_bdhoareS]
+        [FApi.t_try EcHiGoal.process_trivial; t_hoare_of_bdhoareS]
         tc
 
   | FhoareF _ -> t_bdhoare_of_hoareF tc
@@ -237,7 +237,7 @@ let process_bdhoare_split info tc =
            (t_conseq
               f_false
               (EcCoreLib.CI_Logic.mk_logic "andDorN")
-              EcPhlAuto.t_trivial))
+              EcHiGoal.process_trivial))
         tc
 
   | EcParsetree.BDH_split_not (b1, b2) ->

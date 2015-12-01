@@ -2016,46 +2016,46 @@ module Section = struct
 
           | T.CTh_instance (p, cr) ->
               { scope with
-                  sc_env = EcEnv.TypeClass.add_instance p cr scope.sc_env }
+                sc_env = EcEnv.TypeClass.add_instance p cr scope.sc_env }
+
           | T.CTh_baserw x -> 
-              { scope with 
-                sc_env = EcEnv.BaseRw.bind x scope.sc_env }
-          | T.CTh_addrw(p,l) ->
-              { scope with
-                sc_env = EcEnv.BaseRw.bind_addrw p l scope.sc_env }
+              { scope with sc_env = EcEnv.BaseRw.add x scope.sc_env }
+
+          | T.CTh_addrw (p, l) ->
+              { scope with sc_env = EcEnv.BaseRw.addto p l scope.sc_env }
+
+          | T.CTh_auto ps ->
+              { scope with sc_env = EcEnv.Auto.add ps scope.sc_env }
         in
 
         List.fold_left bind1 scope oitems
 end
 
 (* -------------------------------------------------------------------- *)
-module BaseRw = struct
-  let process scope x = 
-    { scope with 
-      sc_env = EcEnv.BaseRw.bind x.pl_desc (env scope) }
-
-  let process_addrw scope (x,l) = 
+module Auto = struct
+  let addrw scope (x, l) = 
     let env = env scope in
     let env, base = 
       match EcEnv.BaseRw.lookup_opt x.pl_desc env with
-      | None -> 
-        let pre, base = x.pl_desc in 
-        if pre <> [] then 
+      | None ->
+        let pre, base = unloc x in 
+        if not (List.is_empty pre) then 
           hierror ~loc:x.pl_loc 
-            "cannot create a hint rewrite base outside a theory";
-        let p = EcPath.pqname (EcEnv.root env) base in
-        begin match EcEnv.Ax.by_path_opt p env with
-        | None -> ()
-        | Some _ ->  
-          hierror ~loc:x.pl_loc 
-            "an axiom with the same name already exists";
-        end;
-        let env = EcEnv.BaseRw.bind base env in
-        env, fst (EcEnv.BaseRw.lookup x.pl_desc env) 
-      | Some (base, _) -> env, base in
-    let l = List.map (fun l -> EcEnv.Ax.lookup_path l.pl_desc env) l in
-    { scope with
-      sc_env = EcEnv.BaseRw.bind_addrw base l env }
+            "cannot create rewrite hints out of its enclosing theory";
+        let env = EcEnv.BaseRw.add base env in
+        (env, fst (EcEnv.BaseRw.lookup x.pl_desc env))
+
+      | Some (base, _) -> (env, base) in
+
+    let l = List.map (fun l -> EcEnv.Ax.lookup_path (unloc l) env) l in
+    { scope with sc_env = EcEnv.BaseRw.addto base l env }
+
+  let addat scope base =
+    let base = List.map
+      (fun l -> EcEnv.Ax.lookup_path (unloc l) scope.sc_env)
+      base in
+
+    { scope with sc_env = EcEnv.Auto.add (Sp.of_list base) scope.sc_env }
 end
 
 (* -------------------------------------------------------------------- *)
@@ -2395,17 +2395,26 @@ module Cloning = struct
   
         | CTh_export p ->
             let p     = EcSubst.subst_path subst p in
-            let scope = { scope with sc_env = EcEnv.Theory.export p scope.sc_env } in
+            let env   = EcEnv.Theory.export p scope.sc_env in
+            let scope = { scope with sc_env = env } in
             (subst, ops, proofs, scope)
   
         | CTh_baserw x ->
-            let scope = { scope with sc_env = EcEnv.BaseRw.bind x scope.sc_env } in
+            let env   = EcEnv.BaseRw.add x scope.sc_env in
+            let scope = { scope with sc_env = env } in
             (subst, ops, proofs, scope)
   
         | CTh_addrw (p, l) ->
-            let p = EcSubst.subst_path subst p in
-            let l = List.map (EcSubst.subst_path subst) l in
-            let scope = { scope with sc_env = EcEnv.BaseRw.bind_addrw p l scope.sc_env } in
+            let p     = EcSubst.subst_path subst p in
+            let l     = List.map (EcSubst.subst_path subst) l in
+            let env   = EcEnv.BaseRw.addto p l scope.sc_env in
+            let scope = { scope with sc_env = env } in
+            (subst, ops, proofs, scope)
+
+        | CTh_auto ps ->
+            let ps    = Sp.translate (EcSubst.subst_path subst) ps in
+            let env   = EcEnv.Auto.add ps scope.sc_env in
+            let scope = { scope with sc_env = env } in
             (subst, ops, proofs, scope)
   
         | CTh_instance ((typ, ty), tc) -> begin

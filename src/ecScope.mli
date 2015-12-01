@@ -202,8 +202,9 @@ module Prover : sig
 end
 
 (* -------------------------------------------------------------------- *)
-module BaseRw : sig
-  val process_addrw : scope -> (pqsymbol * pqsymbol list) -> scope
+module Auto : sig
+  val addrw : scope -> (pqsymbol * pqsymbol list) -> scope
+  val addat : scope -> pqsymbol list -> scope
 end
 
 (* -------------------------------------------------------------------- *)

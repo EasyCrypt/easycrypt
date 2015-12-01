@@ -262,7 +262,7 @@ let t_equiv_deno_bad pre tc =
            @+ [ 
              t_pr_rewrite_i ("mu_sub",None) @+ [
                t_intros_s (`Symbol ["_"]) @! t_apply_prept (`UG real_upto_sub);
-               t_trivial None;
+               t_trivial;
              ];
              t_true;
            ]

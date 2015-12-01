@@ -2657,10 +2657,13 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, (cth, mode)) =
   | EcTheory.CTh_baserw name ->
       Format.fprintf fmt "declare rewrite %s." name
 
-  | EcTheory.CTh_addrw (p,l) ->
+  | EcTheory.CTh_addrw (p, l) ->
       Format.fprintf fmt "hint rewrite %a : %a."
         pp_path p (pp_list "@ " pp_path) l
 
+  | EcTheory.CTh_auto p ->
+      Format.fprintf fmt "hint exact : %a."
+        (pp_list "@ " pp_path) (EcPath.Sp.elements p)
 
 (* -------------------------------------------------------------------- *)
 module ObjectInfo = struct

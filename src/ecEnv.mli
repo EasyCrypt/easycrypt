@@ -337,14 +337,22 @@ module TypeClass : sig
 end
 (* -------------------------------------------------------------------- *)
 module BaseRw : sig
-  type t = Sp.t
-  val by_path : path -> env -> Sp.t 
-  val lookup : qsymbol -> env -> path * Sp.t
+  val by_path    : path -> env -> Sp.t 
+  val lookup     : qsymbol -> env -> path * Sp.t
   val lookup_opt : qsymbol -> env -> (path * Sp.t) option
-  val is_base : qsymbol -> env -> bool
-  val bind : symbol -> env -> env
-  val bind_addrw : path -> path list -> env -> env
+  val is_base    : qsymbol -> env -> bool
+
+  val add   : symbol -> env -> env
+  val addto : path -> path list -> env -> env
 end
+
+(* -------------------------------------------------------------------- *)
+module Auto : sig
+  val add1 : path -> env -> env
+  val add  : Sp.t -> env -> env
+  val get  : env -> Sp.t
+end
+
 (* -------------------------------------------------------------------- *)
 module AbsStmt : sig
   type t = EcModules.abs_uses
