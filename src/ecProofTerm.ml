@@ -518,10 +518,17 @@ and trans_pterm_arg_value pe ?name { pl_desc = arg; pl_loc = loc; } =
 
   | EA_form fp ->
       let env = LDecl.toenv pe.pte_hy in
+      let ptn = ref Mid.empty in
       let fp  =
-        try  EcTyping.trans_form_opt env pe.pte_ue fp None
-        with EcTyping.TyError (loc, env, err) ->
-          tc_pterm_apperror ~loc pe (`InvalidArgForm (`TyError (env, err))) in
+        
+      try  EcTyping.trans_pattern env (ptn, pe.pte_ue) fp
+      with EcTyping.TyError (loc, env, err) ->
+        tc_pterm_apperror ~loc pe (`InvalidArgForm (`TyError (env, err)))
+      in
+
+      Mid.iter
+        (fun x _ -> pe.pte_ev := EcMatching.MEV.add x `Form !(pe.pte_ev))
+        !ptn;
       { ptea_env = pe; ptea_arg = PVAFormula fp; }
 
 (* ------------------------------------------------------------------ *)
