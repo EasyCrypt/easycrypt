@@ -22,8 +22,10 @@ Vagrant.configure(2) do |config|
 #    echo "Installing EasyCrypt and dependencies from OPAM packages."
 #    opam install -q easycrypt ec-provers ec-proofgeneral
 #    why3 config --detect -C /home/vagrant/.why3.conf
+#    echo "(when (fboundp 'electric-indent-mode) (electric-indent-mode -1))
+#(setq proof-output-tooltips nil) (load-file \\"~/.opam/4.02.1/share/ec-proofgeneral/generic/proof-site.el\\")" >> /home/vagrant/.emacs
     echo "Installing EasyCrypt dependencies from OPAM packages."
-    opam install -q ec-toolchain.20150923 ec-provers
+    opam install -q -y ec-toolchain.20150923 ec-provers
     why3 config --detect -C /home/vagrant/.why3.conf
     cd #{project_name}
     echo "Building EasyCrypt."
