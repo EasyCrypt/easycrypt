@@ -34,16 +34,20 @@ type opmatch = [
   | `Proj of EcTypes.prog_var * EcTypes.ty * (int * int)
 ]
 
+type mismatch_funsig = 
+| MF_targs of ty * ty (* expected, got *)
+| MF_tres  of ty * ty (* expected, got *)
+| MF_restr of EcEnv.env * [`Eq of Sx.t * Sx.t | `Sub of Sx.t ]
+
 type tymod_cnv_failure =
 | E_TyModCnv_ParamCountMismatch
 | E_TyModCnv_ParamTypeMismatch of EcIdent.t
 | E_TyModCnv_MissingComp       of symbol
-| E_TyModCnv_MismatchFunSig    of symbol
+| E_TyModCnv_MismatchFunSig    of symbol * mismatch_funsig
 
 type modapp_error =
-| MAE_WrongArgPosition
-| MAE_WrongArgCount
-| MAE_InvalidArgType
+| MAE_WrongArgCount       of int * int  (* expected, got *)
+| MAE_InvalidArgType      of EcPath.mpath * tymod_cnv_failure
 | MAE_AccesSubModFunctor
 
 type modtyp_error =
@@ -104,7 +108,40 @@ exception TyError of EcLocation.t * EcEnv.env * tyerror
 let tyerror loc env e = raise (TyError (loc, env, e))
 
 (* -------------------------------------------------------------------- *)
-let pp_cnv_failure fmt _env error =
+let pp_mismatch_funsig env fmt error =
+  let env   = EcPrinting.PPEnv.ofenv env in
+  let msg x = Format.fprintf fmt x in
+  let pp_type fmt ty = EcPrinting.pp_type env fmt ty in
+
+  match error with
+  | MF_targs (ex,got) -> 
+    msg "its argument has type %a instead of %a"
+      pp_type got pp_type ex 
+  | MF_tres  (ex,got) -> msg "its return type is %a instead of %a"
+    pp_type got pp_type ex
+  | MF_restr  (env,`Sub sx) -> 
+    let env   = EcPrinting.PPEnv.ofenv env in
+    msg "the function is not allowed to use %a"
+      (EcPrinting.pp_list " or@ " (EcPrinting.pp_funname env))
+      (Sx.elements sx)
+  | MF_restr  (env,`Eq(ex,got)) -> 
+    let env   = EcPrinting.PPEnv.ofenv env in
+    let allowed = Sx.diff ex got in
+    let has_allowed = not (Sx.is_empty allowed) in
+    if has_allowed then
+      msg "the function should be allowed to use %a"
+      (EcPrinting.pp_list " or@ " (EcPrinting.pp_funname env))
+      (Sx.elements allowed);
+    let notallowed = Sx.diff got ex in
+    if not (Sx.is_empty notallowed) then
+      msg "%sthe function is not allowed to use %a"
+        (if has_allowed then ", " else "")
+        (EcPrinting.pp_list " or@ " (EcPrinting.pp_funname env))
+        (Sx.elements notallowed)
+ 
+      
+
+let pp_cnv_failure env fmt error =
   let msg x = Format.fprintf fmt x in
 
   match error with
@@ -118,27 +155,28 @@ let pp_cnv_failure fmt _env error =
   | E_TyModCnv_MissingComp x ->
       msg "the item `%s' is missing" x
 
-  | E_TyModCnv_MismatchFunSig x ->
-      msg "the item `%s' does not have a compatible kind/type" x
+  | E_TyModCnv_MismatchFunSig (x,err) ->
+      msg "the item `%s' is not compatible: %a" 
+        x (pp_mismatch_funsig env) err
 
-let pp_modappl_error fmt error =
+let pp_modappl_error env fmt error =
   let msg x = Format.fprintf fmt x in
 
   match error with
-  | MAE_WrongArgPosition ->
-      msg "wrong arguments position"
+  | MAE_WrongArgCount (ex,got)->
+      msg "wrong number of arguments (expected %i, got %i)" ex got
 
-  | MAE_WrongArgCount ->
-      msg "wrong number of arguments"
-
-  | MAE_InvalidArgType ->
-      msg "arguments do not match required interfaces"
+  | MAE_InvalidArgType (mp,error) ->
+    let ppe   = EcPrinting.PPEnv.ofenv env in
+    msg "argument %a do not match required interfaces, %a"
+      (EcPrinting.pp_topmod ppe) mp
+      (pp_cnv_failure env) error
 
   | MAE_AccesSubModFunctor ->
       msg "cannot access a sub-module of a partially applied functor"
 
-let pp_tyerror env fmt error =
-  let env   = EcPrinting.PPEnv.ofenv env in
+let pp_tyerror env1 fmt error =
+  let env   = EcPrinting.PPEnv.ofenv env1 in
   let msg x = Format.fprintf fmt x in
   let pp_type fmt ty = EcPrinting.pp_type env fmt ty in
 
@@ -224,7 +262,7 @@ let pp_tyerror env fmt error =
 
   | TypeModMismatch err ->
       msg "this module body does not meet its interface:@\n";
-      msg "  @[<hov 2>%t@]" (fun fmt -> pp_cnv_failure fmt env err)
+      msg "  @[<hov 2>%t@]" (fun fmt -> pp_cnv_failure env1 fmt err)
 
   | NotAFunction ->
       msg "too many arguments"
@@ -324,7 +362,7 @@ let pp_tyerror env fmt error =
       msg "invalid function application: wrong number of arguments"
 
   | InvalidModAppl err ->
-      msg "invalid module application:@ %a" pp_modappl_error err
+      msg "invalid module application:@ %a" (pp_modappl_error env1) err
 
   | InvalidModType MTE_FunSigDoesNotRepeatArgNames ->
       msg "applied argument names must repeat functor argument names"
@@ -717,31 +755,37 @@ let rec check_sig_cnv mode (env:EcEnv.env) (sin:module_sig) (sout:module_sig) =
       let (ires , ores ) = (fin.fs_ret, fout.fs_ret) in
 
       if not (EqTest.for_type env iargs oargs) then
-        tymod_cnv_failure (E_TyModCnv_MismatchFunSig fin.fs_name);
+        tymod_cnv_failure 
+          (E_TyModCnv_MismatchFunSig(fin.fs_name,MF_targs(iargs,oargs)));
 
       if not (EqTest.for_type env ires ores) then
-          tymod_cnv_failure (E_TyModCnv_MismatchFunSig fin.fs_name);
+          tymod_cnv_failure 
+            (E_TyModCnv_MismatchFunSig(fin.fs_name,MF_tres(ires,ores)));
 
-        let flcmp () =
-          let norm oi = 
-            List.fold_left (fun s f -> 
-              EcPath.Sx.add (EcEnv.NormMp.norm_xfun env f) s)
-              EcPath.Sx.empty oi.oi_calls
-          in
-          let icalls = norm oin in
-          let ocalls = norm oout in
-          match mode with
-          | `Sub -> Sx.subset icalls ocalls
-          | `Eq  -> Sx.equal  icalls ocalls
-        in
-        if not (flcmp ()) then
-          tymod_cnv_failure (E_TyModCnv_MismatchFunSig fin.fs_name);
-        
+      let norm oi = 
+        List.fold_left (fun s f -> 
+          EcPath.Sx.add (EcEnv.NormMp.norm_xfun env f) s)
+          EcPath.Sx.empty oi.oi_calls
+      in
+      let icalls = norm oin in
+      let ocalls = norm oout in
+      match mode with
+      | `Sub -> 
+        if not (Sx.subset icalls ocalls) then
+          let sx = Sx.diff icalls ocalls in
+          tymod_cnv_failure 
+            (E_TyModCnv_MismatchFunSig(fin.fs_name, MF_restr(env, `Sub sx)))
+      | `Eq  -> 
+        if not (Sx.equal icalls ocalls) then
+          tymod_cnv_failure 
+            (E_TyModCnv_MismatchFunSig(fin.fs_name, 
+                                       MF_restr(env, `Eq(ocalls, icalls))))
+            
     in
-      fun i_item o_item ->
-        match i_item, o_item with
-        | Tys_function (fin,oin), Tys_function (fout,oout) -> 
-          check_fun_compatible (fin,oin) (fout,oout)
+    fun i_item o_item ->
+      match i_item, o_item with
+      | Tys_function (fin,oin), Tys_function (fout,oout) -> 
+        check_fun_compatible (fin,oin) (fout,oout)
   in
 
   let check_for_item (o_item : module_sig_body_item) =
@@ -918,7 +962,8 @@ let split_msymb (env : EcEnv.env) (msymb : pmsymbol located) =
   let (top, sm) =
     let ca (x, args) =
       if args <> None then
-        tyerror msymb.pl_loc env (InvalidModAppl MAE_WrongArgPosition);
+        tyerror msymb.pl_loc env 
+          (InvalidModAppl (MAE_WrongArgCount(0, List.length (oget args))));
       x
     in
       (List.map ca top, List.map ca sm)
@@ -954,7 +999,9 @@ let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol located) =
           assert false;
         if args <> None then
           if not (EcPath.p_size sub = List.length sm) then
-            tyerror loc env (InvalidModAppl MAE_WrongArgPosition);
+            tyerror loc env 
+              (InvalidModAppl (MAE_WrongArgCount(EcPath.p_size sub,
+                                                List.length sm)));
         (params, false)
 
     | `Concrete (p, None) ->
@@ -975,22 +1022,23 @@ let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol located) =
     if not istop && params <> [] then
       tyerror loc env (InvalidModAppl MAE_AccesSubModFunctor); 
 
-    (top_path, mod_expr.me_sig)
+    ((top_path,loc), mod_expr.me_sig)
 
   | Some args ->
-      if List.length args > List.length params then
-        tyerror loc env (InvalidModAppl MAE_WrongArgCount);
+      let lena = List.length args in
+      let lenp = List.length params in
+      if lena > lenp then
+        tyerror loc env (InvalidModAppl (MAE_WrongArgCount(lenp, lena)));
 
-      let params, remn = List.takedrop (List.length args) params in
+      let params, remn = List.takedrop lena params in
 
-      List.iter2
-        (fun (_, p) (_, a) ->
-          try check_sig_mt_cnv env a p
-          with TymodCnvFailure _ ->
-            tyerror loc env (InvalidModAppl MAE_InvalidArgType))
-        params args;
+      let args = List.map2 
+        (fun (_,tp) ((a,loc),ta) ->
+          try check_sig_mt_cnv env ta tp; a
+          with TymodCnvFailure error ->
+            tyerror loc env (InvalidModAppl (MAE_InvalidArgType(a, error))))
+        params args in
 
-      let args  = List.map fst args in
       let subst = 
           List.fold_left2
             (fun s (x,_) a -> EcSubst.add_module s x a) 
@@ -1014,7 +1062,12 @@ let rec trans_msymbol (env : EcEnv.env) (msymb : pmsymbol located) =
       in
       let body = EcSubst.subst_modsig_body subst body in
 
-        (EcPath.mpath top_path.EcPath.m_top args, {mis_params = remn; mis_body = body})
+      ((EcPath.mpath top_path.EcPath.m_top args, loc),
+       {mis_params = remn; mis_body = body})
+
+let trans_msymbol env msymb = 
+  let ((m,_),mt) = trans_msymbol env msymb in
+  (m,mt) 
 
 (* -------------------------------------------------------------------- *)
 let rec transty (tp : typolicy) (env : EcEnv.env) ue ty =
@@ -1658,7 +1711,8 @@ let rec transmod ~attop (env : EcEnv.env) (x : symbol) (me : pmodule_expr) =
     let extraparams = sig_.mis_params in
     let allparams = stparams @ extraparams in
     if allparams <> [] && not attop then
-      tyerror me.pl_loc env (InvalidModAppl MAE_WrongArgCount);
+      tyerror me.pl_loc env 
+        (InvalidModAppl (MAE_WrongArgCount(0,List.length allparams)));
     let me = EcEnv.Mod.by_mpath mp env in
     let arity = List.length stparams in
     { me with 

@@ -24,16 +24,20 @@ type opmatch = [
   | `Proj of EcTypes.prog_var * EcTypes.ty * (int * int)
 ]
 
+type mismatch_funsig = 
+| MF_targs of ty * ty (* expected, got *)
+| MF_tres  of ty * ty (* expected, got *)
+| MF_restr of EcEnv.env * [`Eq of Sx.t * Sx.t | `Sub of Sx.t ]
+
 type tymod_cnv_failure =
 | E_TyModCnv_ParamCountMismatch
 | E_TyModCnv_ParamTypeMismatch of EcIdent.t
 | E_TyModCnv_MissingComp       of symbol
-| E_TyModCnv_MismatchFunSig    of symbol
+| E_TyModCnv_MismatchFunSig    of symbol * mismatch_funsig
 
 type modapp_error =
-| MAE_WrongArgPosition
-| MAE_WrongArgCount
-| MAE_InvalidArgType
+| MAE_WrongArgCount      of int * int  (* expected, got *)   
+| MAE_InvalidArgType     of EcPath.mpath * tymod_cnv_failure
 | MAE_AccesSubModFunctor
 
 type modtyp_error =
@@ -96,7 +100,7 @@ val tyerror : EcLocation.t -> env -> tyerror -> 'a
 
 (* -------------------------------------------------------------------- *)
 val pp_tyerror     : env -> Format.formatter -> tyerror -> unit
-val pp_cnv_failure :  Format.formatter -> env -> tymod_cnv_failure -> unit
+val pp_cnv_failure : env -> Format.formatter -> tymod_cnv_failure -> unit
 
 (* -------------------------------------------------------------------- *)
 val unify_or_fail : env -> EcUnify.unienv -> EcLocation.t -> expct:ty -> ty -> unit
