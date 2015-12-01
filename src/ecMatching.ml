@@ -307,6 +307,7 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
 
           | Some `Unset ->
               let ssbj = Fsubst.f_subst subst subject in
+              let ssbj = Fsubst.f_subst (MEV.assubst ue !ev) ssbj in
               if not (Mid.set_disjoint mxs ssbj.f_fv) then
                 raise MatchFailure;
               begin
