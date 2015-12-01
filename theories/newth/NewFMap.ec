@@ -399,11 +399,8 @@ lemma perm_eq_elems_filter (m : ('a, 'b) fmap) (p: 'a -> 'b -> bool):
 proof.
   (* FIXME: curry-uncurry should probably go into Pair for some chosen arities *)
   rewrite filterE; pose P:= fun (x : 'a * 'b) => p x.`1 x.`2.
-  (* FIXME: why does the following not work?
-      `apply (perm_eq_trans _ (@oflistK (filter P (elems m)))).' *)
-  (* Alternative: have h:= oflistK (filter P (elems m)); apply (perm_eq_trans _ h). *)
-  apply (@perm_eq_trans _ (filter P (elems m)) _ _ (:@oflistK (filter P (elems m)))).
-  rewrite -{1}(@reduce_reduced (filter P (elems m))) 2:perm_eq_refl //.
+  apply (perm_eq_trans _ _ (:@oflistK _)).
+  rewrite reduce_reduced 2:perm_eq_refl //.
   by apply/uniq_map_filter/uniq_keys.
 qed.
 
