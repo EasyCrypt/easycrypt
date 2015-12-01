@@ -1035,6 +1035,18 @@ elim/natind: n => [n /nseq0_le<:'a> ->//|n ge0_n].
 by rewrite {1}nseqS ?nseqSr // rev_cons => ->.
 qed.
 
+lemma nth_rev (x0 : 'a) n s :
+  0 <= n < size s => nth x0 (rev s) n = nth x0 s (size s - (n+1)).
+proof.
+elim/last_ind: s n=> /= [|x s ih] n; first by rewrite lez_lt_asym.
+rewrite rev_rcons size_rcons ltzS subz_add2r -cats1 nth_cat /=.
+elim/natcase: n=> [n le0_n|n ge0_n] [ge0_Hn lt_ns] /=.
+  by have ->: n = 0 by rewrite eqz_leq le0_n ge0_Hn.
+rewrite addz_neq0 //= {1}(subzE (size x)) -{2}(addz0 (size x)).
+rewrite ltz_add2l oppz_lt0 ltzS ge0_n /= -ih ?ltzE ?ge0_n //.
+by rewrite subzE -addzA.
+qed.
+
 (* -------------------------------------------------------------------- *)
 (*                        Duplicate-freenes                             *)
 (* -------------------------------------------------------------------- *)
