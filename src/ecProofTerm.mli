@@ -92,7 +92,9 @@ val pf_unify : pt_env -> ty -> ty -> unit
 (* pattern matching - raise [FindOccFailure] on failure. *)
 exception FindOccFailure of [`MatchFailure | `IncompleteMatch]
 
-val pf_find_occurence : pt_env -> ?keyed:bool -> ptn:form -> form -> unit
+type keyed = [`Yes | `No | `Lazy]
+
+val pf_find_occurence : pt_env -> ?keyed:keyed -> ptn:form -> form -> unit
 
 (* -------------------------------------------------------------------- *)
 val pattern_form :

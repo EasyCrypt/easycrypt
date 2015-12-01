@@ -293,7 +293,7 @@ let pf_form_match (pt : pt_env) ?mode ~ptn subject =
 (* -------------------------------------------------------------------- *)
 exception FindOccFailure of [`MatchFailure | `IncompleteMatch]
 
-let pf_find_occurence (pt : pt_env) ?(keyed = false) ~ptn subject =
+let rec pf_find_occurence (pt : pt_env) ?(keyed = false) ~ptn subject =
   let module E = struct exception MatchFound end in
 
   let na = List.length (snd (EcFol.destr_app ptn)) in
@@ -358,6 +358,18 @@ let pf_find_occurence (pt : pt_env) ?(keyed = false) ~ptn subject =
       EcUnify.UniEnv.restore ~dst:pt.pte_ue ~src:ue; pt.pte_ev := pe;
       raise (FindOccFailure `IncompleteMatch)
     end
+
+(* -------------------------------------------------------------------- *)
+type keyed = [`Yes | `No | `Lazy]
+
+let pf_find_occurence (pt : pt_env) ?(keyed = `No) ~ptn subject =
+  match keyed with
+  | `Yes  -> pf_find_occurence pt ~keyed:true  ~ptn subject
+  | `No   -> pf_find_occurence pt ~keyed:false ~ptn subject
+  | `Lazy ->
+       try  pf_find_occurence pt ~keyed:true ~ptn subject
+       with FindOccFailure _ ->
+         pf_find_occurence pt ~keyed:false ~ptn subject
 
 (* -------------------------------------------------------------------- *)
 let pf_unify (pt : pt_env) ty1 ty2 =

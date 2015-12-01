@@ -322,14 +322,12 @@ module LowRewrite = struct
       let fp = match s with `LtoR -> f1 | `RtoL -> f2 in
   
       (try
-          PT.pf_find_occurence ~keyed:true pt.PT.ptev_env ~ptn:fp tgfp
-       with PT.FindOccFailure _ ->
-         try  PT.pf_find_occurence ~keyed:false pt.PT.ptev_env ~ptn:fp tgfp
-         with
-         | PT.FindOccFailure `MatchFailure ->
-             raise (RewriteError LRW_NothingToRewrite)
-         | PT.FindOccFailure `IncompleteMatch ->
-             raise (RewriteError LRW_CannotInfer));
+          PT.pf_find_occurence ~keyed:`Lazy pt.PT.ptev_env ~ptn:fp tgfp
+       with
+       | PT.FindOccFailure `MatchFailure ->
+           raise (RewriteError LRW_NothingToRewrite)
+       | PT.FindOccFailure `IncompleteMatch ->
+           raise (RewriteError LRW_CannotInfer));
   
       let fp   = PT.concretize_form pt.PT.ptev_env fp in
       let pt   = fst (PT.concretize pt) in
@@ -1300,7 +1298,7 @@ let process_pose xsym o p (tc : tcenv1) =
   in
 
   let dopat =
-    try  PT.pf_find_occurence ptenv ~ptn:p concl; true
+    try  PT.pf_find_occurence ptenv ~keyed:`Lazy ~ptn:p concl; true
     with PT.FindOccFailure _ ->
       if not (PT.can_concretize ptenv) then
         if not (EcMatching.MEV.filled !(ptenv.PT.pte_ev)) then
