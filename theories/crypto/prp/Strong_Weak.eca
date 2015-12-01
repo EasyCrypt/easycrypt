@@ -1,0 +1,65 @@
+require import Pred Fun Option Real.
+require (*--*) NewPRP WeakPRP StrongPRP ConcretePRP IdealPRP.
+
+clone include NewPRP.
+
+op dD: { D distr | mu dD predT = 1%r } as dD_ll.
+
+clone import WeakPRP as Weak with
+  type K  <- K,
+    op dK <- dK,
+  type D  <- D
+proof * by exact/dK_ll.
+
+clone import StrongPRP as Strong with
+  type K  <- K,
+    op dK <- dK,
+  type D  <- D
+proof * by exact/dK_ll.
+
+clone import IdealPRP as PRPi with
+  type K  <- K,
+    op dK <- dK,
+  type D  <- D,
+    op dD <- dD
+proof * by smt ml=0 w=(dK_ll dD_ll).
+
+module Strengthen(D : WeakPRP_Distinguisher, O : StrongPRP_Oracles) = {
+  module O' = {
+    proc f  = O.f
+  }
+
+  proc distinguish = D(O').distinguish
+}.
+
+section.
+  declare module P : StrongPRP.
+  declare module D : WeakPRP_Distinguisher { P }.
+
+  equiv eq_Strong_Weak:
+    WeakPRP_IND(P,D).main ~ StrongPRP_IND(P,Strengthen(D)).main:
+      ={glob D, glob P} ==> ={res}.
+  proof. by proc; sim. qed.
+end section.
+
+section.
+  declare module P : PRP                   { StrongPRP_Wrap, WeakPRP_Wrap }.
+  declare module D : WeakPRP_Distinguisher { StrongPRP_Wrap, WeakPRP_Wrap, RandomPermutation, P }.
+
+  local lemma Weak_as_Strong &m:
+    Pr[WeakPRP_IND(WeakPRP_Wrap(P), D).main() @ &m: res]
+    = Pr[WeakPRP_IND(StrongPRP_Wrap(P), D).main() @ &m: res].
+  proof. by byequiv=> //=; sim. qed.
+
+  lemma Strong_Weak &m:
+    `|Pr[WeakPRP_IND(RandomPermutation,D).main() @ &m: res]
+      - Pr[WeakPRP_IND(WeakPRP_Wrap(P),D).main() @ &m: res]|
+    = `|Pr[StrongPRP_IND(RandomPermutation,Strengthen(D)).main() @ &m: res]
+        - Pr[StrongPRP_IND(StrongPRP_Wrap(P),Strengthen(D)).main() @ &m: res]|.
+  proof.
+  do!congr.
+  + by byequiv (eq_Strong_Weak RandomPermutation D).
+  rewrite (Weak_as_Strong &m).
+  by byequiv (eq_Strong_Weak (StrongPRP_Wrap(P)) D).
+  qed.
+end section.

@@ -9,20 +9,12 @@ require import Option FSet NewFMap Distr.
 require import Dexcepted.
 require (*--*) NewPRP.
 
-type K, D.
-
-clone import NewPRP as PRPt with
-  type K <- K,
-  type D <- D
-proof * by smt.
-
-op dK: K distr.
-axiom dK_ll: mu dK predT = 1%r.
+clone include NewPRP.
 
 op dD: D distr.
 axiom dD_ll: mu dD predT = 1%r.
 
-module RandomPermutation (* : PRP_Oracles *) = {
+module RandomPermutation = {
   var m : (D,D) fmap
   var mi: (D,D) fmap
 

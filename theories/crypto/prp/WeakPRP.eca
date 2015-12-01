@@ -4,67 +4,24 @@
  * 
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
+require (*--*) NewPRP.
 
-require import FMap Distr.
-require (*--*) NewPRP IdealPRP ConcretePRP.
+clone include NewPRP.
 
-(** Instantiate the PRP module types **)
-type K, D.
-
-clone import NewPRP as PRPt with
-  type K <- K,
-  type D <- D
-proof * by smt.
-
-(** Instantiate the Ideal Random Permutation **)
-op dK: K distr.
-axiom dK_ll: mu dK predT = 1%r.
-
-op dD:D distr.
-axiom dD_ll: mu dD predT = 1%r.
-
-clone import IdealPRP as PRPi with
-(*theory PRPt <- PRPt,*)
-  type   K    <- K,
-  op     dK   <- dK,
-  type   D    <- D,
-  op     dD   <- dD
-proof * by smt.
-
-(** Instantiate the Real PRP *)
-op P : K -> D -> D.
-op Pi: K -> D -> D.
-
-axiom bijective_P k:
-  support dK k =>
-     cancel (P k) (Pi k)
-  /\ cancel (Pi k) (P k).
-
-clone import ConcretePRP as PRPc with
-(*theory PRPt <- PRPt,*)
-  type K  <- K,
-  op   dK <- dK,
-  type D  <- D,
-  op   dD <- dD,
-  op   P  <- P,
-  op   Pi <- Pi
-proof * by smt.
-
-(** Define Security **)
-module type Weak_Oracles_full = {
+module type WeakPRP = {
   proc init()   : unit
   proc f   (x:D): D
 }.
 
-module type Weak_Oracles = {
-  proc f(x:D): D
+module type WeakPRP_Oracles = {
+  proc f(x : D): D
 }.
 
-module type Distinguisher(F:Weak_Oracles) = {
+module type WeakPRP_Distinguisher(F:WeakPRP_Oracles) = {
   proc distinguish(): bool
 }.
 
-module Weak_IND (P:Weak_Oracles_full,D:Distinguisher) = {
+module WeakPRP_IND (P:WeakPRP,D:WeakPRP_Distinguisher) = {
   proc main(): bool = {
     var b;
 
@@ -74,17 +31,20 @@ module Weak_IND (P:Weak_Oracles_full,D:Distinguisher) = {
   }
 }.
 
-module Weak_Wrap(P:PRP): Weak_Oracles_full, Weak_Oracles = {
+module WeakPRP_Wrap(P:PRP) = {
   var k: K
 
-  proc init()   : unit = { k <@ P.kgen(); }
+  proc init()   : unit = { k <@ P.keygen(); }
   proc f   (x:D): D    = { var r; r <@ P.f(k,x);  return r; }
   proc fi  (x:D): D    = { var r; r <@ P.fi(k,x); return r; }
 }.
 
-module Weak_IND_PRP (P:PRP, D:Distinguisher) = Weak_IND(Weak_Wrap(P),D).
+module Weak_IND_PRP (P:PRP, D:WeakPRP_Distinguisher) =
+  WeakPRP_IND(WeakPRP_Wrap(P),D).
 
-(*** TODO: define notations ***)
-(** Advantage of a distinguisher against a Weak PRP oracle P:
-      Adv^{WeakPRP}_{P}(D,&m) =
-        `|Pr[Weak_IND(P,D) @ &m: res] - Pr[Weak_IND(PRPi.RandomPermutation,D) @ &m: res]| **)
+(** To define the security of an operator P: K -> D -> D as a weak
+    PRP, one needs to clone IdealPRP and ConcretePRP with the
+    appropriate substitutions. The Strong PRP advantage of a
+    distinguisher D is then
+    Adv^{WeakPRP}_P = |Pr[WeakPRP_IND(Ideal,D)]
+                           - Pr[WeakPRP_IND(WeakPRP_Wrap(P),D)|. **)
