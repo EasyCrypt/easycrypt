@@ -10,7 +10,7 @@ require import Pred Fun Int NewLogic List StdRing StdOrder.
 (*---*) import IntOrder.
 
 (* -------------------------------------------------------------------- *)
-(* Finite sets are abstractely represented as the quotient by [perm_eq] *)
+(* Finite sets are abstractly represented as the quotient by [perm_eq]  *)
 (* of lists without duplicates - i.e. as the quotient of lists by the   *)
 (* membership operation.                                                *)
 
@@ -22,25 +22,31 @@ op oflist : 'a list -> 'a fset.
 axiom elemsK  (s : 'a fset): oflist (elems  s) = s.
 axiom oflistK (s : 'a list): perm_eq (undup s) (elems (oflist s)).
 
-lemma uniq_elems (s : 'a fset): uniq (elems s).
-proof.
-  rewrite -(elemsK s); move: (elems s) => {s} s.
-  by rewrite -(perm_eq_uniq (undup s)) ?(undup_uniq, oflistK).
-qed.
-
 axiom fset_eq (s1 s2 : 'a fset):
   (perm_eq (elems s1) (elems s2)) => (s1 = s2).
 
 (* -------------------------------------------------------------------- *)
+lemma uniq_elems (s : 'a fset): uniq (elems s).
+proof.
+rewrite -(elemsK s); move: (elems s) => {s} s.
+by rewrite -(perm_eq_uniq (undup s)) ?(undup_uniq, oflistK).
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma perm_eq_oflist (s1 s2 : 'a list) :
+  oflist s1 = oflist s2 => perm_eq (undup s1) (undup s2).
+proof.
+move=> oflist_eq; rewrite (perm_eq_trans _ _ _ (oflistK s1)) oflist_eq.
+by rewrite perm_eq_sym oflistK.
+qed.
+
 lemma oflist_perm_eq (s1 s2 : 'a list):
   perm_eq s1 s2 => oflist s1 = oflist s2.
 proof.
-  (* FIXME: named cuts for h1/h2 should not be necessary *)
-  move=> peq_s1s2; apply/fset_eq; apply/uniq_perm_eq.
-    by apply/uniq_elems. by apply/uniq_elems.
-  move=> x; have h1 := oflistK s1; have h2 := oflistK s2.
-  rewrite -(perm_eq_mem _ _ h1) -(perm_eq_mem _ _ h2).
-  by rewrite !mem_undup; apply/perm_eq_mem.
+move=> peq_s1s2; apply/fset_eq/uniq_perm_eq; 1,2: exact/uniq_elems.
+move=> x; rewrite -(perm_eq_mem _ _ (oflistK s1)).
+rewrite -(perm_eq_mem _ _ (oflistK s2)).
+by rewrite !mem_undup (perm_eq_mem _ _ peq_s1s2).
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -53,16 +59,15 @@ op mem ['a] (s : 'a fset) (x : 'a) = mem (elems s) x
 lemma mem_oflist (s : 'a list):
   forall x, mem (oflist s) x <=> mem s x.
 proof.
-  move=> x; rewrite !memE /= (perm_eq_mem _ (undup s)).
-    by rewrite perm_eq_sym oflistK.
-  by rewrite mem_undup.
+move=> x; rewrite !memE (perm_eq_mem _ (undup s)) 2:mem_undup //.
+by rewrite perm_eq_sym oflistK.
 qed.
 
 lemma fsetP (s1 s2 : 'a fset):
   (s1 = s2) <=> (forall x, mem s1 x <=> mem s2 x).
 proof.
-  by split=> [-> | h] //; apply/fset_eq; rewrite uniq_perm_eq;
-    rewrite 1?uniq_elems // => x; move: (h x); rewrite !memE.
+split=> // h; apply/fset_eq/uniq_perm_eq; 1,2: exact/uniq_elems.
+by move=> x; rewrite -!memE h.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -79,20 +84,18 @@ op (`\`) ['a] (s1 s2 : 'a fset) = oflist (filter (predC (mem s2)) (elems s1))
   axiomatized by setDE.
 
 (* -------------------------------------------------------------------- *)
-op pick ['a] : 'a fset -> 'a.
-
-axiom pick0: pick<:'a> fset0 = Option.witness.
-
-axiom mem_pick (A : 'a fset): A <> fset0 => mem A (pick A).
-
-(* -------------------------------------------------------------------- *)
 lemma in_fset0: forall x, mem fset0<:'a> x <=> false.
 proof. by move=> x; rewrite set0E mem_oflist. qed.
 
 lemma elems_fset0 ['a]: elems fset0 = [<:'a>].
 proof.
-  rewrite set0E; apply/perm_eq_small/perm_eq_sym=> //=.
-  by rewrite -{1}(undup_id []) ?oflistK.
+rewrite set0E; apply/perm_eq_small/perm_eq_sym=> //=.
+by rewrite -{1}(undup_id []) ?oflistK.
+qed.
+
+lemma elems_eq_fset0 ['a] (A : 'a fset): elems A = [<:'a>] => A = fset0.
+proof.
+by move=> elems_nil; apply/fsetP=> x; rewrite !memE elems_fset0 elems_nil.
 qed.
 
 lemma in_fset1 z: forall x, mem (fset1<:'a> z) x <=> x = z.
@@ -100,8 +103,13 @@ proof. by move=> x; rewrite set1E /= mem_oflist. qed.
 
 lemma elems_fset1 (x : 'a) : elems (fset1 x) = [x].
 proof.
-  rewrite set1E; apply/perm_eq_small/perm_eq_sym=> //=.
-  by rewrite -{1}(undup_id [x]) ?oflistK.
+rewrite set1E; apply/perm_eq_small/perm_eq_sym=> //=.
+by rewrite -{1}(undup_id [x]) ?oflistK.
+qed.
+
+lemma elems_eq_fset1 (A : 'a fset) x : elems A = [x] => A = fset1 x.
+proof.
+by move=> elems_x; apply/fsetP=> x0; rewrite !memE elems_fset1 elems_x.
 qed.
 
 lemma in_fsetU (s1 s2 : 'a fset):
@@ -133,9 +141,22 @@ lemma in_fsetD1 (s : 'a fset) x:
 proof. by move=> x'; rewrite in_fsetD in_fset1. qed.
 
 (* -------------------------------------------------------------------- *)
+op pick ['a] (A : 'a fset) = head Option.witness (elems A)
+axiomatized by pickE.
+
+lemma pick0: pick<:'a> fset0 = Option.witness.
+proof. by rewrite pickE elems_fset0. qed.
+
+lemma mem_pick (A : 'a fset): A <> fset0 => mem A (pick A).
+proof.
+move=> /(contra _ _ (elems_eq_fset0 A)); rewrite pickE memE.
+by move=> /(mem_head_behead Option.witness) <-.
+qed.
+
+(* -------------------------------------------------------------------- *)
 op filter ['a] (p : 'a -> bool) (s : 'a fset) =
   oflist (filter p (elems s))
-  axiomatized by filterE.
+axiomatized by filterE.
 
 (* -------------------------------------------------------------------- *)
 lemma in_filter (p : 'a -> bool) (s : 'a fset):
@@ -148,26 +169,46 @@ proof. by apply/fsetP=> x; rewrite in_filter in_fset0. qed.
 lemma filter1 (p : 'a -> bool) (a : 'a):
   filter p (fset1 a) = if (p a) then fset1 a else fset0.
 proof.
-  apply/fsetP=> x; rewrite in_filter fun_if2 in_fset1 in_fset0.
-  by case (x = a).
+apply/fsetP=> x; rewrite in_filter fun_if2 in_fset1 in_fset0.
+by case (x = a).
 qed.
 
 lemma filterU (p : 'a -> bool) (A B : 'a fset):
   filter p (A `|` B) = filter p A `|` filter p B.
-proof. by apply/fsetP=> x; rewrite !(inE,in_filter) andC; smt. qed.
+proof. by apply/fsetP=> x; rewrite !(inE,in_filter) andb_orr. qed.
+
+lemma filterI (p : 'a -> bool) (A B : 'a fset):
+  filter p (A `&` B) = filter p A `&` filter p B.
+proof. by apply/fsetP=> x; rewrite !(inE,in_filter) andbACA andbb. qed.
+
+lemma filterD (p : 'a -> bool) (A B : 'a fset):
+  filter p (A `\` B) = filter p A `\` filter p B.
+proof.
+apply/fsetP=> x; rewrite !(inE,in_filter) !negb_and andb_orr.
+by rewrite andbAC andbN andbA.
+qed.
+
+lemma filter_pred0 (A : 'a fset): filter pred0 A = fset0.
+proof. by apply/fsetP=> x; rewrite in_fset0 in_filter. qed.
 
 lemma filter_pred1 (a : 'a) (A : 'a fset):
   filter (pred1 a) A = if mem A a then fset1 a else fset0.
 proof.
-  by apply/fsetP=> x; rewrite in_filter /pred1 fun_if2 !inE; case (x = a).
+by apply/fsetP=> x; rewrite in_filter fun_if2 !inE; case (x = a)=> ->.
 qed.
+
+lemma filter_mem (A B : 'a fset): filter (mem A) B = A `&` B.
+proof. by apply/fsetP=> x; rewrite in_fsetI in_filter. qed.
+
+lemma filter_memC (A B : 'a fset): filter (predC (mem A)) B = B `\` A.
+proof. by apply/fsetP=> x; rewrite in_fsetD in_filter andbC. qed.
 
 (* -------------------------------------------------------------------- *)
 pred (<=) (s1 s2 : 'a fset) = mem s1 <= mem s2.
 pred (< ) (s1 s2 : 'a fset) = mem s1 <  mem s2.
 
 lemma nosmt subsetP (s1 s2 : 'a fset):
-  (s1 <= s2) <=> (mem s1 <= mem s2).
+  (s1 <= s2) <=> (mem s1 <= mem s2). (* FIXME: This is the definition *)
 proof. by []. qed.
 
 (* -------------------------------------------------------------------- *)
@@ -180,13 +221,14 @@ lemma nosmt fset_ind (p : 'a fset -> bool):
   (forall x s, !mem s x => p s => p (s `|` (fset1 x))) =>
   (forall s, p s).
 proof.
-  move=> p0 pa s; rewrite -elemsK.
-  elim (elems s) (uniq_elems s)=> {s}; 1: by rewrite -set0E.
-  move=> x s ih /cons_uniq []; rewrite -mem_oflist=> x_notin_s uniq_s. (* FIXME: views *)
-  have /(pa x _ x_notin_s) := ih _=> //; rewrite setUE.
-  rewrite elems_fset1 (oflist_perm_eq (elems (oflist s) ++ [x]) (x::s)) //.
-  apply/perm_catCl=> /=; apply/perm_cons/perm_eq_sym.
-  by rewrite -{1}(undup_id s _) // oflistK.
+move=> p0 pa s; rewrite -elemsK.
+elim (elems s) (uniq_elems s)=> {s} [|x s ih /cons_uniq []].
++ by rewrite -set0E.
+rewrite -mem_oflist=> ^x_notin_s /pa + ^uniq_s /ih - h /h. (* FIXME: => h /h? *)
+rewrite setUE elems_fset1.
+rewrite (oflist_perm_eq (elems (oflist s) ++ [x]) (x::s)) //.
+apply/perm_catCl=> /=; apply/perm_cons/perm_eq_sym.
+by rewrite -{1}(undup_id _ uniq_s) oflistK.
 qed.
 
 (* ------------------------------------------------------------------ *)
@@ -232,7 +274,9 @@ proof. by rewrite fsetIC fset0I. qed.
 
 lemma fset1I (x : 'a) (D : 'a fset):
   fset1 x `&` D = if mem D x then fset1 x else fset0.
-proof. by apply/fsetP=> y; rewrite !inE; case: (mem D x); smt. qed.
+proof.
+by apply/fsetP=> y; rewrite fun_if2 !inE; case: (mem D x); case: (y = x).
+qed.
 
 lemma fsetI1 (x : 'a) (D : 'a fset):
   D `&` fset1 x = if mem D x then fset1 x else fset0.
@@ -293,7 +337,9 @@ proof. by apply/fsetP=> x; rewrite !inE. qed.
 
 lemma fset1D (x : 'a) (D : 'a fset):
   fset1 x `\` D = if mem D x then fset0 else fset1 x.
-proof. by apply/fsetP=> y; rewrite !inE; case: (mem D x); smt. qed.
+proof.
+by apply/fsetP=> y; rewrite fun_if2 !inE; case: (mem D x); case: (y = x).
+qed.
 
 lemma fsetDv (A : 'a fset) : A `\` A = fset0.
 proof. by apply/fsetP=> x; rewrite !inE andbN. qed.
@@ -366,30 +412,29 @@ proof. by rewrite cardE elems_fset1. qed.
 lemma nosmt fcardUI_indep (A B : 'a fset) : A `&` B = fset0 =>
   card (A `|` B) = card A + card B.
 proof.
-  move/fsetP=> h; rewrite setUE !cardE; pose s := _ ++ _.
-  have <- := perm_eq_size _ _ (oflistK s). (* FIXME *)
-  rewrite undup_id /s 2:size_cat // cat_uniq ?uniq_elems /=.
-  rewrite -implybF => /hasP [x [Bx Ax]]; have := h x.
-  by rewrite in_fsetI in_fset0 !memE Bx Ax.
+move/fsetP=> h; rewrite setUE !cardE; pose s := _ ++ _.
+rewrite -(perm_eq_size _ _ (oflistK s)) undup_id /s 2:size_cat //.
+rewrite cat_uniq ?uniq_elems /= -implybF => /hasP [x [Bx Ax]].
+by have:= h x; rewrite in_fsetI in_fset0 !memE Bx Ax.
 qed.
 
 lemma fcardUI (A B : 'a fset) :
   card (A `|` B) + card (A `&` B) = card A + card B.
 proof.
-  rewrite -(fsetID (A `|` B) A) fsetUK (fsetUC A B) fsetDK.
-  rewrite fcardUI_indep.
-    by rewrite fsetIDA fsetDIl fsetDv fset0I.
-  by rewrite addzAC fsetIC -addzA -fcardUI_indep ?fsetID ?fsetII.
+rewrite -(fsetID (A `|` B) A) fsetUK (fsetUC A B) fsetDK.
+rewrite fcardUI_indep.
++ by rewrite fsetIDA fsetDIl fsetDv fset0I.
+by rewrite addzAC fsetIC -addzA -fcardUI_indep ?fsetID ?fsetII.
 qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt fcardU (A B : 'a fset) :
   card (A `|` B) = card A + card B - card (A `&` B).
-proof. by rewrite -fcardUI smt. qed.
+proof. by rewrite -fcardUI Ring.IntID.addrK_sub. qed.
 
 lemma nosmt fcardI (A B : 'a fset) :
   card (A `&` B) = card A + card B - card (A `|` B).
-proof. by rewrite -fcardUI smt. qed.
+proof. by rewrite -fcardUI addzC Ring.IntID.addrK_sub. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt fcardID (A B : 'a fset) :
@@ -398,27 +443,43 @@ proof. by rewrite -fcardUI_indep ?fsetID // fsetII. qed.
 
 lemma nosmt fcardD (A B : 'a fset) :
   card (A `\` B) = card A - card (A `&` B).
-proof. by rewrite -(fcardID A B) smt. qed.
+proof. by rewrite -(fcardID A B) addzC Ring.IntID.addrK_sub. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt fcardD1 (A : 'a fset) (x : 'a) :
   card A = card (A `\` fset1 x) + (if mem A x then 1 else 0).
 proof.
-  case: (mem A x) => Ax //=; last first.
-    congr; apply/fsetP=> y; rewrite !inE smt.
-  rewrite -(fcard1 x) -fcardUI addzC eq_sym eq_fcards0 /=.
-    by apply/fsetP=> y; rewrite !inE smt.
-  by congr; apply/fsetP=> y; rewrite !inE; case: (y = x).
+(* FIXME: This feels like it wasn't thought about very deeply... *)
+case: (mem A x) => Ax //=; last first.
++ congr; apply/fsetP=> y; rewrite !inE.
+  by move: Ax; case: (mem A y); case: (y = x).
+rewrite -(fcard1 x) -fcardUI addzC eq_sym eq_fcards0 /=.
++ by apply/fsetP=> y; rewrite !inE; case: (y = x).
+by congr; apply/fsetP=> y; rewrite !inE; case: (y = x).
 qed.
 
 (* -------------------------------------------------------------------- *)
+lemma subset_fsetU_id (A B : 'a fset) :
+  A <= B => A `|` B = B.
+proof.
+move=> A_le_B; apply/fsetP=> x; rewrite in_fsetU.
+by split=> [[/A_le_B|->]|->].
+qed.
+
+lemma subset_fsetI_id (A B : 'a fset) :
+  B <= A => A `&` B = B.
+proof.
+move=> B_le_A; apply/fsetP=> x; rewrite in_fsetI.
+by split=> [[_ ->]|^x_in_B /B_le_A].
+qed.
+
 lemma subset_leq_fcard (A B : 'a fset) :
   A <= B => card A <= card B.
 proof.
-  move=> /subsetP le_AB; rewrite -(fcardID B A).
-  have ->: B `&` A = A; 1: apply/fsetP=> x.
-    by rewrite in_fsetI andb_idl //; apply/le_AB.
-  by apply/ler_addl; apply/fcard_ge0.
+move=> /subsetP le_AB; rewrite -(fcardID B A).
+have ->: B `&` A = A; 1: apply/fsetP=> x.
+  by rewrite in_fsetI andb_idl //; apply/le_AB.
+by apply/ler_addl; apply/fcard_ge0.
 qed.
 
 (* -------------------------------------------------------------------- *)
