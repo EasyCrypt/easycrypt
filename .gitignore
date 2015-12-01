@@ -13,6 +13,7 @@ _build
 setup.data
 setup.log
 /attic
+/attic.ec*
 /theories/attic
 
 /system/*.o
