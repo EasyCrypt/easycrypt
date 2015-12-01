@@ -89,10 +89,9 @@ lemma oppr_ge0 (x : t): (zeror <= -x) <=> (x <= zeror).
 proof. by rewrite -sub0r subr_ge0. qed.
 
 lemma ler01: zeror <= oner.
-proof.                        (* FIXME: anomaly with (inj_eq mulfI) *)
+proof.
 have n1_nz: `|oner| <> zeror by apply/(contraNneq _ _ oner_neq0) => /normr0_eq0->.
-rewrite ger0_def; have /inj_eq <- := mulfI _ n1_nz.
-by rewrite -normrM !mulr1.
+by rewrite ger0_def -(inj_eq (mulfI _ n1_nz)) -normrM !mulr1.
 qed.
 
 lemma ltr01: zeror < oner.
