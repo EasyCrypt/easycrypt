@@ -50,7 +50,7 @@ type tyerror =
 | UniVarNotAllowed
 | FreeTypeVariables
 | TypeVarNotAllowed
-| OnlyMonoTypeAllowed
+| OnlyMonoTypeAllowed    of symbol option
 | UnboundTypeParameter   of symbol
 | UnknownTypeName        of qsymbol
 | UnknownTypeClass       of qsymbol
