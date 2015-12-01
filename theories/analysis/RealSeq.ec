@@ -9,6 +9,7 @@
 require import Bool Option Fun Distr Int IntExtra Real RealExtra.
 require import Ring StdRing StdOrder StdBigop List.
 (*---*) import IterOp Bigreal.BRA IntID RField IntOrder RealOrder.
+require import NewLogic.
 
 pragma +implicits.
 
@@ -229,7 +230,7 @@ proof. by move=> ^h /cnvP /limP /uniq_cnvto; apply. qed.
 
 lemma lim_Ncnv (s : int -> real):
   !converge s => lim s = 0%r.
-proof. by move=> h; apply/choiceb_dfl/for_ex. qed.
+proof. by move=> h; apply/choiceb_dfl/negb_exists. qed.
 
 lemma lim_eq (N : int) (s1 s2 : int -> real):
      (forall n, N <= n => s1 n = s2 n)

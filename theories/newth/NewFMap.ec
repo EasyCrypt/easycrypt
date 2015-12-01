@@ -578,10 +578,7 @@ proof. by rewrite dom_rem in_fsetD in_fset1. qed.
 lemma rng0: rng map0<:'a, 'b> = fset0.
 proof.
   apply/fsetP=> x; rewrite in_fset0 //= in_rng.
-  (* FIXME: here, higher-order pattern-matching would help *)
-  (* FIXME: or rewriting under quantifiers *)
-  have //= -> // x' := nexists (fun (a:'a), map0.[a] = Some x).
-  by rewrite map0P.
+  by rewrite NewLogic.negb_exists => a; rewrite /= map0P.
 qed.
 
 lemma rng_set (m : ('a, 'b) fmap) (a : 'a) (b : 'b): forall y,
