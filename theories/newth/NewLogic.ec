@@ -8,7 +8,7 @@
 (* This API has been mostly inspired from the [ssrbool] library of the
  * ssreflect Coq extension. *)
 
-require import Fun.
+require import Pred Fun.
 
 pragma +implicits.
 
@@ -146,6 +146,14 @@ lemma negb_and (a b : bool) : !(a /\ b) <=> !a \/ !b
 by [].
 
 lemma negb_or (a b : bool) : !(a \/ b) <=> !a /\ !b
+by [].
+
+(* -------------------------------------------------------------------- *)
+(* Additional connective laws that work for us *)
+lemma negb_exists (P : 'a -> bool): !(exists a, P a) <=> forall a, !P a
+by [].
+
+lemma negb_forall (P : 'a -> bool): !(forall a, P a) <=> exists a, !P a
 by [].
 
 (* -------------------------------------------------------------------- *)
