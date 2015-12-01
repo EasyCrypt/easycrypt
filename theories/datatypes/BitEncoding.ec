@@ -195,4 +195,19 @@ rewrite nth_take ?ltz_pmod 1:ltrW ?gt0_r nth_drop; last 2 first.
   by rewrite modz_ge0 ?gtr_eqF ?gt0_r. by rewrite (@mulrC r) -divz_eq.
 by rewrite mulr_ge0 1:ltrW ?gt0_r // divz_ge0 // gt0_r.
 qed.
+
+lemma flattenK r (bs : 'a list list) : 0 < r =>
+  (forall b, mem bs b => size b = r) => chunk r (flatten bs) = bs.
+proof.
+move=> gt0_r; elim: bs => [|x xs ih] h.
+  by rewrite flatten_nil /chunk div0z mkseq0.
+rewrite flatten_cons /chunk size_cat h // -{3}(mul1r r).
+rewrite divzMDl ?gtr_eqF // mkseq_add //=.
+  by rewrite divz_ge0 1:gt0_r size_ge0.
+rewrite mkseq1 /= drop0 take_cat h //= take0 cats0 /= -{3}ih.
+  by move=> b xsb; apply/h; right.
+apply/eq_in_mkseq=> i /=; rewrite mulrDr mulr1 drop_cat (@h x) //.
+case=> [ge0_i lti]; rewrite ltrNge ler_paddr // 1:mulr_ge0 1:ltrW //.
+by rewrite /= subrE addrAC addrN.
+qed.
 end BitChunking.

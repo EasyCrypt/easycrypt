@@ -1643,9 +1643,19 @@ proof. by rewrite /mkseq iota0. qed.
 lemma mkseq0_le f n : n <= 0 => mkseq<:'a> f n = [].
 proof. by move=> ge0_n @/mkseq; rewrite iota0. qed.
 
+lemma mkseq1 f : mkseq<:'a> f 1 = [f 0].
+proof. by rewrite /mkseq iota1. qed.
+
 lemma mkseqS f n : 0 <= n =>
   mkseq<:'a> f (n + 1) = rcons (mkseq f n) (f n).
 proof. by move=> ge0_n; rewrite /mkseq iotaSr //= map_rcons. qed.
+
+lemma mkseq_add (f : int -> 'a) n m : 0 <= n => 0 <= m =>
+   mkseq f (n+m) = mkseq f n ++ mkseq (fun i => f (n+i)) m.
+proof.
+move=> ge0_n ge0_m; rewrite /mkseq iota_add ?map_cat //=.
+by rewrite -{2}(addz0 n) iota_addl -map_comp.
+qed.
 
 (* -------------------------------------------------------------------- *)
 (*                         Sequence folding                             *)
