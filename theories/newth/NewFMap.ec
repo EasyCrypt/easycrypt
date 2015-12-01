@@ -703,4 +703,38 @@ proof.
   by rewrite -in_fset1; apply eqe.
 qed.
 
+(* -------------------------------------------------------------------- *)
+(** FIXME: these two were minimally imported from old and need cleaning *)
+lemma leq_card_rng_dom (m:('a,'b) fmap):
+  card (rng m) <= card (dom m).
+proof.
+elim/fset_ind: (dom m) {-2}m (eq_refl (dom m))=> {m} [m /dom_eq0 ->|].
++ by rewrite rng0 dom0 !fcards0.
+move=> x s x_notin_s ih m dom_m.
+cut ->: m = (rem x m).[x <- oget m.[x]].
++ apply fmapP=> x'; rewrite getP remP; case: (x' = x)=> [->|//].
+  have /fsetP /(_ x):= dom_m; rewrite in_fsetU in_fset1 /= in_dom.
+  by case: m.[x].
+have /fsetP ->:= rng_set (rem x m) x (oget m.[x]).
+rewrite fcardU rem_rem fsetI1 fun_if !fcard1 fcards0.
+rewrite dom_set fcardUI_indep 2:fcard1.
++ by apply/fsetP=> x0; rewrite in_fsetI dom_rem !inE andA NewLogic.andNb.
+rewrite StdOrder.IntOrder.ler_subl_addr; apply/StdOrder.IntOrder.ler_paddr.
++ by case: (mem (rng _) _).
+apply/StdOrder.IntOrder.ler_add2r/ih/fsetP=> x0.
+by rewrite dom_rem dom_m !inE; case: (x0 = x).
+qed.
+
+lemma endo_dom_rng (m:('a,'a) fmap):
+  (exists x, !mem (dom m) x) =>
+  exists x, !mem (rng m) x.
+proof.
+elim=> x x_notin_m.
+have: 0 < card (((dom m) `|` fset1 x) `\` (rng m)); last by smt.
+rewrite fcardD fcardUI_indep ?fcard1.
++ by apply/fsetP=> x'; rewrite in_fsetI in_fset1 in_fset0 /=; case (x' = x).
+smt.
+qed.    
+
+
 (** TODO: lots of lemmas *)

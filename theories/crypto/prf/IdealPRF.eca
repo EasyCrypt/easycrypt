@@ -1,0 +1,31 @@
+(* --------------------------------------------------------------------
+ * Copyright (c) - 2012--2015 - IMDEA Software Institute
+ * Copyright (c) - 2012--2015 - Inria
+ * 
+ * Distributed under the terms of the CeCILL-B-V1 license
+ * -------------------------------------------------------------------- *)
+
+(** FIXME: This is a Random Function (see ROM) -- make sure we only
+    have one copy of this **)
+require import Option FSet NewFMap Distr.
+require (*--*) NewPRF.
+
+clone include NewPRF.
+
+op dR: R distr.
+axiom dR_ll: mu dR predT = 1%r.
+
+module RandomFunction = {
+  var m : (D,R) fmap
+
+  proc init(): unit = {
+    m  <- map0;
+  }
+
+  proc f(x:D): R = {
+    if (!mem (dom m) x) {
+      m.[x]  <$ dR;
+    }
+    return (oget m.[x]);
+  }
+}.
