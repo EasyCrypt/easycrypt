@@ -162,10 +162,15 @@ let process_clear symbols tc =
 
 (* -------------------------------------------------------------------- *)
 module LowApply = struct
-  exception NoInstance
+  type reason = [`DoNotMatch | `IncompleteInference]
+
+  exception NoInstance of (reason * pt_env * (form * form))
 
   let t_apply_bwd_r pt (tc : tcenv1) =
-    let (hyps, concl) = FApi.tc1_flat tc in
+    let ((hyps, concl), pterr) = (FApi.tc1_flat tc, PT.copy pt.ptev_env) in
+
+    let noinstance reason =
+      raise (NoInstance (reason, pterr, (pt.ptev_ax, concl))) in
 
     let rec instantiate canview istop pt =
       match istop && PT.can_concretize pt.PT.ptev_env with
@@ -179,7 +184,7 @@ module LowApply = struct
           try
             PT.pf_form_match ~mode:fmdelta pt.PT.ptev_env ~ptn:pt.PT.ptev_ax concl;
             if not (PT.can_concretize pt.PT.ptev_env) then
-              raise NoInstance;
+              noinstance `IncompleteInference;
             pt
           with EcMatching.MatchFailure ->
             match TTC.destruct_product hyps pt.PT.ptev_ax with
@@ -188,7 +193,7 @@ module LowApply = struct
                 instantiate canview false (PT.apply_pterm_to_hole pt)
 
             | None when not canview ->
-                raise NoInstance
+                noinstance `DoNotMatch
 
             | None ->
                 let forview (p, fs) =
@@ -212,7 +217,7 @@ module LowApply = struct
                       argpt
                   in
                   try  Some (instantiate false true viewpt)
-                  with NoInstance -> None
+                  with NoInstance _ -> None
                 in
 
                 let views =
@@ -228,7 +233,7 @@ module LowApply = struct
                 in
 
                 try  List.find_map forview views
-                with Not_found -> raise NoInstance
+                with Not_found -> noinstance `DoNotMatch
       end
     in
 
@@ -243,6 +248,19 @@ module LowApply = struct
     let ptenv  = ptenv_of_penv hyps !!tc in
 
     t_apply_bwd_r { ptev_env = ptenv; ptev_pt = pt; ptev_ax = ax; } tc
+
+  let pf_apply_error pe (reason, pt, (src, _dst)) =
+    tc_error_lazy pe
+      (fun fmt ->
+        let ppe = EcPrinting.PPEnv.ofenv (LDecl.toenv pt.pte_hy) in
+        let src = PT.concretize_form pt src in
+        Format.fprintf fmt "the given proof-term proves:@\n@\n%!";
+        Format.fprintf fmt "  @[%a@]@\n@\n" (EcPrinting.pp_form ppe) src;
+        match reason with
+        | `DoNotMatch ->
+             Format.fprintf fmt "it does not apply to the goal@\n"
+        | `IncompleteInference ->
+             Format.fprintf fmt "not all variables can be inferred@\n")
 end
 
 let t_apply_prept pt tc = 
@@ -380,13 +398,8 @@ let process_apply_bwd ~implicits mode (ff : ppterm) (tc : tcenv1) =
           tc_error !!tc "cannot close goal";
         aout
 
-  with LowApply.NoInstance ->
-    tc_error_lazy !!tc
-      (fun fmt ->
-        let ppe = EcPrinting.PPEnv.ofenv (FApi.tc1_env tc) in
-        Format.fprintf fmt "cannot apply the given proof-term for:\n\n%!";
-        Format.fprintf fmt
-          "  @[%a@]" (EcPrinting.pp_form ppe) pt.PT.ptev_ax)
+  with LowApply.NoInstance err ->
+    LowApply.pf_apply_error !!tc err
 
 (* -------------------------------------------------------------------- *)
 let process_apply_fwd ~implicits (pe, hyp) tc =
@@ -439,12 +452,16 @@ let process_apply_top tc =
   let hyps, concl = FApi.tc1_flat tc in
 
   match TTC.destruct_product hyps concl with
-  | Some (`Imp _) ->
+  | Some (`Imp _) -> begin
      let h = LDecl.fresh_id hyps "h" in
 
-     EcLowGoal.t_intros_i_seq ~clear:true [h]
-       (LowApply.t_apply_bwd { pt_head = PTLocal h; pt_args = []} )
-       tc
+     try
+       EcLowGoal.t_intros_i_seq ~clear:true [h]
+         (LowApply.t_apply_bwd { pt_head = PTLocal h; pt_args = []} )
+         tc
+     with LowApply.NoInstance err ->
+       LowApply.pf_apply_error !!tc err
+    end
 
   | _ -> tc_error !!tc "no top assumption"
 

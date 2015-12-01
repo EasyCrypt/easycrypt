@@ -79,7 +79,7 @@ val tc1_process_full_closed_pterm
  : tcenv1 -> ppterm -> proofterm * form
 
 (* Proof-terms manipulation *)
-val check_pterm_arg      : pt_env -> EcIdent.t * gty -> form -> pt_ev_arg_r -> form * pt_arg
+val check_pterm_arg      : ?loc:EcLocation.t -> pt_env -> EcIdent.t * gty -> form -> pt_ev_arg_r -> form * pt_arg
 val apply_pterm_to_arg   : ?loc:EcLocation.t -> pt_ev -> pt_ev_arg -> pt_ev
 val apply_pterm_to_arg_r : ?loc:EcLocation.t -> pt_ev -> pt_ev_arg_r -> pt_ev
 val apply_pterm_to_hole  : ?loc:EcLocation.t -> pt_ev -> pt_ev

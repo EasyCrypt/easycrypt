@@ -213,7 +213,7 @@ let pp_tyerror env fmt error =
 
   | TypeMismatch ((ty1, ty2), _) ->
       msg "This expression has type@\n";
-      msg "  @[<hov 2> %a@]@\n" pp_type ty2;
+      msg "  @[<hov 2> %a@]@\n@\n" pp_type ty2;
       msg "but is expected to have type@\n";
       msg "  @[<hov 2> %a@]" pp_type ty1
 
