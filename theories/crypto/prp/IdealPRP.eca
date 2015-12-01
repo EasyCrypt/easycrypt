@@ -45,3 +45,39 @@ module RandomPermutation = {
     return (oget mi.[y]);
   }
 }.
+
+pred is_permutation (m mi : (D,D) fmap) =
+     (forall x, mem (dom m) x => mi.[oget m.[x]] = Some x)
+  /\ (forall x, mem (dom mi) x => m.[oget mi.[x]] = Some x).
+
+equiv f_perm: RandomPermutation.f ~ RandomPermutation.f:
+     ={glob RandomPermutation, x}
+  /\ is_permutation RandomPermutation.m{1} RandomPermutation.mi{1}
+  ==>    ={glob RandomPermutation, res}
+      /\ is_permutation RandomPermutation.m{1} RandomPermutation.mi{1}.
+proof.
+proc; if=> //=; auto.
+progress [-split]; rewrite H1 /=.
+move: H1; rewrite supp_def -/(support _ _)=> [yL_in_dD y_notin_rng].
+split=> x'.
+  rewrite !getP dom_set !inE; case: (x' = x{2})=> //= _.
+  by move: y_notin_rng; rewrite in_rng; smt. (* !exists <=> forall! *)
+rewrite !getP dom_set !inE; case: (x' = yL)=> //=.
+smt. (* equivalence of rng mi and dom m + similar argument *)
+qed.
+
+equiv fi_perm: RandomPermutation.fi ~ RandomPermutation.fi:
+     ={glob RandomPermutation, y}
+  /\ is_permutation RandomPermutation.m{1} RandomPermutation.mi{1}
+  ==>    ={glob RandomPermutation, res}
+      /\ is_permutation RandomPermutation.m{1} RandomPermutation.mi{1}.
+proof.
+proc; if=> //=; auto.
+progress [-split]; rewrite H1 /=.
+move: H1; rewrite supp_def -/(support _ _)=> [xL_in_dD x_notin_rng].
+split=> x'.
+  rewrite !getP dom_set !inE; case: (x' = xL)=> //= _.
+  by move: x_notin_rng; rewrite in_rng; smt.
+rewrite !getP dom_set !inE; case: (x' = y{2})=> //=.
+smt.
+qed.
