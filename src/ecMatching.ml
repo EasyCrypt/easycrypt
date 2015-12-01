@@ -233,17 +233,24 @@ module MEV = struct
   let assubst ue ev =
     let tysubst = { ty_subst_id with ts_u = EcUnify.UniEnv.assubst ue } in
     let subst = Fsubst.f_subst_init ~sty:tysubst () in
+    let subst = EV.fold (fun x m s -> Fsubst.f_bind_mem s x m) ev.evm_mem subst in
+    let subst = EV.fold (fun x m s -> Fsubst.f_bind_mod s x m) ev.evm_mod subst in
+    let seen  = ref Sid.empty in
 
-    fold
-      (fun x v s ->
-        match v with
-        | `Form f ->
-            Fsubst.f_bind_local s x (Fsubst.f_subst subst f)
-        | `Mem m ->
-            Fsubst.f_bind_mem s x m
-        | `Mod m ->
-            Fsubst.f_bind_mod s x m)
-      ev subst
+    let rec for_ident x binding subst =
+      if Sid.mem x !seen then subst else begin
+        seen := Sid.add x !seen;
+        match binding with None -> subst | Some f ->
+          let subst =
+            Mid.fold2_inter (fun x bdx _ -> for_ident x bdx)
+            ev.evm_form.ev_map f.f_fv subst in
+          Fsubst.f_bind_local subst x (Fsubst.f_subst subst f)
+        end
+    in           
+
+    Mid.fold_left
+      (fun acc x bd -> for_ident x bd acc)
+      subst ev.evm_form.ev_map
 end
 
 (* -------------------------------------------------------------------- *)
@@ -319,14 +326,16 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
           | Some (`Set a) -> begin
               let ssbj = Fsubst.f_subst subst subject in
 
-              if not (EcReduction.is_conv hyps ssbj a) then begin
-                let ssbj = Fsubst.f_subst (MEV.assubst ue !ev) ssbj in
+              if not (EcReduction.is_conv hyps ssbj a) then
+                let ssbj = Fsubst.f_subst (MEV.assubst ue !ev) subject in
                 if not (EcReduction.is_conv hyps ssbj a) then
-                  failure ();
-                end;
-
-              try  EcUnify.unify env ue ptn.f_ty subject.f_ty
-              with EcUnify.UnificationFailure _ -> failure ()
+                  doit env ilc a ssbj
+                else
+                  try  EcUnify.unify env ue ptn.f_ty subject.f_ty
+                  with EcUnify.UnificationFailure _ -> failure ()
+              else
+                try  EcUnify.unify env ue ptn.f_ty subject.f_ty
+                with EcUnify.UnificationFailure _ -> failure ()
           end
       end
 
