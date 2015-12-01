@@ -18,6 +18,7 @@ open EcCoreGoal
 open EcLowGoal
 open FApi
 
+(* -------------------------------------------------------------------- *)
 type norm_kind = 
   | NKring  of cring * RState.rstate ref 
   | NKfield of cfield * RState.rstate ref 
@@ -27,11 +28,14 @@ type einfo = {
   i_env    : env;
   kind_tbl : norm_kind Hty.t;
   rw_info  : path list;
-(*  inj_info : path list;
-  all_info : path list; (* union of rw_info and inj_info *) *)
-  inj_info  : Sp.t;
+  inj_info : Sp.t;
 }
 
+(* -------------------------------------------------------------------- *)
+let algerror tc =
+  tc_error !!tc "cannot solve goal with ring/field/algebra"
+
+(* -------------------------------------------------------------------- *)
 let prewrite = 
   EcPath.extend EcCoreLib.p_top ["Ring"; "rw_algebra"]
 
@@ -113,7 +117,7 @@ let is_in_hyps hyps f1 f2 =
     is_in hyps f1 f2 || is_in hyps f2 f1
 
 let t_ring r l (f1,f2) g = 
-  t_seq (t_ring r l (f1,f2)) t_fail g 
+  t_seq (t_ring r l (f1,f2)) algerror g 
 
 let destr_neq f = 
   match sform_of_form f with
@@ -147,7 +151,7 @@ let t_field_neq r g =
       (fun g -> !@ (t_change (f_imp (f_eq f1 f2) f_false) g));
       t_intros_i [h];
       t_ors tacs]) g
-  | _ -> t_fail g
+  | _ -> algerror g
 
 let t_field r l (f1,f2) g =
   t_seq (t_field r l (f1,f2)) (t_field_neq r.EcDecl.f_ring) g
@@ -177,7 +181,6 @@ let t_autorw info g =
   EcHiGoal.LowRewrite.t_autorewrite info.rw_info g
 
 let rec t_alg_eq info g =
-(*  Format.eprintf "t_alg_eq %a" pp_concl g; *)
   let f1, f2 = 
     try destr_eq (tc1_goal g) 
     with EcFol.DestrError _ -> raise InvalidGoalShape
@@ -185,7 +188,6 @@ let rec t_alg_eq info g =
   t_cut_alg_eq t_reflex_assumption info f1 f2 g
 
 and t_cut_alg_eq t_cont info f1 f2 g =
-(*  Format.eprintf "t_cut_alg_eq %a@." pp_form (f_eq f1 f2, g); *)
   let hyps = tc1_hyps g in
   if is_in_hyps hyps f1 f2 then t_cont g
   else 
@@ -209,7 +211,6 @@ and t_cut_alg_eq1 t_cont info f1 f2 g =
     | NKdefault     -> t_cut_subterm_eq2 t_cont info f1 f2 g
 
 and t_cut_alg_eqs t_cont info fs1 fs2 g =
-(*  Format.eprintf "t_cut_alg_eqs@."; *)
   match fs1, fs2 with
   | [], [] -> t_cont g
   | f1::fs1, f2::fs2 -> 
@@ -222,7 +223,6 @@ and t_cut_subterm_eq t_cont info f1 f2 g =
   else t_cut_subterm_eq1 t_cont info f1 f2 g 
 
 and t_cut_subterm_eq1 t_cont info f1 f2 g = 
-  (*  Format.eprintf "t_cut_subterm_eq1 %a@." pp_form (f_eq f1 f2, g); *)
   let f1', f2' = autorewrite info f1 f2 g in
   if f_equal f1 f1' && f_equal f2 f2' then
     t_cut_subterm_eq2 t_cont info f1' f2' g  
@@ -234,7 +234,6 @@ and t_cut_subterm_eq1 t_cont info f1 f2 g =
     t_cut_alg_eq1 t_cont info f1' f2' g 
 
 and t_cut_subterm_eq2 t_cont info f1 f2 g = 
-(*  Format.eprintf "t_cut_subterm_eq2 %a@." pp_form (f_eq f1 f2, g); *)
   let hyps = tc1_hyps g in
   if is_in_hyps hyps f1 f2 then t_cont g 
   else match f1.f_node, f2.f_node with
@@ -252,7 +251,7 @@ and t_cut_subterm_eq2 t_cont info f1 f2 g =
         t_cut_subterm_eqs2 t_cont info fs1 fs2 g
       else
         t_cut_alg_eqs t_cont info fs1 fs2 g
-    else t_fail g
+    else algerror g
   | Ftuple fs1, Ftuple fs2 when List.length fs1 = List.length fs2 ->
     let t_cont g = 
       (t_seqsub (t_cut (f_eq f1 f2)) [
@@ -260,10 +259,9 @@ and t_cut_subterm_eq2 t_cont info f1 f2 g =
         t_seq t_intro_eq t_cont]) g in
     t_cut_alg_eqs t_cont info fs1 fs2 g
   (* TODO : add something for if ? *)
-  | _, _ -> t_fail g 
+  | _, _ -> algerror g 
 
 and t_cut_subterm_eqs2 t_cont info fs1 fs2 g =
-(*  Format.eprintf "t_cut_alg_eqs@."; *)
   match fs1, fs2 with
   | [], [] -> t_cont g
   | f1::fs1, f2::fs2 -> 
@@ -284,7 +282,7 @@ and t_cut_field_eq t_cont info cr rm f1 f2 g =
         t_seq t_intro_eq t_cont ] g
   else
     let t_end li lf' g = 
-      if li = [] then t_fail g
+      if li = [] then algerror g
       else
         let rm' = RState.update !rm li lf' in
         let f1' = offield r rm' pe1 in
@@ -302,11 +300,7 @@ and t_cut_field_eq t_cont info cr rm f1 f2 g =
            t_seq t_intro_eq t_cont] g in
     t_cut_merges t_end info rm' fv [emb_fzero r; emb_fone r] g
 
-
-
-
 and t_cut_ring_eq t_cont info cr rm f1 f2 g = 
-(*  Format.eprintf "t_cut_ring_eq %a@." pp_form (f_eq f1 f2, g); *)
   let hyps = tc1_hyps g in
   let pe1, rm' = toring hyps cr !rm f1 in
   let pe2, rm' = toring hyps cr rm' f2 in
@@ -320,7 +314,7 @@ and t_cut_ring_eq t_cont info cr rm f1 f2 g =
         t_seq t_intro_eq t_cont ] g
   else
     let t_end li lf' g = 
-      if li = [] then t_fail g
+      if li = [] then algerror g
       else
         let rm' = RState.update !rm li lf' in
         let f1' = ofring r rm' pe1 in
