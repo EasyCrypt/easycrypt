@@ -129,13 +129,7 @@ module PPEnv = struct
 
   let add_locals ?force ppe xs = List.fold_left (add_local ?force) ppe xs
 
-  let add_mods ?force ppe xs mt =
-    (* TODO B : this is costly *)
-    let ppe = add_locals ?force ppe xs in
-    { ppe with ppe_env =
-        List.fold_left (fun e x ->
-          EcEnv.Mod.bind_local x mt (EcPath.Sx.empty, EcPath.Sm.empty) e)
-          ppe.ppe_env xs }
+  let add_mods ?force ppe xs = add_locals ?force ppe xs
 
   let p_shorten cond p =
     let rec shorten prefix (nm, x) =
@@ -1319,7 +1313,7 @@ let pp_binding ?fv (ppe : PPEnv.t) (xs, ty) =
         (tenv1, pp)
 
   | GTmodty (p, sm) ->
-      let tenv1  = PPEnv.add_mods ppe xs p in
+      let tenv1  = PPEnv.add_mods ppe xs in     
       let pp fmt =
         Format.fprintf fmt "(%a <: %a)"
           (pp_list "@ " (pp_local tenv1)) xs (pp_modtype ppe) (p, sm)
@@ -2280,8 +2274,8 @@ module PPGoal = struct
           let ppe = PPEnv.add_local ~force:true ppe id in
           PPEnv.create_and_push_mem ppe (id, EcMemory.lmt_xpath m)
 
-      | EcBaseLogic.LD_modty (p, _) ->
-          PPEnv.add_mods ~force:true ppe [id] p
+      | EcBaseLogic.LD_modty _ ->
+          PPEnv.add_mods ~force:true ppe [id]
 
       | EcBaseLogic.LD_var _ when EcIdent.name id = "_" ->
           PPEnv.add_local
@@ -2676,14 +2670,13 @@ module ObjectInfo = struct
 
   (* -------------------------------------------------------------------- *)
   let pr_gen_r ?(prcat = false) dumper = fun fmt env qs ->
-    try
-      let ppe = PPEnv.ofenv env in
-      let obj = dumper.od_lookup qs env in
-      if prcat then
-        Format.fprintf fmt "* In [%s]:@\n@." dumper.od_name;
-      Format.fprintf fmt "%a@\n@." (dumper.od_printer ppe) obj
-
-    with EcEnv.LookupFailure _ -> raise NoObject
+    let ppe = PPEnv.ofenv env in
+    let obj = 
+      try dumper.od_lookup qs env 
+      with EcEnv.LookupFailure _ -> raise NoObject in
+    if prcat then
+      Format.fprintf fmt "* In [%s]:@\n@." dumper.od_name;
+    Format.fprintf fmt "%a@\n@." (dumper.od_printer ppe) obj
 
   (* -------------------------------------------------------------------- *)
   let pr_gen dumper =
