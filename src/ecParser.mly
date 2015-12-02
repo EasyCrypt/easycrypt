@@ -485,7 +485,6 @@
 %token SKIP
 %token SLASH
 %token SLASHSHARP
-%token SLASHSHARPEQ
 %token SLASHEQ
 %token SLASHSLASH
 %token SLASHSLASHEQ
@@ -1828,6 +1827,9 @@ intro_pattern:
 | SLASHSLASHEQ
    { IPDone true }
 
+| SLASHSHARP
+   { IPSmt ({ (SMT.mk_smt_option []) with plem_max = Some (Some 0) }) }
+
 | SLASHEQ
    { IPSimplify }
 
@@ -1919,10 +1921,7 @@ rwarg1:
    { RWDone true }
 
 | SLASHSHARP
-   { RWSmt ({ (SMT.mk_smt_option []) with plem_max = Some (Some 0) }, false) }
-
-| SLASHSHARPEQ
-   { RWSmt ({ (SMT.mk_smt_option []) with plem_max = Some (Some 0) }, true) }
+   { RWSmt ({ (SMT.mk_smt_option []) with plem_max = Some (Some 0) }) }
 
 | SLASHEQ
    { RWSimpl }
@@ -1937,10 +1936,10 @@ rwarg1:
    { RWPr s }
 
 | SMT
-   { RWSmt (SMT.mk_smt_option [], false) }
+   { RWSmt (SMT.mk_smt_option []) }
 
 | LBRACKET SMT pi=smt_info RBRACKET
-   { RWSmt (pi, false) }
+   { RWSmt pi }
 
 | AMP f=pterm
    { RWApp f }

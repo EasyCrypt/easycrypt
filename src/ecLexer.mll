@@ -209,7 +209,6 @@
     ("/=" , (SLASHEQ     , true ));
     ("/#" , (SLASHSHARP  , true ));
     ("//=", (SLASHSLASHEQ, true ));
-    ("/#=", (SLASHSHARPEQ, true ));
     ("=>" , (IMPL        , true ));
     ("|"  , (PIPE        , true ));
     (":=" , (CEQ         , true ));

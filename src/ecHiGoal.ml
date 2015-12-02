@@ -737,9 +737,8 @@ let rec process_rewrite1_r ttenv ?target ri tc =
       EcPhlPrRw.t_pr_rewrite (unloc x, f) tc
   end
 
-  | RWSmt (info, b) ->
-      let tt = if b then t_simplify ?target:None ~delta:false else t_id in
-      FApi.t_seq tt (process_smt ~loc:ri.pl_loc ttenv info) tc
+  | RWSmt info ->
+      process_smt ~loc:ri.pl_loc ttenv info tc
 
   | RWApp fp -> begin
       let implicits = ttenv.tt_implicits in
@@ -991,7 +990,7 @@ exception IntroCollect of [
 exception CollectBreak
 exception CollectCore of ipcore located
 
-let rec process_mintros ?(cf = true) pis gs =
+let rec process_mintros ?(cf = true) ttenv pis gs =
   let module ST = IntroState in
 
   let mk_intro ids (hyps, form) =
@@ -1056,15 +1055,16 @@ let rec process_mintros ?(cf = true) pis gs =
              if intl then raise (IntroCollect `InternalBreak);
              raise CollectBreak
       
-          | IPCore x   -> raise (CollectCore (mk_loc (loc pi) x))
-          | IPDup  x   -> `Dup (mk_loc (loc pi) x)
-          | IPDone x   -> `Done x
-          | IPSimplify -> `Simpl
+          | IPCore  x  -> raise (CollectCore (mk_loc (loc pi) x))
+          | IPDup   x  -> `Dup (mk_loc (loc pi) x)
+          | IPDone  x  -> `Done x
+          | IPSmt   x  -> `Smt x
           | IPClear xs -> `Clear xs
           | IPRw    x  -> `Rw x
           | IPDelta x  -> `Delta x
-          | IPView x   -> `View x
+          | IPView  x  -> `View x
           | IPSubst x  -> `Subst x
+          | IPSimplify -> `Simpl
       
           | IPCase (mode, x) ->
               let subcollect = List.rev -| fst -| collect true [] [] in
@@ -1102,6 +1102,9 @@ let rec process_mintros ?(cf = true) pis gs =
       | true  -> t_seq (t_simplify ~delta:false) process_trivial
       | false -> process_trivial
     in t tc
+
+  and intro1_smt (_ : ST.state) (pi : pprover_infos) (tc : tcenv1) =
+    process_smt ttenv pi tc
 
   and intro1_simplify (_ : ST.state) tc =
     t_simplify ~delta:false tc
@@ -1172,6 +1175,9 @@ let rec process_mintros ?(cf = true) pis gs =
   
         | `Done b ->
             (nointro, rl (t_onall (intro1_done st b)) gs)
+
+        | `Smt pi ->
+            (nointro, rl (t_onall (intro1_smt st pi)) gs)
   
         | `Simpl ->
             (nointro, rl (t_onall (intro1_simplify st)) gs)
@@ -1212,7 +1218,7 @@ let rec process_mintros ?(cf = true) pis gs =
 
     if List.is_empty pis then gs else
       gs |> t_onall (fun tc ->
-        process_mintros ~cf:true pis (FApi.tcenv_of_tcenv1 tc))
+        process_mintros ~cf:true ttenv pis (FApi.tcenv_of_tcenv1 tc))
 
   with IntroCollect e -> begin
     match e with
@@ -1221,8 +1227,8 @@ let rec process_mintros ?(cf = true) pis gs =
   end
 
 (* -------------------------------------------------------------------- *)
-let process_intros ?cf pis tc =
-  process_mintros ?cf pis (FApi.tcenv_of_tcenv1 tc)
+let process_intros ?cf ttenv pis tc =
+  process_mintros ?cf ttenv pis (FApi.tcenv_of_tcenv1 tc)
 
 (* -------------------------------------------------------------------- *)
 let process_generalize1 pattern (tc : tcenv1) =
@@ -1388,7 +1394,7 @@ let process_subst syms (tc : tcenv1) =
 (* -------------------------------------------------------------------- *)
 type cut_t = intropattern * pformula * (ptactics located) option
 
-let process_cut engine ((ip, phi, t) : cut_t) tc =
+let process_cut engine ttenv ((ip, phi, t) : cut_t) tc =
   let phi = TTC.tc1_process_formula tc phi in
   let tc  = EcLowGoal.t_cut phi tc in
   let tc  =
@@ -1398,12 +1404,12 @@ let process_cut engine ((ip, phi, t) : cut_t) tc =
        let t = mk_loc (loc t) (Pby (Some (unloc t))) in
        FApi.t_first (engine t) tc
 
-  in FApi.t_last (process_intros ip) tc
+  in FApi.t_last (process_intros ttenv ip) tc
 
 (* -------------------------------------------------------------------- *)
 type cutdef_t = intropattern * pcutdef
 
-let process_cutdef (ip, pt) (tc : tcenv1) =
+let process_cutdef ttenv (ip, pt) (tc : tcenv1) =
   let pt = { 
       fp_mode = `Implicit;
       fp_head = FPNamed (pt.ptcd_name, pt.ptcd_tys);
@@ -1418,7 +1424,7 @@ let process_cutdef (ip, pt) (tc : tcenv1) =
   let pt, ax = PT.concretize pt in
 
   FApi.t_sub
-    [EcLowGoal.t_apply pt; process_intros ip]
+    [EcLowGoal.t_apply pt; process_intros ttenv ip]
     (t_cut ax tc)
 
 (* -------------------------------------------------------------------- *)
