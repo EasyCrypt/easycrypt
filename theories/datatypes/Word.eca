@@ -65,6 +65,10 @@ move=> eq_sn @/tolist @/oflist; rewrite ofwordK ?ofarrayK //.
 by rewrite size_mkarray.
 qed.
 
+lemma size_tolist (w : word) : size (tolist w) = n.
+by rewrite -Array.sizeE size_word.
+qed.
+
 (* -------------------------------------------------------------------- *)
 op "_.[_]" (w : word) (i : int): t =
   if 0 <= i < n then (ofword w).[i] else dchar
