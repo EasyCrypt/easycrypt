@@ -10,7 +10,7 @@
 
 (* -------------------------------------------------------------------- *)
 require import Fun Pred Option Pair Int IntExtra.
-
+require NewLogic.
 (* -------------------------------------------------------------------- *)
 type 'a list = [
   | "[]"
@@ -1633,7 +1633,7 @@ proof. by move=> Efg n; apply eq_map. qed.
 lemma nth_mkseq x0 (f : int -> 'a) n i:
   0 <= i < n => nth x0 (mkseq f n) i = f i.
 proof.
-by move=> lt_in; rewrite /mkseq (nth_map 0) ?nth_iota ?size_iota [smt ml=0].
+by move=> lt_in; rewrite /mkseq (nth_map 0) ?nth_iota ?size_iota /#.
 qed.
 
 lemma nth_mkseq_if x0 (f : int -> 'a) n i:
@@ -1663,10 +1663,16 @@ lemma mkseqS f n : 0 <= n =>
 proof. by move=> ge0_n; rewrite /mkseq iotaSr //= map_rcons. qed.
 
 lemma mkseq_add (f : int -> 'a) n m : 0 <= n => 0 <= m =>
-   mkseq f (n+m) = mkseq f n ++ mkseq (fun i => f (n+i)) m.
+  mkseq f (n+m) = mkseq f n ++ mkseq (fun i => f (n+i)) m.
 proof.
 move=> ge0_n ge0_m; rewrite /mkseq iota_add ?map_cat //=.
 by rewrite -{2}(addz0 n) iota_addl -map_comp.
+qed.
+
+lemma mkseqP f n (x:'a) :  
+  mem (mkseq f n) x <=> exists i, 0 <= i < n /\ x = f i.
+proof.
+by rewrite mapP; apply NewLogic.exists_iff=> i; rewrite /= mem_iota.
 qed.
 
 (* -------------------------------------------------------------------- *)
