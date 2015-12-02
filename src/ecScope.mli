@@ -204,6 +204,7 @@ end
 (* -------------------------------------------------------------------- *)
 module Notations : sig
   val add : scope -> pnotation located -> scope
+  val add_abbrev : scope -> pabbrev located -> scope
 end
 
 (* -------------------------------------------------------------------- *)

@@ -1220,7 +1220,7 @@ module Notations = struct
 
   let add (scope : scope) (nt : pnotation located) =
     let nt = nt.pl_desc and gloc = nt.pl_loc in
-    let ue = TT.transtyvars scope.sc_env (gloc, nt.nt_tv) in
+    let ue = TT.transtyvars (env scope) (gloc, nt.nt_tv) in
 
     (* Translate bound idents and their types *)
     let bd = List.mapi (fun i (x, pty) ->
@@ -1255,6 +1255,19 @@ module Notations = struct
 
     if not (EcUnify.UniEnv.closed ue) then
       hierror ~loc:gloc "this notation type contains free type variables";
+
+    ignore body; scope
+
+  let add_abbrev (scope : scope) (at : pabbrev located) =
+    let at = at.pl_desc and gloc = at.pl_loc in
+    let ue = TT.transtyvars (env scope) (gloc, at.ab_tv) in
+    let benv, xs = TT.transbinding (env scope) ue at.ab_args in
+    let codom = TT.transty TT.tp_relax (env scope) ue (fst at.ab_def) in
+    let body = TT.transexpcast benv `InOp ue codom (snd at.ab_def) in
+    let body = e_lam xs body in
+
+    if not (EcUnify.UniEnv.closed ue) then
+      hierror ~loc:gloc "this abbrev. type contains free type variables";
 
     ignore body; scope
 end

@@ -311,9 +311,12 @@ and process_notation (scope : EcScope.scope) (n : pnotation located) =
     scope
 
 (* -------------------------------------------------------------------- *)
-and process_abbrev (scope : EcScope.scope) (_ : pabbrev located) =
+and process_abbrev (scope : EcScope.scope) (a : pabbrev located) =
   EcScope.check_state `InTop "abbreviation" scope;
-  scope
+  let scope = EcScope.Notations.add_abbrev scope a in
+    EcScope.notify scope `Info "added abbrev.: `%s'"
+      (unloc a.pl_desc.ab_name);
+    scope
 
 (* -------------------------------------------------------------------- *)
 and process_axiom (scope : EcScope.scope) (ax : paxiom located) =
