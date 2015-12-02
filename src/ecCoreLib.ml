@@ -127,6 +127,7 @@ module CI_Logic = struct
   let p_if_intro      = _Logic "ifI"
   let p_eq_refl       = _Logic "eq_refl"
   let p_eq_trans      = _Logic "eq_trans"
+  let p_eq_iff        = _Logic "eq_iff"
   let p_fcongr        = _Logic "congr1"
   let p_eq_sym        = _Logic "eq_sym"
   let p_eq_sym_imp    = _Logic "eq_sym_imp"

@@ -139,6 +139,7 @@ module CI_Logic : sig
   val p_iff_intro     : path
   val p_if_intro      : path
   val p_eq_refl       : path
+  val p_eq_iff        : path
   val p_eq_trans      : path
   val p_fcongr        : path
   val p_eq_sym        : path

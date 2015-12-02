@@ -1593,24 +1593,30 @@ let process_exists args (tc : tcenv1) =
 let process_congr tc =
   let (hyps, concl) = FApi.tc1_flat tc in
 
-  if not (EcFol.is_eq concl) then
-    tc_error !!tc "goal must be an equality";
+  if not (EcFol.is_eq_or_iff concl) then
+    tc_error !!tc "goal must be an equality or an equivalence";
 
-  let (f1, f2) = EcFol.destr_eq concl in
+  let ((f1, f2), iseq) =
+    if   EcFol.is_eq concl
+    then (EcFol.destr_eq  concl, true )
+    else (EcFol.destr_iff concl, false) in
 
   match f1.f_node, f2.f_node with
   | Fapp (o1, a1), Fapp (o2, a2)
       when    EcReduction.is_alpha_eq hyps o1 o2
            && List.length a1 = List.length a2 ->
 
+      let tt0 = if iseq then t_id else (fun tc ->
+        let hyps = FApi.tc1_hyps tc in
+        LowApply.t_apply_bwd_r (PT.pt_of_uglobal !!tc hyps LG.p_eq_iff) tc) in
       let tt1 = t_congr (o1, o2) ((List.combine a1 a2), f1.f_ty) in
       let tt2 = t_logic_trivial in
-      FApi.t_seq tt1 tt2 tc
+      FApi.t_seqs [tt0; tt1; tt2] tc
 
-  | Ftuple _, Ftuple _ ->
+  | Ftuple _, Ftuple _ when iseq ->
       FApi.t_seqs [t_split; t_logic_trivial] tc
 
-  | _, _ when EcReduction.is_alpha_eq hyps f1 f2 ->
+  | _, _ when iseq && EcReduction.is_alpha_eq hyps f1 f2 ->
       EcLowGoal.t_reflex tc
 
   | _, _ -> tacuerror "not a congruence"
