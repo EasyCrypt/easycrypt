@@ -297,14 +297,18 @@ and process_operator (scope : EcScope.scope) (op : poperator located) =
 and process_predicate (scope : EcScope.scope) (p : ppredicate located) =
   EcScope.check_state `InTop "predicate" scope;
   let scope = EcScope.Pred.add scope p in
-    EcScope.notify scope `Info "added predicate: `%s'" (unloc p.pl_desc.pp_name);
+    EcScope.notify scope `Info "added predicate: `%s'"
+      (unloc p.pl_desc.pp_name);
     check_opname_validity scope (unloc p.pl_desc.pp_name);
     scope
 
 (* -------------------------------------------------------------------- *)
-and process_notation (scope : EcScope.scope) (_ : pnotation located) =
+and process_notation (scope : EcScope.scope) (n : pnotation located) =
   EcScope.check_state `InTop "notation" scope;
-  scope
+  let scope = EcScope.Notations.add scope n in
+    EcScope.notify scope `Info "added notation: `%s'"
+      (unloc n.pl_desc.nt_name);
+    scope
 
 (* -------------------------------------------------------------------- *)
 and process_abbrev (scope : EcScope.scope) (_ : pabbrev located) =

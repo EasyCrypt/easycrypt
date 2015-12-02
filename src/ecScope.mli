@@ -202,6 +202,11 @@ module Prover : sig
 end
 
 (* -------------------------------------------------------------------- *)
+module Notations : sig
+  val add : scope -> pnotation located -> scope
+end
+
+(* -------------------------------------------------------------------- *)
 module Auto : sig
   val addrw : scope -> (pqsymbol * pqsymbol list) -> scope
   val addat : scope -> pqsymbol list -> scope

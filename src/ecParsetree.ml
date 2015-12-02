@@ -320,11 +320,12 @@ type ppredicate = {
 
 (* -------------------------------------------------------------------- *)
 type pnotation = {
-  nt_name : psymbol;
-  nt_tv   : ptyvardecls option;
-  nt_bd   : (psymbol * pty) list;
-  nt_args : (psymbol * (psymbol list * pty) option) list;
-  nt_body : pexpr;
+  nt_name  : psymbol;
+  nt_tv    : ptyvardecls option;
+  nt_bd    : (psymbol * pty) list;
+  nt_args  : (psymbol * (psymbol list * pty option)) list;
+  nt_codom : pty;
+  nt_body  : pexpr;
 }
 
 type pabbrev = {

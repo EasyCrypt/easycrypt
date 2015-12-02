@@ -1215,6 +1215,51 @@ module Pred = struct
 end
 
 (* -------------------------------------------------------------------- *)
+module Notations = struct
+  module TT  = EcTyping
+
+  let add (scope : scope) (nt : pnotation located) =
+    let nt = nt.pl_desc and gloc = nt.pl_loc in
+    let ue = TT.transtyvars scope.sc_env (gloc, nt.nt_tv) in
+
+    (* Translate bound idents and their types *)
+    let bd = List.mapi (fun i (x, pty) ->
+      let id = EcIdent.create (unloc x) in
+      let ty = TT.transty TT.tp_relax (env scope) ue pty in
+      (unloc x, (i, (id, ty)))) nt.nt_bd in
+
+    if not (List.is_unique ~eq:(fun (x, _) (y, _) -> sym_equal x y) bd) then
+      hierror ~loc:gloc "an ident is bound several time";
+
+    let bd = Msym.of_list bd in
+
+    let getident x =
+      try  Msym.find (unloc x) bd
+      with Not_found ->
+        hierror ~loc:(loc x) "unknown binder: `%s'" (unloc x)
+    in
+
+    (* Translate formal arguments and theiry types *)
+    let abd, xs = List.split (List.map (fun (x, (xbd, ty)) ->
+      let dty = fun () -> mk_loc (loc x) (PTunivar) in
+      let arg = ([mk_loc (loc x) (Some x)], ofdfl dty ty) in
+      (List.map getident xbd, arg)) nt.nt_args) in
+
+    let xs = List.map2 (fun xty (aid, aty) ->
+      (aid, toarrow (List.map (snd |- snd) xty) aty))
+      abd (snd (TT.transbinding (env scope) ue xs)) in
+
+    let benv  = EcEnv.Var.bind_locals xs (env scope) in
+    let codom = TT.transty TT.tp_relax (env scope) ue nt.nt_codom in
+    let body  = TT.transexpcast benv `InOp ue codom nt.nt_body in
+
+    if not (EcUnify.UniEnv.closed ue) then
+      hierror ~loc:gloc "this notation type contains free type variables";
+
+    ignore body; scope
+end
+
+(* -------------------------------------------------------------------- *)
 module Mod = struct
   module TT = EcTyping
 
