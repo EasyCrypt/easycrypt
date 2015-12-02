@@ -167,7 +167,7 @@ let pp_modappl_error env fmt error =
       msg "wrong number of arguments (expected %i, got %i)" ex got
 
   | MAE_InvalidArgType (mp,error) ->
-    let ppe   = EcPrinting.PPEnv.ofenv env in
+    let ppe = EcPrinting.PPEnv.ofenv env in
     msg "argument %a does not match required interface, %a"
       (EcPrinting.pp_topmod ppe) mp
       (pp_cnv_failure env) error

@@ -66,6 +66,7 @@ and pty = pty_r located
 type ptyannot_r =
   | TVIunamed of pty list
   | TVInamed  of (psymbol * pty) list
+
 and ptyannot  = ptyannot_r  located
 
 type plpattern_r =
@@ -277,6 +278,9 @@ let rec pf_ident f =
 type ppattern =
 | PPApp of (pqsymbol * ptyannot option) * psymbol list
 
+type ptyvardecls =
+  (psymbol * pqsymbol list) list
+
 type pop_def =
   | PO_abstr of pty
   | PO_concr of pty * pexpr
@@ -297,7 +301,7 @@ type poperator = {
   po_kind   : [`Op | `Const];
   po_name   : psymbol;
   po_aliases: psymbol list;
-  po_tyvars : (psymbol * pqsymbol list) list option;
+  po_tyvars : ptyvardecls option;
   po_args   : ptybindings;
   po_def    : pop_def;
   po_ax     : psymbol option;
@@ -312,6 +316,22 @@ type ppredicate = {
   pp_name   : psymbol;
   pp_tyvars : (psymbol * pqsymbol list) list option;
   pp_def    : ppred_def;
+}
+
+(* -------------------------------------------------------------------- *)
+type pnotation = {
+  nt_name : psymbol;
+  nt_tv   : ptyvardecls option;
+  nt_bd   : (psymbol * pty) list;
+  nt_args : (psymbol * (psymbol list * pty) option) list;
+  nt_body : pexpr;
+}
+
+type pabbrev = {
+  ab_name : psymbol;
+  ab_tv   : ptyvardecls option;
+  ab_args : ptybindings;
+  ab_def  : pty * pexpr;
 }
 
 (* -------------------------------------------------------------------- *)
@@ -894,6 +914,8 @@ type global_action =
   | Ginterface   of (psymbol * pmodule_sig)
   | Goperator    of poperator
   | Gpredicate   of ppredicate
+  | Gnotation    of pnotation
+  | Gabbrev      of pabbrev
   | Gaxiom       of paxiom
   | Gtype        of ptydecl list
   | Gtypeclass   of ptypeclass

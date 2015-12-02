@@ -302,6 +302,16 @@ and process_predicate (scope : EcScope.scope) (p : ppredicate located) =
     scope
 
 (* -------------------------------------------------------------------- *)
+and process_notation (scope : EcScope.scope) (_ : pnotation located) =
+  EcScope.check_state `InTop "notation" scope;
+  scope
+
+(* -------------------------------------------------------------------- *)
+and process_abbrev (scope : EcScope.scope) (_ : pabbrev located) =
+  EcScope.check_state `InTop "abbreviation" scope;
+  scope
+
+(* -------------------------------------------------------------------- *)
 and process_axiom (scope : EcScope.scope) (ax : paxiom located) =
   EcScope.check_state `InTop "axiom" scope;
   let (name, scope) = EcScope.Ax.add scope (!pragma).pm_check ax in
@@ -541,6 +551,8 @@ and process (ld : Loader.loader) (scope : EcScope.scope) g =
       | Ginterface   i    -> `Fct   (fun scope -> process_interface  scope  i)
       | Goperator    o    -> `Fct   (fun scope -> process_operator   scope  (mk_loc loc o))
       | Gpredicate   p    -> `Fct   (fun scope -> process_predicate  scope  (mk_loc loc p))
+      | Gnotation    n    -> `Fct   (fun scope -> process_notation   scope  (mk_loc loc n))
+      | Gabbrev      n    -> `Fct   (fun scope -> process_abbrev     scope  (mk_loc loc n))
       | Gaxiom       a    -> `Fct   (fun scope -> process_axiom      scope  (mk_loc loc a))
       | GthOpen      name -> `Fct   (fun scope -> process_th_open    scope  (snd_map unloc name))
       | GthClose     info -> `Fct   (fun scope -> process_th_close   scope  info)
