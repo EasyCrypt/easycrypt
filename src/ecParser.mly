@@ -1500,101 +1500,46 @@ pred_tydom:
    { tys  }
 
 tyvars_decl:
-| LBRACKET tyvars=rlist0(typaram, COMMA) RBRACKET { tyvars }
-| LBRACKET tyvars=rlist2(tident , empty) RBRACKET { List.map (fun x -> (x, [])) tyvars }
+| LBRACKET tyvars=rlist0(typaram, COMMA) RBRACKET
+    { tyvars }
 
-%inline op_or_const:
-| OP    x=nosmt { (`Op   , x) }
-| CONST x=nosmt { (`Const, x) }
+| LBRACKET tyvars=rlist2(tident , empty) RBRACKET
+    { List.map (fun x -> (x, [])) tyvars }
+
+op_or_const:
+| OP    { `Op    }
+| CONST { `Const }
 
 operator:
-| k=op_or_const x=plist1(oident, COMMA) tyvars=tyvars_decl? COLON sty=loc(type_exp)
-  { { po_kind    = fst k;
+| k=op_or_const st=nosmt x=plist1(oident, COMMA)
+    tyvars=tyvars_decl? args=ptybindings_decl?
+    sty=prefix(COLON, loc(type_exp))? b=seq(prefix(EQ, loc(opbody)), opax?)?
+
+  { let gloc = EcLocation.make $startpos $endpos in
+    let sty  = sty |> ofdfl (fun () ->
+      mk_loc (b |> omap (loc |- fst) |> odfl gloc) PTunivar) in
+
+    { po_kind    = k;
       po_name    = List.hd x;
       po_aliases = List.tl x;
       po_tyvars  = tyvars;
-      po_args    = [];
-      po_def     = opdef_of_opbody sty None;
-      po_ax      = None;
-      po_nosmt   = snd k; } }
+      po_args    = odfl [] args;
+      po_def     = opdef_of_opbody sty (omap (unloc |- fst) b);
+      po_ax      = obind snd b;
+      po_nosmt   = st; } }
 
-| k=op_or_const x=plist1(oident, COMMA) tyvars=tyvars_decl?
-    args=ptybindings_decl COLON sty=loc(type_exp)
-  { { po_kind    = fst k;
-      po_name    = List.hd x;
-      po_aliases = List.tl x;
-      po_tyvars  = tyvars;
-      po_args    = args;
-      po_def     = opdef_of_opbody sty None;
-      po_ax      = None;
-      po_nosmt   = snd k; } }
-
-| k=op_or_const x=plist1(oident, COMMA) tyvars=tyvars_decl?
+| k=op_or_const st=nosmt x=plist1(oident, COMMA)
+    tyvars=tyvars_decl? args=ptybindings_decl?
     COLON LBRACE sty=loc(type_exp) PIPE reft=form RBRACE AS rname=ident
-  { { po_kind    = fst k;
+
+  { { po_kind    = k;
       po_name    = List.hd x;
       po_aliases = List.tl x;
       po_tyvars  = tyvars;
-      po_args    = [];
+      po_args    = odfl [] args;
       po_def     = opdef_of_opbody sty (Some (`Reft (rname, reft)));
       po_ax      = None;
-      po_nosmt   = snd k; } }
-
-| k=op_or_const x=plist1(oident, COMMA) tyvars=tyvars_decl?
-    args=ptybindings_decl COLON LBRACE sty=loc(type_exp) PIPE reft=form
-    RBRACE AS rname=ident
-  { { po_kind    = fst k;
-      po_name    = List.hd x;
-      po_aliases = List.tl x;
-      po_tyvars  = tyvars;
-      po_args    = args;
-      po_def     = opdef_of_opbody sty (Some (`Reft (rname, reft)));
-      po_ax      = None;
-      po_nosmt   = snd k; } }
-
-| k=op_or_const x=plist1(oident, COMMA) tyvars=tyvars_decl?
-    COLON sty=loc(type_exp) EQ b=opbody opax=opax?
-  { { po_kind    = fst k;
-      po_name    = List.hd x;
-      po_aliases = List.tl x;
-      po_tyvars  = tyvars;
-      po_args    = [];
-      po_def     = opdef_of_opbody sty (Some b);
-      po_ax      = opax;
-      po_nosmt   = snd k; } }
-
-| k=op_or_const x=plist1(oident, COMMA) tyvars=tyvars_decl?
-    eq=loc(EQ) b=opbody opax=opax?
-  { { po_kind    = fst k;
-      po_name    = List.hd x;
-      po_aliases = List.tl x;
-      po_tyvars  = tyvars;
-      po_args    = [];
-      po_def     = opdef_of_opbody (mk_loc eq.pl_loc PTunivar) (Some b);
-      po_ax      = opax;
-      po_nosmt   = snd k; } }
-
-| k=op_or_const x=plist1(oident, COMMA) tyvars=tyvars_decl? args=ptybindings_decl
-    eq=loc(EQ) b=opbody opax=opax?
-  { { po_kind    = fst k;
-      po_name    = List.hd x;
-      po_aliases = List.tl x;
-      po_tyvars  = tyvars;
-      po_args    = args;
-      po_def     = opdef_of_opbody (mk_loc eq.pl_loc PTunivar) (Some b);
-      po_ax      = opax;
-      po_nosmt   = snd k; } }
-
-| k=op_or_const x=plist1(oident, COMMA) tyvars=tyvars_decl? args=ptybindings_decl
-    COLON codom=loc(type_exp) EQ b=opbody opax=opax?
-  { { po_kind    = fst k;
-      po_name    = List.hd x;
-      po_aliases = List.tl x;
-      po_tyvars  = tyvars;
-      po_args    = args;
-      po_def     = opdef_of_opbody codom (Some b);
-      po_ax      = opax;
-      po_nosmt   = snd k; } }
+      po_nosmt   = st; } }
 
 opbody:
 | e=expr   { `Expr e  }
@@ -3132,8 +3077,14 @@ __rlist1(X, S):                         (* left-recursive *)
 | LBRACKET x=X RBRACKET { x }
 
 (* -------------------------------------------------------------------- *)
+%inline seq(X, Y):
+| x=X y=Y { (x, y) }
+
 %inline prefix(S, X):
 | S x=X { x }
+
+%inline postfix(X, S):
+| x=X S { x }
 
 %inline sep(S1, X, S2):
 | x=S1 X y=S2 { (x, y) }
