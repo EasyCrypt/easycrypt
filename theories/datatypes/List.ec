@@ -1671,9 +1671,7 @@ qed.
 
 lemma mkseqP f n (x:'a) :  
   mem (mkseq f n) x <=> exists i, 0 <= i < n /\ x = f i.
-proof.
-by rewrite mapP; apply NewLogic.exists_iff=> i; rewrite /= mem_iota.
-qed.
+proof. by rewrite mapP &NewLogic.exists_iff /= => i; rewrite mem_iota. qed.
 
 (* -------------------------------------------------------------------- *)
 (*                         Sequence folding                             *)
