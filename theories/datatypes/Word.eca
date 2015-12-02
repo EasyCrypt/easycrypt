@@ -61,13 +61,11 @@ proof. by move=> w @/tolist @/oflist; rewrite mkarrayK mkwordK. qed.
 
 lemma tolistK (s : t list) : size s = n => tolist (oflist s) = s.
 proof.
-move=> eq_sn @/tolist @/oflist; rewrite ofwordK ?ofarrayK //.
-by rewrite size_mkarray.
+by move=> eq_sn; rewrite/tolist/oflist ofwordK ?ofarrayK ?size_mkarray.
 qed.
 
 lemma size_tolist (w : word) : size (tolist w) = n.
-by rewrite -Array.sizeE size_word.
-qed.
+proof. by rewrite -Array.sizeE size_word. qed.
 
 (* -------------------------------------------------------------------- *)
 op "_.[_]" (w : word) (i : int): t =
