@@ -311,6 +311,12 @@ exception DestrError of string
 val destr_error : string -> 'a
 
 (* -------------------------------------------------------------------- *)
+val destr_app1 : name:string -> (path -> bool) -> form -> form
+val destr_app2 : name:string -> (path -> bool) -> form -> form * form
+
+val destr_app1_eq : name:string -> path -> form -> form
+val destr_app2_eq : name:string -> path -> form -> form * form
+
 val destr_op        : form -> EcPath.path * ty list
 val destr_local     : form -> EcIdent.t
 val destr_pvar      : form -> prog_var * memory

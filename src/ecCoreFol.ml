@@ -1103,32 +1103,49 @@ let is_op_iff      p = EcPath.p_equal EcCoreLib.CI_Bool.p_iff p
 let is_op_eq       p = EcPath.p_equal EcCoreLib.CI_Bool.p_eq  p
 
 (* -------------------------------------------------------------------- *)
-let destr_app   = function { f_node = Fapp (f, fs) } -> (f, fs) | f -> (f, [])
-let destr_tuple = function { f_node = Ftuple fs } -> fs | _ -> destr_error "tuple"
-let destr_op    = function { f_node = Fop (p, tys) } -> (p, tys) | _ -> destr_error "op"
-let destr_local = function { f_node = Flocal id } -> id | _ -> destr_error "local"
-let destr_pvar  = function { f_node = Fpvar (pv, m) } -> (pv, m) | _ -> destr_error "pvar"
-let destr_proj  = function { f_node = Fproj (f, i) } -> (f, i) | _ -> destr_error "proj"
+let destr_op = function
+  { f_node = Fop (op, tys) } -> op, tys | _ -> destr_error "op"
 
-let _destr1 ~name pred form =
+let destr_app = function
+  { f_node = Fapp (f, fs) } -> (f, fs) | f -> (f, [])
+
+let destr_op_app f = 
+  let (fo, args) = destr_app f in destr_op fo, args
+
+let destr_tuple = function
+  { f_node = Ftuple fs } -> fs | _ -> destr_error "tuple"
+
+let destr_local = function
+  { f_node = Flocal id } -> id | _ -> destr_error "local"
+
+let destr_pvar = function
+  { f_node = Fpvar (pv, m) } -> (pv, m) | _ -> destr_error "pvar"
+
+let destr_proj  = function
+  { f_node = Fproj (f, i) } -> (f, i) | _ -> destr_error "proj"
+
+let destr_app1 ~name pred form =
   match destr_app form with
   | { f_node = Fop (p, _) }, [f] when pred p -> f
   | _ -> destr_error name
 
-let _destr2 ~name pred form =
+let destr_app2 ~name pred form =
   match destr_app form with
   | { f_node = Fop (p, _) }, [f1; f2] when pred p -> (f1, f2)
   | _ -> destr_error name
 
-let destr_not = _destr1 ~name:"not" is_op_not
-let destr_and = _destr2 ~name:"and" is_op_and_any
-let destr_or  = _destr2 ~name:"or"  is_op_or_any
-let destr_imp = _destr2 ~name:"imp" is_op_imp
-let destr_iff = _destr2 ~name:"iff" is_op_iff
-let destr_eq  = _destr2 ~name:"eq"  is_op_eq
+let destr_app1_eq ~name p f = destr_app1 ~name (EcPath.p_equal p) f
+let destr_app2_eq ~name p f = destr_app2 ~name (EcPath.p_equal p) f
+
+let destr_not = destr_app1 ~name:"not" is_op_not
+let destr_and = destr_app2 ~name:"and" is_op_and_any
+let destr_or  = destr_app2 ~name:"or"  is_op_or_any
+let destr_imp = destr_app2 ~name:"imp" is_op_imp
+let destr_iff = destr_app2 ~name:"iff" is_op_iff
+let destr_eq  = destr_app2 ~name:"eq"  is_op_eq
 
 let destr_eq_or_iff = 
-  _destr2 ~name:"eq-or-iff" (fun p -> is_op_eq p || is_op_iff p)
+  destr_app2 ~name:"eq-or-iff" (fun p -> is_op_eq p || is_op_iff p)
 
 let destr_or_r form =
   match destr_app form with
