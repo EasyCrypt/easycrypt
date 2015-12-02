@@ -7,6 +7,8 @@ EasyCrypt uses the following third-party tools/libraries:
 
      Available at http://caml.inria.fr/
 
+ * OCamlbuild (only for OCaml >= 4.03)
+
  * Why3 (>= 0.85)
 
      Available at http://why3.lri.fr/
@@ -17,8 +19,6 @@ EasyCrypt uses the following third-party tools/libraries:
      Why3 libraries must be installed (make byte && make install-lib)
 
  * Menhir [http://gallium.inria.fr/~fpottier/menhir/]
-
- * Yojson [http://mjambon.com/yojson.html]
 
  * OCaml Batteries Included [http://batteries.forge.ocamlcore.org/]
  
