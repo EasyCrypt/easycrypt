@@ -739,7 +739,7 @@ lpattern_u:
 | x=ident
     { LPSymbol x }
 
-| LPAREN p=plist2(ident, COMMA) RPAREN
+| LPAREN p=plist2(bdident, COMMA) RPAREN
     { LPTuple p }
 
 | LPBRACE fs=rlist1(lp_field, SEMICOLON) SEMICOLON? RPBRACE

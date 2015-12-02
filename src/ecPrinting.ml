@@ -513,6 +513,12 @@ let pp_local (ppe : PPEnv.t) fmt x =
   Format.fprintf fmt "%s" (PPEnv.local_symb ppe x)
 
 (* -------------------------------------------------------------------- *)
+let pp_local ?fv (ppe : PPEnv.t) fmt x =
+  if is_none fv || oif (Mid.mem x) fv then
+    pp_local ppe fmt x
+  else pp_string fmt "_"
+
+(* -------------------------------------------------------------------- *)
 let pp_mem (ppe : PPEnv.t) fmt x =
   let x = Format.sprintf "%s" (PPEnv.local_symb ppe x) in
   let x =
@@ -725,12 +731,13 @@ let pp_proji ppe pp_sub osc fmt (e,i) =
     (i+1)
 
 (* -------------------------------------------------------------------- *)
-let pp_let (ppe : PPEnv.t) pp_sub outer fmt (pt, e1, e2) =
+let pp_let ?fv (ppe : PPEnv.t) pp_sub outer fmt (pt, e1, e2) =
   let pp fmt (pt, e1, e2) =
     let ids    = lp_ids pt in
     let subppe = PPEnv.add_locals ppe ids in
       Format.fprintf fmt "@[<hov 0>let %a =@;<1 2>@[%a@]@ in@ %a@]"
-        (pp_tuple `ForBinding subppe (fun ppe _ -> pp_local ppe) (fst outer)) ids
+        (pp_tuple `ForBinding subppe
+           (fun ppe _ -> pp_local ?fv ppe) (fst outer)) ids
         (pp_sub ppe    (fst outer, (e_bin_prio_letin, `NonAssoc))) e1
         (pp_sub subppe (fst outer, (e_bin_prio_letin, `NonAssoc))) e2
   in
@@ -1024,16 +1031,10 @@ let pp_chained_orderings (ppe : PPEnv.t) t_ty pp_sub outer fmt (f, fs) =
 
 (* -------------------------------------------------------------------- *)
 let pp_locbind (ppe : PPEnv.t) ?fv (xs, ty) =
-  let pp_local tenv fmt x =
-    if is_none fv || oif (Mid.mem x) fv then
-      pp_local tenv fmt x
-    else pp_string fmt "_"
-  in
-
   let tenv1 = PPEnv.add_locals ppe xs in
   let pp fmt =
     Format.fprintf fmt "(%a : %a)"
-    (pp_list "@ " (pp_local tenv1)) xs (pp_type  ppe) ty
+    (pp_list "@ " (pp_local ?fv tenv1)) xs (pp_type  ppe) ty
   in
     (tenv1, pp)
 
@@ -1188,7 +1189,7 @@ and pp_expr_core_r (ppe : PPEnv.t) outer fmt (e : expr) =
       pp_app ppe (pp_expr_r, pp_expr_r) outer fmt (e, args)
 
   | Elet (pt, e1, e2) ->
-      pp_let ppe pp_expr_r outer fmt (pt, e1, e2)
+      pp_let ~fv:e2.e_fv ppe pp_expr_r outer fmt (pt, e1, e2)
 
   | Equant (`ELambda, vardecls, e) ->
       let (subppe, pp) = pp_locbinds ppe ~fv:e.e_fv vardecls in
@@ -1289,11 +1290,8 @@ let string_of_quant = function
   | Llambda -> "fun"
 
 (* -------------------------------------------------------------------- *)
-let pp_binding (ppe : PPEnv.t) ?fv (xs, ty) =
-  let pp_local tenv fmt x =
-    if is_none fv || oif (Mid.mem x) fv then
-      pp_local tenv fmt x
-    else pp_string fmt "_" in
+let pp_binding ?fv (ppe : PPEnv.t) (xs, ty) =
+  let pp_local = pp_local ?fv in
 
   match ty with
   | GTty ty ->
@@ -1548,7 +1546,7 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
       Format.fprintf fmt "%s" "no-syntax-yet"
 
   | Flet (lp, f1, f2) ->
-      pp_let ppe pp_form_r outer fmt (lp, f1, f2)
+      pp_let ~fv:f2.f_fv ppe pp_form_r outer fmt (lp, f1, f2)
 
   | Fop (op, tvi) ->
       pp_opapp ppe outer fmt (op, tvi, [])

@@ -402,6 +402,10 @@ let () =
 type ptnmap = ty EcIdent.Mid.t ref
 
 (* -------------------------------------------------------------------- *)
+let ident_of_osymbol x =
+  omap unloc x |> odfl "_" |> EcIdent.create
+
+(* -------------------------------------------------------------------- *)
 module UE = EcUnify.UniEnv
 
 let unify_or_fail (env : EcEnv.env) ue loc ~expct:ty1 ty2 = 
@@ -1142,7 +1146,7 @@ let transpattern1 env ue (p : EcParsetree.plpattern) =
       if not (List.is_unique xs) then
         tyerror p.pl_loc env NonLinearPattern
       else
-        let xs     = List.map EcIdent.create xs in
+        let xs     = List.map ident_of_osymbol xs in
         let subtys = List.map (fun _ -> UE.fresh ue) xs in
         (LTuple (List.combine xs subtys), ttuple subtys)
 
@@ -1277,9 +1281,6 @@ let rec ty_fun_app loc env ue tf targs =
   end
 
 (* -------------------------------------------------------------------- *)
-let ident_of_osymbol x =
-  omap unloc x |> odfl "_" |> EcIdent.create
-
 let transbinding env ue bd =
   let trans_bd1 env (xs, pty) = 
     let ty  = transty tp_relax env ue pty in

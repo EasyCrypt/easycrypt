@@ -40,7 +40,7 @@ val pp_list : ('a, 'b, 'c, 'd, 'd, 'a) format6 -> 'a pp -> 'a list pp
 
 (* -------------------------------------------------------------------- *)
 val pp_pv      : PPEnv.t -> prog_var pp
-val pp_local   : PPEnv.t -> ident pp
+val pp_local   : ?fv:Sid.t -> PPEnv.t -> ident pp
 val pp_opname  : PPEnv.t -> path pp
 val pp_funname : PPEnv.t -> xpath pp
 val pp_topmod  : PPEnv.t -> mpath pp
