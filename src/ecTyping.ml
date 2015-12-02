@@ -153,10 +153,10 @@ let pp_cnv_failure env fmt error =
         (EcIdent.name x)
 
   | E_TyModCnv_MissingComp x ->
-      msg "the item `%s' is missing" x
+      msg "procedure `%s' is missing" x
 
   | E_TyModCnv_MismatchFunSig (x,err) ->
-      msg "the item `%s' is not compatible: %a" 
+      msg "procedure `%s' is not compatible: %a" 
         x (pp_mismatch_funsig env) err
 
 let pp_modappl_error env fmt error =
@@ -168,7 +168,7 @@ let pp_modappl_error env fmt error =
 
   | MAE_InvalidArgType (mp,error) ->
     let ppe   = EcPrinting.PPEnv.ofenv env in
-    msg "argument %a do not match required interfaces, %a"
+    msg "argument %a does not match required interface, %a"
       (EcPrinting.pp_topmod ppe) mp
       (pp_cnv_failure env) error
 
@@ -756,11 +756,11 @@ let rec check_sig_cnv mode (env:EcEnv.env) (sin:module_sig) (sout:module_sig) =
 
       if not (EqTest.for_type env iargs oargs) then
         tymod_cnv_failure 
-          (E_TyModCnv_MismatchFunSig(fin.fs_name,MF_targs(iargs,oargs)));
+          (E_TyModCnv_MismatchFunSig(fin.fs_name,MF_targs(oargs,iargs)));
 
       if not (EqTest.for_type env ires ores) then
           tymod_cnv_failure 
-            (E_TyModCnv_MismatchFunSig(fin.fs_name,MF_tres(ires,ores)));
+            (E_TyModCnv_MismatchFunSig(fin.fs_name,MF_tres(ores,ires)));
 
       let norm oi = 
         List.fold_left (fun s f -> 
