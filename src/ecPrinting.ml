@@ -1779,19 +1779,26 @@ let pp_opdecl_op (ppe : PPEnv.t) fmt (x, ts, ty, op) =
 
           (pp_locbinds ppe ~fv:e.e_fv vds, e)
         in
-          Format.fprintf fmt "%t =@ %a" pp_vds (pp_expr subppe) e
+          Format.fprintf fmt "%t :@ %a =@ %a" pp_vds 
+            (pp_type ppe) e.e_ty (pp_expr subppe) e
 
     | Some (OP_Constr (indp, i)) ->
         Format.fprintf fmt
-          "=@ %d-th constructor of %a" (i+1) (pp_tyname ppe) indp
+          ": %a =@ < %d-th constructor of %a >" 
+          (pp_type ppe) ty
+          (i+1) (pp_tyname ppe) indp
 
     | Some (OP_Record recp) ->
         Format.fprintf fmt
-          "=@ record constructor of %a" (pp_tyname ppe) recp
+          ": %a =@ < record constructor of %a >" 
+          (pp_type ppe) ty
+          (pp_tyname ppe) recp
 
     | Some (OP_Proj (rp, i, _)) ->
         Format.fprintf fmt
-          "=@ %d-th projection of %a" (i+1) (pp_tyname ppe) rp
+          ": %a =@ < %d-th projection of %a >"
+          (pp_type ppe) ty
+          (i+1) (pp_tyname ppe) rp
 
     | Some (OP_Fix fix) ->
         let (subppe, pp_vds) = pp_locbinds ppe fix.opf_args in
