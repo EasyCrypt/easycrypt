@@ -284,8 +284,8 @@ let gen_select_op
 
   let ue_filter =
     match mode with
-    | `Expr _ -> fun op -> not (EcDecl.is_pred op)
-    | `Form   -> fun _  -> true
+    | `Expr _ -> fun op -> EcDecl.is_oper op
+    | `Form   -> fun op -> EcDecl.is_oper op || EcDecl.is_pred op
   in
 
   let by_scope opsc ((p, _), _, _) =
