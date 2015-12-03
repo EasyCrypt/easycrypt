@@ -402,7 +402,9 @@ let trans_matchfix ?(close = true) env ue { pl_loc = loc; pl_desc = name } (bd, 
               if args_exp <> args_got then
                 fxerror cname.pl_loc env (FXE_CtorInvalidArity (args_exp, args_got));
 
-              if not (List.is_unique (List.map unloc cargs)) then
+              let cargs_lin = List.pmap (fun o -> omap unloc (unloc o)) cargs in
+                
+              if not (List.is_unique cargs_lin) then
                 fxerror cname.pl_loc env (FXE_MatchNonLinear);
 
               EcUnify.UniEnv.restore ~src:subue ~dst:ue;
@@ -416,7 +418,9 @@ let trans_matchfix ?(close = true) env ue { pl_loc = loc; pl_desc = name } (bd, 
                with EcUnify.UnificationFailure _ -> assert false);
               TT.unify_or_fail env ue pb.pop_name.pl_loc pty xty;
 
-              let pvars = List.map (EcIdent.create |- unloc) cargs in
+              let create o = 
+                EcIdent.create (omap_dfl unloc "_" o) in
+              let pvars = List.map (create |- unloc) cargs in
               let pvars = List.combine pvars ctorty in
 
               (pb, (indp, ind, (ctorsym, ctoridx)), pvars)

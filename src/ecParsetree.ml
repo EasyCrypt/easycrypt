@@ -52,6 +52,9 @@ type pqsymbol  = qsymbol located
 type pmsymbol  = (psymbol * ((pmsymbol located) list) option) list
 type pgamepath = (pmsymbol * psymbol) located
 
+type osymbol_r   = psymbol option
+type osymbol     = osymbol_r located
+
 (* -------------------------------------------------------------------- *)
 type pty_r =
   | PTunivar
@@ -71,12 +74,12 @@ and ptyannot  = ptyannot_r  located
 
 type plpattern_r =
   | LPSymbol of psymbol
-  | LPTuple  of (psymbol option) located list
+  | LPTuple  of osymbol list
   | LPRecord of (pqsymbol * psymbol) list
 
 and plpattern = plpattern_r located
 
-type ptybinding  = (psymbol option) located list * pty
+type ptybinding  = osymbol list * pty
 and  ptybindings = ptybinding list
 
 and pexpr_r =
@@ -259,7 +262,7 @@ and pformula_r =
   | PFprob     of pgamepath * (pformula list) * pmemory * pformula
   | PFBDhoareF of pformula * pgamepath * pformula * phoarecmp * pformula
 
-and pgtybinding  = (psymbol option) located list * pgty
+and pgtybinding  = osymbol list * pgty
 and pgtybindings = pgtybinding list
 
 and pgty =
@@ -276,7 +279,7 @@ let rec pf_ident f =
 
 (* -------------------------------------------------------------------- *)
 type ppattern =
-| PPApp of (pqsymbol * ptyannot option) * psymbol list
+| PPApp of (pqsymbol * ptyannot option) * osymbol list
 
 type ptyvardecls =
   (psymbol * pqsymbol list) list
@@ -304,7 +307,7 @@ type poperator = {
   po_tyvars : ptyvardecls option;
   po_args   : ptybindings;
   po_def    : pop_def;
-  po_ax     : psymbol option;
+  po_ax     : osymbol_r;
   po_nosmt  : bool;
 }
 
@@ -514,7 +517,7 @@ type phltactic =
   | Pinline        of inline_info
   | Pkill          of (oside * codepos * int option)
   | Prnd           of oside * (pformula, pformula option, pformula) rnd_tac_info
-  | Palias         of (oside * codepos * psymbol option)
+  | Palias         of (oside * codepos * osymbol_r)
   | Pset           of (oside * codepos * bool * psymbol * pexpr)
   | Pconseq        of (pcqoptions * (conseq_ppterm option tuple3))
   | Phrex_elim
@@ -691,7 +694,7 @@ type logtactic =
   | Pmove       of (ppterm list * genpattern list)
   | Pgeneralize of genpattern list
   | Pclear      of psymbol list
-  | Prewrite    of (rwarg list * psymbol option)
+  | Prewrite    of (rwarg list * osymbol_r)
   | Prwnormal   of pformula * pqsymbol list
   | Psubst      of pformula list
   | Psimplify   of preduction
@@ -838,7 +841,7 @@ type w3_renaming =
 (* -------------------------------------------------------------------- *)
 type theory_cloning = {
   pthc_base   : pqsymbol;
-  pthc_name   : psymbol option;
+  pthc_name   : osymbol_r;
   pthc_ext    : (pqsymbol * theory_override) list;
   pthc_prf    : theory_cloning_proof list;
   pthc_rnm    : theory_renaming list;
@@ -933,8 +936,8 @@ type global_action =
   | GthImport    of pqsymbol list
   | GthExport    of pqsymbol list
   | GthClone     of theory_cloning
-  | GsctOpen     of psymbol option
-  | GsctClose    of psymbol option
+  | GsctOpen     of osymbol_r
+  | GsctClose    of osymbol_r
   | Grealize     of prealize located
   | Gtactics     of [`Proof of proofmode | `Actual of ptactic list]
   | Gtcdump      of (tcdump * ptactic list)
