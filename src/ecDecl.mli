@@ -99,7 +99,7 @@ val operator_as_proj : operator -> EcPath.path * int * int
 val operator_as_fix  : operator -> opfix
 
 (* -------------------------------------------------------------------- *)
-type axiom_kind = [`Axiom of Ssym.t | `Lemma]
+type axiom_kind = [`Axiom of (Ssym.t * bool) | `Lemma]
 
 type axiom = {
   ax_tparams : ty_params;

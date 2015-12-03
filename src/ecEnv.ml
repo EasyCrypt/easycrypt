@@ -696,7 +696,7 @@ module MC = struct
               let scname = Printf.sprintf "%s_%s" x name in
                 (scname, { ax_tparams = tyd.tyd_params;
                            ax_spec    = Some scheme;
-                           ax_kind    = `Axiom Ssym.empty;
+                           ax_kind    = `Axiom (Ssym.empty, false);
                            ax_nosmt   = true; })
             in
               (do1 schelim "ind", do1 schcase "case")
@@ -731,7 +731,7 @@ module MC = struct
             let scname = Printf.sprintf "%s_ind" x in
               (scname, { ax_tparams = tyd.tyd_params;
                          ax_spec    = Some scheme;
-                         ax_kind    = `Axiom Ssym.empty;
+                         ax_kind    = `Axiom (Ssym.empty, false);
                          ax_nosmt   = true; })
           in
 
@@ -816,7 +816,7 @@ module MC = struct
             let ax = Fsubst.f_subst fsubst ax in
               (x, { ax_tparams = [(self, Sp.singleton mypath)];
                     ax_spec    = Some ax;
-                    ax_kind    = `Axiom Ssym.empty;
+                    ax_kind    = `Axiom (Ssym.empty, false);
                     ax_nosmt   = true; }))
           tc.tc_axs
       in
@@ -1279,6 +1279,9 @@ module BaseRw = struct
 
   let lookup_opt name env =
     try_lf (fun () -> lookup name env)   
+
+  let lookup_path name env =
+    fst (lookup name env)
 
   let is_base name env = 
     match lookup_opt name env with
@@ -2788,19 +2791,22 @@ module Theory = struct
     List.pmap (filter1 clears root) items
 
   and filter1 clears root =
-    let inclear p = List.exists (oeq EcPath.p_equal p) clears in
-    let thclear = inclear (Some root) in
+    let inclear p = List.exists (EcPath.p_equal p) clears in
+    let thclear = inclear root in
 
     function
     | CTh_axiom (_, { ax_kind = `Lemma }) when thclear ->
         None
 
+    | CTh_axiom (x, ({ ax_kind = `Axiom (tags, false) } as ax)) when thclear ->
+       Some (CTh_axiom (x, { ax with ax_kind = `Axiom (tags, true) }))
+
     | CTh_addrw (p, ps) ->
-        let ps = List.filter (inclear |- EcPath.prefix) ps in
+        let ps = List.filter ((not) |- inclear |- oget |- EcPath.prefix) ps in
         if List.is_empty ps then None else Some (CTh_addrw (p, ps))
 
     | CTh_auto ps ->
-        let ps = Sp.filter (inclear |- EcPath.prefix) ps in
+        let ps = Sp.filter ((not) |- inclear |- oget |- EcPath.prefix) ps in
         if Sp.is_empty ps then None else Some (CTh_auto ps)
 
     | CTh_theory (x, (cth, mode)) ->
@@ -2814,8 +2820,9 @@ module Theory = struct
 
   (* ------------------------------------------------------------------ *)
   let close ?(clears = []) env =
-    let items = List.rev env.env_item in
-    let items =
+    let clears = List.map (ofold ((^~) EcPath.pappend) (root env)) clears in
+    let items  = List.rev env.env_item in
+    let items  =
       if   List.is_empty clears
       then items
       else filter clears (root env) items in

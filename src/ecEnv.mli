@@ -337,10 +337,11 @@ module TypeClass : sig
 end
 (* -------------------------------------------------------------------- *)
 module BaseRw : sig
-  val by_path    : path -> env -> Sp.t 
-  val lookup     : qsymbol -> env -> path * Sp.t
-  val lookup_opt : qsymbol -> env -> (path * Sp.t) option
-  val is_base    : qsymbol -> env -> bool
+  val by_path     : path -> env -> Sp.t 
+  val lookup      : qsymbol -> env -> path * Sp.t
+  val lookup_opt  : qsymbol -> env -> (path * Sp.t) option
+  val lookup_path : qsymbol -> env -> path
+  val is_base     : qsymbol -> env -> bool
 
   val add   : symbol -> env -> env
   val addto : path -> path list -> env -> env

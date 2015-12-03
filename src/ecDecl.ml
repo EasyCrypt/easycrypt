@@ -108,14 +108,13 @@ type operator = {
 }
 
 (* -------------------------------------------------------------------- *)
-type axiom_kind = [`Axiom of Ssym.t | `Lemma]
+type axiom_kind = [`Axiom of (Ssym.t * bool) | `Lemma]
 
 type axiom = {
   ax_tparams : ty_params;
   ax_spec    : EcCoreFol.form option;
   ax_kind    : axiom_kind;
-  ax_nosmt   : bool;
-}
+  ax_nosmt   : bool; }
 
 let is_axiom (x : axiom_kind) = match x with `Axiom _ -> true | _ -> false
 let is_lemma (x : axiom_kind) = match x with `Lemma   -> true | _ -> false
@@ -215,7 +214,7 @@ let axiomatized_op ?(nargs = 0) ?(nosmt = false) path (tparams, bd) =
 
   { ax_tparams = axpm;
     ax_spec    = Some axspec;
-    ax_kind    = `Axiom Ssym.empty;
+    ax_kind    = `Axiom (Ssym.empty, false);
     ax_nosmt   = nosmt; }
 
 (* -------------------------------------------------------------------- *)

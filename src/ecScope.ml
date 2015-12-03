@@ -817,7 +817,7 @@ module Ax = struct
     let axd  =
       let kind =
         match ax.pa_kind with
-        | PAxiom tags -> `Axiom (Ssym.of_list (List.map unloc tags))
+        | PAxiom tags -> `Axiom (Ssym.of_list (List.map unloc tags), false)
         | _ -> `Lemma
 
       in { ax_tparams = tparams;
@@ -1155,7 +1155,7 @@ module Op = struct
           let ax =
             { ax_tparams = axpm;
               ax_spec    = Some ax;
-              ax_kind    = `Axiom Ssym.empty;
+              ax_kind    = `Axiom (Ssym.empty, false);
               ax_nosmt   = false; }
           in Ax.bind scope false (unloc rname, ax))
         scope refts
@@ -1601,7 +1601,7 @@ module Ty = struct
           let t  = { pt_core = t; pt_intros = []; } in
           let ax = { ax_tparams = [];
                      ax_spec    = Some f;
-                     ax_kind    = `Axiom Ssym.empty;
+                     ax_kind    = `Axiom (Ssym.empty, false);
                      ax_nosmt   = true; } in
 
           let pucflags = { puc_nosmt = false; puc_local = false; } in
@@ -2393,33 +2393,35 @@ module Cloning = struct
         | CTh_axiom (x, ax) -> begin
             let subst, x = rename subst (`Lemma, x) in
             let ax = EcSubst.subst_ax subst ax in
-            let (ax, proofs) =
-              if abstract then (ax, proofs) else
+            let (ax, proofs, axclear) =
+              if abstract then (ax, proofs, false) else
               let doproof =
                 match ax.ax_kind with
                 | `Lemma -> None
-                | `Axiom tags -> begin
+                | `Axiom (tags, axclear) -> begin
                     match Msym.find_opt x (ovrds.ovre_ovrd.evc_lemmas.ev_bynames) with
-                    | Some pt -> Some pt
+                    | Some pt -> Some (pt, axclear)
                     | None ->
                         List.Exceptionless.find_map
-                          (function (pt, None) -> Some pt | (pt, Some pttags) ->
-                             if Ssym.disjoint tags pttags then None else Some pt)
+                          (function (pt, None) -> Some (pt, axclear) | (pt, Some pttags) ->
+                             if Ssym.disjoint tags pttags then None else Some (pt, axclear))
                           myovscope.ovrc_glproof
                 end
               in
                 match doproof with
-                | None     -> (ax, proofs)
-                | Some pt  ->
+                | None -> (ax, proofs, false)
+                | Some (pt, axclear)  ->
                     let ax  = { ax with ax_kind = `Lemma } in
                     let axc = { axc_axiom = (x, ax);
                                 axc_path  = EcPath.fromqsymbol (prefix, x);
                                 axc_tac   = pt;
                                 axc_env   = scope.sc_env; } in
-                      (ax, axc :: proofs)
-            in
-  
-              (subst, ops, proofs, Ax.bind scope thcl.pthc_local (x, ax))
+                      (ax, axc :: proofs, axclear) in
+
+            let scope =
+              if axclear then scope else
+                Ax.bind scope thcl.pthc_local (x, ax)
+            in (subst, ops, proofs, scope)
         end
   
         | CTh_modtype (x, modty) ->
