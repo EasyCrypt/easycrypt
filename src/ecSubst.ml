@@ -336,7 +336,17 @@ let rec subst_op_kind (s : _subst) (kind : operator_kind) =
       let body  = Fsubst.f_subst s body in
         OB_pred (Some body) 
 
+  | OB_nott nott ->
+     OB_nott (subst_notation s nott)
+
   | OB_oper None | OB_pred None -> kind
+
+and subst_notation (s : _subst) (nott : notation) =
+  let es = e_subst_of_subst s in
+  let es, xs = EcTypes.add_locals es nott.ont_args in
+  { ont_args  = xs;
+    ont_resty = s.s_ty nott.ont_resty;
+    ont_body  = EcTypes.e_subst es nott.ont_body; }
 
 and subst_op_body (s : _subst) (bd : opbody) =
   match bd with

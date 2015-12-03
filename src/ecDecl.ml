@@ -76,6 +76,7 @@ type locals = EcIdent.t list
 type operator_kind =
   | OB_oper of opbody option
   | OB_pred of EcCoreFol.form option
+  | OB_nott of notation
 
 and opbody =
   | OP_Plain  of EcTypes.expr
@@ -99,6 +100,12 @@ and opbranches =
 and opbranch = {
   opb_ctor : EcPath.path * int;
   opb_sub  : opbranches;
+}
+
+and notation = {
+  ont_args  : (EcIdent.t * EcTypes.ty) list;
+  ont_resty : EcTypes.ty;
+  ont_body  : expr;
 }
 
 type operator = {
@@ -152,6 +159,11 @@ let is_fix op =
   | OB_oper (Some (OP_Fix _)) -> true
   | _ -> false
 
+let is_abbrev op =
+  match op.op_kind with
+  | OB_nott _ -> true
+  | _ -> false
+
 let gen_op tparams ty kind = {
   op_tparams = tparams;
   op_ty      = ty;
@@ -165,6 +177,15 @@ let mk_pred tparams dom body =
 let mk_op tparams ty body = 
   let kind = OB_oper body in
     gen_op tparams ty kind
+
+let mk_abbrev tparams xs (codom, body) =
+  let kind = {
+    ont_args  = xs;
+    ont_resty = codom;
+    ont_body  = body;
+  } in
+
+  gen_op tparams (EcTypes.toarrow (List.map snd xs) codom) (OB_nott kind)
 
 let operator_as_ctor (op : operator) =
   match op.op_kind with

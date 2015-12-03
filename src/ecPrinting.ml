@@ -1644,6 +1644,7 @@ let pp_opdecl_pr (ppe : PPEnv.t) fmt (basename, ts, ty, op) =
     Format.fprintf fmt "@[<hov 2>pred %a %a %t.@]"
       pp_opname ([], basename) (pp_tyvarannot ppe) ts pp_body
 
+(* -------------------------------------------------------------------- *)
 let pp_opdecl_op (ppe : PPEnv.t) fmt (basename, ts, ty, op) =
   let ppe = PPEnv.add_locals ppe (List.map fst ts) in
 
@@ -1726,7 +1727,27 @@ let pp_opdecl_op (ppe : PPEnv.t) fmt (basename, ts, ty, op) =
       Format.fprintf fmt "@[<hov 2>op %a %a %t.@]"
         pp_opname ([], basename) (pp_tyvarannot ppe) ts pp_body
 
+(* -------------------------------------------------------------------- *)
+let pp_opdecl_nt (ppe : PPEnv.t) fmt (basename, ts, _ty, nt) =
+  let ppe = PPEnv.add_locals ppe (List.map fst ts) in
 
+  let pp_body fmt =
+    let subppe, pplocs =
+      pp_locbinds ppe ~fv:nt.ont_body.e_fv nt.ont_args
+    in
+      Format.fprintf fmt "%t :@ %a =@ %a"
+        pplocs (pp_type ppe) nt.ont_resty
+        (pp_expr subppe) nt.ont_body
+  in
+
+  match ts with
+  | [] -> Format.fprintf fmt "@[<hov 2>abbrev %a %t.@]"
+      pp_opname ([], basename) pp_body
+  | _  ->
+      Format.fprintf fmt "@[<hov 2>abbrev %a %a %t.@]"
+        pp_opname ([], basename) (pp_tyvarannot ppe) ts pp_body
+
+(* -------------------------------------------------------------------- *)
 let pp_opdecl ?(long = false) (ppe : PPEnv.t) fmt (x, op) =
   let pp_name fmt x = 
     if long then 
@@ -1741,6 +1762,8 @@ let pp_opdecl ?(long = false) (ppe : PPEnv.t) fmt (x, op) =
       pp_opdecl_op ppe fmt (P.basename x, op.op_tparams, op_ty op, i)
     | OB_pred i -> 
       pp_opdecl_pr ppe fmt (P.basename x, op.op_tparams, op_ty op, i)
+    | OB_nott i ->
+      pp_opdecl_nt ppe fmt (P.basename x, op.op_tparams, op_ty op, i)
 
   in Format.fprintf fmt "@[<v>%a%a@]" pp_name x pp_decl op
 

@@ -327,7 +327,16 @@ let opdecl_use_local_or_abs opdecl lc =
   try
     on_mpath_ty cb opdecl.op_ty;
     (match opdecl.op_kind with
-     | OB_pred f      -> f |> oiter (on_mpath_form cb)
+     | OB_pred f ->
+        f |> oiter (on_mpath_form cb)
+
+     | OB_nott nott -> begin
+        List.iter (on_mpath_ty cb |- snd) nott.ont_args;
+        on_mpath_ty cb nott.ont_resty;
+        on_mpath_expr cb nott.ont_body
+       end
+
+
      | OB_oper None   -> ()
      | OB_oper Some b ->
          match b with

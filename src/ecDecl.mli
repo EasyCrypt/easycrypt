@@ -51,6 +51,7 @@ type locals = EcIdent.t list
 type operator_kind = 
   | OB_oper of opbody option
   | OB_pred of form option
+  | OB_nott of notation
 
 and opbody =
   | OP_Plain  of EcTypes.expr
@@ -76,22 +77,30 @@ and opbranch = {
   opb_sub  : opbranches;
 }
 
+and notation = {
+  ont_args  : (EcIdent.t * EcTypes.ty) list;
+  ont_resty : EcTypes.ty;
+  ont_body  : expr;
+}
+
 type operator = {
   op_tparams : ty_params;
   op_ty      : EcTypes.ty;        
   op_kind    : operator_kind;
 }
 
-val op_ty   : operator -> ty
-val is_pred : operator -> bool
-val is_oper : operator -> bool
-val is_ctor : operator -> bool
-val is_proj : operator -> bool
-val is_rcrd : operator -> bool
-val is_fix  : operator -> bool
+val op_ty     : operator -> ty
+val is_pred   : operator -> bool
+val is_oper   : operator -> bool
+val is_ctor   : operator -> bool
+val is_proj   : operator -> bool
+val is_rcrd   : operator -> bool
+val is_fix    : operator -> bool
+val is_abbrev : operator -> bool
 
-val mk_op   : ty_params -> ty -> opbody option -> operator
-val mk_pred : ty_params -> ty list -> form option -> operator
+val mk_op     : ty_params -> ty -> opbody option -> operator
+val mk_pred   : ty_params -> ty list -> form option -> operator
+val mk_abbrev : ty_params -> (EcIdent.ident * ty) list -> ty * expr -> operator
 
 val operator_as_ctor : operator -> EcPath.path * int
 val operator_as_rcrd : operator -> EcPath.path

@@ -1265,12 +1265,18 @@ module Notations = struct
     let benv, xs = TT.transbinding (env scope) ue at.ab_args in
     let codom = TT.transty TT.tp_relax (env scope) ue (fst at.ab_def) in
     let body = TT.transexpcast benv `InOp ue codom (snd at.ab_def) in
-    let body = e_lam xs body in
 
     if not (EcUnify.UniEnv.closed ue) then
       hierror ~loc:gloc "this abbrev. type contains free type variables";
 
-    ignore body; scope
+    let uni     = EcUnify.UniEnv.close ue in
+    let body    = e_mapty (Tuni.offun uni) body in
+    let codom   = Tuni.offun uni codom in
+    let xs      = List.map (snd_map (Tuni.offun uni)) xs in
+    let tparams = EcUnify.UniEnv.tparams ue in
+    let tyat    = EcDecl.mk_abbrev tparams xs (codom, body) in
+
+    Op.bind scope (unloc at.ab_name, tyat)
 end
 
 (* -------------------------------------------------------------------- *)
@@ -2389,6 +2395,9 @@ module Cloning = struct
                 (subst, ops, proofs, 
                  if alias then Op.bind scope (x, newpr) else scope)
         end
+
+        | CTh_operator (_, ({ op_kind = OB_nott _})) ->
+           (subst, ops, proofs, scope)
   
         | CTh_axiom (x, ax) -> begin
             let subst, x = rename subst (`Lemma, x) in
@@ -2495,7 +2504,8 @@ module Cloning = struct
                       | true  -> Some (EcPath.pappend npath q)
                       | false ->
                           match op.EcDecl.op_kind with
-                          | OB_pred _    -> assert false
+                          | OB_pred _
+                          | OB_nott _    -> assert false
                           | OB_oper None -> None
                           | OB_oper (Some (OP_Constr _))
                           | OB_oper (Some (OP_Record _))
