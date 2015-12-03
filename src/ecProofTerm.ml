@@ -630,7 +630,7 @@ and check_pterm_oarg ?loc pe (x, xty) f arg =
         with
         | EcTyping.TymodCnvFailure _ ->
             tc_pterm_apperror ?loc pe AE_InvalidArgMod
-        | EcTyping.RestrictionError e ->
+        | EcTyping.RestrictionError (_, e) ->
             tc_pterm_apperror ?loc pe (AE_InvalidArgModRestr e)
       end
       | arg ->

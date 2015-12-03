@@ -149,13 +149,21 @@ val trans_msymbol    : env -> pmsymbol located -> mpath * module_sig
 val trans_gamepath   : env -> pgamepath -> xpath 
 
 (* -------------------------------------------------------------------- *)
-type restriction_error
+type restriction_who =
+| RW_mod of EcPath.mpath
+| RW_fun of EcPath.xpath 
+
+type restriction_err =
+| RE_UseVariable          of EcPath.xpath
+| RE_UseVariableViaModule of EcPath.xpath * EcPath.mpath
+| RE_UseModule            of EcPath.mpath
+| RE_VMissingRestriction  of EcPath.xpath * EcPath.mpath pair
+| RE_MMissingRestriction  of EcPath.mpath * EcPath.mpath pair
+
+type restriction_error = restriction_who * restriction_err
+
+exception RestrictionError of EcEnv.env * restriction_error
   
-exception RestrictionError of restriction_error
-
-val pp_restriction_error : 
-   EcEnv.env -> Format.formatter -> restriction_error -> unit
-
 val check_sig_mt_cnv :
   env -> module_sig -> module_type -> unit 
 

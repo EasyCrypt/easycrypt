@@ -107,6 +107,22 @@ exception TyError of EcLocation.t * EcEnv.env * tyerror
 let tyerror loc env e = raise (TyError (loc, env, e))
 
 (* -------------------------------------------------------------------- *)
+type restriction_who =
+| RW_mod of EcPath.mpath
+| RW_fun of EcPath.xpath 
+
+type restriction_err =
+| RE_UseVariable          of EcPath.xpath
+| RE_UseVariableViaModule of EcPath.xpath * EcPath.mpath
+| RE_UseModule            of EcPath.mpath
+| RE_VMissingRestriction  of EcPath.xpath * EcPath.mpath pair
+| RE_MMissingRestriction  of EcPath.mpath * EcPath.mpath pair
+
+type restriction_error = restriction_who * restriction_err
+
+exception RestrictionError of EcEnv.env * restriction_error
+
+(* -------------------------------------------------------------------- *)
 type ptnmap = ty EcIdent.Mid.t ref
 
 (* -------------------------------------------------------------------- *)
@@ -544,71 +560,15 @@ let check_sig_mt_cnv env sin tyout =
   check_sig_cnv `Sub env sin sout
 
 (* -------------------------------------------------------------------- *)
-type restriction_who =
-| RW_mod of EcPath.mpath
-| RW_fun of EcPath.xpath 
-
-type restriction_err =
-| RE_UseVariable          of EcPath.xpath
-| RE_UseVariableViaModule of EcPath.xpath * EcPath.mpath
-| RE_UseModule            of EcPath.mpath
-| RE_VMissingRestriction  of EcPath.xpath * EcPath.mpath pair
-| RE_MMissingRestriction  of EcPath.mpath * EcPath.mpath pair
-
-type restriction_error = restriction_who * restriction_err
-
-exception RestrictionError of restriction_error
-
-let pp_restriction_error env fmt (w, e) = 
-  let ppe = EcPrinting.PPEnv.ofenv env in
-  let pp_v fmt xp = EcPrinting.pp_pv ppe fmt (pv_glob xp) in
-  let pp_m fmt m  = EcPrinting.pp_topmod ppe fmt m in
-
-  let pp_restriction_who fmt = function
-    | RW_mod mp ->
-        Format.fprintf fmt "the module %a" pp_m mp
-
-    | RW_fun xp ->
-        Format.fprintf fmt "the procedure %a" (EcPrinting.pp_funname ppe) xp in
-
-  let pp_restriction_err fmt = function
-    | RE_UseVariable x -> 
-        Format.fprintf fmt
-          "should not be able to use the variable %a"
-          pp_v x
-
-    | RE_UseVariableViaModule (x, m) -> 
-        Format.fprintf fmt
-          "should not be able to use %a (via %a)"
-          pp_v x pp_m m
-
-    | RE_UseModule m -> 
-        Format.fprintf fmt
-          "should not be able to use the module %a"
-          pp_m m
-
-    | RE_VMissingRestriction (x, (m1, m2))->
-        Format.fprintf fmt
-          "should not be able to use %a, add restriction %a to %a"
-          pp_v x pp_m m1 pp_m m2
-
-    | RE_MMissingRestriction (m, (m1, m2))->
-        Format.fprintf fmt
-          "should not be able to use %a, add restriction %a to %a or %a to %a"
-          pp_m m pp_m m1 pp_m m2 pp_m m2 pp_m m1
-
-  in Format.fprintf fmt "%a %a" pp_restriction_who w pp_restriction_err e
-
-(* -------------------------------------------------------------------- *)
 let check_restrictions env who use restr =
-  let re_error = fun x -> raise (RestrictionError (who, x)) in
+  let re_error = fun env x -> raise (RestrictionError (env, (who, x))) in
 
   let restr = NormMp.norm_restr env restr in
 
   let check_xp xp _ =
     (* We check that the variable is not a variable in restr *)
     if NormMp.use_mem_xp xp restr then
-      re_error (RE_UseVariable xp);
+      re_error env (RE_UseVariable xp);
 
     (* We check that the variable is in the restriction of the
      * abstract module in restr. *)
@@ -617,7 +577,7 @@ let check_restrictions env who use restr =
       let r2  = NormMp.get_restr env mp2 in
 
       if not (NormMp.use_mem_xp xp r2) then
-        re_error (RE_UseVariableViaModule (xp, mp2));
+        re_error env (RE_UseVariableViaModule (xp, mp2));
     in
       EcIdent.Sid.iter check restr.EcEnv.us_gl
   in
@@ -627,13 +587,13 @@ let check_restrictions env who use restr =
     let mp1 = EcPath.mident id in
 
     if NormMp.use_mem_gl mp1 restr then
-      re_error (RE_UseModule mp1);
+      re_error env (RE_UseModule mp1);
 
     let r1 = NormMp.get_restr env mp1 in
 
     let check_v xp2 _ =
       if not (NormMp.use_mem_xp xp2 r1) then
-        re_error (RE_VMissingRestriction (xp2, (xp2.x_top, mp1)))
+        re_error env (RE_VMissingRestriction (xp2, (xp2.x_top, mp1)))
     in
     Mx.iter check_v restr.EcEnv.us_pv;
 
@@ -643,7 +603,7 @@ let check_restrictions env who use restr =
       if not (NormMp.use_mem_gl mp2 r1) then
         let r2 = NormMp.get_restr env mp2 in
         if not (NormMp.use_mem_gl mp1 r2) then
-          re_error (RE_MMissingRestriction (mp1, (mp1, mp2)));
+          re_error env (RE_MMissingRestriction (mp1, (mp1, mp2)));
     in
     EcIdent.Sid.iter check_g restr.EcEnv.us_gl
 

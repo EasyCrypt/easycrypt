@@ -977,12 +977,10 @@ let closed (pf : proof) = List.is_empty pf.pr_opened
 
 (* -------------------------------------------------------------------- *)
 module Exn = struct
-  let recast pe hyps f x =
+  let recast pe _hyps f x =
     try  f x
-    with EcTyping.RestrictionError e ->
-      tc_error_lazy pe (fun fmt -> 
-        let env = EcEnv.LDecl.toenv hyps in
-        EcTyping.pp_restriction_error env fmt e)
+    with (EcTyping.RestrictionError _) as e ->
+      tc_error_exn pe e
 
   let recast_pe pe hyps f =
     recast pe hyps f ()
