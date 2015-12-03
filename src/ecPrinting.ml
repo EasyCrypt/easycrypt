@@ -160,6 +160,20 @@ module PPEnv = struct
     in
       p_shorten exists p
 
+  let rw_symb (ppe : t) p =
+      let exists sm =
+      try  EcPath.p_equal (EcEnv.BaseRw.lookup_path sm ppe.ppe_env) p
+      with EcEnv.LookupFailure _ -> false
+    in
+      p_shorten exists p
+
+  let ax_symb (ppe : t) p =
+      let exists sm =
+      try  EcPath.p_equal (EcEnv.Ax.lookup_path sm ppe.ppe_env) p
+      with EcEnv.LookupFailure _ -> false
+    in
+      p_shorten exists p
+
   let op_symb (ppe : t) p info =
     let specs = [1, EcPath.pqoname (EcPath.prefix EcCoreLib.CI_Bool.p_eq) "<>"] in
 
@@ -403,6 +417,14 @@ let pp_tyname ppe fmt p =
 (* -------------------------------------------------------------------- *)
 let pp_tcname ppe fmt p =
   Format.fprintf fmt "%a" EcSymbols.pp_qsymbol (PPEnv.tc_symb ppe p)
+
+(* -------------------------------------------------------------------- *)
+let pp_rwname ppe fmt p =
+  Format.fprintf fmt "%a" EcSymbols.pp_qsymbol (PPEnv.rw_symb ppe p)
+
+(* -------------------------------------------------------------------- *)
+let pp_axname ppe fmt p =
+  Format.fprintf fmt "%a" EcSymbols.pp_qsymbol (PPEnv.ax_symb ppe p)
 
 (* -------------------------------------------------------------------- *)
 let pp_funname (ppe : PPEnv.t) fmt p =
@@ -1880,8 +1902,8 @@ let string_of_axkind = function
   | `Lemma   -> "lemma"
 
 let tags_of_axkind = function
-  | `Axiom x -> List.sort sym_compare (Ssym.elements x)
-  | `Lemma   -> []
+  | `Axiom (x, _) -> List.sort sym_compare (Ssym.elements x)
+  | `Lemma -> []
 
 let pp_axiom ?(long=false) (ppe : PPEnv.t) fmt (x, ax) =
   let ppe = PPEnv.add_locals ppe (List.map fst ax.ax_tparams) in
@@ -2669,11 +2691,11 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, (cth, mode)) =
 
   | EcTheory.CTh_addrw (p, l) ->
       Format.fprintf fmt "hint rewrite %a : %a."
-        pp_path p (pp_list "@ " pp_path) l
+        (pp_rwname ppe) p (pp_list "@ " (pp_axname ppe)) l
 
   | EcTheory.CTh_auto p ->
       Format.fprintf fmt "hint exact : %a."
-        (pp_list "@ " pp_path) (EcPath.Sp.elements p)
+        (pp_list "@ " (pp_axname ppe)) (EcPath.Sp.elements p)
 
 (* -------------------------------------------------------------------- *)
 module ObjectInfo = struct
