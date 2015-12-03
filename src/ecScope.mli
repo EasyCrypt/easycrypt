@@ -85,12 +85,12 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Op : sig
-  val add : scope -> poperator located -> scope
+  val add : scope -> poperator located -> EcDecl.operator * scope
 end
 
 (* -------------------------------------------------------------------- *)
 module Pred : sig
-  val add : scope -> ppredicate located -> scope
+  val add : scope -> ppredicate located -> EcDecl.operator * scope
 end
 
 (* -------------------------------------------------------------------- *)

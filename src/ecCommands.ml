@@ -283,23 +283,26 @@ and process_interface (scope : EcScope.scope) (x, i) =
   EcScope.ModType.add scope x.pl_desc i
 
 (* -------------------------------------------------------------------- *)
-and process_operator (scope : EcScope.scope) (op : poperator located) =
+and process_operator (scope : EcScope.scope) (pop : poperator located) =
   EcScope.check_state `InTop "operator" scope;
-  let scope = EcScope.Op.add scope op in
-    List.iter
-      (fun { pl_desc = name } ->
-        EcScope.notify scope `Info "added operator: `%s'" name;
+  let op, scope = EcScope.Op.add scope pop in
+  let ppe = EcPrinting.PPEnv.ofenv (EcScope.env scope) in
+  List.iter
+    (fun { pl_desc = name } ->
+      EcScope.notify scope `Info "added operator %s %a" 
+        name (EcPrinting.pp_added_op ppe) op;
         check_opname_validity scope name)
-      (op.pl_desc.po_name :: op.pl_desc.po_aliases);
+      (pop.pl_desc.po_name :: pop.pl_desc.po_aliases);
     scope
 
 (* -------------------------------------------------------------------- *)
 and process_predicate (scope : EcScope.scope) (p : ppredicate located) =
   EcScope.check_state `InTop "predicate" scope;
-  let scope = EcScope.Pred.add scope p in
-    EcScope.notify scope `Info "added predicate: `%s'"
-      (unloc p.pl_desc.pp_name);
-    check_opname_validity scope (unloc p.pl_desc.pp_name);
+  let op, scope = EcScope.Pred.add scope p in
+  let ppe = EcPrinting.PPEnv.ofenv (EcScope.env scope) in
+  EcScope.notify scope `Info "added predicate %s %a"
+    (unloc p.pl_desc.pp_name) (EcPrinting.pp_added_op ppe) op;
+  check_opname_validity scope (unloc p.pl_desc.pp_name);
     scope
 
 (* -------------------------------------------------------------------- *)

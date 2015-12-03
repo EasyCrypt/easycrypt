@@ -20,6 +20,7 @@ module PPEnv : sig
   type t
 
   val ofenv : EcEnv.env -> t
+  val add_locals : ?force:bool -> t -> EcIdent.t list -> t
 end
 
 (* -------------------------------------------------------------------- *)
@@ -56,6 +57,7 @@ val pp_path     : path pp
 (* -------------------------------------------------------------------- *)
 val pp_typedecl : PPEnv.t -> (path * tydecl                ) pp
 val pp_opdecl   : ?long:bool -> PPEnv.t -> (path * operator) pp
+val pp_added_op : PPEnv.t -> operator pp
 val pp_axiom    : ?long:bool -> PPEnv.t -> (path * axiom   ) pp
 val pp_theory   : PPEnv.t -> (path * (ctheory * thmode)    ) pp
 val pp_modtype  : PPEnv.t -> (module_type * mod_restr      ) pp

@@ -1724,9 +1724,8 @@ let pp_tyvarannot (ppe : PPEnv.t) fmt ids =
   | ids -> Format.fprintf fmt "[%a]" (pp_list ",@ " (pp_tyvar_ctt ppe)) ids
 
 (* -------------------------------------------------------------------- *)
-let pp_opdecl_pr (ppe : PPEnv.t) fmt (x, ts, ty, op) =
+let pp_opdecl_pr (ppe : PPEnv.t) fmt (basename, ts, ty, op) =
   let ppe = PPEnv.add_locals ppe (List.map fst ts) in
-  let basename = P.basename x in
 
   let pp_body fmt =
     match op with
@@ -1761,9 +1760,8 @@ let pp_opdecl_pr (ppe : PPEnv.t) fmt (x, ts, ty, op) =
     Format.fprintf fmt "@[<hov 2>pred %a %a %t.@]"
       pp_opname ([], basename) (pp_tyvarannot ppe) ts pp_body
 
-let pp_opdecl_op (ppe : PPEnv.t) fmt (x, ts, ty, op) =
+let pp_opdecl_op (ppe : PPEnv.t) fmt (basename, ts, ty, op) =
   let ppe = PPEnv.add_locals ppe (List.map fst ts) in
-  let basename = P.basename x in
 
   let pp_body fmt =
     match op with
@@ -1829,11 +1827,12 @@ let pp_opdecl_op (ppe : PPEnv.t) fmt (x, ts, ty, op) =
 
         let cfix = EcInductive.collate_matchfix fix in
 
-        Format.fprintf fmt "%t = @\n%a" pp_vds
+        Format.fprintf fmt "%t : %a = @\n%a" pp_vds
+          (pp_type ppe) fix.opf_resty
           (pp_list "@\n" pp_branch) cfix
 
     | Some (OP_TC) ->
-        Format.fprintf fmt "= <type-class-operator>"
+        Format.fprintf fmt "= < type-class-operator >"
   in
 
   match ts with
@@ -1854,14 +1853,26 @@ let pp_opdecl ?(long = false) (ppe : PPEnv.t) fmt (x, op) =
 
   let pp_decl fmt op = 
     match op.op_kind with
-    | OB_oper i -> pp_opdecl_op ppe fmt (x, op.op_tparams, op_ty op, i)
-    | OB_pred i -> pp_opdecl_pr ppe fmt (x, op.op_tparams, op_ty op, i)
+    | OB_oper i -> 
+      pp_opdecl_op ppe fmt (P.basename x, op.op_tparams, op_ty op, i)
+    | OB_pred i -> 
+      pp_opdecl_pr ppe fmt (P.basename x, op.op_tparams, op_ty op, i)
 
   in Format.fprintf fmt "@[<v>%a%a@]" pp_name x pp_decl op
+
+let pp_added_op (ppe : PPEnv.t) fmt op =
+  let ppe = PPEnv.add_locals ppe (List.map fst op.op_tparams) in
+  match op.op_tparams with
+  | [] -> Format.fprintf fmt ": @[<hov 2>%a@]" 
+    (pp_type ppe) op.op_ty
+  | ts  ->
+    Format.fprintf fmt "@[<hov 2>%a :@ %a.@]"
+      (pp_tyvarannot ppe) ts (pp_type ppe) op.op_ty
 
 (* -------------------------------------------------------------------- *)
 let pp_opname (ppe : PPEnv.t) fmt (p : EcPath.path) =
   pp_opname fmt (PPEnv.op_symb ppe p None)
+
 
 (* -------------------------------------------------------------------- *)
 let string_of_axkind = function

@@ -1177,7 +1177,7 @@ module Op = struct
 
       end else scope
 
-    in scope
+    in tyop, scope
 end
 
 (* -------------------------------------------------------------------- *)
@@ -1211,7 +1211,8 @@ module Pred = struct
     let tparams = EcUnify.UniEnv.tparams ue in
     let tyop    = EcDecl.mk_pred tparams dom body in
 
-      Op.bind scope (unloc op.pp_name, tyop)
+    let scope = Op.bind scope (unloc op.pp_name, tyop) in
+    tyop, scope
 end
 
 (* -------------------------------------------------------------------- *)
