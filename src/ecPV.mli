@@ -14,6 +14,13 @@ open EcEnv
 open EcFol
 
 (* -------------------------------------------------------------------- *)
+type alias_clash = 
+ | AC_concrete_abstract of mpath * prog_var 
+ | AC_abstract_abstract of mpath * mpath
+
+exception AliasClash of env * alias_clash 
+
+(* -------------------------------------------------------------------- *)
 module PVMap : sig
   type 'a t
 

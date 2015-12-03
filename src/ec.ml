@@ -206,6 +206,9 @@ let _ =
     List.iter EcCommands.addidir ldropts.ldro_idirs;
   end;
 
+  (* Register user messages printers *)
+  begin let open EcUserMessages in register () end;
+
   (* Initialize I/O + interaction module *)
   let (prvopts, input, terminal, interactive) =
     match options.o_command with

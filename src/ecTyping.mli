@@ -99,10 +99,6 @@ exception TyError of EcLocation.t * env * tyerror
 val tyerror : EcLocation.t -> env -> tyerror -> 'a
 
 (* -------------------------------------------------------------------- *)
-val pp_tyerror     : env -> Format.formatter -> tyerror -> unit
-val pp_cnv_failure : env -> Format.formatter -> tymod_cnv_failure -> unit
-
-(* -------------------------------------------------------------------- *)
 val unify_or_fail : env -> EcUnify.unienv -> EcLocation.t -> expct:ty -> ty -> unit
 
 (* -------------------------------------------------------------------- *)

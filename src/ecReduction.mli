@@ -14,6 +14,10 @@ open EcModules
 open EcEnv
 
 (* -------------------------------------------------------------------- *)
+exception IncompatibleType of env * (ty * ty)
+exception IncompatibleForm of env * (form * form)
+
+(* -------------------------------------------------------------------- *)
 type 'a eqtest = env -> 'a -> 'a -> bool
 
 module EqTest : sig

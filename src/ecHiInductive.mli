@@ -50,10 +50,6 @@ val dterror : EcLocation.t -> EcEnv.env -> dterror -> 'a
 val fxerror : EcLocation.t -> EcEnv.env -> fxerror -> 'a
 
 (* -------------------------------------------------------------------- *)
-val pp_rcerror : EcEnv.env -> Format.formatter -> rcerror -> unit
-val pp_dterror : EcEnv.env -> Format.formatter -> dterror -> unit
-
-(* -------------------------------------------------------------------- *)
 val trans_record : env -> ptydname -> precord -> record
 
 (* -------------------------------------------------------------------- *)

@@ -43,72 +43,12 @@ let clone_error env error =
   raise (CloneError (env, error))
 
 (* -------------------------------------------------------------------- *)
-let string_of_ovkind = function
-  | OVK_Type      -> "type"
-  | OVK_Operator  -> "operator"
-  | OVK_Predicate -> "predicate"
-  | OVK_Theory    -> "theory"
-  | OVK_Lemma     -> "lemma/axiom"
-
-(* -------------------------------------------------------------------- *)
 type axclone = {
   axc_axiom : symbol * EcDecl.axiom;
   axc_path  : EcPath.path;
   axc_env   : EcEnv.env;
   axc_tac   : EcParsetree.ptactic_core option;
 }
-
-(* -------------------------------------------------------------------- *)
-let pp_incompatible env fmt = function
-  | NotSameNumberOfTyParam(exp, got) ->
-    Format.fprintf fmt "contains %i type parameter instead of %i" got exp
-  | DifferentType(exp,got) ->
-    let ppe = EcPrinting.PPEnv.ofenv env in
-    Format.fprintf fmt "has type %a instead of %a" 
-      (EcPrinting.pp_type ppe) got  (EcPrinting.pp_type ppe) exp
-
-let pp_clone_error fmt env error =
-  let msg x = Format.fprintf fmt x in
-
-  match error with
-  | CE_UnkTheory name ->
-      msg "cannot find theory to clone: `%s'"
-        (string_of_qsymbol name)
-
-  | CE_DupOverride (kd, x) ->
-      msg "the %s `%s' is instantiate twice"
-        (string_of_ovkind kd) (string_of_qsymbol x)
-
-  | CE_UnkOverride (kd, x) ->
-      msg "unknown %s `%s'"
-        (string_of_ovkind kd) (string_of_qsymbol x)
-
-  | CE_CrtOverride (kd, x) ->
-      msg "cannot instantiate the _concrete_ %s `%s' / they may be not convertible"
-        (string_of_ovkind kd) (string_of_qsymbol x)
-
-  | CE_TypeArgMism (kd, x) ->
-      msg "type argument mismatch for %s `%s'"
-        (string_of_ovkind kd) (string_of_qsymbol x)
-
-  | CE_OpIncompatible (x, err) ->
-      msg "operator `%s' body %a"
-        (string_of_qsymbol x) (pp_incompatible env) err
-
-  | CE_PrIncompatible (x, err) ->
-      msg "predicate `%s' body %a"
-        (string_of_qsymbol x) (pp_incompatible env) err
-
-  | CE_InvalidRE x ->
-      msg "invalid regexp: `%s'" x
-
-let () =
-  let pp fmt exn =
-    match exn with
-    | CloneError (env, e) -> pp_clone_error fmt env e
-    | _ -> raise exn
-  in
-    EcPException.register pp
 
 (* ------------------------------------------------------------------ *)
 type evclone = {

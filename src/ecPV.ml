@@ -21,36 +21,10 @@ type alias_clash =
 
 exception AliasClash of env * alias_clash 
 
-let pp_alias_clash env fmt = function
-  | AC_concrete_abstract(mp,npv) ->
-    let top = m_functor npv.pv_name.x_top in
-    let ppe = EcPrinting.PPEnv.ofenv env in
-    Format.fprintf fmt 
-      "The module %a can write %a (maybe add restriction %a)"
-      (EcPrinting.pp_topmod ppe) mp
-      (EcPrinting.pp_pv ppe) npv
-      (EcPrinting.pp_topmod ppe) top
-  | AC_abstract_abstract(mp,mp') ->
-    let ppe = EcPrinting.PPEnv.ofenv env in
-    Format.fprintf fmt 
-      "The module %a can write %a (add restriction %a to %a, or %a to %a)"
-      (EcPrinting.pp_topmod ppe) mp
-      (EcPrinting.pp_topmod ppe) mp'
-      (EcPrinting.pp_topmod ppe) mp
-      (EcPrinting.pp_topmod ppe) mp' 
-      (EcPrinting.pp_topmod ppe) mp'
-      (EcPrinting.pp_topmod ppe) mp 
-
-let _ = EcPException.register (fun fmt exn ->
-  match exn with
-  | AliasClash(env, ac) -> pp_alias_clash env fmt ac
-  | _ -> raise exn)
-
-
 let pvm = EcEnv.NormMp.norm_pvar
 
-let uerror env c = 
-  EcCoreGoal.tacuerror "%a" (pp_alias_clash env) c
+let uerror env c =
+  EcCoreGoal.tacuerror_exn (AliasClash (env, c))
 
 module Mnpv = 
   EcMaps.Map.Make(struct

@@ -16,6 +16,27 @@ open EcMatching
 open EcCoreGoal
 
 (* -------------------------------------------------------------------- *)
+type apperror =
+  | AE_WrongArgKind of (argkind * argkind)
+  | AE_CannotInfer
+  | AE_CannotInferMod
+  | AE_NotFunctional
+  | AE_InvalidArgForm     of invalid_arg_form
+  | AE_InvalidArgMod
+  | AE_InvalidArgProof    of (form * form)
+  | AE_InvalidArgModRestr of EcTyping.restriction_error
+
+and argkind = [`Form | `Mem | `Mod | `PTerm]
+
+and invalid_arg_form =
+  | IAF_Mismatch of (ty * ty)
+  | IAF_TyError of env * EcTyping.tyerror
+
+type pterror = (LDecl.hyps * EcUnify.unienv * mevmap) * apperror
+
+exception ProofTermError of pterror
+
+(* -------------------------------------------------------------------- *)
 type pt_env = {
   pte_pe : proofenv;         (* proofenv of this proof-term *)
   pte_hy : LDecl.hyps;       (* local context *)
@@ -102,7 +123,7 @@ val pattern_form :
   -> EcIdent.t * form
 
 (* Proof-terms concretization, i.e. evmap/unienv resolution *)
-type cptenv
+type cptenv = CPTEnv of f_subst
 
 val can_concretize  : pt_env -> bool
 val concretize_env  : pt_env -> cptenv

@@ -15,19 +15,6 @@ open EcUtils
 (* -------------------------------------------------------------------- *)
 exception ParseError of EcLocation.t * string option
 
-let pp_parse_error fmt msg =
-  match msg with
-  | Some msg -> Format.fprintf fmt "parse error: %s" msg
-  | None     -> Format.fprintf fmt "parse error"
-
-let () =
-  let pp fmt exn =
-    match exn with
-    | ParseError (_loc, msg) -> pp_parse_error fmt msg
-    | _ -> raise exn
-  in
-    EcPException.register pp
-
 (* -------------------------------------------------------------------- *)
 type side  = [`Left | `Right]
 type oside = side option

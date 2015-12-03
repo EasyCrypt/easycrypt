@@ -20,24 +20,6 @@ module BI = EcBigInt
 exception IncompatibleType of env * (ty * ty)
 exception IncompatibleForm of env * (form * form)
 
-module PE = EcPrinting
-
-let _ = EcPException.register (fun fmt exn ->
-  match exn with
-  | IncompatibleForm (env, (f1, f2)) ->
-      Format.fprintf fmt
-        "the formula %a is not compatible with %a\n%!"
-        (PE.pp_form (PE.PPEnv.ofenv env)) f1
-        (PE.pp_form (PE.PPEnv.ofenv env)) f2
-
-  | IncompatibleType (env, (t1, t2)) ->
-      Format.fprintf fmt
-        "the type %a is not compatible with %a\n%!"
-        (PE.pp_type (PE.PPEnv.ofenv env)) t1
-        (PE.pp_type (PE.PPEnv.ofenv env)) t2
-
-  | _ -> raise exn)
-
 (* -------------------------------------------------------------------- *)
 type 'a eqtest = env -> 'a -> 'a -> bool
 
