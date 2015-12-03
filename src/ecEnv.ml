@@ -2788,13 +2788,20 @@ module Theory = struct
     List.pmap (filter1 clears root) items
 
   and filter1 clears root =
-    let inclear = List.exists (oeq EcPath.p_equal (Some root)) clears in
+    let inclear p = List.exists (oeq EcPath.p_equal p) clears in
+    let thclear = inclear (Some root) in
+
     function
-    | CTh_axiom (_, { ax_kind = `Lemma }) when inclear ->
+    | CTh_axiom (_, { ax_kind = `Lemma }) when thclear ->
         None
 
-    | CTh_baserw _ | CTh_addrw _ when inclear ->
-        None
+    | CTh_addrw (p, ps) ->
+        let ps = List.filter (inclear |- EcPath.prefix) ps in
+        if List.is_empty ps then None else Some (CTh_addrw (p, ps))
+
+    | CTh_auto ps ->
+        let ps = Sp.filter (inclear |- EcPath.prefix) ps in
+        if Sp.is_empty ps then None else Some (CTh_auto ps)
 
     | CTh_theory (x, (cth, mode)) ->
         let isempty = List.is_empty cth.cth_struct in
