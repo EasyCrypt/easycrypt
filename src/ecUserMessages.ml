@@ -662,6 +662,9 @@ match exn with
 | EcTyping.RestrictionError (env, e) ->
     TypingError.pp_restr_error env fmt e
 
+| EcProofTerm.ProofTermError e ->
+    PTermError.pp_pterm_apperror fmt e
+
 | _ -> raise exn
 
 (* -------------------------------------------------------------------- *)
