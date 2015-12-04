@@ -34,6 +34,8 @@ abstract theory ZModule.
   realize Axioms.addmC by apply/addrC.
   realize Axioms.add0m by apply/add0r.
 
+  clear [AddMonoid.Axioms.*].
+
   op ( - ) (x y : t) = x + -y axiomatized by subrE.
 
   lemma nosmt addr0: right_id zeror (+).
@@ -195,6 +197,8 @@ abstract theory ComRing.
   realize Axioms.addmA by apply/mulrA.
   realize Axioms.addmC by apply/mulrC.
   realize Axioms.add0m by apply/mul1r.
+
+  clear [MulMonoid.Axioms.*].
 
   lemma nosmt mulr1: right_id oner ( * ).
   proof. by move=> x; rewrite mulrC mul1r. qed.

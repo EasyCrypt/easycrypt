@@ -54,4 +54,4 @@ clone Number.RealField as RealOrder
   op   ( <= ) <- Real.(<=),
   op   ( <  ) <- Real.(< )
 
-  proof Domain.* by smt, Axioms.* by smt full.
+  proof Field.* by smt, Axioms.* by smt full.

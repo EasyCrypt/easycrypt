@@ -2788,47 +2788,72 @@ module Theory = struct
     { env with env_item = CTh_export path :: env.env_item }
 
   (* ------------------------------------------------------------------ *)
-  let rec filter clears root items =
-    List.pmap (filter1 clears root) items
+  let rec filter clears root cleared items =
+    snd_map (List.pmap identity)
+      (List.map_fold (filter1 clears root) cleared items)
+
+  and filter_th clears root cleared items =
+    let mempty = List.exists (EcPath.p_equal root) clears in
+    let cleared, items = filter clears root cleared items in
+
+    if   mempty && List.is_empty items
+    then (Sp.add root cleared, None)
+    else (cleared, Some items)
 
   and filter1 clears root =
     let inclear p = List.exists (EcPath.p_equal p) clears in
     let thclear = inclear root in
 
-    function
-    | CTh_axiom (_, { ax_kind = `Lemma }) when thclear ->
-        None
+    fun cleared item ->
+      match item with
+      | CTh_theory (x, (cth, mode)) ->
+         let cleared, items =
+           let xpath = EcPath.pqname root x in
+           filter_th clears xpath cleared cth.cth_struct in
+         let item = items |> omap (fun items ->
+           let cth = { cth with cth_struct = items } in
+           CTh_theory (x, (cth, mode))) in
+         (cleared, item)
 
-    | CTh_axiom (x, ({ ax_kind = `Axiom (tags, false) } as ax)) when thclear ->
-       Some (CTh_axiom (x, { ax with ax_kind = `Axiom (tags, true) }))
+      | _ -> let item = match item with
 
-    | CTh_addrw (p, ps) ->
-        let ps = List.filter ((not) |- inclear |- oget |- EcPath.prefix) ps in
-        if List.is_empty ps then None else Some (CTh_addrw (p, ps))
+      | CTh_axiom (_, { ax_kind = `Lemma }) when thclear ->
+          None
 
-    | CTh_auto ps ->
-        let ps = Sp.filter ((not) |- inclear |- oget |- EcPath.prefix) ps in
-        if Sp.is_empty ps then None else Some (CTh_auto ps)
+      | CTh_axiom (x, ({ ax_kind = `Axiom (tags, false) } as ax)) when thclear ->
+          Some (CTh_axiom (x, { ax with ax_kind = `Axiom (tags, true) }))
 
-    | CTh_theory (x, (cth, mode)) ->
-        let isempty = List.is_empty cth.cth_struct in
-        let items = filter clears (EcPath.pqname root x) cth.cth_struct in
+      | CTh_addrw (p, ps) ->
+          let ps = List.filter ((not) |- inclear |- oget |- EcPath.prefix) ps in
+          if List.is_empty ps then None else Some (CTh_addrw (p, ps))
+  
+      | CTh_auto ps ->
+          let ps = Sp.filter ((not) |- inclear |- oget |- EcPath.prefix) ps in
+          if Sp.is_empty ps then None else Some (CTh_auto ps)
 
-        if not isempty && List.is_empty items then None else
-          Some (CTh_theory (x, ({ cth with cth_struct = items }, mode)))
+      | (CTh_export p) as item ->
+          if Sp.mem p cleared then None else Some item
+  
+      | _ as item -> Some item
 
-    | _ as item -> Some item
+      in (cleared, item)
 
   (* ------------------------------------------------------------------ *)
-  let close ?(clears = []) env =
-    let clears = List.map (ofold ((^~) EcPath.pappend) (root env)) clears in
-    let items  = List.rev env.env_item in
-    let items  =
+  let close ?(clears = []) ?(pempty = `No) env =
+    let items = List.rev env.env_item in
+    let items =
       if   List.is_empty clears
-      then items
-      else filter clears (root env) items in
+      then (if List.is_empty items then None else Some items)
+      else snd (filter_th clears (root env) Sp.empty items) in
 
-    { cth_desc = CTh_struct items; cth_struct = items; }
+    let items =
+      match items, pempty with
+      | None, (`No | `ClearOnly) -> Some []
+      | _, _ -> items
+    in
+
+    items |> omap (fun items ->
+      { cth_desc = CTh_struct items; cth_struct = items; })
 
   (* ------------------------------------------------------------------ *)
   let require ?(mode = `Concrete) x cth env =

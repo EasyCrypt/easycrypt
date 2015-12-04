@@ -18,14 +18,14 @@ abstract theory BigZModule.
 type t.
 
 clone import Ring.ZModule as ZM with type t <- t.
-clear [ZM.*].
+clear [ZM.* ZM.AddMonoid.*].
 
 clone include Bigop with
   type t <- t,
   op   Support.idm <- ZM.zeror,
   op   Support.(+) <- ZM.(+)
 
-  proof Support.*.
+  proof Support.Axioms.*.
 
 realize Support.Axioms.addmA. by apply/addrA. qed.
 realize Support.Axioms.addmC. by apply/addrC. qed.
@@ -57,7 +57,7 @@ abstract theory BigComRing.
 type t.
 
 clone import Ring.ComRing as CR with type t <- t.
-clear [CR.*].
+clear [CR.* CR.AddMonoid.* CR.MulMonoid.*].
 
 (* -------------------------------------------------------------------- *)
 theory BAdd.

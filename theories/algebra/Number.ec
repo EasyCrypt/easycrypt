@@ -37,7 +37,7 @@ abstract theory RealDomain.
 type t.
 
 clone import Ring.IDomain as Domain with type t <- t.
-clear [Domain.*].
+clear [Domain.* Domain.AddMonoid.* Domain.MulMonoid.*].
 
 op "`|_|" : t -> t.
 op ( <= ) : t -> t -> bool.
@@ -53,6 +53,8 @@ theory Axioms.
   axiom nosmt ltr_def      (x y : t): x < y <=> (y <> x) /\ x <= y.
   axiom nosmt real_axiom   (x   : t): zeror <= x \/ x <= zeror.
 end Axioms.
+
+clear [Axioms.*].
 
 lemma nosmt ler_norm_add (x y : t): `|x + y| <= `|x| + `|y|.
 proof. by apply/Axioms.ler_norm_add. qed.
@@ -1029,7 +1031,7 @@ theory RealField.
 type t.
 
 clone import Ring.Field as Field with type t <- t.
-clear [Field.*].
+clear [Field.* Field.AddMonoid.* Field.MulMonoid.*].
 
 clone include RealDomain with type t <- t,
   pred Domain.unit (x : t) <- x <> zeror,

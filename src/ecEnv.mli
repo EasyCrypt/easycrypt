@@ -262,7 +262,11 @@ module Theory : sig
   val export  : path -> env -> env
 
   val enter : symbol -> env -> env
-  val close : ?clears:(path option) list -> env -> ctheory
+
+  val close :
+       ?clears:(path list)
+    -> ?pempty:[`Full | `ClearOnly | `No]
+    -> env -> ctheory option
 end
 
 (* -------------------------------------------------------------------- *)
