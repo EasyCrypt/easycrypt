@@ -122,17 +122,17 @@ elim: s1 s2 => [|x1 s1 ih] [|x2 s2] //=; rewrite ?(addz_neq0, size_ge0) //.
 by move/addzI/ih=> ->.
 qed.
 
-lemma lastcons (x y : 'a) (s : 'a list): last x (y :: s) = last y s.
+lemma last_cons (x y : 'a) (s : 'a list): last x (y :: s) = last y s.
 proof. by []. qed.
 
-lemma lastcat (x : 'a) (s1 s2 : 'a list):
+lemma last_cat (x : 'a) (s1 s2 : 'a list):
   last x (s1 ++ s2) = last (last x s1) s2.
 proof. by elim s1 x=> //= x s1 ->. qed.
 
-lemma lastrcons (x y : 'a) (s : 'a list): last x (rcons s y) = y.
+lemma last_rcons (x y : 'a) (s : 'a list): last x (rcons s y) = y.
 proof. by elim s x=> //= x s ->. qed.
 
-lemma lastnonempty (x1 x2 : 'a) (s : 'a list):
+lemma last_nonempty (x1 x2 : 'a) (s : 'a list):
   s <> [] =>
   last x1 s = last x2 s.
 proof. by case s. qed.
