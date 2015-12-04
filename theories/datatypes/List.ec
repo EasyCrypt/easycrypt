@@ -995,6 +995,10 @@ proof. by rewrite /rev -catrev_catr /= -catrev_catl. qed.
 lemma rev_rcons s (x : 'a): rev (rcons s x) = x :: rev s.
 proof. by rewrite -cats1 rev_cat /rev /=. qed.
 
+lemma last_rev ['a] (x0 : 'a) (s : 'a list) :
+  last x0 (rev s) = head x0 s.
+proof. by case: s => [|x s]; rewrite ?rev_nil ?rev_cons ?last_rcons. qed.
+
 lemma revK (s : 'a list): rev (rev s) = s.
 proof. by elim s; smt. qed.
 
