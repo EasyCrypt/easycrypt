@@ -2575,7 +2575,7 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, (cth, mode)) =
       Format.fprintf fmt "declare rewrite %s." name
 
   | EcTheory.CTh_addrw (p, l) ->
-      Format.fprintf fmt "hint rewrite %a : %a."
+      Format.fprintf fmt "hint rewrite %a : @[<hov 2>%a@]."
         (pp_rwname ppe) p (pp_list "@ " (pp_axname ppe)) l
 
   | EcTheory.CTh_auto p ->
