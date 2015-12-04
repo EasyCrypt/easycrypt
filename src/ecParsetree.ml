@@ -593,17 +593,19 @@ type rwarg = (tfocus located) option * rwarg1 located
 
 and rwarg1 =
   | RWSimpl
-  | RWDelta of (rwoptions * pformula)
-  | RWRw    of (rwoptions * (rwside * ppterm) list)
-  | RWPr    of (psymbol * pformula option)
-  | RWDone  of bool
-  | RWSmt   of pprover_infos
-  | RWApp   of ppterm
+  | RWDelta  of (rwoptions * pformula)
+  | RWRw     of (rwoptions * (rwside * ppterm) list)
+  | RWPr     of (psymbol * pformula option)
+  | RWDone   of bool
+  | RWSmt    of pprover_infos
+  | RWApp    of ppterm
+  | RWTactic of rwtactic
 
 and rwoptions = rwside * trepeat option * rwocc
 and rwside    = [`LtoR | `RtoL]
 and rwocc     = (rwocci * Sint.t) option
 and rwocci    = [`Inclusive | `Exclusive]
+and rwtactic  = [`Ring]
 
 (* -------------------------------------------------------------------- *)
 type intropattern1 =

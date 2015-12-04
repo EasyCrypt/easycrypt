@@ -149,6 +149,60 @@ let process_clear symbols tc =
 
 
 (* -------------------------------------------------------------------- *)
+let process_algebra mode kind eqs (tc : tcenv1) =
+  let (env, hyps, concl) = FApi.tc1_eflat tc in
+
+  if not (EcAlgTactic.is_module_loaded env) then
+    tacuerror "ring/field cannot be used when AlgTactic is not loaded";
+
+  let (ty, f1, f2) =
+    match sform_of_form concl with
+    | SFeq (f1, f2) -> (f1.f_ty, f1, f2)
+    | _ -> tacuerror "conclusion must be an equation"
+  in
+
+  let eqs =
+    let eq1 { pl_desc = x } =
+      match LDecl.hyp_exists x hyps with
+      | false -> tacuerror "cannot find equation referenced by `%s'" x
+      | true  -> begin
+        match sform_of_form (snd (LDecl.hyp_by_name x hyps)) with
+        | SFeq (f1, f2) ->
+            if not (EcReduction.EqTest.for_type env ty f1.f_ty) then
+              tacuerror "assumption `%s' is not an equation over the right type" x;
+            (f1, f2)
+        | _ -> tacuerror "assumption `%s' is not an equation" x
+      end
+    in List.map eq1 eqs
+  in
+
+  let tparams = (LDecl.tohyps hyps).h_tvar in
+
+  let tactic =
+    match
+      match mode, kind with
+      | `Simpl, `Ring  -> `Ring  EcAlgTactic.t_ring_simplify
+      | `Simpl, `Field -> `Field EcAlgTactic.t_field_simplify
+      | `Solve, `Ring  -> `Ring  EcAlgTactic.t_ring
+      | `Solve, `Field -> `Field EcAlgTactic.t_field
+    with
+    | `Ring t ->
+        let r =
+          match TT.get_ring (tparams, ty) env with
+          | None   -> tacuerror "cannot find a ring structure"
+          | Some r -> r
+        in t r eqs (f1, f2)
+    | `Field t ->
+        let r =
+          match TT.get_field (tparams, ty) env with
+          | None   -> tacuerror "cannot find a field structure"
+          | Some r -> r
+        in t r eqs (f1, f2)
+  in
+
+  tactic tc
+
+(* -------------------------------------------------------------------- *)
 module LowApply = struct
   type reason = [`DoNotMatch | `IncompleteInference]
 
@@ -746,6 +800,9 @@ let rec process_rewrite1_r ttenv ?target ri tc =
       | None -> process_apply_bwd ~implicits `Apply fp tc
       | Some target -> process_apply_fwd ~implicits (fp, target) tc
     end
+
+  | RWTactic `Ring -> 
+      process_algebra `Solve `Ring [] tc
 
 (* -------------------------------------------------------------------- *)
 let rec process_rewrite1 ttenv ?target ri tc =
@@ -1620,57 +1677,3 @@ let process_congr tc =
       EcLowGoal.t_reflex tc
 
   | _, _ -> tacuerror "not a congruence"
-
-(* -------------------------------------------------------------------- *)
-let process_algebra mode kind eqs (tc : tcenv1) =
-  let (env, hyps, concl) = FApi.tc1_eflat tc in
-
-  if not (EcAlgTactic.is_module_loaded env) then
-    tacuerror "ring/field cannot be used when AlgTactic is not loaded";
-
-  let (ty, f1, f2) =
-    match sform_of_form concl with
-    | SFeq (f1, f2) -> (f1.f_ty, f1, f2)
-    | _ -> tacuerror "conclusion must be an equation"
-  in
-
-  let eqs =
-    let eq1 { pl_desc = x } =
-      match LDecl.hyp_exists x hyps with
-      | false -> tacuerror "cannot find equation referenced by `%s'" x
-      | true  -> begin
-        match sform_of_form (snd (LDecl.hyp_by_name x hyps)) with
-        | SFeq (f1, f2) ->
-            if not (EcReduction.EqTest.for_type env ty f1.f_ty) then
-              tacuerror "assumption `%s' is not an equation over the right type" x;
-            (f1, f2)
-        | _ -> tacuerror "assumption `%s' is not an equation" x
-      end
-    in List.map eq1 eqs
-  in
-
-  let tparams = (LDecl.tohyps hyps).h_tvar in
-
-  let tactic =
-    match
-      match mode, kind with
-      | `Simpl, `Ring  -> `Ring  EcAlgTactic.t_ring_simplify
-      | `Simpl, `Field -> `Field EcAlgTactic.t_field_simplify
-      | `Solve, `Ring  -> `Ring  EcAlgTactic.t_ring
-      | `Solve, `Field -> `Field EcAlgTactic.t_field
-    with
-    | `Ring t ->
-        let r =
-          match TT.get_ring (tparams, ty) env with
-          | None   -> tacuerror "cannot find a ring structure"
-          | Some r -> r
-        in t r eqs (f1, f2)
-    | `Field t ->
-        let r =
-          match TT.get_field (tparams, ty) env with
-          | None   -> tacuerror "cannot find a field structure"
-          | Some r -> r
-        in t r eqs (f1, f2)
-  in
-
-  tactic tc

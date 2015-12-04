@@ -480,6 +480,7 @@
 %token SELF
 %token SEMICOLON
 %token SEQ
+%token SHARP
 %token SIM
 %token SIMPLIFY
 %token SKIP
@@ -1944,6 +1945,15 @@ rwarg1:
 
 | AMP f=pterm
    { RWApp f }
+
+| SHARP x=ident {
+    let tactics = ["ring", `Ring] in
+    match List.Exceptionless.assoc (unloc x) tactics with
+    | Some x -> RWTactic x
+    | None ->
+        let msg = "invalid rw-tactic: " ^ (unloc x) in
+        parse_error (loc x) (Some msg)
+  }
 
 rwpterms:
 | f=pterm

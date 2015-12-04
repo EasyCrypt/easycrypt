@@ -205,6 +205,7 @@
   (* ------------------------------------------------------------------ *)
   let _operators = [
     (":"  , (COLON       , true ));
+    ("#"  , (SHARP       , true ));
     ("//" , (SLASHSLASH  , true ));
     ("/=" , (SLASHEQ     , true ));
     ("/#" , (SLASHSHARP  , true ));
