@@ -233,20 +233,6 @@ let tc_error_lazy (penv : proofenv) ?(catchable = true) ?loc ?who msg =
   raise (TcError (mk_tcerror ~catchable ~penv ?loc (lazy (getmsg ()))))
 
 (* -------------------------------------------------------------------- *)
-let tc_error_clear (pe : proofenv) ?catchable ?loc ?who err =
-    tc_error_lazy pe ?catchable ?loc ?who (fun fmt ->
-      let pp_id fmt id = Format.fprintf fmt "%s" (EcIdent.name id) in
-      match Lazy.force err with
-      | `ClearInGoal xs ->
-          Format.fprintf fmt
-            "cannot clear %a that is/are used in the conclusion"
-            (EcPrinting.pp_list ",@ " pp_id) xs
-      | `ClearDep (x, y) ->
-          Format.fprintf fmt
-            "cannot clear %a that is used in %a"
-            pp_id x pp_id y)
-
-(* -------------------------------------------------------------------- *)
 type symkind = [`Lemma | `Operator | `Local]
 
 let tc_lookup_error pe ?loc ?who kind qs =

@@ -892,3 +892,9 @@ module FPosition = struct
     let x = match x with None -> EcIdent.create "_p" | Some x -> x in
     let tx fp = f_local x fp.f_ty in (x, map p tx f)
 end
+
+(* -------------------------------------------------------------------- *)
+type cptenv = CPTEnv of f_subst
+
+let can_concretize ev ue =
+  EcUnify.UniEnv.closed ue && MEV.filled ev

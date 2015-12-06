@@ -13,6 +13,7 @@ open EcIdent
 open EcTypes
 open EcFol
 open EcEnv
+open EcMatching
 open EcCoreGoal
 
 module L  = EcLocation
@@ -101,11 +102,7 @@ let ptenv_of_penv (hyps : LDecl.hyps) (pe : proofenv) =
 
 (* -------------------------------------------------------------------- *)
 let can_concretize (pt : pt_env) =
-     EcUnify.UniEnv.closed pt.pte_ue
-  && EcMatching.MEV.filled !(pt.pte_ev)
-
-(* -------------------------------------------------------------------- *)
-type cptenv = CPTEnv of f_subst
+  EcMatching.can_concretize !(pt.pte_ev) pt.pte_ue
 
 (* -------------------------------------------------------------------- *)
 let concretize_env pe =

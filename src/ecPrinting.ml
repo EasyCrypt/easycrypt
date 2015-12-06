@@ -1355,6 +1355,38 @@ and try_pp_lossless (ppe : PPEnv.t) outer fmt f =
             in
               maybe_paren outer (fst outer, prio) pp fmt (); true
 
+and try_pp_notations (ppe : PPEnv.t) outer fmt f =
+  let open EcMatching in
+
+  let try_notation (p, (tv, nt)) =
+    let ev = MEV.of_idents (List.map fst nt.ont_args) `Form in
+    let ue = EcUnify.UniEnv.create (Some tv) in
+    let hy = EcEnv.LDecl.init ppe.PPEnv.ppe_env [] in
+
+    try
+      let (ue, ev) =
+        EcMatching.f_match_core fmnotation hy
+          (ue, ev) (form_of_expr mhr nt.ont_body) f
+      in
+
+      if not (EcMatching.can_concretize ev ue) then
+        raise EcMatching.MatchFailure;
+
+      let tv = List.map (tvar |- fst) tv in
+      let f  = f_op p tv (toarrow tv nt.ont_resty) in
+      let f  = f_app f (List.map (curry f_local) nt.ont_args) nt.ont_resty in
+      let f  = Fsubst.f_subst (EcMatching.MEV.assubst ue ev) f in
+      pp_form_core_r ppe outer fmt f; true
+
+    with EcMatching.MatchFailure ->
+      false
+      
+  in
+
+  let nts = EcEnv.Op.get_notations ppe.PPEnv.ppe_env in
+
+  List.exists try_notation nts
+
 and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
   let pp_opapp ppe outer fmt (op, tys, es) =
     let rec dt_sub f =
@@ -1533,7 +1565,8 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
 
 and pp_form_r (ppe : PPEnv.t) outer fmt f =
   let printers =
-    [try_pp_form_eqveq;
+    [try_pp_notations;
+     try_pp_form_eqveq;
      try_pp_chained_orderings;
      try_pp_lossless]
   in

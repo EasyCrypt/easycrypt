@@ -537,7 +537,7 @@ end = struct
 
     | AE_InvalidArgProof (src, dst) ->
        let ppe = EcPrinting.PPEnv.ofenv (LDecl.toenv hyps) in
-       let sb  = CPTEnv (EcMatching.MEV.assubst ue ev) in
+       let sb  = EcMatching.CPTEnv (EcMatching.MEV.assubst ue ev) in
        let src = concretize_e_form sb src in
        let dst = concretize_e_form sb dst in
 
@@ -630,6 +630,18 @@ let pp_tc_error fmt error =
       Format.fprintf fmt "%a" EcPException.exn_printer e);
   penv |> oiter pp_penv
 
+(* -------------------------------------------------------------------- *)
+let pp_error_clear fmt err =
+  let pp_id fmt id = Format.fprintf fmt "%s" (EcIdent.name id) in
+  match Lazy.force err with
+  | `ClearInGoal xs ->
+      Format.fprintf fmt
+        "cannot clear %a that is/are used in the conclusion"
+        (EcPrinting.pp_list ",@ " pp_id) xs
+  | `ClearDep (x, y) ->
+      Format.fprintf fmt
+        "cannot clear %a that is used in %a"
+        pp_id x pp_id y
 
 (* -------------------------------------------------------------------- *)
 let pp fmt exn =
@@ -664,6 +676,9 @@ match exn with
 
 | EcProofTerm.ProofTermError e ->
     PTermError.pp_pterm_apperror fmt e
+
+| EcCoreGoal.ClearError e ->
+    pp_error_clear fmt e
 
 | _ -> raise exn
 

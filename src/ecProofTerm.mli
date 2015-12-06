@@ -123,8 +123,6 @@ val pattern_form :
   -> EcIdent.t * form
 
 (* Proof-terms concretization, i.e. evmap/unienv resolution *)
-type cptenv = CPTEnv of f_subst
-
 val can_concretize  : pt_env -> bool
 val concretize_env  : pt_env -> cptenv
 val concretize      : pt_ev  -> proofterm * form

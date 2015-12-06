@@ -200,10 +200,6 @@ val tc_error_lazy :
      proofenv -> ?catchable:bool -> ?loc:EcLocation.t -> ?who:string
   -> (Format.formatter -> unit) -> 'a
 
-val tc_error_clear :
-     proofenv -> ?catchable:bool -> ?loc:EcLocation.t -> ?who:string
-  -> clearerror Lazy.t -> 'a
-
 (* -------------------------------------------------------------------- *)
 val tacuerror :
   ?catchable:bool -> ('a, Format.formatter, unit, 'b) format4 -> 'a

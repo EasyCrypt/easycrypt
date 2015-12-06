@@ -137,7 +137,7 @@ type preenv = {
   env_tc       : TC.graph;
   env_rwbase   : Sp.t Mip.t;
   env_atbase   : Sp.t;
-  env_ntbase   : (path * EcDecl.notation) list;
+  env_ntbase   : (path * env_notation) list;
   env_modlcs   : Sid.t;                 (* declared modules *)
   env_item     : ctheory_item list;     (* in reverse order *)
   env_norm     : env_norm ref;
@@ -155,6 +155,8 @@ and tcinstance = [
   | `Field   of EcDecl.field
   | `General of EcPath.path
 ]
+
+and env_notation = ty_params * EcDecl.notation
 
 (* -------------------------------------------------------------------- *)
 type env = preenv
@@ -2416,14 +2418,16 @@ module Op = struct
   let bind name op env =
     let env = MC.bind_operator name op env in
     let op  = NormMp.norm_op env op in
-    { env with
-        env_item = CTh_operator(name, op) :: env.env_item; }
+    let nt  =
+      match op.op_kind with
+      | OB_nott nt ->
+         Some (EcPath.pqname (root env) name, (op.op_tparams, nt))
+      | _ -> None
+    in
 
-  (* This version does not create a Why3 binding. *)
-  let bind_logical name op env =
-    let env = MC.bind_operator name op env in
-      { env with
-          env_item = CTh_operator (name, op) :: env.env_item }
+    { env with
+        env_ntbase = ofold List.cons env.env_ntbase nt;
+        env_item   = CTh_operator(name, op) :: env.env_item; }
 
   let rebind name op env =
     MC.bind_operator name op env
@@ -2479,6 +2483,8 @@ module Op = struct
   let is_fix_def env p =
     try  EcDecl.is_fix (by_path p env)
     with LookupFailure _ -> false
+
+  type notation = env_notation
 
   let get_notations env =
     env.env_ntbase
@@ -2721,8 +2727,8 @@ module Theory = struct
   (* ------------------------------------------------------------------ *)
   let bind_nt_cth =
     let for1 path base = function
-      | CTh_operator (x, { op_kind = OB_nott nt }) ->
-         Some ((EcPath.pqname path x, nt) :: base)
+      | CTh_operator (x, ({ op_kind = OB_nott nt } as op)) ->
+         Some ((EcPath.pqname path x, (op.op_tparams, nt)) :: base)
       | _ -> None
 
     in bind_base_cth for1

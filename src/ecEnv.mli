@@ -292,7 +292,9 @@ module Op : sig
   val is_dtype_ctor  : env -> path -> bool
   val is_fix_def     : env -> path -> bool
 
-  val get_notations : env -> (path * EcDecl.notation) list
+  type notation = ty_params * EcDecl.notation
+
+  val get_notations : env -> (path * notation) list
 end
 
 (* -------------------------------------------------------------------- *)
