@@ -1360,25 +1360,30 @@ and try_pp_notations (ppe : PPEnv.t) outer fmt f =
 
   let try_notation (p, (tv, nt)) =
     let ev = MEV.of_idents (List.map fst nt.ont_args) `Form in
-    let ue = EcUnify.UniEnv.create (Some tv) in
+    let ue = EcUnify.UniEnv.create None in
+    let ov = EcUnify.UniEnv.opentvi ue tv None in
+    let ti = Tvar.subst ov in
     let hy = EcEnv.LDecl.init ppe.PPEnv.ppe_env [] in
+    let bd = form_of_expr mhr nt.ont_body in
+    let bd = Fsubst.subst_tvar ov bd in
 
     try
       let (ue, ev) =
-        EcMatching.f_match_core fmnotation hy
-          (ue, ev) (form_of_expr mhr nt.ont_body) f
+        EcMatching.f_match_core fmnotation hy (ue, ev) bd f
       in
 
       if not (EcMatching.can_concretize ev ue) then
         raise EcMatching.MatchFailure;
 
-      let tv = List.map (tvar |- fst) tv in
-      let f  = f_op p tv (toarrow tv nt.ont_resty) in
-      let f  = f_app f (List.map (curry f_local) nt.ont_args) nt.ont_resty in
-      let f  = Fsubst.f_subst (EcMatching.MEV.assubst ue ev) f in
+      let rty  = ti nt.ont_resty in
+      let tv   = List.map (ti |- tvar |- fst) tv in
+      let args = List.map (curry f_local |- snd_map ti) nt.ont_args in
+      let f    = f_op p tv (toarrow tv rty) in
+      let f    = f_app f args rty in
+      let f    = Fsubst.f_subst (EcMatching.MEV.assubst ue ev) f in
       pp_form_core_r ppe outer fmt f; true
-
-    with EcMatching.MatchFailure ->
+ 
+   with EcMatching.MatchFailure ->
       false
       
   in
