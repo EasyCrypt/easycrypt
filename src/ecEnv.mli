@@ -291,6 +291,8 @@ module Op : sig
   val is_record_ctor : env -> path -> bool
   val is_dtype_ctor  : env -> path -> bool
   val is_fix_def     : env -> path -> bool
+
+  val get_notations : env -> (path * EcDecl.notation) list
 end
 
 (* -------------------------------------------------------------------- *)

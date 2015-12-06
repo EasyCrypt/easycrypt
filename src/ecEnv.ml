@@ -137,6 +137,7 @@ type preenv = {
   env_tc       : TC.graph;
   env_rwbase   : Sp.t Mip.t;
   env_atbase   : Sp.t;
+  env_ntbase   : (path * EcDecl.notation) list;
   env_modlcs   : Sid.t;                 (* declared modules *)
   env_item     : ctheory_item list;     (* in reverse order *)
   env_norm     : env_norm ref;
@@ -237,6 +238,7 @@ let empty gstate =
     env_tc       = TC.Graph.empty;
     env_rwbase   = Mip.empty;
     env_atbase   = Sp.empty;
+    env_ntbase   = [];
     env_modlcs   = Sid.empty;
     env_item     = [];
     env_norm     = ref empty_norm_cache; }
@@ -2477,6 +2479,9 @@ module Op = struct
   let is_fix_def env p =
     try  EcDecl.is_fix (by_path p env)
     with LookupFailure _ -> false
+
+  let get_notations env =
+    env.env_ntbase
 end
 
 (* -------------------------------------------------------------------- *)
@@ -2706,7 +2711,18 @@ module Theory = struct
 
   (* ------------------------------------------------------------------ *)
   let bind_at_cth =
-    let for1 _path _base = function
+    let for1 _path base = function
+      | CTh_auto ps ->
+         Some (Sp.union base ps)
+      | _ -> None
+
+    in bind_base_cth for1
+
+  (* ------------------------------------------------------------------ *)
+  let bind_nt_cth =
+    let for1 path base = function
+      | CTh_operator (x, { op_kind = OB_nott nt }) ->
+         Some ((EcPath.pqname path x, nt) :: base)
       | _ -> None
 
     in bind_base_cth for1
@@ -2725,7 +2741,8 @@ module Theory = struct
         let env_tc     = bind_tc_cth thname env.env_tc cth in
         let env_rwbase = bind_br_cth thname env.env_rwbase cth in
         let env_atbase = bind_at_cth thname env.env_atbase cth in
-        { env with env_tci; env_tc; env_rwbase; env_atbase; }
+        let env_ntbase = bind_nt_cth thname env.env_ntbase cth in
+        { env with env_tci; env_tc; env_rwbase; env_atbase; env_ntbase; }
 
     | `Abstract ->
         env
