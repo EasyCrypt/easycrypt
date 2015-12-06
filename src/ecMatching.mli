@@ -117,13 +117,15 @@ end
 exception MatchFailure
 
 type fmoptions = {
-  fm_delta : bool;
-  fm_conv  : bool;
+  fm_delta  : bool;
+  fm_conv   : bool;
+  fm_horder : bool;
 }
 
-val fmsearch : fmoptions
-val fmrigid  : fmoptions
-val fmdelta  : fmoptions
+val fmsearch   : fmoptions
+val fmrigid    : fmoptions
+val fmdelta    : fmoptions
+val fmnotation : fmoptions
 
 val f_match_core :
      fmoptions

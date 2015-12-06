@@ -257,13 +257,30 @@ end
 exception MatchFailure
 
 type fmoptions = {
-  fm_delta : bool;
-  fm_conv  : bool;
+  fm_delta  : bool;
+  fm_conv   : bool;
+  fm_horder : bool;
 }
 
-let fmsearch = { fm_delta = false; fm_conv = false; }
-let fmrigid  = { fm_delta = false; fm_conv = true ; }
-let fmdelta  = { fm_delta = true ; fm_conv = true ; }
+let fmsearch =
+  { fm_delta  = false;
+    fm_conv   = false;
+    fm_horder = true ; }
+
+let fmrigid = {
+    fm_delta  = false;
+    fm_conv   = true ;
+    fm_horder = true ; }
+
+let fmdelta = {
+    fm_delta  = true ;
+    fm_conv   = true ;
+    fm_horder = true ; }
+
+let fmnotation = {
+    fm_delta  = false;
+    fm_conv   = false;
+    fm_horder = false; }
 
 (* -------------------------------------------------------------------- *)
 (* Rigid unification *)
@@ -274,6 +291,12 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
   let iscvar = function
     | { f_node = Flocal x } -> is_none (EV.get x !ev.evm_form)
     | _ -> false
+  in
+
+  let conv =
+    match opts.fm_conv with
+    | true  -> EcReduction.is_conv hyps
+    | false -> EcReduction.is_alpha_eq hyps
   in
 
   let rec doit env ((subst, mxs) as ilc) ptn subject =
@@ -288,7 +311,7 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
       if opts.fm_conv then begin
         let subject = Fsubst.f_subst subst subject in
         let ptn = Fsubst.f_subst (MEV.assubst ue !ev) ptn in
-          if not (EcReduction.is_conv hyps ptn subject) then
+          if not (conv ptn subject) then
             failure ()
       end else failure ()
     in
@@ -326,9 +349,9 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
           | Some (`Set a) -> begin
               let ssbj = Fsubst.f_subst subst subject in
 
-              if not (EcReduction.is_conv hyps ssbj a) then
+              if not (conv ssbj a) then
                 let ssbj = Fsubst.f_subst (MEV.assubst ue !ev) subject in
-                if not (EcReduction.is_conv hyps ssbj a) then
+                if not (conv ssbj a) then
                   doit env ilc a ssbj
                 else
                   try  EcUnify.unify env ue ptn.f_ty subject.f_ty
@@ -352,7 +375,7 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
           end
           | _ -> failure ()
 
-        with MatchFailure ->
+        with MatchFailure when opts.fm_horder ->
           match f1.f_node with
           | Flocal f when
                   not (Mid.mem f mxs)
