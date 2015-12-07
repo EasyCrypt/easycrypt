@@ -260,28 +260,25 @@ let select_pv env side name ue tvi psig =
 
 (* -------------------------------------------------------------------- *)
 module OpSelect = struct
-  type 'a ctargs = 'a * EcTypes.ty
-
-  type pvctor = [
+  type pvsel = [
     | `Proj of EcTypes.prog_var * EcTypes.ty * (int * int)
     | `Var  of EcTypes.prog_var
   ]
 
-  type opctor = EcPath.path * EcTypes.ty list
-
-  type 'a ctor = {
-    ct_pv : EcMemory.memory option -> pvctor ctargs  -> 'a;
-    ct_op : opctor ctargs -> 'a;
-    ct_lc : EcIdent.ident ctargs -> 'a;
-  }
+  type opsel = [
+    | `Pv of EcMemory.memory option * pvsel
+    | `Op of (EcPath.path * ty list)
+    | `Lc of EcIdent.ident
+  ]
 
   type mode = [`Form | `Expr of [`InProc | `InOp]]
+
+  type gopsel = opsel * EcTypes.ty * EcUnify.unienv * opmatch
 end
 
 let gen_select_op
     ~(actonly : bool)
     ~(mode    : OpSelect.mode)
-    (ctor     : 'a OpSelect.ctor)
     (opsc     : path option)
     (tvi      : EcUnify.tvi)
     (env      : EcEnv.env)
@@ -289,14 +286,12 @@ let gen_select_op
     (ue       : EcUnify.unienv)
     (psig     : EcTypes.dom)
 
-    : ('a * EcTypes.ty * EcUnify.unienv * opmatch) list
+    : OpSelect.gopsel list
 =
 
-  let open OpSelect in
-
-  let fpv me (pv, ty, ue) = (ctor.ct_pv me (pv, ty), ty, ue, (pv     :> opmatch)) in
-  let fop    (op, ty, ue) = (ctor.ct_op    (op, ty), ty, ue, (`Op op :> opmatch)) in
-  let flc    (lc, ty, ue) = (ctor.ct_lc    (lc, ty), ty, ue, (`Lc lc :> opmatch)) in
+  let fpv me (pv, ty, ue) = (`Pv (me, pv), ty, ue, (pv     :> opmatch)) in
+  let fop    (op, ty, ue) = (`Op op      , ty, ue, (`Op op :> opmatch)) in
+  let flc    (lc, ty, ue) = (`Lc lc      , ty, ue, (`Lc lc :> opmatch)) in
 
   let ue_filter =
     match mode with
@@ -318,7 +313,8 @@ let gen_select_op
   in
 
   match (if tvi = None then select_local env name else None) with
-  | Some (id, ty) -> [ flc (id, ty, ue) ]
+  | Some (id, ty) ->
+     [ flc (id, ty, ue) ]
 
   | None ->
       let ops () =
@@ -343,42 +339,13 @@ let gen_select_op
 
 (* -------------------------------------------------------------------- *)
 let select_exp_op env mode opsc name ue tvi psig =
-  let ctor =
-    let ppv = (fun _ (pv, ty) -> match pv with
-      | `Var   pv               -> e_var pv ty
-      | `Proj (pv, _  , (0, 1)) -> e_var pv ty
-      | `Proj (pv, ty', (i, _)) -> e_proj (e_var pv ty') i ty)
-
-    and pop  = (fun ((op, tys), ty) -> e_op op tys ty)
-    and flc  = (fun (id, ty) -> e_local id ty) in
-
-    { OpSelect.ct_pv = ppv;
-      OpSelect.ct_op = pop;
-      OpSelect.ct_lc = flc; }
-  in
-
   gen_select_op ~actonly:false ~mode:(`Expr mode)
-    ctor opsc tvi env name ue psig
+    opsc tvi env name ue psig
 
 (* -------------------------------------------------------------------- *)
 let select_form_op env opsc name ue tvi psig =
-  let ctor =
-    let ppv = (fun me (pv, ty) -> 
-      match pv with 
-      | `Var   pv               -> f_pvar pv ty (oget me)
-      | `Proj (pv, _  , (0, 1)) -> f_pvar pv ty (oget me)
-      | `Proj (pv, ty', (i, _)) -> f_proj (f_pvar pv ty' (oget me)) i ty)
-
-    and pop = (fun ((op, tys), ty) -> f_op op tys ty)
-    and flc = (fun (id, ty) -> f_local id ty) in
-
-    { OpSelect.ct_pv = ppv;
-      OpSelect.ct_op = pop;
-      OpSelect.ct_lc = flc; }
-  in
-
   gen_select_op ~actonly:true ~mode:`Form
-    ctor opsc tvi env name ue psig 
+    opsc tvi env name ue psig 
 
 (* -------------------------------------------------------------------- *)
 let select_proj env opsc name ue tvi recty =
@@ -1029,6 +996,16 @@ let trans_record env ue subtt (loc, fields) =
   in
     (ctor, fields, (rtvi, reccty))
 
+(*-------------------------------------------------------------------- *)
+let expr_of_opselect ((sel, ty, _, _) : OpSelect.gopsel) =
+  match sel with
+  | `Op (p, tys) -> e_op p tys ty
+  | `Lc id       -> e_local id ty
+
+  | `Pv (_me, `Var   pv)               -> e_var pv ty
+  | `Pv (_me, `Proj (pv, _  , (0, 1))) -> e_var pv ty
+  | `Pv (_me, `Proj (pv, ty', (i, _))) -> e_proj (e_var pv ty') i ty
+
 (* -------------------------------------------------------------------- *)
 let transexp (env : EcEnv.env) mode ue e =
   let rec transexp_r (osc : EcPath.path option) (env : EcEnv.env) (e : pexpr) =
@@ -1044,9 +1021,9 @@ let transexp (env : EcEnv.env) mode ue e =
         begin match ops with
         | [] -> tyerror loc env (UnknownVarOrOp (name, []))
 
-        | [op, ty, subue, _] ->
+        | [(_, ty, subue, _) as sel] ->
             EcUnify.UniEnv.restore ~src:subue ~dst:ue;
-            op, ty
+            (expr_of_opselect sel, ty)
 
         | _ ->
           let matches = List.map (fun (_, _, subue, m) -> (m, subue)) ops in
@@ -1067,11 +1044,12 @@ let transexp (env : EcEnv.env) mode ue e =
             let esig = Tuni.offun_dom (EcUnify.UniEnv.assubst ue) esig in
             tyerror loc env (UnknownVarOrOp (name, esig))
 
-        | [op, ty, subue, _] ->
+        | [(_, ty, subue, _) as sel] ->
             EcUnify.UniEnv.restore ~src:subue ~dst:ue;
             let esig = List.map2 (fun e l -> mk_loc l.pl_loc e) esig pes in
             let codom = ty_fun_app _dummy env ue ty esig in
-              (e_app op (List.map fst es) codom, codom)
+            let op = expr_of_opselect sel in
+            (e_app op (List.map fst es) codom, codom)
 
         | _ ->
             let esig = Tuni.offun_dom (EcUnify.UniEnv.assubst ue) esig in
@@ -1823,7 +1801,7 @@ and translvalue ue (env : EcEnv.env) lvalue =
           let esig = Tuni.offun_dom (EcUnify.UniEnv.assubst ue) esig in
           tyerror x.pl_loc env (UnknownVarOrOp (name, esig))
 
-      | [{ e_node = Eop (p, tys) }, opty, subue, _] ->
+      | [`Op (p, tys), opty, subue, _] ->
           EcUnify.UniEnv.restore ~src:subue ~dst:ue;
           let esig = Tuni.offun_dom (EcUnify.UniEnv.assubst ue) esig in
           let esig = toarrow esig xty in
@@ -1886,6 +1864,16 @@ end = struct
 end
 
 (* -------------------------------------------------------------------- *)
+let form_of_opselect ((sel, ty, _, _) : OpSelect.gopsel) =
+  match sel with
+  | `Op (p, tys) -> f_op p tys ty
+  | `Lc id       -> f_local id ty
+
+  | `Pv (me, `Var   pv)               -> f_pvar pv ty (oget me)
+  | `Pv (me, `Proj (pv, _  , (0, 1))) -> f_pvar pv ty (oget me)
+  | `Pv (me, `Proj (pv, ty', (i, _))) -> f_proj (f_pvar pv ty' (oget me)) i ty
+
+(* -------------------------------------------------------------------- *)
 let trans_form_or_pattern env (ps, ue) pf tt =
   let state = PFS.create () in
 
@@ -1934,7 +1922,8 @@ let trans_form_or_pattern env (ps, ue) pf tt =
         | [] ->
             tyerror loc env (UnknownVarOrOp (name, []))
 
-        | [op, _, subue, _] -> begin
+        | [(_, _, subue, _) as sel] -> begin
+            let op = form_of_opselect sel in
             let inmem =
               match op.f_node with
               | Fpvar _ | Fproj ({ f_node = Fpvar _ }, _) -> true
@@ -2026,11 +2015,12 @@ let trans_form_or_pattern env (ps, ue) pf tt =
               let esig = Tuni.offun_dom (EcUnify.UniEnv.assubst ue) esig in
                 tyerror loc env (UnknownVarOrOp (name, esig))
 
-          | [op, _, subue, _] ->
+          | [(_, _, subue, _) as sel] ->
+              let op = form_of_opselect sel in
               EcUnify.UniEnv.restore ~src:subue ~dst:ue;
               let esig = List.map2 (fun e l -> mk_loc l.pl_loc e) esig pes in
               let codom = ty_fun_app _dummy env ue op.f_ty esig in
-                f_app op es codom
+              f_app op es codom
 
           | _ ->
               let esig = Tuni.offun_dom (EcUnify.UniEnv.assubst ue) esig in
