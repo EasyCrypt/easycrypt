@@ -142,7 +142,7 @@ and process1_logic (ttenv : ttenv) (t : logtactic located) (tc : tcenv1) =
     | Pcut (ip, f, t)   -> process_cut engine ttenv (ip, f, t)
     | Pcutdef (ip, f)   -> process_cutdef ttenv (ip, f)
     | Pgeneralize l     -> process_generalize l
-    | Pmove (v, l)      -> process_move v l
+    | Pmove (v, cl, l)  -> process_move v cl l
     | Pclear l          -> process_clear l
     | Prewrite (ri, x)  -> process_rewrite ttenv ?target:x ri
     | Psubst   ri       -> process_subst ri

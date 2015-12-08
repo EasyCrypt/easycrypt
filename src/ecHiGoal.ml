@@ -1363,8 +1363,12 @@ let process_generalize patterns (tc : tcenv1) =
     tc_error_exn !!tc err
 
 (* -------------------------------------------------------------------- *)
-let process_move views patterns (tc : tcenv1) =
-  t_seq (process_generalize patterns) (process_view views) tc
+let process_move views clears patterns (tc : tcenv1) =
+  t_seqs 
+    [process_clear clears;
+     process_generalize patterns;
+     process_view views]
+    tc
 
 (* -------------------------------------------------------------------- *)
 let process_pose xsym o p (tc : tcenv1) =

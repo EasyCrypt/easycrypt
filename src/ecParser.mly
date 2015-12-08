@@ -2141,8 +2141,12 @@ logtactic:
 | GENERALIZE l=genpattern+
    { Pgeneralize l }
 
-| MOVE vw=prefix(SLASH, pterm)* gp=option(prefix(COLON, genpattern+))
-   { Pmove (vw, odfl [] gp) }
+| MOVE vw=prefix(SLASH, pterm)*
+   { Pmove (vw, [], []) }
+
+| MOVE vw=prefix(SLASH, pterm)*
+    COLON cl=ioption(brace(loc(ipcore_name)+)) gp=genpattern*
+   { Pmove (vw, odfl [] cl, gp) }
 
 | CLEAR l=loc(ipcore_name)+
    { Pclear l }
