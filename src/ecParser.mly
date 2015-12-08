@@ -1796,8 +1796,8 @@ intro_pattern:
 | x=ipcore
    { IPCore x }
 
-| HAT x=ipcore_renaming
-   { IPDup x }
+| HAT
+   { IPDup }
 
 | LBRACKET mode=icasemode RBRACKET
    { IPCase (mode, []) }

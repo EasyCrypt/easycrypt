@@ -610,7 +610,7 @@ and rwtactic  = [`Ring]
 (* -------------------------------------------------------------------- *)
 type intropattern1 =
   | IPCore   of ipcore
-  | IPDup    of renaming
+  | IPDup
   | IPCase   of ([`One|`Full] * intropattern list)
   | IPView   of ppterm
   | IPRw     of (rwocc * rwside)

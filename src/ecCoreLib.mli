@@ -158,4 +158,6 @@ module CI_Logic : sig
   val p_iff_rl        : path
 
   val p_case_eq_bool  : path
+
+  val p_ip_dup        : path
 end

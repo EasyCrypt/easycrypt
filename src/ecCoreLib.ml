@@ -145,6 +145,8 @@ module CI_Logic = struct
   let p_iff_rl        = _Logic "iffRL"
 
   let p_case_eq_bool  = _Logic "bool_case_eq"
+
+  let p_ip_dup        = _Logic "_ip_dup"
 end
 
 (* -------------------------------------------------------------------- *)

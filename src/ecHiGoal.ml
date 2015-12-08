@@ -1112,7 +1112,7 @@ let rec process_mintros ?(cf = true) ttenv pis gs =
              raise CollectBreak
       
           | IPCore  x  -> raise (CollectCore (mk_loc (loc pi) x))
-          | IPDup   x  -> `Dup (mk_loc (loc pi) x)
+          | IPDup      -> `Dup
           | IPDone  x  -> `Done x
           | IPSmt   x  -> `Smt x
           | IPClear xs -> `Clear xs
@@ -1141,16 +1141,12 @@ let rec process_mintros ?(cf = true) ttenv pis gs =
     List.iter (fun (act, id, name) -> ST.push ?name act id st) torev;
     t_intros ids tc
 
-  and intro1_dup (st : ST.state) id (tc : tcenv1) =
-    let id = mk_loc id.pl_loc (`Temp (Some (unloc id))) in
-    let torev, ids = mk_intro [id] (FApi.tc1_flat tc) in
-    let subst = ST.create () in
-    List.iter (fun (act, id, name) -> ST.push ?name act id subst) torev;
-    t_onall (fun tc ->
-      t_generalize_hyps_x
-        ~missing:true ~naming:(ST.naming st)
-        (ST.listing subst) tc)
-      (t_intros ids tc)
+  and intro1_dup (_ : ST.state) (tc : tcenv1) =
+    try
+      let pt = PT.pt_of_uglobal !!tc (FApi.tc1_hyps tc) LG.p_ip_dup in
+      LowApply.t_apply_bwd_r ~mode:fmrigid ~canview:false pt tc
+    with LowApply.NoInstance _ ->
+      tc_error !!tc "no top-assumption to duplicate"
 
   and intro1_done (_ : ST.state) (simplify : bool) (tc : tcenv1) =
     let t =
@@ -1226,8 +1222,8 @@ let rec process_mintros ?(cf = true) ttenv pis gs =
         | `Core ids ->
             (false, rl (t_onall (intro1_core st ids)) gs)
 
-        | `Dup id ->
-            (false, rl (t_onall (intro1_dup st id)) gs)
+        | `Dup ->
+            (false, rl (t_onall (intro1_dup st)) gs)
   
         | `Done b ->
             (nointro, rl (t_onall (intro1_done st b)) gs)

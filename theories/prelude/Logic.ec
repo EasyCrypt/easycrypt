@@ -283,7 +283,7 @@ lemma nosmt if_same b (x : 'a):
   (if b then x else x) = x
 by [].
 
-lemma nosmt imp   : forall (x y : bool), (x => y) <=> ((!x)\/y) by [].
+lemma nosmt imp : forall (x y : bool), (x => y) <=> ((!x)\/y) by [].
 
 lemma nosmt imp_trans (a b c : bool):
   (a => b) => (b => c) => (a => c)
@@ -291,6 +291,8 @@ by [].
 
 lemma iffP p q r: (r <=> q) => (p => q) => (q => p) => r <=> p
 by [].
+
+lemma nosmt _ip_dup p q : (p => p => q) => p => q by [].
 
 (** equality *)
 lemma nosmt eq_refl  : forall (x:'a), x = x by [].
