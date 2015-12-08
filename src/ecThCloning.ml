@@ -146,6 +146,14 @@ let find_ax cth (nm, x) =
   in find_mc cth.cth_struct nm |> obind (List.opick test)
 
 (* -------------------------------------------------------------------- *)
+let find_nt cth (nm, x) =
+  let test = function
+    | CTh_operator (xop, op) when xop = x && EcDecl.is_abbrev op ->
+       Some op
+    | _ -> None
+  in find_mc cth.cth_struct nm |> obind (List.opick test)
+
+(* -------------------------------------------------------------------- *)
 type clone = {
   cl_name   : symbol;
   cl_theory : EcPath.path * (EcEnv.Theory.t * EcTheory.thmode);
@@ -454,10 +462,9 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
 
   let ntclr =
     let ntclr1 (`Abbrev, { pl_desc = (nm, x) as q }) = 
-      let nt = EcPath.pqname (EcPath.extend opath nm) x in
-      if not (EcEnv.Op.is_abbrev scenv nt) then
+      if is_none (find_nt oth q) then
         clone_error scenv (CE_UnkAbbrev q);
-      nt
+      EcPath.pqname (EcPath.extend opath nm) x
 
     in List.map ntclr1 thcl.pthc_clears
   in
