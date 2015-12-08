@@ -2912,7 +2912,8 @@ module Theory = struct
         env_tci    = bind_instance_cth thpath env.env_tci cth;
         env_tc     = bind_tc_cth thpath env.env_tc cth;
         env_rwbase = bind_br_cth thpath env.env_rwbase cth;
-        env_atbase = bind_at_cth thpath env.env_atbase cth; }
+        env_atbase = bind_at_cth thpath env.env_atbase cth;
+        env_ntbase = bind_nt_cth thpath env.env_ntbase cth; }
 end
 
 (* -------------------------------------------------------------------- *)
