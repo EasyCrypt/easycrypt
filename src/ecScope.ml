@@ -2138,7 +2138,6 @@ module Cloning = struct
   open EcThCloning
 
   (* -------------------------------------------------------------------- *)
-
   exception Incompatible of incompatible
 
   let ty_compatible env ue (rtyvars, rty) (ntyvars, nty) =
@@ -2201,7 +2200,8 @@ module Cloning = struct
     let { cl_name   = name;
           cl_theory = (opath, oth);
           cl_clone  = ovrds;
-          cl_rename = rnms; }
+          cl_rename = rnms;
+          cl_ntclr  = ntclr; }
   
         = C.clone scope.sc_env thcl in
 
@@ -2404,8 +2404,12 @@ module Cloning = struct
                  if alias then Op.bind scope (x, newpr) else scope)
         end
 
-        | CTh_operator (_, ({ op_kind = OB_nott _})) ->
-           (subst, ops, proofs, scope)
+        | CTh_operator (x, ({ op_kind = OB_nott _} as oont)) ->
+            if EcPath.Sp.mem (xpath x) ntclr then
+              (subst, ops, proofs, scope)
+            else
+              let subst, x = rename subst (`Op, x) in
+              (subst, ops, proofs, Op.bind scope (x, EcSubst.subst_op subst oont))
   
         | CTh_axiom (x, ax) -> begin
             let subst, x = rename subst (`Lemma, x) in

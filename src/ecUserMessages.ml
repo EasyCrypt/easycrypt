@@ -476,6 +476,9 @@ end = struct
     | CE_CrtOverride (kd, x) ->
         msg "cannot instantiate the _concrete_ %s `%s' / they may be not convertible"
           (string_of_ovkind kd) (string_of_qsymbol x)
+
+    | CE_UnkAbbrev x ->
+        msg "unknown abbreviation: `%s'" (string_of_qsymbol x)
   
     | CE_TypeArgMism (kd, x) ->
         msg "type argument mismatch for %s `%s'"

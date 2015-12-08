@@ -463,6 +463,7 @@
 %token RCONDT
 %token REALIZE
 %token REFLEX
+%token REMOVE
 %token RENAME
 %token REQUIRE
 %token RES
@@ -2794,27 +2795,22 @@ tactic_dump:
 
 theory_clone:
 | local=boption(LOCAL) CLONE options=clone_opts?
-    ip=clone_import? x=uqident
-    cw=clone_with? cp=clone_proof? cr=clone_rename?
+    ip=clone_import? x=uqident y=prefix(AS, uident)? cw=clone_with?
+    c=or3(clone_proof, clone_rename, clone_clear)*
 
-   { { pthc_base   = x;
-       pthc_name   = None;
+   { let (cp, cr, cl) =
+       List.fold_left (fun (cp, cr, cl) -> function
+        | `Or13 x -> (cp@x, cr, cl)
+        | `Or23 y -> (cp, cr@y, cl)
+        | `Or33 z -> (cp, cr, cl@z))
+       ([], [], []) c in
+
+     { pthc_base   = x;
+       pthc_name   = y;
        pthc_ext    = EcUtils.odfl [] cw;
-       pthc_prf    = EcUtils.odfl [] cp;
-       pthc_rnm    = EcUtils.odfl [] cr;
-       pthc_opts   = odfl [] options;
-       pthc_local  = local;
-       pthc_import = ip; } }
-
-| local=boption(LOCAL) CLONE options=clone_opts?
-    ip=clone_import? x=uqident AS y=uident
-    cw=clone_with? cp=clone_proof? cr=clone_rename?
-
-   { { pthc_base   = x;
-       pthc_name   = Some y;
-       pthc_ext    = EcUtils.odfl [] cw;
-       pthc_prf    = EcUtils.odfl [] cp;
-       pthc_rnm    = EcUtils.odfl [] cr;
+       pthc_prf    = List.rev cp;
+       pthc_rnm    = List.rev cr;
+       pthc_clears = List.rev cl;
        pthc_opts   = odfl [] options;
        pthc_local  = local;
        pthc_import = ip; } }
@@ -2883,6 +2879,13 @@ clone_rename_1:
 
 clone_rename:
 | RENAME rnm=clone_rename_1+ { rnm }
+
+clone_clear_1:
+| ABBREV qs=qoident+
+  { List.map (fun x -> (`Abbrev, x)) qs }
+
+clone_clear:
+| REMOVE cl=clone_clear_1+ { List.flatten cl }
 
 opclmode:
 | EQ     { `Alias }
@@ -3159,6 +3162,12 @@ __rlist1(X, S):                         (* left-recursive *)
 %inline either(X, Y):
 | X {}
 | Y {}
+
+(* -------------------------------------------------------------------- *)
+or3(X, Y, Z):
+| x=X { `Or13 x }
+| y=Y { `Or23 y }
+| z=Z { `Or33 z }
 
 (* -------------------------------------------------------------------- *)
 %inline loc(X):

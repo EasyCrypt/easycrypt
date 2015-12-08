@@ -27,6 +27,7 @@ type clone_error =
 | CE_DupOverride    of ovkind * qsymbol
 | CE_UnkOverride    of ovkind * qsymbol
 | CE_CrtOverride    of ovkind * qsymbol
+| CE_UnkAbbrev      of qsymbol
 | CE_TypeArgMism    of ovkind * qsymbol
 | CE_OpIncompatible of qsymbol * incompatible
 | CE_PrIncompatible of qsymbol * incompatible
@@ -66,6 +67,7 @@ type clone = {
   cl_theory : EcPath.path * (EcEnv.Theory.t * EcTheory.thmode);
   cl_clone  : evclone;
   cl_rename : renaming list;
+  cl_ntclr  : EcPath.Sp.t;
 }
 
 and renaming_kind = [

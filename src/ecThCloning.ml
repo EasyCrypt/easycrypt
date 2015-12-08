@@ -13,6 +13,7 @@ open EcParsetree
 open EcDecl
 open EcTheory
 
+module Sp = EcPath.Sp
 module Mp = EcPath.Mp
 
 (* ------------------------------------------------------------------ *)
@@ -32,6 +33,7 @@ type clone_error =
 | CE_DupOverride    of ovkind * qsymbol
 | CE_UnkOverride    of ovkind * qsymbol
 | CE_CrtOverride    of ovkind * qsymbol
+| CE_UnkAbbrev      of qsymbol
 | CE_TypeArgMism    of ovkind * qsymbol
 | CE_OpIncompatible of qsymbol * incompatible
 | CE_PrIncompatible of qsymbol * incompatible
@@ -149,6 +151,7 @@ type clone = {
   cl_theory : EcPath.path * (EcEnv.Theory.t * EcTheory.thmode);
   cl_clone  : evclone;
   cl_rename : renaming list;
+  cl_ntclr  : Sp.t;
 }
 
 and renaming_kind = [
@@ -200,7 +203,10 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
   let name = odfl (EcPath.basename opath) (thcl.pthc_name |> omap unloc) in
 
   let (genproofs, ovrds) =
-    let rec do1 ?(cancrt = false) (proofs, evc) ({ pl_loc = l; pl_desc = ((nm, x) as name) }, ovrd) =
+    let rec do1
+     ?(cancrt = false) (proofs, evc)
+     ({ pl_loc = l; pl_desc = ((nm, x) as name) }, ovrd)
+    =
        match ovrd with
        | PTHO_Type ((tyargs, _, _) as tyd) -> begin
            match find_type oth name with
@@ -290,7 +296,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
                  in
                  let tyd  = mk_loc l tyd in
                  let ovrd = PTHO_Type (params, tyd, `Inline) in
-                   do1 ~cancrt:true (proofs, evc) (mk_loc l (xdth @ prefix, x), ovrd)
+                 do1 ~cancrt:true (proofs, evc) (mk_loc l (xdth @ prefix, x), ovrd)
 
              | CTh_operator (x, ({ op_kind = OB_oper _ } as oopd)) ->
                  (* FIXME: TC HOOK *)
@@ -305,7 +311,8 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
                      let tya = List.map (fun a -> mk_loc l (PTvar a)) params in
                        mk_loc l (PEident (sym, Some (mk_loc l (TVIunamed tya))));
                  } in
-                   do1 ~cancrt:true (proofs, evc) (mk_loc l (xdth @ prefix, x), PTHO_Op (ovrd, `Inline))
+                 let ovrd = PTHO_Op (ovrd, `Inline) in
+                 do1 ~cancrt:true (proofs, evc) (mk_loc l (xdth @ prefix, x), ovrd)
 
              | CTh_operator (x, ({ op_kind = OB_pred _ } as oprd)) ->
                  (* FIXME: TC HOOK *)
@@ -445,7 +452,18 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
     in List.map rename1 thcl.pthc_rnm
   in
 
+  let ntclr =
+    let ntclr1 (`Abbrev, { pl_desc = (nm, x) as q }) = 
+      let nt = EcPath.pqname (EcPath.extend opath nm) x in
+      if not (EcEnv.Op.is_abbrev scenv nt) then
+        clone_error scenv (CE_UnkAbbrev q);
+      nt
+
+    in List.map ntclr1 thcl.pthc_clears
+  in
+
   { cl_name   = name;
     cl_theory = (opath, (oth, othmode));
     cl_clone  = ovrds;
-    cl_rename = rename; }
+    cl_rename = rename;
+    cl_ntclr  = Sp.of_list ntclr; }

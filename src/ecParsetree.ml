@@ -835,6 +835,7 @@ type theory_cloning = {
   pthc_prf    : theory_cloning_proof list;
   pthc_rnm    : theory_renaming list;
   pthc_opts   : theory_cloning_options;
+  pthc_clears : theory_cloning_clear list;
   pthc_local  : bool;
   pthc_import : [`Export | `Import | `Include] option;
 }
@@ -844,6 +845,9 @@ and theory_renaming_kind =
 
 and theory_renaming =
   (theory_renaming_kind list * string located pair)
+
+and theory_cloning_clear =
+  ([`Abbrev] * pqsymbol)
 
 and theory_cloning_option =
   [ `Abstract ]
