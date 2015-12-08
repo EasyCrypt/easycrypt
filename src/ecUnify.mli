@@ -46,6 +46,8 @@ val hastc : EcEnv.env -> unienv -> ty -> Sp.t -> unit
 
 val tfun_expected : unienv -> EcTypes.ty list -> EcTypes.ty
 
+type sbody = ((EcIdent.t * ty) list * expr) Lazy.t
+
 val select_op :
      ?filter:(operator -> bool) -> tvi -> EcEnv.env -> qsymbol -> unienv
-  -> dom -> ((EcPath.path * ty list) * ty * unienv) list
+  -> dom -> ((EcPath.path * ty list) * ty * unienv * sbody option) list

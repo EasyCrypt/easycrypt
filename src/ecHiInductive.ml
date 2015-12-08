@@ -302,7 +302,7 @@ let trans_matchfix ?(close = true) env ue { pl_loc = loc; pl_desc = name } (bd, 
           | _ :: _ :: _ ->
               fxerror cname.pl_loc env FXE_CtorAmbiguous
 
-          | [(cp, tvi), opty, subue] ->
+          | [(cp, tvi), opty, subue, _] ->
               let ctor = oget (EcEnv.Op.by_path_opt cp env) in
               let (indp, ctoridx) = EcDecl.operator_as_ctor ctor in
               let indty = oget (EcEnv.Ty.by_path_opt indp env) in

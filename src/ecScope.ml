@@ -1276,6 +1276,9 @@ module Notations = struct
     let tparams = EcUnify.UniEnv.tparams ue in
     let tyat    = EcDecl.mk_abbrev tparams xs (codom, body) in
 
+    if EcTypes.is_local body then
+      hierror ~loc:gloc "abbrev. body cannot reduce to a variable";
+
     Op.bind scope (unloc at.ab_name, tyat)
 end
 
@@ -1538,9 +1541,9 @@ module Ty = struct
           | op1::op2::_ ->
               hierror ~loc:op.pl_loc
                 "ambiguous operator (%s / %s)"
-                (EcPath.tostring (fst (proj3_1 op1)))
-                (EcPath.tostring (fst (proj3_1 op2)))
-          | [((p, _), _, _)] ->
+                (EcPath.tostring (fst (proj4_1 op1)))
+                (EcPath.tostring (fst (proj4_1 op2)))
+          | [((p, _), _, _, _)] ->
               let op   = EcEnv.Op.by_path p env in
               let opty =
                 Tvar.subst

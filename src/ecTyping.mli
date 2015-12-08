@@ -76,6 +76,7 @@ type tyerror =
 | TypeClassMismatch
 | TypeModMismatch        of tymod_cnv_failure
 | NotAFunction
+| AbbrevLowArgs
 | UnknownVarOrOp         of qsymbol * ty list
 | MultipleOpMatch        of qsymbol * ty list * (opmatch * EcUnify.unienv) list
 | UnknownModName         of qsymbol

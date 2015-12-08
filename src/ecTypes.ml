@@ -974,6 +974,18 @@ let e_uni uidmap =
   e_mapty (Tuni.offun uidmap)
 
 (* -------------------------------------------------------------------- *)
+let is_local e = 
+  match e.e_node with
+  | Elocal _ -> true
+  | _ -> false
+
+(* -------------------------------------------------------------------- *)
+let destr_local e = 
+   match e.e_node with
+  | Elocal id -> id
+  | _ -> assert false
+
+(* -------------------------------------------------------------------- *)
 let is_var e = 
   match e.e_node with
   | Evar _ -> true

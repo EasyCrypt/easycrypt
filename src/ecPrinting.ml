@@ -200,7 +200,7 @@ module PPEnv = struct
           check_for_local sm;
           let ue = EcUnify.UniEnv.create None in
           match  EcUnify.select_op ~filter tvi ppe.ppe_env sm ue dom with
-          | [(p1, _), _, _] -> p1
+          | [(p1, _), _, _, _] -> p1
           | _ -> raise (EcEnv.LookupFailure (`QSymbol sm)) in
 
     let exists sm =

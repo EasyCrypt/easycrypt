@@ -204,10 +204,12 @@ val e_forall   : ebindings -> expr -> expr
 val e_exists   : ebindings -> expr -> expr
 val e_proj     : expr -> int -> ty -> expr
 
-val is_var     : expr -> bool
-val destr_var  : expr -> prog_var 
+val is_local     : expr -> bool
+val is_var       : expr -> bool
+val is_tuple_var : expr -> bool
 
-val is_tuple_var    : expr -> bool
+val destr_local     : expr -> EcIdent.t
+val destr_var       : expr -> prog_var 
 val destr_tuple_var : expr -> prog_var list
 
 (* -------------------------------------------------------------------- *)

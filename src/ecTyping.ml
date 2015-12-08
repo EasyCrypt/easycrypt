@@ -85,6 +85,7 @@ type tyerror =
 | TypeClassMismatch
 | TypeModMismatch        of tymod_cnv_failure
 | NotAFunction
+| AbbrevLowArgs
 | UnknownVarOrOp         of qsymbol * ty list
 | MultipleOpMatch        of qsymbol * ty list * (opmatch * EcUnify.unienv) list
 | UnknownModName         of qsymbol
@@ -269,11 +270,13 @@ module OpSelect = struct
     | `Pv of EcMemory.memory option * pvsel
     | `Op of (EcPath.path * ty list)
     | `Lc of EcIdent.ident
+    | `Nt of EcUnify.sbody
   ]
 
   type mode = [`Form | `Expr of [`InProc | `InOp]]
 
-  type gopsel = opsel * EcTypes.ty * EcUnify.unienv * opmatch
+  type gopsel =
+    opsel * EcTypes.ty * EcUnify.unienv * opmatch
 end
 
 let gen_select_op
@@ -289,23 +292,30 @@ let gen_select_op
     : OpSelect.gopsel list
 =
 
-  let fpv me (pv, ty, ue) = (`Pv (me, pv), ty, ue, (pv     :> opmatch)) in
-  let fop    (op, ty, ue) = (`Op op      , ty, ue, (`Op op :> opmatch)) in
-  let flc    (lc, ty, ue) = (`Lc lc      , ty, ue, (`Lc lc :> opmatch)) in
+  let fpv me (pv, ty, ue) =
+    (`Pv (me, pv), ty, ue, (pv :> opmatch))
+
+  and fop (op, ty, ue, bd) =
+    match bd with
+    | None -> (`Op op, ty, ue, (`Op op :> opmatch))
+    | Some bd -> (`Nt bd, ty, ue, (`Op op :> opmatch))
+
+  and flc (lc, ty, ue) =
+    (`Lc lc, ty, ue, (`Lc lc :> opmatch)) in
 
   let ue_filter =
     match mode with
-    | `Expr _ -> fun op -> EcDecl.is_oper op
-    | `Form   -> fun op -> EcDecl.is_oper op || EcDecl.is_pred op
+    | `Expr _ -> fun op -> not (EcDecl.is_pred op)
+    | `Form   -> fun _  -> true
   in
 
-  let by_scope opsc ((p, _), _, _) =
+  let by_scope opsc ((p, _), _, _, _) =
     EcPath.p_equal opsc (oget (EcPath.prefix p))
 
-  and by_current ((p, _), _, _) =
+  and by_current ((p, _), _, _, _) =
     EcPath.isprefix (oget (EcPath.prefix p)) (EcEnv.root env)
 
-  and by_tc ((p, _), _, _) =
+  and by_tc ((p, _), _, _, _) =
     match oget (EcEnv.Op.by_path_opt p env) with
     | { op_kind = OB_oper (Some OP_TC) } -> false
     | _ -> true
@@ -351,6 +361,7 @@ let select_form_op env opsc name ue tvi psig =
 let select_proj env opsc name ue tvi recty =
   let filter = (fun op -> EcDecl.is_proj op) in
   let ops = EcUnify.select_op ~filter tvi env name ue [recty] in
+  let ops = List.map (fun (p, ty, ue, _) -> (p, ty, ue)) ops in
 
   match ops, opsc with
   | _ :: _ :: _, Some opsc ->
@@ -799,7 +810,7 @@ let transpattern1 env ue (p : EcParsetree.plpattern) =
               let exn = UnknownRecFieldName (unloc name) in
                 tyerror name.pl_loc env exn
 
-            | Some ((fp, _tvi), opty, subue) ->
+            | Some ((fp, _tvi), opty, subue, _) ->
               let field = oget (EcEnv.Op.by_path_opt fp env) in
               let (recp, fieldidx, _) = EcDecl.operator_as_proj field in
                 EcUnify.UniEnv.restore ~src:subue ~dst:ue;
@@ -938,7 +949,7 @@ let trans_record env ue subtt (loc, fields) =
             let exn = UnknownRecFieldName (unloc rf.rf_name) in
               tyerror rf.rf_name.pl_loc env exn
 
-        | Some ((fp, _tvi), opty, subue) ->
+        | Some ((fp, _tvi), opty, subue, _) ->
             let field = oget (EcEnv.Op.by_path_opt fp env) in
             let (recp, fieldidx, _) = EcDecl.operator_as_proj field in
               EcUnify.UniEnv.restore ~src:subue ~dst:ue;
@@ -997,14 +1008,39 @@ let trans_record env ue subtt (loc, fields) =
     (ctor, fields, (rtvi, reccty))
 
 (*-------------------------------------------------------------------- *)
-let expr_of_opselect ((sel, ty, _, _) : OpSelect.gopsel) =
-  match sel with
-  | `Op (p, tys) -> e_op p tys ty
-  | `Lc id       -> e_local id ty
+let expr_of_opselect
+  loc (env, ue) ((sel, ty, subue, _) : OpSelect.gopsel) args
+=
+  EcUnify.UniEnv.restore ~src:subue ~dst:ue;
 
-  | `Pv (_me, `Var   pv)               -> e_var pv ty
-  | `Pv (_me, `Proj (pv, _  , (0, 1))) -> e_var pv ty
-  | `Pv (_me, `Proj (pv, ty', (i, _))) -> e_proj (e_var pv ty') i ty
+  let esig  = List.map (lmap snd) args in
+  let args  = List.map (fst |- unloc) args in
+  let codom = ty_fun_app _dummy env ue ty esig in
+
+  let op, args =
+    match sel with
+    | `Nt (lazy (bds, body)) ->
+         let nbds = List.length bds in
+
+         if List.length args < List.length bds then
+           tyerror loc env (AbbrevLowArgs);
+         let tosub, args = List.split_at nbds args in
+         let lcmap = List.map2 (fun (x, _) y -> (x, y)) bds tosub in
+         let subst = { EcTypes.e_subst_id with es_freshen = true; } in
+         let subst = { subst with es_loc = Mid.of_list lcmap; } in
+         (EcTypes.e_subst subst body, args)
+
+    | (`Op _ | `Lc _ | `Pv _) as sel -> let op = match sel with
+      | `Op (p, tys) -> e_op p tys ty
+      | `Lc id       -> e_local id ty
+
+      | `Pv (_me, `Var   pv)               -> e_var pv ty
+      | `Pv (_me, `Proj (pv, _  , (0, 1))) -> e_var pv ty
+      | `Pv (_me, `Proj (pv, ty', (i, _))) -> e_proj (e_var pv ty') i ty
+
+    in (op, args)
+
+  in (e_app op args codom, codom)
 
 (* -------------------------------------------------------------------- *)
 let transexp (env : EcEnv.env) mode ue e =
@@ -1021,9 +1057,8 @@ let transexp (env : EcEnv.env) mode ue e =
         begin match ops with
         | [] -> tyerror loc env (UnknownVarOrOp (name, []))
 
-        | [(_, ty, subue, _) as sel] ->
-            EcUnify.UniEnv.restore ~src:subue ~dst:ue;
-            (expr_of_opselect sel, ty)
+        | [sel] ->
+            expr_of_opselect e.pl_loc (env, ue) sel []
 
         | _ ->
           let matches = List.map (fun (_, _, subue, m) -> (m, subue)) ops in
@@ -1034,7 +1069,7 @@ let transexp (env : EcEnv.env) mode ue e =
         let opsc = lookup_scope env popsc in
           transexp_r (Some opsc) env e
 
-    | PEapp ({pl_desc = PEident({ pl_desc = name; pl_loc = loc }, tvi)}, pes) ->
+    | PEapp ({ pl_desc = PEident({ pl_desc = name; pl_loc = loc }, tvi)}, pes) ->
         let tvi  = tvi |> omap (transtvi env ue) in  
         let es   = List.map (transexp env) pes in
         let esig = snd (List.split es) in
@@ -1044,12 +1079,9 @@ let transexp (env : EcEnv.env) mode ue e =
             let esig = Tuni.offun_dom (EcUnify.UniEnv.assubst ue) esig in
             tyerror loc env (UnknownVarOrOp (name, esig))
 
-        | [(_, ty, subue, _) as sel] ->
-            EcUnify.UniEnv.restore ~src:subue ~dst:ue;
-            let esig = List.map2 (fun e l -> mk_loc l.pl_loc e) esig pes in
-            let codom = ty_fun_app _dummy env ue ty esig in
-            let op = expr_of_opselect sel in
-            (e_app op (List.map fst es) codom, codom)
+        | [sel] ->
+            let es = List.map2 (fun e l -> mk_loc l.pl_loc e) es pes in
+            expr_of_opselect loc (env, ue) sel es
 
         | _ ->
             let esig = Tuni.offun_dom (EcUnify.UniEnv.assubst ue) esig in
@@ -1152,7 +1184,9 @@ let transexp (env : EcEnv.env) mode ue e =
         e_proj sube i ty, ty
         
 
-      | _::_::_ -> tyerror x.pl_loc env (AmbiguousProj (unloc x))
+      | _::_::_ ->
+         tyerror x.pl_loc env (AmbiguousProj (unloc x))
+
       | [(op, tvi), pty, subue] ->
         EcUnify.UniEnv.restore ~src:subue ~dst:ue;
         let rty = EcUnify.UniEnv.fresh ue in
@@ -1160,7 +1194,8 @@ let transexp (env : EcEnv.env) mode ue e =
          with EcUnify.UnificationFailure _ -> assert false);
         (e_app (e_op op tvi pty) [sube] rty, rty)
     end
-    | PEproji(sube, i) -> begin
+
+    | PEproji (sube, i) -> begin
       let sube', ety = transexp env sube in
       let ty = Tuni.offun (EcUnify.UniEnv.assubst ue) ety in
       match (EcEnv.Ty.hnorm ty env).ty_node with
@@ -1864,14 +1899,42 @@ end = struct
 end
 
 (* -------------------------------------------------------------------- *)
-let form_of_opselect ((sel, ty, _, _) : OpSelect.gopsel) =
-  match sel with
-  | `Op (p, tys) -> f_op p tys ty
-  | `Lc id       -> f_local id ty
+let form_of_opselect
+  loc (env, ue) ((sel, ty, subue, _) : OpSelect.gopsel) args
+=
+  EcUnify.UniEnv.restore ~src:subue ~dst:ue;
 
-  | `Pv (me, `Var   pv)               -> f_pvar pv ty (oget me)
-  | `Pv (me, `Proj (pv, _  , (0, 1))) -> f_pvar pv ty (oget me)
-  | `Pv (me, `Proj (pv, ty', (i, _))) -> f_proj (f_pvar pv ty' (oget me)) i ty
+  let esig  = List.map (lmap f_ty) args in
+  let args  = List.map unloc args in
+  let codom = ty_fun_app _dummy env ue ty esig in
+
+  let op, args =
+    match sel with
+    | `Nt (lazy (bds, body)) ->
+         let nbds = List.length bds in
+
+         if List.length args < List.length bds then
+           tyerror loc env (AbbrevLowArgs);
+         let tosub, args = List.split_at nbds args in
+         let me    = odfl mhr (EcEnv.Memory.get_active env) in
+         let body  = form_of_expr me body in
+         let lcmap = List.map2 (fun (x, _) y -> (x, y)) bds tosub in
+         let subst = Fsubst.f_subst_init ~freshen:true () in
+         let subst =
+           List.fold_left (fun s -> curry (Fsubst.f_bind_local s)) subst lcmap
+         in (Fsubst.f_subst subst body, args)
+
+    | (`Op _ | `Lc _ | `Pv _) as sel -> let op = match sel with
+      | `Op (p, tys) -> f_op p tys ty
+      | `Lc id       -> f_local id ty
+
+      | `Pv (me, `Var   pv)               -> f_pvar pv ty (oget me)
+      | `Pv (me, `Proj (pv, _  , (0, 1))) -> f_pvar pv ty (oget me)
+      | `Pv (me, `Proj (pv, ty', (i, _))) -> f_proj (f_pvar pv ty' (oget me)) i ty
+
+    in (op, args)
+
+  in f_app op args codom
 
 (* -------------------------------------------------------------------- *)
 let trans_form_or_pattern env (ps, ue) pf tt =
@@ -1922,15 +1985,13 @@ let trans_form_or_pattern env (ps, ue) pf tt =
         | [] ->
             tyerror loc env (UnknownVarOrOp (name, []))
 
-        | [(_, _, subue, _) as sel] -> begin
-            let op = form_of_opselect sel in
+        | [sel] -> begin
+            let op = form_of_opselect f.pl_loc (env, ue) sel [] in
             let inmem =
               match op.f_node with
               | Fpvar _ | Fproj ({ f_node = Fpvar _ }, _) -> true
               | _ -> false in
-
-            if inmem then PFS.set_memused state;
-            EcUnify.UniEnv.restore ~src:subue ~dst:ue; op
+            if inmem then PFS.set_memused state; op
         end
 
         | _ ->
@@ -2015,12 +2076,9 @@ let trans_form_or_pattern env (ps, ue) pf tt =
               let esig = Tuni.offun_dom (EcUnify.UniEnv.assubst ue) esig in
                 tyerror loc env (UnknownVarOrOp (name, esig))
 
-          | [(_, _, subue, _) as sel] ->
-              let op = form_of_opselect sel in
-              EcUnify.UniEnv.restore ~src:subue ~dst:ue;
-              let esig = List.map2 (fun e l -> mk_loc l.pl_loc e) esig pes in
-              let codom = ty_fun_app _dummy env ue op.f_ty esig in
-              f_app op es codom
+          | [sel] ->
+              let es = List.map2 (fun e l -> mk_loc l.pl_loc e) es pes in
+              form_of_opselect loc (env, ue) sel es
 
           | _ ->
               let esig = Tuni.offun_dom (EcUnify.UniEnv.assubst ue) esig in

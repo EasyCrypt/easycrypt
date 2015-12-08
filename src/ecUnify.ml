@@ -404,6 +404,9 @@ let tfun_expected ue psig =
     EcTypes.toarrow psig tres
 
 (* -------------------------------------------------------------------- *)
+type sbody = ((EcIdent.t * ty) list * expr) Lazy.t
+
+(* -------------------------------------------------------------------- *)
 let select_op ?(filter = fun _ -> true) tvi env name ue psig =
   let module D = EcDecl in
 
@@ -453,12 +456,25 @@ let select_op ?(filter = fun _ -> true) tvi env name ue psig =
         with UnificationFailure _ -> raise E.Failure
       end;
 
-      let (top, tys) = UniEnv.openty subue op.D.op_tparams tvi (D.op_ty op) in
-        let texpected = tfun_expected subue psig in
-          (try  unify env subue top texpected
-           with UnificationFailure _ -> raise E.Failure);
+      let (tip, tvs) = UniEnv.openty_r subue op.D.op_tparams tvi in
+      let top = tip op.D.op_ty in
+      let texpected = tfun_expected subue psig in
 
-          Some ((path, tys), top, subue)
+      (try  unify env subue top texpected
+       with UnificationFailure _ -> raise E.Failure);
+
+      let bd =
+        match op.D.op_kind with
+        | OB_nott nt ->
+           let substnt () =
+             let xs = List.map (snd_map tip) nt.D.ont_args in
+             let bd = EcTypes.e_mapty tip nt.D.ont_body in
+             (xs, bd)
+           in Some (Lazy.from_fun substnt)
+
+        | _ -> None
+
+      in Some ((path, tvs), top, subue, bd)
 
     with E.Failure -> None
 
