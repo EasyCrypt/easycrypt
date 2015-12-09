@@ -49,6 +49,7 @@ module LowRewrite : sig
   | LRW_NothingToRewrite
   | LRW_InvalidOccurence
   | LRW_CannotInfer
+  | LRW_IdRewriting
 
   exception RewriteError of error
 

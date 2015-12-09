@@ -255,9 +255,7 @@ let rec pf_find_occurence (pt : pt_env) ?(keyed = false) ~ptn subject =
     | `Var  _, _           -> false
   in
 
-  let keycheck tp key =
-    not keyed || kmatch key tp || Mid.is_empty tp.f_fv
-  in
+  let keycheck tp key = not keyed || kmatch key tp in
 
   (* Extract key from pattern *)
   let key =
@@ -310,14 +308,17 @@ let rec pf_find_occurence (pt : pt_env) ?(keyed = false) ~ptn subject =
 (* -------------------------------------------------------------------- *)
 type keyed = [`Yes | `No | `Lazy]
 
+let pf_find_occurence_lazy (pt : pt_env) ~ptn subject =
+  try  pf_find_occurence pt ~keyed:true ~ptn subject; true
+  with FindOccFailure _ ->
+    pf_find_occurence pt ~keyed:false ~ptn subject; false
+
+
 let pf_find_occurence (pt : pt_env) ?(keyed = `No) ~ptn subject =
   match keyed with
   | `Yes  -> pf_find_occurence pt ~keyed:true  ~ptn subject
   | `No   -> pf_find_occurence pt ~keyed:false ~ptn subject
-  | `Lazy ->
-       try  pf_find_occurence pt ~keyed:true ~ptn subject
-       with FindOccFailure _ ->
-         pf_find_occurence pt ~keyed:false ~ptn subject
+  | `Lazy -> ignore (pf_find_occurence_lazy pt ~ptn subject)
 
 (* -------------------------------------------------------------------- *)
 let pf_unify (pt : pt_env) ty1 ty2 =

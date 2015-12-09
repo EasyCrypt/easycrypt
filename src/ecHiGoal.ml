@@ -315,6 +315,7 @@ module LowRewrite = struct
   | LRW_NothingToRewrite
   | LRW_InvalidOccurence
   | LRW_CannotInfer
+  | LRW_IdRewriting
 
   exception RewriteError of error
 
@@ -361,17 +362,24 @@ module LowRewrite = struct
     let hyps, tgfp = FApi.tc1_flat ?target tc in
 
     let for1 (pt, mode, (f1, f2)) =
-      let fp = match s with `LtoR -> f1 | `RtoL -> f2 in
+      let fp, tp = match s with `LtoR -> f1, f2 | `RtoL -> f2, f1 in
+      let ky =
+        (try
+           PT.pf_find_occurence_lazy pt.PT.ptev_env ~ptn:fp tgfp
+         with
+         | PT.FindOccFailure `MatchFailure ->
+             raise (RewriteError LRW_NothingToRewrite)
+         | PT.FindOccFailure `IncompleteMatch ->
+             raise (RewriteError LRW_CannotInfer)) in
   
-      (try
-          PT.pf_find_occurence ~keyed:`Lazy pt.PT.ptev_env ~ptn:fp tgfp
-       with
-       | PT.FindOccFailure `MatchFailure ->
-           raise (RewriteError LRW_NothingToRewrite)
-       | PT.FindOccFailure `IncompleteMatch ->
-           raise (RewriteError LRW_CannotInfer));
-  
-      let fp   = PT.concretize_form pt.PT.ptev_env fp in
+      let fp = PT.concretize_form pt.PT.ptev_env fp in
+
+      if not ky then begin
+        let tp = PT.concretize_form pt.PT.ptev_env tp in
+        if EcReduction.is_conv hyps fp tp then
+          raise (RewriteError LRW_IdRewriting);
+      end;
+
       let pt   = fst (PT.concretize pt) in
       let cpos =
         try  FPosition.select_form hyps o fp tgfp
@@ -555,6 +563,8 @@ let process_rewrite1_core ?(close = true) ?target (s, o) pt tc =
           tc_error !!tc "invalid occurence selector"
       | LowRewrite.LRW_CannotInfer ->
           tc_error !!tc "cannot infer all placeholders"
+      | LowRewrite.LRW_IdRewriting ->
+          tc_error !!tc "refuse to perform an identity rewriting"
 
 (* -------------------------------------------------------------------- *)
 let process_delta ?target (s, o, p) tc =
