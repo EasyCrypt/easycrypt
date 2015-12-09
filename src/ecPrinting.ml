@@ -602,7 +602,7 @@ let e_bin_prio_if3    = e_bin_prio_lop2
 
 let e_uni_prio_not    = 26
 let e_uni_prio_lsless = 10000
-let e_uni_prio_uminus = 30
+let e_uni_prio_uminus = fst e_bin_prio_lop2
 let e_app_prio        = (10000, `Infix `Left)
 let e_get_prio        = (20000, `Infix `Left)
 
