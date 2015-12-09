@@ -27,7 +27,7 @@ op big (P : 'a -> bool) (F : 'a -> t) (r : 'a list) =
   foldr Support.(+) idm (map F (filter P r)).
 
 (* -------------------------------------------------------------------- *)
-op bigi (P : int -> bool) (F : int -> t) i j =
+abbrev bigi (P : int -> bool) (F : int -> t) i j =
   big P F (range i j).
 
 (* -------------------------------------------------------------------- *)
@@ -393,7 +393,7 @@ qed.
 (* -------------------------------------------------------------------- *)
 lemma nosmt big_int_cond m n P F:
   bigi P F m n = bigi (fun i => m <= i < n /\ P i) F m n.
-proof. by rewrite /bigi big_seq_cond; apply/eq_bigl=> i /=; smt. qed.
+proof. by rewrite big_seq_cond; apply/eq_bigl=> i /=; smt. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt big_int m n F:
@@ -407,7 +407,7 @@ lemma nosmt congr_big_int (m1 n1 m2 n2 : int) P1 P2 F1 F2:
     => (forall i, P1 i /\ (m1 <= i < n2) => F1 i = F2 i)
     => bigi P1 F1 m1 n1 = bigi P2 F2 m2 n2.
 proof.
-  move=> <- <- eqP12 eqF12; rewrite /bigi big_seq_cond (@big_seq_cond P2).
+  move=> <- <- eqP12 eqF12; rewrite big_seq_cond (@big_seq_cond P2).
   by apply/eq_big=> i /=; rewrite mem_range smt.
 qed.
 
@@ -421,7 +421,7 @@ proof. by move=> eqF; apply/congr_big_int. qed.
 lemma nosmt big_ltn_cond (m n : int) P F: m < n =>
   let x = bigi P F (m+1) n in
   bigi P F m n = if P m then F m + x else x.
-proof. by rewrite /bigi => /range_ltn ->; rewrite big_cons. qed.
+proof. by move/range_ltn=> ->; rewrite big_cons. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt big_ltn (m n : int) F: m < n =>
@@ -431,14 +431,14 @@ proof. by move/big_ltn_cond=> /= ->. qed.
 (* -------------------------------------------------------------------- *)
 lemma nosmt big_geq (m n : int) P F: n <= m =>
   bigi P F m n = idm.
-proof. by move/range_geq; rewrite /bigi=> ->; rewrite big_nil. qed.
+proof. by move/range_geq=> ->; rewrite big_nil. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt big_addn (m n a : int) P F:
     bigi P F (m+a) n
   = bigi (fun i => P (i+a)) (fun i => F (i+a)) m (n-a).
 proof.
-rewrite /bigi range_addl big_map; apply/eq_big.
+rewrite range_addl big_map; apply/eq_big.
   by move=> i /=; rewrite /(\o) addzC.
 by move=> i /= _; rewrite /(\o) addzC.
 qed.
@@ -450,7 +450,7 @@ proof. by rewrite big_ltn 1:smt big_geq // addm0. qed.
 (* -------------------------------------------------------------------- *)
 lemma nosmt big_cat_int (n m p : int) P F: m <= n => n <= p =>
   bigi P F m p = (bigi P F m n) + (bigi P F n p).
-proof. by move=> lemn lenp; rewrite {-1}/bigi -big_cat -range_cat. qed.
+proof. by move=> lemn lenp; rewrite -big_cat -range_cat. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt big_int_recl (n m : int) F: m <= n =>
