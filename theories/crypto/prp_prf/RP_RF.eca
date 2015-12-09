@@ -1,4 +1,4 @@
-require import Fun Option Int List FSet NewFMap Real Distr.
+require import Fun Option NewLogic Int List FSet NewFMap Real Distr.
 require import Dexcepted.
 require (*--*) NewPRP WeakPRP IdealPRP.
 require (*--*) NewPRF IdealPRF.
@@ -55,7 +55,10 @@ lemma no_collision (m:(D,D) fmap):
     !mem (dom m) x  \/
     !mem (dom m) x' \/
     m.[x] <> m.[x'].
-proof. by rewrite /collision; smt. qed.
+proof.
+rewrite /collision negb_exists /=; apply/forall_iff=> /= x.
+by rewrite negb_exists /=; apply/forall_iff=> /= x'; rewrite !negb_and.
+qed.
 
 lemma collision_add (m:(D,D) fmap) x y:
   !mem (dom m) x =>
@@ -116,6 +119,15 @@ module PRPi'(S:Sample_t) = {
   }
 }.
 
+lemma nosmt notin_supportIP (P : 'a -> bool) (d : 'a distr):
+  (exists a, support d a /\ !P a) <=> mu d P < mu d predT.
+proof.
+rewrite (mu_split _ predT P) /predI /predT /predC /=.
+rewrite (exists_eq (fun a => support d a /\ !P a) (fun a => !P a /\ in_supp a d)) /=.
++ by move=> a /=; rewrite andbC.
+by rewrite -(witness_support (predC P)) -/(predC _) /#.
+qed.
+
 (* Some losslessness lemmas *)
 lemma excepted_lossless (m:(D,D) fmap):
   (exists x, !mem (dom m) x) =>
@@ -123,9 +135,10 @@ lemma excepted_lossless (m:(D,D) fmap):
 proof.
 move=> /endo_dom_rng h.
 rewrite -/(weight _) Dexcepted.lossless_restr //.
-  + smt ml=0 w=uD_uf_fu.
-  + cut: forall (P : D -> bool), (exists a, !P a) <=> mu uD P < mu uD predT by smt. (* extract into NewDistr. make a real proof. *)
-    by move=> /(_ (mem (rng m))); smt ml=0 w=uD_uf_fu.
++ smt ml=0 w=uD_uf_fu.
++ have [/pred_ext] + [<- _]:= uD_uf_fu.
+  rewrite -(etaE (support uD)) etaP=> h'.
+  by apply/notin_supportIP; rewrite h'.
 qed.  
 
 phoare Indirect_ll: [Indirect.sample: exists x, support uD x /\ !mem X x ==> true] = 1%r.
@@ -134,7 +147,10 @@ proc; seq  1: (exists x, support uD x /\ !mem X x)=> //=.
 + by rnd (predT); skip; smt ml=0 w=uD_uf_fu.
 if=> //=.
 + rnd (predT); skip.
-  by progress [-split]; split=> //=; smt.
+  progress [-split]; split=> //=.
+  apply/Dexcepted.lossless_restr.
+  * smt ml=0 w=uD_uf_fu.
+  * by have [_ [<- _]]:= uD_uf_fu; apply/notin_supportIP; exists x.
 by hoare; rnd=> //=; skip=> &hr ->.
 qed.
 
@@ -144,7 +160,10 @@ proc; if=> //=; wp; call Indirect_ll.
 skip; progress.
 have:= excepted_lossless (PRPi.m{hr}) _.
 + by exists x{hr}.
-smt. (* mu d predT <> 0%r <=> exists x, support d x *)
+rewrite -/(weight _) Dexcepted.mu_weight_def.
+case (weight uD = mu uD (mem (rng PRPi.m{hr})))=> //=.
+rewrite notin_supportIP /= -(etaE (mem (rng _))) etaP.
+by rewrite StdOrder.RealOrder.ltr_def=> -> /=; exact/mu_sub.
 qed.
 
 (** The proof is cut into 3 parts (sections):
@@ -412,12 +431,13 @@ section PRPi_PRPi'_Indirect.
       (* Bound *)
       progress.
       rewrite -/(mu_x (uD \ X{2}) _) mu_x_def.
-      cut -> //=: in_supp a (uD \ X{2}) by smt.
+      rewrite supp_def a_notin_X /=; have [->] @/predT /=:= uD_uf_fu.
       rewrite /weight /mu_x.
       cut not_empty: mu uD predT - mu uD (mem X{2}) <> 0%r.
         rewrite -mu_not.
         cut: 0%r < mu uD (predC (mem X{2})); last smt.
-        by rewrite witness_support; exists a; smt.
+        rewrite witness_support; exists a; rewrite /predC /= a_notin_X /=.
+        by have [->]:= uD_uf_fu.
       by smt ml=0 w=uD_uf_fu.
       (* case r0 = a *)
       seq  2: (a = r0) (mu uD (pred1 a)) 1%r _ 0%r (r0 = r /\ X = X{2}).
