@@ -2006,13 +2006,14 @@ simplify:
 
 conseq:
 | empty                           { None, None }
-| f1=form                         { Some f1, None }
+| UNDERSCORE LONGARROW UNDERSCORE { None, None }
 | f1=form LONGARROW               { Some f1, None }
 | f1=form LONGARROW UNDERSCORE    { Some f1, None }
+| f2=form                         { None, Some f2 }
 | LONGARROW f2=form               { None, Some f2 }
 | UNDERSCORE LONGARROW f2=form    { None, Some f2 }
 | f1=form LONGARROW f2=form       { Some f1, Some f2 }
-| UNDERSCORE LONGARROW UNDERSCORE { None, None }
+
 
 conseq_bd:
 | c=conseq                                   { c, None }
