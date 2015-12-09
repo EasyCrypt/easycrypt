@@ -421,11 +421,12 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
           | _ -> default ()
       end
 
-      | Fquant (b1, q1, f1), Fquant (b2, q2, f2)
-          when b1 = b2 && List.length q1 = List.length q2
-        ->
-        let (env, subst, mxs) = doit_bindings env (subst, mxs) q1 q2 in
-          doit env (subst, mxs) f1 f2
+      | Fquant (b1, q1, f1), Fquant (b2, q2, f2) when b1 = b2 ->
+          let n1, n2 = List.length q1, List.length q2 in
+          let q1, r1 = List.split_at (min n1 n2) q1 in
+          let q2, r2 = List.split_at (min n1 n2) q2 in
+          let (env, subst, mxs) = doit_bindings env (subst, mxs) q1 q2 in
+          doit env (subst, mxs) (f_quant b1 r1 f1) (f_quant b2 r2 f2)
 
       | Fquant _, Fquant _ ->
           failure ();
