@@ -27,6 +27,7 @@ type cut_t    = intropattern * pformula * (ptactics located) option
 type cutdef_t = intropattern * pcutdef
 type apply_t  = EcParsetree.apply_info
 type focus_t  = EcParsetree.tfocus
+type cutmode  = [`Have | `Suff]
 
 (* -------------------------------------------------------------------- *)
 val process_tfocus : tcenv -> focus_t -> tfocus
@@ -80,7 +81,7 @@ val process_apply       : implicits:bool -> apply_t -> backward
 val process_delta       : ?target:psymbol -> (rwside * EcMatching.occ option * pformula) -> backward
 val process_rewrite     : ttenv -> ?target:psymbol -> rwarg list -> backward
 val process_subst       : pformula list -> backward
-val process_cut         : engine -> ttenv -> cut_t -> backward
+val process_cut         : ?mode:cutmode -> engine -> ttenv -> cut_t -> backward
 val process_cutdef      : ttenv -> cutdef_t -> backward
 val process_left        : backward
 val process_right       : backward

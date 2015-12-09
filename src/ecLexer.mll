@@ -91,6 +91,7 @@
     "pose"        , POSE       ;        (* KW: tactic *)
     "cut"         , CUT        ;        (* KW: tactic *)
     "have"        , HAVE       ;        (* KW: tactic *)
+    "suff"        , SUFF       ;        (* KW: tactic *)
     "elim"        , ELIM       ;        (* KW: tactic *)
     "clear"       , CLEAR      ;        (* KW: tactic *)
 

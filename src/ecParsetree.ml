@@ -678,7 +678,7 @@ type logtactic =
   | Pcongr
   | Pelim       of (genpattern list * pqsymbol option)
   | Papply      of apply_info
-  | Pcut        of (intropattern * pformula * ptactics located option)
+  | Pcut        of pcut
   | Pcutdef     of (intropattern * pcutdef)
   | Pmove       of (ppterm list * psymbol list * genpattern list)
   | Pgeneralize of genpattern list
@@ -732,6 +732,11 @@ and ptactic_chain =
   | Pexpect   of pexpect * int
   | Pfocus    of ptactic * tfocus
   | Protate   of [`Left | `Right] * int
+
+
+(* -------------------------------------------------------------------- *)
+and pcut =
+  [`Have | `Suff] * intropattern * pformula * ptactics located option
 
 (* -------------------------------------------------------------------- *)
 type paxiom_kind =

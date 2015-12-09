@@ -1449,18 +1449,27 @@ let process_subst syms (tc : tcenv1) =
 
 (* -------------------------------------------------------------------- *)
 type cut_t = intropattern * pformula * (ptactics located) option
+type cutmode  = [`Have | `Suff]
 
-let process_cut engine ttenv ((ip, phi, t) : cut_t) tc =
+let process_cut ?(mode = `Have) engine ttenv ((ip, phi, t) : cut_t) tc =
   let phi = TTC.tc1_process_formula tc phi in
   let tc  = EcLowGoal.t_cut phi tc in
-  let tc  =
-    match t with
-    | None -> tc
-    | Some t ->
-       let t = mk_loc (loc t) (Pby (Some (unloc t))) in
-       FApi.t_first (engine t) tc
 
-  in FApi.t_last (process_intros ttenv ip) tc
+  let applytc tc =
+    t |> ofold (fun t tc ->
+      let t = mk_loc (loc t) (Pby (Some (unloc t))) in
+      t_onall (engine t) tc) (FApi.tcenv_of_tcenv1 tc)
+  in
+
+  match mode with
+  | `Have ->
+     FApi.t_first applytc
+       (FApi.t_last (process_intros ttenv ip) tc)
+
+  | `Suff ->
+     FApi.t_rotate `Left 1
+       (FApi.t_on1 0 t_id ~ttout:applytc
+         (FApi.t_last (process_intros ttenv ip) tc))
 
 (* -------------------------------------------------------------------- *)
 type cutdef_t = intropattern * pcutdef

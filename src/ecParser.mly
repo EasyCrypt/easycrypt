@@ -497,6 +497,7 @@
 %token STAR
 %token STRICT
 %token SUBST
+%token SUFF
 %token SWAP
 %token SYMMETRY
 %token THEN
@@ -2133,6 +2134,10 @@ app_bd_info:
 | f=prod_form g=prod_form s=sform?
     { PAppMult (s, fst f, snd f, fst g, snd g) }
 
+%inline have_or_suff:
+| HAVE | CUT { `Have }
+| SUFF { `Suff }
+
 logtactic:
 | REFLEX
     { Preflexivity }
@@ -2231,11 +2236,11 @@ logtactic:
 | SUBST l=sform*
    { Psubst l }
 
-| ior_(CUT, HAVE) ip=loc(intro_pattern)* COLON p=form %prec prec_below_IMPL
-   { Pcut (ip, p, None) }
+| m=have_or_suff ip=loc(intro_pattern)* COLON p=form %prec prec_below_IMPL
+   { Pcut (m, ip, p, None) }
 
-| ior_(CUT, HAVE) ip=loc(intro_pattern)* COLON p=form BY t=loc(tactics)
-   { Pcut (ip, p, Some t) }
+| m=have_or_suff ip=loc(intro_pattern)* COLON p=form BY t=loc(tactics)
+   { Pcut (m, ip, p, Some t) }
 
 | ior_(CUT, HAVE) ip=loc(intro_pattern)* CEQ fp=pcutdef
    { Pcutdef (ip, fp) }
