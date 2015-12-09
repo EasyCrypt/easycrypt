@@ -1010,13 +1010,13 @@ let trans_record env ue subtt (loc, fields) =
 
 (*-------------------------------------------------------------------- *)
 let expr_of_opselect
-  (env, ue) ((sel, ty, subue, _) : OpSelect.gopsel) args
+  (env, ue) loc ((sel, ty, subue, _) : OpSelect.gopsel) args
 =
   EcUnify.UniEnv.restore ~src:subue ~dst:ue;
 
   let esig  = List.map (lmap snd) args in
   let args  = List.map (fst |- unloc) args in
-  let codom = ty_fun_app sel.pl_loc env ue ty esig in
+  let codom = ty_fun_app loc env ue ty esig in
 
   let op, args =
     match sel with
@@ -1065,7 +1065,7 @@ let transexp (env : EcEnv.env) mode ue e =
         | [] -> tyerror loc env (UnknownVarOrOp (name, []))
 
         | [sel] ->
-            expr_of_opselect (env, ue) sel []
+            expr_of_opselect (env, ue) e.pl_loc sel []
 
         | _ ->
           let matches = List.map (fun (_, _, subue, m) -> (m, subue)) ops in
@@ -1088,7 +1088,7 @@ let transexp (env : EcEnv.env) mode ue e =
 
         | [sel] ->
             let es = List.map2 (fun e l -> mk_loc l.pl_loc e) es pes in
-            expr_of_opselect (env, ue) sel es
+            expr_of_opselect (env, ue) loc sel es
 
         | _ ->
             let esig = Tuni.offun_dom (EcUnify.UniEnv.assubst ue) esig in
@@ -1907,13 +1907,13 @@ end
 
 (* -------------------------------------------------------------------- *)
 let form_of_opselect
-  (env, ue) ((sel, ty, subue, _) : OpSelect.gopsel) args
+  (env, ue) loc ((sel, ty, subue, _) : OpSelect.gopsel) args
 =
   EcUnify.UniEnv.restore ~src:subue ~dst:ue;
 
   let esig  = List.map (lmap f_ty) args in
   let args  = List.map unloc args in
-  let codom = ty_fun_app sel.pl_loc env ue ty esig in
+  let codom = ty_fun_app loc env ue ty esig in
 
   let op, args =
     match sel with
@@ -2000,7 +2000,7 @@ let trans_form_or_pattern env (ps, ue) pf tt =
             tyerror loc env (UnknownVarOrOp (name, []))
 
         | [sel] -> begin
-            let op = form_of_opselect (env, ue) sel [] in
+            let op = form_of_opselect (env, ue) loc sel [] in
             let inmem =
               match op.f_node with
               | Fpvar _ | Fproj ({ f_node = Fpvar _ }, _) -> true
@@ -2092,7 +2092,7 @@ let trans_form_or_pattern env (ps, ue) pf tt =
 
           | [sel] ->
               let es = List.map2 (fun e l -> mk_loc l.pl_loc e) es pes in
-              form_of_opselect (env, ue) sel es
+              form_of_opselect (env, ue) loc sel es
 
           | _ ->
               let esig = Tuni.offun_dom (EcUnify.UniEnv.assubst ue) esig in
