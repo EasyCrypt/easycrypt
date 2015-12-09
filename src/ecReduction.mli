@@ -43,6 +43,7 @@ type reduction_info = {
   delta_h : (ident -> bool); (* None means all *)
   zeta    : bool;            (* reduce let  *)
   iota    : bool;            (* reduce case *)
+  eta     : bool;            (* reduce eta-expansion *)
   logic   : bool;            (* perform logical simplification *)
   modpath : bool;            (* reduce module path *)
 }

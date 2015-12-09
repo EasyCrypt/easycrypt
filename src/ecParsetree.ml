@@ -361,6 +361,7 @@ type preduction = {
   pdelta   : pqsymbol list option;      (* definition unfolding *)
   pzeta    : bool;                      (* let-reduction *)
   piota    : bool;                      (* case/if-reduction *)
+  peta     : bool;                      (* η-reduction *)
   plogic   : bool;                      (* logical simplification *)
   pmodpath : bool;                      (* modpath normalization *)
 }

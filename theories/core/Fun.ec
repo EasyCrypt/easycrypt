@@ -19,10 +19,10 @@ op idfun (x:'a) = x.
 pred preim ['a 'b] (f : 'a -> 'b) p x = p (f x).
 
 (* -------------------------------------------------------------------- *)
-op eta (f : 'a -> 'b) = fun x => f x
+op eta_ (f : 'a -> 'b) = fun x => f x
   axiomatized by etaE.
 
-lemma nosmt etaP (f : 'a -> 'b): eta f = f.
+lemma nosmt etaP (f : 'a -> 'b): eta_ f = f.
 proof. by apply/fun_ext; rewrite etaE. qed.
 
 (* -------------------------------------------------------------------- *)

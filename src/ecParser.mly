@@ -105,8 +105,9 @@
   let mk_simplify l =
     if l = [] then
       { pbeta  = true; pzeta  = true;
-        piota  = true; plogic = true;
-        pdelta = None; pmodpath = true }
+        piota  = true; peta   = true;
+        plogic = true; pdelta = None;
+        pmodpath = true }
     else
       let doarg acc = function
         | `Delta l ->
@@ -117,15 +118,17 @@
         | `Zeta    -> { acc with pzeta    = true }
         | `Iota    -> { acc with piota    = true }
         | `Beta    -> { acc with pbeta    = true }
+        | `Eta     -> { acc with peta     = true }
         | `Logic   -> { acc with plogic   = true }
-        | `ModPath -> { acc with pmodpath = true}
+        | `ModPath -> { acc with pmodpath = true }
       in
         List.fold_left doarg
           { pbeta  = false; pzeta  = false;
-            piota  = false; plogic = false;
-            pdelta = Some []; pmodpath = false } l
+            piota  = false; peta   = false;
+            plogic = false; pdelta = Some [];
+            pmodpath = false } l
 
-  let simplify_red = [`Zeta; `Iota; `Beta; `Logic; `ModPath]
+  let simplify_red = [`Zeta; `Iota; `Beta; `Eta; `Logic; `ModPath]
 
   let mk_pterm explicit head args =
     { fp_mode = if explicit then `Explicit else `Implicit;
@@ -379,6 +382,7 @@
 %token EOF
 %token EQ
 %token EQUIV
+%token ETA
 %token EXACT
 %token EXFALSO
 %token EXIST
@@ -1996,6 +2000,7 @@ simplify_arg:
 | ZETA             { `Zeta }
 | IOTA             { `Iota }
 | BETA             { `Beta }
+| ETA              { `Eta }
 | LOGIC            { `Logic }
 | MODPATH          { `ModPath }
 

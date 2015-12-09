@@ -114,6 +114,7 @@ let process_simplify ri (tc : tcenv1) =
     EcReduction.delta_h = delta_h;
     EcReduction.zeta    = ri.pzeta;
     EcReduction.iota    = ri.piota;
+    EcReduction.eta     = ri.peta;
     EcReduction.logic   = ri.plogic;
     EcReduction.modpath = ri.pmodpath;
   } in
