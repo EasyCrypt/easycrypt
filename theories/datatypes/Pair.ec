@@ -70,7 +70,7 @@ theory Dprod.
     by rewrite (Hd1_suf (fst x) (fst y)) // (Hd2_suf (snd x) (snd y)).
   qed.
 
-  theory Sample.
+  abstract theory Sample.
     type t1.
     type t2.
     op d1 : t1 distr.
