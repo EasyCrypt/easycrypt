@@ -44,7 +44,7 @@ proof. by apply/(big_endo oppr0 opprD). qed.
 (* -------------------------------------------------------------------- *)
 lemma sumrB P F1 F2 (r : 'a list):
   (big P F1 r) - (big P F2 r) = big P (fun x => F1 x - F2 x) r.
-proof. by rewrite subrE sumrN sumrD; apply/eq_bigr=> /= x; rewrite subrE. qed.
+proof. by rewrite sumrN sumrD; apply/eq_bigr=> /= x. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt sumr_const (P : 'a -> bool) x s:
@@ -65,17 +65,15 @@ clone include BigZModule with
   type t <- t,
     op ZM.zeror  <- CR.zeror,
     op ZM.( + )  <- CR.( + ),
-    op ZM.( - )  <- CR.( - ),
     op ZM.([-])  <- CR.([-]),
     op ZM.intmul <- CR.intmul
 
-  proof ZM.*.
+  proof ZM.* remove abbrev ZM.(-).
 
 realize ZM.addrA. by apply/addrA. qed.
 realize ZM.addrC. by apply/addrC. qed.
 realize ZM.add0r. by apply/add0r. qed.
 realize ZM.addNr. by apply/addNr. qed.
-realize ZM.subrE. by apply/subrE. qed.
 
 lemma nosmt sumr_1 (P : 'a -> bool) s:
   big P (fun i => oner) s = CR.ofint (count P s).
@@ -128,7 +126,6 @@ clone include BigComRing with
     op CR.oner   <- Num.Domain.oner,
     op CR.( + )  <- Num.Domain.( + ),
     op CR.([-])  <- Num.Domain.([-]),
-    op CR.( - )  <- Num.Domain.( - ),
     op CR.( * )  <- Num.Domain.( * ),
     op CR.invr   <- Num.Domain.invr,
     op CR.( / )  <- Num.Domain.( / ),
@@ -136,13 +133,12 @@ clone include BigComRing with
     op CR.ofint  <- Num.Domain.ofint,
     op CR.exp    <- Num.Domain.exp
 
-    proof *.
+    proof * remove abbrev CR.(-).
 
 realize CR.addrA     . proof. by apply/Num.Domain.addrA. qed.
 realize CR.addrC     . proof. by apply/Num.Domain.addrC. qed.
 realize CR.add0r     . proof. by apply/Num.Domain.add0r. qed.
 realize CR.addNr     . proof. by apply/Num.Domain.addNr. qed.
-realize CR.subrE     . proof. by apply/Num.Domain.subrE. qed.
 realize CR.divrE     . proof. by apply/Num.Domain.divrE. qed.
 realize CR.oner_neq0 . proof. by apply/Num.Domain.oner_neq0. qed.
 realize CR.mulrA     . proof. by apply/Num.Domain.mulrA. qed.

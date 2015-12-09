@@ -234,7 +234,6 @@ let toring hyps ((r, cr) : cring) (rmap : RState.rstate) (form : form) =
       | Fapp ({f_node = Fop (p,_)}, [a1; a2]) -> begin
           match op_kind p with
           | Some `Int_add -> PEadd (of_int a1, of_int a2)
-          | Some `Int_sub -> PEsub (of_int a1, of_int a2)
           | Some `Int_mul -> PEmul (of_int a1, of_int a2)
           | Some `Int_pow -> begin
               match a2.f_node with
@@ -301,7 +300,6 @@ let tofield hyps ((r, cr) : cfield) (rmap : RState.rstate) (form : form) =
     | Fapp ({f_node = Fop (p,_)}, [a1; a2]) -> begin
         match op_kind p with
         | Some `Int_add -> FEadd (of_int a1, of_int a2)
-        | Some `Int_sub -> FEsub (of_int a1, of_int a2)
         | Some `Int_mul -> FEmul (of_int a1, of_int a2)
         | Some `Int_pow -> begin
           match a2.f_node with

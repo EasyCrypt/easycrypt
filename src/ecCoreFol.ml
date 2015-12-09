@@ -673,16 +673,17 @@ let f_pr pr_mem pr_fun pr_args pr_event =
 (* -------------------------------------------------------------------- *)
 let fop_int_opp = f_op EcCoreLib.CI_Int.p_int_opp [] (toarrow [tint]       tint)
 let fop_int_add = f_op EcCoreLib.CI_Int.p_int_add [] (toarrow [tint; tint] tint)
-let fop_int_sub = f_op EcCoreLib.CI_Int.p_int_sub [] (toarrow [tint; tint] tint)
 let fop_int_mul = f_op EcCoreLib.CI_Int.p_int_mul [] (toarrow [tint; tint] tint)
 let fop_int_pow = f_op EcCoreLib.CI_Int.p_int_pow [] (toarrow [tint; tint] tint)
 
 let f_int_opp f     = f_app fop_int_opp [f]      tint
 let f_int_add f1 f2 = f_app fop_int_add [f1; f2] tint
-let f_int_sub f1 f2 = f_app fop_int_sub [f1; f2] tint
 let f_int_mul f1 f2 = f_app fop_int_mul [f1; f2] tint
 let f_int_pow f1 f2 = f_app fop_int_pow [f1; f2] tint
   
+let f_int_sub f1 f2 =
+  f_int_add f1 (f_int_opp f2)
+
 let rec f_int (n : BI.zint) =
   match BI.sign n with
   | s when 0 <= s -> mk_form (Fint n) tint

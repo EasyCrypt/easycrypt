@@ -52,7 +52,7 @@ require Int.
   
   axiom Mul_distr_r: forall (x y z : real), (y + z) * x = y * x + z * x.
   
-  op (-) (x y:real) = x + (-y).
+  abbrev (-) (x y:real) = x + (-y).
   
   theory Comm.
     axiom Comm: forall (x y : real), x * y = y * x.
@@ -324,7 +324,6 @@ instance ring with real
   op opp   = [-]
   op mul   = ( * )
   op expr  = PowerInt.( ^ )
-  op sub   = (-)
   op ofint = FromInt.from_int
 
   proof oner_neq0 by smt
@@ -338,7 +337,6 @@ instance ring with real
   proof mulrDl    by smt
   proof expr0     by smt full
   proof exprS     by smt full
-  proof subrE     by smt full
   proof ofint0    by smt
   proof ofint1    by smt
   proof ofintS    by smt full
@@ -351,7 +349,6 @@ instance field with real
   op opp   = [-]
   op mul   = ( * )
   op expr  = PowerInt.( ^ )
-  op sub   = (-)
   op ofint = FromInt.from_int
   op inv   = inv
   op div   = (/)
@@ -369,7 +366,6 @@ instance field with real
   proof expr0     by smt full
   proof exprS     by smt full
   proof exprN     by smt
-  proof subrE     by smt full
   proof divrE     by smt full
   proof ofint0    by smt
   proof ofint1    by smt

@@ -455,10 +455,7 @@ proof. by move=> lemn lenp; rewrite {-1}/bigi -big_cat -range_cat. qed.
 (* -------------------------------------------------------------------- *)
 lemma nosmt big_int_recl (n m : int) F: m <= n =>
   bigi predT F m (n+1) = F m + bigi predT (fun i => F (i+1)) m n.
-proof.
-  move=> lemn; rewrite big_ltn 1?big_addn /= 1:smt.
-  by rewrite subrE addrK.
-qed.
+proof. by move=> lemn; rewrite big_ltn 1?big_addn /= 1:smt addrK. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt big_int_recr (n m : int) F: m <= n =>

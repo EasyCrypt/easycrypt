@@ -25,8 +25,20 @@ module TTC = EcProofTyping
 module LG  = EcCoreLib.CI_Logic
 
 (* -------------------------------------------------------------------- *)
-let (@!) t1 t2 = FApi.t_seq t1 t2
-let (@+) t ts = FApi.t_seqsub t ts 
+let (@!) (t1 : FApi.backward) (t2 : FApi.backward) =
+  FApi.t_seq t1 t2
+
+let (@+) (t : FApi.backward) (ts : FApi.backward list) =
+  FApi.t_seqsub t ts 
+
+let (@~) (t : FApi.backward) (tt : FApi.tactical) =
+  fun tc -> tt (t tc)
+
+let (@!+) (tt : FApi.tactical) (t : FApi.backward) =
+  fun tc -> FApi.t_onall t (tt tc)
+
+let (@~+) (tt : FApi.tactical) (ts : FApi.backward list) =
+  fun tc -> FApi.t_sub ts (tt tc)
 
 (* -------------------------------------------------------------------- *)
 exception InvalidProofTerm

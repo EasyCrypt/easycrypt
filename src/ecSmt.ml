@@ -1043,7 +1043,6 @@ let core_theories = [
   ((["int"], "Int"),
      [(CI_Int.p_int_opp, "prefix -");
       (CI_Int.p_int_add, "infix +" );
-      (CI_Int.p_int_sub, "infix -" );
       (CI_Int.p_int_mul, "infix *" );
       (CI_Int.p_int_lt , "infix <" );  
       (CI_Int.p_int_le , "infix <=")]);
@@ -1051,7 +1050,6 @@ let core_theories = [
   ((["real"], "Real"),
      [(CI_Real.p_real_opp, "prefix -");
       (CI_Real.p_real_add, "infix +" );
-      (CI_Real.p_real_sub, "infix -" );
       (CI_Real.p_real_mul, "inv"     );
       (CI_Real.p_real_div, "infix /" );
       (CI_Real.p_real_mul, "infix *" );
@@ -1123,27 +1121,6 @@ let unwanted_ops =
     CI_Bool.p_imp;
     CI_Bool.p_iff;
     CI_Bool.p_eq;
-
-(*    CI_Int.p_int_opp;
-    CI_Int.p_int_add;
-    CI_Int.p_int_sub;
-    CI_Int.p_int_mul;
-    CI_Int.p_int_le;
-    CI_Int.p_int_lt;
-    CI_Int.p_int_ge;
-    CI_Int.p_int_gt;
-
-    CI_Real.p_real_opp;
-    CI_Real.p_real_add;
-    CI_Real.p_real_sub;
-    CI_Real.p_real_mul;
-    CI_Real.p_real_inv;
-    CI_Real.p_real_div;
-    CI_Real.p_real_of_int;
-    CI_Real.p_real_le;
-    CI_Real.p_real_lt;
-    CI_Real.p_real_ge;
-    CI_Real.p_real_gt; *)
   ]
 
 (* -------------------------------------------------------------------- *)

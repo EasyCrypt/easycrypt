@@ -430,11 +430,11 @@ qed.
 (* -------------------------------------------------------------------- *)
 lemma nosmt fcardU (A B : 'a fset) :
   card (A `|` B) = card A + card B - card (A `&` B).
-proof. by rewrite -fcardUI Ring.IntID.addrK_sub. qed.
+proof. by rewrite -fcardUI Ring.IntID.addrK. qed.
 
 lemma nosmt fcardI (A B : 'a fset) :
   card (A `&` B) = card A + card B - card (A `|` B).
-proof. by rewrite -fcardUI addzC Ring.IntID.addrK_sub. qed.
+proof. by rewrite -fcardUI addzAC subzz. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt fcardID (A B : 'a fset) :
@@ -443,7 +443,7 @@ proof. by rewrite -fcardUI_indep ?fsetID // fsetII. qed.
 
 lemma nosmt fcardD (A B : 'a fset) :
   card (A `\` B) = card A - card (A `&` B).
-proof. by rewrite -(fcardID A B) addzC Ring.IntID.addrK_sub. qed.
+proof. by rewrite -(fcardID A B) addzAC subzz. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt fcardD1 (A : 'a fset) (x : 'a) :
@@ -565,8 +565,8 @@ lemma nosmt fcard_image_leq (f : 'a -> 'b) (A : 'a fset):
 proof.
   elim/fset_ind: A=> [|x A x_notin_A ih]; 1: by rewrite image0 !fcards0.
   rewrite imageU image1 (lez_trans (card (image f A) + 1)).
-    by rewrite fcardU fcard1 subzE ler_naddr 1:oppr_le0 1:fcard_ge0.
-  rewrite fcardU fsetI1 x_notin_A fcards0 fcard1 subzE oppz0 addz0.
+    by rewrite fcardU fcard1 ler_naddr 1:oppr_le0 1:fcard_ge0.
+  rewrite fcardU fsetI1 x_notin_A fcards0 fcard1 oppz0 addz0.
   by rewrite ler_add2r.
 qed.
 

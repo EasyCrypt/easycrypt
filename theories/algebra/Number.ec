@@ -249,7 +249,7 @@ proof.
 have nz2: ofint 2 <> zeror by rewrite pnatr_eq0.
 apply: (mulfI _ nz2); rewrite -{1}normr_nat // -normrM.
 rewrite mulr_intl mulr2z ger0_norm // -{2}normrN.
-by rewrite -normr0 -(@subrr x) subrE ler_norm_add.
+by rewrite -normr0 -(@subrr x) ler_norm_add.
 qed.
 
 lemma nosmt normr_ge0 (x : t): zeror <= `|x|.
@@ -271,10 +271,10 @@ lemma nosmt subr_gt0 (x y : t): (zeror < y - x) <=> (x < y).
 proof. by rewrite !ltr_def subr_eq0 subr_ge0. qed.
 
 lemma nosmt subr_le0 (x y : t): (y - x <= zeror) <=> (y <= x).
-proof. by rewrite -subr_ge0 subrE opprB add0r subr_ge0. qed.
+proof. by rewrite -subr_ge0 opprB add0r subr_ge0. qed.
 
 lemma nosmt subr_lt0 (x y : t): (y - x < zeror) <=> (y < x).
-proof. by rewrite -subr_gt0 subrE opprB add0r subr_gt0. qed.
+proof. by rewrite -subr_gt0 opprB add0r subr_gt0. qed.
 
 lemma nosmt ler_asym (x y : t): x <= y <= x => x = y.
 proof.
@@ -288,7 +288,7 @@ proof. by split=> [->|/ler_asym]; rewrite ?lerr. qed.
 lemma nosmt ltr_trans (y x z : t): x < y => y < z => x < z.
 proof.
 move=> le_xy le_yz; rewrite -subr_gt0 -(@subrK z y).
-by rewrite !subrE -addrA addr_gt0 -?subrE ?subr_gt0.
+by rewrite -addrA addr_gt0 ?subr_gt0.
 qed.
 
 lemma nosmt ler_lt_trans (y x z : t): x <= y => y < z => x < z.
@@ -360,7 +360,7 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt ler_opp2 (x y : t): (-x <= -y) <=> (y <= x).
-proof. by rewrite -subr_ge0 subrE opprK addrC -subrE subr_ge0. qed.
+proof. by rewrite -subr_ge0 opprK addrC subr_ge0. qed.
 
 lemma nosmt ltr_opp2 (x y : t): (-x < -y) <=> (y < x).
 proof. by rewrite lerW_nmono //; apply/ler_opp2. qed.
@@ -402,7 +402,7 @@ lemma nosmt ler_leVge (x y : t):
 proof. by rewrite -!oppr_ge0 => /(ger_leVge _) h /h; rewrite !ler_opp2 orbC. qed.
 
 lemma ler_add2l (x y z : t) : (x + y <= x + z) <=> (y <= z).
-proof. by rewrite -subr_ge0 subrE opprD addrAC addNKr addrC -subrE subr_ge0. qed.
+proof. by rewrite -subr_ge0 opprD addrAC addNKr addrC subr_ge0. qed.
 
 lemma ler_add2r (x y z : t) : (y + x <= z + x) <=> (y <= z).
 proof. by rewrite !(@addrC _ x) ler_add2l. qed.
@@ -434,35 +434,35 @@ proof. by move=> xy zt; rewrite ltr_le_add // ltrW. qed.
 
 lemma nosmt ler_sub (x y z t : t):
   x <= y => t <= z => x - z <= y - t.
-proof. by move=> xy tz; rewrite !subrE ler_add ?lter_opp2. qed.
+proof. by move=> xy tz; rewrite ler_add ?lter_opp2. qed.
 
 lemma nosmt ler_lt_sub (x y z t : t):
   x <= y => t < z => x - z < y - t.
-proof. by move=> xy zt; rewrite !subrE ler_lt_add ?lter_opp2. qed.
+proof. by move=> xy zt; rewrite ler_lt_add ?lter_opp2. qed.
 
 lemma nosmt ltr_le_sub (x y z t : t):
   x < y => t <= z => x - z < y - t.
-proof. by move=> xy zt; rewrite !subrE ltr_le_add ?lter_opp2. qed.
+proof. by move=> xy zt; rewrite ltr_le_add ?lter_opp2. qed.
 
 lemma nosmt ltr_sub (x y z t : t):
   x < y => t < z => x - z < y - t.
-proof. by move=> xy tz; rewrite !subrE ltr_add ?lter_opp2. qed.
+proof. by move=> xy tz; rewrite ltr_add ?lter_opp2. qed.
 
 lemma nosmt ler_subl_addr (x y z : t):
   (x - y <= z) <=> (x <= z + y).
-proof. by rewrite subrE (monoLR (:@addrK y) (:@ler_add2r (-y))). qed.
+proof. by rewrite (monoLR (:@addrK y) (:@ler_add2r (-y))). qed.
 
 lemma nosmt ltr_subl_addr (x y z : t):
   (x - y < z) <=> (x < z + y).
-proof. by rewrite subrE (monoLR (:@addrK y) (:@ltr_add2r (-y))). qed.
+proof. by rewrite (monoLR (:@addrK y) (:@ltr_add2r (-y))). qed.
 
 lemma nosmt ler_subr_addr (x y z : t):
   (x <= y - z) <=> (x + z <= y).
-proof. by rewrite subrE (monoLR (:@addrNK z) (:@ler_add2r z)). qed.
+proof. by rewrite (monoLR (:@addrNK z) (:@ler_add2r z)). qed.
 
 lemma nosmt ltr_subr_addr (x y z : t):
   (x < y - z) <=> (x + z < y).
-proof. by rewrite subrE (monoLR (:@addrNK z) (:@ltr_add2r z)). qed.
+proof. by rewrite (monoLR (:@addrNK z) (:@ltr_add2r z)). qed.
 
 hint rewrite ler_sub_addr  : ler_subl_addr ler_subr_addr.
 hint rewrite ltr_sub_addr  : ltr_subl_addr ltr_subr_addr.
@@ -947,13 +947,13 @@ hint rewrite invr_cp1  : invr_le1 invr_lt1.
 (* -------------------------------------------------------------------- *)
 lemma nosmt ler_norm_sub (x y : t):
   `|x - y| <= `|x| + `|y|.
-proof. by rewrite subrE -(@normrN y) ler_norm_add. qed.
+proof. by rewrite -(@normrN y) ler_norm_add. qed.
 
 lemma nosmt ler_dist_add (z x y : t):
   `|x - y| <= `|x - z| + `|z - y|.
 proof.                          (* FIXME *)
 apply/(ler_trans _ _ (:@ler_norm_add (x-z) (z-y))).
-by rewrite !subrE addrA addrNK lerr.
+by rewrite addrA addrNK lerr.
 qed.
 
 lemma nosmt ler_sub_norm_add (x y : t):
@@ -966,7 +966,7 @@ qed.
 
 lemma nosmt ler_sub_dist (x y : t):
   `|x| - `|y| <= `|x - y|.
-proof. by rewrite -(@normrN y) (@subrE x y) ler_sub_norm_add. qed.
+proof. by rewrite -(@normrN y) ler_sub_norm_add. qed.
 
 lemma nosmt ler_dist_dist (x y : t):
   `| `|x| - `|y| | <= `|x - y|.
@@ -980,7 +980,7 @@ qed.
 
 lemma nosmt ler_dist_norm_add (x y : t):
   `| `|x| - `|y| | <= `|x + y|.
-proof. by rewrite -(@opprK y) normrN -subrE ler_dist_dist. qed.
+proof. by rewrite -(@opprK y) normrN ler_dist_dist. qed.
 
 lemma nosmt ler_nnorml (x y : t): y < zeror => ! (`|x| <= y).
 proof. by move=> y_lt0; rewrite ltr_geF // (ltr_le_trans _ y_lt0) ?normr_ge0. qed.
@@ -1039,7 +1039,6 @@ clone include RealDomain with type t <- t,
   op   Domain.oner   <- Field.oner,
   op   Domain.( + )  <- Field.( + ),
   op   Domain.([-])  <- Field.([-]),
-  op   Domain.( - )  <- Field.( - ),
   op   Domain.( * )  <- Field.( * ),
   op   Domain.( / )  <- Field.( / ),
   op   Domain.invr   <- Field.invr,
@@ -1053,7 +1052,6 @@ clone include RealDomain with type t <- t,
   realize  Domain.addrC     by apply/Field.addrC    .
   realize  Domain.add0r     by apply/Field.add0r    .
   realize  Domain.addNr     by apply/Field.addNr    .
-  realize  Domain.subrE     by apply/Field.subrE    .
   realize  Domain.divrE     by apply/Field.divrE    .
   realize  Domain.oner_neq0 by apply/Field.oner_neq0.
   realize  Domain.mulrA     by apply/Field.mulrA    .

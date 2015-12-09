@@ -12,16 +12,32 @@ open EcTypes
 open EcFol
 open EcEnv
 open EcPV
+open EcPhlPrRw
+open EcHiGoal
 
 open EcCoreGoal
 open EcLowGoal
 open EcLowPhlGoal
+open EcCoreGoal.FApi
 
 module PT  = EcProofTerm
 module TTC = EcProofTyping
-open FApi
-open EcPhlPrRw
-open EcHiGoal
+
+(* -------------------------------------------------------------------- *)
+let real_lemma name   = EcPath.pqname EcCoreLib.CI_Real.p_Real name
+let real_le_trans     = real_lemma "real_le_trans"
+let real_addleM       = real_lemma "addleM"
+let real_eq_le        = real_lemma "eq_le"
+let real_upto         = real_lemma "upto2_abs"
+let real_upto_notbad  = real_lemma "upto2_notbad"
+let real_upto_imp_bad = real_lemma "upto2_imp_bad"
+let real_upto_false   = real_lemma "upto_bad_false"
+let real_upto_or      = real_lemma "upto_bad_or"
+let real_upto_sub     = real_lemma "upto_bad_sub"
+
+(* -------------------------------------------------------------------- *)
+let t_real_le_trans f2 tc = 
+  t_apply_prept (`App (`UG real_le_trans, [`H_; `F f2]))tc
 
 (* -------------------------------------------------------------------- *)
 let t_core_phoare_deno pre post tc =
@@ -74,7 +90,6 @@ let t_phoare_deno_r pre post tc =
   | _ -> t_core_phoare_deno pre post tc
 
 (* -------------------------------------------------------------------- *)
-
 let cond_pre env prl prr pre = 
   (* building the substitution for the pre *)
   (* we substitute param by args and left by ml and right by mr *)
@@ -180,52 +195,27 @@ let process_phoare_deno info tc =
   FApi.t_first (t_apply pt) (t_phoare_deno pre post tc)
 
 (* -------------------------------------------------------------------- *)
-
-let destr_le f = 
-  match f.f_node with
-  | Fapp({f_node = Fop(ple,_)}, [f1;f2]) when
-      EcPath.p_equal ple EcCoreLib.CI_Real.p_real_le ->
-    f1, f2
-  | _ -> raise (DestrError "destr_real_le")
-
 let destr_deno_bad env f = 
-  match destr_le f with
-  | ({f_node = Fpr _} as pr1,
-     {f_node = Fapp({f_node = Fop(padd,_)},
-                    [{f_node = Fpr pr} as pr2; 
-                     {f_node = Fpr pr'} as pr3 ])})
-      when
-        EcPath.p_equal padd EcCoreLib.CI_Real.p_real_add &&
-          NormMp.x_equal env pr.pr_fun pr'.pr_fun ->
-    pr1, pr2, pr3 
-  | _ -> raise (DestrError "destr_deno_bad") 
+  try
+    let fpr1, (fpr2, fpr3) = snd_map DestrReal.add (DestrReal.le f) in
+    let _, pr2, pr3 = t3_map destr_pr (fpr1, fpr2, fpr3) in
 
+    if not (NormMp.x_equal env pr2.pr_fun pr3.pr_fun) then
+      raise (DestrError "");
+    (fpr1, fpr2, fpr3)
+
+  with DestrError _ -> raise (DestrError "destr_deno_bad") 
+
+(* -------------------------------------------------------------------- *)
 let tc_destr_deno_bad tc env f =
-  try destr_deno_bad env f
+  try  destr_deno_bad env f
   with DestrError _ -> tc_error !!tc "invalid goal shape"
 
-let p_real_abs = EcPath.fromqsymbol (["Top";"Real";"Abs"], "`|_|")
-let f_op_real_abs = f_op p_real_abs [] (tfun treal treal) 
-let f_real_abs f = f_app f_op_real_abs [f] treal
-
-let real_lemma name = EcPath.fromqsymbol (["Top";"Real"], name) 
-let real_le_trans = real_lemma "real_le_trans"
-let real_addleM   = real_lemma "addleM"
-let real_eq_le    = real_lemma "eq_le"
-let real_upto     = real_lemma "upto2_abs"
-let real_upto_notbad = real_lemma "upto2_notbad"
-let real_upto_imp_bad = real_lemma "upto2_imp_bad"
-let real_upto_false   = real_lemma "upto_bad_false"
-let real_upto_or      = real_lemma "upto_bad_or"
-let real_upto_sub     = real_lemma "upto_bad_sub"
-
-let t_real_le_trans f2 tc = 
-  t_apply_prept (`App(`UG real_le_trans, [`H_;`F f2]))tc
-
+(* -------------------------------------------------------------------- *)
 let t_pr_pos tc = 
   let pr =
     try 
-      let _, fpr = destr_le (tc1_goal tc) in
+      let _, fpr = DestrReal.le (tc1_goal tc) in
       destr_pr fpr
     with DestrError _ -> tc_error !!tc "invalid goal shape" in
   let prf = f_pr_r {pr with pr_event = f_false} in
@@ -233,6 +223,7 @@ let t_pr_pos tc =
     [ t_pr_rewrite ("mu_false", None) @! t_true;
       t_pr_rewrite ("mu_sub", None) @! t_true]) tc
   
+(* -------------------------------------------------------------------- *)
 let t_equiv_deno_bad pre tc = 
   let env, _hyps, concl = FApi.tc1_eflat tc in
   let fpr1, fpr2, fprb = tc_destr_deno_bad tc env concl in
@@ -269,23 +260,23 @@ let t_equiv_deno_bad pre tc =
        ]
      ]) tc
 
+(* -------------------------------------------------------------------- *)
 let destr_deno_bad2 env f = 
-  match destr_le f with
-  | ({f_node = Fapp ({f_node = Fop(pabs, _)},
-                     [{f_node = Fapp({f_node = Fop(psub,_)},
-                                     [{f_node = Fpr _} as fpr1; 
-                                      {f_node = Fpr pr2} as fpr2 ])}])},
-      ({f_node = Fpr prb} as fprb)) when
-          EcPath.p_equal psub EcCoreLib.CI_Real.p_real_sub &&
-          EcPath.p_equal pabs p_real_abs &&
-          NormMp.x_equal env pr2.pr_fun prb.pr_fun ->
-    fpr1, fpr2, fprb
-  | _ -> raise (DestrError "destr_deno_bad") 
+  try
+    let lhs , rhs  = DestrReal.le f in
+    let fpr1, fpr2 = DestrReal.sub (DestrReal.abs lhs) in
+    let _pr1, pr2, prb = t3_map destr_pr (fpr1, fpr2, rhs) in
+      if not (NormMp.x_equal env pr2.pr_fun prb.pr_fun) then
+        raise (DestrError "pr");
+      (fpr1, fpr2, rhs)
+  with DestrError _ -> raise (DestrError "destr_deno_bad2")
 
+(* -------------------------------------------------------------------- *)
 let tc_destr_deno_bad2 tc env f =
-  try destr_deno_bad2 env f
+  try  destr_deno_bad2 env f
   with DestrError _ -> tc_error !!tc "invalid goal shape"
 
+(* -------------------------------------------------------------------- *)
 let t_equiv_deno_bad2 pre bad1 tc = 
   let env, hyps, concl = FApi.tc1_eflat tc in
   let fpr1, fpr2, fprb = tc_destr_deno_bad2 tc env concl in
@@ -318,7 +309,8 @@ let t_equiv_deno_bad2 pre bad1 tc =
             t_real_le_trans fabs' @+
             [ t_apply_prept (`UG real_eq_le) @!
                 process_congr @! (* abs *)
-                process_congr @+ (* sub *) 
+                process_congr @~ (* add *) 
+                (t_last process_congr) @~+ (* opp *)
                 [ t_pr_rewrite_i ("mu_split", Some bad1) @! t_reflex;
                   t_pr_rewrite_i ("mu_split", Some bad2) @! t_reflex ] ;
               t_apply_prept (`UG real_upto) @+
@@ -341,6 +333,7 @@ let t_equiv_deno_bad2 pre bad1 tc =
         ]
     ]) tc
 
+(* -------------------------------------------------------------------- *)
 let process_pre tc hyps prl prr pre post = 
   let fl = prl.pr_fun and fr = prr.pr_fun in
   match pre with
@@ -369,6 +362,7 @@ let process_pre tc hyps prl prr pre post =
     dof fl al mleft ml; dof fr ar mright mr;
     f_ands !eqs
 
+(* -------------------------------------------------------------------- *)
 let post_iff eq env evl evr =
   let post = f_iff evl evr in
   try 
@@ -377,7 +371,7 @@ let post_iff eq env evl evr =
       (Mpv2.needed_eq env mleft mright post) f_true
   with Not_found -> post
 
-  
+(* -------------------------------------------------------------------- *)
 let process_equiv_deno1 info eq tc =
   let process_cut (pre, post) =
     let env, hyps, concl = FApi.tc1_eflat tc in
@@ -425,6 +419,7 @@ let process_equiv_deno1 info eq tc =
 
   FApi.t_first (t_apply pt) (t_equiv_deno pre post tc)
 
+(* -------------------------------------------------------------------- *)
 let process_equiv_deno_bad info tc =
   let process_cut (pre, post) =
     let env, hyps, concl = FApi.tc1_eflat tc in
@@ -465,8 +460,7 @@ let process_equiv_deno_bad info tc =
     t_last t_sub (t_rotate `Left 1 (t_equiv_deno_bad pre tc)) in
   t_rotate `Left !torotate gs
 
-
-
+(* -------------------------------------------------------------------- *)
 let process_equiv_deno info eq g = 
   let env, _hyps, concl = FApi.tc1_eflat g in
   try ignore (destr_deno_bad env concl);
@@ -474,6 +468,7 @@ let process_equiv_deno info eq g =
   with DestrError _ -> 
     process_equiv_deno1 info eq g
 
+(* -------------------------------------------------------------------- *)
 let process_equiv_deno_bad2 info eq bad1 tc =
   let env, hyps, concl = FApi.tc1_eflat tc in
   let fpr1, fpr2, fprb = tc_destr_deno_bad2 tc env concl in
@@ -521,6 +516,7 @@ let process_equiv_deno_bad2 info eq bad1 tc =
   let gs = 
     t_last t_sub (t_rotate `Left 1 (t_equiv_deno_bad2 pre bad1 tc)) in
   t_rotate `Left !torotate gs
+
 (* -------------------------------------------------------------------- *)
 type denoff = ((pformula option) tuple2) gppterm * bool * pformula option
 
@@ -531,4 +527,3 @@ let process_deno mode (info, eq, bad1) g =
     match bad1 with
     | None -> process_equiv_deno info eq g
     | Some bad1 -> process_equiv_deno_bad2 info eq bad1 g
-

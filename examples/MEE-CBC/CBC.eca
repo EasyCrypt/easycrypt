@@ -38,8 +38,7 @@ clone Ring.ZModule as Block with
   type t               <- block,
   op   zeror           <- zeros,
   op   (+)             <- (+),
-  op   [-] (x : block) <- x,
-  op   (-)             <- (+)
+  op   [-] (x : block) <- x
 proof * by smt.
 
 (* -------------------------------------------------------------------- *)

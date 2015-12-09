@@ -22,11 +22,10 @@ theory RField.
     op   oner  <- 1%r,
     op   ( + ) <- Real.( + ),
     op   [ - ] <- Real.([-]),
-    op   ( - ) <- Real.( - ),
     op   ( * ) <- Real.( * ),
     op   ( / ) <- Real.( / ),
     op   invr  <- Real.inv
-    proof * by smt.
+    proof * by smt remove abbrev (-).
   
   lemma nosmt ofintR (i : int): ofint i = i%r.
   proof.
@@ -62,7 +61,6 @@ instance ring with int
   op opp   = Int.([-])
   op mul   = Int.( * )
   op expr  = Int.( ^ )
-  op sub   = Int.( - )
 
   proof oner_neq0 by smt
   proof addr0     by smt
@@ -74,5 +72,4 @@ instance ring with int
   proof mulrC     by smt
   proof mulrDl    by smt
   proof expr0     by smt 
-  proof exprS     by smt
-  proof subrE     by smt.
+  proof exprS     by smt.

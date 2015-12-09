@@ -17,7 +17,6 @@ instance ring with int
   op opp   = [-]
   op mul   = ( * )
   op expr  = ( ^ )
-  op sub   = (-)
 
   proof oner_neq0 by smt
   proof addr0     by smt
@@ -29,6 +28,4 @@ instance ring with int
   proof mulrC     by smt
   proof mulrDl    by smt
   proof expr0     by smt
-  proof exprS     by smt
-  proof subrE     by smt.
-
+  proof exprS     by smt.

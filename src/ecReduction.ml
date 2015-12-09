@@ -386,10 +386,10 @@ let rec h_red ri env hyps f =
         | Some (`Real_le  ), [f1;f2] -> f_real_le_simpl f1 f2
         | Some (`Real_lt  ), [f1;f2] -> f_real_lt_simpl f1 f2
         | Some (`Int_add  ), [f1;f2] -> f_int_add_simpl f1 f2
-        | Some (`Int_sub  ), [f1;f2] -> f_int_sub_simpl f1 f2
+        | Some (`Int_opp  ), [f]     -> f_int_opp_simpl f
         | Some (`Int_mul  ), [f1;f2] -> f_int_mul_simpl f1 f2
         | Some (`Real_add ), [f1;f2] -> f_real_add_simpl f1 f2
-        | Some (`Real_sub ), [f1;f2] -> f_real_sub_simpl f1 f2
+        | Some (`Real_opp ), [f]     -> f_real_opp_simpl f
         | Some (`Real_mul ), [f1;f2] -> f_real_mul_simpl f1 f2
         | Some (`Real_div ), [f1;f2] -> f_real_div_simpl f1 f2
         | Some (`Eq       ), [f1;f2] -> begin

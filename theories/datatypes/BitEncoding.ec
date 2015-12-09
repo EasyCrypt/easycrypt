@@ -144,7 +144,7 @@ have <-: (i < n) <=> (i %/ n = 0) by rewrite -divz_eq0 // ge0_i.
 case: (i < n) => [lt_in|/lerNgt le_ni]; 2: rewrite ih ?subr_ge0 //.
 + by rewrite modz_small // ge0_i ltr_normr ?lt_in.
 + by move=> x bx; have := eqz x; apply; rewrite /= bx.
-rewrite subrE -mulN1r modzMDr subrE; congr.
+rewrite -mulN1r modzMDr; congr.
 case: (n = 0)=> [^zn ->/=|nz_n]; 2: by rewrite divzMDr 1?addrC.
 rewrite divz0 /= eq_sym nth_neg ?oppr_lt0 // => {ih}; move: eqz.
 by case: bs => // c bs /(_ c) /=; rewrite zn size_eq0 => ->.
@@ -162,8 +162,7 @@ lemma in_chunk_size r (bs : 'a list) b: 0 < r =>
 proof.
 move=> gt0_r /mapP [i] [] /mem_iota /= [ge0_i ^lt_is +] ->.
 rewrite ltzE -(@ler_pmul2r r) 1:gt0_r divzE mulrDl mul1r.
-rewrite -ler_subr_addr 2!subrE addrAC -2!subrE.
-move/ler_trans/(_ (size bs - r) _); 1: rewrite subrE.
+rewrite -ler_subr_addr addrAC => /ler_trans/(_ (size bs - r) _).
   by rewrite ler_naddr // oppr_le0 modz_ge0 gtr_eqF ?gt0_r.
 rewrite (mulrC i) ler_subr_addl -ler_subr_addr => ler.
 have ge0_r: 0 <= r by apply/ltrW/gt0_r.
@@ -208,6 +207,6 @@ rewrite mkseq1 /= drop0 take_cat h //= take0 cats0 /= -{3}ih.
   by move=> b xsb; apply/h; right.
 apply/eq_in_mkseq=> i /=; rewrite mulrDr mulr1 drop_cat (@h x) //.
 case=> [ge0_i lti]; rewrite ltrNge ler_paddr // 1:mulr_ge0 1:ltrW //.
-by rewrite /= subrE addrAC addrN.
+by rewrite addrAC addrN.
 qed.
 end BitChunking.

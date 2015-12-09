@@ -36,7 +36,7 @@ abstract theory ZModule.
 
   clear [AddMonoid.Axioms.*].
 
-  op ( - ) (x y : t) = x + -y axiomatized by subrE.
+  abbrev ( - ) (x y : t) = x + -y.
 
   lemma nosmt addr0: right_id zeror (+).
   proof. by move=> x; rewrite addrC add0r. qed.
@@ -54,7 +54,7 @@ abstract theory ZModule.
   proof. by move=> x y z t; rewrite -!addrA (addrCA y). qed.
 
   lemma nosmt subrr (x : t): x - x = zeror.
-  proof. by rewrite subrE /= addrN. qed.
+  proof. by rewrite addrN. qed.
 
   lemma nosmt addKr: left_loop [-] (+).
   proof. by move=> x y; rewrite addrA addNr add0r. qed.
@@ -65,14 +65,11 @@ abstract theory ZModule.
   lemma nosmt addrK: right_loop [-] (+).
   proof. by move=> x y; rewrite -addrA addrN addr0. qed.
 
-  lemma addrK_sub (x y : t): x + y - y = x.
-  proof. by rewrite subrE addrK. qed.
-
   lemma nosmt addrNK: rev_right_loop [-] (+).
   proof. by move=> x y; rewrite -addrA addNr addr0. qed.
 
   lemma nosmt subrK x y: (x - y) + y = x.
-  proof. by rewrite subrE addrNK. qed.
+  proof. by rewrite addrNK. qed.
 
   lemma nosmt addrI: right_injective (+).
   proof. by move=> x y z h; rewrite -(@addKr x z) -h addKr. qed.
@@ -90,33 +87,33 @@ abstract theory ZModule.
   proof. by rewrite (inv_eq opprK) oppr0. qed.
 
   lemma nosmt subr0 (x : t): x - zeror = x.
-  proof. by rewrite subrE /= oppr0 addr0. qed.
+  proof. by rewrite oppr0 addr0. qed.
 
   lemma nosmt sub0r (x : t): zeror - x = - x.
-  proof. by rewrite subrE /= add0r. qed.
+  proof. by rewrite add0r. qed.
 
   lemma nosmt opprD (x y : t): -(x + y) = -x + -y.
   proof. by apply (@addrI (x + y)); rewrite addrA addrN addrAC addrK addrN. qed.
 
   lemma nosmt opprB (x y : t): -(x - y) = y - x.
-  proof. by rewrite !subrE opprD opprK addrC. qed.
+  proof. by rewrite opprD opprK addrC. qed.
 
   lemma nosmt subrACA: interchange (-) (+).
-  proof. by move=> x y z t; rewrite !subrE addrACA opprD. qed.
+  proof. by move=> x y z t; rewrite addrACA opprD. qed.
 
   lemma nosmt subr_eq (x y z : t):
     (x - z = y) <=> (x = y + z).
   proof.
     move: (can2_eq (fun x, x - z) (fun x, x + z) _ _ x y) => //=.
-    by move=> {x} x /=; rewrite subrE /= addrNK.
-    by move=> {x} x /=; rewrite subrE /= addrK.
+    by move=> {x} x /=; rewrite addrNK.
+    by move=> {x} x /=; rewrite addrK.
   qed.
 
   lemma nosmt subr_eq0 (x y : t): (x - y = zeror) <=> (x = y).
   proof. by rewrite subr_eq add0r. qed.
 
   lemma nosmt addr_eq0 (x y : t): (x + y = zeror) <=> (x = -y).
-  proof. by rewrite -(@subr_eq0 x) subrE /= opprK. qed.
+  proof. by rewrite -(@subr_eq0 x) opprK. qed.
 
   lemma nosmt eqr_opp (x y : t): (- x = - y) <=> (x = y).
   proof. by apply/(@can_eq _ _ opprK x y). qed.
@@ -126,12 +123,12 @@ abstract theory ZModule.
 
   lemma nosmt eqr_sub (x y z t : t) : (x - y = z - t) <=> (x + t = z + y).
   proof.
-  rewrite -{1}(addrK t x) -{1}(addrK y z) 2!subrE -!addrA.
+  rewrite -{1}(addrK t x) -{1}(addrK y z) -!addrA.
   by rewrite (addrC (-t)) !addrA; split=> [/addIr /addIr|->//].
   qed.
 
   lemma subr_add2r (z x y : t): (x + z) - (y + z) = x - y.
-  proof. by rewrite subrE opprD addrACA addrN addr0 subrE. qed.
+  proof. by rewrite opprD addrACA addrN addr0. qed.
 
   op intmul (x : t) (n : int) =
     if n < 0
@@ -237,10 +234,10 @@ abstract theory ComRing.
   proof. by rewrite mulrN mulr1. qed.
 
   lemma nosmt mulrBl: left_distributive ( * ) (-).
-  proof. by move=> x y z; rewrite !subrE mulrDl !mulNr. qed.
+  proof. by move=> x y z; rewrite mulrDl !mulNr. qed.
 
   lemma nosmt mulrBr: right_distributive ( * ) (-).
-  proof. by move=> x y z; rewrite !subrE mulrDr !mulrN. qed.
+  proof. by move=> x y z; rewrite mulrDr !mulrN. qed.
 
   lemma mulrnAl x y n : 0 <= n => (intmul x n) * y = intmul (x * y) n.
   proof.
@@ -449,7 +446,7 @@ abstract theory ComRing.
 
   lemma subr_sqr_1 x : exp x 2 - oner = (x - oner) * (x + oner).
   proof.
-  rewrite mulrBl mulrDr !(mulr1, mul1r) !subrE expr2 -addrA.
+  rewrite mulrBl mulrDr !(mulr1, mul1r) expr2 -addrA.
   by congr; rewrite opprD addrA addrN add0r.
   qed.
 end ComRing.
@@ -532,10 +529,7 @@ abstract theory Additive.
   proof. by rewrite -ZM1.sub0r raddfB raddf0 ZM2.sub0r. qed.
 
   lemma raddfD (x y : t1): f (x + y) = f x + f y.
-  proof.
-    rewrite -{1}(@ZM1.opprK y) -ZM1.subrE raddfB raddfN.
-    by rewrite ZM2.subrE ZM2.opprK.
-  qed.
+  proof. by rewrite -{1}(@ZM1.opprK y) raddfB raddfN ZM2.opprK. qed.
 end Additive.
 
 (* --------------------------------------------------------------------- *)
@@ -565,11 +559,11 @@ clone include IDomain with
   op   oner  <- 1,
   op   ( + ) <- Int.( + ),
   op   [ - ] <- Int.([-]),
-  op   ( - ) <- Int.( - ),
   op   ( * ) <- Int.( * ),
   op   ( / ) <- Int.( * ),
   op   invr  <- (fun (z : int) => z)
-  proof * by smt.
+  proof * by smt
+  remove abbrev (-).
 
 lemma intmulz z c : intmul z c = z * c.
 proof.

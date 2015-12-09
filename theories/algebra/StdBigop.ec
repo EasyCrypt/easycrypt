@@ -19,7 +19,6 @@ clone include Bigalg.BigOrder with
     op Num.Domain.zeror  <- 0,
     op Num.Domain.oner   <- 1,
     op Num.Domain.( + )  <- Int.( + ),
-    op Num.Domain.( - )  <- Int.( - ),
     op Num.Domain.([-])  <- Int.([-]),
     op Num.Domain.( * )  <- Int.( * ),
     op Num.Domain.( / )  <- Int.( * ),
@@ -35,7 +34,9 @@ clone include Bigalg.BigOrder with
     proof Num.Domain.* by smt, Num.Axioms.* by smt
 
     rename [theory] "BAdd" as "BIA"
-           [theory] "BMul" as "BIM".
+           [theory] "BMul" as "BIM"
+
+    remove abbrev Num.Domain.(-).
 
 lemma nosmt sumzE ss : sumz ss = BIA.big predT (fun x => x) ss.
 proof. by elim: ss=> [|s ss ih] //=; rewrite BIA.big_cons -ih. qed.
@@ -60,7 +61,6 @@ clone include Bigalg.BigOrder with
     op Num.Domain.zeror  <- 0%r,
     op Num.Domain.oner   <- 1%r,
     op Num.Domain.( + )  <- Real.( + ),
-    op Num.Domain.( - )  <- Real.( - ),
     op Num.Domain.([-])  <- Real.([-]),
     op Num.Domain.( * )  <- Real.( * ),
     op Num.Domain.invr   <- Real.inv,
@@ -76,7 +76,9 @@ clone include Bigalg.BigOrder with
     proof Num.Domain.* by smt, Num.Axioms.* by smt
 
     rename [theory] "BAdd" as "BRA"
-           [theory] "BMul" as "BRM".
+           [theory] "BMul" as "BRM"
+
+    remove abbrev Num.Domain.(-).
 
 import Bigint.BIA Bigint.BIM BRA BRM. 
 
@@ -151,7 +153,7 @@ lemma nosmt b2i_big (P1 P2 : 'a -> bool) (s : 'a list) :
 proof. 
 elim: s => [|x s ih] //=; rewrite big_cons BIA.big_cons.
 case: (P1 x)=> //= P1x; rewrite ora_or b2i_or.
-rewrite subrE -addrA ler_add2l -subrE ler_subl_addr ler_paddr //.
+rewrite -addrA ler_add2l ler_subl_addr ler_paddr //.
 by rewrite -b2i_and b2i_ge0.
 qed.
 

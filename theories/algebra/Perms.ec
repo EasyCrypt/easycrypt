@@ -31,7 +31,7 @@ case: s=> [|x s]; first by rewrite addz_neq0 ?size_ge0.
   case: (x = y)=> [<<-|]; first by rewrite ih // perm_cons.
   move=> ne_xy; have sy: mem s y.
     by have @/s' := s'y; rewrite mem_undup /= eq_sym ne_xy.
-  rewrite ih /= ?size_rem // 1:subrE 1?addrCA //.
+  rewrite ih /= ?size_rem // 1?addrCA //.
   move/(perm_cons y); rewrite perm_consCA => /perm_eqrE <-.
   by apply/perm_cons/perm_to_rem.
 move=> ^eq_st /perm_eq_mem/(_ x) /= tx; apply/flatten_mapP=> /=.
@@ -45,7 +45,7 @@ have shx: mem s (head x t).
   move/perm_eq_mem/(_ (head x t)): eq_st => /=; rewrite eq_sym.
   by rewrite nex /= => ->; rewrite -(mem_head_behead x).
 exists (behead t); rewrite head_behead //= ih /=.
-  by rewrite size_rem // subrE addrCA.
+  by rewrite size_rem // addrCA.
 rewrite -(perm_cons (head x t)) head_behead // perm_consCA.
 by have/perm_eqrE <- := eq_st; apply/perm_cons/perm_eq_sym/perm_to_rem.
 qed.
@@ -90,9 +90,9 @@ rewrite size_map /= mulrDl /= addrC; congr.
 have: forall y, mem s y => F y = size (allperms_r n s).
   move=> y sy @/F @/(\o); rewrite size_map; case: (x = y)=> //.
   move=> ne_xy; rewrite !ih //= ?size_rem //.
-    by rewrite subrE addrCA.
+    by rewrite addrCA.
     by rewrite rem_uniq //=; apply/negP=> /mem_rem.
-  by rewrite addrC subrE -addrA.
+  by rewrite addrC -addrA.
 move/eq_in_map=> ->; rewrite big_map predT_comp /(\o) /=.
 by rewrite sumr_const intmulz count_predT mulrC.
 qed.

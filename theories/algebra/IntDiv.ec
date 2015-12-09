@@ -32,7 +32,7 @@ case: (d = 0) => [->|nz_d]; first by rewrite normr0 ler_lt_asym.
 case: (q' = q) => [-> /addrI ->|ne_qq'] //=; rewrite addrC -eqr_sub.
 move/(congr1 "`|_|"); rewrite -mulrBl normrM => eq.
 case=> [ge0_r lt_rd] [ge0_r' lr_r'd]; have: `|r - r'| < `|d|.
-  rewrite ltr_norml subrE ltr_paddl // 1:ltr_oppr 1:opprK //=.
+  rewrite ltr_norml ltr_paddl // 1:ltr_oppr 1:opprK //=.
   by rewrite ltr_naddr // oppr_le0.
 rewrite eq gtr_pmull 1:normr_gt0 // (@ltzS _ 0) normr_le0 subr_eq0.
 by move=> ->> /=; move: eq; rewrite subrr normr0P subr_eq0.
@@ -98,7 +98,7 @@ qed.
 (* -------------------------------------------------------------------- *)
 lemma divzN m d : m %/ - d = - (m %/ d).
 proof.
-case: (d = 0) => [->|nz_d]; first by rewrite !(oppr0, divz0).
+case: (d = 0) => [->|nz_d]; first by rewrite 2!(divz0, oppr0).
 have := (divz_eq m (-d)); rewrite {1}(divz_eq m d) modzN mulrN.
 by rewrite -mulNr => /addIr /(mulIf _ nz_d) ->; rewrite opprK.
 qed.
@@ -160,7 +160,7 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 lemma modzE m d : m %% d = m - (m %/ d) * d.
-proof. by have [+ _] - {2}-> := edivzP m d; rewrite subrE addrAC addrN. qed.
+proof. by have [+ _] - {2}-> := edivzP m d; rewrite addrAC addrN. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma divzE m d : m %/ d * d = m - m %% d.
@@ -181,8 +181,7 @@ proof. by move=> nz_d; rewrite (@addrC m); apply/divzMDl. qed.
 lemma nosmt modzMDl p m d : (p * d + m) %% d = m %% d.
 proof.
 case: (d = 0) => [->|nz_d]; first by rewrite mulr0 add0r.
-rewrite modzE divzMDl // mulrDl subrE opprD addrACA.
-by rewrite addrN /= -subrE -modzE.
+by rewrite modzE divzMDl // mulrDl opprD addrACA addrN -modzE.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -336,7 +335,7 @@ lemma dvdzN d m : d %| m => d %| -m.
 proof. by move/dvdzP=> [q ->]; rewrite -mulNr dvdz_mull dvdzz. qed.
 
 lemma dvdzB d m1 m2 : d %| m1 => d %| m2 => d %| (m1 - m2).
-proof. by move=> h1 h2; rewrite subrE; apply/dvdzD/dvdzN. qed.
+proof. by move=> h1 h2; apply/dvdzD/dvdzN. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma dvdz_eq d m : (d %| m) <=> (m %/ d * d = m).
@@ -344,14 +343,14 @@ proof. by rewrite dvdzE modzE subr_eq0 eq_sym. qed.
 
 lemma dvdz_exp2l p m n : 0 <= m <= n => (p ^ m %| p ^ n).
 proof.
-move=> [ge0_m le_mn]; rewrite dvdzE; rewrite -(subrK n m) subrE.
-by rewrite -pow_add // -subrE ?subr_ge0 // modzMl.
+move=> [ge0_m le_mn]; rewrite dvdzE; rewrite -(subrK n m).
+by rewrite -pow_add // ?subr_ge0 // modzMl.
 qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt modz_dvd m p q: q %| p => (m %% p) %% q = m %% q.
 proof.
-move=> dv_qp; rewrite (modzE _ p) subrE -mulNr.
+move=> dv_qp; rewrite (modzE _ p) -mulNr.
 by move/dvdz_eq: dv_qp=> {2}<-; rewrite mulrA modzMDr.
 qed.
 

@@ -12,9 +12,10 @@ op ( < )  : int -> int -> bool.
 op (<= )  = fun x y => x < y \/ x = y.
 op ( + )  : int -> int -> int.
 op ([-])  : int -> int.
-op ( - )  = fun x y => x + (-y).
 op ( * )  : int -> int -> int.
 op "`|_|" = fun x =>  (0 <= x) ? x : -x.
+
+abbrev ( - ) (x y : int) = x + (-y).
 
 axiom nosmt addzA     : forall x y z, x + (y + z) = (x + y) + z.
 axiom nosmt addzC     : forall x y, x + y = y + x.
@@ -29,9 +30,6 @@ axiom nosmt mul1z     : forall x, 1 * x = x.
 axiom nosmt mulzDl    : forall x y z, (x + y) * z = x * z + y * z.
 axiom nosmt mulzDr    : forall x y z, x * (y + z) = x * y + x * z.
 axiom nosmt onez_neq0 : 1 <> 0.
-
-lemma subzE (x y : int): x - y = x + (- y).
-proof. by []. qed.
 
 (* -------------------------------------------------------------------- *)
 axiom nosmt lezz      : forall x, x <= x.

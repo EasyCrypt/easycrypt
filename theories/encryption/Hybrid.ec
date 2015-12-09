@@ -491,7 +491,7 @@ section.
      cut := Hybrid Ob A _ _ _ _ &m p. 
       apply losslessL. apply losslessOb1. apply losslessOb2. apply losslessA.
      move=> /= H. rewrite /p' -H.
-     congr.
+     congr; last congr.
      byequiv (_ : ={glob A, glob Ob} ==> ={glob A, glob Ob, glob HybOrcl, res} /\ Count.c{2} <= 1) => //.
        proc;inline *;wp.
        call (_ : ={glob Ob, glob HybOrcl} /\ (if HybOrcl.l <= HybOrcl.l0 then Count.c = 0 else Count.c =1){2}). 

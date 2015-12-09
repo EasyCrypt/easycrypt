@@ -43,7 +43,7 @@ end Ring.
 
 theory RingT.
   clone import Ring.
-  op ( - ) (r1 r2 : ring) = r1 + -r2.
+  abbrev ( - ) (r1 r2 : ring) = r1 + -r2.
 
   (** Lemmas *)
   lemma addr0 (r : ring):

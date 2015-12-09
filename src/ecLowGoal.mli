@@ -29,6 +29,10 @@ type lazyred = EcProofTyping.lazyred
 val (@!) : FApi.backward -> FApi.backward -> FApi.backward
 val (@+) : FApi.backward -> FApi.backward list -> FApi.backward
 
+val (@~)  : FApi.backward -> FApi.tactical -> FApi.backward
+val (@!+) : FApi.tactical -> FApi.backward -> FApi.tactical
+val (@~+) : FApi.tactical -> FApi.backward list -> FApi.tactical
+
 val t_admit : FApi.backward
 val t_true  : FApi.backward
 val t_fail  : FApi.backward

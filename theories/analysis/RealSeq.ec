@@ -50,7 +50,7 @@ lemma bounded_cnvto l (s : int -> real) :
   convergeto s l => bounded s.
 proof.
 move=> /(_ 1%r) /= [N] les1; exists (1%r + `|l|), N.
-move=> n /les1 /ltrW lesn1; rewrite -(addrK l (s n)) addrAC -subrE.
+move=> n /les1 /ltrW lesn1; rewrite -(addrK l (s n)) addrAC.
 apply/(ler_trans (`|s n - l| + `|l|)); 1: by apply/ler_norm_add.
 by rewrite ler_add2r.
 qed.
@@ -62,8 +62,8 @@ proof.
 split=> [h m n|h n]; last first.
   by move=> ge0n; apply/h; rewrite ge0n ler_addl.
 case=> ge0m; rewrite -IntOrder.subr_ge0 -{2}(@IntID.subrK n m).
-rewrite addrC; elim: (n - m)=> //.
-by move=> i ge0i ih; rewrite addrA (ler_trans _ ih) // h ?addr_ge0.
+elim: (n - m)=> // i ge0i ih; rewrite addrAC (ler_trans _ ih) //.
+by rewrite h ?addr_ge0.
 qed.
 
 lemma uniq_cnvto s x y: convergeto s x => convergeto s y => x = y.
@@ -138,15 +138,14 @@ proof. by move=> cv1 cv2; rewrite -(@add0r l); apply/cnvtoD. qed.
 lemma cnvtoN s l: convergeto s l => convergeto (fun x => -(s x)) (-l).
 proof.
 move=> cnv e /cnv [N {cnv} cnv]; exists N => n /cnv h.
-by rewrite subrE -opprD normrN -subrE.
+by rewrite -opprD normrN.
 qed.
 
 lemma cnvtoB s1 s2 l1 l2:
   convergeto s1 l1 => convergeto s2 l2 =>
   convergeto (fun x => s1 x - s2 x) (l1 - l2).
 proof.
-move=> cv1 /cnvtoN cvN2; have := cnvtoD _ _ _ _ cv1 cvN2.
-by rewrite subrE; apply/eq_cnvto=> /= n; rewrite subrE.
+by move=> cv1 /cnvtoN cvN2; have := cnvtoD _ _ _ _ cv1 cvN2; apply/eq_cnvto.
 qed.
 
 lemma cnvtoBlim s l: convergeto s l =>
@@ -209,7 +208,7 @@ have gt0_e: 0%r < e by rewrite /e divr_gt0 ?subr_gt0.
 have [N' lte] := cvF _ gt0_e; pose n := max N N'.
 have /subr_le0 le0_s12:= le_s12 n _; first by rewrite /n leq_maxl.
 have := lte n _; first by rewrite /n leq_maxr.
-rewrite ltr_norml => [+ _] @/F; rewrite ltr_subr_addl -subrE /F.
+rewrite ltr_norml => [+ _] @/F; rewrite ltr_subr_addl /F.
 move/ltr_le_trans/(_ _ le0_s12); rewrite -(@mulr1 (l1-l2)) /e.
 rewrite divrE -mulrBr pmulr_llt0 1:subr_gt0 1:invr_lt1 //.
 by rewrite subr_lt0 ltrNge (ltrW lt_l21).

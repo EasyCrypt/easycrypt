@@ -135,7 +135,7 @@ lemma rpowD (x n m : real) : 0%r < x => x^(n + m) = x^n * x^m.
 proof. by move=> gt0x; rewrite !rpowE // mulrDl expD. qed.
 
 lemma rpowB (x n m : real) : 0%r < x => x^(n - m) = x^n / x^m.
-proof. by move=> gt0x; rewrite subrE divrE !(rpowN, rpowD) // ltrW. qed.
+proof. by move=> gt0x; rewrite divrE !(rpowN, rpowD) // ltrW. qed.
 
 lemma rpowM (x n m : real) : 0%r < x => x^(n * m) = (x ^ n) ^ m.
 proof. by move=> gt0x; rewrite !rpowE ?exp_gt0 // lnK mulrCA mulrA. qed.

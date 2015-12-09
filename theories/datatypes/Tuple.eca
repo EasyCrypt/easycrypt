@@ -119,7 +119,7 @@ move=> x; rewrite wordnP max_ler 1:addz_ge0 // allpairsP.
 split=> [sz|[] [x1 x2] /= [sz1] [sz2] ->]; last first.
   by rewrite size_cat (in_wordn_size sz1) (in_wordn_size sz2) !max_ler.
 exists (take i x, drop i x) => /=; rewrite !wordnP cat_take_drop /=.
-rewrite size_drop // sz subzE addzAC -subzE !max_ler //=.
+rewrite size_drop // sz addzAC !max_ler //=.
 rewrite size_take ?max_ler //; case: (i < size x)=> //=.
 by rewrite -lezNgt eqz_leq sz => -> /=; rewrite lez_addl.
 qed.  

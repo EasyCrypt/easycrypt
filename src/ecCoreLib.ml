@@ -51,7 +51,6 @@ module CI_Int = struct
   let p_int_elim = _Int "intind"
   let p_int_opp = _Int "[-]"
   let p_int_add = _Int "+"
-  let p_int_sub = _Int "-"
   let p_int_mul = _Int "*"
   let p_int_pow = _Int "^"
   let p_int_le  = _Int "<="
@@ -68,14 +67,14 @@ module CI_Real = struct
 
   let p_real_opp    = _Real "[-]"
   let p_real_add    = _Real "+"
-  let p_real_sub    = _Real "-"
   let p_real_mul    = _Real "*"
   let p_real_inv    = _Real "inv"
   let p_real_div    = _Real "/"
   let p_real_pow    = List.fold_left EcPath.pqname p_Real ["PowerInt"; "^"]
   let p_real_le     = _Real "<="
   let p_real_lt     = _Real "<"
-  let p_real_of_int = List.fold_left EcPath.pqname p_Real ["FromInt"; "from_int"]
+  let p_real_of_int = EcPath.extend p_Real ["FromInt"; "from_int"]
+  let p_real_abs    = EcPath.extend p_Real ["Abs"; "`|_|"]
 end
 
 (* -------------------------------------------------------------------- *)

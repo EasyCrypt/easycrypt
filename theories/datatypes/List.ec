@@ -257,7 +257,7 @@ move=> {le_in} ge0_n; elim: n ge0_n i ge0_i lt_in => [|n ge0_n ih].
 move=> i; rewrite iterS //; elim/natcase: i.
   move=> i le0_i ge0_i; have ->//: i = 0 by rewrite eqz_leq.
 move=> i ge0_i _; rewrite ltz_add2r /= => /(ih _ ge0_i).
-by rewrite addz_neq0 //= subzE -addzA /= => ->.
+by rewrite addz_neq0 //= -addzA /= => ->.
 qed.
 
 lemma nth_nseq_if w i n (a : 'a):
@@ -516,7 +516,7 @@ proof.
 elim: s i => /= [|x s ih] i; 1: by rewrite lez_lt_asym.
 case: (p x)=> //= px; rewrite ?lez_lt_asym //.
 rewrite lez_eqVlt eq_sym; case: (i = 0) => [<-//|_] /=.
-rewrite {1 2}(_ : i = (i + -1)+1) 1:-addzA // -subzE.
+rewrite {1 2}(_ : i = (i + -1)+1) 1:-addzA //.
 by rewrite ltz_add2r ltzS => /ih.
 qed.
 
@@ -946,11 +946,11 @@ case: (n + 1 < size xs)=> [lt_n1_sx|/lezNgt].
   have ->: (n < size xs) by smt. (* n + 1 < size xs => n < size xs *)
   by rewrite catA.
 case: (n < size xs)=> /=; last first.
-  by rewrite catA subzE addzAC -2!subzE.
+  by rewrite catA addzAC.
 rewrite -lez_add1r addzC=> h h'.
 have {h h'} sx_eq_n1:= lez_anti (size xs) (n + 1) _=> //.
-rewrite sx_eq_n1 subzE Ring.IntID.opprD subzE.
-rewrite (addzC (-n)) addzA -(addzA _ _ (-1)) -subzE /=.
+rewrite sx_eq_n1 Ring.IntID.opprD.
+rewrite (addzC (-n)) addzA -(addzA _ _ (-1)) /=.
 by rewrite drop0 -sx_eq_n1 drop_size cats0.
 qed.
 
@@ -1046,9 +1046,8 @@ elim/last_ind: s n=> /= [|x s ih] n; first by rewrite lez_lt_asym.
 rewrite rev_rcons size_rcons ltzS subz_add2r -cats1 nth_cat /=.
 elim/natcase: n=> [n le0_n|n ge0_n] [ge0_Hn lt_ns] /=.
   by have ->: n = 0 by rewrite eqz_leq le0_n ge0_Hn.
-rewrite addz_neq0 //= {1}(subzE (size x)) -{2}(addz0 (size x)).
-rewrite ltz_add2l oppz_lt0 ltzS ge0_n /= -ih ?ltzE ?ge0_n //.
-by rewrite subzE -addzA.
+rewrite addz_neq0 //= -{2}(addz0 (size x)).
+by rewrite ltz_add2l oppz_lt0 ltzS ge0_n /= -ih ?ltzE ?ge0_n // -addzA.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -1375,7 +1374,7 @@ proof.
   elim: s => //= y s ih inj_f s_x; rewrite index_cons.
   case: (f x = f y) => eqf /=; 1: by apply/eq_sym/inj_f.
   move: s_x eqf; case: (x = y)=> //= ne_xy s_x _.
-  rewrite addz1_neq0 1:index_ge0 //= subzE -addzA /= ih //.
+  rewrite addz1_neq0 1:index_ge0 //= -addzA /= ih //.
   by move=> x' y' s_x' s_y'; apply/inj_f; rewrite ?(s_x', s_y').
 qed.
 
@@ -1503,11 +1502,11 @@ theory Range.
 
   lemma range_addl (m n a : int):
     range (m+a) n = map (Int.(+) a) (range m (n-a)).
-  proof. by rewrite -{1}(addrNK a n) -subrE range_add. qed.
+  proof. by rewrite -{1}(addrNK a n) range_add. qed.
 
   lemma range_addr (m n a : int):
     range m (n+a) = map (Int.(+) a) (range (m-a) n).
-  proof. by rewrite -{1}(addrNK a m) -subrE range_add. qed.
+  proof. by rewrite -{1}(addrNK a m) range_add. qed.
 
   lemma range_cat (n m p : int): m <= n => n <= p =>
     range m p = range m n ++ range n p.
@@ -1527,7 +1526,7 @@ theory Range.
     (mem (range m n) i) <=> (m <= i < n).
   proof.
     rewrite /range mem_iota; case: (m <= i)=> //=.
-    by rewrite subrE addrCA addrN addr0.
+    by rewrite addrCA addrN addr0.
   qed.
 
   lemma range_uniq m n: uniq (range m n).
@@ -1567,7 +1566,7 @@ lemma assoc_cons x y s a:
   = if a = x then Some y else assoc s a.
 proof.
   rewrite /assoc /= index_cons {1 3}/fst /=; case: (a = x)=> //=.
-  by move=> _; rewrite subzE -addzA /=addz1_neq0 // index_ge0.
+  by move=> _; rewrite -addzA /=addz1_neq0 // index_ge0.
 qed.
 
 lemma assoc_head x y s: assoc<:'a, 'b> ((x, y) :: s) x = Some y.
