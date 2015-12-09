@@ -7,12 +7,7 @@ require (*--*) Birthday.
 (** We assume a finite domain D, equipped with its uniform
     distribution. **)
 type D.
-
 op uD: { D distr | is_uniform_over uD predT } as uD_uf_fu.
-
-lemma uD_suf: is_subuniform uD by have [_ [_]]:= uD_uf_fu.
-lemma uD_fu:  is_full uD by have [+ _]:= uD_uf_fu.
-lemma uD_ll:  is_lossless uD by have [_ [+ _]]:= uD_uf_fu.
 
 (** and a type K equipped with a lossless distribution **)
 type K.
@@ -29,7 +24,7 @@ clone import IdealPRP as PRPi with
     op dK <- dK,
   type D  <- D,
     op dD <- uD
-proof * by smt ml=0 w=(dK_ll uD_ll)
+proof * by smt ml=0 w=(dK_ll uD_uf_fu)
 rename "RandomPermutation" as "PRPi".
 
 (** This would be split: we only need module types and ideal PRF **)
@@ -39,7 +34,7 @@ clone import IdealPRF as PRFi with
   type R  <- D,
   op   dK <- dK,
   op   dR <- uD
-proof * by smt ml=0 w=(dK_ll uD_ll)
+proof * by smt ml=0 w=(dK_ll uD_uf_fu)
 rename "RandomFunction" as "PRFi".
 
 op q : { int | 0 < q } as gt0_q.
@@ -125,12 +120,18 @@ module PRPi'(S:Sample_t) = {
 lemma excepted_lossless (m:(D,D) fmap):
   (exists x, !mem (dom m) x) =>
   mu (uD \ rng m) predT = 1%r.
-proof. by move=> /endo_dom_rng; smt. qed.
+proof.
+move=> /endo_dom_rng h.
+rewrite -/(weight _) Dexcepted.lossless_restr //.
+  + smt ml=0 w=uD_uf_fu.
+  + cut: forall (P : D -> bool), (exists a, !P a) <=> mu uD P < mu uD predT by smt. (* extract into NewDistr. make a real proof. *)
+    by move=> /(_ (mem (rng m))); smt ml=0 w=uD_uf_fu.
+qed.  
 
 phoare Indirect_ll: [Indirect.sample: exists x, support uD x /\ !mem X x ==> true] = 1%r.
 proof.
 proc; seq  1: (exists x, support uD x /\ !mem X x)=> //=.
-+ by rnd (predT); skip; smt ml=0 w=uD_ll.
++ by rnd (predT); skip; smt ml=0 w=uD_uf_fu.
 if=> //=.
 + rnd (predT); skip.
   by progress [-split]; split=> //=; smt.
@@ -337,7 +338,7 @@ section CollisionProbability.
     progress [-split].
     rewrite H3 //=; split.
       move=> x0; rewrite rng_set !inE.
-      by rewrite rng_rm; smt.
+      by rewrite rng_rem; smt.
       by rewrite NewLogic.negb_and /= collision_add // H H0 orbC.
   auto; progress.
     by rewrite rng0 in_fset0.
@@ -417,7 +418,7 @@ section PRPi_PRPi'_Indirect.
         rewrite -mu_not.
         cut: 0%r < mu uD (predC (mem X{2})); last smt.
         by rewrite witness_support; exists a; smt.
-      by rewrite uD_ll; algebra; first smt.
+      by smt ml=0 w=uD_uf_fu.
       (* case r0 = a *)
       seq  2: (a = r0) (mu uD (pred1 a)) 1%r _ 0%r (r0 = r /\ X = X{2}).
         by auto.

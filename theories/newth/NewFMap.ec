@@ -533,7 +533,7 @@ lemma map0_eq0 (m : ('a,'b) fmap):
   (forall x, m.[x] = None) => m = map0.
 proof. by move=> h; apply fmapP=> x; rewrite h map0P. qed.
 
-lemma rmP_eq (a : 'a) (m : ('a,'b) fmap): (rem a m).[a] = None.
+lemma remP_eq (a : 'a) (m : ('a,'b) fmap): (rem a m).[a] = None.
 proof. by rewrite remP. qed.
 
 lemma rem_rem (a : 'a) (m : ('a, 'b) fmap):
@@ -599,7 +599,7 @@ lemma rng_set_eq (m : ('a, 'b) fmap) (a : 'a) (b : 'b):
   mem (rng m.[a<-b]) b.
 proof. by rewrite rng_set in_fsetU in_fset1. qed.
 
-lemma rng_rm (a : 'a) (m : ('a, 'b) fmap) (b : 'b):
+lemma rng_rem (a : 'a) (m : ('a, 'b) fmap) (b : 'b):
   mem (rng (rem a m)) b <=> (exists x, x <> a /\ m.[x] = Some b).
 proof.
   rewrite in_rng; split=> [[x]|[x] [ne_x_a mx_b]].
@@ -699,6 +699,22 @@ proof.
     by move: x_in_m1; rewrite in_dom; case (m1.[x]).
   by rewrite -in_fset1; apply eqe.
 qed.
+
+(* -------------------------------------------------------------------- *)
+lemma rem_id (x : 'a) (m : ('a,'b) fmap):
+  !mem (dom m) x => rem x m = m.
+proof.
+rewrite in_dom /= => x_notin_m; apply/fmapP=> x'; rewrite remP.
+by case: (x' = x)=> //= ->>; rewrite x_notin_m.
+qed.
+
+lemma dom_rem_le (x : 'a) (m : ('a,'b) fmap) (x' : 'a):
+  mem (dom (rem x m)) x' => mem (dom m) x'.
+proof. by rewrite dom_rem in_fsetD. qed.
+
+lemma rng_rem_le (x : 'a) (m : ('a,'b) fmap) (x' : 'b):
+  mem (rng (rem x m)) x' => mem (rng m) x'.
+proof. by rewrite rng_rem in_rng=> [x0] [_ h]; exists x0. qed.
 
 (* -------------------------------------------------------------------- *)
 (** FIXME: these two were minimally imported from old and need cleaning *)
