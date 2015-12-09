@@ -1476,6 +1476,29 @@ theory Iota.
       by rewrite iota0 hn.
     by rewrite iotaS //= ih smt.
   qed.
+
+  lemma take_iota (k n m : int):
+    take k (iota_ n m) = iota_ n (min m k).
+  proof.
+  move=> @/min; case: (m < k)=> [lt_mk|/lezNgt le_km].
+    case: (m < 0) => [/ltzW/iota0->//|/lezNgt ge0_m].
+    by rewrite take_oversize // size_iota max_ler 2:ltzW.
+  case: (k < 0) => [^/take_neg<:int> -> /ltzW/iota0 ->//|].
+  move/lezNgt=> ge0_k; rewrite -{1}(addzK (-k) m) /=.
+  rewrite addzC iota_add ?subz_ge0 // take_cat.
+  by rewrite size_iota max_ler // ltzz /= take0 cats0.
+  qed.
+
+  lemma drop_iota (k n m : int): 0 <= k =>
+    drop k (iota_ n m) = iota_ (n+k) (m-k).
+  proof.
+  move=> ge0_k; case: (m < k) => [lt_mk|/lezNgt le_km].
+    rewrite drop_oversize ?size_iota ?geq_max ?(@ltzW m) //.
+    by rewrite iota0 // subz_le0 ltzW.
+  rewrite -{1}(addzK (-k) m) /= addzC.
+  rewrite iota_add ?subz_ge0 // drop_cat size_iota.
+  by rewrite max_ler // ltzz /= drop0.
+  qed.
 end Iota.
 
 export Iota.

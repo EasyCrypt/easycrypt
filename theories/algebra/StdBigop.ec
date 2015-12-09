@@ -99,6 +99,14 @@ qed.
 lemma sumr_const (P : 'a -> bool) (x : real) (s : 'a list):
   BRA.big P (fun (i : 'a) => x) s = (count P s)%r * x.
 proof. by rewrite sumr_const RField.intmulr RField.mulrC. qed.
+
+lemma sumr1 (s : 'a list) :
+  BRA.big predT (fun i => 1%r) s = (size s)%r.
+proof. by rewrite sumr_const count_predT RField.mulr1. qed.
+
+lemma sumr1_int (n : int) : 0 <= n =>
+  BRA.bigi predT (fun i => 1%r) 0 n = n%r.
+proof. by move=> ge0_n; rewrite sumr1 size_range max_ler. qed.
 end Bigreal.
 
 import Bigreal.

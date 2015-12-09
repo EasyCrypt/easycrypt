@@ -52,6 +52,9 @@ axiom nosmt addzAC (x y z : int): (x + y) + z = (x + z) + y.
 axiom nosmt addzI  (x y z : int): x + y = x + z => y = z.
 axiom nosmt addIz  (x y z : int): y + x = z + x => y = z.
 
+axiom nosmt addzK (y x : int): (x + y) - y = x.
+axiom nosmt addKz (y x : int): -y + (y + x) = x.
+
 axiom nosmt subz_add2r (x y z : int): (x + z) - (y + z) = x - y.
 
 axiom nosmt lez_norm_add (x y : int): `|x + y| <= `|x| + `|y|.

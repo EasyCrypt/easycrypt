@@ -108,6 +108,16 @@ realize Support.Axioms.addmA. by apply/mulrA. qed.
 realize Support.Axioms.addmC. by apply/mulrC. qed.
 realize Support.Axioms.add0m. by apply/mul1r. qed.
 end BMul.
+
+(* -------------------------------------------------------------------- *)
+lemma mulr_big (P Q : 'a -> bool) (f g : 'a -> t) r s:
+    BAdd.big P f r * BAdd.big Q g s
+  = BAdd.big P (fun x => BAdd.big Q (fun y => f x * g y) s) r.
+proof. 
+elim: r s => [|x r ih] s; first by rewrite BAdd.big_nil mul0r.
+rewrite !BAdd.big_cons; case: (P x) => Px; last by rewrite ih.
+by rewrite mulrDl -ih BAdd.mulr_sumr.
+qed.
 end BigComRing.
 
 (* -------------------------------------------------------------------- *)
