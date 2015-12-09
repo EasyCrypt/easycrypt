@@ -11,6 +11,10 @@ require export ExtEq Fun.
 (* -------------------------------------------------------------------- *)
 type 'a rel = 'a -> 'a -> bool.
 
+lemma pred_ext (P Q : 'a -> bool):
+  P = Q <=> forall x, P x <=> Q x.
+proof. by split=> //= h; apply/fun_ext=> x; rewrite h. qed.
+
 (*** Working with predicates *)
 (** Lifting boolean operators to predicates *)
 op pred0  ['a] = fun (x : 'a) => false.
@@ -96,7 +100,7 @@ lemma predIC (p1 p2 : 'a -> bool) : predI p1 p2 = predI p2 p1.
 proof. by apply fun_ext=> x; rewrite /predI andC. qed.
 
 lemma predCpredI (p : 'a -> bool) : predI (predC p) p = pred0.
-proof. by apply fun_ext=> x /=; case (p x); delta=> ->. qed. (* delta *)
+proof. by apply/fun_ext=> x /=; case (p x); delta=> ->. qed. (* delta *)
 
 lemma predCpredU (p : 'a -> bool) : predU (predC p) p = predT.
 proof. by apply fun_ext=> x /=; case (p x); delta=> ->. qed. (* delta *)
