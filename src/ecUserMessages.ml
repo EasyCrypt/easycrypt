@@ -178,7 +178,7 @@ end = struct
         msg "  @[<hov 2>%t@]" (fun fmt -> pp_cnv_failure env1 fmt err)
   
     | NotAFunction ->
-        msg "too many arguments"
+        msg "the expression is not a function, it can not be applied"
 
     | AbbrevLowArgs ->
         msg "this abbreviation is not applied enough"

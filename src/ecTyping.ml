@@ -922,8 +922,9 @@ let rec ty_fun_app loc env ue tf targs =
       match destr_tfun env ue tf with
       | None -> tyerror loc env NotAFunction
       | Some (dom, codom) ->
-          unify_or_fail env ue t1.pl_loc ~expct:dom t1.pl_desc;
-          ty_fun_app loc env ue codom targs
+        unify_or_fail env ue t1.pl_loc ~expct:dom t1.pl_desc;
+        let loc = EcLocation.merge loc t1.pl_loc in
+        ty_fun_app loc env ue codom targs
   end
 
 (* -------------------------------------------------------------------- *)
@@ -1015,7 +1016,7 @@ let expr_of_opselect
 
   let esig  = List.map (lmap snd) args in
   let args  = List.map (fst |- unloc) args in
-  let codom = ty_fun_app _dummy env ue ty esig in
+  let codom = ty_fun_app sel.pl_loc env ue ty esig in
 
   let op, args =
     match sel with
@@ -1099,7 +1100,7 @@ let transexp (env : EcEnv.env) mode ue e =
         let e, ty = transexp env pe in
         let es = List.map (transexp env) pes in
         let esig = List.map2 (fun (_, ty) l -> mk_loc l.pl_loc ty) es pes in
-        let codom = ty_fun_app loc env ue ty esig in
+        let codom = ty_fun_app pe.pl_loc env ue ty esig in
           (e_app e (List.map fst es) codom, codom)
 
     | PElet (p, (pe1, paty), pe2) ->
@@ -1912,7 +1913,7 @@ let form_of_opselect
 
   let esig  = List.map (lmap f_ty) args in
   let args  = List.map unloc args in
-  let codom = ty_fun_app _dummy env ue ty esig in
+  let codom = ty_fun_app sel.pl_loc env ue ty esig in
 
   let op, args =
     match sel with
@@ -2103,7 +2104,7 @@ let trans_form_or_pattern env (ps, ue) pf tt =
         let es    = List.map (transf env) pes in
         let esig  = List.map2 (fun f l -> mk_loc l.pl_loc f.f_ty) es pes in
         let op    = transf env e in
-        let codom = ty_fun_app f.pl_loc env ue op.f_ty esig in
+        let codom = ty_fun_app e.pl_loc env ue op.f_ty esig in
         f_app op es codom
 
     | PFif (pf1, pf2, pf3) ->
