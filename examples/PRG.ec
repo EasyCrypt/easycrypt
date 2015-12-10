@@ -466,7 +466,7 @@ section.
                   ((sum_n (qF + length P.logP) (qF + n - 1))%r * pr_dseed))).
     progress; cut ->: Bad [] F.m{hr} = false by smt.
     rewrite //=; apply CompatOrderMult=> //; last smt.
-    generalize H0 H; elim/list_case logP=> //=.
+    move: H0 H; elim/list_case logP=> //=.
       (* logP = [] *)
       rewrite /sum_n sum_ij_gt; first smt.
       cut HqP: 0 <= (qP - 1)* qP by smt.
@@ -493,7 +493,7 @@ section.
             n <= qP /\ card (dom F.m) <= qF)=> //.
       by wp; rnd=> //.
       wp; rnd; skip; progress.
-      generalize H2; rewrite !FromInt.Add Mul_distr_r /Bad -nor=> //= [Hu Hf].
+      move: H2; rewrite !FromInt.Add Mul_distr_r /Bad -nor=> //= [Hu Hf].
       apply (Real.Trans _ (mu dseed (predU (fun x, mem x (dom F.m{hr}))
                                            (fun x, mem x P.logP{hr}))));
         first by apply mu_sub=> x /=; smt.
@@ -506,11 +506,11 @@ section.
             by apply CompatOrderMult; smt.
         by apply mu_Lmem_le_length; smt.
         conseq [-frame] Hw; progress=> //.
-        generalize H1; rewrite -neqF=> -> //=.
+        move: H1; rewrite -neqF=> -> //=.
         cut ->: 1 + length logPw = length logPw + 1 by smt.
         done.
       progress => //.
-      generalize H2; rewrite -neqF=> -> //=.
+      move: H2; rewrite -neqF=> -> //=.
       rewrite -Mul_distr_r -Int.CommutativeGroup.Assoc -FromInt.Add sum_n_i1j //.
       smt.
     by skip; progress; smt.
@@ -591,7 +591,7 @@ proof.
  case (Pr[Exp(C(A), Prg).main() @ &m : res] <= Pr[Exp(C(A), Prg_r).main() @ &m : res]) => Hle.
    cut H := conclusion_aux (NegA(A)) _ &m.
      by apply (lossNegA A).
-   generalize H;rewrite -(NegA_Neg_main Prg A &m) -(NegA_Neg_main Prg_r A &m).
+   move: H;rewrite -(NegA_Neg_main Prg A &m) -(NegA_Neg_main Prg_r A &m).
    rewrite (AdvAbsVal.Neg_A_Pr_minus (Exp(C(A), Prg)) &m).
      apply (lossExp Prg A) => //. 
        by fun;call lossless_Ff.

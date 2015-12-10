@@ -351,7 +351,7 @@ lemma or_exists (f:'a->bool) s:
 proof -strict.
   split;last by intros=> [x [x_in_s f_x]]; rewrite (Mbor.sum_rm _ _ x) // f_x.
   intros=> sum_true; pose p := fun x, mem s x /\ f x; change (exists x, p x);
-    apply ex_for; delta p=> {p}; generalize sum_true; apply absurd=> /= h.
+    apply ex_for; delta p=> {p}; move: sum_true; apply absurd=> /= h.
   (cut : s <= s by done); pose {1 3} s' := s;elim/fset_ind s'.
     by rewrite Mbor.sum_empty.
   intros=> x s' nmem IH leq_adds'_s.
@@ -386,7 +386,7 @@ proof strict.
     by intros disj;rewrite Mrplus.sum_empty cpOrs0 mu_false.
   intros f X f_nin_X IH disj; rewrite Mrplus.sum_add // cpOrs_add mu_disjoint.
     rewrite /predI /pred0=> x' /=;
-      rewrite -not_def=> [f_x']; generalize f_nin_X disj .
+      rewrite -not_def=> [f_x']; move: f_nin_X disj .
     rewrite /cpOrs or_exists => Hnm Hd [p [Hp]] /=.
     by apply (Hd f p) => //; smt.
   rewrite IH => //.
@@ -413,8 +413,8 @@ proof strict.
     by rewrite imageP; progress => //;smt. 
   rewrite mu_ors.
     rewrite /is => x1 x2 Hx; rewrite !imageP => [y1 [Hm1 Heq1]] [y2 [Hm2 Heq2]].
-    subst; generalize Hx => /= Hx a [Hpa1 Heq1];rewrite -not_def => [Hpa2 Heq2].
-    by subst; generalize Hx;rewrite not_def.
+    subst; move: Hx => /= Hx a [Hpa1 Heq1];rewrite -not_def => [Hpa2 Heq2].
+    by subst; move: Hx;rewrite not_def.
   rewrite /is => {is};elim/fset_ind sup.
     by rewrite image0 !Mrplus.sum_empty.
   intros x s Hnm Hrec;rewrite FSet.imageU FSet.image1 Mrplus.sum_add0.

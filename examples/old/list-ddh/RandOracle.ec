@@ -169,7 +169,7 @@ theory RandOracle.
                        result = proj FRO.m.[x]; }
                       (={x,xs,FRO.m} ==> ={result,FRO.m})
                       ((={x, xs} /\ FRO.m{1} = LRO.m{2} /\ mem x{1} xs{1}) /\ ! in_dom x{2} LRO.m{2} ==> ={result} /\ FRO.m{1} = LRO.m{2}) => //.
-        intros &m1 &m2 H;exists LRO.m{m2}, x{m2}, xs{m2}; generalize H => //.      
+        intros &m1 &m2 H;exists LRO.m{m2}, x{m2}, xs{m2}; move: H => //.      
       transitivity{1} {
                        while (! xs = []) {
                          x0 = hd xs; xs = tl xs; y = $dsample;
@@ -179,7 +179,7 @@ theory RandOracle.
                        result = proj FRO.m.[x]; }
                       (={x,xs,FRO.m} ==> ={result,FRO.m})
                       (={x, xs,FRO.m} ==> ={result,FRO.m}) => //.
-         intros &m1 &m2 H;exists FRO.m{m2}, x{m2}, xs{m2}; generalize H => //.    
+         intros &m1 &m2 H;exists FRO.m{m2}, x{m2}, xs{m2}; move: H => //.    
          eqobs_in;rnd{2};conseq [-frame] (_ : _ ==> ={x,FRO.m});[ progress;smt | eqobs_in].
          wp;symmetry. 
          eager while (h1:y0 = $dsample; ~ y0 = $dsample; : true ==> ={y0}) => //; first eqobs_in.

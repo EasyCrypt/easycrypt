@@ -152,7 +152,7 @@ section.
                         mem work{1} x{1}) /\
                         !mem (dom IND_Lazy.H.m{2}) x{2} ==>
                         ={result} /\ IND_Eager.H.m{1} = IND_Lazy.H.m{2}) => //.
-        by move=> &1 &2 H; exists IND_Lazy.H.m{2}, x{2}, work{2}; generalize H.
+        by move=> &1 &2 H; exists IND_Lazy.H.m{2}, x{2}, work{2}; move: H.
       transitivity{1} {while (work <> []) {
                          f = head witness work;
                          y = $dsample f;
@@ -164,7 +164,7 @@ section.
                        result = oget IND_Eager.H.m.[x]; }
                        (={x,work,IND_Eager.H.m} ==> ={result,IND_Eager.H.m})
                        (={x,work,IND_Eager.H.m} ==> ={result,IND_Eager.H.m})=> //.
-        by move=> &1 &2 H; exists IND_Eager.H.m{2}, x{2}, work{2}; generalize H.
+        by move=> &1 &2 H; exists IND_Eager.H.m{2}, x{2}, work{2}; move: H.
       by sim; rnd{2}; sim :(={x,IND_Eager.H.m}); progress; apply dsampleL.
 
       wp; symmetry.
@@ -183,7 +183,7 @@ section.
                  else eq_except IND_Eager.H.m{1} IND_Lazy.H.m{2} (fset1 x{1})).
         auto; progress; expect 12; last 2 first; first 11 smt.
         case ((head witness work = x){2})=> pick_x; last smt.
-        subst x{2}; generalize H7 H1; rewrite -neqF /eq_except=> -> /= eq_exc.
+        subst x{2}; move: H7 H1; rewrite -neqF /eq_except=> -> /= eq_exc.
         by apply fmapP=> x0; case (head witness work{2} = x0); smt.
       by auto; smt.
 

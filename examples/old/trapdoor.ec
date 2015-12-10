@@ -309,7 +309,7 @@ lemma div_eq_I : forall (X Y : group), I = X / Y  <=> X = Y.
 proof.
  progress; last first.
  by rewrite -!Cyclic_group_prime.div_def gf_q_minus /I.
- generalize H; rewrite -!Cyclic_group_prime.div_def /I=> H.
+ move: H; rewrite -!Cyclic_group_prime.div_def /I=> H.
  cut:= gen_exp_inj  gf_q0  (log X - log Y) _ => // {H} H.
  cut:= neg_zero (log X) (log Y) _ => // {H} H.
  by rewrite -(group_log_pow X) H group_log_pow.
@@ -465,7 +465,7 @@ proof.
  elim H8 => heq'.
  split => //.
  cut:  (! Z2{2} = Y{2} ^ log (g ^ M.s{2} / M.gx1{2} ^ M.r{2}) => false); last by smt.
- intros => hneq; generalize heq => /=.
+ intros => hneq; move: heq => /=.
   rewrite heq' mult_div_I I_pow_n.
   rewrite div_eq_I.
  smt.
@@ -617,7 +617,7 @@ proof.
        (Z1{2} / Y{2} ^ log M.gx1{2}) ^ M.r{2} <> Y{2} ^ log M.gx2{2} / Z2{2}.
  smt.
  intros => {H2} [|] h.
- generalize H'; rewrite h.
+ move: H'; rewrite h.
  rewrite !mult_div_I I_pow_n.
  progress => //.
  rewrite -I_prod_n H2 div_prod prod_comm group_prod_assoc (prod_comm _ Z2{2}).
@@ -1193,7 +1193,7 @@ proof.
  rewrite /Fun.(==) /Fun.cpTrue /= => x.
  apply (_ : forall p, p => p = true);first smt.
  split; last smt.
- intros => gz2 gy; generalize ( gy ^ log x / gz2) => y.
+ intros => gz2 gy; move: ( gy ^ log x / gz2) => y.
  rewrite -(Dgroup.mu_x_def_in y) /Distr.mu_x.
  apply Distr.mu_eq; rewrite /Fun.(==) /= => x'; smt.
  by rewrite -Dgroup.lossless /Distr.weight.

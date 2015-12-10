@@ -3314,7 +3314,7 @@ section.
     bypr (res{1}) (res{2})=> //.
     move=> &1 &2 a.
     elim/tuple4_ind (i{2})=> i2 pk' sk' b' x' i2_def.
-    generalize (dflt{2})=> d.
+    move: (dflt{2})=> d.
     move=> [[->] ->] [d_invalid] //= [vkeys [vx' invx']].
     cut:= Direct_Loop pk' sk' b' x' d a &1 &2 _ _ _ _=> //.
     cut ->: Pr[Direct.sample((pk',sk',b',x'),d) @ &1: res = a]

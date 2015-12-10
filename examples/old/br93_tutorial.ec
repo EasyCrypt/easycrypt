@@ -205,12 +205,12 @@ proof.
  fun.
  inline Correct(BR).SE.dec Correct(BR).SE.enc RO.o.
  do 4! (wp;rnd);rnd;skip;progress.
-  by generalize H5;rewrite !projPlain_c !projRand_c !(finvof x1 x2 r) //;smt.
+  by move: H5;rewrite !projPlain_c !projRand_c !(finvof x1 x2 r) //;smt.
   
   rewrite !projPlain_c !projRand_c !(finvof x1 x2 r);first by smt. 
   by rewrite -Plaintext.xorwA Plaintext.xorwK;smt.
 
-  by generalize H5;rewrite !projPlain_c !projRand_c !(finvof x1 x2 r) //;smt.
+  by move: H5;rewrite !projPlain_c !projRand_c !(finvof x1 x2 r) //;smt.
 
   rewrite !projPlain_c !projRand_c !(finvof x1 x2 r);first by smt. 
   by rewrite -Plaintext.xorwA Plaintext.xorwK; smt.
