@@ -667,7 +667,6 @@ type logtactic =
   | Preflexivity
   | Passumption
   | Psmt        of pprover_infos 
-  | Pintro      of intropattern
   | Psplit
   | Pfield      of psymbol list
   | Pring       of psymbol list

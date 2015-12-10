@@ -413,7 +413,6 @@
 %token INCLUDE
 %token INLINE
 %token INSTANCE
-%token INTROS
 %token IOTA
 %token KILL
 %token LARROW
@@ -2153,7 +2152,7 @@ logtactic:
    { Pmove (vw, [], []) }
 
 | MOVE vw=prefix(SLASH, pterm)*
-    COLON cl=ioption(brace(loc(ipcore_name)+)) gp=genpattern*
+   COLON cl=ioption(brace(loc(ipcore_name)+)) gp=genpattern*
    { Pmove (vw, odfl [] cl, gp) }
 
 | CLEAR l=loc(ipcore_name)+
@@ -2167,9 +2166,6 @@ logtactic:
 
 | SMT pi=smt_info
    { Psmt pi }
-
-| INTROS a=loc(intro_pattern)*
-   { Pintro a }
 
 | SPLIT
     { Psplit }

@@ -127,7 +127,6 @@ and process1_logic (ttenv : ttenv) (t : logtactic located) (tc : tcenv1) =
     | Preflexivity      -> process_reflexivity
     | Passumption       -> process_assumption
     | Psmt pi           -> process_smt ~loc:(loc t) ttenv pi
-    | Pintro pi         -> process_intros ttenv pi
     | Psplit            -> process_split
     | Pfield st         -> process_algebra `Solve `Field st
     | Pring st          -> process_algebra `Solve `Ring  st
@@ -300,7 +299,6 @@ and process_core (ttenv : ttenv) ({ pl_loc = loc } as t : ptactic_core) (tc : tc
 and process (ttenv : ttenv) (t : ptactic) (tc : tcenv) =
   let cf =
     match unloc t.pt_core with
-    | Plogic Pintro _
     | Plogic (Prewrite _)
     | Plogic (Pmove _)
     | Pidtac _ -> true

@@ -87,7 +87,6 @@
     "right"       , RIGHT      ;        (* KW: tactic *)
     "case"        , CASE       ;        (* KW: tactic *)
 
-    "intros"      , INTROS     ;        (* KW: tactic *)
     "pose"        , POSE       ;        (* KW: tactic *)
     "cut"         , CUT        ;        (* KW: tactic *)
     "have"        , HAVE       ;        (* KW: tactic *)

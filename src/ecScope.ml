@@ -722,6 +722,9 @@ module Tactics = struct
         let scope = { scope with sc_pr_uc = Some puc } in
         Some (penv, hds), scope
 
+  let process1_r mark mode scope t =
+    process_r mark mode scope [t]
+
   let process_core mark mode (scope : scope) (ts : ptactic_core list) =
     let ts = List.map (fun t -> { pt_core = t; pt_intros = []; }) ts in
     snd (process_r mark mode scope ts)
@@ -801,10 +804,11 @@ module Ax = struct
           (pconcl, List.flatten (List.map fst vs))
     in
 
-    let tintro =
+    let ip =
       let ip x = x |> omap (fun x -> `NoRename (unloc x)) |> odfl `NoName in
       List.map (lmap (fun x -> IPCore (`Renaming (ip x)))) tintro in
-    let tintro = mk_loc loc (Plogic (Pintro tintro)) in
+    let tintro = mk_loc loc (Plogic (Pmove ([], [], []))) in
+    let tintro = { pt_core = tintro; pt_intros = ip; } in
 
     let concl = TT.trans_prop scope.sc_env ue pconcl in
 
@@ -846,7 +850,7 @@ module Ax = struct
         let scope = 
           start_lemma scope ~name:(unloc ax.pa_name)
             pucflags check (axd, None) in
-        let scope = Tactics.process_core false `Check scope [tintro] in
+        let scope = snd (Tactics.process1_r false `Check scope tintro) in
         None, scope
 
     | PLemma tc ->
@@ -930,9 +934,9 @@ module Ax = struct
 
     let scope = start_lemma scope pucflags check ?name (axd, None) in
     let scope =
-      match tintro with
-      | None -> scope
-      | Some tintro -> Tactics.process_core false `Check scope [tintro] in
+      tintro |> ofold
+        (fun t sc -> snd (Tactics.process1_r false `Check sc t))
+        scope in
     let scope = Tactics.proof scope mode (if tc = None then true else false) in
 
     let tc =
