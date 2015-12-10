@@ -72,5 +72,5 @@ run-local:
 	  --execute '(load-file "_local/emacs.rc")' \
 	  --execute '(load-file "$(PGDIR)/emacs.local.rc")' \
 	  --execute '(cd "$(PGDIR)/..")' \
-	  --execute '(setq easycrypt-prog-name "$(ECPATH) -emacs")' \
+	  --execute '(setq easycrypt-prog-name "$(ECPATH)")' \
 	  --no-init-file --no-site-file --debug-init

@@ -1,4 +1,5 @@
 (require 'proof)
+(require 'pg-custom)
 (require 'easycrypt-syntax)
 (require 'easycrypt-hooks)
 (require 'easycrypt-abbrev)
@@ -6,9 +7,24 @@
 (add-to-list 'hs-special-modes-alist
   '(easycrypt-mode "{" "}" "/[*/]" nil nil))
 
-(defcustom easycrypt-prog-name "easycrypt -emacs"
+;; --------------------------------------------------------------------
+(defun easycrypt-load-path-safep (path)
+  (and
+   (listp path)
+   (every (lambda (entry) (stringp entry)) path)))
+
+;; --------------------------------------------------------------------
+(defcustom easycrypt-prog-name "easycrypt"
   "*Name of program to run EasyCrypt."
   :type  'file
+  :group 'easycrypt)
+
+(defcustom easycrypt-load-path nil
+  "Non-standard EasyCrypt library load path.
+This list specifies the include path for EasyCrypt. The elements of
+this list are strings."
+  :type  '(repeat (string :tag "simple directory (-I)"))
+  :safe  'easycrypt-load-path-safep
   :group 'easycrypt)
 
 (defcustom easycrypt-web-page
@@ -16,6 +32,30 @@
   "URL of web page for EasyCrypt."
   :type  'string
   :group 'easycrypt-config)
+
+;; --------------------------------------------------------------------
+(defun easycrypt-option-of-load-path-entry (entry)
+  (list "-I" (expand-file-name entry)))
+
+;; --------------------------------------------------------------------
+(defun easycrypt-include-options ()
+  (let ((result nil))
+    (when easycrypt-load-path
+      (dolist (entry easycrypt-load-path)
+        (setq result (append result (easycrypt-option-of-load-path-entry entry)))))
+    result))
+
+;; --------------------------------------------------------------------
+(defun easycrypt-build-prog-args ()
+  (delete "-emacs" easycrypt-prog-args)
+  (push "-emacs" easycrypt-prog-args))
+
+(easycrypt-build-prog-args)
+
+;; --------------------------------------------------------------------
+(defun easycrypt-prog-args ()
+  (message "%s" easycrypt-load-path)
+  (append easycrypt-prog-args (easycrypt-include-options)))
 
 ;; --------------------------------------------------------------------
 ;; Generic mode
