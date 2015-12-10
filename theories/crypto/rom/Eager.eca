@@ -42,7 +42,7 @@ proof.
     auto; progress.
     rewrite domP in_fsetU in_fset1.
     case: (H x)=> [| -> //=].
-    by rewrite -(mem_head_behead witness)// =>[-> | ->].
+    by rewrite -(mem_head_behead witness)// => -[-> | ->].
   by auto; smt.
 qed.
 

@@ -95,7 +95,7 @@ proof.
     elim.
       elim=> z z' [z_neq_z'] [z_in_m] [z'_in_m] mz_eq_mz'.
       by exists z, z'; smt.
-      rewrite mem_rng=> [] x' mx'.
+      rewrite mem_rng=> -[] x' mx'.
       by exists x, x'; smt.
 qed.
 

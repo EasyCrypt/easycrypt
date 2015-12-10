@@ -66,7 +66,7 @@ theory Dprod.
      is_uniform d1 => is_uniform d2 => is_uniform (d1 * d2).
   proof strict.
     move=> [Hd1_supp Hd1_suf] [Hd2_supp Hd2_suf]; split; [smt|move=> x y].
-    rewrite /support !supp_def -!/(mu_x _ x) -!/(mu_x _ y) !mu_x_def /mu_x=> [Hx1 Hx2] [Hy1 Hy2].
+    rewrite /support !supp_def -!/(mu_x _ x) -!/(mu_x _ y) !mu_x_def /mu_x=> -[Hx1 Hx2] [Hy1 Hy2].
     by rewrite (Hd1_suf (fst x) (fst y)) // (Hd2_suf (snd x) (snd y)).
   qed.
 

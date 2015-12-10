@@ -129,7 +129,7 @@ elim/fset_ind {1 3 4}s.
   move=> x s' x_notin_s' ih leq_s'_s.
   rewrite sum_add// ih 1:smt.
   rewrite imageU image1 sum_add /=.
-    rewrite imageP -negP=> [a] [a_in_s' ga_eq_gx].
+    rewrite imageP -negP=> -[a] [a_in_s' ga_eq_gx].
     have:= pcan_g'_g a _. smt.
     have:= pcan_g'_g x _. smt.
     by rewrite ga_eq_gx=> -> ->>.
@@ -372,7 +372,7 @@ lemma cpOrs_add s (p:('a -> bool)) :
 proof -strict.
   apply fun_ext => y.
   rewrite /cpOrs /predU /= !or_exists eq_iff;split=> /=.
-    move=> [x ];rewrite FSet.in_fsetU in_fset1 => [ [ ] H H0];first by right;exists x.
+    move=> [x ];rewrite FSet.in_fsetU in_fset1 => -[ [ ] H H0];first by right;exists x.
     by left;rewrite -H.
   move=> [H | [x [H1 H2]]];first by exists p;rewrite FSet.in_fsetU in_fset1.
   by exists x; rewrite FSet.in_fsetU in_fset1;progress;left.
@@ -386,7 +386,7 @@ proof strict.
     by move=> disj;rewrite Mrplus.sum_empty cpOrs0 mu_false.
   move=> f X f_nin_X IH disj; rewrite Mrplus.sum_add // cpOrs_add mu_disjoint.
     rewrite /predI /pred0=> x' /=;
-      rewrite -not_def=> [f_x']; move: f_nin_X disj .
+      rewrite -not_def=> -[f_x']; move: f_nin_X disj .
     rewrite /cpOrs or_exists => Hnm Hd [p [Hp]] /=.
     by apply (Hd f p) => //; smt.
   rewrite IH => //.
@@ -412,13 +412,13 @@ proof strict.
     move=> [p' []].
     by rewrite imageP; progress => //;smt. 
   rewrite mu_ors.
-    rewrite /is => x1 x2 Hx; rewrite !imageP => [y1 [Hm1 Heq1]] [y2 [Hm2 Heq2]].
-    subst; move: Hx => /= Hx a [Hpa1 Heq1];rewrite -not_def => [Hpa2 Heq2].
+    rewrite /is => x1 x2 Hx; rewrite !imageP => -[y1 [Hm1 Heq1]] [y2 [Hm2 Heq2]].
+    subst; move: Hx => /= Hx a [Hpa1 Heq1];rewrite -not_def => -[Hpa2 Heq2].
     by subst; move: Hx;rewrite not_def.
   rewrite /is => {is};elim/fset_ind sup.
     by rewrite image0 !Mrplus.sum_empty.
   move=> x s Hnm Hrec;rewrite FSet.imageU FSet.image1 Mrplus.sum_add0.
-    rewrite imageP /= => [x0 [H1 H2]].
+    rewrite imageP /= => -[x0 [H1 H2]].
     by rewrite (mu_eq d _ pred0) //;smt.
   rewrite Mrplus.sum_add // -Hrec /=; congr => //.
   rewrite /charfun /mu_x;case (p x) => //= Hp.

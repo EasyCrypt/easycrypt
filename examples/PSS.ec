@@ -319,7 +319,7 @@ clone OW as RSA with
     finvof        by smt.
   realize finv_correct.
     move=> pk sk m vkp; cut:= vkp=> vkp'; apply valid_keypairs in vkp.
-    case=> x; rewrite /f_rng /f_dom=> [vch ->].
+    case=> x; rewrite /f_rng /f_dom=> -[vch ->].
     rewrite rsas_rsap // /rsap_dom.
     smt.
   qed.
@@ -2556,7 +2556,7 @@ section.
                     = x0 /\ support [0..2^(k - 1) - 1] x)
             = ((=) x0).
       apply fun_ext=> x /=; rewrite eq_iff; split.
-        by rewrite andC=> [supp_x]; rewrite simul_invK //; first smt.
+        by rewrite andC=> -[supp_x]; rewrite simul_invK //; first smt.
         by move=> <-; rewrite simul_invK //; smt.
     by rewrite -/(mu_x _ _) Dinter.mu_x_def_in; smt.
   qed.
@@ -4283,13 +4283,13 @@ section.
       if=> //; last first.
         rcondf 4; first by auto.
         wp; skip; progress [-split].
-        cut:= H2 m2 r2 _ => //; rewrite H9 /= => [x1_in_G].
+        cut:= H2 m2 r2 _ => //; rewrite H9 /= => -[x1_in_G].
         cut:= x1_in_G; rewrite mem_dom /oget; case (Gmap.m.[x1]{hr})=> //= [[w st]].
         by progress; cut:= H12 _=> //; progress; rewrite mem_add; left.
       rcondf 6; first by auto.
       wp; skip; progress.
         case ((m1,r1){hr} = (m2,r2)).
-          elim=> m_eq r_eq; subst; move: H9; rewrite get_set_eq /oget /= => [->].
+          elim=> m_eq r_eq; subst; move: H9; rewrite get_set_eq /oget /= => -[->].
           by rewrite mem_dom get_set_eq.
           move=> neq; move: H9; rewrite get_set_neq // => hmr.
           move: H8; rewrite mem_dom get_set_neq // -mem_dom=> dom_hmr.
@@ -4306,7 +4306,7 @@ section.
           move: H8; rewrite mem_dom get_set_neq // -mem_dom=> dom_hmr.
           by cut:= H2 m2 r2 _=> //; rewrite hmr /=; smt.
         case ((m1,r1){hr} = (m2,r2)).
-          elim=> m_eq r_eq; subst; move: H9; rewrite get_set_eq /oget /= => [w_eq] [c_eq u_eq]; subst.
+          elim=> m_eq r_eq; subst; move: H9; rewrite get_set_eq /oget /= => -[w_eq] [c_eq u_eq]; subst.
           by move: H10; rewrite get_set_eq /oget.
           move=> neq; move: H9; rewrite get_set_neq // => hmr.
           move: H8; rewrite mem_dom get_set_neq // -mem_dom=> dom_hmr.
@@ -4342,22 +4342,22 @@ section.
           move: H10 H11; rewrite get_set_neq; first smt.
           by move=> ->.
         move: H9; case ((m1,r1){hr} = (m2,r2)).
-          by elim=> [m_eq r_eq]; subst; rewrite get_set_eq /oget /= => [w_eq u_eq]; subst; smt.
+          by elim=> [m_eq r_eq]; subst; rewrite get_set_eq /oget /= => -[w_eq u_eq]; subst; smt.
           move=> neq; rewrite get_set_neq // => hmr.
           move: H8; rewrite mem_dom get_set_neq // -mem_dom=> dom_hmr.
           cut:= H2 m2 r2 _=> //; rewrite hmr /=; progress.
           move: H10 H11; rewrite get_set_neq; first smt.
           by move=> ->.
         move: H9; case ((m1,r1){hr} = (m2,r2)).
-          by elim=> [m_eq r_eq]; subst; rewrite get_set_eq /oget /= => [w_eq u_eq]; subst; smt.
+          by elim=> [m_eq r_eq]; subst; rewrite get_set_eq /oget /= => -[w_eq u_eq]; subst; smt.
           move=> neq; rewrite get_set_neq // => hmr.
           move: H8; rewrite mem_dom get_set_neq // -mem_dom=> dom_hmr.
           cut:= H2 m2 r2 _=> //; rewrite hmr /=; progress.
           move: H10 H11; rewrite get_set_neq; first smt.
           by move=> ->.
         move: H9; case ((m1,r1){hr} = (m2,r2)).
-          elim=> [m_eq r_eq]; subst; rewrite get_set_eq /oget /= => [w_eq u_eq]; subst.
-          move: H10; rewrite get_set_eq /oget /= => [st_eq c'_eq]; subst.
+          elim=> [m_eq r_eq]; subst; rewrite get_set_eq /oget /= => -[w_eq u_eq]; subst.
+          move: H10; rewrite get_set_eq /oget /= => -[st_eq c'_eq]; subst.
           by rewrite -xorwA xorwK xorw0; smt.
           move=> neq; rewrite get_set_neq // => hmr.
           move: H8; rewrite mem_dom get_set_neq // -mem_dom=> dom_hmr.
@@ -4366,8 +4366,8 @@ section.
           by move=> ->.
         rewrite /oget /= -xorwA xorwK xorw0.
         case ((m1,r1){hr} = (m2,r2)).
-          elim=> [m_eq r_eq]; subst; move: H9; rewrite get_set_eq /oget /= => [w_eq u_eq]; subst.
-          move: H10; rewrite get_set_eq /oget /= => [st_eq c'_eq]; subst.
+          elim=> [m_eq r_eq]; subst; move: H9; rewrite get_set_eq /oget /= => -[w_eq u_eq]; subst.
+          move: H10; rewrite get_set_eq /oget /= => -[st_eq c'_eq]; subst.
           cut:= H3 _; first by split.
           move=> [z_def [-> [-> ->]]].
           rewrite /to_htag /from_htag HTag.pcan_to_from; first smt.
@@ -4535,7 +4535,7 @@ section.
     if=> //; last by auto.
     wp; skip; progress.
       case ((m0,r0){hr} = (m1,r1)).
-        elim=> m_eq r_eq; subst; move: H10; rewrite get_set_eq /oget /= => [->].
+        elim=> m_eq r_eq; subst; move: H10; rewrite get_set_eq /oget /= => -[->].
         by rewrite mem_dom get_set_eq.
         move=> neq; move: H10; rewrite get_set_neq // => hmr.
         move: H9; rewrite mem_dom get_set_neq // -mem_dom=> dom_hmr.
@@ -4552,7 +4552,7 @@ section.
         move: H9; rewrite mem_dom get_set_neq // -mem_dom=> H9 hmr.
         by cut:= H2 m1 r1 _=> //; rewrite hmr /=; progress; smt.
       case ((m0,r0){hr} = (m1,r1)).
-        elim=> m_eq r_eq; subst; move: H10; rewrite get_set_eq /oget /= => [w_eq [c_eq u_eq]]; subst.
+        elim=> m_eq r_eq; subst; move: H10; rewrite get_set_eq /oget /= => -[w_eq [c_eq u_eq]]; subst.
         by move: H11; rewrite get_set_eq /oget.
         move=> neq; move: H10; rewrite get_set_neq // => hmr.
         move: H9; rewrite mem_dom get_set_neq // -mem_dom=> dom_hmr.
@@ -4567,15 +4567,15 @@ section.
         move: H11 H12; rewrite get_set_neq; first smt.
         by move=> ->.
       move: H10; case ((m0,r0){hr} = (m1,r1)).
-        by elim=> [m_eq r_eq]; subst; rewrite get_set_eq /oget /= => [w_eq u_eq]; subst; smt.
+        by elim=> [m_eq r_eq]; subst; rewrite get_set_eq /oget /= => -[w_eq u_eq]; subst; smt.
         move=> neq; rewrite get_set_neq // => hmr.
         move: H9; rewrite mem_dom get_set_neq // -mem_dom=> dom_hmr.
         cut:= H2 m1 r1 _=> //; rewrite hmr /=; progress.
         move: H11 H12; rewrite get_set_neq; first smt.
         by move=> ->; rewrite /rsap_dom.
       move: H10; case ((m0,r0){hr} = (m1,r1)).
-        elim=> [m_eq r_eq]; subst; rewrite get_set_eq /oget /= => [w_eq u_eq]; subst.
-        move: H11; rewrite get_set_eq /oget /= => [st_eq c'_eq]; subst.
+        elim=> [m_eq r_eq]; subst; rewrite get_set_eq /oget /= => -[w_eq u_eq]; subst.
+        move: H11; rewrite get_set_eq /oget /= => -[st_eq c'_eq]; subst.
         by cut:= H3 _.
         move=> neq; rewrite get_set_neq // => hmr.
         move: H9; rewrite mem_dom get_set_neq // -mem_dom=> dom_hmr.
@@ -4583,8 +4583,8 @@ section.
         move: H11 H12; rewrite get_set_neq; first smt.
         by move=> ->.
       move: H10; case ((m0,r0){hr} = (m1,r1)).
-        elim=> [m_eq r_eq]; subst; rewrite get_set_eq /oget /= => [w_eq u_eq]; subst.
-        move: H11; rewrite get_set_eq /oget /= => [st_eq c'_eq]; subst.
+        elim=> [m_eq r_eq]; subst; rewrite get_set_eq /oget /= => -[w_eq u_eq]; subst.
+        move: H11; rewrite get_set_eq /oget /= => -[st_eq c'_eq]; subst.
         by rewrite -xorwA xorwK xorw0; cut:= H3 _.
         move=> neq; rewrite get_set_neq // => hmr.
         move: H9; rewrite mem_dom get_set_neq // -mem_dom=> dom_hmr.
@@ -4697,17 +4697,17 @@ section.
       by rcondf 2; auto; progress; cut:= H0; rewrite mem_dom /fst /oget; case (Gmap.m.[w]{hr}).
       rcondt 2; first by auto.
       auto; progress; (* Good opportunity for progress* *)
-        last 9 by (cut:= H m r _=> //; rewrite H3 => [x2_sig] [x_in_G];
+        last 9 by (cut:= H m r _=> //; rewrite H3 => -[x2_sig] [x_in_G];
                    (cut neq_w_x: w{hr} <> x1 by smt);
                    cut:= H4; rewrite get_set_neq /rsap_dom // => ->).
         by rewrite /fst /oget get_set_eq.
-        cut:= H m r _=> //; rewrite H3 => [x2_sig] [x_in_G].
+        cut:= H m r _=> //; rewrite H3 => -[x2_sig] [x_in_G].
         cut neq_w_x: w{hr} <> x1 by smt.
         by rewrite mem_dom get_set_neq // -mem_dom.
-        cut:= H m r _=> //; rewrite H3 => [x2_sig] [x_in_G].
+        cut:= H m r _=> //; rewrite H3 => -[x2_sig] [x_in_G].
         cut neq_w_x: w{hr} <> x1 by smt.
         smt.
-        cut:= H m r _=> //; rewrite H3 => [x2_sig] [x_in_G].
+        cut:= H m r _=> //; rewrite H3 => -[x2_sig] [x_in_G].
         cut neq_w_x: w{hr} <> x1 by smt.
         smt.
   qed.

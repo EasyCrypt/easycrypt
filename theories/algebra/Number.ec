@@ -147,7 +147,7 @@ proof. by rewrite lt0r; case: (_ = _). qed.
 
 lemma nosmt gtr_eqF (x y : t):
   y < x => (x <> y).
-proof. by rewrite ltr_def => []. qed.
+proof. by rewrite ltr_def => -[]. qed.
 
 lemma nosmt ltr_eqF (x y : t):
   x < y => (x <> y).
@@ -231,7 +231,7 @@ lemma nosmt normrN1: `|-oner| = oner.
 proof.
 have: exp `|-oner| 2 = oner.
   by rewrite -normrX_nat -1?signr_odd // odd2 expr0 normr1.
-rewrite sqrf_eq1=> [->//|]; rewrite -ger0_def le0r oppr_eq0.
+rewrite sqrf_eq1=> -[->//|]; rewrite -ger0_def le0r oppr_eq0.
 by rewrite oner_neq0 /= => /(addr_gt0 _ _ ltr01); rewrite addrN ltrr.
 qed.
 
@@ -278,7 +278,7 @@ proof. by rewrite -subr_gt0 opprB add0r subr_gt0. qed.
 
 lemma nosmt ler_asym (x y : t): x <= y <= x => x = y.
 proof.
-rewrite !ler_def distrC -opprB -addr_eq0 => [->].
+rewrite !ler_def distrC -opprB -addr_eq0 => -[->].
 by rewrite -mulr2z -mulr_intl mulf_eq0 subr_eq0 pnatr_eq0.
 qed.
 
@@ -292,14 +292,14 @@ by rewrite -addrA addr_gt0 ?subr_gt0.
 qed.
 
 lemma nosmt ler_lt_trans (y x z : t): x <= y => y < z => x < z.
-proof. by rewrite !ler_eqVlt => [-> //|/ltr_trans h]; apply/h. qed.
+proof. by rewrite !ler_eqVlt => -[-> //|/ltr_trans h]; apply/h. qed.
 
 lemma nosmt ltr_le_trans (y x z : t): x < y => y <= z => x < z.
 proof. by rewrite !ler_eqVlt => lxy [<- //|lyz]; apply (@ltr_trans y). qed.
 
 lemma nosmt ler_trans (y x z : t): x <= y => y <= z => x <= z.
 proof.
-rewrite !ler_eqVlt => [-> //|lxy] [<-|].
+rewrite !ler_eqVlt => -[-> //|lxy] [<-|].
   by rewrite lxy. by move/(ltr_trans _ _ _ lxy) => ->.
 qed.
 
@@ -585,7 +585,7 @@ proof. by move=> ??; rewrite (@addrC _ x) ltr_snsaddl. qed.
 lemma nosmt paddr_eq0 (x y : t):
   zeror <= x => zeror <= y => (x + y = zeror) <=> (x = zeror) /\ (y = zeror).
 proof.
-rewrite le0r=> [->|hx]; first by rewrite add0r.
+rewrite le0r=> -[->|hx]; first by rewrite add0r.
 by rewrite (gtr_eqF hx) /= => hy; rewrite gtr_eqF // ltr_spaddl.
 qed.
 
@@ -649,7 +649,7 @@ hint rewrite lter_nmul2r : ler_nmul2r ltr_nmul2r.
 lemma nosmt ler_wpmul2l x :
   zeror <= x => forall y z, y <= z => x * y <= x * z.
 proof.
-rewrite le0r => [-> y z|/ler_pmul2l/mono2W ? //].
+rewrite le0r => -[-> y z|/ler_pmul2l/mono2W ? //].
   by rewrite !mul0r lerr.
 qed.
 

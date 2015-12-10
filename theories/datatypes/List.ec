@@ -253,7 +253,7 @@ lemma nth_nseq w i n (a : 'a): 0 <= i < n => nth w (nseq n a) i = a.
 proof.                        (* BUG: PROOF IS TOO LONG *)
 case=> ge0_i ^lt_in /ltzW le_in; have/lez_trans/(_ _ le_in) := ge0_i.
 move=> {le_in} ge0_n; elim: n ge0_n i ge0_i lt_in => [|n ge0_n ih].
-  by move=> i ge0_i; rewrite ltz_def eqz_leq ge0_i /= => [].
+  by move=> i ge0_i; rewrite ltz_def eqz_leq ge0_i /= => -[].
 move=> i; rewrite iterS //; elim/natcase: i.
   move=> i le0_i ge0_i; have ->//: i = 0 by rewrite eqz_leq.
 move=> i ge0_i _; rewrite ltz_add2r /= => /(ih _ ge0_i).
@@ -1606,7 +1606,7 @@ qed.
 lemma mem_assoc_uniq (s : ('a * 'b) list) (a : 'a) (b : 'b):
   uniq (map fst s) => mem s (a, b) <=> assoc s a = Some b.
 proof.
-  elim: s => //= [[x y]] s ih; rewrite eq_sym => [x_notin_1s uq_1s] /=.
+  elim: s => //= [[x y]] s ih; rewrite eq_sym => -[x_notin_1s uq_1s] /=.
   case: (x = a) => [->> |] /=; 1: rewrite assoc_head /=.
     by apply/eq_iff/orb_idr=> /(map_f fst); rewrite x_notin_1s.
   by move=> ne_xa; rewrite assoc_cons ih // (@eq_sym a) ne_xa.
@@ -1860,7 +1860,7 @@ elim: t s => [|x t ih] s eqs.
   have ->: s = []; last by apply/perm_eq_refl.
   by apply/mem_eq0=> a; rewrite -mem_undup (perm_eq_mem _ _ eqs).
 pose s' := filter (predC1 x) s; have/perm_eq_uniq := eqs.
-rewrite undup_uniq cons_uniq /= => [tx uqt]; have {ih} := ih s' _.
+rewrite undup_uniq cons_uniq /= => -[tx uqt]; have {ih} := ih s' _.
   apply/uniq_perm_eq=> //; first by apply/undup_uniq.
   move=> y; have/perm_eq_mem/(_ y) := eqs; rewrite !mem_undup /=.
   by rewrite /s' mem_filter /predC1; case: (y = x).

@@ -220,7 +220,7 @@ move: d; have wl: forall d, 0 < d => 0 < p => p * m %/ (p * d) = m %/ d.
   rewrite pmulr_rge0 ?modz_ge0 //= 1:gtr_eqF //= normrM gtr0_norm //.
   by rewrite ltr_pmul2l // ltz_mod gtr_eqF.
 move=> d; case: (d = 0) => [->|]; first by rewrite ?divz0.
-rewrite eqr_le anda_and -nand -!ltrNge => [/wl //|lt0_d gt0_p].
+rewrite eqr_le anda_and -nand -!ltrNge => -[/wl //|lt0_d gt0_p].
 by rewrite -(opprK d) mulrN divzN wl 1:oppr_gt0 // -divzN.
 qed.
 
@@ -294,7 +294,7 @@ move: d; have wlog: forall d, 0 <= d => d %| 1 <=> `|d| = 1; first last.
 move=> d; case: (1 < d) => [lt1_d ge0_d|/lerNgt].
   have lt1_nd: 1 < `|d| by apply/(ltr_le_trans d)/ler_norm.
   by rewrite dvdzE modz_small /= ?gtr_eqF.
-rewrite ler_eqVlt=> [->|]; first by rewrite dvd1z.
+rewrite ler_eqVlt=> -[->|]; first by rewrite dvd1z.
 rewrite (@ltzS _ 0) => le0d ge0d; have ->: d = 0.
   by rewrite eqr_le le0d ge0d.
 by rewrite normr0 /= dvdzE modz0.

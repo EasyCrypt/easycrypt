@@ -63,7 +63,7 @@ rewrite /cpOrs or_exists;split.
             ev (fst res{m1}) (glob A){m1} (snd r) /\ (fst res{m1}) = fst r).
   split=> //. 
   by rewrite imageP; exists (fst (res{m1})); smt.
-  by move=> [x]; rewrite imageP => /= [[v] /= [Hm <-] /= [h1 <-]].
+  by move=> [x]; rewrite imageP => /= -[[v] /= [Hm <-] /= [h1 <-]].
 qed.
 
 lemma Mean (A <: Worker) &m (ev:input -> glob A -> output -> bool): 

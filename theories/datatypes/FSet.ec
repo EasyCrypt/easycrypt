@@ -537,7 +537,7 @@ lemma nosmt imageU (f : 'a -> 'b) (A B : 'a fset):
   image f (A `|` B) = image f A `|` image f B.
 proof.
   apply/fsetP=> x; rewrite in_fsetU !imageP; split.
-    by move=> [x']; rewrite in_fsetU=> [[x'_in_A|x'_in_B] <-];
+    by move=> [x']; rewrite in_fsetU=> -[[x'_in_A|x'_in_B] <-];
        [left|right]; exists x'.
   by move=> [[x'] [x'_in_X] <-|[x'] [x'_in_X] <-];
      exists x'; rewrite in_fsetU x'_in_X.
@@ -546,15 +546,15 @@ qed.
 lemma nosmt imageI (f : 'a -> 'b) (A B : 'a fset):
   image f (A `&` B) <= image f A `&` image f B.
 proof.
-  move=> x; rewrite !inE !imageP=> [a].
-  rewrite !inE=> [[a_in_A a_in_B] <-].
+  move=> x; rewrite !inE !imageP=> -[a].
+  rewrite !inE=> -[[a_in_A a_in_B] <-].
   by split; exists a.
 qed.
 
 lemma nosmt imageD (f : 'a -> 'b) (A B : 'a fset):
   image f A `\` image f B <= image f (A `\` B).
 proof.
-  move=> x; rewrite !inE !imageP=> [[a] [a_in_A <-]].
+  move=> x; rewrite !inE !imageP=> -[[a] [a_in_A <-]].
   move=> h; exists a; rewrite !inE a_in_A /= -negP=> a_in_B.
   by move: h=> /=; exists a.
 qed.

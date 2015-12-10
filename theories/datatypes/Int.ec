@@ -144,7 +144,7 @@ lemma nosmt ge0ind (p : int -> bool):
   => forall n, p n.
 proof.
 move=> ihn ih0 ihp; elim/natind=> [n|n /ihp] //.
-by rewrite lez_eqVlt=> [->|/ihn].
+by rewrite lez_eqVlt=> -[->|/ihn].
 qed.
 
 lemma nosmt ge0case (p : int -> bool):

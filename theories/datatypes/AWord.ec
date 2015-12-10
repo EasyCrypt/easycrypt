@@ -112,7 +112,7 @@ theory Univ.
     rewrite -(List.perm_eq_size (List.map from_int (elems (oflist (List.Iota.iota_ 0 (2^length)))))).
       rewrite -{1}(List.undup_id (List.map from_int (elems (oflist (List.Iota.iota_ 0 (2^length)))))).
         rewrite List.map_inj_in_uniq 2:uniq_elems // => x y.
-        rewrite -!memE !mem_oflist !List.Iota.mem_iota /= => [le0_x lt_x_2length] [le0_y lt_y_2length] eq_from.
+        rewrite -!memE !mem_oflist !List.Iota.mem_iota /= => -[le0_x lt_x_2length] [le0_y lt_y_2length] eq_from.
         by rewrite -(from_to_bound x _) // -(from_to_bound y) // eq_from.
       exact/oflistK.
     rewrite List.size_map -(List.perm_eq_size (List.Iota.iota_ 0 (2^length))).

@@ -107,7 +107,7 @@ lemma prratE ['a] (s : 'a list) (E : 'a -> bool) :
 proof.
 rewrite muE (@sumE_fin _ (undup s)) ?undup_uniq //=.
   move=> x; case: (E x)=> _ //; rewrite dratE.
-  rewrite divrE mulf_eq0 -nor mem_undup from_intMeq => [+ _].
+  rewrite divrE mulf_eq0 -nor mem_undup from_intMeq => -[+ _].
   by rewrite -lt0n ?count_ge0 // -has_count has_pred1.
 pose F := fun x => (count (pred1 x) s)%r / (size s)%r.
 rewrite -big_mkcond (@eq_bigr _ _ F) /F /= => {F}.
@@ -229,7 +229,7 @@ split=> @/mscale [x|s uqs].
 rewrite -divr_suml; apply/(@ler_trans (weight d / weight d)).
   rewrite 2!divrE ler_wpmul2r // ?invr_ge0 ?ge0_weight //.
   admit.
-have := ge0_weight d; rewrite ler_eqVlt => [<-|gt0_iw].
+have := ge0_weight d; rewrite ler_eqVlt => -[<-|gt0_iw].
   by rewrite divr0. by rewrite divrr // gtr_eqF.
 qed.
 

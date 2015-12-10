@@ -62,7 +62,7 @@ lemma collision_add (m:(D,D) fmap) x y:
   collision m.[x <- y] <=> collision m \/ mem (rng m) y.
 proof.
 move=> x_notin_m; split=> [[z z' [z'_neq_z]]|].
-+ rewrite dom_set !inE=> [z_in_m] [z'_in_m] mz_eq_mz'.
++ rewrite dom_set !inE=> -[z_in_m] [z'_in_m] mz_eq_mz'.
   case (mem (rng m) y)=> //= y_notin_rngm.
   by exists z, z'; smt ml=0 w=@NewFMap.
 move=> [[z z' [z'_neq_z] [z_in_m] [z'_in_m] mz_eq_mz']|/in_rng [x' mx']].

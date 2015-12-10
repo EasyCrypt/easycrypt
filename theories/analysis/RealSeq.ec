@@ -208,7 +208,7 @@ have gt0_e: 0%r < e by rewrite /e divr_gt0 ?subr_gt0.
 have [N' lte] := cvF _ gt0_e; pose n := max N N'.
 have /subr_le0 le0_s12:= le_s12 n _; first by rewrite /n leq_maxl.
 have := lte n _; first by rewrite /n leq_maxr.
-rewrite ltr_norml => [+ _] @/F; rewrite ltr_subr_addl /F.
+rewrite ltr_norml => -[+ _] @/F; rewrite ltr_subr_addl /F.
 move/ltr_le_trans/(_ _ le0_s12); rewrite -(@mulr1 (l1-l2)) /e.
 rewrite divrE -mulrBr pmulr_llt0 1:subr_gt0 1:invr_lt1 //.
 by rewrite subr_lt0 ltrNge (ltrW lt_l21).

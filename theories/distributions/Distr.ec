@@ -354,7 +354,7 @@ theory Dapply.
   proof.
   rewrite /in_supp /mu_x mu_def; split.
     rewrite mu_support /predI /= => in_sup. smt.
-    move=> [x]; rewrite /in_supp /mu_x=> [y_def nempty].
+    move=> [x]; rewrite /in_supp /mu_x=> -[y_def nempty].
     have: pred1 x <= preim f (pred1 y)
       by move=> w; rewrite !pred1E. 
     smt.

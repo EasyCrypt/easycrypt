@@ -37,7 +37,7 @@ lemma nosmt e_ge0 : 0%r <= e.
 proof. by apply/ltrW/e_gt0. qed.
 
 lemma nosmt exp_neq0 x : exp x <> 0%r.
-proof. by have := (exp_gt0 x); rewrite ltr_neqAle eq_sym => []. qed.
+proof. by have := (exp_gt0 x); rewrite ltr_neqAle eq_sym => -[]. qed.
 
 lemma nosmt ln0 : ln 0%r = 0%r.
 proof. by rewrite ln_le0. qed.
@@ -119,14 +119,14 @@ proof. by move/rpowE=> ->; apply/exp_gt0. qed.
 
 lemma rpow_ge0 (x n : real): 0%r <= x => 0%r <= x^n.
 proof.
-rewrite ler_eqVlt => [<-|/rpow_gt0 /(_ n) /ltrW] //.
+rewrite ler_eqVlt => -[<-|/rpow_gt0 /(_ n) /ltrW] //.
 by rewrite rpow0r; case: (n = 0%r).
 qed.
 
 (* -------------------------------------------------------------------- *)
 lemma rpowN (x n : real) : 0%r <= x => x^(-n) = inv (x ^ n).
 proof.
-rewrite ler_eqVlt=> [<-|]; first rewrite !rpow0r oppr_eq0.
+rewrite ler_eqVlt=> -[<-|]; first rewrite !rpow0r oppr_eq0.
   by case: (n = 0%r); rewrite !(invr0, invr1).
 by move=> gt0x; rewrite !rpowE // mulNr expN.
 qed.
@@ -158,7 +158,7 @@ lemma rpow_nat x n : 0 <= n => 0%r <= x => x^(n%r) = x^n.
 proof.
 elim: n=> [|n ge0n ih] ge0x; first by rewrite Power_0 -FromInt.One rpow0.
 rewrite Power_s /(>=) // FromInt.Add; move: ge0x.
-rewrite ler_eqVlt=> [<-|]; first rewrite (mul0r 0%r).
+rewrite ler_eqVlt=> -[<-|]; first rewrite (mul0r 0%r).
   by rewrite rpow0r -FromInt.Add from_intMeq addz1_neq0.
 by move=> gt0x; rewrite rpowD // rpow1 // mulrC ih 1:ltrW.
 qed.
@@ -193,8 +193,8 @@ qed.
 lemma nosmt rpow_hmono (x y n : real):
   0%r <= n => 0%r <= x <= y => x ^ n <= y ^ n.
 proof.
-rewrite ler_eqVlt=> [<-|gt0n]; first by rewrite !rpow0 lerr.
-case; rewrite ler_eqVlt=> [<-|gt0x] ge0y.
+rewrite ler_eqVlt=> -[<-|gt0n]; first by rewrite !rpow0 lerr.
+case; rewrite ler_eqVlt=> -[<-|gt0x] ge0y.
   move: gt0n; rewrite rpow0r ltr_neqAle eq_sym.
   by case=> [-> _]; apply/rpow_ge0.
 by rewrite rpow_mono //; apply/(ltr_le_trans x).

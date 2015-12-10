@@ -185,7 +185,7 @@ lemma chunkK r (bs : 'a list) : 0 < r =>
 proof.
 move=> gt0_r dvd_d_bs; apply/(eq_from_nth witness)=> [|i].
   by rewrite size_flatten_chunk // divzK.
-rewrite size_flatten_chunk ?divzK // => [ge0_i lt_ibs].
+rewrite size_flatten_chunk ?divzK // => -[ge0_i lt_ibs].
 rewrite (@nth_flatten witness r); 1: apply/allP=> s.
 by move/(@in_chunk_size _ _ _ gt0_r).
 rewrite nth_mkseq /= 1:divz_ge0 ?ge0_i ?ltz_divRL ?gt0_r //.

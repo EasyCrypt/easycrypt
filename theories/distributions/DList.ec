@@ -229,7 +229,7 @@ abstract theory Program.
       move=> &1 &2 ->>; split=> /= [|t {t}]; 1:smt.
       split.
         move=> r; rewrite -/(support _ _); case (0 <= n{2})=> sign_n; 2:smt.
-          rewrite /mu_x dlist_support_ge0 // => [<<- all_in_d].
+          rewrite /mu_x dlist_support_ge0 // => -[<<- all_in_d].
           rewrite -{2}(size_rev r); apply/mux_dlist_perm_eq.
           by rewrite perm_eqP=> p; rewrite count_rev.
       smt.

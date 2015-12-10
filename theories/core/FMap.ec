@@ -87,7 +87,7 @@ lemma leq_rng (m1 m2:('a,'b) map):
   rng m1 <= rng m2.
 proof.
   move=> m1_leq_m2 y.
-  rewrite !mem_rng=> [x m1x_y].
+  rewrite !mem_rng=> -[x m1x_y].
   by exists x; rewrite -m1_leq_m2 // mem_dom m1x_y.
 qed.
 
