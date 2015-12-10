@@ -203,13 +203,13 @@ qed.
 
 lemma powPos z p: 0 < z => 0 < z ^ p.
 proof.
- case (0 <= p); intros Hp Hz; last smt.
+ case (0 <= p); move=> Hp Hz; last smt.
  elim/intind: p Hp; smt.
 qed.
 
 lemma pow_Mle (x y:int): 0 <= x <= y => 2^x <= 2^y.
 proof.
-  intros [leq0_x leqx_y]; cut leq0_y: 0 <= y by smt.
+  move=> [leq0_x leqx_y]; cut leq0_y: 0 <= y by smt.
   move: leqx_y; elim/intind: y leq0_y.
     smt.
   smt.

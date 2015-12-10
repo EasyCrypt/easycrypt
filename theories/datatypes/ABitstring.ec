@@ -38,7 +38,7 @@ lemma xorI (a b b':bitstring):
   `|a| = `|b| => `|b| = `|b'| =>
   a ^ b = a ^ b' => b = b'.
 proof -strict.
-intros=> eql_a_b eql_b_b' eq_axor;
+move=> eql_a_b eql_b_b' eq_axor;
 rewrite -xor0 -(xor0 b') -eql_b_b' -eql_a_b -xorN
         ?(xorC _ (a ^ a)) ?length_xor - ?eql_b_b' ?eql_a_b //
         -2?xorA - ?eql_b_b' //
@@ -107,7 +107,7 @@ lemma app_sub (b:bitstring) l1 l2:
   0 <= l1 => 0 <= l2 => l1 + l2 = `|b| =>
   ((sub b 0 l1) || (sub b l1 l2)) = b.
 proof -strict.
- intros Hl1 Hl2 Hb;rewrite {2}(_:l1 = 0 + l1);first smt.
+ move=> Hl1 Hl2 Hb;rewrite {2}(_:l1 = 0 + l1);first smt.
  rewrite sub_app_sub //;first smt.
  rewrite Hb;apply sub_full.
 qed.
@@ -117,7 +117,7 @@ lemma sub_sub (b:bitstring) s1 l1 s2 l2:
   0 <= s2 => 0 <= l2 => s2 + l2 <= l1 =>
   sub (sub b s1 l1) s2 l2 = sub b (s1 + s2) l2.
 proof -strict.
-  intros Hs1 Hl1 Hb Hs2 Hl2 Hsll.
+  move=> Hs1 Hl1 Hb Hs2 Hl2 Hsll.
   rewrite {1}(_: b = (sub b 0 s1 || sub b s1 s2 || 
            sub b (s1+s2) l2 || sub b (s1+s2+l2) (l1-(l2+s2)) || 
            sub b (s1+s2+l2+(l1-(l2+s2))) (`|b|-(s1+l1)))).

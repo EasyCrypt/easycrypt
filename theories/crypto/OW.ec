@@ -63,7 +63,7 @@ lemma f_pk_inj (x, y:t) (pk:pkey) (sk:skey):
   f_dom pk x => f_dom pk y =>
   f pk x = f pk y => x = y.
 proof strict.
-by intros=> Hsupp Hdom_x Hdom_y Heqf;
+by move=> Hsupp Hdom_x Hdom_y Heqf;
    rewrite -(finvof pk sk) // -(finvof pk sk y) // Heqf.
 qed.
 

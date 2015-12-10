@@ -135,13 +135,13 @@ op projPlain(c : ciphertext) : plaintext =
 (*lemma projRand_eq : forall (c : ciphertext, i : int),
  0 <= i => i < l => (projRand c).[i] = c.[i].
 proof.
- intros c i Hgz Hlel.
+ move=> c i Hgz Hlel.
  delta;simplify;smt.
 qed.
 lemma projPlain_eq : forall (c : ciphertext, i : int),
  l <= i => i < k + l => (projPlain c).[i - l] = c.[i].
 proof.
- intros c i Hgz Hlel;
+ move=> c i Hgz Hlel;
  delta; simplify; smt.
 qed.*)
 lemma projRand_c : forall (r : randomness,p : plaintext),
@@ -153,7 +153,7 @@ projPlain((r || p)) = p by [].
 lemma proj_merge : forall(c : ciphertext),
 (projRand c || projPlain c) = c.
 proof.
-intros=> c; rewrite /((||) (projRand c) (projPlain c)).
+move=> c; rewrite /((||) (projRand c) (projPlain c)).
 rewrite /projRand Randomness.pcan_to_from; first by smt.
 rewrite /projPlain Plaintext.pcan_to_from; first by smt.
 rewrite app_sub ?Ciphertext.can_from_to //;
@@ -309,10 +309,10 @@ call
       ==> (!mem BR2.r RO.s){2} => ={res}).
 fun (mem BR2.r RO.s) 
     (={RO.s} /\ eq_except RO.m{1} RO.m{2} BR2.r{2});[smt|smt| | | |].
-intros => R;apply (Hll2 R) => //.
+move=> R;apply (Hll2 R) => //.
 fun;inline RO.o;if;[smt | wp;rnd | ];wp;skip;progress;smt.
-intros &m2 H;fun;if;[inline RO.o;wp;rnd;try (wp;skip=> //);smt|wp;skip=> //].
-intros &m1;fun;if;[inline RO.o;wp;rnd;try (wp;skip=> //);smt|wp;skip=> //].
+move=> &m2 H;fun;if;[inline RO.o;wp;rnd;try (wp;skip=> //);smt|wp;skip=> //].
+move=> &m1;fun;if;[inline RO.o;wp;rnd;try (wp;skip=> //);smt|wp;skip=> //].
 call eq1_enc.
 rnd.
 call (_ : ={RO.m,RO.s,pk} /\ (glob A){1} = (glob A){2} 
@@ -337,7 +337,7 @@ local lemma prob1 :
              Pr[CPA(BR2,A).main() @ &m : res] +
              Pr[CPA(BR2,A).main() @ &m : mem BR2.r RO.s].
 proof.
- intros &m.
+ move=> &m.
  apply (real_le_trans _  
         Pr[CPA(BR2,A).main() @ &m : res \/ mem BR2.r RO.s] _).
  equiv_deno (_ : (glob A){1} = (glob A){2} ==>
@@ -404,7 +404,7 @@ local lemma prob2 : forall &m,
 Pr[CPA(BR2,A).main() @ &m : res] + Pr[CPA(BR2,A).main() @ &m : mem BR2.r RO.s] = 
 Pr[CPA(BR3,A).main() @ &m : res] + Pr[CPA(BR3,A).main() @ &m : mem BR3.r RO.s].
 proof.
- intros => &m.
+ move=> &m.
  by congr;
  equiv_deno (_ : ={glob A} ==> ={res,RO.s} /\ BR2.r{1} = BR3.r{2});
  (try  apply eq2 => //);smt.
@@ -449,7 +449,7 @@ local lemma prob3 :
 Pr[CPA(BR3,A).main() @ &m : res] + Pr[CPA(BR3,A).main() @ &m : mem BR3.r RO.s] =
 1%r/2%r + Pr[CPA2(BR3,A).main() @ &m : mem BR3.r RO.s].
 proof.
- intros => &m.
+ move=> &m.
  congr.
  by equiv_deno (_ : (glob A){1} = (glob A){2} ==> ={res,BR3.r,RO.s}) => //;
     apply eq3 => //;smt.
@@ -461,12 +461,12 @@ proof.
  fun; rnd (lambda b, b = b'); simplify.
  call (_ : true ==> true).
  fun (true);[smt|smt| |].
- by intros => R _;apply (Hll2 R) => //.
+ by move=> R _;apply (Hll2 R) => //.
  by fun;if;[inline RO.o;wp;rnd (cpTrue)|];wp;skip;smt.
  inline CPA2(BR3,A).SO.enc;do 2! (wp;rnd (cpTrue));wp.
  call (_ : true ==> true).
  fun (true);[smt|smt| |].
- by intros => R _;apply (Hll1 R) => //.
+ by move=> R _;apply (Hll1 R) => //.
  fun;if;[inline RO.o;wp;rnd (cpTrue)|];wp;skip;smt.
  inline CPA2(BR3,A).SO.kg RO.init.
  wp;rnd (cpTrue);wp;skip;progress;[smt|smt|smt|].
@@ -501,7 +501,7 @@ forall (x, y : randomness, pk: pkey, sk : skey),
 in_supp (pk,sk) keypairs  =>
 f pk x = f pk y => x = y.
 proof.
- intros x y pk sk Hsupp Heqf.
+ move=> x y pk sk Hsupp Heqf.
  rewrite -(finvof pk sk _ _);first smt.
  rewrite -(finvof pk sk _ _);first smt.
  rewrite Heqf;smt.
@@ -513,7 +513,7 @@ forall (pk : pkey, sk : skey, z x y : randomness),
     in_supp (pk, sk) keypairs =>
     f pk x = f pk z => f pk y = f pk z => x = y.
 proof.
- intros => pk sk z x y ? Heq1 Heq2.
+ move=> pk sk z x y ? Heq1 Heq2.
  by apply (f_iny _ _ pk sk _ _) => //; rewrite Heq1 Heq2 //.
 save.
 
@@ -544,7 +544,7 @@ proof.
       (lambda (p0:randomness) (p1:plaintext), f x1 p0 = f x1 rL) m_R0 rL _) => //=.
   by rewrite H11. 
 
-  by intros => x y Heq1 Heq2;apply (one_way_p_unique x1 x2 rL) => //.
+  by move=> x y Heq1 Heq2;apply (one_way_p_unique x1 x2 rL) => //.
   by rewrite proj_some.
 qed.
 (** end eq4 *)
@@ -555,7 +555,7 @@ forall  &m,
 Pr[ CPA2(BR3,A).main() @ &m : mem BR3.r RO.s] <= 
 Pr[ OW(BR_OW(A)).main () @ &m : res].
 proof.
- intros &m.
+ move=> &m.
  equiv_deno (_ : ={glob A} ==>  (mem BR3.r RO.s){1} => res{2}) => //.
  by apply eq4 => //;smt.
 qed. 
@@ -567,7 +567,7 @@ forall &m,
  Pr[CPA(BR,A).main() @ &m : res] - 1%r / 2%r  <= 
 Pr[OW(BR_OW(A)).main() @ &m : res].
 proof.
- intros &m.
+ move=> &m.
  cut H: 
  (Pr[CPA(BR, A).main() @ &m : res] <= 1%r / 2%r +
   Pr[OW(BR_OW(A)).main() @ &m : res]).
@@ -594,7 +594,7 @@ forall (A <: Adv {BR, RO}) &m,
 Pr[CPA(BR,A).main() @ &m : res] - 1%r / 2%r <= 
 Pr[OW(I).main() @ &m : res].
 proof.
- intros A &m Hll1 Hll2.
+ move=> A &m Hll1 Hll2.
  exists (BR_OW(A)).
  by apply (Reduction A _ _ &m) => //.
 qed.

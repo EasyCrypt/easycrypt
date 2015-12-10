@@ -150,7 +150,7 @@ theory Equiv_Dprod.
   proof strict.
     bypr (res{1}) (res{2}).
       progress.
-    intros=> rab &m1 &m2 _.
+    move=> rab &m1 &m2 _.
     pose ra' := fst rab. 
     pose rb' := snd rab.
     cut -> :(  Pr[Sample_dprod.sample() @ &m2 : rab = res]
@@ -233,7 +233,7 @@ theory Equiv_Dapply.
   proof strict.
     bypr (res{1}) (res{2}).
       progress.
-    intros=> rb &m1 &m2 _.
+    move=> rb &m1 &m2 _.
     cut -> :(  Pr[Sample_dapply.sample() @ &m2 : rb= res]
                = mu da (lambda r, f r = rb)).
     bdhoare_deno (_ : true ==> (rb=res)).
@@ -364,7 +364,7 @@ lemma Eq_Sample_DH_distr_random:
   equiv[ Sample_DH.sample_dh_random ~ Sample_DH_distr.sample_dh_random : true ==> ={res} ].
 proof strict.
   bypr (res{1}) (res{2}). by smt.
-  intros=> a &m1 &m2 _.
+  move=> a &m1 &m2 _.
   cut -> :   Pr[Sample_DH.sample_dh_random() @ &m1 : a = res]
            = Pr[T1_left.sample_dh_random() @ &m1 : a = res].
   by equiv_deno Eq_Sample_DH_T1_left => // ; smt.
@@ -454,7 +454,7 @@ lemma Eq_Sample_DH_distr_real:
   equiv[ Sample_DH.sample_dh_real ~ Sample_DH_distr.sample_dh_real : true ==> ={res} ].
 proof strict.
   bypr (res{1}) (res{2}). by smt.
-  intros=> a &m1 &m2 _.
+  move=> a &m1 &m2 _.
   cut -> :   Pr[Sample_DH.sample_dh_real() @ &m1 : a = res]
            = Pr[S1_left.sample_dh_real() @ &m1 : a = res].
   by equiv_deno Eq_Sample_DH_S1_left => // ; smt.
@@ -475,7 +475,7 @@ lemma Eq_DDH_real_distr:
     equiv[ DDH_real(D).main ~ DDH_distr_real(D).main :
            ={glob D} ==> ={res} ].
 proof strict.
-  intros=> D.
+  move=> D.
   fun. call (_ : true). call Eq_Sample_DH_distr_real. skip; smt.
 qed.
 
@@ -484,6 +484,6 @@ lemma Eq_DDH_random_distr:
     equiv[ DDH_random(D).main ~ DDH_distr_random(D).main :
            ={glob D} ==> ={res} ].
 proof strict.
-  intros=> D.
+  move=> D.
   fun. call (_ : true). call Eq_Sample_DH_distr_random. skip; smt.
 qed.

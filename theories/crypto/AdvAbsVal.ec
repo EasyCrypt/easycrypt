@@ -36,7 +36,7 @@ lemma Neg_A_Pr_minus (A<:Adv) &m:
    islossless A.main => 
    Pr[Neg_main(A).main() @ &m : res] = 1%r - Pr[A.main() @ &m : res].
 proof -strict.
-  intros Hl; rewrite (Neg_A_Pr A &m); rewrite Pr[mu_not]; congr => //.
+  move=> Hl; rewrite (Neg_A_Pr A &m); rewrite Pr[mu_not]; congr => //.
   by byphoare Hl.
 qed.
   

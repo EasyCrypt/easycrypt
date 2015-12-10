@@ -96,7 +96,7 @@ I (glob O1){m} (glob O2){m} =>
 Pr [Experiment(O1, Adv).main() @ &m : P res] <=
 Pr [Experiment(O2, Adv).main() @ &m : P res]  + qO%r * p.
 proof -strict.
-intros => O1 O2 Adv I P m g hg hbnd hinint hinit2 hf hf2 hbound_bad hll1 hll2 hlladv hIm.
+move=> O1 O2 Adv I P m g hg hbnd hinint hinit2 hf hf2 hbound_bad hll1 hll2 hlladv hIm.
 apply (Real.Trans _ 
 (Pr [Experiment(O2, Adv).main() @ &m : P res \/ (Experiment.WO.bad /\
                           Experiment.WO.cO <= qO /\ 
@@ -119,8 +119,8 @@ call (_ : Experiment.WO.bad,
  exists *(  Experiment.WO.cO{2}).
  elim * => cO.
  call (hf cO); skip; progress => //; smt.
- by intros => &2 h; proc; sp; if => //; wp; call hll1; wp; skip; smt.
- by intros => &1; proc; sp; if => //; wp; call hll2; wp; skip; smt.
+ by move=> &2 h; proc; sp; if => //; wp; call hll1; wp; skip; smt.
+ by move=> &1; proc; sp; if => //; wp; call hll2; wp; skip; smt.
  inline Experiment(O1,Adv).WO.init Experiment(O2,Adv).WO.init; wp. 
  call hinint; wp; skip; progress; smt.
 smt.
@@ -131,9 +131,9 @@ Pr [Experiment(O2, Adv).main() @ &m :
              Experiment.WO.cO = m (glob O2){hr}]) _).
 rewrite Pr[mu_or].
 apply (_ : forall (p q r : real), 0%r <= r => p + q - r <= p + q); 
- intros {g hg hbnd hbound_bad}; smt.
+ move=> {g hg hbnd hbound_bad}; smt.
 apply (_ : forall (a b c : real), b <= c => a + b <= a + c); 
- first (intros {g hg hbnd hbound_bad}; smt).
+ first (move=> {g hg hbnd hbound_bad}; smt).
 fel 2 Experiment.WO.cO g  qO (Experiment.WO.bad) 
  [Experiment(O2,Adv).WO.f : 
   (!Experiment.WO.bad  /\ Experiment.WO.cO < qO)]
@@ -151,16 +151,16 @@ progress.
 exists* Experiment.WO.bad.
 elim* => b.
 call (hbound_bad cO); skip; progress; smt.
-intros => c.
+move=> c.
 proc.
 sp; if => //; wp.
 exists* Experiment.WO.cO.
 elim* => cO. 
 call (hf2 cO); wp; skip ; progress.
-intros => {g hg hbnd hbound_bad}; smt.
-intros => {g hg hbnd hbound_bad}; smt.
+move=> {g hg hbnd hbound_bad}; smt.
+move=> {g hg hbnd hbound_bad}; smt.
 
-intros => b c.
+move=> b c.
 proc; sp; if => //.
 swap 1 1; wp.
 exists* Experiment.WO.cO.

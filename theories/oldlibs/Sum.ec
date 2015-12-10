@@ -35,7 +35,7 @@ pred is_cnst (f : int -> 'a) = forall i1 i2, f i1 = f i2.
 lemma int_sum_const (f : int -> real) (s: int fset):
   is_cnst f => int_sum f s = (card s)%r * f 0.
 proof strict.
-by intros=> is_cnst;
+by move=> is_cnst;
    rewrite /int_sum (Mrplus.NatMul.sum_const (f 0)) // => x hh;
    apply is_cnst.
 qed.

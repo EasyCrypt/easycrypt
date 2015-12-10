@@ -62,7 +62,7 @@ theory RingT.
     (r1 + r = r2 + r) =>
     r1 = r2.
   proof strict.
-  by intros=> r1_r2;
+  by move=> r1_r2;
      rewrite -addr0 -(addr0 r2) -(addNr r) -2!addrA -r1_r2.
   qed.
 
@@ -169,7 +169,7 @@ clone Ring as RBool with
 
 clone BRing as BRBool with
   theory Ring = RBool
-  proof * by (intros=> r; delta; smt).
+  proof * by (move=> r; delta; smt).
 
 clone BRingT as BRBoolT with
   theory Ring = RBool.

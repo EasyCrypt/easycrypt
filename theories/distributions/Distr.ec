@@ -89,7 +89,7 @@ qed.
 lemma ew_eq (d d':'a distr):
   d === d' => d = d'.
 proof.
-intros=> ew_eq; rewrite -pw_eq=> x.
+move=> ew_eq; rewrite -pw_eq=> x.
 by rewrite /mu_x ew_eq.
 qed.
 
@@ -124,14 +124,14 @@ proof. by rewrite mu_supp_in. qed.
 lemma mu_eq (d:'a distr) (p q:'a -> bool):
   p == q => mu d p = mu d q.
 proof.
-by intros=> ext_p_q; congr=> //; apply fun_ext.
+by move=> ext_p_q; congr=> //; apply fun_ext.
 qed.
 
 lemma mu_disjoint (d:'a distr) (p q:('a -> bool)):
   (predI p q) <= pred0 =>
   mu d (predU p q) = mu d p + mu d q.
 proof.
-intros=> and_p_q_false; rewrite mu_or.
+move=> and_p_q_false; rewrite mu_or.
 cut ->: (predI p q) = pred0 by apply subpred_asym.
 by rewrite mu_false.
 qed.
@@ -199,7 +199,7 @@ lemma mu_one (P:'a -> bool) (d:'a distr):
   weight d = 1%r =>
   mu d P = 1%r.
 proof.
-intros=> heq <-.
+move=> heq <-.
 rewrite /weight.
 congr=> //.
 by apply fun_ext.
@@ -216,7 +216,7 @@ theory Dempty.
     weight d = 0%r <=> d = dempty.
   proof.
   split; last smt.
-  by intros weight_0; rewrite -(pw_eq<:'a> d dempty); smt.
+  by move=> weight_0; rewrite -(pw_eq<:'a> d dempty); smt.
   qed.
 
   lemma demptyU: is_subuniform dempty<:'a> by smt.
@@ -330,7 +330,7 @@ theory Dscale.
   lemma weight_pos (d:'a distr):
     0%r < weight d => weight (dscale d) = 1%r.
   proof strict.
-  by intros=> H; rewrite /weight mu_def_pos /weight=> //; smt.
+  by move=> H; rewrite /weight mu_def_pos /weight=> //; smt.
   qed.  
 
   lemma dscaleU (d:'a distr):
@@ -354,7 +354,7 @@ theory Dapply.
   proof.
   rewrite /in_supp /mu_x mu_def; split.
     rewrite mu_support /predI /= => in_sup. smt.
-    intros=> [x]; rewrite /in_supp /mu_x=> [y_def nempty].
+    move=> [x]; rewrite /in_supp /mu_x=> [y_def nempty].
     have: pred1 x <= preim f (pred1 y)
       by move=> w; rewrite !pred1E. 
     smt.

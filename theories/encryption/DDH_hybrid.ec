@@ -74,7 +74,7 @@ section.
        (Pr[Ln(DDHb, A).main() @ &m : (res /\ Count.c <= n) ] -
         Pr[Rn(DDHb, A).main() @ &m : (res /\ Count.c <= n) ]).
   proof.
-   intros &m.
+   move=> &m.
    apply (H.Hybrid (<:DDHb) (<:A) _ _ _ _ &m 
        (fun (ga:glob A) (gb:glob DDHb) (c:int) (r:bool), r)).
    apply islossless_leaks. apply islossless_orcl1. apply islossless_orcl2. apply losslessA.

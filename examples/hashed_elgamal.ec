@@ -358,7 +358,7 @@ section.
      by rewrite -Real.inv_def; apply sign_inv; smt.
     rewrite !(Real.Comm.Comm _ (1%r/qH%r)) -Real.Assoc.Assoc -{2}Real.inv_def (Real.Comm.Comm _ qH%r).
     rewrite (_: forall x, qH%r * (inv qH%r) * x = x).
-     intros x;fieldeq;smt.
+     move=> x;fieldeq;smt.
     by rewrite (Set_CDH.Reduction (SCDH_from_CPA(A,RO)) &m); smt.
   qed.
 end section.

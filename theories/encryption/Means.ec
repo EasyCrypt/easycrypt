@@ -53,17 +53,17 @@ lemma introOrs (A <: Worker) &m (ev:input -> glob A -> output -> bool):
    Pr[Rand(A).main() @ &m:
         cpOrs (image (fun v r, ev v (glob A) (snd r) /\ v = fst r) sup) res].
 proof strict.
-intros=> Fsup sup.
+move=> Fsup sup.
 byequiv (_: ={glob A} ==> ={glob A, res} /\ in_supp (fst res{1}) d)=> //;
   first by proc; call (_: true); rnd.
-intros=> &m1 &m2 [[<- <-] Hin].
+move=> &m1 &m2 [[<- <-] Hin].
 rewrite /cpOrs or_exists;split.
-  intros=> H.
+  move=> H.
   exists (fun r, 
             ev (fst res{m1}) (glob A){m1} (snd r) /\ (fst res{m1}) = fst r).
   split=> //. 
   by rewrite imageP; exists (fst (res{m1})); smt.
-  by intros=> [x]; rewrite imageP => /= [[v] /= [Hm <-] /= [h1 <-]].
+  by move=> [x]; rewrite imageP => /= [[v] /= [Hm <-] /= [h1 <-]].
 qed.
 
 lemma Mean (A <: Worker) &m (ev:input -> glob A -> output -> bool): 
@@ -74,13 +74,13 @@ lemma Mean (A <: Worker) &m (ev:input -> glob A -> output -> bool):
      (fun (v:input), mu_x d v * Pr[A.work(v)@ &m:ev v (glob A) res]) 
      sup.
 proof.
-intros=> Fsup /=.
+move=> Fsup /=.
 cut:= introOrs A &m ev _=> //= ->.
 elim/fset_ind (oflist (to_seq (support d))).
   rewrite Mrplus.sum_empty.
   byphoare (_ : true ==> false)=> //.
   by rewrite /cpOrs image0 Mbor.sum_empty.
-  intros=> x s Hx Hrec.
+  move=> x s Hx Hrec.
   rewrite Mrplus.sum_add //=.
   cut ->: Pr[Rand(A).main() @ &m:
                cpOrs (image (fun (v : input) (r : input * output),
@@ -104,10 +104,10 @@ lemma Mean_uni (A<:Worker) &m (ev:input -> glob A -> output -> bool) r:
    Pr[Rand(A).main()@ &m: ev (fst res) (glob A) (snd res)] =
      r * Mrplus.sum (fun (v:input), Pr[A.work(v)@ &m:ev v (glob A) res]) sup.
 proof.
-  intros Hd Hfin /=.
+  move=> Hd Hfin /=.
   cut := Mean A &m ev => /= -> //.
   cut := Mrplus.sum_comp (( * ) r) (fun (v:input), Pr[A.work(v)@ &m:ev v (glob A) res]) => /= <-.
-    by intros x y;ringeq.
+    by move=> x y;ringeq.
   apply Mrplus.sum_eq => /= x.
   by rewrite mem_oflist mem_to_seq// /support=> Hin; rewrite Hd.
 qed.

@@ -222,23 +222,23 @@ section.
       by apply losslessA.
       proc;inline{2} Count.incr;wp.
       if{1};first by call Oborcl1;wp;skip;progress => //;smt.
-      rcondt{1} 1; first by intros &m0;skip;smt.
+      rcondt{1} 1; first by move=> &m0;skip;smt.
       by wp;call Oborcl1;wp;skip;progress => //;smt.
-      intros &m2 _;proc.
+      move=> &m2 _;proc.
       rcondt 1; first by skip;smt.
       by wp;call losslessOb1;skip;smt.
-      by intros &m1;proc;inline Count.incr;wp;call losslessOb1;wp;skip;smt.
+      by move=> &m1;proc;inline Count.incr;wp;call losslessOb1;wp;skip;smt.
       by conseq Obleaks.
-      intros &m2 _;conseq losslessL.
-      intros &m1; conseq losslessL.
+      move=> &m2 _;conseq losslessL.
+      move=> &m1; conseq losslessL.
 
       by conseq Oborcl1.
-      intros &m2 _;conseq losslessOb1.
-      intros &m1; conseq losslessOb1.
+      move=> &m2 _;conseq losslessOb1.
+      move=> &m1; conseq losslessOb1.
 
       by conseq Oborcl2.
-      intros &m2 _;conseq losslessOb2.
-      intros &m1; conseq losslessOb2.
+      move=> &m2 _;conseq losslessOb2.
+      move=> &m1; conseq losslessOb2.
 
     by inline{2} Count.init;wp;skip;smt.
   qed.
@@ -262,22 +262,22 @@ section.
       if{1};
         first by wp;call Oborcl2;wp;skip;progress => //;smt.
       by call Oborcl2;wp;skip;progress => //;smt.
-      intros &m2 _;proc.
+      move=> &m2 _;proc.
       rcondt 1; first by skip;smt.
       by wp;call losslessOb1;skip; smt.
-      intros &m1;proc;inline Count.incr;wp;call losslessOb2;wp;skip;smt.
+      move=> &m1;proc;inline Count.incr;wp;call losslessOb2;wp;skip;smt.
 
       by conseq Obleaks.
-      intros &m2 _;conseq losslessL.
-      intros &m1; conseq losslessL.
+      move=> &m2 _;conseq losslessL.
+      move=> &m1; conseq losslessL.
 
       by conseq Oborcl1.
-      intros &m2 _;conseq losslessOb1.
-      intros &m1; conseq losslessOb1.
+      move=> &m2 _;conseq losslessOb1.
+      move=> &m1; conseq losslessOb1.
 
       by conseq Oborcl2.
-      intros &m2 _;conseq losslessOb2.
-      intros &m1; conseq losslessOb2.
+      move=> &m2 _;conseq losslessOb2.
+      move=> &m1; conseq losslessOb2.
 
     by inline{2} Count.init;wp;skip;smt.
   qed.
@@ -287,15 +287,15 @@ section.
     Pr[HybGameFixed(L(Ob)).work(v) @ &m: p (glob A) (glob Ob) HybOrcl.l res] = 
     Pr[HybGameFixed(R(Ob)).work((v-1)) @ &m : p (glob A) (glob Ob) HybOrcl.l res].
   proof.
-    intros Hv;byequiv (_: ={glob A,glob Ob} /\ x{1} = v /\ x{2} = v-1 ==> 
+    move=> Hv;byequiv (_: ={glob A,glob Ob} /\ x{1} = v /\ x{2} = v-1 ==> 
                              ={glob A,glob Ob, HybOrcl.l, res}) => //.
     proc.
     call (_: ={glob Ob, HybOrcl.l} /\ HybOrcl.l0{1} = v /\ HybOrcl.l0{2} = v-1).
       proc.
-      if{1}; first by rcondt{2} 1;[intros &m0;skip;smt | wp;call Oborcl1].
+      if{1}; first by rcondt{2} 1;[move=> &m0;skip;smt | wp;call Oborcl1].
       if{1};first by rcondt{2} 1;
-       [intros &m0;skip;smt | wp;call Oborcl1;wp].
-      rcondf{2} 1;first by intros &m0;skip;smt.
+       [move=> &m0;skip;smt | wp;call Oborcl1;wp].
+      rcondf{2} 1;first by move=> &m0;skip;smt.
       by if{2};wp;call Oborcl2;wp.
       by conseq Obleaks.
       by conseq Oborcl1.
@@ -312,8 +312,8 @@ section.
     congr => //.   
     apply FSet.fsetP => x.
     rewrite imageP !mem_oflist !List.Iota.mem_iota; split.
-      intros [y];rewrite !mem_oflist !List.Iota.mem_iota;smt.
-    intros Hx;exists (x+k);rewrite !mem_oflist !List.Iota.mem_iota;smt.
+      move=> [y];rewrite !mem_oflist !List.Iota.mem_iota;smt.
+    move=> Hx;exists (x+k);rewrite !mem_oflist !List.Iota.mem_iota;smt.
   qed.
 
   lemma Hybrid &m (p:glob A -> glob Ob -> int -> outputA -> bool):
@@ -324,14 +324,14 @@ section.
       Pr[Ln(Ob,A).main() @ &m : p' (glob A) (glob Ob) Count.c res] - 
         Pr[Rn(Ob,A).main() @ &m : p' (glob A) (glob Ob) Count.c res]).
   proof.
-    intros p';rewrite (GLB_WL &m p') (GRB_WR &m p').
+    move=> p';rewrite (GLB_WL &m p') (GRB_WR &m p').
     simplify p'; rewrite -(WL0_GLA &m p) -(WRq_GRA &m p).
     cut Hint : forall x, support [0..q - 1] x <=> mem (oflist (List.Iota.iota_ 0 q)) x.
       by move=> x; rewrite !mem_oflist !List.Iota.mem_iota /support Dinter.supp_def; smt.
     cut Hfin: is_finite (support [0..q - 1]).
       by exists (List.Iota.iota_ 0 q); smt.
     cut Huni : forall (x : int), in_supp x [0..q - 1] => mu_x [0..q - 1] x = 1%r / q%r.
-      by intros x Hx;rewrite Dinter.mu_x_def_in //;smt.
+      by move=> x Hx;rewrite Dinter.mu_x_def_in //;smt.
     pose ev := 
       fun (_j:int) (g:glob HybGameFixed(L(Ob))) (r:outputA),
         let (l,l0,ga,ge) = g in p ga ge l r /\ l <= q.

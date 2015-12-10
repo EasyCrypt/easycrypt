@@ -171,7 +171,7 @@ section.
       by apply losslessL.
       by proc;call losslessO.
       by proc;call losslessO.
-      intros Ob LR Hlr Hl Ho1 Ho2;proc.
+      move=> Ob LR Hlr Hl Ho1 Ho2;proc.
       call (losslessA (<:A'(Ob,LR).O) (<:A'(Ob,LR).LR') _ _ _) => //;proc.
         by call Hlr. by call Ho1.
     zeta beta => H.

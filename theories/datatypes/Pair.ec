@@ -93,7 +93,7 @@ theory Dprod.
     equiv sample_sample2 : S.sample ~ S.sample2 : true ==> ={res}.
     proof.
      bypr (res{1}) (res{2}) => //.
-     intros &m1 &m2 a.
+     move=> &m1 &m2 a.
      cut ->: Pr[S.sample() @ &m1: a = res] = mu (d1*d2) ((=) a).
       byphoare (_: true ==> a = res)=> //.
       by proc; rnd; skip; rewrite eqL.

@@ -54,7 +54,7 @@ section.
 
   lemma CountO_fL: islossless O.f => islossless Count(O).f.
   proof strict.
-  by intros=> O_fL; proc;
+  by move=> O_fL; proc;
      call O_fL;
      inline Counter.incr; wp.
   qed.
@@ -63,7 +63,7 @@ section.
     islossless O.f =>
     phoare[Count(O).f: Counter.c = ci ==> Counter.c = ci + 1] = 1%r.
   proof strict.
-  by intros=> O_fL; proc;
+  by move=> O_fL; proc;
      call O_fL;
      inline Counter.incr; wp.
   qed.
@@ -167,7 +167,7 @@ theory EnfPen.
       by progress; proc; sp; if=> //;
          inline Count(O).f Counter.incr; wp; call O_fL; wp; skip; smt.
       (* Count(O).f preserves bad *)
-      intros=> &m1 //=; bypr; intros=> &m0 bad.
+      move=> &m1 //=; bypr; move=> &m0 bad.
         cut: 1%r <= Pr[Count(O).f(x{m0}) @ &m0: bound < Counter.c]; last smt.
         cut lbnd: phoare[Count(O).f: Counter.c = Counter.c{m0} ==> Counter.c = Counter.c{m0} + 1] >= 1%r;
           first by conseq [-frame] (CountO_fC O Counter.c{m0} _); apply O_fL.
@@ -276,7 +276,7 @@ theory BndPen.
       (* Wrap(O).f lossless *)
       by progress; proc; sp; if; [call (CountO_fL O _); first apply O_fL |].
       (* O.f preserves bad *)
-      progress; bypr; intros=> &m0 bad.
+      progress; bypr; move=> &m0 bad.
       cut: 1%r <= Pr[Count(O).f(x{m0}) @ &m0: bound < Counter.c]; last smt.
       cut lbnd: phoare[Count(O).f: Counter.c = Counter.c{m0} ==> Counter.c = Counter.c{m0} + 1] >= 1%r;
         first by conseq [-frame] (CountO_fC O Counter.c{m0} _); first apply O_fL.

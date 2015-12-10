@@ -59,13 +59,13 @@ theory GenDice.
       (* case : test i k *)
       pose bd := mu_x (d i0) k.
       cut d_uni : forall x, in_supp x (d i0) => mu_x (d i0) x = bd.
-         by intros x Hx;rewrite /bd; apply dU => //; apply test_in_supp.
+         by move=> x Hx;rewrite /bd; apply dU => //; apply test_in_supp.
       cut Hdiff: bdt <> 0%r.
         by have h: mem (sub_supp i0) k; smt.
       conseq (_:i=i0 ==> k = r : = (if test i r then charfun ((=) k) r else 1%r / bdt)) => //;
         first by smt.
       while (i0=i) (if test i r then 0 else 1) 1 (bdt * bd) => //; first 2 smt.
-        intros Hw; alias 2 r0 = r.
+        move=> Hw; alias 2 r0 = r.
         cut:= Htk; rewrite -test_sub_supp // => Hmemk.
         phoare split bd ((1%r - bdt*bd) * (1%r/bdt)) : (k=r0).
           move=> &hr [H1 H2]; rewrite (_: test i{hr} r{hr} = false) 1:neqF //=.
@@ -87,13 +87,13 @@ theory GenDice.
          phoare split ! 1%r (bdt*bd);wp;rnd => //.
           skip; progress=> //.
           rewrite -(mu_eq (d i{hr}) (mem (sub_supp i{hr}))).
-            by intros x ; rewrite /= -test_sub_supp.
+            by move=> x ; rewrite /= -test_sub_supp.
           apply (Mu_mem.mu_mem (sub_supp i{hr}) (d i{hr}) bd _) => x Hx.
           by apply d_uni; apply test_in_supp=> //; rewrite -test_sub_supp.
         by conseq Hw => //; smt.         
         by conseq (_ : _ ==> true) => //;rnd;skip;progress=> //; smt.
       split; first by cut: 0%r < bd; smt.
-      intros z;conseq (_ : _ ==>  mem (sub_supp i) r); first smt.
+      move=> z;conseq (_ : _ ==>  mem (sub_supp i) r); first smt.
       rnd;skip;progress => //.
       rewrite -(mu_eq (d i{hr}) (mem (sub_supp i{hr}))) => //.
       rewrite (Mu_mem.mu_mem (sub_supp i{hr}) (d i{hr}) bd) => // x Hx.
@@ -118,7 +118,7 @@ theory GenDice.
   
   lemma prSample : forall i k &m, Pr[Sample.sample(i) @ &m : res = k] = mu_x (d' i) k.
   proof.
-    intros i0 k &m; byphoare (_: i0 = i ==> k = res) => //;proc.
+    move=> i0 k &m; byphoare (_: i0 = i ==> k = res) => //;proc.
     rnd;skip;progress.
     apply/(mu_eq (d' i{hr}) (fun x => k = x) (pred1 k)).
     by rewrite pred1E.
@@ -133,7 +133,7 @@ theory GenDice.
        res{1} = finv res{2}.
   proof.
     bypr (res{1}) (finv res{2}) => //.      
-    intros &m1 &m2 k [Heqi [Hv [Ht [Hw [Htin [Hffi Hfif]]]]]].
+    move=> &m1 &m2 k [Heqi [Hv [Ht [Hw [Htin [Hffi Hfif]]]]]].
     rewrite (_:Pr[RsampleW.sample(i{m2}, r{m2}) @ &m2 : k = finv res] = 
                Pr[RsampleW.sample(i{m2}, r{m2}) @ &m2 : res = f k]).
       byequiv (_: ={i,r} /\ i{2} = i{m2} ==> 

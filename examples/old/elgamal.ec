@@ -283,9 +283,9 @@ lemma Pr4_aux (A<:Adv) :
    (islossless A.a1) => (islossless A.a2) =>
    bd_hoare [G2(A).main : true ==> res] = (1%r / 2%r).
 proof.
-  intros Ha1 Ha2;fun.
+  move=> Ha1 Ha2;fun.
   rnd ((=) b'); conseq [-frame]  (_ : ==> true) .
-    intros &m;progress.
+    move=> &m;progress.
     by apply (Dbool.mu_x_def (b'{m})).
   call Ha2.
   cut H1 : mu [0..Int.(-) q 1] Fun.cpTrue = 1%r by smt.
@@ -299,7 +299,7 @@ lemma Pr4 (A<:Adv) &m :
    (islossless A.a1) => (islossless A.a2) =>
    Pr[G2(A).main() @ &m : res] = 1%r / 2%r.
 proof.
- intros Ha1 Ha2.
+ move=> Ha1 Ha2.
  by bdhoare_deno (Pr4_aux A _ _).
 save.
 
@@ -308,7 +308,7 @@ lemma Conclusion1 (A<:Adv) &m :
  `| Pr[CPA(ElGamal, A).main() @ &m : res] - 1%r / 2%r | = 
  `| Pr[DDH0(Inv(A)).main() @ &m :res] - Pr[DDH1(Inv(A)).main() @ &m :res] |.
 proof. 
-  intros Ha1 Ha2.
+  move=> Ha1 Ha2.
   by rewrite (Pr1 A &m) -(Pr4 A &m _ _) // -(Fact3 A &m) (Pr2 A &m).
 save.
 
@@ -318,6 +318,6 @@ lemma Conclusion (A<:Adv) &m :
    `| Pr[CPA(ElGamal, A).main() @ &m : res] - 1%r / 2%r | = 
    `| Pr[DDH0(I).main() @ &m :res] - Pr[DDH1(I).main() @ &m :res] |.
 proof.
-  intros Ha1 Ha2; exists (Inv(A)).
+  move=> Ha1 Ha2; exists (Inv(A)).
   by apply (Conclusion1 A &m).
 save.

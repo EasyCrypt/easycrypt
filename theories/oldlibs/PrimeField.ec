@@ -168,7 +168,7 @@ by [].
 
 lemma nosmt toofint (x:int): 0 <= x => x < q => toint (ofint x) = x.
 proof.
-  intros Hp Hlt;rewrite toofint_mod.
+  move=> Hp Hlt;rewrite toofint_mod.
   smt all.
 qed.
 

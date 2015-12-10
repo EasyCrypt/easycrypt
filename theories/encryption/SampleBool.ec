@@ -69,7 +69,7 @@ lemma Sample_bool_lossless (A<:Worker) &m:
   Pr[Rand(A).main() @ &m : fst res = snd res] - 1%r/2%r = 
       1%r/2%r*(Pr[A.work(true) @ &m : res] - Pr[A.work(false) @ &m : res]).
 proof strict.
-  intros Hloss.
+  move=> Hloss.
   cut := Sample_bool A &m (fun x, true) => /= <-.
   by rewrite Hloss.
 qed.

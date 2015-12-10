@@ -110,7 +110,7 @@ proof.
  call (_ : PRP.bad,
            PRF.m{1} = PRP.m{2} /\ PRF.s{1} = PRP.s{2} /\ card (PRP.s{2}) <= q, 
            card (PRP.s{2}) <= q).
- by intros M0 Hmo; apply (losslessA M0) => //.
+ by move=> M0 Hmo; apply (losslessA M0) => //.
  proc.
  if;first by smt.
  seq 1 1: 
@@ -121,11 +121,11 @@ proof.
  by wp;rnd{2};wp;skip;progress;smt.
  by wp;skip;progress;smt.
  by skip;smt.
- intros &m2 H;proc;if;wp.
+ move=> &m2 H;proc;if;wp.
  rnd True.
  wp;skip;progress;by smt.
  skip;by smt.
- intros &m1;proc;if;wp.
+ move=> &m1;proc;if;wp.
  seq 1: ((PRP.bad /\ true) /\ ! mem x (dom PRP.m) /\ card PRP.s < q);last by smt.
  trivial.
  rnd True; skip;by smt.
@@ -143,7 +143,7 @@ lemma prob1 : forall &m,
  Pr[ M(PRP,A).main() @ &m : res] + 
  Pr[ M(PRP,A).main() @ &m : PRP.bad /\ card PRP.s <= q].
 proof.
- intros => &m.
+ move=> &m.
  apply (real_le_trans _ 
  Pr[ M(PRP,A).main() @ &m : (res || (PRP.bad /\  card PRP.s <= q))] _ _ _).
  byequiv(eq1) => // ;first by smt.
@@ -188,7 +188,7 @@ lemma prob2 : forall &m,
 Pr[ M(PRP,A).main() @ &m : PRP.bad /\ card PRP.s <= q] <= 
 q%r * (q-1)%r * (1%r / (2^l)%r).
 proof.
- intros => &m.
+ move=> &m.
  fel 1 (card PRP.s) (fun x, (x%r)* (1%r/(2^l)%r)) 
      q PRP.bad [PRP.f : (! mem x (dom PRP.m) /\ card PRP.s < q)] => //. 
   apply sum_prop;by smt.
@@ -208,13 +208,13 @@ proof.
      move=> _ _.
      cut H: forall x y, 0%r <= x => 0%r < y => 0%r <= x * y by smt.
      by apply H; [| rewrite -inv_def sign_inv]; smt.
-   intros c;proc;if;last by skip;smt.
+   move=> c;proc;if;last by skip;smt.
  
    wp;seq 1: ((! mem x (dom PRP.m) /\ card PRP.s < q) /\ c = card PRP.s /\
   ! mem x (dom PRP.m) /\ card PRP.s < q /\ in_supp y uniform); first by rnd.
    if;[rnd;wp|];skip;progress;by smt.
          
-  intros b c;proc;wp;if;last by skip;smt.
+  move=> b c;proc;wp;if;last by skip;smt.
   seq 1:  ((! (! mem x (dom PRP.m) /\ card PRP.s < q) /\ PRP.bad = b /\ 
           card PRP.s = c) /\ ! mem x (dom PRP.m) /\ card PRP.s < q /\ 
           in_supp y uniform);first rnd;skip;by smt.
@@ -226,7 +226,7 @@ lemma concl : forall &m,
  Pr[ M(PRF,A).main() @ &m : res] <= 
  Pr[ M(PRP,A).main() @ &m : res] + q%r * (q-1)%r * (1%r / (2^l)%r).
 proof.
- intros &m.
+ move=> &m.
  apply (real_le_trans _  
  (Pr[ M(PRP,A).main() @ &m : res] + 
  Pr[ M(PRP,A).main() @ &m : PRP.bad /\ card PRP.s <= q]) _).

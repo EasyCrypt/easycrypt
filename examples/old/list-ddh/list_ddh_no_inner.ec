@@ -135,7 +135,7 @@ lemma Eq_LDDH_Hybrid0_real:
     equiv [ LDDH_Hyb(A).main ~ LDDH_real(A).main :
             ={glob A} /\ ia{1} = 0 ==> res{1} = res{2} ].
 proof strict.
-  intros A.
+  move=> A.
   fun.
   call (_ :    LDDH_Hyb.O.i{1} = 0 /\ LDDH_Hyb.O.c{1} = LDDH_real.O.c{2}
             /\ LDDH_Hyb.O.c{1} >= 0).
@@ -147,7 +147,7 @@ proof strict.
     if.
       smt.
       rcondf {1} 1.
-      intros &m; intros; skip; smt.
+      move=> &m; move=> ; skip; smt.
       wp. rnd; skip; smt.
     skip; smt.
   wp; skip; smt.
@@ -158,7 +158,7 @@ lemma DDH1_Hybridk:
     equiv [ LDDH_Hyb(A).main ~ LDDH_random(A).main :
             ={glob A} /\ ia{1} = q_t ==> res{1} = res{2} ].
 proof strict.
-  intros A.
+  move=> A.
   fun.
   call (_ : LDDH_Hyb.O.i{1} = q_t /\ LDDH_Hyb.O.c{1} = LDDH_random.O.c{2}).
     fun.
@@ -167,7 +167,7 @@ proof strict.
     if.
       smt.
       rcondt {1} 1.
-      intros &m; intros; skip; smt.
+      move=> &m; move=> ; skip; smt.
       wp.
       rnd; skip; smt.
     skip; smt.
@@ -255,7 +255,7 @@ lemma Eq_Hyb_Hyb2:
     equiv [ LDDH_Hyb(A).main ~ LDDH_Hyb2(LRO_real, A).main :
             ={glob A, ia} ==> res{1} = res{2} ].
 proof strict.
-  intros=> A.
+  move=> A.
   fun.
   inline LRO_real.init.
   seq 2 3 : (   ={glob A} /\ LDDH_Hyb.O.i{1} = LDDH_Hyb2.O.i{2}
@@ -286,7 +286,7 @@ proof strict.
       wp. skip; progress => //. smt.
       wp.
       rcondt {2} 1.
-        intros=> &m. skip. intros &hr. progress. smt.
+        move=> &m. skip. move=> &hr. progress. smt.
         wp. rnd. skip; progress. trivial. smt. smt.
       rnd. skip. progress. smt. smt.
 qed.

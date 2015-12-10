@@ -244,9 +244,9 @@ section.
     (* [F.f ~ F.f: I] when Bad does not hold *)
     proc; wp; do !rnd; wp; skip; rewrite /Top.inv; progress;expect 13 smt. 
     (* F.f is lossless when Bad holds *)
-    by intros=> _ _; apply FfL.
+    by move=> _ _; apply FfL.
     (* F.f preserves bad *)
-    intros=> _ //=; proc.
+    move=> _ //=; proc.
     case (mem x (dom F.m)).
       by rcondf 3; wp; do !rnd=> //; wp; skip; smt.
     rcondt 3; first by do !rnd; wp.
@@ -259,7 +259,7 @@ section.
     wp; do 2!rnd; wp; skip; progress; first 2 last; last 9 smt.
     by move: H6; rewrite notBad=> [logP_unique contradiction]; smt.
     (* Plog.prg is lossless when Bad holds *)
-    by intros=> _ _; proc; inline F.f;
+    by move=> _ _; proc; inline F.f;
        wp; do 2!rnd predT; wp;
        skip; smt.
     (* Psample.prg preserves bad *)
@@ -290,7 +290,7 @@ section.
   proof.
   proc.
   while (true) (n - length P.logP);
-    first by intros=> z; wp; rnd predT; skip; smt.
+    first by move=> z; wp; rnd predT; skip; smt.
   by rnd predT; wp; skip; smt.
   qed.
 
@@ -304,11 +304,11 @@ section.
      (={glob A} ==> ={F.m, P.logP}) 
      (={glob A} ==> ={F.m, P.logP})=> //.
     (* Equality on A's globals *)
-    by intros=> &1 &2 A; exists (glob A){1}.
+    by move=> &1 &2 A; exists (glob A){1}.
     (* no sampling ~ presampling *)
     sim; inline Resample.resample Psample.init F.init.
     rcondf{2} 7;
-      first by intros=> _; rnd; wp; conseq [-frame] (_: _ ==> true) => //.
+      first by move=> _; rnd; wp; conseq [-frame] (_: _ ==> true) => //.
     by wp; rnd; wp; rnd{2} (True); wp; skip; smt.
     (* presampling ~ postsampling *)
     seq 2 2: (={glob A, glob F, glob Plog}); first by sim.
@@ -328,8 +328,8 @@ section.
         while (={P.logP} /\ n{2} = n{1} + 1 /\ length P.logP{1} <= n{1});
           first by wp; rnd; skip; progress; smt.
         by wp; rnd{2}; skip; progress=> //; smt.
-      rcondt{2} 1; first by intros=> _; skip; smt.
-      rcondf{2} 3; first by intros=> _; wp; rnd; skip; smt.
+      rcondt{2} 1; first by move=> _; skip; smt.
+      rcondf{2} 3; first by move=> _; wp; rnd; skip; smt.
       by sim.
       by sim.
   qed.
@@ -384,7 +384,7 @@ lemma CFfL (A <: Adv) (F <: APRF) (P <: APRG):
   islossless F.f =>
   islossless C(A,F,P).CF.f.
 proof.
-intros=> FfL.
+move=> FfL.
 proc; sp; if=> //.
 by call FfL; wp.
 qed.
@@ -393,7 +393,7 @@ lemma CPprgL (A <: Adv) (F <: APRF) (P <: APRG):
   islossless P.prg =>
   islossless C(A,F,P).CP.prg.
 proof.
-intros=> PprgL.
+move=> PprgL.
 proc; sp; if=> //.
 by call PprgL; wp.
 qed.
@@ -407,7 +407,7 @@ lemma CaL (A <: Adv {C}) (F <: APRF {A}) (P <: APRG {A}):
   islossless P.prg =>
   islossless C(A,F,P).a.
 proof.
-intros=> AaL FfL PprgL.
+move=> AaL FfL PprgL.
 proc.
 call (AaL (<: C(A,F,P).CF) (<: C(A,F,P).CP) _ _).
   by apply (CFfL A F P); assumption.
@@ -427,7 +427,7 @@ section.
       Pr[Exp(C(A),F,PrgI).main() @ &m: res] + Pr[Exp'(C(A)).main() @ &m: Bad P.logP F.m].
   proof.
   apply (P_PrgI (<: C(A)) _ &m).
-    intros=> F0 P0 F0fL P0prgL; apply (CaL A F0 P0); last 2 assumption.
+    move=> F0 P0 F0fL P0prgL; apply (CaL A F0 P0); last 2 assumption.
     by apply AaL.
   qed.
 
@@ -473,7 +473,7 @@ section.
       cut Hmod: 0 <= (qP - 1) * qP /% 2 by smt.
       by rewrite from_intMle; smt.
       (* logP = x::xs *)
-      intros=> x l H0 H; rewrite sumn_ij; first smt.
+      move=> x l H0 H; rewrite sumn_ij; first smt.
       rewrite !FromInt.Add.
       apply addleM.
         cut ->: (qF + (1 + length l) - 1 - qF + 1) = (1 + length l) by smt.
@@ -482,7 +482,7 @@ section.
       rewrite from_intMle; apply ediv_Mle=> //.
       by apply mulMle; smt.
   while{1} (n <= qP /\ card (dom F.m) <= qF).
-    intros Hw.
+    move=> Hw.
     exists* P.logP, F.m, n; elim* => logPw m n0.
     case (Bad P.logP F.m).
       by conseq ( _ : _ : <= (1%r))=> //; smt.
@@ -499,7 +499,7 @@ section.
         first by apply mu_sub=> x /=; smt.
       apply mu_or_le.
         rewrite (mu_eq _ _ (cpMem (dom F.m{hr})));
-          first by intros x; rewrite /= /cpMem; smt.
+          first by move=> x; rewrite /= /cpMem; smt.
         apply (Real.Trans _ ((card (dom F.m{hr}))%r * pr_dseed)).
           apply mu_cpMem_le=> x _.
             by rewrite (dseed_suf x witness) 3:/pr_dseed // dseed_fu.
@@ -546,7 +546,7 @@ lemma lossNegA (A<:Adv) :
   forall (O1 <: AOrclPrg{NegA(A)}) (O2 <: OrclRnd{NegA(A)}),
     islossless O1.prg => islossless O2.f => islossless NegA(A, O1, O2).a.
 proof.
- intros Hloss O1 O2 HO1 HO2;fun.
+ move=> Hloss O1 O2 HO1 HO2;fun.
  call (_:true) => //.
 qed.
 
@@ -566,7 +566,7 @@ lemma lossExp (P<:OrclPrg) (A<:Adv{P,F,C}):
    islossless P.prg => islossless P.init =>
    islossless Exp(C(A),P).main.
 proof.
- intros HA Hp Hi;fun.
+ move=> HA Hp Hi;fun.
  call (_: true).
    call (_: true) => //.
      fun.
@@ -587,7 +587,7 @@ lemma conclusion (A<:Adv{Prg,F,C}) :
       `| Pr[Exp(C(A),Prg).main() @ &m : res] - Pr[Exp(C(A),Prg_r).main() @ &m : res] | <=  
        (qP*qF + (qP - 1)*qP/%2)%r*bd1.
 proof.
- intros Hloss &m.
+ move=> Hloss &m.
  case (Pr[Exp(C(A), Prg).main() @ &m : res] <= Pr[Exp(C(A), Prg_r).main() @ &m : res]) => Hle.
    cut H := conclusion_aux (NegA(A)) _ &m.
      by apply (lossNegA A).

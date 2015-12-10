@@ -181,7 +181,7 @@ section.
     1%r/H.q%r * (Pr[CPAL(S,A).main() @ &m : res /\ K.c <= H.q] -
                  Pr[CPAR(S,A).main() @ &m : res /\ K.c <= H.q]).
   proof.
-    intros Hq.
+    move=> Hq.
     cut -> : Pr[CPAL(S, A).main() @ &m : res /\ K.c <= H.q] =
              Pr[INDL(ToOrcl(S),ToAdv(A)).main() @ &m : res /\ H.Count.c <= H.q].
       byequiv (_ : ={glob A, glob S} ==>
@@ -203,9 +203,9 @@ section.
     cut := IND1_INDn (ToOrcl(S)) (ToAdv(A)) _ _ _ _ &m (fun ga go c, true) => //=.
       by proc;call Lkg.
       by proc;call Lenc.    
-      intros O LR Llr Ll Lo;proc;call (La LR _) => //.
+      move=> O LR Llr Ll Lo;proc;call (La LR _) => //.
       by call Ll.
-    intros <-; congr; last congr.
+    move=> <-; congr; last congr.
       byequiv (_: ={glob S,glob A} ==> ={res,glob H.HybOrcl} /\ K.c{1} = H.Count.c{2}) => //.
       proc.
       inline INDL(ToOrcl(S), Ind.HybGame2(ToAdv(A))).A.main H.Count.init CPAL(S, B(S,A)).A.main

@@ -51,14 +51,14 @@ lemma sum_rm (f:'a -> t) (s:'a fset) (x:'a):
 proof strict.
 rewrite /sum=> x_in_s.
 rewrite (foldC x) // /=; last by rewrite addmC.
-by intros=> a b X; rewrite addmCA.
+by move=> a b X; rewrite addmCA.
 qed.
 
 lemma sum_add (f:'a -> t) (s:'a fset) (x:'a):
   (!mem s x) =>
   sum f (s `|` fset1 x) = (f x) + (sum f s).
 proof strict.
-intros=> x_nin_s;
+move=> x_nin_s;
 rewrite (sum_rm _ _ x); first by rewrite in_fsetU in_fset1.
 rewrite fsetDUl fsetDv fsetU0.
 have -> //=: s `\` fset1 x = s. (* FIXME: views *)
@@ -82,7 +82,7 @@ lemma sum_disj (f:'a -> t) (s1 s2:'a fset) :
 proof -strict.
  elim/fset_ind s1.
    by move=> hd; rewrite fset0U sum_empty addmC addmZ.
- by intros x s Hx Hrec Hd; rewrite sum_add // -fsetUAC sum_add 1:smt Hrec smt.
+ by move=> x s Hx Hrec Hd; rewrite sum_add // -fsetUAC sum_add 1:smt Hrec smt.
 qed.
 
 lemma sum_eq (f1 f2:'a -> t) (s: 'a fset) :
@@ -91,7 +91,7 @@ lemma sum_eq (f1 f2:'a -> t) (s: 'a fset) :
 proof strict.
   elim/fset_ind s.
     by rewrite !sum_empty.
-  intros x s Hx Hr Hf; rewrite sum_add // sum_add // Hf;first smt.
+  move=> x s Hx Hr Hf; rewrite sum_add // sum_add // Hf;first smt.
   by rewrite Hr // => y Hin;apply Hf;smt.
 qed.
 
@@ -106,9 +106,9 @@ lemma sum_comp (f: t -> t) (g:'a -> t) (s: 'a fset):
   (forall x y, f (x + y) = f x + f y) =>
   sum (fun a, f (g a)) s = f (sum g s).
 proof -strict.
-  intros Hz Ha;elim/fset_ind s.
+  move=> Hz Ha;elim/fset_ind s.
     by rewrite !sum_empty Hz.
-  by intros x s Hx Hr; rewrite sum_add // sum_add //= Hr Ha. 
+  by move=> x s Hx Hr; rewrite sum_add // sum_add //= Hr Ha. 
 qed.
 
 lemma sum_add2 (f:'a -> t) (g:'a -> t) (s:'a fset):
@@ -123,7 +123,7 @@ lemma sum_chind (f:'a -> t) (g:'a -> 'b) (g':'b -> 'a) (s:'a fset):
   (forall x, mem s x => g' (g x) = x) =>
   (sum f s) = sum (fun x, f (g' x)) (image g s).
 proof strict.
-intros=> pcan_g'_g; have: s <= s by done.
+move=> pcan_g'_g; have: s <= s by done.
 elim/fset_ind {1 3 4}s.
   by rewrite image0 !sum_empty.
   move=> x s' x_notin_s' ih leq_s'_s.
@@ -141,7 +141,7 @@ lemma sum_filter (f:'a -> t) (p:'a -> bool) (s:'a fset):
   (forall x, (!p x) => f x = Z) =>
   sum f (filter p s) = sum f s.
 proof strict.
-intros=> f_Z; have: s <= s by done.
+move=> f_Z; have: s <= s by done.
 elim/fset_ind {1 3 4}s.
   by rewrite FSet.filter0.
   move=> x s' x_notin_s' ih leq_s'_s.
@@ -165,7 +165,7 @@ qed.
 lemma sum_ij_split (k i j:int) f:
   i <= k <= j + 1 => sum_ij i j f = sum_ij i (k-1) f + sum_ij k j f.
 proof -strict. 
-  intros Hbound;rewrite /sum_ij -sum_disj.
+  move=> Hbound;rewrite /sum_ij -sum_disj.
     by apply/fsetP=> x; rewrite in_fset0 /= in_fsetI !mem_oflist !mem_iota smt.
   by congr; apply/fsetP=> x; rewrite in_fsetU !mem_oflist !mem_iota; smt.
 qed.
@@ -179,7 +179,7 @@ lemma sum_ij_le_r (i j:int) f :
    i <= j =>
    sum_ij i j f = sum_ij i (j-1) f + f j.
 proof -strict.
-  intros Hle;rewrite (sum_ij_split j); first by smt.
+  move=> Hle;rewrite (sum_ij_split j); first by smt.
   by rewrite sum_ij_eq.
 qed.
 
@@ -187,7 +187,7 @@ lemma sum_ij_le_l (i j:int) f :
    i <= j =>
    sum_ij i j f = f i + sum_ij (i+1) j f.
 proof -strict.
- intros Hle; rewrite (sum_ij_split (i+1));smt.
+ move=> Hle; rewrite (sum_ij_split (i+1));smt.
 qed.
 
 lemma sum_ij_shf (k i j:int) f:
@@ -216,7 +216,7 @@ theory NatMul.
     (forall (x:'a), mem s x => f x = k) =>
     sum f s = (card s)*k.
   proof strict.
-  intros=> f_x; pose s' := s.
+  move=> f_x; pose s' := s.
   cut -> //: s' <= s => sum f s' = (card s') * k;
     last by smt. (* FIXME *)
   elim/fset_ind s'.
@@ -259,7 +259,7 @@ theory Miplus.
   proof -strict.
     rewrite /sum_n;elim k.
       by rewrite sum_ij_eq => /=; smt all.
-    intros k Hk Hrec;rewrite sum_ij_le_r;first smt.
+    move=> k Hk Hrec;rewrite sum_ij_le_r;first smt.
     cut -> : k + 1 - 1 = k;first smt.
     rewrite Hrec /=.
     have ->: (k + 1) * (k + 1 + 1) = k * (k + 1) + 2 * (k + 1) by smt.
@@ -279,17 +279,17 @@ theory Miplus.
  lemma nosmt sumn_ij_aux (i j:int) : i <= j =>
    sum_n i j = i*((j - i)+1) + sum_n 0 ((j - i)).
  proof -strict.
-   intros Hle;rewrite {1} (_: j=i+(j-i));first smt.
+   move=> Hle;rewrite {1} (_: j=i+(j-i));first smt.
    cut: 0 <= (j-i) by smt.
    elim (j-i)=> //=.
      by rewrite !sum_n_ii.
-   intros {j Hle} j Hj; rewrite -CommutativeGroup.Assoc sum_n_ij1;smt.
+   move=> {j Hle} j Hj; rewrite -CommutativeGroup.Assoc sum_n_ij1;smt.
  qed.
 
  lemma sumn_ij (i j:int) : i <= j =>
    sum_n i j = i*((j - i)+1) + (j-i)*(j-i+1)%/2.
  proof -strict.
-   intros Hle; rewrite sumn_ij_aux //;smt.
+   move=> Hle; rewrite sumn_ij_aux //;smt.
  qed.
 
  lemma sumn_pos (i j:int) : 0 <= i => 0 <= sum_n i j.
@@ -309,7 +309,7 @@ theory Miplus.
  lemma sumn_le (i j k:int) : i <= j =>  0 <= j => j <= k =>
    sum_n i j <= sum_n i k.    
  proof -strict.
-   intros Hij H0j Hjk;rewrite /sum_n /sum_ij.
+   move=> Hij H0j Hjk;rewrite /sum_n /sum_ij.
    cut ->: oflist (iota_ i (k - i + 1))
            = oflist (iota_ i (j - i + 1)) `|` oflist (iota_ (j + 1) (k - (j + 1) + 1)).
      by apply/fsetP=> x; rewrite in_fsetU !mem_oflist !mem_iota; smt.
@@ -349,12 +349,12 @@ pred disj_or (X:('a->bool) fset) =
 lemma or_exists (f:'a->bool) s:
   (Mbor.sum f s) <=> (exists x, (mem s x /\ f x)).
 proof -strict.
-  split;last by intros=> [x [x_in_s f_x]]; rewrite (Mbor.sum_rm _ _ x) // f_x.
-  intros=> sum_true; pose p := fun x, mem s x /\ f x; change (exists x, p x);
+  split;last by move=> [x [x_in_s f_x]]; rewrite (Mbor.sum_rm _ _ x) // f_x.
+  move=> sum_true; pose p := fun x, mem s x /\ f x; change (exists x, p x);
     apply ex_for; delta p=> {p}; move: sum_true; apply absurd=> /= h.
   (cut : s <= s by done); pose {1 3} s' := s;elim/fset_ind s'.
     by rewrite Mbor.sum_empty.
-  intros=> x s' nmem IH leq_adds'_s.
+  move=> x s' nmem IH leq_adds'_s.
   cut leq_s'_s : s' <= s by smt.
   rewrite Mbor.sum_add // -nor IH // /=; cut := h x; rewrite -nand.
   by case (mem s x)=> //=; cut := leq_adds'_s x; rewrite in_fsetU in_fset1 //= => ->.
@@ -372,9 +372,9 @@ lemma cpOrs_add s (p:('a -> bool)) :
 proof -strict.
   apply fun_ext => y.
   rewrite /cpOrs /predU /= !or_exists eq_iff;split=> /=.
-    intros [x ];rewrite FSet.in_fsetU in_fset1 => [ [ ] H H0];first by right;exists x.
+    move=> [x ];rewrite FSet.in_fsetU in_fset1 => [ [ ] H H0];first by right;exists x.
     by left;rewrite -H.
-  intros [H | [x [H1 H2]]];first by exists p;rewrite FSet.in_fsetU in_fset1.
+  move=> [H | [x [H1 H2]]];first by exists p;rewrite FSet.in_fsetU in_fset1.
   by exists x; rewrite FSet.in_fsetU in_fset1;progress;left.
 qed.
 
@@ -383,14 +383,14 @@ lemma mu_ors d (X:('a->bool) fset):
   mu d (cpOrs X) = Mrplus.sum (fun P, mu d P) X.
 proof strict.
   elim/fset_ind X.
-    by intros disj;rewrite Mrplus.sum_empty cpOrs0 mu_false.
-  intros f X f_nin_X IH disj; rewrite Mrplus.sum_add // cpOrs_add mu_disjoint.
+    by move=> disj;rewrite Mrplus.sum_empty cpOrs0 mu_false.
+  move=> f X f_nin_X IH disj; rewrite Mrplus.sum_add // cpOrs_add mu_disjoint.
     rewrite /predI /pred0=> x' /=;
       rewrite -not_def=> [f_x']; move: f_nin_X disj .
     rewrite /cpOrs or_exists => Hnm Hd [p [Hp]] /=.
     by apply (Hd f p) => //; smt.
   rewrite IH => //.
-  by intros x y H1 H2 H3;apply (disj x y) => //;smt.
+  by move=> x y H1 H2 H3;apply (disj x y) => //;smt.
 qed.
 
 require import Finite.
@@ -402,14 +402,14 @@ lemma mean (d:'a distr) (p:'a -> bool):
     Mrplus.sum (fun x, (mu_x d x)*(charfun p x))
         (oflist (to_seq (support d))).
 proof strict.
-  intros=> fin_supp_d.
+  move=> fin_supp_d.
   pose sup := oflist (to_seq (support d)).
   pose is  := image (fun x y, p x /\ x = y) sup.
   rewrite mu_support (mu_eq d _ (cpOrs is)).
-    intros y;rewrite /predI /is /cpOrs /= or_exists eq_iff;split.
-      intros [H1 H2];exists ((fun x0 y0, p x0 /\ x0 = y0) y);split => //.
+    move=> y;rewrite /predI /is /cpOrs /= or_exists eq_iff;split.
+      move=> [H1 H2];exists ((fun x0 y0, p x0 /\ x0 = y0) y);split => //.
       by apply/imageP; exists y; rewrite /sup mem_oflist mem_to_seq.
-    intros [p' []].
+    move=> [p' []].
     by rewrite imageP; progress => //;smt. 
   rewrite mu_ors.
     rewrite /is => x1 x2 Hx; rewrite !imageP => [y1 [Hm1 Heq1]] [y2 [Hm2 Heq2]].
@@ -417,7 +417,7 @@ proof strict.
     by subst; move: Hx;rewrite not_def.
   rewrite /is => {is};elim/fset_ind sup.
     by rewrite image0 !Mrplus.sum_empty.
-  intros x s Hnm Hrec;rewrite FSet.imageU FSet.image1 Mrplus.sum_add0.
+  move=> x s Hnm Hrec;rewrite FSet.imageU FSet.image1 Mrplus.sum_add0.
     rewrite imageP /= => [x0 [H1 H2]].
     by rewrite (mu_eq d _ pred0) //;smt.
   rewrite Mrplus.sum_add // -Hrec /=; congr => //.

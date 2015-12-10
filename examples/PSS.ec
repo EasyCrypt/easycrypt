@@ -1040,7 +1040,7 @@ section.
 
   local lemma GAdvHs_o_ll (H <: SplitOracle {GAdv}) (G <: Gt.Types.ARO {GAdv}):
     islossless H.o => islossless GAdv(H,G).Hs.o.
-  proof. by intros=> H_o_ll; proc; call H_o_ll. qed.
+  proof. by move=> H_o_ll; proc; call H_o_ll. qed.
 
   local lemma GAdvGa_o_ll (H <: SplitOracle {GAdv}) (G <: Gt.Types.ARO {GAdv}):
     islossless G.o => islossless GAdv(H,G).Ga.o.
@@ -1506,7 +1506,7 @@ section.
 
   local lemma GAdv1Hs_o_ll (H <: SplitOracle1 {GAdv}) (G <: Gt.Types.ARO {GAdv}):
     islossless H.o => islossless GAdv1(H,G).Hs.o.
-  proof. by intros=> H_o_ll; proc; call H_o_ll. qed.
+  proof. by move=> H_o_ll; proc; call H_o_ll. qed.
 
   local lemma GAdv1Ga_o_ll (H <: SplitOracle1 {GAdv}) (G <: Gt.Types.ARO {GAdv}):
     islossless G.o => islossless GAdv1(H,G).Ga.o.
@@ -1515,7 +1515,7 @@ section.
   local lemma GAdv1_main_ll (H <: SplitOracle1 {GAdv}) (G <: Gt.Types.ARO {GAdv}):
     islossless H.o => islossless G.o => islossless H.v => islossless GAdv1(H, G).main.
   proof.
-    intros=> H_o_ll G_o_ll H_v_ll; proc.
+    move=> H_o_ll G_o_ll H_v_ll; proc.
     call H_v_ll.
     wp; call G_o_ll.
     wp; call (A_forge_ll (<:GAdv1(H,G).Ha) (<:GAdv1(H,G).Ga) (<:GAdv1(H,G).S) _ _ _).
@@ -1932,7 +1932,7 @@ section.
     equiv [Gen1(Ga,HG0'1,G).main ~ Gen1(Ga,H0'2,G1).main:
               ={glob Ga} ==> !(H0'2.badg \/ H0'2.badh){2}=> ={res}].
   proof.
-    intros=> Ga_main_ll; proc.
+    move=> Ga_main_ll; proc.
     call (_: (H0'2.badg \/ H0'2.badh), ={glob Hmap} /\ G.m{1} = FMap.map fst Gmap.m{2}).
       (* H *)
       by conseq GameG0'1_0'2_H; smt.
@@ -3756,7 +3756,7 @@ section.
        (H3'3bad.cH = Mem.cH + Mem.cS){2} /\  (Mem.cH + Mem.cS){2} < qH + qS ==>
         ={res,glob Hmap, glob Gmap, H3'3.bad} /\ (H3'3bad.cH = Mem.cH + Mem.cS + 1){2}.
   proof.
-    proc;inline *;sp;rcondt{2} 1; first by intros _;skip;progress.
+    proc;inline *;sp;rcondt{2} 1; first by move=> _;skip;progress.
     if => //;last by auto.
     wp 3 3; conseq (_: _ ==> ={ho,glob Hmap, glob Gmap, H3'3.bad}) => //;sim.
   qed.
@@ -3816,7 +3816,7 @@ section.
       while  (0 <= i <= k0 + 1 /\ (c = Adv => invertible Hmem.pk Hmem.xstar) /\
               rsap_dom Hmem.pk Hmem.xstar /\
               Hmem.ystar = rsap Hmem.pk Hmem.xstar /\ support keypairs (Hmem.pk, Hmem.sk)) => //.
-       intros Hrec;exists * i;elim * => i0.
+       move=> Hrec;exists * i;elim * => i0.
        seq 6 : (!b) (1%r/2%r) (1%r / (2 ^ (k0+1 - (i0 + 1)))%r) _ 0%r 
             (i = i0 + 1 /\ 0 <= i0 <= k0 /\ (c = Adv => invertible Hmem.pk Hmem.xstar) /\
               rsap_dom Hmem.pk Hmem.xstar /\
@@ -3832,7 +3832,7 @@ section.
          cut -> := mu_challenge_in_pim Hmem.pk{hr} Hmem.sk{hr} (c{hr} = Adv) Hmem.xstar{hr} _ _ _ => //. 
          cut : (1%r/2%r <=  (2 ^ (k - 1))%r / (p_n Hmem.pk{hr})%r); last smt.
          apply (_:forall x1 x2 y1 y2, 0%r < y1 => 0%r < y2 => x1 * y2 <= x2 * y1 => x1/y1 <= x2/y2) => //=.
-           intros x1 x2 y1 y2 Hy1 Hy2 Hm.
+           move=> x1 x2 y1 y2 Hy1 Hy2 Hm.
            apply (_: forall (x y z:real), 0%r < z => x*z <= y => x <= y / z) => //; first by smt.
            by cut -> : ((x1 / y1) * y2 = (x1*y2) / y1);smt.
            by smt.
@@ -3849,8 +3849,8 @@ section.
          smt.
        by rewrite pow_add //;smt.
        by skip;smt. 
-       by intros c;proc;sp;rcondt 1 => //;wp;conseq (_ : _ ==> true)=> //;smt.
-    by intros b c;proc;sp;rcondf 1.
+       by move=> c;proc;sp;rcondt 1 => //;wp;conseq (_ : _ ==> true)=> //;smt.
+    by move=> b c;proc;sp;rcondf 1.
   qed.
   (* end of computation *)
 

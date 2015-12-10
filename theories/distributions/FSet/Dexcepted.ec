@@ -42,7 +42,7 @@ lemma lossless_restr (d:'a distr) X:
   mu d (mem X) < 1%r =>
   Distr.weight (d \ X) = 1%r. 
 proof.
- intros Hll Hmu; simplify (\);
+ move=> Hll Hmu; simplify (\);
  (rewrite Distr.Dscale.weight_pos;last smt);
  rewrite weight_def;smt.
 qed.
