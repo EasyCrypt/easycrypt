@@ -682,7 +682,6 @@ type logtactic =
   | Pcut        of pcut
   | Pcutdef     of (intropattern * pcutdef)
   | Pmove       of (ppterm list * psymbol list * genpattern list)
-  | Pgeneralize of genpattern list
   | Pclear      of psymbol list
   | Prewrite    of (rwarg list * osymbol_r)
   | Prwnormal   of pformula * pqsymbol list
