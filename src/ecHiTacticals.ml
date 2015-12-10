@@ -299,7 +299,6 @@ and process_core (ttenv : ttenv) ({ pl_loc = loc } as t : ptactic_core) (tc : tc
 and process (ttenv : ttenv) (t : ptactic) (tc : tcenv) =
   let cf =
     match unloc t.pt_core with
-    | Plogic (Prewrite _)
     | Plogic (Pmove _)
     | Pidtac _ -> true
     | _ -> false
