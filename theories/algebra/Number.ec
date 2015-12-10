@@ -1046,7 +1046,7 @@ clone include RealDomain with type t <- t,
   op   Domain.ofint  <- Field.ofint,
   op   Domain.exp    <- Field.exp
 
-  proof Domain.*.
+  proof Domain.* remove abbrev Domain.(-).
 
   realize  Domain.addrA     by apply/Field.addrA    .
   realize  Domain.addrC     by apply/Field.addrC    .
