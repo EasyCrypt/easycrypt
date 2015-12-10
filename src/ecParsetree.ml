@@ -640,6 +640,19 @@ and renaming = [
 type genpattern =
   [ `ProofTerm of ppterm | `Form of (rwocc * pformula) ]
 
+type prevert = {
+  pr_clear : psymbol list;
+  pr_genp  : genpattern list;
+}
+
+type prevertv = {
+  pr_rev  : prevert;
+  pr_view : ppterm list;
+}
+
+let prevert0  = { pr_clear = []; pr_genp = []; }
+let prevertv0 = { pr_rev = prevert0; pr_view = []; }
+
 (* -------------------------------------------------------------------- *)
 type ppgoption = [
   | `Delta of [`Case | `Split] option
@@ -676,11 +689,11 @@ type logtactic =
   | Pright
   | Ptrivial
   | Pcongr
-  | Pelim       of (genpattern list * pqsymbol option)
+  | Pelim       of (prevert * pqsymbol option)
   | Papply      of apply_info
   | Pcut        of pcut
   | Pcutdef     of (intropattern * pcutdef)
-  | Pmove       of (ppterm list * psymbol list * genpattern list)
+  | Pmove       of prevertv
   | Pclear      of psymbol list
   | Prewrite    of (rwarg list * osymbol_r)
   | Prwnormal   of pformula * pqsymbol list
@@ -697,7 +710,7 @@ and ptactic_core_r =
   | Pby         of (ptactics) option
   | Por         of ptactic * ptactic
   | Pseq        of ptactics
-  | Pcase       of (pcaseoptions * genpattern list)
+  | Pcase       of (pcaseoptions * prevertv)
   | Plogic      of logtactic
   | PPhl        of phltactic
   | Pprogress   of ppgoptions * ptactic_core option

@@ -2137,6 +2137,10 @@ app_bd_info:
 | f=prod_form g=prod_form s=sform?
     { PAppMult (s, fst f, snd f, fst g, snd g) }
 
+revert:
+| cl=ioption(brace(loc(ipcore_name)+)) gp=genpattern*
+  { { pr_clear = odfl [] cl; pr_genp = gp; } }
+
 %inline have_or_suff:
 | HAVE | CUT { `Have }
 | SUFF { `Suff }
@@ -2148,12 +2152,8 @@ logtactic:
 | ASSUMPTION
     { Passumption }
 
-| MOVE vw=prefix(SLASH, pterm)*
-   { Pmove (vw, [], []) }
-
-| MOVE vw=prefix(SLASH, pterm)*
-   COLON cl=ioption(brace(loc(ipcore_name)+)) gp=genpattern*
-   { Pmove (vw, odfl [] cl, gp) }
+| MOVE vw=prefix(SLASH, pterm)* gp=prefix(COLON, revert)?
+   { Pmove { pr_rev = odfl prevert0 gp; pr_view = vw; } }
 
 | CLEAR l=loc(ipcore_name)+
    { Pclear l }
@@ -2188,10 +2188,10 @@ logtactic:
 | RIGHT
     { Pright }
 
-| ELIM COLON? e=genpattern*
+| ELIM COLON? e=revert
    { Pelim (e, None) }
 
-| ELIM SLASH p=qident COLON? e=genpattern*
+| ELIM SLASH p=qident COLON? e=revert
    { Pelim (e, Some p) }
 
 | APPLY
@@ -2629,8 +2629,8 @@ tactic_core_r:
 | ADMIT
    { Padmit }
 
-| CASE COLON? opts=caseoptions? gp=genpattern*
-   { Pcase (odfl [] opts, gp) }
+| CASE vw=prefix(SLASH, pterm)* COLON? opts=caseoptions? gp=revert
+   { Pcase (odfl [] opts, { pr_view = vw; pr_rev = gp; } ) }
 
 | PROGRESS opts=pgoptions? t=tactic_core? {
     Pprogress (odfl [] opts, t)

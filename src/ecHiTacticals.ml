@@ -74,12 +74,14 @@ and process1_case (_ : ttenv) (opts, gp) (tc : tcenv1) =
   let opts = CaseOptions.merge CaseOptions.default opts in
 
   let form_of_gp () =
-    match gp with
-    | [`Form (occ, pf)] -> begin
-        match occ with
-        | None   -> pf
-        | Some _ -> tc_error !!tc "cannot specify an occurence selector"
-    end
+    match gp.pr_rev with
+    | { pr_clear = []; pr_genp = [`Form (occ, pf)] }
+        when List.is_empty gp.pr_view ->
+     begin
+       match occ with
+       | None   -> pf
+       | Some _ -> tc_error !!tc "cannot specify an occurence selector"
+     end
 
     | _ -> tc_error !!tc "must give exactly one boolean formula"
   in
@@ -140,7 +142,7 @@ and process1_logic (ttenv : ttenv) (t : logtactic located) (tc : tcenv1) =
     | Papply pe         -> process_apply ~implicits:ttenv.tt_implicits pe
     | Pcut (m, ip, f, t)-> process_cut ~mode:m engine ttenv (ip, f, t)
     | Pcutdef (ip, f)   -> process_cutdef ttenv (ip, f)
-    | Pmove (v, cl, l)  -> process_move v cl l
+    | Pmove pr          -> process_move pr.pr_view pr.pr_rev
     | Pclear l          -> process_clear l
     | Prewrite (ri, x)  -> process_rewrite ttenv ?target:x ri
     | Psubst   ri       -> process_subst ri

@@ -1370,10 +1370,10 @@ let process_generalize patterns (tc : tcenv1) =
     tc_error_exn !!tc err
 
 (* -------------------------------------------------------------------- *)
-let process_move views clears patterns (tc : tcenv1) =
-  t_seqs 
-    [process_clear clears;
-     process_generalize patterns;
+let process_move views pr (tc : tcenv1) =
+  t_seqs
+    [process_clear pr.pr_clear;
+     process_generalize pr.pr_genp;
      process_view views]
     tc
 
@@ -1602,7 +1602,7 @@ let process_elim (pe, qs) tc =
         } in process_elimT qs tc
   in
     try
-      FApi.t_last doelim (process_generalize pe tc)
+      FApi.t_last doelim (process_move [] pe tc)
     with EcCoreGoal.InvalidGoalShape ->
       tc_error !!tc "don't know what to eliminate"
 
@@ -1611,8 +1611,8 @@ let process_case gp tc =
   let module E = struct exception LEMFailure end in
 
   try
-    match gp with
-    | [`Form (None, pf)] ->
+    match gp.pr_rev with
+    | { pr_genp = [`Form (None, pf)] } when List.is_empty gp.pr_view ->
         let env = FApi.tc1_env tc in
 
         let f =
@@ -1621,9 +1621,9 @@ let process_case gp tc =
         in
           if not (EcReduction.EqTest.for_type env f.f_ty tbool) then
             raise E.LEMFailure;
-          t_seq
-            (t_case f)
-            (t_simplify_with_info EcReduction.betaiota_red)
+          t_seqs
+            [process_clear gp.pr_rev.pr_clear; t_case f;
+             t_simplify_with_info EcReduction.betaiota_red]
             tc
 
     | _ -> raise E.LEMFailure
@@ -1632,7 +1632,7 @@ let process_case gp tc =
     try
       FApi.t_last
         (t_or (t_elimT_ind `Case) t_elim)
-        (process_generalize gp tc)
+        (process_move gp.pr_view gp.pr_rev tc)
     with EcCoreGoal.InvalidGoalShape ->
       tc_error !!tc "don't known what to eliminate"
 
