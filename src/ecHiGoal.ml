@@ -1177,11 +1177,13 @@ let rec process_mintros ?(cf = true) ttenv pis gs =
 
   and intro1_case (st : ST.state) nointro (mode, pis) gs =
     let onsub gs =
-      if FApi.tc_count gs <> List.length pis then
-        tc_error !$gs
-          "not the right number of intro-patterns (got %d, expecting %d)"
-          (List.length pis) (FApi.tc_count gs);
-      t_sub (List.map (dointro1 st false) pis) gs
+      if List.is_empty pis then gs else begin
+        if FApi.tc_count gs <> List.length pis then
+          tc_error !$gs
+            "not the right number of intro-patterns (got %d, expecting %d)"
+            (List.length pis) (FApi.tc_count gs);
+        t_sub (List.map (dointro1 st false) pis) gs
+        end
     in
 
     let tc = t_or (t_elimT_ind `Case) t_elim in
