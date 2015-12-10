@@ -240,6 +240,10 @@ proof.
   by move=> -> ->.
 qed.
 
+lemma get_oget (m:('a,'b)fmap) (x:'a) : 
+    mem (dom m) x => m.[x] = Some (oget m.[x]).
+proof. by rewrite in_dom;case (m.[x]). qed.
+
 (* -------------------------------------------------------------------- *)
 op rng ['a 'b] (m : ('a, 'b) fmap) = 
   FSet.oflist (map snd (elems m))
@@ -579,6 +583,14 @@ lemma rng0: rng map0<:'a, 'b> = fset0.
 proof.
   apply/fsetP=> x; rewrite in_fset0 //= in_rng.
   by rewrite NewLogic.negb_exists => a; rewrite /= map0P.
+qed.
+
+lemma find_set (m:('a,'b) fmap) y x (p:'a -> 'b -> bool):
+  (forall x, mem (dom m) x => !p x (oget m.[x])) =>
+  find p m.[x <- y] = if p x y then Some x else None.
+proof.
+  cut [[a []->[]] | []-> Hp Hnp]:= findP p (m.[x<-y]);1: rewrite getP dom_set !inE /#. 
+  by case (p x y)=> //; cut := Hp x;rewrite getP dom_set !inE /= oget_some.
 qed.
 
 lemma rng_set (m : ('a, 'b) fmap) (a : 'a) (b : 'b): forall y,
