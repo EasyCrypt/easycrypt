@@ -593,11 +593,10 @@ proof.
   by case (p x y)=> //; cut := Hp x;rewrite getP dom_set !inE /= oget_some.
 qed.
 
-lemma rng_set (m : ('a, 'b) fmap) (a : 'a) (b : 'b): forall y,
-      mem (rng m.[a<-b]) y
-  <=> mem (rng (rem a m) `|` fset1 b) y.
+lemma rng_set (m : ('a, 'b) fmap) (a : 'a) (b : 'b): 
+      rng m.[a<-b] = rng (rem a m) `|` fset1 b.
 proof.
-  move=> y; rewrite in_fsetU in_fset1 !in_rng; split=> [[] x |].
+  rewrite fsetP=> y; rewrite in_fsetU in_fset1 !in_rng; split=> [[] x |].
     rewrite getP; case (x = a)=> [->> /= <<- |ne_xa mx_y]; [right=> // |left].
     by exists x; rewrite remP ne_xa /=.
   rewrite orbC -ora_or=> -[->> | ].
@@ -740,7 +739,7 @@ cut ->: m = (rem x m).[x <- oget m.[x]].
 + apply fmapP=> x'; rewrite getP remP; case: (x' = x)=> [->|//].
   have /fsetP /(_ x):= dom_m; rewrite in_fsetU in_fset1 /= in_dom.
   by case: m.[x].
-have /fsetP ->:= rng_set (rem x m) x (oget m.[x]).
+have ->:= rng_set (rem x m) x (oget m.[x]).
 rewrite fcardU rem_rem fsetI1 fun_if !fcard1 fcards0.
 rewrite dom_set fcardUI_indep 2:fcard1.
 + by apply/fsetP=> x0; rewrite in_fsetI dom_rem !inE andA NewLogic.andNb.
