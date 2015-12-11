@@ -269,3 +269,11 @@ let prind_is_iso_ands (pr : EcDecl.prind) =
   | [ { prc_ctor = x; prc_bds = []; prc_spec = sp; } ] ->
      Some (x, List.length sp)
   | _ -> None
+
+(* -------------------------------------------------------------------- *)
+let prind_is_iso_ors (pr : EcDecl.prind) =
+  match pr.pri_ctors with
+  | [ { prc_ctor = x1; prc_bds = []; prc_spec = sp1; } ;
+      { prc_ctor = x2; prc_bds = []; prc_spec = sp2; } ] ->
+     Some (t2_map (snd_map List.length) ((x1, sp1), (x2, sp2)))
+  | _ -> None

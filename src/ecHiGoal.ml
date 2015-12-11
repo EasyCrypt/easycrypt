@@ -1507,13 +1507,15 @@ let process_cutdef ttenv (ip, pt) (tc : tcenv1) =
 
 (* -------------------------------------------------------------------- *)
 let process_left (tc : tcenv1) =
-  try  EcLowGoal.t_left tc
+  try
+    t_ors [EcLowGoal.t_left; EcLowGoal.t_or_intro_prind `Left] tc
   with InvalidGoalShape ->
     tc_error !!tc "cannot apply `left` on that goal"
 
 (* -------------------------------------------------------------------- *)
 let process_right (tc : tcenv1) =
-  try  EcLowGoal.t_right tc
+  try
+    t_ors [EcLowGoal.t_left; EcLowGoal.t_or_intro_prind `Right] tc
   with InvalidGoalShape ->
     tc_error !!tc "cannot apply `right` on that goal"
 

@@ -6,6 +6,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
+open EcUtils
 open EcSymbols
 open EcPath
 open EcTypes
@@ -88,3 +89,4 @@ val prind_indsc_path : path -> path
 val prind_introsc_path : path -> symbol -> path
 
 val prind_is_iso_ands : EcDecl.prind -> (symbol * int) option
+val prind_is_iso_ors : EcDecl.prind -> (symbol * int) pair option
