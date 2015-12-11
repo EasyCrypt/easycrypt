@@ -1068,6 +1068,9 @@ let t_elim_default_r = [
 let t_elim ?reduce tc = t_elim_r ?reduce t_elim_default_r tc
 
 (* -------------------------------------------------------------------- *)
+let t_case fp tc = t_elimT_form_global LG.p_case_eq_bool fp tc
+
+(* -------------------------------------------------------------------- *)
 let t_elim_hyp h tc =
   (* FIXME: exception? *)
   let f  = LDecl.hyp_by_id h (FApi.tc1_hyps tc) in
@@ -1075,7 +1078,22 @@ let t_elim_hyp h tc =
   FApi.t_seq (t_cutdef pt f) t_elim tc
 
 (* -------------------------------------------------------------------- *)
-let t_case fp tc = t_elimT_form_global LG.p_case_eq_bool fp tc
+let t_elim_prind ?reduce (_mode : [`Case | `Ind]) tc =
+  let doit fp tc =
+    let env = FApi.tc1_env tc in
+
+    match sform_of_form fp with
+    | SFimp (f1, f2) ->
+       let (p, sk), tv, args =
+         match fst_map f_node (destr_app f1) with
+         | Fop (p, tv), args when EcEnv.Op.is_prind env p ->
+            (oget (EcEnv.Op.scheme_of_prind env `Case p), tv, args)
+         | _ -> raise InvalidGoalShape
+       in t_apply_s p tv ~args:(args @ [f2]) ~sk tc
+
+    | _ -> raise TTC.NoMatch
+
+  in TTC.t_lazy_match ?reduce doit tc
 
 (* -------------------------------------------------------------------- *)
 let t_split ?(closeonly = false) ?reduce (tc : tcenv1) =

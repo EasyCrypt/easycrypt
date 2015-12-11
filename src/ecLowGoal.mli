@@ -127,6 +127,7 @@ val t_elim_eq_tuple : FApi.backward
 val t_elim_exists   : FApi.backward
 val t_elim          : ?reduce:lazyred -> FApi.backward
 val t_elim_hyp      : EcIdent.t -> FApi.backward
+val t_elim_prind    : ?reduce:lazyred -> [ `Case | `Ind ] -> FApi.backward
 
 (* Elimination using an custom elimination principle. *)
 val t_elimT_form : proofterm -> ?sk:int -> form -> FApi.backward

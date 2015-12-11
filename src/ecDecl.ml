@@ -179,6 +179,11 @@ let is_abbrev op =
   | OB_nott _ -> true
   | _ -> false
 
+let is_prind op =
+  match op.op_kind with
+  | OB_pred (Some (PR_Ind _)) -> true
+  | _ -> false
+
 let gen_op tparams ty kind = {
   op_tparams = tparams;
   op_ty      = ty;

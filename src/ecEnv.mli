@@ -292,6 +292,10 @@ module Op : sig
   val is_dtype_ctor  : env -> path -> bool
   val is_fix_def     : env -> path -> bool
   val is_abbrev      : env -> path -> bool
+  val is_prind       : env -> path -> bool
+
+  val scheme_of_prind :
+    env -> [`Ind | `Case] -> EcPath.path -> (path * int) option
 
   type notation = ty_params * EcDecl.notation
 

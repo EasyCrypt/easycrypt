@@ -1186,7 +1186,7 @@ let rec process_mintros ?(cf = true) ttenv pis gs =
         end
     in
 
-    let tc = t_or (t_elimT_ind `Case) t_elim in
+    let tc = t_ors [t_elimT_ind `Case; t_elim; t_elim_prind `Case] in
     let tc = match mode with `One -> tc | `Full -> t_do `Maybe None tc in
     let tc =
       fun g ->
@@ -1623,6 +1623,12 @@ let process_case gp tc =
         in
           if not (EcReduction.EqTest.for_type env f.f_ty tbool) then
             raise E.LEMFailure;
+          begin
+            match (fst (destr_app f)).f_node with
+            | Fop (p, _) when EcEnv.Op.is_prind env p ->
+               raise E.LEMFailure
+            | _ -> ()
+          end;
           t_seqs
             [process_clear gp.pr_rev.pr_clear; t_case f;
              t_simplify_with_info EcReduction.betaiota_red]
@@ -1633,7 +1639,7 @@ let process_case gp tc =
   with E.LEMFailure ->
     try
       FApi.t_last
-        (t_or (t_elimT_ind `Case) t_elim)
+        (t_ors [t_elimT_ind `Case; t_elim; t_elim_prind `Case])
         (process_move gp.pr_view gp.pr_rev tc)
     with EcCoreGoal.InvalidGoalShape ->
       tc_error !!tc "don't known what to eliminate"

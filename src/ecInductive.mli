@@ -82,3 +82,6 @@ type prind = {
 val indsc_of_prind : prind -> ty_params * form
 val introsc_of_prind : prind -> (symbol * (ty_params * form)) list
 val prind_schemes : prind -> (symbol * (ty_params * form)) list
+
+val prind_indsc_name : symbol -> symbol
+val prind_indsc_path : path -> path

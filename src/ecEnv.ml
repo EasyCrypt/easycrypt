@@ -2529,6 +2529,16 @@ module Op = struct
     try  EcDecl.is_abbrev (by_path p env)
     with LookupFailure _ -> false
 
+  let is_prind env p =
+    try  EcDecl.is_prind (by_path p env)
+    with LookupFailure _ -> false
+
+  let scheme_of_prind env (_mode : [`Case | `Ind]) p =
+    match by_path_opt p env with
+    | Some { op_kind = OB_pred (Some (PR_Ind pri)) } ->
+       Some (EcInductive.prind_indsc_path p, List.length pri.pri_ctors)
+    | _ -> None
+
   type notation = env_notation
 
   let get_notations env =

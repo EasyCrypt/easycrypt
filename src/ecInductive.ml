@@ -213,24 +213,22 @@ type prind = {
 
 (* -------------------------------------------------------------------- *)
 let indsc_of_prind ({ ip_path = p; ip_prind = pri } as pr) =
-  let bds    = List.map (snd_map FL.gtty) pri.pri_args in
-  let predty = toarrow (List.map snd pri.pri_args) tbool in
-  let predx  = EcIdent.create "P" in
-  let pred   = FL.f_local predx predty in
-  let predag = (List.map (curry FL.f_local) pri.pri_args) in
-  let predap = FL.f_app pred predag tbool in
+  let bds   = List.map (snd_map FL.gtty) pri.pri_args in
+  let prty  = toarrow (List.map snd pri.pri_args) tbool in
+  let prag  = (List.map (curry FL.f_local) pri.pri_args) in
+  let predx = EcIdent.create "P" in
+  let pred  = FL.f_local predx tbool in
 
   let for1 ctor =
-    let px = FL.f_imps ctor.prc_spec predap in
-    FL.f_forall (bds @ ctor.prc_bds) px
+    let px = FL.f_imps ctor.prc_spec pred in
+    FL.f_forall ctor.prc_bds px
   in
 
-  let sc = FL.f_op p (List.map (tvar |- fst) pr.ip_tparams) predty in
-  let sc = FL.f_app sc predag tbool in
-  let sc = FL.f_imp sc predap in
-  let sc = FL.f_forall bds sc in
+  let sc = FL.f_op p (List.map (tvar |- fst) pr.ip_tparams) prty in
+  let sc = FL.f_imp (FL.f_app sc prag tbool) pred in
   let sc = FL.f_imps (List.map for1 pri.pri_ctors) sc in
-  let sc = FL.f_forall [predx, FL.gtty predty] sc in
+  let sc = FL.f_forall [predx, FL.gtty tbool] sc in
+  let sc = FL.f_forall bds sc in
 
   (pr.ip_tparams, sc)
 
@@ -252,3 +250,11 @@ let introsc_of_prind ({ ip_path = p; ip_prind = pri } as pr) =
 (* --------------------------------------------------------------------- *)
 let prind_schemes (pr : prind) =
   ("ind", indsc_of_prind pr) :: (introsc_of_prind pr)
+
+(* -------------------------------------------------------------------- *)
+let prind_indsc_name (s : symbol) =
+  Printf.sprintf "%s_ind" s 
+
+let prind_indsc_path (p : EcPath.path) =
+  EcPath.pqoname
+    (EcPath.prefix p) (prind_indsc_name (EcPath.basename p))

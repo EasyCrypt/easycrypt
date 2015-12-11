@@ -112,6 +112,7 @@ val is_proj   : operator -> bool
 val is_rcrd   : operator -> bool
 val is_fix    : operator -> bool
 val is_abbrev : operator -> bool
+val is_prind  : operator -> bool
 
 val mk_op     : ty_params -> ty -> opbody option -> operator
 val mk_pred   : ty_params -> ty list -> prbody option -> operator
