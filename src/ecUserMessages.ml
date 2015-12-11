@@ -444,6 +444,8 @@ end = struct
       TypingError.pp_tyerror env fmt e
   | TPE_TyNotClosed ->
       Format.fprintf fmt "this predicate type contains free type variables"
+  | TPE_DuplicatedConstr x ->
+      Format.fprintf fmt "duplicated constructor name: `%s'" x
 end
 
 (* -------------------------------------------------------------------- *)

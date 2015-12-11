@@ -1,5 +1,6 @@
 (* -------------------------------------------------------------------- *)
 open EcUtils
+open EcSymbols
 open EcLocation
 open EcTypes
 open EcCoreFol
@@ -12,6 +13,7 @@ module TT = EcTyping
 type tperror =
 | TPE_Typing of EcTyping.tyerror
 | TPE_TyNotClosed
+| TPE_DuplicatedConstr of symbol
 
 exception TransPredError of EcLocation.t * EcEnv.env * tperror
 
@@ -55,6 +57,10 @@ let trans_preddecl_r (env : EcEnv.env) (pr : ppredicate located) =
         (dom, Some (PR_Plain lam))
 
     | PPind (bd, pi) ->
+        Msym.odup unloc (List.map (fun c -> c.pic_name) pi) |>
+          oiter (fun (_, x) ->
+            tperror x.pl_loc env (TPE_DuplicatedConstr (unloc x)));
+        
         let env, xs = TT.trans_binding env ue bd in
 
         let for1 ctor =
