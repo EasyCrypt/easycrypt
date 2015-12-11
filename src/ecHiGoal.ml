@@ -1515,7 +1515,7 @@ let process_left (tc : tcenv1) =
 (* -------------------------------------------------------------------- *)
 let process_right (tc : tcenv1) =
   try
-    t_ors [EcLowGoal.t_left; EcLowGoal.t_or_intro_prind `Right] tc
+    t_ors [EcLowGoal.t_right; EcLowGoal.t_or_intro_prind `Right] tc
   with InvalidGoalShape ->
     tc_error !!tc "cannot apply `right` on that goal"
 
