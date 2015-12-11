@@ -227,6 +227,11 @@ let operator_as_fix (op : operator) =
   | OB_oper (Some (OP_Fix fix)) -> fix
   | _ -> assert false
 
+let operator_as_prind (op : operator) =
+  match op.op_kind with
+  | OB_pred (Some (PR_Ind pri)) -> pri
+  | _ -> assert false
+
 (* -------------------------------------------------------------------- *)
 let axiomatized_op ?(nargs = 0) ?(nosmt = false) path (tparams, bd) =
   let axbd = EcCoreFol.form_of_expr EcCoreFol.mhr bd in

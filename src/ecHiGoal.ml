@@ -1519,7 +1519,7 @@ let process_right (tc : tcenv1) =
 
 (* -------------------------------------------------------------------- *)
 let process_split (tc : tcenv1) =
-  try  EcLowGoal.t_split tc
+  try  t_ors [EcLowGoal.t_split; EcLowGoal.t_split_prind] tc
   with InvalidGoalShape ->
     tc_error !!tc "cannot apply `split` on that goal"
 

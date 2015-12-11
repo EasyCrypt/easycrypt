@@ -106,6 +106,7 @@ val t_right : ?reduce:lazyred -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
 val t_split : ?closeonly:bool -> ?reduce:lazyred -> FApi.backward
+val t_split_prind : ?reduce:lazyred -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
 val t_exists_intro_s : pt_arg list -> FApi.backward

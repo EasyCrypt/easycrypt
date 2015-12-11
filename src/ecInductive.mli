@@ -85,3 +85,6 @@ val prind_schemes : prind -> (symbol * (ty_params * form)) list
 
 val prind_indsc_name : symbol -> symbol
 val prind_indsc_path : path -> path
+val prind_introsc_path : path -> symbol -> path
+
+val prind_is_iso_ands : EcDecl.prind -> (symbol * int) option

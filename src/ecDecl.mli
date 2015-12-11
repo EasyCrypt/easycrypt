@@ -118,10 +118,11 @@ val mk_op     : ty_params -> ty -> opbody option -> operator
 val mk_pred   : ty_params -> ty list -> prbody option -> operator
 val mk_abbrev : ty_params -> (EcIdent.ident * ty) list -> ty * expr -> operator
 
-val operator_as_ctor : operator -> EcPath.path * int
-val operator_as_rcrd : operator -> EcPath.path
-val operator_as_proj : operator -> EcPath.path * int * int
-val operator_as_fix  : operator -> opfix
+val operator_as_ctor  : operator -> EcPath.path * int
+val operator_as_rcrd  : operator -> EcPath.path
+val operator_as_proj  : operator -> EcPath.path * int * int
+val operator_as_fix   : operator -> opfix
+val operator_as_prind : operator -> prind
 
 (* -------------------------------------------------------------------- *)
 type axiom_kind = [`Axiom of (Ssym.t * bool) | `Lemma]

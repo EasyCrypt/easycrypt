@@ -219,6 +219,9 @@ let prind_indsc_path (p : EcPath.path) =
   EcPath.pqoname
     (EcPath.prefix p) (prind_indsc_name (EcPath.basename p))
 
+let prind_introsc_path (p : EcPath.path) (x : symbol) =
+  EcPath.pqoname (EcPath.prefix p) x
+
 (* -------------------------------------------------------------------- *)
 let indsc_of_prind ({ ip_path = p; ip_prind = pri } as pr) =
   let bds   = List.map (snd_map FL.gtty) pri.pri_args in
@@ -259,3 +262,10 @@ let introsc_of_prind ({ ip_path = p; ip_prind = pri } as pr) =
 let prind_schemes (pr : prind) =
   let iname = prind_indsc_name (EcPath.basename pr.ip_path) in
   (iname, indsc_of_prind pr) :: (introsc_of_prind pr)
+
+(* -------------------------------------------------------------------- *)
+let prind_is_iso_ands (pr : EcDecl.prind) =
+  match pr.pri_ctors with
+  | [ { prc_ctor = x; prc_bds = []; prc_spec = sp; } ] ->
+     Some (x, List.length sp)
+  | _ -> None

@@ -1122,6 +1122,27 @@ let t_split ?(closeonly = false) ?reduce (tc : tcenv1) =
     TTC.t_lazy_match ?reduce t_split_r tc
 
 (* -------------------------------------------------------------------- *)
+let t_split_prind ?reduce (tc : tcenv1) =
+  let t_split_r (fp : form) (tc : tcenv1) =
+    let env = FApi.tc1_env tc in
+
+    let p, tv, args =
+      match fst_map f_node (destr_app fp) with
+      | Fop (p, tv), args when EcEnv.Op.is_prind env p ->
+         (p, tv, args)
+      | _ -> raise InvalidGoalShape in
+    let pri = oget (EcEnv.Op.by_path_opt p env) in
+    let pri = EcDecl.operator_as_prind pri in
+
+    match EcInductive.prind_is_iso_ands pri with
+    | None -> raise InvalidGoalShape
+    | Some (x, sk) ->
+       let p = EcInductive.prind_introsc_path p x in
+       t_apply_s p tv ~args ~sk tc
+
+  in TTC.t_lazy_match ?reduce t_split_r tc
+
+(* -------------------------------------------------------------------- *)
 type rwspec = [`LtoR|`RtoL] * ptnpos option
 type rwmode = [`Bool | `Eq]
 
