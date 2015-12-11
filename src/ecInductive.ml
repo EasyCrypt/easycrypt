@@ -212,6 +212,14 @@ type prind = {
 }
 
 (* -------------------------------------------------------------------- *)
+let prind_indsc_name (s : symbol) =
+  Printf.sprintf "%s_ind" s 
+
+let prind_indsc_path (p : EcPath.path) =
+  EcPath.pqoname
+    (EcPath.prefix p) (prind_indsc_name (EcPath.basename p))
+
+(* -------------------------------------------------------------------- *)
 let indsc_of_prind ({ ip_path = p; ip_prind = pri } as pr) =
   let bds   = List.map (snd_map FL.gtty) pri.pri_args in
   let prty  = toarrow (List.map snd pri.pri_args) tbool in
@@ -249,12 +257,5 @@ let introsc_of_prind ({ ip_path = p; ip_prind = pri } as pr) =
 
 (* --------------------------------------------------------------------- *)
 let prind_schemes (pr : prind) =
-  ("ind", indsc_of_prind pr) :: (introsc_of_prind pr)
-
-(* -------------------------------------------------------------------- *)
-let prind_indsc_name (s : symbol) =
-  Printf.sprintf "%s_ind" s 
-
-let prind_indsc_path (p : EcPath.path) =
-  EcPath.pqoname
-    (EcPath.prefix p) (prind_indsc_name (EcPath.basename p))
+  let iname = prind_indsc_name (EcPath.basename pr.ip_path) in
+  (iname, indsc_of_prind pr) :: (introsc_of_prind pr)

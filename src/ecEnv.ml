@@ -679,7 +679,6 @@ module MC = struct
       | _ -> [] in
 
     let ax = List.map (fun (name, (tv, cl)) ->
-      let name = Printf.sprintf "%s_%s" x name in
       let axp  = EcPath.prefix (Lazy.force mypath) in
       let axp  = IPPath (EcPath.pqoname axp name) in
       let ax   =
