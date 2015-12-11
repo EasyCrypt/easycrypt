@@ -84,6 +84,8 @@ let rec toperror_of_exn_r ?gloc exn =
   | DtError    (loc, _, _) -> Some (loc, exn)
   | ParseError (loc, _)    -> Some (loc, exn)
 
+  | EcHiPredicates.TransPredError (loc, _, _) -> Some (loc, exn)
+
   | EcLexer.LexicalError (loc, _) ->
       Some (odfl (odfl _dummy gloc) loc, exn)
 
@@ -1188,35 +1190,12 @@ end
 module Pred = struct
   module TT = EcTyping
 
-  let add (scope : scope) (op : ppredicate located) =
+  let add (scope : scope) (pr : ppredicate located) =
     assert (scope.sc_pr_uc = None);
-    let op = op.pl_desc and loc = op.pl_loc in
-    let ue     = TT.transtyvars scope.sc_env (loc, op.pp_tyvars) in
-    let tp     = TT.tp_relax in
-    let dom, body =
-      match op.pp_def with
-      | PPabstr ptys ->
-        List.map (TT.transty tp scope.sc_env ue) ptys, None
-      | PPconcr(bd,pe) ->
-        let env, xs = TT.transbinding scope.sc_env ue bd in
-        let body = TT.trans_prop env ue pe in
-        let dom = List.map snd xs in
-        let xs = List.map (fun (x,ty) -> x, EcFol.GTty ty) xs in
-        let lam = EcFol.f_lambda xs body in
-          (dom, Some lam)
-    in
 
-    if not (EcUnify.UniEnv.closed ue) then
-      hierror "this predicate type contains free type variables";
-
-    let uni     = EcUnify.UniEnv.close ue in
-    let body    = body |> omap (EcFol.Fsubst.uni uni) in
-    let dom     = List.map (Tuni.offun uni) dom in
-    let tparams = EcUnify.UniEnv.tparams ue in
-    let tyop    = EcDecl.mk_pred tparams dom body in
-
-    let scope = Op.bind scope (unloc op.pp_name, tyop) in
-    tyop, scope
+    let typr  = EcHiPredicates.trans_preddecl (env scope) pr in
+    let scope = Op.bind scope (unloc (unloc pr).pp_name, typr) in
+    typr, scope
 end
 
 (* -------------------------------------------------------------------- *)

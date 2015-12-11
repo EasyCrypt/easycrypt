@@ -24,6 +24,13 @@ module InductiveError : sig
 end
 
 (* -------------------------------------------------------------------- *)
+module PredError : sig
+  open EcHiPredicates
+
+  val pp_tperror : env -> Format.formatter -> tperror -> unit
+end
+
+(* -------------------------------------------------------------------- *)
 module CloneError : sig
   open EcThCloning
 

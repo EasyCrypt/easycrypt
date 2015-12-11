@@ -432,6 +432,21 @@ end = struct
 end
 
 (* -------------------------------------------------------------------- *)
+module PredError : sig
+  open EcHiPredicates
+
+  val pp_tperror : env -> Format.formatter -> tperror -> unit
+end = struct
+  open EcHiPredicates
+
+  let pp_tperror (env : env) fmt = function
+  | TPE_Typing e ->
+      TypingError.pp_tyerror env fmt e
+  | TPE_TyNotClosed ->
+      Format.fprintf fmt "this predicate type contains free type variables"
+end
+
+(* -------------------------------------------------------------------- *)
 module CloneError : sig
   open EcThCloning
 
@@ -655,6 +670,9 @@ match exn with
 | EcHiInductive.RcError (_, env, e) -> InductiveError.pp_rcerror env fmt e
 | EcHiInductive.DtError (_, env, e) -> InductiveError.pp_dterror env fmt e
 | EcHiInductive.FxError (_, env, e) -> InductiveError.pp_fxerror env fmt e
+
+| EcHiPredicates.TransPredError (_, env, e) ->
+   PredError.pp_tperror env fmt e
 
 | EcPV.AliasClash (env, ac) ->
     pp_alias_clash env fmt ac
