@@ -24,18 +24,32 @@ module IFEL : sig
   val loaded : env -> bool
   val felsum : form -> (form * form) -> form
 end = struct
-  let i_Fel = "FelTactic"
-  let p_Fel = EcPath.pqname EcCoreLib.p_top i_Fel
+  open EcCoreLib
 
-  let p_felsum =
-    let op = EcPath.pqname p_Fel "felsum" in
-    f_op op [] (toarrow [tfun tint treal; tint; tint] treal)
+  let i_Fel  = "FelTactic"
+  let p_Fel  = EcPath.pqname EcCoreLib.p_top i_Fel
+  let p_List = [i_top; "List"]
+  let p_BRA  = [i_top; "StdBigop"; "Bigreal"; "BRA"]
+
+  let tlist =
+    let tlist = EcPath.fromqsymbol (p_List, "list") in
+    fun ty -> EcTypes.tconstr tlist [ty]
+
+  let range =
+    let rg = EcPath.fromqsymbol (p_List @ ["Range"], "range") in
+    let rg = f_op rg [] (toarrow [tint; tint] (tlist tint)) in
+    fun m n -> f_app rg [m; n] (tlist tint)
+
+  let felsum =
+    let bgty = [tpred tint; tfun tint treal; tlist tint] in
+    let bg   = EcPath.fromqsymbol (p_BRA, "big") in
+    let bg   = f_op bg [tint] (toarrow bgty treal) in
+    let prT  = EcPath.fromqsymbol ([i_top; "Pred"], "predT") in
+    let prT  = f_op prT [tint] (tpred tint) in
+    fun f (m, n) -> f_app bg [prT; f; range m n] treal
 
   let loaded (env : env) =
     is_some (EcEnv.Theory.by_path_opt p_Fel env)
-
-  let felsum f (n, m) =
-    f_app p_felsum [f; n; m] treal
 end
 
 (* -------------------------------------------------------------------- *)

@@ -140,6 +140,8 @@ let ttuple lt    =
 let toarrow dom ty = 
   List.fold_right tfun dom ty
 
+let tpred t = tfun t tbool
+
 (* -------------------------------------------------------------------- *)
 let tytuple_flat (ty : ty) =
   match ty.ty_node with Ttuple tys -> tys | _ -> [ty]
