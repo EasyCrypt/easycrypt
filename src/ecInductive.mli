@@ -9,7 +9,7 @@
 open EcSymbols
 open EcPath
 open EcTypes
-open EcFol
+open EcCoreFol
 open EcDecl
 
 (* -------------------------------------------------------------------- *)
@@ -71,3 +71,14 @@ type opfix = branch list
 
 (* -------------------------------------------------------------------- *)
 val collate_matchfix  : EcDecl.opfix -> opfix
+
+(* -------------------------------------------------------------------- *)
+type prind = {
+  ip_path    : path;
+  ip_tparams : ty_params;
+  ip_prind   : EcDecl.prind;
+}
+
+val indsc_of_prind : prind -> ty_params * form
+val introsc_of_prind : prind -> (symbol * (ty_params * form)) list
+val prind_schemes : prind -> (symbol * (ty_params * form)) list

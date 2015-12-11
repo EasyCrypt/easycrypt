@@ -12,6 +12,7 @@ open EcTypes
 open EcDecl
 
 module EP = EcPath
+module FL = EcCoreFol
 
 (* -------------------------------------------------------------------- *)
 type field  = symbol * EcTypes.ty
@@ -40,22 +41,22 @@ let indsc_of_record (rc : record) =
   let targs  = List.map (tvar |- fst) rc.rc_tparams in
   let recty  = tconstr rc.rc_path targs in
   let recx   = fresh_id_of_ty recty in
-  let recfm  = EcFol.f_local recx recty in
+  let recfm  = FL.f_local recx recty in
   let predty = tfun recty tbool in
   let predx  = EcIdent.create "P" in
-  let pred   = EcFol.f_local predx predty in
+  let pred   = FL.f_local predx predty in
   let ctor   = record_ctor_path rc.rc_path in
-  let ctor   = EcFol.f_op ctor targs (toarrow (List.map snd rc.rc_fields) recty) in
+  let ctor   = FL.f_op ctor targs (toarrow (List.map snd rc.rc_fields) recty) in
   let prem   =
     let ids  = List.map (fun (_, fty) -> (fresh_id_of_ty fty, fty)) rc.rc_fields in
-    let vars = List.map (fun (x, xty) -> EcFol.f_local x xty) ids in
-    let bds  = List.map (fun (x, xty) -> (x, EcFol.GTty xty)) ids in
-    let recv = EcFol.f_app ctor vars recty in
-    EcFol.f_forall bds (EcFol.f_app pred [recv] tbool) in
-  let form   = EcFol.f_app pred [recfm] tbool in
-  let form   = EcFol.f_forall [recx, EcFol.GTty recty] form in
-  let form   = EcFol.f_imp prem form in
-  let form   = EcFol.f_forall [predx, EcFol.GTty predty] form in
+    let vars = List.map (fun (x, xty) -> FL.f_local x xty) ids in
+    let bds  = List.map (fun (x, xty) -> (x, FL.GTty xty)) ids in
+    let recv = FL.f_app ctor vars recty in
+    FL.f_forall bds (FL.f_app pred [recv] tbool) in
+  let form   = FL.f_app pred [recfm] tbool in
+  let form   = FL.f_forall [recx, FL.GTty recty] form in
+  let form   = FL.f_imp prem form in
+  let form   = FL.f_forall [predx, FL.GTty predty] form in
 
   form
 
@@ -96,43 +97,43 @@ let indsc_of_datatype ?normty (mode : indmode) (dt : datatype) =
 
     | Ttuple tys -> begin
         let xs  = List.map (fun xty -> (fresh_id_of_ty xty, xty)) tys in
-        let sc1 = fun (x, xty) -> scheme1 p (pred, EcFol.f_local x xty) xty in
+        let sc1 = fun (x, xty) -> scheme1 p (pred, FL.f_local x xty) xty in
           match List.pmap sc1 xs with
           | []  -> None
-          | scs -> Some (EcFol.f_let (LTuple xs) fac (EcFol.f_ands scs))
+          | scs -> Some (FL.f_let (LTuple xs) fac (FL.f_ands scs))
     end
 
     | Tconstr (p', ts)  ->
         if List.exists (occurs p) ts then raise NonPositive;
         if not (EcPath.p_equal p p') then None else
-          Some (EcFol.f_app pred [fac] tbool)
+          Some (FL.f_app pred [fac] tbool)
 
     | Tfun (ty1, ty2) ->
         if occurs p ty1 then raise NonPositive;
         let x = fresh_id_of_ty ty1 in
-          scheme1 p (pred, EcFol.f_app fac [EcFol.f_local x ty1] ty2) ty2
-            |> omap (EcFol.f_forall [x, EcFol.GTty ty1])
+          scheme1 p (pred, FL.f_app fac [FL.f_local x ty1] ty2) ty2
+            |> omap (FL.f_forall [x, FL.GTty ty1])
 
   and schemec mode (targs, p) pred (ctor, tys) =
     let indty = tconstr p (List.map tvar targs) in
     let xs    = List.map (fun xty -> (fresh_id_of_ty xty, xty)) tys in
-    let cargs = List.map (fun (x, xty) -> EcFol.f_local x xty) xs in
+    let cargs = List.map (fun (x, xty) -> FL.f_local x xty) xs in
     let ctor  = EcPath.pqoname (EcPath.prefix tpath) ctor in
-    let ctor  = EcFol.f_op ctor (List.map tvar targs) (toarrow tys indty) in
-    let form  = EcFol.f_app pred [EcFol.f_app ctor cargs indty] tbool in
+    let ctor  = FL.f_op ctor (List.map tvar targs) (toarrow tys indty) in
+    let form  = FL.f_app pred [FL.f_app ctor cargs indty] tbool in
     let form  =
       match mode with
       | `Case -> form
 
       | `Elim ->
-          let sc1 = fun (x, xty) -> scheme1 p (pred, EcFol.f_local x xty) xty in
+          let sc1 = fun (x, xty) -> scheme1 p (pred, FL.f_local x xty) xty in
           let scs = List.pmap sc1 xs in
-            (EcFol.f_imps scs form)
+            (FL.f_imps scs form)
     in
 
     let form  =
-      let bds = List.map (fun (x, xty) -> (x, EcFol.GTty xty)) xs in
-        EcFol.f_forall bds form
+      let bds = List.map (fun (x, xty) -> (x, FL.GTty xty)) xs in
+        FL.f_forall bds form
 
     in
       form
@@ -140,15 +141,15 @@ let indsc_of_datatype ?normty (mode : indmode) (dt : datatype) =
   and scheme mode (targs, p) ctors =
     let indty  = tconstr p (List.map tvar targs) in
     let indx   = fresh_id_of_ty indty in
-    let indfm  = EcFol.f_local indx indty in
+    let indfm  = FL.f_local indx indty in
     let predty = tfun indty tbool in
     let predx  = EcIdent.create "P" in
-    let pred   = EcFol.f_local predx predty in
+    let pred   = FL.f_local predx predty in
     let scs    = List.map (schemec mode (targs, p) pred) ctors in
-    let form   = EcFol.f_app pred [indfm] tbool in
-    let form   = EcFol.f_forall [indx, EcFol.GTty indty] form in
-    let form   = EcFol.f_imps scs form in
-    let form   = EcFol.f_forall [predx, EcFol.GTty predty] form in
+    let form   = FL.f_app pred [indfm] tbool in
+    let form   = FL.f_forall [indx, FL.GTty indty] form in
+    let form   = FL.f_imps scs form in
+    let form   = FL.f_forall [predx, FL.GTty predty] form in
       form
 
   and occurs p t =
@@ -202,3 +203,52 @@ let collate_matchfix (fix : EcDecl.opfix) : opfix =
         in List.flatten aout
 
   in collate [] fix.opf_branches
+
+(*-------------------------------------------------------------------- *)
+type prind = {
+  ip_path    : EcPath.path;
+  ip_tparams : ty_params;
+  ip_prind   : EcDecl.prind;
+}
+
+(* -------------------------------------------------------------------- *)
+let indsc_of_prind ({ ip_path = p; ip_prind = pri } as pr) =
+  let bds    = List.map (snd_map FL.gtty) pri.pri_args in
+  let predty = toarrow (List.map snd pri.pri_args) tbool in
+  let predx  = EcIdent.create "P" in
+  let pred   = FL.f_local predx predty in
+  let predag = (List.map (curry FL.f_local) pri.pri_args) in
+  let predap = FL.f_app pred predag tbool in
+
+  let for1 ctor =
+    let px = FL.f_imps ctor.prc_spec predap in
+    FL.f_forall (bds @ ctor.prc_bds) px
+  in
+
+  let sc = FL.f_op p (List.map (tvar |- fst) pr.ip_tparams) predty in
+  let sc = FL.f_app sc predag tbool in
+  let sc = FL.f_imp sc predap in
+  let sc = FL.f_forall bds sc in
+  let sc = FL.f_imps (List.map for1 pri.pri_ctors) sc in
+  let sc = FL.f_forall [predx, FL.gtty predty] sc in
+
+  (pr.ip_tparams, sc)
+
+(* -------------------------------------------------------------------- *)
+let introsc_of_prind ({ ip_path = p; ip_prind = pri } as pr) =
+  let bds  = List.map (snd_map FL.gtty) pri.pri_args in
+  let clty = toarrow (List.map snd pri.pri_args) tbool in
+  let clag = (List.map (curry FL.f_local) pri.pri_args) in
+  let cl   = FL.f_op p (List.map (tvar |- fst) pr.ip_tparams) clty in
+  let cl   = FL.f_app cl clag tbool in
+
+  let for1 ctor =
+    let cl = FL.f_imps ctor.prc_spec cl in
+    let cl = FL.f_forall (bds @ ctor.prc_bds) cl in
+    (pr.ip_tparams, cl)
+
+  in List.map (fun c -> (c.prc_ctor, for1 c)) pri.pri_ctors
+
+(* --------------------------------------------------------------------- *)
+let prind_schemes (pr : prind) =
+  ("ind", indsc_of_prind pr) :: (introsc_of_prind pr)

@@ -77,6 +77,9 @@ end
 module Mip = EcMaps.Map.Make(IPathC)
 module Sip = EcMaps.Set.MakeOfMap(Mip)
 
+let ippath_as_path (ip : ipath) =
+  match ip with IPPath p -> p | _ -> assert false
+
 (* -------------------------------------------------------------------- *)
 type varbind = {
   vb_type  : EcTypes.ty;
@@ -625,25 +628,6 @@ module MC = struct
     import (_up_mod true) p mod_ env
 
   (* -------------------------------------------------------------------- *)
-  let lookup_operator qnx env =
-    match lookup (fun mc -> mc.mc_operators) qnx env with
-    | None -> lookup_error (`QSymbol qnx)
-    | Some (p, (args, obj)) -> (_downpath_for_operator env p args, obj)
-
-  let lookup_operators qnx env =
-    List.map
-      (fun (p, (args, obj)) -> (_downpath_for_operator env p args, obj))
-      (lookup_all (fun mc -> mc.mc_operators) qnx env)
-
-  let _up_operator candup mc x obj =
-    if not candup && MMsym.last x mc.mc_operators <> None then
-      raise (DuplicatedBinding x);
-    { mc with mc_operators = MMsym.add x obj mc.mc_operators }
-
-  let import_operator p op env =
-    import (_up_operator true) (IPPath p) op env
-
-  (* -------------------------------------------------------------------- *)
   let lookup_axiom qnx env =
     match lookup (fun mc -> mc.mc_axioms) qnx env with
     | None -> lookup_error (`QSymbol qnx)
@@ -661,6 +645,54 @@ module MC = struct
 
   let import_axiom p ax env =
     import (_up_axiom true) (IPPath p) ax env
+
+
+  (* -------------------------------------------------------------------- *)
+  let lookup_operator qnx env =
+    match lookup (fun mc -> mc.mc_operators) qnx env with
+    | None -> lookup_error (`QSymbol qnx)
+    | Some (p, (args, obj)) -> (_downpath_for_operator env p args, obj)
+
+  let lookup_operators qnx env =
+    List.map
+      (fun (p, (args, obj)) -> (_downpath_for_operator env p args, obj))
+      (lookup_all (fun mc -> mc.mc_operators) qnx env)
+
+  let _up_operator candup mc x obj =
+    let module ELI = EcInductive in
+
+    if not candup && MMsym.last x mc.mc_operators <> None then
+      raise (DuplicatedBinding x);
+
+    let mypath = lazy (ippath_as_path (fst obj)) in
+
+    let mc = { mc with mc_operators = MMsym.add x obj mc.mc_operators } in
+    let ax =
+      match (snd obj).op_kind with
+      | OB_pred (Some (PR_Ind pri)) ->
+         let pri = 
+           { ELI.ip_path    = ippath_as_path (fst obj);
+             ELI.ip_tparams = (snd obj).op_tparams;
+             ELI.ip_prind   = pri; } in
+         ELI.prind_schemes pri
+
+      | _ -> [] in
+
+    let ax = List.map (fun (name, (tv, cl)) ->
+      let name = Printf.sprintf "%s_%s" x name in
+      let axp  = EcPath.prefix (Lazy.force mypath) in
+      let axp  = IPPath (EcPath.pqoname axp name) in
+      let ax   =
+        { ax_kind    = `Axiom (Ssym.empty, false);
+          ax_tparams = tv;
+          ax_spec    = Some cl;
+          ax_nosmt   = false; } in
+      (name, (axp, ax))) ax in
+
+    List.fold_left (fun mc -> curry (_up_axiom candup mc)) mc ax
+
+  let import_operator p op env =
+    import (_up_operator true) (IPPath p) op env
 
   (* -------------------------------------------------------------------- *)
   let lookup_tydecl qnx env =

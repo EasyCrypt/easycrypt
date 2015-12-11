@@ -75,7 +75,7 @@ let trans_preddecl_r (env : EcEnv.env) (pr : ppredicate located) =
   let tparams = EcUnify.UniEnv.tparams ue in
   let body    = body |> omap (close_pr_body uni) in
   let dom     = List.map (Tuni.offun uni) dom in
-
+  
   EcDecl.mk_pred tparams dom body
 
 (* -------------------------------------------------------------------- *)
