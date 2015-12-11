@@ -922,7 +922,7 @@ and create_op ?(body = false) (genv : tenv) p =
         let wbody = Cast.arg wbody ls.WTerm.ls_value in
         WDecl.create_logic_decl [WDecl.make_ls_defn ls wparams wbody]
    
-      | true, OB_pred (Some body) ->
+      | true, OB_pred (Some (PR_Plain body)) ->
           let wparams, wbody = trans_body (genv, lenv) wdom None body in
           WDecl.create_logic_decl [WDecl.make_ls_defn ls wparams wbody]
         
@@ -1195,7 +1195,7 @@ module Frequency = struct
 
   let f_ops_oper unwanted_op env p rs =
     match EcEnv.Op.by_path_opt p env with
-    | Some {op_kind = OB_pred (Some f) } -> 
+    | Some {op_kind = OB_pred (Some (PR_Plain f)) } -> 
       r_union rs (f_ops unwanted_op f)
     | Some {op_kind = OB_oper (Some (OP_Plain e)) } -> 
       r_union rs (f_ops unwanted_op (form_of_expr mhr e))
@@ -1205,6 +1205,12 @@ module Frequency = struct
         | OPB_Branch bs -> Parray.fold_left (fun rs b -> aux rs b.opb_sub) rs bs
       in
       aux rs e.opf_branches
+    | Some {op_kind = OB_pred (Some (PR_Ind pri)) } ->
+       let for1 rs ctor =
+         List.fold_left
+           (fun rs f -> r_union rs (f_ops unwanted_op f))
+           rs ctor.prc_spec
+       in List.fold_left for1 rs pri.pri_ctors
     | _ -> rs
 
   (* -------------------------------------------------------------------- *)

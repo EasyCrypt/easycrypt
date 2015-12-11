@@ -1627,11 +1627,17 @@ module Fsubst = struct
     fun f -> if Mid.mem x f.f_fv then f_subst s f else f
 
   (* ------------------------------------------------------------------ *)
+  let fty_subst sty =
+    { f_subst_id with fs_sty = sty; fs_ty = ty_subst sty }    
+
+  let uni_subst uidmap =
+    fty_subst { ty_subst_id with ts_u = uidmap }
+
   let mapty sty =
-    f_subst { f_subst_id with fs_sty = sty; fs_ty = ty_subst sty }
+    f_subst (fty_subst sty)
 
   let uni uidmap =
-    mapty { ty_subst_id with ts_u = uidmap }
+    f_subst (uni_subst uidmap)
 
   (* ------------------------------------------------------------------ *)
   let subst_locals s =
@@ -1647,7 +1653,8 @@ module Fsubst = struct
   (* ------------------------------------------------------------------ *)
   let init_subst_tvar s =
     let sty = { ty_subst_id with ts_v = Mid.find_opt^~ s } in
-    { f_subst_id with fs_freshen = true; fs_sty = sty; fs_ty = ty_subst sty }
+    { f_subst_id with
+        fs_freshen = true; fs_sty = sty; fs_ty = ty_subst sty }
 
   let subst_tvar s =
     f_subst (init_subst_tvar s)

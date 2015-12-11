@@ -332,9 +332,7 @@ let rec subst_op_kind (s : _subst) (kind : operator_kind) =
       OB_oper (Some (subst_op_body s body))
 
   | OB_pred (Some body) ->   
-      let s = f_subst_of_subst s in
-      let body  = Fsubst.f_subst s body in
-        OB_pred (Some body) 
+      OB_pred (Some (subst_pr_body s body))
 
   | OB_nott nott ->
      OB_nott (subst_notation s nott)
@@ -385,6 +383,14 @@ and subst_branches es = function
             opb_sub  = subst_branches es b.opb_sub; }
       in
         OPB_Branch (Parray.map for1 bs)
+
+and subst_pr_body (s : _subst) (bd : prbody) =
+  match bd with
+  | PR_Plain body ->
+      let s = f_subst_of_subst s in
+      PR_Plain (Fsubst.f_subst s body)
+
+  | PR_Ind _ -> assert false
 
 (* -------------------------------------------------------------------- *)
 let subst_op (s : _subst) (op : operator) =

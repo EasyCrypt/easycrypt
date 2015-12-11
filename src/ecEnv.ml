@@ -2275,7 +2275,16 @@ module NormMp = struct
   let norm_op env op =
     let kind =
       match op.op_kind with
-      | OB_pred (Some f) -> OB_pred (Some (norm_form env f))
+      | OB_pred (Some (PR_Plain f)) ->
+         OB_pred (Some (PR_Plain (norm_form env f)))
+
+      | OB_pred (Some (PR_Ind pri)) ->
+         let pri = { pri with pri_ctors =
+           List.map (fun x ->
+             { x with prc_spec = List.map (norm_form env) x.prc_spec })
+             pri.pri_ctors }
+         in OB_pred (Some (PR_Ind pri))
+
       | _ -> op.op_kind
     in
     { op with
@@ -2461,8 +2470,8 @@ module Op = struct
       match op.op_kind with
       | OB_oper (Some (OP_Plain e)) ->
           form_of_expr EcCoreFol.mhr e
-      | OB_pred (Some idsf) ->
-          idsf
+      | OB_pred (Some (PR_Plain f)) ->
+          f
       | _ -> raise NotReducible
     in
       EcCoreFol.Fsubst.subst_tvar

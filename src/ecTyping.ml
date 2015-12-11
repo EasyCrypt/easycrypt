@@ -928,7 +928,7 @@ let rec ty_fun_app loc env ue tf targs =
   end
 
 (* -------------------------------------------------------------------- *)
-let transbinding env ue bd =
+let trans_binding env ue bd =
   let trans_bd1 env (xs, pty) = 
     let ty  = transty tp_relax env ue pty in
     let xs  = List.map (fun x -> ident_of_osymbol (unloc x), ty) xs in
@@ -1134,19 +1134,19 @@ let transexp (env : EcEnv.env) mode ue e =
         (e_if c e1 e2, ty1)
 
     | PEforall (xs, pe) ->
-        let env, xs = transbinding env ue xs in
+        let env, xs = trans_binding env ue xs in
         let e, ety = transexp env pe in
         unify_or_fail env ue pe.pl_loc ~expct:tbool ety;
         (e_forall xs e, tbool)
 
     | PEexists (xs, pe) ->
-        let env, xs = transbinding env ue xs in
+        let env, xs = trans_binding env ue xs in
         let e, ety = transexp env pe in
         unify_or_fail env ue pe.pl_loc ~expct:tbool ety;
         (e_exists xs e, tbool)
 
     | PElambda (bd, pe) ->
-        let env, xs = transbinding env ue bd in
+        let env, xs = trans_binding env ue bd in
         let e, ty = transexp env pe in
         let ty = toarrow (List.map snd xs) ty in
         (e_lam xs e, ty)
@@ -1951,6 +1951,40 @@ let form_of_opselect
   in f_app op args codom
 
 (* -------------------------------------------------------------------- *)
+let trans_gbinding env ue decl = 
+  let trans1 env (xs, pgty) =
+      match pgty with
+      | PGTY_Type ty -> 
+        let ty  = transty tp_relax env ue ty in
+        let xs  = List.map (fun x -> ident_of_osymbol (unloc x), ty) xs in
+        let env = EcEnv.Var.bind_locals xs env in
+        let xs  = List.map (fun (x,ty) -> x,GTty ty) xs in
+        (env, xs)
+  
+      | PGTY_ModTy (mi, restr) ->
+        let mi = fst (transmodtype env mi) in
+        let restr = Sm.of_list (List.map (trans_topmsymbol env) restr) in
+        let restr = Sx.empty, restr in
+        let ty = GTmodty (mi, restr) in
+  
+        let add1 env x = 
+          let x   = ident_of_osymbol (unloc x) in
+          let env = EcEnv.Mod.bind_local x mi restr env in
+          (env, (x, ty))
+  
+        in List.map_fold add1 env xs 
+  
+      | PGTY_Mem ->
+        let add1 env x = 
+          let x   = ident_of_osymbol (unloc x) in
+          let env = EcEnv.Memory.push (EcMemory.abstract x) env in
+          (env, (x, GTmem None))
+  
+        in List.map_fold add1 env xs
+
+  in snd_map List.flatten (List.map_fold trans1 env decl)
+
+(* -------------------------------------------------------------------- *)
 let trans_form_or_pattern env (ps, ue) pf tt =
   let state = PFS.create () in
 
@@ -2125,19 +2159,19 @@ let trans_form_or_pattern env (ps, ue) pf tt =
         f_let p f1 f2 
 
     | PFforall (xs, pf) ->
-        let env, xs = trans_fbind env ue xs in
+        let env, xs = trans_gbinding env ue xs in
         let f = transf env pf in
           unify_or_fail env ue pf.pl_loc ~expct:tbool f.f_ty;
           f_forall xs f
 
     | PFexists (xs, f1) ->
-        let env, xs = trans_fbind env ue xs in
+        let env, xs = trans_gbinding env ue xs in
         let f = transf env f1 in
           unify_or_fail env ue f1.pl_loc ~expct:tbool f.f_ty;
           f_exists xs f
 
     | PFlambda (xs, f1) ->
-        let env, xs = transbinding env ue xs in
+        let env, xs = trans_binding env ue xs in
         let f = transf env f1 in
           f_lambda (List.map (fun (x,ty) -> (x,GTty ty)) xs) f
 
@@ -2268,38 +2302,6 @@ let trans_form_or_pattern env (ps, ue) pf tt =
         unify_or_fail qenv ue post.pl_loc ~expct:tbool post'.f_ty;
         f_eagerF pre' s1 fpath1 fpath2 s2 post'
 
-  and trans_fbind env ue decl = 
-    let trans1 env (xs, pgty) =
-        match pgty with
-        | PGTY_Type ty -> 
-          let ty  = transty tp_relax env ue ty in
-          let xs  = List.map (fun x -> ident_of_osymbol (unloc x), ty) xs in
-          let env = EcEnv.Var.bind_locals xs env in
-          let xs  = List.map (fun (x,ty) -> x,GTty ty) xs in
-          (env, xs)
-  
-        | PGTY_ModTy (mi, restr) ->
-          let mi = fst (transmodtype env mi) in
-          let restr = Sm.of_list (List.map (trans_topmsymbol env) restr) in
-          let restr = Sx.empty, restr in
-          let ty = GTmodty (mi, restr) in
-
-          let add1 env x = 
-            let x   = ident_of_osymbol (unloc x) in
-            let env = EcEnv.Mod.bind_local x mi restr env in
-            (env, (x, ty))
-
-          in List.map_fold add1 env xs 
-
-        | PGTY_Mem ->
-          let add1 env x = 
-            let x   = ident_of_osymbol (unloc x) in
-            let env = EcEnv.Memory.push (EcMemory.abstract x) env in
-            (env, (x, GTmem None))
-
-          in List.map_fold add1 env xs in
-
-    snd_map List.flatten (List.map_fold trans1 env decl)
   in
 
   let f = transf_r None env pf in

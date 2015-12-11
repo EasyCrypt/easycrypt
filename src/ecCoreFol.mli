@@ -419,6 +419,7 @@ module Fsubst : sig
   val f_subst_mem   : EcIdent.t -> EcIdent.t -> form -> form
   val f_subst_mod   : EcIdent.t -> mpath -> form -> form
 
+  val uni_subst : (EcUid.uid -> ty option) -> f_subst
   val uni : (EcUid.uid -> ty option) -> form -> form
   val subst_tvar : EcTypes.ty EcIdent.Mid.t -> form -> form
 

@@ -301,6 +301,15 @@ type poperator = {
 type ppred_def =
   | PPabstr of pty list
   | PPconcr of ptybindings * pformula
+  | PPind   of ppind
+
+and ppind_ctor = {
+  pic_name : psymbol;
+  pic_bds  : pgtybindings;
+  pic_spec : pformula list;
+}
+
+and ppind = ptybindings * (ppind_ctor list)
 
 type ppredicate = {
   pp_name   : psymbol;

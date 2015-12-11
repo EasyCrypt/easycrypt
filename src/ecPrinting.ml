@@ -1589,6 +1589,10 @@ and pp_expr ppe fmt e =
   pp_form ppe fmt (form_of_expr mr e)
 
 (* -------------------------------------------------------------------- *)
+let pp_sform ppe fmt f =
+  pp_form_r ppe ([], ((100, `Infix `NonAssoc), `NonAssoc)) fmt f
+
+(* -------------------------------------------------------------------- *)
 let pp_typedecl (ppe : PPEnv.t) fmt (x, tyd) =
   let ppe = PPEnv.add_locals ppe (List.map fst tyd.tyd_params) in
   let name = P.basename x in
@@ -1664,7 +1668,7 @@ let pp_opdecl_pr (ppe : PPEnv.t) fmt (basename, ts, ty, op) =
               (pp_list " &@ " (pp_stype ppe)) dom
     end
 
-    | Some f ->
+    | Some (PR_Plain f) ->
         let ((subppe, pp_vds), f) =
           let (vds, f) =
             match f.f_node with
@@ -1675,6 +1679,25 @@ let pp_opdecl_pr (ppe : PPEnv.t) fmt (basename, ts, ty, op) =
           (pp_locbinds ppe ~fv:f.f_fv vds, f)
         in
           Format.fprintf fmt "%t =@ %a" pp_vds (pp_form subppe) f
+
+    | Some (PR_Ind pri) ->
+       let (subppe, pp_vds) = pp_locbinds ppe pri.pri_args in
+
+       let pp_ctor fmt ctor =
+         let (specppe, pp_bds) = pp_bindings subppe ctor.prc_bds in
+
+         if List.is_empty ctor.prc_spec then
+           Format.fprintf fmt "| %s %t" ctor.prc_ctor pp_bds
+         else
+           Format.fprintf fmt "| %s %t of %a" ctor.prc_ctor pp_bds
+             (pp_list " &@ " (pp_sform specppe)) ctor.prc_spec
+       in
+
+       if List.is_empty pri.pri_ctors then
+         Format.fprintf fmt "%t = " pp_vds
+       else
+         Format.fprintf fmt "%t =@\n%a"
+           pp_vds (pp_list "@\n" pp_ctor) pri.pri_ctors
   in
 
   if List.is_empty ts then

@@ -50,7 +50,7 @@ type locals = EcIdent.t list
 
 type operator_kind = 
   | OB_oper of opbody option
-  | OB_pred of form option
+  | OB_pred of prbody option
   | OB_nott of notation
 
 and opbody =
@@ -60,6 +60,10 @@ and opbody =
   | OP_Proj   of EcPath.path * int * int
   | OP_Fix    of opfix
   | OP_TC
+
+and prbody =
+  | PR_Plain of form
+  | PR_Ind   of prind
 
 and opfix = {
   opf_args     : (EcIdent.t * EcTypes.ty) list;
@@ -83,6 +87,17 @@ and notation = {
   ont_body  : expr;
 }
 
+and prind = {
+  pri_args  : (EcIdent.t * EcTypes.ty) list;
+  pri_ctors : prctor list;
+}
+
+and prctor = {
+  prc_ctor : symbol;
+  prc_bds  : (EcIdent.t * gty) list;
+  prc_spec : form list;
+}
+
 type operator = {
   op_tparams : ty_params;
   op_ty      : EcTypes.ty;        
@@ -99,7 +114,7 @@ val is_fix    : operator -> bool
 val is_abbrev : operator -> bool
 
 val mk_op     : ty_params -> ty -> opbody option -> operator
-val mk_pred   : ty_params -> ty list -> form option -> operator
+val mk_pred   : ty_params -> ty list -> prbody option -> operator
 val mk_abbrev : ty_params -> (EcIdent.ident * ty) list -> ty * expr -> operator
 
 val operator_as_ctor : operator -> EcPath.path * int

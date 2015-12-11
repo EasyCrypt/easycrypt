@@ -327,8 +327,17 @@ let opdecl_use_local_or_abs opdecl lc =
   try
     on_mpath_ty cb opdecl.op_ty;
     (match opdecl.op_kind with
-     | OB_pred f ->
-        f |> oiter (on_mpath_form cb)
+     | OB_pred None -> ()
+
+     | OB_pred (Some (PR_Plain f)) ->
+        on_mpath_form cb f
+
+     | OB_pred (Some (PR_Ind pri)) ->
+        on_mpath_bindings cb pri.pri_args;
+        List.iter (fun ctor ->
+          on_mpath_gbindings cb ctor.prc_bds;
+          List.iter (on_mpath_form cb) ctor.prc_spec)
+        pri.pri_ctors
 
      | OB_nott nott -> begin
         List.iter (on_mpath_ty cb |- snd) nott.ont_args;

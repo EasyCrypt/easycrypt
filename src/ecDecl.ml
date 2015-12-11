@@ -75,7 +75,7 @@ type locals = EcIdent.t list
 
 type operator_kind =
   | OB_oper of opbody option
-  | OB_pred of EcCoreFol.form option
+  | OB_pred of prbody option
   | OB_nott of notation
 
 and opbody =
@@ -85,6 +85,10 @@ and opbody =
   | OP_Proj   of EcPath.path * int * int
   | OP_Fix    of opfix
   | OP_TC
+
+and prbody =
+  | PR_Plain of form
+  | PR_Ind   of prind
 
 and opfix = {
   opf_args     : (EcIdent.t * EcTypes.ty) list;
@@ -106,6 +110,17 @@ and notation = {
   ont_args  : (EcIdent.t * EcTypes.ty) list;
   ont_resty : EcTypes.ty;
   ont_body  : expr;
+}
+
+and prind = {
+  pri_args  : (EcIdent.t * EcTypes.ty) list;
+  pri_ctors : prctor list;
+}
+
+and prctor = {
+  prc_ctor : EcSymbols.symbol;
+  prc_bds  : (EcIdent.t * gty) list;
+  prc_spec : form list;
 }
 
 type operator = {

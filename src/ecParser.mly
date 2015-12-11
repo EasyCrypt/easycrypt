@@ -1589,20 +1589,32 @@ opptn(BOP):
 (* -------------------------------------------------------------------- *)
 (* Predicate definitions                                                *)
 predicate:
-| PRED x = oident
+| PRED x=oident
    { { pp_name   = x;
        pp_tyvars = None;
        pp_def    = PPabstr []; } }
 
-| PRED x = oident tyvars=tyvars_decl? COLON sty = pred_tydom
+| PRED x=oident tyvars=tyvars_decl? COLON sty=pred_tydom
    { { pp_name   = x;
        pp_tyvars = tyvars;
        pp_def    = PPabstr sty; } }
 
-| PRED x = oident tyvars=tyvars_decl? p=ptybindings EQ f=form
+| PRED x=oident tyvars=tyvars_decl? p=ptybindings EQ f=form
    { { pp_name   = x;
        pp_tyvars = tyvars;
-       pp_def    = PPconcr(p,f); } }
+       pp_def    = PPconcr (p, f); } }
+
+| PRED x=oident tyvars=tyvars_decl? p=ptybindings EQ b=indpred_def
+   { { pp_name   = x;
+       pp_tyvars = tyvars;
+       pp_def    = PPind (p, b) } }
+
+%inline indpred_def:
+| ctors=list(prefix(PIPE, ip_ctor_def)) { ctors }
+
+ip_ctor_def:
+| x=oident bd=pgtybindings? fs=prefix(OF, plist1(sform, AMP))?
+  { { pic_name = x; pic_bds = odfl [] bd; pic_spec = odfl [] fs; } }
 
 (* -------------------------------------------------------------------- *)
 (* Notations                                                            *)

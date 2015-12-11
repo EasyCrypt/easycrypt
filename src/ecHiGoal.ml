@@ -607,10 +607,10 @@ let process_delta ?target (s, o, p) tc =
         match op.EcDecl.op_kind with
         | EcDecl.OB_oper (Some (EcDecl.OP_Plain e)) ->
             (snd p, op.EcDecl.op_tparams, form_of_expr EcFol.mhr e, args)
-        | EcDecl.OB_pred (Some f) ->
+        | EcDecl.OB_pred (Some (EcDecl.PR_Plain f)) ->
             (snd p, op.EcDecl.op_tparams, f, args)
         | _ ->
-            tc_error !!tc "the operator is not transparent"
+            tc_error !!tc "the operator cannot be unfold"
     end
 
     | SFlocal x when LDecl.can_unfold x hyps ->

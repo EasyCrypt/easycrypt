@@ -1050,13 +1050,13 @@ module Op = struct
       | PO_abstr pty ->
           let env   = scope.sc_env in
           let codom = TT.transty TT.tp_relax env ue pty in
-          let xs    = snd (TT.transbinding env ue op.po_args) in
+          let xs    = snd (TT.trans_binding env ue op.po_args) in
           (EcTypes.toarrow (List.map snd xs) codom, `Abstract, [])
 
       | PO_concr (pty, pe) ->
           let env     = scope.sc_env in
           let codom   = TT.transty TT.tp_relax env ue pty in
-          let env, xs = TT.transbinding env ue op.po_args in
+          let env, xs = TT.trans_binding env ue op.po_args in
           let body    = TT.transexpcast env `InOp ue codom pe in
           let lam     = EcTypes.e_lam xs body in
           (lam.EcTypes.e_ty, `Plain lam, [])
@@ -1070,7 +1070,7 @@ module Op = struct
       | PO_reft (pty, (rname, reft)) ->
           let env      = scope.sc_env in
           let codom    = TT.transty TT.tp_relax env ue pty in
-          let _env, xs = TT.transbinding env ue op.po_args in
+          let _env, xs = TT.trans_binding env ue op.po_args in
           let opty     = EcTypes.toarrow (List.map snd xs) codom in
           let opabs    = EcDecl.mk_op [] codom None in
           let openv    = EcEnv.Op.bind (unloc op.po_name) opabs env in
@@ -1231,7 +1231,7 @@ module Notations = struct
 
     let xs = List.map2 (fun xty (aid, aty) ->
       (aid, toarrow (List.map (snd |- snd) xty) aty))
-      abd (snd (TT.transbinding (env scope) ue xs)) in
+      abd (snd (TT.trans_binding (env scope) ue xs)) in
 
     let benv  = EcEnv.Var.bind_locals xs (env scope) in
     let codom = TT.transty TT.tp_relax (env scope) ue nt.nt_codom in
@@ -1245,7 +1245,7 @@ module Notations = struct
   let add_abbrev (scope : scope) (at : pabbrev located) =
     let at = at.pl_desc and gloc = at.pl_loc in
     let ue = TT.transtyvars (env scope) (gloc, at.ab_tv) in
-    let benv, xs = TT.transbinding (env scope) ue at.ab_args in
+    let benv, xs = TT.trans_binding (env scope) ue at.ab_args in
     let codom = TT.transty TT.tp_relax (env scope) ue (fst at.ab_def) in
     let body = TT.transexpcast benv `InOp ue codom (snd at.ab_def) in
 
@@ -2282,7 +2282,7 @@ module Cloning = struct
                   let (ty, body) =
                     let env     = scope.sc_env in
                     let codom   = EcTyping.transty tp env ue opov.opov_retty in
-                    let env, xs = EcTyping.transbinding env ue opov.opov_args in
+                    let env, xs = EcTyping.trans_binding env ue opov.opov_args in
                     let body    = EcTyping.transexpcast env `InOp ue codom opov.opov_body in
                     let lam     = EcTypes.e_lam xs body in
 
@@ -2341,7 +2341,7 @@ module Cloning = struct
                    let ue = EcTyping.transtyvars scope.sc_env (loc, tp) in
                    let body =
                      let env     = scope.sc_env in
-                     let env, xs = EcTyping.transbinding env ue prov.prov_args in
+                     let env, xs = EcTyping.trans_binding env ue prov.prov_args in
                      let body    = EcTyping.trans_form_opt env ue prov.prov_body None in
                      let xs      = List.map (fun (x, ty) -> x, EcFol.GTty ty) xs in
                      let lam     = EcFol.f_lambda xs body in
@@ -2368,7 +2368,7 @@ module Cloning = struct
                    let newpr   =
                      { op_tparams = tparams;
                        op_ty      = body.EcFol.f_ty;
-                       op_kind    = OB_pred (Some body); } in
+                       op_kind    = OB_pred (Some (PR_Plain body)); } in
 
                     match prmode with
                     | `Alias ->

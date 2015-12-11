@@ -120,8 +120,12 @@ val transtys :
 
 val transtvi : env -> EcUnify.unienv -> ptyannot -> EcUnify.tvar_inst
 
-val transbinding : env -> EcUnify.unienv -> ptybindings ->
+(* -------------------------------------------------------------------- *)
+val trans_binding : env -> EcUnify.unienv -> ptybindings ->
   env * (EcIdent.t * EcTypes.ty) list
+
+val trans_gbinding : env -> EcUnify.unienv -> pgtybindings ->
+  env * (EcIdent.t * EcFol.gty) list
 
 (* -------------------------------------------------------------------- *)
 val transexp         : env -> [`InProc|`InOp] -> EcUnify.unienv -> pexpr -> expr * ty
