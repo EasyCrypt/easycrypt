@@ -762,3 +762,7 @@ qed.
 
 
 (** TODO: lots of lemmas *)
+lemma rem0 (a : 'a) : rem a map0<:'a,'b> = map0.
+proof. 
+  by apply map0_eq0=>x;rewrite remP;case (x=a)=>//=;rewrite map0P.
+qed.
