@@ -1805,10 +1805,17 @@ ipcore_renaming:
    { `WithRename s }
 
 %inline icasemode:
-| /* empty */ { `One    }
-| STAR        { `Full None }
-| i=word STAR { `Full (Some (`AtMost i)) }
-| NOT STAR    { `Full (Some (`AsMuch)) }
+| /* empty */
+   { `One    }
+
+| d=boption(SLASH) STAR
+   { `Full (d, None) }
+
+| i=word d=boption(SLASH) STAR
+    { `Full (d, Some (`AtMost i)) }
+
+| NOT d=boption(SLASH) STAR
+    { `Full (d, Some (`AsMuch)) }
 
 intro_pattern:
 | x=ipcore
