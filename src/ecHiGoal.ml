@@ -1175,7 +1175,7 @@ let rec process_mintros ?(cf = true) ttenv pis gs =
   and intro1_clear (_ : ST.state) xs tc =
     process_clear xs tc
 
-  and intro1_case (st : ST.state) nointro (mode, pis) gs =
+  and intro1_case (st : ST.state) nointro pis gs =
     let onsub gs =
       if List.is_empty pis then gs else begin
         if FApi.tc_count gs <> List.length pis then
@@ -1187,7 +1187,6 @@ let rec process_mintros ?(cf = true) ttenv pis gs =
     in
 
     let tc = t_ors [t_elimT_ind `Case; t_elim; t_elim_prind `Case] in
-    let tc = match mode with `One -> tc | `Full -> t_do `Maybe None tc in
     let tc =
       fun g ->
         try  tc g
@@ -1195,15 +1194,44 @@ let rec process_mintros ?(cf = true) ttenv pis gs =
           tc_error !!g "invalid intro-pattern: nothing to eliminate"
     in     
 
-    match nointro && not cf with
-    | true when mode = `One ->
-        onsub gs
-
-    | _ -> begin
-        match pis with
-        | [] -> t_onall tc gs
-        | _  -> t_onall (fun gs -> onsub (tc gs)) gs
+    if nointro && not cf then  onsub gs else begin
+      match pis with
+      | [] -> t_onall tc gs
+      | _  -> t_onall (fun gs -> onsub (tc gs)) gs
     end
+
+  and intro1_full_case (st : ST.state) cnt pis tc =
+    let onsub gs =
+      if List.is_empty pis then gs else begin
+        if FApi.tc_count gs <> List.length pis then
+          tc_error !$gs
+            "not the right number of intro-patterns (got %d, expecting %d)"
+            (List.length pis) (FApi.tc_count gs);
+        t_sub (List.map (dointro1 st false) pis) gs
+        end
+    in
+
+    let doit tc =
+      let togen = ref [] in
+
+      let rec aux tc =
+        try
+          let tc = FApi.as_tcenv1 (EcLowGoal.t_elim_and tc) in
+          aux (aux tc)
+        with InvalidGoalShape ->
+          let id = EcIdent.create "_" in
+          try
+            let tc = EcLowGoal.t_intros_i_1 [id] tc in
+            togen := id :: !togen;  tc
+          with EcCoreGoal.TcError _ ->
+            tc_error !!tc "not enough top-assumptions"
+      in
+
+      let tc = EcUtils.iterop aux (max 0 cnt) tc in
+      t_generalize_hyps ~clear:`Yes ~missing:true (List.rev !togen) tc
+    in
+
+    if List.is_empty pis then doit tc else onsub (doit tc)
 
   and intro1_rw (_ : ST.state) (o, s) tc =
     let h = EcIdent.create "_" in
@@ -1248,10 +1276,13 @@ let rec process_mintros ?(cf = true) ttenv pis gs =
             (nointro, rl (t_onall (intro1_simplify st)) gs)
   
         | `Clear xs ->
-            (nointro, rl (t_onall ((intro1_clear st xs))) gs)
+            (nointro, rl (t_onall (intro1_clear st xs)) gs)
   
-        | `Case (mode, pis) ->
-            (false, rl (intro1_case st nointro (mode, pis)) gs)
+        | `Case (`One, pis) ->
+            (false, rl (intro1_case st nointro pis) gs)
+
+        | `Case (`Full x, pis) ->
+            (false, rl (t_onall (intro1_full_case st x pis)) gs)
   
         | `Rw (o, s) ->
             (false, rl (t_onall (intro1_rw st (o, s))) gs)

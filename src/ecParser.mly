@@ -1805,8 +1805,9 @@ ipcore_renaming:
    { `WithRename s }
 
 %inline icasemode:
-| /* empty */ { `One  }
-| STAR        { `Full }
+| /* empty */ { `One    }
+| STAR        { `Full 1 }
+| i=word STAR { `Full i }
 
 intro_pattern:
 | x=ipcore

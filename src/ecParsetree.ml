@@ -621,7 +621,7 @@ and rwtactic  = [`Ring]
 type intropattern1 =
   | IPCore   of ipcore
   | IPDup
-  | IPCase   of ([`One|`Full] * intropattern list)
+  | IPCase   of ([`One | `Full of int] * intropattern list)
   | IPView   of ppterm
   | IPRw     of (rwocc * rwside)
   | IPDelta  of ((rwside * rwocc) * pformula)

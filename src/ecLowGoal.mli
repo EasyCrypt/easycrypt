@@ -119,7 +119,7 @@ val t_tuple_intro   : ?reduce:lazyred -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
 (* Elimination of logical operators (backward). The top-level
- * assumption is the one that is searched for eliminiation. Do a
+ * assumption is the one that is searched for elimination. Do a
  * generalization first if needed. *)
 val t_elim_false    : FApi.backward
 val t_elim_and      : FApi.backward
