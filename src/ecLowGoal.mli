@@ -121,13 +121,13 @@ val t_tuple_intro   : ?reduce:lazyred -> FApi.backward
 (* Elimination of logical operators (backward). The top-level
  * assumption is the one that is searched for elimination. Do a
  * generalization first if needed. *)
-val t_elim_false    : FApi.backward
-val t_elim_and      : FApi.backward
-val t_elim_or       : FApi.backward
-val t_elim_if       : FApi.backward
-val t_elim_iff      : FApi.backward
-val t_elim_eq_tuple : FApi.backward
-val t_elim_exists   : FApi.backward
+val t_elim_false    : ?reduce:lazyred -> FApi.backward
+val t_elim_and      : ?reduce:lazyred -> FApi.backward
+val t_elim_or       : ?reduce:lazyred -> FApi.backward
+val t_elim_if       : ?reduce:lazyred -> FApi.backward
+val t_elim_iff      : ?reduce:lazyred -> FApi.backward
+val t_elim_eq_tuple : ?reduce:lazyred -> FApi.backward
+val t_elim_exists   : ?reduce:lazyred -> FApi.backward
 val t_elim          : ?reduce:lazyred -> FApi.backward
 val t_elim_hyp      : EcIdent.t -> FApi.backward
 val t_elim_prind    : ?reduce:lazyred -> [ `Case | `Ind ] -> FApi.backward

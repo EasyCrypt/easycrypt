@@ -1216,7 +1216,7 @@ let rec process_mintros ?(cf = true) ttenv pis gs =
 
       let rec aux tc =
         try
-          let tc = FApi.as_tcenv1 (EcLowGoal.t_elim_and tc) in
+          let tc = FApi.as_tcenv1 (EcLowGoal.t_elim_and ~reduce:`NoDelta tc) in
           aux (aux tc)
         with InvalidGoalShape ->
           let id = EcIdent.create "_" in
