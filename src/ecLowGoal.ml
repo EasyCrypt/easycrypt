@@ -1078,7 +1078,7 @@ let t_elim_hyp h tc =
   FApi.t_seq (t_cutdef pt f) t_elim tc
 
 (* -------------------------------------------------------------------- *)
-let t_elim_prind ?reduce (_mode : [`Case | `Ind]) tc =
+let t_elim_prind_r ?reduce ?accept (_mode : [`Case | `Ind]) tc =
   let doit fp tc =
     let env = FApi.tc1_env tc in
 
@@ -1086,14 +1086,39 @@ let t_elim_prind ?reduce (_mode : [`Case | `Ind]) tc =
     | SFimp (f1, f2) ->
        let (p, sk), tv, args =
          match fst_map f_node (destr_app f1) with
-         | Fop (p, tv), args when EcEnv.Op.is_prind env p ->
-            (oget (EcEnv.Op.scheme_of_prind env `Case p), tv, args)
+         | Fop (p, tv), args when EcEnv.Op.is_prind env p -> begin
+            if is_some accept then
+              let pri = oget (EcEnv.Op.by_path_opt p env) in
+              let pri = EcDecl.operator_as_prind pri in
+              if not (oget accept pri) then
+                raise InvalidGoalShape;
+           end;
+           (oget (EcEnv.Op.scheme_of_prind env `Case p), tv, args)
+
          | _ -> raise InvalidGoalShape
+
        in t_apply_s p tv ~args:(args @ [f2]) ~sk tc
 
     | _ -> raise TTC.NoMatch
 
   in TTC.t_lazy_match ?reduce doit tc
+
+(* -------------------------------------------------------------------- *)
+let t_elim_prind = t_elim_prind_r ?accept:None
+
+(* -------------------------------------------------------------------- *)
+let t_elim_iso_and ?reduce tc =
+  try
+    (2, t_elim_and ?reduce tc)
+  with InvalidGoalShape ->
+    let outgoals = ref (-1) in
+
+    let accept pri =
+      match EcInductive.prind_is_iso_ands pri with
+      | None -> false
+      | Some (_, ngoals) -> outgoals := ngoals; true in
+
+    let tc = t_elim_prind_r ?reduce ~accept `Case tc in (!outgoals, tc)
 
 (* -------------------------------------------------------------------- *)
 let t_split ?(closeonly = false) ?reduce (tc : tcenv1) =

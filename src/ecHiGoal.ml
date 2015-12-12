@@ -1200,13 +1200,19 @@ let rec process_mintros ?(cf = true) ttenv pis gs =
       | _  -> t_onall (fun gs -> onsub (tc gs)) gs
     end
 
-  and intro1_full_case
-    (st : ST.state) (delta, (cnt : icasemode_full option)) pis tc
+  and intro1_full_case (st : ST.state)
+    ((prind, delta), (cnt : icasemode_full option)) pis tc
   =
     let module E = struct exception IterDone of tcenv1 end in
 
     let cnt = cnt |> odfl (`AtMost 1) in
     let red = if delta then `Full else `NoDelta in
+
+    let t_and =
+      if prind then
+        t_elim_iso_and ~reduce:red
+      else (fun tc -> (2, t_elim_and tc))
+    in
 
     let onsub gs =
       if List.is_empty pis then gs else begin
@@ -1223,9 +1229,8 @@ let rec process_mintros ?(cf = true) ttenv pis gs =
 
       let rec aux isbnd tc =
         try
-          let tc = EcLowGoal.t_elim_and ~reduce:red tc in
-          let tc = FApi.as_tcenv1 tc in
-          aux isbnd (aux isbnd tc)
+          let ntop, tc = snd_map FApi.as_tcenv1 (t_and tc) in
+          EcUtils.iterop (aux isbnd) ntop tc
         with InvalidGoalShape ->
           let id = EcIdent.create "_" in
           try

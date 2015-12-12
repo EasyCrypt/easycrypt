@@ -1808,14 +1808,17 @@ ipcore_renaming:
 | /* empty */
    { `One    }
 
-| d=boption(SLASH) STAR
-   { `Full (d, None) }
+| opt=icasemode_full_opt STAR
+   { `Full (opt, None) }
 
-| i=word d=boption(SLASH) STAR
-    { `Full (d, Some (`AtMost i)) }
+| i=word opt=icasemode_full_opt STAR
+    { `Full (opt, Some (`AtMost i)) }
 
-| NOT d=boption(SLASH) STAR
-    { `Full (d, Some (`AsMuch)) }
+| NOT opt=icasemode_full_opt STAR
+    { `Full (opt, Some (`AsMuch)) }
+
+%inline icasemode_full_opt:
+| h=iboption(TILD) d=iboption(SLASH) { (h, d) }
 
 intro_pattern:
 | x=ipcore

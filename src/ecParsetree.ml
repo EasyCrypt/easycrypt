@@ -649,7 +649,7 @@ and renaming = [
 ]
 
 and icasemode =
-  [`One | `Full of bool * icasemode_full option]
+  [`One | `Full of (bool * bool) * icasemode_full option]
 
 and icasemode_full =
   [`AtMost of int | `AsMuch]
