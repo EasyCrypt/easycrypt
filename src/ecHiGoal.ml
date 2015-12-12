@@ -1200,7 +1200,11 @@ let rec process_mintros ?(cf = true) ttenv pis gs =
       | _  -> t_onall (fun gs -> onsub (tc gs)) gs
     end
 
-  and intro1_full_case (st : ST.state) cnt pis tc =
+  and intro1_full_case (st : ST.state) (cnt : icasemode_full option) pis tc =
+    let module E = struct exception IterDone of tcenv1 end in
+
+    let cnt = cnt |> odfl (`AtMost 1) in
+
     let onsub gs =
       if List.is_empty pis then gs else begin
         if FApi.tc_count gs <> List.length pis then
@@ -1214,21 +1218,30 @@ let rec process_mintros ?(cf = true) ttenv pis gs =
     let doit tc =
       let togen = ref [] in
 
-      let rec aux tc =
+      let rec aux isbnd tc =
         try
-          let tc = FApi.as_tcenv1 (EcLowGoal.t_elim_and ~reduce:`NoDelta tc) in
-          aux (aux tc)
+          let tc = EcLowGoal.t_elim_and ~reduce:`NoDelta tc in
+          let tc = FApi.as_tcenv1 tc in
+          aux isbnd (aux isbnd tc)
         with InvalidGoalShape ->
           let id = EcIdent.create "_" in
           try
             let tc = EcLowGoal.t_intros_i_1 [id] tc in
             togen := id :: !togen;  tc
           with EcCoreGoal.TcError _ ->
-            tc_error !!tc "not enough top-assumptions"
+            if isbnd then
+              tc_error !!tc "not enough top-assumptions";
+            raise (E.IterDone tc)
       in
 
-      let tc = EcUtils.iterop aux (max 0 cnt) tc in
-      t_generalize_hyps ~clear:`Yes ~missing:true (List.rev !togen) tc
+      let tc =
+        match cnt with
+        | `AtMost cnt ->
+           EcUtils.iterop (aux true) (max 0 cnt) tc
+        | `AsMuch ->
+           try EcUtils.iter (aux false) tc with E.IterDone tc -> tc
+
+      in t_generalize_hyps ~clear:`Yes ~missing:true (List.rev !togen) tc
     in
 
     if List.is_empty pis then doit tc else onsub (doit tc)
