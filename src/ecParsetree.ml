@@ -621,18 +621,17 @@ and rwtactic  = [`Ring]
 type intropattern1 =
   | IPCore   of ipcore
   | IPDup
-  | IPCase   of (icasemode * intropattern list)
-  | IPView   of ppterm
-  | IPRw     of (rwocc * rwside)
-  | IPDelta  of ((rwside * rwocc) * pformula)
-  | IPSubst  of rwside
-  | IPClear  of psymbol list
-  | IPDone   of bool
-  | IPSmt    of pprover_infos
+  | IPCase     of (icasemode * intropattern list)
+  | IPView     of ppterm
+  | IPRw       of (rwocc * rwside)
+  | IPDelta    of ((rwside * rwocc) * pformula)
+  | IPSubst    of rwside
+  | IPClear    of psymbol list
+  | IPDone     of bool
+  | IPSmt      of pprover_infos
+  | IPSubstTop of int option
   | IPSimplify
   | IPBreak
-
-
 
 and intropattern = (intropattern1 located) list
 

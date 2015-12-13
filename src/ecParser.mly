@@ -523,7 +523,7 @@
 %token WP
 %token ZETA
 %token <string> NOP LOP1 ROP1 LOP2 ROP2 LOP3 ROP3 LOP4 ROP4
-%token LTCOLON DASHLT GT LT GE LE
+%token LTCOLON DASHLT GT LT GE LE LTSTARGT
 
 %nonassoc prec_below_comma
 %nonassoc COMMA ELSE
@@ -1868,6 +1868,12 @@ intro_pattern:
 
 | AT s=rwside o=rwocc? SLASH x=sform_h
    { IPDelta ((s, o |> omap (snd_map EcMaps.Sint.of_list)), x) }
+
+| LTSTARGT
+   { IPSubstTop None }
+
+| n=word NOT LTSTARGT
+   { IPSubstTop (Some n) }
 
 | MINUS
    { IPBreak }

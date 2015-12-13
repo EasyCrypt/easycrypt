@@ -1136,6 +1136,8 @@ let rec process_mintros ?(cf = true) ttenv pis gs =
           | IPCase (mode, x) ->
               let subcollect = List.rev -| fst -| collect true [] [] in
               `Case (mode, List.map subcollect x)
+
+          | IPSubstTop x -> `SubstTop x
   
         in collect intl (mk_loc ploc ip :: maybe_core ()) [] pis  
   
@@ -1275,6 +1277,35 @@ let rec process_mintros ?(cf = true) ttenv pis gs =
     with InvalidGoalShape ->
       tc_error !!tc "nothing to substitute"
 
+  and intro1_subst_top (_ : ST.state) omax (tc : tcenv1) =
+    let t_subst eqid =
+      let sk1 = { empty_subst_kind with sk_local = true ; } in
+      let sk2 = {  full_subst_kind with sk_local = false; } in
+      FApi.t_or (t_subst ~kind:sk1 ~eqid) (t_subst ~kind:sk2 ~eqid)
+    in
+
+    let togen = ref [] in
+
+    let rec doit i tc =
+      match omax with Some max when i >= max -> tcenv_of_tcenv1 tc | _ ->
+
+      try
+        let id = EcIdent.create "_" in
+        let tc = EcLowGoal.t_intros_i_1 [id] tc in
+        FApi.t_switch (t_subst id) ~ifok:(doit (i+1))
+          ~iffail:(fun tc -> togen := id :: !togen; doit (i+1) tc)
+          tc
+      with EcCoreGoal.TcError _ ->
+        if is_some omax then
+          tc_error !!tc "not enough top-assumptions";
+        tcenv_of_tcenv1 tc in
+
+    let tc = doit 0 tc in
+
+    t_generalize_hyps
+      ~clear:`Yes ~missing:true
+      (List.rev !togen) (FApi.as_tcenv1 tc)
+
   and dointro (st : ST.state) nointro pis (gs : tcenv) =
     match pis with [] -> gs | { pl_desc = pi; pl_loc = ploc } :: pis ->
       let nointro, gs =
@@ -1316,6 +1347,9 @@ let rec process_mintros ?(cf = true) ttenv pis gs =
   
         | `Subst d ->
             (false, rl (t_onall (intro1_subst st d)) gs)
+
+        | `SubstTop d ->
+            (false, rl (t_onall (intro1_subst_top st d)) gs)
 
       in dointro st nointro pis gs
 
