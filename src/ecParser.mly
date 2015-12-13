@@ -1811,7 +1811,7 @@ ipcore_renaming:
 | opt=icasemode_full_opt STAR
    { `Full (opt, None) }
 
-| i=word opt=icasemode_full_opt STAR
+| i=word NOT opt=icasemode_full_opt STAR
     { `Full (opt, Some (`AtMost i)) }
 
 | NOT opt=icasemode_full_opt STAR
