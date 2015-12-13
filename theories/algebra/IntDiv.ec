@@ -348,6 +348,13 @@ by rewrite -pow_add // ?subr_ge0 // modzMl.
 qed.
 
 (* -------------------------------------------------------------------- *)
+lemma dvdz_modzDl (m n d : int) : d %| m => (m + n) %% d = n %% d.
+proof. by rewrite -modzDml=> /dvdzE ->. qed.
+
+lemma dvdz_modzDr (m n d : int) : d %| n => (m + n) %% d = m %% d.
+proof. by rewrite -modzDmr=> /dvdzE ->. qed.
+
+(* -------------------------------------------------------------------- *)
 lemma nosmt modz_dvd m p q: q %| p => (m %% p) %% q = m %% q.
 proof.
 move=> dv_qp; rewrite (modzE _ p) -mulNr.
@@ -421,6 +428,16 @@ proof.
 move=> gt0_d; case: (0 <= m)=> /= [ge0_m|].
   by rewrite lez_divRL. by rewrite -!ltrNge ltz_divLR.
 qed.
+
+(* -------------------------------------------------------------------- *)
+lemma divzDl m n d : d %| m => (m + n) %/ d = (m %/ d) + (n %/ d).
+proof.
+case: (d = 0) => [->|nz_d]; first by rewrite !divz0.
+by move/divzK=> {1}<-; rewrite divzMDl.
+qed.
+
+lemma divzDr m n d : d %| n => (m + n) %/ d = (m %/ d) + (n %/ d).
+proof. by move=> dv_n; rewrite addrC divzDl // addrC. qed.
 
 (* -------------------------------------------------------------------- *)
 (* FIXME: should be supersed by IntDiv                                  *)
