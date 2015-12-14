@@ -1387,7 +1387,9 @@ let process_intros ?cf ttenv pis tc =
 let process_generalize1 pattern (tc : tcenv1) =
   let hyps, concl = FApi.tc1_flat tc in
 
-  let onresolved pattern =
+  let onresolved ?(tryclear = true) pattern =
+    let clear = if tryclear then `Yes else `No in
+
     match pattern with
     | `Form (occ, pf) -> begin
         match pf.pl_desc with
@@ -1395,7 +1397,7 @@ let process_generalize1 pattern (tc : tcenv1) =
             when occ = None && LDecl.has_name s hyps
           ->
             let id = fst (LDecl.by_name s hyps) in
-            t_generalize_hyp ~clear:`Yes id tc
+            t_generalize_hyp ~clear id tc
 
         | _ ->
           let (ptenv, p) =
@@ -1437,7 +1439,7 @@ let process_generalize1 pattern (tc : tcenv1) =
             when LDecl.has_name s hyps && List.is_empty fp.fp_args
           ->
             let id = fst (LDecl.by_name s hyps) in
-            t_generalize_hyp ~clear:`Yes id tc
+            t_generalize_hyp ~clear id tc
 
         | _ ->
           let pt = PT.tc1_process_full_pterm tc fp in
@@ -1449,8 +1451,13 @@ let process_generalize1 pattern (tc : tcenv1) =
   in
 
   match ffpattern_of_genpattern hyps pattern with
-  | Some ff -> onresolved (`ProofTerm ff)
-  | None    -> onresolved pattern
+  | Some ff ->
+     let tryclear =
+       match pattern with
+       | (`Form (None, { pl_desc = PFident _ })) -> true
+       | _ -> false
+     in onresolved ~tryclear (`ProofTerm ff)
+  | None -> onresolved pattern
 
 (* -------------------------------------------------------------------- *)
 let process_generalize patterns (tc : tcenv1) =
