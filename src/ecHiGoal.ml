@@ -1482,6 +1482,24 @@ let process_generalize patterns (tc : tcenv1) =
     tc_error_exn !!tc err
 
 (* -------------------------------------------------------------------- *)
+let rec process_mgenintros ?cf ttenv pis tc =
+  match pis with [] -> tc | pi :: pis ->
+    let tc =
+      match pi with
+      | `Ip  pi -> process_mintros_1 ?cf ttenv pi tc
+      | `Gen gn ->
+         t_onall (
+           t_seqs [
+               process_clear gn.pr_clear;
+               process_generalize gn.pr_genp
+           ]) tc
+    in process_mgenintros ~cf:false ttenv pis tc
+
+(* -------------------------------------------------------------------- *)
+let process_genintros ?cf ttenv pis tc =
+  process_mgenintros ?cf ttenv pis (FApi.tcenv_of_tcenv1 tc)
+
+(* -------------------------------------------------------------------- *)
 let process_move views pr (tc : tcenv1) =
   t_seqs
     [process_clear pr.pr_clear;

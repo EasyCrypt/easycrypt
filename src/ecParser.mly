@@ -532,7 +532,7 @@
 
 %nonassoc IN
 %nonassoc prec_below_IMPL
-%right    IMPL
+%right    IMPL LEAT
 %nonassoc IFF
 %right    ORA  OR
 %right    ANDA AND
@@ -2692,8 +2692,15 @@ tactic_ip:
 | t=tactic_core %prec prec_below_IMPL
     { mk_core_tactic t }
 
-| t=tactic_core ip=plist1(prefix(IMPL, loc(intro_pattern)+), empty)
+| t=tactic_core ip=plist1(tactic_genip, empty)
     { { pt_core = t; pt_intros = ip; } }
+
+%inline tactic_genip:
+| IMPL ip=loc(intro_pattern)+
+    { `Ip ip }
+
+| LEAT gn=revert
+    { `Gen gn }
 
 tactic:
 | t=tactic_ip %prec prec_below_IMPL

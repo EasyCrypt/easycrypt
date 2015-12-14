@@ -72,8 +72,10 @@ val t_rewrite_prept: rwside * EcMatching.occ option -> prept -> backward
 (* -------------------------------------------------------------------- *)
 val process_reflexivity : backward
 val process_assumption  : backward
-val process_intros      : ?cf:bool -> ttenv -> intropattern list -> backward
 val process_mintros     : ?cf:bool -> ttenv -> intropattern list -> tactical
+val process_intros      : ?cf:bool -> ttenv -> intropattern list -> backward
+val process_mgenintros  : ?cf:bool -> ttenv -> introgenpattern list -> tactical
+val process_genintros   : ?cf:bool -> ttenv -> introgenpattern list -> backward
 val process_generalize  : genpattern list -> backward
 val process_move        : ppterm list -> prevert -> backward
 val process_clear       : psymbol list -> backward

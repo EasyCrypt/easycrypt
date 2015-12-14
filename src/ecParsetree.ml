@@ -740,8 +740,11 @@ and ptactics     = ptactic list
 (* -------------------------------------------------------------------- *)
 and ptactic = {
   pt_core   : ptactic_core;
-  pt_intros : intropattern list;
+  pt_intros : introgenpattern list;
 }
+
+(* -------------------------------------------------------------------- *)
+and introgenpattern = [`Ip of intropattern | `Gen of prevert]
 
 (* -------------------------------------------------------------------- *)
 and pexpect  = [
@@ -759,7 +762,6 @@ and ptactic_chain =
   | Pexpect   of pexpect * int
   | Pfocus    of ptactic * tfocus
   | Protate   of [`Left | `Right] * int
-
 
 (* -------------------------------------------------------------------- *)
 and pcut =

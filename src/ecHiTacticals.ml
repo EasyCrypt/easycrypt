@@ -307,7 +307,7 @@ and process (ttenv : ttenv) (t : ptactic) (tc : tcenv) =
   in
 
   let tc = process_core ttenv t.pt_core tc in
-  let tc = EcHiGoal.process_mintros ~cf ttenv t.pt_intros tc in
+  let tc = EcHiGoal.process_mgenintros ~cf ttenv t.pt_intros tc in
     tc
 
 (* -------------------------------------------------------------------- *)
