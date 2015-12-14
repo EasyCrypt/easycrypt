@@ -1836,10 +1836,10 @@ intro_pattern:
    { IPCase (mode, ip) }
 
 | i=ioption(postfix(ioption(word), NOT)) o=rwocc? RARROW
-   { IPRw (o |> omap (snd_map EcMaps.Sint.of_list), `LtoR, i) }
+   { IPRw (o, `LtoR, i) }
 
 | i=ioption(postfix(ioption(word), NOT)) o=rwocc? LARROW
-   { IPRw (o |> omap (snd_map EcMaps.Sint.of_list), `RtoL, i) }
+   { IPRw (o, `RtoL, i) }
 
 | RRARROW
    { IPSubst `LtoR }
@@ -1872,7 +1872,7 @@ intro_pattern:
    { IPView f }
 
 | AT s=rwside o=rwocc? SLASH x=sform_h
-   { IPDelta ((s, o |> omap (snd_map EcMaps.Sint.of_list)), x) }
+   { IPDelta ((s, o), x) }
 
 | LTSTARGT
    { IPSubstTop None }
@@ -1947,8 +1947,9 @@ rwrepeat:
 | n=word QUESTION { (`Maybe, Some n) }
 
 rwocc:
-| LBRACE       x=word+ RBRACE { (`Inclusive, x) }
-| LBRACE MINUS x=word+ RBRACE { (`Exclusive, x) }
+| LBRACE       x=word+ RBRACE { (`Inclusive (EcMaps.Sint.of_list x)) }
+| LBRACE MINUS x=word+ RBRACE { (`Exclusive (EcMaps.Sint.of_list x)) }
+| LBRACE PLUS          RBRACE { (`All) }
 
 rwpr_arg:
 | i=ident        { (i, None) }
@@ -1974,10 +1975,10 @@ rwarg1:
    { RWSimpl `ProductCompat }
 
 | s=rwside r=rwrepeat? o=rwocc? fp=rwpterms
-   { RWRw ((s, r, o |> omap (snd_map EcMaps.Sint.of_list)), fp) }
+   { RWRw ((s, r, o), fp) }
 
 | s=rwside r=rwrepeat? o=rwocc? SLASH x=sform_h %prec prec_tactic
-   { RWDelta ((s, r, o |> omap (snd_map EcMaps.Sint.of_list)), x); }
+   { RWDelta ((s, r, o), x); }
 
 | PR s=bracket(rwpr_arg)
    { RWPr s }
@@ -2023,7 +2024,7 @@ genpattern:
     { `Form (None, l) }
 
 | o=rwocc l=sform_h %prec prec_tactic
-    { `Form (Some (snd_map EcMaps.Sint.of_list o), l) }
+    { `Form (Some o, l) }
 
 | LPAREN exp=iboption(AT) UNDERSCORE COLON f=form RPAREN
     { `ProofTerm (mk_pterm exp (FPCut (Some f)) []) }
@@ -2284,7 +2285,7 @@ logtactic:
    { Pcutdef (ip, fp) }
 
 | POSE o=rwocc? x=ident CEQ p=form_h %prec prec_below_IMPL
-   { Ppose (x, o |> omap (snd_map EcMaps.Sint.of_list), p) }
+   { Ppose (x, o, p) }
 
 eager_info:
 | h=ident

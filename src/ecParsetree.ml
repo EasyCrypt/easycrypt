@@ -613,9 +613,19 @@ and rwarg1 =
 
 and rwoptions = rwside * trepeat option * rwocc
 and rwside    = [`LtoR | `RtoL]
-and rwocc     = (rwocci * Sint.t) option
-and rwocci    = [`Inclusive | `Exclusive]
+and rwocc     = rwocci option
+and rwocci    = [`Inclusive of Sint.t | `Exclusive of Sint.t | `All]
 and rwtactic  = [`Ring]
+
+(* -------------------------------------------------------------------- *)
+let norm_rwocci (x : rwocci) =
+  match x with
+  | `Inclusive x -> Some (`Inclusive, x)
+  | `Exclusive x -> Some (`Exclusive, x)
+  | `All         -> None
+
+let norm_rwocc (x : rwocc) =
+  obind norm_rwocci x
 
 (* -------------------------------------------------------------------- *)
 type intropattern1 =
@@ -743,7 +753,7 @@ and ptactic = {
   pt_intros : introgenpattern list;
 }
 
-(* -------------------------------------------------------------------- *)
+(* ---------------------`----------------------------------------------- *)
 and introgenpattern = [`Ip of intropattern | `Gen of prevert]
 
 (* -------------------------------------------------------------------- *)
