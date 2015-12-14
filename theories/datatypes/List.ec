@@ -11,6 +11,7 @@
 (* -------------------------------------------------------------------- *)
 require import Fun Pred Option Pair Int IntExtra.
 require NewLogic.
+
 (* -------------------------------------------------------------------- *)
 type 'a list = [
   | "[]"
@@ -1888,6 +1889,51 @@ by apply/hasP; exists a.
 qed.
 
 (* -------------------------------------------------------------------- *)
+(*                             Subseq                                   *)
+(* -------------------------------------------------------------------- *)
+op subseq (s1 s2 : 'a list) =
+  with s2 = []      , s1 = []       => true
+  with s2 = []      , s1 = _ :: _   => false
+  with s2 = x :: s2', s1 = []       => true
+  with s2 = x :: s2', s1 = y :: s1' =>
+    subseq (if x = y then s1' else s1) s2'.
+
+lemma sub0seq (s : 'a list) : subseq [] s.
+proof. by case: s. qed.
+
+lemma subseq0 (s : 'a list) : subseq s [] = (s = []).
+proof. by case: s. qed.
+
+lemma cat_subseq (s1 s2 s3 s4 : 'a list) :
+  subseq s1 s3 => subseq s2 s4 => subseq (s1 ++ s2) (s3 ++ s4).
+proof. admitted.
+
+lemma subseq_refl (s : 'a list) : subseq s s.
+proof. by elim: s => //= x s IHs; rewrite eqxx. qed.
+
+lemma subseq_trans (s2 s1 s3 : 'a list) :
+  subseq s1 s2 => subseq s2 s3 => subseq s1 s3.
+proof. admitted.
+
+lemma subseq_cons (s : 'a list) x : subseq s (x :: s).
+proof. by apply/(@cat_subseq [] s [x] s)=> //; apply/subseq_refl. qed.
+
+lemma subseq_rcons (s : 'a list) x : subseq s (rcons s x).
+proof. by rewrite -{1}(@cats0 s) -cats1 cat_subseq // subseq_refl. qed.
+
+lemma rem_subseq x (s : 'a list) : subseq (rem x s) s.
+proof.
+elim: s => //= y s ih; rewrite eq_sym.
+by case: (x = y) => //= _; apply/subseq_cons.
+qed.
+
+lemma filter_subseq a (s : 'a list) : subseq (filter a s) s.
+proof.
+elim: s => //= y s ih; case: (a y)=> //= Nay.
+by apply/(subseq_trans s)/subseq_cons/ih.
+qed.
+
+(* -------------------------------------------------------------------- *)
 (*                            All pairs                                 *)
 (* -------------------------------------------------------------------- *)
 op allpairs ['a 'b 'c] (f : 'a -> 'b -> 'c) s t =
@@ -2011,6 +2057,137 @@ proof. by rewrite sortE /=; apply InsertSort.perm_sort. qed.
 lemma sort_sorted (e : 'a -> 'a -> bool) s:
   (forall (x y : 'a), e x y \/ e y x) => sorted e (sort e s).
 proof. by rewrite sortE /=; apply InsertSort.sort_sorted. qed.
+
+lemma subseq_order_path (e : 'a -> 'a -> bool) :
+     (forall y x z, e x y => e y z => e x z)
+  => forall (x : 'a) s1 s2,
+       subseq s1 s2 => path e x s2 => path e x s1.
+proof.
+move=> e_tr x s1 s2; elim: s2 x s1 => [|y s2 ih] x [|z s1] //= /(ih y).
+case: (y = z) => {ih} [->|_] ih[] /=; 1: by move=> ->.
+by move=> e_xy /ih [] e_yz; move/e_tr: e_xy => /(_ z e_yz).
+qed.
+
+lemma subseq_sorted (e : 'a -> 'a -> bool) :
+     (forall y x z, e x y => e y z => e x z)
+  => forall s1 s2, subseq s1 s2 => sorted e s2 => sorted e s1.
+proof.
+move=> e_tr [|x1 s1] [|x2 s2] //= sub_s12.
+move/(subseq_order_path e e_tr _ _ _ sub_s12).
+by case: (x2 = x1)=> [->//| _[]].
+qed.
+
+lemma sorted_filter (e : 'a -> 'a -> bool) :
+     (forall y x z, e x y => e y z => e x z)
+  => forall a s, sorted e s => sorted e (filter a s).
+proof. 
+by move=> e_tr a s; apply/(subseq_sorted e e_tr _ _ (filter_subseq a s)).
+qed.
+
+lemma sorted_rem (e : 'a -> 'a -> bool) :
+     (forall y x z, e x y => e y z => e x z)
+  => forall x s, sorted e s => sorted e (rem x s).
+proof.
+by move=> e_tr x s; apply/(subseq_sorted e e_tr _ _ (rem_subseq x s)).
+qed.
+
+lemma mem_sort e s (x : 'a) : mem (sort e s) x <=> mem s x.
+proof. by apply/perm_eq_mem; rewrite perm_sort. qed.
+
+lemma size_sort e (s : 'a list) : size (sort e s) = size s.
+proof. by apply/perm_eq_size; rewrite perm_sort. qed.
+
+lemma sort_uniq e (s : 'a list) : uniq (sort e s) <=> uniq s.
+proof. by apply/perm_eq_uniq; rewrite perm_sort. qed.
+
+lemma perm_sortl (e : 'a -> 'a -> bool) s :
+  forall s', perm_eq (sort e s) s' <=> perm_eq s s'.
+proof. by apply/perm_eqlP/perm_sort. qed.
+
+lemma order_path_min (e : 'a -> 'a -> bool) :
+     (forall y x z, e x y => e y z => e x z)
+  => forall x s, path e x s => all (e x) s.
+proof.
+move=> e_tr x s; elim: s x => [|y s ih] x //= [^e_xy -> /ih /=].
+by move/allP=> h; apply/allP=> z /h; apply/(e_tr y).
+qed.
+
+lemma path_sorted e (x : 'a) s : path e x s => sorted e s.
+proof. by case: s => //= y s. qed.
+
+lemma eq_sorted (e : 'a -> 'a -> bool) :
+     (forall y x z, e x y => e y z => e x z)
+  => (forall x y, e x y => e y x => x = y)
+  => forall s1 s2, sorted e s1 => sorted e s2 =>
+       perm_eq s1 s2 => s1 = s2.
+proof.
+move=> e_tr e_asym; elim=> [|x1 s1 ih] s2 ss1 ss2 eq12.
+  by apply/perm_eq_small=> //; rewrite -(perm_eq_size _ _ eq12).
+have s2_x1: mem s2 x1 by rewrite -(perm_eq_mem _ _ eq12) mem_head.
+case: s2 s2_x1 eq12 ss2 => //= x2 s2 /=.
+case: (x1 = x2) => [<- /= eq12 ss2|ne_x12 /= s2_x1 eq12].
+  by rewrite (ih s2) ?(@path_sorted e x1) // -(perm_cons x1).
+apply/negP=> ss2; have/negP := (ne_x12); apply; apply/e_asym; last first.
+  by have /(_ _ _ ss2)/allP -> := order_path_min e e_tr.
+have: mem (x1 :: s1) x2 by rewrite (perm_eq_mem _ _ eq12) mem_head.
+rewrite /= eq_sym ne_x12 /= => s1_x2; rewrite /= in ss1.
+by have /(_ _ _ ss1)/allP -> := order_path_min e e_tr.
+qed.
+
+lemma perm_sortP (e : 'a -> 'a -> bool):
+     (forall x y, e x y \/ e y x)
+  => (forall y x z, e x y => e y z => e x z)
+  => (forall x y, e x y => e y x => x = y)
+  => forall s1 s2, (perm_eq s1 s2) <=> (sort e s1 = sort e s2) .
+proof.
+move=> e_tt e_tr e_asym s1 s2; split=> eq12; last first.
+  by have /perm_eqlP <- := perm_sort e s1; rewrite eq12 perm_sort.
+apply/(eq_sorted e)=> //; rewrite ?sort_sorted //.
+have /perm_eqlP -> := perm_sort e s1; have /perm_eqlP -> := eq12.
+by apply/perm_eq_sym/perm_sort.
+qed.
+
+lemma sortK (e : 'a -> 'a -> bool) :
+     (forall x y, e x y \/ e y x)
+  => (forall y x z, e x y => e y z => e x z)
+  => (forall x y, e x y => e y x => x = y)
+  => forall s, sort e (sort e s) = sort e s.
+proof.
+move=> e_tot e_tr e_asym s; apply/(eq_sorted e e_tr e_asym).
+  by apply/sort_sorted. by apply/sort_sorted.
+by apply/perm_sort.
+qed.
+
+lemma sort_id (e : 'a -> 'a -> bool) :
+     (forall x y, e x y \/ e y x)
+  => (forall y x z, e x y => e y z => e x z)
+  => (forall x y, e x y => e y x => x = y)
+  => forall s, sorted e s => sort e s = s.
+proof.
+move=> e_tot e_tr e_asym s ss; apply/(eq_sorted e) => //.
+  by apply/sort_sorted. by apply/perm_sort.
+qed.
+
+lemma sort_rem (e : 'a -> 'a -> bool) :
+     (forall x y, e x y \/ e y x)
+  => (forall y x z, e x y => e y z => e x z)
+  => (forall x y, e x y => e y x => x = y)
+  => forall x s,  mem s x =>
+       exists s1 s2, sort e s = s1 ++ x :: s2
+        /\ sort e (rem x s) = s1 ++ s2.
+proof.
+move=> e_tot e_tr e_asym x s ^sx /perm_to_rem eqs.
+have ^ssx: mem (sort e s) x by rewrite mem_sort sx.
+case/splitPr=> s1 s2 ^eqss ->; exists s1, s2 => //=.
+have ss: sorted e (s1 ++ x :: s2) by rewrite -eqss sort_sorted.
+have ss12 := subseq_sorted e e_tr (s1 ++ s2) _ _ ss.
+  by apply/cat_subseq/subseq_cons; apply/subseq_refl.
+have /(_ _ ss12) <- // := sort_id e e_tot e_tr e_asym.
+apply/(@eq_sorted e)=> //; try by apply/sort_sorted.
+apply/perm_eqlP=> s'; rewrite !perm_sortl; apply/perm_eqlP.
+rewrite -(perm_cat2l [x]) perm_eq_sym perm_catCl perm_catAC -catA /=.
+by rewrite -eqss (@perm_eq_trans s) // perm_sort.
+qed.
 
 (* -------------------------------------------------------------------- *)
 (*                          Order lifting                               *)
