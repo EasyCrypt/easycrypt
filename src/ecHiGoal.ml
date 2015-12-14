@@ -1061,7 +1061,7 @@ exception IntroCollect of [
 exception CollectBreak
 exception CollectCore of ipcore located
 
-let rec process_mintros ?(cf = true) ttenv pis gs =
+let rec process_mintros_1 ?(cf = true) ttenv pis gs =
   let module ST = IntroState in
 
   let mk_intro ids (hyps, form) =
@@ -1376,13 +1376,23 @@ let rec process_mintros ?(cf = true) ttenv pis gs =
 
     if List.is_empty pis then gs else
       gs |> t_onall (fun tc ->
-        process_mintros ~cf:true ttenv pis (FApi.tcenv_of_tcenv1 tc))
+        process_mintros_1 ~cf:true ttenv pis (FApi.tcenv_of_tcenv1 tc))
 
   with IntroCollect e -> begin
     match e with
     | `InternalBreak ->
          tc_error !$gs "cannot use internal break in intro-patterns"
   end
+
+(* -------------------------------------------------------------------- *)
+let process_intros_1 ?cf ttenv pis tc =
+  process_mintros_1 ?cf ttenv pis (FApi.tcenv_of_tcenv1 tc)
+
+(* -------------------------------------------------------------------- *)
+let rec process_mintros ?cf ttenv pis tc =
+  match pis with [] -> tc | pi :: pis ->
+    let tc = process_mintros_1 ?cf ttenv pi tc in
+    process_mintros ~cf:false ttenv pis tc
 
 (* -------------------------------------------------------------------- *)
 let process_intros ?cf ttenv pis tc =
@@ -1577,12 +1587,12 @@ let process_cut ?(mode = `Have) engine ttenv ((ip, phi, t) : cut_t) tc =
   match mode with
   | `Have ->
      FApi.t_first applytc
-       (FApi.t_last (process_intros ttenv ip) tc)
+       (FApi.t_last (process_intros_1 ttenv ip) tc)
 
   | `Suff ->
      FApi.t_rotate `Left 1
        (FApi.t_on1 0 t_id ~ttout:applytc
-         (FApi.t_last (process_intros ttenv ip) tc))
+         (FApi.t_last (process_intros_1 ttenv ip) tc))
 
 (* -------------------------------------------------------------------- *)
 type cutdef_t = intropattern * pcutdef
@@ -1602,7 +1612,7 @@ let process_cutdef ttenv (ip, pt) (tc : tcenv1) =
   let pt, ax = PT.concretize pt in
 
   FApi.t_sub
-    [EcLowGoal.t_apply pt; process_intros ttenv ip]
+    [EcLowGoal.t_apply pt; process_intros_1 ttenv ip]
     (t_cut ax tc)
 
 (* -------------------------------------------------------------------- *)

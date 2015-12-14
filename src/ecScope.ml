@@ -810,7 +810,7 @@ module Ax = struct
       let ip x = x |> omap (fun x -> `NoRename (unloc x)) |> odfl `NoName in
       List.map (lmap (fun x -> IPCore (`Renaming (ip x)))) tintro in
     let tintro = mk_loc loc (Plogic (Pmove prevertv0)) in
-    let tintro = { pt_core = tintro; pt_intros = ip; } in
+    let tintro = { pt_core = tintro; pt_intros = [ip]; } in
 
     let concl = TT.trans_prop scope.sc_env ue pconcl in
 
