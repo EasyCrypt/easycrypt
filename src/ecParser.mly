@@ -1833,11 +1833,11 @@ intro_pattern:
 | LBRACKET mode=icasemode ip=plist2(loc(intro_pattern)*, PIPE) RBRACKET
    { IPCase (mode, ip) }
 
-| o=rwocc? RARROW
-   { IPRw (o |> omap (snd_map EcMaps.Sint.of_list), `LtoR) }
+| i=ioption(postfix(ioption(word), NOT)) o=rwocc? RARROW
+   { IPRw (o |> omap (snd_map EcMaps.Sint.of_list), `LtoR, i) }
 
-| o=rwocc? LARROW
-   { IPRw (o |> omap (snd_map EcMaps.Sint.of_list), `RtoL) }
+| i=ioption(postfix(ioption(word), NOT)) o=rwocc? LARROW
+   { IPRw (o |> omap (snd_map EcMaps.Sint.of_list), `RtoL, i) }
 
 | RRARROW
    { IPSubst `LtoR }
@@ -2625,6 +2625,10 @@ caseoption:
 %inline caseoptions:
 | AT xs=bracket(caseoption+) { xs }
 
+%inline do_repeat:
+| n=word? NOT      { (`All, n) }
+| n=word? QUESTION { (`Maybe, n) }
+
 tactic_core_r:
 | IDTAC
    { Pidtac None }
@@ -2641,14 +2645,8 @@ tactic_core_r:
 | BY bracket(empty) | DONE
    { Pby None }
 
-| DO t=tactic_core
-   { Pdo ((`All, None), t) }
-
-| DO n=word? NOT t=tactic_core
-   { Pdo ((`All, n), t) }
-
-| DO n=word? QUESTION t=tactic_core
-   { Pdo ((`Maybe, n), t) }
+| DO r=do_repeat? t=tactic_core
+   { Pdo (odfl (`All, None) r, t) }
 
 | LPAREN s=tactics RPAREN
    { Pseq s }

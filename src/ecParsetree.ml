@@ -623,7 +623,7 @@ type intropattern1 =
   | IPDup
   | IPCase     of (icasemode * intropattern list)
   | IPView     of ppterm
-  | IPRw       of (rwocc * rwside)
+  | IPRw       of (rwocc * rwside * (int option) option)
   | IPDelta    of ((rwside * rwocc) * pformula)
   | IPSubst    of rwside
   | IPClear    of psymbol list
