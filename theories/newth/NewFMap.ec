@@ -565,15 +565,14 @@ lemma domP_eq (m : ('a, 'b) fmap) (a : 'a) (b : 'b):
   mem (dom m.[a <- b]) a.
 proof. by rewrite domP in_fsetU in_fset1. qed.
 
-
 lemma dom_set (m:('a,'b) fmap) a b :
   dom m.[a<-b] = dom m `|` fset1 a.
 proof. by apply/fsetP/domP. qed.
 
 lemma dom_rem (a : 'a) (m : ('a, 'b) fmap):
-  forall x, mem (dom (rem a m)) x <=> mem (dom m `\` fset1 a) x.
+  dom (rem a m) = dom m `\` fset1 a.
 proof.
-  by move=> x; rewrite in_fsetD in_fset1 !in_dom remP; case (x = a).
+  by rewrite fsetP=> x; rewrite in_fsetD in_fset1 !in_dom remP; case (x = a).
 qed.
 
 lemma dom_rem_eq (a : 'a) (m : ('a, 'b) fmap): !mem (dom (rem a m)) a.
