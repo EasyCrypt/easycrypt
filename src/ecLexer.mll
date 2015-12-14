@@ -205,43 +205,43 @@
 
   (* ------------------------------------------------------------------ *)
   let _operators = [
-    (":"  , (COLON       , true ));
-    ("#"  , (SHARP       , true ));
-    ("//" , (SLASHSLASH  , true ));
-    ("/=" , (SLASHEQ     , true ));
-    ("/#" , (SLASHSHARP  , true ));
-    ("//=", (SLASHSLASHEQ, true ));
-    ("=>" , (IMPL        , true ));
-    ("|"  , (PIPE        , true ));
-    (":=" , (CEQ         , true ));
-    ("/"  , (SLASH       , true ));
-    ("<-" , (LARROW      , true ));
-    ("->" , (RARROW      , true ));
-    ("<<-", (LLARROW     , true ));
-    ("->>", (RRARROW     , true ));
-    ("!"  , (NOT         , false));
-    ("^"  , (HAT         , false));
-    ("&"  , (AMP         , false));
-    ("&&" , (ANDA        , false));
-    ("/\\", (AND         , false));
-    ("||" , (ORA         , false));
-    ("\\/", (OR          , false));
-    ("<=>", (IFF         , false));
-    ("%"  , (PCENT       , false));
-    ("+"  , (PLUS        , false));
-    ("-"  , (MINUS       , false));
-    ("*"  , (STAR        , false));
-    ("<<" , (BACKS       , false));
-    (">>" , (FWDS        , false));
-    ("<:" , (LTCOLON     , false));
-    ("==>", (LONGARROW   , false));
-    ("="  , (EQ          , false));
-    ("<>" , (NE          , false));
-    (">"  , (GT          , false));
-    ("<"  , (LT          , false));
-    (">=" , (GE          , false));
-    ("<=" , (LE          , false));
-    ("<*>", (LTSTARGT    , false));
+    (":"   , (COLON            , true ));
+    ("#"   , (SHARP            , true ));
+    ("//"  , (SLASHSLASH       , true ));
+    ("/="  , (SLASHEQ          , true ));
+    ("/#"  , (SLASHSHARP       , true ));
+    ("//=" , (SLASHSLASHEQ     , true ));
+    ("=>"  , (IMPL             , true ));
+    ("|"   , (PIPE             , true ));
+    (":="  , (CEQ              , true ));
+    ("/"   , (SLASH            , true ));
+    ("<-"  , (LARROW           , true ));
+    ("->"  , (RARROW           , true ));
+    ("<<-" , (LLARROW          , true ));
+    ("->>" , (RRARROW          , true ));
+    ("!"   , (NOT              , false));
+    ("^"   , (HAT              , false));
+    ("&"   , (AMP              , false));
+    ("&&"  , (ANDA             , false));
+    ("/\\" , (AND              , false));
+    ("||"  , (ORA              , false));
+    ("\\/" , (OR               , false));
+    ("<=>" , (IFF              , false));
+    ("%"   , (PCENT            , false));
+    ("+"   , (PLUS             , false));
+    ("-"   , (MINUS            , false));
+    ("*"   , (STAR             , false));
+    ("<<"  , (BACKS            , false));
+    (">>"  , (FWDS             , false));
+    ("<:"  , (LTCOLON          , false));
+    ("==>" , (LONGARROW        , false));
+    ("="   , (EQ               , false));
+    ("<>"  , (NE               , false));
+    (">"   , (GT               , false));
+    ("<"   , (LT               , false));
+    (">="  , (GE               , false));
+    ("<="  , (LE               , false));
+    ("<*>" , (LTSTARGT         , false));
   ]
 
   (* ------------------------------------------------------------------ *)
@@ -399,6 +399,9 @@ rule main = parse
   | "`|"  { [TICKPIPE  ] }
   | "<$"  { [LESAMPLE  ] }
   | "<@"  { [LEAT      ] }
+
+  | "/~="  { [SLASHTILDEQ     ] }
+  | "//~=" { [SLASHSLASHTILDEQ] }
 
   (* operators *)
   | nop as x { [NOP x] }

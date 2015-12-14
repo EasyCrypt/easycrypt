@@ -228,8 +228,9 @@ let t_simplify_with_info ?target (ri : reduction_info) (tc : tcenv1) =
   FApi.tcenv_of_tcenv1 (t_change_r ?target action tc)
 
 (* -------------------------------------------------------------------- *)
-let t_simplify ?target ?(delta=true) (tc : tcenv1) =
+let t_simplify ?target ?(delta = true) ?(logic = Some `Full) (tc : tcenv1) =
   let ri = if delta then full_red else nodelta in
+  let ri = { ri with logic } in
   t_simplify_with_info ?target ri tc
 
 (* -------------------------------------------------------------------- *)

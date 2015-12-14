@@ -47,8 +47,12 @@ val t_logic_trivial    : FApi.backward
 val t_trivial          : ?subtc:FApi.backward -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
-val t_simplify : ?target:ident -> ?delta:bool -> FApi.backward
-val t_simplify_with_info : ?target:ident -> reduction_info -> FApi.backward
+val t_simplify :
+     ?target:ident -> ?delta:bool -> ?logic:rlogic_info
+  -> FApi.backward
+
+val t_simplify_with_info :
+  ?target:ident -> reduction_info -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
 val t_change : ?target:ident -> form -> tcenv1 -> tcenv1

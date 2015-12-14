@@ -183,9 +183,13 @@ type reduction_info = {
   zeta    : bool;
   iota    : bool;
   eta     : bool;
-  logic   : bool;
+  logic   : rlogic_info;
   modpath : bool;
 }
+
+and rlogic_info = [`Full | `ProductCompat] option
+
+(* -------------------------------------------------------------------- *)
 
 let full_red = {
   beta    = true;
@@ -194,7 +198,7 @@ let full_red = {
   zeta    = true;
   iota    = true;
   eta     = true;
-  logic   = true;
+  logic   = Some `Full;
   modpath = true;
 }
 
@@ -205,7 +209,7 @@ let no_red = {
   zeta    = false;
   iota    = false;
   eta     = false;
-  logic   = false;
+  logic   = None;
   modpath = false;
 }
 
@@ -374,16 +378,24 @@ let rec h_red ri env hyps f =
         if pv_equal pv pv' then raise NotReducible else f_pvar pv' f.f_ty m
 
     (* logical reduction *)
-  | Fapp ({f_node = Fop (p, tys); } as fo, args) when ri.logic && is_logical_op p ->
+  | Fapp ({f_node = Fop (p, tys); } as fo, args)
+      when is_some ri.logic && is_logical_op p
+    ->
+     let pcompat =
+       match oget ri.logic with `Full -> true | `ProductCompat -> false
+     in
+
       let f' =
         match op_kind p, args with
-        | Some (`Not      ), [f1]    -> f_not_simpl f1
+        | Some (`Not), [f1]    when pcompat -> f_not_simpl f1
+        | Some (`Imp), [f1;f2] when pcompat -> f_imp_simpl f1 f2
+        | Some (`Iff), [f1;f2] when pcompat -> f_iff_simpl f1 f2
+
+
         | Some (`And `Asym), [f1;f2] -> f_anda_simpl f1 f2
         | Some (`Or  `Asym), [f1;f2] -> f_ora_simpl f1 f2
         | Some (`And `Sym ), [f1;f2] -> f_and_simpl f1 f2
         | Some (`Or  `Sym ), [f1;f2] -> f_or_simpl f1 f2
-        | Some (`Imp      ), [f1;f2] -> f_imp_simpl f1 f2
-        | Some (`Iff      ), [f1;f2] -> f_iff_simpl f1 f2
         | Some (`Int_le   ), [f1;f2] -> f_int_le_simpl f1 f2
         | Some (`Int_lt   ), [f1;f2] -> f_int_lt_simpl f1 f2
         | Some (`Real_le  ), [f1;f2] -> f_real_le_simpl f1 f2
@@ -451,7 +463,7 @@ let rec h_red ri env hyps f =
 
     (* Contextual rule - bindings *)
   | Fquant (Lforall as t, b, f1)
-  | Fquant (Lexists as t, b, f1) -> begin
+  | Fquant (Lexists as t, b, f1) when ri.logic = Some `Full -> begin
       let ctor = match t with
         | Lforall -> f_forall_simpl
         | Lexists -> f_exists_simpl

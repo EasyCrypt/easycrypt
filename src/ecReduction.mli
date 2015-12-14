@@ -44,9 +44,11 @@ type reduction_info = {
   zeta    : bool;            (* reduce let  *)
   iota    : bool;            (* reduce case *)
   eta     : bool;            (* reduce eta-expansion *)
-  logic   : bool;            (* perform logical simplification *)
+  logic   : rlogic_info;     (* perform logical simplification *)
   modpath : bool;            (* reduce module path *)
 }
+
+and rlogic_info = [`Full | `ProductCompat] option
 
 val full_red     : reduction_info
 val no_red       : reduction_info

@@ -602,11 +602,11 @@ type tfocus  = (tfocus1 list option) pair
 type rwarg = (tfocus located) option * rwarg1 located
 
 and rwarg1 =
-  | RWSimpl
+  | RWSimpl  of [`Full | `ProductCompat]
   | RWDelta  of (rwoptions * pformula)
   | RWRw     of (rwoptions * (rwside * ppterm) list)
   | RWPr     of (psymbol * pformula option)
-  | RWDone   of bool
+  | RWDone   of [`Full | `ProductCompat] option
   | RWSmt    of pprover_infos
   | RWApp    of ppterm
   | RWTactic of rwtactic
@@ -627,10 +627,10 @@ type intropattern1 =
   | IPDelta    of ((rwside * rwocc) * pformula)
   | IPSubst    of rwside
   | IPClear    of psymbol list
-  | IPDone     of bool
+  | IPDone     of [`Full | `ProductCompat] option
   | IPSmt      of pprover_infos
   | IPSubstTop of int option
-  | IPSimplify
+  | IPSimplify of [`Full | `ProductCompat]
   | IPBreak
 
 and intropattern = (intropattern1 located) list

@@ -115,7 +115,7 @@ let process_simplify ri (tc : tcenv1) =
     EcReduction.zeta    = ri.pzeta;
     EcReduction.iota    = ri.piota;
     EcReduction.eta     = ri.peta;
-    EcReduction.logic   = ri.plogic;
+    EcReduction.logic   = if ri.plogic then Some `Full else None;
     EcReduction.modpath = ri.pmodpath;
   } in
 
@@ -715,14 +715,18 @@ let rec process_rewrite1_r ttenv ?target ri tc =
   let implicits = ttenv.tt_implicits in
 
   match unloc ri with
-  | RWDone b ->
-      let tt = if b then t_simplify ?target:None ~delta:false else t_id in
-      FApi.t_seq tt process_trivial tc
+  | RWDone simpl ->
+      let tt =
+        match simpl with
+        | Some logic ->
+           t_simplify ?target:None ~logic:(Some logic) ~delta:false
+        | None -> t_id
+      in FApi.t_seq tt process_trivial tc
 
-  | RWSimpl ->
+  | RWSimpl logic ->
       let hyps   = FApi.tc1_hyps tc in
       let target = target |> omap (fst |- LDecl.hyp_by_name^~ hyps |- unloc) in
-      t_simplify ?target ~delta:false tc
+      t_simplify ?target ~delta:false ~logic:(Some logic) tc
 
   | RWDelta ((s, r, o), p) -> begin
       let do1 tc = process_delta ?target (s, o, p) tc in
@@ -1121,16 +1125,16 @@ let rec process_mintros ?(cf = true) ttenv pis gs =
              if intl then raise (IntroCollect `InternalBreak);
              raise CollectBreak
       
-          | IPCore  x  -> raise (CollectCore (mk_loc (loc pi) x))
-          | IPDup      -> `Dup
-          | IPDone  x  -> `Done x
-          | IPSmt   x  -> `Smt x
-          | IPClear xs -> `Clear xs
-          | IPRw    x  -> `Rw x
-          | IPDelta x  -> `Delta x
-          | IPView  x  -> `View x
-          | IPSubst x  -> `Subst x
-          | IPSimplify -> `Simpl
+          | IPCore     x -> raise (CollectCore (mk_loc (loc pi) x))
+          | IPDup        -> `Dup
+          | IPDone     x -> `Done x
+          | IPSmt      x -> `Smt x
+          | IPClear    x -> `Clear x
+          | IPRw       x -> `Rw x
+          | IPDelta    x -> `Delta x
+          | IPView     x -> `View x
+          | IPSubst    x -> `Subst x
+          | IPSimplify x -> `Simpl x
       
           | IPCase (mode, x) ->
               let subcollect = List.rev -| fst -| collect true [] [] in
@@ -1160,18 +1164,19 @@ let rec process_mintros ?(cf = true) ttenv pis gs =
     with LowApply.NoInstance _ ->
       tc_error !!tc "no top-assumption to duplicate"
 
-  and intro1_done (_ : ST.state) (simplify : bool) (tc : tcenv1) =
+  and intro1_done (_ : ST.state) simplify (tc : tcenv1) =
     let t =
       match simplify with
-      | true  -> t_seq (t_simplify ~delta:false) process_trivial
-      | false -> process_trivial
+      | Some x ->
+         t_seq (t_simplify ~delta:false ~logic:(Some x)) process_trivial
+      | None -> process_trivial
     in t tc
 
   and intro1_smt (_ : ST.state) (pi : pprover_infos) (tc : tcenv1) =
     process_smt ttenv pi tc
 
-  and intro1_simplify (_ : ST.state) tc =
-    t_simplify ~delta:false tc
+  and intro1_simplify (_ : ST.state) logic tc =
+    t_simplify ~delta:false tc ~logic:(Some logic)
 
   and intro1_clear (_ : ST.state) xs tc =
     process_clear xs tc
@@ -1323,8 +1328,8 @@ let rec process_mintros ?(cf = true) ttenv pis gs =
         | `Smt pi ->
             (nointro, rl (t_onall (intro1_smt st pi)) gs)
   
-        | `Simpl ->
-            (nointro, rl (t_onall (intro1_simplify st)) gs)
+        | `Simpl b ->
+            (nointro, rl (t_onall (intro1_simplify st b)) gs)
   
         | `Clear xs ->
             (nointro, rl (t_onall (intro1_clear st xs)) gs)
