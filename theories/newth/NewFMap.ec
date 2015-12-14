@@ -181,10 +181,10 @@ lemma getP_eq (m : ('a, 'b) fmap) (a : 'a) (b : 'b):
 proof. by rewrite getP. qed.
 
 lemma set_set (m : ('a,'b) fmap) x x' y y':
-  forall a, m.[x <- y].[x' <- y'].[a] = if x = x' then m.[x' <- y'].[a]
-                                        else m.[x' <- y'].[x <- y].[a].
+   m.[x <- y].[x' <- y'] = if x = x' then m.[x' <- y']
+                           else m.[x' <- y'].[x <- y].
 proof.
-  move=> a; case (x = x')=> [<<- {x'} | ne_x_x']; rewrite !getP.
+  rewrite fmapP=> a; case (x = x')=> [<<- {x'} | ne_x_x']; rewrite !getP.
     by case (a = x).
   by case (a = x')=> //; case (a = x)=> // ->;rewrite ne_x_x'.
 qed.
