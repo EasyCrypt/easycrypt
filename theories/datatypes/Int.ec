@@ -266,6 +266,9 @@ theory Extrema.
   lemma geq_max m n1 n2 : (max n1 n2 <= m) <=> (n1 <= m) /\ (n2 <= m)
   by smt.
 
+  lemma gt_max m n1 n2 : (max n1 n2 < m) <=> (n1 < m) /\ (n2 < m)
+  by smt.
+
   lemma nosmt max_is_ub a b:
     a <= max a b /\
     b <= max a b

@@ -587,14 +587,14 @@ op drop n (xs : 'a list) =
     if n <= 0 then xs else drop (n-1) ys.
 
 lemma drop0 (s : 'a list): drop 0 s = s.
-proof. by elim s. qed.
+proof. by elim: s. qed.
 
-lemma drop_neg n (s : 'a list): n < 0 => drop n s = s.
-proof. by elim s => //= x s IHs n_lt0; smt. qed.
+lemma drop_le0 n (s : 'a list): n <= 0 => drop n s = s.
+proof. by elim: s=> //= x s _ -> /=. qed.
 
 lemma drop_oversize n (s : 'a list):
   size s <= n => drop n s = [].
-proof. by elim s n; smt. qed.
+proof. by elim: s n => /#. qed.
 
 lemma drop_size (s : 'a list): drop (size s) s = [].
 proof. by rewrite drop_oversize. qed.
@@ -605,12 +605,12 @@ proof. by rewrite /= lezNgt; case (0 < n). qed.
 
 lemma size_drop n (s : 'a list):
   0 <= n => size (drop n s) = max 0 (size s - n).
-proof. by elim s n => //=; smt. qed.
+proof. by elim: s n => //= /#. qed.
 
 lemma drop_cat n (s1 s2 : 'a list):
-    drop n (s1 ++ s2) =
-      if n < size s1 then drop n s1 ++ s2 else drop (n - size s1) s2.
-proof. by elim s1 n => //=; smt. qed.
+  drop n (s1 ++ s2) =
+    if n < size s1 then drop n s1 ++ s2 else drop (n - size s1) s2.
+proof. by elim: s1 n => /= [|x s ih] n; smt ml=0 w=(drop_le0 size_ge0). qed.
 
 lemma drop_size_cat n (s1 s2 : 'a list):
   size s1 = n => drop n (s1 ++ s2) = s2.
@@ -619,8 +619,8 @@ proof. by move=> <-; rewrite drop_cat subzz ltzz drop0. qed.
 lemma drop_nth (z0 : 'a) n s: 0 <= n < size s =>
   drop n s = nth z0 s n :: drop (n+1) s.
 proof.
-  elim: s n=> [|x s ih] n []; 1: by elim: n => [|n _] hn //=; 1: smt.
-  by elim: n => [|n ge0_n _] /=; rewrite ?drop0 //= smt.
+elim: s n=> [|x s ih] n []; 1: by elim: n => [|n _] hn //=; 1: smt.
+by elim: n => [|n ge0_n _] /=; rewrite ?drop0 //= smt.
 qed.
 
 op take n (xs : 'a list) =
@@ -629,14 +629,14 @@ op take n (xs : 'a list) =
     if n <= 0 then [] else y :: take (n-1) ys.
 
 lemma take0 (s : 'a list): take 0 s = [].
-proof. by elim s. qed.
+proof. by elim: s. qed.
 
-lemma take_neg n (s : 'a list): n < 0 => take n s = [].
-proof. by elim s; smt. qed.
+lemma take_le0 n (s : 'a list): n <= 0 => take n s = [].
+proof. by elim: s => //= x s _ ->. qed.
 
 lemma take_oversize n (s : 'a list):
   size s <= n => take n s = s.
-proof. by elim s n; smt. qed.
+proof. by elim: s n => //= /#. qed.
 
 lemma take_size (s : 'a list): take (size s) s = s.
 proof. by rewrite take_oversize. qed.
@@ -647,12 +647,12 @@ proof. by rewrite /= lezNgt; case (0 < n). qed.
 
 lemma size_take n (s : 'a list):
   0 <= n => size (take n s) = if n < size s then n else size s.
-proof. by elim s n => //=; smt. qed.
+proof. by elim s n => //= /#. qed.
 
 lemma take_cat n (s1 s2 : 'a list):
    take n (s1 ++ s2) =
      if n < size s1 then take n s1 else s1 ++ take (n - size s1) s2.
-proof. by elim s1 n => //=; smt. qed.
+proof. by elim s1 n => //=; smt ml=0 w=(take_le0 size_ge0). qed.
 
 lemma take_size_cat n (s1 s2 : 'a list):
   size s1 = n => take n (s1 ++ s2) = s1.
@@ -661,12 +661,12 @@ proof. by move=> <-; rewrite take_cat subzz ltzz take0 cats0. qed.
 lemma take_nth (z0 : 'a) n s: 0 <= n < size s =>
   take (n+1) s = rcons (take n s) (nth z0 s n).
 proof.
-  elim: s n=> [|x s ih] n []; 1: by elim: n => [|n _] hn //=; 1: smt.
-  by elim: n => [|n ge0_n _] /=; rewrite ?take0 //= smt.
+elim: s n=> [|x s ih] n []; 1: by elim: n => [|n _] hn //=; 1: smt.
+by elim: n => [|n ge0_n _] /=; rewrite ?take0 //= smt.
 qed.
 
 lemma cat_take_drop n (s : 'a list): take n s ++ drop n s = s.
-proof. by elim s n; smt. qed.
+proof. by elim: s n; smt. qed.
 
 lemma nth_drop (x0 : 'a) n s i:
   0 <= n => 0 <= i => nth x0 (drop n s) i = nth x0 s (n + i).
@@ -700,8 +700,8 @@ op rot n (s : 'a list) = drop n s ++ take n s.
 lemma rot0 (s : 'a list): rot 0 s = s.
 proof. smt. qed.
 
-lemma rot_neg n (s : 'a list): n < 0 => rot n s = s.
-proof. by move=> lt0_n; rewrite /rot !(drop_neg, take_neg) // cats0. qed.
+lemma rot_le0 n (s : 'a list): n <= 0 => rot n s = s.
+proof. by move=> le0_n; rewrite /rot !(drop_le0, take_le0) // cats0. qed.
 
 lemma size_rot n (s : 'a list): size (rot n s) = size s.
 proof. smt. qed.
@@ -1484,7 +1484,7 @@ theory Iota.
   move=> @/min; case: (m < k)=> [lt_mk|/lezNgt le_km].
     case: (m < 0) => [/ltzW/iota0->//|/lezNgt ge0_m].
     by rewrite take_oversize // size_iota max_ler 2:ltzW.
-  case: (k < 0) => [^/take_neg<:int> -> /ltzW/iota0 ->//|].
+  case: (k < 0) => [^ /ltzW /take_le0<:int> -> /ltzW/iota0 ->//|].
   move/lezNgt=> ge0_k; rewrite -{1}(addzK (-k) m) /=.
   rewrite addzC iota_add ?subz_ge0 // take_cat.
   by rewrite size_iota max_ler // ltzz /= take0 cats0.

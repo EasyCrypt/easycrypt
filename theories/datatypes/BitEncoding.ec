@@ -121,6 +121,13 @@ theory BitChunking.
 op chunk r (bs : 'a list) =
   mkseq (fun i => take r (drop (r * i) bs)) (size bs %/ r).
 
+lemma nosmt chunk_le0 r (s : 'a list) : r <= 0 => chunk r s = [].
+proof.
+move/ler_eqVlt=> [->|gt0_r] @/chunk; 1: by rewrite divz0 mkseq0.
+rewrite /chunk mkseq0_le // -opprK divzN oppr_le0.
+by rewrite divz_ge0 ?size_ge0 oppr_gt0.
+qed.
+
 lemma nosmt nth_flatten x0 n (bs : 'a list list) i :
      all (fun s => size s = n) bs
   => nth x0 (flatten bs) i = nth x0 (nth [] bs (i %/ n)) (i %% n).
@@ -208,5 +215,24 @@ rewrite mkseq1 /= drop0 take_cat h //= take0 cats0 /= -{3}ih.
 apply/eq_in_mkseq=> i /=; rewrite mulrDr mulr1 drop_cat (@h x) //.
 case=> [ge0_i lti]; rewrite ltrNge ler_paddr // 1:mulr_ge0 1:ltrW //.
 by rewrite addrAC addrN.
+qed.
+
+lemma chunk_cat r (xs ys : 'a list) :
+  r %| size xs => chunk r (xs ++ ys) = chunk r xs ++ chunk r ys.
+proof.
+case: (r <= 0) => [/chunk_le0<:'a> h|/ltrNge lt0_r]; 1: by rewrite !h.
+case/dvdzP=> q @/chunk szxs; rewrite size_cat szxs divzMDl ?gtr_eqF //.
+rewrite mulzK ?gtr_eqF // mkseq_add ?divz_ge0 ?size_ge0 //=.
+  by rewrite -(@ler_pmul2r r) //= -szxs size_ge0.
+congr; last first; apply/eq_in_mkseq=> i /=.
+  case=> [ge0_i lt_i] /=; rewrite drop_cat szxs (mulrC r) ltr_pmul2r //.
+  by rewrite  gtr_addl ltrNge ge0_i /= mulrDl addrAC subrr /= mulrC.
+case=> [ge0_i lt_iq]; rewrite drop_cat szxs (mulrC r).
+rewrite ltr_pmul2r ?lt_iq //= take_cat; pose s := drop _ _.
+suff /ler_eqVlt[->|->//]: r <= size s; 1: rewrite ltrr /=.
+  by rewrite take0 take_size cats0.
+rewrite size_drop ?mulr_ge0 // 1:ltrW // szxs -mulrBl.
+rewrite max_ler ?mulr_ge0 1,2:ltrW ?subr_gt0 ?ler_pmull //.
+by rewrite ler_subr_addl -ltzE.
 qed.
 end BitChunking.
