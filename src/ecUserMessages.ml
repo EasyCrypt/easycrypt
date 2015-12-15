@@ -449,6 +449,30 @@ end = struct
 end
 
 (* -------------------------------------------------------------------- *)
+module NotationsError : sig
+  open EcHiNotations
+
+  val pp_nterror : env -> Format.formatter -> nterror -> unit
+end = struct
+  open EcHiNotations
+
+  let pp_nterror (env : env) fmt error =
+    let msg x = Format.fprintf fmt x in
+
+    match error with
+    | NTE_Typing e ->
+       TypingError.pp_tyerror env fmt e
+    | NTE_TyNotClosed ->
+       msg "this notation type contains free type variables"
+    | NTE_DupIdent ->
+       msg "an ident is bound several time" 
+    | NTE_UnknownBinder x ->
+       msg "unknown binder: `%s'" x
+    | NTE_AbbrevIsVar ->
+       msg "abbrev. body cannot reduce to a variable"
+end
+
+(* -------------------------------------------------------------------- *)
 module CloneError : sig
   open EcThCloning
 
@@ -675,6 +699,9 @@ match exn with
 
 | EcHiPredicates.TransPredError (_, env, e) ->
    PredError.pp_tperror env fmt e
+
+| EcHiNotations.NotationError (_, env, e) ->
+   NotationsError.pp_nterror env fmt e
 
 | EcPV.AliasClash (env, ac) ->
     pp_alias_clash env fmt ac
