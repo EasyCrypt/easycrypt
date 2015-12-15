@@ -564,7 +564,12 @@ module Prover = struct
       po_provers   = provers;
       po_verbose   = verbose;
       pl_all       = ppr.plem_all;
-      pl_max       = omap (odfl max_int) ppr.plem_max; 
+      pl_max       = 
+        begin match ppr.plem_max, ppr.plem_wanted with
+        | Some i, _      -> Some (odfl max_int i)
+        | None  , None   -> None
+        | None  , Some _ -> Some 0
+        end;
       pl_iterate   = ppr.plem_iterate;
       pl_wanted    = omap (process_dbhint env) ppr.plem_wanted;
       pl_unwanted  = omap (process_dbhint env) ppr.plem_unwanted;
