@@ -285,36 +285,20 @@ module Parray : sig
   type 'a t
 
   val empty : 'a t
-
   val get : 'a t -> int -> 'a
-
   val length : 'a t -> int
-
   val of_list : 'a list -> 'a t
-
   val to_list : 'a t -> 'a list
-
   val of_array : 'a array -> 'a t
-
   val init : int -> (int -> 'a) -> 'a t
-
   val map : ('a -> 'b) -> 'a t -> 'b t
-
   val fmap : ('a -> 'b) -> 'a list -> 'b t
-
   val fold_left : ('a -> 'b -> 'a) -> 'a -> 'b t -> 'a
-
   val fold_right : ('b -> 'a -> 'a) -> 'b t -> 'a -> 'a
-
   val fold_left2 : ('a -> 'b -> 'c -> 'a) -> 'a -> 'b t -> 'c t -> 'a
-
   val iter : ('a -> unit) -> 'a t -> unit
-
   val iter2 : ('a -> 'b -> unit) -> 'a t -> 'b t -> unit
-
   val split : ('a * 'b) t -> ('a t * 'b t)
-
   val exists : ('a -> bool) -> 'a t -> bool
-
   val for_all : ('a -> bool) -> 'a t -> bool
 end
