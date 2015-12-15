@@ -110,6 +110,7 @@ and notation = {
   ont_args  : (EcIdent.t * EcTypes.ty) list;
   ont_resty : EcTypes.ty;
   ont_body  : expr;
+  ont_ponly : bool;
 }
 
 and prind = {
@@ -198,11 +199,12 @@ let mk_op tparams ty body =
   let kind = OB_oper body in
     gen_op tparams ty kind
 
-let mk_abbrev tparams xs (codom, body) =
+let mk_abbrev ?(ponly = false) tparams xs (codom, body) =
   let kind = {
     ont_args  = xs;
     ont_resty = codom;
     ont_body  = body;
+    ont_ponly = ponly;
   } in
 
   gen_op tparams (EcTypes.toarrow (List.map snd xs) codom) (OB_nott kind)

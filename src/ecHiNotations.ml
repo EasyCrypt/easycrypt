@@ -21,6 +21,12 @@ exception NotationError of EcLocation.t * EcEnv.env * nterror
 let nterror loc env e = raise (NotationError (loc, env, e))
 
 (* -------------------------------------------------------------------- *)
+let trans_abbrev_opts (opts : abrvopts) =
+  List.fold_left (fun _ -> function
+   | (b, `Printing) -> not b)
+  false opts
+
+(* -------------------------------------------------------------------- *)
 let trans_notation_r (env : env) (nt : pnotation located) =
   let nt = nt.pl_desc and gloc = nt.pl_loc in
   let ue = TT.transtyvars env (gloc, nt.nt_tv) in
@@ -81,7 +87,8 @@ let trans_abbrev_r (env : env) (at : pabbrev located) =
   let codom   = Tuni.offun uni codom in
   let xs      = List.map (snd_map (Tuni.offun uni)) xs in
   let tparams = EcUnify.UniEnv.tparams ue in
-  let tyat    = EcDecl.mk_abbrev tparams xs (codom, body) in
+  let ponly   = trans_abbrev_opts at.ab_opts in
+  let tyat    = EcDecl.mk_abbrev ~ponly tparams xs (codom, body) in
 
   if EcTypes.is_local body then
     nterror gloc env NTE_AbbrevIsVar;

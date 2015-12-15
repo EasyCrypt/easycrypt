@@ -1655,8 +1655,20 @@ notation:
       nt_codom = ofdfl (fun () -> mk_loc (loc body) PTunivar) codom;
       nt_body  = body; } }
 
+abrvopt:
+| b=boption(MINUS) x=ident {
+    match unloc x with
+    | "printing" -> (not b, `Printing)
+    | _ ->
+        parse_error x.pl_loc
+          (Some ("invalid option: " ^ (unloc x)))
+  }
+
+abrvopts:
+| opts=bracket(abrvopt+) { opts }
+
 abbreviation:
-| ABBREV x=oident tyvars=tyvars_decl? args=ptybindings_decl?
+| ABBREV opts=abrvopts? x=oident tyvars=tyvars_decl? args=ptybindings_decl?
     sty=prefix(COLON, loc(type_exp))? EQ b=expr
 
   { let sty  = sty |> ofdfl (fun () -> mk_loc (loc b) PTunivar) in
@@ -1664,7 +1676,8 @@ abbreviation:
     { ab_name = x;
       ab_tv   = tyvars;
       ab_args = odfl [] args;
-      ab_def  = (sty, b); } }
+      ab_def  = (sty, b);
+      ab_opts = odfl [] opts; } }
 
 (* -------------------------------------------------------------------- *)
 top_decl:

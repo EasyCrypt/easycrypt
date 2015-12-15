@@ -85,6 +85,7 @@ and notation = {
   ont_args  : (EcIdent.t * EcTypes.ty) list;
   ont_resty : EcTypes.ty;
   ont_body  : expr;
+  ont_ponly : bool;
 }
 
 and prind = {
@@ -114,9 +115,12 @@ val is_fix    : operator -> bool
 val is_abbrev : operator -> bool
 val is_prind  : operator -> bool
 
-val mk_op     : ty_params -> ty -> opbody option -> operator
-val mk_pred   : ty_params -> ty list -> prbody option -> operator
-val mk_abbrev : ty_params -> (EcIdent.ident * ty) list -> ty * expr -> operator
+val mk_op   : ty_params -> ty -> opbody option -> operator
+val mk_pred : ty_params -> ty list -> prbody option -> operator
+
+val mk_abbrev :
+     ?ponly:bool -> ty_params -> (EcIdent.ident * ty) list
+  -> ty * expr -> operator
 
 val operator_as_ctor  : operator -> EcPath.path * int
 val operator_as_rcrd  : operator -> EcPath.path

@@ -327,11 +327,16 @@ type pnotation = {
   nt_body  : pexpr;
 }
 
+(* -------------------------------------------------------------------- *)
+type abrvopt  = [`Printing]
+type abrvopts = (bool * abrvopt) list
+
 type pabbrev = {
   ab_name : psymbol;
   ab_tv   : ptyvardecls option;
   ab_args : ptybindings;
   ab_def  : pty * pexpr;
+  ab_opts : abrvopts;
 }
 
 (* -------------------------------------------------------------------- *)

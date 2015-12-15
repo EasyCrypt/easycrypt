@@ -1386,7 +1386,9 @@ and try_pp_notations (ppe : PPEnv.t) outer fmt f =
  
    with EcMatching.MatchFailure ->
       false
-      
+
+  in let try_notation ((_, (_, nt)) as args) =
+     not nt.ont_ponly && try_notation args
   in
 
   let nts = EcEnv.Op.get_notations ppe.PPEnv.ppe_env in

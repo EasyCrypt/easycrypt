@@ -344,7 +344,8 @@ and subst_notation (s : _subst) (nott : notation) =
   let es, xs = EcTypes.add_locals es nott.ont_args in
   { ont_args  = xs;
     ont_resty = s.s_ty nott.ont_resty;
-    ont_body  = EcTypes.e_subst es nott.ont_body; }
+    ont_body  = EcTypes.e_subst es nott.ont_body;
+    ont_ponly = nott.ont_ponly; }
 
 and subst_op_body (s : _subst) (bd : opbody) =
   match bd with
