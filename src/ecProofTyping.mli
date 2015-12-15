@@ -55,6 +55,7 @@ val tc1_process_phl_exp      : tcenv1 -> oside -> ty option -> pexpr -> expr
 val tc1_process_prhl_form    : tcenv1 -> ty -> pformula -> form
 val tc1_process_prhl_formula : tcenv1 -> pformula -> form
 
+val tc1_process_stmt : tcenv1 -> EcMemory.memtype -> pstmt -> stmt
 val tc1_process_prhl_stmt : tcenv1 -> side -> pstmt -> stmt
 
 (* -------------------------------------------------------------------- *)

@@ -109,6 +109,8 @@ module Fun : sig
 
   val actmem_post :  memory -> xpath -> function_ -> memenv
 
+  val inv_memory : [`Left|`Right] -> env -> memenv
+
   val inv_memenv : env -> env
 
   val equivF_memenv : xpath -> xpath -> env ->

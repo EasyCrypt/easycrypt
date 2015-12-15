@@ -1553,6 +1553,12 @@ module Fun = struct
         | Some l -> adds_in_memenv mem l in
       (fun_.f_sig,fd), adds_in_memenv mem fd.f_locals
 
+  let inv_memory side env = 
+    let path  = mroot env in
+    let xpath = EcPath.xpath_fun path "" in (* dummy value *)
+    let id    = if side = `Left then EcCoreFol.mleft else EcCoreFol.mright in
+    EcMemory.empty_local id xpath 
+
   let inv_memenv env =
     let path  = mroot env in
     let xpath = EcPath.xpath_fun path "" in (* dummy value *)

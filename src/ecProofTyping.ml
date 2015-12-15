@@ -119,11 +119,8 @@ let tc1_process_prhl_formula tc pf =
   tc1_process_prhl_form tc tbool pf
 
 (* ------------------------------------------------------------------ *)
-let tc1_process_prhl_stmt tc side c =
-  let hyps, concl = FApi.tc1_flat tc in
-  let es = match concl.f_node with FequivS es -> es | _ -> assert false in
-
-  let mt   = snd (match side with `Left -> es.es_ml | `Right -> es.es_mr) in
+let tc1_process_stmt tc mt c =
+  let hyps = FApi.tc1_hyps tc in
   let hyps = LDecl.push_active (mhr,mt) hyps in
   let env  = LDecl.toenv hyps in
   let ue   = unienv_of_hyps hyps in
@@ -131,6 +128,13 @@ let tc1_process_prhl_stmt tc side c =
   let esub = Exn.recast_pe !!tc hyps (fun () -> Tuni.offun (EcUnify.UniEnv.close ue)) in
   let esub = { e_subst_id with es_ty = esub; } in
   EcModules.s_subst esub c
+
+
+let tc1_process_prhl_stmt tc side c =
+  let concl = FApi.tc1_goal tc in
+  let es = match concl.f_node with FequivS es -> es | _ -> assert false in
+  let mt   = snd (match side with `Left -> es.es_ml | `Right -> es.es_mr) in
+  tc1_process_stmt tc mt c
 
 (* ------------------------------------------------------------------ *)
 let tc1_process_phl_exp tc side ty e =
