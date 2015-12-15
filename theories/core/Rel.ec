@@ -59,7 +59,7 @@ lemma sym_right_transitive ['a] (R : 'a -> 'a -> bool) :
   right_transitive R.
 proof.
 move=> symR trR x y /(sym_left_transitive _ symR trR) Rxy z.
-by rewrite /transpose !(symR z) Rxy.
+by rewrite !(symR z) Rxy.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -70,8 +70,8 @@ pred equivalence_rel ['a] (R : 'a -> 'a -> bool) =
 lemma equivalence_relP ['a] (R : 'a -> 'a ->  bool) :
   equivalence_rel R <=> reflexive R /\ left_transitive R.
 proof.
-split=> [eqiR|[Rxx trR] x y z]; last by split; [apply:Rxx| move=>/trR->].
-by split=> [x | x y Rxy z]; [rewrite (eqiR x x x)|rewrite (andEr _ _ (eqiR x y z))].
+split=> [eqiR|[Rxx trR] x y z]; last by split; [apply:Rxx|move=>/trR->].
+by split=> [x|x y Rxy z]; rewrite ?(eqiR x x x) ?(andEr _ _ (eqiR x y z)).
 qed.
 
 (* -------------------------------------------------------------------- *)
