@@ -434,10 +434,13 @@ let process_auto (tc : tcenv1) =
 
   let for1 (p : EcPath.path) tc =
     let pt = PT.pt_of_uglobal !!tc (FApi.tc1_hyps tc) p in
-    FApi.t_seqs
-      [LowApply.t_apply_bwd_r ~mode:fmrigid ~canview:false pt;
-       EcLowGoal.t_trivial; EcLowGoal.t_fail]
-      tc
+    try
+      FApi.t_seqs
+        [LowApply.t_apply_bwd_r ~mode:fmrigid ~canview:false pt;
+         EcLowGoal.t_trivial; EcLowGoal.t_fail]
+        tc
+    with LowApply.NoInstance _ ->
+      raise InvalidGoalShape
   in
 
   try
