@@ -1,0 +1,84 @@
+require import Option List.
+require (*--*) IterProc.
+
+type in_t, state_t.
+
+module type Orcl = {
+  proc f (s : state_t, x : in_t) : state_t
+}.
+
+module Fold (O:Orcl) = {
+  proc fold(s : state_t, l : in_t list) = {
+    while (l <> []) {
+      s <@ O.f(s,head witness l);
+      l <- drop 1 l;
+    }
+    return s;
+  }
+}.
+
+lemma fold_ll (O<:Orcl): islossless O.f => islossless Fold(O).fold.
+proof.
+move=> O_ll; proc; inline Fold(O).fold.
+while true (size l); auto=> /=.
++ call O_ll; skip=> /= ? [*] Hl <-.
+  smt ml=0 w=(size_eq0 size_ge0 size_drop).
+smt ml=0 w=(size_eq0 size_ge0).  
+qed.
+
+section.
+  declare module O:Orcl.
+
+  axiom fold_swap1 i1 i2:
+    equiv [Fold(O).fold ~ Fold(O).fold :
+           ={glob O,s} /\ l{1} = [i1;i2] /\ l{2} = [i2;i1] ==> ={glob O,res}].
+
+  local clone import IterProc as IP with
+    type t <- in_t.
+
+  local module O' = {
+    var s : state_t
+
+    proc f (x : in_t): unit = {
+      s <@ O.f(s,x);
+    }
+  }.
+
+  local equiv Fold_Iter: Fold(O).fold ~ Iter(O').iter:
+    ={glob O,l} /\ s{1} = O'.s{2} ==> ={glob O} /\ res{1} = O'.s{2}.
+  proof.
+  proc; while (={glob O,l} /\ s{1} = O'.s{2}); last by auto.
+  by inline O'.f; wp; call (_: true); auto.
+  qed.
+
+  local equiv iter_swap1 i1 i2: Iter(O').iter ~ Iter(O').iter :
+    ={glob O'} /\ l{1} = [i1;i2] /\ l{2} = [i2;i1] ==> ={glob O'}.
+  proof.
+  transitivity Fold(O).fold
+    (={glob O,l} /\ s{2} = O'.s{1} ==> ={glob O} /\ res{2} = O'.s{1})
+    (={glob O} /\ s{1} = O'.s{2} /\ l{1} = [i1;i2] /\ l{2} = [i2;i1] ==>
+     ={glob O} /\ res{1} = O'.s{2})=> [/#|//||].
+  + by symmetry; conseq Fold_Iter.
+  transitivity Fold(O).fold
+    (={glob O,s} /\ l{1} = [i1;i2] /\ l{2} = [i2;i1] ==> ={glob O,res})
+    (={glob O,l} /\ s{1} = O'.s{2} ==> ={glob O} /\ res{1} = O'.s{2})=> [/#|//||].
+  + by apply (fold_swap1 i1 i2).
+  by conseq Fold_Iter.
+  qed.
+
+  equiv fold_perm : Fold(O).fold ~ Fold(O).fold :
+    ={glob O,s} /\ perm_eq l{1} l{2} ==> ={glob O,res}.
+  proof.
+  transitivity Iter(O').iter
+    (={glob O,l} /\ s{1} = O'.s{2} ==> ={glob O} /\ res{1} = O'.s{2})
+    (={glob O} /\ O'.s{1} = s{2} /\ perm_eq l{1} l{2} ==>
+     ={glob O} /\ O'.s{1} = res{2})=> [/#|//||].
+  + by conseq Fold_Iter.
+  transitivity Iter(O').iter
+    (={glob O'} /\ perm_eq l{1} l{2} ==> ={glob O'})
+    (={glob O,l} /\ O'.s{1} = s{2} ==> ={glob O} /\ O'.s{1} = res{2})=> [/#|//||].
+  + conseq (iter_perm O' _)=> //= i1 i2.
+    by conseq (iter_swap1 i1 i2).
+  by symmetry; conseq Fold_Iter.
+  qed.
+end section.
