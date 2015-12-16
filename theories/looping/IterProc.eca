@@ -15,13 +15,82 @@ module Iter (O:Orcl) = {
   }
 }.
 
-lemma iter_ll (O<:Orcl): islossless O.f => islossless Iter(O).iter.
+module Iters (O:Orcl) = {
+  proc iters(l1 l2 : t list) = {
+    Iter(O).iter(l1);
+    Iter(O).iter(l2);
+  }
+}.
+
+module Iter2 (O:Orcl) = {
+  proc iter2_12(t1 t2 : t) = {
+    O.f(t1);
+    O.f(t2);
+  }
+
+  proc iter2_21(t1 t2 : t) = {
+    O.f(t2);
+    O.f(t1);
+  }
+}.
+
+lemma iter_ll (O <: Orcl): islossless O.f => islossless Iter(O).iter.
 proof.
 move=> O_ll; proc; inline Iter(O).iter.
 while true (size l); auto=> /=.
 + call O_ll; skip=> /= ? [*] Hl <-.
-  smt ml=0 w=(size_eq0 size_ge0 size_drop).
-smt ml=0 w=(size_eq0 size_ge0).  
+  smt w=(size_eq0 size_ge0 size_drop).
+smt w=(size_eq0 size_ge0).
+qed.
+
+equiv iter_cat (O <: Orcl):
+  Iter(O).iter ~ Iters(O).iters:
+  ={glob O} /\ l{1} = (l1++l2){2} ==> ={glob O}.
+proof.
+proc=> /=; inline Iter(O).iter.
+exists* l2{2}; elim*=> _l2.
+splitwhile{1} 1: l <> _l2.
+while (={glob O} /\ l{1} = l0{2}).
++ by auto; call (_: true).
+wp; while (={glob O} /\ l{1} = l{2}++_l2).
++ auto; call (_: true); auto.
+  move=> ? &ml [*] 2!->; case: (l{ml})=> //= x l' ll2_neq_l2.
+  rewrite !drop0 /=; progress=> [/#|/#|].
+  have/contra -> //:= congr1 size (l' ++ _l2) _l2.
+  by rewrite size_cat; smt w=size_ge0.
+by auto; progress=> [/#|/#|]; smt w=(size_cat size_ge0).
+qed.
+
+equiv iter_cat_cat (O <: Orcl):
+  Iters(O).iters ~ Iters(O).iters:
+  ={glob O} /\ (l1++l2){1} = (l1++l2){2} ==> ={glob O}.
+proof.
+transitivity Iter(O).iter
+  (={glob O} /\ (l1++l2){1} = l{2} ==> ={glob O})
+  (={glob O} /\ l{1} = (l1++l2){2} ==> ={glob O})=> [/#|//||].
++ by symmetry; conseq (iter_cat O).
+by apply (iter_cat O).
+qed.
+
+equiv iter2_12_eq (O <: Orcl): Iter2(O).iter2_12 ~ Iter(O).iter:
+  ={glob O} /\ l{2} = [t1;t2]{1} ==> ={glob O}.
+proof.
+proc=> /=.
+rcondt{2} 1; 1: by auto.
+rcondt{2} 3; 1: by auto; call (_: true); auto.
+rcondf{2} 5; 1: by do !(auto; call (_: true)); auto.
+by do !(auto; call (_: true)); auto.
+qed.
+
+lemma iter2_21_eq (O <: Orcl):
+  equiv [Iter2(O).iter2_21 ~ Iter(O).iter:
+         ={glob O} /\ l{2} = [t2;t1]{1} ==> ={glob O}].
+proof.
+proc=> /=.
+rcondt{2} 1; 1: by auto.
+rcondt{2} 3; 1: by auto; call (_: true); auto.
+rcondf{2} 5; 1: by do !(auto; call (_: true)); auto.
+by do !(auto; call (_: true)); auto.
 qed.
 
 section.
@@ -31,52 +100,63 @@ section.
     equiv [Iter(O).iter ~ Iter(O).iter :
            l{1} = [i1;i2] /\ l{2} = [i2;i1] /\ ={glob O} ==> ={glob O}].
 
+  lemma iter2_eq:
+    equiv [Iter2(O).iter2_12 ~ Iter2(O).iter2_21:
+           ={glob O,t1,t2} ==> ={glob O}].
+  proof.
+  transitivity Iter(O).iter
+    (={glob O} /\ l{2} = [t1;t2]{1} ==> ={glob O})
+    (={glob O} /\ l{1} = [t1;t2]{2} ==> ={glob O})=> [/#|//||].
+  + by apply (iter2_12_eq O).
+  transitivity Iter(O).iter
+    (exists i1 i2,l{1} = [i1;i2] /\ l{2} = [i2;i1] /\ ={glob O} ==> ={glob O})
+    (={glob O} /\ l{1} = [t2;t1]{2} ==> ={glob O})=> [/#|//||].
+  + by elim*=> i1 i2; apply (iter_swap1 i1 i2).
+  + by symmetry; conseq (iter2_21_eq O)=> /#.
+  qed.
+
   lemma iter_swap s1 i s2:
     equiv [Iter(O).iter ~ Iter(O).iter :
            l{1} = i::s1++s2 /\ l{2} = s1++i::s2 /\ ={glob O} ==> ={glob O}].
   proof.
   elim: s1=> /= [|i' s1 Hrec]; 1:by sim.
-  transitivity Iter(O).iter
-    (l{1}= i :: i' :: (s1 ++ s2) /\ l{2} = i' :: i :: (s1 ++ s2) /\ ={glob O} ==>
+  transitivity Iters(O).iters
+    (={glob O} /\ l{1} = i::i'::(s1++s2) /\ l1{2} = [i;i'] /\ l2{2} = s1++s2 ==>
      ={glob O})
-    (l{1}= i' :: i :: (s1 ++ s2) /\ l{2} = i' :: (s1 ++ i::s2) /\ ={glob O} ==>
-     ={glob O})=>//.
-  + by move=> ? &mr [*] <*>; exists (glob O){mr}, (i' :: i :: (s1 ++ s2)).
-  + proc; rcondt{1} 1=> //; rcondt{2} 1=> //.
-    rcondt{1}3; 1:by auto; conseq (_: true).
-    rcondt{2}3; 1:by auto; conseq (_: true).
-    seq  4  4: (={l,glob O}); last by sim.
-    transitivity{1} {Iter(O).iter([i;i']); l <- drop 2 l;}
-      (l{1} = i :: i' :: (s1 ++ s2) /\ ={l, glob O} ==> ={l,glob O})
-      (l{1} = i :: i' :: (s1 ++ s2) /\
-       l{2} = i' :: i :: (s1 ++ s2) /\ ={glob O} ==> ={l,glob O})=> //.
-    + by move=> ? &mr [*] <*>; exists (glob O){mr}, (i :: i' :: (s1 ++ s2)).
-    + inline *; rcondt{2} 2; 1:by auto. 
-      rcondt{2} 4; 1:by auto; sp; conseq (_: true).
-      by rcondf{2} 6; auto; do!(call (_: true); auto).
-    transitivity{1} {Iter(O).iter([i';i]); l <- drop 2 l;}
-      (l{1} = i :: i' :: (s1 ++ s2) /\
-       l{2} = i' :: i :: (s1 ++ s2) /\ ={glob O} ==> ={l,glob O})
-      (l{2} = i' :: i :: (s1 ++ s2) /\ ={l, glob O} ==> ={l,glob O})=> //.
-    + by move=> ? &mr [*] <*>; exists (glob O){mr}, (i' :: i :: (s1 ++ s2)).
-    + by wp; call (iter_swap1 i i').
-    inline *; rcondt{1} 2; 1:by auto. 
-    rcondt{1} 4; 1:by auto; sp; conseq (_: true).
-    by rcondf{1} 6; auto; do!(call (_: true); auto).
-  proc; rcondt{1} 1=> //; rcondt{2} 1=> //.
-  seq  2  2: (l{1} = i :: (s1 ++ s2) /\ l{2} = s1 ++ i :: s2 /\ ={glob O}).
-  + by wp; call (_: true); auto; progress; rewrite drop0.
-  transitivity{1} {Iter(O).iter(l);}
-   (={l,glob O} /\ l{1}= i::(s1++s2) ==> ={glob O})
-   (={glob O} /\ l{1}=i::(s1++s2) /\ l{2}= (s1++i::s2) ==> ={glob O})=> //.
-  + by move=> ? &mr [*] <*>; exists (glob O){mr}, (i :: (s1 ++ s2)).
-  + by inline*; sim.
-  transitivity{1} {Iter(O).iter(l);}
-   (={glob O} /\ l{1}=i::(s1++s2) /\ l{2}= (s1++i::s2) ==> ={glob O})
-   (={l,glob O} /\ l{2}= (s1++i::s2) ==> ={glob O})=> //.
-  + by move=> ? &mr [*] <*>; exists (glob O){mr}, (s1 ++ i::s2).
-  + by call Hrec; auto.
-  by inline*; sim.
+    (={glob O} /\ l1{1} = [i;i'] /\ l2{1} = s1 ++ s2 /\ l{2} = i'::(s1++i::s2) ==>
+     ={glob O})=> [/#|//||].
+  + by conseq (iter_cat O)=> ? &ml [*] 4!->.
+  transitivity Iters(O).iters
+    (={glob O,l2} /\ l1{1} = [i;i'] /\ l1{2} = [i';i] /\ l2{1} = s1++s2 ==>
+     ={glob O})
+    (={glob O} /\ l1{1} = [i';i] /\ l2{1} = s1 ++ s2 /\ l{2} = i'::(s1++i::s2) ==>
+     ={glob O})=> [/#|//||].
+  + proc; call (_: ={glob O}).
+    * by while (={glob O,l}); auto; call (_: true).
+    conseq (_: ={glob O} /\ l1{1} = [i;i'] /\ l1{2} = [i';i] ==> ={glob O})=> //.
+    transitivity{1} {Iter2(O).iter2_12(i,i');}
+      (l1{1} = [i;i'] /\ ={glob O,l1} ==> ={glob O})
+      (l1{1} = [i;i'] /\ l1{2} = [i';i] /\ ={glob O} ==> ={glob O})=> [/#|//||].
+    + by symmetry; call (iter2_12_eq O).
+    transitivity{1} {Iter2(O).iter2_21(i,i');}
+      (l1{1} = [i;i'] /\ l1{2} =[i';i] /\ ={glob O} ==> ={glob O})
+      (l1{1} = [i';i] /\ ={glob O,l1} ==> ={glob O})=> [/#|//||].
+    + by wp; call iter2_eq.
+    by call (iter2_21_eq O).
+  transitivity Iters(O).iters
+    (={glob O} /\ l1{1} = [i';i] /\ l2{1} = s1++s2 /\ l1{2} = [i'] /\ l2{2} = i::(s1++s2) ==>
+     ={glob O})
+    (={glob O} /\ l1{1} = [i'] /\ l2{1} = i::s1++s2 /\ l{2} = i'::(s1++i::s2) ==>
+     ={glob O})=> [/#|//||].
+  + by conseq (iter_cat_cat O)=> ? &ml [*] 5!->.
+  transitivity Iters(O).iters
+    (={glob O,l1} /\ l1{1} = [i'] /\ l2{1} = i::s1++s2 /\ l2{2} = s1++i::s2 ==>
+     ={glob O})
+    (={glob O} /\ l1{1} = [i'] /\ l2{1} = s1++i::s2 /\ l{2} = i'::s1++i::s2 ==>
+     ={glob O})=> [/#|//||]; last first.
+  + by symmetry; conseq (iter_cat O)=> // ? &ml [*] 4!->.
+  proc; call Hrec; call (_: ={glob O})=> //.
+  by while (={glob O, l}); auto; call (_: true).
   qed.
 
   lemma iter_perm : 
