@@ -651,16 +651,7 @@ type intropattern1 =
 
 and intropattern = (intropattern1 located) list
 
-and ipcore = [
-  | `Temp     of renaming option
-  | `Renaming of renaming
-  ]
-
-and renaming = [
-  | `NoName
-  | `FindName
-  | `NoRename   of string
-]
+and ipcore = [ `Named of string | `Revert | `Clear | `Anonymous ]
 
 and icasemode =
   [`One | `Full of (bool * bool) * icasemode_full option]

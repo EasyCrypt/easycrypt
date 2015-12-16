@@ -1801,23 +1801,16 @@ ipcore_name:
 
 ipcore:
 | PLUS
-   { `Temp None }
+   { `Revert }
 
-| TILD ip=ipcore_renaming
-   { `Temp (Some ip) }
-
-| ip=ipcore_renaming
-   { `Renaming ip }
-
-ipcore_renaming:
 | UNDERSCORE
-   { `NoName }
+   { `Clear }
 
 | QUESTION
-   { `FindName }
+   { `Anonymous }
 
 | s=ipcore_name
-   { `NoRename s }
+   { `Named s }
 
 %inline icasemode:
 | /* empty */

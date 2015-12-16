@@ -18,6 +18,7 @@ type ttenv = {
   tt_provers   : EcParsetree.pprover_infos -> EcProvers.prover_infos;
   tt_smtmode   : [`Admit | `Strict | `Standard | `Report];
   tt_implicits : bool;
+  tt_oldip     : bool;
 }
 
 type engine  = ptactic_core -> backward

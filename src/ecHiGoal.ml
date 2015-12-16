@@ -37,6 +37,7 @@ type ttenv = {
   tt_provers   : EcParsetree.pprover_infos -> EcProvers.prover_infos;
   tt_smtmode   : [`Admit | `Strict | `Standard | `Report];
   tt_implicits : bool;
+  tt_oldip     : bool;
 }
 
 type engine = ptactic_core -> FApi.backward
@@ -1026,19 +1027,19 @@ let process_view pes tc =
 (* -------------------------------------------------------------------- *)
 module IntroState : sig
   type state
-  type action = [ `Revert | `Dup ]
+  type action = [ `Revert | `Dup | `Clear ]
 
   val create  : unit -> state
   val push    : ?name:symbol -> action -> EcIdent.t -> state -> unit
-  val listing : state -> (genclear * EcIdent.t) list
+  val listing : state -> ([`Gen of genclear | `Clear] * EcIdent.t) list
   val naming  : state -> (EcIdent.t -> symbol option)
 end = struct
   type state = {
-    mutable torev  : (genclear * EcIdent.t) list;
+    mutable torev  : ([`Gen of genclear | `Clear] * EcIdent.t) list;
     mutable naming : symbol option Mid.t;
   }
 
-  and action = [ `Revert | `Dup ]
+  and action = [ `Revert | `Dup | `Clear ]
 
   let create () =
     { torev = []; naming = Mid.empty; }
@@ -1051,8 +1052,9 @@ end = struct
       id st.naming
     and action =
       match action with
-      | `Revert -> `TryClear
-      | `Dup    -> `NoClear
+      | `Revert -> `Gen `TryClear
+      | `Dup    -> `Gen `NoClear
+      | `Clear  -> `Clear
     in
       st.torev  <- (action, id) :: st.torev;
       st.naming <- map
@@ -1094,20 +1096,23 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
         in
         let name, revname, form = destruct form in
         let revert, id =
-          let id_of_renaming = function
-            | `NoName       -> EcIdent.create "_"
-            | `FindName     -> LDecl.fresh_id hyps name
-            | `NoRename s   -> EcIdent.create s
-          in
+          if ttenv.tt_oldip then
             match unloc s with
-            | `Temp None     -> Some false, EcIdent.create "_"
-            | `Temp (Some s) -> Some true , id_of_renaming s
-            | `Renaming s    -> None      , id_of_renaming s
+            | `Revert     -> Some false, EcIdent.create "_"
+            | `Clear      -> None      , EcIdent.create "_"
+            | `Anonymous  -> None      , LDecl.fresh_id hyps name
+            | `Named s    -> None      , EcIdent.create s
+          else
+            match unloc s with
+            | `Revert     -> Some false, EcIdent.create "_"
+            | `Clear      -> Some true , LDecl.fresh_id hyps name
+            | `Anonymous  -> None      , EcIdent.create "_"
+            | `Named s    -> None      , EcIdent.create s
         in
 
         let id     = mk_loc s.pl_loc id in
         let hyps   = LDecl.add_local id.pl_desc (LD_var (tbool, None)) hyps in
-        let revert = revert |> omap (fun b -> if b then `Dup else `Revert) in
+        let revert = revert |> omap (fun b -> if b then `Clear else `Revert) in
         let torev  = revert
           |> omap (fun b -> (b, unloc id, revname) :: torev)
           |> odfl torev
@@ -1379,11 +1384,16 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
     let ip, pis = collect pis in
     let gs = dointro st true (List.rev ip) gs in
     let gs =
+      let ls = ST.listing st in
+      let gn = List.pmap (function (`Gen x, y) -> Some (x, y) | _ -> None) ls in
+      let cl = List.pmap (function (`Clear, y) -> Some y | _ -> None) ls in
+
       t_onall (fun tc ->
         t_generalize_hyps_x
           ~missing:true ~naming:(ST.naming st)
-          (ST.listing st) tc)
-        gs in
+           gn tc)
+        (t_onall (t_clears cl) gs)
+    in
 
     if List.is_empty pis then gs else
       gs |> t_onall (fun tc ->
