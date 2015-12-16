@@ -999,11 +999,9 @@ let lenv_of_hyps genv (hyps : hyps) : lenv =
 
 (* -------------------------------------------------------------------- *)
 let trans_axiom genv (p, ax) = 
-  match ax.ax_spec with
-  | Some f when not ax.ax_nosmt ->
-      let lenv = fst (lenv_of_tparams ax.ax_tparams) in    
-      add_axiom (genv, lenv) (preid_p p) f
-  | _ -> ()
+  if not ax.ax_nosmt then
+    let lenv = fst (lenv_of_tparams ax.ax_tparams) in    
+    add_axiom (genv, lenv) (preid_p p) ax.ax_spec
 
 (* -------------------------------------------------------------------- *)
 let mk_predb1 f l _ = f (Cast.force_prop (as_seq1 l))
@@ -1242,7 +1240,7 @@ module Frequency = struct
       | Fproj    (e, _)       -> add e
       | Fpr      pr           -> addx pr.pr_fun;add pr.pr_event;add pr.pr_args
       | _ -> () in
-    oiter add ax.ax_spec 
+    add ax.ax_spec 
 
   let create unwanted_op : frequency =
     { f_unwanted_op = unwanted_op;
@@ -1295,9 +1293,7 @@ let init_relevant env pi rs =
     let wanted = wanted_ax p in
     if wanted || (not ax.ax_nosmt && not (unwanted_ax p)) then begin
       Frequency.add fr ax;
-      let used = 
-        omap_dfl (Frequency.f_ops unwanted_ops) 
-          Frequency.r_empty ax.ax_spec in
+      let used = Frequency.f_ops unwanted_ops ax.ax_spec in
       let paxu = (p,ax), used in
       if wanted then push paxu rel else push paxu other
     end in

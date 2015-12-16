@@ -684,7 +684,7 @@ module MC = struct
       let ax   =
         { ax_kind    = `Axiom (Ssym.empty, false);
           ax_tparams = tv;
-          ax_spec    = Some cl;
+          ax_spec    = cl;
           ax_nosmt   = false; } in
       (name, (axp, ax))) ax in
 
@@ -730,7 +730,7 @@ module MC = struct
             let do1 scheme name =
               let scname = Printf.sprintf "%s_%s" x name in
                 (scname, { ax_tparams = tyd.tyd_params;
-                           ax_spec    = Some scheme;
+                           ax_spec    = scheme;
                            ax_kind    = `Axiom (Ssym.empty, false);
                            ax_nosmt   = true; })
             in
@@ -765,7 +765,7 @@ module MC = struct
           let scheme =
             let scname = Printf.sprintf "%s_ind" x in
               (scname, { ax_tparams = tyd.tyd_params;
-                         ax_spec    = Some scheme;
+                         ax_spec    = scheme;
                          ax_kind    = `Axiom (Ssym.empty, false);
                          ax_nosmt   = true; })
           in
@@ -850,7 +850,7 @@ module MC = struct
           (fun (x, ax) ->
             let ax = Fsubst.f_subst fsubst ax in
               (x, { ax_tparams = [(self, Sp.singleton mypath)];
-                    ax_spec    = Some ax;
+                    ax_spec    = ax;
                     ax_kind    = `Axiom (Ssym.empty, false);
                     ax_nosmt   = true; }))
           tc.tc_axs
@@ -2329,7 +2329,7 @@ module NormMp = struct
         op_ty   = norm_ty env op.op_ty; }
 
   let norm_ax env ax =
-    { ax with ax_spec = ax.ax_spec |> omap (norm_form env) }
+    { ax with ax_spec = norm_form env ax.ax_spec }
 
   let is_abstract_fun f env =
     let f = norm_xfun env f in
@@ -2586,7 +2586,7 @@ module Ax = struct
 
   let instanciate p tys env =
     match by_path_opt p env with
-    | Some ({ ax_spec = Some f } as ax) ->
+    | Some ({ ax_spec = f } as ax) ->
         Fsubst.subst_tvar
           (EcTypes.Tvar.init (List.map fst ax.ax_tparams) tys) f
     | _ -> raise (LookupFailure (`Path p))

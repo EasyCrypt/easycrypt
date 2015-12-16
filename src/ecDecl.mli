@@ -133,7 +133,7 @@ type axiom_kind = [`Axiom of (Ssym.t * bool) | `Lemma]
 
 type axiom = {
   ax_tparams : ty_params;
-  ax_spec    : form option;
+  ax_spec    : form;
   ax_kind    : axiom_kind;
   ax_nosmt   : bool;
 }

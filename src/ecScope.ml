@@ -778,7 +778,7 @@ module Ax = struct
       | false -> PSNoCheck
       | true  ->
           let hyps  = EcEnv.LDecl.init scope.sc_env axd.ax_tparams in
-          let proof = EcCoreGoal.start hyps (oget axd.ax_spec) in
+          let proof = EcCoreGoal.start hyps axd.ax_spec in
           PSCheck proof
     in
     let puc =
@@ -833,7 +833,7 @@ module Ax = struct
         | _ -> `Lemma
 
       in { ax_tparams = tparams;
-           ax_spec    = Some concl;
+           ax_spec    = concl;
            ax_kind    = kind;
            ax_nosmt   = ax.pa_nosmt; }
     in
@@ -1166,7 +1166,7 @@ module Op = struct
                List.combine axpm (List.map snd tparams)) in
           let ax =
             { ax_tparams = axpm;
-              ax_spec    = Some ax;
+              ax_spec    = ax;
               ax_kind    = `Axiom (Ssym.empty, false);
               ax_nosmt   = false; }
           in Ax.bind scope false (unloc rname, ax))
@@ -1530,7 +1530,7 @@ module Ty = struct
            if not (Mstr.mem x symbs) then
              let ax = {
                ax_tparams = [];
-               ax_spec    = Some req;
+               ax_spec    = req;
                ax_kind    = `Lemma;
                ax_nosmt   = true;
              } in Some ((None, ax), EcPath.psymbol x, scope.sc_env)
@@ -1543,7 +1543,7 @@ module Ty = struct
           let t  = { pl_loc = pt.pl_loc; pl_desc = Pby (Some [t]) } in
           let t  = { pt_core = t; pt_intros = []; } in
           let ax = { ax_tparams = [];
-                     ax_spec    = Some f;
+                     ax_spec    = f;
                      ax_kind    = `Axiom (Ssym.empty, false);
                      ax_nosmt   = true; } in
 
@@ -2005,7 +2005,7 @@ module Section = struct
                   if not (EcSection.is_local `Lemma axp locals) then
                     Ax.bind scope false
                       (x, { ax with ax_spec =
-                              ax.ax_spec |> omap (EcSection.generalize scenv locals) })
+                              EcSection.generalize scenv locals ax.ax_spec })
                   else
                     scope
           end

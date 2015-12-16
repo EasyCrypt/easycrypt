@@ -71,11 +71,7 @@ let match_ (env : EcEnv.env) (search : search list) f =
 
 (* -------------------------------------------------------------------- *)
 let search (env : EcEnv.env) (search : search list) =
-  let check _ ax =
-    match ax.EcDecl.ax_spec with
-    | None   -> false
-    | Some f -> match_ env search f
-
+  let check _ ax = match_ env search ax.EcDecl.ax_spec
   in EcEnv.Ax.all ~check env
 
 (* -------------------------------------------------------------------- *)
@@ -88,14 +84,11 @@ let sort (relevant:Sp.t) (res:(path * EcDecl.axiom) list) =
   let fr = Frequency.create unwanted_ops in
   let do1 (p, ax) = 
     Frequency.add fr ax;
-    let used = 
-      omap_dfl (Frequency.f_ops unwanted_ops) 
-        Frequency.r_empty ax.ax_spec in
+    let used = Frequency.f_ops unwanted_ops ax.ax_spec in
     (p,ax), used in
   let res = List.map do1 res in
 
   (* compute the weight of each axiom *)
-
   let rs = relevant, Sx.empty in
   let frequency_function freq = 1. +. log1p (float_of_int freq) in
 
@@ -112,8 +105,3 @@ let sort (relevant:Sp.t) (res:(path * EcDecl.axiom) list) =
   let res = List.map do1 res in
   let res = List.sort (fun (_,p1) (_,p2) -> compare p1 p2) res in
   List.map fst res
-  
-
-  
-
-  

@@ -135,7 +135,7 @@ type axiom_kind = [`Axiom of (Ssym.t * bool) | `Lemma]
 
 type axiom = {
   ax_tparams : ty_params;
-  ax_spec    : EcCoreFol.form option;
+  ax_spec    : EcCoreFol.form;
   ax_kind    : axiom_kind;
   ax_nosmt   : bool; }
 
@@ -261,7 +261,7 @@ let axiomatized_op ?(nargs = 0) ?(nosmt = false) path (tparams, bd) =
   let axspec = f_forall args (f_eq op axbd) in
 
   { ax_tparams = axpm;
-    ax_spec    = Some axspec;
+    ax_spec    = axspec;
     ax_kind    = `Axiom (Ssym.empty, false);
     ax_nosmt   = nosmt; }
 

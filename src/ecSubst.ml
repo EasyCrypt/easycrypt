@@ -407,17 +407,12 @@ let subst_op (s : _subst) (op : operator) =
 let subst_ax (s : _subst) (ax : axiom) =
   let params = List.map (subst_typaram s) ax.ax_tparams in
   let s      = init_tparams s ax.ax_tparams params in
-  let spec   = 
-    match ax.ax_spec with
-    | None -> None
-    | Some f -> 
-        let s = f_subst_of_subst s in
-          Some (Fsubst.f_subst s f)
-  in
-     { ax_tparams = params;
-       ax_spec    = spec;
-       ax_kind    = ax.ax_kind;
-       ax_nosmt   = ax.ax_nosmt; }
+  let spec   = Fsubst.f_subst (f_subst_of_subst s) ax.ax_spec in
+
+  { ax_tparams = params;
+    ax_spec    = spec;
+    ax_kind    = ax.ax_kind;
+    ax_nosmt   = ax.ax_nosmt; }
 
 (* -------------------------------------------------------------------- *)
 let subst_ring (s : _subst) cr =

@@ -750,7 +750,7 @@ let pp_current_goal ?(all = false) stream =
            let ppe = EcPrinting.PPEnv.ofenv env in
            Format.fprintf stream " %s: %a@\n%!"
              (EcPath.tostring p)
-             (EcPrinting.pp_form ppe) (oget ax.EcDecl.ax_spec))
+             (EcPrinting.pp_form ppe) ax.EcDecl.ax_spec)
         (fst ct)
 
   | Some { S.puc_active = Some (puc, _) } -> begin

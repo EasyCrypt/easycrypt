@@ -1860,9 +1860,7 @@ let pp_axiom ?(long=false) (ppe : PPEnv.t) fmt (x, ax) =
   let basename = P.basename x in
 
   let pp_spec fmt =
-    match ax.ax_spec with
-    | None   -> pp_string fmt "<why3-imported>"
-    | Some f -> pp_form ppe fmt f 
+    pp_form ppe fmt ax.ax_spec
 
   and pp_name fmt =
     match ax.ax_tparams with

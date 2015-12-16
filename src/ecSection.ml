@@ -420,7 +420,7 @@ let generalize env lc (f : EcFol.form) =
     let f =
       let do1 p f =
         let ax = EcEnv.Ax.by_path p env in
-          EcFol.f_imp (oget ax.ax_spec) f
+        EcFol.f_imp ax.ax_spec f
       in
           List.fold_right do1 axioms f in
     let f =

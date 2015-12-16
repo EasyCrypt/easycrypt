@@ -179,7 +179,7 @@ let pt_of_uglobal pf hyps p =
   let ptenv   = ptenv_of_penv hyps pf in
   let env     = LDecl.toenv hyps in
   let ax      = oget (EcEnv.Ax.by_path_opt p env) in
-  let typ, ax = (ax.EcDecl.ax_tparams, oget ax.EcDecl.ax_spec) in
+  let typ, ax = (ax.EcDecl.ax_tparams, ax.EcDecl.ax_spec) in
 
   (* FIXME: TC HOOK *)
   let fs  = EcUnify.UniEnv.opentvi ptenv.pte_ue typ None in
@@ -362,7 +362,7 @@ let lookup_named_psymbol (hyps : LDecl.hyps) ~hastyp fp =
 
   | _ ->
     match EcEnv.Ax.lookup_opt fp (LDecl.toenv hyps) with
-    | Some (p, ({ EcDecl.ax_spec = Some fp } as ax)) ->
+    | Some (p, ({ EcDecl.ax_spec = fp } as ax)) ->
         Some (`Global p, (ax.EcDecl.ax_tparams, fp))
     | _ -> None
 

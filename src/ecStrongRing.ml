@@ -46,7 +46,7 @@ let get_injection env p =
   try 
     let ax = EcEnv.Ax.by_path p env in
     (* try to match a term of the form  _ = _ <=> inj _ = inj _ *)
-    let _, concl = decompose_forall (oget ax.EcDecl.ax_spec) in
+    let _, concl = decompose_forall ax.EcDecl.ax_spec in
     let _, f = destr_iff concl in
     let f1, f2 = destr_eq f in
     match f1.f_node, f2.f_node with

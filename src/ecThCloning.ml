@@ -364,7 +364,7 @@ end = struct
          let ovrd = (ovrd, `Inline) in
          pr_ovrd ~cancrt:true oc (proofs, evc) (loced (xdth @ prefix, x)) ovrd
 
-      | CTh_axiom (x, ({ ax_spec = Some _ } as ax)) ->
+      | CTh_axiom (x, ax) ->
          if is_axiom ax.ax_kind then
            let params = List.map (EcIdent.name |- fst) ax.ax_tparams in
            let params = List.map (mk_loc lc) params in
@@ -478,7 +478,7 @@ end = struct
         clone_error oc.oc_env (CE_UnkOverride (OVK_Lemma, name))
 
     | Some ax ->
-        if not (is_axiom ax.ax_kind) || ax.ax_spec = None then
+        if not (is_axiom ax.ax_kind) then
           clone_error oc.oc_env (CE_CrtOverride (OVK_Lemma, name));
 
         let update1 evc =
