@@ -1233,7 +1233,7 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
     let t_and =
       if prind then
         t_elim_iso_and ~reduce:red
-      else (fun tc -> (2, t_elim_and tc))
+      else (fun tc -> (2, t_elim_and ~reduce:red tc))
     in
 
     let onsub gs =
