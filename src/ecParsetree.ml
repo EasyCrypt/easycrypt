@@ -240,6 +240,7 @@ and pformula_r =
   | PFproji  of pformula * int
   | PFglob   of pmsymbol located
   | PFeqveq  of glob_or_var list * (pmsymbol pair) option
+  | PFeqf    of pformula list
   | PFlsless of pgamepath
   | PFscope  of pqsymbol * pformula
 

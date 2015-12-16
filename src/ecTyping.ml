@@ -2114,6 +2114,29 @@ let trans_form_or_pattern env (ps, ue) pf tt =
           check_mem f.pl_loc EcFol.mright;
           EcFol.f_ands (List.map do1 xs)
 
+    | PFeqf fs ->
+        let check_mem loc me = 
+          match EcEnv.Memory.byid me env with
+          | None -> tyerror loc env (UnknownMemName (EcIdent.name me))
+          | Some _ -> ()
+
+        and do1 (me1, me2) f =
+          let _, f1 =
+            PFS.new_memused 
+              (transf (EcEnv.Memory.set_active me1 env))
+              state f in
+          let _, f2 =
+            PFS.new_memused 
+              (transf (EcEnv.Memory.set_active me2 env))
+              state f in
+          unify_or_fail env ue f.pl_loc ~expct:f1.f_ty f2.f_ty;
+          f_eq f1 f2
+
+        in
+          check_mem f.pl_loc EcFol.mleft;
+          check_mem f.pl_loc EcFol.mright;
+          EcFol.f_ands (List.map (do1 (EcFol.mleft, EcFol.mright)) fs)
+
     | PFapp ({pl_desc = PFident ({ pl_desc = name; pl_loc = loc }, tvi)}, pes) ->
         let tvi  = tvi |> omap (transtvi env ue) in  
         let es   = List.map (transf env) pes in
