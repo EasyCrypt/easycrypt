@@ -90,5 +90,4 @@ and rk_categories = {
 
 (* -------------------------------------------------------------------- *)
 val rename : renaming -> theory_renaming_kind * string -> string option
-
-val clone : EcEnv.env -> theory_cloning -> clone
+val clone  : EcEnv.env -> theory_cloning -> clone
