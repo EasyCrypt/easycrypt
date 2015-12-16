@@ -25,6 +25,8 @@ op size (xs : 'a list) =
 lemma size_ge0 (s : 'a list): 0 <= size s.
 proof. by elim: s => //= x s; smt. qed.
 
+local hint exact : size_ge0.
+
 lemma size_eq0 (s : 'a list): (size s = 0) <=> (s = []).
 proof. by case: s => //=; smt. qed.
 
@@ -119,7 +121,7 @@ proof. by elim: s1=> // x s1 /= ->; smt. qed.
 lemma eqseq_cat (s1 s2 s3 s4 : 'a list) : size s1 = size s2 =>
   (s1 ++ s3 = s2 ++ s4) <=> (s1 = s2) /\ (s3 = s4).
 proof.
-elim: s1 s2 => [|x1 s1 ih] [|x2 s2] //=; rewrite ?(addz_neq0, size_ge0) //.
+elim: s1 s2 => [|x1 s1 ih] [|x2 s2] //=; rewrite ?addz_neq0 //.
 by move/addzI/ih=> ->.
 qed.
 
@@ -1141,7 +1143,6 @@ lemma uniq_leq_size (s1 s2 : 'a list):
   uniq s1 => (mem s1 <= mem s2) => size s1 <= size s2.
 proof.                          (* FIXME: test case: for views *)
   rewrite /Pred.(<=); elim: s1 s2 => //.
-    by move=> s2 /=; rewrite size_ge0.
   move=> x s1 IHs s2 [not_s1x Us1]; rewrite -(allP (mem s2)) /=.
   case=> s2x; rewrite allP => ss12; cut := rot_to s2 x _ => //.
   case=> i s3 def_s2; rewrite -(size_rot i s2) def_s2 /= lez_add2l.
@@ -1571,9 +1572,9 @@ lemma map_nth_range (x0 : 'a) s:
   map (fun i => nth x0 s i) (range 0 (size s)) = s.
 proof.
 apply/(@eq_from_nth x0)=> [|i]; rewrite ?size_map.
-  by rewrite size_range /= max_ler ?size_ge0.
+  by rewrite size_range /= max_ler.
 move=> le_is; rewrite (@nth_map i) //= nth_range //=.
-by move: le_is; rewrite size_range max_ler /= ?size_ge0.
+by move: le_is; rewrite size_range max_ler /=.
 qed.
 
 (* -------------------------------------------------------------------- *)
