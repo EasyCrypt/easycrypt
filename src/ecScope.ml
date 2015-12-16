@@ -2071,27 +2071,38 @@ module Cloning = struct
   open EcTheory
   open EcThCloning
 
-  (* -------------------------------------------------------------------- *)
-  exception Incompatible of incompatible
+  module C = EcThCloning
+  module R = EcTheoryReplay
 
-  let ty_compatible env ue (rtyvars, rty) (ntyvars, nty) =
-    let rlen = List.length rtyvars and nlen = List.length ntyvars in
-    if rlen <> nlen then
-      raise (Incompatible (NotSameNumberOfTyParam(rlen,nlen)));
-
-    let subst = Tvar.init rtyvars (List.map tvar ntyvars) in
-    let rty   = Tvar.subst subst rty in
-
-    try  EcUnify.unify env ue rty nty
-    with EcUnify.UnificationFailure _ ->
-      raise (Incompatible (DifferentType (rty, nty)))
-  
   (* ------------------------------------------------------------------ *)
-  type options = {
-    clo_abstract : bool;
-  }
+  let onenv (tx : 'a -> EcEnv.env -> EcEnv.env) =
+    fun sc x -> { sc with sc_env = tx x (env sc) }
 
+  (* ------------------------------------------------------------------ *)
+  let hooks : scope R.ovrhooks =
+    let thenter sc mode x = Theory.enter sc mode x in
+    let thexit  sc pempty = snd (Theory.exit ?clears:None ~pempty sc) in
+
+    { R.henv     = (fun sc -> env sc);
+      R.hty      = Ty     .bind;
+      R.hop      = Op     .bind;
+      R.hmodty   = ModType.bind;
+      R.hmod     = Mod    .bind;
+      R.hax      = Ax     .bind;
+      R.hexport  = onenv EcEnv.Theory.export;
+      R.hbaserw  = onenv EcEnv.BaseRw.add;
+      R.haddrw   = onenv (curry EcEnv.BaseRw.addto);
+      R.hauto    = onenv EcEnv.Auto.add;
+      R.htycl    = onenv (curry EcEnv.TypeClass.bind);
+      R.hinst    = onenv (curry EcEnv.TypeClass.add_instance);
+      R.hthenter = thenter;
+      R.hthexit  = thexit;
+      R.herr     = (fun ?loc -> hierror ?loc "%s"); }
+
+  (* ------------------------------------------------------------------ *)
   module Options = struct
+    open EcTheoryReplay
+
     let default = { clo_abstract = false; }
 
     let merge1 opts (b, (x : theory_cloning_option)) =
@@ -2103,19 +2114,7 @@ module Cloning = struct
   end
 
   (* ------------------------------------------------------------------ *)
-  type ovrenv = {
-    ovre_ovrd  : EcThCloning.evclone;
-    ovre_scope : ovrsc;
-  }
-
-  and ovrsc = {
-    ovrc_glproof : (ptactic_core option * Ssym.t option) list;
-  }
-
-  (* ------------------------------------------------------------------ *)
   let clone (scope : scope) mode (thcl : theory_cloning) =
-    let module C = EcThCloning in
-
     assert (scope.sc_pr_uc = None);
 
     if EcSection.in_section scope.sc_section then begin
@@ -2139,395 +2138,22 @@ module Cloning = struct
   
         = C.clone scope.sc_env thcl in
 
-    let ovrds = { ovre_ovrd  = ovrds;
-                  ovre_scope = { ovrc_glproof = []}; } in
     let incl  = thcl.pthc_import = Some `Include in
     let opts  = Options.merge Options.default thcl.pthc_opts in
 
-    if thcl.pthc_import = Some `Include && opts.clo_abstract then
+    if thcl.pthc_import = Some `Include && opts.R.clo_abstract then
       hierror "cannot include an abstract theory";
     if thcl.pthc_import = Some `Include && EcUtils.is_some thcl.pthc_name then
       hierror "cannot give an alias to an included clone";
 
     let cpath = EcEnv.root scope.sc_env in
     let npath = if incl then cpath else EcPath.pqname cpath name in
-    let subst = EcSubst.add_path EcSubst.empty opath npath in
 
     let (proofs, scope) =
-      let rec ovr1 prefix abstract (ovrds : ovrenv) (subst, ops, proofs, scope) item =
-        let xpath x = EcPath.pappend opath (EcPath.fromqsymbol (prefix, x)) in
-
-        let rename subst (kind, name) =
-          try
-            let newname =
-              List.find_map
-                (fun rnm -> EcThCloning.rename rnm (kind, name))
-                rnms in
-            let subst =
-              EcSubst.add_path subst ~src:(xpath name)
-                ~dst:(EcPath.pqname npath newname)
-            in (subst, newname)
-
-          with Not_found -> (subst, name)
-        in
-
-        let myovscope = {
-          ovrc_glproof =
-            if List.is_empty ovrds.ovre_ovrd.evc_lemmas.ev_global then
-              ovrds.ovre_scope.ovrc_glproof
-            else
-              ovrds.ovre_ovrd.evc_lemmas.ev_global
-        } in
-
-        match item with
-        | CTh_type (x, otyd) -> begin
-            match Msym.find_opt x ovrds.ovre_ovrd.evc_types with
-            | None ->
-                let otyd = EcSubst.subst_tydecl subst otyd in
-                let subst, x = rename subst (`Type, x) in
-                (subst, ops, proofs, Ty.bind scope (x, otyd))
-  
-            | Some { pl_desc = (nargs, ntyd, mode) } -> begin
-              (* Already checked:
-               *   1. type is abstract
-               *   2. type argument count are equal *)
-                (* FIXME: TC HOOK *)
-                let nargs = List.map2
-                              (fun (_, tc) x -> (EcIdent.create (unloc x), tc))
-                              otyd.tyd_params nargs in
-                let ue    = EcUnify.UniEnv.create (Some nargs) in
-                let ntyd  = EcTyping.transty EcTyping.tp_tydecl scope.sc_env ue ntyd in
-  
-                match mode with
-                | `Alias ->
-                    let binding =
-                      { tyd_params = nargs;
-                        tyd_type   = `Concrete ntyd; } in
-                    let subst, x = rename subst (`Type, x) in
-                    (subst, ops, proofs, Ty.bind scope (x, binding))
-  
-                | `Inline ->
-                    let subst =
-                      (* FIXME: TC HOOK *)
-                      EcSubst.add_tydef subst (xpath x) (List.map fst nargs, ntyd)
-                    in (subst, ops, proofs, scope)
-            end
-        end
-  
-        | CTh_operator (x, ({ op_kind = OB_oper _ } as oopd)) -> begin
-            match Msym.find_opt x ovrds.ovre_ovrd.evc_ops with
-            | None ->
-                let (subst, x) = rename subst (`Op, x) in
-                (subst, ops, proofs, Op.bind scope (x, EcSubst.subst_op subst oopd))
-  
-            | Some { pl_desc = (opov, opmode); pl_loc = loc; } ->
-                let (reftyvars, refty) =
-                  let refop = EcSubst.subst_op subst oopd in
-                  (refop.op_tparams, refop.op_ty)
-                in
-  
-                let (newop, subst, x, alias) =
-                  let tp = opov.opov_tyvars |> omap (List.map (fun tv -> (tv, []))) in
-                  let ue = EcTyping.transtyvars scope.sc_env (loc, tp) in
-                  let tp = EcTyping.tp_relax in
-                  let (ty, body) =
-                    let env     = scope.sc_env in
-                    let codom   = EcTyping.transty tp env ue opov.opov_retty in
-                    let env, xs = EcTyping.trans_binding env ue opov.opov_args in
-                    let body    = EcTyping.transexpcast env `InOp ue codom opov.opov_body in
-                    let lam     = EcTypes.e_lam xs body in
-
-                    (lam.EcTypes.e_ty, lam)
-                  in
-
-                  (* FIXME: TC HOOK *)
-                  begin
-                    try ty_compatible scope.sc_env ue
-                        (List.map fst reftyvars, refty)
-                        (List.map fst (EcUnify.UniEnv.tparams ue), ty)
-                    with Incompatible err ->
-                      clone_error scope.sc_env (CE_OpIncompatible((prefix, x), err))
-                  end;
-
-                  if not (EcUnify.UniEnv.closed ue) then
-                    hierror ~loc "this operator body contains free type variables";
-  
-                  let uni     = EcTypes.Tuni.offun (EcUnify.UniEnv.close ue) in
-                  let body    = body |> EcTypes.e_mapty uni in
-                  let ty      = uni ty in
-                  let tparams = EcUnify.UniEnv.tparams ue in
-                  let newop   = mk_op tparams ty (Some (OP_Plain body)) in
-                    match opmode with
-                    | `Alias ->
-                      let subst, x = rename subst (`Op, x) in
-                      (newop, subst, x, true)
-  
-                    (* FIXME: TC HOOK *)
-                    | `Inline ->
-                        let subst1 = (List.map fst tparams, body) in
-                        let subst  = EcSubst.add_opdef subst (xpath x) subst1
-                        in  (newop, subst, x, false)
-                in
-  
-                let ops = 
-                  Mp.add (EcPath.fromqsymbol (prefix, x)) (newop, alias) ops in
-                (subst, ops, proofs, 
-                 if alias then Op.bind scope (x, newop) else scope)
-        end
-  
-        | CTh_operator (x, ({ op_kind = OB_pred _} as oopr)) -> begin
-            match Msym.find_opt x ovrds.ovre_ovrd.evc_preds with
-            | None ->
-                let subst, x = rename subst (`Pred, x) in
-                (subst, ops, proofs, Op.bind scope (x, EcSubst.subst_op subst oopr))
-  
-            | Some { pl_desc = (prov, prmode); pl_loc = loc; } ->
-                let (reftyvars, refty) =
-                  let refpr = EcSubst.subst_op subst oopr in
-                    (refpr.op_tparams, refpr.op_ty)
-                in
-  
-                let (newpr, subst, x, alias) =
-                   let tp = prov.prov_tyvars |> omap (List.map (fun tv -> (tv, []))) in
-                   let ue = EcTyping.transtyvars scope.sc_env (loc, tp) in
-                   let body =
-                     let env     = scope.sc_env in
-                     let env, xs = EcTyping.trans_binding env ue prov.prov_args in
-                     let body    = EcTyping.trans_form_opt env ue prov.prov_body None in
-                     let xs      = List.map (fun (x, ty) -> x, EcFol.GTty ty) xs in
-                     let lam     = EcFol.f_lambda xs body in
-                     lam
-                   in
-  
-                  (* FIXME: TC HOOK *)
-                   begin 
-                     try 
-                       ty_compatible scope.sc_env ue
-                         (List.map fst reftyvars, refty)
-                         (List.map fst (EcUnify.UniEnv.tparams ue), body.EcFol.f_ty) 
-                     with Incompatible err -> 
-                       clone_error scope.sc_env 
-                         (CE_OpIncompatible((prefix, x), err))
-                   end;
-
-                   if not (EcUnify.UniEnv.closed ue) then
-                     hierror ~loc "this predicate body contains free type variables";
-  
-                   let uni     = EcUnify.UniEnv.close ue in
-                   let body    = EcFol.Fsubst.uni uni body in
-                   let tparams = EcUnify.UniEnv.tparams ue in
-                   let newpr   =
-                     { op_tparams = tparams;
-                       op_ty      = body.EcFol.f_ty;
-                       op_kind    = OB_pred (Some (PR_Plain body)); } in
-
-                    match prmode with
-                    | `Alias ->
-                      let subst, x = rename subst (`Pred, x) in
-                      (newpr, subst, x, true)
-  
-                    (* FIXME: TC HOOK *)
-                    | `Inline ->
-                        let subst1 = (List.map fst tparams, body) in
-                        let subst  = EcSubst.add_pddef subst (xpath x) subst1
-                        in (newpr, subst, x, false)
-
-                in
-  
-                (subst, ops, proofs, 
-                 if alias then Op.bind scope (x, newpr) else scope)
-        end
-
-        | CTh_operator (x, ({ op_kind = OB_nott _} as oont)) ->
-            if EcPath.Sp.mem (xpath x) ntclr then
-              (subst, ops, proofs, scope)
-            else
-              let subst, x = rename subst (`Op, x) in
-              (subst, ops, proofs, Op.bind scope (x, EcSubst.subst_op subst oont))
-  
-        | CTh_axiom (x, ax) -> begin
-            let subst, x = rename subst (`Lemma, x) in
-            let ax = EcSubst.subst_ax subst ax in
-            let (ax, proofs, axclear) =
-              if abstract then (ax, proofs, false) else
-              let doproof =
-                match ax.ax_kind with
-                | `Lemma -> None
-                | `Axiom (tags, axclear) -> begin
-                    match Msym.find_opt x (ovrds.ovre_ovrd.evc_lemmas.ev_bynames) with
-                    | Some pt -> Some (pt, axclear)
-                    | None ->
-                        List.Exceptionless.find_map
-                          (function (pt, None) -> Some (pt, axclear) | (pt, Some pttags) ->
-                             if Ssym.disjoint tags pttags then None else Some (pt, axclear))
-                          myovscope.ovrc_glproof
-                end
-              in
-                match doproof with
-                | None -> (ax, proofs, false)
-                | Some (pt, axclear)  ->
-                    let ax  = { ax with ax_kind = `Lemma } in
-                    let axc = { axc_axiom = (x, ax);
-                                axc_path  = EcPath.fromqsymbol (prefix, x);
-                                axc_tac   = pt;
-                                axc_env   = scope.sc_env; } in
-                      (ax, axc :: proofs, axclear) in
-
-            let scope =
-              if axclear then scope else
-                Ax.bind scope thcl.pthc_local (x, ax)
-            in (subst, ops, proofs, scope)
-        end
-  
-        | CTh_modtype (x, modty) ->
-            let subst, x = rename subst (`ModType, x) in
-            let modty = EcSubst.subst_modsig subst modty in
-            (subst, ops, proofs, ModType.bind scope (x, modty))
-  
-        | CTh_module me ->
-            let subst, name = rename subst (`Module, me.me_name) in
-            let me = EcSubst.subst_module subst me in
-            let me = { me with me_name = name } in
-            (subst, ops, proofs, Mod.bind scope thcl.pthc_local me)
-  
-        | CTh_theory (x, (cth, thmode)) -> begin
-            let (subst, x) = rename subst (`Theory, x) in
-            let subovrds = Msym.find_opt x ovrds.ovre_ovrd.evc_ths in
-            let subovrds = EcUtils.odfl evc_empty subovrds in
-            let subovrds = { ovre_ovrd  = subovrds;
-                             ovre_scope = myovscope; } in
-            let (subst, ops, proofs, subscope) =
-              let subscope = Theory.enter scope thmode x in
-              let abstract = abstract || (thmode = `Abstract) in
-              let (subst, ops, proofs, subscope) =
-                List.fold_left
-                  (ovr1 (prefix @ [x]) abstract subovrds)
-                  (subst, ops, proofs, subscope) cth.cth_struct
-              in
-                (subst, ops, proofs, snd (Theory.exit ~pempty:`Full subscope))
-            in
-              (subst, ops, proofs, subscope)
-        end
-  
-        | CTh_export p ->
-            let p = EcSubst.subst_path subst p in
-
-            if is_none (EcEnv.Theory.by_path_opt p scope.sc_env) then
-              (subst, ops, proofs, scope)
-            else
-              let env   = EcEnv.Theory.export p scope.sc_env in
-              let scope = { scope with sc_env = env } in
-              (subst, ops, proofs, scope)
-  
-        | CTh_baserw x ->
-            let env   = EcEnv.BaseRw.add x scope.sc_env in
-            let scope = { scope with sc_env = env } in
-            (subst, ops, proofs, scope)
-  
-        | CTh_addrw (p, l) ->
-            let p     = EcSubst.subst_path subst p in
-            let l     = List.map (EcSubst.subst_path subst) l in
-            let env   = EcEnv.BaseRw.addto p l scope.sc_env in
-            let scope = { scope with sc_env = env } in
-            (subst, ops, proofs, scope)
-
-        | CTh_auto ps ->
-            let ps    = Sp.translate (EcSubst.subst_path subst) ps in
-            let env   = EcEnv.Auto.add ps scope.sc_env in
-            let scope = { scope with sc_env = env } in
-            (subst, ops, proofs, scope)
-  
-        | CTh_instance ((typ, ty), tc) -> begin
-            let module E = struct exception InvInstPath end in
-  
-            let forpath (p : EcPath.path) =
-              match EcPath.getprefix opath p |> omap List.rev with
-              | None | Some [] -> None
-              | Some (x::px) ->
-                  let q = EcPath.fromqsymbol (List.rev px, x) in
-  
-                  match Mp.find_opt q ops with
-                  | None ->
-                      Some (EcPath.pappend npath q)
-                  | Some (op, alias) ->
-                      match alias with
-                      | true  -> Some (EcPath.pappend npath q)
-                      | false ->
-                          match op.EcDecl.op_kind with
-                          | OB_pred _
-                          | OB_nott _    -> assert false
-                          | OB_oper None -> None
-                          | OB_oper (Some (OP_Constr _))
-                          | OB_oper (Some (OP_Record _))
-                          | OB_oper (Some (OP_Proj   _))
-                          | OB_oper (Some (OP_Fix    _))
-                          | OB_oper (Some (OP_TC      )) ->
-                              Some (EcPath.pappend npath q)
-                          | OB_oper (Some (OP_Plain e)) ->
-                              match e.EcTypes.e_node with
-                              | EcTypes.Eop (r, _) -> Some r
-                              | _ -> raise E.InvInstPath
-            in
-  
-            let forpath p = odfl p (forpath p) in
-  
-            try
-              let (typ, ty) = EcSubst.subst_genty subst (typ, ty) in
-              let tc =
-                let rec doring cr =
-                  { r_type  = EcSubst.subst_ty subst cr.r_type;
-                    r_zero  = forpath cr.r_zero;
-                    r_one   = forpath cr.r_one;
-                    r_add   = forpath cr.r_add;
-                    r_opp   = cr.r_opp |> omap forpath;
-                    r_mul   = forpath cr.r_mul;
-                    r_exp   = cr.r_exp |> omap forpath;
-                    r_sub   = cr.r_sub |> omap forpath;
-                    r_embed =
-                      begin match cr.r_embed with
-                      | `Direct  -> `Direct
-                      | `Default -> `Default
-                      | `Embed p -> `Embed (forpath p)
-                      end;
-                    r_kind = cr.r_kind; }
-  
-                and dofield cr =
-                  { f_ring = doring cr.f_ring;
-                    f_inv  = forpath cr.f_inv;
-                    f_div  = cr.f_div |> omap forpath; }
-                in
-                  match tc with
-                  | `Ring    cr -> `Ring  (doring  cr)
-                  | `Field   cr -> `Field (dofield cr)
-                  | `General p  -> `General (forpath p)
-              in
-
-              let sc_env = EcEnv.TypeClass.add_instance (typ, ty) tc scope.sc_env in
-              (subst, ops, proofs, { scope with sc_env })
-  
-            with E.InvInstPath ->
-              (subst, ops, proofs, scope)
-        end
-  
-        | CTh_typeclass (x, tc) ->
-            let tc = EcSubst.subst_tc subst tc in
-            let scope = { scope with sc_env = EcEnv.TypeClass.bind x tc scope.sc_env } in
-            (subst, ops, proofs, scope)
-  
-      in
-        try
-          let mode  = if opts.clo_abstract then `Abstract else `Concrete in
-          let scope = if incl then scope else Theory.enter scope mode name in
-          let _, _, proofs, scope =
-            List.fold_left (ovr1 [] opts.clo_abstract ovrds)
-              (subst, Mp.empty, [], scope)
-              (fst oth).cth_struct in
-          let scope =
-            if incl then scope else snd (Theory.exit scope) in
-          (List.rev proofs, scope)
-             
-        with EcEnv.DuplicatedBinding x ->
-          hierror "name clash for `%s': check your renamings" x
+      EcTheoryReplay.replay hooks
+        ~abstract:opts.R.clo_abstract ~local:thcl.pthc_local ~incl
+        ~clears:ntclr ~renames:rnms ~opath ~npath ovrds
+        scope (name, (fst oth).cth_struct)
     in
 
     let proofs = List.pmap (fun axc ->
