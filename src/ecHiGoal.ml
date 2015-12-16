@@ -430,22 +430,27 @@ let t_rewrite_prept info pt tc =
 
 (* -------------------------------------------------------------------- *)
 let process_auto (tc : tcenv1) =
-  let module E = struct exception Done of tcenv end in
+  let module E = struct
+      exception Done of tcenv
+      exception Fail
+  end in
 
   let for1 (p : EcPath.path) tc =
     let pt = PT.pt_of_uglobal !!tc (FApi.tc1_hyps tc) p in
+
     try
       FApi.t_seqs
         [LowApply.t_apply_bwd_r ~mode:fmrigid ~canview:false pt;
          EcLowGoal.t_trivial; EcLowGoal.t_fail]
         tc
+
     with LowApply.NoInstance _ ->
-      raise InvalidGoalShape
+      raise E.Fail
   in
 
   try
     Sp.iter
-      (fun p -> raise (E.Done (t_try (for1 p) tc)))
+      (fun p -> try raise (E.Done (for1 p tc)) with E.Fail -> ())
       (EcEnv.Auto.get (FApi.tc1_env tc));
     t_id tc
 
