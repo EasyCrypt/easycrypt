@@ -36,7 +36,7 @@ and 'a ovrhooks = {
   hexport  : 'a -> EcPath.path -> 'a;
   hbaserw  : 'a -> symbol -> 'a;
   haddrw   : 'a -> EcPath.path * EcPath.path list -> 'a;
-  hauto    : 'a -> Sp.t -> 'a;
+  hauto    : 'a -> bool * Sp.t -> 'a;
   htycl    : 'a -> symbol * typeclass -> 'a;
   hinst    : 'a -> (ty_params * ty) * tcinstance -> 'a;
   hthenter : 'a -> thmode -> symbol -> 'a;

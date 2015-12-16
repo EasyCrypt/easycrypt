@@ -212,8 +212,8 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Auto : sig
-  val addrw : scope -> (pqsymbol * pqsymbol list) -> scope
-  val addat : scope -> pqsymbol list -> scope
+  val addrw : scope -> (bool * pqsymbol * pqsymbol list) -> scope
+  val addat : scope -> (bool * pqsymbol list) -> scope
 end
 
 (* -------------------------------------------------------------------- *)

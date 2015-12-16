@@ -3076,12 +3076,12 @@ gprover_info:
     { { empty_pprover with pprov_cpufactor = Some t; } }
 
 addrw:
-| HINT REWRITE p=lqident COLON l=lqident*
-    { (p, l) }
+| local=boption(LOCAL) HINT REWRITE p=lqident COLON l=lqident*
+    { (local, p, l) }
 
 addat:
-| HINT EXACT COLON l=qident*
-    { l }
+| local=boption(LOCAL) HINT EXACT COLON l=qident*
+    { (local, l) }
 
 (* -------------------------------------------------------------------- *)
 (* Search pattern                                                       *)

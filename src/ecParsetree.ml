@@ -959,8 +959,8 @@ type global_action =
   | Gtype        of ptydecl list
   | Gtypeclass   of ptypeclass
   | Gtycinstance of ptycinstance
-  | Gaddrw       of (pqsymbol * pqsymbol list)
-  | Gaddat       of pqsymbol list
+  | Gaddrw       of (bool * pqsymbol * pqsymbol list)
+  | Gaddat       of (bool * pqsymbol list)
   | Gprint       of pprint
   | Gsearch      of pformula list
   | GthOpen      of (bool * psymbol)

@@ -1343,13 +1343,13 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Auto = struct
-  let add (ps : Sp.t) (env : env) =
+  let add ~local (ps : Sp.t) (env : env) =
     { env with
         env_atbase = Sp.union env.env_atbase ps;
-        env_item   = CTh_auto ps :: env.env_item; }
+        env_item   = CTh_auto (local, ps) :: env.env_item; }
     
-  let add1 (p : path) (env : env) =
-    add (Sp.singleton p) env
+  let add1 ~local (p : path) (env : env) =
+    add ~local (Sp.singleton p) env
 
   let get (env : env) =
     env.env_atbase
@@ -2778,7 +2778,7 @@ module Theory = struct
   (* ------------------------------------------------------------------ *)
   let bind_at_cth =
     let for1 _path base = function
-      | CTh_auto ps ->
+      | CTh_auto (false, ps) ->
          Some (Sp.union base ps)
       | _ -> None
 
@@ -2910,9 +2910,9 @@ module Theory = struct
           let ps = List.filter ((not) |- inclear |- oget |- EcPath.prefix) ps in
           if List.is_empty ps then None else Some (CTh_addrw (p, ps))
   
-      | CTh_auto ps ->
+      | CTh_auto (lc, ps) ->
           let ps = Sp.filter ((not) |- inclear |- oget |- EcPath.prefix) ps in
-          if Sp.is_empty ps then None else Some (CTh_auto ps)
+          if Sp.is_empty ps then None else Some (CTh_auto (lc, ps))
 
       | (CTh_export p) as item ->
           if Sp.mem p cleared then None else Some item

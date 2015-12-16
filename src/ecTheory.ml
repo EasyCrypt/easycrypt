@@ -30,7 +30,7 @@ and theory_item =
   | Th_typeclass of (symbol * typeclass)
   | Th_baserw    of symbol
   | Th_addrw     of EcPath.path * EcPath.path list
-  | Th_auto      of Sp.t
+  | Th_auto      of (bool * Sp.t)
 
 and tcinstance = [ `Ring of ring | `Field of field | `General of path ]
 and thmode     = [ `Abstract | `Concrete ]
@@ -59,7 +59,7 @@ and ctheory_item =
   | CTh_typeclass of (symbol * typeclass)
   | CTh_baserw    of symbol
   | CTh_addrw     of EcPath.path * EcPath.path list
-  | CTh_auto      of Sp.t
+  | CTh_auto      of (bool * Sp.t)
 
 and ctheory_clone = {
   cthc_base : EcPath.path;
