@@ -190,8 +190,8 @@ proof.
 qed.
 
 lemma nosmt set_set_eq y (m : ('a, 'b) fmap) x y':
-  forall a, m.[x <- y].[x <- y'].[a] = m.[x <- y'].[a].
-proof. by move=> a; rewrite set_set. qed.
+  m.[x <- y].[x <- y'] = m.[x <- y'].
+proof. by rewrite fmapP=> a; rewrite set_set. qed.
 
 (* -------------------------------------------------------------------- *)
 op rem (a : 'a) (m : ('a, 'b) fmap) =
