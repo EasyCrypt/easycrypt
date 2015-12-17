@@ -24,6 +24,8 @@ module PPEnv : sig
 end
 
 (* -------------------------------------------------------------------- *)
+val string_of_hcmp : EcFol.hoarecmp -> string
+(* -------------------------------------------------------------------- *)
 type 'a pp = Format.formatter -> 'a -> unit
 
 val pp_id    : 'a pp -> 'a pp

@@ -30,11 +30,18 @@ let bd_goal_r fcmp fbd cmp bd =
   | FHle, (FHle | FHeq) -> Some (f_real_le bd fbd)
   | FHge, (FHge | FHeq) -> Some (f_real_le fbd bd)
   | FHeq, FHeq          -> Some (f_eq bd fbd)
+  | FHeq, FHge          -> Some (f_and (f_eq fbd f_r1) (f_eq bd f_r1))
+  | FHeq, FHle          -> Some (f_and (f_eq fbd f_r0) (f_eq bd f_r0))
   | _   , _             -> None
 
-let bd_goal pe fcmp fbd cmp bd =
+let bd_goal tc fcmp fbd cmp bd =
   match bd_goal_r fcmp fbd cmp bd with
-  | None    -> tc_error pe "cannot swap"
+  | None    -> 
+    let ppe = EcPrinting.PPEnv.ofenv (FApi.tc1_env tc) in
+    tc_error !!tc 
+      "do not know how to change phoare[...]%s %a into phoare[...]%s %a"
+      (EcPrinting.string_of_hcmp fcmp) (EcPrinting.pp_form ppe) fbd
+      (EcPrinting.string_of_hcmp cmp) (EcPrinting.pp_form ppe) bd
   | Some fp -> fp
 
 (* -------------------------------------------------------------------- *)
@@ -93,7 +100,7 @@ let t_bdHoareF_conseq_bd cmp bd tc =
   let env = FApi.tc1_env tc in
   let bhf = tc1_as_bdhoareF tc in
   let mpr,_ = EcEnv.Fun.hoareF_memenv bhf.bhf_f env in
-  let bd_goal =  bd_goal !!tc bhf.bhf_cmp bhf.bhf_bd cmp bd in
+  let bd_goal =  bd_goal tc bhf.bhf_cmp bhf.bhf_bd cmp bd in
   let concl = f_bdHoareF bhf.bhf_pr bhf.bhf_f bhf.bhf_po cmp bd in
   let bd_goal = f_forall_mems [mpr] (f_imp bhf.bhf_pr bd_goal) in
   FApi.xmutate1 tc `HlConseq [bd_goal; concl]
@@ -101,7 +108,7 @@ let t_bdHoareF_conseq_bd cmp bd tc =
 (* -------------------------------------------------------------------- *)
 let t_bdHoareS_conseq_bd cmp bd tc =
   let bhs = tc1_as_bdhoareS tc in
-  let bd_goal = bd_goal !!tc bhs.bhs_cmp bhs.bhs_bd cmp bd in
+  let bd_goal = bd_goal tc bhs.bhs_cmp bhs.bhs_bd cmp bd in
   let concl = f_bdHoareS bhs.bhs_m bhs.bhs_pr bhs.bhs_s bhs.bhs_po cmp bd in
   let bd_goal = f_forall_mems [bhs.bhs_m] (f_imp bhs.bhs_pr bd_goal) in
   FApi.xmutate1 tc `HlConseq [bd_goal; concl]
