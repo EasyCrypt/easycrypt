@@ -604,16 +604,14 @@ let pp_apply_error fmt (dpe, reason, pt, (src, dst)) =
   let ppe = EcPrinting.PPEnv.ofenv (LDecl.toenv pt.PT.pte_hy) in
   let src = PT.concretize_form pt src in
 
-  if dpe then begin
-    Format.fprintf fmt "when applied to the goal:@\n@\n";
-    Format.fprintf fmt "  @[%a@]@\n@\n" (EcPrinting.pp_form ppe) dst
-  end;
-
   Format.fprintf fmt "the given proof-term proves:@\n@\n";
   Format.fprintf fmt "  @[%a@]@\n@\n" (EcPrinting.pp_form ppe) src;
   match reason with
   | `DoNotMatch ->
-       Format.fprintf fmt "it does not apply to the goal@\n"
+       Format.fprintf fmt "it does not apply to the goal@\n@\n";
+       if dpe then begin
+         Format.fprintf fmt "  @[%a@]@\n@\n" (EcPrinting.pp_form ppe) dst
+       end;
   | `IncompleteInference ->
        Format.fprintf fmt "not all variables can be inferred@\n"
 

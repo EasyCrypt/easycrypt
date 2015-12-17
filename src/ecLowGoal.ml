@@ -543,7 +543,7 @@ module Apply = struct
     let pt     = { ptev_env = ptenv; ptev_pt = pt; ptev_ax = ax; } in
     t_apply_bwd_r ?mode ?canview pt tc
 
-  let t_apply_bwd_hi ?(dpe = false) ?mode ?canview pt (tc : tcenv1) =
+  let t_apply_bwd_hi ?(dpe = true) ?mode ?canview pt (tc : tcenv1) =
     try  t_apply_bwd ?mode ?canview pt tc
     with (NoInstance (_, r, pt, f)) ->
       tc_error_exn !!tc (NoInstance (dpe, r, pt, f))
