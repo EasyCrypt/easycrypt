@@ -207,21 +207,20 @@ op onth (xs : 'a list) n : 'a option =
   with xs = y :: ys =>  if n = 0 then Some y else (onth ys (n-1)).
 
 lemma nth_onth (z : 'a) xs n: nth z xs n = odflt z (onth xs n).
-proof. by elim: xs n => //=; smt. qed.
+proof. by elim: xs n => //= /#. qed.
 
 lemma onth_nth (z : 'a) xs n:
   0 <= n < size xs => onth xs n = Some (nth z xs n).
-proof. by elim: xs n => //=; smt. qed.
+proof. by elim: xs n => //= /#. qed.
 
 lemma nth_default (z : 'a) s n: size s <= n => nth z s n = z.
 proof.
-  elim: s n => //= x s IHs n; case: (n = 0).
-    by move=> ->; smt.
-    by move=> _ _; rewrite IHs; smt.
+elim: s n => //= x s ih n; case: (n = 0) => [->|_ _].
+  by smt w=(size_ge0). by rewrite ih /#.
 qed.
 
 lemma nth_neg (x0 : 'a) s n: n < 0 => nth x0 s n = x0.
-proof. elim: s n => //=; smt. qed.
+proof. by elim: s n => //= /#. qed.
 
 lemma nth_out (x0 : 'a) s n: ! (0 <= n < size s) => nth x0 s n = x0.
 proof.
@@ -230,26 +229,33 @@ rewrite anda_and -nand; case; rewrite (lezNgt, ltzNge) /=.
 qed.
 
 lemma nth_cat (x0 : 'a) s1 s2 n:
-  nth x0 (s1 ++ s2) n = if n < size s1 then nth x0 s1 n else nth x0 s2 (n - size s1).
+  nth x0 (s1 ++ s2) n =
+    if n < size s1 then nth x0 s1 n else nth x0 s2 (n - size s1).
 proof.
-  case: (n < 0) => [n_lt0|n_ge0]; first by smt.
-  by elim: s1 n n_ge0; smt.
+case: (n < 0) => [n_lt0|n_ge0]; 1: smt w=(size_ge0 nth_neg).
+by elim: s1 n n_ge0; smt w=(size_ge0 nth_neg).
 qed.
+
+lemma last_nth (x0 : 'a) x s : last x s = nth x0 (x :: s) (size s).
+proof. by elim: s x => [|y s IHs] x //=; smt w=(size_ge0). qed.
+
+lemma nth_last (x0 : 'a) s : nth x0 s (size s - 1) = last x0 s.
+proof. by case: s => //= x s; rewrite (last_nth x0) /#. qed.
 
 lemma nth_rcons x0 (s : 'a list) x n:
   nth x0 (rcons s x) n =
     if n < size s then nth x0 s n else if n = size s then x else x0.
-proof. elim: s n; smt. qed.
+proof. by elim: s n; smt w=(size_ge0 nth_neg). qed.
 
 lemma eq_from_nth x0 (s1 s2 : 'a list):
      size s1 = size s2
   => (forall i, 0 <= i < size s1 => nth x0 s1 i = nth x0 s2 i)
   => s1 = s2.
 proof.                        (* BUG: CHECKING IS TOO LONG *)
-  elim: s1 s2 => [|x1 s1 IHs1] [|x2 s2] //=; first 2 smt.
-  move=> eq_szS h; cut eq_sz: size s1 = size s2 by smt.
-  cut := h 0 => /= ->; first smt. rewrite (IHs1 s2) // => i le_i_s1.
-  cut := h (i+1); smt.
+elim: s1 s2 => [|x1 s1 IHs1] [|x2 s2] //=; 1,2: smt w=(size_ge0).
+move=> eq_szS h; have eq_sz: size s1 = size s2 by move=> /#.
+cut := h 0 => /= ->; first smt. rewrite (IHs1 s2) // => i le_i_s1.
+cut := h (i+1); smt.
 qed.
 
 lemma nth_nseq w i n (a : 'a): 0 <= i < n => nth w (nseq n a) i = a.
@@ -269,6 +275,12 @@ proof.
 case: (0 <= i < n) => [/(@nth_nseq w)->//|le].
 rewrite nth_out // size_nseq /max; case: (0 < n)=> //.
 by rewrite lez_lt_asym.
+qed.
+
+lemma last_nseq (x0 x : 'a, n : int) : 0 < n => last x0 (nseq n x) = x.
+proof.
+move=> gt0_n; rewrite (last_nth x0) size_nseq max_ler ?ltzW //=.
+by rewrite eqn0Ngt ?ltzW // gt0_n /= nth_nseq /#.
 qed.
 
 (* -------------------------------------------------------------------- *)
