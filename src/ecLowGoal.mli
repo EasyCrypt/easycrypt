@@ -96,6 +96,20 @@ val t_apply_hyp : EcIdent.t -> ?args:(form list) -> ?sk:int -> FApi.backward
 val t_apply_hd : handle -> ?args:(form list) -> ?sk:int -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
+module Apply : sig
+  open EcMatching
+  open EcProofTerm
+
+  type reason = [`DoNotMatch | `IncompleteInference]
+
+  exception NoInstance of (reason * pt_env * (form * form))
+
+  val t_apply_bwd_r : ?mode:fmoptions -> ?canview:bool -> pt_ev -> FApi.backward
+  val t_apply_bwd   : ?mode:fmoptions -> ?canview:bool -> proofterm -> FApi.backward
+  val t_apply_bwd_hi: ?mode:fmoptions -> ?canview:bool -> proofterm -> FApi.backward
+end
+
+(* -------------------------------------------------------------------- *)
 (* Introduction of logical operators (backward). *)
 val t_or_intro_s  : [`Asym | `Sym] -> [`Left|`Right] -> form pair -> FApi.backward
 val t_and_intro_s : [`Asym | `Sym] -> form pair -> FApi.backward

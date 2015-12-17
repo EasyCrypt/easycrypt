@@ -18,11 +18,13 @@ open EcMatching
 open EcReduction
 open EcCoreGoal
 open EcBaseLogic
+open EcProofTerm
 
 module EP  = EcParsetree
 module ER  = EcReduction
 module TTC = EcProofTyping
 module LG  = EcCoreLib.CI_Logic
+module PT  = EcProofTerm
 
 (* -------------------------------------------------------------------- *)
 let (@!) (t1 : FApi.backward) (t2 : FApi.backward) =
@@ -402,7 +404,10 @@ let tt_apply (pt : proofterm) (tc : tcenv) =
     RApi.to_pure (fun tc -> LowApply.check `Elim pt (`Tc (tc, None))) tc in
 
   if not (EcReduction.is_conv hyps ax concl) then
-    raise InvalidGoalShape;
+    (let ppe = EcPrinting.PPEnv.ofenv (FApi.tc_env tc) in
+    Format.eprintf "ax %a@.concl %a@." 
+      (EcPrinting.pp_form ppe) ax (EcPrinting.pp_form ppe) concl; 
+    raise InvalidGoalShape);
   FApi.close tc (VApply pt)
 
 (* -------------------------------------------------------------------- *)
@@ -448,6 +453,100 @@ let t_apply_s (p : path) (tys : ty list) ?args ?sk tc =
 (* -------------------------------------------------------------------- *)
 let t_apply_hd (hd : handle) ?args ?sk tc =
   tt_apply_hd hd ?args ?sk (FApi.tcenv_of_tcenv1 tc)
+
+(* -------------------------------------------------------------------- *)
+module Apply = struct
+  type reason = [`DoNotMatch | `IncompleteInference]
+
+  exception NoInstance of (reason * PT.pt_env * (form * form))
+
+  let t_apply_bwd_r ?(mode = fmdelta) ?(canview = true) pt (tc : tcenv1) =
+    let ((hyps, concl), pterr) = (FApi.tc1_flat tc, PT.copy pt.ptev_env) in
+
+    let noinstance reason =
+      raise (NoInstance (reason, pterr, (pt.ptev_ax, concl))) in
+
+    let rec instantiate canview istop pt =
+      match istop && PT.can_concretize pt.PT.ptev_env with
+      | true ->
+          let ax = PT.concretize_form pt.PT.ptev_env pt.PT.ptev_ax in
+          if   EcReduction.is_conv hyps ax concl
+          then pt
+          else instantiate canview false pt
+
+      | false -> begin
+          try
+            PT.pf_form_match ~mode pt.PT.ptev_env ~ptn:pt.PT.ptev_ax concl;
+            if not (PT.can_concretize pt.PT.ptev_env) then
+              noinstance `IncompleteInference;
+            pt
+          with EcMatching.MatchFailure ->
+            match TTC.destruct_product hyps pt.PT.ptev_ax with
+            | Some _ ->
+                (* FIXME: add internal marker *)
+                instantiate canview false (PT.apply_pterm_to_hole pt)
+
+            | None when not canview ->
+                noinstance `DoNotMatch
+
+            | None ->
+                let forview (p, fs) =
+                  (* Current proof-term is view argument *)
+                  (* Copy PT environment to set a back-track point *)
+                  let argpt = { pt with ptev_env = PT.copy pt.ptev_env } in
+                  let argpt = { ptea_env = argpt.ptev_env;
+                                ptea_arg = PVASub argpt; } in
+
+                  (* Type-check view - FIXME: the current API is perfectible *)
+                  let viewpt =
+                    { pt_head = PTGlobal (p, []);
+                      pt_args = List.map (fun f -> PAFormula f) fs; } in
+                  let viewpt, ax = LowApply.check `Elim viewpt (`Hyps (hyps, !!tc)) in
+
+                  (* Apply view to its actual arguments *)
+                  let viewpt = apply_pterm_to_arg
+                      { ptev_env = argpt.ptea_env;
+                        ptev_pt  = viewpt;
+                        ptev_ax  = ax; }
+                      argpt
+                  in
+                  try  Some (instantiate false true viewpt)
+                  with NoInstance _ -> None
+                in
+
+                let views =
+                  match sform_of_form pt.PT.ptev_ax with
+                  | SFiff (f1, f2) ->
+                      [(LG.p_iff_lr, [f1; f2]);
+                       (LG.p_iff_rl, [f1; f2])]
+
+                  | SFnot f1 ->
+                      [(LG.p_negbTE, [f1])]
+
+                  | _ -> []
+                in
+
+                try  List.find_map forview views
+                with Not_found -> noinstance `DoNotMatch
+      end
+    in
+
+    let pt = instantiate canview true pt in
+    let pt = fst (PT.concretize pt) in
+
+    t_apply pt tc
+
+  let t_apply_bwd ?mode ?canview pt (tc : tcenv1) =
+    let hyps   = FApi.tc1_hyps tc in
+    let pt, ax = LowApply.check `Elim pt (`Hyps (hyps, !!tc)) in
+    let ptenv  = ptenv_of_penv hyps !!tc in
+    let pt     = { ptev_env = ptenv; ptev_pt = pt; ptev_ax = ax; } in
+    t_apply_bwd_r ?mode ?canview pt tc
+
+  let t_apply_bwd_hi ?mode ?canview pt (tc : tcenv1) =
+    try  t_apply_bwd ?mode ?canview pt tc
+    with (NoInstance _) as e -> tc_error_exn !!tc e
+end
 
 (* -------------------------------------------------------------------- *)
 type genclear = [`Clear | `TryClear | `NoClear]

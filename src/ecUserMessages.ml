@@ -598,6 +598,20 @@ end = struct
 end
 
 (* -------------------------------------------------------------------- *)
+let pp_apply_error fmt (reason, pt, (src, _dst)) =
+  let module PT = EcProofTerm in
+
+  let ppe = EcPrinting.PPEnv.ofenv (LDecl.toenv pt.PT.pte_hy) in
+  let src = PT.concretize_form pt src in
+  Format.fprintf fmt "the given proof-term proves:@\n@\n%!";
+  Format.fprintf fmt "  @[%a@]@\n@\n" (EcPrinting.pp_form ppe) src;
+  match reason with
+  | `DoNotMatch ->
+       Format.fprintf fmt "it does not apply to the goal@\n"
+  | `IncompleteInference ->
+       Format.fprintf fmt "not all variables can be inferred@\n"
+
+(* -------------------------------------------------------------------- *)
 let pp_parse_error fmt msg =
   match msg with
   | Some msg -> Format.fprintf fmt "parse error: %s" msg
@@ -732,6 +746,9 @@ match exn with
 
 | EcCoreGoal.ClearError e ->
     pp_error_clear fmt e
+
+| EcLowGoal.Apply.NoInstance e ->
+    pp_apply_error fmt e
 
 | _ -> raise exn
 

@@ -192,7 +192,7 @@ let process_phoare_deno info tc =
       (bhf.bhf_pr, bhf.bhf_po)
   in
 
-  FApi.t_first (t_apply pt) (t_phoare_deno pre post tc)
+  FApi.t_first (EcLowGoal.Apply.t_apply_bwd_hi pt) (t_phoare_deno pre post tc)
 
 (* -------------------------------------------------------------------- *)
 let destr_deno_bad env f = 
@@ -417,7 +417,7 @@ let process_equiv_deno1 info eq tc =
       (ef.ef_pr, ef.ef_po)
   in
 
-  FApi.t_first (t_apply pt) (t_equiv_deno pre post tc)
+  FApi.t_first (EcLowGoal.Apply.t_apply_bwd_hi pt) (t_equiv_deno pre post tc)
 
 (* -------------------------------------------------------------------- *)
 let process_equiv_deno_bad info tc =
@@ -453,9 +453,10 @@ let process_equiv_deno_bad info tc =
 
   let torotate = ref 1 in
   let t_sub = 
-    FApi.t_or (t_apply pt)
+    FApi.t_or (EcLowGoal.Apply.t_apply_bwd_hi pt)
       (EcPhlConseq.t_equivF_conseq pre equiv.ef_po @+ 
-         [t_true; (fun tc -> incr torotate;t_id tc); t_apply pt]) in
+         [t_true; (fun tc -> incr torotate;t_id tc); 
+          EcLowGoal.Apply.t_apply_bwd_hi pt]) in
   let gs = 
     t_last t_sub (t_rotate `Left 1 (t_equiv_deno_bad pre tc)) in
   t_rotate `Left !torotate gs
@@ -510,9 +511,10 @@ let process_equiv_deno_bad2 info eq bad1 tc =
 
   let torotate = ref 1 in
   let t_sub = 
-    FApi.t_or (t_apply pt)
+    FApi.t_or (EcLowGoal.Apply.t_apply_bwd_hi pt)
       (EcPhlConseq.t_equivF_conseq pre equiv.ef_po @+ 
-         [t_true; (fun tc -> incr torotate;t_id tc); t_apply pt]) in
+         [t_true; (fun tc -> incr torotate;t_id tc); 
+          EcLowGoal.Apply.t_apply_bwd_hi pt]) in
   let gs = 
     t_last t_sub (t_rotate `Left 1 (t_equiv_deno_bad2 pre bad1 tc)) in
   t_rotate `Left !torotate gs

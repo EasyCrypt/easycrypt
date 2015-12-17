@@ -204,110 +204,8 @@ let process_algebra mode kind eqs (tc : tcenv1) =
   tactic tc
 
 (* -------------------------------------------------------------------- *)
-module LowApply = struct
-  type reason = [`DoNotMatch | `IncompleteInference]
-
-  exception NoInstance of (reason * pt_env * (form * form))
-
-  let t_apply_bwd_r ?(mode = fmdelta) ?(canview = true) pt (tc : tcenv1) =
-    let ((hyps, concl), pterr) = (FApi.tc1_flat tc, PT.copy pt.ptev_env) in
-
-    let noinstance reason =
-      raise (NoInstance (reason, pterr, (pt.ptev_ax, concl))) in
-
-    let rec instantiate canview istop pt =
-      match istop && PT.can_concretize pt.PT.ptev_env with
-      | true ->
-          let ax = PT.concretize_form pt.PT.ptev_env pt.PT.ptev_ax in
-          if   EcReduction.is_conv hyps ax concl
-          then pt
-          else instantiate canview false pt
-
-      | false -> begin
-          try
-            PT.pf_form_match ~mode pt.PT.ptev_env ~ptn:pt.PT.ptev_ax concl;
-            if not (PT.can_concretize pt.PT.ptev_env) then
-              noinstance `IncompleteInference;
-            pt
-          with EcMatching.MatchFailure ->
-            match TTC.destruct_product hyps pt.PT.ptev_ax with
-            | Some _ ->
-                (* FIXME: add internal marker *)
-                instantiate canview false (PT.apply_pterm_to_hole pt)
-
-            | None when not canview ->
-                noinstance `DoNotMatch
-
-            | None ->
-                let forview (p, fs) =
-                  (* Current proof-term is view argument *)
-                  (* Copy PT environment to set a back-track point *)
-                  let argpt = { pt with ptev_env = PT.copy pt.ptev_env } in
-                  let argpt = { ptea_env = argpt.ptev_env;
-                                ptea_arg = PVASub argpt; } in
-
-                  (* Type-check view - FIXME: the current API is perfectible *)
-                  let viewpt =
-                    { pt_head = PTGlobal (p, []);
-                      pt_args = List.map (fun f -> PAFormula f) fs; } in
-                  let viewpt, ax = LowApply.check `Elim viewpt (`Hyps (hyps, !!tc)) in
-
-                  (* Apply view to its actual arguments *)
-                  let viewpt = apply_pterm_to_arg
-                      { ptev_env = argpt.ptea_env;
-                        ptev_pt  = viewpt;
-                        ptev_ax  = ax; }
-                      argpt
-                  in
-                  try  Some (instantiate false true viewpt)
-                  with NoInstance _ -> None
-                in
-
-                let views =
-                  match sform_of_form pt.PT.ptev_ax with
-                  | SFiff (f1, f2) ->
-                      [(LG.p_iff_lr, [f1; f2]);
-                       (LG.p_iff_rl, [f1; f2])]
-
-                  | SFnot f1 ->
-                      [(LG.p_negbTE, [f1])]
-
-                  | _ -> []
-                in
-
-                try  List.find_map forview views
-                with Not_found -> noinstance `DoNotMatch
-      end
-    in
-
-    let pt = instantiate canview true pt in
-    let pt = fst (PT.concretize pt) in
-
-    EcLowGoal.t_apply pt tc
-
-  let t_apply_bwd ?mode ?canview pt (tc : tcenv1) =
-    let hyps   = FApi.tc1_hyps tc in
-    let pt, ax = LowApply.check `Elim pt (`Hyps (hyps, !!tc)) in
-    let ptenv  = ptenv_of_penv hyps !!tc in
-    let pt     = { ptev_env = ptenv; ptev_pt = pt; ptev_ax = ax; } in
-    t_apply_bwd_r ?mode ?canview pt tc
-
-  let pf_apply_error pe (reason, pt, (src, _dst)) =
-    tc_error_lazy pe
-      (fun fmt ->
-        let ppe = EcPrinting.PPEnv.ofenv (LDecl.toenv pt.pte_hy) in
-        let src = PT.concretize_form pt src in
-        Format.fprintf fmt "the given proof-term proves:@\n@\n%!";
-        Format.fprintf fmt "  @[%a@]@\n@\n" (EcPrinting.pp_form ppe) src;
-        match reason with
-        | `DoNotMatch ->
-             Format.fprintf fmt "it does not apply to the goal@\n"
-        | `IncompleteInference ->
-             Format.fprintf fmt "not all variables can be inferred@\n")
-end
-
-let t_apply_prept pt tc = 
-  LowApply.t_apply_bwd_r (pt_of_prept tc pt) tc
+let t_apply_prept pt tc =
+  EcLowGoal.Apply.t_apply_bwd_r (pt_of_prept tc pt) tc
 
 (* -------------------------------------------------------------------- *)
 module LowRewrite = struct
@@ -441,11 +339,11 @@ let process_auto (tc : tcenv1) =
 
     try
       FApi.t_seqs
-        [LowApply.t_apply_bwd_r ~mode:fmrigid ~canview:false pt;
+        [EcLowGoal.Apply.t_apply_bwd_r ~mode:fmrigid ~canview:false pt;
          EcLowGoal.t_trivial; EcLowGoal.t_fail]
         tc
 
-    with LowApply.NoInstance _ ->
+    with EcLowGoal.Apply.NoInstance _ ->
       raise E.Fail
   in
 
@@ -475,7 +373,7 @@ let process_apply_bwd ~implicits mode (ff : ppterm) (tc : tcenv1) =
   let pt = PT.tc1_process_full_pterm ~implicits tc ff in
 
   try
-    let aout = LowApply.t_apply_bwd_r pt tc in
+    let aout = EcLowGoal.Apply.t_apply_bwd_r pt tc in
 
     match mode with
     | `Apply -> aout
@@ -485,8 +383,8 @@ let process_apply_bwd ~implicits mode (ff : ppterm) (tc : tcenv1) =
           tc_error !!tc "cannot close goal";
         aout
 
-  with LowApply.NoInstance err ->
-    LowApply.pf_apply_error !!tc err
+  with (EcLowGoal.Apply.NoInstance _) as err ->
+    tc_error_exn !!tc err
 
 (* -------------------------------------------------------------------- *)
 let process_apply_fwd ~implicits (pe, hyp) tc =
@@ -544,10 +442,10 @@ let process_apply_top tc =
 
      try
        EcLowGoal.t_intros_i_seq ~clear:true [h]
-         (LowApply.t_apply_bwd { pt_head = PTLocal h; pt_args = []} )
+         (EcLowGoal.Apply.t_apply_bwd { pt_head = PTLocal h; pt_args = []} )
          tc
-     with LowApply.NoInstance err ->
-       LowApply.pf_apply_error !!tc err
+     with (EcLowGoal.Apply.NoInstance _) as err ->
+       tc_error_exn !!tc err
     end
 
   | _ -> tc_error !!tc "no top assumption"
@@ -1176,8 +1074,8 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
   and intro1_dup (_ : ST.state) (tc : tcenv1) =
     try
       let pt = PT.pt_of_uglobal !!tc (FApi.tc1_hyps tc) LG.p_ip_dup in
-      LowApply.t_apply_bwd_r ~mode:fmrigid ~canview:false pt tc
-    with LowApply.NoInstance _ ->
+      EcLowGoal.Apply.t_apply_bwd_r ~mode:fmrigid ~canview:false pt tc
+    with EcLowGoal.Apply.NoInstance _ ->
       tc_error !!tc "no top-assumption to duplicate"
 
   and intro1_done (_ : ST.state) simplify (tc : tcenv1) =
@@ -1845,7 +1743,8 @@ let process_congr tc =
 
       let tt0 = if iseq then t_id else (fun tc ->
         let hyps = FApi.tc1_hyps tc in
-        LowApply.t_apply_bwd_r (PT.pt_of_uglobal !!tc hyps LG.p_eq_iff) tc) in
+        EcLowGoal.Apply.t_apply_bwd_r
+          (PT.pt_of_uglobal !!tc hyps LG.p_eq_iff) tc) in
       let tt1 = t_congr (o1, o2) ((List.combine a1 a2), f1.f_ty) in
       let tt2 = t_logic_trivial in
       FApi.t_seqs [tt0; tt1; tt2] tc

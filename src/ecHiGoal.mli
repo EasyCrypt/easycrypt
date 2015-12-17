@@ -34,14 +34,6 @@ type cutmode  = [`Have | `Suff]
 val process_tfocus : tcenv -> focus_t -> tfocus
 
 (* -------------------------------------------------------------------- *)
-module LowApply : sig
-  open EcMatching
-
-  val t_apply_bwd_r : ?mode:fmoptions -> ?canview:bool -> pt_ev -> backward
-  val t_apply_bwd   : ?mode:fmoptions -> ?canview:bool -> proofterm -> backward
-end
-
-(* -------------------------------------------------------------------- *)
 module LowRewrite : sig
   open EcLowGoal
 

@@ -437,7 +437,7 @@ let rec check_sig_cnv mode (env:EcEnv.env) (sin:module_sig) (sout:module_sig) =
     List.fold_left2
       (fun subst (xin, tyin) (xout, tyout) ->
         let tyout = EcSubst.subst_modtype subst tyout in
-        check_modtype_cnv env tyin tyout;
+        check_modtype_cnv ~mode env tyout tyin;
         EcSubst.add_module subst xout (EcPath.mident xin))
       EcSubst.empty sin.mis_params sout.mis_params
   in
@@ -528,10 +528,12 @@ let rec check_sig_cnv mode (env:EcEnv.env) (sin:module_sig) (sout:module_sig) =
         tin
     end
 
-and check_modtype_cnv env (tyin:module_type) (tyout:module_type) = 
+and check_modtype_cnv
+  ?(mode = `Eq) env (tyin:module_type) (tyout:module_type)
+= 
   let sin = EcEnv.ModTy.sig_of_mt env tyin in
   let sout = EcEnv.ModTy.sig_of_mt env tyout in
-  check_sig_cnv `Eq env sin sout
+  check_sig_cnv mode env sin sout
 
 let check_sig_mt_cnv env sin tyout = 
   let sout = EcEnv.ModTy.sig_of_mt env tyout in
