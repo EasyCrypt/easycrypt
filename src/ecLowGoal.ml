@@ -458,13 +458,13 @@ let t_apply_hd (hd : handle) ?args ?sk tc =
 module Apply = struct
   type reason = [`DoNotMatch | `IncompleteInference]
 
-  exception NoInstance of (reason * PT.pt_env * (form * form))
+  exception NoInstance of (bool * reason * PT.pt_env * (form * form))
 
   let t_apply_bwd_r ?(mode = fmdelta) ?(canview = true) pt (tc : tcenv1) =
     let ((hyps, concl), pterr) = (FApi.tc1_flat tc, PT.copy pt.ptev_env) in
 
-    let noinstance reason =
-      raise (NoInstance (reason, pterr, (pt.ptev_ax, concl))) in
+    let noinstance ?(dpe = false) reason =
+      raise (NoInstance (dpe, reason, pterr, (pt.ptev_ax, concl))) in
 
     let rec instantiate canview istop pt =
       match istop && PT.can_concretize pt.PT.ptev_env with
@@ -543,9 +543,10 @@ module Apply = struct
     let pt     = { ptev_env = ptenv; ptev_pt = pt; ptev_ax = ax; } in
     t_apply_bwd_r ?mode ?canview pt tc
 
-  let t_apply_bwd_hi ?mode ?canview pt (tc : tcenv1) =
+  let t_apply_bwd_hi ?(dpe = false) ?mode ?canview pt (tc : tcenv1) =
     try  t_apply_bwd ?mode ?canview pt tc
-    with (NoInstance _) as e -> tc_error_exn !!tc e
+    with (NoInstance (_, r, pt, f)) ->
+      tc_error_exn !!tc (NoInstance (dpe, r, pt, f))
 end
 
 (* -------------------------------------------------------------------- *)

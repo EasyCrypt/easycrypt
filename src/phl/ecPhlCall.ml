@@ -411,5 +411,5 @@ let process_call side info tc =
   in
     FApi.t_seqsub
       t_call
-      [FApi.t_seq (EcLowGoal.Apply.t_apply_bwd_hi pt) !subtactic; t_id]
+      [FApi.t_seq (EcLowGoal.Apply.t_apply_bwd_hi ~dpe:true pt) !subtactic; t_id]
       tc

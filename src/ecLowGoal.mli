@@ -102,11 +102,17 @@ module Apply : sig
 
   type reason = [`DoNotMatch | `IncompleteInference]
 
-  exception NoInstance of (reason * pt_env * (form * form))
+  exception NoInstance of (bool * reason * pt_env * (form * form))
 
-  val t_apply_bwd_r : ?mode:fmoptions -> ?canview:bool -> pt_ev -> FApi.backward
-  val t_apply_bwd   : ?mode:fmoptions -> ?canview:bool -> proofterm -> FApi.backward
-  val t_apply_bwd_hi: ?mode:fmoptions -> ?canview:bool -> proofterm -> FApi.backward
+  val t_apply_bwd_r :
+    ?mode:fmoptions -> ?canview:bool -> pt_ev -> FApi.backward
+
+  val t_apply_bwd :
+    ?mode:fmoptions -> ?canview:bool -> proofterm -> FApi.backward
+
+  val t_apply_bwd_hi:
+       ?dpe:bool -> ?mode:fmoptions -> ?canview:bool
+    -> proofterm -> FApi.backward
 end
 
 (* -------------------------------------------------------------------- *)

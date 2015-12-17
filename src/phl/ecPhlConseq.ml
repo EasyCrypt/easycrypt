@@ -423,7 +423,7 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
 
   let t_apply_r (pt, _f) tc =
     match pt with
-    | Some pt -> EcLowGoal.Apply.t_apply_bwd_hi pt tc
+    | Some pt -> EcLowGoal.Apply.t_apply_bwd_hi ~dpe:true pt tc
 
     | None    -> EcPhlTAuto.t_hoare_true tc
   in

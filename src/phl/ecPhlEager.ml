@@ -676,7 +676,7 @@ let process_call info tc =
 
   FApi.t_on1seq 0
     (t_eager_call eg.eg_pr eg.eg_po)
-    (EcLowGoal.Apply.t_apply_bwd_hi pt)
+    (EcLowGoal.Apply.t_apply_bwd_hi ~dpe:true pt)
     tc
 
 (* -------------------------------------------------------------------- *)
