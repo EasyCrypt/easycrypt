@@ -1,4 +1,4 @@
-; Generated on Wed Dec  2 17:38:05 2015
+; Generated on Thu Dec 17 16:14:05 2015
 
 (defvar easycrypt-bytac-keywords '(
   "exact"
@@ -56,6 +56,7 @@
   "timeout"
   "why3"
   "dump"
+  "remove"
   "Top"
   "Self"
 ))
@@ -94,6 +95,7 @@
   "beta"
   "iota"
   "zeta"
+  "eta"
   "logic"
   "delta"
   "simplify"
@@ -102,12 +104,11 @@
   "split"
   "left"
   "right"
-  "generalize"
   "case"
-  "intros"
   "pose"
   "cut"
   "have"
+  "suff"
   "elim"
   "clear"
   "apply"
