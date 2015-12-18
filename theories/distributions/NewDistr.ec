@@ -9,7 +9,7 @@
 require import Option Pred Fun List Int IntExtra Real RealExtra.
 require import StdRing StdOrder StdBigop Discrete RealSeq RealSeries.
 (*---*) import IterOp Bigint Bigreal Bigreal.BRA.
-(*---*) import IntOrder RealOrder RField.
+(*---*) import IntOrder RealOrder RField NewLogic.
 require (*--*) FinType.
 
 pragma +implicits.
@@ -77,12 +77,16 @@ proof. by move=> x; rewrite muK //; apply/isdistr_mnull. qed.
 
 lemma dnullE ['a] (E : 'a -> bool) : mu dnull<:'a> E = 0%r.
 proof.
-rewrite muE.
-
- admit. qed.
+rewrite muE -(@eq_sum (fun x=> 0%r) _ _).
++ by move=> x /=; rewrite dnull1E if_same.
+admit.
+qed.
 
 lemma weight_dnumm ['a] : weight dnull<:'a> = 0%r.
 proof. by apply/dnullE. qed.
+
+lemma supnullE ['a] : support dnull<:'a> = pred0.
+proof. by apply/fun_ext=> x; rewrite /support /in_supp dnull1E. qed.
 
 (* -------------------------------------------------------------------- *)
 theory MRat.
@@ -115,6 +119,16 @@ rewrite -big_mkcond (@eq_bigr _ _ F) /F /= => {F}.
 by rewrite -size_filter -divr_suml -sumr_ofint big_count.
 qed.
 
+lemma support_drat ['a] (s : 'a list) : support (drat s) = mem s.
+proof.
+apply/fun_ext=> x; rewrite /support /in_supp dratE.
+rewrite divrE eq_iff -has_pred1 has_count.
+case: (count (pred1 x) s <= 0); [smt w=count_ge0|].
+move=> /IntOrder.ltrNge ^ + -> /=; rewrite -from_intM; case: s=> //=.
+move=> ? s /(@mulr_gt0 _ (inv (1 + size s)%r)) -> //.
+by rewrite invr_gt0 from_intM [smt w=size_ge0].
+qed.
+
 lemma eq_dratP ['a] (s1 s2 : 'a list) :
   (perm_eq s1 s2) <=> (drat s1 = drat s2).
 proof. admit. qed.
@@ -144,6 +158,9 @@ proof. by rewrite MRat.prratE /=; case: (E x). qed.
 
 lemma dunit_ll ['a] (x : 'a): mu (dunit x) predT = 1%r.
 proof. by apply/MRat.drat_ll. qed.
+
+lemma support_dunit ['a] (x : 'a): support (dunit x) = pred1 x.
+proof. by apply/fun_ext=> x'; rewrite MRat.support_drat. qed.
 end MUnit.
 
 (* -------------------------------------------------------------------- *)
@@ -170,7 +187,10 @@ qed.
 
 lemma duniformE ['a] (E : 'a -> bool) (s : 'a list) :
   mu (duniform s) E = (count E (undup s))%r / (size (undup s))%r.
-proof. apply/MRat.prratE. qed.
+proof. by apply/MRat.prratE. qed.
+
+lemma support_duniform ['a] (s : 'a list): support (duniform s) = mem s.
+proof. by rewrite MRat.support_drat pred_ext=>x; rewrite mem_undup. qed.
 
 lemma duniform_ll (s : 'a list) :
   s <> [] => mu (duniform s) predT = 1%r.
@@ -198,6 +218,9 @@ rewrite size_range; case: (lezWP n m) => [le_nm|le_mn].
   by rewrite max_lel // 1:subr_le0 // range_geq // !divrE.
 by rewrite max_ler // subr_ge0 ltrW // ltzNge.
 qed.
+
+lemma support_drange (m n i : int): support (drange m n) i <=> m <= i < n.
+proof. by rewrite MRat.support_drat undup_id ?range_uniq mem_range. qed.
 end MIntUniform.
 
 (* -------------------------------------------------------------------- *)
@@ -247,4 +270,9 @@ proof. by rewrite MUniform.duniform1E enumP /= undup_id // enum_uniq. qed.
 lemma duniformE (E : t -> bool) :
   mu duniform E = (count E enum)%r / (size enum)%r.
 proof. by rewrite MUniform.duniformE ?undup_id // enum_uniq. qed.
+
+lemma support_duniform: support duniform = predT.
+proof.
+by rewrite MUniform.support_duniform pred_ext=> x; rewrite enumP.
+qed.
 end MFinite.
