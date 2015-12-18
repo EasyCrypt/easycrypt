@@ -64,7 +64,7 @@ section.
   qed. 
 
   local equiv iter_swap1 :
-    Iter(O').iter2_12 ~ Iter(O').iter2_21 :
+    Iter(O').iter_12 ~ Iter(O').iter_21 :
             ={glob O', t1, t2} ==> ={glob O'}.
   proof.
   transitivity Fold(O).fold_12

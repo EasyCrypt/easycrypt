@@ -20,17 +20,17 @@ module Iter (O:Orcl) = {
     iter(l2);
   }
 
-  proc iter1(t:t, l:t list) = {
+  proc iter_1s(t:t, l:t list) = {
     O.f(t); 
     iter(l);
   }
 
-  proc iter2_12(t1 t2 : t) = {
+  proc iter_12(t1 t2 : t) = {
     O.f(t1);
     O.f(t2);
   }
 
-  proc iter2_21(t1 t2 : t) = {
+  proc iter_21(t1 t2 : t) = {
     O.f(t2);
     O.f(t1);
   }
@@ -49,7 +49,7 @@ qed.
 lemma iters_ll (O <: Orcl): islossless O.f => islossless Iter(O).iters.
 proof. by move=> f_ll;proc;do 2!call (iter_ll O f_ll). qed.
 
-lemma iter1_ll (O <: Orcl): islossless O.f => islossless Iter(O).iter1.
+lemma iter_1s_ll (O <: Orcl): islossless O.f => islossless Iter(O).iter_1s.
 proof. by move=> f_ll;proc;call (iter_ll O f_ll);call f_ll. qed.
 
 equiv iter_cat (O <: Orcl):
@@ -81,7 +81,7 @@ transitivity Iter(O).iter
 by apply (iter_cat O).
 qed.
 
-equiv iter2_12_eq (O <: Orcl): Iter(O).iter2_12 ~ Iter(O).iter:
+equiv iter_12_eq (O <: Orcl): Iter(O).iter_12 ~ Iter(O).iter:
   ={glob O} /\ l{2} = [t1;t2]{1} ==> ={glob O}.
 proof.
 proc=> /=.
@@ -91,8 +91,8 @@ rcondf{2} 5; 1: by do !(auto; call (_: true)); auto.
 by do !(auto; call (_: true)); auto.
 qed.
 
-lemma iter2_21_eq (O <: Orcl):
-  equiv [Iter(O).iter2_21 ~ Iter(O).iter:
+lemma iter_21_eq (O <: Orcl):
+  equiv [Iter(O).iter_21 ~ Iter(O).iter:
          ={glob O} /\ l{2} = [t2;t1]{1} ==> ={glob O}].
 proof.
 proc=> /=.
@@ -106,7 +106,7 @@ section.
   declare module O:Orcl.
 
   axiom iter2_eq:
-    equiv [Iter(O).iter2_12 ~ Iter(O).iter2_21:
+    equiv [Iter(O).iter_12 ~ Iter(O).iter_21:
            ={glob O,t1,t2} ==> ={glob O}].
 
   lemma iter_swap s1 i s2:
@@ -128,15 +128,15 @@ section.
   + proc; call (_: ={glob O}).
     * by while (={glob O,l}); auto; call (_: true).
     conseq (_: ={glob O} /\ l1{1} = [i;i'] /\ l1{2} = [i';i] ==> ={glob O})=> //.
-    transitivity{1} {Iter(O).iter2_12(i,i');}
+    transitivity{1} {Iter(O).iter_12(i,i');}
       (l1{1} = [i;i'] /\ ={glob O,l1} ==> ={glob O})
       (l1{1} = [i;i'] /\ l1{2} = [i';i] /\ ={glob O} ==> ={glob O})=> [/#|//||].
-    + by symmetry; call (iter2_12_eq O).
-    transitivity{1} {Iter(O).iter2_21(i,i');}
+    + by symmetry; call (iter_12_eq O).
+    transitivity{1} {Iter(O).iter_21(i,i');}
       (l1{1} = [i;i'] /\ l1{2} =[i';i] /\ ={glob O} ==> ={glob O})
       (l1{1} = [i';i] /\ ={glob O,l1} ==> ={glob O})=> [/#|//||].
     + by wp; call iter2_eq.
-    by call (iter2_21_eq O).
+    by call (iter_21_eq O).
   transitivity Iter(O).iters
     (={glob O} /\ l1{1} = [i';i] /\ l2{1} = s1++s2 /\ l1{2} = [i'] /\ l2{2} = i::(s1++s2) ==>
      ={glob O})
@@ -199,7 +199,7 @@ section.
   qed.
 
   lemma iter1_perm:
-    equiv [Iter(O).iter1 ~ Iter(O).iter : 
+    equiv [Iter(O).iter_1s ~ Iter(O).iter : 
       perm_eq (t{1}::l{1}) l{2} /\ ={glob O} ==> ={glob O}].
   proof.
   transitivity Iter(O).iter
