@@ -765,3 +765,33 @@ lemma rem0 (a : 'a) : rem a map0<:'a,'b> = map0.
 proof. 
   by apply map0_eq0=>x;rewrite remP;case (x=a)=>//=;rewrite map0P.
 qed.
+
+lemma set_eq (m:('a,'b)fmap) x y: m.[x] = Some y => m.[x<-y] = m.
+proof.
+  by rewrite fmapP=> Hx x';rewrite getP;case (x'=x)=>//->;rewrite Hx.
+qed.
+
+lemma map_map0 (f:'a -> 'b -> 'c): map f map0 = map0.
+proof. by rewrite fmapP=> x;rewrite mapP !map0P. qed.
+
+lemma map_set (f:'a -> 'b -> 'c) m x y : 
+  map f m.[x<-y] = (map f m).[x<- f x y].
+proof.
+  by rewrite fmapP=>z;rewrite mapP !getP;case (z=x)=>// _;rewrite mapP.
+qed.
+
+lemma map_rem (f:'a -> 'b -> 'c) m x: map f (rem x m) = rem x (map f m).
+proof. by rewrite fmapP=>z;rewrite !(mapP,remP)/#. qed.
+
+lemma rem_set (m:('a,'b)fmap) x y v:
+  rem x (m.[y<-v]) = if x = y then rem x m else (rem x m).[y<-v].
+proof.
+  rewrite fmapP=>z;case (x=y)=>[->|]; rewrite !(remP,getP) /#.
+qed.
+
+lemma map_comp (f1:'a->'b->'c) (f2:'a->'c->'d) (m:('a,'b)fmap):
+   map f2 (map f1 m) = map (fun a b => f2 a (f1 a b)) m.
+proof. by rewrite fmapP=>x;rewrite !mapP;case (m.[x]). qed.
+
+lemma map_id (m:('a,'b)fmap): map (fun _ b => b) m = m.
+proof. by rewrite fmapP=>x;rewrite mapP;case (m.[x]). qed.

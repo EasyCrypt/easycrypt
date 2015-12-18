@@ -24,6 +24,10 @@ axiom oflistK (s : 'a list): perm_eq (undup s) (elems (oflist s)).
 
 axiom fset_eq (s1 s2 : 'a fset):
   (perm_eq (elems s1) (elems s2)) => (s1 = s2).
+(* -------------------------------------------------------------------- *)
+lemma oflist_uniq (s : 'a list) : uniq s =>
+  perm_eq s (elems (oflist s)).
+proof. by move/undup_id => {1}<-; apply/oflistK. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma uniq_elems (s : 'a fset): uniq (elems s).
@@ -123,6 +127,23 @@ proof. by move=> x; rewrite setIE mem_oflist mem_filter !memE. qed.
 lemma in_fsetD (s1 s2 : 'a fset):
   forall x, mem (s1 `\` s2) x <=> mem s1 x /\ !mem s2 x.
 proof. by move=> x; rewrite setDE mem_oflist mem_filter /predC !memE. qed.
+
+lemma setD1E (s : 'a fset) x :
+  perm_eq (elems (s `\` fset1 x)) (rem x (elems s)).
+proof.
+rewrite setDE; pose s' := List.filter _ _; apply/(perm_eq_trans s').
+  rewrite perm_eq_sym oflist_uniq ?filter_uniq ?uniq_elems.
+rewrite /s' rem_filter ?uniq_elems; apply/uniq_perm_eq;
+  rewrite ?filter_uniq ?uniq_elems // => y.
+by rewrite !mem_filter /predC in_fset1.
+qed.
+
+lemma perm_to_rem (s:'a fset) x : 
+  mem s x => perm_eq (elems s) (x :: elems (s `\` fset1 x)).
+proof.
+rewrite memE => /perm_to_rem /perm_eqlP->; apply/perm_cons.
+have /perm_eqlP <- := (setD1E s x); rewrite perm_eq_refl.
+qed.
 
 (* -------------------------------------------------------------------- *)
 hint rewrite inE : in_fset0 in_fset1 in_fsetU in_fsetI in_fsetD.
