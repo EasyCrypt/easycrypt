@@ -70,7 +70,7 @@ and process1_idtac (_ : ttenv) (msg : string option) (tc : tcenv1) =
   EcLowGoal.t_id tc
 
 (* -------------------------------------------------------------------- *)
-and process1_case (_ : ttenv) (opts, gp) (tc : tcenv1) =
+and process1_case (_ : ttenv) (doeq, opts, gp) (tc : tcenv1) =
   let opts = CaseOptions.merge CaseOptions.default opts in
 
   let form_of_gp () =
@@ -79,8 +79,9 @@ and process1_case (_ : ttenv) (opts, gp) (tc : tcenv1) =
         when List.is_empty gp.pr_view ->
      begin
        match occ with
-       | None   -> pf
-       | Some _ -> tc_error !!tc "cannot specify an occurence selector"
+       | None when not doeq -> pf
+       | _ -> tc_error !!tc
+          "cannot specify an occurence selector, nor eq. generation"
      end
 
     | _ -> tc_error !!tc "must give exactly one boolean formula"
@@ -94,7 +95,7 @@ and process1_case (_ : ttenv) (opts, gp) (tc : tcenv1) =
         let fp = TTC.tc1_process_prhl_formula tc (form_of_gp ()) in
         EcPhlCase.t_equiv_case fp tc
 
-    | _ -> EcHiGoal.process_case gp tc
+    | _ -> EcHiGoal.process_case ~doeq gp tc
 
 (* -------------------------------------------------------------------- *)
 and process1_progress (ttenv : ttenv) options t (tc : tcenv1) =

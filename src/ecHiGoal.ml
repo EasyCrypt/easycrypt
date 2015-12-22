@@ -1318,8 +1318,8 @@ let process_intros ?cf ttenv pis tc =
   process_mintros ?cf ttenv pis (FApi.tcenv_of_tcenv1 tc)
 
 (* -------------------------------------------------------------------- *)
-let process_generalize1 pattern (tc : tcenv1) =
-  let hyps, concl = FApi.tc1_flat tc in
+let process_generalize1 ?(doeq = false) pattern (tc : tcenv1) =
+  let env, hyps, concl = FApi.tc1_eflat tc in
 
   let onresolved ?(tryclear = true) pattern =
     let clear = if tryclear then `Yes else `No in
@@ -1328,7 +1328,7 @@ let process_generalize1 pattern (tc : tcenv1) =
     | `Form (occ, pf) -> begin
         match pf.pl_desc with
         | PFident ({pl_desc = ([], s)}, None)
-            when is_none occ && LDecl.has_name s hyps
+            when not doeq && is_none occ && LDecl.has_name s hyps
           ->
             let id = fst (LDecl.by_name s hyps) in
             t_generalize_hyp ~clear id tc
@@ -1361,6 +1361,13 @@ let process_generalize1 pattern (tc : tcenv1) =
           in
 
           let name, newconcl = FPosition.topattern ~x:name cpos concl in
+          let newconcl =
+            if doeq then
+              if EcReduction.EqTest.for_type env p.f_ty tbool then
+                f_imps [f_iff p (f_local name p.f_ty)] newconcl
+              else
+                f_imps [f_eq p (f_local name p.f_ty)] newconcl
+            else newconcl in
           let newconcl = f_forall [(name, GTty p.f_ty)] newconcl in
           let pt = { pt_head = PTCut newconcl; pt_args = [PAFormula p]; } in
 
@@ -1395,9 +1402,11 @@ let process_generalize1 pattern (tc : tcenv1) =
   | None -> onresolved pattern
 
 (* -------------------------------------------------------------------- *)
-let process_generalize patterns (tc : tcenv1) =
+let process_generalize ?(doeq = false) patterns (tc : tcenv1) =
   try
-    FApi.t_seqs (List.rev_map process_generalize1 patterns) tc
+    let patterns = List.mapi (fun i p ->
+      process_generalize1 ~doeq:(doeq && i = 0) p) patterns in
+    FApi.t_seqs (List.rev patterns) tc
   with (EcCoreGoal.ClearError _) as err ->
     tc_error_exn !!tc err
 
@@ -1420,10 +1429,10 @@ let process_genintros ?cf ttenv pis tc =
   process_mgenintros ?cf ttenv pis (FApi.tcenv_of_tcenv1 tc)
 
 (* -------------------------------------------------------------------- *)
-let process_move views pr (tc : tcenv1) =
+let process_move ?doeq views pr (tc : tcenv1) =
   t_seqs
     [process_clear pr.pr_clear;
-     process_generalize pr.pr_genp;
+     process_generalize ?doeq pr.pr_genp;
      process_view views]
     tc
 
@@ -1660,12 +1669,14 @@ let process_elim (pe, qs) tc =
       tc_error !!tc "don't know what to eliminate"
 
 (* -------------------------------------------------------------------- *)
-let process_case gp tc =
+let process_case ?(doeq = false) gp tc =
   let module E = struct exception LEMFailure end in
 
   try
     match gp.pr_rev with
-    | { pr_genp = [`Form (None, pf)] } when List.is_empty gp.pr_view ->
+    | { pr_genp = [`Form (None, pf)] }
+        when List.is_empty gp.pr_view ->
+
         let env = FApi.tc1_env tc in
 
         let f =
@@ -1691,7 +1702,8 @@ let process_case gp tc =
     try
       FApi.t_last
         (t_ors [t_elimT_ind `Case; t_elim; t_elim_prind `Case])
-        (process_move gp.pr_view gp.pr_rev tc)
+        (process_move ~doeq gp.pr_view gp.pr_rev tc)
+
     with EcCoreGoal.InvalidGoalShape ->
       tc_error !!tc "don't known what to eliminate"
 

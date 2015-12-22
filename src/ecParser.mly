@@ -2678,8 +2678,12 @@ tactic_core_r:
 | ADMIT
    { Padmit }
 
-| CASE vw=prefix(SLASH, pterm)* COLON? opts=caseoptions? gp=revert
-   { Pcase (odfl [] opts, { pr_view = vw; pr_rev = gp; } ) }
+| CASE vw=prefix(SLASH, pterm)*
+    eq=ioption(postfix(boption(UNDERSCORE), COLON))
+    opts=ioption(caseoptions) gp=revert
+
+    { Pcase (odfl false eq, odfl [] opts,
+             { pr_view = vw; pr_rev = gp; } ) }
 
 | PROGRESS opts=pgoptions? t=tactic_core? {
     Pprogress (odfl [] opts, t)

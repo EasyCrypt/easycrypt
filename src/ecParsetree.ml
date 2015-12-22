@@ -259,10 +259,10 @@ and pgty =
 | PGTY_Mem
 
 (* -------------------------------------------------------------------- *)
-let rec pf_ident f =
+let rec pf_ident ?(raw = false) f =
   match unloc f with
   | PFident ({ pl_desc = ([], x) }, _) -> Some x
-  | PFtuple [f] -> pf_ident f
+  | PFtuple [f] when not raw -> pf_ident ~raw f
   | _ -> None
 
 (* -------------------------------------------------------------------- *)
@@ -732,7 +732,7 @@ and ptactic_core_r =
   | Pby         of (ptactics) option
   | Por         of ptactic * ptactic
   | Pseq        of ptactics
-  | Pcase       of (pcaseoptions * prevertv)
+  | Pcase       of (bool * pcaseoptions * prevertv)
   | Plogic      of logtactic
   | PPhl        of phltactic
   | Pprogress   of ppgoptions * ptactic_core option
