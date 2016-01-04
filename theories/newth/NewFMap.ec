@@ -448,6 +448,18 @@ proof.
   by rewrite getE=> -[_ ->].
 qed.
 
+lemma filter_eq_dom (m:('a,'b)fmap) (p1 p2:'a->'b->bool):
+   (forall a, mem (dom m) a=> p1 a (oget m.[a]) = p2 a (oget m.[a])) =>
+   filter p1 m = filter p2 m.
+proof.
+ by move=> Hp;apply fmapP=>z;rewrite !filterP;case (mem (dom m) z)=>// Hz;rewrite Hp.
+qed.
+
+lemma filter_eq (m:('a,'b)fmap) (p1 p2:'a->'b->bool):
+   (forall a b, p1 a b = p2 a b) =>
+   filter p1 m = filter p2 m.
+proof. by move=>Hp;apply filter_eq_dom=>?_;apply Hp. qed.
+   
 (* -------------------------------------------------------------------- *)
 op map (f : 'a -> 'b -> 'c) (m : ('a, 'b) fmap) =
   oflist (map (fun (x : 'a * 'b) => (x.`1,f x.`1 x.`2)) (elems m))
@@ -653,21 +665,24 @@ lemma find_some (p:'a -> 'b -> bool) m x:
 proof. by have:= findP p m; case (find p m). qed.
 
 lemma rem_filter (m : ('a, 'b) fmap) x:
-  forall x', (rem x m).[x'] = (filter (fun x' y => x' <> x) m).[x'].
+  rem x m = filter (fun x' y => x' <> x) m.
 proof.
-  move=> x'; rewrite remP filterP; case (mem (dom m) x').
+  apply fmapP=> x'; rewrite remP filterP; case (mem (dom m) x').
     by case (x' = x).
   by rewrite in_dom /= => ->.
 qed.
 
+lemma filter_predI (p1 p2: 'a -> 'b -> bool) (m : ('a, 'b) fmap):
+  filter (fun a b => p1 a b /\ p2 a b) m = filter p1 (filter p2 m).
+proof. by rewrite fmapP=>x;rewrite !(filterP, dom_filter)/#. qed.
+
 lemma filter_filter (p : 'a -> 'b -> bool) (m : ('a, 'b) fmap):
   filter p (filter p m) = filter p m.
-proof.
-  rewrite fmapP=> x; rewrite !filterP.
-  case (mem (dom m) x /\ p x (oget m.[x]))=> h;
-  have:= h; rewrite -dom_filter=> -> //=.
-  by have [_ ->]:= h.
-qed.
+proof. by rewrite -filter_predI;apply filter_eq => /#. qed.
+
+lemma filter_rem (p:'a->'b->bool) (m:('a,'b)fmap) x:
+  filter p (rem x m) = rem x (filter p m).
+proof. rewrite !rem_filter -!filter_predI;apply filter_eq=>/#. qed.
 
 lemma join_filter (p : 'a -> 'b -> bool) (m : ('a, 'b) fmap):
   (filter p m) + (filter (fun x y=> !p x y) m) = m.
@@ -690,6 +705,12 @@ qed.
 lemma filter_eq_except (m : ('a, 'b) fmap) (X : 'a fset):
   eq_except (filter (fun x y => !mem X x) m) m X.
 proof. by rewrite eq_exceptE filter_filter. qed.
+
+lemma eq_except_rem (m1 m2:('a,'b)fmap) (s:'a fset) x:
+   mem s x => eq_except m1 m2 s => eq_except m1 (rem x m2) s.
+proof.
+  rewrite !eq_exceptE rem_filter -filter_predI=> Hmem ->;apply filter_eq=>/#.
+qed.
 
 lemma set_eq_except x b (m : ('a, 'b) fmap):
   eq_except m.[x <- b] m (fset1 x).
