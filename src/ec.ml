@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -182,7 +182,7 @@ let _ =
         | true  -> Some why3conf
     end
     | why3conf -> why3conf
-  
+
   and ovrevict = options.o_options.o_ovrevict in
 
   begin
@@ -217,7 +217,7 @@ let _ =
           pc_why3     = why3conf;
           pc_pwrapper = pwrapper;
           pc_loadpath = EcCommands.loadpath ();
-        } in 
+        } in
 
         print_config config; exit 0
 
@@ -236,7 +236,7 @@ let _ =
         let terminal =
           lazy (EcTerminal.from_channel ~name ~gcstats (open_in name))
         in
-          ({cmpopts.cmpo_provers with prvo_iterate = true}, 
+          ({cmpopts.cmpo_provers with prvo_iterate = true},
            Some name, terminal, false)
     end
   in
@@ -286,14 +286,14 @@ let _ =
               EcCommands.cm_profile   = prvopts.prvo_profile;
               EcCommands.cm_iterate   = prvopts.prvo_iterate;
             } in
-  
+
             EcCommands.initialize ~restart
               ~undo:interactive ~boot:ldropts.ldro_boot ~checkmode;
             (try
                List.iter EcCommands.apply_pragma prvopts.prvo_pragmas
              with EcCommands.InvalidPragma x ->
                EcScope.hierror "invalid pragma: `%s'\n%!" x);
-  
+
             let notifier (lvl : EcGState.loglevel) (lazy msg) =
               EcTerminal.notice ~immediate:true lvl msg terminal
             in EcCommands.addnotifier notifier;

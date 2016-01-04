@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -26,11 +26,11 @@ module Frequency : sig
   val r_card  : relevant -> int
 
   type all_rel = [ `OP of path | `PROC of xpath]
-    
+
   val r_fold : (all_rel -> 'a -> 'a) -> relevant -> 'a -> 'a
 
   type frequency
-  
+
   val create : Sp.t -> frequency
   val frequency : frequency -> all_rel -> int
   val f_ops : Sp.t -> form -> relevant
@@ -39,5 +39,5 @@ module Frequency : sig
 
 end
 
-  
-    
+
+

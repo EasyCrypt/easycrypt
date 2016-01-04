@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -43,7 +43,7 @@ move=> O_ll; proc; inline Fold(O).fold.
 while true (size l); auto=> /=.
 + call O_ll; skip=> /= ? [*] Hl <-.
   smt w=(size_eq0 size_ge0 size_drop).
-smt w=(size_eq0 size_ge0).  
+smt w=(size_eq0 size_ge0).
 qed.
 
 section.
@@ -68,7 +68,7 @@ section.
   proof.
   proc; while (={glob O,l} /\ s{1} = O'.s{2}); last by auto.
   by inline O'.f; wp; call (_: true); auto.
-  qed. 
+  qed.
 
   local equiv iter_swap1 :
     Iter(O').iter_12 ~ Iter(O').iter_21 :

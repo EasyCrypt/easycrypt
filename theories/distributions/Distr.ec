@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -110,7 +110,7 @@ by apply mu_sub; rewrite /predI=> x.
 qed.
 
 lemma nosmt mu_and_le_r (d:'a distr) (p q:'a -> bool) r :
-  mu d q <= r => 
+  mu d q <= r =>
   mu d (predI p q) <= r.
 proof.
 apply (Real.Trans _ (mu d q)).
@@ -195,7 +195,7 @@ lemma weight_0_mu (d:'a distr):
 by [].
 
 lemma mu_one (P:'a -> bool) (d:'a distr):
-  P == predT => 
+  P == predT =>
   weight d = 1%r =>
   mu d P = 1%r.
 proof.
@@ -203,7 +203,7 @@ move=> heq <-.
 rewrite /weight.
 congr=> //.
 by apply fun_ext.
-qed.  
+qed.
 
 (*** Some useful distributions *)
 (** Empty distribution *)
@@ -292,7 +292,7 @@ theory Dinter.
   by rewrite mu_x_def -neqF=> ->.
 
   lemma mu_in_supp (i j : int):
-    i <= j => 
+    i <= j =>
     mu (dinter i j) (fun x, i <= x <= j) = 1%r.
   proof strict.
     move=> h; rewrite -(mu_eq_support (dinter i j) predT).
@@ -321,7 +321,7 @@ theory Dscale.
 
   axiom mu_def_pos (d:'a distr):
     0%r < weight d =>
-    forall (p:'a -> bool), mu (dscale d) p = mu d p / weight d.  
+    forall (p:'a -> bool), mu (dscale d) p = mu d p / weight d.
 
   lemma weight_0 (d:'a distr):
     weight d = 0%r => weight (dscale d) = 0%r
@@ -331,7 +331,7 @@ theory Dscale.
     0%r < weight d => weight (dscale d) = 1%r.
   proof strict.
   by move=> H; rewrite /weight mu_def_pos /weight=> //; smt.
-  qed.  
+  qed.
 
   lemma dscaleU (d:'a distr):
     mu d predT <> 0%r => is_subuniform d => is_uniform (dscale d)
@@ -356,7 +356,7 @@ theory Dapply.
     rewrite mu_support /predI /= => in_sup. smt.
     move=> [x]; rewrite /in_supp /mu_x=> -[y_def nempty].
     have: pred1 x <= preim f (pred1 y)
-      by move=> w; rewrite !pred1E. 
+      by move=> w; rewrite !pred1E.
     smt.
   qed.
 

@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -28,7 +28,7 @@ module Iter (O:Orcl) = {
   }
 
   proc iter_1s(t:t, l:t list) = {
-    O.f(t); 
+    O.f(t);
     iter(l);
   }
 
@@ -160,7 +160,7 @@ section.
   by while (={glob O, l}); auto; call (_: true).
   qed.
 
-  lemma iter_perm : 
+  lemma iter_perm :
     equiv [Iter(O).iter ~ Iter(O).iter : perm_eq l{1} l{2} /\ ={glob O} ==> ={glob O}].
   proof.
   exists*l{1}, l{2}; elim*=>l1 l2; case (perm_eq l1 l2)=> Hp; last first.
@@ -194,37 +194,37 @@ section.
   qed.
 
   lemma iters_perm:
-    equiv [Iter(O).iters ~ Iter(O).iter : 
+    equiv [Iter(O).iters ~ Iter(O).iter :
       perm_eq (l1{1}++l2{1}) l{2} /\ ={glob O} ==> ={glob O}].
   proof.
   transitivity Iter(O).iter
     (l{2} = l1{1}++l2{1} /\ ={glob O} ==> ={glob O})
     (perm_eq l{1} l{2} /\ ={glob O} ==> ={glob O})=>//.
-  + by move=> &ml&mr[??]; exists (glob O){mr}, (l1{ml} ++ l2{ml}).  
+  + by move=> &ml&mr[??]; exists (glob O){mr}, (l1{ml} ++ l2{ml}).
   + by symmetry;conseq (iter_cat O).
-  by apply iter_perm.    
+  by apply iter_perm.
   qed.
 
   lemma iter1_perm:
-    equiv [Iter(O).iter_1s ~ Iter(O).iter : 
+    equiv [Iter(O).iter_1s ~ Iter(O).iter :
       perm_eq (t{1}::l{1}) l{2} /\ ={glob O} ==> ={glob O}].
   proof.
   transitivity Iter(O).iter
     (l{2} = t{1}::l{1} /\ ={glob O} ==> ={glob O})
     (perm_eq l{1} l{2} /\ ={glob O} ==> ={glob O})=>//.
-  + by move=> &ml&mr[??]; exists (glob O){mr}, (t{ml}::l{ml}).  
+  + by move=> &ml&mr[??]; exists (glob O){mr}, (t{ml}::l{ml}).
   + proc;rcondt{2}1;1:by auto.
     by inline*;sim;wp;call (_:true);skip;progress;rewrite drop0.
-  by apply iter_perm.    
+  by apply iter_perm.
   qed.
 
 end section.
 
 lemma iter_inv (O<:Orcl) (P:t -> bool) (Inv: glob O -> glob O -> bool):
-  equiv [ O.f ~ O.f: 
+  equiv [ O.f ~ O.f:
           ={x} /\ P x{1} /\ Inv (glob O){1} (glob O){2} ==>
           Inv (glob O){1} (glob O){2} ] =>
-  equiv [ Iter(O).iter ~ Iter(O).iter : 
+  equiv [ Iter(O).iter ~ Iter(O).iter :
           ={l} /\ (forall x, mem l{1} x => P x) /\ Inv (glob O){1} (glob O){2} ==>
           Inv (glob O){1} (glob O){2} ].
 proof.

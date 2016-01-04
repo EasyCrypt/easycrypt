@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -129,7 +129,7 @@ theory Univ.
     by rewrite List.Iota.mem_iota /=; smt.
   qed.
 end Univ.
- 
+
 theory Dword.
   require import Real Distr.
   require (*--*) Mu_mem.

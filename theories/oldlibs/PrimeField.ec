@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -35,7 +35,7 @@ theory F.
   axiom addA (x y z:t) : x + (y + z) = (x + y) + z.
   axiom addf0 (x:t): x + zero = x.
   axiom addfN (x:t): x + -x = zero.
-  axiom sub_def (x y:t) : x - y = x + -y.   
+  axiom sub_def (x y:t) : x - y = x + -y.
 
   (* Multiplication *)
   axiom mulC (x y:t): x * y = y * x.
@@ -43,7 +43,7 @@ theory F.
   axiom mulf1 (x:t): x * one = x.
   axiom mulfV (x:t): x <> zero => (x * (inv x)) = one.
   axiom mulfDl (x y z:t): x * y + x * z = x * (y + z).
-  axiom div_def (x y:t): x / y = x * (inv y). 
+  axiom div_def (x y:t): x / y = x * (inv y).
 
   (* Exponentiation *)
   axiom pow0 (x:t): x ^ 0 = one.
@@ -61,7 +61,7 @@ theory F.
   import Int.
   axiom toint_bounded (x:t): 0 <= toint x < q.
   axiom oftoint (x:t): ofint (toint x) = x.
-  axiom toofint_mod (x:int): toint (ofint x) = IntDiv.(%%) x q. 
+  axiom toofint_mod (x:int): toint (ofint x) = IntDiv.(%%) x q.
 end F.
 export F.
 
@@ -75,7 +75,7 @@ instance ring with t
   op add   = F.( + )
   op opp   = F.([-])
   op mul   = F.( * )
-  op expr  = F.( ^ ) 
+  op expr  = F.( ^ )
   op sub   = F.(-)
   op ofint = ofint
 
@@ -142,7 +142,7 @@ lemma nosmt mulNf (x y:t): (-x) * y = - (x * y)
 by ringeq.
 
 lemma nosmt mulfN (x y:t): y * (-x)= - (y * x)
-by ringeq.  
+by ringeq.
 
 lemma nosmt oppK (x:t): -(-x) = x
 by ringeq.
@@ -172,7 +172,7 @@ proof.
   smt all.
 qed.
 
-lemma nosmt ofint1_: ofint 1 = F.one 
+lemma nosmt ofint1_: ofint 1 = F.one
 by [].
 
 theory FDistr.

@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -379,11 +379,11 @@ let tydecl_use_local_or_abs tydecl lc =
     (match tydecl.tyd_type with
     | `Concrete ty -> on_mpath_ty cb ty
     | `Abstract _  -> ()
-  
+
     | `Record (f, fds) ->
         on_mpath_form cb f;
         List.iter (on_mpath_ty cb |- snd) fds
-  
+
     | `Datatype dt ->
         List.iter (List.iter (on_mpath_ty cb) |- snd) dt.tydt_ctors;
         List.iter (on_mpath_form cb) [dt.tydt_schelim; dt.tydt_schcase]);

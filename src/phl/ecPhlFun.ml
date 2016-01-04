@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -416,7 +416,7 @@ let t_fun_to_code_eager_r tc =
   let s = PVM.add env (pv_res fl) (fst ml) (f_pvar rl tyl (fst ml)) s in
   let s = PVM.add env (pv_res fr) (fst mr) (f_pvar rr tyr (fst mr)) s in
   let post  = PVM.subst env s eg.eg_po in
-  let concl = 
+  let concl =
     f_equivS ml mr eg.eg_pr (s_seq eg.eg_sl sl) (s_seq sr eg.eg_sr) post in
   FApi.xmutate1 tc `FunToCode [concl]
 

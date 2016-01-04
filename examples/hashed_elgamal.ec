@@ -1,6 +1,6 @@
 require import Int.
 require import Real.
-require import FMap. 
+require import FMap.
 require import FSet.
 
 require (*--*) DiffieHellman.
@@ -36,7 +36,7 @@ module type Hash = {
   proc hash(x:group): bits
 }.
 
-clone import ROM.Lazy as RandOrcl_group with 
+clone import ROM.Lazy as RandOrcl_group with
   type from  <- group,
   type to    <- bits,
   op dsample <- fun (x:group), uniform.
@@ -52,7 +52,7 @@ clone import PKE as PKE_ with
   type pkey <- pkey,
   type skey <- skey,
   type plaintext <- plaintext,
-  type ciphertext <- ciphertext. 
+  type ciphertext <- ciphertext.
 
 (** Concrete Construction: Hashed ElGammal **)
 module Hashed_ElGamal (H:Hash): Scheme = {
@@ -61,7 +61,7 @@ module Hashed_ElGamal (H:Hash): Scheme = {
 
     H.init();
     sk = $FDistr.dt;
-    return (g ^ sk, sk);   
+    return (g ^ sk, sk);
   }
 
   proc enc(pk:pkey, m:plaintext): ciphertext = {
@@ -75,9 +75,9 @@ module Hashed_ElGamal (H:Hash): Scheme = {
   proc dec(sk:skey, c:ciphertext): plaintext option = {
     var gy, h, hm;
 
-    (gy, hm) = c; 
+    (gy, hm) = c;
     h = H.hash(gy ^ sk);
-    return Option.Some (h ^^ hm); 
+    return Option.Some (h ^^ hm);
   }
 }.
 
@@ -122,7 +122,7 @@ module S = Hashed_ElGamal(H).
 
 (** Correctness **)
 hoare Correctness: Correctness(S).main: true ==> res.
-proof. 
+proof.
   proc; inline*; auto => /= &hr sk0 Hsk0 y Hy y0 Hy0.
   rewrite !(dom_empty, mem_empty) /= !pow_pow F.mulC dom_set mem_add /= => y1 _.
   algebra.
@@ -165,7 +165,7 @@ section.
       H.init();
       x       = $FDistr.dt;
       y       = $FDistr.dt;
-      gx      = g ^ x; 
+      gx      = g ^ x;
       gxy     = gx ^ y;
       (m0,m1) = BA.choose(gx);
       b       = ${0,1};
@@ -194,7 +194,7 @@ section.
   by byequiv CPA_G0.
 
   (* Replace the challenge hash with a random sampling *)
-  local module G1 = { 
+  local module G1 = {
     var gxy : group
 
     proc main() : bool = {
@@ -204,7 +204,7 @@ section.
       H.init();
       x       = $FDistr.dt;
       y       = $FDistr.dt;
-      gx      = g ^ x; 
+      gx      = g ^ x;
       gxy     = gx ^ y;
       (m0,m1) = BA.choose(gx);
       b       = ${0,1};
@@ -255,7 +255,7 @@ section.
   (* Make it clear that the result is independent from the adversary's message *)
   local module G2 = {
     var gxy : group
-   
+
     proc main() : bool = {
       var m0, m1, c, b, b';
       var x, y, h, gx;
@@ -263,7 +263,7 @@ section.
       H.init();
       x        = $FDistr.dt;
       y        = $FDistr.dt;
-      gx       = g ^ x; 
+      gx       = g ^ x;
       gxy      = gx ^ y;
       (m0,m1)  = BA.choose(gx);
       h        = $uniform;
@@ -331,16 +331,16 @@ section.
       by proc; sp; if=> //; inline RO.o; auto; smt.
     by skip; smt.
   qed.
-      
-  local lemma Pr_G2_SCDH &m : 
+
+  local lemma Pr_G2_SCDH &m :
     Pr[G2.main() @ &m : mem G2.gxy Bounder.ARO.qs]
     = Pr[SCDH(SCDH_from_CPA(A,RO)).main() @ &m : res]
   by byequiv G2_SCDH.
-   
+
   local lemma Reduction &m :
     Pr[CPA(S,BA).main() @ &m : res] <=
     1%r / 2%r + Pr[SCDH(SCDH_from_CPA(A,RO)).main() @ &m : res].
-  proof. 
+  proof.
     rewrite (Pr_CPA_G0 &m).
     apply (real_le_trans _ (Pr[G1.main() @ &m : res] + Pr[G1.main() @ &m: mem G1.gxy Bounder.ARO.qs]));
       first by apply (Pr_G0_G1 &m).
@@ -349,12 +349,12 @@ section.
 
   (** Composing reduction from CPA to SCDH with reduction from SCDH to CDH *)
   lemma Security &m :
-      Pr[CPA(S,Bounder(A,RO)).main() @ &m: res] - 1%r / 2%r <= 
+      Pr[CPA(S,Bounder(A,RO)).main() @ &m: res] - 1%r / 2%r <=
       qH%r * Pr[CDH(CDH_from_SCDH(SCDH_from_CPA(A,RO))).main() @ &m: res].
   proof.
     apply (Trans _ (Pr[SCDH(SCDH_from_CPA(A,RO)).main() @ &m: res]));
       first smt.
-    rewrite -(mul_compat_le (1%r/qH%r)).  
+    rewrite -(mul_compat_le (1%r/qH%r)).
      by rewrite -Real.inv_def; apply sign_inv; smt.
     rewrite !(Real.Comm.Comm _ (1%r/qH%r)) -Real.Assoc.Assoc -{2}Real.inv_def (Real.Comm.Comm _ qH%r).
     rewrite (_: forall x, qH%r * (inv qH%r) * x = x).

@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -213,7 +213,7 @@ type prind = {
 
 (* -------------------------------------------------------------------- *)
 let prind_indsc_name (s : symbol) =
-  Printf.sprintf "%s_ind" s 
+  Printf.sprintf "%s_ind" s
 
 let prind_indsc_path (p : EcPath.path) =
   EcPath.pqoname

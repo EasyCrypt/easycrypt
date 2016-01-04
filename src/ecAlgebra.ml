@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -38,20 +38,20 @@ end = struct
 
   let empty = { rst_map = Mf.empty; rst_inv = Mint.empty; rst_idx = 0; }
 
-  exception Found of int 
+  exception Found of int
 
-  let find_alpha hyps form map = 
+  let find_alpha hyps form map =
     match Mf.find_opt form map with
     | Some i -> Some i
-    | None -> 
-      try 
+    | None ->
+      try
         Mf.iter (fun f i ->
           if EcReduction.is_alpha_eq hyps f form then raise (Found i)) map;
         None
       with Found i -> Some i
-       
+
   let add hyps (form : form) (rmap : rstate) =
-    let res = 
+    let res =
       match find_alpha hyps form rmap.rst_map with
       | Some i -> (i, rmap)
       | None ->
@@ -64,10 +64,10 @@ end = struct
   let get (i : int) (rmap : rstate) =
     Mint.find_opt i rmap.rst_inv
 
-  let update1 rmap i f' = 
+  let update1 rmap i f' =
     match get i rmap with
     | Some f ->
-      {rmap with 
+      {rmap with
         rst_map = Mf.add f' i (Mf.remove f rmap.rst_map);
         rst_inv = Mint.add i f' rmap.rst_inv}
     | None -> rmap
@@ -88,14 +88,14 @@ let rzero r = rapp r r.r_zero []
 let rone  r = rapp r r.r_one  []
 
 let radd r e1 e2 = rapp r r.r_add [e1; e2]
-let ropp r e     = 
+let ropp r e     =
   match r.r_opp with
   | Some opp -> rapp r opp [e]
   | None -> assert (r.r_kind = `Boolean); e
 
 let rmul r e1 e2 = rapp r r.r_mul [e1; e2]
 
-let rexp r e i  = 
+let rexp r e i  =
   match r.r_exp with
   | Some r_exp ->
       rapp r r_exp [e; f_int i]
@@ -123,7 +123,7 @@ let rofint r i =
         if BI.equal i BI.one then rone r else
           let x = aux (BI.rshift i 1) in
           match BI.parity i with
-          | `Even -> radd r x x 
+          | `Even -> radd r x x
           | `Odd  -> radd r (rone r) (radd r x x)
       in
         match BI.sign i with
@@ -175,7 +175,7 @@ let cring_of_ring (r : ring) : cring =
   let cr = odfl cr (r.r_opp |> omap (fun p -> Mp.add p `Opp cr)) in
   let cr = odfl cr (r.r_sub |> omap (fun p -> Mp.add p `Sub cr)) in
   let cr = odfl cr (r.r_exp |> omap (fun p -> Mp.add p `Exp cr)) in
-  let cr = r.r_embed |> 
+  let cr = r.r_embed |>
       (function (`Direct | `Default) -> cr | `Embed p -> Mp.add p `OfInt cr) in
     (r, cr)
 
@@ -307,7 +307,7 @@ let tofield hyps ((r, cr) : cfield) (rmap : RState.rstate) (form : form) =
           | _ -> abstract ()
           end
         | _ -> abstract ()
-      end 
+      end
     | Fapp({f_node = Fop (p,_)}, [a]) -> begin
         match op_kind p with
         | Some `Int_opp -> FEsub (FEc c0, of_int a)
@@ -320,7 +320,7 @@ let tofield hyps ((r, cr) : cfield) (rmap : RState.rstate) (form : form) =
   let form = doit form in (form, !rmap)
 
 (* -------------------------------------------------------------------- *)
-let rec ofring (r:ring) (rmap:RState.rstate) (e:pexpr) : form = 
+let rec ofring (r:ring) (rmap:RState.rstate) (e:pexpr) : form =
   match e with
   | PEc c -> rofint r c
   | PEX idx -> oget (RState.get idx rmap)
@@ -328,7 +328,7 @@ let rec ofring (r:ring) (rmap:RState.rstate) (e:pexpr) : form =
   | PEsub(p1,p2) -> rsub r (ofring r rmap p1) (ofring r rmap p2)
   | PEmul(p1,p2) -> rmul r (ofring r rmap p1) (ofring r rmap p2)
   | PEopp p1     -> ropp r (ofring r rmap p1)
-  | PEpow(p1,i)  -> rexp r (ofring r rmap p1) i 
+  | PEpow(p1,i)  -> rexp r (ofring r rmap p1) i
 
 (* -------------------------------------------------------------------- *)
 let norm_pe_of_ring (cr : EcDecl.ring) =
@@ -391,7 +391,7 @@ let field_eq hyps (cr : cfield) (eqs : eq list) (f1 : form) (f2 : form) =
     (cond1 @ cond2, ((num1, num2), (denum1, denum2)))
 
 (* -------------------------------------------------------------------- *)
-let rec offield (r:field) (rmap:RState.rstate) (e:fexpr) : form = 
+let rec offield (r:field) (rmap:RState.rstate) (e:fexpr) : form =
   match e with
   | FEc c        -> fofint r c
   | FEX idx      -> oget (RState.get idx rmap)
@@ -399,14 +399,14 @@ let rec offield (r:field) (rmap:RState.rstate) (e:fexpr) : form =
   | FEsub(p1,p2) -> fsub r (offield r rmap p1) (offield r rmap p2)
   | FEmul(p1,p2) -> fmul r (offield r rmap p1) (offield r rmap p2)
   | FEopp p1     -> fopp r (offield r rmap p1)
-  | FEpow(p1,i)  -> fexp r (offield r rmap p1) i 
+  | FEpow(p1,i)  -> fexp r (offield r rmap p1) i
   | FEinv p1     -> finv r (offield r rmap p1)
   | FEdiv(p1,p2) -> fdiv r (offield r rmap p1) (offield r rmap p2)
 
-let field_simplify_pe (cr:cfield) peqs pe = 
+let field_simplify_pe (cr:cfield) peqs pe =
   let (num,denum,cond) = fnorm pe in
   let norm = norm_pe_of_ring (fst cr).f_ring in
-  let norm f = norm f peqs in 
+  let norm f = norm f peqs in
   (List.map norm cond, (norm num, norm denum))
 
 let field_simplify hyps (cr : cfield) (eqs : eq list) (f : form) =

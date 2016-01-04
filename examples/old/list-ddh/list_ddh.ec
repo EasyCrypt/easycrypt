@@ -24,7 +24,7 @@ module type LDDH_ORACLES = {
   fun getTriple() : gtriple option
 }.
 
-module type LDDH_DISTINGUISHER(S:LDDH_ORACLES) = { 
+module type LDDH_DISTINGUISHER(S:LDDH_ORACLES) = {
   fun init() : unit {*}
   fun distinguish() : bool {S.getTriple}
 }.
@@ -88,7 +88,7 @@ module LDDH_random(A : LDDH_DISTINGUISHER) = {
     O.c = 0;
     b  = AD.distinguish();
     return b;
-  }  
+  }
 }.
 
 (* ----------------------------------------------------------------------*)
@@ -118,7 +118,7 @@ module LDDH_Hyb(A : LDDH_DISTINGUISHER) = {
   }
 
   module AD = A(O)
-  
+
   fun main(ia : int) : bool = {
     var b : bool;
     AD.init();
@@ -126,7 +126,7 @@ module LDDH_Hyb(A : LDDH_DISTINGUISHER) = {
     O.c = 0;
     b  = AD.distinguish();
     return b;
-  }  
+  }
 }.
 
 lemma Eq_LDDH_Hyb0_real: forall (A <: LDDH_DISTINGUISHER {LDDH_Hyb, LDDH_real}),
@@ -301,18 +301,18 @@ module User_LDDH_Hyb2(A : LDDH_DISTINGUISHER, RO : RO_dh.RO) = {
 
   module AD = A(O)
 
-  (* 
+  (*
   var c : int (* BUG: glob equality for User_LDDH_Hyb2 requires equality
                  on User_LDDH_Hyb2.c, even though only User_LDDH_Hyb2.O.c
                  is defined *)
   var i : int (* so we just add them as globals *) *)
-  
+
   fun main(x : int) : bool = {
     var b : bool;
     AD.init();
     O.i = x;
     O.c = 0;
-    (* 
+    (*
     c = 0;  (* see above *)
     i = 0;  (* see above *) *)
     b = AD.distinguish();
@@ -391,7 +391,7 @@ module Dist(A : LDDH_DISTINGUISHER) : DDH_DISTINGUISHER= {
   }
 
   module AD = A(O)
-  
+
   fun distinguish(i : int, X Y Z : group) : bool = {
     var b : bool;
     O.x = X;
@@ -509,7 +509,7 @@ seq 4 4:
   inline RO_dh_real.LRO.init LRO.init.
   wp.
   call (_ : true). skip. smt.
-call (_ : LDDH_Hyb2.O.c{1} = LDDH_Hyb2.O.c{2}  /\ 
+call (_ : LDDH_Hyb2.O.c{1} = LDDH_Hyb2.O.c{2}  /\
           LDDH_Hyb2.O.i{1} = LDDH_Hyb2.O.i{2} + 1 /\
           (LDDH_Hyb2.O.c{2} <= LDDH_Hyb2.O.i{2}
              => LRO.m{2} = Map.empty) /\
@@ -712,7 +712,7 @@ lemma A(A <: LDDH_DISTINGUISHER {FRO_random,LDDH_Hyb2,Dist,LDDH_Hyb,RO_dh_real.L
 proof strict.
 move=> &m.
 apply (Int.induction
-         (lambda i, 
+         (lambda i,
             `|  Pr[ LDDH_Hyb(A).main(0) @ &m: res ]
               - Pr[ LDDH_Hyb(A).main(i) @ &m: res ] |
           <= sum 0 (i-1)

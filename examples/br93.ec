@@ -98,8 +98,8 @@ import OWTP.
      plaintext. We let the adversary query it qH times at most. ***)
 op qH : { int | 0 < qH } as qH_pos.
 
-clone import ROM.ListLog as RandOrcl_BR with 
-  type from  <- randomness, 
+clone import ROM.ListLog as RandOrcl_BR with
+  type from  <- randomness,
   type to    <- plaintext,
   op dsample <- fun (x:randomness) => uniform,
   op qH      <- qH.
@@ -110,7 +110,7 @@ import Types.
 (**  [See theory PKE.ec] **)
 module type Scheme(RO : Oracle) = {
   proc kg(): (pkey * skey)
-  proc enc(pk:pkey, m:plaintext): ciphertext 
+  proc enc(pk:pkey, m:plaintext): ciphertext
 }.
 
 module type Adv(ARO: ARO)  = {
@@ -129,11 +129,11 @@ module CPA(S:Scheme, A:Adv) = {
     ARO.init();
     (pk,sk)  = SO.kg();
     (m0,m1)  = A.a1(pk);
-    b = ${0,1}; 
+    b = ${0,1};
     c  = SO.enc(pk,b?m0:m1);
     b' = A.a2(c);
     return b' = b;
-  } 
+  }
 }.
 
 (** A Scheme E is IND-CPA secure if, for any A,
@@ -147,11 +147,11 @@ module BR(R:Oracle): Scheme(R) = {
     (pk,sk) = $keypairs;
     return (pk,sk);
   }
- 
+
   proc enc(pk:pkey, m:plaintext): ciphertext = {
     var h, r;
 
-    r = $uniform_rand; 
+    r = $uniform_rand;
     h = R.o(r);
     return ((f pk r) ||   m ^ h);
   }
@@ -169,7 +169,7 @@ module BR_OW(A:Adv): Inverter = {
 
     ARO.init();
     (m0,m1) = A.a1(pk);
-    h = $uniform; 
+    h = $uniform;
     b = A.a2(y || h);
     x = oget (find (fun p => f pk p = y) ARO.qs);
     return x;
@@ -271,8 +271,8 @@ section.
     proc enc(pk:pkey, m:plaintext): ciphertext = {
       var h;
 
-      r = $uniform_rand; 
-      h = $uniform; 
+      r = $uniform_rand;
+      h = $uniform;
       return ((f pk r) || h);
     }
   }.
@@ -338,7 +338,7 @@ section.
     wp.
     rnd (pred1 b')=> //=.
     inline *.
-    call (_: true). 
+    call (_: true).
       exact a2_ll. (* adversary *)
       exact lossless_ARO_o. (* oracle *)
     auto.

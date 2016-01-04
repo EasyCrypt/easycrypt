@@ -50,7 +50,7 @@ op Pinv: key -> block -> block.
    modify the axiom below to restrict the bijection *)
 axiom bijective_P (k : key):
      cancel (P k) (Pinv k)
-  /\ cancel (Pinv k) (P k).  
+  /\ cancel (Pinv k) (P k).
 
 (** We instantiate library definitions for brevity **)
 clone import PRP as PRPa with
@@ -267,7 +267,7 @@ proof.
     by wp; call P_f_eq; auto.
   by auto.
 qed.
-    
+
 lemma CPA_direct_eq (P  <: PRFa.PRF_Hiding)
                     (P' <: PRFa.PRF_Hiding)
                     (I: (glob P) -> (glob P') -> bool):
@@ -600,7 +600,7 @@ qed.
  ** We avoid simply bounding using the total number of blocks fed into
  ** the PRP so that the addition of padding does not make us lose too
  ** much precision...
- ** 
+ **
  **)
 module OracleBounder(O:RCPA_full) = {
   var qC : int

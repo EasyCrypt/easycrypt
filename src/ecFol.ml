@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -79,7 +79,7 @@ let fop_real_add   = f_op CI.CI_Real.p_real_add  [] (toarrow [treal; treal] trea
 let fop_real_opp   = f_op CI.CI_Real.p_real_opp  [] (toarrow [treal] treal)
 let fop_real_mul   = f_op CI.CI_Real.p_real_mul  [] (toarrow [treal; treal] treal)
 let fop_real_div   = f_op CI.CI_Real.p_real_div  [] (toarrow [treal; treal] treal)
-let fop_real_abs   = f_op CI.CI_Real.p_real_abs  [] (toarrow [treal]        treal) 
+let fop_real_abs   = f_op CI.CI_Real.p_real_abs  [] (toarrow [treal]        treal)
 
 
 let f_int_le f1 f2 = f_app fop_int_le [f1; f2] tbool
@@ -105,11 +105,11 @@ let fop_mu      ty = f_op CI.CI_Distr.p_mu      [ty] (toarrow [tdistr ty; tcpred
 let f_in_supp f1 f2 = f_app (fop_in_supp f1.f_ty) [f1; f2] tbool
 let f_mu_x    f1 f2 = f_app (fop_mu_x f2.f_ty) [f1; f2] treal
 
-let proj_distr_ty env ty = 
+let proj_distr_ty env ty =
    match (EcEnv.Ty.hnorm ty env).ty_node with
-  | Tconstr(_,lty) when List.length lty = 1  -> 
+  | Tconstr(_,lty) when List.length lty = 1  ->
     List.hd lty
-  | _ -> assert false 
+  | _ -> assert false
 
 let f_mu env f1 f2 =
   f_app (fop_mu (proj_distr_ty env f1.f_ty)) [f1; f2] treal
@@ -686,7 +686,7 @@ module DestrInt : DestrRing = struct
   let sub f =
     try  snd_map opp (add f)
     with DestrError _ -> raise (DestrError "int_sub")
-    
+
 end
 
 (* -------------------------------------------------------------------- *)

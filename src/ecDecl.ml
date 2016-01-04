@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -71,7 +71,7 @@ let ty_instanciate (params : ty_params) (args : ty list) (ty : ty) =
   EcTypes.Tvar.subst subst ty
 
 (* -------------------------------------------------------------------- *)
-type locals = EcIdent.t list 
+type locals = EcIdent.t list
 
 type operator_kind =
   | OB_oper of opbody option
@@ -126,7 +126,7 @@ and prctor = {
 
 type operator = {
   op_tparams : ty_params;
-  op_ty      : EcTypes.ty;        
+  op_ty      : EcTypes.ty;
   op_kind    : operator_kind;
 }
 
@@ -145,12 +145,12 @@ let is_lemma (x : axiom_kind) = match x with `Lemma   -> true | _ -> false
 (* -------------------------------------------------------------------- *)
 let op_ty op = op.op_ty
 
-let is_oper op = 
+let is_oper op =
   match op.op_kind with
   | OB_oper _ -> true
   | _ -> false
 
-let is_pred op = 
+let is_pred op =
   match op.op_kind with
   | OB_pred _ -> true
   | _ -> false
@@ -164,7 +164,7 @@ let is_proj op =
   match op.op_kind with
   | OB_oper (Some (OP_Proj _)) -> true
   | _ -> false
- 
+
 let is_rcrd op =
   match op.op_kind with
   | OB_oper (Some (OP_Record _)) -> true
@@ -195,7 +195,7 @@ let mk_pred tparams dom body =
   let kind = OB_pred body in
     gen_op tparams (EcTypes.toarrow dom EcTypes.tbool) kind
 
-let mk_op tparams ty body = 
+let mk_op tparams ty body =
   let kind = OB_oper body in
     gen_op tparams ty kind
 
@@ -284,7 +284,7 @@ type ring = {
   r_zero  : EcPath.path;
   r_one   : EcPath.path;
   r_add   : EcPath.path;
-  r_opp   : EcPath.path option; 
+  r_opp   : EcPath.path option;
   r_mul   : EcPath.path;
   r_exp   : EcPath.path option;
   r_sub   : EcPath.path option;
@@ -303,7 +303,7 @@ let kind_equal k1 k2 =
 
   | _, _ -> false
 
-let ring_equal r1 r2 = 
+let ring_equal r1 r2 =
      EcTypes.ty_equal r1.r_type r2.r_type
   && EcPath.p_equal r1.r_zero r2.r_zero
   && EcPath.p_equal r1.r_one  r2.r_one
@@ -319,14 +319,14 @@ let ring_equal r1 r2 =
     | `Default , `Default  -> true
     | _        , _         -> false
 
-  
+
 type field = {
   f_ring : ring;
   f_inv  : EcPath.path;
   f_div  : EcPath.path option;
 }
 
-let field_equal f1 f2 = 
+let field_equal f1 f2 =
      ring_equal f1.f_ring f2.f_ring
   && EcPath.p_equal f1.f_inv f2.f_inv
   && EcUtils.oall2 EcPath.p_equal f1.f_div f2.f_div

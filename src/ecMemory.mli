@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -22,7 +22,7 @@ val lmt_equal    : local_memtype -> local_memtype -> bool
 val lmt_xpath    : local_memtype -> EcPath.xpath
 val lmt_bindings : local_memtype -> ((int*int) option * EcTypes.ty) Msym.t
 (* the "int option" indicate if the variable is defined as the projection of
-   "arg" or as a variable *)                         
+   "arg" or as a variable *)
 
 val mt_equal    : memtype -> memtype -> bool
 val mt_xpath    : memtype -> EcPath.xpath
@@ -38,7 +38,7 @@ val me_equal : memenv -> memenv -> bool
 exception DuplicatedMemoryBinding of symbol
 
 val memory   : memenv -> memory
-val memtype  : memenv -> memtype 
+val memtype  : memenv -> memtype
 val xpath    : memenv -> EcPath.xpath
 val bindings : memenv -> ((int*int) option * EcTypes.ty) Msym.t
 

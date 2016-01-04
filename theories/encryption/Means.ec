@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -32,14 +32,14 @@ lemma prCond (A <: Worker) &m (v:input)
     Pr[Rand(A).main() @ &m: ev v (glob A) (snd res) /\ v = fst res] =
       (mu_x d v) * Pr[A.work(v) @ &m : ev v (glob A) res].
 proof.
-byphoare (_: (glob A) = (glob A){m} ==> 
+byphoare (_: (glob A) = (glob A){m} ==>
                  ev (fst res) (glob A) (snd res) /\ fst res = v) => //.
 pose pr := Pr[A.work(v) @ &m: ev v (glob A) res];
 conseq (_: _: = (mu_x d v * pr)). (* WEIRD! *)
 proc; seq 1 : (v = x) (mu_x d v) pr 1%r 0%r ((glob A)=(glob A){m})=> //.
   by rnd.
   by rnd; skip; progress; rewrite /mu_x pred1E; apply/mu_eq.
-  call (_: (glob A) = (glob A){m} /\ x = v ==> 
+  call (_: (glob A) = (glob A){m} /\ x = v ==>
            ev v (glob A) res) => //.
   simplify pr; bypr => &m' eqGlob.
   by byequiv (_: ={glob A, x} ==> ={res, glob A}) => //; proc true.
@@ -59,19 +59,19 @@ byequiv (_: ={glob A} ==> ={glob A, res} /\ in_supp (fst res{1}) d)=> //;
 move=> &m1 &m2 [[<- <-] Hin].
 rewrite /cpOrs or_exists;split.
   move=> H.
-  exists (fun r, 
+  exists (fun r,
             ev (fst res{m1}) (glob A){m1} (snd r) /\ (fst res{m1}) = fst r).
-  split=> //. 
+  split=> //.
   by rewrite imageP; exists (fst (res{m1})); smt.
   by move=> [x]; rewrite imageP => /= -[[v] /= [Hm <-] /= [h1 <-]].
 qed.
 
-lemma Mean (A <: Worker) &m (ev:input -> glob A -> output -> bool): 
+lemma Mean (A <: Worker) &m (ev:input -> glob A -> output -> bool):
   is_finite (support d) =>
   let sup = oflist (to_seq (support d)) in
   Pr[Rand(A).main()@ &m: ev (fst res) (glob A) (snd res)] =
    Mrplus.sum
-     (fun (v:input), mu_x d v * Pr[A.work(v)@ &m:ev v (glob A) res]) 
+     (fun (v:input), mu_x d v * Pr[A.work(v)@ &m:ev v (glob A) res])
      sup.
 proof.
 move=> Fsup /=.
@@ -97,7 +97,7 @@ elim/fset_ind (oflist (to_seq (support d))).
   by rewrite Hrec (prCond A &m x ev).
 qed.
 
-lemma Mean_uni (A<:Worker) &m (ev:input -> glob A -> output -> bool) r: 
+lemma Mean_uni (A<:Worker) &m (ev:input -> glob A -> output -> bool) r:
    (forall x, in_supp x d => mu_x d x = r) =>
    is_finite (support d) =>
    let sup = oflist (to_seq (support d)) in
@@ -111,6 +111,6 @@ proof.
   apply Mrplus.sum_eq => /= x.
   by rewrite mem_oflist mem_to_seq// /support=> Hin; rewrite Hd.
 qed.
-   
+
 
 

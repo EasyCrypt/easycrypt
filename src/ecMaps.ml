@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -77,15 +77,15 @@ end
 module EHashtbl = struct
   module type S = sig
     include Why3.Exthtbl.S
-    val memo_rec : int -> ((key -> 'a) -> key -> 'a) -> key -> 'a   
+    val memo_rec : int -> ((key -> 'a) -> key -> 'a) -> key -> 'a
   end
 
   module Make(T : Why3.Stdlib.OrderedHashedType) = struct
     include Why3.Exthtbl.Make(T)
 
-    let memo_rec size f = 
+    let memo_rec size f =
       let h = create size in
-      let rec aux x = 
+      let rec aux x =
         try find h x with Not_found -> let r = f aux x in add h x r; r in
       aux
   end

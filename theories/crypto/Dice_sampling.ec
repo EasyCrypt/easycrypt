@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -47,7 +47,7 @@ theory GenDice.
     valid i =>
     !test i dfl =>
     weight (d i) = 1%r =>
-    Pr[RsampleW.sample(i,dfl) @ &m : res = k] = 
+    Pr[RsampleW.sample(i,dfl) @ &m : res = k] =
       if test i k then 1%r/(card(sub_supp i))%r else 0%r.
   proof.
     move=> i0 dfl0.
@@ -73,12 +73,12 @@ theory GenDice.
           (* bounding pr : k = r0 /\ k = r *)
           seq 2 : (k = r0) bd 1%r 1%r 0%r (r0 = r /\ i = i0) => //.
             by wp;rnd => //.
-            wp;rnd;skip;progress => //. 
+            wp;rnd;skip;progress => //.
             by rewrite /bd /mu_x pred1E; apply mu_eq => w' //.
             by conseq Hw; progress => //; rewrite Htk.
           by hoare; conseq (_: _ ==> true)=> //; smt.
         (* bounding pr : ! k = r0 /\ k = r *)
-       seq 2 : (test i r0) _ 0%r (1%r - bdt*bd) (1%r/bdt) 
+       seq 2 : (test i r0) _ 0%r (1%r - bdt*bd) (1%r/bdt)
                            (i0 = i /\ test i k /\ r0 = r) => //.
          by wp;rnd.
          case (k = r0);first by conseq (_ : _ ==> false) => //.
@@ -90,7 +90,7 @@ theory GenDice.
             by move=> x ; rewrite /= -test_sub_supp.
           apply (Mu_mem.mu_mem (sub_supp i{hr}) (d i{hr}) bd _) => x Hx.
           by apply d_uni; apply test_in_supp=> //; rewrite -test_sub_supp.
-        by conseq Hw => //; smt.         
+        by conseq Hw => //; smt.
         by conseq (_ : _ ==> true) => //;rnd;skip;progress=> //; smt.
       split; first by cut: 0%r < bd; smt.
       move=> z;conseq (_ : _ ==>  mem (sub_supp i) r); first smt.
@@ -106,7 +106,7 @@ theory GenDice.
   type t'.
   op d' : input -> t' distr.
 
-  module Sample = {  
+  module Sample = {
     proc sample (i:input) : t' = {
       var r : t';
       r = $d' i;
@@ -115,7 +115,7 @@ theory GenDice.
   }.
 
   axiom d'_uni : forall i x, in_supp x (d' i) => mu_x (d' i) x = 1%r/(card(sub_supp i))%r.
-  
+
   lemma prSample : forall i k &m, Pr[Sample.sample(i) @ &m : res = k] = mu_x (d' i) k.
   proof.
     move=> i0 k &m; byphoare (_: i0 = i ==> k = res) => //;proc.
@@ -124,28 +124,28 @@ theory GenDice.
     by rewrite pred1E.
   qed.
 
-  equiv Sample_RsampleW (f : t' -> t) (finv : t -> t') : 
-     Sample.sample ~ RsampleW.sample : 
+  equiv Sample_RsampleW (f : t' -> t) (finv : t -> t') :
+     Sample.sample ~ RsampleW.sample :
        ={i} /\ valid i{2} /\ !test i{2} r{2} /\ weight (d i{2}) = 1%r /\
        (forall rL, in_supp rL (d' i{1}) <=> test i{1} (f rL)) /\
        (forall rR, test i{2} rR => f (finv rR) = rR) /\
        (forall rL, in_supp rL (d' i{1}) => finv (f rL) = rL) ==>
        res{1} = finv res{2}.
   proof.
-    bypr (res{1}) (finv res{2}) => //.      
+    bypr (res{1}) (finv res{2}) => //.
     move=> &m1 &m2 k [Heqi [Hv [Ht [Hw [Htin [Hffi Hfif]]]]]].
-    rewrite (_:Pr[RsampleW.sample(i{m2}, r{m2}) @ &m2 : k = finv res] = 
+    rewrite (_:Pr[RsampleW.sample(i{m2}, r{m2}) @ &m2 : k = finv res] =
                Pr[RsampleW.sample(i{m2}, r{m2}) @ &m2 : res = f k]).
-      byequiv (_: ={i,r} /\ i{2} = i{m2} ==> 
+      byequiv (_: ={i,r} /\ i{2} = i{m2} ==>
                         ={res} /\ test i{m2} res{2}) => //.
         by proc;while (={i,r});[rnd | ];trivial.
-      progress => //. 
+      progress => //.
         by rewrite Hffi.
       by rewrite Hfif // Htin Heqi.
-    rewrite (_:Pr[Sample.sample(i{m1}) @ &m1 : k = res] = 
-               Pr[Sample.sample(i{m1}) @ &m1 : res = k]). 
+    rewrite (_:Pr[Sample.sample(i{m1}) @ &m1 : k = res] =
+               Pr[Sample.sample(i{m1}) @ &m1 : res = k]).
       by rewrite Pr[mu_eq].
-    rewrite (prSample i{m1} k &m1) (prRsampleW (f k) &m2 i{m2} r{m2}) //.   
+    rewrite (prSample i{m1} k &m1) (prRsampleW (f k) &m2 i{m2} r{m2}) //.
     case (test i{m2} (f k)).
       by rewrite -Heqi -Htin; apply d'_uni.
     rewrite -Heqi -Htin /in_supp;smt.

@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -34,7 +34,7 @@ clone include Number.RealDomain
 
   remove abbrev Domain.(-).
 end IntOrder.
-  
+
 (* -------------------------------------------------------------------- *)
 clone Number.RealField as RealOrder
   with type t <- real,

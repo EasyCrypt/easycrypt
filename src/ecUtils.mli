@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -276,7 +276,7 @@ module List : sig
   val ksort:
         ?stable:bool -> ?rev:bool
      -> key:('a -> 'b)
-     -> cmp:('b -> 'b -> int) 
+     -> cmp:('b -> 'b -> int)
      -> 'a list -> 'a list
 end
 

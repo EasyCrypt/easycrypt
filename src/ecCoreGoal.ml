@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -582,7 +582,7 @@ module FApi = struct
     let pe, ln  = on_sub1_map_goals tt (tc_opened tc) pe in
     let ln, dt  = fst_map List.flatten (List.split ln) in
     (dt, tcenv_of_penv ~ctxt:tc.tce_tcenv.tce_ctxt ln pe)
-    
+
   (* ------------------------------------------------------------------ *)
   let t_firsts (tt : backward) (i : int) (tc : tcenv) =
     if i < 0 then invalid_arg "EcCoreGoal.firsts";
@@ -697,7 +697,7 @@ module FApi = struct
   let t_swap_goals (g:int) (delta:int) (tc:tcenv) =
     if delta = 0 || tc.tce_tcenv.tce_goal = None then tc
     else
-      let s = 
+      let s =
         let rgs1, g, gs2 =
           try  List.pivot_at g (tc_opened tc)
           with Invalid_argument _ -> raise InvalidGoalShape

@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -71,8 +71,8 @@ val pp_hoareS   : PPEnv.t -> hoareS  pp
 val pp_bdhoareS : PPEnv.t -> bdHoareS pp
 val pp_equivS   : PPEnv.t -> equivS  pp
 
-val pp_stmt  : PPEnv.t -> stmt pp 
-val pp_instr : PPEnv.t -> instr pp 
+val pp_stmt  : PPEnv.t -> stmt pp
+val pp_instr : PPEnv.t -> instr pp
 
 (* -------------------------------------------------------------------- *)
 type ppgoal = (EcBaseLogic.hyps * EcFol.form) * [

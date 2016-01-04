@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -138,7 +138,7 @@ rewrite /s' rem_filter ?uniq_elems; apply/uniq_perm_eq;
 by rewrite !mem_filter /predC in_fset1.
 qed.
 
-lemma perm_to_rem (s:'a fset) x : 
+lemma perm_to_rem (s:'a fset) x :
   mem s x => perm_eq (elems s) (x :: elems (s `\` fset1 x)).
 proof.
 rewrite memE => /perm_to_rem /perm_eqlP->; apply/perm_cons.

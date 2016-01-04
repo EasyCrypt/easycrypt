@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -16,14 +16,14 @@ type plaintext.
 type ciphertext.
 
 module type Scheme = {
-  proc kg() : pkey * skey 
-  proc enc(pk:pkey, m:plaintext)  : ciphertext 
+  proc kg() : pkey * skey
+  proc enc(pk:pkey, m:plaintext)  : ciphertext
   proc dec(sk:skey, c:ciphertext) : plaintext option
 }.
 
 module type Adversary = {
-  proc choose(pk:pkey)     : plaintext * plaintext 
-  proc guess(c:ciphertext) : bool                  
+  proc choose(pk:pkey)     : plaintext * plaintext
+  proc guess(c:ciphertext) : bool
 }.
 
 module CPA (S:Scheme, A:Adversary) = {
@@ -40,11 +40,11 @@ module CPA (S:Scheme, A:Adversary) = {
     c        = S.enc(pk, b ? m1 : m0);
     b'       = A.guess(c);
     return (b' = b);
-  } 
+  }
 }.
 
 
-(* 
+(*
 ** Based on lists. Several versions can be given as in RandOrcl.
 ** Also, oracle annotations could be used to provide different oracles during
 ** the choose and guess stages of the experiment.
@@ -85,7 +85,7 @@ module CCA (S:Scheme, A:Adversary) = {
     guess    = true;
     b'       = A.guess(c);
     return (b' = b);
-  } 
+  }
 }.
 
 module Correctness (S:Scheme) = {
@@ -97,7 +97,7 @@ module Correctness (S:Scheme) = {
 
     (pk, sk) = S.kg();
     c        = S.enc(pk, m);
-    m'       = S.dec(sk, c); 
+    m'       = S.dec(sk, c);
     return (m' = Some m);
   }
 }.

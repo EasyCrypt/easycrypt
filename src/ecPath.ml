@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -26,24 +26,24 @@ let p_equal   = ((==) : path -> path -> bool)
 let p_hash    = fun p -> p.p_tag
 let p_compare = fun p1 p2 -> p_hash p1 - p_hash p2
 
-module Hspath = Why3.Hashcons.Make (struct 
+module Hspath = Why3.Hashcons.Make (struct
   type t = path
 
-  let equal_node p1 p2 = 
+  let equal_node p1 p2 =
     match p1, p2 with
     | Psymbol id1, Psymbol id2 ->
         sym_equal id1 id2
-    | Pqname (p1, id1), Pqname(p2, id2) -> 
+    | Pqname (p1, id1), Pqname(p2, id2) ->
         sym_equal id1 id2 && p_equal p1 p2
     | _ -> false
 
   let equal p1 p2 = equal_node p1.p_node p2.p_node
 
-  let hash p = 
+  let hash p =
     match p.p_node with
     | Psymbol id    -> Hashtbl.hash id
     | Pqname (p,id) -> Why3.Hashcons.combine p.p_tag (Hashtbl.hash id)
-          
+
   let tag n p = { p with p_tag = n }
 end)
 
@@ -63,7 +63,7 @@ let mk_path node =
 let psymbol id   = mk_path (Psymbol id)
 let pqname  p id = mk_path (Pqname(p,id))
 
-let rec pappend p1 p2 = 
+let rec pappend p1 p2 =
   match p2.p_node with
   | Psymbol id -> pqname p1 id
   | Pqname(p2,id) -> pqname (pappend p1 p2) id
@@ -80,8 +80,8 @@ let rec tostring p =
   | Pqname (p,x) -> Printf.sprintf "%s.%s" (tostring p) x
 
 let tolist =
-  let rec aux l p = 
-    match p.p_node with 
+  let rec aux l p =
+    match p.p_node with
     | Psymbol x     -> x :: l
     | Pqname (p, x) -> aux (x :: l) p in
   aux []
@@ -97,8 +97,8 @@ let fromqsymbol ((nm, x) : qsymbol) =
        (fun p x -> Some (pqoname p x)) None nm)
     x
 
-let basename p = 
-  match p.p_node with 
+let basename p =
+  match p.p_node with
   | Psymbol x     -> x
   | Pqname (_, x) -> x
 
@@ -106,7 +106,7 @@ let extend p s =
   List.fold_left pqname p s
 
 let prefix p =
-  match p.p_node with 
+  match p.p_node with
   | Psymbol _ -> None
   | Pqname (p, _) -> Some p
 
@@ -125,8 +125,8 @@ let isprefix p q =
   | None   -> false
   | Some _ -> true
 
-let rec rootname p = 
-  match p.p_node with 
+let rec rootname p =
+  match p.p_node with
   | Psymbol x     -> x
   | Pqname (p, _) -> rootname p
 
@@ -148,33 +148,33 @@ and mpath_top =
 
 let m_equal   = ((==) : mpath -> mpath -> bool)
 
-let mt_equal mt1 mt2 = 
+let mt_equal mt1 mt2 =
   match mt1, mt2 with
   | `Local id1, `Local id2 -> EcIdent.id_equal id1 id2
   | `Concrete(p1, o1), `Concrete(p2, o2) ->
     p_equal p1 p2 && oall2 p_equal o1 o2
-  | _, _ -> false 
+  | _, _ -> false
 
 let m_hash    = fun p -> p.m_tag
 let m_compare = fun p1 p2 -> m_hash p1 - m_hash p2
 
-module Hsmpath = Why3.Hashcons.Make (struct 
+module Hsmpath = Why3.Hashcons.Make (struct
   type t = mpath
 
-  let equal m1 m2 = 
+  let equal m1 m2 =
     mt_equal m1.m_top m2.m_top  && List.all2 m_equal m1.m_args m2.m_args
 
-  let hash m = 
-    let hash = 
+  let hash m =
+    let hash =
       match m.m_top with
       | `Local id -> EcIdent.id_hash id
-      | `Concrete(p, o) -> 
+      | `Concrete(p, o) ->
         o |> ofold
               (fun s h -> Why3.Hashcons.combine h (p_hash s))
               (p_hash p)
     in
     Why3.Hashcons.combine_list m_hash hash m.m_args
-          
+
   let tag n p = { p with m_tag = n }
 end)
 
@@ -196,39 +196,39 @@ let mident id = mpath_abs id []
 
 let mpath_crt p args sp = mpath (`Concrete(p,sp)) args
 
-let mqname mp x = 
+let mqname mp x =
   match mp.m_top with
   | `Concrete(top,None) -> mpath_crt top mp.m_args (Some (psymbol x))
   | `Concrete(top,Some sub) -> mpath_crt top mp.m_args (Some (pqname sub x))
   | _ -> assert false
-  
+
 let mastrip mp = { mp with m_args = [] }
 
-let m_apply mp args = 
+let m_apply mp args =
   let args' = mp.m_args in
-  mpath mp.m_top (args'@args) 
+  mpath mp.m_top (args'@args)
 (* PY check that it is safe. previous code *)
-(* if args' = [] then mpath mp.m_top args 
+(* if args' = [] then mpath mp.m_top args
   else (assert (args = []); mp) *)
 
-let m_functor mp = 
-  let top = 
+let m_functor mp =
+  let top =
     match mp.m_top with
     | `Concrete(p,Some _) -> `Concrete(p,None)
     | t -> t in
   mpath top []
 
-let mget_ident mp = 
+let mget_ident mp =
   match mp.m_top with
   | `Local id -> id
   | _ -> assert false
 
-let rec m_fv fv mp = 
-  let fv = 
-    match mp.m_top with 
-    | `Local id -> EcIdent.fv_add id fv 
+let rec m_fv fv mp =
+  let fv =
+    match mp.m_top with
+    | `Local id -> EcIdent.fv_add id fv
     | `Concrete _  -> fv in
-  List.fold_left m_fv fv mp.m_args 
+  List.fold_left m_fv fv mp.m_args
 
 let rec pp_list sep pp fmt xs =
   let pp_list = pp_list sep pp in
@@ -237,12 +237,12 @@ let rec pp_list sep pp fmt xs =
     | [x]     -> Format.fprintf fmt "%a" pp x
     | x :: xs -> Format.fprintf fmt "%a%(%)%a" pp x sep pp_list xs
 
-let rec pp_m fmt mp = 
-  let pp_args fmt args = 
+let rec pp_m fmt mp =
+  let pp_args fmt args =
     if args <> [] then
       Format.fprintf fmt "@[(%a)@]" (pp_list "," pp_m) args in
   match mp.m_top with
-  | `Local id -> 
+  | `Local id ->
     Format.fprintf fmt "%s%a" (EcIdent.tostring id) pp_args mp.m_args
   | `Concrete(p,None) ->
     Format.fprintf fmt "%s%a" (tostring p) pp_args mp.m_args
@@ -260,20 +260,20 @@ let x_equal   = ((==) : xpath -> xpath -> bool)
 let x_hash    = fun p -> p.x_tag
 let x_compare = fun p1 p2 -> x_hash p1 - x_hash p2
 
-let x_equal_na x1 x2 = 
+let x_equal_na x1 x2 =
      mt_equal x1.x_top.m_top x2.x_top.m_top
   && p_equal x1.x_sub x2.x_sub
 
 let x_compare_na x1 x2 =
   x_compare x1 x2 (* FIXME: doc says something about x_top being normalized *)
 
-module Hsxpath = Why3.Hashcons.Make (struct 
+module Hsxpath = Why3.Hashcons.Make (struct
   type t = xpath
 
-  let equal m1 m2 = 
+  let equal m1 m2 =
     m_equal m1.x_top m2.x_top && p_equal m1.x_sub m2.x_sub
 
-  let hash m = 
+  let hash m =
     Why3.Hashcons.combine (m_hash m.x_top) (p_hash m.x_sub)
 
   let tag n p = { p with x_tag = n }
@@ -291,7 +291,7 @@ module Hx = XPath.H
 let xpath top sub =
   Hsxpath.hashcons { x_top = top; x_sub = sub; x_tag = -1; }
 
-let x_fv fv xp = m_fv fv xp.x_top 
+let x_fv fv xp = m_fv fv xp.x_top
 
 let xpath_fun mp f = xpath mp (psymbol f)
 let xqname x s = xpath x.x_top (pqname x.x_sub s)
@@ -299,30 +299,30 @@ let xastrip x = { x with x_top = mastrip x.x_top }
 let xbasename xp = basename xp.x_sub
 
 (* -------------------------------------------------------------------- *)
-let rec m_tostring (m : mpath) = 
-  let top, sub = 
+let rec m_tostring (m : mpath) =
+  let top, sub =
     match m.m_top with
     | `Local id -> (EcIdent.tostring id, "")
 
     | `Concrete (p, sub) ->
-      let strsub = 
+      let strsub =
         sub |> ofold (fun p _ -> Format.sprintf ".%s" (tostring p)) ""
       in
         (tostring p, strsub)
   in
 
-  let args = 
+  let args =
     let a = m.m_args in
       match a with
       | [] -> ""
-      | _  -> 
+      | _  ->
         let stra = List.map m_tostring a in
           Printf.sprintf "(%s)" (String.concat ", " stra)
   in
     Printf.sprintf "%s%s%s" top args sub
 
-let x_tostring x = 
-  Printf.sprintf "%s./%s" 
+let x_tostring x =
+  Printf.sprintf "%s./%s"
     (m_tostring x.x_top) (tostring x.x_sub)
 
 (* -------------------------------------------------------------------- *)
@@ -334,7 +334,7 @@ let p_subst (s : path Mp.t) =
       with Not_found ->
         match p.p_node with
         | Psymbol _ -> p
-        | Pqname(p1, id) -> 
+        | Pqname(p1, id) ->
           let p1' = aux p1 in
           if p1 == p1' then p else pqname p1' id in
     Hp.memo_rec 107 p_subst
@@ -343,30 +343,30 @@ let p_subst (s : path Mp.t) =
 let rec m_subst (sp : path -> path) (sm : mpath EcIdent.Mid.t) m =
   let args = List.Smart.map (m_subst sp sm) m.m_args in
   match m.m_top with
-  | `Concrete(p,sub) -> 
+  | `Concrete(p,sub) ->
     let p' = sp p in
     let top = if p == p' then m.m_top else `Concrete(p',sub) in
-    if m.m_top == top && m.m_args == args then m else 
-      mpath top args 
+    if m.m_top == top && m.m_args == args then m else
+      mpath top args
   | `Local id ->
-    try 
+    try
       let m' = EcIdent.Mid.find id sm in
-      m_apply m' args 
-    with Not_found -> 
+      m_apply m' args
+    with Not_found ->
       if m.m_args == args then m else
-        mpath m.m_top args 
-      
+        mpath m.m_top args
+
 let m_subst (sp : path -> path) (sm : mpath EcIdent.Mid.t) =
   if sp == identity && EcIdent.Mid.is_empty sm then identity
   else m_subst sp sm
 
 (* -------------------------------------------------------------------- *)
-let x_subst (sm : mpath -> mpath) = 
-  if sm == identity then identity 
-  else fun x -> 
+let x_subst (sm : mpath -> mpath) =
+  if sm == identity then identity
+  else fun x ->
     let top = sm x.x_top in
-    if x.x_top == top then x 
+    if x.x_top == top then x
     else xpath top x.x_sub
 
-let x_substm sp sm = 
+let x_substm sp sm =
   x_subst (m_subst sp sm)

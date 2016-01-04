@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -33,7 +33,7 @@ op ub (E : real -> bool) (z : real) =
 op has_ub  (E : real -> bool) = nonempty (ub E).
 op has_lub (E : real -> bool) = nonempty E /\ has_ub E.
 
-axiom lub_upper_bound (E : real -> bool): has_lub E => 
+axiom lub_upper_bound (E : real -> bool): has_lub E =>
   forall x, E x => x <= lub E.
 
 axiom lub_adherent (E : real -> bool): has_lub E =>

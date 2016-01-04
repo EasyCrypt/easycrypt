@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -47,7 +47,7 @@ let process_prhl_post g phi =
     | _ -> tacuerror "expecting a PRHL statement" in
   let hyps = LDecl.push_all [ml; mr] hyps in
   EcCoreHiLogic.process_form hyps phi tbool
-  
+
 (* -------------------------------------------------------------------- *)
 let process_phl_exp side e ty g =
   let (hyps, concl) = get_goal g in
@@ -64,7 +64,7 @@ let process_phl_exp side e ty g =
 let process_phl_formula  = process_phl_form tbool
 let process_prhl_formula = process_prhl_form tbool
 
-let process_prhl_stmt side g c = 
+let process_prhl_stmt side g c =
   let (hyps, concl) = get_goal g in
 
   let es   = EcCorePhl.t_as_equivS concl in
@@ -75,4 +75,4 @@ let process_prhl_stmt side g c =
   let c    = EcTyping.transstmt env ue c in
   let esub = Tuni.offun (EcUnify.UniEnv.close ue) in
   let esub = { e_subst_id with es_ty = esub; } in
-    EcModules.s_subst esub c 
+    EcModules.s_subst esub c

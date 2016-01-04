@@ -19,7 +19,7 @@ module type Adv(O : Orcl) = {
 module G0(AF : Adv) = {
   var b : bool
   var k : int
-  
+
   module O = {
     fun query(n : int) : int = {
       var k_ : int;
@@ -27,14 +27,14 @@ module G0(AF : Adv) = {
       return k_;
     }
   }
-  
+
   module A = AF(O)
-  
+
   fun main(x : unit) : unit = {
     k = 0;
     b = A.run();
     (* This is an artificial way to ensure that 0 <= k < q.
-       Usually, this would be enforced in the oracle, e.g., 
+       Usually, this would be enforced in the oracle, e.g.,
        by stopping to answer (and increasing the counter)
        after q queries. *)
     k = `|k %% q|;
@@ -53,9 +53,9 @@ module G1(AF : Adv) = {
       return k_;
     }
   }
-  
+
   module A = AF(O)
-  
+
   fun main(x : unit) : unit = {
     i = $(Distr.Dinter.dinter 0 (q -1));
     k = 0;
@@ -79,7 +79,7 @@ lemma Bound_aux &m (A <: Adv):
   = Pr[ Guess(G0(A)).main(()) @ &m :  G0.b /\ (fst res) = if G0.k >= 0 && G0.k < q then G0.k else 0 ].
 proof.
   print axiom PBound.
-  cut := PBound &m (G0(A)) 
+  cut := PBound &m (G0(A))
            (lambda g u, let (b,k_,g_a_) = g in b)
            (lambda g u, let (b_,k,g_a_) = g in 1)
            tt.

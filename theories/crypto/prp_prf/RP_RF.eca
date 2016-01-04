@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -146,7 +146,7 @@ rewrite -/(weight _) Dexcepted.lossless_restr //.
 + have [/pred_ext] + [<- _]:= uD_uf_fu.
   rewrite -(etaE (support uD)) etaP=> h'.
   by apply/notin_supportIP; rewrite h'.
-qed.  
+qed.
 
 phoare Indirect_ll: [Indirect.sample: exists x, support uD x /\ !mem X x ==> true] = 1%r.
 proof.
@@ -326,7 +326,7 @@ section CollisionProbability.
     proc a(): unit = {
       var b:bool;
       b = IND.main();
-    }  
+    }
   }.
 
   local lemma A_ll (S <: ASampler {A}) &m: islossless S.s => islossless A(S).a.

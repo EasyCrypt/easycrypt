@@ -22,7 +22,7 @@ theory BiasedCoin.
     apply fun_ext=> b; rewrite /True /support /in_supp /mu_x.
     by case b; rewrite biased_def /charfun /Pred.([!]) /=; smt.
   qed.
-  
+
   lemma biasedL: mu biased True = 1%r.
   proof. by rewrite biased_def /True /charfun /=; smt. qed.
 end BiasedCoin.

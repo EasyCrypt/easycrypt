@@ -31,7 +31,7 @@ module type AdvES = {
   proc guess(_: hkey * bits) : bool
 }.
 
-module ES0 (A:AdvES) = {  
+module ES0 (A:AdvES) = {
   proc main () : bool = {
     var b, hk, h;
     hk = $sample_hkey;
@@ -41,7 +41,7 @@ module ES0 (A:AdvES) = {
   }
 }.
 
-module ES1 (A:AdvES) = {  
+module ES1 (A:AdvES) = {
   proc main () : bool = {
     var b, hk, z;
     hk = $sample_hkey;
@@ -61,7 +61,7 @@ clone import PKE as PKE_ with
   type pkey <- pkey,
   type skey <- skey,
   type plaintext <- plaintext,
-  type ciphertext <- ciphertext. 
+  type ciphertext <- ciphertext.
 
 (** Concrete Construction: Hashed ElGammal **)
 module Hashed_ElGamal : Scheme = {
@@ -70,7 +70,7 @@ module Hashed_ElGamal : Scheme = {
 
     hk = $sample_hkey;
     sk = $FDistr.dt;
-    return ((hk,g ^ sk), (hk,sk));   
+    return ((hk,g ^ sk), (hk,sk));
   }
 
   proc enc(pk:pkey, m:plaintext): ciphertext = {
@@ -84,16 +84,16 @@ module Hashed_ElGamal : Scheme = {
   proc dec(sk:skey, c:ciphertext): plaintext option = {
     var gy, h, hm;
 
-    (gy, hm) = c; 
+    (gy, hm) = c;
     h = hash sk.`1 (gy ^ sk.`2);
-    return Some (h ^^ hm); 
+    return Some (h ^^ hm);
   }
 }.
 
 (** Correctness of the scheme *)
 hoare Correctness: Correctness( Hashed_ElGamal).main: true ==> res.
-proof. 
-  proc; inline*; auto; progress. 
+proof.
+  proc; inline*; auto; progress.
   rewrite !pow_pow F.mulC;algebra.
 qed.
 
@@ -127,7 +127,7 @@ section Security.
 
   declare module A:Adversary.
 
-  local lemma cpa_ddh0 &m: 
+  local lemma cpa_ddh0 &m:
       Pr[CPA(Hashed_ElGamal,A).main() @ &m : res] =
       Pr[DDH0(DDHAdv(A)).main() @ &m : res].
   proof.
@@ -136,8 +136,8 @@ section Security.
     auto;call (_:true); auto;call (_:true);auto;progress;smt.
   qed.
 
-  local lemma ddh1_es1 &m: 
-      Pr[DDH1(DDHAdv(A)).main() @ &m : res] = 
+  local lemma ddh1_es1 &m:
+      Pr[DDH1(DDHAdv(A)).main() @ &m : res] =
       Pr[ES1(ESAdv(A)).main() @ &m : res].
   proof.
     byequiv => //;proc;inline *.
@@ -159,8 +159,8 @@ section Security.
     }
   }.
 
-  local lemma es0_Gb &m:  
-      Pr[ES0(ESAdv(A)).main() @ &m : res] = 
+  local lemma es0_Gb &m:
+      Pr[ES0(ESAdv(A)).main() @ &m : res] =
       Pr[Gb.main()@ &m : res].
   proof.
     byequiv => //;proc;inline *.
@@ -173,21 +173,21 @@ section Security.
   axiom Ac_l : islossless A.choose.
   axiom Ag_l : islossless A.guess.
 
-  local lemma Gb_half &m: 
+  local lemma Gb_half &m:
      Pr[Gb.main()@ &m : res] = 1%r/2%r.
   proof.
     byphoare => //;proc.
     rnd => /=. conseq [-frame] (_:_ ==> true).
-    progress; rewrite -(Bool.Dbool.mu_x_def b'{hr}) /Distr.mu_x. 
+    progress; rewrite -(Bool.Dbool.mu_x_def b'{hr}) /Distr.mu_x.
     by apply Distr.mu_eq => x.
-    call Ag_l;auto;call Ac_l;auto;progress;smt. 
+    call Ag_l;auto;call Ac_l;auto;progress;smt.
   qed.
 
   lemma conclusion &m :
     `| Pr[CPA(Hashed_ElGamal,A).main() @ &m : res] - 1%r/2%r | <=
-    `| Pr[DDH0(DDHAdv(A)).main() @ &m : res] -  
-         Pr[DDH1(DDHAdv(A)).main() @ &m : res] | + 
-    `| Pr[ES0(ESAdv(A)).main() @ &m : res] - 
+    `| Pr[DDH0(DDHAdv(A)).main() @ &m : res] -
+         Pr[DDH1(DDHAdv(A)).main() @ &m : res] | +
+    `| Pr[ES0(ESAdv(A)).main() @ &m : res] -
          Pr[ES1(ESAdv(A)).main() @ &m : res]|.
   proof.
    rewrite (cpa_ddh0 &m) (ddh1_es1 &m) (es0_Gb &m) (Gb_half &m);smt.

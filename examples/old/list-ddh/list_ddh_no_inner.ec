@@ -23,7 +23,7 @@ module type LDDH_ORACLES = {
   fun getTriple() : gtriple option
 }.
 
-module type LDDH_DISTINGUISHER(S:LDDH_ORACLES) = { 
+module type LDDH_DISTINGUISHER(S:LDDH_ORACLES) = {
   fun distinguish() : bool {S.getTriple}
 }.
 
@@ -88,7 +88,7 @@ module LDDH_random(A : LDDH_DISTINGUISHER) = {
     O.c = 0;
     b  = AD.distinguish();
     return b;
-  }  
+  }
 }.
 
 (* ----------------------------------------------------------------------*)
@@ -120,14 +120,14 @@ module LDDH_Hyb(A : LDDH_DISTINGUISHER) = {
 
   module O = LDDH_Hyb_O
   module AD = A(O)
-  
+
   fun main(ia : int) : bool = {
     var b : bool;
     O.i = ia;
     O.c = 0;
     b  = AD.distinguish();
     return b;
-  }  
+  }
 }.
 
 lemma Eq_LDDH_Hybrid0_real:
@@ -291,7 +291,7 @@ proof strict.
       rnd. skip. progress. smt. smt.
 qed.
 
-(* INCOMPLETE 
+(* INCOMPLETE
 
 (******************************************************************)
 (** We show that for the real DH oracle, LDDH_Hyb2 can be expressed

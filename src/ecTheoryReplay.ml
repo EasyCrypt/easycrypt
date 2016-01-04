@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -177,7 +177,7 @@ and replay_opd (ove : _ ovrenv) (subst, ops, proofs, scope) (x, oopd) =
               in  (newop, subst, x, false)
       in
 
-      let ops = 
+      let ops =
         let opp = EcPath.fromqsymbol (ove.ovre_prefix, x) in
         Mp.add opp (newop, alias) ops in
       let scope =
@@ -213,13 +213,13 @@ and replay_prd (ove : _ ovrenv) (subst, ops, proofs, scope) (x, oopr) =
            lam
          in
 
-         begin 
-           try 
+         begin
+           try
              ty_compatible scenv ue
                (List.map fst reftyvars, refty)
-               (List.map fst (EcUnify.UniEnv.tparams ue), body.EcFol.f_ty) 
-           with Incompatible err -> 
-             clone_error scenv 
+               (List.map fst (EcUnify.UniEnv.tparams ue), body.EcFol.f_ty)
+           with Incompatible err ->
+             clone_error scenv
                (CE_OpIncompatible ((ove.ovre_prefix, x), err))
          end;
 
@@ -530,7 +530,7 @@ let replay (hooks : 'a ovrhooks)
         (subst, Mp.empty, [], scope) items in
      let scope = if incl then scope else hooks.hthexit scope `No in
     (List.rev proofs, scope)
-       
+
   with EcEnv.DuplicatedBinding x ->
     hooks.herr
       (Printf.sprintf "name clash for `%s': check your renamings" x)

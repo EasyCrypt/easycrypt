@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -64,7 +64,7 @@ theory Lazy.
     proc init():unit = {
       m <- FMap.empty;
     }
-  
+
     proc o(x:from):to = {
       var y:to;
       y <$ dsample x;
@@ -371,7 +371,7 @@ theory LazyEager.
       seq 1 1: (={glob D} /\ IND_Lazy.H.m{1} = IND_Eager.H.m{2}); first by wp.
       symmetry.
       eager (H: IND_Eager.resample(); ~ IND_Lazy.resample();:
-                  IND_Eager.H.m{1} = IND_Lazy.H.m{2} ==> IND_Eager.H.m{1} = IND_Lazy.H.m{2}): 
+                  IND_Eager.H.m{1} = IND_Lazy.H.m{2} ==> IND_Eager.H.m{1} = IND_Lazy.H.m{2}):
             (={glob D} /\ IND_Eager.H.m{1} = IND_Lazy.H.m{2}) => //;
         first by sim.
       eager proc H (IND_Eager.H.m{1} = IND_Lazy.H.m{2})=> //;
@@ -812,7 +812,7 @@ theory ROM_BadCall.
         by rewrite Pr [mu_or]; smt.
       qed.
     end section.
-  end OnBound.    
+  end OnBound.
 end ROM_BadCall.
 
 theory ROM_Bad.

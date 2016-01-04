@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -56,7 +56,7 @@ let tc_error_noXhl ?(kinds : hlkinds option) pf =
     in
       Printf.sprintf "%s%s" kind (fm |> string_of_form)
   in
-  
+
   tc_error_lazy pf (fun fmt ->
     Format.fprintf fmt "expecting a goal of the form: %s"
       (String.concat ", " (List.map string_of_kind (odfl [] kinds))))
@@ -126,25 +126,25 @@ let tc1_last_assert tc st = pf_last_assert !!tc st
 (* -------------------------------------------------------------------- *)
 (* TODO: use in change pos *)
 
-let pf_pos_last_gen msg test pe s = 
+let pf_pos_last_gen msg test pe s =
   match List.orindex test s.s_node with
   | None -> tc_error pe "can not find the last %s instruction" msg
   | Some i -> i
 
-let pf_pos_last_asgn   pe s = pf_pos_last_gen "asgn"   is_asgn   pe s 
-let pf_pos_last_rnd    pe s = pf_pos_last_gen "rnd"    is_rnd    pe s 
-let pf_pos_last_call   pe s = pf_pos_last_gen "call"   is_call   pe s 
-let pf_pos_last_if     pe s = pf_pos_last_gen "if"     is_if     pe s 
-let pf_pos_last_while  pe s = pf_pos_last_gen "while"  is_while  pe s 
-let pf_pos_last_assert pe s = pf_pos_last_gen "assert" is_assert pe s 
+let pf_pos_last_asgn   pe s = pf_pos_last_gen "asgn"   is_asgn   pe s
+let pf_pos_last_rnd    pe s = pf_pos_last_gen "rnd"    is_rnd    pe s
+let pf_pos_last_call   pe s = pf_pos_last_gen "call"   is_call   pe s
+let pf_pos_last_if     pe s = pf_pos_last_gen "if"     is_if     pe s
+let pf_pos_last_while  pe s = pf_pos_last_gen "while"  is_while  pe s
+let pf_pos_last_assert pe s = pf_pos_last_gen "assert" is_assert pe s
 
 
-let tc1_pos_last_asgn   tc s = pf_pos_last_asgn   !!tc s 
-let tc1_pos_last_rnd    tc s = pf_pos_last_rnd    !!tc s 
-let tc1_pos_last_call   tc s = pf_pos_last_call   !!tc s 
-let tc1_pos_last_if     tc s = pf_pos_last_if     !!tc s 
-let tc1_pos_last_while  tc s = pf_pos_last_while  !!tc s 
-let tc1_pos_last_assert tc s = pf_pos_last_assert !!tc s 
+let tc1_pos_last_asgn   tc s = pf_pos_last_asgn   !!tc s
+let tc1_pos_last_rnd    tc s = pf_pos_last_rnd    !!tc s
+let tc1_pos_last_call   tc s = pf_pos_last_call   !!tc s
+let tc1_pos_last_if     tc s = pf_pos_last_if     !!tc s
+let tc1_pos_last_while  tc s = pf_pos_last_while  !!tc s
+let tc1_pos_last_assert tc s = pf_pos_last_assert !!tc s
 
 (* -------------------------------------------------------------------- *)
 let pf_as_hoareF   pe c = as_phl (`Hoare  `Pred) (fun () -> destr_hoareF   c) pe
@@ -311,17 +311,17 @@ let lv_subst m lv f =
 
 (* -------------------------------------------------------------------- *)
 let mk_let_of_lv_substs_nolet env (lets, f) =
-  if List.is_empty lets then f 
+  if List.is_empty lets then f
   else
-    let s = 
+    let s =
       List.fold_left (fun s (lv,m,f1) ->
         let f1 = PVM.subst env s f1 in
         match lv, f1.f_node with
-        | LvVar (pv,_), _ -> PVM.add env pv m f1 s 
-        | LvTuple vs, Ftuple fs -> 
+        | LvVar (pv,_), _ -> PVM.add env pv m f1 s
+        | LvTuple vs, Ftuple fs ->
           List.fold_left2 (fun s (pv,_) f -> PVM.add env pv m f s) s vs fs
         | LvTuple vs, _ ->
-          List.fold_lefti 
+          List.fold_lefti
             (fun s i (pv,ty) -> PVM.add env pv m (f_proj f i ty) s)
             s vs
         | LvMap _, _ -> assert false)  PVM.empty lets in
@@ -329,14 +329,14 @@ let mk_let_of_lv_substs_nolet env (lets, f) =
 
 let add_lv_subst env lv m s =
   match lv with
-  | LvVar (pv,t) -> 
+  | LvVar (pv,t) ->
     let id = id_of_pv pv m in
     let s = PVM.add env pv m (f_local id t) s in
     LSymbol(id, t), s
 
-  | LvTuple pvs -> 
-    let s, ids = 
-      List.map_fold (fun s (pv,t) -> 
+  | LvTuple pvs ->
+    let s, ids =
+      List.map_fold (fun s (pv,t) ->
         let id = id_of_pv pv m in
         let s = PVM.add env pv m (f_local id t) s in
         s, (id,t)) s pvs in
@@ -345,9 +345,9 @@ let add_lv_subst env lv m s =
   | _ -> assert false
 
 let mk_let_of_lv_substs_let env (lets, f) =
-  if List.is_empty lets then f 
+  if List.is_empty lets then f
   else
-    let accu,s = 
+    let accu,s =
       List.fold_left (fun (accu,s) (lv,m,f1) ->
         let f1 = PVM.subst env s f1 in
         let lv, s = add_lv_subst env lv m s in
@@ -355,22 +355,22 @@ let mk_let_of_lv_substs_let env (lets, f) =
     (* accu is the sequence of let in reverse order *)
     let f = PVM.subst env s f in
     (* compute the fv *)
-    let _, fvlets = 
+    let _, fvlets =
       List.fold_left (fun (fv2,lets) (lp,f1 as lpf) ->
         let fv = EcIdent.fv_diff fv2 (lp_fv lp) in
         let fv = EcIdent.fv_union (f_fv f1) fv in
         fv, (lpf,fv2)::lets) (f.f_fv,[]) accu in
     (* fvlets is the sequence of let in the right order *)
     (* build the lets and perform the substitution/simplification *)
-    let add_id fv (accu,s) (id,ty) f1 = 
+    let add_id fv (accu,s) (id,ty) f1 =
       match EcIdent.Mid.find_opt id fv with
       | None   -> (accu, s)
       | Some i ->
         if   i = 1 || can_subst f1
-        then accu, Fsubst.f_bind_local s id f1 
+        then accu, Fsubst.f_bind_local s id f1
         else (LSymbol(id,ty), f1)::accu, s in
-    
-    let rlets, s = 
+
+    let rlets, s =
       List.fold_left (fun (rlets,s as accus) ((lp,f1),fv) ->
         let f1 = Fsubst.f_subst s f1 in
         match lp, f1.f_node with
@@ -378,15 +378,15 @@ let mk_let_of_lv_substs_let env (lets, f) =
         | LSymbol idt, _ -> add_id fv accus idt f1
         | LTuple ids, Ftuple fs -> List.fold_left2 (add_id fv) accus ids fs
         | LTuple ids, _ ->
-          let used = 
+          let used =
             List.fold_left (fun u (id, _) ->
               match u, EcIdent.Mid.find_opt id fv with
               | Some i1, Some i2 -> Some (i1+i2)
               | None, i | i, None -> i) None ids in
           match used with
-          | None -> accus 
+          | None -> accus
           | Some i ->
-            let accus, fx = 
+            let accus, fx =
               if i = 1 || can_subst f1 then accus, f1
               else
                 let x = EcIdent.create "tpl" in
@@ -445,23 +445,23 @@ let generalize_mod_ env m modi f =
   (* 3. We build the related substitution *)
 
   (* 3.a. Add the global variables *)
- 
+
 (*  let scheck = proj3_3 (generalize_subst_ env m melts mglob )in *)
   let (bd', bd, s ) = generalize_subst_ env m uelts uglob in
    (* 3.b. Check that the modify variables does not clash with
            the variables not generalized *)
-  let restrs = 
-    List.fold_left (fun r mp -> 
+  let restrs =
+    List.fold_left (fun r mp ->
       let restr = NormMp.get_restr env mp in
       EcPath.Mm.add mp restr r) EcPath.Mm.empty mglob in
-  List.iter (fun (npv,_) -> 
+  List.iter (fun (npv,_) ->
     if is_glob npv then
       let check1 mp restr =  Mpv.check_npv_mp env npv mp restr in
       EcPath.Mm.iter check1 restrs) nelts;
   List.iter (fun mp ->
     let restr = NormMp.get_restr env mp in
     let check (npv,_) =
-      if is_glob npv then 
+      if is_glob npv then
         Mpv.check_npv_mp env npv mp restr in
     List.iter check melts;
     let check mp' restr' = Mpv.check_mp_mp env mp restr mp' restr' in
@@ -481,21 +481,21 @@ let generalize_mod env m modi f =
   res
 
 (* -------------------------------------------------------------------- *)
-let abstract_info env f1 = 
+let abstract_info env f1 =
   let f   = EcEnv.NormMp.norm_xfun env f1 in
   let top = EcPath.m_functor f.EcPath.x_top in
   let def = EcEnv.Fun.by_xpath f env in
-  let oi  = 
+  let oi  =
     match def.f_def with
     | FBabs oi -> oi
-    | _ -> 
+    | _ ->
       let ppe = EcPrinting.PPEnv.ofenv env in
-        if EcPath.x_equal f1 f then 
+        if EcPath.x_equal f1 f then
           EcCoreGoal.tacuerror
             "The function %a should be abstract"
             (EcPrinting.pp_funname ppe) f1
-        else 
-          EcCoreGoal.tacuerror 
+        else
+          EcCoreGoal.tacuerror
             "The function %a, which reduces to %a, should be abstract"
             (EcPrinting.pp_funname ppe) f1
             (EcPrinting.pp_funname ppe) f
@@ -510,7 +510,7 @@ let abstract_info2 env fl' fr' =
   let fr1 = EcPath.xpath topr fr.EcPath.x_sub in
     if not (EcPath.x_equal fl1 fr1) then begin
       let ppe = EcPrinting.PPEnv.ofenv env in
-        EcCoreGoal.tacuerror 
+        EcCoreGoal.tacuerror
           "function %a reduces to %a and %a reduces to %a, %a and %a should be equal"
           (EcPrinting.pp_funname ppe) fl'
           (EcPrinting.pp_funname ppe) fl1

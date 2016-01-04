@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -220,7 +220,7 @@ section.
 
   local equiv eq_Sample_BSample: Exp(Bounder(Sample),A).main ~ Exp(BSample,A).main: ={glob A} ==> ={Sample.l}.
   proof.
-    transitivity  Exp(Sample,Bounded(A)).main 
+    transitivity  Exp(Sample,Bounded(A)).main
                   (={glob A,glob Sample} ==> ={glob A,glob Sample})
                   (={glob A} ==> ={Sample.l})=> //.
     + by progress; exists (glob A){2}, Sample.l{1}.

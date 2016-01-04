@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -22,7 +22,7 @@ open EcBigInt.Notations
 module BI = EcBigInt
 
 (* -------------------------------------------------------------------- *)
-type fexpr =  
+type fexpr =
 | FEc   of c
 | FEX   of int
 | FEadd of fexpr * fexpr
@@ -39,35 +39,35 @@ type rsplit = pexpr * pexpr * pexpr
 let left   ((t,_,_) : rsplit) : pexpr = t
 let right  ((_,_,t) : rsplit) : pexpr = t
 let common ((_,t,_) : rsplit) : pexpr = t
-  
+
 (* -------------------------------------------------------------------- *)
 let npepow x n =
   if BI.equal n BI.zero then PEc c1 else
   if BI.equal n BI.one  then x else
     match x with
     | PEc c -> begin
-             if ceq c c1 then PEc c1 
-        else if ceq c c0 then PEc c0 
+             if ceq c c1 then PEc c1
+        else if ceq c c0 then PEc c0
         else try  PEc (BI.pow c (BI.to_int n))
              with BI.Overflow -> PEpow (x, n)
     end
     | _ -> PEpow (x, n)
-        
+
 (* -------------------------------------------------------------------- *)
 let rec npemul (x : pexpr) (y : pexpr) : pexpr =
   match x,y with
   | PEc c, PEc c' -> PEc (cmul c c')
-  | PEc c, _ -> 
-         if ceq c c1 then y 
-    else if ceq c c0 then PEc c0 
+  | PEc c, _ ->
+         if ceq c c1 then y
+    else if ceq c c0 then PEc c0
     else PEmul (x,y)
-  | _, PEc c -> 
-         if ceq c c1 then x 
-    else if ceq c c0 then PEc c0 
+  | _, PEc c ->
+         if ceq c c1 then x
+    else if ceq c c0 then PEc c0
     else PEmul (x,y)
-  | PEpow (e1,n1), PEpow (e2,n2) -> 
+  | PEpow (e1,n1), PEpow (e2,n2) ->
       if   BI.equal n1 n2
-      then npepow (npemul e1 e2) n1 
+      then npepow (npemul e1 e2) n1
       else PEmul (x,y)
   | _,_ -> PEmul (x,y)
 
@@ -83,7 +83,7 @@ let rec isin (e1 : pexpr) (p1 : BI.zint) (e2 : pexpr) (p2 : BI.zint) =
         | Some (n, e6) -> Some (n, npemul e5 e6)
         | None -> Some (p, npemul e5 (npepow e4 p2))
     end
-    | None -> 
+    | None ->
       match isin e1 p1 e4 p2 with
       | Some (n,e5) -> Some (n,npemul (npepow e3 p2) e5)
       | None -> None
@@ -94,7 +94,7 @@ let rec isin (e1 : pexpr) (p1 : BI.zint) (e2 : pexpr) (p2 : BI.zint) =
       then None
       else isin e1 p1 e3 (p3 *^ p2)
 
-  | _ -> 
+  | _ ->
     if pexpr_eq e1 e2 then
       match BI.compare p1 p2 with
       | c when c > 0 -> Some (p1-^p2, PEc c1)
@@ -143,7 +143,7 @@ let npeadd (e1 : pexpr) (e2 : pexpr) =
   | _ -> PEadd (e1, e2)
 
 (* -------------------------------------------------------------------- *)
-let npesub e1 e2 = 
+let npesub e1 e2 =
   match (e1,e2) with
   | (PEc c, PEc c') -> PEc (csub c c')
   | (PEc c, _ ) -> if (ceq c c0) then PEopp e2 else PEsub (e1, e2)
@@ -160,7 +160,7 @@ let rec fnorm (e : fexpr) : linear =
   | FEc c -> (PEc c, PEc c1, [])
   | FEX x -> (PEX x, PEc c1, [])
 
-  | FEadd (e1, e2) -> 
+  | FEadd (e1, e2) ->
     let x = fnorm e1 in
     let y = fnorm e2 in
     let s = split (denum x) (denum y) in
@@ -193,7 +193,7 @@ let rec fnorm (e : fexpr) : linear =
     let x = fnorm e in
     (denum x, num x, (num x) :: (condition x))
 
-  | FEdiv (e1,e2) -> 
+  | FEdiv (e1,e2) ->
     let x = fnorm e1 in
     let y = fnorm e2 in
     let s1 = split (num x) (num y) in

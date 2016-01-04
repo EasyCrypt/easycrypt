@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -190,7 +190,7 @@ pred left_inverse (e:'a) (inv:'a -> 'a) (o:'a -> 'a -> 'a) =
   forall (x:'a), o (inv x) x = e.
 
 pred right_inverse (e:'a) (inv:'a -> 'a) (o:'a -> 'a -> 'a) =
-  forall (x:'a), o x (inv x) = e.  
+  forall (x:'a), o x (inv x) = e.
 
 pred left_inverse_in (p : 'a -> bool) (e : 'a) inv (o : 'a -> 'a -> 'a) =
   forall x, p x => o (inv x) x = e.

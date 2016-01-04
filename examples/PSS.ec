@@ -574,7 +574,7 @@ op simul (pk:pkey) (sk:skey) (b:bool) (x u:int) =
 (* For simplicity in the formal proof, we will instead
    consider the uniform distribution on the image of
    [0..2^(k - 1)[ by the inverse permutation (when it is
-   a permutation) defined as follows. This is strictly 
+   a permutation) defined as follows. This is strictly
    equivalent (and can be proved equivalent).            *)
 op simul_inv (pk:pkey) (sk:skey) (b:bool) (x z:int) =
   if b then ((inv pk x) ** (rsas sk z)) pk
@@ -929,14 +929,14 @@ section.
       oracle. This should allow some abstraction in the
       proof, and in particular in the two eager steps
       on G.                                             **)
-  module type Gadv (H:SplitOracle, G:Gt.Types.ARO) = { 
+  module type Gadv (H:SplitOracle, G:Gt.Types.ARO) = {
     proc main (ks:pkey * skey): bool {H.o G.o H.v}
   }.
 
   local module Gen (Gadv:Gadv, H:SplitOracle, G:Gt.Types.Oracle) = {
     module GA = Gadv(H,G)
 
-    proc main () : bool = { 
+    proc main () : bool = {
       var keys, b;
 
       keys = $keypairs;
@@ -1246,7 +1246,7 @@ section.
   (** Zeroth Transition:
       We rewrite PSS into an adversary against Gen with G and a trivial split oracle H0. *)
   (* More or less Coron's Game0 *)
-  local module H0: SplitOracle = { 
+  local module H0: SplitOracle = {
     proc init(ks:pkey*skey): unit = {
       Hmap.init(ks);
     }
@@ -1397,14 +1397,14 @@ section.
     proc v(m:message,r:salt):htag
   }.
 
-  module type Gadv1 (H:SplitOracle1, G:Gt.Types.ARO) = { 
+  module type Gadv1 (H:SplitOracle1, G:Gt.Types.ARO) = {
     proc main (ks:pkey * skey): bool {H.o G.o H.v}
   }.
 
   local module Gen1 (Gadv:Gadv1, H:SplitOracle1, G:Gt.Types.Oracle) = {
     module GA = Gadv(H,G)
 
-    proc main () : bool = { 
+    proc main () : bool = {
       var keys, b;
 
       keys = $keypairs;
@@ -1414,7 +1414,7 @@ section.
       return b;
     }
   }.
- 
+
   local module GAdv1(H:SplitOracle1, G:Gt.Types.ARO) = {
     (* Wrapping a split oracle for direct use by the adversary *)
     module Ha = {
@@ -1549,7 +1549,7 @@ section.
       w  = $htag;
       st = $gtag;
       st = st ^ (GTag.from_bits (from_salt r || zeros (kg - k0)));
-      
+
       if (!mem (m,r) (dom Hmap.m)) {
         if (!mem w (dom Gmap.m)) {
           Hmap.m.[(m,r)] = (w,c,2^k - 1);
@@ -1558,7 +1558,7 @@ section.
         ho = Some(w,st);
       } else {
         w = oget (omap pi3_1 Hmap.m.[(m,r)]);
-        ho = if c = Adv then Some(w,witness) else None; 
+        ho = if c = Adv then Some(w,witness) else None;
       }
       return ho;
     }
@@ -1853,7 +1853,7 @@ section.
   qed.
 
   (** Game0'2: - Abort if H calls G on a non-fresh input,
-                 with Pr[Game1'2: H1'2.badg] <= (qS + qF + qH) * (qS + qF + qH + qG)%r * 2^-kh 
+                 with Pr[Game1'2: H1'2.badg] <= (qS + qF + qH) * (qS + qF + qH + qG)%r * 2^-kh
                - Abort if one of the signing oracles queries H
                  on some non-fresh input despite freshly sampling r,
                  with Pr[Game1'2: H1'2.bad] <= (qS + qF) * (qS + qF + qH) * 2^-k0 *)
@@ -1864,7 +1864,7 @@ section.
       Hmap.init(ks);
       badg = false;
       badh = false;
-    }  
+    }
 
     proc o(c:caller,m:message,r:salt): (htag *gtag) option = {
       var w, st, ho;
@@ -1882,7 +1882,7 @@ section.
         ho = Some(w,st);
       } else {
         w = oget (omap pi3_1 Hmap.m.[(m,r)]);
-        ho = if c = Adv then Some(w,witness) else None; 
+        ho = if c = Adv then Some(w,witness) else None;
       }
       return ho;
     }
@@ -1896,7 +1896,7 @@ section.
   local equiv GameG0'1_0'2_H: HG0'1.o ~ H0'2.o:
     !H0'2.badg{2} /\ !H0'2.badh{2} /\
     ={glob Hmap, c, m, r} /\ G.m{1} = FMap.map fst Gmap.m{2} ==>
-    !(H0'2.badg{2} \/ H0'2.badh{2}) => 
+    !(H0'2.badg{2} \/ H0'2.badh{2}) =>
     ( ={glob Hmap, res} /\ G.m{1} = FMap.map fst Gmap.m{2}).
   proof.
     proc.
@@ -1916,7 +1916,7 @@ section.
     inline *; swap{1} 3 -2.
     case (mem w{2} (dom Gmap.m{2})); first by conseq (_: _ ==> true); auto; smt.
     rcondt{2} 3; first by auto; smt.
-    rcondt{1} 4. 
+    rcondt{1} 4.
       auto;progress.
       move: H0; rewrite !mem_dom get_map; smt.
     wp; rnd ((^) (GTag.from_bits (from_salt r || zeros (kg - k0)))){2}; auto; progress; try algebra.
@@ -1945,7 +1945,7 @@ section.
       by progress; proc; auto; smt.
       (* G *)
       conseq (_ : _ ==> ={res} /\ G.m{1} = map fst Gmap.m{2})=> //.
-      proc. 
+      proc.
         seq 1 1 : (x{1} = w{2} /\ y{1} = g{2} /\ G.m{1} = map fst Gmap.m{2});first by auto.
         if.
           by progress [-split]; rewrite !mem_dom get_map; smt.
@@ -1969,7 +1969,7 @@ section.
       Hmap.init(ks);
       H0'2.badg = false;
       cHs = 0;
-    }  
+    }
 
     proc o(c:caller,m:message,r:salt): (htag *gtag) option = {
       var w, st, ho;
@@ -1987,7 +1987,7 @@ section.
           ho = Some(w,st);
         } else {
           w = oget (omap pi3_1 Hmap.m.[(m,r)]);
-          ho = if c = Adv then Some(w,witness) else None; 
+          ho = if c = Adv then Some(w,witness) else None;
         }
         cHs = cHs + 1;
       }
@@ -2005,7 +2005,7 @@ section.
        Mem.cG{1} <= qG /\ Mem.cH{1} + Mem.cS{1} < qH + qS /\
        card (dom Gmap.m{1}) <= Mem.cG{1} + Mem.cH{1} + Mem.cS{1} ==>
        ={res, glob Hmap, glob Gmap, glob Mem, H0'2.badg} /\
-       H0'2'badg.cHs{2} = Mem.cH{1} + Mem.cS{1} + 1 /\ 
+       H0'2'badg.cHs{2} = Mem.cH{1} + Mem.cS{1} + 1 /\
        card (dom Gmap.m{1}) <= Mem.cG{1} + Mem.cH{1} + Mem.cS{1} + 1.
   proof.
     proc; rcondt{2} 1; first by auto; smt.
@@ -2076,8 +2076,8 @@ section.
       seq 1: (mem w (dom Gmap.m)) ((qS + qH + qG - 1)%r / (2 ^ kh)%r) 1%r _ 0%r (!H0'2.badg) => //;
         first by auto.
         rnd; skip; progress.
-        rewrite -/(cpMem _) (mu_cpMem _ _ (1%r / (2^kh)%r)); first smt. 
-        cut ->: forall x, x * (1%r / (2^kh)%r) = x / (2^kh)%r by smt. 
+        rewrite -/(cpMem _) (mu_cpMem _ _ (1%r / (2^kh)%r)); first smt.
+        cut ->: forall x, x * (1%r / (2^kh)%r) = x / (2^kh)%r by smt.
         by apply (_: forall (x y z:real), x <= y => 0%r < z => x / z <= y / z); smt.
 (*-*) by hoare; conseq (_ : _ ==> true) => //; smt.
 (*-*) by progress; proc; rcondt 1; auto; smt.
@@ -2085,7 +2085,7 @@ section.
   qed.
   (* end computation *)
 
-  (* computing the probability Pr[Game0'2.main() @ &m: H0'2.badh] *) 
+  (* computing the probability Pr[Game0'2.main() @ &m: H0'2.badh] *)
   local module Game0'2'badh = {
     var cHs:int
 
@@ -2108,7 +2108,7 @@ section.
           ho = Some(w,st);
         } else {
           w = oget (omap pi3_1 Hmap.m.[(m,r)]);
-          ho = if c = Adv then Some(w,witness) else None; 
+          ho = if c = Adv then Some(w,witness) else None;
         }
         return ho;
       }
@@ -2380,7 +2380,7 @@ section.
           ho = Some (w,st);
         } else {
           w = oget (omap pi3_1 Hmap.m.[(m,r)]);
-          ho = if c = Adv then Some(w,witness) else None; 
+          ho = if c = Adv then Some(w,witness) else None;
         }
       }
       return ho;
@@ -2418,7 +2418,7 @@ section.
           ho = Some (w,st);
         } else {
           w = oget (omap pi3_1 Hmap.m.[(m,r)]);
-          ho = if c = Adv then Some(w,witness) else None; 
+          ho = if c = Adv then Some(w,witness) else None;
         }
       }
       return ho;
@@ -2452,7 +2452,7 @@ section.
 
   local lemma Game1_1'1_abstract (Ga <: Gadv1 {Gmap,Hmap}):
     (forall (H <: SplitOracle1 {Ga}) (G <: Gt.Types.ARO {Ga}),
-       islossless H.o => islossless G.o => islossless H.v => islossless Ga(H,G).main) => 
+       islossless H.o => islossless G.o => islossless H.v => islossless Ga(H,G).main) =>
     equiv [Gen1(Ga,H1,G1).main ~ Gen1(Ga,GenH1(SampleWST),G1).main:
              ={glob Ga} ==>
              ={res} \/ !invertible Hmem.pk{2} Hmem.xstar{2}].
@@ -2491,7 +2491,7 @@ section.
   qed.
   (* end of computation *)
   (* end of refactoring proof *)
-  
+
   local module SampleU = {
     proc sample(c:caller): htag * gtag = {
       var u, z, w, st;
@@ -2538,11 +2538,11 @@ section.
     conseq (_: _ ==>
                 z  = os2ip (to_signature (zeros 1 || from_htag w0 || from_gtag st0)))
             (_: _ ==> 0 <= z < 2^(k-1)) => //;first by (auto;smt).
-      progress; rewrite /from_htag /to_htag /from_gtag /to_gtag /from_signature 
+      progress; rewrite /from_htag /to_htag /from_gtag /to_gtag /from_signature
         /to_signature; last 2 by smt.
       cut [_ <-] := msb0_bnd (i2osp z0);first by smt.
-      rewrite /from_signature HTag.pcan_to_from 1:smt. 
-      rewrite GTag.pcan_to_from 1:smt. 
+      rewrite /from_signature HTag.pcan_to_from 1:smt.
+      rewrite GTag.pcan_to_from 1:smt.
       rewrite sub_app_sub //;first 3 smt.
       rewrite  app_sub;first 3 smt.
       by rewrite Signature.can_from_to; smt.
@@ -2740,7 +2740,7 @@ section.
   }.
 
   local module H3: SplitOracle1 = {
-    proc init = Hmap.init 
+    proc init = Hmap.init
 
     proc o(c:caller,m:message,r:salt): (htag*gtag) option = {
       var w, st, u, z, ho;
@@ -2765,11 +2765,11 @@ section.
         }
         else {
           w = oget (omap pi3_1 Hmap.m.[(m,r)]);
-          ho = if c = Adv then Some(w,witness) else None; 
+          ho = if c = Adv then Some(w,witness) else None;
         }
       }
       return ho;
-    } 
+    }
 
     proc v = H0.v
   }.
@@ -2817,7 +2817,7 @@ section.
           }
           else {
             w = oget (omap pi3_1 Hmap.m.[(m,r)]);
-            ho = if c = Adv then Some(w,witness) else None; 
+            ho = if c = Adv then Some(w,witness) else None;
           }
         }
       }
@@ -2950,7 +2950,7 @@ section.
         }
         else {
           w = oget (omap pi3_1 Hmap.m.[(m,r)]);
-          ho = None; 
+          ho = None;
         }
         return ho;
       }
@@ -3088,7 +3088,7 @@ section.
   }.
 
   local module GenH3(S:LoopSampling) = {
-    proc init = Hmap.init 
+    proc init = Hmap.init
 
     proc o(c:caller,m:message,r:salt): (htag*gtag) option = {
       var w, st, u, z, ho;
@@ -3114,12 +3114,12 @@ section.
           }
           else {
             w = oget (omap pi3_1 Hmap.m.[(m,r)]);
-            ho = if c = Adv then Some(w,witness) else None; 
+            ho = if c = Adv then Some(w,witness) else None;
           }
         }
       }
       return ho;
-    } 
+    }
 
     proc v = H0.v
 
@@ -3159,7 +3159,7 @@ section.
       auto; call Game3'1_GenH3_H.
       by auto.
     by inline *; auto.
-  qed.    
+  qed.
 
   local module Loop = {
     proc sample(i:pkey * skey * bool * int, dflt:int): int = {
@@ -3253,7 +3253,7 @@ section.
             conseq Hw; progress=> //.
             cut ->: 0 <= z{hr} < 2^(k - 1) by smt.
             by rewrite /charfun.
-            hoare; conseq (_: _ ==> true) => //. 
+            hoare; conseq (_: _ ==> true) => //.
             by progress;rewrite -nand;left.
           seq 3: (0 <= z0 < 2^(k - 1)) _ 0%r (1%r - bdt * bd) (1%r/bdt)
                  ((pk,sk,b,x) = (pk',sk',b',x') /\ 0 <= r' < 2^(k - 1) /\ z0 = z /\
@@ -3272,7 +3272,7 @@ section.
               by skip; smt.
               skip; progress; rewrite /bdt /bd {2}/challenge Dinter.mu_x_def_in; first smt.
               by rewrite mu_challenge_in_pim //; smt.
-            by conseq Hw => //; smt.         
+            by conseq Hw => //; smt.
           by conseq (_: _ ==> true)=> //; auto; smt.
       progress; first smt.
       wp; rnd; skip; progress.
@@ -3387,12 +3387,12 @@ section.
             ho = Some (w,st);
           } else {
             w = oget (omap pi3_1 Hmap.m.[(m,r)]);
-            ho = if c = Adv then Some(w,witness) else None; 
+            ho = if c = Adv then Some(w,witness) else None;
           }
         }
       }
       return ho;
-    } 
+    }
 
     proc v(m:message,r:salt):htag = {
       var h;
@@ -3545,12 +3545,12 @@ section.
             ho = Some (w,st);
           } else {
             w = oget (omap pi3_1 Hmap.m.[(m,r)]);
-            ho = if c = Adv then Some(w,witness) else None; 
+            ho = if c = Adv then Some(w,witness) else None;
           }
         } else bad = true;
       }
       return ho;
-    } 
+    }
 
     proc v(m:message,r:salt):htag = {
       var h;
@@ -3712,7 +3712,7 @@ section.
       st = witness;
       b  = false;
       if (cH < qH + qS) {
-        if (Hmem.ystar = rsap Hmem.pk Hmem.xstar /\ support keypairs (Hmem.pk, Hmem.sk) /\ 
+        if (Hmem.ystar = rsap Hmem.pk Hmem.xstar /\ support keypairs (Hmem.pk, Hmem.sk) /\
             rsap_dom Hmem.pk Hmem.xstar /\
             (invertible Hmem.pk Hmem.xstar \/ c <> Adv)) {
           while (!b /\ i < k0 + 1) {
@@ -3735,22 +3735,22 @@ section.
               ho = Some (w,st);
             } else {
               w = oget (omap pi3_1 Hmap.m.[(m,r)]);
-              ho = if c = Adv then Some(w,witness) else None; 
+              ho = if c = Adv then Some(w,witness) else None;
             }
           } else H3'3.bad = true;
         }
         cH = cH + 1;
       }
       return ho;
-    } 
+    }
 
     proc v = H3'3.v
   }.
 
   local module Game3'3bad = Gen1(GAdv3,H3'3bad,G1).
 
-  local equiv H3'3o : H3'3.o ~ H3'3bad.o : 
-      ={arg, glob Hmap, glob Gmap, H3'3.bad} /\ 
+  local equiv H3'3o : H3'3.o ~ H3'3bad.o :
+      ={arg, glob Hmap, glob Gmap, H3'3.bad} /\
        (Hmem.ystar = rsap Hmem.pk Hmem.xstar){2} /\ support keypairs (Hmem.pk, Hmem.sk){2} /\
        (rsap_dom Hmem.pk Hmem.xstar){2} /\
        (H3'3bad.cH = Mem.cH + Mem.cS){2} /\  (Mem.cH + Mem.cS){2} < qH + qS ==>
@@ -3761,8 +3761,8 @@ section.
     wp 3 3; conseq (_: _ ==> ={ho,glob Hmap, glob Gmap, H3'3.bad}) => //;sim.
   qed.
 
-  local lemma Game3'3_3'3bad &m: 
-     Pr[Game3'3.main() @ &m: H3'3.bad] = 
+  local lemma Game3'3_3'3bad &m:
+     Pr[Game3'3.main() @ &m: H3'3.bad] =
        Pr[Game3'3bad.main() @ &m: H3'3.bad /\ H3'3bad.cH <= qH + qS].
   proof.
     byequiv (_: ={glob A} ==> ={H3'3.bad} /\ H3'3bad.cH{2} <= qH + qS) => //;proc.
@@ -3774,17 +3774,17 @@ section.
     call (_: ={glob Hmap, glob Gmap, glob Mem, H3'3.bad} /\
             (Hmem.ystar = rsap Hmem.pk Hmem.xstar){2} /\ support keypairs (Hmem.pk, Hmem.sk){2} /\
             (rsap_dom Hmem.pk Hmem.xstar){2} /\
-            (H3'3bad.cH = Mem.cH + Mem.cS){2} /\ Mem.cH{2} <= qH /\ Mem.cS{2} <= qS). 
+            (H3'3bad.cH = Mem.cH + Mem.cS){2} /\ Mem.cH{2} <= qH /\ Mem.cS{2} <= qS).
       proc;sp;if => //;wp; inline GAdv3(H3'3, G1).Hs.o GAdv3(H3'3bad, G1).Hs.o;wp.
       call H3'3o;wp;rnd;skip;progress;smt.
-      by sim (: ={glob Gmap}) / ((Hmem.ystar = rsap Hmem.pk Hmem.xstar){2} /\ support keypairs (Hmem.pk, Hmem.sk){2} /\ 
+      by sim (: ={glob Gmap}) / ((Hmem.ystar = rsap Hmem.pk Hmem.xstar){2} /\ support keypairs (Hmem.pk, Hmem.sk){2} /\
                              (rsap_dom Hmem.pk Hmem.xstar){2} /\
                              H3'3bad.cH{2} = Mem.cH{2} + Mem.cS{2} /\ Mem.cH{2} <= qH /\ Mem.cS{2} <= qS) :
         (={res,glob Hmap, glob Gmap, glob Mem, H3'3.bad}).
       by proc;sp;if => //;wp;call H3'3o;skip;progress;smt.
     inline *;auto;progress. smt. smt. smt. smt. smt. smt.
    qed.
-  
+
   (* computing the probability of bad in Game3'3 (a call to H fails to sample a valid
      signature in k0 + 1 attempts) *)
   local lemma Game3'3'bad &m:
@@ -3800,7 +3800,7 @@ section.
       rewrite /max (_: qH + qS < 0 = false) /=; first smt.
       by rewrite /Monoid.Mrplus.NatMul.( * ); smt.
       by inline *;auto.
-      cut Hpos : (0%r <= 1%r / (2 ^ (k0+1))%r). 
+      cut Hpos : (0%r <= 1%r / (2 ^ (k0+1))%r).
         cut lt_div: forall (x y z:real), 0%r < z => x < y => x / z < y / z by smt.
         cut pos_inv: forall x, 0%r < x => 0%r < 1%r/x.
           by move=> x lt0x; cut ->: 0%r = 0%r/x; smt.
@@ -3817,7 +3817,7 @@ section.
               rsap_dom Hmem.pk Hmem.xstar /\
               Hmem.ystar = rsap Hmem.pk Hmem.xstar /\ support keypairs (Hmem.pk, Hmem.sk)) => //.
        move=> Hrec;exists * i;elim * => i0.
-       seq 6 : (!b) (1%r/2%r) (1%r / (2 ^ (k0+1 - (i0 + 1)))%r) _ 0%r 
+       seq 6 : (!b) (1%r/2%r) (1%r / (2 ^ (k0+1 - (i0 + 1)))%r) _ 0%r
             (i = i0 + 1 /\ 0 <= i0 <= k0 /\ (c = Adv => invertible Hmem.pk Hmem.xstar) /\
               rsap_dom Hmem.pk Hmem.xstar /\
               Hmem.ystar = rsap Hmem.pk Hmem.xstar /\ support keypairs (Hmem.pk, Hmem.sk)) => //;first by auto;smt.
@@ -3829,26 +3829,26 @@ section.
                   (!(fun (x:int), 0 <= simul Hmem.pk{hr} Hmem.sk{hr} (c{hr} = Adv)  Hmem.xstar{hr} x < 2^(k-1)))).
             by apply fun_ext => x;rewrite /Pred.([!]) /simul.
          rewrite mu_not (_ : mu (challenge Hmem.pk{hr}) True = 1%r);first by smt.
-         cut -> := mu_challenge_in_pim Hmem.pk{hr} Hmem.sk{hr} (c{hr} = Adv) Hmem.xstar{hr} _ _ _ => //. 
+         cut -> := mu_challenge_in_pim Hmem.pk{hr} Hmem.sk{hr} (c{hr} = Adv) Hmem.xstar{hr} _ _ _ => //.
          cut : (1%r/2%r <=  (2 ^ (k - 1))%r / (p_n Hmem.pk{hr})%r); last smt.
          apply (_:forall x1 x2 y1 y2, 0%r < y1 => 0%r < y2 => x1 * y2 <= x2 * y1 => x1/y1 <= x2/y2) => //=.
            move=> x1 x2 y1 y2 Hy1 Hy2 Hm.
            apply (_: forall (x y z:real), 0%r < z => x*z <= y => x <= y / z) => //; first by smt.
            by cut -> : ((x1 / y1) * y2 = (x1*y2) / y1);smt.
            by smt.
-         rewrite {2} (_:2 = 2^1); first by rewrite (_: 1 = 0 + 1) // powS // pow0. 
+         rewrite {2} (_:2 = 2^1); first by rewrite (_: 1 = 0 + 1) // powS // pow0.
          rewrite (_:(2 ^ (k - 1))%r * (2 ^ 1)%r = (2 ^ (k - 1) * 2 ^ 1)%r); first smt.
          by rewrite pow_add //;smt.
          by conseq Hrec => //;smt.
-         rcondf 1 => //;first by auto;smt. 
+         rcondf 1 => //;first by auto;smt.
          by hoare.
-       progress. 
+       progress.
          rewrite (_ : (2%r * (2 ^ (k0 + 1 - (i{hr} + 1)))%r) = (2 ^ (k0 + 1 - i{hr}))%r) //.
          rewrite {1}(_: 2 = (2^1)); first by rewrite (_: 1 = 0 + 1) // powS // pow0.
          cut ->: (2^1)%r * (2 ^ (k0 + 1 - (i{hr} + 1)))%r = (2^1 * 2^(k0 + 1 - (i{hr} + 1)))%r.
          smt.
        by rewrite pow_add //;smt.
-       by skip;smt. 
+       by skip;smt.
        by move=> c;proc;sp;rcondt 1 => //;wp;conseq (_ : _ ==> true)=> //;smt.
     by move=> b c;proc;sp;rcondf 1.
   qed.
@@ -3862,8 +3862,8 @@ section.
     cut: Pr[Game3'2.main() @ &m: res] <= Pr[Game3'3.main() @ &m: res \/ H3'3.bad].
       by byequiv GenH3'2_Game3'3=> //; smt.
     rewrite Pr [mu_or].
-    rewrite (Game3'3_3'3bad &m). 
-    cut := Game3'3'bad &m; smt. 
+    rewrite (Game3'3_3'3bad &m).
+    cut := Game3'3'bad &m; smt.
   qed.
 
   (** Game4: Minor cleanup to facilitate the reduction *)
@@ -3899,12 +3899,12 @@ section.
             ho = Some (w,st);
           } else {
             w = oget (omap pi3_1 Hmap.m.[(m,r)]);
-            ho = if c = Adv then Some(w,witness) else None; 
+            ho = if c = Adv then Some(w,witness) else None;
           }
         }
       }
       return ho;
-    } 
+    }
 
     proc v(m:message,r:salt):htag = {
       var h;

@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -67,7 +67,7 @@ let trans_preddecl_r (env : EcEnv.env) (pr : ppredicate located) =
         Msym.odup unloc (List.map (fun c -> c.pic_name) pi) |>
           oiter (fun (_, x) ->
             tperror x.pl_loc env (TPE_DuplicatedConstr (unloc x)));
-        
+
         let env, xs = TT.trans_binding env ue bd in
 
         let for1 ctor =
@@ -88,7 +88,7 @@ let trans_preddecl_r (env : EcEnv.env) (pr : ppredicate located) =
   let tparams = EcUnify.UniEnv.tparams ue in
   let body    = body |> omap (close_pr_body uni) in
   let dom     = List.map (Tuni.offun uni) dom in
-  
+
   EcDecl.mk_pred tparams dom body
 
 (* -------------------------------------------------------------------- *)

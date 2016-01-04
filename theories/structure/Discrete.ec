@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -29,4 +29,3 @@ op cunion (C1 C2 : int -> 'a option) : (int -> 'a option).
 (* -------------------------------------------------------------------- *)
 op cunions (Cs : (int -> 'a option) list) =
   foldr cunion (fun x => None) Cs.
-  

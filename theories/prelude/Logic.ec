@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -75,7 +75,7 @@ lemma nosmt bool_ind (P : bool -> bool):
 by [].
 
 (** and *)
-lemma nosmt andE : forall (a b c:bool), 
+lemma nosmt andE : forall (a b c:bool),
     (a => b => c) => (a /\ b) => c
 by [].
 
@@ -87,7 +87,7 @@ lemma nosmt andEr : forall (a b:bool),
     (a /\ b) => b
 by [].
 
-lemma nosmt andI : forall (a b : bool), 
+lemma nosmt andI : forall (a b : bool),
    a => b => (a /\ b)
 by [].
 
@@ -121,7 +121,7 @@ lemma andb_id2r (a b c : bool) : (b => a = c) <=> (a /\ b) = (c /\ b).
 proof. smt. qed.
 
 (** or *)
-lemma nosmt orE : forall (a b c:bool), 
+lemma nosmt orE : forall (a b c:bool),
     (a => c) => (b => c) => (a \/ b) => c
 by [].
 
@@ -231,7 +231,7 @@ lemma nosmt iffRL (a b : bool):
 by [].
 
 (** if *)
-lemma nosmt ifE : forall (a bt bf c: bool), 
+lemma nosmt ifE : forall (a bt bf c: bool),
   (a => bt => c) => (!a => bf => c)
     => (if a then bt else bf) => c
 by [].

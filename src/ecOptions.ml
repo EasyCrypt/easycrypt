@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -241,7 +241,7 @@ let specs = {
       `Spec ("profile"    , `Flag  , "Collect some profiling informations");
       `Spec ("iterate"    , `Flag  , "Force to iterate smt call");
     ]);
-       
+
 
     ("loader", "Options related to loader", [
       `Spec ("I"   , `String, "Add <dir> to the list of include directories");

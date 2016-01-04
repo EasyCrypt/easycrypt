@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -83,7 +83,7 @@ let test_if_evict_prover test (name, version) =
         | `Lt -> cmp <  0
         | `Le -> cmp <= 0
       end
-  
+
     | `ByVersion (_, _) -> false
 
   in if evict then Some test.pe_cause else None
@@ -157,7 +157,7 @@ end = struct
         let name    = p.Whyconf.prover_name in
         let version = p.Whyconf.prover_version in
         let driver  = Driver.load_driver w3_env config.Whyconf.driver [] in
-  
+
         { pr_prover  =
             { pr_name    = name;
               pr_version = version;
@@ -421,7 +421,7 @@ module POSIX : PExec = struct
           (fun i prover ->
              if i < pi.pr_maxprocs then run i prover else Queue.add prover pqueue)
           pi.pr_provers;
-  
+
         (* Wait for the first prover giving a definitive answer *)
         let status = ref None in
         let alives = ref (-1) in

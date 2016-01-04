@@ -30,7 +30,7 @@ require import Distr.
 
 type gtriple =  (group * group * group).
 
-module type DDH_DISTINGUISHER = { 
+module type DDH_DISTINGUISHER = {
   fun distinguish(i : int, X Y Z : group) : bool
 }.
 
@@ -51,17 +51,17 @@ module Sample_DH = {
   }
 }.
 
-module DDH_real (D:DDH_DISTINGUISHER) = { 
+module DDH_real (D:DDH_DISTINGUISHER) = {
   fun main(i : int) : bool = {
     var x, y, z : group;
     var b : bool;
     (x,y,z) = Sample_DH.sample_dh_real();
     b = D.distinguish(i,x,y,z);
     return b;
-  }     
+  }
 }.
 
-module DDH_random (D:DDH_DISTINGUISHER) = { 
+module DDH_random (D:DDH_DISTINGUISHER) = {
   fun main(i:int) : bool = {
     var x, y, z : group;
     var b : bool;
@@ -97,17 +97,17 @@ module Sample_DH_distr = {
   }
 }.
 
-module DDH_distr_real (D:DDH_DISTINGUISHER) = { 
+module DDH_distr_real (D:DDH_DISTINGUISHER) = {
   fun main(i : int) : bool = {
     var x, y, z : group;
     var b : bool;
     (x,y,z) = Sample_DH_distr.sample_dh_real();
     b = D.distinguish(i,x,y,z);
     return b;
-  }     
+  }
 }.
 
-module DDH_distr_random (D:DDH_DISTINGUISHER) = { 
+module DDH_distr_random (D:DDH_DISTINGUISHER) = {
   fun main(i : int) : bool = {
     var x, y, z : group;
     var b : bool;
@@ -122,7 +122,7 @@ require import Real.
 theory Equiv_Dprod.
   type a.
   type b.
-  
+
   const da : a distr.
   const db : b distr.
 
@@ -151,7 +151,7 @@ theory Equiv_Dprod.
     bypr (res{1}) (res{2}).
       progress.
     move=> rab &m1 &m2 _.
-    pose ra' := fst rab. 
+    pose ra' := fst rab.
     pose rb' := snd rab.
     cut -> :(  Pr[Sample_dprod.sample() @ &m2 : rab = res]
              = mu_x da ra' * mu_x db rb').
@@ -186,7 +186,7 @@ theory Equiv_Dprod.
      apply fun_ext. by trivial.
    trivial.
    rnd. skip. progress.
-   cut -> :  ((lambda (x : a), ! ra' = x) = 
+   cut -> :  ((lambda (x : a), ! ra' = x) =
              (cpNot (lambda (x : a), ra' = x))).
      apply fun_ext.
      smt.
@@ -206,7 +206,7 @@ end Equiv_Dprod.
 theory Equiv_Dapply.
   type a.
   type b.
-  
+
   const da : a distr.
 
   op f : a -> b.
@@ -315,13 +315,13 @@ module T3(S : S3_ra) = {
 module T3_left  = T3(E3_ra.Sample_then_apply).
 module T3_right = T3(E3_ra.Sample_dapply).
 
-lemma Eq_Sample_DH_T1_left: 
+lemma Eq_Sample_DH_T1_left:
   equiv[ Sample_DH.sample_dh_random ~ T1_left.sample_dh_random : true ==> ={res} ].
 proof strict.
   fun. inline E1_ra.Sample_twice.sample. rnd. wp. do rnd. skip; progress; smt.
 qed.
 
-lemma Eq_T1_left_T1_right: 
+lemma Eq_T1_left_T1_right:
   equiv[ T1_left.sample_dh_random ~ T1_right.sample_dh_random : true ==> ={res} ].
 proof strict.
   fun. seq 1 1: (={x,y}). call E1_ra.eq_twice_dprod; skip. smt. rnd; skip. smt.
@@ -418,13 +418,13 @@ module S2(S : S2_re) = {
 module S2_left  = S2(E2_re.Sample_then_apply).
 module S2_right = S2(E2_re.Sample_dapply).
 
-lemma Eq_Sample_DH_S1_left: 
+lemma Eq_Sample_DH_S1_left:
   equiv[ Sample_DH.sample_dh_real ~ S1_left.sample_dh_real : true ==> ={res} ].
 proof strict.
   fun. inline E1_re.Sample_twice.sample. wp. rnd. rnd. skip; progress; smt.
 qed.
 
-lemma Eq_S1_left_S1_right: 
+lemma Eq_S1_left_S1_right:
   equiv[ S1_left.sample_dh_real ~ S1_right.sample_dh_real : true ==> ={res} ].
 proof strict.
   fun. seq 1 1: (={x,y}). call E1_re.eq_twice_dprod; skip. smt. skip. smt.

@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -28,11 +28,11 @@ val t_ring : ring -> eq list -> form * form -> FApi.backward
 val t_ring_simplify : ring -> eq list -> form * form -> FApi.backward
 
 val t_ring_congr :
-     cring -> RState.rstate -> int list -> form list -> FApi.backward 
+     cring -> RState.rstate -> int list -> form list -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
 val t_field : field -> eq list -> form * form -> FApi.backward
 val t_field_simplify : field -> eq list -> form * form -> FApi.backward
 
 val t_field_congr :
-     cfield -> RState.rstate -> int list -> form list -> FApi.backward 
+     cfield -> RState.rstate -> int list -> form list -> FApi.backward

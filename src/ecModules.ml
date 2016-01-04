@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -15,7 +15,7 @@ module Sid = EcIdent.Sid
 module Mid = EcIdent.Mid
 
 (* -------------------------------------------------------------------- *)
-type lvmap = 
+type lvmap =
     (EcPath.path * EcTypes.ty list)
   *  EcTypes.prog_var * EcTypes.expr * EcTypes.ty
 
@@ -496,7 +496,7 @@ and i_get_uninit_read (w : Sx.t) (i : instr) =
       let r1    = Sx.diff (Sx.big_union (List.map (Uninit.e_pv is_loc) args)) w in
       let w, r2 = olv |> omap (lv_get_uninit_read w) |> odfl (w, Sx.empty) in
       (w, Sx.union r1 r2)
-        
+
   | Sif (e, s1, s2) ->
       let r = Sx.diff (Uninit.e_pv is_loc e) w in
       let w1, r1 = s_get_uninit_read w s1 in

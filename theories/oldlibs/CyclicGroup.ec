@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -13,7 +13,7 @@ type group.
 
 op g:group. (* the generator *)
 op ( * ): group -> group -> group.   (* multiplication of group elements *)
-op inv : group -> group.             (* inverse of the multiplication *) 
+op inv : group -> group.             (* inverse of the multiplication *)
 op ( / ): group -> group -> group.   (* division *)
 op ( ^ ): group -> t -> group.       (* exponentiation *)
 op log  : group -> t.                (* discrete logarithm *)
@@ -45,20 +45,20 @@ qed.
 
 lemma nosmt pow_opp (x:group) (p:F.t): x^(-p) = inv (x^p).
 proof.
-  rewrite inv_def. 
+  rewrite inv_def.
   cut -> : -p = (-F.one) * p by ringeq.
   cut -> : -log (x ^ p) = (-F.one) * log(x^p) by ringeq.
   by rewrite !(F.mulC (-F.one)) -!pow_pow gpow_log.
 qed.
 
 lemma nosmt mulC (x y: group): x * y = y * x.
-proof. 
-  by rewrite -(gpow_log x) -(gpow_log y) mul_pow;smt. 
+proof.
+  by rewrite -(gpow_log x) -(gpow_log y) mul_pow;smt.
 qed.
 
 lemma nosmt mulA (x y z: group): x * (y * z) = x * y * z.
-proof. 
-  by rewrite -(gpow_log x) -(gpow_log y) -(gpow_log z) !mul_pow;smt. 
+proof.
+  by rewrite -(gpow_log x) -(gpow_log y) -(gpow_log z) !mul_pow;smt.
 qed.
 
 lemma nosmt mul1 x: g1 * x = x.
@@ -84,7 +84,7 @@ qed.
 
 lemma mulN (x:group): x * inv x = g1.
 proof.
-  rewrite inv_def -{1}(gpow_log x) mul_pow;smt. 
+  rewrite inv_def -{1}(gpow_log x) mul_pow;smt.
 qed.
 
 lemma inj_gpow_log (a:group): a = g ^ (log a) by smt.

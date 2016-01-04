@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -246,7 +246,7 @@ module MEV = struct
             ev.evm_form.ev_map f.f_fv subst in
           Fsubst.f_bind_local subst x (Fsubst.f_subst subst f)
         end
-    in           
+    in
 
     Mid.fold_left
       (fun acc x bd -> for_ident x bd acc)

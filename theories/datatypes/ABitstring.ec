@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -84,7 +84,7 @@ axiom sub_app_fst_le (b1 b2:bitstring) x l:
     sub (b1 || b2) x l = sub b1 x l.
 
 axiom sub_app_snd_le (b1 b2:bitstring) x l:
-  `|b1| <= x => 
+  `|b1| <= x =>
    sub (b1 || b2) x l = sub b2 (x - `|b1| ) l.
 
 axiom sub_app_sub: forall (xs:bitstring, i l1 l2:int),
@@ -118,8 +118,8 @@ lemma sub_sub (b:bitstring) s1 l1 s2 l2:
   sub (sub b s1 l1) s2 l2 = sub b (s1 + s2) l2.
 proof -strict.
   move=> Hs1 Hl1 Hb Hs2 Hl2 Hsll.
-  rewrite {1}(_: b = (sub b 0 s1 || sub b s1 s2 || 
-           sub b (s1+s2) l2 || sub b (s1+s2+l2) (l1-(l2+s2)) || 
+  rewrite {1}(_: b = (sub b 0 s1 || sub b s1 s2 ||
+           sub b (s1+s2) l2 || sub b (s1+s2+l2) (l1-(l2+s2)) ||
            sub b (s1+s2+l2+(l1-(l2+s2))) (`|b|-(s1+l1)))).
     rewrite sub_app_sub //; first 4 smt.
     by rewrite sub_app_sub //;smt.

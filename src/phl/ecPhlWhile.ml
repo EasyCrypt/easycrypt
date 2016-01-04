@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -19,8 +19,8 @@ module Sx  = EcPath.Sx
 module TTC = EcProofTyping
 
 (* -------------------------------------------------------------------- *)
-let while_info env e s = 
-  let rec i_info (w,r,c) i = 
+let while_info env e s =
+  let rec i_info (w,r,c) i =
     match i.i_node with
     | Sasgn(lp, e) | Srnd(lp, e) ->
         let r = e_read_r env (EcPV.lp_read_r env r lp) e in
@@ -39,12 +39,12 @@ let while_info env e s =
         let w = match lp with None -> w | Some lp -> lp_write_r env w lp in
         let f = EcEnv.NormMp.norm_xfun env f in
         (w, r, Sx.add f c)
-  
+
     | Sassert e ->
         (w, e_read_r env r e, c)
 
     | Sabstract id ->
-      let add_pv x (pv,ty) = PV.add env pv ty x in 
+      let add_pv x (pv,ty) = PV.add env pv ty x in
       let us = EcEnv.AbsStmt.byid id env in
       let w = List.fold_left add_pv w us.EcModules.aus_writes in
       let r = List.fold_left add_pv r us.EcModules.aus_reads in

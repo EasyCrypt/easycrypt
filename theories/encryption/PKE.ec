@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -22,9 +22,9 @@ type plaintext.
 type ciphertext.
 
 module type Scheme = {
-  proc kg() : pkey * skey 
-  proc enc(pk:pkey, m:plaintext)  : ciphertext 
-  proc dec(sk:skey, c:ciphertext) : plaintext option  
+  proc kg() : pkey * skey
+  proc enc(pk:pkey, m:plaintext)  : ciphertext
+  proc dec(sk:skey, c:ciphertext) : plaintext option
 }.
 
 module Correctness (S:Scheme) = {
@@ -36,7 +36,7 @@ module Correctness (S:Scheme) = {
 
     (pk, sk) = S.kg();
     c        = S.enc(pk, m);
-    m'       = S.dec(sk, c); 
+    m'       = S.dec(sk, c);
     return (m' = Some m);
   }
 }.
@@ -49,13 +49,13 @@ module type AdvCPA(LR:LR) = {
   proc main(pk:pkey) : bool
 }.
 
-module K = { 
+module K = {
   var c  : int
   var pk : pkey
   var sk : skey
   var b  : bool
 }.
- 
+
 module L (S:Scheme) = {
 
   proc orcl (m0 m1:plaintext) : ciphertext = {
@@ -163,20 +163,20 @@ module B (S:Scheme, A:AdvCPA, LR:LR) = {
 section.
 
   declare module S:Scheme {K, H.Count, H.HybOrcl}.
-    (* Normaly I would like to locally 
+    (* Normaly I would like to locally
        clone Indist in the section, in that case
        restrictions at least on H.c are not needed.
-       But LRB and B are used so we need to do it 
-     *) 
+       But LRB and B are used so we need to do it
+     *)
 
   declare module A:AdvCPA {K,H.Count,H.HybOrcl,S}.
 
   axiom Lkg  : islossless S.kg.
-  axiom Lenc : islossless S.enc. 
+  axiom Lenc : islossless S.enc.
   axiom La   : forall (LR<:LR{A}), islossless LR.orcl => islossless A(LR).main.
 
-  lemma CPA1_CPAn &m : 0 < H.q => 
-    Pr[CPAL(S,B(S,A)).main() @ &m : res /\ H.HybOrcl.l <= H.q /\ K.c <= 1] - 
+  lemma CPA1_CPAn &m : 0 < H.q =>
+    Pr[CPAL(S,B(S,A)).main() @ &m : res /\ H.HybOrcl.l <= H.q /\ K.c <= 1] -
     Pr[CPAR(S,B(S,A)).main() @ &m : res /\ H.HybOrcl.l <= H.q /\ K.c <= 1] =
     1%r/H.q%r * (Pr[CPAL(S,A).main() @ &m : res /\ K.c <= H.q] -
                  Pr[CPAR(S,A).main() @ &m : res /\ K.c <= H.q]).
@@ -186,7 +186,7 @@ section.
              Pr[INDL(ToOrcl(S),ToAdv(A)).main() @ &m : res /\ H.Count.c <= H.q].
       byequiv (_ : ={glob A, glob S} ==>
                         ={res,glob A, glob S, K.pk} /\ K.c{1} = H.Count.c{2}) => //.
-      proc. 
+      proc.
       inline INDL(ToOrcl(S), ToAdv(A)).A.main H.Count.init  ToOrcl(S).leaks.
       wp;call (_: ={glob S, K.pk} /\ K.c{1} = H.Count.c{2}).
         by proc;inline ToOrcl(S).orcl H.Count.incr;wp;call (_:true);wp.
@@ -195,14 +195,14 @@ section.
              Pr[INDR(ToOrcl(S),ToAdv(A)).main() @ &m : res /\ H.Count.c <= H.q].
       byequiv (_ : ={glob A, glob S} ==>
                         ={res,glob A, glob S, K.pk} /\ K.c{1} = H.Count.c{2}) => //.
-      proc. 
+      proc.
       inline INDR(ToOrcl(S), ToAdv(A)).A.main H.Count.init  ToOrcl(S).leaks.
       wp;call (_: ={glob S, K.pk} /\ K.c{1} = H.Count.c{2}).
         by proc;inline ToOrcl(S).orcl H.Count.incr;wp;call (_:true);wp.
       by wp;call (_:true);wp.
     cut := IND1_INDn (ToOrcl(S)) (ToAdv(A)) _ _ _ _ &m (fun ga go c, true) => //=.
       by proc;call Lkg.
-      by proc;call Lenc.    
+      by proc;call Lenc.
       move=> O LR Llr Ll Lo;proc;call (La LR _) => //.
       by call Ll.
     move=> <-; congr; last congr.

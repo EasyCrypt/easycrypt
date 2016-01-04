@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -269,8 +269,8 @@ module PGOptions : sig
   val merge   : pgoptions -> ppgoptions -> pgoptions
 end
 
-val t_progress : 
-     ?options:pgoptions -> 
+val t_progress :
+     ?options:pgoptions ->
      ?ti:(EcIdent.t -> EcCoreGoal.FApi.backward) ->
      FApi.backward -> FApi.backward
 

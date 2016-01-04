@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -28,10 +28,10 @@ require import Distr.
 (* Product distribution *)
 theory Dprod.
   op ( * ) : 'a distr -> 'b distr -> ('a * 'b) distr.
- 
+
   (* This can be generalized *)
   axiom mu_def (P1:'a -> bool) (P2:'b -> bool) (d1:'a distr) (d2: 'b distr):
-     mu (d1 * d2) (fun p, P1 (fst p) /\ P2 (snd p)) = 
+     mu (d1 * d2) (fun p, P1 (fst p) /\ P2 (snd p)) =
      mu d1 P1 * mu d2 P2.
 
   lemma mu_x_def (d1:'a distr) (d2:'b distr) p:
@@ -47,7 +47,7 @@ theory Dprod.
   proof strict.
   by do 3!rewrite /in_supp; rewrite mu_x_def; smt.
   qed.
- 
+
   lemma weight_def (d1:'a distr) (d2:'b distr):
      weight (d1 * d2) = weight d1 * weight d2.
   proof strict.
@@ -55,14 +55,14 @@ theory Dprod.
   by apply mu_eq=> x.
   qed.
 
-  lemma lossless (d1:'a distr) (d2:'b distr): 
+  lemma lossless (d1:'a distr) (d2:'b distr):
      weight d1 = 1%r => weight d2 = 1%r =>
      weight (d1 * d2) = 1%r.
   proof strict.
   by rewrite weight_def=> -> ->.
   qed.
 
-  lemma dprodU (d1:'a distr) (d2:'b distr): 
+  lemma dprodU (d1:'a distr) (d2:'b distr):
      is_uniform d1 => is_uniform d2 => is_uniform (d1 * d2).
   proof strict.
     move=> [Hd1_supp Hd1_suf] [Hd2_supp Hd2_suf]; split; [smt|move=> x y].
@@ -89,7 +89,7 @@ theory Dprod.
         return (r1,r2);
       }
     }.
- 
+
     equiv sample_sample2 : S.sample ~ S.sample2 : true ==> ={res}.
     proof.
      bypr (res{1}) (res{2}) => //.

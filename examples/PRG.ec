@@ -242,7 +242,7 @@ section.
     (* adversary is lossless *)
     by apply AaL.
     (* [F.f ~ F.f: I] when Bad does not hold *)
-    proc; wp; do !rnd; wp; skip; rewrite /Top.inv; progress;expect 13 smt. 
+    proc; wp; do !rnd; wp; skip; rewrite /Top.inv; progress;expect 13 smt.
     (* F.f is lossless when Bad holds *)
     by move=> _ _; apply FfL.
     (* F.f preserves bad *)
@@ -301,7 +301,7 @@ section.
   proof.
   byequiv (_: ={glob A} ==> ={P.logP, F.m})=> //; proc.
   transitivity{1} { F.init(); Psample.init(); Resample.resample(); b = Exp'A.A.a(); }
-     (={glob A} ==> ={F.m, P.logP}) 
+     (={glob A} ==> ={F.m, P.logP})
      (={glob A} ==> ={F.m, P.logP})=> //.
     (* Equality on A's globals *)
     by move=> &1 &2 A; exists (glob A){1}.
@@ -437,7 +437,7 @@ section.
   proc.
   seq 3: true
          1%r ((qP * qF + (qP - 1) * qP /% 2)%r * pr_dseed)
-         0%r 1%r  
+         0%r 1%r
          (length P.logP <= qP /\ card (dom F.m) <= qF)=> //.
     inline Exp'(C(A)).A.a; wp.
     call (_: length P.logP = C.cP /\ C.cP <= qP /\
@@ -462,7 +462,7 @@ section.
          (n = length logP /\ n <= qP /\ P.logP = [] /\
           card (dom F.m) <= qF)=> //.
     by rnd; wp.
-  conseq [-frame] (_:_: <= (if Bad P.logP F.m then 1%r else 
+  conseq [-frame] (_:_: <= (if Bad P.logP F.m then 1%r else
                   ((sum_n (qF + length P.logP) (qF + n - 1))%r * pr_dseed))).
     progress; cut ->: Bad [] F.m{hr} = false by smt.
     rewrite //=; apply CompatOrderMult=> //; last smt.
@@ -486,10 +486,10 @@ section.
     exists* P.logP, F.m, n; elim* => logPw m n0.
     case (Bad P.logP F.m).
       by conseq ( _ : _ : <= (1%r))=> //; smt.
-    seq 2: (Bad P.logP F.m) 
+    seq 2: (Bad P.logP F.m)
            ((qF + length logPw)%r * pr_dseed) 1%r
            1%r ((sum_n (qF + (length logPw + 1)) (qF + n - 1))%r * pr_dseed)
-           (n = n0 /\ F.m = m /\ r::logPw = P.logP /\ 
+           (n = n0 /\ F.m = m /\ r::logPw = P.logP /\
             n <= qP /\ card (dom F.m) <= qF)=> //.
       by wp; rnd=> //.
       wp; rnd; skip; progress.
@@ -533,7 +533,7 @@ end section.
 (*
 module NegA (A:Adv, P:AOrclPrg, R:OrclRnd) = {
   module A = A(P,R)
-  fun a() : bool = { 
+  fun a() : bool = {
     var ba:bool;
     ba = A.a();
     return !ba;
@@ -550,7 +550,7 @@ proof.
  call (_:true) => //.
 qed.
 
-lemma NegA_Neg_main (P<:OrclPrg) (A<:Adv{P,F,C}) &m: 
+lemma NegA_Neg_main (P<:OrclPrg) (A<:Adv{P,F,C}) &m:
     Pr[AdvAbsVal.Neg_main(Exp(C(A),P)).main() @ &m : res] =
     Pr[Exp(C(NegA(A)),P).main() @ &m : res].
 proof.
@@ -560,7 +560,7 @@ proof.
      Exp(C(A), P).A.a;wp; eqobs_in.
 qed.
 
-lemma lossExp (P<:OrclPrg) (A<:Adv{P,F,C}):  
+lemma lossExp (P<:OrclPrg) (A<:Adv{P,F,C}):
   (forall (O1 <: AOrclPrg{A}) (O2 <: OrclRnd{A}),
          islossless O1.prg => islossless O2.f => islossless A(O1, O2).a) =>
    islossless P.prg => islossless P.init =>
@@ -581,10 +581,10 @@ proof.
 qed.
 
 lemma conclusion (A<:Adv{Prg,F,C}) :
-    (forall (O1 <: AOrclPrg{A}) (O2<:OrclRnd{A}), islossless O1.prg => islossless O2.f => 
+    (forall (O1 <: AOrclPrg{A}) (O2<:OrclRnd{A}), islossless O1.prg => islossless O2.f =>
        islossless A(O1,O2).a) =>
-    forall &m, 
-      `| Pr[Exp(C(A),Prg).main() @ &m : res] - Pr[Exp(C(A),Prg_r).main() @ &m : res] | <=  
+    forall &m,
+      `| Pr[Exp(C(A),Prg).main() @ &m : res] - Pr[Exp(C(A),Prg_r).main() @ &m : res] | <=
        (qP*qF + (qP - 1)*qP/%2)%r*bd1.
 proof.
  move=> Hloss &m.
@@ -593,11 +593,11 @@ proof.
      by apply (lossNegA A).
    move: H;rewrite -(NegA_Neg_main Prg A &m) -(NegA_Neg_main Prg_r A &m).
    rewrite (AdvAbsVal.Neg_A_Pr_minus (Exp(C(A), Prg)) &m).
-     apply (lossExp Prg A) => //. 
+     apply (lossExp Prg A) => //.
        by fun;call lossless_Ff.
      fun;rnd;skip;smt.
    rewrite (AdvAbsVal.Neg_A_Pr_minus (Exp(C(A), Prg_r)) &m);last smt.
-      apply (lossExp Prg_r A) => //. 
+      apply (lossExp Prg_r A) => //.
         by fun;rnd;skip;smt.
       by fun.
  by cut H := conclusion_aux A _ &m => //;smt.

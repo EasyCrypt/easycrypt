@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -40,7 +40,7 @@ qed.
 lemma lossless_restr (d:'a distr) X:
   weight d = 1%r =>
   mu d (mem X) < 1%r =>
-  Distr.weight (d \ X) = 1%r. 
+  Distr.weight (d \ X) = 1%r.
 proof.
  move=> Hll Hmu; simplify (\);
  (rewrite Distr.Dscale.weight_pos;last smt);

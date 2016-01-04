@@ -1,7 +1,7 @@
 require import Pair Int Real Distr.
 (*---*) import EuclDiv.
 
-(* 
+(*
   TODO:
     - Generalize from Dinter to Duni.
     - Provide another version for arbitrary distributions where the
@@ -20,7 +20,7 @@ module type Game = {
   proc main(x:tin): tres
 }.
 
-module Guess(G:Game) = {  
+module Guess(G:Game) = {
   proc main(x:tin): int * tres = {
     var i, o;
 

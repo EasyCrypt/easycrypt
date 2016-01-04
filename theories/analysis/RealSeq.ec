@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -127,7 +127,7 @@ apply (@ler_lt_trans x); rewrite /x => {x}.
 by rewrite -(@double_half e) ltr_add ?(c1, c2).
 qed.
 
-lemma cnvtoDr0 s2 s1 l: convergeto s2 0%r => convergeto s1 l => 
+lemma cnvtoDr0 s2 s1 l: convergeto s2 0%r => convergeto s1 l =>
   convergeto (fun x => s1 x + s2 x) l.
 proof. by move=> cv1 cv2; rewrite -(@addr0 l); apply/cnvtoD. qed.
 
@@ -162,7 +162,7 @@ rewrite -mulrBr normrM -(@ltr_pmul2l `|c|) ?normr_gt0 //.
 by rewrite divrE mulrCA mulrV 1:normr0P.
 qed.
 
-lemma cnvtoM_boundedr s1 s2: convergeto s1 0%r => bounded s2 => 
+lemma cnvtoM_boundedr s1 s2: convergeto s1 0%r => bounded s2 =>
   convergeto (fun x => s1 x * s2 x) 0%r.
 proof.
 move=> c1 /boundedP [M] [ge0_M] [N leM] e gt0_e.
@@ -175,7 +175,7 @@ apply/(ler_lt_trans (M * (e / (M + 1%r)))); last first.
 by rewrite mulrC ler_pmul ?normr_ge0 // ?leM //; apply/ltrW/lee.
 qed.
 
-lemma cnvtoM_boundedl s1 s2: convergeto s2 0%r => bounded s1 => 
+lemma cnvtoM_boundedl s1 s2: convergeto s2 0%r => bounded s1 =>
   convergeto (fun x => s1 x * s2 x) 0%r.
 proof.
 move=> c2 b1; have := cnvtoM_boundedr _ _ c2 b1.
@@ -195,7 +195,7 @@ apply/cnvtoDr0/cnvtoDr0/cnvtoC; last first.
 move=> @/a1; apply/cnvtoM_boundedr; first by apply/cnvtoBlim.
 by apply/(@bounded_cnvto l2).
 qed.
-  
+
 (* -------------------------------------------------------------------- *)
 lemma le_cnvto_form s1 s2 l1 l2:
      (exists N, forall n, (N <= n)%Int => (s1 n <= s2 n)%Real)
@@ -236,7 +236,7 @@ lemma lim_eq (N : int) (s1 s2 : int -> real):
   => lim s1 = lim s2.
 proof. move=> eq.
 case: (converge s1) => ^cv1; rewrite (@eq_cnv_fromP N _ s2) // => cv2;
-  last by rewrite !lim_Ncnv.  
+  last by rewrite !lim_Ncnv.
 apply/lim_cnvto; case: cv2 => [l2 ^c2 /lim_cnvto ->]; move: c2.
 by apply/(@eq_cnvto_from N)=> n leNn; apply/eq_sym/eq.
 qed.

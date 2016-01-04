@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -24,7 +24,7 @@ type opmatch = [
   | `Proj of EcTypes.prog_var * EcTypes.ty * (int * int)
 ]
 
-type mismatch_funsig = 
+type mismatch_funsig =
 | MF_targs of ty * ty (* expected, got *)
 | MF_tres  of ty * ty (* expected, got *)
 | MF_restr of EcEnv.env * [`Eq of Sx.t * Sx.t | `Sub of Sx.t ]
@@ -36,7 +36,7 @@ type tymod_cnv_failure =
 | E_TyModCnv_MismatchFunSig    of symbol * mismatch_funsig
 
 type modapp_error =
-| MAE_WrongArgCount      of int * int  (* expected, got *)   
+| MAE_WrongArgCount      of int * int  (* expected, got *)
 | MAE_InvalidArgType     of EcPath.mpath * tymod_cnv_failure
 | MAE_AccesSubModFunctor
 
@@ -113,9 +113,9 @@ val transtyvars:
   env -> (EcLocation.t * ptyparams option) -> EcUnify.unienv
 
 (* -------------------------------------------------------------------- *)
-val transty : typolicy -> env -> EcUnify.unienv -> pty -> ty 
+val transty : typolicy -> env -> EcUnify.unienv -> pty -> ty
 
-val transtys :  
+val transtys :
     typolicy -> env -> EcUnify.unienv -> pty list -> ty list
 
 val transtvi : env -> EcUnify.unienv -> ptyannot -> EcUnify.tvar_inst
@@ -151,12 +151,12 @@ val transmod     : attop:bool -> env -> symbol -> pmodule_expr -> module_expr
 
 val trans_topmsymbol : env -> pmsymbol located -> mpath
 val trans_msymbol    : env -> pmsymbol located -> mpath * module_sig
-val trans_gamepath   : env -> pgamepath -> xpath 
+val trans_gamepath   : env -> pgamepath -> xpath
 
 (* -------------------------------------------------------------------- *)
 type restriction_who =
 | RW_mod of EcPath.mpath
-| RW_fun of EcPath.xpath 
+| RW_fun of EcPath.xpath
 
 type restriction_err =
 | RE_UseVariable          of EcPath.xpath
@@ -168,9 +168,9 @@ type restriction_err =
 type restriction_error = restriction_who * restriction_err
 
 exception RestrictionError of EcEnv.env * restriction_error
-  
+
 val check_sig_mt_cnv :
-  env -> module_sig -> module_type -> unit 
+  env -> module_sig -> module_type -> unit
 
 val check_restrictions_fun :
   env -> xpath -> use -> mod_restr -> unit

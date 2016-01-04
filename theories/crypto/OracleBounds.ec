@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -223,7 +223,7 @@ theory BndPen.
     }
   }.
 
-  module EnforcedAdv (A:Adv, O:Oracle) = A(Enforce(O)). 
+  module EnforcedAdv (A:Adv, O:Oracle) = A(Enforce(O)).
 
   section.
     declare module O:Oracle {Count}.

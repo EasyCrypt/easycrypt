@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -40,7 +40,7 @@ clone include Bigalg.BigOrder with
 
 lemma nosmt sumzE ss : sumz ss = BIA.big predT (fun x => x) ss.
 proof. by elim: ss=> [|s ss ih] //=; rewrite BIA.big_cons -ih. qed.
-      
+
 lemma nosmt big_constz (P : 'a -> bool) x s:
   BIA.big P (fun i => x) s = x * (count P s).
 proof. by rewrite BIA.sumr_const -IntID.intmulz. qed.
@@ -80,7 +80,7 @@ clone include Bigalg.BigOrder with
 
     remove abbrev Num.Domain.(-).
 
-import Bigint.BIA Bigint.BIM BRA BRM. 
+import Bigint.BIA Bigint.BIM BRA BRM.
 
 lemma sumr_ofint (P : 'a -> bool) F s :
   (Bigint.BIA.big P F s)%r = (BRA.big P (fun i => (F i)%r) s).
@@ -119,7 +119,7 @@ clone Bigop as BBA with
   type t <- bool,
   op Support.idm <- false,
   op Support.(+) <- Bool.( ^^ )
-  proof Support.Axioms.* by (delta; smt).  
+  proof Support.Axioms.* by (delta; smt).
 
 (* -------------------------------------------------------------------- *)
 theory BBM.
@@ -127,7 +127,7 @@ clone include Bigop with
   type t <- bool,
   op Support.idm <- true,
   op Support.(+) <- Pervasive.( /\ )
-  proof Support.Axioms.* by (delta; smt).  
+  proof Support.Axioms.* by (delta; smt).
 
 lemma bigP (P : 'a -> bool) (s : 'a list):
   big predT P s <=> (forall a, mem s a => P a).
@@ -144,7 +144,7 @@ clone include Bigop with
   type t <- bool,
   op Support.idm <- false,
   op Support.(+) <- Pervasive.( || )
-  proof Support.Axioms.* by (delta; smt).  
+  proof Support.Axioms.* by (delta; smt).
 
 lemma bigP (P : 'a -> bool) (s : 'a list):
   big predT P s <=> (exists a, mem s a /\ P a).
@@ -158,7 +158,7 @@ qed.
 
 lemma nosmt b2i_big (P1 P2 : 'a -> bool) (s : 'a list) :
    b2i (big P1 P2 s) <= BIA.big P1 (fun i => b2i (P2 i)) s.
-proof. 
+proof.
 elim: s => [|x s ih] //=; rewrite big_cons BIA.big_cons.
 case: (P1 x)=> //= P1x; rewrite ora_or b2i_or.
 rewrite -addrA ler_add2l ler_subl_addr ler_paddr //.

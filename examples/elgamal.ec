@@ -1,6 +1,6 @@
 require import Int.
 require import Real.
-require import FMap. 
+require import FMap.
 require import FSet.
 
 require (*--*) DiffieHellman.
@@ -20,7 +20,7 @@ clone import PKE as PKE_ with
   type pkey <- pkey,
   type skey <- skey,
   type plaintext <- plaintext,
-  type ciphertext <- ciphertext. 
+  type ciphertext <- ciphertext.
 
 (** Concrete Construction: Hashed ElGammal **)
 module ElGamal : Scheme = {
@@ -28,7 +28,7 @@ module ElGamal : Scheme = {
     var sk;
 
     sk = $FDistr.dt;
-    return (g ^ sk, sk);   
+    return (g ^ sk, sk);
   }
 
   proc enc(pk:pkey, m:plaintext): ciphertext = {
@@ -41,8 +41,8 @@ module ElGamal : Scheme = {
   proc dec(sk:skey, c:ciphertext): plaintext option = {
     var gy, gm;
 
-    (gy, gm) = c; 
-    return Some (gm * gy^(-sk)); 
+    (gy, gm) = c;
+    return Some (gm * gy^(-sk));
   }
 }.
 
@@ -67,7 +67,7 @@ section Security.
 
   declare module A:Adversary.
 
-  local lemma cpa_ddh0 &m: 
+  local lemma cpa_ddh0 &m:
       Pr[CPA(ElGamal,A).main() @ &m : res] =
       Pr[DDH0(DDHAdv(A)).main() @ &m : res].
   proof.
@@ -89,14 +89,14 @@ section Security.
     }
   }.
 
-  local lemma ddh1_gb &m: 
-      Pr[DDH1(DDHAdv(A)).main() @ &m : res] = 
+  local lemma ddh1_gb &m:
+      Pr[DDH1(DDHAdv(A)).main() @ &m : res] =
       Pr[Gb.main() @ &m : res].
   proof.
     byequiv => //;proc;inline *.
     swap{1} 3 2;swap{1} [5..6] 2;swap{2} 6 -2.
     auto;call (_:true);wp.
-    rnd (fun z, z + log(if b then m1 else m0){2}) 
+    rnd (fun z, z + log(if b then m1 else m0){2})
         (fun z, z - log(if b then m1 else m0){2}).
     auto;call (_:true);auto;progress; (algebra || smt).
   qed.
@@ -104,18 +104,18 @@ section Security.
   axiom Ac_l : islossless A.choose.
   axiom Ag_l : islossless A.guess.
 
-  local lemma Gb_half &m: 
+  local lemma Gb_half &m:
      Pr[Gb.main()@ &m : res] = 1%r/2%r.
   proof.
     byphoare => //;proc.
     rnd  ((=) b')=> //=.
-    call Ag_l;auto;call Ac_l;auto;progress;smt. 
+    call Ag_l;auto;call Ac_l;auto;progress;smt.
   qed.
 
   lemma conclusion &m :
     `| Pr[CPA(ElGamal,A).main() @ &m : res] - 1%r/2%r | =
-    `| Pr[DDH0(DDHAdv(A)).main() @ &m : res] -  
-         Pr[DDH1(DDHAdv(A)).main() @ &m : res] |. 
+    `| Pr[DDH0(DDHAdv(A)).main() @ &m : res] -
+         Pr[DDH1(DDHAdv(A)).main() @ &m : res] |.
   proof.
    by rewrite (cpa_ddh0 &m) (ddh1_gb &m) (Gb_half &m).
   qed.

@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -14,11 +14,11 @@ open EcEnv
 open EcFol
 
 (* -------------------------------------------------------------------- *)
-type alias_clash = 
- | AC_concrete_abstract of mpath * prog_var 
+type alias_clash =
+ | AC_concrete_abstract of mpath * prog_var
  | AC_abstract_abstract of mpath * mpath
 
-exception AliasClash of env * alias_clash 
+exception AliasClash of env * alias_clash
 
 (* -------------------------------------------------------------------- *)
 module PVMap : sig
@@ -30,7 +30,7 @@ module PVMap : sig
 end
 
 (* -------------------------------------------------------------------- *)
-module Mpv : sig 
+module Mpv : sig
   type ('a,'b) t
 
   val empty : ('a,'b) t
@@ -41,7 +41,7 @@ module Mpv : sig
 
   val check_npv : env -> prog_var -> ('a,'b) t -> unit
 
-  val check_glob : env -> mpath -> ('a,'b) t -> unit 
+  val check_glob : env -> mpath -> ('a,'b) t -> unit
 
   val add : env -> prog_var -> 'a -> ('a,'b) t -> ('a,'b) t
 
@@ -52,7 +52,7 @@ module Mpv : sig
   val find_glob : env -> mpath -> ('a,'b) t -> 'b
 
   val issubst : env -> (expr, unit) t -> instr list -> instr list
-end 
+end
 
 (* -------------------------------------------------------------------- *)
 exception MemoryClash
@@ -65,19 +65,19 @@ module PVM : sig
   val add : env -> prog_var -> EcIdent.t -> form -> subst -> subst
 
   val add_glob : env -> mpath -> EcIdent.t -> form -> subst -> subst
-    
+
   val of_mpv : (form,form) Mpv.t -> EcIdent.t -> subst
 
   val find : env -> prog_var -> memory -> subst -> form
 
   val subst   : env -> subst -> form  -> form
 
-  val subst1  : env -> prog_var -> EcIdent.t -> form -> form -> form    
+  val subst1  : env -> prog_var -> EcIdent.t -> form -> form -> form
 end
 
 (* -------------------------------------------------------------------- *)
 module PV : sig
-  type t 
+  type t
 
   val empty : t
 
@@ -91,7 +91,7 @@ module PV : sig
   val union    : t -> t -> t
   val diff     : t -> t -> t
   val subset   : t -> t -> bool
-    
+
   val interdep     : env -> t -> t -> t
   val indep        : env -> t -> t -> bool
   val check_depend : env -> t -> mpath -> unit
@@ -143,7 +143,7 @@ val f_read  : xpath      pvaccess0
 exception EqObsInError
 
 module Mpv2 : sig
-  type t 
+  type t
   val to_form : EcIdent.t -> EcIdent.t -> t -> form -> form
   val of_form : env -> EcIdent.t -> EcIdent.t -> form -> t
   val needed_eq : env -> EcIdent.t -> EcIdent.t -> form -> t
@@ -159,8 +159,8 @@ module Mpv2 : sig
   val subst_r : env -> prog_var -> prog_var -> t -> t
   val substs_l : env -> (prog_var * 'a) list -> prog_var list -> t -> t
   val substs_r : env -> (prog_var * 'a) list -> prog_var list -> t -> t
-    
-  val check_glob : t -> unit 
+
+  val check_glob : t -> unit
 
   (* [mem x1 x2 eq] return true if (x1,x2) is in eq.
      x1 and x2 are assumed in normal form *)
@@ -169,10 +169,10 @@ module Mpv2 : sig
 
   (* [iter fpv fabs eq] iterate fpv and fabs on all pair contained in eq.
      The argument given to both function are in normal form *)
-  val iter : 
+  val iter :
     (prog_var -> prog_var -> ty -> unit) -> (mpath -> unit) -> t -> unit
 
-  val eq_refl : PV.t -> t 
+  val eq_refl : PV.t -> t
   val fv2 : t -> PV.t
   val eq_fv2 : t -> t
 

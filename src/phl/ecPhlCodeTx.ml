@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -84,8 +84,8 @@ let t_kill_r side cpos olen tc =
 
 (* -------------------------------------------------------------------- *)
 let alias_stmt env id (pf, _) me i =
-  let dopv ty = 
-    let id       = odfl "x" (omap EcLocation.unloc id) in 
+  let dopv ty =
+    let id       = odfl "x" (omap EcLocation.unloc id) in
     let id       = { v_name = id; v_type = ty; } in
     let (me, id) = fresh_pv me id in
     let pv       = pv_loc (EcMemory.xpath me) id in

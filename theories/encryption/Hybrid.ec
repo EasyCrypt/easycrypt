@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -23,7 +23,7 @@ type outputA.
 (* -------------------------------------------------------------------- *)
 (* Wrappers for counting *)
 
-module Count = { 
+module Count = {
   var c : int
   proc init () : unit = {
     c <- 0;
@@ -46,7 +46,7 @@ module AdvCount (A : Adv) = {
   }
 }.
 
-module type Orcl = { 
+module type Orcl = {
   proc orcl(m : input) : output
 }.
 
@@ -65,11 +65,11 @@ module OrclCount (O : Orcl) = {
 op q : { int | 0 < q } as q_pos.
 
 module type AdvOrcl (O : Orcl) = {
-  proc main () : outputA 
+  proc main () : outputA
 }.
 
 module type Orclb = {
-  proc leaks (il : inleaks) : outleaks  
+  proc leaks (il : inleaks) : outleaks
   proc orclL (m : input) : output
   proc orclR (m : input) : output
 }.
@@ -86,7 +86,7 @@ module type AdvOrclb (Ob : Orclb, O : Orcl) = {
   proc main () : outputA
 }.
 
-module Orcln (A : AdvOrcl, O : Orcl) = AdvCount(A(OrclCount(O))). 
+module Orcln (A : AdvOrcl, O : Orcl) = AdvCount(A(OrclCount(O))).
 
 module Ln(Ob : Orclb, A : AdvOrclb) = Orcln(A(Ob), L(Ob)).
 
@@ -97,7 +97,7 @@ module Rn(Ob : Orclb, A : AdvOrclb) = Orcln(A(Ob), R(Ob)).
    oracle O for queries = l0, and
    right oracle for queries > l0. *)
 module HybOrcl (Ob : Orclb, O : Orcl) = {
-  var l, l0 : int  
+  var l, l0 : int
   proc orcl(m:input):output = {
     var r : output;
     if   (l0 < l) r <@ Ob.orclL(m);
@@ -156,12 +156,12 @@ section.
   proof. by proc true. qed.
 
   local lemma GLB_WL &m (p:glob A -> glob Ob -> int -> outputA -> bool):
-    Pr[Ln(Ob,HybGame(A)).main() @ &m : p (glob A) (glob Ob) HybOrcl.l res /\ Count.c <= 1] = 
+    Pr[Ln(Ob,HybGame(A)).main() @ &m : p (glob A) (glob Ob) HybOrcl.l res /\ Count.c <= 1] =
     Pr[Rand(HybGameFixed(L(Ob))).main() @ &m : p (glob A) (glob Ob) HybOrcl.l (snd res)].
   proof.
-    byequiv (_ : ={glob A, glob Ob} ==> 
-                    ={glob A, glob Ob,glob HybOrcl} /\ res{1} = snd res{2} /\ 
-                    Count.c{1} <= 1) => //;proc. 
+    byequiv (_ : ={glob A, glob Ob} ==>
+                    ={glob A, glob Ob,glob HybOrcl} /\ res{1} = snd res{2} /\
+                    Count.c{1} <= 1) => //;proc.
     inline{1} HybGame(A, Ob, OrclCount(L(Ob))).main; inline{2} HybGameFixed(L(Ob)).work;wp.
     call (_: ={glob Ob, glob HybOrcl} /\ Count.c{1} = (HybOrcl.l0{1} < HybOrcl.l{1}) ? 1 : 0).
       proc;wp.
@@ -181,8 +181,8 @@ section.
     Pr[Rn(Ob,HybGame(A)).main() @ &m : p (glob A) (glob Ob) HybOrcl.l res /\ Count.c <= 1] =
     Pr[Rand(HybGameFixed(R(Ob))).main() @ &m : p (glob A) (glob Ob) HybOrcl.l (snd res)].
   proof.
-    byequiv (_ : ={glob A, glob Ob} ==> 
-                    ={glob A, glob Ob, glob HybOrcl} /\ res{1} = snd res{2} /\ 
+    byequiv (_ : ={glob A, glob Ob} ==>
+                    ={glob A, glob Ob, glob HybOrcl} /\ res{1} = snd res{2} /\
                     Count.c{1} <= 1) => //;proc.
     inline{1} HybGame(A, Ob, OrclCount(R(Ob))).main; inline{2} HybGameFixed(R(Ob)).work;wp.
     call (_: ={glob Ob, glob HybGame} /\ Count.c{1} = (HybOrcl.l0{1} < HybOrcl.l{1}) ? 1 : 0).
@@ -203,15 +203,15 @@ section.
   axiom losslessOb1: islossless Ob.orclL.
   axiom losslessOb2: islossless Ob.orclR.
   axiom losslessA (Ob0 <: Orclb{A}) (LR <: Orcl{A}):
-    islossless LR.orcl => 
+    islossless LR.orcl =>
     islossless Ob0.leaks => islossless Ob0.orclL => islossless Ob0.orclR =>
     islossless A(Ob0, LR).main.
 
-  local lemma WL0_GLA &m (p:glob A -> glob Ob -> int -> outputA -> bool): 
-    Pr[HybGameFixed(L(Ob)).work(0) @ &m : p (glob A) (glob Ob) HybOrcl.l res /\ HybOrcl.l <= q] = 
+  local lemma WL0_GLA &m (p:glob A -> glob Ob -> int -> outputA -> bool):
+    Pr[HybGameFixed(L(Ob)).work(0) @ &m : p (glob A) (glob Ob) HybOrcl.l res /\ HybOrcl.l <= q] =
     Pr[Ln(Ob,A).main() @ &m : p (glob A) (glob Ob) Count.c res /\ Count.c <= q ].
   proof.
-    byequiv (_ : ={glob A, glob Ob} /\ x{1}=0 ==> 
+    byequiv (_ : ={glob A, glob Ob} /\ x{1}=0 ==>
                     (HybOrcl.l{1} <= q) = (Count.c{2} <= q) /\
                     (Count.c{2} <= q =>
                       ={glob A, glob Ob,res} /\ HybOrcl.l{1} = Count.c{2})) => //;
@@ -243,11 +243,11 @@ section.
     by inline{2} Count.init;wp;skip;smt.
   qed.
 
-  local lemma WRq_GRA &m (p:glob A -> glob Ob -> int -> outputA -> bool): 
-    Pr[HybGameFixed(R(Ob)).work((q-1)) @ &m :  p (glob A) (glob Ob) HybOrcl.l res /\ HybOrcl.l <= q] = 
+  local lemma WRq_GRA &m (p:glob A -> glob Ob -> int -> outputA -> bool):
+    Pr[HybGameFixed(R(Ob)).work((q-1)) @ &m :  p (glob A) (glob Ob) HybOrcl.l res /\ HybOrcl.l <= q] =
     Pr[Rn(Ob,A).main() @ &m :  p (glob A) (glob Ob) Count.c res /\ Count.c <= q ].
   proof.
-    byequiv (_ : ={glob A, glob Ob} /\ x{1}=q-1 ==> 
+    byequiv (_ : ={glob A, glob Ob} /\ x{1}=q-1 ==>
                     (HybOrcl.l{1} <= q) = (Count.c{2} <= q) /\
                     (Count.c{2} <= q =>
                       ={glob A, glob Ob, res} /\ HybOrcl.l{1} = Count.c{2})) => //;
@@ -282,12 +282,12 @@ section.
     by inline{2} Count.init;wp;skip;smt.
   qed.
 
-  local lemma WLR_shift &m v (p:glob A -> glob Ob -> int -> outputA -> bool): 
-    1 <= v <= q-1 => 
-    Pr[HybGameFixed(L(Ob)).work(v) @ &m: p (glob A) (glob Ob) HybOrcl.l res] = 
+  local lemma WLR_shift &m v (p:glob A -> glob Ob -> int -> outputA -> bool):
+    1 <= v <= q-1 =>
+    Pr[HybGameFixed(L(Ob)).work(v) @ &m: p (glob A) (glob Ob) HybOrcl.l res] =
     Pr[HybGameFixed(R(Ob)).work((v-1)) @ &m : p (glob A) (glob Ob) HybOrcl.l res].
   proof.
-    move=> Hv;byequiv (_: ={glob A,glob Ob} /\ x{1} = v /\ x{2} = v-1 ==> 
+    move=> Hv;byequiv (_: ={glob A,glob Ob} /\ x{1} = v /\ x{2} = v-1 ==>
                              ={glob A,glob Ob, HybOrcl.l, res}) => //.
     proc.
     call (_: ={glob Ob, HybOrcl.l} /\ HybOrcl.l0{1} = v /\ HybOrcl.l0{2} = v-1).
@@ -304,12 +304,12 @@ section.
   qed.
 
   (* TODO : move this *)
-  lemma Mrplus_inter_shift (i j k:int) f: 
-      Mrplus.sum f (oflist (List.Iota.iota_ i (j - i + 1))) = 
+  lemma Mrplus_inter_shift (i j k:int) f:
+      Mrplus.sum f (oflist (List.Iota.iota_ i (j - i + 1))) =
       Mrplus.sum (fun l, f (l + k)) (oflist (List.Iota.iota_ (i-k) (j - i + 1))).
   proof strict.
     rewrite (Mrplus.sum_chind f (fun l, l - k) (fun l, l + k)) /=;first smt.
-    congr => //.   
+    congr => //.
     apply FSet.fsetP => x.
     rewrite imageP !mem_oflist !List.Iota.mem_iota; split.
       move=> [y];rewrite !mem_oflist !List.Iota.mem_iota;smt.
@@ -318,10 +318,10 @@ section.
 
   lemma Hybrid &m (p:glob A -> glob Ob -> int -> outputA -> bool):
     let p' = fun ga ge l r, p ga ge l r /\ l <= q in
-    Pr[Ln(Ob,HybGame(A)).main() @ &m : p' (glob A) (glob Ob) HybOrcl.l res /\ Count.c <= 1] - 
+    Pr[Ln(Ob,HybGame(A)).main() @ &m : p' (glob A) (glob Ob) HybOrcl.l res /\ Count.c <= 1] -
       Pr[Rn(Ob,HybGame(A)).main() @ &m : p' (glob A) (glob Ob) HybOrcl.l res /\ Count.c <= 1] =
     1%r/q%r * (
-      Pr[Ln(Ob,A).main() @ &m : p' (glob A) (glob Ob) Count.c res] - 
+      Pr[Ln(Ob,A).main() @ &m : p' (glob A) (glob Ob) Count.c res] -
         Pr[Rn(Ob,A).main() @ &m : p' (glob A) (glob Ob) Count.c res]).
   proof.
     move=> p';rewrite (GLB_WL &m p') (GRB_WR &m p').
@@ -332,14 +332,14 @@ section.
       by exists (List.Iota.iota_ 0 q); smt.
     cut Huni : forall (x : int), in_supp x [0..q - 1] => mu_x [0..q - 1] x = 1%r / q%r.
       by move=> x Hx;rewrite Dinter.mu_x_def_in //;smt.
-    pose ev := 
+    pose ev :=
       fun (_j:int) (g:glob HybGameFixed(L(Ob))) (r:outputA),
         let (l,l0,ga,ge) = g in p ga ge l r /\ l <= q.
     cut := M.Mean_uni (HybGameFixed(L(Ob))) &m ev (1%r/q%r) _ _ => //; simplify ev => ->.
     cut := M.Mean_uni (HybGameFixed(R(Ob))) &m ev (1%r/q%r) _ _ => //; simplify ev => ->.
     cut -> : oflist (to_seq (support [0..q - 1])) = oflist (List.Iota.iota_ 0 q).
       by apply FSet.fsetP => x; rewrite !mem_oflist mem_to_seq// smt.
-    (* BUG type are not normalized in ev => assert failure in ecWhy *)      
+    (* BUG type are not normalized in ev => assert failure in ecWhy *)
     clear ev.
     cut {1}->: oflist (List.Iota.iota_ 0 q) = oflist (List.Iota.iota_ 1 (q - 1)) `|` fset1 0.
       by apply/fsetP=> x; rewrite !inE !mem_oflist !List.Iota.mem_iota; smt.
@@ -401,13 +401,13 @@ section.
      ={glob A, glob Ob} ==>
      ={glob A, glob Ob, glob HybOrcl, res} /\ Count.c{2} = HybOrcl.l{2} /\ Count.c{2} <= q.
   proof.
-    conseq [-frame] (_:  ={glob A, glob Ob} ==>  ={glob A, glob Ob, glob HybOrcl, res}) _ 
+    conseq [-frame] (_:  ={glob A, glob Ob} ==>  ={glob A, glob Ob, glob HybOrcl, res}) _
            (_:true ==> Count.c = HybOrcl.l /\ Count.c <= q).
      conseq [-frame] (_:true ==> Count.c = HybOrcl.l) (_: true ==> Count.c <= q).
        proc; call (A_call (<:HybOrcl(Ob,L(Ob)))) => //.
      proc;inline *;wp;call (_ : Count.c = HybOrcl.l).
      proc;inline *;wp; by conseq (_: _ ==> true) => //.
-     conseq (_: _ ==> true) => //. conseq (_: _ ==> true) => //. conseq (_: _ ==> true) => //. 
+     conseq (_: _ ==> true) => //. conseq (_: _ ==> true) => //. conseq (_: _ ==> true) => //.
      by wp.
     proc;inline Al.main;wp. call (_: ={glob Ob, glob HybOrcl}).
     proc;inline *;wp. sp;if => //. call (_:true) => //.
@@ -420,13 +420,13 @@ section.
      ={glob A, glob Ob} ==>
      ={glob A, glob Ob, glob HybOrcl, res} /\ Count.c{2} = HybOrcl.l{2} /\ Count.c{2} <= q.
   proof.
-    conseq [-frame] (_:  ={glob A, glob Ob} ==>  ={glob A, glob Ob, glob HybOrcl, res}) _ 
+    conseq [-frame] (_:  ={glob A, glob Ob} ==>  ={glob A, glob Ob, glob HybOrcl, res}) _
            (_:true ==> Count.c = HybOrcl.l /\ Count.c <= q).
      conseq [-frame] (_:true ==> Count.c = HybOrcl.l) (_: true ==> Count.c <= q).
        proc; call (A_call (<:HybOrcl(Ob,R(Ob)))) => //.
      proc;inline *;wp;call (_ : Count.c = HybOrcl.l).
      proc;inline *;wp; by conseq (_: _ ==> true) => //.
-     conseq (_: _ ==> true) => //. conseq (_: _ ==> true) => //. conseq (_: _ ==> true) => //. 
+     conseq (_: _ ==> true) => //. conseq (_: _ ==> true) => //. conseq (_: _ ==> true) => //.
      by wp.
     proc;inline Ar.main;wp. call (_: ={glob Ob, glob HybOrcl}).
     proc;inline *;wp. sp;if => //. call (_:true) => //.
@@ -435,33 +435,33 @@ section.
     inline *;wp;rnd => //.
   qed.
 
-  local lemma Pr_Bl &m (p:glob A -> glob Ob -> int -> outputA -> bool): 
+  local lemma Pr_Bl &m (p:glob A -> glob Ob -> int -> outputA -> bool):
      Pr[HybGame(A,Ob,L(Ob)).main() @ &m : p (glob A) (glob Ob) HybOrcl.l res] =
      Pr[HybGame(A,Ob,L(Ob)).main() @ &m : p (glob A) (glob Ob) HybOrcl.l res /\ HybOrcl.l <= q].
   proof.
-    cut -> : 
+    cut -> :
        Pr[HybGame(A,Ob,L(Ob)).main() @ &m : p (glob A) (glob Ob) HybOrcl.l res] =
        Pr[Bl.main() @ &m : p (glob A) (glob Ob) HybOrcl.l res /\ HybOrcl.l <= q].
       byequiv B_Bl => //.
-    apply eq_sym.  byequiv B_Bl => //.   
+    apply eq_sym.  byequiv B_Bl => //.
   qed.
 
-  local lemma Pr_Br &m (p:glob A -> glob Ob -> int -> outputA -> bool): 
+  local lemma Pr_Br &m (p:glob A -> glob Ob -> int -> outputA -> bool):
      Pr[HybGame(A,Ob,R(Ob)).main() @ &m : p (glob A) (glob Ob) HybOrcl.l res] =
      Pr[HybGame(A,Ob,R(Ob)).main() @ &m : p (glob A) (glob Ob) HybOrcl.l res /\ HybOrcl.l <= q].
   proof.
-    cut -> : 
+    cut -> :
        Pr[HybGame(A,Ob,R(Ob)).main() @ &m : p (glob A) (glob Ob) HybOrcl.l res] =
        Pr[Br.main() @ &m : p (glob A) (glob Ob) HybOrcl.l res /\ HybOrcl.l <= q].
       byequiv B_Br => //.
-    apply eq_sym.  byequiv B_Br => //.   
+    apply eq_sym.  byequiv B_Br => //.
   qed.
 
   axiom losslessL: islossless Ob.leaks.
-  axiom losslessOb1: islossless Ob.orclL. 
+  axiom losslessOb1: islossless Ob.orclL.
   axiom losslessOb2: islossless Ob.orclR.
   axiom losslessA (Ob0 <: Orclb{A}) (LR <: Orcl{A}):
-    islossless LR.orcl => 
+    islossless LR.orcl =>
     islossless Ob0.leaks => islossless Ob0.orclL => islossless Ob0.orclR =>
     islossless A(Ob0, LR).main.
 
@@ -469,7 +469,7 @@ section.
       Pr[HybGame(A,Ob,L(Ob)).main() @ &m : p (glob A) (glob Ob) HybOrcl.l res] -
       Pr[HybGame(A,Ob,R(Ob)).main() @ &m : p (glob A) (glob Ob) HybOrcl.l res] =
       1%r/q%r * (
-         Pr[Ln(Ob,A).main() @ &m : p (glob A) (glob Ob) Count.c res] - 
+         Pr[Ln(Ob,A).main() @ &m : p (glob A) (glob Ob) Count.c res] -
          Pr[Rn(Ob,A).main() @ &m : p (glob A) (glob Ob) Count.c res]).
    proof.
      pose p' := fun ga ge l r, p ga ge l r /\ l <= q.
@@ -488,14 +488,14 @@ section.
          last by sim;  proc (={Count.c}).
        apply (A_call (<:R(Ob))).
      rewrite (Pr_Bl &m p) (Pr_Br &m p).
-     cut := Hybrid Ob A _ _ _ _ &m p. 
+     cut := Hybrid Ob A _ _ _ _ &m p.
       apply losslessL. apply losslessOb1. apply losslessOb2. apply losslessA.
      move=> /= H. rewrite /p' -H.
      congr; last congr.
      byequiv (_ : ={glob A, glob Ob} ==> ={glob A, glob Ob, glob HybOrcl, res} /\ Count.c{2} <= 1) => //.
        proc;inline *;wp.
-       call (_ : ={glob Ob, glob HybOrcl} /\ (if HybOrcl.l <= HybOrcl.l0 then Count.c = 0 else Count.c =1){2}). 
-        proc. inline *;wp. 
+       call (_ : ={glob Ob, glob HybOrcl} /\ (if HybOrcl.l <= HybOrcl.l0 then Count.c = 0 else Count.c =1){2}).
+        proc. inline *;wp.
         if => //. call (_: ={glob HybOrcl});auto; smt.
         if => //. wp;call (_: ={glob HybOrcl});auto; smt. call (_: ={glob HybOrcl});auto; smt.
        conseq (_: _ ==> ={res,glob Ob}) => //. sim.
@@ -504,8 +504,8 @@ section.
        auto;progress;smt.
      byequiv (_ : ={glob A, glob Ob} ==> ={glob A, glob Ob, glob HybOrcl, res} /\ Count.c{2} <= 1) => //.
        proc;inline *;wp.
-       call (_ : ={glob Ob, glob HybOrcl} /\ (if HybOrcl.l <= HybOrcl.l0 then Count.c = 0 else Count.c =1){2}). 
-        proc. inline *;wp. 
+       call (_ : ={glob Ob, glob HybOrcl} /\ (if HybOrcl.l <= HybOrcl.l0 then Count.c = 0 else Count.c =1){2}).
+        proc. inline *;wp.
         if => //. call (_: ={glob HybOrcl});auto; smt.
         if => //. wp;call (_: ={glob HybOrcl});auto; smt. call (_: ={glob HybOrcl});auto; smt.
        conseq (_: _ ==> ={res,glob Ob}) => //. sim.

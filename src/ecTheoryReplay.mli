@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -58,4 +58,4 @@ val replay : 'a ovrhooks
   -> opath:path -> npath:path -> evclone
   -> 'a -> symbol * ctheory_item list
   ->  axclone list * 'a
-       
+

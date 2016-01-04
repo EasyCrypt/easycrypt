@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -40,7 +40,7 @@ val prefix      : path -> path option
 val getprefix   : path -> path -> symbol list option
 val isprefix    : path -> path -> bool
 val rootname    : path -> symbol
-val tolist      : path -> symbol list 
+val tolist      : path -> symbol list
 val p_size      : path -> int
 
 (* -------------------------------------------------------------------- *)

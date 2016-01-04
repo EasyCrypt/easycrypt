@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -48,7 +48,7 @@ val ty_instanciate : ty_params -> ty list -> ty -> ty
 (* -------------------------------------------------------------------- *)
 type locals = EcIdent.t list
 
-type operator_kind = 
+type operator_kind =
   | OB_oper of opbody option
   | OB_pred of prbody option
   | OB_nott of notation
@@ -101,7 +101,7 @@ and prctor = {
 
 type operator = {
   op_tparams : ty_params;
-  op_ty      : EcTypes.ty;        
+  op_ty      : EcTypes.ty;
   op_kind    : operator_kind;
 }
 

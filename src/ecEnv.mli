@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -165,9 +165,9 @@ module Ax : sig
   val add  : path -> env -> env
   val bind : symbol -> axiom -> env -> env
 
-  val iter : ?name:qsymbol -> (path -> axiom -> unit) -> env -> unit 
+  val iter : ?name:qsymbol -> (path -> axiom -> unit) -> env -> unit
 
-  val all : 
+  val all :
     ?check:(path -> axiom -> bool) -> ?name:qsymbol -> env -> (path * t) list
 
   val instanciate : path -> EcTypes.ty list -> env -> form
@@ -352,7 +352,7 @@ module TypeClass : sig
 end
 (* -------------------------------------------------------------------- *)
 module BaseRw : sig
-  val by_path     : path -> env -> Sp.t 
+  val by_path     : path -> env -> Sp.t
   val lookup      : qsymbol -> env -> path * Sp.t
   val lookup_opt  : qsymbol -> env -> (path * Sp.t) option
   val lookup_path : qsymbol -> env -> path

@@ -158,7 +158,7 @@ abstract theory Program.
   qed.
 
   equiv Sample_Loop_eq: Sample.sample ~ Loop.sample: ={n} ==> ={res}.
-  proof. 
+  proof.
     proc*; exists* n{1}; elim* => _n.
     move: (eq_refl _n); case (_n <= 0)=> //= h.
       by inline *; rcondf{2} 4; auto; smt.

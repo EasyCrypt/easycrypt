@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -481,7 +481,7 @@ and trans_pterm_arg_value pe ?name { pl_desc = arg; pl_loc = loc; } =
       let env = LDecl.toenv pe.pte_hy in
       let ptn = ref Mid.empty in
       let fp  =
-        
+
       try  EcTyping.trans_pattern env (ptn, pe.pte_ue) fp
       with EcTyping.TyError (loc, env, err) ->
         tc_pterm_apperror ~loc pe (AE_InvalidArgForm (IAF_TyError (env, err)))
@@ -787,8 +787,8 @@ let tc1_process_full_closed_pterm (tc : tcenv1) (ff : ppterm) =
 
 (* -------------------------------------------------------------------- *)
 type prept = [
-  | `Hy   of EcIdent.t 
-  | `G    of EcPath.path * ty list 
+  | `Hy   of EcIdent.t
+  | `G    of EcPath.path * ty list
   | `UG   of EcPath.path
   | `App  of prept * prept_arg list
 ]
@@ -802,7 +802,7 @@ and prept_arg =  [
 ]
 
 (* -------------------------------------------------------------------- *)
-let pt_of_prept tc pt = 
+let pt_of_prept tc pt =
   let hyps, pe = FApi.tc1_hyps tc, !!tc in
 
   let rec build_pt = function

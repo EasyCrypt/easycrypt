@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -99,7 +99,7 @@ val is_rnd    : instr -> bool
 val is_call   : instr -> bool
 val is_if     : instr -> bool
 val is_while  : instr -> bool
-val is_assert : instr -> bool 
+val is_assert : instr -> bool
 
 (* -------------------------------------------------------------------- *)
 val get_uninit_read : stmt -> Sx.t

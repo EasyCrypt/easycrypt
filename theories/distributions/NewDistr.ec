@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -42,7 +42,7 @@ proof. by elim/distrW: d x => m dm; rewrite muK //; case: dm. qed.
 
 lemma le1_mu_x ['a] (d : 'a distr) :
   forall (s : 'a list), uniq s => big predT (mu_x d) s <= 1%r.
-proof. by elim/distrW: d => m dm; rewrite muK //; case: dm. qed.      
+proof. by elim/distrW: d => m dm; rewrite muK //; case: dm. qed.
 
 lemma summable_mu_x ['a] (d : 'a distr) : summable (mu_x d).
 proof.

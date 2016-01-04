@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -228,7 +228,7 @@ module LowRewrite = struct
       match EcFol.sform_of_form ax with
       | EcFol.SFeq  (f1, f2) -> Some (pt, `Eq, (f1, f2))
       | EcFol.SFiff (f1, f2) -> Some (pt, `Eq, (f1, f2))
-  
+
       | EcFol.SFnot f ->
           let pt' = pt_of_global_r pt.ptev_env LG.p_negeqF [] in
           let pt' = apply_pterm_to_arg_r pt' (PVAFormula f) in
@@ -270,7 +270,7 @@ module LowRewrite = struct
              raise (RewriteError LRW_NothingToRewrite)
          | PT.FindOccFailure `IncompleteMatch ->
              raise (RewriteError LRW_CannotInfer)) in
-  
+
       let fp = PT.concretize_form pt.PT.ptev_env fp in
 
       if not ky then begin
@@ -284,7 +284,7 @@ module LowRewrite = struct
         try  FPosition.select_form hyps o fp tgfp
         with InvalidOccurence -> raise (RewriteError (LRW_InvalidOccurence))
       in
-  
+
       EcLowGoal.t_rewrite ?target ~mode pt (s, Some cpos) tc in
 
     let rec do_first = function
@@ -324,7 +324,7 @@ module LowRewrite = struct
     in t_do_r ~focus:0 `Maybe None (t_ors (List.map try1 pts)) !@tc
 end
 
-let t_rewrite_prept info pt tc = 
+let t_rewrite_prept info pt tc =
   LowRewrite.t_rewrite_r info (pt_of_prept tc pt) tc
 
 (* -------------------------------------------------------------------- *)
@@ -658,10 +658,10 @@ let rec process_rewrite1_r ttenv ?target ri tc =
           | _    , `LtoR -> (s     :> rwside)
           | `RtoL, `RtoL -> (`LtoR :> rwside) in
 
-        let is_baserw p tc = 
+        let is_baserw p tc =
           EcEnv.BaseRw.is_base p.pl_desc (FApi.tc1_env tc) in
 
-        match pt with 
+        match pt with
         | { fp_head = FPNamed (p, None); fp_args = []; }
               when pt.fp_mode = `Implicit && is_baserw p tc
         ->
@@ -725,7 +725,7 @@ let rec process_rewrite1_r ttenv ?target ri tc =
       | Some target -> process_apply_fwd ~implicits (fp, target) tc
     end
 
-  | RWTactic `Ring -> 
+  | RWTactic `Ring ->
       process_algebra `Solve `Ring [] tc
 
 (* -------------------------------------------------------------------- *)
@@ -787,7 +787,7 @@ let process_view1 pe tc =
         try
           PT.pf_form_match ~mode:fmdelta pte.PT.ptev_env ~ptn:f1 fp;
           (pte, ids, f2, `IffLR (f1, f2))
-        with MatchFailure -> try 
+        with MatchFailure -> try
           PT.pf_form_match ~mode:fmdelta pte.PT.ptev_env ~ptn:f2 fp;
           (pte, ids, f1, `IffRL (f1, f2))
         with MatchFailure ->
@@ -1038,7 +1038,7 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
           | IPBreak ->
              if intl then raise (IntroCollect `InternalBreak);
              raise CollectBreak
-      
+
           | IPCore     x -> raise (CollectCore (mk_loc (loc pi) x))
           | IPDup        -> `Dup
           | IPDone     x -> `Done x
@@ -1049,15 +1049,15 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
           | IPView     x -> `View x
           | IPSubst    x -> `Subst x
           | IPSimplify x -> `Simpl x
-      
+
           | IPCase (mode, x) ->
               let subcollect = List.rev -| fst -| collect true [] [] in
               `Case (mode, List.map subcollect x)
 
           | IPSubstTop x -> `SubstTop x
-  
-        in collect intl (mk_loc ploc ip :: maybe_core ()) [] pis  
-  
+
+        in collect intl (mk_loc ploc ip :: maybe_core ()) [] pis
+
       with
       | CollectBreak  -> (maybe_core (), pis)
       | CollectCore x -> collect intl acc (x :: core) pis
@@ -1112,7 +1112,7 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
         try  tc g
         with InvalidGoalShape ->
           tc_error !!g "invalid intro-pattern: nothing to eliminate"
-    in     
+    in
 
     if nointro && not cf then  onsub gs else begin
       match pis with
@@ -1235,25 +1235,25 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
 
         | `Dup ->
             (false, rl (t_onall (intro1_dup st)) gs)
-  
+
         | `Done b ->
             (nointro, rl (t_onall (intro1_done st b)) gs)
 
         | `Smt pi ->
             (nointro, rl (t_onall (intro1_smt st pi)) gs)
-  
+
         | `Simpl b ->
             (nointro, rl (t_onall (intro1_simplify st b)) gs)
-  
+
         | `Clear xs ->
             (nointro, rl (t_onall (intro1_clear st xs)) gs)
-  
+
         | `Case (`One, pis) ->
             (false, rl (intro1_case st nointro pis) gs)
 
         | `Case (`Full x, pis) ->
             (false, rl (t_onall (intro1_full_case st x pis)) gs)
-  
+
         | `Rw (o, s, None) ->
             (false, rl (t_onall (intro1_rw st (o, s))) gs)
 
@@ -1262,10 +1262,10 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
 
         | `Delta ((o, s), p) ->
             (nointro, rl (t_onall (intro1_unfold st (o, s) p)) gs)
-  
+
         | `View pe ->
             (false, rl (t_onall (intro1_view st pe)) gs)
-  
+
         | `Subst d ->
             (false, rl (t_onall (intro1_subst st d)) gs)
 
@@ -1546,7 +1546,7 @@ let process_cut ?(mode = `Have) engine ttenv ((ip, phi, t) : cut_t) tc =
 type cutdef_t = intropattern * pcutdef
 
 let process_cutdef ttenv (ip, pt) (tc : tcenv1) =
-  let pt = { 
+  let pt = {
       fp_mode = `Implicit;
       fp_head = FPNamed (pt.ptcd_name, pt.ptcd_tys);
       fp_args = pt.ptcd_args;

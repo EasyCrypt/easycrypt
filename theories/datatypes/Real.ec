@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -13,94 +13,94 @@ require Int.
 *)
 (** Begin Import **)
   op zero : real.
-  
+
   op one : real.
-  
+
   op (<) : real -> real -> bool.
-  
+
   op (>) (x y:real) = y < x.
-  
+
   op (<=) (x y:real) = x < y \/ x = y.
-  
+
   op (+) : real -> real -> real.
-  
+
   op [-] : real -> real.
-  
+
   op ( * ) : real -> real -> real.
-  
+
   theory CommutativeGroup.
     axiom Assoc: forall (x y z : real), x + y + z = x + (y + z).
-    
+
     axiom Unit_def_l: forall (x : real), zero + x = x.
-    
+
     axiom Unit_def_r: forall (x : real), x + zero = x.
-    
+
     axiom Inv_def_l: forall (x : real), -x + x = zero.
-    
+
     axiom Inv_def_r: forall (x : real), x + -x = zero.
-    
+
     theory Comm.
       axiom Comm: forall (x y : real), x + y = y + x.
     end Comm.
   end CommutativeGroup.
-  
+
   theory Assoc.
     axiom Assoc: forall (x y z : real), x * y * z = x * (y * z).
   end Assoc.
-  
+
   axiom Mul_distr_l: forall (x y z : real), x * (y + z) = x * y + x * z.
-  
+
   axiom Mul_distr_r: forall (x y z : real), (y + z) * x = y * x + z * x.
-  
+
   abbrev (-) (x y:real) = x + (-y).
-  
+
   theory Comm.
     axiom Comm: forall (x y : real), x * y = y * x.
   end Comm.
-  
+
   axiom Unitary: forall (x : real), one * x = x.
-  
+
   axiom NonTrivialRing: zero <> one.
-  
+
   op inv : real -> real.
-  
+
   axiom Inverse: forall (x : real), x <> zero => x * inv x = one.
-  
+
   op (/) : real -> real -> real.
-  
+
   axiom add_div:
     forall (x y z : real), z <> zero => (x + y) / z = x / z + y / z.
-  
+
   axiom sub_div:
     forall (x y z : real), z <> zero => (x - y) / z = x / z - y / z.
-  
+
   axiom neg_div: forall (x y : real), y <> zero => -x / y = -(x / y).
-  
+
   axiom assoc_mul_div:
     forall (x y z : real), z <> zero => x * y / z = x * (y / z).
-  
+
   axiom assoc_div_mul:
     forall (x y z : real),
       y <> zero /\ z <> zero => x / y / z = x / (y * z).
-  
+
   axiom assoc_div_div:
     forall (x y z : real),
       y <> zero /\ z <> zero => x / (y / z) = x * z / y.
-  
+
   op (>=) : real -> real -> bool.
-  
+
   axiom Refl: forall (x : real), x <= x.
-  
+
   axiom Trans: forall (x y z : real), x <= y => y <= z => x <= z.
-  
+
   axiom Antisymm: forall (x y : real), x <= y => y <= x => x = y.
-  
+
   axiom Total: forall (x y : real), x <= y \/ y <= x.
-  
+
   axiom ZeroLessOne: zero <= one.
-  
+
   axiom CompatOrderAdd: forall (x y z : real), x <= y => x + z <= y + z.
-  
+
   axiom CompatOrderMult:
     forall (x y z : real), x <= y => zero <= z => x * z <= y * z.
 (** End Import **)
@@ -114,15 +114,15 @@ theory Abs.
   (* unset triangular_inequality *)
 (** Begin Import **)
     op "`|_|" (x:real) = if x >= zero then x else -x.
-    
+
     axiom Abs_le: forall (x y : real), `|x| <= y <=> -y <= x /\ x <= y.
-    
+
     axiom Abs_pos: forall (x:real), `|x| >= zero.
-    
+
     axiom Abs_sum: forall (x y : real), `|x + y| <= `|x| + `|y|.
-    
+
     axiom Abs_prod: forall (x y : real), `|x * y| = `|x| * `|y|.
-    
+
     axiom triangular_inequality:
       forall (x y z : real), `|x - z| <= `|x - y| + `|y - z|.
 (** End Import **)
@@ -179,21 +179,21 @@ theory PowerInt.
 *)
 (** Begin Import **)
     op (^) : real -> int -> real.
-    
+
     axiom Power_0: forall (x:real), x ^ (Int.zero) = one.
-    
+
     axiom Power_s: forall (x:real) (n:int), Int.(<=) Int.zero n => x ^ (Int.(+) n Int.one) = x * x ^ n.
-    
+
     axiom Power_s_alt: forall (x:real) (n:int), Int.(<) Int.zero n => x ^ n = x * x ^ (Int.(-) n Int.one).
-    
+
     axiom Power_1: forall (x:real), x ^ Int.one = x.
-    
+
     axiom Power_sum: forall (x:real) (n m:int), Int.(<=) Int.zero n => Int.(<=) Int.zero m => x ^ (Int.(+) n m) = x^n * x^m.
-    
+
     axiom Power_mult: forall (x:real) (n m:int), Int.(<=) Int.zero n => Int.(<=) Int.zero m => x ^ (Int.( * ) n m) = (x ^ n) ^ m.
-    
+
     axiom Power_mult2: forall (x y:real) (n:int), Int.(<=) Int.zero n => (x * y) ^ n = x ^ n * y ^ n.
-    
+
     axiom Pow_ge_one: forall (x:real) (n:int), Int.(<=) Int.zero n /\ one <= x => one <= x ^ n.
 (** End Import **)
 
@@ -217,17 +217,17 @@ theory Square.
 *)
 (** Begin Import **)
     op sqr : real -> real.
-    
+
     op sqrt : real -> real.
-    
+
     axiom Sqrt_positive: forall (x:real), x >= zero => sqrt x >= zero.
-    
+
     axiom Sqrt_square: forall (x:real), x >= zero => sqr (sqrt x) = x.
-    
+
     axiom Square_sqrt: forall (x:real), x >= zero => sqrt (x * x) = x.
-    
+
     axiom Sqrt_mul: forall (x y:real), x >= zero /\ y >= zero => sqrt (x * y) = sqrt x * sqrt y.
-    
+
     axiom Sqrt_le: forall (x y:real), zero <= x <= y => sqrt x <= sqrt y.
 (** End Import **)
 end Square.
@@ -273,18 +273,18 @@ lemma mul_compat_le (z x y:real):
 by smt full.
 
 lemma nosmt addleM : forall (x1 x2 y1 y2:real),
-   x1 <= x2 => y1 <= y2 => x1 + y1 <= x2 + y2 
+   x1 <= x2 => y1 <= y2 => x1 + y1 <= x2 + y2
 by smt.
 
 lemma nosmt addgeM : forall (x1 x2 y1 y2:real),
-   x1 >= x2 => y1 >= y2 => x1 + y1 >= x2 + y2 
+   x1 >= x2 => y1 >= y2 => x1 + y1 >= x2 + y2
 by smt full.
 
 lemma real_abs_sum : forall (a b c:real),
  a = b + c => `|a| <= `|b| + `|c|
 by smt.
 
-lemma real_le_trans: forall (a b c:real), 
+lemma real_le_trans: forall (a b c:real),
  a <= b => b <= c => a <= c
 by smt.
 
@@ -372,13 +372,13 @@ instance field with real
   proof ofintS    by smt full
   proof ofintN    by smt.
 
-(* WARNING Lemmas used by tactics : 
+(* WARNING Lemmas used by tactics :
    eq_le addleM real_le_trans and the following lemmas *)
 lemma nosmt upto2_abs (x1 x2 x3 x4 x5:real):
-   FromInt.from_int 0 <= x1 => 
-   FromInt.from_int 0 <= x3 => 
-   x1 <= x5 => 
-   x3 <= x5 => 
+   FromInt.from_int 0 <= x1 =>
+   FromInt.from_int 0 <= x3 =>
+   x1 <= x5 =>
+   x3 <= x5 =>
    x2 = x4 =>
    `|x1 + x2 - (x3 + x4)| <= x5 by smt full.
 

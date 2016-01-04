@@ -327,7 +327,7 @@ section CollisionProbability.
     proc a(): unit = {
       var b:bool;
       b = IND.main();
-    }  
+    }
   }.
 
   local lemma A_ll (S <: ASampler {A}) &m: islossless S.s => islossless A(S).a.

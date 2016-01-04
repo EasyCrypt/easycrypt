@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -36,7 +36,7 @@ proof. by move=> le0_n; rewrite /wordn iota0. qed.
 
 lemma nosmt wordnS n : 0 <= n => wordn (n + 1) = cross enum (wordn n).
 proof. by move=> geo_0; rewrite /wordn iotaSr //= -cats1 foldl_cat. qed.
-    
+
 (* -------------------------------------------------------------------- *)
 lemma nosmt wordn_size i : all (fun x => size x = max 0 i) (wordn i).
 proof.
@@ -122,4 +122,4 @@ exists (take i x, drop i x) => /=; rewrite !wordnP cat_take_drop /=.
 rewrite size_drop // sz addzAC !max_ler //=.
 rewrite size_take ?max_ler //; case: (i < size x)=> //=.
 by rewrite -lezNgt eqz_leq sz => -> /=; rewrite lez_addl.
-qed.  
+qed.

@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -160,8 +160,8 @@ val ffpattern_of_genpattern : LDecl.hyps -> genpattern -> ppterm option
 
 (* -------------------------------------------------------------------- *)
 type prept = [
-  | `Hy   of EcIdent.t 
-  | `G    of EcPath.path * ty list 
+  | `Hy   of EcIdent.t
+  | `G    of EcPath.path * ty list
   | `UG   of EcPath.path
   | `App  of prept * prept_arg list
 ]

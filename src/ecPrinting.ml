@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -204,7 +204,7 @@ module PPEnv = struct
           | _ -> raise (EcEnv.LookupFailure (`QSymbol sm)) in
 
     let exists sm =
-        try EcPath.p_equal (lookup sm) p 
+        try EcPath.p_equal (lookup sm) p
        with EcEnv.LookupFailure _ -> false
     in
       (* FIXME: for special operators, do check `info` *)
@@ -476,7 +476,7 @@ let get_projarg_for_var mkvar ppe x i =
     raise NoProjArg;
   if EcPath.basename x.pv_name.EcPath.x_sub <> "arg" then
     raise NoProjArg;
-      
+
   let x = x.pv_name in
   let f =
       EcPath.xpath
@@ -830,14 +830,14 @@ let pp_opapp
         match opname, es with
         | x, [] when x = EcCoreLib.s_nil ->
             ((fun fmt -> pp_string fmt "[]"), max_op_prec)
-  
+
         | x, [e] when x = EcCoreLib.s_abs ->
             let pp fmt =
               Format.fprintf fmt "`|%a|"
                 (pp_sub ppe (inm, (min_op_prec, `NonAssoc))) e
             in
               (pp, e_app_prio)
-  
+
         | x, [e1; e2] when x = EcCoreLib.s_get ->
             let pp fmt =
               Format.fprintf fmt "@[%a.[%a]@]"
@@ -845,7 +845,7 @@ let pp_opapp
                 (pp_sub ppe (inm, (min_op_prec, `NonAssoc))) e2
             in
               (pp, e_get_prio)
-  
+
         | x, [e1; e2; e3] when x = EcCoreLib.s_set ->
             let pp fmt =
               Format.fprintf fmt "@[<hov 2>%a.[%a <-@ %a]@]"
@@ -854,7 +854,7 @@ let pp_opapp
                 (pp_sub ppe (inm, (min_op_prec, `NonAssoc))) e3
             in
               (pp, e_get_prio)
-  
+
         | _ ->
             raise E.PrintAsPlain
       in
@@ -1115,7 +1115,7 @@ let pp_binding ?fv (ppe : PPEnv.t) (xs, ty) =
         (tenv1, pp)
 
   | GTmodty (p, sm) ->
-      let tenv1  = PPEnv.add_mods ppe xs in     
+      let tenv1  = PPEnv.add_mods ppe xs in
       let pp fmt =
         Format.fprintf fmt "(%a <: %a)"
           (pp_list "@ " (pp_local tenv1)) xs (pp_modtype ppe) (p, sm)
@@ -1383,7 +1383,7 @@ and try_pp_notations (ppe : PPEnv.t) outer fmt f =
       let f    = f_app f args rty in
       let f    = Fsubst.f_subst (EcMatching.MEV.assubst ue ev) f in
       pp_form_core_r ppe outer fmt f; true
- 
+
    with EcMatching.MatchFailure ->
       false
 
@@ -1727,18 +1727,18 @@ let pp_opdecl_op (ppe : PPEnv.t) fmt (basename, ts, ty, op) =
 
           (pp_locbinds ppe ~fv:e.e_fv vds, e)
         in
-          Format.fprintf fmt "%t :@ %a =@ %a" pp_vds 
+          Format.fprintf fmt "%t :@ %a =@ %a" pp_vds
             (pp_type ppe) e.e_ty (pp_expr subppe) e
 
     | Some (OP_Constr (indp, i)) ->
         Format.fprintf fmt
-          ": %a =@ < %d-th constructor of %a >" 
+          ": %a =@ < %d-th constructor of %a >"
           (pp_type ppe) ty
           (i+1) (pp_tyname ppe) indp
 
     | Some (OP_Record recp) ->
         Format.fprintf fmt
-          ": %a =@ < record constructor of %a >" 
+          ": %a =@ < record constructor of %a >"
           (pp_type ppe) ty
           (pp_tyname ppe) recp
 
@@ -1814,18 +1814,18 @@ let pp_opdecl_nt (ppe : PPEnv.t) fmt (basename, ts, _ty, nt) =
 
 (* -------------------------------------------------------------------- *)
 let pp_opdecl ?(long = false) (ppe : PPEnv.t) fmt (x, op) =
-  let pp_name fmt x = 
-    if long then 
+  let pp_name fmt x =
+    if long then
       let qs = PPEnv.op_symb ppe x None in
       if not (List.is_empty (fst qs)) then
         Format.fprintf fmt "(* %a *)@ " pp_opname qs
   in
 
-  let pp_decl fmt op = 
+  let pp_decl fmt op =
     match op.op_kind with
-    | OB_oper i -> 
+    | OB_oper i ->
       pp_opdecl_op ppe fmt (P.basename x, op.op_tparams, op_ty op, i)
-    | OB_pred i -> 
+    | OB_pred i ->
       pp_opdecl_pr ppe fmt (P.basename x, op.op_tparams, op_ty op, i)
     | OB_nott i ->
       pp_opdecl_nt ppe fmt (P.basename x, op.op_tparams, op_ty op, i)
@@ -1835,7 +1835,7 @@ let pp_opdecl ?(long = false) (ppe : PPEnv.t) fmt (x, op) =
 let pp_added_op (ppe : PPEnv.t) fmt op =
   let ppe = PPEnv.add_locals ppe (List.map fst op.op_tparams) in
   match op.op_tparams with
-  | [] -> Format.fprintf fmt ": @[<hov 2>%a@]" 
+  | [] -> Format.fprintf fmt ": @[<hov 2>%a@]"
     (pp_type ppe) op.op_ty
   | ts  ->
     Format.fprintf fmt "@[<hov 2>%a :@ %a.@]"
@@ -1872,9 +1872,9 @@ let pp_axiom ?(long=false) (ppe : PPEnv.t) fmt (x, ax) =
     if not (List.is_empty tags) then
       Format.fprintf fmt "[@[%a@]] " (pp_list "@ " pp_symbol) tags
   in
-  
-  let pp_long fmt x = 
-     if long then 
+
+  let pp_long fmt x =
+     if long then
        let qs = PPEnv.ax_symb ppe x in
        if fst qs <> [] then
          Format.fprintf fmt "(* %a *)@ " EcSymbols.pp_qsymbol qs in
@@ -2334,7 +2334,7 @@ module PPGoal = struct
     | FequivS es   -> pp_equivS   ppe fmt es
     | _ -> Format.fprintf fmt "%a@\n%!" (pp_form ppe) concl
 end
-  
+
 let pp_goal (ppe : PPEnv.t) fmt (g, extra) =
   let n =
     match extra with
@@ -2348,7 +2348,7 @@ let pp_goal (ppe : PPEnv.t) fmt (g, extra) =
     | 1 -> Format.fprintf fmt "Current goal@\n@\n%!"
     | _ -> Format.fprintf fmt "Current goal (remaining: %d)@\n@\n%!" n
   end;
-  
+
   Format.fprintf fmt "%a@?" (PPGoal.pp_goal1 ppe) g;
 
   match extra with
@@ -2633,7 +2633,7 @@ let rec pp_theory ppe (fmt : Format.formatter) (path, (cth, mode)) =
           Format.fprintf fmt "instance %a with %a."
             (pp_type ppe) ty pp_path p
   end
-  
+
   | EcTheory.CTh_baserw name ->
       Format.fprintf fmt "declare rewrite %s." name
 
@@ -2660,8 +2660,8 @@ module ObjectInfo = struct
   (* -------------------------------------------------------------------- *)
   let pr_gen_r ?(prcat = false) dumper = fun fmt env qs ->
     let ppe = PPEnv.ofenv env in
-    let obj = 
-      try dumper.od_lookup qs env 
+    let obj =
+      try dumper.od_lookup qs env
       with EcEnv.LookupFailure _ -> raise NoObject in
     if prcat then
       Format.fprintf fmt "* In [%s]:@\n@." dumper.od_name;
@@ -2694,7 +2694,7 @@ module ObjectInfo = struct
       l in
     { od_name    = "operators or predicates";
       od_lookup  = get_ops;
-      od_printer = 
+      od_printer =
         fun ppe fmt l ->
           Format.fprintf fmt "@[<v>%a@]"
             (pp_list "@ " (pp_opdecl ~long:true ppe)) l; }
@@ -2717,7 +2717,7 @@ module ObjectInfo = struct
       l in
     { od_name    = "lemmas or axioms";
       od_lookup  = get_ops;
-      od_printer = 
+      od_printer =
         fun ppe fmt l ->
           Format.fprintf fmt "@[<v>%a@]"
             (pp_list "@ " (pp_axiom ~long:true ppe)) l; }

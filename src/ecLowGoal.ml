@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -31,7 +31,7 @@ let (@!) (t1 : FApi.backward) (t2 : FApi.backward) =
   FApi.t_seq t1 t2
 
 let (@+) (t : FApi.backward) (ts : FApi.backward list) =
-  FApi.t_seqsub t ts 
+  FApi.t_seqsub t ts
 
 let (@~) (t : FApi.backward) (tt : FApi.tactical) =
   fun tc -> tt (t tc)
@@ -668,7 +668,7 @@ module LowAssumption = struct
 end
 
 (* -------------------------------------------------------------------- *)
-let alpha_find_in_hyps hyps f = 
+let alpha_find_in_hyps hyps f =
    LowAssumption.gen_find_in_hyps (EcReduction.is_alpha_eq hyps f) hyps
 
 let t_assumption mode (tc : tcenv1) =
@@ -1141,7 +1141,7 @@ let t_elimT_ind ?reduce mode (tc : tcenv1) =
     | SFquant (Lforall, (x, GTty ty), _) -> begin
         let hyps = FApi.tc1_hyps tc in
         let id   = LDecl.fresh_id hyps (EcIdent.name x) in
-  
+
         FApi.t_seqs
           [t_intros_i_seq ~clear:true [id] (elim (id, ty));
            t_simplify_with_info EcReduction.beta_red]
@@ -1332,7 +1332,7 @@ let t_rewrite
     | None     -> FPosition.select_form hyps None left tgfp
     | Some pos -> pos in
 
-  let tgfp = 
+  let tgfp =
     try  FPosition.map npos change tgfp
     with InvalidPosition -> raise InvalidGoalShape
   in
@@ -1590,7 +1590,7 @@ let t_absurd_hyp ?(conv  = `AlphaEq) id tc =
     (b = not b') && EcReduction.xconv conv hyps f f' in
 
   let id' =
-    try  LowAssumption.gen_find_in_hyps test hyps 
+    try  LowAssumption.gen_find_in_hyps test hyps
     with _ -> raise InvalidGoalShape
   in
 
@@ -1633,7 +1633,7 @@ and pgo_delta = {
 
 module PGOptions = struct
   let default =
-    let fordelta = 
+    let fordelta =
       { pgod_case  = false;
         pgod_split = true ; }; in
 
@@ -1692,7 +1692,7 @@ let t_progress ?options ?ti (tt : FApi.backward) (tc : tcenv1) =
     FApi.t_or (t_subst ~kind:sk1 ?eqid) (t_subst ~kind:sk2 ?eqid)
   in
 
-  let ts = 
+  let ts =
     if   options.pgo_subst
     then fun id -> FApi.t_or (t_progress_subst ~eqid:id) (ti id)
     else ti in
@@ -1731,9 +1731,9 @@ let t_progress ?options ?ti (tt : FApi.backward) (tc : tcenv1) =
              on_intro:
                (try subst (if option)
                 or default_intro id);
-             default_intro id = 
+             default_intro id =
                try absurd id;   -- ie if id: b and !b is an assumption
-               rewrite_bool id; -- if id: !b -> rewrite b = false, 
+               rewrite_bool id; -- if id: !b -> rewrite b = false,
                                    if id:  b -> rewrite b = true
                default_on_intro id *)
           let iffail tc =

@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -203,7 +203,7 @@ section Upto.
         PRPi.m.[oget PRPi.mi.[y]] <- y;
       }
       return oget PRPi.mi.[y];
-    } 
+    }
   }.
 
   local lemma PRPi'_Indirect_eq &m:
@@ -372,7 +372,7 @@ section CollisionProbability.
   proof.
   have ->: Pr[IND(ARP,DBounder(D)).main() @ &m: ARP.coll]
            = Pr[IND(ARP,DBounder(D)).main() @ &m: ARP.coll /\ DBounder.FBounder.c <= q].
-  + byequiv=> //=; conseq (_: ={glob D} ==> ={ARP.coll,DBounder.FBounder.c}) 
+  + byequiv=> //=; conseq (_: ={glob D} ==> ={ARP.coll,DBounder.FBounder.c})
                           (_: true ==> DBounder.FBounder.c <= q)=> //=.
     * proc; inline *; wp; call (_: DBounder.FBounder.c <= q).
       - by proc; sp; if=> //=; inline*; sp; if=> //=; auto=> /#.

@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -192,7 +192,7 @@ lemma powS p x: 0 <= p => x ^ (p+1) = x * x ^ p
 by smt.
 
 lemma pow_add z p1 p2: 0 <= p1 => 0 <= p2 => z^p1 * z^p2 = z^(p1+p2).
-proof. 
+proof.
   move=> Hp1; elim/intind: p2; smt.
 qed.
 

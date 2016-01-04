@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -10,7 +10,7 @@ open EcUtils
 open Why3
 
 (* ----------------------------------------------------------------------*)
-module Talpha = struct 
+module Talpha = struct
   type t = Term.vsymbol list * Term.term
 
   type talphaenv = {
@@ -36,7 +36,7 @@ module Talpha = struct
 
   let w3_ty_compare t1 t2 = Ty.ty_hash   t1 - Ty.ty_hash   t2
   let w3_ls_compare l1 l2 = Term.ls_hash l1 - Term.ls_hash l2
-      
+
   let rec pat_compare_alpha m1 m2 p1 p2 =
     let ct = w3_ty_compare p1.Term.pat_ty p2.Term.pat_ty in
     if ct <> 0 then ct else
@@ -67,9 +67,9 @@ module Talpha = struct
             (lazy (pat_compare_alpha m1 m2 q1 q2))
 
       | _ -> compare_tag  p1.Term.pat_node p2.Term.pat_node
-        
+
   let rec t_compare_alpha m1 m2 t1 t2 =
-    if Term.t_equal t1 t2 then 0 else 
+    if Term.t_equal t1 t2 then 0 else
       match ocompare w3_ty_compare t1.Term.t_ty t2.Term.t_ty with
       | ct when ct <> 0 -> ct
       | _ -> begin
@@ -135,7 +135,7 @@ module Talpha = struct
 
         | Term.Tquant (q1, b1), Term.Tquant (q2, b2) ->
             let compare_body b1 b2 =
-              let cv v1 v2 = w3_ty_compare v1.Term.vs_ty v2.Term.vs_ty in 
+              let cv v1 v2 = w3_ty_compare v1.Term.vs_ty v2.Term.vs_ty in
               let vl1,_,e1 = Term.t_open_quant b1 in
               let vl2,_,e2 = Term.t_open_quant b2 in
                 compare2
@@ -163,7 +163,7 @@ module Talpha = struct
   let compare (vl1,e1) (vl2,e2) =
     let m1 = tae_create () in
     let m2 = tae_create () in
-    let cv v1 v2 = w3_ty_compare v1.Term.vs_ty v2.Term.vs_ty in 
+    let cv v1 v2 = w3_ty_compare v1.Term.vs_ty v2.Term.vs_ty in
       compare2
         (lazy (List.compare cv vl1 vl2))
         (lazy (let m1 = vl_rename_alpha m1 vl1 in

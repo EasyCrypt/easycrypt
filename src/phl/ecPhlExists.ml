@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -17,10 +17,10 @@ open EcLowPhlGoal
 module TTC = EcProofTyping
 
 let get_to_gens fs =
-  let do_id f = 
-    let id = 
+  let do_id f =
+    let id =
       match f.f_node with
-      | Fpvar (pv, m) -> id_of_pv pv m 
+      | Fpvar (pv, m) -> id_of_pv pv m
       | Fglob (mp, m) -> id_of_mp mp m
       | _             -> EcIdent.create "f" in
     id, f in
@@ -57,7 +57,7 @@ let t_hr_exists_intro_r fs tc =
         ([ml; mr], s)
 
     | false ->
-        let m = LDecl.fresh_id hyps "&m" in 
+        let m = LDecl.fresh_id hyps "&m" in
         let s = Fsubst.f_subst_id in
         let s = Fsubst.f_bind_mem s mhr m in
         ([m], s)

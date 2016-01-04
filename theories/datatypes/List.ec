@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -1172,7 +1172,7 @@ lemma leq_size_uniq (s1 s2 : 'a list):
   uniq s1 => (mem s1 <= mem s2) => size s2 <= size s1 => uniq s2.
 proof.
   rewrite /Pred.(<=); elim: s1 s2 => [[] | x s1 IHs s2] //; first smt.
-  move=> Us1x; cut [not_s1x Us1] := Us1x; rewrite -(allP (mem s2)).  
+  move=> Us1x; cut [not_s1x Us1] := Us1x; rewrite -(allP (mem s2)).
   case=> s2x; rewrite allP => ss12 le_s21.
   cut := rot_to s2 x _ => //; case=> {s2x} i s3 def_s2.
   move: le_s21; rewrite -(rot_uniq i) -(size_rot i) def_s2 /= lez_add2l => le_s31.
@@ -1441,12 +1441,12 @@ theory Iota.
   proof. by rewrite (iotaS i 0) // iota0. qed.
 
   lemma size_iota m n: size (iota_ m n) = max 0 n.
-  proof. 
+  proof.
     elim/natind: n m => [n hn|n hn ih] m.
       by rewrite iota0 // max_lel.
     rewrite iotaS //= ih max_ler // smt.
   qed.
- 
+
   lemma iota_add m n1 n2 : 0 <= n1 => 0 <= n2 =>
      iota_ m (n1 + n2) = iota_ m n1 ++ iota_ (m + n1) n2.
   proof.
@@ -1454,7 +1454,7 @@ theory Iota.
       by rewrite (iota0 m 0).
     by rewrite addzAC !iotaS // 1:smt ih addzAC addzA.
   qed.
- 
+
   lemma iotaSr i n : 0 <= n =>
     iota_ i (n+1) = rcons (iota_ i n) (i+n).
   proof. by move=> ge0_n; rewrite iota_add // iota1 cats1. qed.
@@ -1471,11 +1471,11 @@ theory Iota.
     elim/natind: n m2 => [n hn|n hn ih] m2; 1: by rewrite !iota0.
     by rewrite !iotaS // map_cons -addzA ih.
   qed.
- 
+
   lemma mem_iota m n i : mem (iota_ m n) i <=> (m <= i /\ i < m + n).
   proof.
     elim/natind: n m => [n hn|n hn ih] m.
-      by rewrite iota0 // smt.  
+      by rewrite iota0 // smt.
     by rewrite iotaS // in_cons ih smt.
   qed.
 
@@ -1553,7 +1553,7 @@ theory Range.
 
   lemma range_cat (n m p : int): m <= n => n <= p =>
     range m p = range m n ++ range n p.
-  proof. 
+  proof.
     rewrite /range (_: p - m = n - m + (p - n)) 1:smt.
     by move=> le_mn le_np; rewrite iota_add; smt.
   qed.
@@ -1715,7 +1715,7 @@ move=> ge0_n ge0_m; rewrite /mkseq iota_add ?map_cat //=.
 by rewrite -{2}(addz0 n) iota_addl -map_comp.
 qed.
 
-lemma mkseqP f n (x:'a) :  
+lemma mkseqP f n (x:'a) :
   mem (mkseq f n) x <=> exists i, 0 <= i < n /\ x = f i.
 proof. by rewrite mapP &NewLogic.exists_iff /= => i; rewrite mem_iota. qed.
 
@@ -1828,7 +1828,7 @@ proof. by []. qed.
 lemma flatten_cons (x : 'a list) s :
   flatten (x :: s) = x ++ flatten s.
 proof. by []. qed.
-    
+
 lemma flatten_cat (s1 s2 : 'a list list):
   flatten (s1 ++ s2) = flatten s1 ++ flatten s2.
 proof.
@@ -2099,7 +2099,7 @@ qed.
 lemma sorted_filter (e : 'a -> 'a -> bool) :
      (forall y x z, e x y => e y z => e x z)
   => forall a s, sorted e s => sorted e (filter a s).
-proof. 
+proof.
 by move=> e_tr a s; apply/(subseq_sorted e e_tr _ _ (filter_subseq a s)).
 qed.
 

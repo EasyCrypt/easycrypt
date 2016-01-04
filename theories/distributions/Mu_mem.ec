@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -53,7 +53,7 @@ qed.
 lemma mu_mem_card (l:'a list) (d:'a distr) (bd:real):
   (forall (x : 'a), mem l x => mu d (pred1 x) = bd) =>
   mu d (mem l) = (card (oflist l))%r * bd.
-proof.  
+proof.
   move=> mu_cnst; rewrite (mu_eq _ _ (mem (oflist l))).
     by move=> x; rewrite mem_oflist.
   by apply mu_mem=> x; rewrite mem_oflist=> /mu_cnst.
@@ -62,7 +62,7 @@ qed.
 lemma mu_mem_le_card (l:'a list) (d:'a distr) (bd:real):
   (forall (x : 'a), mem l x => mu d (pred1 x) <= bd) =>
   mu d (mem l) <= (card (oflist l))%r * bd.
-proof.  
+proof.
   move=> mu_bound; rewrite (mu_eq _ _ (mem (oflist l))).
     by move=> x; rewrite mem_oflist.
   by apply mu_mem_le=> x; rewrite mem_oflist=> /mu_bound.
@@ -71,7 +71,7 @@ qed.
 lemma mu_mem_ge_card (l:'a list) (d:'a distr) (bd:real):
   (forall (x : 'a), mem l x => mu d (pred1 x) >= bd) =>
   mu d (mem l) >= (card (oflist l))%r * bd.
-proof.  
+proof.
   move=> mu_bound; rewrite (mu_eq _ _ (mem (oflist l))).
     by move=> x; rewrite mem_oflist.
   by apply mu_mem_ge=> x; rewrite mem_oflist=> /mu_bound.

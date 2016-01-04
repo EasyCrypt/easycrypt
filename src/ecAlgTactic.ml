@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -88,7 +88,7 @@ module Axioms = struct
     let add    = fun subst x p -> EcSubst.add_path subst (xpath x) p in
     let addctt = fun subst x f -> EcSubst.add_opdef subst (xpath x) ([], f) in
 
-    let subst  = 
+    let subst  =
       EcSubst.add_tydef EcSubst.empty (xpath tname) ([], cr.r_type) in
     let subst  =
       List.fold_left (fun subst (x, p) -> add subst x p) subst crcore in
@@ -105,7 +105,7 @@ module Axioms = struct
           subst
     in
 
-    let subst  = 
+    let subst  =
       match cr.r_embed with
       | `Direct | `Default -> subst
       | `Embed p -> add subst embed p
@@ -138,24 +138,24 @@ module Axioms = struct
       List.map for1 axs
 
   let getr env cr axs = get (`Ring  cr) env axs
-  let getf env cr axs = get (`Field cr) env axs 
+  let getf env cr axs = get (`Field cr) env axs
 
   let ring_axioms env (cr : ring) =
-    let axcore = 
+    let axcore =
       match cr.r_kind with
       | `Boolean   -> getr env cr core_bool
       | `Integer   -> getr env cr core
       | `Modulus _ -> getr env cr core in
     let axint =
-      match cr.r_embed with 
+      match cr.r_embed with
       | `Direct | `Default -> [] | `Embed _ -> getr env cr ofint in
-    let axopp = 
+    let axopp =
       match cr.r_opp with
       | Some _ when cr.r_kind = `Boolean -> getr env cr ofoppbool
       | _ -> [] in
-    let axsub = 
+    let axsub =
       match cr.r_sub with None -> [] | Some _ -> getr env cr ofsub in
-    let axexp = 
+    let axexp =
       match cr.r_exp with None -> [] | Some _ -> getr env cr intpow in
     let axCnp =
       match cr.r_kind with
@@ -218,7 +218,7 @@ let t_ring_congr (cr:cring) (rm:RState.rstate) li lv tc =
     let r1 = oget (RState.get i rm) in
     let r2 = oget (RState.get i rm') in
     EcReduction.EqTest.for_type_exn env r1.f_ty r2.f_ty;
-    f_eq r1 r2 in 
+    f_eq r1 r2 in
   FApi.xmutate1 tc `Ring_congr (List.map mk_goal li)
 
 (* -------------------------------------------------------------------- *)
@@ -261,5 +261,5 @@ let t_field_congr (cr:cfield) (rm:RState.rstate) li lv tc =
     let r1 = oget (RState.get i rm) in
     let r2 = oget (RState.get i rm') in
     EcReduction.EqTest.for_type_exn env r1.f_ty r2.f_ty;
-    f_eq r1 r2 in 
+    f_eq r1 r2 in
   FApi.xmutate1 tc `Field_congr (List.map mk_goal li)

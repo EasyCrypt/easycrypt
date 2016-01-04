@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -15,7 +15,7 @@ open EcTyping
 type pattern = (ptnmap * EcUnify.unienv) * form
 
 type search = [
-  | `ByPath    of Sp.t 
+  | `ByPath    of Sp.t
   | `ByPattern of pattern
 ]
 

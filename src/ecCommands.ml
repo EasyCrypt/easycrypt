@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -289,7 +289,7 @@ and process_operator (scope : EcScope.scope) (pop : poperator located) =
   let ppe = EcPrinting.PPEnv.ofenv (EcScope.env scope) in
   List.iter
     (fun { pl_desc = name } ->
-      EcScope.notify scope `Info "added operator %s %a" 
+      EcScope.notify scope `Info "added operator %s %a"
         name (EcPrinting.pp_added_op ppe) op;
         check_opname_validity scope name)
       (pop.pl_desc.po_name :: pop.pl_desc.po_aliases);
@@ -530,7 +530,7 @@ and process_dump scope (source, tc) =
 
         try
           let output  = open_out_bin ecfname in
-    
+
           try_finally
             (fun () ->
               let fbuf = Format.formatter_of_out_channel output in

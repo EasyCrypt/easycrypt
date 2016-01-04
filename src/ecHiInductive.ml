@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -316,7 +316,7 @@ let trans_matchfix ?(close = true) env ue { pl_loc = loc; pl_desc = name } (bd, 
                 fxerror cname.pl_loc env (FXE_CtorInvalidArity (args_exp, args_got));
 
               let cargs_lin = List.pmap (fun o -> omap unloc (unloc o)) cargs in
-                
+
               if not (List.is_unique cargs_lin) then
                 fxerror cname.pl_loc env (FXE_MatchNonLinear);
 
@@ -331,7 +331,7 @@ let trans_matchfix ?(close = true) env ue { pl_loc = loc; pl_desc = name } (bd, 
                with EcUnify.UnificationFailure _ -> assert false);
               TT.unify_or_fail env ue pb.pop_name.pl_loc pty xty;
 
-              let create o = 
+              let create o =
                 EcIdent.create (omap_dfl unloc "_" o) in
               let pvars = List.map (create |- unloc) cargs in
               let pvars = List.combine pvars ctorty in
@@ -389,12 +389,12 @@ let trans_matchfix ?(close = true) env ue { pl_loc = loc; pl_desc = name } (bd, 
         let lcmap = Mid.add opname opexpr e_subst_id.es_loc in
         { e_subst_id with es_freshen = false; es_ty = uni; es_loc = lcmap; }
       in
-    
+
       let branches =
         let rec uni_branches = function
           | OPB_Leaf (locals, e) ->
               OPB_Leaf (List.map (List.map (snd_map uni)) locals, e_subst ebsubst e)
-    
+
           | OPB_Branch bs ->
             let for1 b =
               { opb_ctor = b.opb_ctor;
@@ -403,7 +403,7 @@ let trans_matchfix ?(close = true) env ue { pl_loc = loc; pl_desc = name } (bd, 
               OPB_Branch (Parray.map for1 bs)
         in
           uni_branches branches
-  
+
       in { mf_name     = opname;
            mf_codom    = codom;
            mf_args     = args;

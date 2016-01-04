@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -82,7 +82,7 @@ let sort (relevant:Sp.t) (res:(path * EcDecl.axiom) list) =
   (* initialisation of the frequency *)
   let unwanted_ops = Sp.empty in
   let fr = Frequency.create unwanted_ops in
-  let do1 (p, ax) = 
+  let do1 (p, ax) =
     Frequency.add fr ax;
     let used = Frequency.f_ops unwanted_ops ax.ax_spec in
     (p,ax), used in
@@ -92,10 +92,10 @@ let sort (relevant:Sp.t) (res:(path * EcDecl.axiom) list) =
   let rs = relevant, Sx.empty in
   let frequency_function freq = 1. +. log1p (float_of_int freq) in
 
-  let do1 (ax,cs) = 
+  let do1 (ax,cs) =
     let r  = Frequency.r_inter cs rs in
     let ir = Frequency.r_diff cs r in
-    let weight path m = 
+    let weight path m =
       let freq = Frequency.frequency fr path in
       let w = frequency_function freq in
       m +. w in

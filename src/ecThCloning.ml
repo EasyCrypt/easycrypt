@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -18,7 +18,7 @@ module Mp = EcPath.Mp
 
 (* ------------------------------------------------------------------ *)
 type incompatible =
-| NotSameNumberOfTyParam of int * int 
+| NotSameNumberOfTyParam of int * int
 | DifferentType of EcTypes.ty * EcTypes.ty
 
 type ovkind =
@@ -218,7 +218,7 @@ module OVRD : sig
   val pr_ovrd : pr_override ovrd
   val th_ovrd : th_override ovrd
 
-  val ovrd : 
+  val ovrd :
        ?cancrt:bool -> octxt -> state -> pqsymbol
     -> theory_override -> state
 end = struct
@@ -464,7 +464,7 @@ end = struct
             clone_error oc.oc_env (CE_UnkOverride (OVK_Lemma, unloc name))
          | Some _ -> let (nm, name) = unloc name in nm @ [name]
     in
-    
+
     let update1 evc =
       let evl = evc.evc_lemmas in
       let evl = {
@@ -523,7 +523,7 @@ let clone (scenv : EcEnv.env) (thcl : theory_cloning) =
   let rename = List.map (Renaming.rename1 oc) thcl.pthc_rnm in
 
   let ntclr =
-    let ntclr1 (`Abbrev, { pl_desc = (nm, x) as q }) = 
+    let ntclr1 (`Abbrev, { pl_desc = (nm, x) as q }) =
       if is_none (find_nt oth q) then
         clone_error scenv (CE_UnkAbbrev q);
       EcPath.pqname (EcPath.extend opath nm) x

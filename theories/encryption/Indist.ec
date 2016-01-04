@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -17,7 +17,7 @@ require Hybrid.
 
 type input.
 
-clone import Hybrid as H 
+clone import Hybrid as H
   with type input <- input * input,
        type outputA <- bool.
 
@@ -26,7 +26,7 @@ clone import Hybrid as H
    or second argument (right). *)
 
 module type Orcl = {
-  proc leaks (il:inleaks) : outleaks  
+  proc leaks (il:inleaks) : outleaks
   proc orcl (m:input) : output
 }.
 
@@ -149,21 +149,21 @@ section.
   }.
 
   axiom losslessL: islossless O.leaks.
-  axiom losslessO: islossless O.orcl. 
+  axiom losslessO: islossless O.orcl.
   axiom losslessA (O <: Orcl{A}) (LR <: LR{A}):
-    islossless LR.orcl => 
+    islossless LR.orcl =>
     islossless O.leaks => islossless O.orcl =>
     islossless A(O, LR).main.
   axiom q_pos : 0 < q.
-         
+
   lemma IND1_INDn &m (p:glob A -> glob O -> int -> bool):
      Pr[INDL(O,HybGame2(A)).main() @ &m : res /\ p (glob A) (glob O) HybOrcl.l /\
-                                          HybOrcl.l <= q /\ Count.c <= 1] - 
+                                          HybOrcl.l <= q /\ Count.c <= 1] -
        Pr[INDR(O,HybGame2(A)).main() @ &m : res /\ p (glob A) (glob O) HybOrcl.l /\
                                             HybOrcl.l <= q /\ Count.c <= 1]  =
      1%r/q%r * (
        Pr[INDL(O,A).main() @ &m : res /\ p (glob A) (glob O) Count.c /\
-                                  Count.c <= q] - 
+                                  Count.c <= q] -
          Pr[INDR(O,A).main() @ &m :  res /\ p (glob A) (glob O) Count.c /\
                                      Count.c <= q]).
   proof.
@@ -296,35 +296,35 @@ section.
      (Pr[INDL(O,A).main() @ &m : res /\ p (glob A) (glob O) Count.c] -
       Pr[INDR(O,A).main() @ &m : res /\ p (glob A) (glob O) Count.c])/2%r.
   proof.
-   cut := Sample_bool WA &m 
+   cut := Sample_bool WA &m
      (fun (g:glob WA), let (b,c,ga,go) = g in p ga go c) => /= H.
    cut -> : Pr[INDb(O, A).main() @ &m : res /\ p (glob A) (glob O) Count.c] =
     Pr[MB.M.Rand(WA).main() @ &m : fst res = snd res /\ p (glob A) (glob O) Count.c].
      byequiv (_: ={glob A,glob O} ==> ={glob A,glob O, Count.c} /\
                    res{1} = (fst res = snd res){2}) => //;proc.
-     inline Count.init WA.work;simplify fst snd. 
+     inline Count.init WA.work;simplify fst snd.
      by swap{1} 2 -1; sim; proc (={Orclb.b, Count.c}).
-   cut He: equiv [INDR(O, A).main ~ WA.work: x{2}=false /\ 
+   cut He: equiv [INDR(O, A).main ~ WA.work: x{2}=false /\
                    ={glob A,glob O} ==> ={res,glob A,glob O, Count.c}].
-    proc. 
+    proc.
     call (_: ={glob O, Count.c} /\ Orclb.b{2} = false).
-      by proc (={Count.c} /\ Orclb.b{2} = false).      
-      by proc (={Count.c} /\ Orclb.b{2} = false). 
+      by proc (={Count.c} /\ Orclb.b{2} = false).
+      by proc (={Count.c} /\ Orclb.b{2} = false).
       by proc;inline Count.incr;wp;call(_:true);wp;skip;progress.
     inline Count.init;by wp.
    cut -> : Pr[INDR(O, A).main() @ &m : p (glob A) (glob O) Count.c] =
             Pr[WA.work(false) @ &m : p (glob A) (glob O) Count.c].
      by byequiv He.
-   cut -> : Pr[INDR(O, A).main() @ &m : res /\ p (glob A) (glob O) Count.c] = 
+   cut -> : Pr[INDR(O, A).main() @ &m : res /\ p (glob A) (glob O) Count.c] =
             Pr[WA.work(false) @ &m : res /\ p (glob A) (glob O) Count.c].
      by byequiv He.
-   (cut -> : Pr[INDL(O, A).main() @ &m : res /\ p (glob A) (glob O) Count.c] = 
+   (cut -> : Pr[INDL(O, A).main() @ &m : res /\ p (glob A) (glob O) Count.c] =
             Pr[WA.work(true) @ &m : res /\ p (glob A) (glob O) Count.c]) => //.
-   byequiv 
+   byequiv
       (_: x{2}=true /\ ={glob A,glob O} ==> ={res,glob A,glob O, Count.c}) => //.
    proc; call (_: ={glob O, Count.c} /\ Orclb.b{2} = true).
-     by proc (={Count.c} /\ Orclb.b{2} = true).      
-     by proc (={Count.c} /\ Orclb.b{2} = true). 
+     by proc (={Count.c} /\ Orclb.b{2} = true).
+     by proc (={Count.c} /\ Orclb.b{2} = true).
      by proc;inline Count.incr;wp;call(_:true);wp;skip;progress.
    inline Count.init;by wp.
  qed.

@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -43,7 +43,7 @@ end
 (* -------------------------------------------------------------------- *)
 module CI_Int = struct
   let i_Int = "Int"
-  let p_Int = EcPath.pqname p_top i_Int 
+  let p_Int = EcPath.pqname p_top i_Int
   let p_int = _Pervasive "int"
 
   let _Int = fun x -> EcPath.pqname p_Int x

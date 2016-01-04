@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2015 - IMDEA Software Institute
  * Copyright (c) - 2012--2015 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -15,7 +15,7 @@ require import Sum.
 (* Scenario: you have an adversary with access to an oracle f
    and exactly q calls to it.
    You replace the oracle f with oracle f' and you know that
-   f and f' return the same result with probability p. Then, 
+   f and f' return the same result with probability p. Then,
    you can conclude that the probability of distinguishing is
    q * p *)
 
@@ -47,7 +47,7 @@ module Experiment( O : Oracle, AdvF : A) = {
    cO = 0;
    O.init();
   }
-  proc f (x : from) : to * bool = { 
+  proc f (x : from) : to * bool = {
    var y : to = def;
    var b : bool = false;
    if (cO < qO /\ !bad) {
@@ -68,24 +68,24 @@ module Experiment( O : Oracle, AdvF : A) = {
 }.
 
 lemma Conclusion &m p:
-forall (O1 <: Oracle{Experiment})(O2 <: Oracle{Experiment}) 
+forall (O1 <: Oracle{Experiment})(O2 <: Oracle{Experiment})
        (Adv <: A{Experiment, O1, O2}),
 forall I P (m : glob O2 -> int) (g : int -> real),
 (forall x, 0%r <= g x <= 1%r) =>
 int_sum g (intval 0 (qO - 1)) <= qO%r * p =>
-(equiv [O1.init ~ O2.init : true ==> 
+(equiv [O1.init ~ O2.init : true ==>
                    I (glob O1){1} (glob O2){2} /\
                    (m (glob O2)){2} = 0 ]) =>
 hoare [ O2.init : true ==> m (glob O2) = 0 ] =>
-(forall k, 
-equiv [O1.f ~ O2.f : I (glob O1){1} (glob O2){2} /\ 
-                      (m ( glob O2)){2} = k ==> 
+(forall k,
+equiv [O1.f ~ O2.f : I (glob O1){1} (glob O2){2} /\
+                      (m ( glob O2)){2} = k ==>
                     (m (glob O2)){2} = k + 1 /\
-                   (! snd(res){2} => fst res{1} = fst res{2} 
-                    /\ snd res{1} = snd res{2} 
+                   (! snd(res){2} => fst res{1} = fst res{2}
+                    /\ snd res{1} = snd res{2}
                     /\ I (glob O1){1} (glob O2){2})]) =>
-(forall k, 
-hoare [O2.f : (m (glob O2)) = k ==> 
+(forall k,
+hoare [O2.f : (m (glob O2)) = k ==>
               (m (glob O2)) = k + 1]) =>
 (forall k,
  phoare [O2.f : m (glob O2) = k ==> snd res] <= (g k )) =>
@@ -97,21 +97,21 @@ Pr [Experiment(O1, Adv).main() @ &m : P res] <=
 Pr [Experiment(O2, Adv).main() @ &m : P res]  + qO%r * p.
 proof -strict.
 move=> O1 O2 Adv I P m g hg hbnd hinint hinit2 hf hf2 hbound_bad hll1 hll2 hlladv hIm.
-apply (Real.Trans _ 
+apply (Real.Trans _
 (Pr [Experiment(O2, Adv).main() @ &m : P res \/ (Experiment.WO.bad /\
-                          Experiment.WO.cO <= qO /\ 
+                          Experiment.WO.cO <= qO /\
 Experiment.WO.cO = m (glob O2))]) _).
-byequiv (_ : true ==> 
-          (! Experiment.WO.bad{2} => ={res}) /\ 
+byequiv (_ : true ==>
+          (! Experiment.WO.bad{2} => ={res}) /\
              Experiment.WO.cO{2} <= qO /\
              Experiment.WO.cO{2} = m (glob O2){2})  => //.
 proc.
 call (_ : Experiment.WO.bad,
-          I  (glob O1){1} (glob O2){2} /\ 
+          I  (glob O1){1} (glob O2){2} /\
           ={Experiment.WO.cO, Experiment.WO.bad} /\
           Experiment.WO.cO{2} <= qO /\
           Experiment.WO.cO{2} = m (glob O2){2},
-          Experiment.WO.cO{2} <= qO /\ 
+          Experiment.WO.cO{2} <= qO /\
           Experiment.WO.cO{2} = m (glob O2){2}) => // {g hg hbnd hbound_bad}.
  proc.
  sp; if => //.
@@ -121,23 +121,23 @@ call (_ : Experiment.WO.bad,
  call (hf cO); skip; progress => //; smt.
  by move=> &2 h; proc; sp; if => //; wp; call hll1; wp; skip; smt.
  by move=> &1; proc; sp; if => //; wp; call hll2; wp; skip; smt.
- inline Experiment(O1,Adv).WO.init Experiment(O2,Adv).WO.init; wp. 
+ inline Experiment(O1,Adv).WO.init Experiment(O2,Adv).WO.init; wp.
  call hinint; wp; skip; progress; smt.
 smt.
-apply (Real.Trans _ 
+apply (Real.Trans _
 (Pr [Experiment(O2, Adv).main() @ &m : P res]  +
-Pr [Experiment(O2, Adv).main() @ &m : 
-             Experiment.WO.bad /\ Experiment.WO.cO <= qO /\ 
+Pr [Experiment(O2, Adv).main() @ &m :
+             Experiment.WO.bad /\ Experiment.WO.cO <= qO /\
              Experiment.WO.cO = m (glob O2){hr}]) _).
 rewrite Pr[mu_or].
-apply (_ : forall (p q r : real), 0%r <= r => p + q - r <= p + q); 
+apply (_ : forall (p q r : real), 0%r <= r => p + q - r <= p + q);
  move=> {g hg hbnd hbound_bad}; smt.
-apply (_ : forall (a b c : real), b <= c => a + b <= a + c); 
+apply (_ : forall (a b c : real), b <= c => a + b <= a + c);
  first (move=> {g hg hbnd hbound_bad}; smt).
-fel 2 Experiment.WO.cO g  qO (Experiment.WO.bad) 
- [Experiment(O2,Adv).WO.f : 
+fel 2 Experiment.WO.cO g  qO (Experiment.WO.bad)
+ [Experiment(O2,Adv).WO.f :
   (!Experiment.WO.bad  /\ Experiment.WO.cO < qO)]
-(m (glob O2) = Experiment.WO.cO) => //. 
+(m (glob O2) = Experiment.WO.cO) => //.
 by inline Experiment(O2, Adv).WO.init; call hinit2; wp.
  proc.
  sp 2; if => //; wp; last first.
@@ -155,7 +155,7 @@ move=> c.
 proc.
 sp; if => //; wp.
 exists* Experiment.WO.cO.
-elim* => cO. 
+elim* => cO.
 call (hf2 cO); wp; skip ; progress.
 move=> {g hg hbnd hbound_bad}; smt.
 move=> {g hg hbnd hbound_bad}; smt.
@@ -164,6 +164,6 @@ move=> b c.
 proc; sp; if => //.
 swap 1 1; wp.
 exists* Experiment.WO.cO.
-elim* => cO. 
+elim* => cO.
 call (hf2 cO); wp; skip ; progress; smt.
 qed.

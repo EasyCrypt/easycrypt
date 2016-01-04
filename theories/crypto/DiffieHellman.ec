@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -12,7 +12,7 @@ require (*  *) CyclicGroup.
 clone export CyclicGroup as G.
 
 theory DDH.
-   
+
   module type Adversary = {
     proc guess(gx gy gz:G.group): bool
   }.
@@ -30,7 +30,7 @@ theory DDH.
   module DDH1 (A:Adversary) = {
     proc main() : bool = {
       var b, x, y, z;
-        
+
       x = $FDistr.dt;
       y = $FDistr.dt;
       z = $FDistr.dt;
@@ -40,7 +40,7 @@ theory DDH.
   }.
 
 end DDH.
-  
+
 
 
 (** Computational Diffie-Hellman problem **)
@@ -145,7 +145,7 @@ theory Set_CDH.
            - the probability that s contains g^(x*y) and that |s| <= n is Pr[SCDH(A).main() @ &m: res], and
            - when s contains g^(x*y), the probability of sampling that one element uniformly in s is bounded
              by 1/n. *)
-      seq  1: (mem s (g ^ (SCDH'.x * SCDH'.y)) /\ card s <= n) p (1%r/n%r) _ 0%r => //. 
+      seq  1: (mem s (g ^ (SCDH'.x * SCDH'.y)) /\ card s <= n) p (1%r/n%r) _ 0%r => //.
         (* The first part is dealt with by equivalence with SCDH. *)
         conseq (_: _: =p). (* strengthening >= into = for simplicity*)
           call (_: (glob A) = (glob A){m}  ==> mem res (g^(SCDH'.x * SCDH'.y)) /\ card res <= n)=> //.
@@ -159,7 +159,7 @@ theory Set_CDH.
         cut H1: 0 < card s{hr} by smt.
         by rewrite -!Real.inv_def inv_le; smt.
         smt.
-    qed.  
+    qed.
   end section.
 
 end Set_CDH.

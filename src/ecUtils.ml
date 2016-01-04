@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -521,13 +521,13 @@ module List = struct
     let sort = if stable then List.stable_sort else List.sort in
     sort cmp xs
 
-  let min ?(cmp = Pervasives.compare) s = 
+  let min ?(cmp = Pervasives.compare) s =
     reduce (fun x y -> if cmp x y < 0 then x else y) s
 
-  let max ?(cmp = Pervasives.compare) s = 
+  let max ?(cmp = Pervasives.compare) s =
     reduce (fun x y -> if cmp x y > 0 then x else y) s
 
-  let is_singleton l = 
+  let is_singleton l =
     match l with
     | [_] -> true
     |  _  -> false
@@ -590,19 +590,19 @@ module String = struct
     let aout = BatString.trim s in
     if s == aout then BatString.copy aout else s
 
-  let rev (s:string) = init (length s) (fun i -> s.[length s - 1 - i]) 
+  let rev (s:string) = init (length s) (fun i -> s.[length s - 1 - i])
 
   (* ------------------------------------------------------------------ *)
   module OptionMatching = struct
-    let all_matching tomatch s = 
+    let all_matching tomatch s =
       let matched = List.map (fun s -> (s, 0)) tomatch in
 
-      let rec aux matched i = 
+      let rec aux matched i =
         if   i = length s || List.is_empty matched
-        then List.map fst matched 
+        then List.map fst matched
         else
           let c = s.[i] in
-          let do1 (tomatch, k) = 
+          let do1 (tomatch, k) =
             try Some (tomatch, index_from tomatch k c + 1)
             with Invalid_argument _ | Not_found -> None
           in aux (List.filter_map do1 matched) (i+1)
@@ -610,11 +610,11 @@ module String = struct
 
     let first_matching tomatch s =
       let matched = List.map (fun s -> (s, 0)) tomatch in
-      let rec aux matched i = 
+      let rec aux matched i =
         if   i = length s || List.is_empty matched
-        then List.map fst matched 
+        then List.map fst matched
         else
-          let do1 (tomatch,k) = 
+          let do1 (tomatch,k) =
             try Some (tomatch, index_from tomatch k s.[i] + 1)
             with Invalid_argument _ | Not_found -> None in
 
@@ -624,7 +624,7 @@ module String = struct
             let min = snd (List.min ~cmp:(fun (_, x) (_, y) -> x - y) matched) in
             let oge = fun x -> if snd x <= min then Some x else None in
             let matched = List.filter_map oge matched in
-  
+
             if   List.is_singleton matched
             then List.map fst matched
             else aux matched (i+1)
@@ -636,7 +636,7 @@ module String = struct
       first_matching (List.map rev tomatch) (rev s)
   end
 
-  let option_matching tomatch s = 
+  let option_matching tomatch s =
     match OptionMatching.all_matching tomatch s with
     | [s] -> [s] | matched ->
     match OptionMatching.first_matching matched s with

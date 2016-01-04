@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -680,7 +680,7 @@ let f_int_opp f     = f_app fop_int_opp [f]      tint
 let f_int_add f1 f2 = f_app fop_int_add [f1; f2] tint
 let f_int_mul f1 f2 = f_app fop_int_mul [f1; f2] tint
 let f_int_pow f1 f2 = f_app fop_int_pow [f1; f2] tint
-  
+
 let f_int_sub f1 f2 =
   f_int_add f1 (f_int_opp f2)
 
@@ -890,7 +890,7 @@ let f_map gt g fp =
   | Fpr pr ->
       let args' = g pr.pr_args in
       let ev'   = g pr.pr_event in
-        FSmart.f_pr (fp, pr) 
+        FSmart.f_pr (fp, pr)
           { pr with pr_args = args'; pr_event = ev'; }
 
 (* -------------------------------------------------------------------- *)
@@ -899,7 +899,7 @@ let f_iter g f =
   | Fint     _
   | Flocal   _
   | Fpvar    _
-  | Fglob    _ 
+  | Fglob    _
   | Fop      _ -> ()
 
   | Fquant   (_ , _ , f1) -> g f1
@@ -925,7 +925,7 @@ let form_exists g f =
   | Fint     _
   | Flocal   _
   | Fpvar    _
-  | Fglob    _ 
+  | Fglob    _
   | Fop      _ -> false
 
   | Fquant   (_ , _ , f1) -> g f1
@@ -951,7 +951,7 @@ let form_forall g f =
   | Fint     _
   | Flocal   _
   | Fpvar    _
-  | Fglob    _ 
+  | Fglob    _
   | Fop      _ -> true
 
   | Fquant   (_ , _ , f1) -> g f1
@@ -974,7 +974,7 @@ let form_forall g f =
 (* -------------------------------------------------------------------- *)
 let f_ops f =
   let aout = ref EcPath.Sp.empty in
-  let rec doit f = 
+  let rec doit f =
     match f.f_node with
     | Fop (p, _) -> aout := Sp.add p !aout
     | _ -> f_iter doit f
@@ -1021,7 +1021,7 @@ let destr_exists f =
   | Fquant(Lexists,bd,p) -> bd, p
   | _ -> destr_error "exists"
 
-let destr_let f = 
+let destr_let f =
   match f.f_node with
   | Flet(lp, e1,e2) -> lp,e1,e2
   | _ -> destr_error "let"
@@ -1110,7 +1110,7 @@ let destr_op = function
 let destr_app = function
   { f_node = Fapp (f, fs) } -> (f, fs) | f -> (f, [])
 
-let destr_op_app f = 
+let destr_op_app f =
   let (fo, args) = destr_app f in destr_op fo, args
 
 let destr_tuple = function
@@ -1145,7 +1145,7 @@ let destr_imp = destr_app2 ~name:"imp" is_op_imp
 let destr_iff = destr_app2 ~name:"iff" is_op_iff
 let destr_eq  = destr_app2 ~name:"eq"  is_op_eq
 
-let destr_eq_or_iff = 
+let destr_eq_or_iff =
   destr_app2 ~name:"eq-or-iff" (fun p -> is_op_eq p || is_op_iff p)
 
 let destr_or_r form =
@@ -1161,7 +1161,7 @@ let destr_and_r form =
   | _ -> destr_error "and"
 
 let destr_nots form =
-  let rec aux b form = 
+  let rec aux b form =
     match try Some (destr_not form) with DestrError _ -> None with
     | None      -> (b, form)
     | Some form -> aux (not b) form
@@ -1628,7 +1628,7 @@ module Fsubst = struct
 
   (* ------------------------------------------------------------------ *)
   let fty_subst sty =
-    { f_subst_id with fs_sty = sty; fs_ty = ty_subst sty }    
+    { f_subst_id with fs_sty = sty; fs_ty = ty_subst sty }
 
   let uni_subst uidmap =
     fty_subst { ty_subst_id with ts_u = uidmap }

@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -240,7 +240,7 @@ let t_sp_side pos tc =
         Format.fprintf fmt
           "%d instruction(s) %s, change your [sp] bound"
           (List.length stmt) side)
-  in    
+  in
 
   match concl.f_node, pos with
   | FhoareS hs, (None | Some (Single _)) ->

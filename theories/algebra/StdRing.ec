@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -26,7 +26,7 @@ theory RField.
     op   ( / ) <- Real.( / ),
     op   invr  <- Real.inv
     proof * by smt remove abbrev (-).
-  
+
   lemma nosmt ofintR (i : int): ofint i = i%r.
   proof.
     have h: forall i, 0 <= i => ofint i = i%r.
@@ -71,5 +71,5 @@ instance ring with int
   proof mulrA     by smt
   proof mulrC     by smt
   proof mulrDl    by smt
-  proof expr0     by smt 
+  proof expr0     by smt
   proof exprS     by smt.

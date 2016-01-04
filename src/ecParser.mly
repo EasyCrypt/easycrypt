@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -145,10 +145,10 @@
       ptm_body  = body ;
       ptm_local = local; }
 
-  let mk_rel_pterm info = 
+  let mk_rel_pterm info =
     odfl ({ fp_mode = `Implicit;
             fp_head = FPCut (None, None);
-            fp_args = []; }) info 
+            fp_args = []; }) info
 
   (* ------------------------------------------------------------------ *)
   type prover =
@@ -183,17 +183,17 @@
         match match_option s.pl_desc with
         | [m] -> mk_loc s.pl_loc m
         | []  -> parse_error s.pl_loc (Some ("unknown option: " ^ (unloc s)))
-        | ls  -> 
+        | ls  ->
           let msg =
             Printf.sprintf
               "option `%s` is ambiguous. matching ones are: `%s`"
               (unloc s) (String.concat ", " ls)
           in parse_error s.pl_loc (Some msg)
-  
-    let option_matching = 
+
+    let option_matching =
        option_matching
          [ "all"; "timeout"; "maxprovers"; "maxlemmas";
-           "wantedlemmas"; "unwantedlemmas"; 
+           "wantedlemmas"; "unwantedlemmas";
            "prover"; "verbose"; "lazy"; "full"; "iterate" ]
 
     let as_int = function
@@ -236,7 +236,7 @@
           let msg = Printf.sprintf "`%s`: no option expected" (unloc s) in
           parse_error s.pl_loc (Some msg)
 
-    let mk_pi_option (s : psymbol) (o : pi option) : smt = 
+    let mk_pi_option (s : psymbol) (o : pi option) : smt =
       let s = option_matching s in
 
       match unloc s with
@@ -252,8 +252,8 @@
       | "all"            -> get_as_none s o; (`ALL)
       | "iterate"        -> get_as_none s o; (`ITERATE)
       | _                ->  assert false
-  
-    let mk_smt_option (os : smt list) = 
+
+    let mk_smt_option (os : smt list) =
       let mprovers = ref None in
       let timeout  = ref None in
       let pnames   = ref None in
@@ -264,35 +264,35 @@
       let verbose  = ref None in
       let version  = ref None in
       let iterate  = ref None in
-  
-      let add_prover (k, p) = 
+
+      let add_prover (k, p) =
         let r = odfl empty_pprover_list !pnames in
-        pnames := Some  
+        pnames := Some
           (match k with
-          | `Only    -> { r with pp_use_only =            p  :: r.pp_use_only } 
+          | `Only    -> { r with pp_use_only =            p  :: r.pp_use_only }
           | `Include -> { r with pp_add_rm   = (`Include, p) :: r.pp_add_rm   }
           | `Exclude -> { r with pp_add_rm   = (`Exclude, p) :: r.pp_add_rm   }) in
-        
-      let do1 o  = 
+
+      let do1 o  =
         match o with
         | `ALL              -> all      := Some true
         | `TIMEOUT        n -> timeout  := Some n
         | `MAXPROVERS     n -> mprovers := Some n
         | `MAXLEMMAS      n -> mlemmas  := Some n
-        | `WANTEDLEMMAS   d -> wanted   := Some d 
+        | `WANTEDLEMMAS   d -> wanted   := Some d
         | `UNWANTEDLEMMAS d -> unwanted := Some d
         | `VERBOSE        v -> verbose  := Some v
         | `VERSION        v -> version  := Some v
         | `ITERATE          -> iterate  := Some true
-        | `PROVER         p -> List.iter add_prover p 
+        | `PROVER         p -> List.iter add_prover p
       in
-  
+
       List.iter do1 os;
-  
-      oiter 
+
+      oiter
         (fun r -> pnames := Some { r with pp_add_rm = List.rev r.pp_add_rm })
         !pnames;
-  
+
       { pprov_max       = !mprovers;
         pprov_timeout   = !timeout;
         pprov_cpufactor =  None;
@@ -1649,7 +1649,7 @@ nt_bindings:
     { bd }
 
 notation:
-| NOTATION x=loc(NOP) tv=tyvars_decl? bd=nt_bindings? 
+| NOTATION x=loc(NOP) tv=tyvars_decl? bd=nt_bindings?
     args=nt_arg1* codom=prefix(COLON, loc(type_exp))? EQ body=expr
   { { nt_name  = x;
       nt_tv    = tv;
@@ -2172,7 +2172,7 @@ dbmap1:
 dbhint:
 | m=dbmap1         { [m] }
 | m=paren(dbmap1+) {  m  }
-  
+
 %inline prod_form:
 | f1=sform f2=sform   { (Some f1, Some f2) }
 | UNDERSCORE f2=sform { (None   , Some f2) }
@@ -2461,7 +2461,7 @@ phltactic:
 | BYPHOARE info=gpterm(conseq)?
     { Pbydeno (`PHoare, (mk_rel_pterm info, true, None)) }
 
-| BYEQUIV eq=bracket(byequivopt)? info=gpterm(conseq)? 
+| BYEQUIV eq=bracket(byequivopt)? info=gpterm(conseq)?
     { Pbydeno (`Equiv, (mk_rel_pterm info, odfl true eq, None)) }
 
 | BYEQUIV eq=bracket(byequivopt)? info=gpterm(conseq)? COLON bad1=sform
@@ -2571,9 +2571,9 @@ eqobs_in_pos:
 | i1=word i2=word { i1, i2 }
 
 eqobs_in_eqglob1:
-| LPAREN mp1= uoption(loc(fident)) TILD mp2= uoption(loc(fident)) COLON 
-  geq=form RPAREN 
-  {((mp1, mp2),geq) } 
+| LPAREN mp1= uoption(loc(fident)) TILD mp2= uoption(loc(fident)) COLON
+  geq=form RPAREN
+  {((mp1, mp2),geq) }
 
 | LPAREN UNDERSCORE? COLON geq=form RPAREN { ((None,None), geq) }
 
@@ -2590,7 +2590,7 @@ eqobs_in:
 | pos=eqobs_in_pos? i=eqobs_in_eqinv p=eqobs_in_eqpost? {
     { sim_pos  = pos;
       sim_hint = i;
-      sim_eqs  = p; } 
+      sim_eqs  = p; }
 }
 
 pgoptionkw:
@@ -3059,8 +3059,8 @@ smt_info1:
 
 prover_kind1:
 | l=loc(STRING)       { `Only   , l }
-| PLUS  l=loc(STRING) { `Include, l } 
-| MINUS l=loc(STRING) { `Exclude, l } 
+| PLUS  l=loc(STRING) { `Include, l }
+| MINUS l=loc(STRING) { `Exclude, l }
 
 prover_kind:
 | LBRACKET lp=prover_kind1* RBRACKET { lp }

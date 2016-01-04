@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -199,9 +199,9 @@ let t_eager_while_r h tc =
   let to_form eq =  Mpv2.to_form (fst eC.es_ml) (fst eC.es_mr) eq f_true in
 
   let eqI  = eC.es_pr in
-  let seqI = 
-    try 
-      Mpv2.of_form env (fst eC.es_ml) (fst eC.es_mr) eqI 
+  let seqI =
+    try
+      Mpv2.of_form env (fst eC.es_ml) (fst eC.es_mr) eqI
     with Not_found ->
       tc_error_lazy !!tc (fun fmt ->
         let ppe  = EcPrinting.PPEnv.ofenv env in
@@ -485,8 +485,8 @@ let eager pf env s s' inv eqIs eqXs c c' eqO =
         Mpv2.check_glob outf;
         let fhyps, inf = f_eager fhyps fl fr outf in
         let eqi =
-          List.fold_left2 
-            (fun eqs e1 e2 -> Mpv2.add_eqs env e1 e2 eqs) 
+          List.fold_left2
+            (fun eqs e1 e2 -> Mpv2.add_eqs env e1 e2 eqs)
             (Mpv2.union eqnm inf) argsl argsr
         in
           (fhyps, eqi)
@@ -606,8 +606,8 @@ let process_info info tc =
   | EcParsetree.LE_todo (h, s1, s2, eqIs, eqXs) ->
     let ml,mr =
       match (FApi.tc1_goal tc).f_node with
-      | FeagerF _ -> 
-        EcEnv.Fun.inv_memory `Left env, EcEnv.Fun.inv_memory `Right env 
+      | FeagerF _ ->
+        EcEnv.Fun.inv_memory `Left env, EcEnv.Fun.inv_memory `Right env
       | _ ->
         let es    = tc1_as_equivS tc in
         es.es_ml, es.es_mr in

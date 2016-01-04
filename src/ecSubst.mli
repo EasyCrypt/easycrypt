@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -49,7 +49,7 @@ val subst_ctheory : subst -> ctheory -> ctheory
 (* -------------------------------------------------------------------- *)
 val subst_path         : subst -> path  -> path
 val subst_mpath        : subst -> mpath -> mpath
-val subst_function     : subst -> function_ -> function_ 
+val subst_function     : subst -> function_ -> function_
 val subst_module       : subst -> module_expr -> module_expr
 val subst_module_comps : subst -> module_comps -> module_comps
 val subst_modtype      : subst -> module_type -> module_type

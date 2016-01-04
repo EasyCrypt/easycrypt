@@ -32,7 +32,7 @@ import Dexcepted.
 (* Abstract cipher *)
 module type AC = {
  proc f (x : block) : block
- proc init () : unit 
+ proc init () : unit
  }.
 
 module type AAC = {
@@ -75,7 +75,7 @@ module PRF : AC = {
   if (!mem x (dom m) /\ card s < q) {
    y = $uniform;
    m.[x] = y;
-   s = add y s; 
+   s = add y s;
   }
   return oget (m.[x]);
  }
@@ -103,17 +103,17 @@ declare module A : Adv {PRP,PRF}.
 axiom losslessA :
 forall (M0 <: AAC), islossless M0.f => islossless A(M0).a.
 
-equiv eq1 : M(PRF,A).main ~ M(PRP,A).main : 
+equiv eq1 : M(PRF,A).main ~ M(PRP,A).main :
             ={glob A} ==> card (PRP.s{2}) <= q /\ (!PRP.bad{2} => ={res}).
 proof.
  proc.
  call (_ : PRP.bad,
-           PRF.m{1} = PRP.m{2} /\ PRF.s{1} = PRP.s{2} /\ card (PRP.s{2}) <= q, 
+           PRF.m{1} = PRP.m{2} /\ PRF.s{1} = PRP.s{2} /\ card (PRP.s{2}) <= q,
            card (PRP.s{2}) <= q).
  by move=> M0 Hmo; apply (losslessA M0) => //.
  proc.
  if;first by smt.
- seq 1 1: 
+ seq 1 1:
  ((! PRP.bad{2} /\ ={x,y} /\ PRF.m{1} = PRP.m{2}) /\ ! mem x{1} (dom PRF.m{1}) /\
     card PRF.s{1} < q /\ PRF.s{1} = PRP.s{2} /\ card (PRP.s{2}) < q).
  by rnd;skip => //.
@@ -135,16 +135,16 @@ proof.
  inline PRF.init PRP.init;wp;skip;by smt.
 qed.
 
-lemma real_le_trans : forall(a b c : real),  
-  a <= b => b <= c => a <= c by []. 
+lemma real_le_trans : forall(a b c : real),
+  a <= b => b <= c => a <= c by [].
 
-lemma prob1 : forall &m, 
- Pr[ M(PRF,A).main() @ &m : res] <= 
- Pr[ M(PRP,A).main() @ &m : res] + 
+lemma prob1 : forall &m,
+ Pr[ M(PRF,A).main() @ &m : res] <=
+ Pr[ M(PRP,A).main() @ &m : res] +
  Pr[ M(PRP,A).main() @ &m : PRP.bad /\ card PRP.s <= q].
 proof.
  move=> &m.
- apply (real_le_trans _ 
+ apply (real_le_trans _
  Pr[ M(PRP,A).main() @ &m : (res || (PRP.bad /\  card PRP.s <= q))] _ _ _).
  byequiv(eq1) => // ;first by smt.
  rewrite Pr [mu_or];by smt.
@@ -181,23 +181,23 @@ proof.
   cut ->: n%r * (n - 1)%r * (1%r / 2%r) * (1%r / (2^l)%r) = (n%r * (n - 1)%r * (1%r / (2^l)%r)) * 1%r / 2%r by smt.
   cut ->: forall x, 0%r <= x => x * 1%r / 2%r <= x; first last; last 2 smt.
   cut ->: n%r * (n - 1)%r = (n * (n - 1))%r by smt.
-  cut ->: forall x y, 0%r <= x => 0%r <= y => 0%r <= x * y; smt.  
+  cut ->: forall x y, 0%r <= x => 0%r <= y => 0%r <= x * y; smt.
 qed.
 
-lemma prob2 : forall &m, 
-Pr[ M(PRP,A).main() @ &m : PRP.bad /\ card PRP.s <= q] <= 
+lemma prob2 : forall &m,
+Pr[ M(PRP,A).main() @ &m : PRP.bad /\ card PRP.s <= q] <=
 q%r * (q-1)%r * (1%r / (2^l)%r).
 proof.
  move=> &m.
- fel 1 (card PRP.s) (fun x, (x%r)* (1%r/(2^l)%r)) 
-     q PRP.bad [PRP.f : (! mem x (dom PRP.m) /\ card PRP.s < q)] => //. 
+ fel 1 (card PRP.s) (fun x, (x%r)* (1%r/(2^l)%r))
+     q PRP.bad [PRP.f : (! mem x (dom PRP.m) /\ card PRP.s < q)] => //.
   apply sum_prop;by smt.
   inline PRP.init;wp;skip;by smt.
   proc;if;wp.
-  seq 1 : (mem y PRP.s) 
-          ((card PRP.s)%r * (1%r / (2^l)%r)) (1%r) 
+  seq 1 : (mem y PRP.s)
+          ((card PRP.s)%r * (1%r / (2^l)%r)) (1%r)
           (1%r - ((card PRP.s)%r * (1%r / (2^l)%r))) (0%r)
-          (!PRP.bad /\ ! mem x (dom PRP.m) /\ card PRP.s < q) => //. 
+          (!PRP.bad /\ ! mem x (dom PRP.m) /\ card PRP.s < q) => //.
    by rnd => //.
    rnd  (cpMem PRP.s);skip;progress;last trivial.
    delta uniform Block.length;rewrite Block.Dword.mu_cpMemw.
@@ -209,33 +209,33 @@ proof.
      cut H: forall x y, 0%r <= x => 0%r < y => 0%r <= x * y by smt.
      by apply H; [| rewrite -inv_def sign_inv]; smt.
    move=> c;proc;if;last by skip;smt.
- 
+
    wp;seq 1: ((! mem x (dom PRP.m) /\ card PRP.s < q) /\ c = card PRP.s /\
   ! mem x (dom PRP.m) /\ card PRP.s < q /\ in_supp y uniform); first by rnd.
    if;[rnd;wp|];skip;progress;by smt.
-         
+
   move=> b c;proc;wp;if;last by skip;smt.
-  seq 1:  ((! (! mem x (dom PRP.m) /\ card PRP.s < q) /\ PRP.bad = b /\ 
-          card PRP.s = c) /\ ! mem x (dom PRP.m) /\ card PRP.s < q /\ 
+  seq 1:  ((! (! mem x (dom PRP.m) /\ card PRP.s < q) /\ PRP.bad = b /\
+          card PRP.s = c) /\ ! mem x (dom PRP.m) /\ card PRP.s < q /\
           in_supp y uniform);first rnd;skip;by smt.
   if;[wp;rnd|];wp;skip;by smt.
 qed.
 
 
-lemma concl : forall &m, 
- Pr[ M(PRF,A).main() @ &m : res] <= 
+lemma concl : forall &m,
+ Pr[ M(PRF,A).main() @ &m : res] <=
  Pr[ M(PRP,A).main() @ &m : res] + q%r * (q-1)%r * (1%r / (2^l)%r).
 proof.
  move=> &m.
- apply (real_le_trans _  
- (Pr[ M(PRP,A).main() @ &m : res] + 
+ apply (real_le_trans _
+ (Pr[ M(PRP,A).main() @ &m : res] +
  Pr[ M(PRP,A).main() @ &m : PRP.bad /\ card PRP.s <= q]) _).
  by apply (prob1 &m).
- cut H: Pr[M(PRP, A).main() @ &m : PRP.bad /\ card PRP.s <= q] <= 
+ cut H: Pr[M(PRP, A).main() @ &m : PRP.bad /\ card PRP.s <= q] <=
         q%r * (q - 1)%r * (1%r / (2 ^ l)%r).
  by apply (prob2 &m).
  cut H1: forall (x y z : real), x <= y => z + x <= z + y;first by smt.
- by apply H1 => //.    
+ by apply H1 => //.
 qed.
 
 end section.

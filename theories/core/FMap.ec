@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -405,7 +405,7 @@ op filter: ('a -> 'b -> bool) -> ('a,'b) map -> ('a,'b) map.
 axiom get_filter f (m:('a,'b) map) x:
   (filter f m).[x] = if f x (oget m.[x]) then m.[x] else None.
 
-lemma filter_empty (f:'a -> 'b -> bool): 
+lemma filter_empty (f:'a -> 'b -> bool):
    filter f (empty<:'a,'b>) = empty<:'a,'b>.
 proof. by apply map_ext=> x;smt. qed.
 
@@ -511,7 +511,7 @@ axiom get_map (f:'b -> 'c) (m:('a,'b) map) (x:'a):
 
 lemma map_empty (f:'b -> 'c) : map f (empty<:'a,'b>) = empty<:'a,'c>.
 proof. apply map_ext => x;smt. qed.
-  
+
 lemma map_set (f:'b -> 'c) (m:('a,'b) map) (x:'a) y:
   map f (m.[x <- y]) = (map f m).[x <- f y].
 proof. by apply map_ext;move=> x';case (x = x');smt. qed.
@@ -557,7 +557,7 @@ proof.
     by apply/fsetP=> x'; rewrite in_fsetI in_fset1 in_fset0 /=; case (x' = x).
   rewrite !fcards0 //=.
   smt.
-qed.    
+qed.
 
 (** Miscellaneous higher-order stuff *)
 (* lam and lamo: turning maps into lambdas *)

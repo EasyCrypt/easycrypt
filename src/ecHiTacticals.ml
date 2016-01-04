@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -133,7 +133,7 @@ and process1_logic (ttenv : ttenv) (t : logtactic located) (tc : tcenv1) =
     | Psplit            -> process_split
     | Pfield st         -> process_algebra `Solve `Field st
     | Pring st          -> process_algebra `Solve `Ring  st
-    | Palg_norm         -> EcStrongRing.t_alg_eq 
+    | Palg_norm         -> EcStrongRing.t_alg_eq
     | Pexists fs        -> process_exists fs
     | Pleft             -> process_left
     | Pright            -> process_right
@@ -212,7 +212,7 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
   | EcLowPhlGoal.InvalidSplit (i, lo, hi) ->
       tc_error_lazy !!tc (fun fmt ->
         Format.fprintf fmt
-          "invalid split index: %d is not in the interval [%d..%d]" 
+          "invalid split index: %d is not in the interval [%d..%d]"
           i lo hi)
 
 (* -------------------------------------------------------------------- *)
@@ -228,7 +228,7 @@ and process_sub (ttenv : ttenv) tts tc =
 and process_fsub (ttenv : ttenv) (ts, t) tc =
   let ts = List.map (fst_map (process_tfocus tc)) ts in
   let tx i =
-    ts 
+    ts
       |> List.ofind (fun (p, _) -> p i)
       |> (function Some (_, t) -> Some t | _ -> t)
       |> omap (process1 ttenv)

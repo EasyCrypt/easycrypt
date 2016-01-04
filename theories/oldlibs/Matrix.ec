@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -68,7 +68,7 @@ axiom sub_get: forall (M:'a matrix) i j m n k l,
   (sub M (i,j) (m,n)).[(k,l)] = M.[(i + k,j + l)].
 
 (* write M (i,j) M' (k,l) (m,n): copy the contents of (sub M' (k,l) (m,n)) into M starting at index (i,j) *)
-op write: 'a matrix -> (int * int) -> 
+op write: 'a matrix -> (int * int) ->
           'a matrix -> (int * int) -> (int * int) -> 'a matrix.
 
 axiom write_size: forall (M M':'a matrix) i j k l m n,

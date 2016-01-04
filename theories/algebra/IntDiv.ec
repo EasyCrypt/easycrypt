@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -415,7 +415,7 @@ move: d; have wlog: forall d, 0 < d => `|m %/ d| <= `|m|; last first.
   by move=> lt0_d; rewrite -(opprK d) divzN normrN wlog oppr_gt0.
 admit. qed.
 *)
- 
+
 lemma nosmt leq_div2r d m n :
   m <= n => 0 <= d => m %/ d <= n %/ d.
 proof.

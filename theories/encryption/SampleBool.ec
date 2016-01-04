@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -15,14 +15,14 @@ require import OldMonoid.
 require Means.
 
 theory MeansBool.
-  
+
   clone export Means as M with
   type input <- bool,
   op d <- {0,1}.
 
   lemma Mean (A<:Worker) &m (p: bool -> glob A -> output -> bool):
-     Pr[Rand(A).main() @ &m : p (fst res) (glob A) (snd res)] = 
-     1%r/2%r*(Pr[A.work(true) @ &m : p true (glob A) res] + 
+     Pr[Rand(A).main() @ &m : p (fst res) (glob A) (snd res)] =
+     1%r/2%r*(Pr[A.work(true) @ &m : p true (glob A) res] +
                 Pr[A.work(false) @ &m : p false (glob A) res]).
   proof.
     cut Hf : is_finite (support {0,1})
@@ -40,24 +40,24 @@ theory MeansBool.
 
 end MeansBool.
 
-clone import MeansBool as MB with 
+clone import MeansBool as MB with
   type M.output <- bool.
 
 lemma Sample_bool (A<:Worker) &m (p:glob A -> bool):
-  Pr[Rand(A).main() @ &m : fst res = snd res /\ p (glob A)] - 
-  Pr[A.work(false) @ &m : p (glob A)]/2%r = 
-      1%r/2%r*(Pr[A.work(true) @ &m : res /\ p (glob A)] - 
+  Pr[Rand(A).main() @ &m : fst res = snd res /\ p (glob A)] -
+  Pr[A.work(false) @ &m : p (glob A)]/2%r =
+      1%r/2%r*(Pr[A.work(true) @ &m : res /\ p (glob A)] -
                Pr[A.work(false) @ &m : res /\ p (glob A)]).
 proof strict.
   cut := Mean A &m (fun b (gA:glob A) (b':bool), b = b' /\ p gA) => /= ->.
   cut Hd: 2%r <> Real.zero by smt.
-  cut -> : Pr[A.work(true) @ &m : true = res /\ p (glob A)] = 
+  cut -> : Pr[A.work(true) @ &m : true = res /\ p (glob A)] =
            Pr[A.work(true) @ &m : res /\ p (glob A)].
     by rewrite Pr[mu_eq];smt.
-  cut -> : Pr[A.work(false) @ &m : false = res /\ p (glob A)] = 
+  cut -> : Pr[A.work(false) @ &m : false = res /\ p (glob A)] =
            Pr[A.work(false) @ &m : !res /\ p (glob A)].
-    by rewrite Pr[mu_eq];smt.       
-  cut -> : Pr[A.work(false) @ &m : p (glob A)] = 
+    by rewrite Pr[mu_eq];smt.
+  cut -> : Pr[A.work(false) @ &m : p (glob A)] =
            Pr[A.work(false) @ &m : (!res /\ p (glob A)) \/ (res /\ p (glob A))].
     by rewrite Pr[mu_eq];smt.
   rewrite Pr[mu_disjoint];first smt.
@@ -66,7 +66,7 @@ qed.
 
 lemma Sample_bool_lossless (A<:Worker) &m:
   Pr[A.work(false) @ &m : true] = 1%r =>
-  Pr[Rand(A).main() @ &m : fst res = snd res] - 1%r/2%r = 
+  Pr[Rand(A).main() @ &m : fst res = snd res] - 1%r/2%r =
       1%r/2%r*(Pr[A.work(true) @ &m : res] - Pr[A.work(false) @ &m : res]).
 proof strict.
   move=> Hloss.

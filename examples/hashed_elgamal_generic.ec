@@ -2,7 +2,7 @@ require import Pred.
 require import Distr.
 require import Int.
 require import Real.
-require import FMap. 
+require import FMap.
 require import FSet.
 require (*--*) CDH.
 require (*--*) AWord.
@@ -49,7 +49,7 @@ clone import PKE as PKE_ with
   type pkey <- pkey,
   type skey <- skey,
   type plaintext <- plaintext,
-  type ciphertext <- ciphertext. 
+  type ciphertext <- ciphertext.
 
 module type Hash = {
   proc init(): unit
@@ -62,7 +62,7 @@ module Hashed_ElGamal (H:Hash): Scheme = {
 
     H.init();
     sk = $[0..q-1];
-    return (g ^ sk, sk);   
+    return (g ^ sk, sk);
   }
 
   proc enc(pk:pkey, m:plaintext): ciphertext = {
@@ -76,9 +76,9 @@ module Hashed_ElGamal (H:Hash): Scheme = {
   proc dec(sk:skey, c:ciphertext): plaintext option = {
     var gy, h, hm;
 
-    (gy, hm) = c; 
+    (gy, hm) = c;
     h = H.hash(gy ^ sk);
-    return Option.Some (h ^^ hm); 
+    return Option.Some (h ^^ hm);
   }
 }.
 
@@ -143,7 +143,7 @@ section.
       H.init();
       x       = $[0..q-1];
       y       = $[0..q-1];
-      gx      = g ^ x; 
+      gx      = g ^ x;
       gxy     = gx ^ y;
       (m0,m1) = BA.choose(gx);
       b       = ${0,1};
@@ -171,7 +171,7 @@ section.
     Pr[CPA(S,BA).main() @ &m: res] = Pr[G0.main() @ &m: res]
   by byequiv CPA_G0.
 
-  local module G1 = { 
+  local module G1 = {
     proc main() : bool = {
       var m0, m1, c, b, b';
       var x, y, h, gx, gxy;
@@ -179,7 +179,7 @@ section.
       H.init();
       x       = $[0..q-1];
       y       = $[0..q-1];
-      gx      = g ^ x; 
+      gx      = g ^ x;
       gxy     = gx ^ y;
       (m0,m1) = BA.choose(gx);
       b       = ${0,1};
@@ -200,7 +200,7 @@ section.
       H.init();
       x       = $[0..q-1];
       y       = $[0..q-1];
-      gx      = g ^ x; 
+      gx      = g ^ x;
       gxy     = gx ^ y;
       (m0,m1) = BA.choose(gx);
       b       = ${0,1};
@@ -223,7 +223,7 @@ section.
 
       x       = $[0..q-1];
       y       = $[0..q-1];
-      gx      = g ^ x; 
+      gx      = g ^ x;
       gxy     = gx ^ y;
       (m0,m1) = A.choose(gx);
       b       = ${0,1};
@@ -271,7 +271,7 @@ section.
   proof.
     rewrite (G0_D &m) (G1_D &m) (G2_D &m).
     apply (OnBound.ROM_BadCall D _ _ &m).
-      by progress; proc; auto; call (chooseL H _)=> //; auto; progress; smt. 
+      by progress; proc; auto; call (chooseL H _)=> //; auto; progress; smt.
       by progress; proc; call (guessL H _)=> //; auto.
   qed.
 
@@ -283,7 +283,7 @@ section.
       H.init();
       x       = $[0..q-1];
       y       = $[0..q-1];
-      gx      = g ^ x; 
+      gx      = g ^ x;
       gxy     = gx ^ y;
       (m0,m1) = BA.choose(gx);
       b       = ${0,1};
@@ -323,7 +323,7 @@ section.
 
   local module G2' = {
     var gxy : group
-   
+
     proc main() : bool = {
       var m0, m1, c, b, b';
       var x, y, h, gx;
@@ -331,7 +331,7 @@ section.
       H.init();
       x        = $[0..q-1];
       y        = $[0..q-1];
-      gx       = g ^ x; 
+      gx       = g ^ x;
       gxy      = gx ^ y;
       (m0,m1)  = BA.choose(gx);
       b        = ${0,1};
@@ -370,33 +370,33 @@ section.
       by proc; sp; if=> //; inline Bound(RO).LO.o RO.o; auto; smt.
     by skip; smt.
   qed.
-      
-  local lemma Pr_G2'_SCDH &m : 
+
+  local lemma Pr_G2'_SCDH &m :
     Pr[G2'.main() @ &m: res]
     = Pr[SCDH(SCDH_from_CPA(A,RO)).main() @ &m : res]
   by byequiv G2'_SCDH.
-   
+
   local lemma Reduction &m :
     Pr[CPA(S,BA).main() @ &m : res] <=
     1%r / 2%r + Pr[SCDH(SCDH_from_CPA(A,RO)).main() @ &m : res].
-  proof. 
+  proof.
     rewrite (Pr_CPA_G0 &m).
     rewrite -(Pr_G1' &m) -(G1_G1' &m).
     rewrite -(Pr_G2'_SCDH &m) -(G2_G2' &m).
     by apply (G0_G1_G2 &m).
   qed.
 
-  lemma mult_inv_le_r (x y z:real) : 
+  lemma mult_inv_le_r (x y z:real) :
     0%r < x => (1%r / x) * y <= z => y <= x * z.
   proof.
     move=> lt0x ledivxyz.
     cut:= mulrMle (1%r / x * y) z x _ _; [by smt | done  |].
     by rewrite -Real.Comm.Comm -Real.Assoc.Assoc -div_def 2:mul_div // smt.
-  qed.    
+  qed.
 
   (** Composing reduction from CPA to SCDH with reduction from SCDH to CDH *)
   lemma Security &m:
-      Pr[CPA(S,A(Bound(RO))).main() @ &m: res] - 1%r / 2%r <= 
+      Pr[CPA(S,A(Bound(RO))).main() @ &m: res] - 1%r / 2%r <=
       qH%r * Pr[CDH.CDH(CDH_from_SCDH(SCDH_from_CPA(A,RO))).main() @ &m: res].
   proof.
     apply (Trans _ (Pr[SCDH(SCDH_from_CPA(A,RO)).main() @ &m: res]));

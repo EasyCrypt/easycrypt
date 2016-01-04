@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -261,7 +261,7 @@ end = struct
 
   let asflags = function Flags m -> m | _ -> assert false
 
-  let oid = 
+  let oid =
     let default = Mstr.of_list KnownFlags.flags in
     let for_loading = function
       | Flags _ -> Flags default
@@ -417,7 +417,7 @@ module Options = struct
   let set scope name value =
     { scope with sc_options =
         Flags.set scope.sc_options name value }
-    
+
   let get_implicits scope =
     get scope KnownFlags.implicits
 
@@ -482,10 +482,10 @@ let maybe_add_to_section scope item =
 (* -------------------------------------------------------------------- *)
 module Prover = struct
 
-  let all_provers () = 
+  let all_provers () =
     List.map
       (fun p -> p.EcProvers.pr_name)
-      (EcProvers.known ~evicted:false) 
+      (EcProvers.known ~evicted:false)
 
   let check_prover_name { pl_desc = name; pl_loc = loc } =
     if not (EcProvers.is_prover_known name) then
@@ -501,12 +501,12 @@ module Prover = struct
           (match kind with `Lemma -> "lemma" | `Theory -> "theory")
           (string_of_qsymbol (unloc p))
       in
-      
+
       let addm hints hflag p =
         match EcEnv.Theory.lookup_opt (unloc p) env with
         | None -> nf `Theory p
         | Some (p, _) -> EcProvers.Hints.addm p hflag hints
-          
+
       and add1 hints hflag p =
         match EcEnv.Ax.lookup_opt (unloc p) env with
         | None -> nf `Lemma p
@@ -516,7 +516,7 @@ module Prover = struct
       match x.pht_kind with
       | `Theory -> addm hints x.pht_flag x.pht_name
       | `Lemma  -> add1 hints x.pht_flag x.pht_name
-        
+
     in
     let hints = EcProvers.Hints.empty in
     let hints = List.fold_left add hints db in
@@ -551,15 +551,15 @@ module Prover = struct
   }
 
   (* -------------------------------------------------------------------- *)
-  let process_prover_option env ppr = 
-    let provers = 
+  let process_prover_option env ppr =
+    let provers =
       match ppr.pprov_names with
       | None -> None, []
       | Some pl ->
-        let do_uo s = 
+        let do_uo s =
           if s.pl_desc = "ALL" then all_provers ()
           else [check_prover_name s] in
-        let uo = 
+        let uo =
           if pl.pp_use_only = [] then None
           else Some (List.flatten (List.map do_uo pl.pp_use_only)) in
         let do_ar (k,s) = k, check_prover_name s in
@@ -572,7 +572,7 @@ module Prover = struct
       po_provers   = provers;
       po_verbose   = verbose;
       pl_all       = ppr.plem_all;
-      pl_max       = 
+      pl_max       =
         begin match ppr.plem_max, ppr.plem_wanted with
         | Some i, _      -> Some (odfl max_int i)
         | None  , None   -> None
@@ -598,11 +598,11 @@ module Prover = struct
     let pr_iterate   = odfl dft.pr_iterate options.pl_iterate in
     let pr_wanted    = odfl dft.pr_wanted options.pl_wanted in
     let pr_unwanted  = odfl dft.pr_unwanted options.pl_unwanted in
-    let pr_provers   = 
+    let pr_provers   =
       let l = odfl dft.pr_provers (fst options.po_provers) in
-      let do_ar l (k, p) = 
+      let do_ar l (k, p) =
         match k with
-        | `Exclude -> List.remove_all l p 
+        | `Exclude -> List.remove_all l p
         | `Include -> if List.exists ((=) p) l then l else p::l
       in List.fold_left do_ar l (snd options.po_provers) in
 
@@ -617,31 +617,31 @@ module Prover = struct
     { scope with sc_options = Prover_info.set scope.sc_options pi; }
 
   (* -------------------------------------------------------------------- *)
-  let do_prover_info scope ppr = 
+  let do_prover_info scope ppr =
     let options = process_prover_option scope.sc_env ppr in
     mk_prover_info scope options
-       
+
   (* -------------------------------------------------------------------- *)
-  let process scope ppr = 
+  let process scope ppr =
     let pi = do_prover_info scope ppr in
     { scope with sc_options = Prover_info.set scope.sc_options pi }
 
   (* -------------------------------------------------------------------- *)
-  let set_default scope options = 
+  let set_default scope options =
     let provers = match fst options.po_provers with
-      | None   -> 
+      | None   ->
         let provers = EcProvers.dft_prover_names in
         List.filter EcProvers.is_prover_known provers
 
-      | Some l -> 
-        List.iter 
+      | Some l ->
+        List.iter
           (fun name -> if not (EcProvers.is_prover_known name) then
               hierror "unknown prover %s" name) l; l in
-    let options = 
+    let options =
       { options with po_provers = (Some provers, snd options.po_provers) } in
     let pi = mk_prover_info scope options in
     { scope with sc_options = Prover_info.set scope.sc_options pi }
- 
+
   (* -------------------------------------------------------------------- *)
   let full_check scope =
     { scope with sc_options = Check_mode.set_fullcheck scope.sc_options }
@@ -705,7 +705,7 @@ module Tactics = struct
         let htmode =
           match pac.puc_mode, mode with
           | Some true , `WeakCheck -> `Admit
-          | _         , `WeakCheck -> 
+          | _         , `WeakCheck ->
                hierror "cannot weak-check a non-strict proof script"
           | Some true , `Check     -> `Strict
           | Some false, `Check     -> `Standard
@@ -864,7 +864,7 @@ module Ax = struct
 
     match ax.pa_kind with
     | PILemma ->
-        let scope = 
+        let scope =
           start_lemma scope ~name:(unloc ax.pa_name)
             pucflags check (axd, None) in
         let scope = snd (Tactics.process1_r false `Check scope tintro) in
@@ -1148,7 +1148,7 @@ module Op = struct
               let tyop  = { tyop with op_kind = OB_oper None; } in
               let scope = bind scope (unloc op.po_name, tyop) in
               Ax.bind scope false (unloc ax, axop)
-  
+
           | _ -> hierror ~loc "cannot axiomatized non-plain operators"
       end
     in
@@ -1837,10 +1837,10 @@ module Theory = struct
   (* ------------------------------------------------------------------ *)
   let exit ?(pempty = `ClearOnly) ?(clears =[]) (scope : scope) =
     let rec add_restr1 section where env item : EcEnv.env =
-      match item with 
+      match item with
       | EcTheory.CTh_theory (name, th) ->
           add_restr section (EcPath.pqname where name) th env
-  
+
       | EcTheory.CTh_module me ->
           if EcSection.in_section section then begin
             let islocal =
@@ -1848,16 +1848,16 @@ module Theory = struct
                 (EcPath.pqname where me.me_name)
                 (EcSection.locals section)
             in
-  
+
             if islocal then
               Mod.add_local_restr env where me
             else
               env
           end else
             env
-  
+
       | _ -> env
-  
+
     and add_restr section where (th, thmode) env =
       match thmode with
       | `Abstract -> env
@@ -2034,7 +2034,7 @@ module Section = struct
               { scope with
                 sc_env = EcEnv.TypeClass.add_instance p cr scope.sc_env }
 
-          | T.CTh_baserw x -> 
+          | T.CTh_baserw x ->
               { scope with sc_env = EcEnv.BaseRw.add x scope.sc_env }
 
           | T.CTh_addrw (p, l) ->
@@ -2049,18 +2049,18 @@ end
 
 (* -------------------------------------------------------------------- *)
 module Auto = struct
-  let addrw scope (lc, x, l) = 
+  let addrw scope (lc, x, l) =
     let env = env scope in
 
     if lc then
       hierror "rewrite hints cannot be local";
 
-    let env, base = 
+    let env, base =
       match EcEnv.BaseRw.lookup_opt x.pl_desc env with
       | None ->
-        let pre, base = unloc x in 
-        if not (List.is_empty pre) then 
-          hierror ~loc:x.pl_loc 
+        let pre, base = unloc x in
+        if not (List.is_empty pre) then
+          hierror ~loc:x.pl_loc
             "cannot create rewrite hints out of its enclosing theory";
         let env = EcEnv.BaseRw.add base env in
         (env, fst (EcEnv.BaseRw.lookup x.pl_desc env))
@@ -2136,7 +2136,7 @@ module Cloning = struct
       let oname = omap fst (EcEnv.Theory.lookup_opt oname scope.sc_env) in
       let tenv  = EcSection.topenv scope.sc_section in
 
-      oname |> oiter (fun oname -> 
+      oname |> oiter (fun oname ->
         if EcUtils.is_none (EcEnv.Theory.by_path_opt oname tenv) then
           hierror "cannot clone a theory that has been defined in the active section")
     end else begin
@@ -2149,7 +2149,7 @@ module Cloning = struct
           cl_clone  = ovrds;
           cl_rename = rnms;
           cl_ntclr  = ntclr; }
-  
+
         = C.clone scope.sc_env thcl in
 
     let incl  = thcl.pthc_import = Some `Include in
@@ -2229,9 +2229,9 @@ module Search = struct
     let relevant =
       let get_path r = function `ByPath s -> Sp.union r s | _ -> r in
       List.fold_left get_path Sp.empty paths in
- 
+
     let axioms = EcSearch.search scope.sc_env paths in
-    let axioms = EcSearch.sort relevant axioms in 
+    let axioms = EcSearch.sort relevant axioms in
 
     let buffer = Buffer.create 0 in
     let fmt    = Format.formatter_of_buffer buffer in

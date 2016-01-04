@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -31,12 +31,12 @@ theory Dbool.
 
   axiom mu_def (p:bool -> bool):
     mu dbool p = (1%r / 2%r) * charfun p true + (1%r / 2%r) * charfun p false.
- 
+
   lemma supp_def (b:bool): in_supp b dbool.
   proof strict.
   by rewrite /in_supp /mu_x mu_def /charfun; smt.
   qed.
-  
+
   lemma mu_x_def (b:bool): mu_x dbool b = 1%r / 2%r.
   proof strict.
   by rewrite /mu_x mu_def /charfun; smt.

@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -69,11 +69,11 @@ lemma sum_add0 (f:'a -> t) (s:'a fset) (x:'a):
   (mem s x => f x = Z) =>
   sum f (s `|` fset1 x) = (f x) + (sum f s).
 proof strict.
-case (mem s x) => /= Hin.  
+case (mem s x) => /= Hin.
   have -> ->: s `|` fset1 x = s
     by apply/fsetP=> x'; rewrite in_fsetU in_fset1; case (x' = x).
   by rewrite addmC addmZ.
-by apply sum_add.  
+by apply sum_add.
 qed.
 
 lemma sum_disj (f:'a -> t) (s1 s2:'a fset) :
@@ -108,7 +108,7 @@ lemma sum_comp (f: t -> t) (g:'a -> t) (s: 'a fset):
 proof -strict.
   move=> Hz Ha;elim/fset_ind s.
     by rewrite !sum_empty Hz.
-  by move=> x s Hx Hr; rewrite sum_add // sum_add //= Hr Ha. 
+  by move=> x s Hx Hr; rewrite sum_add // sum_add //= Hr Ha.
 qed.
 
 lemma sum_add2 (f:'a -> t) (g:'a -> t) (s:'a fset):
@@ -153,10 +153,10 @@ qed.
 require import Int IntDiv.
 import List.Iota.
 
-op sum_ij (i j : int) (f:int -> t)  = 
+op sum_ij (i j : int) (f:int -> t)  =
   sum f (oflist (iota_ i (j - i + 1))).
 
-lemma sum_ij_gt (i j:int) f : 
+lemma sum_ij_gt (i j:int) f :
   j < i => sum_ij i j f = Z.
 proof -strict.
   by move=> gt_i_j; rewrite /sum_ij iota0 1:smt -set0E sum_empty.
@@ -164,7 +164,7 @@ qed.
 
 lemma sum_ij_split (k i j:int) f:
   i <= k <= j + 1 => sum_ij i j f = sum_ij i (k-1) f + sum_ij k j f.
-proof -strict. 
+proof -strict.
   move=> Hbound;rewrite /sum_ij -sum_disj.
     by apply/fsetP=> x; rewrite in_fset0 /= in_fsetI !mem_oflist !mem_iota smt.
   by congr; apply/fsetP=> x; rewrite in_fsetU !mem_oflist !mem_iota; smt.
@@ -175,7 +175,7 @@ proof -strict.
   by rewrite /sum_ij /= iota1 -set1E /sum fold1 /= addmC addmZ.
 qed.
 
-lemma sum_ij_le_r (i j:int) f : 
+lemma sum_ij_le_r (i j:int) f :
    i <= j =>
    sum_ij i j f = sum_ij i (j-1) f + f j.
 proof -strict.
@@ -183,7 +183,7 @@ proof -strict.
   by rewrite sum_ij_eq.
 qed.
 
-lemma sum_ij_le_l (i j:int) f : 
+lemma sum_ij_le_l (i j:int) f :
    i <= j =>
    sum_ij i j f = f i + sum_ij (i+1) j f.
 proof -strict.
@@ -234,7 +234,7 @@ end Comoid.
 (* For bool *)
 require Bool.
 
-clone Comoid as Mbor with 
+clone Comoid as Mbor with
    type Base.t <- bool,
    op Base.(+) <- (\/),
    op Base.Z   <- false,
@@ -269,7 +269,7 @@ theory Miplus.
 
  lemma sum_n_ii (k:int): sum_n k k = k
  by [].
- 
+
  lemma sum_n_ij1 (i j:int) : i <= j => sum_n i (j+1) = sum_n i j + (j+1)
  by [].
 
@@ -307,7 +307,7 @@ theory Miplus.
  import List.Iota.
 
  lemma sumn_le (i j k:int) : i <= j =>  0 <= j => j <= k =>
-   sum_n i j <= sum_n i k.    
+   sum_n i j <= sum_n i k.
  proof -strict.
    move=> Hij H0j Hjk;rewrite /sum_n /sum_ij.
    cut ->: oflist (iota_ i (k - i + 1))
@@ -318,9 +318,9 @@ theory Miplus.
    rewrite -!/(sum_ij _ _ _) -!/(sum_n _ _).
    smt.
  qed.
-   
+
 end Miplus.
-  
+
 (* For real *)
 require Real.
 
@@ -330,12 +330,12 @@ clone Comoid as Mrplus with
    op Base.Z   <- 0%r,
    op NatMul.( * ) = fun n, (Real.( * ) (n%r))
   proof Base.* by smt, NatMul.* by smt.
-import Int.  
+import Int.
 import Real.
 
-lemma NatMul_mul : forall (n:int) (r:real), 0 <= n => 
+lemma NatMul_mul : forall (n:int) (r:real), 0 <= n =>
     Mrplus.NatMul.( * ) n r = n%r * r.
-proof.    
+proof.
   move => n r;elim n;smt.
 qed.
 
@@ -367,7 +367,7 @@ proof -strict.
   by apply fun_ext => y;rewrite /cpOrs Mbor.sum_empty.
 qed.
 
-lemma cpOrs_add s (p:('a -> bool)) : 
+lemma cpOrs_add s (p:('a -> bool)) :
   cpOrs (s `|` fset1 p) = (predU p (cpOrs s)).
 proof -strict.
   apply fun_ext => y.
@@ -398,7 +398,7 @@ import Real.
 
 lemma mean (d:'a distr) (p:'a -> bool):
   is_finite (support d) =>
-  mu d p = 
+  mu d p =
     Mrplus.sum (fun x, (mu_x d x)*(charfun p x))
         (oflist (to_seq (support d))).
 proof strict.
@@ -410,7 +410,7 @@ proof strict.
       move=> [H1 H2];exists ((fun x0 y0, p x0 /\ x0 = y0) y);split => //.
       by apply/imageP; exists y; rewrite /sup mem_oflist mem_to_seq.
     move=> [p' []].
-    by rewrite imageP; progress => //;smt. 
+    by rewrite imageP; progress => //;smt.
   rewrite mu_ors.
     rewrite /is => x1 x2 Hx; rewrite !imageP => -[y1 [Hm1 Heq1]] [y2 [Hm2 Heq2]].
     subst; move: Hx => /= Hx a [Hpa1 Heq1];rewrite -not_def => -[Hpa2 Heq2].

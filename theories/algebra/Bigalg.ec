@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -113,7 +113,7 @@ end BMul.
 lemma mulr_big (P Q : 'a -> bool) (f g : 'a -> t) r s:
     BAdd.big P f r * BAdd.big Q g s
   = BAdd.big P (fun x => BAdd.big Q (fun y => f x * g y) s) r.
-proof. 
+proof.
 elim: r s => [|x r ih] s; first by rewrite BAdd.big_nil mul0r.
 rewrite !BAdd.big_cons; case: (P x) => Px; last by rewrite ih.
 by rewrite mulrDl -ih BAdd.mulr_sumr.

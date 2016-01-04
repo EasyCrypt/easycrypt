@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -228,7 +228,7 @@ let t_failure_event at_pos cntr ash q f_event pred_specs inv tc =
 let process_fel at_pos (infos : fel_info) tc =
   let env, hyps, concl = FApi.tc1_eflat tc in
 
-  if not (IFEL.loaded env) then 
+  if not (IFEL.loaded env) then
     tacuerror "fel: load the `FelTactic' theory first";
 
   let f = match concl.f_node with

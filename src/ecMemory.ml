@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -29,17 +29,17 @@ let mt_fv = function
   | None -> EcIdent.Mid.empty
   | Some lmt ->
     let fv = EcPath.x_fv EcIdent.Mid.empty lmt.mt_path in
-    Msym.fold (fun _ (_,ty) fv -> EcIdent.fv_union fv ty.ty_fv) lmt.mt_vars fv 
+    Msym.fold (fun _ (_,ty) fv -> EcIdent.fv_union fv ty.ty_fv) lmt.mt_vars fv
 
-let lmt_equal mt1 mt2 =   
+let lmt_equal mt1 mt2 =
   EcPath.x_equal mt1.mt_path mt2.mt_path &&
-    Msym.equal (fun (p1,ty1) (p2,ty2) -> p1 = p2 && ty_equal ty1 ty2) 
+    Msym.equal (fun (p1,ty1) (p2,ty2) -> p1 = p2 && ty_equal ty1 ty2)
       mt1.mt_vars mt2.mt_vars
 
 let lmt_xpath mt = mt.mt_path
 let lmt_bindings mt = mt.mt_vars
 
-let mt_equal mt1 mt2 = 
+let mt_equal mt1 mt2 =
   match mt1, mt2 with
   | Some mt1, Some mt2 -> lmt_equal mt1 mt2
   | None, None         -> true
@@ -48,16 +48,16 @@ let mt_equal mt1 mt2 =
 let mt_xpath = function
   | None -> assert false
   | Some mt -> lmt_xpath mt
- 
+
 let mt_bindings = function
   | None -> assert false
   | Some mt -> lmt_bindings mt
 
 (* -------------------------------------------------------------------- *)
-type memenv = memory * memtype 
+type memenv = memory * memtype
 
-let me_equal (m1,mt1) (m2,mt2) = 
-  mem_equal m1 m2 && mt_equal mt1 mt2 
+let me_equal (m1,mt1) (m2,mt2) =
+  mem_equal m1 m2 && mt_equal mt1 mt2
 
 (* -------------------------------------------------------------------- *)
 let memory   (m,_) = m
@@ -90,13 +90,13 @@ let bind x ty me = bindp x None ty me
 
 (* -------------------------------------------------------------------- *)
 let lookup (x : symbol) ((_,mt) : memenv) =
-  match mt with 
+  match mt with
   | None -> None
   | Some mt ->  Msym.find_opt x (lmt_bindings mt)
 
 let is_bound x me = lookup x me <> None
-  
-let is_bound_pv pv me = 
+
+let is_bound_pv pv me =
   is_loc pv && is_bound (EcPath.xbasename pv.pv_name) me
 (* -------------------------------------------------------------------- *)
 let mt_subst sx st o =
@@ -104,9 +104,9 @@ let mt_subst sx st o =
   | None -> o
   | Some mt ->
     let p' = sx mt.mt_path in
-    let vars' = 
+    let vars' =
       if st == identity then mt.mt_vars else
-        Msym.map (fun (p,ty) -> p, st ty) mt.mt_vars in 
+        Msym.map (fun (p,ty) -> p, st ty) mt.mt_vars in
            (* FIXME could be greate to use smart_map *)
     if p' == mt.mt_path && vars' == mt.mt_vars then o else
       Some { mt_path   = p'; mt_vars   = vars' }
@@ -117,7 +117,7 @@ let mt_substm sp smp st o =
 let me_subst sx sm st (m,mt as me) =
   let m' = EcIdent.Mid.find_def m m sm in
   let mt' = mt_subst sx st mt in
-  if m' == m && mt' == mt then me else 
+  if m' == m && mt' == mt then me else
     (m', mt')
 
 let me_substm sp smp sm st me =

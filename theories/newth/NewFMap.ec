@@ -1,7 +1,7 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
  * Copyright (c) - 2012--2016 - Inria
- * 
+ *
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
@@ -69,7 +69,7 @@ proof. by rewrite {1}/reduce /= augment_nil reduce_cat cat1s. qed.
 
 lemma assoc_reduce (s : ('a * 'b) list):
   forall x, assoc (reduce s) x = assoc s x.
-proof. 
+proof.
   move=> x; elim: s => //; case=> x' y' s ih.
   rewrite reduce_cons !assoc_cons; case: (x = x')=> // ne_xx'.
   by rewrite assoc_filter /predC1 ne_xx'.
@@ -240,12 +240,12 @@ proof.
   by move=> -> ->.
 qed.
 
-lemma get_oget (m:('a,'b)fmap) (x:'a) : 
+lemma get_oget (m:('a,'b)fmap) (x:'a) :
     mem (dom m) x => m.[x] = Some (oget m.[x]).
 proof. by rewrite in_dom;case (m.[x]). qed.
 
 (* -------------------------------------------------------------------- *)
-op rng ['a 'b] (m : ('a, 'b) fmap) = 
+op rng ['a 'b] (m : ('a, 'b) fmap) =
   FSet.oflist (map snd (elems m))
   axiomatized by rngE.
 
@@ -459,7 +459,7 @@ lemma filter_eq (m:('a,'b)fmap) (p1 p2:'a->'b->bool):
    (forall a b, p1 a b = p2 a b) =>
    filter p1 m = filter p2 m.
 proof. by move=>Hp;apply filter_eq_dom=>?_;apply Hp. qed.
-   
+
 (* -------------------------------------------------------------------- *)
 op map (f : 'a -> 'b -> 'c) (m : ('a, 'b) fmap) =
   oflist (map (fun (x : 'a * 'b) => (x.`1,f x.`1 x.`2)) (elems m))
@@ -600,11 +600,11 @@ lemma find_set (m:('a,'b) fmap) y x (p:'a -> 'b -> bool):
   (forall x, mem (dom m) x => !p x (oget m.[x])) =>
   find p m.[x <- y] = if p x y then Some x else None.
 proof.
-  cut [[a []->[]] | []-> Hp Hnp]:= findP p (m.[x<-y]);1: rewrite getP dom_set !inE /#. 
+  cut [[a []->[]] | []-> Hp Hnp]:= findP p (m.[x<-y]);1: rewrite getP dom_set !inE /#.
   by case (p x y)=> //; cut := Hp x;rewrite getP dom_set !inE /= oget_some.
 qed.
 
-lemma rng_set (m : ('a, 'b) fmap) (a : 'a) (b : 'b): 
+lemma rng_set (m : ('a, 'b) fmap) (a : 'a) (b : 'b):
       rng m.[a<-b] = rng (rem a m) `|` fset1 b.
 proof.
   rewrite fsetP=> y; rewrite in_fsetU in_fset1 !in_rng; split=> [[] x |].
@@ -778,12 +778,12 @@ have: 0 < card (((dom m) `|` fset1 x) `\` (rng m)); last by smt.
 rewrite fcardD fcardUI_indep ?fcard1.
 + by apply/fsetP=> x'; rewrite in_fsetI in_fset1 in_fset0 /=; case (x' = x).
 smt.
-qed.    
+qed.
 
 
 (** TODO: lots of lemmas *)
 lemma rem0 (a : 'a) : rem a map0<:'a,'b> = map0.
-proof. 
+proof.
   by apply map0_eq0=>x;rewrite remP;case (x=a)=>//=;rewrite map0P.
 qed.
 
@@ -795,7 +795,7 @@ qed.
 lemma map_map0 (f:'a -> 'b -> 'c): map f map0 = map0.
 proof. by rewrite fmapP=> x;rewrite mapP !map0P. qed.
 
-lemma map_set (f:'a -> 'b -> 'c) m x y : 
+lemma map_set (f:'a -> 'b -> 'c) m x y :
   map f m.[x<-y] = (map f m).[x<- f x y].
 proof.
   by rewrite fmapP=>z;rewrite mapP !getP;case (z=x)=>// _;rewrite mapP.
