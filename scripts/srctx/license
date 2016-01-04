@@ -102,6 +102,7 @@ class CoqCopyrightStyle(CopyrightStyle):
     def format(self, contents):
         contents = [' * %s' % (x,) for x in contents]
         contents = ['(* %s' % ('-' * 68,)] + contents + [' * %s *)' % ('-' * 68,)]
+        contents = [x.rstrip() for x in contents]
         contents = '\n'.join([x.rstrip('\r\n') for x in contents]) + '\n\n'
         return contents
 
