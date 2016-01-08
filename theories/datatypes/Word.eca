@@ -213,11 +213,13 @@ apply/duniform_ll/negP=> zw; move: (enumP witness).
 by rewrite zw.
 qed.
 
-lemma dword_uf_fu: is_uniform_over dword predT.
+lemma dword_uf: is_uniform dword.
 proof.
-split; first by move=> x; rewrite supportP.
 apply/duniform_uf/negP=> zw; move: (enumP witness).
 by rewrite zw.
 qed.
+
+lemma dword_fu: support dword = predT.
+proof. by rewrite pred_ext=> x; rewrite supportP. qed.
 
 end DWord.

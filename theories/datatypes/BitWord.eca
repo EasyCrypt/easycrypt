@@ -18,8 +18,8 @@ clone include Word with
   type Alphabet.t    <- bool,
   op   Alphabet.enum <- [true; false],
   op   Alphabet.card <- 2,
-  op   n <- n,
-  op   dchar <- false
+  op   n             <- n,
+  op   dchar         <- false
 
 proof Alphabet.* by case, ge0_n by apply/ltzW/gt0_n
 
