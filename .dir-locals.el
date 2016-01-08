@@ -6,5 +6,4 @@
     (eval . (add-hook 'write-contents-functions 'delete-trailing-whitespace))))
  (easycrypt-mode .
    ((require-final-newline . t)
-    (indent-tabs-mode . nil)
-    (eval . (add-hook 'write-contents-functions 'delete-trailing-whitespace)))))
+    (indent-tabs-mode . nil)))
