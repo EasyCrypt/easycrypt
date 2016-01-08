@@ -209,7 +209,15 @@ qed.
 
 lemma dword_ll: mu dword predT = 1%r.
 proof.
-apply/duniform_ll; apply/negP=> zw; move: (enumP witness).
+apply/duniform_ll/negP=> zw; move: (enumP witness).
 by rewrite zw.
 qed.
+
+lemma dword_uf_fu: is_uniform_over dword predT.
+proof.
+split; first by move=> x; rewrite supportP.
+apply/duniform_uf/negP=> zw; move: (enumP witness).
+by rewrite zw.
+qed.
+
 end DWord.

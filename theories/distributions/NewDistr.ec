@@ -193,8 +193,15 @@ lemma support_duniform ['a] (s : 'a list): support (duniform s) = mem s.
 proof. by rewrite MRat.support_drat pred_ext=>x; rewrite mem_undup. qed.
 
 lemma duniform_ll (s : 'a list) :
-  s <> [] => mu (duniform s) predT = 1%r.
+  s <> [] => is_lossless (duniform s).
 proof. by move=> nz_s; apply/MRat.drat_ll; rewrite undup_nilp. qed.
+
+lemma duniform_uf (s : 'a list) :
+  s <> [] => is_uniform (duniform s).
+proof.
+move=> s_ne0; rewrite /is_uniform duniform_ll //=.
+by move=> x y; rewrite 2!duniform1E support_duniform=> !->.
+qed.
 end MUniform.
 
 (* -------------------------------------------------------------------- *)
