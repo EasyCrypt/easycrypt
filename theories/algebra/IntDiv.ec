@@ -131,6 +131,9 @@ proof. by move=> /edivz_eq /(_ 0). qed.
 lemma modz_small m d: 0 <= m < `|d| => m %% d = m.
 proof. by move=> /emodz_eq /(_ 0). qed.
 
+lemma nosmt pmod_small n d: 0 <= n < d => n %% d = n.
+proof. by move=> h; apply/modz_small => /#. qed.
+
 (* -------------------------------------------------------------------- *)
 lemma divz_eq0 m d : 0 < d => (0 <= m < d) <=> (m %/ d = 0).
 proof. move=> gt0_d; split=> [[ge0_m lt_md]|].
