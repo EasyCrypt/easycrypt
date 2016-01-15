@@ -85,7 +85,7 @@ module CI_Distr = struct
 
   let _Distr   = fun x -> EcPath.pqname p_Distr x
 
-  let p_dbool = List.fold_left EcPath.pqname CI_Bool.p_Bool ["Dbool"; "dbool"]
+  let p_dbool = List.fold_left EcPath.pqname p_top ["DBool"; "dbool"]
   let p_dbitstring = List.fold_left EcPath.pqname p_Distr ["Dbitstring"; "dbitstring"]
   let p_dinter     = List.fold_left EcPath.pqname p_Distr ["Dinter"; "dinter"]
 

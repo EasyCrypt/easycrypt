@@ -5,9 +5,8 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import Option.
-require import Bool.
-require import List.
+require import Option Bool List.
+require import DBool.
 
 type key.
 type plaintext.

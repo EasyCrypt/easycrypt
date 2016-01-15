@@ -6,7 +6,7 @@
  * -------------------------------------------------------------------- *)
 
 require import Bool Option FSet.
-require (*--*) NewSKE.
+require (*--*) DBool NewSKE.
 
 clone include NewSKE.
 

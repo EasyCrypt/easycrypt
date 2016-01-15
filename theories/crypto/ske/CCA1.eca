@@ -6,7 +6,7 @@
  * -------------------------------------------------------------------- *)
 
 require import Bool Option.
-require (*--*) NewSKE.
+require (*--*) DBool NewSKE.
 
 clone include NewSKE.
 

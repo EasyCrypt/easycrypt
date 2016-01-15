@@ -5,12 +5,8 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import Real.
-require import Finite List.
-require import FSet.
-require import Pair.
-require import Distr.
-require import OldMonoid.
+require import Pair List FSet Finite Real Distr OldMonoid.
+require DBool.
 
 require Means.
 
@@ -33,7 +29,7 @@ theory MeansBool.
       by apply/fsetP=> x; rewrite !inE mem_oflist mem_to_seq//; smt.
     rewrite Mrplus.sum_add /=;first smt.
     rewrite Mrplus.sum_add /=;first smt.
-    rewrite Mrplus.sum_empty /= !Bool.Dbool.mu_x_def.
+    rewrite Mrplus.sum_empty /= !DBool.dboolb.
     cut Hd: 2%r <> 0%r by smt.
     by algebra.
   qed.

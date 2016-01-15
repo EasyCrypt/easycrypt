@@ -5,15 +5,8 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import Int.
-require import Real.
-require import FSet.
-require import Finite.
-require import Pair.
-require import Distr.
-require import OldMonoid.
-require import SampleBool.
-require Hybrid.
+require import Pair Int FSet Real Distr SampleBool OldMonoid.
+require DBool Hybrid.
 
 type input.
 

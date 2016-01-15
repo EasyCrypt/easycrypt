@@ -5,10 +5,8 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import Bool.
-require import Int.
-require import Option.
-require import FSet.
+require import Bool Int Option FSet.
+require import DBool.
 
 type key.
 type message.
