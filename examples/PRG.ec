@@ -1,6 +1,4 @@
-require import Int List Real FSet FMap Distr.
-require (*--*) Monoid.
-(*---*) import Monoid.Miplus.
+require import Int IntDiv List Real FSet FMap Distr.
 
 (*** Some type definitions *)
 (** Our PRG uses a type for internal seeds
@@ -8,9 +6,9 @@ require (*--*) Monoid.
 type seed.
 
 op dseed: { seed distr | is_uniform_over dseed predT } as dseed_uf_fu.
-lemma dseed_ll:  is_lossless dseed by [].
-lemma dseed_suf: is_subuniform dseed by [].
-lemma dseed_fu:  is_full dseed by [].
+lemma dseed_ll:  is_lossless dseed by smt w=dseed_uf_fu.
+lemma dseed_suf: is_subuniform dseed by smt w=dseed_uf_fu.
+lemma dseed_fu:  is_full dseed by smt w=dseed_uf_fu.
 
 op pr_dseed = mu_x dseed witness.
 
@@ -35,8 +33,7 @@ module type PRG = {
     the PRG at most qP times and
     the PRF at most qF times and
     return a boolean *)
-op qP:int.
-axiom leq0_qP: 0 <= qP.
+op qP : { int | 0 <= qP } as leq0_qP.
 
 op qF:int.
 axiom leq0_qF: 0 <= qF.
@@ -94,7 +91,7 @@ module F = {
 
     r1 = $dseed;
     r2 = $dout;
-    if (!mem x (dom m))
+    if (!mem (dom m) x)
       m.[x] = (r1,r2);
 
     return oget (m.[x]);
@@ -158,10 +155,10 @@ module Resample = {
   proc resample() : unit = {
     var n, r;
 
-    n = length P.logP;
+    n = size P.logP;
     P.logP = [];
     P.seed = $dseed;
-    while (length P.logP < n) {
+    while (size P.logP < n) {
       r = $dseed;
       P.logP = r :: P.logP;
     }
@@ -215,19 +212,19 @@ section.
   by do !sim.
   qed.
 
-  pred Bad logP (m:('a,'b) map) =          (* Bad holds whenever: *)
-       !unique logP                        (*  - there is a cycle in the state, OR *)
-    \/ exists r, mem r logP /\ mem r (dom m). (*  - an adversary query collides with an internal seed. *)
+  pred Bad logP (m:('a,'b) map) =             (* Bad holds whenever: *)
+       !uniq logP                             (*  - there is a cycle in the state, OR *)
+    \/ exists r, mem logP r /\ mem (dom m) r. (*  - an adversary query collides with an internal seed. *)
 
   lemma notBad logP (m:('a,'b) map):
     !Bad logP m <=>
-      (unique logP /\ forall r, !mem r logP \/ !mem r (dom m))
+      (uniq logP /\ forall r, !mem logP r \/ !mem (dom m) r)
   by smt.
 
   (* In this game, we replace the PRF with fresh samples *)
   pred inv (m1 m2:('a,'b) map) (logP:'a list) =
-    (forall r, mem r (dom m1) <=> (mem r (dom m2) \/ mem r logP)) /\
-    (forall r, mem r (dom m2) => m1.[r] = m2.[r]).
+    (forall r, mem (dom m1) r <=> (mem (dom m2) r \/ mem logP r)) /\
+    (forall r, mem (dom m2) r => m1.[r] = m2.[r]).
 
   local lemma Plog_Psample &m:
     Pr[Exp(A,F,Plog).main() @ &m: res] <=
@@ -247,13 +244,13 @@ section.
     by move=> _ _; apply FfL.
     (* F.f preserves bad *)
     move=> _ //=; proc.
-    case (mem x (dom F.m)).
+    case (mem (dom F.m) x).
       by rcondf 3; wp; do !rnd=> //; wp; skip; smt.
     rcondt 3; first by do !rnd; wp.
     auto; progress. smt. smt.
     elim H=> H; [by left | right].
     elim H=> r [r_in_logP r_in_m].
-    by exists r; split=> //; rewrite dom_set mem_add; left.
+    by exists r; split=> //; rewrite dom_set in_fsetU; left.
     (* [Psample.prg ~ Plog.prg: I] when Bad does not hold *)
     proc; inline F.f. swap{2} 3 -2.
     wp; do 2!rnd; wp; skip; progress; first 2 last; last 9 smt.
@@ -289,7 +286,7 @@ section.
   local lemma Resample_resampleL: islossless Resample.resample.
   proof.
   proc.
-  while (true) (n - length P.logP);
+  while (true) (n - size P.logP);
     first by move=> z; wp; rnd predT; skip; smt.
   by rnd predT; wp; skip; smt.
   qed.
@@ -322,10 +319,10 @@ section.
       swap{1} 3 3. swap{2} [4..5] 2. swap{2} [6..8] 1.
       swap{1} 4 3. swap{1} 4 2. swap{2} 2 4.
       sim.
-      splitwhile {2} 5 : (length P.logP < n - 1).
+      splitwhile {2} 5 : (size P.logP < n - 1).
       conseq (_ : _ ==> ={P.logP})=> //.
-      seq 3 5: (={P.logP} /\ (length P.logP = n - 1){2}).
-        while (={P.logP} /\ n{2} = n{1} + 1 /\ length P.logP{1} <= n{1});
+      seq 3 5: (={P.logP} /\ (size P.logP = n - 1){2}).
+        while (={P.logP} /\ n{2} = n{1} + 1 /\ size P.logP{1} <= n{1});
           first by wp; rnd; skip; progress; smt.
         by wp; rnd{2}; skip; progress=> //; smt.
       rcondt{2} 1; first by move=> _; skip; smt.
@@ -432,15 +429,15 @@ section.
   qed.
 
   local lemma Bad_bound:
-    phoare [Exp'(C(A)).main : true ==> Bad P.logP F.m] <= ((qP * qF + (qP - 1) * qP /% 2)%r * pr_dseed).
+    phoare [Exp'(C(A)).main : true ==> Bad P.logP F.m] <= ((qP * qF + (qP - 1) * qP %/ 2)%r * pr_dseed).
   proof.
   proc.
   seq 3: true
-         1%r ((qP * qF + (qP - 1) * qP /% 2)%r * pr_dseed)
+         1%r ((qP * qF + (qP - 1) * qP %/ 2)%r * pr_dseed)
          0%r 1%r
-         (length P.logP <= qP /\ card (dom F.m) <= qF)=> //.
+         (size P.logP <= qP /\ card (dom F.m) <= qF)=> //.
     inline Exp'(C(A)).A.a; wp.
-    call (_: length P.logP = C.cP /\ C.cP <= qP /\
+    call (_: size P.logP = C.cP /\ C.cP <= qP /\
              card (dom F.m) <= C.cF /\ C.cF <= qF).
       (* f *)
       proc; sp; if=> //.
@@ -449,7 +446,7 @@ section.
       by wp; skip; smt.
       (* prg *)
       proc; sp; if=> //.
-      call (_: length P.logP = C.cP - 1 ==> length P.logP = C.cP);
+      call (_: size P.logP = C.cP - 1 ==> size P.logP = C.cP);
         first by proc; wp; do !rnd; skip; smt.
       by wp; skip; smt.
     by inline Psample.init F.init;
@@ -457,13 +454,13 @@ section.
   inline Resample.resample.
   exists* P.logP; elim* => logP.
   seq 3: true
-         1%r  ((qP * qF + (qP - 1) * qP /% 2)%r * pr_dseed)
+         1%r  ((qP * qF + (qP - 1) * qP %/ 2)%r * pr_dseed)
          0%r 1%r
-         (n = length logP /\ n <= qP /\ P.logP = [] /\
+         (n = size logP /\ n <= qP /\ P.logP = [] /\
           card (dom F.m) <= qF)=> //.
     by rnd; wp.
   conseq [-frame] (_:_: <= (if Bad P.logP F.m then 1%r else
-                  ((sum_n (qF + length P.logP) (qF + n - 1))%r * pr_dseed))).
+                  ((sum_n (qF + size P.logP) (qF + n - 1))%r * pr_dseed))).
     progress; cut ->: Bad [] F.m{hr} = false by smt.
     rewrite //=; apply CompatOrderMult=> //; last smt.
     move: H0 H; elim/list_case logP=> //=.
@@ -476,8 +473,8 @@ section.
       move=> x l H0 H; rewrite sumn_ij; first smt.
       rewrite !FromInt.Add.
       apply addleM.
-        cut ->: (qF + (1 + length l) - 1 - qF + 1) = (1 + length l) by smt.
-        cut ->: qF * (1 + length l) = (1 + length l) * qF by smt.
+        cut ->: (qF + (1 + size l) - 1 - qF + 1) = (1 + size l) by smt.
+        cut ->: qF * (1 + size l) = (1 + size l) * qF by smt.
         smt.
       rewrite from_intMle; apply ediv_Mle=> //.
       by apply mulMle; smt.
@@ -487,8 +484,8 @@ section.
     case (Bad P.logP F.m).
       by conseq ( _ : _ : <= (1%r))=> //; smt.
     seq 2: (Bad P.logP F.m)
-           ((qF + length logPw)%r * pr_dseed) 1%r
-           1%r ((sum_n (qF + (length logPw + 1)) (qF + n - 1))%r * pr_dseed)
+           ((qF + size logPw)%r * pr_dseed) 1%r
+           1%r ((sum_n (qF + (size logPw + 1)) (qF + n - 1))%r * pr_dseed)
            (n = n0 /\ F.m = m /\ r::logPw = P.logP /\
             n <= qP /\ card (dom F.m) <= qF)=> //.
       by wp; rnd=> //.
@@ -504,10 +501,10 @@ section.
           apply mu_cpMem_le=> x _.
             by rewrite (dseed_suf x witness) 3:/pr_dseed // dseed_fu.
             by apply CompatOrderMult; smt.
-        by apply mu_Lmem_le_length; smt.
+        by apply mu_Lmem_le_size; smt.
         conseq [-frame] Hw; progress=> //.
         move: H1; rewrite -neqF=> -> //=.
-        cut ->: 1 + length logPw = length logPw + 1 by smt.
+        cut ->: 1 + size logPw = size logPw + 1 by smt.
         done.
       progress => //.
       move: H2; rewrite -neqF=> -> //=.
