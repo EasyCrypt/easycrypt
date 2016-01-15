@@ -57,7 +57,8 @@ proof.
     move=> [[x xs'] /= [->]]; rewrite Dprod.supp_def /fst /snd /=.
     rewrite -!/(support _ xs') ih; smt.
     case xs=> [|x xs /= [len_n [x_in_d all_in_d]]]; 1:smt.
-    by exists (x,xs)=> //=; rewrite Dprod.supp_def /fst/ snd /= smt.
+    exists (x,xs)=> //=; rewrite Dprod.supp_def /fst/ snd x_in_d /=.
+    by rewrite -/(support _ _) ih -(addzI 1 (size xs) n) -?(addzC n 1).
 qed.
 
 lemma mux_dlist0 (d : 'a distr) n x:

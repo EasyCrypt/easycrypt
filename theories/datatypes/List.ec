@@ -946,7 +946,10 @@ proof. smt. qed.
 
 lemma size_trim (xs : 'a list) (n : int): 0 <= n < size xs =>
   size (trim xs n) = size xs - 1.
-proof. smt. qed.
+proof.
+move=> [] le0_n ltn_size; rewrite size_cat size_take ?ltn_size //=.
+by rewrite size_drop /#.
+qed.
 
 lemma trim_head (x : 'a) (xs : 'a list):
   trim (x :: xs) 0 = xs.
