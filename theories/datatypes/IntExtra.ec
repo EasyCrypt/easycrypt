@@ -121,11 +121,21 @@ end IterOp.
 export IterOp.
 
 (* -------------------------------------------------------------------- *)
-op odd (z : int) = iter z [!] false.
+op odd (z : int) = iter `|z| [!] false.
 
 lemma odd0 : !odd 0. proof. by rewrite iter0. qed.
 lemma odd1 :  odd 1. proof. by rewrite iter1. qed.
 lemma odd2 : !odd 2. proof. by rewrite iter2. qed.
 
-lemma oddS z : 0 <= z => odd (z + 1) = !(odd z).
-proof. by move/iterS<:bool>=> ->. qed.
+lemma oddN z : odd (-z) = odd z by [].
+lemma odd_abs z : odd `|z| = odd z by [].
+lemma oddS z : odd (z + 1) = !(odd z) by [].
+
+lemma oddD z1 z2 : odd (z1 + z2) = (odd z1 = !odd z2).
+proof. by elim/intwlog: z1 z2; smt w=(odd0 oddS oddN). qed.
+
+lemma oddM z1 z2 : odd (z1 * z2) = ((odd z1) /\ (odd z2)).
+proof.
+elim/intwlog: z1 => [z1 /#| |z1] /=; 1: by rewrite odd0.
+by move=> ge0_z1 ih; rewrite mulzDl /= oddS oddD ih /#.
+qed.

@@ -154,6 +154,13 @@ by rewrite ler_eqVlt eq_sym nz_iM2 /= (@ltzS _ 1) ltzE -eqr_le.
 qed.
 
 (* -------------------------------------------------------------------- *)
+lemma oddP z: odd z <=> (z %% 2 <> 0).
+proof. smt. qed.
+
+lemma oddPn z: !odd z <=> (z %% 2 = 0).
+proof. by rewrite oddP /#. qed.
+
+(* -------------------------------------------------------------------- *)
 lemma nosmt modz_mod m d : m %% d %% d = m %% d.
 proof.
 case: (d = 0) => [->|nz_d]; first by rewrite modz0.

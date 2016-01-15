@@ -154,6 +154,17 @@ lemma nosmt ge0case (p : int -> bool):
   => forall n, p n.
 proof. by move=> ihn ih0 ihp n; apply/ge0ind=> // k /ihp. qed.
 
+lemma nosmt intwlog (p:int -> bool):
+  (forall i, p (-i) => p i) =>
+  (p 0) =>
+  (forall i, 0 <= i => p i => p (i + 1)) =>
+  (forall i, p i).
+proof.
+move=> wlog ih0 ihS; have: forall i, 0 <= i => p i by elim/intind.
+move=> {ih0 ihS} ih i; case: (lezWP 0 i); 1: by apply/ih.
+by move=> _ le0_i; apply/wlog/ih; rewrite oppz_ge0.
+qed.
+
 (* -------------------------------------------------------------------- *)
 (* Fold operator *)
 

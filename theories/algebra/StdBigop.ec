@@ -6,10 +6,12 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Pred Int IntExtra Real RealExtra Ring List.
+require import Pred Int IntExtra IntDiv Real RealExtra Ring List.
 require import StdRing StdOrder.
 require (*--*) Bigop Bigalg.
 (*---*) import IntID IntOrder.
+
+pragma Proofs:weak.
 
 (* -------------------------------------------------------------------- *)
 theory Bigint.
@@ -49,6 +51,16 @@ lemma nosmt big_count (P : 'a -> bool) s:
     BIA.big P (fun (x : 'a) => count (pred1 x) s) (undup s)
   = size (filter P s).
 proof. admit. qed.
+
+abbrev sumid i j = BIA.bigi predT (fun n => n) i j.
+
+lemma sumidE n : 0 <= n =>
+  BIA.bigi predT (fun i => i) 0 n = (n * (n - 1)) %/ 2.
+proof.
+elim: n => /= [|n ge0_n ih]; first by rewrite BIA.big_geq // div0z.
+rewrite BIA.big_int_recr //= ih addrK mulrC -{3}(mulzK n 2) //.
+by rewrite -divzDl 2:/# dvdzE -oddPn oddM -{2}(addzK 1) addzAC oddS /#.
+qed.
 end Bigint.
 
 import Bigint.
