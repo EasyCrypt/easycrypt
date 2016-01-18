@@ -172,6 +172,7 @@
     "const"       , CONST      ;        (* KW: global *)
     "op"          , OP         ;        (* KW: global *)
     "pred"        , PRED       ;        (* KW: global *)
+    "inductive"   , INDUCTIVE  ;        (* KW: global *)
     "notation"    , NOTATION   ;        (* KW: global *)
     "abbrev"      , ABBREV     ;        (* KW: global *)
     "require"     , REQUIRE    ;        (* KW: global *)
