@@ -782,7 +782,7 @@ module Mpv2 = struct
         let eqs = add_eq local eqs e1 e2 in
         let local = enter_local env local (lp_bind lp1) (lp_bind lp2) in
         add_eq local eqs f1 f2
-      | Fint i1, Fint i2 when i1 = i2 -> eqs
+      | Fint i1, Fint i2 when EcBigInt.equal i1 i2 -> eqs
       | Flocal id1, Flocal id2 when
           opt_equal EcIdent.id_equal (Some id1) (Mid.find_opt id2 local) -> eqs
       | Fpvar(pv1,m1), Fpvar(pv2,m2)
@@ -890,7 +890,7 @@ module Mpv2 = struct
     | Equant(qt1,bds1,e1), Equant(qt2,bds2,e2) when qt_equal qt1 qt2 ->
       let local = enter_local env local bds1 bds2 in
       add_eqs env local eqs e1 e2
-    | Eint i1, Eint i2 when i1 = i2 -> eqs
+    | Eint i1, Eint i2 when EcBigInt.equal i1 i2 -> eqs
     | Elocal x1, Elocal x2 when
         opt_equal EcIdent.id_equal (Some x1) (Mid.find_opt x2 local) -> eqs
     | Evar pv1, Evar pv2

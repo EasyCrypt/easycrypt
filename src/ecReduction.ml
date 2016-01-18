@@ -585,7 +585,7 @@ let check_alpha_equal ri hyps f1 f2 =
       let (env,subst) = check_lpattern env subst p1 p2 in
       aux env subst g1 g2
 
-    | Fint i1, Fint i2 when i1 = i2 -> ()
+    | Fint i1, Fint i2 when EcBigInt.equal i1 i2 -> ()
 
     | Flocal id1, Flocal id2 -> check_local subst id1 f2 id2
 

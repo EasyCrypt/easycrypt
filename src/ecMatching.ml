@@ -450,7 +450,7 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
         end
 
       | Fint i1, Fint i2 ->
-          if i1 <> i2 then failure ();
+          if not (EcBigInt.equal i1 i2) then failure ();
 
       | Fglob (mp1, me1), Fglob (mp2, me2) ->
           let mp1 = EcEnv.NormMp.norm_mpath env mp1 in
