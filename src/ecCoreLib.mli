@@ -81,6 +81,8 @@ module CI_Real : sig
   val p_Real : path
   val p_real : path
 
+  val p_real0       : path 
+  val p_real1       : path
   val p_real_opp    : path
   val p_real_add    : path
   val p_real_mul    : path

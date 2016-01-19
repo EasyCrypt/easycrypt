@@ -65,16 +65,18 @@ module CI_Real = struct
 
   let _Real = fun x -> EcPath.pqname p_Real x
 
+  let p_real0    = _Real "zero"
+  let p_real1    = _Real "one"
   let p_real_opp    = _Real "[-]"
   let p_real_add    = _Real "+"
   let p_real_mul    = _Real "*"
   let p_real_inv    = _Real "inv"
   let p_real_div    = _Real "/"
-  let p_real_pow    = List.fold_left EcPath.pqname p_Real ["PowerInt"; "^"]
+  let p_real_pow    = EcPath.extend p_Real ["^"]
   let p_real_le     = _Real "<="
   let p_real_lt     = _Real "<"
-  let p_real_of_int = EcPath.extend p_Real ["FromInt"; "from_int"]
-  let p_real_abs    = EcPath.extend p_Real ["Abs"; "`|_|"]
+  let p_real_of_int = EcPath.extend p_Real ["from_int"]
+  let p_real_abs    = EcPath.extend p_Real ["`|_|"]
 end
 
 (* -------------------------------------------------------------------- *)

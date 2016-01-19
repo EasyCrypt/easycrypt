@@ -1046,7 +1046,9 @@ let core_theories = [
       (CI_Int.p_int_le , "infix <=")]);
 
   ((["real"], "Real"),
-     [(CI_Real.p_real_opp, "prefix -");
+     [(CI_Real.p_real0,    "zero"); 
+      (CI_Real.p_real1,    "one"); 
+      (CI_Real.p_real_opp, "prefix -");
       (CI_Real.p_real_add, "infix +" );
       (CI_Real.p_real_mul, "inv"     );
       (CI_Real.p_real_div, "infix /" );
