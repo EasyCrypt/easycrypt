@@ -111,6 +111,9 @@ rewrite ler_def subrr -(inj_eq (addrI `|zeror|)) /= addr0.
 by rewrite -mulr2z -mulr_intr -n2 -normrM mul0r.
 qed.
 
+lemma nosmt lerr_eq (x y : t): x = y => x <= y.
+proof. by move=> ->; rewrite lerr. qed.
+
 lemma nosmt ltrr (x : t): !(x < x).
 proof. by rewrite ltr_def. qed.
 
@@ -920,10 +923,10 @@ proof. by rewrite -oppr_cp0 -invrN invr_ge0 oppr_cp0. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt divr_ge0 x y : zeror <= x => zeror <= y => zeror <= x / y.
-proof. by move=> x_ge0 y_ge0; rewrite divrE mulr_ge0 ?invr_ge0. qed.
+proof. by move=> x_ge0 y_ge0; rewrite mulr_ge0 ?invr_ge0. qed.
 
 lemma nosmt divr_gt0 x y : zeror < x => zeror < y => zeror < x / y.
-proof. by move=> x_gt0 y_gt0; rewrite divrE pmulr_rgt0 ?invr_gt0. qed.
+proof. by move=> x_gt0 y_gt0; rewrite pmulr_rgt0 ?invr_gt0. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma invr_gt1 x : unit x => zeror < x => (oner < invr x) <=> (x < oner).
@@ -1040,19 +1043,19 @@ clone include RealDomain with type t <- t,
   op   Domain.( + )  <- Field.( + ),
   op   Domain.([-])  <- Field.([-]),
   op   Domain.( * )  <- Field.( * ),
-  op   Domain.( / )  <- Field.( / ),
   op   Domain.invr   <- Field.invr,
   op   Domain.intmul <- Field.intmul,
   op   Domain.ofint  <- Field.ofint,
   op   Domain.exp    <- Field.exp
 
-  proof Domain.* remove abbrev Domain.(-).
+  proof Domain.*
+  remove abbrev Domain.(-)
+  remove abbrev Domain.(/).
 
   realize  Domain.addrA     by apply/Field.addrA    .
   realize  Domain.addrC     by apply/Field.addrC    .
   realize  Domain.add0r     by apply/Field.add0r    .
   realize  Domain.addNr     by apply/Field.addNr    .
-  realize  Domain.divrE     by apply/Field.divrE    .
   realize  Domain.oner_neq0 by apply/Field.oner_neq0.
   realize  Domain.mulrA     by apply/Field.mulrA    .
   realize  Domain.mulrC     by apply/Field.mulrC    .
@@ -1064,74 +1067,91 @@ clone include RealDomain with type t <- t,
   realize  Domain.mulf_eq0  by apply/Field.mulf_eq0 .
 
 (* -------------------------------------------------------------------- *)
+lemma lef_pinv x :
+  zeror < x => forall y, (invr y <= invr x) <=> (x <= y).
+proof. admit. qed.
+
+lemma lef_ninv x :
+  x < zeror => forall y, (invr y <= invr x) <=> (x <= y).
+proof. admit. qed.
+
+lemma ltf_pinv x :
+  zeror < x => forall y, (invr y < invr x) <=> (x < y).
+proof. admit. qed.
+
+lemma ltf_ninv x :
+  x < zeror => forall y, (invr y < invr x) <=> (x < y).
+proof. admit. qed.
+
+(* -------------------------------------------------------------------- *)
 lemma ler_pdivl_mulr z x y : zeror < z => (x <= y / z) <=> (x * z <= y).
-proof. by move=> z_gt0; rewrite -(@ler_pmul2r z) ?divrE ?mulrVK ?gtr_eqF //. qed.
+proof. by move=> z_gt0; rewrite -(@ler_pmul2r z) ?mulrVK ?gtr_eqF //. qed.
 
 lemma ltr_pdivl_mulr z x y : zeror < z => (x < y / z) <=> (x * z < y).
-proof. by move=> z_gt0; rewrite -(@ltr_pmul2r z) ?divrE ?mulrVK ?gtr_eqF. qed.
+proof. by move=> z_gt0; rewrite -(@ltr_pmul2r z) ?mulrVK ?gtr_eqF. qed.
 
 hint rewrite lter_pdivl_mulr : ler_pdivl_mulr ltr_pdivl_mulr.
 
 (* -------------------------------------------------------------------- *)
 lemma ler_pdivr_mulr z x y : zeror < z => (y / z <= x) <=> (y <= x * z).
-proof. by move=> z_gt0; rewrite -(@ler_pmul2r z) ?divrE ?mulrVK ?gtr_eqF. qed.
+proof. by move=> z_gt0; rewrite -(@ler_pmul2r z) ?mulrVK ?gtr_eqF. qed.
 
 lemma ltr_pdivr_mulr z x y : zeror < z => (y / z < x) <=> (y < x * z).
-proof. by move=> z_gt0; rewrite -(@ltr_pmul2r z) ?divrE ?mulrVK ?gtr_eqF. qed.
+proof. by move=> z_gt0; rewrite -(@ltr_pmul2r z) ?mulrVK ?gtr_eqF. qed.
 
 hint rewrite lter_pdivr_mulr : ler_pdivr_mulr ltr_pdivr_mulr.
 
 (* -------------------------------------------------------------------- *)
 lemma ler_pdivl_mull z x y : zeror < z => (x <= invr z * y) <=> (z * x <= y).
-proof. by move=> z_gt0; rewrite mulrC -divrE ler_pdivl_mulr ?(mulrC z). qed.
+proof. by move=> z_gt0; rewrite mulrC ler_pdivl_mulr ?(mulrC z). qed.
 
 lemma ltr_pdivl_mull z x y : zeror < z => (x < invr z * y) <=> (z * x < y).
-proof. by move=> z_gt0; rewrite mulrC -divrE ltr_pdivl_mulr ?(mulrC z). qed.
+proof. by move=> z_gt0; rewrite mulrC ltr_pdivl_mulr ?(mulrC z). qed.
 
 hint rewrite lter_pdivl_mull : ler_pdivl_mull ltr_pdivl_mull.
 
 (* -------------------------------------------------------------------- *)
 lemma ler_pdivr_mull z x y : zeror < z => (invr z * y <= x) <=> (y <= z * x).
-proof. by move=> z_gt0; rewrite mulrC -divrE ler_pdivr_mulr ?(mulrC z). qed.
+proof. by move=> z_gt0; rewrite mulrC ler_pdivr_mulr ?(mulrC z). qed.
 
 lemma ltr_pdivr_mull z x y : zeror < z => (invr z * y < x) <=> (y < z * x).
-proof. by move=> z_gt0; rewrite mulrC -divrE ltr_pdivr_mulr ?(mulrC z). qed.
+proof. by move=> z_gt0; rewrite mulrC ltr_pdivr_mulr ?(mulrC z). qed.
 
 hint rewrite lter_pdivr_mull : ler_pdivr_mull ltr_pdivr_mull.
 
 (* -------------------------------------------------------------------- *)
 lemma ler_ndivl_mulr z x y : z < zeror => (x <= y / z) <=> (y <= x * z).
-proof. by move=> z_lt0; rewrite -(@ler_nmul2r z) ?divrE ?mulrVK  ?ltr_eqF. qed.
+proof. by move=> z_lt0; rewrite -(@ler_nmul2r z) ?mulrVK  ?ltr_eqF. qed.
 
 lemma ltr_ndivl_mulr z x y : z < zeror => (x < y / z) <=> (y < x * z).
-proof. by move=> z_lt0; rewrite -(@ltr_nmul2r z) ?divrE ?mulrVK ?ltr_eqF. qed.
+proof. by move=> z_lt0; rewrite -(@ltr_nmul2r z) ?mulrVK ?ltr_eqF. qed.
 
 hint rewrite lter_ndivl_mulr : ler_ndivl_mulr ltr_ndivl_mulr.
 
 (* -------------------------------------------------------------------- *)
 lemma ler_ndivr_mulr z x y : z < zeror => (y / z <= x) <=> (x * z <= y).
-proof. by move=> z_lt0; rewrite -(@ler_nmul2r z) ?divrE ?mulrVK ?ltr_eqF. qed.
+proof. by move=> z_lt0; rewrite -(@ler_nmul2r z) ?mulrVK ?ltr_eqF. qed.
 
 lemma ltr_ndivr_mulr z x y : z < zeror => (y / z < x) <=> (x * z < y).
-proof. by move=> z_lt0; rewrite -(@ltr_nmul2r z) ?divrE ?mulrVK ?ltr_eqF. qed.
+proof. by move=> z_lt0; rewrite -(@ltr_nmul2r z) ?mulrVK ?ltr_eqF. qed.
 
 hint rewrite lter_ndivr_mulr : ler_ndivr_mulr ltr_ndivr_mulr.
 
 (* -------------------------------------------------------------------- *)
 lemma ler_ndivl_mull z x y : z < zeror => (x <= invr z * y) <=> (y <= z * x).
-proof. by move=> z_lt0; rewrite mulrC -divrE ler_ndivl_mulr ?(mulrC z). qed.
+proof. by move=> z_lt0; rewrite mulrC ler_ndivl_mulr ?(mulrC z). qed.
 
 lemma ltr_ndivl_mull z x y : z < zeror => (x < invr z * y) <=> (y < z * x).
-proof. by move=> z_lt0; rewrite mulrC -divrE ltr_ndivl_mulr ?(mulrC z). qed.
+proof. by move=> z_lt0; rewrite mulrC ltr_ndivl_mulr ?(mulrC z). qed.
 
 hint rewrite lter_ndivl_mull : ler_ndivl_mull ltr_ndivl_mull.
 
 (* -------------------------------------------------------------------- *)
 lemma ler_ndivr_mull z x y : z < zeror => (invr z * y <= x) <=> (z * x <= y).
-proof. by move=> z_lt0; rewrite mulrC -divrE ler_ndivr_mulr ?(mulrC z). qed.
+proof. by move=> z_lt0; rewrite mulrC ler_ndivr_mulr ?(mulrC z). qed.
 
 lemma ltr_ndivr_mull z x y : z < zeror => (invr z * y < x) <=> (z * x < y).
-proof. by move=> z_lt0; rewrite mulrC -divrE ltr_ndivr_mulr ?(mulrC z). qed.
+proof. by move=> z_lt0; rewrite mulrC ltr_ndivr_mulr ?(mulrC z). qed.
 
 hint rewrite lter_ndivr_mull : ler_ndivr_mull ltr_ndivr_mull.
 end RealField.

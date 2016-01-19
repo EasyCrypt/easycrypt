@@ -6,7 +6,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Option Pred Fun Int IntExtra Real Array List.
+require import Option Pred Fun Int IntExtra Real RealExtra Array List.
 require import NewDistr NewLogic StdOrder.
 require (*--*) FinType Tuple.
 (*---*) import RealOrder.
@@ -199,12 +199,12 @@ lemma muP p: mu dword p = (count p words)%r / (Alphabet.card^n)%r.
 proof. by rewrite duniformE !undup_id ?enum_uniq // -word_card. qed.
 
 lemma muxP w: mu dword (pred1 w) = 1%r / (Alphabet.card^n)%r.
-proof. by rewrite muP count_uniq_mem 1:enum_uniq// enumP. qed.
+proof. by rewrite muP count_uniq_mem 1:enum_uniq // enumP /b2i. qed.
 
 lemma supportP w: support dword w.
 proof.
 rewrite /support /in_supp muxP divr_gt0 //.
-by rewrite from_intM; apply/powPos/Alphabet.card_gt0.
+by rewrite lt_fromint; apply/powPos/Alphabet.card_gt0.
 qed.
 
 lemma dword_ll: mu dword predT = 1%r.

@@ -89,10 +89,7 @@ proof. by rewrite big_distrr //; (apply/mulr0 || apply/mulrDr). qed.
 
 lemma divr_suml (P : 'a -> bool) F s x :
   (big P F s) / x = big P (fun i => F i / x) s.
-proof.
-rewrite divrE mulr_suml; apply/eq_bigr.
-by move=> i _ /=; rewrite divrE.
-qed.
+proof. by rewrite mulr_suml; apply/eq_bigr. qed.
 end BAdd.
 
 (* -------------------------------------------------------------------- *)
@@ -138,18 +135,16 @@ clone include BigComRing with
     op CR.([-])  <- Num.Domain.([-]),
     op CR.( * )  <- Num.Domain.( * ),
     op CR.invr   <- Num.Domain.invr,
-    op CR.( / )  <- Num.Domain.( / ),
     op CR.intmul <- Num.Domain.intmul,
     op CR.ofint  <- Num.Domain.ofint,
     op CR.exp    <- Num.Domain.exp
 
-    proof * remove abbrev CR.(-).
+    proof * remove abbrev CR.(-) remove abbrev CR.(/).
 
 realize CR.addrA     . proof. by apply/Num.Domain.addrA. qed.
 realize CR.addrC     . proof. by apply/Num.Domain.addrC. qed.
 realize CR.add0r     . proof. by apply/Num.Domain.add0r. qed.
 realize CR.addNr     . proof. by apply/Num.Domain.addNr. qed.
-realize CR.divrE     . proof. by apply/Num.Domain.divrE. qed.
 realize CR.oner_neq0 . proof. by apply/Num.Domain.oner_neq0. qed.
 realize CR.mulrA     . proof. by apply/Num.Domain.mulrA. qed.
 realize CR.mulrC     . proof. by apply/Num.Domain.mulrC. qed.

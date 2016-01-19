@@ -174,7 +174,7 @@ abstract theory ComRing.
   op   invr  : t -> t.
   pred unit  : t.
 
-  op ( / ) (x y : t) = x * (invr y) axiomatized by divrE.
+  abbrev ( / ) (x y : t) = x * (invr y).
 
   axiom nosmt oner_neq0 : oner <> zeror.
   axiom nosmt mulrA     : associative ( * ).
@@ -267,7 +267,7 @@ abstract theory ComRing.
   proof. by move=> x /mulVr; rewrite mulrC. qed.
 
   lemma nosmt divrr (x : t): unit x => x / x = oner.
-  proof. by rewrite divrE => /mulrV. qed.
+  proof. by apply/mulrV. qed.
 
   lemma nosmt invr_out (x : t): !unit x => invr x = x.
   proof. by apply/unitout. qed.
@@ -296,7 +296,7 @@ abstract theory ComRing.
   lemma nosmt unitrE (x : t): unit x <=> (x / x = oner).
   proof.
     split=> [Ux|xx1]; 1: by apply/divrr.
-    by apply/unitrP; exists (invr x); rewrite mulrC -divrE.
+    by apply/unitrP; exists (invr x); rewrite mulrC.
   qed.
 
   lemma nosmt invrK: involutive invr.
@@ -311,7 +311,7 @@ abstract theory ComRing.
   proof. by apply: (can_inj _ _ invrK). qed.
 
   lemma nosmt unitrV x: unit (invr x) <=> unit x.
-  proof. by rewrite !unitrE !divrE invrK mulrC. qed.
+  proof. by rewrite !unitrE invrK mulrC. qed.
 
   lemma nosmt unitr1: unit oner.
   proof. by apply/unitrP; exists oner; rewrite mulr1. qed.
@@ -320,10 +320,10 @@ abstract theory ComRing.
   proof. by rewrite -{2}(mulVr _ unitr1) mulr1. qed.
 
   lemma nosmt div1r x: oner / x = invr x.
-  proof. by rewrite divrE mul1r. qed.
+  proof. by rewrite mul1r. qed.
 
   lemma nosmt divr1 x: x / oner = x.
-  proof. by rewrite divrE invr1 mulr1. qed.
+  proof. by rewrite invr1 mulr1. qed.
 
   lemma nosmt unitr0: !unit zeror.
   proof. by apply/negP=> /unitrP [y]; rewrite mulr0 eq_sym oner_neq0. qed.
@@ -335,7 +335,7 @@ abstract theory ComRing.
   proof. by apply/unitrP; exists (-oner); rewrite mulrNN mulr1. qed.
 
   lemma nosmt invrN1: invr (-oner) = -oner.
-  proof. by rewrite -{2}(divrr unitrN1) divrE mulN1r opprK. qed.
+  proof. by rewrite -{2}(divrr unitrN1) mulN1r opprK. qed.
 
   lemma nosmt unitrMl x y : unit y => (unit (x * y) <=> unit x).
   proof.                        (* FIXME: wlog *)
@@ -560,10 +560,10 @@ clone include IDomain with
   op   ( + ) <- Int.( + ),
   op   [ - ] <- Int.([-]),
   op   ( * ) <- Int.( * ),
-  op   ( / ) <- Int.( * ),
   op   invr  <- (fun (z : int) => z)
   proof * by smt
-  remove abbrev (-).
+  remove abbrev (-)
+  remove abbrev (/).
 
 lemma intmulz z c : intmul z c = z * c.
 proof.

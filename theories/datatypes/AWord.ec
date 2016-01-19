@@ -5,13 +5,15 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import Int IntDiv.
-require import Finite FSet.
+(* -------------------------------------------------------------------- *)
+require import Int IntExtra IntDiv Real RealExtra.
+require import Finite FSet StdRing StdOrder.
+(*---*) import RField RealOrder.
 
 type word.
 
 const length:int.
-axiom leq0_length: Int.(<) 0 length.
+axiom leq0_length: 0 < length.
 
 op zeros: word.
 op ones: word.
@@ -144,7 +146,7 @@ theory Dword.
   qed.
 
   lemma mu_cpMemw X:
-    mu dword (mem X) = (card X)%r / (2^length)%r.
+    mu dword (mem X)%FSet = (card X)%r / (2^length)%r.
   proof.
     rewrite (Mu_mem.mu_mem X dword (1%r/(2^length)%r)) //.
     by move=> x _; rewrite -/(mu_x _ _) mu_x_def.
@@ -157,9 +159,6 @@ theory Dword.
     weight (dword \ X) = 1%r.
   proof.
   move=> lt_CX_2sx; rewrite lossless_restr ?lossless // ?mu_cpMemw.
-  cut <-: (forall x y, x * (1%r / y) = x / y) by smt.
-  apply (real_lt_trans _ ((2^length)%r* (1%r/(2^length)%r)) _); last smt.
-  apply mulrM; last by rewrite from_intM.
-  smt.
+  by rewrite ltr_pdivr_mulr /= lte_fromint // powPos.
   qed.
 end Dword.

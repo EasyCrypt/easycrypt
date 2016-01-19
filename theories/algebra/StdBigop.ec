@@ -23,7 +23,6 @@ clone include Bigalg.BigOrder with
     op Num.Domain.( + )  <- Int.( + ),
     op Num.Domain.([-])  <- Int.([-]),
     op Num.Domain.( * )  <- Int.( * ),
-    op Num.Domain.( / )  <- Int.( * ),
     op Num.Domain.invr   <- (fun (z : int) => z),
     op Num.Domain.intmul <- IntID.intmul,
     op Num.Domain.ofint  <- IntID.ofint,
@@ -38,7 +37,8 @@ clone include Bigalg.BigOrder with
     rename [theory] "BAdd" as "BIA"
            [theory] "BMul" as "BIM"
 
-    remove abbrev Num.Domain.(-).
+    remove abbrev Num.Domain.(-)
+    remove abbrev Num.Domain.(/).
 
 lemma nosmt sumzE ss : sumz ss = BIA.big predT (fun x => x) ss.
 proof. by elim: ss=> [|s ss ih] //=; rewrite BIA.big_cons -ih. qed.
@@ -76,12 +76,11 @@ clone include Bigalg.BigOrder with
     op Num.Domain.([-])  <- Real.([-]),
     op Num.Domain.( * )  <- Real.( * ),
     op Num.Domain.invr   <- Real.inv,
-    op Num.Domain.( / )  <- Real.( / ),
     op Num.Domain.intmul <- RField.intmul,
     op Num.Domain.ofint  <- RField.ofint,
     op Num.Domain.exp    <- RField.exp,
 
-    op Num."`|_|" <- Real.Abs."`|_|",
+    op Num."`|_|" <- Real."`|_|",
     op Num.( <= ) <- Real.(<=),
     op Num.( <  ) <- Real.(< )
 
@@ -90,7 +89,8 @@ clone include Bigalg.BigOrder with
     rename [theory] "BAdd" as "BRA"
            [theory] "BMul" as "BRM"
 
-    remove abbrev Num.Domain.(-).
+    remove abbrev Num.Domain.(-)
+    remove abbrev Num.Domain.(/).
 
 import Bigint.BIA Bigint.BIM BRA BRM.
 
@@ -98,14 +98,14 @@ lemma sumr_ofint (P : 'a -> bool) F s :
   (Bigint.BIA.big P F s)%r = (BRA.big P (fun i => (F i)%r) s).
 proof.
 elim: s => [//|x s ih]; rewrite !big_cons; case: (P x)=> // _.
-by rewrite FromInt.Add ih.
+by rewrite fromintD ih.
 qed.
 
 lemma prodr_ofint (P : 'a -> bool) F s :
   (Bigint.BIM.big P F s)%r = (BRM.big P (fun i => (F i)%r) s).
 proof.
 elim: s => [//|x s ih]; rewrite !big_cons; case: (P x)=> // _.
-by rewrite FromInt.Mul ih.
+by rewrite fromintM ih.
 qed.
 
 lemma sumr_const (P : 'a -> bool) (x : real) (s : 'a list):
@@ -182,6 +182,6 @@ lemma nosmt b2r_big (P1 P2 : 'a -> bool) (s : 'a list) :
 proof.
 rewrite b2rE (BRA.eq_bigr _ _ (fun i => (b2i (P2 i))%r)).
   by move=> x _ /=; rewrite b2rE.
-by rewrite -sumr_ofint FromInt.from_intMle b2i_big.
+by rewrite -sumr_ofint le_fromint b2i_big.
 qed.
 end BBO.

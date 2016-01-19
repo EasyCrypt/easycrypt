@@ -5,7 +5,8 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import FSet Int Real.
+require import FSet Int Real RealExtra StdRing StdOrder.
+(*---*) import RField RealOrder.
 require (*  *) Duni.
 require (*  *) CyclicGroup.
 
@@ -129,7 +130,7 @@ theory Set_CDH.
            <= Pr[SCDH'.main() @ &m: res]
            <= Pr[CDH.CDH(CDH_from_SCDH(A)).main() @ &m: res]. *)
       (* "first last" allows us to first focus on the second inequality, which is easier. *)
-      apply (real_le_trans _ Pr[SCDH'.main() @ &m: res]); first last.
+      apply (ler_trans Pr[SCDH'.main() @ &m: res]); first last.
         (* Pr[SCDH'.main() @ &m: res] <= Pr[CDH.CDH(CDH_from_SCDH(A)).main() @ &m: res] *)
         (* This is in fact an equality, which we prove by program equivalence *)
         byequiv (_: _ ==> ={res})=> //=.
@@ -157,7 +158,7 @@ theory Set_CDH.
       skip; progress.
         rewrite Duni.mu_dU filter_pred1 H /= fcard1.
         cut H1: 0 < card s{hr} by smt.
-        by rewrite -!Real.inv_def inv_le; smt.
+        by rewrite mul1r lef_pinv /#.
         smt.
     qed.
   end section.

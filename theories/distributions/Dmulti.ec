@@ -27,9 +27,7 @@ rewrite dmultiE; case: (mem s x)=> //= [x_in_s|x_notin_s].
 have ->: predI (mem s) (pred1 x) = pred0.
   apply/fun_ext=> x'; rewrite /predI /pred1 eq_iff.
   by case (x' = x)=> [->|].
-rewrite count_pred0; case ((size s)%r = 0%r)=> [->|h].
-  by rewrite StdRing.divr0.
-by rewrite div_def// StdRing.RField.mul0r.
+by rewrite count_pred0; case ((size s)%r = 0%r)=> [->|].
 qed.
 
 lemma eq_dmultiP (s1 s2 : 'a list):

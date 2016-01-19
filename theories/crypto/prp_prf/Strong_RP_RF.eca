@@ -5,10 +5,11 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import Fun NewLogic Option Int List FSet NewFMap Real Distr.
+require import Fun NewLogic Option Int IntExtra Real RealExtra.
+require import Distr List FSet NewFMap StdRing StdOrder.
 require import Dexcepted.
-require (*--*) NewPRP StrongPRP IdealPRP.
-require (*--*) FelTactic.
+require (*--*) NewPRP StrongPRP IdealPRP FelTactic.
+(*---*) import RField RealOrder.
 
 (** We assume a finite domain D, equipped with its uniform
     distribution. **)
@@ -410,7 +411,7 @@ section CollisionProbability.
     by auto; progress; rewrite rng0 fcards0.
   fel 2 FEL.c (fun x, q%r * mu uD (pred1 witness)) q (ARP.coll) [FEL(D).FBounder.f: (FEL.c < q); FEL(D).FBounder.fi: (FEL.c < q)]=> //.
   + rewrite sumr_const count_predT size_range /= max_ler 1:ler_subr_addr 1:-ltzE 1:gt0_q.
-    rewrite -mulr_intr ofintR (powS 1) // pow1 Mul.
+    rewrite -mulr_intr ofintR (powS 1) // pow1 fromintM.
     smt.
   + by inline*; auto; rewrite dom0 fcards0.
   + proc; sp; if=> //=; last by hoare=> //=; smt.
@@ -420,7 +421,7 @@ section CollisionProbability.
       progress.
       - apply/(RealOrder.ler_trans ((card (rng ARP.m{hr}))%r * mu uD (pred1 witness))).
         apply/mu_mem_le; move=> x _; have [] uD_fu [] _ uD_suf:= uD_uf_fu.
-        apply/eq_le/uD_suf; 1,2:rewrite uD_fu //.
+        apply/RealOrder.lerr_eq/uD_suf; 1,2:rewrite uD_fu //.
         smt.
       - by move: H6; rewrite H0.
     * by hoare; [smt|auto].
@@ -436,7 +437,7 @@ section CollisionProbability.
       progress.
       - apply/(RealOrder.ler_trans ((card (rng ARP.mi{hr}))%r * mu uD (pred1 witness))).
         apply/mu_mem_le; move=> x _; have [] uD_fu [] _ uD_suf:= uD_uf_fu.
-        apply/eq_le/uD_suf; 1,2:rewrite uD_fu //.
+        apply/RealOrder.lerr_eq/uD_suf; 1,2:rewrite uD_fu //.
         smt.
       - by move: H6; rewrite H0.
     * by hoare; [smt|auto].

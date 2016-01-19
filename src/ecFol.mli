@@ -52,6 +52,7 @@ val f_real_add : form -> form -> form
 val f_real_opp : form -> form
 val f_real_sub : form -> form -> form
 val f_real_mul : form -> form -> form
+val f_real_inv : form -> form
 val f_real_div : form -> form -> form
 val f_real_abs : form -> form
 
@@ -110,6 +111,7 @@ val f_real_opp_simpl : form -> form
 val f_real_sub_simpl : form -> form -> form
 val f_real_mul_simpl : form -> form -> form
 val f_real_div_simpl : form -> form -> form
+val f_real_inv_simpl : form -> form
 
 (* -------------------------------------------------------------------- *)
 val destr_exists_prenex : form -> bindings * form
@@ -139,7 +141,7 @@ type op_kind = [
   | `Real_add
   | `Real_opp
   | `Real_mul
-  | `Real_div
+  | `Real_inv
 ]
 
 val op_kind       : path -> op_kind option

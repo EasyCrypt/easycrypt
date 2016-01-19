@@ -13,7 +13,7 @@ op (<= )  = fun x y => x < y \/ x = y.
 op ( + )  : int -> int -> int.
 op ([-])  : int -> int.
 op ( * )  : int -> int -> int.
-op "`|_|" = fun x =>  (0 <= x) ? x : -x.
+op "`|_|" = fun x => (0 <= x) ? x : -x.
 
 abbrev ( - ) (x y : int) = x + (-y).
 

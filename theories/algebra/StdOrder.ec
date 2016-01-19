@@ -20,7 +20,6 @@ clone include Number.RealDomain
   op   Domain.( + )  <- Int.( + ),
   op   Domain.([-])  <- Int.([-]),
   op   Domain.( * )  <- Int.( * ),
-  op   Domain.( / )  <- Int.( * ),
   op   Domain.invr   <- (fun (z : int) => z),
   op   Domain.intmul <- IntID.intmul,
   op   Domain.ofint  <- IntID.ofint,
@@ -32,7 +31,8 @@ clone include Number.RealDomain
 
   proof Domain.* by smt, Axioms.* by smt
 
-  remove abbrev Domain.(-).
+  remove abbrev Domain.(-)
+  remove abbrev Domain.(/).
 end IntOrder.
 
 (* -------------------------------------------------------------------- *)
@@ -44,16 +44,16 @@ clone Number.RealField as RealOrder
   op   Field.( + )  <- Real.( + ),
   op   Field.([-])  <- Real.([-]),
   op   Field.( * )  <- Real.( * ),
-  op   Field.( / )  <- Real.( / ),
   op   Field.invr   <- Real.inv,
   op   Field.intmul <- RField.intmul,
   op   Field.ofint  <- RField.ofint,
   op   Field.exp    <- RField.exp,
 
-  op   "`|_|" <- Real.Abs."`|_|",
+  op   "`|_|" <- Real."`|_|",
   op   ( <= ) <- Real.(<=),
   op   ( <  ) <- Real.(< )
 
   proof Field.* by smt, Axioms.* by smt full
 
-  remove abbrev Field.(-).
+  remove abbrev Field.(-)
+  remove abbrev Field.(/).

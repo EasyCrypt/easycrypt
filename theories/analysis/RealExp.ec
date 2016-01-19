@@ -142,7 +142,7 @@ lemma rpowD (x n m : real) : 0%r < x => x^(n + m) = x^n * x^m.
 proof. by move=> gt0x; rewrite !rpowE // mulrDl expD. qed.
 
 lemma rpowB (x n m : real) : 0%r < x => x^(n - m) = x^n / x^m.
-proof. by move=> gt0x; rewrite divrE !(rpowN, rpowD) // ltrW. qed.
+proof. by move=> gt0x; rewrite !(rpowN, rpowD) // ltrW. qed.
 
 lemma rpowM (x n m : real) : 0%r < x => x^(n * m) = (x ^ n) ^ m.
 proof. by move=> gt0x; rewrite !rpowE ?exp_gt0 // lnK mulrCA mulrA. qed.
@@ -159,22 +159,22 @@ proof. by move=> gt0x; rewrite !rpowE ?invr_gt0 ?lnV // mulrN expN. qed.
 
 lemma rpowMVr (x y n : real):
   0%r < x => 0%r < y => (x/y)^n = x^n/y^n.
-proof. by move=> gt0x gt0y; rewrite !divrE rpowMr ?invr_gt0 // rpowVr. qed.
+proof. by move=> gt0x gt0y; rewrite rpowMr ?invr_gt0 // rpowVr. qed.
 
 lemma rpow_nat x n : 0 <= n => 0%r <= x => x^(n%r) = x^n.
 proof.
-elim: n=> [|n ge0n ih] ge0x; first by rewrite Power_0 -FromInt.One rpow0.
-rewrite Power_s /(>=) // FromInt.Add; move: ge0x.
+elim: n=> [|n ge0n ih] ge0x; first by rewrite powr0 -fromint1 rpow0.
+rewrite powrS // fromintD; move: ge0x.
 rewrite ler_eqVlt=> -[<-|]; first rewrite (mul0r 0%r).
-  by rewrite rpow0r -FromInt.Add from_intMeq addz1_neq0.
-by move=> gt0x; rewrite rpowD // rpow1 // mulrC ih 1:ltrW.
+  by rewrite rpow0r -fromintD /#.
+by move=> gt0x; rewrite rpowD // rpow1 // ih 1:ltrW.
 qed.
 
 lemma rpow_int x n : 0%r <= x => x^(n%r) = x^n.
 proof.
 move=> ge0x; case: (lezWP 0 n)=> [/rpow_nat ->|_] //.
-move=> le0n; rewrite -(opprK n%r) rpowN // -FromInt.Neg.
-by rewrite rpow_nat // ?oppz_ge0 // pow_inv invrK.
+move=> le0n; rewrite -(opprK n%r) rpowN // -fromintN.
+by rewrite rpow_nat // ?oppz_ge0 // powrN invrK.
 qed.
 
 (* -------------------------------------------------------------------- *)

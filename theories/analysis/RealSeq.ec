@@ -159,7 +159,7 @@ move=> cnv e gt0e; case: (c = 0%r) => [->|nz_c].
 have: 0%r < e / `|c| by rewrite divr_gt0 // normr_gt0.
 move/cnv=> [N {cnv} cnv]; exists N => n /cnv.
 rewrite -mulrBr normrM -(@ltr_pmul2l `|c|) ?normr_gt0 //.
-by rewrite divrE mulrCA mulrV 1:normr0P.
+by rewrite mulrCA mulrV 1:normr0P.
 qed.
 
 lemma cnvtoM_boundedr s1 s2: convergeto s1 0%r => bounded s2 =>
@@ -170,7 +170,7 @@ have /= [N' lee] := c1 (e / (M + 1%r)) _.
   by rewrite divr_gt0 ?ltr_spaddr // (ler_trans `|s2 N|).
 exists (max N N')=> n /= /geq_max [leNn leN'n]; rewrite normrM.
 apply/(ler_lt_trans (M * (e / (M + 1%r)))); last first.
-  rewrite divrE mulrCA gtr_pmulr // -divrE ltr_pdivr_mulr.
+  rewrite mulrCA gtr_pmulr // ltr_pdivr_mulr.
   by rewrite ltr_spaddr. by rewrite mul1r ltr_addl.
 by rewrite mulrC ler_pmul ?normr_ge0 // ?leM //; apply/ltrW/lee.
 qed.
@@ -210,7 +210,7 @@ have /subr_le0 le0_s12:= le_s12 n _; first by rewrite /n leq_maxl.
 have := lte n _; first by rewrite /n leq_maxr.
 rewrite ltr_norml => -[+ _] @/F; rewrite ltr_subr_addl /F.
 move/ltr_le_trans/(_ _ le0_s12); rewrite -(@mulr1 (l1-l2)) /e.
-rewrite divrE -mulrBr pmulr_llt0 1:subr_gt0 1:invr_lt1 //.
+rewrite -mulrBr pmulr_llt0 1:subr_gt0 1:invr_lt1 //.
 by rewrite subr_lt0 ltrNge (ltrW lt_l21).
 qed.
 

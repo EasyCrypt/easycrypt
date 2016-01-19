@@ -8,7 +8,8 @@
 (* -------------------------------------------------------------------- *)
 require import Fun Int IntExtra Real RealExtra.
 require import Finite List FSet FMap Distr.
-require import StdRing StdBigop FelTactic.
+require import StdRing StdBigop StdOrder FelTactic.
+(*---*) import RealOrder.
 
 (* -------------------------------------------------------------------- *)
 theory Types.
@@ -876,7 +877,7 @@ theory ROM_Bad.
       Pr[Experiment(O1,D).main() @ &m: res] <= Pr[Experiment(O2,D).main() @ &m: res] + qH%r * eps.
     proof.
       move=> eps_pos badinit eq_init bad_preserved bad1 eq_upto.
-      apply (Trans _ (Pr[Experiment(O2,D).main() @ &m: res] + Pr[Experiment(O2,D).main() @ &m: bad (glob O2)])).
+      apply (ler_trans (Pr[Experiment(O2,D).main() @ &m: res] + Pr[Experiment(O2,D).main() @ &m: bad (glob O2)])).
         cut: Pr[Experiment(O1,D).main() @ &m: res] <= Pr[Experiment(O2,D).main() @ &m: res \/ bad (glob O2)].
           byequiv (_: ={glob D} ==> !bad (glob O2){2} => ={res})=> //; last smt.
           proc.

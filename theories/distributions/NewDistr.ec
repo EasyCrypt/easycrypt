@@ -96,7 +96,7 @@ op mrat ['a] (s : 'a list) =
 lemma isdistr_drat (s : 'a list) : isdistr (mrat s).
 proof.
 rewrite /mrat; split=> /= [x|J uq_J].
-  by rewrite divr_ge0 // from_intMle ?(count_ge0, size_ge0).
+  by rewrite divr_ge0 // le_fromint ?(count_ge0, size_ge0).
 rewrite -divr_suml -sumr_ofint. admit.
 qed.
 
@@ -111,7 +111,7 @@ lemma prratE ['a] (s : 'a list) (E : 'a -> bool) :
 proof.
 rewrite muE (@sumE_fin _ (undup s)) ?undup_uniq //=.
   move=> x; case: (E x)=> _ //; rewrite dratE.
-  rewrite divrE mulf_eq0 -nor mem_undup from_intMeq => -[+ _].
+  rewrite mulf_eq0 -nor mem_undup eq_fromint => -[+ _].
   by rewrite -lt0n ?count_ge0 // -has_count has_pred1.
 pose F := fun x => (count (pred1 x) s)%r / (size s)%r.
 rewrite -big_mkcond (@eq_bigr _ _ F) /F /= => {F}.
@@ -122,11 +122,11 @@ qed.
 lemma support_drat ['a] (s : 'a list) : support (drat s) = mem s.
 proof.
 apply/fun_ext=> x; rewrite /support /in_supp dratE.
-rewrite divrE eq_iff -has_pred1 has_count.
+rewrite eq_iff -has_pred1 has_count.
 case: (count (pred1 x) s <= 0); [smt w=count_ge0|].
-move=> /IntOrder.ltrNge ^ + -> /=; rewrite -from_intM; case: s=> //=.
+move=> /IntOrder.ltrNge ^ + -> /=; rewrite -lt_fromint; case: s=> //=.
 move=> ? s /(@mulr_gt0 _ (inv (1 + size s)%r)) -> //.
-by rewrite invr_gt0 from_intM [smt w=size_ge0].
+by rewrite invr_gt0 lt_fromint [smt w=size_ge0].
 qed.
 
 lemma eq_dratP ['a] (s1 s2 : 'a list) :
@@ -137,7 +137,7 @@ lemma drat_ll ['a] (s : 'a list) :
   s <> [] => mu (drat s) predT = 1%r.
 proof.
 move=> nz_s; rewrite prratE count_predT divrr //.
-by rewrite from_intMeq size_eq0.
+by rewrite eq_fromint size_eq0.
 qed.
 end MRat.
 
@@ -171,7 +171,7 @@ lemma duniform1E ['a] (s : 'a list) x :
   mu_x (duniform s) x = if mem s x then 1%r / (size (undup s))%r else 0%r.
 proof.
 rewrite MRat.dratE count_uniq_mem ?undup_uniq // mem_undup.
-by case: (mem s x)=> //=; rewrite divrE mul0r.
+by case: (mem s x)=> //= @/b2i.
 qed.
 
 lemma eq_duniformP ['a] (s1 s2 : 'a list) :
@@ -222,7 +222,7 @@ lemma drangeE (E : int -> bool) (m n : int) :
 proof.
 rewrite MUniform.duniformE undup_id 1:range_uniq //.
 rewrite size_range; case: (lezWP n m) => [le_nm|le_mn].
-  by rewrite max_lel // 1:subr_le0 // range_geq // !divrE.
+  by rewrite max_lel // 1:subr_le0 // range_geq //.
 by rewrite max_ler // subr_ge0 ltrW // ltzNge.
 qed.
 
@@ -257,7 +257,7 @@ proof.
 split=> @/mscale [x|s uqs].
   by rewrite divr_ge0 1:ge0_mu_x // ge0_weight.
 rewrite -divr_suml; apply/(@ler_trans (weight d / weight d)).
-  rewrite 2!divrE ler_wpmul2r // ?invr_ge0 ?ge0_weight //.
+  rewrite ler_wpmul2r // ?invr_ge0 ?ge0_weight //.
   admit.
 have := ge0_weight d; rewrite ler_eqVlt => -[<-|gt0_iw].
   by rewrite divr0. by rewrite divrr // gtr_eqF.

@@ -68,6 +68,9 @@ let destr_rint f =
       try destr_int f1 with DestrError _ -> destr_error "destr_rint"
   end
 
+  | Fop (p, _) when EcPath.p_equal p CI.CI_Real.p_real0 -> BI.zero
+  | Fop (p, _) when EcPath.p_equal p CI.CI_Real.p_real1 -> BI.one
+
   | _ -> destr_error "destr_rint"
 
 (* -------------------------------------------------------------------- *)
@@ -78,9 +81,8 @@ let fop_real_lt    = f_op CI.CI_Real.p_real_lt   [] (toarrow [treal; treal] tboo
 let fop_real_add   = f_op CI.CI_Real.p_real_add  [] (toarrow [treal; treal] treal)
 let fop_real_opp   = f_op CI.CI_Real.p_real_opp  [] (toarrow [treal] treal)
 let fop_real_mul   = f_op CI.CI_Real.p_real_mul  [] (toarrow [treal; treal] treal)
-let fop_real_div   = f_op CI.CI_Real.p_real_div  [] (toarrow [treal; treal] treal)
+let fop_real_inv   = f_op CI.CI_Real.p_real_inv  [] (toarrow [treal]        treal)
 let fop_real_abs   = f_op CI.CI_Real.p_real_abs  [] (toarrow [treal]        treal)
-
 
 let f_int_le f1 f2 = f_app fop_int_le [f1; f2] tbool
 let f_int_lt f1 f2 = f_app fop_int_lt [f1; f2] tbool
@@ -91,11 +93,14 @@ let f_real_lt  f1 f2 = f_app fop_real_lt  [f1; f2] tbool
 let f_real_add f1 f2 = f_app fop_real_add [f1; f2] treal
 let f_real_opp f     = f_app fop_real_opp [f]      treal
 let f_real_mul f1 f2 = f_app fop_real_mul [f1; f2] treal
-let f_real_div f1 f2 = f_app fop_real_div [f1; f2] treal
+let f_real_inv f     = f_app fop_real_inv [f]      treal
 let f_real_abs f     = f_app fop_real_abs [f]      treal
 
 let f_real_sub f1 f2 =
   f_real_add f1 (f_real_opp f2)
+
+let f_real_div f1 f2 =
+  f_real_mul f1 (f_real_inv f2)
 
 (* -------------------------------------------------------------------- *)
 let fop_in_supp ty = f_op CI.CI_Distr.p_in_supp [ty] (toarrow [ty; tdistr ty] tbool)
@@ -158,12 +163,43 @@ let f_int_mul_simpl f1 f2 =
 
 (* -------------------------------------------------------------------- *)
 let destr_rdivint f =
-  match f.f_node with
-  | Fapp (op, [f1; f2]) when f_equal op fop_real_div -> begin
+   match f.f_node with
+  | Fapp (op, [f1; { f_node = Fapp (subop, [f2]) }])
+      when f_equal    op fop_real_mul
+        && f_equal subop fop_real_inv -> begin
       try  (destr_rint f1, destr_rint f2)
       with DestrError _ -> destr_error "rdivint"
-  end
+    end
+
+  | Fapp (op, [f])
+      when f_equal op fop_real_inv -> begin
+      try  (BI.one, destr_rint f)
+      with DestrError _ -> destr_error "rdivint"
+    end
+
   | _ -> destr_error "rdivint"
+
+let real_split f =
+  match f.f_node with
+  | Fapp (op, [f1; { f_node = Fapp (subop, [f2]) }])
+      when f_equal    op fop_real_mul
+        && f_equal subop fop_real_inv
+    -> (f1, f2)
+
+  | Fapp (op, [{ f_node = Fapp (subop, [f1]) }; f2])
+      when f_equal    op fop_real_mul
+        && f_equal subop fop_real_inv
+    -> (f1, f2)
+
+  | _ -> (f, f_r1)
+
+and real_is_zero f =
+  try  BI.equal BI.zero (destr_rint f)
+  with DestrError _ -> false
+
+and real_is_one f =
+  try  BI.equal BI.one (destr_rint f)
+  with DestrError _ -> false
 
 let norm_real_int_div n1 n2 =
   if BI.sign n2 = 0 then f_real_div (f_rint n1) (f_rint n2) else
@@ -188,8 +224,8 @@ let f_real_add_simpl f1 f2 =
       then norm_real_int_div (n1 *^ n2) BI.zero
       else norm_real_int_div (n1*^d2 +^ n2*^d1) (d1*^d2)
     with DestrError _ ->
-           if f_equal f_r0 f1 then f2
-      else if f_equal f_r0 f2 then f1
+           if real_is_zero f1 then f2
+      else if real_is_zero f2 then f1
       else match f2.f_node with
       | Fapp (op, [f2])
            when f_equal op fop_real_opp && f_equal f1 f2
@@ -199,53 +235,52 @@ let f_real_add_simpl f1 f2 =
 let f_real_opp_simpl f =
   match f.f_node with
   | Fapp (op, [f]) when f_equal op fop_real_opp -> f
-  | _ -> if f_equal f_r0 f then f_r0 else f_real_opp f
+  | _ -> if real_is_zero f then f_r0 else f_real_opp f
 
 let f_real_sub_simpl f1 f2 =
   f_real_add_simpl f1 (f_real_opp_simpl f2)
 
 let rec f_real_mul_simpl f1 f2 =
-  match f1.f_node, f2.f_node with
-  | Fapp (op1, [f1_1; f1_2]), Fapp (op2, [f2_1; f2_2])
-      when f_equal op1 fop_real_div
-        && f_equal op2 fop_real_div
-    -> f_real_div_simpl
-         (f_real_mul_simpl f1_1 f2_1)
-         (f_real_mul_simpl f1_2 f2_2)
+  let (n1, d1) = real_split f1 in
+  let (n2, d2) = real_split f2 in
 
-  | _, Fapp (op2, [f2_1; f2_2]) when f_equal op2 fop_real_div ->
-      f_real_div_simpl (f_real_mul_simpl f1 f2_1) f2_2
-
-  | Fapp (op1, [f1_1; f1_2]), _ when f_equal op1 fop_real_div ->
-      f_real_div_simpl (f_real_mul_simpl f1_1 f2) f1_2
-
-  | _ ->
-      try  f_rint (destr_rint f1 *^ destr_rint f2)
-      with DestrError _ ->
-             if f_equal f_r0 f1 || f_equal f_r0 f2 then f_r0
-        else if f_equal f_r1 f1 then f2
-        else if f_equal f_r1 f2 then f1
-        else f_real_mul f1 f2
+  f_real_div_simpl_r
+    (f_real_mul_simpl_r n1 n2)
+    (f_real_mul_simpl_r d1 d2)
 
 and f_real_div_simpl f1 f2 =
-  match f1.f_node, f2.f_node with
-  | Fapp (op1, [f1_1; f1_2]), Fapp (op2, [f2_1; f2_2])
-      when f_equal op1 fop_real_div
-        && f_equal op2 fop_real_div
-    -> f_real_div_simpl
-         (f_real_mul_simpl f1_1 f2_2)
-         (f_real_mul_simpl f1_2 f2_1)
+  let (n1, d1) = real_split f1 in
+  let (n2, d2) = real_split f2 in
 
-  | _, Fapp (op2, [f2_1; f2_2]) when f_equal op2 fop_real_div ->
-      f_real_div_simpl (f_real_mul_simpl f1 f2_2) f2_1
+  f_real_div_simpl_r
+    (f_real_mul_simpl_r n1 d2)
+    (f_real_mul_simpl_r d1 n2)
 
-  | Fapp (op, [f1_1; f1_2]), _ when f_equal op fop_real_div ->
-      f_real_div_simpl f1_1 (f_real_mul_simpl f1_2 f2)
+and f_real_mul_simpl_r f1 f2=
+  if real_is_zero f1 || real_is_zero f2 then f_r0 else
+
+  if real_is_one f1 then f2 else
+  if real_is_one f2 then f1 else
+
+  try
+    f_rint (destr_rint f1 *^ destr_rint f2)
+  with DestrError _ ->
+    f_real_mul f1 f2
+
+and f_real_div_simpl_r f1 f2 =
+  f_real_mul_simpl_r f1 (f_real_inv_simpl f2)
+
+and f_real_inv_simpl f =
+  match f.f_node with
+  | Fapp (op, [f]) when f_equal op fop_real_inv -> f
 
   | _ ->
-      try  norm_real_int_div (destr_rint f1) (destr_rint f2)
-      with DestrError _ ->
-        if f_equal f2 f_r1 then f1 else f_real_div f1 f2
+     try
+       match destr_rint f with
+       | n when BI.equal n BI.zero -> f_r0
+       | n when BI.equal n BI.one  -> f_r1
+       | _ -> destr_error "destr_rint/inv"
+     with DestrError _ -> f_app fop_real_inv [f] treal
 
 (* -------------------------------------------------------------------- *)
 let rec f_let_simpl lp f1 f2 =
@@ -484,7 +519,7 @@ type op_kind = [
   | `Real_add
   | `Real_opp
   | `Real_mul
-  | `Real_div
+  | `Real_inv
 ]
 
 let operators =
@@ -508,7 +543,7 @@ let operators =
      CI.CI_Real.p_real_add, `Real_add ;
      CI.CI_Real.p_real_opp, `Real_opp ;
      CI.CI_Real.p_real_mul, `Real_mul ;
-     CI.CI_Real.p_real_div, `Real_div ;
+     CI.CI_Real.p_real_inv, `Real_inv ;
      CI.CI_Real.p_real_le , `Real_le  ;
      CI.CI_Real.p_real_lt , `Real_lt  ; ]
   in
@@ -528,7 +563,7 @@ let is_logical_op op =
         `Not | `And _ | `Or _ | `Imp | `Iff | `Eq
       | `Int_le   | `Int_lt   | `Real_le  | `Real_lt
       | `Int_add  | `Int_opp  | `Int_mul
-      | `Real_add | `Real_opp | `Real_mul | `Real_div
+      | `Real_add | `Real_opp | `Real_mul | `Real_inv
    ) -> true
 
   | _ -> false
@@ -705,10 +740,13 @@ module DestrReal : DestrReal = struct
   let opp = destr_app1_eq ~name:"real_opp" CI.CI_Real.p_real_opp
   let mul = destr_app2_eq ~name:"real_mul" CI.CI_Real.p_real_mul
   let inv = destr_app1_eq ~name:"real_inv" CI.CI_Real.p_real_inv
-  let div = destr_app2_eq ~name:"real_div" CI.CI_Real.p_real_div
   let abs = destr_app1_eq ~name:"real_abs" CI.CI_Real.p_real_abs
 
   let sub f =
     try  snd_map opp (add f)
     with DestrError _ -> raise (DestrError "real_sub")
+
+  let div f =
+    try  snd_map inv (mul f)
+    with DestrError _ -> raise (DestrError "int_sub")
 end

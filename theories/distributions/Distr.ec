@@ -5,11 +5,11 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import Logic.
+(* -------------------------------------------------------------------- *)
 require export Pred.
-require import Int.
-require import Real.
-require import Fun.
+require import Fun Int IntExtra Real RealExtra Ring.
+require import StdRing StdOrder.
+(*---*) import RField RealOrder.
 
 op charfun (p:'a -> bool) x: real = if p x then 1%r else 0%r.
 
@@ -105,7 +105,7 @@ lemma nosmt mu_and_le_l (d:'a distr) (p q:'a -> bool) r:
   mu d p <= r =>
   mu d (predI p q) <= r.
 proof.
-apply (Real.Trans _ (mu d p)).
+apply (ler_trans (mu d p)).
 by apply mu_sub; rewrite /predI=> x.
 qed.
 
@@ -113,7 +113,7 @@ lemma nosmt mu_and_le_r (d:'a distr) (p q:'a -> bool) r :
   mu d q <= r =>
   mu d (predI p q) <= r.
 proof.
-apply (Real.Trans _ (mu d q)).
+apply (ler_trans (mu d q)).
 by apply mu_sub; rewrite /predI=> x.
 qed.
 
@@ -154,7 +154,7 @@ qed.
 lemma mu_support (p:('a -> bool)) (d:'a distr):
   mu d p = mu d (predI p (support d)).
 proof.
-apply Antisymm; last by apply/mu_sub/predIsubpredl.
+apply/ler_anti; split => [|_]; last by apply/mu_sub/predIsubpredl.
 have ->: forall (p q:'a -> bool), (predI p q) = predC (predU (predC p) (predC q)).
   by (move=> p1 p2; apply fun_ext; delta; smt). (* delta *)
 by rewrite mu_not mu_or !mu_not mu_supp; smt.

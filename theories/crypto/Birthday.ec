@@ -9,7 +9,7 @@
 require import Option Int IntExtra Real RealExtra Distr List.
 require (*--*) Mu_mem.
 require import Ring StdRing StdOrder StdBigop FelTactic.
-(*---*) import RField RealOrder.
+(*---*) import RField IntOrder RealOrder.
 
 (** A non-negative integer q **)
 op q:int.
@@ -116,8 +116,7 @@ section.
       rewrite Bigreal.sumr_const count_predT size_range /=.
       rewrite max_ler 1:smt mulrA ler_wpmul2r 1:smt //.
       have ->: q^2 = q * q by smt.
-      rewrite FromInt.Mul ler_wpmul2r 1:ltrW // ?from_intM ?lt0q //.
-      by rewrite from_intMle // smt.
+      by rewrite -fromintM le_fromint ler_wpmul2r 1:ltrW ?lt0q /#.
       by inline*; auto; smt.
       proc; sp; if=> //; last by (hoare; auto; smt).
       wp; rnd (mem Sample.l); skip=> //=.
@@ -126,8 +125,8 @@ section.
           move=> x _; rewrite /mu_x; cut: mu uT (pred1 x) = mu uT (pred1 witness); last smt.
           have [uT_fu [_ uT_suf]]:= uT_ufT.
           by apply uT_suf; apply uT_fu.
-        move /(Trans _ ((size Sample.l{hr})%r * mu uT (pred1 witness)))=> -> //=.
-        by apply/mulrMle; smt.
+        move /(ler_trans ((size Sample.l{hr})%r * mu uT (pred1 witness)))=> -> //=.
+        by apply/ler_wpmul2r; smt w=(mu_bounded).
         by move: H4; rewrite H0.
       by progress; proc; rcondt 2; auto; smt.
       by progress; proc; rcondf 2; auto.
@@ -239,9 +238,7 @@ section.
       rewrite Bigreal.sumr_const count_predT size_range /=.
       rewrite max_ler 1:smt mulrA ler_wpmul2r 1:smt //.
       have ->: q^2 = q * q by smt.
-      rewrite FromInt.Mul ler_wpmul2r 1:ltrW // ?from_intM ?lt0q //.
-      by rewrite from_intMle // smt.
-
+      by rewrite -fromintM le_fromint ler_wpmul2r 1:ltrW ?lt0q /#.
       by inline*; auto; smt.
       proc; sp; if=> //; last by (hoare; auto; smt).
       wp; rnd (mem Sample.l); skip=> //=.
@@ -250,8 +247,8 @@ section.
           move=> x _; rewrite /mu_x; cut: mu uT (pred1 x) = mu uT (pred1 witness); last smt.
           have [uT_fu [_ uT_suf]]:= uT_ufT.
           by apply uT_suf; apply uT_fu.
-        move /(Trans _ ((size Sample.l{hr})%r * mu uT (pred1 witness)))=> -> //=.
-        by apply/mulrMle; smt.
+        move/(ler_trans ((size Sample.l{hr})%r * mu uT (pred1 witness)))=> -> //=.
+        by apply/ler_wpmul2r; smt w=(mu_bounded).
         by move: H4; rewrite H0.
       by progress; proc; rcondt 2; auto; smt.
       by progress; proc; rcondf 2; auto.

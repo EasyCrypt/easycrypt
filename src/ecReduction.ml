@@ -406,7 +406,7 @@ let rec h_red ri env hyps f =
         | Some (`Real_add ), [f1;f2] -> f_real_add_simpl f1 f2
         | Some (`Real_opp ), [f]     -> f_real_opp_simpl f
         | Some (`Real_mul ), [f1;f2] -> f_real_mul_simpl f1 f2
-        | Some (`Real_div ), [f1;f2] -> f_real_div_simpl f1 f2
+        | Some (`Real_inv ), [f]     -> f_real_inv_simpl f
         | Some (`Eq       ), [f1;f2] -> begin
             match fst_map f_node (destr_app f1), fst_map f_node (destr_app f2) with
             | (Fop (p1, _), args1), (Fop (p2, _), args2)

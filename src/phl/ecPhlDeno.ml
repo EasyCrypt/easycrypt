@@ -24,10 +24,15 @@ module PT  = EcProofTerm
 module TTC = EcProofTyping
 
 (* -------------------------------------------------------------------- *)
-let real_lemma name   = EcPath.pqname EcCoreLib.CI_Real.p_Real name
-let real_le_trans     = real_lemma "real_le_trans"
-let real_addleM       = real_lemma "addleM"
-let real_eq_le        = real_lemma "eq_le"
+let real_lemma name =
+  EcPath.pqname EcCoreLib.CI_Real.p_Real name
+
+let real_order_lemma name =
+  EcPath.pqname EcCoreLib.CI_Real.p_RealOrder name
+
+let real_le_trans     = real_order_lemma "ler_trans"
+let real_ler_add      = real_order_lemma "ler_add"
+let real_eq_le        = real_order_lemma "lerr_eq"
 let real_upto         = real_lemma "upto2_abs"
 let real_upto_notbad  = real_lemma "upto2_notbad"
 let real_upto_imp_bad = real_lemma "upto2_imp_bad"
@@ -37,7 +42,7 @@ let real_upto_sub     = real_lemma "upto_bad_sub"
 
 (* -------------------------------------------------------------------- *)
 let t_real_le_trans f2 tc =
-  t_apply_prept (`App (`UG real_le_trans, [`H_; `F f2]))tc
+  t_apply_prept (`App (`UG real_le_trans, [`F f2]))tc
 
 (* -------------------------------------------------------------------- *)
 let t_core_phoare_deno pre post tc =
@@ -249,7 +254,7 @@ let t_equiv_deno_bad pre tc =
       t_pr_rewrite_i ("mu_disjoint", None) @+
        [ t_intro_s (`Symbol "_") @! t_false;
          t_apply_prept
-           (`App (`UG real_addleM, [`F pra;`F fpr2;`F fprb;`F fprb; `H_; `H_]))
+           (`App (`UG real_ler_add, [`F pra;`F fpr2;`F fprb;`F fprb; `H_; `H_]))
            @+ [
              t_pr_rewrite_i ("mu_sub",None) @+ [
                t_intros_s (`Symbol ["_"]) @! t_apply_prept (`UG real_upto_sub);
