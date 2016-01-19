@@ -34,7 +34,8 @@ lemma invr0: inv (from_int 0) = from_int 0 by done.
 op b2r (b:bool) = if b then from_int 1 else from_int 0.
 
 (* -------------------------------------------------------------------- *)
-op "`|_|" : real -> real.
+op "`|_|" x = if from_int 0 <= x then x else -x.
+
 op ( ^ )  : real -> int -> real.
 
 axiom powrN (x : real) (n : int) :
