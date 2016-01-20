@@ -209,6 +209,7 @@
     (":"   , (COLON            , true ));
     ("#"   , (SHARP            , true ));
     ("//"  , (SLASHSLASH       , true ));
+    ("//#" , (SLASHSLASHSHARP  , true ));
     ("/="  , (SLASHEQ          , true ));
     ("/#"  , (SLASHSHARP       , true ));
     ("//=" , (SLASHSLASHEQ     , true ));

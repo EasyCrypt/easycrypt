@@ -495,6 +495,7 @@
 %token SLASHSLASH
 %token SLASHSLASHEQ
 %token SLASHSLASHTILDEQ
+%token SLASHSLASHSHARP
 %token SMT
 %token SP
 %token SPLIT
@@ -1873,7 +1874,10 @@ intro_pattern:
    { IPDone (Some `ProductCompat) }
 
 | SLASHSHARP
-   { IPSmt ({ (SMT.mk_smt_option []) with plem_max = Some (Some 0) }) }
+   { IPSmt (false, { (SMT.mk_smt_option []) with plem_max = Some (Some 0) }) }
+
+| SLASHSLASHSHARP
+   { IPSmt (true, { (SMT.mk_smt_option []) with plem_max = Some (Some 0) }) }
 
 | SLASHEQ
    { IPSimplify `Full }
@@ -1979,7 +1983,10 @@ rwarg1:
    { RWDone (Some `ProductCompat) }
 
 | SLASHSHARP
-   { RWSmt ({ (SMT.mk_smt_option []) with plem_max = Some (Some 0) }) }
+   { RWSmt (false, { (SMT.mk_smt_option []) with plem_max = Some (Some 0) }) }
+
+| SLASHSLASHSHARP
+   { RWSmt (true, { (SMT.mk_smt_option []) with plem_max = Some (Some 0) }) }
 
 | SLASHEQ
    { RWSimpl `Full }
@@ -1997,10 +2004,10 @@ rwarg1:
    { RWPr s }
 
 | SMT
-   { RWSmt (SMT.mk_smt_option []) }
+   { RWSmt (false, SMT.mk_smt_option []) }
 
 | LBRACKET SMT pi=smt_info RBRACKET
-   { RWSmt pi }
+   { RWSmt (false, pi) }
 
 | AMP f=pterm
    { RWApp f }

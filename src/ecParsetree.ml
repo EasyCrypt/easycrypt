@@ -613,7 +613,7 @@ and rwarg1 =
   | RWRw     of (rwoptions * (rwside * ppterm) list)
   | RWPr     of (psymbol * pformula option)
   | RWDone   of [`Full | `ProductCompat] option
-  | RWSmt    of pprover_infos
+  | RWSmt    of (bool * pprover_infos)
   | RWApp    of ppterm
   | RWTactic of rwtactic
 
@@ -644,7 +644,7 @@ type intropattern1 =
   | IPSubst    of rwside
   | IPClear    of psymbol list
   | IPDone     of [`Full | `ProductCompat] option
-  | IPSmt      of pprover_infos
+  | IPSmt      of (bool * pprover_infos)
   | IPSubstTop of int option
   | IPSimplify of [`Full | `ProductCompat]
   | IPBreak

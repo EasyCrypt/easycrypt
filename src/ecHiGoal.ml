@@ -715,8 +715,11 @@ let rec process_rewrite1_r ttenv ?target ri tc =
       EcPhlPrRw.t_pr_rewrite (unloc x, f) tc
   end
 
-  | RWSmt info ->
-      process_smt ~loc:ri.pl_loc ttenv info tc
+  | RWSmt (false, info) ->
+     process_smt ~loc:ri.pl_loc ttenv info tc
+
+  | RWSmt (true, info) ->
+     t_or process_done (process_smt ~loc:ri.pl_loc ttenv info) tc
 
   | RWApp fp -> begin
       let implicits = ttenv.tt_implicits in
@@ -1086,8 +1089,10 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
       | None -> process_trivial
     in t tc
 
-  and intro1_smt (_ : ST.state) (pi : pprover_infos) (tc : tcenv1) =
-    process_smt ttenv pi tc
+  and intro1_smt (_ : ST.state) ((dn, pi) : _ * pprover_infos) (tc : tcenv1) =
+    if dn then
+      t_or process_done (process_smt ttenv pi) tc
+    else process_smt ttenv pi tc
 
   and intro1_simplify (_ : ST.state) logic tc =
     t_simplify ~delta:false tc ~logic:(Some logic)
