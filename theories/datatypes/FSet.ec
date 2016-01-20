@@ -542,6 +542,10 @@ proof.
   by move=> [a] [x_in_A <-]; exists a; rewrite -memE.
 qed.
 
+lemma mem_image (f:'a->'b) (s:'a fset) x:
+  mem s x => mem (image f s) (f x).
+proof. by rewrite imageP=> ?;exists x. qed.
+
 lemma nosmt image0 (f : 'a -> 'b): image f fset0 = fset0.
 proof.
   by apply/fsetP=> b; rewrite imageP; split=> [[a]|]; rewrite in_fset0.
