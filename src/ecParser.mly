@@ -2758,7 +2758,7 @@ tactic:
 | s1=tcfc_set? TILD s2=tcfc_set
     { (s1, Some s2) }
 
-tactic_chain:
+tactic_chain_r:
 | LBRACKET ts=plist1(loc(tactics0), PIPE) RBRACKET
     { Psubtacs (List.map mk_core_tactic ts) }
 
@@ -2790,16 +2790,22 @@ tactic_chain:
 | EXPECT n=word t=loc(tactics)
     { Pexpect (`Tactic (mk_tactic_of_tactics t), n) }
 
-| EXPECT n=word t=loc(paren(rlist1(tactic_chain, SEMICOLON)))
+| EXPECT n=word t=loc(paren(rlist1(tactic_chain_r, SEMICOLON)))
     { Pexpect (`Chain t, n) }
 
 | fc=tcfc COLON t=tactic
     { Pfocus (t, fc) }
 
-subtactic:
-| t=loc(tactic_chain)
+tactic_chain:
+| t=loc(tactic_chain_r) %prec prec_below_IMPL
     { mk_core_tactic (mk_loc t.pl_loc (Psubgoal (unloc t))) }
 
+| t=loc(tactic_chain_r) ip=plist1(tactic_genip, empty)
+    { let t = mk_loc t.pl_loc (Psubgoal (unloc t)) in
+      { pt_core = t; pt_intros = ip; } }
+
+subtactic:
+| t=tactic_chain
 | t=tactic
     { t }
 
