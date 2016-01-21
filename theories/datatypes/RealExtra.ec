@@ -21,6 +21,12 @@ proof. by rewrite /#. qed.
 lemma b2r_ge0 (b : bool): 0%r <= b2r b.
 proof. by case: b. qed.
 
+lemma b2r0: b2r false = 0%r.
+proof. by rewrite b2rE b2i0. qed.
+
+lemma b2r1: b2r true = 1%r.
+proof. by rewrite b2rE b2i1. qed.
+
 (* -------------------------------------------------------------------- *)
 op lub (E : real -> bool) : real.
 
