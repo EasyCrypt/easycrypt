@@ -61,6 +61,18 @@ module LowApply = struct
     | `Tc (tc, target) -> RApi.tc_hyps ?target tc
 
   (* ------------------------------------------------------------------ *)
+  let eq_hyps (hy1 : LDecl.hyps) (hy2 : LDecl.hyps) =
+    if hy1 (*φ*)== hy2 then true else
+
+    let env1, ld1 = LDecl.baseenv hy1, LDecl.tohyps hy1 in
+    let env2, ld2 = LDecl.baseenv hy2, LDecl.tohyps hy2 in
+
+    if env1 (*φ*)!= env2 then false else begin
+         ld1.h_tvar  == ld2.h_tvar
+      && ld1.h_local == ld2.h_local
+    end
+
+  (* ------------------------------------------------------------------ *)
   let rec check_pthead (pt : pt_head) (tc : ckenv) =
     let hyps = hyps_of_ckenv tc in
 
@@ -81,8 +93,9 @@ module LowApply = struct
           | `Tc   tc -> RApi.tc_get_pregoal_by_id hd (fst tc)
         in
         (* proof reuse - fetch corresponding subgoal*)
-        if subgoal.g_hyps !=(*φ*) hyps_of_ckenv tc then
+        if not (eq_hyps subgoal.g_hyps (hyps_of_ckenv tc)) then
           raise InvalidProofTerm;
+
         (pt, subgoal.g_concl)
     end
 
@@ -174,6 +187,10 @@ module LowApply = struct
 
     ({ pt_head = nhd; pt_args = nargs }, ax)
 end
+
+(* -------------------------------------------------------------------- *)
+let t_abort (_ : tcenv1) =
+  raise InvalidGoalShape
 
 (* -------------------------------------------------------------------- *)
 let t_admit (tc : tcenv1) =
@@ -1362,9 +1379,9 @@ let t_rewrite
       RApi.tcenv_of_rtcenv tc
 
 (* -------------------------------------------------------------------- *)
-let t_rewrite_hyp (id : EcIdent.t) pos (tc : tcenv1) =
+let t_rewrite_hyp ?mode (id : EcIdent.t) pos (tc : tcenv1) =
   let pt = { pt_head = PTLocal id; pt_args = []; } in
-  t_rewrite ?mode:None pt pos tc
+  t_rewrite ?mode pt pos tc
 
 (* -------------------------------------------------------------------- *)
 type vsubst = [
@@ -1623,6 +1640,36 @@ let t_absurd_hyp ?conv ?id tc =
         | _ -> None
 
       in let hyps = (LDecl.tohyps (FApi.tc1_hyps tc)).h_local
+      in let tc = FApi.t_try (FApi.t_ors_pmap tott hyps) tc in
+
+      if not (FApi.tc_done tc) then raise InvalidGoalShape; tc
+
+(* -------------------------------------------------------------------- *)
+let t_false ?(conv = `Eq) id tc =
+  let hy = FApi.tc1_hyps tc in
+  let hh = LDecl.hyp_by_id id hy in
+
+  if not (EcReduction.xconv conv hy hh f_false) then
+    raise InvalidGoalShape;
+
+  FApi.t_internal ~info:"t_false"
+    (FApi.t_seq
+       (t_generalize_hyp ~clear:`No id) t_elim_false)
+    tc
+
+(* -------------------------------------------------------------------- *)
+let t_false ?conv ?id tc =
+  let tfalse = t_false ?conv in
+
+  match id with
+  | Some id -> tfalse id tc
+  | None    ->
+      let tott (id, lk) =
+        match lk with
+        | LD_hyp _ -> Some (tfalse id)
+        | _ -> None
+
+      in let hyps = (LDecl.tohyps (FApi.tc1_hyps tc)).h_local
       in FApi.t_ors_pmap tott hyps tc
 
 (* -------------------------------------------------------------------- *)
@@ -1772,6 +1819,100 @@ let t_progress ?options ?ti (tt : FApi.backward) (tc : tcenv1) =
         FApi.t_try (FApi.t_seq thesplit aux0) tc
 
     | _ -> t_id tc
+
+  in entry tc
+
+(* -------------------------------------------------------------------- *)
+let t_crush ?(delta = true) (tc : tcenv1) =
+  let t_progress_subst ?eqid =
+    let sk1 = { empty_subst_kind with sk_local = true ; } in
+    let sk2 = {  full_subst_kind with sk_local = false; } in
+    FApi.t_or (t_subst ~kind:sk1 ?eqid) (t_subst ~kind:sk2 ?eqid)
+  in
+
+  let tt = FApi.t_try (t_assumption `Alpha) in
+  let ts id = FApi.t_try (t_progress_subst ~eqid:id) in
+
+  (* Entry of progress: simplify goal, and chain with progress *)
+  let rec entry tc = FApi.t_seq (t_simplify ~delta:false) aux0 tc
+
+  (* Progress (level 0): try to apply user tactic. *)
+  and aux0 tc = FApi.t_seq (FApi.t_try tt) aux1 tc
+
+  (* Progress (level 1): intro/elim top-level assumption. *)
+  and aux1 tc =
+    let hyps, concl = FApi.tc1_flat tc in
+
+    match sform_of_form concl with
+    | SFquant (Lforall, _, _) ->
+      let bd  = fst (destr_forall concl) in
+      let ids = List.map (EcIdent.name |- fst) bd in
+      let ids = LDecl.fresh_ids hyps ids in
+      FApi.t_seqs
+        [t_intros_i ids; aux0;
+         t_generalize_hyps ~clear:`Yes ~missing:true ids]
+        tc
+
+    | SFlet (LTuple fs, f1, _) ->
+      let tys    = List.map snd fs in
+      let tc, hd = FApi.bwd1_of_fwd (pf_gen_tuple_elim tys hyps) tc in
+      let pt     = { pt_head = PTHandle hd; pt_args = []; } in
+      FApi.t_seq (t_elimT_form pt f1) aux0 tc
+
+    | SFimp (_, _) -> begin
+      let id = LDecl.fresh_id hyps "_" in
+
+      match t_intros_i_seq [id] tt tc with
+      | tc when FApi.tc_done tc -> tc
+      | tc ->
+          let tc = FApi.as_tcenv1 tc in
+          let tc =
+            let rw = t_rewrite_hyp ~mode:`Bool id (`LtoR, None) in
+            (    FApi.t_try (t_absurd_hyp ~conv:`AlphaEq ~id)
+              @! FApi.t_try (FApi.t_seq (FApi.t_try rw) tt)
+              @! t_generalize_hyp ~clear:`Yes id) tc
+          in
+
+          let iffail tc =
+            t_intros_i_seq [id]
+              (FApi.t_seqs
+                 [ts id; entry;
+                  t_generalize_hyp ~clear:`Yes ~missing:true id])
+              tc
+          in
+
+          let elims  = PGInternals.pg_cnj_elims in
+          let reduce = if delta then `Full else `NoDelta in
+
+          FApi.t_onall
+            (FApi.t_switch ~on:`All (t_elim_r ~reduce elims) ~ifok:aux0 ~iffail)
+            tc
+    end
+
+    | _ ->
+       let thesplit = t_split ~closeonly:false ~reduce:`Full in
+       let tc =
+         match FApi.t_try_base (FApi.t_seq thesplit aux0) tc with
+         | `Success tc -> tc
+         | `Failure _  ->
+            FApi.t_try
+              (FApi.t_ors [t_assumption `Conv;
+                           t_absurd_hyp ~conv:`Conv;
+                           t_false ~conv:`Conv])
+              tc in
+       let pr = proofenv_of_proof (proof_of_tcenv tc) in
+       let cl = List.map (FApi.get_pregoal_by_id^~ pr) (FApi.tc_opened tc) in
+       let nl = List.length cl in
+
+       match cl with [] | [_] -> tc | _ ->
+       
+       let cl = f_ands (List.map (fun g -> g.g_concl) cl) in
+       let tc, hd = FApi.newgoal tc ~hyps cl in
+       let pt = { pt_head = PTHandle hd; pt_args = []; } in
+
+       FApi.t_on1 nl t_id
+         ~ttout:(FApi.t_seqs [t_cutdef pt cl; aux0; t_abort])
+         tc
 
   in entry tc
 

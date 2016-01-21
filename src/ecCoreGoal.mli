@@ -341,6 +341,8 @@ module FApi : sig
   val t_seqsub : backward -> backward list -> backward
   val t_on1seq : int -> backward -> ?ttout:backward -> backward -> backward
 
+  val t_try_base : backward -> tcenv1 -> [`Failure of exn | `Success of tcenv]
+
   val t_try    : backward -> backward
   val t_switch : ?on:[`All|`Focus] -> backward -> ifok:backward -> iffail:backward -> backward
   val t_do_r   : ?focus:int -> [`All | `Maybe] -> int option -> backward -> tcenv -> tcenv

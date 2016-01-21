@@ -1082,6 +1082,7 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
           | IPView     x -> `View x
           | IPSubst    x -> `Subst x
           | IPSimplify x -> `Simpl x
+          | IPCrush    x -> `Crush x
 
           | IPCase (mode, x) ->
               let subcollect = List.rev -| fst -| collect true [] [] in
@@ -1259,6 +1260,9 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
       ~clear:`Yes ~missing:true
       (List.rev !togen) (FApi.as_tcenv1 tc)
 
+  and intro1_crush (_st : ST.state) (d : bool) (gs : tcenv1) =
+    EcLowGoal.t_crush ~delta:d gs
+
   and dointro (st : ST.state) nointro pis (gs : tcenv) =
     match pis with [] -> gs | { pl_desc = pi; pl_loc = ploc } :: pis ->
       let nointro, gs =
@@ -1309,6 +1313,9 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
 
         | `SubstTop d ->
             (false, rl (t_onall (intro1_subst_top st d)) gs)
+
+        | `Crush d ->
+           (false, rl (t_onall (intro1_crush st d)) gs)
 
       in dointro st nointro pis gs
 

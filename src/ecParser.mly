@@ -445,6 +445,7 @@
 %token PCENT
 %token PHOARE
 %token PIPE
+%token PIPEGT
 %token PLUS
 %token POSE
 %token PR
@@ -489,6 +490,7 @@
 %token SIMPLIFY
 %token SKIP
 %token SLASH
+%token SLASHGT
 %token SLASHSHARP
 %token SLASHEQ
 %token SLASHTILDEQ
@@ -1909,6 +1911,12 @@ intro_pattern:
 
 | MINUS
    { IPBreak }
+
+| PIPEGT
+   { IPCrush false }
+
+| SLASHGT
+   { IPCrush true }
 
 gpterm_head(F):
 | exp=iboption(AT) p=qident tvi=tvars_app?

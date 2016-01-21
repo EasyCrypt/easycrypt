@@ -647,6 +647,7 @@ type intropattern1 =
   | IPSmt      of (bool * pprover_infos)
   | IPSubstTop of int option
   | IPSimplify of [`Full | `ProductCompat]
+  | IPCrush    of bool
   | IPBreak
 
 and intropattern = (intropattern1 located) list
