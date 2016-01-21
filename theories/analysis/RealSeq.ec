@@ -113,7 +113,7 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 lemma cnvtoC c: convergeto (fun x => c) c.
-proof. by move=> e gt0e; exists 0 => n _; rewrite subrr normr0. qed.
+proof. by move=> e gt0e; exists 0 => n _; rewrite subrr. qed.
 
 lemma cnvtoD s1 s2 l1 l2: convergeto s1 l1 => convergeto s2 l2 =>
   convergeto (fun x => s1 x + s2 x) (l1 + l2).
