@@ -1812,7 +1812,13 @@ ipcore:
    { `Clear }
 
 | QUESTION
-   { `Anonymous }
+   { `Anonymous None }
+
+| n=word QUESTION
+   { `Anonymous (Some (Some n)) }
+
+| STAR
+   { `Anonymous (Some None) }
 
 | s=ipcore_name
    { `Named s }
@@ -1821,13 +1827,13 @@ ipcore:
 | /* empty */
    { `One    }
 
-| opt=icasemode_full_opt STAR
+| opt=icasemode_full_opt SHARP
    { `Full (opt, None) }
 
-| i=word NOT opt=icasemode_full_opt STAR
+| i=word NOT opt=icasemode_full_opt SHARP
     { `Full (opt, Some (`AtMost i)) }
 
-| NOT opt=icasemode_full_opt STAR
+| NOT opt=icasemode_full_opt SHARP
     { `Full (opt, Some (`AsMuch)) }
 
 %inline icasemode_full_opt:

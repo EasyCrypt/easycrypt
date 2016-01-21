@@ -651,7 +651,12 @@ type intropattern1 =
 
 and intropattern = (intropattern1 located) list
 
-and ipcore = [ `Named of string | `Revert | `Clear | `Anonymous ]
+and ipcore = [
+  | `Revert
+  | `Clear
+  | `Named     of string
+  | `Anonymous of (int option) option
+]
 
 and icasemode =
   [`One | `Full of (bool * bool) * icasemode_full option]

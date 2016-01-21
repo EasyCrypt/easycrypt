@@ -980,50 +980,76 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
 
   let mk_intro ids (hyps, form) =
     let (_, torev), ids =
-        List.map_fold (fun ((hyps, form), torev) s ->
+      let rec compile (((hyps, form), torev) as acc) newids ids =
+        match ids with [] -> (acc, newids) | s :: ids ->
+
         let rec destruct fp =
           match EcFol.sform_of_form fp with
           | SFquant (Lforall, (x, _)  , lazy fp) ->
-              let name = EcIdent.name x in (name, Some name, false, fp)
+              let name = EcIdent.name x in (name, Some name, `Named, fp)
           | SFlet (LSymbol (x, _), _, fp) ->
-              let name = EcIdent.name x in (name, Some name, false, fp)
+              let name = EcIdent.name x in (name, Some name, `Named, fp)
           | SFimp (_, fp) ->
-              ("H", None, true, fp)
+              ("H", None, `Hyp, fp)
           | _ -> begin
             match EcReduction.h_red_opt EcReduction.full_red hyps fp with
-            | None   -> ("_", None, true , f_true)
+            | None   -> ("_", None, `None, f_true)
             | Some f -> destruct f
           end
         in
-        let name, revname, ishyp, form = destruct form in
-        let revert, id =
+        let name, revname, kind, form = destruct form in
+        let revertid =
           if ttenv.tt_oldip then
             match unloc s with
-            | `Revert     -> Some false, EcIdent.create "_"
-            | `Clear      -> None      , EcIdent.create "_"
-            | `Named s    -> None      , EcIdent.create s
-            | `Anonymous  -> None      , LDecl.fresh_id hyps name
+            | `Revert      -> Some (Some false, EcIdent.create "_")
+            | `Clear       -> Some (None      , EcIdent.create "_")
+            | `Named s     -> Some (None      , EcIdent.create s)
+            | `Anonymous a ->
+               if (a = Some None || a = Some (Some 0)) && kind = `None then
+                 None
+               else Some (None, LDecl.fresh_id hyps name)
           else
             match unloc s with
-            | `Revert     -> Some false, EcIdent.create "_"
-            | `Clear      -> Some true , LDecl.fresh_id hyps name
-            | `Named s    -> None      , EcIdent.create s
-            | `Anonymous  ->
-               if ishyp then
-                 (None, LDecl.fresh_id hyps "_")
-               else
-                 (None, LDecl.fresh_id hyps ("`" ^ name))
+            | `Revert      -> Some (Some false, EcIdent.create "_")
+            | `Clear       -> Some (Some true , LDecl.fresh_id hyps name)
+            | `Named s     -> Some (None      , EcIdent.create s)
+            | `Anonymous a ->
+               match a, kind with
+               | Some None    , `None -> None
+               | Some (Some 0), _     -> None
+
+               | _, `Named ->
+                  Some (None, LDecl.fresh_id hyps ("`" ^ name))
+               | _, _ ->
+                  Some (None, LDecl.fresh_id hyps "_")
         in
 
-        let id     = mk_loc s.pl_loc id in
-        let hyps   = LDecl.add_local id.pl_desc (LD_var (tbool, None)) hyps in
-        let revert = revert |> omap (fun b -> if b then `Clear else `Revert) in
-        let torev  = revert
-          |> omap (fun b -> (b, unloc id, revname) :: torev)
-          |> odfl torev
-        in ((hyps, form), torev), Tagged (unloc id, Some id.pl_loc))
+        match revertid with
+        | Some (revert, id) ->
+            let id     = mk_loc s.pl_loc id in
+            let hyps   = LDecl.add_local id.pl_desc (LD_var (tbool, None)) hyps in
+            let revert = revert |> omap (fun b -> if b then `Clear else `Revert) in
+            let torev  = revert
+              |> omap (fun b -> (b, unloc id, revname) :: torev)
+              |> odfl torev
+            in
 
-        ((hyps, form), []) ids
+            let newids = Tagged (unloc id, Some id.pl_loc) :: newids in
+
+            let ((hyps, form), torev), newids =
+              match unloc s with
+              | `Anonymous (Some None) when kind <> `None ->
+                 compile ((hyps, form), torev) newids [s]
+              | `Anonymous (Some (Some i)) when 0 < i ->
+                 let s = mk_loc (loc s) (`Anonymous (Some (Some (i-1)))) in
+                 compile ((hyps, form), torev) newids [s]
+              | _ -> ((hyps, form), torev), newids
+
+            in compile ((hyps, form), torev) newids ids
+
+        | None -> compile ((hyps, form), torev) newids ids
+
+      in snd_map List.rev (compile ((hyps, form), []) [] ids)
 
     in (torev, ids)
   in
