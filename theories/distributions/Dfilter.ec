@@ -29,4 +29,4 @@ proof. by rewrite /support /in_supp dfilterE; case (p x). qed.
 
 lemma weight_dfilter (d : 'a distr) (p : 'a -> bool):
   mu (dfilter d p) predT = mu d p.
-proof. by rewrite dfilterP /predI /predT /= -etaE etaP. qed.
+proof. by rewrite dfilterP. qed.

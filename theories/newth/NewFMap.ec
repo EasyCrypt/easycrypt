@@ -89,7 +89,7 @@ lemma reduced_reduce (s : ('a * 'b) list): uniq (map fst (reduce s)).
 proof.
   elim: s => [|[x y] s ih]; 1: by rewrite reduce_nil.
   rewrite reduce_cons /= {3}/fst /=; split.
-    by apply/negP=> /mapP [[x' y']]; rewrite mem_filter=> -[* h1 h2 ->>].
+    by apply/negP=> /mapP [[x' y']]; rewrite mem_filter=> -[# h1 h2 ->>].
   rewrite /(\o); have <- := filter_map fst<:'a, 'b> (predC1 x).
   by rewrite filter_uniq.
 qed.

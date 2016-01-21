@@ -41,7 +41,7 @@ lemma fold_ll (O<:Orcl): islossless O.f => islossless Fold(O).fold.
 proof.
 move=> O_ll; proc; inline Fold(O).fold.
 while true (size l); auto=> /=.
-+ call O_ll; skip=> /= ? [*] Hl <-.
++ call O_ll; skip=> /= ? [#] Hl <-.
   smt w=(size_eq0 size_ge0 size_drop).
 smt w=(size_eq0 size_ge0).
 qed.
