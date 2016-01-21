@@ -427,7 +427,10 @@ let rec h_red ri env hyps f =
 
                 f_true
 
-            | _ -> f_eq_simpl f1 f2
+            | _ ->
+               if   f_equal f1 f2 || is_alpha_eq hyps f1 f2
+               then f_true
+               else f_eq_simpl f1 f2
         end
 
         | _ when ri.delta_p p ->
@@ -490,7 +493,7 @@ and h_red_opt ri env hyps f =
   try Some (h_red ri env hyps f)
   with NotReducible -> None
 
-let check_alpha_equal ri hyps f1 f2 =
+and check_alpha_equal ri hyps f1 f2 =
   let env = LDecl.toenv hyps in
   let exn = IncompatibleForm (env, (f1, f2)) in
   let error () = raise exn in
@@ -689,10 +692,10 @@ let check_alpha_equal ri hyps f1 f2 =
   in
   aux env Fsubst.f_subst_id f1 f2
 
-let check_alpha_eq = check_alpha_equal no_red
-let check_conv     = check_alpha_equal full_red
+and check_alpha_eq f1 f2 = check_alpha_equal no_red   f1 f2
+and check_conv     f1 f2 = check_alpha_equal full_red f1 f2
 
-let is_alpha_eq hyps f1 f2 =
+and is_alpha_eq hyps f1 f2 =
   try check_alpha_eq hyps f1 f2; true
   with _ -> false
 
