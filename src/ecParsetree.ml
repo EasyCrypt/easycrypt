@@ -641,7 +641,7 @@ type intropattern1 =
   | IPView     of ppterm
   | IPRw       of (rwocc * rwside * (int option) option)
   | IPDelta    of ((rwside * rwocc) * pformula)
-  | IPSubst    of rwside
+  | IPSubst    of (rwside * (int option) option)
   | IPClear    of psymbol list
   | IPDone     of [`Full | `ProductCompat] option
   | IPSmt      of (bool * pprover_infos)

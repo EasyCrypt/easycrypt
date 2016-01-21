@@ -1833,6 +1833,10 @@ ipcore:
 %inline icasemode_full_opt:
 | h=iboption(TILD) d=iboption(SLASH) { (h, d) }
 
+ip_repeat:
+| i=ioption(word) NOT { i }
+| i=word { Some i }
+
 intro_pattern:
 | x=ipcore
    { IPCore x }
@@ -1849,17 +1853,17 @@ intro_pattern:
 | LBRACKET mode=icasemode ip=plist2(loc(intro_pattern)*, PIPE) RBRACKET
    { IPCase (mode, ip) }
 
-| i=ioption(postfix(ioption(word), NOT)) o=rwocc? RARROW
+| i=ioption(ip_repeat) o=rwocc? RARROW
    { IPRw (o, `LtoR, i) }
 
-| i=ioption(postfix(ioption(word), NOT)) o=rwocc? LARROW
+| i=ioption(ip_repeat) o=rwocc? LARROW
    { IPRw (o, `RtoL, i) }
 
-| RRARROW
-   { IPSubst `LtoR }
+| i=ioption(ip_repeat) RRARROW
+   { IPSubst (`LtoR, i) }
 
-| LLARROW
-   { IPSubst `RtoL }
+| i=ioption(ip_repeat) LLARROW
+   { IPSubst (`RtoL, i) }
 
 | LBRACE xs=loc(ipcore_name)+ RBRACE
    { IPClear xs }

@@ -1275,8 +1275,11 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
         | `View pe ->
             (false, rl (t_onall (intro1_view st pe)) gs)
 
-        | `Subst d ->
+        | `Subst (d, None) ->
             (false, rl (t_onall (intro1_subst st d)) gs)
+
+        | `Subst (d, Some i) ->
+            (false, rl (t_onall (t_do `All i (intro1_subst st d))) gs)
 
         | `SubstTop d ->
             (false, rl (t_onall (intro1_subst_top st d)) gs)
