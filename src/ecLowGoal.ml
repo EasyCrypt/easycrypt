@@ -275,9 +275,17 @@ let t_clears ?leniant xs tc =
 
 (* -------------------------------------------------------------------- *)
 module LowIntro = struct
-  let valid_value_name (x : symbol) = x = "_" || EcIo.is_sym_ident x
-  let valid_mod_name   (x : symbol) = x = "_" || EcIo.is_mod_ident x
-  let valid_mem_name   (x : symbol) = x = "_" || EcIo.is_mem_ident x
+  let valid_anon_name chk x =
+    if x <> "" then
+      x.[0] = '`' && chk (String.sub x 1 (String.length x - 1))
+    else false
+
+  let valid_name chk x =
+    x = "_" || chk x || valid_anon_name chk x
+
+  let valid_value_name (x : symbol) = valid_name EcIo.is_sym_ident x
+  let valid_mod_name   (x : symbol) = valid_name EcIo.is_mod_ident x
+  let valid_mem_name   (x : symbol) = valid_name EcIo.is_mem_ident x
 
   type kind = [`Value | `Module | `Memory]
 

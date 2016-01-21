@@ -984,31 +984,35 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
         let rec destruct fp =
           match EcFol.sform_of_form fp with
           | SFquant (Lforall, (x, _)  , lazy fp) ->
-              let name = EcIdent.name x in (name, Some name, fp)
+              let name = EcIdent.name x in (name, Some name, false, fp)
           | SFlet (LSymbol (x, _), _, fp) ->
-              let name = EcIdent.name x in (name, Some name, fp)
+              let name = EcIdent.name x in (name, Some name, false, fp)
           | SFimp (_, fp) ->
-              ("H", None, fp)
+              ("H", None, true, fp)
           | _ -> begin
             match EcReduction.h_red_opt EcReduction.full_red hyps fp with
-            | None   -> ("_", None, f_true)
+            | None   -> ("_", None, true , f_true)
             | Some f -> destruct f
           end
         in
-        let name, revname, form = destruct form in
+        let name, revname, ishyp, form = destruct form in
         let revert, id =
           if ttenv.tt_oldip then
             match unloc s with
             | `Revert     -> Some false, EcIdent.create "_"
             | `Clear      -> None      , EcIdent.create "_"
-            | `Anonymous  -> None      , LDecl.fresh_id hyps name
             | `Named s    -> None      , EcIdent.create s
+            | `Anonymous  -> None      , LDecl.fresh_id hyps name
           else
             match unloc s with
             | `Revert     -> Some false, EcIdent.create "_"
             | `Clear      -> Some true , LDecl.fresh_id hyps name
-            | `Anonymous  -> None      , EcIdent.create "_"
             | `Named s    -> None      , EcIdent.create s
+            | `Anonymous  ->
+               if ishyp then
+                 (None, LDecl.fresh_id hyps "_")
+               else
+                 (None, LDecl.fresh_id hyps ("`" ^ name))
         in
 
         let id     = mk_loc s.pl_loc id in
