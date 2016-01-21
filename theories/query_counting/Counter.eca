@@ -1,0 +1,82 @@
+require import Int Real Distr StdOrder.
+(*---*) import RealOrder.
+
+type from, to.
+
+module type System = {
+  proc init(): unit
+  proc oracle(_ : from): to
+}.
+
+module type Oracle = {
+  proc oracle(_ : from): to
+}.
+
+module type Distinguisher(O : Oracle) = {
+  proc distinguish(): unit
+}.
+
+module Counter(S : System) = {
+  var c : int
+
+  proc init(): unit = {
+    c <- 0;
+    S.init();
+  }
+
+  proc oracle(x : from): to = {
+    var r;
+
+    r <@ S.oracle(x);
+    c <- c + 1;
+    return r;
+  }
+}.
+
+section.
+  declare module S : System.
+  declare module D : Distinguisher { S }.
+
+  lemma ind_counting (E : (glob S) -> bool) &m:
+      Pr[D(S).distinguish() @ &m: E (glob S)]
+    = Pr[D(Counter(S)).distinguish() @ &m: E (glob S)].
+  proof.
+  byequiv=> //=; proc *.
+  by call (_: ={glob S}); first by proc *; inline *; sim.
+  qed.
+
+  equiv eq_counting:
+    S.oracle ~ Counter(S).oracle: ={glob S, arg} ==> ={glob S, res}.
+  proof. by proc *; inline *; sim. qed.
+end section.
+
+op q : { int | 0 <= q } as ge0_q.
+
+section.
+  declare module D : Distinguisher { Counter }.
+
+  axiom D_bounded (S <: System { Counter, D }) c0 &m:
+    islossless S.oracle =>
+    Counter.c{m} = c0 =>
+    Pr[D(Counter(S)).distinguish() @ &m : Counter.c <= c0 + q] = 1%r.
+
+  lemma D_ll (S <: System { Counter, D }):
+    islossless S.oracle => islossless D(Counter(S)).distinguish.
+  proof.
+  move=> S_ll.
+  exists* Counter.c; elim*=> c0.
+  bypr=> &m0 /= /eq_sym /(D_bounded S c0 &m0 S_ll) pr_E1.
+  apply/ler_anti; split=> [|_]; first by smt w=mu_bounded.
+  by rewrite -pr_E1 Pr [mu_sub].
+  qed.
+
+  lemma D_bounded_hoare (S <: System { Counter, D }) c0:
+    islossless S.oracle =>
+    hoare [D(Counter(S)).distinguish: Counter.c = c0 ==> Counter.c <= c0 + q].
+  proof.
+  move=> S_ll; hoare.
+  bypr=> &m0 /(D_bounded S c0 &m0 S_ll).
+  rewrite Pr [mu_not] (_: Pr[D(Counter(S)).distinguish() @ &m0 : true] = 1%r)=> [|<-//].
+  by byphoare (D_ll S S_ll).
+  qed.
+end section.
