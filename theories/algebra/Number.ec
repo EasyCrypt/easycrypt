@@ -1068,19 +1068,19 @@ clone include RealDomain with type t <- t,
 
 (* -------------------------------------------------------------------- *)
 lemma lef_pinv x :
-  zeror < x => forall y, (invr y <= invr x) <=> (x <= y).
+  zeror < x => zeror < y => forall y, (invr y <= invr x) <=> (x <= y).
 proof. admit. qed.
 
 lemma lef_ninv x :
-  x < zeror => forall y, (invr y <= invr x) <=> (x <= y).
+  x < zeror => y < zeror => forall y, (invr y <= invr x) <=> (x <= y).
 proof. admit. qed.
 
 lemma ltf_pinv x :
-  zeror < x => forall y, (invr y < invr x) <=> (x < y).
+  zeror < x => zeror < y => forall y, (invr y < invr x) <=> (x < y).
 proof. admit. qed.
 
 lemma ltf_ninv x :
-  x < zeror => forall y, (invr y < invr x) <=> (x < y).
+  x < zeror => y < zeror => forall y, (invr y < invr x) <=> (x < y).
 proof. admit. qed.
 
 (* -------------------------------------------------------------------- *)
