@@ -189,9 +189,13 @@ let real_split f =
   | Fapp (op, [{ f_node = Fapp (subop, [f1]) }; f2])
       when f_equal    op fop_real_mul
         && f_equal subop fop_real_inv
-    -> (f1, f2)
+    -> (f2, f1)
 
-  | _ -> (f, f_r1)
+  | Fapp (op, [f]) when f_equal op fop_real_inv ->
+     (f_r1, f)
+
+  | _ ->
+     (f, f_r1)
 
 and real_is_zero f =
   try  BI.equal BI.zero (destr_rint f)
