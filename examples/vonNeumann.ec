@@ -1,39 +1,55 @@
 (* In this theory, we illustrate some reasoning on distributions on
-   Von Nuemann's trick to simulate a fair coin toss using only a
+   Von Neumann's trick to simulate a fair coin toss using only a
    biased coin (of unknown bias. *)
 
-require import Bool.
-require import Real.
-require import Distr.
+require import Bool Int IntExtra Real RealExtra NewDistr StdOrder Mu_mem.
+(*---*) import RealOrder.
 
 theory BiasedCoin.
-  op p:real.
-  axiom p_bnd: 0%r < p < 1%r.
+  op p : {real | 0%r < p < 1%r} as p_strict.
+  lemma gt0_p: 0%r < p by have [] := p_strict.
+  lemma lt1_p: p < 1%r by have [] := p_strict.
 
-  op biased: bool distr.
+  (** This distribution cannot be defined using the standard NewDistr
+      building blocks. We axiomatize it for now but could define it
+      through its probability mass function and prove that it is a
+      valid distribution. **)
+  (** TODO: finish it and stick it into the standard lib **)
+  op mbiased (b : bool) = if b then p else 1%r -p.
 
-  axiom biased_def (P:bool -> bool):
-    mu biased P =
-      p         * charfun P true +
-      (1%r - p) * charfun P false.
-
-  lemma biased_full: support biased = True.
+  lemma isdistr_mbiased: isdistr mbiased.
   proof.
-    apply fun_ext=> b; rewrite /True /support /in_supp /mu_x.
-    by case b; rewrite biased_def /charfun /Pred.([!]) /=; smt.
+  split.
+    by case; rewrite /mbiased /= ler_eqVlt ?gt0_p ?subr_gt0 ?lt1_p.
+  admit. (* at worst, the list can be a permutation of [true;false], whose sum is 1%r *)
   qed.
 
-  lemma biasedL: mu biased True = 1%r.
-  proof. by rewrite biased_def /True /charfun /=; smt. qed.
+  op biased = mk mbiased.
+
+  lemma biased_def (P:bool -> bool):
+    mu biased P =
+      p         * b2r (P true) +
+      (1%r - p) * b2r (P false).
+  proof.
+  rewrite muE muK ?isdistr_mbiased.
+  admit. (* the sum is finite over (FinBool.enum) *)
+  qed.
+
+  lemma biased_fu: support biased = predT.
+  proof.
+  apply fun_ext=> b; rewrite /predT /support /in_supp /mu_x /= eqT.
+  by case b; rewrite biased_def /pred1 b2r0 b2r1 //= ?gt0_p ?subr_gt0 ?lt1_p.
+  qed.
+
+  lemma biased_ll: mu biased predT = 1%r.
+  proof. by rewrite biased_def /predT /#. qed.
 end BiasedCoin.
 
 theory VonNeumann.
   import BiasedCoin.
-  require import Pred.
-  require import Pair.
+
+  require import Pair FSet Dexcepted DBool.
   (*---*) import Dprod.
-  require import FSet.
-  (*---*) import Dexcepted.
 
   module Fair = {
     proc sample(): bool = {
@@ -45,66 +61,45 @@ theory VonNeumann.
   }.
 
   (* First we prove things about the distribution "pairs of uniform booleans minus pairs of identical elements" *)
-  op vn = ({0,1} * {0,1}) \ (add (true,true) (add (false,false) empty)).
+  op vn = ({0,1} * {0,1}) \ (fset1 (true,true) `|` fset1 (false,false)).
 
-  lemma mux_vn_TF: mu vn ((=) (true,false)) = 1%r/2%r.
+  lemma pr_evict:
+    mu ({0,1} * {0,1}) (mem (fset1 (true,true) `|` fset1 (false,false))) = 1%r/2%r.
   proof.
-    rewrite -/(mu_x _ _) /vn mu_x_def.
-    cut ->: in_supp (true,false) ({0,1} * {0,1} \ add (true,true) (add (false,false) empty)).
-      cut [_ H]:= supp_def (true,false) ({0,1} * {0,1}) (add (true,true) (add (false,false) empty)).
-      by apply H; split; smt.
-    rewrite /=.
-    cut ->: weight ({0,1} * {0,1}) = 1%r by smt.
-    cut ->: cpMem (add (true,true) (add (false,false) empty)) = (((=) (true,true)) \/ ((=) (false,false))).
-      by rewrite /cpMem /Pred.(\/) -fun_ext=> x; smt.
-    rewrite mu_disjoint; first smt.
-    cut split_eq: forall (a b:bool), ((=) (a,b)) = fun x, (fun x, a = x) (fst x) /\ (fun x, b = x) (snd x).
-      by move=> a b; rewrite -fun_ext; smt.
-    rewrite !split_eq.
-    rewrite !Dprod.mu_def.
-    cut eq_eta: forall (b:bool), (fun x, b = x) = ((=) b).
-      by move=> b; rewrite -fun_ext=> x.
-    rewrite !eq_eta -/(mu_x _ _) -/(mu_x _ _) Dprod.mu_x_def /fst/ snd /= !Dbool.mu_x_def.
-    smt.
+  have -> := mu_mem (fset1 (true,true) `|` fset1 (false,false)) ({0,1} * {0,1}) (inv 4%r).
+  + move=> [x1 x2] _.
+    rewrite (mu_eq _ _ (fun x=> (pred1 x1) (fst x) /\ (pred1 x2) (snd x))) /=.
+    * by move=> [x'1 x'2]; rewrite /pred1 /fst /snd /= anda_and.
+    by rewrite (Dprod.mu_def (pred1 x1) (pred1 x2)) !DBool.dboolb.
+    rewrite fcardUI_indep 2:!fcard1 /= 1:fsetP=> [[x1 x2]|].
+    * by rewrite !inE /=; case x1.
+  smt ml=0.
   qed.
 
-  lemma mux_vn_FT: mu vn ((=) (false,true)) = 1%r/2%r.
+  lemma pr_final b: mu vn (pred1 (b,!b)) = 1%r/2%r.
   proof.
-    rewrite -/(mu_x _ _) /vn mu_x_def.
-    cut ->: in_supp (false,true) ({0,1} * {0,1} \ add (true,true) (add (false,false) empty)).
-      cut [_ H]:= supp_def (false,true) ({0,1} * {0,1}) (add (true,true) (add (false,false) empty)).
-      apply H; split.
-        smt.
-        by rewrite !mem_add -!nor; do !(split; last smt); smt.
-    rewrite /=.
-    cut ->: weight ({0,1} * {0,1}) = 1%r by smt.
-    cut ->: cpMem (add (true,true) (add (false,false) empty)) = (((=) (true,true)) \/ ((=) (false,false))).
-      by rewrite /cpMem /Pred.(\/) -fun_ext=> x /=; rewrite !mem_add; smt.
-    rewrite mu_disjoint; first smt.
-    cut split_eq: forall (a b:bool), ((=) (a,b)) = fun x, (fun x, a = x) (fst x) /\ (fun x, b = x) (snd x).
-      by move=> a b; rewrite -fun_ext; smt.
-    rewrite !split_eq.
-    rewrite !Dprod.mu_def.
-    cut eq_eta: forall (b:bool), (fun x, b = x) = ((=) b).
-      by move=> b; rewrite -fun_ext=> x.
-    rewrite !eq_eta -/(mu_x _ _) -/(mu_x _ _) Dprod.mu_x_def /fst/ snd /= !Dbool.mu_x_def.
-    smt.
+  rewrite -/(mu_x _ _) Dexcepted.mu_x_def Dexcepted.supp_def !inE /=.
+  rewrite Dprod.supp_def /fst /snd /=.
+  do 2!rewrite -/(support _ _) DBool.dbool_fu /predT /=.
+  rewrite Dprod.weight_def DBool.dbool_predT pr_evict /=.
+  rewrite mu_x_def /fst /snd /=.
+  have -> : 1%r - inv 2%r = inv 2%r by smt ml=0.
+  by rewrite DBool.dboolb DBool.dboolb /#.
   qed.
 
-  lemma supp_vn a b:
-    in_supp (a,b) vn <=>
-    a <> b.
+  lemma pr_eq b: mu vn (pred1 (b,b)) = 0%r.
   proof.
-    rewrite /vn; split.
-      move=> H.
-      cut [H1 _]:= supp_def (a,b) ({0,1} * {0,1}) (add (true,true) (add (false,false) empty)).
-      apply H1 in H; move: H=> [_].
-      by rewrite !mem_add -!nor; smt.
-      move=> neq_a_b.
-      cut [_ H]:= supp_def (a,b) ({0,1} * {0,1}) (add (true,true) (add (false,false) empty)).
-      apply H; split; first smt.
-      rewrite !mem_add -!nor; smt.
+  rewrite -/(mu_x _ _) Dexcepted.mu_x_def Dexcepted.supp_def !inE /=.
+  by case: b.
   qed.
+
+  lemma support_vn a b: support vn (a,b) <=> a <> b.
+  proof.
+  by case: a; case: b; rewrite /support /in_supp ?pr_eq // pr_final /#.
+  qed.
+
+  lemma support_vnP: support vn = (fun (ab : bool * bool)=> ab.`1 <> ab.`2).
+  proof. by rewrite pred_ext=>- [a b]; exact/support_vn. qed.
 
   module SamplePair = {
     proc sample(): bool = {
@@ -117,18 +112,15 @@ theory VonNeumann.
 
   equiv samplePair: SamplePair.sample ~ Fair.sample: true ==> ={res}.
   proof.
-    bypr (res{1}) (res{2})=> // &1 &2 b0.
-    cut ->: Pr[Fair.sample() @ &2: b0 = res] = 1%r/2%r.
-      byphoare (_: true ==> res = b0)=> //.
-      by proc; rnd ((=) b0); skip; progress; smt.
-    byphoare (_: true ==> b0 = res)=> //.
-    proc; rnd (fun bb', let (b,b') = bb' in b0 = b); skip; progress.
-      rewrite mu_support.
-      cut ->: ((fun bb', let (b,b') = bb' in b0 = b) /\ support vn) = ((=) (b0,!b0)).
-        rewrite -fun_ext /Pred.(/\) /support=> bb' /=.
-        by elim/tuple2_ind bb'=> bb' b b' bb'_def /=; smt.
-      by case b0=> /=; [rewrite mux_vn_TF | rewrite mux_vn_FT].
-      by move: H0 H1; elim/tuple2_ind v.
+  bypr (res{1}) (res{2})=> // &1 &2 b0.
+  have ->: Pr[Fair.sample() @ &2: b0 = res] = 1%r/2%r.
+  + byphoare (_: true ==> res = b0)=> //.
+    by proc; rnd (pred1 b0); skip=> />; rewrite DBool.dboolb.
+  byphoare (_: true ==> b0 = res)=> //.
+  proc; rnd (fun (bb' : bool * bool)=> b0 = bb'.`1); skip=> />.
+  rewrite mu_support support_vnP /predI /=.
+  rewrite (mu_eq _ _ (pred1 (b0,!b0))) 1:/#.
+  by rewrite pr_final.
   qed.
 
   (* We can now prove that sampling a pair in the restricted
@@ -150,32 +142,26 @@ theory VonNeumann.
 
   lemma Simulate_is_Fair (x:bool) &m: Pr[Simulate.sample() @ &m: res = x] = Pr[Fair.sample() @ &m: res = x].
   proof.
-    cut <-: Pr[SamplePair.sample() @ &m: res = x] = Pr[Fair.sample() @ &m: res = x].
-      by byequiv samplePair.
-    (** The following can probably be done more cleanly by cloning WhileSampling **)
-    cut ->: Pr[SamplePair.sample() @ &m: res = x] = mu vn (fun (bb:bool * bool), bb.`1 = x).
-      byphoare (_: true ==> res = x)=> //.
-      by proc; rnd (fun (bb:bool * bool), bb.`1 = x).
-    byphoare (_: true ==> res = x)=> //.
-    proc; sp.
-    while true (if (b <> b') then 0 else 1) 1 (2%r * p * (1%r - p))=> //.
-      smt.
-      move=> IH.
-      seq  2: true 1%r (mu vn (fun (bb:bool * bool), bb.`1 = x)) 0%r _ => //.
-        by auto; smt.
-      by auto; smt.
-      split=> //=.
-        cut lt0p: 0%r < p by smt.
-        cut ltp1: 0%r < (1%r - p) by smt.
-        smt.
-      move=> z.
-      conseq (_: true ==> b <> b')=> //=.
-        by progress; rewrite H.
-      seq  1: b p (1%r - p) (1%r - p) p=> //.
-        by rnd; skip=> //=; rewrite biased_def.
-        by rnd; skip=> //= &hr hb; rewrite hb biased_def.
-        by rnd; skip=> //=; rewrite biased_def.
-        by rnd; skip=> //= &hr; rewrite -neqF=> ->>; rewrite biased_def.
-        smt.
+  have <-: Pr[SamplePair.sample() @ &m: res = x] = Pr[Fair.sample() @ &m: res = x].
+  + by byequiv samplePair.
+  (** The following can probably be done more cleanly by cloning WhileSampling **)
+  have ->: Pr[SamplePair.sample() @ &m: res = x] = mu vn (fun (bb:bool * bool), bb.`1 = x).
+  + byphoare (_: true ==> res = x)=> //.
+    by proc; rnd (fun (bb:bool * bool), bb.`1 = x).
+  byphoare (_: true ==> res = x)=> //.
+  proc; sp.
+  while true (if (b <> b') then 0 else 1) 1 (2%r * p * (1%r - p))=> //.
+  + smt ml=0.
+  + move=> ih.
+    seq  2: true 1%r (mu vn (fun (bb:bool * bool), bb.`1 = x)) 0%r _ => //.
+    * by auto=> />; rewrite biased_ll.
+  + by auto=> />; rewrite biased_ll.
+  + split=> //= [|z].
+    * smt w=(gt0_p lt1_p).
+  conseq (_: true ==> b <> b')=> //= />.
+  seq  1: b p (1%r - p) (1%r - p) p=> //; first 3
+    by rnd; skip=> />; rewrite biased_def b2r0 b2r1.
+  + by rnd; skip=> /> _ -> />; rewrite biased_def /= b2r0 b2r1.
+  smt w=(gt0_p lt1_p).
   qed.
 end VonNeumann.
