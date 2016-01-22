@@ -9,8 +9,7 @@
  * ssreflect Coq extension. *)
 
 (* -------------------------------------------------------------------- *)
-require import Fun Pred Option Pair Int IntExtra.
-require NewLogic.
+require import NewLogic Fun Pred Option Pair Int IntExtra.
 
 (* -------------------------------------------------------------------- *)
 type 'a list = [
@@ -1035,6 +1034,14 @@ proof. by move=> h; have /eqseq_cat /= <-: size s = size s by done. qed.
 lemma catIs (s1 s2 t : 'a list): s1 ++ t = s2 ++ t => s1 = s2.
 proof. by move/(congr1 rev); rewrite !rev_cat => /catsI /rev_inj. qed.
 
+lemma rconsIs ['a] xs xs' (x x' : 'a):
+  rcons xs x = rcons xs' x' => x = x'.
+proof. by move=> /(congr1 (last witness)); rewrite !last_rcons. qed.
+
+lemma rconssI ['a] (x x' : 'a) xs xs':
+  rcons xs x = rcons xs' x' => xs = xs'.
+proof. by move=> ^ /rconsIs ->>; rewrite -!cats1=> /catIs. qed.
+
 lemma mem_rev (s : 'a list):
   forall x, mem (rev s) x = mem s x.
 proof.
@@ -1631,7 +1638,7 @@ lemma mem_assoc_uniq (s : ('a * 'b) list) (a : 'a) (b : 'b):
 proof.
   elim: s => //= [[x y]] s ih; rewrite eq_sym => -[x_notin_1s uq_1s] /=.
   case: (x = a) => [->> |] /=; 1: rewrite assoc_head /=.
-    by apply/eq_iff/orb_idr=> /(map_f fst); rewrite x_notin_1s.
+    by apply/orb_idr=> /(map_f fst); rewrite x_notin_1s.
   by move=> ne_xa; rewrite assoc_cons ih // (@eq_sym a) ne_xa.
 qed.
 
@@ -1893,7 +1900,7 @@ rewrite flatten_cons => /perm_eqlP; rewrite perm_eq_sym=> <-.
 apply/perm_cat2l/perm_eq_refl_eq; congr; apply/eq_in_map.
 move=> a ta /=; case: (x = a)=> [->>//|] ne_xa.
 congr; rewrite count_filter; apply/eq_count.
-by move=> b; apply/eq_iff/andb_idr=> -> @/predC1; rewrite eq_sym.
+by move=> b; apply/andb_idr=> -> @/predC1; rewrite eq_sym.
 qed.
 
 lemma nosmt uniq_flatten_map (f : 'a -> 'b list) s:
