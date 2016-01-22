@@ -688,8 +688,18 @@ mod_ident1:
 | x=uident LPAREN args=plist1(loc(mod_qident), COMMA) RPAREN
     { (x, Some args) }
 
+
 %inline mod_qident:
-| x=rlist1(mod_ident1, DOT) { x }
+| x=rlist1(mod_ident1, DOT)
+    { x }
+
+| _l=TOP DOT x=rlist1(mod_ident1, DOT)
+    { (mk_loc (EcLocation.make $startpos(_l) $endpos(_l))
+         EcCoreLib.i_top, None) :: x }
+
+| _l=SELF DOT x=rlist1(mod_ident1, DOT)
+    { (mk_loc (EcLocation.make $startpos(_l) $endpos(_l))
+         EcCoreLib.i_self, None) :: x }
 
 fident:
 | nm=mod_qident DOT x=lident { (nm, x) }
