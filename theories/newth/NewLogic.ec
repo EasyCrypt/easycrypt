@@ -27,7 +27,7 @@ lemma negbT b  : b = false => !b by [].
 lemma negbTE b : !b => b = false by [].
 lemma negbF b  : b => !b = false by [].
 lemma negbFE b : !b = false => b by [].
-lemma negbK    : involutive [!]  by case. (* FIXME: by []: "Not a formula: x1" *)
+lemma negbK    : involutive [!]  by [].
 lemma negbNE b : !!b => b        by [].
 
 lemma negb_inj : injective [!]      by exact: (can_inj _ _ negbK).
@@ -227,6 +227,10 @@ lemma addbP a b : (!a <=> b) <=> (a ^ b) by case: a b.
 (* -------------------------------------------------------------------- *)
 (* Short-circuiting *)
 
+(** Views for split/case **)
+lemma andaP b1 b2 : b1 => (b1 => b2) => b1 /\ b2 by [].
+lemma oraP  b1 b2 : b1 \/ b2 <=> b1 \/ (!b1 => b2) by [].
+
 lemma andabP b1 b2 : b1 && b2 <=> b1 /\ b2 by [].
 lemma orabP  b1 b2 : b1 || b2 <=> b1 \/ b2 by [].
 
@@ -264,8 +268,7 @@ lemma forall_eq_in (P : 'a -> bool) (Q Q' : 'a -> bool) :
   (forall x, P x => (Q x = Q' x)) =>
   (forall (x : 'a), P x => Q x) <=> (forall (x : 'a), P x => Q' x).
 proof.
-(* FIXME? Why is exact/eq_Q needed? *)
-by move=> eq_Q; apply/forall_eq=> x /=; case (P x)=> //; exact/eq_Q.
+by move=> eq_Q; apply/forall_eq=> x /=; case (P x)=> // /eq_Q.
 qed.
 
 lemma forall_iff (P P' : 'a -> bool) :
@@ -277,7 +280,7 @@ lemma forall_iff_in (P : 'a -> bool) (Q Q' : 'a -> bool) :
   (forall x, P x => (Q x <=> Q' x)) =>
   (forall (x : 'a), P x => Q x) <=> (forall (x : 'a), P x => Q' x).
 proof.
-by move=> eq_Q; apply/forall_iff=> x /=; case (P x)=> //; exact/eq_Q.
+by move=> eq_Q; apply/forall_iff=> x /=; case (P x)=> // /eq_Q.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -308,7 +311,7 @@ lemma exists_eq_in (P : 'a -> bool) (Q Q' : 'a -> bool) :
   (forall x, P x => (Q x = Q' x)) =>
   (exists (x : 'a), P x /\ Q x) <=> (exists (x : 'a), P x /\ Q' x).
 proof.
-by move=> eq_Q; apply/exists_eq=> x /=; case (P x)=> //; exact/eq_Q.
+by move=> eq_Q; apply/exists_eq=> x /=; case (P x)=> // /eq_Q.
 qed.
 
 lemma exists_iff (P P' : 'a -> bool) :
@@ -320,7 +323,7 @@ lemma exists_iff_in (P : 'a -> bool) (Q Q' : 'a -> bool) :
   (forall x, P x => (Q x <=> Q' x)) =>
   (exists (x : 'a), P x /\ Q x) <=> (exists (x : 'a), P x /\ Q' x).
 proof.
-by move=> eq_Q; apply/exists_iff=> x /=; case (P x)=> //; exact/eq_Q.
+by move=> eq_Q; apply/exists_iff=> x /=; case (P x)=> // /eq_Q.
 qed.
 
 (* -------------------------------------------------------------------- *)
