@@ -1067,20 +1067,20 @@ clone include RealDomain with type t <- t,
   realize  Domain.mulf_eq0  by apply/Field.mulf_eq0 .
 
 (* -------------------------------------------------------------------- *)
-lemma lef_pinv x :
-  zeror < x => zeror < y => forall y, (invr y <= invr x) <=> (x <= y).
+lemma lef_pinv x y :
+  zeror < x => zeror < y => (invr y <= invr x) <=> (x <= y).
 proof. admit. qed.
 
-lemma lef_ninv x :
-  x < zeror => y < zeror => forall y, (invr y <= invr x) <=> (x <= y).
+lemma lef_ninv x y :
+  x < zeror => y < zeror => (invr y <= invr x) <=> (x <= y).
 proof. admit. qed.
 
-lemma ltf_pinv x :
-  zeror < x => zeror < y => forall y, (invr y < invr x) <=> (x < y).
+lemma ltf_pinv x y :
+  zeror < x => zeror < y => (invr y < invr x) <=> (x < y).
 proof. admit. qed.
 
-lemma ltf_ninv x :
-  x < zeror => y < zeror => forall y, (invr y < invr x) <=> (x < y).
+lemma ltf_ninv x y :
+  x < zeror => y < zeror => (invr y < invr x) <=> (x < y).
 proof. admit. qed.
 
 (* -------------------------------------------------------------------- *)
