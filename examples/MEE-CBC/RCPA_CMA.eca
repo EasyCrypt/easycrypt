@@ -559,7 +559,7 @@ theory EtM.
                     ={glob E, glob M}
                  /\ CTXT_Wrap.k{1} = (CMAa.ek,MACa.SUF_CMA.SUF_Wrap.k){2}
                  /\ (forall p, mem p CTXT_Wrap.s{1} <=> mem p MACa.SUF_CMA.SUF_Wrap.s{2})
-                 /\ (forall c t, mem (c,t) CTXT_Wrap.s{1} => dec CMAa.ek{2} c <> None)
+                 /\ (forall c t, mem CTXT_Wrap.s{1} (c,t) => dec CMAa.ek{2} c <> None)
                  /\ (CTXT_Wrap.win{1} => MACa.SUF_CMA.SUF_Wrap.win{2})).
           (* adversary is lossless *)
           exact/A_forge_ll.
@@ -586,7 +586,7 @@ theory EtM.
                       /\ c{1} = ct{2}
                       /\ CTXT_Wrap.k{1} = (CMAa.ek,MACa.SUF_CMA.SUF_Wrap.k){2}
                       /\ (forall p, mem p CTXT_Wrap.s{1} <=> mem p MACa.SUF_CMA.SUF_Wrap.s{2})
-                      /\ (forall c t, mem (c,t) CTXT_Wrap.s{1} => dec CMAa.ek{2} c <> None)
+                      /\ (forall c t, mem CTXT_Wrap.s{1} (c,t) => dec CMAa.ek{2} c <> None)
                       /\ (CTXT_Wrap.win{1} => MACa.SUF_CMA.SUF_Wrap.win{2})
                       /\ k{1}  = CTXT_Wrap.k{1}
                       /\ ct{1} = c{1}

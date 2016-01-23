@@ -1,9 +1,10 @@
 (*** A proof that CBC mode turns any weak PRP into an IND$- CPA-secure
      symmetric encryption scheme **when used with random IVs**  ***)
-require import Option Fun Int Real Distr NewList NewFMap Distr.
-require import Dlist.
+require import Option Fun Int Real Distr List FSet NewFMap Distr.
+require import StdRing StdOrder Dlist.
 require (*ab*) PRP PRF SKE_INDR. (* Definitions and Security Notions *)
 require (*ab*) RP_RF.            (* Generic Arguments *)
+(*---*) import RField RealOrder.
 
 (* -------------------------------------------------------------------- *)
 (** Parameters and Constants *)
@@ -138,7 +139,7 @@ clone import SKE_INDR as SKEa with
   type ptxt          <- block list,
   type ctxt          <- block list,
   type leaks         <- int,
-  op   leak          <- NewList.size<:block>,
+  op   leak          <- List.size<:block>,
   op   dC    (l:int) <- dBlocks (l + 1) (* plus iv *)
 proof * by smt.
 import RCPA.
@@ -523,14 +524,14 @@ section Reduce.
     proc.
     call (_: DoubleQuery.bad,
                   ={glob DoubleQuery}
-               /\ forall x, mem DoubleQuery.qs{1} x <=> FSet.mem x (FMap.dom PRFa.PRFi.m){1},
+               /\ forall x, mem DoubleQuery.qs{1} x <=> mem (FMap.dom PRFa.PRFi.m){1} x,
                ={DoubleQuery.bad}).
     + exact/A_distinguish_ll.
     + proc.
       while (   ={DoubleQuery.bad, i, p}
              /\ (!DoubleQuery.bad{2}
                  =>    ={s, c, glob DoubleQuery}
-                    /\ forall x, mem DoubleQuery.qs{1} x <=> FSet.mem x (FMap.dom PRFa.PRFi.m){1})).
+                    /\ forall x, mem DoubleQuery.qs{1} x <=> mem (FMap.dom PRFa.PRFi.m){1} x)).
         case (DoubleQuery.bad{2}).
           inline *.
           seq  4  4: (DoubleQuery.bad{2} /\ ={DoubleQuery.bad, i, p});
@@ -775,12 +776,12 @@ section Probability_Collision.
     Pr[INDR_CPA_direct(Compute,QueryBounder(A)).main() @ &m: Compute.bad]
     <= ((q * ell)^2)%r * mu dBlock (pred1 witness).
   proof.
-    apply/(Trans _ Pr[Exp(Bounder(Sample),Wrap(A)).main() @ &m: !(List.unique Sample.l)]).
+    apply/(ler_trans Pr[Exp(Bounder(Sample),Wrap(A)).main() @ &m: !(uniq Sample.l)]).
       byequiv=> //=.
       symmetry.
       transitivity Exp(Sample,Bounded(Wrap(A))).main
                    (={glob Wrap(A), glob Sample} ==> ={glob A, glob Sample})
-                   (={glob A} ==> Compute.bad{2} => !List.unique Sample.l{1})=> //=.
+                   (={glob A} ==> Compute.bad{2} => !uniq Sample.l{1})=> //=.
         smt.
         by conseq (PushBound Sample (Wrap(A))).
       symmetry.
@@ -788,8 +789,8 @@ section Probability_Collision.
       call (_:    OracleBounder.qC{1} = Wrap.qC{2}
                /\ 0 <= Wrap.qC{2} <= q
                /\ 0 <= Bounder.c{2} <= Wrap.qC{2} * ell
-               /\ (Compute.bad{1} <=> !List.unique Sample.l{2})
-               /\ (forall x, mem Compute.qs{1} x <=> List.mem x Sample.l{2})).
+               /\ (Compute.bad{1} <=> !List.uniq Sample.l{2})
+               /\ (forall x, mem Compute.qs{1} x <=> mem Sample.l{2} x)).
         proc; sp; if=> //=; 2:by while (={i, p} /\ r{1} = c{2}); auto.
           inline *; auto.
           while (   ={c}
@@ -798,9 +799,9 @@ section Probability_Collision.
                  /\ 0 <= Wrap.qC{2} < q
                  /\ 0 <= i{2} <= size p{2} <= ell
                  /\ 0 <= Bounder.c{2} <= Wrap.qC{2} * ell + i{2}
-                 /\ (Compute.bad{1} <=> !List.unique Sample.l{2})
-                 /\ (forall x, mem Compute.qs{1} x <=> List.mem x Sample.l{2})).
-            rcondt{2} 3; auto; progress; 2..16:smt.
+                 /\ (Compute.bad{1} <=> !List.uniq Sample.l{2})
+                 /\ (forall x, mem Compute.qs{1} x <=> mem Sample.l{2} x)).
+            rcondt{2} 3; auto; progress; 2..15:smt.
             by have: Bounder.c{hr} <= (q - 1) * ell + i{hr}; smt.
           by auto; smt.
         by auto; smt.
@@ -814,7 +815,7 @@ section Probability_Collision.
           while (true) (size p + 1 - i);
             by auto; smt.
         by auto.
-      by rewrite -pred1E.
+      done.
     qed.
 end section Probability_Collision.
 

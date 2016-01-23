@@ -1,4 +1,4 @@
-require import Pred Fun Option Int Real NewList Distr.
+require import Pred Fun Option Int Real List Distr.
 require import Dlist.
 require (*..*) PRP MACs RCPA_CMA CBC RCPA_pad.
 
@@ -43,8 +43,7 @@ clone Ring.ZModule as Block with
   type t               <- block,
   op   zeror           <- zeros,
   op   (+)             <- (+),
-  op   [-] (x : block) <- x,
-  op   (-)             <- (+)
+  op   [-] (x : block) <- x
 proof * by smt.
 
 (** Assume a (deterministic) MAC (mac,verify) with key in mK, message in msg and tag in tag **)

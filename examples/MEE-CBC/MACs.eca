@@ -23,12 +23,12 @@ theory WUF_CMA.
   (* Definitions for WUF-CMA security *)
   module WUF_Wrap (S : MAC_Scheme): CMA_Oracles = {
     var k  : mK
-    var s  : msg set
+    var s  : msg fset
     var win: bool
 
     proc init(): unit = {
       k   <@ S.keygen();
-      s   <- empty;
+      s   <- fset0;
       win <- false;
     }
 
@@ -36,7 +36,7 @@ theory WUF_CMA.
       var t;
 
       t <@ S.tag(k,m);
-      s <- add m s;
+      s <- s `|` (fset1 m);
       return t;
     }
 
@@ -44,7 +44,7 @@ theory WUF_CMA.
       var b;
 
       b   <@ S.verify(k,m,t);
-      win <- win \/ (b /\ !mem m s);
+      win <- win \/ (b /\ !mem s m);
       return b;
     }
   }.
@@ -70,12 +70,12 @@ theory SUF_CMA.
   (* Definitions for SUF-CMA security *)
   module SUF_Wrap (S : MAC_Scheme): CMA_Oracles = {
     var k  : mK
-    var s  : (msg * tag) set
+    var s  : (msg * tag) fset
     var win: bool
 
     proc init(): unit = {
       k   <@ S.keygen();
-      s   <- empty;
+      s   <- fset0;
       win <- false;
     }
 
@@ -83,7 +83,7 @@ theory SUF_CMA.
       var t;
 
       t <@ S.tag(k,m);
-      s <- add (m,t) s;
+      s <-  s `|` (fset1 (m, t));
       return t;
     }
 
@@ -91,7 +91,7 @@ theory SUF_CMA.
       var b;
 
       b   <@ S.verify(k,m,t);
-      win <- win \/ (b /\ !mem (m,t) s);
+      win <- win \/ (b /\ !mem s (m,t));
       return b;
     }
   }.

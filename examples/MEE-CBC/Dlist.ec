@@ -1,5 +1,5 @@
 require import Option Pair Int List Distr Real.
-require (*--*) NewBigop.
+require (*--*) Bigop.
 
 op dlist: 'a distr -> int -> 'a list distr.
 axiom dlist0 (d : 'a distr) n: n <= 0 => dlist d n = Dunit.dunit [].
@@ -50,12 +50,12 @@ lemma mux_dlistS (d : 'a distr) x xs:
   mu (dlist d (size (x::xs))) (pred1 (x::xs)) =
     mu d (pred1 x) * mu (dlist d (size xs)) (pred1 xs).
 proof.
-  rewrite /= Int.CommutativeGroup.Comm.Comm dlistS 1:smt.
+  rewrite /= addzC dlistS 1:smt.
   rewrite -/(mu_x _ _) Dapply.mu_x_def /preim /pred1 /=.
   by rewrite (Dprod.mu_def (fun x0 => x0 = x) (fun x0 => x0 = xs)).
 qed.
 
-clone import NewBigop as Prod with
+clone import Bigop as Prod with
   type t <- real,
   op   Support.idm <- 1%r,
   op   Support.(+) <- Real.( * )

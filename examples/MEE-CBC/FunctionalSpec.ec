@@ -1,5 +1,7 @@
-require import Fun Pred Option Int List ABitstring Distr.
+require import Fun Pred Option Int IntExtra IntDiv List.
+require import Ring StdRing ABitstring Distr.
 require (*--*) AWord MAC_then_Pad_then_CBC.
+(*---*) import IntID.
 
 (** A type for octets and its structure **)
 type octet.
@@ -59,9 +61,9 @@ axiom bits2osS (bs : bitstring):
 
 lemma size_bits2os (bs : bitstring):
   `|bs| %% 8 = 0 =>
-  size (bits2os bs) = `|bs| /% 8.
+  size (bits2os bs) = `|bs| %/ 8.
 proof.
-  move: {-1}(`|bs| /% 8) (eq_refl (`|bs| /% 8))=> n len_bs.
+  move: {-1}(`|bs| %/ 8) (eq_refl (`|bs| %/ 8))=> n len_bs.
   have le0_n: 0 <= n by smt.
   elim n le0_n bs len_bs=> [bs bs_is_octets bs_is_empty
                                                |n le0_n ih bs bs_is_nonempty bs_is_octets].
@@ -90,11 +92,11 @@ proof.
   rewrite /os2bits /= -/(os2bits _)=> h_len. (* FIXME *)
   rewrite bits2osS /=.
     by rewrite h_len smt.
-    by rewrite h_len -(add0z (8 * (1 + size os))) addzC Mod_mult 2:Mod_0 smt.
+    by rewrite h_len -(add0z (8 * (1 + size os))) addzC /= modzMr //.
   rewrite -(Octet.length_to_bits o); split.
     by rewrite sub_app_fst Octet.can_from_to.
-    rewrite h_len {2}Octet.length_to_bits Mul_distr_l //=.
-    rewrite addzC StdOrder.IntOrder.Domain.subrE addzA Ring.IntID.addrN addzC add0z.
+    rewrite h_len {2}Octet.length_to_bits mulrDr //=.
+    rewrite addzC addzA Ring.IntID.addrN addzC.
     by rewrite -length_os2bits sub_app_snd.
 qed.
 
@@ -102,7 +104,7 @@ lemma os2bitsK (bs : bitstring):
   `|bs| %% 8 = 0 =>
   os2bits (bits2os bs) = bs.
 proof.
-  move: {-1}(`|bs| /% 8) (eq_refl (`|bs| /% 8))=> n len_bs.
+  move: {-1}(`|bs| %/ 8) (eq_refl (`|bs| %/ 8))=> n len_bs.
   have le0_n: 0 <= n by smt.
   elim n le0_n bs len_bs=> [|n le0_n ih bs len_bs good_length].
     smt.
@@ -125,9 +127,9 @@ axiom bits2bsS (bs : bitstring):
 
 lemma size_bits2bs (bs : bitstring):
   `|bs| %% 128 = 0 =>
-  size (bits2bs bs) = `|bs| /% 128.
+  size (bits2bs bs) = `|bs| %/ 128.
 proof.
-  move: {-1}(`|bs| /% 128) (eq_refl (`|bs| /% 128))=> n len_bs.
+  move: {-1}(`|bs| %/ 128) (eq_refl (`|bs| %/ 128))=> n len_bs.
   have le0_n: 0 <= n by smt.
   elim n le0_n bs len_bs=> [bs bs_is_octets bs_is_empty
                                                |n le0_n ih bs bs_is_nonempty bs_is_octets].
@@ -156,11 +158,11 @@ proof.
   rewrite /bs2bits /= -/(bs2bits _)=> h_len. (* FIXME *)
   rewrite bits2bsS /=.
     by rewrite h_len smt.
-    by rewrite h_len -(add0z (128 * (1 + size bs))) addzC Mod_mult 2:Mod_0 smt.
+    by rewrite h_len -(add0z (128 * (1 + size bs))) addzC /= modzMr.
   rewrite -(Block.length_to_bits b); split.
     by rewrite sub_app_fst Block.can_from_to.
-    rewrite h_len {2}Block.length_to_bits Mul_distr_l //=.
-    rewrite addzC StdOrder.IntOrder.Domain.subrE addzA Ring.IntID.addrN addzC add0z.
+    rewrite h_len {2}Block.length_to_bits mulrDr /=.
+    rewrite addzC addzA Ring.IntID.addrN addzC.
     by rewrite -length_bs2bits sub_app_snd.
 qed.
 
@@ -168,7 +170,7 @@ lemma bs2bitsK (bs : bitstring):
   `|bs| %% 128 = 0 =>
   bs2bits (bits2bs bs) = bs.
 proof.
-  move: {-1}(`|bs| /% 128) (eq_refl (`|bs| /% 128))=> n len_bs.
+  move: {-1}(`|bs| %/ 128) (eq_refl (`|bs| %/ 128))=> n len_bs.
   have le0_n: 0 <= n by smt.
   elim n le0_n bs len_bs=> [|n le0_n ih bs len_bs good_length].
     smt.
@@ -183,48 +185,34 @@ op bs2os bs = bits2os (bs2bits bs).
 
 lemma size_bs2os bs: size (bs2os bs) = 16 * size bs.
 proof.
-  rewrite /bs2os size_bits2os length_bs2bits;
-  have ->: 128 * size bs = 8 * (16 * size bs) + 0 by smt.
-    by rewrite Mod_mult smt.
-  rewrite Div_mult 1:smt -{2}(add0z (16 * size bs)) addzC.
-  by congr; smt.
+  rewrite /bs2os size_bits2os length_bs2bits.
+    by rewrite (_ : 128 = 8 * 16) // -mulrA modzMr.
+  rewrite -(mulr1 8) (_ : 128 = 8 * 16) // -mulrA.
+  by rewrite divzMpl // divz1.
 qed.
 
 op os2bs os = bits2bs (os2bits os).
 
 lemma size_os2bs os:
   size os %% 16 = 0 =>
-  size (os2bs os) = size os /% 16.
+  size (os2bs os) = size os %/ 16.
 proof.
-  move=> bs_is_blocks.
-  rewrite /os2bs size_bits2bs length_os2bits (Div_mod (size os) 16) 1,3:smt bs_is_blocks;
-  have ->: 8 * (16 * (size os /% 16) + 0) = 128 * (size os /% 16) + 0 by smt.
-    by rewrite Mod_mult smt.
-  rewrite !Div_mult 1,2:smt.
-  by congr; smt.
+  case/dvdzP=> q ^qE ->; rewrite size_bits2bs length_os2bits.
+    by rewrite qE (mulrC q) mulrA /= modzMr.
+  by rewrite qE (_ : 128 = 8 * 16) // divzMpl.
 qed.
 
 lemma os2bsK bs: os2bs (bs2os bs) = bs.
 proof.
-  rewrite /os2bs /bs2os.
-  rewrite os2bitsK.
-    rewrite length_bs2bits.
-    have ->: 128 * size bs %% 8 = (8 * (16 * size bs) + 0) %% 8 by smt.
-    by rewrite Mod_mult smt.
-  by rewrite bits2bsK.
+  rewrite /os2bs /bs2os os2bitsK ?length_bs2bits ?bits2bsK //.
+  by rewrite (_ : 128 = 8 * 16) // -mulrA modzMr.
 qed.
 
 lemma bs2osK os:
-  size os %% 16 = 0 =>
-  bs2os (os2bs os) = os.
+  size os %% 16 = 0 => bs2os (os2bs os) = os.
 proof.
-  move=> bs_is_blocks.
-  rewrite /os2bs /bs2os.
-  rewrite bs2bitsK.
-    rewrite length_os2bits (Div_mod (size os) 16) 1:smt bs_is_blocks.
-    have ->: 8 * (16 * (size os /% 16) + 0) = 128 * (size os /% 16) + 0 by smt.
-    by rewrite Mod_mult smt.
-  by rewrite bits2osK.
+  case/dvdzP=> q qE; rewrite /os2bs /bs2os bs2bitsK ?bits2osK //.
+  by rewrite length_os2bits qE mulrCA /= modzMl.
 qed.
 
 (* tag <-> octet list *)
@@ -377,18 +365,12 @@ op unpad (bs : block list) =
   else None.
 
 (* Proofs for instantiation *)
-lemma (* TODO: move *) mod_sub_mod x y: 0 < y => (x - x %% y) %% y = 0.
-proof.
-  move=> lt0_y; rewrite {1}(Div_mod x y) 1:smt Ring.IntID.subrE addzA Ring.IntID.addrN.
-  by rewrite Mod_mult smt.
-qed.
-
 lemma size_padding m: size (padding (pad_length m)) = 16 - size m %% 16.
 proof. by rewrite /padding /= size_mkseq smt. qed.
 
 lemma last_padding x m: last x (padding (pad_length m)) = Octet.from_int (16 - size m %% 16).
 proof.
-  rewrite /padding /mkseq /= -(lastnonempty ((fun x => Octet.from_int (16 - size m %% 16)) witness<:int>)).
+  rewrite /padding /mkseq /= -(last_nonempty ((fun x => Octet.from_int (16 - size m %% 16)) witness<:int>)).
     case {-1}(iota_ 0 (16 - size m %% 16)) (eq_refl (iota_ 0 (16 - size m %% 16)))=> //=.
     by have:= size_iota 0 (16 - size m %% 16); smt.
   by rewrite last_map.
@@ -402,31 +384,25 @@ proof. by rewrite !size_cat size_padding size_t2os smt. qed.
 lemma padded_is_blocks m t:
   size (m ++ t2os t ++ padding (pad_length m)) %% 16 = 0.
 proof.
-  rewrite size_padded.
-  have ->: 48 = 16 * 3 by smt.
-  by rewrite Mod_mult 1:smt mod_sub_mod//.
+  rewrite size_padded (_ : 48 = 16 * 3) // -modzDm modzMr //=.
+  by rewrite modz_mod -divzE modzMl.
 qed.
 
 lemma size_pad m t:
   size (pad m t) (* this is in blocks of 16 octets *)
-  = size m /% 16 (* message *) + 2 (* tag *) + 1 (* padding *).
+  = size m %/ 16 (* message *) + 2 (* tag *) + 1 (* padding *).
 proof.
-  rewrite /pad /= size_os2bs 1:padded_is_blocks// size_padded.
-  have ->: (48 + (size m - size m %% 16)) /% 16
-           = (16 * 3 + (size m - size m %% 16)) /% 16  by smt.
-  rewrite Div_mult 1:smt {1}(Div_mod (size m) 16) 1:smt Ring.IntID.subrE addzA Ring.IntID.addrN.
-  rewrite Div_mult 1:smt addzC -!addzA /= -{2}(add0z 3).
-  by congr; congr; smt.
+  rewrite /pad /= size_os2bs 1:padded_is_blocks // size_padded.
+  by rewrite (_ : 48 = 3 * 16) ?divzMDl // -divzE -addrA addrC /= mulzK.
 qed.
 
-lemma unpad_pad m t:
-  unpad (pad m t) = Some (m,t).
+lemma unpad_pad m t: unpad (pad m t) = Some (m,t).
 proof.
   rewrite /unpad.
   have -> /=: bs2os (pad m t)
               = m ++ t2os t ++ padding (pad_length m).
     by rewrite /pad /= bs2osK 1:padded_is_blocks.
-  rewrite !lastcat last_padding Octet.from_to.
+  rewrite !last_cat last_padding Octet.from_to.
   rewrite (powS 7 2)// (powS 6 2)// (powS 5 2)// (powS 4 2)//
           (powS 3 2)// (powS 2 2)// (powS 1 2)// (powS 0 2)//
           (pow0 2) /=.
@@ -451,8 +427,7 @@ proof.
   do 2!rewrite size_os2bs 1:padded_is_blocks//.
   rewrite !size_cat !size_padding !size_mkseq.
   have ->: max 0 (size m - size m %% 16) = (size m - size m %% 16) by smt.
-  congr; ringeq.
-  exact/mod_sub_mod.
+  by congr; ringeq; rewrite -divzE modzMl //.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -531,7 +506,7 @@ clone import MAC_then_Pad_then_CBC as MEEt with
   op   pad (mt : msg * tag) <- pad mt.`1 mt.`2,
   op   unpad                <- unpad,
   op   leak       (m : msg) <- mkseq (fun i => Octet.zeros) (size m - size m %% 16),
-  op   valid_msg  (m : msg) <- size m /% 16 < n,
+  op   valid_msg  (m : msg) <- size m %/ 16 < n,
   (* security parameters *)
   op   q                    <- q,
   op   n                    <- n + 3

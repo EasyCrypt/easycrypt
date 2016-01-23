@@ -89,12 +89,12 @@ theory PTXT.
 
   module PTXT_Wrap (S : Enc_Scheme): PTXT_Oracles = {
     var k  : eK
-    var s  : ptxt set
+    var s  : ptxt fset
     var win: bool
 
     proc init(): unit = {
       k   <@ S.keygen();
-      s   <- empty;
+      s   <- fset0;
       win <- false;
     }
 
@@ -102,7 +102,7 @@ theory PTXT.
       var c;
 
       c <@ S.enc(k,p);
-      s <- add p s;
+      s <- s `|` (fset1 p);
       return c;
     }
 
@@ -110,7 +110,7 @@ theory PTXT.
       var p;
 
       p   <@ S.dec(k,c);
-      win <- win \/ (p <> None /\ !mem (oget p) s);
+      win <- win \/ (p <> None /\ !mem s (oget p));
       return (p <> None);
     }
   }.
@@ -144,12 +144,12 @@ theory CTXT.
 
   module CTXT_Wrap (S : Enc_Scheme): CTXT_Oracles = {
     var k  : eK
-    var s  : ctxt set
+    var s  : ctxt fset
     var win: bool
 
     proc init(): unit = {
       k   <@ S.keygen();
-      s   <- empty;
+      s   <- fset0;
       win <- false;
     }
 
@@ -157,7 +157,7 @@ theory CTXT.
       var c;
 
       c <@ S.enc(k,p);
-      s <- add c s;
+      s <- s `|` (fset1 c);
       return c;
     }
 
@@ -165,7 +165,7 @@ theory CTXT.
       var p;
 
       p   <@ S.dec(k,c);
-      win <- win \/ (p <> None /\ !mem c s);
+      win <- win \/ (p <> None /\ !mem s c);
       return (p <> None);
     }
   }.

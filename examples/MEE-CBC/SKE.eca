@@ -1,4 +1,4 @@
-require import Pred Option Bool Int Real FSet Distr.
+require import Pred Option Bool Int Real FSet Distr DBool.
 
 type eK, ptxt, ctxt.
 
@@ -72,12 +72,12 @@ theory CCA.
 
   module CCA_Wrap (S : Enc_Scheme): CCA_Oracles = {
     var k: eK
-    var s: ctxt set
+    var s: ctxt fset
     var b: bool
 
     proc init(): unit = {
       k <@ S.keygen();
-      s <- empty;
+      s <- fset0;
       b <$ {0,1};
     }
 
@@ -88,7 +88,7 @@ theory CCA.
       if (leak p0 = leak p1) {
         p <- if b then p1 else p0;
         c <@ S.enc(k,p);
-        s <- add c s;
+        s <- s `|` (fset1 c);
       }
       return c;
     }
@@ -96,7 +96,7 @@ theory CCA.
     proc dec(c:ctxt): ptxt option = {
       var p = None;
 
-      if (!mem c s)
+      if (!mem s c)
         p <@ S.dec(k,c);
       return p;
     }
@@ -131,12 +131,12 @@ theory PTXT.
 
   module PTXT_Wrap (S : Enc_Scheme): PTXT_Oracles = {
     var k  : eK
-    var s  : ptxt set
+    var s  : ptxt fset
     var win: bool
 
     proc init(): unit = {
       k   <@ S.keygen();
-      s   <- empty;
+      s   <- fset0;
       win <- false;
     }
 
@@ -144,7 +144,7 @@ theory PTXT.
       var c;
 
       c <@ S.enc(k,p);
-      s <- add p s;
+      s <- s `|` (fset1 p);
       return c;
     }
 
@@ -152,7 +152,7 @@ theory PTXT.
       var p;
 
       p   <@ S.dec(k,c);
-      win <- win \/ (p <> None /\ !mem (oget p) s);
+      win <- win \/ (p <> None /\ !mem s (oget p));
       return (p <> None);
     }
   }.
@@ -184,12 +184,12 @@ theory CTXT.
 
   module CTXT_Wrap (S : Enc_Scheme): CTXT_Oracles = {
     var k  : eK
-    var s  : ctxt set
+    var s  : ctxt fset
     var win: bool
 
     proc init(): unit = {
       k   <@ S.keygen();
-      s   <- empty;
+      s   <- fset0;
       win <- false;
     }
 
@@ -197,7 +197,7 @@ theory CTXT.
       var c;
 
       c <@ S.enc(k,p);
-      s <- add c s;
+      s <- s `|` (fset1 c);
       return c;
     }
 
@@ -205,7 +205,7 @@ theory CTXT.
       var p;
 
       p   <@ S.dec(k,c);
-      win <- win \/ (p <> None /\ !mem c s);
+      win <- win \/ (p <> None /\ !mem s c);
       return (p <> None);
     }
   }.
@@ -294,13 +294,13 @@ theory CPA_CTXT_CCA.
     local module G1 = {
       var bad: bool
       var k  : eK
-      var s  : ctxt set
+      var s  : ctxt fset
       var b  : bool
 
       module O' = {
         proc init(): unit = {
           k   <@ E.keygen();
-          s   <- empty;
+          s   <- fset0;
           b   <$ {0,1};
           bad <- false;
         }
@@ -312,7 +312,7 @@ theory CPA_CTXT_CCA.
           if (leak p0 = leak p1) {
             p <- if b then p1 else p0;
             c <@ E.enc(k,p);
-            s <- add c s;
+            s <- s `|` (fset1 c);
           }
           return c;
         }
@@ -320,7 +320,7 @@ theory CPA_CTXT_CCA.
         proc dec(c:ctxt): ptxt option = {
           var p = None;
 
-          if (!mem c s)
+          if (!mem s c)
             p <@ E.dec(k,c);
           if (p <> None)
             bad <- true;
