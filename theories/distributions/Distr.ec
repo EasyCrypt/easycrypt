@@ -334,8 +334,15 @@ theory Dscale.
   qed.
 
   lemma dscaleU (d:'a distr):
-    mu d predT <> 0%r => is_subuniform d => is_uniform (dscale d)
-  by [].
+    mu d predT <> 0%r => is_subuniform d => is_uniform (dscale d).
+  proof.
+  move=> wd_neq_null d_suf.
+  have d_neq_null: 0%r < weight d by smt w=(mu_bounded weight_pos).
+  split=> [|x y].
+  + by rewrite /is_lossless -/(weight _) weight_pos.
+  rewrite !supp_def=> x_in_supp y_in_supp; rewrite !mu_def_pos //.
+  by rewrite (d_suf x y x_in_supp y_in_supp).
+  qed.
 end Dscale.
 
 (** Distribution resulting from applying a function to a distribution *)

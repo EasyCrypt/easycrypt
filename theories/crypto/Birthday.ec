@@ -118,7 +118,10 @@ section.
       have ->: q^2 = q * q by smt.
       by rewrite -fromintM le_fromint ler_wpmul2r 1:ltrW ?lt0q /#.
       by inline*; auto; smt.
-      proc; sp; if=> //; last by (hoare; auto; smt).
+      proc; sp; if=> //; last first.
+        hoare; auto=> /> &hr ge0_size uniq; rewrite ltzNge /= => geq_size.
+        apply/mulr_ge0; last by smt w=mu_bounded.
+        by apply/le_fromint/IntOrder.ltrW/lt0q.
       wp; rnd (mem Sample.l); skip=> //=.
       progress.
         have:= Mu_mem.mu_mem_le_size (Sample.l{hr}) uT (mu uT (pred1 witness)) _.
@@ -240,7 +243,10 @@ section.
       have ->: q^2 = q * q by smt.
       by rewrite -fromintM le_fromint ler_wpmul2r 1:ltrW ?lt0q /#.
       by inline*; auto; smt.
-      proc; sp; if=> //; last by (hoare; auto; smt).
+      proc; sp; if=> //; last first.
+        hoare; auto=> /> &hr ge0_size uniq; rewrite ltzNge /= => geq_size.
+        apply/mulr_ge0; last by smt w=mu_bounded.
+        by apply/le_fromint/IntOrder.ltrW/lt0q.
       wp; rnd (mem Sample.l); skip=> //=.
       progress.
         have:= Mu_mem.mu_mem_le_size (Sample.l{hr}) uT (mu uT (pred1 witness)) _.

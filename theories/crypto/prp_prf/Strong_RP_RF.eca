@@ -142,13 +142,17 @@ qed.
 lemma PRPi'_Indirect_f_ll: islossless PRPi'(Indirect).f.
 proof.
 proc; if=> //=; auto; call Indirect_ll.
-by skip; progress; smt w=uD_uf_fu.
+skip=> /> &hr x_notin_m.
+have [x0] x0_notinr_m := endo_dom_rng PRPi.m{hr} _; first by exists x{hr}.
+by exists x0; rewrite x0_notinr_m; smt w=uD_uf_fu.
 qed.
 
 lemma PRPi'_Indirect_fi_ll: islossless PRPi'(Indirect).fi.
 proof.
 proc; if=> //=; auto; call Indirect_ll.
-by skip; progress; smt w=uD_uf_fu.
+skip=> /> &hr x_notin_mi.
+have [x0] x0_notinr_mi := endo_dom_rng PRPi.mi{hr} _; first by exists x{hr}.
+by exists x0; rewrite x0_notinr_mi; smt w=uD_uf_fu.
 qed.
 
 (** The proof is cut into 3 parts (sections):
@@ -411,36 +415,42 @@ section CollisionProbability.
     by auto; progress; rewrite rng0 fcards0.
   fel 2 FEL.c (fun x, q%r * mu uD (pred1 witness)) q (ARP.coll) [FEL(D).FBounder.f: (FEL.c < q); FEL(D).FBounder.fi: (FEL.c < q)]=> //.
   + rewrite sumr_const count_predT size_range /= max_ler 1:ler_subr_addr 1:-ltzE 1:gt0_q.
-    rewrite -mulr_intr ofintR (powS 1) // pow1 fromintM.
-    smt.
+    rewrite -mulr_intr ofintR (powS 1) // pow1 fromintM mulrC mulrA.
+    apply/RealOrder.ler_wpmul2r; first by smt w=mu_bounded.
+    apply/RealOrder.ler_wpmul2r; first by smt w=gt0_q.
+    smt ml=0.
   + by inline*; auto; rewrite dom0 fcards0.
-  + proc; sp; if=> //=; last by hoare=> //=; smt.
-    inline *; sp; if=> //=; last by hoare; auto; smt.
+  + proc; sp; if=> //=; first last.
+    * hoare=> // /> &hr _ _ _.
+      by apply/RealOrder.mulr_ge0; smt w=(mu_bounded gt0_q).
+    inline *; sp; if=> //=; last first.
+    * hoare; auto=> // /> &hr _ _ _ _.
+      by apply/RealOrder.mulr_ge0; smt w=(mu_bounded gt0_q).
     sp; if=> //=.
     * wp; rnd (mem (rng ARP.m)); skip.
       progress.
       - apply/(RealOrder.ler_trans ((card (rng ARP.m{hr}))%r * mu uD (pred1 witness))).
         apply/mu_mem_le; move=> x _; have [] uD_fu [] _ uD_suf:= uD_uf_fu.
         apply/RealOrder.lerr_eq/uD_suf; 1,2:rewrite uD_fu //.
-        smt.
+        by apply/RealOrder.ler_wpmul2r; smt w=(mu_bounded lt_fromint ltrW).
       - by move: H6; rewrite H0.
-    * by hoare; [smt|auto].
+    * by hoare; auto=> //=; smt w=(RealOrder.mulr_ge0 mu_bounded gt0_q).
   + move=> c; proc. rcondt 2; 1:by auto.
     sp; if=> //=.
     * by wp; call (_: true); auto=> /#.
     * by auto=> /#.
   + by move=> b c; proc; rcondf 2; auto.
-  + proc; sp; if=> //=; last by hoare=> //=; smt.
-    inline *; sp; if=> //=; last by hoare; auto; smt.
+  + proc; sp; if=> //=; last by hoare=> //=; smt w=(RealOrder.mulr_ge0 mu_bounded gt0_q).
+    inline *; sp; if=> //=; last by hoare; auto; smt w=(RealOrder.mulr_ge0 mu_bounded gt0_q).
     sp; if=> //=.
     * wp; rnd (mem (rng ARP.mi)); skip.
       progress.
       - apply/(RealOrder.ler_trans ((card (rng ARP.mi{hr}))%r * mu uD (pred1 witness))).
         apply/mu_mem_le; move=> x _; have [] uD_fu [] _ uD_suf:= uD_uf_fu.
         apply/RealOrder.lerr_eq/uD_suf; 1,2:rewrite uD_fu //.
-        smt.
+        smt w=(RealOrder.ler_wpmul2r mu_bounded le_fromint ltrW).
       - by move: H6; rewrite H0.
-    * by hoare; [smt|auto].
+    * by hoare; auto; smt w=(RealOrder.mulr_ge0 mu_bounded gt0_q).
   + move=> c; proc; rcondt 2; 1:by auto.
     sp; if=> //=.
     * by wp; call (_: true); auto=> /#.

@@ -26,7 +26,13 @@ proof.
                /in_supp
                (_: (0%r < mu_x (Dscale.dscale (drestr d X)) x) = false)=> //=;
        first smt.
-    by smt.
+    rewrite Dscale.supp_def Dscale.mu_def_pos ?weight_def 1:smt Drestrict.supp_def.
+    case: (in_supp x d)=> /= [x_in_d|x_notin_d]; first last.
+    + have: !in_supp x (drestr d X) by rewrite Drestrict.supp_def x_notin_d.
+      smt.
+    case (!mem X x)=> /= [x_notin_X|x_in_X].
+    + by rewrite mu_x_def_notin.
+    by rewrite mu_x_def_in.
 qed.
 
 lemma nosmt mu_weight_def (d:'a distr) X:

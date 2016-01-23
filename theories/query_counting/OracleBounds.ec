@@ -5,9 +5,8 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import Int.
-require import Real.
-require import Distr. (* We use core knowledge on probabilities *)
+require import Int Real Distr StdOrder.
+(*---*) import RealOrder.
 
 (* To apply the lemmas, you will need to rewrite
    your oracle to increment Count.c when called.
@@ -168,7 +167,7 @@ theory EnfPen.
          inline Count(O).f Counter.incr; wp; call O_fL; wp; skip; smt.
       (* Count(O).f preserves bad *)
       move=> &m1 //=; bypr; move=> &m0 bad.
-        cut: 1%r <= Pr[Count(O).f(x{m0}) @ &m0: bound < Counter.c]; last smt.
+        apply/ler_anti; rewrite anda_and; split; first by smt w=mu_bounded.
         cut lbnd: phoare[Count(O).f: Counter.c = Counter.c{m0} ==> Counter.c = Counter.c{m0} + 1] >= 1%r;
           first by conseq [-frame] (CountO_fC O Counter.c{m0} _); apply O_fL.
         by byphoare lbnd=> //; smt.
