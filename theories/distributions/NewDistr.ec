@@ -45,6 +45,9 @@ lemma le1_mu_x ['a] (d : 'a distr) :
   forall (s : 'a list), uniq s => big predT (mu_x d) s <= 1%r.
 proof. by elim/distrW: d => m dm; rewrite muK //; case: dm. qed.
 
+lemma isdistr_mu_x (d : 'a distr): isdistr (mu_x d).
+proof. split; [exact/ge0_mu_x|exact/le1_mu_x]. qed.
+
 lemma summable_mu_x ['a] (d : 'a distr) : summable (mu_x d).
 proof.
 exists 1%r=> s eq_s; rewrite (@eq_bigr _ _ (mu_x d)) => /=.
@@ -53,6 +56,10 @@ by apply/le1_mu_x.
 qed.
 
 lemma ge0_weight ['a] (d : 'a distr) : 0%r <= weight d.
+proof. admit. qed.
+
+lemma weight_eq0 ['a] (d : 'a distr) :
+  weight d = 0%r => (forall x, mu_x d x = 0%r).
 proof. admit. qed.
 
 lemma countable_mu ['a] (d : 'a distr):
@@ -256,13 +263,9 @@ op mlet ['a 'b] (f : 'a -> 'b distr) (d : 'a distr) =
 op dlet ['a 'b] (f : 'a -> 'b distr) (d : 'a distr) =
   mk (mlet f d).
 
-lemma isdisrtr_mlet ['a 'b] (f : 'a -> 'b distr) (d : 'a distr) :
+lemma isdistr_mlet ['a 'b] (f : 'a -> 'b distr) (d : 'a distr) :
   isdistr (mlet f d).
 proof. admit. qed.
-
-(* -------------------------------------------------------------------- *)
-op dprod ['a 'b] (d1 : 'a distr) (d2 : 'b distr) =
-  dlet (fun x => d2) d1.
 
 (* -------------------------------------------------------------------- *)
 op mscale ['a] (d : 'a distr) =
@@ -282,6 +285,37 @@ have := ge0_weight d; rewrite ler_eqVlt => -[<-|gt0_iw].
   by rewrite divr0. by rewrite divrr // gtr_eqF.
 qed.
 
+lemma mux_dscale ['a] (d : 'a distr) (x : 'a) :
+  mu_x (dscale d) x = mu_x d x / weight d.
+proof. by rewrite muK 1:isdistr_mscale. qed.
+
+lemma mu_dscale ['a] (d : 'a distr) (E : 'a -> bool) :
+  mu (dscale d) E = mu d E / weight d.
+proof.
+rewrite muE. have:= mux_dscale d.
+rewrite fun_ext -(@etaE (mu_x (dscale d))) etaP=> -> /=.
+apply/(@eq_trans _ ((sum (fun x=> if E x then mu_x d x else 0%r)) / weight d)).
++ admit. (* push constant multiplicative factors out of sums when non-null *)
+by rewrite -muE.
+qed.
+
+lemma weight_dscale ['a] (d : 'a distr) :
+  weight (dscale d) = if weight d = 0%r then 0%r else 1%r.
+proof.
+rewrite mu_dscale -/(weight _); case: (weight d = 0%r)=> //= [->|].
++ exact/divr0.
+exact/unitrE.
+qed.
+
+lemma support_dscale ['a] (d : 'a distr) :
+  support (dscale d) = support d.
+proof.
+rewrite -fun_ext /support /in_supp=> x; rewrite eq_iff mux_dscale.
+case: (weight d = 0%r)=> [^/weight_eq0 -> ->|d_nonempty].
++ by rewrite divr0.
+smt w=ge0_weight.
+qed.
+
 (* -------------------------------------------------------------------- *)
 abstract theory MFinite.
 type t.
@@ -293,7 +327,7 @@ op dunifin : t distr = MUniform.duniform enum.
 lemma dunifin1E (x : t) : mu_x dunifin x = 1%r / (size enum)%r.
 proof. by rewrite MUniform.duniform1E enumP /= undup_id // enum_uniq. qed.
 
-lemma duniformE (E : t -> bool) :
+lemma dunifinE (E : t -> bool) :
   mu dunifin E = (count E enum)%r / (size enum)%r.
 proof. by rewrite MUniform.duniformE ?undup_id // enum_uniq. qed.
 

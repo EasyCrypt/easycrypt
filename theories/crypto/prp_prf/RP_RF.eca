@@ -140,12 +140,11 @@ lemma excepted_lossless (m:(D,D) fmap):
   (exists x, !mem (dom m) x) =>
   mu (uD \ rng m) predT = 1%r.
 proof.
-move=> /endo_dom_rng h.
-rewrite -/(weight _) Dexcepted.lossless_restr //.
-+ smt ml=0 w=uD_uf_fu.
-+ have [/pred_ext] + [<- _]:= uD_uf_fu.
-  rewrite -(etaE (support uD)) etaP=> h'.
-  by apply/notin_supportIP; rewrite h'.
+move=> /endo_dom_rng h; rewrite -/(weight _) dexcepted_ll //.
++ smt w=uD_uf_fu.
+have [/pred_ext] + [<- _]:= uD_uf_fu.
+rewrite -(etaE (support uD)) etaP=> h'.
+by apply/notin_supportIP; rewrite h'.
 qed.
 
 phoare Indirect_ll: [Indirect.sample: exists x, support uD x /\ !mem X x ==> true] = 1%r.
@@ -155,7 +154,7 @@ proc; seq  1: (exists x, support uD x /\ !mem X x)=> //=.
 if=> //=.
 + rnd (predT); skip.
   progress [-split]; split=> //=.
-  apply/Dexcepted.lossless_restr.
+  apply/dexcepted_ll.
   * smt ml=0 w=uD_uf_fu.
   * by have [_ [<- _]]:= uD_uf_fu; apply/notin_supportIP; exists x.
 by hoare; rnd=> //=; skip=> &hr ->.
@@ -167,7 +166,7 @@ proc; if=> //=; wp; call Indirect_ll.
 skip; progress.
 have:= excepted_lossless (PRPi.m{hr}) _.
 + by exists x{hr}.
-rewrite -/(weight _) Dexcepted.mu_weight_def.
+rewrite -/(weight _) weight_dexcepted /b2r.
 case (weight uD = mu uD (mem (rng PRPi.m{hr})))=> //=.
 rewrite notin_supportIP /= -(etaE (mem (rng _))) etaP.
 by rewrite StdOrder.RealOrder.ltr_def=> -> /=; exact/mu_sub.
@@ -437,8 +436,7 @@ section PRPi_PRPi'_Indirect.
     phoare split (mu uD (pred1 a)) (mu uD (mem X) * mu (uD \ X) (pred1 a)): (r0 = a).
       (* Bound *)
       progress.
-      rewrite -/(mu_x (uD \ X{2}) _) mu_x_def.
-      rewrite supp_def a_notin_X /=; have [->] @/predT /=:= uD_uf_fu.
+      rewrite -/(mu_x (uD \ X{2}) _) mux_dexcepted a_notin_X /=.
       rewrite /weight /mu_x.
       cut not_empty: mu uD predT - mu uD (mem X{2}) <> 0%r.
         rewrite -mu_not.

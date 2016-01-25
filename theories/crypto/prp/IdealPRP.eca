@@ -58,7 +58,7 @@ equiv f_perm: RandomPermutation.f ~ RandomPermutation.f:
 proof.
 proc; if=> //=; auto.
 progress [-split]; rewrite H1 /=.
-move: H1; rewrite supp_def -/(support _ _)=> -[yL_in_dD y_notin_rng].
+move: H1; rewrite support_dexcepted=> -[yL_in_dD y_notin_rng].
 split=> x'.
   rewrite !getP dom_set !inE; case: (x' = x{2})=> //= _.
   by move: y_notin_rng; rewrite in_rng; smt. (* !exists <=> forall! *)
@@ -74,7 +74,7 @@ equiv fi_perm: RandomPermutation.fi ~ RandomPermutation.fi:
 proof.
 proc; if=> //=; auto.
 progress [-split]; rewrite H1 /=.
-move: H1; rewrite supp_def -/(support _ _)=> -[xL_in_dD x_notin_rng].
+move: H1; rewrite support_dexcepted=> -[xL_in_dD x_notin_rng].
 split=> x'.
   rewrite !getP dom_set !inE; case: (x' = xL)=> //= _.
   by move: x_notin_rng; rewrite in_rng; smt.

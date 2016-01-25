@@ -21,7 +21,7 @@ abbrev dbool = dunifin.
 lemma mu_dbool (E : bool -> bool):
   mu dbool E =   (if E true  then 1%r/2%r else 0%r)
                + (if E false then 1%r/2%r else 0%r).
-proof. by rewrite !duniformE /= /#. qed.
+proof. by rewrite !dunifinE /= /#. qed.
 
 lemma dbool_pred0: mu dbool pred0 = 0%r.
 proof. by rewrite mu_dbool. qed.

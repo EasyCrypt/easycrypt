@@ -158,7 +158,7 @@ theory Dword.
     card X < 2^length =>
     weight (dword \ X) = 1%r.
   proof.
-  move=> lt_CX_2sx; rewrite lossless_restr ?lossless // ?mu_cpMemw.
+  move=> lt_CX_2sx; rewrite dexcepted_ll /is_lossless -/(weight _) ?lossless // ?mu_cpMemw.
   by rewrite ltr_pdivr_mulr /= lte_fromint // powPos.
   qed.
 end Dword.

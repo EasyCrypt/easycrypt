@@ -144,7 +144,7 @@ proof.
 proc; if=> //=; auto; call Indirect_ll.
 skip=> /> &hr x_notin_m.
 have [x0] x0_notinr_m := endo_dom_rng PRPi.m{hr} _; first by exists x{hr}.
-by exists x0; rewrite x0_notinr_m; smt w=uD_uf_fu.
+by exists x0; rewrite x0_notinr_m /= -/(mu_x _ _); smt w=uD_uf_fu.
 qed.
 
 lemma PRPi'_Indirect_fi_ll: islossless PRPi'(Indirect).fi.
@@ -152,7 +152,7 @@ proof.
 proc; if=> //=; auto; call Indirect_ll.
 skip=> /> &hr x_notin_mi.
 have [x0] x0_notinr_mi := endo_dom_rng PRPi.mi{hr} _; first by exists x{hr}.
-by exists x0; rewrite x0_notinr_mi; smt w=uD_uf_fu.
+by exists x0; rewrite x0_notinr_mi -/(mu_x _ _); smt w=uD_uf_fu.
 qed.
 
 (** The proof is cut into 3 parts (sections):
@@ -517,9 +517,9 @@ section PRPi_PRPi'_Indirect.
     phoare split (mu uD (pred1 a)) (mu uD (mem X) * mu (uD \ X) (pred1 a)): (r0 = a).
       (* Bound *)
       progress.
-      rewrite -/(mu_x (uD \ X{2}) _) mu_x_def.
+      rewrite -/(mu_x (uD \ X{2}) _) mux_dexcepted.
       have [] uD_fu [] uD_suf uD_ll @/predT /=:= uD_uf_fu.
-      rewrite supp_def uD_fu /= /weight /mu_x.
+      rewrite /weight /mu_x.
       cut not_empty: mu uD predT - mu uD (mem X{2}) <> 0%r.
         rewrite -mu_not.
         cut: 0%r < mu uD (predC (mem X{2})); last smt.
