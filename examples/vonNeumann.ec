@@ -51,9 +51,7 @@ theory VonNeumann.
 
   lemma pr_final b: mu vn (pred1 (b,!b)) = 1%r/2%r.
   proof.
-  rewrite -/(mu_x _ _) Dexcepted.mu_x_def Dexcepted.supp_def !inE /=.
-  rewrite Dprod.supp_def /fst /snd /=.
-  do 2!rewrite -/(support _ _) DBool.dbool_fu /predT /=.
+  rewrite -/(mu_x _ _) mux_dexcepted !inE /=.
   rewrite Dprod.weight_def DBool.dbool_predT pr_evict /=.
   rewrite mu_x_def /fst /snd /=.
   by rewrite DBool.dboolb DBool.dboolb /#.
@@ -61,7 +59,7 @@ theory VonNeumann.
 
   lemma pr_eq b: mu vn (pred1 (b,b)) = 0%r.
   proof.
-  rewrite -/(mu_x _ _) Dexcepted.mu_x_def Dexcepted.supp_def !inE /=.
+  rewrite -/(mu_x _ _) mux_dexcepted !inE /=.
   by case: b.
   qed.
 
@@ -87,9 +85,9 @@ theory VonNeumann.
   bypr (res{1}) (res{2})=> // &1 &2 b0.
   have ->: Pr[Fair.sample() @ &2: b0 = res] = 1%r/2%r.
   + byphoare (_: true ==> res = b0)=> //.
-    by proc; rnd (pred1 b0); skip=> />; rewrite DBool.dboolb.
+    by proc; rnd (pred1 b0); skip=> /=; rewrite DBool.dboolb /#.
   byphoare (_: true ==> b0 = res)=> //.
-  proc; rnd (fun (bb' : bool * bool)=> b0 = bb'.`1); skip=> />.
+  proc; rnd (fun (bb' : bool * bool)=> b0 = bb'.`1); skip=> /=.
   rewrite mu_support support_vnP /predI /=.
   rewrite (mu_eq _ _ (pred1 (b0,!b0))) 1:/#.
   by rewrite pr_final.
