@@ -1941,7 +1941,7 @@ let t_crush ?(delta = true) (tc : tcenv1) =
          ~ttout:(FApi.t_seqs [t_cutdef pt cl; aux0; t_abort])
          tc
 
-  in entry tc
+  in FApi.t_seq entry t_simplify tc
 
 (* -------------------------------------------------------------------- *)
 let t_logic_trivial (tc : tcenv1) =
