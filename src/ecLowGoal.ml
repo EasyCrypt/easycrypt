@@ -67,10 +67,36 @@ module LowApply = struct
     let env1, ld1 = LDecl.baseenv hy1, LDecl.tohyps hy1 in
     let env2, ld2 = LDecl.baseenv hy2, LDecl.tohyps hy2 in
 
-    if env1 (*φ*)!= env2 then false else begin
-         ld1.h_tvar  == ld2.h_tvar
-      && ld1.h_local == ld2.h_local
-    end
+    if env1        (*φ*)!= env2        then false else
+    if ld1.h_tvar  (*φ*)!= ld2.h_tvar  then false else
+    if ld1.h_local (*φ*)== ld2.h_local then true  else
+
+    let env  = env1 in
+    let hyps = LDecl.init env ld1.h_tvar in
+
+    let h_eq (x1, h1) (x2, h2) =
+      (id_equal x1 x2) && ((h1 (*φ*)== h2) || begin
+        match h1, h2 with
+        | LD_var (t1, f1), LD_var (t2, f2) ->
+              EqTest.for_type env t1 t2
+           && oeq (is_alpha_eq hyps) f1 f2
+
+        | LD_mem m1, LD_mem m2 ->
+           oeq EcMemory.lmt_equal m1 m2
+
+        | LD_modty (mt1, mr1), LD_modty (mt2, mr2) ->
+           (mt1 == mt2) && (mr1 == mr2)
+
+        | LD_hyp f1, LD_hyp f2 ->
+           is_alpha_eq hyps f1 f2
+
+        | LD_abs_st au1, LD_abs_st au2 ->
+           au1 == au2
+
+        | _, _ -> false
+      end)
+
+   in List.all2 h_eq ld1.h_local ld2.h_local
 
   (* ------------------------------------------------------------------ *)
   let rec check_pthead (pt : pt_head) (tc : ckenv) =
