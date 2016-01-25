@@ -246,9 +246,16 @@ and pformula_r =
 
   | PFhoareF   of pformula * pgamepath * pformula
   | PFequivF   of pformula * (pgamepath * pgamepath) * pformula
+  | PFaequivF  of paequiv
   | PFeagerF   of pformula * (pstmt * pgamepath * pgamepath * pstmt) * pformula
   | PFprob     of pgamepath * (pformula list) * pmemory * pformula
   | PFBDhoareF of pformula * pgamepath * pformula * phoarecmp * pformula
+
+and paequiv = {
+  paf_bds : pformula * pformula;
+  paf_cds : pformula * pformula;
+  paf_pth : pgamepath * pgamepath;
+}
 
 and pgtybinding  = osymbol list * pgty
 and pgtybindings = pgtybinding list

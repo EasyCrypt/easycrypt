@@ -58,6 +58,7 @@
     "assert"      , ASSERT     ;        (* KW: prog *)
     "return"      , RETURN     ;        (* KW: prog *)
     "res"         , RES        ;        (* KW: prog *)
+    "aequiv"      , AEQUIV     ;        (* KW: prog *)
     "equiv"       , EQUIV      ;        (* KW: prog *)
     "hoare"       , HOARE      ;        (* KW: prog *)
     "phoare"      , PHOARE     ;        (* KW: prog *)

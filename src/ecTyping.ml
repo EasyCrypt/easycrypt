@@ -2315,6 +2315,21 @@ let trans_form_or_pattern env (ps, ue) pf tt =
           unify_or_fail qenv ue post.pl_loc ~expct:tbool post'.f_ty;
           f_equivF pre' fpath1 fpath2 post'
 
+    | PFaequivF aef ->
+        let fpath1 = trans_gamepath env (fst aef.paf_pth) in
+        let fpath2 = trans_gamepath env (snd aef.paf_pth) in
+        let dp = transf env (fst aef.paf_bds) in
+        let ep = transf env (snd aef.paf_bds) in
+        let penv, qenv = EcEnv.Fun.equivF fpath1 fpath2 env in
+        let pr = transf penv (fst aef.paf_cds) in
+        let po = transf qenv (snd aef.paf_cds) in
+
+        unify_or_fail penv ue (fst aef.paf_cds).pl_loc ~expct:tbool pr.f_ty;
+        unify_or_fail qenv ue (snd aef.paf_cds).pl_loc ~expct:tbool po.f_ty;
+        unify_or_fail penv ue (fst aef.paf_bds).pl_loc ~expct:treal dp.f_ty;
+        unify_or_fail qenv ue (snd aef.paf_bds).pl_loc ~expct:treal ep.f_ty;
+        f_aequivF ~dp ~ep pr fpath1 fpath2 po
+
     | PFeagerF (pre, (s1,gp1,gp2,s2), post) ->
         let fpath1 = trans_gamepath env gp1 in
         let fpath2 = trans_gamepath env gp2 in

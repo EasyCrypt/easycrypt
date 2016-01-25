@@ -332,6 +332,7 @@
 %token ABSTRACT
 %token ADMIT
 %token ADMITTED
+%token AEQUIV
 %token ALGNORM
 %token ALIAS
 %token AMP
@@ -1019,6 +1020,8 @@ sform_u(P):
 
 | EQUIV LBRACKET eb=equiv_body(P) RBRACKET { eb }
 
+| AEQUIV LBRACKET eb=aequiv_body(P) RBRACKET { eb }
+
 | EAGER LBRACKET eb=eager_body(P) RBRACKET { eb }
 
 | PR LBRACKET
@@ -1133,6 +1136,15 @@ equiv_body(P):
   mp1=loc(fident) TILD mp2=loc(fident)
   COLON pre=form_r(P) LONGARROW post=form_r(P)
     { PFequivF (pre, (mp1, mp2), post) }
+
+aequiv_body(P):
+  LBRACKET dp=sform_r(P) AMP ep=sform_r(P) RBRACKET
+  mp1=loc(fident) TILD mp2=loc(fident)
+  COLON pre=form_r(P) LONGARROW post=form_r(P)
+    { PFaequivF
+        { paf_bds = (dp, ep);
+          paf_cds = (pre, post);
+          paf_pth = (mp1, mp2); } }
 
 eager_body(P):
 | s1=stmt COMMA  mp1=loc(fident) TILD mp2=loc(fident) COMMA s2=stmt
@@ -1730,8 +1742,10 @@ axiom:
     { mk_axiom ~local:l ~nosmt:o d ao }
 
 | l=local  EQUIV x=ident pd=pgtybindings? COLON p=loc( equiv_body(none)) ao=axiom_tc
+| l=local AEQUIV x=ident pd=pgtybindings? COLON p=loc(aequiv_body(none)) ao=axiom_tc
 | l=local  HOARE x=ident pd=pgtybindings? COLON p=loc( hoare_body(none)) ao=axiom_tc
 | l=local PHOARE x=ident pd=pgtybindings? COLON p=loc(phoare_body(none)) ao=axiom_tc
+
     { mk_axiom ~local:l (x, None, pd, p) ao }
 
 proofend:
