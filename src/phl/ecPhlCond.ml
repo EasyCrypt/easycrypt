@@ -116,7 +116,8 @@ let process_cond info tc =
 
   match info with
   | `Head side ->
-    t_hS_or_bhS_or_eS ~th:t_hoare_cond ~tbh:t_bdhoare_cond ~te:(t_equiv_cond side) tc
+     t_hS_or_bhS_or_eS_or_eaS
+       ~th:t_hoare_cond ~tbh:t_bdhoare_cond ~te:(t_equiv_cond side) tc
 
   | `Seq (side, i1, i2, f) ->
     let es = tc1_as_equivS tc in

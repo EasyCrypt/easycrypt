@@ -1156,6 +1156,16 @@ let destr_equivF f =
   | FequivF es -> es
   | _ -> destr_error "equivF"
 
+let destr_aequivS f =
+  match f.f_node with
+  | FaequivS es -> es
+  | _ -> destr_error "aequivS"
+
+let destr_aequivF f =
+  match f.f_node with
+  | FaequivF es -> es
+  | _ -> destr_error "aequivF"
+
 let destr_eagerF f =
   match f.f_node with
   | FeagerF eg -> eg

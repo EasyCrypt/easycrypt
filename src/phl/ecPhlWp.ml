@@ -132,6 +132,6 @@ let t_wp_r ?(uselet=true) k g =
         (None, None, Some (T.t_equiv_wp ~uselet (Some (i, j))))
 
   in
-    t_hS_or_bhS_or_eS ?th ?tbh ?te g
+    t_hS_or_bhS_or_eS_or_eaS ?th ?tbh ?te g
 
 let t_wp ?(uselet=true) = FApi.t_low1 "wp" (t_wp_r ~uselet)

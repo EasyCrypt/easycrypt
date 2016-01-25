@@ -77,8 +77,9 @@ module LowInternal = struct
 end
 
 (* -------------------------------------------------------------------- *)
-let t_skip =
-  t_hS_or_bhS_or_eS
+let t_skip tc =
+  t_hS_or_bhS_or_eS_or_eaS
     ~th: LowInternal.t_hoare_skip
     ~tbh:LowInternal.t_bdhoare_skip
     ~te: LowInternal.t_equiv_skip
+    tc

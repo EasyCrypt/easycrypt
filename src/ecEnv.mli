@@ -120,6 +120,16 @@ module Fun : sig
 
   val equivS : xpath -> xpath -> env ->
     memenv * (funsig * function_def) * memenv * (funsig * function_def) * env
+
+  val aequivF_memenv : xpath -> xpath -> env ->
+    (memenv * memenv) * (memenv * memenv)
+
+  val aequivF :
+    xpath -> xpath -> env -> env * env
+
+  val aequivS : xpath -> xpath -> env ->
+    memenv * (funsig * function_def) * memenv * (funsig * function_def) * env
+
 end
 
 (* -------------------------------------------------------------------- *)

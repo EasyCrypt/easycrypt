@@ -77,11 +77,12 @@ let t_auto_rnd_bdhoare = FApi.t_low0 "auto-rnd-bdhoare" t_auto_rnd_bdhoare_r
 let t_auto_rnd_equiv   = FApi.t_low0 "auto-rnd-equiv"   t_auto_rnd_equiv_r
 
 (* -------------------------------------------------------------------- *)
-let t_auto_rnd =
-  t_hS_or_bhS_or_eS
+let t_auto_rnd tc =
+  t_hS_or_bhS_or_eS_or_eaS
     ~th:t_auto_rnd_hoare
     ~tbh:t_auto_rnd_bdhoare
     ~te:t_auto_rnd_equiv
+    tc
 
 (* -------------------------------------------------------------------- *)
 let rec t_auto_phl_r tc =

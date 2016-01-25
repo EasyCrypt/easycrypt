@@ -28,6 +28,7 @@ type hlkind = [
   | `Hoare  of hlform
   | `PHoare of hlform
   | `Equiv  of hlform
+  | `AEquiv of hlform
   | `Eager
 ]
 
@@ -52,6 +53,7 @@ let tc_error_noXhl ?(kinds : hlkinds option) pf =
       | `Hoare  fm -> ("hoare" , fm)
       | `PHoare fm -> ("phoare", fm)
       | `Equiv  fm -> ("equiv" , fm)
+      | `AEquiv fm -> ("aequiv", fm)
       | `Eager     -> ("eager" , `Any)
     in
       Printf.sprintf "%s%s" kind (fm |> string_of_form)
@@ -153,6 +155,8 @@ let pf_as_bdhoareF pe c = as_phl (`PHoare `Pred) (fun () -> destr_bdHoareF c) pe
 let pf_as_bdhoareS pe c = as_phl (`PHoare `Stmt) (fun () -> destr_bdHoareS c) pe
 let pf_as_equivF   pe c = as_phl (`Equiv  `Pred) (fun () -> destr_equivF   c) pe
 let pf_as_equivS   pe c = as_phl (`Equiv  `Stmt) (fun () -> destr_equivS   c) pe
+let pf_as_aequivF  pe c = as_phl (`AEquiv `Pred) (fun () -> destr_aequivF  c) pe
+let pf_as_aequivS  pe c = as_phl (`AEquiv `Stmt) (fun () -> destr_aequivS  c) pe
 let pf_as_eagerF   pe c = as_phl `Eager          (fun () -> destr_eagerF   c) pe
 
 (* -------------------------------------------------------------------- *)
@@ -162,6 +166,8 @@ let tc1_as_bdhoareF tc = pf_as_bdhoareF !!tc (FApi.tc1_goal tc)
 let tc1_as_bdhoareS tc = pf_as_bdhoareS !!tc (FApi.tc1_goal tc)
 let tc1_as_equivF   tc = pf_as_equivF   !!tc (FApi.tc1_goal tc)
 let tc1_as_equivS   tc = pf_as_equivS   !!tc (FApi.tc1_goal tc)
+let tc1_as_aequivF  tc = pf_as_aequivF  !!tc (FApi.tc1_goal tc)
+let tc1_as_aequivS  tc = pf_as_aequivS  !!tc (FApi.tc1_goal tc)
 let tc1_as_eagerF   tc = pf_as_eagerF   !!tc (FApi.tc1_goal tc)
 
 (* -------------------------------------------------------------------- *)
@@ -234,25 +240,28 @@ let s_split_o i s =
   | Some i -> s_split i s
 
 (* -------------------------------------------------------------------- *)
-let t_hS_or_bhS_or_eS ?th ?tbh ?te tc =
+let t_hS_or_bhS_or_eS_or_eaS ?th ?tbh ?te ?tae tc =
   match (FApi.tc1_goal tc).f_node with
   | FhoareS   _ when EcUtils.is_some th  -> (oget th ) tc
   | FbdHoareS _ when EcUtils.is_some tbh -> (oget tbh) tc
   | FequivS   _ when EcUtils.is_some te  -> (oget te ) tc
+  | FaequivS  _ when EcUtils.is_some tae -> (oget tae) tc
 
   | _ ->
     let kinds = List.flatten [
          if EcUtils.is_some th  then [`Hoare  `Stmt] else [];
          if EcUtils.is_some tbh then [`PHoare `Stmt] else [];
-         if EcUtils.is_some te  then [`Equiv  `Stmt] else []]
+         if EcUtils.is_some te  then [`Equiv  `Stmt] else [];
+         if EcUtils.is_some tae then [`AEquiv `Stmt] else []]
 
     in tc_error_noXhl ~kinds !!tc
 
-let t_hF_or_bhF_or_eF ?th ?tbh ?te ?teg tc =
+let t_hF_or_bhF_or_eF_or_eaF ?th ?tbh ?te ?tae ?teg tc =
   match (FApi.tc1_goal tc).f_node with
   | FhoareF   _ when EcUtils.is_some th  -> (oget th ) tc
   | FbdHoareF _ when EcUtils.is_some tbh -> (oget tbh) tc
   | FequivF   _ when EcUtils.is_some te  -> (oget te ) tc
+  | FaequivF  _ when EcUtils.is_some tae -> (oget tae) tc
   | FeagerF   _ when EcUtils.is_some teg -> (oget teg) tc
 
   | _ ->
@@ -260,6 +269,7 @@ let t_hF_or_bhF_or_eF ?th ?tbh ?te ?teg tc =
          if EcUtils.is_some th  then [`Hoare  `Pred] else [];
          if EcUtils.is_some tbh then [`PHoare `Pred] else [];
          if EcUtils.is_some te  then [`Equiv  `Pred] else [];
+         if EcUtils.is_some tae then [`AEquiv `Pred] else [];
          if EcUtils.is_some teg then [`Eager       ] else []]
 
     in tc_error_noXhl ~kinds !!tc

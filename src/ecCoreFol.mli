@@ -377,6 +377,8 @@ val destr_exists1   : form -> EcIdent.t * gty * form
 val destr_exists    : form -> bindings * form
 val destr_equivF    : form -> equivF
 val destr_equivS    : form -> equivS
+val destr_aequivF   : form -> aequivF
+val destr_aequivS   : form -> aequivS
 val destr_eagerF    : form -> eagerF
 val destr_hoareF    : form -> hoareF
 val destr_hoareS    : form -> hoareS

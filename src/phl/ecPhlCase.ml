@@ -40,7 +40,7 @@ let t_equiv_case   = FApi.t_low1 "equiv-case"   t_equiv_case_r
 
 (* --------------------------------------------------------------------- *)
 let t_hl_case_r f tc =
-  t_hS_or_bhS_or_eS
+  t_hS_or_bhS_or_eS_or_eaS
     ~th:(t_hoare_case f)
     ~tbh:(t_bdhoare_case f)
     ~te:(t_equiv_case f)

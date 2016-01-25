@@ -1619,6 +1619,11 @@ module Fun = struct
     let fd1, mem1 = actmem_body EcCoreFol.mleft path1 fun1 in
     let fd2, mem2 = actmem_body EcCoreFol.mright path2 fun2 in
     mem1, fd1, mem2, fd2, Memory.push_all [mem1; mem2] env
+
+  let aequivF_memenv = equivF_memenv
+
+  let aequivF = equivF
+  let aequivS = equivS
 end
 
 (* -------------------------------------------------------------------- *)

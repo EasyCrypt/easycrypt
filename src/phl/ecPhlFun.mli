@@ -56,6 +56,7 @@ val t_equivF_abs   : form -> FApi.backward
 val t_hoareF_fun_def   : FApi.backward
 val t_bdhoareF_fun_def : FApi.backward
 val t_equivF_fun_def   : FApi.backward
+val t_aequivF_fun_def  : FApi.backward
 
 (* -------------------------------------------------------------------- *)
 val t_equivF_abs_upto : form -> form -> form -> FApi.backward

@@ -125,18 +125,48 @@ let t_equivF_fun_def_r tc =
   let concl' = f_equivS menvl menvr pre fdefl.f_body fdefr.f_body post in
   FApi.xmutate1 tc `FunDef [concl']
 
+(* ------------------------------------------------------------------ *)
+let t_aequivF_fun_def_r tc =
+  let env = FApi.tc1_env tc in
+  let aef = tc1_as_aequivF tc in
+  let fl = NormMp.norm_xfun env aef.aef_fl in
+  let fr = NormMp.norm_xfun env aef.aef_fr in
+  let dp = aef.aef_dp in
+  let ep = aef.aef_ep in
+  check_concrete !!tc env fl; check_concrete !!tc env fr;
+  let (menvl, eqsl, menvr, eqsr, env) = Fun.aequivS fl fr env in
+  let (fsigl, fdefl) = eqsl in
+  let (fsigr, fdefr) = eqsr in
+  let ml = EcMemory.memory menvl in
+  let mr = EcMemory.memory menvr in
+  let fresl = odfl f_tt (omap (form_of_expr ml) fdefl.f_ret) in
+  let fresr = odfl f_tt (omap (form_of_expr mr) fdefr.f_ret) in
+  let s = PVM.add env (pv_res fl) ml fresl PVM.empty in
+  let s = PVM.add env (pv_res fr) mr fresr s in
+  let post = PVM.subst env s aef.aef_po in
+  let s = subst_pre env fl fsigl ml PVM.empty in
+  let s = subst_pre env fr fsigr mr s in
+  let pre = PVM.subst env s aef.aef_pr in
+  let concl' =
+    f_aequivS menvl menvr ~dp ~ep
+    pre fdefl.f_body fdefr.f_body post
+
+  in FApi.xmutate1 tc `FunDef [concl']
+
 (* -------------------------------------------------------------------- *)
 let t_hoareF_fun_def   = FApi.t_low0 "hoare-fun-def"   t_hoareF_fun_def_r
 let t_bdhoareF_fun_def = FApi.t_low0 "bdhoare-fun-def" t_bdhoareF_fun_def_r
 let t_equivF_fun_def   = FApi.t_low0 "equiv-fun-def"   t_equivF_fun_def_r
+let t_aequivF_fun_def  = FApi.t_low0 "aequiv-fun-def"  t_aequivF_fun_def_r
 
 (* -------------------------------------------------------------------- *)
 let t_fun_def_r tc =
   let th  = t_hoareF_fun_def
   and tbh = t_bdhoareF_fun_def
-  and te  = t_equivF_fun_def in
+  and te  = t_equivF_fun_def
+  and tae = t_aequivF_fun_def in
 
-  t_hF_or_bhF_or_eF ~th ~tbh ~te tc
+  t_hF_or_bhF_or_eF_or_eaF ~th ~tbh ~te ~tae tc
 
 let t_fun_def = FApi.t_low0 "fun-def" t_fun_def_r
 
@@ -433,7 +463,7 @@ let t_fun_to_code_r tc =
   let tbh = t_fun_to_code_bdhoare in
   let te  = t_fun_to_code_equiv in
   let teg = t_fun_to_code_eager in
-  t_hF_or_bhF_or_eF ~th ~tbh ~te ~teg tc
+  t_hF_or_bhF_or_eF_or_eaF ~th ~tbh ~te ~teg tc
 
 let t_fun_to_code = FApi.t_low0 "fun-to-code" t_fun_to_code_r
 
@@ -458,7 +488,7 @@ let t_fun_r inv tc =
       then t_equivF_abs inv tc
       else t_equivF_fun_def tc
   in
-    t_hF_or_bhF_or_eF ~th ~tbh ~te tc
+    t_hF_or_bhF_or_eF_or_eaF ~th ~tbh ~te tc
 
 let t_fun = FApi.t_low1 "fun" t_fun_r
 
@@ -511,4 +541,4 @@ let process_fun_abs inv tc =
     t_equivF_abs inv tc
 
   in
-    t_hF_or_bhF_or_eF ~th:t_hoare ~tbh:t_bdhoare ~te:t_equiv tc
+    t_hF_or_bhF_or_eF_or_eaF ~th:t_hoare ~tbh:t_bdhoare ~te:t_equiv tc
