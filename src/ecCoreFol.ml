@@ -71,6 +71,9 @@ and f_node =
   | FequivF of equivF (* $left,$right / $left,$right *)
   | FequivS of equivS
 
+  | FaequivF of aequivF
+  | FaequivS of aequivS
+
   | FeagerF of eagerF
 
   | Fpr of pr (* hr *)
@@ -99,6 +102,26 @@ and equivS = {
   es_sr  : stmt;
   es_po  : form; }
 
+
+and aequivF = {
+  aef_pr : form;
+  aef_ep : form;
+  aef_dp : form;
+  aef_fl : EcPath.xpath;
+  aef_fr : EcPath.xpath;
+  aef_po : form;
+}
+and aequivS = {
+  aes_ml : EcMemory.memenv;
+  aes_mr : EcMemory.memenv;
+  aes_ep : form;
+  aes_dp : form;
+  aes_pr : form;
+  aes_sl : stmt;
+  aes_sr : stmt;
+  aes_po : form;
+}
+
 and hoareF = {
   hf_pr : form;
   hf_f  : EcPath.xpath;
@@ -108,7 +131,8 @@ and hoareS = {
   hs_m  : EcMemory.memenv;
   hs_pr : form;
   hs_s  : stmt;
-  hs_po : form; }
+  hs_po : form;
+}
 
 and bdHoareF = {
   bhf_pr  : form;
@@ -245,6 +269,24 @@ let eqs_equal es1 es2 =
   && EcMemory.me_equal es1.es_ml es2.es_ml
   && EcMemory.me_equal es1.es_mr es2.es_mr
 
+let aeqf_equal ef1 ef2 =
+     f_equal ef1.aef_pr ef2.aef_pr
+  && f_equal ef1.aef_po ef2.aef_po
+  && f_equal ef1.aef_dp ef2.aef_dp
+  && f_equal ef1.aef_ep ef2.aef_ep
+  && EcPath.x_equal ef1.aef_fl ef2.aef_fl
+  && EcPath.x_equal ef1.aef_fr ef2.aef_fr
+
+let aeqs_equal es1 es2 =
+     f_equal es1.aes_pr es2.aes_pr
+  && f_equal es1.aes_po es2.aes_po
+  && f_equal es1.aes_dp es2.aes_dp
+  && f_equal es1.aes_ep es2.aes_ep
+  && s_equal es1.aes_sl es2.aes_sl
+  && s_equal es1.aes_sr es2.aes_sr
+  && EcMemory.me_equal es1.aes_ml es2.aes_ml
+  && EcMemory.me_equal es1.aes_mr es2.aes_mr
+
 let egf_equal eg1 eg2 =
      f_equal eg1.eg_pr eg2.eg_pr
   && f_equal eg1.eg_po eg2.eg_po
@@ -287,6 +329,17 @@ let es_hash es =
   Why3.Hashcons.combine3
     (f_hash es.es_pr) (f_hash es.es_po)
     (EcModules.s_hash es.es_sl) (EcModules.s_hash es.es_sr)
+
+let aef_hash ef =
+  Why3.Hashcons.combine_list f_hash
+    (Why3.Hashcons.combine (EcPath.x_hash ef.aef_fl) (EcPath.x_hash ef.aef_fr))
+    [ef.aef_pr; ef.aef_po; ef.aef_dp; ef.aef_ep]
+
+let aes_hash es =
+  Why3.Hashcons.combine_list f_hash
+    (Why3.Hashcons.combine
+      (EcModules.s_hash es.aes_sl) (EcModules.s_hash es.aes_sr))
+    [es.aes_pr; es.aes_po; es.aes_dp; es.aes_ep]
 
 let eg_hash eg =
   Why3.Hashcons.combine3
@@ -351,6 +404,8 @@ module Hsform = Why3.Hashcons.Make (struct
     | FbdHoareS bhs1, FbdHoareS bhs2 -> bhs_equal bhs1 bhs2
     | FequivF   eqf1, FequivF   eqf2 -> eqf_equal eqf1 eqf2
     | FequivS   eqs1, FequivS   eqs2 -> eqs_equal eqs1 eqs2
+    | FaequivF  eqf1, FaequivF  eqf2 -> aeqf_equal eqf1 eqf2
+    | FaequivS  eqs1, FaequivS  eqs2 -> aeqs_equal eqs1 eqs2
     | FeagerF   eg1 , FeagerF   eg2  -> egf_equal eg1 eg2
     | Fpr       pr1 , Fpr       pr2  -> pr_equal pr1 pr2
 
@@ -403,6 +458,8 @@ module Hsform = Why3.Hashcons.Make (struct
     | FbdHoareS bhs -> bhs_hash bhs
     | FequivF   ef  -> ef_hash ef
     | FequivS   es  -> es_hash es
+    | FaequivF  ef  -> aef_hash ef
+    | FaequivS  es  -> aes_hash es
     | FeagerF   eg  -> eg_hash eg
     | Fpr       pr  -> pr_hash pr
 
@@ -464,6 +521,20 @@ module Hsform = Why3.Hashcons.Make (struct
         let fv = fv_diff fv (Sid.add ml (Sid.singleton mr)) in
         fv_union fv
           (fv_union (EcModules.s_fv es.es_sl) (EcModules.s_fv es.es_sr))
+
+    | FaequivF aef ->
+        let fv = [aef.aef_pr; aef.aef_po; aef.aef_dp; aef.aef_ep] in
+        let fv = union f_fv fv in
+        let fv = fv_diff fv fv_mlr in
+        EcPath.x_fv (EcPath.x_fv fv aef.aef_fl) aef.aef_fr
+
+    | FaequivS aes ->
+        let fv = [aes.aes_pr; aes.aes_po; aes.aes_dp; aes.aes_ep] in
+        let fv = union f_fv fv in
+        let ml, mr = fst aes.aes_ml, fst aes.aes_mr in
+        let fv = fv_diff fv (Sid.add ml (Sid.singleton mr)) in
+        fv_union fv
+          (fv_union (EcModules.s_fv aes.aes_sl) (EcModules.s_fv aes.aes_sr))
 
     | FeagerF eg ->
         let fv = fv_union (f_fv eg.eg_pr) (f_fv eg.eg_po) in
@@ -659,6 +730,17 @@ let f_equivF ef_pr ef_fl ef_fr ef_po =
   f_equivF_r{ ef_pr; ef_fl; ef_fr; ef_po; }
 
 (* -------------------------------------------------------------------- *)
+let f_aequivS_r es = mk_form (FaequivS es) tbool
+let f_aequivF_r ef = mk_form (FaequivF ef) tbool
+
+let f_aequivS aes_ml aes_mr ~dp ~ep aes_pr aes_sl aes_sr aes_po =
+  f_aequivS_r
+   { aes_ml; aes_mr; aes_dp = dp; aes_ep = ep; aes_pr; aes_sl; aes_sr; aes_po; }
+
+let f_aequivF ~dp ~ep aef_pr aef_fl aef_fr aef_po =
+  f_aequivF_r{ aef_pr; aef_fl; aef_dp = dp; aef_ep = ep; aef_fr; aef_po; }
+
+(* -------------------------------------------------------------------- *)
 let f_eagerF_r eg = mk_form (FeagerF eg) tbool
 
 let f_eagerF eg_pr eg_sl eg_fl eg_fr eg_sr eg_po =
@@ -764,6 +846,12 @@ module FSmart = struct
 
   let f_equivS (fp, es) es' =
     if eqs_equal es es' then fp else f_equivS_r es'
+
+  let f_aequivF (fp, aef) aef' =
+    if aeqf_equal aef aef' then fp else mk_form (FaequivF aef') fp.f_ty
+
+  let f_aequivS (fp, aes) aes' =
+    if aeqs_equal aes aes' then fp else f_aequivS_r aes'
 
   let f_eagerF (fp, eg) eg' =
     if egf_equal eg eg' then fp else mk_form (FeagerF eg') fp.f_ty
@@ -881,6 +969,23 @@ let f_map gt g fp =
         FSmart.f_equivS (fp, es)
           { es with es_pr = pr'; es_po = po'; }
 
+  | FaequivF aef ->
+      let aef_pr = g aef.aef_pr in
+      let aef_po = g aef.aef_po in
+      let aef_dp = g aef.aef_dp in
+      let aef_ep = g aef.aef_ep in
+        FSmart.f_aequivF (fp, aef)
+          { aef with aef_pr; aef_po; aef_dp; aef_ep; }
+
+  | FaequivS aes ->
+      let aes_pr = g aes.aes_pr in
+      let aes_po = g aes.aes_po in
+      let aes_dp = g aes.aes_dp in
+      let aes_ep = g aes.aes_ep in
+
+        FSmart.f_aequivS (fp, aes)
+          { aes with aes_pr; aes_po; aes_dp; aes_ep; }
+
   | FeagerF eg ->
       let pr' = g eg.eg_pr in
       let po' = g eg.eg_po in
@@ -916,6 +1021,8 @@ let f_iter g f =
   | FbdHoareS bhs -> g bhs.bhs_pr; g bhs.bhs_po
   | FequivF   ef  -> g ef.ef_pr; g ef.ef_po
   | FequivS   es  -> g es.es_pr; g es.es_po
+  | FaequivF  ef  -> g ef.aef_pr; g ef.aef_po; g ef.aef_dp; g ef.aef_ep
+  | FaequivS  es  -> g es.aes_pr; g es.aes_po; g es.aes_dp; g es.aes_ep
   | FeagerF   eg  -> g eg.eg_pr; g eg.eg_po
   | Fpr       pr  -> g pr.pr_args; g pr.pr_event
 
@@ -942,6 +1049,10 @@ let form_exists g f =
   | FbdHoareS bhs -> g bhs.bhs_pr || g bhs.bhs_po
   | FequivF   ef  -> g ef.ef_pr   || g ef.ef_po
   | FequivS   es  -> g es.es_pr   || g es.es_po
+  | FaequivF  ef  -> g ef.aef_pr  || g ef.aef_po ||
+                     g ef.aef_dp  || g ef.aef_ep
+  | FaequivS  es  -> g es.aes_pr  || g es.aes_po ||
+                     g es.aes_dp  || g es.aes_ep
   | FeagerF   eg  -> g eg.eg_pr   || g eg.eg_po
   | Fpr       pr  -> g pr.pr_args || g pr.pr_event
 
@@ -968,6 +1079,10 @@ let form_forall g f =
   | FbdHoareS bhs -> g bhs.bhs_pr && g bhs.bhs_po
   | FequivF   ef  -> g ef.ef_pr   && g ef.ef_po
   | FequivS   es  -> g es.es_pr   && g es.es_po
+  | FaequivF  ef  -> g ef.aef_pr  && g ef.aef_po &&
+                     g ef.aef_dp  && g ef.aef_ep
+  | FaequivS  es  -> g es.aes_pr  && g es.aes_po &&
+                     g es.aes_dp  && g es.aes_ep
   | FeagerF   eg  -> g eg.eg_pr   && g eg.eg_po
   | Fpr       pr  -> g pr.pr_args && g pr.pr_event
 
@@ -1531,6 +1646,37 @@ module Fsubst = struct
         { es_ml = ml'; es_mr = mr';
           es_pr = pr'; es_po = po';
           es_sl = sl'; es_sr = sr'; }
+
+    | FaequivF aef ->
+      assert (not (Mid.mem mleft s.fs_mem) && not (Mid.mem mright s.fs_mem));
+      let m_subst = EcPath.x_substm s.fs_sty.ts_p s.fs_mp in
+      let aef_pr = f_subst ~tx s aef.aef_pr in
+      let aef_po = f_subst ~tx s aef.aef_po in
+      let aef_dp = f_subst ~tx s aef.aef_dp in
+      let aef_ep = f_subst ~tx s aef.aef_ep in
+      let aef_fl = m_subst aef.aef_fl in
+      let aef_fr = m_subst aef.aef_fr in
+      FSmart.f_aequivF (fp, aef)
+        { aef_pr; aef_po; aef_fl; aef_fr; aef_dp; aef_ep; }
+
+    | FaequivS aes ->
+      assert (not (Mid.mem (fst aes.aes_ml) s.fs_mem) &&
+              not (Mid.mem (fst aes.aes_mr) s.fs_mem));
+      let es = e_subst_init s.fs_freshen s.fs_sty.ts_p s.fs_ty s.fs_opdef s.fs_mp in
+      let s_subst = EcModules.s_subst es in
+      let aes_pr = f_subst ~tx s aes.aes_pr in
+      let aes_po = f_subst ~tx s aes.aes_po in
+      let aes_dp = f_subst ~tx s aes.aes_dp in
+      let aes_ep = f_subst ~tx s aes.aes_ep in
+      let aes_sl = s_subst aes.aes_sl in
+      let aes_sr = s_subst aes.aes_sr in
+      let aes_ml =
+        EcMemory.me_substm s.fs_sty.ts_p s.fs_mp s.fs_mem s.fs_ty aes.aes_ml in
+      let aes_mr =
+        EcMemory.me_substm s.fs_sty.ts_p s.fs_mp s.fs_mem s.fs_ty aes.aes_mr in
+
+      FSmart.f_aequivS (fp, aes)
+        { aes_ml; aes_mr; aes_dp; aes_ep; aes_pr; aes_po; aes_sl; aes_sr; }
 
     | FeagerF eg ->
       assert (not (Mid.mem mleft s.fs_mem) && not (Mid.mem mright s.fs_mem));

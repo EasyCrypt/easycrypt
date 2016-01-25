@@ -1525,6 +1525,32 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
         (pp_form ppe) es.es_pr
         (pp_form ppe) es.es_po
 
+  | FaequivF aef ->
+      let ppe =
+        PPEnv.create_and_push_mems
+          ppe [(EcFol.mleft, aef.aef_fl); (EcFol.mright, aef.aef_fr)]
+      in
+      Format.fprintf fmt
+        "aequiv[@[<hov 2>[%a & %a]@ %a ~@ %a :@ @[%a ==>@ %a@]@]]"
+        (pp_form ppe) aef.aef_dp
+        (pp_form ppe) aef.aef_ep
+        (pp_funname ppe) aef.aef_fl
+        (pp_funname ppe) aef.aef_fr
+        (pp_form ppe) aef.aef_pr
+        (pp_form ppe) aef.aef_po
+
+  | FaequivS aes ->
+      let ppe = PPEnv.push_mems ppe [aes.aes_ml; aes.aes_mr] in
+      Format.fprintf fmt
+        "aequiv[@[<hov 2>[%a & %a]@ %a ~@ %a :@ @[%a ==>@ %a@]@]]"
+        (pp_form ppe) aes.aes_dp
+        (pp_form ppe) aes.aes_ep
+        (pp_stmt_for_form ppe) aes.aes_sl
+        (pp_stmt_for_form ppe) aes.aes_sr
+        (pp_form ppe) aes.aes_pr
+        (pp_form ppe) aes.aes_po
+
+
   | FeagerF eg ->
       let ppe =
         PPEnv.create_and_push_mems

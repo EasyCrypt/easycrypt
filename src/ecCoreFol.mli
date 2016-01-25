@@ -71,6 +71,9 @@ and f_node =
   | FequivF of equivF (* $left,$right / $left,$right *)
   | FequivS of equivS (* $left,$right / $left,$right *)
 
+  | FaequivF of aequivF
+  | FaequivS of aequivS
+
   | FeagerF of eagerF
 
   | Fpr of pr (* hr *)
@@ -98,6 +101,26 @@ and equivS = {
   es_sl : stmt;
   es_sr : stmt;
   es_po : form;
+}
+
+and aequivF = {
+  aef_pr : form;
+  aef_ep : form;
+  aef_dp : form;
+  aef_fl : xpath;
+  aef_fr : xpath;
+  aef_po : form;
+}
+
+and aequivS = {
+  aes_ml : EcMemory.memenv;
+  aes_mr : EcMemory.memenv;
+  aes_ep : form;
+  aes_dp : form;
+  aes_pr : form;
+  aes_sl : stmt;
+  aes_sr : stmt;
+  aes_po : form;
 }
 
 and hoareF = {
@@ -210,6 +233,16 @@ val f_equivF : form -> xpath -> xpath -> form -> form
 
 val f_equivS_r : equivS -> form
 val f_equivF_r : equivF -> form
+
+(* soft-constructors - aequiv *)
+val f_aequivS :
+     memenv -> memenv -> dp:form -> ep:form
+  -> form -> stmt -> stmt -> form -> form
+val f_aequivF :
+  dp:form -> ep:form -> form -> xpath -> xpath -> form -> form
+
+val f_aequivS_r : aequivS -> form
+val f_aequivF_r : aequivF -> form
 
 (* soft-constructors - eager *)
 val f_eagerF_r : eagerF -> form
