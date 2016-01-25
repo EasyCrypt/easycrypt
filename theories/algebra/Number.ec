@@ -56,6 +56,9 @@ end Axioms.
 
 clear [Axioms.*].
 
+op minr (x y : t) = if x <= y then x else y.
+op maxr (x y : t) = if y <= x then x else y.
+
 lemma nosmt ler_norm_add (x y : t): `|x + y| <= `|x| + `|y|.
 proof. by apply/Axioms.ler_norm_add. qed.
 

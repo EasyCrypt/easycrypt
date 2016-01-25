@@ -26,9 +26,10 @@ axiom muE ['a] (d : 'a distr) (E : 'a -> bool):
 (* -------------------------------------------------------------------- *)
 op mk : ('a -> real) -> 'a distr.
 
-op isdistr (m : 'a -> real) =
-     (forall x, 0%r <= m x)
-  /\ (forall s, uniq s => big predT m s <= 1%r).
+inductive isdistr (m : 'a -> real) =
+| Distr of
+       (forall x, 0%r <= m x)
+     & (forall s, uniq s => big predT m s <= 1%r).
 
 axiom distrW (P : 'a distr -> bool):
   (forall m, isdistr m => P (mk m)) => forall d, P d.
@@ -63,6 +64,24 @@ lemma eq_distr (d1 d2 : 'a distr):
 proof.
 split=> [->//|eq_mu]; rewrite -(@mkK d1) -(@mkK d2).
 by congr; apply/fun_ext.
+qed.
+
+lemma isdistr_finP (s : 'a list) (m : 'a -> real) :
+     uniq s
+  => (forall x, m x <> 0%r => mem s x)
+  => (forall x, 0%r <= m x)
+  => (isdistr m <=> (big predT m s <= 1%r)).
+proof.
+move=> uq_s fin ge0_m; split=> [[_ /(_ s uq_s)]|le1_m] //.
+split=> // s' uq_s'; rewrite (@bigID _ _ (mem s)) addrC big1 /=.
+  by move=> i [_] @/predC; apply/contraR=> /fin.
+rewrite -big_filter; apply/(ler_trans _ _ le1_m).
+rewrite filter_predI filter_predT; pose t := filter _ _.
+suff /eq_big_perm ->: perm_eq t (filter (mem s') s).
+  rewrite big_filter (@bigID predT _ (mem s')) ler_addl.
+  by rewrite sumr_ge0 => x _; apply/ge0_m.
+apply/uniq_perm_eq; rewrite ?filter_uniq // => x.
+by rewrite !mem_filter andbC.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -159,7 +178,7 @@ proof. by rewrite MRat.prratE /=; case: (E x). qed.
 lemma dunit_ll ['a] (x : 'a): mu (dunit x) predT = 1%r.
 proof. by apply/MRat.drat_ll. qed.
 
-lemma support_dunit ['a] (x : 'a): support (dunit x) = pred1 x.
+lemma dunit_fu ['a] (x : 'a): support (dunit x) = pred1 x.
 proof. by apply/fun_ext=> x'; rewrite MRat.support_drat. qed.
 end MUnit.
 
@@ -189,7 +208,7 @@ lemma duniformE ['a] (E : 'a -> bool) (s : 'a list) :
   mu (duniform s) E = (count E (undup s))%r / (size (undup s))%r.
 proof. by apply/MRat.prratE. qed.
 
-lemma support_duniform ['a] (s : 'a list): support (duniform s) = mem s.
+lemma duniform_fu ['a] (s : 'a list): support (duniform s) = mem s.
 proof. by rewrite MRat.support_drat pred_ext=>x; rewrite mem_undup. qed.
 
 lemma duniform_ll (s : 'a list) :
@@ -200,7 +219,7 @@ lemma duniform_uf (s : 'a list) :
   s <> [] => is_uniform (duniform s).
 proof.
 move=> s_ne0; rewrite /is_uniform duniform_ll //=.
-by move=> x y; rewrite 2!duniform1E support_duniform=> !->.
+by move=> x y; rewrite 2!duniform1E duniform_fu=> !->.
 qed.
 end MUniform.
 
@@ -269,17 +288,24 @@ type t.
 
 clone import FinType as Support with type t <- t.
 
-op duniform : t distr = MUniform.duniform enum.
+op dunifin : t distr = MUniform.duniform enum.
 
-lemma duniform1E (x : t) : mu_x duniform x = 1%r / (size enum)%r.
+lemma dunifin1E (x : t) : mu_x dunifin x = 1%r / (size enum)%r.
 proof. by rewrite MUniform.duniform1E enumP /= undup_id // enum_uniq. qed.
 
 lemma duniformE (E : t -> bool) :
-  mu duniform E = (count E enum)%r / (size enum)%r.
+  mu dunifin E = (count E enum)%r / (size enum)%r.
 proof. by rewrite MUniform.duniformE ?undup_id // enum_uniq. qed.
 
-lemma support_duniform: support duniform = predT.
+lemma dunifin_ll : is_lossless dunifin.
 proof.
-by rewrite MUniform.support_duniform pred_ext=> x; rewrite enumP.
+rewrite MUniform.duniform_ll -size_eq0 -lt0n.
+  by rewrite size_ge0. by rewrite Support.card_gt0.
+qed.
+
+lemma duniform_fu: support dunifin = predT.
+proof.
+rewrite MUniform.duniform_fu; apply/fun_ext.
+by move=> x; rewrite Support.enumP.
 qed.
 end MFinite.

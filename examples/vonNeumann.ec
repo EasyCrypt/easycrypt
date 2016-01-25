@@ -1,50 +1,23 @@
+(* --------------------------------------------------------------------
+ * Copyright (c) - 2012--2016 - IMDEA Software Institute
+ * Copyright (c) - 2012--2016 - Inria
+ *
+ * Distributed under the terms of the CeCILL-B-V1 license
+ * -------------------------------------------------------------------- *)
+
+(* -------------------------------------------------------------------- *)
+
 (* In this theory, we illustrate some reasoning on distributions on
    Von Neumann's trick to simulate a fair coin toss using only a
    biased coin (of unknown bias. *)
 
-require import Bool Int IntExtra Real RealExtra NewDistr StdOrder Mu_mem.
-(*---*) import RealOrder.
+require import Bool Int IntExtra Real RealExtra NewDistr.
+require import StdRing StdOrder DBool Mu_mem.
+(*---*) import RField RealOrder.
 
-theory BiasedCoin.
-  op p : {real | 0%r < p < 1%r} as p_strict.
-  lemma gt0_p: 0%r < p by have [] := p_strict.
-  lemma lt1_p: p < 1%r by have [] := p_strict.
+clone FixedBiased as BiasedCoin.
 
-  (** This distribution cannot be defined using the standard NewDistr
-      building blocks. We axiomatize it for now but could define it
-      through its probability mass function and prove that it is a
-      valid distribution. **)
-  (** TODO: finish it and stick it into the standard lib **)
-  op mbiased (b : bool) = if b then p else 1%r -p.
-
-  lemma isdistr_mbiased: isdistr mbiased.
-  proof.
-  split.
-    by case; rewrite /mbiased /= ler_eqVlt ?gt0_p ?subr_gt0 ?lt1_p.
-  admit. (* at worst, the list can be a permutation of [true;false], whose sum is 1%r *)
-  qed.
-
-  op biased = mk mbiased.
-
-  lemma biased_def (P:bool -> bool):
-    mu biased P =
-      p         * b2r (P true) +
-      (1%r - p) * b2r (P false).
-  proof.
-  rewrite muE muK ?isdistr_mbiased.
-  admit. (* the sum is finite over (FinBool.enum) *)
-  qed.
-
-  lemma biased_fu: support biased = predT.
-  proof.
-  apply fun_ext=> b; rewrite /predT /support /in_supp /mu_x /= eqT.
-  by case b; rewrite biased_def /pred1 b2r0 b2r1 //= ?gt0_p ?subr_gt0 ?lt1_p.
-  qed.
-
-  lemma biased_ll: mu biased predT = 1%r.
-  proof. by rewrite biased_def /predT /#. qed.
-end BiasedCoin.
-
+(* -------------------------------------------------------------------- *)
 theory VonNeumann.
   import BiasedCoin.
 
@@ -83,7 +56,6 @@ theory VonNeumann.
   do 2!rewrite -/(support _ _) DBool.dbool_fu /predT /=.
   rewrite Dprod.weight_def DBool.dbool_predT pr_evict /=.
   rewrite mu_x_def /fst /snd /=.
-  have -> : 1%r - inv 2%r = inv 2%r by smt ml=0.
   by rewrite DBool.dboolb DBool.dboolb /#.
   qed.
 
@@ -133,8 +105,8 @@ theory VonNeumann.
       b  = true;
       b' = true;
       while (b = b') {
-        b  = $biased;
-        b' = $biased;
+        b  = $dbiased;
+        b' = $dbiased;
       }
       return b;
     }
@@ -154,14 +126,14 @@ theory VonNeumann.
   + smt ml=0.
   + move=> ih.
     seq  2: true 1%r (mu vn (fun (bb:bool * bool), bb.`1 = x)) 0%r _ => //.
-    * by auto=> />; rewrite biased_ll.
-  + by auto=> />; rewrite biased_ll.
+    * by auto=> />; rewrite dbiased_ll.
+  + by auto=> />; rewrite dbiased_ll.
   + split=> //= [|z].
-    * smt w=(gt0_p lt1_p).
+    * smt w=(in01_p).
   conseq (_: true ==> b <> b')=> //= />.
   seq  1: b p (1%r - p) (1%r - p) p=> //; first 3
-    by rnd; skip=> />; rewrite biased_def b2r0 b2r1.
-  + by rnd; skip=> /> _ -> />; rewrite biased_def /= b2r0 b2r1.
-  smt w=(gt0_p lt1_p).
+    by rnd; skip=> />; rewrite prbiasedE /=.
+  + by rnd; skip=> /> _ -> />; rewrite prbiasedE /=.
+  smt w=(in01_p).
   qed.
 end VonNeumann.
