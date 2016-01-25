@@ -2273,6 +2273,40 @@ let pp_equivS (ppe : PPEnv.t) fmt es =
     Format.fprintf fmt "%a%!" (pp_post ppe) es.es_po
 
 (* -------------------------------------------------------------------- *)
+let pp_aequivF (ppe : PPEnv.t) fmt aef =
+  let subppe =
+    PPEnv.create_and_push_mems
+      ppe [(EcFol.mleft, aef.aef_fl); (EcFol.mright, aef.aef_fr)]
+  in
+
+  Format.fprintf fmt "e = %a@\n%!" (pp_form ppe) aef.aef_ep;
+  Format.fprintf fmt "d = %a@\n%!" (pp_form ppe) aef.aef_dp;
+  Format.fprintf fmt "@\n%!";
+  Format.fprintf fmt "%a@\n%!" (pp_pre subppe) aef.aef_pr;
+  Format.fprintf fmt "    %a ~ %a@\n%!"
+    (pp_funname subppe) aef.aef_fl
+    (pp_funname subppe) aef.aef_fr;
+  Format.fprintf fmt "@\n%a%!" (pp_post subppe) aef.aef_po
+
+(* -------------------------------------------------------------------- *)
+let pp_aequivS (ppe : PPEnv.t) fmt aes =
+  let ppe = PPEnv.push_mems ppe [aes.aes_ml; aes.aes_mr] in
+  let ppnode = collect2_s aes.aes_sl.s_node aes.aes_sr.s_node in
+  let ppnode = c_ppnode ~width:40 ~mem:(fst aes.aes_ml, fst aes.aes_mr) ppe ppnode in
+
+    Format.fprintf fmt "&1 (left ) : %a@\n%!" (pp_funname ppe) (EcMemory.xpath aes.aes_ml);
+    Format.fprintf fmt "&2 (right) : %a@\n%!" (pp_funname ppe) (EcMemory.xpath aes.aes_mr);
+    Format.fprintf fmt "@\n%!";
+    Format.fprintf fmt "e = %a@\n%!" (pp_form ppe) aes.aes_ep;
+    Format.fprintf fmt "d = %a@\n%!" (pp_form ppe) aes.aes_dp;
+    Format.fprintf fmt "@\n%!";
+    Format.fprintf fmt "%a%!" (pp_pre ppe) aes.aes_pr;
+    Format.fprintf fmt "@\n%!";
+    Format.fprintf fmt "%a" (pp_node `Both) ppnode;
+    Format.fprintf fmt "@\n%!";
+    Format.fprintf fmt "%a%!" (pp_post ppe) aes.aes_po
+
+(* -------------------------------------------------------------------- *)
 type ppgoal = (EcBaseLogic.hyps * EcFol.form) * [
   | `One of int
   | `All of (EcBaseLogic.hyps * EcFol.form) list
@@ -2352,12 +2386,14 @@ module PPGoal = struct
     Format.fprintf fmt "%s@\n%!" (goalline glsz);
 
     match concl.f_node with
-    | FbdHoareF hf -> pp_bdhoareF ppe fmt hf
-    | FbdHoareS hs -> pp_bdhoareS ppe fmt hs
-    | FhoareF hf   -> pp_hoareF   ppe fmt hf
-    | FhoareS hs   -> pp_hoareS   ppe fmt hs
-    | FequivF ef   -> pp_equivF   ppe fmt ef
-    | FequivS es   -> pp_equivS   ppe fmt es
+    | FbdHoareF hf  -> pp_bdhoareF ppe fmt hf
+    | FbdHoareS hs  -> pp_bdhoareS ppe fmt hs
+    | FhoareF   hf  -> pp_hoareF   ppe fmt hf
+    | FhoareS   hs  -> pp_hoareS   ppe fmt hs
+    | FequivF   ef  -> pp_equivF   ppe fmt ef
+    | FequivS   es  -> pp_equivS   ppe fmt es
+    | FaequivF  aef -> pp_aequivF  ppe fmt aef
+    | FaequivS  aes -> pp_aequivS  ppe fmt aes
     | _ -> Format.fprintf fmt "%a@\n%!" (pp_form ppe) concl
 end
 
