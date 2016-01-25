@@ -784,7 +784,7 @@ module FPosition = struct
             filter o cpos
 
   (* ------------------------------------------------------------------ *)
-  let select_form hyps o p target =
+  let select_form ?(xconv = `Conv) hyps o p target =
     let na = List.length (snd (EcFol.destr_app p)) in
     let test _ tp =
       let (tp, ti) =
@@ -794,7 +794,7 @@ module FPosition = struct
               (f_app h a1 (toarrow (List.map f_ty a2) tp.f_ty), na)
         | _ -> (tp, -1)
       in
-      if EcReduction.is_conv hyps p tp then `Accept ti else `Continue
+      if EcReduction.xconv xconv hyps p tp then `Accept ti else `Continue
 
     in select ?o test target
 

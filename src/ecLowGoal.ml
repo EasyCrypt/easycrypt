@@ -1346,7 +1346,8 @@ type rwmode = [`Bool | `Eq]
 
 (* -------------------------------------------------------------------- *)
 let t_rewrite
-  ?target ?(mode : rwmode option) (pt : proofterm) (s, pos) (tc : tcenv1)
+  ?xconv ?target ?(mode : rwmode option) (pt : proofterm)
+    (s, pos) (tc : tcenv1)
 =
   let tc           = RApi.rtcenv_of_tcenv1 tc in
   let (hyps, tgfp) = RApi.tc_flat ?target tc in
@@ -1380,7 +1381,7 @@ let t_rewrite
 
   let npos  =
     match pos with
-    | None     -> FPosition.select_form hyps None left tgfp
+    | None     -> FPosition.select_form ?xconv hyps None left tgfp
     | Some pos -> pos in
 
   let tgfp =
@@ -1405,9 +1406,9 @@ let t_rewrite
       RApi.tcenv_of_rtcenv tc
 
 (* -------------------------------------------------------------------- *)
-let t_rewrite_hyp ?mode (id : EcIdent.t) pos (tc : tcenv1) =
+let t_rewrite_hyp ?xconv ?mode (id : EcIdent.t) pos (tc : tcenv1) =
   let pt = { pt_head = PTLocal id; pt_args = []; } in
-  t_rewrite ?mode pt pos tc
+  t_rewrite ?xconv ?mode pt pos tc
 
 (* -------------------------------------------------------------------- *)
 type vsubst = [
@@ -1893,7 +1894,7 @@ let t_crush ?(delta = true) (tc : tcenv1) =
       | tc ->
           let tc = FApi.as_tcenv1 tc in
           let tc =
-            let rw = t_rewrite_hyp ~mode:`Bool id (`LtoR, None) in
+            let rw = t_rewrite_hyp ~xconv:`AlphaEq ~mode:`Bool id (`LtoR, None)in
             (    FApi.t_try (t_absurd_hyp ~conv:`AlphaEq ~id)
               @! FApi.t_try (FApi.t_seq (FApi.t_try rw) tt)
               @! t_generalize_hyp ~clear:`Yes id) tc

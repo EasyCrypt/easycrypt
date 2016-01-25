@@ -161,7 +161,8 @@ module FPosition : sig
 
   val select : ?o:occ -> (Sid.t -> form -> select) -> form -> ptnpos
 
-  val select_form : LDecl.hyps -> occ option -> form -> form -> ptnpos
+  val select_form : ?xconv:EcReduction.xconv ->
+    LDecl.hyps -> occ option -> form -> form -> ptnpos
 
   val is_occurences_valid : Sint.t -> ptnpos -> bool
 
