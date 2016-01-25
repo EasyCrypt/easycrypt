@@ -515,6 +515,7 @@
 %token TILD
 %token TIME
 %token TIMEOUT
+%token TOEQUIV
 %token TOP
 %token TRANSITIVITY
 %token TRIVIAL
@@ -2594,6 +2595,8 @@ phltactic:
     { Pbd_equiv (s, pr, po) }
 
 | AUTO { Pauto }
+
+| TOEQUIV { Ptoequiv }
 
 bdhoare_split:
 | b1=sform b2=sform b3=sform?

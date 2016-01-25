@@ -554,6 +554,7 @@ type phltactic =
 
     (* Relation between logic *)
   | Pbd_equiv of (side * pformula * pformula)
+  | Ptoequiv
 
     (* Automation *)
   | Pauto
