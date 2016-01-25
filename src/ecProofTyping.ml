@@ -119,6 +119,22 @@ let tc1_process_prhl_formula tc pf =
   tc1_process_prhl_form tc tbool pf
 
 (* ------------------------------------------------------------------ *)
+let tc1_process_aprhl_form tc ty pf =
+  let hyps, concl = FApi.tc1_flat tc in
+  let ml, mr =
+    match concl.f_node with
+    | FaequivS aes -> (aes.aes_ml, aes.aes_mr)
+    | _ -> assert false
+  in
+
+  let hyps = LDecl.push_all [ml; mr] hyps in
+  pf_process_form !!tc hyps ty pf
+
+(* ------------------------------------------------------------------ *)
+let tc1_process_aprhl_formula tc pf =
+  tc1_process_aprhl_form tc tbool pf
+
+(* ------------------------------------------------------------------ *)
 let tc1_process_stmt tc mt c =
   let hyps = FApi.tc1_hyps tc in
   let hyps = LDecl.push_active (mhr,mt) hyps in

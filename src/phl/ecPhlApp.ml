@@ -129,9 +129,32 @@ let t_equiv_app_onesided side i pre post tc =
     ] tc
 
 (* -------------------------------------------------------------------- *)
+let t_aequiv_app (i, j) (dir, (dp, ep)) phi tc =
+  let aes = tc1_as_aequivS tc in
+  let sl1,sl2 = s_split i aes.aes_sl in
+  let sr1,sr2 = s_split j aes.aes_sr in
+
+  let dp' = f_real_sub_simpl aes.aes_dp dp in
+  let ep' = f_real_sub_simpl aes.aes_ep ep in
+
+  let ((dpa, epa), (dpb, epb)) =
+    match dir with
+    | Backs -> ((dp , ep ), (dp', ep'))
+    | Fwds  -> ((dp', ep'), (ep , dp ))
+  in
+
+  let a = f_aequivS_r { aes with aes_dp = dpa; aes_ep = epa;
+    aes_sl=stmt sl1; aes_sr=stmt sr1; aes_po=phi; } in
+
+  let b = f_aequivS_r { aes with aes_dp = dpb; aes_ep = epb;
+    aes_pr=phi; aes_sl=stmt sl2; aes_sr=stmt sr2; } in
+
+  FApi.xmutate1 tc `HlApp [a; b]
+
+(* -------------------------------------------------------------------- *)
 let process_phl_bd_info dir bd_info tc =
   match bd_info with
-  | PAppNone ->
+  | None ->
       let hs = tc1_as_bdhoareS tc in
       let f1, f2 =
          match dir with
@@ -141,7 +164,7 @@ let process_phl_bd_info dir bd_info tc =
         (* The last argument will not be used *)
         (f_true, f1, f2, f_r0, f_r1)
 
-  | PAppSingle f ->
+  | Some (PAppSingle f) ->
       let hs = tc1_as_bdhoareS tc in
       let f  = TTC.tc1_process_phl_form tc treal f in
       let f1, f2 =
@@ -151,7 +174,7 @@ let process_phl_bd_info dir bd_info tc =
       in
         (f_true, f1, f2, f_r0, f_r1)
 
-  | PAppMult (phi, f1, f2, g1, g2) ->
+  | Some (PAppMult (phi, f1, f2, g1, g2)) ->
       let phi =
         phi |> omap (TTC.tc1_process_phl_formula tc)
             |> odfl f_true in
@@ -183,8 +206,35 @@ let process_phl_bd_info dir bd_info tc =
       (phi, f1, f2, g1, g2)
 
 (* -------------------------------------------------------------------- *)
-let process_app (side, dir, k, phi, bd_info) tc =
+let process_phl_ae_info dir ae_info tc =
+  match ae_info with
+  | None ->
+     (dir, (f_r0, f_r0))
+
+  | Some (dp, ep) ->
+     let dp = TTC.tc1_process_form tc treal dp in
+     let ep = TTC.tc1_process_form tc treal ep in
+     (dir, (dp, ep))
+
+(* -------------------------------------------------------------------- *)
+let process_app (side, dir, k, phi, seq_info) tc =
   let concl = FApi.tc1_goal tc in
+
+  let is_bd_info = function None | Some (PAppBd   _) -> true | _ -> false in
+  let is_ae_info = function None | Some (PAppDiff _) -> true | _ -> false in
+
+  let as_bd_info =
+    function
+    | None -> Some None
+    | Some (PAppBd bd) -> Some (Some bd)
+    | _ -> None
+
+  and as_ae_info =
+    function
+    | None -> Some None
+    | Some (PAppDiff ae) -> Some (Some ae)
+    | _  -> None
+  in
 
   let get_single phi =
     match phi with
@@ -195,37 +245,44 @@ let process_app (side, dir, k, phi, bd_info) tc =
     if EcUtils.is_some side then
       tc_error !!tc "seq: no side information expected" in
 
-  match k, bd_info with
-  | Single i, PAppNone when is_hoareS concl ->
+  match k, seq_info with
+  | Single i, None when is_hoareS concl ->
     check_side side;
     let phi = TTC.tc1_process_phl_formula tc (get_single phi) in
     t_hoare_app i phi tc
 
-  | Single i, PAppNone when is_equivS concl ->
-    let pre, post =
-      match phi with
-      | Single _ -> tc_error !!tc "seq onsided: a pre and a post is expected"
-      | Double (pre, post) ->
-        TTC.tc1_process_phl_formula ?side tc pre,
-        TTC.tc1_process_phl_formula ?side tc post in
+  | Single i, None when is_equivS concl ->
     let side =
       match side with
       | None -> tc_error !!tc "seq onsided: side information expected"
       | Some side -> side in
+    let pre, post =
+      match phi with
+      | Single _ -> tc_error !!tc "seq onsided: a pre and a post is expected"
+      | Double (pre, post) ->
+        TTC.tc1_process_phl_formula ~side tc pre,
+        TTC.tc1_process_phl_formula ~side tc post in
     t_equiv_app_onesided side i pre post tc
 
-  | Single i, _ when is_bdHoareS concl ->
+  | Double (i, j), None when is_equivS concl ->
+      let phi = TTC.tc1_process_prhl_formula tc (get_single phi) in
+      t_equiv_app (i, j) phi tc
+
+  | Double (i, j), _ when is_ae_info seq_info && is_aequivS concl ->
+     let ae = oget (as_ae_info seq_info) in
+     let ae = process_phl_ae_info dir ae tc in
+     let phi = TTC.tc1_process_aprhl_formula tc (get_single phi) in
+     t_aequiv_app (i, j) ae phi tc
+
+  | Single i, _ when is_bd_info seq_info && is_bdHoareS concl ->
+      let bd_info = oget (as_bd_info seq_info) in
       let pia = TTC.tc1_process_phl_formula tc (get_single phi) in
       let (ra, f1, f2, f3, f4) = process_phl_bd_info dir bd_info tc in
       t_bdhoare_app i (ra, pia, f1, f2, f3, f4) tc
 
-  | Double (i, j), PAppNone when is_equivS concl ->
-      let phi = TTC.tc1_process_prhl_formula tc (get_single phi) in
-      t_equiv_app (i, j) phi tc
-
-  | Single _, PAppNone
-  | Double _, PAppNone ->
+  | Single _, None
+  | Double _, None ->
       tc_error !!tc "invalid `position' parameter"
 
   | _, _ ->
-      tc_error !!tc "optional bound parameter not supported"
+      tc_error !!tc "optional seq parameter not supported"

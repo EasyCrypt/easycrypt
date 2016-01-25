@@ -415,8 +415,11 @@ type call_info =
   | CI_inv  of pformula
   | CI_upto of (pformula * pformula * pformula option)
 
-type p_app_bd_info =
-  | PAppNone
+type p_seq_info =
+  | PAppBd   of p_bd_info
+  | PAppDiff of pformula pair
+
+and p_bd_info =
   | PAppSingle of pformula
   | PAppMult   of (pformula option) tuple5
 
@@ -459,7 +462,7 @@ type fun_info = [
 
 (* -------------------------------------------------------------------- *)
 type app_info =
-  oside * tac_dir * int doption * pformula doption * p_app_bd_info
+  oside * tac_dir * int doption * pformula doption * p_seq_info option
 
 (* -------------------------------------------------------------------- *)
 type pcond_info = [

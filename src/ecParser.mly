@@ -2232,15 +2232,15 @@ dbhint:
 | UNDERSCORE f2=sform { (None   , Some f2) }
 | f1=sform UNDERSCORE { (Some f1, None   ) }
 
-app_bd_info:
-| empty
-    { PAppNone }
-
+seq_info:
 | f=sform
-    { PAppSingle f }
+    { PAppBd (PAppSingle f) }
 
 | f=prod_form g=prod_form s=sform?
-    { PAppMult (s, fst f, snd f, fst g, snd g) }
+    { PAppBd (PAppMult (s, fst f, snd f, fst g, snd g)) }
+
+| LT LBRACKET d=sform AMP e=sform RBRACKET GT
+    { PAppDiff (d, e) }
 
 revert:
 | cl=ioption(brace(loc(ipcore_name)+)) gp=genpattern*
@@ -2428,7 +2428,8 @@ phltactic:
 | PROC STAR
    { Pfun `Code }
 
-| SEQ s=side? d=tac_dir pos=code_position COLON p=form_or_double_form f=app_bd_info
+| SEQ s=side? d=tac_dir pos=code_position COLON
+   p=form_or_double_form f=seq_info?
    { Papp (s, d, pos, p, f) }
 
 | WP n=code_position?
