@@ -21,8 +21,7 @@ clone FixedBiased as BiasedCoin.
 theory VonNeumann.
   import BiasedCoin.
 
-  require import Pair FSet Dexcepted DBool.
-  (*---*) import Dprod.
+  require import Pair FSet Dexcepted DBool DProd.
 
   module Fair = {
     proc sample(): bool = {
@@ -38,16 +37,16 @@ theory VonNeumann.
   (** TODO: This is rather inelegant, now that we have predicate-based
             filtering. However, expresing it with sets allows us to
             make use of mu_mem, which is easiest at the moment. **)
-  op vn = ({0,1} * {0,1}) \ (mem (fset1 (true,true) `|` fset1 (false,false))).
+  op vn = ({0,1} `*` {0,1}) \ (mem (fset1 (true,true) `|` fset1 (false,false))).
 
   lemma pr_evict:
-    mu ({0,1} * {0,1}) (mem (fset1 (true,true) `|` fset1 (false,false))) = 1%r/2%r.
+    mu ({0,1} `*` {0,1}) (mem (fset1 (true,true) `|` fset1 (false,false))) = 1%r/2%r.
   proof.
-  have -> := mu_mem (fset1 (true,true) `|` fset1 (false,false)) ({0,1} * {0,1}) (inv 4%r).
+  have -> := mu_mem (fset1 (true,true) `|` fset1 (false,false)) ({0,1} `*` {0,1}) (inv 4%r).
   + move=> [x1 x2] _.
     rewrite (mu_eq _ _ (fun x=> (pred1 x1) (fst x) /\ (pred1 x2) (snd x))) /=.
     * by move=> [x'1 x'2]; rewrite /pred1 /fst /snd /= anda_and.
-    by rewrite (Dprod.mu_def (pred1 x1) (pred1 x2)) !DBool.dboolb.
+    by rewrite (mu_dprod (pred1 x1) (pred1 x2)) !DBool.dboolb.
     rewrite fcardUI_indep 2:!fcard1 /= 1:fsetP=> [[x1 x2]|].
     * by rewrite !inE /=; case x1.
   smt ml=0.
@@ -56,9 +55,8 @@ theory VonNeumann.
   lemma pr_final b: mu vn (pred1 (b,!b)) = 1%r/2%r.
   proof.
   rewrite -/(mu_x _ _) mux_dexcepted !inE /=.
-  rewrite Dprod.weight_def DBool.dbool_predT pr_evict /=.
-  rewrite mu_x_def /fst /snd /=.
-  by rewrite DBool.dboolb DBool.dboolb /#.
+  rewrite weight_dprod DBool.dbool_predT pr_evict /=.
+  by rewrite mux_dprod /= DBool.dboolb DBool.dboolb /#.
   qed.
 
   lemma pr_eq b: mu vn (pred1 (b,b)) = 0%r.
