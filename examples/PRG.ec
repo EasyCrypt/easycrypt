@@ -1,5 +1,5 @@
 (* -------------------------------------------------------------------- *)
-require import Int IntExtra IntDiv List Real Distr FSet FMap.
+require import Int IntExtra IntDiv List Real RealExtra Distr FSet FMap.
 require import Mu_mem StdRing StdOrder StdBigop.
 (*---*) import Bigint Ring.IntID RField IntOrder RealOrder BIA.
 
@@ -245,7 +245,7 @@ section.
       Pr[Exp(A,F,Psample).main() @ &m: res] +
       Pr[Exp(A,F,Psample).main() @ &m: Bad P.logP F.m].
   proof.
-  apply (Trans _ (Pr[Exp(A,F,Psample).main() @ &m: res \/ Bad P.logP F.m]));
+  apply (ler_trans (Pr[Exp(A,F,Psample).main() @ &m: res \/ Bad P.logP F.m]));
     last by rewrite Pr [mu_or]; smt.
   byequiv (_: ={glob A} ==> !(Bad P.logP F.m){2} => ={res})=> //; last smt.
   proc.
@@ -472,7 +472,7 @@ section.
   conseq [-frame] (_ : _ : <= (if Bad P.logP F.m then 1%r else
       (sumid (qF + size P.logP) (qF + n))%r * pr_dseed)).
   + progress; have ->/=: Bad [] F.m{hr} = false by smt ml=0.
-    apply/ler_wpmul2r; first by smt. apply/from_intMle.
+    apply/ler_wpmul2r; first by smt. apply/le_fromint.
     rewrite -{1}(add0z qF) big_addn /= /predT -/predT.
     rewrite (addzC qF) !addrK big_split big_constz.
     rewrite count_predT size_range /= max_ler ?size_ge0 addrC.
@@ -491,7 +491,7 @@ section.
             n <= qP /\ card (dom F.m) <= qF)=> //.
       by wp; rnd=> //.
       wp; rnd; skip; progress.
-      move: H2; rewrite !FromInt.Add mulrDl /Bad -nor => //= -[Hu Hf].
+      move: H2; rewrite !fromintD mulrDl /Bad -nor => //= -[Hu Hf].
       apply (ler_trans (mu dseed (predU (fun x, mem (dom F.m{hr}) x)
                                         (fun x, mem P.logP{hr} x)))).
         by apply mu_sub=> x /#.
@@ -501,11 +501,11 @@ section.
         apply (ler_trans ((card (dom F.m{hr}))%r * pr_dseed)).
           apply mu_mem_le=> x _.
             by rewrite (dseed_suf x witness) 3:/pr_dseed // dseed_fu.
-            by apply/ler_wpmul2r; smt.
+            by apply/ler_wpmul2r; [smt w=mu_bounded|exact/le_fromint].
           pose p := mem P.logP{hr}; apply mu_mem_le_size; smt.
         conseq [-frame] Hw; progress=> //.
         by rewrite H1 /= (Ring.IntID.addrC 1) lerr.
-      progress=> //; rewrite H2 /= -mulrDl addrA -FromInt.Add.
+      progress=> //; rewrite H2 /= -mulrDl addrA -fromintD.
       rewrite
         (BIA.big_cat_int (qF + size P.logP{hr} + 1) (_ + List.size _))
         ?BIA.big_int1 /#.

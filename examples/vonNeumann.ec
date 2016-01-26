@@ -33,8 +33,12 @@ theory VonNeumann.
     }
   }.
 
-  (* First we prove things about the distribution "pairs of uniform booleans minus pairs of identical elements" *)
-  op vn = ({0,1} * {0,1}) \ (fset1 (true,true) `|` fset1 (false,false)).
+  (* First we prove things about the distribution "pairs of uniform
+     booleans minus pairs of identical elements" *)
+  (** TODO: This is rather inelegant, now that we have predicate-based
+            filtering. However, expresing it with sets allows us to
+            make use of mu_mem, which is easiest at the moment. **)
+  op vn = ({0,1} * {0,1}) \ (mem (fset1 (true,true) `|` fset1 (false,false))).
 
   lemma pr_evict:
     mu ({0,1} * {0,1}) (mem (fset1 (true,true) `|` fset1 (false,false))) = 1%r/2%r.
