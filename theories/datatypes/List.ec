@@ -9,7 +9,7 @@
  * ssreflect Coq extension. *)
 
 (* -------------------------------------------------------------------- *)
-require import NewLogic Fun Pred Option Pair Int IntExtra.
+require import NewLogic Fun Pred Option Pair Int IntExtra Ring.
 
 (* -------------------------------------------------------------------- *)
 type 'a list = [

@@ -64,7 +64,7 @@ by apply/(@isdistr_mprod (mu_x da) (mu_x db)); (split; [exact/ge0_mu_x|exact/le1
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma mu_dprod (da : 'a distr) (db : 'b distr) Pa Pb:
+lemma mu_dprod Pa Pb (da : 'a distr) (db : 'b distr):
   mu (da `*` db) (fun (ab : 'a * 'b) => Pa ab.`1 /\ Pb ab.`2)
   = mu da Pa * mu db Pb.
 proof.
@@ -88,6 +88,10 @@ proof.
 rewrite (@mu_eq _ _ (fun (ab : 'a * 'b)=> predT ab.`1 /\ predT ab.`2)) //.
 by rewrite mu_dprod.
 qed.
+
+lemma dprod_ll (da : 'a distr) (db : 'b distr):
+  is_lossless (da `*` db) <=> is_lossless da /\ is_lossless db.
+proof. rewrite /is_lossless weight_dprod [smt w=mu_bounded]. qed.
 
 (* -------------------------------------------------------------------- *)
 abstract theory ProdSampling.
