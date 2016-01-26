@@ -206,62 +206,6 @@ by apply fun_ext.
 qed.
 
 (*** Some useful distributions *)
-(** Empty distribution *)
-theory Dempty.
-  op dempty : 'a distr.
-
-  axiom mu_def (p:'a -> bool): mu dempty p = 0%r.
-
-  lemma unique (d:'a distr):
-    weight d = 0%r <=> d = dempty.
-  proof.
-  split; last smt.
-  by move=> weight_0; rewrite -(pw_eq<:'a> d dempty); smt.
-  qed.
-
-  lemma demptyU: is_subuniform dempty<:'a> by smt.
-end Dempty.
-
-(** Point distribution *)
-theory Dunit.
-  op dunit: 'a -> 'a distr.
-
-  axiom mu_def x (p:'a -> bool):
-    mu (dunit x) p = charfun p x.
-
-  lemma nosmt mu_def_in x (p:'a -> bool):
-    p x => mu (dunit x) p = 1%r
-  by [].
-
-  lemma nosmt mu_def_notin x (p:('a -> bool)):
-    !p x => mu (dunit x) p = 0%r
-  by [].
-
-  lemma nosmt mu_x_def (x y:'a):
-    mu_x (dunit y) x = if x = y then 1%r else 0%r
-  by rewrite /mu_x mu_def /charfun pred1E.
-
-  lemma nosmt mu_x_def_eq (x:'a):
-    mu_x (dunit x) x = 1%r
-  by rewrite mu_x_def.
-
-  lemma nosmt mu_x_def_neq (x y:'a):
-    x <> y => mu_x (dunit x) y = 0%r
-  by (rewrite mu_x_def; smt).
-
-  lemma supp_def (x y:'a):
-    in_supp x (dunit y) <=> x = y
-  by (rewrite /in_supp mu_x_def; case (x = y)).
-
-  lemma lossless (x:'a):
-    weight (dunit x) = 1%r
-  by [].
-
-  lemma dunitU (x:'a):
-    is_uniform (dunit x)
-  by [].
-end Dunit.
-
 (** Uniform distribution on (closed) integer intervals *)
 (* A concrete realization of this distribution using uniform
    distributions on finite sets of integers is available as

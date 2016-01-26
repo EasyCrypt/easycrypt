@@ -7,12 +7,13 @@
 
 require import Option Pair Int List NewDistr Real DProd.
 require (*--*) Bigop.
+(*---*) import MUnit.
 
 op dlist (d : 'a distr) (n : int): 'a list distr =
-  Int.fold (fun d' => Dapply.dapply (fun (xy : 'a * 'a list) => xy.`1 :: xy.`2) (d `*` d')) (Dunit.dunit []) n
+  Int.fold (fun d' => Dapply.dapply (fun (xy : 'a * 'a list) => xy.`1 :: xy.`2) (d `*` d')) (dunit []) n
   axiomatized by dlistE.
 
-lemma dlist0 (d : 'a distr) n: n <= 0 => dlist d n = Dunit.dunit [].
+lemma dlist0 (d : 'a distr) n: n <= 0 => dlist d n = dunit [].
 proof. by move=> ge0_n; rewrite dlistE Int.foldle0. qed.
 
 lemma dlistS (d : 'a distr) n:
@@ -194,14 +195,14 @@ abstract theory Program.
       wp; rnd (fun x => head witness x) (fun x => [x]).
       auto; progress; subst _n=> /=.
       + rewrite (dlistS _ 0) // dlist0 // Dapply.mu_x_def /preim /pred1 /=.
-        rewrite (mu_dprod (pred1 rR) (pred1 []) d (Dunit.dunit [])).
-        by rewrite Dunit.mu_x_def.
+        rewrite (mu_dprod (pred1 rR) (pred1 []) d (dunit [])).
+        by rewrite dunit1E.
       + move: H0; rewrite (dlistS _ 0) // dlist0 // Dapply.supp_def /preim /pred1 /=.
         move=> [[x xs]] /= [->] /=.
         by rewrite support_dprod.
       + move: H0; rewrite (dlistS _ 0) // dlist0 // Dapply.supp_def /preim /pred1 /=.
         move=> [[x xs]] /= [->] /=.
-        by rewrite support_dprod /= Dunit.supp_def.
+        by rewrite support_dprod /= dunit_fu.
     transitivity SampleCons.sample
                  (={n} /\ 0 < n{1} ==> ={res})
                  (_n + 1 = n{1} /\ ={n} /\ 0 < n{1} ==> ={res})=> //=; 1:smt.
