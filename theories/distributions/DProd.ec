@@ -90,6 +90,38 @@ by rewrite mu_dprod.
 qed.
 
 (* -------------------------------------------------------------------- *)
-(** TODO: reproduce the results on the equivalence of:
-    - sampling in "da `*` db" and
-    - sampling in "da", sampling in "db" and constructing the pair. **)
+abstract theory ProdSampling.
+  type t1, t2.
+  op d1 : t1 distr.
+  op d2 : t2 distr.
+
+  module S = {
+    proc sample () : t1 * t2 = {
+      var r;
+
+      r <$ d1 `*` d2;
+      return r;
+    }
+
+    proc sample2 () : t1 * t2 = {
+      var r1, r2;
+
+      r1 = $ d1;
+      r2 = $ d2;
+      return (r1,r2);
+    }
+  }.
+
+  equiv sample_sample2 : S.sample ~ S.sample2 : true ==> ={res}.
+  proof.
+  bypr (res{1}) (res{2}) => // &m1 &m2 a.
+  have ->: Pr[S.sample() @ &m1 : a = res] = mu (d1 `*` d2) (pred1 a).
+  + by byphoare=> //=; proc; rnd (pred1 a); skip=> /> v; rewrite pred1E.
+  elim: a=> a1 a2; have -> := mux_dprod d1 d2 a1 a2.
+  byphoare=> //=.
+  proc; seq  1: (a1 = r1) (mu d1 (pred1 a1)) (mu d2 (pred1 a2)) _ 0%r true=> //=.
+  + by rnd (pred1 a1); skip=> /> v; rewrite pred1E.
+  + by rnd (pred1 a2); skip=> /> v; rewrite pred1E.
+  by hoare; auto=> /> ? ->.
+  qed.
+end ProdSampling.
