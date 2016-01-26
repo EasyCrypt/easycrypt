@@ -77,9 +77,9 @@ admit. (* lots of things going on here, same as above but with sum *)
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma support_dprod (da : 'a distr) (db : 'b distr) a b:
-  support (da `*` db) (a,b) <=> support da a /\ support db b.
-proof. by rewrite /support /in_supp mux_dprod; smt w=mu_bounded. qed.
+lemma support_dprod (da : 'a distr) (db : 'b distr) ab:
+  support (da `*` db) ab <=> support da ab.`1 /\ support db ab.`2.
+proof. by elim ab=> a b; rewrite /support /in_supp mux_dprod; smt w=mu_bounded. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma weight_dprod (da : 'a distr) (db : 'b distr):
@@ -92,6 +92,29 @@ qed.
 lemma dprod_ll (da : 'a distr) (db : 'b distr):
   is_lossless (da `*` db) <=> is_lossless da /\ is_lossless db.
 proof. rewrite /is_lossless weight_dprod [smt w=mu_bounded]. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma dprod_suf (da : 'a distr) (db : 'b distr):
+  is_subuniform da => is_subuniform db =>
+  is_subuniform (da `*` db).
+proof.
+move=> da_suf db_suf [] a b [] a' b'.
+rewrite !support_dprod=>- [] a_in_da b_in_db [] a'_in_da b'_in_db.
+have:= (mu_dprod (pred1 a) (pred1 b) da db).
+rewrite (@mu_eq _ _ (pred1 (a,b))); 2: move=> ->.
++ by move=> [] x1 x2 @/pred1 /=; rewrite anda_and.
+rewrite (@da_suf a a') // (@db_suf b b') // -mu_dprod.
+by apply/mu_eq=>- [] x1 x2 @/pred1 /=; rewrite anda_and.
+qed.
+
+lemma dprod_uf (da : 'a distr) (db : 'b distr):
+  is_uniform da => is_uniform db =>
+  is_uniform (da `*` db).
+proof.
+move=> [] da_ll da_suf [] db_ll db_suf; split.
++ exact/dprod_ll.
+exact/dprod_suf.
+qed.
 
 (* -------------------------------------------------------------------- *)
 abstract theory ProdSampling.
