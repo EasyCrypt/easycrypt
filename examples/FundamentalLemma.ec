@@ -1,4 +1,5 @@
-require import Real Distr.
+require import Real Distr StdOrder.
+(*---*) import RealOrder.
 
 op max (x y:real) = if x <= y then y else x.
 
@@ -42,8 +43,8 @@ lemma FundamentalLemma (G1 <: Exp) (G2 <: Exp) (Mem <: Mem)
 proof.
   rewrite -(Pr_split G1 Mem A F &m) -(Pr_split G2 Mem B F &m)=> ->.
   cut ->: forall (x y z:real), x + y - (z + y) = x - z by smt.
-  apply (Trans _ (max Pr[G1.main() @ &m: A (glob Mem) res /\ F (glob Mem) res]
-                      Pr[G2.main() @ &m: B (glob Mem) res /\ F (glob Mem) res]));
+  apply (ler_trans (max Pr[G1.main() @ &m: A (glob Mem) res /\ F (glob Mem) res]
+                   Pr[G2.main() @ &m: B (glob Mem) res /\ F (glob Mem) res]));
     first smt full.
   cut H: forall (x y x' y':real), x <= x' => y <= y' => max x y <= max x' y' by smt.
   apply H.
