@@ -5,9 +5,8 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import Option Pair Int List NewDistr Real DProd.
-require (*--*) Bigop.
-(*---*) import MUnit.
+require import Option Pair Int List NewDistr Real DProd StdBigop.
+(*---*) import Bigreal.BRM MUnit.
 
 op dlist (d : 'a distr) (n : int): 'a list distr =
   Int.fold (fun d' => Dapply.dapply (fun (xy : 'a * 'a list) => xy.`1 :: xy.`2) (d `*` d')) (dunit []) n
@@ -76,12 +75,6 @@ rewrite /= addzC dlistS 1:smt.
 rewrite -/(mu_x _ _) Dapply.mu_x_def /preim /pred1 /=.
 by rewrite (mu_dprod (fun x0 => x0 = x) (fun x0 => x0 = xs)).
 qed.
-
-clone import Bigop as Prod with
-  type t <- real,
-  op   Support.idm <- 1%r,
-  op   Support.(+) <- Real.( * )
-proof * by smt.
 
 lemma mux_dlist (d : 'a distr) n xs:
   0 <= n =>
