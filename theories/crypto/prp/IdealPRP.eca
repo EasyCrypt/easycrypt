@@ -27,7 +27,7 @@ module RandomPermutation = {
     var y;
 
     if (!mem (dom m) x) {
-      y      <$ dD \ (rng m);
+      y      <$ dD \ (mem (rng m));
       m.[x]  <- y;
       mi.[y] <- x;
     }
@@ -38,7 +38,7 @@ module RandomPermutation = {
     var x;
 
     if (!mem (dom mi) y) {
-      x      <$ dD \ (rng mi);
+      x      <$ dD \ (mem (rng mi));
       mi.[y] <- x;
       m.[x]  <- y;
     }

@@ -156,7 +156,7 @@ theory Dword.
 
   lemma lossless_restrw X:
     card X < 2^length =>
-    weight (dword \ X) = 1%r.
+    weight (dword \ (mem X)) = 1%r.
   proof.
   move=> lt_CX_2sx; rewrite dexcepted_ll /is_lossless -/(weight _) ?lossless // ?mu_cpMemw.
   by rewrite ltr_pdivr_mulr /= lte_fromint // powPos.

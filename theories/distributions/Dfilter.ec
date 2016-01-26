@@ -5,28 +5,79 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import Pred Real Distr.
+require import NewLogic Int Real NewDistr FSet StdRing StdOrder StdBigop.
+(*---*) import RField RealOrder Bigreal BRA.
 
-op dfilter (d : 'a distr) (p : 'a -> bool): 'a distr.
+pragma +implicits.
+pragma -oldip.
 
-axiom dfilterP (d : 'a distr) (p : 'a -> bool) (E : 'a -> bool):
-  mu (dfilter d p) E = mu d (predI p E).
+(* -------------------------------------------------------------------- *)
+op mfilter (m : 'a -> real) (P : 'a -> bool) (x : 'a) =
+  if P x then 0%r else m x.
 
-lemma dfilterE (d : 'a distr) (p : 'a -> bool) (x : 'a):
-  mu_x (dfilter d p) x  = if (p x) then mu_x d x else 0%r.
+lemma isdistr_mfilter (m : 'a -> real) (P : 'a -> bool) :
+  isdistr m =>
+  isdistr (mfilter m P).
 proof.
-  rewrite /mu_x dfilterP; case (p x)=> /= h.
-    apply/mu_eq=> x'; rewrite /predI/pred1; case (x' = x)=> [->>|//=].
-    by rewrite h.
-  rewrite -(mu_false d); apply/mu_eq=> x'.
-  rewrite /predI /pred1 /pred0 neqF; case (x' = x)=> [->|//=].
-  by rewrite h.
+move=> [] ge0_m le1_m; split=> [x|x /le1_m {le1_m} le1_m].
++ by rewrite /mfilter; case (P x)=> //= _; exact/ge0_m.
+apply/(@ler_trans (big predT m x) _ _ _ le1_m)/ler_sum=> a _.
+by rewrite /mfilter fun_if2 ge0_m.
 qed.
 
-lemma support_dfilter (d : 'a distr) (p : 'a -> bool) (x : 'a):
-  support (dfilter d p) x <=> support d x /\ p x.
-proof. by rewrite /support /in_supp dfilterE; case (p x). qed.
+(* -------------------------------------------------------------------- *)
+op dfilter (d : 'a distr) (P : 'a -> bool) = mk (mfilter (mu_x d) P).
 
-lemma weight_dfilter (d : 'a distr) (p : 'a -> bool):
-  mu (dfilter d p) predT = mu d p.
-proof. by rewrite dfilterP. qed.
+(* -------------------------------------------------------------------- *)
+lemma mux_dfilter d (P:'a -> bool) (x:'a):
+  mu_x (dfilter d P) x = if P x then 0%r else mu_x d x.
+proof. by rewrite muK 1:isdistr_mfilter 1:isdistr_mu_x. qed.
+
+lemma nosmt mux_dfilter_notin (d : 'a distr) P x:
+  !P x => mu_x (dfilter d P) x = mu_x d x.
+proof. by rewrite mux_dfilter=> ->. qed.
+
+lemma nosmt mux_dfilter_in d P (x:'a):
+  P x => mu_x (dfilter d P) x = 0%r.
+proof. by rewrite mux_dfilter=> ->. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt mu_dfilter (d : 'a distr) P E:
+  mu (dfilter d P) E = mu d (predI E (predC (P))).
+proof.
+rewrite !muE; apply/RealSeries.eq_sum=> x /=.
+by rewrite mux_dfilter /predI /predC; case: (P x).
+qed.
+
+lemma nosmt mu_dfilter_subset (d : 'a distr) P E:
+  (forall x, E x => P x) =>
+  mu (dfilter d P) E = 0%r.
+proof.
+move=> E_subset_P; rewrite mu_dfilter /predI /predC.
+rewrite (@mu_eq _ _ pred0) 2:mu_false // => x @/pred0 /=.
+by rewrite neqF negb_and /= -implybE; exact/E_subset_P.
+qed.
+
+lemma nosmt mu_dfilter_indep (d : 'a distr) P E:
+  (forall x, !(E x /\ P x)) =>
+  mu (dfilter d P) E = mu d E.
+proof.
+move=> E_indep_P; rewrite mu_dfilter /predI /predC.
+by apply/mu_eq=> x; have:= E_indep_P x; case (E x)=> //= _ ->.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma support_dfilter ['a] (d : 'a distr) P:
+  support (dfilter d P) = predI (support d) (predC P).
+proof.
+apply/fun_ext=> x; rewrite /support /in_supp /predI /predC mux_dfilter.
+by case: (P x).
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma weight_dfilter (d:'a distr) P:
+  weight (dfilter d P) = weight d - mu d (P).
+proof.
+rewrite mu_dfilter mu_and -addrA -opprB.
+by rewrite (@mu_eq _ (predU _ _) predT) // -mu_not.
+qed.

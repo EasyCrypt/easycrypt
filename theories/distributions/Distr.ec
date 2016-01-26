@@ -308,43 +308,6 @@ theory Dinter.
   qed.
 end Dinter.
 
-(** Normalization of a sub-distribution *)
-theory Dscale.
-  op dscale: 'a distr -> 'a distr.
-
-  axiom supp_def (x:'a) (d:'a distr):
-    in_supp x (dscale d) <=> in_supp x d.
-
-  axiom mu_def_0 (d:'a distr):
-    weight d = 0%r =>
-    forall (p:'a -> bool), mu (dscale d) p = 0%r.
-
-  axiom mu_def_pos (d:'a distr):
-    0%r < weight d =>
-    forall (p:'a -> bool), mu (dscale d) p = mu d p / weight d.
-
-  lemma weight_0 (d:'a distr):
-    weight d = 0%r => weight (dscale d) = 0%r
-  by [].
-
-  lemma weight_pos (d:'a distr):
-    0%r < weight d => weight (dscale d) = 1%r.
-  proof strict.
-  by move=> H; rewrite /weight mu_def_pos /weight=> //; smt.
-  qed.
-
-  lemma dscaleU (d:'a distr):
-    mu d predT <> 0%r => is_subuniform d => is_uniform (dscale d).
-  proof.
-  move=> wd_neq_null d_suf.
-  have d_neq_null: 0%r < weight d by smt w=(mu_bounded weight_pos).
-  split=> [|x y].
-  + by rewrite /is_lossless -/(weight _) weight_pos.
-  rewrite !supp_def=> x_in_supp y_in_supp; rewrite !mu_def_pos //.
-  by rewrite (d_suf x y x_in_supp y_in_supp).
-  qed.
-end Dscale.
-
 (** Distribution resulting from applying a function to a distribution *)
 theory Dapply.
   op dapply: ('a -> 'b) -> 'a distr -> 'b distr.

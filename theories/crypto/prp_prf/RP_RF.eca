@@ -99,7 +99,7 @@ module Direct = {
   proc sample(X:D fset): D = {
     var r;
 
-    r = $uD \ X;
+    r = $uD \ (mem X);
     return r;
   }
 }.
@@ -110,7 +110,7 @@ module Indirect = {
 
     r = $uD;
     if (mem X r) {
-      r = $uD \ X;
+      r = $uD \ (mem X);
     }
     return r;
   }
@@ -138,7 +138,7 @@ qed.
 (* Some losslessness lemmas *)
 lemma excepted_lossless (m:(D,D) fmap):
   (exists x, !mem (dom m) x) =>
-  mu (uD \ rng m) predT = 1%r.
+  mu (uD \ (mem (rng m))) predT = 1%r.
 proof.
 move=> /endo_dom_rng h; rewrite -/(weight _) dexcepted_ll //.
 + smt w=uD_uf_fu.
@@ -206,7 +206,7 @@ section Upto.
       r = $uD;
       if (mem X r) {
         bad <- true;
-        r = $uD \ X;
+        r = $uD \ (mem X);
       }
       return r;
     }
@@ -407,7 +407,7 @@ section PRPi_PRPi'_Indirect.
   bypr (res{1}) (res{2})=> //. (* Pointwise equality of distributions *)
   progress.
   (* We first perform the computation on the easy side,... *)
-  cut ->: Pr[Direct.sample(X{1}) @ &1: a = res] = mu (uD \ X{1}) (pred1 a).
+  cut ->: Pr[Direct.sample(X{1}) @ &1: a = res] = mu (uD \ (mem X){1}) (pred1 a).
     byphoare (_: X = X{1} ==> _)=> //=.
     proc; rnd=> //=; skip; progress.
     by rewrite pred1E -{2}(etaP ((=) a)) etaE.
@@ -433,10 +433,10 @@ section PRPi_PRPi'_Indirect.
     (* There are two scenarios that lead to a = r:
          - r0 = a /\ r = a (with probability mu uD (pred1 a));
          - r0 <> a /\ r = a (with probability mu uD (fun x, mem x X) * mu (uD \ X) (pred1 a)). *)
-    phoare split (mu uD (pred1 a)) (mu uD (mem X) * mu (uD \ X) (pred1 a)): (r0 = a).
+    phoare split (mu uD (pred1 a)) (mu uD (mem X) * mu (uD \ (mem X)) (pred1 a)): (r0 = a).
       (* Bound *)
       progress.
-      rewrite -/(mu_x (uD \ X{2}) _) mux_dexcepted a_notin_X /=.
+      rewrite -/(mu_x (uD \ (mem X){2}) _) mux_dexcepted a_notin_X /=.
       rewrite /weight /mu_x.
       cut not_empty: mu uD predT - mu uD (mem X{2}) <> 0%r.
         rewrite -mu_not.
@@ -454,7 +454,7 @@ section PRPi_PRPi'_Indirect.
     (* case r0 <> a *)
     seq  2: (!mem X r)
             _                 0%r
-            (mu uD (mem X)) (mu (uD \ X) (pred1 a))
+            (mu uD (mem X)) (mu (uD \ (mem X)) (pred1 a))
             (r0 = r /\ X = X{2}).
       by auto.
       by hoare; rcondf 1=> //=; skip; smt.

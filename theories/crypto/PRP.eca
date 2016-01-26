@@ -102,7 +102,7 @@ theory Weak_PRP.
     proc init(): unit = { m = FMap.empty; }
 
     proc f(x:D): D = {
-      if (!mem (dom m) x) m.[x] = $dD \ (rng m);
+      if (!mem (dom m) x) m.[x] = $dD \ (mem (rng m));
       return (oget m.[x]);
     }
   }.
@@ -154,7 +154,7 @@ theory Strong_PRP.
       var y;
 
       if (!mem (dom m) x) {
-        y        <$ dD \ (dom minv);
+        y        <$ dD \ (mem (dom minv));
         m.[x]    <- y;
         minv.[y] <- x;
       }
@@ -165,7 +165,7 @@ theory Strong_PRP.
       var y;
 
       if (!mem (dom minv) x) {
-        y        <$ dD \ (dom m);
+        y        <$ dD \ (mem (dom m));
         minv.[x] <- y;
         m.[y]    <- x;
       }

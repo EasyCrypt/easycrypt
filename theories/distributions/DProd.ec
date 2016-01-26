@@ -35,7 +35,7 @@ move=> uniq_s; pose sab := (unzip s); move: sab=> [] sa sb.
 have -> : big predT (mprod ma mb) s
           = (big predT ma (undup sa)) * (big predT mb (undup sb)).
 + admit. (* lots of things going on here *)
-apply/mulr_ile1; 1,2: apply/sumr_ge0=> />.
+apply/mulr_ile1; 1,2: apply/sumr_ge0=> @/predT />.
 + by case: isdistr_ml.
 + by case: isdistr_mr.
 + by move: isdistr_ml=> [] _ -> //=; exact/undup_uniq.
