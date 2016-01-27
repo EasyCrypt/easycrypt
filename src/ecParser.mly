@@ -1143,7 +1143,7 @@ aequiv_body(P):
   mp1=loc(fident) TILD mp2=loc(fident)
   COLON pre=form_r(P) LONGARROW post=form_r(P)
     { PFaequivF
-        { paf_bds = (dp, ep);
+        { paf_bds = (ep, dp);
           paf_cds = (pre, post);
           paf_pth = (mp1, mp2); } }
 

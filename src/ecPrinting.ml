@@ -1543,8 +1543,8 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
       let ppe = PPEnv.push_mems ppe [aes.aes_ml; aes.aes_mr] in
       Format.fprintf fmt
         "aequiv[@[<hov 2>[%a & %a]@ %a ~@ %a :@ @[%a ==>@ %a@]@]]"
-        (pp_form ppe) aes.aes_dp
         (pp_form ppe) aes.aes_ep
+        (pp_form ppe) aes.aes_dp
         (pp_stmt_for_form ppe) aes.aes_sl
         (pp_stmt_for_form ppe) aes.aes_sr
         (pp_form ppe) aes.aes_pr

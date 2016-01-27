@@ -2318,8 +2318,8 @@ let trans_form_or_pattern env (ps, ue) pf tt =
     | PFaequivF aef ->
         let fpath1 = trans_gamepath env (fst aef.paf_pth) in
         let fpath2 = trans_gamepath env (snd aef.paf_pth) in
-        let dp = transf env (fst aef.paf_bds) in
-        let ep = transf env (snd aef.paf_bds) in
+        let ep = transf env (fst aef.paf_bds) in
+        let dp = transf env (snd aef.paf_bds) in
         let penv, qenv = EcEnv.Fun.equivF fpath1 fpath2 env in
         let pr = transf penv (fst aef.paf_cds) in
         let po = transf qenv (snd aef.paf_cds) in

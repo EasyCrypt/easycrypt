@@ -70,16 +70,43 @@ module Low = struct
     FApi.xmutate1 tc `RCond [concl1; concl2]
 
   (* ------------------------------------------------------------------ *)
+  let t_aequiv_rcond_r side b at_pos tc =
+    let aes = tc1_as_aequivS tc in
+    let m,mo,s =
+      match side with
+      | `Left  -> aes.aes_ml,aes.aes_mr, aes.aes_sl
+      | `Right -> aes.aes_mr,aes.aes_ml, aes.aes_sr in
+    let hd,e,s = gen_rcond !!tc b EcFol.mhr at_pos s in
+    let mo' = EcIdent.create "&m" in
+    let s1 = Fsubst.f_subst_id in
+    let s1 = Fsubst.f_bind_mem s1 (EcMemory.memory m) EcFol.mhr in
+    let s1 = Fsubst.f_bind_mem s1 (EcMemory.memory mo) mo' in
+    let pre1 = Fsubst.f_subst s1 aes.aes_pr in
+    let concl1 =
+      f_forall_mems [mo', EcMemory.memtype mo]
+        (f_hoareS (EcFol.mhr, EcMemory.memtype m) pre1 hd e) in
+    let sl,sr = match side with `Left -> s, aes.aes_sr | `Right -> aes.aes_sl, s in
+    let concl2 = f_aequivS_r { aes with aes_sl = sl; aes_sr = sr } in
+    FApi.xmutate1 tc `RCond [concl1; concl2]
+
+  (* ------------------------------------------------------------------ *)
   let t_hoare_rcond   = FApi.t_low2 "hoare-rcond"   t_hoare_rcond_r
   let t_bdhoare_rcond = FApi.t_low2 "bdhoare-rcond" t_bdhoare_rcond_r
   let t_equiv_rcond   = FApi.t_low3 "equiv-rcond"   t_equiv_rcond_r
+  let t_aequiv_rcond  = FApi.t_low3 "aequiv-rcond"  t_aequiv_rcond_r
 end
 
 (* -------------------------------------------------------------------- *)
 let t_rcond side b at_pos tc =
-  let concl = FApi.tc1_goal tc in
-
   match side with
-  | None when is_bdHoareS concl -> Low.t_bdhoare_rcond b at_pos tc
-  | None -> Low.t_hoare_rcond b at_pos tc
-  | Some side -> Low.t_equiv_rcond side b at_pos tc
+  | None ->
+     t_hS_or_bhS_or_eS_or_eaS
+       ~th:(Low.t_hoare_rcond b at_pos)
+       ~tbh:(Low.t_bdhoare_rcond b at_pos)
+       tc
+
+  | Some side ->
+     t_hS_or_bhS_or_eS_or_eaS
+       ~te:(Low.t_equiv_rcond side b at_pos)
+       ~tae:(Low.t_aequiv_rcond side b at_pos)
+       tc
