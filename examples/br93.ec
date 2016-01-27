@@ -1,4 +1,4 @@
-require import Fun Bool Int Real Distr List FSet Array FMap.
+require import Fun Bool Int Real Distr List FSet Array FMap DBool.
 require (*--*) AWord ROM.
 
 (** We consider three lengths of bitstrings **)
@@ -32,16 +32,6 @@ op uniform_rand = Randomness.Dword.dword.
 op (||) (x:randomness) (y:plaintext):ciphertext =
  Ciphertext.from_bits ((to_bits x) || (to_bits y)).
 
-(** Please ignore **)
-lemma find_unique x' (p: 'a -> bool) (xs : 'a list):
-  (forall (x : 'a), p x => x = x') =>
-  mem x' xs => p x' => find p xs = Some x'.
-proof.
-  move=> p_unique x'_in_m p_x'.
-  case {-1}(find p xs) (Logic.eq_refl (find p xs))=> //=.
-    smt.
-    by move=> x /List.find_cor [] _ /p_unique.
-qed.
 
 (*** One way trapdoor permutation (pre-instantiated) ***)
 (**  [See theory OW.ec] **)
@@ -171,7 +161,7 @@ module BR_OW(A:Adv): Inverter = {
     (m0,m1) = A.a1(pk);
     h = $uniform;
     b = A.a2(y || h);
-    x = oget (find (fun p => f pk p = y) ARO.qs);
+    x = nth witness ARO.qs (find (fun p => f pk p = y) ARO.qs);
     return x;
   }
 }.
@@ -216,14 +206,14 @@ section.
   local lemma BR_BR1 &m:
     Pr[CPA(BR,A).main() @ &m: res]
     <= Pr[CPA(BR1,A).main() @ &m: res]
-       + Pr[CPA(BR1,A).main() @ &m: mem BR1.r Log.qs].
+       + Pr[CPA(BR1,A).main() @ &m: mem Log.qs BR1.r].
   proof.
     byequiv=> //=.
     proc.
     (* Until the adversary queries the ROM with r, knowing that
        the two ROMs agree on all points except r is sufficient
        to prove the equivalence of the adversary's views        *)
-    call (_: mem BR1.r Log.qs,
+    call (_: mem Log.qs BR1.r ,
              eq_except RO.m{1} RO.m{2} BR1.r{2}).
       (* Adversary is lossless *)
       exact/a2_ll.
@@ -243,7 +233,7 @@ section.
     wp. rnd.
     (* The first adversary call is simpler *)
     call (_:    ={Log.qs, RO.m}
-             /\ (forall x, mem x Log.qs{1} <=> mem x (dom RO.m){1})).
+             /\ (forall x, mem Log.qs{1} x <=> mem (dom RO.m){1} x)).
       proc. inline RO.o.
       wp. rnd.
       wp. skip. smt.
@@ -302,8 +292,8 @@ section.
 
   (* The probability of the failure event is the same in both games *)
   local lemma BR1_BR2_bad &m:
-    Pr[CPA(BR1,A).main() @ &m: mem BR1.r Log.qs]
-    = Pr[CPA(BR2,A).main() @ &m: mem BR2.r Log.qs].
+    Pr[CPA(BR1,A).main() @ &m: mem Log.qs BR1.r]
+    = Pr[CPA(BR2,A).main() @ &m: mem Log.qs BR2.r].
   proof.
     byequiv=> //=.
     proc.
@@ -351,14 +341,14 @@ section.
 
   local lemma pr_BR_BR2 &m:
     Pr[CPA(BR,A).main() @ &m: res] - 1%r/2%r
-    <= Pr[CPA(BR2,A).main() @ &m: mem BR2.r Log.qs].
+    <= Pr[CPA(BR2,A).main() @ &m: mem Log.qs BR2.r].
   proof. smt. qed.
 
   (** Step 3: Finally, we can do the reduction and prove that whenever
       A queries the RO with the randomness used in the challenge
       encryption, BR_OW(A) inverts the OW challenge. **)
   local lemma BR2_OW &m:
-    Pr[CPA(BR2,A).main() @ &m: mem BR2.r Log.qs]
+    Pr[CPA(BR2,A).main() @ &m: mem Log.qs BR2.r]
     <= Pr[OW(BR_OW(A)).main() @ &m: res].
   proof.
     byequiv => //=.
@@ -369,9 +359,10 @@ section.
            support keypairs (pk0{2}, sk{2}) /\
            BR2.r{1} = OW.r{2} /\ Log.qs{1} = Log.qs{2} /\
            y{2} = f pk0{2} BR2.r{1}).
-      progress.
-      rewrite (find_unique OW.r{2} _ Log.qs{2}) => //=.
-      progress; first apply (f_injective sk{2} pk0{2} x OW.r{2}) => //.
+      progress; pose P := fun p => f _ p = _.
+      have := nth_find witness P Log.qs{2} _.
+        by apply/hasP; exists OW.r{2}.
+      by move/(f_injective _ _ _ _ H)=> ->.
     (* rest of proof *)
     swap {1} 3 - 2; swap {1} 9 -7; swap {1} 9 3; swap {1} 7 4.
     wp. rnd{1}.
