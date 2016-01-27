@@ -1,3 +1,4 @@
+(* -------------------------------------------------------------------- *)
 require import Fun Bool Int Real Distr List FSet Array FMap DBool.
 require (*--*) AWord ROM.
 
@@ -32,7 +33,6 @@ op uniform_rand = Randomness.Dword.dword.
 op (||) (x:randomness) (y:plaintext):ciphertext =
  Ciphertext.from_bits ((to_bits x) || (to_bits y)).
 
-
 (*** One way trapdoor permutation (pre-instantiated) ***)
 (**  [See theory OW.ec] **)
 theory OWTP.
@@ -56,10 +56,7 @@ theory OWTP.
     support keypairs (pk,sk) =>
     f pk x = f pk y =>
     x = y.
-  proof.
-    move=> Hsupp Heqf.
-    by rewrite -(finvof pk sk) // Heqf finvof.
-  qed.
+  proof. by move=> supp eq_f; rewrite -(finvof pk sk) // eq_f finvof. qed.
 
   module type Inverter = {
     proc i(pk:pkey,y:randomness): randomness
@@ -71,9 +68,10 @@ theory OWTP.
     proc main(): bool = {
       var x', pk, sk;
 
-      (pk,sk) = $keypairs;
-      r       = $uniform_rand;
-      x'      = I.i(pk,f pk r);
+      (pk,sk) <$ keypairs;
+      r       <$ uniform_rand;
+      x'      <@ I.i(pk,f pk r);
+
       return (r = x');
     }
   }.
@@ -93,10 +91,12 @@ clone import ROM.ListLog as RandOrcl_BR with
   type to    <- plaintext,
   op dsample <- fun (x:randomness) => uniform,
   op qH      <- qH.
+
 import Lazy.
 import Types.
 
-(*** We can now define what it means to be a CPA-secure public-key encryption scheme ***)
+(*** We can now define what it means to be a CPA-secure public-key
+   * encryption scheme ***)
 (**  [See theory PKE.ec] **)
 module type Scheme(RO : Oracle) = {
   proc kg(): (pkey * skey)
@@ -119,9 +119,9 @@ module CPA(S:Scheme, A:Adv) = {
     ARO.init();
     (pk,sk)  = SO.kg();
     (m0,m1)  = A.a1(pk);
-    b = ${0,1};
-    c  = SO.enc(pk,b?m0:m1);
-    b' = A.a2(c);
+    b  <$ {0,1};
+    c  <@ SO.enc(pk,b?m0:m1);
+    b' <@ A.a2(c);
     return b' = b;
   }
 }.
@@ -134,16 +134,16 @@ module BR(R:Oracle): Scheme(R) = {
   proc kg():(pkey * skey) = {
     var pk, sk;
 
-    (pk,sk) = $keypairs;
+    (pk,sk) <$ keypairs;
     return (pk,sk);
   }
 
   proc enc(pk:pkey, m:plaintext): ciphertext = {
     var h, r;
 
-    r = $uniform_rand;
-    h = R.o(r);
-    return ((f pk r) ||   m ^ h);
+    r <$ uniform_rand;
+    h <@ R.o(r);
+    return ((f pk r) || m ^ h);
   }
 }.
 
@@ -158,10 +158,12 @@ module BR_OW(A:Adv): Inverter = {
     var m0,m1,h,b;
 
     ARO.init();
-    (m0,m1) = A.a1(pk);
-    h = $uniform;
-    b = A.a2(y || h);
-    x = nth witness ARO.qs (find (fun p => f pk p = y) ARO.qs);
+
+    (m0,m1) <@ A.a1(pk);
+    h       <$ uniform;
+    b       <@ A.a2(y || h);
+    x       <- nth witness ARO.qs (find (fun p => f pk p = y) ARO.qs);
+
     return x;
   }
 }.
@@ -175,7 +177,8 @@ lemma lossless_ARO_o : islossless Log(RO).o.
 proof. by apply/(Log_o_ll RO)/RO_o_ll/Plaintext.Dword.lossless. qed.
 
 section.
-  (* Forall CPA adversary A whose memory footprint is disjoint from that of RO, Log and OW *)
+  (* Forall CPA adversary A whose memory footprint is disjoint from
+     that of RO, Log and OW *)
   declare module A : Adv {RO,Log,OW}.
 
   (* and whose two procedures as lossless provided the random oracle is *)
@@ -193,8 +196,8 @@ section.
     proc enc(pk:pkey, m:plaintext): ciphertext = {
       var h;
 
-      r = $uniform_rand;
-      h = $uniform;
+      r <$ uniform_rand;
+      h <$ uniform;
       return ((f pk r) || m ^ h);
     }
   }.
@@ -237,14 +240,7 @@ section.
       proc. inline RO.o.
       wp. rnd.
       wp. skip. smt.
-    inline *. auto.
-    progress.
-      smt.
-      smt.
-      smt.
-      smt.
-      smt.
-      smt.
+    inline *. auto. progress; smt.
   qed.
 
   (** Step 2: replace h ^ m with h in challenge encryption **)
@@ -254,15 +250,15 @@ section.
     proc kg():(pkey * skey) = {
       var pk, sk;
 
-      (pk,sk) = $keypairs;
+      (pk,sk) <$ keypairs;
       return (pk,sk);
     }
 
     proc enc(pk:pkey, m:plaintext): ciphertext = {
       var h;
 
-      r = $uniform_rand;
-      h = $uniform;
+      r <$ uniform_rand;
+      h <$ uniform;
       return ((f pk r) || h);
     }
   }.
@@ -318,7 +314,8 @@ section.
       BR1_BR2 and BR1_BR2_bad in one? Prove it and use it to prove
       BR1_BR2_bad and BR1_BR2. **)
 
-  (** We can now prove that the success probability of A in CPA(BR2) is exactly 1/2 **)
+  (** We can now prove that the success probability of A in CPA(BR2) is
+    * exactly 1/2 **)
   local lemma pr_BR2_res &m: Pr[CPA(BR2,A).main() @ &m: res] = 1%r / 2%r.
   proof.
     byphoare=> //=.
