@@ -91,7 +91,7 @@ module CI_Distr = struct
 
   let p_dbool = List.fold_left EcPath.pqname p_top ["DBool"; "dbool"]
   let p_dbitstring = List.fold_left EcPath.pqname p_Distr ["Dbitstring"; "dbitstring"]
-  let p_dinter     = List.fold_left EcPath.pqname p_Distr ["Dinter"; "dinter"]
+  let p_dinter     = List.fold_left EcPath.pqname p_top ["DInterval"; "dinter"]
 
   let p_in_supp = _Distr "in_supp"
   let p_mu      = _Pervasive "mu"

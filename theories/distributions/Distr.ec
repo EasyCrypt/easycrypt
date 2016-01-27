@@ -7,8 +7,7 @@
 
 (* -------------------------------------------------------------------- *)
 require export Pred.
-require import Fun Int IntExtra Real RealExtra Ring.
-require import StdRing StdOrder.
+require import Fun Int IntExtra Real RealExtra StdRing StdOrder.
 (*---*) import RField RealOrder.
 
 op charfun (p:'a -> bool) x: real = if p x then 1%r else 0%r.
@@ -206,52 +205,6 @@ by apply fun_ext.
 qed.
 
 (*** Some useful distributions *)
-(** Uniform distribution on (closed) integer intervals *)
-(* A concrete realization of this distribution using uniform
-   distributions on finite sets of integers is available as
-   FSet.Dinter_uni.dinter, so these axioms are untrusted. *)
-theory Dinter.
-  op dinter: int -> int -> int distr.
-
-  axiom supp_def (i j x:int):
-    in_supp x (dinter i j) <=> i <= x <= j.
-
-  axiom weight_def (i j:int):
-    weight (dinter i j) = if i <= j then 1%r else 0%r.
-
-  axiom mu_x_def (i j x:int):
-    mu_x (dinter i j) x =
-      if in_supp x (dinter i j)
-      then 1%r / (j - i + 1)%r
-      else 0%r.
-
-  lemma nosmt mu_x_def_in (i j x:int):
-    in_supp x (dinter i j) =>
-    mu_x (dinter i j) x = 1%r / (j - i + 1)%r
-  by rewrite mu_x_def=> ->.
-
-  lemma nosmt mu_x_def_notin (i j x:int):
-    !in_supp x (dinter i j) =>
-    mu_x (dinter i j) x = 0%r
-  by rewrite mu_x_def -neqF=> ->.
-
-  lemma mu_in_supp (i j : int):
-    i <= j =>
-    mu (dinter i j) (fun x, i <= x <= j) = 1%r.
-  proof strict.
-    move=> h; rewrite -(mu_eq_support (dinter i j) predT).
-      by apply/fun_ext=> x /=; smt.
-      by smt.
-  qed.
-
-  lemma dinterU (i j:int):
-    is_subuniform (dinter i j).
-  proof.
-    move=> x y x_in_supp y_in_supp.
-    by rewrite -/(mu_x _ x) -/(mu_x _ y) !mu_x_def_in.
-  qed.
-end Dinter.
-
 (** Distribution resulting from applying a function to a distribution *)
 theory Dapply.
   op dapply: ('a -> 'b) -> 'a distr -> 'b distr.
