@@ -1205,6 +1205,11 @@ let destr_programS side f =
       | `Left  -> (es.es_ml, es.es_sl)
       | `Right -> (es.es_mr, es.es_sr)
   end
+  | Some b, FaequivS  aes -> begin
+      match b with
+      | `Left  -> (aes.aes_ml, aes.aes_sl)
+      | `Right -> (aes.aes_mr, aes.aes_sr)
+  end
   | _, _ -> destr_error "programS"
 
 let destr_int f =

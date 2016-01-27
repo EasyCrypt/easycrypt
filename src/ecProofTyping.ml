@@ -143,14 +143,14 @@ let tc1_process_Xhl_exp tc side ty e =
 (* ------------------------------------------------------------------ *)
 let tc1_process_Xhl_form ?side tc ty pf =
   let hyps, concl = FApi.tc1_flat tc in
-
-
   let memory =
     match concl.f_node, side with
-    | FhoareS   hs, None        -> hs.hs_m
-    | FbdHoareS hs, None        -> hs.bhs_m
-    | FequivS   es, Some `Left  -> (mhr, snd es.es_ml)
-    | FequivS   es, Some `Right -> (mhr, snd es.es_mr)
+    | FhoareS   hs , None        -> hs.hs_m
+    | FbdHoareS hs , None        -> hs.bhs_m
+    | FequivS   es , Some `Left  -> (mhr, snd es.es_ml)
+    | FequivS   es , Some `Right -> (mhr, snd es.es_mr)
+    | FaequivS  aes, Some `Left  -> (mhr, snd aes.aes_ml)
+    | FaequivS  aes, Some `Right -> (mhr, snd aes.aes_mr)
 
     | _, _ -> raise (DestrError "destr_programS")
   in
