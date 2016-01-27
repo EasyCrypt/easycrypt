@@ -157,7 +157,7 @@ let unroll_stmt (pf, _) me i =
 
 let t_unroll_r side cpos g =
   let tr = fun side -> `LoopUnraoll (side, cpos) in
-    t_code_transform side  ~bdhoare:true cpos tr (t_fold unroll_stmt) g
+  t_code_transform side  ~bdhoare:true cpos tr (t_fold unroll_stmt) g
 
 let t_unroll = FApi.t_low2 "loop-unroll" t_unroll_r
 
@@ -174,7 +174,7 @@ let splitwhile_stmt b (pf, _) me i =
 
 let t_splitwhile_r b side cpos g =
   let tr = fun side -> `SplitWhile (b, side, cpos) in
-    t_code_transform side ~bdhoare:true cpos tr (t_fold (splitwhile_stmt b)) g
+  t_code_transform side ~bdhoare:true cpos tr (t_fold (splitwhile_stmt b)) g
 
 let t_splitwhile = FApi.t_low3 "split-while" t_splitwhile_r
 
@@ -189,5 +189,7 @@ let process_unroll (side, cpos) tc =
   t_unroll side cpos tc
 
 let process_splitwhile (b, side, cpos) tc =
-  let b = TTC.tc1_process_phl_exp tc side (Some tbool) b in
-    t_splitwhile b side cpos tc
+  let b =
+    try  TTC.tc1_process_Xhl_exp tc side (Some tbool) b
+    with EcFol.DestrError _ -> tc_error !!tc "goal must be a *HL statement"
+  in t_splitwhile b side cpos tc

@@ -83,26 +83,6 @@ let tc1_process_pattern tc fp =
   Exn.recast_tc1 tc (fun hyps -> process_pattern hyps fp)
 
 (* ------------------------------------------------------------------ *)
-let tc1_process_phl_form ?side tc ty pf =
-  let hyps, concl = FApi.tc1_flat tc in
-  let memory =
-    match concl.f_node, side with
-    | FhoareS   hs, None        -> hs.hs_m
-    | FbdHoareS hs, None        -> hs.bhs_m
-    | FequivS   es, Some `Left  -> (mhr, snd es.es_ml)
-    | FequivS   es, Some `Right -> (mhr, snd es.es_mr)
-
-    | _, _ -> assert false
-  in
-
-  let hyps = LDecl.push_active memory hyps in
-  pf_process_form !!tc hyps ty pf
-
-(* ------------------------------------------------------------------ *)
-let tc1_process_phl_formula ?side tc pf =
-  tc1_process_phl_form ?side tc tbool pf
-
-(* ------------------------------------------------------------------ *)
 let tc1_process_prhl_form tc ty pf =
   let hyps, concl = FApi.tc1_flat tc in
   let ml, mr =
@@ -137,14 +117,34 @@ let tc1_process_prhl_stmt tc side c =
   tc1_process_stmt tc mt c
 
 (* ------------------------------------------------------------------ *)
-let tc1_process_phl_exp tc side ty e =
+let tc1_process_Xhl_exp tc side ty e =
   let hyps, concl = FApi.tc1_flat tc in
-  let m =
-    try  fst (EcFol.destr_programS side concl)
-    with DestrError _ -> assert false in
+  let m = fst (EcFol.destr_programS side concl) in
 
   let hyps = LDecl.push_active m hyps in
   pf_process_exp !!tc hyps `InProc ty e
+
+(* ------------------------------------------------------------------ *)
+let tc1_process_Xhl_form ?side tc ty pf =
+  let hyps, concl = FApi.tc1_flat tc in
+
+
+  let memory =
+    match concl.f_node, side with
+    | FhoareS   hs, None        -> hs.hs_m
+    | FbdHoareS hs, None        -> hs.bhs_m
+    | FequivS   es, Some `Left  -> (mhr, snd es.es_ml)
+    | FequivS   es, Some `Right -> (mhr, snd es.es_mr)
+
+    | _, _ -> raise (DestrError "destr_programS")
+  in
+
+  let hyps = LDecl.push_active memory hyps in
+  pf_process_form !!tc hyps ty pf
+
+(* ------------------------------------------------------------------ *)
+let tc1_process_Xhl_formula ?side tc pf =
+  tc1_process_Xhl_form ?side tc tbool pf
 
 (* ------------------------------------------------------------------ *)
 (* FIXME: factor out to typing module                                 *)

@@ -227,5 +227,5 @@ let process_alias (side, cpos, id) tc =
   t_alias side cpos id tc
 
 let process_set (side, cpos, fresh, id, e) tc =
-  let e = TTC.tc1_process_phl_exp tc side None e in
+  let e = TTC.tc1_process_Xhl_exp tc side None e in
   t_set side cpos (fresh, id) e tc
