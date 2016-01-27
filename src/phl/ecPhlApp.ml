@@ -211,7 +211,7 @@ let process_phl_ae_info dir ae_info tc =
   | None ->
      (dir, (f_r0, f_r0))
 
-  | Some (dp, ep) ->
+  | Some (ep, dp) ->
      let dp = TTC.tc1_process_form tc treal dp in
      let ep = TTC.tc1_process_form tc treal ep in
      (dir, (dp, ep))

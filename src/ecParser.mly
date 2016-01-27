@@ -2239,8 +2239,8 @@ seq_info:
 | f=prod_form g=prod_form s=sform?
     { PAppBd (PAppMult (s, fst f, snd f, fst g, snd g)) }
 
-| LT LBRACKET d=sform AMP e=sform RBRACKET GT
-    { PAppDiff (d, e) }
+| LT LBRACKET e=sform AMP d=sform RBRACKET GT
+    { PAppDiff (e, d) }
 
 revert:
 | cl=ioption(brace(loc(ipcore_name)+)) gp=genpattern*
