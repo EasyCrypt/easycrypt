@@ -88,7 +88,7 @@ and process1_case (_ : ttenv) (doeq, opts, gp) (tc : tcenv1) =
   in
     match (FApi.tc1_goal tc).f_node with
     | FbdHoareS _ | FhoareS _ when not opts.cod_ambient ->
-        let fp = TTC.tc1_process_phl_formula tc (form_of_gp ()) in
+        let fp = TTC.tc1_process_Xhl_formula tc (form_of_gp ()) in
         EcPhlCase.t_hl_case fp tc
 
     | FequivS _ when not opts.cod_ambient ->

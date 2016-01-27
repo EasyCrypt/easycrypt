@@ -338,7 +338,7 @@ let process_while side winfos tc =
   match (FApi.tc1_goal tc).f_node with
   | FhoareS _ -> begin
       match vrnt with
-      | None -> t_hoare_while (TTC.tc1_process_phl_formula tc phi) tc
+      | None -> t_hoare_while (TTC.tc1_process_Xhl_formula tc phi) tc
       | _    -> tc_error !!tc "invalid arguments"
     end
 
@@ -346,20 +346,20 @@ let process_while side winfos tc =
       match vrnt, bds with
       | Some vrnt, None ->
           t_bdhoare_while
-            (TTC.tc1_process_phl_formula tc phi)
-            (TTC.tc1_process_phl_form tc tint vrnt)
+            (TTC.tc1_process_Xhl_formula tc phi)
+            (TTC.tc1_process_Xhl_form tc tint vrnt)
             tc
 
       | Some vrnt, Some (k, eps) ->
         t_bdhoare_while_rev_geq
-          (TTC.tc1_process_phl_formula tc phi)
-          (TTC.tc1_process_phl_form    tc tint vrnt)
-          (TTC.tc1_process_phl_form    tc tint k)
-          (TTC.tc1_process_phl_form    tc treal eps)
+          (TTC.tc1_process_Xhl_formula tc phi)
+          (TTC.tc1_process_Xhl_form    tc tint vrnt)
+          (TTC.tc1_process_Xhl_form    tc tint k)
+          (TTC.tc1_process_Xhl_form    tc treal eps)
           tc
 
       | None, None ->
-          t_bdhoare_while_rev (TTC.tc1_process_phl_formula tc phi) tc
+          t_bdhoare_while_rev (TTC.tc1_process_Xhl_formula tc phi) tc
 
       | None, Some _ -> tc_error !!tc "invalid arguments"
   end
