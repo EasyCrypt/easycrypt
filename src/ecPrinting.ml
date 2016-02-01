@@ -1532,8 +1532,8 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
       in
       Format.fprintf fmt
         "aequiv[@[<hov 2>[%a & %a]@ %a ~@ %a :@ @[%a ==>@ %a@]@]]"
-        (pp_form ppe) aef.aef_dp
         (pp_form ppe) aef.aef_ep
+        (pp_form ppe) aef.aef_dp
         (pp_funname ppe) aef.aef_fl
         (pp_funname ppe) aef.aef_fr
         (pp_form ppe) aef.aef_pr

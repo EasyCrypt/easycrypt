@@ -1139,7 +1139,7 @@ equiv_body(P):
     { PFequivF (pre, (mp1, mp2), post) }
 
 aequiv_body(P):
-  LBRACKET dp=sform_r(P) AMP ep=sform_r(P) RBRACKET
+  LBRACKET ep=sform_r(P) AMP dp=sform_r(P) RBRACKET
   mp1=loc(fident) TILD mp2=loc(fident)
   COLON pre=form_r(P) LONGARROW post=form_r(P)
     { PFaequivF
