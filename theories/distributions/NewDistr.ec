@@ -6,8 +6,8 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Option Pred Fun List Int IntExtra Real RealExtra.
-require import StdRing StdOrder StdBigop Discrete RealSeq RealSeries.
+require import Option Pred Fun List Int IntExtra IntDiv Real RealExtra.
+require import Ring StdRing StdOrder StdBigop Discrete RealSeq RealSeries.
 (*---*) import IterOp Bigint Bigreal Bigreal.BRA.
 (*---*) import IntOrder RealOrder RField NewLogic.
 require (*--*) FinType.
@@ -116,6 +116,31 @@ proof. by apply/fun_ext=> x; rewrite /support /in_supp dnull1E. qed.
 
 (* -------------------------------------------------------------------- *)
 theory MRat.
+pred eq_ratl (s1 s2 : 'a list) =
+  (s1 = [] <=> s2 = []) /\
+  perm_eq
+    (flatten (nseq (size s2) s1))
+    (flatten (nseq (size s1) s2)).
+
+lemma perm_eq_ratl (s1 s2 : 'a list):
+  perm_eq s1 s2 => eq_ratl s1 s2.
+proof. 
+move=> ^eq_s12 /perm_eqP eqp_s12; split.
+  by split=> ->>; apply/perm_eq_small=> //; apply/perm_eq_sym.
+apply/perm_eqP=> p; rewrite !count_flatten_nseq.
+by rewrite eqp_s12 (perm_eq_size eq_s12).
+qed.
+
+lemma ratl_mem (s1 s2 : 'a list) :
+  eq_ratl s1 s2 => forall x, mem s1 x <=> mem s2 x.
+proof.
+case=> eqvnil /perm_eq_mem h x; move/(_ x): h.
+rewrite -!has_pred1 !has_count !count_flatten_nseq.
+rewrite !max_ler ?size_ge0; case: (s1 = []) => [^/eqvnil -> ->//|nz_s1].
+rewrite !IntOrder.pmulr_rgt0 ?lt0n ?size_ge0 ?size_eq0 -?eqvnil //.
+by rewrite count_ge0. by rewrite count_ge0.
+qed.
+
 op mrat ['a] (s : 'a list) =
   fun x => (count (pred1 x) s)%r / (size s)%r.
 
@@ -123,7 +148,8 @@ lemma isdistr_drat (s : 'a list) : isdistr (mrat s).
 proof.
 rewrite /mrat; split=> /= [x|J uq_J].
   by rewrite divr_ge0 // le_fromint ?(count_ge0, size_ge0).
-rewrite -divr_suml -sumr_ofint. admit.
+rewrite -divr_suml -sumr_ofint.
+admit.
 qed.
 
 op drat ['a] (s : 'a list) = mk (mrat s).
@@ -155,20 +181,41 @@ move=> ? s /(@mulr_gt0 _ (inv (1 + size s)%r)) -> //.
 by rewrite invr_gt0 lt_fromint [smt w=size_ge0].
 qed.
 
-(* Note: the RL direction without size equality only implies "exists k, perm_eq s1 (k*s2)" *)
 lemma eq_dratP ['a] (s1 s2 : 'a list) :
-  size s1 = size s2 =>
-  (perm_eq s1 s2) <=> (drat s1 = drat s2).
+  eq_ratl s1 s2 <=> (drat s1 = drat s2).
 proof.
-move=> size_eq; rewrite eq_distr; split.
-+ by rewrite perm_eqP=> count_eq x; rewrite !dratE size_eq count_eq.
-move: size_eq; case: (s2 = [])=> //= [->|s2_neq_nil size_eq]. 
-+ by rewrite size_eq0.
-rewrite (@forall_iff _ (fun x => count (pred1 x) s1 = count (pred1 x) s2)) /=.
-+ move=> x /=; rewrite !dratE size_eq; split=> [|->] //=.
-  rewrite -size_eq0 -eq_fromint -unitrV in s2_neq_nil.
-  by rewrite -eq_fromint; exact/(@mulIr (inv (size s2)%r)).
-by rewrite allP=> eq_count x /= _; exact/eq_count.
+split=> [[]|eq_d].
+  move=> eqvnil eq_s12; apply/eq_distr=> x; rewrite !dratE.
+  move/perm_eqP/(_ (pred1 x)): eq_s12; rewrite !count_flatten_nseq.
+  rewrite !max_ler ?size_ge0; case: (s1 = []).
+    by move=> ^/eqvnil -> ->.
+  move=> ^nz_s1; rewrite eqvnil => nz_s2.
+  rewrite eqf_div ?eq_fromint ?size_eq0 // -!fromintM.
+  by rewrite eq_fromint !(@mulzC (size _)).
+apply/anda_and; split.
+  have h: forall t1 t2, drat<:'a> t1 = drat t2 => t1 = [] => t2 = [].
+    move=> t1 [|x t2] eq_dt ->>//; move/(congr1 (fun d => mu_x d x)): eq_dt.
+    rewrite /= !dratE /= eq_sym mulf_neq0 // ?invr_eq0 eq_fromint.
+    by apply/add1z_neq0/count_ge0. by apply/add1z_neq0/size_ge0.
+  by split=> z_s; [apply/(h s1)|apply/(h s2)]=> //; apply/eq_sym.
+case: s1 s2 eq_d => [|x1 s1] [|x2 s2] //=.
+  by apply/perm_eq_refl.
+move=> eq_d; apply/perm_eqP=> p; rewrite !count_flatten_nseq.
+move/(congr1 (fun d => mu d p)): eq_d => /=; rewrite !prratE /=.
+rewrite !max_ler ?addr_ge0 ?size_ge0 // eqf_div;
+  try by rewrite eq_fromint add1z_neq0 ?size_ge0.
+by rewrite -!fromintM eq_fromint !(@mulzC (1 + _)).
+qed.
+
+lemma eq_sz_dratP ['a] (s1 s2 : 'a list) : size s1 = size s2 =>
+  perm_eq s1 s2 <=> (drat s1 = drat s2).
+proof.
+move=> eq_sz; rewrite -eq_dratP /eq_ratl -!size_eq0 -!eq_sz /=.
+split=> /perm_eqP eq; apply/perm_eqP=> p; rewrite ?count_flatten_nseq ?eq //.
+move/(_ p): eq; rewrite !count_flatten_nseq max_ler ?size_ge0.
+case: (s1 = []) => [->>|] /=.
+  suff ->//: s2 = []; by rewrite -size_eq0 eq_sz.
+by rewrite -size_eq0 => nz_s1 /(IntID.mulfI _ nz_s1).
 qed.
 
 lemma drat_ll ['a] (s : 'a list) :
@@ -218,10 +265,10 @@ lemma eq_duniformP ['a] (s1 s2 : 'a list) :
 proof. admit (* TODO: fix proof after change in eq_dratP *). qed.
 (*
 rewrite -MRat.eq_dratP; split=> h.
-  apply/uniq_perm_eq; rewrite ?undup_uniq=> //.
+  apply/MRat.perm_eq_ratl/uniq_perm_eq; rewrite ?undup_uniq=> //.
   by move=> x; rewrite !mem_undup; apply/h.
 move=> x; rewrite -(@mem_undup s1) -(@mem_undup s2).
-by apply/perm_eq_mem.
+by apply/MRat.ratl_mem.
 qed.
 *)
 
