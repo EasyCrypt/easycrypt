@@ -13,6 +13,7 @@ require import StdRing StdOrder StdBigop Discrete RealSeq RealSeries.
 require (*--*) FinType.
 
 pragma +implicits.
+pragma -oldip.
 
 (* -------------------------------------------------------------------- *)
 (* We currently bind old distr/mu_x et al to the new constructs         *)
@@ -103,9 +104,8 @@ proof. by move=> x; rewrite muK //; apply/isdistr_mnull. qed.
 
 lemma dnullE ['a] (E : 'a -> bool) : mu dnull<:'a> E = 0%r.
 proof.
-rewrite muE -(@eq_sum (fun x=> 0%r) _ _).
-+ by move=> x /=; rewrite dnull1E if_same.
-admit.
+rewrite muE -(@eq_sum (fun x=> 0%r) _ _) 2:sum0 //.
+by move=> x /=; rewrite dnull1E if_same.
 qed.
 
 lemma weight_dnumm ['a] : weight dnull<:'a> = 0%r.
@@ -257,15 +257,123 @@ proof. by rewrite MRat.support_drat undup_id ?range_uniq mem_range. qed.
 end MIntUniform.
 
 (* -------------------------------------------------------------------- *)
-op mlet ['a 'b] (f : 'a -> 'b distr) (d : 'a distr) =
+op mlet ['a 'b] (d : 'a distr) (f : 'a -> 'b distr) =
   fun (y : 'b) => sum<:'a> (fun x => mu_x d x * mu_x (f x) y).
 
-op dlet ['a 'b] (f : 'a -> 'b distr) (d : 'a distr) =
-  mk (mlet f d).
+op dlet ['a 'b] (d : 'a distr) (f : 'a -> 'b distr) =
+  mk (mlet d f).
 
-lemma isdistr_mlet ['a 'b] (f : 'a -> 'b distr) (d : 'a distr) :
-  isdistr (mlet f d).
+lemma isdistr_mlet ['a 'b] (d : 'a distr) (f : 'a -> 'b distr) :
+  isdistr (mlet d f).
 proof. admit. qed.
+
+lemma mux_dlet (d : 'a distr) (f : 'a -> 'b distr) (b : 'b):
+  mu_x (dlet d f) b = sum<:'a> (fun a => mu_x d a * mu_x (f a) b).
+proof. by rewrite muK 1:isdistr_mlet. qed.
+
+lemma mu_dlet (d : 'a distr) (f : 'a -> 'b distr) (P : 'b -> bool):
+  mu (dlet d f) P
+  = sum<:'b> (fun b =>
+      sum<:'a> (fun a =>
+        if P b then mu_x d a * mu_x (f a) b else 0%r)).
+proof.
+rewrite muE; have:= mux_dlet d f; rewrite (@fun_ext (mu_x _))=> -> /=.
+by apply/eq_sum=> /= b; case: (P b)=> //=; rewrite sum0.
+qed.
+
+lemma mu_dlet_swap (d : 'a distr) (f : 'a -> 'b distr) (P : 'b -> bool):
+  mu (dlet d f) P
+  = sum<:'a> (fun a =>
+      sum<:'b> (fun b =>
+        if P b then mu_x d a * mu_x (f a) b else 0%r)).
+proof. rewrite mu_dlet. admit (* swapping convergent sums *). qed.
+
+lemma weight_dlet (d:'a distr) (F:'a -> 'b distr) :
+  weight (dlet d F) <= weight d.
+proof. admit. qed.
+
+lemma support_dlet (d : 'a distr) (F : 'a -> 'b distr) (b : 'b) :
+  support (dlet d F) b <=> exists a, support d a /\ support (F a) b.
+proof.
+have ->: (exists a, support d a /\ support (F a) b)
+         <=> exists a, mu_x d a * mu_x (F a) b <> 0%r.
++ by apply/exists_iff=> a /= @/support @/in_supp; smt w=mu_bounded.
+rewrite /support /in_supp mux_dlet.
+admit (* a positive sum is non-zero iff one of its terms is non-zero *).
+qed.
+
+lemma nosmt dlet_d_unit (d:'a distr) : dlet d MUnit.dunit = d.
+proof.
+apply/pw_eq=> x; rewrite mux_dlet /mlet /=.
+rewrite (@sumE_fin _ [x]) //=.
++ by move=> x0; rewrite MUnit.dunit1E /=; case (x0 = x).
+by rewrite big_consT big_nil /= MUnit.dunit1E.
+qed.
+
+lemma nosmt dlet_unit (F:'a -> 'b distr) a : dlet (MUnit.dunit a) F = F a.
+proof.
+apply/pw_eq=> x; rewrite mux_dlet /mlet /=.
+rewrite (@sumE_fin _ [a]) //=.
++ by move=> a0; rewrite MUnit.dunit1E (@eq_sym a); case (a0 = a).
+by rewrite big_consT big_nil /= MUnit.dunit1E.
+qed.
+
+lemma dlet_dlet (d1:'a distr) (F1:'a -> 'b distr) (F2: 'b -> 'c distr):
+  dlet (dlet d1 F1) F2 = dlet d1 (fun x1 => dlet (F1 x1) F2).
+proof.
+apply/pw_eq=> c; rewrite !mu_dlet /=.
+apply eq_sum=> c' /= @/pred1; case: (c' = c)=> //=; 2: by rewrite !sum0.
+move=> ->> {c'}.
+admit.
+qed.
+
+lemma dlet_dnull (F:'a -> 'b distr): dlet dnull F = dnull.
+proof.
+apply/pw_eq=> x; rewrite mux_dlet dnull1E (@sumE_fin _ []) //= => x0.
+by rewrite dnull1E.
+qed.
+
+lemma dlet_d_dnull (d:'a distr): dlet d (fun a => dnull<:'b>) = dnull.
+proof. by apply/pw_eq=> x; rewrite mux_dlet dnull1E /= (@sumE_fin _ []). qed.
+
+(* -------------------------------------------------------------------- *)
+abbrev dlift (F: 'a -> 'b distr) : 'a distr -> 'b distr =
+  fun d => dlet d F.
+
+(* -------------------------------------------------------------------- *)
+op dmap ['a 'b] (d : 'a distr) (f : 'a -> 'b) =
+  dlet d (MUnit.dunit \o f).
+
+lemma mux_dmap (d : 'a distr) (f : 'a -> 'b) (b : 'b):
+  mu_x (dmap d f) b = mu d ((pred1 b) \o f).
+proof.
+rewrite muE mux_dlet; apply/eq_sum=> x /=.
+by rewrite MUnit.dunit1E /preim /pred1 /(\o); case: (f x = b).
+qed.
+
+lemma mu_dmap (d : 'a distr) (f : 'a -> 'b) (P : 'b -> bool):
+  mu (dmap d f) P = mu d (P \o f).
+proof.
+rewrite mu_dlet_swap muE.
+apply/eq_sum=> a /=; rewrite (@sumE_fin _ [f a]) //=.
++ by move=> b; rewrite (@eq_sym b) MUnit.dunit1E; case: (f a = b).
+by rewrite big_seq1 /= MUnit.dunit1E.
+qed.
+
+lemma support_dmap (d : 'a distr) (f : 'a -> 'b) (b : 'b):
+  support (dmap d f) b <=> exists a, support d a /\ b = f a.
+proof.
+rewrite support_dlet /(\o); apply/exists_eq=> a /=.
+by rewrite MUnit.dunit_fu.
+qed.
+
+lemma weight_dmap (d : 'a distr) (f : 'a -> 'b):
+  weight (dmap d f) = weight d.
+proof. by rewrite /weight {2}(_: predT = preim f predT) // mu_dmap. qed.
+
+(* -------------------------------------------------------------------- *)
+abbrev dapply (F: 'a -> 'b) : 'a distr -> 'b distr =
+  fun d => dmap d F.
 
 (* -------------------------------------------------------------------- *)
 op mscale ['a] (d : 'a distr) =

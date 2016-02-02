@@ -9,7 +9,7 @@ require import Option Pair Int List NewDistr Real DProd StdBigop.
 (*---*) import Bigreal.BRM MUnit.
 
 op dlist (d : 'a distr) (n : int): 'a list distr =
-  Int.fold (fun d' => Dapply.dapply (fun (xy : 'a * 'a list) => xy.`1 :: xy.`2) (d `*` d')) (dunit []) n
+  Int.fold (fun d' => dapply (fun (xy : 'a * 'a list) => xy.`1 :: xy.`2) (d `*` d')) (dunit []) n
   axiomatized by dlistE.
 
 lemma dlist0 (d : 'a distr) n: n <= 0 => dlist d n = dunit [].
@@ -18,7 +18,7 @@ proof. by move=> ge0_n; rewrite dlistE Int.foldle0. qed.
 lemma dlistS (d : 'a distr) n:
   0 <= n =>
   dlist d (n + 1)
-  = Dapply.dapply (fun (xy : 'a * 'a list) => xy.`1 :: xy.`2) (d `*` (dlist d n)).
+  = dapply (fun (xy : 'a * 'a list) => xy.`1 :: xy.`2) (d `*` (dlist d n)).
 proof.
 elim n=> [|n le0_n ih].
 + by rewrite !dlistE /= -foldpos // fold0.
@@ -39,7 +39,7 @@ move=> d_ll; case (0 <= n); first last.
 + by move=> lt0_n; rewrite dlist0 smt.
 elim n=> [|n le0_n ih].
 + by rewrite dlist0 // smt.
-rewrite dlistS // /is_lossless -/(weight _) Dapply.lossless.
+rewrite dlistS // /is_lossless -/(weight _) weight_dmap.
 by rewrite /weight -/(is_lossless _) dprod_ll.
 qed.
 
@@ -54,10 +54,10 @@ lemma dlist_support_ge0 (d : 'a distr) n xs:
 proof.
 move=> le0_n; move: le0_n xs.
 elim n =>[|n le0_n ih xs]; 1:smt.
-rewrite dlistS // /support Dapply.supp_def; split.
-+ move=> [[x xs'] /= [->]]; rewrite support_dprod /=.
-  rewrite -!/(support _ xs') ih; smt.
-case xs=> [|x xs /= [len_n [x_in_d all_in_d]]]; 1:smt.
+rewrite dlistS // /support support_dmap; split.
++ move=> [[] x xs' /= [] + ->]; rewrite support_dprod /=.
+  by rewrite -!/(support _ xs') ih /support=> /#.
+case xs=> [|x xs /= [len_n [x_in_d all_in_d]]]=> [/#|].
 exists (x,xs)=> //=; rewrite support_dprod x_in_d /=.
 by rewrite -/(support _ _) ih -(addzI 1 (size xs) n) -?(addzC n 1).
 qed.
@@ -71,8 +71,8 @@ lemma mux_dlistS (d : 'a distr) x xs:
   mu (dlist d (size (x::xs))) (pred1 (x::xs)) =
     mu d (pred1 x) * mu (dlist d (size xs)) (pred1 xs).
 proof.
-rewrite /= addzC dlistS 1:smt.
-rewrite -/(mu_x _ _) Dapply.mu_x_def /preim /pred1 /=.
+rewrite /= addzC dlistS 1:size_ge0.
+rewrite -/(mu_x _ _) mux_dmap /preim /pred1 /=.
 by rewrite (mu_dprod (fun x0 => x0 = x) (fun x0 => x0 = xs)).
 qed.
 
@@ -87,14 +87,14 @@ move=> le0_n; case (n = size xs)=> [->|].
 + elim xs=> [|x xs ih].
   * by rewrite mux_dlist0.
   by rewrite mux_dlistS /= big_cons ih.
-smt.
+smt w=(dlist_support_ge0 mu_bounded).
 qed.
 
 lemma mux_dlist_perm_eq (d : 'a distr) s1 s2:
   perm_eq s1 s2 =>
   mu (dlist d (size s1)) (pred1 s1) = mu (dlist d (size s2)) (pred1 s2).
 proof.
-rewrite !mux_dlist //= 1,2:smt.
+rewrite !mux_dlist //= 1,2:size_ge0.
 exact/eq_big_perm.
 qed.
 
@@ -187,14 +187,14 @@ abstract theory Program.
       rcondf{2} 6; 1:by auto; smt.
       wp; rnd (fun x => head witness x) (fun x => [x]).
       auto; progress; subst _n=> /=.
-      + rewrite (dlistS _ 0) // dlist0 // Dapply.mu_x_def /preim /pred1 /=.
+      + rewrite (dlistS _ 0) // dlist0 // mux_dmap /preim /pred1 /=.
         rewrite (mu_dprod (pred1 rR) (pred1 []) d (dunit [])).
         by rewrite dunit1E.
-      + move: H0; rewrite (dlistS _ 0) // dlist0 // Dapply.supp_def /preim /pred1 /=.
-        move=> [[x xs]] /= [->] /=.
+      + move: H0; rewrite (dlistS _ 0) // dlist0 // support_dmap /preim /pred1 /=.
+        move=> [[x xs]] /= [+ ->] /=.
         by rewrite support_dprod.
-      + move: H0; rewrite (dlistS _ 0) // dlist0 // Dapply.supp_def /preim /pred1 /=.
-        move=> [[x xs]] /= [->] /=.
+      + move: H0; rewrite (dlistS _ 0) // dlist0 // support_dmap /preim /pred1 /=.
+        move=> [[x xs]] /= [+ ->] /=.
         by rewrite support_dprod /= dunit_fu.
     transitivity SampleCons.sample
                  (={n} /\ 0 < n{1} ==> ={res})
