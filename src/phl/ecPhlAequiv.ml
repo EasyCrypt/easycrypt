@@ -6,32 +6,132 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
+open EcParsetree
+open EcTypes
 open EcFol
 open EcCoreGoal
 open EcLowPhlGoal
+
+module Mid = EcIdent.Mid
+module TTC = EcProofTyping
 
 (* -------------------------------------------------------------------- *)
 let t_toequiv_r (tc : tcenv1) =
   match f_node (FApi.tc1_goal tc) with
   | FaequivF aef ->
      let concl = f_equivF aef.aef_pr aef.aef_fl aef.aef_fr aef.aef_po in
-     let dp = f_real_le f_r0 aef.aef_dp in
      let ep = f_real_le f_r0 aef.aef_ep in
+     let dp = f_real_le f_r0 aef.aef_dp in
      FApi.t_seq
-       (fun tc -> FApi.xmutate1 tc `ToEquiv [dp; ep; concl])
+       (fun tc -> FApi.xmutate1 tc `ToEquiv [ep; dp; concl])
        EcLowGoal.t_trivial tc
 
   | FaequivS aes ->
      let concl =
        f_equivS aes.aes_ml aes.aes_mr
          aes.aes_pr aes.aes_sl aes.aes_sr aes.aes_po in
-     let dp = f_real_le f_r0 aes.aes_dp in
      let ep = f_real_le f_r0 aes.aes_ep in
+     let dp = f_real_le f_r0 aes.aes_dp in
      FApi.t_seq
-       (fun tc -> FApi.xmutate1 tc `ToEquiv [dp; ep; concl])
+       (fun tc -> FApi.xmutate1 tc `ToEquiv [ep; dp; concl])
+       EcLowGoal.t_trivial tc
+
+  | _ -> tc_error_noXhl ~kinds:[`AEquiv `Any] !!tc
+
+(* -------------------------------------------------------------------- *)
+let t_ofequiv_r (tc : tcenv1) =
+  match f_node (FApi.tc1_goal tc) with
+  | FequivF ef ->
+     let concl =
+       f_aequivF ~ep:f_r0 ~dp:f_r0
+         ef.ef_pr ef.ef_fl ef.ef_fr ef.ef_po in
+     FApi.t_seq
+       (fun tc -> FApi.xmutate1 tc `ToEquiv [concl])
+       EcLowGoal.t_trivial tc
+
+  | FequivS es ->
+     let concl =
+       f_aequivS ~ep:f_r0 ~dp:f_r0
+         es.es_ml es.es_mr es.es_pr es.es_sl es.es_sr es.es_po in
+     FApi.t_seq
+       (fun tc -> FApi.xmutate1 tc `ToEquiv [concl])
        EcLowGoal.t_trivial tc
 
   | _ -> tc_error_noXhl ~kinds:[`AEquiv `Any] !!tc
 
 (* -------------------------------------------------------------------- *)
 let t_toequiv = FApi.t_low0 "to-equiv" t_toequiv_r
+let t_ofequiv = FApi.t_low0 "to-equiv" t_ofequiv_r
+
+(* -------------------------------------------------------------------- *)
+let rec t_lap_r (mode : lap_mode) (tc : tcenv1) =
+  let env = FApi.tc1_env tc in
+  let aes = tc1_as_aequivS tc in
+
+  let (x1, ty1), (e1, a1) = tc1_instr_lap tc aes.aes_sl in
+  let (x2, ty2), (e2, a2) = tc1_instr_lap tc aes.aes_sr in
+
+  match mode with
+  | `Null -> begin
+      let rd1 = EcPV.e_read_r env EcPV.PV.empty a1 in
+      let rd2 = EcPV.e_read_r env EcPV.PV.empty a2 in
+(*      let rf  = EcPV.f_read_r env EcPV.PV.empty aes.aes_pr in*)
+
+      if EcPV.PV.mem_pv env x1 rd1 || EcPV.PV.mem_pv env x2 rd2 then
+        tc_error !!tc "lvalue of rnd-lap cannot occur in the lap argument";
+
+      let f1 = form_of_expr (fst aes.aes_ml) a1 in
+      let f2 = form_of_expr (fst aes.aes_mr) a2 in
+
+      let f_dpriv = f_eq
+        (f_int_sub (f_pvar x1 ty1 (fst aes.aes_ml))
+                   (f_pvar x2 ty2 (fst aes.aes_mr)))
+        (f_int_sub f1 f2)
+      in
+
+      let ep    = f_real_le f_r0 aes.aes_ep in
+      let dp    = f_real_le f_r0 aes.aes_dp in
+      let concl = f_imps [aes.aes_pr; f_dpriv] aes.aes_po in
+      let concl = f_forall_mems [aes.aes_ml; aes.aes_mr] concl in
+
+      FApi.t_seq
+        (fun tc -> FApi.xmutate1 tc `Lap [ep; dp; concl])
+        EcLowGoal.t_trivial tc
+    end
+
+  | `Gen (k, k') -> begin
+     let k  = TTC.tc1_process_form tc treal k  in
+     let k' = TTC.tc1_process_form tc treal k' in
+
+     let e1 = form_of_expr mhr e1 in
+     let e2 = form_of_expr mhr e2 in
+     let a1 = form_of_expr (fst aes.aes_ml) a1 in
+     let a2 = form_of_expr (fst aes.aes_mr) a2 in
+
+     let eqe = f_eq e1 e2 in
+     let eqk = f_eq (f_real_mul k' e1) aes.aes_ep in
+     let ep  = f_real_le f_r0 aes.aes_ep in
+     let dp  = f_real_le f_r0 aes.aes_dp in
+
+     let f_pr =
+       f_real_le
+         (f_real_abs (f_real_sub (f_real_add k a1) a2))
+         k'
+
+     and f_po =
+       f_eq
+         (f_real_add (f_pvar x1 ty1 (fst aes.aes_ml)) k)
+         (f_pvar x2 ty2 (fst aes.aes_ml))
+     in
+
+     let concl1 = f_imp aes.aes_pr f_pr in
+     let concl2 = f_imp f_po aes.aes_po in
+
+      FApi.t_seq
+        (fun tc -> FApi.xmutate1 tc `Lap
+           [eqe; eqk; ep; dp; concl1; concl2])
+        EcLowGoal.t_trivial tc
+    end
+
+(*-------------------------------------------------------------------- *)
+let t_lap = FApi.t_low1 "lap" t_lap_r

@@ -112,6 +112,13 @@ module CI_Distr : sig
   val p_weight  : path
 end
 
+(*-------------------------------------------------------------------- *)
+module CI_Aprhl : sig
+  val i_Aprhl : symbol
+  val p_Aprhl : path
+  val p_lap   : path
+end
+
 (* -------------------------------------------------------------------- *)
 module CI_Logic : sig
   val i_Logic  : symbol

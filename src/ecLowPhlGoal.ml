@@ -82,6 +82,15 @@ let s_last proj s =
       try  let i = proj i in Some (i, stmt (List.rev r))
       with Not_found -> None
 
+let s_intr proj s =
+  match List.rev s.s_node with
+  | [i] -> begin
+      try  let i = proj i in Some i
+      with Not_found -> None
+    end
+
+  | _ -> None
+
 (* -------------------------------------------------------------------- *)
 let pf_first_gen _kind proj pe s =
   match s_first proj s with
@@ -93,21 +102,46 @@ let pf_last_gen _kind proj pe s =
   | None   -> tc_error pe "invalid last instruction"
   | Some x -> x
 
-(* -------------------------------------------------------------------- *)
-let pf_first_asgn   pe st = pf_first_gen  "asgn"   destr_asgn   pe st
-let pf_first_rnd    pe st = pf_first_gen  "rnd"    destr_rnd    pe st
-let pf_first_call   pe st = pf_first_gen  "call"   destr_call   pe st
-let pf_first_if     pe st = pf_first_gen  "if"     destr_if     pe st
-let pf_first_while  pe st = pf_first_gen  "while"  destr_while  pe st
-let pf_first_assert pe st = pf_first_gen  "assert" destr_assert pe st
+let pf_instr_gen _kind proj pe s =
+  match s_intr proj s with
+  | None   -> tc_error pe "invalid single instruction"
+  | Some x -> x
+
+(*-------------------------------------------------------------------- *)
+let get_rnd_lap (i : instr) =
+  match i.i_node with
+  | Srnd (LvVar (pv, ty), e) -> begin
+     match e.e_node with
+     | Eapp ({ e_node = Eop(p, []) }, [e; x])
+         when EcPath.p_equal EcCoreLib.CI_Aprhl.p_lap p
+       -> Some ((pv, ty), (e, x))
+     | _ -> None
+    end
+  | _ -> None
+
+let destr_lap i =
+  oget ~exn:Not_found (get_rnd_lap i)
 
 (* -------------------------------------------------------------------- *)
-let pf_last_asgn   pe st = pf_last_gen  "asgn"   destr_asgn   pe st
-let pf_last_rnd    pe st = pf_last_gen  "rnd"    destr_rnd    pe st
-let pf_last_call   pe st = pf_last_gen  "call"   destr_call   pe st
-let pf_last_if     pe st = pf_last_gen  "if"     destr_if     pe st
-let pf_last_while  pe st = pf_last_gen  "while"  destr_while  pe st
-let pf_last_assert pe st = pf_last_gen  "assert" destr_assert pe st
+let pf_first_asgn   pe st = pf_first_gen  "asgn"    destr_asgn   pe st
+let pf_first_rnd    pe st = pf_first_gen  "rnd"     destr_rnd    pe st
+let pf_first_call   pe st = pf_first_gen  "call"    destr_call   pe st
+let pf_first_if     pe st = pf_first_gen  "if"      destr_if     pe st
+let pf_first_while  pe st = pf_first_gen  "while"   destr_while  pe st
+let pf_first_assert pe st = pf_first_gen  "assert"  destr_assert pe st
+let pf_first_lap    pe st = pf_first_gen  "rnd-lap" destr_lap    pe st
+
+(* -------------------------------------------------------------------- *)
+let pf_last_asgn   pe st = pf_last_gen  "asgn"    destr_asgn   pe st
+let pf_last_rnd    pe st = pf_last_gen  "rnd"     destr_rnd    pe st
+let pf_last_call   pe st = pf_last_gen  "call"    destr_call   pe st
+let pf_last_if     pe st = pf_last_gen  "if"      destr_if     pe st
+let pf_last_while  pe st = pf_last_gen  "while"   destr_while  pe st
+let pf_last_assert pe st = pf_last_gen  "assert"  destr_assert pe st
+let pf_last_lap    pe st = pf_last_gen  "rnd-lap" destr_lap    pe st
+
+(* -------------------------------------------------------------------- *)
+let pf_instr_lap   pe st = pf_instr_gen "rnd-lap" destr_lap    pe st
 
 (* -------------------------------------------------------------------- *)
 let tc1_first_asgn   tc st = pf_first_asgn   !!tc st
@@ -116,6 +150,7 @@ let tc1_first_call   tc st = pf_first_call   !!tc st
 let tc1_first_if     tc st = pf_first_if     !!tc st
 let tc1_first_while  tc st = pf_first_while  !!tc st
 let tc1_first_assert tc st = pf_first_assert !!tc st
+let tc1_first_lap    tc st = pf_first_lap    !!tc st
 
 (* -------------------------------------------------------------------- *)
 let tc1_last_asgn   tc st = pf_last_asgn   !!tc st
@@ -124,6 +159,10 @@ let tc1_last_call   tc st = pf_last_call   !!tc st
 let tc1_last_if     tc st = pf_last_if     !!tc st
 let tc1_last_while  tc st = pf_last_while  !!tc st
 let tc1_last_assert tc st = pf_last_assert !!tc st
+let tc1_last_lap    tc st = pf_last_lap    !!tc st
+
+(* -------------------------------------------------------------------- *)
+let tc1_instr_lap   tc st = pf_instr_lap   !!tc st
 
 (* -------------------------------------------------------------------- *)
 (* TODO: use in change pos *)

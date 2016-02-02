@@ -1,7 +1,6 @@
 (* -------------------------------------------------------------------- *)
-require import Distr NewDistr Int.
+require import Distr NewDistr Int Real.
 
-op lap : int -> int distr.
+op lap : real -> int -> int distr.
 
-axiom lap_ll x : is_lossless (lap x).
-
+axiom lap_ll e x : is_lossless (lap e x).

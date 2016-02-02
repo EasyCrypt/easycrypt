@@ -557,10 +557,18 @@ type phltactic =
 
     (* Relation between logic *)
   | Pbd_equiv of (side * pformula * pformula)
-  | Ptoequiv
+
+    (* aPRHL *)
+  | Paprhl of paprhl
 
     (* Automation *)
   | Pauto
+
+and paprhl =
+  | Atoequiv
+  | Alap of lap_mode
+
+and lap_mode = [`Gen of pformula pair | `Null]
 
 (* -------------------------------------------------------------------- *)
 type include_exclude = [ `Include | `Exclude ]

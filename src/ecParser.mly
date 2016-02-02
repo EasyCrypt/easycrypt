@@ -417,6 +417,7 @@
 %token INSTANCE
 %token IOTA
 %token KILL
+%token LAP
 %token LARROW
 %token LAST
 %token LBRACE
@@ -588,6 +589,7 @@ _lident:
 | STRICT   { "strict"   }
 | ADMITTED { "admitted" }
 | ABORT    { "abort"    }
+| LAP      { "lap"      }
 
 | x=RING  { match x with `Eq -> "ringeq"  | `Raw -> "ring"  }
 | x=FIELD { match x with `Eq -> "fieldeq" | `Raw -> "field" }
@@ -2597,7 +2599,15 @@ phltactic:
 
 | AUTO { Pauto }
 
-| TOEQUIV { Ptoequiv }
+  (* aPRHL *)
+| TOEQUIV
+    { Paprhl Atoequiv }
+
+| LAP
+    { Paprhl (Alap `Null) }
+
+| LAP k1=sform k2=sform
+    { Paprhl (Alap (`Gen (k1, k2))) }
 
 bdhoare_split:
 | b1=sform b2=sform b3=sform?

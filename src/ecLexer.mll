@@ -141,6 +141,7 @@
     "byequiv"     , BYEQUIV    ;        (* KW: tactic *)
     "toequiv"     , TOEQUIV    ;        (* KW: tactic *)
     "fel"         , FEL        ;        (* KW: tactic *)
+    "lap"         , LAP        ;        (* KW: tactic *)
 
     "conseq"      , CONSEQ     ;        (* KW: tactic *)
     "exfalso"     , EXFALSO    ;        (* KW: tactic *)

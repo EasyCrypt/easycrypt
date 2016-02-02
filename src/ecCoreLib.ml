@@ -152,6 +152,15 @@ module CI_Logic = struct
   let p_ip_dup        = _Logic "_ip_dup"
 end
 
+(*-------------------------------------------------------------------- *)
+module CI_Aprhl = struct
+  let i_Aprhl  = "Aprhl"
+  let p_Aprhl  = EcPath.pqname p_top i_Aprhl
+  let _Aprhl   = fun x -> EcPath.pqname p_Aprhl x
+
+  let p_lap = _Aprhl "lap"
+end
+
 (* -------------------------------------------------------------------- *)
 let s_get  = "_.[_]"
 let s_set  = "_.[_<-_]"
