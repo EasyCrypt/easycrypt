@@ -262,15 +262,13 @@ qed.
 lemma eq_duniformP ['a] (s1 s2 : 'a list) :
      (forall x, mem s1 x <=> mem s2 x)
  <=> (duniform s1 = duniform s2).
-proof. admit (* TODO: fix proof after change in eq_dratP *). qed.
-(*
+proof.
 rewrite -MRat.eq_dratP; split=> h.
   apply/MRat.perm_eq_ratl/uniq_perm_eq; rewrite ?undup_uniq=> //.
   by move=> x; rewrite !mem_undup; apply/h.
 move=> x; rewrite -(@mem_undup s1) -(@mem_undup s2).
 by apply/MRat.ratl_mem.
 qed.
-*)
 
 lemma duniformE ['a] (E : 'a -> bool) (s : 'a list) :
   mu (duniform s) E = (count E (undup s))%r / (size (undup s))%r.
