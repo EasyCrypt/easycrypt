@@ -57,7 +57,12 @@ by apply/le1_mu_x.
 qed.
 
 lemma ge0_weight ['a] (d : 'a distr) : 0%r <= weight d.
-proof. admit. qed.
+proof.
+rewrite -sum0<:'a> muE; apply/RealSeries.ler_sum=> /=; first last.
++ by apply/summable0.
++ by rewrite -(@eq_summable (mu_x d)) ?summable_mu_x.
++ by move=> x @/predT /=; apply/ge0_mu_x.
+qed.
 
 lemma weight_eq0 ['a] (d : 'a distr) :
   weight d = 0%r => (forall x, mu_x d x = 0%r).
@@ -148,8 +153,7 @@ lemma isdistr_drat (s : 'a list) : isdistr (mrat s).
 proof.
 rewrite /mrat; split=> /= [x|J uq_J].
   by rewrite divr_ge0 // le_fromint ?(count_ge0, size_ge0).
-rewrite -divr_suml -sumr_ofint.
-admit.
+rewrite -divr_suml -sumr_ofint. admit.
 qed.
 
 op drat ['a] (s : 'a list) = mk (mrat s).
