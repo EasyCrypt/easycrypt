@@ -192,6 +192,10 @@ by move=> x /mem_range lt_xJ /=; rewrite (@nth_map witness).
 qed.
 
 (* -------------------------------------------------------------------- *)
+lemma sum0 ['a]: sum<:'a> (fun _ => 0%r) = 0%r.
+proof. by rewrite (@sumE_fin _ []). qed.
+
+(* -------------------------------------------------------------------- *)
 lemma nosmt ler_psum (s1 s2 : 'a -> real) :
      (forall x, `|s1 x| <= `|s2 x|)
   => summable s2 => psum s1 <= psum s2.
