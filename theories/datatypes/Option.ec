@@ -39,6 +39,9 @@ proof. by []. qed.
 lemma nosmt oget_some (x : 'a): oget (Some x) = x.
 proof. by []. qed.
 
+lemma nosmt some_oget (x : 'a option): x <> None => x = Some (oget x)
+by case: x.
+
 lemma nosmt someI (x y:'a): Some x = Some y => x = y by [].
 
 lemma none_omap (f:'a -> 'b) ox:
