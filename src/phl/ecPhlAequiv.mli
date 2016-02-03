@@ -9,6 +9,9 @@
 open EcParsetree
 open EcCoreGoal
 
+val t_tohoare : FApi.backward
+val t_ofhoare : FApi.backward
+
 val t_toequiv : FApi.backward
 val t_ofequiv : FApi.backward
 

@@ -140,6 +140,7 @@
     "bypr"        , BYPR       ;        (* KW: tactic *)
     "byphoare"    , BYPHOARE   ;        (* KW: tactic *)
     "byequiv"     , BYEQUIV    ;        (* KW: tactic *)
+    "tohoare"     , TOHOARE    ;        (* KW: tactic *)
     "toequiv"     , TOEQUIV    ;        (* KW: tactic *)
     "fel"         , FEL        ;        (* KW: tactic *)
     "lap"         , LAP        ;        (* KW: tactic *)

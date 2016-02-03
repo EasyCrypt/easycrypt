@@ -26,6 +26,7 @@ type hlform = [`Any | `Pred | `Stmt]
 
 type hlkind = [
   | `Hoare  of hlform
+  | `AHoare of hlform
   | `PHoare of hlform
   | `Equiv  of hlform
   | `AEquiv of hlform
@@ -51,6 +52,7 @@ let tc_error_noXhl ?(kinds : hlkinds option) pf =
     let kind, fm =
       match kind with
       | `Hoare  fm -> ("hoare" , fm)
+      | `AHoare fm -> ("ahoare", fm)
       | `PHoare fm -> ("phoare", fm)
       | `Equiv  fm -> ("equiv" , fm)
       | `AEquiv fm -> ("aequiv", fm)

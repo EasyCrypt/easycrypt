@@ -16,6 +16,49 @@ module Mid = EcIdent.Mid
 module TTC = EcProofTyping
 
 (* -------------------------------------------------------------------- *)
+let t_tohoare_r (tc : tcenv1) =
+  match f_node (FApi.tc1_goal tc) with
+  | FahoareF ahf ->
+     let concl = f_hoareF ahf.ahf_pr ahf.ahf_f ahf.ahf_po in
+     let bp = f_real_le f_r0 ahf.ahf_b in
+     FApi.t_seq
+       (fun tc -> FApi.xmutate1 tc `ToHoare [bp; concl])
+       EcLowGoal.t_trivial tc
+
+  | FahoareS ahs ->
+     let concl =
+       f_hoareS ahs.ahs_m ahs.ahs_pr ahs.ahs_s ahs.ahs_po in
+     let bp = f_real_le f_r0 ahs.ahs_b in
+     FApi.t_seq
+       (fun tc -> FApi.xmutate1 tc `ToHoare [bp; concl])
+       EcLowGoal.t_trivial tc
+
+  | _ -> tc_error_noXhl ~kinds:[`AHoare `Any] !!tc
+
+(* -------------------------------------------------------------------- *)
+let t_ofhoare_r (tc : tcenv1) =
+  match f_node (FApi.tc1_goal tc) with
+  | FhoareF hf ->
+     let concl =
+       f_ahoareF ~b:f_r0 hf.hf_pr hf.hf_f hf.hf_po in
+     FApi.t_seq
+       (fun tc -> FApi.xmutate1 tc `ToHoare [concl])
+       EcLowGoal.t_trivial tc
+
+  | FhoareS hs ->
+     let concl =
+       f_ahoareS ~b:f_r0  hs.hs_m hs.hs_pr hs.hs_s hs.hs_po in
+     FApi.t_seq
+       (fun tc -> FApi.xmutate1 tc `ToHoare [concl])
+       EcLowGoal.t_trivial tc
+
+  | _ -> tc_error_noXhl ~kinds:[`AHoare `Any] !!tc
+
+(* -------------------------------------------------------------------- *)
+let t_tohoare = FApi.t_low0 "to-hoare" t_tohoare_r
+let t_ofhoare = FApi.t_low0 "of-hoare" t_ofhoare_r
+
+(* -------------------------------------------------------------------- *)
 let t_toequiv_r (tc : tcenv1) =
   match f_node (FApi.tc1_goal tc) with
   | FaequivF aef ->
@@ -61,7 +104,7 @@ let t_ofequiv_r (tc : tcenv1) =
 
 (* -------------------------------------------------------------------- *)
 let t_toequiv = FApi.t_low0 "to-equiv" t_toequiv_r
-let t_ofequiv = FApi.t_low0 "to-equiv" t_ofequiv_r
+let t_ofequiv = FApi.t_low0 "ofx-equiv" t_ofequiv_r
 
 (* -------------------------------------------------------------------- *)
 let rec t_lap_r (mode : lap_mode) (tc : tcenv1) =

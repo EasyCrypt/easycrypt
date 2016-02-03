@@ -2231,6 +2231,8 @@ let pp_hoareS (ppe : PPEnv.t) fmt hs =
 let pp_ahoareF (ppe : PPEnv.t) fmt ahf =
   let ppe = PPEnv.create_and_push_mem ppe ~active:true (EcFol.mhr, ahf.ahf_f) in
 
+  Format.fprintf fmt "b = %a\n%!" (pp_form ppe) ahf.ahf_b;
+  Format.fprintf fmt "@\n%!";
   Format.fprintf fmt "%a@\n%!" (pp_pre ppe) ahf.ahf_pr;
   Format.fprintf fmt "    %a@\n%!" (pp_funname ppe) ahf.ahf_f;
   Format.fprintf fmt "@\n%a%!" (pp_post ppe) ahf.ahf_po
@@ -2243,7 +2245,7 @@ let pp_ahoareS (ppe : PPEnv.t) fmt ahs =
   in
     Format.fprintf fmt "Context : %a@\n%!" (pp_funname ppe) (EcMemory.xpath ahs.ahs_m);
     Format.fprintf fmt "@\n%!";
-    Format.fprintf fmt "b = %a%!" (pp_form ppe) ahs.ahs_b;
+    Format.fprintf fmt "b = %a\n%!" (pp_form ppe) ahs.ahs_b;
     Format.fprintf fmt "@\n%!";
     Format.fprintf fmt "%a%!" (pp_pre ppe) ahs.ahs_pr;
     Format.fprintf fmt "@\n%!";

@@ -517,6 +517,7 @@
 %token TIME
 %token TIMEOUT
 %token TOEQUIV
+%token TOHOARE
 %token TOP
 %token TRANSITIVITY
 %token TRIVIAL
@@ -2610,6 +2611,9 @@ phltactic:
   (* aPRHL *)
 | TOEQUIV
     { Paprhl Atoequiv }
+
+| TOHOARE
+    { Paprhl Atohoare }
 
 | LAP
     { Paprhl (Alap `Null) }

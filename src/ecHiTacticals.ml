@@ -205,6 +205,7 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Pbd_equiv (nm, f1, f2)    -> EcPhlConseq.process_bd_equiv nm (f1, f2)
     | Pauto                     -> EcPhlAuto.t_auto
     | Paprhl Atoequiv           -> EcPhlAequiv.t_toequiv
+    | Paprhl Atohoare           -> EcPhlAequiv.t_tohoare
     | Paprhl (Alap x)           -> EcPhlAequiv.t_lap x
 
   in

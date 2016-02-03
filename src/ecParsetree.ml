@@ -567,6 +567,7 @@ type phltactic =
 
 and paprhl =
   | Atoequiv
+  | Atohoare
   | Alap of lap_mode
 
 and lap_mode = [`Gen of pformula pair | `Null]
