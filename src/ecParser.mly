@@ -2253,6 +2253,9 @@ seq_info:
 | LT LBRACKET e=sform AMP d=sform RBRACKET GT
     { PAppDiff (e, d) }
 
+| LT LBRACKET b=sform  GT
+    { PAppAcc b }
+
 revert:
 | cl=ioption(brace(loc(ipcore_name)+)) gp=genpattern*
   { { pr_clear = odfl [] cl; pr_genp = gp; } }

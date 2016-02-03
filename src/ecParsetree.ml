@@ -419,6 +419,7 @@ type call_info =
 type p_seq_info =
   | PAppBd   of p_bd_info
   | PAppDiff of pformula pair
+  | PAppAcc  of pformula
 
 and p_bd_info =
   | PAppSingle of pformula

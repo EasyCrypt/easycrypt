@@ -30,6 +30,28 @@ let t_hoare_app_r i phi tc =
 let t_hoare_app = FApi.t_low2 "hoare-app" t_hoare_app_r
 
 (* -------------------------------------------------------------------- *)
+let t_ahoare_app_r i (dir, b1) phi tc =
+  let ahs = tc1_as_ahoareS tc in
+  let s1, s2 = s_split i ahs.ahs_s in
+
+  let b2 = f_real_sub_simpl ahs.ahs_b b1 in
+
+  let (b1, b2) =
+    match dir with
+    | Backs -> (b1, b2)
+    | Fwds  -> (b2, b1)
+  in
+
+  let g1 = f_ahoareS_r
+    { ahs with ahs_b = b2; ahs_s = stmt s1; ahs_po = phi }  in
+  let g2 = f_ahoareS_r
+    { ahs with ahs_b = b1; ahs_pr = phi; ahs_s = stmt s2 } in
+
+  FApi.xmutate1 tc `AHlApp [g1; g2]
+
+let t_ahoare_app = FApi.t_low3 "hoare-app" t_ahoare_app_r
+
+(* -------------------------------------------------------------------- *)
 let t_bdhoare_app_r_low i (phi, pR, f1, f2, g1, g2) tc =
   let bhs = tc1_as_bdhoareS tc in
   let s1, s2 = s_split i bhs.bhs_s in
@@ -217,11 +239,17 @@ let process_phl_ae_info dir ae_info tc =
      (dir, (dp, ep))
 
 (* -------------------------------------------------------------------- *)
+let process_phl_ac_info dir b tc =
+  let b = b |> omap (TTC.tc1_process_form tc treal) |> odfl f_r0 in
+  (dir, b)
+
+(* -------------------------------------------------------------------- *)
 let process_app (side, dir, k, phi, seq_info) tc =
   let concl = FApi.tc1_goal tc in
 
   let is_bd_info = function None | Some (PAppBd   _) -> true | _ -> false in
   let is_ae_info = function None | Some (PAppDiff _) -> true | _ -> false in
+  let is_ac_info = function None | Some (PAppAcc  _) -> true | _ -> false in
 
   let as_bd_info =
     function
@@ -233,6 +261,12 @@ let process_app (side, dir, k, phi, seq_info) tc =
     function
     | None -> Some None
     | Some (PAppDiff ae) -> Some (Some ae)
+    | _  -> None
+
+  and as_ac_info =
+    function
+    | None -> Some None
+    | Some (PAppAcc b) -> Some (Some b)
     | _  -> None
   in
 
@@ -273,6 +307,12 @@ let process_app (side, dir, k, phi, seq_info) tc =
      let ae = process_phl_ae_info dir ae tc in
      let phi = TTC.tc1_process_aprhl_formula tc (get_single phi) in
      t_aequiv_app (i, j) ae phi tc
+
+  | Single i, _ when is_ac_info seq_info && is_ahoareS concl ->
+     let b   = oget (as_ac_info seq_info) in
+     let b   = process_phl_ac_info dir b tc in
+     let phi = TTC.tc1_process_Xhl_formula tc (get_single phi) in
+     t_ahoare_app i b phi tc
 
   | Single i, _ when is_bd_info seq_info && is_bdHoareS concl ->
       let bd_info = oget (as_bd_info seq_info) in

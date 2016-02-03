@@ -192,6 +192,8 @@ let tc1_pos_last_assert tc s = pf_pos_last_assert !!tc s
 (* -------------------------------------------------------------------- *)
 let pf_as_hoareF   pe c = as_phl (`Hoare  `Pred) (fun () -> destr_hoareF   c) pe
 let pf_as_hoareS   pe c = as_phl (`Hoare  `Stmt) (fun () -> destr_hoareS   c) pe
+let pf_as_ahoareF  pe c = as_phl (`AHoare `Pred) (fun () -> destr_ahoareF  c) pe
+let pf_as_ahoareS  pe c = as_phl (`AHoare `Stmt) (fun () -> destr_ahoareS  c) pe
 let pf_as_bdhoareF pe c = as_phl (`PHoare `Pred) (fun () -> destr_bdHoareF c) pe
 let pf_as_bdhoareS pe c = as_phl (`PHoare `Stmt) (fun () -> destr_bdHoareS c) pe
 let pf_as_equivF   pe c = as_phl (`Equiv  `Pred) (fun () -> destr_equivF   c) pe
@@ -203,6 +205,8 @@ let pf_as_eagerF   pe c = as_phl `Eager          (fun () -> destr_eagerF   c) pe
 (* -------------------------------------------------------------------- *)
 let tc1_as_hoareF   tc = pf_as_hoareF   !!tc (FApi.tc1_goal tc)
 let tc1_as_hoareS   tc = pf_as_hoareS   !!tc (FApi.tc1_goal tc)
+let tc1_as_ahoareF  tc = pf_as_ahoareF  !!tc (FApi.tc1_goal tc)
+let tc1_as_ahoareS  tc = pf_as_ahoareS  !!tc (FApi.tc1_goal tc)
 let tc1_as_bdhoareF tc = pf_as_bdhoareF !!tc (FApi.tc1_goal tc)
 let tc1_as_bdhoareS tc = pf_as_bdhoareS !!tc (FApi.tc1_goal tc)
 let tc1_as_equivF   tc = pf_as_equivF   !!tc (FApi.tc1_goal tc)

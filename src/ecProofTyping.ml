@@ -146,6 +146,7 @@ let tc1_process_Xhl_form ?side tc ty pf =
   let memory =
     match concl.f_node, side with
     | FhoareS   hs , None        -> hs.hs_m
+    | FahoareS  ahs, None        -> ahs.ahs_m
     | FbdHoareS hs , None        -> hs.bhs_m
     | FequivS   es , Some `Left  -> (mhr, snd es.es_ml)
     | FequivS   es , Some `Right -> (mhr, snd es.es_mr)
