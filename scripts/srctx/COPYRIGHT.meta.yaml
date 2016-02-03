@@ -13,7 +13,7 @@ root:
           required: true
         style:
           type: string
-          values: ["coq", "ocaml", "ec"]
+          values: ["coq", "ocaml", "ec", "elisp"]
           required: true
         copyrights:
           type: listofdicts
