@@ -72,7 +72,7 @@ module ARP = {
   }
 }.
 
-op q : { int | 0 < q } as gt0_q.
+op q : { int | 0 <= q } as ge0_q.
 
 (** To factor out the difficult step, we parameterize the PRP by a
     procedure that samples its output, and provide two instantiations
@@ -382,7 +382,7 @@ section CollisionProbability.
     * proc; inline *; wp; call (_: DBounder.FBounder.c <= q).
       - by proc; sp; if=> //=; inline*; sp; if=> //=; auto=> /#.
       - by proc; sp; if=> //=; inline*; sp; if=> //=; auto=> /#.
-      by auto=> /=; apply/ltrW/gt0_q.
+      by auto=> /=; apply/ge0_q.
     by sim.
   have ->: Pr[IND(ARP,DBounder(D)).main() @ &m: ARP.coll /\ DBounder.FBounder.c <= q]
            = Pr[FEL(D).main() @ &m: ARP.coll /\ FEL.c <= q].
@@ -413,19 +413,19 @@ section CollisionProbability.
           smt.
       - smt ml=0.
     by auto; progress; rewrite rng0 fcards0.
-  fel 2 FEL.c (fun x, q%r * mu uD (pred1 witness)) q (ARP.coll) [FEL(D).FBounder.f: (FEL.c < q); FEL(D).FBounder.fi: (FEL.c < q)]=> //.
-  + rewrite sumr_const count_predT size_range /= max_ler 1:ler_subr_addr 1:-ltzE 1:gt0_q.
+  fel 2 FEL.c (fun x, q%r * mu uD (pred1 witness)) (q + 1) (ARP.coll) [FEL(D).FBounder.f: (FEL.c < q); FEL(D).FBounder.fi: (FEL.c < q)]=> //.
+  + rewrite sumr_const count_predT size_range /= max_ler -Ring.IntID.addrA /= 1:ge0_q.
     rewrite -mulr_intr ofintR (powS 1) // pow1 fromintM mulrC mulrA.
     apply/RealOrder.ler_wpmul2r; first by smt w=mu_bounded.
-    apply/RealOrder.ler_wpmul2r; first by smt w=gt0_q.
-    smt ml=0.
+    by apply/RealOrder.ler_wpmul2r; first by smt w=ge0_q.
+  + smt ml=0.
   + by inline*; auto; rewrite dom0 fcards0.
   + proc; sp; if=> //=; first last.
     * hoare=> // /> &hr _ _ _.
-      by apply/RealOrder.mulr_ge0; smt w=(mu_bounded gt0_q).
+      by apply/RealOrder.mulr_ge0; smt w=(mu_bounded ge0_q).
     inline *; sp; if=> //=; last first.
     * hoare; auto=> // /> &hr _ _ _ _.
-      by apply/RealOrder.mulr_ge0; smt w=(mu_bounded gt0_q).
+      by apply/RealOrder.mulr_ge0; smt w=(mu_bounded ge0_q).
     sp; if=> //=.
     * wp; rnd (mem (rng ARP.m)); skip.
       progress.
@@ -434,14 +434,14 @@ section CollisionProbability.
         apply/RealOrder.lerr_eq/uD_suf; 1,2:rewrite uD_fu //.
         by apply/RealOrder.ler_wpmul2r; smt w=(mu_bounded lt_fromint ltrW).
       - by move: H6; rewrite H0.
-    * by hoare; auto=> //=; smt w=(RealOrder.mulr_ge0 mu_bounded gt0_q).
+    * by hoare; auto=> //=; smt w=(RealOrder.mulr_ge0 mu_bounded ge0_q).
   + move=> c; proc. rcondt 2; 1:by auto.
     sp; if=> //=.
     * by wp; call (_: true); auto=> /#.
     * by auto=> /#.
   + by move=> b c; proc; rcondf 2; auto.
-  + proc; sp; if=> //=; last by hoare=> //=; smt w=(RealOrder.mulr_ge0 mu_bounded gt0_q).
-    inline *; sp; if=> //=; last by hoare; auto; smt w=(RealOrder.mulr_ge0 mu_bounded gt0_q).
+  + proc; sp; if=> //=; last by hoare=> //=; smt w=(RealOrder.mulr_ge0 mu_bounded ge0_q).
+    inline *; sp; if=> //=; last by hoare; auto; smt w=(RealOrder.mulr_ge0 mu_bounded ge0_q).
     sp; if=> //=.
     * wp; rnd (mem (rng ARP.mi)); skip.
       progress.
@@ -450,7 +450,7 @@ section CollisionProbability.
         apply/RealOrder.lerr_eq/uD_suf; 1,2:rewrite uD_fu //.
         smt w=(RealOrder.ler_wpmul2r mu_bounded le_fromint ltrW).
       - by move: H6; rewrite H0.
-    * by hoare; auto; smt w=(RealOrder.mulr_ge0 mu_bounded gt0_q).
+    * by hoare; auto; smt w=(RealOrder.mulr_ge0 mu_bounded ge0_q).
   + move=> c; proc; rcondt 2; 1:by auto.
     sp; if=> //=.
     * by wp; call (_: true); auto=> /#.
