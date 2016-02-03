@@ -96,7 +96,12 @@ module Fun : sig
   val add   : xpath -> env -> env
 
   (* ------------------------------------------------------------------ *)
-  (* FIXME: what are these functions for? *)
+  val actmem_post :  memory -> xpath -> function_ -> memenv
+
+  val inv_memory : [`Left|`Right] -> env -> memenv
+
+  val inv_memenv : env -> env
+
   val prF_memenv : EcMemory.memory -> xpath -> env -> memenv
 
   val prF : xpath -> env -> env
@@ -107,11 +112,11 @@ module Fun : sig
 
   val hoareS : xpath -> env -> memenv * (funsig * function_def) * env
 
-  val actmem_post :  memory -> xpath -> function_ -> memenv
+  val ahoareF_memenv : xpath -> env -> memenv * memenv
 
-  val inv_memory : [`Left|`Right] -> env -> memenv
+  val ahoareF : xpath -> env -> env * env
 
-  val inv_memenv : env -> env
+  val ahoareS : xpath -> env -> memenv * (funsig * function_def) * env
 
   val equivF_memenv : xpath -> xpath -> env ->
     (memenv * memenv) * (memenv * memenv)

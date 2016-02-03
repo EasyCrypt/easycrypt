@@ -1596,6 +1596,11 @@ module Fun = struct
     let fd, memenv = actmem_body EcCoreFol.mhr path fun_ in
     memenv, fd, Memory.push_active memenv env
 
+  let ahoareF_memenv = hoareF_memenv
+
+  let ahoareF = hoareF
+  let ahoareS = hoareS
+
   let equivF_memenv path1 path2 env =
     let (ip1, _) = oget (ipath_of_xpath path1) in
     let (ip2, _) = oget (ipath_of_xpath path2) in

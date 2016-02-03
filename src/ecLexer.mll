@@ -61,6 +61,7 @@
     "aequiv"      , AEQUIV     ;        (* KW: prog *)
     "equiv"       , EQUIV      ;        (* KW: prog *)
     "hoare"       , HOARE      ;        (* KW: prog *)
+    "ahoare"      , AHOARE     ;        (* KW: prog *)
     "phoare"      , PHOARE     ;        (* KW: prog *)
     "islossless"  , LOSSLESS   ;        (* KW: prog *)
 

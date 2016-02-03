@@ -245,6 +245,7 @@ and pformula_r =
   | PFscope  of pqsymbol * pformula
 
   | PFhoareF   of pformula * pgamepath * pformula
+  | PFahoareF  of pformula * (pformula * pgamepath * pformula)
   | PFequivF   of pformula * (pgamepath * pgamepath) * pformula
   | PFaequivF  of paequiv
   | PFeagerF   of pformula * (pstmt * pgamepath * pgamepath * pstmt) * pformula

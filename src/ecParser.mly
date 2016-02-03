@@ -326,13 +326,13 @@
 %token<[`Raw|`Eq]> RING
 %token<[`Raw|`Eq]> FIELD
 
-
 %token ABORT
 %token ABBREV
 %token ABSTRACT
 %token ADMIT
 %token ADMITTED
 %token AEQUIV
+%token AHOARE
 %token ALGNORM
 %token ALIAS
 %token AMP
@@ -1021,6 +1021,8 @@ sform_u(P):
 
 | HOARE LBRACKET hb=hoare_body(P) RBRACKET { hb }
 
+| AHOARE LBRACKET hb=ahoare_body(P) RBRACKET { hb }
+
 | EQUIV LBRACKET eb=equiv_body(P) RBRACKET { eb }
 
 | AEQUIV LBRACKET eb=aequiv_body(P) RBRACKET { eb }
@@ -1127,6 +1129,11 @@ hoare_bd_cmp :
 hoare_body(P):
   mp=loc(fident) COLON pre=form_r(P) LONGARROW post=form_r(P)
     { PFhoareF (pre, mp, post) }
+
+ahoare_body(P):
+  LBRACKET bp=sform_r(P) RBRACKET mp=loc(fident)
+  COLON pre=form_r(P) LONGARROW post=form_r(P)
+    { PFahoareF (bp, (pre, mp, post)) }
 
 phoare_body(P):
   LBRACKET mp=loc(fident) COLON
@@ -1747,6 +1754,7 @@ axiom:
 | l=local  EQUIV x=ident pd=pgtybindings? COLON p=loc( equiv_body(none)) ao=axiom_tc
 | l=local AEQUIV x=ident pd=pgtybindings? COLON p=loc(aequiv_body(none)) ao=axiom_tc
 | l=local  HOARE x=ident pd=pgtybindings? COLON p=loc( hoare_body(none)) ao=axiom_tc
+| l=local AHOARE x=ident pd=pgtybindings? COLON p=loc(ahoare_body(none)) ao=axiom_tc
 | l=local PHOARE x=ident pd=pgtybindings? COLON p=loc(phoare_body(none)) ao=axiom_tc
 
     { mk_axiom ~local:l (x, None, pd, p) ao }

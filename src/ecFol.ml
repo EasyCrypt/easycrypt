@@ -629,10 +629,14 @@ type sform =
 
   | SFhoareF   of hoareF
   | SFhoareS   of hoareS
+  | SFahoareF  of ahoareF
+  | SFahoareS  of ahoareS
   | SFbdHoareF of bdHoareF
   | SFbdHoareS of bdHoareS
   | SFequivF   of equivF
   | SFequivS   of equivS
+  | SFaequivF  of aequivF
+  | SFaequivS  of aequivS
   | SFpr       of pr
 
   | SFother of form
@@ -667,13 +671,17 @@ let rec sform_of_form fp =
   | Fquant (q, [b]  , f) -> SFquant (q, b, lazy f)
   | Fquant (q, b::bs, f) -> SFquant (q, b, lazy (f_quant q bs f))
 
-  | FhoareF   hf -> SFhoareF   hf
-  | FhoareS   hs -> SFhoareS   hs
-  | FbdHoareF hf -> SFbdHoareF hf
-  | FbdHoareS hs -> SFbdHoareS hs
-  | FequivF   ef -> SFequivF   ef
-  | FequivS   es -> SFequivS   es
-  | Fpr       pr -> SFpr       pr
+  | FhoareF   hf  -> SFhoareF   hf
+  | FhoareS   hs  -> SFhoareS   hs
+  | FahoareF  ahf -> SFahoareF  ahf
+  | FahoareS  ahs -> SFahoareS  ahs
+  | FbdHoareF hf  -> SFbdHoareF hf
+  | FbdHoareS hs  -> SFbdHoareS hs
+  | FequivF   ef  -> SFequivF   ef
+  | FequivS   es  -> SFequivS   es
+  | FaequivF  aef -> SFaequivF  aef
+  | FaequivS  aes -> SFaequivS  aes
+  | Fpr       pr  -> SFpr       pr
 
   | Fop (op, ty) ->
       sform_of_op (op, ty) []

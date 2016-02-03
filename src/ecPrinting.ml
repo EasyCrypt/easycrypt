@@ -1506,6 +1506,23 @@ and pp_form_core_r (ppe : PPEnv.t) outer fmt f =
         (pp_form ppe) hs.hs_pr
         (pp_form ppe) hs.hs_po
 
+  | FahoareF ahf ->
+      let ppe =
+        PPEnv.create_and_push_mem ppe ~active:true (EcFol.mhr, ahf.ahf_f) in
+      Format.fprintf fmt "ahoare[@[<hov 2>[%a]@ %a :@ @[%a ==>@ %a@]@]]"
+        (pp_form ppe) ahf.ahf_b
+        (pp_funname ppe) ahf.ahf_f
+        (pp_form ppe) ahf.ahf_pr
+        (pp_form ppe) ahf.ahf_po
+
+  | FahoareS ahs ->
+      let ppe = PPEnv.push_mem ppe ~active:true ahs.ahs_m in
+      Format.fprintf fmt "ahoare[@[<hov 2>[%a]@ %a :@ @[%a ==>@ %a@]@]]"
+        (pp_form ppe) ahs.ahs_b
+        (pp_stmt_for_form ppe) ahs.ahs_s
+        (pp_form ppe) ahs.ahs_pr
+        (pp_form ppe) ahs.ahs_po
+
   | FequivF eqv ->
       let ppe =
         PPEnv.create_and_push_mems
@@ -2211,6 +2228,30 @@ let pp_hoareS (ppe : PPEnv.t) fmt hs =
     Format.fprintf fmt "%a%!" (pp_post ppe) hs.hs_po
 
 (* -------------------------------------------------------------------- *)
+let pp_ahoareF (ppe : PPEnv.t) fmt ahf =
+  let ppe = PPEnv.create_and_push_mem ppe ~active:true (EcFol.mhr, ahf.ahf_f) in
+
+  Format.fprintf fmt "%a@\n%!" (pp_pre ppe) ahf.ahf_pr;
+  Format.fprintf fmt "    %a@\n%!" (pp_funname ppe) ahf.ahf_f;
+  Format.fprintf fmt "@\n%a%!" (pp_post ppe) ahf.ahf_po
+
+(* -------------------------------------------------------------------- *)
+let pp_ahoareS (ppe : PPEnv.t) fmt ahs =
+  let ppe = PPEnv.push_mem ppe ~active:true ahs.ahs_m in
+  let ppnode = collect2_s ahs.ahs_s.s_node [] in
+  let ppnode = c_ppnode ~width:80 ppe ppnode
+  in
+    Format.fprintf fmt "Context : %a@\n%!" (pp_funname ppe) (EcMemory.xpath ahs.ahs_m);
+    Format.fprintf fmt "@\n%!";
+    Format.fprintf fmt "b = %a%!" (pp_form ppe) ahs.ahs_b;
+    Format.fprintf fmt "@\n%!";
+    Format.fprintf fmt "%a%!" (pp_pre ppe) ahs.ahs_pr;
+    Format.fprintf fmt "@\n%!";
+    Format.fprintf fmt "%a" (pp_node `Left) ppnode;
+    Format.fprintf fmt "@\n%!";
+    Format.fprintf fmt "%a%!" (pp_post ppe) ahs.ahs_po
+
+(* -------------------------------------------------------------------- *)
 let string_of_hrcmp = function
   | FHle -> "[<=]"
   | FHeq -> "[=]"
@@ -2390,6 +2431,8 @@ module PPGoal = struct
     | FbdHoareS hs  -> pp_bdhoareS ppe fmt hs
     | FhoareF   hf  -> pp_hoareF   ppe fmt hf
     | FhoareS   hs  -> pp_hoareS   ppe fmt hs
+    | FahoareF  ahf -> pp_ahoareF  ppe fmt ahf
+    | FahoareS  ahs -> pp_ahoareS  ppe fmt ahs
     | FequivF   ef  -> pp_equivF   ppe fmt ef
     | FequivS   es  -> pp_equivS   ppe fmt es
     | FaequivF  aef -> pp_aequivF  ppe fmt aef

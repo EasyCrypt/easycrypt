@@ -176,10 +176,14 @@ type sform =
 
   | SFhoareF   of hoareF
   | SFhoareS   of hoareS
+  | SFahoareF  of ahoareF
+  | SFahoareS  of ahoareS
   | SFbdHoareF of bdHoareF
   | SFbdHoareS of bdHoareS
   | SFequivF   of equivF
   | SFequivS   of equivS
+  | SFaequivF  of aequivF
+  | SFaequivS  of aequivS
   | SFpr       of pr
 
   | SFother of form

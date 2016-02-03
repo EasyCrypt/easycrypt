@@ -198,11 +198,14 @@ module PVM = struct
         check_binding (fst aes.aes_ml) s;
         check_binding (fst aes.aes_mr) s;
         EcFol.f_map (fun ty -> ty) aux f
-      | FhoareF _ | FbdHoareF _ ->
+      | FhoareF _ | FahoareF _ | FbdHoareF _ ->
         check_binding EcFol.mhr s;
         EcFol.f_map (fun ty -> ty) aux f
       | FhoareS hs ->
         check_binding (fst hs.hs_m) s;
+        EcFol.f_map (fun ty -> ty) aux f
+      | FahoareS ahs ->
+        check_binding (fst ahs.ahs_m) s;
         EcFol.f_map (fun ty -> ty) aux f
       | FbdHoareS hs ->
         check_binding (fst hs.bhs_m) s;
@@ -320,9 +323,9 @@ module PV = struct
       | Fapp(e, es) -> List.fold_left (aux env) (aux env fv e) es
       | Ftuple es   -> List.fold_left (aux env) fv es
       | Fproj(e,_)  -> aux env fv e
-      | FhoareF _  | FhoareS _ | FbdHoareF _  | FbdHoareS _
+      | FhoareF _  | FhoareS _ | FahoareF _ | FahoareS _
       | FequivF _ | FequivS _ | FaequivF _ | FaequivS _
-      | FeagerF _ | Fpr _ -> assert false
+      | FbdHoareF _  | FbdHoareS _ | FeagerF _ | Fpr _ -> assert false
     in
     aux env empty f
 
