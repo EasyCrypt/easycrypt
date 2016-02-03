@@ -135,7 +135,8 @@ check-xunit: ec.native
 license:
 	scripts/srctx/license COPYRIGHT.yaml \
 	  $(shell find src -name '*.ml' -o -name '*.ml[a-z]') \
-	  $(shell find theories -name '*.ec' -o -name '*.ec[a-z]')
+	  $(shell find theories -name '*.ec' -o -name '*.ec[a-z]') \
+	  $(shell find proofgeneral/easycrypt -name '*.el')
 
 clean:
 	$(OCAMLBUILD) -clean
