@@ -115,10 +115,11 @@ let rec t_lap_r (mode : lap_mode) (tc : tcenv1) =
   let (x2, ty2), (e2, a2) = tc1_instr_lap tc aes.aes_sr in
 
   match mode with
-  | `Null -> begin
+  | `Null k -> begin
+      let k   = TTC.tc1_process_form tc tint k in
       let rd1 = EcPV.e_read_r env EcPV.PV.empty a1 in
       let rd2 = EcPV.e_read_r env EcPV.PV.empty a2 in
-(*      let rf  = EcPV.f_read_r env EcPV.PV.empty aes.aes_pr in*)
+(* FIXME:     let rf  = EcPV.f_read_r env EcPV.PV.empty aes.aes_pr in*)
 
       if EcPV.PV.mem_pv env x1 rd1 || EcPV.PV.mem_pv env x2 rd2 then
         tc_error !!tc "lvalue of rnd-lap cannot occur in the lap argument";
@@ -126,23 +127,32 @@ let rec t_lap_r (mode : lap_mode) (tc : tcenv1) =
       let f1 = form_of_expr (fst aes.aes_ml) a1 in
       let f2 = form_of_expr (fst aes.aes_mr) a2 in
 
-      let f_dpriv = f_eq
-        (f_int_sub (f_pvar x1 ty1 (fst aes.aes_ml))
-                   (f_pvar x2 ty2 (fst aes.aes_mr)))
-        (f_int_sub f1 f2)
+      let f_lap1 = f_int_le (f_int_abs (f_int_sub f1 f2)) k
+      and f_lap2 =
+        f_int_le
+          (f_int_abs
+             (f_int_sub 
+                (f_pvar x1 ty1 (fst aes.aes_ml))
+                (f_pvar x2 ty2 (fst aes.aes_mr))))
+          k
       in
 
-      let ep    = f_real_le f_r0 aes.aes_ep in
-      let dp    = f_real_le f_r0 aes.aes_dp in
-      let concl = f_imps [aes.aes_pr; f_dpriv] aes.aes_po in
-      let concl = f_forall_mems [aes.aes_ml; aes.aes_mr] concl in
+      let eqe    = f_eq (form_of_expr mhr e1) (form_of_expr mhr e2) in
+      let ep     = f_real_le f_r0 aes.aes_ep in
+      let dp     = f_real_le f_r0 aes.aes_dp in
+      let concl1 = f_imp aes.aes_pr f_lap1 in
+      let concl2 = f_imp (f_and aes.aes_pr f_lap2) aes.aes_po in
+
+      let concl1 = f_forall_mems [aes.aes_ml; aes.aes_mr] concl1 in
+      let concl2 = f_forall_mems [aes.aes_ml; aes.aes_mr] concl2 in
 
       FApi.t_seq
-        (fun tc -> FApi.xmutate1 tc `Lap [ep; dp; concl])
+        (fun tc -> FApi.xmutate1 tc `Lap [eqe; ep; dp; concl1; concl2])
         EcLowGoal.t_trivial tc
     end
 
-  | `Gen (k, k') -> begin
+  | `Gen _ -> begin assert false
+(*
      let k  = TTC.tc1_process_form tc treal k  in
      let k' = TTC.tc1_process_form tc treal k' in
 
@@ -174,6 +184,7 @@ let rec t_lap_r (mode : lap_mode) (tc : tcenv1) =
         (fun tc -> FApi.xmutate1 tc `Lap
            [eqe; eqk; ep; dp; concl1; concl2])
         EcLowGoal.t_trivial tc
+ *)
     end
 
 (*-------------------------------------------------------------------- *)

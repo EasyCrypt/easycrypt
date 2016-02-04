@@ -48,13 +48,14 @@ module CI_Int = struct
 
   let _Int = fun x -> EcPath.pqname p_Int x
 
+  let p_int_abs  = _Int "`|_|"
   let p_int_elim = _Int "intind"
-  let p_int_opp = _Int "[-]"
-  let p_int_add = _Int "+"
-  let p_int_mul = _Int "*"
-  let p_int_pow = _Int "^"
-  let p_int_le  = _Int "<="
-  let p_int_lt  = _Int "<"
+  let p_int_opp  = _Int "[-]"
+  let p_int_add  = _Int "+"
+  let p_int_mul  = _Int "*"
+  let p_int_pow  = _Int "^"
+  let p_int_le   = _Int "<="
+  let p_int_lt   = _Int "<"
 end
 
 (* -------------------------------------------------------------------- *)

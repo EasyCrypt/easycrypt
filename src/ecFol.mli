@@ -37,6 +37,9 @@ val f_eqglob:
 val f_int_le  : form -> form -> form
 val f_int_lt  : form -> form -> form
 
+(* soft-constructors - abs *)
+val f_int_abs : form -> form
+
 (* soft-constructors - reals *)
 val f_rint : zint -> form
 val f_real_of_int : form -> form

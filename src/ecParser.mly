@@ -2618,8 +2618,8 @@ phltactic:
 | TOHOARE
     { Paprhl Atohoare }
 
-| LAP
-    { Paprhl (Alap `Null) }
+| LAP k=sform
+    { Paprhl (Alap (`Null k)) }
 
 | LAP k1=sform k2=sform
     { Paprhl (Alap (`Gen (k1, k2))) }

@@ -67,6 +67,7 @@ module CI_Int : sig
 
   val p_int_elim : path
 
+  val p_int_abs : path
   val p_int_opp : path
   val p_int_add : path
   val p_int_mul : path

@@ -76,6 +76,7 @@ let destr_rint f =
 (* -------------------------------------------------------------------- *)
 let fop_int_le     = f_op CI.CI_Int .p_int_le    [] (toarrow [tint ; tint ] tbool)
 let fop_int_lt     = f_op CI.CI_Int .p_int_lt    [] (toarrow [tint ; tint ] tbool)
+let fop_int_abs    = f_op CI.CI_Int .p_int_abs   [] (toarrow [tint]         tint )
 let fop_real_le    = f_op CI.CI_Real.p_real_le   [] (toarrow [treal; treal] tbool)
 let fop_real_lt    = f_op CI.CI_Real.p_real_lt   [] (toarrow [treal; treal] tbool)
 let fop_real_add   = f_op CI.CI_Real.p_real_add  [] (toarrow [treal; treal] treal)
@@ -84,8 +85,9 @@ let fop_real_mul   = f_op CI.CI_Real.p_real_mul  [] (toarrow [treal; treal] trea
 let fop_real_inv   = f_op CI.CI_Real.p_real_inv  [] (toarrow [treal]        treal)
 let fop_real_abs   = f_op CI.CI_Real.p_real_abs  [] (toarrow [treal]        treal)
 
-let f_int_le f1 f2 = f_app fop_int_le [f1; f2] tbool
-let f_int_lt f1 f2 = f_app fop_int_lt [f1; f2] tbool
+let f_int_le  f1 f2 = f_app fop_int_le  [f1; f2] tbool
+let f_int_lt  f1 f2 = f_app fop_int_lt  [f1; f2] tbool
+let f_int_abs f     = f_app fop_int_abs [f]      tint
 
 (* -------------------------------------------------------------------- *)
 let f_real_le  f1 f2 = f_app fop_real_le  [f1; f2] tbool
