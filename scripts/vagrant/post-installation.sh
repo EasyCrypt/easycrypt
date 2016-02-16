@@ -17,10 +17,10 @@ OVERSION=4.02.1
 msg "Installing dependencies from Ubuntu packages."
 
 sudo apt-get update
-sudo DEBIAN_FRONTEND=noninteractive apt-get upgrade
+sudo DEBIAN_FRONTEND=noninteractive apt-get -yy upgrade
 sudo DEBIAN_FRONTEND=noninteractive apt-get install \
-  -yy git m4 opam libgmp-dev libpcre3-dev pkg-config emacs24
-apt-get clean
+  -yy git m4 opam libgmp-dev libpcre3-dev libzip-dev pkg-config emacs24
+sudo apt-get clean
 
 # --------------------------------------------------------------------
 msg "Initializing opam."
@@ -34,7 +34,6 @@ opam update
 # --------------------------------------------------------------------
 msg "Installing EasyCrypt and dependencies from OPAM packages."
 
-opam install ec-toolchain
 opam install ec-toolchain ec-provers
 why3 config --detect
 

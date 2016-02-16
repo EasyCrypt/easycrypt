@@ -29,6 +29,10 @@ Vagrant.configure(2) do |config|
       vb.customize ["modifyvm", :id, "--vram", "128"]
       vb.customize ["modifyvm", :id, "--accelerate3d", "off"]
       vb.customize ["modifyvm", :id, "--clipboard", "bidirectional"]
+      vb.customize ["modifyvm", :id, "--usb", "on"]
+      vb.customize ["modifyvm", :id, "--usbehci", "off"]
+      vb.customize ["modifyvm", :id, "--usbxhci", "off"]
+      vb.customize ["modifyvm", :id, "--audio", "none"]
     end
 
     config.vm.provision "shell", binary: true, privileged: false do |s|
