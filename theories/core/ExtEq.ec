@@ -21,7 +21,7 @@ lemma nosmt fsym   (f g   : 'a -> 'b): f == g => g == f by [].
 lemma nosmt ftrans (f g h : 'a -> 'b): f == g => g == h => f == h by [].
 
 (* -------------------------------------------------------------------- *)
-axiom fun_ext ['a 'b] (f g:'a -> 'b): f == g <=> f = g.
+axiom fun_ext ['a 'b] (f g:'a -> 'b): f = g <=> f == g.
 
 (* -------------------------------------------------------------------- *)
 lemma econgr1 ['a 'b] (f g : 'a -> 'b) x y: f == g => x = y => f x = g y.

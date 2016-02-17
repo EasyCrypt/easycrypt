@@ -340,7 +340,7 @@ lemma mu_dlet (d : 'a distr) (f : 'a -> 'b distr) (P : 'b -> bool):
       sum<:'a> (fun a =>
         if P b then mu_x d a * mu_x (f a) b else 0%r)).
 proof.
-rewrite muE; have:= mux_dlet d f; rewrite (@fun_ext (mu_x _))=> -> /=.
+rewrite muE; have:= mux_dlet d f; rewrite -(@fun_ext (mu_x _))=> -> /=.
 by apply/eq_sum=> /= b; case: (P b)=> //=; rewrite sum0.
 qed.
 
@@ -465,7 +465,7 @@ lemma mu_dscale ['a] (d : 'a distr) (E : 'a -> bool) :
   mu (dscale d) E = mu d E / weight d.
 proof.
 rewrite muE. have:= mux_dscale d.
-rewrite fun_ext -(@etaE (mu_x (dscale d))) etaP=> -> /=.
+rewrite -fun_ext -(@etaE (mu_x (dscale d))) etaP=> -> /=.
 apply/(@eq_trans _ ((sum (fun x=> if E x then mu_x d x else 0%r)) / weight d)).
 + admit. (* push constant multiplicative factors out of sums when non-null *)
 by rewrite -muE.
@@ -482,7 +482,7 @@ qed.
 lemma support_dscale ['a] (d : 'a distr) :
   support (dscale d) = support d.
 proof.
-rewrite -fun_ext /support /in_supp=> x; rewrite eq_iff mux_dscale.
+rewrite fun_ext /support /in_supp=> x; rewrite eq_iff mux_dscale.
 case: (weight d = 0%r)=> [^/weight_eq0 -> ->|d_nonempty].
 + by rewrite divr0.
 smt w=ge0_weight.

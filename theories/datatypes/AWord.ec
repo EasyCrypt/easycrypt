@@ -45,9 +45,7 @@ axiom landwDl (x y z:word): land (x ^ y) z = land x z ^ land y z.
 axiom landI (x:word): land x x = x.
 
 lemma subwE : ( ^ ) = fun (x y: word), x ^ lopp y.
-proof.
-  rewrite -ExtEq.fun_ext => x; rewrite -ExtEq.fun_ext => y; smt.
-qed.
+proof. by rewrite ExtEq.fun_ext => x; rewrite ExtEq.fun_ext => y /#. qed.
 
 (** View bitstring as a ring *)
 require (*--*) Ring.
