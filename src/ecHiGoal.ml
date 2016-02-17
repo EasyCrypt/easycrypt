@@ -1026,7 +1026,7 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
           else
             match unloc s with
             | `Revert      -> Some (Some false, EcIdent.create "_")
-            | `Clear       -> Some (Some true , LDecl.fresh_id hyps name)
+            | `Clear       -> Some (Some true , EcIdent.create "_")
             | `Named s     -> Some (None      , EcIdent.create s)
             | `Anonymous a ->
                match a, kind with
