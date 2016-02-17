@@ -393,7 +393,6 @@
 %token FIRST
 %token FISSION
 %token FORALL
-%token FROM_INT
 %token FUN
 %token FUSION
 %token FWDS
@@ -794,22 +793,23 @@ sexpr_u:
 | e=sexpr PCENT p=uqident
    { PEscope (p, e) }
 
-| e=sexpr PCENT p=lident
-   { if unloc p <> "top" then
-       parse_error p.pl_loc (Some "invalid scope name");
-     PEscope (pqsymb_of_symb p.pl_loc "<top>", e) }
+| e=sexpr p=loc(prefix(PCENT, lident))
+   { let { pl_loc = lc; pl_desc = p; } = p in
+     if unloc p = "r" then
+       let id =
+         PEident (mk_loc lc EcCoreLib.s_real_of_int, None)
+       in PEapp (mk_loc lc id, [e])
+     else begin
+       if unloc p <> "top" then
+         parse_error p.pl_loc (Some "invalid scope name");
+       PEscope (pqsymb_of_symb p.pl_loc "<top>", e)
+     end }
 
 | n=uint
    { PEint n }
 
 | x=qoident ti=tvars_app?
    { PEident (x, ti) }
-
-| se=sexpr op=loc(FROM_INT)
-   { let id =
-       PEident (mk_loc op.pl_loc EcCoreLib.s_real_of_int, None)
-     in
-       PEapp (mk_loc op.pl_loc id, [se]) }
 
 | se=sexpr DLBRACKET ti=tvars_app? e=expr RBRACKET
    { peget (EcLocation.make $startpos $endpos) ti se e }
@@ -967,8 +967,20 @@ sform_u(P):
 | x=P
    { x }
 
-| f=sform_r(P) PCENT p=qident
+| f=sform_r(P) PCENT p=uqident
    { PFscope (p, f) }
+
+| f=sform_r(P) p=loc(prefix(PCENT, lident))
+   { let { pl_loc = lc; pl_desc = p; } = p in
+     if unloc p = "r" then
+       let id =
+         PFident (mk_loc lc EcCoreLib.s_real_of_int, None)
+       in PFapp (mk_loc lc id, [f])
+     else begin
+       if unloc p <> "top" then
+         parse_error p.pl_loc (Some "invalid scope name");
+       PFscope (pqsymb_of_symb p.pl_loc "<top>", f)
+     end }
 
 | n=uint
    { PFint n }
@@ -981,10 +993,6 @@ sform_u(P):
 
 | x=mident
    { PFmem x }
-
-| se=sform_r(P) op=loc(FROM_INT)
-   { let id = PFident(mk_loc op.pl_loc EcCoreLib.s_real_of_int, None) in
-     PFapp (mk_loc op.pl_loc id, [se]) }
 
 | se=sform_r(P) DLBRACKET ti=tvars_app? e=form_r(P) RBRACKET
    { pfget (EcLocation.make $startpos $endpos) ti se e }

@@ -375,7 +375,6 @@ rule main = parse
   | ".["    { [DLBRACKET] }
   | ".`"    { [DOTTICK  ] }
   | "{0,1}" { [RBOOL    ] }
-  | "%r"    { [FROM_INT ] }
 
   (* position *)
   | (digit+ ['.' '?'])+ digit+ {

@@ -605,6 +605,7 @@ let e_uni_prio_lsless = 10000
 let e_uni_prio_uminus = fst e_bin_prio_lop2
 let e_app_prio        = (10000, `Infix `Left)
 let e_get_prio        = (20000, `Infix `Left)
+let e_uni_prio_rint   = (100, `Postfix)
 
 let min_op_prec = (-1     , `Infix `NonAssoc)
 let max_op_prec = (max_int, `Infix `NonAssoc)
@@ -965,7 +966,7 @@ let pp_opapp
     | [e] when qs = EcCoreLib.s_real_of_int ->
         let pp fmt () =
           Format.fprintf fmt "%a%%r"
-            (pp_sub ppe (fst outer, (max_op_prec, `NonAssoc))) e
+            (pp_sub ppe (fst outer, (e_uni_prio_rint, `NonAssoc))) e
         in
           Some pp
 
