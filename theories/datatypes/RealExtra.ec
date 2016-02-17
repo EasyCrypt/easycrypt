@@ -61,11 +61,13 @@ by [].
 
 lemma nosmt le_fromint (z1 z2 : int) :
   (z1%r <= z2%r) <=> (z1 <= z2)
-by [].
+by smt ml=0.
 
 lemma nosmt lt_fromint (z1 z2 : int) :
   (z1%r < z2%r) <=> (z1 < z2)
-by [].
+by smt ml=0.
+
+lemma nosmt fromint_abs  (z : int) : (`|z|)%r = `|z%r| by smt ml=0.
 
 hint rewrite lte_fromint : le_fromint lt_fromint.
 
