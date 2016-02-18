@@ -1821,6 +1821,13 @@ let process_congr tc =
       let tt2 = t_logic_trivial in
       FApi.t_seqs [tt0; tt1; tt2] tc
 
+  | Fif (_, { f_ty = cty }, _), Fif _ ->
+     let tt0 tc =
+       let hyps = FApi.tc1_hyps tc in
+       EcLowGoal.Apply.t_apply_bwd_r
+         (PT.pt_of_global !!tc hyps LG.p_if_congr [cty]) tc
+     in FApi.t_seqs [tt0; t_logic_trivial] tc
+
   | Ftuple _, Ftuple _ when iseq ->
       FApi.t_seqs [t_split; t_logic_trivial] tc
 

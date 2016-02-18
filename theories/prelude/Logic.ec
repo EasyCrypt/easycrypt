@@ -240,6 +240,11 @@ lemma nosmt ifI : forall (a bt bf : bool),
   (a => bt) => (!a => bf) => if a then bt else bf
 by [].
 
+lemma nosmt if_congr ['a] (e e' : bool) (c1 c2 c1' c2': 'a) :
+     e = e' => c1 = c1' => c2 = c2'
+  => (if e then c1 else c2) = (if e' then c1' else c2')
+by [].
+
 lemma nosmt if_det a (bt bf:'a):
   bt = bf =>
   (if a then bt else bf) = bt

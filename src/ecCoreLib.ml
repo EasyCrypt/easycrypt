@@ -128,6 +128,7 @@ module CI_Logic = struct
   let p_ora_intro_r   = _Logic "oraIr"
   let p_iff_intro     = _Logic "iffI"
   let p_if_intro      = _Logic "ifI"
+  let p_if_congr      = _Logic "if_congr"
   let p_eq_refl       = _Logic "eq_refl"
   let p_eq_trans      = _Logic "eq_trans"
   let p_eq_iff        = _Logic "eq_iff"
