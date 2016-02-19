@@ -509,6 +509,10 @@ let get_e_projarg ppe e i =
   | _ -> raise NoProjArg
 
 (* -------------------------------------------------------------------- *)
+
+let pp_modtype1 (ppe : PPEnv.t) fmt mty = 
+  EcSymbols.pp_msymbol fmt (PPEnv.modtype_symb ppe mty)
+  
 let pp_modtype (ppe : PPEnv.t) fmt ((mty, r) : module_type * _) =
   let pp_restr fmt (rx,r) =
     let pp_rx fmt rx =
@@ -521,8 +525,7 @@ let pp_modtype (ppe : PPEnv.t) fmt ((mty, r) : module_type * _) =
     | true, false -> Format.fprintf fmt "{@[%a@]}" pp_r r
     | false, true -> Format.fprintf fmt "{@[%a@]}" pp_rx rx
     | false, false -> Format.fprintf fmt "{@[%a,@ %a@]}" pp_rx rx pp_r r in
-  Format.fprintf fmt "%a%a"
-    EcSymbols.pp_msymbol (PPEnv.modtype_symb ppe mty) pp_restr r
+  Format.fprintf fmt "%a%a" (pp_modtype1 ppe) mty pp_restr r
 
 (* -------------------------------------------------------------------- *)
 let pp_local (ppe : PPEnv.t) fmt x =

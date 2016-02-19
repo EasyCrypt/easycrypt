@@ -1271,8 +1271,7 @@ module Mod = struct
     if ptm.ptm_local && not (EcSection.in_section scope.sc_section) then
       hierror "cannot declare a local module outside of a section";
 
-    let { ptm_name = name; ptm_body = m; } = ptm in
-    let m = TT.transmod scope.sc_env ~attop:true (unloc name) m in
+    let m = TT.transmod scope.sc_env ~attop:true ptm in
 
     if not ptm.ptm_local then begin
       match EcSection.olocals scope.sc_section with

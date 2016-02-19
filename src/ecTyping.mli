@@ -34,6 +34,8 @@ type tymod_cnv_failure =
 | E_TyModCnv_ParamTypeMismatch of EcIdent.t
 | E_TyModCnv_MissingComp       of symbol
 | E_TyModCnv_MismatchFunSig    of symbol * mismatch_funsig
+| E_TyModCnv_SubTypeArg        of 
+    EcIdent.t * module_type * module_type * tymod_cnv_failure
 
 type modapp_error =
 | MAE_WrongArgCount      of int * int  (* expected, got *)
@@ -147,7 +149,7 @@ val trans_pattern  : env -> (ptnmap * EcUnify.unienv) -> pformula -> EcFol.form
 (* -------------------------------------------------------------------- *)
 val transmodsig  : env -> symbol -> pmodule_sig  -> module_sig
 val transmodtype : env -> pmodule_type -> module_type * module_sig
-val transmod     : attop:bool -> env -> symbol -> pmodule_expr -> module_expr
+val transmod     : attop:bool -> env -> pmodule_def -> module_expr
 
 val trans_topmsymbol : env -> pmsymbol located -> mpath
 val trans_msymbol    : env -> pmsymbol located -> mpath * module_sig

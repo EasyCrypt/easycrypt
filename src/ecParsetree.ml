@@ -148,22 +148,30 @@ and pfunction_decl = {
 }
 
 (* -------------------------------------------------------------------- *)
+
+and pmodule_def = {
+  ptm_header : pmodule_header;
+  ptm_body   : pmodule_expr;
+  ptm_local  : bool;
+}
+
+and pmodule_header = 
+  | Pmh_ident  of psymbol
+  | Pmh_params of (pmodule_header * pmodule_params) located
+  | Pmh_cast   of pmodule_header * pqsymbol list
+
 and pmodule_params = (psymbol * pmodule_type) list
 
 and pmodule_expr_r =
-  | Pm_ident  of pmodule_params * pmsymbol
+  | Pm_ident  of pmsymbol
   | Pm_struct of pstructure
 
 and pmodule_expr = pmodule_expr_r located
 
-and pstructure = {
-  ps_params    : pmodule_params;
-  ps_body      : pstructure_item located list;
-  ps_signature : ((pqsymbol * psymbol list) located) list;
-}
-
+and pstructure = pstructure_item located list
+ 
 and pstructure_item =
-  | Pst_mod    of (psymbol * pmodule_expr)
+  | Pst_mod    of (psymbol * pqsymbol list * pmodule_expr)
   | Pst_var    of (psymbol list * pty)
   | Pst_fun    of (pfunction_decl * pfunction_body)
   | Pst_alias  of (psymbol * pgamepath)
@@ -180,13 +188,8 @@ and pfunction_local = {
   pfl_init  : pexpr option;
 }
 
-and pmodule_def = {
-  ptm_name  : psymbol;
-  ptm_body  : pmodule_expr;
-  ptm_local : bool;
-}
 
-and pmodule_decl = {
+type pmodule_decl = {
   ptmd_name  : psymbol;
   ptmd_modty : pmodule_type_restr;
 }

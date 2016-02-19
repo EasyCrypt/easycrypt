@@ -43,6 +43,8 @@ type tymod_cnv_failure =
 | E_TyModCnv_ParamTypeMismatch of EcIdent.t
 | E_TyModCnv_MissingComp       of symbol
 | E_TyModCnv_MismatchFunSig    of symbol * mismatch_funsig
+| E_TyModCnv_SubTypeArg        of
+    EcIdent.t * module_type * module_type * tymod_cnv_failure
 
 type modapp_error =
 | MAE_WrongArgCount       of int * int  (* expected, got *)
@@ -437,7 +439,12 @@ let rec check_sig_cnv mode (env:EcEnv.env) (sin:module_sig) (sout:module_sig) =
     List.fold_left2
       (fun subst (xin, tyin) (xout, tyout) ->
         let tyout = EcSubst.subst_modtype subst tyout in
-        check_modtype_cnv ~mode env tyout tyin;
+        begin 
+          try check_modtype_cnv ~mode env tyout tyin
+          with TymodCnvFailure err ->
+            tymod_cnv_failure 
+              (E_TyModCnv_SubTypeArg(xin, tyout, tyin, err))
+        end;
         EcSubst.add_module subst xout (EcPath.mident xin))
       EcSubst.empty sin.mis_params sout.mis_params
   in
@@ -1394,10 +1401,55 @@ and transmodsig_body (env : EcEnv.env) (sa : Sm.t)
       items
 
 (* -------------------------------------------------------------------- *)
-let rec transmod ~attop (env : EcEnv.env) (x : symbol) (me : pmodule_expr) =
+let rec transmod ~attop (env : EcEnv.env) (me : pmodule_def) =
+  snd (transmod_header ~attop env me.ptm_header [] me.ptm_body) 
+
+(* -------------------------------------------------------------------- *)
+and transmod_header
+   ~attop (env : EcEnv.env) (mh:pmodule_header) params (me:pmodule_expr) =
+  match mh with
+  | Pmh_ident x -> 
+    0, transmod_body ~attop env x params me
+  | Pmh_params {pl_desc = (mh,params')} ->
+    let n, me = transmod_header ~attop env mh (params' @ params) me in
+    n + List.length params', me
+  | Pmh_cast(mh, mts) ->
+    let n, me = transmod_header ~attop env mh params me in
+    (* Compute the signature at the given position,
+       i.e: remove the n first argument *)
+    let rm,mis_params = List.takedrop n me.me_sig.mis_params in
+    let rm =
+      List.fold_left (fun mparams (id,_) ->
+        Sm.add (EcPath.mident id) mparams) Sm.empty rm in
+    let filter f =
+      let ftop = EcPath.m_functor f.EcPath.x_top in
+      not (Sm.mem ftop rm) in 
+    let clear (Tys_function(fsig,oi)) = 
+      Tys_function(fsig, {oi with oi_calls = List.filter filter oi.oi_calls}) in
+    let mis_body = List.map clear me.me_sig.mis_body in
+    let tymod = { mis_params; mis_body } in
+    (* Check that the signature is a subtype *)
+    let check s = 
+      let (aty, _asig) = transmodtype env s in
+      try  check_sig_mt_cnv env tymod aty
+      with TymodCnvFailure err -> tyerror s.pl_loc env (TypeModMismatch err) in
+    List.iter check mts;
+    n,me
+     
+
+(* -------------------------------------------------------------------- *)
+and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
+  (* Check parameters types *) (* FIXME: dup names *)
+  let stparams =
+    List.map                          (* FIXME: exn *)
+      (fun (a, aty) ->
+         (EcIdent.create a.pl_desc, fst (transmodtype env aty)))
+      params
+  in
+  let env = EcEnv.Mod.enter x.pl_desc stparams env in
+
   match me.pl_desc with
-  | Pm_ident (params,m) ->
-    let stparams, env = transmod_params env x params in
+  | Pm_ident m ->
     let (mp, sig_) = trans_msymbol env {pl_desc = m; pl_loc = me.pl_loc} in
     let extraparams = sig_.mis_params in
     let allparams = stparams @ extraparams in
@@ -1406,36 +1458,22 @@ let rec transmod ~attop (env : EcEnv.env) (x : symbol) (me : pmodule_expr) =
         (InvalidModAppl (MAE_WrongArgCount(0,List.length allparams)));
     let me = EcEnv.Mod.by_mpath mp env in
     let arity = List.length stparams in
-    { me with
-      me_name  = x;
-      me_body  = ME_Alias (arity,mp);
-      me_sig   = { sig_ with mis_params = allparams };
-    }
-
-  | Pm_struct st -> transstruct ~attop env x (mk_loc me.pl_loc st)
-
+    let me = 
+      { me with
+        me_name  = x.pl_desc;
+        me_body  = ME_Alias (arity,mp);
+        me_sig   = { sig_ with mis_params = allparams };
+      } in
+    me
+  | Pm_struct ps ->
+    transstruct ~attop env x.pl_desc stparams (mk_loc me.pl_loc ps)
+   
 (* -------------------------------------------------------------------- *)
-and transmod_params env x params =
-    (* Check parameters types *) (* FIXME: dup names *)
-  let stparams =
-    List.map                          (* FIXME: exn *)
-      (fun (a, aty) ->
-         (EcIdent.create a.pl_desc, fst (transmodtype env aty)))
-      params
-  in
-
-  (* Check structure items, extending environment initially with
-   * structure arguments, and then with previously checked items. *)
-  let env = EcEnv.Mod.enter x stparams env in
-  stparams, env
-
-and transstruct ~attop (env : EcEnv.env) (x : symbol) (st : pstructure located) =
+and transstruct ~attop (env : EcEnv.env) (x : symbol) stparams (st:pstructure located) =
   let { pl_loc = loc; pl_desc = st; } = st in
 
-  if not attop && st.ps_params <> [] then
+  if not attop && stparams <> [] then
     tyerror loc env (InvalidModType MTE_InternalFunctor);
-
-  let stparams, env0 = transmod_params env x st.ps_params in
 
   let (envi, items) =
     let tydecl1 (x, obj) =
@@ -1449,7 +1487,7 @@ and transstruct ~attop (env : EcEnv.env) (x : symbol) (st : pstructure located) 
         let newitems = transstruct1 env item in
         let env = EcEnv.bindall (List.map tydecl1 newitems) env in
         (env, acc @ newitems))
-      (env0, []) st.ps_body
+      (env, []) st
   in
   let items = List.map snd items in
 
@@ -1485,10 +1523,19 @@ and transstruct ~attop (env : EcEnv.env) (x : symbol) (st : pstructure located) 
     in
 
     let sigitems = List.pmap tymod1 items in
-      { mis_params = stparams;
-        mis_body   = sigitems; };
+    { mis_params = stparams;
+      mis_body   = sigitems; };
   in
+  (* Construct structure representation *)
+  let me =
+    { me_name  = x;
+      me_body  = ME_Structure { ms_body = items; };
+      me_comps = items;
+      me_sig   = tymod; }
+  in
+  me
 
+(*
   (* Check that generated signature is structurally included in
    * associated type mode. *)
   let check1 { pl_desc = (aty, oatyp); pl_loc = loc } =
@@ -1514,22 +1561,18 @@ and transstruct ~attop (env : EcEnv.env) (x : symbol) (st : pstructure located) 
       with TymodCnvFailure err -> tyerror loc env0 (TypeModMismatch err)
   in
     List.iter check1 st.ps_signature;
-
-  (* Construct structure representation *)
-  let me =
-    { me_name  = x;
-      me_body  = ME_Structure { ms_body = items; };
-      me_comps = items;
-      me_sig   = tymod; }
-  in
-    me
-
+  *)
 (* -------------------------------------------------------------------- *)
 and transstruct1 (env : EcEnv.env) (st : pstructure_item located) =
   match unloc st with
-  | Pst_mod ({ pl_desc = m }, me) ->
-      let me = transmod ~attop:false env m me in
-        [(m, MI_Module me)]
+  | Pst_mod  (x,cast, me) ->
+    let pe = {
+      ptm_header = if cast=[] then Pmh_ident x else Pmh_cast(Pmh_ident x, cast);
+      ptm_body   = me;
+      ptm_local  = true } in
+
+    let me = transmod ~attop:false env pe in
+    [me.me_name, MI_Module me]
 
   | Pst_var (xs, ty) ->
       let ty = transty_for_decl env ty in
