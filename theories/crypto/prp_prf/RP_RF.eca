@@ -305,7 +305,7 @@ section CollisionProbability.
 
   (* We construct a Birthday Bound adversary from the IND
      experiment. *)
-  local module A(S:ASampler):Adv(S) = {
+  local module (A:Adv)(S:ASampler) = {
     (* We simulate an f-oracle using the s-oracle *)
     module F = {
       proc init = PRFi.init
