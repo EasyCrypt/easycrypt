@@ -189,8 +189,10 @@ end = struct
     | TypeClassMismatch ->
         msg "Type-class unification failure"
 
-    | TypeModMismatch err ->
-        msg "this module does not meet its interface:@\n";
+    | TypeModMismatch(mp, mt, err) ->
+        msg "the module %a does not have the module type %a:@\n"
+          (EcPrinting.pp_topmod env) mp
+          (EcPrinting.pp_modtype1 env) mt;
         msg "  @[<hov 2>%t@]" (fun fmt -> pp_cnv_failure env1 fmt err)
 
     | NotAFunction ->

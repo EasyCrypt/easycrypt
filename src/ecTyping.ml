@@ -85,7 +85,7 @@ type tyerror =
 | NonUnitFunWithoutReturn
 | TypeMismatch           of (ty * ty) * (ty * ty)
 | TypeClassMismatch
-| TypeModMismatch        of tymod_cnv_failure
+| TypeModMismatch        of mpath * module_type * tymod_cnv_failure
 | NotAFunction
 | AbbrevLowArgs
 | UnknownVarOrOp         of qsymbol * ty list
@@ -1418,12 +1418,12 @@ and transmod_header
     (* Compute the signature at the given position,
        i.e: remove the n first argument *)
     let rm,mis_params = List.takedrop n me.me_sig.mis_params in
-    let rm =
+    let torm =
       List.fold_left (fun mparams (id,_) ->
         Sm.add (EcPath.mident id) mparams) Sm.empty rm in
     let filter f =
       let ftop = EcPath.m_functor f.EcPath.x_top in
-      not (Sm.mem ftop rm) in 
+      not (Sm.mem ftop torm) in 
     let clear (Tys_function(fsig,oi)) = 
       Tys_function(fsig, {oi with oi_calls = List.filter filter oi.oi_calls}) in
     let mis_body = List.map clear me.me_sig.mis_body in
@@ -1432,7 +1432,10 @@ and transmod_header
     let check s = 
       let (aty, _asig) = transmodtype env s in
       try  check_sig_mt_cnv env tymod aty
-      with TymodCnvFailure err -> tyerror s.pl_loc env (TypeModMismatch err) in
+      with TymodCnvFailure err -> 
+        let args = List.map (fun (id,_) -> EcPath.mident id) rm in
+        let mp = mpath_crt (psymbol me.me_name) args None in 
+        tyerror s.pl_loc env (TypeModMismatch(mp, aty, err)) in
     List.iter check mts;
     n,me
      

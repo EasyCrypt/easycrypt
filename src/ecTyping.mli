@@ -76,7 +76,7 @@ type tyerror =
 | NonUnitFunWithoutReturn
 | TypeMismatch           of (ty * ty) * (ty * ty)
 | TypeClassMismatch
-| TypeModMismatch        of tymod_cnv_failure
+| TypeModMismatch        of mpath * module_type * tymod_cnv_failure
 | NotAFunction
 | AbbrevLowArgs
 | UnknownVarOrOp         of qsymbol * ty list
