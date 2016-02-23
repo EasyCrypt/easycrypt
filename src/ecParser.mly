@@ -443,6 +443,7 @@
 %token NOT
 %token NOTATION
 %token OF
+%token OFEQUIV
 %token OP
 %token PCENT
 %token PHOARE
@@ -2614,6 +2615,9 @@ phltactic:
   (* aPRHL *)
 | TOEQUIV
     { Paprhl Atoequiv }
+
+| OFEQUIV
+    { Paprhl Aofequiv }
 
 | TOHOARE
     { Paprhl Atohoare }

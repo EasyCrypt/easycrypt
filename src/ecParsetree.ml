@@ -568,6 +568,7 @@ type phltactic =
 
 and paprhl =
   | Atoequiv
+  | Aofequiv
   | Atohoare
   | Alap of lap_mode
 

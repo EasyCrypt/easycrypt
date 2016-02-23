@@ -142,6 +142,7 @@
     "byequiv"     , BYEQUIV    ;        (* KW: tactic *)
     "tohoare"     , TOHOARE    ;        (* KW: tactic *)
     "toequiv"     , TOEQUIV    ;        (* KW: tactic *)
+    "ofequiv"     , OFEQUIV    ;        (* KW: tactic *)
     "fel"         , FEL        ;        (* KW: tactic *)
     "lap"         , LAP        ;        (* KW: tactic *)
 
