@@ -88,7 +88,7 @@ let print_config config =
   Format.eprintf "System PATH:@\n%!";
   List.iter
     (fun x -> Format.eprintf "  %s@\n%!" x)
-    (Pcre.split ~pat:(Pcre.quote psep)
+    (EcRegexp.split0 (`S (EcRegexp.quote psep))
       (try Sys.getenv "PATH" with Not_found -> ""))
 
 (* -------------------------------------------------------------------- *)
@@ -97,8 +97,8 @@ let _ =
   and mydir   = Filename.dirname  Sys.executable_name in
 
   let eclocal =
-    let rex = Pcre.regexp "^ec\\.(?:native|byte)(?:\\.exe)?$" in
-    Pcre.pmatch ~rex myname
+    let rex = EcRegexp.regexp "^ec\\.(?:native|byte)(?:\\.exe)?$" in
+    EcRegexp.match_ (`C rex) myname
   in
 
   let bin =
@@ -138,7 +138,7 @@ let _ =
     let module E = struct exception Found of string end in
 
     let rootdir = resource ["_tools"] in
-    let regexp  = Pcre.regexp "^ocaml-[0-9.]+$" in
+    let regexp  = EcRegexp.regexp "^ocaml-[0-9.]+$" in
 
     if Sys.file_exists rootdir && Sys.is_directory rootdir then begin
       let dirs = Sys.readdir rootdir in
@@ -147,7 +147,7 @@ let _ =
         for i = 0 to (Array.length dirs) - 1 do
           let target = Filename.concat rootdir dirs.(i) in
             if Sys.is_directory target then
-              if Pcre.pmatch ~rex:regexp dirs.(i) then
+              if EcRegexp.match_ (`C regexp) dirs.(i) then
                 raise (E.Found target)
         done
       with E.Found target ->

@@ -202,8 +202,9 @@ let is_uniop (x : string) =
   | Some (EcParser.PUNIOP x) -> begin
     try
       let x =
-        try  Pcre.get_substring (Pcre.exec ~pat:"^\\[(.+)\\]$" x) 1
-        with Not_found -> x
+        EcRegexp.exec (`S "^\\[(.+)\\]$") x
+          |> omap (fun m -> oget (EcRegexp.Match.group m 1))
+          |> odfl x
       in
 
       let parse  = isuniop_fun () in

@@ -31,8 +31,8 @@ module Filename = struct
 
   let paths_of_string s =
     let rex = String.make 1 path_sep in
-    let rex = Pcre.regexp ((Pcre.quote rex) ^ "+") in
-    Pcre.split ~rex s
+    let rex = EcRegexp.regexp ((EcRegexp.quote rex) ^ "+") in
+    EcRegexp.split0 (`C rex) s
 end
 
 (* -------------------------------------------------------------------- *)

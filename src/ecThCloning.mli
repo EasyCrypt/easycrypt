@@ -76,7 +76,7 @@ and renaming_kind = [
 ]
 
 and renaming =
-  renaming_kind * (Pcre.regexp * Pcre.substitution)
+  renaming_kind * (EcRegexp.regexp * EcRegexp.subst)
 
 and rk_categories = {
   rkc_lemmas  : bool;
