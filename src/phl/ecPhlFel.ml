@@ -46,7 +46,7 @@ end = struct
     let bg   = f_op bg [tint] (toarrow bgty treal) in
     let prT  = EcPath.fromqsymbol ([i_top; "Pred"], "predT") in
     let prT  = f_op prT [tint] (tpred tint) in
-    fun f (m, n) -> f_app bg [prT; f; range m (f_int_add n f_i1)] treal
+    fun f (m, n) -> f_app bg [prT; f; range m n] treal
 
   let loaded (env : env) =
     is_some (EcEnv.Theory.by_path_opt p_Fel env)
