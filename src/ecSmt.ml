@@ -40,6 +40,7 @@ let w_t_lets vs ws w2 =
 
 (* -------------------------------------------------------------------- *)
 type w3_known_op = WTerm.lsymbol * WTheory.theory
+type w3_known_ty = WTy.tysymbol * WTheory.theory
 
 type w3ty = WTy.tysymbol
 
@@ -66,6 +67,7 @@ type w3absmod = {
 type tenv = {
   (*---*) te_env        : EcEnv.env;
   mutable te_task       : WTask.task;
+  (*---*) ty_known_w3   : w3_known_ty Hp.t;
   (*---*) te_known_w3   : w3_known_op Hp.t;
   (*---*) te_ty         : w3ty Hp.t;
   (*---*) te_op         : w3op Hp.t;
@@ -76,10 +78,11 @@ type tenv = {
   (*---*) te_absmod     : w3absmod Hid.t;     (* abstract module *)
 }
 
-let empty_tenv env task known =
+let empty_tenv env task known_ty known =
   { te_env        = env;
     te_task       = task;
     te_known_w3   = known;
+    ty_known_w3   = known_ty;
     te_ty         = Hp.create 0;
     te_op         = Hp.create 0;
     te_lc         = Hid.create 0;
@@ -356,7 +359,13 @@ and trans_tys env tys = List.map (trans_ty env) tys
 and trans_pty genv p =
   match Hp.find_opt genv.te_ty p with
   | Some tv -> tv
-  | None    -> trans_tydecl genv (p, EcEnv.Ty.by_path p genv.te_env)
+  | None    ->
+    match Hp.find_opt genv.ty_known_w3 p with
+    | Some (ts, th) -> 
+      load_wtheory genv th;
+      Hp.add genv.te_ty p ts;
+      ts
+    | None -> trans_tydecl genv (p, EcEnv.Ty.by_path p genv.te_env)
 
 and trans_tydecl genv (p, tydecl) =
   let pid = preid_p p in
@@ -892,7 +901,8 @@ and create_op ?(body = false) (genv : tenv) p =
   let known, ls =
     match Hp.find_opt genv.te_known_w3 p with
     | Some (ls, th) ->
-        (load_wtheory genv th; (true, ls))
+      Format.eprintf "ICI op@.";
+        load_wtheory genv th; (true, ls)
 
     | None ->
         let ls = WTerm.create_lsymbol (preid_p p) wdom wcodom in
@@ -902,7 +912,7 @@ and create_op ?(body = false) (genv : tenv) p =
   let w3op =
     let name = ls.WTerm.ls_name.WIdent.id_string in
     { w3op_fo = `LDecl ls;
-      w3op_ta = instantiate wparams ls.WTerm.ls_args ls.WTerm.ls_value;
+      w3op_ta = instantiate wparams wdom wcodom;
       w3op_ho = `HO_TODO (name, wdom, wcodom); }
   in
 
@@ -1057,6 +1067,18 @@ let core_theories = [
 
   ((["real"], "FromInt"),
      [(CI_Real.p_real_of_int, "from_int")]);
+
+  ((["map"], "Map"),
+     [(CI_Map.p_get, "get");
+      (CI_Map.p_set, "set");
+      (CI_Map.p_cnst, "const");
+     ]);
+
+]
+
+let core_ty_theories = [
+  ((["map"], "Map"),
+   [(CI_Map.p_map, "map")]);
 ]
 
 let core_theories = Lazy.from_fun (fun () ->
@@ -1067,17 +1089,28 @@ let core_theories = Lazy.from_fun (fun () ->
       Hp.add tbl p (WTheory.ns_find_ls namesp [name], theory))
       operators
   in
-  let tbl = Hp.create 0 in
-  Hp.add tbl CI_Unit.p_tt (WTerm.fs_tuple 0, WTheory.tuple_theory 0);
-  List.iter (add_core_theory tbl) core_theories;
-  Hp.add tbl CI_Distr.p_mu (fs_mu, distr_theory);
-  tbl)
+  let known = Hp.create 27 in
+  Hp.add known CI_Unit.p_tt (WTerm.fs_tuple 0, WTheory.tuple_theory 0);
+  List.iter (add_core_theory known) core_theories;
+  Hp.add known CI_Distr.p_mu (fs_mu, distr_theory);
+
+  let add_core_ty tbl (thname, tys) = 
+    let theory = curry P.get_w3_th thname in
+    let namesp = theory.WTheory.th_export in
+    List.iter (fun (p, name) ->
+      Hp.add tbl p (WTheory.ns_find_ts namesp [name], theory)) 
+      tys in    
+  let ty_known = Hp.create 7 in
+  List.iter (add_core_ty ty_known) core_ty_theories;
+  ty_known, known
+
+)
 
 (* -------------------------------------------------------------------- *)
 let add_core_bindings (env : tenv) =
   (* Core types *)
   List.iter (curry (Hp.add env.te_ty)) core_types;
-
+  
   (* Core operators *)
   List.iter (fun (p, id, arity, fo) ->
     Hp.add env.te_op p (prop_w3op ~name:id arity fo))
@@ -1101,6 +1134,15 @@ let add_core_bindings (env : tenv) =
 
     in Hp.add env.te_op CI_Bool.p_eq w3o_eq
   end;
+
+  (* Add symbol for map *)
+  begin 
+    (* Add Map theory *)
+    let th_map = P.get_w3_th ["map"] "Map" in
+    let namesp = th_map.WTheory.th_export in
+    Hp.add env.te_ty CI_Map.p_map (WTheory.ns_find_ts namesp ["map"]);
+  end;
+   
   (* Add modules stuff *)
   env.te_task <- WTask.add_ty_decl env.te_task ts_mem
 
@@ -1352,12 +1394,14 @@ let create_global_task () =
   let task  = WTask.use_export task WTheory.bool_theory in
   let task  = WTask.use_export task WTheory.highord_theory in
   let task  = WTask.use_export task distr_theory in
+  let thmap = P.get_w3_th ["map"] "Map" in
+  let task  = WTask.use_export task thmap in 
   task
 
 (* -------------------------------------------------------------------- *)
 let dump_why3 (env : EcEnv.env) (filename : string) =
-  let known = Lazy.force core_theories in
-  let tenv  = empty_tenv env (create_global_task ()) known in
+  let ty_known, known = Lazy.force core_theories in
+  let tenv  = empty_tenv env (create_global_task ()) ty_known known in
   let ()    = add_core_bindings tenv in
 
   List.iter (trans_axiom tenv) (EcEnv.Ax.all env);
@@ -1384,8 +1428,8 @@ let check ?notify pi (hyps : LDecl.hyps) (concl : form) =
   let env   = LDecl.toenv hyps in
   let hyps  = LDecl.tohyps hyps in
   let task  = create_global_task () in
-  let known = Lazy.force core_theories in
-  let tenv  = empty_tenv env task known in
+  let ty_known, known = Lazy.force core_theories in
+  let tenv  = empty_tenv env task ty_known known in
   let ()    = add_core_bindings tenv in
   let lenv  = lenv_of_hyps tenv hyps in
   let wterm = Cast.force_prop (trans_form (tenv, lenv) concl) in

@@ -165,3 +165,12 @@ module CI_Logic : sig
 
   val p_ip_dup        : path
 end
+
+module CI_Map : sig
+  val i_Map  : symbol
+  val p_Map  : path
+  val p_map  : path
+  val p_get  : path
+  val p_set  : path
+  val p_cnst : path
+end
