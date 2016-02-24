@@ -156,7 +156,7 @@ let t_failure_event_r (at_pos, cntr, ash, q, f_event, pred_specs, inv) tc =
 
   (* subgoal on the bounds *)
   let bound_goal =
-    let v = IFEL.felsum ash (f_i0, f_int_sub q f_i1) in
+    let v = IFEL.felsum ash (f_i0, q) in
     f_real_le v bd
   in
 
