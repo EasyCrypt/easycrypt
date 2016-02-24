@@ -413,11 +413,12 @@ section CollisionProbability.
           smt.
       - smt ml=0.
     by auto; progress; rewrite rng0 fcards0.
-  fel 2 FEL.c (fun x, q%r * mu uD (pred1 witness)) q (ARP.coll) [FEL(D).FBounder.f: (FEL.c < q); FEL(D).FBounder.fi: (FEL.c < q)]=> //.
+  fel 2 FEL.c (fun x, q%r * mu uD (pred1 witness)) (q + 1) (ARP.coll) [FEL(D).FBounder.f: (FEL.c < q); FEL(D).FBounder.fi: (FEL.c < q)]=> //.
   + rewrite sumr_const count_predT size_range /= max_ler -Ring.IntID.addrA /= 1:ge0_q.
     rewrite -mulr_intr ofintR (powS 1) // pow1 fromintM mulrC mulrA.
     apply/RealOrder.ler_wpmul2r; first by smt w=mu_bounded.
     by apply/RealOrder.ler_wpmul2r; first by smt w=ge0_q.
+  + smt ml=0.
   + by inline*; auto; rewrite dom0 fcards0.
   + proc; sp; if=> //=; first last.
     * hoare=> // /> &hr _ _ _.
