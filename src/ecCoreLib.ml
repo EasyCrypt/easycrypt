@@ -63,6 +63,9 @@ module CI_Real = struct
   let p_Real = EcPath.pqname p_top i_Real
   let p_real = _Pervasive "real"
 
+  let p_RealExtra = EcPath.pqname p_top "RealExtra"
+
+
   let p_RealOrder =
     EcPath.extend p_top ["StdOrder"; "RealOrder"]
 

@@ -12,6 +12,11 @@ require export Real.
 pragma +implicits.
 
 (* -------------------------------------------------------------------- *)
+lemma divr0: forall x, x / 0%r = 0%r by done.
+
+lemma invr0: inv 0%r = 0%r by done.
+
+(* -------------------------------------------------------------------- *)
 lemma b2rE (b : bool): b2r b = (b2i b)%r.
 proof. by case: b. qed.
 
@@ -124,3 +129,31 @@ instance field with real
   proof ofint1    by smt ml=0
   proof ofintS    by smt ml=0
   proof ofintN    by smt ml=0.
+
+(* -------------------------------------------------------------------- *)
+(* WARNING Lemmas used by tactics: *)
+lemma nosmt upto2_abs (x1 x2 x3 x4 x5:real):
+   0%r <= x1 =>
+   0%r <= x3 =>
+   x1 <= x5 =>
+   x3 <= x5 =>
+   x2 = x4 =>
+   `|x1 + x2 - (x3 + x4)| <= x5 by [].
+
+lemma nosmt upto2_notbad (ev1 ev2 bad1 bad2:bool) :
+  ((bad1 <=> bad2) /\ (!bad2 => (ev1 <=> ev2))) =>
+  ((ev1 /\ !bad1) <=> (ev2 /\ !bad2)) by [].
+
+lemma nosmt upto2_imp_bad (ev1 ev2 bad1 bad2:bool) :
+  ((bad1 <=> bad2) /\ (!bad2 => (ev1 <=> ev2))) =>
+  (ev1 /\ bad1) => bad2 by [].
+
+lemma nosmt upto_bad_false (ev bad2:bool) :
+  !((ev /\ !bad2) /\ bad2) by [].
+
+lemma nosmt upto_bad_or (ev1 ev2 bad2:bool) :
+   (!bad2 => ev1 => ev2) => ev1 =>
+    ev2 /\ !bad2 \/ bad2 by [].
+
+lemma nosmt upto_bad_sub (ev bad:bool) :
+  ev /\ ! bad => ev by [].
