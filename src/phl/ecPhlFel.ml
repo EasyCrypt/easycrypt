@@ -226,22 +226,23 @@ let t_failure_event at_pos cntr ash q f_event pred_specs inv tc =
 
 (* -------------------------------------------------------------------- *)
 let process_fel at_pos (infos : fel_info) tc =
-  let env, hyps, concl = FApi.tc1_eflat tc in
+  let env, hyps1, concl = FApi.tc1_eflat tc in
 
   if not (IFEL.loaded env) then
     tacuerror "fel: load the `FelTactic' theory first";
 
-  let f = match concl.f_node with
+  let pr = 
+    match concl.f_node with
     | Fapp ({ f_node = Fop (op, _) }, [pr; _])
         when is_pr pr && EcPath.p_equal op EcCoreLib.CI_Real.p_real_le
-      -> let { pr_fun = f } = destr_pr pr in f
-
-    | _ -> tc_error !!tc "a goal of the form Pr[ _ ] <= _ is required"
-  in
-  let hyps    = fst (LDecl.hoareF f hyps) in
+      -> destr_pr pr 
+    | _ -> tc_error !!tc "a goal of the form Pr[ _ ] <= _ is required" in
+      
+  let hyps    = LDecl.inv_memenv1 hyps1 in
   let cntr    = TTC.pf_process_form !!tc hyps tint infos.pfel_cntr in
   let ash     = TTC.pf_process_form !!tc hyps (tfun tint treal) infos.pfel_asg in
-  let q       = TTC.pf_process_form !!tc hyps tint infos.pfel_q in
+  let hypsq   = LDecl.push_active (pr.pr_mem, None) hyps1 in
+  let q       = TTC.pf_process_form !!tc hypsq tint infos.pfel_q in
   let f_event = TTC.pf_process_form !!tc hyps tbool infos.pfel_event in
   let inv     =
     infos.pfel_inv
