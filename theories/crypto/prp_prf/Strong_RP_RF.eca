@@ -417,9 +417,7 @@ section CollisionProbability.
   + rewrite sumr_const count_predT size_range /= max_ler 1:ge0_q.
     by rewrite -mulr_intr ofintR (powS 1) // pow1 fromintM mulrC mulrA.
   + by inline*; auto; rewrite dom0 fcards0.
-  + proc; sp; if=> //=; first last.
-    * hoare=> // /> &hr _ _ _.
-      by apply/RealOrder.mulr_ge0; smt w=(mu_bounded ge0_q).
+  + proc; sp; rcondt 1=> //.
     inline *; sp; if=> //=; last first.
     * hoare; auto=> // /> &hr _ _ _ _.
       by apply/RealOrder.mulr_ge0; smt w=(mu_bounded ge0_q).
@@ -430,14 +428,14 @@ section CollisionProbability.
         apply/mu_mem_le; move=> x _; have [] uD_fu [] _ uD_suf:= uD_uf_fu.
         apply/RealOrder.lerr_eq/uD_suf; 1,2:rewrite uD_fu //.
         by apply/RealOrder.ler_wpmul2r; smt w=(mu_bounded lt_fromint ltrW).
-      - by move: H6; rewrite H0.
+      - by move: H7;rewrite H1.
     * by hoare; auto=> //=; smt w=(RealOrder.mulr_ge0 mu_bounded ge0_q).
   + move=> c; proc. rcondt 2; 1:by auto.
     sp; if=> //=.
     * by wp; call (_: true); auto=> /#.
     * by auto=> /#.
   + by move=> b c; proc; rcondf 2; auto.
-  + proc; sp; if=> //=; last by hoare=> //=; smt w=(RealOrder.mulr_ge0 mu_bounded ge0_q).
+  + proc; sp; rcondt 1=> //=.
     inline *; sp; if=> //=; last by hoare; auto; smt w=(RealOrder.mulr_ge0 mu_bounded ge0_q).
     sp; if=> //=.
     * wp; rnd (mem (rng ARP.mi)); skip.
@@ -446,7 +444,7 @@ section CollisionProbability.
         apply/mu_mem_le; move=> x _; have [] uD_fu [] _ uD_suf:= uD_uf_fu.
         apply/RealOrder.lerr_eq/uD_suf; 1,2:rewrite uD_fu //.
         smt w=(RealOrder.ler_wpmul2r mu_bounded le_fromint ltrW).
-      - by move: H6; rewrite H0.
+      - by move: H7; rewrite H1.
     * by hoare; auto; smt w=(RealOrder.mulr_ge0 mu_bounded ge0_q).
   + move=> c; proc; rcondt 2; 1:by auto.
     sp; if=> //=.

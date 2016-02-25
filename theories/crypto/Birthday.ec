@@ -113,26 +113,21 @@ section.
     <= (q^2)%r * mu uT (pred1 witness).
   proof.
     fel 1 (size Sample.l) (fun x, q%r * mu uT (pred1 witness)) q (!uniq Sample.l) [BSample.s: (size Sample.l < q)]=> //.
-      rewrite Bigreal.sumr_const count_predT size_range /=.
+    + rewrite Bigreal.sumr_const count_predT size_range /=.
       rewrite max_ler 1:smt mulrA ler_wpmul2r 1:smt //.
-      have ->: q^2 = q * q by smt.
+      have ->: q^2 = q * q by rewrite (_:2 = 1 + 1) // powS // pow1.
       by rewrite -fromintM le_fromint ler_wpmul2r 1:ltrW ?lt0q /#.
-      by inline*; auto; smt.
-      proc; sp; if=> //; last first.
-        hoare; auto=> /> &hr ge0_size uniq; rewrite ltzNge /= => geq_size.
-        apply/mulr_ge0; last by smt w=mu_bounded.
-        by apply/le_fromint/IntOrder.ltrW/lt0q.
-      wp; rnd (mem Sample.l); skip=> //=.
-      progress.
-        have:= Mu_mem.mu_mem_le_size (Sample.l{hr}) uT (mu uT (pred1 witness)) _.
-          move=> x _; rewrite /mu_x; cut: mu uT (pred1 x) = mu uT (pred1 witness); last smt.
-          have [uT_fu [_ uT_suf]]:= uT_ufT.
-          by apply uT_suf; apply uT_fu.
-        move /(ler_trans ((size Sample.l{hr})%r * mu uT (pred1 witness)))=> -> //=.
-        by apply/ler_wpmul2r; smt w=(mu_bounded).
-        by move: H4; rewrite H0.
-      by progress; proc; rcondt 2; auto; smt.
-      by progress; proc; rcondf 2; auto.
+    + by inline*; auto.
+    + proc; sp;rcondt 1=> //.
+      wp; rnd (mem Sample.l); skip=> // /> &hr ???.
+      have:= Mu_mem.mu_mem_le_size (Sample.l{hr}) uT (mu uT (pred1 witness)) _.
+      + move=> x _; rewrite /mu_x; cut: mu uT (pred1 x) = mu uT (pred1 witness); last smt ml=0.
+        have [uT_fu [_ uT_suf]]:= uT_ufT.
+        by apply uT_suf; apply uT_fu.
+      move /(ler_trans ((size Sample.l{hr})%r * mu uT (pred1 witness)))=> -> //=.
+      by apply/ler_wpmul2r; smt w=(mu_bounded).
+    + move=> c; proc; rcondt 2; auto=> /#.
+    by progress; proc; rcondf 2; auto.
   qed.
 
   lemma pr_collision &m:
@@ -238,26 +233,21 @@ section.
     <= (q^2)%r * mu uT (pred1 witness).
   proof.
     fel 1 (size Sample.l) (fun x, q%r * mu uT (pred1 witness)) q (!uniq Sample.l) [BSample.s: (size Sample.l < q)]=> //.
-      rewrite Bigreal.sumr_const count_predT size_range /=.
+    + rewrite Bigreal.sumr_const count_predT size_range /=.
       rewrite max_ler 1:smt mulrA ler_wpmul2r 1:smt //.
-      have ->: q^2 = q * q by smt.
+      have ->: q^2 = q * q by rewrite (_:2=1 + 1) // powS // pow1.
       by rewrite -fromintM le_fromint ler_wpmul2r 1:ltrW ?lt0q /#.
-      by inline*; auto; smt.
-      proc; sp; if=> //; last first.
-        hoare; auto=> /> &hr ge0_size uniq; rewrite ltzNge /= => geq_size.
-        apply/mulr_ge0; last by smt w=mu_bounded.
-        by apply/le_fromint/IntOrder.ltrW/lt0q.
-      wp; rnd (mem Sample.l); skip=> //=.
-      progress.
-        have:= Mu_mem.mu_mem_le_size (Sample.l{hr}) uT (mu uT (pred1 witness)) _.
-          move=> x _; rewrite /mu_x; cut: mu uT (pred1 x) = mu uT (pred1 witness); last smt.
-          have [uT_fu [_ uT_suf]]:= uT_ufT.
-          by apply uT_suf; apply uT_fu.
-        move/(ler_trans ((size Sample.l{hr})%r * mu uT (pred1 witness)))=> -> //=.
-        by apply/ler_wpmul2r; smt w=(mu_bounded).
-        by move: H4; rewrite H0.
-      by progress; proc; rcondt 2; auto; smt.
-      by progress; proc; rcondf 2; auto.
+    + by inline*; auto.
+      proc; sp;rcondt 1=>//.
+      wp; rnd (mem Sample.l); skip=> // /> &hr ???.
+      have:= Mu_mem.mu_mem_le_size (Sample.l{hr}) uT (mu uT (pred1 witness)) _.
+      + move=> x _; rewrite /mu_x (_: mu uT (pred1 x) = mu uT (pred1 witness)) 2:/#.
+        have [uT_fu [_ uT_suf]]:= uT_ufT.
+        by apply uT_suf; apply uT_fu.
+      move/(ler_trans ((size Sample.l{hr})%r * mu uT (pred1 witness)))=> -> //=.
+      by apply/ler_wpmul2r; smt w=(mu_bounded).
+    + by progress; proc; rcondt 2; auto; smt.
+    by progress; proc; rcondf 2; auto.
   qed.
 
   lemma pr_collision_bounded_oracles &m:
@@ -266,12 +256,12 @@ section.
   proof.
     cut ->: Pr[Exp(Bounder(Sample),A).main() @ &m: !uniq Sample.l]
             = Pr[Exp(BSample,A).main() @ &m: size Sample.l <= q /\ !uniq Sample.l].
-      byequiv (_: ={glob A} ==> ={Sample.l} /\ size Sample.l{2} <= q)=> //=.
+    + byequiv (_: ={glob A} ==> ={Sample.l} /\ size Sample.l{2} <= q)=> //=.
       conseq eq_Sample_BSample _ (_: _ ==> size Sample.l <= q)=> //=.
-        proc.
-        call (_: size Sample.l <= q).
-          by proc; sp; if=> //=; auto; smt.
-        by inline *; auto; smt.
+      proc; call (_: size Sample.l <= q).
+      + by proc; sp; if=> //=; auto; smt.
+      by inline *; auto; smt.
     by apply (pr_BSample &m).
   qed.
+
 end section.

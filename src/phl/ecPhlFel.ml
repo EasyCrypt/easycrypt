@@ -170,12 +170,12 @@ let t_failure_event_r (at_pos, cntr, ash, q, f_event, pred_specs, inv) tc =
   let mo = EcIdent.create "&m" in
   let post_goal =
     let subst = Fsubst.f_bind_mem Fsubst.f_subst_id mhr mo in
-    let p = f_imp ev (f_and f_event (f_int_le cntr q)) in
+    let p = f_imps [ev;inv] (f_and f_event (f_int_le cntr q)) in
     let p = Fsubst.f_subst subst p in
     f_forall_mems [mo, EcMemory.memtype m] p
   in
 
-  (* not fail and cntr=0 holds at designated program point,
+  (* not fail and cntr=0 and invariant holds at designated program point,
      under the pre that the initial parameter values correspond to arguments,
      and that the initial values of global read variables  
      are equal to the initial memory *)
@@ -198,10 +198,19 @@ let t_failure_event_r (at_pos, cntr, ash, q, f_event, pred_specs, inv) tc =
   in
 
   let oracle_goal o =
+    let some_p =
+      pred_specs
+        |> List.ofind (fun (o', _) -> o = o')
+        |> omap snd
+        |> odfl f_true
+    in
+
     let not_F_to_F_goal =
       let bound = f_app_simpl ash [cntr] treal in
-      let pre = f_and (f_int_le f_i0 cntr) (f_not f_event) in
+      let pre = f_and (f_int_le f_i0 cntr) (f_int_lt cntr q) in
+      let pre = f_and pre (f_not f_event) in
       let pre = f_and_simpl pre inv in
+      let pre = f_and_simpl pre some_p in
       let post = f_event in
       f_bdHoareF pre o post FHle bound
     in
@@ -209,23 +218,18 @@ let t_failure_event_r (at_pos, cntr, ash, q, f_event, pred_specs, inv) tc =
     let old_b_id = EcIdent.create "b" in
     let old_cntr = f_local old_cntr_id tint in
     let old_b = f_local old_b_id tbool in
-    let some_p =
-      pred_specs
-        |> List.ofind (fun (o', _) -> o = o')
-        |> omap snd
-        |> odfl f_true
-    in
+    
     let cntr_decr_goal =
       let pre  = f_and some_p (f_eq old_cntr cntr) in
       let pre = f_and_simpl pre inv in
-      let post = f_and (f_int_lt old_cntr cntr) (f_int_le cntr q) in
+      let post = f_int_lt old_cntr cntr in
       let post = f_and_simpl post inv in
         f_forall_simpl [old_cntr_id,GTty tint] (f_hoareF pre o post)
     in
     let cntr_stable_goal =
       let pre  = f_ands [f_not some_p;f_eq f_event old_b;f_eq cntr old_cntr] in
       let pre  = f_and_simpl pre inv in
-      let post = f_ands [f_eq f_event old_b;f_eq cntr old_cntr] in
+      let post = f_ands [f_eq f_event old_b;f_int_le old_cntr cntr] in
       let post = f_and_simpl post inv in
         f_forall_simpl
           [old_b_id,GTty tbool; old_cntr_id,GTty tint]
