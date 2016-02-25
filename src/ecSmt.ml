@@ -901,8 +901,7 @@ and create_op ?(body = false) (genv : tenv) p =
   let known, ls =
     match Hp.find_opt genv.te_known_w3 p with
     | Some (ls, th) ->
-      Format.eprintf "ICI op@.";
-        load_wtheory genv th; (true, ls)
+      load_wtheory genv th; (true, ls)
 
     | None ->
         let ls = WTerm.create_lsymbol (preid_p p) wdom wcodom in
