@@ -133,25 +133,31 @@ let t_failure_event_r (at_pos, cntr, ash, q, f_event, pred_specs, inv) tc =
   let f  = NormMp.norm_xfun env pr.pr_fun in
   let ev = pr.pr_event in
 
-  let memenv, (_, fdef), _ =
+  let memenv, (fsig, fdef), _ =
     try  Fun.hoareS f env
     with _ -> tc_error !!tc "not applicable to abstract functions"
   in
 
-  let s_hd, s_tl = s_split at_pos fdef.f_body in
+  let s_hd, s_tl = 
+    let len = List.length fdef.f_body.s_node in
+    if len < at_pos then 
+      tc_error !!tc 
+      "the size of the initialization code %i should be smaller than the size of the function body %i" at_pos len;
+    s_split at_pos fdef.f_body in
   let fve        = PV.fv env mhr f_event in
   let fvc        = PV.fv env mhr cntr in
-  let fv         = PV.union fve fvc in
+  let fvi        = PV.fv env mhr inv in
+  let fv         = PV.union (PV.union fve fvc) fvi in
   let os         = callable_oracles_stmt env fv (stmt s_tl) in
 
-  (* check that bad event is only modified in oracles *)
+  (* check that bad event, cntr and inv are only modified in oracles *)
   let written_except_os = s_write ~except:os env (stmt s_tl) in
 
   if not (PV.indep env written_except_os fv ) then
     tc_error_lazy !!tc (fun fmt ->
       Format.fprintf fmt
         "%s@. @[%a@] is not disjoint from @[%a@]@."
-        "fail-event is modified outside oracles"
+        "after initialization fail-event or invariant or counter is modified outside oracles"
         (PV.pp env) written_except_os (PV.pp env) fv);
 
   (* subgoal on the bounds *)
@@ -169,11 +175,26 @@ let t_failure_event_r (at_pos, cntr, ash, q, f_event, pred_specs, inv) tc =
     f_forall_mems [mo, EcMemory.memtype m] p
   in
 
-  (* not fail and cntr=0 holds at designated program point *)
+  (* not fail and cntr=0 holds at designated program point,
+     under the pre that the initial parameter values correspond to arguments,
+     and that the initial values of global read variables  
+     are equal to the initial memory *)
+  
   let init_goal =
+    let xs,gs = PV.elements (f_read env f) in
+    let mh = fst memenv in
+    let mi = pr.pr_mem in
+    let f_xeq (x,ty) = f_eq (f_pvar x ty mh) (f_pvar x ty mi) in
+    let eqxs = List.map f_xeq xs in
+    let eqgs = List.map (fun m -> f_eqglob m mh m mi) gs in
+    let eqparams = 
+      let vs = oget fsig.fs_anames in
+      let f_x x = f_pvloc f x mh in
+      f_eq (f_tuple (List.map f_x vs)) pr.pr_args in
+    let pre = f_ands (eqparams :: (eqxs@eqgs)) in
     let p = f_and (f_not f_event) (f_eq cntr f_i0) in
     let p = f_and_simpl p inv in
-    f_hoareS memenv f_true (stmt s_hd) p
+    f_hoareS memenv pre (stmt s_hd) p
   in
 
   let oracle_goal o =
