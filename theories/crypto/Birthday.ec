@@ -12,8 +12,7 @@ require import Ring StdRing StdOrder StdBigop FelTactic.
 (*---*) import RField IntOrder RealOrder.
 
 (** A non-negative integer q **)
-op q:int.
-axiom lt0q: 0 < q.
+op q : { int | 0 <= q } as ge0_q.
 
 (** A type T equipped with its full uniform distribution **)
 type T.
@@ -77,7 +76,7 @@ section.
     + rewrite Bigreal.sumr_const count_predT size_range /=.
       rewrite max_ler 1:smt mulrA ler_wpmul2r 1:smt //.
       have ->: q^2 = q * q by rewrite (_:2 = 1 + 1) // powS // pow1.
-      by rewrite -fromintM le_fromint ler_wpmul2r 1:ltrW ?lt0q /#.
+      by rewrite -fromintM le_fromint ler_wpmul2r 1:ge0_q /#.
     + by inline*; auto.
     + proc;wp; rnd (mem Sample.l); skip=> // /> &hr ???.
       have:= Mu_mem.mu_mem_le_size (Sample.l{hr}) uT (mu uT (pred1 witness)) _.
@@ -170,7 +169,7 @@ section.
       by proc;sp;if;auto;call HS.     
     proc; call (_: size Sample.l <= Bounder.c <= q).
     + proc;sp;if=>//;inline *;auto=> /#.
-    auto;smt w=lt0q.
+    auto;smt w=ge0_q.
   qed.
 
 end section.

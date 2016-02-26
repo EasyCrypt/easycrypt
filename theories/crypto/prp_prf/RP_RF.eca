@@ -34,7 +34,6 @@ clone import IdealPRP as PRPi with
 proof * by smt ml=0 w=(dK_ll uD_uf_fu)
 rename "RandomPermutation" as "PRPi".
 
-(** This would be split: we only need module types and ideal PRF **)
 clone import IdealPRF as PRFi with
   type K  <- K,
   type D  <- D,
@@ -44,7 +43,7 @@ clone import IdealPRF as PRFi with
 proof * by smt ml=0 w=(dK_ll uD_uf_fu)
 rename "RandomFunction" as "PRFi".
 
-op q : { int | 0 < q } as gt0_q.
+op q : { int | 0 <= q } as ge0_q.
 
 (* In the proof, we consider the following bad event (applied to the
     PRF's internal map):
@@ -298,9 +297,9 @@ section CollisionProbability.
   axiom D_ll (O <: PRF_Oracle {D}): islossless O.f => islossless D(O).distinguish.
 
   local clone import Birthday as BBound with
-    op q <- q,
+    op   q <- q,
     type T <- D,
-    op uT <- uD
+    op   uT <- uD
   proof * by smt.
 
   (* We construct a Birthday Bound adversary from the IND
@@ -337,15 +336,12 @@ section CollisionProbability.
   by inline*; auto.
   qed.
 
-  local lemma A_bounded &m: size Sample.l{m} = 0 => Pr[A(Sample).a() @ &m: size Sample.l <= q] = 1%r.
+  local hoare A_bounded: A(Sample).a: size Sample.l = 0 ==> size Sample.l <= q.
   proof.
-  move=> l_empty; byphoare (_: size Sample.l = 0 ==> _)=> //=.
-  proc.
-  inline*; wp.
+  proc; inline *; wp.
   call (_: size Sample.l <= DBounder.FBounder.c /\ DBounder.FBounder.c <= q).
-    exact D_ll.
-    by proc; inline*; do!(sp; if=> //=); auto; smt.
-  by auto; smt.
+  + by proc; inline *; do !(sp; if=> //=); auto=> /#.
+  by auto; smt w=ge0_q.
   qed.
 
   local lemma pr_PRFi_Exp_collision &m:
