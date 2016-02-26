@@ -129,7 +129,13 @@ module PPEnv = struct
 
   let add_locals ?force ppe xs = List.fold_left (add_local ?force) ppe xs
 
-  let add_mods ?force ppe xs = add_locals ?force ppe xs
+  let add_mods ?force ppe xs (mty, sm) =
+    let ppe = add_locals ?force ppe xs in
+    { ppe with
+        ppe_env =
+          List.fold_left
+            (fun env x -> EcEnv.Mod.bind_local x mty sm env)
+            ppe.ppe_env xs; }
 
   let p_shorten cond p =
     let rec shorten prefix (nm, x) =
@@ -509,7 +515,6 @@ let get_e_projarg ppe e i =
   | _ -> raise NoProjArg
 
 (* -------------------------------------------------------------------- *)
-
 let pp_modtype1 (ppe : PPEnv.t) fmt mty = 
   EcSymbols.pp_msymbol fmt (PPEnv.modtype_symb ppe mty)
   
@@ -1120,7 +1125,7 @@ let pp_binding ?fv (ppe : PPEnv.t) (xs, ty) =
         (tenv1, pp)
 
   | GTmodty (p, sm) ->
-      let tenv1  = PPEnv.add_mods ppe xs in
+      let tenv1  = PPEnv.add_mods ppe xs (p, sm) in
       let pp fmt =
         Format.fprintf fmt "(%a <: %a)"
           (pp_list "@ " (pp_local tenv1)) xs (pp_modtype ppe) (p, sm)
@@ -2267,8 +2272,8 @@ module PPGoal = struct
           let ppe = PPEnv.add_local ~force:true ppe id in
           PPEnv.create_and_push_mem ppe (id, EcMemory.lmt_xpath m)
 
-      | EcBaseLogic.LD_modty _ ->
-          PPEnv.add_mods ~force:true ppe [id]
+      | EcBaseLogic.LD_modty (p, sm) ->
+          PPEnv.add_mods ~force:true ppe [id] (p, sm)
 
       | EcBaseLogic.LD_var _ when EcIdent.name id = "_" ->
           PPEnv.add_local
