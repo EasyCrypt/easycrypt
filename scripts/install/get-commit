@@ -1,0 +1,8 @@
+#! /bin/bash
+
+# --------------------------------------------------------------------
+hash=$(head -n 1 <(git rev-parse HEAD 2>/dev/null))
+
+if [[ "${hash}" =~ ^[a-fA-F0-9]{40}$ ]]; then
+  echo -n "${hash}"
+fi

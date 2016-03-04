@@ -8,6 +8,7 @@
 (* -------------------------------------------------------------------- *)
 val copyright : string
 val url       : string
+val hash      : string
 
 module License : sig
   val engine : string

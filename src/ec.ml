@@ -20,7 +20,8 @@ let copyright =
        String.split_lines EcVersion.License.engine;
        ["Standard Library (theories/**/*.ec): "];
        List.map (Printf.sprintf "\t%s")
-         (String.split_lines EcVersion.License.stdlib); ]
+         (String.split_lines EcVersion.License.stdlib);
+       [""; Format.sprintf "GIT hash: %s" EcVersion.hash] ]
   in
   String.concat "\n"
     (List.map
@@ -38,6 +39,9 @@ type pconfig = {
 }
 
 let print_config config =
+  (* Print git-hash *)
+  Format.eprintf "git-hash: %s@\n%!" EcVersion.hash;
+
   (* Print load path *)
   Format.eprintf "load-path:@\n%!";
   List.iter

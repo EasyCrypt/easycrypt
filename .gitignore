@@ -35,6 +35,8 @@ setup.log
 *.synctex.gz
 *.kilepr
 
+/src/ecVersion.ml
+
 /doc/refman/easycrypt.pdf
 /doc/userman/easycrypt.pdf
 
