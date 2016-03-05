@@ -24,6 +24,9 @@ find:src:*.mli
 find:src:*.mly
 find:src:*.mll
 
+src/ecVersion.ml.in
+exclude:src/ecVersion.ml
+
 # EasyCrypt theories
 find:theories:*.ec
 find:theories:*.eca
