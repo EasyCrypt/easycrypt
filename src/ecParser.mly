@@ -2043,6 +2043,9 @@ rwarg1:
 | LBRACKET SMT pi=smt_info RBRACKET
    { RWSmt (false, pi) }
 
+| LBRACKET SMT LPAREN dbmap=dbmap1+ RPAREN RBRACKET 
+   { RWSmt (false, SMT.mk_smt_option [`WANTEDLEMMAS dbmap]) }
+
 | AMP f=pterm
    { RWApp f }
 
@@ -2262,6 +2265,9 @@ logtactic:
 
 | SMT pi=smt_info
    { Psmt pi }
+
+| SMT LPAREN dbmap=dbmap1+ RPAREN
+   { Psmt (SMT.mk_smt_option [`WANTEDLEMMAS dbmap]) }
 
 | SPLIT
     { Psplit }
