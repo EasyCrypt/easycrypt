@@ -5,11 +5,9 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import Int.
-require import Distr.
-require import Real.
-require import Pair.
-require import Sum.
+require import Pair Int Real NewDistr StdOrder StdBigop.
+(*---*) import RealOrder Bigreal BRA.
+require (*--*) FelTactic.
 
 (* Simple up to bad reasoning *)
 (* Scenario: you have an adversary with access to an oracle f
@@ -67,12 +65,14 @@ module Experiment( O : Oracle, AdvF : A) = {
  }
 }.
 
+print BRA.
+
 lemma Conclusion &m p:
 forall (O1 <: Oracle{Experiment})(O2 <: Oracle{Experiment})
        (Adv <: A{Experiment, O1, O2}),
 forall I P (m : glob O2 -> int) (g : int -> real),
 (forall x, 0%r <= g x <= 1%r) =>
-int_sum g (intval 0 (qO - 1)) <= qO%r * p =>
+bigi predT g 0 qO <= qO%r * p =>
 (equiv [O1.init ~ O2.init : true ==>
                    I (glob O1){1} (glob O2){2} /\
                    (m (glob O2)){2} = 0 ]) =>
@@ -97,8 +97,7 @@ Pr [Experiment(O1, Adv).main() @ &m : P res] <=
 Pr [Experiment(O2, Adv).main() @ &m : P res]  + qO%r * p.
 proof -strict.
 move=> O1 O2 Adv I P m g hg hbnd hinint hinit2 hf hf2 hbound_bad hll1 hll2 hlladv hIm.
-apply (Real.Trans _
-(Pr [Experiment(O2, Adv).main() @ &m : P res \/ (Experiment.WO.bad /\
+apply (ler_trans (Pr [Experiment(O2, Adv).main() @ &m : P res \/ (Experiment.WO.bad /\
                           Experiment.WO.cO <= qO /\
 Experiment.WO.cO = m (glob O2))]) _).
 byequiv (_ : true ==>
@@ -124,7 +123,7 @@ call (_ : Experiment.WO.bad,
  inline Experiment(O1,Adv).WO.init Experiment(O2,Adv).WO.init; wp.
  call hinint; wp; skip; progress; smt.
 smt.
-apply (Real.Trans _
+apply (ler_trans
 (Pr [Experiment(O2, Adv).main() @ &m : P res]  +
 Pr [Experiment(O2, Adv).main() @ &m :
              Experiment.WO.bad /\ Experiment.WO.cO <= qO /\
@@ -157,7 +156,6 @@ sp; if => //; wp.
 exists* Experiment.WO.cO.
 elim* => cO.
 call (hf2 cO); wp; skip ; progress.
-move=> {g hg hbnd hbound_bad}; smt.
 move=> {g hg hbnd hbound_bad}; smt.
 
 move=> b c.

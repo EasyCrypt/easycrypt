@@ -1,4 +1,5 @@
-require import Int Real Distr FSet Dice_sampling.
+require import Int Real NewDistr List FSet Dice_sampling.
+require import DInterval.
 
 clone GenDice as D4_6 with
   type t <- int,
@@ -6,7 +7,7 @@ clone GenDice as D4_6 with
   pred valid = predT,
   op d (i:unit) <- [1..6],
   op test (i:unit) x <- 1 <= x <= 4,
-  op sub_supp (i:unit) <- Interval.interval 1 4,
+  op sub_supp (i:unit) <- oflist (range 1 5),
   type t' <- int,
   op d' (i:unit) <- [1..4]
   proof *.
@@ -15,7 +16,8 @@ realize dU. smt. qed.
 realize test_sub_supp. smt. qed.
 realize test_in_supp. smt. qed.
 realize d'_uni.
-  by progress; rewrite -Dinter_uni.dinter_is_dinter /Dinter_uni.dinter Duni.mu_x_def_in; first smt.
+  rewrite cardE -(perm_eq_size _ _ (oflistK _)) undup_id 1:range_uniq size_range max_ler //=.
+  by move=> x; rewrite support_dinter mux_dinter=> ->.
 qed.
 
 module D4 = {
@@ -31,9 +33,7 @@ lemma prD4 : forall k &m, Pr[D4.sample() @ &m : res = k] =
 proof.
   move=> k &m; byphoare=> //.
   proc; rnd; skip; progress => //.
-  by rewrite -/(pred1 _) -/(mu_x _ _); case (1 <= k <= 4)=> Hk;
-     [rewrite Dinter.mu_x_def_in|rewrite Dinter.mu_x_def_notin];
-     smt.
+  by rewrite -/(pred1 _) -/(mu_x _ _); rewrite mux_dinter.
 qed.
 
 module D6 = {
@@ -68,11 +68,10 @@ proof.
     by move=> _ _ _;exists ((),5).
     conseq [-frame] (D4_6.Sample_RsampleW f finv) => //.
     move=> &m1 &m2 -> /=; split; first by smt.
-    split; first by rewrite /D4_6.valid.
-    split; first by rewrite Dinter.weight_def.
-    split; first by move=> x; rewrite Dinter.supp_def; exact/Hbound.
+    split; first by rewrite weight_dinter.
+    split; first by move=> x; rewrite support_dinter; exact/Hbound.
     split; first by move=> x Hx; cut:= Hbij x _.
-    by move=> x; rewrite Dinter.supp_def => Hx; cut:= Hbij x _.
+    by move=> x; rewrite support_dinter => Hx; cut:= Hbij x _.
   by symmetry; apply/D6_RsampleW.
 qed.
 
