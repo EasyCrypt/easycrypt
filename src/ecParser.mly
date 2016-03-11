@@ -2043,7 +2043,7 @@ rwarg1:
 | LBRACKET SMT pi=smt_info RBRACKET
    { RWSmt (false, pi) }
 
-| LBRACKET SMT LPAREN dbmap=dbmap1+ RPAREN RBRACKET 
+| LBRACKET SMT LPAREN dbmap=dbmap1* RPAREN RBRACKET 
    { RWSmt (false, SMT.mk_smt_option [`WANTEDLEMMAS dbmap]) }
 
 | AMP f=pterm
@@ -2219,7 +2219,7 @@ dbmap1:
 
 dbhint:
 | m=dbmap1         { [m] }
-| m=paren(dbmap1+) {  m  }
+| m=paren(dbmap1*) {  m  }
 
 %inline prod_form:
 | f1=sform f2=sform   { (Some f1, Some f2) }
@@ -2266,7 +2266,7 @@ logtactic:
 | SMT pi=smt_info
    { Psmt pi }
 
-| SMT LPAREN dbmap=dbmap1+ RPAREN
+| SMT LPAREN dbmap=dbmap1* RPAREN
    { Psmt (SMT.mk_smt_option [`WANTEDLEMMAS dbmap]) }
 
 | SPLIT
