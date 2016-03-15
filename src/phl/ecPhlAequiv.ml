@@ -6,6 +6,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
+open EcUtils
 open EcParsetree
 open EcTypes
 open EcFol
@@ -14,6 +15,25 @@ open EcLowPhlGoal
 
 module Mid = EcIdent.Mid
 module TTC = EcProofTyping
+
+(* -------------------------------------------------------------------- *)
+module IAPRHL : sig
+  val loaded : EcEnv.env -> bool
+  val sumr   : form -> form -> form
+end = struct
+  let i_Aprhl = "Aprhl"
+  let p_Aprhl = EcPath.pqname EcCoreLib.p_top i_Aprhl
+
+  let sumr =
+    let bgty = [tint; tfun tint treal] in
+    let bg   = EcPath.pqname p_Aprhl "sumr" in
+    let bg   = f_op bg [] (toarrow bgty treal) in
+    fun n f -> f_app bg [n; f] treal
+
+  let loaded (env : EcEnv.env) =
+    is_some (EcEnv.Theory.by_path_opt p_Aprhl env)
+end
+
 
 (* -------------------------------------------------------------------- *)
 let t_tohoare_r (tc : tcenv1) =
@@ -153,5 +173,85 @@ let rec t_lap_r (mode : lap_mode) (tc : tcenv1) =
 
   | _ -> assert false
 
-(*-------------------------------------------------------------------- *)
+(* -------------------------------------------------------------------- *)
 let t_lap = FApi.t_low1 "lap" t_lap_r
+
+(* -------------------------------------------------------------------- *)
+let t_while_r ((ef, df), (v, inv), n) tc =
+  assert (0 <= n);
+
+  if not (IAPRHL.loaded (FApi.tc1_env tc)) then
+    tacuerror "awhile: load the `Aprhl' theory first";
+
+  let hyps, _ = FApi.tc1_flat tc in
+  let aes = tc1_as_aequivS tc in
+
+  let (b1, s1) = tc1_instr_while tc aes.aes_sl in
+  let (b2, s2) = tc1_instr_while tc aes.aes_sr in
+
+  let fb1 = form_of_expr (fst aes.aes_ml) b1 in
+  let fb2 = form_of_expr (fst aes.aes_mr) b2 in
+
+  let tb = tfun tint treal in
+  let ef = EcProofTyping.process_exp hyps `InOp (Some tb) ef in
+  let df = EcProofTyping.process_exp hyps `InOp (Some tb) df in
+
+  let eff = form_of_expr mhr ef in
+  let dff = form_of_expr mhr df in
+
+  let v =
+    let hyps = EcEnv.LDecl.push_active aes.aes_ml hyps in
+    EcProofTyping.pf_process_form !!tc hyps tint v
+  in
+
+  let inv =
+    let hyps = EcEnv.LDecl.push_all [aes.aes_ml; aes.aes_mr] hyps in
+    EcProofTyping.pf_process_formula !!tc hyps inv
+  in
+
+  let k  = EcIdent.create "k" in
+  let ki = f_local k tint in
+
+  let fn =  f_int (EcBigInt.of_int n) in
+
+  let ef_gt0 =
+    f_forall [k, GTty tint] (f_real_le f_r0 (f_app eff [ki] treal)) in
+
+  let df_gt0 =
+    f_forall [k, GTty tint] (f_real_le f_r0 (f_app dff [ki] treal)) in
+
+  let term =
+    f_forall_mems [aes.aes_ml]
+       (f_imp (f_and inv (f_int_lt v f_i0)) (f_not fb1)) in
+
+  let sub =
+    let sub_pre = f_ands [inv; fb1; fb2; f_eq ki v; f_int_le v fn] in
+
+    let sub_post = f_ands [inv; f_eq fb1 fb2; f_int_lt v ki] in
+
+    f_forall [k, GTty tint] (
+      f_aequivS aes.aes_ml aes.aes_mr
+        ~dp:(form_of_expr mhr (e_app df [e_local k tint] treal))
+        ~ep:(form_of_expr mhr (e_app ef [e_local k tint] treal))
+        sub_pre s1 s2 sub_post)
+  in
+
+  let concl1 = f_forall_mems [aes.aes_ml; aes.aes_mr]
+    (f_imp aes.aes_pr (
+       f_ands [inv; f_eq fb1 fb2; f_int_lt v fn])) in
+
+  let concl2 = f_forall_mems [aes.aes_ml; aes.aes_mr]
+    (f_imp (f_ands [inv; f_not fb1; f_not fb2]) aes.aes_po) in
+
+  let sume, sumd =
+    (f_eq aes.aes_ep (IAPRHL.sumr fn eff),
+     f_eq aes.aes_ep (IAPRHL.sumr fn dff))
+  in
+
+  FApi.t_seq
+    (fun tc -> FApi.xmutate1 tc `AWhile
+       [ef_gt0; df_gt0; term; concl1; concl2; sume; sumd; sub])
+    (FApi.t_seq EcLowGoal.t_simplify EcLowGoal.t_trivial) tc
+
+(* -------------------------------------------------------------------- *)
+let t_while = FApi.t_low1 "awhile" t_while_r

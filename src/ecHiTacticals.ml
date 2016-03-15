@@ -208,6 +208,7 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Paprhl Aofequiv           -> EcPhlAequiv.t_ofequiv
     | Paprhl Atohoare           -> EcPhlAequiv.t_tohoare
     | Paprhl (Alap x)           -> EcPhlAequiv.t_lap x
+    | Paprhl (Awhile info)      -> EcPhlAequiv.t_while info
 
   in
 

@@ -570,7 +570,8 @@ and paprhl =
   | Atoequiv
   | Aofequiv
   | Atohoare
-  | Alap of lap_mode
+  | Alap   of lap_mode
+  | Awhile of ((pexpr * pexpr) * (pformula * pformula) * int)
 
 and lap_mode = [`Gen of pformula pair | `Null of pformula]
 

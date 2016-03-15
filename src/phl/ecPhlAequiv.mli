@@ -6,6 +6,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
+open EcUtils
 open EcParsetree
 open EcCoreGoal
 
@@ -16,3 +17,5 @@ val t_toequiv : FApi.backward
 val t_ofequiv : FApi.backward
 
 val t_lap : lap_mode -> FApi.backward
+
+val t_while : (pexpr * pexpr) * (pformula pair) * int -> FApi.backward

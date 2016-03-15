@@ -342,6 +342,7 @@
 %token ASSUMPTION
 %token AT
 %token AUTO
+%token AWHILE
 %token AXIOM
 %token AXIOMATIZED
 %token BACKS
@@ -2627,6 +2628,12 @@ phltactic:
 
 | LAP k1=sform k2=sform
     { Paprhl (Alap (`Gen (k1, k2))) }
+
+| AWHILE
+    LBRACKET ef=sexpr AMP df=sexpr RBRACKET
+    n=word
+    LBRACKET v=form RBRACKET inv=sform
+    { Paprhl (Awhile ((ef, df), (v, inv), n)) }
 
 bdhoare_split:
 | b1=sform b2=sform b3=sform?

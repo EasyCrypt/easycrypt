@@ -143,6 +143,7 @@ let pf_last_assert pe st = pf_last_gen  "assert"  destr_assert pe st
 let pf_last_lap    pe st = pf_last_gen  "rnd-lap" destr_lap    pe st
 
 (* -------------------------------------------------------------------- *)
+let pf_instr_while pe st = pf_instr_gen "while"   destr_while  pe st
 let pf_instr_lap   pe st = pf_instr_gen "rnd-lap" destr_lap    pe st
 
 (* -------------------------------------------------------------------- *)
@@ -164,6 +165,7 @@ let tc1_last_assert tc st = pf_last_assert !!tc st
 let tc1_last_lap    tc st = pf_last_lap    !!tc st
 
 (* -------------------------------------------------------------------- *)
+let tc1_instr_while tc st = pf_instr_while !!tc st
 let tc1_instr_lap   tc st = pf_instr_lap   !!tc st
 
 (* -------------------------------------------------------------------- *)
