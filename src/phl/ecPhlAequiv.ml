@@ -19,15 +19,17 @@ module TTC = EcProofTyping
 (* -------------------------------------------------------------------- *)
 module IAPRHL : sig
   val loaded : EcEnv.env -> bool
+  val sumr_p : EcPath.path
   val sumr   : form -> form -> form
 end = struct
   let i_Aprhl = "Aprhl"
   let p_Aprhl = EcPath.pqname EcCoreLib.p_top i_Aprhl
 
+  let sumr_p = EcPath.pqname p_Aprhl "sumr"
+
   let sumr =
     let bgty = [tint; tfun tint treal] in
-    let bg   = EcPath.pqname p_Aprhl "sumr" in
-    let bg   = f_op bg [] (toarrow bgty treal) in
+    let bg   = f_op sumr_p [] (toarrow bgty treal) in
     fun n f -> f_app bg [n; f] treal
 
   let loaded (env : EcEnv.env) =
@@ -248,10 +250,16 @@ let t_while_r ((ef, df), (v, inv), n) tc =
      f_eq aes.aes_ep (IAPRHL.sumr fn dff))
   in
 
-  FApi.t_seq
-    (fun tc -> FApi.xmutate1 tc `AWhile
-       [ef_gt0; df_gt0; term; concl1; concl2; sume; sumd; sub])
-    (FApi.t_seq EcLowGoal.t_simplify EcLowGoal.t_trivial) tc
+  FApi.t_seqs [ (fun tc ->
+    FApi.t_onselect (fun i -> i = 5 || i = 6)
+      (EcLowGoal.t_simplify_with_info
+        { EcReduction.no_red with
+            EcReduction.delta_p = EcPath.p_equal IAPRHL.sumr_p; })
+      (FApi.xmutate1 tc `AWhile
+         [ef_gt0; df_gt0; term; concl1; concl2; sume; sumd; sub]));
+    EcLowGoal.t_simplify_with_info EcReduction.nodelta;
+    EcLowGoal.t_trivial
+  ] tc
 
 (* -------------------------------------------------------------------- *)
 let t_while = FApi.t_low1 "awhile" t_while_r

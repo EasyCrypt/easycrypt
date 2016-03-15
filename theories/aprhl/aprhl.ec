@@ -1,6 +1,9 @@
 (* -------------------------------------------------------------------- *)
-require import Distr NewDistr Int Real StdBigop.
+require export Distr NewDistr Int IntExtra Real RealExtra.
+require import StdBigop.
+(*---*) export StdBigop.Bigreal.BRA.
 
+(* -------------------------------------------------------------------- *)
 op lap : real -> int -> int distr.
 
 axiom lap_ll e x : is_lossless (lap e x).
