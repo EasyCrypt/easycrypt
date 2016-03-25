@@ -230,8 +230,8 @@ of Why3 installed, it may be impossible to share the same configuration
 file among them. EasyCrypt via the option -why3, allows you to load a
 Why3 configuration file from a custom location. For instance:
 
-  why3 config --detect -C $WHY3CONF.conf
-  ./ec.native -why3 $WHY3CONF.conf
+       $> why3 config --detect -C $WHY3CONF.conf
+       $> ./ec.native -why3 $WHY3CONF.conf
 
 
 Compilation
