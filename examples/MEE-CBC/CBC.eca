@@ -6,6 +6,8 @@ require (*ab*) NewPRP ConcretePRP NewPRF SKE_INDR. (* Definitions and Security N
 require (*ab*) RP_RF.            (* Generic Arguments *)
 (*---*) import RField RealOrder.
 
+pragma -oldip.
+
 (* -------------------------------------------------------------------- *)
 (** Parameters and Constants *)
 op q   : {int | 0 < q}   as gt0_q.   (* number of queries *)
@@ -58,7 +60,7 @@ clone import WeakPRP as PRPt with
   type D    <- block,
   type K    <- key,
   op   dK   <- dKey
-proof * by smt.
+proof * by smt (dKey_uffu).
 
 clone import ConcretePRP as PRPr with
   type D    <- block,
@@ -66,7 +68,7 @@ clone import ConcretePRP as PRPr with
   op   dK   <- dKey,
   op   P    <- P,
   op   Pi   <- Pi
-proof * by smt.
+proof * by smt (dKey_uffu bijective_P).
 
 clone import IdealPRP as PRPi with
   type D    <- block,
@@ -74,7 +76,7 @@ clone import IdealPRP as PRPi with
   op   dK   <- dKey,
   op   dD   <- dBlock
 rename "RandomPermutation" as "PRPi"
-proof * by smt.
+proof * by smt (dKey_uffu dBlock_uffu).
 
 (*-------------------------------------------------------------------- *)
 (** The CBC construction turning a PRP into an explicit-IV SKE scheme **)
@@ -144,7 +146,7 @@ module IV_Wrap (S : IVScheme) = {
 
 op dBlocks: int -> block list distr = dlist dBlock.
 lemma dBlocks_ll l: is_lossless (dBlocks l)
-by [].
+by smt (dlist_ll dBlock_uffu).
 
 clone import SKE_INDR as SKEa with
   type eK            <- key,
@@ -153,7 +155,7 @@ clone import SKE_INDR as SKEa with
   type leaks         <- int,
   op   leak          <- List.size<:block>,
   op   dC    (l:int) <- dBlocks (l + 1) (* plus iv *)
-proof * by smt.
+proof * by smt (dBlocks_ll).
 import RCPA.
 
 (** We say that a SKE S scheme is IND$-CPA secure whenever, for all
@@ -185,17 +187,17 @@ section Random_Ideal.
   local clone import Program as Sampling with
     type t <- block,
     op   d <- dBlock
-  proof * by smt.
+  proof *.
 
   equiv Random_Ideal: Random.enc ~ Ideal.enc: size p{1} = size p{2} ==> ={res}.
   proof.
     transitivity Sampling.LoopSnoc.sample
                  (size p{1} + 1 = n{2} ==> ={res})
-                 (n{1} = size p{2} + 1 ==> ={res})=> //=; 1:smt.
-      by proc; inline *; while (={i} /\ c{1} = l{2} /\ size p{1} + 1 = n{2}); auto; smt.
+                 (n{1} = size p{2} + 1 ==> ={res})=> //=; 1:smt ml=0.
+      by proc; inline *; while (={i} /\ c{1} = l{2} /\ size p{1} + 1 = n{2}); auto=> /#.
     transitivity Sampling.Sample.sample
                  (n{1} = n{2} ==> ={res})
-                 (n{1} = size p{2} + 1 ==> ={res})=> //=; 1:smt.
+                 (n{1} = size p{2} + 1 ==> ={res})=> //=; 1:smt ml=0.
       by symmetry=> //=; conseq Sampling.Sample_LoopSnoc_eq.
     by proc; auto.
   qed.
@@ -212,7 +214,7 @@ clone import NewPRF as PRFt with
   type D  <- block,
   type R  <- block,
   op   dK <- dKey
-proof * by smt.
+proof * by smt (dKey_uffu).
 
 clone import IdealPRF as PRFi with
   type K  <- key,
@@ -221,7 +223,7 @@ clone import IdealPRF as PRFi with
   op   dK <- dKey,
   op   dR <- dBlock
 rename "RandomFunction" as "PRFi"
-proof * by smt.
+proof * by smt (dKey_uffu dBlock_uffu).
 
 module CBC_Oracle(P:PRF_Oracles) = {
   proc init = P.init
@@ -343,11 +345,11 @@ section Cleanup.
   proof.
     proc; inline *; wp.
     rcondt{1} 5.
-      by move=> &m; auto; smt.
+      by move=> &m; auto; smt (size_ge0).
     while (   i{1} = i{2} + 1
            /\ p0{1} = p{2}
            /\ c0{1} = c{2});
-    by auto; smt.
+    by auto; smt ml=0.
   qed.
 
   local lemma success_eq_random &m:
@@ -498,17 +500,16 @@ section Reduce.
       ==> ={bad,qs}(DoubleQuery,Compute) /\ ={res}.
   proof.
     proc; inline*; case (size p{1} = 0).
-      rcondf{1} 4; 1:by auto; smt.
-      rcondf{2} 3; 1:by auto; smt.
-      by auto; smt.
+      rcondf{1} 4; 1:by auto=> /#.
+      by rcondf{2} 3; auto=> /#.
     splitwhile{1} 4: (i < size p - 1).
     rcondt{1} 5=> [&m|].
       while (0 <= i < size p);
-        by auto; smt.
+        by auto; smt (size_ge0).
     rcondf{1} 15=> [&m|].
       auto; while (0 <= i < size p);
-        by auto; smt.
-    rcondt{2} 3; 1:by auto; smt.
+        by auto; smt (size_ge0).
+    rcondt{2} 3; 1:by auto; smt (size_ge0).
     auto=> //=.
     while (   ={p, c}
            /\ i{1} = i{2} - 1
@@ -516,12 +517,24 @@ section Reduce.
            /\ Compute.bad{2}
               = (DoubleQuery.bad{1} \/ mem DoubleQuery.qs (s + nth witness p i)){1}
            /\ Compute.qs{2} = (DoubleQuery.qs `|` (fset1 (s + nth witness p i))){1}).
-      wp; rnd (fun x => x + pi{2}); auto.
-      have [dBlock_fu [dBlock_ll dBlock_suf]]:= dBlock_uffu.
-      by progress; expect 34; smt.
+      wp; rnd (fun x => x + pi{2}); auto=> /> &1 &2 ge0_iP _ _ lt_i_szp.
+      case: (mem DoubleQuery.qs{1} _)=> //=.
+        split=> [|_]; 1:smt (addbA addbK add0b). (* TODO: instantiate ring structure *)
+        split=> [|_ r _]; 1:smt (dBlock_uffu).
+        split=> [|_]; 1:smt (dBlock_uffu).
+        split=> [|_]; 1:smt (addbA addbK add0b). (* TODO: instantiate ring structure *)
+        by split=> [|/#]; 1:smt (addbA addbK add0b). (* TODO: instantiate ring structure *)
+      split=> [|_]; 1:smt (addbA addbK add0b). (* TODO: instantiate ring structure *)
+      split=> [|_ r _]; 1:smt (dBlock_uffu).
+      split=> [|_]; 1:smt (dBlock_uffu).
+      split=> [|_]; 1:smt (addbA addbK add0b). (* TODO: instantiate ring structure *)
+      by rewrite Ring.IntID.subrK; split=> ->; smt (addbA addbK add0b). (* TODO: instantiate ring structure *)
     wp; rnd (fun x => x + pi{2}).
-    auto. have [dBlock_fu [dBlock_ll dBlock_suf]]:= dBlock_uffu.
-    by progress; expect 12; smt.
+    auto=> /> &2 szp_neq_0; split=> [|_]; 1:smt (addbA addbK add0b). (* TODO: instantiate ring structure *)
+    split=> [|_ s _]; 1:smt (dBlock_uffu).
+    split=> [|_]; 1:smt (dBlock_uffu).
+    split=> [|_]; 1:smt (addbA addbK add0b). (* TODO: instantiate ring structure *)
+    smt (size_ge0).
   qed.
 
   local lemma DQ_Sample_Compute_pr &m:
@@ -540,7 +553,7 @@ section Reduce.
     <= Pr[INDR_CPA_direct(Compute,A).main() @ &m: Compute.bad].
   proof.
     rewrite -(DQ_Sample_Compute_pr &m) (doublequery_eq PRFi &m) (doublequery_eq Sample &m).
-    byequiv: DoubleQuery.bad=> //=; 2:smt. (* bad interaction between generated contract and generated goal *)
+    byequiv: DoubleQuery.bad=> //=; 2:smt ml=0.
     proc.
     call (_: DoubleQuery.bad,
                   ={glob DoubleQuery}
@@ -554,30 +567,33 @@ section Reduce.
                     /\ forall x, mem DoubleQuery.qs{1} x <=> mem (dom PRFi.m){1} x)).
         case (DoubleQuery.bad{2}).
           inline *.
-          seq  4  4: (DoubleQuery.bad{2} /\ ={DoubleQuery.bad, i, p});
-            1:by auto; smt.
-          by if{1}; auto; smt.
-        wp; inline *; sp 2 2; if; 1:smt.
-        * rcondf{1} 3; 1:by auto; smt.
+          seq  4  4: (DoubleQuery.bad{2} /\ ={DoubleQuery.bad, i, p}).
+            by auto=> /#.
+          by if{1}; auto; smt (dBlock_uffu).
+        wp; inline *; sp 2 2; if; 1:smt ml=0.
+        * rcondf{1} 3; 1:by auto=> /#.
           by auto; smt (dD_ll).
-        * rcondt{1} 2; 1:by auto; smt.
+        * rcondt{1} 2; 1:by auto=> /#.
           auto=> /> &1 &2 ih lt_i_szp /ih [#] !->> eq_qs h m _.
           by rewrite !getP /= oget_some //= dom_set => b; rewrite !inE eq_qs.
-      by auto; smt.
+      by auto; smt ml=0.
     + move=> &2 bad; proc.
       while (   DoubleQuery.bad = DoubleQuery.bad{2}
              /\ 0 <= i <= size p)
             (size p - i).
-        by move=> z; inline *; sp; if=> //=; auto; smt.
-      by auto; smt.
+        move=> z; inline *; sp; if=> //=; auto=> />; 2:smt ml=0.
+        by rewrite -/predT; smt (dBlock_uffu).
+      by auto=> />; rewrite -/predT; smt (dBlock_uffu size_ge0).
     + move=> &1; proc.
       while (   DoubleQuery.bad
              /\ DoubleQuery.bad{1} = DoubleQuery.bad
              /\ 0 <= i <= size p)
             (size p - i).
-        by move=> z; inline *; auto; smt.
-      by auto; smt.
-    by inline *; auto; smt.
+        by move=> z; inline *; auto=> />; rewrite -/predT; smt (dBlock_uffu size_ge0).
+      by auto=> />; rewrite -/predT; smt (dBlock_uffu size_ge0).
+    inline *; auto=> />.
+    split=> [|_]; 1:by move=> x; rewrite dom0.
+    by move=> rL rR gaL mL qsL badL gaR qsR [].
   qed.
 end section Reduce.
 
@@ -689,7 +705,7 @@ section Probability_RP_RF.
     op   dK   <- dKey,
     op   uD   <- dBlock,
     op   q    <- q * ell
-  proof * by smt.
+  proof * by smt (dKey_uffu dBlock_uffu IntOrder.divr_ge0 gt0_q gt0_ell).
 
   lemma Bound_by_PRP_PRF &m:
     `|Pr[WeakPRP_IND(PRPi,PRPF_Adv(QueryBounder(A))).main() @ &m: res]
@@ -711,10 +727,10 @@ section Probability_RP_RF.
                      /\ 0 <= i0{2} <= size p0{2} <= ell
                      /\ 0 <= RP_RFc.DBounder.FBounder.c{2} <= OracleBounder.qC{2} * ell + i0{2}).
             rcondt{2} 4; first auto; progress.
-              by have: RP_RFc.DBounder.FBounder.c{hr} <= (q - 1) * ell + i0{hr}; smt.
-            by sp; if=> //=; auto; smt.
-          by auto; smt.
-      by auto; smt.
+              by have: RP_RFc.DBounder.FBounder.c{hr} <= (q - 1) * ell + i0{hr}; smt ml=0.
+            by sp; if=> //=; auto=> /#.
+          by auto=> />; smt (size_ge0).
+      by auto=> />; smt (gt0_q).
     have ->: Pr[WeakPRP_IND(PRFi,PRPF_Adv(QueryBounder(A))).main() @ &m: res]
              = Pr[RP_RFc.PRFi.IND(RP_RFc.PRFi.PRFi,RP_RFc.DBounder(PRPF_Adv(QueryBounder(A)))).main() @ &m: res].
       byequiv=> //=.
@@ -730,18 +746,18 @@ section Probability_RP_RF.
                      /\ 0 <= i0{2} <= size p0{2} <= ell
                      /\ 0 <= RP_RFc.DBounder.FBounder.c{2} <= OracleBounder.qC{2} * ell + i0{2}).
             rcondt{2} 4; first auto; progress.
-              by have: RP_RFc.DBounder.FBounder.c{hr} <= (q - 1) * ell + i0{hr}; smt.
-            by sp; if=> //=; auto; smt.
-          by auto; smt.
-      by auto; smt.
+              by have: RP_RFc.DBounder.FBounder.c{hr} <= (q - 1) * ell + i0{hr}; smt ml=0.
+            by sp; if=> //=; auto=> /#.
+          by auto; smt (size_ge0).
+      by auto; smt (gt0_q).
     apply/(RP_RFc.Conclusion (PRPF_Adv(QueryBounder(A))) &m).
     move=> O O_f_ll.
     proc. call (A_run_ll (<: QueryBounder(A,PRPF_Adv(QueryBounder(A),O).O).O') _).
       proc; inline *; sp; if=> //=.
         wp; while true (size p0 - i0).
-          by auto; call O_f_ll; auto; smt.
-          by auto; smt.
-        by while true (size p + 1 - i); auto; smt.
+          by auto; call O_f_ll; auto=> /#.
+          by auto; rewrite -/predT; smt (dBlock_uffu).
+        by while true (size p + 1 - i); auto=> /#.
     by auto.
   qed.
 end section Probability_RP_RF.
@@ -754,7 +770,7 @@ section Probability_Collision.
     type T  <- block,
     op   uT <- dBlock,
     op   q  <- q * ell
-  proof * by smt.
+  proof * by smt (dBlock_uffu IntOrder.divr_ge0 gt0_q gt0_ell).
 
   local module Wrap(A : RCPA_Adversary,S : ASampler) = {
     var qC : int
@@ -801,7 +817,7 @@ section Probability_Collision.
       transitivity Exp(Sample,Bounded(Wrap(A))).main
                    (={glob Wrap(A), glob Sample} ==> ={glob A, glob Sample})
                    (={glob A} ==> Compute.bad{2} => !uniq Sample.l{1})=> //=.
-        smt.
+        smt ml=0.
         by conseq (PushBound Sample (Wrap(A))).
       symmetry.
       proc; inline *; wp.
@@ -820,19 +836,21 @@ section Probability_Collision.
                  /\ 0 <= Bounder.c{2} <= Wrap.qC{2} * ell + i{2}
                  /\ (Compute.bad{1} <=> !List.uniq Sample.l{2})
                  /\ (forall x, mem Compute.qs{1} x <=> mem Sample.l{2} x)).
-            rcondt{2} 3; auto; progress; 2..15:smt.
-            by have: Bounder.c{hr} <= (q - 1) * ell + i{hr}; smt.
-          by auto; smt.
-        by auto; smt.
+            rcondt{2} 3.
+              auto=> /> &hr; progress.
+              by apply/(IntOrder.ler_lt_trans ((q - 1) * ell + i{hr}))=> /#.
+            by auto=> /> &1 &2; smt (in_fsetU in_fset1).
+          by auto=> />; smt (size_ge0).
+        by auto; smt (in_fset0 gt0_q).
       have:= BBound.pr_collision_bounded_oracles (Wrap(A)) _ &m.
         move=> S S_s_ll; proc.
         call (A_run_ll (<: Wrap(A,S).O) _).
           proc; sp; if=> //=.
             auto; while (true) (size p - i).
-              by move=> z; wp; call S_s_ll; auto; smt.
-            by auto; smt.
+              by move=> z; wp; call S_s_ll; auto=> /#.
+            by auto; rewrite -/predT; smt (dBlock_uffu).
           while (true) (size p + 1 - i);
-            by auto; smt.
+            by auto=> /#.
         by auto.
       done.
     qed.
@@ -851,7 +869,7 @@ proof.
     move=> O O_enc_ll; proc.
     call (A_distinguish_ll (<: QueryBounder(A,O).O') _).
       by proc; sp; if=> //=;
-        [wp; call O_enc_ll|while (true) (size p + 1 - i); auto; smt].
+        [wp; call O_enc_ll|while (true) (size p + 1 - i); auto=> /#].
     by auto.
   have:= reduction (QueryBounder(A)) &m BA_distinguish_ll.
   have:= Bound_by_Birthday A A_distinguish_ll &m.
