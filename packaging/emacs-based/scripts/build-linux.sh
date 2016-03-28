@@ -91,7 +91,7 @@ cp ../config/scripts/run-easycrypt package/easycrypt/
 
 # --------------------------------------------------------------------
 ldd package/easycrypt/bin/* | fgrep '=>' | \
-    fgrep -w 'libgmp' | awk '{print $3}' | sort -u | \
+    egrep -w 'libgmp|libpcre' | awk '{print $3}' | sort -u | \
     xargs -r -I '{}' -- cp '{}' package/easycrypt/lib/
 
 # --------------------------------------------------------------------
