@@ -1,6 +1,6 @@
 require import Pred Fun Option Int Real List Distr.
-require import Dlist.
-require (*..*) PRP MACs RCPA_CMA CBC RCPA_pad.
+require import DList.
+require (*..*) WeakPRP MACs RCPA_CMA CBC RCPA_pad.
 
 (** Assume a permutation (P,Pinv) on block indexed by eK **)
 type eK, block.
@@ -11,24 +11,36 @@ axiom d_eK_uffu: is_uniform_over d_eK predT.
 op d_block: block distr.
 axiom d_block_uffu: is_uniform_over d_block predT.
 
-op P   : eK -> block -> block.
-op Pinv: eK -> block -> block.
+op P : eK -> block -> block.
+op Pi: eK -> block -> block.
 
 axiom bijectiveP k:
      support d_eK k
-  =>    cancel (P k) (Pinv k)
-     /\ cancel (Pinv k) (P k).
+  =>    cancel (P k) (Pi k)
+     /\ cancel (Pi k) (P k).
 
 (* Import definitions to consider (P,Pinv) as a weak PRP *)
-clone import PRP as PRPa with
+clone import WeakPRP as PRPt with
+  type K    <- eK,
+  type D    <- block,
+  op   dK   <- d_eK
+proof * by smt.
+
+clone import ConcretePRP as PRPc with
   type K    <- eK,
   type D    <- block,
   op   dK   <- d_eK,
-  op   dD   <- d_block,
   op   P    <- P,
-  op   Pinv <- Pinv
+  op   Pi   <- Pi
 proof * by smt.
-import Weak_PRP.
+
+clone import IdealPRP as PRPi with
+  type K    <- eK,
+  type D    <- block,
+  op   dK   <- d_eK,
+  op   dD   <- d_block
+rename "RandomPermutation" as "PRPi"
+proof * by smt.
 
 (** Assume a zmodule structure on block (for generality... we will instantiate it with {0,1}^k later on) *)
 op zeros: block.
@@ -92,8 +104,8 @@ op leak: msg -> msg.
 axiom leak_pad m t: size (pad (m,t)) = size (pad ((leak m),t)).
 
 (** And construct MAC-then-Encode-then-Encrypt as a SKE scheme **)
-op q: { int | 0 < q } as lt0_q. (* Number of queries to the lr oracle *)
-op n: { int | 1 < n } as lt1_n. (* Max length of queries to the lr oracle (in blocks) *)
+op q: { int | 0 < q } as gt0_q. (* Number of queries to the lr oracle *)
+op n: { int | 1 < n } as gt1_n. (* Max length of queries to the lr oracle (in blocks) *)
 
 op valid_msg: msg -> bool.
 axiom max_pad_n m t: valid_msg m => size (pad (m,t)) < n.
@@ -153,7 +165,7 @@ module MEE(P:PRP,M:MAC_Scheme): Enc_Scheme = {
     i       <- 0;
     while (i < size c) {
       ci     <- nth witness c i;
-      pi     <@ P.finv(ek,ci);
+      pi     <@ P.fi(ek,ci);
       padded <- padded ++ [s + pi];
       s      <- ci;
       i      <- i + 1;
@@ -203,7 +215,7 @@ module RCPA_QueryBounder (A : RCPA_Adversary, O : RCPA_Oracles) = {
 }.
 
 (* From the MAC and a CPA adversary against MtE, we construct an adversary against the PRP *)
-module Weak_PRPa (M : MAC_Scheme, A : RCPA_Adversary, P : Weak_Oracles) = {
+module Weak_PRPa (M : MAC_Scheme, A : RCPA_Adversary, P : WeakPRP_Oracles) = {
   var qC: int
   var mk: mK
 
@@ -248,7 +260,7 @@ module Weak_PRPa (M : MAC_Scheme, A : RCPA_Adversary, P : Weak_Oracles) = {
 }.
 
 section RCPA.
-  declare module A : RCPA_Adversary { PRPi, Wrap, RCPA_Wrap, RCPA_QueryBounder, Weak_PRPa }.
+  declare module A : RCPA_Adversary { PRPi, WeakPRP_Wrap, RCPA_Wrap, RCPA_QueryBounder, Weak_PRPa }.
   axiom A_distinguish_ll (O <: RCPA_Oracles { A }):
     islossless O.enc => islossless A(O).distinguish.
 
@@ -262,8 +274,17 @@ section RCPA.
     op   zeros   <- zeros,
     op   (+)     <- (+),
     op   P       <- P,
-    op   Pinv    <- Pinv
-  proof * by smt.
+    op   Pi      <- Pi
+  proof *.
+  realize gt0_q       by exact/gt0_q.
+  realize gt0_ell     by smt (gt1_n).
+  realize dKey_uffu   by exact/d_eK_uffu.
+  realize dBlock_uffu by exact/d_block_uffu.
+  realize add0b       by exact/add0b.
+  realize addbA       by exact/addbA.
+  realize addbC       by exact/addbC.
+  realize addbK       by exact/addbK.
+  realize bijective_P. by move=> k; apply/bijectiveP; smt (d_eK_uffu). qed.
 
   (** We really want to clone only MtE, but since RCPA_CPA is
       abstract, its inner theories don't exist until cloned...
@@ -395,8 +416,8 @@ section RCPA.
   local lemma local_conclusion &m:
     `|Pr[INDR_CPA(MacThenEncrypt(PadThenEncrypt(IV_Wrap(CBC(PRPr))),MAC),RCPA_QueryBounder(A)).main () @ &m: res]
       - Pr[INDR_CPA(Ideal,RCPA_QueryBounder(A)).main() @ &m: res]|
-    <= `|Pr[IND(Wrap(PRPr), PRPF_Adv(QueryBounder(RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,A))))).main() @ &m : res]
-         - Pr[IND(PRPi, PRPF_Adv(QueryBounder(RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,A))))).main() @ &m : res]|
+    <= `|Pr[WeakPRP_IND(WeakPRP_Wrap(PRPr), PRPF_Adv(QueryBounder(RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,A))))).main() @ &m : res]
+         - Pr[WeakPRP_IND(PRPi, PRPF_Adv(QueryBounder(RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,A))))).main() @ &m : res]|
        + 2%r * ((q * n) ^ 2)%r * mu d_block (pred1 witness).
   proof.
     have := Conclusion (<: RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,A))) &m _.
@@ -407,13 +428,13 @@ section RCPA.
       by wp; rnd predT; skip; smt.
     rewrite (MtE_security &m) (PtE_security &m) (CBC_security &m).
     (* Here again, we have to tell EasyCrypt that alpha equality implies semantic equality *)
-    have ->: Pr[PRPa.Weak_PRP.IND(PRPa.Wrap(PRPa.PRPr), PRPF_Adv(QueryBounder(RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,A))))).main() @ &m: res]
-             = Pr[IND(Wrap(PRPr),PRPF_Adv(QueryBounder(RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,A))))).main() @ &m: res].
+    have ->: Pr[PRPt.WeakPRP_IND(PRPt.WeakPRP_Wrap(PRPr.PRPr), PRPF_Adv(QueryBounder(RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,A))))).main() @ &m: res]
+             = Pr[WeakPRP_IND(WeakPRP_Wrap(PRPr),PRPF_Adv(QueryBounder(RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,A))))).main() @ &m: res].
       by byequiv=> //=; sim.
-    have ->: Pr[PRPa.Weak_PRP.IND(PRPa.Weak_PRP.PRPi, PRPF_Adv(QueryBounder(RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,A))))).main() @ &m: res]
-             = Pr[IND(PRPi,PRPF_Adv(QueryBounder(RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,A))))).main() @ &m: res].
+    have ->: Pr[PRPt.WeakPRP_IND(PRPi.PRPi, PRPF_Adv(QueryBounder(RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,A))))).main() @ &m: res]
+             = Pr[WeakPRP_IND(PRPi,PRPF_Adv(QueryBounder(RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,A))))).main() @ &m: res].
       by byequiv=> //=; sim.
-    have ->: Pr[CBCa.SKEa.RCPA.INDR_CPA(IV_Wrap(CBC(PRPa.PRPr)),QueryBounder(RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,A)))).main() @ &m: res]
+    have ->: Pr[CBCa.SKEa.RCPA.INDR_CPA(IV_Wrap(CBC(PRPr.PRPr)),QueryBounder(RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,A)))).main() @ &m: res]
              = Pr[CBCa.SKEa.RCPA.INDR_CPA(IV_Wrap(CBC(PRPr)),QueryBounder(RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,A)))).main() @ &m: res].
       by byequiv=> //=; sim.
     have ->: Pr[CBCa.SKEa.RCPA.INDR_CPA(Random,QueryBounder(RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,A)))).main() @ &m: res]
@@ -436,9 +457,9 @@ section RCPA.
     done.
   qed.
 
-  local lemma CleanupAdversary (P <: Weak_PRP { A, Weak_PRPa, OracleBounder, RCPA_WUF_RCPA.RCPAa }) &m:
-    Pr[IND(P,Weak_PRPa(MAC,A)).main() @ &m: res]
-    = Pr[IND(P, PRPF_Adv(QueryBounder(RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,A))))).main() @ &m : res].
+  local lemma CleanupAdversary (P <: WeakPRP { A, Weak_PRPa, OracleBounder, RCPA_WUF_RCPA.RCPAa }) &m:
+    Pr[WeakPRP_IND(P,Weak_PRPa(MAC,A)).main() @ &m: res]
+    = Pr[WeakPRP_IND(P, PRPF_Adv(QueryBounder(RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,A))))).main() @ &m : res].
   proof.
     byequiv (_: ={glob P, glob A} ==> ={res})=> //=; proc; inline *; wp.
     call (_:    ={glob P}
@@ -458,11 +479,11 @@ section RCPA.
   lemma RCPA_security &m:
     `|Pr[INDR_CPA(MEE(PRPr,MAC),RCPA_QueryBounder(A)).main() @ &m: res]
       - Pr[INDR_CPA(Ideal,RCPA_QueryBounder(A)).main() @ &m: res]|
-    <= `|Pr[IND(Wrap(PRPr), Weak_PRPa(MAC,A)).main() @ &m : res]
-         - Pr[IND(PRPi, Weak_PRPa(MAC,A)).main() @ &m: res]|
+    <= `|Pr[WeakPRP_IND(WeakPRP_Wrap(PRPr), Weak_PRPa(MAC,A)).main() @ &m : res]
+         - Pr[WeakPRP_IND(PRPi, Weak_PRPa(MAC,A)).main() @ &m: res]|
        + 2%r * ((q * n) ^ 2)%r * mu d_block (pred1 witness).
   proof.
-    rewrite (MEE_unfold &m) (CleanupAdversary (<: Wrap(PRPr)) &m) (CleanupAdversary PRPi &m).
+    rewrite (MEE_unfold &m) (CleanupAdversary (<: WeakPRP_Wrap(PRPr)) &m) (CleanupAdversary PRPi &m).
     exact/(local_conclusion &m).
   qed.
 end section RCPA.
@@ -501,7 +522,7 @@ module CMAa (P : PRP, A : PTXT_Adversary, M : CMA_Oracles) = {
       i       <- 0;
       while (i < size c) {
         ci     <- nth witness c i;
-        pi     <@ P.finv(ek,ci);
+        pi     <@ P.fi(ek,ci);
         padded <- padded ++ [s + pi];
         s      <- ci;
         i      <- i + 1;
@@ -539,8 +560,17 @@ section PTXT.
     op   zeros   <- zeros,
     op   (+)     <- (+),
     op   P       <- P,
-    op   Pinv    <- Pinv
-  proof * by smt.
+    op   Pi      <- Pi
+  proof *.
+  realize gt0_q       by exact/gt0_q.
+  realize gt0_ell     by smt (gt1_n).
+  realize dKey_uffu   by exact/d_eK_uffu.
+  realize dBlock_uffu by exact/d_block_uffu.
+  realize add0b       by exact/add0b.
+  realize addbA       by exact/addbA.
+  realize addbC       by exact/addbC.
+  realize addbK       by exact/addbK.
+  realize bijective_P. by move=> k; apply/bijectiveP; smt (d_eK_uffu). qed.
 
   (** TODO: ditto **)
   local clone import RCPA_pad as PtEb (* FIXME *) with
