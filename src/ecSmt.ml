@@ -1070,9 +1070,10 @@ let core_theories = [
   ((["map"], "Map"),
      [(CI_Map.p_get, "get");
       (CI_Map.p_set, "set");
-      (CI_Map.p_cnst, "const");
      ]);
 
+  ((["map"], "Const"),
+     [CI_Map.p_cnst, "const"]);
 ]
 
 let core_ty_theories = [
