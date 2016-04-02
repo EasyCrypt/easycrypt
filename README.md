@@ -24,6 +24,8 @@ EasyCrypt uses the following third-party tools/libraries:
  
  * OCaml PCRE (>= 7) [https://github.com/mmottl/pcre-ocaml]
 
+ * OCaml ZArith [https://forge.ocamlcore.org/projects/zarith]
+
 Installing requirements using OPAM (POSIX systems - preferred)
 --------------------------------------------------------------------
 
