@@ -354,12 +354,14 @@ let rec run_prover ?(notify : notify option) (pi : prover_infos) (prover : strin
         | Some wrapper -> Printf.sprintf "%s %s" wrapper command
       in
 
-      let timelimit =
-        let limit = pi.pr_timelimit * pi.pr_cpufactor in
-        if limit <= 0 then None else Some limit in
+      let limit = { Call_provers.empty_limit with
+        Call_provers.limit_time =
+          let limit = pi.pr_timelimit * pi.pr_cpufactor in
+          if limit <= 0 then None else Some limit;
+      } in
 
       let rec doit gcdone =
-        try  Driver.prove_task ~command ?timelimit dr task ()
+        try  Driver.prove_task ~command ~limit dr task ()
         with Unix.Unix_error (Unix.ENOMEM, "fork", _) when not gcdone ->
           Gc.compact (); doit true
       in
