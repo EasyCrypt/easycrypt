@@ -6,7 +6,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Fun Pred Int IntExtra.
+require import Fun Pred Rel Int IntExtra.
 require (*--*) Ring.
 
 pragma +implicits.
