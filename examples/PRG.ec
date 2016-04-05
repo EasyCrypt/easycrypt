@@ -235,7 +235,7 @@ section.
       (uniq logP /\ forall r, !mem logP r \/ !mem (dom m) r)
   by smt ml=0.
 
-  (* In this game, we replace the PRF with fresh samples *)
+  (* In this game, we replace the PRF queries with fresh sampling operations *)
   pred inv (m1 m2:('a,'b) fmap) (logP:'a list) =
     (forall r, mem (dom m1) r <=> (mem (dom m2) r \/ mem logP r)) /\
     (forall r, mem (dom m2) r => m1.[r] = m2.[r]).
@@ -530,9 +530,7 @@ section.
         Pr[Exp(C(A),F,PrgI).main() @ &m: res]
       + (qP * qF + (qP - 1) * qP %/ 2)%r* mu_x dseed witness.
   proof.
-  apply (ler_trans (Pr[Exp(C(A),F,PrgI).main() @ &m: res] +
-                    Pr[Exp'(C(A)).main() @ &m: Bad P.logP F.m])).
-    by apply (pr &m).
+  apply/(ler_trans _ _ _ (pr &m)).
   have: Pr[Exp'(C(A)).main() @ &m: Bad P.logP F.m]
        <= (qP * qF + (qP - 1) * qP%/2)%r * pr_dseed
     by byphoare Bad_bound.
