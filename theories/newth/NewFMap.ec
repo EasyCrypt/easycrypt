@@ -5,7 +5,7 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import Fun Pred Option Pair Int List FSet.
+require import Fun Pred Rel Option Pair Int List FSet.
 pragma +implicits.
 
 (* -------------------------------------------------------------------- *)
@@ -452,13 +452,17 @@ lemma filter_eq_dom (m:('a,'b)fmap) (p1 p2:'a->'b->bool):
    (forall a, mem (dom m) a=> p1 a (oget m.[a]) = p2 a (oget m.[a])) =>
    filter p1 m = filter p2 m.
 proof.
- by move=> Hp;apply fmapP=>z;rewrite !filterP;case (mem (dom m) z)=>// Hz;rewrite Hp.
+  by move=> Hp;apply fmapP=>z;rewrite !filterP;case (mem (dom m) z)=>// Hz;rewrite Hp.
 qed.
 
 lemma filter_eq (m:('a,'b)fmap) (p1 p2:'a->'b->bool):
    (forall a b, p1 a b = p2 a b) =>
    filter p1 m = filter p2 m.
 proof. by move=>Hp;apply filter_eq_dom=>?_;apply Hp. qed.
+
+lemma filter_dom (m : ('a,'b) fmap) (p : 'a -> 'b -> bool):
+  filter (relI p (fun a (_ : 'b)=> mem (dom m) a)) m = filter p m.
+proof. by apply/filter_eq_dom=> a @/relI ->. qed.
 
 (* -------------------------------------------------------------------- *)
 op map (f : 'a -> 'b -> 'c) (m : ('a, 'b) fmap) =
