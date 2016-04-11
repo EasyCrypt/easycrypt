@@ -5,12 +5,7 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import Int.
-require import Real.
-require import FSet.
-require import Finite.
-require import Pair.
-require import Distr.
+require import Int Real FSet Finite Pair Distr DInterval.
 require import OldMonoid.
 require Means.
 
@@ -327,11 +322,11 @@ section.
     move=> p';rewrite (GLB_WL &m p') (GRB_WR &m p').
     simplify p'; rewrite -(WL0_GLA &m p) -(WRq_GRA &m p).
     cut Hint : forall x, support [0..q - 1] x <=> mem (oflist (List.Iota.iota_ 0 q)) x.
-      by move=> x; rewrite !mem_oflist !List.Iota.mem_iota /support Dinter.supp_def; smt.
+      by move=> x; rewrite !mem_oflist !List.Iota.mem_iota /support support_dinter; smt.
     cut Hfin: is_finite (support [0..q - 1]).
       by exists (List.Iota.iota_ 0 q); smt.
     cut Huni : forall (x : int), in_supp x [0..q - 1] => mu_x [0..q - 1] x = 1%r / q%r.
-      by move=> x Hx;rewrite Dinter.mu_x_def_in //;smt.
+      by move=> x Hx;rewrite mux_dinter //;smt.
     pose ev :=
       fun (_j:int) (g:glob HybGameFixed(L(Ob))) (r:outputA),
         let (l,l0,ga,ge) = g in p ga ge l r /\ l <= q.

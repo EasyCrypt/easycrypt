@@ -82,6 +82,7 @@ module CI_Real : sig
   val p_Real : path
   val p_real : path
 
+  val p_RealExtra : path
   val p_RealOrder : path
 
   val p_real0       : path 
@@ -148,6 +149,7 @@ module CI_Logic : sig
   val p_ora_intro_r   : path
   val p_iff_intro     : path
   val p_if_intro      : path
+  val p_if_congr      : path
   val p_eq_refl       : path
   val p_eq_iff        : path
   val p_eq_trans      : path
@@ -170,4 +172,13 @@ module CI_Logic : sig
   val p_case_eq_bool  : path
 
   val p_ip_dup        : path
+end
+
+module CI_Map : sig
+  val i_Map  : symbol
+  val p_Map  : path
+  val p_map  : path
+  val p_get  : path
+  val p_set  : path
+  val p_cnst : path
 end

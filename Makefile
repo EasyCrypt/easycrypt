@@ -6,6 +6,7 @@ OCAMLBUILD_BIN   ?= ocamlbuild
 OCAMLBUILD_EXTRA ?= 
 OCAMLBUILD_OPTS  := -use-ocamlfind -j $(OCAMLBUILD_JOBS)
 
+
 # In Emacs, use classic display to enable error jumping.
 ifeq ($(shell echo $$TERM), dumb)
  OCAMLBUILD_OPTS += -classic-display
@@ -23,6 +24,8 @@ VERSION    ?= $(shell date '+%F')
 DISTDIR    := easycrypt-$(VERSION)
 INSTALL    := scripts/install/install-sh
 PWD        := $(shell pwd)
+COMMIT     := $(shell scripts/install/get-commit)
+FVERSION   := src/ecVersion.ml
 
 include Makefile.system
 
@@ -60,6 +63,7 @@ build: callprover native
 
 define do-build
 	rm -f "$(1)$(EXE)"
+	sed 's/COMMIT/$(COMMIT)/g' < $(FVERSION).in > $(FVERSION)
 	$(OCAMLBUILD) "src/$(1)"
 	if [ ! -z "$(EXE)" ]; then \
 	  cp "_build/src/$(1)" "$(1)$(EXE)"; \
@@ -135,7 +139,8 @@ check-xunit: ec.native
 license:
 	scripts/srctx/license COPYRIGHT.yaml \
 	  $(shell find src -name '*.ml' -o -name '*.ml[a-z]') \
-	  $(shell find theories -name '*.ec' -o -name '*.ec[a-z]')
+	  $(shell find theories -name '*.ec' -o -name '*.ec[a-z]') \
+	  $(shell find proofgeneral/easycrypt -name '*.el')
 
 clean:
 	$(OCAMLBUILD) -clean

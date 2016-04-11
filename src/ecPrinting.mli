@@ -62,6 +62,7 @@ val pp_opdecl   : ?long:bool -> PPEnv.t -> (path * operator) pp
 val pp_added_op : PPEnv.t -> operator pp
 val pp_axiom    : ?long:bool -> PPEnv.t -> (path * axiom   ) pp
 val pp_theory   : PPEnv.t -> (path * (ctheory * thmode)    ) pp
+val pp_modtype1 : PPEnv.t -> module_type                     pp
 val pp_modtype  : PPEnv.t -> (module_type * mod_restr      ) pp
 val pp_modexp   : PPEnv.t -> (mpath * module_expr          ) pp
 val pp_modsig   : PPEnv.t -> (path * module_sig            ) pp

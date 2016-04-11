@@ -10,3 +10,9 @@ EasyCrypt standard library (theories/**/*.ec):
   Distributed under the terms of the CeCILL-B licence.
 
   http://www.cecill.info/licences/Licence_CeCILL-B_V1-en.txt
+
+ProofGeneral mode (proofgeneral/easycrypt/*.el):
+  Copyright (c) - 2012-2016 - IMDEA Software Institute and INRIA
+  Distributed under the terms of the GPL license (version 3)
+
+  http://www.gnu.org/licenses/gpl-3.0.txt

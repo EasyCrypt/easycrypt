@@ -52,6 +52,15 @@ proof. by move=> ih n; rewrite -mkwordK; apply/ih/size_word. qed.
 lemma nosmt ofword_inj : injective ofword.
 proof. by apply/(can_inj _ _ mkwordK). qed.
 
+lemma nosmt mkword_pinj (s1 s2 : t array) :
+  size s1 = n => size s2 = n =>
+  mkword s1 = mkword s2 =>
+  s1 = s2.
+proof.
+move=> size_s1 size_s2 eq_mkword.
+by rewrite -(@ofwordK s1) // -(@ofwordK s2) // eq_mkword.
+qed.
+
 (* -------------------------------------------------------------------- *)
 op oflist (s : t list) = mkword (Array.mkarray s).
 op tolist (w : word) = Array.ofarray (ofword w).

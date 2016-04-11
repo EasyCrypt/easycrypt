@@ -99,7 +99,7 @@ let check_case idir name (dev, ino) =
 
 (* -------------------------------------------------------------------- *)
 let locate ?(onlysys = false) (name : string) (ecl : ecloader) =
-  if not (Pcre.pmatch ~pat:"^[a-zA-Z0-9_]+$" name) then
+  if not (EcRegexp.match_ (`S "^[a-zA-Z0-9_]+$") name) then
     None
   else
     let locate kind ((issys, idir), _) =

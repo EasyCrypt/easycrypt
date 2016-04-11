@@ -6,18 +6,26 @@ set -e
 msg () { echo $* >&2; }
 
 # --------------------------------------------------------------------
-pname="$1"
+[ $# -eq 2 ] || exit 1
+
+pname="$1"; mode="$2"
+
+# --------------------------------------------------------------------
+OVERSION=4.02.1
 
 # --------------------------------------------------------------------
 msg "Installing dependencies from Ubuntu packages."
 
+sudo apt-get update
+sudo DEBIAN_FRONTEND=noninteractive apt-get -yy upgrade
 sudo DEBIAN_FRONTEND=noninteractive apt-get install \
-  -qq -yy m4 opam libgmp-dev libpcre3-dev pkg-config emacs24
+  -yy git m4 opam libgmp-dev libpcre3-dev libzip-dev pkg-config emacs24
+sudo apt-get clean
 
 # --------------------------------------------------------------------
 msg "Initializing opam."
 
-opam init -q -a --compiler=4.02.1
+opam init -a --compiler="${OVERSION}"
 eval `opam config env`
 
 opam repository add easycrypt git://github.com/EasyCrypt/opam.git
@@ -26,25 +34,68 @@ opam update
 # --------------------------------------------------------------------
 msg "Installing EasyCrypt and dependencies from OPAM packages."
 
-opam install easycrypt ec-provers ec-proofgeneral
+opam install ec-toolchain ec-provers
 why3 config --detect
-cat >/home/vagrant/.emacs <<EOF
-(when (fboundp 'electric-indent-mode) (electric-indent-mode -1))
-  (setq proof-output-tooltips nil)
-(load-file "~/.opam/4.02.1/share/ec-proofgeneral/generic/proof-site.el")
-EOF
-
-# # --------------------------------------------------------------------
-# msg "Installing EasyCrypt dependencies from OPAM packages."
-# 
-# opam install -q -y ec-toolchain ec-provers
-# why3 config --detect
-# 
-# # --------------------------------------------------------------------
-# msg "Building EasyCrypt."
-# 
-# make -C "${pname}"
-# make -C "${pname}/proofgeneral" local
 
 # --------------------------------------------------------------------
-msg "Now use vagrant ssh -- -X and make pg"
+if [ ! -e ~/.emacs.rc ]; then mkdir ~/.emacs.rc; fi
+
+cat >~/.emacs.rc/emacs-pkg-install.el <<EOF
+(require 'package)
+(package-initialize)
+
+(add-to-list 'package-archives
+             '("melpa" . "http://melpa.milkbox.net/packages/") t)
+
+(setq url-http-attempt-keepalives nil)
+(package-refresh-contents)
+(package-install pkg-to-install)
+EOF
+
+einstall () {
+  emacs --batch --eval "(defconst pkg-to-install '${1})" \
+        -l ~/.emacs.rc/emacs-pkg-install.el
+}
+
+# --------------------------------------------------------------------
+if [ "$mode" = "cloned" ]; then
+  msg "Installing EasyCrypt from opam."
+
+  opam install -y easycrypt ec-proofgeneral
+
+  einstall opam
+
+  cat >~/.emacs <<EOF
+;; Disable eletric indent
+(when (fboundp 'electric-indent-mode) (electric-indent-mode -1))
+  (setq proof-output-tooltips nil)
+
+;; MELPA
+(require 'package)
+(package-initialize)
+
+(add-to-list 'package-archives
+             '("melpa" . "http://melpa.milkbox.net/packages/") t)
+
+;; Opam
+(require 'opam)
+(opam-init)
+
+;; ProofGeneral
+(setq proof-output-tooltips nil)
+(load-file "~/.opam/${OVERSION}/share/ec-proofgeneral/generic/proof-site.el")
+EOF
+
+  msg "Your vagrant box is ready to be exported."
+fi
+
+# --------------------------------------------------------------------
+if [ "$mode" = "shared" ]; then
+  msg "Building EasyCrypt from shared directory."
+
+  make -C "${pname}"
+  make -C "${pname}/proofgeneral" local
+
+  msg "You can now use your vagrant/easycryptxbox by typing:"
+  msg ">> vagrant ssh -- -X -- make -C easycrypt pg"
+fi

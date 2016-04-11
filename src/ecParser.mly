@@ -21,11 +21,11 @@
   let pqsymb_of_symb loc x : pqsymbol =
     mk_loc loc ([], x)
 
-  let mk_mod ?(modtypes = []) params body = Pm_struct {
+(*  let mk_mod ?(modtypes = []) params body = Pm_struct {
     ps_params    = params;
     ps_signature = modtypes;
     ps_body      = body;
-  }
+  } *)
 
   let mk_tydecl (tyvars, name) body = {
     pty_name   = name;
@@ -140,10 +140,12 @@
   let mk_tactic_of_tactics ts =
     mk_core_tactic (mk_loc ts.pl_loc (Pseq (unloc ts)))
 
-  let mk_topmod ~local (name, body) =
-    { ptm_name  = name ;
-      ptm_body  = body ;
-      ptm_local = local; }
+  let mk_topmod ~local (header, body) =
+    {
+      ptm_header = header;
+      ptm_body   = body;
+      ptm_local  = local;
+    }
 
   let mk_rel_pterm info =
     odfl ({ fp_mode = `Implicit;
@@ -395,7 +397,6 @@
 %token FIRST
 %token FISSION
 %token FORALL
-%token FROM_INT
 %token FUN
 %token FUSION
 %token FWDS
@@ -801,22 +802,23 @@ sexpr_u:
 | e=sexpr PCENT p=uqident
    { PEscope (p, e) }
 
-| e=sexpr PCENT p=lident
-   { if unloc p <> "top" then
-       parse_error p.pl_loc (Some "invalid scope name");
-     PEscope (pqsymb_of_symb p.pl_loc "<top>", e) }
+| e=sexpr p=loc(prefix(PCENT, lident))
+   { let { pl_loc = lc; pl_desc = p; } = p in
+     if unloc p = "r" then
+       let id =
+         PEident (mk_loc lc EcCoreLib.s_real_of_int, None)
+       in PEapp (mk_loc lc id, [e])
+     else begin
+       if unloc p <> "top" then
+         parse_error p.pl_loc (Some "invalid scope name");
+       PEscope (pqsymb_of_symb p.pl_loc "<top>", e)
+     end }
 
 | n=uint
    { PEint n }
 
 | x=qoident ti=tvars_app?
    { PEident (x, ti) }
-
-| se=sexpr op=loc(FROM_INT)
-   { let id =
-       PEident (mk_loc op.pl_loc EcCoreLib.s_real_of_int, None)
-     in
-       PEapp (mk_loc op.pl_loc id, [se]) }
 
 | se=sexpr DLBRACKET ti=tvars_app? e=expr RBRACKET
    { peget (EcLocation.make $startpos $endpos) ti se e }
@@ -974,8 +976,20 @@ sform_u(P):
 | x=P
    { x }
 
-| f=sform_r(P) PCENT p=qident
+| f=sform_r(P) PCENT p=uqident
    { PFscope (p, f) }
+
+| f=sform_r(P) p=loc(prefix(PCENT, lident))
+   { let { pl_loc = lc; pl_desc = p; } = p in
+     if unloc p = "r" then
+       let id =
+         PFident (mk_loc lc EcCoreLib.s_real_of_int, None)
+       in PFapp (mk_loc lc id, [f])
+     else begin
+       if unloc p <> "top" then
+         parse_error p.pl_loc (Some "invalid scope name");
+       PFscope (pqsymb_of_symb p.pl_loc "<top>", f)
+     end }
 
 | n=uint
    { PFint n }
@@ -988,10 +1002,6 @@ sform_u(P):
 
 | x=mident
    { PFmem x }
-
-| se=sform_r(P) op=loc(FROM_INT)
-   { let id = PFident(mk_loc op.pl_loc EcCoreLib.s_real_of_int, None) in
-     PFapp (mk_loc op.pl_loc id, [se]) }
 
 | se=sform_r(P) DLBRACKET ti=tvars_app? e=form_r(P) RBRACKET
    { pfget (EcLocation.make $startpos $endpos) ti se e }
@@ -1336,8 +1346,8 @@ mod_item:
 | v=var_decl
     { Pst_var v }
 
-| m=mod_def
-    { let (x, m) = m in Pst_mod (x, m) }
+| MODULE x=uident c=mod_cast? EQ m=loc(mod_body)
+    { Pst_mod (x, odfl [] c, m) }
 
 | PROC decl=loc(fun_decl) EQ body=fun_def_body {
     let { pl_loc = loc; pl_desc = decl; } = decl in
@@ -1356,23 +1366,26 @@ mod_item:
 
 mod_body:
 | m=mod_qident
-    { `Alias m }
+    { Pm_ident m }
 
 | LBRACE stt=loc(mod_item)* RBRACE
-    { `Struct stt }
+    { Pm_struct stt }
 
 mod_def:
-| MODULE x=uident p=mod_params? t=mod_aty? EQ body=loc(mod_body)
-    { let p = EcUtils.odfl [] p in
-        match body.pl_desc with
-        | `Alias m ->
-             if t <> None then
-               parse_error (EcLocation.make $startpos $endpos)
-                 (Some "cannot bind module type to module alias");
-             (x, mk_loc body.pl_loc (Pm_ident(p, m)))
+| MODULE header=mod_header c=mod_cast? EQ body=loc(mod_body) 
+  { let header = match c with None -> header | Some c ->  Pmh_cast(header,c) in
+    header, body }
 
-        | `Struct st ->
-             (x, mk_loc body.pl_loc (mk_mod ?modtypes:t p st)) }
+mod_header:
+| x=uident                  { Pmh_ident x }
+| mh=loc(mod_header_params) { Pmh_params mh }
+| LPAREN mh=mod_header c=mod_cast RPAREN { Pmh_cast(mh,c) }
+
+mod_cast:
+| COLON c=plist1(uqident,COMMA) { c }
+
+mod_header_params:
+| mh=mod_header p=mod_params { mh,p }
 
 top_mod_def:
 | LOCAL x=mod_def { mk_topmod ~local:true  x }
@@ -1384,13 +1397,6 @@ top_mod_decl:
 
 mod_params:
 | LPAREN a=plist1(sig_param, COMMA) RPAREN  { a }
-
-mod_aty:
-| COLON t=plist1(loc(mod_aty1), COMMA) { t }
-
-mod_aty1:
-| x=qident { (x, []) }
-| x=qident xs=paren(ident+) { (x, xs) }
 
 (* -------------------------------------------------------------------- *)
 (* Modules interfaces                                                   *)
@@ -2065,6 +2071,9 @@ rwarg1:
 | LBRACKET SMT pi=smt_info RBRACKET
    { RWSmt (false, pi) }
 
+| LBRACKET SMT LPAREN dbmap=dbmap1* RPAREN RBRACKET 
+   { RWSmt (false, SMT.mk_smt_option [`WANTEDLEMMAS dbmap]) }
+
 | AMP f=pterm
    { RWApp f }
 
@@ -2238,7 +2247,7 @@ dbmap1:
 
 dbhint:
 | m=dbmap1         { [m] }
-| m=paren(dbmap1+) {  m  }
+| m=paren(dbmap1*) {  m  }
 
 %inline prod_form:
 | f1=sform f2=sform   { (Some f1, Some f2) }
@@ -2287,6 +2296,9 @@ logtactic:
 
 | SMT pi=smt_info
    { Psmt pi }
+
+| SMT LPAREN dbmap=dbmap1* RPAREN
+   { Psmt (SMT.mk_smt_option [`WANTEDLEMMAS dbmap]) }
 
 | SPLIT
     { Psplit }

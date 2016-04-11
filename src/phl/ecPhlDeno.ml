@@ -25,7 +25,7 @@ module TTC = EcProofTyping
 
 (* -------------------------------------------------------------------- *)
 let real_lemma name =
-  EcPath.pqname EcCoreLib.CI_Real.p_Real name
+  EcPath.pqname EcCoreLib.CI_Real.p_RealExtra name
 
 let real_order_lemma name =
   EcPath.pqname EcCoreLib.CI_Real.p_RealOrder name

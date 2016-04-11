@@ -9,7 +9,7 @@
 require import Pred Int IntExtra IntDiv Real RealExtra Ring List.
 require import StdRing StdOrder.
 require (*--*) Bigop Bigalg.
-(*---*) import IntID IntOrder.
+(*---*) import RField IntID IntOrder.
 
 pragma Proofs:weak.
 
@@ -54,13 +54,16 @@ proof. admit. qed.
 
 abbrev sumid i j = BIA.bigi predT (fun n => n) i j.
 
-lemma sumidE n : 0 <= n =>
-  BIA.bigi predT (fun i => i) 0 n = (n * (n - 1)) %/ 2.
+lemma sumidE_r n : 0 <= n =>
+  2 * sumid 0 n  = (n * (n - 1)).
 proof.
 elim: n => /= [|n ge0_n ih]; first by rewrite BIA.big_geq // div0z.
-rewrite BIA.big_int_recr //= ih addrK mulrC -{3}(mulzK n 2) //.
-by rewrite -divzDl 2:/# dvdzE -oddPn oddM -{2}(addzK 1) addzAC oddS /#.
+by rewrite BIA.big_int_recr //= mulrDr ih #ring.
 qed.
+
+lemma sumidE n : 0 <= n =>
+  sumid 0 n = (n * (n - 1)) %/ 2.
+proof. by move/sumidE_r=> <-; rewrite mulKz. qed.
 end Bigint.
 
 import Bigint.
@@ -119,6 +122,13 @@ proof. by rewrite sumr_const count_predT RField.mulr1. qed.
 lemma sumr1_int (n : int) : 0 <= n =>
   BRA.bigi predT (fun i => 1%r) 0 n = n%r.
 proof. by move=> ge0_n; rewrite sumr1 size_range max_ler. qed.
+
+lemma sumidE n : 0 <= n =>
+  BRA.bigi predT (fun i => i%r) 0 n = (n * (n - 1))%r / 2%r.
+proof.
+move=> ge0_n; rewrite -sumr_ofint -sumidE_r //.
+by rewrite fromintM mulrAC divff.
+qed.
 end Bigreal.
 
 import Bigreal.

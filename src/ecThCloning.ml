@@ -168,7 +168,7 @@ and renaming_kind = [
 ]
 
 and renaming =
-  renaming_kind * (Pcre.regexp * Pcre.substitution)
+  renaming_kind * (EcRegexp.regexp * EcRegexp.subst)
 
 and rk_categories = {
   rkc_lemmas  : bool;
@@ -195,7 +195,7 @@ let rename ((rk, (rex, itempl)) : renaming) (k, x) =
     | _, _ -> false in
 
   let newx =
-    try  if selected then Pcre.replace ~rex ~itempl x else x
+    try  if selected then EcRegexp.sub (`C rex) (`C itempl) x else x
     with Failure _ -> x in
 
   if x = newx then None else Some newx
@@ -412,17 +412,17 @@ module Renaming : sig
 end = struct
   let rename1 oc (k, (r1, r2)) : renaming =
     let e1 =
-      try  Pcre.regexp (unloc r1)
-      with Pcre.Error _ -> clone_error oc.oc_env (CE_InvalidRE (unloc r1)) in
+      try  EcRegexp.regexp (unloc r1)
+      with EcRegexp.Error _ -> clone_error oc.oc_env (CE_InvalidRE (unloc r1)) in
     let e2 =
-      try  Pcre.subst (unloc r2)
-      with Pcre.Error _ -> clone_error oc.oc_env (CE_InvalidRE (unloc r2)) in
+      try  EcRegexp.subst (unloc r2)
+      with EcRegexp.Error _ -> clone_error oc.oc_env (CE_InvalidRE (unloc r2)) in
 
     Array.iter
       (fun m ->
-        if Pcre.pmatch ~pat:"^0+$" m.(1) then
+        if EcRegexp.match_ (`S "^0+$") (oget m.(1)) then
           clone_error oc.oc_env (CE_InvalidRE (unloc r2)))
-      (try  Pcre.extract_all ~pat:"\\$([0-9]+)" (unloc r2)
+      (try  EcRegexp.extract (`S "\\$([0-9]+)") (unloc r2)
        with Not_found -> [||]);
 
     let k =

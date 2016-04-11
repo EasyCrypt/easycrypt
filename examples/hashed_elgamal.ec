@@ -1,7 +1,5 @@
-require import Int.
-require import Real.
-require import FMap.
-require import FSet.
+require import Int Real FMap FSet StdOrder.
+(*---*) import RealOrder.
 
 require (*--*) DiffieHellman.
 require (*--*) AWord.
@@ -92,14 +90,14 @@ module type Adversary (O:ARO) = {
 (* TODO: use generic defs from ROM.ec *)
 module Bounder(A:Adversary,O:ARO) = {
   module ARO = {
-    var qs:group set
+    var qs:group fset
 
     proc o(x:group): bits = {
       var r = witness;
 
       if (card qs < qH) {
         r  = O.o(x);
-        qs = add x qs;
+        qs = qs `|` fset1 x;
       }
       return r;
     }
@@ -113,7 +111,7 @@ module Bounder(A:Adversary,O:ARO) = {
 
 (* Specializing the hash function and merging it into the bounding wrapper *)
 module H:Hash = {
-  proc init(): unit = { RO.init(); Bounder.ARO.qs = FSet.empty; }
+  proc init(): unit = { RO.init(); Bounder.ARO.qs = fset0; }
   proc hash = RO.o
 }.
 
@@ -124,7 +122,7 @@ module S = Hashed_ElGamal(H).
 hoare Correctness: Correctness(S).main: true ==> res.
 proof.
   proc; inline*; auto => /= &hr sk0 Hsk0 y Hy y0 Hy0.
-  rewrite !(dom_empty, mem_empty) /= !pow_pow F.mulC dom_set mem_add /= => y1 _.
+  rewrite !(dom_empty, mem_empty) /= !pow_pow F.mulC dom_set !inE /= => y1 _.
   algebra.
 qed.
 
@@ -133,7 +131,7 @@ qed.
 module SCDH_from_CPA(A:Adversary,O:ARO): Set_CDH.Adversary = {
   module BA = Bounder(A,O)
 
-  proc solve(gx:group, gy:group): group set = {
+  proc solve(gx:group, gy:group): group fset = {
     var m0, m1, h, b';
 
     H.init();
@@ -217,7 +215,7 @@ section.
 
   (* The equivalence is up to the adversary guessing the challenge *)
   local equiv G0_G1:
-    G0.main ~ G1.main: ={glob A} ==> !(mem G1.gxy Bounder.ARO.qs){2} => ={res}.
+    G0.main ~ G1.main: ={glob A} ==> !(mem Bounder.ARO.qs G1.gxy){2} => ={res}.
   proof.
     proc.
     (* Up until the hash call, the two games are equivalent *)
@@ -229,12 +227,12 @@ section.
       by inline H.init RO.init; wp; do !rnd; wp; skip; smt.
     (* After that, the equivalence relation may be broken if the adversary queries g^(x*y) from the ROM *)
     (* BUG: the invariant form of call raises an anomaly *)
-    call (_: (!mem G1.gxy Bounder.ARO.qs){2} =>
+    call (_: (!mem Bounder.ARO.qs G1.gxy){2} =>
              ={glob A, Bounder.ARO.qs, c} /\ eq_except RO.m{1} RO.m{2} G1.gxy{2}
              ==>
-             (!mem G1.gxy Bounder.ARO.qs){2} =>
+             (!mem Bounder.ARO.qs G1.gxy){2} =>
              ={glob A, Bounder.ARO.qs, res} /\ eq_except RO.m{1} RO.m{2} G1.gxy{2})=> //.
-      proc (mem G1.gxy Bounder.ARO.qs) (={Bounder.ARO.qs} /\ eq_except RO.m{1} RO.m{2} G1.gxy{2})=> //.
+      proc (mem Bounder.ARO.qs G1.gxy) (={Bounder.ARO.qs} /\ eq_except RO.m{1} RO.m{2} G1.gxy{2})=> //.
         by move=> &1 &2 H /H.
         by move=> &1 &2 H /H.
         exact guessL.
@@ -245,9 +243,9 @@ section.
   qed.
 
   local lemma Pr_G0_G1 &m:
-    Pr[G0.main() @ &m: res] <= Pr[G1.main() @ &m: res] + Pr[G1.main() @ &m: mem G1.gxy Bounder.ARO.qs].
+    Pr[G0.main() @ &m: res] <= Pr[G1.main() @ &m: res] + Pr[G1.main() @ &m: mem Bounder.ARO.qs G1.gxy].
   proof.
-    cut: Pr[G0.main() @ &m: res] <= Pr[G1.main() @ &m: res \/ mem G1.gxy Bounder.ARO.qs].
+    cut: Pr[G0.main() @ &m: res] <= Pr[G1.main() @ &m: res \/ mem Bounder.ARO.qs G1.gxy].
       by byequiv G0_G1=> //; smt.
     by rewrite Pr [mu_or]; smt.
   qed.
@@ -293,7 +291,7 @@ section.
   by byequiv G1_G2.
 
   local lemma Pr_G1_G2_coll &m:
-    Pr[G1.main() @ &m: mem G1.gxy Bounder.ARO.qs] = Pr[G2.main() @ &m: mem G2.gxy Bounder.ARO.qs]
+    Pr[G1.main() @ &m: mem Bounder.ARO.qs G1.gxy] = Pr[G2.main() @ &m: mem Bounder.ARO.qs G2.gxy]
   by byequiv G1_G2.
 
   (* G2 is clearly uniform random *)
@@ -314,7 +312,7 @@ section.
   (** Final reduction **)
   (* We add the bound on the number of ROM queries answered to facilitate the computation later on *)
   local equiv G2_SCDH: G2.main ~ SCDH(SCDH_from_CPA(A,RO)).main:
-    ={glob A} ==> (mem G2.gxy Bounder.ARO.qs){1} = res{2} /\ card Bounder.ARO.qs{1} <= qH.
+    ={glob A} ==> (mem Bounder.ARO.qs G2.gxy){1} = res{2} /\ card Bounder.ARO.qs{1} <= qH.
   proof.
     proc.
     inline SCDH_from_CPA(A,RO).solve.
@@ -333,7 +331,7 @@ section.
   qed.
 
   local lemma Pr_G2_SCDH &m :
-    Pr[G2.main() @ &m : mem G2.gxy Bounder.ARO.qs]
+    Pr[G2.main() @ &m : mem Bounder.ARO.qs G2.gxy]
     = Pr[SCDH(SCDH_from_CPA(A,RO)).main() @ &m : res]
   by byequiv G2_SCDH.
 
@@ -342,7 +340,7 @@ section.
     1%r / 2%r + Pr[SCDH(SCDH_from_CPA(A,RO)).main() @ &m : res].
   proof.
     rewrite (Pr_CPA_G0 &m).
-    apply (real_le_trans _ (Pr[G1.main() @ &m : res] + Pr[G1.main() @ &m: mem G1.gxy Bounder.ARO.qs]));
+    apply (ler_trans (Pr[G1.main() @ &m : res] + Pr[G1.main() @ &m: mem Bounder.ARO.qs G1.gxy]));
       first by apply (Pr_G0_G1 &m).
     by rewrite (Pr_G1_G2_res &m) (Pr_G2 &m) (Pr_G1_G2_coll &m) (Pr_G2_SCDH &m).
   qed.
@@ -352,13 +350,9 @@ section.
       Pr[CPA(S,Bounder(A,RO)).main() @ &m: res] - 1%r / 2%r <=
       qH%r * Pr[CDH(CDH_from_SCDH(SCDH_from_CPA(A,RO))).main() @ &m: res].
   proof.
-    apply (Trans _ (Pr[SCDH(SCDH_from_CPA(A,RO)).main() @ &m: res]));
+    apply (ler_trans (Pr[SCDH(SCDH_from_CPA(A,RO)).main() @ &m: res]));
       first smt.
-    rewrite -(mul_compat_le (1%r/qH%r)).
-     by rewrite -Real.inv_def; apply sign_inv; smt.
-    rewrite !(Real.Comm.Comm _ (1%r/qH%r)) -Real.Assoc.Assoc -{2}Real.inv_def (Real.Comm.Comm _ qH%r).
-    rewrite (_: forall x, qH%r * (inv qH%r) * x = x).
-     move=> x;fieldeq;smt.
+    apply/ler_pdivr_mull; 1: smt.
     by rewrite (Set_CDH.Reduction (SCDH_from_CPA(A,RO)) &m); smt.
   qed.
 end section.

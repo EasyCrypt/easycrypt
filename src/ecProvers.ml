@@ -32,13 +32,13 @@ end = struct
 
   let parse =
     let pop (version : string) =
-      let rex = Pcre.regexp "^([0-9]+)[.-]?(.*)" in
-      try
-        let groups = Pcre.exec ~rex version in
-        let g1 = Pcre.get_substring groups 1 in
-        let g2 = Pcre.get_substring groups 2 in
-        (int_of_string g1, g2)
-      with Not_found -> (0, version)
+      let rex = EcRegexp.regexp "^([0-9]+)[.-]?(.*)" in
+      match EcRegexp.exec (`C rex) version with
+      | Some m -> 
+         let m = EcRegexp.Match.groups m in
+         (int_of_string (oget m.(1)), (oget m.(2)))
+
+      | None -> (0, version)
     in
 
     fun (version : string) ->

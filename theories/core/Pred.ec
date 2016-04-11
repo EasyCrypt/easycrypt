@@ -49,7 +49,7 @@ by [].
 
 lemma nosmt subpred_asym (X Y:'a -> bool):
   X <= Y => Y <= X => X = Y
-by (rewrite -fun_ext; smt).
+by (rewrite fun_ext; smt).
 
 lemma nosmt subpred_trans (X Y Z:'a -> bool):
   X <= Y => Y <= Z => X <= Z

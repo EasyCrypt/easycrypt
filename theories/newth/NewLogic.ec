@@ -185,7 +185,7 @@ by [].
 lemma implybN a b : (a => !b) <=> (b => !a)
 by [].
 
-lemma implybNN a b : (!a => !b) <=> b => a
+lemma implybNN a b : (!a => !b) <=> (b => a)
 by [].
 
 lemma implyb_idl (a b : bool) : (!a => b) => (a => b) <=> b

@@ -61,7 +61,7 @@ end = struct
             (EcPrinting.pp_list " or@ " (EcPrinting.pp_funname ppe))
             (Sx.elements notallowed)
 
-  let pp_cnv_failure env fmt error =
+  let rec pp_cnv_failure env fmt error =
     let msg x = Format.fprintf fmt x in
 
     match error with
@@ -78,6 +78,15 @@ end = struct
     | E_TyModCnv_MismatchFunSig (x,err) ->
         msg "procedure `%s' is not compatible: %a"
           x (pp_mismatch_funsig env) err
+    | E_TyModCnv_SubTypeArg(x,t1,t2,err) ->
+      let ppe = EcPrinting.PPEnv.ofenv env in
+      msg "@[<v>for argument %s:@   %a is not a subtype of %a because@   %a@]"
+        (EcIdent.name x)
+        (EcPrinting.pp_modtype1 ppe) t1
+        (EcPrinting.pp_modtype1 ppe) t2
+        (pp_cnv_failure env) err
+          
+          
 
   let pp_modappl_error env fmt error =
     let msg x = Format.fprintf fmt x in
@@ -180,8 +189,10 @@ end = struct
     | TypeClassMismatch ->
         msg "Type-class unification failure"
 
-    | TypeModMismatch err ->
-        msg "this module body does not meet its interface:@\n";
+    | TypeModMismatch(mp, mt, err) ->
+        msg "the module %a does not have the module type %a:@\n"
+          (EcPrinting.pp_topmod env) mp
+          (EcPrinting.pp_modtype1 env) mt;
         msg "  @[<hov 2>%t@]" (fun fmt -> pp_cnv_failure env1 fmt err)
 
     | NotAFunction ->

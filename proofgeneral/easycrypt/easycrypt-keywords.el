@@ -1,4 +1,4 @@
-; Generated on Mon Jan 25 17:13:24 2016
+; Generated on Mon Apr 11 20:40:39 2016
 
 (defvar easycrypt-bytac-keywords '(
   "exact"
@@ -83,12 +83,14 @@
   "else"
   "elif"
   "while"
+  "awhile"
   "assert"
   "return"
   "res"
   "aequiv"
   "equiv"
   "hoare"
+  "ahoare"
   "phoare"
   "islossless"
 ))
@@ -145,8 +147,11 @@
   "bypr"
   "byphoare"
   "byequiv"
+  "tohoare"
   "toequiv"
+  "ofequiv"
   "fel"
+  "lap"
   "conseq"
   "exfalso"
   "inline"

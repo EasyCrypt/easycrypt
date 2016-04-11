@@ -33,7 +33,7 @@ opam update
 
 git clone --depth=1 https://github.com/EasyCrypt/easycrypt.git
 
-opam install -v -y ec-toolchain.20150923 ec-provers.20150209
+opam install -v -y ec-toolchain ec-provers
 make -C easycrypt
 
 # --------------------------------------------------------------------
@@ -91,7 +91,7 @@ cp ../config/scripts/run-easycrypt package/easycrypt/
 
 # --------------------------------------------------------------------
 ldd package/easycrypt/bin/* | fgrep '=>' | \
-    fgrep -w 'libgmp' | awk '{print $3}' | sort -u | \
+    egrep -w 'libgmp|libpcre' | awk '{print $3}' | sort -u | \
     xargs -r -I '{}' -- cp '{}' package/easycrypt/lib/
 
 # --------------------------------------------------------------------

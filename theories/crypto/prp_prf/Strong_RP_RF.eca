@@ -72,7 +72,7 @@ module ARP = {
   }
 }.
 
-op q : { int | 0 < q } as gt0_q.
+op q : { int | 0 <= q } as ge0_q.
 
 (** To factor out the difficult step, we parameterize the PRP by a
     procedure that samples its output, and provide two instantiations
@@ -85,7 +85,7 @@ module Direct = {
   proc sample(X:D fset): D = {
     var r;
 
-    r = $uD \ X;
+    r = $uD \ (mem X);
     return r;
   }
 }.
@@ -96,7 +96,7 @@ module Indirect = {
 
     r = $uD;
     if (mem X r) {
-      r = $uD \ X;
+      r = $uD \ (mem X);
     }
     return r;
   }
@@ -126,7 +126,7 @@ module PRPi'(S:Sample_t) = {
 (* FIXME: cleanup *)
 lemma excepted_lossless (m:(D,D) fmap):
   (exists x, !mem (dom m) x) =>
-  mu (uD \ rng m) predT = 1%r.
+  mu (uD \ (mem (rng m))) predT = 1%r.
 proof. by move=> /endo_dom_rng; smt. qed.
 
 phoare Indirect_ll: [Indirect.sample: exists x, support uD x /\ !mem X x ==> true] = 1%r.
@@ -144,7 +144,7 @@ proof.
 proc; if=> //=; auto; call Indirect_ll.
 skip=> /> &hr x_notin_m.
 have [x0] x0_notinr_m := endo_dom_rng PRPi.m{hr} _; first by exists x{hr}.
-by exists x0; rewrite x0_notinr_m; smt w=uD_uf_fu.
+by exists x0; rewrite x0_notinr_m /= -/(mu_x _ _); smt w=uD_uf_fu.
 qed.
 
 lemma PRPi'_Indirect_fi_ll: islossless PRPi'(Indirect).fi.
@@ -152,7 +152,7 @@ proof.
 proc; if=> //=; auto; call Indirect_ll.
 skip=> /> &hr x_notin_mi.
 have [x0] x0_notinr_mi := endo_dom_rng PRPi.mi{hr} _; first by exists x{hr}.
-by exists x0; rewrite x0_notinr_mi; smt w=uD_uf_fu.
+by exists x0; rewrite x0_notinr_mi -/(mu_x _ _); smt w=uD_uf_fu.
 qed.
 
 (** The proof is cut into 3 parts (sections):
@@ -189,7 +189,7 @@ section Upto.
       r = $uD;
       if (mem X r) {
         bad <- true;
-        r = $uD \ X;
+        r = $uD \ (mem X);
       }
       return r;
     }
@@ -382,7 +382,7 @@ section CollisionProbability.
     * proc; inline *; wp; call (_: DBounder.FBounder.c <= q).
       - by proc; sp; if=> //=; inline*; sp; if=> //=; auto=> /#.
       - by proc; sp; if=> //=; inline*; sp; if=> //=; auto=> /#.
-      by auto=> /=; apply/ltrW/gt0_q.
+      by auto=> /=; apply/ge0_q.
     by sim.
   have ->: Pr[IND(ARP,DBounder(D)).main() @ &m: ARP.coll /\ DBounder.FBounder.c <= q]
            = Pr[FEL(D).main() @ &m: ARP.coll /\ FEL.c <= q].
@@ -414,18 +414,13 @@ section CollisionProbability.
       - smt ml=0.
     by auto; progress; rewrite rng0 fcards0.
   fel 2 FEL.c (fun x, q%r * mu uD (pred1 witness)) q (ARP.coll) [FEL(D).FBounder.f: (FEL.c < q); FEL(D).FBounder.fi: (FEL.c < q)]=> //.
-  + rewrite sumr_const count_predT size_range /= max_ler 1:ler_subr_addr 1:-ltzE 1:gt0_q.
-    rewrite -mulr_intr ofintR (powS 1) // pow1 fromintM mulrC mulrA.
-    apply/RealOrder.ler_wpmul2r; first by smt w=mu_bounded.
-    apply/RealOrder.ler_wpmul2r; first by smt w=gt0_q.
-    smt ml=0.
+  + rewrite sumr_const count_predT size_range /= max_ler 1:ge0_q.
+    by rewrite -mulr_intr ofintR (powS 1) // pow1 fromintM mulrC mulrA.
   + by inline*; auto; rewrite dom0 fcards0.
-  + proc; sp; if=> //=; first last.
-    * hoare=> // /> &hr _ _ _.
-      by apply/RealOrder.mulr_ge0; smt w=(mu_bounded gt0_q).
+  + proc; sp; rcondt 1=> //.
     inline *; sp; if=> //=; last first.
     * hoare; auto=> // /> &hr _ _ _ _.
-      by apply/RealOrder.mulr_ge0; smt w=(mu_bounded gt0_q).
+      by apply/RealOrder.mulr_ge0; smt w=(mu_bounded ge0_q).
     sp; if=> //=.
     * wp; rnd (mem (rng ARP.m)); skip.
       progress.
@@ -433,15 +428,15 @@ section CollisionProbability.
         apply/mu_mem_le; move=> x _; have [] uD_fu [] _ uD_suf:= uD_uf_fu.
         apply/RealOrder.lerr_eq/uD_suf; 1,2:rewrite uD_fu //.
         by apply/RealOrder.ler_wpmul2r; smt w=(mu_bounded lt_fromint ltrW).
-      - by move: H6; rewrite H0.
-    * by hoare; auto=> //=; smt w=(RealOrder.mulr_ge0 mu_bounded gt0_q).
+      - by move: H7;rewrite H1.
+    * by hoare; auto=> //=; smt w=(RealOrder.mulr_ge0 mu_bounded ge0_q).
   + move=> c; proc. rcondt 2; 1:by auto.
     sp; if=> //=.
     * by wp; call (_: true); auto=> /#.
     * by auto=> /#.
   + by move=> b c; proc; rcondf 2; auto.
-  + proc; sp; if=> //=; last by hoare=> //=; smt w=(RealOrder.mulr_ge0 mu_bounded gt0_q).
-    inline *; sp; if=> //=; last by hoare; auto; smt w=(RealOrder.mulr_ge0 mu_bounded gt0_q).
+  + proc; sp; rcondt 1=> //=.
+    inline *; sp; if=> //=; last by hoare; auto; smt w=(RealOrder.mulr_ge0 mu_bounded ge0_q).
     sp; if=> //=.
     * wp; rnd (mem (rng ARP.mi)); skip.
       progress.
@@ -449,8 +444,8 @@ section CollisionProbability.
         apply/mu_mem_le; move=> x _; have [] uD_fu [] _ uD_suf:= uD_uf_fu.
         apply/RealOrder.lerr_eq/uD_suf; 1,2:rewrite uD_fu //.
         smt w=(RealOrder.ler_wpmul2r mu_bounded le_fromint ltrW).
-      - by move: H6; rewrite H0.
-    * by hoare; auto; smt w=(RealOrder.mulr_ge0 mu_bounded gt0_q).
+      - by move: H7; rewrite H1.
+    * by hoare; auto; smt w=(RealOrder.mulr_ge0 mu_bounded ge0_q).
   + move=> c; proc; rcondt 2; 1:by auto.
     sp; if=> //=.
     * by wp; call (_: true); auto=> /#.
@@ -488,7 +483,7 @@ section PRPi_PRPi'_Indirect.
   bypr (res{1}) (res{2})=> //. (* Pointwise equality of distributions *)
   progress.
   (* We first perform the computation on the easy side,... *)
-  cut ->: Pr[Direct.sample(X{1}) @ &1: a = res] = mu (uD \ X{1}) (pred1 a).
+  cut ->: Pr[Direct.sample(X{1}) @ &1: a = res] = mu (uD \ (mem X){1}) (pred1 a).
     byphoare (_: X = X{1} ==> _)=> //=.
     proc; rnd=> //=; skip; progress.
     by rewrite pred1E -{2}(etaP ((=) a)) etaE.
@@ -514,12 +509,12 @@ section PRPi_PRPi'_Indirect.
     (* There are two scenarios that lead to a = r:
          - r0 = a /\ r = a (with probability mu uD (pred1 a));
          - r0 <> a /\ r = a (with probability mu uD (fun x, mem x X) * mu (uD \ X) (pred1 a)). *)
-    phoare split (mu uD (pred1 a)) (mu uD (mem X) * mu (uD \ X) (pred1 a)): (r0 = a).
+    phoare split (mu uD (pred1 a)) (mu uD (mem X) * mu (uD \ (mem X)) (pred1 a)): (r0 = a).
       (* Bound *)
       progress.
-      rewrite -/(mu_x (uD \ X{2}) _) mu_x_def.
+      rewrite -/(mu_x (uD \ (mem X){2}) _) mux_dexcepted.
       have [] uD_fu [] uD_suf uD_ll @/predT /=:= uD_uf_fu.
-      rewrite supp_def uD_fu /= /weight /mu_x.
+      rewrite /weight /mu_x.
       cut not_empty: mu uD predT - mu uD (mem X{2}) <> 0%r.
         rewrite -mu_not.
         cut: 0%r < mu uD (predC (mem X{2})); last smt.
@@ -535,7 +530,7 @@ section PRPi_PRPi'_Indirect.
     (* case r0 <> a *)
     seq  2: (!mem X r)
             _                 0%r
-            (mu uD (mem X)) (mu (uD \ X) (pred1 a))
+            (mu uD (mem X)) (mu (uD \ (mem X)) (pred1 a))
             (r0 = r /\ X = X{2}).
       by auto.
       by hoare; rcondf 1=> //=; skip; smt.

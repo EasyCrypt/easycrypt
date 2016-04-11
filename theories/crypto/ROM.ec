@@ -911,7 +911,7 @@ theory ROM_Bad.
           by move: qH_pos; smt ml=0.
           by call (_: true ==> !bad (glob O2) /\ Bound.c = 0);
             first proc; wp; call badinit.
-          proc; sp; if=> //; last by hoare.
+          proc; sp;rcondt 1 => //.
           by wp; call (_: !bad (glob O2) ==> bad (glob O2)).
           by progress; proc; sp; if=> //; wp; call (_: true); skip; smt.
           by progress; proc; rcondf 2; auto; smt.

@@ -9,7 +9,7 @@
  * ssreflect Coq extension. *)
 
 (* -------------------------------------------------------------------- *)
-require import NewLogic Fun Pred Option Pair Int IntExtra.
+require import NewLogic Fun Pred Option Pair Int IntExtra Ring.
 
 (* -------------------------------------------------------------------- *)
 type 'a list = [
@@ -1839,6 +1839,9 @@ lemma flatten_cons (x : 'a list) s :
   flatten (x :: s) = x ++ flatten s.
 proof. by []. qed.
 
+lemma flatten_seq1 (s : 'a list) : flatten [s] = s.
+proof. by rewrite flatten_cons flatten_nil cats0. qed.
+
 lemma flatten_cat (s1 s2 : 'a list list):
   flatten (s1 ++ s2) = flatten s1 ++ flatten s2.
 proof.
@@ -1915,6 +1918,16 @@ rewrite flatten_cons cat_uniq; rewrite uqf ih //=.
 apply/negP=> /hasP [a] [/flatten_mapP] [b] [sb] fba fxa.
 have ->>//: x = b; apply/inj_f=> //; first by rewrite sb.
 by apply/hasP; exists a.
+qed.
+
+lemma count_flatten_nseq (p : 'a -> bool) k s :
+  count p (flatten (nseq k s)) = (max 0 k) * (count p s).
+proof.
+case: (lez_total 0 k) => [ge0_k|le0_k]; last first.
+  by rewrite max_lel //= nseq0_le // flatten_nil.
+rewrite max_ler //; elim: k ge0_k => [|k ge0_k ih].
+  by rewrite nseq0 flatten_nil.
+by rewrite nseqS // flatten_cons count_cat /#.
 qed.
 
 (* -------------------------------------------------------------------- *)

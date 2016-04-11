@@ -198,10 +198,11 @@ let parse spec argv =
               (fun anon -> anons := anon :: !anons)
               ""
           with Arg.Bad msg ->
-            try
-              let msg = Pcre.get_substring (Pcre.exec ~pat:"(.*)" msg) 1 in
-              raise (Arg.Bad msg)
-            with Not_found -> raise (Arg.Bad msg)
+            let msg =
+              EcRegexp.exec (`S "(.*)") msg
+                |> omap (fun m -> oget (EcRegexp.Match.group m 1))
+                |> odfl msg
+            in raise (Arg.Bad msg)
         end;
         (command, !values, List.rev !anons)
   end
@@ -355,7 +356,7 @@ let parse argv =
     | _    -> List.exists (fun (x, _, _) -> x = args.(0)) specs.xp_commands
   in
 
-  let isec x = Pcre.pmatch ~pat:".*\\.eca?" x in
+  let isec x = EcRegexp.match_ (`S ".*\\.eca?") x in
 
   let necfiles = Array.fold_left (fun s n -> if isec n then s+1 else s) 0 args in
   let ecommand =

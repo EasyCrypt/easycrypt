@@ -218,10 +218,11 @@ module LowRewrite = struct
 
   exception RewriteError of error
 
-  let rec find_rewrite_patterns (dir : rwside) pt =
+  let rec find_rewrite_patterns ~inpred (dir : rwside) pt =
     let hyps = pt.PT.ptev_env.PT.pte_hy in
     let env  = LDecl.toenv hyps in
     let pt   = { pt with ptev_ax = snd (PT.concretize pt) } in
+    let ptc  = { pt with ptev_env = EcProofTerm.copy pt.ptev_env } in
     let ax   = pt.ptev_ax in
 
     let base ax =
@@ -242,20 +243,33 @@ module LowRewrite = struct
     | Some x -> [x]
 
     | _ -> begin
-        match TTC.destruct_product hyps ax with
-        | None ->
-            let pt1 =
-              if   dir = `LtoR && ER.EqTest.for_type env ax.f_ty tbool
-              then Some (pt, `Bool, (ax, f_true))
-              else None
-            and pt2 = obind base
-              (EcReduction.h_red_opt EcReduction.full_red hyps ax)
-            in (otolist pt1) @ (otolist pt2)
+      let ptb = Lazy.from_fun (fun () ->
+        let pt1 =
+          if dir = `LtoR then
+            if   ER.EqTest.for_type env ax.f_ty tbool
+            then Some (ptc, `Bool, (ax, f_true))
+            else None
+          else None
+        and pt2 = obind base
+          (EcReduction.h_red_opt EcReduction.full_red hyps ax)
+        in (otolist pt1) @ (otolist pt2)) in
 
-        | Some _ ->
-            let pt = EcProofTerm.apply_pterm_to_hole pt in
-            find_rewrite_patterns dir pt
+        let rec doit reduce =
+          match TTC.destruct_product ~reduce hyps ax with
+          | None -> begin
+             if reduce then Lazy.force ptb else
+               let pts = doit true in
+               if inpred then pts else (Lazy.force ptb) @ pts
+            end
+
+          | Some _ ->
+             let pt = EcProofTerm.apply_pterm_to_hole pt in
+             find_rewrite_patterns ~inpred:(inpred || reduce) dir pt
+
+        in doit false
       end
+
+  let find_rewrite_patterns = find_rewrite_patterns ~inpred:false
 
   let t_rewrite_r ?target (s, o) pt tc =
     let hyps, tgfp = FApi.tc1_flat ?target tc in
@@ -292,14 +306,15 @@ module LowRewrite = struct
 
       | (pt, mode, (f1, f2)) :: pts ->
            try  for1 (pt, mode, (f1, f2))
-           with RewriteError (LRW_NothingToRewrite) ->
-             do_first pts in
+           with RewriteError (LRW_NothingToRewrite | LRW_IdRewriting) ->
+             do_first pts
+    in
 
     let pts = find_rewrite_patterns s pt in
 
     if List.is_empty pts then
       raise (RewriteError LRW_NotAnEquation);
-    do_first pts
+    do_first (List.rev pts)
 
   let t_rewrite ?target (s, o) pt (tc : tcenv1) =
     let hyps   = FApi.tc1_hyps ?target tc in
@@ -1011,7 +1026,7 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
           else
             match unloc s with
             | `Revert      -> Some (Some false, EcIdent.create "_")
-            | `Clear       -> Some (Some true , LDecl.fresh_id hyps name)
+            | `Clear       -> Some (Some true , EcIdent.create "_")
             | `Named s     -> Some (None      , EcIdent.create s)
             | `Anonymous a ->
                match a, kind with
@@ -1805,6 +1820,13 @@ let process_congr tc =
       let tt1 = t_congr (o1, o2) ((List.combine a1 a2), f1.f_ty) in
       let tt2 = t_logic_trivial in
       FApi.t_seqs [tt0; tt1; tt2] tc
+
+  | Fif (_, { f_ty = cty }, _), Fif _ ->
+     let tt0 tc =
+       let hyps = FApi.tc1_hyps tc in
+       EcLowGoal.Apply.t_apply_bwd_r
+         (PT.pt_of_global !!tc hyps LG.p_if_congr [cty]) tc
+     in FApi.t_seqs [tt0; t_logic_trivial] tc
 
   | Ftuple _, Ftuple _ when iseq ->
       FApi.t_seqs [t_split; t_logic_trivial] tc

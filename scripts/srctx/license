@@ -106,9 +106,29 @@ class CoqCopyrightStyle(CopyrightStyle):
         contents = '\n'.join([x.rstrip('\r\n') for x in contents]) + '\n\n'
         return contents
 
+# --------------------------------------------------------------------
+class ELispCopyrightStyle(CopyrightStyle):
+    _re = r'^\s*;;\*[^A-Za-z0-9]*copyright.*?;;x'
+    _re = r'^\s*;;(?:\s|-)*[^A-Za-z0-9]*copyright.*?;;\s*[-]+\s*'
+
+    def strip(self, contents):
+        m = re.search(self._re, contents, re.S | re.I)
+        if m is not None:
+            contents = contents[m.end():]
+        return contents
+
+    def format(self, contents):
+        contents = [';; %s' % (x,) for x in contents]
+        contents = [';; %s' % ('-' * 68,)] + contents + [';; %s' % ('-' * 68,)]
+        contents = [x.rstrip() for x in contents]
+        contents = '\n'.join([x.rstrip('\r\n') for x in contents]) + '\n\n'
+        return contents
+
+# --------------------------------------------------------------------
 CopyrightStyle.STYLES['coq'  ] = CoqCopyrightStyle
 CopyrightStyle.STYLES['ocaml'] = CoqCopyrightStyle
 CopyrightStyle.STYLES['ec'   ] = CoqCopyrightStyle
+CopyrightStyle.STYLES['elisp'] = ELispCopyrightStyle
 
 # --------------------------------------------------------------------
 def _main():

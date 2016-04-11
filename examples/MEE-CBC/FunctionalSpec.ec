@@ -1,5 +1,5 @@
 require import Fun Pred Option Int IntExtra IntDiv List.
-require import Ring StdRing ABitstring Distr.
+require import Ring StdRing ABitstring NewDistr.
 require (*--*) AWord MAC_then_Pad_then_CBC.
 (*---*) import IntID.
 
@@ -493,7 +493,7 @@ clone import MAC_then_Pad_then_CBC as MEEt with
   op   d_eK                 <- Block.Dword.dword,
   op   d_block              <- Block.Dword.dword,
   op   P                    <- AES,
-  op   Pinv                 <- AESi,
+  op   Pi                   <- AESi,
   op   zeros                <- Block.zeros,
   op   (+)                  <- Block.(^),
   (* MAC parameters *)
@@ -516,15 +516,14 @@ proof * by smt.
 (** We show that the pWhile programs on which we do the security proof
     fully and faithfully implement the operators used as functional
     specs for the C code... **)
-import Dapply.
 
 phoare mee_encrypt_correct _mk _ek _p _c:
-  [MEEt.MEE(MEEt.PRPa.PRPr,MEEt.MAC).enc: key = (_ek,_mk) /\ p = _p
+  [MEEt.MEE(MEEt.PRPc.PRPr,MEEt.MAC).enc: key = (_ek,_mk) /\ p = _p
                                       ==> res = _c]
   =(mu (dapply (fun iv => iv :: mee_enc AES hmac_sha256 _ek _mk iv _p) Top.Block.Dword.dword) (pred1 _c)).
 proof.
-  rewrite -/(mu_x _ _) Dapply.mu_x_def /preim /pred1 /=.
-  proc; inline MAC.tag PRPa.PRPr.f.
+  rewrite -/(mu_x _ _) mux_dmap /preim /pred1 /=.
+  proc; inline MAC.tag PRPc.PRPr.f.
   swap 6 -5 => //=; alias 2 iv = s.
   while (   0 <= i <= size (pad _p (hmac_sha256 _mk _p))
          /\ ek = _ek
@@ -554,12 +553,12 @@ proof.
 qed.
 
 phoare mee_decrypt_correct _mk _ek _c:
-  [MEEt.MEE(MEEt.PRPa.PRPr,MEEt.MAC).dec: key = (_ek,_mk) /\ c = _c
+  [MEEt.MEE(MEEt.PRPc.PRPr,MEEt.MAC).dec: key = (_ek,_mk) /\ c = _c
                                       ==> res = mee_dec AESi hmac_sha256 _ek _mk (head witness _c) (behead _c)]
   =1%r.
 proof.
   conseq (_: true ==> true) (_: _ ==> _)=> //=.
-    proc; inline MAC.verify PRPa.PRPr.finv; wp.
+    proc; inline MAC.verify PRPc.PRPr.fi; wp.
     while (   0 <= i <= size c
            /\ ek = _ek
            /\ s  = (if 0 < i then nth witness c (i - 1) else head witness _c)

@@ -1,5 +1,5 @@
 (** Encrypt-then-MAC and MAC-then-Encrypt -- Generic Reductions **)
-require import Option Bool Int FSet Real Distr.
+require import Option Bool Int FSet Real NewDistr DProd.
 require (*--*) SKE_INDR MACs.
 
 (** We now reason about the security of MtE(E,M) for an
@@ -247,7 +247,7 @@ theory MtE.
         call (_: MACa.WUF_CMA.WUF_Wrap.win,
                     ={glob E, glob M}
                  /\ PTXT_Wrap.k{1} = (CMAa.ek,MACa.WUF_CMA.WUF_Wrap.k){2}
-                 /\ (forall p, mem p PTXT_Wrap.s{1} <=> mem p MACa.WUF_CMA.WUF_Wrap.s{2})
+                 /\ (forall p, mem PTXT_Wrap.s{1} p <=> mem MACa.WUF_CMA.WUF_Wrap.s{2} p)
                  /\ (PTXT_Wrap.win{1} => MACa.WUF_CMA.WUF_Wrap.win{2})).
           (* adversary is lossless *)
           exact/A_forge_ll.
@@ -270,7 +270,7 @@ theory MtE.
           seq  5  2: (   !MACa.WUF_CMA.WUF_Wrap.win{2}
                       /\ ={glob E, glob M, c, pt}
                       /\ PTXT_Wrap.k{1} = (CMAa.ek,MACa.WUF_CMA.WUF_Wrap.k){2}
-                      /\ (forall p, mem p PTXT_Wrap.s{1} <=> mem p MACa.WUF_CMA.WUF_Wrap.s{2})
+                      /\ (forall p, mem PTXT_Wrap.s{1} p <=> mem MACa.WUF_CMA.WUF_Wrap.s{2} p)
                       /\ (PTXT_Wrap.win{1} => MACa.WUF_CMA.WUF_Wrap.win{2})
                       /\ !b{2}
                       /\ k{1} = PTXT_Wrap.k{1}
@@ -279,7 +279,8 @@ theory MtE.
                       /\ (ek,mk){1} = k{1}).
             by call (_: true); auto.
           if=> //=.
-            by auto; call (_: true); auto; smt.
+            auto; call (_: true); auto=> /> &1 &2 -> /> eq_qs -> /> _.
+            by case: (pt{2})=> //= -[p t] r; case: r=> //= _; rewrite !oget_some /= eq_qs.
           by auto; smt.
         (* lossless after win *)
         by move=> &2 bad; proc; wp; call (MtE_dec_ll E M E_dec_ll M_verify_ll).
@@ -334,7 +335,7 @@ theory EtM.
     type ctxt            <- ctxt * tag,
     type leaks           <- leaks,
     op   leak            <- leak,
-    op   dC    (l:leaks) <- Pair.Dprod.( * ) (dC l) (Dunit.dunit witness<:tag>)
+    op   dC    (l:leaks) <- (dC l) `*` (MUnit.dunit witness<:tag>)
   proof * by smt.
 
   (** The black-box construction is as follows **)
@@ -558,7 +559,7 @@ theory EtM.
         call (_: MACa.SUF_CMA.SUF_Wrap.win,
                     ={glob E, glob M}
                  /\ CTXT_Wrap.k{1} = (CMAa.ek,MACa.SUF_CMA.SUF_Wrap.k){2}
-                 /\ (forall p, mem p CTXT_Wrap.s{1} <=> mem p MACa.SUF_CMA.SUF_Wrap.s{2})
+                 /\ (forall p, mem CTXT_Wrap.s{1} p <=> mem MACa.SUF_CMA.SUF_Wrap.s{2} p)
                  /\ (forall c t, mem CTXT_Wrap.s{1} (c,t) => dec CMAa.ek{2} c <> None)
                  /\ (CTXT_Wrap.win{1} => MACa.SUF_CMA.SUF_Wrap.win{2})).
           (* adversary is lossless *)
@@ -585,7 +586,7 @@ theory EtM.
                       /\ b{1} = b0{2}
                       /\ c{1} = ct{2}
                       /\ CTXT_Wrap.k{1} = (CMAa.ek,MACa.SUF_CMA.SUF_Wrap.k){2}
-                      /\ (forall p, mem p CTXT_Wrap.s{1} <=> mem p MACa.SUF_CMA.SUF_Wrap.s{2})
+                      /\ (forall p, mem CTXT_Wrap.s{1} p <=> mem MACa.SUF_CMA.SUF_Wrap.s{2} p)
                       /\ (forall c t, mem CTXT_Wrap.s{1} (c,t) => dec CMAa.ek{2} c <> None)
                       /\ (CTXT_Wrap.win{1} => MACa.SUF_CMA.SUF_Wrap.win{2})
                       /\ k{1}  = CTXT_Wrap.k{1}

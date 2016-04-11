@@ -268,9 +268,9 @@
   let opre =
     let ops = List.map fst (List.filter (snd |- snd) _operators) in
     let ops = List.ksort ~key:(String.length) ~cmp:compare ~rev:true ops in
-    let ops = String.join "|" (List.map Pcre.quote ops) in
+    let ops = String.join "|" (List.map EcRegexp.quote ops) in
     let ops = Printf.sprintf "(%s)" ops in
-    Pcre.regexp ops
+    EcRegexp.regexp ops
 
   (* ----------------------------------------------------------------- *)
   let lex_std_op ?name op =
@@ -285,23 +285,22 @@
     let baseop (op : string) =
       try  fst (Hashtbl.find operators op)
       with Not_found ->
-        if   Pcre.pmatch ~pat:"^:+$" op
+        if   EcRegexp.match_ (`S "^:+$") op
         then ROP4 op else begin
-          if   Pcre.pmatch ~pat:"^%+.$" op
+          if   EcRegexp.match_ (`S "^%+.$") op
           then lex_std_op ~name:op (String.make 1 op.[String.length op -1])
           else raise Not_found
         end
     in
       try  [baseop op]
       with Not_found ->
-        List.pmap
+        List.map
         (function
-          | Pcre.Delim op ->
-              Some (fst (Hashtbl.find operators op))
-          | Pcre.Text op ->
-              Some (try baseop op with Not_found -> lex_std_op op)
-          | _ -> None)
-        (Pcre.full_split ~rex:opre op)
+          | EcRegexp.Delim op ->
+              fst (Hashtbl.find operators op)
+          | EcRegexp.Text op ->
+              try baseop op with Not_found -> lex_std_op op)
+        (EcRegexp.split (`C opre) op)
 
   (* ------------------------------------------------------------------ *)
   let lex_tick_operator (op : string) =
@@ -382,7 +381,6 @@ rule main = parse
   | ".["    { [DLBRACKET] }
   | ".`"    { [DOTTICK  ] }
   | "{0,1}" { [RBOOL    ] }
-  | "%r"    { [FROM_INT ] }
 
   (* position *)
   | (digit+ ['.' '?'])+ digit+ {

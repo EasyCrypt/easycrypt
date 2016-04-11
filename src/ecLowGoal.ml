@@ -565,8 +565,8 @@ module Apply = struct
                 let views =
                   match sform_of_form pt.PT.ptev_ax with
                   | SFiff (f1, f2) ->
-                      [(LG.p_iff_lr, [f1; f2]);
-                       (LG.p_iff_rl, [f1; f2])]
+                      [(LG.p_iff_rl, [f1; f2]);
+                       (LG.p_iff_lr, [f1; f2])]
 
                   | SFnot f1 ->
                       [(LG.p_negbTE, [f1])]
@@ -1941,7 +1941,7 @@ let t_crush ?(delta = true) (tc : tcenv1) =
          ~ttout:(FApi.t_seqs [t_cutdef pt cl; aux0; t_abort])
          tc
 
-  in FApi.t_seq entry t_simplify tc
+  in FApi.t_seq entry (t_simplify_with_info EcReduction.nodelta) tc
 
 (* -------------------------------------------------------------------- *)
 let t_logic_trivial (tc : tcenv1) =

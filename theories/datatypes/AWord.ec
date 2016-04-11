@@ -45,9 +45,7 @@ axiom landwDl (x y z:word): land (x ^ y) z = land x z ^ land y z.
 axiom landI (x:word): land x x = x.
 
 lemma subwE : ( ^ ) = fun (x y: word), x ^ lopp y.
-proof.
-  rewrite -ExtEq.fun_ext => x; rewrite -ExtEq.fun_ext => y; smt.
-qed.
+proof. by rewrite ExtEq.fun_ext => x; rewrite ExtEq.fun_ext => y /#. qed.
 
 (** View bitstring as a ring *)
 require (*--*) Ring.
@@ -156,9 +154,9 @@ theory Dword.
 
   lemma lossless_restrw X:
     card X < 2^length =>
-    weight (dword \ X) = 1%r.
+    weight (dword \ (mem X)) = 1%r.
   proof.
-  move=> lt_CX_2sx; rewrite lossless_restr ?lossless // ?mu_cpMemw.
+  move=> lt_CX_2sx; rewrite dexcepted_ll /is_lossless -/(weight _) ?lossless // ?mu_cpMemw.
   by rewrite ltr_pdivr_mulr /= lte_fromint // powPos.
   qed.
 end Dword.

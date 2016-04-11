@@ -171,7 +171,17 @@ move=> uqJ sJ; rewrite (@sumE _ (nth None (map Some J))); 1: split.
   by move/(congr1 (fun x => index x J))=> /=; rewrite !index_uniq.
 + move=> x /sJ sx; exists (index x J); rewrite ?index_ge0 /=.
   by rewrite (@nth_map x) /= 1:index_ge0 1:index_mem // nth_index.
-+ admit.
++ exists (big predT (fun x => `|s x|) (filter (fun x => s x <> 0%r) J))=> J' uniq_J'.
+  rewrite -(eq_big_perm (:@perm_filterC (fun x => s x <> 0%r) J')).
+  rewrite big_cat (@big1_seq _ _ (filter (fun (x : 'a) => s x = 0%r) J')) /=.
+  * by move=> x @/predT; rewrite mem_filter /abs_s /= =>- [] ->.
+  rewrite -(eq_big_perm (:@perm_filterC (fun x => mem J' x) (filter _ J))).
+  rewrite -!filter_predI /predC /predI /= big_cat; apply/ler_paddr.
+  * by apply/sumr_ge0=> a //=; rewrite /abs_s normr_ge0.
+  rewrite -(@eq_big_perm _ _ (filter (fun x => mem J' x /\ s x <> 0%r) J)).
+  * apply/uniq_perm_eq=> [| |x]; 1,2: exact/filter_uniq.
+    by rewrite !mem_filter /=; split=> //= -[] ^/sJ.
+  exact/lerr_eq.
 apply/(@limC_eq_from (size J)) => n ge_Jn /=.
 rewrite (@range_cat (size J)) 1:size_ge0 // pmap_cat big_cat.
 rewrite addrC -(@eq_in_pmap (fun i => None)) ?pmap_none ?big_nil /=.
@@ -180,6 +190,10 @@ congr; pose F := fun (i : int) => Some (nth witness J i).
 rewrite -(@eq_in_pmap F) /F 2:pmap_some 2:map_nth_range //.
 by move=> x /mem_range lt_xJ /=; rewrite (@nth_map witness).
 qed.
+
+(* -------------------------------------------------------------------- *)
+lemma sum0 ['a]: sum<:'a> (fun _ => 0%r) = 0%r.
+proof. by rewrite (@sumE_fin _ []). qed.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt ler_psum (s1 s2 : 'a -> real) :

@@ -1,5 +1,5 @@
-require import Pair Int Real Distr.
-(*---*) import EuclDiv.
+require import Pair Int IntDiv Real NewDistr.
+require import DInterval.
 
 (*
   TODO:
@@ -14,7 +14,7 @@ type tres.
 
 const bound : int.
 
-axiom bound_pos : bound > 0.
+axiom bound_pos : 0 < bound.
 
 module type Game = {
   proc main(x:tin): tres
@@ -66,7 +66,7 @@ proof.
                        then psi (glob G){hr} o{hr}
                        else 0)).
       by apply fun_ext=> x //=; rewrite H /= (eq_sym x).
-    by rewrite -/(mu_x _ _) Distr.Dinter.mu_x_def_in; smt.
+    by rewrite -/(mu_x _ _) mux_dinter; smt.
     (* probability that sampling changes '!phi (glob G) o' to 'phi (glob G) o' zero *)
     hoare; rnd; skip; progress [-split].
     by move: H; rewrite -neqF /snd /= => ->.

@@ -129,7 +129,13 @@ module PPEnv = struct
 
   let add_locals ?force ppe xs = List.fold_left (add_local ?force) ppe xs
 
-  let add_mods ?force ppe xs = add_locals ?force ppe xs
+  let add_mods ?force ppe xs (mty, sm) =
+    let ppe = add_locals ?force ppe xs in
+    { ppe with
+        ppe_env =
+          List.fold_left
+            (fun env x -> EcEnv.Mod.bind_local x mty sm env)
+            ppe.ppe_env xs; }
 
   let p_shorten cond p =
     let rec shorten prefix (nm, x) =
@@ -509,6 +515,9 @@ let get_e_projarg ppe e i =
   | _ -> raise NoProjArg
 
 (* -------------------------------------------------------------------- *)
+let pp_modtype1 (ppe : PPEnv.t) fmt mty = 
+  EcSymbols.pp_msymbol fmt (PPEnv.modtype_symb ppe mty)
+  
 let pp_modtype (ppe : PPEnv.t) fmt ((mty, r) : module_type * _) =
   let pp_restr fmt (rx,r) =
     let pp_rx fmt rx =
@@ -521,8 +530,7 @@ let pp_modtype (ppe : PPEnv.t) fmt ((mty, r) : module_type * _) =
     | true, false -> Format.fprintf fmt "{@[%a@]}" pp_r r
     | false, true -> Format.fprintf fmt "{@[%a@]}" pp_rx rx
     | false, false -> Format.fprintf fmt "{@[%a,@ %a@]}" pp_rx rx pp_r r in
-  Format.fprintf fmt "%a%a"
-    EcSymbols.pp_msymbol (PPEnv.modtype_symb ppe mty) pp_restr r
+  Format.fprintf fmt "%a%a" (pp_modtype1 ppe) mty pp_restr r
 
 (* -------------------------------------------------------------------- *)
 let pp_local (ppe : PPEnv.t) fmt x =
@@ -605,6 +613,7 @@ let e_uni_prio_lsless = 10000
 let e_uni_prio_uminus = fst e_bin_prio_lop2
 let e_app_prio        = (10000, `Infix `Left)
 let e_get_prio        = (20000, `Infix `Left)
+let e_uni_prio_rint   = (100, `Postfix)
 
 let min_op_prec = (-1     , `Infix `NonAssoc)
 let max_op_prec = (max_int, `Infix `NonAssoc)
@@ -879,8 +888,9 @@ let pp_opapp
       | Some bopprio ->
           let opprio = (bopprio, `Prefix) in
           let opname =
-            try  Pcre.get_substring (Pcre.exec ~pat:"^\\[(.+)\\]$" opname) 1
-            with Not_found -> opname in
+            EcRegexp.exec (`S "^\\[(.+)\\]$") opname
+              |> omap (fun m -> oget (EcRegexp.Match.group m 1))
+              |> odfl opname in
           let pp fmt =
             Format.fprintf fmt "@[%s%s%a@]" opname
               (if is_trm e then "" else " ")
@@ -965,7 +975,7 @@ let pp_opapp
     | [e] when qs = EcCoreLib.s_real_of_int ->
         let pp fmt () =
           Format.fprintf fmt "%a%%r"
-            (pp_sub ppe (fst outer, (max_op_prec, `NonAssoc))) e
+            (pp_sub ppe (fst outer, (e_uni_prio_rint, `NonAssoc))) e
         in
           Some pp
 
@@ -1115,7 +1125,7 @@ let pp_binding ?fv (ppe : PPEnv.t) (xs, ty) =
         (tenv1, pp)
 
   | GTmodty (p, sm) ->
-      let tenv1  = PPEnv.add_mods ppe xs in
+      let tenv1  = PPEnv.add_mods ppe xs (p, sm) in
       let pp fmt =
         Format.fprintf fmt "(%a <: %a)"
           (pp_list "@ " (pp_local tenv1)) xs (pp_modtype ppe) (p, sm)
@@ -2022,7 +2032,7 @@ let c_split ?width pp x =
         width |> oiter (Format.pp_set_margin fmt);
         Format.fprintf fmt "@[<hov 2>%a@]@." pp x
     end;
-    Pcre.split ~pat:"(?:\r?\n)+" (Buffer.contents buf)
+    EcRegexp.split0 (`S "(?:\r?\n)+") (Buffer.contents buf)
 
 let pp_i_asgn (ppe : PPEnv.t) fmt (lv, e) =
   Format.fprintf fmt "%a <-@ %a"
@@ -2365,8 +2375,8 @@ module PPGoal = struct
           let ppe = PPEnv.add_local ~force:true ppe id in
           PPEnv.create_and_push_mem ppe (id, EcMemory.lmt_xpath m)
 
-      | EcBaseLogic.LD_modty _ ->
-          PPEnv.add_mods ~force:true ppe [id]
+      | EcBaseLogic.LD_modty (p, sm) ->
+          PPEnv.add_mods ~force:true ppe [id] (p, sm)
 
       | EcBaseLogic.LD_var _ when EcIdent.name id = "_" ->
           PPEnv.add_local

@@ -19,7 +19,7 @@ axiom PK k:
   /\ cancel (Pi k) (P k).
 
 module PRPr = {
-  proc kgen(): K = {
+  proc keygen(): K = {
     var k;
 
     k <$ dK;

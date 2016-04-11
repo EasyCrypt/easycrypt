@@ -232,6 +232,10 @@ lemma nosmt subsetP (s1 s2 : 'a fset):
   (s1 <= s2) <=> (mem s1 <= mem s2). (* FIXME: This is the definition *)
 proof. by []. qed.
 
+lemma nosmt subset_trans (s1 s2 s3 : 'a fset): 
+  s1 <= s2 => s2 <= s3 => s1 <= s3.
+proof. by move=> H1 H2 ? H3;apply /H2/H1. qed.
+
 (* -------------------------------------------------------------------- *)
 lemma nosmt eqEsubset (A B : 'a fset) : (A = B) <=> (A <= B) /\ (B <= A).
 proof. by rewrite fsetP 2!subsetP subpred_eqP. qed.

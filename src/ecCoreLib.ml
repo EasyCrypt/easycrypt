@@ -64,6 +64,9 @@ module CI_Real = struct
   let p_Real = EcPath.pqname p_top i_Real
   let p_real = _Pervasive "real"
 
+  let p_RealExtra = EcPath.pqname p_top "RealExtra"
+
+
   let p_RealOrder =
     EcPath.extend p_top ["StdOrder"; "RealOrder"]
 
@@ -92,7 +95,7 @@ module CI_Distr = struct
 
   let p_dbool = List.fold_left EcPath.pqname p_top ["DBool"; "dbool"]
   let p_dbitstring = List.fold_left EcPath.pqname p_Distr ["Dbitstring"; "dbitstring"]
-  let p_dinter     = List.fold_left EcPath.pqname p_Distr ["Dinter"; "dinter"]
+  let p_dinter     = List.fold_left EcPath.pqname p_top ["DInterval"; "dinter"]
 
   let p_in_supp = _Distr "in_supp"
   let p_mu      = _Pervasive "mu"
@@ -129,6 +132,7 @@ module CI_Logic = struct
   let p_ora_intro_r   = _Logic "oraIr"
   let p_iff_intro     = _Logic "iffI"
   let p_if_intro      = _Logic "ifI"
+  let p_if_congr      = _Logic "if_congr"
   let p_eq_refl       = _Logic "eq_refl"
   let p_eq_trans      = _Logic "eq_trans"
   let p_eq_iff        = _Logic "eq_iff"
@@ -179,3 +183,15 @@ let s_real_of_int = EcPath.toqsymbol CI_Real.p_real_of_int
 let s_dbool       = EcPath.toqsymbol CI_Distr.p_dbool
 let s_dbitstring  = EcPath.toqsymbol CI_Distr.p_dbitstring
 let s_dinter      = EcPath.toqsymbol CI_Distr.p_dinter
+
+
+(* -------------------------------------------------------------------- *)
+module CI_Map = struct
+  let i_Map = "NewMap"
+  let p_Map = EcPath.pqname p_top i_Map
+  let _Map = fun x -> EcPath.pqname p_Map x
+  let p_map = _Map "map"
+  let p_get = _Map s_get
+  let p_set = _Map s_set
+  let p_cnst = _Map "cnst"
+end
