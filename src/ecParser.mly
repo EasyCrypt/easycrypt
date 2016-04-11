@@ -2631,7 +2631,7 @@ phltactic:
 
 | AWHILE
     LBRACKET ef=sexpr AMP df=sexpr RBRACKET
-    n=word
+    n=sexpr
     LBRACKET v=form RBRACKET inv=sform
     { Paprhl (Awhile ((ef, df), (v, inv), n)) }
 

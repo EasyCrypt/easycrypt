@@ -179,9 +179,7 @@ let rec t_lap_r (mode : lap_mode) (tc : tcenv1) =
 let t_lap = FApi.t_low1 "lap" t_lap_r
 
 (* -------------------------------------------------------------------- *)
-let t_while_r ((ef, df), (v, inv), n) tc =
-  assert (0 <= n);
-
+let t_while_r ((ef, df), (v, inv), nf) tc =
   if not (IAPRHL.loaded (FApi.tc1_env tc)) then
     tacuerror "awhile: load the `Aprhl' theory first";
 
@@ -198,6 +196,8 @@ let t_while_r ((ef, df), (v, inv), n) tc =
   let ef = EcProofTyping.process_exp hyps `InOp (Some tb) ef in
   let df = EcProofTyping.process_exp hyps `InOp (Some tb) df in
 
+  let n   = EcProofTyping.process_exp hyps `InOp (Some tint) nf in
+  let fn  = form_of_expr mhr n in
   let eff = form_of_expr mhr ef in
   let dff = form_of_expr mhr df in
 
@@ -214,16 +214,16 @@ let t_while_r ((ef, df), (v, inv), n) tc =
   let k  = EcIdent.create "k" in
   let ki = f_local k tint in
 
-  let fn =  f_int (EcBigInt.of_int n) in
-
   let ef_gt0 =
     f_forall [k, GTty tint] (f_real_le f_r0 (f_app eff [ki] treal)) in
 
   let df_gt0 =
     f_forall [k, GTty tint] (f_real_le f_r0 (f_app dff [ki] treal)) in
 
+  let fn_gt0 = f_int_le f_i0 fn in
+
   let term =
-    f_forall_mems [aes.aes_ml]
+    f_forall_mems [aes.aes_ml; aes.aes_mr]
        (f_imp (f_and inv (f_int_lt v f_i0)) (f_not fb1)) in
 
   let sub =
@@ -247,7 +247,7 @@ let t_while_r ((ef, df), (v, inv), n) tc =
 
   let sume, sumd =
     (f_eq aes.aes_ep (IAPRHL.sumr fn eff),
-     f_eq aes.aes_ep (IAPRHL.sumr fn dff))
+     f_eq aes.aes_dp (IAPRHL.sumr fn dff))
   in
 
   FApi.t_seqs [ (fun tc ->
@@ -256,9 +256,9 @@ let t_while_r ((ef, df), (v, inv), n) tc =
         { EcReduction.no_red with
             EcReduction.delta_p = EcPath.p_equal IAPRHL.sumr_p; })
       (FApi.xmutate1 tc `AWhile
-         [ef_gt0; df_gt0; term; concl1; concl2; sume; sumd; sub]));
-    EcLowGoal.t_simplify_with_info EcReduction.nodelta;
-    EcLowGoal.t_trivial
+         [fn_gt0; ef_gt0; df_gt0; term; concl1; concl2; sume; sumd; sub]));
+(*    EcLowGoal.t_simplify_with_info EcReduction.nodelta;
+    EcLowGoal.t_trivial*)
   ] tc
 
 (* -------------------------------------------------------------------- *)

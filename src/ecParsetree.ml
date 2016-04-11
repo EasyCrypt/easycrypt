@@ -571,7 +571,7 @@ and paprhl =
   | Aofequiv
   | Atohoare
   | Alap   of lap_mode
-  | Awhile of ((pexpr * pexpr) * (pformula * pformula) * int)
+  | Awhile of ((pexpr * pexpr) * (pformula * pformula) * pexpr)
 
 and lap_mode = [`Gen of pformula pair | `Null of pformula]
 
