@@ -16,7 +16,8 @@ open EcMemory
 include module type of struct include EcCoreFol end
 
 (* -------------------------------------------------------------------- *)
-val f_losslessF: xpath -> form
+val f_losslessF : xpath -> form
+val f_losslessS : memenv -> stmt -> form
 
 val f_eqparams:
      xpath -> EcTypes.ty -> variable list option -> memory

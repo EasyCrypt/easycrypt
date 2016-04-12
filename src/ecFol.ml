@@ -128,7 +128,8 @@ let f_weight ty d =
   f_app (fop_weight ty) [d] treal
 
 (* -------------------------------------------------------------------- *)
-let f_losslessF f = f_bdHoareF f_true f f_true FHeq f_r1
+let f_losslessF f    = f_bdHoareF f_true f f_true FHeq f_r1
+let f_losslessS me s = f_bdHoareS me f_true s f_true FHeq f_r1
 
 (* -------------------------------------------------------------------- *)
 let f_identity ?(name = "x") ty =

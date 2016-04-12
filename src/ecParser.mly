@@ -462,6 +462,7 @@
 %token PROGRESS
 %token PROOF
 %token PROVER
+%token PWEQ
 %token QED
 %token QUESTION
 %token RARROW
@@ -2646,6 +2647,9 @@ phltactic:
     n=sexpr
     LBRACKET v=form RBRACKET inv=sform
     { Paprhl (Awhile ((ef, df), (v, inv), n)) }
+
+| PWEQ e=sform
+    { Paprhl (APwEq e) }
 
 bdhoare_split:
 | b1=sform b2=sform b3=sform?

@@ -257,9 +257,50 @@ let t_while_r ((ef, df), (v, inv), nf) tc =
             EcReduction.delta_p = EcPath.p_equal IAPRHL.sumr_p; })
       (FApi.xmutate1 tc `AWhile
          [fn_gt0; ef_gt0; df_gt0; term; concl1; concl2; sume; sumd; sub]));
-(*    EcLowGoal.t_simplify_with_info EcReduction.nodelta;
-    EcLowGoal.t_trivial*)
+    EcLowGoal.t_simplify_with_info EcReduction.nodelta;
+    EcLowGoal.t_trivial
   ] tc
 
 (* -------------------------------------------------------------------- *)
 let t_while = FApi.t_low1 "awhile" t_while_r
+
+(* -------------------------------------------------------------------- *)
+let t_pweq_r e (tc : tcenv1) =
+  let hyps = FApi.tc1_hyps tc in
+  let aes  = tc1_as_aequivS tc in
+
+  let e1 = 
+    let hyps = EcEnv.LDecl.push_active aes.aes_ml hyps in
+    EcProofTyping.pf_process_form !!tc hyps tint e
+
+  and e2 = 
+    let hyps = EcEnv.LDecl.push_active aes.aes_mr hyps in
+    EcProofTyping.pf_process_form !!tc hyps tint e
+  in
+
+  let ll1   = f_losslessS aes.aes_ml aes.aes_sl in
+  let ll2   = f_losslessS aes.aes_mr aes.aes_sr in
+  let eq0   = f_eq aes.aes_dp f_r0 in
+
+  let concl, conseq =
+    let nmi   = EcIdent.create "i" in
+    let vari  = f_local nmi tint in
+    let post  = f_imp (f_eq vari e1) (f_eq vari e2) in
+    let concl =
+      f_forall [nmi, GTty vari.f_ty]
+        (f_aequivS aes.aes_ml aes.aes_mr ~dp:f_r0 ~ep:aes.aes_ep
+           aes.aes_pr aes.aes_sl aes.aes_sr post)
+    and conseq =
+      f_forall_mems [aes.aes_ml; aes.aes_mr] (f_imp post aes.aes_po)
+    in (concl, conseq)
+  in
+
+  FApi.t_seqs [
+    (fun tc -> FApi.xmutate1 tc `APwEq [ll1; ll2; eq0; conseq; concl]);
+    EcLowGoal.t_simplify_with_info EcReduction.nodelta;
+    EcLowGoal.t_trivial
+  ] tc
+  
+
+(* -------------------------------------------------------------------- *)
+let t_pweq = FApi.t_low1 "pweq" t_pweq_r

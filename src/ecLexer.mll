@@ -56,6 +56,7 @@
     "elif"        , ELIF       ;        (* KW: prog *)
     "while"       , WHILE      ;        (* KW: prog *)
     "awhile"      , AWHILE     ;        (* KW: prog *)
+    "pweq"        , PWEQ       ;        (* KW: prog *)
     "assert"      , ASSERT     ;        (* KW: prog *)
     "return"      , RETURN     ;        (* KW: prog *)
     "res"         , RES        ;        (* KW: prog *)

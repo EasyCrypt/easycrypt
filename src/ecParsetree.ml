@@ -573,6 +573,7 @@ and paprhl =
   | Atoequiv
   | Aofequiv
   | Atohoare
+  | APwEq  of pformula
   | Alap   of lap_mode
   | Awhile of ((pexpr * pexpr) * (pformula * pformula) * pexpr)
 
