@@ -40,7 +40,9 @@ let t_hr_exists_intro_r fs tc =
   let concl = FApi.tc1_goal tc in
   let pre   = tc1_get_pre  tc in
   let post  = tc1_get_post tc in
-  let side  = is_equivS concl || is_equivF concl in
+  let side  =
+    is_equivS concl  || is_equivF  concl ||
+    is_aequivS concl || is_aequivF concl in
   let gen   = get_to_gens fs in
   let eqs   = List.map (fun (id, f) -> f_eq (f_local id f.f_ty) f) gen in
   let bd    = List.map (fun (id, f) -> (id, GTty f.f_ty)) gen in
@@ -95,7 +97,9 @@ let process_exists_intro fs tc =
     | FbdHoareS bhs -> LDecl.push_active bhs.bhs_m hyps
     | FequivF ef -> fst (LDecl.equivF ef.ef_fl ef.ef_fr hyps)
     | FequivS es -> LDecl.push_all [es.es_ml; es.es_mr] hyps
-    | _ -> tc_error_noXhl ~kinds:hlkinds_Xhl (*FIXME*) !!tc
+    | FaequivF aef -> fst (LDecl.equivF aef.aef_fl aef.aef_fr hyps)
+    | FaequivS aes -> LDecl.push_all [aes.aes_ml; aes.aes_mr] hyps
+    | _ -> tc_error_noXhl ~kinds:hlkinds_all (*FIXME*) !!tc
   in
 
   let fs =

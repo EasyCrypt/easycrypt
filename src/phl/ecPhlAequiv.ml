@@ -157,7 +157,10 @@ let rec t_lap_r (mode : lap_mode) (tc : tcenv1) =
       in
 
       let eqe    = f_eq (form_of_expr mhr e1) (form_of_expr mhr e2) in
-      let ep     = f_real_le (f_real_mul (f_real_of_int k') aes.aes_ep) aes.aes_ep in
+      let ep     =
+        f_real_le
+          (f_real_mul (f_real_of_int k') (form_of_expr mhr e1))
+          aes.aes_ep in
       let dp     = f_real_le f_r0 aes.aes_dp in
       let k'ge0  = f_int_le f_i0 k' in
       let concl1 = f_imp aes.aes_pr f_lap1 in
@@ -227,8 +230,7 @@ let t_while_r ((ef, df), (v, inv), nf) tc =
        (f_imp (f_and inv (f_int_lt v f_i0)) (f_not fb1)) in
 
   let sub =
-    let sub_pre = f_ands [inv; fb1; fb2; f_eq ki v; f_int_le v fn] in
-
+    let sub_pre  = f_ands [inv; fb1; fb2; f_eq ki v; f_int_le v fn] in
     let sub_post = f_ands [inv; f_eq fb1 fb2; f_int_lt v ki] in
 
     f_forall [k, GTty tint] (
@@ -265,17 +267,25 @@ let t_while_r ((ef, df), (v, inv), nf) tc =
 let t_while = FApi.t_low1 "awhile" t_while_r
 
 (* -------------------------------------------------------------------- *)
-let t_pweq_r e (tc : tcenv1) =
+let t_pweq_r ((e1, e2), meas) (tc : tcenv1) =
   let hyps = FApi.tc1_hyps tc in
   let aes  = tc1_as_aequivS tc in
 
   let e1 = 
     let hyps = EcEnv.LDecl.push_active aes.aes_ml hyps in
-    EcProofTyping.pf_process_form !!tc hyps tint e
+    EcProofTyping.pf_process_form_opt !!tc hyps None e1
 
   and e2 = 
     let hyps = EcEnv.LDecl.push_active aes.aes_mr hyps in
-    EcProofTyping.pf_process_form !!tc hyps tint e
+    EcProofTyping.pf_process_form_opt !!tc hyps None e2
+  in
+
+  if not (EcReduction.EqTest.for_type (FApi.tc1_env tc) e1.f_ty e2.f_ty) then
+    tc_error !!tc "pweq: incompatible type for expr.";
+
+  let meas =
+    let mty = tfun e1.f_ty tint in
+    EcProofTyping.pf_process_form_opt !!tc hyps (Some mty) meas
   in
 
   let ll1   = f_losslessS aes.aes_ml aes.aes_sl in
@@ -285,18 +295,26 @@ let t_pweq_r e (tc : tcenv1) =
   let concl, conseq =
     let nmi   = EcIdent.create "i" in
     let vari  = f_local nmi tint in
-    let post  = f_imp (f_eq vari e1) (f_eq vari e2) in
+    let post  =
+      let nmx  = EcIdent.create "x" in
+      let varx = f_local nmx e1.f_ty in
+      f_forall [nmx, GTty varx.f_ty] (
+        f_imps [f_eq vari (f_app meas [varx] tint);
+                f_eq varx e2] (f_eq varx e1)
+      ) in
     let concl =
       f_forall [nmi, GTty vari.f_ty]
         (f_aequivS aes.aes_ml aes.aes_mr ~dp:f_r0 ~ep:aes.aes_ep
            aes.aes_pr aes.aes_sl aes.aes_sr post)
     and conseq =
-      f_forall_mems [aes.aes_ml; aes.aes_mr] (f_imp post aes.aes_po)
+      f_forall_mems [aes.aes_ml; aes.aes_mr]
+        (f_imp (f_forall [nmi, GTty vari.f_ty] post) aes.aes_po)
     in (concl, conseq)
   in
 
   FApi.t_seqs [
-    (fun tc -> FApi.xmutate1 tc `APwEq [ll1; ll2; eq0; conseq; concl]);
+    (fun tc -> FApi.xmutate1 tc `APwEq
+       [ll1; ll2; eq0; conseq; concl]);
     EcLowGoal.t_simplify_with_info EcReduction.nodelta;
     EcLowGoal.t_trivial
   ] tc

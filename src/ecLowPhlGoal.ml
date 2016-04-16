@@ -226,6 +226,8 @@ let get_pre f =
   | FbdHoareS hs -> Some (hs.bhs_pr)
   | FequivF ef   -> Some (ef.ef_pr )
   | FequivS es   -> Some (es.es_pr )
+  | FaequivF aef -> Some (aef.aef_pr)
+  | FaequivS aes -> Some (aes.aes_pr)
   | _            -> None
 
 let tc1_get_pre tc =
@@ -242,6 +244,8 @@ let get_post f =
   | FbdHoareS hs -> Some (hs.bhs_po)
   | FequivF ef   -> Some (ef.ef_po )
   | FequivS es   -> Some (es.es_po )
+  | FaequivF aef -> Some (aef.aef_po)
+  | FaequivS aes -> Some (aes.aes_po)
   | _            -> None
 
 let tc1_get_post tc =
@@ -258,6 +262,9 @@ let set_pre ~pre f =
  | FbdHoareS hs -> f_bdHoareS_r { hs with bhs_pr = pre }
  | FequivF ef   -> f_equivF pre ef.ef_fl ef.ef_fr ef.ef_po
  | FequivS es   -> f_equivS_r { es with es_pr = pre }
+ | FaequivF aef -> f_aequivF ~dp:aef.aef_dp ~ep:aef.aef_ep
+                             pre aef.aef_fl aef.aef_fr aef.aef_po
+ | FaequivS aes -> f_aequivS_r { aes with aes_pr = pre }
  | _            -> assert false
 
 (* -------------------------------------------------------------------- *)

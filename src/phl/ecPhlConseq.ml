@@ -147,6 +147,15 @@ let t_equivS_conseq pre post tc =
   FApi.xmutate1 tc `HlConseq [concl1; concl2; concl3]
 
 (* -------------------------------------------------------------------- *)
+let t_aequivS_conseq pre post tc =
+  let aes = tc1_as_aequivS tc in
+  let cond1, cond2 = conseq_cond aes.aes_pr aes.aes_po pre post in
+  let concl1 = f_forall_mems [aes.aes_ml;aes.aes_mr] cond1 in
+  let concl2 = f_forall_mems [aes.aes_ml;aes.aes_mr] cond2 in
+  let concl3 = f_aequivS_r { aes with aes_pr = pre; aes_po = post } in
+  FApi.xmutate1 tc `HlConseq [concl1; concl2; concl3]
+
+(* -------------------------------------------------------------------- *)
 let t_conseq pre post tc =
   match (FApi.tc1_goal tc).f_node with
   | FhoareF _   -> t_hoareF_conseq pre post tc
@@ -156,7 +165,8 @@ let t_conseq pre post tc =
   | FequivF _   -> t_equivF_conseq pre post tc
   | FequivS _   -> t_equivS_conseq pre post tc
   | FeagerF _   -> t_eagerF_conseq pre post tc
-  | _           -> tc_error_noXhl !!tc
+  | FaequivS _  -> t_aequivS_conseq pre post tc
+  | _           -> tc_error_noXhl ~kinds:hlkinds_all  !!tc
 
 (* -------------------------------------------------------------------- *)
 let t_equivF_notmod post tc =
@@ -199,7 +209,21 @@ let t_equivS_notmod post tc =
   let cond = generalize_mod env mr modir cond in
   let cond = generalize_mod env ml modil cond in
   let cond1 = f_forall_mems [es.es_ml; es.es_mr] (f_imp es.es_pr cond) in
-  let cond2 = f_equivS_r {es with es_po = post} in
+  let cond2 = f_equivS_r { es with es_po = post; } in
+  FApi.xmutate1 tc `HlNotmod [cond1; cond2]
+
+(* -------------------------------------------------------------------- *)
+let t_aequivS_notmod post tc =
+  let env = FApi.tc1_env tc in
+  let aes = tc1_as_aequivS tc in
+  let sl, sr = aes.aes_sl, aes.aes_sr in
+  let ml, mr = fst aes.aes_ml, fst aes.aes_mr in
+  let cond = f_imp post aes.aes_po in
+  let modil, modir = s_write env sl, s_write env sr in
+  let cond = generalize_mod env mr modir cond in
+  let cond = generalize_mod env ml modil cond in
+  let cond1 = f_forall_mems [aes.aes_ml; aes.aes_mr] (f_imp aes.aes_pr cond) in
+  let cond2 = f_aequivS_r { aes with aes_po = post; } in
   FApi.xmutate1 tc `HlNotmod [cond1; cond2]
 
 (* -------------------------------------------------------------------- *)
@@ -290,6 +314,7 @@ let t_equivF_conseq_nm   = gen_conseq_nm t_equivF_notmod   t_equivF_conseq
 let t_equivS_conseq_nm   = gen_conseq_nm t_equivS_notmod   t_equivS_conseq
 let t_bdHoareF_conseq_nm = gen_conseq_nm t_bdHoareF_notmod t_bdHoareF_conseq
 let t_bdHoareS_conseq_nm = gen_conseq_nm t_bdHoareS_notmod t_bdHoareS_conseq
+let t_aequivS_conseq_nm  = gen_conseq_nm t_aequivS_notmod  t_aequivS_conseq
 
 (* -------------------------------------------------------------------- *)
 (*                   Relation between logics                            *)
@@ -660,6 +685,12 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
     t_on1 2 (t_apply_r nf1) (tac es.es_pr es.es_po tc)
 
   (* ------------------------------------------------------------------ *)
+  (* aequivS / aequivS / ⊥ / ⊥                                            *)
+  | FaequivS _, Some ((_, {f_node = FaequivS aes}) as nf1), None, None ->
+    let tac = if notmod then t_aequivS_conseq_nm else t_aequivS_conseq in
+    t_on1 2 (t_apply_r nf1) (tac aes.aes_pr aes.aes_po tc)
+
+  (* ------------------------------------------------------------------ *)
   (* equivS / equivS / hoareS / hoareS  *)
   | FequivS _,
       Some ((_, {f_node = FequivS es}) as nf1),
@@ -868,6 +899,12 @@ let process_conseq notmod (info1, info2, info3) tc =
         let fmake pre post bd =
           ensure_none bd; f_equivS_r { es with es_pr = pre; es_po = post; }
         in (env, env, es.es_pr, es.es_po, fmake)
+
+      | FaequivS aes ->
+        let env = LDecl.push_all [aes.aes_ml; aes.aes_mr] hyps in
+        let fmake pre post bd =
+          ensure_none bd; f_aequivS_r { aes with aes_pr = pre; aes_po = post; }
+        in (env, env, aes.aes_pr, aes.aes_po, fmake)
 
       | _ -> tc_error !!tc "conseq: not a phl/prhl judgement"
     in
