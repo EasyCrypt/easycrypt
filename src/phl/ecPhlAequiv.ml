@@ -267,7 +267,7 @@ let t_while_r ((ef, df), (v, inv), nf) tc =
 let t_while = FApi.t_low1 "awhile" t_while_r
 
 (* -------------------------------------------------------------------- *)
-let t_pweq_r ((e1, e2), meas) (tc : tcenv1) =
+let t_pweq_r (e1, e2) (tc : tcenv1) =
   let hyps = FApi.tc1_hyps tc in
   let aes  = tc1_as_aequivS tc in
 
@@ -283,32 +283,22 @@ let t_pweq_r ((e1, e2), meas) (tc : tcenv1) =
   if not (EcReduction.EqTest.for_type (FApi.tc1_env tc) e1.f_ty e2.f_ty) then
     tc_error !!tc "pweq: incompatible type for expr.";
 
-  let meas =
-    let mty = tfun e1.f_ty tint in
-    EcProofTyping.pf_process_form_opt !!tc hyps (Some mty) meas
-  in
-
   let ll1   = f_losslessS aes.aes_ml aes.aes_sl in
   let ll2   = f_losslessS aes.aes_mr aes.aes_sr in
   let eq0   = f_eq aes.aes_dp f_r0 in
 
   let concl, conseq =
-    let nmi   = EcIdent.create "i" in
-    let vari  = f_local nmi tint in
-    let post  =
-      let nmx  = EcIdent.create "x" in
-      let varx = f_local nmx e1.f_ty in
-      f_forall [nmx, GTty varx.f_ty] (
-        f_imps [f_eq vari (f_app meas [varx] tint);
-                f_eq varx e2] (f_eq varx e1)
-      ) in
+    let nmx  = EcIdent.create "x" in
+    let varx = f_local nmx e1.f_ty in
+
+    let post  = f_imp (f_eq varx e2) (f_eq varx e1) in
     let concl =
-      f_forall [nmi, GTty vari.f_ty]
+      f_forall [nmx, GTty varx.f_ty]
         (f_aequivS aes.aes_ml aes.aes_mr ~dp:f_r0 ~ep:aes.aes_ep
            aes.aes_pr aes.aes_sl aes.aes_sr post)
     and conseq =
       f_forall_mems [aes.aes_ml; aes.aes_mr]
-        (f_imp (f_forall [nmi, GTty vari.f_ty] post) aes.aes_po)
+        (f_imp (f_forall [nmx, GTty varx.f_ty] post) aes.aes_po)
     in (concl, conseq)
   in
 

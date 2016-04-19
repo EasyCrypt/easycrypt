@@ -2648,8 +2648,8 @@ phltactic:
     LBRACKET v=form RBRACKET inv=sform
     { Paprhl (Awhile ((ef, df), (v, inv), n)) }
 
-| PWEQ LPAREN e1=sform COMMA e2=sform RPAREN COLON f=sform
-    { Paprhl (APwEq ((e1, e2), f)) }
+| PWEQ LPAREN e1=sform COMMA e2=sform RPAREN
+    { Paprhl (APwEq (e1, e2)) }
 
 bdhoare_split:
 | b1=sform b2=sform b3=sform?
