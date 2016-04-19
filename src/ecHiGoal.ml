@@ -1406,7 +1406,7 @@ let process_generalize1 ?(doeq = false) pattern (tc : tcenv1) =
           let p    = PT.concretize_form ptenv p in
           let occ  = norm_rwocc occ in
           let cpos =
-            try  FPosition.select_form hyps occ p concl
+            try  FPosition.select_form ~xconv:`AlphaEq hyps occ p concl
             with InvalidOccurence -> tacuerror "invalid occurence selector"
           in
 
