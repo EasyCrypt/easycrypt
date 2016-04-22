@@ -1,0 +1,158 @@
+(* --------------------------------------------------------------------
+ * Copyright (c) - 2012--2016 - IMDEA Software Institute
+ * Copyright (c) - 2012--2016 - Inria
+ *
+ * Distributed under the terms of the CeCILL-B-V1 license
+ * -------------------------------------------------------------------- *)
+
+require import Int FSet Real NewDistr.
+require (*--*) Mu_mem.
+
+(* The distribution and test can be parameterized by some input *)
+(* We allow a validity condition on inputs (also known as "poor man's subtyping") *)
+type input.
+op valid: { input -> bool | exists x, valid x } as valid_nonempty.
+
+(* The distribution is subuniform on some subset of some type t *)
+type t.
+op d : { input -> t distr | forall i, valid i => is_subuniform (d i) } as dU.
+
+(* And we have a test that is a subset of the distribution's domain (for all valid inputs) *)
+op test : { input -> t fset | forall i x, valid i => mem (test i) x => support (d i) x } as test_in_d.
+
+module RsampleW = {
+  proc sample (i:input, r:t) : t = {
+    while (!mem (test i) r) {
+       r = $(d i);
+    }
+    return r;
+  }
+}.
+
+equiv RsampleW_subuniform a b:
+  RsampleW.sample ~ RsampleW.sample:
+       ={i, r}
+    /\ valid i{1}
+    /\ mem (test i{1}) a
+    /\ mem (test i{1}) b
+    /\ !mem (test i{1}) r{1}
+  ==> res{1} = a <=> res{2} = b.
+proof.
+proc=> /=; while (   ={i}
+                  /\ valid i{1}
+                  /\ mem (test i{1}) a
+                  /\ mem (test i{1}) b
+                  /\ (r{1} = a <=> r{2} = b))=> //=.
+rnd (fun x=> if x = b then a else if x = a then b else x); skip.
+move=> //= &1 &2 [#] ->> valid_i a_in_test b_in_test h_ab r1_notin_test r2_notin_test.
+split=> [/#|_]; split=> [x x_in_di|_]; first by smt (dU test_in_d).
+by move=> r r_in_di; split=> [|/#]; first smt (test_in_d).
+qed.
+
+lemma prRsampleW k &m: forall i dfl,
+  valid i =>
+  !mem (test i) dfl =>
+  weight (d i) = 1%r =>
+  Pr[RsampleW.sample(i,dfl) @ &m : res = k] =
+    if mem (test i) k then 1%r/(card(test i))%r else 0%r.
+proof.
+  move=> i0 dfl0.
+  pose bdt := (card(test i0))%r.
+  cut bdt_pos: 0 <= card (test i0) by exact/fcard_ge0.
+  cut bdt_posr: 0%r <= (card (test i0))%r by exact/RealExtra.le_fromint.
+  case (mem (test i0) k) => Htk Hvalid Hdfl Hweight;
+    byphoare (_: !mem (test i) r /\ i0 = i ==> k = res) => //;proc.
+    (* case : test i k *)
+    pose bd := mu_x (d i0) k.
+    cut d_uni : forall x, in_supp x (d i0) => mu_x (d i0) x = bd.
+       by move=> x Hx;rewrite /bd; apply dU => //; apply test_in_d.
+    cut Hdiff: bdt <> 0%r.
+      by have h: mem (test i0) k; smt.
+    conseq (_:i=i0 ==> k = r : = (if mem (test i) r then charfun ((=) k) r else 1%r / bdt)) => //;
+      first by smt.
+    while (i0=i) (if mem (test i) r then 0 else 1) 1 (bdt * bd) => //; first 2 smt.
+      move=> Hw; alias 2 r0 = r.
+      cut:= Htk=> Hmemk.
+      phoare split bd ((1%r - bdt*bd) * (1%r/bdt)) : (k=r0).
+        move=> &hr [H1 H2]; rewrite (_: mem (test i{hr}) r{hr} = false) 1:neqF //=.
+        by cut {1}->: bd = bd * bdt / bdt; smt.
+        (* bounding pr : k = r0 /\ k = r *)
+        seq 2 : (k = r0) bd 1%r 1%r 0%r (r0 = r /\ i = i0) => //.
+          by wp;rnd => //.
+          wp;rnd;skip;progress => //.
+          by rewrite /bd /mu_x pred1E; apply mu_eq => w' //.
+          by conseq Hw; progress => //; rewrite Htk.
+        by hoare; conseq (_: _ ==> true)=> //; smt.
+      (* bounding pr : ! k = r0 /\ k = r *)
+     seq 2 : (mem (test i) r0) _ 0%r (1%r - bdt*bd) (1%r/bdt)
+                         (i0 = i /\ mem (test i) k /\ r0 = r) => //.
+       by wp;rnd.
+       case (k = r0);first by conseq (_ : _ ==> false) => //.
+       conseq Hw;progress => //.
+       by rewrite H0 //= /charfun (_: (k = r{hr}) = false) 1:neqF //.
+       phoare split ! 1%r (bdt*bd);wp;rnd => //.
+        skip; progress=> //.
+        rewrite -(mu_eq (d i{hr}) (mem (test i{hr}))).
+          by move=> x.
+        apply (Mu_mem.mu_mem (test i{hr}) (d i{hr}) bd _) => x Hx.
+        by apply d_uni; apply test_in_d=> //.
+      by conseq Hw => //; smt.
+      by conseq (_ : _ ==> true) => //;rnd;skip;progress=> //; smt.
+    split; first by cut: 0%r < bd; smt.
+    move=> z;conseq (_ : _ ==>  mem (test i) r); first smt.
+    rnd;skip;progress => //.
+    rewrite -(mu_eq (d i{hr}) (mem (test i{hr}))) => //.
+    rewrite (Mu_mem.mu_mem (test i{hr}) (d i{hr}) bd) => // x Hx.
+    by apply d_uni; apply test_in_d=> //.
+  (* case ! test i0 k *)
+  hoare; while (!mem (test i) k); first rnd => //.
+  by skip;smt.
+qed.
+
+type t'.
+op d' : input -> t' distr.
+
+module Sample = {
+  proc sample (i:input) : t' = {
+    var r : t';
+    r = $d' i;
+    return r;
+  }
+}.
+
+axiom d'_uni : forall i x, in_supp x (d' i) => mu_x (d' i) x = 1%r/(card(test i))%r.
+
+lemma prSample : forall i k &m, Pr[Sample.sample(i) @ &m : res = k] = mu_x (d' i) k.
+proof.
+  move=> i0 k &m; byphoare (_: i0 = i ==> k = res) => //;proc.
+  rnd;skip;progress.
+  apply/(mu_eq (d' i{hr}) (fun x => k = x) (pred1 k)).
+  by rewrite pred1E.
+qed.
+
+equiv Sample_RsampleW (f : t' -> t) (finv : t -> t') :
+   Sample.sample ~ RsampleW.sample :
+     ={i} /\ valid i{2} /\ !mem (test i){2} r{2} /\ weight (d i{2}) = 1%r /\
+     (forall rL, in_supp rL (d' i{1}) <=> mem (test i){1} (f rL)) /\
+     (forall rR, mem (test i){2} rR => f (finv rR) = rR) /\
+     (forall rL, in_supp rL (d' i{1}) => finv (f rL) = rL) ==>
+     res{1} = finv res{2}.
+proof.
+  bypr (res{1}) (finv res{2}) => //.
+  move=> &m1 &m2 k [Heqi [Hv [Ht [Hw [Htin [Hffi Hfif]]]]]].
+  rewrite (_:Pr[RsampleW.sample(i{m2}, r{m2}) @ &m2 : k = finv res] =
+             Pr[RsampleW.sample(i{m2}, r{m2}) @ &m2 : res = f k]).
+    byequiv (_: ={i,r} /\ i{2} = i{m2} ==>
+                      ={res} /\ mem (test i){m2} res{2}) => //.
+      by proc;while (={i,r});[rnd | ];trivial.
+    progress => //.
+      by rewrite Hffi.
+    by rewrite Hfif // Htin Heqi.
+  rewrite (_:Pr[Sample.sample(i{m1}) @ &m1 : k = res] =
+             Pr[Sample.sample(i{m1}) @ &m1 : res = k]).
+    by rewrite Pr[mu_eq].
+  rewrite (prSample i{m1} k &m1) (prRsampleW (f k) &m2 i{m2} r{m2}) //.
+  case (mem (test i){m2} (f k)).
+    by rewrite -Heqi -Htin; apply d'_uni.
+  rewrite -Heqi -Htin /in_supp;smt.
+qed.
