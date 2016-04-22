@@ -109,15 +109,28 @@ proof. by move=> x; rewrite muK //; apply/isdistr_mnull. qed.
 
 lemma dnullE ['a] (E : 'a -> bool) : mu dnull<:'a> E = 0%r.
 proof.
-rewrite muE -(@eq_sum (fun x=> 0%r) _ _) 2:sum0 //.
+rewrite muE -(@eq_sum (fun x=> 0%r)) 2:sum0 //.
 by move=> x /=; rewrite dnull1E if_same.
 qed.
 
-lemma weight_dnumm ['a] : weight dnull<:'a> = 0%r.
+lemma weight_dnull ['a] : weight dnull<:'a> = 0%r.
 proof. by apply/dnullE. qed.
 
-lemma supnullE ['a] : support dnull<:'a> = pred0.
+lemma support_dnull ['a] : support dnull<:'a> = pred0.
 proof. by apply/fun_ext=> x; rewrite /support /in_supp dnull1E. qed.
+
+lemma support_eq0 ['a] (d : 'a distr) : support d = pred0 => d = dnull.
+proof.
+move=>/pred_ext @/pred0 /=; rewrite (@forall_iff _ (fun x=> mu_x d x = 0%r)) /=.
++ move=> x /=; rewrite /support /in_supp -lerNgt.
+  by split=> [le0_dx|->] //; apply/ler_asym; rewrite le0_dx ge0_mu_x.
+by move=> h; apply/eq_distr=> x; rewrite h dnull1E.
+qed.
+
+lemma weight_eq0_dnull ['a] (d : 'a distr) : weight d = 0%r => d = dnull.
+proof.
+by move=> /weight_eq0 dx_eq0; apply/eq_distr=> x; rewrite dnull1E dx_eq0.
+qed.
 
 (* -------------------------------------------------------------------- *)
 theory MRat.
@@ -440,52 +453,85 @@ abbrev dapply (F: 'a -> 'b) : 'a distr -> 'b distr =
   fun d => dmap d F.
 
 (* -------------------------------------------------------------------- *)
-op mscale ['a] (d : 'a distr) =
-  fun x => mu_x d x / weight d.
+theory DScalar.
+require import FSet StdBigop StdOrder.
+(*---*) import RealOrder Bigreal BRA.
 
-op dscale ['a] (d : 'a distr) =
-  mk (mscale d).
+op mscalar (k : real) (m : 'a -> real) (x : 'a) = k * (m x).
 
-lemma isdistr_mscale (d : 'a distr) : isdistr (mscale d).
+lemma isdistr_mscalar k (m : 'a -> real):
+  isdistr m =>
+  0%r <= k => k <= inv (weight (mk m)) => isdistr (mscalar k m).
 proof.
-split=> @/mscale [x|s uqs].
-  by rewrite divr_ge0 1:ge0_mu_x // ge0_weight.
-rewrite -divr_suml; apply/(@ler_trans (weight d / weight d)).
-  rewrite ler_wpmul2r // ?invr_ge0 ?ge0_weight //.
-  admit.
-have := ge0_weight d; rewrite ler_eqVlt => -[<-|gt0_iw].
-  by rewrite divr0. by rewrite divrr // gtr_eqF.
+move=> @/mscalar [] ge0_mx le1_mx ge0_k k_le_invm; split=> [/#|].
+move=> s uniq_s.
+admit. (* partial sums of a positive sum are bounded by the sum *)
 qed.
+
+op dscalar (k : real) (d : 'a distr) = mk (mscalar k (mu_x d)).
+
+abbrev (\cdot) (k : real) (d : 'a distr) = dscalar k d.
+
+lemma dscalar1E (k : real) (d : 'a distr) (x : 'a):
+  0%r <= k => k <= inv (weight d) =>
+  mu_x (k \cdot d) x = k * mu_x d x.
+proof.
+by move=> ge0_k le1_k; rewrite muK // isdistr_mscalar 1:isdistr_mu_x 2:mkK.
+qed.
+
+lemma dscalarE (k : real) (d : 'a distr) (E : 'a -> bool):
+  0%r <= k => k <= inv (weight d) =>
+  mu (k \cdot d) E = k * mu d E.
+proof.
+move=> ge0_k k_le_weight; rewrite muE.
+rewrite (@eq_sum _ (fun x=> k * if E x then mu_x d x else 0%r)).
++ by move=> x /=; rewrite dscalar1E //; have /= -> := fun_if (fun x=> k * x).
+case: (k = 0%r)=> [->|]; first by rewrite sum0.
+rewrite muE. admit. (* push non-null scalars out of sums *)
+qed.
+
+lemma weight_dscalar (k : real) (d : 'a distr):
+  0%r <= k => k <= inv (weight d) =>
+  weight (k \cdot d) = k * weight d.
+proof. by move=> ge0_k k_le_weight; rewrite dscalarE. qed.
+
+lemma support_dscalar_gt0 (k : real) (d : 'a distr):
+  0%r < k => k <= inv (weight d) =>
+  support (k \cdot d) = support d.
+proof.
+move=> gt0_k k_le_weight; apply/pred_ext=> x.
+by rewrite /support /in_supp dscalar1E 1:ltrW // /#.
+qed.
+end DScalar.
+export DScalar.
+
+(* -------------------------------------------------------------------- *)
+op dscale ['a] (d : 'a distr) = dscalar (inv (weight d)) d.
 
 lemma mux_dscale ['a] (d : 'a distr) (x : 'a) :
   mu_x (dscale d) x = mu_x d x / weight d.
-proof. by rewrite muK 1:isdistr_mscale. qed.
+proof. by rewrite dscalar1E // invr_ge0 ge0_weight. qed.
 
 lemma mu_dscale ['a] (d : 'a distr) (E : 'a -> bool) :
   mu (dscale d) E = mu d E / weight d.
-proof.
-rewrite muE. have:= mux_dscale d.
-rewrite -fun_ext -(@etaE (mu_x (dscale d))) etaP=> -> /=.
-apply/(@eq_trans _ ((sum (fun x=> if E x then mu_x d x else 0%r)) / weight d)).
-+ admit. (* push constant multiplicative factors out of sums when non-null *)
-by rewrite -muE.
-qed.
+proof. by rewrite dscalarE // invr_ge0 ge0_weight. qed.
 
 lemma weight_dscale ['a] (d : 'a distr) :
   weight (dscale d) = if weight d = 0%r then 0%r else 1%r.
 proof.
-rewrite mu_dscale -/(weight _); case: (weight d = 0%r)=> //= [->|].
-+ exact/divr0.
-exact/unitrE.
+rewrite weight_dscalar // 1:invr_ge0 1:ge0_weight.
+by case: (weight d = 0%r)=> [->|/divrr].
 qed.
 
 lemma support_dscale ['a] (d : 'a distr) :
   support (dscale d) = support d.
 proof.
-rewrite fun_ext /support /in_supp=> x; rewrite eq_iff mux_dscale.
-case: (weight d = 0%r)=> [^/weight_eq0 -> ->|d_nonempty].
-+ by rewrite divr0.
-smt w=ge0_weight.
+case: (weight d <= 0%r)=> [le0_weight|/ltrNge gt0_weight].
++ rewrite (@weight_eq0_dnull d _).
+  + by apply/ler_asym; rewrite le0_weight ge0_weight.
+  rewrite support_dnull pred_ext=> x @/pred0 /=.
+  by rewrite /support /in_supp mux_dscale dnull1E weight_dnull.
+by apply/support_dscalar_gt0=> //; exact/invr_gt0.
 qed.
 
 (* -------------------------------------------------------------------- *)
