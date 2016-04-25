@@ -3,6 +3,8 @@ require import Ring StdRing ABitstring NewDistr.
 require (*--*) AWord MAC_then_Pad_then_CBC.
 (*---*) import IntID.
 
+(*** TODO: Use the more recent and much better Word theories ***)
+
 (** A type for octets and its structure **)
 type octet.
 (** WARNING: This clone implicitly assumes:
@@ -15,7 +17,7 @@ type octet.
 clone import AWord as Octet with
   type word   <- octet,
   op   length <- 8
-proof leq0_length by smt.
+proof leq0_length by done.
 
 (** A type for blocks and its structure **)
 type block.
@@ -29,10 +31,14 @@ type block.
 clone import AWord as Block with
   type word   <- block,
   op   length <- 128
-proof leq0_length by smt.
+proof leq0_length by done.
 
 lemma d_block_uffu: is_uniform_over Block.Dword.dword predT.
-proof. by do !split; smt. qed.
+proof.
+split=> [x|]; first by rewrite Dword.in_supp_def.
+split=> [|x y _ _]; last by rewrite !Dword.mu_x_def.
+by rewrite /is_lossless -/(weight _) Dword.lossless.
+qed.
 
 (** A type for tags and its structure **)
 type tag.
@@ -45,7 +51,7 @@ type tag.
 clone import AWord as Tag with
   type word   <- tag,
   op   length <- 256
-proof leq0_length by smt.
+proof leq0_length by done.
 
 (** Conversions **)
 (* octet list <-> bitstring *)
@@ -64,13 +70,13 @@ lemma size_bits2os (bs : bitstring):
   size (bits2os bs) = `|bs| %/ 8.
 proof.
   move: {-1}(`|bs| %/ 8) (eq_refl (`|bs| %/ 8))=> n len_bs.
-  have le0_n: 0 <= n by smt.
+  have le0_n: 0 <= n by smt (divz_ge0 lengthP).
   elim n le0_n bs len_bs=> [bs bs_is_octets bs_is_empty
-                                               |n le0_n ih bs bs_is_nonempty bs_is_octets].
-    by rewrite bits2os0 1:smt.
-  rewrite bits2osS 1:smt //=.
-  have h_len:= length_sub bs 8 (`|bs| - 8) _ _ _ => //=; 1,2:smt.
-  rewrite ih 3:addzC// h_len 1,2:smt.
+                           |n le0_n ih bs bs_is_nonempty bs_is_octets].
+    by rewrite bits2os0 1:[smt (@IntDiv)].
+  rewrite bits2osS 1:[smt (@IntDiv)] //=.
+  have h_len:= length_sub bs 8 (`|bs| - 8) _ _ _ => //=; 1,2:smt (@IntDiv).
+  by rewrite ih 3:addzC// h_len 1,2:[smt (@IntDiv)].
 qed.
 
 op os2bits (os : octet list) =
@@ -81,17 +87,17 @@ lemma length_os2bits (os : octet list):
 proof.
   elim os=> //= [|o os ih].
     by rewrite /os2bits /= length_zeros.
-  by rewrite /os2bits /= length_app length_to_bits ih smt.
+  by rewrite /os2bits /= length_app length_to_bits ih /#.
 qed.
 
 lemma bits2osK (os : octet list):
   bits2os (os2bits os) = os.
 proof.
-  elim os=> //= [|o os ih]; 1:smt.
+  elim os=> //= [|o os ih]; 1:by rewrite /os2bits /= bits2os0 1:length_zeros.
   have /= := length_os2bits (o :: os).
   rewrite /os2bits /= -/(os2bits _)=> h_len. (* FIXME *)
   rewrite bits2osS /=.
-    by rewrite h_len smt.
+    by rewrite h_len [smt (size_ge0)].
     by rewrite h_len -(add0z (8 * (1 + size os))) addzC /= modzMr //.
   rewrite -(Octet.length_to_bits o); split.
     by rewrite sub_app_fst Octet.can_from_to.
@@ -105,13 +111,15 @@ lemma os2bitsK (bs : bitstring):
   os2bits (bits2os bs) = bs.
 proof.
   move: {-1}(`|bs| %/ 8) (eq_refl (`|bs| %/ 8))=> n len_bs.
-  have le0_n: 0 <= n by smt.
+  have le0_n: 0 <= n by smt (divz_ge0 lengthP).
   elim n le0_n bs len_bs=> [|n le0_n ih bs len_bs good_length].
-    smt.
+    move=> bs bs_div_8 bs_mod_8; have:= divz_eq `|bs| 8.
+    rewrite bs_div_8 bs_mod_8=> lenbs_eq0.
+    by rewrite bits2os0 // /os2bits /=; smt (@ABitstring).
   have h_len: `|sub bs 8 (`|bs| - 8)| = `|bs| - 8.
-    by rewrite length_sub // 1,2:smt.
-  rewrite bits2osS //= 1:smt /os2bits /= -/(os2bits _) ih 1,2:h_len 1,2:smt.
-  by rewrite Octet.pcan_to_from 1:smt app_sub //= smt.
+    by rewrite length_sub // 1,2:smt (@IntDiv).
+  rewrite bits2osS //= 1:[smt (@IntDiv)] /os2bits /= -/(os2bits _) ih 1,2:h_len 1,2:[smt (@IntDiv)].
+  by rewrite Octet.pcan_to_from 1:[smt (@ABitstring)] app_sub //= [smt (@IntDiv)].
 qed.
 
 (* block list <-> bitstring *)
@@ -130,13 +138,13 @@ lemma size_bits2bs (bs : bitstring):
   size (bits2bs bs) = `|bs| %/ 128.
 proof.
   move: {-1}(`|bs| %/ 128) (eq_refl (`|bs| %/ 128))=> n len_bs.
-  have le0_n: 0 <= n by smt.
+  have le0_n: 0 <= n by smt (divz_ge0 lengthP).
   elim n le0_n bs len_bs=> [bs bs_is_octets bs_is_empty
                                                |n le0_n ih bs bs_is_nonempty bs_is_octets].
-    by rewrite bits2bs0 1:smt.
-  rewrite bits2bsS 1:smt //=.
-  have h_len:= length_sub bs 128 (`|bs| - 128) _ _ _ => //=; 1,2:smt.
-  rewrite ih 3:addzC// h_len 1,2:smt.
+    by rewrite bits2bs0 1:[smt (@IntDiv)].
+  rewrite bits2bsS 1:[smt (@IntDiv)] //=.
+  have h_len:= length_sub bs 128 (`|bs| - 128) _ _ _ => //=; 1,2:smt (@IntDiv).
+  by rewrite ih 3:addzC// h_len 1,2:[smt (@IntDiv)].
 qed.
 
 op bs2bits (os : block list) =
@@ -147,17 +155,17 @@ lemma length_bs2bits (bs : block list):
 proof.
   elim bs=> //= [|b bs ih].
     by rewrite /bs2bits /= length_zeros.
-  by rewrite /bs2bits /= length_app length_to_bits ih smt.
+  by rewrite /bs2bits /= length_app length_to_bits ih /#.
 qed.
 
 lemma bits2bsK (bs : block list):
   bits2bs (bs2bits bs) = bs.
 proof.
-  elim bs=> //= [|b bs ih]; 1:smt.
+  elim bs=> //= [|b bs ih]; 1:by rewrite /bs2bits /= bits2bs0 1:length_zeros.
   have /= := length_bs2bits (b :: bs).
   rewrite /bs2bits /= -/(bs2bits _)=> h_len. (* FIXME *)
   rewrite bits2bsS /=.
-    by rewrite h_len smt.
+    by rewrite h_len [smt (size_ge0)].
     by rewrite h_len -(add0z (128 * (1 + size bs))) addzC /= modzMr.
   rewrite -(Block.length_to_bits b); split.
     by rewrite sub_app_fst Block.can_from_to.
@@ -171,13 +179,15 @@ lemma bs2bitsK (bs : bitstring):
   bs2bits (bits2bs bs) = bs.
 proof.
   move: {-1}(`|bs| %/ 128) (eq_refl (`|bs| %/ 128))=> n len_bs.
-  have le0_n: 0 <= n by smt.
+  have le0_n: 0 <= n by smt (divz_ge0 lengthP).
   elim n le0_n bs len_bs=> [|n le0_n ih bs len_bs good_length].
-    smt.
+    move=> bs bs_div_128 bs_mod_128; have:= divz_eq `|bs| 128.
+    rewrite bs_div_128 bs_mod_128=> lenbs_eq0.
+    by rewrite bits2bs0 // /bs2bits /=; smt (@ABitstring).
   have h_len: `|sub bs 128 (`|bs| - 128)| = `|bs| - 128.
-    by rewrite length_sub // 1,2:smt.
-  rewrite bits2bsS //= 1:smt /bs2bits /= -/(bs2bits _) ih 1,2:h_len 1,2:smt.
-  by rewrite Block.pcan_to_from 1:smt app_sub //= smt.
+    by rewrite length_sub // 1,2:[smt (@IntDiv)].
+  rewrite bits2bsS //= 1:[smt (@IntDiv)] /bs2bits /= -/(bs2bits _) ih 1,2:h_len 1,2:[smt (@IntDiv)].
+  by rewrite Block.pcan_to_from 1:[smt (@ABitstring)] app_sub //= [smt (@IntDiv)].
 qed.
 
 (* block list <-> octet list *)
@@ -219,39 +229,38 @@ qed.
 op t2os t = bits2os (Tag.to_bits t).
 
 lemma size_t2os t: size (t2os t) = 32.
-proof. by rewrite /t2os size_bits2os length_to_bits smt. qed.
+proof. by rewrite /t2os size_bits2os length_to_bits [smt (@IntDiv)]. qed.
 
 op os2t os = Tag.from_bits (os2bits os).
 
 lemma os2tK t: os2t (t2os t) = t.
-proof. by rewrite /os2t /t2os os2bitsK 1:length_to_bits 1:smt Tag.can_from_to. qed.
+proof. by rewrite /os2t /t2os os2bitsK 1:length_to_bits 1:[smt (@IntDiv)] Tag.can_from_to. qed.
 
 lemma t2osK os:
   size os = 32 =>
   t2os (os2t os) = os.
 proof.
   move=> bs_is_tag.
-  rewrite /os2t /t2os Tag.pcan_to_from 1:length_os2bits 1:bs_is_tag 1:smt.
-  by rewrite bits2osK.
+  by rewrite /os2t /t2os Tag.pcan_to_from 1:length_os2bits 1:bs_is_tag 2:bits2osK.
 qed.
 
 (* tag <-> block list *)
 op t2bs t = os2bs (t2os t).
 
 lemma size_t2bs t: size (t2bs t) = 2.
-proof. rewrite /t2bs size_os2bs size_t2os smt. qed.
+proof. by rewrite /t2bs size_os2bs size_t2os [smt (@IntDiv)]. qed.
 
 op bs2t bs = os2t (bs2os bs).
 
 lemma bs2tK t: bs2t (t2bs t) = t.
-proof. by rewrite /bs2t /t2bs bs2osK 2:os2tK// size_t2os smt. qed.
+proof. by rewrite /bs2t /t2bs bs2osK 2:os2tK// size_t2os [smt (@IntDiv)]. qed.
 
 lemma t2bsK bs:
   size bs = 2 =>
   t2bs (bs2t bs) = bs.
 proof.
   move=> bs_is_tag.
-  by rewrite /bs2t /t2bs t2osK 2:os2bsK// size_bs2os bs_is_tag smt.
+  by rewrite /bs2t /t2bs t2osK 2:os2bsK// size_bs2os bs_is_tag /#.
 qed.
 
 type msg = octet list.
@@ -310,7 +319,7 @@ lemma cbc_correct P Pi k st p:
 proof.
   move=> PiK; elim p st=> //= pi p ih st.
   split; 2:by apply/ih.
-  by rewrite PiK; smt.
+  by rewrite PiK; algebra.
 qed.
 
 (* Useful lemmas *)
@@ -320,8 +329,8 @@ lemma cbc_enc_rcons (P : block -> block -> block) k st (p:block list) pn:
 proof.
   elim p st=> //=.
   move=> pi p ih st.
-  have -> /=: 1 + size p <> 0 by smt.
-  have ->: 1 + size p - 1 = size p by smt.
+  have -> /=: 1 + size p <> 0 by smt (size_ge0).
+  have ->: 1 + size p - 1 = size p by smt ().
   by rewrite -ih.
 qed.
 
@@ -331,9 +340,9 @@ lemma cbc_dec_rcons (Pi : block -> block -> block) k st (c:block list) cn:
 proof.
   elim c st=> //=.
   move=> ci c ih st //=.
-  have -> /=: 0 < 1 + size c by smt.
-  have ->: 1 + size c - 1 = size c by smt.
-  by rewrite -ih; smt.
+  have -> /=: 0 < 1 + size c by smt (size_ge0).
+  have ->: 1 + size c - 1 = size c by smt ().
+  by rewrite -ih [smt (size_ge0)].
 qed.
 
 lemma size_cbc_enc P k iv p: size (cbc_enc P k iv p) = size p.
@@ -366,20 +375,20 @@ op unpad (bs : block list) =
 
 (* Proofs for instantiation *)
 lemma size_padding m: size (padding (pad_length m)) = 16 - size m %% 16.
-proof. by rewrite /padding /= size_mkseq smt. qed.
+proof. by rewrite /padding /= size_mkseq [smt (size_ge0 @IntDiv)]. qed.
 
 lemma last_padding x m: last x (padding (pad_length m)) = Octet.from_int (16 - size m %% 16).
 proof.
   rewrite /padding /mkseq /= -(last_nonempty ((fun x => Octet.from_int (16 - size m %% 16)) witness<:int>)).
-    case {-1}(iota_ 0 (16 - size m %% 16)) (eq_refl (iota_ 0 (16 - size m %% 16)))=> //=.
-    by have:= size_iota 0 (16 - size m %% 16); smt.
+    case {-1}(iota_ 0 (16 - size m %% 16)) (eq_refl (iota_ 0 (16 - size m %% 16)))=> //=;
+    by have:= size_iota 0 (16 - size m %% 16); smt (@IntDiv).
   by rewrite last_map.
 qed.
 
 lemma size_padded m t:
   size (m ++ t2os t ++ padding (pad_length m))
   = 48 + (size m - size m %% 16).
-proof. by rewrite !size_cat size_padding size_t2os smt. qed.
+proof. by rewrite !size_cat size_padding size_t2os [smt (@IntDiv)]. qed.
 
 lemma padded_is_blocks m t:
   size (m ++ t2os t ++ padding (pad_length m)) %% 16 = 0.
@@ -406,16 +415,16 @@ proof.
   rewrite (powS 7 2)// (powS 6 2)// (powS 5 2)// (powS 4 2)//
           (powS 3 2)// (powS 2 2)// (powS 1 2)// (powS 0 2)//
           (pow0 2) /=.
-  have h: 0 < 16 - size m %% 16 <= 16 < 256 by smt.
-  have ->: (16 - size m %% 16) %% 256 = 16 - size m %% 16 by smt.
+  have h: 0 < 16 - size m %% 16 <= 16 < 256 by smt (@IntDiv).
+  have ->: (16 - size m %% 16) %% 256 = 16 - size m %% 16 by smt (@IntDiv).
   rewrite drop_size_cat.
-    by rewrite !size_cat size_padding smt.
+    by rewrite !size_cat size_padding /#.
   rewrite {1}/pad_length /=.
   rewrite -catA take_size_cat //=.
-    rewrite !size_cat size_padding 1:smt.
+    by rewrite !size_cat size_padding 1:size_t2os /#.
   rewrite drop_size_cat.
-    rewrite !size_cat size_padding 1:smt.
-  rewrite (_: 1 <= 16 - size m %% 16 <= 16) 1:smt /=.
+    by rewrite !size_cat size_padding 1:size_t2os /#.
+  rewrite (_: 1 <= 16 - size m %% 16 <= 16) 1:[smt (@IntDiv)] /=.
   by rewrite take_size_cat 1:size_t2os// os2tK.
 qed.
 
@@ -426,7 +435,7 @@ proof.
   rewrite /pad /=.
   do 2!rewrite size_os2bs 1:padded_is_blocks//.
   rewrite !size_cat !size_padding !size_mkseq.
-  have ->: max 0 (size m - size m %% 16) = (size m - size m %% 16) by smt.
+  have ->: max 0 (size m - size m %% 16) = (size m - size m %% 16) by smt (size_ge0 @IntDiv).
   by congr; ringeq; rewrite -divzE modzMl //.
 qed.
 
@@ -529,10 +538,18 @@ proof.
          /\ ek = _ek
          /\ p' = pad _p (hmac_sha256 _mk _p)
          /\ s  = nth witness c i
-         /\ size c = i + 1
+         /\ size c = 1 + i
          /\ c      = iv :: cbc_enc AES _ek iv (take i (pad _p (hmac_sha256 _mk _p))))
         (size (pad _p (hmac_sha256 _mk _p)) - i).
-    by auto; smt.
+    auto=> /> &hr le0_i _ /addzI szcbc_eq_i lti_szpadded.
+    split; last by smt ().
+    split; first by smt().
+    split; last first.
+      split; first by rewrite size_cat /= szcbc_eq_i.
+      rewrite (take_nth witness) //= -cbc_enc_rcons -cats1 /=.
+      by rewrite size_take // lti_szpadded.
+    have -> /=: i{hr} + 1 <> 0 by smt ().
+    by rewrite cats1 nth_rcons size_cbc_enc size_take // lti_szpadded /= -addzA.
   wp=> //=.
   conseq (_: _ ==> s :: mee_enc AES hmac_sha256 _ek _mk s _p = _c)=> //=.
     move=> &m [->>] ->> iv //=; split=> [[[le0_size _] h]|<<-].
@@ -564,8 +581,12 @@ proof.
            /\ s  = (if 0 < i then nth witness c (i - 1) else head witness _c)
            /\ size padded = i
            /\ padded = cbc_dec AESi _ek (head witness _c) (take i c)).
-      auto; progress; 1..4:smt.
-      by rewrite (take_nth witness)// -cbc_dec_rcons cats1 -H1 smt.
+      auto=> /> &hr le0_szpadded _ h lt_padded_c.
+      split; first by smt ().
+      split; first by smt (size_ge0).
+      split; first by rewrite size_cat.
+      rewrite (take_nth witness) // -cbc_dec_rcons -h cats1.
+      by rewrite size_take // lt_padded_c /= 1:smt.
     by auto; smt.
   by proc; inline *; wp; while true (size c - i); auto; smt.
 qed.
