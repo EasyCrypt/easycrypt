@@ -382,6 +382,26 @@ proof.
 qed.
 
 (* -------------------------------------------------------------------- *)
+lemma partition_big ['a] px (P Q : 'a -> bool) (F : 'a -> t) s s' :
+     uniq s'
+  => (forall x, mem s x => P x => mem s' (px x) /\ Q (px x))
+  => big P F s = big Q (fun x => big (fun y => P y /\ px y = x) F s) s'.
+proof.
+move=> uq_s'; elim: s => /~= [|x xs ih] hm.
+  by rewrite big_nil big1_eq.
+rewrite big_cons; case: (P x) => /= [Px|PxN]; last first.
+  rewrite ih //; 1: by move=> y y_xs; apply/hm; rewrite y_xs.
+  by apply/eq_bigr=> i _ /=; rewrite big_cons /= PxN.
+have := hm x; rewrite Px /= => -[s'_px Qpx]; apply/eq_sym.
+rewrite (@bigD1_cond _ _ _ (px x)) //= big_cons Px /=.
+rewrite -addmA; congr; apply/eq_sym; rewrite ih.
+  by move=> y y_xs; apply/hm; rewrite y_xs.
+rewrite (@bigD1_cond _ _ _ (px x)) //=; congr.
+apply/eq_bigr=> /= i [Qi @/predC1]; rewrite eq_sym => ne_pxi.
+by rewrite big_cons /= ne_pxi.
+qed.
+
+(* -------------------------------------------------------------------- *)
 lemma nosmt big_allpairs f F s t:
     big predT F (allpairs<:'a, 'b, 'c> f s t)
   = big predT (fun x => big predT (fun y => F (f x y)) t) s.
