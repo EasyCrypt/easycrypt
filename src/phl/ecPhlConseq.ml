@@ -1032,3 +1032,21 @@ end
 let process_conseq_opt cqopt infos tc =
   let cqopt = CQOptions.merge CQOptions.default cqopt in
   process_conseq cqopt.cqo_frame infos tc
+
+(* -------------------------------------------------------------------- *)
+let t_conseq_aprhl (dp,ep) tc = 
+  let aes = tc1_as_aequivS tc in
+  let concl1 = 
+    f_forall_mems [aes.aes_ml;aes.aes_mr] 
+      (f_imp aes.aes_pr 
+         (f_and (f_real_le aes.aes_ep ep)
+                (f_real_le aes.aes_dp dp))) in
+  let concl2 = 
+    f_aequivS_r { aes with aes_ep = ep; aes_dp = dp } in
+  FApi.xmutate1 tc `Conseq [concl1; concl2]  
+
+let process_conseq_aprhl (e,d) tc = 
+  let dp = TTC.tc1_process_form tc treal d in
+  let ep = TTC.tc1_process_form tc treal e in
+  t_conseq_aprhl (dp, ep) tc 
+  

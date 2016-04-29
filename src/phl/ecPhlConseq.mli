@@ -47,3 +47,5 @@ val process_bd_equiv : side -> pformula pair -> FApi.backward
 val process_conseq_opt :
   pcqoptions -> conseq_ppterm option tuple3 -> FApi.backward
 
+(* -------------------------------------------------------------------- *)
+val process_conseq_aprhl   : pformula pair -> FApi.backward

@@ -538,6 +538,7 @@ type phltactic =
   | Palias         of (oside * codepos * osymbol_r)
   | Pset           of (oside * codepos * bool * psymbol * pexpr)
   | Pconseq        of (pcqoptions * (conseq_ppterm option tuple3))
+  | Pconseq_aprhl  of pformula * pformula
   | Phrex_elim
   | Phrex_intro    of pformula list
   | Pexfalso

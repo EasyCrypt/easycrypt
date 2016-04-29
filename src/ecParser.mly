@@ -2152,6 +2152,7 @@ conseq_bd:
 | c=conseq   COLON cmp=hoare_bd_cmp? bd=sform { c, Some (cmp, bd) }
 | UNDERSCORE COLON cmp=hoare_bd_cmp? bd=sform { (None, None), Some(cmp, bd) }
 
+
 call_info:
  | f1=form LONGARROW f2=form             { CI_spec (f1, f2) }
  | f=form                                { CI_inv  f }
@@ -2553,6 +2554,9 @@ phltactic:
 
 | CONSEQ cq=cqoptions?
     { Pconseq (odfl [] cq, (None, None, None)) }
+
+| CONSEQ LT LBRACKET e=sform AMP d=sform RBRACKET GT
+     { Pconseq_aprhl(e, d) }
 
 | CONSEQ cq=cqoptions? info1=gpterm(conseq_bd)
     { Pconseq (odfl [] cq, (Some info1, None, None)) }
