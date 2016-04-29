@@ -34,9 +34,17 @@ let t_equiv_case_r f tc =
   FApi.xmutate1 tc (`HlCase f) [concl1; concl2]
 
 (* --------------------------------------------------------------------- *)
+let t_aequiv_case_r f tc =
+  let aes = tc1_as_aequivS tc in
+  let concl1 = f_aequivS_r { aes with aes_pr = f_and aes.aes_pr f } in
+  let concl2 = f_aequivS_r { aes with aes_pr = f_and aes.aes_pr (f_not f) } in
+  FApi.xmutate1 tc (`HlCase f) [concl1; concl2]
+
+(* --------------------------------------------------------------------- *)
 let t_hoare_case   = FApi.t_low1 "hoare-case"   t_hoare_case_r
 let t_bdhoare_case = FApi.t_low1 "bdhoare-case" t_bdhoare_case_r
 let t_equiv_case   = FApi.t_low1 "equiv-case"   t_equiv_case_r
+let t_aequiv_case  = FApi.t_low1 "aequiv-case"  t_aequiv_case_r
 
 (* --------------------------------------------------------------------- *)
 let t_hl_case_r f tc =
@@ -44,6 +52,7 @@ let t_hl_case_r f tc =
     ~th:(t_hoare_case f)
     ~tbh:(t_bdhoare_case f)
     ~te:(t_equiv_case f)
+    ~tae:(t_aequiv_case f)
     tc
 
 (* -------------------------------------------------------------------- *)
