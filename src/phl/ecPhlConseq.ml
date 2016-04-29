@@ -1039,8 +1039,8 @@ let t_conseq_aprhl (dp,ep) tc =
   let concl1 = 
     f_forall_mems [aes.aes_ml;aes.aes_mr] 
       (f_imp aes.aes_pr 
-         (f_and (f_real_le aes.aes_ep ep)
-                (f_real_le aes.aes_dp dp))) in
+         (f_and (f_real_le ep aes.aes_ep)
+                (f_real_le dp aes.aes_dp))) in
   let concl2 = 
     f_aequivS_r { aes with aes_ep = ep; aes_dp = dp } in
   FApi.xmutate1 tc `Conseq [concl1; concl2]  
