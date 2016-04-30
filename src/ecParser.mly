@@ -1381,12 +1381,9 @@ mod_params:
     { (x, restr) }
 
 sig_def:
-| MODULE TYPE x=uident args=sig_params? EQ i=sig_body
-    {
-      let args = EcUtils.odfl [] args in
-      (x, Pmty_struct { pmsig_params = args;
-                        pmsig_body   = i; })
-    }
+| MODULE TYPE x=uident args=sig_params* EQ i=sig_body
+    { (x, Pmty_struct { pmsig_params = List.flatten args;
+                        pmsig_body   = i; }) }
 
 sig_body:
 | body=sig_struct_body { body }
