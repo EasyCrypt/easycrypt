@@ -75,6 +75,10 @@ let xpath ove x =
   EcPath.pappend ove.ovre_opath (EcPath.fromqsymbol (ove.ovre_prefix, x))
 
 (* -------------------------------------------------------------------- *)
+let xnpath ove x =
+  EcPath.pappend ove.ovre_npath (EcPath.fromqsymbol (ove.ovre_prefix, x))
+
+(* -------------------------------------------------------------------- *)
 let rename ove subst (kind, name) =
   try
     let newname =
@@ -82,8 +86,8 @@ let rename ove subst (kind, name) =
         (fun rnm -> EcThCloning.rename rnm (kind, name))
         ove.ovre_rnms in
     let subst =
-      EcSubst.add_path subst ~src:(xpath ove name)
-        ~dst:(EcPath.pqname ove.ovre_npath newname)
+      EcSubst.add_path subst
+        ~src:(xpath ove name) ~dst:(xnpath ove newname)
     in (subst, newname)
 
   with Not_found -> (subst, name)
