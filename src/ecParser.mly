@@ -21,12 +21,6 @@
   let pqsymb_of_symb loc x : pqsymbol =
     mk_loc loc ([], x)
 
-(*  let mk_mod ?(modtypes = []) params body = Pm_struct {
-    ps_params    = params;
-    ps_signature = modtypes;
-    ps_body      = body;
-  } *)
-
   let mk_tydecl (tyvars, name) body = {
     pty_name   = name;
     pty_tyvars = tyvars;

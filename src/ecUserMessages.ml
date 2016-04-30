@@ -298,11 +298,17 @@ end = struct
     | InvalidModAppl err ->
         msg "invalid module application:@ %a" (pp_modappl_error env1) err
 
-    | InvalidModType MTE_FunSigDoesNotRepeatArgNames ->
-        msg "applied argument names must repeat functor argument names"
-
-    | InvalidModType MTE_InternalFunctor ->
+    | InvalidModType MTE_InnerFunctor ->
         msg "functors must be top-level modules"
+
+    | InvalidModType (MTE_DupProcName x) ->
+        msg "duplicated var/proc name in module expression: `%s'" x
+
+    | InvalidModSig (MTS_DupProcName x) ->
+        msg "duplicated proc. name in signature: `%s'" x
+
+    | InvalidModSig (MTS_DupArgName (f, x)) ->
+        msg "duplicated proc. arg. name in signature: `%s.%s'" f x
 
     | InvalidMem (name, MAE_IsConcrete) ->
         msg "the memory %s must be abstract" name

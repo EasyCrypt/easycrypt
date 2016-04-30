@@ -2388,9 +2388,12 @@ let pp_mod_params ppe bms =
     | bm::bms ->
       let ppe, pp1 = pp_mp ppe bm in
       let ppe, pp2 = aux ppe bms in
-      (ppe, fun fmt -> Format.fprintf fmt "%t,@,%t" pp1 pp2) in
-  let (ppe,pp) = aux ppe bms in
-  (ppe, fun fmt -> if bms = [] then () else Format.fprintf fmt "@[(%t)@]" pp)
+      (ppe, fun fmt -> Format.fprintf fmt "%t,@, %t" pp1 pp2) in
+
+  let (ppe, pp) = aux ppe bms in
+  let pp fmt =
+    if not (List.is_empty bms) then Format.fprintf fmt "@[(%t)@]" pp
+  in (ppe, pp)
 
 let pp_pvdecl ppe fmt v =
   Format.fprintf fmt "%s : %a" v.v_name (pp_type ppe) v.v_type

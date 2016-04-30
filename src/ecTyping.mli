@@ -43,8 +43,12 @@ type modapp_error =
 | MAE_AccesSubModFunctor
 
 type modtyp_error =
-| MTE_FunSigDoesNotRepeatArgNames
-| MTE_InternalFunctor
+| MTE_InnerFunctor
+| MTE_DupProcName of symbol
+
+type modsig_error =
+| MTS_DupProcName of symbol
+| MTS_DupArgName  of symbol * symbol
 
 type funapp_error =
 | FAE_WrongArgCount
@@ -89,6 +93,7 @@ type tyerror =
 | InvalidFunAppl         of funapp_error
 | InvalidModAppl         of modapp_error
 | InvalidModType         of modtyp_error
+| InvalidModSig          of modsig_error
 | InvalidMem             of symbol * mem_error
 | FunNotInModParam       of qsymbol
 | NoActiveMemory
