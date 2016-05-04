@@ -24,7 +24,7 @@ clone import WeakPRP as PRPt with
   type K    <- eK,
   type D    <- block,
   op   dK   <- d_eK
-proof * by smt.
+proof * by smt (d_eK_uffu).
 
 clone import ConcretePRP as PRPc with
   type K    <- eK,
@@ -32,7 +32,7 @@ clone import ConcretePRP as PRPc with
   op   dK   <- d_eK,
   op   P    <- P,
   op   Pi   <- Pi
-proof * by smt.
+proof * by smt (d_eK_uffu bijectiveP).
 
 clone import IdealPRP as PRPi with
   type K    <- eK,
@@ -40,7 +40,7 @@ clone import IdealPRP as PRPi with
   op   dK   <- d_eK,
   op   dD   <- d_block
 rename "RandomPermutation" as "PRPi"
-proof * by smt.
+proof * by smt (d_eK_uffu d_block_uffu).
 
 (** Assume a zmodule structure on block (for generality... we will instantiate it with {0,1}^k later on) *)
 op zeros: block.
@@ -56,7 +56,7 @@ clone Ring.ZModule as Block with
   op   zeror           <- zeros,
   op   (+)             <- (+),
   op   [-] (x : block) <- x
-proof * by smt.
+proof * by smt (add0b addbA addbC addbK).
 
 (** Assume a (deterministic) MAC (mac,verify) with key in mK, message in msg and tag in tag **)
 type mK, msg, tag.
@@ -71,7 +71,7 @@ clone import MACs as MACa with
   type mK  <- mK,
   type msg <- msg,
   type tag <- tag
-proof * by smt.
+proof * by smt ().
 import WUF_CMA.
 
 module MAC: MAC_Scheme = {
@@ -118,7 +118,7 @@ clone import SKE_INDR as SKEa with
   type leaks           <- int,
   op   leak  (m : msg) <- size (pad (m,witness<:tag>)),
   op   dC    (l : int) <- dlist d_block (l + 1)
-proof * by smt.
+proof * by smt (dlist_ll d_block_uffu).
 import RCPA PTXT.
 
 module MEE(P:PRP,M:MAC_Scheme): Enc_Scheme = {
@@ -298,7 +298,7 @@ section RCPA.
     type MtE.leaks           <- msg,
     op   MtE.leak  (m : msg) <- leak m,
     op   MtE.dC    (m : msg) <- CBCa.dBlocks (size (pad (m,witness<:tag>)) + 1)
-  proof MtE.* by smt.
+  proof MtE.* by smt (dlist_ll d_block_uffu).
   import CPA_CMA.MtE.
 
   local clone import RCPA_pad as PtE with
@@ -314,7 +314,7 @@ section RCPA.
     op   unpad                   <- unpad,
     op   dC_m          (m : msg) <- CBCa.dBlocks (size (pad (m,witness<:tag>)) + 1),
     op   dC_p          (l : int) <- CBCa.dBlocks (l + 1)
-  proof * by smt.
+  proof * by smt (dlist_ll d_block_uffu can_unpad leak_pad pad_tag).
 
   local lemma MEE_unfold &m:
     Pr[INDR_CPA(MEE(PRPr,MAC),RCPA_QueryBounder(A)).main() @ &m: res]
@@ -338,12 +338,12 @@ section RCPA.
        alpha conversion does not work at module level, so we need
        to prove that it implies semantic equality. This is easy. *)
     rewrite -(RCPA_WUF_RCPA.RCPA_preservation (<: PadThenEncrypt(IV_Wrap(CBC(PRPr)))) MAC (<: RCPA_QueryBounder(A)) &m _ _).
-      by proc; rnd predT; skip; smt.
+      by proc; rnd predT; auto=> />; smt (d_mK_uffu).
       by proc.
     do !congr.
       by byequiv=> //=; sim.
     byequiv=> //=. proc; inline *; wp; call (_: ={glob RCPA_QueryBounder}).
-      by proc; inline *; sp; if=> //=; auto; [smt|sim].
+      proc; inline *; sp; if=> //=; auto; [smt (leak_pad pad_tag)|sim].
     by auto.
   qed.
 
@@ -382,15 +382,16 @@ section RCPA.
           proc; inline *.
           case ((RCPA_QueryBounder.qC < q /\ size (pad (p,witness)) <= n){2}).
             rcondt{2} 2; 1:by auto.
-            rcondt{1} 8; 1:by auto; smt.
+            rcondt{1} 8; 1:by auto; smt (pad_tag).
             wp; call (_: true).
             by auto.
           rcondf{2} 2; 1:by auto.
-          rcondf{1} 8; 1:by auto; smt.
-          by wp; while (   ={i, p}
-                        /\ r{1} = c{2}
-                        /\ p0{1} = pad (p,t){1});
-             auto; smt.
+          rcondf{1} 8; 1:by auto; smt (pad_tag).
+          wp; while (   ={i, p}
+                     /\ r{1} = c{2}
+                     /\ p0{1} = pad (p,t){1}).
+            by auto; smt (pad_tag).
+          by auto; smt (max_pad_n pad_tag).
         by auto.
       have ->: Pr[CBCa.SKEa.RCPA.INDR_CPA(IV_Wrap(CBC(PRPr)),QueryBounder(RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,A)))).main() @ &m: res]
                = Pr[CBCa.SKEa.RCPA.INDR_CPA(IV_Wrap(CBC(PRPr)),RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,RCPA_QueryBounder(A)))).main() @ &m: res].
@@ -408,8 +409,7 @@ section RCPA.
     inline *; wp.
     call (_:    ={glob RCPA_QueryBounder, glob RCPA_WUF_RCPA.RCPAa}
              /\ ={k}(Core.RCPA.RCPA_Wrap,CBCa.SKEa.RCPA.RCPA_Wrap)).
-      proc; inline *; sp; if=> //=; 2:by sim.
-      by auto; smt.
+      by proc; inline *; sp; if=> //=; sim.
     by auto.
   qed.
 
@@ -424,8 +424,8 @@ section RCPA.
       move=> O O_enc_ll.
       proc; inline *.
       wp; call (_: true); 1:exact/A_distinguish_ll.
-        by proc; inline *; wp; call O_enc_ll; auto; smt.
-      by wp; rnd predT; skip; smt.
+        by proc; inline *; wp; call O_enc_ll; auto.
+      by wp; rnd predT; auto; smt (d_mK_uffu).
     rewrite (MtE_security &m) (PtE_security &m) (CBC_security &m).
     (* Here again, we have to tell EasyCrypt that alpha equality implies semantic equality *)
     have ->: Pr[PRPt.WeakPRP_IND(PRPt.WeakPRP_Wrap(PRPr.PRPr), PRPF_Adv(QueryBounder(RCPAa(RCPA_WUF_RCPA.RCPAa(MAC,A))))).main() @ &m: res]
@@ -466,13 +466,13 @@ section RCPA.
              /\ ={qC}(Weak_PRPa,OracleBounder)
              /\ Weak_PRPa.mk{1} = RCPA_WUF_RCPA.RCPAa.mk{2})=> //=.
       proc; inline *; sp.
-      if; 1:smt.
-        by sim; auto; smt.
+      if; 1:smt (max_pad_n pad_tag).
+      + by sim; auto.
       wp; while (   ={i}
                  /\ size (pad (p,witness)){1} = size p0{2}
                  /\ c{1} = r{2});
-        1:by auto; smt.
-      by auto; smt.
+        1:by auto=> /#.
+      by auto; smt (pad_tag).
     by auto; call (_: true).
   qed.
 
@@ -586,7 +586,7 @@ section PTXT.
     op   unpad                   <- unpad,
     op   dC_m          (m : msg) <- CBCa.dBlocks (size (pad (m,witness<:tag>)) + 1),
     op   dC_p          (l : int) <- CBCa.dBlocks (l + 1)
-  proof * by smt.
+  proof * by smt (dlist_ll d_block_uffu can_unpad leak_pad pad_tag).
 
   (** See comment in CPA proof **)
   local clone import RCPA_CMA as MtEb (* FIXME *) with
@@ -598,7 +598,7 @@ section PTXT.
     type MtE.leaks           <- msg,
     op   MtE.leak  (m : msg) <- leak m,
     op   MtE.dC    (m : msg) <- CBCa.dBlocks (size (pad (m,witness<:tag>)) + 1)
-  proof MtE.* by smt.
+  proof MtE.* by smt (dlist_ll d_block_uffu).
   import MtEb.MtE.
 
   local lemma MEE_unfold &m:
@@ -622,10 +622,14 @@ section PTXT.
              = Pr[Sec.PTXT.INT_PTXT(MacThenEncrypt(PadThenEncrypt(IV_Wrap(CBC(PRPr))),MAC),A).main() @ &m: res].
       by byequiv=> //=; proc; inline *; sim.
     apply/(RCPA_WUF_PTXT.PTXT_security (<: PadThenEncrypt(IV_Wrap(CBC(PRPr)))) MAC A _ _ _ _ _ _ _ &m).
-      by proc; auto; smt.
-      by proc; inline *; wp; while (0 <= i <= size p0) (size p0 - i); auto; smt.
-      by proc; inline *; wp; while (0 <= i <= size c1) (size c1 - i); auto; smt.
-      by proc; rnd predT; skip; smt.
+      by proc; wp; rnd predT; auto; smt (d_eK_uffu).
+      proc; inline *; wp; while (0 <= i <= size p0) (size p0 - i).
+        by move=> z; auto=> /#.
+      by wp; rnd predT; auto; smt (d_block_uffu size_ge0).
+      proc; inline *; wp; while (0 <= i <= size c1) (size c1 - i).
+        by move=> z; auto=> /#.
+      by auto; smt (size_ge0).
+      by proc; rnd predT; skip; smt (d_mK_uffu).
       by proc.
       by proc.
       by move=> O O_enc_ll O_verify_ll; apply (A_forge_ll O). (* types are different but the same *)
@@ -643,13 +647,13 @@ section PTXT.
                 /\ c2{1} = c{2}
                 /\ p1{1} = padded{2}
                 /\ key0{1} = CMAa.ek{2});
-         auto; smt.
+         auto.
       by proc; inline *; wp;
          while (   ={i, s}
                 /\ c2{1} = c{2}
                 /\ p2{1} = padded{2}
                 /\ key0{1} = CMAa.ek{2});
-         auto; smt.
+         auto.
     by auto.
   qed.
 
