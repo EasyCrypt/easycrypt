@@ -3,7 +3,6 @@ require import Ring StdRing StdOrder StdBigop ABitstring NewDistr.
 require import BitEncoding.
 require (*--*) BitWord MAC_then_Pad_then_CBC.
 (*---*) import BS2Int BitChunking IntID IntOrder Bigint BIA.
-(*---*) import Array.
 
 (** A type for octets and its structure **)
 clone import BitWord as Octet with
@@ -12,18 +11,18 @@ rename "word" as "octet"
 rename "Word" as "Octet"
 proof gt0_n by done.
 
-op o2int (o : octet) : int = bs2int (ofarray (ofoctet o)).
-op int2o (i : int) : octet = mkoctet (mkarray (int2bs 8 i)).
+op o2int (o : octet) : int = bs2int (ofoctet o).
+op int2o (i : int) : octet = mkoctet (int2bs 8 i).
 
 lemma o2intK (o : octet): int2o (o2int o) = o.
 proof.
-by rewrite /int2o /o2int -(size_octet o) sizeE bs2intK mkarrayK mkoctetK.
+by rewrite /int2o /o2int -(size_octet o) bs2intK mkoctetK.
 qed.
 
 lemma int2oK (i : int): 0 <= i < 2^8 => o2int (int2o i) = i.
 proof.
-move=> ge0_i_lt256; rewrite /o2int /int2o ofoctetK 1:size_mkarray 1:size_int2bs //.
-by rewrite ofarrayK int2bsK.
+move=> ge0_i_lt256; rewrite /o2int /int2o ofoctetK 1:size_int2bs //.
+by rewrite int2bsK.
 qed.
 
 (** A type for blocks and its structure **)
@@ -38,7 +37,7 @@ realize Alphabet.enum_spec by exact/Octet.enum_spec.
 
 lemma dblock_uffu: is_uniform_over dblock predT.
 proof.
-split=> [x|]; first by rewrite DBlock.supportP.
+split=> [x|]; first by rewrite DBlock.support_dblock.
 by rewrite DBlock.dblock_uf.
 qed.
 
@@ -131,17 +130,17 @@ type msg = octet list.
 
 (** Conversions **)
 op bs2os (bs : block list) : octet list =
-  flatten (map (ofarray \o ofblock) bs).
+  flatten (map ofblock bs).
 
 op os2bs (os : octet list) : block list =
-  map (mkblock \o mkarray) (chunk 16 os).
+  map mkblock (chunk 16 os).
 
 lemma size_bs2os (bs : block list):
   size (bs2os bs) = 16 * size bs.
 proof.
 elim: bs=> //= [|x xs ih].
 + by rewrite /bs2os /flatten.
-rewrite /bs2os /= flatten_cons size_cat -sizeE size_block ih.
+rewrite /bs2os /= flatten_cons size_cat size_block ih.
 by algebra.
 qed.
 
@@ -153,9 +152,8 @@ lemma bs2osK (bs : block list):
   os2bs (bs2os bs) = bs.
 proof.
 rewrite /os2bs /bs2os flattenK //.
-+ by move=> os /mapP [] b [] _ ->; rewrite -sizeE size_block.
-rewrite -map_comp id_map // => x @/(\o).
-by rewrite mkarrayK<:octet> mkblockK.
++ by move=> os /mapP [] b [] _ ->; rewrite size_block.
+by rewrite -map_comp id_map // => x @/(\o); rewrite mkblockK.
 qed.
 
 lemma os2bsK (os : octet list):
@@ -163,31 +161,30 @@ lemma os2bsK (os : octet list):
 proof.
 move=> sz_os; rewrite /os2bs /bs2os -map_comp.
 pose F := _ \o _; have [+ _] - ->:= eq_in_map F (fun x=> x) (chunk 16 os).
-+ move=> x in_chunk; rewrite /F /(\o) ofblockK 1:sizeE ofarrayK //.
++ move=> x in_chunk; rewrite /F /(\o) ofblockK //.
   by apply/(in_chunk_size _ _ _ _ in_chunk).
 by rewrite id_map 2:chunkK.
 qed.
 
-op t2os (t : tag) : octet list = ofarray (oftag t).
+op t2os (t : tag) : octet list = oftag t.
 
 op os2t (os : octet list) : tag =
-  mktag (mkarray (head witness (chunk 32 os))).
+  mktag (head witness (chunk 32 os)).
 
 lemma size_t2os (t : tag): size (t2os t) = 32.
-proof. by rewrite /t2os -sizeE size_tag. qed.
+proof. by rewrite /t2os size_tag. qed.
 
 lemma t2osK (t : tag): os2t (t2os t) = t.
 proof.
-rewrite /os2t /t2os /chunk -sizeE size_tag divzz /b2i /=.
+rewrite /os2t /t2os /chunk size_tag divzz /b2i /=.
 rewrite /mkseq /= (iotaS _ 0) //= drop0.
-by rewrite -(size_tag t) sizeE take_size mkarrayK mktagK.
+by rewrite -(size_tag t) take_size mktagK.
 qed.
 
 lemma os2tK (os : octet list): size os = 32 => t2os (os2t os) = os.
 proof.
 move=> sz_os; rewrite /t2os /os2t /chunk sz_os divzz /b2i /=.
-rewrite /mkseq /= (iotaS _ 0) //= drop0 -sz_os take_size.
-by rewrite oftagK 1:size_mkarray // ofarrayK.
+by rewrite /mkseq /= (iotaS _ 0) //= drop0 -sz_os take_size  oftagK.
 qed.
 
 (* -------------------------------------------------------------------- *)

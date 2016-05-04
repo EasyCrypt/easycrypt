@@ -6,7 +6,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Option Pred Fun Int IntExtra Real RealExtra Array List.
+require import Option Pred Fun Int IntExtra Real RealExtra List.
 require import NewDistr NewLogic StdOrder.
 require (*--*) FinType Tuple.
 (*---*) import RealOrder.
@@ -18,24 +18,24 @@ op n : {int | 0 <= n} as ge0_n.
 
 type word.
 
-op mkword : t array -> word.
-op ofword : word -> t array.
+op mkword : t list -> word.
+op ofword : word -> t list.
 op dchar  : t.
 
-op wordw = Array.offun (fun i => dchar) n.
+op wordw : t list = mkseq (fun _ => dchar) n.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt size_wordw: size wordw = n.
-proof. by rewrite size_offun max_ler ?ge0_n. qed.
+proof. by rewrite size_mkseq max_ler ?ge0_n. qed.
 
 axiom nosmt mkwordK : cancel ofword mkword.
 
 axiom nosmt ofwordK :
-  forall (s : t array), size s = n =>
+  forall (s : t list), size s = n =>
     ofword (mkword s) = s.
 
 axiom nosmt mkword_out :
-  forall (s : t array), size s <> n =>
+  forall (s : t list), size s <> n =>
     ofword (mkword s) = wordw.
 
 lemma nosmt size_word : forall w, size (ofword w) = n.
@@ -45,14 +45,14 @@ by rewrite mkwordK. by move/mkword_out=> ->; rewrite size_wordw.
 qed.
 
 lemma nosmt mkwordW (P : word -> bool):
-     (forall (s : t array), size s = n => P (mkword s))
+     (forall (s : t list), size s = n => P (mkword s))
   => forall n, P n.
 proof. by move=> ih n; rewrite -mkwordK; apply/ih/size_word. qed.
 
 lemma nosmt ofword_inj : injective ofword.
 proof. by apply/(can_inj _ _ mkwordK). qed.
 
-lemma nosmt mkword_pinj (s1 s2 : t array) :
+lemma nosmt mkword_pinj (s1 s2 : t list) :
   size s1 = n => size s2 = n =>
   mkword s1 = mkword s2 =>
   s1 = s2.
@@ -62,40 +62,26 @@ by rewrite -(@ofwordK s1) // -(@ofwordK s2) // eq_mkword.
 qed.
 
 (* -------------------------------------------------------------------- *)
-op oflist (s : t list) = mkword (Array.mkarray s).
-op tolist (w : word) = Array.ofarray (ofword w).
-
-lemma oflistK : cancel tolist oflist.
-proof. by move=> w @/tolist @/oflist; rewrite mkarrayK mkwordK. qed.
-
-lemma tolistK (s : t list) : size s = n => tolist (oflist s) = s.
-proof.
-by move=> eq_sn; rewrite/tolist/oflist ofwordK ?ofarrayK ?size_mkarray.
-qed.
-
-lemma size_tolist (w : word) : size (tolist w) = n.
-proof. by rewrite -Array.sizeE size_word. qed.
-
-(* -------------------------------------------------------------------- *)
 op "_.[_]" (w : word) (i : int): t =
-  if 0 <= i < n then (ofword w).[i] else dchar
+  if 0 <= i < n then nth witness (ofword w) i else dchar
 axiomatized by getE.
 
 op "_.[_<-_]" (w : word) (i : int) (x : t) : word =
-  mkword ((ofword w).[i <- x])
+  mkword (mkseq (fun k => if i = k then x else w.[k]) n)
 axiomatized by setE.
 
 (* -------------------------------------------------------------------- *)
 lemma wordP (w1 w2 : word):
   w1 = w2 <=> forall i, 0 <= i < n => w1.[i] = w2.[i].
 proof.
-rewrite -(inj_eq _ ofword_inj) arrayP !size_word /=.
-by apply/forall_eq_in=> /= i le0_i_n; rewrite !getE le0_i_n.
+split=> [->|] //= h; apply/(inj_eq _ ofword_inj)/(eq_from_nth witness).
++ by rewrite !size_word.
+by move=> i; rewrite size_word=> ^i_bound /h; rewrite !getE i_bound.
 qed.
 
 (* -------------------------------------------------------------------- *)
 lemma wordW (P : word -> bool):
-     (forall (s : t array), size s = n => P (mkword s))
+     (forall (s : t list), size s = n => P (mkword s))
   => forall w, P w.
 proof. by move=> ih n; rewrite -mkwordK; apply/ih/size_word. qed.
 
@@ -103,9 +89,11 @@ proof. by move=> ih n; rewrite -mkwordK; apply/ih/size_word. qed.
 lemma get_set_if (w : word) (x : t) (i j : int):
   w.[i <- x].[j] = if 0 <= i < n /\ j = i then x else w.[j].
 proof.
-rewrite !Self.getE !Self.setE ofwordK ?size_set ?size_word//.
-rewrite get_set_if size_word; case: (j = i)=> //= ->.
-by case: (0 <= i < n).
+rewrite !Self.getE !Self.setE ofwordK ?size_mkseq ?max_ler ?ge0_n //.
+case: (0 <= j < n)=> j_n.
++ rewrite nth_mkseq ?j_n /= (eq_sym i) getE.
+  by case: (j = i)=> [<-|]; rewrite j_n.
+by case: (j = i)=> [<-|]; rewrite ?j_n.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -137,8 +125,13 @@ lemma set_set_if (w : word) (k k' : int) (x x' : t):
        then w.[k' <- x']
        else w.[k' <- x'].[k <- x].
 proof.
-rewrite !Self.setE !ofwordK ?size_set ?size_word//.
-by rewrite set_set_if fun_if.
+apply/wordP=> i i_n; rewrite !Self.setE !Self.getE i_n /=.
+rewrite (fun_if ofword) (fun_if (nth witness)) if_arg.
+rewrite !ofwordK ?size_mkseq ?max_ler ?ge0_n //.
+rewrite !nth_mkseq //= !getE !ofwordK ?size_mkseq ?max_ler ?ge0_n // i_n /=.
+case: (k = k')=> [->|].
++ by case: (k' = i)=> //= k'_neq_i; rewrite nth_mkseq //= getE i_n k'_neq_i.
+by rewrite !nth_mkseq //=; case: (k' = i); case: (k = i).
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -152,13 +145,13 @@ lemma set_set_swap (w : word) (k k' : int) (x x' : t):
 proof. by rewrite set_set_if. qed.
 
 (* -------------------------------------------------------------------- *)
-op offun f: word = mkword (offun f n).
+op offun f: word = mkword (mkseq f n).
 
 lemma offunifE f i:
   (offun f).[i] = if 0 <= i < n then f i else dchar.
 proof.
-rewrite getE ofwordK ?size_offun ?size_word ?max_ler ?ge0_n//.
-by rewrite offunifE; case: (0 <= i < n).
+rewrite getE ofwordK ?size_mkseq ?size_word ?max_ler ?ge0_n//.
+by case: (0 <= i < n)=> //= h; rewrite nth_mkseq.
 qed.
 
 lemma offunE f i: 0 <= i < n => (offun f).[i] = f i.
@@ -170,7 +163,7 @@ op map (f : t -> t) (w : word) : word = mkword (map f (ofword w)).
 lemma mapE f w i: 0 <= i < n => (map f w).[i] = f w.[i].
 proof.
 rewrite !Self.getE ofwordK ?size_map 1:size_word// => ^h -> /=.
-by move: h; rewrite -{1}(size_word w); apply/mapE.
+by apply/nth_map; rewrite size_word.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -182,16 +175,15 @@ proof * by exact/enum_spec.
 (* -------------------------------------------------------------------- *)
 clone include FinType with
   type t    <- word,
-    op enum = List.map (mkword \o mkarray) (Enum.wordn n)
+    op enum = List.map mkword (Enum.wordn n)
 proof * rename [op] "enum" as "words".
 
 realize enum_spec.
 proof.
-move=> x; rewrite count_map -(Enum.word_spec n ((ofarray \o ofword) x) _).
-  by rewrite -sizeE size_word max_ler 1:ge0_n.
+move=> x; rewrite count_map -(Enum.word_spec n (ofword x) _).
++ by rewrite size_word max_ler 1:ge0_n.
 apply/eq_in_count=> s /Enum.wordnP; rewrite !pred1E /preim max_ler 1:ge0_n.
-move=> sx; rewrite -(can_eq _ _ mkwordK) ofwordK ?size_mkarray//.
-by rewrite -(can_eq _ _ mkarrayK) ofarrayK.
+by move=> sx; rewrite -(can_eq _ _ mkwordK) ofwordK.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -204,15 +196,15 @@ op dword : word distr = MUniform.duniform words.
 theory DWord.
 import MUniform.
 
-lemma muP p: mu dword p = (count p words)%r / (Alphabet.card^n)%r.
+lemma dwordE p: mu dword p = (count p words)%r / (Alphabet.card^n)%r.
 proof. by rewrite duniformE !undup_id ?enum_uniq // -word_card. qed.
 
-lemma muxP w: mu dword (pred1 w) = 1%r / (Alphabet.card^n)%r.
-proof. by rewrite muP count_uniq_mem 1:enum_uniq // enumP /b2i. qed.
+lemma dword1E w: mu dword (pred1 w) = 1%r / (Alphabet.card^n)%r.
+proof. by rewrite dwordE count_uniq_mem 1:enum_uniq // enumP /b2i. qed.
 
-lemma supportP w: support dword w.
+lemma support_dword w: support dword w.
 proof.
-rewrite /support /in_supp muxP divr_gt0 //.
+rewrite /support /in_supp dword1E divr_gt0 //.
 by rewrite lt_fromint; apply/powPos/Alphabet.card_gt0.
 qed.
 
@@ -229,6 +221,6 @@ by rewrite zw.
 qed.
 
 lemma dword_fu: support dword = predT.
-proof. by rewrite pred_ext=> x; rewrite supportP. qed.
+proof. by rewrite pred_ext=> x; rewrite support_dword. qed.
 
 end DWord.
