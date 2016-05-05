@@ -31,7 +31,7 @@ type 'a ovrenv = {
   ovre_opath    : EcPath.path;
   ovre_npath    : EcPath.path;
   ovre_prefix   : symbol list;
-  ovre_glproof  : (ptactic_core option * Ssym.t option) list;
+  ovre_glproof  : (ptactic_core option * evtags option) list;
   ovre_abstract : bool;
   ovre_local    : bool;
   ovre_hooks    : 'a ovrhooks;
@@ -69,6 +69,24 @@ let ty_compatible env ue (rtyvars, rty) (ntyvars, nty) =
   try  EcUnify.unify env ue rty nty
   with EcUnify.UnificationFailure _ ->
     raise (Incompatible (DifferentType (rty, nty)))
+
+(* -------------------------------------------------------------------- *)
+let check_evtags (tags : evtags) (src : symbol list) =
+  let module E = struct exception Reject end in
+
+  try
+    let dfl = not (List.exists (fun (mode, _) -> mode = `Include) tags) in
+    let stt =
+      List.map (fun src ->
+        let rec do1 status (mode, dst) =
+          match mode with
+          | `Exclude -> if sym_equal src dst then raise E.Reject; status
+          | `Include -> status || (sym_equal src dst)
+        in List.fold_left do1 dfl tags)
+        src
+    in List.mem true stt
+
+  with E.Reject -> false
 
 (* -------------------------------------------------------------------- *)
 let xpath ove x =
@@ -282,7 +300,9 @@ and replay_axd (ove : _ ovrenv) (subst, ops, proofs, scope) (x, ax) =
           | None ->
               List.Exceptionless.find_map
                 (function (pt, None) -> Some (pt, axclear) | (pt, Some pttags) ->
-                   if Ssym.disjoint tags pttags then None else Some (pt, axclear))
+                   if check_evtags pttags (Ssym.elements tags) then
+                     Some (pt, axclear)
+                   else None)
                 ove.ovre_glproof
       end
     in

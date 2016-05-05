@@ -907,11 +907,14 @@ and theory_cloning_options =
 
 and theory_cloning_proof = {
   pthp_mode   : [
-    | `All   of (pqsymbol option * psymbol list)
+    | `All   of (pqsymbol option * theory_cloning_proof_tag list)
     | `Named of pqsymbol
   ];
   pthp_tactic : ptactic_core option;
 }
+
+and theory_cloning_proof_tag =
+  [`Include | `Exclude] * psymbol
 
 and theory_override =
 | PTHO_Type   of ty_override

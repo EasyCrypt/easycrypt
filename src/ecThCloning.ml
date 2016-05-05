@@ -62,9 +62,11 @@ type evclone = {
 }
 
 and evlemma = {
-  ev_global  : (ptactic_core option * Ssym.t option) list;
+  ev_global  : (ptactic_core option * evtags option) list;
   ev_bynames : (ptactic_core option) Msym.t;
 }
+
+and evtags = ([`Include | `Exclude] * symbol) list
 
 (*-------------------------------------------------------------------- *)
 let evc_empty =
@@ -454,7 +456,7 @@ end = struct
   let all_proof oc evc (name, tags, tactics) =
     let tags =
       if   List.is_empty tags then None
-      else Some (Ssym.of_list (List.map unloc tags)) in
+      else Some (List.map (snd_map unloc) tags) in
     let name =
       match name with
       | None -> []

@@ -2940,8 +2940,12 @@ clone_opts:
 clone_with:
 | WITH x=plist1(clone_override, COMMA) { x }
 
+clone_lemma_tag:
+|       x=ident { (`Include, x) }
+| MINUS x=ident { (`Exclude, x) }
+
 clone_lemma_base:
-| STAR x=bracket(ident+)?
+| STAR x=bracket(clone_lemma_tag+)?
     { `All (odfl [] x) }
 
 | x=_ident
