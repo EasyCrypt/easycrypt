@@ -1931,6 +1931,35 @@ by rewrite nseqS // flatten_cons count_cat /#.
 qed.
 
 (* -------------------------------------------------------------------- *)
+(*                               Mask                                   *)
+(* -------------------------------------------------------------------- *)
+op mask ['a] m (s : 'a list) =
+  with m = []    , s = []     => []
+  with m = b :: m, s = []     => []
+  with m = []    , s = x :: s => []
+  with m = b :: m, s = x :: s =>
+    if b then x :: mask m s else mask m s.
+
+lemma mask0 m : mask m [] = [<:'a>].
+proof. by case: m. qed.
+
+lemma mask_false s n : mask (nseq n false) s = [<:'a>].
+proof.
+elim: s n => [|x s ih] n; first by rewrite mask0.
+elim/natcase: n => n hn; first by rewrite nseq0_le.
+by rewrite nseqS //= ih.
+qed.
+
+lemma mask_true (s : 'a list) n :
+  size s <= n => mask (nseq n true) s = s.
+proof.
+elim: s n => /= [|x s ih] n le; first by rewrite mask0.
+elim/natcase: n le => n hn; first move/lez_trans/(_ _ hn).
+  by rewrite addzC -ltzE ltzNge size_ge0.
+by rewrite addzC lez_add2r nseqS //= => /ih ->.
+qed.
+
+(* -------------------------------------------------------------------- *)
 (*                             Subseq                                   *)
 (* -------------------------------------------------------------------- *)
 op subseq (s1 s2 : 'a list) =
@@ -1948,7 +1977,10 @@ proof. by case: s. qed.
 
 lemma cat_subseq (s1 s2 s3 s4 : 'a list) :
   subseq s1 s3 => subseq s2 s4 => subseq (s1 ++ s2) (s3 ++ s4).
-proof. admitted.
+proof.
+
+
+ admitted.
 
 lemma subseq_refl (s : 'a list) : subseq s s.
 proof. by elim: s => //= x s IHs; rewrite eqxx. qed.
