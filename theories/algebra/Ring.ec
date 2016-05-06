@@ -80,6 +80,9 @@ abstract theory ZModule.
   lemma nosmt opprK: involutive [-].
   proof. by move=> x; apply (@addIr (-x)); rewrite addNr addrN. qed.
 
+  lemma oppr_inj : injective [-].
+  proof. by move=> x y eq; apply/(addIr (-x)); rewrite subrr eq subrr. qed.
+
   lemma nosmt oppr0: -zeror = zeror.
   proof. by rewrite -(@addr0 (-zeror)) addNr. qed.
 
@@ -435,6 +438,14 @@ abstract theory ComRing.
     case: (i = 0) => [->|]; first by rewrite oppz0 expr0 invr1.
     rewrite /exp oppz_lt0 ltzNge lez_eqVlt oppzK=> -> /=.
     by case: (_ < _)=> //=; rewrite invrK.
+  qed.
+
+  lemma exprD x (m n : int) : 0 <= m => 0 <= n =>
+    exp x (m + n) = exp x m * exp x n.
+  proof.
+    move=> ge0_m ge0_n; elim: m ge0_m => [|m ge0_m ih].
+      by rewrite expr0 mul1r.    
+    by rewrite addzAC !exprS ?addz_ge0 // ih mulrA.
   qed.
 
   lemma signr_odd n : 0 <= n => exp (-oner) (b2i (odd n)) = exp (-oner) n.

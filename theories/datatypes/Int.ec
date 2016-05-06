@@ -168,7 +168,9 @@ qed.
 lemma nosmt sintind (p : int -> bool):
   (forall i, 0 <= i => (forall j, 0 <= j < i => p j) => p i) =>
   (forall i, 0 <= i => p i).
-proof. by move=> sih i ^ge0_i; elim: i ge0_i {-2}i (lezz i) => /#. qed.
+proof.
+by move=> sih i ^ge0_i; elim/intind: i ge0_i {-2}i (lezz i) => /#.
+qed.
 
 (* -------------------------------------------------------------------- *)
 (* Fold operator *)
