@@ -147,11 +147,11 @@ op argmin (p : int -> bool) =
 lemma argmin_out p: (forall i, !p i) => argmin p = 0.
 proof. by move=> pN; rewrite choiceb_dfl => //= x; rewrite pN. qed.
 
-lemma nosmt argminP_r p: (exists i, 0 <= i /\ p i) =>
+lemma nosmt argminP_r p i: 0 <= i => p i =>
   0 <= argmin p /\ p (argmin p) /\ forall i, 0 <= i < (argmin p) => !p i.
 proof.
 pose F := fun i0 => forall j, 0 <= j < i0 => !p j.
-case=> i [ge0_i pi]; have: exists j, 0 <= j /\ p j /\ F j.
+move=> ge0_i pi; have: exists j, 0 <= j /\ p j /\ F j.
   elim/sintind: i ge0_i pi => i ge0_i ih pi.
   case: (exists j, (0 <= j < i) /\ p j).
     by case=> j [/ih {ih} ih/ih]; apply.
@@ -160,19 +160,19 @@ case=> i [ge0_i pi]; have: exists j, 0 <= j /\ p j /\ F j.
 by move/choicebP/(_ 0); apply.
 qed.
 
-lemma argminP p: (exists i, 0 <= i /\ p i) => p (argmin p).
-proof. by move/argminP_r. qed.
+lemma argminP p i: 0 <= i => p i => p (argmin p).
+proof. by move=> ge0_i/(argminP_r _ _ ge0_i). qed.
 
 lemma ge0_argmin p: 0 <= argmin p.
 proof.                          (* FIXME: choice_spec *)
-case: (exists i, 0 <= i /\ p i); first by move/argminP_r.
+case: (exists i, 0 <= i /\ p i); first by case=> i [] /(argminP_r p) h /h.
 move=> h; rewrite choiceb_dfl ?lez_lt_asym //=.
 by move=> x; apply/negP=> [# ge0_x px xmin]; apply/h; exists x.
 qed.
 
 lemma argmin_min p: forall j, 0 <= j < argmin p => !p j.
 proof.                          (* FIXME: choice_spec *)
-case: (exists i, 0 <= i /\ p i); first by move/argminP_r.
+case: (exists i, 0 <= i /\ p i); first by case=> i [] /(argminP_r p) h /h.
 move=> h j; rewrite choiceb_dfl ?lez_lt_asym //=.
 by move=> x; apply/negP=> [# ge0_x px xmin]; apply/h; exists x.
 qed.
