@@ -132,10 +132,47 @@ lemma odd_abs z : odd `|z| = odd z by [].
 lemma oddS z : odd (z + 1) = !(odd z) by [].
 
 lemma oddD z1 z2 : odd (z1 + z2) = (odd z1 = !odd z2).
-proof. by elim/intwlog: z1 z2; smt w=(odd0 oddS oddN). qed.
+proof. by elim/intwlog: z1 z2; smt(odd0 oddS oddN). qed.
 
 lemma oddM z1 z2 : odd (z1 * z2) = ((odd z1) /\ (odd z2)).
 proof.
 elim/intwlog: z1 => [z1 /#| |z1] /=; 1: by rewrite odd0.
 by move=> ge0_z1 ih; rewrite mulzDl /= oddS oddD ih /#.
+qed.
+
+(* -------------------------------------------------------------------- *)
+op argmin (p : int -> bool) =
+  choiceb (fun j => 0 <= j /\ p j /\ forall i, 0 <= i < j => !p i) 0.
+
+lemma argmin_out p: (forall i, !p i) => argmin p = 0.
+proof. by move=> pN; rewrite choiceb_dfl => //= x; rewrite pN. qed.
+
+lemma nosmt argminP_r p: (exists i, 0 <= i /\ p i) =>
+  0 <= argmin p /\ p (argmin p) /\ forall i, 0 <= i < (argmin p) => !p i.
+proof.
+pose F := fun i0 => forall j, 0 <= j < i0 => !p j.
+case=> i [ge0_i pi]; have: exists j, 0 <= j /\ p j /\ F j.
+  elim/sintind: i ge0_i pi => i ge0_i ih pi.
+  case: (exists j, (0 <= j < i) /\ p j).
+    by case=> j [/ih {ih} ih/ih]; apply.
+  move=> h; exists i; rewrite pi ge0_i => j lt_ji; apply/negP.
+  by move=> pj; apply/h; exists j; rewrite pj.
+by move/choicebP/(_ 0); apply.
+qed.
+
+lemma argminP p: (exists i, 0 <= i /\ p i) => p (argmin p).
+proof. by move/argminP_r. qed.
+
+lemma ge0_argmin p: 0 <= argmin p.
+proof.                          (* FIXME: choice_spec *)
+case: (exists i, 0 <= i /\ p i); first by move/argminP_r.
+move=> h; rewrite choiceb_dfl ?lez_lt_asym //=.
+by move=> x; apply/negP=> [# ge0_x px xmin]; apply/h; exists x.
+qed.
+
+lemma argmin_min p: forall j, 0 <= j < argmin p => !p j.
+proof.                          (* FIXME: choice_spec *)
+case: (exists i, 0 <= i /\ p i); first by move/argminP_r.
+move=> h j; rewrite choiceb_dfl ?lez_lt_asym //=.
+by move=> x; apply/negP=> [# ge0_x px xmin]; apply/h; exists x.
 qed.
