@@ -1049,4 +1049,3 @@ let process_conseq_aprhl (e,d) tc =
   let dp = TTC.tc1_process_form tc treal d in
   let ep = TTC.tc1_process_form tc treal e in
   t_conseq_aprhl (dp, ep) tc 
-  

@@ -312,3 +312,82 @@ let t_pweq_r (e1, e2) (tc : tcenv1) =
 
 (* -------------------------------------------------------------------- *)
 let t_pweq = FApi.t_low1 "pweq" t_pweq_r
+
+(* -------------------------------------------------------------------- *)
+let t_bw_r ((f, g), (p, q)) (tc : tcenv1) =
+  let hyps = FApi.tc1_hyps tc in
+  let env  = FApi.tc1_env  tc in
+  let aes  = tc1_as_aequivS tc in
+
+  let (x1, ty1), mu1 = tc1_instr_rnd1 tc aes.aes_sl in
+  let (x2, ty2), mu2 = tc1_instr_rnd1 tc aes.aes_sr in
+
+  if not (EcReduction.EqTest.for_type env mu1.e_ty mu2.e_ty) then
+    tc_error !!tc "left and right distribution must have the same domain";
+
+  let muty   = proj_distr_ty env mu1.e_ty in
+  let bijty  = tfun muty muty in
+  let predty = tfun muty tbool in
+
+  let f = EcProofTyping.pf_process_exp !!tc hyps `InProc (Some bijty) f in
+  let g = EcProofTyping.pf_process_exp !!tc hyps `InProc (Some bijty) g in
+
+  let opf arg = f_app (form_of_expr mhr f) [arg] muty in
+  let opg arg = f_app (form_of_expr mhr g) [arg] muty in
+
+  let p = EcProofTyping.pf_process_form !!tc hyps predty p in
+  let q = EcProofTyping.pf_process_form !!tc hyps predty q in
+
+  let pdp arg = f_app p [arg] tbool in
+  let pdq arg = f_app q [arg] tbool in
+
+  let px1 = f_pvar x1 ty1 (fst aes.aes_ml) in
+  let px2 = f_pvar x2 ty2 (fst aes.aes_mr) in
+
+  let d_ge0 = f_real_le f_r0 aes.aes_dp in
+
+  let invx =
+    let x   = EcIdent.create "x" in
+    let pvx = f_local x muty in
+    f_forall [x, GTty muty] (f_imp (pdp pvx)
+      (f_and (pdq (opf pvx)) (f_eq (opg (opf pvx)) pvx)))
+   in
+
+  let invy =
+    let y   = EcIdent.create "y" in
+    let pvy = f_local y muty in
+    f_forall [y, GTty muty] (f_imp (pdq pvy)
+      (f_and (pdp (opg pvy)) (f_eq (opf (opg pvy)) pvy)))
+   in
+
+  let concl1 =
+    let v    = EcIdent.create "v" in
+    let pvv  = f_local v muty in
+    let post = f_imp (f_eq pvv px1) (f_eq pvv px2) in
+    f_forall [v, GTty muty]
+      (f_imp (f_not (pdp pvv)) (f_aequivS_r
+        { aes with aes_dp = f_r0; aes_pr = f_true; aes_po = post }))
+  in
+
+  let concl2 =
+    let v    = EcIdent.create "v" in
+    let pvv  = f_local v muty in
+    let post = f_imp (f_eq pvv px1) (f_eq pvv (opf px2)) in
+    f_forall [v, GTty muty]
+      (f_imp (pdp pvv) (f_aequivS_r
+        { aes with aes_dp = f_r0; aes_pr = f_true; aes_po = post }))
+  in
+
+  let po = f_imp (pdp px1) (pdq px2) in
+
+  FApi.t_last (
+    FApi.t_seqs [
+      (fun tc -> FApi.xmutate1 tc `ABw
+         [d_ge0; invx; invy; concl1; concl2]);
+      EcLowGoal.t_simplify_with_info EcReduction.nodelta;
+      EcLowGoal.t_trivial
+    ])
+  (EcPhlConseq.t_aequivS_conseq f_true po tc)
+
+(* -------------------------------------------------------------------- *)
+let t_bw = FApi.t_low1 "bw" t_bw_r

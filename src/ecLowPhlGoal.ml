@@ -125,6 +125,15 @@ let destr_lap i =
   oget ~exn:Not_found (get_rnd_lap i)
 
 (* -------------------------------------------------------------------- *)
+let get_rnd1 (i : instr) =
+  match i.i_node with
+  | Srnd (LvVar (pv, ty), e) -> Some ((pv, ty), e)
+  | _ -> None
+
+let destr_rnd1 i =
+  oget ~exn:Not_found (get_rnd1 i)
+
+(* -------------------------------------------------------------------- *)
 let pf_first_asgn   pe st = pf_first_gen  "asgn"    destr_asgn   pe st
 let pf_first_rnd    pe st = pf_first_gen  "rnd"     destr_rnd    pe st
 let pf_first_call   pe st = pf_first_gen  "call"    destr_call   pe st
@@ -145,6 +154,8 @@ let pf_last_lap    pe st = pf_last_gen  "rnd-lap" destr_lap    pe st
 (* -------------------------------------------------------------------- *)
 let pf_instr_while pe st = pf_instr_gen "while"   destr_while  pe st
 let pf_instr_lap   pe st = pf_instr_gen "rnd-lap" destr_lap    pe st
+let pf_instr_rnd   pe st = pf_instr_gen "rnd"     destr_rnd    pe st
+let pf_instr_rnd1  pe st = pf_instr_gen "rnd1"    destr_rnd1   pe st
 
 (* -------------------------------------------------------------------- *)
 let tc1_first_asgn   tc st = pf_first_asgn   !!tc st
@@ -167,6 +178,8 @@ let tc1_last_lap    tc st = pf_last_lap    !!tc st
 (* -------------------------------------------------------------------- *)
 let tc1_instr_while tc st = pf_instr_while !!tc st
 let tc1_instr_lap   tc st = pf_instr_lap   !!tc st
+let tc1_instr_rnd   tc st = pf_instr_rnd   !!tc st
+let tc1_instr_rnd1  tc st = pf_instr_rnd1  !!tc st
 
 (* -------------------------------------------------------------------- *)
 (* TODO: use in change pos *)

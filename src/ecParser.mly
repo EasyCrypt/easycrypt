@@ -349,6 +349,7 @@
 %token AXIOMATIZED
 %token BACKS
 %token BETA
+%token BW
 %token BY
 %token BYEQUIV
 %token BYPHOARE
@@ -2654,6 +2655,10 @@ phltactic:
 
 | PWEQ LPAREN e1=sform COMMA e2=sform RPAREN
     { Paprhl (APwEq (e1, e2)) }
+
+| BW LBRACKET f=sexpr COMMA g=sexpr RBRACKET
+    LPAREN p=sform LONGARROW q=sform RPAREN
+    { Paprhl (Abw ((f, g), (p, q))) }
 
 bdhoare_split:
 | b1=sform b2=sform b3=sform?
