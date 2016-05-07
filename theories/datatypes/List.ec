@@ -438,6 +438,9 @@ proof. by rewrite has_count count_pred0. qed.
 lemma has_predT (s : 'a list): has predT s <=> (0 < size s).
 proof. by rewrite has_count count_predT. qed.
 
+lemma has_predC p (s : 'a list) : has (predC p) s = ! all p s.
+proof. by elim: s => //= x s -> @/predC; case: (p x). qed.
+
 lemma all_count p (s : 'a list): all p s <=> (count p s = size s).
 proof. by elim: s => //= x s; case: (p x) => _ /=; smt. qed.
 
@@ -555,6 +558,33 @@ qed.
 
 lemma mem_nseq n (x y: 'a): mem (nseq n x) y = (0 < n /\ x = y).
 proof. by rewrite -has_pred1 has_nseq. qed.
+
+lemma all_pred1P (x : 'a) s :
+  (s = nseq (size s) x) <=> (all (pred1 x) s).
+proof.
+elim: s => [|y s ih] //=; first by rewrite nseq0.
+by rewrite addzC nseqS //= ih.
+qed.
+
+lemma all_nthP (p : 'a -> bool) s x0 :
+      (forall i, 0 <= i < size s => p (nth x0 s i))
+  <=> (all p s).
+proof.
+elim: s => [/#|y s ih] //=; rewrite -ih; split=> [h|[h1 h2]].
+  rewrite (h 0) /= 1?addzC 1?ltzS // => i [ge0_i lt_is].
+  have := h (i+1); rewrite addzC ltz_add2l lt_is /=.
+  by rewrite addz_ge0 // !addz_neq0 //= addzAC.
+move=> i []; elim: i => [//|i ge0_i _]; rewrite addzC ltz_add2l.
+by move=> lt_is; rewrite addz_neq0 //= addzAC /=; apply/h2.
+qed.
+
+lemma has_nthP (p : 'a -> bool) s x0 :
+      (exists i, 0 <= i < size s /\ p (nth x0 s i))
+  <=> (has p s).
+proof.
+rewrite -(eq_has (fun x => ! (!p x))) // has_predC.
+by rewrite -(all_nthP _ _ x0) /= /#.
+qed.
 
 (* -------------------------------------------------------------------- *)
 (*                              Lookup                                  *)
@@ -1975,12 +2005,44 @@ proof. by case: s. qed.
 lemma subseq0 (s : 'a list) : subseq s [] = (s = []).
 proof. by case: s. qed.
 
+lemma subseqP (s1 s2 : 'a list) :
+      (exists m, size m = size s2 /\ s1 = mask m s2)
+  <=> (subseq s1 s2).
+proof.
+elim: s2 s1 => [|y s2 ih] [|x s1] /=; last (split; last first).
++ by exists [].
++ by apply/negP; do 2! case.
++ exists (nseq (size s2 + 1) false); rewrite ?mask_false /=.
+  by rewrite size_nseq max_ler 1?addzC // addz_ge0 ?size_ge0.
++ case/ih=> m [eqsz def]; exists ((y = x) :: m) => //=.
+  by rewrite eqsz /=; case _: (y = x) def => /= [!->|].
+case: (y = x) => [->>|ne_yx]; last first.
+  case=> -[//|[] m] /= [/addzI eq_sz] => [[/eq_sym ?]|] //.
+  by move=> ->; apply/ih; exists m.
+case=> m [eqsz eq]; pose i := index true m; apply/ih.
+have def: take i m = nseq (size (take i m)) false.
+  apply/all_pred1P/(all_nthP _ _ true)=> j [ge0_j lt] @/pred1.
+  have {lt}lt_ji: j < i; first move: lt.
+    rewrite size_take ?index_ge0; case: (i < size m) => //.
+    by rewrite ltzNge !ltzE => /= h1 h2; apply/(lez_trans (size m)).
+  rewrite nth_take ?index_ge0 //; have := (before_find true (pred1 true)).
+  by move/(_ m j); rewrite lt_ji ge0_j /pred1 /=; case: (nth _ _ _).
+have lt_im: i < size m.
+  rewrite ltzNge; apply/negP=> le_mi; move: def eq.
+  by rewrite take_oversize // => ->; rewrite mask_false.
+exists (take i m ++ drop (i+1) m); split.
+  rewrite size_cat ?(size_take, size_drop).
+    by rewrite index_ge0. by rewrite addz_ge0 ?index_ge0.
+  by rewrite lt_im /= max_ler 2:/# subz_ge0 -ltzE.
+have /= -> := congr1 behead _ _ eq; rewrite -(cat_take_drop i s2).
+rewrite -{1}(cat_take_drop i m) def -cat_cons.
+
+
+admitted.
+
 lemma cat_subseq (s1 s2 s3 s4 : 'a list) :
   subseq s1 s3 => subseq s2 s4 => subseq (s1 ++ s2) (s3 ++ s4).
-proof.
-
-
- admitted.
+proof. admitted.
 
 lemma subseq_refl (s : 'a list) : subseq s s.
 proof. by elim: s => //= x s IHs; rewrite eqxx. qed.
