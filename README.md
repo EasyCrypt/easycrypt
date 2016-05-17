@@ -26,6 +26,10 @@ EasyCrypt uses the following third-party tools/libraries:
 
  * OCaml ZArith [https://forge.ocamlcore.org/projects/zarith]
 
+On POSIX systems (GNU/Linux, *BSD, OS-X), we recommend people to
+install EasyCrypt and all its dependencies via `opam`.
+
+
 Installing requirements using OPAM (POSIX systems - preferred)
 --------------------------------------------------------------------
 
@@ -76,6 +80,9 @@ Installing requirements using a local toolchain
 --------------------------------------------------------------------
 
 ### On POSIX systems
+
+We recommend people to use the "OPAM based installation" (section
+above) on POSIX systems.
 
 You can install a local copy of OCaml and all the needed libraries by
 running [make toolchain]. You only need [curl] and the [gcc] compiler.
@@ -236,20 +243,31 @@ Why3 configuration file from a custom location. For instance:
        $> ./ec.native -why3 $WHY3CONF.conf
 
 
-Compilation
+Installing/Compiling EasyCrypt
 ====================================================================
 
-The shell commands
+If installing from source, running
 
         $> make
         $> make install
 
-should build and install easycrypt.
+builds and install EasyCrypt (under the binary named `easycrypt`),
+assuming that all dependencies have been successfully installed. If
+you choose not to install EasyCrypt system wide, you can use the
+binary `ec.native` that is located at the root of the source tree.
 
 It is possible to change the installation prefix by setting the
 environment variable PREFIX:
 
         $> make PREFIX=/my/prefix install
+
+
+EasyCrypt comes also with an opam package. Running
+
+      $> opam install easycrypt
+
+installs EasyCrypt and its dependencies via opam. In that case, the
+EasyCrypt binary is named `easycrypt`.
 
 
 Proof General Front-End
@@ -265,6 +283,29 @@ Requirements
  * ProofGeneral 4.2
 
      Available at http://proofgeneral.inf.ed.ac.uk/
+
+
+Installing using opam
+--------------------------------------------------------------------
+
+If you installed the EasyCrypt dependencies using opam, you can
+install ProofGeneral via opam too. Running
+
+      $> opam install ec-proofgeneral
+
+installs ProofGeneral along with its EasyCrypt mode. You still have to
+tweak your emacs configuration file (~/.emacs) to load
+ProofGeneral by adding the following line to it
+
+        (load-file "$proof-general-home/generic/proof-site.el")
+
+where $proof-general-home should be replaced by
+
+        $prefix/share/ec-proofgeneral/generic/proof-site.el
+
+with $prefix being set to the output of
+
+        $> opam config var prefix
 
 
 Installing locally
