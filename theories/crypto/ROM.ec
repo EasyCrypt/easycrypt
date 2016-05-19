@@ -6,8 +6,8 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Fun Int IntExtra Real RealExtra.
-require import Finite List FSet FMap Distr.
+require import Option Fun Int IntExtra Real RealExtra.
+require import Finite List FSet NewFMap Distr.
 require import StdRing StdBigop StdOrder FelTactic.
 (*---*) import RealOrder.
 
@@ -60,10 +60,10 @@ theory Lazy.
     op dsample <- dsample.
 
   module RO:Oracle = {
-    var m:(from, to) map
+    var m:(from, to) fmap
 
     proc init():unit = {
-      m <- FMap.empty;
+      m <- map0;
     }
 
     proc o(x:from):to = {
@@ -105,15 +105,15 @@ theory Eager.
     op dsample <- dsample.
 
   module RO: Oracle = {
-    var m:(from,to) map
+    var m:(from,to) fmap
 
     proc init(): unit = {
       var y:to;
       var work:from fset;
       var f:from;
 
-      m    <- FMap.empty;
-      work <- oflist (to_seq predT);
+      m    <- map0;
+      work <- FSet.oflist (to_seq predT);
       while (work <> fset0)
       {
         f     <- pick work;
@@ -194,10 +194,10 @@ theory LazyEager.
 
     local module IND_Lazy = {
       module H:Oracle = {
-        var m : (from, to) map
+        var m : (from, to) fmap
 
         proc init():unit = {
-          m <- FMap.empty;
+          m <- map0;
         }
 
         proc o(x:from):to = {
@@ -213,7 +213,7 @@ theory LazyEager.
         var f : from;
         var y, y0 : to;
 
-        work <- oflist (to_seq predT);
+        work <- FSet.oflist (to_seq predT);
         while (work <> fset0)
         {
           f <- pick work;
@@ -251,7 +251,7 @@ theory LazyEager.
 
     local module IND_Eager = {
       module H = {
-        var m:(from,to) map
+        var m:(from,to) fmap
 
         proc o(x:from): to = {
           return oget (m.[x]);
@@ -263,7 +263,7 @@ theory LazyEager.
         var f:from;
         var y,y0:to;
 
-        work <- oflist (to_seq predT);
+        work <- FSet.oflist (to_seq predT);
         while (work <> fset0)
         {
           f <- pick work;
@@ -278,7 +278,7 @@ theory LazyEager.
       proc main(): bool = {
         var b:bool;
 
-        H.m <- FMap.empty;
+        H.m <- map0;
         resample();
         b <@ D.distinguish();
 
@@ -348,11 +348,11 @@ theory LazyEager.
                    IND_Lazy.H.m.[x]{2} = Some y0{1} /\
                    if (mem (dom IND_Eager.H.m) x){1}
                    then IND_Eager.H.m{1} = IND_Lazy.H.m{2}
-                   else eq_except IND_Eager.H.m{1} IND_Lazy.H.m{2} x{1}).
+                   else eq_except IND_Eager.H.m{1} IND_Lazy.H.m{2} (fset1 x{1})).
           auto; (progress; expect 12 idtac); last 2 first; first 11 smt.
           case ((pick work = x){2})=> pick_x; last smt.
           subst x{2}; move: H7 H1; rewrite -neqF /eq_except=> -> /= eq_exc.
-          by apply map_ext=> x0; case (pick work{2} = x0); smt.
+          by apply fmapP=> x0; case (pick work{2} = x0); smt.
         by auto; smt.
 
       wp; while (={x,work} /\
@@ -704,9 +704,9 @@ theory ROM_BadCall.
           call (_: mem Log.qs G1'.x,
                    ={glob Log} /\
                    Log.qs{2} = dom RO.m{2} /\
-                   eq_except RO.m{1} RO.m{2} G1'.x{2}).
+                   eq_except RO.m{1} RO.m{2} (fset1 G1'.x{2})).
             by apply Da2L.
-            by proc; inline RO.o; auto; smt.
+            by proc; inline RO.o; auto=> />; smt (@NewFMap).
             by progress; apply (Log_o_ll RO); apply (RO_o_ll _); smt.
             progress; exists* G1'.x; elim* => x; conseq (Log_o_ll RO _) (Log_o_stable RO x)=> //.
             by apply (RO_o_ll _); smt.
@@ -800,9 +800,9 @@ theory ROM_BadCall.
           call (_: mem Log.qs G1'.x,
                    ={glob Log} /\
                    Log.qs{2} = dom RO.m{2} /\
-                   eq_except RO.m{1} RO.m{2} G1'.x{2}).
+                   eq_except RO.m{1} RO.m{2} (fset1 G1'.x{2})).
             by apply Da2L.
-            by proc; inline Bound(RO).LO.o RO.o; sp; if=> //; auto; smt.
+            by proc; inline *; sp; if=> //=; auto=> />; smt (@NewFMap).
             by progress; apply (Bound_o_ll RO); apply (RO_o_ll _); smt.
             progress; exists* G1'.x; elim* => x; conseq (Bound_o_ll RO _) (Bound_o_stable RO x)=> //.
             by apply (RO_o_ll _); smt.

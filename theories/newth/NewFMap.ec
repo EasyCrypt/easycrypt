@@ -5,8 +5,8 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import Fun Pred Rel Option Pair Int List FSet.
-pragma +implicits.
+require import Fun Pred Rel Option Pair Int List FSet NewLogic.
+pragma -oldip. pragma +implicits.
 
 (* -------------------------------------------------------------------- *)
 lemma perm_eq_uniq_map (f : 'a -> 'b)  (s1 s2 : 'a list):
@@ -41,25 +41,25 @@ lemma nosmt reduce_cat (r s : ('a * 'b) list):
     foldl augment r s
   = r ++ filter (predC (mem (map fst r)) \o fst) (foldl augment [] s).
 proof.
-  rewrite -(@revK s) !foldl_rev; pose f := fun x z => augment z x.
-  elim/last_ind: s r => /=.
-    by move=> r; rewrite !rev_nil /= cats0.
-  move=> s [x y] ih r; rewrite !rev_rcons /= ih => {ih}.
-  rewrite {1}/f {1}/augment map_cat mem_cat /=.
-  pose t1 := map fst _; pose t2 := map fst _.
-  case: (mem t1 x \/ mem t2 x) => //; last first.
-    rewrite -nor => -[t1_x t2_x]; rewrite rcons_cat; congr.
-    rewrite {2}/f /augment /=; pose t := map fst _.
-    case: (mem t x) => h; last first.
-      by rewrite filter_rcons /= /(\o) /predC t1_x.
-    have: mem t2 x; rewrite // /t2 /(\o).
-    have <- := filter_map<:'a, 'a * 'b> fst (predC (mem t1)).
-    by rewrite mem_filter /predC t1_x.
-  case=> h; congr; rewrite {2}/f /augment /=; last first.
-    move: h; rewrite /t2 => /mapP [z] [h ->>].
-    by move: h; rewrite mem_filter => -[_ /(map_f fst) ->].
-  case: (List.mem _ _) => //=; rewrite filter_rcons.
-  by rewrite /(\o) /predC h.
+rewrite -(@revK s) !foldl_rev; pose f := fun x z => augment z x.
+elim/last_ind: s r => /=.
+  by move=> r; rewrite !rev_nil /= cats0.
+move=> s [x y] ih r; rewrite !rev_rcons /= ih => {ih}.
+rewrite {1}/f {1}/augment map_cat mem_cat /=.
+pose t1 := map fst _; pose t2 := map fst _.
+case: (mem t1 x \/ mem t2 x) => //; last first.
+  rewrite -nor => -[t1_x t2_x]; rewrite rcons_cat; congr.
+  rewrite {2}/f /augment /=; pose t := map fst _.
+  case: (mem t x) => h; last first.
+    by rewrite filter_rcons /= /(\o) /predC t1_x.
+  have: mem t2 x; rewrite // /t2 /(\o).
+  have <- := filter_map<:'a, 'a * 'b> fst (predC (mem t1)).
+  by rewrite mem_filter /predC t1_x.
+case=> h; congr; rewrite {2}/f /augment /=; last first.
+  move: h; rewrite /t2 => /mapP [z] [h ->>].
+  by move: h; rewrite mem_filter => -[_ /(map_f fst) ->].
+case: (List.mem _ _) => //=; rewrite filter_rcons.
+by rewrite /(\o) /predC h.
 qed.
 
 lemma reduce_cons (x : 'a) (y : 'b) s:
@@ -70,38 +70,37 @@ proof. by rewrite {1}/reduce /= augment_nil reduce_cat cat1s. qed.
 lemma assoc_reduce (s : ('a * 'b) list):
   forall x, assoc (reduce s) x = assoc s x.
 proof.
-  move=> x; elim: s => //; case=> x' y' s ih.
-  rewrite reduce_cons !assoc_cons; case: (x = x')=> // ne_xx'.
-  by rewrite assoc_filter /predC1 ne_xx'.
+move=> x; elim: s => //; case=> x' y' s ih.
+rewrite reduce_cons !assoc_cons; case: (x = x')=> // ne_xx'.
+by rewrite assoc_filter /predC1 ne_xx'.
 qed.
 
 lemma dom_reduce (s : ('a * 'b) list):
   forall x, mem (map fst (reduce s)) x <=> mem (map fst s) x.
 proof.
-  move=> x; elim: s => [|[x' y] s ih] /=; 1: by rewrite reduce_nil.
-  rewrite reduce_cons /=; apply/eq_iff/orb_id2l.
-  rewrite {1}/fst /(\o) /= => ne_xx'.
-  have <- := filter_map fst<:'a, 'b> (predC1 x').
-  by rewrite mem_filter /predC1 ne_xx' /= ih.
+move=> x; elim: s => [|[x' y] s ih] /=; 1: by rewrite reduce_nil.
+rewrite reduce_cons /=; apply/orb_id2l.
+rewrite {1}/fst /(\o) /= => ne_xx'.
+by rewrite -(@filter_map _ (predC1 x')) mem_filter /predC1 ne_xx' /= ih.
 qed.
 
 lemma reduced_reduce (s : ('a * 'b) list): uniq (map fst (reduce s)).
 proof.
-  elim: s => [|[x y] s ih]; 1: by rewrite reduce_nil.
-  rewrite reduce_cons /= {3}/fst /=; split.
-    by apply/negP=> /mapP [[x' y']]; rewrite mem_filter=> -[# h1 h2 ->>].
-  rewrite /(\o); have <- := filter_map fst<:'a, 'b> (predC1 x).
-  by rewrite filter_uniq.
+elim: s => [|[x y] s ih]; 1: by rewrite reduce_nil.
+rewrite reduce_cons /= {3}/fst /=; split.
++ by apply/negP=> /mapP [[x' y']]; rewrite mem_filter=> -[# h1 h2 ->>].
+rewrite /(\o); have <- := filter_map fst<:'a, 'b> (predC1 x).
+by rewrite filter_uniq.
 qed.
 
 lemma reduce_reduced (s : ('a * 'b) list):
   uniq (map fst s) => reduce s = s.
 proof.
-  elim: s => [|[x y] s ih]; 1: by rewrite reduce_nil.
-  rewrite reduce_cons /= {2}/fst /= => -[x_notin_s /ih ->].
-  rewrite (@eq_in_filter _ predT) ?filter_predT /predT //=.
-  case=> x' y' /(map_f fst) x'_in_s; apply/negP => <<-.
-  by move: x_notin_s.
+elim: s => [|[x y] s ih]; 1: by rewrite reduce_nil.
+rewrite reduce_cons /= {2}/fst /= => -[x_notin_s /ih ->].
+rewrite (@eq_in_filter _ predT) ?filter_predT /predT //=.
+case=> x' y' /(map_f fst) x'_in_s; apply/negP => <<-.
+by move: x_notin_s.
 qed.
 
 lemma reduceK (xs : ('a * 'b) list): reduce (reduce xs) = reduce xs.
@@ -125,14 +124,14 @@ axiom oflistK (s : ('a * 'b) list): perm_eq (reduce s) (elems (Self.oflist s)).
 
 lemma uniq_keys (m : ('a, 'b) fmap): uniq (map fst (elems m)).
 proof.
-  rewrite -elemsK; move: (elems m) => {m} m.
-  apply (@perm_eq_uniq (map fst (reduce m)) _).
-    by apply perm_eq_map; apply oflistK.
-  by apply reduced_reduce.
+rewrite -elemsK; move: (elems m) => {m} m.
+apply (@perm_eq_uniq (map fst (reduce m)) _).
++ by apply perm_eq_map; apply oflistK.
+by apply reduced_reduce.
 qed.
 
 axiom fmap_eq (s1 s2 : ('a,'b) fmap):
-  (perm_eq (elems s1) (elems s2)) => (s1 = s2).
+  (perm_eq (elems s1) (elems s2)) <=> (s1 = s2).
 
 (* -------------------------------------------------------------------- *)
 lemma fmapW (p : ('a, 'b) fmap -> bool):
@@ -147,18 +146,17 @@ op "_.[_]" (m : ('a,'b) fmap) (x : 'a) = assoc (elems m) x
 lemma get_oflist (s : ('a * 'b) list):
   forall x, (Self.oflist s).[x] = assoc s x.
 proof.
-  move=> x; rewrite getE; rewrite -(@assoc_reduce s).
-  apply/eq_sym/perm_eq_assoc; 1: by apply/uniq_keys.
-  by apply/oflistK.
+move=> x; rewrite getE; rewrite -(@assoc_reduce s).
+apply/eq_sym/perm_eq_assoc; 1: by apply/uniq_keys.
+by apply/oflistK.
 qed.
 
 lemma fmapP (m1 m2 : ('a,'b) fmap):
   (m1 = m2) <=> (forall x, m1.[x] = m2.[x]).
 proof.
-  split=> // h; apply fmap_eq; apply uniq_perm_eq;
-    1..2: by apply/ (@uniq_map fst)/uniq_keys.
-  case=> x y; move: (h x); rewrite !getE => {h} h.
-  by rewrite !mem_assoc_uniq ?uniq_keys // h.
+split=> // h; apply/fmap_eq/uniq_perm_eq; ~3:by apply/(@uniq_map fst)/uniq_keys.
+case=> x y; move: (h x); rewrite !getE => {h} h.
+by rewrite !mem_assoc_uniq ?uniq_keys // h.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -172,8 +170,7 @@ op "_.[_<-_]" (m : ('a, 'b) fmap) (a : 'a) (b : 'b) =
 lemma getP (m : ('a, 'b) fmap) (a : 'a) (b : 'b) (x : 'a):
   m.[a <- b].[x] = if x = a then Some b else m.[x].
 proof.
-  rewrite setE get_oflist assoc_reduce assoc_cons getE;
-    by case (x = a).
+by rewrite setE get_oflist assoc_reduce assoc_cons getE; case: (x = a).
 qed.
 
 lemma getP_eq (m : ('a, 'b) fmap) (a : 'a) (b : 'b):
@@ -184,9 +181,9 @@ lemma set_set (m : ('a,'b) fmap) x x' y y':
    m.[x <- y].[x' <- y'] = if x = x' then m.[x' <- y']
                            else m.[x' <- y'].[x <- y].
 proof.
-  rewrite fmapP=> a; case (x = x')=> [<<- {x'} | ne_x_x']; rewrite !getP.
-    by case (a = x).
-  by case (a = x')=> //; case (a = x)=> // ->;rewrite ne_x_x'.
+rewrite fmapP=> a; case (x = x')=> [<<- {x'} | ne_x_x']; rewrite !getP.
++ by case (a = x).
+by case (a = x')=> //; case (a = x)=> // ->;rewrite ne_x_x'.
 qed.
 
 lemma nosmt set_set_eq y (m : ('a, 'b) fmap) x y':
@@ -201,8 +198,8 @@ op rem (a : 'a) (m : ('a, 'b) fmap) =
 lemma remP (a : 'a) (m : ('a, 'b) fmap):
   forall x, (rem a m).[x] = if x = a then None else m.[x].
 proof.
-  move=> x; rewrite remE get_oflist assoc_filter; case (x = a)=> //=.
-  by rewrite /predC1 getE=> ->.
+move=> x; rewrite remE get_oflist assoc_filter; case (x = a)=> //=.
+by rewrite /predC1 getE=> ->.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -213,9 +210,9 @@ op dom ['a 'b] (m : ('a, 'b) fmap) =
 lemma dom_oflist (s : ('a * 'b) list):
   forall x, mem (dom (Self.oflist s)) x <=> mem (map fst s) x.
 proof.
-  move=> x; rewrite domE mem_oflist.
-  have/perm_eq_sym/(perm_eq_map fst) := oflistK s.
-  by move/perm_eq_mem=> ->; apply/dom_reduce.
+move=> x; rewrite domE mem_oflist.
+have/perm_eq_sym/(perm_eq_map fst) := oflistK s.
+by move/perm_eq_mem=> ->; apply/dom_reduce.
 qed.
 
 lemma mem_domE (m : ('a, 'b) fmap) x:
@@ -225,24 +222,24 @@ proof. by rewrite domE mem_oflist. qed.
 lemma in_dom (m : ('a, 'b) fmap) x:
   mem (dom m) x <=> m.[x] <> None.
 proof.
-  rewrite mem_domE getE;
-    by have [[-> [y [_ ->]]] | [-> ->]] := assocP (elems m) x.
+rewrite mem_domE getE.
+by case: (assocP (elems m) x)=> [[-> [y [_ ->]]] | [-> ->]].
 qed.
 
 lemma fmap_domP (m1 m2 : ('a, 'b) fmap):
   (m1 = m2) <=>    (forall x, mem (dom m1) x = mem (dom m2) x)
                 /\ (forall x, mem (dom m1) x => m1.[x] = m2.[x]).
 proof.
-  split=> // [[]] eq_dom eq_on_dom.
-  apply fmapP=> x; case (mem (dom m1) x)=> h.
-    by apply eq_on_dom.
-  have := h; move: h; rewrite {2}eq_dom !in_dom /=.
-  by move=> -> ->.
+split=> // [[]] eq_dom eq_on_dom.
+apply fmapP=> x; case: (mem (dom m1) x).
++ by apply eq_on_dom.
+move=> ^; rewrite {2}eq_dom !in_dom /=.
+by move=> -> ->.
 qed.
 
 lemma get_oget (m:('a,'b)fmap) (x:'a) :
     mem (dom m) x => m.[x] = Some (oget m.[x]).
-proof. by rewrite in_dom;case (m.[x]). qed.
+proof. by rewrite in_dom; case: (m.[x]). qed.
 
 (* -------------------------------------------------------------------- *)
 op rng ['a 'b] (m : ('a, 'b) fmap) =
@@ -256,11 +253,11 @@ proof. by rewrite rngE mem_oflist. qed.
 lemma in_rng (m: ('a,'b) fmap) (b : 'b):
   mem (rng m) b <=> (exists a, m.[a] = Some b).
 proof.
-  rewrite mem_rngE; split.
-    move/List.mapP=> [] [x y] [h ->]; exists x.
-    by rewrite getE -mem_assoc_uniq 1:uniq_keys.
-  case=> x; rewrite getE -mem_assoc_uniq ?uniq_keys // => h.
-  by apply/List.mapP; exists (x, b).
+rewrite mem_rngE; split.
++ move/List.mapP=> [] [x y] [h ->]; exists x.
+  by rewrite getE -mem_assoc_uniq 1:uniq_keys.
+case=> x; rewrite getE -mem_assoc_uniq ?uniq_keys // => h.
+by apply/List.mapP; exists (x, b).
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -271,14 +268,11 @@ op has (p : 'a -> 'b -> bool) (m : ('a, 'b) fmap) =
 lemma hasP p (m : ('a, 'b) fmap):
   has p m <=> (exists x, mem (dom m) x /\ p x (oget m.[x])).
 proof.
-  (** FIXME: rewriting under quantifiers would help here **)
-  rewrite hasE hasP; split=> [[[a b]] /= [ab_in_m p_a_b] |[a] []].
-    have:= ab_in_m; rewrite mem_assoc_uniq 1:uniq_keys // -getE => ma_b.
-    exists a; rewrite ma_b mem_domE /oget /= p_a_b /= mem_map_fst;
-      by exists b.
-  rewrite mem_domE mem_map_fst=> -[b] ab_in_m.
-  have:= ab_in_m; rewrite mem_assoc_uniq 1:uniq_keys // getE /oget=> -> /= p_a_b.
-  by exists (a,b).
+rewrite hasE hasP /=; split=> [[[a b]] /= [^ab_in_m+ p_a_b] |[a] []].
++ rewrite mem_assoc_uniq 1:uniq_keys // -getE => ma_b.
+  by exists a; rewrite ma_b mem_domE /oget /= p_a_b /= mem_map_fst; exists b.
+rewrite mem_domE mem_map_fst=> -[b] ^ab_in_m+.
+by rewrite mem_assoc_uniq 1:uniq_keys // getE /oget=> -> /= p_a_b; exists (a,b).
 qed.
 
 (* FIXME: name *)
@@ -287,8 +281,7 @@ lemma has_le p' (m : ('a, 'b) fmap) (p : 'a -> 'b -> bool):
   has p  m =>
   has p' m.
 proof.
-  move=> le_p_p'.
-  by rewrite !hasP=> -[x] /le_p_p' [p'_x x_in_m]; exists x.
+by move=> le_p_p'; rewrite !hasP=> -[x] /le_p_p' [p'_x x_in_m]; exists x.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -299,34 +292,29 @@ op all (p : 'a -> 'b -> bool) (m : ('a, 'b) fmap) =
 lemma allP p (m : ('a, 'b) fmap):
   all p m <=> (forall x, mem (dom m) x => p x (oget m.[x])).
 proof.
-  (** FIXME: rewriting under quantifiers would help here **)
-  rewrite allE allP; split=> [h a|h [a b] /= ab_in_m].
-    rewrite mem_domE mem_map_fst=> -[b] ab_in_m.
-    have:= ab_in_m; rewrite mem_assoc_uniq 1:uniq_keys // -getE /oget => -> /=.
-    by apply (@h (a,b)).
-  rewrite (_: b = oget m.[a]).
-    by move: ab_in_m; rewrite mem_assoc_uniq 1:uniq_keys // getE /oget=> ->.
-  by apply h; rewrite mem_domE mem_map_fst; exists b.
+rewrite allE allP; split=> [h a|h [a b] /= ^ab_in_m].
++ rewrite mem_domE mem_map_fst=> -[b] ^ab_in_m+.
+  by rewrite mem_assoc_uniq 1:uniq_keys -getE /oget=> ->; apply (@h (a,b)).
+rewrite mem_assoc_uniq 1:uniq_keys -getE=> /(@congr1 oget) <-.
+by apply/h; rewrite mem_domE mem_map_fst; exists b.
 qed.
 
-(* FIXME: name *)
 lemma all_le p' (m : ('a, 'b) fmap) (p : 'a -> 'b -> bool):
   (forall x y, mem (dom m) x /\ p x y => mem (dom m) x /\ p' x y) =>
   all p  m =>
   all p' m.
 proof.
-  move=> le_p_p'.
-  rewrite !allP=> h x x_in_m; have /h p_x:= x_in_m.
-  by have:= le_p_p' x (oget m.[x]) _.
+move=> le_p_p'. rewrite !allP=> h x ^x_in_m /h p_x.
+exact/(andEr _ (:@le_p_p' x (oget m.[x]) _)).
 qed.
 
 (* -------------------------------------------------------------------- *)
 lemma has_all (m : ('a, 'b) fmap) (p : 'a -> 'b -> bool):
   has p m <=> !all (fun x y, !p x y) m.
 proof.
-  rewrite hasP allP; split=> [[x] [x_in_m p_x]|].
-    by rewrite -not_def=> h; by have := h x x_in_m.
-  by apply absurd=> /=; smt. (* no higher-order pattern-matching *)
+rewrite hasP allP negb_forall /=; split=> [[x] [x_in_m p_x]|[] x].
++ by exists x; rewrite p_x.
+by rewrite negb_imply /= => h; exists x.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -347,36 +335,32 @@ op find (p : 'a -> 'b -> bool) (m : ('a, 'b) fmap) =
 lemma find_none (p : 'a -> 'b -> bool) (m : ('a, 'b) fmap):
   has p m <=> find p m <> None.
 proof.
-  rewrite hasE /= findE List.has_find; split=> [h|].
-    by rewrite (@onth_nth witness) 1:find_ge0/= 1:size_map.
-  by apply absurd=> h; rewrite onth_nth_map -map_comp nth_default 1:size_map 1:lezNgt.
+rewrite hasE /= findE List.has_find; split=> [h|].
++ by rewrite (@onth_nth witness) 1:find_ge0/= 1:size_map.
+by apply/contraLR=> h; rewrite onth_nth_map -map_comp nth_default 1:size_map 1:lezNgt.
 qed.
 
 lemma findP (p : 'a -> 'b -> bool) (m : ('a, 'b) fmap):
      (exists x, find p m = Some x /\ mem (dom m) x /\ p x (oget m.[x]))
   \/ (find p m = None /\ forall x, mem (dom m) x => !p x (oget m.[x])).
 proof.
-  case (has p m)=> [has_p | all_not_p].
-    left; have:= has_p. rewrite hasE has_find.
-    have := find_ge0 (fun (x : 'a * 'b) => p x.`1 x.`2) (elems m).
-    pose i := find _ (elems m).
-    move=> le0_i lt_i_sizem.
-    exists (nth witness (map fst (elems m)) i).
-    split.
-      by rewrite findE -/i (@onth_nth witness) 1:size_map.
-    split.
-      by rewrite mem_domE -index_mem index_uniq 1,3:size_map 2:uniq_keys.
-    have /= := nth_find witness (fun (x : 'a * 'b) => p (fst x) (snd x)) (elems m) _.
-      by rewrite -hasE.
-    rewrite -/i -(@nth_map _ witness) //.
-    rewrite getE /assoc.
-    rewrite (@index_uniq witness i (map fst (elems m))).
-    + by rewrite size_map.
-    + exact/uniq_keys.
-    by rewrite (@onth_nth witness) //.
-  right.
-  have:= all_not_p; rewrite has_all /= allP /= => h.
-  by split=> //; move: all_not_p; rewrite find_none.
+case: (has p m)=> [^has_p | ^all_not_p].
++ rewrite hasE has_find.
+  have:= find_ge0 (fun (x : 'a * 'b) => p x.`1 x.`2) (elems m).
+  pose i:= find _ (elems m); move => le0_i lt_i_sizem; left.
+  exists (nth witness (map fst (elems m)) i); split.
+  + by rewrite findE -/i (@onth_nth witness) 1:size_map.
+  split.
+  + by rewrite mem_domE -index_mem index_uniq 1,3:size_map 2:uniq_keys.
+  have /= := nth_find witness (fun (x : 'a * 'b) => p (fst x) (snd x)) (elems m) _.
+  + by rewrite -hasE.
+  rewrite -/i -(@nth_map _ witness) // getE /assoc
+          (@index_uniq witness i (map fst (elems m))).
+  + by rewrite size_map.
+  + exact/uniq_keys.
+  by rewrite (@onth_nth witness) //.
+rewrite has_all /= allP /= => h; right.
+by split=> //; move: all_not_p; rewrite find_none.
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -643,13 +627,12 @@ qed.
 lemma has_join (p : 'a -> 'b -> bool) (m1 m2 : ('a, 'b) fmap):
   has p (m1 + m2) <=> has (fun x y => p x y /\ !mem (dom m2) x) m1 \/ has p m2.
 proof.
-  rewrite !hasP; split=> [[x]|].
-    rewrite joinP dom_join in_fsetU.
-    by case (mem (dom m2) x)=> //=
-         [x_in_m2 p_x_m2x|x_notin_m2 [x_in_m1 p_x_m1x]];
-         [right|left]; exists x.
-  by move=> [[x] [_ [p_x h]]|[x] [h p_x]];
-     exists x; rewrite dom_join joinP in_fsetU h.
+rewrite !hasP; split=> [[x]|].
+  rewrite joinP dom_join in_fsetU.
+  by case: (mem (dom m2) x)=> //=
+       [x_in_m2 p_x_m2x|x_notin_m2 [x_in_m1 p_x_m1x]];
+       [right|left]; exists x.
+by move=> [[]|[]] x /> => [x_in_m1|h] p_x => [h|]; exists x; rewrite dom_join joinP in_fsetU h.
 qed.
 
 lemma get_find (p : 'a -> 'b -> bool) (m : ('a, 'b) fmap):

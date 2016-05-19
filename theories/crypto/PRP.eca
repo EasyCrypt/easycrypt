@@ -6,7 +6,7 @@
  * -------------------------------------------------------------------- *)
 
 (*** A formalization of pseudo-random permutations **)
-require import Fun Int Real Distr FSet FMap.
+require import Option Fun Int Real Distr FSet NewFMap.
 require import Dexcepted.
 
 (** A PRP is a family of permutations P on domain D indexed by a
@@ -97,9 +97,9 @@ theory Weak_PRP.
   }.
 
   module PRPi = {
-    var m:(D,D) map
+    var m:(D,D) fmap
 
-    proc init(): unit = { m = FMap.empty; }
+    proc init(): unit = { m = map0; }
 
     proc f(x:D): D = {
       if (!mem (dom m) x) m.[x] = $dD \ (mem (rng m));
@@ -142,12 +142,12 @@ theory Strong_PRP.
   }.
 
   module PRPi = {
-    var m   : (D,D) map
-    var minv: (D,D) map
+    var m   : (D,D) fmap
+    var minv: (D,D) fmap
 
     proc init(): unit = {
-      m    <- FMap.empty;
-      minv <- FMap.empty;
+      m    <- map0;
+      minv <- map0;
     }
 
     proc f(x:D): D = {

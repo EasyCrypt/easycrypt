@@ -289,6 +289,8 @@ op mem (s : 'a list) (z : 'a) =
   with s = []      => false
   with s = x :: s' => (z = x) \/ mem s' z.
 
+abbrev (\in) (z : 'a) (s : 'a list) = mem s z.
+
 lemma in_nil (x : 'a): mem [] x = false.
 proof. by []. qed.
 
