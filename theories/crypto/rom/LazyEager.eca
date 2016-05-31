@@ -180,7 +180,7 @@ section.
                  IND_Lazy.H.m.[x]{2} = Some y0{1} /\
                  if (mem (dom IND_Eager.H.m) x){1}
                  then IND_Eager.H.m{1} = IND_Lazy.H.m{2}
-                 else eq_except IND_Eager.H.m{1} IND_Lazy.H.m{2} (fset1 x{1})).
+                 else eq_except IND_Eager.H.m{1} IND_Lazy.H.m{2} (pred1 x{1})).
         auto; progress; expect 12; last 2 first; first 11 smt.
         case ((head witness work = x){2})=> pick_x; last smt.
         subst x{2}; move: H7 H1; rewrite -neqF /eq_except=> -> /= eq_exc.

@@ -348,7 +348,7 @@ theory LazyEager.
                    IND_Lazy.H.m.[x]{2} = Some y0{1} /\
                    if (mem (dom IND_Eager.H.m) x){1}
                    then IND_Eager.H.m{1} = IND_Lazy.H.m{2}
-                   else eq_except IND_Eager.H.m{1} IND_Lazy.H.m{2} (fset1 x{1})).
+                   else eq_except IND_Eager.H.m{1} IND_Lazy.H.m{2} (pred1 x{1})).
           auto; (progress; expect 12 idtac); last 2 first; first 11 smt.
           case ((pick work = x){2})=> pick_x; last smt.
           subst x{2}; move: H7 H1; rewrite -neqF /eq_except=> -> /= eq_exc.
@@ -704,9 +704,14 @@ theory ROM_BadCall.
           call (_: mem Log.qs G1'.x,
                    ={glob Log} /\
                    Log.qs{2} = dom RO.m{2} /\
-                   eq_except RO.m{1} RO.m{2} (fset1 G1'.x{2})).
+                   eq_except RO.m{1} RO.m{2} (pred1 G1'.x{2})).
             by apply Da2L.
-            by proc; inline RO.o; auto=> />; smt (@NewFMap).
+            proc; inline RO.o; auto=> /> //= &1 &2 x2_notin_G1' eqe y _.
+            rewrite !inE !getP x2_notin_G1' /= oget_some dom_set eq_except_set //= eq_sym.
+            move: eqe; rewrite eq_exceptP !in_dom /pred1 /= => h.
+            split. by move=> + + /h eq_m; rewrite eq_m.
+            move=> h'; split=> + /h eq_m; rewrite eq_m h' //=.
+            by apply/fsetP=> x'; rewrite !inE in_dom /#.
             by progress; apply (Log_o_ll RO); apply (RO_o_ll _); smt.
             progress; exists* G1'.x; elim* => x; conseq (Log_o_ll RO _) (Log_o_stable RO x)=> //.
             by apply (RO_o_ll _); smt.
@@ -800,9 +805,14 @@ theory ROM_BadCall.
           call (_: mem Log.qs G1'.x,
                    ={glob Log} /\
                    Log.qs{2} = dom RO.m{2} /\
-                   eq_except RO.m{1} RO.m{2} (fset1 G1'.x{2})).
+                   eq_except RO.m{1} RO.m{2} (pred1 G1'.x{2})).
             by apply Da2L.
-            by proc; inline *; sp; if=> //=; auto=> />; smt (@NewFMap).
+            proc; inline *; sp; if=> //=; auto=> /> &1 &2 x2_notin_G1' eqe c y _.
+            rewrite !inE !getP x2_notin_G1' /= oget_some dom_set eq_except_set //= eq_sym.
+            move: eqe; rewrite eq_exceptP !in_dom /pred1 /= => h.
+            split. by move=> + + /h eq_m; rewrite eq_m.
+            move=> h'; split=> + /h eq_m; rewrite eq_m h' //=.
+            by apply/fsetP=> x'; rewrite !inE in_dom /#.
             by progress; apply (Bound_o_ll RO); apply (RO_o_ll _); smt.
             progress; exists* G1'.x; elim* => x; conseq (Bound_o_ll RO _) (Bound_o_stable RO x)=> //.
             by apply (RO_o_ll _); smt.
