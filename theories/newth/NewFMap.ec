@@ -761,12 +761,16 @@ lemma endo_dom_rng (m:('a,'a) fmap):
   exists x, !mem (rng m) x.
 proof.
 elim=> x x_notin_m.
-have: 0 < card (((dom m) `|` fset1 x) `\` (rng m)); last by smt.
-rewrite fcardD fcardUI_indep ?fcard1.
-+ by apply/fsetP=> x'; rewrite in_fsetI in_fset1 in_fset0 /=; case (x' = x).
-smt.
+have h: 0 < card (((dom m) `|` fset1 x) `\` (rng m)); last first.
++ by have: forall (X : 'a fset), 0 < card X => exists x, mem X x; smt.
+rewrite fcardD fcardUI_indep.
++ by apply/fsetP=> x'; rewrite !inE /#.
+rewrite fcard1 fsetIUl fcardUI_indep.
++ by apply/fsetP=> x'; rewrite !inE /#.
+have ->: card (fset1 x `&` rng m) = if mem (rng m) x then 1 else 0.
++ smt (@FSet).
+smt (leq_card_rng_dom @FSet).
 qed.
-
 
 (** TODO: lots of lemmas *)
 lemma rem0 (a : 'a) : rem a map0<:'a,'b> = map0.
