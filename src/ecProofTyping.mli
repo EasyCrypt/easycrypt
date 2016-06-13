@@ -84,8 +84,6 @@ val destruct_product: ?reduce:bool -> EcEnv.LDecl.hyps -> form -> dproduct optio
 val destruct_exists : ?reduce:bool -> EcEnv.LDecl.hyps -> form -> dexists  option
 
 (* -------------------------------------------------------------------- *)
-exception NoMatch
-
 type lazyred = [`Full | `NoDelta | `None]
 
 val t_lazy_match:
