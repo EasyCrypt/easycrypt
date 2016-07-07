@@ -418,6 +418,7 @@
 %token INDUCTIVE
 %token INLINE
 %token INSTANCE
+%token INT
 %token IOTA
 %token KILL
 %token LAP
@@ -596,6 +597,7 @@ _lident:
 | ADMITTED { "admitted" }
 | ABORT    { "abort"    }
 | LAP      { "lap"      }
+| INT      { "int"      }
 
 | x=RING  { match x with `Eq -> "ringeq"  | `Raw -> "ring"  }
 | x=FIELD { match x with `Eq -> "fieldeq" | `Raw -> "field" }
@@ -2646,6 +2648,12 @@ phltactic:
 
 | LAP k1=sform k2=sform
     { Paprhl (Alap (`Gen (k1, k2))) }
+
+| INT LAP
+    LBRACKET p=sform COMMA q=sform RBRACKET
+    LBRACKET r=sform COMMA s=sform RBRACKET
+    n=sexpr AMP sg=sexpr AMP k=sexpr
+    { Paprhl (Alap (`Int (((p, q), (r, s)), (n, sg), k))) }
 
 | AWHILE
     LBRACKET ef=sexpr AMP df=sexpr RBRACKET

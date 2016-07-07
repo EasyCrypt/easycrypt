@@ -84,6 +84,8 @@ let fop_real_opp   = f_op CI.CI_Real.p_real_opp  [] (toarrow [treal] treal)
 let fop_real_mul   = f_op CI.CI_Real.p_real_mul  [] (toarrow [treal; treal] treal)
 let fop_real_inv   = f_op CI.CI_Real.p_real_inv  [] (toarrow [treal]        treal)
 let fop_real_abs   = f_op CI.CI_Real.p_real_abs  [] (toarrow [treal]        treal)
+let fop_real_exp   = f_op CI.CI_Real.p_real_exp  [] (toarrow [treal]        treal)
+let fop_real_ln    = f_op CI.CI_Real.p_real_ln   [] (toarrow [treal]        treal)
 
 let f_int_le  f1 f2 = f_app fop_int_le  [f1; f2] tbool
 let f_int_lt  f1 f2 = f_app fop_int_lt  [f1; f2] tbool
@@ -103,6 +105,9 @@ let f_real_sub f1 f2 =
 
 let f_real_div f1 f2 =
   f_real_mul f1 (f_real_inv f2)
+
+let f_real_exp f = f_app fop_real_exp [f] treal
+let f_real_ln  f = f_app fop_real_ln  [f] treal
 
 (* -------------------------------------------------------------------- *)
 let fop_in_supp ty = f_op CI.CI_Distr.p_in_supp [ty] (toarrow [ty; tdistr ty] tbool)

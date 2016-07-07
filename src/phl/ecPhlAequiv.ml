@@ -176,6 +176,80 @@ let rec t_lap_r (mode : lap_mode) (tc : tcenv1) =
         EcLowGoal.t_trivial tc
     end
 
+  | `Int (((p, q), (r, s)), (n, sg), k) ->
+      let p   = TTC.tc1_process_aprhl_form tc tint p  in
+      let q   = TTC.tc1_process_aprhl_form tc tint q  in
+      let r   = TTC.tc1_process_aprhl_form tc tint r  in
+      let s   = TTC.tc1_process_aprhl_form tc tint s  in
+      let en  = TTC.tc1_process_exp tc `InProc (Some tint) n  in
+      let esg = TTC.tc1_process_exp tc `InProc (Some tint) sg in
+      let ek  = TTC.tc1_process_exp tc `InProc (Some tint) k  in
+      let rd1 = EcPV.e_read_r env EcPV.PV.empty a1 in
+      let rd2 = EcPV.e_read_r env EcPV.PV.empty a2 in
+
+      if EcPV.PV.mem_pv env x1 rd1 || EcPV.PV.mem_pv env x2 rd2 then
+        tc_error !!tc "lvalue of rnd-lap cannot occur in the lap argument";
+
+      List.iter (fun z ->
+        let rd1 = EcPV.PV.fv (FApi.tc1_env tc) (fst aes.aes_ml) z in
+        let rd2 = EcPV.PV.fv (FApi.tc1_env tc) (fst aes.aes_mr) z in
+        if EcPV.PV.mem_pv env x1 rd1 || EcPV.PV.mem_pv env x2 rd2 then
+          tc_error !!tc "lvalue of rnd-lap cannot occur in bounds")
+      [p; q; r; s];
+
+      let f1 = form_of_expr (fst aes.aes_ml) a1 in
+      let f2 = form_of_expr (fst aes.aes_mr) a2 in
+
+      let fx1 = f_pvar x1 ty1 (fst aes.aes_ml) in
+      let fx2 = f_pvar x2 ty2 (fst aes.aes_mr) in
+
+      let n  = form_of_expr mhr en  in
+      let sg = form_of_expr mhr esg in
+      let k  = form_of_expr mhr ek  in
+
+      let pre = f_ands [
+        f_int_le (f_int_abs (f_int_sub f1 f2)) k;
+        f_int_le (f_int_add p k) r;
+        f_int_lt r s;
+        f_int_le s (f_int_sub q k);
+        f_int_le (f_int_sub (f_int_sub q p) (f_int_sub s r)) n;
+        f_int_lt f_i0 sg;
+        f_int_le sg (f_int_add (f_int_sub s r) (f_int (EcBigInt.of_int 2)));
+      ]
+
+      and post =
+        f_iff
+          (f_and (f_int_le p fx1) (f_int_le fx1 q))
+          (f_and (f_int_le r fx2) (f_int_le fx2 s))
+      in
+
+      let fe1 = form_of_expr mhr e1 in
+      let fe2 = form_of_expr mhr e2 in
+
+      let eps' = f_real_ln (f_real_div
+        (f_real_exp (f_real_mul (f_real_of_int n) fe1))
+        (f_real_sub f_r1
+           (f_real_exp
+             (f_real_div
+                (f_real_opp (f_real_mul (f_real_of_int sg) fe1))
+                (f_rint (EcBigInt.of_int 2))))))
+      in
+
+      let eqe    = f_eq fe1 fe2 in
+      let eqeps  = f_eq aes.aes_ep eps' in
+      let kge0   = f_int_le f_i0 k in
+      let dp     = f_real_le f_r0 aes.aes_dp in
+      let ep     = f_real_le f_r0 aes.aes_ep in
+      let concl1 = f_imp aes.aes_pr pre in
+      let concl2 = f_imp post aes.aes_po in
+
+      FApi.t_seq
+        (fun tc -> FApi.xmutate1 tc `Lap
+          [dp; ep; kge0; eqe; eqeps;
+           f_forall_mems [aes.aes_ml; aes.aes_mr] concl1;
+           f_forall_mems [aes.aes_ml; aes.aes_mr] concl2])
+        EcLowGoal.t_trivial tc
+
   | _ -> assert false
 
 (* -------------------------------------------------------------------- *)

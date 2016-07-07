@@ -65,7 +65,7 @@ module CI_Real = struct
   let p_real = _Pervasive "real"
 
   let p_RealExtra = EcPath.pqname p_top "RealExtra"
-
+  let p_RealExp   = EcPath.pqname p_top "RealExp"
 
   let p_RealOrder =
     EcPath.extend p_top ["StdOrder"; "RealOrder"]
@@ -83,6 +83,10 @@ module CI_Real = struct
   let p_real_lt     = _Real "<"
   let p_real_of_int = EcPath.extend p_Real ["from_int"]
   let p_real_abs    = EcPath.extend p_Real ["`|_|"]
+
+  let p_real_ln  = EcPath.extend p_RealExp ["ln"]
+  let p_real_exp = EcPath.extend p_RealExp ["exp"]
+
 end
 
 (* -------------------------------------------------------------------- *)

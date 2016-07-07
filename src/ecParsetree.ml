@@ -579,7 +579,11 @@ and paprhl =
   | Awhile of ((pexpr pair) * (pformula pair) * pexpr)
   | Abw    of (pexpr pair * pformula pair)
 
-and lap_mode = [`Gen of pformula pair | `Null of pformula]
+and lap_mode = [
+  | `Gen  of pformula pair
+  | `Null of pformula
+  | `Int  of (pformula pair pair * pexpr pair * pexpr)
+]
 
 (* -------------------------------------------------------------------- *)
 type include_exclude = [ `Include | `Exclude ]

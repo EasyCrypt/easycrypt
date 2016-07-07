@@ -72,6 +72,10 @@ val f_weight  : EcTypes.ty -> form -> form
 (* common functions *)
 val f_identity : ?name:EcSymbols.symbol -> EcTypes.ty -> form
 
+(* exp / ln *)
+val f_real_ln  : form -> form
+val f_real_exp : form -> form
+
 (* -------------------------------------------------------------------- *)
 (* WARNING : this function should be use only in a context ensuring
  * that the quantified variables can be instanciated *)
