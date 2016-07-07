@@ -68,6 +68,7 @@
     "phoare"      , PHOARE     ;        (* KW: prog *)
     "islossless"  , LOSSLESS   ;        (* KW: prog *)
     "int"         , INT        ;        (* KW: prog *)
+    "adv"         , ADV        ;        (* KW: prog *)
 
     "try"         , TRY        ;        (* KW: tactical *)
     "first"       , FIRST      ;        (* KW: tactical *)

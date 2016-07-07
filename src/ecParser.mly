@@ -333,6 +333,7 @@
 %token ABSTRACT
 %token ADMIT
 %token ADMITTED
+%token ADV
 %token AEQUIV
 %token AHOARE
 %token ALGNORM
@@ -598,6 +599,7 @@ _lident:
 | ABORT    { "abort"    }
 | LAP      { "lap"      }
 | INT      { "int"      }
+| ADV      { "adv"      }
 
 | x=RING  { match x with `Eq -> "ringeq"  | `Raw -> "ring"  }
 | x=FIELD { match x with `Eq -> "fieldeq" | `Raw -> "field" }
@@ -2663,6 +2665,10 @@ phltactic:
 
 | PWEQ LPAREN e1=sform COMMA e2=sform RPAREN
     { Paprhl (APwEq (e1, e2)) }
+
+| PWEQ LPAREN e1=sform COMMA e2=sform RPAREN COLON
+    inter=sform LONGARROW bad=sform
+    { Paprhl (APwEqBad ((e1, e2), (inter, bad))) }
 
 | BW LBRACKET f=sexpr COMMA g=sexpr RBRACKET
     LPAREN p=sform LONGARROW q=sform RPAREN

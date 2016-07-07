@@ -465,3 +465,24 @@ let t_bw_r ((f, g), (p, q)) (tc : tcenv1) =
 
 (* -------------------------------------------------------------------- *)
 let t_bw = FApi.t_low1 "bw" t_bw_r
+
+(* -------------------------------------------------------------------- *)
+let t_pweq_bad_r ((e1, e2), (inter, bad)) tc =
+  let hyps = FApi.tc1_hyps tc in
+  let aes  = tc1_as_aequivS tc in
+
+  let e1, inter, bad =
+    let hyps = EcEnv.LDecl.push_active aes.aes_ml hyps in
+    (EcProofTyping.pf_process_form_opt !!tc hyps None e1,
+     EcProofTyping.pf_process_formula  !!tc hyps inter,
+     EcProofTyping.pf_process_formula  !!tc hyps bad)
+
+  and e2 = 
+    let hyps = EcEnv.LDecl.push_active aes.aes_mr hyps in
+    EcProofTyping.pf_process_form_opt !!tc hyps None e2
+  in
+
+  assert false
+
+(* -------------------------------------------------------------------- *)
+let t_pweq_bad = FApi.t_low1 "pweq-bad" t_pweq_bad_r
