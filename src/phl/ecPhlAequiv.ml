@@ -442,17 +442,16 @@ let t_while_ac_r ((e, d), (v, inv), (bN, k, n, w)) tc =
     in (concl1, concl2)
   in
 
-  let pre  = f_ands [inv; f_eq fb1 fb2; f_int_le v bNf; le_sz; gt0_w] in
+  let pre  = f_ands [
+     inv; f_eq fb1 fb2; f_int_le v bNf; le_sz;
+     gt0_w; ge0_n; ge0_e; ge0_d
+  ] in
+
   let post = f_ands [inv; f_not fb1; f_not fb2] in
 
   FApi.t_last (
-    FApi.t_seqs [
-      (fun tc -> FApi.xmutate1 tc `AWhileAc
-         [ge0_n; ge0_e; ge0_d; eqe; eqd;
-          cond1; concl1; concl2]);
-      EcLowGoal.t_simplify_with_info EcReduction.nodelta;
-      EcLowGoal.t_trivial
-    ])
+     fun tc -> FApi.xmutate1 tc `AWhileAc
+       [eqe; eqd; cond1; concl1; concl2])
   (EcPhlConseq.t_aequivS_conseq pre post tc)
 
 (* -------------------------------------------------------------------- *)
