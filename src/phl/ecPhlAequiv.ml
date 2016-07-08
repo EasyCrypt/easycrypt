@@ -245,10 +245,12 @@ let rec t_lap_r (mode : lap_mode) (tc : tcenv1) =
       let concl1 = f_imp aes.aes_pr pre in
       let concl2 = f_imp post aes.aes_po in
 
-      FApi.xmutate1 tc `Lap
-        [dp; ep; kge0; eqe; eqeps;
-         f_forall_mems [aes.aes_ml; aes.aes_mr] concl1;
-         f_forall_mems [aes.aes_ml; aes.aes_mr] concl2]
+      FApi.t_seq
+        (fun tc -> FApi.xmutate1 tc `Lap
+          [dp; ep; kge0; eqe; eqeps;
+           f_forall_mems [aes.aes_ml; aes.aes_mr] concl1;
+           f_forall_mems [aes.aes_ml; aes.aes_mr] concl2])
+        EcLowGoal.t_trivial tc
 
   | _ -> assert false
 
