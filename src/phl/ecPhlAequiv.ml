@@ -467,22 +467,38 @@ let t_bw_r ((f, g), (p, q)) (tc : tcenv1) =
 let t_bw = FApi.t_low1 "bw" t_bw_r
 
 (* -------------------------------------------------------------------- *)
-let t_pweq_bad_r ((e1, e2), (inter, bad)) tc =
+let t_utb_eq_r ((e1, e2), bad) tc =
   let hyps = FApi.tc1_hyps tc in
   let aes  = tc1_as_aequivS tc in
 
-  let e1, inter, bad =
+  let e1, bad =
     let hyps = EcEnv.LDecl.push_active aes.aes_ml hyps in
     (EcProofTyping.pf_process_form_opt !!tc hyps None e1,
-     EcProofTyping.pf_process_formula  !!tc hyps inter,
-     EcProofTyping.pf_process_formula  !!tc hyps bad)
+     EcProofTyping.pf_process_formula  !!tc hyps bad) in
 
-  and e2 = 
+  let e2 = 
     let hyps = EcEnv.LDecl.push_active aes.aes_mr hyps in
-    EcProofTyping.pf_process_form_opt !!tc hyps None e2
+    EcProofTyping.pf_process_form_opt !!tc hyps (Some e1.f_ty) e2
   in
 
-  assert false
+  let eq_e = f_eq e1 e2 in 
+  (* 1: post => e1 = e2, application of conseq *)
+  let cond_c = 
+    f_forall_mems [aes.aes_ml; aes.aes_mr] (f_imp aes.aes_po eq_e) in
+  (* first condition, bounding bad *)
+  let cond_d = 
+    let subst = Fsubst.f_subst_mem (fst aes.aes_ml) mhr in
+    let pre   = subst aes.aes_pr in
+    let post  = (subst bad) in
+    let concl = 
+      f_bdHoareS (mhr, snd aes.aes_ml) pre aes.aes_sl post FHle aes.aes_dp in
+    f_forall_mems [aes.aes_mr] concl in
+  let cond_a = 
+    let post = f_imp (f_not bad) eq_e in
+    let aes = {aes with aes_dp = f_r0; aes_po = post} in
+    f_aequivS_r aes in
+
+  FApi.xmutate1 tc `APuptobad [cond_c; cond_d; cond_a]
 
 (* -------------------------------------------------------------------- *)
-let t_pweq_bad = FApi.t_low1 "pweq-bad" t_pweq_bad_r
+let t_utb_eq = FApi.t_low1 "pweq-bad" t_utb_eq_r

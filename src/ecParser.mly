@@ -2667,8 +2667,8 @@ phltactic:
     { Paprhl (APwEq (e1, e2)) }
 
 | PWEQ LPAREN e1=sform COMMA e2=sform RPAREN COLON
-    inter=sform LONGARROW bad=sform
-    { Paprhl (APwEqBad ((e1, e2), (inter, bad))) }
+    bad=sform
+    { Paprhl (APwEqBad ((e1, e2), bad)) }
 
 | BW LBRACKET f=sexpr COMMA g=sexpr RBRACKET
     LPAREN p=sform LONGARROW q=sform RPAREN

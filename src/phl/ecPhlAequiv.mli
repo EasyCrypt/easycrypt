@@ -21,6 +21,6 @@ val t_lap : lap_mode -> FApi.backward
 val t_while : (pexpr * pexpr) * (pformula pair) * pexpr -> FApi.backward
 
 val t_pweq : pformula pair -> FApi.backward
-val t_pweq_bad : pformula pair * pformula pair -> FApi.backward
+val t_utb_eq : pformula pair * pformula -> FApi.backward
 
 val t_bw : (pexpr pair * pformula pair) -> FApi.backward
