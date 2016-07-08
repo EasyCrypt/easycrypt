@@ -572,12 +572,8 @@ let t_bw_r ((f, g), (p, q)) (tc : tcenv1) =
   let po = f_imp (pdp px1) (pdq px2) in
 
   FApi.t_last (
-    FApi.t_seqs [
-      (fun tc -> FApi.xmutate1 tc `ABw
-         [d_ge0; invx; invy; concl1; concl2]);
-      EcLowGoal.t_simplify_with_info EcReduction.nodelta;
-      EcLowGoal.t_trivial
-    ])
+     fun tc -> FApi.xmutate1 tc `ABw
+       [d_ge0; invx; invy; concl1; concl2])
   (EcPhlConseq.t_aequivS_conseq f_true po tc)
 
 (* -------------------------------------------------------------------- *)
