@@ -494,11 +494,16 @@ let t_utb_eq_r ((e1, e2), bad) tc =
       f_bdHoareS (mhr, snd aes.aes_ml) pre aes.aes_sl post FHle aes.aes_dp in
     f_forall_mems [aes.aes_mr] concl in
   let cond_a = 
-    let post = f_imp (f_not bad) eq_e in
+    let iid    = EcIdent.create "i" in
+    let i  = f_local iid e1.f_ty in
+    let eq = f_imp (f_eq e1 i) (f_eq e2 i) in
+    let post = f_imp (f_not bad) eq in
     let aes = {aes with aes_dp = f_r0; aes_po = post} in
-    f_aequivS_r aes in
+    f_forall [iid, GTty e1.f_ty] (f_aequivS_r aes) in
 
-  FApi.xmutate1 tc `APuptobad [cond_c; cond_d; cond_a]
+  let ll1   = f_losslessS aes.aes_ml aes.aes_sl in
+  let ll2   = f_losslessS aes.aes_mr aes.aes_sr in
+  FApi.xmutate1 tc `APuptobad [ll1; ll2; cond_c; cond_d; cond_a]
 
 (* -------------------------------------------------------------------- *)
 let t_utb_eq = FApi.t_low1 "pweq-bad" t_utb_eq_r
