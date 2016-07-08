@@ -341,6 +341,120 @@ let t_while_r ((ef, df), (v, inv), nf) tc =
 let t_while = FApi.t_low1 "awhile" t_while_r
 
 (* -------------------------------------------------------------------- *)
+let t_while_ac_r ((e, d), (v, inv), (k, n, w)) tc =
+  if not (IAPRHL.loaded (FApi.tc1_env tc)) then
+    tacuerror "awhile: load the `Aprhl' theory first";
+
+  let hyps, _ = FApi.tc1_flat tc in
+  let aes = tc1_as_aequivS tc in
+
+  let (b1, s1) = tc1_instr_while tc aes.aes_sl in
+  let (b2, s2) = tc1_instr_while tc aes.aes_sr in
+
+  let fb1 = form_of_expr (fst aes.aes_ml) b1 in
+  let fb2 = form_of_expr (fst aes.aes_mr) b2 in
+
+  let v =
+    let hyps = EcEnv.LDecl.push_active aes.aes_ml hyps in
+    EcProofTyping.pf_process_form !!tc hyps tint v
+  in
+
+  let inv =
+    let hyps = EcEnv.LDecl.push_all [aes.aes_ml; aes.aes_mr] hyps in
+    EcProofTyping.pf_process_formula !!tc hyps inv
+  in
+
+  let e = EcProofTyping.process_exp hyps `InOp (Some treal) e in
+  let d = EcProofTyping.process_exp hyps `InOp (Some treal) d in
+  let n = EcProofTyping.process_exp hyps `InOp (Some tint ) n in
+  let w = EcProofTyping.process_exp hyps `InOp (Some treal) w in
+  let k = EcProofTyping.process_exp hyps `InOp None k in
+
+  let ef = form_of_expr mhr e in
+  let df = form_of_expr mhr d in
+  let nf = form_of_expr mhr n in
+  let wf = form_of_expr mhr w in
+  let kf = form_of_expr mhr k in
+
+  let nr = f_real_of_int nf in
+
+  let cond1 = f_forall_mems [aes.aes_ml; aes.aes_mr]
+    (f_imps [inv; f_int_le v f_i0] (f_not fb1)) in
+
+  let gt0_w = f_real_lt f_r0 wf in
+  let ge0_n = f_int_le  f_i0 nf in
+  let ge0_e = f_real_le f_r0 ef in
+  let ge0_d = f_real_le f_r0 df in
+
+  let lty =
+    match (EcEnv.Ty.hnorm k.e_ty (FApi.tc1_env tc)).ty_node with
+    | Tconstr (p, [lty]) when EcPath.p_equal p EcCoreLib.CI_List.p_list ->
+       lty
+    | _ -> tc_error !!tc "`K` must be a list"
+  in
+
+  let le_sz = f_int_le (EcFol.CList.size lty kf) nf in
+
+  let eqe =
+    let term1 = f_rint (EcBigInt.of_int 2) in
+    let term1 = f_real_mul term1 nr in
+    let term1 = f_real_mul term1 (f_real_ln (f_real_inv wf)) in
+    let term1 = f_real_mul (f_real_sqrt term1) ef in
+
+    let term2 = f_real_sub (f_real_exp ef) f_r1 in
+    let term2 = f_real_mul (f_real_mul nr ef) term2 in
+
+    f_eq aes.aes_ep (f_real_add term1 term2)
+  in
+
+  let eqd = f_eq aes.aes_dp
+    (f_real_add (f_real_mul nr df) wf) in
+
+  let concl1, concl2 =
+    let x  = EcIdent.create "k" in
+    let xf = EcFol.f_local x lty in
+
+    let pre  = f_ands [inv; fb1; fb2; f_eq v xf] in
+    let post = f_ands [inv; f_eq fb1 fb2; f_int_lt v xf] in
+
+    let concl1 =
+      let eqv = { aes with
+        aes_ep = ef ; aes_dp = df  ;
+        aes_pr = pre; aes_po = post;
+        aes_sl = s1 ; aes_sr = s2  ; } in
+
+      EcFol.f_forall [(x, GTty lty)]
+        (f_imp (CList.mem lty kf xf) (f_aequivS_r eqv))
+
+    and concl2 =
+      let eqv = { aes with
+        aes_ep = f_r0; aes_dp = f_r0;
+        aes_pr = pre ; aes_po = post;
+        aes_sl = s1  ; aes_sr = s2  ; } in
+
+      EcFol.f_forall [(x, GTty lty)]
+        (f_imp (f_not (CList.mem lty kf xf)) (f_aequivS_r eqv))
+
+    in (concl1, concl2)
+  in
+
+  let pre  = f_ands [inv; f_eq fb1 fb2; f_int_le v nf] in
+  let post = f_ands [inv; f_not fb1; f_not fb2] in
+
+  FApi.t_last (
+    FApi.t_seqs [
+      (fun tc -> FApi.xmutate1 tc `AWhileAc
+         [gt0_w; ge0_n; ge0_e; ge0_d; le_sz; eqe; eqd;
+          cond1; concl1; concl2]);
+      EcLowGoal.t_simplify_with_info EcReduction.nodelta;
+      EcLowGoal.t_trivial
+    ])
+  (EcPhlConseq.t_aequivS_conseq pre post tc)
+
+(* -------------------------------------------------------------------- *)
+let t_while_ac = FApi.t_low1 "awhile-ac" t_while_ac_r
+
+(* -------------------------------------------------------------------- *)
 let t_pweq_r (e1, e2) (tc : tcenv1) =
   let hyps = FApi.tc1_hyps tc in
   let aes  = tc1_as_aequivS tc in
@@ -382,7 +496,6 @@ let t_pweq_r (e1, e2) (tc : tcenv1) =
     EcLowGoal.t_simplify_with_info EcReduction.nodelta;
     EcLowGoal.t_trivial
   ] tc
-  
 
 (* -------------------------------------------------------------------- *)
 let t_pweq = FApi.t_low1 "pweq" t_pweq_r

@@ -73,8 +73,10 @@ val f_weight  : EcTypes.ty -> form -> form
 val f_identity : ?name:EcSymbols.symbol -> EcTypes.ty -> form
 
 (* exp / ln *)
-val f_real_ln  : form -> form
-val f_real_exp : form -> form
+val f_real_ln   : form -> form
+val f_real_exp  : form -> form
+val f_real_rpow : form -> form -> form
+val f_real_sqrt : form -> form
 
 (* -------------------------------------------------------------------- *)
 (* WARNING : this function should be use only in a context ensuring
@@ -120,6 +122,12 @@ val f_real_sub_simpl : form -> form -> form
 val f_real_mul_simpl : form -> form -> form
 val f_real_div_simpl : form -> form -> form
 val f_real_inv_simpl : form -> form
+
+(* -------------------------------------------------------------------- *)
+module CList : sig
+  val size : ty -> form -> form
+  val mem  : ty -> form -> form -> form
+end
 
 (* -------------------------------------------------------------------- *)
 val destr_exists_prenex : form -> bindings * form

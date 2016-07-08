@@ -98,6 +98,7 @@ module CI_Real : sig
   val p_real_abs    : path
   val p_real_ln     : path
   val p_real_exp    : path
+  val p_real_rpow   : path
 end
 
 (* -------------------------------------------------------------------- *)
@@ -114,6 +115,16 @@ module CI_Distr : sig
   val p_mu      : path
   val p_mu_x    : path
   val p_weight  : path
+end
+
+(* -------------------------------------------------------------------- *)
+module CI_List : sig
+  val i_List : symbol
+  val p_List : path
+
+  val p_list : path
+  val p_size : path
+  val p_mem  : path
 end
 
 (*-------------------------------------------------------------------- *)

@@ -86,6 +86,7 @@ let fop_real_inv   = f_op CI.CI_Real.p_real_inv  [] (toarrow [treal]        trea
 let fop_real_abs   = f_op CI.CI_Real.p_real_abs  [] (toarrow [treal]        treal)
 let fop_real_exp   = f_op CI.CI_Real.p_real_exp  [] (toarrow [treal]        treal)
 let fop_real_ln    = f_op CI.CI_Real.p_real_ln   [] (toarrow [treal]        treal)
+let fop_real_rpow  = f_op CI.CI_Real.p_real_rpow [] (toarrow [treal; treal] treal)
 
 let f_int_le  f1 f2 = f_app fop_int_le  [f1; f2] tbool
 let f_int_lt  f1 f2 = f_app fop_int_lt  [f1; f2] tbool
@@ -106,8 +107,12 @@ let f_real_sub f1 f2 =
 let f_real_div f1 f2 =
   f_real_mul f1 (f_real_inv f2)
 
-let f_real_exp f = f_app fop_real_exp [f] treal
-let f_real_ln  f = f_app fop_real_ln  [f] treal
+let f_real_exp  f   = f_app fop_real_exp  [f] treal
+let f_real_ln   f   = f_app fop_real_ln   [f] treal
+let f_real_rpow f a = f_app fop_real_rpow [f; a] treal
+
+let f_real_sqrt f =
+  f_real_rpow f (f_real_inv (f_rint (BI.of_int 2)))
 
 (* -------------------------------------------------------------------- *)
 let fop_in_supp ty = f_op CI.CI_Distr.p_in_supp [ty] (toarrow [ty; tdistr ty] tbool)
@@ -541,6 +546,19 @@ let f_real_lt_simpl f1 f2 =
         -> f_bool (BI.compare x1 x2 < 0)
 
     | _, _ -> f_real_lt f1 f2
+
+(* -------------------------------------------------------------------- *)
+module CList = struct
+  let size lty f =
+    let sz = toarrow [EcTypes.tlist lty] tint in
+    let sz = f_op EcCoreLib.CI_List.p_size [lty] sz in
+    f_app sz [f] tint
+
+  let mem lty s x =
+    let sz = toarrow [EcTypes.tlist lty; lty] tbool in
+    let sz = f_op EcCoreLib.CI_List.p_mem [lty] sz in
+    f_app sz [s; x] tbool
+end
 
 (* -------------------------------------------------------------------- *)
 type op_kind = [

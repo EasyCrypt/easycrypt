@@ -69,6 +69,7 @@
     "islossless"  , LOSSLESS   ;        (* KW: prog *)
     "int"         , INT        ;        (* KW: prog *)
     "adv"         , ADV        ;        (* KW: prog *)
+    "ac"          , AC         ;        (* KW: prog *)
 
     "try"         , TRY        ;        (* KW: tactical *)
     "first"       , FIRST      ;        (* KW: tactical *)

@@ -84,8 +84,9 @@ module CI_Real = struct
   let p_real_of_int = EcPath.extend p_Real ["from_int"]
   let p_real_abs    = EcPath.extend p_Real ["`|_|"]
 
-  let p_real_ln  = EcPath.extend p_RealExp ["ln"]
-  let p_real_exp = EcPath.extend p_RealExp ["exp"]
+  let p_real_ln   = EcPath.extend p_RealExp ["ln"]
+  let p_real_exp  = EcPath.extend p_RealExp ["exp"]
+  let p_real_rpow = EcPath.extend p_RealExp ["^"]
 
 end
 
@@ -105,6 +106,18 @@ module CI_Distr = struct
   let p_mu      = _Pervasive "mu"
   let p_mu_x    = _Distr "mu_x"
   let p_weight  = _Distr "weight"
+end
+
+(* -------------------------------------------------------------------- *)
+module CI_List = struct
+  let i_List = "List"
+  let p_List = EcPath.pqname p_top i_List
+
+  let _List = fun x -> EcPath.pqname p_List x
+
+  let p_list = _List "list"
+  let p_size = _List "size"
+  let p_mem  = _List "mem"
 end
 
 (* -------------------------------------------------------------------- *)

@@ -1,5 +1,5 @@
 (* -------------------------------------------------------------------- *)
-require export Distr NewDistr Int IntExtra Real RealExtra RealExp.
+require export Distr NewDistr Int IntExtra Real RealExtra RealExp List.
 require import StdBigop.
 (*---*) export StdBigop.Bigreal.BRA.
 
