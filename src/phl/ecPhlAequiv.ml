@@ -609,7 +609,7 @@ let t_utb_eq_r ((e1, e2), bad) tc =
   let cond_a = 
     let iid    = EcIdent.create "i" in
     let i  = f_local iid e1.f_ty in
-    let eq = f_imp (f_eq e1 i) (f_eq e2 i) in
+    let eq = f_imp (f_eq e2 i) (f_eq e1 i) in
     let post = f_imp (f_not bad) eq in
     let aes = {aes with aes_dp = f_r0; aes_po = post} in
     f_forall [iid, GTty e1.f_ty] (f_aequivS_r aes) in
