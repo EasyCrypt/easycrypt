@@ -181,9 +181,9 @@ let rec t_lap_r (mode : lap_mode) (tc : tcenv1) =
       let q   = TTC.tc1_process_aprhl_form tc tint q  in
       let r   = TTC.tc1_process_aprhl_form tc tint r  in
       let s   = TTC.tc1_process_aprhl_form tc tint s  in
-      let en  = TTC.tc1_process_exp tc `InProc (Some tint) n  in
-      let esg = TTC.tc1_process_exp tc `InProc (Some tint) sg in
-      let ek  = TTC.tc1_process_exp tc `InProc (Some tint) k  in
+      let en  = TTC.tc1_process_exp tc `InProc (Some tint ) n  in
+      let esg = TTC.tc1_process_exp tc `InProc (Some treal) sg in
+      let ek  = TTC.tc1_process_exp tc `InProc (Some tint ) k  in
       let rd1 = EcPV.e_read_r env EcPV.PV.empty a1 in
       let rd2 = EcPV.e_read_r env EcPV.PV.empty a2 in
 
@@ -213,8 +213,10 @@ let rec t_lap_r (mode : lap_mode) (tc : tcenv1) =
         f_int_lt r s;
         f_int_le s (f_int_sub q k);
         f_int_le (f_int_sub (f_int_sub q p) (f_int_sub s r)) n;
-        f_int_lt f_i0 sg;
-        f_int_le sg (f_int_add (f_int_sub s r) (f_int (EcBigInt.of_int 2)));
+        f_real_lt f_r0 sg;
+        f_real_le sg (f_real_add
+            (f_real_sub (f_real_of_int s) (f_real_of_int r))
+            (f_rint (EcBigInt.of_int 2)));
       ]
 
       and post =
@@ -231,7 +233,7 @@ let rec t_lap_r (mode : lap_mode) (tc : tcenv1) =
         (f_real_sub f_r1
            (f_real_exp
              (f_real_div
-                (f_real_opp (f_real_mul (f_real_of_int sg) fe1))
+                (f_real_opp (f_real_mul sg fe1))
                 (f_rint (EcBigInt.of_int 2))))))
       in
 
