@@ -341,7 +341,7 @@ let t_while_r ((ef, df), (v, inv), nf) tc =
 let t_while = FApi.t_low1 "awhile" t_while_r
 
 (* -------------------------------------------------------------------- *)
-let t_while_ac_r ((e, d), (v, inv), (k, n, w)) tc =
+let t_while_ac_r ((e, d), (v, inv), (bN, k, n, w)) tc =
   if not (IAPRHL.loaded (FApi.tc1_env tc)) then
     tacuerror "awhile: load the `Aprhl' theory first";
 
@@ -364,17 +364,19 @@ let t_while_ac_r ((e, d), (v, inv), (k, n, w)) tc =
     EcProofTyping.pf_process_formula !!tc hyps inv
   in
 
-  let e = EcProofTyping.process_exp hyps `InOp (Some treal) e in
-  let d = EcProofTyping.process_exp hyps `InOp (Some treal) d in
-  let n = EcProofTyping.process_exp hyps `InOp (Some tint ) n in
-  let w = EcProofTyping.process_exp hyps `InOp (Some treal) w in
-  let k = EcProofTyping.process_exp hyps `InOp None k in
+  let e  = EcProofTyping.process_exp hyps `InOp (Some treal) e  in
+  let d  = EcProofTyping.process_exp hyps `InOp (Some treal) d  in
+  let n  = EcProofTyping.process_exp hyps `InOp (Some tint ) n  in
+  let w  = EcProofTyping.process_exp hyps `InOp (Some treal) w  in
+  let bN = EcProofTyping.process_exp hyps `InOp (Some tint ) bN in
+  let k  = EcProofTyping.process_exp hyps `InOp None k in
 
-  let ef = form_of_expr mhr e in
-  let df = form_of_expr mhr d in
-  let nf = form_of_expr mhr n in
-  let wf = form_of_expr mhr w in
-  let kf = form_of_expr mhr k in
+  let ef  = form_of_expr mhr e  in
+  let df  = form_of_expr mhr d  in
+  let nf  = form_of_expr mhr n  in
+  let wf  = form_of_expr mhr w  in
+  let bNf = form_of_expr mhr bN in
+  let kf  = form_of_expr mhr k  in
 
   let nr = f_real_of_int nf in
 
@@ -438,7 +440,7 @@ let t_while_ac_r ((e, d), (v, inv), (k, n, w)) tc =
     in (concl1, concl2)
   in
 
-  let pre  = f_ands [inv; f_eq fb1 fb2; f_int_le v nf] in
+  let pre  = f_ands [inv; f_eq fb1 fb2; f_int_le v bNf] in
   let post = f_ands [inv; f_not fb1; f_not fb2] in
 
   FApi.t_last (
