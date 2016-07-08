@@ -2667,7 +2667,7 @@ phltactic:
 | AWHILE AC w=sexpr
     LBRACKET ef=sexpr AMP df=sexpr RBRACKET
     LBRACKET k=sexpr AMP n=sexpr RBRACKET
-    LBRACKET v=form AMP bN=sexpr RBRACKET inv=sform
+    LBRACKET v=sform AMP bN=sexpr RBRACKET inv=sform
     { Paprhl (AwhileAc ((ef, df), (v, inv), (bN, k, n, w))) }
 
 | PWEQ LPAREN e1=sform COMMA e2=sform RPAREN
