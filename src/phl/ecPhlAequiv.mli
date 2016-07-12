@@ -19,7 +19,7 @@ val t_ofequiv : FApi.backward
 val t_lap : lap_mode -> FApi.backward
 
 val t_while : (pexpr pair) * (pformula pair) * pexpr -> FApi.backward
-val t_while_ac : (pexpr pair * pformula pair * pexpr tuple4) -> FApi.backward
+val t_while_ac : (pexpr pair * pformula pair * pexpr pair) -> FApi.backward
 
 val t_pweq : pformula pair -> FApi.backward
 val t_utb_eq : pformula pair * pformula -> FApi.backward

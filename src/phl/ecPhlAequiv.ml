@@ -343,7 +343,7 @@ let t_while_r ((ef, df), (v, inv), nf) tc =
 let t_while = FApi.t_low1 "awhile" t_while_r
 
 (* -------------------------------------------------------------------- *)
-let t_while_ac_r ((e, d), (v, inv), (bN, k, n, w)) tc =
+let t_while_ac_r ((e, d), (v, inv), (bN, w)) tc =
   if not (IAPRHL.loaded (FApi.tc1_env tc)) then
     tacuerror "awhile: load the `Aprhl' theory first";
 
@@ -368,90 +368,67 @@ let t_while_ac_r ((e, d), (v, inv), (bN, k, n, w)) tc =
 
   let e  = EcProofTyping.process_exp hyps `InOp (Some treal) e  in
   let d  = EcProofTyping.process_exp hyps `InOp (Some treal) d  in
-  let n  = EcProofTyping.process_exp hyps `InOp (Some tint ) n  in
   let w  = EcProofTyping.process_exp hyps `InOp (Some treal) w  in
   let bN = EcProofTyping.process_exp hyps `InOp (Some tint ) bN in
-  let k  = EcProofTyping.process_exp hyps `InOp None k in
 
   let ef  = form_of_expr mhr e  in
   let df  = form_of_expr mhr d  in
-  let nf  = form_of_expr mhr n  in
   let wf  = form_of_expr mhr w  in
   let bNf = form_of_expr mhr bN in
-  let kf  = form_of_expr mhr k  in
 
-  let nr = f_real_of_int nf in
+  let bNr = f_real_of_int bNf   in
 
   let cond1 = f_forall_mems [aes.aes_ml; aes.aes_mr]
     (f_imps [inv; f_int_le v f_i0] (f_not fb1)) in
 
   let gt0_w = f_real_lt f_r0 wf in
-  let ge0_n = f_int_le  f_i0 nf in
+  let ge0_N = f_int_le  f_i0 bNf in
   let ge0_e = f_real_le f_r0 ef in
   let ge0_d = f_real_le f_r0 df in
 
-  let lty =
-    match (EcEnv.Ty.hnorm k.e_ty (FApi.tc1_env tc)).ty_node with
-    | Tconstr (p, [lty]) when EcPath.p_equal p EcCoreLib.CI_List.p_list ->
-       lty
-    | _ -> tc_error !!tc "`K` must be a list"
-  in
-
-  let le_sz = f_int_le (EcFol.CList.size lty kf) nf in
-
+  (* Conseq on the bound by hand ... *)
   let eqe =
     let term1 = f_rint (EcBigInt.of_int 2) in
-    let term1 = f_real_mul term1 nr in
+    let term1 = f_real_mul term1 bNr in
     let term1 = f_real_mul term1 (f_real_ln (f_real_inv wf)) in
     let term1 = f_real_mul (f_real_sqrt term1) ef in
 
     let term2 = f_real_sub (f_real_exp ef) f_r1 in
-    let term2 = f_real_mul (f_real_mul nr ef) term2 in
+    let term2 = f_real_mul (f_real_mul bNr ef) term2 in
 
-    f_eq aes.aes_ep (f_real_add term1 term2)
+    f_real_le (f_real_add term1 term2) aes.aes_ep 
   in
 
-  let eqd = f_eq aes.aes_dp
-    (f_real_add (f_real_mul nr df) wf) in
+  let eqd = 
+    f_real_le (f_real_add (f_real_mul bNr df) wf) aes.aes_dp in
+ 
+  let concl1 =
+    let k  = EcIdent.create "k" in
+    let kf = EcFol.f_local k tint in
 
-  let concl1, concl2 =
-    let x  = EcIdent.create "k" in
-    let xf = EcFol.f_local x lty in
+    let pre  = f_ands [inv; fb1; fb2; f_eq v kf] in
+    let post = f_ands [inv; f_eq fb1 fb2; f_int_lt v kf] in
 
-    let pre  = f_ands [inv; fb1; fb2; f_eq v xf] in
-    let post = f_ands [inv; f_eq fb1 fb2; f_int_lt v xf] in
+    let eqv = { aes with
+      aes_ep = ef ; aes_dp = df  ;
+      aes_pr = pre; aes_po = post;
+      aes_sl = s1 ; aes_sr = s2  ; } in
 
-    let concl1 =
-      let eqv = { aes with
-        aes_ep = ef ; aes_dp = df  ;
-        aes_pr = pre; aes_po = post;
-        aes_sl = s1 ; aes_sr = s2  ; } in
+    EcFol.f_forall [(k, GTty tint)] (f_aequivS_r eqv)
 
-      EcFol.f_forall [(x, GTty lty)]
-        (f_imp (CList.mem lty kf xf) (f_aequivS_r eqv))
-
-    and concl2 =
-      let eqv = { aes with
-        aes_ep = f_r0; aes_dp = f_r0;
-        aes_pr = pre ; aes_po = post;
-        aes_sl = s1  ; aes_sr = s2  ; } in
-
-      EcFol.f_forall [(x, GTty lty)]
-        (f_imp (f_not (CList.mem lty kf xf)) (f_aequivS_r eqv))
-
-    in (concl1, concl2)
   in
 
-  let pre  = f_ands [
-     inv; f_eq fb1 fb2; f_int_le v bNf; le_sz;
-     gt0_w; ge0_n; ge0_e; ge0_d
-  ] in
+  let cond2 = 
+    f_forall_mems [aes.aes_ml; aes.aes_mr]
+    (f_imp aes.aes_pr (f_ands [gt0_w; ge0_N; ge0_e; ge0_d])) in
+
+  let pre  = f_ands [inv; f_eq fb1 fb2; f_int_le v bNf] in
 
   let post = f_ands [inv; f_not fb1; f_not fb2] in
 
   FApi.t_last (
      fun tc -> FApi.xmutate1 tc `AWhileAc
-       [eqe; eqd; cond1; concl1; concl2])
+       [eqe; eqd; cond1; cond2; concl1])
   (EcPhlConseq.t_aequivS_conseq pre post tc)
 
 (* -------------------------------------------------------------------- *)
