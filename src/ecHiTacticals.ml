@@ -216,7 +216,7 @@ and process1_phl (_ : ttenv) (t : phltactic located) (tc : tcenv1) =
     | Paprhl (Awhile info)      -> EcPhlAequiv.t_while info
     | Paprhl (AwhileAc info)    -> EcPhlAequiv.t_while_ac info
     | Paprhl (APwEq info)       -> EcPhlAequiv.t_pweq info
-    | Paprhl (APwEqBad info)    -> EcPhlAequiv.t_utb_eq info
+    | Paprhl (AUtbL info)       -> EcPhlAequiv.t_utb_l info
     | Paprhl (Abw info)         -> EcPhlAequiv.t_bw info
 
   in

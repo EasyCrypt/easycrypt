@@ -459,7 +459,7 @@ let t_pweq_r (e1, e2) (tc : tcenv1) =
     let nmx  = EcIdent.create "x" in
     let varx = f_local nmx e1.f_ty in
 
-    let post  = f_imp (f_eq varx e2) (f_eq varx e1) in
+    let post  = f_imp (f_eq varx e1) (f_eq varx e2) in
     let concl =
       f_forall [nmx, GTty varx.f_ty]
         (f_aequivS aes.aes_ml aes.aes_mr ~dp:f_r0 ~ep:aes.aes_ep
@@ -560,7 +560,7 @@ let t_bw_r ((f, g), (p, q)) (tc : tcenv1) =
 let t_bw = FApi.t_low1 "bw" t_bw_r
 
 (* -------------------------------------------------------------------- *)
-let t_utb_eq_r ((e1, e2), bad) tc =
+let t_utb_l_r ((e1, e2), (bad, delta)) tc =
   let hyps = FApi.tc1_hyps tc in
   let aes  = tc1_as_aequivS tc in
 
@@ -574,6 +574,9 @@ let t_utb_eq_r ((e1, e2), bad) tc =
     EcProofTyping.pf_process_form_opt !!tc hyps (Some e1.f_ty) e2
   in
 
+  let delta = 
+    EcProofTyping.pf_process_form_opt !!tc hyps (Some treal) delta in
+    
   let eq_e = f_eq e1 e2 in 
   (* 1: post => e1 = e2, application of conseq *)
   let cond_c = 
@@ -584,19 +587,18 @@ let t_utb_eq_r ((e1, e2), bad) tc =
     let pre   = subst aes.aes_pr in
     let post  = (subst bad) in
     let concl = 
-      f_bdHoareS (mhr, snd aes.aes_ml) pre aes.aes_sl post FHle aes.aes_dp in
+      f_bdHoareS (mhr, snd aes.aes_ml) pre aes.aes_sl post FHle delta in
     f_forall_mems [aes.aes_mr] concl in
+  (* FIXME: check 0 <= f_real_sub aes.aes_dp delta *)
   let cond_a = 
-    let iid    = EcIdent.create "i" in
-    let i  = f_local iid e1.f_ty in
-    let eq = f_imp (f_eq e1 i) (f_eq e2 i) in
+    let eq = f_eq e1 e2 in
     let post = f_imp (f_not bad) eq in
-    let aes = {aes with aes_dp = f_r0; aes_po = post} in
-    f_forall [iid, GTty e1.f_ty] (f_aequivS_r aes) in
+    let aes = {aes with aes_dp = f_real_sub aes.aes_dp delta; aes_po = post} in
+    (f_aequivS_r aes) in
 
   let ll1   = f_losslessS aes.aes_ml aes.aes_sl in
   let ll2   = f_losslessS aes.aes_mr aes.aes_sr in
   FApi.xmutate1 tc `APuptobad [ll1; ll2; cond_c; cond_d; cond_a]
 
 (* -------------------------------------------------------------------- *)
-let t_utb_eq = FApi.t_low1 "pweq-bad" t_utb_eq_r
+let t_utb_l = FApi.t_low1 "utb-l" t_utb_l_r

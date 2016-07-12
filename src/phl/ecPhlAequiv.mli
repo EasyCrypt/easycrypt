@@ -22,6 +22,6 @@ val t_while : (pexpr pair) * (pformula pair) * pexpr -> FApi.backward
 val t_while_ac : (pexpr pair * pformula pair * pexpr pair) -> FApi.backward
 
 val t_pweq : pformula pair -> FApi.backward
-val t_utb_eq : pformula pair * pformula -> FApi.backward
+val t_utb_l : pformula pair * pformula pair -> FApi.backward
 
 val t_bw : (pexpr pair * pformula pair) -> FApi.backward

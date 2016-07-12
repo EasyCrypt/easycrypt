@@ -575,7 +575,7 @@ and paprhl =
   | Aofequiv
   | Atohoare
   | APwEq    of (pformula pair)
-  | APwEqBad of (pformula pair * pformula)
+  | AUtbL    of (pformula pair * pformula pair)
   | Alap     of lap_mode
   | Awhile   of (pexpr pair * pformula pair * pexpr)
   | AwhileAc of (pexpr pair * pformula pair * pexpr pair)

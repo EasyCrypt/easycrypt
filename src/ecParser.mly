@@ -467,6 +467,7 @@
 %token PROOF
 %token PROVER
 %token PWEQ
+%token UTB
 %token QED
 %token QUESTION
 %token RARROW
@@ -2672,9 +2673,9 @@ phltactic:
 | PWEQ LPAREN e1=sform COMMA e2=sform RPAREN
     { Paprhl (APwEq (e1, e2)) }
 
-| PWEQ LPAREN e1=sform COMMA e2=sform RPAREN COLON
-    bad=sform
-    { Paprhl (APwEqBad ((e1, e2), bad)) }
+| UTB LPAREN e1=sform COMMA e2=sform RPAREN COLON
+    LBRACKET bad=sform COMMA delta=sform RBRACKET
+    { Paprhl (AUtbL ((e1, e2), (bad, delta))) }
 
 | BW LBRACKET f=sexpr COMMA g=sexpr RBRACKET
     LPAREN p=sform LONGARROW q=sform RPAREN
