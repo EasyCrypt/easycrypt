@@ -110,6 +110,61 @@ let rec t_equiv_cond side tc =
                    [t_aux; t_clear hiff]]))
           tc
 
+let rec t_aequiv_cond side tc =
+  let hyps = FApi.tc1_hyps tc in
+  let es   = tc1_as_aequivS tc in
+
+  match side with
+  | Some s ->
+      let e =
+        match s with
+        | `Left ->
+          let (e,_,_) = fst (tc1_first_if tc es.aes_sl) in
+          form_of_expr (EcMemory.memory es.aes_ml) e
+        | `Right ->
+          let (e,_,_) = fst (tc1_first_if tc es.aes_sr) in
+          form_of_expr (EcMemory.memory es.aes_mr) e
+      in LowInternal.t_gen_cond side e tc
+
+  | None ->
+      let el,_,_ = fst (tc1_first_if tc es.aes_sl) in
+      let er,_,_ = fst (tc1_first_if tc es.aes_sr) in
+      let el     = form_of_expr (EcMemory.memory es.aes_ml) el in
+      let er     = form_of_expr (EcMemory.memory es.aes_mr) er in
+      let fiff   =
+        f_forall_mems
+          [es.aes_ml;es.aes_mr]
+          (f_imp es.aes_pr (f_iff el er)) in
+
+      let fresh = ["hiff";"&m1";"&m2";"h";"h";"h"] in
+      let fresh = LDecl.fresh_ids hyps fresh in
+
+      let hiff,m1,m2,h,h1,h2 = as_seq6 fresh in
+
+      let t_aux =
+        let rwpt = { pt_head = PTLocal hiff;
+                     pt_args = [PAMemory m1; PAMemory m2; PASub None]; } in
+
+
+        FApi.t_seqs [t_intros_i [m1]    ; EcPhlSkip.t_skip;
+                     t_intros_i [m2; h] ; t_elim_hyp h;
+                     t_intros_i [h1; h2];
+                     FApi.t_seqsub
+                       (t_rewrite rwpt (`RtoL, None))
+                       [t_apply_hyp h1; t_apply_hyp h2]]
+      in
+        FApi.t_on1seq 1 (t_cut fiff)
+          (t_intros_i_seq [hiff]
+             (FApi.t_seqsub
+                (t_equiv_cond (Some `Left))
+                [FApi.t_seqsub
+                   (EcPhlRCond.Low.t_equiv_rcond `Right true  1)
+                   [t_aux; t_clear hiff];
+                 FApi.t_seqsub
+                   (EcPhlRCond.Low.t_equiv_rcond `Right false 1)
+                   [t_aux; t_clear hiff]]))
+          tc
+
 (* -------------------------------------------------------------------- *)
 let process_cond info tc =
   let default_if i s = ofdfl (fun _ -> tc1_pos_last_if tc s) i in
@@ -117,7 +172,8 @@ let process_cond info tc =
   match info with
   | `Head side ->
      t_hS_or_bhS_or_eS_or_eaS
-       ~th:t_hoare_cond ~tbh:t_bdhoare_cond ~te:(t_equiv_cond side) tc
+       ~th:t_hoare_cond ~tbh:t_bdhoare_cond ~te:(t_equiv_cond side) 
+       ~tae:(t_aequiv_cond side) tc
 
   | `Seq (side, i1, i2, f) ->
     let es = tc1_as_equivS tc in
