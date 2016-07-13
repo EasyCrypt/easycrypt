@@ -394,6 +394,23 @@ let t_equivS_conseq_conj pre1 post1 pre2 post2 pre' post' tc =
   let concl3 = f_equivS_r {es with es_pr = pre'; es_po = post'} in
   FApi.xmutate1 tc `HlConseqConj [concl1; concl2; concl3]
 
+let t_aequivS_conseq_conj pre1 post1 pre2 post2 pre' post' tc =
+  let es = tc1_as_aequivS tc in
+  let subst1 = Fsubst.f_subst_mem mhr mleft in
+  let subst2 = Fsubst.f_subst_mem mhr mright in
+  let pre1'  = subst1 pre1 in
+  let post1' = subst1 post1 in
+  let pre2'  = subst2 pre2 in
+  let post2' = subst2 post2 in
+  if not (f_equal es.aes_pr (f_ands [pre';pre1';pre2'])) then
+    tc_error !!tc "invalid pre-condition";
+  if not (f_equal es.aes_po (f_ands [post';post1';post2'])) then
+    tc_error !!tc "invalid post-condition";
+  let concl1 = f_hoareS (mhr,snd es.aes_ml) pre1 es.aes_sl post1 in
+  let concl2 = f_hoareS (mhr,snd es.aes_mr) pre2 es.aes_sr post2 in
+  let concl3 = f_aequivS_r {es with aes_pr = pre'; aes_po = post'} in
+  FApi.xmutate1 tc `HlConseqConj [concl1; concl2; concl3]
+
 (* -------------------------------------------------------------------- *)
 let t_equivF_conseq_conj pre1 post1 pre2 post2 pre' post' tc =
   let ef = tc1_as_equivF tc in
@@ -690,6 +707,7 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
     let tac = if notmod then t_aequivS_conseq_nm else t_aequivS_conseq in
     t_on1 2 (t_apply_r nf1) (tac aes.aes_pr aes.aes_po tc)
 
+  
   (* ------------------------------------------------------------------ *)
   (* equivS / equivS / hoareS / hoareS  *)
   | FequivS _,
@@ -711,6 +729,38 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
             hs2.hs_pr hs2.hs_po hs3.hs_pr hs3.hs_po es.es_pr es.es_po)
          [t_apply_r nf2; t_apply_r nf3; t_apply_r nf1])
       tc
+
+  (* ------------------------------------------------------------------ *)
+  (* aequivS / aequivS / hoareS / hoareS  *)
+  | FaequivS _, 
+      Some ((_, {f_node = FaequivS es}) as nf1),
+      Some ((_, f2) as nf2),
+      Some ((_, f3) as nf3)
+    ->
+    let subst1 = Fsubst.f_subst_mem mhr mleft  in
+    let subst2 = Fsubst.f_subst_mem mhr mright in
+    let hs2    = pf_as_hoareS !!tc f2 in
+    let hs3    = pf_as_hoareS !!tc f3 in
+    let pre    = f_ands [es.aes_pr; subst1 hs2.hs_pr; subst2 hs3.hs_pr] in
+    let post   = f_ands [es.aes_po; subst1 hs2.hs_po; subst2 hs3.hs_po] in
+    let tac    = if notmod then t_aequivS_conseq_nm else t_aequivS_conseq in
+
+    t_on1seq 2 (tac pre post)
+      (FApi.t_seqsub
+         (t_aequivS_conseq_conj
+            hs2.hs_pr hs2.hs_po hs3.hs_pr hs3.hs_po es.aes_pr es.aes_po)
+         [t_apply_r nf2; t_apply_r nf3; t_apply_r nf1])
+      tc
+
+  (* aequivS / aequivS / hoareS / ⊥ *)
+  | FaequivS es, Some _, Some _, None ->
+    let f3 = f_hoareS (mhr, snd es.aes_mr) f_true es.aes_sr f_true in
+    t_hi_conseq notmod f1 f2 (Some (None, f3)) tc
+
+  (* aequivS / aequivS / ⊥ / hoareS *)
+  | FaequivS es, Some _, None, Some _->
+    let f2 = f_hoareS (mhr, snd es.aes_ml) f_true es.aes_sl f_true in
+    t_hi_conseq notmod f1 (Some (None, f2)) f3 tc
 
   (* ------------------------------------------------------------------ *)
   (* equivS / equivS / bdhoareS / ⊥                                     *)
@@ -828,6 +878,8 @@ let rec t_hi_conseq notmod f1 f2 f3 tc =
       match f.f_node with
       | FequivF   _ -> "equivF"
       | FequivS   _ -> "equivS"
+      | FaequivF  _ -> "aequivF"
+      | FaequivS  _ -> "aequivS"
       | FhoareF   _ -> "hoareF"
       | FhoareS   _ -> "hoareS"
       | FbdHoareF _ -> "phoareF"
@@ -968,6 +1020,26 @@ let process_conseq notmod (info1, info2, info3) tc =
             let cmp = odfl FHeq cmp in
               f_bdHoareS m pre f post cmp bd
         in (env, env, f_true, f_true, fmake)
+
+      | FaequivF ef ->
+        ensure_none bd;
+        let f = sideif side ef.aef_fl ef.aef_fr in
+        let penv, qenv = LDecl.hoareF f hyps in
+        let fmake pre post bd = ensure_none bd; f_hoareF pre f post in
+        (penv, qenv, f_true, f_true, fmake)
+
+      | FaequivS es ->
+        ensure_none bd;
+        let f = sideif side es.aes_sl es.aes_sr in
+        let m = sideif side es.aes_ml es.aes_mr in
+        let m = (mhr, snd m) in
+        let env = LDecl.push_active m hyps in
+
+        let fmake pre post _bd =
+          ensure_none bd; f_hoareS m pre f post
+
+        in (env, env, f_true, f_true, fmake)
+
 
       | _ -> tc_error !!tc "conseq: not a phl/prhl judgement"
     in
