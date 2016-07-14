@@ -347,7 +347,7 @@ and replay_addrw
 and replay_auto
   (ove : _ ovrenv) (subst, ops, proofs, scope) (lc, ps)
 =
-  let ps    = Sp.translate (EcSubst.subst_path subst) ps in
+  let ps = Sp.map (EcSubst.subst_path subst) ps in
   let scope = ove.ovre_hooks.hauto scope (lc, ps) in
   (subst, ops, proofs, scope)
 
