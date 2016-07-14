@@ -62,6 +62,7 @@ module Set = struct
     include Why3.Extset.S
 
     val big_union : t list -> t
+    val map : (elt -> elt) -> t -> t
   end
 
   module MakeOfMap(M : Why3.Extmap.S) : S with module M = M = struct
@@ -69,6 +70,9 @@ module Set = struct
 
     let big_union (xs : t list) : t =
       List.fold_left union empty xs
+
+    let map f s =
+      fold (fun k s -> add (f k) s) s empty
   end
 
   module Make(Ord : OrderedType) = MakeOfMap(Map.Make(Ord))
