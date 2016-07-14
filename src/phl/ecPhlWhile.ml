@@ -432,6 +432,8 @@ module ASyncWhile = struct
       | FhoareF   _ | FhoareS   _
       | FbdHoareF _ | FbdHoareS _
       | FequivF   _ | FequivS   _
+      | FaequivF   _ | FaequivS   _
+      | FahoareF   _ | FahoareS   _
       | FeagerF   _ | Fpr       _ -> raise CannotTranslate
 
     and auxkd (kd : quantif) : equantif =
@@ -456,7 +458,7 @@ let process_async_while (winfos : EP.async_while_info) tc =
   in
 
   let { EP.asw_inv  = inv     ;
-        EP.asw_test = (t1, t2);
+        EP.asw_test = ((t1,f1), (t2,f2));
         EP.asw_pred = (p0, p1); } = winfos in
 
   let evs  = tc1_as_equivS tc in
@@ -472,8 +474,10 @@ let process_async_while (winfos : EP.async_while_info) tc =
   let inv = TTC.tc1_process_prhl_formula tc inv in
   let p0  = TTC.tc1_process_prhl_formula tc  p0 in
   let p1  = TTC.tc1_process_prhl_formula tc  p1 in
-  let t1  = TTC.tc1_process_Xhl_exp tc (Some `Left ) (Some tbool) t1 in
-  let t2  = TTC.tc1_process_Xhl_exp tc (Some `Right) (Some tbool) t2 in
+  let f1  = TTC.tc1_process_prhl_form_opt tc None f1 in
+  let f2  = TTC.tc1_process_prhl_form_opt tc None f2 in
+  let t1  = TTC.tc1_process_Xhl_exp tc (Some `Left ) (Some (tfun f1.f_ty tbool)) t1 in
+  let t2  = TTC.tc1_process_Xhl_exp tc (Some `Right) (Some (tfun f2.f_ty tbool)) t2 in
   let ft1 = form_of_expr ml t1 in
   let ft2 = form_of_expr mr t2 in
   let fe1 = form_of_expr ml el in
@@ -481,7 +485,9 @@ let process_async_while (winfos : EP.async_while_info) tc =
   let fe  = f_or fe1 fe2 in
 
   let cond1 = f_forall_mems [evs.es_ml; evs.es_mr]
-    (f_imps [inv; fe; p0] (f_ands [fe1; fe2; ft1; ft2])) in
+    (f_imps [inv; fe; p0] (f_ands [fe1; fe2; 
+                                   f_app ft1 [f1] tbool; 
+                                   f_app ft2 [f2] tbool])) in
 
   let cond2 = f_forall_mems [evs.es_ml; evs.es_mr]
     (f_imps [inv; fe; f_not p0; p1] fe1) in
@@ -490,11 +496,20 @@ let process_async_while (winfos : EP.async_while_info) tc =
     (f_imps [inv; fe; f_not p0; f_not p1] fe2) in
 
   let xwh =
-    let pr = f_ands [inv; fe; p0] in
+    let v1, v2 = as_seq2 (EcEnv.LDecl.fresh_ids hyps ["v1_"; "v2_"]) in
+    let fv1 = f_local v1 f1.f_ty in
+    let fv2 = f_local v2 f2.f_ty in
+    let ev1 = e_local v1 f1.f_ty in
+    let ev2 = e_local v2 f2.f_ty in
+    let eq1 = f_eq fv1 f1 and eq2 = f_eq fv2 f2 in
+    let pr = f_ands [inv; fe; p0; eq1; eq2] in
     let po = inv in
-    let wl = s_while (e_and el t1, cl) in
-    let wr = s_while (e_and er t2, cr) in
-    f_equivS evs.es_ml evs.es_mr pr wl wr po in
+    let wl = s_while (e_and el (e_app t1 [ev1] tbool), cl) in
+    let wr = s_while (e_and er (e_app t2 [ev2] tbool), cr) in
+    (* FIXME we should use forall, but need to fix the bug on intros first *)
+    let hyps = EcEnv.LDecl.add_local v1 (LD_var(f1.f_ty,None)) hyps in
+    let hyps = EcEnv.LDecl.add_local v2 (LD_var(f2.f_ty,None)) hyps in
+    (hyps, f_equivS evs.es_ml evs.es_mr pr wl wr po) in
 
   let hr1, hr2 =
     let hr1 =
@@ -574,5 +589,5 @@ let process_async_while (winfos : EP.async_while_info) tc =
 
   FApi.xmutate1_hyps
     tc `AsyncWhile
-      ((List.map (fun x -> (hyps, x)) [cond1; cond2; cond3; xwh; hr1; hr2])
-        @ [(xhyps m1, ll1); (xhyps m2, ll2); (hyps, concl)])
+      ((List.map (fun x -> (hyps, x)) [cond1; cond2; cond3; hr1; hr2])
+        @ [xwh; (xhyps m1, ll1); (xhyps m2, ll2); (hyps, concl)])
