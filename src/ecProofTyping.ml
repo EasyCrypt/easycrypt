@@ -143,6 +143,7 @@ let tc1_process_Xhl_exp tc side ty e =
 (* ------------------------------------------------------------------ *)
 let tc1_process_Xhl_form ?side tc ty pf =
   let hyps, concl = FApi.tc1_flat tc in
+
   let memory =
     match concl.f_node, side with
     | FhoareS   hs , None        -> hs.hs_m

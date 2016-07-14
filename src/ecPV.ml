@@ -51,6 +51,8 @@ module PVMap = struct
 
   let find k m =
     Mnpv.find_opt (pvm m.pvm_env k) m.pvm_map
+
+  let raw m = m.pvm_map
 end
 
 (* -------------------------------------------------------------------- *)
@@ -1065,11 +1067,3 @@ let check_module_in env mp mt =
           (EcPrinting.pp_funname ppe) f (PV.pp env) eqi in
 
   List.iter check sig_.mis_body
-
-
-
-
-
-
-
-

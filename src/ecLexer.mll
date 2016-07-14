@@ -71,6 +71,7 @@
     "int"         , INT        ;        (* KW: prog *)
     "adv"         , ADV        ;        (* KW: prog *)
     "ac"          , AC         ;        (* KW: prog *)
+    "async"       , ASYNC      ;        (* KW: prog *)
 
     "try"         , TRY        ;        (* KW: tactical *)
     "first"       , FIRST      ;        (* KW: tactical *)
