@@ -6,6 +6,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
+open EcMaps
 open EcPath
 open EcTypes
 open EcModules
@@ -21,12 +22,17 @@ type alias_clash =
 exception AliasClash of env * alias_clash
 
 (* -------------------------------------------------------------------- *)
+module Mnpv : Map.S with type key = prog_var
+module Snpv : Set.S with module M = Map.MakeBase(Mnpv)
+
+(* -------------------------------------------------------------------- *)
 module PVMap : sig
   type 'a t
 
   val create : env -> 'a t
   val add    : prog_var -> 'a -> 'a t -> 'a t
   val find   : prog_var -> 'a t -> 'a option
+  val raw    : 'a t -> 'a Mnpv.t
 end
 
 (* -------------------------------------------------------------------- *)

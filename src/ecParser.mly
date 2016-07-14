@@ -335,6 +335,7 @@
 %token AS
 %token ASSERT
 %token ASSUMPTION
+%token ASYNC
 %token AT
 %token AUTO
 %token AXIOM
@@ -581,6 +582,7 @@ _lident:
 | STRICT   { "strict"   }
 | ADMITTED { "admitted" }
 | ABORT    { "abort"    }
+| ASYNC    { "async"    }
 
 | x=RING  { match x with `Eq -> "ringeq"  | `Raw -> "ring"  }
 | x=FIELD { match x with `Eq -> "fieldeq" | `Raw -> "field" }
@@ -1341,7 +1343,7 @@ mod_body:
     { Pm_struct stt }
 
 mod_def:
-| MODULE header=mod_header c=mod_cast? EQ body=loc(mod_body) 
+| MODULE header=mod_header c=mod_cast? EQ body=loc(mod_body)
   { let header = match c with None -> header | Some c ->  Pmh_cast(header,c) in
     header, body }
 
@@ -2034,7 +2036,7 @@ rwarg1:
 | LBRACKET SMT pi=smt_info RBRACKET
    { RWSmt (false, pi) }
 
-| LBRACKET SMT LPAREN dbmap=dbmap1* RPAREN RBRACKET 
+| LBRACKET SMT LPAREN dbmap=dbmap1* RPAREN RBRACKET
    { RWSmt (false, SMT.mk_smt_option [`WANTEDLEMMAS dbmap]) }
 
 | AMP f=pterm
@@ -2136,7 +2138,7 @@ code_position:
 | n1=sword n2=sword
     { Double (n1, n2) }
 
-while_tac_info :
+while_tac_info:
 | inv=sform
     { { wh_inv = inv; wh_vrnt = None; wh_bds = None; } }
 
@@ -2145,6 +2147,12 @@ while_tac_info :
 
 | inv=sform vrnt=sform k=sform eps=sform
     { { wh_inv = inv; wh_vrnt = Some vrnt; wh_bds = Some (k, eps); } }
+
+async_while_tac_info:
+| LBRACKET t1=sexpr AMP t2=sexpr RBRACKET p0=sform p1=sform COLON inv=sform
+    { { asw_test = (t1, t2);
+        asw_pred = (p0, p1);
+        asw_inv  = inv; } }
 
 rnd_info:
 | empty
@@ -2430,6 +2438,9 @@ phltactic:
 
 | WHILE s=side? info=while_tac_info
     { Pwhile (s, info) }
+
+| ASYNC WHILE info=async_while_tac_info
+    { Pasyncwhile info }
 
 | CALL s=side? info=gpterm(call_info)
     { Pcall (s, info) }

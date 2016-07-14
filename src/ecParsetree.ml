@@ -155,7 +155,7 @@ and pmodule_def = {
   ptm_local  : bool;
 }
 
-and pmodule_header = 
+and pmodule_header =
   | Pmh_ident  of psymbol
   | Pmh_params of (pmodule_header * pmodule_params) located
   | Pmh_cast   of pmodule_header * pqsymbol list
@@ -169,7 +169,7 @@ and pmodule_expr_r =
 and pmodule_expr = pmodule_expr_r located
 
 and pstructure = pstructure_item located list
- 
+
 and pstructure_item =
   | Pst_mod    of (psymbol * pqsymbol list * pmodule_expr)
   | Pst_var    of (psymbol list * pty)
@@ -472,6 +472,13 @@ type while_info = {
 }
 
 (* -------------------------------------------------------------------- *)
+type async_while_info = {
+  asw_test : pexpr * pexpr;
+  asw_pred : pformula * pformula;
+  asw_inv  : pformula;
+}
+
+(* -------------------------------------------------------------------- *)
 type inline_info = [
   | `ByName    of oside * (pgamepath list * int list option)
   | `ByPattern of pipattern
@@ -511,6 +518,7 @@ type phltactic =
   | Pwp            of int doption option
   | Psp            of int doption option
   | Pwhile         of (oside * while_info)
+  | Pasyncwhile    of async_while_info
   | Pfission       of (oside * codepos * (int * (int * int)))
   | Pfusion        of (oside * codepos * (int * (int * int)))
   | Punroll        of (oside * codepos)

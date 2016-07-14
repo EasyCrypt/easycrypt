@@ -11,12 +11,15 @@ open EcTypes
 open EcFol
 open EcModules
 open EcPV
+open EcBaseLogic
 
 open EcCoreGoal
 open EcLowPhlGoal
 
 module Sx  = EcPath.Sx
 module TTC = EcProofTyping
+module EP  = EcParsetree
+module Mid = EcIdent.Mid
 
 (* -------------------------------------------------------------------- *)
 let while_info env e s =
@@ -331,9 +334,9 @@ let t_equiv_while_disj      = FApi.t_low3 "equiv-while"   t_equiv_while_disj_r
 
 (* -------------------------------------------------------------------- *)
 let process_while side winfos tc =
-  let { EcParsetree.wh_inv  = phi ;
-        EcParsetree.wh_vrnt = vrnt;
-        EcParsetree.wh_bds  = bds ; } = winfos in
+  let { EP.wh_inv  = phi ;
+        EP.wh_vrnt = vrnt;
+        EP.wh_bds  = bds ; } = winfos in
 
   match (FApi.tc1_goal tc).f_node with
   | FhoareS _ -> begin
@@ -379,3 +382,197 @@ let process_while side winfos tc =
   end
 
   | _ -> tc_error !!tc "expecting a hoare[...]/equiv[...]"
+
+(* -------------------------------------------------------------------- *)
+module ASyncWhile = struct
+  exception CannotTranslate
+
+  let form_of_expr env mh =
+    let map = ref Mid.empty in
+
+    let rec aux fp =
+      match fp.f_node with
+      | Fint   z -> e_int z
+      | Flocal x -> e_local x fp.f_ty
+
+      | Fop  (p, tys) -> e_op p tys fp.f_ty
+      | Fapp (f, fs)  -> e_app (aux f) (List.map aux fs) fp.f_ty
+      | Ftuple fs     -> e_tuple (List.map aux fs)
+      | Fproj  (f, i) -> e_proj (aux f) i fp.f_ty
+
+      | Fif (c, f1, f2) ->
+         e_if (aux c) (aux f1) (aux f2)
+
+      | Fmatch (c, bs, ty) ->
+         e_match (aux c) (List.map aux bs) ty
+
+      | Flet (lp, f1, f2) ->
+         e_let lp (aux f1) (aux f2)
+
+      | Fquant (kd, bds, f) ->
+         e_quantif (auxkd kd) (List.map auxbd bds) (aux f)
+
+      | Fpvar (pv, m) ->
+         if EcIdent.id_equal m mh then
+           e_var pv fp.f_ty
+         else
+           let bds = odfl (EcPV.PVMap.create env) (Mid.find_opt m !map) in
+           let idx =
+             match EcPV.PVMap.find pv bds with
+             | None ->
+                 let x   = EcPath.basename pv.pv_name.EcPath.x_sub in
+                 let x   = EcIdent.create x in
+                 let bds = EcPV.PVMap.add pv (x, fp.f_ty) bds in
+                 map := Mid.add m bds !map; x
+             | Some (x, _) -> x
+
+           in e_local idx fp.f_ty
+
+      | Fglob     _
+      | FhoareF   _ | FhoareS   _
+      | FbdHoareF _ | FbdHoareS _
+      | FequivF   _ | FequivS   _
+      | FeagerF   _ | Fpr       _ -> raise CannotTranslate
+
+    and auxkd (kd : quantif) : equantif =
+      match kd with
+      | Lforall -> `EForall
+      | Lexists -> `EExists
+      | Llambda -> `ELambda
+
+    and auxbd ((x, bd) : binding) =
+      match bd with
+      | GTty ty -> (x, ty)
+      | _ -> raise CannotTranslate
+
+    in fun f -> let e = aux f in (e, !map)
+end
+
+(* -------------------------------------------------------------------- *)
+let process_async_while (winfos : EP.async_while_info) tc =
+  let e_and e1 e2 =
+    let p = EcCoreLib.CI_Bool.p_and in
+    e_app (e_op p [] (toarrow [tbool; tbool] tbool)) [e1; e2] tbool
+  in
+
+  let { EP.asw_inv  = inv     ;
+        EP.asw_test = (t1, t2);
+        EP.asw_pred = (p0, p1); } = winfos in
+
+  let evs  = tc1_as_equivS tc in
+  let env  = FApi.tc1_env  tc in
+  let hyps = FApi.tc1_hyps tc in
+
+  let ml = EcMemory.memory evs.es_ml in
+  let mr = EcMemory.memory evs.es_mr in
+
+  let (el, cl), sl = tc1_last_while tc evs.es_sl in
+  let (er, cr), sr = tc1_last_while tc evs.es_sr in
+
+  let inv = TTC.tc1_process_prhl_formula tc inv in
+  let p0  = TTC.tc1_process_prhl_formula tc  p0 in
+  let p1  = TTC.tc1_process_prhl_formula tc  p1 in
+  let t1  = TTC.tc1_process_Xhl_exp tc (Some `Left ) (Some tbool) t1 in
+  let t2  = TTC.tc1_process_Xhl_exp tc (Some `Right) (Some tbool) t2 in
+  let ft1 = form_of_expr ml t1 in
+  let ft2 = form_of_expr mr t2 in
+  let fe1 = form_of_expr ml el in
+  let fe2 = form_of_expr mr er in
+  let fe  = f_or fe1 fe2 in
+
+  let cond1 = f_forall_mems [evs.es_ml; evs.es_mr]
+    (f_imps [inv; fe; p0] (f_ands [fe1; fe2; ft1; ft2])) in
+
+  let cond2 = f_forall_mems [evs.es_ml; evs.es_mr]
+    (f_imps [inv; fe; f_not p0; p1] fe1) in
+
+  let cond3 = f_forall_mems [evs.es_ml; evs.es_mr]
+    (f_imps [inv; fe; f_not p0; f_not p1] fe2) in
+
+  let xwh =
+    let pr = f_ands [inv; fe; p0] in
+    let po = inv in
+    let wl = s_while (e_and el t1, cl) in
+    let wr = s_while (e_and er t2, cr) in
+    f_equivS evs.es_ml evs.es_mr pr wl wr po in
+
+  let hr1, hr2 =
+    let hr1 =
+      let subst = Fsubst.f_bind_mem Fsubst.f_subst_id ml mhr in
+      let inv   = Fsubst.f_subst subst inv in
+      let p0    = Fsubst.f_subst subst p0  in
+      let p1    = Fsubst.f_subst subst p1  in
+
+      let pre = f_ands [inv; form_of_expr mhr er; f_not p0; p1] in
+      f_forall_mems [evs.es_mr]
+        (f_hoareS (mhr, EcMemory.memtype evs.es_ml) pre cl inv)
+
+    and hr2 =
+      let subst = Fsubst.f_bind_mem Fsubst.f_subst_id mr mhr in
+      let inv   = Fsubst.f_subst subst inv in
+      let p0    = Fsubst.f_subst subst p0  in
+      let p1    = Fsubst.f_subst subst p1  in
+
+      let pre = f_ands [inv; form_of_expr mhr er; f_not p0; f_not p1] in
+      f_forall_mems [evs.es_ml]
+        (f_hoareS (mhr, EcMemory.memtype evs.es_mr) pre cl inv)
+
+    in (hr1, hr2)
+  in
+
+  let (m1, ll1), (m2, ll2) =
+    try
+      let ll1 =
+        let subst   = Fsubst.f_bind_mem Fsubst.f_subst_id ml mhr in
+        let inv     = Fsubst.f_subst subst inv in
+        let test    = f_ands [fe1; f_not p0; p1] in
+        let test, m = ASyncWhile.form_of_expr env ml test in
+        let c       = s_while (test, cl) in
+        (m, f_bdHoareS (mhr, EcMemory.memtype evs.es_ml) inv c f_true FHeq f_r1)
+
+      and ll2 =
+        let subst   = Fsubst.f_bind_mem Fsubst.f_subst_id mr mhr in
+        let inv     = Fsubst.f_subst subst inv in
+        let test    = f_ands [fe1; f_not p0; f_not p1] in
+        let test, m = ASyncWhile.form_of_expr env mr test in
+        let c       = s_while (test, cr) in
+        (m, f_bdHoareS (mhr, EcMemory.memtype evs.es_mr) inv c f_true FHeq f_r1)
+
+      in (ll1, ll2)
+
+    with ASyncWhile.CannotTranslate ->
+      tc_error !!tc
+        "async-while linking predicates cannot be converted to expressions"
+  in
+
+  let concl =
+    let post  = f_imps [f_not fe1; f_not fe2; inv] evs.es_po in
+    let modil = s_write env cl in
+    let modir = s_write env cr in
+    let post  = generalize_mod env mr modir post in
+    let post  = generalize_mod env ml modil post in
+    f_equivS_r { evs with es_sl = sl; es_sr = sr; es_po = post; } in
+
+  let xhyps =
+    let mtypes = Mid.of_list [evs.es_ml; evs.es_mr] in
+
+    fun m ->
+      Mid.fold (fun mh pvs hyps ->
+          let hyps =
+            let mid = EcEnv.LDecl.fresh_id hyps (EcIdent.name mh) in
+            let mty = Mid.find_opt mh mtypes in
+            EcEnv.LDecl.add_local mid (LD_mem (oget mty)) hyps
+          in
+
+          EcPV.Mnpv.fold (fun pv (x, ty) hyps ->
+            EcEnv.LDecl.add_local
+              x (LD_var (ty, (Some (f_pvar pv ty mh)))) hyps)
+          (EcPV.PVMap.raw pvs) hyps)
+
+        m hyps
+  in
+
+  FApi.xmutate1_hyps
+    tc `AsyncWhile
+      ((List.map (fun x -> (hyps, x)) [cond1; cond2; cond3; xwh; hr1; hr2])
+        @ [(xhyps m1, ll1); (xhyps m2, ll2); (hyps, concl)])
