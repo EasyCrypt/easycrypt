@@ -2149,8 +2149,9 @@ while_tac_info:
     { { wh_inv = inv; wh_vrnt = Some vrnt; wh_bds = Some (k, eps); } }
 
 async_while_tac_info:
-| LBRACKET t1=sexpr AMP t2=sexpr RBRACKET p0=sform p1=sform COLON inv=sform
-    { { asw_test = (t1, t2);
+| LBRACKET t1=expr COMMA f1=form RBRACKET 
+  LBRACKET t2=expr COMMA f2=form RBRACKET p0=sform p1=sform COLON inv=sform
+    { { asw_test = ((t1, f1), (t2,f2));
         asw_pred = (p0, p1);
         asw_inv  = inv; } }
 

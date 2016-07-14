@@ -83,7 +83,7 @@ let tc1_process_pattern tc fp =
   Exn.recast_tc1 tc (fun hyps -> process_pattern hyps fp)
 
 (* ------------------------------------------------------------------ *)
-let tc1_process_prhl_form tc ty pf =
+let tc1_process_prhl_form_opt tc oty pf =
   let hyps, concl = FApi.tc1_flat tc in
   let ml, mr =
     match concl.f_node with
@@ -92,7 +92,9 @@ let tc1_process_prhl_form tc ty pf =
   in
 
   let hyps = LDecl.push_all [ml; mr] hyps in
-  pf_process_form !!tc hyps ty pf
+  pf_process_form_opt !!tc hyps oty pf
+
+let tc1_process_prhl_form tc ty pf = tc1_process_prhl_form_opt tc (Some ty) pf
 
 (* ------------------------------------------------------------------ *)
 let tc1_process_prhl_formula tc pf =

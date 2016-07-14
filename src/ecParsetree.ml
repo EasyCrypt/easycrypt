@@ -473,7 +473,7 @@ type while_info = {
 
 (* -------------------------------------------------------------------- *)
 type async_while_info = {
-  asw_test : pexpr * pexpr;
+  asw_test : (pexpr * pformula) pair;
   asw_pred : pformula * pformula;
   asw_inv  : pformula;
 }
