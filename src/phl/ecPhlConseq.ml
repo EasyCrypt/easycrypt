@@ -1106,18 +1106,38 @@ let process_conseq_opt cqopt infos tc =
   process_conseq cqopt.cqo_frame infos tc
 
 (* -------------------------------------------------------------------- *)
-let t_conseq_aprhl (dp,ep) tc = 
-  let aes = tc1_as_aequivS tc in
-  let concl1 = 
-    f_forall_mems [aes.aes_ml;aes.aes_mr] 
-      (f_imp aes.aes_pr 
-         (f_and (f_real_le ep aes.aes_ep)
-                (f_real_le dp aes.aes_dp))) in
-  let concl2 = 
-    f_aequivS_r { aes with aes_ep = ep; aes_dp = dp } in
+let cond_conseq_aprhl ml mr pr (ae, ad) (ep, dp)  = 
+  f_forall_mems [ml;mr] 
+      (f_imp pr (f_and (f_real_le ep ae) (f_real_le dp ad)))
+
+let t_conseq_aprhl (ep, dp) tc = 
+  let concl = FApi.tc1_goal tc in
+  let concl1, concl2 = 
+    match concl.f_node with
+    | FaequivS aes -> 
+      let concl1 = 
+        cond_conseq_aprhl aes.aes_ml aes.aes_mr aes.aes_pr 
+          (aes.aes_ep, aes.aes_dp) (ep, dp) in
+      let concl2 = 
+        f_aequivS_r { aes with aes_ep = ep; aes_dp = dp } in
+      concl1, concl2
+    | FaequivF aef ->
+      let env = FApi.tc1_env tc in
+      let concl1 = 
+        let (ml, mr), _ = 
+          EcEnv.Fun.aequivF_memenv aef.aef_fl aef.aef_fr env in
+        cond_conseq_aprhl ml mr aef.aef_pr 
+          (aef.aef_ep, aef.aef_dp) (ep, dp) in
+      let concl2 = 
+        f_aequivF_r { aef with aef_ep = ep; aef_dp = dp } in
+      concl1, concl2
+    | _ -> 
+      tc_error !!tc "expecting a goal of the form: aequiv" in
+
   FApi.xmutate1 tc `Conseq [concl1; concl2]  
 
 let process_conseq_aprhl (e,d) tc = 
   let dp = TTC.tc1_process_form tc treal d in
   let ep = TTC.tc1_process_form tc treal e in
-  t_conseq_aprhl (dp, ep) tc 
+
+  t_conseq_aprhl (ep, dp) tc 
