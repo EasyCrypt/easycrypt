@@ -114,6 +114,8 @@ rewrite ler_def subrr -(inj_eq (addrI `|zeror|)) /= addr0.
 by rewrite -mulr2z -mulr_intr -n2 -normrM mul0r.
 qed.
 
+hint exact : lerr.
+
 lemma nosmt lerr_eq (x y : t): x = y => x <= y.
 proof. by move=> ->; rewrite lerr. qed.
 
@@ -1085,6 +1087,16 @@ qed.
 
 lemma nosmt ler_normr x y : (x <= `|y|) <=> (x <= y) \/ (x <= - y).
 proof. by rewrite lerNgt ltr_norml // anda_and -nand !lerNgt orbC ltr_oppl. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma maxrC (x y : t) : maxr x y = maxr y x.
+proof. by rewrite /maxr lerNgt ler_eqVlt; case: (x = y); case: (x < y). qed.
+
+lemma maxrl (x y : t) : x <= maxr x y.
+proof. by rewrite /maxr; case: (y <= x) => [_|/ltrNge/ltrW]. qed.
+
+lemma maxrr (x y : t) : y <= maxr x y.
+proof. by rewrite maxrC maxrl. qed.
 end RealDomain.
 
 (* -------------------------------------------------------------------- *)

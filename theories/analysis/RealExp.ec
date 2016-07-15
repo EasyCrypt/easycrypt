@@ -6,7 +6,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Fun Int IntExtra Real RealExtra StdRing StdOrder.
+require import Fun Int IntExtra Real RealExtra StdRing StdOrder RealFun.
 (*---*) import RField RealOrder.
 
 (* -------------------------------------------------------------------- *)
@@ -26,6 +26,8 @@ axiom nosmt le_ln_up (x : real): 0%r < x => ln x <= x - 1%r.
 axiom nosmt le_ln_dw (x : real): 1%r < x => (x - 1%r) / x < ln x.
 
 axiom nosmt le1Dx_exp (x : real): 0%r <= x => 1%r+x <= exp x.
+
+axiom nosmt convexe_exp a b: convexe exp a b.
 
 op log (a : real) = fun x => ln x / ln a.
 
