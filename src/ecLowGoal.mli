@@ -211,7 +211,12 @@ val t_subst:
   -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
-type iname  = [`Symbol of symbol      | `Ident of EcIdent.t     ]
+type iname  = [
+  | `Symbol of symbol
+  | `Fresh
+  | `Ident  of EcIdent.t
+]
+
 type inames = [`Symbol of symbol list | `Ident of EcIdent.t list]
 
 val t_intros   : ident mloc list -> FApi.backward
@@ -225,6 +230,8 @@ val t_intros_i_1 : ident list -> tcenv1 -> tcenv1
 
 val t_intros_i_seq : ?clear:bool -> ident list -> FApi.backward -> FApi.backward
 val t_intros_s_seq : inames -> FApi.backward -> FApi.backward
+
+val t_intros_n : int -> FApi.backward
 
 (* -------------------------------------------------------------------- *)
 type genclear = [`Clear | `TryClear | `NoClear]
