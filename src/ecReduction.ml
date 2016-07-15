@@ -506,7 +506,7 @@ and check_alpha_equal ri hyps f1 f2 =
     check_ty env subst ty1 ty2;
     env,
     if id_equal x1 x2 then subst
-    else Fsubst.f_bind_local subst x2 (f_local x1 ty1) in
+    else Fsubst.f_bind_rename subst x2 x1 ty1 in
 
   let check_lpattern env subst lp1 lp2 =
     match lp1, lp2 with
@@ -533,7 +533,8 @@ and check_alpha_equal ri hyps f1 f2 =
     | GTty ty1, GTty ty2 ->
       ensure (EqTest.for_type env ty1 ty2);
       env,
-      if id_equal x1 x2 then subst else Fsubst.f_bind_local subst x2 (f_local x1 ty1)
+      if id_equal x1 x2 then subst else
+        Fsubst.f_bind_rename subst x2 x1 ty1
     | GTmodty (p1, r1) , GTmodty(p2, r2) ->
       ensure (ModTy.mod_type_equiv env p1 p2 &&
                 NormMp.equal_restr env r1 r2);
@@ -567,7 +568,8 @@ and check_alpha_equal ri hyps f1 f2 =
     ensure (EqTest.for_xp_norm env xp1 xp2) in
 
   let check_s env s s1 s2 =
-    let es = e_subst_init s.fs_freshen s.fs_sty.ts_p s.fs_ty Mp.empty s.fs_mp in
+    let es = e_subst_init s.fs_freshen s.fs_sty.ts_p
+                          s.fs_ty Mp.empty s.fs_mp s.fs_esloc in
     let s2 = EcModules.s_subst es s2 in
     ensure (EqTest.for_stmt_norm env s1 s2) in
 

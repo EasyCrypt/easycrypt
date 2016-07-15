@@ -817,13 +817,13 @@ let e_subst_id = {
 }
 
 (* -------------------------------------------------------------------- *)
-let is_subst_id s =
+let is_e_subst_id s =
   not s.es_freshen && s.es_p == identity &&
     s.es_ty == identity && s.es_mp == identity &&
     s.es_xp == identity && Mid.is_empty s.es_loc
 
 (* -------------------------------------------------------------------- *)
-let e_subst_init freshen on_path on_ty opdef on_mpath =
+let e_subst_init freshen on_path on_ty opdef on_mpath esloc =
   let on_mp =
     let f = EcPath.m_subst on_path on_mpath in
     if f == identity then f else EcPath.Hm.memo 107 f in
@@ -837,7 +837,7 @@ let e_subst_init freshen on_path on_ty opdef on_mpath =
     es_opdef   = opdef;
     es_mp      = on_mp;
     es_xp      = on_xp;
-    es_loc     = Mid.empty; }
+    es_loc     = esloc; }
 
 (* -------------------------------------------------------------------- *)
 let add_local s ((x, t) as xt) =
@@ -962,7 +962,7 @@ let e_subst_closure s (args, e) =
 
 (* -------------------------------------------------------------------- *)
 let e_subst s =
-  if is_subst_id s then identity
+  if is_e_subst_id s then identity
   else
     if s.es_freshen then e_subst s
     else He.memo 107 (e_subst s)
