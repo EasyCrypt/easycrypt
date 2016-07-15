@@ -177,7 +177,7 @@ let f_int_mul_simpl f1 f2 =
 (* -------------------------------------------------------------------- *)
 let destr_rdivint =
   let rec aux isneg f =
-    let renorm (n, d) =
+    let renorm n d =
       if isneg then (BI.neg n, d) else (n, d)
     in
 
@@ -188,20 +188,20 @@ let destr_rdivint =
         let n1, n2 =
           try  (destr_rint f1, destr_rint f2)
           with DestrError _ -> destr_error "rdivint"
-        in renorm (n1, n2)
+        in renorm n1 n2
       end
-  
+
     | Fapp (op, [f]) when f_equal op fop_real_inv -> begin
         try
-          renorm (BI.one, destr_rint f)
+          renorm BI.one (destr_rint f)
         with DestrError _ -> destr_error "rdivint"
       end
 
     | Fapp (op, [f]) when f_equal op fop_real_opp ->
        aux (not isneg) f
-  
+
     | _ ->
-       try  renorm (destr_rint f, BI.one)
+       try  renorm (destr_rint f) BI.one
        with DestrError _ -> destr_error "rdivint"
 
   in fun f -> aux false f
@@ -233,21 +233,18 @@ and real_is_one f =
   with DestrError _ -> false
 
 let norm_real_int_div n1 n2 =
-  if BI.sign n1 = 0 || BI.sign n2 = 0 then f_r0 else
-
-  let n1, n2 =
-    match BI.gcd n1 n2 with
-    | n when BI.equal n BI.one -> (n1, n2)
-    | n -> (n1/^n, n2/^n)
-  in
-       if BI.equal n1 BI.zero then f_r0
-  else if BI.equal n2 BI.one  then f_rint n1
+  let s1 = BI.sign n1 and s2 = BI.sign n2 in
+  if s1 = 0 || s2 = 0 then f_r0
   else
-
-  let s = (BI.sign n1) * (BI.sign n2) in
-  let f = f_real_div (f_rint n1) (f_rint n2) in
-
-  if s < 0 then f_real_opp f else f
+    let n1 = BI.abs n1 and n2 = BI.abs n2 in
+    let n1, n2 =
+      match BI.gcd n1 n2 with
+      | n when BI.equal n BI.one -> (n1, n2)
+      | n -> (n1/^n, n2/^n)
+    in
+    let n1 = if (s1 * s2) < 0 then BI.neg n1 else n1 in
+    if BI.equal n2 BI.one then f_rint n1
+    else f_real_div (f_rint n1) (f_rint n2)
 
 let f_real_add_simpl f1 f2 =
   try  f_rint (destr_rint f1 +^ destr_rint f2)
@@ -255,8 +252,6 @@ let f_real_add_simpl f1 f2 =
     try
       let (n1, d1) = destr_rdivint f1 in
       let (n2, d2) = destr_rdivint f2 in
-
-      if BI.sign d1 = 0 || BI.sign d2 = 0 then f_r0 else
 
       norm_real_int_div (n1*^d2 +^ n2*^d1) (d1*^d2)
 
