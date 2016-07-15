@@ -506,10 +506,9 @@ let process_async_while (winfos : EP.async_while_info) tc =
     let po = inv in
     let wl = s_while (e_and el (e_app t1 [ev1] tbool), cl) in
     let wr = s_while (e_and er (e_app t2 [ev2] tbool), cr) in
-    (* FIXME we should use forall, but need to fix the bug on intros first *)
-    let hyps = EcEnv.LDecl.add_local v1 (LD_var(f1.f_ty,None)) hyps in
-    let hyps = EcEnv.LDecl.add_local v2 (LD_var(f2.f_ty,None)) hyps in
-    (hyps, f_equivS evs.es_ml evs.es_mr pr wl wr po) in
+    EcFol.f_forall [(v1, GTty f1.f_ty); (v2, GTty f2.f_ty)]
+      (f_equivS evs.es_ml evs.es_mr pr wl wr po)
+  in
 
   let hr1, hr2 =
     let hr1 =
@@ -590,4 +589,4 @@ let process_async_while (winfos : EP.async_while_info) tc =
   FApi.xmutate1_hyps
     tc `AsyncWhile
       ((List.map (fun x -> (hyps, x)) [cond1; cond2; cond3; hr1; hr2])
-        @ [xwh; (xhyps m1, ll1); (xhyps m2, ll2); (hyps, concl)])
+        @ [(hyps, xwh); (xhyps m1, ll1); (xhyps m2, ll2); (hyps, concl)])

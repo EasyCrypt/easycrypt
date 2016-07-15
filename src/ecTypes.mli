@@ -237,12 +237,15 @@ type e_subst = {
 
 val e_subst_id : e_subst
 
+val is_e_subst_id : e_subst -> bool
+
 val e_subst_init :
-      bool
+     bool
   -> (EcPath.path -> EcPath.path)
   -> (ty -> ty)
   -> (EcIdent.t list * expr) EcPath.Mp.t
   -> EcPath.mpath EcIdent.Mid.t
+  -> expr Mid.t
   -> e_subst
 
 val add_local  : e_subst -> EcIdent.t * ty -> e_subst * (EcIdent.t * ty)

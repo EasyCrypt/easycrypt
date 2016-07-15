@@ -356,7 +356,7 @@ let t_intros (ids : ident mloc list) (tc : tcenv1) =
     match gty with
     | GTty ty ->
         LowIntro.check_name_validity !!tc `Value name;
-        (LD_var (ty, None), Fsubst.f_bind_local sbt x (f_local id ty))
+        (LD_var (ty, None), Fsubst.f_bind_rename sbt x id ty)
     | GTmem me ->
         LowIntro.check_name_validity !!tc `Memory name;
         (LD_mem me, Fsubst.f_bind_mem sbt x id)
@@ -386,7 +386,7 @@ let t_intros (ids : ident mloc list) (tc : tcenv1) =
     | SFlet (LSymbol (x, xty), xe, concl) ->
         let xty  = sbt.fs_ty xty in
         let xe   = Fsubst.f_subst sbt xe in
-        let sbt  = Fsubst.f_bind_local sbt x (f_local (tg_val id) xty) in
+        let sbt  = Fsubst.f_bind_rename sbt x (tg_val id) xty in
         let hyps = add_ld id (LD_var (xty, Some xe)) hyps in
         (hyps, concl), sbt
 
@@ -624,7 +624,7 @@ let t_generalize_hyps_x ?(missing = false) ?naming ids tc =
       match LDecl.ld_subst s (LDecl.by_id id hyps) with
       | LD_var (ty, _) ->
           let x    = fresh id in
-          let s    = Fsubst.f_bind_local s id (f_local x ty) in
+          let s    = Fsubst.f_bind_rename s id x ty in
           let bds  = `Forall (x, GTty ty) :: bds in
           let args = PAFormula (f_local id ty) :: args in
           (s, bds, args, cls)

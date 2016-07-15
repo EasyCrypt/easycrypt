@@ -395,8 +395,7 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
                    let nx = EcIdent.fresh x in
                    let xsubst =
                      Mid.find_opt x mxs
-                       |> omap (fun y -> Fsubst.f_bind_local
-                            xsubst y (f_local nx xty))
+                       |> omap (fun y -> Fsubst.f_bind_rename xsubst y nx xty)
                        |> odfl xsubst
                    in (xsubst, (nx, GTty xty)))
                 Fsubst.f_subst_id fs1 in
@@ -557,7 +556,7 @@ let f_match_core opts hyps (ue, ev) ~ptn subject =
             let subst =
               if   id_equal x1 x2
               then subst
-              else Fsubst.f_bind_local subst x2 (f_local x1 ty2)
+              else Fsubst.f_bind_rename subst x2 x1 ty2
 
             and env = EcEnv.Var.bind_local x1 ty1 env in
 
