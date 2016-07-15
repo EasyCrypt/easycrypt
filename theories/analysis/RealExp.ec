@@ -79,7 +79,7 @@ proof. by move=> gt0x gt0y; rewrite -exp_mono_ltr !expK. qed.
 lemma nosmt ln1 : ln 1%r = 0%r.
 proof. by rewrite -exp0 lnK. qed.
 
-lemma nosmt le_gt0 x : 1%r < x => 0%r < ln x.
+lemma nosmt ln_gt0 x : 1%r < x => 0%r < ln x.
 proof. by move=> h; rewrite -ln1 ln_mono_ltr //#. qed.
 
 lemma nosmt lnM (x y : real) : 0%r < x => 0%r < y =>
