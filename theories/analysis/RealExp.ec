@@ -43,6 +43,8 @@ proof. by apply/(@ltr_le_trans 2%r)/ge2_e. qed.
 lemma nosmt e_ge0 : 0%r <= e.
 proof. by apply/ltrW/e_gt0. qed.
 
+hint exact : e_gt0 e_ge0.
+
 lemma nosmt exp_neq0 x : exp x <> 0%r.
 proof. by have := (exp_gt0 x); rewrite ltr_neqAle eq_sym => -[]. qed.
 
@@ -233,3 +235,20 @@ qed.
 lemma rpowe_sum (P : 'a -> bool) (F : 'a -> real) s:
   e^(BRA.big P F s) = BRM.big P (fun a => e^(F a)) s.
 proof. by rewrite rpoweE exp_sum; apply/eq_bigr=> x _ /=; rewrite rpoweE. qed.
+
+(* -------------------------------------------------------------------- *)
+abbrev sqrt (x : real) = x ^ (inv 2%r).
+
+lemma sqrtE x : sqrt x = if x <= 0%r then 0%r else exp (ln x / 2%r).
+proof. by rewrite /(^); case: (_ <= 0%r) => //=; rewrite invr_eq0. qed.
+
+
+lemma ge0_sqrt x : 0%r <= sqrt x.
+proof.
+by rewrite sqrtE -rpoweE; case: (_ <= 0%r) => //=; apply/rpow_ge0.
+qed.
+
+lemma ge1_sqrt x: 1%r <= x => 1%r <= sqrt x.
+proof.
+by move=> ge1_x; rewrite -{1}(rpow1r (1%r/2%r)) rpow_hmono /#.
+qed.
