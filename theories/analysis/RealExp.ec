@@ -22,6 +22,9 @@ axiom ln_le0   : forall x, x <= 0%r => ln x = 0%r.
 axiom lnK  : forall x, ln (exp x) = x.
 axiom expK : forall x, 0%r < x => exp (ln x) = x.
 
+axiom nosmt le_ln_up (x : real): 0%r < x => ln x <= x - 1%r.
+axiom nosmt le_ln_dw (x : real): 1%r < x => (x - 1%r) / x < ln x.
+
 axiom nosmt le1Dx_exp (x : real): 0%r <= x => 1%r+x <= exp x.
 
 op log (a : real) = fun x => ln x / ln a.
