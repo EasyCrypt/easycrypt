@@ -1069,6 +1069,10 @@ let core_theories = [
   ((["real"], "FromInt"),
      [(CI_Real.p_real_of_int, "from_int")]);
 
+  ((["real"], "ExpLog"),
+     [(CI_Real.p_real_exp, "exp");
+      (CI_Real.p_real_ln , "log")]);
+
   ((["map"], "Map"),
      [(CI_Map.p_get, "get");
       (CI_Map.p_set, "set");
