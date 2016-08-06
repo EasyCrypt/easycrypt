@@ -2733,8 +2733,9 @@ tactic_core_r:
    { Padmit }
 
 | CASE vw=prefix(SLASH, pterm)*
-    eq=ioption(postfix(boption(UNDERSCORE), COLON))
-    opts=ioption(caseoptions) gp=revert
+     opts=ioption(caseoptions)
+     eq=ioption(postfix(boption(UNDERSCORE), COLON))
+     gp=revert
 
     { Pcase (odfl false eq, odfl [] opts,
              { pr_view = vw; pr_rev = gp; } ) }
