@@ -2149,7 +2149,7 @@ while_tac_info:
     { { wh_inv = inv; wh_vrnt = Some vrnt; wh_bds = Some (k, eps); } }
 
 async_while_tac_info:
-| LBRACKET t1=expr COMMA f1=form RBRACKET 
+| LBRACKET t1=expr COMMA f1=form RBRACKET
   LBRACKET t2=expr COMMA f2=form RBRACKET p0=sform p1=sform COLON inv=sform
     { { asw_test = ((t1, f1), (t2,f2));
         asw_pred = (p0, p1);
@@ -2931,9 +2931,9 @@ theory_clone:
      { pthc_base   = x;
        pthc_name   = y;
        pthc_ext    = EcUtils.odfl [] cw;
-       pthc_prf    = List.rev cp;
-       pthc_rnm    = List.rev cr;
-       pthc_clears = List.rev cl;
+       pthc_prf    = cp;
+       pthc_rnm    = cr;
+       pthc_clears = cl;
        pthc_opts   = odfl [] options;
        pthc_local  = local;
        pthc_import = ip; } }
@@ -2982,14 +2982,10 @@ clone_lemma_1:
     { { pthp_mode = cl; pthp_tactic = Some t; } }
 
 clone_lemma:
-| x=clone_lemma_1
-    { [x] }
-
-| xs=clone_lemma COMMA x=clone_lemma_1
-    { x :: xs }
+| x=plist1(clone_lemma_1, COMMA) { x }
 
 clone_proof:
-| PROOF x=clone_lemma { List.rev x }
+| PROOF x=clone_lemma { x }
 
 clone_rename_kind:
 | TYPE        { `Type    }
