@@ -1883,7 +1883,9 @@ let t_crush ?(delta = true) (tc : tcenv1) =
   let t_progress_subst ?eqid =
     let sk1 = { empty_subst_kind with sk_local = true ; } in
     let sk2 = {  full_subst_kind with sk_local = false; } in
-    FApi.t_or (t_subst ~kind:sk1 ?eqid) (t_subst ~kind:sk2 ?eqid)
+    FApi.t_or
+      (t_subst ~clear:false ~kind:sk1 ?eqid)
+      (t_subst ~clear:false ~kind:sk2 ?eqid)
   in
 
   let tt = FApi.t_try (t_assumption `Alpha) in
