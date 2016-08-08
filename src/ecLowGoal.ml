@@ -384,7 +384,7 @@ let t_intros_x (ids : (ident  option) mloc list) (tc : tcenv1) =
 
     | SFimp (prem, concl) ->
         let prem = Fsubst.f_subst sbt prem in
-        let id   = tg_map (function 
+        let id   = tg_map (function
           | None    -> EcIdent.create "_"
           | Some id -> id) id in
         let hyps = add_ld id (LD_hyp prem) hyps in
@@ -1948,7 +1948,8 @@ let t_crush ?(delta = true) (tc : tcenv1) =
     end
 
     | _ ->
-       let thesplit = t_split ~closeonly:false ~reduce:`Full in
+       let reduce = if delta then `Full else `NoDelta in
+       let thesplit = t_split ~closeonly:false ~reduce in
        let tc =
          match FApi.t_try_base (FApi.t_seq thesplit aux0) tc with
          | `Success tc -> tc
@@ -1963,7 +1964,7 @@ let t_crush ?(delta = true) (tc : tcenv1) =
        let nl = List.length cl in
 
        match cl with [] | [_] -> tc | _ ->
-       
+
        let cl = f_ands (List.map (fun g -> g.g_concl) cl) in
        let tc, hd = FApi.newgoal tc ~hyps cl in
        let pt = { pt_head = PTHandle hd; pt_args = []; } in
