@@ -200,7 +200,7 @@ val t_rewrite_hyp :
      ?xconv:xconv -> ?mode:rwmode -> EcIdent.t
   -> rwspec -> FApi.backward
 
-type tside = [`All | `LtoR | `RtoL]
+type tside = [`All of [`LtoR | `RtoL] option | `LtoR | `RtoL]
 
 val t_subst:
      ?kind:subst_kind

@@ -1246,11 +1246,14 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
     with InvalidGoalShape ->
       tc_error !!tc "nothing to substitute"
 
-  and intro1_subst_top (_ : ST.state) omax (tc : tcenv1) =
+  and intro1_subst_top (_ : ST.state) (omax, osd) (tc : tcenv1) =
     let t_subst eqid =
-      let sk1 = { empty_subst_kind with sk_local = true ; } in
-      let sk2 = {  full_subst_kind with sk_local = false; } in
-      FApi.t_or (t_subst ~kind:sk1 ~eqid) (t_subst ~kind:sk2 ~eqid)
+      let sk1  = { empty_subst_kind with sk_local = true ; } in
+      let sk2  = {  full_subst_kind with sk_local = false; } in
+      let side = `All osd in
+      FApi.t_or
+        (t_subst ~tside:side ~kind:sk1 ~eqid)
+        (t_subst ~tside:side ~kind:sk2 ~eqid)
     in
 
     let togen = ref [] in

@@ -656,7 +656,7 @@ type intropattern1 =
   | IPClear    of psymbol list
   | IPDone     of [`Full | `ProductCompat] option
   | IPSmt      of (bool * pprover_infos)
-  | IPSubstTop of int option
+  | IPSubstTop of (int option * [`LtoR | `RtoL] option)
   | IPSimplify of [`Full | `ProductCompat]
   | IPCrush    of bool
   | IPBreak

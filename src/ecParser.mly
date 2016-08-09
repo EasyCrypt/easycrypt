@@ -525,7 +525,7 @@
 %token WP
 %token ZETA
 %token <string> NOP LOP1 ROP1 LOP2 ROP2 LOP3 ROP3 LOP4 ROP4
-%token LTCOLON DASHLT GT LT GE LE LTSTARGT
+%token LTCOLON DASHLT GT LT GE LE LTSTARGT LTLTSTARGT LTSTARGTGT
 
 %nonassoc prec_below_comma
 %nonassoc COMMA ELSE
@@ -1854,6 +1854,11 @@ ip_repeat:
 | i=ioption(word) NOT { i }
 | i=word { Some i }
 
+ipsubsttop:
+| LTSTARGT   { None }
+| LTLTSTARGT { Some `RtoL }
+| LTSTARGTGT { Some `LtoR }
+
 intro_pattern:
 | x=ipcore
    { IPCore x }
@@ -1912,11 +1917,11 @@ intro_pattern:
 | AT s=rwside o=rwocc? SLASH x=sform_h
    { IPDelta ((s, o), x) }
 
-| LTSTARGT
-   { IPSubstTop None }
+| ip=ipsubsttop
+   { IPSubstTop (None, ip) }
 
-| n=word NOT LTSTARGT
-   { IPSubstTop (Some n) }
+| n=word NOT ip=ipsubsttop
+   { IPSubstTop (Some n, ip) }
 
 | MINUS
    { IPBreak }

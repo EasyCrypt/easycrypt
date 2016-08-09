@@ -1456,7 +1456,7 @@ type subst_kind = {
 let  full_subst_kind = { sk_local = true ; sk_pvar  = true ; sk_glob  = true ; }
 let empty_subst_kind = { sk_local = false; sk_pvar  = false; sk_glob  = false; }
 
-type tside = [`All | `LtoR | `RtoL]
+type tside = [`All of [`LtoR | `RtoL] option | `LtoR | `RtoL]
 
 (* -------------------------------------------------------------------- *)
 module LowSubst = struct
@@ -1498,28 +1498,33 @@ module LowSubst = struct
     | _, _ -> None
 
   (* ------------------------------------------------------------------ *)
-  let is_eq_for_subst ?kind ?(tside = (`All : tside)) hyps var (f1, f2) =
-    let canl = match tside with `All | `LtoR -> true | `RtoL -> false in
-    let canr = match tside with `All | `RtoL -> true | `LtoR -> false in
+  let is_eq_for_subst ?kind ?(tside = (`All None : tside)) hyps var (f1, f2) =
+    let can (side : [`LtoR | `RtoL]) =
+      match tside with
+      | `All  None    -> Some `High
+      | `All (Some x) -> Some (if x = side then `High else `Low)
+      | _ -> if tside = (side :> tside) then Some `High else None
+    in
 
-    let is_member_for_subst ?kind side env var f =
-      match side with
-      | `Left  when canl -> is_member_for_subst ?kind env var f
-      | `Right when canr -> is_member_for_subst ?kind env var f
-      | _                -> None
-
+    let is_member_for_subst ?kind side env var f tg =
+      can side |> obind (fun prio ->
+        is_member_for_subst ?kind env var f
+          |> obind (fun eq -> Some (prio, (eq, tg))))
     in
 
     let env = LDecl.toenv hyps in
 
-    let var =
-      match is_member_for_subst ?kind `Left env var f1 with
-      | Some var -> Some (var, f2)
-      | None ->
-        match is_member_for_subst ?kind `Right env var f2 with
-        | Some var -> Some (var, f1)
-        | None -> None
-    in
+    let var = List.pmap identity
+      [is_member_for_subst ?kind `LtoR env var f1 f2;
+       is_member_for_subst ?kind `RtoL env var f2 f1] in
+
+    let cmp x y =
+      let x = match x with `High -> 1 | `Low -> 0 in
+      let y = match y with `High -> 1 | `Low -> 0 in
+      Pervasives.compare x y in
+
+    let var = List.ksort ~stable:true ~rev:true ~key:fst ~cmp var in
+    let var = List.ohead var |> omap snd in
 
     match var with
     | None -> None
