@@ -976,7 +976,7 @@ end = struct
       st.naming <- map
 
   let listing (st : state) =
-    st.torev
+    List.rev st.torev
 
   let naming (st : state) (x : EcIdent.t) =
     Mid.find_opt x st.naming |> odfl None
@@ -1066,7 +1066,7 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
 
       in snd_map List.rev (compile ((hyps, form), []) [] ids)
 
-    in (torev, ids)
+    in (List.rev torev, ids)
   in
 
   let rec collect intl acc core pis =

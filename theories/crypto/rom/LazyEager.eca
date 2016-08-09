@@ -224,9 +224,8 @@ section.
            (forall x, mem (dom IND_Eager.H.m{1}) x <=> !mem work{1} x) /\
            IND_Eager.H.m{1} = EagerRO.RO.m{2}).
       rcondt{1} 3; 1: by auto=> />; smt w=mem_head_behead.
-      auto=> /> &2; move=> + + /(head_behead _ witness) + y _ - <- /= [] />.
-      move=> not_head uniq_behead h x; rewrite dom_set !inE h.
-      by case: (x = head witness work{2})=> /= [->|].
+      auto=> /> &2; case: (work{2}) => //= l w [xNw ->] /= h y _.
+      by move=> x; rewrite dom_set !inE h; case: (x = l).
     by auto; smt.
   qed.
 
