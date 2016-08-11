@@ -57,9 +57,9 @@ let while_info env e s =
 
   let (w,r,c) = s_info (PV.empty, EcPV.e_read env e, Sx.empty) s in
 
-  { EcModules.aus_reads  = fst (PV.elements r);
-    EcModules.aus_writes = fst (PV.elements w);
-    EcModules.aus_calls  = Sx.elements c; }
+  { EcModules.aus_reads  = fst (PV.ntr_elements r);
+    EcModules.aus_writes = fst (PV.ntr_elements w);
+    EcModules.aus_calls  = Sx.ntr_elements c; }
 
 (* -------------------------------------------------------------------- *)
 let t_hoare_while_r inv tc =

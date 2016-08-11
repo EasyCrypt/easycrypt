@@ -369,6 +369,11 @@ let pv_compare_p v1 v2 =
   | 0 -> Pervasives.compare v1.pv_kind v2.pv_kind
   | r -> r
 
+let pv_ntr_compare v1 v2 =
+  match Pervasives.compare v1.pv_kind v2.pv_kind with
+  | 0 -> EcPath.x_ntr_compare v1.pv_name v2.pv_name
+  | r -> r
+
 let is_loc  v = match v.pv_kind with PVloc  -> true | _ -> false
 let is_glob v = match v.pv_kind with PVglob -> true | _ -> false
 
@@ -1010,4 +1015,3 @@ let destr_tuple_var e =
    match e.e_node with
   | Etuple es -> List.map destr_var es
   | _ -> assert false
-

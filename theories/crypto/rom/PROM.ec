@@ -446,7 +446,7 @@ abstract theory GenEager.
       (={x,y,FRO.m} /\ mem (dom FRO.m{1}) x{1} /\ (oget FRO.m{1}.[x{1}]).`2 = Unknown==>
        ={x,y} /\ eq_except FRO.m{1} FRO.m{2} (pred1 x{1}) /\
        FRO.m{2}.[x{2}] = Some (y{2},Known)).
-    + by move=> ? &mr [#] 2-> ? ? ?; exists FRO.m{mr}, y{mr}, x{mr}=> /#.
+    + by move=> ? &mr [#] 2-> ? ? ?; exists FRO.m{mr}, x{mr}, y{mr}=> /#.
     + move=> ? &m &mr [#] <*> [#] 2-> Hex Hm2.
       by rewrite (@eq_except_set_eq FRO.m{mr} FRO.m{m} x{mr}) ?in_dom ?Hm2 // eq_except_sym.
     + symmetry; call (iter1_perm RRO.I iter_perm2); auto=> ? &mr [#] 3 -> Hdom Hm; split=> //=.

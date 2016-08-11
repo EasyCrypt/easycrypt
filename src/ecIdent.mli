@@ -30,6 +30,8 @@ val id_equal : t -> t -> bool
 val id_compare : t -> t -> int
 val id_hash : t -> int
 
+val id_ntr_compare : t -> t -> int
+
 (* -------------------------------------------------------------------- *)
 module Mid : Map.S with type key = t
 module Sid : Set.S with module M = Map.MakeBase(Mid)

@@ -43,7 +43,7 @@ end = struct
         let ppe = EcPrinting.PPEnv.ofenv env in
         msg "the function is not allowed to use %a"
           (EcPrinting.pp_list " or@ " (EcPrinting.pp_funname ppe))
-          (Sx.elements sx)
+          (Sx.ntr_elements sx)
 
     | MF_restr (env, `Eq (ex, got)) ->
         let ppe = EcPrinting.PPEnv.ofenv env in
@@ -54,12 +54,12 @@ end = struct
         if has_allowed then
           msg "the function should be allowed to use %a"
             (EcPrinting.pp_list " or@ " (EcPrinting.pp_funname ppe))
-            (Sx.elements allowed);
+            (Sx.ntr_elements allowed);
         if not (Sx.is_empty notallowed) then
           msg "%sthe function is not allowed to use %a"
             (if has_allowed then ",@ " else "")
             (EcPrinting.pp_list " or@ " (EcPrinting.pp_funname ppe))
-            (Sx.elements notallowed)
+            (Sx.ntr_elements notallowed)
 
   let rec pp_cnv_failure env fmt error =
     let msg x = Format.fprintf fmt x in
@@ -85,8 +85,8 @@ end = struct
         (EcPrinting.pp_modtype1 ppe) t1
         (EcPrinting.pp_modtype1 ppe) t2
         (pp_cnv_failure env) err
-          
-          
+
+
 
   let pp_modappl_error env fmt error =
     let msg x = Format.fprintf fmt x in

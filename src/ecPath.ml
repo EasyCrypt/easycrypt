@@ -52,9 +52,30 @@ module Path = MakeMSH (struct
   let tag = p_hash
 end)
 
-module Sp = Path.S
+let rec p_ntr_compare (p1 : path) (p2 : path) =
+  match p1.p_node, p2.p_node with
+  | Psymbol _, Pqname  _ -> -1
+  | Pqname  _, Psymbol _ -> +1
+
+  | Psymbol x1, Psymbol x2 ->
+       String.compare x1 x2
+
+  | Pqname (p1, x1), Pqname (p2, x2) -> begin
+      match p_ntr_compare p1 p2 with
+      | 0 -> String.compare x1 x2
+      | n -> n
+    end
+
+(* -------------------------------------------------------------------- *)
 module Mp = Path.M
 module Hp = Path.H
+
+module Sp = struct
+  include Path.S
+
+  let ntr_elements s =
+    List.ksort ~key:identity ~cmp:p_ntr_compare (elements s)
+end
 
 (* -------------------------------------------------------------------- *)
 let mk_path node =
@@ -183,9 +204,35 @@ module MPath = MakeMSH (struct
   let tag = m_hash
 end)
 
-module Sm = MPath.S
+let m_top_ntr_compare (mt1 : mpath_top) (mt2 : mpath_top) =
+  match mt1, mt2 with
+  | `Local    _, `Concrete _ -> -1
+  | `Concrete _, `Local    _ -> +1
+
+  | `Local id1, `Local id2 ->
+       id_ntr_compare id1 id2
+
+  | `Concrete (p1, op1), `Concrete (p2, op2) -> begin
+       match p_ntr_compare p1 p2 with
+       | 0 -> ocompare p_ntr_compare op1 op2
+       | n -> n
+end
+
+let rec m_ntr_compare (m1 : mpath) (m2 : mpath) =
+  match m_top_ntr_compare m1.m_top m2.m_top with
+  | 0 -> List.compare m_ntr_compare m1.m_args m2.m_args
+  | n -> n
+
+(* -------------------------------------------------------------------- *)
 module Mm = MPath.M
 module Hm = MPath.H
+
+module Sm = struct
+  include MPath.S
+
+  let ntr_elements s =
+    List.ksort ~key:identity ~cmp:m_ntr_compare (elements s)
+end
 
 (* -------------------------------------------------------------------- *)
 let mpath p args =
@@ -284,9 +331,10 @@ module XPath = MakeMSH (struct
   let tag = x_hash
 end)
 
-module Sx = XPath.S
-module Mx = XPath.M
-module Hx = XPath.H
+let x_ntr_compare (xp1 : xpath) (xp2 : xpath) =
+  match m_ntr_compare xp1.x_top xp2.x_top with
+  | 0 -> p_ntr_compare xp1.x_sub xp2.x_sub
+  | n -> n
 
 let xpath top sub =
   Hsxpath.hashcons { x_top = top; x_sub = sub; x_tag = -1; }
@@ -297,6 +345,17 @@ let xpath_fun mp f = xpath mp (psymbol f)
 let xqname x s = xpath x.x_top (pqname x.x_sub s)
 let xastrip x = { x with x_top = mastrip x.x_top }
 let xbasename xp = basename xp.x_sub
+
+(* -------------------------------------------------------------------- *)
+module Mx = XPath.M
+module Hx = XPath.H
+
+module Sx = struct
+  include XPath.S
+
+  let ntr_elements s =
+    List.ksort ~key:identity ~cmp:x_ntr_compare (elements s)
+end
 
 (* -------------------------------------------------------------------- *)
 let rec m_tostring (m : mpath) =
