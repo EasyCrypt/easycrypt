@@ -349,10 +349,19 @@ theory LazyEager.
                    if (mem (dom IND_Eager.H.m) x){1}
                    then IND_Eager.H.m{1} = IND_Lazy.H.m{2}
                    else eq_except IND_Eager.H.m{1} IND_Lazy.H.m{2} (pred1 x{1})).
-          auto; (progress; expect 12 idtac); last 2 first; first 11 smt.
-          case ((pick work = x){2})=> pick_x; last smt.
-          subst x{2}; move: H7 H1; rewrite -neqF /eq_except=> -> /= eq_exc.
-          by apply fmapP=> x0; case (pick work{2} = x0); smt.
+          auto=> /> &1 &2 Hpart m_x upd_cond work_neq_nil y _.
+          case: (mem work{2} x{2})=> [|^x_in_work /Hpart x_in_Em]; last first.
+          + move: upd_cond; rewrite x_in_Em=> /= <*>.
+            case: (pick work{2} = x{2})=> //= ^pkwork_neq_x.
+            rewrite in_fsetD1 eq_sym dom_set !inE !getP=> -> /=.
+            rewrite eq_except_set 1:eq_except_refl /=.
+            by split=> ^ + ->.
+          case: (pick work{2} = x{2})=> [<<*> _|].
+          + rewrite in_fsetD1 dom_set !getP !inE //=.
+            smt (@NewFMap).
+          rewrite in_fsetD1 dom_set !getP !inE //= eq_sym => -> -> //=.
+          rewrite m_x eq_except_set 1:[smt (@NewFMap)] //=.
+          smt (@NewFMap @FSet).
         by auto; smt.
 
       wp; while (={x,work} /\
