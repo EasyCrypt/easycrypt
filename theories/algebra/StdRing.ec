@@ -23,10 +23,11 @@ theory RField.
 
   lemma nosmt ofintR (i : int): ofint i = i%r.
   proof.
-    have h: forall i, 0 <= i => ofint i = i%r.
-      elim=> [|j j_ge0 ih] //=; first by rewrite ofint0.
-      by rewrite ofintS // fromintD ih addrC.
-    elim/natind: i; smt.
+  have h: forall i, 0 <= i => ofint i = i%r.
+  + elim=> [|j j_ge0 ih] //=; first by rewrite ofint0.
+    by rewrite ofintS // fromintD ih addrC.
+  elim/natind: i=> [n|/#].
+  by rewrite -oppz_ge0 -eqr_opp -ofintN -fromintN; exact/h.
   qed.
 
   lemma intmulr x c : intmul x c = x * c%r.
