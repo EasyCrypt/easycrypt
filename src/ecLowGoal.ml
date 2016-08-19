@@ -570,23 +570,21 @@ module Apply = struct
                 let forview (p, fs) =
                   (* Current proof-term is view argument *)
                   (* Copy PT environment to set a back-track point *)
-                  let argpt = { pt with ptev_env = PT.copy pt.ptev_env } in
+                  let ptenv = PT.copy pt.ptev_env in
+                  let argpt = { pt with ptev_env = ptenv } in
                   let argpt = { ptea_env = argpt.ptev_env;
                                 ptea_arg = PVASub argpt; } in
 
                   (* Type-check view - FIXME: the current API is perfectible *)
+                  let viewpt = PT.pt_of_global_r ptenv p [] in
                   let viewpt =
-                    { pt_head = PTGlobal (p, []);
-                      pt_args = List.map (fun f -> PAFormula f) fs; } in
-                  let viewpt, ax = LowApply.check `Elim viewpt (`Hyps (hyps, !!tc)) in
+                    List.fold_left
+                      (fun viewpt arg -> apply_pterm_to_arg_r viewpt (PVAFormula arg))
+                      viewpt fs in
 
                   (* Apply view to its actual arguments *)
-                  let viewpt = apply_pterm_to_arg
-                      { ptev_env = argpt.ptea_env;
-                        ptev_pt  = viewpt;
-                        ptev_ax  = ax; }
-                      argpt
-                  in
+                  let viewpt = apply_pterm_to_arg viewpt argpt in
+
                   try  Some (instantiate false true viewpt)
                   with NoInstance _ -> None
                 in
