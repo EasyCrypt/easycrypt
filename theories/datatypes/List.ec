@@ -2316,7 +2316,7 @@ lemma sort_rem (e : 'a -> 'a -> bool) :
 proof.
 move=> e_tot e_tr e_asym x s ^sx /perm_to_rem eqs.
 have ^ssx: mem (sort e s) x by rewrite mem_sort sx.
-case/splitPr=> s1 s2 ^eqss ->; exists s1, s2 => //=.
+case/splitPr=> s1 s2 ^eqss ->; exists s1 s2 => //=.
 have ss: sorted e (s1 ++ x :: s2) by rewrite -eqss sort_sorted.
 have ss12 := subseq_sorted e e_tr (s1 ++ s2) _ _ ss.
   by apply/cat_subseq/subseq_cons; apply/subseq_refl.

@@ -2286,7 +2286,7 @@ logtactic:
 | ALGNORM
    { Palg_norm }
 
-| EXIST a=iplist1(loc(gpterm_arg), COMMA) %prec prec_below_comma
+| EXIST a=iplist1(loc(gpterm_arg), empty)
    { Pexists a }
 
 | LEFT

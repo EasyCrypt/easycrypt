@@ -13,10 +13,10 @@ require import Fun Int IntExtra Ring StdOrder.
 lemma nosmt euclide_nat m d : 0 <= m => 0 < d =>
   exists q r, 0 <= r < d /\ m = q * d + r.
 proof.
-move=> ge0_m gt0_d; elim: m ge0_m => [|m ih] //=; 1: by exists 0, 0.
+move=> ge0_m gt0_d; elim: m ge0_m => [|m ih] //=; 1: by exists 0 0.
 case=> q r [[ge0_r lt_rd] ->]; case: (r + 1 = d) => [SrE|ne_Sr_d].
-  exists (q+1), 0 => //=; 1: by rewrite gt0_d -addrA SrE /= mulrDl.
-exists q, (r+1) => //; rewrite addr_ge0 //= ltr_neqAle ne_Sr_d /=.
+  exists (q+1) 0 => //=; 1: by rewrite gt0_d -addrA SrE /= mulrDl.
+exists q (r+1) => //; rewrite addr_ge0 //= ltr_neqAle ne_Sr_d /=.
 by rewrite -ltzE lt_rd addrA.
 qed.
 

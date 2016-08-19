@@ -399,7 +399,7 @@ abstract theory GenEager.
        ={x} /\ eq_except FRO.m{1} FRO.m{2} (pred1 x{1}) /\
        FRO.m{1}.[x{2}] = Some (result{2},Unknown) /\
        FRO.m{2}.[x{2}] = Some (result{2},Known)).
-    + by move=> ? &mr [#] -> -> ? ?; exists FRO.m{mr}, x{mr}=> /#.
+    + by move=> ? &mr [#] -> -> ? ?; exists FRO.m{mr} x{mr}=> /#.
     + move=> ? ? ?; rewrite in_dom=> [#] <*> [#] -> /eq_except_sym H Hxm Hx2.
       rewrite sampleto_ll=> r _; rewrite /= Hxm oget_some /=; apply /eq_sym.
       have /(congr1 oget):= Hx2 => <-; apply/eq_except_set_eq=> //.
@@ -446,7 +446,7 @@ abstract theory GenEager.
       (={x,y,FRO.m} /\ mem (dom FRO.m{1}) x{1} /\ (oget FRO.m{1}.[x{1}]).`2 = Unknown==>
        ={x,y} /\ eq_except FRO.m{1} FRO.m{2} (pred1 x{1}) /\
        FRO.m{2}.[x{2}] = Some (y{2},Known)).
-    + by move=> ? &mr [#] 2-> ? ? ?; exists FRO.m{mr}, x{mr}, y{mr}=> /#.
+    + by move=> ? &mr [#] 2-> ? ? ?; exists FRO.m{mr} x{mr} y{mr}=> /#.
     + move=> ? &m &mr [#] <*> [#] 2-> Hex Hm2.
       by rewrite (@eq_except_set_eq FRO.m{mr} FRO.m{m} x{mr}) ?in_dom ?Hm2 // eq_except_sym.
     + symmetry; call (iter1_perm RRO.I iter_perm2); auto=> ? &mr [#] 3 -> Hdom Hm; split=> //=.
@@ -485,7 +485,7 @@ abstract theory GenEager.
       { Iter(RRO.I).iter_1s(x,elems (dom (restr Unknown FRO.m) `\` fset1 x)); }
       (={x,FRO.m}/\(in_dom_with FRO.m x Unknown){1}==> ={x,FRO.m}) 
       (={x,FRO.m}/\ (in_dom_with FRO.m x Unknown){1} ==> (rem x FRO.m){1} = FRO.m{2})=>//.
-    + by move=> ? &mr [#] 2-> ?; exists FRO.m{mr}, x{mr}.
+    + by move=> ? &mr [#] 2-> ?; exists FRO.m{mr} x{mr}.
     + symmetry; call (iter1_perm RRO.I iter_perm2); skip=> ? &mr [#] 2-> ? /=; split=> //.
       by apply/perm_eq_sym/perm_to_rem/dom_restr. 
     inline{1}Iter(RRO.I).iter_1s.
@@ -561,7 +561,7 @@ abstract theory GenEager.
     + inline{2} RRO.resample;call (iter1_perm RRO.I iter_perm2).
       auto=> ? &mr [#] 2-> Hmem /= ? -> /=.
       by apply/perm_eq_sym/perm_to_rem; rewrite restr_set /= dom_set !inE.
-    + by move=> ? &mr [#] 2-> ?; exists FRO.m{mr}, x{mr}.
+    + by move=> ? &mr [#] 2-> ?; exists FRO.m{mr} x{mr}.
     inline Iter(RRO.I).iter_1s RRO.I.f RRO.resample; wp; swap{1} -1.
     seq  1  7: (={x} /\ eq_except FRO.m{1} FRO.m{2} (pred1 x{1}) /\
                 l{2} = (elems (dom (restr Unknown FRO.m))){1} /\
@@ -708,7 +708,7 @@ abstract theory GenEager.
           ={res,glob D})
        (={glob D} /\ FRO.m{1} = map (fun _ c => (c,Known)) RO.m{2} ==>
           ={res,glob D})=>//.
-    + by move=> ? &mr [] 2->; exists (glob D){mr}, (map(fun _ c =>(c,Known))RO.m{mr}).
+    + by move=> ? &mr [] 2->; exists (glob D){mr} (map(fun _ c =>(c,Known))RO.m{mr}).
     + proc*; inline M.main1; wp; call (RO_FRO_D D); inline *.
       rcondf{2} 2; auto.
       + move=> &mr [] _ ->; apply mem_eq0=> z.
@@ -719,7 +719,7 @@ abstract theory GenEager.
        (={glob D, FRO.m} ==> ={res, glob D})
        (={glob D} /\ FRO.m{1} = map (fun _ c => (c,Known)) RO.m{2} ==>
           ={res,glob D})=>//.
-    + by move=> ? &mr [] 2->; exists (glob D){mr}, (map(fun _ c =>(c,Known))RO.m{mr}).
+    + by move=> ? &mr [] 2->; exists (glob D){mr} (map(fun _ c =>(c,Known))RO.m{mr}).
     + by proc; eager call (eager_D D); auto.
     proc*; inline M.main2; wp; call{1} RRO_resample_ll.
     symmetry; call (LRO_RRO_D D); auto=> &ml &mr [#] 2->; split=> //=.

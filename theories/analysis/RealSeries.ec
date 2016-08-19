@@ -204,9 +204,9 @@ move=> le_s12 ^sbl_s2 [M2 bs2]; have ^sbl_s1 [M1 bs1]: summable s1.
   exists M2=> J /bs2; (pose F := big _ _ _) => leFM.
   rewrite (ler_trans F) // /F; apply/ler_sum=> a _ /=; apply/le_s12.
 apply/ler_lub; first last; first split.
-+ by exists 0%r, []=> /=; apply/eq_sym/(@big_nil _ _).
++ by exists 0%r []=> /=; apply/eq_sym/(@big_nil _ _).
 + by exists M2=> x [J] [+ ->] - /bs2.
-+ by exists 0%r, []=> /=; apply/eq_sym/(@big_nil _ _).
++ by exists 0%r []=> /=; apply/eq_sym/(@big_nil _ _).
 move=> x [J] [uqJ ->] /=; exists (big predT (fun x => `|s2 x|) J).
 by split; [exists J | apply/ler_sum].
 qed.

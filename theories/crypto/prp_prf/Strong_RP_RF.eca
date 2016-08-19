@@ -545,7 +545,7 @@ section PRPi_PRPi'_Indirect.
     ={x, PRPi.m, PRPi.mi} ==> ={res, PRPi.m, PRPi.mi}.
   proof.
   transitivity PRPi'(Direct).f (={PRPi.m,PRPi.mi,x} ==> ={PRPi.m,PRPi.mi,res}) (={PRPi.m,PRPi.mi,x} ==> ={PRPi.m,PRPi.mi,res}).
-  + by move=> &1 &2 [->> [->> ->>]]; exists PRPi.m{2}, PRPi.mi{2}, x{2}.
+  + by move=> &1 &2 [->> [->> ->>]]; exists PRPi.m{2} PRPi.mi{2} x{2}.
   + done.
   + by proc; inline *; if=> //=; auto; progress; rewrite getP.
   + by proc; if=> //=; wp; call eq_Direct_Indirect.
@@ -555,7 +555,7 @@ section PRPi_PRPi'_Indirect.
     y{1} = x{2} /\ ={PRPi.m, PRPi.mi} ==> ={res, PRPi.m, PRPi.mi}.
   proof.
   transitivity PRPi'(Direct).fi (={PRPi.m,PRPi.mi} /\ y{1} = x{2} ==> ={PRPi.m,PRPi.mi,res}) (={PRPi.m,PRPi.mi,x} ==> ={PRPi.m,PRPi.mi,res}).
-  + by move=> &1 &2 [->> [->> ->>]]; exists PRPi.m{2}, PRPi.mi{2}, x{2}.
+  + by move=> &1 &2 [->> [->> ->>]]; exists PRPi.m{2} PRPi.mi{2} x{2}.
   + done.
   + by proc; inline *; if=> //=; auto; progress; rewrite getP.
   + by proc; if=> //=; wp; call eq_Direct_Indirect.

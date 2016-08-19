@@ -318,7 +318,7 @@ theory LazyEager.
         ((={x,work} /\ IND_Eager.H.m{1} = IND_Lazy.H.m{2} /\  mem work{1} x{1})
           /\ !mem (dom IND_Lazy.H.m{2}) x{2} ==>
             ={result} /\ IND_Eager.H.m{1} = IND_Lazy.H.m{2}) => //.
-        by move=> &1 &2 H; exists IND_Lazy.H.m{2}, work{2}, x{2}; move: H.
+        by move=> &1 &2 H; exists IND_Lazy.H.m{2} work{2} x{2}; move: H.
         transitivity{1} {
           while (work <> fset0) {
             f <- pick work;
@@ -332,7 +332,7 @@ theory LazyEager.
          }
          (={x,work,IND_Eager.H.m} ==> ={result,IND_Eager.H.m})
          (={x,work,IND_Eager.H.m} ==> ={result,IND_Eager.H.m})=> //.
-          by move=> &1 &2 H; exists IND_Eager.H.m{2}, work{2}, x{2}; move: H.
+          by move=> &1 &2 H; exists IND_Eager.H.m{2} work{2} x{2}; move: H.
         by sim; rnd{2}; sim: (={x,IND_Eager.H.m}); smt.
 
         wp; symmetry; eager

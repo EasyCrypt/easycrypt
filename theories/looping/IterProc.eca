@@ -173,19 +173,19 @@ section.
   transitivity Iter(O).iter
     (l{1}=i::s1 /\ l{2}=i::(s3++s4) /\ ={glob O} ==> ={glob O})
     (l{1}=i::(s3++s4) /\ l{2}=s3++i::s4 /\ ={glob O} ==> ={glob O})=>//.
-  + by move=> ? &mr [#] 2!-> _ ->; exists (glob O){mr}, (i :: (s3 ++ s4)).
+  + by move=> ? &mr [#] 2!-> _ ->; exists (glob O){mr} (i :: (s3 ++ s4)).
   + proc; rcondt{1} 1=> //; rcondt{2}1=> //.
     seq  2  2: (s1 = l{1} /\ l{2}=s3++s4 /\ ={glob O}).
     + by wp; call (_: true); auto; progress; rewrite drop0.
     transitivity{1} {Iter(O).iter(l);}
       (={l,glob O} ==> ={glob O})
       (s1 = l{1} /\ l{2} = s3 ++ s4 /\ ={glob O} ==> ={glob O})=> //.
-    + by move=> ? &mr [#] 3!->; exists (glob O){mr}, l{1}.
+    + by move=> ? &mr [#] 3!->; exists (glob O){mr} l{1}.
     + by inline Iter(O).iter; sim.
     transitivity{1} {Iter(O).iter(l);}
       (s1 = l{1} /\ l{2} = s3 ++ s4 /\ ={glob O} ==> ={glob O})
       (={l,glob O} ==> ={glob O})=> //.
-    + by move=> ? &mr [#] 3!->; exists (glob O){mr}, (s3++s4).
+    + by move=> ? &mr [#] 3!->; exists (glob O){mr} (s3++s4).
     + move: eq_s12; rewrite -(cat1s i s4) catA perm_eq_sym.
       rewrite perm_catCA /= perm_cons perm_eq_sym=> Hp.
       by call (ih (s3++s4) Hp).
@@ -200,7 +200,7 @@ section.
   transitivity Iter(O).iter
     (l{2} = l1{1}++l2{1} /\ ={glob O} ==> ={glob O})
     (perm_eq l{1} l{2} /\ ={glob O} ==> ={glob O})=>//.
-  + by move=> &ml&mr[??]; exists (glob O){mr}, (l1{ml} ++ l2{ml}).
+  + by move=> &ml&mr[??]; exists (glob O){mr} (l1{ml} ++ l2{ml}).
   + by symmetry;conseq (iter_cat O).
   by apply iter_perm.
   qed.
@@ -212,7 +212,7 @@ section.
   transitivity Iter(O).iter
     (l{2} = t{1}::l{1} /\ ={glob O} ==> ={glob O})
     (perm_eq l{1} l{2} /\ ={glob O} ==> ={glob O})=>//.
-  + by move=> &ml&mr[??]; exists (glob O){mr}, (t{ml}::l{ml}).
+  + by move=> &ml&mr[??]; exists (glob O){mr} (t{ml}::l{ml}).
   + proc;rcondt{2}1;1:by auto.
     by inline*;sim;wp;call (_:true);skip;progress;rewrite drop0.
   by apply iter_perm.
