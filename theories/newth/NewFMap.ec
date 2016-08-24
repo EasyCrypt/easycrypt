@@ -177,6 +177,11 @@ lemma getP_eq (m : ('a, 'b) fmap) (a : 'a) (b : 'b):
   m.[a <- b].[a] = Some b.
 proof. by rewrite getP. qed.
 
+lemma getP_neq (m : ('a, 'b) fmap) (a1 a2 : 'a) (b : 'b):
+  a1 <> a2 =>
+  m.[a1 <- b].[a2] = m.[a2].
+proof. by rewrite getP eq_sym=> ->. qed.
+
 lemma set_set (m : ('a,'b) fmap) x x' y y':
    m.[x <- y].[x' <- y'] = if x = x' then m.[x' <- y']
                            else m.[x' <- y'].[x <- y].
