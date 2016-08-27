@@ -38,9 +38,18 @@ type ttenv = {
   tt_smtmode   : [`Admit | `Strict | `Standard | `Report];
   tt_implicits : bool;
   tt_oldip     : bool;
+  tt_redlogic  : bool;
 }
 
 type engine = ptactic_core -> FApi.backward
+
+(* -------------------------------------------------------------------- *)
+let t_simplify_lg ?target ?delta (ttenv, logic) (tc : tcenv1) =
+  let logic =
+    match logic with
+    | `Default -> if ttenv.tt_redlogic then `Full else `ProductCompat
+    | `Variant -> if ttenv.tt_redlogic then `ProductCompat else `Full
+  in t_simplify ?target ?delta ~logic:(Some logic) tc
 
 (* -------------------------------------------------------------------- *)
 type focus_t = EcParsetree.tfocus
@@ -644,14 +653,14 @@ let rec process_rewrite1_r ttenv ?target ri tc =
       let tt =
         match simpl with
         | Some logic ->
-           t_simplify ?target:None ~logic:(Some logic) ~delta:false
+           t_simplify_lg ?target:None ~delta:false (ttenv, logic)
         | None -> t_id
       in FApi.t_seq tt process_trivial tc
 
   | RWSimpl logic ->
       let hyps   = FApi.tc1_hyps tc in
       let target = target |> omap (fst |- LDecl.hyp_by_name^~ hyps |- unloc) in
-      t_simplify ?target ~delta:false ~logic:(Some logic) tc
+      t_simplify_lg ?target ~delta:false (ttenv, logic) tc
 
   | RWDelta ((s, r, o), p) -> begin
       let do1 tc = process_delta ?target (s, o, p) tc in
@@ -1131,7 +1140,7 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
     let t =
       match simplify with
       | Some x ->
-         t_seq (t_simplify ~delta:false ~logic:(Some x)) process_trivial
+         t_seq (t_simplify_lg ~delta:false (ttenv, x)) process_trivial
       | None -> process_trivial
     in t tc
 
@@ -1141,7 +1150,7 @@ let rec process_mintros_1 ?(cf = true) ttenv pis gs =
     else process_smt ttenv pi tc
 
   and intro1_simplify (_ : ST.state) logic tc =
-    t_simplify ~delta:false tc ~logic:(Some logic)
+    t_simplify_lg ~delta:false (ttenv, logic) tc
 
   and intro1_clear (_ : ST.state) xs tc =
     process_clear xs tc

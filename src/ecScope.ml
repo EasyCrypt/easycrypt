@@ -241,10 +241,12 @@ end
 module KnownFlags = struct
   let implicits = "implicits"
   let oldip     = "oldip"
+  let redlogic  = "redlogic"
 
   let flags = [
     (implicits, false);
     (oldip    , true );
+    (redlogic , true );
   ]
 end
 
@@ -429,6 +431,12 @@ module Options = struct
 
   let set_oldip scope value =
     set scope KnownFlags.oldip value
+
+  let get_redlogic scope =
+    get scope KnownFlags.redlogic
+
+  let set_redlogic scope value =
+    set scope KnownFlags.redlogic value
 end
 
 (* -------------------------------------------------------------------- *)
@@ -719,7 +727,8 @@ module Tactics = struct
           EcHiGoal.tt_provers    = pi scope;
           EcHiGoal.tt_smtmode    = htmode;
           EcHiGoal.tt_implicits  = Options.get_implicits scope;
-          EcHiGoal.tt_oldip      = Options.get_oldip scope; } in
+          EcHiGoal.tt_oldip      = Options.get_oldip scope;
+          EcHiGoal.tt_redlogic   = Options.get_redlogic scope; } in
 
         let (hds, juc) =
           try  TTC.process ttenv tac juc

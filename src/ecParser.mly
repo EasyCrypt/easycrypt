@@ -1894,10 +1894,10 @@ intro_pattern:
    { IPDone None }
 
 | SLASHSLASHEQ
-   { IPDone (Some `Full) }
+   { IPDone (Some `Default) }
 
 | SLASHSLASHTILDEQ
-   { IPDone (Some `ProductCompat) }
+   { IPDone (Some `Variant) }
 
 | SLASHSHARP
    { IPSmt (false, { (SMT.mk_smt_option []) with plem_max = Some (Some 0) }) }
@@ -1906,10 +1906,10 @@ intro_pattern:
    { IPSmt (true, { (SMT.mk_smt_option []) with plem_max = Some (Some 0) }) }
 
 | SLASHEQ
-   { IPSimplify `Full }
+   { IPSimplify `Default }
 
 | SLASHTILDEQ
-   { IPSimplify `ProductCompat }
+   { IPSimplify `Variant }
 
 | SLASH f=pterm
    { IPView f }
@@ -2009,10 +2009,10 @@ rwarg1:
    { RWDone None }
 
 | SLASHSLASHEQ
-   { RWDone (Some `Full) }
+   { RWDone (Some `Default) }
 
 | SLASHSLASHTILDEQ
-   { RWDone (Some `ProductCompat) }
+   { RWDone (Some `Variant) }
 
 | SLASHSHARP
    { RWSmt (false, { (SMT.mk_smt_option []) with plem_max = Some (Some 0) }) }
@@ -2021,10 +2021,10 @@ rwarg1:
    { RWSmt (true, { (SMT.mk_smt_option []) with plem_max = Some (Some 0) }) }
 
 | SLASHEQ
-   { RWSimpl `Full }
+   { RWSimpl `Default }
 
 | SLASHTILDEQ
-   { RWSimpl `ProductCompat }
+   { RWSimpl `Variant }
 
 | s=rwside r=rwrepeat? o=rwocc? fp=rwpterms
    { RWRw ((s, r, o), fp) }
