@@ -482,6 +482,7 @@ type async_while_info = {
 type inline_info = [
   | `ByName    of oside * (pgamepath list * int list option)
   | `ByPattern of pipattern
+  | `CodePos   of (oside * codepos)
   | `All       of oside
 ]
 

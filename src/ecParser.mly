@@ -2475,6 +2475,9 @@ phltactic:
 | INLINE s=side? o=occurences? f=plist1(loc(fident), empty)
     { Pinline (`ByName (s, (f, o))) }
 
+| INLINE s=side? p=codepos
+    { Pinline (`CodePos (s, p)) }
+
 | INLINE s=side? STAR
     { Pinline (`All s) }
 

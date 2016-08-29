@@ -193,6 +193,7 @@ let t_inline_equiv   = FApi.t_low2 "equiv-inline"   t_inline_equiv_r
 
 (* -------------------------------------------------------------------- *)
 module HiInternal = struct
+  (* ------------------------------------------------------------------ *)
   let pat_all env fs s =
     let test f =
       let is_defined = function FBdef _ -> true | _ -> false in
@@ -209,17 +210,17 @@ module HiInternal = struct
 
     let rec aux_i i =
       match i.i_node with
-      | Scall(_, f, _) ->
+      | Scall (_, f, _) ->
           if test f then Some IPpat else None
 
-      | Sif(_, s1, s2) ->
+      | Sif (_, s1, s2) ->
           let sp1 = aux_s 0 s1.s_node in
           let sp2 = aux_s 0 s2.s_node in
           if   List.is_empty sp1 && List.is_empty sp2
           then None
           else Some (IPif (sp1, sp2))
 
-      | Swhile(_, s) ->
+      | Swhile (_, s) ->
           let sp = aux_s 0 s.s_node in
           if List.is_empty sp then None else Some (IPwhile (sp))
 
@@ -235,6 +236,7 @@ module HiInternal = struct
     in
       aux_s 0 s.s_node
 
+  (* ------------------------------------------------------------------ *)
   let pat_of_occs cond occs s =
     let occs = ref occs in
 
@@ -249,13 +251,13 @@ module HiInternal = struct
           end else occ, None
         else occ, None
 
-      | Sif(_,s1,s2) ->
+      | Sif (_, s1, s2) ->
         let occ, sp1 = aux_s occ 0 s1.s_node in
         let occ, sp2 = aux_s occ 0 s2.s_node in
         let ip = if sp1 = [] && sp2 = [] then None else Some (IPif (sp1, sp2)) in
         occ, ip
 
-      | Swhile(_,s) ->
+      | Swhile (_, s) ->
         let occ, sp = aux_s occ 0 s.s_node in
         let ip = if sp = [] then None else Some(IPwhile sp) in
         occ, ip
@@ -269,12 +271,38 @@ module HiInternal = struct
         match aux_i occ i with
         | occ, Some ip ->
           let occ, sp = aux_s occ 0 s in
-          occ, (n,ip) :: sp
+          occ, (n, ip) :: sp
         | occ, None -> aux_s occ (n+1) s in
 
     let sp = snd (aux_s 0 0 s.s_node) in
 
     assert (Sint.is_empty !occs); sp    (* FIXME error message *)
+
+  (* ------------------------------------------------------------------ *)
+  let pat_of_spath =
+    let module Zp = EcMatching.Zipper in
+
+    let rec aux_i aout ip =
+      match ip with
+      | Zp.ZTop -> aout
+      | Zp.ZWhile  (_, sp)    -> aux_s (IPwhile aout) sp
+      | Zp.ZIfThen (_, sp, _) -> aux_s (IPif (aout, [])) sp
+      | Zp.ZIfElse (_, _, sp) -> aux_s (IPif ([], aout)) sp
+
+    and aux_s aout ((sl, _), ip) =
+      aux_i [(List.length sl, aout)] ip
+
+    in fun (p : Zp.spath) -> aux_s IPpat p
+
+  (* ------------------------------------------------------------------ *)
+  let pat_of_codepos pos stmt =
+    let module Zp = EcMatching.Zipper in
+
+    let zip = Zp.zipper_of_cpos pos stmt in
+    match zip.Zp.z_tail with
+    | { i_node = Scall _ } :: tl ->
+         pat_of_spath ((zip.Zp.z_head, tl), zip.Zp.z_path)
+    | _ -> raise Zp.InvalidCPos
 end
 
 (* -------------------------------------------------------------------- *)
@@ -345,6 +373,30 @@ let process_inline_occs side fs occs tc =
   | _, _ -> tc_error !!tc "invalid arguments"
 
 (* -------------------------------------------------------------------- *)
+let process_inline_codepos side pos tc =
+  let concl = FApi.tc1_goal tc in
+
+  try
+    match concl.f_node, side with
+    | FequivS es, Some b ->
+        let st = sideif b es.es_sl es.es_sr in
+        let sp = HiInternal.pat_of_codepos pos st in
+        t_inline_equiv b sp tc
+
+    | FhoareS hs, None ->
+        let sp = HiInternal.pat_of_codepos pos hs.hs_s in
+        t_inline_hoare sp tc
+
+    | FbdHoareS bhs, None ->
+        let sp = HiInternal.pat_of_codepos pos bhs.bhs_s in
+        t_inline_bdhoare sp tc
+
+    | _, _ -> tc_error !!tc "invalid arguments"
+
+  with EcMatching.Zipper.InvalidCPos ->
+    tc_error !!tc "invalid position"
+
+(* -------------------------------------------------------------------- *)
 let process_inline infos tc =
   match infos with
   | `ByName (side, (fs, occs)) -> begin
@@ -359,6 +411,9 @@ let process_inline infos tc =
         | None      -> process_inline_all side (Some fs) tc
         | Some occs -> process_inline_occs side fs occs tc
     end
+
+  | `CodePos (side, pos) ->
+       process_inline_codepos side pos tc
 
   | `All side -> process_inline_all side None tc
 
