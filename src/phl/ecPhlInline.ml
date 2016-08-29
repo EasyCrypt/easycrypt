@@ -338,7 +338,11 @@ let process_inline_occs side fs occs tc =
       let sp = HiInternal.pat_of_occs cond occs hs.hs_s in
         t_inline_hoare sp tc
 
-  | _, _ -> assert false (* FIXME error message *)
+  | FbdHoareS bhs, None ->
+      let sp = HiInternal.pat_of_occs cond occs bhs.bhs_s in
+        t_inline_bdhoare sp tc
+
+  | _, _ -> tc_error !!tc "invalid arguments"
 
 (* -------------------------------------------------------------------- *)
 let process_inline infos tc =
