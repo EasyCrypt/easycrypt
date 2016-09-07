@@ -1886,26 +1886,33 @@ let t_progress ?options ?ti (tt : FApi.backward) (tc : tcenv1) =
   in entry tc
 
 (* -------------------------------------------------------------------- *)
+type cstate = {
+  cs_sbeq : Sid.t option;
+}
+
 let t_crush ?(delta = true) (tc : tcenv1) =
-  let t_progress_subst ?eqid =
+  let t_progress_subst ?(tg : Sid.t option) ?eqid =
     let sk1 = { empty_subst_kind with sk_local = true ; } in
     let sk2 = {  full_subst_kind with sk_local = false; } in
     FApi.t_or
-      (t_subst ~clear:false ~kind:sk1 ?eqid)
-      (t_subst ~clear:false ~kind:sk2 ?eqid)
+      (t_subst ?tg ~clear:false ~kind:sk1 ?eqid)
+      (t_subst ?tg ~clear:false ~kind:sk2 ?eqid)
   in
 
   let tt = FApi.t_try (t_assumption `Alpha) in
-  let ts id = FApi.t_try (t_progress_subst ~eqid:id) in
+
+  let ts ?tg id =
+    FApi.t_try (t_progress_subst ?tg ~eqid:id) in
 
   (* Entry of progress: simplify goal, and chain with progress *)
-  let rec entry tc = FApi.t_seq (t_simplify ~delta:false) aux0 tc
+  let rec entry (st : cstate) tc =
+    FApi.t_seq (t_simplify ~delta:false) (aux0 st) tc
 
   (* Progress (level 0): try to apply user tactic. *)
-  and aux0 tc = FApi.t_seq (FApi.t_try tt) aux1 tc
+  and aux0 (st : cstate) tc = FApi.t_seq (FApi.t_try tt) (aux1 st) tc
 
   (* Progress (level 1): intro/elim top-level assumption. *)
-  and aux1 tc =
+  and aux1 (st : cstate) tc =
     let hyps, concl = FApi.tc1_flat tc in
 
     match sform_of_form concl with
@@ -1913,8 +1920,10 @@ let t_crush ?(delta = true) (tc : tcenv1) =
       let bd  = fst (destr_forall concl) in
       let ids = List.map (EcIdent.name |- fst) bd in
       let ids = LDecl.fresh_ids hyps ids in
+      let st  = { st with cs_sbeq = st.cs_sbeq |> omap (fun tg ->
+         List.fold_left ((^~) Sid.add) tg ids) } in
       FApi.t_seqs
-        [t_intros_i ids; aux0;
+        [t_intros_i ids; aux0 st;
          t_generalize_hyps ~clear:`Yes ~missing:true ids]
         tc
 
@@ -1922,7 +1931,7 @@ let t_crush ?(delta = true) (tc : tcenv1) =
       let tys    = List.map snd fs in
       let tc, hd = FApi.bwd1_of_fwd (pf_gen_tuple_elim tys hyps) tc in
       let pt     = { pt_head = PTHandle hd; pt_args = []; } in
-      FApi.t_seq (t_elimT_form pt f1) aux0 tc
+      FApi.t_seq (t_elimT_form pt f1) (aux0 st) tc
 
     | SFimp (_, _) -> begin
       let id = LDecl.fresh_id hyps "_" in
@@ -1930,9 +1939,10 @@ let t_crush ?(delta = true) (tc : tcenv1) =
       match t_intros_i_seq [id] tt tc with
       | tc when FApi.tc_done tc -> tc
       | tc ->
+          let st = { st with cs_sbeq = st.cs_sbeq |> omap (Sid.add id); } in
           let tc = FApi.as_tcenv1 tc in
           let tc =
-            let rw = t_rewrite_hyp ~xconv:`AlphaEq ~mode:`Bool id (`LtoR, None)in
+            let rw = t_rewrite_hyp ~xconv:`AlphaEq ~mode:`Bool id (`LtoR, None) in
             (    FApi.t_try (t_absurd_hyp ~conv:`AlphaEq ~id)
               @! FApi.t_try (FApi.t_seq (FApi.t_try rw) tt)
               @! t_generalize_hyp ~clear:`Yes id) tc
@@ -1941,7 +1951,7 @@ let t_crush ?(delta = true) (tc : tcenv1) =
           let iffail tc =
             t_intros_i_seq [id]
               (FApi.t_seqs
-                 [ts id; entry;
+                 [ts ?tg:st.cs_sbeq id; entry st;
                   t_generalize_hyp ~clear:`Yes ~missing:true id])
               tc
           in
@@ -1950,7 +1960,8 @@ let t_crush ?(delta = true) (tc : tcenv1) =
           let reduce = if delta then `Full else `NoDelta in
 
           FApi.t_onall
-            (FApi.t_switch ~on:`All (t_elim_r ~reduce elims) ~ifok:aux0 ~iffail)
+            (FApi.t_switch ~on:`All ~ifok:(aux0 st) ~iffail
+                           (t_elim_r ~reduce elims))
             tc
     end
 
@@ -1958,7 +1969,9 @@ let t_crush ?(delta = true) (tc : tcenv1) =
        let reduce = if delta then `Full else `NoDelta in
        let thesplit = t_split ~closeonly:false ~reduce in
        let tc =
-         match FApi.t_try_base (FApi.t_seq thesplit aux0) tc with
+         let stsub = { st with cs_sbeq = Some Sid.empty } in
+
+         match FApi.t_try_base (FApi.t_seq thesplit (aux0 stsub)) tc with
          | `Success tc -> tc
          | `Failure _  ->
             FApi.t_try
@@ -1977,10 +1990,13 @@ let t_crush ?(delta = true) (tc : tcenv1) =
        let pt = { pt_head = PTHandle hd; pt_args = []; } in
 
        FApi.t_on1 nl t_id
-         ~ttout:(FApi.t_seqs [t_cutdef pt cl; aux0; t_abort])
+         ~ttout:(FApi.t_seqs [t_cutdef pt cl; aux0 st; t_abort])
          tc
 
-  in FApi.t_seq entry (t_simplify_with_info EcReduction.nodelta) tc
+  in
+
+  let state = { cs_sbeq = None; } in
+  FApi.t_seq (entry state) (t_simplify_with_info EcReduction.nodelta) tc
 
 (* -------------------------------------------------------------------- *)
 let t_logic_trivial (tc : tcenv1) =
