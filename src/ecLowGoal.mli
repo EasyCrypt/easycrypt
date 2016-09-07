@@ -204,6 +204,7 @@ type tside = [`All of [`LtoR | `RtoL] option | `LtoR | `RtoL]
 
 val t_subst:
      ?kind:subst_kind
+  -> ?tg:Sid.t
   -> ?clear:bool
   -> ?var:vsubst
   -> ?tside:tside

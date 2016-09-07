@@ -1564,10 +1564,14 @@ module LowSubst = struct
 end
 
 (* -------------------------------------------------------------------- *)
-let t_subst ?kind ?(clear = true) ?var ?tside ?eqid (tc : tcenv1) =
+let t_subst ?kind ?tg ?(clear = true) ?var ?tside ?eqid (tc : tcenv1) =
   let env, hyps, concl = FApi.tc1_eflat tc in
 
   let subst1 (subst, check) moved (id, lk) =
+    if   tg |> omap (fun tg -> not (Sid.mem id tg)) |> odfl false
+    then `Pre (id, lk)
+    else
+
     let check tg =
       check tg || not (Mid.disjoint (fun _ _ _ -> false) tg.f_fv moved) in
 
