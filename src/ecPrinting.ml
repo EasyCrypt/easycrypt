@@ -518,9 +518,9 @@ let get_e_projarg ppe e i =
   | _ -> raise NoProjArg
 
 (* -------------------------------------------------------------------- *)
-let pp_modtype1 (ppe : PPEnv.t) fmt mty = 
+let pp_modtype1 (ppe : PPEnv.t) fmt mty =
   EcSymbols.pp_msymbol fmt (PPEnv.modtype_symb ppe mty)
-  
+
 let pp_modtype (ppe : PPEnv.t) fmt ((mty, r) : module_type * _) =
   let pp_restr fmt (rx,r) =
     let pp_rx fmt rx =
@@ -1386,10 +1386,10 @@ and try_pp_notations (ppe : PPEnv.t) outer fmt f =
         let (ue, ev) =
           EcMatching.f_match_core fmnotation hy (ue, ev) bd f
         in
-  
+
         if not (EcMatching.can_concretize ev ue) then
           raise EcMatching.MatchFailure;
-  
+
         let rty  = ti nt.ont_resty in
         let tv   = List.map (ti |- tvar |- fst) tv in
         let args = List.map (curry f_local |- snd_map ti) nt.ont_args in
@@ -2351,6 +2351,27 @@ module PPGoal = struct
     | _ -> Format.fprintf fmt "%a@\n%!" (pp_form ppe) concl
 end
 
+(* -------------------------------------------------------------------- *)
+let pp_hyps (ppe : PPEnv.t) fmt hyps =
+  let hyps = EcEnv.LDecl.tohyps hyps in
+  let ppe = PPEnv.add_locals ppe (List.map fst hyps.EcBaseLogic.h_tvar) in
+  let ppe, pps =
+    List.map_fold PPGoal.pre_pp_hyp ppe
+                  (List.rev hyps.EcBaseLogic.h_local) in
+
+  begin match hyps.EcBaseLogic.h_tvar with
+  | [] -> Format.fprintf fmt "Type variables: <none>@\n\n%!"
+  | tv ->
+      Format.fprintf fmt "Type variables: %a@\n\n%!"
+        (pp_list ", " (pp_tyvar_ctt ppe)) tv
+  end;
+  List.iter (fun (id, dk) ->
+    Format.fprintf fmt
+      "%-.2s: @[<hov 2>%t@]@\n%!"
+      (PPEnv.local_symb ppe id) dk)
+    pps
+
+(* -------------------------------------------------------------------- *)
 let pp_goal (ppe : PPEnv.t) fmt (g, extra) =
   let n =
     match extra with
