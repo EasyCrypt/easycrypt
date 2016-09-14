@@ -61,10 +61,14 @@ all: build
 
 build: callprover native
 
+define do-core-build
+	$(OCAMLBUILD) "$(1)"
+endef
+
 define do-build
 	rm -f "$(1)$(EXE)"
 	sed 's/COMMIT/$(COMMIT)/g' < $(FVERSION).in > $(FVERSION)
-	$(OCAMLBUILD) "src/$(1)"
+  $(call do-core-build,src/$(1))
 	if [ ! -z "$(EXE)" ]; then \
 	  cp "_build/src/$(1)" "$(1)$(EXE)"; \
 	fi
@@ -170,16 +174,16 @@ distcheck: dist
 	  sed -e 1h -e 1s/./=/g -e 1p -e 1x -e '$$p' -e '$$x'
 
 # --------------------------------------------------------------------
+%.inferred.mli:
+	@$(call do-core-build,src/$@) && cat _build/src/$@
+
+# --------------------------------------------------------------------
 %.ml:
-	$(call do-build,src/$*.cmo)
+	$(call do-core-build,src/$*.cmo)
 
 # --------------------------------------------------------------------
 %.mli:
-	$(call do-build,src/$*.cmi)
-
-# --------------------------------------------------------------------
-%.inferred.mli:
-	$(call do-build,src/$@) && cat _build/src/$@
+	$(call do-core-build,src/$*.cmi)
 
 # --------------------------------------------------------------------
 pg:
