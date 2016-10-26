@@ -18,7 +18,7 @@ let _ = dispatch begin function
              | false -> S[A"-w"; A(Printf.sprintf "%s%d" mode wid)]
              | true  -> S[A"-warn-error"; A(Printf.sprintf "%s%d" mode wid)]
          in
-           for i = 1 to 45 do
+           for i = 1 to 59 do
              flag ["ocaml"; "compile"; Printf.sprintf "warn_+%d" i] & (wflag false `Enable  i);
              flag ["ocaml"; "compile"; Printf.sprintf "warn_-%d" i] & (wflag false `Disable i);
              flag ["ocaml"; "compile"; Printf.sprintf "warn_@%d" i] & (wflag false `Mark    i);
