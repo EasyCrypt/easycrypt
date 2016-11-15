@@ -105,6 +105,16 @@ module EqTest = struct
             alpha lid1 lid2
       | _, _ -> raise E.NotConv in
 
+    let check_binding env alpha (id1, ty1) (id2, ty2) =
+      if not (for_type env ty1 ty2) then
+        raise E.NotConv;
+      Mid.add id1 id2 alpha in
+
+    let check_bindings env alpha b1 b2 =
+      if List.length b1 <> List.length b2 then
+        raise E.NotConv;
+      List.fold_left2 (check_binding env) alpha b1 b2 in
+
     let rec aux alpha e1 e2 =
       e_equal e1 e2 || aux_r alpha e1 e2
 
@@ -115,7 +125,12 @@ module EqTest = struct
       | Evar   p1, Evar   p2 -> for_pv_norm env p1 p2
       | Eop(o1,ty1), Eop(o2,ty2) ->
           p_equal o1 o2 && List.all2 (for_type env) ty1 ty2
-
+      | Equant(q1,b1,e1), Equant(q2,b2,e2) when qt_equal q1 q2 -> begin
+          try
+            let alpha = check_bindings env alpha b1 b2 in
+            aux alpha e1 e2
+          with E.NotConv -> false
+        end
       | Eapp(f1,args1), Eapp(f2,args2) ->
           aux alpha f1 f2 &&
           List.all2 (aux alpha) args1 args2
