@@ -111,7 +111,7 @@ pweq ((k, glob A), (k, glob A)).
 + while true (Top.M - j); last by auto => /#.
   move=> z; wp; rnd predT; call adv_ll; auto; smt(lap_ll).
 + by move=> /#.
-case=> {v} I gA; case: (I < 0) => [lt0_I|];
+case=> {v} I gA; case: @[ambient] (I < 0) => [lt0_I|];
   first toequiv; first smt(ge0_eps).
   conseq (_ : ={j} /\ 0 <= k{2} /\ 0 <= j{1} ==> 0 <= k{2}); first 2 smt.
   while (0 <= k{2} /\ 0 <= j{2} /\ ={j}); last by auto=> /#.
@@ -121,7 +121,7 @@ case=> {v} I gA; case: (I < 0) => [lt0_I|];
     (call{1} (_ : true ==> true); first by apply/adv_ll); (* LL *)
     (call{2} (_ : true ==> true); first by apply/adv_ll); (* LL *)
     skip; smt(lap_ll).
-rewrite ltrNge /= => ge0_I; case: (M < I) => [le|].
+rewrite ltrNge /= => ge0_I; case: @[ambient] (M < I) => [le|].
   toequiv; first smt(ge0_eps).
   conseq (_ : ={j} /\ j{2} = 0 /\ k{2} = M ==> k{2} <= M);
     first 2 by move=> /#.
@@ -182,7 +182,7 @@ seq 4 4 : (
     (I = k{2} /\ gA = (glob A){2} =>
      I = k{1} /\ gA = (glob A){1})
 ) <[ (2%r * eps) & 0%r ]>.
-+ exists* k{2}; elim* => kR; case (kR < I) => [lt|].
++ exists* k{2}; elim* => kR; case: @[ambient] (kR < I) => [lt|].
   + conseq (_ : ={l, j, glob A} /\ j{1} = I /\ k{2} < I ==>
       ={l, j, glob A} /\ j{1} = I+1 /\ k{2} < I); first 2 by auto=> /#.
     toequiv; first smt(ge0_eps).
