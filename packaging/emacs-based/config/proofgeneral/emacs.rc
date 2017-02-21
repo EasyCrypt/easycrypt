@@ -1,4 +1,0 @@
-(load-file "share/easycrypt/pg/ProofGeneral/generic/proof-site.el")
-(setq easycrypt-prog-name "easycrypt")
-(setq easycrypt-prog-args '("-why3" "etc/why3.conf" "-reloc"))
-(custom-set-variables '(electric-indent-mode nil))
