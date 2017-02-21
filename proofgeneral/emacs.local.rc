@@ -1,4 +1,0 @@
-;; Local configuration file - don't load PG from here
-
-;; Disable eletric indent
-(when (fboundp 'electric-indent-mode) (electric-indent-mode -1))

@@ -43,22 +43,10 @@ system/win32/*.c
 system/unix/*.c
 
 # EasyCrypt examples
-examples/*.ec
-
-# EasyCrypt tests files
-find:tests/modules:*.ec
-find:tests/pbhl:*.ec
-find:tests/phl:*.ec
-find:tests/prhl:*.ec
-find:tests/tactics:*.ec
-find:tests/theories:*.ec
-find:tests/third-party:*.ec
-find:tests/typing:*.ec
-find:tests/unclassified:*.ec
+find:examples:*.ec
+find:examples:*.eca
 
 # Build scripts
-scripts/activate-toolchain.sh
-scripts/toolchain/ec-build-toolchain
 scripts/install/install-sh
 scripts/install/distribution
 scripts/testing/runtest
