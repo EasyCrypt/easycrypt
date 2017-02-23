@@ -9,15 +9,6 @@ _tags
 myocamlbuild.ml
 config/tests.config
 
-# proofgeneral
-proofgeneral/Makefile
-proofgeneral/proof-site.patch
-proofgeneral/pg-4.2.patch
-proofgeneral/emacs.local.rc
-proofgeneral/easycrypt/*.el
-proofgeneral/config/emacs.rc.in
-proofgeneral/scripts/find-emacs
-
 # EasyCrypt sources
 find:src:*.ml
 find:src:*.mli
