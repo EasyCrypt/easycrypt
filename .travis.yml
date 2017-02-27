@@ -7,10 +7,10 @@ branches:
   - 1.0
   - travis
 services:
+- docker
 notifications:
   email:
   - tracker@easycrypt.info
-- docker
 before_install:
 - docker pull strubpy/ec-build-box
 script:
