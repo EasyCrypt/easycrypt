@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/EasyCrypt/easycrypt.svg?branch=1.0)](https://travis-ci.org/EasyCrypt/easycrypt)
+
 Installing requirements
 ====================================================================
 
