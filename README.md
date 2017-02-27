@@ -46,8 +46,13 @@ via the opam OCaml packages manager.
 
         $> opam repository add easycrypt git://github.com/EasyCrypt/opam.git
         $> opam update
-        
-  2. Add the EasyCrypt meta-packages:
+
+  2. Optionally, use opam to install the system dependencies:
+
+        $> opam install depext
+        $> opam depext easycrypt
+
+  3. Add the EasyCrypt meta-packages:
 
         $> opam install --deps-only easycrypt
         $> opam install ec-provers
