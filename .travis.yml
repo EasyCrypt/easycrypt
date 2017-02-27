@@ -1,0 +1,19 @@
+sudo: required
+dist: trusty
+language: ocaml
+branches:
+  only:
+  - master
+  - 1.0
+  - travis
+services:
+notifications:
+  email:
+  - tracker@easycrypt.info
+- docker
+before_install:
+- docker pull strubpy/ec-build-box
+script:
+- >-
+  docker run -v $PWD:/home/ci/easycrypt strubpy/ec-build-box
+  sh -c 'cd easycrypt && opam config exec -- make'
