@@ -49,12 +49,21 @@ via the opam OCaml packages manager.
         $> opam repository add easycrypt git://github.com/EasyCrypt/opam.git
         $> opam update
 
-  2. Optionally, use opam to install the system dependencies:
+  2. Optionally, select the EasyCrypt (git) branch you want to use:
+
+       $> opam pin add easycrypt https://github.com/EasyCrypt/easycrypt.git#branch
+       
+     where `branch` is the branch name you want to use (e.g. `aprhl`).
+
+     In that case, we advise you to create a dedicated opam switch
+     (see first step above).
+
+  3. Optionally, use opam to install the system dependencies:
 
         $> opam install depext
         $> opam depext easycrypt
 
-  3. Add the EasyCrypt meta-packages:
+  4. Add the EasyCrypt meta-packages:
 
         $> opam install --deps-only easycrypt
         $> opam install ec-provers
@@ -97,8 +106,8 @@ Installing/Compiling EasyCrypt
 
 If installing from source, running
 
-        $> make
-        $> make install
+       $> make
+       $> make install
 
 builds and install EasyCrypt (under the binary named `easycrypt`),
 assuming that all dependencies have been successfully installed. If
@@ -108,12 +117,12 @@ binary `ec.native` that is located at the root of the source tree.
 It is possible to change the installation prefix by setting the
 environment variable PREFIX:
 
-        $> make PREFIX=/my/prefix install
+       $> make PREFIX=/my/prefix install
 
 
 EasyCrypt comes also with an opam package. Running
 
-      $> opam install easycrypt
+       $> opam install easycrypt
 
 installs EasyCrypt and its dependencies via opam. In that case, the
 EasyCrypt binary is named `easycrypt`.
