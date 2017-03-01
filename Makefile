@@ -100,9 +100,6 @@ install: ec.native uninstall
 	  $(INSTALL) -m 0755 -d $(DESTDIR)$(LIBDIR)/$$i ';'; \
 	  $(INSTALL) -m 0644 -t $(DESTDIR)$(LIBDIR)/$$i $$i/*.ec*; \
 	done
-	$(INSTALL) -m 0755 -d $(DESTDIR)$(SHRDIR)
-	$(INSTALL) -m 0755 -d $(DESTDIR)$(SHRDIR)/emacs
-	$(INSTALL) -m 0644 -t $(DESTDIR)$(SHRDIR)/emacs proofgeneral/easycrypt/*.el
 
 define rmdir
 	-@if [ -d "$(1)" ]; then rmdir "$(1)"; fi
