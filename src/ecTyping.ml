@@ -444,10 +444,10 @@ let rec check_sig_cnv mode (env:EcEnv.env) (sin:module_sig) (sout:module_sig) =
     List.fold_left2
       (fun subst (xin, tyin) (xout, tyout) ->
         let tyout = EcSubst.subst_modtype subst tyout in
-        begin 
+        begin
           try check_modtype_cnv ~mode env tyout tyin
           with TymodCnvFailure err ->
-            tymod_cnv_failure 
+            tymod_cnv_failure
               (E_TyModCnv_SubTypeArg(xin, tyout, tyin, err))
         end;
         EcSubst.add_module subst xout (EcPath.mident xin))
@@ -1407,13 +1407,13 @@ and transmodsig_body
 
 (* -------------------------------------------------------------------- *)
 let rec transmod ~attop (env : EcEnv.env) (me : pmodule_def) =
-  snd (transmod_header ~attop env me.ptm_header [] me.ptm_body) 
+  snd (transmod_header ~attop env me.ptm_header [] me.ptm_body)
 
 (* -------------------------------------------------------------------- *)
 and transmod_header
    ~attop (env : EcEnv.env) (mh:pmodule_header) params (me:pmodule_expr) =
   match mh with
-  | Pmh_ident x -> 
+  | Pmh_ident x ->
     0, transmod_body ~attop env x params me
   | Pmh_params {pl_desc = (mh,params')} ->
     let n, me = transmod_header ~attop env mh (params' @ params) me in
@@ -1428,18 +1428,18 @@ and transmod_header
         Sm.add (EcPath.mident id) mparams) Sm.empty rm in
     let filter f =
       let ftop = EcPath.m_functor f.EcPath.x_top in
-      not (Sm.mem ftop torm) in 
-    let clear (Tys_function(fsig,oi)) = 
+      not (Sm.mem ftop torm) in
+    let clear (Tys_function(fsig,oi)) =
       Tys_function(fsig, {oi with oi_calls = List.filter filter oi.oi_calls}) in
     let mis_body = List.map clear me.me_sig.mis_body in
     let tymod = { mis_params; mis_body } in
     (* Check that the signature is a subtype *)
-    let check s = 
+    let check s =
       let (aty, _asig) = transmodtype env s in
       try  check_sig_mt_cnv env tymod aty
-      with TymodCnvFailure err -> 
+      with TymodCnvFailure err ->
         let args = List.map (fun (id,_) -> EcPath.mident id) rm in
-        let mp = mpath_crt (psymbol me.me_name) args None in 
+        let mp = mpath_crt (psymbol me.me_name) args None in
         tyerror s.pl_loc env (TypeModMismatch(mp, aty, err)) in
     List.iter check mts;
     n,me
@@ -1465,7 +1465,7 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
         (InvalidModAppl (MAE_WrongArgCount(0,List.length allparams)));
     let me = EcEnv.Mod.by_mpath mp env in
     let arity = List.length stparams in
-    let me = 
+    let me =
       { me with
         me_name  = x.pl_desc;
         me_body  = ME_Alias (arity,mp);
@@ -1474,7 +1474,7 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
     me
   | Pm_struct ps ->
     transstruct ~attop env x.pl_desc stparams (mk_loc me.pl_loc ps)
-   
+
 (* -------------------------------------------------------------------- *)
 and transstruct ~attop (env : EcEnv.env) (x : symbol) stparams (st:pstructure located) =
   let { pl_loc = loc; pl_desc = st; } = st in
@@ -1849,7 +1849,7 @@ and translvalue ue (env : EcEnv.env) lvalue =
 
   | PLvTuple xs ->
       let xs = List.map (trans_pv env) xs in
-      if not (List.is_unique ~eq:(EqTest.for_pv_norm env) (List.map fst xs)) then
+      if not (List.is_unique ~eq:(EqTest.for_pv env) (List.map fst xs)) then
         tyerror lvalue.pl_loc env LvNonLinear;
       let ty = ttuple (List.map snd xs) in
       (LvTuple xs, ty)
