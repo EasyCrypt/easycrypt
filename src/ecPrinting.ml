@@ -2266,7 +2266,7 @@ let pp_equivS (ppe : PPEnv.t) fmt es =
 
     Format.fprintf fmt "&1 (left ) : %a%s@\n%!"
       (pp_funname ppe) (EcMemory.xpath es.es_ml)
-      (if insync then " [program are in sync]" else "");
+      (if insync then " [programs are in sync]" else "");
     Format.fprintf fmt "&2 (right) : %a@\n%!"
       (pp_funname ppe) (EcMemory.xpath es.es_mr);
     Format.fprintf fmt "@\n%!";
