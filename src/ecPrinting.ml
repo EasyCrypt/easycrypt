@@ -2249,32 +2249,36 @@ let pp_equivF (ppe : PPEnv.t) fmt ef =
 
 (* -------------------------------------------------------------------- *)
 let pp_equivS (ppe : PPEnv.t) fmt es =
-  let ppe, ppnode, mode, insync =
-    if EcMemory.mt_equal (snd es.es_ml) (snd es.es_mr) &&
-       EcModules.s_equal es.es_sl es.es_sr
-    then begin
+  let insync =
+    let ppe = PPEnv.push_mems ppe [es.es_ml; es.es_mr] in
+       EcMemory.mt_equal (snd es.es_ml) (snd es.es_mr)
+    && EcReduction.EqTest.for_stmt
+         ppe.PPEnv.ppe_env ~norm:false es.es_sl es.es_sr in
+
+  let ppe, ppnode, mode =
+    if insync then begin
       let ppe    = PPEnv.push_mem ~active:true ppe es.es_ml in
       let ppnode = collect2_s es.es_sl.s_node [] in
       let ppnode = c_ppnode ~width:80 ppe ppnode in
-      (ppe, ppnode, `Left, true)
+      (ppe, ppnode, `Left)
     end else begin
-      let ppe    = PPEnv.push_mems ppe [es.es_ml; es.es_mr] in
       let ppnode = collect2_s es.es_sl.s_node es.es_sr.s_node in
-      let ppnode = c_ppnode ~width:40 ~mem:(fst es.es_ml, fst es.es_mr) ppe ppnode in
-      (ppe, ppnode, `Both, false)
+      let ppnode = c_ppnode ~width:40 ~mem:(fst es.es_ml, fst es.es_mr)
+                            ppe ppnode in
+      (ppe, ppnode, `Both)
     end in
 
-    Format.fprintf fmt "&1 (left ) : %a%s@\n%!"
-      (pp_funname ppe) (EcMemory.xpath es.es_ml)
-      (if insync then " [programs are in sync]" else "");
-    Format.fprintf fmt "&2 (right) : %a@\n%!"
-      (pp_funname ppe) (EcMemory.xpath es.es_mr);
-    Format.fprintf fmt "@\n%!";
-    Format.fprintf fmt "%a%!" (pp_pre ppe) es.es_pr;
-    Format.fprintf fmt "@\n%!";
-    Format.fprintf fmt "%a" (pp_node mode) ppnode;
-    Format.fprintf fmt "@\n%!";
-    Format.fprintf fmt "%a%!" (pp_post ppe) es.es_po
+  Format.fprintf fmt "&1 (left ) : %a%s@\n%!"
+    (pp_funname ppe) (EcMemory.xpath es.es_ml)
+    (if insync then " [programs are in sync]" else "");
+  Format.fprintf fmt "&2 (right) : %a@\n%!"
+    (pp_funname ppe) (EcMemory.xpath es.es_mr);
+  Format.fprintf fmt "@\n%!";
+  Format.fprintf fmt "%a%!" (pp_pre ppe) es.es_pr;
+  Format.fprintf fmt "@\n%!";
+  Format.fprintf fmt "%a" (pp_node mode) ppnode;
+  Format.fprintf fmt "@\n%!";
+  Format.fprintf fmt "%a%!" (pp_post ppe) es.es_po
 
 (* -------------------------------------------------------------------- *)
 type ppgoal = (EcBaseLogic.hyps * EcFol.form) * [
