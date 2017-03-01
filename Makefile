@@ -94,7 +94,7 @@ install: ec.native uninstall
 	-@$(call check-for-staled-files)
 	$(INSTALL) -m 0755 -d $(DESTDIR)$(BINDIR)
 	$(INSTALL) -m 0755 -T ec.native $(DESTDIR)$(BINDIR)/easycrypt$(EXE)
-	$(INSTALL) -m 0755 -T scripts/testting/runtest $(DESTDIR)$(BINDIR)/ec-runtest$(EXE)
+	$(INSTALL) -m 0755 -T scripts/testing/runtest $(DESTDIR)$(BINDIR)/ec-runtest$(EXE)
 	$(INSTALL) -m 0755 -d $(DESTDIR)$(SYSDIR)
 	$(INSTALL) -m 0755 -T system/callprover$(EXE) $(DESTDIR)$(SYSDIR)/callprover$(EXE)
 	for i in $$(find theories -type d); do \
