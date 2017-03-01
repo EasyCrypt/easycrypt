@@ -27,8 +27,8 @@ RUN \
 	opam init -a && \
 	opam remote add easycrypt https://github.com/EasyCrypt/opam.git && \
 	opam install depext && opam depext easycrypt ec-provers && \
-	opam install ec-provers && \
-	opam install --deps-only easycrypt && \
+	opam pin add easycrypt https://github.com/EasyCrypt/easycrypt.git#aprhl && \
+	opam install easycrypt.dev && \
 	rm -rf .opam/packages.dev/* && sudo apt-get -q -y clean
 
 RUN opam config exec -- why3 config --detect

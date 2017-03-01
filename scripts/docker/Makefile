@@ -3,7 +3,7 @@
 # --------------------------------------------------------------------
 # docker.com account name
 DNAME ?= strubpy
-BBOX  := build-box doc-box test-box
+BBOX  := build-box doc-box test-box aprhl-test-box
 
 # --------------------------------------------------------------------
 .PHONY: all __force__
