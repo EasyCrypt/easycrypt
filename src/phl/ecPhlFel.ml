@@ -138,10 +138,10 @@ let t_failure_event_r (at_pos, cntr, ash, q, f_event, pred_specs, inv) tc =
     with _ -> tc_error !!tc "not applicable to abstract functions"
   in
 
-  let s_hd, s_tl = 
+  let s_hd, s_tl =
     let len = List.length fdef.f_body.s_node in
-    if len < at_pos then 
-      tc_error !!tc 
+    if len < at_pos then
+      tc_error !!tc
       "the size of the initialization code %i should be smaller than the size of the function body %i" at_pos len;
     s_split at_pos fdef.f_body in
   let fve        = PV.fv env mhr f_event in
@@ -177,17 +177,17 @@ let t_failure_event_r (at_pos, cntr, ash, q, f_event, pred_specs, inv) tc =
 
   (* not fail and cntr=0 and invariant holds at designated program point,
      under the pre that the initial parameter values correspond to arguments,
-     and that the initial values of global read variables  
+     and that the initial values of global read variables
      are equal to the initial memory *)
-  
+
   let init_goal =
-    let xs,gs = PV.elements (f_read env f) in
+    let xs,gs = PV.ntr_elements (f_read env f) in
     let mh = fst memenv in
     let mi = pr.pr_mem in
     let f_xeq (x,ty) = f_eq (f_pvar x ty mh) (f_pvar x ty mi) in
     let eqxs = List.map f_xeq xs in
     let eqgs = List.map (fun m -> f_eqglob m mh m mi) gs in
-    let eqparams = 
+    let eqparams =
       let vs = oget fsig.fs_anames in
       let f_x x = f_pvloc f x mh in
       f_eq (f_tuple (List.map f_x vs)) pr.pr_args in
@@ -218,7 +218,7 @@ let t_failure_event_r (at_pos, cntr, ash, q, f_event, pred_specs, inv) tc =
     let old_b_id = EcIdent.create "b" in
     let old_cntr = f_local old_cntr_id tint in
     let old_b = f_local old_b_id tbool in
-    
+
     let cntr_decr_goal =
       let pre  = f_and some_p (f_eq old_cntr cntr) in
       let pre = f_and_simpl pre inv in
@@ -238,8 +238,10 @@ let t_failure_event_r (at_pos, cntr, ash, q, f_event, pred_specs, inv) tc =
     [not_F_to_F_goal;cntr_decr_goal;cntr_stable_goal]
   in
 
-  let os_goals = List.concat (List.map oracle_goal (Sx.elements os)) in
-  let concls   = bound_goal :: post_goal :: init_goal :: os_goals in
+  let os_goals =
+    List.concat (List.map oracle_goal (Sx.ntr_elements os)) in
+
+  let concls = bound_goal :: post_goal :: init_goal :: os_goals in
   let res = FApi.xmutate1 tc (`Fel (cntr, ash, q, f_event, pred_specs)) concls in
   res
 
@@ -256,13 +258,13 @@ let process_fel at_pos (infos : fel_info) tc =
   if not (IFEL.loaded env) then
     tacuerror "fel: load the `FelTactic' theory first";
 
-  let pr = 
+  let pr =
     match concl.f_node with
     | Fapp ({ f_node = Fop (op, _) }, [pr; _])
         when is_pr pr && EcPath.p_equal op EcCoreLib.CI_Real.p_real_le
-      -> destr_pr pr 
+      -> destr_pr pr
     | _ -> tc_error !!tc "a goal of the form Pr[ _ ] <= _ is required" in
-      
+
   let hyps    = LDecl.inv_memenv1 hyps1 in
   let cntr    = TTC.pf_process_form !!tc hyps tint infos.pfel_cntr in
   let ash     = TTC.pf_process_form !!tc hyps (tfun tint treal) infos.pfel_asg in

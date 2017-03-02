@@ -10,19 +10,85 @@ require import Fun Int IntExtra Ring StdOrder.
 (*---*) import Ring.IntID IntOrder.
 
 (* -------------------------------------------------------------------- *)
-op (%/) : int -> int -> int.
-op (%%) : int -> int -> int.
-
-axiom nosmt edivzP (m d : int):
-  m = (m %/ d) * d + (m %% d) /\ (d <> 0 => 0 <= m %% d < `|d|).
-
-axiom divz0 m: m %/ 0 = 0.
+lemma nosmt euclide_nat m d : 0 <= m => 0 < d =>
+  exists q r, 0 <= r < d /\ m = q * d + r.
+proof.
+move=> ge0_m gt0_d; elim: m ge0_m => [|m ih] //=; 1: by exists 0 0.
+case=> q r [[ge0_r lt_rd] ->]; case: (r + 1 = d) => [SrE|ne_Sr_d].
+  exists (q+1) 0 => //=; 1: by rewrite gt0_d -addrA SrE /= mulrDl.
+exists q (r+1) => //; rewrite addr_ge0 //= ltr_neqAle ne_Sr_d /=.
+by rewrite -ltzE lt_rd addrA.
+qed.
 
 (* -------------------------------------------------------------------- *)
+op euclidef (m d : int) (qr : int * int) =
+     m = qr.`1 * d + qr.`2
+  /\ (d <> 0 => 0 <= qr.`2 < `|d|).
+
+op edivn (m d : int) =
+  if (d < 0 \/ m < 0) then (0, 0) else
+    if d = 0 then (0, m) else choiceb (euclidef m d) (0, 0)
+  axiomatized by edivn_def.
+
+op edivz (m d : int) =
+  let (q, r) =
+    if 0 <= m then edivn m `|d| else
+      let (q, r) = edivn (-(m+1)) `|d| in
+      (- (q + 1), `|d| - 1 - r)
+    in (signz d * q, r)
+  axiomatized by edivz_def.
+
+op (%/) (m d : int) = (edivz m d).`1.
+op (%%) (m d : int) = (edivz m d).`2.
 op (%|) (m d : int) = (d %% m = 0).
 
 (* -------------------------------------------------------------------- *)
-lemma nosmt euclideU d q q' r r':
+lemma nosmt edivnP (m d : int): 0 <= m => 0 <= d =>
+  euclidef m d (edivn m d).
+proof.
+move=> ge0_m ge0_d; rewrite edivn_def !ltrNge !(ge0_m, ge0_d) /=.
+case: (d = 0) => [->|] //= nz_d; apply/(choicebP (euclidef m d)).
+case: (euclide_nat m d _ _) => //; 1: by rewrite ltr_neqAle eq_sym.
+by move=> q r [lt_rd mE]; exists (q, r); rewrite /euclidef ger0_norm.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt edivzP_r (m d : int): euclidef m d (edivz m d).
+proof.
+rewrite edivz_def; case: (0 <= m).
++ move=> ge0_m; case _: (edivn _ _) => q r E /=.
+  case: (edivnP m `|d| _ _) => //; rewrite ?normr_ge0 E /= => mE.
+  rewrite normr0P normr_id => lt_rd; split=> /= [|/lt_rd] //.
+  by rewrite mulrAC -signVzE mE mulrC.
+rewrite lerNgt /= => lt0_m; case _: (edivn _ _) => q r E /=.
+case: (edivnP (-(m+1)) `|d| _ _) => /=; rewrite ?E /=.
+  by rewrite oppr_ge0 -ltzE. by rewrite normr_ge0.
+rewrite normr0P normr_id=> mE lt_rd; split=> /=; last first.
+  move/lt_rd=> {lt_rd}[ge0_r lt_rd]; rewrite -addrA -opprD.
+  rewrite subr_ge0 (addrC 1) -ltzE lt_rd /= ltr_snaddr //.
+  by rewrite oppr_lt0 ltzS.
+apply/(addIr 1)/oppr_inj; rewrite mE; case: (d = 0) => [|nz_d].
+  by move=> ->; rewrite normr0 /= addrAC.
+by rewrite mulrN mulNr -addrA opprD opprK mulrAC -signVzE #ring.
+qed.
+
+lemma edivzP (m d : int) :
+  m = (m %/ d) * d + (m %% d) /\ (d <> 0 => 0 <= m %% d < `|d|).
+proof. by case: (edivzP_r m d) => @/(%/) @/(%%). qed.
+
+(* -------------------------------------------------------------------- *)
+lemma divz0 m: m %/ 0 = 0.
+proof.
+rewrite /(%/) edivz_def; case: (0 <= m) => /= _.
+  by case: (edivn _ _) => q r /=; rewrite signz0.
+by case: (edivn _ _) => q r /=; rewrite signz0.
+qed.
+
+lemma modz0 m: m %% 0 = m.
+proof. by have [/= <-] := edivzP m 0. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt euclideU d q q' r r' :
      q * d + r = q' * d + r'
   => 0 <= r  < `|d|
   => 0 <= r' < `|d|
@@ -50,14 +116,17 @@ by case: (edivzP m d)=> _ /(_ nz_d).
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma modz0 m: m %% 0 = m.
-proof. by have [/= <-] := edivzP m 0. qed.
-
-(* -------------------------------------------------------------------- *)
 lemma modz_ge0 m d : d <> 0 => 0 <= m %% d.
 proof.
 case: (d = 0) => [->|nz_d /=]; first by rewrite modz0.
 by case: (edivzP m d)=> _ /(_ nz_d) [].
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma modn_ge0 m d : 0 <= m => 0 <= m %% d.
+proof.
+by move=> ge0_m; case: (d = 0) => [->|nz_d /=];
+  [rewrite modz0 | rewrite modz_ge0].
 qed.
 
 (* -------------------------------------------------------------------- *)
@@ -374,10 +443,15 @@ qed.
 (* -------------------------------------------------------------------- *)
 lemma divNz (m d : int) :
   0 < m => 0 < d => (-m) %/ d = - ((m-1) %/ d + 1).
-proof. admit. qed.
+proof.
+move=> gt0_m gt0_d; rewrite /(%/) /(%%) !edivz_def.
+rewrite oppr_ge0 lerNgt gt0_m -ltzS -addrA gt0_m /=.
+rewrite opprD opprK; case _: (edivn _ _) => q r E /=.
+by rewrite mulrN signz_gt0.
+qed.
 
 lemma modNz m d : 0 < m => 0 < d =>
-  (-m) %% d = d - 1 - (m - 1) %% d.
+  (-m) %% d = d - 1 - (m-1) %% d.
 proof. by move=> gt0_m gt0_d; rewrite !modzE !divNz //; ring. qed.
 
 (* -------------------------------------------------------------------- *)
@@ -401,30 +475,25 @@ rewrite -(ltr_pmul2r _ d_gt0 _ n) //; apply/ler_lt_trans.
 by apply/lez_floor; rewrite gtr_eqF.
 qed.
 
-lemma nosmt lez_divRL m n d : 0 < d => (m <= n %/ d) <=> (m * d <= n).
+lemma nosmt lez_divRL m n d : 0 < d =>
+  (m <= n %/ d) <=> (m * d <= n).
 proof. by move=> d_gt0; rewrite !lerNgt ltz_divLR. qed.
 
-lemma nosmt lez_divLR d m n : 0 < d => d %| m => (m %/ d <= n) <=> (m <= n * d).
+lemma nosmt lez_divLR d m n : 0 < d => d %| m =>
+  (m %/ d <= n) <=> (m <= n * d).
 proof. by move=> /ler_pmul2r <- /divzK->. qed.
 
-lemma nosmt ltz_divRL d m n : 0 < d => d %| m => (n < m %/ d) <=> (n * d < m).
+lemma nosmt ltz_divRL d m n : 0 < d => d %| m =>
+  (n < m %/ d) <=> (n * d < m).
 proof. by move=> /ltr_pmul2r <- /divzK->. qed.
 
-lemma nosmt eqz_div d m n : d <> 0 => d %| m => (n = m %/ d) <=> (n * d = m).
+lemma nosmt eqz_div d m n : d <> 0 => d %| m =>
+  (n = m %/ d) <=> (n * d = m).
 proof. by move=> /mulIf/inj_eq <- /divzK->. qed.
 
-lemma nosmt eqz_mul d m n : d <> 0 => d %| m => (m = n * d) <=> (m %/ d = n).
+lemma nosmt eqz_mul d m n : d <> 0 => d %| m =>
+  (m = n * d) <=> (m %/ d = n).
 proof. by move=> d_gt0 dv_d_m; rewrite eq_sym -eqz_div // eq_sym. qed.
-
-(*
-lemma nosmt lez_div m d : `|m %/ d| <= `|m|.
-proof.
-move: d; have wlog: forall d, 0 < d => `|m %/ d| <= `|m|; last first.
-  move=> d; case: (0 < d) => [/wlog//|/lerNgt /ler_eqVlt [->|]].
-    by rewrite divz0 normr0 normr_ge0.
-  by move=> lt0_d; rewrite -(opprK d) divzN normrN wlog oppr_gt0.
-admit. qed.
-*)
 
 lemma nosmt leq_div2r d m n :
   m <= n => 0 <= d => m %/ d <= n %/ d.
@@ -437,6 +506,37 @@ lemma divz_ge0 m d : 0 < d => (0 <= m %/ d) <=> (0 <= m).
 proof.
 move=> gt0_d; case: (0 <= m)=> /= [ge0_m|].
   by rewrite lez_divRL. by rewrite -!ltrNge ltz_divLR.
+qed.
+
+lemma leq_trunc_div m d : 0 <= m => 0 <= d => m %/ d * d <= m.
+proof.
+move=> ge0_m ge0_d; rewrite {2}(divz_eq m d).
+by rewrite ler_paddr // modn_ge0.
+qed.
+
+lemma nosmt leq_div m d : 0 <= m => 0 <= d => m %/ d <= m.
+proof.
+move=> ge0_m; rewrite ler_eqVlt => -[<-|]; 1: by rewrite divz0.
+move=> gt0_d; rewrite -(ler_pmul2r d) //.
+apply/(ler_trans m); first by apply/leq_trunc_div/ltrW.
+by apply/ler_pemulr => //; rewrite -(ltzE 0).
+qed.
+
+lemma nosmt lez_div m d : `|m %/ d| <= `|m|.
+proof.
+move: d; have wlog: forall d, 0 < d => `|m %/ d| <= `|m|; last first.
+  move=> d; case: (0 < d) => [/wlog//|/lerNgt /ler_eqVlt [->|]].
+    by rewrite divz0 normr0 normr_ge0.
+  by move=> lt0_d; rewrite -(opprK d) divzN normrN wlog oppr_gt0.
+move=> d gt0_d; case: (0 <= m) => [ge0_m|].
+  by rewrite !ger0_norm ?divz_ge0 // ?leq_div // ltrW.
+rewrite lerNgt /= => lt0_m; rewrite !ler0_norm 1,2:ltrW //.
+  by rewrite ltrNge divz_ge0 // lerNgt.
+rewrite -{1}(opprK m) divNz ?oppr_gt0 // opprK.
+rewrite -ltzE; apply/(ler_lt_trans (-(m+1))).
+  rewrite opprD; apply/leq_div/ltrW=> //.
+  by rewrite subr_ge0 -(ltzE 0) oppr_gt0.
+by rewrite ltzE opprD -addrA.
 qed.
 
 (* -------------------------------------------------------------------- *)

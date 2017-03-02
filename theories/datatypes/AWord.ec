@@ -92,7 +92,7 @@ axiom from_to i: to_int (from_int i) = i %% 2^length.
 lemma from_to_bound i:
    0 <= i < 2^length =>
    to_int (from_int i) = i.
-proof. by rewrite from_to; smt all. qed.
+proof. by rewrite from_to; smt. qed.
 
 (** univ *)
 

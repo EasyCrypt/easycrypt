@@ -47,7 +47,7 @@ module Zipper = struct
   let rec zipper_of_cpos ((i, sub) : codepos) zpr s =
     let (s1, i, s2) =
       try  List.pivot_at (i-1) s.s_node
-      with Invalid_argument _ -> raise InvalidCPos
+      with (Invalid_argument _ | Not_found) -> raise InvalidCPos
     in
     match sub with
     | None -> zipper s1 (i::s2) zpr

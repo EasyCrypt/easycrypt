@@ -7,7 +7,7 @@
 
 (* -------------------------------------------------------------------- *)
 require import Fun Bool Int List.
-require (*--*) FinType Word.
+require (*--*) FinType Word Ring.
 
 pragma +implicits.
 
@@ -119,3 +119,34 @@ instance bring with word
   proof mulrDl    by apply/andwDl
   proof mulrK     by apply/andwK
   proof oppr_id   by trivial.
+
+pred unitw (w:word) = w = onew.
+op iandw (w:word) = if w = onew then onew else w.
+
+clone import Ring.ComRing as WRing with 
+   type t = word,
+   op zeror <- zerow,
+   op ( + ) <- (+^),
+   op [ - ] <- oppw,
+   op oner  <- onew,
+   op ( * ) <- andw, 
+   op invr  <- iandw,
+   pred unit <- unitw
+proof *.
+realize addrA.     proof. apply xorwA. qed.
+realize addrC.     proof. apply xorwC. qed.
+realize add0r.     proof. move=> ?;ring. qed.
+realize addNr.     proof. move=> ?;ring. qed.
+realize oner_neq0. proof. apply onew_neq0. qed.
+realize mulrA.     proof. apply andwA. qed.
+realize mulrC.     proof. apply andwC. qed.
+realize mul1r.     proof. move=> ?;ring. qed. 
+realize mulrDl.    proof. apply andwDl. qed. 
+realize mulVr.     proof. move=> ?;rewrite /unitw /iandw => -> /=;ring. qed.
+realize unitout.   proof. by move=> x;rewrite /unitw /iandw => ->. qed.
+realize unitP. 
+proof. 
+  move=> x y;rewrite /unitw !wordP => + i Hi -/(_ i Hi).
+  rewrite andwE onewE Hi /#.
+qed.
+

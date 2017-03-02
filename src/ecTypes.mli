@@ -131,8 +131,10 @@ type prog_var = private {
   pv_kind : pvar_kind;
 }
 
-val pv_equal   : prog_var -> prog_var -> bool
-val pv_compare : prog_var -> prog_var -> int
+val pv_equal       : prog_var -> prog_var -> bool
+val pv_compare     : prog_var -> prog_var -> int
+val pv_ntr_compare : prog_var -> prog_var -> int
+
 (* work only if the prog_var has been normalized *)
 val pv_compare_p : prog_var -> prog_var -> int
 val pv_hash    : prog_var -> int

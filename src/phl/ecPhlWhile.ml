@@ -57,9 +57,9 @@ let while_info env e s =
 
   let (w,r,c) = s_info (PV.empty, EcPV.e_read env e, Sx.empty) s in
 
-  { EcModules.aus_reads  = fst (PV.elements r);
-    EcModules.aus_writes = fst (PV.elements w);
-    EcModules.aus_calls  = Sx.elements c; }
+  { EcModules.aus_reads  = fst (PV.ntr_elements r);
+    EcModules.aus_writes = fst (PV.ntr_elements w);
+    EcModules.aus_calls  = Sx.ntr_elements c; }
 
 (* -------------------------------------------------------------------- *)
 let t_hoare_while_r inv tc =
@@ -486,8 +486,8 @@ let process_async_while (winfos : EP.async_while_info) tc =
   let fe  = f_or fe1 fe2 in
 
   let cond1 = f_forall_mems [evs.es_ml; evs.es_mr]
-    (f_imps [inv; fe; p0] (f_ands [fe1; fe2; 
-                                   f_app ft1 [f1] tbool; 
+    (f_imps [inv; fe; p0] (f_ands [fe1; fe2;
+                                   f_app ft1 [f1] tbool;
                                    f_app ft2 [f2] tbool])) in
 
   let cond2 = f_forall_mems [evs.es_ml; evs.es_mr]

@@ -73,12 +73,12 @@ proof.
 move=> x_notin_m; split=> [[z z' [z'_neq_z]]|].
 + rewrite dom_set !inE=> -[z_in_m] [z'_in_m] mz_eq_mz'.
   case (mem (rng m) y)=> //= y_notin_rngm.
-  by exists z, z'; smt ml=0 w=@NewFMap.
+  by exists z z'; smt ml=0 w=@NewFMap.
 move=> [[z z' [z'_neq_z] [z_in_m] [z'_in_m] mz_eq_mz']|/in_rng [x' mx']].
-+ exists z, z'; rewrite z'_neq_z dom_set !inE !getP mz_eq_mz' z_in_m z'_in_m /=.
++ exists z z'; rewrite z'_neq_z dom_set !inE !getP mz_eq_mz' z_in_m z'_in_m /=.
   rewrite (contra _ _ (congr1 (mem (dom m)) z  x)) 1:x_notin_m 1:z_in_m //=.
   by rewrite (contra _ _ (congr1 (mem (dom m)) z' x)) 1:x_notin_m 1:z'_in_m.
-by exists x, x'; smt ml=0 w=@NewFMap.
+by exists x x'; smt ml=0 w=@NewFMap.
 qed.
 
 lemma collision_stable (m:(D,D) fmap) y y':
@@ -465,7 +465,7 @@ section PRPi_PRPi'_Indirect.
     ={x, PRPi.m} ==> ={res, PRPi.m}.
   proof.
   transitivity PRPi'(Direct).f (={PRPi.m,x} ==> ={PRPi.m,res}) (={PRPi.m,x} ==> ={PRPi.m,res}).
-  + by move=> &1 &2 [->> ->>]; exists PRPi.m{2}, x{2}.
+  + by move=> &1 &2 [->> ->>]; exists PRPi.m{2} x{2}.
   + done.
   + by proc; inline *; if=> //=; auto.
   + by proc; if=> //=; wp; call eq_Direct_Indirect.

@@ -21,7 +21,8 @@ exception IncompatibleType of env * (ty * ty)
 exception IncompatibleForm of env * (form * form)
 
 (* -------------------------------------------------------------------- *)
-type 'a eqtest = env -> 'a -> 'a -> bool
+type 'a eqtest  = env -> 'a -> 'a -> bool
+type 'a eqntest = env -> ?norm:bool -> 'a -> 'a -> bool
 
 module EqTest = struct
   let rec for_type env t1 t2 =
@@ -75,104 +76,162 @@ module EqTest = struct
       raise (IncompatibleType (env, (t1, t2)))
 
   (* ------------------------------------------------------------------ *)
-  let for_pv_norm env p1 p2 =
-    pv_equal p1 p2 ||
-      (p1.pv_kind = p2.pv_kind &&
-          EcPath.x_equal
-            (NormMp.norm_pvar env p1).pv_name (NormMp.norm_pvar env p2).pv_name)
+  let for_pv env ~norm p1 p2 =
+    pv_equal p1 p2 || (norm && (p1.pv_kind = p2.pv_kind) &&
+      let p1 = NormMp.norm_pvar env p1 in
+      let p2 = NormMp.norm_pvar env p2 in
+      EcPath.x_equal p1.pv_name p2.pv_name)
 
   (* ------------------------------------------------------------------ *)
-  let for_xp_norm env p1 p2 =
-       EcPath.x_equal p1 p2
-    || EcPath.x_equal (NormMp.norm_xfun env p1) (NormMp.norm_xfun env p2)
+  let for_xp env ~norm p1 p2 =
+     EcPath.x_equal p1 p2 || (norm &&
+       let p1 = NormMp.norm_xfun env p1 in
+       let p2 = NormMp.norm_xfun env p2 in
+       EcPath.x_equal p1 p2)
 
   (* ------------------------------------------------------------------ *)
-  let for_mp_norm env p1 p2 =
-       EcPath.m_equal p1 p2
-    || EcPath.m_equal (NormMp.norm_mpath env p1) (NormMp.norm_mpath env p2)
+  let for_mp env ~norm p1 p2 =
+     EcPath.m_equal p1 p2 || (norm &&
+       let p1 = NormMp.norm_mpath env p1 in
+       let p2 = NormMp.norm_mpath env p2 in
+       EcPath.m_equal p1 p2)
 
   (* ------------------------------------------------------------------ *)
-  let for_expr_norm env =
+  let for_expr env ~norm =
     let module E = struct exception NotConv end in
 
     let find alpha id = odfl id (Mid.find_opt id alpha) in
 
+    let noconv (f : expr -> expr -> bool) e1 e2 =
+      try f e1 e2 with E.NotConv -> false in
+
     let check_lpattern alpha lp1 lp2 =
       match lp1, lp2 with
-      | LSymbol (id1,_), LSymbol (id2,_) -> Mid.add id1 id2 alpha
+      | LSymbol (id1,_), LSymbol (id2,_) ->
+          Mid.add id1 id2 alpha
+
       | LTuple lid1, LTuple lid2 when List.length lid1 = List.length lid2 ->
-          List.fold_left2 (fun alpha (id1,_) (id2,_) -> Mid.add id1 id2 alpha)
+          List.fold_left2
+            (fun alpha (id1,_) (id2,_) -> Mid.add id1 id2 alpha)
             alpha lid1 lid2
+
       | _, _ -> raise E.NotConv in
+
+    let check_binding env alpha (id1, ty1) (id2, ty2) =
+      if not (for_type env ty1 ty2) then
+        raise E.NotConv;
+      Mid.add id1 id2 alpha in
+
+    let check_bindings env alpha b1 b2 =
+      if List.length b1 <> List.length b2 then
+        raise E.NotConv;
+      List.fold_left2 (check_binding env) alpha b1 b2 in
 
     let rec aux alpha e1 e2 =
       e_equal e1 e2 || aux_r alpha e1 e2
 
     and aux_r alpha e1 e2 =
       match e1.e_node, e2.e_node with
-      | Eint i1, Eint i2 -> BI.equal i1 i2
-      | Elocal id1, Elocal id2 -> EcIdent.id_equal (find alpha id1) id2
-      | Evar   p1, Evar   p2 -> for_pv_norm env p1 p2
+      | Eint i1, Eint i2 ->
+          BI.equal i1 i2
+
+      | Elocal id1, Elocal id2 ->
+          EcIdent.id_equal (find alpha id1) id2
+
+      | Evar p1, Evar p2 ->
+          for_pv env ~norm p1 p2
+
       | Eop(o1,ty1), Eop(o2,ty2) ->
           p_equal o1 o2 && List.all2 (for_type env) ty1 ty2
 
-      | Eapp(f1,args1), Eapp(f2,args2) ->
-          aux alpha f1 f2 &&
-          List.all2 (aux alpha) args1 args2
-      | Elet(p1,f1',g1), Elet(p2,f2',g2) ->
-             aux alpha f1' f2'
-          && (try aux (check_lpattern alpha p1 p2) g1 g2 with E.NotConv -> false)
+      | Equant(q1,b1,e1), Equant(q2,b2,e2) when qt_equal q1 q2 ->
+          let alpha = check_bindings env alpha b1 b2 in
+          noconv (aux alpha) e1 e2
+
+      | Eapp (f1, args1), Eapp (f2, args2) ->
+          aux alpha f1 f2 && List.all2 (aux alpha) args1 args2
+
+      | Elet (p1, f1', g1), Elet (p2, f2', g2) ->
+          aux alpha f1' f2'
+            && noconv (aux (check_lpattern alpha p1 p2)) g1 g2
+
       | Etuple args1, Etuple args2 -> List.all2 (aux alpha) args1 args2
+
       | Eif (a1,b1,c1), Eif(a2,b2,c2) ->
           aux alpha a1 a2 && aux alpha b1 b2 && aux alpha c1 c2
+
       | Ematch (e1,es1,ty1), Ematch(e2,es2,ty2) ->
-             for_type env ty1 ty2
-          && List.all2 (aux alpha) (e1::es1) (e2::es2)
+          for_type env ty1 ty2
+            && List.all2 (aux alpha) (e1::es1) (e2::es2)
+
       | _, _ -> false
-    in
-      fun e1 e2 -> aux Mid.empty e1 e2
+
+    in fun e1 e2 -> aux Mid.empty e1 e2
 
   (* ------------------------------------------------------------------ *)
-  let for_lv_norm env lv1 lv2 =
+  let for_lv env ~norm lv1 lv2 =
     match lv1, lv2 with
-    | LvVar(p1,_), LvVar(p2,_) -> for_pv_norm env p1 p2
+    | LvVar(p1, _), LvVar(p2, _) ->
+        for_pv env ~norm p1 p2
+
     | LvTuple p1, LvTuple p2 ->
-        List.all2 (fun (p1,_) (p2,_) -> for_pv_norm env p1 p2) p1 p2
-    | LvMap((m1,ty1),p1,e1,_), LvMap((m2,ty2),p2,e2,_) ->
-        p_equal m1 m2 &&
-        List.all2 (for_type env) ty1 ty2 &&
-        for_pv_norm env p1 p2 && for_expr_norm env e1 e2
+        List.all2
+          (fun (p1, _) (p2, _) -> for_pv env ~norm p1 p2)
+          p1 p2
+
+    | LvMap ((m1, ty1), p1, e1, _), LvMap ((m2, ty2), p2, e2, _) ->
+        p_equal m1 m2
+          && List.all2 (for_type env) ty1 ty2
+          && for_pv env ~norm p1 p2
+          && for_expr env ~norm e1 e2
+
     | _, _ -> false
 
   (* ------------------------------------------------------------------ *)
-  let rec for_stmt_norm env s1 s2 =
+  let rec for_stmt env ~norm s1 s2 =
        s_equal s1 s2
-    || List.all2 (for_instr_norm env) s1.s_node s2.s_node
+    || List.all2 (for_instr env ~norm) s1.s_node s2.s_node
 
   (* ------------------------------------------------------------------ *)
-  and for_instr_norm env i1 i2 =
-    i_equal i1 i2 || for_instr_norm_r env i1 i2
+  and for_instr env ~norm i1 i2 =
+    i_equal i1 i2 || for_instr_r env ~norm i1 i2
 
-  and for_instr_norm_r env i1 i2 =
+  and for_instr_r env ~norm i1 i2 =
     match i1.i_node, i2.i_node with
-    | Sasgn(lv1,e1), Sasgn(lv2,e2) ->
-        for_lv_norm env lv1 lv2 && for_expr_norm env e1 e2
-    | Srnd(lv1,e1), Srnd(lv2,e2) ->
-        for_lv_norm env lv1 lv2 && for_expr_norm env e1 e2
-    | Scall(lv1, f1, e1), Scall(lv2,f2,e2) ->
-        oall2 (for_lv_norm env) lv1 lv2 &&
-        for_xp_norm env f1 f2 &&
-        List.all2 (for_expr_norm env) e1 e2
-    | Sif (a1,b1,c1), Sif(a2,b2,c2) ->
-        for_expr_norm env a1 a2
-          && for_stmt_norm env b1 b2
-          && for_stmt_norm env c1 c2
+    | Sasgn (lv1, e1), Sasgn (lv2, e2) ->
+        for_lv env ~norm lv1 lv2 && for_expr env ~norm e1 e2
+
+    | Srnd (lv1, e1), Srnd (lv2, e2) ->
+        for_lv env ~norm lv1 lv2 && for_expr env ~norm e1 e2
+
+    | Scall (lv1, f1, e1), Scall (lv2, f2, e2) ->
+        oall2 (for_lv env ~norm) lv1 lv2
+          && for_xp env ~norm f1 f2
+          && List.all2 (for_expr env ~norm) e1 e2
+
+    | Sif (a1, b1, c1), Sif(a2, b2, c2) ->
+        for_expr env ~norm a1 a2
+          && for_stmt env ~norm b1 b2
+          && for_stmt env ~norm c1 c2
+
     | Swhile(a1,b1), Swhile(a2,b2) ->
-        for_expr_norm env a1 a2 && for_stmt_norm env b1 b2
+        for_expr env ~norm a1 a2 && for_stmt env ~norm b1 b2
+
     | Sassert a1, Sassert a2 ->
-        for_expr_norm env a1 a2
-    | Sabstract id1, Sabstract id2 -> EcIdent.id_equal id1 id2
+        for_expr env ~norm a1 a2
+
+    | Sabstract id1, Sabstract id2 ->
+        EcIdent.id_equal id1 id2
+
     | _, _ -> false
+
+  (* ------------------------------------------------------------------ *)
+  let for_pv    = fun env ?(norm = true) -> for_pv    env ~norm
+  let for_xp    = fun env ?(norm = true) -> for_xp    env ~norm
+  let for_mp    = fun env ?(norm = true) -> for_mp    env ~norm
+  let for_instr = fun env ?(norm = true) -> for_instr env ~norm
+  let for_stmt  = fun env ?(norm = true) -> for_stmt  env ~norm
+  let for_expr  = fun env ?(norm = true) -> for_expr  env ~norm
 end
 
 (* -------------------------------------------------------------------- *)
@@ -520,12 +579,13 @@ and check_alpha_equal ri hyps f1 f2 =
     | None, None -> ()
     | Some lmt1, Some lmt2 ->
       let xp1, xp2 = EcMemory.lmt_xpath lmt1, EcMemory.lmt_xpath lmt2 in
-      ensure (EqTest.for_xp_norm env xp1 xp2);
+      ensure (EqTest.for_xp env xp1 xp2);
       let m1, m2 = EcMemory.lmt_bindings lmt1, EcMemory.lmt_bindings lmt2 in
       ensure (EcSymbols.Msym.equal
                 (fun (p1,ty1) (p2,ty2) ->
                   p1 = p2 && EqTest.for_type env ty1 ty2) m1 m2)
     | _, _ -> error () in
+
   (* TODO all declaration in env, do it also in add local *)
   let check_binding (env, subst) (x1,gty1) (x2,gty2) =
     let gty2 = Fsubst.gty_subst subst gty2 in
@@ -547,6 +607,7 @@ and check_alpha_equal ri hyps f1 f2 =
       if id_equal x1 x2 then subst
       else Fsubst.f_bind_mem subst x2 x1
     | _, _ -> error () in
+
   let check_bindings env subst bd1 bd2 =
     List.fold_left2 check_binding (env,subst) bd1 bd2 in
 
@@ -554,24 +615,28 @@ and check_alpha_equal ri hyps f1 f2 =
     match (Mid.find_def f2 id2 subst.fs_loc).f_node with
     | Flocal id2 -> ensure (EcIdent.id_equal id1 id2)
     | _ -> assert false in
+
   let check_mem subst m1 m2 =
     let m2 = Mid.find_def m2 m2 subst.fs_mem in
     ensure (EcIdent.id_equal m1 m2) in
+
   let check_pv env subst pv1 pv2 =
     let pv2 = pv_subst (EcPath.x_substm subst.fs_sty.ts_p subst.fs_mp) pv2 in
-    ensure (EqTest.for_pv_norm env pv1 pv2) in
+    ensure (EqTest.for_pv env pv1 pv2) in
+
   let check_mp env subst mp1 mp2 =
     let mp2 = EcPath.m_subst subst.fs_sty.ts_p subst.fs_mp mp2 in
-    ensure (EqTest.for_mp_norm env mp1 mp2) in
+    ensure (EqTest.for_mp env mp1 mp2) in
+
   let check_xp env subst xp1 xp2 =
     let xp2 = EcPath.x_substm subst.fs_sty.ts_p subst.fs_mp xp2 in
-    ensure (EqTest.for_xp_norm env xp1 xp2) in
+    ensure (EqTest.for_xp env xp1 xp2) in
 
   let check_s env s s1 s2 =
     let es = e_subst_init s.fs_freshen s.fs_sty.ts_p
                           s.fs_ty Mp.empty s.fs_mp s.fs_esloc in
     let s2 = EcModules.s_subst es s2 in
-    ensure (EqTest.for_stmt_norm env s1 s2) in
+    ensure (EqTest.for_stmt env s1 s2) in
 
   let rec aux1 env subst f1 f2 =
     if Fsubst.is_subst_id subst && f_equal f1 f2 then ()
@@ -758,4 +823,3 @@ let xconv (mode : xconv) hyps =
   | `Eq      -> f_equal
   | `AlphaEq -> is_alpha_eq hyps
   | `Conv    -> is_conv hyps
-

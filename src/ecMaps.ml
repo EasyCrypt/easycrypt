@@ -16,7 +16,6 @@ module Map = struct
     include Why3.Extmap.S
 
     val odup : ('a -> key) -> 'a list -> ('a * 'a) option
-
     val to_stream : 'a t -> (key * 'a) Stream.t
   end
 
@@ -63,6 +62,7 @@ module Set = struct
 
     val big_union : t list -> t
     val map : (elt -> elt) -> t -> t
+    val undup : elt list -> elt list
   end
 
   module MakeOfMap(M : Why3.Extmap.S) : S with module M = M = struct
@@ -73,6 +73,17 @@ module Set = struct
 
     let map f s =
       fold (fun k s -> add (f k) s) s empty
+
+    let undup =
+      let rec doit seen acc s =
+        match s with
+        | [] -> List.rev acc
+        | x :: s ->
+           if mem x seen then
+             doit seen acc s
+           else
+             doit (add x seen) (x :: acc) s
+      in fun (s : elt list) -> doit empty [] s
   end
 
   module Make(Ord : OrderedType) = MakeOfMap(Map.Make(Ord))

@@ -391,7 +391,18 @@ and subst_pr_body (s : _subst) (bd : prbody) =
       let s = f_subst_of_subst s in
       PR_Plain (Fsubst.f_subst s body)
 
-  | PR_Ind _ -> assert false
+  | PR_Ind ind ->
+      let args    = List.map (snd_map gtty) ind.pri_args in
+      let s, args = Fsubst.add_bindings (f_subst_of_subst s) args in
+      let args    = List.map (snd_map gty_as_ty) args in
+      let ctors   =
+        let for1 ctor =
+          let s, bds = Fsubst.add_bindings s ctor.prc_bds in
+          let spec   = List.map (Fsubst.f_subst s) ctor.prc_spec in
+          { ctor with prc_bds = bds; prc_spec = spec; }
+        in List.map for1 ind.pri_ctors
+
+      in PR_Ind { pri_args = args; pri_ctors = ctors; }
 
 (* -------------------------------------------------------------------- *)
 let subst_op (s : _subst) (op : operator) =

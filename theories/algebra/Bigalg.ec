@@ -159,7 +159,7 @@ lemma nosmt ler_sum (P : 'a -> bool) (F1 F2 :'a -> t) s:
   => (BAdd.big P F1 s <= BAdd.big P F2 s).
 proof.
 apply: (@BAdd.big_ind2 (fun (x y : t) => x <= y)) => //=.
-  by apply/ler_add. by apply/lerr.
+  by apply/ler_add.
 qed.
 
 lemma nosmt sumr_ge0 (P : 'a -> bool) (F : 'a -> t) s:
@@ -167,7 +167,7 @@ lemma nosmt sumr_ge0 (P : 'a -> bool) (F : 'a -> t) s:
   => zeror <= BAdd.big P F s.
 proof.
 move=> h; apply: (@BAdd.big_ind (fun x => zeror <= x)) => //=.
-  by apply/addr_ge0. by apply/lerr.
+  by apply/addr_ge0.
 qed.
 
 lemma nosmt prodr_ge0 (P : 'a -> bool) F s:

@@ -494,6 +494,7 @@ type async_while_info = {
 type inline_info = [
   | `ByName    of oside * (pgamepath list * int list option)
   | `ByPattern of pipattern
+  | `CodePos   of (oside * codepos)
   | `All       of oside
 ]
 
@@ -652,11 +653,11 @@ type tfocus  = (tfocus1 list option) pair
 type rwarg = (tfocus located) option * rwarg1 located
 
 and rwarg1 =
-  | RWSimpl  of [`Full | `ProductCompat]
+  | RWSimpl  of [`Default | `Variant]
   | RWDelta  of (rwoptions * pformula)
   | RWRw     of (rwoptions * (rwside * ppterm) list)
   | RWPr     of (psymbol * pformula option)
-  | RWDone   of [`Full | `ProductCompat] option
+  | RWDone   of [`Default | `Variant] option
   | RWSmt    of (bool * pprover_infos)
   | RWApp    of ppterm
   | RWTactic of rwtactic
@@ -687,10 +688,10 @@ type intropattern1 =
   | IPDelta    of ((rwside * rwocc) * pformula)
   | IPSubst    of (rwside * (int option) option)
   | IPClear    of psymbol list
-  | IPDone     of [`Full | `ProductCompat] option
+  | IPDone     of [`Default | `Variant] option
   | IPSmt      of (bool * pprover_infos)
-  | IPSubstTop of int option
-  | IPSimplify of [`Full | `ProductCompat]
+  | IPSubstTop of (int option * [`LtoR | `RtoL] option)
+  | IPSimplify of [`Default | `Variant]
   | IPCrush    of bool
   | IPBreak
 
@@ -948,11 +949,14 @@ and theory_cloning_options =
 
 and theory_cloning_proof = {
   pthp_mode   : [
-    | `All   of (pqsymbol option * psymbol list)
+    | `All   of (pqsymbol option * theory_cloning_proof_tag list)
     | `Named of pqsymbol
   ];
   pthp_tactic : ptactic_core option;
 }
+
+and theory_cloning_proof_tag =
+  [`Include | `Exclude] * psymbol
 
 and theory_override =
 | PTHO_Type   of ty_override

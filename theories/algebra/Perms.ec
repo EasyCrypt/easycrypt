@@ -11,18 +11,24 @@ require import IntDiv Binomial Ring.
 (*---*) import IntID.
 
 (* -------------------------------------------------------------------- *)
-op allperms_r (n : unit list) (s : 'a list) =
-  with n = [] => [[]]
-  with n = h :: n => flatten (
+op allperms_r (n : unit list) (s : 'a list) : 'a list list.
+
+axiom allperms_r0 (s : 'a list) :
+  allperms_r [] s = [[]].
+
+axiom allperms_rS (x : unit) (n : unit list) (s : 'a list) :
+  allperms_r (x :: n) s = flatten (
     map (fun x => map ((::) x) (allperms_r n (rem x s))) (undup s)).
 
 op allperms (s : 'a list) = allperms_r (nseq (size s) tt) s.
+
+hint rewrite ap_r : allperms_r0 allperms_rS.
 
 (* -------------------------------------------------------------------- *)
 lemma nosmt allperms_rP n (s t : 'a list) : size s = size n =>
   (mem (allperms_r n s) t) <=> (perm_eq s t).
 proof.
-elim: n s t => [s t /size_eq0 ->|_ n ih s t] //=.
+elim: n s t => [s t /size_eq0 ->|_ n ih s t] //=; rewrite ?ap_r /=.
   split=> [->|]; first by apply/perm_eq_refl.
   by move/perm_eq_sym; apply/perm_eq_small.
 case: s=> [|x s]; first by rewrite addz_neq0 ?size_ge0.
@@ -53,7 +59,8 @@ qed.
 (* -------------------------------------------------------------------- *)
 lemma nosmt uniq_allperms_r n (s : 'a list) : uniq (allperms_r n s).
 proof.
-elim: n s => //= _ n ih s; apply/uniq_flatten_map/undup_uniq.
+elim: n s => [|_ n ih] s; rewrite ?ap_r  //.
+apply/uniq_flatten_map/undup_uniq.
   by move=> x /=; apply/map_inj_in_uniq/ih => a b _ _ [].
 move=> x y; rewrite !mem_undup => sx sy /= /hasP[t].
 by case=> /mapP[t1] [st1 ->] /mapP[t2] [st2 [->]].
@@ -80,7 +87,8 @@ require import StdBigop.
 lemma size_allperms_uniq_r n (s : 'a list) : size s = size n => uniq s =>
   size (allperms_r n s) = fact (size s).
 proof.
-elim: n s => /= [|_ n ih] s; 1: by move/size_eq0=> -> /=; rewrite fact0.
+elim: n s => /= [|_ n ih] s; rewrite ?ap_r /=.
+  by move/size_eq0=> -> /=; rewrite fact0.
 case: s=> [|x s]; first by rewrite addz_neq0 ?size_ge0.
 (pose s' := undup _)=> /=; move/addrI=> eq_sz [Nsz uqs].
 rewrite (addrC 1) factS ?size_ge0 // -ih //.

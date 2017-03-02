@@ -20,12 +20,19 @@ type idents = ident list
 
 (* -------------------------------------------------------------------- *)
 let name x = x.id_symb
+let id_compare i1 i2 = i2.id_tag - i1.id_tag
 let tag  x = x.id_tag
 
 (* -------------------------------------------------------------------- *)
 let id_equal : ident -> ident -> bool = (==)
-let id_compare i1 i2 = i2.id_tag - i1.id_tag
 let id_hash id = id.id_tag
+
+let id_ntr_compare (id1 : ident) (id2 : ident) =
+  if id_equal id1 id2 then 0 else
+
+  match String.compare id1.id_symb id2.id_symb with
+  | 0 -> id_compare id1 id2
+  | n -> n
 
 (* -------------------------------------------------------------------- *)
 module Collection = MakeMSH(struct

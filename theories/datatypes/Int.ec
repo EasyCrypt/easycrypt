@@ -165,6 +165,13 @@ move=> {ih0 ihS} ih i; case: (lezWP 0 i); 1: by apply/ih.
 by move=> _ le0_i; apply/wlog/ih; rewrite oppz_ge0.
 qed.
 
+lemma nosmt sintind (p : int -> bool):
+  (forall i, 0 <= i => (forall j, 0 <= j < i => p j) => p i) =>
+  (forall i, 0 <= i => p i).
+proof.
+by move=> sih i ^ge0_i; elim/intind: i ge0_i {-2}i (lezz i) => /#.
+qed.
+
 (* -------------------------------------------------------------------- *)
 (* Fold operator *)
 

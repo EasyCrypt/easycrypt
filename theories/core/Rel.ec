@@ -11,6 +11,8 @@
 
 require import ExtEq Pred Fun.
 
+type 'a rel = 'a -> 'a -> bool.
+
 (* -------------------------------------------------------------------- *)
 pred total ['a] (R : 'a -> 'a -> bool) = forall x y, R x y \/ R y x.
 
@@ -78,3 +80,75 @@ qed.
 lemma rev_trans ['a] (R : 'a -> 'a -> bool) :
   transitive R => transitive (transpose R).
 proof. by move=> trR x y z Ryx Rzy; apply: (trR _ _ _ Rzy Ryx). qed.
+
+(* -------------------------------------------------------------------- *)
+lemma rel_ext (P Q : 'a -> 'b -> bool):
+  P = Q <=> forall a b, P a b <=> Q a b.
+proof. by split=> //= h; apply/fun_ext=> a; apply/fun_ext=> b; rewrite h. qed.
+
+(*** Working with relations ***)
+(** Lifting boolean operators to relations *)
+op rel0  ['a 'b] = fun (x : 'a) (y : 'b) => false.
+op relT  ['a 'b] = fun (x : 'a) (y : 'b) => true.
+op relI  ['a 'b] = fun (p1 p2 : 'a -> 'b -> bool) a b => p1 a b /\ p2 a b.
+op relU  ['a 'b] = fun (p1 p2 : 'a -> 'b -> bool) a b => p1 a b \/ p2 a b.
+op relC  ['a 'b] = fun (p : 'a -> 'b -> bool) a b => ! (p a b).
+op relD  ['a 'b] = fun (p1 p2 : 'a -> 'b -> bool) a b => !p2 a b /\ p1 a b.
+
+op rel1  ['a 'b] = fun (ca : 'a) (cb : 'b) a b => ca = a /\ cb = b.
+op relU1 ['a 'b] = fun (ca : 'a) (cb : 'b) (p : 'a -> 'b -> bool) (a : 'a) (b : 'b)=>
+                     (a = ca /\ b = cb) \/ p a b.
+op relC1 ['a 'b] = fun (ca : 'a) (cb : 'b) (a : 'a) (b : 'b) => a <> ca /\ b <> cb.
+op relD1 ['a 'b] = fun (p : 'a -> 'b -> bool) (ca : 'a) (cb : 'b) (a : 'a) (b : 'b)=>
+                     (a <> ca \/ b <> cb) /\ p a b.
+
+(** Subrelation *)
+pred subrel (r1 r2 : 'a -> 'b -> bool) = forall x y, r1 x y => r2 x y.
+
+(* Lemmas on relation inclusion *)
+lemma nosmt subrel_eqP (r1 r2 : 'a -> 'b -> bool):
+  (forall x y, r1 x y <=> r2 x y) <=> (subrel r1 r2 /\ subrel r2 r1)
+by [].
+
+lemma nosmt subrel_refl (r : 'a -> 'b -> bool): subrel r r
+by [].
+
+lemma nosmt subrel_asym (r1 r2 : 'a -> 'b -> bool):
+  subrel r1 r2 => subrel r2 r1 => r1 = r2.
+proof.
+  move=> subrel_r1_r2 subrel_r2_r1.
+  (* Binary Extensional Equality *)
+  apply/fun_ext=> x.
+  apply/fun_ext=> y.
+  smt.
+qed.
+
+lemma nosmt subrel_trans (r2 r1 r3 : 'a -> 'b -> bool):
+  subrel r1 r2 => subrel r2 r3 => subrel r1 r3
+by [].
+
+(** Lemmas **)
+lemma relIC (p1 p2 : 'a -> 'b -> bool) : relI p1 p2 = relI p2 p1.
+proof. by apply/rel_ext=> a b; rewrite /relI andC. qed.
+
+lemma relCrelI (p : 'a -> 'b -> bool) : relI (relC p) p = rel0.
+proof. by apply/rel_ext=> a b /=; case: (p a b); delta=> ->. qed. (* delta *)
+
+lemma relCrelU (p : 'a -> 'b -> bool) : relU (relC p) p = relT.
+proof. by apply/rel_ext=> a b /=; case: (p a b); delta=> ->. qed. (* delta *)
+
+lemma nosmt subrelUl (p1 p2 : 'a -> 'b -> bool):
+  subrel p1 (relU p1 p2)
+by [].
+
+lemma nosmt subrelUr (p1 p2 : 'a -> 'b -> bool):
+  subrel p2 (relU p1 p2)
+by [].
+
+lemma nosmt relIsubrell (p1 p2 : 'a -> 'b -> bool):
+  subrel (relI p1 p2) p1
+by [].
+
+lemma nosmt relIsubrelr (p1 p2 : 'a -> 'b -> bool):
+  subrel (relI p1 p2) p2
+by [].

@@ -132,10 +132,52 @@ lemma odd_abs z : odd `|z| = odd z by [].
 lemma oddS z : odd (z + 1) = !(odd z) by [].
 
 lemma oddD z1 z2 : odd (z1 + z2) = (odd z1 = !odd z2).
-proof. by elim/intwlog: z1 z2; smt w=(odd0 oddS oddN). qed.
+proof. by elim/intwlog: z1 z2; smt(odd0 oddS oddN). qed.
 
 lemma oddM z1 z2 : odd (z1 * z2) = ((odd z1) /\ (odd z2)).
 proof.
 elim/intwlog: z1 => [z1 /#| |z1] /=; 1: by rewrite odd0.
 by move=> ge0_z1 ih; rewrite mulzDl /= oddS oddD ih /#.
 qed.
+
+(* -------------------------------------------------------------------- *)
+op argmin (f : int -> 'a) (p : 'a -> bool) =
+  choiceb (fun j => 0 <= j /\ p (f j) /\ forall i, 0 <= i < j => !p (f i)) 0.
+
+lemma argmin_out (f : int -> 'a) p: (forall i, !p (f i)) => argmin f p = 0.
+proof. by move=> pN; rewrite choiceb_dfl => //= x; rewrite pN. qed.
+
+lemma nosmt argminP_r (f : int -> 'a) p i: 0 <= i => p (f i) =>
+     0 <= argmin f p
+  /\ p (f (argmin f p))
+  /\ forall i, 0 <= i < (argmin f p) => !p (f i).
+proof.
+pose F := fun i0 => forall j, 0 <= j < i0 => !p (f j).
+move=> ge0_i pi; have: exists j, 0 <= j /\ p (f j) /\ F j.
+  elim/sintind: i ge0_i pi => i ge0_i ih pi.
+  case: (exists j, (0 <= j < i) /\ p (f j)).
+    by case=> j [/ih {ih} ih/ih]; apply.
+  move=> h; exists i; rewrite pi ge0_i => j lt_ji; apply/negP.
+  by move=> pj; apply/h; exists j; rewrite pj.
+by move/choicebP/(_ 0); apply.
+qed.
+
+lemma argminP (f : int -> 'a) p i: 0 <= i => p (f i) => p (f (argmin f p)).
+proof. by move=> ge0_i/(argminP_r _ _ _ ge0_i). qed.
+
+lemma ge0_argmin (f : int -> 'a) p: 0 <= argmin f p.
+proof.                          (* FIXME: choice_spec *)
+case: (exists i, 0 <= i /\ p (f i)); first by case=> i [] /(argminP_r f p) h /h.
+move=> h; rewrite choiceb_dfl ?lez_lt_asym //=.
+by move=> x; apply/negP=> [# ge0_x px xmin]; apply/h; exists x.
+qed.
+
+lemma argmin_min (f : int -> 'a) p: forall j, 0 <= j < argmin f p => !p (f j).
+proof.                          (* FIXME: choice_spec *)
+case: (exists i, 0 <= i /\ p (f i)); first by case=> i [] /(argminP_r f p) h /h.
+move=> h j; rewrite choiceb_dfl ?lez_lt_asym //=.
+by move=> x; apply/negP=> [# ge0_x px xmin]; apply/h; exists x.
+qed.
+
+(* -------------------------------------------------------------------- *)
+abbrev minz = argmin (fun (i : int)=> i).

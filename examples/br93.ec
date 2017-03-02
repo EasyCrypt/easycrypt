@@ -1,5 +1,5 @@
 (* -------------------------------------------------------------------- *)
-require import Fun Bool Int Real Distr List FSet Array FMap DBool.
+require import Option Fun Bool Int Real NewDistr List FSet Array NewFMap DBool.
 require (*--*) AWord ROM.
 
 (** We consider three lengths of bitstrings **)
@@ -130,7 +130,7 @@ module CPA(S:Scheme, A:Adv) = {
       Adv^{CPA}_{S}(A) = `|Pr[CPA(S,A).main() @ &m: res] - 1/2|
     is small. **)
 
-module BR(R:Oracle): Scheme(R) = {
+module (BR : Scheme) (R:Oracle) = {
   proc kg():(pkey * skey) = {
     var pk, sk;
 
@@ -188,7 +188,7 @@ section.
   (* the following lemmas hold on the following constructions *)
 
   (** Step 1: replace RO call with random sampling **)
-  local module BR1(R:Oracle): Scheme(R) = {
+  local module (BR1:Scheme) (R:Oracle) = {
     var r:randomness
 
     proc kg = BR(R).kg
@@ -217,13 +217,13 @@ section.
        the two ROMs agree on all points except r is sufficient
        to prove the equivalence of the adversary's views        *)
     call (_: mem Log.qs BR1.r ,
-             eq_except RO.m{1} RO.m{2} BR1.r{2}).
+             eq_except RO.m{1} RO.m{2} (pred1 BR1.r{2})).
       (* Adversary is lossless *)
       exact/a2_ll.
       (* Oracles are equivalent up to the failure event *)
       proc. inline RO.o.
       wp. rnd.
-      wp. skip. smt.
+      wp. skip. smt (@NewFMap).
       (* Left oracle is lossless *)
       move=> &2 _; exact/lossless_ARO_o.
       (* Right oracle is lossless and preserves bad once set *)
@@ -244,7 +244,7 @@ section.
   qed.
 
   (** Step 2: replace h ^ m with h in challenge encryption **)
-  local module BR2(R:Oracle): Scheme(R) = {
+  local module (BR2:Scheme) (R:Oracle) = {
     var r:randomness
 
     proc kg():(pkey * skey) = {
@@ -358,7 +358,7 @@ section.
            y{2} = f pk0{2} BR2.r{1}).
       progress; pose P := fun p => f _ p = _.
       have := nth_find witness P Log.qs{2} _.
-        by apply/hasP; exists OW.r{2}.
+        by rewrite hasP; exists OW.r{2}.
       by move/(f_injective _ _ _ _ H)=> ->.
     (* rest of proof *)
     swap {1} 3 - 2; swap {1} 9 -7; swap {1} 9 3; swap {1} 7 4.

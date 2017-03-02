@@ -47,9 +47,11 @@ type evclone = {
 }
 
 and evlemma = {
-  ev_global  : (ptactic_core option * Ssym.t option) list;
+  ev_global  : (ptactic_core option * evtags option) list;
   ev_bynames : (ptactic_core option) Msym.t;
 }
+
+and evtags = ([`Include | `Exclude] * symbol) list
 
 val evc_empty : evclone
 

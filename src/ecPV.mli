@@ -102,6 +102,7 @@ module PV : sig
   val indep        : env -> t -> t -> bool
   val check_depend : env -> t -> mpath -> unit
   val elements     : t -> (prog_var * ty) list * mpath list
+  val ntr_elements : t -> (prog_var * ty) list * mpath list
 
   val mem_pv   : env -> prog_var -> t -> bool
   val mem_glob : env -> mpath -> t -> bool

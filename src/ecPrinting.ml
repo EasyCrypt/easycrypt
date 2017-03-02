@@ -23,6 +23,7 @@ module Ssym = EcSymbols.Ssym
 module Msym = EcSymbols.Msym
 module Sid  = EcIdent.Sid
 module Mid  = EcIdent.Mid
+module Sp   = EcPath.Sp
 
 (* -------------------------------------------------------------------- *)
 type 'a pp = Format.formatter -> 'a -> unit
@@ -34,13 +35,15 @@ module PPEnv = struct
     ppe_locals : symbol Mid.t;
     ppe_inuse  : Ssym.t;
     ppe_univar : (symbol Mint.t * Ssym.t) ref;
+    ppe_fb     : Sp.t;
   }
 
   let ofenv (env : EcEnv.env) =
     { ppe_env    = env;
       ppe_locals = Mid.empty;
       ppe_inuse  = Ssym.empty;
-      ppe_univar = ref (Mint.empty, Ssym.empty); }
+      ppe_univar = ref (Mint.empty, Ssym.empty);
+      ppe_fb     = Sp.empty; }
 
   let enter_by_memid ppe id =
     match EcEnv.Memory.byid id ppe.ppe_env with
@@ -515,9 +518,9 @@ let get_e_projarg ppe e i =
   | _ -> raise NoProjArg
 
 (* -------------------------------------------------------------------- *)
-let pp_modtype1 (ppe : PPEnv.t) fmt mty = 
+let pp_modtype1 (ppe : PPEnv.t) fmt mty =
   EcSymbols.pp_msymbol fmt (PPEnv.modtype_symb ppe mty)
-  
+
 let pp_modtype (ppe : PPEnv.t) fmt ((mty, r) : module_type * _) =
   let pp_restr fmt (rx,r) =
     let pp_rx fmt rx =
@@ -1369,33 +1372,35 @@ and try_pp_notations (ppe : PPEnv.t) outer fmt f =
   let open EcMatching in
 
   let try_notation (p, (tv, nt)) =
-    let ev = MEV.of_idents (List.map fst nt.ont_args) `Form in
-    let ue = EcUnify.UniEnv.create None in
-    let ov = EcUnify.UniEnv.opentvi ue tv None in
-    let ti = Tvar.subst ov in
-    let hy = EcEnv.LDecl.init ppe.PPEnv.ppe_env [] in
-    let mr = odfl mhr (EcEnv.Memory.get_active ppe.PPEnv.ppe_env) in
-    let bd = form_of_expr mr nt.ont_body in
-    let bd = Fsubst.subst_tvar ov bd in
+    if not (Sp.mem p ppe.PPEnv.ppe_fb) then begin
+      let ev = MEV.of_idents (List.map fst nt.ont_args) `Form in
+      let ue = EcUnify.UniEnv.create None in
+      let ov = EcUnify.UniEnv.opentvi ue tv None in
+      let ti = Tvar.subst ov in
+      let hy = EcEnv.LDecl.init ppe.PPEnv.ppe_env [] in
+      let mr = odfl mhr (EcEnv.Memory.get_active ppe.PPEnv.ppe_env) in
+      let bd = form_of_expr mr nt.ont_body in
+      let bd = Fsubst.subst_tvar ov bd in
 
-    try
-      let (ue, ev) =
-        EcMatching.f_match_core fmnotation hy (ue, ev) bd f
-      in
+      try
+        let (ue, ev) =
+          EcMatching.f_match_core fmnotation hy (ue, ev) bd f
+        in
 
-      if not (EcMatching.can_concretize ev ue) then
-        raise EcMatching.MatchFailure;
+        if not (EcMatching.can_concretize ev ue) then
+          raise EcMatching.MatchFailure;
 
-      let rty  = ti nt.ont_resty in
-      let tv   = List.map (ti |- tvar |- fst) tv in
-      let args = List.map (curry f_local |- snd_map ti) nt.ont_args in
-      let f    = f_op p tv (toarrow tv rty) in
-      let f    = f_app f args rty in
-      let f    = Fsubst.f_subst (EcMatching.MEV.assubst ue ev) f in
-      pp_form_core_r ppe outer fmt f; true
+        let rty  = ti nt.ont_resty in
+        let tv   = List.map (ti |- tvar |- fst) tv in
+        let args = List.map (curry f_local |- snd_map ti) nt.ont_args in
+        let f    = f_op p tv (toarrow tv rty) in
+        let f    = f_app f args rty in
+        let f    = Fsubst.f_subst (EcMatching.MEV.assubst ue ev) f in
+        pp_form_core_r ppe outer fmt f; true
 
-   with EcMatching.MatchFailure ->
-      false
+      with EcMatching.MatchFailure ->
+        false
+    end else false
 
   in let try_notation ((_, (_, nt)) as args) =
      not nt.ont_ponly && try_notation args
@@ -1881,6 +1886,7 @@ let pp_opdecl ?(long = false) (ppe : PPEnv.t) fmt (x, op) =
     | OB_pred i ->
       pp_opdecl_pr ppe fmt (P.basename x, op.op_tparams, op_ty op, i)
     | OB_nott i ->
+      let ppe = { ppe with PPEnv.ppe_fb = Sp.add x ppe.PPEnv.ppe_fb } in
       pp_opdecl_nt ppe fmt (P.basename x, op.op_tparams, op_ty op, i)
 
   in Format.fprintf fmt "@[<v>%a%a@]" pp_name x pp_decl op
@@ -2313,17 +2319,37 @@ let pp_equivF (ppe : PPEnv.t) fmt ef =
 (* -------------------------------------------------------------------- *)
 let pp_equivS (ppe : PPEnv.t) fmt es =
   let ppe = PPEnv.push_mems ppe [es.es_ml; es.es_mr] in
-  let ppnode = collect2_s es.es_sl.s_node es.es_sr.s_node in
-  let ppnode = c_ppnode ~width:40 ~mem:(fst es.es_ml, fst es.es_mr) ppe ppnode in
 
-    Format.fprintf fmt "&1 (left ) : %a@\n%!" (pp_funname ppe) (EcMemory.xpath es.es_ml);
-    Format.fprintf fmt "&2 (right) : %a@\n%!" (pp_funname ppe) (EcMemory.xpath es.es_mr);
-    Format.fprintf fmt "@\n%!";
-    Format.fprintf fmt "%a%!" (pp_pre ppe) es.es_pr;
-    Format.fprintf fmt "@\n%!";
-    Format.fprintf fmt "%a" (pp_node `Both) ppnode;
-    Format.fprintf fmt "@\n%!";
-    Format.fprintf fmt "%a%!" (pp_post ppe) es.es_po
+  let insync =
+       EcMemory.mt_equal (snd es.es_ml) (snd es.es_mr)
+    && EcReduction.EqTest.for_stmt
+         ppe.PPEnv.ppe_env ~norm:false es.es_sl es.es_sr in
+
+  let ppnode =
+    if insync then begin
+      let ppe    = PPEnv.push_mem ~active:true ppe es.es_ml in
+      let ppnode = collect2_s es.es_sl.s_node [] in
+      let ppnode = c_ppnode ~width:80 ppe ppnode in
+      fun fmt -> pp_node `Left fmt ppnode
+    end else begin
+      let ppnode = collect2_s es.es_sl.s_node es.es_sr.s_node in
+      let ppnode =
+        c_ppnode ~width:40 ~mem:(fst es.es_ml, fst es.es_mr)
+                 ppe ppnode
+      in fun fmt -> pp_node `Both fmt ppnode
+    end in
+
+  Format.fprintf fmt "&1 (left ) : %a%s@\n%!"
+    (pp_funname ppe) (EcMemory.xpath es.es_ml)
+    (if insync then " [programs are in sync]" else "");
+  Format.fprintf fmt "&2 (right) : %a@\n%!"
+    (pp_funname ppe) (EcMemory.xpath es.es_mr);
+  Format.fprintf fmt "@\n%!";
+  Format.fprintf fmt "%a%!" (pp_pre ppe) es.es_pr;
+  Format.fprintf fmt "@\n%!";
+  Format.fprintf fmt "%t" ppnode;
+  Format.fprintf fmt "@\n%!";
+  Format.fprintf fmt "%a%!" (pp_post ppe) es.es_po
 
 (* -------------------------------------------------------------------- *)
 let pp_aequivF (ppe : PPEnv.t) fmt aef =
@@ -2452,6 +2478,27 @@ module PPGoal = struct
     | _ -> Format.fprintf fmt "%a@\n%!" (pp_form ppe) concl
 end
 
+(* -------------------------------------------------------------------- *)
+let pp_hyps (ppe : PPEnv.t) fmt hyps =
+  let hyps = EcEnv.LDecl.tohyps hyps in
+  let ppe = PPEnv.add_locals ppe (List.map fst hyps.EcBaseLogic.h_tvar) in
+  let ppe, pps =
+    List.map_fold PPGoal.pre_pp_hyp ppe
+                  (List.rev hyps.EcBaseLogic.h_local) in
+
+  begin match hyps.EcBaseLogic.h_tvar with
+  | [] -> Format.fprintf fmt "Type variables: <none>@\n\n%!"
+  | tv ->
+      Format.fprintf fmt "Type variables: %a@\n\n%!"
+        (pp_list ", " (pp_tyvar_ctt ppe)) tv
+  end;
+  List.iter (fun (id, dk) ->
+    Format.fprintf fmt
+      "%-.2s: @[<hov 2>%t@]@\n%!"
+      (PPEnv.local_symb ppe id) dk)
+    pps
+
+(* -------------------------------------------------------------------- *)
 let pp_goal (ppe : PPEnv.t) fmt (g, extra) =
   let n =
     match extra with
@@ -2495,9 +2542,12 @@ let pp_mod_params ppe bms =
     | bm::bms ->
       let ppe, pp1 = pp_mp ppe bm in
       let ppe, pp2 = aux ppe bms in
-      (ppe, fun fmt -> Format.fprintf fmt "%t,@,%t" pp1 pp2) in
-  let (ppe,pp) = aux ppe bms in
-  (ppe, fun fmt -> if bms = [] then () else Format.fprintf fmt "@[(%t)@]" pp)
+      (ppe, fun fmt -> Format.fprintf fmt "%t,@, %t" pp1 pp2) in
+
+  let (ppe, pp) = aux ppe bms in
+  let pp fmt =
+    if not (List.is_empty bms) then Format.fprintf fmt "@[(%t)@]" pp
+  in (ppe, pp)
 
 let pp_pvdecl ppe fmt v =
   Format.fprintf fmt "%s : %a" v.v_name (pp_type ppe) v.v_type

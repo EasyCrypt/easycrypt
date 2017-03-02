@@ -27,7 +27,7 @@ type 'a ovrenv = {
   ovre_opath    : EcPath.path;
   ovre_npath    : EcPath.path;
   ovre_prefix   : symbol list;
-  ovre_glproof  : (ptactic_core option * Ssym.t option) list;
+  ovre_glproof  : (ptactic_core option * evtags option) list;
   ovre_abstract : bool;
   ovre_local    : bool;
   ovre_hooks    : 'a ovrhooks;

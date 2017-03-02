@@ -19,15 +19,18 @@ exception IncompatibleForm of env * (form * form)
 
 (* -------------------------------------------------------------------- *)
 type 'a eqtest = env -> 'a -> 'a -> bool
+type 'a eqntest = env -> ?norm:bool -> 'a -> 'a -> bool
 
 module EqTest : sig
   val for_type_exn : env -> ty -> ty -> unit
 
-  val for_type       : ty       eqtest
-  val for_pv_norm    : prog_var eqtest
-  val for_instr_norm : instr    eqtest
-  val for_stmt_norm  : stmt     eqtest
-  val for_expr_norm  : expr     eqtest
+  val for_type  : ty       eqtest
+  val for_pv    : prog_var eqntest
+  val for_xp    : xpath    eqntest
+  val for_mp    : mpath    eqntest
+  val for_instr : instr    eqntest
+  val for_stmt  : stmt     eqntest
+  val for_expr  : expr     eqntest
 
   val is_unit : env -> ty -> bool
   val is_bool : env -> ty -> bool
@@ -68,4 +71,3 @@ val check_conv : LDecl.hyps -> form -> form -> unit
 type xconv = [`Eq | `AlphaEq | `Conv]
 
 val xconv : xconv -> LDecl.hyps -> form -> form -> bool
-

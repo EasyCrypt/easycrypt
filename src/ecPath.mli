@@ -26,9 +26,10 @@ val pqname  : path -> symbol -> path
 val pqoname : path option -> symbol -> path
 val pappend : path -> path -> path
 
-val p_equal   : path -> path -> bool
-val p_compare : path -> path -> int
-val p_hash    : path -> int
+val p_equal       : path -> path -> bool
+val p_compare     : path -> path -> int
+val p_ntr_compare : path -> path -> int
+val p_hash        : path -> int
 
 (* -------------------------------------------------------------------- *)
 val tostring    : path -> string
@@ -45,8 +46,13 @@ val p_size      : path -> int
 
 (* -------------------------------------------------------------------- *)
 module Mp : Map.S with type key = path
-module Sp : Set.S with module M = Map.MakeBase(Mp)
 module Hp : EcMaps.EHashtbl.S with type key = path
+
+module Sp : sig
+  include Set.S with module M = Map.MakeBase(Mp)
+
+  val ntr_elements : t -> elt list
+end
 
 (* -------------------------------------------------------------------- *)
 type mpath = private {
@@ -68,12 +74,13 @@ val mastrip   : mpath -> mpath
 val mident    : ident -> mpath
 val mpath_crt : path -> mpath list -> path option -> mpath
 
-val m_equal   : mpath -> mpath -> bool
-val mt_equal  : mpath_top -> mpath_top -> bool
-val m_compare : mpath -> mpath -> int
-val m_hash    : mpath -> int
-val m_apply   : mpath -> mpath list -> mpath
-val m_fv      : int EcIdent.Mid.t -> mpath -> int EcIdent.Mid.t
+val m_equal       : mpath -> mpath -> bool
+val mt_equal      : mpath_top -> mpath_top -> bool
+val m_compare     : mpath -> mpath -> int
+val m_ntr_compare : mpath -> mpath -> int
+val m_hash        : mpath -> int
+val m_apply       : mpath -> mpath list -> mpath
+val m_fv          : int EcIdent.Mid.t -> mpath -> int EcIdent.Mid.t
 
 val m_functor : mpath -> mpath
 
@@ -93,9 +100,10 @@ val xpath_fun : mpath -> symbol -> xpath
 val xqname    : xpath -> symbol -> xpath
 val xastrip   : xpath -> xpath
 
-val x_equal   : xpath -> xpath -> bool
-val x_compare : xpath -> xpath -> int
-val x_hash    : xpath -> int
+val x_equal       : xpath -> xpath -> bool
+val x_compare     : xpath -> xpath -> int
+val x_ntr_compare : xpath -> xpath -> int
+val x_hash        : xpath -> int
 
 (* These functions expect xpath representing program variables
  * with a normalized [x_top] field. *)
@@ -112,13 +120,23 @@ val x_tostring : xpath -> string
 
 (* -------------------------------------------------------------------- *)
 module Mm : Map.S with type key = mpath
-module Sm : Set.S with module M = Map.MakeBase(Mm)
 module Hm : EcMaps.EHashtbl.S with type key = mpath
+
+module Sm : sig
+  include Set.S with module M = Map.MakeBase(Mm)
+
+  val ntr_elements : t -> elt list
+end
 
 (* -------------------------------------------------------------------- *)
 module Mx : Map.S with type key = xpath
-module Sx : Set.S with module M = Map.MakeBase(Mx)
 module Hx : EcMaps.EHashtbl.S with type key = xpath
+
+module Sx : sig
+  include Set.S with module M = Map.MakeBase(Mx)
+
+  val ntr_elements : t -> elt list
+end
 
 (* -------------------------------------------------------------------- *)
 val p_subst : path Mp.t -> path -> path

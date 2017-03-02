@@ -481,3 +481,18 @@ proof. by move=> lemn; rewrite big_ltn 1?big_addn /= 1:smt addrK. qed.
 lemma nosmt big_int_recr (n m : int) F: m <= n =>
   bigi predT F m (n+1) = bigi predT F m n + F n.
 proof. by move=> lemn; rewrite (@big_cat_int n) ?big_int1 // smt. qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt big_int_recl_cond (n m : int) P F: m <= n =>
+  bigi P F m (n+1) =
+    (if P m then F m else idm) +
+      bigi (fun i => P (i+1)) (fun i => F (i+1)) m n.
+proof.
+by move=> lemn; rewrite big_mkcond big_int_recl //= -big_mkcond.
+qed.
+
+(* -------------------------------------------------------------------- *)
+lemma nosmt big_int_recr_cond (n m : int) P F: m <= n =>
+  bigi P F m (n+1) =
+    bigi P F m n + (if P n then F n else idm).
+proof. by move=> lemn; rewrite !(@big_mkcond P) big_int_recr. qed.

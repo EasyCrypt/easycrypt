@@ -508,11 +508,11 @@ let generalize_subst_ env m uelts uglob =
     (b', b, s)
 
 let generalize_mod_ env m modi f =
-  let (melts, mglob) = PV.elements modi in
+  let (melts, mglob) = PV.ntr_elements modi in
 
   (* 1. Compute the prog-vars and the globals used in [f] *)
   let fv = PV.fv env m f in
-  let felts, fglob = PV.elements fv in
+  let felts, fglob = PV.ntr_elements fv in
 
   (* 2. Split [modi] into two parts:
    *    the one used in the free-vars and the others *)

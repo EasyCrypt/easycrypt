@@ -260,6 +260,8 @@
     (">="  , (GE               , false));
     ("<="  , (LE               , false));
     ("<*>" , (LTSTARGT         , false));
+    ("<<*>", (LTLTSTARGT       , false));
+    ("<*>>", (LTSTARGTGT       , false));
   ]
 
   (* ------------------------------------------------------------------ *)
@@ -320,7 +322,8 @@
   let cposition_of_string =
     let cpos1 x =
       try  int_of_string x
-      with Failure "int_of_string" -> raise InvalidCodePosition
+      with Failure x when x = "int_of_string" ->
+        raise InvalidCodePosition
     in
 
     let rec doit = function

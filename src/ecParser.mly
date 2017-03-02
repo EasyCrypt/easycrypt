@@ -21,12 +21,6 @@
   let pqsymb_of_symb loc x : pqsymbol =
     mk_loc loc ([], x)
 
-(*  let mk_mod ?(modtypes = []) params body = Pm_struct {
-    ps_params    = params;
-    ps_signature = modtypes;
-    ps_body      = body;
-  } *)
-
   let mk_tydecl (tyvars, name) body = {
     pty_name   = name;
     pty_tyvars = tyvars;
@@ -543,7 +537,7 @@
 %token WP
 %token ZETA
 %token <string> NOP LOP1 ROP1 LOP2 ROP2 LOP3 ROP3 LOP4 ROP4
-%token LTCOLON DASHLT GT LT GE LE LTSTARGT
+%token LTCOLON DASHLT GT LT GE LE LTSTARGT LTLTSTARGT LTSTARGTGT
 
 %nonassoc prec_below_comma
 %nonassoc COMMA ELSE
@@ -1422,12 +1416,9 @@ mod_params:
     { (x, restr) }
 
 sig_def:
-| MODULE TYPE x=uident args=sig_params? EQ i=sig_body
-    {
-      let args = EcUtils.odfl [] args in
-      (x, Pmty_struct { pmsig_params = args;
-                        pmsig_body   = i; })
-    }
+| MODULE TYPE x=uident args=sig_params* EQ i=sig_body
+    { (x, Pmty_struct { pmsig_params = List.flatten args;
+                        pmsig_body   = i; }) }
 
 sig_body:
 | body=sig_struct_body { body }
@@ -1899,6 +1890,11 @@ ip_repeat:
 | i=ioption(word) NOT { i }
 | i=word { Some i }
 
+ipsubsttop:
+| LTSTARGT   { None }
+| LTLTSTARGT { Some `RtoL }
+| LTSTARGTGT { Some `LtoR }
+
 intro_pattern:
 | x=ipcore
    { IPCore x }
@@ -1934,10 +1930,10 @@ intro_pattern:
    { IPDone None }
 
 | SLASHSLASHEQ
-   { IPDone (Some `Full) }
+   { IPDone (Some `Default) }
 
 | SLASHSLASHTILDEQ
-   { IPDone (Some `ProductCompat) }
+   { IPDone (Some `Variant) }
 
 | SLASHSHARP
    { IPSmt (false, { (SMT.mk_smt_option []) with plem_max = Some (Some 0) }) }
@@ -1946,10 +1942,10 @@ intro_pattern:
    { IPSmt (true, { (SMT.mk_smt_option []) with plem_max = Some (Some 0) }) }
 
 | SLASHEQ
-   { IPSimplify `Full }
+   { IPSimplify `Default }
 
 | SLASHTILDEQ
-   { IPSimplify `ProductCompat }
+   { IPSimplify `Variant }
 
 | SLASH f=pterm
    { IPView f }
@@ -1957,11 +1953,11 @@ intro_pattern:
 | AT s=rwside o=rwocc? SLASH x=sform_h
    { IPDelta ((s, o), x) }
 
-| LTSTARGT
-   { IPSubstTop None }
+| ip=ipsubsttop
+   { IPSubstTop (None, ip) }
 
-| n=word NOT LTSTARGT
-   { IPSubstTop (Some n) }
+| n=word NOT ip=ipsubsttop
+   { IPSubstTop (Some n, ip) }
 
 | MINUS
    { IPBreak }
@@ -2049,10 +2045,10 @@ rwarg1:
    { RWDone None }
 
 | SLASHSLASHEQ
-   { RWDone (Some `Full) }
+   { RWDone (Some `Default) }
 
 | SLASHSLASHTILDEQ
-   { RWDone (Some `ProductCompat) }
+   { RWDone (Some `Variant) }
 
 | SLASHSHARP
    { RWSmt (false, { (SMT.mk_smt_option []) with plem_max = Some (Some 0) }) }
@@ -2061,10 +2057,10 @@ rwarg1:
    { RWSmt (true, { (SMT.mk_smt_option []) with plem_max = Some (Some 0) }) }
 
 | SLASHEQ
-   { RWSimpl `Full }
+   { RWSimpl `Default }
 
 | SLASHTILDEQ
-   { RWSimpl `ProductCompat }
+   { RWSimpl `Variant }
 
 | s=rwside r=rwrepeat? o=rwocc? fp=rwpterms
    { RWRw ((s, r, o), fp) }
@@ -2195,7 +2191,7 @@ while_tac_info:
     { { wh_inv = inv; wh_vrnt = Some vrnt; wh_bds = Some (k, eps); } }
 
 async_while_tac_info:
-| LBRACKET t1=expr COMMA f1=form RBRACKET 
+| LBRACKET t1=expr COMMA f1=form RBRACKET
   LBRACKET t2=expr COMMA f2=form RBRACKET p0=sform p1=sform COLON inv=sform
     { { asw_test = ((t1, f1), (t2,f2));
         asw_pred = (p0, p1);
@@ -2330,7 +2326,7 @@ logtactic:
 | ALGNORM
    { Palg_norm }
 
-| EXIST a=iplist1(loc(gpterm_arg), COMMA) %prec prec_below_comma
+| EXIST a=iplist1(loc(gpterm_arg), empty)
    { Pexists a }
 
 | LEFT
@@ -2519,6 +2515,9 @@ phltactic:
 
 | INLINE s=side? o=occurences? f=plist1(loc(fident), empty)
     { Pinline (`ByName (s, (f, o))) }
+
+| INLINE s=side? p=codepos
+    { Pinline (`CodePos (s, p)) }
 
 | INLINE s=side? STAR
     { Pinline (`All s) }
@@ -2830,8 +2829,9 @@ tactic_core_r:
    { Padmit }
 
 | CASE vw=prefix(SLASH, pterm)*
-    eq=ioption(postfix(boption(UNDERSCORE), COLON))
-    opts=ioption(caseoptions) gp=revert
+     opts=ioption(caseoptions)
+     eq=ioption(postfix(boption(UNDERSCORE), COLON))
+     gp=revert
 
     { Pcase (odfl false eq, odfl [] opts,
              { pr_view = vw; pr_rev = gp; } ) }
@@ -3028,9 +3028,9 @@ theory_clone:
      { pthc_base   = x;
        pthc_name   = y;
        pthc_ext    = EcUtils.odfl [] cw;
-       pthc_prf    = List.rev cp;
-       pthc_rnm    = List.rev cr;
-       pthc_clears = List.rev cl;
+       pthc_prf    = cp;
+       pthc_rnm    = cr;
+       pthc_clears = cl;
        pthc_opts   = odfl [] options;
        pthc_local  = local;
        pthc_import = ip; } }
@@ -3049,8 +3049,12 @@ clone_opts:
 clone_with:
 | WITH x=plist1(clone_override, COMMA) { x }
 
+clone_lemma_tag:
+|       x=ident { (`Include, x) }
+| MINUS x=ident { (`Exclude, x) }
+
 clone_lemma_base:
-| STAR x=bracket(ident+)?
+| STAR x=bracket(clone_lemma_tag+)?
     { `All (odfl [] x) }
 
 | x=_ident
@@ -3075,14 +3079,10 @@ clone_lemma_1:
     { { pthp_mode = cl; pthp_tactic = Some t; } }
 
 clone_lemma:
-| x=clone_lemma_1
-    { [x] }
-
-| xs=clone_lemma COMMA x=clone_lemma_1
-    { x :: xs }
+| x=plist1(clone_lemma_1, COMMA) { x }
 
 clone_proof:
-| PROOF x=clone_lemma { List.rev x }
+| PROOF x=clone_lemma { x }
 
 clone_rename_kind:
 | TYPE        { `Type    }

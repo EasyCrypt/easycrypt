@@ -81,6 +81,7 @@ type ppgoal = (EcBaseLogic.hyps * EcFol.form) * [
   | `All of (EcBaseLogic.hyps * EcFol.form) list
 ]
 
+val pp_hyps : PPEnv.t -> EcEnv.LDecl.hyps pp
 val pp_goal : PPEnv.t -> ppgoal pp
 
 (* -------------------------------------------------------------------- *)

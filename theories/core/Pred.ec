@@ -9,8 +9,6 @@
 require export ExtEq Fun.
 
 (* -------------------------------------------------------------------- *)
-type 'a rel = 'a -> 'a -> bool.
-
 lemma pred_ext (P Q : 'a -> bool):
   P = Q <=> forall x, P x <=> Q x.
 proof. by split=> //= h; apply/fun_ext=> x; rewrite h. qed.
@@ -28,9 +26,6 @@ op pred1  ['a] = fun (c x : 'a) => x = c.
 op predU1 ['a] = fun (c : 'a) (p : 'a -> bool) (x : 'a) => x = c \/ p x.
 op predC1 ['a] = fun (c : 'a) (x : 'a) => x <> c.
 op predD1 ['a] = fun (p : 'a -> bool) (c : 'a) (x : 'a) => x <> c /\ p x.
-
-(** Relations **) (* TODO: Should relation stuff be pushed out into a separate file? *)
-op relU   ['a,'b] = fun (r1 r2 : 'a -> 'b -> bool) x y => r1 x y \/ r2 x y.
 
 (** Subpredicate *)
 pred (<=) (p q:'a -> bool) = (* subpred *)
@@ -53,31 +48,6 @@ by (rewrite fun_ext; smt).
 
 lemma nosmt subpred_trans (X Y Z:'a -> bool):
   X <= Y => Y <= Z => X <= Z
-by [].
-
-(** Subrelation *)
-pred subrel (r1 r2 : 'a -> 'b -> bool) = forall x y, r1 x y => r2 x y.
-
-(* Lemmas on relation inclusion *)
-lemma nosmt subrel_eqP (r1 r2 : 'a -> 'b -> bool):
-  (forall x y, r1 x y <=> r2 x y) <=> (subrel r1 r2 /\ subrel r2 r1)
-by [].
-
-lemma nosmt subrel_refl (r : 'a -> 'b -> bool): subrel r r
-by [].
-
-lemma nosmt subrel_asym (r1 r2 : 'a -> 'b -> bool):
-  subrel r1 r2 => subrel r2 r1 => r1 = r2.
-proof.
-  move=> subrel_r1_r2 subrel_r2_r1.
-  (* Binary Extensional Equality *)
-  apply/fun_ext=> x.
-  apply/fun_ext=> y.
-  smt.
-qed.
-
-lemma nosmt subrel_trans (r2 r1 r3 : 'a -> 'b -> bool):
-  subrel r1 r2 => subrel r2 r3 => subrel r1 r3
 by [].
 
 (** Lemmas **)
@@ -119,14 +89,6 @@ by [].
 
 lemma nosmt predIsubpredr (p1 p2 : 'a -> bool):
   predI p1 p2 <= p2
-by [].
-
-lemma nosmt subrelUl (r1 r2 : 'a -> 'b -> bool):
-  subrel r1 (relU r1 r2)
-by [].
-
-lemma nosmt subrelUr (r1 r2 : 'a -> 'b -> bool):
-  subrel r2 (relU r1 r2)
 by [].
 
 lemma nosmt predTofV (f : 'a -> 'b): predT \o f = predT.

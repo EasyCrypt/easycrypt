@@ -475,7 +475,8 @@ and process_pragma (scope : EcScope.scope) opt =
   | "compact" -> Gc.compact ()
   | "reset"   -> raise (Pragma `Reset)
   | "restart" -> raise (Pragma `Restart)
-  | _         -> ()
+
+  | x -> EcScope.notify scope `Warning "unknown pragma: `%s'" x
 
 (* -------------------------------------------------------------------- *)
 and process_option (scope : EcScope.scope) (name, value) =

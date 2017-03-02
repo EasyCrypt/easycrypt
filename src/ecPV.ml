@@ -293,7 +293,13 @@ module PV = struct
         (fun _ o1 o2 -> if o2 = None then o1 else o2) fv1.s_pv fv2.s_pv;
       s_gl = Sm.union fv1.s_gl fv2.s_gl }
 
-  let elements fv = Mnpv.bindings fv.s_pv, Sm.elements fv.s_gl
+  let elements fv =
+    (Mnpv.bindings fv.s_pv, Sm.elements fv.s_gl)
+
+  let ntr_elements fv =
+    let xs, gs = elements fv in
+    (List.ksort ~key:fst ~cmp:pv_ntr_compare xs,
+     List.ksort ~key:identity ~cmp:m_ntr_compare gs)
 
   let fv env m f =
 
@@ -333,7 +339,7 @@ module PV = struct
 
   let pp env fmt fv =
     let ppe = EcPrinting.PPEnv.ofenv env in
-    let vs,gs = elements fv in
+    let vs,gs = ntr_elements fv in
     let pp_vs fmt (pv,_) = EcPrinting.pp_pv ppe fmt pv in
     let pp_gl fmt mp =
       Format.fprintf fmt "(glob %a)" (EcPrinting.pp_topmod ppe) mp in

@@ -52,8 +52,12 @@ type modapp_error =
 | MAE_AccesSubModFunctor
 
 type modtyp_error =
-| MTE_FunSigDoesNotRepeatArgNames
-| MTE_InternalFunctor
+| MTE_InnerFunctor
+| MTE_DupProcName of symbol
+
+type modsig_error =
+| MTS_DupProcName of symbol
+| MTS_DupArgName  of symbol * symbol
 
 type funapp_error =
 | FAE_WrongArgCount
@@ -98,6 +102,7 @@ type tyerror =
 | InvalidFunAppl         of funapp_error
 | InvalidModAppl         of modapp_error
 | InvalidModType         of modtyp_error
+| InvalidModSig          of modsig_error
 | InvalidMem             of symbol * mem_error
 | FunNotInModParam       of qsymbol
 | NoActiveMemory
@@ -439,10 +444,10 @@ let rec check_sig_cnv mode (env:EcEnv.env) (sin:module_sig) (sout:module_sig) =
     List.fold_left2
       (fun subst (xin, tyin) (xout, tyout) ->
         let tyout = EcSubst.subst_modtype subst tyout in
-        begin 
+        begin
           try check_modtype_cnv ~mode env tyout tyin
           with TymodCnvFailure err ->
-            tymod_cnv_failure 
+            tymod_cnv_failure
               (E_TyModCnv_SubTypeArg(xin, tyout, tyin, err))
         end;
         EcSubst.add_module subst xout (EcPath.mident xin))
@@ -1234,10 +1239,6 @@ let transexpcast_opt (env : EcEnv.env) mode ue oty e =
   | Some t -> transexpcast env mode ue t e
 
 (* -------------------------------------------------------------------- *)
-exception DuplicatedSigItemName
-exception DuplicatedArgumentsName of pfunction_decl
-
-(* -------------------------------------------------------------------- *)
 let name_of_sigitem = function
   | `FunctionDecl f -> f.pfd_name
 
@@ -1335,19 +1336,24 @@ let rec transmodsig (env : EcEnv.env) (name : symbol) (modty : pmodule_sig) =
     mis_body   = body; }
 
 (* -------------------------------------------------------------------- *)
-and transmodsig_body (env : EcEnv.env) (sa : Sm.t)
-    (is : pmodule_sig_struct_body) =
+and transmodsig_body
+  (env : EcEnv.env) (sa : Sm.t) (is : pmodule_sig_struct_body)
+=
   let transsig1 (`FunctionDecl f) =
-    let name   = f.pfd_name in
+    let name = f.pfd_name in
     let tyarg, tyargs =
       match f.pfd_tyargs with
-      | Fparams_exp l ->
+      | Fparams_exp args ->
         let tyargs =
-          List.map                          (* FIXME: continuation *)
-            (fun (x, ty) -> { v_name = x.pl_desc;
-                              v_type = transty_for_decl env ty}) l in
-        if not (List.is_unique (List.map fst l)) then
-          raise (DuplicatedArgumentsName f);
+          List.map              (* FIXME: continuation *)
+            (fun (x, ty) -> {
+                 v_name = x.pl_desc;
+                 v_type = transty_for_decl env ty}) args
+        in
+
+        Msym.odup unloc (List.map fst args) |> oiter (fun (_, a) ->
+          tyerror name.pl_loc env
+            (InvalidModSig (MTS_DupArgName (unloc name, unloc a))));
         let tyarg = ttuple (List.map (fun vd -> vd.v_type) tyargs) in
         tyarg, Some tyargs
       | Fparams_imp ty ->
@@ -1395,20 +1401,19 @@ and transmodsig_body (env : EcEnv.env) (sa : Sm.t)
   let items = List.map transsig1 is in
   let names = List.map name_of_sigitem is in
 
-    if not (List.is_unique names) then
-      raise DuplicatedSigItemName
-    else
-      items
+  Msym.odup unloc names |> oiter (fun (_, x) ->
+    tyerror (loc x) env (InvalidModSig (MTS_DupProcName (unloc x))));
+  items
 
 (* -------------------------------------------------------------------- *)
 let rec transmod ~attop (env : EcEnv.env) (me : pmodule_def) =
-  snd (transmod_header ~attop env me.ptm_header [] me.ptm_body) 
+  snd (transmod_header ~attop env me.ptm_header [] me.ptm_body)
 
 (* -------------------------------------------------------------------- *)
 and transmod_header
    ~attop (env : EcEnv.env) (mh:pmodule_header) params (me:pmodule_expr) =
   match mh with
-  | Pmh_ident x -> 
+  | Pmh_ident x ->
     0, transmod_body ~attop env x params me
   | Pmh_params {pl_desc = (mh,params')} ->
     let n, me = transmod_header ~attop env mh (params' @ params) me in
@@ -1423,22 +1428,21 @@ and transmod_header
         Sm.add (EcPath.mident id) mparams) Sm.empty rm in
     let filter f =
       let ftop = EcPath.m_functor f.EcPath.x_top in
-      not (Sm.mem ftop torm) in 
-    let clear (Tys_function(fsig,oi)) = 
+      not (Sm.mem ftop torm) in
+    let clear (Tys_function(fsig,oi)) =
       Tys_function(fsig, {oi with oi_calls = List.filter filter oi.oi_calls}) in
     let mis_body = List.map clear me.me_sig.mis_body in
     let tymod = { mis_params; mis_body } in
     (* Check that the signature is a subtype *)
-    let check s = 
+    let check s =
       let (aty, _asig) = transmodtype env s in
       try  check_sig_mt_cnv env tymod aty
-      with TymodCnvFailure err -> 
+      with TymodCnvFailure err ->
         let args = List.map (fun (id,_) -> EcPath.mident id) rm in
-        let mp = mpath_crt (psymbol me.me_name) args None in 
+        let mp = mpath_crt (psymbol me.me_name) args None in
         tyerror s.pl_loc env (TypeModMismatch(mp, aty, err)) in
     List.iter check mts;
     n,me
-     
 
 (* -------------------------------------------------------------------- *)
 and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
@@ -1461,7 +1465,7 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
         (InvalidModAppl (MAE_WrongArgCount(0,List.length allparams)));
     let me = EcEnv.Mod.by_mpath mp env in
     let arity = List.length stparams in
-    let me = 
+    let me =
       { me with
         me_name  = x.pl_desc;
         me_body  = ME_Alias (arity,mp);
@@ -1470,13 +1474,13 @@ and transmod_body ~attop (env : EcEnv.env) x params (me:pmodule_expr) =
     me
   | Pm_struct ps ->
     transstruct ~attop env x.pl_desc stparams (mk_loc me.pl_loc ps)
-   
+
 (* -------------------------------------------------------------------- *)
 and transstruct ~attop (env : EcEnv.env) (x : symbol) stparams (st:pstructure located) =
   let { pl_loc = loc; pl_desc = st; } = st in
 
   if not attop && stparams <> [] then
-    tyerror loc env (InvalidModType MTE_InternalFunctor);
+    tyerror loc env (InvalidModType MTE_InnerFunctor);
 
   let (envi, items) =
     let tydecl1 (x, obj) =
@@ -1538,33 +1542,6 @@ and transstruct ~attop (env : EcEnv.env) (x : symbol) stparams (st:pstructure lo
   in
   me
 
-(*
-  (* Check that generated signature is structurally included in
-   * associated type mode. *)
-  let check1 { pl_desc = (aty, oatyp); pl_loc = loc } =
-    let (aty, _asig) = transmodtype env aty in
-    if oatyp <> [] then
-      begin
-        let cmp (x1, _) x2 = (EcIdent.name x1 = unloc x2) in
-        if not (List.all2 cmp stparams oatyp) then
-          tyerror loc env
-            (InvalidModType MTE_FunSigDoesNotRepeatArgNames);
-        (* Now we check the signature *)
-        try  check_sig_mt_cnv env tymod aty
-        with TymodCnvFailure err -> tyerror loc env (TypeModMismatch err)
-      end
-    else (* In that case we check the fully applied signature *)
-      let sig_ =
-        { mis_params = [];
-          mis_body = List.map
-            (fun (Tys_function (s, oi)) ->
-              Tys_function (s, { oi_calls = []; oi_in = oi.oi_in }))
-            tymod.mis_body } in
-      try  check_sig_mt_cnv env0 sig_ aty
-      with TymodCnvFailure err -> tyerror loc env0 (TypeModMismatch err)
-  in
-    List.iter check1 st.ps_signature;
-  *)
 (* -------------------------------------------------------------------- *)
 and transstruct1 (env : EcEnv.env) (st : pstructure_item located) =
   match unloc st with
@@ -1872,7 +1849,7 @@ and translvalue ue (env : EcEnv.env) lvalue =
 
   | PLvTuple xs ->
       let xs = List.map (trans_pv env) xs in
-      if not (List.is_unique ~eq:(EqTest.for_pv_norm env) (List.map fst xs)) then
+      if not (List.is_unique ~eq:(EqTest.for_pv env) (List.map fst xs)) then
         tyerror lvalue.pl_loc env LvNonLinear;
       let ty = ttuple (List.map snd xs) in
       (LvTuple xs, ty)

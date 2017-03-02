@@ -39,7 +39,7 @@ by exists M; rewrite leM /= (ler_trans `|s N|) 1:normr_ge0 // lesM.
 qed.
 
 lemma boundedC c : bounded (fun x => c).
-proof. by exists `|c|, 0. qed.
+proof. by exists `|c| 0. qed.
 
 (* -------------------------------------------------------------------- *)
 lemma cnvP l s: convergeto s l => converge s.
@@ -49,7 +49,7 @@ proof. by move=> cnv_sl; exists l. qed.
 lemma bounded_cnvto l (s : int -> real) :
   convergeto s l => bounded s.
 proof.
-move=> /(_ 1%r) /= [N] les1; exists (1%r + `|l|), N.
+move=> /(_ 1%r) /= [N] les1; exists (1%r + `|l|) N.
 move=> n /les1 /ltrW lesn1; rewrite -(addrK l (s n)) addrAC.
 apply/(ler_trans (`|s n - l| + `|l|)); 1: by apply/ler_norm_add.
 by rewrite ler_add2r.
