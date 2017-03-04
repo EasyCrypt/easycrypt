@@ -1,5 +1,5 @@
 FROM easycryptpa/ec-build-box:latest
 
 RUN \
-	opam install easycrypt.dev && \
+	opam install -v easycrypt.dev && \
 	rm -rf .opam/packages.dev/*
