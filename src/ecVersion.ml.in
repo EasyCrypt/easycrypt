@@ -6,10 +6,10 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-let copyrights = [
-  "Copyright (c) - 2012-2016 - IMDEA Software Institute"
-  "Copyright (c) - 2012-2017 - INRIA"
-  "Copyright (c) - 2017-2017 - Ecole Polytechnique"
+let copyright = [
+  "Copyright (c) - 2012-2016 - IMDEA Software Institute";
+  "Copyright (c) - 2012-2017 - INRIA";
+  "Copyright (c) - 2017-2017 - Ecole Polytechnique";
 ]
 
 let url  = "https://www.easycrypt.info/"

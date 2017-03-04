@@ -16,7 +16,7 @@ module T  = EcTerminal
 let copyright =
   let sentences =
     List.flatten
-      [String.split_lines EcVersion.copyright;
+      [EcVersion.copyright;
        String.split_lines EcVersion.License.engine;
        ["Standard Library (theories/**/*.ec): "];
        List.map (Printf.sprintf "\t%s")
