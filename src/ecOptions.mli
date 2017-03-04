@@ -53,4 +53,4 @@ and glb_options = {
 }
 
 (* -------------------------------------------------------------------- *)
-val parse : string array -> options
+val parse_cmdline : string array -> options

@@ -348,7 +348,7 @@ let parse argv =
       o_command = command; }
 
 (* -------------------------------------------------------------------- *)
-let parse argv =
+let parse_cmdline argv =
   let args   = Array.sub argv 1 (Array.length argv - 1) in
   let hascmd =
     match args with
