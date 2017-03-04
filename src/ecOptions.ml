@@ -57,6 +57,15 @@ and glb_options = {
 }
 
 (* -------------------------------------------------------------------- *)
+type ini_options = {
+  ini_why3     : string option;
+  ini_ovrevict : string list;
+  ini_provers  : string list;
+  ini_idirs    : string list;
+  ini_rdirs    : string list;
+}
+
+(* -------------------------------------------------------------------- *)
 type xoptions = {
   xp_globals  : xspec list;
   xp_commands : (string * string * xspec list) list;
@@ -286,21 +295,35 @@ let get_strings name values =
     List.rev xs
 
 (* -------------------------------------------------------------------- *)
-let ldr_options_of_values values =
-  { ldro_idirs = get_strings "I"    values;
-    ldro_rdirs = get_strings "R"    values;
-    ldro_boot  = get_flag    "boot" values; }
+let ldr_options_of_values ?ini values =
+  if get_flag "boot" values then
+    { ldro_idirs = []; ldro_rdirs = []; ldro_boot = true; }
+  else
+    let idirs = omap_dfl (fun x -> x.ini_idirs) [] ini in
+    let rdirs = omap_dfl (fun x -> x.ini_idirs) [] ini in
+    { ldro_idirs = idirs @ (get_strings "I" values);
+      ldro_rdirs = rdirs @ (get_strings "R" values);
+      ldro_boot  = false; }
 
-let glb_options_of_values values =
-  { o_why3     = get_string  "why3"     values;
-    o_reloc    = get_flag    "reloc"    values;
-    o_ovrevict = get_strings "no-evict" values;
-    o_loader   = ldr_options_of_values  values; }
+let glb_options_of_values ?ini values =
+  let why3 =
+    match get_string "why3" values with
+    | None -> obind (fun x -> x.ini_why3) ini
+    | why3 -> why3 in
 
-let prv_options_of_values values =
+  let ovrevict = omap_dfl (fun x -> x.ini_ovrevict) [] ini in
+
+  { o_why3     = why3;
+    o_reloc    = get_flag "reloc" values;
+    o_ovrevict = ovrevict @ (get_strings "no-evict" values);
+    o_loader   = ldr_options_of_values ?ini values; }
+
+let prv_options_of_values ?ini values =
   let provers =
-    match get_strings "p" values with
-    | [] -> None | provers -> Some provers
+    let provers =
+      (omap_dfl (fun x -> x.ini_provers) [] ini) @
+      (get_strings "p" values)
+    in match provers with [] -> None | provers -> Some provers
   in
     { prvo_maxjobs   = odfl 4 (get_int "max-provers" values);
       prvo_timeout   = odfl 3 (get_int "timeout" values);
@@ -312,30 +335,30 @@ let prv_options_of_values values =
       prvo_iterate   = get_flag "iterate" values;
     }
 
-let cli_options_of_values values =
+let cli_options_of_values ?ini values =
   { clio_emacs   = get_flag "emacs" values;
-    clio_provers = prv_options_of_values values; }
+    clio_provers = prv_options_of_values ?ini values; }
 
-let cmp_options_of_values values input =
+let cmp_options_of_values ?ini values input =
   { cmpo_input   = input;
-    cmpo_provers = prv_options_of_values values;
+    cmpo_provers = prv_options_of_values ?ini values;
     cmpo_gcstats = get_flag "gcstats" values; }
 
 (* -------------------------------------------------------------------- *)
-let parse argv =
+let parse ?ini argv =
   let (command, values, anons) = parse specs argv in
   let command =
     match command with
     | "compile" -> begin
         match anons with
-        | [input] -> `Compile (cmp_options_of_values values input)
+        | [input] -> `Compile (cmp_options_of_values ?ini values input)
         | _ -> raise (Arg.Bad "this command takes a single argument")
     end
 
     | "cli" ->
         if anons != [] then
           raise (Arg.Bad "this command does not take arguments");
-        `Cli (cli_options_of_values values)
+        `Cli (cli_options_of_values ?ini values)
 
     | "config" ->
         if anons != [] then
@@ -344,11 +367,11 @@ let parse argv =
 
     | _ -> assert false
   in
-    { o_options = glb_options_of_values values;
+    { o_options = glb_options_of_values ?ini values;
       o_command = command; }
 
 (* -------------------------------------------------------------------- *)
-let parse_cmdline argv =
+let parse_cmdline ?ini argv =
   let args   = Array.sub argv 1 (Array.length argv - 1) in
   let hascmd =
     match args with
@@ -358,7 +381,10 @@ let parse_cmdline argv =
 
   let isec x = EcRegexp.match_ (`S ".*\\.eca?") x in
 
-  let necfiles = Array.fold_left (fun s n -> if isec n then s+1 else s) 0 args in
+  let necfiles =
+    Array.fold_left
+      (fun s n -> if isec n then s+1 else s) 0 args in
+
   let ecommand =
     match hascmd with
     | true -> None
@@ -377,7 +403,46 @@ let parse_cmdline argv =
          | 1 -> cmd
          | i -> argv.(i-1))
   in
-    try parse argv
+    try parse ?ini argv
     with
     | Arg.Bad  msg -> print_usage ~msg specs; exit 1
     | Arg.Help _   -> print_usage specs; exit 1
+
+(* -------------------------------------------------------------------- *)
+exception InvalidIniFile of (int * string)
+
+let read_ini_file (filename : string) =
+  let sec = "general" in
+  let ini =
+    try  new Inifiles.inifile filename
+    with Inifiles.Ini_parse_error code -> raise (InvalidIniFile code) in
+
+  let tryget name =
+    try  Some (ini#getval sec name)
+    with
+    | Inifiles.Invalid_section _
+    | Inifiles.Invalid_element _ -> None
+
+  and trylist name =
+    try  ini#getaval sec name
+    with
+    | Inifiles.Invalid_section _
+    | Inifiles.Invalid_element _ -> [] in
+
+  let expand (x : string) =
+    EcRegexp.sub
+      (`C (EcRegexp.regexp "^~"))
+      (`S XDG.home) x in
+
+  let ini =
+    { ini_why3     = tryget  "why3conf";
+      ini_ovrevict = trylist "no-evict";
+      ini_provers  = trylist "provers" ;
+      ini_idirs    = trylist "idirs"   ;
+      ini_rdirs    = trylist "rdirs"   ; } in
+
+  { ini_why3     = omap expand ini.ini_why3;
+    ini_ovrevict = ini.ini_ovrevict;
+    ini_provers  = ini.ini_provers;
+    ini_idirs    = List.map expand ini.ini_idirs;
+    ini_rdirs    = List.map expand ini.ini_rdirs; }

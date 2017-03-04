@@ -21,6 +21,9 @@ val xdgroots : xdgroots
 exception XdgUndefined of string
 
 (* -------------------------------------------------------------------- *)
+val home : string
+
+(* -------------------------------------------------------------------- *)
 type mode = [`User | `System | `All]
 
 type xdgfile =

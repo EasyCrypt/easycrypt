@@ -138,7 +138,17 @@ let _ =
   in
 
   (* Parse command line arguments *)
-  let options = EcOptions.parse_cmdline Sys.argv in
+  let options =
+    let ini = resource ["etc"; "easycrypt.ini"] in
+    let ini =
+      try  Some (EcOptions.read_ini_file ini)
+      with
+      | Sys_error _ -> None
+      | EcOptions.InvalidIniFile (lineno, file) ->
+          Format.eprintf "%s:%l: cannot read INI file@." file lineno;
+          exit 1
+
+    in EcOptions.parse_cmdline ?ini Sys.argv in
 
   (* chrdir_$PATH if in reloc mode (FIXME / HACK) *)
   let relocdir =
