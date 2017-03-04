@@ -51,7 +51,7 @@ via the opam OCaml packages manager.
 
   2. Optionally, select the EasyCrypt (git) branch you want to use:
 
-       $> opam pin add easycrypt https://github.com/EasyCrypt/easycrypt.git#branch
+       $> opam pin -n add easycrypt https://github.com/EasyCrypt/easycrypt.git#branch
        
      where `branch` is the branch name you want to use (e.g. `aprhl`).
 

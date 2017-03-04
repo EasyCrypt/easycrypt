@@ -1,6 +1,6 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2016 - Inria
+ * Copyright (c) - 2012--2017 - Inria
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -53,4 +53,16 @@ and glb_options = {
 }
 
 (* -------------------------------------------------------------------- *)
-val parse : string array -> options
+type ini_options = {
+  ini_why3     : string option;
+  ini_ovrevict : string list;
+  ini_provers  : string list;
+  ini_idirs    : string list;
+  ini_rdirs    : string list;
+}
+
+(* -------------------------------------------------------------------- *)
+exception InvalidIniFile of (int * string)
+
+val read_ini_file : string -> ini_options
+val parse_cmdline : ?ini:ini_options -> string array -> options

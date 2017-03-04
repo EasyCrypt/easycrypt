@@ -1,6 +1,6 @@
 (* --------------------------------------------------------------------
  * Copyright (c) - 2012--2016 - IMDEA Software Institute
- * Copyright (c) - 2012--2016 - Inria
+ * Copyright (c) - 2012--2017 - Inria
  *
  * Distributed under the terms of the CeCILL-C-V1 license
  * -------------------------------------------------------------------- *)
@@ -16,7 +16,7 @@ module T  = EcTerminal
 let copyright =
   let sentences =
     List.flatten
-      [String.split_lines EcVersion.copyright;
+      [EcVersion.copyright;
        String.split_lines EcVersion.License.engine;
        ["Standard Library (theories/**/*.ec): "];
        List.map (Printf.sprintf "\t%s")
@@ -137,34 +137,18 @@ let _ =
         else None
   in
 
-  (* If in local mode, add the toolchain bin/ path to $PATH *)
-  if eclocal then begin
-    let module E = struct exception Found of string end in
-
-    let rootdir = resource ["_tools"] in
-    let regexp  = EcRegexp.regexp "^ocaml-[0-9.]+$" in
-
-    if Sys.file_exists rootdir && Sys.is_directory rootdir then begin
-      let dirs = Sys.readdir rootdir in
-
-      try
-        for i = 0 to (Array.length dirs) - 1 do
-          let target = Filename.concat rootdir dirs.(i) in
-            if Sys.is_directory target then
-              if EcRegexp.match_ (`C regexp) dirs.(i) then
-                raise (E.Found target)
-        done
-      with E.Found target ->
-        let target = List.fold_left
-          Filename.concat target ["opam"; "system"; "bin"] in
-        let path = try Unix.getenv "PATH" with Not_found -> "" in
-        let path = Printf.sprintf "%s%s%s" target psep path in
-        Unix.putenv "PATH" path
-    end
-  end;
-
   (* Parse command line arguments *)
-  let options = EcOptions.parse Sys.argv in
+  let options =
+    let ini = resource ["etc"; "easycrypt.ini"] in
+    let ini =
+      try  Some (EcOptions.read_ini_file ini)
+      with
+      | Sys_error _ -> None
+      | EcOptions.InvalidIniFile (lineno, file) ->
+          Format.eprintf "%s:%l: cannot read INI file@." file lineno;
+          exit 1
+
+    in EcOptions.parse_cmdline ?ini Sys.argv in
 
   (* chrdir_$PATH if in reloc mode (FIXME / HACK) *)
   let relocdir =
@@ -177,16 +161,7 @@ let _ =
   in
 
   (* Initialize why3 engine *)
-  let why3conf =
-    match options.o_options.o_why3 with
-    | None when eclocal -> begin
-      let why3conf = resource ["_tools"; "why3.local.conf"] in
-        match Sys.file_exists why3conf with
-        | false -> None
-        | true  -> Some why3conf
-    end
-    | why3conf -> why3conf
-
+  let why3conf = options.o_options.o_why3
   and ovrevict = options.o_options.o_ovrevict in
 
   begin
