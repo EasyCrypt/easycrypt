@@ -2,7 +2,7 @@
 
 # --------------------------------------------------------------------
 # docker.com account name
-DNAME ?= strubpy
+DNAME ?= easycryptpa
 BBOX  := build-box doc-box test-box aprhl-test-box
 
 # --------------------------------------------------------------------
@@ -16,7 +16,6 @@ all:
 
 %-test-box-build:
 	[ -d $*-test-box ] || mkdir $*-test-box
-	cp templates/sudo-ci $*-test-box/
 	sed -e 's/BRANCH/$*/g' < templates/Dockerfile > $*-test-box/Dockerfile
 	cd $*-test-box && docker build -t $(DNAME)/ec-$*-test-box .
 
