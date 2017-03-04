@@ -2,7 +2,7 @@
 
 # --------------------------------------------------------------------
 # docker.com account name
-DNAME ?= strubpy
+DNAME ?= easycryptpa
 BBOX  := build-box doc-box test-box aprhl-test-box
 
 # --------------------------------------------------------------------

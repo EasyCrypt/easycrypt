@@ -12,8 +12,8 @@ notifications:
   email:
   - tracker@easycrypt.info
 before_install:
-- docker pull strubpy/ec-build-box
+- docker pull easycryptpa/ec-build-box
 script:
 - >-
-  docker run -v $PWD:/home/ci/easycrypt strubpy/ec-build-box
+  docker run -v $PWD:/home/ci/easycrypt easycryptpa/ec-build-box
   sh -c 'cd easycrypt && opam config exec -- make'
