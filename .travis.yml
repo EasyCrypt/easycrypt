@@ -3,9 +3,8 @@ dist: trusty
 language: ocaml
 branches:
   only:
-  - master
   - 1.0
-  - travis
+  - /^deploy-.*$/
 services:
 - docker
 notifications:
