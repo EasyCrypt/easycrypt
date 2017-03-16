@@ -2074,6 +2074,83 @@ qed.
 (* -------------------------------------------------------------------- *)
 (*                            All pairs                                 *)
 (* -------------------------------------------------------------------- *)
+op zip ['a 'b] (s : 'a list) (t : 'b list) =
+  with s = x :: s', t = y :: t' => (x, y) :: zip s' t'
+  with s = _ :: _ , t = []      => []
+  with s = []     , t = _ :: _  => []
+  with s = []     , t = []      => [].
+
+abbrev unzip1 ['a 'b] (s : ('a * 'b) list) = map fst s.
+abbrev unzip2 ['a 'b] (s : ('a * 'b) list) = map snd s.
+
+lemma zip_unzip ['a 'b] (s : ('a * 'b) list) :
+  zip (unzip1 s) (unzip2 s) = s.
+proof. by elim: s => // -[x y s /= ->]. qed.
+
+lemma unzip1_zip ['a 'b] (s : 'a list) (t : 'b list) :
+  size s <= size t => unzip1 (zip s t) = s.
+proof.
+elim: s t => [|x s ih] [|y t] //=; 1: smt(size_ge0).
+by rewrite lez_add2l => /ih ->.
+qed.
+
+lemma unzip2_zip ['a 'b] (s : 'a list) (t : 'b list) :
+  size t <= size s => unzip2 (zip s t) = t.
+proof.
+elim: s t => [|x s ih] [|y t] //=; 1: smt(size_ge0).
+by rewrite lez_add2l => /ih ->.
+qed.
+
+lemma size1_zip ['a 'b] (s : 'a list) (t : 'b list) :
+  size s <= size t => size (zip s t) = size s.
+proof.
+elim: s t => [|x s ih] [|y t] //=; 1: smt(size_ge0).
+by rewrite lez_add2l => /ih ->.
+qed.
+
+lemma size2_zip ['a 'b] (s : 'a list) (t : 'b list) :
+  size t <= size s => size (zip s t) = size t.
+proof.
+elim: s t => [|x s ih] [|y t] //=; 1: smt(size_ge0).
+by rewrite lez_add2l => /ih ->.
+qed.
+
+lemma size_zip ['a 'b] (s : 'a list) (t : 'b list) :
+  size (zip s t) = min (size s) (size t).
+proof. by elim: s t => [|x s ih] [|y t] //=; smt(size_ge0). qed.
+
+lemma zip_cat ['a 'b] (s1 s2 : 'a list) (t1 t2 : 'b list) :
+  size s1 = size t1 => zip (s1 ++ s2) (t1 ++ t2) = zip s1 t1 ++ zip s2 t2.
+proof. elim: s1 t1 => [|x s1 ih] [|y t1] //=; smt(size_ge0). qed.
+
+lemma nth_zip ['a 'b] (x : 'a) (y : 'b) s t i :
+  size s = size t => nth (x, y) (zip s t) i = (nth x s i, nth y t i).
+proof. by elim: s t i => [|xs s ih] [|xt t] //=; smt(size_ge0). qed.
+
+lemma nth_zip_cond ['a 'b] p (s : 'a list) (t : 'b list) i :
+   nth p (zip s t) i
+     = (if i < size (zip s t) then (nth p.`1 s i, nth p.`2 t i) else p).
+proof.
+case: (i < 0) => [le0_i|].
++ by rewrite !nth_neg // -(pairS p) if_same.
+by elim: s t i => [|x s ih] [|y t] i //=; (move=> ->// || smt(size_ge0)).
+qed.
+
+lemma zip_rcons ['a 'b] s1 s2 (z1 : 'a) (z2 : 'b) :
+  size s1 = size s2 =>
+    zip (rcons s1 z1) (rcons s2 z2) = rcons (zip s1 s2) (z1, z2).
+proof. by move=> eq_sz; rewrite -!cats1 zip_cat //= eq_sz. qed.
+
+lemma rev_zip ['a 'b] (s1 : 'a list) (s2 : 'b list) :
+  size s1 = size s2 => rev (zip s1 s2) = zip (rev s1) (rev s2).
+proof.
+elim: s1 s2 => [|x s1 ih] [|y s2] //=; 1,2,3: smt(size_ge0).
+by move/addzI=> eq_sz; rewrite !(rev_cons, zip_rcons) ?size_rev // ih.
+qed.
+
+(* -------------------------------------------------------------------- *)
+(*                            All pairs                                 *)
+(* -------------------------------------------------------------------- *)
 op allpairs ['a 'b 'c] (f : 'a -> 'b -> 'c) s t =
   foldr (fun x => (++) (map (f x) t)) [] s.
 
