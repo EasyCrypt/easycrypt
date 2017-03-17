@@ -382,7 +382,7 @@ proof.
 qed.
 
 (* -------------------------------------------------------------------- *)
-lemma partition_big ['a] px (P Q : 'a -> bool) (F : 'a -> t) s s' :
+lemma partition_big ['a 'b] (px : 'a -> 'b) P Q (F : 'a -> t) s s' :
      uniq s'
   => (forall x, mem s x => P x => mem s' (px x) /\ Q (px x))
   => big P F s = big Q (fun x => big (fun y => P y /\ px y = x) F s) s'.
