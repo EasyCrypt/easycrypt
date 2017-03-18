@@ -15,4 +15,4 @@ before_install:
 script:
 - >-
   docker run -v $PWD:/home/ci/easycrypt easycryptpa/ec-build-box
-  sh -c 'cd easycrypt && opam config exec -- make'
+  sh -c 'cd easycrypt && opam config exec -- make build check'
