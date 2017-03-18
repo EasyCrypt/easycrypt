@@ -9,7 +9,7 @@ services:
 - docker
 env:
 - TARGETS=build
-- TARGETS=build check
+- TARGETS=check
 notifications:
   email:
   - tracker@easycrypt.info
