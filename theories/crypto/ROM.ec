@@ -333,8 +333,7 @@ theory LazyEager.
          (={x,work,IND_Eager.H.m} ==> ={result,IND_Eager.H.m})
          (={x,work,IND_Eager.H.m} ==> ={result,IND_Eager.H.m})=> //.
           by move=> &1 &2 H; exists IND_Eager.H.m{2} work{2} x{2}; move: H.
-        by sim; rnd{2}; sim: (={x,IND_Eager.H.m}); smt.
-
+        + by sim; rnd{2}; sim: (={x,IND_Eager.H.m})=> /> ?;apply dsampleL.
         wp; symmetry; eager
           while (H:y0 = $dsample x; ~ y0 = $dsample x; : ={x} ==> ={y0})=> //;
           first by rnd.
@@ -402,7 +401,9 @@ theory LazyEager.
              (forall x, !FSet.mem (dom IND_Eager.H.m{1}) x <=>
                         mem work{1} x) /\ IND_Eager.H.m{1} = Eager.RO.m{2}).
         by auto; progress; smt.
-      by auto; smt.
+      auto => />;split=> [x| m].
+      + by rewrite dom0 in_fset0 mem_oflist mem_to_seq.
+      by move=> H x;have := H x;rewrite in_fset0.
     qed.
 
     lemma eagerRO:

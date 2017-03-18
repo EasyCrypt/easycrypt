@@ -334,8 +334,6 @@ section.
     cut := M.Mean_uni (HybGameFixed(R(Ob))) &m ev (1%r/q%r) _ _ => //; simplify ev => ->.
     cut -> : oflist (to_seq (support [0..q - 1])) = oflist (List.Iota.iota_ 0 q).
       by apply FSet.fsetP => x; rewrite !mem_oflist mem_to_seq// smt.
-    (* BUG type are not normalized in ev => assert failure in ecWhy *)
-    clear ev.
     cut {1}->: oflist (List.Iota.iota_ 0 q) = oflist (List.Iota.iota_ 1 (q - 1)) `|` fset1 0.
       by apply/fsetP=> x; rewrite !inE !mem_oflist !List.Iota.mem_iota; smt.
     cut ->: oflist (List.Iota.iota_ 0 q) = oflist (List.Iota.iota_ 0 (q - 1)) `|` fset1 (q - 1).
