@@ -90,7 +90,7 @@ define check-for-staled-files
 	fi
 endef
 
-install: ec.native uninstall
+install: build uninstall
 	-@$(call check-for-staled-files)
 	$(INSTALL) -m 0755 -d $(DESTDIR)$(BINDIR)
 	$(INSTALL) -m 0755 -T ec.native $(DESTDIR)$(BINDIR)/easycrypt$(EXE)
@@ -128,13 +128,13 @@ tests: check
 examples:
 	$(CHECK) examples
 
-check: ec.native
+check: build
 	$(CHECK) $(CHECKCATS)
 
-weak-check: ec.native
+weak-check: build
 	$(CHECK) --bin-args="-pragmas Proofs:weak" $(CHECKCATS) '!unit'
 
-check-xunit: ec.native
+check-xunit: build
 	$(CHECK) --xunit="$(XUNITOUT)" $(CHECKCATS)
 
 license:
