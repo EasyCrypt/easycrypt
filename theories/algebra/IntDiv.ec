@@ -224,7 +224,13 @@ qed.
 
 (* -------------------------------------------------------------------- *)
 lemma oddP z: odd z <=> (z %% 2 <> 0).
-proof. smt. qed.
+proof.
+rewrite {1}(divz_eq _ 2); case: (z %% 2 = 0) => /=.
++ by move=> ->/=; rewrite oddM odd2.
+move=> nz_z2; suff ->/=: z %% 2 = 1.
++ by rewrite oddD oddM odd2 odd1.
+smt(ltz_pmod modz_ge0).         (* FIXME: use case for nat *)
+qed.
 
 lemma oddPn z: !odd z <=> (z %% 2 = 0).
 proof. by rewrite oddP /#. qed.
