@@ -38,7 +38,7 @@ SYSDIR := $(LIBDIR)/system
 # --------------------------------------------------------------------
 XUNITOUT  ?= xunit.xml
 ECARGS    ?=
-ECTOUT    ?= 5
+ECTOUT    ?= 10
 ECJOBS    ?= 1
 ECEXTRA   ?= --pretty
 ECPROVERS ?= Alt-Ergo Z3 Eprover
