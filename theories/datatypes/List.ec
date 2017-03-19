@@ -463,6 +463,14 @@ lemma eq_count p1 p2 (s : 'a list):
   (forall x, p1 x <=> p2 x) => count p1 s = count p2 s.
 proof. by move=> h; rewrite -!size_filter (eq_filter _ p2). qed.
 
+lemma count_pred0_eq p (s : 'a list):
+  (forall x, ! p x) => count p s = 0.
+proof. by move=> eq; rewrite -(count_pred0 s) &(eq_count). qed.
+
+lemma count_predT_eq p (s : 'a list):
+  (forall x, p x) => count p s = size s.
+proof. by move=> eq; rewrite -(count_predT s) &(eq_count). qed.
+
 lemma eq_has p1 p2 (s : 'a list):
   (forall x, p1 x <=> p2 x) => has p1 s <=> has p2 s.
 proof. by move=> h; rewrite !has_count (eq_count _ p2). qed.
