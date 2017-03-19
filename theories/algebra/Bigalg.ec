@@ -178,6 +178,14 @@ move=> h; apply: (@BMul.big_ind (fun x => zeror <= x)) => //=.
   by apply/mulr_ge0. by apply/ler01.
 qed.
 
+lemma nosmt prodr_gt0 (P : 'a -> bool) F s:
+     (forall a, P a => zeror < F a)
+  => zeror < BMul.big P F s.
+proof.
+move=> h; apply: (@BMul.big_ind (fun x => zeror < x)) => //=.
+  by apply/mulr_gt0. by apply/ltr01.
+qed.
+
 lemma nosmt ler_prod (P : 'a -> bool) (F1 F2 :'a -> t) s:
      (forall a, P a => zeror <= F1 a <= F2 a)
   => (BMul.big P F1 s <= BMul.big P F2 s).
@@ -209,6 +217,14 @@ lemma nosmt prodr_ge0_seq (P : 'a -> bool) F s:
 proof.
 move=> h; rewrite !(@BMul.big_seq_cond P).
 by rewrite prodr_ge0=> //= x []; apply/h.
+qed.
+
+lemma nosmt prodr_gt0_seq (P : 'a -> bool) F s:
+     (forall a, mem s a => P a => zeror < F a)
+  => zeror < BMul.big P F s.
+proof.
+move=> h; rewrite !(@BMul.big_seq_cond P).
+by rewrite prodr_gt0=> //= x []; apply/h.
 qed.
 
 lemma nosmt ler_prod_seq (P : 'a -> bool) (F1 F2 :'a -> t) s:
