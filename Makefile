@@ -125,7 +125,7 @@ uninstall-purge:
 
 tests: check
 
-examples:
+examples: build
 	$(CHECK) examples
 
 check: build
