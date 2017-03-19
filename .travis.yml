@@ -10,6 +10,7 @@ services:
 env:
 - TARGETS=build
 - TARGETS=check
+- TARGETS=examples
 notifications:
   email:
   - tracker@easycrypt.info
