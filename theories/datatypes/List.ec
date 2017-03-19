@@ -1113,6 +1113,9 @@ rewrite addz_neq0 //= -{2}(addz0 (size x)).
 by rewrite ltz_add2l oppz_lt0 ltzS ge0_n /= -ih ?ltzE ?ge0_n // -addzA.
 qed.
 
+lemma perm_eq_rev (s : 'a list) : perm_eq s (rev s).
+proof. by rewrite perm_eqP=> p; rewrite count_rev. qed.
+
 (* -------------------------------------------------------------------- *)
 (*                        Duplicate-freenes                             *)
 (* -------------------------------------------------------------------- *)
