@@ -274,6 +274,13 @@ proof.
 qed.
 
 (* -------------------------------------------------------------------- *)
+lemma nosmt eq_big_perm_map (F : 'a -> t) s1 s2:
+  perm_eq (map F s1) (map F s2) => big predT F s1 = big predT F s2.
+proof.
+by move=> peq; rewrite -!(@big_map F predT idfun) &(eq_big_perm).
+qed.
+
+(* -------------------------------------------------------------------- *)
 lemma nosmt big_seq_cond (P : 'a -> bool) (F : 'a -> t) s:
   big P F s = big (fun i => mem s i /\ P i) F s.
 proof. by rewrite -!(@big_filter _ _ s); congr; apply/eq_in_filter. qed.
