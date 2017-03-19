@@ -6,6 +6,7 @@
  * -------------------------------------------------------------------- *)
 
 require import Int.
+require import IntExtra.
 require import Real.
 require import FSet.
 require import Finite.

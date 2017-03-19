@@ -5,15 +5,15 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import Option Pair Int List NewDistr Real DProd StdBigop.
+require import Option Pair Int IntExtra List NewDistr Real DProd StdBigop.
 (*---*) import Bigreal.BRM MUnit.
 
 op dlist (d : 'a distr) (n : int): 'a list distr =
-  Int.fold (fun d' => dapply (fun (xy : 'a * 'a list) => xy.`1 :: xy.`2) (d `*` d')) (dunit []) n
+  fold (fun d' => dapply (fun (xy : 'a * 'a list) => xy.`1 :: xy.`2) (d `*` d')) (dunit []) n
   axiomatized by dlistE.
 
 lemma dlist0 (d : 'a distr) n: n <= 0 => dlist d n = dunit [].
-proof. by move=> ge0_n; rewrite dlistE Int.foldle0. qed.
+proof. by move=> ge0_n; rewrite dlistE foldle0. qed.
 
 lemma dlistS (d : 'a distr) n:
   0 <= n =>

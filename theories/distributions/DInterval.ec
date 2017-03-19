@@ -6,7 +6,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Int Real List NewDistr RealExtra.
+require import Int IntExtra Real List NewDistr RealExtra.
 (*---*) import MUniform Range.
 
 (* -------------------------------------------------------------------- *)

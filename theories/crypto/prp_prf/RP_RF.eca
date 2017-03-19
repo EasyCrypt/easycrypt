@@ -5,8 +5,8 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import Fun Option NewLogic Int List FSet NewFMap Real Distr.
-require import Dexcepted.
+require import Fun Option NewLogic Int IntExtra List FSet NewFMap Real.
+require import Distr Dexcepted.
 require (*--*) NewPRP WeakPRP IdealPRP.
 require (*--*) NewPRF IdealPRF.
 require (*--*) Birthday.
