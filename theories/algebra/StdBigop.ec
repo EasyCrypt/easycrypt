@@ -50,7 +50,16 @@ proof. by rewrite BIA.sumr_const -IntID.intmulz. qed.
 lemma nosmt big_count (P : 'a -> bool) s:
     BIA.big P (fun (x : 'a) => count (pred1 x) s) (undup s)
   = size (filter P s).
-proof. admit. qed.
+proof.
+rewrite size_filter -(mul1r (count _ _)) -big_constz.
+have := perm_undup_count s => /BIA.eq_big_perm <-.
+rewrite BIA.big_flatten BIA.big_map /predT /(\o).
+rewrite BIA.big_mkcond; apply/BIA.eq_bigr=> x _ /=.
+rewrite big_constz mul1r -filter_pred1 count_filter.
+case: (P x)=> [Px|NPx]; last rewrite count_pred0_eq //.
++ by apply/eq_count => y @/pred1; split=> [->|[]].
++ by move=> y @/predI @/pred1; case: (y = x).
+qed.
 
 abbrev sumid i j = BIA.bigi predT (fun n => n) i j.
 
