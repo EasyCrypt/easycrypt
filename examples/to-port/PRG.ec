@@ -1,5 +1,5 @@
 (* -------------------------------------------------------------------- *)
-require import NewLogic Option Int List Real NewDistr FSet NewFMap.
+require import NewLogic Option Int List Real Distr FSet NewFMap.
 require import IntExtra IntDiv RealExtra Mu_mem StdRing StdOrder StdBigop.
 (*---*) import Bigint Ring.IntID RField IntOrder RealOrder BIA.
 require (*--*) FinType.

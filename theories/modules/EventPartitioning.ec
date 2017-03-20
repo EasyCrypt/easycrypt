@@ -5,7 +5,7 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import NewLogic Option Real List NewDistr.
+require import NewLogic Option Real List Distr.
 require import RealExtra StdBigop StdRing StdOrder.
 (*---*) import Bigreal BRA RField IntOrder RealOrder.
 
@@ -156,12 +156,12 @@ theory TotalSubuniformResultOnly.
   section.
   declare module M : T.
 
-  axiom M_suf a b i X &m:
+  axiom M_suf a b i (X:input -> output list) &m:
        mem (X i) a
     => mem (X i) b
     => Pr[M.f(i) @ &m: res = a] = Pr[M.f(i) @ &m: res = b].
 
-  lemma subuniform_result i X a &m:
+  lemma subuniform_result i (X:input -> output list) a &m:
        (forall i, hoare [M.f: arg = i ==> mem (X i) res])
     => mem (X i) a
     => Pr[M.f(i) @ &m: true] = (size (undup (X i)))%r * Pr[M.f(i) @ &m: res = a].
@@ -200,14 +200,14 @@ theory SubuniformReference.
   declare module M : T.
 
   axiom M_suf a b i X &m:
-       mem (X i) a
+       List.mem (X i) a
     => mem (X i) b
     => Pr[M.f(i) @ &m: res = a] = Pr[M.f(i) @ &m: res = b].
 
   axiom weight_M: phoare [M.f: true ==> true] =(k arg).
 
   lemma pr_res_notin_X a i X &m:
-       (forall i, hoare [M.f: arg = i ==> mem (X i) res])
+       (forall i, hoare [M.f: arg = i ==> List.mem (X i) res])
     => !mem (X i) a
     => Pr[M.f(i) @ &m: res = a] = 0%r.
   proof.
@@ -217,7 +217,7 @@ theory SubuniformReference.
   qed.
 
   lemma is_subuniform i X a &m:
-       (forall i, hoare [M.f: arg = i ==> mem (X i) res])
+       (forall i, hoare [M.f: arg = i ==> List.mem (X i) res])
     => mem (X i) a
     => Pr[M.f(i) @ &m: res = a] = (k i)/(size (undup (X i)))%r.
   proof.
@@ -229,7 +229,7 @@ theory SubuniformReference.
   qed.
 
   lemma eq_M_Ref &m X:
-       (forall i, hoare [M.f: arg = i ==> mem (X i) res])
+       (forall i, hoare [M.f: arg = i ==> List.mem (X i) res])
     => (forall i, X i <> [])
     => equiv [M.f ~ Ref.f: (i,xs){2} = (arg,X arg){1} ==> ={res}].
   proof.
@@ -239,9 +239,9 @@ theory SubuniformReference.
   + move=> ^a_notin_X /(@pr_res_notin_X a arg{1} X &1 support_M) ->.
     byphoare (_: (i,xs) = (arg,X arg){1} ==> _)=> //=.
     hoare; proc; auto=> /> r.
-    rewrite -/(support _ _) support_dscalar_gt0 1:gt0_k.
+    rewrite -/(support _ _) supp_dscalar 1:gt0_k.
     + by rewrite duniform_ll 1:Xi_neq0 // le1_k.
-    by case: (r = a)=> [->|]; first by rewrite duniform_fu.
+    case: (r = a)=> [->|//];by rewrite supp_duniform.
   move=> a_in_X. rewrite (@is_subuniform arg{1} X a &1 support_M a_in_X).
   byphoare (_: (i,xs) = (i,xs){2} ==> _)=> //=; proc; rnd (pred1 a); auto=> />.
   rewrite dscalar1E 1:ltrW 1:gt0_k.

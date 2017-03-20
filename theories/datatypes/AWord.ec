@@ -96,6 +96,7 @@ proof. by rewrite from_to; smt. qed.
 
 (** univ *)
 
+(* FIXME REMOVE THIS *)
 theory Univ.
   (** Keeping this for now so as not to break the interface. Everything should be a list instead... **)
   op univ = image from_int (oflist (List.Iota.iota_ 0  (2^length))).
@@ -130,24 +131,44 @@ theory Univ.
   qed.
 end Univ.
 
+(* --------------------------------------------------------------- *)
+require import Real Distr Mu_mem.
+        import List.
+
 theory Dword.
-  require import Real Distr.
-  require (*--*) Mu_mem.
 
-  op dword: word distr.
-  axiom mu_x_def w: mu_x dword w = 1%r/(2^length)%r.
-  axiom lossless: weight dword = 1%r.
-
-  lemma in_supp_def w: in_supp w dword.
-  proof -strict.
-  rewrite /in_supp mu_x_def;smt.
+  op enum = List.map from_int  (List.Iota.iota_ 0 (2 ^ length)).
+ 
+  lemma enum_full : forall w, w \in enum. 
+  proof. 
+    move=> w;rewrite /enum mapP;exists (to_int w).
+    rewrite mema_iota to_from /= -to_from from_to; smt (edivzP powPos).
   qed.
 
+  lemma enum_uniq : uniq enum.
+  proof. 
+    rewrite /enum; apply map_inj_in_uniq;last by apply iota_uniq.
+    move=> x y /mema_iota /from_to_bound Hx /mema_iota /from_to_bound Hy Heq. 
+    by rewrite -Hx -Hy Heq.
+  qed.    
+ 
+  lemma size_enum : size enum = 2^length.
+  proof. rewrite /enum size_map size_iota;smt (powPos). qed.
+
+  clone include MFinite with
+    type t <- word,
+    op Support.enum <- enum,
+    op Support.card <- 2^length
+    rename "dunifin" as "dword"
+    proof Support.enum_spec 
+      by (move=> x; rewrite count_uniq_mem ?enum_full // enum_uniq).
+
+  (* FIXME this lemma should be move and done in MFinite and MUniform *)
   lemma mu_cpMemw X:
     mu dword (mem X)%FSet = (card X)%r / (2^length)%r.
   proof.
     rewrite (Mu_mem.mu_mem X dword (1%r/(2^length)%r)) //.
-    by move=> x _; rewrite -/(mu_x _ _) mu_x_def.
+    by move=> x _;rewrite dword1E.
   qed.
 
   require import Dexcepted.
@@ -156,7 +177,9 @@ theory Dword.
     card X < 2^length =>
     weight (dword \ (mem X)) = 1%r.
   proof.
-  move=> lt_CX_2sx; rewrite dexcepted_ll /is_lossless -/(weight _) ?lossless // ?mu_cpMemw.
+  move=> lt_CX_2sx; rewrite dexcepted_ll ?dword_ll // mu_cpMemw.
   by rewrite ltr_pdivr_mulr /= lte_fromint // powPos.
   qed.
+
 end Dword.
+

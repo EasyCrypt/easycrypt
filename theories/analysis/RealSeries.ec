@@ -6,7 +6,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Bool Option Fun Distr Int IntExtra Real RealExtra.
+require import Bool Option Pred Fun Int IntExtra Real RealExtra.
 require import StdRing StdOrder StdBigop Discrete List RealLub RealSeq.
 (*---*) import IterOp Bigreal Bigreal.BRA IntOrder RField RealOrder.
 

@@ -125,7 +125,7 @@ clone import Indist as Ind with
   type input <- plaintext,
   type H.output <- ciphertext,
   type H.inleaks <- unit,
-  type H.outleaks <- pkey.
+  type H.outleaks <- pkey. 
 
 module ToOrcl (S:Scheme) = {
   proc leaks (il:unit) : pkey = {

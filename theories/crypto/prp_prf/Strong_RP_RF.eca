@@ -14,7 +14,7 @@ require (*--*) NewPRP StrongPRP IdealPRP FelTactic.
 (** We assume a finite domain D, equipped with its uniform
     distribution. **)
 type D.
-op uD: { D distr | is_uniform_over uD predT } as uD_uf_fu.
+op uD: { D distr | is_uniform uD /\ is_lossless uD /\ is_full uD } as uD_uf_fu.
 
 (** and a type K equipped with a lossless distribution **)
 type K.
@@ -124,10 +124,26 @@ module PRPi'(S:Sample_t) = {
 
 (* Some losslessness lemmas *)
 (* FIXME: cleanup *)
+
+(* FIXME: Duplicate lemmas with RP_RF *)
+lemma nosmt notin_supportIP (P : 'a -> bool) (d : 'a distr):
+  (exists a, support d a /\ !P a) <=> mu d P < mu d predT.
+proof.
+rewrite (mu_split _ predT P) /predI /predT /predC /=.
+rewrite (exists_eq (fun a => support d a /\ !P a) (fun a => !P a /\ a \in d)) /=.
++ by move=> a /=; rewrite andbC.
+by rewrite -(witness_support (predC P)) -/(predC _) /#.
+qed.
+
 lemma excepted_lossless (m:(D,D) fmap):
   (exists x, !mem (dom m) x) =>
   mu (uD \ (mem (rng m))) predT = 1%r.
-proof. by move=> /endo_dom_rng; smt. qed.
+proof. 
+move=> /endo_dom_rng [x h]; rewrite dexcepted_ll //.
++ smt w=uD_uf_fu.
+have [?[<- @/is_full Hsupp]]:= uD_uf_fu.
+apply/notin_supportIP;exists x => />;apply Hsupp.
+qed.
 
 phoare Indirect_ll: [Indirect.sample: exists x, support uD x /\ !mem X x ==> true] = 1%r.
 proof.
@@ -144,7 +160,7 @@ proof.
 proc; if=> //=; auto; call Indirect_ll.
 skip=> /> &hr x_notin_m.
 have [x0] x0_notinr_m := endo_dom_rng PRPi.m{hr} _; first by exists x{hr}.
-by exists x0; rewrite x0_notinr_m /= -/(mu_x _ _); smt w=uD_uf_fu.
+by exists x0; rewrite x0_notinr_m /=; smt w=uD_uf_fu.
 qed.
 
 lemma PRPi'_Indirect_fi_ll: islossless PRPi'(Indirect).fi.
@@ -152,7 +168,7 @@ proof.
 proc; if=> //=; auto; call Indirect_ll.
 skip=> /> &hr x_notin_mi.
 have [x0] x0_notinr_mi := endo_dom_rng PRPi.mi{hr} _; first by exists x{hr}.
-by exists x0; rewrite x0_notinr_mi -/(mu_x _ _); smt w=uD_uf_fu.
+by exists x0; rewrite x0_notinr_mi; smt w=uD_uf_fu.
 qed.
 
 (** The proof is cut into 3 parts (sections):
@@ -425,7 +441,7 @@ section CollisionProbability.
     * wp; rnd (mem (rng ARP.m)); skip.
       progress.
       - apply/(RealOrder.ler_trans ((card (rng ARP.m{hr}))%r * mu uD (pred1 witness))).
-        apply/mu_mem_le; move=> x _; have [] uD_fu [] _ uD_suf:= uD_uf_fu.
+        apply/mu_mem_le; move=> x _; have [] uD_suf [] ? uD_fu:= uD_uf_fu.
         apply/RealOrder.lerr_eq/uD_suf; 1,2:rewrite uD_fu //.
         by apply/RealOrder.ler_wpmul2r; smt w=(mu_bounded lt_fromint ltrW).
       - by move: H7;rewrite H1.
@@ -441,7 +457,7 @@ section CollisionProbability.
     * wp; rnd (mem (rng ARP.mi)); skip.
       progress.
       - apply/(RealOrder.ler_trans ((card (rng ARP.mi{hr}))%r * mu uD (pred1 witness))).
-        apply/mu_mem_le; move=> x _; have [] uD_fu [] _ uD_suf:= uD_uf_fu.
+        apply/mu_mem_le; move=> x _; have [] uD_suf [] _ uD_fu:= uD_uf_fu.
         apply/RealOrder.lerr_eq/uD_suf; 1,2:rewrite uD_fu //.
         smt w=(RealOrder.ler_wpmul2r mu_bounded le_fromint ltrW).
       - by move: H7; rewrite H1.
@@ -512,9 +528,8 @@ section PRPi_PRPi'_Indirect.
     phoare split (mu uD (pred1 a)) (mu uD (mem X) * mu (uD \ (mem X)) (pred1 a)): (r0 = a).
       (* Bound *)
       progress.
-      rewrite -/(mu_x (uD \ (mem X){2}) _) mux_dexcepted.
-      have [] uD_fu [] uD_suf uD_ll @/predT /=:= uD_uf_fu.
-      rewrite /weight /mu_x.
+      rewrite dexcepted1E.
+      have [] uD_suf [] uD_ll uD_fu /=:= uD_uf_fu.
       cut not_empty: mu uD predT - mu uD (mem X{2}) <> 0%r.
         rewrite -mu_not.
         cut: 0%r < mu uD (predC (mem X{2})); last smt.

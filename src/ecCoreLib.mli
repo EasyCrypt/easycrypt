@@ -84,7 +84,7 @@ module CI_Real : sig
   val p_RealExtra : path
   val p_RealOrder : path
 
-  val p_real0       : path 
+  val p_real0       : path
   val p_real1       : path
   val p_real_opp    : path
   val p_real_add    : path
@@ -98,6 +98,15 @@ module CI_Real : sig
 end
 
 (* -------------------------------------------------------------------- *)
+module CI_Pred : sig
+  val i_Pred : symbol
+  val p_Pred : path
+
+  val p_predT      : path
+  val p_pred1      : path
+end
+
+(* -------------------------------------------------------------------- *)
 module CI_Distr : sig
   val i_Distr : symbol
   val p_Distr : path
@@ -107,10 +116,8 @@ module CI_Distr : sig
   val p_dbitstring : path
   val p_dinter     : path
 
-  val p_in_supp : path
+  val p_support : path
   val p_mu      : path
-  val p_mu_x    : path
-  val p_weight  : path
 end
 
 (* -------------------------------------------------------------------- *)

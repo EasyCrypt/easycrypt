@@ -1,4 +1,4 @@
-require import Real Distr.
+require import Real OldDistr.
 
 type t.
 op sample : t distr.

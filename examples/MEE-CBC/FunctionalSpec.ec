@@ -1,5 +1,5 @@
 require import Fun Pred Option Int IntExtra IntDiv List NewLogic.
-require import Ring StdRing StdOrder StdBigop ABitstring NewDistr.
+require import Ring StdRing StdOrder StdBigop ABitstring Distr.
 require import BitEncoding.
 require (*--*) BitWord MAC_then_Pad_then_CBC.
 (*---*) import BS2Int BitChunking IntID IntOrder Bigint BIA.

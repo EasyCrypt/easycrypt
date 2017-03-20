@@ -340,7 +340,7 @@ proof.
 qed.
 
 require import FSet.
-require import Distr.
+require import OldDistr.
 
 pred disj_or (X:('a->bool) fset) =
   forall x1 x2, x1 <> x2 => mem X x1 => mem X x2 =>
@@ -399,7 +399,7 @@ import Real.
 lemma mean (d:'a distr) (p:'a -> bool):
   is_finite (support d) =>
   mu d p =
-    Mrplus.sum (fun x, (mu_x d x)*(charfun p x))
+    Mrplus.sum (fun x, (mu1 d x)*(charfun p x))
         (oflist (to_seq (support d))).
 proof strict.
   move=> fin_supp_d.
@@ -421,7 +421,7 @@ proof strict.
     rewrite imageP /= => -[x0 [H1 H2]].
     by rewrite (mu_eq d _ pred0) //;smt.
   rewrite Mrplus.sum_add // -Hrec /=; congr => //.
-  rewrite /charfun /mu_x;case (p x) => //= Hp.
+  rewrite /charfun /mu1;case (p x) => //= Hp.
     by apply mu_eq; rewrite pred1E.
   by rewrite -(mu_false d);apply mu_eq.
 qed.

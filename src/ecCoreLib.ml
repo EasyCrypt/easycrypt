@@ -84,6 +84,15 @@ module CI_Real = struct
   let p_real_abs    = EcPath.extend p_Real ["`|_|"]
 end
 
+module CI_Pred = struct
+  let i_Pred  = "Pred"
+  let p_Pred  = EcPath.pqname p_top i_Pred
+
+  let _Pred x = EcPath.pqname p_Pred x
+  let p_predT = _Pred "predT"
+  let p_pred1 = _Pred "pred1"
+end
+
 (* -------------------------------------------------------------------- *)
 module CI_Distr = struct
   let i_Distr = "Distr"
@@ -96,9 +105,8 @@ module CI_Distr = struct
   let p_dbitstring = List.fold_left EcPath.pqname p_Distr ["Dbitstring"; "dbitstring"]
   let p_dinter     = List.fold_left EcPath.pqname p_top ["DInterval"; "dinter"]
 
-  let p_in_supp = _Distr "in_supp"
+  let p_support = _Distr "support"
   let p_mu      = _Pervasive "mu"
-  let p_mu_x    = _Distr "mu_x"
   let p_weight  = _Distr "weight"
 end
 

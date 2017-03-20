@@ -25,7 +25,7 @@ import DDH.
 type hkey.
 op sample_hkey : hkey distr.
 op hash : hkey -> group -> bits.
-axiom sample_hkey_lossless: Distr.weight sample_hkey = 1%r.
+axiom sample_hkey_lossless: OldDistr.weight sample_hkey = 1%r.
 
 module type AdvES = {
   proc guess(_: hkey * bits) : bool
@@ -178,8 +178,8 @@ section Security.
   proof.
     byphoare => //;proc.
     rnd => /=. conseq [-frame] (_:_ ==> true).
-    progress; rewrite -(Bool.Dbool.mu_x_def b'{hr}) /Distr.mu_x.
-    by apply Distr.mu_eq => x.
+    progress; rewrite -(Bool.Dbool.mu_x_def b'{hr}) /OldDistr.mu_x.
+    by apply OldDistr.mu_eq => x.
     call Ag_l;auto;call Ac_l;auto;progress;smt.
   qed.
 

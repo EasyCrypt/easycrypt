@@ -36,10 +36,10 @@ theory Dgroup.
   op dgroup: group distr.
 
   axiom supp_def: forall (s:group),
-    in_supp s dgroup.
+    s \in dgroup.
 
-  axiom mu_x_def_in: forall (s:group),
-    mu_x dgroup s = 1%r/q%r.
+  axiom mu1_def_in: forall (s:group),
+    mu1 dgroup s = 1%r/q%r.
 
   axiom lossless: weight dgroup = 1%r.
 end Dgroup.

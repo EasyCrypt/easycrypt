@@ -16,7 +16,7 @@ require import Prime_field.
 require import Int.
 require import Map.
 require import Pair.
-require import Distr.
+require import OldDistr.
 require import FSet.
 require import RandOracle.
 

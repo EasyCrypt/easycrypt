@@ -1,4 +1,4 @@
-require import Real Distr StdOrder.
+require import Real OldDistr StdOrder.
 (*---*) import RealOrder.
 
 op max (x y:real) = if x <= y then y else x.

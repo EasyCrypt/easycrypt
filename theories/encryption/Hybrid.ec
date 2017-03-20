@@ -322,11 +322,11 @@ section.
     move=> p';rewrite (GLB_WL &m p') (GRB_WR &m p').
     simplify p'; rewrite -(WL0_GLA &m p) -(WRq_GRA &m p).
     cut Hint : forall x, support [0..q - 1] x <=> mem (oflist (List.Iota.iota_ 0 q)) x.
-      by move=> x; rewrite !mem_oflist !List.Iota.mem_iota /support support_dinter; smt.
+      by move=> x; rewrite !mem_oflist !List.Iota.mem_iota  supp_dinter; smt.
     cut Hfin: is_finite (support [0..q - 1]).
       by exists (List.Iota.iota_ 0 q); smt.
-    cut Huni : forall (x : int), in_supp x [0..q - 1] => mu_x [0..q - 1] x = 1%r / q%r.
-      by move=> x Hx;rewrite mux_dinter //;smt.
+    cut Huni : forall (x : int), x \in [0..q - 1] => mu1 [0..q - 1] x = 1%r / q%r.
+      by move=> x Hx;rewrite dinter1E //;smt.
     pose ev :=
       fun (_j:int) (g:glob HybGameFixed(L(Ob))) (r:outputA),
         let (l,l0,ga,ge) = g in p ga ge l r /\ l <= q.

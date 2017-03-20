@@ -1,4 +1,4 @@
-require import Pair Int IntDiv Real NewDistr.
+require import Pair Int IntDiv Real Distr.
 require import DInterval.
 
 (*

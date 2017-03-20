@@ -6,7 +6,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Bool Option Fun Distr Int IntExtra Real RealExtra.
+require import Bool Option ExtEq Fun Int IntExtra Real RealExtra.
 require import StdRing StdOrder.
 (*---*) import RField RealOrder.
 

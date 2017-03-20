@@ -1,4 +1,4 @@
-require import Distr.
+require import OldDistr.
 require import Real.
 require import Int.
   import EuclDiv.
@@ -57,7 +57,7 @@ module G1(AF : Adv) = {
   module A = AF(O)
 
   fun main(x : unit) : unit = {
-    i = $(Distr.Dinter.dinter 0 (q -1));
+    i = $(OldDistr.Dinter.dinter 0 (q -1));
     k = 0;
     b = A.run();
     k = `|k %% q|;

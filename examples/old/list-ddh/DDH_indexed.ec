@@ -3,7 +3,7 @@ require import Bool.
 require import Prime_field.
 require import Cyclic_group_prime.
 require import Pair.
-require import Distr.
+require import OldDistr.
 
 (* We define the following modules:
    - Sample_DH: provide functions that sample real

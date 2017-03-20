@@ -1,7 +1,7 @@
 require import Map.
 require import FSet.
 require import Int.
-require import Distr.
+require import OldDistr.
 require import Bool.
 require import Real.
 require import Pair.

@@ -29,7 +29,7 @@ theory MeansBool.
       by apply/fsetP=> x; rewrite !inE mem_oflist mem_to_seq//; smt.
     rewrite Mrplus.sum_add /=;first smt.
     rewrite Mrplus.sum_add /=;first smt.
-    rewrite Mrplus.sum_empty /= !DBool.dboolb.
+    rewrite Mrplus.sum_empty /= !DBool.dbool1E.
     cut Hd: 2%r <> 0%r by smt.
     by algebra.
   qed.
@@ -69,5 +69,3 @@ proof strict.
   cut := Sample_bool A &m (fun x, true) => /= <-.
   by rewrite Hloss.
 qed.
-
-

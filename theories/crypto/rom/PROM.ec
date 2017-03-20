@@ -5,7 +5,7 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import Fun Pred Rel Pair Option List FSet NewFMap NewDistr.
+require import Fun Pred Rel Pair Option List FSet NewFMap Distr.
 (*---*) import NewLogic.
 require (*--*) IterProc.
 

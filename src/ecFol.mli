@@ -57,9 +57,9 @@ val f_real_div : form -> form -> form
 val f_real_abs : form -> form
 
 (* soft constructors - distributions *)
-val fop_in_supp : EcTypes.ty -> form
-val fop_mu_x    : EcTypes.ty -> form
+val fop_support : EcTypes.ty -> form
 
+val f_support : form -> form -> form
 val f_in_supp : form -> form -> form
 val f_mu      : EcEnv.env -> form -> form -> form
 val f_mu_x    : form -> form -> form

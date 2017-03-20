@@ -6,7 +6,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Int IntExtra Real List NewDistr RealExtra.
+require import Int IntExtra Real List Distr RealExtra.
 (*---*) import MUniform Range.
 
 (* -------------------------------------------------------------------- *)
@@ -14,36 +14,26 @@ require import Int IntExtra Real List NewDistr RealExtra.
    notation to this distribution. *)
 op dinter (i j : int) = duniform (range i (j + 1)).
 
-(* -------------------------------------------------------------------- *)
-lemma mux_dinter (i j : int) x:
-  mu_x (dinter i j) x = if (i <= x <= j) then 1%r/(j - i + 1)%r else 0%r.
+lemma dinter1E (i j : int) x:
+  mu1 (dinter i j) x = if (i <= x <= j) then 1%r/(j - i + 1)%r else 0%r.
 proof. by rewrite duniform1E mem_range undup_id 1:range_uniq size_range /#. qed.
 
-(* -------------------------------------------------------------------- *)
-lemma mu_dinter (i j : int) P:
+lemma dinterE (i j : int) P:
   mu (dinter i j) P
   = (size (filter P (range i (j + 1))))%r / (max 0 (j - i + 1))%r.
 proof. by rewrite duniformE undup_id 1:range_uniq size_range size_filter /#. qed.
 
-(* -------------------------------------------------------------------- *)
 lemma weight_dinter (i j : int):
   weight (dinter i j) = b2r (i <= j).
-proof. by rewrite /weight mu_dinter filter_predT size_range /#. qed.
+proof. by rewrite /weight dinterE filter_predT size_range /#. qed.
 
-(* -------------------------------------------------------------------- *)
-lemma support_dinter (i j : int) x:
-  support (dinter i j) x <=> i <= x <= j.
-proof. by rewrite /support /in_supp mux_dinter; case (i <= x <= j)=> //= /#. qed.
+lemma supp_dinter (i j : int) x:
+  x \in (dinter i j) <=> i <= x <= j.
+proof. by rewrite /support /in_supp dinter1E; case (i <= x <= j)=> //= /#. qed.
 
-(* -------------------------------------------------------------------- *)
-lemma dinter_suf (i j : int): is_subuniform (dinter i j).
-proof.
-move=> x y /support_dinter x_in_ij /support_dinter y_in_ij.
-by rewrite !mux_dinter x_in_ij y_in_ij.
-qed.
+lemma dinter_ll (i j : int): i <= j => is_lossless (dinter i j).
+proof. move=> Hij;apply /drange_ll => /#. qed.
 
-lemma dinter_uf (i j : int): i <= j => is_uniform (dinter i j).
-proof.
-move=> x_le_y; split; 2:exact/dinter_suf.
-by rewrite /is_lossless -/(weight _) weight_dinter x_le_y b2r1.
-qed.
+lemma dinter_uni (i j : int): is_uniform (dinter i j).
+proof. apply drange_uni. qed.
+
