@@ -17,6 +17,7 @@ type 'a list = [
   | (::) of  'a & 'a list
 ].
 
+(* -------------------------------------------------------------------- *)
 op size (xs : 'a list) =
   with xs = []      => 0
   with xs = y :: ys => 1 + (size ys).
@@ -28,6 +29,14 @@ local hint exact : size_ge0.
 
 lemma size_eq0 (s : 'a list): (size s = 0) <=> (s = []).
 proof. by case: s => //=; smt. qed.
+
+lemma seq2_ind ['a 'b] (P : 'a list -> 'b list -> bool) :
+  P [] [] => (forall x1 x2 s1 s2, P s1 s2 => P (x1 :: s1) (x2 :: s2)) =>
+    forall s1 s2, size s1 = size s2 => P s1 s2.
+proof.
+move=> Pnil Pcons; elim=> [|x s ih] [|y s'] //=; 1,2:smt(size_ge0).
+by move=> /addzI/ih/Pcons; apply.
+qed.
 
 (* -------------------------------------------------------------------- *)
 lemma eqseq_cons (x1 x2 : 'a) (s1 s2 : 'a list) :
@@ -96,6 +105,10 @@ op last (x : 'a) s =
   with s = []      => x
   with s = y :: ys => last y ys.
 
+op belast (x : 'a) s =
+  with s = x' :: s' => x :: (belast x' s')
+  with s = [] => [].
+
 lemma cat0s (s : 'a list): [] ++ s = s.
 proof. by []. qed.
 
@@ -152,6 +165,19 @@ proof. by rewrite -!cats1 catA. qed.
 lemma behead_cat ['a] (s1 s2 : 'a list): s1 <> [] =>
   behead (s1 ++ s2) = behead s1 ++ s2.
 proof. by case: s1. qed.
+
+lemma size_belast x s : size (belast<:'a> x s) = size s.
+proof. by elim: s x => [|y s ih] x //=; rewrite ih. qed.
+
+lemma lastI (x : 'a) s : x :: s = rcons (belast x s) (last x s).
+proof. by elim: s x => [|y s ih] x //=; rewrite ih. qed.
+
+lemma belast_cat x s1 s2 :
+  belast<:'a> x (s1 ++ s2) = belast x s1 ++ belast (last x s1) s2.
+proof. by elim: s1 x => [|y s1 ih] x //=; rewrite ih. qed.
+
+lemma belast_rcons x s z : belast<:'a> x (rcons s z) = x :: s.
+proof. by rewrite lastI -!cats1 belast_cat. qed.
 
 (* -------------------------------------------------------------------- *)
 (*                   rcons / induction principle                        *)
@@ -701,6 +727,13 @@ proof. by rewrite /= lezNgt; case: (0 < n). qed.
 lemma size_take n (s : 'a list):
   0 <= n => size (take n s) = if n < size s then n else size s.
 proof. by elim: s n => //= /#. qed.
+
+lemma size_takel n (s : 'a list ):
+  0 <= n <= size s => size (take n s) = n.
+proof.
+case=> ge0_n le_sz; rewrite size_take //; move: le_sz.
+by rewrite lez_eqVlt => -[] ->.
+qed.
 
 lemma take_cat n (s1 s2 : 'a list):
    take n (s1 ++ s2) =
@@ -2002,6 +2035,21 @@ elim/natcase: n le => n hn; first move/lez_trans/(_ _ hn).
 by rewrite addzC lez_add2r nseqS //= => /ih ->.
 qed.
 
+lemma mask_cons b m x s :
+  mask<:'a> (b :: m) (x :: s) = nseq (b2i b) x ++ mask m s.
+proof. by case: (b) => _; rewrite (nseq0, nseq1). qed.
+
+lemma size_mask m s :
+  size m = size s => size (mask<:'a> m s) = count idfun m.
+proof.
+move: m s; apply/seq2_ind => //= x1 x2 s1 s2 ih.
+by case: (x1) => /=; rewrite ih.
+qed.
+
+lemma mask_cat m1 m2 s1 s2 : size m1 = size s1 =>
+  mask<:'a> (m1 ++ m2) (s1 ++ s2) = mask m1 s1 ++ mask m2 s2.
+proof. by move: m1 s1; apply/seq2_ind=> //= -[]. qed.
+
 (* -------------------------------------------------------------------- *)
 (*                             Subseq                                   *)
 (* -------------------------------------------------------------------- *)
@@ -2049,20 +2097,39 @@ exists (take i m ++ drop (i+1) m); split.
   by rewrite lt_im /= max_ler 2:/# subz_ge0 -ltzE.
 have /= -> := congr1 behead _ _ eq; rewrite -(cat_take_drop i s2).
 rewrite -{1}(cat_take_drop i m) def -cat_cons.
-
-
-admitted.
+have sz_i_s2: size (take i s2) = i.
+  by rewrite &(size_takel) index_ge0 /= /#.
+have h: size (take i m) = size (take i s2).
++ by rewrite sz_i_s2 size_takel // index_ge0 /= ltzW.
+rewrite lastI cat_rcons !mask_cat ?size_nseq ?size_belast.
++ by rewrite h max_ler. + by rewrite h max_ler.
+rewrite !mask_false (drop_nth true) ?index_ge0 //.
+by rewrite nth_index -?index_mem.
+qed.
 
 lemma cat_subseq (s1 s2 s3 s4 : 'a list) :
   subseq s1 s3 => subseq s2 s4 => subseq (s1 ++ s2) (s3 ++ s4).
-proof. admitted.
+proof.
+case/subseqP=> m1 [sz_m1 ->] /subseqP [m2] [sz_m2 ->].
+apply/subseqP; exists (m1 ++ m2); rewrite !size_cat.
+by rewrite !mask_cat // sz_m1 sz_m2.
+qed.
 
 lemma subseq_refl (s : 'a list) : subseq s s.
 proof. by elim: s => //= x s IHs; rewrite eqxx. qed.
 
 lemma subseq_trans (s2 s1 s3 : 'a list) :
   subseq s1 s2 => subseq s2 s3 => subseq s1 s3.
-proof. admitted.
+proof.
+move=> /subseqP[m2] [h{h} ->] /subseqP[m1] [h{h} ->].
+elim: s3 m1 m2 => [|x s ih] m1 m2; first by rewrite !mask0.
+case: m1 => [|[] m1]; first by rewrite mask0.
+  case: m2 => [|[] m2] //=; first by rewrite /= ih.
+  case/subseqP: (ih m1 m2) => m [sz_m def_s]; apply/subseqP.
+  by exists (false :: m); rewrite //= sz_m.
+case/subseqP: (ih m1 m2) => m [sz_m def_s]; apply/subseqP.
+by exists (false :: m); rewrite //= sz_m.
+qed.
 
 lemma subseq_cons (s : 'a list) x : subseq s (x :: s).
 proof. by apply/(@cat_subseq [] s [x] s)=> //; apply/subseq_refl. qed.
