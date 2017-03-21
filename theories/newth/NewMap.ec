@@ -5,7 +5,7 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import ExtEq Option CoreMap Finite List FSet.
+require import Core Int CoreMap Finite List FSet.
 
 op offun ['a 'b] : ('a -> 'b) -> ('a, 'b) map.
 
