@@ -5,7 +5,8 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import Option Pair Int IntExtra List Distr Real DProd StdBigop.
+(* -------------------------------------------------------------------- *)
+require import AllCore List Distr DProd StdBigop.
 (*---*) import Bigreal.BRM MUnit.
 
 op dlist (d : 'a distr) (n : int): 'a list distr =

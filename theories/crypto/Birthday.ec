@@ -6,9 +6,9 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Option Int IntExtra Real RealExtra Distr List.
+require import AllCore List Distr Ring.
+require import StdRing StdOrder StdBigop FelTactic.
 require (*--*) Mu_mem.
-require import Ring StdRing StdOrder StdBigop FelTactic.
 (*---*) import RField IntOrder RealOrder.
 
 (** A non-negative integer q **)

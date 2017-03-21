@@ -6,8 +6,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Option Fun Pred Bool Int IntExtra IntDiv List Ring.
-require import StdRing StdOrder StdBigop.
+require import Bool AllCore IntDiv List Ring StdRing StdOrder StdBigop.
 require (*--*) FinType Word.
 (*---*) import IntID IntOrder Bigint Bigint.BIA.
 
@@ -119,7 +118,7 @@ end BS2Int.
 (* -------------------------------------------------------------------- *)
 theory BitChunking.
 op chunk r (bs : 'a list) =
-  mkseq (fun i => take r (drop (r * i) bs)) (size bs %/ r).
+  mkseq (fun i => take r (drop (r * i)%Int bs)) (size bs %/ r).
 
 lemma nosmt chunk_le0 r (s : 'a list) : r <= 0 => chunk r s = [].
 proof.

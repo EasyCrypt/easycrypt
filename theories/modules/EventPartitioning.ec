@@ -5,8 +5,7 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import NewLogic Option Real List Distr.
-require import RealExtra StdBigop StdRing StdOrder.
+require import AllCore List Distr StdBigop StdRing StdOrder.
 (*---*) import Bigreal BRA RField IntOrder RealOrder.
 
 pragma -oldip. pragma +implicits.

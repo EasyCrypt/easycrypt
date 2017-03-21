@@ -5,7 +5,7 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import Pred Fun Option Real.
+require import Real.
 require (*--*) NewPRP WeakPRP StrongPRP ConcretePRP IdealPRP.
 
 clone include NewPRP.

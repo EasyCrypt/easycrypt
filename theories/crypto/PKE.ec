@@ -5,7 +5,7 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import Bool Int Option List.
+require import Bool Core Int List.
 require import DBool.
 
 type pkey.

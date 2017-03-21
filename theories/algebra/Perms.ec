@@ -6,8 +6,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Option Pred Fun Int IntExtra Real RealExtra List.
-require import IntDiv Binomial Ring.
+require import AllCore List IntDiv Binomial Ring.
 (*---*) import IntID.
 
 (* -------------------------------------------------------------------- *)

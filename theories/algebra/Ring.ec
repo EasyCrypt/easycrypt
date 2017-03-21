@@ -8,7 +8,7 @@
 pragma +implicits.
 
 (* -------------------------------------------------------------------- *)
-require import Fun Int IntExtra.
+require import Core Int IntExtra.
 require (*--*) Monoid.
 
 (* -------------------------------------------------------------------- *)
@@ -437,7 +437,7 @@ abstract theory ComRing.
   proof.
     case: (i = 0) => [->|]; first by rewrite oppz0 expr0 invr1.
     rewrite /exp oppz_lt0 ltzNge lez_eqVlt oppzK=> -> /=.
-    by case: (_ < _)=> //=; rewrite invrK.
+    by case: (_ < _)%Int => //=; rewrite invrK.
   qed.
 
   lemma exprD x (m n : int) : 0 <= m => 0 <= n =>
@@ -487,7 +487,7 @@ abstract theory IDomain.
     forall (x y : t), x * y = zeror <=> x = zeror \/ y = zeror.
 
   lemma mulf_neq0 (x y : t): x <> zeror => y <> zeror => x * y <> zeror.
-  proof. by move=> nz_x nz_y; apply/not_def; rewrite mulf_eq0; smt. qed.
+  proof. by move=> nz_x nz_y; apply/negP; rewrite mulf_eq0; smt. qed.
 
   lemma mulfI (x : t): x <> zeror => injective (( * ) x).
   proof.

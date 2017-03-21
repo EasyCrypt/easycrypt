@@ -126,7 +126,6 @@ module CI_Logic : sig
   val p_Logic  : path
   val mk_logic : symbol -> path
 
-  val p_cut_lemma     : path
   val p_unit_elim     : path
   val p_false_elim    : path
   val p_bool_elim     : path
@@ -155,22 +154,16 @@ module CI_Logic : sig
   val p_fcongr        : path
   val p_eq_sym        : path
   val p_eq_sym_imp    : path
-  val p_imp_trans     : path
-  val p_negbTE        : path
   val p_negeqF        : path
-
-  val p_rewrite_l     : path
-  val p_rewrite_r     : path
-  val p_rewrite_iff_l : path
-  val p_rewrite_iff_r : path
-  val p_rewrite_bool  : path
 
   val p_iff_lr        : path
   val p_iff_rl        : path
 
+  val p_cut_lemma     : path
   val p_case_eq_bool  : path
-
   val p_ip_dup        : path
+
+  val p_negbTE        : path
 end
 
 module CI_Map : sig

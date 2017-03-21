@@ -5,7 +5,7 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import Fun Option NewLogic Int IntExtra List FSet NewFMap Real Distr.
+require import AllCore List FSet NewFMap Real Distr.
 require import Dexcepted.
 require (*--*) NewPRP WeakPRP IdealPRP.
 require (*--*) NewPRF IdealPRF.
@@ -367,7 +367,7 @@ section CollisionProbability.
     rewrite H3 //=; split.
       move=> x0; rewrite rng_set !inE.
       by rewrite rng_rem; smt.
-      by rewrite NewLogic.negb_and /= collision_add // H H0 orbC.
+      by rewrite negb_and /= collision_add // H H0 orbC.
   auto; progress.
     by rewrite rng0 in_fset0.
     smt.

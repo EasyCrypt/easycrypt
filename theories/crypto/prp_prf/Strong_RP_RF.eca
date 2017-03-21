@@ -5,8 +5,7 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import Fun NewLogic Option Int IntExtra Real RealExtra.
-require import Distr List FSet NewFMap StdRing StdOrder.
+require import AllCore Distr List FSet NewFMap StdRing StdOrder.
 require import Dexcepted.
 require (*--*) NewPRP StrongPRP IdealPRP FelTactic.
 (*---*) import RField RealOrder.

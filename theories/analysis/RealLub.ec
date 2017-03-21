@@ -6,8 +6,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Bool Option ExtEq Fun Int IntExtra Real RealExtra.
-require import StdRing StdOrder.
+require import AllCore Bool StdRing StdOrder.
 (*---*) import RField RealOrder.
 
 pragma +implicits.

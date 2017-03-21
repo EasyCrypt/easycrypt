@@ -6,8 +6,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Pair Fun Pred Int Real RealExtra List.
-require import Pred Real RealExtra StdOrder Distr StdOrder.
+require import AllCore List StdOrder Distr StdOrder.
 (*---*) import RealOrder RealSeries StdBigop.Bigreal BRA.
 
 pragma +implicits.
@@ -24,11 +23,10 @@ proof.
 move=> isa isb; split=> [x|s uqs].
 + by apply/mulr_ge0; apply/ge0_isdistr.
 (* FIXME: This instance should be in bigops *)
-rewrite (@partition_big fst _ predT _ _ (undup (unzip1 s))).
+rewrite (@partition_big ofst _ predT _ _ (undup (unzip1 s))).
 + by apply/undup_uniq.
-+ by case=> a b ab_in_s _; rewrite mem_undup map_f.
-rewrite /mprod.
-pose P := fun x ab => fst<:'a, 'b> ab = x.
++ by case=> a b ab_in_s _; rewrite mem_undup map_f /mprod.
+pose P := fun x ab => ofst<:'a, 'b> ab = x.
 pose F := fun (ab : 'a * 'b) => mb ab.`2.
 rewrite -(@eq_bigr _ (fun x => ma x * big (P x) F s)) => /= [x _|].
 + by rewrite mulr_sumr; apply/eq_bigr=> -[a b] /= @/P <-.
@@ -36,7 +34,7 @@ pose s' := undup _; apply/(@ler_trans (big predT (fun x => ma x) s')).
 + apply/ler_sum=> a _ /=; apply/ler_pimulr; first by apply/ge0_isdistr.
   rewrite -big_filter -(@big_map snd predT) le1_sum_isdistr //.
   rewrite map_inj_in_uniq ?filter_uniq //; case=> [a1 b1] [a2 b2].
-  by rewrite !mem_filter => @/P @/fst @/snd |>.
+  by rewrite !mem_filter => @/P @/ofst @/osnd |>.
 by apply/le1_sum_isdistr/undup_uniq.
 qed.
 

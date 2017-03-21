@@ -5,7 +5,7 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import NewLogic Option FSet NewFMap Real Distr StdOrder StdRing.
+require import AllCore FSet NewFMap Distr StdOrder StdRing.
 (*---*) import RField RealOrder.
 require import Dexcepted.
 require (*--*) NewPRP.
@@ -101,7 +101,7 @@ case: {-1}(mu _ _ = mu _ _)
 rewrite eqT -subr_eq0 ltr0_neq0 //.
 rewrite (mu_split _ _ (mem (rng RandomPermutation.m{m}))) /predI /predT /predC /=.
 rewrite -(etaE (mem _)) etaP.
-rewrite addrC addrA (addrC (-_)) addrN add0r.
+rewrite addrC addrA (addrC (-_)%Real) addrN add0r.
 apply/(ltr_le_trans (mu dD (pred1 x0))).
 + by rewrite dD_fu.
 by apply/mu_sub=> x ->.
@@ -119,7 +119,7 @@ case: {-1}(mu _ _ = mu _ _)
 rewrite eqT -subr_eq0 ltr0_neq0 //.
 rewrite (mu_split _ _ (mem (rng RandomPermutation.mi{m}))) /predI /predT /predC /=.
 rewrite -(etaE (mem _)) etaP.
-rewrite addrC addrA (addrC (-_)) addrN add0r.
+rewrite addrC addrA (addrC (-_)%Real) addrN add0r.
 apply/(ltr_le_trans (mu dD (pred1 y0))).
 + by rewrite dD_fu.
 by apply/mu_sub=> y ->.

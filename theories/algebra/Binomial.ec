@@ -6,7 +6,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Pred Int IntExtra List Ring StdBigop StdOrder.
+require import Core Int IntExtra List Ring StdBigop StdOrder.
 (*---*) import Bigint IntOrder.
 
 (* -------------------------------------------------------------------- *)

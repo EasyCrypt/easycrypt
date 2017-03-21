@@ -5,11 +5,11 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import Fun Pred Rel Pair Option List FSet NewFMap Distr.
-(*---*) import NewLogic.
+require import AllCore List FSet NewFMap Distr.
 require (*--*) IterProc.
 
-pragma -oldip. pragma +implicits.
+pragma -oldip.
+pragma +implicits.
 
 (* -------------------------------------------------------------------- *)
 type flag = [ Unknown | Known ].
@@ -646,7 +646,7 @@ abstract theory GenEager.
     ==> ={res} /\ RO.m{1} = restr Known FRO.m{2}.
   proof. 
   proc;auto=> ? &ml [] -> -> /= ? -> /=.
-  rewrite dom_restr negb_and ora_or neqK_eqU.
+  rewrite dom_restr negb_and oraE neqK_eqU.
   rewrite !restr_set /= !getP_eq oget_some=> />.
   by rewrite negb_or/= restrP in_dom /#.
   qed.

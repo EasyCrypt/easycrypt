@@ -6,12 +6,9 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Pred Int IntExtra IntDiv Real RealExtra Ring List.
-require import StdRing StdOrder.
+require import AllCore IntDiv Ring List StdRing StdOrder.
 require (*--*) Bigop Bigalg.
 (*---*) import RField IntID IntOrder.
-
-pragma Proofs:weak.
 
 (* -------------------------------------------------------------------- *)
 theory Bigint.
@@ -32,7 +29,7 @@ clone include Bigalg.BigOrder with
     op Num.( <= ) <- Int.(<=),
     op Num.( <  ) <- Int.(< )
 
-    proof Num.Domain.* by smt, Num.Axioms.* by smt
+    proof Num.Domain.* by smt(), Num.Axioms.* by smt()
 
     rename [theory] "BAdd" as "BIA"
            [theory] "BMul" as "BIM"
@@ -191,7 +188,7 @@ lemma nosmt b2i_big (P1 P2 : 'a -> bool) (s : 'a list) :
    b2i (big P1 P2 s) <= BIA.big P1 (fun i => b2i (P2 i)) s.
 proof.
 elim: s => [|x s ih] //=; rewrite big_cons BIA.big_cons.
-case: (P1 x)=> //= P1x; rewrite ora_or b2i_or.
+case: (P1 x)=> //= P1x; rewrite oraE b2i_or.
 rewrite -addrA ler_add2l ler_subl_addr ler_paddr //.
 by rewrite -b2i_and b2i_ge0.
 qed.

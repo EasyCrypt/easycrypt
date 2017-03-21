@@ -167,7 +167,7 @@ theory EnfPen.
          inline Count(O).f Counter.incr; wp; call O_fL; wp; skip; smt.
       (* Count(O).f preserves bad *)
       move=> &m1 //=; bypr; move=> &m0 bad.
-        apply/ler_anti; rewrite anda_and; split; first by smt w=mu_bounded.
+        apply/ler_anti; rewrite andaE; split; first by smt w=mu_bounded.
         cut lbnd: phoare[Count(O).f: Counter.c = Counter.c{m0} ==> Counter.c = Counter.c{m0} + 1] >= 1%r;
           first by conseq [-frame] (CountO_fC O Counter.c{m0} _); apply O_fL.
         by byphoare lbnd=> //; smt.

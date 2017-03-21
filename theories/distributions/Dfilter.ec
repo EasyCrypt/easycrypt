@@ -5,7 +5,7 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import NewLogic Int Real Fun Pred Distr FSet StdRing StdOrder StdBigop.
+require import AllCore Distr FSet StdRing StdOrder StdBigop.
 (*---*) import RField RealOrder Bigreal BRA.
 
 pragma +implicits.

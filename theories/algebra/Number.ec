@@ -6,7 +6,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Fun Pred Rel Int IntExtra.
+require import AllCore.
 require (*--*) Ring.
 
 pragma +implicits.
@@ -188,7 +188,7 @@ qed.
 lemma nosmt pmulr_rgt0 (x y : t):
   zeror < x => (zeror < x * y) <=> (zeror < y).
 proof.
-rewrite !ltr_def !ger0_def normrM mulf_eq0 -nor.
+rewrite !ltr_def !ger0_def normrM mulf_eq0 negb_or.
 by case=> ^nz_x -> -> /=; have /inj_eq -> := mulfI _ nz_x.
 qed.
 
@@ -319,13 +319,13 @@ proof. by rewrite -eqr_le. qed.
 
 lemma nosmt ltr_le_asym (x y : t): ! (x < y <= x).
 proof.
-rewrite anda_and ltr_neqAle andA -!anda_and.
+rewrite andaE ltr_neqAle -andbA -!andaE.
 by rewrite -eqr_le eq_sym; case: (_ = _).
 qed.
 
 lemma nosmt ler_lt_asym (x y : t):
   ! (x <= y < x).
-proof. by rewrite anda_and andC -anda_and ltr_le_asym. qed.
+proof. by rewrite andaE andbC -andaE ltr_le_asym. qed.
 
 lemma nosmt ltr_geF (x y : t): x < y => ! (y <= x).
 proof. by move=> xy; apply/negP => /(ltr_le_trans _ _ _ xy); rewrite ltrr. qed.
@@ -1066,12 +1066,12 @@ have h: forall z, zeror <= z => (z <= y) <=> (- y <= z <= y).
   move=> z ge0_z; case: (z <= y)=> //= le_zy; apply/(ler_trans zeror)=> //.
   by rewrite oppr_le0 (ler_trans z).
 case: (zeror <= x) => [^ge0_x /h|/ltrNge/ltrW ge0_x]; first by rewrite ger0_norm.
-rewrite -(opprK x) normrN ler_opp2 anda_and andC ler_oppl h.
+rewrite -(opprK x) normrN ler_opp2 andaE andbC ler_oppl h.
   by rewrite normr_ge0. by rewrite ger0_norm // oppr_ge0.
 qed.
 
 lemma nosmt ltr_normr x y : (x < `|y|) <=> (x < y) \/ (x < - y).
-proof. by rewrite ltrNge ler_norml anda_and -nand -!ltrNge ltr_oppr orbC. qed.
+proof. by rewrite ltrNge ler_norml andaE negb_and -!ltrNge ltr_oppr orbC. qed.
 
 lemma ltr_norml : forall x y, (`|x| < y) <=> (- y < x < y).
 proof.
@@ -1080,13 +1080,15 @@ have h:
   => forall x y, (`|x| < y) <=> (- y < x < y).
 + move=> wlog x y; case: (leVge zeror x) => [/wlog|hx]; 1: by apply.
   rewrite -(opprK x) normrN wlog ?oppr_ge0 //.
-  by rewrite !ltr_opp2 !anda_and andC opprK.
+  by rewrite !ltr_opp2 !andaE andbC opprK.
 apply/h=> x y hx; rewrite ger0_norm //; case: (x < y) => //= le_xy.
 by rewrite (ltr_le_trans _ _ hx) oppr_lt0 (ler_lt_trans _ hx).
 qed.
 
 lemma nosmt ler_normr x y : (x <= `|y|) <=> (x <= y) \/ (x <= - y).
-proof. by rewrite lerNgt ltr_norml // anda_and -nand !lerNgt orbC ltr_oppl. qed.
+proof.
+by rewrite lerNgt ltr_norml // andaE negb_and !lerNgt orbC ltr_oppl.
+qed.
 
 (* -------------------------------------------------------------------- *)
 lemma maxrC (x y : t) : maxr x y = maxr y x.
