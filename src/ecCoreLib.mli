@@ -179,5 +179,4 @@ module CI_Map : sig
   val p_map  : path
   val p_get  : path
   val p_set  : path
-  val p_cnst : path
 end

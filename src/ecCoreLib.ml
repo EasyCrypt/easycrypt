@@ -185,11 +185,10 @@ let s_dinter      = EcPath.toqsymbol CI_Distr.p_dinter
 
 (* -------------------------------------------------------------------- *)
 module CI_Map = struct
-  let i_Map = "NewMap"
+  let i_Map = "CoreMap"
   let p_Map = EcPath.pqname p_top i_Map
   let _Map = fun x -> EcPath.pqname p_Map x
   let p_map = _Map "map"
   let p_get = _Map s_get
   let p_set = _Map s_set
-  let p_cnst = _Map "cnst"
 end
