@@ -7,7 +7,7 @@
 
 (** FIXME: This is a Random Function (see ROM) -- make sure we only
     have one copy of this **)
-require import Option FSet NewFMap Distr.
+require import FSet NewFMap Distr.
 require (*--*) NewPRF.
 
 clone include NewPRF.

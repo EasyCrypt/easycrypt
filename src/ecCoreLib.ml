@@ -85,7 +85,7 @@ module CI_Real = struct
 end
 
 module CI_Pred = struct
-  let i_Pred  = "Pred"
+  let i_Pred  = "Logic"
   let p_Pred  = EcPath.pqname p_top i_Pred
 
   let _Pred x = EcPath.pqname p_Pred x
@@ -112,23 +112,22 @@ end
 
 (* -------------------------------------------------------------------- *)
 module CI_Logic = struct
-  let i_Logic  = "Logic"
+  let i_Logic  = "Tactics"
   let p_Logic  = EcPath.pqname p_top i_Logic
   let _Logic   = fun x -> EcPath.pqname p_Logic x
   let mk_logic = _Logic
 
-  let p_cut_lemma     = _Logic "cut_lemma"
-  let p_unit_elim     = _Logic "unit_ind"
-  let p_false_elim    = _Logic "falseE"
-  let p_bool_elim     = _Logic "bool_ind"
-  let p_and_elim      = _Logic "andE"
-  let p_anda_elim     = _Logic "andaE"
-  let p_and_proj_l    = _Logic "andEl"
-  let p_and_proj_r    = _Logic "andEr"
-  let p_or_elim       = _Logic "orE"
-  let p_ora_elim      = _Logic "oraE"
-  let p_iff_elim      = _Logic "iffE"
-  let p_if_elim       = _Logic "ifE"
+  let p_unit_elim     = _Logic "unitW"
+  let p_false_elim    = _Logic "falseW"
+  let p_bool_elim     = _Logic "boolW"
+  let p_and_elim      = _Logic "andW"
+  let p_anda_elim     = _Logic "andaW"
+  let p_and_proj_l    = _Logic "andWl"
+  let p_and_proj_r    = _Logic "andWr"
+  let p_or_elim       = _Logic "orW"
+  let p_ora_elim      = _Logic "oraW"
+  let p_iff_elim      = _Logic "iffW"
+  let p_if_elim       = _Logic "ifW"
 
   let p_true_intro    = _Logic "trueI"
   let p_and_intro     = _Logic "andI"
@@ -146,22 +145,15 @@ module CI_Logic = struct
   let p_fcongr        = _Logic "congr1"
   let p_eq_sym        = _Logic "eq_sym"
   let p_eq_sym_imp    = _Logic "eq_sym_imp"
-  let p_imp_trans     = _Logic "imp_trans"
   let p_negbTE        = _Logic "negbTE"
   let p_negeqF        = _Logic "negeqF"
-
-  let p_rewrite_l     = _Logic "rewrite_l"
-  let p_rewrite_r     = _Logic "rewrite_r"
-  let p_rewrite_iff_l = _Logic "rewrite_iff_l"
-  let p_rewrite_iff_r = _Logic "rewrite_iff_r"
-  let p_rewrite_bool  = _Logic "rewrite_bool"
 
   let p_iff_lr        = _Logic "iffLR"
   let p_iff_rl        = _Logic "iffRL"
 
-  let p_case_eq_bool  = _Logic "bool_case_eq"
-
-  let p_ip_dup        = _Logic "_ip_dup"
+  let p_cut_lemma     = _Logic "cut_"
+  let p_case_eq_bool  = _Logic "boolWE"
+  let p_ip_dup        = _Logic "dup"
 end
 
 (* -------------------------------------------------------------------- *)

@@ -6,8 +6,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Option Pred Fun Int IntExtra Real RealExtra List.
-require import Distr NewLogic StdOrder.
+require import AllCore List Distr StdOrder.
 require (*--*) FinType Tuple.
 (*---*) import RealOrder.
 

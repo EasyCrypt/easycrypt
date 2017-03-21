@@ -5,11 +5,13 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import Option Fun Pred Real RealExtra List Distr.
-require import Ring Number StdRing StdOrder StdBigop RealSeq RealSeries.
+(* -------------------------------------------------------------------- *)
+require import AllCore List Distr Ring Number.
+require import StdRing StdOrder StdBigop RealSeq RealSeries.
 require (*--*) Bigop Bigalg.
 (*---*) import RField RealOrder Bigreal.BRA.
 
+(* -------------------------------------------------------------------- *)
 clone include Distr.MFinite with
   type t            <- bool,
   op Support.enum <- [true; false],

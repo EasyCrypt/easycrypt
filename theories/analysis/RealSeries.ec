@@ -6,8 +6,8 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Bool Option Pred Fun Int IntExtra Real RealExtra.
-require import StdRing StdOrder StdBigop Discrete List RealLub RealSeq.
+require import Bool AllCore List.
+require import StdRing StdOrder StdBigop Discrete RealLub RealSeq.
 (*---*) import IterOp Bigreal Bigreal.BRA IntOrder RField RealOrder.
 
 pragma +implicits.

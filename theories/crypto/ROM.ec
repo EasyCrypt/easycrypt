@@ -6,8 +6,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Option Fun Int IntExtra Real RealExtra.
-require import Finite List FSet NewFMap Distr.
+require import AllCore Finite List FSet NewFMap Distr.
 require import StdRing StdBigop StdOrder FelTactic.
 (*---*) import RealOrder.
 

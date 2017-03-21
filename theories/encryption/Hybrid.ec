@@ -5,7 +5,7 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import Int Real FSet Finite Pair Distr DInterval.
+require import AllCore FSet Finite Distr DInterval.
 require import OldMonoid.
 require Means.
 

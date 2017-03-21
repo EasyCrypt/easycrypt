@@ -8,7 +8,7 @@
 pragma +implicits.
 
 (* -------------------------------------------------------------------- *)
-require import Fun Pred Pair Int IntExtra List.
+require import AllCore List.
 require (*--*) Bigop Ring Number.
 
 import Ring.IntID.

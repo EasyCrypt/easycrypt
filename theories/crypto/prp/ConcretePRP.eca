@@ -5,7 +5,7 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require export Fun Distr.
+require export Distr.
 require (*--*) NewPRP.
 
 clone include NewPRP.

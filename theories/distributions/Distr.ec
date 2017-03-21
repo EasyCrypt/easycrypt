@@ -29,11 +29,10 @@
  *)
 
 (* -------------------------------------------------------------------- *)
-require export Pred.
-require import Option Fun List Int IntExtra IntDiv Real RealExtra.
+require import AllCore List.
 require import Ring StdRing StdOrder StdBigop Discrete RealSeq RealSeries.
 (*---*) import IterOp Bigint Bigreal Bigreal.BRA.
-(*---*) import IntOrder RealOrder RField NewLogic.
+(*---*) import IntOrder RealOrder RField.
 require (*--*) FinType.
 
 pragma +implicits.
@@ -304,7 +303,7 @@ lemma prratE ['a] (s : 'a list) (E : 'a -> bool) :
 proof.
 rewrite muE (@sumE_fin _ (undup s)) ?undup_uniq //=.
   move=> x; case: (E x)=> _ //; rewrite massE dratE.
-  rewrite mulf_eq0 -nor mem_undup eq_fromint => -[+ _].
+  rewrite mulf_eq0 negb_or mem_undup eq_fromint => -[+ _].
   by rewrite -lt0n ?count_ge0 // -has_count has_pred1.
 pose F := fun x => (count (pred1 x) s)%r / (size s)%r.
 rewrite -big_mkcond (@eq_bigr _ _ F) /F /= => {F}.
@@ -332,7 +331,7 @@ split=> [[]|eq_d].
   move=> ^nz_s1; rewrite eqvnil => nz_s2.
   rewrite eqf_div ?eq_fromint ?size_eq0 // -!fromintM.
   by rewrite eq_fromint !(@mulzC (size _)).
-apply/anda_and; split.
+apply/andaE; split.
   have h: forall t1 t2, drat<:'a> t1 = drat t2 => t1 = [] => t2 = [].
     move=> t1 [|x t2] eq_dt ->>//; move/(congr1 (fun d => mu1 d x)): eq_dt.
     rewrite /= !dratE /= eq_sym mulf_neq0 // ?invr_eq0 eq_fromint.
@@ -673,9 +672,6 @@ abbrev dapply (F: 'a -> 'b) : 'a distr -> 'b distr =
 
 (* -------------------------------------------------------------------- *)
 theory DScalar.
-require import FSet StdBigop StdOrder.
-(*---*) import RealOrder Bigreal BRA.
-
 op mscalar (k : real) (m : 'a -> real) (x : 'a) = k * (m x).
 
 lemma isdistr_mscalar k (m : 'a -> real):
@@ -778,8 +774,8 @@ proof. apply dscalar_ll. qed.
 lemma dscale_uni ['a] (d : 'a distr) : 
   is_uniform d => is_uniform (dscale d).
 proof.
-case (weight d = 0%r) => Hw.
-+ by move=> _ x y _ _;rewrite !dscale1E Hw.
-apply dscalar_uni =>//;smt (ge0_weight @Real).
+case: (weight d = 0%r) => Hw.
++ by move=> _ x y _ _; rewrite !dscale1E Hw.
+apply dscalar_uni =>//; smt (ge0_weight @Real).
 qed.
 

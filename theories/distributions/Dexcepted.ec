@@ -6,7 +6,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Int Real Distr FSet Dfilter StdRing.
+require import AllCore Distr FSet Dfilter StdRing.
 (*---*) import RField.
 
 pragma +implicits.

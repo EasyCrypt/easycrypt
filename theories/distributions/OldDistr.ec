@@ -6,8 +6,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require export Pred.
-require import Fun Int IntExtra Real RealExtra StdRing StdOrder.
+require import AllCore StdRing StdOrder.
 (*---*) import RField RealOrder.
 
 op charfun (p:'a -> bool) x: real = if p x then 1%r else 0%r.
@@ -140,15 +139,16 @@ lemma mu_not (d:'a distr) (p:('a -> bool)):
   mu d (predC p) = mu d predT - mu d p.
 proof.
 have: mu d (predC p) + mu d p = mu d predT; [rewrite -mu_disjoint | smt].
-+ by rewrite predCpredI; apply/(subpred_refl<:'a> pred0). (* rewrite seems to unroll too much *)
-+ by rewrite predCpredU.
+  (* rewrite seems to unroll too much *)
++ by rewrite predCI; apply/(subpred_refl<:'a> pred0).
++ by rewrite predCU.
 qed.
 
 lemma mu_split (d:'a distr) (p q:('a -> bool)):
   mu d p = mu d (predI p q) + mu d (predI p (predC q)).
 proof.
 rewrite -mu_disjoint; first smt.
-by apply mu_eq=> x; rewrite /predI /predC /predU !(andC (p x)) orDandN.
+by apply mu_eq=> x; rewrite /predI /predC /predU !(andbC (p x)) orDandN.
 qed.
 
 lemma mu_support (p:('a -> bool)) (d:'a distr):
@@ -170,7 +170,7 @@ split=> [|[] x [x_in_P x_in_d]].
   by exists x.
 cut: mu d (pred1 x) <= mu d P /\ 0%r < mu d (pred1 x); last smt.
 split=> [|//=].
-by rewrite mu_sub // /Pred.(<=) /pred1 => x0 <<-.
+by rewrite mu_sub // /Core.(<=) /pred1 => x0 <<-.
 qed.
 
 lemma mu_sub_support (d:'a distr) (p q:('a -> bool)):

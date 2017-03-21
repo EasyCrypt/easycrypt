@@ -5,7 +5,7 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import Int FSet Real Distr.
+require import Core Int FSet Real Distr.
 require (*--*) Mu_mem.
 
 (* The distribution and test can be parameterized by some input *)

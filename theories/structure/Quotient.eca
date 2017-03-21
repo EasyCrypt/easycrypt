@@ -8,9 +8,6 @@
 pragma +implicits.
 
 (* -------------------------------------------------------------------- *)
-require import Fun.
-
-(* -------------------------------------------------------------------- *)
 (* This theory defines the effective quotient [qT] obtained from [T]    *)
 (* via a representative/canonical surjecton pair of functions.          *)
 (* -------------------------------------------------------------------- *)

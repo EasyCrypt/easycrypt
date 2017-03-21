@@ -5,7 +5,7 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import Pair Int FSet Real Distr SampleBool OldMonoid.
+require import AllCore FSet Distr SampleBool OldMonoid.
 require DBool Hybrid.
 
 type input.

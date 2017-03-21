@@ -6,7 +6,7 @@
  * -------------------------------------------------------------------- *)
 
 (*** A formalization of pseudo-random permutations **)
-require import Fun Option Int Real Distr FSet NewFMap.
+require import Int Real Distr FSet NewFMap.
 require import Dexcepted.
 
 (** A PRP is a family of permutations F on domain D indexed by a

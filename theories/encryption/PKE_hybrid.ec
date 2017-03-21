@@ -5,17 +5,8 @@
  * Distributed under the terms of the CeCILL-B-V1 license
  * -------------------------------------------------------------------- *)
 
-require import Int.
-require import IntExtra.
-require import Real.
-require import FSet.
-require import Finite.
-require import Pair.
-require import Distr.
-require import OldMonoid.
+require import AllCore List FSet Finite Distr OldMonoid.
 require import Indist.
-require import Option.
-require import List.
 
 type pkey.
 type skey.

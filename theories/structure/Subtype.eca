@@ -8,8 +8,6 @@
 pragma +implicits.
 
 (* -------------------------------------------------------------------- *)
-require import Fun.
-require import Option.
 
 (* -------------------------------------------------------------------- *)
 (* This theory defines the subtype [sT] of [T] defined as {x : T | P x} *)
@@ -25,6 +23,8 @@ require import Option.
 (*       1. insub x = None                  if !(P x)                   *)
 (*       2. insub x = Some y with val y = x if  (P x)                   *)
 (* -------------------------------------------------------------------- *)
+
+require import Core.
 
 type T, sT.
 pred P : T.

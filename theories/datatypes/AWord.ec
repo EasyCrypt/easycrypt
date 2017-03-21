@@ -6,8 +6,7 @@
  * -------------------------------------------------------------------- *)
 
 (* -------------------------------------------------------------------- *)
-require import Int IntExtra IntDiv Real RealExtra.
-require import Finite FSet StdRing StdOrder.
+require import AllCore Finite IntDiv FSet StdRing StdOrder.
 (*---*) import RField RealOrder.
 
 type word.
@@ -45,7 +44,7 @@ axiom landwDl (x y z:word): land (x ^ y) z = land x z ^ land y z.
 axiom landI (x:word): land x x = x.
 
 lemma subwE : ( ^ ) = fun (x y: word), x ^ lopp y.
-proof. by rewrite ExtEq.fun_ext => x; rewrite ExtEq.fun_ext => y /#. qed.
+proof. by rewrite fun_ext => x; rewrite fun_ext => y /#. qed.
 
 (** View bitstring as a ring *)
 require (*--*) Ring.
@@ -122,7 +121,7 @@ theory Univ.
     by rewrite List.Iota.size_iota; smt. (* excuse the non-linear integer arithmetic *)
   qed.
 
-  lemma finite_univ : is_finite (Pred.predT <:word>).
+  lemma finite_univ : is_finite (predT <:word>).
   proof.
     exists (List.map from_int (List.Iota.iota_ 0 (2^length))); split=> [|x].
       by rewrite List.map_inj_in_uniq 2:List.Iota.iota_uniq// => x y; smt.

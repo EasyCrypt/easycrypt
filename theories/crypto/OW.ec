@@ -6,7 +6,7 @@
  * -------------------------------------------------------------------- *)
 
 (* Trapdoor one-way permutations *)
-require import Distr.
+require import Core Distr.
 
 (** Abstract declarations to be refined when instantiating *)
 (* Support *)
