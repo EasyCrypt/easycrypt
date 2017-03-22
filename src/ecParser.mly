@@ -167,6 +167,7 @@
     | `WANTEDLEMMAS   of EcParsetree.pdbhint
     | `VERBOSE        of int option
     | `VERSION        of [ `Full | `Lazy ]
+    | `SELECTED
   ]
 
   module SMT : sig
@@ -190,7 +191,7 @@
        option_matching
          [ "all"; "timeout"; "maxprovers"; "maxlemmas";
            "wantedlemmas"; "unwantedlemmas";
-           "prover"; "verbose"; "lazy"; "full"; "iterate" ]
+           "prover"; "verbose"; "lazy"; "full"; "iterate"; "selected" ]
 
     let as_int = function
       | None          -> `None
@@ -247,6 +248,7 @@
       | "full"           -> `VERSION        (get_as_none s o; `Full)
       | "all"            -> get_as_none s o; (`ALL)
       | "iterate"        -> get_as_none s o; (`ITERATE)
+      | "selected"       -> get_as_none s o; (`SELECTED)
       | _                ->  assert false
 
     let mk_smt_option (os : smt list) =
@@ -260,6 +262,7 @@
       let verbose  = ref None in
       let version  = ref None in
       let iterate  = ref None in
+      let selected = ref None in
 
       let add_prover (k, p) =
         let r = odfl empty_pprover_list !pnames in
@@ -281,6 +284,7 @@
         | `VERSION        v -> version  := Some v
         | `ITERATE          -> iterate  := Some true
         | `PROVER         p -> List.iter add_prover p
+        | `SELECTED         -> selected := Some true
       in
 
       List.iter do1 os;
@@ -299,7 +303,9 @@
         plem_max        = !mlemmas;
         plem_iterate    = !iterate;
         plem_wanted     = !wanted;
-        plem_unwanted   = !unwanted; }
+        plem_unwanted   = !unwanted;
+        plem_selected   = !selected;
+      }
   end
 %}
 

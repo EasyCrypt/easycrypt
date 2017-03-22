@@ -361,7 +361,7 @@ and trans_pty genv p =
   | Some tv -> tv
   | None    ->
     match Hp.find_opt genv.ty_known_w3 p with
-    | Some (ts, th) -> 
+    | Some (ts, th) ->
       load_wtheory genv th;
       Hp.add genv.te_ty p ts;
       ts
@@ -1055,8 +1055,8 @@ let core_theories = [
       (CI_Int.p_int_le , "infix <=")]);
 
   ((["real"], "Real"),
-     [(CI_Real.p_real0,    "zero"); 
-      (CI_Real.p_real1,    "one"); 
+     [(CI_Real.p_real0,    "zero");
+      (CI_Real.p_real1,    "one");
       (CI_Real.p_real_opp, "prefix -");
       (CI_Real.p_real_add, "infix +" );
       (CI_Real.p_real_inv, "inv"     );
@@ -1094,12 +1094,12 @@ let core_theories = Lazy.from_fun (fun () ->
   List.iter (add_core_theory known) core_theories;
   Hp.add known CI_Distr.p_mu (fs_mu, distr_theory);
 
-  let add_core_ty tbl (thname, tys) = 
+  let add_core_ty tbl (thname, tys) =
     let theory = curry P.get_w3_th thname in
     let namesp = theory.WTheory.th_export in
     List.iter (fun (p, name) ->
-      Hp.add tbl p (WTheory.ns_find_ts namesp [name], theory)) 
-      tys in    
+      Hp.add tbl p (WTheory.ns_find_ts namesp [name], theory))
+      tys in
   let ty_known = Hp.create 7 in
   List.iter (add_core_ty ty_known) core_ty_theories;
   ty_known, known
@@ -1110,7 +1110,7 @@ let core_theories = Lazy.from_fun (fun () ->
 let add_core_bindings (env : tenv) =
   (* Core types *)
   List.iter (curry (Hp.add env.te_ty)) core_types;
-  
+
   (* Core operators *)
   List.iter (fun (p, id, arity, fo) ->
     Hp.add env.te_op p (prop_w3op ~name:id arity fo))
@@ -1136,13 +1136,13 @@ let add_core_bindings (env : tenv) =
   end;
 
   (* Add symbol for map *)
-  begin 
+  begin
     (* Add Map theory *)
     let th_map = P.get_w3_th ["map"] "Map" in
     let namesp = th_map.WTheory.th_export in
     Hp.add env.te_ty CI_Map.p_map (WTheory.ns_find_ts namesp ["map"]);
   end;
-   
+
   (* Add modules stuff *)
   env.te_task <- WTask.add_ty_decl env.te_task ts_mem
 
@@ -1395,7 +1395,7 @@ let create_global_task () =
   let task  = WTask.use_export task WTheory.highord_theory in
   let task  = WTask.use_export task distr_theory in
   let thmap = P.get_w3_th ["map"] "Map" in
-  let task  = WTask.use_export task thmap in 
+  let task  = WTask.use_export task thmap in
   task
 
 (* -------------------------------------------------------------------- *)
@@ -1437,6 +1437,17 @@ let check ?notify pi (hyps : LDecl.hyps) (concl : form) =
   let decl  = WDecl.create_prop_decl WDecl.Pgoal pr wterm in
 
   let execute_task toadd =
+    if pi.P.pr_selected then begin
+      let buffer = Buffer.create 0 in
+      let fmt    = Format.formatter_of_buffer buffer in
+      let ppe    = EcPrinting.PPEnv.ofenv env in
+      let l      = List.map fst toadd in
+      let pp fmt = EcPrinting.pp_list "@ " (EcPrinting.pp_axname ppe) fmt in
+      Format.fprintf fmt "selected lemmas: @[%a@]@." pp l;
+      notify |> oiter (fun notify -> notify `Warning
+        (lazy (Buffer.contents buffer)))
+    end;
+
     List.iter (trans_axiom tenv) toadd;
     let task = WTask.add_decl tenv.te_task decl in
     let tkid = Counter.next cnt in
