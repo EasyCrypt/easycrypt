@@ -118,6 +118,7 @@ module CI_Distr : sig
 
   val p_support : path
   val p_mu      : path
+  val p_lossless: path
 end
 
 (* -------------------------------------------------------------------- *)

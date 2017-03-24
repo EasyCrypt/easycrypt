@@ -34,11 +34,7 @@ let t_exfalso = FApi.t_low0 "exfalso" t_exfalso_r
 
 (* -------------------------------------------------------------------- *)
 let prnd_info =
-  let builder ty =
-    let id = EcIdent.create "x" in
-      f_lambda [(id, GTty ty)] f_true
-  in
-  EcParsetree.PSingleRndParam builder
+  EcParsetree.PSingleRndParam f_predT
 
 (* -------------------------------------------------------------------- *)
 let t_auto_rnd_hoare_r tc =

@@ -105,8 +105,13 @@ let f_real_div f1 f2 =
 (* -------------------------------------------------------------------- *)
 let f_predT     ty = f_op CI.CI_Pred.p_predT      [ty] (tcpred ty)
 let fop_pred1   ty = f_op CI.CI_Pred.p_pred1      [ty] (tcpred ty)
-let fop_support ty = f_op CI.CI_Distr.p_support [ty] (toarrow [tdistr ty; ty] tbool)
-let fop_mu      ty = f_op CI.CI_Distr.p_mu      [ty] (toarrow [tdistr ty; tcpred ty] treal)
+let fop_support ty =
+  f_op CI.CI_Distr.p_support  [ty] (toarrow [tdistr ty; ty] tbool)
+let fop_mu      ty =
+  f_op CI.CI_Distr.p_mu       [ty] (toarrow [tdistr ty; tcpred ty] treal)
+let fop_lossless ty =
+  f_op CI.CI_Distr.p_lossless [ty] (toarrow [tdistr ty] tbool)
+
 
 let f_support f1 f2 = f_app (fop_support f2.f_ty) [f1; f2] tbool
 let f_in_supp f1 f2 = f_support f2 f1
@@ -126,6 +131,9 @@ let f_mu env f1 f2 =
 
 let f_weight ty d =
   f_app (fop_mu ty) [d; f_predT ty] treal
+
+let f_lossless ty d =
+  f_app (fop_lossless ty) [d] tbool
 
 (* -------------------------------------------------------------------- *)
 let f_losslessF f = f_bdHoareF f_true f f_true FHeq f_r1

@@ -107,7 +107,8 @@ module CI_Distr = struct
 
   let p_support = _Distr "support"
   let p_mu      = _Pervasive "mu"
-  let p_weight  = _Distr "weight"
+  let p_lossless = _Distr "is_lossless"
+
 end
 
 (* -------------------------------------------------------------------- *)

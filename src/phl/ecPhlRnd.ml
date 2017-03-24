@@ -44,7 +44,7 @@ let wp_equiv_disj_rnd_r side tc =
   let post  = subst_form_lv env (EcMemory.memory m) lv x es.es_po in
   let post  = f_imp (f_in_supp x distr) post in
   let post  = f_forall_simpl [(x_id,GTty ty_distr)] post in
-  let post  = f_anda (f_eq (f_weight ty_distr distr) f_r1) post in
+  let post  = f_anda (f_lossless ty_distr distr) post in
   let concl =
     match side with
     | `Left  -> f_equivS_r { es with es_sl=s; es_po=post; }
@@ -178,7 +178,7 @@ let t_bdhoare_rnd_r tac_info tc =
   in
   let mk_event ?(simpl=true) ty =
     let x = EcIdent.create "x" in
-    if is_post_indep && simpl then f_lambda [x,GTty ty] f_true
+    if is_post_indep && simpl then f_predT ty
     else match lv with
       | LvVar (pv,_) ->
         f_lambda [x,GTty ty]

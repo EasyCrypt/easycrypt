@@ -321,7 +321,7 @@ abstract theory GenEager.
   lemma RRO_resample_ll : islossless RRO.resample.
   proof. 
   proc; call (iter_ll RRO.I _)=> //.
-  by proc; auto=> /= ?; apply/sampleto_ll. 
+  proc; auto=> /> ?; apply/sampleto_ll. 
   qed.
 
   lemma eager_init :
@@ -726,4 +726,5 @@ abstract theory GenEager.
     by rewrite fmapP=> x; rewrite restrP mapP; case: (RO.m{ml}.[x]).
     qed.
   end section.
+
 end GenEager.
