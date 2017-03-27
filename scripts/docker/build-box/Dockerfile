@@ -7,7 +7,8 @@ ENV DEBIAN_FRONTEND noninteractive
 RUN \
 	apt-get -q -y update && \
 	apt-get -q -y dist-upgrade && \
-	apt-get -q -y install sudo m4 rsync git && \
+	apt-get -q -y install sudo m4 rsync git curl python python-pip && \
+	pip install --no-cache-dir pyyaml && \
 	apt-get -q -y --no-install-recommends install ocaml-nox opam aspcud && \
 	apt-get -q -y clean
 
