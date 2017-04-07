@@ -472,6 +472,9 @@ proof. by elim: s => //= x s -> @/predC; case: (p x). qed.
 lemma all_count p (s : 'a list): all p s <=> (count p s = size s).
 proof. by elim: s => //= x s; case: (p x) => _ /=; smt. qed.
 
+lemma all_count_in p (s : 'a list): all p s => count p s = size s.
+proof. by apply/all_count. qed.
+
 lemma all_pred0 (s : 'a list): all pred0 s <=> (size s = 0).
 proof. by rewrite all_count count_pred0 eq_sym. qed.
 
