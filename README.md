@@ -153,7 +153,7 @@ ProofGeneral by adding the following line to it
 
 where $proof-general-home should be replaced by
 
-        $prefix/share/proofgeneral/generic/proof-site.el
+        $prefix/share/proofgeneral
 
 with $prefix being set to the output of
 
