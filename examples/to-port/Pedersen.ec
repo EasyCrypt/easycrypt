@@ -162,6 +162,9 @@ section PedersenSecurity.
     (* Here the proof needs a hand... *)
     have leftpart : (c = g ^ d * g ^ x ^ m /\ c = g ^ d' * g ^ x ^ m' /\ m <> m') =>
                     (d - d' + x*m = x*m') by smt.
+    have rightpart1: ((d - d') * inv (m' - m) * (m' - m)) = (d - d') * F.one by smt.
+    have rightpart2: ((d - d') * inv (m' - m) * (m' - m)) = (d - d') by smt.
+    have rightpart3: ((d - d') * inv (m' - m) = x) = ((d - d') = x * (m' - m)) by smt.
     have rightpart : ((d - d') * inv (m' - m) = x) = (d - d' + x*m = x*m') by smt.
     smt.
     trivial.
