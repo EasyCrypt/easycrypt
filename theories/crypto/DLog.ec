@@ -7,7 +7,6 @@
 (* A formalisation of the discrete logarithm assumption. *)
 
 require import CyclicGroup.
-require import Option.
 require import Real.
 
 theory DLog.

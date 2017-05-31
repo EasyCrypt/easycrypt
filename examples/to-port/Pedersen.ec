@@ -13,7 +13,6 @@
 require import Real.
 require import DLog.
 require import CyclicGroup.
-require import Option.
 
 require (*--*) Commitment.
 
