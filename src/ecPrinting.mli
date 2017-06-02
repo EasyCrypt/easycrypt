@@ -73,7 +73,7 @@ val pp_hoareS   : PPEnv.t -> hoareS  pp
 val pp_bdhoareS : PPEnv.t -> bdHoareS pp
 val pp_equivS   : PPEnv.t -> equivS  pp
 
-val pp_stmt  : PPEnv.t -> stmt pp
+val pp_stmt  : ?lineno:bool -> PPEnv.t -> stmt pp
 val pp_instr : PPEnv.t -> instr pp
 
 (* -------------------------------------------------------------------- *)
