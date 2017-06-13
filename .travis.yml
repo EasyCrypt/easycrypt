@@ -22,4 +22,4 @@ after_failure:
 script:
 - >-
   docker run -v $PWD:/home/ci/easycrypt easycryptpa/ec-build-box
-  sh -c "cd easycrypt && opam config exec -- make ${TARGETS}"
+  sh -c "git clone easycrypt easycrypt.dev && cd easycrypt.dev && opam config exec -- make ${TARGETS}"
