@@ -96,7 +96,7 @@ let print_config config =
       (try Sys.getenv "PATH" with Not_found -> ""))
 
 (* -------------------------------------------------------------------- *)
-let _ =
+let main () =
   let myname  = Filename.basename Sys.executable_name
   and mydir   = Filename.dirname  Sys.executable_name in
 
@@ -322,3 +322,6 @@ let _ =
   with e ->
     (try EcTerminal.finalize terminal with _ -> ());
     raise e
+
+(* -------------------------------------------------------------------- *)
+let () = main ()
