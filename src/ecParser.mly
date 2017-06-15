@@ -2496,9 +2496,6 @@ phltactic:
 | KILL s=side? o=codepos NOT STAR
     { Pkill (s, o, None) }
 
-| p=tselect INLINE
-    { Pinline (`ByPattern p) }
-
 | ALIAS s=side? o=codepos
     { Palias (s, o, None) }
 
