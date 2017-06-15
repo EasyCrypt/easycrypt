@@ -138,6 +138,9 @@ end = struct
     | UnknownRecFieldName qs ->
         msg "unknown (record) field name: %a" pp_qsymbol qs
 
+    | UnknownInstrMetaVar x ->
+        msg "unkown instruction meta-variable: %a" pp_symbol x
+
     | DuplicatedRecFieldName qs ->
         msg "duplicated (record) field name: %s" qs
 

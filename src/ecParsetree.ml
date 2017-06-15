@@ -102,6 +102,7 @@ type plvalue_r =
 and plvalue = plvalue_r located
 
 type pinstr_r =
+  | PSident  of psymbol
   | PSasgn   of plvalue * pexpr
   | PSrnd    of plvalue * pexpr
   | PScall   of plvalue option * pgamepath * (pexpr list) located
@@ -427,9 +428,37 @@ type tac_dir = Backs | Fwds
 type pfel_spec_preds = (pgamepath*pformula) list
 
 (* -------------------------------------------------------------------- *)
+type pim_repeat_kind =
+  | IM_R_Repeat of int option pair
+  | IM_R_May    of int option
+
+type pim_repeat =
+  bool * pim_repeat_kind
+
+type anchor =
+  | Without_anchor
+  | With_anchor
+
+type pim_regexp =
+  | IM_Any
+  | IM_Parens of pim_regexp
+  | IM_Assign
+  | IM_Sample
+  | IM_Call
+  | IM_If     of pim_block option * pim_block option
+  | IM_While  of pim_block option
+  | IM_Named  of psymbol * pim_regexp option
+  | IM_Repeat of pim_repeat * pim_regexp
+  | IM_Seq    of pim_regexp list
+  | IM_Choice of pim_regexp list
+
+and pim_block = anchor pair * pim_regexp
+
+(* -------------------------------------------------------------------- *)
 type trans_kind =
-  | TKfun  of pgamepath
-  | TKstmt of oside * pstmt
+  | TKfun        of pgamepath
+  | TKstmt       of oside * pstmt
+  | TKparsedStmt of oside * pim_block * pstmt
 
 type trans_info =
   trans_kind * pformula * pformula * pformula * pformula
@@ -513,6 +542,7 @@ type pcqoptions = (bool * pcqoption) list
 (* -------------------------------------------------------------------- *)
 type phltactic =
   | Pskip
+  | Prepl_stmt     of trans_info
   | Pfun           of fun_info
   | Papp           of app_info
   | Pwp            of int doption option
