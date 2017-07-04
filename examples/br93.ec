@@ -1,76 +1,79 @@
 (* -------------------------------------------------------------------- *)
 require import AllCore List FSet NewFMap.
 require import Distr DBool.
-require (*--*) AWord ROM.
+require (*--*) BitWord ROM.
 
 (** We consider three lengths of bitstrings **)
-op k : { int | 0 < k } as k_pos. (* size of message *)
-op l : { int | 0 < l } as l_pos. (* size of randomness *)
-op n : { int | 0 < n } as n_pos. (* size of cipher *)
+op k : { int | 0 < k } as gt0_k. (* size of message *)
+op l : { int | 0 < l } as gt0_l. (* size of randomness *)
+op n = k + l.                    (* size of cipher *)
 
-axiom sizes : k + l = n.
+lemma gt0_n: 0 < n by smt.
 
-clone import AWord as Plaintext with
-  op length = k
-proof leq0_length by smt.
+(* We instantiate the types of plaintexts, ciphertexts and nonces as   *)
+(* bitstrings of these lengths.                                        *)
+type ptxt, ctxt, rand.
 
-clone import AWord as Ciphertext with
-  op length = n
-proof leq0_length by smt.
+clone import BitWord as Plaintext with
+  type word <- ptxt,
+  op n <- k
+proof gt0_n by exact/gt0_k.
 
-clone import AWord as Randomness with
-  op length = l
-proof leq0_length by smt.
+clone import BitWord as Ciphertext with
+  type word <- ctxt,
+  op n <- n
+proof gt0_n by exact/Self.gt0_n.
 
-type plaintext = Plaintext.word.
-type ciphertext = Ciphertext.word.
-type randomness = Randomness.word.
+clone import BitWord as Randomness with
+  type word <- rand,
+  op n <- l
+proof gt0_n by exact/gt0_l.
 
 (* We only need distributions on plaintexts and nonces *)
-op uniform      = Plaintext.Dword.dword.
-op uniform_rand = Randomness.Dword.dword.
+op dptxt = Plaintext.dword.
+op drand = Randomness.dword.
 
 (* We have operators that combine them *)
-op (||) (x:randomness) (y:plaintext):ciphertext =
- Ciphertext.from_bits ((to_bits x) || (to_bits y)).
+op (||) (x:rand) (y:ptxt):ctxt =
+ Ciphertext.mkword ((ofword x) ++ (ofword y)).
 
 (*** One way trapdoor permutation (pre-instantiated) ***)
 (**  [See theory OW.ec] **)
 theory OWTP.
   type pkey, skey.
 
-  op keypairs: (pkey * skey) distr.
-  axiom keypair_lossless : is_lossless keypairs.
+  op dkeys: (pkey * skey) distr.
+  axiom dkeys_ll : is_lossless dkeys.
 
-  op f       : pkey -> randomness -> randomness.
-  op finv    : skey -> randomness -> randomness.
+  op f       : pkey -> rand -> rand.
+  op finv    : skey -> rand -> rand.
 
   axiom finvof pk sk x:
-   support keypairs (pk,sk) =>
+   support dkeys (pk,sk) =>
    finv sk (f pk x) = x.
 
   axiom fofinv pk sk x:
-   support keypairs (pk,sk) =>
+   support dkeys (pk,sk) =>
    f pk (finv sk x) = x.
 
   lemma f_injective sk pk x y:
-    support keypairs (pk,sk) =>
+    support dkeys (pk,sk) =>
     f pk x = f pk y =>
     x = y.
   proof. by move=> supp eq_f; rewrite -(finvof pk sk) // eq_f finvof. qed.
 
   module type Inverter = {
-    proc i(pk:pkey,y:randomness): randomness
+    proc i(pk:pkey,y:rand): rand
   }.
 
   module OW(I:Inverter) = {
-    var r:randomness
+    var r:rand
 
     proc main(): bool = {
       var x', pk, sk;
 
-      (pk,sk) <$ keypairs;
-      r       <$ uniform_rand;
+      (pk,sk) <$ dkeys;
+      r       <$ drand;
       x'      <@ I.i(pk,f pk r);
 
       return (r = x');
@@ -84,13 +87,14 @@ end OWTP.
 import OWTP.
 
 (*** We make use of a hash function (ROM) from randomness to
-     plaintext. We let the adversary query it qH times at most. ***)
+  plaintext. We let the adversary query it qH times at most. ***)
+(** qH is left abstract, so the result is universally quantified **)
 op qH : { int | 0 < qH } as qH_pos.
 
 clone import ROM.ListLog as RandOrcl_BR with
-  type from  <- randomness,
-  type to    <- plaintext,
-  op dsample <- fun (x:randomness) => uniform,
+  type from  <- rand,
+  type to    <- ptxt,
+  op dsample <- fun (x:rand) => dptxt,
   op qH      <- qH.
 
 import Lazy.
@@ -101,12 +105,12 @@ import Types.
 (**  [See theory PKE.ec] **)
 module type Scheme(RO : Oracle) = {
   proc kg(): (pkey * skey)
-  proc enc(pk:pkey, m:plaintext): ciphertext
+  proc enc(pk:pkey, m:ptxt): ctxt
 }.
 
 module type Adv(ARO: ARO)  = {
-  proc a1(p:pkey)      : (plaintext * plaintext)
-  proc a2(c:ciphertext): bool
+  proc a1(p:pkey): (ptxt * ptxt)
+  proc a2(c:ctxt): bool
 }.
 
 module CPA(S:Scheme, A:Adv) = {
@@ -135,16 +139,16 @@ module (BR : Scheme) (R:Oracle) = {
   proc kg():(pkey * skey) = {
     var pk, sk;
 
-    (pk,sk) <$ keypairs;
+    (pk,sk) <$ dkeys;
     return (pk,sk);
   }
 
-  proc enc(pk:pkey, m:plaintext): ciphertext = {
+  proc enc(pk:pkey, m:ptxt): ctxt = {
     var h, r;
 
-    r <$ uniform_rand;
+    r <$ drand;
     h <@ R.o(r);
-    return ((f pk r) || m ^ h);
+    return ((f pk r) || m +^ h);
   }
 }.
 
@@ -153,15 +157,15 @@ module BR_OW(A:Adv): Inverter = {
   module ARO = Log(RO)
   module A = A(ARO)
 
-  var x:randomness
+  var x:rand
 
-  proc i(pk:pkey,y:randomness): randomness = {
+  proc i(pk:pkey,y:rand): rand = {
     var m0,m1,h,b;
 
     ARO.init();
 
     (m0,m1) <@ A.a1(pk);
-    h       <$ uniform;
+    h       <$ dptxt;
     b       <@ A.a2(y || h);
     x       <- nth witness ARO.qs (find (fun p => f pk p = y) ARO.qs);
 
@@ -171,11 +175,11 @@ module BR_OW(A:Adv): Inverter = {
 
 (** such that Adv^{CPA}_{S}(A) <= Adv^{OW}^{f}(I(A)).
     We now prove this bound. **)
-lemma lossless_ARO_init: islossless Log(RO).init.
+lemma ARO_init_ll: islossless Log(RO).init.
 proof. by apply/(Log_init_ll RO)/RO_init_ll. qed.
 
-lemma lossless_ARO_o : islossless Log(RO).o.
-proof. by apply/(Log_o_ll RO)/RO_o_ll/Plaintext.Dword.dword_ll. qed.
+lemma ARO_o_ll : islossless Log(RO).o.
+proof. by apply/(Log_o_ll RO)/RO_o_ll/Plaintext.DWord.dword_ll. qed.
 
 section.
   (* Forall CPA adversary A whose memory footprint is disjoint from
@@ -190,16 +194,16 @@ section.
 
   (** Step 1: replace RO call with random sampling **)
   local module (BR1:Scheme) (R:Oracle) = {
-    var r:randomness
+    var r:rand
 
     proc kg = BR(R).kg
 
-    proc enc(pk:pkey, m:plaintext): ciphertext = {
+    proc enc(pk:pkey, m:ptxt): ctxt = {
       var h;
 
-      r <$ uniform_rand;
-      h <$ uniform;
-      return ((f pk r) || m ^ h);
+      r <$ drand;
+      h <$ dptxt;
+      return ((f pk r) || m +^ h);
     }
   }.
 
@@ -226,7 +230,7 @@ section.
       wp. rnd.
       wp. skip. smt (@NewFMap).
       (* Left oracle is lossless *)
-      move=> &2 _; exact/lossless_ARO_o.
+      move=> &2 _; exact/ARO_o_ll.
       (* Right oracle is lossless and preserves bad once set *)
       move=> &1. proc. inline *. wp. rnd. wp. skip. smt. (* or use conseq [-frame]... *)
     (* We return to the main game *)
@@ -246,20 +250,20 @@ section.
 
   (** Step 2: replace h ^ m with h in challenge encryption **)
   local module (BR2:Scheme) (R:Oracle) = {
-    var r:randomness
+    var r:rand
 
     proc kg():(pkey * skey) = {
       var pk, sk;
 
-      (pk,sk) <$ keypairs;
+      (pk,sk) <$ dkeys;
       return (pk,sk);
     }
 
-    proc enc(pk:pkey, m:plaintext): ciphertext = {
+    proc enc(pk:pkey, m:ptxt): ctxt = {
       var h;
 
-      r <$ uniform_rand;
-      h <$ uniform;
+      r <$ drand;
+      h <$ dptxt;
       return ((f pk r) || h);
     }
   }.
@@ -274,7 +278,7 @@ section.
     call (_: ={RO.m}).
       proc. inline *. auto.
     inline CPA(BR1,A).SO.enc CPA(BR2,A).SO.enc.
-    wp. rnd (fun x => m{2} ^ x).
+    wp. rnd (fun x => m{2} +^ x).
     rnd.
     wp. rnd.
     call (_: ={RO.m}).
@@ -298,7 +302,7 @@ section.
              /\ BR1.r{1} = BR2.r{2}).
       proc. inline *. auto.
     inline CPA(BR1,A).SO.enc CPA(BR2,A).SO.enc.
-    wp. rnd (fun x => m{2} ^ x).
+    wp. rnd (fun x => m{2} +^ x).
     rnd. simplify.
     wp. rnd.
     call (_: ={Log.qs, RO.m}).
@@ -328,11 +332,11 @@ section.
     inline *.
     call (_: true).
       exact a2_ll. (* adversary *)
-      exact lossless_ARO_o. (* oracle *)
+      exact ARO_o_ll. (* oracle *)
     auto.
     call (_: true).
       exact a1_ll. (* adversary *)
-      exact lossless_ARO_o.
+      exact ARO_o_ll.
     auto=> //=.
     smt.
   qed.
@@ -354,7 +358,7 @@ section.
     (* simplify postcondition to no longer have find *)
     conseq [-frame]
       (_ : _ ==>
-           support keypairs (pk0{2}, sk{2}) /\
+           support dkeys (pk0{2}, sk{2}) /\
            BR2.r{1} = OW.r{2} /\ Log.qs{1} = Log.qs{2} /\
            y{2} = f pk0{2} BR2.r{1}).
       progress; pose P := fun p => f _ p = _.
