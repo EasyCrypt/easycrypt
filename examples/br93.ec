@@ -1,5 +1,6 @@
 (* -------------------------------------------------------------------- *)
-require import Option Fun Bool Int Real Distr List FSet Array NewFMap DBool.
+require import AllCore List FSet NewFMap.
+require import Distr DBool.
 require (*--*) AWord ROM.
 
 (** We consider three lengths of bitstrings **)
@@ -174,7 +175,7 @@ lemma lossless_ARO_init: islossless Log(RO).init.
 proof. by apply/(Log_init_ll RO)/RO_init_ll. qed.
 
 lemma lossless_ARO_o : islossless Log(RO).o.
-proof. by apply/(Log_o_ll RO)/RO_o_ll/Plaintext.Dword.lossless. qed.
+proof. by apply/(Log_o_ll RO)/RO_o_ll/Plaintext.Dword.dword_ll. qed.
 
 section.
   (* Forall CPA adversary A whose memory footprint is disjoint from
@@ -239,7 +240,7 @@ section.
              /\ (forall x, mem Log.qs{1} x <=> mem (dom RO.m){1} x)).
       proc. inline RO.o.
       wp. rnd.
-      wp. skip. smt.
+      wp. skip=> /> &2 log_is_dom y _; smt(@NewFMap).
     inline *. auto. progress; smt.
   qed.
 
