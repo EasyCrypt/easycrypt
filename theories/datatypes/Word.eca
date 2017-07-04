@@ -174,7 +174,7 @@ proof * by exact/enum_spec.
 (* -------------------------------------------------------------------- *)
 clone include FinType with
   type t    <- word,
-    op enum = List.map mkword (Enum.wordn n)
+  op enum = List.map mkword (Enum.wordn n)
 proof * rename [op] "enum" as "words".
 
 realize enum_spec.
@@ -190,33 +190,8 @@ lemma word_card: card = Alphabet.card^n.
 proof. by rewrite size_map Enum.size_wordn max_ler ?ge0_n. qed.
 
 (* -------------------------------------------------------------------- *)
-op dword : word distr = MUniform.duniform words.
-
-(* FIXME this should be a clone of MFinite *)
-theory DWord.
-import MUniform.
-
-lemma dwordE p: mu dword p = (count p words)%r / (Alphabet.card^n)%r.
-proof. by rewrite duniformE !undup_id ?enum_uniq // -word_card. qed.
-
-lemma dword1E w: mu1 dword w = 1%r / (Alphabet.card^n)%r.
-proof. by rewrite dwordE count_uniq_mem 1:enum_uniq // enumP /b2i. qed.
-
-lemma supp_dword w: w \in dword.
-proof.
-rewrite /support dword1E divr_gt0 // lt_fromint.
-by apply/powPos/Alphabet.card_gt0.
-qed.
-
-lemma dword_ll: mu dword predT = 1%r.
-proof.
-by apply/duniform_ll/negP=> zw; move: (enumP witness); rewrite zw.
-qed.
-
-lemma dword_funi: is_funiform dword.
-proof. by move=> ??; rewrite !dword1E. qed.
-
-lemma dword_fu: is_full dword.
-proof. by move=> ?; apply supp_dword. qed.
-
-end DWord.
+clone MFinite as DWord with
+  type t <- word,
+  op   Support.enum = List.map mkword (Enum.wordn n),
+  op   Support.card <- card
+proof Support.enum_spec by exact/enum_spec.
