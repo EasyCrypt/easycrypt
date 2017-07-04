@@ -1,4 +1,4 @@
-require import Fun Pred Option Int IntExtra IntDiv List NewLogic.
+require import AllCore Int IntExtra IntDiv List.
 require import Ring StdRing StdOrder StdBigop ABitstring Distr.
 require import BitEncoding.
 require (*--*) BitWord MAC_then_Pad_then_CBC.
@@ -35,10 +35,12 @@ rename "Word" as "Block"
 proof Alphabet.enum_spec, ge0_n by done.
 realize Alphabet.enum_spec by exact/Octet.enum_spec.
 
-lemma dblock_uffu: is_uniform_over dblock predT.
+abbrev dblock = DBlock.dunifin.
+
+lemma dblock_uffu: is_lossless dblock /\ is_funiform dblock.
 proof.
-split=> [x|]; first by rewrite DBlock.support_dblock.
-by rewrite DBlock.dblock_uf.
+split; first by rewrite DBlock.dunifin_ll.
+by rewrite DBlock.dunifin_funi.
 qed.
 
 (** Boolean ring structure **)
@@ -53,7 +55,7 @@ op andb (b1 b2 : block) = Block.offun (fun i=> andw b1.[i] b2.[i]).
 
 lemma oneb_neq0: oneb <> zerob.
 proof.
-rewrite blockP NewLogic.negb_forall /=; exists 0=> /=.
+rewrite blockP negb_forall /=; exists 0=> /=.
 by rewrite !offunE // onew_neq0.
 qed.
 
@@ -372,7 +374,7 @@ theory HMAC_SHA256.
   type mK.
 
   op d_mK: mK distr.
-  axiom d_mK_uffu: is_uniform_over d_mK Pred.predT.
+  axiom d_mK_uffu: is_lossless d_mK /\ is_funiform d_mK.
 
   op hmac_sha256: mK -> msg -> tag.
 end HMAC_SHA256.
@@ -459,7 +461,9 @@ phoare mee_encrypt_correct _mk _ek _p _c:
                                       ==> res = _c]
   =(mu (dapply (fun iv => iv :: mee_enc AES hmac_sha256 _ek _mk iv _p) dblock) (pred1 _c)).
 proof.
-  rewrite -/(mu_x _ _) mux_dmap /preim /pred1 /=.
+  have->: mu1 (dapply (fun iv=> iv :: mee_enc AES hmac_sha256 _ek _mk iv _p) dblock) _c
+          = mu1 (dmap dblock (fun iv=> iv :: mee_enc AES hmac_sha256 _ek _mk iv _p)) _c by move.
+  rewrite dmap1E /preim /pred1 /=.
   proc; inline MAC.tag PRPc.PRPr.f.
   swap 6 -5 => //=; alias 2 iv = s.
   while (   0 <= i <= size (pad _p (hmac_sha256 _mk _p))
@@ -482,13 +486,13 @@ proof.
   conseq (_: _ ==> s :: mee_enc AES hmac_sha256 _ek _mk s _p = _c)=> //=.
     move=> &m [->>] ->> iv //=; split=> [[[le0_size _] h]|<<-].
       have -> //=:= h (iv :: mee_enc AES hmac_sha256 _ek _mk iv _p)
+                      (size (pad _p (hmac_sha256 _mk _p)))
                       (nth witness (iv :: mee_enc AES hmac_sha256 _ek _mk iv _p)
-                                   (size (pad _p (hmac_sha256 _mk _p))))
-                      (size (pad _p (hmac_sha256 _mk _p))).
+                                   (size (pad _p (hmac_sha256 _mk _p)))).
       split=> //=.
       split; 1:by rewrite /mee_enc /= size_cbc_enc addzC.
       by rewrite take_size.
-    split=> [|c s0 n]; 1:by split; [rewrite size_ge0|rewrite take0].
+    split=> [|c n s0]; 1:by split; [rewrite size_ge0|rewrite take0].
     split=> [[[le0_n le_n_size] [s0_is_nth [size_c]]] c_is_enc|].
       by rewrite StdOrder.IntOrder.ler_subl_addr add0z=> /StdOrder.IntOrder.ler_gtF.
     rewrite -lezNgt=> le_size_n [[le0_n le_n_size]] [_] [_] ->.

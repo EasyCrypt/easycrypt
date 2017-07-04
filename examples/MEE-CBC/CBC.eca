@@ -1,6 +1,6 @@
 (*** A proof that CBC mode turns any weak PRP into an IND$- CPA-secure
      symmetric encryption scheme **when used with random IVs**  ***)
-require import Option Fun Int Real Distr List FSet NewFMap.
+require import AllCore Int Real Distr List FSet NewFMap.
 require import StdRing StdOrder DList.
 require (*ab*) NewPRP ConcretePRP NewPRF SKE_INDR. (* Definitions and Security Notions *)
 require (*ab*) RP_RF.            (* Generic Arguments *)
@@ -593,7 +593,7 @@ section Reduce.
       by auto=> />; rewrite -/predT; smt (dBlock_uffu size_ge0).
     inline *; auto=> />.
     split=> [|_]; 1:by move=> x; rewrite dom0.
-    by move=> rL rR gaL mL qsL badL gaR qsR [].
+    by move=> rL rR gaL mL qsL badL gaR [].
   qed.
 end section Reduce.
 
@@ -852,7 +852,8 @@ section Probability_Collision.
           while (true) (size p + 1 - i);
             by auto=> /#.
         by auto.
-      done.
+      have [] + [] _ dBlock_fu:= dBlock_uffu.
+      by rewrite /is_uniform=> /(_ _ _ (dBlock_fu maxu) (dBlock_fu witness)) ->.
     qed.
 end section Probability_Collision.
 
