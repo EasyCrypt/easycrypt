@@ -30,8 +30,8 @@ clone import BitWord as Randomness with
 proof gt0_n by exact/gt0_l.
 
 (* We only need distributions on plaintexts and nonces *)
-op dptxt = Plaintext.dword.
-op drand = Randomness.dword.
+op dptxt = Plaintext.DWord.dunifin.
+op drand = Randomness.DWord.dunifin.
 
 (* We have operators that combine them *)
 op (||) (x:rand) (y:ptxt):ctxt =
@@ -179,7 +179,7 @@ lemma ARO_init_ll: islossless Log(RO).init.
 proof. by apply/(Log_init_ll RO)/RO_init_ll. qed.
 
 lemma ARO_o_ll : islossless Log(RO).o.
-proof. by apply/(Log_o_ll RO)/RO_o_ll/Plaintext.DWord.dword_ll. qed.
+proof. by apply/(Log_o_ll RO)/RO_o_ll/Plaintext.DWord.dunifin_ll. qed.
 
 section.
   (* Forall CPA adversary A whose memory footprint is disjoint from
