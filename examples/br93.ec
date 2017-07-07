@@ -1,90 +1,62 @@
 (* -------------------------------------------------------------------- *)
 require import AllCore List FSet NewFMap.
 require import Distr DBool.
-require (*--*) BitWord ROM.
+require (*--*) BitWord OW ROM.
 
-(** We consider three lengths of bitstrings **)
-op k : { int | 0 < k } as gt0_k. (* size of message *)
-op l : { int | 0 < l } as gt0_l. (* size of randomness *)
-op n = k + l.                    (* size of cipher *)
-
-lemma gt0_n: 0 < n by smt.
-
-(* We instantiate the types of plaintexts, ciphertexts and nonces as   *)
-(* bitstrings of these lengths.                                        *)
-type ptxt, ctxt, rand.
+(*** We consider a concrete instance:
+     - plaintexts are bitstrings of length k > 0
+     - nonces are bitstrings of length l > 0
+     - ciphertexts are bitstrings of length n = k + l                 ***)
+(** A type for plaintexts **)
+op k : { int | 0 < k } as gt0_k. (* size of plaintexts *)
 
 clone import BitWord as Plaintext with
-  type word <- ptxt,
   op n <- k
-proof gt0_n by exact/gt0_k.
+proof gt0_n by exact/gt0_k
+rename "word" as "ptxt".
 
-clone import BitWord as Ciphertext with
-  type word <- ctxt,
-  op n <- n
-proof gt0_n by exact/Self.gt0_n.
+(** A type for nonces **)
+op l : { int | 0 < l } as gt0_l. (* size of nonces *)
 
 clone import BitWord as Randomness with
-  type word <- rand,
   op n <- l
-proof gt0_n by exact/gt0_l.
+proof gt0_n by exact/gt0_l
+rename "word" as "rand".
 
-(* We only need distributions on plaintexts and nonces *)
+(** A type for ciphertexts **)
+op n = k + l.                    (* size of ciphertexts *)
+lemma gt0_n: 0 < n by smt(gt0_k gt0_l).
+
+clone import BitWord as Ciphertext with
+  op n <- n
+proof gt0_n by exact/Self.gt0_n
+rename "word" as "ctxt".
+
+(** We rename a few things to make them usable...                      **)
 op dptxt = Plaintext.DWord.dunifin.
 op drand = Randomness.DWord.dunifin.
 
-(* We have operators that combine them *)
-op (||) (x:rand) (y:ptxt):ctxt =
- Ciphertext.mkword ((ofword x) ++ (ofword y)).
+(** ... and define the concatenation of nonce and plaintext into
+    a ciphertext.                                                      **)
+op (||) (x:rand) (y:ptxt):ctxt = mkctxt ((ofrand x) ++ (ofptxt y)).
 
-(*** One way trapdoor permutation (pre-instantiated) ***)
-(**  [See theory OW.ec] **)
-theory OWTP.
-  type pkey, skey.
-
-  op dkeys: (pkey * skey) distr.
-  axiom dkeys_ll : is_lossless dkeys.
-
-  op f       : pkey -> rand -> rand.
-  op finv    : skey -> rand -> rand.
-
-  axiom finvof pk sk x:
-   support dkeys (pk,sk) =>
-   finv sk (f pk x) = x.
-
-  axiom fofinv pk sk x:
-   support dkeys (pk,sk) =>
-   f pk (finv sk x) = x.
-
-  lemma f_injective sk pk x y:
-    support dkeys (pk,sk) =>
-    f pk x = f pk y =>
-    x = y.
-  proof. by move=> supp eq_f; rewrite -(finvof pk sk) // eq_f finvof. qed.
-
-  module type Inverter = {
-    proc i(pk:pkey,y:rand): rand
-  }.
-
-  module OW(I:Inverter) = {
-    var r:rand
-
-    proc main(): bool = {
-      var x', pk, sk;
-
-      (pk,sk) <$ dkeys;
-      r       <$ drand;
-      x'      <@ I.i(pk,f pk r);
-
-      return (r = x');
-    }
-  }.
-
-  (** f is a secure OWTP if, for any inverter I,
-        Adv^{OW}^f(I) = Pr[OW(I).main() @ &m: res]
-      is small. **)
-end OWTP.
-import OWTP.
+(*** We consider a one-way trapdoor permutation over nonces
+     (with abstract keys)                                             ***)
+(** Note: this hides a few existential axioms:
+      * existence of two types pkey and skey such that
+        a lossless distribution dkeys exists on (pkey * skey), and
+      * existence of, for each valid pair (pk,sk) in the support
+        of dkeys, a bijection `f pk` (and its inverse `finj sk`)       **)
+clone import OW as OW_rand with
+  type D           <- rand,
+  type R           <- rand,
+  op   challenge _ <- drand
+proof challenge_ll, challenge_uni.
+realize challenge_ll by move=> _ _; exact/Randomness.DWord.dunifin_ll.
+realize challenge_uni by move=> _ _; exact/Randomness.DWord.dunifin_uni.
+(** f is a secure OWTP if, for any inverter I,
+      Adv^{OW}^f(I) = Pr[OW(I).main() @ &m: res]
+    is small. **)
 
 (*** We make use of a hash function (ROM) from randomness to
   plaintext. We let the adversary query it qH times at most. ***)
@@ -102,7 +74,7 @@ import Types.
 
 (*** We can now define what it means to be a CPA-secure public-key
    * encryption scheme ***)
-(**  [See theory PKE.ec] **)
+(**  [See theory PKE_CPA.ec, note the issue with oracles] **)
 module type Scheme(RO : Oracle) = {
   proc kg(): (pkey * skey)
   proc enc(pk:pkey, m:ptxt): ctxt
@@ -159,7 +131,7 @@ module BR_OW(A:Adv): Inverter = {
 
   var x:rand
 
-  proc i(pk:pkey,y:rand): rand = {
+  proc invert(pk:pkey,y:rand): rand = {
     var m0,m1,h,b;
 
     ARO.init();
@@ -349,22 +321,41 @@ section.
   (** Step 3: Finally, we can do the reduction and prove that whenever
       A queries the RO with the randomness used in the challenge
       encryption, BR_OW(A) inverts the OW challenge. **)
+  local module OWr (I : Inverter) = {
+    var x : rand
+
+    proc main() : bool = {
+      var x', pk, sk;
+
+      (pk,sk) <$ dkeys;
+      x       <$ drand;
+      x'      <@ I.invert(pk,f pk x);
+      return (x = x');
+    }
+  }.
+
+  local lemma globx &m:
+    Pr[OW(BR_OW(A)).main() @ &m: res]
+    = Pr[OWr(BR_OW(A)).main() @ &m: res].
+  proof. by byequiv=> //=; sim. qed.
+
   local lemma BR2_OW &m:
     Pr[CPA(BR2,A).main() @ &m: mem Log.qs BR2.r]
     <= Pr[OW(BR_OW(A)).main() @ &m: res].
   proof.
+    rewrite (globx &m).
     byequiv => //=.
     proc; inline *; wp.
     (* simplify postcondition to no longer have find *)
     conseq [-frame]
       (_ : _ ==>
            support dkeys (pk0{2}, sk{2}) /\
-           BR2.r{1} = OW.r{2} /\ Log.qs{1} = Log.qs{2} /\
+           BR2.r{1} = OWr.x{2} /\ Log.qs{1} = Log.qs{2} /\
            y{2} = f pk0{2} BR2.r{1}).
       progress; pose P := fun p => f _ p = _.
-      have := nth_find witness P Log.qs{2} _.
-        by rewrite hasP; exists OW.r{2}.
-      by move/(f_injective _ _ _ _ H)=> ->.
+      have h := nth_find witness P Log.qs{2} _.
+        by rewrite hasP; exists OWr.x{2}.
+      by rewrite (f_pk_inj _ _ _ _ H _ _ h) //; move=> _; rewrite Randomness.DWord.dunifin_fu.
     (* rest of proof *)
     swap {1} 3 - 2; swap {1} 9 -7; swap {1} 9 3; swap {1} 7 4.
     wp. rnd{1}.
