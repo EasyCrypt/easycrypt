@@ -3,6 +3,10 @@ require import AllCore List FSet NewFMap.
 require import Distr DBool.
 require (*--*) BitWord OW ROM.
 
+(* ---------------- Sane Default Behaviours --------------------------- *)
+pragma -oldip.
+pragma +implicits.
+
 (*** We consider a concrete instance:
      - plaintexts are bitstrings of length k > 0
      - nonces are bitstrings of length l > 0
@@ -364,7 +368,7 @@ section.
   + move=> /> x qs pk sk vk x_in_qs; pose P := fun p => f _ p = _.
     have h := nth_find witness P qs _.
     + by rewrite hasP; exists x.
-    by rewrite (f_pk_inj _ _ _ _ vk _ _ h) // /f_dom drand_fu.
+    by rewrite (f_pk_inj _ _ vk _ _ h) // /f_dom drand_fu.
   (* rest of proof *)
   swap {1} 3 - 2; swap {1} 9 -7; swap {1} 9 3; swap {1} 7 4.
   wp; rnd{1}.
