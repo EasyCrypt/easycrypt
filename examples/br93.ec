@@ -74,7 +74,6 @@ clone import ROM.ListLog as RandOrcl_BR with
   type to    <- ptxt,
   op dsample <- fun (x:rand) => dptxt,
   op qH      <- qH.
-
 import Lazy.
 import Types.
 
@@ -191,7 +190,7 @@ section.
   local lemma BR_BR1 &m:
     Pr[CPA(BR,A).main() @ &m: res]
     <= Pr[CPA(BR1,A).main() @ &m: res]
-       + Pr[CPA(BR1,A).main() @ &m: mem Log.qs BR1.r].
+       + Pr[CPA(BR1,A).main() @ &m: BR1.r \in Log.qs].
   proof.
   byequiv=> //=; proc.
   inline CPA(BR,A).ARO.init CPA(BR1,A).ARO.init
@@ -199,16 +198,16 @@ section.
          CPA(BR,A).SO.enc CPA(BR1,A).SO.enc.
   seq  9  9: (   ={glob A, glob RO, Log.qs, pk, sk, b, m, pk1}
               /\ r{1} = BR1.r{2}
-              /\ (forall x, x \in Log.qs{1} <=> mem (dom RO.m){1} x)).
+              /\ (forall x, x \in Log.qs{1} <=> x \in (dom RO.m){1})).
   + auto. call (:   ={Log.qs, RO.m}
-                 /\ (forall x, x \in Log.qs{1} <=> mem (dom RO.m){1} x)).
+                 /\ (forall x, x \in Log.qs{1} <=> x \in (dom RO.m){1})).
     + proc; inline RO.o.
       auto=> /> &2 log_is_dom y _; smt (@NewFMap).
     by inline *; auto=> />; rewrite dom0=> _ _ x; rewrite in_fset0.
   (* Until the adversary queries the ROM with r, knowing that
      the two ROMs agree on all points except r is sufficient
      to prove the equivalence of the adversary's views        *)
-  call (_: mem Log.qs BR1.r ,
+  call (_: BR1.r \in Log.qs,
            eq_except RO.m{1} RO.m{2} (pred1 BR1.r{2})).
     (* Adversary is lossless *)
   + exact/a2_ll.
@@ -234,7 +233,7 @@ section.
     + by auto=> />.
     by auto=> />; exact/dptxt_ll.
   (* We return to the main game *)
-  inline RO.o. case: ((mem (dom RO.m) r){1}).
+  inline RO.o. case: ((r \in (dom RO.m)){1}).
   + conseq (: _ ==> ={b} /\ BR1.r{2} \in Log.qs{2})=> //=.
     + by move=> /> &1 &2 _ _ rR _ _ _ _ _ h /h [] -> //.
     by auto=> /> &2 <- ->.
@@ -286,8 +285,8 @@ section.
 
   (* The probability of the failure event is the same in both games *)
   local lemma BR1_BR2_bad &m:
-    Pr[CPA(BR1,A).main() @ &m: mem Log.qs BR1.r]
-    = Pr[CPA(BR2,A).main() @ &m: mem Log.qs BR2.r].
+    Pr[CPA(BR1,A).main() @ &m: BR1.r \in Log.qs]
+    = Pr[CPA(BR2,A).main() @ &m: BR2.r \in Log.qs].
   proof.
   byequiv=> //=; proc.
   call (_:    ={Log.qs, RO.m}
@@ -327,7 +326,7 @@ section.
 
   local lemma pr_BR_BR2 &m:
     Pr[CPA(BR,A).main() @ &m: res] - 1%r/2%r
-    <= Pr[CPA(BR2,A).main() @ &m: mem Log.qs BR2.r].
+    <= Pr[CPA(BR2,A).main() @ &m: BR2.r \in Log.qs].
   proof. smt(BR_BR1 BR1_BR2 BR1_BR2_bad pr_BR2_res). qed.
 
   (** Step 3: Finally, we can do the reduction and prove that whenever
@@ -354,7 +353,7 @@ section.
   proof. by byequiv=> //=; sim. qed.
 
   local lemma BR2_OW &m:
-    Pr[CPA(BR2,A).main() @ &m: mem Log.qs BR2.r]
+    Pr[CPA(BR2,A).main() @ &m: BR2.r \in Log.qs]
     <= Pr[OW(BR_OW(A)).main() @ &m: res].
   proof.
   rewrite (OW_OWr &m (BR_OW(A))).
