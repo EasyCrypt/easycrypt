@@ -12,8 +12,8 @@ pragma +implicits.
 clone include MFinite
 rename
   [type] "t" as "seed"
-         "dunifin" as "dseed"
-         "duniform" as "dseed".
+  "dunifin" as "dseed"
+  "duniform" as "dseed".
 
 (* -------------------------------------------------------------------- *)
 (** Some output type equipped with some lossless distribution **)
@@ -43,18 +43,18 @@ op qP : { int | 0 <= qP } as ge0_qP.
 op qF : { int | 0 <= qF } as ge0_qF.
 
 module type APRF = {
-  proc f(x:seed): seed * output
+  proc f(_:seed): seed * output
 }.
 
 module type APRG = {
   proc prg(): output
 }.
 
-module type Adv (F:APRF,P:APRG) = {
+module type Adv (F:APRF) (P:APRG) = {
   proc a(): bool
 }.
 
-module Exp (A:Adv,F:PRF,P:PRG) = {
+module Exp (A:Adv) (F:PRF) (P:PRG) = {
   module A = A(F,P)
 
   proc main():bool = {
@@ -62,7 +62,7 @@ module Exp (A:Adv,F:PRF,P:PRG) = {
 
     F.init();
     P.init();
-    b = A.a();
+    b <@ A.a();
     return b;
   }
 }.
@@ -75,7 +75,7 @@ module PrgI = {
   proc prg(): output = {
     var r;
 
-    r = $dout;
+    r <$ dout;
     return r;
   }
 }.
@@ -112,13 +112,13 @@ module P (F:PRF) = {
   var logP: seed list
 
   proc init(): unit = {
-    seed = $dseed;
+    seed <$ dseed;
   }
 
   proc prg(): output = {
     var r;
 
-    (seed,r) = F.f (seed);
+    (seed,r) <@ F.f (seed);
     return r;
   }
 }.
@@ -163,10 +163,10 @@ module Resample = {
 
     n = size P.logP;
     P.logP = [];
-    P.seed = $dseed;
+    P.seed <$ dseed;
     while (size P.logP < n) {
-      r = $dseed;
-      P.logP = r :: P.logP;
+      r      <$ dseed;
+      P.logP <- r :: P.logP;
     }
   }
 }.
@@ -178,7 +178,7 @@ module Exp'(A:Adv) = {
     var b : bool;
     F.init();
     Psample.init();
-    b = A.a();
+    b <@ A.a();
     Resample.resample();
     return b;
   }
