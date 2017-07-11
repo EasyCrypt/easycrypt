@@ -4,6 +4,7 @@ require import IntExtra IntDiv RealExtra Mu_mem StdRing StdOrder StdBigop.
 (*---*) import Bigint Ring.IntID RField IntOrder RealOrder BIA.
 require (*--*) FinType.
 
+(* ---------------- Sane Default Behaviours --------------------------- *)
 pragma -oldip.
 pragma +implicits.
 
@@ -21,8 +22,9 @@ type output.
 op dout: { output distr | is_lossless dout } as dout_ll.
 
 (* -------------------------------------------------------------------- *)
-(** We use a PRF that, on input a seed, produces a seed and an output...*)
-module type PRF = {
+(** We use a public RF that, on input a seed, produces a seed and
+    an output...                                                        *)
+module type RF = {
   proc * init() : unit
   proc f(x:seed): seed * output
 }.
@@ -42,7 +44,7 @@ module type PRG = {
 op qP : { int | 0 <= qP } as ge0_qP.
 op qF : { int | 0 <= qF } as ge0_qF.
 
-module type APRF = {
+module type ARF = {
   proc f(_:seed): seed * output
 }.
 
@@ -50,18 +52,18 @@ module type APRG = {
   proc prg(): output
 }.
 
-module type Adv (F:APRF) (P:APRG) = {
+module type Adv (F:ARF) (P:APRG) = {
   proc a(): bool
 }.
 
-module Exp (A:Adv) (F:PRF) (P:PRG) = {
+module Exp (A:Adv) (F:RF) (P:PRG) = {
   module A = A(F,P)
 
   proc main():bool = {
     var b: bool;
 
-    F.init();
-    P.init();
+         F.init();
+         P.init();
     b <@ A.a();
     return b;
   }
@@ -79,11 +81,12 @@ module PrgI = {
     return r;
   }
 }.
+(* Adv^PRG_A,F,P = `| Exp(A,F,P) - Exp(A,F,PrgI) | *)
 
 (* -------------------------------------------------------------------- *)
 (* Concrete considerations                                              *)
 
-(* We use the following PRF *)
+(* We use the following RF *)
 module F = {
   var m:(seed,seed * output) fmap
 
@@ -107,7 +110,7 @@ lemma FfL: islossless F.f.
 proof. by proc; auto; rewrite dseed_ll dout_ll. qed.
 
 (* And we are proving the security of the following PRG *)
-module P (F:PRF) = {
+module P (F:RF) = {
   var seed: seed
   var logP: seed list
 
@@ -125,11 +128,7 @@ module P (F:PRF) = {
 
 (* -------------------------------------------------------------------- *)
 (* We use the following oracle in an intermediate game that links two
-   sections. Ideally, we would hide it somehwere, but nested sections
-   don't work yet. *)
-
-(* Note that it uses P's state (in which we have a useless thing) to
-   avoid contaminating the final result. *)
+   sections.                                                            *)
 
 module Psample = {
   proc init(): unit = {
@@ -153,16 +152,13 @@ proof. by proc; auto; rewrite dseed_ll dout_ll. qed.
 
 (* -------------------------------------------------------------------- *)
 (* In preparation of the eager/lazy reasoning step                      *)
-
-(* Again, note that none of these have their own state.  Therefore, it
-   does not matter overmuch that they are not hidden. *)
-
+(* -------------------------------------------------------------------- *)
 module Resample = {
   proc resample() : unit = {
     var n, r;
 
-    n = size P.logP;
-    P.logP = [];
+    n      <- size P.logP;
+    P.logP <- [];
     P.seed <$ dseed;
     while (size P.logP < n) {
       r      <$ dseed;
@@ -176,15 +172,14 @@ module Exp'(A:Adv) = {
 
   proc main():bool = {
     var b : bool;
-    F.init();
-    Psample.init();
+         F.init();
+         Psample.init();
     b <@ A.a();
-    Resample.resample();
+         Resample.resample();
     return b;
   }
 }.
 
-(* -------------------------------------------------------------------- *)
 (* The Proof                                                            *)
 
 section.
@@ -192,7 +187,7 @@ section.
   declare module A:Adv {P,F}.
 
   (* ... and whose a procedure is lossless whenever F.f and P.prg are *)
-  axiom AaL (F <: APRF {A}) (P <: APRG {A}):
+  axiom AaL (F <: ARF {A}) (P <: APRG {A}):
     islossless P.prg =>
     islossless F.f =>
     islossless A(F,P).a.
@@ -384,7 +379,7 @@ end section.
    non-counting adversaries, but we need the counting to bound the
    probability of Bad. *)
 
-module C (A:Adv,F:APRF,P:APRG) = {
+module C (A:Adv,F:ARF,P:APRG) = {
   var cF, cP:int
 
   module CF = {
@@ -417,18 +412,18 @@ module C (A:Adv,F:APRF,P:APRG) = {
   }
 }.
 
-lemma CFfL (A <: Adv) (F <: APRF) (P <: APRG):
+lemma CFfL (A <: Adv) (F <: ARF) (P <: APRG):
   islossless F.f =>
   islossless C(A,F,P).CF.f.
 proof. by move=> FfL; proc; sp; if=> //; call FfL; wp. qed.
 
-lemma CPprgL (A <: Adv) (F <: APRF) (P <: APRG):
+lemma CPprgL (A <: Adv) (F <: ARF) (P <: APRG):
   islossless P.prg =>
   islossless C(A,F,P).CP.prg.
 proof. by move=> PprgL; proc; sp; if=> //; call PprgL; wp. qed.
 
-lemma CaL (A <: Adv {C}) (F <: APRF {A}) (P <: APRG {A}):
-  (forall (F <: APRF {A}) (P <: APRG {A}),
+lemma CaL (A <: Adv {C}) (F <: ARF {A}) (P <: APRG {A}):
+  (forall (F <: ARF {A}) (P <: APRG {A}),
     islossless P.prg => islossless F.f => islossless A(F,P).a) =>
      islossless F.f
   => islossless P.prg
@@ -443,7 +438,7 @@ qed.
 
 section.
   declare module A:Adv {C,P,F}.
-  axiom AaL (F <: APRF {A}) (P <: APRG {A}):
+  axiom AaL (F <: ARF {A}) (P <: APRG {A}):
     islossless P.prg =>
     islossless F.f =>
     islossless A(F,P).a.
